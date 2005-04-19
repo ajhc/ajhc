@@ -1,0 +1,13 @@
+# -f code options 
+
+!Code Options
+inline-pragmas use inline pragmas
+rules use rules 
+wrapper wrap main in exception handler
+float-in perform float inward transform
+
+lint perform lots of extra type checks 
+
+
+!Default settings
+@default inline-pragmas rules wrapper float-in

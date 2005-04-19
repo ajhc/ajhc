@@ -1,0 +1,198 @@
+#!/usr/bin/perl -w 
+
+use strict;
+use Data::Dumper;
+
+open OP, "<data/operators.txt";
+
+my @fl;
+my @in;
+
+my @add;
+my %stuff;
+
+while(<OP>) {
+    chomp;
+    next unless /\S/;
+    next if /^\s*#/;
+    if (/^\[([\w,\s]*)\]\s*$/) {
+        @add = split(/\s*,\s*/,$1);
+        next;
+    }
+    my @a = split /\s*,\s*/;
+    foreach my $y (@add) {
+        push @{$stuff{$y}}, \@a;
+    }
+#    push @fl, \@a unless $add eq 'int'; 
+#    push @in, \@a unless $add eq 'float'; 
+}
+
+my @ds;
+open PR, "<data/primitives.txt";
+while(<PR>) {
+    chomp;
+    next unless /\S/;
+    next if /^\s*#/;
+    my @a = split /\s*,\s*/;
+    push @ds, \@a;
+}
+
+#print Dumper(\@fl,\@in,\@ds);
+
+my @inst; 
+my @meth;
+my @cmeth;
+my @names;
+my %seen;
+
+sub const($$@) {
+    my ($v,$t,$ct) = @_;
+    $ct ||= "\"int\"";
+    if ($v =~ /^\d/) {
+        return "prim_number $v $ct $t";
+
+        #return "ELit (LitInt $v $t)"; 
+    } else {       
+        #return "EPrim \"prim_const.$v\" [] $t"
+        #return "EPrim (primPrim \"prim_const.$v\") [] $t"
+        return "prim_const \"$v\" $ct $t";
+    }
+} 
+
+#print STDERR Dumper(\%stuff);
+
+my %tcon;
+sub tcon($) { 
+    return $tcon{$_[0]}[0] if $tcon{$_[0]};
+    my $n = $_[0];
+    $n =~ s/\W/_/g;
+    $n = "t_" . $n;
+    my $v = "$n = ELit (LitCons (parseName TypeConstructor \"$_[0]\") [] eStar)";
+    $tcon{$_[0]} = [$n,$v];
+    return $n;
+}
+
+my %dcon;
+sub dcon($) { 
+    return $dcon{$_[0]}[0] if $dcon{$_[0]};
+    my $n = $_[0];
+    $n =~ s/\W/_/g;
+    $n = "d_" . $n;
+    my $v = "$n = parseName DataConstructor \"$_[0]\"";
+    $dcon{$_[0]} = [$n,$v];
+    return $n;
+}
+
+my %hsname;
+sub hsname($) { 
+    return $hsname{$_[0]}[0] if $hsname{$_[0]};
+    my $n = $_[0];
+    $n =~ s/\W/_/g;
+    $n = "n_" . $n;
+    my $v = "$n = toHsName \"$_[0]\"";
+    $hsname{$_[0]} = [$n,$v];
+    return $n;
+}
+
+my %tycon;
+sub tycon($) { 
+    return $tycon{$_[0]}[0] if $tycon{$_[0]};
+    my $n = $_[0];
+    $n =~ s/\W/_/g;
+    $n = "tc_" . $n;
+    my $v = "$n = TCon (Tycon (toHsName \"$_[0]\") Star)";
+    $tycon{$_[0]} = [$n,$v];
+    return $n;
+}
+
+foreach my $d (@ds) {
+    #my @cs = ($d->[2] =~ /int/) ? @in : @fl;
+    my @cs = @{$stuff{$d->[2]}};
+    my $t = tcon($d->[0]);
+    #my $t =  "(ELit (LitCons (parseName TypeConstructor \"$d->[0]\") [] eStar) )";
+    #my $t =  "(ELit (LitCons $nn [] eStar) )";
+    my $tycon = tycon($d->[0]);
+    my $cncons = dcon($d->[0]);
+    #push @inst, "[] :=> IsIn (toHsName \"Prelude.Bounded\") (TCon \$ Tycon (toHsName \"$d->[0]\") Star)\n" unless $seen{'Prelude.Bounded',$d->[0]}++;
+    #push @inst, "[] :=> IsIn (toHsName \"Foreign.Storable.Storable\") (TCon \$ Tycon (toHsName \"$d->[0]\") Star)\n";
+    my $prelude_bounded = hsname("Prelude.Bounded");
+    my $foreign_storable = hsname("Foreign.Storable.Storable");
+    push @inst, "[] :=> IsIn $prelude_bounded $tycon";
+    push @inst, "[] :=> IsIn $foreign_storable $tycon";
+    push @cmeth, "(toInstName \"Foreign.Storable.sizeOf.$d->[0]\", ELam (tVr 0 $t) \$ " . const("sizeof($d->[1])","tInt") . ")";
+    push @cmeth, "(toInstName \"Foreign.Storable.poke.$d->[0]\", buildPoke $cncons $t \"$d->[1]\")";
+    push @cmeth, "(toInstName \"Foreign.Storable.peek.$d->[0]\", buildPeek $cncons $t \"$d->[1]\")";
+    push @cmeth, "(toInstName \"Prelude.maxBound.$d->[0]\", " . const($d->[3],$t,"\"$d->[1]\"") . ")";
+    push @cmeth, "(toInstName \"Prelude.minBound.$d->[0]\", " . const($d->[4],$t,"\"$d->[1]\"") . ")";
+    my $ivar = "(tVr 2 tInt)"; 
+    my $ivart = "(tVr 2 tInteger)"; 
+    my $tvar = "(tVr 2 $t)"; 
+    if ($d->[0] eq "Prelude.Int") {
+        push @cmeth, "(toInstName \"Prelude.fromInt.$d->[0]\", ELam $ivar (EVar $ivar))";
+        push @cmeth, "(toInstName \"Prelude.toInt.$d->[0]\", ELam $ivar (EVar $ivar))";
+    } else {
+        push @cmeth, "(toInstName \"Prelude.fromInt.$d->[0]\", ELam $ivar (prim_integralCast (EVar $ivar) $t))";
+        push @cmeth, "(toInstName \"Prelude.toInt.$d->[0]\", ELam $tvar (prim_integralCast (EVar $tvar) tInt))" if $d->[2] =~ /int/ ;
+    }
+    if ($d->[0] eq "Prelude.Integer") {
+        push @cmeth, "(toInstName \"Prelude.fromInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
+        push @cmeth, "(toInstName \"Prelude.toInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
+    } else {
+        push @cmeth, "(toInstName \"Prelude.fromInteger.$d->[0]\", ELam $ivart (prim_integralCast (EVar $ivart) $t))";
+        push @cmeth, "(toInstName \"Prelude.toInteger.$d->[0]\", ELam $tvar (prim_integralCast (EVar $tvar) tInteger))" if $d->[2] =~ /int/ ;
+    }
+    #push @cmeth, "(toInstName \"Prelude.abs.$d->[0]\", ELam $tvar (buildAbs $tvar $t))" if $d->[2] =~ /int/ ;
+    push @cmeth, "(toInstName \"Prelude.abs.$d->[0]\", ELam $tvar (build_abs \"$d->[1]\" $cncons (EVar $tvar)  ))" if $d->[2] =~ /int/ ;
+    #push @cmeth, "(toInstName \"Prelude.signum.$d->[0]\", ELam $tvar (buildSignum $tvar $t))" if $d->[2] =~ /int/ ;
+    push @cmeth, "(toInstName \"Prelude.signum.$d->[0]\", ELam $tvar (build_signum \"$d->[1]\" $cncons (EVar $tvar) ))" if $d->[2] =~ /int/ ;
+    push @names, "(\"$d->[0]\", \"$d->[1]\")\n";
+    foreach my $c (@cs) {
+        my $tycon = tycon($d->[0]);
+        my $nn = hsname($c->[2]);
+        #push @inst, "[] :=> IsIn (toHsName \"$c->[2]\") (TCon \$ Tycon (toHsName \"$d->[0]\") Star)\n" unless $seen{$c->[2],$d->[0]}++;
+        push @inst, "[] :=> IsIn $nn $tycon" unless $seen{$c->[2],$d->[0]}++;
+        my $x = $c->[2];
+        $x =~ s/^([\w.]+\.).*$/$1/;
+        if ($c->[0] =~ /^a[aI][aIB]?$/) {
+        push @cmeth, "(toInstName \"$x$c->[1].$d->[0]\", op_$c->[0]  \"$c->[3]\" \"$d->[1]\" $cncons $t)";
+        } else {
+        push @meth, "(toInstName \"$x$c->[1].$d->[0]\", \"$c->[0]\", \"prim_op_$c->[0].$c->[3]\", \"$d->[0]\")";
+    }
+    }
+}
+
+my $head = `cat data/PrimitiveOperators-in.hs`;
+print "$head\n";
+#print "{- This file is generated -}\n";
+#print "module PrimitiveOperators(primitiveInsts,constantMethods,theMethods,allCTypes) where\n\n";
+#print "import Representation\n";
+#print "import E.E\n";
+#print "import E.Values\n";
+#print "import C.Prims\n";
+#print "import VConsts\n";
+#print "import Name\n\n";
+#print "toHsName x = nameName \$ parseName TypeConstructor x\n\n";
+#print "toInstName x = toName Val (\"Instance@\",'i':x)\n\n";
+#print 'buildAbs v t = eIf (EPrim (primPrim "prim_op_aaB.<") [EVar v,(ELit (LitInt 0 t))] tBool) (EPrim (primPrim "prim_op_aa.-") [EVar v] t) (EVar v)'. "\n\n";
+#print 'buildSignum v t = eCase (EVar v) [Alt (LitInt 0 t) (ELit (LitInt 0 t))] (eIf (EPrim (primPrim "prim_op_aaB.<") [EVar v,(ELit (LitInt 0 t))] tBool) (ELit (LitInt (-1) t)) (ELit (LitInt 1  t)))' . "\n\n";  
+print "primitiveInsts = [\n   ", join("\n  ,",@inst), " ]\n\n";
+print "constantMethods = [\n   ", join("\n  ,",@cmeth), " ]\n\n";
+print "theMethods = [\n   ", join("\n  ,",@meth), " ]\n\n";
+push @names, "(\"Prelude.()\",\"void\")";
+print "allCTypes = [\n   ", join("  ,",@names), " ]\n\n";
+
+print join("\n",map { $_->[1] } values %tcon) . "\n\n"; 
+print join("\n",map { $_->[1] } values %tycon) . "\n\n"; 
+print join("\n",map { $_->[1] } values %hsname) . "\n\n"; 
+print join("\n",map { $_->[1] } values %dcon) . "\n\n"; 
+
+print "\n\n";
+
+
+
+#    push @cmeth, "(toName Val (\"Instance@\",\"iForeign.Storable.sizeOf.$d->[0]\"), ELam (TVr 0 $t) \$ " . const("sizeof($d->[1])","tInt") . ")\n";
+#    push @cmeth, "(toName Val (\"Instance@\",\"iForeign.Storable.poke.$d->[0]\"), buildPoke $t \"$d->[1]\")\n";
+#    push @cmeth, "(toName Val (\"Instance@\",\"iForeign.Storable.peek.$d->[0]\"), buildPeek $t \"$d->[1]\")\n";
+#    push @cmeth, "(toName Val (\"Instance@\",\"iPrelude.maxBound.$d->[0]\"), " . const($d->[3],$t,"\"$d->[1]\"") . ")\n";
+#    push @cmeth, "(toName Val (\"Instance@\",\"iPrelude.minBound.$d->[0]\"), " . const($d->[4],$t,"\"$d->[1]\"") . ")\n";
+

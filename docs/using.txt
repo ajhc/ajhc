@@ -1,0 +1,74 @@
+= Using jhc =
+
+Installation of jhc involves building the jhc binary, placing it somewhere you
+can execute it and putting the libraries somewhere. 
+
+=== Building jhc ===
+
+building jhc requires the most recent version of DrIFT which can be gotten at
+http://repetae.net/john/computer/haskell/DrIFT/, GHC 6.4, happy, Perl, and having
+darcs will help keep updated with the newest version and submit patches.
+
+==== Getting the source ==== 
+
+Because jhc uses subrepositories, you need to use multiple darcs commands to
+pull everything needed to build jhc.
+
+  darcs get http://repetae.net/john/repos/jhc 
+  cd jhc
+  darcs get http://repetae.net/john/repos/Boolean 
+  darcs get http://repetae.net/john/repos/Doc
+
+==== making it ====
+
+Assuming you have ghc 6.4, happy, and DrIFT installed, you may now type 'make'
+and get a binary 'jhc' out if nothing went wrong.  
+
+=== Installing the libraries ====
+
+The jhc libraries will be in the 'lib' directory. these may be installed
+anywhere or left in place but the directory where they are installed *must be
+writable by the user of jhc* otherwise the compiler cannot create its
+intermediate files.
+
+Set the environment variable JHCPATH to the location of the library wherever
+you put it, or pass -l<dir> to jhc every time you call it so it can find the
+standard libraries.
+
+The first time you compile something, jhc will automatically create an
+optimized version of the standard libraries in 'ho' files next to their source
+code. This is why the library needs to be somewhere writable. Another effect
+being the first time you run jhc, it will take much longer than future runs.
+
+
+=== Running jhc ===
+
+jhc always runs in a mode similar to 'ghc --make' and will find all
+dependencies automatically. just run jhc on your file containing the Main module.  
+
+  jhc -v Main.hs 
+
+it is HIGHLY HIGHLY recommended you pass the '-v' flag to jhc. jhc takes a very
+long time to compile programs and without feedback you won't know if there is a
+problem. Much of the debugging output contains Unicode characters, it helps if
+your terminal is UTF8.
+
+While compiling, jhc will drop 'ho' files alongside your source code to speed
+up future compilation. feel free to delete these but having a set for the
+standard Haskell libraries pre-built will greatly speed up future builds.
+
+==== Options ====
+
+general options
+
+<include text `../jhc --help 2>&1`>
+
+things to pass to -d 
+
+<include text `../jhc -dhelp  2>&1`>
+
+things to pass to -f 
+
+<include text `../jhc -fhelp 2>&1 `>
+
+

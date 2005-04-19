@@ -1,0 +1,99 @@
+#!/usr/bin/perl 
+
+
+use strict;
+
+use Getopt::Std;
+
+my %h;
+getopts("n:",\%h);
+
+die "no name" unless $h{n};
+my $name = $h{n};
+$name =~ s/\.[a-z]+$//;
+
+my @l;
+my %h;
+
+# this is fun
+my $cat;
+my %cat;
+my @cat;
+
+while (<>) {
+    next unless /\S/;
+    next if /^\s*#/;
+    if (/^([a-z-]+)\s+(\S.*\S)\s*$/) {
+        my @xs = ($1,$2);
+        my $n = $1;
+        my ($v,$d) = ($1,$2);
+        $n =~ s/-([^-]*)/\u$1/g;
+        #push @l,["\u$n",$1,$2];
+        $h{$v} = {hname => "\u$n", oname => $v, desc => $d, cat => $cat  };
+        push @{$cat{$cat}}, $v;
+        unshift @xs, "\u$n";
+        push @l,\@xs;
+    } elsif (/^\@([a-z-]+)\s+(\S.*\S)\s*$/) {
+        $h{$1} = { oname => $1, cat => $cat, desc => $2, vals => [split(/\s+/,$2)] };
+        push @{$cat{$cat}}, $1;
+    } elsif (/^!(.*)\s*$/) {
+        push @cat,$1;
+        $cat = $1;
+        }
+}
+
+
+my @ds;
+foreach (@l) {
+    my $h = $_->[2];
+    $h =~ s{/}{\\/}g;
+    push @ds, (sprintf "%-17s -- ^ %s",$_->[0],$h);
+}
+@ds = sort @ds;
+
+print "module $name(Flag(..),process,helpMsg) where\n\n";
+print "import qualified Data.Set as Set\n";
+print "\n";
+print "-- | Flags\n";
+print "data Flag =\n      ";
+print join "\n    | ", @ds;
+print "\n    deriving(Eq,Ord,Bounded)\n";
+
+print "\ninstance Show Flag where\n"; 
+foreach (@l) {
+    print "    show $_->[0] = \"$_->[1]\"\n";
+}
+print "\n";
+
+
+foreach (keys %h) {
+    if ($h{$_}{hname}) { 
+        print "one \"$_\" = Right \$ Set.insert $h{$_}{hname}\n";
+        print "one \"no-$_\" = Right \$ Set.delete $h{$_}{hname}\n";
+    } else {
+        print "one \"$_\" = Right \$ foldr (.) id [ f | Right f <- [ " . join(",",( map { "one \"$_\"" } @{$h{$_}{vals}})) . "]]\n"
+    }
+}
+print "one x = Left x\n";
+
+
+print "\nprocess s xs = foldr f (s,[]) (map one xs) where\n";
+print "   f (Right g) (s,xs) = (g s,xs)\n";
+print "   f (Left x) (s,xs) = (s,x:xs)\n";
+
+
+my $help = "";
+
+foreach (@cat) {
+    $help .= "\\n-- $_ --\\n";
+    foreach my $j (sort @{$cat{$_}}) {
+        $help .= " $h{$j}{oname}\\n    $h{$j}{desc}\\n";
+    }
+}
+
+print "\nhelpMsg = \"$help\"\n";
+
+
+
+
+

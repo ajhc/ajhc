@@ -1,0 +1,37 @@
+#!/usr/bin/perl -w 
+
+use strict;
+
+
+my $mod = shift @ARGV;
+
+print "module $mod where\n\n\n"; 
+
+while (@ARGV) {
+    my $fn = shift @ARGV;
+    my $nn = lc $fn;
+    $nn =~ s/^.*\///;
+    $nn =~ s/\W/_/g;
+
+    open F, "<:utf8", $fn;
+
+    $fn =~ s{/}{\\/}g;
+    print "-- | Generated from $fn on " . `date`;
+    print "$nn :: String\n";
+    print "$nn = \"\\\n \\";
+    #print "$nn = \"";
+    while (<F>) {
+        chomp;
+        s/\\/\\\\/g;
+        s/[^\x20-\x7e]/sprintf("\\x%04x\\&", ord($&))/eg;
+
+        s/\"/\\"/g;
+        print "$_\\n\\\n \\";
+        #print "$_\\n";
+    }
+
+    print "\"\n\n";
+}
+
+
+print "\n\n";

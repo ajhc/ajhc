@@ -1,0 +1,118 @@
+
+much of the FrontEnd has been derived from other sources, such as the 'hatchet' type checking tool.
+various documents from the original sources follow. 
+
+Most files contain modifications by John Meacham (c) 2003-2005
+
+I have made little effort to keep track of the changes from the original
+hatchet source. but there are many, some drastic, others subtle.
+
+some changes include:
+
+got rid of AnnotatedHsSyn. uses HsSyn all the way through.
+handles recursive modules
+fixed renaming, seperated type and term namespaces
+fixed parser to not need HsParsePostProcess pass
+utilized record syntax.
+typechecks instance and class decls now
+keeps type variables around.
+annotates every use of a variable or data constructor with the type is was instantiated with
+lifts instance declarations to their own functions 
+records the type of every variable, pattern, useage of a variable, wildcard match etc. for direct conversion to a TIL.
+much more efficient, makes about 2 passes over the syntax rather than 5.
+got rid of TidyModule, it didn't help much and just generated lots of garbage during conversion.
+used DrIFT when appropriate.
+suport hierchical module names
+monadified parser and lexer using code from the latest Language.Haskell.ParserMonad
+added support for record syntax and record desugaring 
+added location info to ambiguity and context reduction errors
+
+
+Hatchet License:
+
+Hatchet version 0.1 is derived from a number of sources 
+each with their own Copyright and License restrictions. 
+See each file for the respective Copyright and
+License information.
+
+Special License and Copyright information for all work
+derived directly and indirectly from "Typing Haskell
+in Haskell" by Mark Jones (http://www.cse.ogi.edu/~mpj/thih/)
+is provided in the file "License.thih". Please read 
+that file carefully and abide by its contents.
+
+Hatchet is free software. Permission is granted to
+all good lifeforms and machines to use and distribute 
+it in whole or part, as source or binary, modified or 
+unmodified, for any purpose providing the Licenses 
+and Copyrights of the component sources are also 
+respected and followed.
+
+No warranty for any aspect of this software is 
+provided, neither explicitly nor implicitly,
+by anyone anywhere anyhow at any time past, present
+or future.
+
+THIH License:
+
+`Typing Haskell in Haskell' is Copyright (c) Mark P Jones,
+and the Oregon Graduate Institute of Science and Technology,
+October 1999, All rights reserved, and is distributed as
+free software under the following license.
+
+Redistribution and use in source and binary forms, with or
+without modification, are permitted provided that the following
+conditions are met:
+
+- Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+
+- Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following
+disclaimer in the documentation and/or other materials provided
+with the distribution.
+
+- Neither name of the copyright holders nor the names of its
+contributors may be used to endorse or promote products derived
+from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND THE
+CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR THE
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+
+Hatchet Contributors:
+
+The following people have contributed to Hatchet:
+-------------------------------------------------
+
+Bernie Pope             (bjpop@cs.mu.oz.au)
+Bryn Humberstone
+Toby Ord
+Lindsay Powles
+Robert Shelton
+
+Hatchet has derived benefit from the work of many others including:
+-------------------------------------------------------------------
+
+Mark Jones         (Typing Haskell in Haskell)
+Manuel Chakravarty (FiniteMaps)
+Sven Panne         (GetOpt)
+Graham Hutton      (ParseLib)
+Erik Meijer        (ParseLib)
+The GHC team       (Digraph, Haskell Parsing and Pretty Printing)
+
+
+
+Thankyou to all those involved.

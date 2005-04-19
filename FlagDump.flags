@@ -1,0 +1,52 @@
+# dump-flags
+
+!Front End 
+renamed code after uniqueness renaming 
+parsed  parsed code 
+derived show generated derived instances 
+imports show in scope names for each module
+exports show which names are exported from each module
+scc-modules show strongly connected modules in dependency order 
+defs Show all defined names in a module
+
+
+!Type Checker
+kind    show results of kind inference for each module
+dcons   data constructors
+class-summary summary of all classes
+class detailed information on each class
+instance show instances
+bindgroups show bindgroups
+types display unified type table containing all defined names
+all-kind show unified kind table after everything has been typechecked
+all-dcons show unified data constructor table 
+all-types show unified type table, after everything has been typechecked
+sigenv initial signature environment
+srcsigs processed signatures from source code
+program impl expls, the whole shebang.
+decls processed declarations
+aspats show as patterns
+tyvar show original tyvars rather than renaming them.
+
+
+!Intermediate code
+lambdacube show intermediate lambda cube code
+lambdacube-before-lift show intermediate lambda cube code just before lambda lifting
+pass show optimization passes over intermediate code
+datatable show data table of constructors
+optimization-stats show combined stats of optimization passes 
+rules show all rules
+
+
+!Grin code
+tags list of all tags and their types 
+grin-preeval show grin code just before eval/apply inlining
+grin show final grin code
+steps show interpreter go
+eval show detailed eval inlining info
+
+!General 
+@verbose progress
+@veryverbose progress stats
+progress show basic progress indicators
+stats show extra information about stuff

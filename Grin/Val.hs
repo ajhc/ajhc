@@ -1,0 +1,88 @@
+module Grin.Val(FromVal(..),ToVal(..),cChar,cInt,world__,pworld__) where
+
+import Grin.Grin
+import Atom
+import Char
+import VConsts 
+import Number
+
+nil = (toAtom "CPrelude.[]")
+cons =  (toAtom "CPrelude.:")
+
+cChar = toAtom "CPrelude.Char"
+cInt = toAtom "CPrelude.Int"
+
+world__ = NodeC (toAtom "CJhc.IO.World__") []
+pworld__ = Const world__
+
+class ToVal a where
+    toVal :: a -> Val 
+    toUnVal :: a -> Val
+    toUnVal x = toVal x
+
+class FromVal a where
+    fromVal :: Monad m => Val -> m a 
+    fromUnVal :: Monad m => Val -> m a 
+    fromUnVal x = fromVal x
+
+instance ToVal () where
+    toVal () = vUnit
+    toUnVal () = unit
+
+instance ToVal Bool where
+    toVal True = vTrue
+    toVal False = vFalse
+
+instance ToVal Ordering where
+    toVal x = vOrdering x
+
+instance ToVal a => ToVal [a] where
+    toVal [] = NodeC nil []
+    toVal (x:xs) =  NodeC cons [Const (toVal x),Const (toVal xs)]
+instance  ToVal (Val,Val) where
+    toVal (x,y) = NodeC (toAtom "CPrelude.(,)") [x,y] 
+
+instance ToVal Char where
+    toVal c = NodeC cChar [toUnVal c]
+    toUnVal c =   Lit (fromIntegral $ ord c) (Ty cChar)
+instance ToVal Int where
+    toVal c = NodeC (toAtom "CPredule.Int") [toUnVal c]
+    toUnVal c =  Lit (fromIntegral c) tIntzh
+
+
+instance ToVal Val where
+    toVal x = x
+
+
+instance FromVal Int where
+    fromVal (NodeC _ [Lit i _]) | Just x <- toIntegral i = return x
+    fromVal n = fail $ "Val is not Int: " ++ show n 
+    fromUnVal (Lit i _) | Just x <- toIntegral i = return x
+    fromUnVal n = fail $ "Val is not UnInt: " ++ show n 
+instance FromVal Char where
+    fromVal (NodeC _ [Lit i _]) | Just x <- toIntegral i = return (chr x)
+    fromVal n = fail $ "Val is not Char: " ++ show n
+    fromUnVal (Lit i _) | Just x <- toIntegral i = return (chr x)
+    fromUnVal n = fail $ "Val is not UnChar: " ++ show n 
+instance FromVal () where
+    fromVal n | n == toVal () = return ()
+    fromVal n = fail $ "Val is not (): " ++ show n
+    fromUnVal (Tup []) = return ()
+    fromUnVal n = fail $ "Val is not Un(): " ++ show n
+
+instance FromVal a => FromVal [a] where
+    fromVal (NodeC n [])  | n == nil = return []
+    fromVal (NodeC n [Const a,Const b]) | n == cons = do
+        x <- fromVal a
+        xs <- fromVal b
+        return (x:xs)
+    fromVal n = fail $ "Val is not [a]: " ++ show n
+
+    
+instance FromVal Bool  where 
+    fromVal n 
+        | n == toVal True = return True 
+        | n == toVal False = return False 
+    fromVal n = fail $ "Val is not Bool: " ++ show n
+instance FromVal Val where
+    fromVal n = return n
