@@ -11,12 +11,12 @@ DRIFT= ../DrIFT/src/DrIFT
 
 ALLHS:=$(shell find . Grin Boolean Doc C E  FrontEnd DerivingDrift -maxdepth 1 -follow \( -name \*.hs -or -name \*.lhs \) -and \( \! -name Try\*.hs \) | sed -e 's@^\./@@')
 
-OBJS=$(shell ./collect_deps.prl Main.o < depend.make)
+OBJS=$(shell perl ./collect_deps.prl Main.o < depend.make)
 
 
 SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
 
-all: jhc
+all: depend.make  jhc
 
 MAIN=Main.hs
 
@@ -40,7 +40,7 @@ RawFiles.hs:  data/HsFFI.h data/jhc_rts.c
 FrontEnd/HsParser.hs: FrontEnd/HsParser.ly
 	happy -a -g -c FrontEnd/HsParser.ly
 
-jhc: $(OBJS)
+jhc: $(OBJS)  PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs
 	$(HC) $(GHCOPTS) $(EXTRAOPTS) $(OBJS) -o $@
 
 tags: $(ALLHS)
@@ -86,4 +86,4 @@ PrimitiveOperators.hs: op_process.prl data/operators.txt data/primitives.txt dat
 
 .PHONY: depend clean regress hsdocs
 
-include depend.make
+-include depend.make
