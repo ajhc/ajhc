@@ -1,8 +1,10 @@
 
+all:   jhc
+
 GHCDEBUGOPTS= -W -fno-warn-unused-matches -fno-warn-unused-binds    # -O2 -ddump-simpl-stats -ddump-rules
 GHCINC=  -iFrontEnd
 PACKAGES= -package mtl  -package unix  #  -prof -auto-all
-GHCOPTS=   -O     -pgmF drift-ghc  -F $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) -fwarn-type-defaults   -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
+GHCOPTS=   -O   -pgmF drift-ghc  -F $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) -fwarn-type-defaults   -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
 
 HC = ghc
 HC_OPTS = $(GHCOPTS)
@@ -11,12 +13,17 @@ DRIFT= ../DrIFT/src/DrIFT
 
 ALLHS:=$(shell find . Grin Boolean Doc C E  FrontEnd DerivingDrift -maxdepth 1 -follow \( -name \*.hs -or -name \*.lhs \) -and \( \! -name Try\*.hs \) | sed -e 's@^\./@@')
 
-OBJS=$(shell perl ./collect_deps.prl Main.o < depend.make)
+BUILTSOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs
+
+
+# OBJS is defined in 'depend.make'
+# OBJS=$(shell perl ./collect_deps.prl Main.o < depend.make)
+#
+-include depend.make
 
 
 SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
 
-all: depend.make  jhc
 
 MAIN=Main.hs
 
@@ -34,11 +41,6 @@ MAIN=Main.hs
 %.o-boot: %.hs-boot
 	$(HC) $(HCFLAGS) $(GHCOPTS) -c $<
 
-RawFiles.hs:  data/HsFFI.h data/jhc_rts.c
-	perl ./op_raw.prl $(basename $@)  $^ > $@
-
-FrontEnd/HsParser.hs: FrontEnd/HsParser.ly
-	happy -a -g -c FrontEnd/HsParser.ly
 
 jhc: $(OBJS)  PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs
 	$(HC) $(GHCOPTS) $(EXTRAOPTS) $(OBJS) -o $@
@@ -64,19 +66,27 @@ printos:
 	echo $(OBJS)
 
 
-depend: $(ALLHS)
-	$(HC) -M -optdep-f -optdepdepend.make $(HC_OPTS) $(ALLHS)
+depend: depend.make
+
+depend.make: $(BUILTSOURCES) $(ALLHS)
+	$(HC) -M -optdep-f -optdepdepend.make $(HC_OPTS) Main.hs
+	echo OBJS=`perl ./collect_deps.prl Main.o < depend.make` >> depend.make  
+
+# $(ALLHS)
 
 clean:
 	rm -f $(OBJS) jhc *.hs_code.c `find . -name \*.hi -or -name \*.o-boot -or -name \*.hi-boot`
 
-builtfiles: PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs
 
 realclean: clean
-	rm -f PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs
+	rm -f $(BUILTSOURCES) depend.make
 
+builtfiles: $(BUILTSOURCES)
 clean-ho:
 	rm -f -- `find -name \*.ho`
+
+
+# Various rules for generated Haskell files
 
 %.hs: %.flags  ./opt_sets.prl
 	perl ./opt_sets.prl -n $< $<  > $@
@@ -84,6 +94,11 @@ clean-ho:
 PrimitiveOperators.hs: op_process.prl data/operators.txt data/primitives.txt data/PrimitiveOperators-in.hs
 	perl ./op_process.prl > $@ || rm -f $@
 
-.PHONY: depend clean regress hsdocs
+RawFiles.hs:  data/HsFFI.h data/jhc_rts.c
+	perl ./op_raw.prl $(basename $@)  $^ > $@
 
--include depend.make
+FrontEnd/HsParser.hs: FrontEnd/HsParser.ly
+	happy -a -g -c FrontEnd/HsParser.ly
+
+.PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs
+
