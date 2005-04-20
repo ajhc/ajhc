@@ -71,4 +71,7 @@ things to pass to -f
 
 <include text `/home/john/bin/jhc -fhelp 2>&1 `>
 
+---- 
+
+http://repetae.net/john/computer/jhc
 

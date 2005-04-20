@@ -59,7 +59,7 @@ times when I just started using Haskell, the code quality actually varies a
 lot across the whole project)
 
 * All indirect jumps are transformed away, jhc's final code is very similar to
-hand-written imperitive code, using only branches and static function calls. A
+hand-written imperative code, using only branches and static function calls. A
 simple basic-blocks analysis is enough to transform tail-calls into loops. 
 
 * Full transparent support for mutually recursive modules.
@@ -344,17 +344,24 @@ compiler to quit with an 'error' or pattern match failure.
 
 == References == 
 
-* Boquist Thesis
+* Boquist Thesis - http://www.cs.chalmers.se/~boquist/phd/index.html
 
-* Henk paper
+* Henk paper - http://research.microsoft.com/~simonpj/Papers/henk.ps.gz
 
 * Pure Type Systems type checking paper
+
+* Secrets of the GHC Inliner -  http://www.research.microsoft.com/~simonpj/Papers/inlining/index.htm
 
 * CPR analysis.
 
 * Strictness analysis w/ HORN clauses
 
-* Typing Haskell in Haskell
+* Typing Haskell in Haskell -  http://www.cse.ogi.edu/~mpj/thih/
 
-* Hatchet
+* Hatchet -  http://www.cs.mu.oz.au/~bjpop/hatchet.html
+
+----
+
+http://repetae.net/john/computer/jhc  
+
 
