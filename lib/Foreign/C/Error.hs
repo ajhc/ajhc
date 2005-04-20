@@ -528,6 +528,7 @@ errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
         | errno == eXDEV           = UnsupportedOperation
         | otherwise                = OtherError
 #else
+#endif
 -}
     return (userError (loc ++ ": " ++ str ++ maybe "" (": "++) maybeName))
 -- #endif

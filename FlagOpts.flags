@@ -7,6 +7,7 @@ wrapper wrap main in exception handler
 float-in perform float inward transform
 
 lint perform lots of extra type checks 
+cpp Pass code through cpp.
 
 
 !Default settings

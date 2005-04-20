@@ -16,6 +16,7 @@ import Doc.DocLike
 import E.E 
 import qualified PPrint(render)
 import E.Rules
+import FilterInput
 import FrontEnd.Infix
 import FrontEnd.Unlit
 import GenUtil hiding(putErrLn,putErr,putErrDie)
@@ -32,6 +33,7 @@ import Options
 import PackedString
 import PrimitiveOperators
 import qualified FlagDump as FD
+import qualified FlagOpts as FO
 import qualified Data.Map as Map
 import Representation
 import System.Posix.Files
@@ -351,7 +353,8 @@ getModule ho name files  = do
                         Nothing -> loop (fromModule m) (searchPaths (fromModule m)) >> checkHoDep (m,fd)
         addNeed :: String -> FileDep -> Handle -> String ->  IO ()
         addNeed name fd fh ho_name = do
-            cs <- CharIO.hGetContents fh
+            cs <- if fopts FO.Cpp then filterInput "cpp" ["-D__JHC__","-traditional","-P"] fh 
+                                  else CharIO.hGetContents fh
             hs <- parseHsSource (fromAtom $ fileName fd) cs
             wdump FD.Progress $ do
                 sp <- shortenPath $ fromAtom (fileName fd)
