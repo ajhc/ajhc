@@ -34,5 +34,6 @@ readFile fn = Prelude.readFile fn >>= \s -> return (fromUTF8 s)
 hGetContents h =  IO.hGetContents h >>= \s -> return (fromUTF8 s)
 
 runMain :: IO a -> IO ()
-runMain action = do 
-    Control.Exception.catch (action >> return ()) (\x -> putErrDie $ show x)
+runMain action = Control.Exception.catch (action >> return ()) $ \x -> case x of
+        ExitException _ -> throw x
+        _ -> putErrDie $ show x
