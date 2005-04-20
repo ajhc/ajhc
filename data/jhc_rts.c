@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <malloc.h>
 #define _GNU_SOURCE
 #include <wchar.h>
 #include <limits.h>
