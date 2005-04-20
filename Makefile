@@ -69,7 +69,7 @@ printos:
 depend: depend.make
 
 depend.make: $(BUILTSOURCES) $(ALLHS)
-	$(HC) -M -optdep-f -optdepdepend.make $(HC_OPTS) Main.hs
+	$(HC) -M -optdep-f -optdepdepend.make $(HC_OPTS) $(ALLHS)
 	echo OBJS=`perl ./collect_deps.prl Main.o < depend.make` >> depend.make  
 
 # $(ALLHS)
