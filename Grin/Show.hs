@@ -7,12 +7,14 @@ import Doc.DocLike
 import Atom
 import Char
 import VConsts
-import ANSI
 import Grin.Val
 import Number
 import Monad
 import CharIO
+import Doc.Attr
 import E.Pretty(render)
+import qualified FlagDump as FD
+import Options
 
 instance PPrint Doc Val   where
     pprint v = prettyVal v
@@ -25,16 +27,21 @@ pVar v  = pVal v <+> operator "<- "
 
 pVar' v  = pVal v <+> operator "<- " 
 
+attr = if dump FD.Html then html else ansi
 
-color :: Int -> Doc -> Doc
-color 1 doc = oob (attr [1]) <> doc <> oob (attr [0])
-color c doc = oob (attr [c]) <> doc <> oob (attr [39])
+bold :: Doc -> Doc
+bold = attrBold (attr oob)
+color n x = attrColor (attr oob) n x
 
-operator = color 1 . text
-keyword = color 1 . text 
+--color :: Int -> Doc -> Doc
+--color 1 doc = oob (attr [1]) <> doc <> oob (attr [0])
+--color c doc = oob (attr [c]) <> doc <> oob (attr [39])
+
+operator = bold . text
+keyword = bold . text 
 tag = text
-func = color 92 . text
-prim = color 91 . text
+func = color "lightgreen" . text
+prim = color "red" . text
 --func = text
 --tag = color 92 . text
 

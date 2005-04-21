@@ -9,14 +9,13 @@ import Maybe
 import C.FromGrin
 import CharIO
 import Class
+import Control.Exception
 import Control.Monad.Identity
 import DataConstructors
 import Data.Monoid
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
-import qualified E.CPR
-import qualified Info
 import E.Diff
 import E.E
 import E.FromHs
@@ -44,12 +43,14 @@ import Options
 import qualified Data.IntMap as IM
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified E.CPR
 import qualified E.SSimplify as SS
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Grin.Interpret
 import qualified Grin.PointsTo
 import qualified Grin.Simplify
+import qualified Info
 import qualified Stats
 import qualified System
 
@@ -64,7 +65,13 @@ printCheckName dataTable e = do
     putErrLn  ( render $ hang 4 (pprint ty))
 
 
-main = runMain $ do
+bracketHtml action = do
+    pn <- System.getProgName
+    as <- System.getArgs 
+    wdump FD.Html $ putStrLn $ "<html><head><title>" ++ (unwords (pn:as)) ++ "</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body style=\"background: black; color: lightgrey\"><pre>"
+    action `finally` (wdump FD.Html $ putStrLn "</pre></body></html>")
+
+main = runMain $ bracketHtml $ do
     o <- processOptions
     case optShowHo options of
         [] -> processFiles  (optArgs o)
