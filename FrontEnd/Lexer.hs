@@ -21,7 +21,7 @@ module FrontEnd.Lexer (Token(..), lexer) where
 
 import FrontEnd.ParseMonad
 
-import Data.Char
+import Char 
 import Data.Ratio
 import qualified Data.Map as Map
 
