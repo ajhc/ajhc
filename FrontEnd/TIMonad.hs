@@ -40,23 +40,22 @@ module TIMonad (TI,
                 getModName,
                 newTVar) where
 
-import HsSyn    
-import Diagnostic
-import Representation
-import Type                  ((@@), Types (..), Instantiate (..), nullSubst, mgu)
-import Class                 (ClassHierarchy)
-import FrontEnd.Env
-import KindInfer             (KindEnv)
-import TypeSigs              (SigEnv)
-import PPrint                (pretty)
-import Monad
-import Control.Monad.State hiding(State(..))
 import Atom
-import Utils
+import Class                 (ClassHierarchy)
+import Control.Monad.State hiding(State(..))
 import Data.IORef
+import Diagnostic
+import HsSyn    
+import KindInfer             (KindEnv)
+import Monad
+import PPrint                (pretty)
+import qualified Data.Map as Map
+import Representation
+import TypeSigs              (SigEnv)
+import Type                  ((@@), Types (..), Instantiate (..), nullSubst, mgu)
+import Utils
 import VConsts
 import Warning
---import Control.Monad.Reader
 
 --------------------------------------------------------------------------------
 
@@ -70,7 +69,7 @@ data TcEnv = TcEnv {
       tcDiagnostics       :: [Diagnostic],   -- list of information that might help diagnosis
       tcVarnum            :: IORef Int,
       tcSubst             :: IORef Subst,
-      tcDConsEnv          :: Env Scheme,
+      tcDConsEnv          :: Map.Map HsName Scheme,
       tcSigs              :: SigEnv
     } 
    {-! derive: update !-}
@@ -129,7 +128,7 @@ instance Monad TI where
 instance Functor TI where
     fmap = liftM
 
-runTI     :: Env Scheme-> ClassHierarchy -> KindEnv -> SigEnv -> Module -> TI a -> IO a
+runTI     :: Map.Map HsName Scheme-> ClassHierarchy -> KindEnv -> SigEnv -> Module -> TI a -> IO a
 runTI env' ch' kt' st' mod' (TI c) = do
     vn <- newIORef 0
     sub <- newIORef nullSubst
@@ -165,7 +164,7 @@ getErrorContext = asks tcDiagnostics
 getSubst :: TI Subst
 getSubst = TI $ \t -> readIORef (tcSubst t) -- gets subst
 
-getDConsTypeEnv :: TI (Env Scheme) 
+getDConsTypeEnv :: TI (Map.Map HsName Scheme) 
 getDConsTypeEnv = TI $ \t -> return (tcDConsEnv t) -- gets env 
 
 getClassHierarchy  :: TI ClassHierarchy
@@ -185,7 +184,7 @@ dConScheme :: HsName -> TI Scheme
 dConScheme conName
    = do
         env <- getDConsTypeEnv 
-        case lookupEnv conName env of
+        case Map.lookup conName env of
            Nothing 
             --  | Just n <- fromTupname conName -> return (toTuple n) 
             | otherwise -> error $ "dConScheme: constructor not found: " ++ show conName ++

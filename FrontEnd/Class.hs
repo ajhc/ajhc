@@ -54,7 +54,6 @@ module Class(
 import Binary
 import Control.Monad.Identity
 import Control.Monad.Writer
-import Data.FiniteMap  
 import Data.Generics
 import Data.Monoid
 import DDataUtil
@@ -83,6 +82,7 @@ import HasSize
 -- Instance
 type Inst  = Qual Pred
 
+listToFM = Map.fromList
 
 bySuper :: ClassHierarchy -> Pred -> [Pred]
 bySuper h p@(IsIn c t)

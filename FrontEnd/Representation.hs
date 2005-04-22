@@ -34,7 +34,7 @@ module Representation(
 import HsSyn    
 import PPrint(Doc,pprint,PPrint,pptuple,nest)
 import Utils 
-import Data.FiniteMap
+import qualified Data.Map as Map
 import Data.Generics
 import Atom
 import VConsts
@@ -278,7 +278,7 @@ instance PPrint Doc (Qual Type) where
 
 -- substitutions
 
-type Subst  = FiniteMap Atom Type
+type Subst  = Map.Map Atom Type
 
 --------------------------------------------------------------------------------
 

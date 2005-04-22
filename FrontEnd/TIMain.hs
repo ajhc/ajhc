@@ -54,8 +54,6 @@ import DependAnalysis           (getBindGroups)
 import Maybe                    (fromMaybe)
 import TypeUtils                (aHsTypeSigToAssumps)
 import TypeSigs                 (SigEnv)
-import FrontEnd.Env                     
-import Data.FiniteMap
 import VConsts
                                    
 import DeclsDepends             (getDeclDeps)                                
@@ -69,24 +67,24 @@ import Doc.PPrint
 strace _ s = s
 
 -- a TypeEnv maps identifier names to type schemes
-type TypeEnv = Env Scheme
+type TypeEnv = Map.Map HsName Scheme
 
 instance Types a => Types (HsName, a) where
    apply s (x, y) = (x, apply s y)
    tv (_, y) = tv y 
 
 instance Types TypeEnv where
-   apply s = mapFM (\k e -> apply s e)
-   tv env = tv $ map snd $ toListFM env
+   apply s = Map.map (\e -> apply s e)
+   tv env = tv $ map snd $ Map.toList env
 
 
 tiExpr ::  TypeEnv -> (HsExp) -> TI ([Pred], TypeEnv, Type)
 
-tiExpr env (HsVar v) | Just sc <- lookupEnv v env = do
+tiExpr env (HsVar v) | Just sc <- Map.lookup v env = do
           (ty@(ps :=> t)) <- freshInst sc
           --addInstance ((v,n),ty)
-          return (ps, emptyEnv, t)
-tiExpr env (HsVar v) = error $ "tiExpr: could not find type scheme for: " ++ show v ++ " " ++ showEnv env        
+          return (ps, Map.empty, t)
+tiExpr env (HsVar v) = error $ "tiExpr: could not find type scheme for: " ++ show v ++ " " ++ show env        
     
 {-
                   
@@ -96,7 +94,7 @@ tiExpr env (HsVar v) = error $ "tiExpr: could not find type scheme for: " ++ sho
                   Just scheme -> scheme
       (ty@(ps :=> t)) <- freshInst sc
       --addInstance ((v,n),ty)
-      return (ps, emptyEnv, t)
+      return (ps, Map.empty, t)
 -}
 
 tiExpr env (HsCon conName)
@@ -104,17 +102,17 @@ tiExpr env (HsCon conName)
       sc <- dConScheme conName
       (ty@(ps :=> t)) <- freshInst sc
       --addInstance ((conName,n),ty)
-      return (ps, emptyEnv, t)
+      return (ps, Map.empty, t)
 
 tiExpr _env (HsLit l)
  = do (ps,t) <- tiLit l
-      return (ps, emptyEnv, t)
+      return (ps, Map.empty, t)
 
 tiExpr env (HsAsPat n e) = do
     (ps,nenv, t) <- tiExpr env e 
     --let newAssump = makeAssump n $ toScheme t
     --let newEnv = addToEnv (assumpToPair newAssump) nenv
-    let newEnv = addToEnv (n,toScheme t) nenv
+    let newEnv = Map.insert n (toScheme t) nenv
     return (ps, newEnv, t)
 
 
@@ -127,7 +125,7 @@ tiExpr env expr@(HsInfixApp e1 e2 e3)
        (rs, env3, te3) <- tiExpr env e3 
        tout      <- newTVar Star
        unify (te1 `fn` (te3 `fn` tout)) te2
-       return (ps ++ qs ++ rs, env1 `joinEnv` env2 `joinEnv` env3, tout)
+       return (ps ++ qs ++ rs, env1 `Map.union` env2 `Map.union` env3, tout)
 
 tiExpr env expr@(HsApp e1 e2)
  = withContext
@@ -137,7 +135,7 @@ tiExpr env expr@(HsApp e1 e2)
       (qs, env2, te2) <- tiExpr env e2 
       t           <- newTVar Star
       unify (te2 `fn` t) te1
-      return (ps++qs, env1 `joinEnv` env2, t)
+      return (ps++qs, env1 `Map.union` env2, t)
 
 -- we need to fix the type to to be in the class
 -- cNum, just for cases such as:
@@ -155,8 +153,8 @@ tiExpr env expr@(HsLambda sloc pats e)
       (locSimple sloc $ "in the lambda expression\n   \\" ++ show pats ++ " -> ...") $
       do
         (ps, envP, ts) <- tiPats pats
-        (qs, envE, t)  <- tiExpr (envP `joinEnv` env) e
-        return (ps++qs, envP `joinEnv` envE, foldr fn t ts)  -- Boba
+        (qs, envE, t)  <- tiExpr (envP `Map.union` env) e
+        return (ps++qs, envP `Map.union` envE, foldr fn t ts)  -- Boba
 
 tiExpr env expr@(HsLet decls e)
  = withContext 
@@ -165,9 +163,9 @@ tiExpr env expr@(HsLet decls e)
          sigEnv <- getSigEnv
          let bgs = getFunDeclsBg sigEnv decls
          (ps, env1) <- tiSeq tiBindGroup env bgs
-         (qs, env2, t) <- tiExpr (env1 `joinEnv` env) e
+         (qs, env2, t) <- tiExpr (env1 `Map.union` env) e
          -- keep the let bound type assumptions in the environment
-         return (ps ++ qs, env1 `joinEnv` env2, t) 
+         return (ps ++ qs, env1 `Map.union` env2, t) 
 
 tiExpr env (HsIf e e1 e2)
  = withContext
@@ -178,7 +176,7 @@ tiExpr env (HsIf e e1 e2)
          (ps1, env2, t1) <- tiExpr env e1
          (ps2, env3, t2) <- tiExpr env e2
          unify t1 t2
-         return (ps++ps1++ps2, env1 `joinEnv` env2 `joinEnv` env3, t1)
+         return (ps++ps1++ps2, env1 `Map.union` env2 `Map.union` env3, t1)
 
 
 tiExpr env (HsCase e alts)
@@ -194,12 +192,12 @@ tiExpr env (HsCase e alts)
         let pstsEs   = map trd3 psastsAlts
         let psEs     = concatMap fst pstsEs
         let tsEs     = map snd pstsEs
-        let envAlts  = joinListEnvs $ map snd3 psastsAlts
+        let envAlts  = Map.unions $ map snd3 psastsAlts
         unifyList (te:tsPats)
         unifyList tsEs
         -- the list of rhs alternatives must be non-empty
         -- so it is safe to call head here
-        return (pse ++ psPats ++ psEs, env1 `joinEnv` envAlts, head tsEs)
+        return (pse ++ psPats ++ psEs, env1 `Map.union` envAlts, head tsEs)
 
 
 tiExpr env (HsDo stmts)
@@ -216,14 +214,14 @@ tiExpr env tuple@(HsTuple exps@(_:_))
            psasts <- mapM (tiExpr env) exps
            let typeList = map trd3 psasts
            let preds = concatMap fst3 psasts
-           let env1 = joinListEnvs $ map snd3 psasts
+           let env1 = Map.unions $ map snd3 psasts
            return (preds, env1, tTTuple typeList)
 
 -- special case for the empty list
 tiExpr _env (HsList [])
    = do
         v <- newTVar Star
-        return ([], emptyEnv, TAp tList v)
+        return ([], Map.empty, TAp tList v)
 
 -- non empty list
 tiExpr env expr@(HsList exps@(_:_))
@@ -233,7 +231,7 @@ tiExpr env expr@(HsList exps@(_:_))
         let typeList = map trd3 psasts
         unifyList typeList 
         let preds = concatMap fst3 psasts
-        let env1 = joinListEnvs $ map snd3 psasts
+        let env1 = Map.unions $ map snd3 psasts
         return (preds, env1, TAp tList (head typeList)) 
 
 
@@ -252,7 +250,7 @@ tiExpr env (HsLeftSection e1 e2)
         (e2Ps, envE2, e2T) <- tiExpr env e2
         tv          <- newTVar Star
         unify e1T (e2T `fn` tv)
-        return (e1Ps ++ e2Ps, envE1 `joinEnv` envE2, tv) 
+        return (e1Ps ++ e2Ps, envE1 `Map.union` envE2, tv) 
 
 
 -- I know this looks weird but it appears to be correct 
@@ -267,7 +265,7 @@ tiExpr env (HsRightSection e1 e2)
         tv1         <- newTVar Star
         tv2         <- newTVar Star
         unify e2T (tv1 `fn` (e1T `fn` tv2))
-        return (e1Ps ++ e2Ps, envE1 `joinEnv` envE2, tv1 `fn` tv2) 
+        return (e1Ps ++ e2Ps, envE1 `Map.union` envE2, tv1 `fn` tv2) 
 
 tiExpr env (HsRecConstr _ _)
    = error $ "tiExpr env (HsRecConstr _ _): not implemented"
@@ -286,7 +284,7 @@ tiExpr env (HsEnumFromTo e1 e2)
         (e2Ps, e2Env, e2T) <- tiExpr env e2
         unify e1T e2T
         return (IsIn classEnum e1T : IsIn classEnum e2T : (e1Ps ++ e2Ps), 
-                e1Env `joinEnv` e2Env, 
+                e1Env `Map.union` e2Env, 
                 TAp tList e1T)
 
 tiExpr env (HsEnumFromThen e1 e2)
@@ -295,7 +293,7 @@ tiExpr env (HsEnumFromThen e1 e2)
         (e2Ps, e2Env, e2T) <- tiExpr env e2
         unify e1T e2T
         return (IsIn classEnum e1T : IsIn classEnum e2T : (e1Ps ++ e2Ps), 
-                e1Env `joinEnv` e2Env, 
+                e1Env `Map.union` e2Env, 
                 TAp tList e1T)
 
 tiExpr env (HsEnumFromThenTo e1 e2 e3)
@@ -305,7 +303,7 @@ tiExpr env (HsEnumFromThenTo e1 e2 e3)
         (e3Ps, e3Env, e3T) <- tiExpr env e3
         unifyList [e1T,e2T,e3T]
         return (IsIn classEnum e1T : IsIn classEnum e2T : IsIn classEnum e3T : (e1Ps ++ e2Ps ++ e3Ps), 
-                e1Env `joinEnv` e2Env `joinEnv` e3Env, 
+                e1Env `Map.union` e2Env `Map.union` e3Env, 
                 TAp tList e1T)
 
 tiExpr env (HsListComp e stmts)
@@ -313,8 +311,8 @@ tiExpr env (HsListComp e stmts)
         psEnv <- tiStmts env stmts
         let stmtsPs = fst psEnv
         let stmtsEnv = snd psEnv 
-        (ePs, eEnv, eT) <- tiExpr (stmtsEnv `joinEnv` env) e
-        return (stmtsPs ++ ePs, eEnv `joinEnv` stmtsEnv, TAp tList eT)
+        (ePs, eEnv, eT) <- tiExpr (stmtsEnv `Map.union` env) e
+        return (stmtsPs ++ ePs, eEnv `Map.union` stmtsEnv, TAp tList eT)
 
 -- This should be desugared already
 -- e :: t   ----> let {v::t; v=e} in v
@@ -328,7 +326,7 @@ tiExpr _env e
 
 tiStmts ::  TypeEnv -> [(HsStmt)] -> TI ([Pred], TypeEnv)
 
-tiStmts = tiStmtsAcc [] emptyEnv 
+tiStmts = tiStmtsAcc [] Map.empty 
 
 tiStmtsAcc ::   [Pred] -> TypeEnv -> TypeEnv -> [(HsStmt)] -> TI ([Pred], TypeEnv)
 tiStmtsAcc predAcc envAcc _ [] 
@@ -336,8 +334,8 @@ tiStmtsAcc predAcc envAcc _ []
 
 tiStmtsAcc predAcc envAcc env (s:ss)
    = do
-        (newPs, newEnv) <- tiStmt (envAcc `joinEnv` env) s
-        tiStmtsAcc (newPs ++ predAcc) (newEnv `joinEnv` envAcc) env ss
+        (newPs, newEnv) <- tiStmt (envAcc `Map.union` env) s
+        tiStmtsAcc (newPs ++ predAcc) (newEnv `Map.union` envAcc) env ss
  
 tiStmt :: TypeEnv -> (HsStmt) -> TI ([Pred], TypeEnv)
 
@@ -353,7 +351,7 @@ tiStmt env expr@(HsGenerator srcLoc pat e)
         (ePs, eEnv, eT) <- tiExpr env e
         (patPs, patEnv, patT) <- tiPat pat
         unify eT (TAp tList patT)
-        return (ePs ++ patPs, eEnv `joinEnv` patEnv)
+        return (ePs ++ patPs, eEnv `Map.union` patEnv)
 
 tiStmt env stmt@(HsQualifier e)
    = withContext (makeMsg "in " $ render $ ppHsStmt stmt) $
@@ -380,10 +378,10 @@ tiAlt env alt@(HsAlt sloc pat gAlts wheres)
         sigEnv <- getSigEnv
         let wheresBgs = getFunDeclsBg sigEnv wheres
         (psPat, envPat, patT) <- tiPat pat
-        (wheresPs, wheresEnv) <- tiSeq tiBindGroup (envPat `joinEnv` env) wheresBgs
-        (psAlt, envAlt, tAlt) <- tiGuardedAlts (wheresEnv `joinEnv` envPat  `joinEnv` env) gAlts
+        (wheresPs, wheresEnv) <- tiSeq tiBindGroup (envPat `Map.union` env) wheresBgs
+        (psAlt, envAlt, tAlt) <- tiGuardedAlts (wheresEnv `Map.union` envPat  `Map.union` env) gAlts
         -- not sure about the use of wheresPs below
-        return ((psPat, patT), envPat `joinEnv` envAlt `joinEnv` wheresEnv, (wheresPs ++ psAlt, tAlt)) --Boba
+        return ((psPat, patT), envPat `Map.union` envAlt `Map.union` wheresEnv, (wheresPs ++ psAlt, tAlt)) --Boba
                        
 
 tiGuardedAlts env (HsUnGuardedAlt e)
@@ -400,11 +398,11 @@ tiGuardedAlts env (HsGuardedAlts gAlts)
         let rhsPs      = concatMap fst3 rhsPsEnvTs
         let guardTs    = map trd3 guardsPsEnvTs
         let rhsTs      = map trd3 rhsPsEnvTs
-        let guardEnv   = joinListEnvs $ map snd3 guardsPsEnvTs
-        let rhsEnv      = joinListEnvs $ map snd3 rhsPsEnvTs 
+        let guardEnv   = Map.unions $ map snd3 guardsPsEnvTs
+        let rhsEnv      = Map.unions $ map snd3 rhsPsEnvTs 
         unifyList (tBool:guardTs)                -- make sure these are all booleans
         unifyList rhsTs
-        return (guardPs ++ rhsPs, guardEnv `joinEnv` rhsEnv, head rhsTs)
+        return (guardPs ++ rhsPs, guardEnv `Map.union` rhsEnv, head rhsTs)
 
 
 -- basically the same as tiGuardedRhs
@@ -433,15 +431,15 @@ tiDecl env decl@(HsPatBind sloc pat rhs wheres) = withContext (declDiagnostic de
         sigEnv <- getSigEnv
         let wheresBgs = getFunDeclsBg sigEnv wheres
         (ps, env1)     <- tiSeq tiBindGroup env wheresBgs 
-        (qs, env2, t)  <- tiRhs (env1 `joinEnv` env) rhs
-        return (ps ++ qs, env1 `joinEnv` env2, t)
+        (qs, env2, t)  <- tiRhs (env1 `Map.union` env) rhs
+        return (ps ++ qs, env1 `Map.union` env2, t)
 
 
 tiDecl env decl@(HsFunBind matches)  = withContext (declDiagnostic decl) $ do
         psEnvts <- mapM (tiMatch env) matches
         let ps' = concatMap fst3 psEnvts
         let ts' = map trd3 psEnvts
-        let matchesEnv = joinListEnvs $ map snd3 psEnvts
+        let matchesEnv = Map.unions $ map snd3 psEnvts
         unifyList ts'  -- all matches must have the same type
         return (ps', matchesEnv, head ts') 
 
@@ -474,9 +472,9 @@ tiMatch env (HsMatch sloc funName pats rhs wheres)
         (patsPs, patsEnv, patsTs) <- tiPats pats
         sigEnv <- getSigEnv
         let wheresBgs = getFunDeclsBg sigEnv wheres 
-        (wheresPs, wheresEnv) <- tiSeq tiBindGroup (patsEnv `joinEnv` env) wheresBgs  
-        (rhsPs, rhsEnv, rhsT)   <- tiRhs (wheresEnv `joinEnv` patsEnv `joinEnv` env) rhs
-        return (wheresPs++patsPs++rhsPs, patsEnv `joinEnv` rhsEnv `joinEnv` wheresEnv, foldr fn rhsT patsTs)  --Boba
+        (wheresPs, wheresEnv) <- tiSeq tiBindGroup (patsEnv `Map.union` env) wheresBgs  
+        (rhsPs, rhsEnv, rhsT)   <- tiRhs (wheresEnv `Map.union` patsEnv `Map.union` env) rhs
+        return (wheresPs++patsPs++rhsPs, patsEnv `Map.union` rhsEnv `Map.union` wheresEnv, foldr fn rhsT patsTs)  --Boba
 
 -----------------------------------------------------------------------------
 
@@ -494,11 +492,11 @@ tiRhs env (HsGuardedRhss rhss)
         let rhsPs      = concatMap fst3 rhsPsEnvTs 
         let guardTs    = map trd3 guardsPsEnvTs
         let rhsTs      = map trd3 rhsPsEnvTs
-        let guardEnv    = joinListEnvs $ map snd3 guardsPsEnvTs
-        let rhsEnv      = joinListEnvs $ map snd3 rhsPsEnvTs 
+        let guardEnv    = Map.unions $ map snd3 guardsPsEnvTs
+        let rhsEnv      = Map.unions $ map snd3 rhsPsEnvTs 
         unifyList (tBool:guardTs)                -- make sure these are all booleans
         unifyList rhsTs
-        return (guardPs ++ rhsPs, guardEnv `joinEnv` rhsEnv, head rhsTs)
+        return (guardPs ++ rhsPs, guardEnv `Map.union` rhsEnv, head rhsTs)
         
 
 tiGuardedRhs ::  TypeEnv -> (HsGuardedRhs) -> TI (([Pred], TypeEnv, Type), ([Pred], TypeEnv, Type))
@@ -570,8 +568,8 @@ tiImpls env bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: "
       let 
           is      = getImplsNames bs
           scs     = map toScheme ts
-          newEnv1 = listToEnv $ zip is scs -- map assumpToPair $ zipWith makeAssump is scs 
-          env'    = newEnv1 `joinEnv` env 
+          newEnv1 = Map.fromList $ zip is scs -- map assumpToPair $ zipWith makeAssump is scs 
+          env'    = newEnv1 `Map.union` env 
       pssEnvs <- sequence (zipWith (tiDeclTop env') bs ts)
       let pss  = map fst pssEnvs
       let envs = map snd pssEnvs
@@ -588,12 +586,12 @@ tiImpls env bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: "
       if restricted bs then
           let gs'  = gs \\ tv rs
               scs' = map (quantify gs' . ([]:=>)) ts'
-              newEnv2 = listToEnv $ zip is scs' -- map assumpToPair $ zipWith makeAssump is scs'
-          in return (ds++rs,  (joinListEnvs envs) `joinEnv` newEnv2)
+              newEnv2 = Map.fromList $ zip is scs' -- map assumpToPair $ zipWith makeAssump is scs'
+          in return (ds++rs,  (Map.unions envs) `Map.union` newEnv2)
         else
           let scs' = map (quantify gs . (rs:=>)) ts'
-              newEnv3 = listToEnv $ zip is scs' -- map assumpToPair $ zipWith makeAssump is scs'
-          in return (ds,  (joinListEnvs envs) `joinEnv` newEnv3)  
+              newEnv3 = Map.fromList $ zip is scs' -- map assumpToPair $ zipWith makeAssump is scs'
+          in return (ds,  (Map.unions envs) `Map.union` newEnv3)  
 
 getImplsNames :: [Impl] -> [HsName]
 getImplsNames impls
@@ -611,22 +609,22 @@ type BindGroup = ([Expl], [Impl])
 tiBindGroup env (es, is)
    = do 
      modName <- getModName
-     --let env1 = listToEnv [assumpToPair $ getDeclName decl :>: sc | (sc,decl) <- es ]
-     let env1 = listToEnv [(getDeclName decl, sc) | (sc,decl) <- es ]
-     (implPs, implEnv) <- tiImpls (env1 `joinEnv` env) is
-     explPsEnv   <- mapM (tiExpl (implEnv `joinEnv` env1 `joinEnv` env)) es 
+     --let env1 = Map.fromList [assumpToPair $ getDeclName decl :>: sc | (sc,decl) <- es ]
+     let env1 = Map.fromList [(getDeclName decl, sc) | (sc,decl) <- es ]
+     (implPs, implEnv) <- tiImpls (env1 `Map.union` env) is
+     explPsEnv   <- mapM (tiExpl (implEnv `Map.union` env1 `Map.union` env)) es 
      let explPs = concat [ x | (_,x,_) <- explPsEnv]
-     let explEnv = joinListEnvs $ [ x | (_,_,x) <- explPsEnv]
-     --let env2 = listToEnv [ assumpToPair (getDeclName decl :>: sc) | (sc,_,_) <- explPsEnv | (_,decl) <- es ]
-     let env2 = listToEnv [ (getDeclName decl,sc) | (sc,_,_) <- explPsEnv | (_,decl) <- es ]
-     return (implPs ++ explPs, env2 `joinEnv` explEnv `joinEnv` implEnv)
+     let explEnv = Map.unions $ [ x | (_,_,x) <- explPsEnv]
+     --let env2 = Map.fromList [ assumpToPair (getDeclName decl :>: sc) | (sc,_,_) <- explPsEnv | (_,decl) <- es ]
+     let env2 = Map.fromList [ (getDeclName decl,sc) | (sc,_,_) <- explPsEnv | (_,decl) <- es ]
+     return (implPs ++ explPs, env2 `Map.union` explEnv `Map.union` implEnv)
 
 tiSeq ti env []
- = return ([],emptyEnv)
+ = return ([],Map.empty)
 tiSeq ti env (bs:bss)
  = do (ps,env1)  <- ti env bs
-      (qs,env2) <- tiSeq ti (env1 `joinEnv` env) bss
-      return (ps++qs, env2 `joinEnv` env1)
+      (qs,env2) <- tiSeq ti (env1 `Map.union` env) bss
+      return (ps++qs, env2 `Map.union` env1)
 
 -----------------------------------------------------------------------------
 
@@ -706,18 +704,18 @@ tiLit (HsString _)  = return ([], tString)
 
 -- Typing Patterns
 
-tiPat :: HsPat -> TI ([Pred], Env Scheme, Type)
+tiPat :: HsPat -> TI ([Pred], Map.Map HsName Scheme, Type)
 
 tiPat (HsPVar i) = do 
         v <- newTVar Star
         --let newAssump = assumpToPair $ makeAssump i (toScheme v)
-        let newAssump = (i,toScheme v)
-        return ([], unitEnv newAssump, v)
+        --let newAssump = (i,toScheme v)
+        return ([], Map.singleton i (toScheme v), v)
 
 tiPat (HsPLit l) 
    = do 
         (ps, t) <- tiLit l
-        return (ps, emptyEnv, t)
+        return (ps, Map.empty, t)
 
 -- this is for negative literals only
 -- so the pat must be a literal
@@ -735,7 +733,7 @@ tiPat (HsPInfixApp pLeft conName pRight)
         sc <- dConScheme conName
         (qs :=> t) <-  freshInst sc
         unify t (tLeft `fn` (tRight `fn` t'))
-        return (psLeft ++ psRight, envLeft `joinEnv` envRight, t')
+        return (psLeft ++ psRight, envLeft `Map.union` envRight, t')
 
 tiPat (HsPApp conName pats)
    = do
@@ -754,7 +752,7 @@ tiPat tuple@(HsPTuple pats)
 tiPat (HsPList [])
    = do
         v <- newTVar Star
-        return ([], emptyEnv, TAp tList v)
+        return ([], Map.empty, TAp tList v)
 
 tiPat (HsPList pats@(_:_))
    = do
@@ -764,13 +762,13 @@ tiPat (HsPList pats@(_:_))
 
 tiPat HsPWildCard
  = do v <- newTVar Star
-      return ([], emptyEnv, v)
+      return ([], Map.empty, v)
 
 tiPat (HsPAsPat i pat)
  = do (ps, env, t) <- tiPat pat 
       --let newAssump = makeAssump i $ toScheme t
       --let newEnv = addToEnv (assumpToPair newAssump) env
-      let newEnv = addToEnv (i,toScheme t) env
+      let newEnv = Map.insert  i (toScheme t) env
       return (ps, newEnv, t)
 
 tiPat (HsPIrrPat p)
@@ -779,10 +777,10 @@ tiPat (HsPIrrPat p)
 tiPat (HsPParen p)
  = tiPat p 
 
-tiPats :: [HsPat] -> TI ([Pred], Env Scheme, [Type])
+tiPats :: [HsPat] -> TI ([Pred], Map.Map HsName Scheme, [Type])
 tiPats pats =
   do psEnvts <- mapM tiPat pats
      let ps = [ p | (ps,_,_) <- psEnvts, p<-ps ]
-         env = joinListEnvs $ map snd3 psEnvts
+         env = Map.unions $ map snd3 psEnvts
          ts = [ t | (_,_,t) <- psEnvts ]
      return (ps, env, ts)

@@ -14,7 +14,6 @@ import Warning
 import TypeSynonyms
 import List
 import Control.Monad.Fix
-import FrontEnd.Env
 import FrontEnd.Desugar (doToExp)
 import DDataUtil
 import qualified Seq

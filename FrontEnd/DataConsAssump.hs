@@ -33,21 +33,21 @@ import Representation
 import Type                     (assumpToPair, makeAssump, Types (..), quantify)
 import TypeUtils                (aHsTypeToType)
 import KindInfer 
-import FrontEnd.Env              
+import qualified Data.Map as Map
 
 --------------------------------------------------------------------------------
 
-dataConsEnv :: Module -> KindEnv -> [HsDecl] -> Env Scheme 
+dataConsEnv :: Module -> KindEnv -> [HsDecl] -> Map.Map HsName Scheme 
 dataConsEnv modName kt decls 
-   = joinListEnvs $ map (dataDeclEnv modName kt) decls 
+   = Map.unions $ map (dataDeclEnv modName kt) decls 
 
 
 -- we should only apply this function to data decls and newtype decls
 -- howver the fall through case is just there for completeness
 
-dataDeclEnv :: Module -> KindEnv -> (HsDecl) -> Env Scheme 
+dataDeclEnv :: Module -> KindEnv -> (HsDecl) -> Map.Map HsName Scheme 
 dataDeclEnv modName kt (HsDataDecl _sloc context typeName args condecls _)
-   = joinListEnvs $ map (conDeclType modName kt preds resultType) $ condecls 
+   = Map.unions $ map (conDeclType modName kt preds resultType) $ condecls 
    where
    typeKind = kindOf typeName kt 
    resultType = foldl TAp tycon argVars
@@ -73,13 +73,15 @@ dataDeclEnv modName kt (HsNewTypeDecl _sloc context typeName args condecl _)
    preds = hsContextToPreds kt context
 
 dataDeclEnv _modName _kt _anyOtherDecl 
-   = emptyEnv
+   = Map.empty
 
 
 hsContextToPreds :: KindEnv -> HsContext -> [Pred]
 hsContextToPreds kt assts = map (hsAsstToPred kt) assts
 
-conDeclType :: Module -> KindEnv -> [Pred] -> Type -> HsConDecl -> Env Scheme 
+unitEnv (x,y) = Map.singleton x y 
+
+conDeclType :: Module -> KindEnv -> [Pred] -> Type -> HsConDecl -> Map.Map HsName Scheme 
 conDeclType modName kt preds tResult (HsConDecl _sloc conName bangTypes)
    = unitEnv $ assumpToPair $ makeAssump conName $ quantify (tv qualConType) qualConType
    where

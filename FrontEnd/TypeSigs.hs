@@ -16,8 +16,6 @@ module TypeSigs (collectSigs,
                  SigEnv,
                  listSigsToSigEnv) where
 
---import FrontEnd.Env              (Env,
---                         listToEnv)
 
 import Type             (assumpToPair)
 

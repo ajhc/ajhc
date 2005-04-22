@@ -45,8 +45,7 @@ module Type (kind,
 
 import HsSyn   (HsName (..))
 import List    (union, nub)
-import Data.FiniteMap
-import FrontEnd.Env
+import qualified Data.Map as Map
 import Representation
 import Monad   (foldM)
 import VConsts
@@ -109,10 +108,10 @@ instance Types Pred where
 -- substitutions
 
 nullSubst  :: Subst
-nullSubst   = zeroFM 
+nullSubst   = Map.empty
 
 (+->)      :: Tyvar -> Type -> Subst
-Tyvar u _ _ +-> t     = unitFM u t
+Tyvar u _ _ +-> t     = Map.singleton u t
 
 instance Types Type where
   
@@ -125,7 +124,7 @@ instance Types Type where
 --          Just t  -> t
 --          Nothing -> TVar var 
   apply s x@(TVar (Tyvar var _ _)) 
-     = case lookupFM s var of
+     = case Map.lookup var s of
           Just t  -> t
           Nothing -> x
   apply s (TAp l r)     = TAp (apply s l) (apply s r)
@@ -147,15 +146,15 @@ instance Types a => Types [a] where
 infixr 4 @@
 (@@)       :: Subst -> Subst -> Subst
 s1 @@ s2 
-   =(joinFM s1OverS2 s1)
+   =(Map.union s1OverS2 s1)
    where
    s1OverS2 = mapSubstitution s1 s2 
 
 merge      :: Monad m => Subst -> Subst -> m Subst
 merge s1 s2 = if agree then return s else fail $ "merge: substitutions don't agree" 
  where
- s = joinFM s1 s2
- agree = all (\v -> lookupFM s1 (v) == lookupFM s2 (v)) $ map fst $ toListFM $ s1 `intersectFM` s2
+ s = Map.union s1 s2
+ agree = all (\v -> (Map.lookup v s1 :: Maybe Type) == Map.lookup v s2 ) $ map fst $ Map.toList $ s1 `Map.intersection` s2
 -- agree = all (\v -> apply s1 (TVar v) == apply s2 (TVar v)) $ map fst $ toListFM $ s1 `intersectFM` s2
 
 -- highly specialised version of lookupFM for
@@ -180,9 +179,9 @@ mapSubstitution s Leaf                = Leaf
 -}
 
 
-mapSubstitution s fm =(mapFM (\_ v -> apply s v) fm)
+mapSubstitution s fm =(Map.map (\v -> apply s v) fm)
 
-rnfFM fm = foldFM (\k e a -> k `seq` e `seq` a) () fm `seq` fm
+--rnfFM fm = Map.fold (\k e a -> k `seq` e `seq` a) () fm `seq` fm
 
 --------------------------------------------------------------------------------
 
@@ -274,7 +273,7 @@ quantify      :: [Tyvar] -> Qual Type -> Scheme
 quantify vs qt = Forall ks (apply s qt)
  where vs' = [ v | v <- tv qt, v `elem` vs ]
        ks  = map kind vs'
-       s   = listToFM $ map (\(a@(Tyvar x _ _),b) -> (x,b a)) $ zip vs' (map TGen [0..])
+       s   = Map.fromList $ map (\(a@(Tyvar x _ _),b) -> (x,b a)) $ zip vs' (map TGen [0..])
 
 toScheme      :: Type -> Scheme
 toScheme t     = Forall [] ([] :=> t)
