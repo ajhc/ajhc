@@ -4,7 +4,7 @@
 -- Module      :  Language.Haskell.Lexer
 -- Copyright   :  (c) The GHC Team, 1997-2000
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
@@ -21,7 +21,7 @@ module FrontEnd.Lexer (Token(..), lexer) where
 
 import FrontEnd.ParseMonad
 
-import Char 
+import Char
 import Data.Ratio
 import qualified Data.Map as Map
 
@@ -39,7 +39,7 @@ data Token
 	| Character Char
         | StringTok String
         | PragmaOptions [String]
-        | PragmaStart String 
+        | PragmaStart String
         | PragmaEnd
 
 -- Symbols
@@ -193,7 +193,7 @@ lexWhiteSpace :: Bool -> Lex a Bool
 lexWhiteSpace bol = do
 	s <- getInput
 	case s of
-            '{':'-':'#':s | takeWhile isAlphaNum (dropWhile isSpace s) `Map.member` pragmas -> return bol  
+            '{':'-':'#':s | takeWhile isAlphaNum (dropWhile isSpace s) `Map.member` pragmas -> return bol
 	    '{':'-':_ -> do
 		discard 2
 		bol <- lexNestedComment bol
@@ -274,13 +274,13 @@ lexToken = do
         [] -> return EOF
         '{':'-':'#':s' -> do
             discard 3
-            lexWhile isSpace 
+            lexWhile isSpace
             w <- lexWhile isAlphaNum
-            case normPragma w  of 
+            case normPragma w  of
                 (False,w') -> return (PragmaStart w')
                 (True,w') -> lexRawPragma w'
-        '#':'-':'}':_ -> do 
-            discard 3 
+        '#':'-':'}':_ -> do
+            discard 3
             return PragmaEnd
 
 	'0':c:d:_ | toLower c == 'o' && isOctDigit d -> do
@@ -566,12 +566,13 @@ parseInteger radix ds =
 	foldl1 (\n d -> n * radix + d) (map (toInteger . digitToInt) ds)
 
 -- pragmas for which we just want the raw contents of
-pragmas_raw = [["OPTIONS", "JHC_OPTIONS"]]
--- pragmas for which we want to parse the insides of 
+pragmas_raw = [["OPTIONS", "JHC_OPTIONS", "OPTIONS_JHC" ]]
+-- pragmas for which we want to parse the insides of
 pragmas_std = [
-    ["INLINE"], 
-    ["NOINLINE","NOTINLINE"], 
+    ["INLINE"],
+    ["NOINLINE","NOTINLINE"],
     ["SPECIALIZE", "SPECIALISE"],
+    ["MULTISPECIALIZE", "MULTISPECIALISE"],
     ["SRCLOC_ANNOTATE"]
     ]
 

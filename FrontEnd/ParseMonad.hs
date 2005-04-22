@@ -4,7 +4,7 @@
 -- Module      :  Language.Haskell.ParseMonad
 -- Copyright   :  (c) The GHC Team, 1997-2000
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
@@ -52,7 +52,7 @@ indentOfParseState _            = 0
 -- More to come later, e.g. literate mode, language extensions.
 
 data ParseMode = ParseMode {
-				-- | original name of the file being parsed
+                -- | original name of the file being parsed
 		parseFilename :: String
 		}
 
@@ -99,7 +99,7 @@ instance Monad P where
 	fail s = P $ \_r _col _line loc _stk _m -> Failed loc s
 
 returnP :: a -> P a
-returnP = return 
+returnP = return
 thenP :: P a -> (a -> P b) -> P b
 thenP = (>>=)
 
@@ -250,7 +250,7 @@ srcParseErr
   -> Int                -- length of the previous token
   -> Message
 srcParseErr buf len
-  = hcat [ if null token 
+  = hcat [ if null token
          then ptext SLIT("parse error (possibly incorrect indentation)")
          else hcat [ptext SLIT("parse error on input "),
                 char '`', text token, char '\'']
@@ -261,7 +261,7 @@ srcParseErr buf len
 -- the location of the error.  This is the entry point for errors
 -- detected during parsing.
 srcParseFail :: P a
-srcParseFail = P $ \buf _ _ last_loc _ _ -> 
+srcParseFail = P $ \buf _ _ last_loc _ _ ->
     Failed last_loc (srcParseErr buf len)
 
 -- A lexical error is reported at a particular position in the source file,
@@ -272,7 +272,7 @@ srcParseFail = P $ \buf _ _ last_loc _ _ ->
 --lexError str = do
 --  loc <- getSrcLoc
 --  i@(end,_) <- getInput
---  failLocMsgP loc end str      
+--  failLocMsgP loc end str
 
 
 -}
