@@ -20,7 +20,7 @@ import FreeVars
 import Binary
 import Atom
 import CanType
-import {-# SOURCE #-} E.Subst 
+import {-# SOURCE #-} E.Subst
 import C.Prims
 import Data.Monoid
 import Number
@@ -34,7 +34,7 @@ import qualified Info
 
 
 data Lit e t = LitInt Number t |  LitCons Name [e] t --  | LitFrac Rational t   LitInt !Integer t  |
-	deriving(Data,Eq,Ord, Typeable) 
+	deriving(Data,Eq,Ord, Typeable)
         {-!derive: is, GhcBinary !-}
 
 
@@ -43,7 +43,7 @@ instance (Show e,Show t) => Show (Lit e t) where
     --show (LitInt x _) = show x
     --show (LitFrac r _) = show r
     show (LitInt x _) = show x
-    show (LitCons n es t) = parens $  hsep (show n:map show es) <> "::" <> show t  
+    show (LitCons n es t) = parens $  hsep (show n:map show es) <> "::" <> show t
 
 instance Functor (Lit e) where
     fmap f x = runIdentity $ fmapM (return . f) x
@@ -57,23 +57,23 @@ instance FunctorM (Lit e) where
 
 
 
-data ESort = 
+data ESort =
     EStar     -- ^ the sort of types
     | EHash   -- ^ the sort of unboxed types
     | EBox    -- ^ the sort of types of types
 
-data E = EAp E E 
-    | ELam TVr E 
-    | EPi TVr E 
-    | EVar TVr 
-    | Unknown 
-    | ESort !Int 
-    | ELit !(Lit E E) 
-    | ELetRec [(TVr, E)] E 
-    | EPrim APrim [E] E 
-    | EError String E 
-    | ECase {    
-       eCaseScrutinee :: E, 
+data E = EAp E E
+    | ELam TVr E
+    | EPi TVr E
+    | EVar TVr
+    | Unknown
+    | ESort !Int
+    | ELit !(Lit E E)
+    | ELetRec [(TVr, E)] E
+    | EPrim APrim [E] E
+    | EError String E
+    | ECase {
+       eCaseScrutinee :: E,
        eCaseBind :: TVr,
        eCaseAlts :: [Alt E],
        eCaseDefault :: (Maybe E)
@@ -90,7 +90,7 @@ data EBind = EBind [TVr] E
 fromAp e = f [] e where
     f as (EAp e a) = f (a:as) e
     f as e  =  (e,as)
---fromAp _ = fail "not application" 
+--fromAp _ = fail "not application"
 
 --fromPi (EPi (EBind ts e)) = (e,ts)
 --fromLam (ELam (EBind ts e)) = (e,ts)
@@ -109,9 +109,9 @@ data TVr' e = TVr { tvrIdent :: !Int, tvrType :: e, tvrInfo :: Info.Info }
     deriving(Data,Typeable)
     {-! derive: update !-}
 
-tVr x y = tvr { tvrIdent = x, tvrType = y } 
+tVr x y = tvr { tvrIdent = x, tvrType = y }
 
-tvr = TVr { tvrIdent = 0, tvrType = Unknown, tvrInfo = mempty } 
+tvr = TVr { tvrIdent = 0, tvrType = Unknown, tvrInfo = mempty }
 
 data TvrBinary = TvrBinaryNone | TvrBinaryAtom Atom | TvrBinaryInt Int
     {-! derive: GhcBinary !-}
@@ -127,12 +127,12 @@ instance Binary TVr where
         put_ bh (TvrBinaryInt i)
         put_ bh e
     get bh = do
-        (x ) <- get bh 
-        e <- get bh 
+        (x ) <- get bh
+        e <- get bh
         case x of
-            TvrBinaryNone -> return $ TVr 0 e mempty 
-            TvrBinaryAtom a -> return $ TVr (atomIndex a) e mempty 
-            TvrBinaryInt i -> return $ TVr (i) e mempty 
+            TvrBinaryNone -> return $ TVr 0 e mempty
+            TvrBinaryAtom a -> return $ TVr (atomIndex a) e mempty
+            TvrBinaryInt i -> return $ TVr (i) e mempty
 
 instance Show a => Show (TVr' a) where
     show TVr { tvrIdent = 0, tvrType = e} = "(_::" ++ show e ++ ")"
@@ -146,10 +146,10 @@ tvrNum TVr { tvrIdent =  n } = n
 instance FunctorM TVr' where
     fmapM f t = do e <- f (tvrType t); return t { tvrType = e }
 instance Functor TVr' where
-    fmap f t = runIdentity (fmapM (return . f) t) 
+    fmap f t = runIdentity (fmapM (return . f) t)
 
 --instance FunctorM Pat where
---    fmapM f (PatLit l) = fmapM f l >>= return . PatLit 
+--    fmapM f (PatLit l) = fmapM f l >>= return . PatLit
 --    fmapM _ PatWildCard = return PatWildCard
 
 
@@ -168,7 +168,7 @@ litHead :: Lit a b -> Lit () ()
 litHead (LitInt x _) = LitInt x ()
 litHead (LitCons s _ _) = LitCons s [] ()
 
-litBinds ((LitCons _ xs _) ) = xs 
+litBinds ((LitCons _ xs _) ) = xs
 litBinds _ = []
 
 patToLitEE (LitCons n [a,b] t) | t == eStar, n == tArrow = EPi (tVr 0 (EVar a)) (EVar b)
@@ -183,7 +183,7 @@ caseBodies ec = [ b | Alt _ b <- eCaseAlts ec] ++ maybeToMonad (eCaseDefault ec)
 casePats ec =  [ p | Alt p _ <- eCaseAlts ec]
 caseBinds ec = eCaseBind ec : concat [ xs  | LitCons _ xs _ <- casePats ec]
 
---data Pat e = PatLit !(Lit e) | PatWildCard 
+--data Pat e = PatLit !(Lit e) | PatWildCard
 --	deriving(Data,Show, Eq, Typeable)
 --    {-!derive: is, GhcBinary !-}
 
@@ -218,14 +218,14 @@ instance TypeNames E where
     tChar = ELit (LitCons tChar [] eStar)
     tBool = ELit (LitCons tBool [] eStar)
     tUnit = ELit (LitCons tUnit [] eStar)
-    tString =  (ELit (litCons TypeConstructor ("Prelude","[]") [tChar] eStar))   
+    tString =  (ELit (litCons TypeConstructor ("Prelude","[]") [tChar] eStar))
     tInteger = ELit (LitCons tInteger [] eStar)
     tWorld__ = ELit (LitCons tWorld__ [] eStar)
     tIntzh = ELit (LitCons tIntzh [] eStar)
     tIntegerzh = ELit (LitCons tIntegerzh [] eStar)
     tCharzh = ELit (LitCons tCharzh [] eStar)
 
-instance ConNames E where 
+instance ConNames E where
     vTrue = ELit vTrue
     vFalse = ELit vFalse
     vUnit  = ELit vUnit
@@ -234,8 +234,8 @@ instance ConNames (Lit x E) where
     vTrue  = (LitCons vTrue [] tBool)
     vFalse = (LitCons vFalse [] tBool)
     vUnit  = (LitCons vUnit [] tUnit)
-    
-    
+
+
 vWorld__ = ELit (litCons DataConstructor ("Jhc.IO","World__") [] tWorld__)
 
 -- types
@@ -253,7 +253,7 @@ tFunc a b = ePi (tVr 0 a) b
 tvrSilly = tVr ((-1)) Unknown
 
 -----------------
--- E constructors 
+-- E constructors
 -----------------
 
 litCons t x y z = LitCons (toName t x) y z
@@ -264,13 +264,13 @@ eBox = ESort 1
 eStar = ESort 0
 
 
-sortLetDecls ds = sortBy f ds where 
+sortLetDecls ds = sortBy f ds where
     f (TVr { tvrIdent = i },_) (TVr { tvrIdent = j } ,_) = compare i j
 
 --ePi t (EPi (EBind ts b)) = EPi $  EBind (t:ts) b
 --ePi t b = EPi $  EBind [t] b
 
-ePi a b = EPi a b 
+ePi a b = EPi a b
 
 eLam v (EError s t) = EError s (ePi v t)
 eLam v t = ELam v t
@@ -281,9 +281,9 @@ eLam v t = ELam v t
 
 {-
 discardArgs 0 e = e
-discardArgs n (EPi (EBind ts b)) 
-    | n == lts = b 
-    | n < lts = EPi (EBind (drop n ts) b) 
+discardArgs n (EPi (EBind ts b))
+    | n == lts = b
+    | n < lts = EPi (EBind (drop n ts) b)
     where
     lts = length ts
 discardArgs _ _ = error "discardArgs"
@@ -304,7 +304,7 @@ tvrName (TVr {tvrIdent =  n }) | Just a <- intToAtom n = return $ fromAtom a
 tvrName tvr = fail $ "TVr is not Name: " ++ show tvr
 
 tvrShowName :: TVr -> String
-tvrShowName t = maybe ('x':(show $ tvrNum t)) show (tvrName t) 
+tvrShowName t = maybe ('x':(show $ tvrNum t)) show (tvrName t)
 
 
 ---------------------------
@@ -323,7 +323,7 @@ eCompat (ELit (LitCons n es t)) (ELit (LitCons n' es' t')) = n == n' && all (unc
 eCompat x y = x == y
 
 
--------------------------    
+-------------------------
 -- finding free variables
 -------------------------
 
@@ -335,7 +335,7 @@ instance FreeVars E IS.IntSet where
     freeVars e = IS.fromAscList (fsts . IM.toAscList $ freeVs e)
 instance FreeVars E (Set.Set Int) where
     freeVars e = Set.fromAscList (fsts . IM.toAscList $ freeVs e)
-instance FreeVars E [Int] where 
+instance FreeVars E [Int] where
     freeVars e =  IM.keys $ freeVs e
 instance FreeVars E (IM.IntMap TVr) where
     freeVars = freeVs
@@ -344,16 +344,16 @@ instance FreeVars E (Set.Set TVr) where
 instance FreeVars E [TVr] where
     freeVars x = IM.elems $ freeVars x
 instance FreeVars (Alt E) (IM.IntMap TVr) where
-    freeVars as@(Alt l e) = IM.unions $ freeVars (getType l):(freeVars e IM.\\ IM.fromList [ (tvrNum t,t) | t <- litBinds l]):( map (freeVars . getType) $ litBinds l) 
+    freeVars as@(Alt l e) = IM.unions $ freeVars (getType l):(freeVars e IM.\\ IM.fromList [ (tvrNum t,t) | t <- litBinds l]):( map (freeVars . getType) $ litBinds l)
 instance FreeVars E t => FreeVars TVr t where
     freeVars tvr = freeVars (getType tvr)
 instance FreeVars (Alt E) (Set.Set Int) where
-    freeVars as@(Alt l e) = Set.unions $ freeVars (getType l):(freeVars e Set.\\ Set.fromList [ tvrNum t | t <- litBinds l]):( map (freeVars . getType) $ litBinds l) 
+    freeVars as@(Alt l e) = Set.unions $ freeVars (getType l):(freeVars e Set.\\ Set.fromList [ tvrNum t | t <- litBinds l]):( map (freeVars . getType) $ litBinds l)
 
 
 instance FreeVars E x => FreeVars (Lit TVr E) x where
-    freeVars l =  mconcat $ freeVars (getType l):(map (freeVars . getType) $ litBinds l) 
-    
+    freeVars l =  mconcat $ freeVars (getType l):(map (freeVars . getType) $ litBinds l)
+
 
 
 freeVs :: E -> IM.IntMap TVr
@@ -367,7 +367,7 @@ freeVs =   fv where
     fv (EPi (TVr { tvrIdent =  ( i), tvrType =  t}) e) =  (delete i $ fv e <> fv t)
     --fv (EPi (TVr Nothing t) e) = fv t <> fv e
     fv (ELetRec dl e) =  ((tl <> bl <> fv e) IM.\\ IM.fromList ll)  where
-        (ll,tl,bl) = liftT3 (id,IM.unions,IM.unions) $ unzip3 $ 
+        (ll,tl,bl) = liftT3 (id,IM.unions,IM.unions) $ unzip3 $
             map (\(tvr@(TVr { tvrIdent = j, tvrType =  t}),y) -> ((j,tvr), fv t, fv y)) dl
 
     --fv (ECase e alts ) = IM.unions ( foldl (flip ($)) [fv e] [ \x -> fvPat p:fv e:x | (p,e) <- alts] )
@@ -377,7 +377,7 @@ freeVs =   fv where
     fv (ECase e b as d) = IM.unions ( fv e:freeVars (getType $ b):(IM.delete (tvrNum b) $ IM.unions (freeVars d:map freeVars as)  ):[])
     fv Unknown = IM.empty
     fv ESort {} = IM.empty
-    fvLit (LitCons _ es e) = IM.unions $ fv e:map fv es 
+    fvLit (LitCons _ es e) = IM.unions $ fv e:map fv es
     fvLit l = freeVs (getType l)
     --fvPat (PatLit l) = fvLit l
     --fvPat _ = IM.empty
@@ -393,13 +393,13 @@ decomposeDefns bs = map g (scc (map f bs)) where
     g [x] = case ( ml x) of
         t@(_,e) | x `elem` freeVList e -> Right [t]
                 | otherwise -> Left t
-    g xs = Right (map ml xs)            
+    g xs = Right (map ml xs)
 -}
 
 decomposeDefns :: [(TVr, E)] -> [Either (TVr, E) [(TVr,E)]]
 decomposeDefns bs = map f mp where
     mp = G.stronglyConnComp [ (v,i,freeVars t `mappend` freeVars e) | v@(TVr i t _ ,e) <- bs]
-    f (AcyclicSCC v) = Left v 
+    f (AcyclicSCC v) = Left v
     f (CyclicSCC vs) = Right vs
 
 decomposeLet :: E ->  ([Either (TVr, E) [(TVr,E)]],E)
@@ -410,18 +410,18 @@ decomposeLet e = ([],e)
 decomposeDefns' :: [(TVr, E)] -> [Either ((TVr, E),[Int]) [((TVr,E),[Int])]]
 decomposeDefns' bs = map f mp where
     mp = G.stronglyConnComp [ (v,i,freeVars t `mappend` freeVars e) | v@(TVr (i) t,e) <- bs]
-    f (AcyclicSCC v) = Left v 
+    f (AcyclicSCC v) = Left v
     f (CyclicSCC vs) = Right vs
 -}
 
 sortStarLike e = e /= eBox && typ e == eBox
-sortTypeLike e = e /= eBox && not (sortStarLike e) && sortStarLike (typ e) 
-sortTermLike e = e /= eBox && not (sortStarLike e) && not (sortTypeLike e) && sortTypeLike (typ e) 
+sortTypeLike e = e /= eBox && not (sortStarLike e) && sortStarLike (typ e)
+sortTermLike e = e /= eBox && not (sortStarLike e) && not (sortTypeLike e) && sortTypeLike (typ e)
 
 -- Fast (and lazy, and perhaps unsafe) typeof
 typ ::  E -> E
 typ (ESort 0) =  eBox
-typ (ESort 1) = error "Box inhabits nowhere." 
+typ (ESort 1) = error "Box inhabits nowhere."
 typ (ESort _) = error "What sort of sort is this?"
 typ (ELit l) = getType l
 typ (EVar v) =  getType v
@@ -451,7 +451,7 @@ instance CanType (Lit x t) t where
     getType (LitCons _ _ t) = t
 instance CanType e t => CanType (Alt e) t where
     getType (Alt _ e) = getType e
-    
+
 
 eAp (EPi (TVr { tvrIdent =  0 }) b) _ = b
 eAp (EPi t b) e = subst t e b
