@@ -10,6 +10,8 @@ while(<STDIN>) {
     next if /^\s*#/;
     next unless /^\s*(\S*)\s*\:\s*(\S*)\s*$/;
     my ($a,$b) = ($1,$2);
+    $a =~ s/^\.\///;
+    $b =~ s/^\.\///;
     $b =~ s/^(\.\/)?(.*)\.[a-z-]+$/$2.o/;
     push @{$deps{$a}}, $b;
 }
@@ -26,4 +28,4 @@ while(my $do = pop @todo) {
 
 print (join(" ", keys %done), "\n");
 
-#print Dumper(\%deps);
+#print STDERR Dumper(\%deps);

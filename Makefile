@@ -42,7 +42,7 @@ MAIN=Main.hs
 	$(HC) $(HCFLAGS) $(GHCOPTS) -c $<
 
 
-jhc: $(OBJS)  PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs
+jhc: $(OBJS)  
 	$(HC) $(GHCOPTS) $(EXTRAOPTS) $(OBJS) -o $@
 
 tags: $(ALLHS)
@@ -69,7 +69,7 @@ printos:
 depend: depend.make
 
 depend.make: $(BUILTSOURCES) $(ALLHS)
-	$(HC) -M -optdep-f -optdepdepend.make $(HC_OPTS) $(ALLHS)
+	$(HC) -M -optdep-f -optdepdepend.make $(HC_OPTS) Main.hs
 	echo OBJS=`perl ./collect_deps.prl Main.o < depend.make` >> depend.make  
 
 # $(ALLHS)
