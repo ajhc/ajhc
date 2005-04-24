@@ -1,15 +1,18 @@
 {-# OPTIONS -w -funbox-strict-fields #-}
 module Options(processOptions, Opt(..), options, putVerbose, putVerboseLn, verbose, verbose2, dump, wdump, fopts, flint, fileOptions) where
 
-import GenUtil
-import System
-import System.Console.GetOpt
-import System.IO.Unsafe
-import Monad
 import Control.Monad.Error
+import Data.Version
+import GenUtil
+import Monad
 import qualified Data.Set as S
 import qualified FlagDump
 import qualified FlagOpts
+import System
+import System.Console.GetOpt
+import System.Info
+import System.IO.Unsafe
+import Version
 
 data Opt = Opt {
     optColumns     :: !Int,
@@ -24,6 +27,7 @@ data Opt = Opt {
     optCC          ::  String,
     optArgs        ::  [String],
     optInteractive :: !Bool,
+    optVersion     :: !Bool,
     optInterpret   :: !Bool,
     optKeepGoing   :: !Bool,
     optMainFunc    ::  Maybe (Bool,String),
@@ -58,6 +62,7 @@ opt = Opt {
     optOutName     = "hs.out",
     optPrelude     = True,
     optVerbose     = 0,
+    optVersion     = False,
     optDumpSet     = S.empty,
     optFOptsSet    = S.empty
 }
@@ -65,9 +70,10 @@ opt = Opt {
 idu "-" _ = []
 idu d ds = ds ++ [d]
 
-theoptions :: [OptDescr (Opt -> Opt)] 
+theoptions :: [OptDescr (Opt -> Opt)]
 theoptions =
-    [ Option ['v'] ["verbose"]   (NoArg  (optVerbose_u (+1)))    "chatty output on stderr"
+    [ Option ['V'] ["version"]   (NoArg  (optVersion_s True))    "print version info and exit"
+    , Option ['v'] ["verbose"]   (NoArg  (optVerbose_u (+1)))    "chatty output on stderr"
     , Option ['d'] []            (ReqArg (\d -> optDump_u (d:)) "dump-flag")  "dump specified data to stdout"
     , Option ['f'] []            (ReqArg (\d -> optFOpts_u (d:)) "flag")  "set compilation options"
     , Option ['o'] ["output"]    (ReqArg (optOutName_s) "FILE")  "output to FILE"
@@ -87,11 +93,11 @@ theoptions =
     , Option []    ["interactive"] (NoArg  (optInteractive_s True)) "run interactivly"
     , Option []    ["ignore-ho"] (NoArg  (optIgnoreHo_s True)) "Ignore existing haskell object files"
     , Option []    ["nowrite-ho"] (NoArg  (optNoWriteHo_s True)) "Do not write new haskell object files"
-    ]  
+    ]
 
 getColumns :: Int
 getColumns = read $ unsafePerformIO (getEnv "COLUMNS" `mplus` return "80")
-    
+
 
 postProcess o = case FlagDump.process (optDumpSet o) (optDump o ++ vv) of
         (s,errs) -> (o { optDumpSet = s }, f errs) where
@@ -106,15 +112,20 @@ postProcess' o = case FlagOpts.process (optFOptsSet o) (optFOpts o) of
         (s,errs) -> (o { optFOptsSet = s }, f errs) where
                 f [] = ""
                 f xs = "Unrecognized flag passed to '-f': " ++ unwords xs ++ "\nValid flags:\n\n" ++ FlagOpts.helpMsg
-    
+
 
 {-# NOINLINE processOptions #-}
 processOptions = do
     argv <- System.getArgs
     let header = "Usage: jhc [OPTION...] Main.hs"
     case (getOpt Permute theoptions argv) of
-	  (o,ns,[]) -> case postProcess (foldl (flip ($)) opt o) of 
-                (o,"") -> case postProcess' o of 
+	  (o,ns,[]) -> case postProcess (foldl (flip ($)) opt o) of
+                (o,"") -> case postProcess' o of
+                    (Opt { optVersion = True },_) -> do
+                        putStr $ "jhc compiled by " ++ compilerName ++ "-" ++ showVersion compilerVersion
+                        putStrLn $ " on a " ++ arch ++ " running " ++ os
+                        putStrLn changes_txt
+                        exitSuccess
                     (o,"") -> return (o { optArgs = ns })
                     (_,err) -> putErrDie err
                 (_,err) -> putErrDie err
@@ -134,7 +145,7 @@ options :: Opt
 options = unsafePerformIO processOptions
 
 putVerbose s = when (optVerbose options > 0) $ putErr s
-putVerboseLn s = putVerbose (s ++ "\n") 
+putVerboseLn s = putVerbose (s ++ "\n")
 
 verbose = optVerbose options > 0
 verbose2 = optVerbose options > 1
@@ -143,12 +154,12 @@ verbose2 = optVerbose options > 1
 
 dump s = s `S.member` optDumpSet options
 fopts s = s `S.member` optFOptsSet options
-wdump f = when (dump f) 
+wdump f = when (dump f)
 
-flint = FlagOpts.Lint `S.member` optFOptsSet options 
+flint = FlagOpts.Lint `S.member` optFOptsSet options
 
 initialIncludes = unsafePerformIO $ do
     p <- lookupEnv "JHCPATH"
     Just x <- return $  p `mplus` Just ""
     return (".":(tokens (== ':') x))
-    
+

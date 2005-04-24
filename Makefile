@@ -13,7 +13,7 @@ DRIFT= ../DrIFT/src/DrIFT
 
 ALLHS:=$(shell find . Grin Boolean Doc C E  FrontEnd DerivingDrift -maxdepth 1 -follow \( -name \*.hs -or -name \*.lhs \) -and \( \! -name Try\*.hs \) | sed -e 's@^\./@@')
 
-BUILTSOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs
+BUILTSOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs Version.hs
 
 
 # OBJS is defined in 'depend.make'
@@ -99,6 +99,11 @@ RawFiles.hs:  data/HsFFI.h data/jhc_rts.c
 
 FrontEnd/HsParser.hs: FrontEnd/HsParser.ly
 	happy -a -g -c FrontEnd/HsParser.ly
+
+Version.hs: _darcs/inventory 
+	darcs changes --context > changes.txt  || echo "No darcs Context Available!" > changes.txt
+	perl ./op_raw.prl $(basename $@) changes.txt > $@
+	rm -f changes.txt
 
 .PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs
 
