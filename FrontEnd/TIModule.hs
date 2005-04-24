@@ -42,6 +42,9 @@ trimEnv env = (Map.fromList [ n | n@(name,_) <- Map.toList env,  isGlobal name ]
 trimMapEnv env = (Map.fromAscList [ n | n@(name,_) <- Map.toAscList env,  isGlobal name ])
 --------------------------------------------------------------------------------
 
+getDeclNames ::  HsDecl -> [HsName]
+getDeclNames (HsTypeSig _ ns _ ) =  ns
+getDeclNames d = maybeGetDeclName d
 
 -- Extra data produced by the front end, used to fill in the Ho file.
 data TiData = TiData {

@@ -752,32 +752,40 @@ makeClassHierarchy (ClassHierarchy ch) kt ds = return (ClassHierarchy ans) where
 ensureNotDup :: Monad m => SrcLoc -> Inst -> [Inst] -> m ()
 ensureNotDup sl i is | i `elem` is = failSl sl $ "Duplicate Instance: " ++ show i
                      | otherwise = return ()
-    {-
 
-addClassToHierarchy :: Monad m =>  KindEnv -> HsDecl -> ClassHierarchy -> m ClassHierarchy
-addClassToHierarchy  kt (HsClassDecl _ t decls) (ClassHierarchy h) |   (HsQualType cntxt (HsTyApp (HsTyCon className) (HsTyVar argName)))  <- toHsQualType t = let 
-   qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
-   newClassContext = [(className, argName)] 
-   in return $ ClassHierarchy $ Map.insertWith combineClassRecords  className ClassRecord { className = className, classSupers = map fst cntxt, classInsts = [], classDerives = [], classAssumps = qualifiedMethodAssumps } h  
-    
+-- takes a list of things and puts a seperator string after each elem
+-- except the last, first arg is a function to convert the things into
+-- strings
+showListAndSep :: (a -> String) -> String -> [a] -> String
+showListAndSep f sep [] = []
+showListAndSep f sep [s] = f s
+showListAndSep f sep (s:ss) = f s ++ sep ++ showListAndSep f sep ss
 
-addClassToHierarchy  _ _ ch = return ch
+accLen :: Int -> [[a]] -> [(Int, [a])]
+accLen width [] = []
+accLen width (x:xs)
+   = let newWidth
+           = length x + width
+     in (newWidth, x) : accLen newWidth xs
 
-addInstancesToHierarchy :: Monad m => KindEnv -> ClassHierarchy -> [HsDecl] -> m ClassHierarchy
-addInstancesToHierarchy kt ch decls = do
-    insts <- mapM (hsInstDeclToInst kt) decls
-    return $ foldl addOneInstanceToHierarchy ch (concat insts)
-modifyClassRecord ::  (ClassRecord -> ClassRecord) -> Class -> ClassHierarchy -> ClassHierarchy
-modifyClassRecord f c (ClassHierarchy h) = case Map.lookup c h of
-           --Nothing -> error $ "modifyClassRecord: " ++ show c
-           Nothing -> ClassHierarchy $ Map.insert c (f (newClassRecord c)) h
-           Just r -> ClassHierarchy $ Map.insert c (f r) h 
+groupStringsToWidth :: Int -> [String] -> [String]
+groupStringsToWidth width ss
+   = groupStringsToWidth' width (accLen 0 ss)
+   where
+   groupStringsToWidth' :: Int -> [(Int,String)] -> [String]
+   groupStringsToWidth' width [] = []
+   groupStringsToWidth' width xs
+      = headString : groupStringsToWidth' width (accLen 0 $ map snd rest)
+      where
+      (headSegments, rest)
+         = case span ((<=width).fst) xs of
+              ([], ss)     -> ([head ss], tail ss)
+              anythingElse -> anythingElse
+      headString = concatMap snd headSegments
 
-addOneInstanceToHierarchy :: ClasHierarchy -> (Bool,Inst) -> ClassHierarchy
-addOneInstanceToHierarchy ch (x,inst@(cntxt :=> IsIn className _)) = modifyClassRecord f className ch where
-    f c 
-        | x = c { classInsts = inst:classInsts c, classDerives = inst:classDerives c }
-        | otherwise = c { classInsts = inst:classInsts c  }
-
-
--}
+showListAndSepInWidth :: (a -> String) -> Int -> String -> [a] -> String
+showListAndSepInWidth _ _ _ [] = []
+showListAndSepInWidth f width sep things
+   = unlines $ groupStringsToWidth width newThings
+   where
+   newThings = (map ((\t -> t ++ sep).f) (init things)) ++ [f (last things)]

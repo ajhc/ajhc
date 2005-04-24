@@ -27,24 +27,19 @@ import qualified PPrint
 import HsSyn
 import Representation     
 import Type      
-import Monad                    (zipWithM)
 import Diagnostic 
 import Class                    (ClassHierarchy,
                                  entails,
                                  split,
                                  topDefaults,
-                                 splitReduce,
-                                 reduce)
+                                 splitReduce)
 
 import TIMonad
 
 
-import Utils                    (isSigDecl,
-                                 isBindDecl,
-                                 fromHsName,
+import Utils                    (fromHsName,
                                  getDeclName,
                                  groupEquations,
-                                 Binding (..),
                                  fst3,
                                  snd3,
                                  trd3)
@@ -63,6 +58,10 @@ import qualified Data.Map as Map
 import Doc.PPrint
 
 
+isBindDecl :: HsDecl -> Bool
+isBindDecl HsPatBind {} = True
+isBindDecl HsFunBind {} = True 
+isBindDecl _ = False
 
 strace _ s = s
 

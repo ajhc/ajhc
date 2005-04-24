@@ -1031,7 +1031,7 @@ isRenamed (Qual _mod i) = isIdentRenamed i
 -- an identifier is renamed if it starts with one or more digits
 -- such an identifier would normally be illegal in Haskell
 isIdentRenamed :: HsIdentifier -> Bool
-isIdentRenamed i = not $ null $ takeWhile isDigit $ fromHsIdentifier i
+isIdentRenamed i = not $ null $ takeWhile isDigit $ hsIdentString i
 
 
 
@@ -1650,6 +1650,18 @@ instance Renameable a => Renameable [a] where
 -- Ident table stuff
 type IdentTable = FiniteMap HsName (SrcLoc, Binding)
 addToIdentTable _ _ = return ()
+
+data Binding
+   = TopFun             -- function binding at the top level
+   | ClassMethod        -- name of a method in a class
+   | Instance           -- an instance decl lifted to a top-level binding
+   | WhereFun           -- function binding in a where clause
+   | LetFun             -- function binding in a let expression (used to include topbinds too)
+   | LamPat             -- pattern binding in a lambda expression
+   | CasePat            -- pattern binding in a case expression
+   | GenPat             -- pattern binding in a generator statement
+   | FunPat             -- pattern binding in a function declaration
+   | Constr             -- name is a data constructor
 
 {-
 printIdentTable :: IdentTable -> IO ()
