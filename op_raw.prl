@@ -17,6 +17,7 @@ while (@ARGV) {
 
     $fn =~ s{/}{\\/}g;
     print "-- | Generated from $fn on " . `date`;
+    print "{-# NOINLINE $nn #-}\n";
     print "$nn :: String\n";
     print "$nn = \"\\\n \\";
     #print "$nn = \"";
