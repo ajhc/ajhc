@@ -138,7 +138,7 @@ processDecls stats ho ho' tiData = do
         lc <- doopt' False stats "FixupLets..." (\stats x -> atomizeApps stats x >>= coalesceLets stats)  lc
         lc <- mangle  False ("Barendregt: " ++ show n) (return . barendregt) lc
         let cm stats e = do
-            let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = dataTable, SS.so_properties = (if fopts FO.InlinePragmas then  hoProps ho else mempty) }
+            let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable, SS.so_properties = (if fopts FO.InlinePragmas then  hoProps ho else mempty) }
             let (e',stat,occ) = SS.simplify sopt e
             Stats.tickStat stats stat
             return e'

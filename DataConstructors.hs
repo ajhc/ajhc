@@ -221,7 +221,7 @@ typesCompatable dataTable a b = go a b where
 
 lookupCType dataTable e = case followAliases dataTable e of
     ELit (LitCons c [] _) | Just pt <- Prelude.lookup (show c) allCTypes -> return (c,pt)
-    _ -> fail $ "lookupCType: " ++ show e
+    e' -> fail $ "lookupCType: " ++ show (e,e')
 
 lookupCType' dataTable e = case followAliases dataTable e of
     ELit (LitCons c [] _)
@@ -229,7 +229,7 @@ lookupCType' dataTable e = case followAliases dataTable e of
           Just Constructor { conSlots = [st@(ELit (LitCons n [] _))] } <- getConstructor cn dataTable
             -> return (cn,st,show n)
     ELit (LitCons c [] _) | Just cn  <- getConstructor c dataTable -> fail $ "lookupCType: " ++ show cn
-    _ -> fail $ "lookupCType: " ++ show e
+    e' -> fail $ "lookupCType': " ++ show (e,e')
 
 followAlias :: Monad m => DataTable -> E -> m E
 followAlias dataTable (ELit (LitCons c ts e))
