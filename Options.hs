@@ -24,6 +24,8 @@ data Opt = Opt {
     optProgArgs    ::  [String],
     optShowHo      ::  [String],
     optCCargs      ::  [String],
+    optHls         ::  [String],
+    optBuildHl     ::  String,
     optCC          ::  String,
     optArgs        ::  [String],
     optInteractive :: !Bool,
@@ -46,6 +48,8 @@ opt = Opt {
     optCompile     = True,
     optDebug       = False,
     optIncdirs     = initialIncludes,
+    optHls         = [],
+    optBuildHl     = "",
     optProgArgs    = [],
     optDump        = [],
     optFOpts       = ["default"],
@@ -90,6 +94,8 @@ theoptions =
     , Option ['e'] []            (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression."
     , Option []    ["debug"]     (NoArg  (optDebug_s True)) "debugging"
     , Option []    ["show-ho"]   (ReqArg  (\d -> optShowHo_u (++ [d])) "file.ho") "Show ho file"
+    , Option ['p'] []            (ReqArg (\d -> optHls_u (++ [d])) "file.hl") "Load given haskell library .hl file"
+    , Option []    ["build-hl"]  (ReqArg (\d -> optBuildHl_s d) "file.hl") "Build hakell library from given list of modules"
     , Option []    ["interactive"] (NoArg  (optInteractive_s True)) "run interactivly"
     , Option []    ["ignore-ho"] (NoArg  (optIgnoreHo_s True)) "Ignore existing haskell object files"
     , Option []    ["nowrite-ho"] (NoArg  (optNoWriteHo_s True)) "Do not write new haskell object files"

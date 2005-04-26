@@ -73,9 +73,17 @@ bracketHtml action = do
 
 main = runMain $ bracketHtml $ do
     o <- processOptions
-    case optShowHo options of
-        [] -> processFiles  (optArgs o)
-        xs -> mapM_ dumpHoFile xs
+    case o of
+        Opt { optShowHo = xs@(_:_) } -> mapM_ dumpHoFile xs
+        Opt { optBuildHl = hlName@(_:_) } -> buildHl hlName (optArgs o) 
+        _ -> processFiles  (optArgs o)
+
+buildHl fname [] = putErrDie "Cannot build hl file without list of input modules"
+buildHl fname ms = do
+    stats <- Stats.new
+    me <- parseFiles [] (map Module ms) (processDecls stats)
+    recordHoFile me [fname] HoHeader { hohGeneration = 0, hohDepends = [], hohModDepends = [] }
+    return ()
 
 processFiles [] | Nothing <- optMainFunc options = do
     putErrDie "jhc: no input files"

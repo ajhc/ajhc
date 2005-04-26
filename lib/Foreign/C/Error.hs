@@ -1,4 +1,3 @@
-{-# OPTIONS -fno-implicit-prelude -#include "HsBase.h" #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.C.Error

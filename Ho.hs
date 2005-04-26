@@ -1,4 +1,4 @@
-module Ho(Ho(..),HoHeader(..),FileDep(..),findModule,showHoCounts,initialHo,dumpHoFile) where
+module Ho(Ho(..),HoHeader(..),FileDep(..),findModule,showHoCounts,initialHo,dumpHoFile,loadLibraries,recordHoFile) where
 
 
 import Prelude hiding(print,putStrLn)
@@ -159,12 +159,12 @@ checkForHoFile :: String            -- ^ file name to check for
 checkForHoFile fn = flip catch (\e -> putErrLn (show e) >> return Nothing) $ do
     bracket (openGetFileDep fn) (hClose . fst) $ \ (fh,dep) -> do 
     -- (fh,dep) <- openGetFileDep fn
-    if optIgnoreHo options then do
-        wdump FD.Progress $ do
-            fn' <- shortenPath fn
-            putErrLn $ "Skipping haskell object file:" <+> fn'
-        return Nothing 
-     else do 
+--    if optIgnoreHo options then do
+--        wdump FD.Progress $ do
+--            fn' <- shortenPath fn
+--            putErrLn $ "Skipping haskell object file:" <+> fn'
+--        return Nothing 
+--     else do 
     --wdump FD.Progress $ do
     --    putErrLn $ "Found haskell object file:" <+> fn
     bh <- openBinIO fh
@@ -322,7 +322,11 @@ getModule ho name files  = do
             (fh,fd,ho_name) <- findFirstFile name files 
             --if fd == emptyFileDep then return mempty else do
             when (fd == emptyFileDep) $ processIOErrors >> fail "Couldn't find file" -- then return mempty else do
-            mho <- checkForHoFile ho_name 
+            mho <- if optIgnoreHo options then do
+                    wdump FD.Progress $ do
+                        putErrLn $ "Skipping haskell object file:" <+> ho_name
+                    return Nothing 
+                   else checkForHoFile ho_name 
             case mho of 
                 Just (hh,ho') -> do 
                     as <- mapM checkHoDep (hohModDepends hh) 
@@ -452,6 +456,15 @@ showHoCounts ho = do
     putErrLn $ "hoProps:" <+> tshow (size $  hoProps ho)
     putErrLn $ "hoRules:" <+> tshow (size $  hoRules ho)
 
+
+loadLibraries :: IO Ho 
+loadLibraries = f initialHo (optHls options)  where
+    f ho [] = return ho
+    f ho (fn:rs) = checkForHoFile fn >>= \x -> case x of
+        Nothing -> putErrDie $ "Library not found or invalid: " ++ show fn
+        Just (_,ho') -> f (ho' `mappend` ho) rs
+        
+    
 
 initialHo = mempty { hoEs = es , hoClassHierarchy = ch  }  where
     ch = foldl addOneInstanceToHierarchy mempty (map ((,) False) primitiveInsts)

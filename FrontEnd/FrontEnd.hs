@@ -35,6 +35,7 @@ parseFiles fs deps func = do
         f ho (x:xs) = do
             ho' <- findModule ho x (doModules func)
             f ho' xs
+    initialHo <- loadLibraries
     ho <- f initialHo xs
     processIOErrors
     when (dump FD.AllKind) $
