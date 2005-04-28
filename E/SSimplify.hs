@@ -313,8 +313,9 @@ simplify sopts e = (e'',stat,occ) where
 
     nname tvr@(TVr { tvrIdent = n, tvrType =  t}) sub inb  = do 
         t' <- dosub sub t 
+        let t'' = substMap'' (Map.fromAscList [ (t,e) | (t,IsBoundTo _ e) <- Map.toAscList (envInScope inb) ]) t'
         n' <- uniqueName n 
-        return $ tvr { tvrIdent = n', tvrType =  t' }
+        return $ tvr { tvrIdent = n', tvrType =  t'' }
 --        case n `Map.member` inb of
 --            True -> do
 --                n' <- newName 
