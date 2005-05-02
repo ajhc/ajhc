@@ -47,7 +47,6 @@ import Utils                    (fromHsName,
 
 import DependAnalysis           (getBindGroups)
 import Maybe                    (fromMaybe)
-import TypeUtils                (aHsTypeSigToAssumps)
 import TypeSigs                 (SigEnv)
 import VConsts
                                    
