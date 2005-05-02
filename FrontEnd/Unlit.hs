@@ -36,7 +36,7 @@ unclassify Comment     = ""
 
 -- | Remove literate comments leaving normal haskell source.
 
-unlit :: 
+unlit ::
     String      -- ^ Filename for error messages
     -> String   -- ^ literate source
     -> String   -- ^ deliterated source
