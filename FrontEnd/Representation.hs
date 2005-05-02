@@ -79,22 +79,22 @@ instance Eq Type where
 
 -- Unquantified type variables
 
-data Tyvar = Tyvar {-# UNPACK #-} !Atom  !HsName Kind
+data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !HsName, tyvarKind :: Kind } 
     deriving(Data,Typeable, Show)
     {-! derive: GhcBinary !-}
 
-tyvar n k = Tyvar (fromString $ fromHsName n) n k
+tyvar n k = Tyvar (fromString $ fromHsName n) n k 
 
 instance Eq Tyvar where
-    Tyvar x _ _ == Tyvar y _ _ = x == y
-    Tyvar x _ _ /= Tyvar y _ _ = x /= y
+    Tyvar { tyvarAtom = x } == Tyvar { tyvarAtom = y } = x == y
+    Tyvar { tyvarAtom = x } /= Tyvar { tyvarAtom = y } = x /= y
 
 instance Ord Tyvar where
-    compare (Tyvar x _ _) (Tyvar y _ _) = compare x y
-    (Tyvar x _ _) <= (Tyvar y _ _) = x <= y
-    (Tyvar x _ _) >= (Tyvar y _ _) = x >= y
-    (Tyvar x _ _) < (Tyvar y _ _)  = x < y
-    (Tyvar x _ _) > (Tyvar y _ _)  = x > y
+    compare (Tyvar { tyvarAtom = x }) (Tyvar { tyvarAtom = y }) = compare x y
+    (Tyvar { tyvarAtom = x }) <= (Tyvar { tyvarAtom = y }) = x <= y
+    (Tyvar { tyvarAtom = x }) >= (Tyvar { tyvarAtom = y }) = x >= y
+    (Tyvar { tyvarAtom = x }) <  (Tyvar { tyvarAtom = y })  = x < y
+    (Tyvar { tyvarAtom = x }) >  (Tyvar { tyvarAtom = y })  = x > y
 
 
 
@@ -122,7 +122,7 @@ instance PPrint Doc Type where
 prettyPrintTypeM :: Type -> VarName Doc
 prettyPrintTypeM t
    = case t of
-           TVar (Tyvar _ tv _) -> do 
+           TVar (Tyvar { tyvarName = tv }) -> do 
                             findResult <- lookupInMap t 
                             case findResult of
                                Nothing -> do nm <- nextName
@@ -138,7 +138,7 @@ prettyPrintTypeM t
                                False -> do doc1 <- prettyPrintTypeM t1
                                            doc2 <- maybeParensAp t2 
                                            return $ doc1 <+> doc2
-           TGen _ (Tyvar _ tv _)   -> do 
+           TGen _ (Tyvar { tyvarName = tv })   -> do 
                             findResult <- lookupInMap t 
                             case findResult of
                                 Nothing -> do 

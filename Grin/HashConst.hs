@@ -42,6 +42,7 @@ newConst' fuzzy n = f n where
                 let h' = Map.insert n c h
                 put $ HcHash (c + 1) h' 
                 return (False,c) 
+    f _ = error "HashConst.newConst'"
 
 toList :: HcHash -> [(HcNode,Int)]
 toList (HcHash _ mp) = reverse ans where
