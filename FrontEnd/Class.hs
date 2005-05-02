@@ -58,6 +58,7 @@ import Data.Generics
 import Data.Monoid
 import DDataUtil
 import Doc.PPrint
+import Text.PrettyPrint.HughesPJ as PPrint
 import GenUtil(concatInter) 
 import GenUtil(snub)
 import HsSyn    
@@ -68,7 +69,6 @@ import Maybe
 import Monad
 import MonoidUtil
 import Name
-import PPrint    
 import qualified Data.Map as Map
 import Representation 
 import Type     
@@ -789,3 +789,6 @@ showListAndSepInWidth f width sep things
    = unlines $ groupStringsToWidth width newThings
    where
    newThings = (map ((\t -> t ++ sep).f) (init things)) ++ [f (last things)]
+
+pretty  :: PPrint Doc a => a -> String
+pretty   = render . pprint

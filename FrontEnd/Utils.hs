@@ -17,7 +17,6 @@ module Utils where
 
 import HsSyn
 import Char
---import PPrint (PPrint (..),vcat)
 import Control.Monad.Identity
 import Doc.DocLike
 import Doc.PPrint

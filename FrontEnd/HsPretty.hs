@@ -23,14 +23,14 @@ module HsPretty (PPLayout(..),PPHsMode(..),defaultMode,
                 ppHsName,
 		ppHsQName) where
 
-import HsSyn
-import qualified PPrint as P
-import qualified Text.PrettyPrint.HughesPJ as P
-import Options
-import FlagDump as FD
 import Char
-import VConsts
+import FlagDump as FD
 import FrontEnd.Rename(unRename)
+import HsSyn
+import Options
+import qualified Doc.PPrint as P
+import qualified Text.PrettyPrint.HughesPJ as P
+import VConsts
 
 infixl 5 $$$ 
 

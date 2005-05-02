@@ -42,19 +42,18 @@ module TIMonad (TI,
 
 import Atom
 import Class                 (ClassHierarchy)
-import Control.Monad.State hiding(State(..))
 import Data.IORef
+import Text.PrettyPrint.HughesPJ(render,Doc)
+import Doc.PPrint(pprint,PPrint)
 import Diagnostic
 import HsSyn    
 import KindInfer             (KindEnv)
 import Monad
-import PPrint                (pretty)
 import qualified Data.Map as Map
 import Representation
 import TypeSigs              (SigEnv)
 import Type                  ((@@), Types (..), Instantiate (..), nullSubst, mgu)
 import Utils
-import VConsts
 import Warning
 
 --------------------------------------------------------------------------------
@@ -258,3 +257,5 @@ freshInst (Forall ks qt) = do
         return (v)
 
 
+pretty  :: PPrint Doc a => a -> String
+pretty   = render . pprint

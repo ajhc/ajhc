@@ -32,7 +32,8 @@ module Representation(
 
 
 import HsSyn    
-import PPrint(Doc,pprint,PPrint,pptuple,nest)
+import Doc.PPrint(pprint,PPrint)
+import Text.PrettyPrint.HughesPJ(nest,Doc)
 import Utils 
 import qualified Data.Map as Map
 import Data.Generics

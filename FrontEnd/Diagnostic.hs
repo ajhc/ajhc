@@ -25,7 +25,6 @@ module Diagnostic (
 
 import List  (find)
 import Maybe (isJust)
-import PPrint (PPrint, pretty)
 import HsSyn
 import Data.Monoid
 

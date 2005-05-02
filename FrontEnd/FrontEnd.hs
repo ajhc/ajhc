@@ -13,8 +13,9 @@ import Monad
 import MultiModuleBasics
 import Options
 import qualified Data.Map as Map
+import qualified Doc.PPrint as PPrint
 import qualified FlagDump as FD
-import qualified PPrint
+import qualified Text.PrettyPrint.HughesPJ as PPrint
 import TIModule
 import Utils
 import Warning

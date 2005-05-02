@@ -28,7 +28,7 @@ import Prelude hiding((&&),(||),not,and,or,any,all)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified FlagOpts as FO
-import qualified PPrint(render)
+import qualified Text.PrettyPrint.HughesPJ as PPrint
 import qualified Seq
 import Representation
 import Utils
@@ -247,10 +247,10 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (concatMap cDecl 
         es = [ (tVr ( n) t) |  t <- ts, not (sortStarLike t) | n <- localVars ]
     cDecl (HsForeignDecl _ ForeignCCall s n _)
         | Func _ s _ _ <- p, not isIO =  expr $ createFunc dataTable [4,6..] (map tvrType es) $ \rs -> eStrictLet rtVar' (EPrim (APrim (Func False s (snds rs) rtt) req) [ EVar t | (t,_) <- rs ] rtt') (ELit $ LitCons cn [EVar rtVar'] rt')
-        | Func _ s _ _ <- p, "void" <- toExtType rt' = 
+        | Func _ s _ _ <- p, "void" <- toExtType rt' =
                 expr $ (createFunc dataTable [4,6..] (map tvrType es) $ \rs -> ELam tvrWorld $
                     eStrictLet tvrWorld2 (EPrim (APrim (Func True s (snds rs) "void") req) (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit))
-        | Func _ s _ _ <- p = 
+        | Func _ s _ _ <- p =
                 expr $ (createFunc dataTable [4,6..] (map tvrType es) $ \rs -> ELam tvrWorld $
                     eCaseTup' (EPrim (APrim (Func True s (snds rs) rtt) req) (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ LitCons cn [EVar rtVar'] rt') (eJustIO (EVar tvrWorld2) (EVar rtVar))))
         --  | AddrOf _ <- p = expr $ EPrim (APrim p req) [] rt

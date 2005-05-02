@@ -27,7 +27,8 @@ import qualified FlagDump as FD
 import qualified HsPretty
 import qualified Data.Map as Map
 import qualified Data.Map as M
-import qualified PPrint 
+import Doc.PPrint as PPrint
+import Text.PrettyPrint.HughesPJ as PPrint
 import Representation
 import TIMain             
 import TypeSigs           (collectSigs, listSigsToSigEnv)
@@ -36,7 +37,6 @@ import TypeSyns
 import Utils 
 import Warning
 import GenUtil
-import PPrint
 
 trimEnv env = (Map.fromList [ n | n@(name,_) <- Map.toList env,  isGlobal name ])
 trimMapEnv env = (Map.fromAscList [ n | n@(name,_) <- Map.toAscList env,  isGlobal name ])
