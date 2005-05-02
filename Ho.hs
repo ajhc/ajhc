@@ -45,7 +45,6 @@ import qualified Text.PrettyPrint.HughesPJ as PPrint
 import Representation
 import System.Posix.Files
 import System.Posix.IO
-import Text.PrettyPrint.HughesPJ(render)
 import TypeSynonyms
 import Warning
 

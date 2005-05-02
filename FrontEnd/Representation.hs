@@ -1,10 +1,10 @@
 {-
-        Copyright:        Mark Jones and The Hatchet Team 
+        Copyright:        Mark Jones and The Hatchet Team
                           (see file Contributors)
         Module:           Representation
         Primary Authors:  Mark Jones and Bernie Pope
-        Description:      The basic data types for representing objects 
-                          in the type inference algorithm.  
+        Description:      The basic data types for representing objects
+                          in the type inference algorithm.
         Notes:            See the file License for license information
                           Large parts of this module were derived from
                           the work of Mark Jones' "Typing Haskell in
@@ -12,8 +12,8 @@
 -}
 
 module Representation(
-    Type(..), 
-    Tyvar(..), 
+    Type(..),
+    Tyvar(..),
     tyvar,
     Tycon(..),
     fn,
@@ -31,20 +31,20 @@ module Representation(
     )where
 
 
-import HsSyn    
-import Doc.PPrint(pprint,PPrint)
-import Text.PrettyPrint.HughesPJ(nest,Doc)
-import Utils 
-import qualified Data.Map as Map
-import Data.Generics
 import Atom
-import VConsts
-import Utils
-import qualified FlagDump as FD
-import Options
 import Binary
+import Data.Generics
 import Doc.DocLike
+import Doc.PPrint(pprint,PPrint)
+import HsSyn
+import Options
+import qualified Data.Map as Map
 import qualified Doc.DocLike as D
+import qualified FlagDump as FD
+import Text.PrettyPrint.HughesPJ(nest,Doc)
+import Utils
+import Utils
+import VConsts
 
 
 --------------------------------------------------------------------------------
@@ -65,7 +65,7 @@ instance TypeNames Type where
     tString = TAp tList tChar
     tChar      = TCon (Tycon (Qual (Module "Prelude") (HsIdent "Char")) Star)
     tUnit = TCon (Tycon (Qual (Module "Prelude") (HsIdent "()")) Star)
-    
+
 tList = TCon (Tycon (Qual (Module "Prelude") (HsIdent "[]")) (Kfun Star Star))
 
 instance Eq Type where
@@ -74,17 +74,16 @@ instance Eq Type where
     (TAp a' a) == (TAp b' b) = a' == b' && b == a
     (TGen a _) == (TGen b _) = a == b
     (TArrow a' a) == (TArrow b' b) = a' == b' && b == a
---    (TTuple a) == (TTuple b) = a == b
     _ == _ = False
 
 
 -- Unquantified type variables
 
-data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !HsName, tyvarKind :: Kind } 
+data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !HsName, tyvarKind :: Kind }
     deriving(Data,Typeable, Show)
     {-! derive: GhcBinary !-}
 
-tyvar n k = Tyvar (fromString $ fromHsName n) n k 
+tyvar n k = Tyvar (fromString $ fromHsName n) n k
 
 instance Eq Tyvar where
     Tyvar { tyvarAtom = x } == Tyvar { tyvarAtom = y } = x == y
@@ -117,19 +116,19 @@ instance ToTuple Scheme where
 instance PPrint Doc Type where
   pprint t = fst $ runVarName [] Utils.nameSupply $ prettyPrintTypeM t
 
--- the trickery is to map TVars and TGens into nice 
+-- the trickery is to map TVars and TGens into nice
 -- variable names: a, b, c, d, and so on when we print them
 
 prettyPrintTypeM :: Type -> VarName Doc
 prettyPrintTypeM t
    = case t of
-           TVar (Tyvar { tyvarName = tv }) -> do 
-                            findResult <- lookupInMap t 
+           TVar (Tyvar { tyvarName = tv }) -> do
+                            findResult <- lookupInMap t
                             case findResult of
                                Nothing -> do nm <- nextName
                                              updateVMap (t, nm)
                                              return (text nm)
-                               --Just v  -> return $ text v 
+                               --Just v  -> return $ text v
                                Just v  -> return $ text v <> tyvar (text (show tv))
            TCon tycon -> return $ pprint tycon
            -- check for the Prelude.[] special case
@@ -137,12 +136,12 @@ prettyPrintTypeM t
                                True  -> do doc  <- prettyPrintTypeM t2
                                            return $ brackets doc
                                False -> do doc1 <- prettyPrintTypeM t1
-                                           doc2 <- maybeParensAp t2 
+                                           doc2 <- maybeParensAp t2
                                            return $ doc1 <+> doc2
-           TGen _ (Tyvar { tyvarName = tv })   -> do 
-                            findResult <- lookupInMap t 
+           TGen _ (Tyvar { tyvarName = tv })   -> do
+                            findResult <- lookupInMap t
                             case findResult of
-                                Nothing -> do 
+                                Nothing -> do
                                     nm <- nextName
                                     updateVMap (t, nm)
                                     --return (text nm)
@@ -151,8 +150,6 @@ prettyPrintTypeM t
            TArrow t1 t2 -> do doc1 <- maybeParensArrow t1
                               doc2 <- prettyPrintTypeM t2
                               return $ doc1 <> text " -> " <> doc2
---           TTuple ts    -> do tsDocs <- mapM prettyPrintTypeM ts
---                              return $ parens $ hcat $ punctuate comma tsDocs
     where
     -- puts parentheses around the doc for a type if needed
     maybeParensAp :: Type -> VarName Doc
@@ -173,7 +170,7 @@ prettyPrintTypeM t
 
 
 instance PPrint Doc Tycon where
-   pprint (Tycon i _) = pprint i 
+   pprint (Tycon i _) = pprint i
 
 infixr      4 `fn`
 fn         :: Type -> Type -> Type
@@ -196,12 +193,12 @@ instance DocLike d => PPrint d Kind where
    pprint (Kfun Star Star) = text "* -> *"
    pprint (Kfun k1   Star) = text "(" <> pprint k1 <> text ")" <> text " -> *"
    --pprint (Kfun Star k2)   = text "*->" <> text "(" <> pprint k2 <> text ")"
-   pprint (Kfun Star k2)   = text "* -> " <> pprint k2 
+   pprint (Kfun Star k2)   = text "* -> " <> pprint k2
    pprint (Kfun k1   k2)   = text "(" <> pprint k1 <> text ") -> (" <> pprint k2 <> text ")"
    pprint (KVar kindVar)   = pprint kindVar
 
 instance DocLike d =>  PPrint d Kindvar where
-   pprint (Kindvar s) = text $ 'k':show s 
+   pprint (Kindvar s) = text $ 'k':show s
 
 --  * -> * == [*,*]
 --  (*->*->*) -> * -> * == [(*->*->*), *, *]
@@ -218,8 +215,8 @@ data Pred   = IsIn Class Type
     {-! derive: GhcBinary !-}
 
 instance PPrint Doc Pred where
-  -- pprint (IsIn c t) = pprint c <+> pprint t 
-  pprint pred 
+  -- pprint (IsIn c t) = pprint c <+> pprint t
+  pprint pred
      = fst $ runVarName [] Utils.nameSupply $ prettyPrintPredM pred
 
 prettyPrintPredM :: Pred -> VarName Doc
@@ -227,7 +224,7 @@ prettyPrintPredM (IsIn c t)
    = do typeDoc <- prettyPrintTypeM t
         return $ pprint c <+> typeDoc
 
--- Qualified entities  
+-- Qualified entities
 data Qual t =  [Pred] :=> t
               deriving(Data,Typeable, Show, Eq,Ord)
     {-! derive: GhcBinary !-}
@@ -235,14 +232,14 @@ data Qual t =  [Pred] :=> t
 prettyPrintQualPredM :: Qual Pred -> VarName Doc
 prettyPrintQualPredM (preds :=> pred)
    = do case preds of
-           []            -> prettyPrintPredM pred 
+           []            -> prettyPrintPredM pred
            [p]           -> do leftPredDoc  <- prettyPrintPredM p
-                               rightPredDoc <- prettyPrintPredM pred 
-                               return $ hsep [leftPredDoc, text "=>", rightPredDoc]
-           preds@(_:_:_) -> do docs <- mapM prettyPrintPredM preds 
-                               let predsDoc = parens (hcat (punctuate comma docs)) 
                                rightPredDoc <- prettyPrintPredM pred
-                               return $ hsep [predsDoc, text "=>", rightPredDoc] 
+                               return $ hsep [leftPredDoc, text "=>", rightPredDoc]
+           preds@(_:_:_) -> do docs <- mapM prettyPrintPredM preds
+                               let predsDoc = parens (hcat (punctuate comma docs))
+                               rightPredDoc <- prettyPrintPredM pred
+                               return $ hsep [predsDoc, text "=>", rightPredDoc]
 
 
 
@@ -251,28 +248,28 @@ prettyPrintQualTypeM :: Qual Type -> VarName Doc
 prettyPrintQualTypeM (preds :=> t)
    = do case preds of
            []            -> prettyPrintTypeM t
-           [p]           -> do predDoc <- prettyPrintPredM p 
+           [p]           -> do predDoc <- prettyPrintPredM p
                                typeDoc <- prettyPrintTypeM t
                                return $ hsep [predDoc, text "=>", typeDoc]
-           preds@(_:_:_) -> do docs <- mapM prettyPrintPredM preds 
+           preds@(_:_:_) -> do docs <- mapM prettyPrintPredM preds
                                let predsDoc = parens (hcat (punctuate comma docs))
                                typeDoc <- prettyPrintTypeM t
                                return $ hsep [predsDoc, text "=>", typeDoc]
- 
+
 -- Class
 type Class = HsName
 
 --instance PPrint Doc t => PPrint Doc (Qual t) where
 --  pprint (ps :=> t) = pptuple ps <+> text "=>" <+> pprint t
 
-instance PPrint Doc (Qual Pred) where 
+instance PPrint Doc (Qual Pred) where
     pprint inst = fst $ runVarName [] Utils.nameSupply $ prettyPrintQualPredM inst
 
-instance PPrint Doc (Qual Type) where 
+instance PPrint Doc (Qual Type) where
     pprint inst = fst $ runVarName [] Utils.nameSupply $ prettyPrintQualTypeM inst
 
 --prettyPrintInst :: Inst -> Doc
---prettyPrintInst inst 
+--prettyPrintInst inst
 --   = fst $ runVarName [] Utils.nameSupply $ prettyPrintQualPredM inst
 
 --------------------------------------------------------------------------------
@@ -286,8 +283,6 @@ type Subst  = Map.Map Atom Type
 getTypeCons (TCon (Tycon n _)) = n
 getTypeCons (TAp a _) = getTypeCons a
 getTypeCons (TArrow {}) = Qual (Module "Prelude") $ HsIdent "->"
---getTypeCons (TTuple xs) = Qual (Module "Prelude") $ HsIdent ("(" ++ (replicate (length xs - 1) ',') ++ ")")
---getTypeCons (TTuple xs) | n <- length xs, n > 1  = toTuple n
 getTypeCons x = error $ "getTypeCons: " ++ show x
 
 -- schemes
@@ -298,7 +293,7 @@ data Scheme = Forall [Kind] (Qual Type)
     {-! derive: GhcBinary !-}
 
 instance PPrint Doc Scheme where
-  pprint scheme 
+  pprint scheme
     = fst $ runVarName [] Utils.nameSupply $ prettyPrintSchemeM scheme
 
 prettyPrintSchemeM :: Scheme -> VarName Doc
@@ -324,17 +319,17 @@ instance  PPrint Doc Assump where
 newtype VarName a = VarName (State -> (a, State))  deriving(Typeable)
 
 type VMap = [(Type, String)]  -- maps type (vars) to strings
-type NameSupply = [String]    -- a fresh name supply 
+type NameSupply = [String]    -- a fresh name supply
 
 data State = State {
-      vmap  :: VMap,       -- the map of variables to names 
-      names :: NameSupply  -- a fresh name Supply 
+      vmap  :: VMap,       -- the map of variables to names
+      names :: NameSupply  -- a fresh name Supply
    } deriving(Typeable)
 
 instance Monad VarName where
-    return a 
+    return a
         = VarName (\state -> (a, state))
-    VarName comp >>= fun   
+    VarName comp >>= fun
         = VarName (\state -> let (result, newState) = comp state
                                  VarName comp' = fun result
                              in comp' newState)
@@ -351,19 +346,21 @@ select :: (State -> a) -> VarName a
 select selector = VarName (\state -> (selector state, state))
 
 getVMap :: VarName VMap
-getVMap = select vmap 
+getVMap = select vmap
 
 updateVMap :: (Type, String) -> VarName ()
 updateVMap newEntry
    = VarName (\state -> let oldmap = vmap state
-                        in ((), state {vmap = newEntry : oldmap}))  
+                        in ((), state {vmap = newEntry : oldmap}))
 
 nextName :: VarName String
-nextName 
+nextName
    = VarName (\state -> let oldNames = names state
                         in (head oldNames, state {names = tail oldNames}))
 
 lookupInMap :: Type -> VarName (Maybe String)
-lookupInMap t 
-   = do m <- getVMap
-        return $ lookup t m 
+lookupInMap t = do
+    m <- getVMap
+    return $ lookup t m
+
+

@@ -1,6 +1,6 @@
 {-------------------------------------------------------------------------------
 
-        Copyright:              Mark Jones and The Hatchet Team 
+        Copyright:              Mark Jones and The Hatchet Team
                                 (see file Contributors)
 
         Module:                 Type
@@ -41,13 +41,12 @@ module Type (kind,
              assumpId,
              tTTuple,
              Instantiate (..)
-             ) where 
+             ) where
 
 import HsSyn   (HsName (..))
 import List    (union, nub)
 import qualified Data.Map as Map
 import Representation
-import Monad   (foldM)
 import VConsts
 
 
@@ -63,7 +62,6 @@ class Instantiate t where
 instance Instantiate Type where
   inst ts (TAp l r)     = TAp (inst ts l) (inst ts r)
   inst ts (TArrow l r)  = TArrow (inst ts l) (inst ts r)
---  inst ts (TTuple args) = TTuple $ map (inst ts) args
   inst ts t@(TGen n _)  | n < length ts = ts !! n
                         | otherwise = error $ "inst TGen " ++ show (ts,t)
   inst ts t             = t
@@ -88,8 +86,8 @@ instance HasKind Type where
   kind (TVar u)  = kind u
   kind (TAp t _) = case (kind t) of
                      (Kfun _ k) -> k
+                     _ -> error "Type.kind: Invalid kind"
   kind (TArrow _l _r) = Star
---  kind (TTuple _args) = Star
   kind (TGen _ tv) = kind tv
   --kind x = error $ "Type:kind: " ++ show x
 
@@ -114,74 +112,40 @@ nullSubst   = Map.empty
 Tyvar u _ _ +-> t     = Map.singleton u t
 
 instance Types Type where
-  
-  -- attempting to cache successful substitutions doesn't
-  -- seem to make much difference, as the variables are 
-  -- mostly independent
-
---  apply s (TVar var@(Tyvar name _kind)) 
---     = case lookupSubstitutionMap s name of
---          Just t  -> t
---          Nothing -> TVar var 
-  apply s x@(TVar (Tyvar var _ _)) 
+  apply s x@(TVar Tyvar { tyvarAtom = var })
      = case Map.lookup var s of
           Just t  -> t
           Nothing -> x
   apply s (TAp l r)     = TAp (apply s l) (apply s r)
   apply s (TArrow l r)  = TArrow (apply s l) (apply s r)
---  apply s (TTuple args) = TTuple $ map (apply s) args 
   apply _ t         = t
 
   tv (TVar u)      = [u]
   tv (TAp l r)     = tv l `union` tv r
-  tv (TArrow l r)  = tv l `union` tv r 
-  -- tv (TTuple args) = concatMap tv args 
---  tv (TTuple args) = foldl union [] $ map tv args 
+  tv (TArrow l r)  = tv l `union` tv r
   tv _             = []
 
 instance Types a => Types [a] where
-  apply s = map (apply s)              -- it may be worth using a cached version of apply in this circumstance? 
+  apply s = map (apply s)              -- it may be worth using a cached version of apply in this circumstance?
   tv      = nub . concat . map tv
 
 infixr 4 @@
 (@@)       :: Subst -> Subst -> Subst
-s1 @@ s2 
+s1 @@ s2
    =(Map.union s1OverS2 s1)
    where
-   s1OverS2 = mapSubstitution s1 s2 
+   s1OverS2 = mapSubstitution s1 s2
 
 merge      :: Monad m => Subst -> Subst -> m Subst
-merge s1 s2 = if agree then return s else fail $ "merge: substitutions don't agree" 
+merge s1 s2 = if agree then return s else fail $ "merge: substitutions don't agree"
  where
  s = Map.union s1 s2
  agree = all (\v -> (Map.lookup v s1 :: Maybe Type) == Map.lookup v s2 ) $ map fst $ Map.toList $ s1 `Map.intersection` s2
 -- agree = all (\v -> apply s1 (TVar v) == apply s2 (TVar v)) $ map fst $ toListFM $ s1 `intersectFM` s2
 
--- highly specialised version of lookupFM for
--- a Substitution. It is worth specialising this as it is called
--- frequently during a call to apply
--- according to profiling almost half of the computation time
--- is spent here
-
-{-
-lookupSubstitutionMap :: FiniteMap Tyvar Type -> HsName -> Maybe Type
-lookupSubstitutionMap (Node (Tyvar k _kind) e _ sm gr) k'
-   | k' <  k    = lookupSubstitutionMap sm k' 
-   | k' >  k    = lookupSubstitutionMap gr k' 
-   | otherwise  = Just e
-lookupSubstitutionMap Leaf _
-   = Nothing
--- specialised version of mapFM for substitutions
-
-mapSubstitution :: Subst -> FiniteMap Tyvar Type -> FiniteMap Tyvar Type 
-mapSubstitution s (Node k e n sm gr)  = Node k (apply s e) n (mapSubstitution s sm) (mapSubstitution s gr)
-mapSubstitution s Leaf                = Leaf
--}
 
 
 mapSubstitution s fm =(Map.map (\v -> apply s v) fm)
-
---rnfFM fm = Map.fold (\k e a -> k `seq` e `seq` a) () fm `seq` fm
 
 --------------------------------------------------------------------------------
 
@@ -190,29 +154,15 @@ mapSubstitution s fm =(Map.map (\v -> apply s v) fm)
 mgu     :: Monad m => Type -> Type -> m Subst
 varBind :: Monad m => Tyvar -> Type -> m Subst
 
-mgu (TAp l r) (TAp l' r') 
+mgu (TAp l r) (TAp l' r')
    = do s1 <- mgu l l'
         s2 <- mgu (apply s1 r) (apply s1 r')
         return (s2 @@ s1)
 
 mgu (TArrow l r) (TArrow l' r')
-   = do s1 <- mgu l l' 
+   = do s1 <- mgu l l'
         s2 <- mgu (apply s1 r) (apply s1 r')
         return (s2 @@ s1)
-
-
--- DEPR TTuple
---mgu (TTuple args1) (TTuple args2)
---   = do let lenArgs1 = length args1
---        let lenArgs2 = length args2
---        -- check the dimensions of the tuples are the same
---        case lenArgs1 == lenArgs2 of
---           True  -> foldM (\oldSub (t1,t2) -> case mgu (apply oldSub t1) (apply oldSub t2) of
---                                                 Nothing      -> Nothing
---                                                 Just newSub  -> return (newSub @@ oldSub)) 
---                          nullSubst
---                          (zip args1 args2)
---           False -> Nothing 
 
 mgu (TVar u) t        = varBind u t
 mgu t (TVar u)        = varBind u t
@@ -229,29 +179,15 @@ varBind u t | t == TVar u      = return nullSubst
 
 match :: Monad m => Type -> Type -> m Subst
 
-match (TAp l r) (TAp l' r') 
+match (TAp l r) (TAp l' r')
    = do sl <- match l l'
         sr <- match r r'
         merge sl sr
 
-match (TArrow l r) (TArrow l' r') 
+match (TArrow l r) (TArrow l' r')
    = do sl <- match l l'
         sr <- match r r'
         merge sl sr
-
-
--- DEPR TTuple
---match (TTuple args1) (TTuple args2) 
---   = do let lenArgs1 = length args1
---        let lenArgs2 = length args2
---        -- check the dimensions of the tuples are the same
---        case lenArgs1 == lenArgs2 of
---           True  -> foldM (\oldSub (t1,t2) -> case match t1 t2 of
---                                                 Nothing      -> Nothing
---                                                 Just newSub  -> merge oldSub newSub)
---                          nullSubst
---                          (zip args1 args2)
---           False -> Nothing 
 
 match (TVar u) t
    | kind u == kind t = return (u +-> t)
@@ -282,7 +218,6 @@ unQuantify :: Scheme -> (Qual Type)
 unQuantify (Forall _ (ps :=> t)) =  map uq' ps :=> uq t where
     uq (TAp a b) = TAp (uq a) (uq b)
     uq (TArrow a b) = TArrow (uq a) (uq b)
---    uq (TTuple ts) = TTuple (map uq ts)
     uq (TGen _ tv) = TVar tv
     uq x = x
     uq' (IsIn s t) = IsIn s (uq t)
@@ -300,11 +235,11 @@ instance Types Assump where
   tv (i :>: sc)      = tv sc
 
 
-assumpId :: Assump -> HsName 
+assumpId :: Assump -> HsName
 assumpId (id :>: _scheme) = id
 
 assumpScheme :: Assump -> Scheme
-assumpScheme (_id :>: scheme) = scheme 
+assumpScheme (_id :>: scheme) = scheme
 
 makeAssump :: HsName -> Scheme -> Assump
 makeAssump name scheme = name :>: scheme
