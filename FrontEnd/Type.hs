@@ -43,11 +43,15 @@ module Type (kind,
              Instantiate (..)
              ) where
 
-import HsSyn   (HsName (..))
+import Control.Monad.Error
+import Control.Monad.Trans
 import List    (union, nub)
 import qualified Data.Map as Map
+
+import HsSyn   (HsName (..))
 import Representation
 import VConsts
+import Data.IORef
 
 
 --------------------------------------------------------------------------------
@@ -78,7 +82,7 @@ instance Instantiate Pred where
 class HasKind t where
   kind :: t -> Kind
 instance HasKind Tyvar where
-  kind (Tyvar _ _ k) = k
+  kind Tyvar { tyvarKind = k} = k
 instance HasKind Tycon where
   kind (Tycon v k) = k
 instance HasKind Type where
@@ -109,10 +113,10 @@ nullSubst  :: Subst
 nullSubst   = Map.empty
 
 (+->)      :: Tyvar -> Type -> Subst
-Tyvar u _ _ +-> t     = Map.singleton u t
+u +-> t     = Map.singleton u t
 
 instance Types Type where
-  apply s x@(TVar Tyvar { tyvarAtom = var })
+  apply s x@(TVar var)
      = case Map.lookup var s of
           Just t  -> t
           Nothing -> x
@@ -151,26 +155,50 @@ mapSubstitution s fm =(Map.map (\v -> apply s v) fm)
 
 -- unification
 
-mgu     :: Monad m => Type -> Type -> m Subst
+mgu     :: MonadIO m => Type -> Type -> m (Maybe Subst)
 varBind :: Monad m => Tyvar -> Type -> m Subst
 
-mgu (TAp l r) (TAp l' r')
-   = do s1 <- mgu l l'
-        s2 <- mgu (apply s1 r) (apply s1 r')
+mgu x y = do
+    r <- runErrorT (mgu'' x y)
+    case r of 
+        Right x -> return (Just x)
+        Left (_::String) -> return Nothing
+    
+
+mgu'' x y = do
+    x' <- findType x
+    y' <- findType y
+    mgu' x' y'
+
+mgu' (TAp l r) (TAp l' r')
+   = do s1 <- mgu'' l l'
+        --s2 <- mgu'' (apply s1 r) (apply s1 r')
+        s2 <- mgu'' r r'
         return (s2 @@ s1)
 
-mgu (TArrow l r) (TArrow l' r')
-   = do s1 <- mgu l l'
-        s2 <- mgu (apply s1 r) (apply s1 r')
+mgu' (TArrow l r) (TArrow l' r')
+   = do s1 <- mgu'' l l'
+        --s2 <- mgu'' (apply s1 r) (apply s1 r')
+        s2 <- mgu'' r r'
         return (s2 @@ s1)
 
-mgu (TVar u) t        = varBind u t
-mgu t (TVar u)        = varBind u t
-mgu (TCon tc1) (TCon tc2)
+mgu' t@(TVar Tyvar { tyvarRef = Nothing }) (TVar u@Tyvar { tyvarRef = Just _ } )  = varBind' u t
+mgu' (TVar u) t        = varBind' u t
+mgu' t (TVar u)        = varBind' u t
+mgu' (TCon tc1) (TCon tc2)
            | tc1==tc2 = return nullSubst
            | otherwise = fail "mgu: Constructors don't match"
 --mgu (TGen n tv) (TGen n' tv') | n == n' = varBind tv' (TVar tv)
-mgu t1 t2  = fail "mgu: types do not unify"
+mgu' t1 t2  = fail "mgu: types do not unify"
+
+varBind' u t | t == TVar u      = return nullSubst
+            | u `elem` tv t    = fail "varBind: occurs check fails"
+            | kind u == kind t, Just r <- tyvarRef u = do
+                Nothing <- liftIO $ readIORef r
+                liftIO $ writeIORef r (Just t)
+                return (u +-> t)
+            | otherwise        = fail "varBind: kinds do not match"
+
 
 varBind u t | t == TVar u      = return nullSubst
             | u `elem` tv t    = fail "varBind: occurs check fails"
@@ -179,23 +207,28 @@ varBind u t | t == TVar u      = return nullSubst
 
 match :: Monad m => Type -> Type -> m Subst
 
-match (TAp l r) (TAp l' r')
+match x y = do
+    --x' <- findType x
+    --y' <- findType y
+    match' x y
+
+match' (TAp l r) (TAp l' r')
    = do sl <- match l l'
         sr <- match r r'
         merge sl sr
 
-match (TArrow l r) (TArrow l' r')
+match' (TArrow l r) (TArrow l' r')
    = do sl <- match l l'
         sr <- match r r'
         merge sl sr
 
-match (TVar u) t
+match' (TVar u) t
    | kind u == kind t = return (u +-> t)
 
-match (TCon tc1) (TCon tc2)
+match' (TCon tc1) (TCon tc2)
    | tc1==tc2         = return nullSubst
 
-match t1 t2           = fail $ "match: " ++ show (t1,t2)
+match' t1 t2           = fail $ "match: " ++ show (t1,t2)
 
 tTTuple ts | length ts < 2 = error "tTTuple"
 tTTuple ts = foldl TAp (toTuple (length ts)) ts
@@ -209,7 +242,7 @@ quantify      :: [Tyvar] -> Qual Type -> Scheme
 quantify vs qt = Forall ks (apply s qt)
  where vs' = [ v | v <- tv qt, v `elem` vs ]
        ks  = map kind vs'
-       s   = Map.fromList $ map (\(a@(Tyvar x _ _),b) -> (x,b a)) $ zip vs' (map TGen [0..])
+       s   = Map.fromList $ map (\(a,b) -> (a,b a)) $ zip vs' (map TGen [0..])
 
 toScheme      :: Type -> Scheme
 toScheme t     = Forall [] ([] :=> t)

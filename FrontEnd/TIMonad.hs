@@ -26,7 +26,6 @@ module TIMonad (TI,
                 runTI,
                 getErrorContext,
                 withContext,
-                getSubst,
                 getClassHierarchy,
                 getKindEnv,
                 getSigEnv,
@@ -44,7 +43,6 @@ import Monad
 import qualified Data.Map as Map
 import Text.PrettyPrint.HughesPJ(render,Doc)
 
-import Atom
 import Class                 (ClassHierarchy)
 import Diagnostic
 import Doc.PPrint(pprint,PPrint)
@@ -52,8 +50,8 @@ import HsSyn
 import KindInfer             (KindEnv)
 import Representation
 import TypeSigs              (SigEnv)
-import Type                  ((@@), Types (..), Instantiate (..), nullSubst, mgu)
-import Utils
+import Type                  ((@@), Instantiate (..), mgu)
+import Utils()
 import Warning
 
 --------------------------------------------------------------------------------
@@ -67,7 +65,7 @@ data TcEnv = TcEnv {
       tcModuleName        :: Module,
       tcDiagnostics       :: [Diagnostic],   -- list of information that might help diagnosis
       tcVarnum            :: IORef Int,
-      tcSubst             :: IORef Subst,
+      -- tcSubst             :: IORef Subst,
       tcDConsEnv          :: Map.Map HsName Scheme,
       tcSigs              :: SigEnv
     }
@@ -106,15 +104,15 @@ instance Functor TI where
 runTI     :: Map.Map HsName Scheme-> ClassHierarchy -> KindEnv -> SigEnv -> Module -> TI a -> IO a
 runTI env' ch' kt' st' mod' (TI c) = do
     vn <- newIORef 0
-    sub <- newIORef nullSubst
-    c tcenv {  tcVarnum = vn,  tcSubst = sub } where
+    -- sub <- newIORef nullSubst
+    c tcenv {  tcVarnum = vn } where
     tcenv = TcEnv {
         tcClassHierarchy = ch',
         tcKinds = kt',
         tcModuleName = mod',
         tcSigs = st',
         tcVarnum = undefined,
-        tcSubst = undefined,
+        -- tcSubst = undefined,
         tcDConsEnv = env',
         tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ fromModule mod']
 
@@ -136,8 +134,8 @@ getErrorContext :: TI [Diagnostic]
 getErrorContext = asks tcDiagnostics
 
 
-getSubst :: TI Subst
-getSubst = TI $ \t -> readIORef (tcSubst t) -- gets subst
+--getSubst :: TI Subst
+--getSubst = TI $ \t -> readIORef (tcSubst t) -- gets subst
 
 getDConsTypeEnv :: TI (Map.Map HsName Scheme)
 getDConsTypeEnv = TI $ \t -> return (tcDConsEnv t) -- gets env
@@ -155,6 +153,7 @@ getModName :: TI Module
 getModName = asks tcModuleName
 
 
+
 dConScheme :: HsName -> TI Scheme
 dConScheme conName
    = do
@@ -167,9 +166,25 @@ dConScheme conName
            Just s -> return s
 
 unify      :: Type -> Type -> TI ()
-unify t1 t2 = do s <- getSubst
-                 let t1' = apply s t1
-                     t2' = apply s t2
+unify t1 t2 = do 
+    t1' <- findType t1
+    t2' <- findType t2
+    b <- mgu t1' t2' 
+    case b of 
+        Just u -> return () -- extSubst u
+        Nothing -> do
+                  diagnosis <- getErrorContext
+                  typeError (Unification $ "attempted to unify " ++
+                                           pretty t1' ++
+                                           " with " ++
+                                           pretty t2')
+                            diagnosis
+
+{-
+--s <- getSubst            
+--let t1' = apply s t1     
+--    t2' = apply s t2     
+
                  case mgu t1' t2' of
                    Just u  -> extSubst u
                    Nothing -> do
@@ -179,6 +194,7 @@ unify t1 t2 = do s <- getSubst
                                                        " with " ++
                                                        pretty t2')
                                         diagnosis
+-}
 
 unifyList :: [Type] -> TI ()
 unifyList [] = return ()
@@ -189,13 +205,15 @@ unifyList (t1:t2:ts) = do
 
 
 extSubst   :: Subst -> TI ()
-extSubst s' = TI (\t -> modifyIORef (tcSubst t) (s' @@))
+--extSubst s' = TI (\t -> modifyIORef (tcSubst t) (s' @@))
+extSubst s = sequence_ [ do y' <- findType y ; liftIO $ writeIORef r (Just y') | (Tyvar { tyvarRef = ~(Just r)} ,y) <- Map.toList s] 
 
 newTVar    :: Kind -> TI Type
 newTVar k   = TI $ \te -> do
                 n <- readIORef (tcVarnum te)
+                r <- newIORef Nothing
                 let ident = Qual (tcModuleName te) $ HsIdent $ "v" ++ show n
-                    v = Tyvar (Atom.fromString $ fromHsName ident) ident k
+                    v = tyvar ident k (Just r)
                 writeIORef (tcVarnum te) $! n + 1
                 return $ TVar v
 

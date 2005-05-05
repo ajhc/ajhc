@@ -56,7 +56,7 @@ dataDeclEnv modName kt (HsDataDecl _sloc context typeName args condecls _)
    argKinds = init $ unfoldKind typeKind 
    fromHsNameToTyVar :: (Kind, HsName) -> Type
    fromHsNameToTyVar (k, n) 
-      = TVar (tyvar n k)
+      = TVar (tyvar n k Nothing)
    preds = hsContextToPreds kt context
 
 dataDeclEnv modName kt (HsNewTypeDecl _sloc context typeName args condecl _)
@@ -69,7 +69,7 @@ dataDeclEnv modName kt (HsNewTypeDecl _sloc context typeName args condecl _)
    argKinds = init $ unfoldKind typeKind
    fromHsNameToTyVar :: (Kind, HsName) -> Type
    fromHsNameToTyVar (k, n)
-      = TVar (tyvar n k)
+      = TVar (tyvar n k Nothing)
    preds = hsContextToPreds kt context
 
 dataDeclEnv _modName _kt _anyOtherDecl 

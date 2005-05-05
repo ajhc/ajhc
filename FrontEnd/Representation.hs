@@ -22,10 +22,13 @@ module Representation(
     unfoldKind,
     Pred(..),
     Qual(..),
+    findType,
     Class,
     Subst,
     getTypeCons,
+    flattenType,
     Scheme(..),
+    FlattenType(..),
     Assump(..),
     tList
     )where
@@ -42,9 +45,11 @@ import qualified Data.Map as Map
 import qualified Doc.DocLike as D
 import qualified FlagDump as FD
 import Text.PrettyPrint.HughesPJ(nest,Doc)
+import Control.Monad.Trans
 import Utils
 import Utils
 import VConsts
+import Data.IORef
 
 
 --------------------------------------------------------------------------------
@@ -79,9 +84,80 @@ instance Eq Type where
 
 -- Unquantified type variables
 
-data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !HsName, tyvarKind :: Kind }
-    deriving(Data,Typeable, Show)
-    {-! derive: GhcBinary !-}
+data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !HsName, tyvarKind :: Kind, tyvarRef :: Maybe (IORef (Maybe Type)) }
+    deriving(Data,Typeable)
+    {-  derive: GhcBinary -}
+
+instance Show Tyvar where 
+    showsPrec _ Tyvar { tyvarName = hn, tyvarKind = k, tyvarRef = Just _ } = shows hn . (":-" ++) . shows k 
+    showsPrec _ Tyvar { tyvarName = hn, tyvarKind = k } = shows hn . ("::" ++) . shows k 
+
+findType :: MonadIO m => Type -> m Type 
+findType tv@(TVar Tyvar {tyvarRef = Just r }) = liftIO $ do
+    rt <- readIORef r 
+    case rt of 
+        Nothing -> return tv
+        Just t -> do
+            t' <- findType t
+            writeIORef r (Just t')
+            return t'
+findType tv = return tv
+
+refType (TVar tv@Tyvar {tyvarRef = Nothing}) = do
+    r <- newIORef Nothing
+    return $ TVar tv { tyvarRef = Just r } 
+refType t = return t
+
+unrefType (TVar tv) =  TVar tv { tyvarRef = Nothing }
+unrefType t = t
+
+
+class FlattenType t where
+    flattenType' ::  t -> IO t
+
+flattenType :: (FlattenType t, MonadIO m) => t -> m t 
+flattenType t = liftIO (flattenType' t)
+
+instance FlattenType t => FlattenType [t] where
+   flattenType' xs = mapM flattenType' xs 
+
+instance FlattenType Pred where
+    flattenType' (IsIn c t) = do
+        t' <- flattenType' t
+        return $ IsIn c t'
+
+instance FlattenType t => FlattenType (Qual t) where
+    flattenType' (ps :=> t) = do
+        ps' <- flattenType' ps
+        t' <- flattenType' t
+        return $ ps' :=> t'
+
+instance FlattenType Type where
+    flattenType' tv =  do
+        tv' <- findType tv 
+        --tv' <- refType tv'
+        let ft (TAp x y) = do
+                x' <- flattenType' x
+                y' <- flattenType' y
+                return $ TAp x' y'
+            ft (TArrow x y) = do
+                x' <- flattenType' x
+                y' <- flattenType' y
+                return $ TArrow x' y'
+            ft t = return t
+        ft tv'
+
+instance FlattenType Scheme where
+    flattenType' (Forall ks qt) = flattenType' qt >>= return . Forall ks
+
+instance FlattenType Assump where
+    flattenType' (ks :>: qt) = flattenType' qt >>= return . (:>:) ks
+
+instance FlattenType t => FlattenType (Map.Map x t) where
+    flattenType' mp = sequence [flattenType' y >>= return . (,) x| (x,y) <- Map.toAscList mp] >>= return . Map.fromDistinctAscList
+
+instance Show (IORef a) where
+    showsPrec _ _ = ("<IORef>" ++)
 
 tyvar n k = Tyvar (fromString $ fromHsName n) n k
 
@@ -276,7 +352,7 @@ instance PPrint Doc (Qual Type) where
 
 -- substitutions
 
-type Subst  = Map.Map Atom Type
+type Subst = Map.Map Tyvar Type
 
 --------------------------------------------------------------------------------
 
@@ -363,4 +439,18 @@ lookupInMap t = do
     m <- getVMap
     return $ lookup t m
 
+
+instance Binary Tyvar where
+    put_ bh (Tyvar aa ab ac ad) = do
+            put_ bh aa
+            put_ bh ab
+            put_ bh ac
+            --put_ bh ad
+    get bh = do
+    aa <- get bh
+    ab <- get bh
+    ac <- get bh
+    --ad <- get bh
+    --ad <- newIORef Nothing
+    return (Tyvar aa ab ac Nothing)
 

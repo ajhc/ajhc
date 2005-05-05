@@ -41,8 +41,8 @@ import VConsts
 tipe (TAp t1 t2) = eAp (tipe t1) (tipe t2)
 tipe (TArrow t1 t2) =  EPi (tVr 0 (tipe t1)) (tipe t2)
 tipe (TCon (Tycon n k)) =  ELit (LitCons (toName TypeConstructor n) [] (kind k))
-tipe (TGen n (Tyvar _ _ k)) = EVar (tVr ((n + 1) * 2 ) (kind k))
-tipe (TVar (Tyvar _ n k)) = error "tipe': Tyvar"
+tipe (TGen n (Tyvar { tyvarKind = k })) = EVar (tVr ((n + 1) * 2 ) (kind k))
+tipe (TVar Tyvar {}) = error "tipe': Tyvar"
 kind Star = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."

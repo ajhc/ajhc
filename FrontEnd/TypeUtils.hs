@@ -52,7 +52,7 @@ aHsTypeSigToAssumps kt sig@(HsTypeSig _ names qualType)
 aHsAsstToPred :: KindEnv -> HsAsst -> Pred
 aHsAsstToPred kt (className, varName)
    -- = IsIn className (TVar $ Tyvar varName (kindOf varName kt))
-   = IsIn className (TVar $ tyvar varName (kindOf className kt))
+   = IsIn className (TVar $ tyvar varName (kindOf className kt) Nothing)
 
 -- one sig can be given to multiple names, hence
 -- the multiple assumptions in the output

@@ -253,7 +253,7 @@ ppHsImportSpec (HsIThingWith name nameList)      = ppHsName name <>
 
 -------------------------  Declarations ------------------------------
 ppHsDecl :: HsDecl -> Doc
-ppHsDecl (HsForeignDecl _ _ s n qt) = text "ForeignDecl" <+> ppHsName n <+> ppHsQualType qt
+ppHsDecl fd@(HsForeignDecl _ _ s n qt) = text "ForeignDecl" <+> ppHsName n <+> ppHsQualType qt <+> text (show fd)
 ppHsDecl (HsTypeDecl loc name nameList htype) = 
 	   --blankline $
 	   mySep ( [text "type",ppHsName name] 

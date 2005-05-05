@@ -55,8 +55,8 @@ lt n =  atomIndex $ toAtom $ toName TypeVal n
 tipe (TAp t1 t2) = eAp (tipe t1) (tipe t2)
 tipe (TArrow t1 t2) =  EPi (tVr 0 (tipe t1)) (tipe t2)
 tipe (TCon (Tycon n k)) =  ELit (LitCons (toName TypeConstructor n) [] (kind k))
-tipe (TVar (Tyvar _ n k)) = EVar (tVr (lt n) (kind k))
-tipe (TGen _ (Tyvar _ n k)) = EVar (tVr (lt n) (kind k))
+tipe (TVar (Tyvar _ n k _)) = EVar (tVr (lt n) (kind k))
+tipe (TGen _ (Tyvar _ n k _)) = EVar (tVr (lt n) (kind k))
 --tipe (TTuple ts) = ltTuple (map tipe ts)
 --    tipe (TCon (Tycon n k)) = foldr ($) (ELit (LitCons (getName n) (map EVar es) rt)) (map ELam es) where
 --        (ts,rt) = argTypes' (kind k)
@@ -94,13 +94,13 @@ simplifyHsPat p = error $ "simplifyHsPat: " ++ show p
 
 convertVal assumps n = (mp EPi ts (tipe t), mp eLam ts) where
     Just (Forall _ (_ :=> t)) = Map.lookup n assumps -- getAssump n
-    mp fn (((Tyvar _ n k)):rs) t = fn (tVr (lt n) (kind k)) (mp fn rs t)
+    mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (lt n) (kind k)) (mp fn rs t)
     mp _ [] t = t
     ts = ctgen t
     lt n =  nameToInt (fromTypishHsName  n)
 
 convertOneVal (Forall _ (_ :=> t)) = (mp EPi ts (tipe t)) where
-    mp fn (((Tyvar _ n k)):rs) t = fn (tVr (lt n) (kind k)) (mp fn rs t)
+    mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (lt n) (kind k)) (mp fn rs t)
     mp _ [] t = t
     ts = ctgen t
     lt n =  nameToInt (fromTypishHsName  n)

@@ -432,7 +432,7 @@ convType tsks
 
 toType :: (HsType, Kind) -> Type
 toType (HsTyCon n, k) = TCon $ Tycon n k
-toType (HsTyVar n, k) = TVar $ tyvar n k
+toType (HsTyVar n, k) = TVar $ tyvar n k Nothing
 toType (HsTyFun x y, Star) = TArrow (toType (x,Star)) (toType (y,Star))
 toType x = error $ "toType: " ++ show x
 
@@ -569,7 +569,7 @@ newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
    --ct n | n == classArg = return $ aHsTypeToType kt instanceType
    --ct n = return n
    newQualType = everywhere (mkT at) $ quantify (tv qt) qt 
-   at (Tyvar _ n k) =  tyvar (hsNameIdent_u (hsIdentString_u (++ foo)) n) k
+   at (Tyvar _ n k r) =  tyvar (hsNameIdent_u (hsIdentString_u (++ foo)) n) k r
    qt = (map (aHsAsstToPred kt) newCntxt ++ restContext) :=> (everywhere (mkT ct) t) 
    ct n | n == classArg =  aHsTypeToType kt instanceType
    ct n =  n
@@ -685,7 +685,7 @@ defs h v qs = [ t | all ((TVar v)==) ts,
 
 withDefaults     :: Monad m => ClassHierarchy ->  [Tyvar] -> [Pred] -> m [(Tyvar, [Pred], Type)]
 withDefaults h vs ps 
-  | any null tss = fail $ "ambiguity: " ++ (render $ pprint ps) 
+  | any null tss = fail $ "withDefaults.ambiguity: " ++ (render $ pprint ps) ++ show vs ++ show ps
 --  | otherwise = fail $ "Zambiguity: " ++ (render $ pprint ps) ++  show (ps,ps',ams)  
   | otherwise    = return $ [ (v,qs,head ts) | (v,qs,ts) <- ams ]
     where ams = ambig h vs ps
@@ -701,7 +701,7 @@ genDefaults h vs ps = do
 
 useDefaults     :: Monad m => ClassHierarchy -> [Tyvar] -> [Pred] -> m [Pred]
 useDefaults h vs ps
-  | any null tss = fail $ "ambiguity: " ++ (render $ pprint ps) ++  show ps  
+  | any null tss = fail $ "useDefaults.ambiguity: " ++ (render $ pprint ps) ++  show ps  
   | otherwise = fail $ "Zambiguity: " ++ (render $ pprint ps) ++  show (ps,ps',ams)  
   | otherwise    = return $ ps \\ ps'
     where ams = ambig h vs ps
@@ -714,7 +714,7 @@ topDefaults h ps
   | otherwise    = return $ listToFM (zip vs (map head tss))
     where ams = ambig h [] ps
           tss = [ ts | (v,qs,ts) <- ams ]
-          vs  = [ v  | (Tyvar v _ _,qs,ts) <- ams ]
+          vs  = [ v  | (v,qs,ts) <- ams ]
 
 defaults    :: [Type]
 defaults     = map (\name -> TCon (Tycon (Qual (Module "Prelude") (HsIdent name)) Star))

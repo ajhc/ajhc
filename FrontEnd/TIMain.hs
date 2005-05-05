@@ -55,6 +55,8 @@ import Doc.PPrint as PPrint
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 
+getSubst = return Map.empty
+
 isBindDecl :: HsDecl -> Bool
 isBindDecl HsPatBind {} = True
 isBindDecl HsFunBind {} = True
@@ -453,9 +455,9 @@ declDiagnostic decl@(HsFunBind matches) = locMsg (srcLoc decl) "in the function 
 
 tiDeclTop ::  TypeEnv -> HsDecl -> Type -> TI ([Pred], TypeEnv)
 tiDeclTop env decl t
-   = do psEnvT <- tiDecl env decl
-        unify t (trd3 psEnvT)
-        return (fst3 psEnvT, snd3 psEnvT)
+   = do (ps,env,t') <- tiDecl env decl
+        unify t t'
+        return (ps, env)
 
 --------------------------------------------------------------------------------
 
@@ -513,24 +515,37 @@ tiGuardedRhs env gRhs@(HsGuardedRhs sloc eGuard eRhs)
 type Expl = (Scheme, HsDecl)
 
 
---tiExpl ::  TypeEnv -> Expl -> TI ([Pred], TypeEnv)
-tiExpl env (sc, decl)
- = withContext
-       (locSimple (srcLoc decl) ("in the explicitly typed " ++  (render $ ppHsDecl decl))) $
-    do
+tiExpl ::  TypeEnv -> Expl -> TI (Scheme, [Pred], TypeEnv)
+tiExpl env (sc, HsForeignDecl {}) = do
+    return (sc,[],Map.empty)
+tiExpl env (sc, decl) = withContext
+       (locSimple (srcLoc decl) ("in the explicitly typed " ++  (render $ ppHsDecl decl))) $ do
+       --liftIO $ putStrLn  $ render (ppHsDecl decl)
        cHierarchy <- getClassHierarchy
-       --(qs :=> t) <- fmap snd $ freshInst sc
+       --(qs :=> t) <- -fmap snd $ freshInst sc
        let (qs :=> t) = unQuantify sc
+       t <- flattenType t
+       qs <- flattenType qs
+       --liftIO $ putStrLn  $ show sc
        (ps, env') <- tiDeclTop env decl t
+       --liftIO $ putStrLn  $ show ps
+       ps <- flattenType ps
+
+       --qs' <- flattenType qs
+       --ps'' <- flattenType ps
+       fs <- liftM tv (flattenType env)
+       --qs' <- sequence [ flattenType y >>= return . IsIn x | IsIn x y <- qs]
        s          <- getSubst
        let qs'     = apply s qs
            t'      = apply s t
            ps'     = [ p | p <- apply s ps, not (entails cHierarchy qs' p) ]
-           fs      = tv (apply s env)
+       --    fs      = tv (apply s env)
            gs      = tv t' {- \\ fs  -} -- TODO fix this!
            sc'     = quantify gs (qs':=>t')
        -- (ds,rs) <- reduce cHierarchy fs gs ps'
+       --liftIO $ putStrLn  $ show (gs,ps')
        (ds,rs,nsub) <- splitReduce cHierarchy fs gs ps'
+       --liftIO $ putStrLn  $ show (ds,rs,nsub)
        sequence_ [ unify  (TVar tv) t | (tv,t) <- nsub ]
        --extSubst nsub
        --unify t' t
@@ -557,23 +572,28 @@ restricted bs
    isSimpleDecl (HsPatBind _sloc _pat _rhs _wheres) = True
    isSimpleDecl _ = False
 
+tiImpls ::  TypeEnv -> [Impl] -> TI ([Pred], TypeEnv)
 tiImpls env [] = return ([],env)
 tiImpls env bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ (show (map getDeclName bs)))) $ do
+      --liftIO $ mapM (putStrLn .  render . ppHsDecl) bs 
       cHierarchy <- getClassHierarchy
       ts <- mapM (\_ -> newTVar Star) bs
       let
           is      = getImplsNames bs
           scs     = map toScheme ts
-          newEnv1 = Map.fromList $ zip is scs -- map assumpToPair $ zipWith makeAssump is scs
+          newEnv1 = Map.fromList $ zip is scs
           env'    = newEnv1 `Map.union` env
       pssEnvs <- sequence (zipWith (tiDeclTop env') bs ts)
       let pss  = map fst pssEnvs
       let envs = map snd pssEnvs
       s   <- getSubst
-      let ps'     = apply s (concat pss)
-          ts'     = apply s ts
-          fs      = tv (apply s env)
-          vss@(_:_)  = map tv ts'
+      ps' <- flattenType $ concat pss
+      ts' <- flattenType ts
+      fs <- liftM tv (flattenType env)
+      --let ps'     = apply s (concat pss)
+      --    ts'     = apply s ts
+      --    fs      = tv (apply s env)
+      let vss@(_:_)  = map tv ts'
           gs      = foldr1 union vss \\ fs
       -- (ds,rs) <- reduce cHierarchy fs (foldr1 intersect vss) ps'
       (ds,rs,nsub) <- splitReduce cHierarchy fs (foldr1 intersect vss) ps'
@@ -671,9 +691,12 @@ tiProgram ::  Module -> SigEnv -> KindEnv -> ClassHierarchy -> TypeEnv -> TypeEn
 tiProgram modName sEnv kt h dconsEnv env bgs = runTI dconsEnv h kt sEnv modName $
   do (ps, env1) <- tiSeq tiBindGroup env bgs
      s         <- getSubst
+     ps <- flattenType ps 
      ([], rs) <- split h [] (apply s ps)
      case topDefaults h rs of
-       Right s' -> return $  apply ( s'@@s)  env1
+       Right s' -> do
+        env1' <- flattenType env1
+        return $  apply  s'  env1'
        --Nothing -> return $  apply  s env1
        Left s -> fail $ show modName ++ s
 
