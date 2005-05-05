@@ -67,7 +67,7 @@ printCheckName dataTable e = do
 
 bracketHtml action = do
     pn <- System.getProgName
-    as <- System.getArgs 
+    as <- System.getArgs
     wdump FD.Html $ putStrLn $ "<html><head><title>" ++ (unwords (pn:as)) ++ "</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body style=\"background: black; color: lightgrey\"><pre>"
     action `finally` (wdump FD.Html $ putStrLn "</pre></body></html>")
 
@@ -75,7 +75,7 @@ main = runMain $ bracketHtml $ do
     o <- processOptions
     case o of
         Opt { optShowHo = xs@(_:_) } -> mapM_ dumpHoFile xs
-        Opt { optBuildHl = hlName@(_:_) } -> buildHl hlName (optArgs o) 
+        Opt { optBuildHl = hlName@(_:_) } -> buildHl hlName (optArgs o)
         _ -> processFiles  (optArgs o)
 
 buildHl fname [] = putErrDie "Cannot build hl file without list of input modules"
@@ -304,7 +304,9 @@ compileModEnv' stats ho = do
         wdump FD.Progress $ putErrLn ("Writing " ++ show cf)
         writeFile cf $ cg -- toUTF8  (prettyC z ++ concatMap (\(i,n) -> "//" ++ 'v':show i ++ " -> " ++ n ++ "\n") (snd us))
         --let comm =  "gcc -std=gnu99 -g -Wall -o '" ++ fn ++ "' '" ++ cf ++ "'"
-        let comm = shellQuote $ [optCC options, "-std=gnu99", "-g", "-Wall", "-o", fn, cf ] ++ rls ++ optCCargs options
+        let boehmOpts | fopts FO.Boehm = ["-DUSE_BOEHM_GC", "-lgc"]
+                      | otherwise = []
+        let comm = shellQuote $ [optCC options, "-std=gnu99", "-g", "-Wall", "-o", fn, cf ] ++ rls ++ optCCargs options  ++ boehmOpts
         wdump FD.Progress $ putErrLn ("Running: " ++ comm)
         r <- System.system comm
         when (r /= System.ExitSuccess) $ fail "C code did not compile."

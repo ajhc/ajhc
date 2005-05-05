@@ -10,6 +10,13 @@
 #include <math.h>
 #include <float.h>
 
+#ifdef USE_BOEHM_GC
+#include <gc/gc.h>
+#define malloc GC_malloc
+#define free GC_free
+#endif
+
+
 #ifdef __GNUC__
 #define A_NORETURN __attribute__ ((noreturn))
 #define A_PURE __attribute__ ((pure))

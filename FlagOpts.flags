@@ -1,13 +1,14 @@
-# -f code options 
+# -f code options
 
 !Code Options
 inline-pragmas use inline pragmas
-rules use rules 
+rules use rules
 wrapper wrap main in exception handler
 float-in perform float inward transform
 
-lint perform lots of extra type checks 
-cpp Pass code through cpp.
+lint perform lots of extra type checks
+cpp pass code through cpp
+boehm use Boehm garbage collector
 
 
 !Default settings
