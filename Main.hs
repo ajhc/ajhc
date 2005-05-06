@@ -306,7 +306,7 @@ compileModEnv' stats ho = do
         --let comm =  "gcc -std=gnu99 -g -Wall -o '" ++ fn ++ "' '" ++ cf ++ "'"
         let boehmOpts | fopts FO.Boehm = ["-DUSE_BOEHM_GC", "-lgc"]
                       | otherwise = []
-        let comm = shellQuote $ [optCC options, "-std=gnu99", "-g", "-Wall", "-o", fn, cf ] ++ rls ++ optCCargs options  ++ boehmOpts
+        let comm = shellQuote $ [optCC options, "-std=gnu99", "-foptimize-sibling-calls", "-O", "-funit-at-a-time", "-g", "-Wall", "-o", fn, cf ] ++ rls ++ optCCargs options  ++ boehmOpts
         wdump FD.Progress $ putErrLn ("Running: " ++ comm)
         r <- System.system comm
         when (r /= System.ExitSuccess) $ fail "C code did not compile."
