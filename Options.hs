@@ -15,31 +15,31 @@ import System.IO.Unsafe
 import Version
 
 data Opt = Opt {
-    optColumns     :: !Int,
-    optCompile     :: !Bool,
-    optDebug       :: !Bool,
-    optDump        ::  [String],
-    optFOpts       ::  [String],
-    optIncdirs     ::  [String],
-    optProgArgs    ::  [String],
-    optShowHo      ::  [String],
-    optCCargs      ::  [String],
-    optHls         ::  [String],
-    optBuildHl     ::  String,
-    optCC          ::  String,
+    optColumns     :: !Int,       -- ^ Width of terminal.
+    optCompile     :: !Bool,      -- ^ Compile.
+    optDebug       :: !Bool,      -- ^ Debugging.
+    optDump        ::  [String],  -- ^ Dump options (raw).
+    optFOpts       ::  [String],  -- ^ Flag options (raw).
+    optIncdirs     ::  [String],  -- ^ Include directories.
+    optProgArgs    ::  [String],  -- ^ Arguments to pass to the interpreted program.
+    optShowHo      ::  [String],  -- ^ Show ho-file.
+    optCCargs      ::  [String],  -- ^ Optional arguments to the C compiler.
+    optHls         ::  [String],  -- ^ Load the specified hl-files (haskell libraries).
+    optBuildHl     ::  String,    -- ^ Build a hl (haskell library) from the set of modules given.
+    optCC          ::  String,    -- ^ C compiler.
     optArgs        ::  [String],
-    optInteractive :: !Bool,
-    optVersion     :: !Bool,
-    optInterpret   :: !Bool,
-    optKeepGoing   :: !Bool,
-    optMainFunc    ::  Maybe (Bool,String),
-    optOutName     ::  String,
-    optPrelude     :: !Bool,
-    optIgnoreHo    :: !Bool,
-    optNoWriteHo   :: !Bool,
-    optVerbose     :: !Int,
-    optDumpSet     ::  S.Set FlagDump.Flag,
-    optFOptsSet    ::  S.Set FlagOpts.Flag
+    optInteractive :: !Bool,      -- ^ Run interactively.
+    optVersion     :: !Bool,      -- ^ Print version and die.
+    optInterpret   :: !Bool,      -- ^ Interpret.
+    optKeepGoing   :: !Bool,      -- ^ Keep going when encountering errors.
+    optMainFunc    ::  Maybe (Bool,String),    -- ^ Entry point name for the main function.
+    optOutName     ::  String,                 -- ^ Name of output file.
+    optPrelude     :: !Bool,                   -- ^ No implicit Prelude.
+    optIgnoreHo    :: !Bool,                   -- ^ Ignore ho-files.
+    optNoWriteHo   :: !Bool,                   -- ^ Don't write ho-files.
+    optVerbose     :: !Int,                    -- ^ Verbosity
+    optDumpSet     ::  S.Set FlagDump.Flag,    -- ^ Dump flags.
+    optFOptsSet    ::  S.Set FlagOpts.Flag     -- ^ Flag options (-f\<opt\>).
   } deriving(Show) {-!derive: update !-}
 
 
@@ -101,6 +101,7 @@ theoptions =
     , Option []    ["nowrite-ho"] (NoArg  (optNoWriteHo_s True)) "Do not write new haskell object files"
     ]
 
+-- | Width of terminal.
 getColumns :: Int
 getColumns = read $ unsafePerformIO (getEnv "COLUMNS" `mplus` return "80")
 
@@ -121,6 +122,8 @@ postProcess' o = case FlagOpts.process (optFOptsSet o) (optFOpts o) of
 
 
 {-# NOINLINE processOptions #-}
+-- | Parse commandline options.
+processOptions :: IO Opt
 processOptions = do
     argv <- System.getArgs
     let header = "Usage: jhc [OPTION...] Main.hs"
@@ -147,25 +150,42 @@ fileOptions xs = case getOpt Permute theoptions xs of
     (_,_,errs) -> fail (concat errs)
 
 {-# NOINLINE options #-}
+-- | The global options currently used.
 options :: Opt
 options = unsafePerformIO processOptions
 
+-- | Put a string to stderr when running verbose.
+putVerbose :: String -> IO ()
 putVerbose s = when (optVerbose options > 0) $ putErr s
+
+-- | Put a line to stderr when running verbose.
+putVerboseLn :: String -> IO ()
 putVerboseLn s = putVerbose (s ++ "\n")
 
+-- | Is verbose > 0?
+verbose :: Bool
 verbose = optVerbose options > 0
+-- | Is verbose > 1?
+verbose2 :: Bool
 verbose2 = optVerbose options > 1
 
---dump s = s `S.member` S.fromList (optDump options)
-
+-- | Test whether a dump flag is set.
+dump :: FlagDump.Flag -> Bool
 dump s = s `S.member` optDumpSet options
+-- | Test whether an option flag is set.
+fopts :: FlagOpts.Flag -> Bool
 fopts s = s `S.member` optFOptsSet options
+-- | Do the action when the suplied dump flag is set.
+wdump :: (Monad m) => FlagDump.Flag -> m () -> m ()
 wdump f = when (dump f)
 
+-- | Is the \"lint\" option flag set?
+flint :: Bool
 flint = FlagOpts.Lint `S.member` optFOptsSet options
 
+-- | Include directories taken from JHCPATH enviroment variable.
+initialIncludes :: [String]
 initialIncludes = unsafePerformIO $ do
     p <- lookupEnv "JHCPATH"
-    Just x <- return $  p `mplus` Just ""
+    let x = maybe "" id p
     return (".":(tokens (== ':') x))
-
