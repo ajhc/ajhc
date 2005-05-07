@@ -25,8 +25,10 @@ class Monad m => NameMonad n m | m -> n  where
     --  | get bound names
     -- getNames :: m [n]
 
+-- | Generating names.
+
 class GenName n where
-    -- | Generate a list of canidate names given a seed
+    -- | Generate a list of candidate names given a seed
     genNames :: Int -> [n]
 
 instance GenName Int where
@@ -36,6 +38,7 @@ instance GenName Int where
 instance GenName Atom where
     genNames i = map (toAtom . show) [abs i..]
     
+-- | Generate an infinite list of names not present in the given set.
 freeNames :: (Ord n,GenName n) => Set.Set n -> [n]
 freeNames s  = filter (not . (`Set.member` s)) (genNames (Set.size s))
 
@@ -47,13 +50,18 @@ instance (Monad m, Monad (t m), MonadTrans t, NameMonad n m) => NameMonad n (t m
 
     --getNames = lift getNames
 
+-- | Name monad transformer.
 newtype NameMT n m a = NameMT (StateT (Set.Set n, Set.Set n) m a)
     deriving(Monad, MonadTrans, Functor, MonadFix, MonadPlus, MonadIO)
 
+-- | Run the name monad transformer.
+runNameMT :: (Monad m) => NameMT a1 m a -> m a
 runNameMT (NameMT x) = liftM fst $ runStateT x (Set.empty,Set.empty)
 
 
+fromNameMT :: NameMT n m a -> StateT (Set.Set n, Set.Set n) m a
 fromNameMT (NameMT x) = x
+
 instance (GenName n,Ord n,Monad m) => NameMonad n (NameMT n m) where
     addNames ns = NameMT $ do 
         modify (\ (used,bound) -> (Set.fromList ns `Set.union` used, bound) )
@@ -62,9 +70,9 @@ instance (GenName n,Ord n,Monad m) => NameMonad n (NameMT n m) where
         if n `Set.member` bound then fromNameMT newName else put (Set.insert n used,Set.insert n bound) >> return n
     newNameFrom vs = NameMT $ do
         (used,bound) <- get 
-        let f (v:vs) 
-                | v `Set.member` used = f vs
-                | otherwise = v
+        let f (x:xs)
+                | x `Set.member` used = f xs
+                | otherwise = x
             f [] = error "newNameFrom: finite list!"
             nn = f vs
         put (Set.insert nn used, Set.insert nn bound) 
