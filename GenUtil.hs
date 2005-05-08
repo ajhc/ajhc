@@ -436,7 +436,7 @@ shellQuote ss = unwords (map f ss) where
 -- | looks up an enviornment variable and returns it in an arbitrary Monad rather
 -- than raising an exception if the variable is not set.
 lookupEnv :: Monad m => String -> IO (m String)
-lookupEnv s = catch (fmap return $ System.getEnv s) (\e -> if IO.isDoesNotExistError e then fail (show e) else ioError e)
+lookupEnv s = catch (fmap return $ System.getEnv s) (\e -> if IO.isDoesNotExistError e then return (fail (show e)) else ioError e)
 
 {-# SPECIALIZE fmapLeft :: (a -> c) -> [(Either a b)] -> [(Either c b)] #-}
 fmapLeft :: Functor f => (a -> c) -> f (Either a b) -> f (Either c b)
