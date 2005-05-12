@@ -24,7 +24,6 @@ module Grin.Grin(
     p0,p1,p2,p3,
     n0,n1,n2,n3,
     Var(..),
-    createEval',
     sequenceG_,
     funcEval,
     funcFetch,
@@ -313,6 +312,7 @@ valIsNF Lit {} = True
 valIsNF _ = False
 
 
+{-
 
 -- create an eval suitable for inlining.
 createEval' :: Bool -> TyEnv -> [Tag] -> Lam
@@ -340,7 +340,6 @@ createEval' shared  te ts
         | otherwise = App (toAtom $ n) vs
 
 
-{-
 createEval :: TyEnv -> [Tag] -> Exp
 createEval  te ts
     | null cs = Error ("Empty Eval:" ++ show ts) TyNode
