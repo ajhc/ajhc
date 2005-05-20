@@ -360,6 +360,7 @@ renameHsDecl (HsClassDecl srcLoc hsQualType hsDecls) subTable = do
     {- WAS: typeSigSubTable <- updateSubTableWithHsQualType initialSubTable hsQualType -}
     typeSigSubTable <- updateSubTableWithHsQualType startingSubTable hsQualType
     hsQualType' <- renameHsQualType hsQualType typeSigSubTable
+    doesClassMakeSense hsQualType'
     hsDecls' <- renameHsDecls hsDecls subTable
     return (HsClassDecl srcLoc hsQualType' hsDecls')
 renameHsDecl (HsInstDecl srcLoc hsQualType hsDecls) subTable = do
@@ -387,7 +388,13 @@ renameHsDecl (HsPragmaProps srcLoc prop hsNames) subTable = do
 renameHsDecl otherHsDecl _ = return otherHsDecl
 
 
-
+doesClassMakeSense :: HsQualType -> ScopeSM ()
+doesClassMakeSense (HsQualType _ type_) =
+ case type_ of
+  (HsTyApp (HsTyCon _) (HsTyVar _)) -> return ()
+  (HsTyApp (HsTyApp _ _) _)         -> failRename "Multiparameter typeclasses not supported"
+  (HsTyCon _)                       -> failRename "Typeclass with no parameters"
+  _                                 -> failRename $ "Invalid type in class declaration: "++show type_
 
 renameHsQualType :: HsQualType -> SubTable -> ScopeSM (HsQualType)
 renameHsQualType (HsQualType hsContext hsType) subTable = do
