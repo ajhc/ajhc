@@ -271,8 +271,8 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >	| 'newtype' ctype srcloc '=' constr deriving
 >			{% checkDataHeader $2 `thenP` \(cs,c,t) ->
 >			   returnP (HsNewTypeDecl $3 cs c t $5 $6) }
->	| 'class' srcloc ctype optcbody	
->			{ HsClassDecl $2 $3 $4 }
+>	| 'class' srcloc ctype optfundep optcbody
+>			{ HsClassDecl $2 $3 $5 }
 >	| 'instance' srcloc ctype optvaldefs	
 >			{ HsInstDecl $2 $3 $4 }
 >	| 'default' srcloc type		
@@ -470,6 +470,24 @@ Class declarations
 > cdefaults :: { [HsDecl] }
 >	: cdefaults ';' valdef			{ $3 : $1 }
 >	| valdef				{ [$1] }
+
+-----------------------------------------------------------------------------
+Functional dependencies
+
+> optfundep :: { [([HsName],[HsName])] }
+>       : {- empty -}                           { [] }
+>       | '|' fundeps                           { reverse $2 }
+
+> fundeps   :: { [([HsName],[HsName])] }
+>       : fundeps ',' fundep                    { ($3:$1) }
+>       | fundep                                { [$1]    }
+
+> fundep    :: { ([HsName],[HsName]) }
+>       : varids '->' varids                    { ($1,$3) }
+
+> varids    :: { [HsName] }
+>       : {- empty -}                           { [] }
+>       | varids tyvar                          { ($2:$1) }
 
 -----------------------------------------------------------------------------
 Instance declarations
