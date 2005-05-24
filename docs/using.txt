@@ -32,7 +32,7 @@ writable by the user of jhc* otherwise the compiler cannot create its
 intermediate files.
 
 Set the environment variable JHCPATH to the location of the library wherever
-you put it, or pass -l<dir> to jhc every time you call it so it can find the
+you put it, or pass -i<dir> to jhc every time you call it so it can find the
 standard libraries.
 
 The first time you compile something, jhc will automatically create an
