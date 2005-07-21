@@ -1,10 +1,10 @@
 
---  $Id: GenUtil.hs,v 1.40 2005/02/02 11:55:22 john Exp $
+--  $Id: GenUtil.hs,v 1.42 2005/07/21 09:22:10 john Exp $
 -- arch-tag: 835e46b7-8ffd-40a0-aaf9-326b7e347760
 
 
 -- Copyright (c) 2002 John Meacham (john@foo.net)
--- 
+--
 -- Permission is hereby granted, free of charge, to any person obtaining a
 -- copy of this software and associated documentation files (the
 -- "Software"), to deal in the Software without restriction, including
@@ -12,10 +12,10 @@
 -- distribute, sublicense, and/or sell copies of the Software, and to
 -- permit persons to whom the Software is furnished to do so, subject to
 -- the following conditions:
--- 
+--
 -- The above copyright notice and this permission notice shall be included
 -- in all copies or substantial portions of the Software.
--- 
+--
 -- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
 -- OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
 -- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -34,15 +34,15 @@
 
 module GenUtil(
     -- * Functions
-    -- ** Error reporting 
+    -- ** Error reporting
     putErr,putErrLn,putErrDie,
-    -- ** Simple deconstruction 
+    -- ** Simple deconstruction
     fromLeft,fromRight,fsts,snds,splitEither,rights,lefts,
     -- ** System routines
     exitSuccess, System.exitFailure, epoch, lookupEnv,endOfTime,
     -- ** Random routines
     repMaybe,
-    liftT2, liftT3, liftT4, 
+    liftT2, liftT3, liftT4,
     snub, snubFst, sortFst, groupFst, foldl',
     fmapLeft,fmapRight,isDisjoint,isConjoint,
     groupUnder,
@@ -58,7 +58,7 @@ module GenUtil(
     toMonadM, ioM, ioMp, foldlM, foldlM_, foldl1M, foldl1M_,
     -- ** Text Routines
     -- *** Quoting
-    shellQuote, simpleQuote, simpleUnquote, 
+    shellQuote, simpleQuote, simpleUnquote,
     -- *** Layout
     indentLines,
     buildTableLL,
@@ -134,7 +134,7 @@ groupFst :: Eq a => [(a,b)] -> [[(a,b)]]
 groupFst = groupBy (\(x,_) (y,_) -> x == y)
 
 -- | group a list based on a function of the values.
-groupUnder :: Eq b => (a -> b) -> [a] -> [[a]]  
+groupUnder :: Eq b => (a -> b) -> [a] -> [[a]]
 groupUnder f = groupBy (\x y -> f x == f y)
 -- | sort a list based on a function of the values.
 sortUnder :: Ord b => (a -> b) -> [a] -> [a]
@@ -149,22 +149,22 @@ sortGroupUnderFG :: Ord b => (a -> b) -> (a -> c) -> [a] -> [(b,[c])]
 sortGroupUnderFG f g xs = [ (f x, map g xs) |  xs@(x:_) <- sortGroupUnder f xs]
 
 minimumUnder :: Ord b => (a -> b) -> [a] -> a
-minimumUnder f [] = error "minimumUnder: empty list"
+minimumUnder _ [] = error "minimumUnder: empty list"
 minimumUnder f (x:xs) = g (f x) x xs where
     g _ x [] = x
     g fb b (x:xs)
         | fx < fb = g fx x xs
         | otherwise = g fb b xs where
-            fx = f x 
+            fx = f x
 
 maximumUnder :: Ord b => (a -> b) -> [a] -> a
-maximumUnder f [] = error "maximumUnder: empty list"
+maximumUnder _ [] = error "maximumUnder: empty list"
 maximumUnder f (x:xs) = g (f x) x xs where
     g _ x [] = x
     g fb b (x:xs)
         | fx > fb = g fx x xs
         | otherwise = g fb b xs where
-            fx = f x 
+            fx = f x
 
 -- | Flushes stdout and writes string to standard error
 putErr :: String -> IO ()
@@ -172,16 +172,16 @@ putErr s = IO.hFlush IO.stdout >> IO.hPutStr IO.stderr s
 
 -- | Flush stdout and write string and newline to standard error
 putErrLn :: String -> IO ()
-putErrLn s = IO.hFlush IO.stdout >> IO.hPutStrLn IO.stderr s 
+putErrLn s = IO.hFlush IO.stdout >> IO.hPutStrLn IO.stderr s
 
 
--- | Flush stdout, write string and newline to standard error, 
+-- | Flush stdout, write string and newline to standard error,
 -- then exit program with failure.
 putErrDie :: String -> IO a
 putErrDie s = putErrLn s >> System.exitFailure
 
 
--- | exit program successfully. 'exitFailure' is 
+-- | exit program successfully. 'exitFailure' is
 -- also exported from System.
 exitSuccess :: IO a
 exitSuccess = System.exitWith System.ExitSuccess
@@ -199,7 +199,7 @@ fromLeft _ = error "fromLeft"
 
 -- | recursivly apply function to value until it returns Nothing
 repMaybe :: (a -> Maybe a) -> a -> a
-repMaybe f e = case f e of 
+repMaybe f e = case f e of
     Just e' -> repMaybe f e'
     Nothing -> e
 
@@ -224,7 +224,7 @@ class Monad m => UniqueProducer m where
 --    modifyUniq :: (Int -> Int) -> m ()
 --    newUniq = do
 --	v <- peekUniq
---	modifyUniq (+1) 
+--	modifyUniq (+1)
 --	return v
 
 rtup a b = (b,a)
@@ -288,14 +288,14 @@ foldl1M _ _ = error "foldl1M"
 
 foldlM_ :: Monad m => (a -> b -> m a) -> a -> [b] -> m ()
 foldlM_ f v xs = foldlM f v xs >> return ()
-     
+
 foldl1M_ ::Monad m => (a -> a -> m a)  -> [a] -> m ()
 foldl1M_ f xs = foldl1M f xs >> return ()
 
 -- | partition a list of eithers.
 splitEither :: [Either a b] -> ([a],[b])
-splitEither  (r:rs) = case splitEither rs of 
-    (xs,ys) -> case r of 
+splitEither  (r:rs) = case splitEither rs of
+    (xs,ys) -> case r of
         Left x -> (x:xs,ys)
         Right y -> (xs,y:ys)
 splitEither          [] = ([],[])
@@ -314,7 +314,7 @@ mapSnd    g (x,y) = (  x,g y)
 {-# INLINE mapFsts #-}
 {-# INLINE mapSnds #-}
 mapFsts :: (a -> b) -> [(a,c)] -> [(b,c)]
-mapFsts f xs = [(f x, y) | (x,y) <- xs] 
+mapFsts f xs = [(f x, y) | (x,y) <- xs]
 mapSnds :: (a -> b) -> [(c,a)] -> [(c,b)]
 mapSnds g xs = [(x, g y) | (x,y) <- xs]
 
@@ -342,7 +342,7 @@ ioMp action = catch (fmap return action) (\_ -> return mzero)
 paragraph :: Int -> String -> String
 paragraph maxn xs = drop 1 (f maxn (words xs)) where
     f n (x:xs) | lx < n = (' ':x) ++ f (n - lx) xs where
-        lx = length x + 1    
+        lx = length x + 1
     f _ (x:xs) = '\n': (x ++ f (maxn - length x) xs)
     f _ [] = "\n"
 
@@ -350,27 +350,27 @@ chunk :: Int -> [a] -> [[a]]
 chunk mw s | length s < mw = [s]
 chunk mw s = case splitAt mw s of (a,b) -> a : chunk mw b
 
-chunkText :: Int -> String -> String 
+chunkText :: Int -> String -> String
 chunkText mw s = concatMap (unlines . chunk mw) $ lines s
 
 {-
-paragraphBreak :: Int -> String -> String 
+paragraphBreak :: Int -> String -> String
 paragraphBreak  maxn xs = unlines (map ( unlines . map (unlines . chunk maxn) . lines . f maxn ) $ lines xs) where
     f _ "" = ""
     f n xs | length ss > 0 = if length ss + r rs > n then '\n':f maxn rs else ss where
-        (ss,rs) = span isSpace xs  
+        (ss,rs) = span isSpace xs
     f n xs = ns ++ f (n - length ns) rs where
-        (ns,rs) = span (not . isSpace) xs  
+        (ns,rs) = span (not . isSpace) xs
     r xs = length $ fst $ span (not . isSpace) xs
 -}
 
-paragraphBreak :: Int -> String -> String 
+paragraphBreak :: Int -> String -> String
 paragraphBreak  maxn xs = unlines $ (map f) $ lines xs where
     f s | length s <= maxn = s
     f s | isSpace (head b) = a ++ "\n" ++ f (dropWhile isSpace b)
         | all (not . isSpace) a = a ++ "\n" ++ f b
         | otherwise  = reverse (dropWhile isSpace sa) ++ "\n" ++ f (reverse ea ++ b) where
-            (ea, sa) = span (not . isSpace) $ reverse a 
+            (ea, sa) = span (not . isSpace) $ reverse a
             (a,b) = splitAt maxn s
 
 expandTabs' :: Int -> Int -> String -> String
@@ -399,10 +399,10 @@ tr as bs s = map (f as bs) s where
     f (a:_) (b:_) c | a == c = b
     f (_:as) (_:bs) c = f as bs c
     f [] _ c = c
-    f as' [] c = f as' bs c  
+    f as' [] c = f as' bs c
     --f _ _ _ = error "invalid tr"
 
- 
+
 -- | quote strings rc style. single quotes protect any characters between
 -- them, to get an actual single quote double it up. Inverse of 'simpleUnquote'
 simpleQuote :: [String] -> String
@@ -423,7 +423,7 @@ simpleUnquote s = f (dropWhile isSpace s)  where
     quote' a (x:xs) = quote' (x:a) xs
     quote' a [] = (reverse a, "")
 
--- | quote a set of strings as would be appropriate to pass them as 
+-- | quote a set of strings as would be appropriate to pass them as
 -- arguments to a sh style shell
 shellQuote :: [String] -> String
 shellQuote ss = unwords (map f ss) where
@@ -456,16 +456,16 @@ fmapRight fn = fmap f where
 {-# SPECIALIZE isConjoint :: [Int] -> [Int] -> Bool #-}
 -- | set operations on lists. (slow!)
 isDisjoint, isConjoint :: Eq a => [a] -> [a] -> Bool
-isConjoint xs ys = or [x == y | x <- xs, y <- ys] 
+isConjoint xs ys = or [x == y | x <- xs, y <- ys]
 isDisjoint xs ys = not (isConjoint xs ys)
 
--- | 'concat' composed with 'List.intersperse'. Can be used similarly to join in perl. 
+-- | 'concat' composed with 'List.intersperse'. Can be used similarly to join in perl.
 concatInter :: String -> [String] -> String
 concatInter x = concat . (intersperse x)
 
 -- | place spaces before each line in string.
-indentLines :: Int -> String -> String 
-indentLines n s = unlines $ map (replicate n ' ' ++)$ lines s 
+indentLines :: Int -> String -> String
+indentLines n s = unlines $ map (replicate n ' ' ++)$ lines s
 
 -- | trim blank lines at beginning and end of string
 trimBlankLines :: String -> String
@@ -491,7 +491,7 @@ foldl' f a (x:xs) = (foldl' f $! f a x) xs
 
 -- | count elements of list that have a given property
 count :: (a -> Bool) -> [a] -> Int
-count f = length . filter f 
+count f = length . filter f
 
 -- | randomly permute a list, using the standard random number generator.
 randomPermuteIO :: [a] -> IO [a]
@@ -518,7 +518,7 @@ powerSet (x:xs) = xss /\/ map (x:) xss
 
 (/\/)        :: [a] -> [a] -> [a]
 []     /\/ ys = ys
-(x:xs) /\/ ys = x : (ys /\/ xs)        
+(x:xs) /\/ ys = x : (ys /\/ xs)
 
 
 
@@ -535,7 +535,7 @@ readHex cs = mapM readHexChar cs >>= \cs' -> return (rh $ reverse cs') where
 
 {-# SPECIALIZE overlaps :: (Int,Int) -> (Int,Int) -> Bool #-}
 
--- | determine if two closed intervals overlap at all. 
+-- | determine if two closed intervals overlap at all.
 
 overlaps :: Ord a => (a,a) -> (a,a) -> Bool
 (a,_) `overlaps` (_,y) | y < a = False
@@ -548,12 +548,12 @@ showDuration x = st "d" dayI ++ st "h" hourI ++ st "m" minI ++ show secI ++ "s" 
         (dayI, hourI) = divMod hourI' 24
         (hourI', minI) = divMod minI' 60
         (minI',secI) = divMod x 60
-        st _ 0 = "" 
+        st _ 0 = ""
         st c n = show n ++ c
 
 -- | behave like while(<>) in perl, go through the argument list, reading the
 -- concation of each file name mentioned or stdin if '-' is on it. If no
--- arguments are given, read stdin. 
+-- arguments are given, read stdin.
 
 getArgContents :: IO String
 getArgContents = do
@@ -566,17 +566,17 @@ getArgContents = do
 -- | Combination of parseOpt and getArgContents.
 getOptContents :: String -> IO (String,[Char],[(Char,String)])
 getOptContents args = do
-    as <- System.getArgs 
-    (as,o1,o2) <- parseOpt args as 
+    as <- System.getArgs
+    (as,o1,o2) <- parseOpt args as
     let f "-" = getContents
         f fn = readFile fn
     cs <- mapM f as
     s <- if null as then getContents else return $ concat cs
     return (s,o1,o2)
 
-    
+
 -- | Process options with an option string like the standard C getopt function call.
-parseOpt :: Monad m => 
+parseOpt :: Monad m =>
     String -- ^ Argument string, list of valid options with : after ones which accept an argument
     -> [String]  -- ^ Arguments
     -> m ([String],[Char],[(Char,String)])  -- ^ (non-options,flags,options with arguments)
@@ -589,7 +589,7 @@ parseOpt ps as = f ([],[],[]) as where
     f cs [] = return cs
     f (xs,ys,zs) ("--":rs) = return (xs ++ rs, ys, zs)
     f cs (('-':as@(_:_)):rs) = z cs as where
-        z (xs,ys,zs) (c:cs) 
+        z (xs,ys,zs) (c:cs)
             | c `elem` args = z (xs,c:ys,zs) cs
             | c `elem` oargs = case cs of
                 [] -> case rs of
@@ -627,25 +627,25 @@ split p s = case rest of
 
 -- | Like 'split', except that sequences of adjacent separators are
 -- treated as a single separator. eg.
---                                                                                      
---   > tokens (=='a') "aabbaca"                                                         
---   > ["bb","c"]                                                                         
-tokens :: (a -> Bool) -> [a] -> [[a]]                                                   
-tokens p = filter (not.null) . split p                                
+--
+--   > tokens (=='a') "aabbaca"
+--   > ["bb","c"]
+tokens :: (a -> Bool) -> [a] -> [[a]]
+tokens p = filter (not.null) . split p
 
 
 buildTable ::  [String] -> [(String,[String])] -> String
 buildTable ts rs = bt [ x:xs | (x,xs) <- ("",ts):rs ] where
     bt ts = unlines (map f ts) where
         f xs = concatInter " " [  es n s | s <- xs | n <- cw ]
-        cw = [ maximum (map length xs) | xs <- transpose ts] 
-    es n s = replicate (n - length s) ' ' ++ s 
+        cw = [ maximum (map length xs) | xs <- transpose ts]
+    es n s = replicate (n - length s) ' ' ++ s
 
--- | time task 
+-- | time task
 doTime :: String -> IO a -> IO a
 doTime str action = do
     start <- getCPUTime
-    x <- action 
+    x <- action
     end <- getCPUTime
     putStrLn $ "Timing: " ++ str ++ " " ++ show ((end - start) `div` cpuTimePrecision)
     return x
@@ -653,7 +653,9 @@ doTime str action = do
 getPrefix :: Monad m => String -> String -> m String
 getPrefix a b = f a b where
     f [] ss = return ss
-    f (p:ps) (s:ss) 
-        | p == s = f ps ss  
-        | otherwise = fail $ "getPrefix: " ++ a ++ " " ++ b 
+    f _  [] = fail "getPrefix: value too short"
+    f (p:ps) (s:ss)
+        | p == s = f ps ss
+        | otherwise = fail $ "getPrefix: " ++ a ++ " " ++ b
+
 
