@@ -18,14 +18,14 @@
 
 module FrontEnd.Infix (buildFixityMap, infixHsModule, FixityMap,size) where
 
-import HsSyn
-import qualified Data.Map as Map
-import Data.Monoid
-import Name
-import DDataUtil
 import Binary
-import MapBinaryInstance
+import Data.Monoid
+import DDataUtil()
 import HasSize
+import HsSyn
+import MapBinaryInstance()
+import Name
+import qualified Data.Map as Map
 
 ----------------------------------------------------------------------------
 

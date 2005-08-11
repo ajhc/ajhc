@@ -4,11 +4,11 @@
 
 module HsErrors where
 
-import HsSyn
-import Warning
-import VConsts
 import Class
+import HsSyn
 import Monad
+import VConsts
+import Warning
 
 
 

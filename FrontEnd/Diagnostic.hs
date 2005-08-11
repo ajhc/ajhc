@@ -96,7 +96,7 @@ dumpDiagnostic maxContext diagnostics
          = case List.find hasASrcLoc diagnostics of
                 Just (Msg (Just (SrcLoc fn line col)) _)
                     -> "on line " ++ show line ++ " in " ++ fn
-                Nothing -> "no line information"
+                _ -> "no line information"
 
 
 {- display an entire stack of diagnostics (it displays the top of

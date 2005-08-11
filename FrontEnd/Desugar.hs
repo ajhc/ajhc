@@ -40,7 +40,7 @@ import Control.Monad.State
 import FrontEnd.Deriving
 import HsSyn
 import VConsts
-import Name
+import Name()
 import GenUtil
 
 removeSynonymsFromType _ t = t
@@ -334,6 +334,7 @@ patVarNames (HsPAsPat asName pat)
 patVarNames HsPWildCard = []
 patVarNames (HsPIrrPat pat)
    = patVarNames pat
+patVarNames e = error $ "patVarNames: " ++ show e
 
 -- replaces all occurrences of a name with a new variable
 -- and every other name with underscore
@@ -364,6 +365,7 @@ replaceVarNamesInPat name (HsPAsPat asName pat)
 replaceVarNamesInPat name HsPWildCard = HsPWildCard
 replaceVarNamesInPat name (HsPIrrPat pat)
    = HsPIrrPat $ replaceVarNamesInPat name pat
+replaceVarNamesInPat name p = error $ "replaceVarNamesInPat: " ++ show (name,p)
 
 
 desugarRhs :: (HsRhs) -> PatSM (HsRhs)

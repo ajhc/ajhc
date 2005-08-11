@@ -11,7 +11,6 @@ import qualified Doc.Chars as C
 import Char
 import Data.IORef
 import Control.Exception
-import Control.Monad.Trans
 import Control.Monad.Writer
 import Control.Monad.Reader
 import Control.Monad.Identity
@@ -68,11 +67,13 @@ ticks (Stats r h) c k' = do
 
 splitUp str = filter (not . null) (f str)  where
     f str = case span (`notElem` ".{") str  of
-     (x,"") -> [x]
-     (x,('.':rs)) -> x:f rs
-     (x,('{':rs)) -> case span (/= '}') rs of
+        (x,"") -> [x]
+        (x,('.':rs)) -> x:f rs
+        (x,('{':rs)) -> case span (/= '}') rs of
             (a,'}':b) -> x:a:f b
             (a,"") -> [x,a]
+            _ -> error "this can't happen"
+        _ -> error "this can't happen"
 
 
 print greets stats = do

@@ -1,23 +1,11 @@
 module TypeSyns( expandTypeSyns ) where
 
-import HsSyn hiding(srcLoc)
-import Data.FiniteMap
-import List             (nub)
-import Char
-import Utils
 import Control.Monad.State
-import GenUtil
-import Data.Monoid
-import MonadUtil
-import MonoidUtil
-import Warning
-import TypeSynonyms
-import List
-import Control.Monad.Fix
-import FrontEnd.Desugar (doToExp)
-import DDataUtil
-import qualified Seq
 import Control.Monad.Writer
+import FrontEnd.Desugar (doToExp)
+import HsSyn hiding(srcLoc)
+import List
+import TypeSynonyms
 import Warning
 
 
@@ -37,12 +25,6 @@ type ScopeSM = State ScopeState
 
 instance MonadWarn ScopeSM where
     addWarning w = modify (\s -> s { errors = w: errors s})
-
-
-
-getCurrentModule :: ScopeSM Module
-getCurrentModule = gets currentModule
-
 
 setSrcLoc e = modify (\s -> s { srcLoc = e `mappend` srcLoc s})
 
@@ -594,50 +576,6 @@ clobberHsName :: HsName -> SubTable -> ScopeSM (SubTable)
 clobberHsName hsName subTable = return subTable
 
 
-
-renameAndQualify :: HsName -> Int -> Module -> HsName
-renameAndQualify name unique currentMod
-    = case rename name unique of
-           UnQual name' -> Qual currentMod name'
-           qual_name    -> qual_name
-
--- renames a haskell name with its unique number
-rename :: HsName -> Int -> HsName
-rename n unique = hsNameIdent_u (hsIdentString_u ((show unique ++ "_") ++)) n
-
--- unRename gets the original identifier name
-
-unRename :: HsName -> HsName
-unRename name
-   = case isRenamed name of
-          False -> name
-          True  -> case name of
-                      UnQual i   -> UnQual   $ unrenameIdent i
-                      Qual mod i -> Qual mod $ unrenameIdent i
-
-unrenameIdent :: HsIdentifier -> HsIdentifier
-unrenameIdent = hsIdentString_u unRenameString
-
-isRenamed :: HsName -> Bool
-isRenamed (UnQual i)    = isIdentRenamed i
-isRenamed (Qual _mod i) = isIdentRenamed i
-
--- an identifier is renamed if it starts with one or more digits
--- such an identifier would normally be illegal in Haskell
-isIdentRenamed :: HsIdentifier -> Bool
-isIdentRenamed i = not $ null $ takeWhile isDigit $ hsIdentString i
-
-
-
-
-unRenameString :: String -> String
-unRenameString s = (dropUnderscore . dropDigits) s where
-   dropUnderscore ('_':rest) = rest
-   dropUnderscore otherList = otherList
-   dropDigits = dropWhile isDigit
-
-
-
 --------------------------------------------------------
 ----This section of code updates the current SubTable to reflect the present scope
 
@@ -672,14 +610,6 @@ updateSubTableWithHsStmt subTable hsStmt = do
 --
 
 
--- takes a list of HsNames representing type variables in a data decl and
--- adds them to the current subTable
-
-updateSubTableWithHsNames :: SubTable -> [HsName] -> ScopeSM (SubTable)
-updateSubTableWithHsNames subTable hsNames = do
-      subTable' <- clobberHsNames hsNames subTable
-      return (subTable')
-
 -- takes an HsQualType (a type signature) and adds the names of its variables
 -- to the current subTable
 
@@ -690,19 +620,6 @@ updateSubTableWithHsQualType subTable hsQualType = do
       return (subTable')
 
 
-
--- takes a list of decls and examines only the class decls
--- to get the names of variables used in their type sigs
-
-updateSubTableWithClasses :: SubTable -> [HsDecl] -> ScopeSM (SubTable)
-updateSubTableWithClasses subTable []
-  = return subTable
-updateSubTableWithClasses subTable (hsDecl:hsDecls)
-  = do
-      let hsNames = getHsNamesFromClass hsDecl
-      subTable'  <- clobberHsNames hsNames subTable
-      subTable'' <- updateSubTableWithClasses subTable' hsDecls
-      return (subTable'')
 
 getHsNamesAndASrcLocsFromHsDecl :: HsDecl -> [(HsName, SrcLoc)]
 getHsNamesAndASrcLocsFromHsDecl (HsPatBind srcLoc (HsPVar hsName) _ _) = [(hsName, srcLoc)]
@@ -724,43 +641,7 @@ getHsNamesAndASrcLocsFromHsMatch (HsMatch srcLoc hsName _ _ _)
   = [(hsName, srcLoc)]
 
 
-collectDefsHsModule :: HsModule -> [(Bool,HsName,SrcLoc,[HsName])]
-collectDefsHsModule m = map g $ snd $ runWriter (mapM_ f (hsModuleDecls m)) where
-    g (b,n,sl,ns) = (b,mod n, sl, map mod ns)
-    mod = qualifyName (hsModuleName m)
-    f (HsForeignDecl a _ _ n _)  = tell [(False,n,a,[])]
-    f (HsFunBind [])  = return ()
-    f (HsFunBind (HsMatch a n _ _ _:_))  = tell [(False,n,a,[])]
-    f (HsPatBind srcLoc p _ _) = tell [ (False,n,srcLoc,[]) | n <- (getHsNamesFromHsPat p) ]
-    f (HsTypeDecl sl n _ _) = tell [(True,n,sl,[])]
-    f (HsDataDecl sl _ n _ cs _) = tell $ (True,n,sl,fsts cs'):[ (False,n,sl,[]) | (n,sl) <- cs'] where
-        cs' = concatMap namesHsConDecl cs
-    f (HsNewTypeDecl sl _ n _ c _) =  tell $ (True,n,sl,fsts cs'):[ (False,n,sl,[]) | (n,sl) <- cs'] where
-        cs' = namesHsConDecl c
-    f cd@(HsClassDecl sl _ ds) = tell $ (True,z,sl,fsts cs):[ (False,n,a,[]) | (n,a) <- cs]  where
-        Just z = maybeGetDeclName cd
-        cs = fst (mconcatMap namesHsDeclTS ds)
-    f _ = return ()
 
-namesHsModule m = mconcatMap namesHsDecl (hsModuleDecls m)
-
-namesHsDecl :: HsDecl -> ([(HsName, SrcLoc)],[(HsName, SrcLoc)])
-namesHsDecl (HsForeignDecl a _ _ n _)  = ([(n,a)],[])
-namesHsDecl (HsFunBind hsMatches)  = (getHsNamesAndASrcLocsFromHsMatches hsMatches, [])
-namesHsDecl (HsPatBind srcLoc p _ _) = (map (rtup srcLoc) (getHsNamesFromHsPat p),[])
-namesHsDecl (HsTypeDecl sl n _ _) = ([],[(n,sl)])
-namesHsDecl (HsDataDecl sl _ n _ cs _) = ( (concatMap namesHsConDecl cs) ,[(n,sl)])
-namesHsDecl (HsNewTypeDecl sl _ n _ c _) = ( (namesHsConDecl c),[(n,sl)])
-namesHsDecl cd@(HsClassDecl sl _ ds) = (mconcatMap namesHsDeclTS ds) `mappend` ([],[(z,sl)]) where
-    Just z = maybeGetDeclName cd
-namesHsDecl _ = mempty
-
-namesHsDeclTS (HsTypeSig sl ns _) = ((map (rtup sl) ns),[])
-namesHsDeclTS _ = ([],[])
-
-namesHsConDecl c = (hsConDeclName c,hsConDeclSrcLoc c) : case c of
-    HsRecDecl { hsConDeclRecArg = ra } -> concatMap (map (rtup (hsConDeclSrcLoc c)) . fst) ra
-    _ -> []
 
 getHsNamesFromHsPat :: HsPat -> [HsName]
 getHsNamesFromHsPat (HsPVar hsName) = [hsName]
@@ -798,22 +679,6 @@ getHsNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls)
 -- the getNew... functions are used only inside class declarations to avoid _re_ renaming things
 -- that should be left as is.
 
-getNewHsNamesFromHsQualType :: SubTable -> HsQualType -> [HsName]
-getNewHsNamesFromHsQualType subTable (HsQualType _hsContext hsType)
-  = getNewHsNamesFromHsType subTable hsType
-getNewHsNamesFromHsQualType subTable (HsUnQualType hsType)
-  = getNewHsNamesFromHsType subTable hsType
-
-getNewHsNamesFromHsType :: SubTable -> HsType -> [HsName]
-getNewHsNamesFromHsType subTable (HsTyFun hsType1 hsType2)
-  = (getNewHsNamesFromHsType subTable hsType1) ++ (getNewHsNamesFromHsType subTable hsType2)
-getNewHsNamesFromHsType subTable (HsTyTuple hsTypes)
-  = concat $ map (getNewHsNamesFromHsType subTable) hsTypes
-getNewHsNamesFromHsType subTable (HsTyApp hsType1 hsType2)
-  = (getNewHsNamesFromHsType subTable hsType1) ++ (getNewHsNamesFromHsType subTable hsType2)
-getNewHsNamesFromHsType subTable (HsTyVar hsName) = [hsName]
-getNewHsNamesFromHsType _subTable (HsTyCon _hsName)
-  = [] -- don't rename the Constructors
 
 getHsNamesFromHsQualType :: HsQualType -> [HsName]
 getHsNamesFromHsQualType (HsQualType _hsContext hsType)
@@ -835,22 +700,6 @@ getHsNamesFromHsType (HsTyCon _hsName)
 
 
 -- gets the names of the functions declared in a class declaration
-
-getHsNamesFromClass :: HsDecl -> [HsName]
-getHsNamesFromClass (HsClassDecl _srcLoc _hsQualType hsDecls)
-  = getHsNamesFromTypeSigs hsDecls
-getHsNamesFromClass _otherDecl
-  = []
-
--- gets the names of the functions whose types are declared in class decls
-
-getHsNamesFromTypeSigs :: [HsDecl] -> [HsName]
-getHsNamesFromTypeSigs ((HsTypeSig _srcLoc hsNames _hsQualType):hsDecls)
-  = hsNames ++ getHsNamesFromTypeSigs hsDecls
-getHsNamesFromTypeSigs (_otherDecl:hsDecls)
-  = getHsNamesFromTypeSigs hsDecls
-getHsNamesFromTypeSigs []
-  = []
 
 --------------------------------------------------------------------------------
 
@@ -922,15 +771,7 @@ instance Renameable HsFixity where
 -}
 
 instance Renameable HsAssoc where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsAssocNone  ->
-                HsAssocNone
-            HsAssocLeft  ->
-                HsAssocLeft
-            HsAssocRight  ->
-                HsAssocRight
+    replaceName _ object = object
 
 
 instance Renameable (HsDecl) where
@@ -1195,20 +1036,16 @@ instance Renameable a => Renameable [a] where
 
 
 -- Ident table stuff
-type IdentTable = FiniteMap HsName (SrcLoc, Binding)
-addToIdentTable _ _ = return ()
+--type IdentTable = FiniteMap HsName (SrcLoc, Binding)
+--addToIdentTable _ _ = return ()
 
 data Binding
-   = TopFun             -- function binding at the top level
-   | ClassMethod        -- name of a method in a class
-   | Instance           -- an instance decl lifted to a top-level binding
-   | WhereFun           -- function binding in a where clause
+   = WhereFun           -- function binding in a where clause
    | LetFun             -- function binding in a let expression (used to include topbinds too)
    | LamPat             -- pattern binding in a lambda expression
    | CasePat            -- pattern binding in a case expression
    | GenPat             -- pattern binding in a generator statement
    | FunPat             -- pattern binding in a function declaration
-   | Constr             -- name is a data constructor
 
 {-
 printIdentTable :: IdentTable -> IO ()

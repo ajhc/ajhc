@@ -2,11 +2,11 @@ module HsSyn where
 
 
 
-import Data.Generics
 import Atom
-import PackedString
 import Binary
+import Data.Generics
 import Data.Monoid
+import PackedString
 
 bogusASrcLoc = SrcLoc "bogus#" (-1) (-1)
 bogusSrcSpan = srcSpan bogusASrcLoc bogusASrcLoc
@@ -48,7 +48,6 @@ instance HasLocation HsExp where
 
 instance HasLocation a => HasLocation [a] where
     srcLoc xs = mconcat (map srcLoc xs)
-    srcLoc [] = bogusASrcLoc
 
 instance Show SrcLoc where
     show (SrcLoc fn l c) = fn ++ f l ++ f c where

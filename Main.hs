@@ -1,10 +1,10 @@
 
 module Main(main) where
 
-import Prelude hiding(putStrLn, putStr,print)
 import Char
 import List hiding(group)
 import Maybe
+import Prelude hiding(putStrLn, putStr,print)
 
 import C.FromGrin
 import CharIO

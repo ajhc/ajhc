@@ -31,8 +31,7 @@ module Seq( -- * Type
           , fromList
           ) where
 
-import Data.Monoid
-import Monad
+import Data.Monoid()
 import Control.Monad.Writer as W
 
 {--------------------------------------------------------------------

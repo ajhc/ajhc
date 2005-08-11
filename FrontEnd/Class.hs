@@ -58,9 +58,9 @@ import Data.Generics
 import Data.Monoid
 import DDataUtil
 import Doc.PPrint
-import Text.PrettyPrint.HughesPJ as PPrint
 import GenUtil(concatInter)
 import GenUtil(snub)
+import HasSize
 import HsSyn
 import KindInfer
 import List((\\), partition)
@@ -71,11 +71,11 @@ import MonoidUtil
 import Name
 import qualified Data.Map as Map
 import Representation
+import Text.PrettyPrint.HughesPJ as PPrint
 import Type
 import TypeUtils
 import Utils
 import VConsts
-import HasSize
 
 --------------------------------------------------------------------------------
 
