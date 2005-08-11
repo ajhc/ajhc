@@ -1,7 +1,7 @@
 module Name(
-    NameType(..), 
-    Name, 
-    nameName, 
+    NameType(..),
+    Name,
+    nameName,
     nameType,
     nameValue,
     getModule,
@@ -29,19 +29,19 @@ import GenUtil
 import Doc.DocLike
 import Doc.PPrint
 
-data NameType = 
-    TypeConstructor 
-    | DataConstructor 
-    | ClassName 
-    | TypeVal 
-    | Val 
-    | SortName  
+data NameType =
+    TypeConstructor
+    | DataConstructor
+    | ClassName
+    | TypeVal
+    | Val
+    | SortName
     | FieldLabel
-    | RawType 
+    | RawType
     deriving(Ord,Eq,Enum,Read,Show,Typeable,Data)
 
 
-newtype Name = Name Atom 
+newtype Name = Name Atom
     deriving(Ord,Eq,Typeable,Data,Binary,ToAtom,FromAtom)
 
 isTypeNamespace TypeConstructor = True
@@ -65,21 +65,21 @@ instance ValName HsName where
     hsValName (a,b) = Qual (Module a) $ HsIdent b
     hsUnqualValName b = UnQual $ HsIdent b
 
-    
-    
+
+
 
 fromTypishHsName, fromValishHsName :: HsName -> Name
-fromTypishHsName name 
+fromTypishHsName name
     | isUpper x || x `elem` ":(" = toName TypeConstructor name
     | otherwise = toName TypeVal name
-    where x = head (hsIdentString . hsNameIdent  $ name) 
-fromValishHsName name 
+    where x = head (hsIdentString . hsNameIdent  $ name)
+fromValishHsName name
     | isUpper x || x `elem` ":(" = toName DataConstructor name
     | otherwise = toName Val name
-    where x = head (hsIdentString . hsNameIdent  $ name) 
+    where x = head (hsIdentString . hsNameIdent  $ name)
 
 class ToName a where
-    toName :: NameType -> a -> Name 
+    toName :: NameType -> a -> Name
     fromName :: Name -> (NameType, a)
 
 instance ToName HsName where
@@ -87,20 +87,20 @@ instance ToName HsName where
         i = hsIdentString $ hsNameIdent n
         m | Qual (Module m) _ <- n = m
           | otherwise = ""
-    fromName n = (nameType n, nameName n) 
+    fromName n = (nameType n, nameName n)
 
 instance ToName (String,String) where
-    toName nt (m,i) = Name $ toAtom $ (chr $ fromEnum nt):m ++ "\NUL" ++ i 
+    toName nt (m,i) = Name $ toAtom $ (chr $ fromEnum nt):m ++ "\NUL" ++ i
     fromName n = (nameType n, mi ) where
         nn = nameName n
-        mi  | Qual (Module m) (HsIdent i) <- nn = (m,i) 
+        mi  | Qual (Module m) (HsIdent i) <- nn = (m,i)
             | UnQual (HsIdent i) <- nn = ("",i)
 
 instance ToName String where
-    toName nt i = Name $ toAtom $ (chr $ fromEnum nt):"\NUL" ++ i 
+    toName nt i = Name $ toAtom $ (chr $ fromEnum nt):"\NUL" ++ i
     fromName n = (nameType n, m ++ i ) where
         nn = nameName n
-        (m,i)  | Qual (Module m) (HsIdent i) <- nn = (m ++ ".",i) 
+        (m,i)  | Qual (Module m) (HsIdent i) <- nn = (m ++ ".",i)
                | UnQual (HsIdent i) <- nn = ("",i)
 
 
@@ -110,31 +110,31 @@ getModule n = case nameName n of
     UnQual {} -> fail "Name is unqualified."
 
 toUnqualified :: Name -> Name
-toUnqualified n = case fromName n of 
+toUnqualified n = case fromName n of
     (_,UnQual {}) -> n
     (t,Qual m n) -> toName t (UnQual n)
 
 qualifyName :: Module -> Name -> Name
-qualifyName m n = case fromName n of 
-    (t,UnQual n) -> toName t (Qual m n) 
+qualifyName m n = case fromName n of
+    (t,UnQual n) -> toName t (Qual m n)
     (_,Qual {}) -> n
 
 setModule :: Module -> Name -> Name
-setModule m n = qualifyName m  $ toUnqualified n 
+setModule m n = qualifyName m  $ toUnqualified n
 
-    
-parseName :: NameType -> String -> Name 
+
+parseName :: NameType -> String -> Name
 parseName t name = toName t (concatInter "." ms, concatInter "." (ns ++ [last sn])) where
-    sn = (split (== '.') name) 
-    (ms,ns) = span validMod (init sn) 
-    validMod (c:cs) = isUpper c && all (\c -> isAlphaNum c || c `elem` "_'") cs 
+    sn = (split (== '.') name)
+    (ms,ns) = span validMod (init sn)
+    validMod (c:cs) = isUpper c && all (\c -> isAlphaNum c || c `elem` "_'") cs
     validMod _ = False
-    
-    
+
+
 
 
 nameType :: Name -> NameType
-nameType (Name a) = toEnum (ord (head (toString a))) 
+nameType (Name a) = toEnum (ord (head (toString a)))
 
 nameName :: Name -> HsName
 nameName (Name a) = f $ tail (toString a) where
@@ -155,11 +155,11 @@ nameTuple _ n | n < 2 = error "attempt to create tuple of length < 2"
 nameTuple t n = toName t  $ (toTuple n:: (String,String)) -- Qual (HsIdent ("(" ++ replicate (n - 1) ',' ++ ")"))
 
 unboxedNameTuple t n = toName t $ "(#" ++ show n ++ "#)"
---unboxedNameTuple t n = toName t $ "(#": replicate (n - 1) ',' ++ "#)" 
+--unboxedNameTuple t n = toName t $ "(#": replicate (n - 1) ',' ++ "#)"
 
 fromUnboxedNameTuple n = case show n of
     '(':'#':xs | (ns@(_:_),"#)") <- span isDigit xs -> return (read ns::Int)
-    _ -> fail $ "Not unboxed tuple: " ++ show n 
+    _ -> fail $ "Not unboxed tuple: " ++ show n
 
 
 
@@ -193,7 +193,7 @@ instance DocLike d => PPrint d Name  where
     pprint n = text (show n)
 
 {-
-instance ClassNames Name where 
+instance ClassNames Name where
     classEq :: a
     classOrd :: a
     classEnum :: a
@@ -213,4 +213,4 @@ instance ClassNames Name where
 
 -}
 
-nameValue m n = atomIndex $ toAtom (toName Val (m,n)) 
+nameValue m n = atomIndex $ toAtom (toName Val (m,n))

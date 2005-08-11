@@ -24,9 +24,9 @@ toUTF (x:xs) | ord x<=0x007F = (fromIntegral $ ord x):toUTF xs
 -- | Convert UTF-8 to Unicode.
 
 fromUTF :: [Word8] -> String
-fromUTF xs = fromUTF' (map fromIntegral xs) where 
+fromUTF xs = fromUTF' (map fromIntegral xs) where
     fromUTF' [] = []
-    fromUTF' (all@(x:xs)) 
+    fromUTF' (all@(x:xs))
 	| x<=0x7F = (chr (x)):fromUTF' xs
 	| x<=0xBF = err
 	| x<=0xDF = twoBytes all
@@ -39,6 +39,6 @@ fromUTF xs = fromUTF' (map fromIntegral xs) where
     threeBytes (x1:x2:x3:xs) = chr ((((x1 .&. 0x0F) `shift` 12) .|.
 				    ((x2 .&. 0x3F) `shift` 6) .|.
 				    (x3 .&. 0x3F))):fromUTF' xs
-    threeBytes _ = error "fromUTF: illegal three byte sequence" 
-    
+    threeBytes _ = error "fromUTF: illegal three byte sequence"
+
     err = error "fromUTF: illegal UTF-8 character"

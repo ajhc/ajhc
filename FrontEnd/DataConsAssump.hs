@@ -2,9 +2,9 @@
 
         Copyright:              The Hatchet Team (see file Contributors)
 
-        Module:                 DataConsAssump 
+        Module:                 DataConsAssump
 
-        Description:            Computes the type assumptions of data 
+        Description:            Computes the type assumptions of data
                                 constructors in a module
 
                                 For example:
@@ -16,7 +16,7 @@
 
                                 from section 4.2 of the Haskell Report:
 
-                                "These declarations may only appear at the 
+                                "These declarations may only appear at the
                                  top level of a module."
 
         Primary Authors:        Bernie Pope
@@ -28,34 +28,34 @@
 module DataConsAssump (dataConsEnv) where
 
 
-import HsSyn  
-import Representation     
+import HsSyn
+import Representation
 import Type                     (assumpToPair, makeAssump, Types (..), quantify)
 import TypeUtils                (aHsTypeToType)
-import KindInfer 
+import KindInfer
 import qualified Data.Map as Map
 
 --------------------------------------------------------------------------------
 
-dataConsEnv :: Module -> KindEnv -> [HsDecl] -> Map.Map HsName Scheme 
-dataConsEnv modName kt decls 
-   = Map.unions $ map (dataDeclEnv modName kt) decls 
+dataConsEnv :: Module -> KindEnv -> [HsDecl] -> Map.Map HsName Scheme
+dataConsEnv modName kt decls
+   = Map.unions $ map (dataDeclEnv modName kt) decls
 
 
 -- we should only apply this function to data decls and newtype decls
 -- howver the fall through case is just there for completeness
 
-dataDeclEnv :: Module -> KindEnv -> (HsDecl) -> Map.Map HsName Scheme 
+dataDeclEnv :: Module -> KindEnv -> (HsDecl) -> Map.Map HsName Scheme
 dataDeclEnv modName kt (HsDataDecl _sloc context typeName args condecls _)
-   = Map.unions $ map (conDeclType modName kt preds resultType) $ condecls 
+   = Map.unions $ map (conDeclType modName kt preds resultType) $ condecls
    where
-   typeKind = kindOf typeName kt 
+   typeKind = kindOf typeName kt
    resultType = foldl TAp tycon argVars
    tycon = TCon (Tycon typeName typeKind)
    argVars = map fromHsNameToTyVar $ zip argKinds args
-   argKinds = init $ unfoldKind typeKind 
+   argKinds = init $ unfoldKind typeKind
    fromHsNameToTyVar :: (Kind, HsName) -> Type
-   fromHsNameToTyVar (k, n) 
+   fromHsNameToTyVar (k, n)
       = TVar (tyvar n k Nothing)
    preds = hsContextToPreds kt context
 
@@ -72,16 +72,16 @@ dataDeclEnv modName kt (HsNewTypeDecl _sloc context typeName args condecl _)
       = TVar (tyvar n k Nothing)
    preds = hsContextToPreds kt context
 
-dataDeclEnv _modName _kt _anyOtherDecl 
+dataDeclEnv _modName _kt _anyOtherDecl
    = Map.empty
 
 
 hsContextToPreds :: KindEnv -> HsContext -> [Pred]
 hsContextToPreds kt assts = map (hsAsstToPred kt) assts
 
-unitEnv (x,y) = Map.singleton x y 
+unitEnv (x,y) = Map.singleton x y
 
-conDeclType :: Module -> KindEnv -> [Pred] -> Type -> HsConDecl -> Map.Map HsName Scheme 
+conDeclType :: Module -> KindEnv -> [Pred] -> Type -> HsConDecl -> Map.Map HsName Scheme
 conDeclType modName kt preds tResult (HsConDecl _sloc conName bangTypes)
    = unitEnv $ assumpToPair $ makeAssump conName $ quantify (tv qualConType) qualConType
    where
@@ -94,6 +94,6 @@ conDeclType modName kt preds tResult rd@(HsRecDecl _sloc conName _)
    qualConType = preds :=> conType
 
 bangTypeToType :: KindEnv -> HsBangType -> Type
-bangTypeToType kt (HsBangedTy t) = aHsTypeToType kt t 
+bangTypeToType kt (HsBangedTy t) = aHsTypeToType kt t
 bangTypeToType kt (HsUnBangedTy t) = aHsTypeToType kt t
 

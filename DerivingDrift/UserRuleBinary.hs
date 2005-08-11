@@ -12,18 +12,18 @@ userRulesBinary = [
 
 
 data Data = D {	name :: Name,			 -- type's name
-			constraints :: [(Class,Var)], 
+			constraints :: [(Class,Var)],
 			vars :: [Var],		 -- Parameters
 			body :: [Body],
 			derives :: [Class],	 -- derived classes
 			statement :: Statement}  -- type of statement
 	   | Directive				 --|
 	   | TypeName Name			 --| used by derive (ignore)
-		deriving (Eq,Show) 
+		deriving (Eq,Show)
 
 data Body = Body { constructor :: Constructor,
 		    labels :: [Name], -- [] for a non-record datatype.
-		    types :: [Type]} deriving (Eq,Show) 
+		    types :: [Type]} deriving (Eq,Show)
 
 data Statement = DataStmt | NewTypeStmt deriving (Eq,Show)
 
@@ -38,12 +38,12 @@ type Rule = (Tag, Data->Doc)
 
 
 -- useful helper things
-namesupply   = [text [x,y] | x <- ['a' .. 'z'], 
+namesupply   = [text [x,y] | x <- ['a' .. 'z'],
                              y <- ['a' .. 'z'] ++ ['A' .. 'Z']]
 mknss []     _  = []
 mknss (c:cs) ns =
   let (thisns,rest) = splitAt (length (types c)) ns
-  in thisns: mknss cs rest 
+  in thisns: mknss cs rest
 
 mkpattern :: Constructor -> [a] -> [Doc] -> Doc
 mkpattern c l ns =
@@ -69,7 +69,7 @@ instanceheader cls dat =
 -- begin here for Binary derivation
 
 
-userRuleBinary dat = 
+userRuleBinary dat =
   let cs  = body dat
       cvs = mknss cs namesupply
       k   = (ceiling . logBase 2 . realToFrac . length) cs

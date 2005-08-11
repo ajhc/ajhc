@@ -67,7 +67,7 @@ single x
 
 -- | /O(1)/. Create a sequence of one element.
 singleton :: a -> Seq a
-singleton x = single x  
+singleton x = single x
 
 -- | /O(1)/. Put a value in front of a sequence.
 cons :: a -> Seq a -> Seq a
@@ -101,8 +101,8 @@ tells xs = W.tell (Seq.fromList xs)
 --    mempty = Seq.empty
 --    mappend = (Seq.<>)
 
-concat :: Seq (Seq a) -> Seq a 
-concat (Seq f) = (foldr Seq.append Seq.empty (f [])) 
+concat :: Seq (Seq a) -> Seq a
+concat (Seq f) = (foldr Seq.append Seq.empty (f []))
 
 instance Functor Seq.Seq where
     --fmap f xs = Seq.fromList (map f (Seq.toList xs))

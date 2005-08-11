@@ -22,8 +22,8 @@ import qualified Data.Map as Map
 
 data Stats = Stats !(IORef Int) !(H.HashTable Atom Int)
 
-    
-                    
+
+
 {-# NOINLINE theStats #-}
 theStats :: Stats
 theStats = unsafePerformIO new
@@ -36,22 +36,22 @@ combine stats (Stats _ h2) = do
     --modifyIORef c1 (+ c)
     ls <- H.toList h2
     let f (a,i) = ticks stats i a
-    mapM_ f ls 
-    
+    mapM_ f ls
+
 
 new = do
-    h <- H.new (==) (fromIntegral . atomIndex) 
+    h <- H.new (==) (fromIntegral . atomIndex)
     r <- newIORef 0
     return $ Stats r h
 
 clear (Stats r h) = do
     writeIORef r 0
-    xs <- H.toList h 
+    xs <- H.toList h
     mapM_ (H.delete h) (fsts xs)
 
 toList (Stats _ h) = H.toList h
 
-getTicks (Stats r _)  = readIORef r 
+getTicks (Stats r _)  = readIORef r
 
 tick stats k = ticks stats 1 k
 
@@ -86,7 +86,7 @@ print greets stats = do
 
 createForest :: a -> [([String],a)] -> Forest (String,a)
 createForest def xs = map f gs where
-    --[Node (concat $ intersperse "." (xs),y) [] | (xs,y) <- xs] 
+    --[Node (concat $ intersperse "." (xs),y) [] | (xs,y) <- xs]
     f [(xs,ys)] =  Node (concatInter "." xs,ys) []
     f xs@((x:_,_):_) = Node (x,def) (createForest def [ (xs,ys) | (_:xs@(_:_),ys)<- xs])
     f _ = error "createForest: should not happen."
@@ -103,23 +103,23 @@ draw (Node x ts0) = x : drawSubTrees ts0
 
         shift first other = zipWith (++) (first : repeat other)
         --vLine = chr 0x254F
-        
+
 tickStat ::  Stats -> Stat -> IO ()
 tickStat stats (Stat stat) = sequence_  [ ticks stats n a | (a,n) <- Map.toList stat]
 
-runStatIO :: MonadIO m =>  Stats -> StatT m a -> m a 
+runStatIO :: MonadIO m =>  Stats -> StatT m a -> m a
 runStatIO stats action = do
     (a,s) <- runStatT action
     liftIO $ tickStat stats s
     return a
 
-instance MonadStats IO where 
+instance MonadStats IO where
     mticks' n a = ticks theStats n a
 
 -- Pure varients
-        
+
 newtype Stat = Stat (Map.Map Atom Int)
-    
+
 printStat greets (Stat s) = do
     let fs = createForest 0 $ sort [(splitUp $ fromAtom x,y) | (x,y) <- Map.toList s]
     mapM_ CharIO.putErrLn $ ( draw . fmap p ) (Node (greets,0) fs)  where
@@ -127,7 +127,7 @@ printStat greets (Stat s) = do
         p (x,n) = x ++ ": " ++ show n
 
 {-
-instance DocLike d => PPrint d Stat where 
+instance DocLike d => PPrint d Stat where
     pprint (Stat s) =  ( draw . fmap p ) (Node (greets,0) fs)  where
         fs = createForest 0 $ sort [(splitUp $ fromAtom x,y) | (x,y) <- Map.toList s]
         p (x,0) = x
@@ -138,24 +138,24 @@ instance Monoid Stat where
     mempty = Stat Map.empty
     mappend (Stat a) (Stat b) = Stat $ Map.unionWith (+) a b
     --mconcat xs = Stat $ Map.unionsWith (+) [ x | Stat x <- xs]
-    
-    
+
+
 newtype StatT m a = StatT (WriterT Stat m a)
     deriving(MonadIO, Functor, MonadFix, MonadTrans, Monad)
-    
-runStatT (StatT m) =  runWriterT m 
+
+runStatT (StatT m) =  runWriterT m
 
 class Monad m => MonadStats m where
     mticks' ::  Int -> Atom -> m ()
 
--- These are inlined so the 'toAtom' can become a caf and be shared 
+-- These are inlined so the 'toAtom' can become a caf and be shared
 {-# INLINE mtick  #-}
 {-# INLINE mticks #-}
 mtick k = mticks' 1 (toAtom k)
 mticks n k = n `seq` mticks' n (toAtom k)
 
 --instance (Monad m, Monad (t m), MonadTrans t, MonadReader r m) => MonadReader r (t m) where
---    ask = lift $ ask 
+--    ask = lift $ ask
   --  (r -> r) ->  m a -> t m a
   --  (r -> r) -> m a -> m a
   --  local l m = local l m
@@ -164,13 +164,13 @@ mticks n k = n `seq` mticks' n (toAtom k)
 instance MonadStats Identity where
     mticks' _ _ = return ()
 
-instance MonadReader r m => MonadReader r (StatT m) where 
+instance MonadReader r m => MonadReader r (StatT m) where
     ask = lift $ ask
     local f (StatT m) = StatT $ local f m
-    
+
 instance (Monad m, Monad (t m), MonadTrans t, MonadStats m) => MonadStats (t m) where
     mticks' n k = lift $ mticks' n k
-    
+
 instance Monad m => MonadStats (StatT m) where
     mticks' n k = StatT $ tell (Stat $ Map.singleton k n)
 

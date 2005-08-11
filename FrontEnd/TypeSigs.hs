@@ -25,7 +25,7 @@ import Representation   (Scheme)
 
 import TypeUtils        (aHsTypeSigToAssumps)
 
-import HsSyn  
+import HsSyn
 import qualified Data.Map as Map
 
 --------------------------------------------------------------------------------
@@ -42,8 +42,8 @@ collectSigsFromDecls (d@(HsTypeSig {}):ds) = d : collectSigsFromDecls ds
 collectSigsFromDecls ((HsForeignDecl sl _ _ n qt):ds) = HsTypeSig sl [n] qt:collectSigsFromDecls ds
 
 collectSigsFromDecls ((HsPatBind _ _ rhs wheres):ds)
-   = collectSigsFromRhs rhs ++ 
-     collectSigsFromDecls wheres ++ 
+   = collectSigsFromRhs rhs ++
+     collectSigsFromDecls wheres ++
      collectSigsFromDecls ds
 
 collectSigsFromDecls ((HsFunBind matches):ds)
@@ -67,7 +67,7 @@ collectSigsFromRhs (HsUnGuardedRhs e)
 collectSigsFromRhs (HsGuardedRhss rhss)
    = concatMap collectSigsFromGuardedRhs rhss
 
-collectSigsFromGuardedRhs :: (HsGuardedRhs) -> [(HsDecl)] 
+collectSigsFromGuardedRhs :: (HsGuardedRhs) -> [(HsDecl)]
 
 collectSigsFromGuardedRhs (HsGuardedRhs _ e1 e2)
    = collectSigsFromExp e1 ++
@@ -104,7 +104,7 @@ collectSigsFromExp (HsLet decls e)
 collectSigsFromExp (HsIf e1 e2 e3)
    = collectSigsFromExp e1 ++
      collectSigsFromExp e2 ++
-     collectSigsFromExp e3 
+     collectSigsFromExp e3
 
 collectSigsFromExp (HsCase e alts)
    = collectSigsFromExp e ++
@@ -200,8 +200,8 @@ type SigEnv = Map.Map HsName Scheme
 
 listSigsToSigEnv :: KindEnv -> [HsDecl] -> SigEnv
 listSigsToSigEnv kt sigs
-   = Map.fromList $ 
+   = Map.fromList $
         map assumpToPair $
         concatMap (aHsTypeSigToAssumps kt) sigs
-        
+
 

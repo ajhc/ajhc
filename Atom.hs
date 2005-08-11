@@ -30,14 +30,14 @@ intPtr :: Ptr Int
 intPtr = unsafePerformIO (new 1)
 
 
-data Atom = Atom {-# UNPACK #-} !Int !PackedString 
+data Atom = Atom {-# UNPACK #-} !Int !PackedString
     deriving(Typeable, Data)
 
 instance Show Atom where
     show = toString
 
 instance Read Atom where
-    readsPrec p s = [ (fromString x,y) |  (x,y) <- readsPrec p s] 
+    readsPrec p s = [ (fromString x,y) |  (x,y) <- readsPrec p s]
 
 toPackedString (Atom _ ps) = ps
 toString (Atom _ ps) = unpackPS ps
@@ -80,7 +80,7 @@ instance Ord Atom where
     Atom x _ >= Atom y _ = x >= y
     Atom x _ < Atom y _ = x < y
     Atom x _ > Atom y _ = x > y
-    
+
 fromString :: String -> Atom
 fromString xs = unsafePerformIO $ fromStringIO xs
 
@@ -101,18 +101,18 @@ fromPackedStringIO ps = HT.lookup table ps >>= \x -> case x of
 dumpAtomTable = do
     x <- HT.toList table
     mapM_ putStrLn [ show i ++ " " ++ show ps  | (_,Atom i ps) <- sort x]
-        
-    
+
+
 intToAtom :: Monad m => Int -> m Atom
 intToAtom i = unsafePerformIO $  HT.lookup reverseTable i >>= \x -> case x of
     Just x -> return (return x)
-    Nothing -> return $ fail $ "intToAtom: " ++ show i 
-    
+    Nothing -> return $ fail $ "intToAtom: " ++ show i
+
 {-
     xs <- HT.toList table
     case [ at | (_,at@(Atom i' _)) <- xs, i' == i ] of
         [a] -> return (return a)
-        [] -> return $ fail $ "intToAtom: " ++ show i 
+        [] -> return $ fail $ "intToAtom: " ++ show i
         _ -> error "intToAtom: can't happen"
 instance Binary Atom where
     get bh = do
@@ -120,6 +120,6 @@ instance Binary Atom where
         a <- fromPackedStringIO ps
         return a
     put_ bh (Atom _ ps) = put_ bh ps
-        
+
 -}
 

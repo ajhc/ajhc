@@ -21,6 +21,6 @@ filterInput prog args ifh = do
     when (ret /= Just (Exited ExitSuccess)) $ putErrDie "cpp exited abnormally"
     return str
 
-dupAndClose :: Fd -> Fd -> IO ()    
+dupAndClose :: Fd -> Fd -> IO ()
 dupAndClose from to = dupTo from to >> closeFd from
 

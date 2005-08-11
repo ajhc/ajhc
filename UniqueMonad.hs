@@ -9,7 +9,7 @@ import Control.Monad.Writer
 import Control.Monad.Identity
 
 
-instance UniqueProducer IO where 
+instance UniqueProducer IO where
     newUniq = do
         u <- newUnique
         return $ hashUnique u
@@ -29,11 +29,11 @@ runUniq x y = runIdentity $ runUniqT y x
 
 -- | Execute the bare unique int generator starting with 1.
 execUniq1 :: Uniq a -> a
-execUniq1 x = fst $ runUniq 1 x  
+execUniq1 x = fst $ runUniq 1 x
 
 -- | Execute the bare unique int generator starting with the suplied number.
 execUniq :: Int -> Uniq a -> a
-execUniq st x = fst $ runUniq st x  
+execUniq st x = fst $ runUniq st x
 
 -- | Execute the transformer version of the unique int generator starting with the suplied number.
 execUniqT :: Monad m =>  Int -> UniqT m a -> m a

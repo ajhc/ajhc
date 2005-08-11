@@ -12,18 +12,18 @@ userRulesGhcBinary = [
 
 
 data Data = D {	name :: Name,			 -- type's name
-			constraints :: [(Class,Var)], 
+			constraints :: [(Class,Var)],
 			vars :: [Var],		 -- Parameters
 			body :: [Body],
 			derives :: [Class],	 -- derived classes
 			statement :: Statement}  -- type of statement
 	   | Directive				 --|
 	   | TypeName Name			 --| used by derive (ignore)
-		deriving (Eq,Show) 
+		deriving (Eq,Show)
 
 data Body = Body { constructor :: Constructor,
 		    labels :: [Name], -- [] for a non-record datatype.
-		    types :: [Type]} deriving (Eq,Show) 
+		    types :: [Type]} deriving (Eq,Show)
 
 data Statement = DataStmt | NewTypeStmt deriving (Eq,Show)
 
@@ -38,12 +38,12 @@ type Rule = (Tag, Data->Doc)
 
 
 -- useful helper things
-namesupply   = [text [x,y] | x <- ['a' .. 'z'], 
+namesupply   = [text [x,y] | x <- ['a' .. 'z'],
                              y <- ['a' .. 'z'] ++ ['A' .. 'Z']]
 mknss []     _  = []
 mknss (c:cs) ns =
   let (thisns,rest) = splitAt (length (types c)) ns
-  in thisns: mknss cs rest 
+  in thisns: mknss cs rest
 
 mkpattern :: Constructor -> [a] -> [Doc] -> Doc
 mkpattern c l ns =
@@ -69,7 +69,7 @@ instanceheader cls dat =
 -- begin here for Binary derivation
 
 
-userRuleGhcBinary dat = 
+userRuleGhcBinary dat =
   let cs  = body dat
       cvs = mknss cs namesupply
       --k   = (ceiling . logBase 256 . realToFrac . length) cs
@@ -80,12 +80,12 @@ userRuleGhcBinary dat =
         ++ [getfn k [0..] cvs cs]
         )
 
-putfn 1 _ [] c = 
+putfn 1 _ [] c =
     text "put_ _" <+> ppCons [] c <+> text "= return ()"
-putfn 1 _ cv c = 
+putfn 1 _ cv c =
   text "put_ bh" <+> ppCons cv c <+> text "= do" $$
   nest 8 (
-    vcat (map (text "put_ bh" <+>) cv) 
+    vcat (map (text "put_ bh" <+>) cv)
   )
 putfn _ n cv c =
   text "put_ bh" <+> ppCons cv c <+> text "= do" $$
@@ -97,9 +97,9 @@ putfn _ n cv c =
 
 ppCons cv c = mkpattern (constructor c) (types c) cv
 
-getfn _ _ [[]] [c] = 
+getfn _ _ [[]] [c] =
     text "return" <+> ppCons [] c
-getfn _ _ [vs] [c] = 
+getfn _ _ [vs] [c] =
   text "get bh = do" $$
     vcat (map (\v-> v <+> text "<-" <+> text "get bh") vs) $$
     text "return" <+> ppCons vs c

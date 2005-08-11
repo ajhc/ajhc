@@ -166,11 +166,11 @@ dConScheme conName
            Just s -> return s
 
 unify      :: Type -> Type -> TI ()
-unify t1 t2 = do 
+unify t1 t2 = do
     t1' <- findType t1
     t2' <- findType t2
-    b <- mgu t1' t2' 
-    case b of 
+    b <- mgu t1' t2'
+    case b of
         Just u -> return () -- extSubst u
         Nothing -> do
                   diagnosis <- getErrorContext
@@ -181,9 +181,9 @@ unify t1 t2 = do
                             diagnosis
 
 {-
---s <- getSubst            
---let t1' = apply s t1     
---    t2' = apply s t2     
+--s <- getSubst
+--let t1' = apply s t1
+--    t2' = apply s t2
 
                  case mgu t1' t2' of
                    Just u  -> extSubst u
@@ -206,7 +206,7 @@ unifyList (t1:t2:ts) = do
 
 extSubst   :: Subst -> TI ()
 --extSubst s' = TI (\t -> modifyIORef (tcSubst t) (s' @@))
-extSubst s = sequence_ [ do y' <- findType y ; liftIO $ writeIORef r (Just y') | (Tyvar { tyvarRef = ~(Just r)} ,y) <- Map.toList s] 
+extSubst s = sequence_ [ do y' <- findType y ; liftIO $ writeIORef r (Just y') | (Tyvar { tyvarRef = ~(Just r)} ,y) <- Map.toList s]
 
 newTVar    :: Kind -> TI Type
 newTVar k   = TI $ \te -> do

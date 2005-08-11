@@ -7,7 +7,7 @@ import Text.PrettyPrint.HughesPJ
 import DerivingDrift.DataP (Statement(..),Data(..),Type(..),Name,Var,Class,
 		Body(..),Constructor)
 
--- Rule Declarations 
+-- Rule Declarations
 
 type Tag = String
 type Rule = (Tag,Data -> Doc)
@@ -40,7 +40,7 @@ texts = map text
 
 block, blockList,parenList,bracketList :: [Doc] -> Doc
 block = nest 4 . vcat
-blockList = braces . fcat . sepWith semi 
+blockList = braces . fcat . sepWith semi
 parenList = parens . fcat . sepWith comma
 bracketList = brackets . fcat . sepWith comma
 
@@ -59,7 +59,7 @@ opt a f = f a
 opt1 :: [a] -> ([a] -> Doc) -> (a -> Doc) -> Doc
 opt1 [] _ _ = empty
 opt1 [x] _ g = g x
-opt1 a f g = f a 
+opt1 a f g = f a
 
 -- new simple docs
 commentLine x = text "--" <+> x -- useful for warnings / error messages
@@ -71,7 +71,7 @@ commentBlock x = text "{-" <> x <> text "-}"
 
 -- instance header, handling class constraints etc.
 simpleInstance :: Class -> Data -> Doc
-simpleInstance s d = hsep [text "instance" 
+simpleInstance s d = hsep [text "instance"
 		, opt constr (\x -> parenList x <+> text "=>")
 		, text s
 		, opt1 (texts (name d : vars d)) parenSpace id]
@@ -82,7 +82,7 @@ simpleInstance s d = hsep [text "instance"
 
 
 -- instanceSkeleton handles most instance declarations, where instance
--- functions are not related to one another.  A member function is generated 
+-- functions are not related to one another.  A member function is generated
 -- using a (IFunction,Doc) pair.  The IFunction is applied to each body of the
 --  type, creating a block of pattern - matching cases. Default cases can be
 -- given using the Doc in the pair.  If a default case is not required, set
@@ -91,16 +91,16 @@ simpleInstance s d = hsep [text "instance"
 type IFunction = Body -> Doc -- instance function
 
 instanceSkeleton :: Class -> [(IFunction,Doc)] -> Data -> Doc
-instanceSkeleton s ii  d = (simpleInstance s d <+> text "where") 
+instanceSkeleton s ii  d = (simpleInstance s d <+> text "where")
 				$$ block functions
 	where
 	functions = concatMap f ii
-	f (i,dflt) = map i (body d) ++ [dflt]      
+	f (i,dflt) = map i (body d) ++ [dflt]
 
 -- little variable name generator, generates (length l) unique names aa - aZ
 varNames :: [a] -> [Doc]
 varNames l = take (length l) names
-   where names = [text [x,y] | x <- ['a' .. 'z'], 
+   where names = [text [x,y] | x <- ['a' .. 'z'],
                                y <- ['a' .. 'z'] ++ ['A' .. 'Z']]
 -- variant generating aa' - aZ'
 varNames' :: [a] -> [Doc]

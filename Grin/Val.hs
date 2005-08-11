@@ -3,7 +3,7 @@ module Grin.Val(FromVal(..),ToVal(..),cChar,cInt,world__,pworld__) where
 import Grin.Grin
 import Atom
 import Char
-import VConsts 
+import VConsts
 import Number
 
 nil = (toAtom "CPrelude.[]")
@@ -16,13 +16,13 @@ world__ = NodeC (toAtom "CJhc.IO.World__") []
 pworld__ = Const world__
 
 class ToVal a where
-    toVal :: a -> Val 
+    toVal :: a -> Val
     toUnVal :: a -> Val
     toUnVal x = toVal x
 
 class FromVal a where
-    fromVal :: Monad m => Val -> m a 
-    fromUnVal :: Monad m => Val -> m a 
+    fromVal :: Monad m => Val -> m a
+    fromUnVal :: Monad m => Val -> m a
     fromUnVal x = fromVal x
 
 instance ToVal () where
@@ -40,7 +40,7 @@ instance ToVal a => ToVal [a] where
     toVal [] = NodeC nil []
     toVal (x:xs) =  NodeC cons [Const (toVal x),Const (toVal xs)]
 instance  ToVal (Val,Val) where
-    toVal (x,y) = NodeC (toAtom "CPrelude.(,)") [x,y] 
+    toVal (x,y) = NodeC (toAtom "CPrelude.(,)") [x,y]
 
 instance ToVal Char where
     toVal c = NodeC cChar [toUnVal c]
@@ -56,14 +56,14 @@ instance ToVal Val where
 
 instance FromVal Int where
     fromVal (NodeC _ [Lit i _]) | Just x <- toIntegral i = return x
-    fromVal n = fail $ "Val is not Int: " ++ show n 
+    fromVal n = fail $ "Val is not Int: " ++ show n
     fromUnVal (Lit i _) | Just x <- toIntegral i = return x
-    fromUnVal n = fail $ "Val is not UnInt: " ++ show n 
+    fromUnVal n = fail $ "Val is not UnInt: " ++ show n
 instance FromVal Char where
     fromVal (NodeC _ [Lit i _]) | Just x <- toIntegral i = return (chr x)
     fromVal n = fail $ "Val is not Char: " ++ show n
     fromUnVal (Lit i _) | Just x <- toIntegral i = return (chr x)
-    fromUnVal n = fail $ "Val is not UnChar: " ++ show n 
+    fromUnVal n = fail $ "Val is not UnChar: " ++ show n
 instance FromVal () where
     fromVal n | n == toVal () = return ()
     fromVal n = fail $ "Val is not (): " ++ show n
@@ -78,11 +78,11 @@ instance FromVal a => FromVal [a] where
         return (x:xs)
     fromVal n = fail $ "Val is not [a]: " ++ show n
 
-    
-instance FromVal Bool  where 
-    fromVal n 
-        | n == toVal True = return True 
-        | n == toVal False = return False 
+
+instance FromVal Bool  where
+    fromVal n
+        | n == toVal True = return True
+        | n == toVal False = return False
     fromVal n = fail $ "Val is not Bool: " ++ show n
 instance FromVal Val where
     fromVal n = return n

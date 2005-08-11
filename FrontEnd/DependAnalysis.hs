@@ -2,7 +2,7 @@
 
         Copyright:              The Hatchet Team (see file Contributors)
 
-        Module:                 DependAnalysis  
+        Module:                 DependAnalysis
 
         Description:            Compute the dependencies between values. Can
                                 be used for computing the dependencies in
@@ -19,7 +19,7 @@
 
 module DependAnalysis (getBindGroups, showBindGroups, debugBindGroups) where
 
-import List (nub) 
+import List (nub)
 import Data.Graph(stronglyConnComp, SCC(..))
 
 
@@ -41,17 +41,17 @@ getBindGroups ns fn fd = map f $ stronglyConnComp [ (n, fn n, fd n) | n <- ns] w
     f (CyclicSCC xs) = xs
 {-
 getBindGroups ns getName getDeps
-	= [ mapOnList nameToNodeFM group | group <- nameGroups ] 
+	= [ mapOnList nameToNodeFM group | group <- nameGroups ]
 	where
-	nameGroups = buildNameGroups nameList nameEdges 
+	nameGroups = buildNameGroups nameList nameEdges
 	nameList = map getName ns
-	nameEdges = buildNameEdges ns getName getDeps 
+	nameEdges = buildNameEdges ns getName getDeps
 	nameToNodeFM = listToFM [ (getName x, x) | x <- ns ]	
 
 getBindGroups ns toName getDeps = filter (not . null) (map (concatMap f) $ Scc.scc ds) where
     f n = case M.lookup n m of
         --Nothing -> error $ "cannot find " ++ show n ++ " in " ++ unlines (map show (sort ds))
-        --Just x -> x 
+        --Just x -> x
         Nothing -> fail "Nothing"
         Just x -> return x
     ds = [ (toName x, getDeps x) | x <- ns ]
@@ -82,7 +82,7 @@ buildNameGroups :: Ord name      =>
                    [(name,name)] ->    -- List of edges
                    [[name]]            -- List of bindgroups
 buildNameGroups ns es
-	= [ mapOnList intToNameFM group | group <- intGroups ] 
+	= [ mapOnList intToNameFM group | group <- intGroups ]
 	where
 	intGroups = map preorder $ scc $ buildG (1, sizeFM nameToIntFM) intEdges
 	intEdges = mapOnTuple nameToIntFM es
@@ -117,16 +117,16 @@ mapOnTuple :: Ord a         =>
 mapOnTuple _ [] = []
 mapOnTuple fm ((a1,a2):as)
 	= case (lookupFM fm a1) of
-		Just x  -> 
+		Just x  ->
 			case (lookupFM fm a2) of
-				Just y  -> (x,y) : (mapOnTuple fm as) 
-				Nothing -> mapOnTuple fm as 
-		Nothing -> mapOnTuple fm as 
+				Just y  -> (x,y) : (mapOnTuple fm as)
+				Nothing -> mapOnTuple fm as
+		Nothing -> mapOnTuple fm as
 
 -}
 
 --------------------------------------------------------------------------------
--- showBindGroups 
+-- showBindGroups
 --------------------------------------------------------------------------------
 
 --
@@ -149,14 +149,14 @@ showBindGroups_ :: [[node]]        ->     -- List of nodes
 showBindGroups_ [] _ _
 	= ""
 showBindGroups_ (n:ns) getAlias groupNum
-	= "Bindgroup " ++ show groupNum ++ " = " 
-	  ++ bgString ++ "\n" 
+	= "Bindgroup " ++ show groupNum ++ " = "
+	  ++ bgString ++ "\n"
 	  ++ showBindGroups_ ns getAlias (groupNum + 1)
 	where
-	bgString = wrapString "EMPTY" (listToString n getAlias) 
+	bgString = wrapString "EMPTY" (listToString n getAlias)
 
 --------------------------------------------------------------------------------
--- debugBindGroups 
+-- debugBindGroups
 --------------------------------------------------------------------------------
 
 --
@@ -189,16 +189,16 @@ debugBindGroups_ :: (Eq name) =>
 debugBindGroups_ [] _ _ _ _ _
 	= ""
 debugBindGroups_ (n:ns) getAlias getName getDeps groupNum history
-	= show groupNum ++ " = " 
-	  ++ bgString ++ "\n" 
+	= show groupNum ++ " = "
+	  ++ bgString ++ "\n"
 	  ++ debugBindGroups_ ns getAlias getName getDeps (groupNum + 1) newHistory
 	where
 	bgString = showBindGroup (expandBindGroup n getAlias getDeps newHistory)
 	newHistory = history ++ [(groupNum, [ getName x | x <- n ])]
 
-	  
+	
 --
--- Expand bindgroups, generating dependancie and error information. 
+-- Expand bindgroups, generating dependancie and error information.
 --
 expandBindGroup :: (Eq name) =>
                    [node]         ->               -- List of nodes
@@ -210,11 +210,11 @@ expandBindGroup [] _ _ _
 	= ([],[],[])
 expandBindGroup (n:ns) getAlias getDeps history
 	= if err
-		then (name:a, bgs++b, name:c) 
-		else (name:a, bgs++b, c) 
+		then (name:a, bgs++b, name:c)
+		else (name:a, bgs++b, c)
 	where
 	name = getAlias n
-	(bgs, err) = inHistory (getDeps n) history 
+	(bgs, err) = inHistory (getDeps n) history
 	(a,b,c) = expandBindGroup ns getAlias getDeps history
 -- NB ticti, you should not be calling inHistory on the name, but instead on the deps.
 
@@ -224,7 +224,7 @@ expandBindGroup (n:ns) getAlias getDeps history
 --
 showBindGroup :: ([String],[Int],[String]) -> String
 showBindGroup (bg, deps, errors)
-	= bgString ++ " " ++ depString ++ " " ++ errString 
+	= bgString ++ " " ++ depString ++ " " ++ errString
 	where
 	bgString  = wrapString [] $ listToString bg id
 	depString = wrapString [] $ listToString (nub deps) show
@@ -257,7 +257,7 @@ inHistory :: Eq name =>
              ([Int],Bool)         -- Number of bind group that name is in, or its own alias.
 inHistory [] _
 	= ([],False)
-inHistory (name:names) history 
+inHistory (name:names) history
 	= if location < 0
 		then (bgs, False)
 		else (location : bgs, err)
@@ -273,7 +273,7 @@ searchHistory :: Eq name        =>
                  name           ->   -- List of names to be searched for
                  [(Int,[name])] ->   -- History information of names already processed
                  Int                 -- Bindgroup num that name occurred in (-1 is error)
-searchHistory _ [] 
+searchHistory _ []
 	= -1
 searchHistory name ((bgnum, bgnames):history)
 	= if elem name bgnames

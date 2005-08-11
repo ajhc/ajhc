@@ -7,9 +7,9 @@
         Module:                 MultiModuleBasics
 
         Description:            More Support code for type checking multi-module
-                                programs. 
+                                programs.
 
-        Primary Authors:        Bryn Humberstone 
+        Primary Authors:        Bryn Humberstone
 
         Notes:                  See the file License for license information
 
@@ -37,7 +37,7 @@ data ModInfo = ModInfo {
     modInfoImport :: [(Name,[Name])],
     modInfoHsModule :: HsModule,
     modInfoOptions :: Opt
-    } 
+    }
    {-! derive: update !-}
 
 instance Eq ModInfo where
@@ -45,24 +45,24 @@ instance Eq ModInfo where
 
 instance Ord ModInfo where
     compare a b = compare (modInfoName a) (modInfoName b)
- 
+
 
 {-
 
 data ModEnv = ModEnv {
     modEnvModules :: M.Map Module ModInfo,
-    modEnvVarAssumptions :: Env Scheme,          -- used for typechecking 
-    modEnvDConsAssumptions :: Env Scheme,        -- used for typechecking 
+    modEnvVarAssumptions :: Env Scheme,          -- used for typechecking
+    modEnvDConsAssumptions :: Env Scheme,        -- used for typechecking
     modEnvAllAssumptions :: M.Map Name Scheme,          -- used for code generation
     modEnvFixities :: FixityMap,
     modEnvKinds :: KindEnv,                      -- used for typechecking
     modEnvClassHierarchy :: ClassHierarchy,
     modEnvTypeSynonyms :: TypeSynonyms,
     modEnvLiftedInstances :: M.Map HsName HsDecl
-    } 
+    }
    {-! derive: update, Monoid !-}
 
 emptyModEnv :: ModEnv
-emptyModEnv = mempty 
+emptyModEnv = mempty
 
 -}

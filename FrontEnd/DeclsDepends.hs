@@ -2,10 +2,10 @@
 
         Copyright:              The Hatchet Team (see file Contributors)
 
-        Module:                 DeclsDepends 
+        Module:                 DeclsDepends
 
         Description:            Collect the names that a variable declaration
-                                depends upon, for use in dependency 
+                                depends upon, for use in dependency
                                 analysis.
 
         Primary Authors:        Bernie Pope, Robert Shelton
@@ -16,7 +16,7 @@
 
 module DeclsDepends (getDeclDeps, debugDeclBindGroups) where
 
-import HsSyn 
+import HsSyn
 import DependAnalysis           (debugBindGroups)
 import Utils                    (getDeclName, fromHsName)
 import FrontEnd.Rename          (unRename)
@@ -26,17 +26,17 @@ import FrontEnd.Rename          (unRename)
 -- for printing out decl bindgroups
 
 debugDeclBindGroups :: [[HsDecl]] -> String
-debugDeclBindGroups groups 
+debugDeclBindGroups groups
    = debugBindGroups groups (fromHsName . unRename . getDeclName)
                             getDeclName
-                            getDeclDeps  
+                            getDeclDeps
 
--- HsDecl getDeps function 
+-- HsDecl getDeps function
 
 
 getDeclDeps :: HsDecl -> [HsName]
 
-getDeclDeps (HsPatBind _pat _ rhs wheres) 
+getDeclDeps (HsPatBind _pat _ rhs wheres)
    = getRhsDeps rhs ++ foldr (++) [] (map getLocalDeclDeps wheres)
 
 getDeclDeps (HsFunBind matches)
@@ -54,27 +54,27 @@ getMatchDeps (HsMatch _sloc _name _pats rhs wheres)
 getLocalDeclDeps :: HsDecl -> [HsName]
 getLocalDeclDeps (HsFunBind matches)
    = foldr (++) [] (map getMatchDeps matches)
-   
+
 getLocalDeclDeps (HsPatBind _sloc _hspat rhs wheres)
-   = getRhsDeps rhs ++ foldr (++) [] (map getLocalDeclDeps wheres) 
+   = getRhsDeps rhs ++ foldr (++) [] (map getLocalDeclDeps wheres)
 
 getLocalDeclDeps _ = []
 
 -- get the dependencies from the rhs of a function
 
 getRhsDeps :: HsRhs -> [HsName]
-getRhsDeps (HsUnGuardedRhs e) 
+getRhsDeps (HsUnGuardedRhs e)
    = getExpDeps e
 getRhsDeps (HsGuardedRhss rhss)
    = foldr (++) [] (map getGuardedRhsDeps rhss)
 
 getGuardedRhsDeps :: HsGuardedRhs -> [HsName]
-getGuardedRhsDeps (HsGuardedRhs _sloc guardExp rhsExp) 
-   = getExpDeps guardExp ++ getExpDeps rhsExp 
+getGuardedRhsDeps (HsGuardedRhs _sloc guardExp rhsExp)
+   = getExpDeps guardExp ++ getExpDeps rhsExp
 
 getExpDeps :: HsExp -> [HsName]
-getExpDeps (HsVar name) 
-   = [name] 
+getExpDeps (HsVar name)
+   = [name]
 
 getExpDeps (HsCon _)
    = []
@@ -85,25 +85,25 @@ getExpDeps (HsLit _)
 getExpDeps (HsInfixApp e1 e2 e3)
    = getExpDeps e1 ++
      getExpDeps e2 ++
-     getExpDeps e3 
+     getExpDeps e3
 
-getExpDeps (HsApp e1 e2) 
-   = getExpDeps e1 ++ getExpDeps e2 
+getExpDeps (HsApp e1 e2)
+   = getExpDeps e1 ++ getExpDeps e2
 
-getExpDeps (HsNegApp e) 
-   = getExpDeps e 
+getExpDeps (HsNegApp e)
+   = getExpDeps e
 
-getExpDeps (HsLambda _ _ e) 
-   = getExpDeps e 
+getExpDeps (HsLambda _ _ e)
+   = getExpDeps e
 
 getExpDeps (HsLet decls e)
    = foldr (++) [] (map getLocalDeclDeps decls) ++
-     getExpDeps e 
+     getExpDeps e
 
-getExpDeps (HsIf e1 e2 e3) 
+getExpDeps (HsIf e1 e2 e3)
    = getExpDeps e1 ++
      getExpDeps e2 ++
-     getExpDeps e3 
+     getExpDeps e3
 
 getExpDeps (HsCase e alts)
    = getExpDeps e ++
@@ -112,10 +112,10 @@ getExpDeps (HsCase e alts)
 getExpDeps (HsDo stmts)
    = foldr (++) [] (map getStmtDeps stmts)
 
-getExpDeps (HsTuple exps) 
+getExpDeps (HsTuple exps)
    = foldr (++) [] (map getExpDeps exps)
 
-getExpDeps (HsList exps) 
+getExpDeps (HsList exps)
    = foldr (++) [] (map getExpDeps exps)
 
 getExpDeps (HsParen e)
@@ -158,7 +158,7 @@ getAltDeps :: HsAlt -> [HsName]
 
 getAltDeps (HsAlt _sloc _pat guardedAlts wheres)
    = getGuardedAltsDeps guardedAlts ++
-     foldr (++) [] (map getLocalDeclDeps wheres) 
+     foldr (++) [] (map getLocalDeclDeps wheres)
 
 getGuardedAltsDeps :: HsGuardedAlts -> [HsName]
 getGuardedAltsDeps (HsUnGuardedAlt e)

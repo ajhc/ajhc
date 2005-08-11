@@ -1,7 +1,7 @@
 module DerivingDrift.StandardRules (standardRules) where
 
 import DerivingDrift.RuleUtils
-import List 
+import List
 import GenUtil
 
 tshow = text . show
@@ -36,82 +36,82 @@ nffn = instanceSkeleton "NFData" [(makeRnf,empty)]
 
 makeRnf :: IFunction
 makeRnf (Body{constructor=constructor,types=types})
-	| null types = text "rnf" <+> 
+	| null types = text "rnf" <+>
 		fsep [pattern constructor [],equals,text "()"]
-	| otherwise = let 
+	| otherwise = let
    vars = varNames types
-   head = [pattern constructor vars, equals] 
+   head = [pattern constructor vars, equals]
    body =  sepWith (text "`seq`") . map (text "rnf" <+>) $ vars
        in  text "rnf" <+> fsep (head ++  body)
 
 
 -----------------------------------------------------------------------------
 -- Forming 'update' functions for each label in a record
--- 
+--
 -- for a datatype G, where label has type G -> a
--- the corresponding update fn has type (a -> a) -> G -> G 
+-- the corresponding update fn has type (a -> a) -> G -> G
 -- The update fn has the same name as the label with _u appended
 
--- an example of what we want to generate 
+-- an example of what we want to generate
 -- 	--> foo_u f d{foo}=d{foo = f foo}
--- 
+--
 -- labels can be common to more than one constructor in a type. -- this
 -- is a problem, and the reason why a sort is used.
 
 updatefn :: Data -> Doc
 updatefn d@(D{body=body,name=name})
 	| hasRecord d = vcat (updates ++ sets)
-	| otherwise = commentLine $ 
-	text "Warning - can't derive `update' functions for non-record type: " 
-	<+> text name 
-	where 
+	| otherwise = commentLine $
+	text "Warning - can't derive `update' functions for non-record type: "
+	<+> text name
+	where
     nc = length body
     labs = gf $ sort . concatMap f $ body
     updates = map genup labs --  $$  hsep [text (n ++ "_u"), char '_', char 'x', equals, char 'x']
-    sets = map genset . nub . map fst $ labs 
-    f :: Body -> [(Name,Constructor)] 
+    sets = map genset . nub . map fst $ labs
+    f :: Body -> [(Name,Constructor)]
     f (Body{constructor=constructor,labels=labels}) = zip (filter (not . null) labels ) (repeat constructor)
     gf ts = map (\ts -> (fst (head ts), snds ts)) (groupBy (\(a,_) (b,_) -> a == b) (sort ts))
 
     genup :: (Name,[Constructor]) -> Doc
     genup (n,cs) = vcat (map up cs) $$ up' where
-        up c = hsep [text (n ++ "_u") , char 'f' 
-            , char 'r' <> char '@' <> text c <> braces (text n <+> text " = x") 
-            , equals , char 'r' <> braces (hsep [text n, text "= f x"])] 
+        up c = hsep [text (n ++ "_u") , char 'f'
+            , char 'r' <> char '@' <> text c <> braces (text n <+> text " = x")
+            , equals , char 'r' <> braces (hsep [text n, text "= f x"])]
         up' | nc > length cs = hsep [text (n ++ "_u"), char '_', char 'x', equals, char 'x']
             | otherwise =  empty
 
     -- while we're at it, may as well define a set function too...
     genset :: Name -> Doc
-    genset n = hsep [text (n ++ "_s v = "), text (n ++ "_u"), text " (const v)"] 
+    genset n = hsep [text (n ++ "_s v = "), text (n ++ "_u"), text " (const v)"]
 
 getfn :: Data -> Doc
 getfn d@(D{body=body,name=name})
 	| hasRecord d = vcat (updates ++ sets)
-	| otherwise = commentLine $ 
-	text "Warning - can't derive `get' functions for non-record type: " 
-	<+> text name 
-	where 
+	| otherwise = commentLine $
+	text "Warning - can't derive `get' functions for non-record type: "
+	<+> text name
+	where
     nc = length body
     labs = gf $ sort . concatMap f $ body
-    updates = map genup labs 
-    sets = map genset . nub . map fst $ labs 
-    f :: Body -> [(Name,Constructor)] 
+    updates = map genup labs
+    sets = map genset . nub . map fst $ labs
+    f :: Body -> [(Name,Constructor)]
     f (Body{constructor=constructor,labels=labels}) = zip (filter (not . null) labels ) (repeat constructor)
     gf ts = map (\ts -> (fst (head ts), snds ts)) (groupBy (\(a,_) (b,_) -> a == b) (sort ts))
 
     genup :: (Name,[Constructor]) -> Doc
     genup (n,cs) = vcat (map up cs) $$ up' where
         fn = n ++ "_g"
-        up c = hsep [text fn 
-            , char 'r' <> char '@' <> text c <> braces (text n <+> text " = x") 
-            , equals , text "return x"] 
+        up c = hsep [text fn
+            , char 'r' <> char '@' <> text c <> braces (text n <+> text " = x")
+            , equals , text "return x"]
         up' | nc > length cs = hsep [text fn, char '_',  equals, text "fail", tshow fn]
             | otherwise =  empty
 
     -- while we're at it, may as well define a set function too...
     genset :: Name -> Doc
-    genset n = hsep [text (n ++ "_s v = "), text (n ++ "_u"), text " (const v)"] 
+    genset n = hsep [text (n ++ "_s v = "), text (n ++ "_u"), text " (const v)"]
 
 ----------------------------------------------------------------------
 -- Similar rules to provide predicates for the presence of a constructor / label
@@ -119,50 +119,50 @@ getfn d@(D{body=body,name=name})
 isfn :: Data -> Doc
 isfn (D{body=body}) =  vcat (map is body)
 	where	
-	is Body{constructor=constructor,types=types} = let 
+	is Body{constructor=constructor,types=types} = let
 		fnName = text ("is" ++ constructor)
-		fn = fnName <+> 
+		fn = fnName <+>
 			hsep [pattern_ constructor types,text "=",text "True"]
 		defaultFn = fnName <+> hsep (texts ["_","=","False"])
 		in fn $$ defaultFn
 
 fromfn :: Data -> Doc
 fromfn (D{body=body}) =  vcat (map from body) where	
-    from Body{constructor=constructor,types=types} = fn $$ defaultFn where 
+    from Body{constructor=constructor,types=types} = fn $$ defaultFn where
             fnName = ("from" ++ constructor)
             fnName' = text fnName
-            fn = fnName' <+> 
+            fn = fnName' <+>
                     hsep [pattern constructor types,text "=",text "return", tuple (varNames types) ]
             defaultFn = fnName' <+> hsep (texts ["_","=","fail",show fnName ])
 
 hasfn :: Data -> Doc
 hasfn d@(D{body=body,name=name})
 	| hasRecord d = vcat [has l b | l <- labs, b <- body]
-	| otherwise = commentLine $ 
+	| otherwise = commentLine $
 	    text "Warning - can't derive `has' functions for non-record type:"
 	    <+> text name
-	where     
+	where
 	has lab Body{constructor=constructor,labels=labels} = let
 		bool = text . show $ lab `elem` labels
 		pattern = text (constructor ++ "{}")
 		fnName = text ( "has" ++ lab)
-		in fsep[fnName, pattern, text "=", bool]     	    
-	labs = nub . concatMap (labels) $  body       
-		       
+		in fsep[fnName, pattern, text "=", bool]     	
+	labs = nub . concatMap (labels) $  body
+		
 
 -- Function to make using newtypes a bit nicer.
--- for newtype N = T a , unN :: T -> a 
+-- for newtype N = T a , unN :: T -> a
 
 unfn :: Data -> Doc
-unfn (D{body=body,name=name,statement=statement}) | statement == DataStmt 
-	= commentLine 
-	  $ text "Warning - can't derive 'un' function for data declaration " 
+unfn (D{body=body,name=name,statement=statement}) | statement == DataStmt
+	= commentLine
+	  $ text "Warning - can't derive 'un' function for data declaration "
 	  <+> text name
 			      | otherwise
 	= let fnName = text ("un" ++ name)
 	      b = head body
 	      pattern = parens $ text (constructor b) <+> text "a"
-	      in fsep [fnName,pattern, equals, text "a"] 
+	      in fsep [fnName,pattern, equals, text "a"]
 
 
 -----------------------------------------------------------------------------
@@ -171,7 +171,7 @@ unfn (D{body=body,name=name,statement=statement}) | statement == DataStmt
 -- from the entire file should be generated.
 
 
-dattest d =  commentBlock . vcat $ 
+dattest d =  commentBlock . vcat $
            [text (name d)
 		, fsep . texts . map show $ constraints d
 		, fsep . texts . map show $ vars d
@@ -185,17 +185,17 @@ dattest d =  commentBlock . vcat $
 
 -- Eq
 
-eqfn = instanceSkeleton "Eq" [(makeEq,defaultEq)] 
+eqfn = instanceSkeleton "Eq" [(makeEq,defaultEq)]
 
 makeEq :: IFunction
 makeEq (Body{constructor=constructor,types=types})
 	| null types = hsep $ texts [constructor,"==",constructor, "=", "True"]
 	| otherwise = let
 	v = varNames types
-	v' = varNames' types 
+	v' = varNames' types
 	d x = parens . hsep $ text constructor : x
 	head = [ text "==", d v', text "="]
-	body = sepWith (text "&&") $ 
+	body = sepWith (text "&&") $
 		zipWith (\x y -> (x <+> text "==" <+> y)) v v'
 	in d v <+> fsep (head ++  body)
 
@@ -205,18 +205,18 @@ defaultEq = hsep $ texts ["_", "==", "_", "=" ,"False"]
 
 -- Ord
 
-ordfn d = let 
+ordfn d = let
    ifn = [f c c'
 		| c <- zip (body d) [1 ..]
 		, c' <- zip (body d) [1 ..]]
    cmp n n' = show $  compare n n'
-   f (b,n) (b',n') 
+   f (b,n) (b',n')
 	| null (types b) = text "compare" <+>
 		   fsep [text (constructor b),
 			 pattern (constructor b') (types b')
 			, char '=', text $ cmp n n' ]
 	| otherwise = let
-		      head  = fsep [l,r, char '='] 
+		      head  = fsep [l,r, char '=']
 		      l = pattern (constructor b) (types b)
 		      r = pattern' (constructor b') (types b')
 		      one x y = fsep [text "compare",x,y]
@@ -235,12 +235,12 @@ ordfn d = let
 ----------------------------------------------------------------------
 
 -- Show & Read
--- 	won't work for infix constructors 
+-- 	won't work for infix constructors
 -- 	(and anyway, neither does the parser currently)
 -- 	
--- Show 
+-- Show
 
-showfn = instanceSkeleton "Show" [(makeShow,empty)] 
+showfn = instanceSkeleton "Show" [(makeShow,empty)]
 
 makeShow :: IFunction
 makeShow (Body{constructor=constructor,labels=labels,types=types})
@@ -264,7 +264,7 @@ makeShow (Body{constructor=constructor,labels=labels,types=types})
 	showString s = fsep[ text "showString", doubleQuotes $ text s]
 	comp = char '.'
 
--- Read 
+-- Read
 
 readfn d = simpleInstance "Read" d <+> text "where" $$ readsPrecFn d
 
@@ -281,7 +281,7 @@ makeRead (Body{constructor=constructor,labels=labels,types=types})
 	where
 	headfn = fsep [text "readParen", parens (text "d > 9")]
 	read0 = lambda $ listComp (result rest) [lexConstr rest]
-	read = lambda . listComp (result rest) 
+	read = lambda . listComp (result rest)
 		     $ lexConstr ip : ( map f (init vars) )
 			++ final (last vars)
         f v = fsep [tup v ip, from,readsPrec, ip]
@@ -294,12 +294,12 @@ makeRead (Body{constructor=constructor,labels=labels,types=types})
 		openB = fsep [tup (text $ show "{") ip,lex]
 		closeB = fsep [tup (text $ show "}") rest,lex]
 		comma = [fsep [tup (text $ show ",") ip,lex]]
-		in lambda . listComp (result rest) 
-			$ lexConstr ip : openB 
+		in lambda . listComp (result rest)
+			$ lexConstr ip : openB
 			: (concat . sepWith comma) (zipWith f labels vars)
 			 ++ [closeB]
 	lambda x = parens ( fsep [text "\\",ip,text "->",x])
-	listComp x (l:ll) = brackets . fsep . sepWith comma $  
+	listComp x (l:ll) = brackets . fsep . sepWith comma $
 				((fsep[x, char '|', l]) : ll)
 	result x = tup (pattern constructor vars) x
 	lexConstr x = fsep [tup (text $ show constructor) x, lex]
@@ -317,32 +317,32 @@ makeRead (Body{constructor=constructor,labels=labels,types=types})
 -- Enum -- a lot of this code should be provided as default instances,
 -- 	 but currently isn't
 
-enumfn d = let 
+enumfn d = let
 	fromE = fromEnumFn d
 	toE = toEnumFn d
 	eFrom = enumFromFn d
 	in if any (not . null . types) (body d)
-	   then commentLine $ text "Warning -- can't derive Enum for" 
+	   then commentLine $ text "Warning -- can't derive Enum for"
 				<+> text (name d)
-	   else simpleInstance "Enum" d <+> text "where" 
+	   else simpleInstance "Enum" d <+> text "where"
 		$$ block (fromE ++ toE ++ [eFrom,enumFromThenFn])
 
 fromEnumFn :: Data -> [Doc]
 fromEnumFn (D{body=body}) = map f (zip body [0 ..])
 	where
 	f (Body{constructor=constructor},n) = text "fromEnum" <+> (fsep $
-		texts [constructor , "=", show n])	 
+		texts [constructor , "=", show n])	
 		
 toEnumFn :: Data -> [Doc]
 toEnumFn (D{body=body}) = map f (zip body [0 ..])
 	where
 	f (Body{constructor=constructor},n) = text "toEnum" <+> (fsep $
-		texts [show n , "=", constructor])    
+		texts [show n , "=", constructor])
 		
 enumFromFn :: Data -> Doc
-enumFromFn D{body=body} = let 
+enumFromFn D{body=body} = let
 	conList = bracketList . texts . map constructor $ body
-	bodydoc = fsep [char 'e', char '=', text "drop", 
+	bodydoc = fsep [char 'e', char '=', text "drop",
 		parens (text "fromEnum" <+> char 'e'), conList]
 	in text "enumFrom" <+> bodydoc
 		
@@ -360,7 +360,7 @@ enumFromThenFn = let
 
 -- Bounded - as if anyone uses this one :-) ..
 
-boundedfn d@D{name=name,body=body,derives=derives} 
+boundedfn d@D{name=name,body=body,derives=derives}
 	| all (null . types) body  = boundedEnum d
 	| singleton body = boundedSingle d
        | otherwise = commentLine $ text "Warning -- can't derive Bounded for"
@@ -374,7 +374,7 @@ boundedEnum d@D{body=body} = let f = constructor . head $ body
 
 boundedSingle d@D{body=body} = let f = head $ body
 	in simpleInstance "Bounded" d <+> text "where" $$ block [
-		hsep . texts $ [ "minBound","=",constructor f] ++ 
+		hsep . texts $ [ "minBound","=",constructor f] ++
 			replicate (length (types f)) "minBound",
 		hsep . texts $ [ "maxBound","=",constructor f] ++
 			replicate (length (types f)) "maxBound"]

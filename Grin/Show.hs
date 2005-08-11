@@ -23,9 +23,9 @@ instance PPrint Doc Exp   where
     pprint v = prettyExp empty v
 
 pVar v | v == unit = empty
-pVar v  = pVal v <+> operator "<- " 
+pVar v  = pVal v <+> operator "<- "
 
-pVar' v  = pVal v <+> operator "<- " 
+pVar' v  = pVal v <+> operator "<- "
 
 attr = if dump FD.Html then html else ansi
 
@@ -38,7 +38,7 @@ color n x = attrColor (attr oob) n x
 --color c doc = oob (attr [c]) <> doc <> oob (attr [39])
 
 operator = bold . text
-keyword = bold . text 
+keyword = bold . text
 tag = text
 func = color "lightgreen" . text
 prim = color "red" . text
@@ -82,7 +82,7 @@ pVal (Lit i t) | t == tCharzh, i >= 0x20 && i < 0x7f, Just x <- toIntegral i = t
 pVal (Lit i _)  = tshow i
 --pVal Unit = text "()"
 pVal (Tup xs)  = tupled $ map pVal xs
-pVal (Const v) = char '&' <> pVal v 
+pVal (Const v) = char '&' <> pVal v
 pVal (Addr _) = text "<ref>"
 
 instance DocLike d => PPrint d Var where
@@ -97,9 +97,9 @@ prettyFun (n,(Tup as :-> e)) = func (fromAtom n) <+> hsep (map pVal as) <+> oper
 
 printGrin :: Grin -> IO ()
 printGrin Grin { grinFunctions = ds', grinCafs = cafs } = do
-    when (not $ null cafs) $ do 
+    when (not $ null cafs) $ do
         putErrLn "-- Cafs"
-        mapM_ (putErrLn) $ map (\(x,y) -> show x ++ " = " ++  render (prettyVal y))  cafs 
+        mapM_ (putErrLn) $ map (\(x,y) -> show x ++ " = " ++  render (prettyVal y))  cafs
     putErrLn "-- Functions"
     mapM_ (putErrLn . render) $ map prettyFun ds'
 

@@ -20,10 +20,10 @@ import GenUtil
 -- Some of these arn't optimizations, but rather important transformations.
 
 primOpt dataTable stats e = do
-    runStatIO stats (primOpt' dataTable e)  
+    runStatIO stats (primOpt' dataTable e)
 
 create_integralCast dataTable e t = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] te) cc] Nothing  where
-    te = typ e       
+    te = typ e
     (vara:varb:_) = freeNames (freeVars (e,t))
     tvra =  tVr vara sta
     tvrb =  tVr varb stb
@@ -32,10 +32,10 @@ create_integralCast dataTable e t = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] 
     cc = if ta == tb then ELit (LitCons cnb [EVar tvra] t) else
         eStrictLet  tvrb (EPrim (APrim (CCast ta tb) mempty) [EVar tvra] stb)  (ELit (LitCons cnb [EVar tvrb] t))
 
-unbox :: DataTable -> E -> Int -> (TVr -> E) -> E 
-unbox dataTable e vn wtd = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] te) (wtd tvra)] Nothing where 
-    te = typ e       
-    tvra = tVr vn sta 
+unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
+unbox dataTable e vn wtd = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] te) (wtd tvra)] Nothing where
+    te = typ e
+    tvra = tVr vn sta
     Just (cna,sta,ta) = lookupCType' dataTable te
 
 intt = rawType "int"
@@ -68,8 +68,8 @@ primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
                 (_,tr) <- lookupCType dataTable t
                 unless (ta == tb && tb == tr) $ fail "bad divide"
                 return $ unbox dataTable a vara $ \tvra ->
-                    unbox dataTable b varb $ \tvrb -> 
-                        eStrictLet (tVr varc sta) (EPrim (APrim (Operator "/" [ta,ta] ta) mempty) [EVar tvra, EVar tvrb] sta) (ELit (LitCons cna [EVar (tVr varc sta)] t)) 
+                    unbox dataTable b varb $ \tvrb ->
+                        eStrictLet (tVr varc sta) (EPrim (APrim (Operator "/" [ta,ta] ta) mempty) [EVar tvra, EVar tvrb] sta) (ELit (LitCons cna [EVar (tVr varc sta)] t))
 
                 --return $ EPrim (APrim (Operator "/" [ta,tb] tr) mempty) [a,b] t
 
@@ -77,13 +77,13 @@ primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
         --    (_,ta) <- lookupCType dataTable t
         --    return $ EPrim (APrim (CConst c ta) mempty) [] t
         primopt (PrimPrim pn) [] t | Just c <-  getPrefix "const." pn = do
-            (cn,st,ct) <- case lookupCType' dataTable t of 
+            (cn,st,ct) <- case lookupCType' dataTable t of
                 Right x -> return x
                 Left x -> error x
             let (var:_) = freeNames (freeVars t)
             return $ eStrictLet (tVr var st) (EPrim (APrim (CConst c ct) mempty) [] st) (ELit (LitCons cn [EVar $ tVr var st] t))
-            
-        
+
+
         primopt (PrimPrim "integralCast") [e] t = return $ create_integralCast dataTable e t
         --primopt (PrimPrim "integralCast") [e] t | Just (_,ta) <- lookupCType dataTable (typ e), Just (_,tb) <- lookupCType dataTable t =
         --    if ta == tb then return (prim_unsafeCoerce e t)  else return $ EPrim (APrim (CCast ta tb) mempty) [e] t
@@ -148,14 +148,14 @@ primOpt dataTable  stats (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = d
         primopt (PrimPrim pn) [] t | Just c <-  getPrefix "const." pn = do
             (_,ta) <- lookupCType dataTable t
             return $ EPrim (APrim (CConst c ta) mempty) [] t
-            
-        
+
+
         primopt (PrimPrim "integralCast") [e] t | Just (_,ta) <- lookupCType dataTable (typ e), Just (_,tb) <- lookupCType dataTable t =
             if ta == tb then return (prim_unsafeCoerce e t)  else return $ EPrim (APrim (CCast ta tb) mempty) [e] t
         primopt (PrimPrim "integralCast") es t = error $ "Invalid integralCast " ++ show (es,t)
         primopt (CCast _ _) [ELit (LitInt x _)] t = return $ ELit (LitInt x t)  -- TODO ensure constant fits
         primopt (CCast x y) [e] t | x == y = return $ prim_unsafeCoerce e t
-            
+
         --primopt (PrimPrim "integralCast") [e'] t | Just (x,_) <- from_integralCast e' = return $ prim_integralCast x t
         --primopt (PrimPrim "integralCast") [EError err _] t  = return $ EError err t
         --primopt (PrimPrim "integralCast") [ELit (LitInt x _)] t  = return $ ELit (LitInt x t)

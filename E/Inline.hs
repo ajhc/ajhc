@@ -17,15 +17,15 @@ import qualified Data.Set as Set
 
 
 
--- To decide whether to inline, we take a few things into account 
+-- To decide whether to inline, we take a few things into account
 
-                       
-baseInlinability e 
+
+baseInlinability e
     | isAtomic e = 5
-    | whnfOrBot e = 4 
+    | whnfOrBot e = 4
     | otherwise = 0
 
-basicDecompose :: 
+basicDecompose ::
     Maybe [Int]  -- ^ Just a set of values not to prune or nothing to not prune at all.
     -> Rules     -- ^ Rules for pruning
     -> E             -- ^ body for pruning info
@@ -33,10 +33,10 @@ basicDecompose ::
     -> [Either (TVr,E) [(TVr,E)]]     -- ^ bindings pruned and ordered by inlinability value
 basicDecompose prune rules body ds = ans where
     zs = [ ((t,e), tvrNum t, freeVars (tvrType t) `mappend` freeVars e `mappend` Set.toList (ruleFreeVars rules t)) |  (t,e) <- ds ]
-    cg zs =  newGraph zs (\ (_,x,_) -> x) ( \ (_,_,x) -> x) 
+    cg zs =  newGraph zs (\ (_,x,_) -> x) ( \ (_,_,x) -> x)
     tg = cg zs
-    scc' = scc tg 
-    scc'' = case prune of 
+    scc' = scc tg
+    scc'' = case prune of
         Nothing -> scc'
         Just s -> scc $ cg $ reachable tg (freeVars body ++ s )
     ans = mapScc f scc''
@@ -46,20 +46,20 @@ basicDecompose prune rules body ds = ans where
         g (Right xs) = Right (map f xs)
 
 
-inlineDecompose :: 
+inlineDecompose ::
     Maybe [Int]  -- ^ Just a set of values not to prune or nothing to not prune at all.
     -> E             -- ^ body for pruning info
     -> [(TVr,E)]     -- ^ incoming bindings
     -> [(TVr,E)]     -- ^ bindings pruned and ordered by inlinability value
 inlineDecompose prune body ds = ans where
     zs = [ ((t,e), tvrNum t, freeVars e, inlinability e) |  (t,e) <- ds ]
-    cg zs =  newGraph zs (\ (_,x,_,_) -> x) ( \ (_,_,x,_) -> x) 
+    cg zs =  newGraph zs (\ (_,x,_,_) -> x) ( \ (_,_,x,_) -> x)
     tg = cg zs
-    scc' = scc tg 
-    scc'' = case prune of 
+    scc' = scc tg
+    scc'' = case prune of
         Nothing -> scc'
         Just s -> scc $ cg $ reachable tg (freeVars body ++ s )
-    inlinability e = baseInlinability e - size (fst $ fromLam e)   
+    inlinability e = baseInlinability e - size (fst $ fromLam e)
     ans = f scc'' []
     f (Left (v,_,_,_):ds) xs = f ds (v:xs)
     f (Right ms:ds) xs = f (scc' ++ ds) xs where
@@ -67,14 +67,14 @@ inlineDecompose prune body ds = ans where
         (_,i,_,_) = minimumUnder (\ (_,_,_,x) -> x) ms
     f [] xs = reverse xs
 
- 
-    
+
+
 {-
 inlineDecompose prune body ds = ans where
     zs = [ ((t,e), tvrNum t, freeVars e, inlinability e) |  (t,e) <- ds ]
-    --tg = newGraph zs (\ (_,x,_,_) -> x) ( \ (_,_,x,_) -> x) 
+    --tg = newGraph zs (\ (_,x,_,_) -> x) ( \ (_,_,x,_) -> x)
     scc = stronglyConnComp [ (x,a,b) | x@(_,a,b,_) <- zs ]
-    inlinability e = baseInlinability e - size (fst $ fromLam e)   
+    inlinability e = baseInlinability e - size (fst $ fromLam e)
     ans = f scc []
     f (AcyclicSCC (v,_,_,_):ds) xs = f ds (v:xs)
     f (CyclicSCC ms:ds) xs = f (scc' ++ ds) xs where
@@ -94,7 +94,7 @@ emapE f (ELetRec aa ab) = do aa <- mapM (\x -> do x <- (do (aa,ab) <- return x; 
 emapE f (ECase e b as d) = do
     e' <- f e
     b' <- fmapM f b
-    as' <- mapmAlt as 
+    as' <- mapmAlt as
     d' <- fmapM f d
     return (ECase e' b' as' d')
 --    aa ab) = do aa <- f aa;ab <- mapM (\(x,y) -> do x <- fmapM f x; y <- f y; return (x,y)) ab; return $ ECase aa ab
@@ -115,14 +115,14 @@ emapE' f (ELit aa) = do aa <- fmapM f aa; return $ ELit aa
 emapE' f (ELetRec aa ab) = do aa <- mapM (\x -> do x <- (do (aa,ab) <- return x; ab <- f ab;return (aa,ab)); return x) aa;ab <- f ab; return $ ELetRec aa ab
 emapE' f (ECase e b as d) = do
     e' <- f e
-    as' <- mapmAlt' as 
+    as' <- mapmAlt' as
     d' <- fmapM f d
     return (ECase e' b as' d')
 --emapE' f (ECase aa ab) = do aa <- f aa;ab <- mapM (\(x,y) -> do x <- patFmap' f x; y <- f y; return (x,y)) ab; return $ ECase aa ab
 emapE' f (EPrim aa ab ac) = do ab <- mapM f ab; return $ EPrim aa ab ac
 emapE' f (EError aa ab) =  return $ EError aa ab
 
-mapmTvr f (TVr x e) = f e >>= return . TVr x 
+mapmTvr f (TVr x e) = f e >>= return . TVr x
 mapmAlt f (Alt l e) = do
     e' <- f e
     l' <- litSMapM f l
@@ -142,8 +142,8 @@ litFmap' _ l = return l
 emapE_ :: Monad m => (E -> m a) -> E -> m ()
 emapE_ f e = emapEG f' f' e >> return () where
     f' e = f e >> return e
-emapE f = emapEG f f 
-emapE' f = emapEG f return 
+emapE f = emapEG f f
+emapE' f = emapEG f return
 
 emapEG f g e = z e where
     z (EAp aa ab) = do aa <- f aa;ab <- f ab; return $ EAp aa ab
@@ -158,7 +158,7 @@ emapEG f g e = z e where
     z (ECase e b as d) = do
         e' <- f e
         b' <- fmapM g b
-        as' <- mapM mapmAlt as 
+        as' <- mapM mapmAlt as
         d' <- fmapM f d
         return (ECase e' b' as' d')
     --    aa ab) = do aa <- f aa;ab <- mapM (\(x,y) -> do x <- fmapM f x; y <- f y; return (x,y)) ab; return $ ECase aa ab
@@ -179,14 +179,14 @@ emapEG f g e = z e where
 instance Monoid Int where
     mempty = 0
     mappend = (+)
-    mconcat = sum 
+    mconcat = sum
 
 instance HasSize E where
     size = eSize
-    
+
 eSize :: E -> Int
 eSize e = n where
-    (_, n) = runWriter (f e) 
+    (_, n) = runWriter (f e)
     f e@ELit {} = tell 1 >> return e
     f e@EPrim {} = tell 1 >> return e
     f e@EError {} = tell 1 >> return e

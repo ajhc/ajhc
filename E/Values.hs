@@ -17,7 +17,7 @@ eTuple []  = vUnit
 eTuple [e] = e
 eTuple es = ELit $ LitCons (toTuple (length es)) es (ltTuple ts) where
     ts = map typ es
-    
+
 eTuple' es = ELit $ LitCons (unboxedNameTuple DataConstructor (length es)) es (ltTuple' ts) where
     ts = map typ es
 
@@ -43,10 +43,10 @@ toString x = toList x >>= mapM fromChar where
 --fromString (x:xs) = eCons (ELit (LitInt (fromIntegral $ ord x) tChar)) $ fromString xs
 --fromString "" = eNil tString
 
-class ToE a where 
+class ToE a where
     toE :: a -> E
     typeE :: a -> E -- lazy in a
-    
+
 class ToEzh a where
     toEzh :: a -> E
     typeEzh :: a -> E
@@ -58,7 +58,7 @@ instance ToEzh Char where
 instance ToEzh Int where
     toEzh ch = ELit $ LitInt (fromIntegral  ch) tIntzh
     typeEzh _ = tIntzh
-    
+
 instance ToEzh Integer where
     toEzh ch = ELit $ LitInt (fromIntegral  ch) tIntegerzh
     typeEzh _ = tIntegerzh
@@ -73,31 +73,31 @@ instance ToE Bool where
     typeE _ = tBool
 
 dc_Char = toName DataConstructor ("Prelude","Char")
-dc_Rational = toName DataConstructor ("Ratio",":%") 
+dc_Rational = toName DataConstructor ("Ratio",":%")
 dc_Addr = toName DataConstructor ("Jhc.Addr","Addr")
 dc_JustIO = toName DataConstructor ("Jhc.IO", "JustIO")
 
-instance ToE Char where 
+instance ToE Char where
     toE ch = ELit (LitCons dc_Char [toEzh ch] tChar)
     typeE _ = tChar
 
 instance ToE Rational where
-    toE rat = ELit (LitCons dc_Rational [toE (numerator rat), toE (denominator rat)] tRational) 
+    toE rat = ELit (LitCons dc_Rational [toE (numerator rat), toE (denominator rat)] tRational)
     typeE _ = tRational
 
-instance ToE Integer where 
+instance ToE Integer where
     toE ch = ELit (litCons DataConstructor ("Prelude","Integer") [toEzh ch] tInteger)
     typeE _ = tInteger
 
-instance ToE Int where 
+instance ToE Int where
     toE ch = ELit (litCons DataConstructor ("Prelude","Int") [toEzh ch] tInt)
     typeE _ = tInt
 
 instance ToE a => ToE [a] where
     toE xs@[] = eNil (typeE xs)
-    toE (x:xs) = eCons (toE x) (toE xs) 
-    typeE (_::[a]) = ELit (litCons TypeConstructor ("Prelude","[]") [typeE (undefined::a)] eStar)   
-    
+    toE (x:xs) = eCons (toE x) (toE xs)
+    typeE (_::[a]) = ELit (litCons TypeConstructor ("Prelude","[]") [typeE (undefined::a)] eStar)
+
 
 --eInt x = ELit $ LitInt x tInt
 
@@ -107,26 +107,26 @@ eNil t = ELit $ LitCons vEmptyList [] t
 eCaseTup e vs w = ECase e (tVr 0 (typ e)) [Alt (LitCons (toTuple (length vs)) vs (typ e)) w] Nothing
 eCaseTup' e vs w = ECase e (tVr 0 (typ e)) [Alt (LitCons (unboxedNameTuple DataConstructor (length vs)) vs (typ e)) w] Nothing
 
-eJustIO w x = ELit (LitCons dc_JustIO [w,x] (ELit (LitCons (toName TypeConstructor ("Jhc.IO","IOResult")) [typ x] eStar))) 
+eJustIO w x = ELit (LitCons dc_JustIO [w,x] (ELit (LitCons (toName TypeConstructor ("Jhc.IO","IOResult")) [typ x] eStar)))
 tIO t = ELit (LitCons (toName TypeConstructor ("Jhc.IO", "IO")) [t] eStar)
 
 eCase e alts Unknown = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 (typ e)), eCaseDefault = Nothing, eCaseAlts =  alts }
 eCase e alts els = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 (typ e)), eCaseDefault = Just els, eCaseAlts =  alts }
 --    f (p@(PatWildCard,_):_) = [p]
 --    f (p:ps) = p:f ps
---    f [] = [(PatWildCard,eLam (TVr Nothing (typ e)) els)] 
+--    f [] = [(PatWildCard,eLam (TVr Nothing (typ e)) els)]
 
 -- This takes care of types right away, it simplifies various other things to do it this way.
-eLet (TVr { tvrIdent = 0 }) _ = id 
-eLet t@(TVr { tvrType =  ty}) e | sortStarLike ty && isAtomic e = subst t e  
+eLet (TVr { tvrIdent = 0 }) _ = id
+eLet t@(TVr { tvrType =  ty}) e | sortStarLike ty && isAtomic e = subst t e
 eLet t e = ELetRec [(t,e)]
 
 fullyConst :: Monad m => E -> m ()
 fullyConst (ELit (LitCons _ [] _)) = return ()
-fullyConst (ELit (LitCons _ xs _)) = mapM_ fullyConst xs 
+fullyConst (ELit (LitCons _ xs _)) = mapM_ fullyConst xs
 fullyConst ELit {} = return ()
 fullyConst (EPi (TVr { tvrType = t }) x) = do
-    fullyConst t 
+    fullyConst t
     fullyConst x
 fullyConst _ = fail "not fully constant"
 
@@ -152,21 +152,21 @@ whnfOrBot (ELit (LitCons _ xs _)) = all isAtomic xs
 whnfOrBot (EPi (TVr { tvrIdent =  j, tvrType =  x }) y) | not (j `Set.member` freeVars y) = isAtomic x && isAtomic y
 whnfOrBot e = isAtomic e
 
-safeToDup e = whnfOrBot e || isELam e || isEPi e  
+safeToDup e = whnfOrBot e || isELam e || isEPi e
 
-eStrictLet t@(TVr { tvrType =  ty }) v e | sortStarLike ty && isAtomic v = subst t v e  
+eStrictLet t@(TVr { tvrType =  ty }) v e | sortStarLike ty && isAtomic v = subst t v e
 eStrictLet t v e = ECase v t [] (Just e)
 
 prim_seq a b | isWHNF a = b
 prim_seq a b = ECase a (tVr 0 (typ a)) [] (Just b)
 
-prim_unsafeCoerce e t = p e' where 
+prim_unsafeCoerce e t = p e' where
     (_,e',p) = unsafeCoerceOpt $ EPrim (primPrim "unsafeCoerce") [e] t
 from_unsafeCoerce (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = return (e,t)
 from_unsafeCoerce _ = fail "Not unsafeCoerce primitive"
 
 rawType s  = ELit (LitCons (toName RawType s) [] eStar)
-    
+
 unsafeCoerceOpt (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = f (0::Int) e t where
     f n e t | Just (e',_) <- from_unsafeCoerce e = f (n + 1) e' t
     f n (ELetRec ds e) t = (n + 1, ELetRec ds (p e'),id) where
@@ -177,14 +177,14 @@ unsafeCoerceOpt (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = f (0::Int) e
     f n e t | typ e == t = (n,e,id)
     f n e t = (n,e,flip prim_unsafeCoerce t)
 unsafeCoerceOpt e = (0,e,id)
-    
+
 prim_integralCast e t = EPrim (primPrim "integralCast") [e] t
 from_integralCast (EPrim (APrim (PrimPrim "integralCast") _) [e] t) = return (e,t)
 from_integralCast _ = fail "Not integralCast primitive"
 
 tPtr t = ELit (LitCons (toName TypeConstructor ("Foreign.Ptr","Ptr")) [t] eStar)
 
---prim_const rs s t = EPrim (APrim (CConst s t)) 
+--prim_const rs s t = EPrim (APrim (CConst s t))
 
 --isAtomic (ELit (LitInt {})) = True
 --isAtomic (ELit (LitChar {})) = True
@@ -192,10 +192,10 @@ tPtr t = ELit (LitCons (toName TypeConstructor ("Foreign.Ptr","Ptr")) [t] eStar)
 --isAtomic (ELit (LitCons _ [] _)) = True
 --isAtomic _ = False
 
-caseBodiesMapM :: Monad m => (E -> m E) -> E -> m E 
+caseBodiesMapM :: Monad m => (E -> m E) -> E -> m E
 caseBodiesMapM f (ECase e b as d) = do
     let g (Alt l e) = f e >>= return . Alt l
     as' <- mapM g as
-    d' <- fmapM f d 
+    d' <- fmapM f d
     return $ ECase e b as' d'
 caseBodiesMapM _ _ = error "caseBodiesMapM"

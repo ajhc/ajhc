@@ -5,8 +5,8 @@ import Data.FunctorM
 -- This is much more verbose/complicated than it needs be.
 
 class TypeNames a where
-    tInt :: a 
-    tRational :: a 
+    tInt :: a
+    tRational :: a
     tChar :: a
     tIntzh :: a
     tIntegerzh :: a
@@ -16,7 +16,7 @@ class TypeNames a where
     tUnit :: a
     tString :: a
     tInteger :: a
-    tWorld__ :: a 
+    tWorld__ :: a
 
     tInt = error "tInt"
     tRational = error "tRational"
@@ -39,7 +39,7 @@ class ConNames a where
     vCons :: a
     vUnit :: a
     vOrdering :: Ordering -> a
-    
+
     vTrue = error "vTrue"
     vFalse = error "vFalse"
     vEmptyList = error "vEmptyList"
@@ -59,11 +59,11 @@ instance FromTupname (String,String) where
     fromTupname xs =  fail $ "fromTupname: not tuple " ++ show xs
 
 
-class ToTuple a where 
+class ToTuple a where
     toTuple :: Int -> a
 
 instance ToTuple String where
-    toTuple n = '(': replicate (n - 1) ',' ++ ")" 
+    toTuple n = '(': replicate (n - 1) ',' ++ ")"
 
 instance ToTuple (String,String) where
     toTuple n = ("Prelude",toTuple n)
@@ -115,7 +115,7 @@ data FuncNames a = FuncNames {
     func_fromRational :: a,
     func_equals :: a,
     func_concatMap :: a
-    } 
+    }
     {-! derive: FunctorM !-}
 
 sFuncNames = FuncNames {

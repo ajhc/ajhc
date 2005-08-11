@@ -32,20 +32,20 @@ import qualified Doc.PPrint as P
 import qualified Text.PrettyPrint.HughesPJ as P
 import VConsts
 
-infixl 5 $$$ 
+infixl 5 $$$
 
 -----------------------------------------------------------------------------
 -- pretty printing monad
 
 data PPLayout = PPOffsideRule		-- classical layout
 	      | PPSemiColon		-- classical layout made explicit
-	      | PPInLine		-- inline decls, \n between them 
+	      | PPInLine		-- inline decls, \n between them
 	      | PPNoLayout		-- everything on a single line
 	      deriving Eq
 
 type Indent = Int
 
-data PPHsMode = PPHsMode { 
+data PPHsMode = PPHsMode {
 			 classIndent,  -- class, instance
 			 doIndent,
 			 caseIndent,
@@ -65,7 +65,7 @@ defaultMode = PPHsMode{
 		      whereIndent = 6,
 		      onsideIndent = 2,
 		      spacing = True,
-		      layout = PPOffsideRule, 
+		      layout = PPOffsideRule,
 		      comments = True
 		      }
 
@@ -91,10 +91,10 @@ unDocM :: DocM s a -> (s -> a)
 unDocM (DocM f) = f
 
 -- all this extra stuff, just for this one function..
-getPPEnv :: DocM s s 
+getPPEnv :: DocM s s
 getPPEnv = DocM id
 
--- So that pp code still looks the same 
+-- So that pp code still looks the same
 -- this means we lose some generality though
 type Doc = DocM PPHsMode P.Doc
 
@@ -104,7 +104,7 @@ empty :: Doc
 empty = return P.empty
 
 nest :: Int -> Doc -> Doc
-nest i m = m >>= return . P.nest i 
+nest i m = m >>= return . P.nest i
 
 dropAs (HsAsPat _ e) = e
 dropAs e = e
@@ -198,19 +198,19 @@ renderWithMode ppMode d = P.render . unDocM d $ ppMode
 render :: Doc -> String
 render = renderWithMode defaultMode
 
-fullRenderWithMode :: PPHsMode -> P.Mode -> Int -> Float -> 
+fullRenderWithMode :: PPHsMode -> P.Mode -> Int -> Float ->
 		      (P.TextDetails -> a -> a) -> a -> Doc -> a
-fullRenderWithMode ppMode m i f fn e mD = 
+fullRenderWithMode ppMode m i f fn e mD =
 		   P.fullRender m i f fn e $ (unDocM mD) ppMode
 
 
-fullRender :: P.Mode -> Int -> Float -> (P.TextDetails -> a -> a) 
+fullRender :: P.Mode -> Int -> Float -> (P.TextDetails -> a -> a)
 	      -> a -> Doc -> a
 fullRender = fullRenderWithMode defaultMode
 
 -------------------------  Pretty-Print a Module --------------------
 ppHsModule :: HsModule -> Doc
-ppHsModule (HsModule mod _ mbExports imp decls _) = 
+ppHsModule (HsModule mod _ mbExports imp decls _) =
    topLevel (ppHsModuleHeader mod mbExports)
             (map ppHsImportDecl imp ++ map ppHsDecl decls)
 
@@ -227,26 +227,26 @@ ppHsModuleHeader (Module modName) mbExportList = mySep [
 
 ppHsExportSpec :: HsExportSpec -> Doc
 ppHsExportSpec (HsEVar name)                     = ppHsQNameParen name
-ppHsExportSpec (HsEAbs name)                     = ppHsQName name 
+ppHsExportSpec (HsEAbs name)                     = ppHsQName name
 ppHsExportSpec (HsEThingAll name)                = ppHsQName name <> text"(..)"
 ppHsExportSpec (HsEThingWith name nameList)      = ppHsQName name <>
                                                    (parenList . map ppHsQNameParen $ nameList)
-ppHsExportSpec (HsEModuleContents (Module name)) = text "module" <+> text name 
+ppHsExportSpec (HsEModuleContents (Module name)) = text "module" <+> text name
 
-ppHsImportDecl (HsImportDecl pos (Module mod) bool mbName mbSpecs) = 
-	   mySep [text "import", 
+ppHsImportDecl (HsImportDecl pos (Module mod) bool mbName mbSpecs) =
+	   mySep [text "import",
 		 if bool then text "qualified" else empty,
-		 text mod, 
+		 text mod,
 		 maybePP (\(Module n) -> text "as" <+> text n) mbName,
 		 maybePP exports mbSpecs]
            where
-	   exports (b,specList) 
+	   exports (b,specList)
 	    | b = text "hiding" <+> (parenList . map ppHsImportSpec $ specList)
 	    | otherwise = parenList . map ppHsImportSpec $  specList
 
 ppHsImportSpec :: HsImportSpec -> Doc
 ppHsImportSpec (HsIVar name)                     = ppHsNameParen name
-ppHsImportSpec (HsIAbs name)                     = ppHsName name 
+ppHsImportSpec (HsIAbs name)                     = ppHsName name
 ppHsImportSpec (HsIThingAll name)                = ppHsName name <> text"(..)"
 ppHsImportSpec (HsIThingWith name nameList)      = ppHsName name <>
                                                    (parenList . map ppHsNameParen $ nameList)
@@ -254,15 +254,15 @@ ppHsImportSpec (HsIThingWith name nameList)      = ppHsName name <>
 -------------------------  Declarations ------------------------------
 ppHsDecl :: HsDecl -> Doc
 ppHsDecl fd@(HsForeignDecl _ _ s n qt) = text "ForeignDecl" <+> ppHsName n <+> ppHsQualType qt <+> text (show fd)
-ppHsDecl (HsTypeDecl loc name nameList htype) = 
+ppHsDecl (HsTypeDecl loc name nameList htype) =
 	   --blankline $
-	   mySep ( [text "type",ppHsName name] 
+	   mySep ( [text "type",ppHsName name]
 		   ++ map ppHsName nameList
 		   ++ [equals, ppHsType htype])
 
-ppHsDecl (HsDataDecl loc context name nameList constrList derives) = 
+ppHsDecl (HsDataDecl loc context name nameList constrList derives) =
 	   --blankline $
-           mySep ([text "data", ppHsContext context, ppHsName name] 
+           mySep ([text "data", ppHsContext context, ppHsName name]
                   ++ map ppHsName nameList)
                   <+> (myVcat (zipWith (<+>) (equals : repeat (char '|'))
                                            (map ppHsConstr constrList))
@@ -282,33 +282,33 @@ ppHsDecl (HsClassDecl pos qualType []) =
 ppHsDecl (HsClassDecl pos qualType declList) =
 	   --blankline $
 	   mySep [text "class", ppHsQualType qualType, text "where"]
-	   $$$ body classIndent (map ppHsDecl declList)  
+	   $$$ body classIndent (map ppHsDecl declList)
 
 -- m{spacing=False}
 -- special case for empty instance declaration
-ppHsDecl (HsInstDecl pos qualType []) = 
+ppHsDecl (HsInstDecl pos qualType []) =
 	   --blankline $
 	   mySep [text "instance", ppHsQualType qualType]
-ppHsDecl (HsInstDecl pos qualType declList) = 
+ppHsDecl (HsInstDecl pos qualType declList) =
 	   --blankline $
 	   mySep [text "instance", ppHsQualType qualType, text "where"]
 	   $$$ body classIndent (map ppHsDecl declList)
-		   
-ppHsDecl (HsDefaultDecl pos htype) = 
-	   --blankline $ 
+		
+ppHsDecl (HsDefaultDecl pos htype) =
+	   --blankline $
 	   text "default" <+> ppHsType htype
- 
-ppHsDecl (HsTypeSig pos nameList qualType) = 
-	 --blankline $ 
+
+ppHsDecl (HsTypeSig pos nameList qualType) =
+	 --blankline $
 	 mySep ((punctuate comma . map ppHsNameParen $ nameList)
 	       ++ [text "::", ppHsQualType qualType])
 
 {-
-ppHsDecl (HsFunBind pos matches) 
+ppHsDecl (HsFunBind pos matches)
    = foldr ($$$) empty (map ppMatch matches)
 -}
-ppHsDecl (HsFunBind matches) 
-   =  foldr ($$$) empty (map ppMatch matches) 
+ppHsDecl (HsFunBind matches)
+   =  foldr ($$$) empty (map ppMatch matches)
 
 ppHsDecl (HsPatBind pos pat rhs whereDecls)
    = myFsep [ppHsPatOrOp pat, ppHsRhs rhs] $$$ ppWhere whereDecls
@@ -318,7 +318,7 @@ ppHsDecl (HsPatBind pos pat rhs whereDecls)
 	ppHsPatOrOp p = ppHsPat p
 
 ppHsDecl (HsInfixDecl pos assoc prec nameList) =
-	   --blankline $ 
+	   --blankline $
 	   mySep ([ppAssoc assoc, int prec]	
 	     ++ (punctuate comma . map ppHsNameInfix $ nameList))
 	    where
@@ -333,7 +333,7 @@ ppMatch (HsMatch pos f ps rhs whereDecls)
 
 ppWhere [] = empty
 ppWhere l = nest 2 (text "where" $$$ body whereIndent (map ppHsDecl l))
-        
+
 ------------------------- Data & Newtype Bodies -------------------------
 ppHsConstr :: HsConDecl -> Doc
 ppHsConstr (HsRecDecl pos name fieldList) =
@@ -344,7 +344,7 @@ ppHsConstr (HsConDecl pos name typeList)
 	 let [l, r] = typeList in
 	 myFsep [ppHsBangType l, ppHsName name, ppHsBangType r]
      | otherwise =
-	 mySep $ (ppHsName name) : 
+	 mySep $ (ppHsName name) :
 		 map ppHsBangType typeList
 
 ppField :: ([HsName],HsBangType) -> Doc
@@ -400,11 +400,11 @@ ppHsTypePrec p (HsTyCon name) = ppHsQName name
 ------------------------- Expressions -------------------------
 ppHsRhs :: HsRhs -> Doc
 ppHsRhs (HsUnGuardedRhs exp) = equals <+> ppHsExp exp
-ppHsRhs (HsGuardedRhss guardList) = 
+ppHsRhs (HsGuardedRhss guardList) =
 	myVcat . map ppHsGuardedRhs $ guardList
 
 ppHsGuardedRhs :: HsGuardedRhs -> Doc
-ppHsGuardedRhs (HsGuardedRhs pos guard body) = 
+ppHsGuardedRhs (HsGuardedRhs pos guard body) =
 	       myFsep [ char '|',
 		      ppHsExp guard,
 		      equals,
@@ -430,15 +430,15 @@ ppHsExp :: HsExp -> Doc
 ppHsExp (HsLit l) = ppHsLit l
 -- lambda stuff
 ppHsExp (HsInfixApp a op b) = myFsep[ppHsExp a, ppInfix op, ppHsExp b]
-	where 
+	where
 	ppInfix (HsAsPat _ (HsVar n)) = ppHsQNameInfix n
 	ppInfix (HsAsPat _ (HsCon n)) = ppHsQNameInfix n
-	ppInfix (HsVar n) = ppHsQNameInfix n 
+	ppInfix (HsVar n) = ppHsQNameInfix n
 	ppInfix (HsCon n) = ppHsQNameInfix n
 	ppInfix n = error $ "illegal infix expression: " ++ show n
 ppHsExp (HsNegApp e) = myFsep [char '-', ppHsExp e]
 ppHsExp (HsApp a b) = myFsep [ppHsExp a, ppHsExp b]
--- ppHsExp (HsLambda expList body) = myFsep $ 
+-- ppHsExp (HsLambda expList body) = myFsep $
 ppHsExp (HsLambda _srcLoc expList body) = myFsep $              -- srcLoc added by Bernie
 	(((char '\\' ):) . map ppHsPat $ expList)
 	++ [text "->", ppHsExp body]
@@ -446,7 +446,7 @@ ppHsExp (HsLambda _srcLoc expList body) = myFsep $              -- srcLoc added 
 ppHsExp (HsLet expList letBody) =
 	myFsep [text "let" <+> body letIndent (map ppHsDecl expList),
 		text "in", ppHsExp letBody]
-ppHsExp (HsIf cond thenexp elsexp) = 
+ppHsExp (HsIf cond thenexp elsexp) =
 	myFsep [text "if", ppHsExp cond,
 	      text "then", ppHsExp thenexp,
 	      text "else", ppHsExp elsexp]
@@ -469,10 +469,10 @@ ppHsExp (HsRightSection exp v) | (HsVar name) <- dropAs v =
 ppHsExp (HsRightSection exp v) | (HsCon name) <- dropAs v =
 	parens (ppHsQNameInfix name <+> ppHsExp exp)
 ppHsExp (HsRightSection _ _) = error "illegal right section"
-ppHsExp (HsRecConstr c fieldList) = 
+ppHsExp (HsRecConstr c fieldList) =
 	ppHsQName c
         <> (braceList . map ppHsFieldUpdate  $ fieldList)
-ppHsExp (HsRecUpdate exp fieldList) = 
+ppHsExp (HsRecUpdate exp fieldList) =
 	ppHsExp exp
         <> (braceList . map ppHsFieldUpdate  $ fieldList)
 -- patterns
@@ -484,21 +484,21 @@ ppHsExp (HsAsPat name exp) = hcat[ppHsName name,char '@',ppHsExp exp]
 ppHsExp (HsWildCard _) = char '_'
 ppHsExp (HsIrrPat exp) = char '~' <> ppHsExp exp
 -- Lists
-ppHsExp (HsList list) = 
+ppHsExp (HsList list) =
 	bracketList . punctuate comma . map ppHsExp $ list
 ppHsExp (HsEnumFrom exp) =
 	bracketList [ppHsExp exp,text ".."]
 ppHsExp (HsEnumFromTo from to) =
 	bracketList [ppHsExp from, text "..", ppHsExp to]
-ppHsExp (HsEnumFromThen from thenE) = 
+ppHsExp (HsEnumFromThen from thenE) =
 	bracketList [ppHsExp from <> comma, ppHsExp thenE]
-ppHsExp (HsEnumFromThenTo from thenE to) = 
+ppHsExp (HsEnumFromThenTo from thenE to) =
 	bracketList [ppHsExp from <> comma, ppHsExp thenE,
 			text "..", ppHsExp to]
-ppHsExp (HsListComp exp stmtList) = 
+ppHsExp (HsListComp exp stmtList) =
 	bracketList ([ppHsExp exp, char '|']
 		++ (punctuate comma . map ppHsStmt $ stmtList))
-ppHsExp (HsExpTypeSig pos exp ty) = 
+ppHsExp (HsExpTypeSig pos exp ty) =
 	myFsep[ppHsExp exp, text "::", ppHsQualType ty]
 
 ------------------------- Patterns -----------------------------
@@ -512,8 +512,8 @@ ppHsPat (HsPApp n ps) = myFsep (ppHsQName n : map ppHsPat ps)
 ppHsPat (HsPTuple ps) = parenList . map ppHsPat $ ps
 ppHsPat (HsPList ps) = bracketList . punctuate comma . map ppHsPat $ ps
 ppHsPat (HsPParen p) = parens . ppHsPat $ p
-ppHsPat (HsPRec c fields) 
-    =  ppHsQName c 
+ppHsPat (HsPRec c fields)
+    =  ppHsQName c
     <> (braceList . map ppHsPatField $ fields)
 -- special case that would otherwise be buggy
 ppHsPat (HsPAsPat name (HsPIrrPat pat)) =
@@ -523,7 +523,7 @@ ppHsPat	HsPWildCard = char '_'
 ppHsPat	(HsPIrrPat pat) = char '~' <> ppHsPat pat
 
 ppHsPatField (HsPFieldPat name pat) = myFsep[ppHsQName name, equals, ppHsPat pat]
-  
+
 ------------------------- Case bodies  -------------------------
 ppHsAlt :: HsAlt -> Doc
 ppHsAlt (HsAlt pos exp gAlts decls) = 	
@@ -533,7 +533,7 @@ ppGAlts :: HsGuardedAlts -> Doc
 ppGAlts (HsUnGuardedAlt exp) = text "->" <+> ppHsExp exp
 ppGAlts (HsGuardedAlts altList) = myVcat . map ppGAlt $ altList
 
-ppGAlt (HsGuardedAlt pos exp body) = 
+ppGAlt (HsGuardedAlt pos exp body) =
 	 myFsep [char '|', ppHsExp exp, text "->", ppHsExp body]
 
 ------------------------- Statements in monads & list comprehensions -----
@@ -541,18 +541,18 @@ ppHsStmt :: HsStmt -> Doc
 ppHsStmt (HsGenerator _sloc exp from) =                    -- sloc added by Bernie
 	 ppHsPat exp <+> text "<-" <+> ppHsExp from
 ppHsStmt (HsQualifier exp) = ppHsExp exp
-ppHsStmt (HsLetStmt declList) = text "let" 
+ppHsStmt (HsLetStmt declList) = text "let"
 				$$$ body letIndent (map ppHsDecl declList)
 
 ------------------------- Record updates
 ppHsFieldUpdate :: HsFieldUpdate -> Doc
-ppHsFieldUpdate (HsFieldUpdate name exp) = 
+ppHsFieldUpdate (HsFieldUpdate name exp) =
 		  myFsep[ppHsQName name,equals,ppHsExp exp]
 
 ------------------------- Names -------------------------
 ppHsQName :: HsName -> Doc
 ppHsQName (UnQual name)			= ppHsIdentifier name
-ppHsQName z@(Qual m@(Module mod) name) 
+ppHsQName z@(Qual m@(Module mod) name)
 	 | m == prelude_mod && isSpecialName z = ppHsIdentifier name
 	 | otherwise = text mod <> char '.' <> ppHsIdentifier name
 
@@ -580,7 +580,7 @@ ppHsNameInfix name
 isSymbolName :: HsName -> Bool
 --isSymbolName (Qual _ (HsSymbol _)) = True
 --isSymbolName (UnQual (HsSymbol _)) = True
-isSymbolName x | (c:_) <- hsIdentString (hsNameIdent (unRename x)), isAlpha c || c `elem` "'_" = False 
+isSymbolName x | (c:_) <- hsIdentString (hsNameIdent (unRename x)), isAlpha c || c `elem` "'_" = False
 isSymbolName _ = True
 
 isSpecialName :: HsName -> Bool
@@ -623,9 +623,9 @@ blankline :: Doc -> Doc
 blankline dl = do{e<-getPPEnv;if spacing e && layout e /= PPNoLayout
 			      then space $$ dl else dl}
 topLevel :: Doc -> [Doc] -> Doc
-topLevel header dl = do 
+topLevel header dl = do
 	 e <- fmap layout getPPEnv
-	 case e of 
+	 case e of
 	     PPOffsideRule -> header $$ vcat dl
 	     PPSemiColon -> header $$ (braces . vcat . punctuate semi) dl
 	     PPInLine -> header $$ (braces . vcat . punctuate semi) dl
@@ -634,13 +634,13 @@ topLevel header dl = do
 body :: (PPHsMode -> Int) -> [Doc] -> Doc
 body f dl = do
 	 e <- fmap layout getPPEnv
-	 case e of PPOffsideRule -> indent 
+	 case e of PPOffsideRule -> indent
 		   PPSemiColon   -> indentExplicit
 		   _ -> inline
 		   where
 		   inline = braces . hsep . punctuate semi $ dl
 		   indent  = do{i <-fmap f getPPEnv;nest i . vcat $ dl}
-		   indentExplicit = do {i <- fmap f getPPEnv; 
+		   indentExplicit = do {i <- fmap f getPPEnv;
 			   nest i . braces . vcat . punctuate semi $ dl}
 
 ($$$) :: Doc -> Doc -> Doc
@@ -677,13 +677,13 @@ layoutChoice a b dl = do e <- getPPEnv
 
 
 instance P.PPrint P.Doc HsDecl where
-    pprint d = unDocM (ppHsDecl d) defaultMode  
+    pprint d = unDocM (ppHsDecl d) defaultMode
 
 instance P.PPrint P.Doc HsExp where
-    pprint d = unDocM (ppHsExp d) defaultMode  
+    pprint d = unDocM (ppHsExp d) defaultMode
 
 instance P.PPrint P.Doc HsType where
-    pprint d = unDocM (ppHsType d) defaultMode  
+    pprint d = unDocM (ppHsType d) defaultMode
 
 instance P.PPrint P.Doc HsQualType where
-    pprint d = unDocM (ppHsQualType d) defaultMode  
+    pprint d = unDocM (ppHsQualType d) defaultMode

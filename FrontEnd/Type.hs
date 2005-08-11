@@ -160,10 +160,10 @@ varBind :: Monad m => Tyvar -> Type -> m Subst
 
 mgu x y = do
     r <- runErrorT (mgu'' x y)
-    case r of 
+    case r of
         Right x -> return (Just x)
         Left (_::String) -> return Nothing
-    
+
 
 mgu'' x y = do
     x' <- findType x

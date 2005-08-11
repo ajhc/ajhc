@@ -11,18 +11,18 @@ userRulesXml = [("Haskell2Xml", userRuleXml, "Representation", "encode terms as 
 
 
 data Data = D {	name :: Name,			 -- type's name
-			constraints :: [(Class,Var)], 
+			constraints :: [(Class,Var)],
 			vars :: [Var],		 -- Parameters
 			body :: [Body],
 			derives :: [Class],	 -- derived classes
 			statement :: Statement}  -- type of statement
 	   | Directive				 --|
 	   | TypeName Name			 --| used by derive (ignore)
-		deriving (Eq,Show) 
+		deriving (Eq,Show)
 
 data Body = Body { constructor :: Constructor,
 		    labels :: [Name], -- [] for a non-record datatype.
-		    types :: [Type]} deriving (Eq,Show) 
+		    types :: [Type]} deriving (Eq,Show)
 
 data Statement = DataStmt | NewTypeStmt deriving (Eq,Show)
 
@@ -35,7 +35,7 @@ type Rule = (Tag, Data->Doc)
 
 -}
 
-userRuleXml dat = 
+userRuleXml dat =
   let cs  = body dat
       cvs = mknss cs namesupply
   in
@@ -63,13 +63,13 @@ toHTfn cs cvs dat =
        nest 4 (vcat (map (<+> text "= v") pats)) $$
        nest 4 (vcat (map (simplest typ (zip cvs cs)) fvs))
 
-namesupply   = [text [x,y] | x <- ['a' .. 'z'], 
+namesupply   = [text [x,y] | x <- ['a' .. 'z'],
                              y <- ['a' .. 'z'] ++ ['A' .. 'Z']]
 
 mknss []     _  = []
 mknss (c:cs) ns =
   let (thisns,rest) = splitAt (length (types c)) ns
-  in thisns: mknss cs rest 
+  in thisns: mknss cs rest
 
 mkpat ns c =
   if null ns then []

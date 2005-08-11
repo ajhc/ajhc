@@ -24,6 +24,6 @@ instance FreeVars a b => FreeVars (Maybe a) b where
     freeVars Nothing = mempty
 
 instance (FreeVars x b, FreeVars y b) => FreeVars (Either x y) b where
-    freeVars (Left x) = freeVars x 
-    freeVars (Right y) = freeVars y 
+    freeVars (Left x) = freeVars x
+    freeVars (Right y) = freeVars y
 

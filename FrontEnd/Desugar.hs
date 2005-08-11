@@ -15,7 +15,7 @@
                                           x = (\(a, _, _) -> a) newVal
                                           y = (\(_, a, _) -> a) newVal
                                           z = (\(_, _, a) -> a) newVal
-                                        - do notation is converted into 
+                                        - do notation is converted into
                                           expression form, using (>>) and
                                           (>>=)
                                         - type synonyms are removed
@@ -24,9 +24,9 @@
 
         Notes:                  See the file License for license information
 
-                                According to the Haskell report a pattern 
-                                binding is called "simple" if it consists only 
-                                of a single variable - thus we convert all 
+                                According to the Haskell report a pattern
+                                binding is called "simple" if it consists only
+                                of a single variable - thus we convert all
                                 pattern bindings to simple bindings.
 
 -------------------------------------------------------------------------------}
@@ -54,20 +54,20 @@ getUnique = do
     incUnique
     return n
 
-readUnique :: PatSM Int 
-readUnique 
+readUnique :: PatSM Int
+readUnique
    = do
         state <- readPatSM
-        return (fst state) 
+        return (fst state)
 
 readSyns :: PatSM [HsDecl]
-readSyns 
+readSyns
    = do
         state <- readPatSM
         return (snd state)
 
 
-incUnique :: PatSM () 
+incUnique :: PatSM ()
 incUnique = updatePatSM (\(u, s) -> (u + 1, s))
 
 --newtype PatSM a = PatSM (PatState -> (a, PatState))  -- The monadic type
@@ -82,7 +82,7 @@ type PatSM = State PatState
 --  return k                  =  PatSM (\s -> (k,s))
 --
 -- -- extracts the state from the monad
---readPatSM                  :: PatSM PatState 
+--readPatSM                  :: PatSM PatState
 --readPatSM                  =  PatSM (\s -> (s,s))
 --
 -- -- updates the state of the monad
@@ -104,12 +104,12 @@ runPatSM = flip runState
 newPatVarName :: HsName
 newPatVarName = hsUnqualValName "patvar@0"
 
--- a new (unique) name introduced in expressions 
+-- a new (unique) name introduced in expressions
 newVarName :: HsName
 newVarName = hsUnqualValName "var@0"
 
-remSynsSig :: HsDecl -> PatSM HsDecl 
-remSynsSig sig 
+remSynsSig :: HsDecl -> PatSM HsDecl
+remSynsSig sig
    = do
         syns <- readSyns
         let newSig = removeSynsFromSig syns sig
@@ -119,7 +119,7 @@ remSynsType :: HsType -> PatSM HsType
 remSynsType t
    = do
         syns <- readSyns
-        let newType = removeSynonymsFromType syns t 
+        let newType = removeSynonymsFromType syns t
         return newType
 
 
@@ -132,7 +132,7 @@ remSynsType t
  (x, y) = head $ zip "abc" [1,2,3]
 
  becomes
- 
+
  x = (\(a, _) -> a) rhs1
  y = (\(_, a) -> a) rhs1
  rhs1 = head $ zip "abc" [1,2,3]
@@ -140,16 +140,16 @@ remSynsType t
 
 -- first argument is imported synonyms
 
-desugarHsModule :: HsModule -> HsModule 
+desugarHsModule :: HsModule -> HsModule
 desugarHsModule m = hsModuleDecls_s ds' m where
     (ds', _) = runPatSM (0::Int, undefined) $ dsm (hsModuleDecls m)
     dsm ds = fmap concat $ mapM desugarDecl ds
-    
+
 --desugarTidyModule :: [HsDecl] -> TidyModule -> TidyModule
 --desugarTidyModule importSyns tidy
 --   = newTidy
 --   where
---   (newTidy, _) = runPatSM (0::Int, synonyms) $ desugarTidyModuleM tidy 
+--   (newTidy, _) = runPatSM (0::Int, synonyms) $ desugarTidyModuleM tidy
 --   synonyms = tidyTyDecls tidy ++ importSyns
 --
 --desugarTidyModuleM :: TidyModule -> PatSM TidyModule
@@ -164,16 +164,16 @@ desugarHsModule m = hsModuleDecls_s ds' m where
 --            oldTySigs     = tidyTySigs tidy
 --            oldFunBinds   = tidyFunBinds tidy
 --            oldPatBinds   = tidyPatBinds tidy
---        newTyDecls    <- mapM desugarDecl oldTyDecls 
---        newDataDecls  <- mapM desugarDecl oldDataDecls 
---        newInFixDecls <- mapM desugarDecl oldInFixDecls 
---        newNewTyDecls <- mapM desugarDecl oldNewTyDecls 
---        newClassDecls <- mapM desugarDecl oldClassDecls 
---        newInstDecls  <- mapM desugarDecl oldInstDecls 
---        newDefs       <- mapM desugarDecl oldDefs 
---        newTySigs     <- mapM desugarDecl oldTySigs 
---        newFunBinds   <- mapM desugarDecl oldFunBinds 
---        newPatBinds   <- mapM desugarDecl oldPatBinds 
+--        newTyDecls    <- mapM desugarDecl oldTyDecls
+--        newDataDecls  <- mapM desugarDecl oldDataDecls
+--        newInFixDecls <- mapM desugarDecl oldInFixDecls
+--        newNewTyDecls <- mapM desugarDecl oldNewTyDecls
+--        newClassDecls <- mapM desugarDecl oldClassDecls
+--        newInstDecls  <- mapM desugarDecl oldInstDecls
+--        newDefs       <- mapM desugarDecl oldDefs
+--        newTySigs     <- mapM desugarDecl oldTySigs
+--        newFunBinds   <- mapM desugarDecl oldFunBinds
+--        newPatBinds   <- mapM desugarDecl oldPatBinds
 --        return tidy{tidyTyDecls    = concat newTyDecls, --[],  -- return the empty list of synonyms, we don't need them anymore
 --                    tidyDataDecls  = concat newDataDecls,
 --                    tidyInFixDecls = concat newInFixDecls,
@@ -192,7 +192,7 @@ desugarDecl (HsForeignDecl sl ft s n qt) = do
     qt' <- remSynsQualType qt
     return [HsForeignDecl sl ft s n qt']
 desugarDecl (HsFunBind matches) = do
-    newMatches <- mapM desugarMatch matches  
+    newMatches <- mapM desugarMatch matches
     return [HsFunBind newMatches]
 
 -- variable pattern bindings remain unchanged
@@ -200,7 +200,7 @@ desugarDecl pb@(HsPatBind sloc (HsPVar n) rhs wheres) = do
     newRhs <- desugarRhs rhs
     newWheres <- mapM desugarDecl wheres
     return [HsPatBind sloc (HsPVar n) newRhs (concat newWheres)]
-        
+
 
 -- constructor and tuple pattern bindings must be changed
 -- XXX bjpop: what about nested parenthesised patterns that just bind
@@ -211,14 +211,14 @@ desugarDecl pb@(HsPatBind sloc pat rhs wheres) = do
     unique <- getUnique
     let newRhsName = UnQual $ HsIdent $ "patrhs@" ++ show unique
     newWheres <- mapM desugarDecl wheres
-    let newTopDeclForRhs 
+    let newTopDeclForRhs
                = HsPatBind sloc (HsPVar newRhsName) rhs (concat newWheres)
-    let newBinds = genBindsForPat pat sloc newRhsName 
-    newBinds <- mapM desugarDecl newBinds 
+    let newBinds = genBindsForPat pat sloc newRhsName
+    newBinds <- mapM desugarDecl newBinds
     return (newTopDeclForRhs : concat newBinds)
 
 desugarDecl (HsClassDecl sloc qualtype decls) = do
-    newDecls <- mapM desugarDecl decls 
+    newDecls <- mapM desugarDecl decls
     return [HsClassDecl sloc qualtype (concat newDecls)]
 
 desugarDecl (HsInstDecl sloc qualtype decls) = do
@@ -227,40 +227,40 @@ desugarDecl (HsInstDecl sloc qualtype decls) = do
     return [HsInstDecl sloc newQualType (concat newDecls)]
 
 desugarDecl sig@(HsTypeSig _sloc _names _qualType) = do
-    newSig <- remSynsSig sig 
+    newSig <- remSynsSig sig
     return [newSig]
 
 
 desugarDecl (HsDataDecl sloc cntxt name args condecls derives) = do
         --newConDecls <- mapM remSynsFromCondecl condecls
         newConDecls <- return condecls
-        ds <- deriveInstances sloc name args newConDecls derives 
+        ds <- deriveInstances sloc name args newConDecls derives
         ss <- createSelectors sloc newConDecls
         return $ (HsDataDecl sloc cntxt name args newConDecls derives):(ds ++ ss)
 
 desugarDecl (HsNewTypeDecl sloc cntxt name args condecl derives) = do
         --newConDecl <- remSynsFromCondecl condecl
         newConDecl <- return condecl
-        ds <- deriveInstances sloc name args [newConDecl] derives 
+        ds <- deriveInstances sloc name args [newConDecl] derives
         ss <- createSelectors sloc [newConDecl]
         return $ (HsNewTypeDecl sloc cntxt name args newConDecl derives):(ds ++ ss)
-        
+
 desugarDecl anyOtherDecl = return [anyOtherDecl]
 
 
 
-createSelectors _sloc ds = ans where 
+createSelectors _sloc ds = ans where
     ds' :: [(HsName,[(HsName,HsBangType)])]
     ds' = [ (c,[(n,t) | (ns,t) <- rs , n <- ns ]) | HsRecDecl _ c rs <- ds ]
     ns = sortGroupUnderF fst $ concatMap f ds' -- [  | (c,nts) <- ds' ]
     f ::  (HsName,[(HsName,HsBangType)]) -> [ (HsName, (HsName,Int,Int)) ]
     f (c,nts) = [ (n,(c,i,length nts)) | (n,_) <- nts | i <- [0..]]
-    ans = return $  map g ns 
+    ans = return $  map g ns
     g (n,cs) = HsFunBind (map f cs ++ [els]) where
-        f (_,(c,i,l)) = HsMatch _sloc n [pat c i l] (HsUnGuardedRhs (HsVar var)) [] 
+        f (_,(c,i,l)) = HsMatch _sloc n [pat c i l] (HsUnGuardedRhs (HsVar var)) []
         pat c i l = HsPApp c [ if p == i then HsPVar var else HsPWildCard | p <- [0 .. l - 1]]
         els = HsMatch _sloc n [HsPWildCard] (HsUnGuardedRhs (HsApp (HsVar err) (HsLit (HsString (show n))))) []
-        
+
     var = UnQual (HsIdent "x")
     err = UnQual (HsIdent "error")
 
@@ -282,7 +282,7 @@ remSynsFromBangType (HsBangedTy t) = do
     return (HsBangedTy newType)
 remSynsFromBangType (HsUnBangedTy t) = do
     newType <- remSynsType t
-    return (HsUnBangedTy newType)   
+    return (HsUnBangedTy newType)
 -}
 
 
@@ -333,9 +333,9 @@ patVarNames (HsPAsPat asName pat)
    = asName : patVarNames pat
 patVarNames HsPWildCard = []
 patVarNames (HsPIrrPat pat)
-   = patVarNames pat 
+   = patVarNames pat
 
--- replaces all occurrences of a name with a new variable 
+-- replaces all occurrences of a name with a new variable
 -- and every other name with underscore
 
 replaceVarNamesInPat :: HsName -> HsPat -> HsPat
@@ -344,9 +344,9 @@ replaceVarNamesInPat name1 (HsPVar name2)
    | name1 == name2 = HsPVar $ newPatVarName
    | otherwise = HsPWildCard
 replaceVarNamesInPat _ p@(HsPLit _) = p
-replaceVarNamesInPat name (HsPNeg pat) 
-   = HsPNeg $ replaceVarNamesInPat name pat 
-replaceVarNamesInPat name (HsPInfixApp pat1 conName pat2) 
+replaceVarNamesInPat name (HsPNeg pat)
+   = HsPNeg $ replaceVarNamesInPat name pat
+replaceVarNamesInPat name (HsPInfixApp pat1 conName pat2)
    = HsPInfixApp (replaceVarNamesInPat name pat1) conName (replaceVarNamesInPat name pat2)
 replaceVarNamesInPat name (HsPApp conName pats)
    = HsPApp conName (map (replaceVarNamesInPat name) pats)
@@ -356,14 +356,14 @@ replaceVarNamesInPat name (HsPList pats)
    = HsPList (map (replaceVarNamesInPat name) pats)
 replaceVarNamesInPat name (HsPParen pat)
    = HsPParen (replaceVarNamesInPat name pat)
-replaceVarNamesInPat name (HsPRec _ _) 
+replaceVarNamesInPat name (HsPRec _ _)
    = error  "replaceVarNamesInPat name (HsPRec _ _): not implemented"
 replaceVarNamesInPat name (HsPAsPat asName pat)
    | name == asName = HsPAsPat newPatVarName (replaceVarNamesInPat name pat)
    | otherwise = replaceVarNamesInPat name pat
 replaceVarNamesInPat name HsPWildCard = HsPWildCard
 replaceVarNamesInPat name (HsPIrrPat pat)
-   = HsPIrrPat $ replaceVarNamesInPat name pat 
+   = HsPIrrPat $ replaceVarNamesInPat name pat
 
 
 desugarRhs :: (HsRhs) -> PatSM (HsRhs)
@@ -388,7 +388,7 @@ desugarExp :: (HsExp) -> PatSM (HsExp)
 
 desugarExp e@HsVar {} = return e
 
-desugarExp e@HsCon {} = return e 
+desugarExp e@HsCon {} = return e
 
 desugarExp e@HsLit {} = return e
 
@@ -410,7 +410,7 @@ desugarExp (HsNegApp e)
         newE <- desugarExp e
         return (HsNegApp newE)
 
-desugarExp (HsLambda sloc pats e) 
+desugarExp (HsLambda sloc pats e)
     | all isHsPVar pats = do
         newE <- desugarExp e
         return (HsLambda sloc pats newE)
@@ -418,15 +418,15 @@ desugarExp (HsLambda sloc pats e)
 desugarExp (HsLambda sloc pats e) = z where
     z = do
         ps <- mapM f pats
-        let (xs,zs) = unzip ps       
+        let (xs,zs) = unzip ps
         e' <- (ne e $ concat zs)
-        return (HsLambda sloc (map HsPVar xs) e')  
-    ne e [] = desugarExp e    
+        return (HsLambda sloc (map HsPVar xs) e')
+    ne e [] = desugarExp e
     ne e ((n,p):zs) =  do
-        e' <- ne e zs 
+        e' <- ne e zs
         let a1 =  HsAlt sloc p (HsUnGuardedAlt e') []
             a2 =  HsAlt sloc HsPWildCard (HsUnGuardedAlt (HsApp (HsVar (UnQual $ HsIdent "error")) (HsLit $ HsString $ show sloc ++ " failed pattern match in lambda"))) []
-        return $ HsCase (HsVar n) [a1, a2 ] 
+        return $ HsCase (HsVar n) [a1, a2 ]
 
     f (HsPVar x) = return (x,[])
     f (HsPAsPat n p) = return (n,[(n,p)])
@@ -439,7 +439,7 @@ desugarExp (HsLambda sloc pats e) = z where
 
 desugarExp (HsLet decls e)
    = do
-        newDecls <- mapM desugarDecl decls    
+        newDecls <- mapM desugarDecl decls
         newE <- desugarExp e
         return (HsLet (concat newDecls) newE)
 
@@ -466,7 +466,7 @@ desugarExp (HsTuple exps)
         newExps <- mapM desugarExp exps
         return (HsTuple newExps)
 
-desugarExp (HsList exps)   
+desugarExp (HsList exps)
    = do
         newExps <- mapM desugarExp exps
         return (HsList newExps)
@@ -483,18 +483,18 @@ desugarExp (HsLeftSection e1 e2)
         return (HsLeftSection newE1 newE2)
 
 desugarExp (HsRightSection e1 e2) = do
-        newE1 <- desugarExp e1                          
+        newE1 <- desugarExp e1
         newE2 <- desugarExp e2
         let nv = (hsUnqualValName "rsection@")
         return (HsLambda bogusASrcLoc [HsPVar nv ] (HsApp (HsRightSection newE1 newE2) (HsVar nv)))
 
 desugarExp (HsRecConstr n fus) = do
-    fus' <- mapM desugarFU fus 
+    fus' <- mapM desugarFU fus
     return $ HsRecConstr n fus'
 --   = error "desugarExp (HsRecConstr _ _): not implemented"
 
 desugarExp (HsRecUpdate e fus) = do
-    fus' <- mapM desugarFU fus 
+    fus' <- mapM desugarFU fus
     e' <- desugarExp e
     return $ HsRecUpdate e' fus'
 --   = error "desugarExp (HsRecUpdate _ _): not implemented"
@@ -540,12 +540,12 @@ desugarExp (HsExpTypeSig sloc e qualType)
 -}
 
 desugarExp (HsExpTypeSig sloc e qualType)
-   = do 
+   = do
         newE <- desugarExp e
         newQualType <- remSynsQualType qualType
         let newTypeSig = HsTypeSig sloc [newVarName] newQualType
-        let newVarDecl = HsPatBind sloc 
-                                    (HsPVar newVarName) 
+        let newVarDecl = HsPatBind sloc
+                                    (HsPVar newVarName)
                                     (HsUnGuardedRhs newE) []
         return (HsLet [newTypeSig, newVarDecl] (HsVar newVarName))
 
@@ -561,7 +561,7 @@ desugarExp (HsWildCard x)
 desugarExp (HsIrrPat e)
    = do
         newE <- desugarExp e
-        return (HsIrrPat newE) 
+        return (HsIrrPat newE)
 
 desugarFU (HsFieldUpdate n e) = do
     e' <- desugarExp e
@@ -608,7 +608,7 @@ desugarStmt (HsQualifier e)
 
 desugarStmt (HsLetStmt decls)
    = do
-        newDecls <- mapM desugarDecl decls 
+        newDecls <- mapM desugarDecl decls
         return (HsLetStmt $ concat newDecls)
 
 
@@ -646,7 +646,7 @@ doToExp ((HsQualifier e):ss)
 doToExp ((HsGenerator _srcLoc pat@(HsPVar {}) e):ss)
    = HsInfixApp (hsParen e) (HsVar (hsUnqualValName ">>=")) (HsLambda _srcLoc [pat] (doToExp ss))
 doToExp ((HsGenerator srcLoc pat e):ss) = HsInfixApp (hsParen e) (HsVar (hsUnqualValName ">>=")) (HsLambda srcLoc [HsPVar newPatVarName] kase)  where
-   kase = HsCase (HsVar newPatVarName) [a1, a2 ] 
+   kase = HsCase (HsVar newPatVarName) [a1, a2 ]
    a1 =  HsAlt srcLoc pat (HsUnGuardedAlt (doToExp ss)) []
    a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedAlt (HsApp (HsVar (hsUnqualValName "fail")) (HsLit $ HsString $ show srcLoc ++ " failed pattern match in do"))) []
 doToExp ((HsLetStmt decls):ss)
@@ -658,9 +658,9 @@ listCompToExp exp ss = hsParen (f ss) where
     f ((HsLetStmt ds):ss) = hsParen (HsLet ds (f ss))
     f (HsQualifier e:ss) = hsParen (HsIf e (f ss) (HsList []))
     f ((HsGenerator srcLoc pat e):ss) = hsParen $ HsApp (HsApp (HsVar (hsUnqualValName "concatMap"))  (hsParen $ HsLambda srcLoc [HsPVar newPatVarName] kase)) e where
-        kase = HsCase (HsVar newPatVarName) [a1, a2 ] 
+        kase = HsCase (HsVar newPatVarName) [a1, a2 ]
         a1 =  HsAlt srcLoc pat (HsUnGuardedAlt (f ss)) []
         a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedAlt $ HsList []) []
-    
+
 
 

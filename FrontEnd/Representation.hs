@@ -88,14 +88,14 @@ data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !HsName, t
     deriving(Data,Typeable)
     {-  derive: GhcBinary -}
 
-instance Show Tyvar where 
-    showsPrec _ Tyvar { tyvarName = hn, tyvarKind = k, tyvarRef = Just _ } = shows hn . (":-" ++) . shows k 
-    showsPrec _ Tyvar { tyvarName = hn, tyvarKind = k } = shows hn . ("::" ++) . shows k 
+instance Show Tyvar where
+    showsPrec _ Tyvar { tyvarName = hn, tyvarKind = k, tyvarRef = Just _ } = shows hn . (":-" ++) . shows k
+    showsPrec _ Tyvar { tyvarName = hn, tyvarKind = k } = shows hn . ("::" ++) . shows k
 
-findType :: MonadIO m => Type -> m Type 
+findType :: MonadIO m => Type -> m Type
 findType tv@(TVar Tyvar {tyvarRef = Just r }) = liftIO $ do
-    rt <- readIORef r 
-    case rt of 
+    rt <- readIORef r
+    case rt of
         Nothing -> return tv
         Just t -> do
             t' <- findType t
@@ -105,7 +105,7 @@ findType tv = return tv
 
 refType (TVar tv@Tyvar {tyvarRef = Nothing}) = do
     r <- newIORef Nothing
-    return $ TVar tv { tyvarRef = Just r } 
+    return $ TVar tv { tyvarRef = Just r }
 refType t = return t
 
 unrefType (TVar tv) =  TVar tv { tyvarRef = Nothing }
@@ -115,11 +115,11 @@ unrefType t = t
 class FlattenType t where
     flattenType' ::  t -> IO t
 
-flattenType :: (FlattenType t, MonadIO m) => t -> m t 
+flattenType :: (FlattenType t, MonadIO m) => t -> m t
 flattenType t = liftIO (flattenType' t)
 
 instance FlattenType t => FlattenType [t] where
-   flattenType' xs = mapM flattenType' xs 
+   flattenType' xs = mapM flattenType' xs
 
 instance FlattenType Pred where
     flattenType' (IsIn c t) = do
@@ -134,7 +134,7 @@ instance FlattenType t => FlattenType (Qual t) where
 
 instance FlattenType Type where
     flattenType' tv =  do
-        tv' <- findType tv 
+        tv' <- findType tv
         --tv' <- refType tv'
         let ft (TAp x y) = do
                 x' <- flattenType' x

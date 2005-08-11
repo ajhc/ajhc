@@ -7,7 +7,7 @@ class Unparsable a where
     unparseCat :: a -> a -> a
     unparseSpace :: a -> a -> a
     unparseConcat :: [a] -> a
-    unparseConcat = foldl1 unparseCat 
+    unparseConcat = foldl1 unparseCat
 
 instance Unparsable String where
     unparseGroup x = "(" ++ x ++ ")"
@@ -46,7 +46,7 @@ bop :: Unparsable a => (Side,Int) -> a -> Unparse a -> Unparse a -> Unparse a
 bop (f1,f2) s (a,Atom) (b,Atom)  = (sopns s a b, Fix f1 f2)
 bop f@(f1,f2) s (a,af) (b,bf) | lts L f af  && lts R f bf  = (sop s a b, Fix f1 f2)
 bop f s (a,af) b | not (lts L f af) = bop f s (mkatom (a,af)) b
-bop f s a (b,bf) | not (lts R f bf)  = bop f s a (mkatom (b,bf)) 
+bop f s a (b,bf) | not (lts R f bf)  = bop f s a (mkatom (b,bf))
 
 pop :: Unparsable a => a -> Unparse a -> Unparse a
 pop s (x, Atom) = (unparseCat s  x, Pre)
@@ -102,14 +102,14 @@ d = text "d"
 x = text "x"
 y = text "y"
 
-abcdr = foldl1 plus [a,b,c,d] 
+abcdr = foldl1 plus [a,b,c,d]
 abcdl = foldr1 plus [a,b,c,d]
 eql = foldl1 eq [a,b,c]
 
 z = eq (plus a b) (pow (times b c) abcdl) `eq` eql
 
 
-g = minus (plus (times (plus a b) (plus b c)) abcdr) abcdl  
+g = minus (plus (times (plus a b) (plus b c)) abcdr) abcdl
 
 
 main = putStrLn $ fst $ foldl1 plus [g,eql, z ]

@@ -17,13 +17,13 @@ instance Monoid (IO ()) where
 
 --instance (Monoid a, Monoid b) => Monoid (a,b) where
 --    mempty = (mempty,mempty)
---    mappend (a,b) (c,d) = (mappend a c, mappend b d) 
---    mconcat xs = case unzip xs of (a,b) -> (mconcat a,mconcat b) 
+--    mappend (a,b) (c,d) = (mappend a c, mappend b d)
+--    mconcat xs = case unzip xs of (a,b) -> (mconcat a,mconcat b)
 --
 --instance (Monoid a, Monoid b, Monoid c) => Monoid (a,b,c) where
 --    mempty = (mempty,mempty,mempty)
---    mappend (a,b,c) (a',b',c') = (mappend a a', mappend b b', mappend c c') 
---    mconcat xs = case unzip3 xs of (a,b,c) -> (mconcat a,mconcat b,mconcat c) 
+--    mappend (a,b,c) (a',b',c') = (mappend a a', mappend b b', mappend c c')
+--    mconcat xs = case unzip3 xs of (a,b,c) -> (mconcat a,mconcat b,mconcat c)
 
 instance Monoid Bool where
     mempty = False
@@ -46,7 +46,7 @@ instance  QueryMonoid [a] where
     isEmpty = null
 
 instance QueryMonoid Bool where
-    isEmpty = not 
+    isEmpty = not
 
 instance QueryMonoid () where
     isEmpty _ = True

@@ -1,5 +1,5 @@
 module Grin.EvalInline(
-    createEval, 
+    createEval,
     createApply,
     UpdateType(..)
     ) where
@@ -10,7 +10,7 @@ import Control.Monad.Identity
 import Atom
 import Char
 
-data UpdateType = NoUpdate | TrailingUpdate | HoistedUpdate Val 
+data UpdateType = NoUpdate | TrailingUpdate | HoistedUpdate Val
 
 -- create an eval suitable for inlining.
 createEval :: UpdateType -> TyEnv -> [Tag] -> Lam
@@ -29,7 +29,7 @@ createEval shared  te ts
         Return (NodeC t [v])
     | otherwise = p1 :->
         Fetch p1 :>>= n2 :->
-        Case n2 cs 
+        Case n2 cs
     where
     cs = [f t | t <- ts, tagIsTag t, isGood t ]
     isGood t | tagIsWHNF t, HoistedUpdate (NodeC t' _) <- shared, t /= t' = False

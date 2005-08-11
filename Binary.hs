@@ -59,7 +59,7 @@ import Data.Int
 import Data.Word
 import Data.IORef
 import Data.Char		( ord, chr )
-import Control.Monad	 
+import Control.Monad	
 import Control.Exception	( throwDyn )
 import System.IO as IO
 import System.IO.Unsafe		( unsafeInterleaveIO )
@@ -141,7 +141,7 @@ data BinHandle
 --		Bin
 ---------------------------------------------------------------
 
-newtype Bin a = BinPtr Int 
+newtype Bin a = BinPtr Int
   deriving (Eq, Ord, Show, Bounded)
 
 castBin :: Bin a -> Bin b
@@ -169,7 +169,7 @@ getAt  :: Binary a => BinHandle -> Bin a -> IO a
 getAt bh p = do seekBin bh p; get bh
 
 openBinIO_ :: IO.Handle -> IO BinHandle
-openBinIO_ h = openBinIO h 
+openBinIO_ h = openBinIO h
 
 openBinIO :: IO.Handle -> IO BinHandle
 openBinIO h = do
@@ -194,7 +194,7 @@ tellBin (BinIO   r _)   = do ix <- readFastMutInt r; return (BinPtr ix)
 tellBin (BinMem  r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
 
 seekBin :: BinHandle -> Bin a -> IO ()
-seekBin (BinIO  ix_r h) (BinPtr p) = do 
+seekBin (BinIO  ix_r h) (BinPtr p) = do
   writeFastMutInt ix_r p
   hSeek h AbsoluteSeek (fromIntegral p)
 seekBin h@(BinMem  ix_r sz_r a) (BinPtr p) = do
@@ -259,11 +259,11 @@ putWord8 h@(BinMem  ix_r sz_r arr_r) w = do
     ix <- readFastMutInt ix_r
     sz <- readFastMutInt sz_r
 	-- double the size of the array if it overflows
-    if (ix >= sz) 
-        then do 
+    if (ix >= sz)
+        then do
             expandBin h ix
             putWord8 h w
-        else do 
+        else do
             arr <- readIORef arr_r
             unsafeWrite arr ix w
             writeFastMutInt ix_r (ix+1)
@@ -327,9 +327,9 @@ instance Binary Word32 where
     w2 <- getWord8 h
     w3 <- getWord8 h
     w4 <- getWord8 h
-    return $! ((fromIntegral w1 `shiftL` 24) .|. 
-	       (fromIntegral w2 `shiftL` 16) .|. 
-	       (fromIntegral w3 `shiftL`  8) .|. 
+    return $! ((fromIntegral w1 `shiftL` 24) .|.
+	       (fromIntegral w2 `shiftL` 16) .|.
+	       (fromIntegral w3 `shiftL`  8) .|.
 	       (fromIntegral w4))
 
 
@@ -352,13 +352,13 @@ instance Binary Word64 where
     w6 <- getWord8 h
     w7 <- getWord8 h
     w8 <- getWord8 h
-    return $! ((fromIntegral w1 `shiftL` 56) .|. 
-	       (fromIntegral w2 `shiftL` 48) .|. 
-	       (fromIntegral w3 `shiftL` 40) .|. 
-	       (fromIntegral w4 `shiftL` 32) .|. 
-	       (fromIntegral w5 `shiftL` 24) .|. 
-	       (fromIntegral w6 `shiftL` 16) .|. 
-	       (fromIntegral w7 `shiftL`  8) .|. 
+    return $! ((fromIntegral w1 `shiftL` 56) .|.
+	       (fromIntegral w2 `shiftL` 48) .|.
+	       (fromIntegral w3 `shiftL` 40) .|.
+	       (fromIntegral w4 `shiftL` 32) .|.
+	       (fromIntegral w5 `shiftL` 24) .|.
+	       (fromIntegral w6 `shiftL` 16) .|.
+	       (fromIntegral w7 `shiftL`  8) .|.
 	       (fromIntegral w8))
 
 -- -----------------------------------------------------------------------------
@@ -424,33 +424,33 @@ instance Binary ClockTime where
 	put_ bh (ctSec t)
     get bh = do
 	year <- get bh
-	month <- fmap toEnum $ get bh 
-	day <- get bh 
-	hour <- get bh 
-	min <- get bh 
-	sec <- get bh 
+	month <- fmap toEnum $ get bh
+	day <- get bh
+	hour <- get bh
+	min <- get bh
+	sec <- get bh
 	return $ toClockTime $ (toUTCTime epoch) {ctYear = year, ctDay = day, ctMonth = month, ctHour = hour, ctMin = min, ctSec = sec}
 epoch = toClockTime $ CalendarTime { ctYear = 1970, ctMonth = January, ctDay = 0, ctHour = 0, ctMin = 0, ctSec = 0, ctTZ = 0, ctPicosec = 0, ctWDay = undefined, ctYDay = undefined, ctTZName = undefined, ctIsDST = undefined}
 
 instance Binary PackedString where
     put_ bh (PS a) = put_ bh a
-    get bh = fmap PS $ get bh 
+    get bh = fmap PS $ get bh
 
 --put_ bh $ (snd $ Data.Array.IArray.bounds a) + 1
 --mapM_ (put_ bh) (Data.Array.IArray.elems a)
 --sz <- get bh
 --x <- sequence $ replicate sz (get bh)
---return $ PS (Data.Array.IArray.listArray (0,sz - 1) x) 
+--return $ PS (Data.Array.IArray.listArray (0,sz - 1) x)
 
---put_ bh ps = put_ bh (unpackPS ps) 
+--put_ bh ps = put_ bh (unpackPS ps)
 --get bh = liftM packString $ get bh
---put_ bh ps = putNList_ bh (unpackPS ps) 
+--put_ bh ps = putNList_ bh (unpackPS ps)
 --get bh = liftM packString $ getNList bh
-    
+
 -- putNList_ bh xs = do
 --     put_ bh (length xs)
 --     mapM_ (put_ bh) xs
--- 
+--
 -- getNList bh = do
 --     l <- get bh
 --     sequence $ replicate l (get bh)
@@ -497,12 +497,12 @@ instance (Binary a, Binary b, Binary c, Binary d) => Binary (a,b,c,d) where
 instance Binary a => Binary (Maybe a) where
     put_ bh Nothing  = putByte bh 0
     put_ bh (Just a) = do putByte bh 1; put_ bh a
-    get bh           = do 
+    get bh           = do
         h <- getWord8 bh
         case h of
             0 -> return Nothing
-            _ -> do 
-                x <- get bh 
+            _ -> do
+                x <- get bh
                 return (Just x)
 
 instance (Binary a, Binary b) => Binary (Either a b) where
@@ -519,7 +519,7 @@ instance (Binary a, Binary b) => Binary (Either a b) where
 instance Binary (UArray Int Word8) where
     put_ bh@(BinIO ix_r h) ua = do
         let sz = rangeSize (Data.Array.IO.bounds ua)
-        ix <- readFastMutInt ix_r 
+        ix <- readFastMutInt ix_r
         put_ bh sz
         ua <- unsafeThaw ua
         hPutArray h ua sz
@@ -530,15 +530,15 @@ instance Binary (UArray Int Word8) where
         case sz of
             I# i -> putByteArray bh ba i
     get bh@(BinIO ix_r h) = do
-        ix <- readFastMutInt ix_r 
-        sz <- get bh 
+        ix <- readFastMutInt ix_r
+        sz <- get bh
         ba <- newArray_ (0, sz - 1)
-        hGetArray h ba sz 
+        hGetArray h ba sz
         writeFastMutInt ix_r (ix + sz + 4)
-        ba <- unsafeFreeze ba 
+        ba <- unsafeFreeze ba
         return ba
     get  bh = do
-        sz <- get bh 
+        sz <- get bh
         BA ba <- getByteArray bh sz
         return $ UArray 0 (sz - 1) ba
 
@@ -551,12 +551,12 @@ instance (Ix a, Binary a) => Binary (UArray a Word8) where
         case (rangeSize (s,e)) of
             I# i -> putByteArray bh ba i
     get  bh = do
-        s <- get bh 
+        s <- get bh
         e <- get bh
         BA ba <- getByteArray bh (rangeSize (s,e))
         return $ UArray s e ba
 
--} 
+-}
 --  #ifdef __GLASGOW_HASKELL__
 
 instance Binary Integer where
@@ -567,8 +567,8 @@ instance Binary Integer where
 	let sz# = sizeofByteArray# a#  -- in *bytes*
 	put_ bh (I# sz#)  -- in *bytes*
 	putByteArray bh a# sz#
-   
-    get bh = do 
+
+    get bh = do
 	b <- getByte bh
 	case b of
 	  0 -> do (I# i#) <- get bh
@@ -580,7 +580,7 @@ instance Binary Integer where
 
 putByteArray :: BinHandle -> ByteArray# -> Int# -> IO ()
 putByteArray bh a s# = loop 0#
-  where loop n# 
+  where loop n#
 	   | n# ==# s# = return ()
 	   | otherwise = do
 	   	putByte bh (indexByteArray a n#)
@@ -588,11 +588,11 @@ putByteArray bh a s# = loop 0#
 
 getByteArray :: BinHandle -> Int -> IO ByteArray
 getByteArray bh (I# sz) = do
-  (MBA arr) <- newByteArray sz 
+  (MBA arr) <- newByteArray sz
   let loop n
 	   | n ==# sz = return ()
 	   | otherwise = do
-		w <- getByte bh 
+		w <- getByte bh
 		writeByteArray arr n w
 		loop (n +# 1#)
   loop 0#
@@ -650,7 +650,7 @@ lazyGet bh = do
     seekBin bh p -- skip over the object for now
     return a
 
- 
+
 {-
 ---------------------------------------------------------
 --		Reading and writing FastStrings
@@ -663,7 +663,7 @@ putFS bh s = error ("Binary.put_(FastString): " ++ unpackFS s)
 	-- Note: the length of the FastString is *not* the same as
 	-- the size of the ByteArray: the latter is rounded up to a
 	-- multiple of the word size.
-  
+
 {- -- possible faster version, not quite there yet:
 getFS bh@BinMem{} = do
   (I# l) <- get bh
@@ -679,7 +679,7 @@ getFS bh = do
 {-
 instance Binary FastString where
   put_ bh f@(FastString id l ba) =
-    case getUserData bh of { 
+    case getUserData bh of {
 	UserData { ud_next = j_r, ud_map = out_r, ud_dict = dict} -> do
     out <- readIORef out_r
     let uniq = getUnique f
@@ -693,7 +693,7 @@ instance Binary FastString where
     }
   put_ bh s = error ("Binary.put_(FastString): " ++ show (unpackFS s))
 
-  get bh = do 
+  get bh = do
 	j <- get bh
 	return $! (ud_dict (getUserData bh) ! j)
 -}
@@ -705,4 +705,4 @@ instance Binary Atom where
         a <- fromPackedStringIO ps
         return a
     put_ bh a = put_ bh (toPackedString a)
-        
+

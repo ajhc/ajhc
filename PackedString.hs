@@ -3,7 +3,7 @@
 -- Module      :  Data.PackedString
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
--- Original GHC implementation by Bryan O\'Sullivan, 
+-- Original GHC implementation by Bryan O\'Sullivan,
 -- rewritten to use UArray by Simon Marlow.
 -- modified by John Meacham for use in ginsu
 -- arch-tag: 8ad19c9c-9511-48a1-b25a-f5f98a386b8c
@@ -24,7 +24,7 @@ module PackedString (
          -- * Converting to and from @PackedString@s
 	packString,  -- :: String -> PackedString
 	unpackPS,    -- :: PackedString -> String
-        -- toString,   
+        -- toString,
         toUTF8,
         lengthPS,
         utfLengthPS,
@@ -96,7 +96,7 @@ import Data.Generics.Basics
 
 instance Monoid PackedString where
     mempty = nilPS
-    mappend x y = appendPS x y 
+    mappend x y = appendPS x y
     mconcat xs = concatPS xs
 
 -- -----------------------------------------------------------------------------
@@ -213,28 +213,28 @@ foldlPS f b (PS (UArray _ (I# e) ba)) = unpackFoldlUtf8# (\x y -> f x (C# y)) b 
 
 -- | The 'foldrPS' function behaves like 'foldr' on 'PackedString's.
 foldrPS :: (Char -> a -> a) -> a -> PackedString -> a
-foldrPS f b (PS (UArray _ (I# e) ba)) = unpackFoldrUtf8# ba (e +# 1#) (\x y -> f (C# x)  y) b 
+foldrPS f b (PS (UArray _ (I# e) ba)) = unpackFoldrUtf8# ba (e +# 1#) (\x y -> f (C# x)  y) b
 --foldrPS f v ps = foldr f v (unpackPS ps)
 
 {-
 hashPS :: PackedString -> Int32
 hashPS (PS arr) = f 5381 (elems arr) where
     f x [] = x
-    f m (c:cs) = n `seq` f n cs where 
-        n = ((m `shiftL` 5) + m ) `xor` fromIntegral c 
+    f m (c:cs) = n `seq` f n cs where
+        n = ((m `shiftL` 5) + m ) `xor` fromIntegral c
 
 hashPS' :: PackedString -> Int32
 hashPS' (PS (UArray 0 (I# e) ba)) = fromIntegral $ unpackFoldlUtf8# f 5381 ba (e +# 1#) where
-    f m c = ((m `shiftL` 5) + m ) `xor` I# (ord# c) 
+    f m c = ((m `shiftL` 5) + m ) `xor` I# (ord# c)
 -}
 
 hashPS :: PackedString -> Word
 hashPS (PS (UArray 0 (I# e) ba)) =  W# (f (unsafeCoerce# 5381#) 0#) where
-    f m c 
+    f m c
         | c ==# (e +# 1#) = m
-        | otherwise = f (((m `uncheckedShiftL#` 5#) `plusWord#` m ) `xor#`  (((indexWord8Array# ba c)))) (c +# 1#) 
-            
-       
+        | otherwise = f (((m `uncheckedShiftL#` 5#) `plusWord#` m ) `xor#`  (((indexWord8Array# ba c)))) (c +# 1#)
+
+
 
 -- | The 'takePS' function takes the first @n@ characters of a 'PackedString'.
 --takePS :: Int -> PackedString -> PackedString
@@ -311,7 +311,7 @@ joinPS filler pss = concatPS (splice pss)
 {-
   Some properties that hold:
 
-  * splitPS x ls = ls'   
+  * splitPS x ls = ls'
       where False = any (map (x `elemPS`) ls')
 
   * joinPS (packString [x]) (splitPS x ls) = ls
@@ -328,8 +328,8 @@ joinPS filler pss = concatPS (splice pss)
 -- splitify 0
 -- where
 --  len = lengthPS (PS ps)
-  
---  splitify n 
+
+--  splitify n
 --   | n >= len = []
 --   | otherwise =
 --      let
@@ -338,11 +338,11 @@ joinPS filler pss = concatPS (splice pss)
 --      if break_pt == n then -- immediate match, empty substring
 --         nilPS
 --	 : splitify (break_pt + 1)
---      else 
+--      else
 --         substrPS (PS ps) n (break_pt - 1) -- leave out the matching character
 --         : splitify (break_pt + 1)
 --
---first_pos_that_satisfies pred ps len n = 
+--first_pos_that_satisfies pred ps len n =
 --   case [ m | m <- [n..len-1], pred (ps ! m) ] of
 --	[]    -> len
 --	(m:_) -> m
@@ -379,9 +379,9 @@ joinPS filler pss = concatPS (splice pss)
 
 -- | Read a 'PackedString' directly from the specified 'Handle'.
 -- This is far more efficient than reading the characters into a 'String'
--- and then using 'packString'.  
+-- and then using 'packString'.
 --
--- NOTE: as with 'hPutPS', the string representation in the file is 
+-- NOTE: as with 'hPutPS', the string representation in the file is
 -- assumed to be ISO-8859-1.
 --hGetPS :: Handle -> Int -> IO PackedString
 --hGetPS h i = do
@@ -394,8 +394,8 @@ joinPS filler pss = concatPS (splice pss)
 utfCount :: String -> Int#
 utfCount cs = uc 0# cs where
     uc n []  = n
-    uc n (x:xs) 
-        | ord x <= 0x7f = uc (n +# 1#) xs 
+    uc n (x:xs)
+        | ord x <= 0x7f = uc (n +# 1#) xs
         | ord x <= 0x7ff = uc (n +# 2#) xs
         | ord x <= 0xffff = uc (n +# 3#) xs
         | ord x <= 0x1fffff = uc (n +# 4#) xs
@@ -422,7 +422,7 @@ toUTF (x:xs) | ord x<=0x007F = (fromIntegral $ ord x):toUTF xs
 
 
 {-# INLINE unpackFoldrUtf8# #-}
-unpackFoldrUtf8# :: ByteArray# -> Int# -> (Char# -> b -> b) -> b -> b 
+unpackFoldrUtf8# :: ByteArray# -> Int# -> (Char# -> b -> b) -> b -> b
 unpackFoldrUtf8# addr count f e = unpack 0# where
     unpack nh
       | nh ==# count  = e
@@ -454,11 +454,11 @@ unpackFoldlUtf8# f e addr count = unpack 0# e where
       | ch `leChar#` '\xDF'# =
            let n = f e (chr# (((ord# ch                                  -# 0xC0#) `uncheckedIShiftL#`  6#) +#
                      (ord# (indexCharArray# addr (nh +# 1#)) -# 0x80#))) in n `seq` unpack (nh +# 2#) n
-      | ch `leChar#` '\xEF'# = 
+      | ch `leChar#` '\xEF'# =
          let n = f e (chr# (((ord# ch                        -# 0xE0#) `uncheckedIShiftL#` 12#) +#
                     ((ord# (indexCharArray# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#`  6#) +#
                      (ord# (indexCharArray# addr (nh +# 2#)) -# 0x80#))) in n `seq` unpack (nh +# 3#) n
-      | otherwise            = 
+      | otherwise            =
          let n = f e (chr# (((ord# ch                        -# 0xF0#) `uncheckedIShiftL#` 18#) +#
                     ((ord# (indexCharArray# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#` 12#) +#
                     ((ord# (indexCharArray# addr (nh +# 2#)) -# 0x80#) `uncheckedIShiftL#`  6#) +#
@@ -477,9 +477,9 @@ less efficient non-ghc versions
 -- | Convert UTF-8 to Unicode.
 
 fromUTF :: [Word8] -> String
-fromUTF xs = fromUTF' (map fromIntegral xs) where 
+fromUTF xs = fromUTF' (map fromIntegral xs) where
     fromUTF' [] = []
-    fromUTF' (all@(x:xs)) 
+    fromUTF' (all@(x:xs))
 	| x<=0x7F = (chr (x)):fromUTF' xs
 	| x<=0xBF = err
 	| x<=0xDF = twoBytes all
@@ -492,8 +492,8 @@ fromUTF xs = fromUTF' (map fromIntegral xs) where
     threeBytes (x1:x2:x3:xs) = chr ((((x1 .&. 0x0F) `shift` 12) .|.
 				    ((x2 .&. 0x3F) `shift` 6) .|.
 				    (x3 .&. 0x3F))):fromUTF' xs
-    threeBytes _ = error "fromUTF: illegal three byte sequence" 
-    
+    threeBytes _ = error "fromUTF: illegal three byte sequence"
+
     err = error "fromUTF: illegal UTF-8 character"
 
 -}

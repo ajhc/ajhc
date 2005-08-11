@@ -8,12 +8,12 @@ type Rel a b = Set (a,b)
 --domain :: Rel a b -> Set a
 --range :: Rel a b -> Set b
 
-domain r = fromAscList (map fst (toAscList r)) 
+domain r = fromAscList (map fst (toAscList r))
 range r = fromList [ y | (_,y) <- toList r ]
 
 
-restrictDomain f r = Set.filter (f . fst) r 
-restrictRange f r = Set.filter (f . snd) r 
+restrictDomain f r = Set.filter (f . fst) r
+restrictRange f r = Set.filter (f . snd) r
 
 
 mapDomain f r = fromList [ (f x,y)| (x,y) <- toList r ]
@@ -23,7 +23,7 @@ partitionDomain f r = Set.partition (f . fst) r
 partitionRange f r = Set.partition (f . snd) r
 
 applyRelation :: (Ord a, Ord b) => Rel a b -> a -> [b]
-applyRelation r a = map snd (toList $ restrictDomain (== a) r) 
+applyRelation r a = map snd (toList $ restrictDomain (== a) r)
 
 toRelationList :: (Ord a, Ord b) => Rel a b -> [(a,[b])]
-toRelationList rel = [ (x, applyRelation rel x) | x <- toList (domain rel)] 
+toRelationList rel = [ (x, applyRelation rel x) | x <- toList (domain rel)]

@@ -1,8 +1,8 @@
 -- stub module to add your own rules.
 module RuleMonoid (rules) where
 
-import List 
-import DerivingDrift.RuleUtils 
+import List
+import DerivingDrift.RuleUtils
 
 rules = [
     ("Monoid", userRuleMonoid, "Generics", "derive reasonable Data.Monoid implementation", Nothing)
@@ -12,18 +12,18 @@ rules = [
 
 
 data Data = D {	name :: Name,			 -- type's name
-			constraints :: [(Class,Var)], 
+			constraints :: [(Class,Var)],
 			vars :: [Var],		 -- Parameters
 			body :: [Body],
 			derives :: [Class],	 -- derived classes
 			statement :: Statement}  -- type of statement
 	   | Directive				 --|
 	   | TypeName Name			 --| used by derive (ignore)
-		deriving (Eq,Show) 
+		deriving (Eq,Show)
 
 data Body = Body { constructor :: Constructor,
 		    labels :: [Name], -- [] for a non-record datatype.
-		    types :: [Type]} deriving (Eq,Show) 
+		    types :: [Type]} deriving (Eq,Show)
 
 data Statement = DataStmt | NewTypeStmt deriving (Eq,Show)
 
@@ -64,10 +64,10 @@ instanceheader cls dat =
 
 
 userRuleMonoid dat@D{name = name, vars = vars, body=[body] } = ins where
-    ins = instanceheader "Monoid" dat $$ 
+    ins = instanceheader "Monoid" dat $$
         block [me, ma]
     me, ma :: Doc
-    me = text "mempty" <+> equals <+> text (constructor body) <+> hsep (replicate lt (text "mempty"))     
+    me = text "mempty" <+> equals <+> text (constructor body) <+> hsep (replicate lt (text "mempty"))
     ma = text "mappend" <+> mkpattern c (varNames ty) <+> mkpattern c (varNames' ty) <+> equals <+> text c <+> hcat (zipWith f (varNames ty) (varNames' ty))
     f a b = parens $ text "mappend"  <+> a <+> b
     c = constructor body

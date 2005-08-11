@@ -26,45 +26,45 @@ intt = rawType "int"
 zeroI =  LitInt 0 intt
 
 op_aIa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
-    tvra' = tVr 2 t 
+    tvra' = tVr 2 t
     tvrb' = tVr 4 tInt
-    tvra = tVr 6 st 
+    tvra = tVr 6 st
     tvrb = tVr 8 intt
-    tvrc = tVr 10 st 
+    tvrc = tVr 10 st
     st = rawType ct
     wtd = eStrictLet tvrc (oper_aIa op ct (EVar tvra) (EVar tvrb)) (rebox (EVar tvrc))
-    rebox x = ELit (LitCons cn [x] t) 
+    rebox x = ELit (LitCons cn [x] t)
 op_aaa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
-    tvra' = tVr 2 t 
-    tvrb' = tVr 4 t 
-    tvra = tVr 6 st 
-    tvrb = tVr 8 st 
-    tvrc = tVr 10 st 
+    tvra' = tVr 2 t
+    tvrb' = tVr 4 t
+    tvra = tVr 6 st
+    tvrb = tVr 8 st
+    tvrc = tVr 10 st
     st = rawType ct
     wtd = eStrictLet tvrc (oper_aaa op ct (EVar tvra) (EVar tvrb)) (rebox (EVar tvrc))
-    rebox x = ELit (LitCons cn [x] t) 
+    rebox x = ELit (LitCons cn [x] t)
 op_aa op ct cn t = ELam tvra' (unbox' (EVar tvra') cn tvra wtd) where
-    tvra' = tVr 2 t 
-    tvra = tVr 6 st 
-    tvrc = tVr 10 st 
+    tvra' = tVr 2 t
+    tvra = tVr 6 st
+    tvrc = tVr 10 st
     st = rawType ct
     wtd = eStrictLet tvrc (oper_aa op ct (EVar tvra)) (rebox (EVar tvrc))
-    rebox x = ELit (LitCons cn [x] t) 
+    rebox x = ELit (LitCons cn [x] t)
 op_aaI op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
-    tvra' = tVr 2 t 
-    tvrb' = tVr 4 t 
-    tvra = tVr 6 st 
-    tvrb = tVr 8 st 
+    tvra' = tVr 2 t
+    tvrb' = tVr 4 t
+    tvra = tVr 6 st
+    tvrb = tVr 8 st
     tvrc = tVr 10 intt
     st = rawType ct
     wtd = eStrictLet tvrc (oper_aaI op ct (EVar tvra) (EVar tvrb)) (rebox (EVar tvrc))
-    rebox x = ELit (LitCons d_Prelude_Int [x] t) 
+    rebox x = ELit (LitCons d_Prelude_Int [x] t)
 
 op_aaB op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
-    tvra' = tVr 2 t 
-    tvrb' = tVr 4 t 
-    tvra = tVr 6 st 
-    tvrb = tVr 8 st 
+    tvra' = tVr 2 t
+    tvrb' = tVr 4 t
+    tvra = tVr 6 st
+    tvrb = tVr 8 st
     tvrc = tVr 10 intt
     st = rawType ct
     wtd = eStrictLet tvrc (oper_aaI op ct (EVar tvra) (EVar tvrb)) (caseof (EVar tvrc))
@@ -74,24 +74,24 @@ op_aaB op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
 --build_abs ct cn v = unbox' v cn tvra (eCase (EPrim (APrim (Operator "<" [ct,ct] "int") mempty) [EVar tvra, zero] intt) [Alt zeroI (rebox $ EVar tvra)] (fs)) where
 build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaI "<" ct (EVar tvra) zero)  [Alt zeroI (rebox $ EVar tvra)] (fs)) where
     te = typ v
-    tvra = tVr 2 st  
-    tvrb = tVr 4 st  
+    tvra = tVr 2 st
+    tvrb = tVr 4 st
     zero = ELit $ LitInt 0 st
     st = rawType ct
     intt =  rawType "int"
     fs = eStrictLet tvrb (oper_aa "-" ct (EVar tvra)) (rebox (EVar tvrb))
-    rebox x = ELit (LitCons cn [x] te) 
+    rebox x = ELit (LitCons cn [x] te)
 
 buildSignum v t = eCase (EVar v) [Alt (LitInt 0 t) (ELit (LitInt 0 t))] (eIf (EPrim (primPrim "prim_op_aaB.<") [EVar v,(ELit (LitInt 0 t))] tBool) (ELit (LitInt (-1) t)) (ELit (LitInt 1  t)))
 build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaI "<" ct (EVar tvra) (ELit zero)) [Alt zeroI (rebox one)] (rebox negativeOne))) where
-    tvra = tVr 2 st 
+    tvra = tVr 2 st
     te = typ v
     st = rawType ct
     zero :: Lit a E
     zero = LitInt 0 st
     one = ELit $ LitInt 1 st
     negativeOne = ELit $ LitInt (-1) st
-    rebox x = ELit (LitCons cn [x] te) 
+    rebox x = ELit (LitCons cn [x] te)
 
 
 
@@ -121,7 +121,7 @@ buildPeek t p = ELam tvr $ createIO t (\tvrWorld -> EPrim (APrim (Peek p) mempty
 buildPoke t p = ELam ptr_tvr $ ELam v_tvr $ createIO_ $ (\tw -> EPrim (APrim (Poke p) mempty) [EVar tw, EVar ptr_tvr, EVar v_tvr] tWorld__) where
     ptr_tvr =  (tVr 2 (tPtr t))
     v_tvr = tVr 4 t
---toIO t x = prim_unsafeCoerce x (tIO t) 
+--toIO t x = prim_unsafeCoerce x (tIO t)
 -}
 
 createIO t pv = toIO t (ELam tvrWorld $  eCaseTup  (pv tvrWorld) [tvrWorld2,rtVar] (eJustIO (EVar tvrWorld2) (EVar rtVar))) where
@@ -136,7 +136,7 @@ createIO_ pv = toIO tUnit (ELam tvrWorld $  eStrictLet tvrWorld2 (pv tvrWorld)  
 prim_number v t et@(ELit (LitCons cn' _ _)) = ELit (LitCons cn [ELit (LitInt v st)] et) where
     st = ELit (LitCons (toName RawType t) [] eStar)
     cn = toName DataConstructor $ nameName cn'
-    
+
 
 prim_const s t et@(ELit (LitCons cn' _ _)) =  eStrictLet (tVr 2 st) (EPrim (APrim (CConst s t) mempty) [] st) (ELit (LitCons cn [EVar $ tVr 2 st] et)) where
     st = ELit (LitCons (toName RawType t) [] eStar)

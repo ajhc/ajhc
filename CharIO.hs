@@ -1,11 +1,11 @@
 module CharIO(
     putStr,
     putStrLn,
-    putErr, 
-    putErrLn, 
-    putErrDie, 
-    CharIO.readFile, 
-    CharIO.print, 
+    putErr,
+    putErrLn,
+    putErrDie,
+    CharIO.readFile,
+    CharIO.print,
     CharIO.hGetContents,
     runMain
     ) where
@@ -18,13 +18,13 @@ import UTF8
 import System
 import Char
 
-toUTF8 s = (map (chr. fromIntegral) $ toUTF s) 
-fromUTF8 s = fromUTF (map (fromIntegral . ord) s) 
+toUTF8 s = (map (chr. fromIntegral) $ toUTF s)
+fromUTF8 s = fromUTF (map (fromIntegral . ord) s)
 
 flushOut = Control.Exception.catch  (hFlush stdout) (\_ -> return ())
 
-putStr = Prelude.putStr . toUTF8  
-putStrLn = Prelude.putStrLn . toUTF8  
+putStr = Prelude.putStr . toUTF8
+putStrLn = Prelude.putStrLn . toUTF8
 putErr s = flushOut >> IO.hPutStr IO.stderr (toUTF8 s)
 putErrLn s = flushOut >> IO.hPutStrLn IO.stderr (toUTF8 s)
 putErrDie s = flushOut >> IO.hPutStrLn IO.stderr (toUTF8 s) >> System.exitFailure

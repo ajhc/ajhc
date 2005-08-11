@@ -4,10 +4,10 @@
 
         Module:                 Diagnostic
 
-        Description:            Utilities for working with (error/otherwise) 
+        Description:            Utilities for working with (error/otherwise)
                                 diagnostics.
 
-        Primary Authors:        Bryn Humberstone 
+        Primary Authors:        Bryn Humberstone
 
         Notes:                  See the file License for license information
 
@@ -30,27 +30,27 @@ import Data.Monoid
 
 --------------------------------------------------------------------------------
 
-data TypeError 
+data TypeError
         = Unification String
-        | BogusError 
+        | BogusError
         | Failure String
-    
+
 
 typeError :: TypeError -> [Diagnostic] -> a
 typeError err ds
-   = error $ "\n" ++ 
+   = error $ "\n" ++
              "What:    " ++ whatStr ++ "\n" ++
              "Why:     " ++ whyStr ++ "\n" ++
-             "Where:   " ++ dumpDiagnostic 3 ds 
+             "Where:   " ++ dumpDiagnostic 3 ds
    where
    (whatStr, whyStr) =
         case err of
            Unification s -> ("type unification error", s)
-           BogusError    -> ("bogus reason", "bogus reason") 
+           BogusError    -> ("bogus reason", "bogus reason")
            Failure s ->  ("failure", s)
-     
 
-data Diagnostic = Msg (Maybe SrcLoc) String 
+
+data Diagnostic = Msg (Maybe SrcLoc) String
    deriving Show
 
 {- Little helper functions for keeping good error contexts around -}
@@ -79,7 +79,7 @@ locMsg loc desc val = locSimple loc (desc ++ "\n   " ++ val)
 
 
 
-{- take a diagnostic stack and a 'maxContext' and display the 
+{- take a diagnostic stack and a 'maxContext' and display the
    most recent maxContext number of lines from the stack -}
 dumpDiagnostic :: Int -> [Diagnostic] -> String
 dumpDiagnostic maxContext diagnostics
@@ -88,40 +88,40 @@ dumpDiagnostic maxContext diagnostics
       ++ (showDiagnostics . take maxContext $ diagnostics)
    where
      hasASrcLoc diag
-         = case diag of 
-                Msg maybeloc _ -> isJust maybeloc 
+         = case diag of
+                Msg maybeloc _ -> isJust maybeloc
            --   _ -> False
 
-     mostRecentASrcLoc 
+     mostRecentASrcLoc
          = case List.find hasASrcLoc diagnostics of
-                Just (Msg (Just (SrcLoc fn line col)) _) 
+                Just (Msg (Just (SrcLoc fn line col)) _)
                     -> "on line " ++ show line ++ " in " ++ fn
                 Nothing -> "no line information"
-                
+
 
 {- display an entire stack of diagnostics (it displays the top of
-   the stack first, so most calls will have to reverse the stack 
+   the stack first, so most calls will have to reverse the stack
    before getting here -}
-showDiagnostics :: [Diagnostic] -> String   
+showDiagnostics :: [Diagnostic] -> String
 showDiagnostics diags
-    = case diags of 
+    = case diags of
         [onlyOne] -> "The error was " ++ showDiag onlyOne
         _         -> showDiagnostics' diags
-    where 
+    where
     showDiagnostics' [] = ""
     showDiagnostics' (diag:diags)
-       = case diags of 
+       = case diags of
          --[] -> "\nSo the error was " ++ showDiag diag  -- innermost error
          [] -> showDiag diag  -- innermost error
          _  -> showDiag diag ++ "\n" ++ showDiagnostics' diags
-       
+
     showDiag (Msg maybeLoc msg)
-       = msg 
+       = msg
          {- I think that all these line numbers are probably excessive -}
-         ++ case maybeLoc of 
+         ++ case maybeLoc of
               Just srcloc -> "\t\t{- on line " ++ show (srcLine srcloc) ++ " -}"  -- discreetly display line nums
               _ -> ""
-              
+
 
 srcLine :: SrcLoc -> Int
 srcLine = srcLocLine

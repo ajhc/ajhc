@@ -20,7 +20,7 @@ instance Data Info where
 instance Monoid Info where
     mempty = Info []
     mappend (Info as) (Info bs) = Info ([ b | b <- bs, not (show b `Set.member` bss) ] ++ as) where
-        bss = Set.fromList $ map show bs 
+        bss = Set.fromList $ map show bs
 
 
 lookup :: forall a m .  (Monad m,Typeable a) => Info -> m a

@@ -20,21 +20,21 @@ whizState = Left mempty
 --normalizeGrin grin@Grin { grinFunctions = fs } = grin { grinFunctions = f fs [] (Right 1) } where
 --    f [] xs _ = xs
 --    f ((a,(Tup vs,fn)):xs) ys set = f xs ((a,(Tup vs',fn')):ys) set' where
---        (Identity ((NodeC _ vs',fn'),set')) = whiz return return set (NodeC tagHole vs , fn) 
+--        (Identity ((NodeC _ vs',fn'),set')) = whiz return return set (NodeC tagHole vs , fn)
 normalizeGrin :: Grin -> Grin
 normalizeGrin grin@Grin { grinFunctions = fs } = grin { grinFunctions = f fs [] (Right 1) } where
     f [] xs _ = reverse xs
     f ((a,lm):xs) ys set = f xs ((a,lm'):ys) set' where
-        (Identity (lm',set')) = fizz (grinTypeEnv grin) (\_ x -> x) (return . Just) return set lm 
+        (Identity (lm',set')) = fizz (grinTypeEnv grin) (\_ x -> x) (return . Just) return set lm
 
 normalizeGrin' :: Grin -> Grin
 normalizeGrin' grin@Grin { grinFunctions = fs } = grin { grinFunctions = f fs [] } where
     f [] xs  = reverse xs
     f ((a,lm):xs) ys  = f xs ((a,lm'):ys) where
-        (Identity (lm',_)) = whiz (\_ x -> x) (return . Just) return (Right 1) lm 
+        (Identity (lm',_)) = whiz (\_ x -> x) (return . Just) return (Right 1) lm
 
-whizExps :: Monad m => (Exp -> m Exp) -> Lam -> m Lam 
-whizExps f l = liftM fst $ whiz (\_ x -> x) (\(p,e) -> f e >>= \e' -> return  (Just (p,e'))) f whizState l  
+whizExps :: Monad m => (Exp -> m Exp) -> Lam -> m Lam
+whizExps f l = liftM fst $ whiz (\_ x -> x) (\(p,e) -> f e >>= \e' -> return  (Just (p,e'))) f whizState l
 
 -- | magic traversal and flattening routine.
 -- whiz traverses Grin code and right assosiates it as well as renaming and
@@ -47,20 +47,20 @@ whizExps f l = liftM fst $ whiz (\_ x -> x) (\(p,e) -> f e >>= \e' -> return  (J
 -- Whiz also vectorizes tuple->tuple assignments, breaking them into individual assignments
 -- for its components to better aid future optimizations.
 
-whiz :: Monad m => 
+whiz :: Monad m =>
     (forall a . Val -> m a -> m a)         -- ^ called for each sub-code block, such as in case statements
     -> ((Val,Exp) -> m (Maybe (Val,Exp)))  -- ^ routine to transform or omit simple bindings
     -> (Exp -> m Exp)       -- ^ routine to transform final statement in code block
     -> WhizState            -- ^ Initial state
     -> Lam                  -- ^ input lambda expression
     -> m (Lam,WhizState)
-whiz sub te tf inState start = res where 
-    res = runStateT (dc mempty start) inState 
+whiz sub te tf inState start = res where
+    res = runStateT (dc mempty start) inState
     f (a :>>= (v :-> b)) xs env = f a ((env,v,b):xs) env
     f a@(Return (Tup xs@(_:_))) ((senv,p@(Tup ys@(_:_)),b):rs) env | length xs == length ys  = do
-        Return (Tup xs) <- g env a 
+        Return (Tup xs) <- g env a
         (Tup ys,env') <- renamePattern p
-        ts <- lift $ mapM te [(y,Return x) | x <- xs | y <- ys ] 
+        ts <- lift $ mapM te [(y,Return x) | x <- xs | y <- ys ]
         z <- f b rs (env' `mappend` senv)
         let h [] = z
             h ((p,v):rs) = v :>>= p :-> h rs
@@ -69,9 +69,9 @@ whiz sub te tf inState start = res where
         a <- g env a
         (p,env') <- renamePattern p
         x <- lift $ te (p,a)
-        z <- f b xs (env' `mappend` senv) 
-        case x of 
-            Just (p',a') -> do 
+        z <- f b xs (env' `mappend` senv)
+        case x of
+            Just (p',a') -> do
                 return $ a' :>>= (p' :-> z)
             Nothing -> do
                 return z
@@ -82,7 +82,7 @@ whiz sub te tf inState start = res where
         v <- applySubst env v
         as <- mapM (dc env) as
         return $ Case v as
-    g env x = applySubstE env x 
+    g env x = applySubstE env x
     dc env (p :-> e) = do
         (p,env') <- renamePattern p
         g <- get
@@ -90,7 +90,7 @@ whiz sub te tf inState start = res where
         put g
         return (p :-> z)
 
-        
+
 -- | magic traversal and flattening routine.
 -- whiz traverses Grin code and right assosiates it as well as renaming and
 -- repeated variables along the way.
@@ -104,22 +104,22 @@ whiz sub te tf inState start = res where
 -- fizz is similar to whiz, but processes things in 'bottom-up' order.
 -- fizz also removes all statements past an Error.
 
-fizz :: Monad m => 
-    TyEnv -> 
+fizz :: Monad m =>
+    TyEnv ->
     (forall a . Val -> m a -> m a)         -- ^ called for each sub-code block, such as in case statements
     -> ((Val,Exp) -> m (Maybe (Val,Exp)))  -- ^ routine to transform or omit simple bindings
     -> (Exp -> m Exp)       -- ^ routine to transform final statement in code block
     -> WhizState            -- ^ Initial state
     -> Lam                  -- ^ input lambda expression
     -> m (Lam,WhizState)
-fizz tyEnv sub te tf inState start = res where 
-    res = runStateT (dc mempty start) inState 
+fizz tyEnv sub te tf inState start = res where
+    res = runStateT (dc mempty start) inState
     f (a :>>= (v :-> b)) xs env = f a ((env,v,b):xs) env
     f a@(Return (Tup xs@(_:_))) ((senv,p@(Tup ys@(_:_)),b):rs) env | length xs == length ys  = do
-        Return (Tup xs) <- g env a 
+        Return (Tup xs) <- g env a
         (Tup ys,env') <- renamePattern p
         z <- f b rs (env' `mappend` senv)
-        ts <- lift $ mapM te (reverse [(y,Return x) | x <- xs | y <- ys ]) 
+        ts <- lift $ mapM te (reverse [(y,Return x) | x <- xs | y <- ys ])
         let h [] = z
             h ((p,v):rs) = v :>>= p :-> h rs
         return $ h [ (p,v) |  Just (p,v) <- reverse ts]
@@ -128,10 +128,10 @@ fizz tyEnv sub te tf inState start = res where
     f a ((senv,p,b):xs) env = do
         a <- g env a
         (p,env') <- renamePattern p
-        z <- f b xs (env' `mappend` senv) 
+        z <- f b xs (env' `mappend` senv)
         x <- lift $ te (p,a)
-        case x of 
-            Just (p',a') -> do 
+        case x of
+            Just (p',a') -> do
                 return $ a' :>>= (p' :-> z)
             Nothing -> do
                 return z
@@ -142,7 +142,7 @@ fizz tyEnv sub te tf inState start = res where
         v <- applySubst env v
         as <- mapM (dc env) as
         return $ Case v as
-    g env x = applySubstE env x 
+    g env x = applySubstE env x
     dc env (p :-> e) = do
         (p,env') <- renamePattern p
         g <- get
@@ -152,7 +152,7 @@ fizz tyEnv sub te tf inState start = res where
 
 
 
-applySubstE env x = f x where 
+applySubstE env x = f x where
     g = applySubst env
     f (App a vs) = do
         vs' <- mapM g vs
@@ -174,10 +174,10 @@ applySubstE env x = f x where
         b <- g b
         return $ Update a b
     f e@Error {} = return e
-    f (Cast v t) = do 
+    f (Cast v t) = do
         v <- g v
         return $ Cast v t
-    f (Case e as) = do 
+    f (Case e as) = do
         e <- g e
         return $ Case e as
     f x = error $ "applySubstE: " ++ show x
@@ -196,14 +196,14 @@ applySubst env x = f x where
     f (NodeV t vs) = do
         vs' <- mapM f vs
         return $ NodeV t vs'
-    f Addr {} = error "Address in subst" 
+    f Addr {} = error "Address in subst"
     f x = return x
 
-renamePattern :: MonadState (WhizState) m => Val ->  m (Val,WhizEnv) 
+renamePattern :: MonadState (WhizState) m => Val ->  m (Val,WhizEnv)
 renamePattern x = runWriterT (f x) where
     f :: MonadState (WhizState) m => Val -> WriterT (WhizEnv) m Val
     f (Var v t) = do
-        v' <- lift $ newVarName v 
+        v' <- lift $ newVarName v
         let nv = Var v' t
         tell (Map.singleton v nv)
         return nv
@@ -218,13 +218,13 @@ renamePattern x = runWriterT (f x) where
         tell (Map.singleton t (Var t' TyTag))
         vs' <- mapM f vs
         return $ NodeV t' vs'
-    f Addr {} = error "Address in pattern" 
+    f Addr {} = error "Address in pattern"
     f x = return x
 
 newVarName :: MonadState WhizState m => Var -> m Var
 newVarName (V sv) = do
-    s <- get 
-    case s of 
+    s <- get
+    case s of
         Left s -> do
             let nv = v sv
                 v n | n `Set.member` s = v (n + Set.size s)
@@ -234,6 +234,6 @@ newVarName (V sv) = do
         Right n -> do
             put $! (Right $! (n + 1))
             return $ V n
-    
+
 
 

@@ -16,12 +16,12 @@ ToDo: Differentiate between record updates and labeled construction.
 
 > {
 > module FrontEnd.HsParser (parse, parseHsStmt) where
-> 
+>
 > import HsSyn
-> import FrontEnd.ParseMonad 
+> import FrontEnd.ParseMonad
 > import FrontEnd.Lexer
 > import FrontEnd.ParseUtils hiding(readInteger,readRational)
-> 
+>
 >
 >
 > }
@@ -263,7 +263,7 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >	: 'type' simpletype srcloc '=' type	
 >			{ HsTypeDecl $3 (fst $2) (snd $2) $5 }
 >       | 'data' ctype srcloc deriving
->           {% checkDataHeader $2 `thenP` \(cs,c,t) -> 
+>           {% checkDataHeader $2 `thenP` \(cs,c,t) ->
 >              returnP (HsDataDecl $3 cs c t [] $4) }
 >	| 'data' ctype srcloc '=' constrs deriving
 >			{% checkDataHeader $2 `thenP` \(cs,c,t) ->
@@ -344,7 +344,7 @@ Types
 >        : srcloc varid                   { hsTyVarBind { hsTyVarBindSrcLoc = $1, hsTyVarBindName = $2 } }
 >        | srcloc '(' varid '::' kind ')' { hsTyVarBind { hsTyVarBindSrcLoc = $1, hsTyVarBindName = $3, hsTyVarBindKind = Just $5 } }
 
-> kind :: { HsKind } 
+> kind :: { HsKind }
 >       : bkind                          { $1 }
 >       | bkind '->' kind                { HsKindFn $1 $3 }
 
@@ -407,7 +407,7 @@ Datatype declarations
 > constr :: { HsConDecl }
 >	: srcloc scontype		{ HsConDecl $1 (fst $2) (snd $2) }
 >	| srcloc sbtype conop sbtype	{ HsConDecl $1 $3 [$2,$4] }
->	| srcloc con '{' fielddecls '}' 
+>	| srcloc con '{' fielddecls '}'
 >					{ HsRecDecl $1 $2 (reverse $4) }
 
 > scontype :: { (HsName, [HsBangType]) }
@@ -637,7 +637,7 @@ Case alternatives
 > alt :: { HsAlt }
 >	: infixexp srcloc ralt	{% checkPattern $1 `thenP` \p ->
 >				   returnP (HsAlt $2 p $3 []) }
->	| infixexp srcloc ralt 'where' decllist 
+>	| infixexp srcloc ralt 'where' decllist
 >				{% checkPattern $1 `thenP` \p ->
 >				   returnP (HsAlt $2 p $3 $5) }
 
@@ -789,7 +789,7 @@ Variables, Constructors and Operators.
 >	| STRING		{ HsLit (HsString $1) }
 
 >  srcloc :: { SrcLoc }	:	{% getSrcLoc }
- 
+
 -----------------------------------------------------------------------------
 Layout
 

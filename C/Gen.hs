@@ -22,11 +22,11 @@ data CDecl = CFunc CType String [(CType,String)] [CStatement] | CVar CType Strin
     deriving(Ord,Eq)
 data CStatement = CSAssign CExpr CExpr | CSExpr CExpr | CSAuto CType String | CSReturn CExpr | CSDoc String | CSSwitch CExpr [(Maybe String,[CStatement])]
     deriving(Ord,Eq)
-data CExpr = CEIdent String | CEFunCall String [CExpr] | CELiteral CLit | CEDot CExpr String | CEIndirect CExpr String | CESizeof CType | CECast CType CExpr | CEEval CExpr | CEDoc String | CEVar CType String | CETernary CExpr CExpr CExpr | CEOp String CExpr CExpr  | CEUOp String CExpr 
+data CExpr = CEIdent String | CEFunCall String [CExpr] | CELiteral CLit | CEDot CExpr String | CEIndirect CExpr String | CESizeof CType | CECast CType CExpr | CEEval CExpr | CEDoc String | CEVar CType String | CETernary CExpr CExpr CExpr | CEOp String CExpr CExpr  | CEUOp String CExpr
     deriving(Ord,Eq)
 data CLit = CLitChar Char | CLitInt Int | CLitNull
     deriving(Ord,Eq)
- 
+
 data CFunction = CFunction {
     cFuncComments :: String,
     cFuncName :: String,
@@ -36,7 +36,7 @@ data CFunction = CFunction {
     cFuncBody :: [CStatement]
     }
 
-cfunction = CFunction { cFuncComments = "", cFuncName = "_unknown", cFuncReturnType = CTypeBasic "void", cFuncArgs = [], cFuncPublic = False, cFuncBody = [] } 
+cfunction = CFunction { cFuncComments = "", cFuncName = "_unknown", cFuncReturnType = CTypeBasic "void", cFuncArgs = [], cFuncPublic = False, cFuncBody = [] }
 
 instance PPrint P.Doc CFunction where
     pprint = prettyFunc
@@ -52,7 +52,7 @@ prettyFunc cf =  ans where
 prettyFuncP cf = prettyProto (fdecl cf)
 
 fdecl cf = CFunc (cFuncReturnType cf) (cFuncName cf) (cFuncArgs cf) (cFuncBody cf)
-    
+
 
 data CCode = CCode {
     cCodeIncludes :: [String],
@@ -84,7 +84,7 @@ instance ToCIdent Atom where
 instance Show CIdent where
     show (CIdent x) = x
 
-    
+
 -----------------------------------------
 -- high level monad for generating C code
 -----------------------------------------
@@ -135,7 +135,7 @@ newIdent = do
 instance Monad m => Unique (CGen m) where
     modifyGetUniqueState f = do
 	modify (\(x,y,z) -> (x,y,f z))
-	(_,_,z) <- get 
+	(_,_,z) <- get
 	return z
 
 instance Monad m => UniqueProducer (CGen m) where
@@ -193,7 +193,7 @@ cCase e (as,d) = do
     addStmts [CSAuto cVoidStar r, CSAuto tEv te,CSAssign (ceIdent te) e]
     addStmts  [CSDoc ( text "switch" <> parens (prettyExpr $ CECast ctInt e) <> text "{" $$ nest 8 (vcat fas $$ gd) $$ text "}")]
     return (ceIdent r)  where
-	f r (l,v)  = do 
+	f r (l,v)  = do
 	    s <- cBlock (v >>= \e -> addStmts [CSAssign (ceIdent r) e])
 	    return $ (text "case" <+> prettyLit l <> colon ) $$  prettyCode s $$ text "break;"
 	g r v = do
@@ -210,7 +210,7 @@ cCase e (as,d) = do
     addStmts [CSAuto cVoidStar r, CSAuto tEv te,CSAssign (ceIdent te) e]
     addStmts  [CSDoc ( text "switch" <> parens (prettyExpr $ CECast ctInt (CEEval (ceIdent te))) <> text "{" $$ nest 8 (vcat fas $$ gd) $$ text "}")]
     return (ceIdent r)  where
-	f r (l,v)  = do 
+	f r (l,v)  = do
 	    s <- cBlock (v >>= \e -> addStmts [CSAssign (ceIdent r) e])
 	    return $ (text "case" <+> prettyLit l <> colon ) $$  prettyCode s $$ text "break;"
 	g r v = do
@@ -220,7 +220,7 @@ cCase e (as,d) = do
 
 cBlock :: Monad m => CGen m () -> CGen m [CStatement]
 cBlock v = do
-    (s,()) <- runSubCGen v 
+    (s,()) <- runSubCGen v
     let (as, ns) = partition isAuto s
     addStmts as
     return ns
@@ -234,7 +234,7 @@ cBlock v = do
     addStmts as
     modify $ liftT3 (id,id,const ni)
     return ns
-    
+
 -}
 
 
@@ -260,8 +260,8 @@ cAllocThunk i = cAlloc (CTypeStruct ('s':show i))
 
 
 prettyC :: [CDecl] -> String
-prettyC (cf) = render (header $$$ 
-    ((vcat $ map prettyDecl sts) $$$ (vcat $ map prettyProto fns) $$$ 
+prettyC (cf) = render (header $$$
+    ((vcat $ map prettyDecl sts) $$$ (vcat $ map prettyProto fns) $$$
 	(vcat $ map prettyDecl vars) $$$ (vcat $ map prettyDecl fns)) $$$ text "")  where
     vars = filter isVar cf
     fns = filter isFn cf
@@ -272,12 +272,12 @@ prettyC (cf) = render (header $$$
     isFn _ = False
     isStruct (CStruct _ _) = True
     isStruct _ = False
-    header =  text "#include <malloc.h>" $$ 
-	text "#include \"jhc_rts.h\"" $$ text "" 
+    header =  text "#include <malloc.h>" $$
+	text "#include \"jhc_rts.h\"" $$ text ""
 
 --a $$ b = a <> char '\n' <>  b
 
---a $+$ b = a $$ b 
+--a $+$ b = a $$ b
 --semi = char ';'
 --nest _ x = x
 
@@ -285,7 +285,7 @@ a $$$ b = a $$ text "" $$ b
 
 
 prettyArgs [] = text "void"
-prettyArgs args = hcat (punctuate (text ", ") (map (\(t,i) -> prettyType t <+> text i) $ args))  
+prettyArgs args = hcat (punctuate (text ", ") (map (\(t,i) -> prettyType t <+> text i) $ args))
 
 prettyDecl (CFunc rt n args code) = text "static" <+> prettyType rt $$ text n <> text "(" <> prettyArgs args <> text ")" $+$
     text "{" $+$ nest 8 (prettyCode code) $+$ text "}"
@@ -307,10 +307,10 @@ prettyCode' showSa (ss) = vcat $ map ps ((if showSa then snub sa else [])  ++ sb
     ps (CSSwitch e ts) = text "switch" <+> parens (prettyExpr e) <+> char '{' <$> vcat (map sc ts) <$> md <$>  char '}' where
         sc (Just x,ss) = text "case" <+> text x <> char ':' $$ nest 4  (prettyCode' False ss $$ text "break;")
         sc (Nothing,ss) = text "default:" $$ nest 4  (prettyCode' False ss) $$ text "break;"
-        md = if any isNothing (fsts ts) then empty else text "default: jhc_case_fell_off(__LINE__);" 
+        md = if any isNothing (fsts ts) then empty else text "default: jhc_case_fell_off(__LINE__);"
     ps (CSDoc d) = text d
-    sa = collectAuto ss 
-    sb = filter (not . isAuto) ss 
+    sa = collectAuto ss
+    sb = filter (not . isAuto) ss
     collectAuto ss = filter isAuto ss ++ concatMap f ss where
         f (CSSwitch _ ts) = concat [collectAuto x | (_,x) <- ts]
         f _ = []
@@ -335,7 +335,7 @@ prettyExpr (CEDot (CEIndirect e x) y) = (parens $ prettyExpr e) <> text "->" <> 
 prettyExpr (CEIndirect (CEIdent i) n) = text i <> text "->" <> text n
 prettyExpr (CEIndirect e n) = (parens $ prettyExpr e) <> text "->" <> text n
 prettyExpr (CEDot e n) = (parens $ prettyExpr e) <> text "." <> text n
-prettyExpr (CESizeof t) = text "sizeof" <>(parens $ prettyType t) 
+prettyExpr (CESizeof t) = text "sizeof" <>(parens $ prettyType t)
 prettyExpr (CECast t e) = parens (prettyType t) <> prettyExpr e
 prettyExpr (CEEval e) = (prettyExpr (CEIndirect e "eval"))  <>  parens (prettyExpr e)
 prettyExpr (CEDoc d) = text d

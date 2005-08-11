@@ -3,7 +3,6 @@ module MonadUtil where
 import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Monad
-import Data.Monoid
 
 
 class Monad m => ContextMonad c m | m -> c where
@@ -20,7 +19,7 @@ instance Error [String] where
 instance ContextMonad String (Either [String]) where
     withContext s (Right x) = Right x
     withContext s (Left cs) = Left  (s:cs)
-    
+
 
 runSimpleContextMonad :: Either [String] a -> a
 runSimpleContextMonad (Left ss) = error $ unlines ss

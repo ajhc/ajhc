@@ -575,7 +575,7 @@ restricted bs
 tiImpls ::  TypeEnv -> [Impl] -> TI ([Pred], TypeEnv)
 tiImpls env [] = return ([],env)
 tiImpls env bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ (show (map getDeclName bs)))) $ do
-      --liftIO $ mapM (putStrLn .  render . ppHsDecl) bs 
+      --liftIO $ mapM (putStrLn .  render . ppHsDecl) bs
       cHierarchy <- getClassHierarchy
       ts <- mapM (\_ -> newTVar Star) bs
       let
@@ -691,7 +691,7 @@ tiProgram ::  Module -> SigEnv -> KindEnv -> ClassHierarchy -> TypeEnv -> TypeEn
 tiProgram modName sEnv kt h dconsEnv env bgs = runTI dconsEnv h kt sEnv modName $
   do (ps, env1) <- tiSeq tiBindGroup env bgs
      s         <- getSubst
-     ps <- flattenType ps 
+     ps <- flattenType ps
      ([], rs) <- split h [] (apply s ps)
      case topDefaults h rs of
        Right s' -> do

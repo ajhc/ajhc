@@ -11,16 +11,16 @@ vars = [ UnQual (HsIdent ('d':show v ++ "_derive@") ) |  v <- [1::Int ..]]
 deriveInstances :: Monad m => SrcLoc -> HsName -> [HsName] -> [HsConDecl] -> [HsName] -> m [HsDecl]
 deriveInstances sloc name args cons ds = return []
 deriveInstances sloc name args cons ds = return $ concatMap f ds where
-    f n 
+    f n
         | n == hsUnqualValName "Bounded" = [inst n (mkBounded cons)]
-        | n == hsUnqualValName "Enum" = [inst n (mkEnum cons)] 
-        | otherwise = error $ "unknown deriving: " ++ show n 
-    inst n ds = HsInstDecl sloc (HsQualType [] (HsTyApp (HsTyCon n) tipe))  ds  
+        | n == hsUnqualValName "Enum" = [inst n (mkEnum cons)]
+        | otherwise = error $ "unknown deriving: " ++ show n
+    inst n ds = HsInstDecl sloc (HsQualType [] (HsTyApp (HsTyCon n) tipe))  ds
     tipe = foldr HsTyApp (HsTyCon name) (map HsTyVar args)
     patBind n v = HsPatBind sloc (HsPVar n) (HsUnGuardedRhs v) []
     match n ps v = HsMatch sloc n ps (HsUnGuardedRhs v) []
     mkBounded cs = [patBind (hsValName ("@Prelude","minBound")) (HsCon $ hsConDeclName (head cs)),  patBind (hsValName ("Prelude","maxBound")) (HsCon $ hsConDeclName (last cs))]
-    mkEnum cs = [HsFunBind (map f (zip cs [0..])),  HsFunBind $ (map g (zip cs [0..])) ++ [err]] where 
+    mkEnum cs = [HsFunBind (map f (zip cs [0..])),  HsFunBind $ (map g (zip cs [0..])) ++ [err]] where
         f (c,n) = match (hsValName ("@Prelude","fromEnum")) [HsPApp (hsConDeclName c) []] (HsLit $ HsInt ( n))
         g (c,n) =  match (hsValName ("@Prelude","toEnum")) [HsPLit (HsInt ( n))] (HsCon (hsConDeclName c))
         err = match (hsValName ("@Prelude","toEnum"))  [HsPWildCard] (HsApp (HsVar (hsValName ("@Prelude","error"))) (HsLit $ HsString $ "toEnum: " ++ show name))
@@ -28,26 +28,26 @@ deriveInstances sloc name args cons ds = return $ concatMap f ds where
 {-
 data Statement = DataStmt | NewTypeStmt deriving (Eq,Show)
 data Data = D {	name :: String,		-- type name
-                constraints :: [(Class,Var)], 
+                constraints :: [(Class,Var)],
                 vars :: [Var],		-- Parameters
                 body :: [Body],
                 derives :: [Class],		-- derived classes
                 statement :: Statement}
-		deriving (Eq,Show) 
-data Body = Body { 
+		deriving (Eq,Show)
+data Body = Body {
     constructor :: String,
     labels :: [String],
     types :: [HsBangType]
-    } deriving (Eq,Show) 
+    } deriving (Eq,Show)
 
 
-toData :: HsName -> [HsName] -> [HsConDecl] -> [HsName] -> Data 
+toData :: HsName -> [HsName] -> [HsConDecl] -> [HsName] -> Data
 toData name args cons derives = ans where
-    f c = Body { constructor = show $ hsConDeclName c, types = hsConDeclArgs c, labels = lb c } 
+    f c = Body { constructor = show $ hsConDeclName c, types = hsConDeclArgs c, labels = lb c }
     lb HsConDecl {} = []
     lb r = concat [map show xs | (xs,_) <- hsConDeclRecArg r ]
     ans = D { statement = DataStmt, vars = map show args, constraints = [], name = name,  derives = map show derives, body = map f cons }
-                                                         
+
 {-
 type Name = String
 type Var = String
@@ -55,17 +55,17 @@ type Class = String
 type Constructor = String
 -}
 
-eqfn = instanceSkeleton "Eq" [(makeEq,defaultEq)] 
+eqfn = instanceSkeleton "Eq" [(makeEq,defaultEq)]
 
 makeEq :: IFunction
 makeEq (Body{constructor=constructor,types=types})
 	| null types = hsep $ texts [constructor,"==",constructor, "=", "True"]
 	| otherwise = let
 	v = varNames types
-	v' = varNames' types 
+	v' = varNames' types
 	d x = parens . hsep $ text constructor : x
 	head = [ text "==", d v', text "="]
-	body = sepWith (text "&&") $ 
+	body = sepWith (text "&&") $
 		zipWith (\x y -> (x <+> text "==" <+> y)) v v'
 	in d v <+> fsep (head ++  body)
 
@@ -75,18 +75,18 @@ defaultEq = hsep $ texts ["_", "==", "_", "=" ,"False"]
 
 -- Ord
 
-ordfn d = let 
+ordfn d = let
    ifn = [f c c'
 		| c <- zip (body d) [1 ..]
 		, c' <- zip (body d) [1 ..]]
    cmp n n' = show $  compare n n'
-   f (b,n) (b',n') 
+   f (b,n) (b',n')
 	| null (types b) = text "compare" <+>
 		   fsep [text (constructor b),
 			 pattern (constructor b') (types b')
 			, char '=', text $ cmp n n' ]
 	| otherwise = let
-		      head  = fsep [l,r, char '='] 
+		      head  = fsep [l,r, char '=']
 		      l = pattern (constructor b) (types b)
 		      r = pattern' (constructor b') (types b')
 		      one x y = fsep [text "compare",x,y]
@@ -110,9 +110,9 @@ hsName x y = Qual (Module x) (HsIdent y)
 hsUName x = UnQual (HsIdent x)
 
 instanceSkeleton _ fs d = ans where
-    ans = HsFunBind $ concat [ map x (body d) ++ y | (x,y) <- fs ] 
+    ans = HsFunBind $ concat [ map x (body d) ++ y | (x,y) <- fs ]
 
-showfn = instanceSkeleton "Show" [(makeShow,mempty)] 
+showfn = instanceSkeleton "Show" [(makeShow,mempty)]
 
 makeShow :: IFunction
 makeShow (Body{constructor=constructor,labels=labels,types=types})
@@ -137,7 +137,7 @@ makeShow (Body{constructor=constructor,labels=labels,types=types})
         showString s = HsApp (HsVar $ hsName ("Prelude.Text","showString")) (HsLit (HsString s))
 	comp = char '.'
 
--- Read 
+-- Read
 
 readfn d = simpleInstance "Read" d <+> text "where" $$ readsPrecFn d
 
@@ -154,7 +154,7 @@ makeRead (Body{constructor=constructor,labels=labels,types=types})
 	where
 	headfn = fsep [text "readParen", parens (text "d > 9")]
 	read0 = lambda $ listComp (result rest) [lexConstr rest]
-	read = lambda . listComp (result rest) 
+	read = lambda . listComp (result rest)
 		     $ lexConstr ip : ( map f (init vars) )
 			++ final (last vars)
         f v = fsep [tup v ip, from,readsPrec, ip]
@@ -167,12 +167,12 @@ makeRead (Body{constructor=constructor,labels=labels,types=types})
 		openB = fsep [tup (text $ show "{") ip,lex]
 		closeB = fsep [tup (text $ show "}") rest,lex]
 		comma = [fsep [tup (text $ show ",") ip,lex]]
-		in lambda . listComp (result rest) 
-			$ lexConstr ip : openB 
+		in lambda . listComp (result rest)
+			$ lexConstr ip : openB
 			: (concat . sepWith comma) (zipWith f labels vars)
 			 ++ [closeB]
 	lambda x = parens ( fsep [text "\\",ip,text "->",x])
-	listComp x (l:ll) = brackets . fsep . sepWith comma $  
+	listComp x (l:ll) = brackets . fsep . sepWith comma $
 				((fsep[x, char '|', l]) : ll)
 	result x = tup (pattern constructor vars) x
 	lexConstr x = fsep [tup (text $ show constructor) x, lex]
@@ -190,32 +190,32 @@ makeRead (Body{constructor=constructor,labels=labels,types=types})
 -- Enum -- a lot of this code should be provided as default instances,
 -- 	 but currently isn't
 
-enumfn d = let 
+enumfn d = let
 	fromE = fromEnumFn d
 	toE = toEnumFn d
 	eFrom = enumFromFn d
 	in if any (not . null . types) (body d)
-	   then commentLine $ text "Warning -- can't derive Enum for" 
+	   then commentLine $ text "Warning -- can't derive Enum for"
 				<+> text (name d)
-	   else simpleInstance "Enum" d <+> text "where" 
+	   else simpleInstance "Enum" d <+> text "where"
 		$$ block (fromE ++ toE ++ [eFrom,enumFromThenFn])
 
 fromEnumFn :: Data -> [Doc]
 fromEnumFn (D{body=body}) = map f (zip body [0 ..])
 	where
 	f (Body{constructor=constructor},n) = text "fromEnum" <+> (fsep $
-		texts [constructor , "=", show n])	 
+		texts [constructor , "=", show n])	
 		
 toEnumFn :: Data -> [Doc]
 toEnumFn (D{body=body}) = map f (zip body [0 ..])
 	where
 	f (Body{constructor=constructor},n) = text "toEnum" <+> (fsep $
-		texts [show n , "=", constructor])    
+		texts [show n , "=", constructor])
 		
 enumFromFn :: Data -> Doc
-enumFromFn D{body=body} = let 
+enumFromFn D{body=body} = let
 	conList = bracketList . texts . map constructor $ body
-	bodydoc = fsep [char 'e', char '=', text "drop", 
+	bodydoc = fsep [char 'e', char '=', text "drop",
 		parens (text "fromEnum" <+> char 'e'), conList]
 	in text "enumFrom" <+> bodydoc
 		
@@ -233,7 +233,7 @@ enumFromThenFn = let
 
 -- Bounded - as if anyone uses this one :-) ..
 
-boundedfn d@D{name=name,body=body,derives=derives} 
+boundedfn d@D{name=name,body=body,derives=derives}
 	| all (null . types) body  = boundedEnum d
 	| singleton body = boundedSingle d
        | otherwise = commentLine $ text "Warning -- can't derive Bounded for"
@@ -247,7 +247,7 @@ boundedEnum d@D{body=body} = let f = constructor . head $ body
 
 boundedSingle d@D{body=body} = let f = head $ body
 	in simpleInstance "Bounded" d <+> text "where" $$ block [
-		hsep . texts $ [ "minBound","=",constructor f] ++ 
+		hsep . texts $ [ "minBound","=",constructor f] ++
 			replicate (length (types f)) "minBound",
 		hsep . texts $ [ "maxBound","=",constructor f] ++
 			replicate (length (types f)) "maxBound"]

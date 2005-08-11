@@ -10,7 +10,7 @@
 
                                 The main tasks implemented by this module are:
 
-        Primary Authors:        Lindsay Powles 
+        Primary Authors:        Lindsay Powles
 
         Notes:                  See the file License for license information
 
@@ -70,12 +70,12 @@ infixHsModule (FixityMap ism) m = return $ hsModuleDecls_u f m where
     f = map (processDecl ism)
     --ism = buildSMap is
 
-    
-    
+
+
 
 
 --infixer :: [HsDecl] -> TidyModule -> TidyModule
---infixer infixRules tidyMod = 
+--infixer infixRules tidyMod =
 --    tidyMod { tidyClassDecls = process tidyClassDecls,
 --              tidyInstDecls = process tidyInstDecls,
 --              tidyFunBinds = process tidyFunBinds,
@@ -91,14 +91,14 @@ infixHsModule (FixityMap ism) m = return $ hsModuleDecls_u f m where
   -- associated associativity and binding power.
 
 buildFixityMap :: [HsDecl] -> FixityMap
-buildFixityMap ds = FixityMap (Map.fromList $ concatMap f ds)  where 
+buildFixityMap ds = FixityMap (Map.fromList $ concatMap f ds)  where
         f (HsInfixDecl _ assoc strength names) = zip (map make_key names) $ repeat (strength,assoc)
         f _ = []
-        make_key = fromValishHsName 
+        make_key = fromValishHsName
         --make_key a_name = case a_name of
         --    (Qual a_module name)   -> (a_module, name)
         --    (UnQual name)          -> (unqualModule, name)
-        
+
 
 --buildSMap infixRules =
 --    foldl myAddToFM emptyFM $ concat $ map formatDecl infixRules
@@ -113,8 +113,8 @@ buildFixityMap ds = FixityMap (Map.fromList $ concatMap f ds)  where
 
 lookupSM infixMap  exp = case exp of
     HsAsPat _ e -> lookupSM infixMap e
-    HsVar qname    -> Map.findWithDefault defaultFixity (toName Val qname) infixMap 
-    HsCon qname    -> Map.findWithDefault defaultFixity (toName DataConstructor qname) infixMap 
+    HsVar qname    -> Map.findWithDefault defaultFixity (toName Val qname) infixMap
+    HsCon qname    -> Map.findWithDefault defaultFixity (toName DataConstructor qname) infixMap
     _           -> error $ "Operator (" ++ show exp ++ ") is invalid."
 
 --lookupSM infixMap  exp = case exp of
@@ -159,7 +159,7 @@ processRhs infixMap rhs = case rhs of
     HsGuardedRhss  rhss    -> HsGuardedRhss $ map (processGRhs infixMap) rhss
 
 
-processGRhs :: SymbolMap -> HsGuardedRhs -> HsGuardedRhs 
+processGRhs :: SymbolMap -> HsGuardedRhs -> HsGuardedRhs
 processGRhs infixMap (HsGuardedRhs srcloc e1 e2) = HsGuardedRhs srcloc new_e1 new_e2
     where
         new_e1 = fst $ processExp infixMap e1
@@ -173,7 +173,7 @@ processAlt infixMap (HsAlt srcloc pat g_alts decls) = HsAlt srcloc (procPat infi
         new_decls = map (processDecl infixMap) decls
 
 
-processGAlts :: SymbolMap -> HsGuardedAlts -> HsGuardedAlts 
+processGAlts :: SymbolMap -> HsGuardedAlts -> HsGuardedAlts
 processGAlts infixMap g_alts = case g_alts of
     HsUnGuardedAlt exp     -> HsUnGuardedAlt $ fst $ processExp infixMap exp
     HsGuardedAlts galts    -> HsGuardedAlts $ map (processGAlt infixMap) galts

@@ -1,4 +1,4 @@
-module Grin.DeadFunctions(deadFunctions) where 
+module Grin.DeadFunctions(deadFunctions) where
 
 
 import Atom
@@ -11,7 +11,7 @@ import FindFixpoint
 import FreeVars
 import GenUtil hiding(replicateM_)
 import Grin.Grin
-import Grin.Whiz 
+import Grin.Whiz
 import MonoidUtil()
 import List
 import Monad
@@ -20,13 +20,13 @@ import qualified Data.Set as Set
 import Seq
 import Stats
 
-concatMapM f xs = liftM concat $ mapM f xs 
+concatMapM f xs = liftM concat $ mapM f xs
 
 data ArgInfo = Used | Unused | Passed [(Atom,Int)]
     deriving(Eq,Ord,Show)
 
 instance Monoid ArgInfo where
-    mempty = Unused 
+    mempty = Unused
     mappend Unused b = b
     mappend b Unused = b
     mappend Used _ = Used
@@ -40,7 +40,7 @@ data FunctionInfo = FunctionInfo {
     functionUnusedArgs :: [Int],
     functionArgInfo :: [ArgInfo],
     functionCafsUsed :: [Var],
-    functionCalls :: [Atom] 
+    functionCalls :: [Atom]
 }
 
 
@@ -74,7 +74,7 @@ getFunctionInfo cafs indirect (a,b@(Tup as :-> e)) = FunctionInfo {
         fc | indirect =  snub $ concatMap tagToFunction (Set.toList ts) ++ ef
            | otherwise = filter tagIsFunction (Set.toList ts)
         (vs,ts) = freeVars e
-        ef =  concatMap tagToFunction  (freeVars (nc)) 
+        ef =  concatMap tagToFunction  (freeVars (nc))
         uuargs = [ i | (Var v _,i) <- zip as [0..], not $ v `Set.member` vs]
         cused = [ v | v@(V n) <- Set.toList vs, n < 0 ]
         arginfo = collectArgInfo b
@@ -83,16 +83,16 @@ getFunctionInfo cafs indirect (a,b@(Tup as :-> e)) = FunctionInfo {
 
 -- | Remove dead functions
 
-deadFunctions :: 
+deadFunctions ::
     Bool       -- ^ Whether to count indirect function calls. (used before eval\/apply inlining)
     -> Stats   -- ^ stats to update with what was done
-    -> [Atom]  -- ^ roots 
-    -> Grin    -- ^ input 
+    -> [Atom]  -- ^ roots
+    -> Grin    -- ^ input
     -> IO Grin -- ^ output
 deadFunctions indirect stats keeps grin = do
     let (graph,lv,kv) = graphFromEdges [ (gf, functionName gf, functionCalls gf) |  gf <- map (getFunctionInfo (grinCafs grin) indirect) $ grinFunctions grin ]
-        reach = [ x|  (x,_,_) <- map lv $ snub $ concatMap (reachable graph) (map la keeps)]  
-        rs = Set.fromList (map functionName reach) 
+        reach = [ x|  (x,_,_) <- map lv $ snub $ concatMap (reachable graph) (map la keeps)]
+        rs = Set.fromList (map functionName reach)
         --la a = case Map.lookup a $ Map.fromList $  zip (sort $ fsts (grinFunctions grin)) [0..] of
         la a = case kv a  of
             Just n -> n
@@ -100,32 +100,32 @@ deadFunctions indirect stats keeps grin = do
         fs =  [ f | f@(a,_) <- grinFunctions grin, a `Set.member` rs ]
         cu = Set.fromList $ concatMap functionCafsUsed reach
         (nc,uuc) = List.partition ((`Set.member` cu) . fst)  (grinCafs grin)
-    replicateM_ (length (grinFunctions grin) - length reach) $ tick stats $ (toAtom "Optimize.dead-function") 
+    replicateM_ (length (grinFunctions grin) - length reach) $ tick stats $ (toAtom "Optimize.dead-function")
     --CharIO.putStr "Dead Functions: "
-    --CharIO.print [ a | (a,_) <- grinFunctions grin, not $ a `Set.member` rs ] 
-    --mapM cleanupDeadArgs 
+    --CharIO.print [ a | (a,_) <- grinFunctions grin, not $ a `Set.member` rs ]
+    --mapM cleanupDeadArgs
     --let f n | null $ functionUnusedArgs n = ""
     --        | otherwise = show (functionName n) ++ show (functionUnusedArgs n) ++ "\n"
     --mapM (CharIO.putStr . f) reach
     when (not $ null uuc) $ do
-        replicateM_ (length uuc) $ tick stats $ (toAtom "Optimize.caf-cleanup") 
+        replicateM_ (length uuc) $ tick stats $ (toAtom "Optimize.caf-cleanup")
         --CharIO.putStr "Dead Cafs: "
         --CharIO.print uuc
     --mapM_ CharIO.print reach
-    reach <- findDeadCode stats  reach 
-        
+    reach <- findDeadCode stats  reach
+
     fs <- mapM (removeDeadArgs stats reach) fs
     return $ grin { grinFunctions = fs, grinCafs = nc }
 
 
 {-
-class  FixIn b a | b -> a where 
+class  FixIn b a | b -> a where
     getSafeDependencies :: Maybe (b -> [a])
     getSafeDependencies = Nothing
 -}
 
 
-findFixpoint :: (Show a,Ord a,Eq b,Monoid b) => Maybe String -> (x -> a) -> ((a -> Ms b b) -> x -> Ms b b) -> [x] -> IO [(x,b)]  
+findFixpoint :: (Show a,Ord a,Eq b,Monoid b) => Maybe String -> (x -> a) -> ((a -> Ms b b) -> x -> Ms b b) -> [x] -> IO [(x,b)]
 findFixpoint str en fn xs = ans where
     ans = do
         rs <- solve str mempty is
@@ -133,21 +133,21 @@ findFixpoint str en fn xs = ans where
     mp = Map.fromList [ (en x,i) | x <- xs | i <- [0..]]
     f a | Just x <- Map.lookup a mp = getVal x
     f a | otherwise = return $ mempty
-    f a | otherwise = error $ "findFixpoint: Cannot find " ++ show a 
-    is = map (fn f) xs 
-    
-    
-    
+    f a | otherwise = error $ "findFixpoint: Cannot find " ++ show a
+    is = map (fn f) xs
 
-findDeadCode stats fs = ans where 
+
+
+
+findDeadCode stats fs = ans where
     is = [ ((functionName f,i),functionArgInfo f !! i) | f <- fs, i <- [0 .. functionArity f - 1]  ]
     ans = do
         zs <- findFixpoint Nothing fst c is
         ua <- concatMapM rs zs
         let mp = Map.fromList $ [ (x,snds xs) | (x,xs) <- sortGroupUnderF fst ua]
             z f | Just x <- Map.lookup (functionName f) mp = f { functionUnusedArgs = x }
-            z f@(FunctionInfo { functionUnusedArgs = [] }) = f 
-        return $ map z fs 
+            z f@(FunctionInfo { functionUnusedArgs = [] }) = f
+        return $ map z fs
     st = Set.fromList $ map functionName fs
     c getVal (_,f) = g getVal f
     g getVal Used = return True
@@ -157,11 +157,11 @@ findDeadCode stats fs = ans where
     rs ((x,Passed _), False) = do
         --CharIO.print x
         tick stats $ toAtom "Optimize.rec-dead-arg"
-        rs' (x,False) 
+        rs' (x,False)
     rs ((x,_),y) = rs' (x,y)
     rs' (x,True) = return []
     rs' (x,False) = return [x]
-    
+
 
 pHole = Const (NodeC tagHole [])
 
@@ -170,17 +170,17 @@ removeDeadArgs stats fs (a,l) =  whizExps f l >>= return . (,) a where
         as <- dff fn as
         return $ App fn as
     f (Return (NodeC fn as)) | Just fn' <- tagToFunction fn = do
-        as <- dff fn' as 
+        as <- dff fn' as
         return $ Return (NodeC fn as)
     f (Store (NodeC fn as)) |  Just fn' <- tagToFunction fn = do
-        as <- dff fn' as 
+        as <- dff fn' as
         return $ Store (NodeC fn as)
     f (Update p (NodeC fn as)) |  Just fn' <- tagToFunction fn = do
-        as <- dff fn' as 
+        as <- dff fn' as
         return $ Update p (NodeC fn as)
     f x = return x
     dff fn as = mapM df  (zip as [0..]) where
-        xs = lup fn 
+        xs = lup fn
         df (a,i) | a /= pHole && i `elem` xs  = do
             tick stats $ toAtom "Optimize.dead-arg"
             return pHole
@@ -190,18 +190,18 @@ removeDeadArgs stats fs (a,l) =  whizExps f l >>= return . (,) a where
         Just x -> x
         Nothing -> []
     m = Map.fromList [  (functionName x,functionUnusedArgs x) | x <- fs, not $ null (functionUnusedArgs x) ]
-    
-groupConcatFst xs = [ (x,mconcat $ snds xs) | (x,xs) <- sortGroupUnderF fst xs] 
-        
+
+groupConcatFst xs = [ (x,mconcat $ snds xs) | (x,xs) <- sortGroupUnderF fst xs]
+
 -- TODO make this see through store and fetches
 collectArgInfo :: Lam -> [ArgInfo]
-collectArgInfo exp@(Tup as :-> _) = ans where   
-    ws = Map.fromList $ groupConcatFst $ Seq.toList $ execWriter (whizExps f exp) 
-    lv x = case Map.lookup x ws of 
+collectArgInfo exp@(Tup as :-> _) = ans where
+    ws = Map.fromList $ groupConcatFst $ Seq.toList $ execWriter (whizExps f exp)
+    lv x = case Map.lookup x ws of
         Just x -> x
         Nothing -> Unused
     ans = [ lv x |  Var x _ <- as ]
-    f e = g e >> return e 
+    f e = g e >> return e
     g (App a [e]) | a == funcEval =  tell (Seq.fromList [ (v,Used) | v <- freeVars e ])
     g (App a [x,y]) | a == funcApply =  tell (Seq.fromList [ (v,Used) | v <- freeVars (x,y) ])
     g (App a vs) = tell (Seq.fromList $ concat [ [ (x,Passed [(a,i)]) | x <- freeVars v] | v <- vs | i <- [0..] ])
@@ -211,5 +211,5 @@ collectArgInfo exp@(Tup as :-> _) = ans where
     g (Case e _) = tell (Seq.fromList [ (v,Used) | v <- freeVars e ])
     g e = tell (Seq.fromList [ (v,Used) | v <- freeVars e ])
     g _ = return ()
-    
-    
+
+

@@ -4,7 +4,7 @@
 -- Module      :  Language.Haskell.ParseUtils
 -- Copyright   :  (c) The GHC Team, 1997-2000
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
@@ -347,29 +347,29 @@ checkRevDecls = mergeFunBinds []
 -- intended as a post-processer for the parser output
 fixupHsDecls :: [HsDecl] -> [HsDecl]
 fixupHsDecls (d@(HsFunBind matches):ds) =  (HsFunBind newMatches) : fixupHsDecls different where
-    funName = matchName $ head matches 
+    funName = matchName $ head matches
     (same, different) = span (sameFun funName) (d:ds)
     newMatches =  collectMatches same
 fixupHsDecls (d:ds) =  d : fixupHsDecls ds
 fixupHsDecls [] = []
 -- get the variable name bound by a match
-matchName (HsMatch _sloc name _pats _rhs _whereDecls) = name 
+matchName (HsMatch _sloc name _pats _rhs _whereDecls) = name
 
 
 -- True if the decl is a HsFunBind and binds the same name as the
 -- first argument, False otherwise
 sameFun :: HsName -> HsDecl -> Bool
-sameFun name (HsFunBind matches@(_:_)) = name == (matchName $ head matches) 
+sameFun name (HsFunBind matches@(_:_)) = name == (matchName $ head matches)
 sameFun _ _ = False
 
 -- collects all the HsMatch equations from any FunBinds
 -- from a list of HsDecls
-collectMatches :: [HsDecl] -> [HsMatch] 
+collectMatches :: [HsDecl] -> [HsMatch]
 collectMatches [] = []
 collectMatches (d:ds)
    = case d of
         (HsFunBind matches) -> matches ++ collectMatches ds
-        _anythingElse             -> collectMatches ds 
+        _anythingElse             -> collectMatches ds
 
 -- Stolen from Hugs' Prelude
 

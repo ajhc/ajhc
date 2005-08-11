@@ -12,24 +12,24 @@ bogusASrcLoc = SrcLoc "bogus#" (-1) (-1)
 bogusSrcSpan = srcSpan bogusASrcLoc bogusASrcLoc
 
 
-data SrcLoc = SrcLoc { srcLocFileName :: String, srcLocLine :: !Int, srcLocColumn :: !Int} 
+data SrcLoc = SrcLoc { srcLocFileName :: String, srcLocLine :: !Int, srcLocColumn :: !Int}
     deriving(Data,Typeable,Eq,Ord)
     {-! derive: update, GhcBinary !-}
 
 data SrcSpan = SrcSpan { srcSpanBegin :: !SrcLoc, srcSpanEnd :: !SrcLoc }
-    deriving(Data,Typeable,Eq,Ord) 
+    deriving(Data,Typeable,Eq,Ord)
     {-! derive: update !-}
 
 srcSpan :: SrcLoc -> SrcLoc -> SrcSpan
 srcSpan = SrcSpan
 
-instance Monoid SrcLoc where 
+instance Monoid SrcLoc where
     mempty = bogusASrcLoc
-    mappend a b 
+    mappend a b
         | a == bogusASrcLoc = b
         | otherwise = a
 
-    
+
 
 class HasLocation a where
     srcLoc :: a -> SrcLoc
@@ -55,9 +55,9 @@ instance Show SrcLoc where
         f (-1) = ""
         f n = ':':show n
 instance Show SrcSpan where
-    show (SrcSpan { srcSpanBegin =  sl1, srcSpanEnd = sl2 } ) = show sl1 ++ "-" ++ show sl2 
+    show (SrcSpan { srcSpanBegin =  sl1, srcSpanEnd = sl2 } ) = show sl1 ++ "-" ++ show sl2
 
-newtype Module = Module String 
+newtype Module = Module String
   deriving(Data,Typeable,Eq,Ord,Show,ToAtom,FromAtom)
 
 fromModule (Module s) = s
@@ -73,10 +73,10 @@ data HsName
 
 
 instance ToAtom HsName where
-    toAtom = Atom.fromString . show 
+    toAtom = Atom.fromString . show
 
 instance Show HsName where
-   showsPrec _ (Qual (Module m) s) = 
+   showsPrec _ (Qual (Module m) s) =
 	showString m . showString "." . shows s
    showsPrec _ (UnQual s) = shows s
 
@@ -88,7 +88,7 @@ instance Binary Module where
         ps <- get bh
         return (Module $ unpackPS ps)
     put_ bh (Module n) = put_ bh (packString n)
-    
+
 instance Binary HsIdentifier where
     get bh = do
         ps <- get bh
@@ -108,12 +108,12 @@ instance Show HsIdentifier where
 instance HasLocation HsModule where
     srcLoc x = hsModuleSrcLoc x
 
-data HsModule = HsModule { 
-    hsModuleName :: Module, 
+data HsModule = HsModule {
+    hsModuleName :: Module,
     hsModuleSrcLoc :: SrcLoc,
-    hsModuleExports :: (Maybe [HsExportSpec]), 
-    hsModuleImports :: [HsImportDecl], 
-    hsModuleDecls :: [HsDecl], 
+    hsModuleExports :: (Maybe [HsExportSpec]),
+    hsModuleImports :: [HsImportDecl],
+    hsModuleDecls :: [HsDecl],
     hsModuleOptions :: [String]
     }
   deriving(Data,Typeable, Show)
@@ -133,12 +133,12 @@ instance HasLocation HsImportDecl where
     srcLoc x = hsImportDeclSrcLoc x
 
 
-data HsImportDecl = HsImportDecl { 
-    hsImportDeclSrcLoc :: SrcLoc, 
-    hsImportDeclModule :: Module, 
-    hsImportDeclQualified :: !Bool, 
-    hsImportDeclAs :: (Maybe Module), 
-    hsImportDeclSpec :: (Maybe (Bool,[HsImportSpec])) 
+data HsImportDecl = HsImportDecl {
+    hsImportDeclSrcLoc :: SrcLoc,
+    hsImportDeclModule :: Module,
+    hsImportDeclQualified :: !Bool,
+    hsImportDeclAs :: (Maybe Module),
+    hsImportDeclSpec :: (Maybe (Bool,[HsImportSpec]))
     }
   deriving(Data,Typeable,Eq,Show)
 
@@ -187,7 +187,7 @@ data HsDecl
 instance HasLocation HsMatch where
     srcLoc (HsMatch sl _ _ _ _) = sl
 
-data HsMatch 
+data HsMatch
 	 = HsMatch SrcLoc HsName [HsPat] HsRhs {-where-} [HsDecl]
   deriving(Data,Typeable,Eq,Show)
 
@@ -198,7 +198,7 @@ data HsConDecl
   {-! derive: is !-}
 
 hsConDeclArgs HsConDecl { hsConDeclConArg = as } = as
-hsConDeclArgs HsRecDecl { hsConDeclRecArg = as } = concat [ replicate (length ns) t | (ns,t) <- as] 
+hsConDeclArgs HsRecDecl { hsConDeclRecArg = as } = concat [ replicate (length ns) t | (ns,t) <- as]
 
 data HsBangType
 	 = HsBangedTy   { hsBangType :: HsType }
@@ -229,15 +229,15 @@ data HsType
 	 | HsTyApp   HsType HsType
 	 | HsTyVar   { hsTypeName :: HsName }
 	 | HsTyCon   { hsTypeName :: HsName }
-         | HsTyForall { 
-            hsTypeVars :: [HsTyVarBind], 
+         | HsTyForall {
+            hsTypeVars :: [HsTyVarBind],
             hsTypeType :: HsQualType }
   deriving(Data,Typeable,Eq,Ord,Show)
   {-! derive: GhcBinary !-}
 
-data HsTyVarBind = HsTyVarBind { 
-    hsTyVarBindSrcLoc :: SrcLoc, 
-    hsTyVarBindName :: HsName, 
+data HsTyVarBind = HsTyVarBind {
+    hsTyVarBindSrcLoc :: SrcLoc,
+    hsTyVarBindName :: HsName,
     hsTyVarBindKind :: Maybe HsKind }
   deriving(Data,Typeable,Eq,Ord,Show)
   {-! derive: GhcBinary !-}
@@ -275,7 +275,7 @@ hsParen x@HsTuple {} = x
 hsParen x = HsParen x
 
 data HsExp
-	= HsVar { {- hsExpSrcSpan :: SrcSpan,-} hsExpName :: HsName } 
+	= HsVar { {- hsExpSrcSpan :: SrcSpan,-} hsExpName :: HsName }
 	| HsCon { {-hsExpSrcSpan :: SrcSpan,-} hsExpName :: HsName }
 	| HsLit HsLiteral
 	| HsInfixApp HsExp HsExp HsExp

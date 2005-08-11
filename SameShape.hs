@@ -11,7 +11,7 @@ import Data.Tree
 --    sameShape x y = sameShape1 x y
 --instance (SameShape2 f) => SameShape (f a b) (f c d) where
 --    sameShape x y = sameShape2 x y
-    
+
 class SameShape1 f where
     sameShape1 :: f a -> f b -> Bool
 class SameShape2 f where

@@ -3,7 +3,7 @@ module DDataUtil(Elems(..),Member(..)) where
 import qualified Data.IntSet as IS
 import qualified Data.IntMap as IM
 import qualified Data.Set as Set
-import qualified Data.Map as Map 
+import qualified Data.Map as Map
 
 
 
@@ -15,7 +15,7 @@ class Elems xs k v  | xs -> k v where
     assocs x = zip (keys x) (elems x)
     elems x = [ y | (_,y) <- assocs x]
     keys x =  [ x | (x,_) <- assocs x]
-    
+
 instance Elems (Set.Set x) x x where
     elems = Set.elems
     keys = Set.elems
@@ -76,7 +76,7 @@ instance Monoid (IM.IntMap a) where
     mempty = IM.empty
     mappend = IM.union
     mconcat = IM.unions
-    
+
 instance Ord a => Monoid (Set.Set a) where
     mempty = Set.empty
     mappend = Set.union
@@ -94,7 +94,7 @@ instance Functor IM.IntMap where
 
 --instance Ord k => Functor (Map.Map k) where
 --    fmap = Map.map
-    
+
 
 instance HasSize (Map.Map a b) where
     size = Map.size
@@ -103,4 +103,4 @@ instance HasSize (Set.Set a) where
 instance HasSize IS.IntSet where
     size = IS.size
 -}
-    
+

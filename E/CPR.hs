@@ -61,31 +61,31 @@ smerge xs [] = xs
 cprAnalyzeBinds :: Env -> [(TVr,E)] -> ([(TVr,E)],Env)
 cprAnalyzeBinds env bs = f env  (decomposeDefns bs) [] where
     f env (Left (t,e):rs) zs = case cprAnalyze env e of
-        (e',v) -> f (envInsert t v env) rs ((tvrInfo_u (Info.insert v) t,e'):zs) 
+        (e',v) -> f (envInsert t v env) rs ((tvrInfo_u (Info.insert v) t,e'):zs)
     f env (Right xs:rs) zs = g (length xs + 2) ([ (t,(e,Bot)) | (t,e) <- xs]) where
         g 0 mp =  f nenv rs ([ (tvrInfo_u (Info.insert b) t,e)   | (t,(e,b)) <- mp] ++ zs)  where
-            nenv = Env (Map.fromList [ (t,b) | (t,(e,b)) <- mp]) `mappend` env 
+            nenv = Env (Map.fromList [ (t,b) | (t,(e,b)) <- mp]) `mappend` env
         g n mp = g (n - 1) [ (t,cprAnalyze nenv e)  | (t,e) <- xs] where
-            nenv = Env (Map.fromList [ (t,b) | (t,(e,b)) <- mp]) `mappend` env 
+            nenv = Env (Map.fromList [ (t,b) | (t,(e,b)) <- mp]) `mappend` env
     f env [] zs = (reverse zs,env)
 
 
-envInsert :: TVr -> Val -> Env -> Env 
+envInsert :: TVr -> Val -> Env -> Env
 envInsert tvr val (Env mp) = Env $ Map.insert tvr val mp
 
 cprAnalyze :: Env -> E -> (E,Val)
-cprAnalyze (Env mp) (EVar v) 
+cprAnalyze (Env mp) (EVar v)
     | Just t <- Map.lookup v mp = (EVar v,t)
     | Just t <- Info.lookup (tvrInfo v)  = (EVar v,t)
     | otherwise = (EVar v,Top)
 cprAnalyze env (ELetRec ds e) = (ELetRec ds' e',val) where
-    (ds',env') = cprAnalyzeBinds env ds   
+    (ds',env') = cprAnalyzeBinds env ds
     (e',val) = cprAnalyze (env' `mappend` env) e
 cprAnalyze env (ELam t e) = (ELam t e',Fun val) where
-    (e',val) = cprAnalyze (envInsert t Top env) e 
+    (e',val) = cprAnalyze (envInsert t Top env) e
 cprAnalyze env ec@(ECase {}) = runWriter (caseBodiesMapM f ec) where
     f e = do
-        (e',v) <- return $ cprAnalyze env e 
+        (e',v) <- return $ cprAnalyze env e
         tell v
         return e'
 cprAnalyze env (EAp fun arg) = (EAp fun_cpr arg,res_res) where
@@ -102,7 +102,7 @@ cprAnalyze env  e = (e,f e) where
     f (EPi _ _) = Tup tArrow
     f (EPrim {}) = Top -- TODO fix primitives
     f (EError {}) = Bot
-    f e = error $ "cprAnalyze.f: " ++ show e 
+    f e = error $ "cprAnalyze.f: " ++ show e
     {-
     f (ELam t e) = Fun (cprAnalyze (Env $ Map.insert t Top mp)  e)
     f (EVar v)
