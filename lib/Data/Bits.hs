@@ -1,14 +1,14 @@
-module Data.Bits where 
+module Data.Bits where
 
 
 
 infixl 8 `shift`, `rotate`, `shiftL`, `shiftR`, `rotateL`, `rotateR`
 infixl 7 .&.
 infixl 6 `xor`
-infixl 5 .|.   
+infixl 5 .|.
 
 
-{-| 
+{-|
 The 'Bits' class defines bitwise operations over integral types.
 
 * Bits are numbered from 0 with bit 0 being the least
@@ -132,6 +132,6 @@ class Num a => Bits a where
 	'rotate', depending on which is more convenient for the type in
 	question. -}
     rotateR           :: a -> Int -> a
-    x `rotateR` i = x `rotate` (-i)     
+    x `rotateR` i = x `rotate` (-i)
 
 

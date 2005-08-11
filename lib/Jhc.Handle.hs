@@ -1,10 +1,10 @@
 module Jhc.Handle(
-    Handle(..), 
-    IOMode(..), 
-    stdin, 
-    stdout, 
-    stderr, 
-    withHandle, 
+    Handle(..),
+    IOMode(..),
+    stdin,
+    stdout,
+    stderr,
+    withHandle,
     hClose,
     hIsOpen,
     openFile
@@ -21,7 +21,7 @@ import Foreign.C.Error
 data IOMode = ReadMode | WriteMode | AppendMode | ReadWriteMode
     deriving(Eq, Ord, Bounded, Enum, Read, Show)
 
-data Handle = Handle { 
+data Handle = Handle {
     handleName :: String,
     handleFile :: Ptr (Ptr Handle),
     handleIOMode :: IOMode
@@ -49,20 +49,20 @@ foreign import ccall "stdio.h &stdout" c_stdout :: Ptr (Ptr Handle)
 foreign import ccall "stdio.h &stderr" c_stderr :: Ptr (Ptr Handle)
 
 withHandle h action = do
-    ptr <- peek (handleFile h) 
-    case ptr == nullPtr of 
+    ptr <- peek (handleFile h)
+    case ptr == nullPtr of
         True -> fail $ handleName h ++ ": handle  is closed"
         False -> action ptr
 
 hClose h = do
-    ptr <- peek (handleFile h) 
-    case ptr == nullPtr of 
+    ptr <- peek (handleFile h)
+    case ptr == nullPtr of
         True -> return ()
         False -> c_fclose ptr >> poke (handleFile h) nullPtr
 
 hIsOpen h = do
-    ptr <- peek (handleFile h) 
-    return (ptr /= nullPtr) 
+    ptr <- peek (handleFile h)
+    return (ptr /= nullPtr)
 
 throwErrnoFN     :: String	-- ^ textual description of the error location
                -> String
@@ -87,7 +87,7 @@ foreign import primitive "const.\"r\"" read_str :: Ptr CChar
 foreign import primitive "const.\"w\"" write_str  :: Ptr CChar
 foreign import primitive "const.\"a\"" append_str  :: Ptr CChar
 foreign import primitive "const.\"r+\"" readwrite_str  :: Ptr CChar
-    
+
 foreign import ccall "stdio.h fclose" c_fclose :: Ptr Handle -> IO CInt
 foreign import ccall "stdio.h fopen" c_fopen :: Ptr CChar -> Ptr CChar ->  IO (Ptr Handle)
 

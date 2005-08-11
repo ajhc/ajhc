@@ -10,8 +10,8 @@ ctype :: String -> IO CType
 ctype s = withCString s >>= c_wctype
 
 
-t_alnum, t_alpha, t_blank, t_cntrl, 
- t_digit, t_graph, t_lower, t_print, 
+t_alnum, t_alpha, t_blank, t_cntrl,
+ t_digit, t_graph, t_lower, t_print,
  t_punct, t_space, t_upper, t_xdigit, t_none :: CType
 
 t_alnum = unsafePerformIO (ctype "alnum")

@@ -29,7 +29,7 @@ import Prelude.IOError
 allocaBytes :: Int -> (Ptr a -> IO b) -> IO b
 allocaBytes b f = do
     p <- mallocBytes b
-    r <- f p 
+    r <- f p
     free p
     return r
 
@@ -112,9 +112,9 @@ doRealloc dummy ptr  = let
 --
 reallocBytes          :: Ptr a -> Int -> IO (Ptr a)
 reallocBytes ptr 0     = do free ptr; return nullPtr
-reallocBytes ptr size  = 
+reallocBytes ptr size  =
   failWhenNULL "realloc" (_realloc ptr (fromIntegral size))
 
-foreign import ccall "stdlib.h malloc" _malloc :: CSize -> IO (Ptr a) 
+foreign import ccall "stdlib.h malloc" _malloc :: CSize -> IO (Ptr a)
 foreign import ccall "stdlib.h free" free :: Ptr a -> IO ()
 foreign import ccall "stdlib.h realloc" _realloc :: Ptr a -> CSize -> IO (Ptr b)

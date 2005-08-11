@@ -3,7 +3,7 @@
 -- Module      :  Test.QuickCheck
 -- Copyright   :  (c) Koen Claessen, John Hughes 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
@@ -20,35 +20,35 @@ module Test.QuickCheck
   ( quickCheck    -- :: prop -> IO ()
   , verboseCheck  -- :: prop -> IO ()
   , test          -- :: prop -> IO ()  -- = quickCheck
-  
+
   , Config(Config, configMaxTest, configMaxFail, configSize, configEvery)    -- :: *
   , defaultConfig -- :: Config
   , check         -- :: Config -> prop -> IO ()
- 
+
   -- property combinators
   , forAll        -- :: Gen a -> (a -> prop) -> prop
   , (==>)         -- :: Bool -> prop -> prop
-  
+
   -- gathering test-case information
   , label         -- :: String         -> prop -> prop
   , collect       -- :: Show a => a    -> prop -> prop
   , classify      -- :: Bool -> String -> prop -> prop
   , trivial       -- :: Bool           -> prop -> prop
-  
+
   -- generator combinators
   , Gen           -- :: * -> * ; Functor, Monad
-  
+
   , elements      -- :: [a] -> Gen a
   , two           -- :: Gen a -> Gen (a,a)
   , three         -- :: Gen a -> Gen (a,a,a)
   , four          -- :: Gen a -> Gen (a,a,a,a)
-  
+
   , sized         -- :: (Int -> Gen a) -> Gen a
   , resize        -- :: Int -> Gen a -> Gen a
   , choose        -- :: Random a => (a, a) -> Gen a
   , oneof         -- :: [Gen a] -> Gen a
   , frequency     -- :: [(Int, Gen a)] -> Gen a
-  
+
   , vector        -- :: Arbitrary a => Int -> Gen [a]
 
   -- default generators
@@ -173,11 +173,11 @@ instance Arbitrary Integer where
   coarbitrary n = variant (fromInteger (if n >= 0 then 2*n else 2*(-n) + 1))
 
 instance Arbitrary Float where
-  arbitrary     = liftM3 fraction arbitrary arbitrary arbitrary 
+  arbitrary     = liftM3 fraction arbitrary arbitrary arbitrary
   coarbitrary x = coarbitrary (decodeFloat x)
 
 instance Arbitrary Double where
-  arbitrary     = liftM3 fraction arbitrary arbitrary arbitrary 
+  arbitrary     = liftM3 fraction arbitrary arbitrary arbitrary
   coarbitrary x = coarbitrary (decodeFloat x)
 
 fraction a b c = fromInteger a + (fromInteger b / (abs (fromInteger c) + 1))
@@ -286,7 +286,7 @@ quick = Config
   , configSize    = (+ 3) . (`div` 2)
   , configEvery   = \n args -> let s = show n in s ++ [ '\b' | _ <- s ]
   }
-         
+
 verbose :: Config
 verbose = quick
   { configEvery = \n args -> show n ++ ":\n" ++ unlines args
@@ -299,13 +299,13 @@ test, quickCheck, verboseCheck :: Testable a => a -> IO ()
 test         = check quick
 quickCheck   = check quick
 verboseCheck = check verbose
-         
+
 check :: Testable a => Config -> a -> IO ()
 check config a =
   do rnd <- newStdGen
      tests config (evaluate a) rnd 0 0 []
 
-tests :: Config -> Gen Result -> StdGen -> Int -> Int -> [[String]] -> IO () 
+tests :: Config -> Gen Result -> StdGen -> Int -> Int -> [[String]] -> IO ()
 tests config gen rnd0 ntest nfail stamps
   | ntest == configMaxTest config = do done "OK, passed" ntest stamps
   | nfail == configMaxFail config = do done "Arguments exhausted after" ntest stamps

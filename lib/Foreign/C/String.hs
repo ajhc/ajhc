@@ -3,7 +3,7 @@
 -- Module      :  Foreign.C.String
 -- Copyright   :  (c) The FFI task force 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  ffi@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -217,7 +217,7 @@ peekCAStringLen           :: CStringLen -> IO String
 --   cs <- peekArray len cp
 --  return (cCharsToChars cs)
 --  #else
-peekCAStringLen (cp, len) 
+peekCAStringLen (cp, len)
   | len <= 0  = return "" -- being (too?) nice.
   | otherwise = loop [] (len-1)
   where

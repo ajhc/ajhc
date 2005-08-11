@@ -1,16 +1,16 @@
-module Data.Dynamic(Dynamic,toDyn,fromDyn,fromDynamic,dynApply,dynApp) where 
+module Data.Dynamic(Dynamic,toDyn,fromDyn,fromDynamic,dynApply,dynApp) where
 
 
 import Data.Typeable
 
-data Obj 
+data Obj
 
 data Dynamic = Dynamic TypeRep Obj
 
 instance Show Dynamic where
     showsPrec _ x s = "<Dynamic>" ++ s
-     
--- | Converts an arbitrary value into an object of type 'Dynamic'.  
+
+-- | Converts an arbitrary value into an object of type 'Dynamic'.
 --
 -- The type of the object must be an instance of 'Typeable', which
 -- ensures that only monomorphically-typed objects may be converted to
@@ -26,7 +26,7 @@ toDyn v = Dynamic (typeOf v) (unsafeCoerce v)
 -- the correct type.  See also 'fromDynamic'.
 fromDyn :: Typeable a
  	=> Dynamic 	-- ^ the dynamically-typed object
-	-> a		-- ^ a default value 
+	-> a		-- ^ a default value
 	-> a		-- ^ returns: the value of the first argument, if
 			-- it has the correct type, otherwise the value of
 			-- the second argument.
@@ -40,10 +40,10 @@ fromDynamic
 	:: Typeable a
 	=> Dynamic	-- ^ the dynamically-typed object
 	-> Maybe a	-- ^ returns: @'Just' a@, if the dynamically-typed
-			-- object has the correct type (and @a@ is its value), 
+			-- object has the correct type (and @a@ is its value),
 			-- or 'Nothing' otherwise.
 fromDynamic (Dynamic t v) =
-  case unsafeCoerce v of 
+  case unsafeCoerce v of
     r | t == typeOf r -> Just r
       | otherwise     -> Nothing
 
@@ -55,11 +55,11 @@ dynApply (Dynamic t1 f) (Dynamic t2 x) =
     Nothing -> Nothing
 
 dynApp :: Dynamic -> Dynamic -> Dynamic
-dynApp f x = case dynApply f x of 
+dynApp f x = case dynApply f x of
              Just r -> r
              Nothing -> error ("Type error in dynamic application.\n" ++
                                "Can't apply function " ++ show f ++
-                               " to argument " ++ show x)      
+                               " to argument " ++ show x)
 
 
 foreign primitive "unsafeCoerce" unsafeCoerce :: a -> b

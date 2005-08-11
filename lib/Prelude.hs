@@ -33,24 +33,24 @@ data () = ()
 data [] a =  a : ([] a) | []
     -- odd syntax, so we write instances manually
 
-data  Ordering    =  LT | EQ | GT 
+data  Ordering    =  LT | EQ | GT
     deriving (Eq, Ord, Bounded, Enum, Read, Show)
 
 
-data (,) a b = (,) a b                        
-data (,,) a b c = (,,) a b c                    
-data (,,,) a b c d = (,,,) a b c d                 
-data (,,,,) a b c d e = (,,,,) a b c d e             
+data (,) a b = (,) a b
+data (,,) a b c = (,,) a b c
+data (,,,) a b c d = (,,,) a b c d
+data (,,,,) a b c d e = (,,,,) a b c d e
 data (,,,,,) a b c d e f = (,,,,,) a b c d e f
 data (,,,,,,) a b c d e f g = (,,,,,,) a b c d e f g
 data (,,,,,,,) a b c d e f g h = (,,,,,,,) a b c d e f g h
 data (,,,,,,,,) a b c d e f g h i = (,,,,,,,,) a b c d e f g h i
 
-type String = [Char]     
+type String = [Char]
 data Integer
-data Int                  
-data Char               
-data Float               
+data Int
+data Char
+data Float
 data Double
 
 -- Enumeration and Bounded classes
@@ -75,7 +75,7 @@ class  Enum a  where
     enumFrom x       =  map toEnum [fromEnum x ..]
     enumFromTo x y   =  map toEnum [fromEnum x .. fromEnum y]
     enumFromThen x y =  map toEnum [fromEnum x, fromEnum y ..]
-    enumFromThenTo x y z = 
+    enumFromThenTo x y z =
                         map toEnum [fromEnum x, fromEnum y .. fromEnum z]
 
 
@@ -108,7 +108,7 @@ class  (Num a, Ord a) => Real a  where
 
 
 class  (Real a, Enum a) => Integral a  where
-    quot, rem        :: a -> a -> a   
+    quot, rem        :: a -> a -> a
     div, mod         :: a -> a -> a
     quotRem, divMod  :: a -> a -> (a,a)
     toInteger        :: a -> Integer
@@ -129,7 +129,7 @@ class  (Real a, Enum a) => Integral a  where
     --toInt x = case toInteger x of
     --    Integer y -> y
     toInteger x = toInteger (toInt x)
-    toInt x = toInt (toInteger x) 
+    toInt x = toInt (toInteger x)
     --toIntMax x = toIntMax (toInteger x)
     --toWordMax x = toWordMax (toInteger x)
 
@@ -175,17 +175,17 @@ class  (Real a, Fractional a) => RealFrac a  where
         -- Minimal complete definition:
         --      properFraction
     truncate x       =  m  where (m,_) = properFraction x
-    
+
     round x          =  let (n,r) = properFraction x
                             m     = if r < 0 then n - 1 else n + 1
                           in case signum (abs r - 0.5) of
                                 -1 -> n
                                 0  -> if even n then n else m
                                 1  -> m
-   
+
     ceiling x        =  if r > 0 then n + 1 else n
                         where (n,r) = properFraction x
-    
+
     floor x          =  if r < 0 then n - 1 else n
                         where (n,r) = properFraction x
 
@@ -205,7 +205,7 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     atan2            :: a -> a -> a
 
         -- Minimal complete definition:
-        --      All except exponent, significand, 
+        --      All except exponent, significand,
         --                 scaleFloat, atan2
     exponent x       =  if m == 0 then 0 else n + floatDigits x
                         where (m,n) = decodeFloat x
@@ -219,7 +219,7 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     atan2 y x
       | x>0           =  atan (y/x)
       | x==0 && y>0   =  pi/2
-      | x<0  && y>0   =  pi + atan (y/x) 
+      | x<0  && y>0   =  pi + atan (y/x)
       |(x<=0 && y<0)  ||
        (x<0 && isNegativeZero y) ||
        (isNegativeZero x && isNegativeZero y)
@@ -229,7 +229,7 @@ class  (RealFrac a, Floating a) => RealFloat a  where
       | x==0 && y==0  =  y     -- must be after the other double zero tests
       | otherwise     =  x + y -- x or y is a NaN, return a NaN (via +)
 
- 
+
 -- Numeric functions
 
 
@@ -294,10 +294,10 @@ class Monad m  where
     m >> k  =  m >>= \_ -> k
     fail s  = error s
 
-sequence       :: Monad m => [m a] -> m [a] 
+sequence       :: Monad m => [m a] -> m [a]
 sequence       =  foldr mcons (return [])
                     where mcons p q = p >>= \x -> q >>= \y -> return (x:y)
-sequence_      :: Monad m => [m a] -> m () 
+sequence_      :: Monad m => [m a] -> m ()
 sequence_      =  foldr (>>) (return ())
 
 -- The xxxM functions take list arguments, but lift the function or
@@ -314,7 +314,7 @@ f =<< x          =  x >>= f
 
 
 
-    
+
 instance Monad Maybe where
     return x = Just x
     Nothing >>= _ = Nothing
@@ -332,11 +332,11 @@ instance Monad [] where
 class Eq a where
     (==) :: a -> a -> Bool
     (/=) :: a -> a -> Bool
-    x == y = case x /= y of 
+    x == y = case x /= y of
         True -> False
         False -> True
     x /= y = case x == y of
-        True -> False 
+        True -> False
         False -> True
 
 class  (Eq a) => Ord a  where
@@ -392,7 +392,7 @@ True  && x       =  x
 False && _       =  False
 True  || _       =  True
 False || x       =  x
-                                        
+
 
 not              :: Bool -> Bool
 not x = if x then False else True
@@ -405,7 +405,7 @@ otherwise        =  True
 
 data Maybe a  =  Nothing | Just a
     deriving (Eq, Ord, Read, Show)
-    
+
 
 maybe :: b -> (a -> b) -> Maybe a -> b
 maybe n f m = case m of
@@ -426,7 +426,7 @@ snd (a,b) = b
 
 
 until            :: (a -> Bool) -> (a -> a) -> a -> a
-until p f x 
+until p f x
      | p x       =  x
      | otherwise =  until p f (f x)
 
@@ -441,16 +441,16 @@ asTypeOf         =  const
 
 
 
- 
+
 -- module PreludeList (
---    map, (++), filter, concat, concatMap, 
---    head, last, tail, init, null, length, (!!), 
+--    map, (++), filter, concat, concatMap,
+--    head, last, tail, init, null, length, (!!),
 --    foldl, foldl1, scanl, scanl1, foldr, foldr1, scanr, scanr1,
 --    iterate, repeat, replicate, cycle,
 --    take, drop, splitAt, takeWhile, dropWhile, span, break,
 --    lines, words, unlines, unwords, reverse, and, or,
 --    any, all, elem, notElem, lookup,
---    sum, product, maximum, minimum, 
+--    sum, product, maximum, minimum,
 --    zip, zip3, zipWith, zipWith3, unzip, unzip3)
 --  where
 
@@ -602,13 +602,13 @@ foldr1 _ []      =  error "Prelude.foldr1: empty list"
 
 scanr             :: (a -> b -> b) -> b -> [a] -> [b]
 scanr f q0 []     =  [q0]
-scanr f q0 (x:xs) =  f x q : qs where qs@(q:_) = scanr f q0 xs 
+scanr f q0 (x:xs) =  f x q : qs where qs@(q:_) = scanr f q0 xs
 
 
 scanr1          :: (a -> a -> a) -> [a] -> [a]
 scanr1 f []     =  []
 scanr1 f [x]    =  [x]
-scanr1 f (x:xs) =  f x q : qs where qs@(q:_) = scanr1 f xs 
+scanr1 f (x:xs) =  f x q : qs where qs@(q:_) = scanr1 f xs
 
 -- iterate f x returns an infinite list of repeated applications of f to x:
 -- iterate f x == [x, f x, f (f x), ...]
@@ -658,13 +658,13 @@ splitAt n xs             =  (take n xs, drop n xs)
 
 -- takeWhile, applied to a predicate p and a list xs, returns the longest
 -- prefix (possibly empty) of xs of elements that satisfy p.  dropWhile p xs
--- returns the remaining suffix.  span p xs is equivalent to 
+-- returns the remaining suffix.  span p xs is equivalent to
 -- (takeWhile p xs, dropWhile p xs), while break p uses the negation of p.
 
 
 takeWhile               :: (a -> Bool) -> [a] -> [a]
 takeWhile p []          =  []
-takeWhile p (x:xs) 
+takeWhile p (x:xs)
             | p x       =  x : takeWhile p xs
             | otherwise =  []
 
@@ -678,8 +678,8 @@ dropWhile p xs@(x:xs')
 
 span, break             :: (a -> Bool) -> [a] -> ([a],[a])
 span p []            = ([],[])
-span p xs@(x:xs') 
-            | p x       =  (x:ys,zs) 
+span p xs@(x:xs')
+            | p x       =  (x:ys,zs)
             | otherwise =  ([],xs)
                            where (ys,zs) = span p xs'
 
@@ -758,7 +758,7 @@ lookup key ((x,y):xys)
 -- sum and product compute the sum or product of a finite list of numbers.
 
 sum, product     :: (Num a) => [a] -> a
-sum              =  foldl (+) 0  
+sum              =  foldl (+) 0
 product          =  foldl (*) 1
 
 -- maximum and minimum return the maximum or minimum value from a list,
@@ -802,7 +802,7 @@ zipWith3 z (a:as) (b:bs) (c:cs)
 zipWith3 _ _ _ _ =  []
 
 
--- unzip transforms a list of pairs into a pair of lists.  
+-- unzip transforms a list of pairs into a pair of lists.
 
 
 unzip            :: [(a,b)] -> ([a],[b])
@@ -812,18 +812,18 @@ unzip            =  foldr (\(a,b) ~(as,bs) -> (a:as,b:bs)) ([],[])
 unzip3           :: [(a,b,c)] -> ([a],[b],[c])
 unzip3           =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
                           ([],[],[])
- 
+
 
 
 {-# NOINLINE error #-}
 error s = unsafePerformIO $ do
     putStrLn "error:"
-    putStrLn s    
+    putStrLn s
     c_exit 255
     return undefined
-    
-    
-    
+
+
+
 
 
 
@@ -852,7 +852,7 @@ instance Enum Int where
         inc = y - x
         f x | x <= z = x:f (x + z)
             | otherwise = []
-    
+
 instance Enum Char where
     toEnum = Char.chr
     fromEnum = Char.ord
@@ -874,11 +874,11 @@ instance Enum Integer where
         inc = y - x
         f x | x <= z = x:f (x + z)
             | otherwise = []
-    
+
 
 {-
 instance (Ord a, Ord b) => Ord (a,b) where
-    compare (x,y) (a,b) = case compare x a of 
+    compare (x,y) (a,b) = case compare x a of
         EQ -> compare y b
         z -> z
     -}
@@ -903,7 +903,7 @@ curry f x y = f (x,y)
 instance (Eq a, Eq b) => Eq (a,b) where
     (x,y) == (a,b) = x == a && y == b
     -}
-    
+
 instance Real Integer where
     toRational = fromInteger
 instance Real Int where

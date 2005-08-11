@@ -38,7 +38,7 @@ class  Read a  where
 
 class  Show a  where
     showsPrec        :: Int -> a -> ShowS
-    show             :: a -> String 
+    show             :: a -> String
     showList         :: [a] -> ShowS
 
         -- Mimimal complete definition:
@@ -103,7 +103,7 @@ lex ('"':s)      =  [('"':str, t)      | (str,t) <- lexString s]
 
                     lexStrItem ('\\':('&':s)) =  [("\\&",s)]
                     lexStrItem ('\\':(c:s)) | isSpace c
-                                           =  [("\\&",t) | 
+                                           =  [("\\&",t) |
                                                '\\':t <-
                                                    [dropWhile isSpace s]]
                     lexStrItem s           =  lexLitChar s
@@ -146,9 +146,9 @@ instance  Show Integer  where
 instance  Read Integer  where
     readsPrec p         = readSigned readDec
 
-instance  Show Float  where 
+instance  Show Float  where
     showsPrec p         = showFloat
-           
+
 instance  Read Float  where
     readsPrec p         = readSigned readFloat
 
@@ -192,13 +192,13 @@ instance  (Show a) => Show [a]  where
 instance  (Read a) => Read [a]  where
     readsPrec p      = readList
 
-    
+
     {-
 instance Show a => Show (Maybe a) where
     showsPrec _p Nothing s = showString "Nothing" s
     showsPrec p (Just x) s
-                          = (showParen (p > 10) $ 
-    			     showString "Just " . 
+                          = (showParen (p > 10) $
+    			     showString "Just " .
 			     showsPrec 11 x) s
 
 instance (Show a, Show b) => Show (Either a b) where
@@ -207,7 +207,7 @@ instance (Show a, Show b) => Show (Either a b) where
         case e of
          Left  a -> showString "Left "  . showsPrec 11 a
 	 Right b -> showString "Right " . showsPrec 11 b)
-       s            
+       s
     -}
 
 -- Tuples
@@ -227,7 +227,7 @@ instance  (Read a, Read b) => Read (a,b)  where
 
 instance  (Show a, Show b) => Show (a,b)  where
     showsPrec _ (x,y) s = (showChar '(' . shows x . showChar ',' .
-                                          shows y . showChar ')') 
+                                          shows y . showChar ')')
 			  s
 
 instance (Show a, Show b, Show c) => Show (a, b, c) where
@@ -248,10 +248,10 @@ instance (Show a, Show b, Show c, Show d, Show e) => Show (a, b, c, d, e) where
 					     	shows w . showChar ',' .
 					     	shows x . showChar ',' .
 					     	shows y . showChar ',' .
-					     	shows z . showChar ')') 
-				s                                                      
+					     	shows z . showChar ')')
+				s
 -- Other tuples have similar Read and Show instances
 
 -}
 
- 
+

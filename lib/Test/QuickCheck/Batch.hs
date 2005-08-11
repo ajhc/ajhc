@@ -3,7 +3,7 @@
 -- Module      :  Test.QuickCheck.Batch
 -- Copyright   :  (c) Andy Gill 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  non-portable (uses Control.Exception, Control.Concurrent)
@@ -18,22 +18,22 @@
  -  ? = every example passed, but quickcheck did not find enough good examples
  -  * = test aborted for some reason (out-of-time, bottom, etc)
  -  # = test failed outright
- - 
+ -
  - We also provide the dangerous "isBottom".
  -
  - Here is is an example of use for sorting:
- - 
+ -
  - testOptions :: TestOptions
- - testOptions = TestOptions 
+ - testOptions = TestOptions
  -                 { no_of_tests = 100		-- number of tests to run
  -                 , length_of_tests = 1	-- 1 second max per check
  -						-- where a check == n tests
  -                 , debug_tests = False	-- True => debugging info
  -                 }
- - 
+ -
  - prop_sort1 xs = sort xs == sortBy compare xs
  -   where types = (xs :: [OrdALPHA])
- - prop_sort2 xs = 
+ - prop_sort2 xs =
  -         (not (null xs)) ==>
  -         (head (sort xs) == minimum xs)
  -   where types = (xs :: [OrdALPHA])
@@ -55,7 +55,7 @@
  -         (not (null ys)) ==>
  -         (head (sort (xs ++ ys)) == max (maximum xs) (maximum ys))
  -   where types = (xs :: [OrdALPHA], ys :: [OrdALPHA])
- - 
+ -
  - test_sort = runTests "sort" testOptions
  -         [ run prop_sort1
  -         , run prop_sort2
@@ -63,11 +63,11 @@
  -         , run prop_sort4
  -         , run prop_sort5
  -         ]
- - 
+ -
  - When run, this gives
  - Main> test_sort
  -                     sort : .....
- - 
+ -
  - You would tie together all the test_* functions
  - into one test_everything, on a per module basis.
  -
@@ -80,7 +80,7 @@
 
 module Test.QuickCheck.Batch
    ( run		-- :: Testable a => a -> TestOptions -> IO TestResult
-   , runTests		-- :: String -> TestOptions -> 
+   , runTests		-- :: String -> TestOptions ->
 			--	[TestOptions -> IO TestResult] -> IO ()
    , defOpt		-- :: TestOptions
    , TestOptions (..)
@@ -104,7 +104,7 @@ data TestOptions = TestOptions {
 	debug_tests     :: Bool }
 
 defOpt :: TestOptions
-defOpt = TestOptions 
+defOpt = TestOptions
 	{ no_of_tests = 100
 	, length_of_tests = 1
 	, debug_tests = False
@@ -115,7 +115,7 @@ data TestResult = TestOk 	String  Int [[String]]
 		| TestFailed   [String] Int
 		| TestAborted   Exception
 
-tests :: Config -> Gen Result -> StdGen -> Int -> Int -> [[String]] 
+tests :: Config -> Gen Result -> StdGen -> Int -> Int -> [[String]]
       -> IO TestResult
 tests config gen rnd0 ntest nfail stamps
   | ntest == configMaxTest config = return (TestOk  "OK, passed" ntest stamps)
@@ -173,7 +173,7 @@ run a TestOptions { no_of_tests = n, length_of_tests = len, debug_tests = debug 
         Right r -> return r
         Left  e -> return (TestAborted e)
   where
-	theTest = tests (batch n debug) (evaluate a) (mkStdGen 0) 0 0 []     
+	theTest = tests (batch n debug) (evaluate a) (mkStdGen 0) 0 0 []
 
 -- Prints a one line summary of various tests with common theme
 runTests :: String -> TestOptions -> [TestOptions -> IO TestResult] -> IO ()
@@ -188,17 +188,17 @@ runTests name scale actions =
 	tr n [] xs c = do
 			putStr (rjustify (max 0 (35-n)) " (" ++ show c ++ ")\n")
 			return xs
-	tr n (action:actions) others c = 
+	tr n (action:actions) others c =
 	   do r <- action scale
 	      case r of
-		(TestOk _ m _) 
+		(TestOk _ m _)
 			-> do { putStr "." ;
 			       tr (n+1) actions others (c+m) }
-		(TestExausted s m ss) 
+		(TestExausted s m ss)
 
 			-> do { putStr "?" ;
 			       tr (n+1) actions others (c+m) }
-		(TestAborted e) 
+		(TestAborted e)
 			-> do { putStr "*" ;
 			       tr (n+1) actions others c }
 	  	(TestFailed f num)
@@ -206,9 +206,9 @@ runTests name scale actions =
 			        tr (n+1) actions ((f,n,num):others) (c+num) }
 
 	fa :: ([String],Int,Int) -> IO ()
-	fa (f,n,no) = 
+	fa (f,n,no) =
 	  do putStr "\n"
-	     putStr ("    ** test " 
+	     putStr ("    ** test "
 			++ show (n  :: Int)
 			++ " of "
 			++ name

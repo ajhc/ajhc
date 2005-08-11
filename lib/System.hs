@@ -1,4 +1,4 @@
-module System ( 
+module System (
     ExitCode(ExitSuccess,ExitFailure),
     getArgs, getProgName, getEnv, system, exitWith, exitFailure
   ) where
@@ -8,7 +8,7 @@ import Foreign.Ptr
 import Foreign.Storable
 import Foreign.C.Types
 
-data ExitCode = ExitSuccess | ExitFailure Int 
+data ExitCode = ExitSuccess | ExitFailure Int
             --    deriving (Eq, Ord, Read, Show)
 
 getArgs     :: IO [String]
@@ -24,30 +24,30 @@ exitFailure :: IO a
 --getEnv _ = return ""
 
 exitWith ExitSuccess = do
-    c_exit 0 
+    c_exit 0
     return undefined
 exitWith (ExitFailure n) = do
-    c_exit n 
+    c_exit n
     return undefined
 exitFailure = exitWith $ ExitFailure 255
 
 
 
-getProgName = peek jhc_progname >>= peekCString 
+getProgName = peek jhc_progname >>= peekCString
 getArgs = do
     argc <- peek jhc_argc
     argv <- peek jhc_argv
-    let f n = peekElemOff argv n >>= peekCString 
+    let f n = peekElemOff argv n >>= peekCString
     mapM f [0 .. fromIntegral argc - 1]
 
 
-getEnv s = withCString s c_getenv >>= \p -> 
+getEnv s = withCString s c_getenv >>= \p ->
     if p == nullPtr then fail ("getEnv: " ++ show s)  else peekCString p
 
 {-
-getEnv s = case lookup s theEnvironment of 
+getEnv s = case lookup s theEnvironment of
     Just y -> return y
-    Nothing -> fail $ "getEnv: " ++ s 
+    Nothing -> fail $ "getEnv: " ++ s
 
 theEnvironment :: [(String,String)]
 theEnvironment = unsafePerformIO $ do
@@ -57,13 +57,13 @@ theEnvironment = unsafePerformIO $ do
     --        cs <- peekCString ptr
     --        let (x,y) = span (/= '=') cs
     --        return ((x,drop 1 y):xs)
-    xs <- mapM peekCString $ takeWhile (/= nullPtr) (iterate (`plusPtr` sizeOf (undefined :: CString)) ep) 
+    xs <- mapM peekCString $ takeWhile (/= nullPtr) (iterate (`plusPtr` sizeOf (undefined :: CString)) ep)
     let g xs = (x,drop 1 y) where (x,y) = span (/= '=') xs
     return $ map g xs
     -}
 
 system s = withCString s c_system >>= \r -> case r of
-    0 -> return ExitSuccess 
+    0 -> return ExitSuccess
     _ -> return $ ExitFailure (fromIntegral r)
 
 --foreign import primitive getArgs' :: World__ -> IOResult [String]

@@ -1,15 +1,15 @@
 module Foreign.Ptr(
-    Ptr, 
-    nullPtr, 
-    castPtr, 
-    plusPtr, 
-    alignPtr, 
-    minusPtr, 
-    FunPtr, 
-    nullFunPtr, 
-    castFunPtr, 
-    castFunPtrToPtr, 
-    castPtrToFunPtr, 
+    Ptr,
+    nullPtr,
+    castPtr,
+    plusPtr,
+    alignPtr,
+    minusPtr,
+    FunPtr,
+    nullFunPtr,
+    castFunPtr,
+    castFunPtrToPtr,
+    castPtrToFunPtr,
     freeHaskellFunPtr
     ) where
 
@@ -18,13 +18,13 @@ import Jhc.Addr
 import Foreign.Storable
 
 
-newtype Ptr a = Ptr Addr 
-newtype FunPtr a = FunPtr FunAddr 
+newtype Ptr a = Ptr Addr
+newtype FunPtr a = FunPtr FunAddr
 
-instance Storable (Ptr a) where 
+instance Storable (Ptr a) where
     sizeOf (Ptr a) = sizeOf a
     alignment (Ptr a) = alignment a
-    peek p = peek (castPtr p) >>= return . Ptr 
+    peek p = peek (castPtr p) >>= return . Ptr
     poke p (Ptr x) = poke (castPtr p) x
 
 instance Eq (Ptr a) where
@@ -38,7 +38,7 @@ instance Ord (Ptr a) where
     Ptr a > Ptr b = a > b
     Ptr a >= Ptr b = a >= b
 
-instance Show (Ptr a) where 
+instance Show (Ptr a) where
     showsPrec n (Ptr x) = showsPrec n (toInteger (addrToWordPtr  x))
 
 nullPtr :: Ptr a
@@ -58,7 +58,7 @@ alignPtr = error "alignPtr"
 --alignPtr addr@(Ptr a) (I# i)
 --  = case remAddr# a i of {
 --      0# -> addr;
---      n -> Ptr (plusAddr# a (i -# n)) }    
+--      n -> Ptr (plusAddr# a (i -# n)) }
 
 
 

@@ -9,7 +9,7 @@ import Foreign.C.Error
 
 -- | Lazily read a file as a sequence of bytes.
 
-readBinaryFile :: FilePath -> IO [Word8] 
+readBinaryFile :: FilePath -> IO [Word8]
 readBinaryFile fn = do
     file <- withCString fn $ \fnc -> c_fopen fnc read_str
     if  (file == nullPtr) then getErrno >>= \errno -> (ioError $ errnoToIOError "readBinaryFile" errno Nothing (Just fn)) else do
@@ -18,7 +18,7 @@ readBinaryFile fn = do
                 case ch of
                     -1 -> c_fclose file >> return []
                     _ -> do
-                        xs <- unsafeInterleaveIO gc 
+                        xs <- unsafeInterleaveIO gc
                         return (cintToWord8 ch:xs)
         unsafeInterleaveIO gc
 

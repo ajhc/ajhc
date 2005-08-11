@@ -2,9 +2,9 @@ module Numeric(fromRat,
                showSigned, showIntAtBase,
                showInt, showOct, showHex,
                readSigned, readInt,
-               readDec, readOct, readHex, 
+               readDec, readOct, readHex,
                floatToDigits,
-               showEFloat, showFFloat, showGFloat, showFloat, 
+               showEFloat, showFFloat, showGFloat, showFloat,
                readFloat, lexDigits) where
 
 import Char   ( isDigit, isOctDigit, isHexDigit
@@ -18,7 +18,7 @@ import Prelude.Text
 
 {-
 fromRat :: (RealFloat a) => Rational -> a
-fromRat x = 
+fromRat x =
     if x == 0 then encodeFloat 0 0              -- Handle exceptional cases
     else if x < 0 then - fromRat' (-x)          -- first.
     else fromRat' x
@@ -45,7 +45,7 @@ fromRat' x = r
         r = encodeFloat (round x') p'
 
 -- Scale x until xMin <= x < xMax, or p (the exponent) <= minExp.
-scaleRat :: Rational -> Int -> Rational -> Rational -> 
+scaleRat :: Rational -> Int -> Rational -> Rational ->
              Int -> Rational -> (Rational, Int)
 scaleRat b minExp xMin xMax p x =
     if p <= minExp then
@@ -88,10 +88,10 @@ integerLogBase b i =
         in  doDiv (i `div` (b^l)) l
 
 
--- Misc utilities to show integers and floats 
+-- Misc utilities to show integers and floats
 
 showSigned :: Real a => (a -> ShowS) -> Int -> a -> ShowS
-showSigned showPos p x 
+showSigned showPos p x
   | x < 0     = showParen (p > 6) (showChar '-' . showPos (-x))
   | otherwise = showPos x
 
@@ -101,7 +101,7 @@ showOct = showIntAtBase  8 intToDigit
 showInt = showIntAtBase 10 intToDigit
 showHex = showIntAtBase 16 intToDigit
 
-showIntAtBase :: Integral a 
+showIntAtBase :: Integral a
 	      => a              -- base
 	      -> (Int -> Char)  -- digit to char
 	      -> a              -- number to show
@@ -124,7 +124,7 @@ readSigned readPos = readParen False read'
                                                 (n,"")  <- readPos str]
 
 
--- readInt reads a string of digits using an arbitrary base.  
+-- readInt reads a string of digits using an arbitrary base.
 -- Leading minus signs must be handled elsewhere.
 
 readInt :: (Integral a) => a -> (Char -> Bool) -> (Char -> Int) -> ReadS a
@@ -147,32 +147,32 @@ showFloat      :: (RealFloat a) => a -> ShowS
 showEFloat d x =  showString (formatRealFloat FFExponent d x)
 showFFloat d x =  showString (formatRealFloat FFFixed d x)
 showGFloat d x =  showString (formatRealFloat FFGeneric d x)
-showFloat      =  showGFloat Nothing 
+showFloat      =  showGFloat Nothing
 
 -- These are the format types.  This type is not exported.
 
 data FFFormat = FFExponent | FFFixed | FFGeneric
 
 formatRealFloat :: (RealFloat a) => FFFormat -> Maybe Int -> a -> String
-formatRealFloat fmt decs x 
+formatRealFloat fmt decs x
   = s
-  where 
+  where
     base = 10
-    s = if isNaN x then 
+    s = if isNaN x then
             "NaN"
-        else if isInfinite x then 
+        else if isInfinite x then
             if x < 0 then "-Infinity" else "Infinity"
-        else if x < 0 || isNegativeZero x then 
+        else if x < 0 || isNegativeZero x then
             '-' : doFmt fmt (floatToDigits (toInteger base) (-x))
-        else 
+        else
             doFmt fmt (floatToDigits (toInteger base) x)
-    
+
     doFmt fmt (is, e)
-      = let 
+      = let
            ds = map intToDigit is
-        in  
+        in
         case fmt of
-          FFGeneric -> 
+          FFGeneric ->
               doFmt (if e < 0 || e > 7 then FFExponent else FFFixed)
                     (is, e)
           FFExponent ->
@@ -182,7 +182,7 @@ formatRealFloat fmt decs x
                    []    -> "0.0e0"
                    [d]   -> d : ".0e" ++ show (e-1)
                    d:ds  -> d : '.' : ds ++ 'e':show (e-1)
-          
+
               Just dec ->
                 let dec' = max dec 1 in
                 case is of
@@ -192,35 +192,35 @@ formatRealFloat fmt decs x
                         d:ds = map intToDigit
                                    (if ei > 0 then init is' else is')
                     in d:'.':ds  ++ "e" ++ show (e-1+ei)
-          
+
           FFFixed ->
             case decs of
                Nothing 	-- Always prints a decimal point
                  | e > 0     -> take e (ds ++ repeat '0')
                                 ++ '.' : mk0 (drop e ds)
                  | otherwise -> "0." ++ mk0 (replicate (-e) '0' ++ ds)
-              
+
                Just dec ->  -- Print decimal point iff dec > 0
                  let dec' = max dec 0 in
                  if e >= 0 then
                    let (ei, is') = roundTo base (dec' + e) is
-                       (ls, rs)  = splitAt (e+ei) 
+                       (ls, rs)  = splitAt (e+ei)
                                               (map intToDigit is')
                    in  mk0 ls ++ mkdot0 rs
                  else
-                   let (ei, is') = roundTo base dec' 
+                   let (ei, is') = roundTo base dec'
                                            (replicate (-e) 0 ++ is)
-                       d : ds = map intToDigit 
+                       d : ds = map intToDigit
                                     (if ei > 0 then is' else 0:is')
                    in  d : mkdot0 ds
-            where   
+            where
               mk0 "" = "0"        -- Print 0.34, not .34
-              mk0 s  = s  
-    
+              mk0 s  = s
+
               mkdot0 "" = ""       -- Print 34, not 34.
               mkdot0 s  = '.' : s  -- when the format specifies no
 			           -- digits after the decimal point
-    
+
 
 roundTo :: Int -> Int -> [Int] -> (Int, [Int])
 roundTo base d is = case f d is of
@@ -229,7 +229,7 @@ roundTo base d is = case f d is of
   where b2 = base `div` 2
         f n [] = (0, replicate n 0)
         f 0 (i:_) = (if i >= b2 then 1 else 0, [])
-        f d (i:is) = 
+        f d (i:is) =
             let (c, ds) = f (d-1) is
                 i' = c + i
             in  if i' == base then (1, 0:ds) else (0, i':ds)
@@ -237,7 +237,7 @@ roundTo base d is = case f d is of
 --
 -- Based on "Printing Floating-Point Numbers Quickly and Accurately"
 -- by R.G. Burger and R. K. Dybvig, in PLDI 96.
--- The version here uses a much slower logarithm estimator.  
+-- The version here uses a much slower logarithm estimator.
 -- It should be improved.
 
 -- This function returns a non-empty list of digits (Ints in [0..base-1])
@@ -245,7 +245,7 @@ roundTo base d is = case f d is of
 --      floatToDigits r = ([a, b, ... z], e)
 -- then
 --      r = 0.ab..z * base^e
--- 
+--
 
 floatToDigits :: (RealFloat a) => Integer -> a -> ([Int], Int)
 
@@ -276,7 +276,7 @@ floatToDigits base x =
                    (f*b*2, b^(-e+1)*2, b, 1)
                else
                    (f*2, b^(-e)*2, 1, 1)
-        k = 
+        k =
             let k0 =
                     if b==2 && base==10 then
                         -- logBase 10 2 is slightly bigger than 3/10 so
@@ -285,8 +285,8 @@ floatToDigits base x =
                         -- Haskell promises that p-1 <= logBase b f < p.
                         (p - 1 + e0) * 3 `div` 10
                     else
-                        ceiling ((log ((fromInteger (f+1))::Double) + 
-                                 fromIntegral e * log (fromInteger b)) / 
+                        ceiling ((log ((fromInteger (f+1))::Double) +
+                                 fromIntegral e * log (fromInteger b)) /
                                   log (fromInteger base))
                 fixup n =
                     if n >= 0 then
@@ -325,22 +325,22 @@ readFloat r    = [(fromRational ((n%1)*10^^(k-d)),t) | (n,d,s) <- readFix r,
                                                        (k,t)   <- readExp s] ++
                  [ (0/0, t) | ("NaN",t)      <- lex r] ++
                  [ (1/0, t) | ("Infinity",t) <- lex r]
-               where 
+               where
                  readFix r = [(read (ds++ds'), length ds', t)
                              | (ds,d) <- lexDigits r,
                                (ds',t) <- lexFrac d ]
-               
+
                  lexFrac ('.':ds) = lexDigits ds
-                 lexFrac s        = [("",s)]        
-                 
+                 lexFrac s        = [("",s)]
+
                  readExp (e:s) | e `elem` "eE" = readExp' s
                  readExp s                     = [(0,s)]
-                 
+
                  readExp' ('-':s) = [(-k,t) | (k,t) <- readDec s]
                  readExp' ('+':s) = readDec s
                  readExp' s       = readDec s
 -}
-lexDigits        :: ReadS String 
+lexDigits        :: ReadS String
 lexDigits        =  nonnull isDigit
 
 nonnull          :: (Char -> Bool) -> ReadS String

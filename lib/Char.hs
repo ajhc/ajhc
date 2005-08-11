@@ -1,4 +1,4 @@
-module Char ( 
+module Char (
     isAscii, isLatin1, isControl, isPrint, isSpace, isUpper, isLower,
     isAlpha, isDigit, isOctDigit, isHexDigit, isAlphaNum,
     digitToInt, intToDigit,
@@ -24,7 +24,7 @@ isLatin1 c               =  c <= '\xff'
 
 isControl c              =  c < ' ' || c >= '\DEL' && c <= '\x9f'
 
-isPrint c               =  isLatin1 c && not (isControl c) 
+isPrint c               =  isLatin1 c && not (isControl c)
 
 isSpace c                =  c `elem` " \t\n\r\f\v\xA0"
 
@@ -61,9 +61,9 @@ intToDigit i
 
 -- Case-changing operations
 toUpper :: Char -> Char
-toUpper c | isLower c = chr $ ord c - 32  
+toUpper c | isLower c = chr $ ord c - 32
           | otherwise = c
-        
+
 toLower :: Char -> Char
 toLower c | isUpper c = chr $ ord c + 32
           | otherwise = c
@@ -71,7 +71,7 @@ toLower c | isUpper c = chr $ ord c + 32
 -- Character code functions
 --foreign import primitive ord :: Char -> Int
 --ord  =  fromEnum
-     
+
 --foreign import primitive chr :: Int  -> Char
 --chr  =  toEnum
 
@@ -113,7 +113,7 @@ match (x:xs) (y:ys) | x == y  =  match xs ys
 match xs     ys               =  (xs,ys)
 
 showLitChar               :: Char -> ShowS
-showLitChar c | c > '\DEL' =  showChar '\\' . 
+showLitChar c | c > '\DEL' =  showChar '\\' .
                               protectEsc isDigit (shows (ord c))
 showLitChar '\DEL'         =  showString "\\DEL"
 showLitChar '\\'           =  showString "\\\\"
@@ -132,13 +132,13 @@ protectEsc p f             = f . cont
                              where cont s@(c:_) | p c = "\\&" ++ s
                                    cont s             = s
 
-asciiTab :: [String]                                   
+asciiTab :: [String]
 asciiTab = --listArray ('\NUL', ' ')
            ["NUL", "SOH", "STX", "ETX", "EOT", "ENQ", "ACK", "BEL",
-            "BS",  "HT",  "LF",  "VT",  "FF",  "CR",  "SO",  "SI", 
+            "BS",  "HT",  "LF",  "VT",  "FF",  "CR",  "SO",  "SI",
             "DLE", "DC1", "DC2", "DC3", "DC4", "NAK", "SYN", "ETB",
-            "CAN", "EM",  "SUB", "ESC", "FS",  "GS",  "RS",  "US", 
-            "SP"] 
+            "CAN", "EM",  "SUB", "ESC", "FS",  "GS",  "RS",  "US",
+            "SP"]
 
 lexLitChar          :: ReadS String
 lexLitChar ('\\':s) =  map (prefix '\\') (lexEsc s)

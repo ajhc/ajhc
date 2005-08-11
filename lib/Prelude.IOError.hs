@@ -9,7 +9,7 @@ showIOError (IOError x) = x
 
 {-
 data IOError = IOError {
-     ioe_handle   :: Maybe Handle,   -- the handle used by the action flagging 
+     ioe_handle   :: Maybe Handle,   -- the handle used by the action flagging
 				     -- the error.
      ioe_type     :: IOErrorType,    -- what it was.
      ioe_location :: String,	     -- location.
@@ -27,7 +27,7 @@ data IOErrorType
   | EOF
   | IllegalOperation
   | PermissionDenied
-  | UserError                
+  | UserError
 
 instance Show IOErrorType where
   showsPrec _ e =
@@ -40,7 +40,7 @@ instance Show IOErrorType where
       EOF		-> "end of file"
       IllegalOperation	-> "illegal operation"
       PermissionDenied  -> "permission denied"
-      UserError		-> "user error"              
+      UserError		-> "user error"
 
 instance Show IOException where
     showsPrec p (IOError hdl iot loc s fn) =
@@ -52,12 +52,12 @@ instance Show IOException where
       (case loc of
          "" -> id
 	 _  -> showString loc . showString ": ") .
-      showsPrec p iot . 
+      showsPrec p iot .
       (case s of
 	 "" -> id
-	 _  -> showString " (" . showString s . showString ")")               
+	 _  -> showString " (" . showString s . showString ")")
 
 -}
 
 userError       :: String  -> IOError
-userError str	=  IOError  str 
+userError str	=  IOError  str

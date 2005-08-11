@@ -8,7 +8,7 @@ class  Ord a => Ix a  where
     rangeSize :: (a,a) -> Int
 
     rangeSize b@(l,h) | null (range b) = 0
-                      | otherwise      = index b h + 1 
+                      | otherwise      = index b h + 1
 	-- NB: replacing "null (range b)" by  "not (l <= h)"
 	-- fails if the bounds are tuples.  For example,
 	-- 	(1,2) <= (2,1)

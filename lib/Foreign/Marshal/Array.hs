@@ -110,7 +110,7 @@ peekArray size ptr | size <= 0 = return []
   where
     f 0 acc = do e <- peekElemOff ptr 0; return (e:acc)
     f n acc = do e <- peekElemOff ptr n; f (n-1) (e:acc)
-  
+
 -- |Convert an array terminated by the given end marker into a Haskell list
 --
 peekArray0            :: (Storable a, Eq a) => a -> Ptr a -> IO [a]

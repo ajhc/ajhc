@@ -1,12 +1,12 @@
 module Complex(
-    Complex((:+)), 
-    realPart, 
-    imagPart, 
-    conjugate, 
+    Complex((:+)),
+    realPart,
+    imagPart,
+    conjugate,
     mkPolar,
-    cis, 
-    polar, 
-    magnitude, 
+    cis,
+    polar,
+    magnitude,
     phase
     )  where
 

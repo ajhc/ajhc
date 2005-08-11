@@ -1,5 +1,5 @@
- 
-module List ( 
+
+module List (
     elemIndex, elemIndices,
     find, findIndex, findIndices,
     nub, nubBy, delete, deleteBy, (\\), deleteFirstsBy,
@@ -23,7 +23,7 @@ module List (
     take, drop, splitAt, takeWhile, dropWhile, span, break,
     lines, words, unlines, unwords, reverse, and, or,
     any, all, elem, notElem, lookup,
-    sum, product, maximum, minimum, concatMap, 
+    sum, product, maximum, minimum, concatMap,
     zip, zip3, zipWith, zipWith3, unzip, unzip3
     ) where
 
@@ -32,10 +32,10 @@ infix 5 \\
 
 elemIndex               :: Eq a => a -> [a] -> Maybe Int
 elemIndex x             =  findIndex (x ==)
-        
+
 elemIndices             :: Eq a => a -> [a] -> [Int]
 elemIndices x           =  findIndices (x ==)
-                        
+
 find    :: (a -> Bool) -> [a] -> Maybe a
 find p xs =  case  filter p xs of
     (x:_) -> Just x
@@ -70,7 +70,7 @@ deleteFirstsBy          :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 deleteFirstsBy eq       =  foldl (flip (deleteBy eq))
 
 union                   :: Eq a => [a] -> [a] -> [a]
-union                   =  unionBy (==)    
+union                   =  unionBy (==)
 
 unionBy                 :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 unionBy eq xs ys        =  xs ++ deleteFirstsBy eq (nubBy eq ys) xs
@@ -94,7 +94,7 @@ intersperse sep (x:xs)  =  x : sep : intersperse sep xs
 transpose                :: [[a]] -> [[a]]
 transpose []             = []
 transpose ([]     : xss) = transpose xss
-transpose ((x:xs) : xss) = (x : [h | (h:t) <- xss]) : 
+transpose ((x:xs) : xss) = (x : [h | (h:t) <- xss]) :
                            transpose (xs : [t | (h:t) <- xss])
 
 partition               :: (a -> Bool) -> [a] -> ([a],[a])
@@ -187,42 +187,42 @@ genericLength (x:xs)    =  1 + genericLength xs
 genericTake             :: (Integral a) => a -> [b] -> [b]
 genericTake _ []        =  []
 genericTake 0 _         =  []
-genericTake n (x:xs) 
+genericTake n (x:xs)
    | n > 0              =  x : genericTake (n-1) xs
    | otherwise          =  error "List.genericTake: negative argument"
 
 genericDrop             :: (Integral a) => a -> [b] -> [b]
 genericDrop 0 xs        =  xs
 genericDrop _ []        =  []
-genericDrop n (_:xs) 
+genericDrop n (_:xs)
    | n > 0              =  genericDrop (n-1) xs
    | otherwise          =  error "List.genericDrop: negative argument"
 
 genericSplitAt          :: (Integral a) => a -> [b] -> ([b],[b])
 genericSplitAt 0 xs     =  ([],xs)
 genericSplitAt _ []     =  ([],[])
-genericSplitAt n (x:xs) 
+genericSplitAt n (x:xs)
    | n > 0              =  (x:xs',xs'')
    | otherwise          =  error "List.genericSplitAt: negative argument"
        where (xs',xs'') =  genericSplitAt (n-1) xs
 
 genericIndex            :: (Integral a) => [b] -> a -> b
 genericIndex (x:_)  0   =  x
-genericIndex (_:xs) n 
+genericIndex (_:xs) n
         | n > 0         =  genericIndex xs (n-1)
         | otherwise     =  error "List.genericIndex: negative argument"
 genericIndex _ _        =  error "List.genericIndex: index too large"
 
 genericReplicate        :: (Integral a) => a -> b -> [b]
 genericReplicate n x    =  genericTake n (repeat x)
- 
+
 zip4                    :: [a] -> [b] -> [c] -> [d] -> [(a,b,c,d)]
 zip4                    =  zipWith4 (,,,)
 
 zip5                    :: [a] -> [b] -> [c] -> [d] -> [e] -> [(a,b,c,d,e)]
 zip5                    =  zipWith5 (,,,,)
 
-zip6                    :: [a] -> [b] -> [c] -> [d] -> [e] -> [f] -> 
+zip6                    :: [a] -> [b] -> [c] -> [d] -> [e] -> [f] ->
                               [(a,b,c,d,e,f)]
 zip6                    =  zipWith6 (,,,,,)
 
@@ -235,7 +235,7 @@ zipWith4 z (a:as) (b:bs) (c:cs) (d:ds)
                         =  z a b c d : zipWith4 z as bs cs ds
 zipWith4 _ _ _ _ _      =  []
 
-zipWith5                :: (a->b->c->d->e->f) -> 
+zipWith5                :: (a->b->c->d->e->f) ->
                            [a]->[b]->[c]->[d]->[e]->[f]
 zipWith5 z (a:as) (b:bs) (c:cs) (d:ds) (e:es)
                         =  z a b c d e : zipWith5 z as bs cs ds es

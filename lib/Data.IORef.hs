@@ -4,12 +4,12 @@ module Data.IORef(
     readIORef,	      -- :: IORef a -> IO a
     writeIORef,	      -- :: IORef a -> a -> IO ()
     modifyIORef,      -- :: IORef a -> (a -> a) -> IO ()
-    atomicModifyIORef,-- :: IORef a -> (a -> (a,b)) -> IO b    
+    atomicModifyIORef,-- :: IORef a -> (a -> (a,b)) -> IO b
     ) where
 
 import Prelude.IO
 
-data IORef a 
+data IORef a
 
 foreign import primitive newIORef :: a -> IO (IORef a)
 foreign import primitive readIORef :: IORef a -> IO a
@@ -26,5 +26,5 @@ modifyIORef ref f = writeIORef ref . f =<< readIORef ref
 
 atomicModifyIORef r f = do
     a <- readIORef r
-    case f a of 
-        (a',b) -> writeIORef r a' >> return b  
+    case f a of
+        (a',b) -> writeIORef r a' >> return b

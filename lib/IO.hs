@@ -12,11 +12,11 @@ module IO(
     hClose,
     openFile,
     hIsOpen
-    
-    ) where 
+
+    ) where
 {-
 module IO(
-    Handle, 
+    Handle,
     IOMode(..),
     BufferMode(..),
     SeekMode(..),
@@ -41,7 +41,7 @@ data BufferMode = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
 data SeekMode = AbsoluteSeek | RelativeSeek | SeekFromEnd
     deriving(Eq,Ord,Bounded,Enum,Read,Show)
 
-                      
+
 
 try            :: IO a -> IO (Either IOError a)
 try f          =  catch (do r <- f
@@ -80,29 +80,29 @@ isEOF = hIsEOF stdin
 
 hIsEOF :: Handle -> IO Bool
 hIsEOF h = withHandle h $ \ptr -> do
-    r <- c_feof ptr 
-    return (r /= 0) 
+    r <- c_feof ptr
+    return (r /= 0)
 
 hPutChar h ch = withHandle h $ \ptr -> do
-    c_fputwc (fromInt (ord ch)) ptr  
+    c_fputwc (fromInt (ord ch)) ptr
     return ()
 
 hPutStr     :: Handle -> String -> IO ()
 hPutStr h s   = withHandle h $ \ptr -> do
     sequence_ [ c_fputwc (fromInt (ord ch)) ptr | ch <- s ]
-	   
+	
 hPutStrLn   :: Handle -> String -> IO ()
-hPutStrLn h s = do 
+hPutStrLn h s = do
     hPutStr h s
     hPutChar h '\n'
-	   
+	
 hPrint      :: Show a => Handle -> a -> IO ()
 hPrint h x    =  hPutStrLn h (show x)
 
 hGetContents :: Handle -> IO String
 hGetContents h = withHandle h $ \ptr -> do
     let getContents' = do
-            ch <- c_fgetwc ptr 
+            ch <- c_fgetwc ptr
             case ch of
                 -1 -> return []
                 _ -> do

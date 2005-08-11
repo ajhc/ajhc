@@ -1,17 +1,17 @@
 module Time (
-    ClockTime, 
+    ClockTime,
     Month(..),
     Day(..),
     CalendarTime(..),
     TimeDiff(..),
-    getClockTime, 
-    addToClockTime, 
+    getClockTime,
+    addToClockTime,
     diffClockTimes,
-    toCalendarTime, 
-    toUTCTime, 
+    toCalendarTime,
+    toUTCTime,
     toClockTime,
-    calendarTimeToString, 
-    formatCalendarTime 
+    calendarTimeToString,
+    formatCalendarTime
     ) where
 
 import Ix(Ix)
@@ -25,7 +25,7 @@ data Month =  January   | February | March    | April
            |  September | October  | November | December
            deriving (Eq, Ord, Enum, Bounded, Ix, Read, Show)
 
-data Day   =  Sunday | Monday  | Tuesday  | Wednesday | Thursday 
+data Day   =  Sunday | Monday  | Tuesday  | Wednesday | Thursday
            |  Friday | Saturday
            deriving (Eq, Ord, Enum, Bounded, Ix, Read, Show)
 
@@ -49,10 +49,10 @@ data TimeDiff = TimeDiff {
 
 -- Functions on times
 getClockTime         :: IO ClockTime
-     
+
 addToClockTime       :: TimeDiff  -> ClockTime -> ClockTime
 diffClockTimes       :: ClockTime -> ClockTime -> TimeDiff
-     
+
 toCalendarTime       :: ClockTime    -> IO CalendarTime
 toUTCTime            :: ClockTime    -> CalendarTime
 toClockTime          :: CalendarTime -> ClockTime
@@ -63,7 +63,7 @@ calendarTimeToString    :: CalendarTime -> String
 calendarTimeToString    =  formatCalendarTime defaultTimeLocale "%c"
 
 formatCalendarTime :: TimeLocale -> String -> CalendarTime -> String
-formatCalendarTime l fmt ct@(CalendarTime year mon day hour min sec sdec 
+formatCalendarTime l fmt ct@(CalendarTime year mon day hour min sec sdec
                                            wday yday tzname _ _) =
         doFmt fmt
   where doFmt ('%':c:cs) = decode c ++ doFmt cs
@@ -99,18 +99,18 @@ formatCalendarTime l fmt ct@(CalendarTime year mon day hour min sec sdec
         decode 'S' = show2 sec
         decode 's' = ...                -- Implementation-dependent
         decode 'U' = show2 ((yday + 7 - fromEnum wday) `div` 7)
-        decode 'u' = show (let n = fromEnum wday in 
+        decode 'u' = show (let n = fromEnum wday in
                            if n == 0 then 7 else n)
-        decode 'V' = 
-            let (week, days) = 
-                   (yday + 7 - if fromEnum wday > 0 then 
+        decode 'V' =
+            let (week, days) =
+                   (yday + 7 - if fromEnum wday > 0 then
                                fromEnum wday - 1 else 6) `divMod` 7
             in  show2 (if days >= 4 then
-                          week+1 
+                          week+1
                        else if week == 0 then 53 else week)
 
-        decode 'W' = 
-            show2 ((yday + 7 - if fromEnum wday > 0 then 
+        decode 'W' =
+            show2 ((yday + 7 - if fromEnum wday > 0 then
                                fromEnum wday - 1 else 6) `div` 7)
         decode 'w' = show (fromEnum wday)
         decode 'X' = doFmt (timeFmt l)

@@ -1,7 +1,7 @@
 module Data.Typeable(TypeRep,typeOf) where
 
 
-data TypeRep 
+data TypeRep
 
 instance Eq TypeRep where
     (==) = primTypeRepEq
@@ -38,25 +38,25 @@ gcast x = r
   r = if typeOf (getArg x) == typeOf (getArg (fromJust r))
         then Just $ unsafeCoerce x
         else Nothing
-  getArg :: c x -> x 
+  getArg :: c x -> x
   getArg = undefined
 
 -- | Cast for * -> *
-gcast1 ::  c (t a) -> Maybe (c (t' a)) 
+gcast1 ::  c (t a) -> Maybe (c (t' a))
 gcast1 x = r
  where
   r = if typeOf1 (getArg x) == typeOf1 (getArg (fromJust r))
        then Just $ unsafeCoerce x
        else Nothing
-  getArg :: c x -> x 
+  getArg :: c x -> x
   getArg = undefined
 
 -- | Cast for * -> * -> *
-gcast2 ::  c (t a b) -> Maybe (c (t' a b)) 
+gcast2 ::  c (t a b) -> Maybe (c (t' a b))
 gcast2 x = r
  where
   r = if typeOf2 (getArg x) == typeOf2 (getArg (fromJust r))
        then Just $ unsafeCoerce x
        else Nothing
-  getArg :: c x -> x 
-  getArg = undefined           
+  getArg :: c x -> x
+  getArg = undefined

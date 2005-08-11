@@ -1,6 +1,6 @@
 module Prelude.IO(
-    IO, 
-    module Prelude.IO, 
+    IO,
+    module Prelude.IO,
     userError) where
 
 import Prelude
@@ -28,63 +28,63 @@ runMain :: IO a -> IO ()
 runMain main = do
     catch main  (\e -> do
         putStr "\nError..\n"
-        putStrLn $ showIOError e 
-        return (error "runMain")) 
+        putStrLn $ showIOError e
+        return (error "runMain"))
     return ()
 
 runExpr :: Show a => a -> IO ()
-runExpr x = runMain (print x) 
+runExpr x = runMain (print x)
 
 
-ioError    ::  IOError -> IO a 
-ioError e   =  (IO $ \w -> FailIO w e) 
+ioError    ::  IOError -> IO a
+ioError e   =  (IO $ \w -> FailIO w e)
 
-	   
-catch      ::  IO a -> (IOError -> IO a) -> IO a 
+	
+catch      ::  IO a -> (IOError -> IO a) -> IO a
 catch (IO x) fn  = IO $ \w -> case x w of
     JustIO w' z  -> JustIO w' z
     FailIO w' z -> case fn z of
         IO f -> f w'
-	   
-	   
+	
+	
 putStr     :: String -> IO ()
 putStr s   =  mapM_ putChar s
-	   
+	
 putStrLn   :: String -> IO ()
 putStrLn s =  do putStr s
                  putStr "\n"
-	   
+	
 print      :: Show a => a -> IO ()
 print x    =  putStrLn (show x)
-	   
-	   
+	
+	
 getLine    :: IO String
 getLine    =  do c <- getChar
-                 if c == '\n' then return "" else 
+                 if c == '\n' then return "" else
                     do s <- getLine
                        return (c:s)
 
 getContents :: IO String
-getContents = unsafeInterleaveIO getContents' where  
+getContents = unsafeInterleaveIO getContents' where
     getContents' = do
-        ch <- c_getwchar 
+        ch <- c_getwchar
         case ch of
             -1 -> return []
             _ -> do
                 xs <- unsafeInterleaveIO getContents'
                 return (cwintToChar ch:xs)
-            
+
 {-
 getContents :: IO String
-getContents = return (unsafePerformIO getContents') where  
+getContents = return (unsafePerformIO getContents') where
     getContents' = do
-        ch <- c_getwchar 
+        ch <- c_getwchar
         case ch of
             -1 -> return []
             _ -> return (chr (fromIntegral ch):unsafePerformIO getContents')
--}    
-    
-readFile :: FilePath -> IO String 
+-}
+
+readFile :: FilePath -> IO String
 readFile fn = do
     file <- withCString fn $ \fnc -> c_fopen fnc read_str
     if  (file == nullPtr) then (fail "Could not open file.") else do
@@ -93,7 +93,7 @@ readFile fn = do
                 case ch of
                     -1 -> c_fclose file >> return []
                     _ -> do
-                        xs <- unsafeInterleaveIO gc 
+                        xs <- unsafeInterleaveIO gc
                         return (cwintToChar ch:xs)
         unsafeInterleaveIO gc
 
@@ -113,7 +113,7 @@ foreign import ccall "wchar.h getwchar" c_getwchar :: IO CWint
 
 interact        ::  (String -> String) -> IO ()
 interact f      =   do s <- getContents
-                       putStr (f s)             
+                       putStr (f s)
 {-
 interact    ::  (String -> String) -> IO ()
 -- The hSetBuffering ensures the expected interactive behaviour
@@ -124,10 +124,10 @@ interact f  =  do hSetBuffering stdin  NoBuffering
 
 -}
 
-	   
+	
 writeFile  :: FilePath -> String -> IO ()
 writeFile  =  error "writeFile"
-	   
+	
 appendFile :: FilePath -> String -> IO ()
 appendFile =  error "appendFile"
 
@@ -144,12 +144,12 @@ readLn =  do l <- getLine
              return r
 
 putChar :: Char -> IO ()
-putChar c = c_putwchar (fromIntegral (ord c)) 
+putChar c = c_putwchar (fromIntegral (ord c))
 
---TODO EOF == -1 
+--TODO EOF == -1
 getChar :: IO Char
 getChar = do
-    ch <- c_getwchar 
+    ch <- c_getwchar
     case ch of
         -1 -> fail "End of file."
         _ -> return (cwintToChar ch)

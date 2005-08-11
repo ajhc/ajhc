@@ -1,18 +1,18 @@
-module Locale where 
+module Locale where
 
 data TimeLocale = TimeLocale {
         wDays  :: [(String, String)],   -- full and abbreviated week days
         months :: [(String, String)],   -- full and abbreviated months
         amPm   :: (String, String),     -- AM/PM symbols
         dateTimeFmt, dateFmt,           -- formatting strings
-          timeFmt, time12Fmt :: String     
+          timeFmt, time12Fmt :: String
         } deriving (Eq, Ord, Show)
 
-defaultTimeLocale :: TimeLocale 
-defaultTimeLocale =  TimeLocale { 
-        wDays  = [("Sunday",   "Sun"),  ("Monday",    "Mon"),   
-                  ("Tuesday",  "Tue"),  ("Wednesday", "Wed"), 
-                  ("Thursday", "Thu"),  ("Friday",    "Fri"), 
+defaultTimeLocale :: TimeLocale
+defaultTimeLocale =  TimeLocale {
+        wDays  = [("Sunday",   "Sun"),  ("Monday",    "Mon"),
+                  ("Tuesday",  "Tue"),  ("Wednesday", "Wed"),
+                  ("Thursday", "Thu"),  ("Friday",    "Fri"),
                   ("Saturday", "Sat")],
 
         months = [("January",   "Jan"), ("February",  "Feb"),

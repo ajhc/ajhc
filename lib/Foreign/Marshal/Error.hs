@@ -3,7 +3,7 @@
 -- Module      :  Foreign.Marshal.Error
 -- Copyright   :  (c) The FFI task force 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  ffi@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -16,7 +16,7 @@
 module Foreign.Marshal.Error (
   throwIf,       -- :: (a -> Bool) -> (a -> String) -> IO a       -> IO a
   throwIf_,      -- :: (a -> Bool) -> (a -> String) -> IO a       -> IO ()
-  throwIfNeg,    -- :: (Ord a, Num a) 
+  throwIfNeg,    -- :: (Ord a, Num a)
 	         -- =>                (a -> String) -> IO a       -> IO a
   throwIfNeg_,   -- :: (Ord a, Num a)
 	         -- =>                (a -> String) -> IO a       -> IO ()

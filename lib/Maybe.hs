@@ -1,4 +1,4 @@
- 
+
 module Maybe(
     isJust, isNothing,
     fromJust, fromMaybe, listToMaybe, maybeToList,
@@ -33,7 +33,7 @@ maybeToList (Just a)   =  [a]
 listToMaybe            :: [a] -> Maybe a
 listToMaybe []         =  Nothing
 listToMaybe (a:_)      =  Just a
- 
+
 catMaybes              :: [Maybe a] -> [a]
 catMaybes ms           =  [ m | Just m <- ms ]
 

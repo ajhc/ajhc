@@ -1,6 +1,6 @@
-module Directory ( 
-    Permissions( Permissions, readable, writable, executable, searchable ), 
-    createDirectory, removeDirectory, removeFile, 
+module Directory (
+    Permissions( Permissions, readable, writable, executable, searchable ),
+    createDirectory, removeDirectory, removeFile,
     renameDirectory, renameFile, getDirectoryContents,
     getCurrentDirectory, setCurrentDirectory,
     doesFileExist, doesDirectoryExist,

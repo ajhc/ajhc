@@ -9,7 +9,7 @@ infixl 7  %
 
 ratPrec = 7 :: Int
 
-data  (Integral a)      => Ratio a = !a :% !a  
+data  (Integral a)      => Ratio a = !a :% !a
 type  Rational          =  Ratio Integer
 
 (%)                     :: (Integral a) => a -> a -> Ratio a
@@ -39,12 +39,12 @@ reduce x y              =  (x `quot` d) :% (y `quot` d)
                            where d = gcd x y
 
 instance  (Integral a)  => Eq (Ratio a)  where
-    (x:%y) == (x':%y')  =  x == x' && y == y' 
+    (x:%y) == (x':%y')  =  x == x' && y == y'
 
 instance  (Integral a)  => Ord (Ratio a)  where
     (x:%y) <= (x':%y')  =  x * y' <= x' * y
     (x:%y) <  (x':%y')  =  x * y' <  x' * y
-    
+
 --negateRatio (x:%y)       =  (-x) :% y
 --(x:%y) `plusRatio` (x':%y')   =  reduce ((x*y') + (x'*y)) (y*y')
 --absRatio (x:%y)          =  abs x :% y
@@ -92,8 +92,8 @@ instance  (Read a, Integral a)  => Read (Ratio a)  where
 
 instance  (Integral a)  => Show (Ratio a)  where
     showsPrec p (x:%y)  =  showParen (p > ratPrec)
-                               (showsPrec (ratPrec+1) x . 
-			        showString " % " . 
+                               (showsPrec (ratPrec+1) x .
+			        showString " % " .
 				showsPrec (ratPrec+1) y)
 
 approxRational x eps    =  simplest (x-eps) (x+eps)

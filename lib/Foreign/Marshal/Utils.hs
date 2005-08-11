@@ -4,7 +4,7 @@
 -- Module      :  Foreign.Marshal.Utils
 -- Copyright   :  (c) The FFI task force 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  ffi@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -66,8 +66,8 @@ import Foreign.Marshal.Alloc 	( malloc, alloca )
 -- 'Foreign.Marshal.Alloc.finalizerFree' when no longer required.
 --
 new     :: Storable a => a -> IO (Ptr a)
-new val  = 
-  do 
+new val  =
+  do
     ptr <- malloc
     poke ptr val
     return ptr
@@ -117,12 +117,12 @@ maybeNew  = maybe (return nullPtr)
 -- |Converts a @withXXX@ combinator into one marshalling a value wrapped
 -- into a 'Maybe', using 'nullPtr' to represent 'Nothing'.
 --
-maybeWith :: (      a -> (Ptr b -> IO c) -> IO c) 
+maybeWith :: (      a -> (Ptr b -> IO c) -> IO c)
 	  -> (Maybe a -> (Ptr b -> IO c) -> IO c)
 maybeWith  = maybe ($ nullPtr)
 
 -- |Convert a peek combinator into a one returning 'Nothing' if applied to a
--- 'nullPtr' 
+-- 'nullPtr'
 --
 maybePeek                           :: (Ptr a -> IO b) -> Ptr a -> IO (Maybe b)
 maybePeek peek ptr | ptr == nullPtr  = return Nothing

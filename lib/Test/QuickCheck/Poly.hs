@@ -3,14 +3,14 @@
 -- Module      :  Test.QuickCheck.Poly
 -- Copyright   :  (c) Andy Gill 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- This is an attempt to emulate polymorphic types for the 
+-- This is an attempt to emulate polymorphic types for the
 -- purposes of testing by using abstract monomorphic types.
--- 
+--
 -- It is likely that future versions of QuickCheck will
 -- include some polymorphic emulation testing facility,
 -- but this module can be used for now.
@@ -34,7 +34,7 @@ import Test.QuickCheck.Utils
 {- This is the basic pseudo-polymorphic object.
  - The idea is you can't cheat, and use the integer
  - directly, but need to use the abstraction.
- - 
+ -
  - We use phantom types (ref: Domain Specific Embedded Compilers,
  - Daan Leijen & Erik Meijer, 2nd Conference of Domain Specific
  - Languages, Austin, TX, 1999)

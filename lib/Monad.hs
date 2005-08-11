@@ -1,13 +1,13 @@
 module Monad(
     MonadPlus(mzero, mplus),
     join, guard, when, unless, ap, msum,
-    filterM, mapAndUnzipM, zipWithM, zipWithM_, foldM, 
+    filterM, mapAndUnzipM, zipWithM, zipWithM_, foldM,
     liftM, liftM2, liftM3, liftM4, liftM5,
 
     -- ...and what the Prelude exports
     Monad((>>=), (>>), return, fail),
     Functor(fmap),
-    mapM, mapM_, sequence, sequence_, (=<<) 
+    mapM, mapM_, sequence, sequence_, (=<<)
 )where
 
 class Monad m => MonadPlus m where
@@ -26,7 +26,7 @@ instance MonadPlus [] where
     mplus = (++)
 
 
--- Functions    
+-- Functions
 
 
 msum  :: MonadPlus m => [m a] -> m a
@@ -63,7 +63,7 @@ foldM f a (x:xs) =  f a x >>= \ y -> foldM f y xs
 filterM :: Monad m => (a -> m Bool) -> [a] -> m [a]
 filterM p []     = return []
 filterM p (x:xs) = do { b  <- p x;
-ys <- filterM p xs; 
+ys <- filterM p xs;
 return (if b then (x:ys) else ys)
    }
 

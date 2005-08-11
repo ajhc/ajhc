@@ -1,6 +1,6 @@
-module  Array ( 
-    module Ix,  -- export all of Ix 
-    Array, array, listArray, (!), bounds, indices, elems, assocs, 
+module  Array (
+    module Ix,  -- export all of Ix
+    Array, array, listArray, (!), bounds, indices, elems, assocs,
     accumArray, (//), accum, ixmap ) where
 
 import Ix
@@ -61,7 +61,7 @@ ixmap                 :: (Ix a, Ix b) => (a,a) -> (a -> b) -> Array b c
 ixmap b f a           = array b [(i, a ! f i) | i <- range b]
 
 instance  (Ix a)          => Functor (Array a) where
-    fmap fn (MkArray b f) =  MkArray b (fn . f) 
+    fmap fn (MkArray b f) =  MkArray b (fn . f)
 
 instance  (Ix a, Eq b)  => Eq (Array a b)  where
     a == a' =  assocs a == assocs a'
@@ -77,7 +77,7 @@ instance  (Ix a, Show a, Show b) => Show (Array a b)  where
 
 instance  (Ix a, Read a, Read b) => Read (Array a b)  where
     readsPrec p = readParen (p > arrPrec)
-           (\r -> [ (array b as, u) 
+           (\r -> [ (array b as, u)
                   | ("array",s) <- lex r,
                     (b,t)       <- readsPrec (arrPrec+1) s,
                     (as,u)      <- readsPrec (arrPrec+1) t ])
