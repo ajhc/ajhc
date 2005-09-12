@@ -7,7 +7,6 @@ module Fixer(
     newValue,
     findFixpoint,
     readValue,
-    propegateValue,
     isSuperSetOf,
     value,
     modifiedSuperSetOf,
@@ -72,6 +71,7 @@ newValue Fixer { vars = vars } v = do
 --    return v { readable = False }
 
 addAction :: Fixable a => Value a -> (a -> IO ())  -> IO ()
+addAction (ConstValue n) act = act n
 addAction (IV v) act = do
     modifyIORef (action v) (act:)
     c <- readIORef (current v)
@@ -122,6 +122,7 @@ dynamicRule v dr = addAction v dr
 
 propegateValue :: Fixable a => a -> Value a -> IO ()
 propegateValue a _ | isBottom a = return ()
+propegateValue _ (ConstValue _) = fail "Fixer: You cannot modify a constant value"
 propegateValue p (IV v) = do
     modifyIORef (pending v) (lub p)
     {-
