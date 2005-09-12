@@ -8,6 +8,7 @@ module Grin.Grin(
     tagIsFunction,
     tagToFunction,
     tagFlipFunction,
+    tagUnfunction,
     valIsNF,
     gApply,
     partialTag,
@@ -244,6 +245,13 @@ partialTag v c = case fromAtom v of
 
 
 
+tagUnfunction :: Monad m => Tag -> m (Int, Tag)
+tagUnfunction t
+    | tagIsSuspFunction t = return (0,tagFlipFunction t)
+    | tagIsFunction t = return (0,t)
+    | ('P':zs) <- t', (n@(_:_),'_':rs) <- span isDigit zs = return (read n, toAtom ('f':rs))
+    where t' = fromAtom t
+tagUnfunction _ = fail "Tag does not represent function"
 
 
 
