@@ -638,7 +638,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
 --            return $ mconcat ep
 
     let procPos self p = pp p where
-            pp p | Just c <- constPos p = propegateValue c self
+            pp p | Just c <- constPos p = self `isSuperSetOf` value c
             pp p | Just e <- simplePos p = self `isSuperSetOf` e
             pp (Union ps) = mapM_ pp ps
             pp (Tuple ts) = pp (Con tupleName ts)
@@ -659,6 +659,10 @@ findFixpoint' grin (HcHash _ mp) eq = do
                 | a == funcEval = do
                     p' <- newVal p
                     modifiedSuperSetOf self p' (\n -> pruneNodes $ VsNodes (Map.filterWithKey (\ (t,_) _ -> tagIsWHNF t) (getNodeArgs n)) (Set.filter tagIsWHNF (getNodes n)))
+                    dynamicRule p' $ \p -> do
+                        flip mapM_ (Map.toList $ getNodeArgs p) $ \ ((n,i),v) -> do
+                            a <- getArg n i
+                            a `isSuperSetOf` value v
                 | a == funcFetch = do
                     p' <- newVal p
                     dynamicRule p' $ \v -> flip mapM_ (Set.toList (getHeaps' ("funcFetch" ++ show cc) v)) $ \u -> do
@@ -666,7 +670,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
                             Just (x,_) -> self `isSuperSetOf` x
                             Nothing -> do
                                 z <- Map.lookup u cheaps
-                                propegateValue z self
+                                self `isSuperSetOf` value z
             pp cc@(Complex a [v,x]) | a == funcApply = do
                 v' <- newVal v
                 x' <- newVal x
@@ -734,7 +738,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
                             let fn = toAtom ('f':rs)
                             case Map.lookup (fn,i) argMap of
                                 Nothing -> return ()
-                                Just arg -> propegateValue v arg
+                                Just arg -> arg `isSuperSetOf` value v
                         _ -> return ()
 
                 flip mapM_ (Set.toList (getNodes p1)) $ \ a -> do
