@@ -211,8 +211,10 @@ instance Show ValueSet where
         | Set.size s > 7  = braces (hcat (intersperse (char ',') $ map tshow  (take 7 $ Set.toAscList s)) <> text ",...")
         | otherwise  = braces (hcat (intersperse (char ',') $ map tshow  ( Set.toAscList s)) )
 
-    showsPrec x (VsNodes n s) = braces (hcat (intersperse (char ',') $ (map f $ Map.toAscList n) ++ map tshow (Set.toList s) )) where
-        f (t,vs) = tshow t <> tshow vs
+    showsPrec x (VsNodes n s) = braces (hcat (intersperse (char ',') $ (map f $ snub $ fsts  (Map.keys n) ++ Set.toList s) )) where
+        f a = (if a `Set.member` s then tshow a else char '#' <> tshow a) <> tshow (g a)
+        g a = sort [ (i,v) | ((a',i),v) <- Map.toList n, a' == a ]
+        --f (t,vs) = tshow t <> tshow vs
 
 
 data PointsTo = PointsTo {
@@ -357,8 +359,14 @@ grinInlineEvalApply  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFun
     pt <- analyze grin
     wdump FD.Progress $ do
         CharIO.putStrLn (pointsToStats pt)
-    --mapM CharIO.print [ v  | v@(_,_) <-  Map.toList (ptFunc pt)]
-    --mapM CharIO.print [ v  | v@(_,_) <-  Map.toList (ptVars pt)]
+    wdump FD.Eval $ do
+        CharIO.putStrLn "funcs:"
+        mapM_ CharIO.print [ v  | v@(_,_) <-  Map.toList (ptFunc pt)]
+        CharIO.putStrLn "vars:"
+        mapM_ CharIO.print [ v  | v@(_,_) <-  Map.toList (ptVars pt)]
+        CharIO.putStrLn "heap:"
+        mapM_ CharIO.print [ v  | v@(_,_) <-  Map.toList (ptHeap pt)]
+
     let f (l :-> e) = l :-> g e
         g (App a [vr@(Var v _)] :>>= vb :-> Return vb' :>>= node@(NodeC {}) :-> e)
             | vb == vb', a == funcEval = (Return vr :>>= createEval (HoistedUpdate node) typeEnv (tagsp v)) :>>= vb :-> Return vb' :>>= node :-> g e
@@ -587,6 +595,8 @@ convertPos grin hcHash eq = return (xs,ys) where
 hcHashGetNodes (HcHash _ hc) = [ (x,n) | (n,x) <- Map.toList hc ]
 
 
+tupleName = toAtom ""
+
 -- constPos (Ptr h) = return (setHeaps [convertHeap h])
 constPos Basic = return vsBas
 constPos (Con a []) = return (setNodes [(a,[])])
@@ -594,7 +604,7 @@ constPos (Con a xs) = do
     cs <- mapM constPos xs
     return (setNodes [(a,cs)])
 constPos (Tuple []) = return vsBas
-constPos (Tuple ts) = constPos (Con (toAtom "") ts)
+constPos (Tuple ts) = constPos (Con tupleName ts)
 constPos (Union cs) = do
     cs' <- mapM constPos cs
     return (mconcat cs')
@@ -631,8 +641,8 @@ findFixpoint' grin (HcHash _ mp) eq = do
             pp p | Just c <- constPos p = propegateValue c self
             pp p | Just e <- simplePos p = self `isSuperSetOf` e
             pp (Union ps) = mapM_ pp ps
-            pp (Tuple ts) = pp (Con (toAtom "") ts)
-            pp (DownTup p n) = pp (Down p (toAtom "") n)
+            pp (Tuple ts) = pp (Con tupleName ts)
+            pp (DownTup p n) = pp (Down p tupleName n)
             pp (PIf True p a t) = do
                 p' <- newVal p
                 t' <- newVal t
@@ -749,7 +759,6 @@ findFixpoint' grin (HcHash _ mp) eq = do
                     x <- newValue fr mempty
                     modifyIORef argMap (Map.insert (a,i) x)
                     return x
-        newVal p | Just v <- constPos p = return (value v)
         newVal p | Just v <- simplePos p = return v
         newVal p = do
             v <- newValue fr mempty

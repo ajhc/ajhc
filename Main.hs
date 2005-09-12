@@ -274,7 +274,7 @@ compileModEnv' stats ho = do
     wdump FD.Progress $ putErrLn "Points-to analysis..."
     x <- Grin.PointsToAnalysis.grinInlineEvalApply x
     typecheckGrin x
-    --wdump FD.Grin $ printGrin x
+    wdump FD.GrinPreeval $ printGrin x
     x <- return $ normalizeGrin x
     typecheckGrin x
     let opt (0::Int) x = return x
