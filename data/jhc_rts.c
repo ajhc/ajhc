@@ -62,7 +62,7 @@ static void  A_NORETURN A_UNUSED
 jhc_case_fell_off(int n) {
         fflush(stdout);
         fprintf(stderr, "\n%s:%i: case fell off\n", __FILE__, n); 
-        exit(32);
+        abort();
 }
 
 
