@@ -49,7 +49,8 @@ import qualified E.SSimplify as SS
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Grin.Interpret
-import qualified Grin.PointsTo
+--import qualified Grin.PointsTo
+import qualified Grin.PointsToAnalysis
 import qualified Grin.Simplify
 import qualified Info
 import qualified Stats
@@ -271,7 +272,7 @@ compileModEnv' stats ho = do
     wdump FD.Progress $ putErrLn "Linear nodes analysis..."
     lr <- Grin.Linear.grinLinear x
     wdump FD.Progress $ putErrLn "Points-to analysis..."
-    x <- Grin.PointsTo.grinInlineEvalApply x
+    x <- Grin.PointsToAnalysis.grinInlineEvalApply x
     typecheckGrin x
     --wdump FD.Grin $ printGrin x
     x <- return $ normalizeGrin x
