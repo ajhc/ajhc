@@ -646,13 +646,15 @@ findFixpoint' grin (HcHash _ mp) eq = do
             pp (PIf True p a t) = do
                 p' <- newVal p
                 t' <- newVal t
-                conditionalRule (Set.member a . getNodes) p' $ do self `isSuperSetOf` t'
+                --conditionalRule (Set.member a . getNodes) p' $ do self `isSuperSetOf` t' -- TODO
+                self `isSuperSetOf` t'
             pp (PCase p vs e) = do
                 p' <- newVal p
                 e' <- newVal e
                 flip mapM_ vs $ \ (a,w) -> do
                     w' <- newVal w
-                    conditionalRule (Set.member a . getNodes) p' $ do self `isSuperSetOf` w'
+                    --conditionalRule (Set.member a . getNodes) p' $ do self `isSuperSetOf` w'  -- TODO
+                    self `isSuperSetOf` w'
                 self `isSuperSetOf` e' -- TODO make this better
                 -- conditionalRule (\x -> not $ or [ Set.member a (getNodes x) | (a,_) <- vs]) p' $ do self `isSuperSetOf` e'  -- TODO, should only fire once
             pp cc@(Complex a [p])
