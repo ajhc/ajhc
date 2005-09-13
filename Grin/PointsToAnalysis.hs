@@ -661,8 +661,9 @@ findFixpoint' grin (HcHash _ mp) eq = do
                     modifiedSuperSetOf self p' (\n -> pruneNodes $ VsNodes (Map.filterWithKey (\ (t,_) _ -> tagIsWHNF t) (getNodeArgs n)) (Set.filter tagIsWHNF (getNodes n)))
                     dynamicRule p' $ \p -> do
                         flip mapM_ (Map.toList $ getNodeArgs p) $ \ ((n,i),v) -> do
-                            a <- getArg n i
-                            a `isSuperSetOf` value v
+                            when (tagIsSuspFunction n) $ do
+                                a <- getArg (tagFlipFunction n) i
+                                a `isSuperSetOf` value v
                 | a == funcFetch = do
                     p' <- newVal p
                     dynamicRule p' $ \v -> flip mapM_ (Set.toList (getHeaps' ("funcFetch" ++ show cc) v)) $ \u -> do
@@ -708,7 +709,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
                 as'' <- mapM newVal as ;
                 self `isSuperSetOf` value (VsNodes mempty (Set.singleton n))
                 flip mapM_ (zip [(0 :: Int) ..] as'') $ \ (i,a) -> do
-                    modifiedSuperSetOf self a $ \a' -> VsNodes (Map.singleton (n,i) a') mempty
+                    modifiedSuperSetOf self a $ \a' -> pruneNodes $ VsNodes (Map.singleton (n,i) a') (Set.singleton n)
                     -- setNodes [(n,[ if i' == i then a' else mempty | i' <- [0..] | _ <- as])]
             pp (Ptr i) | Just _ <- Map.lookup i cheaps = propegateValue (setHeaps [i]) self
             pp e = fail $ "pp: " ++ show e
@@ -733,18 +734,16 @@ findFixpoint' grin (HcHash _ mp) eq = do
             dynamicRule p1' $ \p1 -> do
                 argMap <- readIORef argMap
                 flip mapM_ (Map.toList (getNodeArgs p1)) $ \ ((a,i),v) -> do
-                    case fromAtom a of
-                        'P':'1':'_':rs -> do
-                            let fn = toAtom ('f':rs)
+                    case tagUnfunction a of
+                        Just (1,fn) -> do
                             case Map.lookup (fn,i) argMap of
                                 Nothing -> return ()
                                 Just arg -> arg `isSuperSetOf` value v
                         _ -> return ()
 
                 flip mapM_ (Set.toList (getNodes p1)) $ \ a -> do
-                    case fromAtom a of
-                        'P':'1':'_':rs -> do
-                            let fn = toAtom ('f':rs)
+                    case tagUnfunction a of
+                        Just (1,fn) -> do
                             case Map.lookup (fn,length (fst $ runIdentity $  findArgsType (grinTypeEnv grin) fn) - 1) argMap of
                                 Just arg -> arg `isSuperSetOf` p2'
                                 Nothing -> return ()
@@ -756,6 +755,8 @@ findFixpoint' grin (HcHash _ mp) eq = do
         --simplePos (Ptr v) = liftM fst $  Map.lookup v heapMap
         simplePos _ = fail "this pos is not simple"
         getArg a i = do
+            CharIO.print ("getArg", a, i)
+            when (not $ tagIsFunction a) $ fail "getArg: tag not function"
             am <- readIORef argMap
             case Map.lookup (a,i) am of
                 Just e -> return e
@@ -765,6 +766,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
                     return x
         newVal p | Just v <- simplePos p = return v
         newVal p = do
+            CharIO.print ("Creating newval", p)
             v <- newValue fr mempty
             procPos v p
             return v
