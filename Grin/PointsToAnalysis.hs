@@ -626,16 +626,6 @@ findFixpoint' grin (HcHash _ mp) eq = do
     let cheaps = Map.fromList [ ((-x),setNodes [(t,(map z xs))]) | (HcNode t xs,x) <- Map.toList mp ] where
         z (Right n) = setHeaps [(-n)]
         z (Left _) = vsBas
-    let fmp = Map.fromListWith (zipWith mappend) $ appEq eq
---        heaps = [ (Lh x,cp y >>= \z -> getUpdates x >>= return . mappend z ) | (x,(_,y)) <- heapEq eq ] ++ cheaps
---        getUpdates p = do
---            let e (v,x) = do
---                    ns <- cp v
---                    case Set.member p (getHeaps ns) of
---                        True -> cp x
---                        False -> return mempty
---            ep <-  mapM e (updateEq eq)
---            return $ mconcat ep
 
     let procPos self p = pp p where
             pp p | Just c <- constPos p = self `isSuperSetOf` value c
@@ -689,11 +679,14 @@ findFixpoint' grin (HcHash _ mp) eq = do
                    -- mconcat $ concat [  papp (fromAtom n) as x  | (n,as) <- Map.toList (getNodes v), tagIsPartialAp n ]
 
                 dynamicRule v' $ \v -> do
-                    flip mapM_ (concat [  incp (fromAtom n)  | n <- Set.toList (getNodes v), tagIsPartialAp n ]) $ \n -> do
+                    flip mapM_ (concat [  fmap ((,) n) (incp (fromAtom n))  | n <- (allNodes v), tagIsPartialAp n ]) $ \(on,n) -> do
                         (ts,_) <- findArgsType (grinTypeEnv grin) n
+                        let mm = Map.fromList $ concat [ Map.lookup (on,i) (getNodeArgs v) >>= return . ((,) (n,i)) |  i <- [0 .. length ts ]]
+                        self `isSuperSetOf` value (pruneNodes $ VsNodes mm mempty)
                         modifiedSuperSetOf self x' $ \x ->
-                            VsNodes (Map.singleton (n,length ts - 1) x) Set.empty
-                    sequence_ $ concat [  papp' (fromAtom n)  | n <- Set.toList (getNodes v), tagIsPartialAp n ]
+                                pruneNodes $ VsNodes (Map.singleton (n,length ts - 1) x) Set.empty
+                    sequence_ $ concat [  papp'' (fromAtom n) i a | ((n,i),a) <- Map.toList (getNodeArgs v), tagIsPartialAp n ]
+                    sequence_ $ concat [  papp' (fromAtom n) x'  | n <- Set.toList (getNodes v), tagIsPartialAp n ]
             pp (Down p a i) = do
                 p' <- newVal p
                 modifiedSuperSetOf self p' $ \p -> case Map.lookup (a,i) (getNodeArgs p) of
@@ -702,11 +695,6 @@ findFixpoint' grin (HcHash _ mp) eq = do
             pp arg@(Arg a i) = do
                 x <- getArg a i
                 self `isSuperSetOf` x
-                case Map.lookup a fmp of
-                    Nothing -> return ()
-                    Just ps -> do
-                        --CharIO.print (arg, ps)
-                        pp (ps !! i)
             pp (Con n as) = do
                 as'' <- mapM newVal as ;
                 self `isSuperSetOf` value (VsNodes mempty (Set.singleton n))
@@ -750,7 +738,13 @@ findFixpoint' grin (HcHash _ mp) eq = do
                                 Just arg -> arg `isSuperSetOf` p2'
                                 Nothing -> return ()
                         _ -> return ()
-        --procApp a ps = undefined
+        procApp a ps = do
+            argMap <- readIORef argMap
+            flip mapM_ (zip [0..] ps) $ \ (i,p) -> do
+                case Map.lookup (a,i) argMap of
+                    Just v -> procPos v p
+                    Nothing -> return ()
+
         simplePos p | Just x <- constPos p = return $ value x
         simplePos (Variable v) = liftM fst $ Map.lookup v varMap
         simplePos (Func v) = liftM fst $  Map.lookup v funcMap
@@ -778,7 +772,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
     flip mapM_ (Map.elems heapMap) $ \ (e,(_,p)) -> procPos e p
     mapM_ (uncurry procUpdate) (updateEq eq)
     mapM_ (uncurry procApply) (applyEq eq)
-    --mapM_ (uncurry procApp) (appEq eq)
+    mapM_ (uncurry procApp) (appEq eq)
 
     CharIO.putStrLn "About to solve fixpoint.."
     findFixpoint fr
