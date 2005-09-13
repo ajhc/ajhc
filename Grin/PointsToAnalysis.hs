@@ -49,7 +49,6 @@ data Pos =
     | Tuple [Pos]
     | Complex {-# UNPACK #-}!Atom [Pos]
     deriving(Ord,Eq)
---    | Con Val
 
 instance Show Pos where
     showsPrec n (Variable v) xs = showsPrec n v xs
@@ -85,65 +84,6 @@ instance Monoid Pos where
         f (x:xs) ys = f xs (x:ys)
 
 
-type Index = Int
-
--- Optimized DataFlow equations
-data OPos =
-    OVal !Index
-    | ODown OUnion !Tag !Int
-    | OIf OUnion (Either Index Tag) OUnion
-    | ONode !Atom [OUnion]
-    | OCase !Index [(Tag,OUnion)] OUnion
-    | ORestrictEval  OUnion
-    | OFetch OUnion
-    | OApply OUnion OUnion
-        deriving(Eq,Ord,Show)
-
-data OUnion = OUnion ValueSet [OPos]
-        deriving(Eq,Ord,Show)
-        {-! derive: Monoid !-}
-
-normalizeOUnion (OUnion vs ops) = OUnion vs (snub ops)
-
-fixupOPos (OApply x y) = do
-    x <- fixupOUnion x
-    y <- fixupOUnion y
-    return $ OApply x y
-fixupOPos (OFetch x) = do
-    x <- fixupOUnion x
-    return $ OFetch x
-fixupOPos (ORestrictEval x) = do
-    x <- fixupOUnion x
-    return $ ORestrictEval x
-fixupOPos (ODown x a i) = do
-    x <- fixupOUnion x
-    return $ ODown x a i
-fixupOPos (OIf x a y) = do
-    x <- fixupOUnion x
-    y <- fixupOUnion y
-    --a <- evaluate a
-    return $ OIf x a y
-fixupOPos (ONode a xs) = do
-    xs <- mapM fixupOUnion xs
-    return $ ONode a xs
-fixupOPos (OCase a xs els) = do
-    xs <- sequence [ fixupOUnion x >>= return . (,) t | (t,x) <- xs]
-    els <- fixupOUnion els
-    return $ OCase a xs els
-fixupOPos x = return x
-
-fixupOUnion :: OUnion -> IO OUnion
-fixupOUnion (OUnion vs xs) = do
-    xs <- mapM fixupOPos xs
-    --xs <- mapM evaluate (snub xs)
-    return $ ((OUnion $ vs) $ xs)
-
-
-oVal x = OUnion mempty [x]
-oVar x = oVal (OVal x)
-oConst x = OUnion x []
-
---data ValueSet = VsEmpty | VsNodes (Map.Map Atom [ValueSet]) !  | VsHeaps !(Set.Set Int) | VsBas
 data ValueSet = VsEmpty | VsNodes (Map.Map (Atom,Int) ValueSet) (Set.Set Atom)  | VsHeaps !(Set.Set Int) | VsBas
     deriving(Eq,Ord)
     {-! derive: is !-}
@@ -199,10 +139,6 @@ instance Fixable ValueSet where
                if isBottom m then [] else [((a,i),m)]
         | ((a,i),v) <- Map.toList n1 ] ) (w1 Set.\\ w2)
     minus x y = error $ "minus: " ++ show x <+> show y
-    --minus (VsNodes n1 w1) (VsNodes n2 w2) = VsNodes $ Map.fromList $ concat [ case Map.lookup a n2 of Just as' -> f a as as'; _ -> [(a,as)] | (a,as) <- Map.toList n1 ] where
-    --    f n as as' = if all isBottom as'' then [] else [(n,as'')] where
-    --        as'' = [ a `minus` a' | a <- as | a' <- as' ]
-
 
 instance Show ValueSet where
     showsPrec x VsEmpty = \xs -> '{':'}':xs
@@ -214,7 +150,6 @@ instance Show ValueSet where
     showsPrec x (VsNodes n s) = braces (hcat (intersperse (char ',') $ (map f $ snub $ fsts  (Map.keys n) ++ Set.toList s) )) where
         f a = (if a `Set.member` s then tshow a else char '#' <> tshow a) <> tshow (g a)
         g a = sort [ (i,v) | ((a',i),v) <- Map.toList n, a' == a ]
-        --f (t,vs) = tshow t <> tshow vs
 
 
 data PointsTo = PointsTo {
@@ -227,26 +162,12 @@ data PointsTo = PointsTo {
     {-! derive: Monoid, update !-}
 
 pointsToStats :: PointsTo -> String
-pointsToStats pt = text "PointsTo Analysis results:" <$> buildTable ["Total", "Empty", "Basic", "Max", "Average" ] [f "Variables" (Map.filterWithKey (\k _ -> k /= app_var) $ ptVars pt), f "Functions" (ptFunc pt), f "Heap" (ptHeap pt)] where
+pointsToStats pt = text "PointsTo Analysis results:" <$> buildTable ["Total", "Empty", "Basic", "Max", "Average" ] [f "Variables" (ptVars pt), f "Functions" (ptFunc pt), f "Heap" (ptHeap pt)] where
     f n mp = {- text n <> char ':' <+> -}  vs n (Map.elems mp)
     vs n xs = (n,[tshow $ length xs, show (count isVsEmpty xs),show (count isVsBas xs),show (maximum $ 0:map num xs), show ((fromIntegral (sum (map num xs)) ::Double ) / fromIntegral (length xs))] )
     num (VsNodes x s) = Set.size s
     num (VsHeaps x) = Set.size x
     num _ = 0
-
-
-
-
-{-
-buildTableRL :: [(String,String)] -> [String]
-buildTableRL ps = map f ps where
-    f (x,"") = x
-    f (x,y) = replicate (bs - length x) ' ' ++ x ++ replicate 4 ' ' ++ y
-    bs = maximum (map (length . fst) [ p | p@(_,_:_) <- ps ])
---newtype HeapLoc = HeapLoc Int
---    deriving(Ord,Eq,Num)
--}
-
 
 
 
@@ -257,7 +178,6 @@ data PointsToEq = PointsToEq {
     heapEq :: [(Int,(HeapType,Pos))],
     updateEq :: [(Pos,Pos)],
     applyEq :: [(Pos,Pos)],
-    --hcheapEq :: HcHash,
     appEq  :: [(Atom,[Pos])]
 
     }
@@ -272,21 +192,9 @@ flattenPointsToEq eq = varEq_u f . funcEq_u f . heapEq_u h . appEq_u g $ eq  whe
 
 
 
-data L = Lv {-# UNPACK #-} !Var | Lh {-# UNPACK #-} !Int | Lf {-# UNPACK #-} !Atom
-    deriving(Ord,Eq)
-
-instance Show L where
-    showsPrec n (Lv v) = showsPrec n v
-    showsPrec n (Lh v) = showsPrec n v
-    showsPrec n (Lf v) = showsPrec n v
-
-
-
 
 newHeap ht p@(Con a ps)
     | tagIsSuspFunction a, Identity t <- tagToFunction a = newHeap' ht (mappend p (Func t))
---    | 'B':xs <- fromAtom a = newHeap' ht (mappend p (Func $ toAtom ('b':xs)))
---    | 'F':xs <- fromAtom a = newHeap' ht (mappend p (Func $ toAtom ('f':xs)))
 newHeap ht p = newHeap' ht p
 
 
@@ -306,7 +214,6 @@ bind (Tup vs) p | sameLength vs vs' = tell mempty { varEq = vs'  }  where
     vs' = [ (v,if basicType ty then Basic else DownTup p i) | Var v ty <- vs | i <- [0..] ]
     basicType (Ty _) = True
     basicType _ = False
---bind _ Basic = return ()
 bind x y = error $ unwords ["bind:",show x,show y]
 
 analyze :: Grin -> IO PointsTo
@@ -517,78 +424,7 @@ toPos (Var v _)  = return $ Variable v
 toPos u | u == unit = return Basic
 toPos x  = error $ unwords ["toPos:",show x]
 
---toPos (Const v) = toPos v
 
-app_var = V (-195000)
-
-{-
-convertPos :: Grin -> HcHash -> PointsToEq -> IO ([OUnion],[(L,Int)])
-convertPos grin hcHash eq = return (xs,ys) where
-    ys = [ (fh l,i) | (i,l,_) <- wholeMap ]
-    fh (Lh h) = Lh $ convertHeap h
-    fh x = x
-    xs = snds $  sortUnder fst [ (i,p) | (i,_,p) <- wholeMap ]
-    vars = (Lv app_var,apps):[ (Lv x,cp y) | (x,y) <- varEq eq ]
-    heaps = [ (Lh x, cp y `mappend` getUpdates ht (convertHeap x) ) | (x,(ht,y)) <- heapEq eq ] ++ cheaps where
-        cheaps = [ (Lh (-x),oNode t (map z xs)) | (x,HcNode t xs) <- hcHashGetNodes hcHash ] where
-        z (Right n) = oConst $ setHeaps [(convertHeap (-n))]
-        z (Left (Var v _)) = oVar $ convertVar v
-        z (Left (Lit _ _)) = oConst vsBas
-        z (Left (Tag t)) = oConst vsBas
-        oNode t [] = oConst (setNodes [(t,[])])
-        oNode t xs = oVal (ONode t xs)
-    funcs = [ (Lf x,cp y) | (x,y) <- Map.toList $ Map.fromListWith mappend $ funcEq eq ]
-    wholeMap = [ (i,x,y) |  (x,y) <- (vars ++ heaps ++ funcs) | i <- [0..] ]
-    varsMap = Map.fromList  [ (v,i) | (i,Lv v,_) <- wholeMap  ]
-    heapsMap = Map.fromList [ (v,i) | (i,Lh v,_) <- wholeMap ]
-    funcsMap = Map.fromList [ (v,i) | (i,Lf v,_) <- wholeMap ]
-    convertVar v | Just x <- Map.lookup v varsMap = x
-    convertVar v | otherwise = error $ "convertVar: " ++ show v
-    convertHeap v | Just x <- Map.lookup v heapsMap = x
-    convertFunc v | Just x <- Map.lookup v funcsMap = x
-    convertFunc v = error $ "convertFunc: " ++ show v
-    funcMap = Map.fromListWith (zipWith mappend) $ appEq eq
-    getUpdates RecursiveThunk p =
-        let e (x,c) = OIf (cp x) (Left p) (cp c)
-        in OUnion mempty (map e (updateEq eq))
-    getUpdates _ _ = mempty
-    cp (Func a) = oVar (convertFunc a)
-    cp (Variable a) = oVar (convertVar a)
-    cp (Ptr h) = oConst (setHeaps [convertHeap h])
-    cp (Union ps) = mconcat $ map cp ps
-    cp Basic = oConst vsBas
-    cp (PIf True (x) tg v) = oVal (OIf (cp x) (Right tg) (cp v))
-    cp (PCase (Variable x) xs e) = oVal (OCase (convertVar x) [ (t,cp v) | (t,v) <- xs ] (cp e))
-    cp (Down x a i) = oVal (ODown (cp x) a i)
-    cp (DownTup x i) = oVal (ODown (cp x) (toAtom "") i)
-    cp (Con a []) = oConst (setNodes [(a,[])])
-    cp (Con a ps) = oVal (ONode a (map cp ps))
-    cp (Tuple []) = oConst vsBas
-    cp (Tuple ps) = cp (Con (toAtom "") ps)
-    cp (Complex a [p])
-        | a == funcFetch = oVal (OFetch (cp p))
-        | a == funcEval = oVal (ORestrictEval (cp p))
-    cp (Complex a [v,x]) | a == funcApply = oVal $ OApply (cp v) (cp x)
-    cp exp@(Arg a i) = mconcat (asd:cps) where
-        asd = case Map.lookup a funcMap of
-            Just ps | i >= length ps -> error $ "Arg i to large: " ++ show exp
-            Just ps -> cp (ps !! i)
-            Nothing -> mempty
-        pt = partialTag a 1
-        cps | 'f':_ <- fromAtom a, i < length as - 1 = [oVal (ODown (oVar appVar) pt i)]
-            | 'f':_ <- fromAtom a = map f (applyEq eq)
-            | otherwise = []
-        --f (v,x)
-        --    | i == length as - 1 =  oVal (OIf (cp v) (Right pt) (cp x))
-        --    | otherwise = oVal (ODown (cp (v)) pt i)
-        f (v,x) = oVal (OIf (cp v) (Right pt) (dpt v x))
-        dpt _ x | i == length as - 1 = cp x
-        dpt v x = oVal (ODown (cp (v)) pt i)
-        Identity (as,_) = findArgsType (grinTypeEnv grin) a
-    apps = mconcat [ cp v |  (v,_) <- (applyEq eq)]
-    appVar = convertVar app_var
-
--}
 
 hcHashGetNodes (HcHash _ hc) = [ (x,n) | (n,x) <- Map.toList hc ]
 
@@ -664,8 +500,6 @@ findFixpoint' grin (HcHash _ mp) eq = do
             pp cc@(Complex a [v,x]) | a == funcApply = do
                 v' <- newVal v
                 x' <- newVal x
-                --CharIO.print cc
-                -- TODO modifiedSuperSetOf2 self (v',x') $ \ (v,x) -> mconcat $ concat [  papp (fromAtom n) as x  | (n,as) <- Map.toList (getNodes v), tagIsPartialAp n ]
                 modifiedSuperSetOf self v' $ \v -> let
                     ns = Set.fromList $ concat [ incp (fromAtom n) | n <- Set.toList (getNodes v), tagIsPartialAp n ]
                     as = Map.fromList $ concat [
@@ -673,7 +507,6 @@ findFixpoint' grin (HcHash _ mp) eq = do
                                return ((nn,i),v)
                         | ((n,i),v) <- Map.toList (getNodeArgs v), tagIsPartialAp n]
                    in VsNodes as ns
-                   -- mconcat $ concat [  papp (fromAtom n) as x  | (n,as) <- Map.toList (getNodes v), tagIsPartialAp n ]
 
                 dynamicRule v' $ \v -> do
                     flip mapM_ (concat [  fmap ((,) n) (incp (fromAtom n))  | n <- (allNodes v), tagIsPartialAp n ]) $ \(on,n) -> do
@@ -697,7 +530,6 @@ findFixpoint' grin (HcHash _ mp) eq = do
                 self `isSuperSetOf` value (VsNodes mempty (Set.singleton n))
                 flip mapM_ (zip [(0 :: Int) ..] as'') $ \ (i,a) -> do
                     modifiedSuperSetOf self a $ \a' -> pruneNodes $ VsNodes (Map.singleton (n,i) a') (Set.singleton n)
-                    -- setNodes [(n,[ if i' == i then a' else mempty | i' <- [0..] | _ <- as])]
             pp e = fail $ "pp: " ++ show e
             papp'' t i a
                 | Just (1,fn) <- tagUnfunction t = return $ do
@@ -1327,5 +1159,143 @@ findFixpoint (HcHash _ mp) eq = fmap cpt (solve mempty fs) where
 
     papp ('P':'1':'_':xs) _ _ = getVal (Lf (toAtom $ 'f':xs)) -- cp (Func (toAtom $ 'f':xs))
     papp ('P':cs) as x | (n','_':rs) <- span isDigit cs, n <- read n', n > 1 = return $ setNodes [((toAtom $ 'P':(show $ n -  (1::Int)) ++ "_" ++ rs),(as ++ [x]))]
+
+-}
+
+{-
+convertPos :: Grin -> HcHash -> PointsToEq -> IO ([OUnion],[(L,Int)])
+convertPos grin hcHash eq = return (xs,ys) where
+    ys = [ (fh l,i) | (i,l,_) <- wholeMap ]
+    fh (Lh h) = Lh $ convertHeap h
+    fh x = x
+    xs = snds $  sortUnder fst [ (i,p) | (i,_,p) <- wholeMap ]
+    vars = (Lv app_var,apps):[ (Lv x,cp y) | (x,y) <- varEq eq ]
+    heaps = [ (Lh x, cp y `mappend` getUpdates ht (convertHeap x) ) | (x,(ht,y)) <- heapEq eq ] ++ cheaps where
+        cheaps = [ (Lh (-x),oNode t (map z xs)) | (x,HcNode t xs) <- hcHashGetNodes hcHash ] where
+        z (Right n) = oConst $ setHeaps [(convertHeap (-n))]
+        z (Left (Var v _)) = oVar $ convertVar v
+        z (Left (Lit _ _)) = oConst vsBas
+        z (Left (Tag t)) = oConst vsBas
+        oNode t [] = oConst (setNodes [(t,[])])
+        oNode t xs = oVal (ONode t xs)
+    funcs = [ (Lf x,cp y) | (x,y) <- Map.toList $ Map.fromListWith mappend $ funcEq eq ]
+    wholeMap = [ (i,x,y) |  (x,y) <- (vars ++ heaps ++ funcs) | i <- [0..] ]
+    varsMap = Map.fromList  [ (v,i) | (i,Lv v,_) <- wholeMap  ]
+    heapsMap = Map.fromList [ (v,i) | (i,Lh v,_) <- wholeMap ]
+    funcsMap = Map.fromList [ (v,i) | (i,Lf v,_) <- wholeMap ]
+    convertVar v | Just x <- Map.lookup v varsMap = x
+    convertVar v | otherwise = error $ "convertVar: " ++ show v
+    convertHeap v | Just x <- Map.lookup v heapsMap = x
+    convertFunc v | Just x <- Map.lookup v funcsMap = x
+    convertFunc v = error $ "convertFunc: " ++ show v
+    funcMap = Map.fromListWith (zipWith mappend) $ appEq eq
+    getUpdates RecursiveThunk p =
+        let e (x,c) = OIf (cp x) (Left p) (cp c)
+        in OUnion mempty (map e (updateEq eq))
+    getUpdates _ _ = mempty
+    cp (Func a) = oVar (convertFunc a)
+    cp (Variable a) = oVar (convertVar a)
+    cp (Ptr h) = oConst (setHeaps [convertHeap h])
+    cp (Union ps) = mconcat $ map cp ps
+    cp Basic = oConst vsBas
+    cp (PIf True (x) tg v) = oVal (OIf (cp x) (Right tg) (cp v))
+    cp (PCase (Variable x) xs e) = oVal (OCase (convertVar x) [ (t,cp v) | (t,v) <- xs ] (cp e))
+    cp (Down x a i) = oVal (ODown (cp x) a i)
+    cp (DownTup x i) = oVal (ODown (cp x) (toAtom "") i)
+    cp (Con a []) = oConst (setNodes [(a,[])])
+    cp (Con a ps) = oVal (ONode a (map cp ps))
+    cp (Tuple []) = oConst vsBas
+    cp (Tuple ps) = cp (Con (toAtom "") ps)
+    cp (Complex a [p])
+        | a == funcFetch = oVal (OFetch (cp p))
+        | a == funcEval = oVal (ORestrictEval (cp p))
+    cp (Complex a [v,x]) | a == funcApply = oVal $ OApply (cp v) (cp x)
+    cp exp@(Arg a i) = mconcat (asd:cps) where
+        asd = case Map.lookup a funcMap of
+            Just ps | i >= length ps -> error $ "Arg i to large: " ++ show exp
+            Just ps -> cp (ps !! i)
+            Nothing -> mempty
+        pt = partialTag a 1
+        cps | 'f':_ <- fromAtom a, i < length as - 1 = [oVal (ODown (oVar appVar) pt i)]
+            | 'f':_ <- fromAtom a = map f (applyEq eq)
+            | otherwise = []
+        --f (v,x)
+        --    | i == length as - 1 =  oVal (OIf (cp v) (Right pt) (cp x))
+        --    | otherwise = oVal (ODown (cp (v)) pt i)
+        f (v,x) = oVal (OIf (cp v) (Right pt) (dpt v x))
+        dpt _ x | i == length as - 1 = cp x
+        dpt v x = oVal (ODown (cp (v)) pt i)
+        Identity (as,_) = findArgsType (grinTypeEnv grin) a
+    apps = mconcat [ cp v |  (v,_) <- (applyEq eq)]
+    appVar = convertVar app_var
+
+type Index = Int
+
+-- Optimized DataFlow equations
+data OPos =
+    OVal !Index
+    | ODown OUnion !Tag !Int
+    | OIf OUnion (Either Index Tag) OUnion
+    | ONode !Atom [OUnion]
+    | OCase !Index [(Tag,OUnion)] OUnion
+    | ORestrictEval  OUnion
+    | OFetch OUnion
+    | OApply OUnion OUnion
+        deriving(Eq,Ord,Show)
+
+data OUnion = OUnion ValueSet [OPos]
+        deriving(Eq,Ord,Show)
+        {-! derive: Monoid !-}
+
+normalizeOUnion (OUnion vs ops) = OUnion vs (snub ops)
+
+fixupOPos (OApply x y) = do
+    x <- fixupOUnion x
+    y <- fixupOUnion y
+    return $ OApply x y
+fixupOPos (OFetch x) = do
+    x <- fixupOUnion x
+    return $ OFetch x
+fixupOPos (ORestrictEval x) = do
+    x <- fixupOUnion x
+    return $ ORestrictEval x
+fixupOPos (ODown x a i) = do
+    x <- fixupOUnion x
+    return $ ODown x a i
+fixupOPos (OIf x a y) = do
+    x <- fixupOUnion x
+    y <- fixupOUnion y
+    --a <- evaluate a
+    return $ OIf x a y
+fixupOPos (ONode a xs) = do
+    xs <- mapM fixupOUnion xs
+    return $ ONode a xs
+fixupOPos (OCase a xs els) = do
+    xs <- sequence [ fixupOUnion x >>= return . (,) t | (t,x) <- xs]
+    els <- fixupOUnion els
+    return $ OCase a xs els
+fixupOPos x = return x
+
+fixupOUnion :: OUnion -> IO OUnion
+fixupOUnion (OUnion vs xs) = do
+    xs <- mapM fixupOPos xs
+    --xs <- mapM evaluate (snub xs)
+    return $ ((OUnion $ vs) $ xs)
+
+
+oVal x = OUnion mempty [x]
+oVar x = oVal (OVal x)
+oConst x = OUnion x []
+
+
+
+data L = Lv {-# UNPACK #-} !Var | Lh {-# UNPACK #-} !Int | Lf {-# UNPACK #-} !Atom
+    deriving(Ord,Eq)
+
+instance Show L where
+    showsPrec n (Lv v) = showsPrec n v
+    showsPrec n (Lh v) = showsPrec n v
+    showsPrec n (Lf v) = showsPrec n v
+
 
 -}
