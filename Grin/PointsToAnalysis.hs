@@ -1,7 +1,6 @@
 module Grin.PointsToAnalysis(grinInlineEvalApply) where
 
 import Atom
-import Char(isDigit)
 import CharIO
 import Control.Monad.Identity
 import Control.Monad.State
@@ -199,6 +198,7 @@ instance Fixable ValueSet where
                let m =  v `minus` v'
                if isBottom m then [] else [((a,i),m)]
         | ((a,i),v) <- Map.toList n1 ] ) (w1 Set.\\ w2)
+    minus x y = error $ "minus: " ++ show x <+> show y
     --minus (VsNodes n1 w1) (VsNodes n2 w2) = VsNodes $ Map.fromList $ concat [ case Map.lookup a n2 of Just as' -> f a as as'; _ -> [(a,as)] | (a,as) <- Map.toList n1 ] where
     --    f n as as' = if all isBottom as'' then [] else [(n,as'')] where
     --        as'' = [ a `minus` a' | a <- as | a' <- as' ]
@@ -327,6 +327,7 @@ analyze grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinC
         (neq,hc) = mapFst flattenPointsToEq $ foldl f  (eq,hc') grinFunctions
         func ('B':xs) = Func $ toAtom $ 'b':xs
         func ('F':xs) = Func $ toAtom $ 'f':xs
+        func x = error $ "func:" ++ x
     when (dump FD.Eval) $ do
         CharIO.putStrLn "vars:"
         mapM_ CharIO.print $ sort $ varEq neq
@@ -411,11 +412,7 @@ grinInlineEvalApply  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFun
             --simple (NodeC t [Lit {}] :-> _) = False
             --simple (NodeC t _ :-> _) = True
         docase _ ((_ :-> x):_) _ = Error "No Valid alternatives. This Should Not be reachable." (runIdentity $ tc typeEnv x)
-
-
-
-    --CharIO.print $ pt
-    --mapM_ CharIO.print [ (n,flattenPointsToEq $  collect n l) |  (n,l) <- grinFunctions ]
+        docase _ _ _ = error $ "docase: strange argument"
     return grin { grinFunctions = map (mapSnd f) grinFunctions }
 
 collect :: HcHash -> Int -> Atom -> Lam -> (PointsToEq,HcHash)
@@ -501,6 +498,7 @@ collect hc st fname (Tup vs :-> exp')
         tell mempty { updateEq = [(p,v)] }
         return Basic
     g x = error $ unwords ["g",show x]
+collect _ _ _ _ = error "collect: bad argument"
 
 toPos (NodeC tag vs) = do
     vs' <- mapM toPos vs
@@ -597,7 +595,6 @@ hcHashGetNodes (HcHash _ hc) = [ (x,n) | (n,x) <- Map.toList hc ]
 
 tupleName = toAtom ""
 
--- constPos (Ptr h) = return (setHeaps [convertHeap h])
 constPos Basic = return vsBas
 constPos (Con a []) = return (setNodes [(a,[])])
 constPos (Con a xs) = do
@@ -701,14 +698,22 @@ findFixpoint' grin (HcHash _ mp) eq = do
                 flip mapM_ (zip [(0 :: Int) ..] as'') $ \ (i,a) -> do
                     modifiedSuperSetOf self a $ \a' -> pruneNodes $ VsNodes (Map.singleton (n,i) a') (Set.singleton n)
                     -- setNodes [(n,[ if i' == i then a' else mempty | i' <- [0..] | _ <- as])]
-            pp (Ptr i) | Just _ <- Map.lookup i cheaps = propegateValue (setHeaps [i]) self
             pp e = fail $ "pp: " ++ show e
-            papp ('P':cs) as x | (n','_':rs) <- span isDigit cs, n <- read n', n > 1 = return $ setNodes [((toAtom $ 'P':(show $ n -  (1::Int)) ++ "_" ++ rs),(as ++ [x]))]
-            papp _ _ _ = fail "not papp"
-            papp' ('P':'1':'_':xs)  = return $ self `isSuperSetOf` (fst $ runIdentity $ Map.lookup (toAtom $ 'f':xs) funcMap) -- cp (Func (toAtom $ 'f':xs))
-            papp' _  = fail "not papp'"
-            incp ('P':cs) | (n','_':rs) <- span isDigit cs, n <- read n', n > 1 = return (toAtom $ 'P':(show $ n -  (1::Int)) ++ "_" ++ rs)
+            papp'' t i a
+                | Just (1,fn) <- tagUnfunction t = return $ do
+                    av <- getArg fn i
+                    av `isSuperSetOf` value a
+                | otherwise = fail "not papp''"
+            papp' t x'
+                | Just (1,fn) <- tagUnfunction t = return $ do
+                    self `isSuperSetOf` (fst $ runIdentity $ Map.lookup fn funcMap) -- cp (Func (toAtom $ 'f':xs))
+                    (ts,_) <- findArgsType (grinTypeEnv grin) fn
+                    av <- getArg fn (length ts - 1)
+                    av `isSuperSetOf` x'
+                | otherwise = fail "not papp'"
+            incp t | Just (n,fn) <- tagUnfunction t, n > 1 = return (partialTag fn (n - 1))
             incp _ = fail "not incp"
+            allNodes x = snub $ (Set.toList $ getNodes x) ++ (fsts $ Map.keys (getNodeArgs x))
         procUpdate p1 p2 = do
             p1' <- newVal p1
             p2' <- newVal p2
@@ -716,8 +721,6 @@ findFixpoint' grin (HcHash _ mp) eq = do
                 case Map.lookup h heapMap of
                     Just (e,_) -> e `isSuperSetOf` p2'
                     Nothing -> return ()
-
-
         procApply p1 p2 = do
             p1' <- newVal p1
             p2' <- newVal p2
@@ -748,7 +751,6 @@ findFixpoint' grin (HcHash _ mp) eq = do
         simplePos p | Just x <- constPos p = return $ value x
         simplePos (Variable v) = liftM fst $ Map.lookup v varMap
         simplePos (Func v) = liftM fst $  Map.lookup v funcMap
-        --simplePos (Ptr v) = liftM fst $  Map.lookup v heapMap
         simplePos _ = fail "this pos is not simple"
         getArg a i = do
             CharIO.print ("getArg", a, i)
