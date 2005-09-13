@@ -49,7 +49,6 @@ import qualified E.SSimplify as SS
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Grin.Interpret
---import qualified Grin.PointsTo
 import qualified Grin.PointsToAnalysis
 import qualified Grin.Simplify
 import qualified Info
