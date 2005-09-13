@@ -12,7 +12,7 @@ import Grin.Grin
 import UnionFind
 
 data W = One | Omega | LessThan (Set.Set E)
-    deriving(Show)
+    deriving(Ord,Eq,Show)
 type E = Element W Var
 
 instance Monoid W where
@@ -21,6 +21,7 @@ instance Monoid W where
     mappend (LessThan xs) (LessThan ys) = LessThan (Set.union xs ys)
     mappend x LessThan {} = x
     mappend LessThan {} x = x
+    mappend x y = error $ "mappend: " ++ show (x,y)
     mempty = LessThan Set.empty
 
 grinLinear :: Grin -> IO [(Var,W)]

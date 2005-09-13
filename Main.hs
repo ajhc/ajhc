@@ -33,7 +33,6 @@ import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import GraphUtil
 import Grin.DeadFunctions
 import Grin.FromE
-import Grin.Linear
 import Grin.Grin hiding (typecheck)
 import Grin.Show
 import Grin.Whiz
@@ -268,9 +267,6 @@ compileModEnv' stats ho = do
     x <- return $ normalizeGrin x
     typecheckGrin x
     wdump FD.GrinPreeval $ printGrin x
-    --wdump FD.Progress $ putErrLn "Linear nodes analysis..."
-    --lr <- Grin.Linear.grinLinear x
-    --mapM_ CharIO.print lr
     wdump FD.Progress $ putErrLn "Points-to analysis..."
     x <- Grin.PointsToAnalysis.grinInlineEvalApply x
     typecheckGrin x

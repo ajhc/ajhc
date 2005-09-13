@@ -24,6 +24,7 @@ import qualified FlagDump as FD
 import UniqueMonad
 import Grin.EvalInline
 import Fixer
+import Grin.Linear
 
 sameLength (_:xs) (_:ys) = sameLength xs ys
 sameLength [] [] = True
@@ -219,9 +220,12 @@ bind x y = error $ unwords ["bind:",show x,show y]
 
 analyze :: Grin -> IO PointsTo
 analyze grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinCafs = cafs }) = do
+    wdump FD.Progress $ CharIO.putErrLn "Linear nodes analysis..."
+    lr <- Grin.Linear.grinLinear grin
+
     let f (eq,hc) (n,l) | n == funcEval = (eq,hc)
         f (eq,hc) (n,l) | n == funcApply = (eq,hc)
-        f (eq,hc) (n,l) = mapFst (mappend eq) $ collect hc (mh eq + 1) n l
+        f (eq,hc) (n,l) = mapFst (mappend eq) $ collect (Map.fromList lr) hc (mh eq + 1) n l
         mh PointsToEq { heapEq = xs } = maximum $ 1:fsts xs
         --toHEq (NodeC t []) | not (tagIsWHNF t) = return (SharedEval,Union [Con t [], func (fromAtom t) ] )
         toHEq (NodeC t []) | not (tagIsWHNF t) = return (SharedEval,Con t []  )
@@ -333,14 +337,23 @@ grinInlineEvalApply  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFun
         docase _ _ _ = error $ "docase: strange argument"
     return grin { grinFunctions = map (mapSnd f) grinFunctions }
 
-collect :: HcHash -> Int -> Atom -> Lam -> (PointsToEq,HcHash)
-collect hc st fname (Tup vs :-> exp')
+collect :: Map.Map Var W -> HcHash -> Int -> Atom -> Lam -> (PointsToEq,HcHash)
+collect lmap hc st fname (Tup vs :-> exp')
     | sameLength avs vs = (eq { funcEq = (fname,v):funcEq eq, varEq = varEq eq ++ avs },hc')   where
     avs = [ (v,Arg fname n) |  Var v _ <- vs | n <- [0..] ]
     --((v,eq),hc') = execUniq st $ (runStateT ((runWriterT (f exp'))) hc)
     ((v,hc'),eq) = execUniq st $ (runWriterT (runStateT (f exp') hc))
     --((v,hc'),eq) = runWriter $ execUniqT st $ (runStateT  (f exp') hc)
     --tell x = lift $ Control.Monad.Writer.tell x
+    isHole (Con t _) | t == tagHole = True
+    isHole _ = False
+
+    f (Store { expValue = val } :>>= var@(Var v _) :-> exp2) = do
+        p <- toPos val
+        p' <- if Map.lookup v lmap == Just One then newHeap UnsharedEval p else newHeap SharedEval p
+        bind var p'
+        f exp2
+
     f (exp :>>= v :-> exp2) = do
         p <- g exp
         bind v p
@@ -416,7 +429,7 @@ collect hc st fname (Tup vs :-> exp')
         tell mempty { updateEq = [(p,v)] }
         return Basic
     g x = error $ unwords ["g",show x]
-collect _ _ _ _ = error "collect: bad argument"
+collect _ _ _ _ _ = error "collect: bad argument"
 
 toPos (NodeC tag vs) = do
     vs' <- mapM toPos vs
@@ -467,6 +480,8 @@ findFixpoint' grin (HcHash _ mp) eq = do
     funcMap <- cmap (funcEq eq)
     heapMap <- cmap (heapEq eq)
     argMap <- newIORef mempty
+
+
     let cheaps = Map.fromList [ ((-x),setNodes [(t,(map z xs))]) | (HcNode t xs,x) <- Map.toList mp ] where
         z (Right n) = setHeaps [(-n)]
         z (Left (Var v _)) = case Map.lookup v varMap of
@@ -578,10 +593,10 @@ findFixpoint' grin (HcHash _ mp) eq = do
             p' <- newVal p
             dynamicRule p' $ \p -> flip mapM_ (Set.toList (getHeaps p)) $ \h -> do
                 case Map.lookup h heapMap of
-                    Just (e',_) -> dynamicRule e' $ \e -> do
+                    Just (e',(x,_)) | True || x /= UnsharedEval -> dynamicRule e' $ \e -> do
                         flip mapM_ (fsts [ runIdentity $ Map.lookup (tagFlipFunction n) funcMap | n <- (Set.toList $ getNodes e), tagIsSuspFunction n ]) $ \z -> do
                             e' `isSuperSetOf` z
-                    Nothing -> return ()
+                    _ -> return ()
 
         procApp a ps = do
             unless (tagIsFunction a) $ fail "procApp: not function"
