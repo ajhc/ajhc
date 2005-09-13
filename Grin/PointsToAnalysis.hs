@@ -501,22 +501,22 @@ findFixpoint' grin (HcHash _ mp) eq = do
                 v' <- newVal v
                 x' <- newVal x
                 modifiedSuperSetOf self v' $ \v -> let
-                    ns = Set.fromList $ concat [ incp (fromAtom n) | n <- Set.toList (getNodes v), tagIsPartialAp n ]
+                    ns = Set.fromList $ concatMap incp (Set.toList (getNodes v))
                     as = Map.fromList $ concat [
-                            do nn <- incp (fromAtom n)
+                            do nn <- incp n
                                return ((nn,i),v)
-                        | ((n,i),v) <- Map.toList (getNodeArgs v), tagIsPartialAp n]
+                        | ((n,i),v) <- Map.toList (getNodeArgs v)]
                    in VsNodes as ns
 
                 dynamicRule v' $ \v -> do
-                    flip mapM_ (concat [  fmap ((,) n) (incp (fromAtom n))  | n <- (allNodes v), tagIsPartialAp n ]) $ \(on,n) -> do
+                    flip mapM_ (concat [  fmap ((,) n) (incp n)  | n <- (allNodes v) ]) $ \(on,n) -> do
                         (ts,_) <- findArgsType (grinTypeEnv grin) n
                         let mm = Map.fromList $ concat [ Map.lookup (on,i) (getNodeArgs v) >>= return . ((,) (n,i)) |  i <- [0 .. length ts ]]
                         self `isSuperSetOf` value (pruneNodes $ VsNodes mm mempty)
                         modifiedSuperSetOf self x' $ \x ->
                                 pruneNodes $ VsNodes (Map.singleton (n,length ts - 1) x) Set.empty
-                    sequence_ $ concat [  papp'' (fromAtom n) i a | ((n,i),a) <- Map.toList (getNodeArgs v), tagIsPartialAp n ]
-                    sequence_ $ concat [  papp' (fromAtom n) x'  | n <- Set.toList (getNodes v), tagIsPartialAp n ]
+                    sequence_ $ concat [  papp'' n i a | ((n,i),a) <- Map.toList (getNodeArgs v) ]
+                    sequence_ $ concat [  papp' n x'  | n <- Set.toList (getNodes v) ]
             pp (Down p a i) = do
                 p' <- newVal p
                 modifiedSuperSetOf self p' $ \p -> case Map.lookup (a,i) (getNodeArgs p) of
@@ -574,6 +574,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
                                 Nothing -> return ()
                         _ -> return ()
         procApp a ps = do
+            unless (tagIsFunction a) $ fail "procApp: not function"
             argMap <- readIORef argMap
             flip mapM_ (zip [0..] ps) $ \ (i,p) -> do
                 case Map.lookup (a,i) argMap of
