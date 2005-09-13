@@ -249,8 +249,8 @@ compileModEnv' stats ho = do
     wdump FD.Progress $ printEStats lc
     wdump FD.Progress $ putErrLn "Converting to Grin..."
     x <- Grin.FromE.compile dataTable (error "vmap") (eToSC dataTable lc)
-    --Stats.print "Grin" Stats.theStats
-    --wdump FD.GrinPreeval $ printGrin x
+    Stats.print "Grin" Stats.theStats
+    wdump FD.Grin $ printGrin x
     x <- return $ normalizeGrin x
     typecheckGrin x
     let opt x = do
@@ -268,8 +268,9 @@ compileModEnv' stats ho = do
     x <- return $ normalizeGrin x
     typecheckGrin x
     wdump FD.GrinPreeval $ printGrin x
-    wdump FD.Progress $ putErrLn "Linear nodes analysis..."
-    lr <- Grin.Linear.grinLinear x
+    --wdump FD.Progress $ putErrLn "Linear nodes analysis..."
+    --lr <- Grin.Linear.grinLinear x
+    --mapM_ CharIO.print lr
     wdump FD.Progress $ putErrLn "Points-to analysis..."
     x <- Grin.PointsToAnalysis.grinInlineEvalApply x
     typecheckGrin x

@@ -117,8 +117,8 @@ instance Monoid ValueSet where
     mempty = VsEmpty
     mappend VsEmpty x = x
     mappend x VsEmpty = x
-    mappend (VsBas a) (VsBas b) | a == b = VsBas a
-    mappend (VsBas a) (VsBas b) = VsBas (a ++ b)
+    mappend (VsBas a) (VsBas b) = VsBas a
+    --mappend (VsBas a) (VsBas b) = VsBas (a ++ b)
     mappend (VsHeaps a) (VsHeaps b) = VsHeaps (Set.union a b)
     mappend (VsNodes a a') (VsNodes b b') = pruneNodes $ VsNodes (Map.unionWith mappend a b) (Set.union a' b')
     mappend x y = error $ "mappend: " ++ show x <+> show y
@@ -194,8 +194,8 @@ flattenPointsToEq eq = varEq_u f . funcEq_u f . heapEq_u h . appEq_u g $ eq  whe
 
 
 
-newHeap ht p@(Con a ps)
-    | tagIsSuspFunction a, Identity t <- tagToFunction a = newHeap' ht (mappend p (Func t))
+--newHeap ht p@(Con a ps)
+--    | tagIsSuspFunction a, Identity t <- tagToFunction a = newHeap' ht (mappend p (Func t))
 newHeap ht p = newHeap' ht p
 
 
@@ -223,7 +223,8 @@ analyze grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinC
         f (eq,hc) (n,l) | n == funcApply = (eq,hc)
         f (eq,hc) (n,l) = mapFst (mappend eq) $ collect hc (mh eq + 1) n l
         mh PointsToEq { heapEq = xs } = maximum $ 1:fsts xs
-        toHEq (NodeC t []) | not (tagIsWHNF t) = return (SharedEval,Union [Con t [], func (fromAtom t) ] )
+        --toHEq (NodeC t []) | not (tagIsWHNF t) = return (SharedEval,Union [Con t [], func (fromAtom t) ] )
+        toHEq (NodeC t []) | not (tagIsWHNF t) = return (SharedEval,Con t []  )
         toHEq node = toPos node >>= return . (,) Constant
         (heapEq',hc') = runState (sequence [ toHEq node >>= return . (,) h | (v,node) <- cafs | h <- [1..] ]) emptyHcHash
         eq = mempty {
@@ -348,7 +349,7 @@ collect hc st fname (Tup vs :-> exp')
 
     g (App fe [v]) | fe == funcEval = do
         x <- toPos v
-        --tell mempty { appEq = [(funcEval,[x])] }
+        tell mempty { appEq = [(funcEval,[x])] }
         return $ Complex funcEval [Complex funcFetch [x]]
     g (App fe [v,x]) | fe == funcApply = do
         v <- toPos v
@@ -363,20 +364,20 @@ collect hc st fname (Tup vs :-> exp')
         return $ Func a
     g Return { expValue = n@(NodeC _ (_:_)) } = do
         p@(Con a ts) <- toPos n
-        case fromAtom a of
-            'F':rs -> tell mempty { appEq = [(toAtom ('f':rs),ts)] }
-            'B':rs -> tell mempty { appEq = [(toAtom ('b':rs),ts)] }
-            _ -> return ()
+        --case fromAtom a of
+        --    'F':rs -> tell mempty { appEq = [(toAtom ('f':rs),ts)] }
+        --    'B':rs -> tell mempty { appEq = [(toAtom ('b':rs),ts)] }
+        --    _ -> return ()
         return p
     g (Return { expValue = val }) = toPos val
     g Store { expValue = NodeC t _ } | t == tagHole = do
         newHeap RecursiveThunk mempty
     g Store { expValue = n@(NodeC _ (_:_)) } = do
         p@(Con a ts) <- toPos n
-        case fromAtom a of
-            'F':rs -> tell mempty { appEq = [(toAtom ('f':rs),ts)] }
-            'B':rs -> tell mempty { appEq = [(toAtom ('b':rs),ts)] }
-            _ -> return ()
+        --case fromAtom a of
+        --    'F':rs -> tell mempty { appEq = [(toAtom ('f':rs),ts)] }
+        --    'B':rs -> tell mempty { appEq = [(toAtom ('b':rs),ts)] }
+        --    _ -> return ()
         newHeap SharedEval p
     g (Store { expValue = val }) = do
         v <- toPos val
@@ -573,6 +574,15 @@ findFixpoint' grin (HcHash _ mp) eq = do
                                 Just arg -> arg `isSuperSetOf` p2'
                                 _ -> return ()
                         _ -> return ()
+        procApp a [p] | a == funcEval = do
+            p' <- newVal p
+            dynamicRule p' $ \p -> flip mapM_ (Set.toList (getHeaps p)) $ \h -> do
+                case Map.lookup h heapMap of
+                    Just (e',_) -> dynamicRule e' $ \e -> do
+                        flip mapM_ (fsts [ runIdentity $ Map.lookup (tagFlipFunction n) funcMap | n <- (Set.toList $ getNodes e), tagIsSuspFunction n ]) $ \z -> do
+                            e' `isSuperSetOf` z
+                    Nothing -> return ()
+
         procApp a ps = do
             unless (tagIsFunction a) $ fail "procApp: not function"
             argMap <- readIORef argMap
@@ -582,9 +592,9 @@ findFixpoint' grin (HcHash _ mp) eq = do
                     Nothing -> return ()
 
         simplePos p | Just x <- constPos p = return $ value x
-        simplePos (Variable v) = case Map.lookup v varMap of
+        simplePos var@(Variable v) = case Map.lookup v varMap of
             Just (x,_) -> return x
-            Nothing -> error "varMap has no var"
+            Nothing -> error $ "varMap has no var:" ++ show var
         simplePos (Func v) = case Map.lookup v funcMap of
             Just (x,_) -> return x
             Nothing -> error "funcMap has no var"

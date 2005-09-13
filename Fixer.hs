@@ -97,9 +97,7 @@ propegateValue p (IV v) = do
     if isBottom diff then return () else do
     as <- readIORef (action v)
     writeIORef (current v) (p `lub` c)
-    --writeIORef (pending v) bottom
     mapM_ ($ diff) as
-    --f vs True
     -}
 
 

@@ -183,7 +183,10 @@ applySubstE env x = f x where
     f x = error $ "applySubstE: " ++ show x
 
 applySubst env x = f x where
-    f (Var v _) | Just n <- Map.lookup v env =  return n
+    f var@(Var v _)
+        | Just n <- Map.lookup v env =  return n
+        -- | V n <- v, n < 0 = return var
+        -- | otherwise = error $ "Var not found: " ++ show var
     f (NodeC t vs) = do
         vs' <- mapM f vs
         return $ NodeC t vs'
