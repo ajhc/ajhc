@@ -84,7 +84,7 @@ instance Monoid Pos where
         f (x:xs) ys = f xs (x:ys)
 
 
-data ValueSet = VsEmpty | VsNodes (Map.Map (Atom,Int) ValueSet) (Set.Set Atom)  | VsHeaps !(Set.Set Int) | VsBas
+data ValueSet = VsEmpty | VsNodes (Map.Map (Atom,Int) ValueSet) (Set.Set Atom)  | VsHeaps !(Set.Set Int) | VsBas String
     deriving(Eq,Ord)
     {-! derive: is !-}
 
@@ -104,7 +104,7 @@ getNodeArgs VsEmpty = Map.empty
 getNodeArgs (VsNodes s _) = s
 getNodeArgs x = error $ "getNodeArgs: " ++ show x
 
-vsBas = VsBas
+vsBas = VsBas ""
 setNodes [] = VsEmpty
 setNodes xs = pruneNodes $ VsNodes (Map.fromList $ concat [ [ ((n,i),a) | a <- as | i <- [0..] ] | (n,as) <- xs]) (Set.fromList (fsts xs))
 setHeaps [] = VsEmpty
@@ -117,7 +117,8 @@ instance Monoid ValueSet where
     mempty = VsEmpty
     mappend VsEmpty x = x
     mappend x VsEmpty = x
-    mappend VsBas VsBas = VsBas
+    mappend (VsBas a) (VsBas b) | a == b = VsBas a
+    mappend (VsBas a) (VsBas b) = VsBas (a ++ b)
     mappend (VsHeaps a) (VsHeaps b) = VsHeaps (Set.union a b)
     mappend (VsNodes a a') (VsNodes b b') = pruneNodes $ VsNodes (Map.unionWith mappend a b) (Set.union a' b')
     mappend x y = error $ "mappend: " ++ show x <+> show y
@@ -131,18 +132,18 @@ instance Fixable ValueSet where
     isBottom _ = False
     minus a VsEmpty = a
     minus VsEmpty _ = VsEmpty
-    minus VsBas VsBas = VsEmpty
+    minus (VsBas _) (VsBas _) = VsEmpty
     minus (VsHeaps h1) (VsHeaps h2) = VsHeaps (h1 Set.\\ h2)
     minus (VsNodes n1 w1) (VsNodes n2 w2) = pruneNodes $ VsNodes (Map.fromList $ concat [
-            do v' <- Map.lookup (a,i) n2
-               let m =  v `minus` v'
-               if isBottom m then [] else [((a,i),m)]
+            case Map.lookup (a,i) n2 of
+                Just v' ->  [((a,i),v `minus` v')]
+                Nothing ->  [((a,i),v)]
         | ((a,i),v) <- Map.toList n1 ] ) (w1 Set.\\ w2)
     minus x y = error $ "minus: " ++ show x <+> show y
 
 instance Show ValueSet where
     showsPrec x VsEmpty = \xs -> '{':'}':xs
-    showsPrec x VsBas = \xs -> 'B':'a':'s':xs
+    showsPrec x (VsBas a) = \xs -> '(':'B':'a':'s':':':a ++ ")" ++ xs
     showsPrec x (VsHeaps s)
         | Set.size s > 7  = braces (hcat (intersperse (char ',') $ map tshow  (take 7 $ Set.toAscList s)) <> text ",...")
         | otherwise  = braces (hcat (intersperse (char ',') $ map tshow  ( Set.toAscList s)) )
@@ -246,6 +247,15 @@ analyze grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinC
         mapM_ CharIO.print $ sort $ updateEq neq
         CharIO.putStrLn "heaps:"
         mapM_ CharIO.print $ sort $ heapEq neq
+        let vm = Map.fromList (varEq neq)
+            (HcHash _ mp) = hc
+            cheaps = sort [ ((-x),setNodes [(t,(map z xs))]) | (HcNode t xs,x) <- Map.toList mp ] where
+            z (Right n) = setHeaps [(-n)]
+            z (Left (Var v _)) = case Map.lookup v vm of
+                Just (Ptr h) -> setHeaps [h]
+                _ -> error "cheaps"
+            z (Left x) = VsBas (show x)
+        mapM_ CharIO.print $ sort $ cheaps
         CharIO.putStrLn "applys:"
         mapM_ CharIO.print $ sort $ applyEq neq
     doTime "findFixpoint" $ findFixpoint' grin hc neq
@@ -292,7 +302,7 @@ grinInlineEvalApply  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFun
         g (Case v@(Var vr _) xs) = docase v (map f xs) (tags vr)
         g (Case v xs) = Case v (map f xs)
         g x = x
-        tags v = if x == vsBas then Nothing else Just [ t | t <- Set.toList vs] where
+        tags v = if isVsBas x then Nothing else Just [ t | t <- Set.toList vs] where
               vs = getNodes   x
               x = case Map.lookup v (ptVars pt) of
                 Just x -> x
@@ -436,7 +446,7 @@ constPos (Con a []) = return (setNodes [(a,[])])
 constPos (Con a xs) = do
     cs <- mapM constPos xs
     return (setNodes [(a,cs)])
-constPos (Tuple []) = return vsBas
+constPos (Tuple []) = return $ VsBas "()"
 constPos (Tuple ts) = constPos (Con tupleName ts)
 constPos (Union cs) = do
     cs' <- mapM constPos cs
@@ -458,7 +468,10 @@ findFixpoint' grin (HcHash _ mp) eq = do
     argMap <- newIORef mempty
     let cheaps = Map.fromList [ ((-x),setNodes [(t,(map z xs))]) | (HcNode t xs,x) <- Map.toList mp ] where
         z (Right n) = setHeaps [(-n)]
-        z (Left _) = vsBas
+        z (Left (Var v _)) = case Map.lookup v varMap of
+            Just (_,(Ptr h)) -> setHeaps [h]
+            _ -> error "cheaps"
+        z (Left i) = VsBas (show i)
 
     let procPos self p = pp p where
             pp p | Just c <- constPos p = self `isSuperSetOf` value c
@@ -469,17 +482,17 @@ findFixpoint' grin (HcHash _ mp) eq = do
             pp (PIf True p a t) = do
                 p' <- newVal p
                 t' <- newVal t
-                --conditionalRule (Set.member a . getNodes) p' $ do self `isSuperSetOf` t' -- TODO
-                self `isSuperSetOf` t'
+                conditionalRule (Set.member a . getNodes) p' $ do self `isSuperSetOf` t' -- TODO
+                --self `isSuperSetOf` t'
             pp (PCase p vs e) = do
                 p' <- newVal p
                 e' <- newVal e
                 flip mapM_ vs $ \ (a,w) -> do
                     w' <- newVal w
-                    --conditionalRule (Set.member a . getNodes) p' $ do self `isSuperSetOf` w'  -- TODO
-                    self `isSuperSetOf` w'
-                self `isSuperSetOf` e' -- TODO make this better
-                -- conditionalRule (\x -> not $ or [ Set.member a (getNodes x) | (a,_) <- vs]) p' $ do self `isSuperSetOf` e'  -- TODO, should only fire once
+                    conditionalRule (Set.member a . getNodes) p' $ do self `isSuperSetOf` w'  -- TODO
+                    --self `isSuperSetOf` w'
+                --self `isSuperSetOf` e' -- TODO make this better
+                conditionalRule (\x -> not $ or [ Set.member a (getNodes x) | (a,_) <- vs]) p' $ do self `isSuperSetOf` e'  -- TODO, should only fire once
             pp cc@(Complex a [p])
                 | a == funcEval = do
                     p' <- newVal p
@@ -502,21 +515,22 @@ findFixpoint' grin (HcHash _ mp) eq = do
                 x' <- newVal x
                 modifiedSuperSetOf self v' $ \v -> let
                     ns = Set.fromList $ concatMap incp (Set.toList (getNodes v))
-                    as = Map.fromList $ concat [
-                            do nn <- incp n
-                               return ((nn,i),v)
-                        | ((n,i),v) <- Map.toList (getNodeArgs v)]
+                    as = Map.fromList $  [ ((nn,i),v) | ((n,i),v) <- Map.toList (getNodeArgs v), nn <- incp n ]
                    in VsNodes as ns
 
                 dynamicRule v' $ \v -> do
                     flip mapM_ (concat [  fmap ((,) n) (incp n)  | n <- (allNodes v) ]) $ \(on,n) -> do
                         (ts,_) <- findArgsType (grinTypeEnv grin) n
-                        let mm = Map.fromList $ concat [ Map.lookup (on,i) (getNodeArgs v) >>= return . ((,) (n,i)) |  i <- [0 .. length ts ]]
-                        self `isSuperSetOf` value (pruneNodes $ VsNodes mm mempty)
+                        --let mm = Map.fromList $ concat [ Map.lookup (on,i) (getNodeArgs v) >>= return . ((,) (n,i)) |  i <- [0 .. length ts ]]
+                        --self `isSuperSetOf` value (pruneNodes $ VsNodes mm mempty)
                         modifiedSuperSetOf self x' $ \x ->
                                 pruneNodes $ VsNodes (Map.singleton (n,length ts - 1) x) Set.empty
-                    sequence_ $ concat [  papp'' n i a | ((n,i),a) <- Map.toList (getNodeArgs v) ]
-                    sequence_ $ concat [  papp' n x'  | n <- Set.toList (getNodes v) ]
+                        return ()
+                    flip mapM_ (Set.toList (getNodes v)) $ \n -> do
+                         case tagUnfunction n of
+                            Just (1,fn) -> self `isSuperSetOf` (fst $ runIdentity $ Map.lookup fn funcMap)
+                            _ -> return ()
+                    --sequence_ $ concat [  papp'' n i a | ((n,i),a) <- Map.toList (getNodeArgs v) ]
             pp (Down p a i) = do
                 p' <- newVal p
                 modifiedSuperSetOf self p' $ \p -> case Map.lookup (a,i) (getNodeArgs p) of
@@ -526,7 +540,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
                 x <- getArg a i
                 self `isSuperSetOf` x
             pp (Con n as) = do
-                as'' <- mapM newVal as ;
+                as'' <- mapM newVal as
                 self `isSuperSetOf` value (VsNodes mempty (Set.singleton n))
                 flip mapM_ (zip [(0 :: Int) ..] as'') $ \ (i,a) -> do
                     modifiedSuperSetOf self a $ \a' -> pruneNodes $ VsNodes (Map.singleton (n,i) a') (Set.singleton n)
@@ -539,9 +553,9 @@ findFixpoint' grin (HcHash _ mp) eq = do
             papp' t x'
                 | Just (1,fn) <- tagUnfunction t = return $ do
                     self `isSuperSetOf` (fst $ runIdentity $ Map.lookup fn funcMap) -- cp (Func (toAtom $ 'f':xs))
-                    (ts,_) <- findArgsType (grinTypeEnv grin) fn
-                    av <- getArg fn (length ts - 1)
-                    av `isSuperSetOf` x'
+                    --(ts,_) <- findArgsType (grinTypeEnv grin) fn
+                    --av <- getArg fn (length ts - 1)
+                    --av `isSuperSetOf` x'
                 | otherwise = fail "not papp'"
             incp t | Just (n,fn) <- tagUnfunction t, n > 1 = return (partialTag fn (n - 1))
             incp _ = fail "not incp"
@@ -553,17 +567,19 @@ findFixpoint' grin (HcHash _ mp) eq = do
                 case Map.lookup h heapMap of
                     Just (e,_) -> e `isSuperSetOf` p2'
                     Nothing -> return ()
-        procApply p1 p2 = do
-            p1' <- newVal p1
-            p2' <- newVal p2
+        procApply xp1 xp2 = do
+            p1' <- newVal xp1
+            p2' <- newVal xp2
             dynamicRule p1' $ \p1 -> do
                 argMap <- readIORef argMap
                 flip mapM_ (Map.toList (getNodeArgs p1)) $ \ ((a,i),v) -> do
                     case tagUnfunction a of
                         Just (1,fn) -> do
                             case Map.lookup (fn,i) argMap of
-                                Nothing -> return ()
-                                Just arg -> arg `isSuperSetOf` value v
+                                Just arg -> do
+                                    CharIO.print ("arg", (xp1,xp2), (fn,i), v)
+                                    arg `isSuperSetOf` value v
+                                _  -> return ()
                         _ -> return ()
 
                 flip mapM_ (Set.toList (getNodes p1)) $ \ a -> do
@@ -571,7 +587,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
                         Just (1,fn) -> do
                             case Map.lookup (fn,length (fst $ runIdentity $  findArgsType (grinTypeEnv grin) fn) - 1) argMap of
                                 Just arg -> arg `isSuperSetOf` p2'
-                                Nothing -> return ()
+                                _ -> return ()
                         _ -> return ()
         procApp a ps = do
             unless (tagIsFunction a) $ fail "procApp: not function"
@@ -582,8 +598,12 @@ findFixpoint' grin (HcHash _ mp) eq = do
                     Nothing -> return ()
 
         simplePos p | Just x <- constPos p = return $ value x
-        simplePos (Variable v) = liftM fst $ Map.lookup v varMap
-        simplePos (Func v) = liftM fst $  Map.lookup v funcMap
+        simplePos (Variable v) = case Map.lookup v varMap of
+            Just (x,_) -> return x
+            Nothing -> error "varMap has no var"
+        simplePos (Func v) = case Map.lookup v funcMap of
+            Just (x,_) -> return x
+            Nothing -> error "funcMap has no var"
         simplePos _ = fail "this pos is not simple"
         getArg a i = do
             CharIO.print ("getArg", a, i)
@@ -618,6 +638,10 @@ findFixpoint' grin (HcHash _ mp) eq = do
     ptVars <- readMap varMap
     ptFunc <- readMap funcMap
     ptHeap <- readMap heapMap
+
+    CharIO.putStrLn "argMap"
+    argMap <- readIORef argMap
+    mapM_  (\ (ai,x) -> readValue x >>= \x' -> CharIO.print (ai,x')) (Map.toList argMap)
 
     return PointsTo {
         ptVars = ptVars,
