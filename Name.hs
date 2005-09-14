@@ -78,26 +78,32 @@ fromValishHsName name
     | otherwise = toName Val name
     where x = head (hsIdentString . hsNameIdent  $ name)
 
+createName _ "" i = error $ "createName: empty module "  ++ i
+createName _ m "" = error $ "createName: empty ident "   ++ m
+createName t m i = Name $  toAtom $ (chr $ fromEnum t):m ++ "\NUL" ++ i
+createUName _ "" = error $ "createUName: empty ident"
+createUName t i =  Name $ toAtom $ (chr $ fromEnum t):"\NUL" ++ i
+
 class ToName a where
     toName :: NameType -> a -> Name
     fromName :: Name -> (NameType, a)
 
 instance ToName HsName where
-    toName nt n = Name $ toAtom $ (chr $ fromEnum nt):m ++ "\NUL" ++ i where
+    toName nt n = m where
         i = hsIdentString $ hsNameIdent n
-        m | Qual (Module m) _ <- n = m
-          | otherwise = ""
+        m | Qual (Module m) _ <- n = createName nt m i
+          | otherwise = createUName nt i
     fromName n = (nameType n, nameName n)
 
 instance ToName (String,String) where
-    toName nt (m,i) = Name $ toAtom $ (chr $ fromEnum nt):m ++ "\NUL" ++ i
+    toName nt (m,i) = createName nt m i
     fromName n = (nameType n, mi ) where
         nn = nameName n
         mi  | Qual (Module m) (HsIdent i) <- nn = (m,i)
             | UnQual (HsIdent i) <- nn = ("",i)
 
 instance ToName String where
-    toName nt i = Name $ toAtom $ (chr $ fromEnum nt):"\NUL" ++ i
+    toName nt i = createUName nt i
     fromName n = (nameType n, m ++ i ) where
         nn = nameName n
         (m,i)  | Qual (Module m) (HsIdent i) <- nn = (m ++ ".",i)
@@ -124,7 +130,7 @@ setModule m n = qualifyName m  $ toUnqualified n
 
 
 parseName :: NameType -> String -> Name
-parseName t name = toName t (concatInter "." ms, concatInter "." (ns ++ [last sn])) where
+parseName t name = if not (null ms) then toName t (concatInter "." ms, concatInter "." (ns ++ [last sn])) else toName t (concatInter "." (ns ++ [last sn])) where
     sn = (split (== '.') name)
     (ms,ns) = span validMod (init sn)
     validMod (c:cs) = isUpper c && all (\c -> isAlphaNum c || c `elem` "_'") cs

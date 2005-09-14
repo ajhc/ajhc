@@ -6,6 +6,8 @@ import Boolean.TestCases
 import ArbitraryInstances()
 import PackedString
 import HasSize
+import Name
+import HsSyn
 
 
 
@@ -17,6 +19,7 @@ selfTest _ = do
     quickCheck prop_atomid
     testPackedString
     testHasSize
+    testName
 
 prop_atomid xs = fromAtom (toAtom xs) == (xs::String)
 
@@ -30,6 +33,22 @@ testPackedString = do
     quickCheck prop_pslen
     quickCheck prop_psappend
     quickCheck prop_psappend'
+
+testName = do
+    putStrLn "Testing Name"
+    let nn = not . null
+    let prop_tofrom t a b = nn a && nn b ==> fromName (toName t (a::String,b::String)) == (t,(a,b))
+        prop_pn t s = nn s ==> let (a,b) = fromName (parseName t s) in (a,b) == (t,s)
+        prop_acc t a b = nn a && nn b ==> let
+            n = toName t (a::String,b::String)
+            un = toUnqualified n
+            in  nameType n == t && getModule n == Just (Module a) && getModule un == Nothing && show un == b && show n == (a ++ "." ++ b)
+        prop_tup n = n >= 0 ==> fromUnboxedNameTuple (unboxedNameTuple RawType n) == Just n
+    quickCheck prop_tofrom
+    quickCheck prop_pn
+    quickCheck prop_acc
+    quickCheck prop_tup
+
 
 testBoolean = do
     quickCheck (\(x::Bool) -> prop_notnot x)
@@ -56,4 +75,8 @@ testHasSize = do
     quickCheck prop_gte
     quickCheck prop_lte
 
+
+
+instance Arbitrary NameType where
+    arbitrary = oneof $ map return [ TypeConstructor .. ] -- ,  DataConstructor, ClassName, TypeVal, Val, SortName, FieldLabel, RawType]
 
