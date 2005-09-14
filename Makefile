@@ -3,7 +3,7 @@ all:   jhc
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches -fno-warn-unused-binds    # -O2 -ddump-simpl-stats -ddump-rules
 GHCINC=  -iFrontEnd
-PACKAGES= -package mtl  -package unix  #  -prof -auto-all
+PACKAGES= -package mtl  -package unix -package QuickCheck  #  -prof -auto-all
 GHCOPTS=   -O   -pgmF drift-ghc  -F $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) -fwarn-type-defaults   -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
 
 HC = ghc

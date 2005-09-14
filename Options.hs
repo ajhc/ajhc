@@ -12,12 +12,14 @@ import System
 import System.Console.GetOpt
 import System.Info
 import System.IO.Unsafe
+import SelfTest(selfTest)
 import Version
 
 data Opt = Opt {
     optColumns     :: !Int,       -- ^ Width of terminal.
     optCompile     :: !Bool,      -- ^ Compile.
     optDebug       :: !Bool,      -- ^ Debugging.
+    optSelfTest    :: !Bool,      -- ^ Perform self-test
     optDump        ::  [String],  -- ^ Dump options (raw).
     optFOpts       ::  [String],  -- ^ Flag options (raw).
     optIncdirs     ::  [String],  -- ^ Include directories.
@@ -47,6 +49,7 @@ opt = Opt {
     optColumns     = getColumns,
     optCompile     = True,
     optDebug       = False,
+    optSelfTest    = False,
     optIncdirs     = initialIncludes,
     optHls         = [],
     optBuildHl     = "",
@@ -97,8 +100,9 @@ theoptions =
     , Option ['p'] []            (ReqArg (\d -> optHls_u (++ [d])) "file.hl") "Load given haskell library .hl file"
     , Option []    ["build-hl"]  (ReqArg (\d -> optBuildHl_s d) "file.hl") "Build hakell library from given list of modules"
     , Option []    ["interactive"] (NoArg  (optInteractive_s True)) "run interactivly"
-    , Option []    ["ignore-ho"] (NoArg  (optIgnoreHo_s True)) "Ignore existing haskell object files"
+    , Option []    ["ignore-ho"]  (NoArg  (optIgnoreHo_s True)) "Ignore existing haskell object files"
     , Option []    ["nowrite-ho"] (NoArg  (optNoWriteHo_s True)) "Do not write new haskell object files"
+    , Option []    ["selftest"]   (NoArg  (optSelfTest_s True)) "Perform internal integrity testing"
     ]
 
 -- | Width of terminal.
@@ -134,6 +138,10 @@ processOptions = do
                         putStr $ "jhc compiled by " ++ compilerName ++ "-" ++ showVersion compilerVersion
                         putStrLn $ " on a " ++ arch ++ " running " ++ os
                         putStrLn changes_txt
+                        exitSuccess
+                    (Opt { optSelfTest = True},_) -> do
+                        putStrLn "Starting self testing..."
+                        SelfTest.selfTest ns
                         exitSuccess
                     (o,"") -> return (o { optArgs = ns })
                     (_,err) -> putErrDie err
