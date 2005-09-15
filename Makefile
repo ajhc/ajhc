@@ -1,3 +1,4 @@
+JHC_VERSION=0.1
 
 all:   jhc
 
@@ -13,7 +14,7 @@ DRIFT= ../DrIFT/src/DrIFT
 
 ALLHS:=$(shell find . Grin Boolean Doc C E  FrontEnd DerivingDrift -maxdepth 1 -follow \( -name \*.hs -or -name \*.lhs \) -and \( \! -name Try\*.hs \) | sed -e 's@^\./@@')
 
-BUILTSOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs Version.hs
+BUILTSOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs Version.hs VersionCtx.hs
 
 
 # OBJS is defined in 'depend.make'
@@ -100,10 +101,19 @@ RawFiles.hs:  data/HsFFI.h data/jhc_rts.c
 FrontEnd/HsParser.hs: FrontEnd/HsParser.ly
 	happy -a -g -c FrontEnd/HsParser.ly
 
-Version.hs: _darcs/inventory 
+VersionCtx.hs: _darcs/inventory
 	darcs changes --context > changes.txt  || echo "No darcs Context Available!" > changes.txt
 	perl ./op_raw.prl $(basename $@) changes.txt > $@
 	rm -f changes.txt
+
+Version.hs: _darcs/inventory
+	echo "module Version where"                                     > $@
+	echo "jhcVersion = \"$(JHC_VERSION)\""                         >> $@
+	date +'compileDate = "%Y%m%d"'                                 >> $@
+	darcs changes -t '.' \
+	|  perl -e '<>;$$_=<>;s/^\s*tagged\s+/darcsTag = "/;s/$$/"/;print' >> $@
+	darcs changes --from-tag='' --xml-output | grep '</patch>' \
+	| wc -l | perl -e 'print "darcsPatches = \"".(<>-1)."\"\n"'    >> $@
 
 .PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs
 

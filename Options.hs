@@ -14,6 +14,7 @@ import System.Info
 import System.IO.Unsafe
 import {-# SOURCE #-} SelfTest(selfTest)
 import Version
+import VersionCtx
 
 data Opt = Opt {
     optColumns     :: !Int,       -- ^ Width of terminal.
@@ -32,6 +33,7 @@ data Opt = Opt {
     optArgs        ::  [String],
     optInteractive :: !Bool,      -- ^ Run interactively.
     optVersion     :: !Bool,      -- ^ Print version and die.
+    optVersionCtx  :: !Bool,      -- ^ Print version context and die.
     optInterpret   :: !Bool,      -- ^ Interpret.
     optKeepGoing   :: !Bool,      -- ^ Keep going when encountering errors.
     optMainFunc    ::  Maybe (Bool,String),    -- ^ Entry point name for the main function.
@@ -70,6 +72,7 @@ opt = Opt {
     optPrelude     = True,
     optVerbose     = 0,
     optVersion     = False,
+    optVersionCtx  = False,
     optDumpSet     = S.empty,
     optFOptsSet    = S.empty
 }
@@ -80,6 +83,7 @@ idu d ds = ds ++ [d]
 theoptions :: [OptDescr (Opt -> Opt)]
 theoptions =
     [ Option ['V'] ["version"]   (NoArg  (optVersion_s True))    "print version info and exit"
+    , Option []    ["version-context"] (NoArg  (optVersionCtx_s True)) "print version context (darcs changes) info and exit"
     , Option ['v'] ["verbose"]   (NoArg  (optVerbose_u (+1)))    "chatty output on stderr"
     , Option ['d'] []            (ReqArg (\d -> optDump_u (d:)) "dump-flag")  "dump specified data to stdout"
     , Option ['f'] []            (ReqArg (\d -> optFOpts_u (d:)) "flag")  "set compilation options"
@@ -135,8 +139,11 @@ processOptions = do
 	  (o,ns,[]) -> case postProcess (foldl (flip ($)) opt o) of
                 (o,"") -> case postProcess' o of
                     (Opt { optVersion = True },_) -> do
-                        putStr $ "jhc compiled by " ++ compilerName ++ "-" ++ showVersion compilerVersion
+                        putStr $ concat ["jhc ", jhcVersion, " ", compileDate, " (", darcsTag, "+",darcsPatches, ")\n"]
+                        putStr $ "compiled by " ++ compilerName ++ "-" ++ showVersion compilerVersion
                         putStrLn $ " on a " ++ arch ++ " running " ++ os
+                        exitSuccess
+                    (Opt { optVersionCtx = True },_) -> do
                         putStrLn changes_txt
                         exitSuccess
                     (Opt { optSelfTest = True},_) -> do
