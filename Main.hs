@@ -54,6 +54,8 @@ import qualified Info
 import qualified Stats
 import qualified System
 
+import E.Arbitrary()
+
 ---------------
 -- ∀α∃β . α → β
 ---------------

@@ -8,6 +8,10 @@ import PackedString
 import HasSize
 import Name
 import HsSyn
+import E.Arbitrary
+import Info
+import Monad
+import Data.Monoid
 
 
 
@@ -20,6 +24,8 @@ selfTest _ = do
     testPackedString
     testHasSize
     testName
+    testInfo
+    -- testE
 
 prop_atomid xs = fromAtom (toAtom xs) == (xs::String)
 
@@ -75,6 +81,14 @@ testHasSize = do
     quickCheck prop_gte
     quickCheck prop_lte
 
+
+testInfo = do
+    putStrLn "Testing Info"
+    i <- return mempty
+    unless (Info.lookup i == (Nothing :: Maybe Int)) $ fail "test failed..."
+    i <- return $ insert (3 :: Int) i
+    unless (Info.lookup i == (Just 3 :: Maybe Int)) $ fail "test failed..."
+    unless (Info.fetch (insert (5 :: Int) i) == ([] :: [Int])) $ fail "test failed..."
 
 
 instance Arbitrary NameType where
