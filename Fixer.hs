@@ -16,8 +16,10 @@ module Fixer(
     ) where
 
 import Data.IORef
-import Monad
+import Data.Unique
 import IO(hFlush, stdout)
+import Monad
+import qualified Data.Set as Set
 
 
 class Show a => Fixable a where
@@ -28,33 +30,51 @@ class Show a => Fixable a where
 
 data MkFixable = forall a . Fixable a => MkFixable (RvValue a)
 type Rules = IO ()
-newtype Fixer  = Fixer { vars :: IORef [MkFixable] }
+
+data Fixer  = Fixer {
+    vars :: !(IORef [MkFixable]),
+    todo :: !(IORef (Set.Set MkFixable))
+    }
+
 
 newFixer :: IO Fixer
 newFixer = do
     v <- newIORef []
-    return Fixer { vars = v }
+    t <- newIORef Set.empty
+    return Fixer { vars = v, todo = t }
 
 data Value a = ConstValue a | IV (RvValue a)
 
 
 data RvValue a = RvValue {
-    action :: IORef [a -> IO ()],
-    pending :: IORef a,
-    current :: IORef a
+    ident :: {-# UNPACK #-} !Unique,
+    action :: !(IORef [a -> IO ()]),
+    pending :: !(IORef a),
+    current :: !(IORef a),
+    fixer :: Fixer
     }
 
+instance Eq MkFixable where
+    MkFixable a == MkFixable b = ident a == ident b
+    MkFixable a /= MkFixable b = ident a /= ident b
+instance Ord MkFixable where
+    MkFixable a `compare` MkFixable b = ident a `compare` ident b
+    MkFixable a >= MkFixable b = ident a >= ident b
+    MkFixable a <= MkFixable b = ident a <= ident b
+    MkFixable a > MkFixable b = ident a > ident b
+    MkFixable a < MkFixable b = ident a < ident b
 
 value :: a -> Value a
 value x = ConstValue x
 
 newValue :: Fixable a => Fixer -> a -> IO (Value a)
-newValue Fixer { vars = vars } v = do
+newValue fixer@Fixer { vars = vars } v = do
+    ident <- newUnique
     pending <- newIORef bottom
     current <- newIORef bottom
     action <- newIORef []
     let value =  IV rv
-        rv =  RvValue { current = current, pending = pending, action = action }
+        rv =  RvValue { ident = ident, fixer = fixer, current = current, pending = pending, action = action }
     modifyIORef vars (MkFixable rv:)
     propegateValue v value
     return value
@@ -90,6 +110,8 @@ propegateValue :: Fixable a => a -> Value a -> IO ()
 propegateValue a _ | isBottom a = return ()
 propegateValue _ (ConstValue _) = fail "Fixer: You cannot modify a constant value"
 propegateValue p (IV v) = do
+    if isBottom p then return () else do
+    (modifyIORef (todo $ fixer v) (Set.insert $ MkFixable v))
     modifyIORef (pending v) (lub p)
     {-
     c <- readIORef (current v)
@@ -107,10 +129,15 @@ readValue (ConstValue v) = return v
 
 
 findFixpoint :: Fixer -> IO ()
-findFixpoint Fixer { vars = vars } = do
+findFixpoint Fixer { vars = vars, todo = todo } = do
+    to <- readIORef todo
     vars <- readIORef vars
     putStrLn $ "Fixer: " ++ show (length vars)
-    let f [] n | n > 0 = putStr "(" >> putStr (show n) >> putStr ")" >> hFlush stdout >> f vars 0
+    let f [] n | n > 0 = do
+            vs <- readIORef todo
+            writeIORef todo Set.empty
+            putStr "(" >> putStr (show n) >> putStr ")" >> hFlush stdout
+            f (Set.toList vs) 0
         f [] _ = putStrLn "" >> return ()
         f (MkFixable v:vs) n = do
             p <- readIORef (pending v)
@@ -125,7 +152,7 @@ findFixpoint Fixer { vars = vars } = do
             --putStr "]"
             mapM_ ($ diff) as
             f vs $! (n + 1)
-    f vars (0::Int)
+    f (Set.toList to) (0::Int)
 
 
 
