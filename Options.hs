@@ -12,7 +12,7 @@ import System
 import System.Console.GetOpt
 import System.Info
 import System.IO.Unsafe
-import SelfTest(selfTest)
+import {-# SOURCE #-} SelfTest(selfTest)
 import Version
 
 data Opt = Opt {
