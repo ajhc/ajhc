@@ -177,8 +177,6 @@ instance TypeNames Name where
     tChar = toName TypeConstructor $ hsname "Prelude" "Char"
     tStar = toName SortName $ hsname "Prelude" "*"
     tUnit = toName TypeConstructor $ hsname "Prelude" "()"
-    --tIntzh = toName TypeConstructor $ hsname "Prelude" "Int#"
-    --tCharzh = toName TypeConstructor $ hsname "Prelude" "Char#"
     tIntzh = toName RawType "int"
     tCharzh = toName RawType "uint32_t"
     tIntegerzh = toName RawType "intmax_t"

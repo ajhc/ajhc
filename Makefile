@@ -60,7 +60,7 @@ regress: jhc Try-Regress.hs
 #
 
 hsdocs:
-	haddock -h $(filter-out %/HsParser.hs FrontEnd/Representation.hs C/Gen.hs DData/% E/Subst.hs, $(OBJS:.o=.hs)) -o hsdocs
+	haddock -h $(filter-out SelfTest.hs %/HsParser.hs FrontEnd/Representation.hs C/Gen.hs DData/% E/Subst.hs, $(OBJS:.o=.hs)) -o hsdocs
 
 printos:
 	echo $(ALLHS)
