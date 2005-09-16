@@ -7,7 +7,6 @@ import qualified Data.Graph
 import Data.Graph hiding(Graph)
 import GenUtil
 import Array
---import qualified Map
 import List(sort,sortBy,group,delete)
 
 
@@ -20,7 +19,6 @@ newGraph :: Ord k => [n] -> (n -> k) -> (n -> [k]) -> Graph n k
 newGraph ns fn fd = Graph ans lv' kv fn where
     (ans,lv,kv) = graphFromEdges [ (n,fn n,snub $ fd n) | n <- ns ]
     lv' x | (n,_,_) <- lv x = n
-    --kv a = Map.lookup a $ Map.fromList $  zip (sort $ map fn ns) [0..]
 
 fromScc (Left n) = [n]
 fromScc (Right n) = n
@@ -41,7 +39,6 @@ findLoopBreakers func (Graph g ln kv fn) = ans where
         f g (n:_) fs lb = f ng (Data.Graph.scc ng) [] (mv:lb) where
             ((mv,_):_) = sortBy (\ a b -> compare (snd b) (snd a)) [ (v,func (ln v)) | v <- ns]
             ns = dec n []
-            -- ng =  -- (g // [(n,[ x | x <- g!n, x /= mv]) | n <- ns])
             ng = fmap (List.delete mv) g
 
         f _ [] xs lb = (map (ln . head) (group $ sort lb),reverse $ map ln xs)
@@ -50,7 +47,6 @@ findLoopBreakers func (Graph g ln kv fn) = ans where
 
 sccGroups :: Graph n k -> [[n]]
 sccGroups g = map fromScc (GraphUtil.scc g)
-
 
 scc :: Graph n k -> [Either n [n]]
 scc (Graph g ln kv fn) = map decode forest where
@@ -72,4 +68,3 @@ topSort (Graph g ln _ _) = map ln $ Data.Graph.topSort g
 cyclicNodes :: Graph n k -> [n]
 cyclicNodes g = concat [ xs | Right xs <- GraphUtil.scc g]
 
---reachable :: Graph n k -> [k] -> [k]

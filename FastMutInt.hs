@@ -1,23 +1,8 @@
 {-# OPTIONS -cpp #-}
---
--- (c) The University of Glasgow 2002
---
--- Unboxed mutable Ints
-
--- arch-tag: cc964025-cbad-4910-8f56-5d54d5b1a006
-
-
-{-# OPTIONS -cpp #-}
 module FastMutInt(
 	FastMutInt, newFastMutInt,
 	readFastMutInt, writeFastMutInt
   ) where
-
-
-
---  #define SIZEOF_HSINT 4
-
-
 
 
 import GHC.Base

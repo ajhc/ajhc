@@ -147,8 +147,6 @@ processDecls stats ho ho' tiData = do
         lc <- doopt' False stats "Float Inward..." (\stats x -> return (floatInward allRules x))  lc
         lc <- doopt' False stats "SuperSimplify" cm lc
         wdump FD.Lambdacube $ printCheckName fullDataTable lc
-        --let bs = annotateBindings mempty lc
-        --mapM_ putErrLn  [ tvrShowName x <+> "->" <+> tshow y | (x,y) <- Map.toList bs]
         wdump FD.Progress $ putErr "."
         return ((n,v,lc):ds, Map.insert (tvrNum v) lc smap )
     let reached = Set.fromList [ tvrNum b | (_,b,_) <- reachable graph  [ tvrNum b | (n,b,_) <- ds, isExported n]]
@@ -183,14 +181,13 @@ compileModEnv' stats ho = do
 
     --mapM_ putErrLn ([ show x <+> "::" <+> render (ePretty ty) | (x,(TVr _ ty,_)) <- Map.toList $ hoEs ho])
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
-    --wdump FD.Progress $ showHoCounts ho
 
     when (dump FD.ClassSummary) $ do
         putStrLn "  ---- class summary ---- "
         printClassSummary (hoClassHierarchy ho)
     when (dump FD.Class) $ do
-            putStrLn "  ---- class hierarchy ---- "
-            printClassHierarchy (hoClassHierarchy ho)
+        putStrLn "  ---- class hierarchy ---- "
+        printClassHierarchy (hoClassHierarchy ho)
     es' <- createMethods dataTable (hoClassHierarchy ho) (hoEs ho)
     es' <- return [ (x,y,floatInward rules z) | (x,y,z) <- es' ]
     wdump FD.Class $ do
@@ -200,24 +197,16 @@ compileModEnv' stats ho = do
     let ds = ((main,mainv):Map.elems es)
     let ds' = reachable (newGraph ds (tvrNum . fst) (\(t,e) -> freeVars e `mappend` Set.toList (ruleFreeVars rules t)) ) [tvrNum main]
 
-    --wdump FD.Progress $ putErrLn $ "Functions culled: " ++ show (length ds - length ds')
     let lco = ELetRec ds'  (EVar main)
     --typecheck dataTable lco
     wdump FD.Rules $ printRules rules
     let opt = doopt (mangle dataTable) True stats
 
-    let pe = ePrettyEx
-    --let esimplify = E.Simplify.simplify mempty { so_dataTable = dataTable, so_properties = (if fopts FO.InlinePragmas then  hoProps ho else mempty), so_rules = rules }
-    --let esimplify = E.Simplify.simplify ((if fopts FO.InlinePragmas then  hoProps ho else mempty)) dataTable
     lc <- mangle dataTable True "Barendregt" (return . barendregt) lco
     wdump FD.Progress $ printEStats lc
     let cm stats e = do
         let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable, SS.so_properties = (if fopts FO.InlinePragmas then  hoProps ho else mempty) }
         let (e',stat,occ) = SS.simplify sopt e
-        --let (e'',_,_occ) = collectOcc [] rules dataTable e
-        --mapM_ (putDocMLn CharIO.putErr) $ [ pprint x <+> text "->" <+> tshow y|  (x,y) <- Map.toList occ]
-        --putErrLn ">>> Funzo"
-        --printCheckName dataTable e''
         Stats.tickStat stats stat
         return e'
     lc <- opt "SuperSimplify" cm lc
@@ -305,7 +294,6 @@ compileModEnv' stats ho = do
         let cf = (fn ++ "_code.c")
         wdump FD.Progress $ putErrLn ("Writing " ++ show cf)
         writeFile cf $ cg -- toUTF8  (prettyC z ++ concatMap (\(i,n) -> "//" ++ 'v':show i ++ " -> " ++ n ++ "\n") (snd us))
-        --let comm =  "gcc -std=gnu99 -g -Wall -o '" ++ fn ++ "' '" ++ cf ++ "'"
         let boehmOpts | fopts FO.Boehm = ["-DUSE_BOEHM_GC", "-lgc"]
                       | otherwise = []
         let comm = shellQuote $ [optCC options, "-std=gnu99", "-foptimize-sibling-calls", "-O", {- "-funit-at-a-time", -} "-g", "-Wall", "-o", fn, cf ] ++ rls ++ optCCargs options  ++ boehmOpts
