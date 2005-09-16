@@ -44,14 +44,14 @@ testName = do
     putStrLn "Testing Name"
     let nn = not . null
     let prop_tofrom t a b = nn a && nn b ==> fromName (toName t (a::String,b::String)) == (t,(a,b))
-        prop_pn t s = nn s ==> let (a,b) = fromName (parseName t s) in (a,b) == (t,s)
+        -- prop_pn t s = nn s ==> let (a,b) = fromName (parseName t s) in (a,b) == (t,s)
         prop_acc t a b = nn a && nn b ==> let
             n = toName t (a::String,b::String)
             un = toUnqualified n
             in  nameType n == t && getModule n == Just (Module a) && getModule un == Nothing && show un == b && show n == (a ++ "." ++ b)
         prop_tup n = n >= 0 ==> fromUnboxedNameTuple (unboxedNameTuple RawType n) == Just n
     quickCheck prop_tofrom
-    quickCheck prop_pn
+    -- quickCheck prop_pn
     quickCheck prop_acc
     quickCheck prop_tup
 
