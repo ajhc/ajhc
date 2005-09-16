@@ -78,7 +78,7 @@ data E = EAp E E
        eCaseAlts :: [Alt E],
        eCaseDefault :: (Maybe E)
        }
-	deriving(Data,Eq, Typeable, Show)
+	deriving(Data,Eq, Ord, Typeable, Show)
     {-! derive: is, from, GhcBinary !-}
 
 
@@ -158,7 +158,7 @@ instance Functor TVr' where
 
 --type Alt e = (Lit TVr e,e)
 data Alt e = Alt (Lit TVr e) e
-    deriving(Data,Show,Eq,Typeable)
+    deriving(Data,Show,Eq,Ord,Typeable)
        {-!derive: GhcBinary !-}
 
 altHead :: Alt E -> Lit () ()
