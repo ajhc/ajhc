@@ -43,7 +43,7 @@ MAIN=Main.hs
 	$(HC) $(HCFLAGS) $(GHCOPTS) -c $<
 
 
-jhc: $(OBJS)  
+jhc: $(OBJS)
 	$(HC) $(GHCOPTS) $(EXTRAOPTS) $(OBJS) -o $@
 
 tags: $(ALLHS)
@@ -71,7 +71,8 @@ depend: depend.make
 
 depend.make: $(BUILTSOURCES) $(ALLHS)
 	$(HC) -M -optdep-f -optdepdepend.make $(HC_OPTS) Main.hs
-	echo OBJS=`perl ./collect_deps.prl Main.o < depend.make` >> depend.make  
+	sed -e '/^#.*DELETE: End/q' -i depend.make
+	echo OBJS=`perl ./collect_deps.prl Main.o < depend.make ` >> depend.make
 
 # $(ALLHS)
 
