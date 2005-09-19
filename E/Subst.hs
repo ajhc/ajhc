@@ -60,7 +60,9 @@ substMapScope :: IM.IntMap E -> IS.IntSet -> E -> E
 substMapScope im ss e = substMapScope' False im ss e
 
 substMapScope' :: Bool -> IM.IntMap E -> IS.IntSet -> E -> E
-substMapScope' allShadow im ss e = doSubst False allShadow (Map.fromAscList [ (x,Nothing) | x <- IS.toAscList ss ] `Map.union` Map.fromAscList [ (x,Just y) |  (x,y) <-  IM.toAscList im]) e
+-- TODO - why doesn't this work? perhaps it tickles the IntMap bug.
+--substMapScope' allShadow im ss e = doSubst False allShadow (Map.fromAscList [ (x,Nothing) | x <- IS.toAscList ss ] `Map.union` Map.fromAscList [ (x,Just y) |  (x,y) <-  IM.toAscList im]) e
+substMapScope' allShadow im ss e = doSubst False allShadow (Map.fromList $ [ (x,Nothing) | x <- IS.toAscList ss ] ++  [ (x,Just y) |  (x,y) <-  IM.toAscList im]) e
 
 noShadow :: E -> E
 noShadow e = doSubst False False (Map.fromList [ (x,Nothing) | x <- freeVars e ]) e
