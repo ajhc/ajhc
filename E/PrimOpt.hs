@@ -1,20 +1,20 @@
 module E.PrimOpt(primOpt,primOpt') where
 
-import E.E
-import Stats
-import E.TypeCheck
 import Atom
-import E.Values
-import List
+import CanType
 import C.Prims
-import Doc.PPrint
-import Doc.DocLike
 import DataConstructors
 import Data.Monoid
-import Monad
-import NameMonad
+import Doc.DocLike
+import Doc.PPrint
+import E.E
+import E.Values
 import FreeVars
 import GenUtil
+import List
+import Monad
+import NameMonad
+import Stats
 
 
 -- Some of these arn't optimizations, but rather important transformations.
@@ -23,7 +23,7 @@ primOpt dataTable stats e = do
     runStatIO stats (primOpt' dataTable e)
 
 create_integralCast dataTable e t = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] te) cc] Nothing  where
-    te = typ e
+    te = getType e
     (vara:varb:_) = freeNames (freeVars (e,t))
     tvra =  tVr vara sta
     tvrb =  tVr varb stb
@@ -34,7 +34,7 @@ create_integralCast dataTable e t = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] 
 
 unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
 unbox dataTable e vn wtd = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] te) (wtd tvra)] Nothing where
-    te = typ e
+    te = getType e
     tvra = tVr vn sta
     Just (cna,sta,ta) = lookupCType' dataTable te
 
@@ -63,8 +63,8 @@ primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
             (vara:varb:varc:_) = freeNames (freeVars (a,b,t))
             Just (cna,sta,ta) = lookupCType' dataTable t
             ans = do
-                (_,ta) <- lookupCType dataTable (typ a)
-                (_,tb) <- lookupCType dataTable (typ b)
+                (_,ta) <- lookupCType dataTable (getType a)
+                (_,tb) <- lookupCType dataTable (getType b)
                 (_,tr) <- lookupCType dataTable t
                 unless (ta == tb && tb == tr) $ fail "bad divide"
                 return $ unbox dataTable a vara $ \tvra ->

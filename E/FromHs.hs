@@ -2,6 +2,7 @@ module E.FromHs(matchesConv,altConv,guardConv,convertDecls,getMainFunction,creat
 
 import Atom
 import Boolean.Algebra
+import CanType
 import Char
 import Class
 import Control.Monad.Identity
@@ -119,7 +120,7 @@ altConv as = map v as where
 guardConv (HsUnGuardedAlt e) = HsUnGuardedRhs e
 guardConv (HsGuardedAlts gs) = HsGuardedRhss (map (\(HsGuardedAlt s e1 e2) -> HsGuardedRhs s e1 e2) gs)
 
-argTypes e = span ((== eBox) . typ) (map tvrType xs) where
+argTypes e = span ((== eBox) . getType) (map tvrType xs) where
     (_,xs) = fromPi e
 argTypes' :: E -> ([E],E)
 argTypes' e = let (x,y) = fromPi e in (map tvrType y,x)
@@ -132,11 +133,11 @@ getMainFunction name ds = ans where
         runMain <- findName (func_runMain nameFuncNames)
         runExpr <- findName (func_runExpr nameFuncNames)
         let e | not (fopts FO.Wrapper) = maine
-              | otherwise = case ioLike (typ maine) of
+              | otherwise = case ioLike (getType maine) of
                 Just x ->  EAp (EAp (EVar runMain)  x ) maine
                 Nothing ->  EAp (EAp (EVar runExpr) ty) maine
             theMain = (theMainName,theMainTvr,e)
-            theMainTvr =  tVr (nameToInt theMainName) (typ e)
+            theMainTvr =  tVr (nameToInt theMainName) (getType e)
             tvm@(TVr { tvrType =  ty}) =  main
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs ]
             (ty',xs) = fromPi ty
@@ -166,8 +167,8 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
         methodName = toName Name.Val n
         Identity (deftvr@(TVr { tvrType = ty}),_) = findName defaultName
         defaultName =  (toName Name.Val (defaultInstanceName n))
-        valToPat' (ELit (LitCons x ts t)) = ELit $ LitCons x [ EVar (tVr ( j) (typ z)) | z <- ts | j <- [2,4 ..]]  t
-        valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ LitCons tArrow [ EVar (tVr ( j) (typ z)) | z <- [a,b] | j <- [2,4 ..]]  eStar
+        valToPat' (ELit (LitCons x ts t)) = ELit $ LitCons x [ EVar (tVr ( j) (getType z)) | z <- ts | j <- [2,4 ..]]  t
+        valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ LitCons tArrow [ EVar (tVr ( j) (getType z)) | z <- [a,b] | j <- [2,4 ..]]  eStar
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
         as = [ rule  t | (_ :=> IsIn _ t ) <- snub (classInsts classRecord) ]
         rule t = emptyRule { ruleHead = methodVar, ruleArgs = [valToPat' (tipe t)], ruleBody = body, ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
@@ -192,7 +193,7 @@ createMethods dataTable classHierarchy funcs = return ans where
         as = concatMap cinst [ t | (_ :=> IsIn _ t ) <- classInsts classRecord]
         cinst t | Nothing <- getConstructor x dataTable = fail "skip un-imported primitives"
                 | Just (tvr,_) <- findName name = return $ calt (foldl EAp (EVar tvr) vs)
-                | EError "Bad" _ <- defe = return $ calt $  EError ( show n ++ ": undefined at type " ++  PPrint.render (pprint  t) ) (typ els)
+                | EError "Bad" _ <- defe = return $ calt $  EError ( show n ++ ": undefined at type " ++  PPrint.render (pprint  t) ) (getType els)
                 | otherwise = return $ calt $ ELetRec [(tvr,tipe t)] (EAp (EVar deftvr) (EVar tvr))
                 | ELam x e <- defe, not (isAtomic (tipe t)) = return $ calt $ eLetRec [(x,tipe t)] e
                 | ELam x e <- defe, isAtomic (tipe t) = return $ calt $ subst x (tipe t) e -- [(x,tipe t)] e
@@ -216,7 +217,7 @@ methodNames  classHierarchy =  ans where
 
 unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
 unbox dataTable e vn wtd = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] te) (wtd tvra)] Nothing where
-    te = typ e
+    te = getType e
     tvra = tVr vn sta
     Just (cna,sta,ta) = lookupCType' dataTable te
 
@@ -227,14 +228,14 @@ createFunc dataTable ns es ee = foldr ELam eee tvrs where
     tvrs = [ t | (t,_,_) <- xs]
     eee = foldr esr (ee tvrs') xs
     esr (tvr,n',(cn,st,_)) e = ECase (EVar tvr) (tVr 0 te) [Alt (LitCons cn [tVr n' st] te) e] Nothing  where
-        te = typ $ EVar tvr
+        te = getType $ EVar tvr
 
 
 
 
 convertDecls :: Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
 convertDecls classHierarchy assumps dataTable hsDecls = return (concatMap cDecl hsDecls) where
-    doNegate e = eAp (eAp (func_negate funcs) (typ e)) e
+    doNegate e = eAp (eAp (func_negate funcs) (getType e)) e
     Identity funcs = fmapM (return . EVar . toTVr assumps) nameFuncNames
 
     pval = convertVal assumps
@@ -350,7 +351,7 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (concatMap cDecl 
     cExpr (HsLeftSection op e) = eAp (cExpr op) (cExpr e)
     cExpr (HsApp (HsRightSection e op) e') = eAp (eAp (cExpr op) (cExpr e')) (cExpr e)
     cExpr (HsRightSection e op) = eLam var (eAp (eAp cop (EVar var)) ce)  where
-        (_,TVr { tvrType = ty}:_) = fromPi (typ cop)
+        (_,TVr { tvrType = ty}:_) = fromPi (getType cop)
         var = (tVr ( nv) ty)
         cop = cExpr op
         ce = cExpr e
@@ -364,7 +365,7 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (concatMap cDecl 
     cExpr (HsIf e a b) = eIf (cExpr e) (cExpr a) (cExpr b)
     cExpr (HsCase _ []) = error "empty case"
     cExpr hs@(HsCase e alts) = z where
-        z = cMatchs [cExpr e] (altConv alts) (EError ("No Match in Case expression at " ++ show (srcLoc hs))  (typ z))
+        z = cMatchs [cExpr e] (altConv alts) (EError ("No Match in Case expression at " ++ show (srcLoc hs))  (getType z))
     cExpr (HsTuple es) = eTuple (map cExpr es)
     cExpr (HsAsPat n (HsList xs)) = cl xs where
         cl (x:xs) = eCons (cExpr x) (cl xs)
@@ -394,12 +395,12 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (concatMap cDecl 
     lp  [] e = e
     lp  (HsPVar n:ps) e = eLam (tv n) $ lp  ps e
     lp  p e  =  error $ "unsupported pattern:" <+> tshow p  <+> tshow e
-    --cRhs sl rhs = g where g = cGuard rhs (ump sl $ typ g) --deliciously lazy
+    --cRhs sl rhs = g where g = cGuard rhs (ump sl $ getType g) --deliciously lazy
     cRhs sl (HsUnGuardedRhs e) = cExpr e
     cRhs sl (HsGuardedRhss []) = error "HsGuardedRhss: empty"
     cRhs sl (HsGuardedRhss gs@(HsGuardedRhs _ _ e:_)) = f gs where
         f (HsGuardedRhs _ g e:gs) = eIf (cExpr g) (cExpr e) (f gs)
-        f [] = ump sl $ typ (cExpr e)
+        f [] = ump sl $ getType (cExpr e)
     processGuards xs = [ (map simplifyHsPat ps,hsLetE wh . cGuard e) | (ps,e,wh) <- xs ]
     spec g s e = ct (gg g s)  e  where
         ct ts e = foldl eAp e $ map ty $ snds ts
@@ -448,7 +449,7 @@ fromHsPLitInt (HsPLit l@(HsFrac _)) = return l
 fromHsPLitInt x = fail $ "fromHsPLitInt: " ++ show x
 
 convertMatches funcs dataTable tv cType bs ms err = evalState (match bs ms err) (20 + 2*length bs)  where
-    doNegate e = eAp (eAp (func_negate funcs) (typ e)) e
+    doNegate e = eAp (eAp (func_negate funcs) (getType e)) e
     fromInt = func_fromInt funcs
     fromInteger = func_fromInteger funcs
     fromRational = func_fromRational funcs
@@ -467,14 +468,14 @@ convertMatches funcs dataTable tv cType bs ms err = evalState (match bs ms err) 
             if isEVar err' || isEError err' then
                g ps err'
                else do
-                [ev] <- newVars [typ err']
+                [ev] <- newVars [getType err']
                 nm <- g ps (EVar ev)
                 return $ eLetRec [(ev,err')] nm
         g ps err
             | all (not . isStrictPat) patternHeads = match bs [(ps',eLetRec (toBinding p) . e)  | (p:ps',e) <- ps] err
             | any (isHsPAsPat || isHsPNeg || isHsPIrrPat) patternHeads = g (map (procAs b) ps) err
             | Just () <- mapM_ fromHsPLitInt patternHeads = do
-                let tb = typ b
+                let tb = getType b
                 [bv] <- newVars [tb]
                 let gps = [ (p,[ (ps,e) |  (_:ps,e) <- xs ]) | (p,xs) <- sortGroupUnderF (head . fst) ps]
                     eq = EAp (func_equals funcs) tb
@@ -495,7 +496,7 @@ convertMatches funcs dataTable tv cType bs ms err = evalState (match bs ms err) 
                 let gps = [ (p,[ (ps,e) |  (_:ps,e) <- xs ]) | (p,xs) <- sortGroupUnderF (head . fst) ps]
                     f (HsPLit l,ps) = do
                         m <- match bs ps err
-                        return (Alt  (litconvert l (typ b)) m)
+                        return (Alt  (litconvert l (getType b)) m)
                 as@(_:_) <- mapM f gps
                 [TVr { tvrIdent = vr }] <- newVars [Unknown]
                 return $ unbox dataTable b vr $ \tvr -> eCase (EVar tvr) as err
@@ -505,10 +506,10 @@ convertMatches funcs dataTable tv cType bs ms err = evalState (match bs ms err) 
                     f (name,ps) = do
                         let spats = hsPatPats $ head $ fst (head ps)
                             nargs = length spats
-                        vs <- newVars (slotTypes dataTable (toName DataConstructor name) (typ b))
+                        vs <- newVars (slotTypes dataTable (toName DataConstructor name) (getType b))
                         ps' <- mapM pp ps
                         m <- match (map EVar vs ++ bs) ps' err
-                        return (Alt (LitCons (toName DataConstructor name) vs (typ b))  m)
+                        return (Alt (LitCons (toName DataConstructor name) vs (getType b))  m)
                     --pp :: Monad m =>  ([HsPat], E->E) -> m ([HsPat], E->E)
                     pp (HsPApp n ps:rps,e)  = do
                         return $ (ps ++ rps , e)

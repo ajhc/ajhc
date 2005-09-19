@@ -1,18 +1,25 @@
 module Ho(Ho(..),HoHeader(..),FileDep(..),findModule,showHoCounts,initialHo,dumpHoFile,loadLibraries,recordHoFile) where
 
 
+import Data.Graph(stronglyConnComp,SCC(..))
+import Data.IORef
+import Data.Monoid
+import IO(bracket)
+import List
 import Prelude hiding(print,putStrLn)
+import qualified Data.Map as Map
+import qualified Text.PrettyPrint.HughesPJ as PPrint
 import System.IO hiding(print,putStrLn)
+import System.Posix.Files
+import System.Posix.IO
 
 import Atom
 import Binary
+import CanType
 import CharIO
 import Class
 import Control.Monad.Identity
 import DataConstructors
-import Data.Graph(stronglyConnComp,SCC(..))
-import Data.IORef
-import Data.Monoid
 import Directory
 import Doc.DocLike
 import Doc.PPrint
@@ -21,6 +28,7 @@ import E.E
 import E.Inline(emapE)
 import E.Rules
 import E.Subst(substMap'')
+import E.TypeCheck()
 import FilterInput
 import FrontEnd.HsParser
 import FrontEnd.Infix
@@ -28,9 +36,7 @@ import FrontEnd.ParseMonad
 import FrontEnd.Unlit
 import GenUtil hiding(putErrLn,putErr,putErrDie)
 import HsSyn
-import IO(bracket)
 import KindInfer
-import List
 import MapBinaryInstance()
 import Maybe
 import Monad
@@ -38,13 +44,9 @@ import Name
 import Options
 import PackedString
 import PrimitiveOperators
-import qualified Data.Map as Map
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
-import qualified Text.PrettyPrint.HughesPJ as PPrint
 import Representation
-import System.Posix.Files
-import System.Posix.IO
 import TypeSynonyms
 import Warning
 
@@ -469,8 +471,9 @@ loadLibraries = f initialHo (optHls options)  where
 
 initialHo = mempty { hoEs = es , hoClassHierarchy = ch  }  where
     ch = foldl addOneInstanceToHierarchy mempty (map ((,) False) primitiveInsts)
-    es = Map.fromList [  (n,(tVr (atomIndex $ toAtom n) (typ v),v)) |  (n,v) <- constantMethods ] `mappend` es'
-    es' = Map.fromList [ (n,(tVr (atomIndex $ toAtom n) (typ v),v)) | (n,t,p,d) <- theMethods, let v = f n t p d  ]
+    es = Map.fromList [  (n,(tVr (atomIndex $ toAtom n) (getType v),v)) |  (n,v) <- constantMethods ] `mappend` es'
+    --es' = Map.fromList [ (n,(tVr (atomIndex $ toAtom n) (getType v),v)) | (n,t,p,d) <- theMethods, let v = f n t p d  ]
+    es' = Map.fromList [ (n,(tVr (atomIndex $ toAtom n) (error "f no longer relevant"),v)) | (n,t,p,d) <- theMethods, let v = f n t p d  ]
     f _ _ _ _ = error "f no longer relevant"
 
 

@@ -2,9 +2,6 @@
 module E.E where
 
 import GenUtil
-import qualified Data.IntMap as IM
-import qualified Data.IntSet as IS
-import qualified Data.Set as Set
 import Control.Monad.Identity
 import Monad
 import Data.Generics
@@ -15,13 +12,10 @@ import DDataUtil()
 import Doc.DocLike
 import VConsts
 import Name
-import Data.Graph as G
-import FreeVars
 import Binary
 import Atom
-import CanType
-import {-# SOURCE #-} E.Subst
 import C.Prims
+import Char(chr)
 import Data.Monoid
 import Number
 import qualified Info
@@ -32,7 +26,7 @@ import qualified Info
 --------------------------------------
 
 
-data Lit e t = LitInt Number t |  LitCons Name [e] t --  | LitFrac Rational t   LitInt !Integer t  |
+data Lit e t = LitInt Number t |  LitCons Name [e] t
 	deriving(Data,Eq,Ord, Typeable)
         {-!derive: is, GhcBinary !-}
 
@@ -296,112 +290,47 @@ eCompat (ELit (LitCons n es t)) (ELit (LitCons n' es' t')) = n == n' && all (unc
 eCompat x y = x == y
 
 
--------------------------
--- finding free variables
--------------------------
+
+isAtomic :: E -> Bool
+--isAtomic e | sortTypeLike e = True
+isAtomic EVar {}  = True
+isAtomic e = isFullyConst e
+
+fullyConst :: Monad m => E -> m ()
+fullyConst (ELit (LitCons _ [] _)) = return ()
+fullyConst (ELit (LitCons _ xs _)) = mapM_ fullyConst xs
+fullyConst ELit {} = return ()
+fullyConst (EPi (TVr { tvrType = t }) x) = do
+    fullyConst t
+    fullyConst x
+fullyConst _ = fail "not fully constant"
+
+isFullyConst :: E -> Bool
+isFullyConst = maybe False (const True) . fullyConst
+
+isBottom EError {} = True
+isBottom _ = False
 
 
-instance FreeVars E IS.IntSet where
-    freeVars e = IS.fromAscList (fsts . IM.toAscList $ freeVs e)
-instance FreeVars E (Set.Set Int) where
-    freeVars e = Set.fromAscList (fsts . IM.toAscList $ freeVs e)
-instance FreeVars E [Int] where
-    freeVars e =  IM.keys $ freeVs e
-instance FreeVars E (IM.IntMap TVr) where
-    freeVars = freeVs
-instance FreeVars E (Set.Set TVr) where
-    freeVars x = Set.fromList $ freeVars x
-instance FreeVars E [TVr] where
-    freeVars x = IM.elems $ freeVars x
-instance FreeVars (Alt E) (IM.IntMap TVr) where
-    freeVars as@(Alt l e) = IM.unions $ freeVars (getType l):(freeVars e IM.\\ IM.fromList [ (tvrNum t,t) | t <- litBinds l]):( map (freeVars . getType) $ litBinds l)
-instance FreeVars E t => FreeVars TVr t where
-    freeVars tvr = freeVars (getType tvr)
-instance FreeVars (Alt E) (Set.Set Int) where
-    freeVars as@(Alt l e) = Set.unions $ freeVars (getType l):(freeVars e Set.\\ Set.fromList [ tvrNum t | t <- litBinds l]):( map (freeVars . getType) $ litBinds l)
+caseBodiesMapM :: Monad m => (E -> m E) -> E -> m E
+caseBodiesMapM f (ECase e b as d) = do
+    let g (Alt l e) = f e >>= return . Alt l
+    as' <- mapM g as
+    d' <- fmapM f d
+    return $ ECase e b as' d'
+caseBodiesMapM _ _ = error "caseBodiesMapM"
 
+toList :: Monad m => E -> m  [E]
+toList (ELit (LitCons n [e,b] _)) | vCons == n = toList b >>= \x -> return (e:x)
+toList (ELit (LitCons n [] _)) | vEmptyList == n = return []
+toList _ = fail "toList: not list"
 
-instance FreeVars E x => FreeVars (Lit TVr E) x where
-    freeVars l =  mconcat $ freeVars (getType l):(map (freeVars . getType) $ litBinds l)
+toString x = toList x >>= mapM fromChar where
+    fromChar (ELit (LitCons dc [ELit (LitInt ch t)] _ot)) | dc == dc_Char && t == tCharzh = return (chr $ fromIntegral ch)
+    fromChar _ = fail "fromChar: not char"
 
-
-
-freeVs :: E -> IM.IntMap TVr
-freeVs =   fv where
-    (<>) = IM.union
-    delete = IM.delete
-    fv (EAp e1 e2) = fv e1 <> fv e2
-    fv (EVar tvr@(TVr { tvrIdent =  ( i), tvrType =  t })) = IM.insert i tvr (fv t)
-    fv (ELam (TVr { tvrIdent = i, tvrType = t}) e) =  (delete i $ fv e <> fv t)
-    fv (EPi (TVr { tvrIdent =  i, tvrType = t}) e) =  (delete i $ fv e <> fv t)
-    fv (ELetRec dl e) =  ((tl <> bl <> fv e) IM.\\ IM.fromList ll)  where
-        (ll,tl,bl) = liftT3 (id,IM.unions,IM.unions) $ unzip3 $
-            map (\(tvr@(TVr { tvrIdent = j, tvrType =  t}),y) -> ((j,tvr), fv t, fv y)) dl
-    fv (EError _ e) = fv e
-    fv (ELit l) = fvLit l
-    fv (EPrim _ es e) = IM.unions $ fv e : map fv es
-    fv (ECase e b as d) = IM.unions ( fv e:freeVars (getType $ b):(IM.delete (tvrNum b) $ IM.unions (freeVars d:map freeVars as)  ):[])
-    fv Unknown = IM.empty
-    fv ESort {} = IM.empty
-    fvLit (LitCons _ es e) = IM.unions $ fv e:map fv es
-    fvLit l = freeVs (getType l)
-
-
-
--- | separate out recursive strongly connected components from a declaration list
-
-decomposeDefns :: [(TVr, E)] -> [Either (TVr, E) [(TVr,E)]]
-decomposeDefns bs = map f mp where
-    mp = G.stronglyConnComp [ (v,i,freeVars t `mappend` freeVars e) | v@(TVr i t _ ,e) <- bs]
-    f (AcyclicSCC v) = Left v
-    f (CyclicSCC vs) = Right vs
-
-
--- | pull apart an ELet and separate out recursive strongly connected components from an ELet.
-decomposeLet :: E ->  ([Either (TVr, E) [(TVr,E)]],E)
-decomposeLet (ELetRec ds e) = (decomposeDefns ds,e)
-decomposeLet e = ([],e)
-
-
-sortStarLike e = e /= eBox && typ e == eBox
-sortTypeLike e = e /= eBox && not (sortStarLike e) && sortStarLike (typ e)
-sortTermLike e = e /= eBox && not (sortStarLike e) && not (sortTypeLike e) && sortTypeLike (typ e)
-
--- Fast (and lazy, and perhaps unsafe) typeof
-typ ::  E -> E
-typ (ESort 0) =  eBox
-typ (ESort 1) = error "Box inhabits nowhere."
-typ (ESort _) = error "What sort of sort is this?"
-typ (ELit l) = getType l
-typ (EVar v) =  getType v
-typ (EPi _ b) = typ b
-typ (EAp a b) = eAp (typ a) b
-typ (ELam (TVr { tvrIdent = x, tvrType =  a}) b) = EPi (tVr x a) (typ b)
-typ (ELetRec _ e) = typ e
-typ (ECase {eCaseScrutinee = e, eCaseDefault = Just d}) | sortTypeLike e = typ d
-typ (ECase {eCaseAlts = (x:_)}) = getType x
-typ (ECase {eCaseDefault = Just e}) = typ e
-typ (ECase _ _ [] Nothing) = error "empty case"
-typ (EError _ e) = e
-typ (EPrim _ _ t) = t
-typ Unknown = Unknown
-
-instance CanType E E where
-    getType = typ
-instance CanType TVr E where
-    getType = tvrType
-instance CanType (Lit x t) t where
-    getType (LitInt _ t) = t
-    getType (LitCons _ _ t) = t
-instance CanType e t => CanType (Alt e) t where
-    getType (Alt _ e) = getType e
-
-
-eAp (EPi (TVr { tvrIdent =  0 }) b) _ = b
-eAp (EPi t b) e = subst t e b
---eAp (EPrim n es t@(EPi _ _)) b = EPrim n (es ++ [b]) (eAp t b)  -- only apply if type is pi-like
-eAp (ELit (LitCons n es t)) b = (ELit (LitCons n (es ++ [b]) (eAp t b)))
-eAp (EError s t) b = EError s (eAp t b)
-eAp a b = EAp a b
-
+dc_Addr = toName DataConstructor ("Jhc.Addr","Addr")
+dc_Char = toName DataConstructor ("Prelude","Char")
+dc_JustIO = toName DataConstructor ("Jhc.IO", "JustIO")
+dc_Rational = toName DataConstructor ("Ratio",":%")
 

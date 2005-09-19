@@ -9,13 +9,15 @@ import C.Prims
 import VConsts
 import Name
 import Data.Monoid
+import E.TypeCheck()
+import CanType
 
 toHsName x = nameName $ parseName TypeConstructor x
 
 toInstName x = toName Val ("Instance@",'i':x)
 
 unbox' e cn tvr wtd = ECase e (tVr 0 te) [Alt (LitCons cn [tvr] te) wtd] Nothing where
-    te = typ e
+    te = getType e
 
 oper_aa op ct e = EPrim (APrim (Operator op [ct] ct) mempty) [e] (rawType ct)
 oper_aaI op ct a b = EPrim (APrim (Operator op [ct,ct] "int") mempty) [a,b] intt
@@ -73,7 +75,7 @@ op_aaB op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
 --buildAbs v t = eIf (EPrim (primPrim "prim_op_aaB.<") [EVar v,(ELit (LitInt 0 t))] tBool) (EPrim (primPrim "prim_op_aa.-") [EVar v] t) (EVar v)
 --build_abs ct cn v = unbox' v cn tvra (eCase (EPrim (APrim (Operator "<" [ct,ct] "int") mempty) [EVar tvra, zero] intt) [Alt zeroI (rebox $ EVar tvra)] (fs)) where
 build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaI "<" ct (EVar tvra) zero)  [Alt zeroI (rebox $ EVar tvra)] (fs)) where
-    te = typ v
+    te = getType v
     tvra = tVr 2 st
     tvrb = tVr 4 st
     zero = ELit $ LitInt 0 st
@@ -85,7 +87,7 @@ build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaI "<" ct (EVar tvra) zero)  
 buildSignum v t = eCase (EVar v) [Alt (LitInt 0 t) (ELit (LitInt 0 t))] (eIf (EPrim (primPrim "prim_op_aaB.<") [EVar v,(ELit (LitInt 0 t))] tBool) (ELit (LitInt (-1) t)) (ELit (LitInt 1  t)))
 build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaI "<" ct (EVar tvra) (ELit zero)) [Alt zeroI (rebox one)] (rebox negativeOne))) where
     tvra = tVr 2 st
-    te = typ v
+    te = getType v
     st = rawType ct
     zero :: Lit a E
     zero = LitInt 0 st

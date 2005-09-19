@@ -2,6 +2,7 @@ module E.Arbitrary where
 
 --import Test.QuickCheck
 import E.E
+import E.TypeCheck()
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Random

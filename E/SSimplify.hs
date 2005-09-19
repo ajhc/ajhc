@@ -1,18 +1,18 @@
 module E.SSimplify(Occurance(..), simplify, SimplifyOpts(..)) where
 
 import Atom
+import CanType
 import Control.Monad.Identity
 import Control.Monad.Writer
 import DataConstructors
 import Data.FunctorM
+import Data.Generics
 import Data.Monoid
 import E.E
 import E.PrimOpt
 import E.Rules
 import E.Subst
 import E.Values
-import qualified Info
-import qualified E.Strictness as Strict
 import FreeVars
 import GenUtil
 import GraphUtil
@@ -22,10 +22,10 @@ import NameMonad
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified E.Strictness as Strict
+import qualified E.Strictness as Strict
+import qualified Info
 import qualified Seq
 import Stats hiding(new,print,Stats)
-import CanType
-import Data.Generics
 import VConsts
 
 data Occurance =
@@ -336,7 +336,7 @@ simplify sopts e = (e'',stat,occ) where
 
     doCase (EVar v) b as d sub inb | Just (IsBoundTo _ e) <- Map.lookup (tvrNum v) (envInScope inb) , isBottom e = do
         mtick "E.Simplify.case-of-bottom'"
-        let t = typ (ECase (EVar v) b as d)
+        let t = getType (ECase (EVar v) b as d)
         t' <- dosub sub t
         return $ prim_unsafeCoerce (EVar v) t'
 
@@ -352,7 +352,7 @@ simplify sopts e = (e'',stat,occ) where
         return (ECase e b as'' d'')      -- we duplicate code so continue for next renaming pass before going further.
     doCase e b as d sub inb | isBottom e = do
         mtick "E.Simplify.case-of-bottom"
-        let t = typ (ECase e b as d)
+        let t = getType (ECase e b as d)
         t' <- dosub sub t
         return $ prim_unsafeCoerce e t'
 
@@ -374,7 +374,7 @@ simplify sopts e = (e'',stat,occ) where
         ls' <- mapM f ls
         doCase e b (as ++ ls') Nothing sub inb
         where
-        te = typ e
+        te = getType e
         dt = (so_dataTable sopts)
     doCase e b [] (Just d) sub inb | not (isLifted e) = do
         mtick "E.Simplify.case-unlifted"

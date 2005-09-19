@@ -8,7 +8,8 @@ import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.E
-import E.Values
+import E.FreeVars
+--import E.Values
 import FreeVars
 import GenUtil
 import Name

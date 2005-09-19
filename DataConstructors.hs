@@ -76,7 +76,10 @@ data Constructor = Constructor {
 newtype DataTable = DataTable {
     constructorMap :: (Map Name Constructor)
     }
-    deriving(Binary,Monoid,HasSize)
+    {-! derive: GhcBinary, Monoid !-}
+
+instance HasSize DataTable where
+    size (DataTable d) = Map.size d
 
 getConstructor :: Monad m => Name -> DataTable -> m Constructor
 getConstructor n (DataTable map) = case Map.lookup n map of

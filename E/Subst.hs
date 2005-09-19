@@ -1,5 +1,4 @@
-module E.Subst(subst,subst',substMap,substMap',noShadow,doSubst,substMap'',litSMapM, app, substLet) where
-
+module E.Subst(subst,subst',eAp, substMap,substMap',noShadow,doSubst,substMap'',litSMapM, app, substLet) where
 
 -- This is tricky.
 
@@ -8,8 +7,8 @@ import Control.Monad.Reader
 import Data.FunctorM
 import Data.Monoid
 import E.E
-import E.Values
 import FreeVars
+import E.FreeVars
 import GenUtil
 import List
 import qualified Data.IntMap as IM
@@ -17,7 +16,6 @@ import qualified Data.IntSet as IS
 import qualified Data.Map as Map
 import Stats
 import Atom
-
 
 
 substLet :: [(TVr,E)] -> E -> E
@@ -32,7 +30,8 @@ subst ::
     -> E  -- ^ input term
     -> E  -- ^ output term
 subst (TVr { tvrIdent = 0 }) _ e = e
-subst (TVr { tvrIdent = i }) w e = doSubst False False (Map.insert i (Just w) $ Map.fromList [ (x,Nothing) | x <- freeVars (getType w) ++ freeVars e ]) e
+--subst (TVr { tvrIdent = i }) w e = doSubst False False (Map.insert i (Just w) $ Map.fromList [ (x,Nothing) | x <- freeVars (getType w) ++ freeVars e ]) e
+subst (TVr { tvrIdent = i }) w e = doSubst False False (Map.insert i (Just w) $ Map.fromList [ (x,Nothing) | x <- freeVars w ++ freeVars e ]) e
 
 -- | Identitcal to 'subst' except that it substitutes inside the local types
 -- for variables in expressions. This should not be used because it breaks the
@@ -42,7 +41,8 @@ subst (TVr { tvrIdent = i }) w e = doSubst False False (Map.insert i (Just w) $ 
 
 subst' :: TVr -> E -> E -> E
 subst' (TVr { tvrIdent = 0 }) _ e = e
-subst' (TVr { tvrIdent = (i) }) w e = doSubst True False (Map.insert i (Just w) $ Map.fromList [ (x,Nothing) | x <- freeVars (getType w) ++ freeVars e ]) e
+--subst' (TVr { tvrIdent = (i) }) w e = doSubst True False (Map.insert i (Just w) $ Map.fromList [ (x,Nothing) | x <- freeVars (getType w) ++ freeVars e ]) e
+subst' (TVr { tvrIdent = (i) }) w e = doSubst True False (Map.insert i (Just w) $ Map.fromList [ (x,Nothing) | x <- freeVars w ++ freeVars e ]) e
 
 
 substMap :: IM.IntMap E -> E -> E
@@ -190,4 +190,12 @@ app' (EError s t) xs = do
     return $ EError s (foldl eAp t xs)
 app' e as = do
     return $ foldl EAp e as
+
+eAp (EPi (TVr { tvrIdent =  0 }) b) _ = b
+eAp (EPi t b) e = subst t e b
+--eAp (EPrim n es t@(EPi _ _)) b = EPrim n (es ++ [b]) (eAp t b)  -- only apply if type is pi-like
+eAp (ELit (LitCons n es t)) b = (ELit (LitCons n (es ++ [b]) (eAp t b)))
+eAp (EError s t) b = EError s (eAp t b)
+eAp a b = EAp a b
+
 

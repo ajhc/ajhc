@@ -1,7 +1,7 @@
-module E.TypeCheck(typ, eAp, sortStarLike, sortTypeLike,  sortTermLike, inferType, typeInfer, typeInfer') where
+module E.TypeCheck(eAp, sortStarLike, sortTypeLike,  sortTermLike, inferType, typeInfer, typeInfer') where
 
 import CanType
-import DataConstructors
+import {-# SOURCE #-} DataConstructors
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
@@ -15,10 +15,40 @@ import Monad(when)
 
 
 
+-- Fast (and lazy, and perhaps unsafe) typeof
+typ ::  E -> E
+typ (ESort 0) =  eBox
+typ (ESort 1) = error "Box inhabits nowhere."
+typ (ESort _) = error "What sort of sort is this?"
+typ (ELit l) = getType l
+typ (EVar v) =  getType v
+typ (EPi _ b) = typ b
+typ (EAp a b) = eAp (typ a) b
+typ (ELam (TVr { tvrIdent = x, tvrType =  a}) b) = EPi (tVr x a) (typ b)
+typ (ELetRec _ e) = typ e
+typ (ECase {eCaseScrutinee = e, eCaseDefault = Just d}) | sortTypeLike e = typ d
+typ (ECase {eCaseAlts = (x:_)}) = getType x
+typ (ECase {eCaseDefault = Just e}) = typ e
+typ (ECase _ _ [] Nothing) = error "empty case"
+typ (EError _ e) = e
+typ (EPrim _ _ t) = t
+typ Unknown = Unknown
 
 
+instance CanType E E where
+    getType = typ
+instance CanType TVr E where
+    getType = tvrType
+instance CanType (Lit x t) t where
+    getType (LitInt _ t) = t
+    getType (LitCons _ _ t) = t
+instance CanType e t => CanType (Alt e) t where
+    getType (Alt _ e) = getType e
 
 
+sortStarLike e = e /= eBox && getType e == eBox
+sortTypeLike e = e /= eBox && not (sortStarLike e) && sortStarLike (getType e)
+sortTermLike e = e /= eBox && not (sortStarLike e) && not (sortTypeLike e) && sortTypeLike (getType e)
 
 
 

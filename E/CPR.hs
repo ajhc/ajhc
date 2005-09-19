@@ -1,14 +1,14 @@
 module E.CPR(Val(..), cprAnalyzeBinds, cprAnalyze) where
 
+import Control.Monad.Writer
+import Data.Generics
+import Data.Monoid()
+import Doc.DocLike
 import E.E
+import E.FreeVars
+import Name
 import qualified Data.Map as Map
 import qualified Doc.Chars as C
-import Data.Monoid()
-import Name
-import Data.Generics
-import Doc.DocLike
-import Control.Monad.Writer
-import E.Values
 import qualified Info
 
 newtype Env = Env (Map.Map TVr Val)

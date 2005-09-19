@@ -14,23 +14,23 @@ module E.Rules(
     applyRule'
     )where
 
-import E.Eval
-import E.E
-import E.Values
-import Stats
-import qualified Data.Map as Map
 import Data.Monoid
-import Binary
-import E.Subst
 import qualified Data.IntMap as IM
-import GenUtil
-import MapBinaryInstance()
-import E.Pretty
-import Atom(toAtom,fromAtom,Atom)
-import Name
-import FreeVars
+import qualified Data.Map as Map
 import qualified Data.Set as Set
+
+import Atom(toAtom,fromAtom,Atom)
+import Binary
+import E.E
+import E.Eval
+import E.Pretty
+import E.Subst
+import FreeVars
+import GenUtil
 import HasSize
+import MapBinaryInstance()
+import Name
+import Stats
 
 
 

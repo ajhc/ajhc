@@ -9,6 +9,7 @@ import Data.FunctorM
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.Monoid
+import DataConstructors()
 import E.Inline
 import E.Strictness as Strict
 import E.Values

@@ -6,6 +6,7 @@ module E.Eval(eval, unify,strong) where
 import E.E
 import E.Subst
 import E.Pretty
+import E.FreeVars
 import Seq
 import Control.Monad.Writer
 import qualified Data.Map as Map

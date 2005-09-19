@@ -1,23 +1,25 @@
 module E.LambdaLift(SC(..), scToE, eToSC, lambdaLift, lambdaLiftE)  where
 
-import Atom
 import Control.Monad.Reader
 import Control.Monad.Writer
+import Data.FunctorM
 import Data.IORef
-import E.E
-import E.Subst
+import List
+import qualified Data.Set as Set
+
+import Atom
 import DataConstructors
+import E.E
+import E.FreeVars
+import E.Subst
 import E.Traverse
 import E.TypeCheck
 import FreeVars
 import GenUtil
 import GraphUtil as G
 import Name
-import qualified Data.Set as Set
 import Stats
 import UniqueMonad
-import List
-import Data.FunctorM
 
 
 -- super combinators

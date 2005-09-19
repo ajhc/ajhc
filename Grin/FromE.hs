@@ -1,19 +1,25 @@
 module Grin.FromE(compile,typecheckGrin) where
 
-import Atom
 import Char
-import Control.Monad.Identity
-import C.Prims
-import DataConstructors
 import Data.Graph(stronglyConnComp, SCC(..))
 import Data.IORef
 import Data.Map as Map hiding(map,null)
 import Data.Monoid
+import List
+import Maybe
+import qualified Data.Set as Set
+
+import Atom
+import CanType
+import Control.Monad.Identity
+import C.Prims
+import DataConstructors
 import DDataUtil()
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.E
+import E.FreeVars
 import E.LambdaLift
 import E.Pretty(render)
 import E.TypeCheck
@@ -24,13 +30,9 @@ import GraphUtil as G
 import Grin.Grin
 import Grin.Show
 import Grin.Val
-import List
-import Maybe
-import Monad
 import Name
 import Options
 import PrimitiveOperators
-import qualified Data.Set as Set
 import qualified FlagDump as FD
 import Stats
 import VConsts
@@ -101,7 +103,7 @@ cafNum n = V $ - atomIndex (partialTag t 0)
 toEntry (n,as,e)
     | Just nm <- intToAtom (tvrNum n)  = f (toAtom ('f':show (fromAtom nm :: Name)))
     | otherwise = f (toAtom ('f':show (tvrNum n))) where
-        f x = (x,map (toty (TyPtr TyNode) . tvrType ) as,toty TyNode (typ e))
+        f x = (x,map (toty (TyPtr TyNode) . tvrType ) as,toty TyNode (getType (e::E) :: E))
         toty node (ELit (LitCons n [] es)) |  es == eStar, RawType <- nameType n = (Ty $ toAtom (show n))
         toty node _ = node
 
@@ -438,7 +440,7 @@ compile' dataTable cenv (tvr,as,e) = cr e >>= \x -> return (nn,(Tup (map toVal a
         wh <- ce wh
         return $ e :>>= Tup (map toVal xs) :-> wh
 
-    ce (ECase e b as d) | (ELit (LitCons n [] _)) <- typ e, RawType <- nameType n = do
+    ce (ECase e b as d) | (ELit (LitCons n [] _)) <- getType e, RawType <- nameType n = do
             let ty = Ty $ toAtom (show n)
             v <- newPrimVar ty
             e <- ce e
@@ -478,7 +480,7 @@ compile' dataTable cenv (tvr,as,e) = cr e >>= \x -> return (nn,(Tup (map toVal a
     cpa :: E -> IO (Val,Val,Exp)
     cpa e = do
         v <- newVar
-        (c,t) <- case lookupCType dataTable (typ e) of
+        (c,t) <- case lookupCType dataTable (getType e) of
             Right x -> return x
             Left m -> fail (m <+> show e)
         let var = Var v (Ty $ toAtom t)
@@ -671,7 +673,7 @@ compile' dataTable cenv (tvr,as,e) = cr e >>= \x -> return (nn,(Tup (map toVal a
                 let es' = args es
                 ts <- mapM (typecheck te) es'
                 let nvs = [ Var v t | t <- ts | v <- [v2,V 4..] ]
-                x <- ce (EPrim aprim [ EVar (tvr { tvrIdent = v, tvrType =  t}) | t <- map typ es | v <- [2,4..]] pt)
+                x <- ce (EPrim aprim [ EVar (tvr { tvrIdent = v, tvrType =  t}) | t <- map getType es | v <- [2,4..]] pt)
                 addNewFunction (fn,Tup nvs :-> x)
                 return $ Store $ NodeC fn' es'
     --cc (EPrim (APrim (PrimPrim s) _) es _) = do
