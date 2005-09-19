@@ -200,6 +200,7 @@ compileModEnv' stats ho = do
     let lco = ELetRec ds'  (EVar main)
     --typecheck dataTable lco
     wdump FD.Rules $ printRules rules
+    let mangle = mangle' (Just mempty)
     let opt = doopt (mangle dataTable) True stats
 
     lc <- mangle dataTable True "Barendregt" (return . barendregt) lco
@@ -305,7 +306,7 @@ compileModEnv' stats ho = do
 
 
 
-mangle = mangle' (Just mempty)
+--mangle = mangle' (Just mempty)
 
 mangle' :: Maybe (Set.Set Int) -- ^ Acceptable free variables
     -> DataTable

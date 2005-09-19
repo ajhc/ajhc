@@ -28,7 +28,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import SameShape
 import Stats
-import E.SSimplify(app)
+import E.Subst(app)
 import Control.Monad.Identity
 
 

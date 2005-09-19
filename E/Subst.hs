@@ -59,6 +59,8 @@ litSMapM f l = fmapM f l
 substMapScope :: IM.IntMap E -> IS.IntSet -> E -> E
 substMapScope im ss e = substMapScope' False im ss e
 
+substMapScope' :: Bool -> IM.IntMap E -> IS.IntSet -> E -> E
+substMapScope' allShadow im ss e = doSubst False allShadow (Map.fromAscList [ (x,Nothing) | x <- IS.toAscList ss ] `Map.union` Map.fromAscList [ (x,Just y) |  (x,y) <-  IM.toAscList im]) e
 
 noShadow :: E -> E
 noShadow e = doSubst False False (Map.fromList [ (x,Nothing) | x <- freeVars e ]) e
@@ -162,9 +164,6 @@ nv' ss = v (2 * (Map.size ss + 1)) where
     v n | (Just Nothing) <- Map.lookup n ss = v (n + 2)
     v n = n
 
--- swiss army knife of substitution
-substMapScope' :: Bool -> IM.IntMap E -> IS.IntSet -> E -> E
-substMapScope' allShadow im ss e = doSubst False allShadow (Map.fromList $ [ (x,Nothing) | x <- IS.toList ss ] ++ [ (x,Just y) |  (x,y) <-  IM.toList im] ) e
 
 app (e,[]) = return e
 app (e,xs) = app' e xs
@@ -192,45 +191,3 @@ app' (EError s t) xs = do
 app' e as = do
     return $ foldl EAp e as
 
-{-
-substMapScope' allShadow im ss e = s im ss e where
-    s im ss ev@(EVar (TVr i t)) = case IM.lookup i im of
-        Just x -> x
-        Nothing -> ev -- EVar (TVr (Just i) (s im ss t))
-    s im ss (ELam tvr e) = lp im ss ELam tvr e
-    s im ss (EPi tvr e)  =  lp im ss EPi tvr e
-    s im ss (ELetRec dl e) =   ELetRec dl' (s' e) where
-        s' = s im' ss'
-        (ss', dl', im') = foldl f (ss,[], im) dl
-        f  (ss,dl,im) ((TVr (i) t),e) |  i `IS.member` ss  =  (IS.insert v ss,(ntvr, s' e):dl,IM.insert i (EVar ntvr) im) where
-            v = nv ss
-            ntvr = TVr ( v) (s' t)
-        f  (ss,dl,im) ((TVr (i) t),e) = (IS.insert i ss,(ntvr, s' e):dl,IM.insert i (EVar ntvr) im) where
-            ntvr = TVr ( i) (s' t)
-        f _ _ = error "invalid ELetRec"
-    s im ss (EAp a b) = EAp (s im ss a) (s im ss b)
-    --s im ss (ELit (LitCons x es e)) = ELit (LitCons x (map (s im ss) es) (s im ss e))
-    s im ss (ELit l) = ELit $ sLit im ss l
-    s im ss (EError x e) = EError x (s im ss e)
-    s im ss (EPrim x es e) = EPrim x (map (s im ss) es) (s im ss e)
-    --s im ss ec@(ECase {}) = ECase { eCaseScrutinee = (s im ss $ eCaseScrutinee ec) } where
-           --v [ (sPat im ss p, s im ss e) | (p,e) <- alt]
-    s _ _ e = e
-    sLit im ss (LitCons x es e) = LitCons x (map (s im ss) es) (s im ss e)
-    sLit im ss l = fmap (s im ss) l
-    nv ss = v (2 * (IS.size ss + 1)) where
-        v n | n `IS.member` ss = v (n + 2)
-        v n = n
-    lp im ss lam (TVr (i) t) e | allShadow && not (i `IS.member` freeVars e) = lam ntvr (s (IM.delete i im) ss e) where
-        t' =  (s im ss t)
-        ntvr =  (TVr 0 t')
-    lp im ss lam (TVr 0 t) e = lam (TVr 0 (s im ss t)) (s im ss e)
-    lp im ss lam (TVr (i) t) e | allShadow || i `IS.member` ss = r  where
-        v = nv (ss `IS.union` freeVars t')
-        t' =  (s im ss t)
-        ntvr =  (TVr ( v) t')
-        r = lam ntvr (s (IM.insert i (EVar ntvr) im) (IS.insert v ss) e)
-    lp im ss lam (TVr j@(i) t) e = lam ntvr (s (IM.insert i (EVar ntvr) (IM.delete i im)) (IS.insert i ss) e) where
-        t' =  (s im ss t)
-        ntvr =  (TVr j t')
--}

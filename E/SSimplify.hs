@@ -1,4 +1,4 @@
-module E.SSimplify(Occurance(..), simplify, SimplifyOpts(..), app) where
+module E.SSimplify(Occurance(..), simplify, SimplifyOpts(..)) where
 
 import Atom
 import Control.Monad.Identity

@@ -1,17 +1,11 @@
 module E.Shadow(allShadow) where
 
-
-import E.E
-import qualified Data.Map as Map
 import Control.Monad.Reader
-import Data.FunctorM
+import E.E
+import E.Subst(litSMapM)
+import qualified Data.Map as Map
 
-litSMapM f (LitCons s es t) = do
-    t' <- f t
-    es' <- mapM f es
-    return $ LitCons s es' t'
-litSMapM f l = fmapM f l
-
+-- | This is simplified to only work on things that only occur in types and is deterministic, so can be used to compare modulo naming differences.
 
 allShadow :: E -> E
 allShadow e  = f e (Map.empty,2) where
@@ -30,6 +24,17 @@ allShadow e  = f e (Map.empty,2) where
     f e@(ESort {}) = return e
     f (ELit l) = liftM ELit $ litSMapM f l
     f e = error $ "allShadow: " ++ show e
+    lp lam tvr e = do
+        (tv,r) <- ntvr tvr
+        e' <- local r $ f e
+        return $ lam tv e'
+
+    ntvr tvr@(TVr { tvrIdent = i, tvrType =  t }) = do
+        t' <- f t
+        (_,i') <- ask
+        let nvr = (tvr { tvrIdent =  i', tvrType =  t'})
+        return (nvr,\ (a,b) -> (Map.insert i (EVar nvr) a,i' + 2))
+
     {-
     f (ELetRec dl e) = do
         (as,rs) <- liftM unzip $ mapMntvr (fsts dl)
@@ -63,16 +68,6 @@ allShadow e  = f e (Map.empty,2) where
             local r $ f ts ((t',r):rs)
         vs = [ tvrNum x | x <- ts ]
     -}
-    lp lam tvr e = do
-        (tv,r) <- ntvr tvr
-        e' <- local r $ f e
-        return $ lam tv e'
-
-    ntvr tvr@(TVr { tvrIdent = i, tvrType =  t }) = do
-        t' <- f t
-        (_,i') <- ask
-        let nvr = (tvr { tvrIdent =  i', tvrType =  t'})
-        return (nvr,\ (a,b) -> (Map.insert i (EVar nvr) a,i' + 2))
 
 
 
