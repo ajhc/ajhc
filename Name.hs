@@ -130,7 +130,8 @@ setModule m n = qualifyName m  $ toUnqualified n
 
 
 parseName :: NameType -> String -> Name
-parseName t name = if not (null ms) then toName t (concatInter "." ms, concatInter "." (ns ++ [last sn])) else toName t (concatInter "." (ns ++ [last sn])) where
+--parseName t name = if not (null ms) then toName t (concatInter "." ms, concatInter "." (ns ++ [last sn])) else toName t (concatInter "." (ns ++ [last sn])) where
+parseName t name = toName t (concatInter "." ms, concatInter "." (ns ++ [last sn])) where
     sn = (split (== '.') name)
     (ms,ns) = span validMod (init sn)
     validMod (c:cs) = isUpper c && all (\c -> isAlphaNum c || c `elem` "_'") cs
