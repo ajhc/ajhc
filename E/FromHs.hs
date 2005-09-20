@@ -543,7 +543,9 @@ isStrictPat _ = True
 deNewtype :: DataTable -> E -> E
 deNewtype dataTable e = f e where
     f (ELit (LitCons n [x] t)) | alias =  (f x)  where
-        Just Constructor { conAlias = alias } = getConstructor n dataTable
+        alias = case getConstructor n dataTable of
+                 Just v -> conAlias v
+                 x      -> error ("deNewtype for "++show n++": "++show x)
     f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons n [v] t) z):_) } | alias = eLet v (f e)  (f z) where
         Just Constructor { conAlias = alias } = getConstructor n dataTable
     f e = runIdentity $ emapE (return . f) e

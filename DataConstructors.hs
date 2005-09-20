@@ -321,7 +321,7 @@ slotTypes wdt@(DataTable dt) n (ELit (LitCons pn xs _))
     Just pc = Map.lookup (conInhabits mc) dt
     sub = substMap $ IM.fromList [ (i,sl) | sl <- xs | i <- [2,4..] ]
 slotTypes wdt n e | Just fa <- followAlias wdt e  = slotTypes wdt n fa
-slotTypes _ _ e = error $ "slotTypes:" ++ show e
+slotTypes _ n e = error $ "slotTypes: error in " ++ show n ++ ": " ++ show e
 
 showDataTable (DataTable mp) = vcat xs where
     c  const = vcat [t,e,cl,cs,al,ih,ch] where

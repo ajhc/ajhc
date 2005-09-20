@@ -90,7 +90,7 @@ instance HasKind Type where
   kind (TVar u)  = kind u
   kind (TAp t _) = case (kind t) of
                      (Kfun _ k) -> k
-                     _ -> error "Type.kind: Invalid kind"
+                     x -> error $ "Type.kind: Invalid kind in type application for "++show t++": "++show x
   kind (TArrow _l _r) = Star
   kind (TGen _ tv) = kind tv
   --kind x = error $ "Type:kind: " ++ show x
