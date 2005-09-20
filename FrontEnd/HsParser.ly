@@ -454,22 +454,12 @@ Datatype declarations
 Class declarations
 
 > optcbody :: { [HsDecl] }
->	: 'where' '{' cbody '}'			{ fixupHsDecls $3 }
->	| 'where' layout_on cbody close		{ fixupHsDecls $3 }
+>	: 'where' decllist			{ fixupHsDecls $2 }
 >	| {- empty -}				{ [] }
 
-> cbody :: { [HsDecl] }
->	: cmethods ';' cdefaults optsemi	{ reverse $1 ++ reverse $3 }
->	| cmethods optsemi			{ reverse $1 }
->	| optsemi				{ [] }
-
-> cmethods :: { [HsDecl] }
->	: cmethods ';' signdecl			{ $3 : $1 }
->	| signdecl				{ [$1] }
-
 > cdefaults :: { [HsDecl] }
->	: cdefaults ';' valdef			{ $3 : $1 }
->	| valdef				{ [$1] }
+>      : cdefaults ';' valdef                  { $3 : $1 }
+>      | valdef                                { [$1] }
 
 -----------------------------------------------------------------------------
 Functional dependencies
