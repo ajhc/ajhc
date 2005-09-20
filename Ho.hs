@@ -332,8 +332,12 @@ getModule ho name files  = do
                    else checkForHoFile ho_name
             case mho of
                 Just (hh,ho') -> do
-                    as <- mapM checkHoDep (hohModDepends hh)
-                    case and as of
+                    let f (a:as) = do
+                            r <- checkHoDep a
+                            if r then f as else return False
+                        f [] = return True
+                    r <- f (hohModDepends hh)
+                    case r of
                         True -> do
                             fixups <- readIORef fixup_ref
                             let nfixups = getFixups ho' `mappend` fixups
@@ -385,7 +389,6 @@ searchPaths m = ans where
 
 
 parseHsSource :: String -> String -> IO HsModule
---parseHsSource fn s = case parse s' (SrcLoc fn 1 1) 0 [] of
 parseHsSource fn s = case runParserWithMode ParseMode { parseFilename = fn } parse  s'  of
                       ParseOk e -> return e
                       ParseFailed sl err -> putErrDie $ show sl ++ ": " ++ err
@@ -395,7 +398,7 @@ parseHsSource fn s = case runParserWithMode ParseMode { parseFilename = fn } par
 
 
 mapHoBodies  :: (E -> E) -> Ho -> Ho
-mapHoBodies sm ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  E.Rules.mapBodies ( sm) (hoRules ho) } where
+mapHoBodies sm ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  E.Rules.mapBodies sm (hoRules ho) } where
     f (t,e) = (t,sm e)
 
 
@@ -409,7 +412,7 @@ getFixups :: Ho -> Map.Map Int E
 getFixups ho = Map.fromList [ (tvrIdent x,EVar x) | (x,_) <- Map.elems (hoEs ho)]
 
 applyFixups :: Map.Map Int E -> Ho -> Ho
-applyFixups mie ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  E.Rules.mapBodies (sm) (hoRules ho) } where
+applyFixups mie ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  E.Rules.mapBodies sm (hoRules ho) } where
     f (t,e) = (t,sm e)
     sm = substMap'' mie
 
