@@ -41,6 +41,7 @@ data Opt = Opt {
     optPrelude     :: !Bool,                   -- ^ No implicit Prelude.
     optIgnoreHo    :: !Bool,                   -- ^ Ignore ho-files.
     optNoWriteHo   :: !Bool,                   -- ^ Don't write ho-files.
+    optNoAuto      :: !Bool,                   -- ^ Don't autoload packages
     optVerbose     :: !Int,                    -- ^ Verbosity
     optDumpSet     ::  S.Set FlagDump.Flag,    -- ^ Dump flags.
     optFOptsSet    ::  S.Set FlagOpts.Flag     -- ^ Flag options (-f\<opt\>).
@@ -73,6 +74,7 @@ opt = Opt {
     optVerbose     = 0,
     optVersion     = False,
     optVersionCtx  = False,
+    optNoAuto      = True,
     optDumpSet     = S.empty,
     optFOptsSet    = S.empty
 }
@@ -101,6 +103,7 @@ theoptions =
     , Option ['e'] []            (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression."
     , Option []    ["debug"]     (NoArg  (optDebug_s True)) "debugging"
     , Option []    ["show-ho"]   (ReqArg  (\d -> optShowHo_u (++ [d])) "file.ho") "Show ho file"
+    , Option []    ["noauto"]    (NoArg  (optNoAuto_s True)) "Don't automatically load base and haskell98 packages"
     , Option ['p'] []            (ReqArg (\d -> optHls_u (++ [d])) "file.hl") "Load given haskell library .hl file"
     , Option []    ["build-hl"]  (ReqArg (\d -> optBuildHl_s d) "file.hl") "Build hakell library from given list of modules"
     , Option []    ["interactive"] (NoArg  (optInteractive_s True)) "run interactivly"
@@ -114,6 +117,7 @@ getColumns :: Int
 getColumns = read $ unsafePerformIO (getEnv "COLUMNS" `mplus` return "80")
 
 
+postProcess :: Opt -> (Opt, String)
 postProcess o = case FlagDump.process (optDumpSet o) (optDump o ++ vv) of
         (s,errs) -> (o { optDumpSet = s }, f errs) where
                 f [] = ""
@@ -150,7 +154,9 @@ processOptions = do
                         putStrLn "Starting self testing..."
                         SelfTest.selfTest ns
                         exitSuccess
-                    (o,"") -> return (o { optArgs = ns })
+                    (o,"") -> case optNoAuto o of
+                               True -> return (o { optArgs = ns })
+                               False-> return (o { optArgs = ns, optHls  = basePackages ++ optHls o })
                     (_,err) -> putErrDie err
                 (_,err) -> putErrDie err
 	  --(_,_,[]) -> putErrDie (usageInfo header options)

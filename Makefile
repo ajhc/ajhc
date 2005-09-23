@@ -115,6 +115,7 @@ Version.hs: _darcs/inventory
 	|  perl -e '<>;$$_=<>;s/^\s*tagged\s+/darcsTag = "/;s/$$/"/;print' >> $@
 	darcs changes --from-tag='' --xml-output | grep '</patch>' \
 	| wc -l | perl -e 'print "darcsPatches = \"".(<>-1)."\"\n"'    >> $@
+	echo 'basePackages = ["base-0.1", "haskell98-0.1"]'            >> $@
 
 .PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs
 
