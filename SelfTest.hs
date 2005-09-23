@@ -9,7 +9,7 @@ import HasSize
 import Name
 import HsSyn
 import E.Arbitrary
-import Info
+import Info.Info as Info
 import Monad
 import Data.Monoid
 

@@ -18,7 +18,7 @@ import C.Prims
 import Char(chr)
 import Data.Monoid
 import Number
-import qualified Info
+import qualified Info.Info as Info
 
 
 --------------------------------------

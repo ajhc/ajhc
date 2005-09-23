@@ -9,7 +9,7 @@ import E.FreeVars
 import Name
 import qualified Data.Map as Map
 import qualified Doc.Chars as C
-import qualified Info
+import qualified Info.Info as Info
 
 newtype Env = Env (Map.Map TVr Val)
     deriving(Monoid)

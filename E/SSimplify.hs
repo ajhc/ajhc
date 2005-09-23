@@ -23,7 +23,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified E.Strictness as Strict
 import qualified E.Strictness as Strict
-import qualified Info
+import qualified Info.Info as Info
 import qualified Seq
 import Stats hiding(new,print,Stats)
 import VConsts

@@ -50,9 +50,10 @@ import qualified FlagOpts as FO
 import qualified Grin.Interpret
 import qualified Grin.PointsToAnalysis
 import qualified Grin.Simplify
-import qualified Info
+import qualified Info.Info as Info
 import qualified Stats
 import qualified System
+import Info.Binary()
 
 import E.Arbitrary()
 

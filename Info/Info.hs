@@ -1,4 +1,4 @@
-module Info where
+module Info.Info where
 
 import Data.Dynamic
 import Data.Monoid
@@ -6,6 +6,7 @@ import Data.Generics
 import HasSize
 import Monad
 import qualified Data.Set as Set
+import Atom
 
 -- extensible type indexed product
 
@@ -43,7 +44,7 @@ delete :: (Typeable a) => a -> Info -> Info
 delete x info = error "Info.delete"
 
 fetch :: (Monoid a, Typeable a) => Info -> a
-fetch info = maybe mempty id  (Info.lookup info)
+fetch info = maybe mempty id  (Info.Info.lookup info)
 
 extend :: (Monoid a, Typeable a) => a -> Info -> Info
 extend x info = insertWith mappend x info
