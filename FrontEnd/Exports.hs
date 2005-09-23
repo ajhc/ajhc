@@ -18,7 +18,7 @@ import Options
 import Prelude hiding (putStr,putStrLn)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Relation as R
+import Util.Relation as R
 import Warning
 
 modInfoModImports m =  mp  [ i | i <- hsModuleImports (modInfoHsModule m)] where
