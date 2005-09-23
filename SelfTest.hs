@@ -12,6 +12,11 @@ import E.Arbitrary
 import Info.Info as Info
 import Monad
 import Data.Monoid
+import Binary
+import Info.Binary()
+import Info.Types
+import System.IO
+import E.E
 
 
 
@@ -25,6 +30,7 @@ selfTest _ = do
     testHasSize
     testName
     testInfo
+    testBinary
     -- testE
 
 prop_atomid xs = fromAtom (toAtom xs) == (xs::String)
@@ -89,6 +95,43 @@ testInfo = do
     i <- return $ insert (3 :: Int) i
     unless (Info.lookup i == (Just 3 :: Maybe Int)) $ fail "test failed..."
     unless (Info.fetch (insert (5 :: Int) i) == ([] :: [Int])) $ fail "test failed..."
+
+putFile fn a = do
+    h <- openBinaryFile fn WriteMode
+    bh <- openBinIO h
+    put_ bh a
+    hClose h
+
+getFile fn = do
+    h <- openBinaryFile fn ReadMode
+    bh <- openBinIO h
+    b <- get bh
+    hClose h
+    return b
+
+
+testBinary = do
+    let test = ("hello",3::Int)
+        fn = "/tmp/jhc.test.bin"
+    putStrLn "Testing Binary"
+    putFile fn test
+    x <- getFile fn
+    if (x /= test) then fail "Test Failed" else return ()
+    let fn = "/tmp/jhc.info.bin"
+        t = Arity 3
+        nf = (Info.insert "food" $ Info.insert t mempty)
+    print nf
+    putFile fn nf
+    x <- getFile fn
+    print x
+    z <- Info.lookup x
+    if (z /= t) then fail "Info Test Failed" else return ()
+
+
+
+
+
+
 
 
 instance Arbitrary NameType where

@@ -18,6 +18,7 @@ import C.Prims
 import Char(chr)
 import Data.Monoid
 import Number
+import Info.Binary()
 import qualified Info.Info as Info
 
 
@@ -106,22 +107,28 @@ data TvrBinary = TvrBinaryNone | TvrBinaryAtom Atom | TvrBinaryInt Int
     {-! derive: GhcBinary !-}
 
 instance Binary TVr where
-    put_ bh (TVr 0 e _) = do
+    put_ bh (TVr { tvrIdent = 0, tvrType =  e, tvrInfo = nf} ) = do
         put_ bh (TvrBinaryNone)
         put_ bh e
-    put_ bh (TVr (i) e _) | Just x <- intToAtom i = do
+        put_ bh nf
+    put_ bh (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) | Just x <- intToAtom i = do
         put_ bh (TvrBinaryAtom x)
         put_ bh e
-    put_ bh (TVr (i) e _) = do
+        put_ bh nf
+    put_ bh (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) = do
+        unless (even i) $ fail "number not even"
         put_ bh (TvrBinaryInt i)
         put_ bh e
+        put_ bh nf
     get bh = do
         (x ) <- get bh
         e <- get bh
+        nf <- get bh
         case x of
-            TvrBinaryNone -> return $ TVr 0 e mempty
-            TvrBinaryAtom a -> return $ TVr (atomIndex a) e mempty
-            TvrBinaryInt i -> return $ TVr (i) e mempty
+            TvrBinaryNone -> return $ TVr 0 e nf
+            TvrBinaryAtom a -> return $ TVr (atomIndex a) e nf
+            TvrBinaryInt i -> return $ TVr (i) e nf
+
 
 instance Show a => Show (TVr' a) where
     show TVr { tvrIdent = 0, tvrType = e} = "(_::" ++ show e ++ ")"

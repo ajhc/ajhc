@@ -4,7 +4,6 @@ import Binary
 import Info.Info
 import Atom
 import PackedString
-import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Info.Types
 import Data.Dynamic
@@ -25,8 +24,10 @@ binTable = Map.fromList [
     ]
 
 
-putDyn :: BinHandle -> (Dynamic,Binable) -> IO ()
-putDyn h (d,Binable (_::a)) = put_ h (fromDyn d (error (show d)) :: a)
+putDyn :: BinHandle -> (PackedString,Dynamic,Binable) -> IO ()
+putDyn h (ps,d,Binable (_::a)) = do
+    put_ h ps
+    put_ h (fromDyn d (error (show d)) :: a)
 
 -- = case Map.lookup (packString (show d)) of
 --    Just (Binable (x::a)) -> put_ h (case fromDynamic d of Just x -> x :: a)
@@ -41,7 +42,11 @@ getDyn h = do
 
 instance Binary Info where
     put_ h (Info ds) = do
-        let ds' = concatMap (\d -> do x <- Map.lookup (packString $ show d) binTable ; return (d,x))  ds
+        let ds' = concatMap (\d -> do
+                let ps = packString $ show d
+                x <- Map.lookup ps binTable
+                return (ps,d,x)
+              )  ds
         put_ h (length ds')
         mapM_ (putDyn h) ds'
     get h = do

@@ -15,6 +15,9 @@ type T = Info
 newtype Info = Info [Dynamic]
     deriving(HasSize,Typeable)
 
+instance Show Info where
+    show (Info ds) = show ds
+
 instance Data Info where
     toConstr = undefined
 

@@ -53,7 +53,6 @@ import qualified Grin.Simplify
 import qualified Info.Info as Info
 import qualified Stats
 import qualified System
-import Info.Binary()
 
 import E.Arbitrary()
 
