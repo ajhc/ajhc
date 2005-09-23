@@ -31,7 +31,6 @@ import HsSyn
 import MapBinaryInstance()
 import Name
 import PrimitiveOperators
-import qualified Name
 import qualified Seq
 import Representation
 import Util.HasSize

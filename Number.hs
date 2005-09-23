@@ -1,7 +1,6 @@
 module Number(Number(..),TypeInfo,toIntegral) where
 
 import Ratio
-import Name
 import Binary
 import Data.Generics
 

@@ -1,11 +1,12 @@
 -- | some useful types to use in Info's that don't really fit anywhere else
 module Info.Types where
 
+import Data.Dynamic
 import qualified Data.Set as Set
+
 import Atom
 import Binary
-import Data.Dynamic
-import MapBinaryInstance
+import MapBinaryInstance()
 
 -- | list of properties of a function, such as specified by use pragmas or options
 newtype Properties = Properties (Set.Set Atom)

@@ -2,13 +2,12 @@ module E.Subst(subst,subst',eAp, substMap,substMap',noShadow,doSubst,substMap'',
 
 -- This is tricky.
 
-import CanType
 import Control.Monad.Reader
 import Data.FunctorM
 import Data.Monoid
 import E.E
 import FreeVars
-import E.FreeVars
+import E.FreeVars()
 import GenUtil
 import List
 import qualified Data.IntMap as IM

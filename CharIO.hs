@@ -11,7 +11,7 @@ module CharIO(
     ) where
 
 import Prelude hiding(putStr, putStrLn)
-import qualified Prelude
+import qualified Prelude (putStr, putStrLn)
 import IO hiding(putStr, putStrLn)
 import Control.Exception
 import UTF8

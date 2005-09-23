@@ -47,7 +47,6 @@ import qualified FlagDump as FD
 import Text.PrettyPrint.HughesPJ(nest,Doc)
 import Control.Monad.Trans
 import Utils
-import Utils
 import VConsts
 import Data.IORef
 

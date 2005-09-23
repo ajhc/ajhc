@@ -22,7 +22,6 @@ import List
 import Name
 import NameMonad
 import qualified E.Strictness as Strict
-import qualified E.Strictness as Strict
 import qualified Info.Info as Info
 import qualified Seq
 import Stats hiding(new,print,Stats)

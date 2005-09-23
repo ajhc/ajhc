@@ -1,20 +1,19 @@
 module E.Pretty(ePretty, ePrettyNEx, ePrettyEx, ePrettyN, prettyE, render ) where
 
-import Atom(Atom,fromAtom)
-import Atom(intToAtom)
 import Char
+import qualified Data.Map as Map
+
+import Atom(intToAtom,fromAtom)
 import Doc.Attr
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.E
-import E.FreeVars
---import E.Values
+import E.FreeVars()
 import FreeVars
 import GenUtil
 import Name
 import Options
-import qualified Data.Map as Map
 import qualified Doc.Chars as UC
 import qualified FlagDump as FD
 import Unparse

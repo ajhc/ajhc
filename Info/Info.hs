@@ -7,7 +7,6 @@ import Monad
 import qualified Data.Set as Set
 
 
-import Atom
 import Util.HasSize
 
 -- extensible type indexed product
@@ -22,6 +21,7 @@ instance Show Info where
 
 instance Data Info where
     toConstr = undefined
+    dataTypeOf = undefined
 
 instance Monoid Info where
     mempty = Info []

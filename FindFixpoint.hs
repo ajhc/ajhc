@@ -2,14 +2,12 @@ module FindFixpoint(Ms, getVal, solve) where
 
 import Array
 import CharIO
-import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.Array.IO
-import Data.Graph(stronglyConnComp, SCC(..),flattenSCCs)
+import Data.Graph
 import Data.IntSet as IntSet
 import GenUtil
 import Monad(liftM)
-import System.IO.Unsafe
 
 
 

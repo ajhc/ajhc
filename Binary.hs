@@ -53,14 +53,12 @@ module Binary
 import FastMutInt
 
 import Data.Array.IO
-import Data.Array
 import Data.Bits
 import Data.Int
 import Data.Word
 import Data.IORef
 import Data.Char		( ord, chr )
 import Control.Monad	
-import Control.Exception	( throwDyn )
 import System.IO as IO
 import System.IO.Unsafe		( unsafeInterleaveIO )
 import System.IO.Error		( mkIOError, eofErrorType )
