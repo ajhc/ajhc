@@ -25,6 +25,8 @@ import UniqueMonad
 import Grin.EvalInline
 import Fixer
 import Grin.Linear
+import Util.Once
+
 
 sameLength (_:xs) (_:ys) = sameLength xs ys
 sameLength [] [] = True
@@ -505,7 +507,8 @@ findFixpoint' grin (HcHash _ mp) eq = do
                 flip mapM_ vs $ \ (a,w) -> do
                     w' <- newVal w
                     conditionalRule (Set.member a . getNodes) p' $ do self `isSuperSetOf` w'
-                conditionalRule (\x -> not $ or [ Set.member a (getNodes x) | (a,_) <- vs]) p' $ do self `isSuperSetOf` e'  -- TODO, should only fire once
+                once <- newOnce
+                conditionalRule (\x -> not $ or [ Set.member a (getNodes x) | (a,_) <- vs]) p' $ do runOnce once (self `isSuperSetOf` e')
             pp cc@(Complex a [p])
                 | a == funcEval = do
                     p' <- newVal p

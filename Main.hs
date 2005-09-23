@@ -102,6 +102,8 @@ processFiles  fs = do
 
 barendregt e = runIdentity  (renameTraverse' e)
 
+-- | this is called on parsed, typechecked haskell code to convert it to the internal representation
+
 processDecls ::
     Stats.Stats   -- ^ statistics
     -> Ho   -- ^ Collected ho
