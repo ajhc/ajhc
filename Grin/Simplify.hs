@@ -9,7 +9,6 @@ import Data.Set as Set
 import FreeVars
 import Data.Monoid
 import MonoidUtil()
-import DDataUtil()
 import List
 import Atom
 import GenUtil

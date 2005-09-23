@@ -4,7 +4,6 @@ import Boolean.Algebra
 import Prelude hiding((&&),(||),not,and,or,any,all)
 import E.E
 import Data.Monoid
-import DDataUtil()
 import MonoidUtil()
 import GenUtil
 import C.Prims

@@ -56,11 +56,10 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Generics
 import Data.Monoid
-import DDataUtil
 import Doc.PPrint
 import GenUtil(concatInter)
 import GenUtil(snub)
-import HasSize
+import Util.HasSize
 import HsSyn
 import KindInfer
 import List((\\), partition)

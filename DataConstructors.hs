@@ -13,10 +13,13 @@ module DataConstructors(
     getSiblings
     ) where
 
-import Binary
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Map as Map hiding(map)
+import List(sortBy)
+import qualified Data.IntMap as IM
+
+import Binary
 import Doc.DocLike
 import Doc.Pretty
 import E.E
@@ -24,17 +27,15 @@ import E.Pretty
 import E.Shadow
 import E.Subst
 import GenUtil
-import HasSize
 import HsSyn
-import List(sortBy)
 import MapBinaryInstance()
 import Name
 import PrimitiveOperators
-import qualified Data.IntMap as IM
 import qualified Name
 import qualified Seq
 import Representation
-import SameShape
+import Util.HasSize
+import Util.SameShape
 import VConsts
 
 

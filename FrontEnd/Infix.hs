@@ -20,8 +20,7 @@ module FrontEnd.Infix (buildFixityMap, infixHsModule, FixityMap,size) where
 
 import Binary
 import Data.Monoid
-import DDataUtil()
-import HasSize
+import Util.HasSize
 import HsSyn
 import MapBinaryInstance()
 import Name

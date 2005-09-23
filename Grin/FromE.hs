@@ -14,7 +14,6 @@ import CanType
 import Control.Monad.Identity
 import C.Prims
 import DataConstructors
-import DDataUtil()
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
@@ -26,7 +25,6 @@ import E.TypeCheck
 import E.Values
 import FreeVars
 import GenUtil
-import GraphUtil as G
 import Grin.Grin
 import Grin.Show
 import Grin.Val
@@ -35,6 +33,7 @@ import Options
 import PrimitiveOperators
 import qualified FlagDump as FD
 import Stats
+import Util.Graph as G
 import VConsts
 
 

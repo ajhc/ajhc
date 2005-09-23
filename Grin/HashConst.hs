@@ -1,10 +1,11 @@
 module Grin.HashConst where
 
-import Grin.Grin
-import Atom
 import Control.Monad.State
 import qualified Data.Map as Map
-import GraphUtil
+
+import Atom
+import Grin.Grin
+import Util.Graph
 
 -- TODO tuples
 

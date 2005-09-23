@@ -21,7 +21,6 @@ module MultiModuleBasics where
 
 import HsSyn
 import qualified Data.Map as M
-import DDataUtil()
 import Options
 import Name
 import FrontEnd.Infix

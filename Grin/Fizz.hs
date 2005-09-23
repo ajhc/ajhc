@@ -8,7 +8,6 @@ import Control.Monad.State
 import Control.Monad.Writer
 import Control.Monad.Trans
 import Data.Monoid
-import DDataUtil()
 import Control.Monad.Identity
 
 type WhizState = Either (Set.Set Int) Int

@@ -1,22 +1,23 @@
 module SelfTest(selfTest) where
 
-import Test.QuickCheck
-import Atom
-import Boolean.TestCases
-import ArbitraryInstances()
-import PackedString
-import HasSize
-import Name
-import HsSyn
-import E.Arbitrary
-import Info.Info as Info
-import Monad
 import Data.Monoid
-import Binary
-import Info.Binary()
-import Info.Types
+import Monad
 import System.IO
+import Test.QuickCheck
+
+import ArbitraryInstances()
+import Atom
+import Binary
+import Boolean.TestCases
+import E.Arbitrary
 import E.E
+import HsSyn
+import Info.Binary()
+import Info.Info as Info
+import Info.Types
+import Name
+import PackedString
+import Util.HasSize
 
 
 

@@ -8,7 +8,6 @@ import Data.Generics
 import Data.FunctorM
 import Maybe
 import List
-import DDataUtil()
 import Doc.DocLike
 import VConsts
 import Name

@@ -5,19 +5,20 @@ module TypeSynonyms (
     TypeSynonyms
     ) where
 
-import HsSyn
-import HsErrors
-import Control.Monad.Writer
 import Control.Monad.Identity
-import List
-import GenUtil
-import Doc.DocLike
-import Warning
-import qualified Data.Map as Map
+import Control.Monad.Writer
 import Data.Monoid
-import Name
+import List
+import qualified Data.Map as Map
+
 import Binary
-import HasSize
+import Doc.DocLike
+import GenUtil
+import HsErrors
+import HsSyn
+import Name
+import Util.HasSize
+import Warning
 
 
 newtype TypeSynonyms = TypeSynonyms (Map.Map Name ([HsName], HsType, SrcLoc))

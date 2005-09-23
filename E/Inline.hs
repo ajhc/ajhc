@@ -8,8 +8,8 @@ import E.Values
 
 import Control.Monad.Writer
 import Data.Monoid
-import GraphUtil
-import HasSize
+import Util.Graph
+import Util.HasSize
 import FreeVars
 import GenUtil
 import Data.FunctorM

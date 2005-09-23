@@ -8,7 +8,6 @@ import Control.Monad.State
 import Control.Monad.Writer
 import C.Prims
 import Data.Monoid
-import DDataUtil()
 import Doc.DocLike
 import Doc.PPrint
 import E.Pretty(render)

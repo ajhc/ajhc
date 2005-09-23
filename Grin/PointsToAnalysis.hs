@@ -6,7 +6,6 @@ import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Writer
 import Data.Monoid
-import DDataUtil()
 import Doc.DocLike
 import GenUtil
 import Grin.Grin

@@ -11,7 +11,6 @@ import C.Prims
 import DataConstructors
 import Data.FunctorM
 import Data.Generics
-import DDataUtil()
 import Doc.DocLike
 import Doc.PPrint
 import E.E

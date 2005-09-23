@@ -1,12 +1,14 @@
 module Info.Info where
 
 import Data.Dynamic
-import Data.Monoid
 import Data.Generics
-import HasSize
+import Data.Monoid
 import Monad
 import qualified Data.Set as Set
+
+
 import Atom
+import Util.HasSize
 
 -- extensible type indexed product
 

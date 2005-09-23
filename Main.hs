@@ -2,20 +2,25 @@
 module Main(main) where
 
 import Char
+import Control.Exception
+import Control.Monad.Identity
 import List hiding(group)
 import Maybe
 import Prelude hiding(putStrLn, putStr,print)
+import qualified Data.IntMap as IM
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+import qualified System
 
 import C.FromGrin
 import CharIO
 import Class
-import Control.Exception
-import Control.Monad.Identity
 import DataConstructors
 import Data.Monoid
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
+import E.Arbitrary()
 import E.Diff
 import E.E
 import E.FromHs
@@ -30,7 +35,6 @@ import E.TypeCheck
 import FreeVars
 import FrontEnd.FrontEnd
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
-import GraphUtil
 import Grin.DeadFunctions
 import Grin.FromE
 import Grin.Grin hiding (typecheck)
@@ -40,9 +44,6 @@ import Ho
 import HsSyn
 import Name
 import Options
-import qualified Data.IntMap as IM
-import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified E.CPR
 import qualified E.SSimplify as SS
 import qualified FlagDump as FD
@@ -52,9 +53,7 @@ import qualified Grin.PointsToAnalysis
 import qualified Grin.Simplify
 import qualified Info.Info as Info
 import qualified Stats
-import qualified System
-
-import E.Arbitrary()
+import Util.Graph
 
 ---------------
 -- ∀α∃β . α → β

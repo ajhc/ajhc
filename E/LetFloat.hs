@@ -9,27 +9,25 @@ module E.LetFloat(
     floatInward
   ) where
 
-
-import Atom
+import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Monoid
-import DDataUtil()
-import E.E
-import E.Inline
-import E.Traverse
-import E.Values
-import E.Rules
-import FreeVars
-import GenUtil
-import GraphUtil
 import List
-import qualified GraphUtil as G
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import SameShape
-import Stats
+
+import Atom
+import E.E
+import E.Inline
+import E.Rules
 import E.Subst(app)
-import Control.Monad.Identity
+import E.Traverse
+import E.Values
+import FreeVars
+import GenUtil
+import qualified Util.Graph as G
+import Stats
+import Util.SameShape
 
 
 
@@ -139,7 +137,7 @@ floatInward rules e = f e [] where
     --    | otherwise = error $ "floatInward: shouldn't happen:" <+>  tshow (EVar v) <+> tshow (v')
     f e xs = letRec xs e
     letRec [] e = e
-    letRec xs e = f (G.scc $ G.newGraph (concatMap fromScc xs) (tvrNum . fst . fst) (Set.toList . snd)) where
+    letRec xs e = f (G.scc $ G.newGraph (concatMap G.fromScc xs) (tvrNum . fst . fst) (Set.toList . snd)) where
         f [] = e
         f (Left (te,_):rs) = eLetRec [te] $ f rs
         f (Right ds:rs) = eLetRec (fsts ds) $ f rs
@@ -151,12 +149,12 @@ type Binds = [Either ((TVr,E),FVarSet) [((TVr,E),FVarSet)]]
 
 
 sepDupableBinds fvs xs = partition ind xs where
-    g = G.reachable (G.newGraph (concatMap fromScc xs) (tvrNum . fst . fst) (Set.toList . snd)) (fvs `mappend` (map (tvrNum . fst . fst) $ concatMap fromScc unsafe_ones))
+    g = G.reachable (G.newGraph (concatMap G.fromScc xs) (tvrNum . fst . fst) (Set.toList . snd)) (fvs `mappend` (map (tvrNum . fst . fst) $ concatMap G.fromScc unsafe_ones))
     uso = map (tvrNum . fst . fst) g
     (_,unsafe_ones) = partition std xs
     std (Left ((_,e),_)) = safeToDup e
     std (Right zs) = all safeToDup (snds $ fsts zs)
-    ind x = any ( (`elem` uso) . tvrNum . fst . fst ) (fromScc x)
+    ind x = any ( (`elem` uso) . tvrNum . fst . fst ) (G.fromScc x)
 
 sameLength [] [] = True
 sameLength (_:xs) (_:ys) = sameLength xs ys

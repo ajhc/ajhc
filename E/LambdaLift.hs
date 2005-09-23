@@ -16,10 +16,10 @@ import E.Traverse
 import E.TypeCheck
 import FreeVars
 import GenUtil
-import GraphUtil as G
 import Name
 import Stats
 import UniqueMonad
+import Util.Graph as G
 
 
 -- super combinators

@@ -27,7 +27,7 @@ import E.Pretty
 import E.Subst
 import FreeVars
 import GenUtil
-import HasSize
+import Util.HasSize
 import MapBinaryInstance()
 import Name
 import Stats

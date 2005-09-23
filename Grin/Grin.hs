@@ -48,7 +48,6 @@ import Control.Monad.Identity
 import C.Prims
 import Data.IORef
 import Data.Monoid
-import DDataUtil()
 import Doc.DocLike
 import FreeVars
 import GenUtil

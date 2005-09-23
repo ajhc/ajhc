@@ -1,13 +1,16 @@
 module E.SSimplify(Occurance(..), simplify, SimplifyOpts(..)) where
 
-import Atom
-import CanType
 import Control.Monad.Identity
 import Control.Monad.Writer
-import DataConstructors
 import Data.FunctorM
 import Data.Generics
 import Data.Monoid
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+
+import Atom
+import CanType
+import DataConstructors
 import E.E
 import E.PrimOpt
 import E.Rules
@@ -15,17 +18,15 @@ import E.Subst
 import E.Values
 import FreeVars
 import GenUtil
-import GraphUtil
 import List
 import Name
 import NameMonad
-import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified E.Strictness as Strict
 import qualified E.Strictness as Strict
 import qualified Info.Info as Info
 import qualified Seq
 import Stats hiding(new,print,Stats)
+import Util.Graph
 import VConsts
 
 data Occurance =
