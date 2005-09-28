@@ -16,18 +16,22 @@ module Name(
     isConstructorLike,
     unboxedNameTuple,
     fromUnboxedNameTuple,
+    toId,
+    fromId,
     setModule
     ) where
 
-import Data.Generics
-import Atom
-import HsSyn
 import Char
-import VConsts
+import Data.Generics
+import Monad(liftM)
+
+import Atom
 import Binary
-import GenUtil
 import Doc.DocLike
 import Doc.PPrint
+import GenUtil
+import HsSyn
+import VConsts
 
 data NameType =
     TypeConstructor
@@ -101,6 +105,7 @@ instance ToName (String,String) where
         nn = nameName n
         mi  | Qual (Module m) (HsIdent i) <- nn = (m,i)
             | UnQual (HsIdent i) <- nn = ("",i)
+            | otherwise = error "can't happen"
 
 instance ToName String where
     toName nt i = createUName nt i
@@ -219,3 +224,12 @@ instance ClassNames Name where
 -}
 
 nameValue m n = atomIndex $ toAtom (toName Val (m,n))
+
+toId :: Name -> Int
+toId x = atomIndex (toAtom x)
+
+fromId :: Monad m => Int -> m Name
+fromId i = liftM Name (intToAtom i)
+
+
+
