@@ -1,7 +1,7 @@
 
 -- | a simple type that only lets an IO action happen once, caching its result.
 
-module Util.Once(Once, newOnce, runOnce) where
+module Util.Once(Once, newOnce, runOnce, altOnce) where
 
 import Data.IORef
 import Data.Dynamic
@@ -26,4 +26,17 @@ runOnce (Once ref) action = do
             r <- action
             writeIORef ref (Just r)
             return r
+
+-- | run first argument once, after which perform the second
+
+altOnce :: Once () -> IO b -> IO b -> IO b
+altOnce (Once ref) first second = do
+    b <- readIORef ref
+    case b of
+        Just _ -> second
+        Nothing -> do
+            writeIORef ref (Just ())
+            first
+
+
 
