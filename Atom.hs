@@ -1,15 +1,14 @@
--- arch-tag: da6b923d-c4d6-4918-9ce4-35ca0167d387
 module Atom(Atom, toPackedString, Atom.toString, atomIndex, fromStringIO, fromString, fromPackedStringIO, dumpAtomTable, ToAtom(..), FromAtom(..), intToAtom) where
 
-import PackedString
-import qualified Data.HashTable as HT
-import Foreign
 import Char
---import Binary
-import System.IO.Unsafe
-import List(sort)
 import Data.Generics
 import Data.Monoid
+import Foreign
+import List(sort)
+import qualified Data.HashTable as HT
+import System.IO.Unsafe
+
+import PackedString
 
 
 instance Monoid Atom where
@@ -67,8 +66,8 @@ instance FromAtom Atom where
 instance ToAtom Char where
     toAtom x = toAtom [x]
 
-instance FromAtom Int where
-    fromAtom (Atom i _) = i
+--instance FromAtom Int where
+--    fromAtom (Atom i _) = i
 
 instance Eq Atom where
     Atom x _ == Atom y _ = x == y
@@ -98,6 +97,9 @@ fromPackedStringIO ps = HT.lookup table ps >>= \x -> case x of
         HT.insert reverseTable i a
         return a
 
+
+-- The following are 'unwise' in that they may reveal internal structure that may differ between program runs
+
 dumpAtomTable = do
     x <- HT.toList table
     mapM_ putStrLn [ show i ++ " " ++ show ps  | (_,Atom i ps) <- sort x]
@@ -107,19 +109,4 @@ intToAtom :: Monad m => Int -> m Atom
 intToAtom i = unsafePerformIO $  HT.lookup reverseTable i >>= \x -> case x of
     Just x -> return (return x)
     Nothing -> return $ fail $ "intToAtom: " ++ show i
-
-{-
-    xs <- HT.toList table
-    case [ at | (_,at@(Atom i' _)) <- xs, i' == i ] of
-        [a] -> return (return a)
-        [] -> return $ fail $ "intToAtom: " ++ show i
-        _ -> error "intToAtom: can't happen"
-instance Binary Atom where
-    get bh = do
-        ps <- get bh
-        a <- fromPackedStringIO ps
-        return a
-    put_ bh (Atom _ ps) = put_ bh ps
-
--}
 
