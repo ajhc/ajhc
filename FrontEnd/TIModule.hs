@@ -1,34 +1,34 @@
 module TIModule (tiModules', TiData(..)) where
 
-import Atom
 import Char
-import Class
 import Control.Monad.Writer
+import IO
+import List
+import Monad
+import qualified Data.Map as Map
+import Text.PrettyPrint.HughesPJ as PPrint
+
+import Atom
+import Class
 import DataConsAssump     (dataConsEnv)
+import DataConstructors
 import DeclsDepends       (getDeclDeps, debugDeclBindGroups)
 import DependAnalysis     (getBindGroups)
 import DerivingDrift.Drift
+import Doc.PPrint as PPrint
 import FrontEnd.Desugar
 import FrontEnd.Infix
 import FrontEnd.Rename
 import GenUtil
 import Ho
-import DataConstructors
 import HsSyn
-import IO
 import KindInfer
-import List
-import Monad
 import MonoidUtil
 import MultiModuleBasics
 import Name
 import Options
 import qualified FlagDump as FD
 import qualified HsPretty
-import qualified Data.Map as Map
-import qualified Data.Map as M
-import Doc.PPrint as PPrint
-import Text.PrettyPrint.HughesPJ as PPrint
 import Representation
 import TIMain
 import TypeSigs           (collectSigs, listSigsToSigEnv)
@@ -36,7 +36,6 @@ import TypeSynonyms
 import TypeSyns
 import Utils
 import Warning
-import GenUtil
 
 trimEnv env = (Map.fromList [ n | n@(name,_) <- Map.toList env,  isGlobal name ])
 trimMapEnv env = (Map.fromAscList [ n | n@(name,_) <- Map.toAscList env,  isGlobal name ])
@@ -48,7 +47,7 @@ getDeclNames d = maybeGetDeclName d
 
 -- Extra data produced by the front end, used to fill in the Ho file.
 data TiData = TiData {
-    tiDataLiftedInstances :: M.Map HsName HsDecl,
+    tiDataLiftedInstances :: Map.Map HsName HsDecl,
     tiDataModules :: [(Module,HsModule)],
     tiModuleOptions :: [(Module,Opt)],
     tiAllAssumptions :: Map.Map Name Scheme
@@ -258,14 +257,14 @@ tiModules' me ms = do
     localVarEnv <- return $  localVarEnv `Map.union` noDefaultSigs
     let externalKindEnv = Map.fromList [ v | v@(x@(Qual m i) ,s) <- Map.toList kindInfo, isGlobal x, m `elem` map modInfoName ms ]
 
-    let pragmaProps = M.fromListWith (\a b -> snub $ a ++ b ) [ (toName Name.Val x,[toAtom w]) |  HsPragmaProps _ w xs <- ds, x <- xs ]
+    let pragmaProps = Map.fromListWith (\a b -> snub $ a ++ b ) [ (toName Name.Val x,[toAtom w]) |  HsPragmaProps _ w xs <- ds, x <- xs ]
 
-    let allAssumps = M.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Map.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Map.toList localVarEnv ]
+    let allAssumps = Map.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Map.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Map.toList localVarEnv ]
         --expAssumps = M.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Env.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Env.toList $ trimEnv localVarEnv ]
-        expAssumps = M.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Map.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Map.toList $ externalEnv ]
+        expAssumps = Map.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Map.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Map.toList $ externalEnv ]
     let ho = mempty {
-        hoExports = M.fromList [ (modInfoName m,modInfoExport m) | m <- ms ],
-        hoDefs =  M.fromList [ (x,(y,z)) | (x,y,z) <- concat $ map modInfoDefs ms],
+        hoExports = Map.fromList [ (modInfoName m,modInfoExport m) | m <- ms ],
+        hoDefs =  Map.fromList [ (x,(y,z)) | (x,y,z) <- concat $ map modInfoDefs ms],
         hoAssumps = expAssumps,
         hoFixities = thisFixityMap,
         --hoKinds = trimMapEnv kindInfo,
@@ -277,7 +276,7 @@ tiModules' me ms = do
 
         }
         tiData = TiData {
-            tiDataLiftedInstances = M.fromList [ (getDeclName d,d) | d <- liftedInstances],
+            tiDataLiftedInstances = Map.fromList [ (getDeclName d,d) | d <- liftedInstances],
             tiDataModules = [ (modInfoName m, modInfoHsModule m) |  m <- ms],
             tiModuleOptions = [ (modInfoName m, modInfoOptions m) |  m <- ms],
             tiAllAssumptions = allAssumps
