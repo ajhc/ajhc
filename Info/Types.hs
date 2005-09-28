@@ -16,6 +16,15 @@ newtype Properties = Properties (Set.Set Atom)
 newtype Arity = Arity Int
     deriving(Typeable,Show,Ord,Eq,Num,Binary)
 
+-- | how the variable is bound
+data BindType = CaseDefault | CasePattern | LetBound | LambdaBound | PiBound
+    deriving(Typeable,Show,Ord,Eq)
 
+-- | whether the variable is exported from the current module
+data ExportStatus = Exported
+    deriving(Typeable,Show,Ord,Eq)
 
+instance Binary ExportStatus where
+    put_ _ _ = return ()
+    get _ = return Exported
 

@@ -20,6 +20,7 @@ import Data.Monoid
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
+import E.Annotate(annotate)
 import E.Arbitrary()
 import E.Diff
 import E.E
@@ -42,6 +43,7 @@ import Grin.Show
 import Grin.Whiz
 import Ho
 import HsSyn
+import Info.Types
 import Name
 import Options
 import qualified E.CPR
@@ -54,6 +56,7 @@ import qualified Grin.Simplify
 import qualified Info.Info as Info
 import qualified Stats
 import Util.Graph
+import Util.Once
 
 ---------------
 -- ∀α∃β . α → β
@@ -82,7 +85,8 @@ main = runMain $ bracketHtml $ do
 buildHl fname [] = putErrDie "Cannot build hl file without list of input modules"
 buildHl fname ms = do
     stats <- Stats.new
-    me <- parseFiles [] (map Module ms) (processDecls stats)
+    once <- newOnce
+    me <- parseFiles [] (map Module ms) (processDecls once stats)
     recordHoFile me [fname] HoHeader { hohGeneration = 0, hohDepends = [], hohModDepends = [] }
     return ()
 
@@ -92,24 +96,47 @@ processFiles [] | Just (b,m) <- optMainFunc options = do
     m <- return $ parseName Val m
     Module m <- getModule m
     stats <- Stats.new
-    me <- parseFiles [] [Module m] (processDecls stats)
+    once <- newOnce
+    me <- parseFiles [] [Module m] (processDecls once stats)
     compileModEnv' stats me
 processFiles  fs = do
     stats <- Stats.new
-    me <- parseFiles  fs [] (processDecls stats)
+    once <- newOnce
+    me <- parseFiles  fs [] (processDecls once stats)
     compileModEnv' stats me
 
 barendregt e = runIdentity  (renameTraverse' e)
 
+manifestLambdas :: E -> Arity
+manifestLambdas e = Arity (f 0 e) where
+    f n _ = n
+    f n (ELam _ e) = f (n + 1) e
+
+
 -- | this is called on parsed, typechecked haskell code to convert it to the internal representation
 
 processDecls ::
-    Stats.Stats   -- ^ statistics
-    -> Ho   -- ^ Collected ho
-    -> Ho   -- ^ preliminary haskell object  data
+    Once ()
+    -> Stats.Stats   -- ^ statistics
+    -> Ho     -- ^ Collected ho
+    -> Ho     -- ^ preliminary haskell object  data
     -> TiData -- ^ front end output
     -> IO Ho  -- ^ final haskell object file
-processDecls stats ho ho' tiData = do
+processDecls once stats ho ho' tiData = do
+    ho <- flip (altOnce once) (return ho) $ do
+        putStrLn "Initial annotate..."
+        let lamann _ = return mempty
+            letann e = return (Info.singleton $ manifestLambdas e)
+            idann i = return (props i)
+            props i = case fromId i of
+                Just n -> case Map.lookup n (hoProps ho) of
+                    Just ps ->  Info.singleton (Properties $ Set.fromList ps)
+                    Nothing ->  mempty
+                Nothing -> mempty
+        let Identity (ELetRec ds (ESort 0)) = annotate mempty idann letann lamann (ELetRec (Map.elems $ hoEs ho) eStar)
+        return ho { hoEs = Map.fromAscList [ (k,d) | k <- Map.keys $ hoEs ho | d <- ds ] }
+    let initMap = Map.fromList [ (tvrIdent t, Just t) | (t,_) <- (Map.elems (hoEs ho))]
+
     let isExported n | "Instance@" `isPrefixOf` show n = True
         isExported n = n `Set.member` exports
         exports = Set.fromList $ concat $ Map.elems (hoExports ho')

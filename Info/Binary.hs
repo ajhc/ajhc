@@ -1,13 +1,13 @@
 module Info.Binary() where
 
-import Binary
-import Info.Info
-import Atom
-import PackedString
-import qualified Data.Map as Map
-import Info.Types
 import Data.Dynamic
+import qualified Data.Map as Map
+
+import Binary
 import GenUtil
+import Info.Info
+import Info.Types
+import PackedString
 
 
 data Binable = forall a . (Typeable a, Binary a) => Binable a
@@ -18,9 +18,8 @@ u = u
 cb x = (packString (show (toDyn x)), Binable x)
 
 binTable = Map.fromList [
-    cb (u :: Arity),
     cb (u :: Properties),
-    cb (u :: Atom)
+    cb (u :: ExportStatus)
     ]
 
 

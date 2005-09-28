@@ -25,9 +25,10 @@ import qualified Info.Info as Info
 -- Lambda Cube (it's just fun to say.)
 --------------------------------------
 
+type Id = Int
 
 data Lit e t = LitInt Number t |  LitCons Name [e] t
-	deriving(Data,Eq,Ord, Typeable)
+    deriving(Data,Eq,Ord,Typeable)
         {-!derive: is, GhcBinary !-}
 
 
@@ -95,7 +96,7 @@ fromLam e = f [] e where
     f as e  =  (e,reverse as)
 
 type TVr = TVr' E
-data TVr' e = TVr { tvrIdent :: !Int, tvrType :: e, tvrInfo :: Info.Info }
+data TVr' e = TVr { tvrIdent :: !Id, tvrType :: e, tvrInfo :: Info.Info }
     deriving(Data,Typeable)
     {-! derive: update !-}
 
