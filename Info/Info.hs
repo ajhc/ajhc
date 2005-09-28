@@ -24,7 +24,7 @@ instance Data Info where
     dataTypeOf = undefined
 
 instance Monoid Info where
-    mempty = Info []
+    mempty = empty
     mappend (Info as) (Info bs) = Info ([ b | b <- bs, not (show b `Set.member` bss) ] ++ as) where
         bss = Set.fromList $ map show bs
 
@@ -44,6 +44,8 @@ insertWith f x (Info ds) = Info (g ds []) where
 insert :: (Typeable a) => a -> Info -> Info
 insert x info = insertWith const x info
 
+singleton :: (Typeable a) => a -> Info
+singleton x = insert x empty
 
 delete :: (Typeable a) => a -> Info -> Info
 delete x info = error "Info.delete"
@@ -53,6 +55,9 @@ fetch info = maybe mempty id  (Info.Info.lookup info)
 
 extend :: (Monoid a, Typeable a) => a -> Info -> Info
 extend x info = insertWith mappend x info
+
+empty :: Info
+empty = Info []
 
 {-
 
