@@ -24,7 +24,7 @@ import Name
 import NameMonad
 import qualified E.Strictness as Strict
 import qualified Info.Info as Info
-import qualified Seq
+import qualified Util.Seq as Seq
 import Stats hiding(new,print,Stats)
 import Util.Graph
 import VConsts

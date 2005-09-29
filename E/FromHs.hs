@@ -1,16 +1,21 @@
 module E.FromHs(matchesConv,altConv,guardConv,convertDecls,getMainFunction,createMethods,createInstanceRules,theMainName,deNewtype,methodNames) where
 
+import Control.Monad.Identity
+import Control.Monad.State
+import Data.FunctorM
+import Data.Generics
+import Prelude hiding((&&),(||),not,and,or,any,all)
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+import qualified Text.PrettyPrint.HughesPJ as PPrint
+
 import Atom
 import Boolean.Algebra
 import CanType
 import Char
 import Class
-import Control.Monad.Identity
-import Control.Monad.State
 import C.Prims
 import DataConstructors
-import Data.FunctorM
-import Data.Generics
 import Doc.DocLike
 import Doc.PPrint
 import E.E
@@ -23,17 +28,13 @@ import FreeVars
 import GenUtil
 import HsSyn
 import Name
+import NameMonad
 import Options
-import Prelude hiding((&&),(||),not,and,or,any,all)
-import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified FlagOpts as FO
-import qualified Text.PrettyPrint.HughesPJ as PPrint
-import qualified Seq
+import qualified Util.Seq as Seq
 import Representation
 import Utils
 import VConsts
-import NameMonad
 
 localVars = [10,12..]
 theMainName = toName Name.Val (UnQual $ HsIdent "theMain")

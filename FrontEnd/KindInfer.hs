@@ -14,19 +14,20 @@ module KindInfer (kiDecls,
 
                   ) where
 
-import Representation hiding (Subst)
-import HsSyn
-import Utils
-import List (nub)
-import DependAnalysis
 import Control.Monad
-import MonadUtil
 import Data.Generics
-import qualified Seq
 import Data.IORef
-import System.IO.Unsafe
-import Type(quantify,tv,tTTuple)
+import List (nub)
 import qualified Data.Map as Map
+import System.IO.Unsafe
+
+import DependAnalysis
+import HsSyn
+import MonadUtil
+import qualified Util.Seq as Seq
+import Representation hiding (Subst)
+import Type(quantify,tv,tTTuple)
+import Utils
 
 
 

@@ -1,24 +1,24 @@
 module Grin.DeadFunctions(deadFunctions) where
 
-
-import Atom
-import CharIO
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Graph
 import Data.Monoid
+import List
+import Monad
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+
+import Atom
+import CharIO
 import FindFixpoint
 import FreeVars
 import GenUtil hiding(replicateM_)
 import Grin.Grin
 import Grin.Whiz
 import MonoidUtil()
-import List
-import Monad
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import Seq
 import Stats
+import Util.Seq as Seq
 
 concatMapM f xs = liftM concat $ mapM f xs
 

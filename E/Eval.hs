@@ -3,14 +3,15 @@ module E.Eval(eval, unify,strong) where
 -- Simple lambda Calculus interpreter
 -- does not handle recursive Let or Case statements, but those don't appear in types anyway.
 
-import E.E
-import E.Subst
-import E.Pretty
-import E.FreeVars
-import Seq
 import Control.Monad.Writer
 import qualified Data.Map as Map
+
 import Doc.PPrint
+import E.E
+import E.FreeVars
+import E.Pretty
+import E.Subst
+import Util.Seq as Seq
 
 
 

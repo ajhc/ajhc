@@ -1,13 +1,19 @@
 module C.FromGrin(compileGrin) where
 
-import Atom
-import C.Gen
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.Writer
-import C.Prims
 import Data.Monoid
+import List
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+import qualified Text.PrettyPrint.HughesPJ as P
+import Text.PrettyPrint.HughesPJ(nest,($$),($+$))
+
+import Atom
+import C.Gen
+import C.Prims
 import Doc.DocLike
 import Doc.PPrint
 import E.Pretty(render)
@@ -16,14 +22,9 @@ import GenUtil
 import Grin.Grin
 import Grin.HashConst
 import Grin.Show
-import List
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import qualified Text.PrettyPrint.HughesPJ as P
+import qualified Util.Seq as Seq
 import RawFiles
-import Text.PrettyPrint.HughesPJ(nest,($$),($+$))
 import VConsts
-import qualified Seq
 
 
 toType TyTag = tag_t

@@ -14,7 +14,7 @@
   Modified by John Meacham for use in jhc
 -}
 ---------------------------------------------------------------------------------}
-module Seq( -- * Type
+module Util.Seq( -- * Type
             Seq
             -- * Operators
           , (<>)
@@ -93,29 +93,29 @@ fromList xs
   = Seq (\ts -> xs++ts)
 
 
-tell x = W.tell (Seq.singleton x)
-tells xs = W.tell (Seq.fromList xs)
+tell x = W.tell (Util.Seq.singleton x)
+tells xs = W.tell (Util.Seq.fromList xs)
 
 --instance Monoid (Seq.Seq a) where
 --    mempty = Seq.empty
 --    mappend = (Seq.<>)
 
 concat :: Seq (Seq a) -> Seq a
-concat (Seq f) = (foldr Seq.append Seq.empty (f []))
+concat (Seq f) = (foldr Util.Seq.append Util.Seq.empty (f []))
 
-instance Functor Seq.Seq where
+instance Functor Util.Seq.Seq where
     --fmap f xs = Seq.fromList (map f (Seq.toList xs))
     fmap f (Seq xs) = Seq (\ts -> map f (xs []) ++ ts )
 
-instance Monad Seq.Seq where
+instance Monad Util.Seq.Seq where
     --a >>= b  = mconcat ( fmap b (Seq.toList a))
-    a >>= b  = Seq.concat (fmap b a)
-    return x = Seq.single x
-    fail _ = Seq.empty
+    a >>= b  = Util.Seq.concat (fmap b a)
+    return x = Util.Seq.single x
+    fail _ = Util.Seq.empty
 
-instance MonadPlus Seq.Seq where
+instance MonadPlus Util.Seq.Seq where
     mplus = mappend
-    mzero = Seq.empty
+    mzero = Util.Seq.empty
 
 
 
