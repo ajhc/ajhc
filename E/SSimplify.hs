@@ -432,9 +432,15 @@ simplify sopts e = (e'',stat,occ) where
     match m [] (_,Nothing) = error $ "End of match: " ++ show m
     match m as d = error $ "Odd Match: " ++ show ((m,getType m),as,d)
 
-    forceInline x | Properties p <- Info.fetch (tvrInfo x) = Set.member (toAtom "INLINE") p
+    forceInline x | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_INLINE p
 
 
+
+    h (EVar v) xs' inb | Properties p <- Info.fetch (tvrInfo v), Set.member prop_NOINLINE p = do
+        z <- applyRule'' (so_rules sopts) v xs'
+        case z of
+            Just (x,xs) -> h x xs inb
+            Nothing -> app (EVar v, xs')
 
     h (EVar v) xs' inb = do
         z <- applyRule'' (so_rules sopts) v xs'

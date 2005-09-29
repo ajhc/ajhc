@@ -9,9 +9,7 @@ module E.Rules(
     emptyRule,
     printRule,
     printRules,
-    applyRule,
-    mapBodies,
-    applyRule'
+    mapBodies
     )where
 
 import Data.Monoid
@@ -59,10 +57,13 @@ emptyRule = Rule {
 newtype Rules = Rules (Map.Map TVr [Rule])
     deriving(HasSize,Binary)
 
-mapBodies :: (E ->  E) -> Rules ->  Rules
-mapBodies g (Rules mp) = Rules $ Map.map (map f) mp where
-    f rule = rule { ruleBody = g (ruleBody rule) }
-    --    return rule { ruleBody = b }
+mapBodies :: Monad m => (E -> m E) -> Rules -> m Rules
+mapBodies g (Rules mp) = do
+    let f rule = do
+            b <- g (ruleBody rule)
+            return rule { ruleBody = b }
+    mp' <- sequence [ do rs' <- mapM f rs; return (k,rs') | (k,rs) <- Map.toAscList mp ]
+    return $ Rules $ Map.fromAscList mp'
 
 
 ruleAllFreeVars (Rules r) = freeVars (concatMap (map ruleBody) (Map.elems r))
@@ -99,31 +100,9 @@ fromRules rs = Rules $ Map.map snds $ Map.fromList $ sortGroupUnderF fst [ (rule
     --fvs rule = (freeVars $ ruleBody rule) Set.\\ freeVars (ruleArgs rule)
 
 
-applyRule stats rules (EVar tvr) xs = do
-    z <- applyRule' stats rules tvr xs
-    case z of
-        Just (x,xs) -> return $ foldl EAp x xs
-        Nothing -> return $ foldl EAp (EVar tvr) xs
-applyRule _stats _rules _ _xs = fail "Can't apply rule"
-
 preludeError = nameValue "Prelude" "error"
 ruleError = toAtom "Rule.error/EError"
 
-applyRule' stats _ (TVr { tvrIdent = n }) (ty:s:rs) | n == preludeError, Just s' <- toString s  = do
-        tick stats ruleError
-        return $ Just ((EError ("Prelude.error: " ++ s') ty),rs)
-applyRule' stats (Rules rules) tvr xs = ans where
-    ans = case Map.lookup tvr rules of
-            Just rs -> f rs
-            _ -> return Nothing
-    f [] = return Nothing
-    f (r:_) | nArgs <= length xs, Just ss <- sequence (zipWith unify (ruleArgs r) xs) = ans ss where
-        nArgs = length (ruleArgs r)
-        ans ss = do
-            tick stats (ruleName r)
-            let b = substMap (IM.fromList [ (i,x) | ~(~(EVar (TVr { tvrIdent = i })),x) <- concat ss ]) (ruleBody r)
-            return $ Just (b,(drop nArgs xs))
-    f (_:rs) = f rs
 
 applyRule'' _ (TVr { tvrIdent = n }) (ty:s:rs) | n == preludeError, Just s' <- toString s  = do
         mtick ruleError

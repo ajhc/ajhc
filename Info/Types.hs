@@ -29,3 +29,7 @@ instance Binary ExportStatus where
     put_ _ _ = return ()
     get _ = return Exported
 
+
+prop_INLINE = toAtom "INLINE"
+prop_NOINLINE = toAtom "NOINLINE"
+

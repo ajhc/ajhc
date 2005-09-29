@@ -400,7 +400,7 @@ parseHsSource fn s = case runParserWithMode ParseMode { parseFilename = fn } par
 
 
 mapHoBodies  :: (E -> E) -> Ho -> Ho
-mapHoBodies sm ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  E.Rules.mapBodies sm (hoRules ho) } where
+mapHoBodies sm ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) } where
     f (t,e) = (t,sm e)
 
 
@@ -414,7 +414,7 @@ getFixups :: Ho -> Map.Map Int E
 getFixups ho = Map.fromList [ (tvrIdent x,EVar x) | (x,_) <- Map.elems (hoEs ho)]
 
 applyFixups :: Map.Map Int E -> Ho -> Ho
-applyFixups mie ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  E.Rules.mapBodies sm (hoRules ho) } where
+applyFixups mie ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) } where
     f (t,e) = (t,sm e)
     sm = substMap'' mie
 
