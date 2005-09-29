@@ -2,6 +2,7 @@
 module Info.Types where
 
 import Data.Dynamic
+import Data.Monoid
 import qualified Data.Set as Set
 
 import Atom
@@ -10,7 +11,7 @@ import MapBinaryInstance()
 
 -- | list of properties of a function, such as specified by use pragmas or options
 newtype Properties = Properties (Set.Set Atom)
-    deriving(Typeable,Show,Binary)
+    deriving(Typeable,Show,Binary,Monoid)
 
 -- | how many manifest lambdas are in a functions definition
 newtype Arity = Arity Int

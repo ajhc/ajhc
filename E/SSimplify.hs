@@ -18,6 +18,7 @@ import E.Subst
 import E.Values
 import FreeVars
 import GenUtil
+import Info.Types
 import List
 import Name
 import NameMonad
@@ -431,8 +432,7 @@ simplify sopts e = (e'',stat,occ) where
     match m [] (_,Nothing) = error $ "End of match: " ++ show m
     match m as d = error $ "Odd Match: " ++ show ((m,getType m),as,d)
 
-    forceInline x | Just n <- tvrName x, Just xs <- Map.lookup n (so_properties sopts)  = toAtom "INLINE" `elem` xs
-    forceInline _ = False
+    forceInline x | Properties p <- Info.fetch (tvrInfo x) = Set.member (toAtom "INLINE") p
 
 
 
