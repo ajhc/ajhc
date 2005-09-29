@@ -26,15 +26,16 @@ import Warning
 
 parseFiles :: [String]      -- ^ List of files to read
                -> [Module]  -- ^ List of modules to find
+               -> (Ho -> IO Ho) -- ^ Process initial data loaded from ho files
                -> (Ho -> Ho -> TiData -> IO Ho)  -- ^ routine which takes the global ho, the partial local ho and the output of the front end, and returns the completed ho.
                -> IO Ho     -- ^ the final combined ho.
-parseFiles fs deps func = do
+parseFiles fs deps ifunc func = do
     wdump FD.Progress $ do
         putErrLn $ "Compiling " ++ show fs
     let xs = snub $ map Right fs ++ map Left deps
         f ho [] = return ho
         f ho (x:xs) = do
-            ho' <- findModule ho x (doModules func)
+            ho' <- findModule ho x ifunc (doModules func)
             f ho' xs
     initialHo <- loadLibraries
     ho <- f initialHo xs

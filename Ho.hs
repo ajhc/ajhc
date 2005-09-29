@@ -134,10 +134,11 @@ findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
 
 findModule :: Ho                                 -- ^ Accumulated Ho
               -> (Either Module String)          -- ^ Either a module or filename to find
+              -> (Ho -> IO Ho)                   -- ^ Process initial ho loaded from files and library
               -> (Ho -> [HsModule] -> IO Ho)     -- ^ Process set of mutually recursive modules to produce final Ho
               -> IO Ho                           -- ^ Final accumulated ho
-findModule have (Left m) _ | m `Map.member` (hoExports have) = return have
-findModule have need func  = do
+findModule have (Left m) ifunc _ | m `Map.member` (hoExports have) = ifunc have
+findModule have need ifunc func  = do
     let f (Left (Module m)) = (m,searchPaths m)
         f (Right n) = (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
         (name,files) = f need
@@ -155,7 +156,8 @@ findModule have need func  = do
                 mdeps = [ (m,runIdentity $ Map.lookup m (hoModules ho)) | m <- mods']
             ho' <- recordHoFile ho' [ x | (_,_,x) <- sc ] HoHeader { hohGeneration = 0, hohDepends = [ x | (_,x,_) <- sc], hohModDepends = mdeps }
             f (ho `mappend` ho') scs
-    f (ho `mappend` have) scc
+    ho <- ifunc (ho `mappend` have)
+    f ho scc
 
 checkForHoFile :: String            -- ^ file name to check for
     -> IO (Maybe (HoHeader,Ho))

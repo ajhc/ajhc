@@ -85,8 +85,7 @@ main = runMain $ bracketHtml $ do
 buildHl fname [] = putErrDie "Cannot build hl file without list of input modules"
 buildHl fname ms = do
     stats <- Stats.new
-    once <- newOnce
-    me <- parseFiles [] (map Module ms) (processDecls once stats)
+    me <- parseFiles [] (map Module ms) processInitialHo (processDecls stats)
     recordHoFile me [fname] HoHeader { hohGeneration = 0, hohDepends = [], hohModDepends = [] }
     return ()
 
@@ -96,13 +95,11 @@ processFiles [] | Just (b,m) <- optMainFunc options = do
     m <- return $ parseName Val m
     Module m <- getModule m
     stats <- Stats.new
-    once <- newOnce
-    me <- parseFiles [] [Module m] (processDecls once stats)
+    me <- parseFiles [] [Module m] processInitialHo (processDecls stats)
     compileModEnv' stats me
 processFiles  fs = do
     stats <- Stats.new
-    once <- newOnce
-    me <- parseFiles  fs [] (processDecls once stats)
+    me <- parseFiles  fs [] processInitialHo (processDecls stats)
     compileModEnv' stats me
 
 barendregt e = runIdentity  (renameTraverse' e)
@@ -112,30 +109,33 @@ manifestLambdas e = Arity (f 0 e) where
     f n _ = n
     f n (ELam _ e) = f (n + 1) e
 
+letann e = return (Info.singleton $ manifestLambdas e)
+idann ps i = return (props ps i)
+props ps i = case tvrName (TVr { tvrIdent = i }) of
+    Just n -> case Map.lookup n ps of
+        Just ps ->  Info.singleton (Properties $ Set.fromList ps)
+        Nothing ->  mempty
+    Nothing -> mempty
+
+processInitialHo :: Ho -> IO Ho
+processInitialHo ho = do
+    putStrLn $ "Initial annotate: " ++ show (Map.keys $ hoModules ho)
+    let lamann _ = return mempty
+    let Identity (ELetRec ds (ESort 0)) = annotate mempty (idann (hoProps ho) ) letann lamann (ELetRec (Map.elems $ hoEs ho) eStar)
+    return ho { hoEs = Map.fromAscList [ (k,d) | k <- Map.keys $ hoEs ho | d <- ds ] }
+
 
 -- | this is called on parsed, typechecked haskell code to convert it to the internal representation
 
 processDecls ::
-    Once ()
-    -> Stats.Stats   -- ^ statistics
+    Stats.Stats   -- ^ statistics
     -> Ho     -- ^ Collected ho
     -> Ho     -- ^ preliminary haskell object  data
     -> TiData -- ^ front end output
     -> IO Ho  -- ^ final haskell object file
-processDecls once stats ho ho' tiData = do
-    ho <- flip (altOnce once) (return ho) $ do
-        putStrLn "Initial annotate..."
-        let lamann _ = return mempty
-            letann e = return (Info.singleton $ manifestLambdas e)
-            idann i = return (props i)
-            props i = case fromId i of
-                Just n -> case Map.lookup n (hoProps ho) of
-                    Just ps ->  Info.singleton (Properties $ Set.fromList ps)
-                    Nothing ->  mempty
-                Nothing -> mempty
-        let Identity (ELetRec ds (ESort 0)) = annotate mempty idann letann lamann (ELetRec (Map.elems $ hoEs ho) eStar)
-        return ho { hoEs = Map.fromAscList [ (k,d) | k <- Map.keys $ hoEs ho | d <- ds ] }
-    let initMap = Map.fromList [ (tvrIdent t, Just t) | (t,_) <- (Map.elems (hoEs ho))]
+processDecls stats ho ho' tiData = do
+    --mapM_ print [ (EVar t) | (t,_) <- (Map.elems (hoEs ho))]
+    let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
 
     let isExported n | "Instance@" `isPrefixOf` show n = True
         isExported n = n `Set.member` exports
@@ -153,20 +153,23 @@ processDecls once stats ho ho' tiData = do
     let inscope =  [ tvrNum n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrNum n | (_,n,_) <- ds ] ++ map tvrNum (methodNames (hoClassHierarchy ho `mappend` hoClassHierarchy ho'))
     let mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
     let doopt' = doopt mangle
-    let f (ds,smap) (n,v,lc) = do
+    let f (ds,(smap,annmap)) (n,v,lc) = do
         wdump FD.Lambdacube $ putErrLn (show n)
         let g (TVr { tvrIdent = 0 }) = error "absurded zero"
             g tvr@(TVr { tvrIdent = n, tvrType = k})
                 | sortStarLike k =  tAbsurd k
                 | otherwise = EVar tvr
+        nfo <- idann (hoProps ho') (tvrIdent v)
+        v <- return  v { tvrInfo = nfo `mappend` tvrInfo v }
         fvs <- return $ foldr IM.delete (freeVars lc)  inscope
         when (IM.size fvs > 0) $ do
             putDocM putErr $ parens $ text "Absurded vars:" <+> align (hsep $ map pprint (IM.elems fvs))
         lc <- mangle False ("Absurdize") (return . substMap (IM.map g fvs)) lc
-        lc <- mangle  False ("Barendregt: " ++ show n) (return . barendregt) lc
-        lc <- mangle  False "deNewtype" (return . deNewtype fullDataTable) lc
+        lc <- mangle False ("Barendregt: " ++ show n) (return . barendregt) lc
+        lc <- mangle False "deNewtype" (return . deNewtype fullDataTable) lc
         lc <- doopt' False stats "FixupLets..." (\stats x -> atomizeApps stats x >>= coalesceLets stats)  lc
-        lc <- mangle  False ("Barendregt: " ++ show n) (return . barendregt) lc
+        lc <- mangle False ("Barendregt: " ++ show n) (return . barendregt) lc
+        lc <- mangle False ("Annotate") (annotate annmap (idann (hoProps ho `mappend` hoProps ho')) letann (\_ -> return mempty)) lc
         let cm stats e = do
             let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable, SS.so_properties = (if fopts FO.InlinePragmas then  hoProps ho else mempty) }
             let (e',stat,occ) = SS.simplify sopt e
@@ -176,12 +179,14 @@ processDecls once stats ho ho' tiData = do
         lc <- doopt' False stats "SuperSimplify" cm lc
         wdump FD.Lambdacube $ printCheckName fullDataTable lc
         wdump FD.Progress $ putErr "."
-        return ((n,v,lc):ds, Map.insert (tvrNum v) lc smap )
+        nfo <- letann lc
+        v <- return $ v { tvrInfo = Info.insert LetBound nfo `mappend` tvrInfo v }
+        return ((n,v,lc):ds, (Map.insert (tvrNum v) lc smap, Map.insert (tvrNum v) (Just (EVar v)) annmap))
     let reached = Set.fromList [ tvrNum b | (_,b,_) <- reachable graph  [ tvrNum b | (n,b,_) <- ds, isExported n]]
         graph =  (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c))
         (_,dog)  = findLoopBreakers (const 0) graph
 
-    (ds,_) <- foldM f ([],Map.fromList [ (tvrNum v,e) | (v,e) <- Map.elems (hoEs ho)]) [ x | x@(_,b,_) <- dog, tvrNum b `Set.member` reached ]
+    (ds,_) <- foldM f ([],(Map.fromList [ (tvrNum v,e) | (v,e) <- Map.elems (hoEs ho)], initMap)) [ x | x@(_,b,_) <- dog, tvrNum b `Set.member` reached ]
     wdump FD.Progress $ putErrLn "!"
 
     let ds' = reachable (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c)) [ tvrNum b | (n,b,_) <- ds, isExported n]
