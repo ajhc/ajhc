@@ -180,6 +180,7 @@ processDecls stats ho ho' tiData = do
         wdump FD.Lambdacube $ printCheckName fullDataTable lc
         wdump FD.Progress $ putErr "."
         nfo <- letann lc
+        nfo <- return $ if isExported n then Info.insert Exported nfo else nfo
         v <- return $ v { tvrInfo = Info.insert LetBound nfo `mappend` tvrInfo v }
         return ((n,v,lc):ds, (Map.insert (tvrNum v) lc smap, Map.insert (tvrNum v) (Just (EVar v)) annmap))
     let reached = Set.fromList [ tvrNum b | (_,b,_) <- reachable graph  [ tvrNum b | (n,b,_) <- ds, isExported n]]
@@ -253,7 +254,7 @@ compileModEnv' stats ho = do
     lc <- if fopts FO.FloatIn then  opt "Float Inward..." (\stats x -> return (floatInward rules  x))  lc  else return lc
     --wdump FD.Progress $ printEStats lc
     --wdump FD.Lambdacube $ printCheckName dataTable lc
-    vs <- collectSolve lc
+    vs <- if fopts FO.Strictness then (collectSolve lc) else return []
     --mapM_ putErrLn $  sort [ tshow x <+> "->" <+> tshow y | (x@(E.Strictness.V i),y@Lam {}) <- vs, odd i]
     --let esimplify = E.Simplify.simplify mempty { so_dataTable = dataTable, so_properties = (if fopts FO.InlinePragmas then  hoProps ho else mempty), so_rules = rules, so_strictness = Map.fromList [ (i,S n) | (E.Strictness.V i,S n) <- vs] }
     --lc <- opt "Strictness Simplification..." (\ss e -> esimplify ss e >>= \e' -> printCheckName dataTable e' >> return e' ) lc

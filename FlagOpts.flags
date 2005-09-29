@@ -5,6 +5,7 @@ inline-pragmas use inline pragmas
 rules use rules
 wrapper wrap main in exception handler
 float-in perform float inward transform
+strictness perform strictness analysis
 
 lint perform lots of extra type checks
 cpp pass code through cpp
