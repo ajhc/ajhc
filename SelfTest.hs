@@ -121,12 +121,13 @@ testBinary = do
     if (x /= test) then fail "Test Failed" else return ()
     let fn = "/tmp/jhc.info.bin"
         t = Properties (Set.singleton prop_INLINE)
-        nf = (Info.insert "food" $ Info.insert t mempty)
+        nfo = (Info.insert "food" $ Info.insert t mempty)
+        nf = (nfo, "Hello, this is a test", Set.fromList ['a' .. 'f'])
     print nf
     putFile fn nf
-    x <- getFile fn
-    print x
-    z <- Info.lookup x
+    x@(nfo,_,_) <- getFile fn
+    print $ x `asTypeOf` nf
+    z <- Info.lookup nfo
     if (z /= t) then fail "Info Test Failed" else return ()
 
 
