@@ -109,6 +109,7 @@ manifestLambdas e = Arity (f 0 e) where
     f n (ELam _ e) = let n' = n + 1 in n' `seq` f n' e
     f n _ = n
 
+lamann _ = return mempty
 letann e = return (Info.singleton $ manifestLambdas e)
 idann rs ps i = return (props ps i `mappend` rules rs i) where
     props ps i = case tvrName (tvr { tvrIdent = i }) of
@@ -118,11 +119,14 @@ idann rs ps i = return (props ps i `mappend` rules rs i) where
         Nothing -> mempty
     rules rs i = Info.maybeInsert (getARules rs i) Info.empty
 
+annotateMethods ch rs ps = (Map.fromList [ (tvrIdent t, Just (EVar t)) | t <- ts ]) where
+    ts = [ let Identity x = idann rs ps (tvrIdent t) in t { tvrInfo = x `mappend` tvrInfo t } | t <-methodNames ch ] 
+
 processInitialHo :: Ho -> IO Ho
 processInitialHo ho = do
     putStrLn $ "Initial annotate: " ++ show (Map.keys $ hoModules ho)
-    let lamann _ = return mempty
-    let Identity (ELetRec ds (ESort 0)) = annotate mempty (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec (Map.elems $ hoEs ho) eStar)
+    let imap = annotateMethods (hoClassHierarchy ho) (hoRules ho) (hoProps ho)
+    let Identity (ELetRec ds (ESort 0)) = annotate imap (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec (Map.elems $ hoEs ho) eStar)
     return ho { hoEs = Map.fromAscList [ (k,d) | k <- Map.keys $ hoEs ho | d <- ds ] }
 
 
@@ -136,7 +140,6 @@ processDecls ::
     -> IO Ho  -- ^ final haskell object file
 processDecls stats ho ho' tiData = do
     --mapM_ print [ (EVar t) | (t,_) <- (Map.elems (hoEs ho))]
-    let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
 
     let isExported n | "Instance@" `isPrefixOf` show n = True
         isExported n = n `Set.member` exports
@@ -188,6 +191,8 @@ processDecls stats ho ho' tiData = do
         graph =  (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c))
         (_,dog)  = findLoopBreakers (const 0) graph
 
+    let imap = annotateMethods (hoClassHierarchy ho `mappend` hoClassHierarchy ho') allRules (hoProps ho `mappend` hoProps ho')
+    let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))] `mappend` imap
     (ds,_) <- foldM f ([],(Map.fromList [ (tvrNum v,e) | (v,e) <- Map.elems (hoEs ho)], initMap)) [ x | x@(_,b,_) <- dog, tvrNum b `Set.member` reached ]
     wdump FD.Progress $ putErrLn "!"
 
@@ -224,6 +229,7 @@ compileModEnv' stats ho = do
         putStrLn "  ---- class hierarchy ---- "
         printClassHierarchy (hoClassHierarchy ho)
     es' <- createMethods dataTable (hoClassHierarchy ho) (hoEs ho)
+
     es' <- return [ (x,y,floatInward rules z) | (x,y,z) <- es' ]
     wdump FD.Class $ do
         sequence_ [ putDocM CharIO.putErr (pprint $ ELetRec [(y,z)] Unknown) >> putErrLn "" |  (x,y,z) <- es']
@@ -245,6 +251,9 @@ compileModEnv' stats ho = do
         let (e',stat,occ) = SS.simplify sopt e
         Stats.tickStat stats stat
         return e'
+
+    --let imap = annotateMethods (hoClassHierarchy ho) (hoRules ho) (hoProps ho)
+    lc <- return $ runIdentity $ annotate mempty (idann rules (hoProps ho) ) letann lamann lc
     lc <- opt "SuperSimplify" cm lc
 
     -- (lc,_) <- return $ E.CPR.cprAnalyze mempty lc
