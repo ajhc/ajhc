@@ -5,6 +5,7 @@ import Control.Monad.Writer
 import Data.FunctorM
 import Data.Generics
 import Data.Monoid
+import List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -19,10 +20,11 @@ import E.Values
 import FreeVars
 import GenUtil
 import Info.Types
-import List
 import Name
 import NameMonad
+import Options
 import qualified E.Strictness as Strict
+import qualified FlagOpts as FO
 import qualified Info.Info as Info
 import qualified Util.Seq as Seq
 import Stats hiding(new,print,Stats)
@@ -435,15 +437,20 @@ simplify sopts e = (e'',stat,occ) where
     forceInline x | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_INLINE p
 
 
+    applyRule v xs  = do
+        z <- builtinRule v xs
+        case z of
+            Nothing | fopts FO.Rules -> applyRules (Info.fetch (tvrInfo v)) xs
+            x -> return x
 
     h (EVar v) xs' inb | Properties p <- Info.fetch (tvrInfo v), Set.member prop_NOINLINE p = do
-        z <- applyRule'' (so_rules sopts) v xs'
+        z <- applyRule v xs'
         case z of
             Just (x,xs) -> h x xs inb
             Nothing -> app (EVar v, xs')
 
     h (EVar v) xs' inb = do
-        z <- applyRule'' (so_rules sopts) v xs'
+        z <- applyRule v xs'
         case z of
             Just (x,xs) -> h x xs inb
             Nothing -> case Map.lookup (tvrNum v) (envInScope inb) of

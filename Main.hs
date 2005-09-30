@@ -120,7 +120,7 @@ idann rs ps i = return (props ps i `mappend` rules rs i) where
     rules rs i = Info.maybeInsert (getARules rs i) Info.empty
 
 annotateMethods ch rs ps = (Map.fromList [ (tvrIdent t, Just (EVar t)) | t <- ts ]) where
-    ts = [ let Identity x = idann rs ps (tvrIdent t) in t { tvrInfo = x `mappend` tvrInfo t } | t <-methodNames ch ] 
+    ts = [ let Identity x = idann rs ps (tvrIdent t) in t { tvrInfo = x `mappend` tvrInfo t } | t <-methodNames ch ]
 
 processInitialHo :: Ho -> IO Ho
 processInitialHo ho = do
@@ -216,7 +216,7 @@ doopt mangle dmp stats name func lc = do
 compileModEnv' stats ho = do
 
     let dataTable = hoDataTable ho
-    let rules = if fopts FO.Rules then hoRules ho else mempty
+    let rules = hoRules ho
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
 
     --mapM_ putErrLn ([ show x <+> "::" <+> render (ePretty ty) | (x,(TVr _ ty,_)) <- Map.toList $ hoEs ho])

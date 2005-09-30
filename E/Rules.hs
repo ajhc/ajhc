@@ -3,7 +3,6 @@ module E.Rules(
     Rule(ruleHead,ruleBinds,ruleArgs,ruleBody,ruleName),
     ruleFreeVars,
     ruleAllFreeVars,
-    applyRule'',
     ruleFreeVars',
     fromRules,
     emptyRule,
@@ -115,32 +114,10 @@ instance Monoid Rules where
 
 
 fromRules :: [Rule] -> Rules
-fromRules rs = Rules $ Map.map snds $ Map.fromList $ sortGroupUnderF fst [ (tvrIdent $ ruleHead r,f r) | r <- rs ] where
-    f rule = rule
-    --f rule = rule { ruleFvs = fvs rule } where
-    --fvs rule = (freeVars $ ruleBody rule) Set.\\ freeVars (ruleArgs rule)
+fromRules rs = Rules $ Map.map snds $ Map.fromList $ sortGroupUnderF fst [ (tvrIdent $ ruleHead r,r) | r <- rs ]
 
 getARules :: Monad m => Rules -> Id -> m ARules
 getARules (Rules mp) tvr = liftM arules (Map.lookup tvr mp)
-
-
-
-
-applyRule'' _ (TVr { tvrIdent = n }) (ty:s:rs) | n == preludeError, Just s' <- toString s  = do
-        mtick ruleError
-        return $ Just ((EError ("Prelude.error: " ++ s') ty),rs)
-applyRule'' (Rules rules) tvr xs = ans where
-    ans = case Map.lookup (tvrIdent tvr) rules of
-            Just rs -> f rs
-            _ -> return Nothing
-    f [] = return Nothing
-    f (r:_) | nArgs <= length xs, Just ss <- sequence (zipWith unify (ruleArgs r) xs) = ans ss where
-        nArgs = length (ruleArgs r)
-        ans ss = do
-            mtick (ruleName r)
-            let b = substMap (IM.fromList [ (i,x) | ~(~(EVar (TVr { tvrIdent = i })),x) <- concat ss ]) (ruleBody r)
-            return $ Just (b,(drop nArgs xs))
-    f (_:rs) = f rs
 
 
 -- | invarients for ARules
@@ -153,9 +130,13 @@ newtype ARules = ARules [Rule]
 arules xs = ARules (sortUnder ruleNArgs (map f xs)) where
     f rule = rule { ruleNArgs = length  (ruleArgs rule) }
 
+instance Monoid ARules where
+    mempty = ARules []
+    mappend (ARules a) (ARules b) = ARules (sortUnder ruleNArgs (a ++ b))
 
-applyRules :: [Rule] -> [E] -> IO (Maybe (E,[E]))
-applyRules rs xs = f rs where
+
+-- applyRules :: ARules -> [E] -> IO (Maybe (E,[E]))
+applyRules (ARules rs) xs = f rs where
     lxs = length xs
     f [] = return Nothing
     f (r:_) | ruleNArgs r > lxs = return Nothing
