@@ -202,6 +202,7 @@ readHoFile fn = do
     ho <- get bh
     x <- get bh
     when (x /= magic2) (putErrDie $ "Bad ho file magic2:" <+> fn)
+    hClose fh
     return (hh,ho)
 
 
@@ -296,6 +297,7 @@ recordHoFile ho fs header = do
             put bh header
             put bh (mapHoBodies eraseE ho { hoModules = mempty })
             put bh magic2
+            hFlush fh
             (fh,fd) <- hGetFileDep fn fh
             hClose fh
             rename tfn fn
