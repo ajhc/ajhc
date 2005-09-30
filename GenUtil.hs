@@ -1,5 +1,5 @@
 
---  $Id: GenUtil.hs,v 1.43 2005/08/09 23:03:20 john Exp $
+--  $Id: GenUtil.hs,v 1.45 2005/09/30 04:57:28 john Exp $
 -- arch-tag: 835e46b7-8ffd-40a0-aaf9-326b7e347760
 
 
