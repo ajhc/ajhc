@@ -106,22 +106,23 @@ barendregt e = runIdentity  (renameTraverse' e)
 
 manifestLambdas :: E -> Arity
 manifestLambdas e = Arity (f 0 e) where
+    f n (ELam _ e) = let n' = n + 1 in n' `seq` f n' e
     f n _ = n
-    f n (ELam _ e) = f (n + 1) e
 
 letann e = return (Info.singleton $ manifestLambdas e)
-idann ps i = return (props ps i)
-props ps i = case tvrName (TVr { tvrIdent = i }) of
-    Just n -> case Map.lookup n ps of
-        Just ps ->  Info.singleton (Properties $ Set.fromList ps)
-        Nothing ->  mempty
-    Nothing -> mempty
+idann rs ps i = return (props ps i `mappend` rules rs i) where
+    props ps i = case tvrName (tvr { tvrIdent = i }) of
+        Just n -> case Map.lookup n ps of
+            Just ps ->  Info.singleton (Properties $ Set.fromList ps)
+            Nothing ->  mempty
+        Nothing -> mempty
+    rules rs i = Info.maybeInsert (getARules rs i) Info.empty
 
 processInitialHo :: Ho -> IO Ho
 processInitialHo ho = do
     putStrLn $ "Initial annotate: " ++ show (Map.keys $ hoModules ho)
     let lamann _ = return mempty
-    let Identity (ELetRec ds (ESort 0)) = annotate mempty (idann (hoProps ho) ) letann lamann (ELetRec (Map.elems $ hoEs ho) eStar)
+    let Identity (ELetRec ds (ESort 0)) = annotate mempty (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec (Map.elems $ hoEs ho) eStar)
     return ho { hoEs = Map.fromAscList [ (k,d) | k <- Map.keys $ hoEs ho | d <- ds ] }
 
 
@@ -159,7 +160,7 @@ processDecls stats ho ho' tiData = do
             g tvr@(TVr { tvrIdent = n, tvrType = k})
                 | sortStarLike k =  tAbsurd k
                 | otherwise = EVar tvr
-        nfo <- idann (hoProps ho') (tvrIdent v)
+        nfo <- idann (hoRules ho') (hoProps ho') (tvrIdent v)
         v <- return  v { tvrInfo = nfo `mappend` tvrInfo v }
         fvs <- return $ foldr IM.delete (freeVars lc)  inscope
         when (IM.size fvs > 0) $ do
@@ -169,7 +170,7 @@ processDecls stats ho ho' tiData = do
         lc <- mangle False "deNewtype" (return . deNewtype fullDataTable) lc
         lc <- doopt' False stats "FixupLets..." (\stats x -> atomizeApps stats x >>= coalesceLets stats)  lc
         lc <- mangle False ("Barendregt: " ++ show n) (return . barendregt) lc
-        lc <- mangle False ("Annotate") (annotate annmap (idann (hoProps ho `mappend` hoProps ho')) letann (\_ -> return mempty)) lc
+        lc <- mangle False ("Annotate") (annotate annmap (idann (hoRules ho `mappend` hoRules ho') (hoProps ho `mappend` hoProps ho')) letann (\_ -> return mempty)) lc
         let cm stats e = do
             let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable, SS.so_properties = (if fopts FO.InlinePragmas then  hoProps ho else mempty) }
             let (e',stat,occ) = SS.simplify sopt e
@@ -265,6 +266,8 @@ compileModEnv' stats ho = do
         Stats.tickStat stats stat
         return e'
     lc <- opt "SuperSimplify" cm lc
+
+    let ELetRec ds _ = lc in mapM_ (\t -> putStrLn (prettyE (EVar t) <+> show (tvrInfo t))) (fsts ds)
 
     wdump FD.LambdacubeBeforeLift $ printCheckName dataTable lc
     lc <- mangle dataTable True "LambdaLift" (lambdaLiftE stats dataTable) lc

@@ -9,10 +9,18 @@ module E.Rules(
     emptyRule,
     printRule,
     printRules,
-    mapBodies
+    mapBodies,
+    hasBuiltinRule,
+    getARules,
+    arules,
+    ARules,
+    applyRules,
+    builtinRule
     )where
 
+import Data.Typeable
 import Data.Monoid
+import Monad(liftM)
 import qualified Data.IntMap as IM
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -38,24 +46,36 @@ data Rule = Rule {
 --    ruleFvs :: Set.Set Int,
     ruleBinds :: [TVr],
     ruleArgs :: [E],
+    ruleNArgs :: {-# UNPACK #-} !Int,
     ruleBody :: E,
     ruleName :: Atom
     }
  {-! derive: GhcBinary !-}
 
 
+instance Show Rule where
+    showsPrec _ r = showString (fromAtom $ ruleName r)
+
 emptyRule :: Rule
 emptyRule = Rule {
     ruleHead = error "ruleHead undefined",
 --    ruleFvs = error "ruleFvs undefined",
     ruleArgs = [],
+    ruleNArgs = 0,
     ruleBinds = [],
     ruleBody = error "ruleBody undefined",
     ruleName = error "ruleName undefined"
     }
 
-newtype Rules = Rules (Map.Map TVr [Rule])
-    deriving(HasSize,Binary)
+newtype Rules = Rules (Map.Map Id [Rule])
+    deriving(HasSize)
+
+
+instance Binary Rules where
+    put_ h (Rules mp) = putNList h (concat $ Map.elems mp)
+    get h = do
+        rs <- getNList h
+        return $ fromRules rs
 
 mapBodies :: Monad m => (E -> m E) -> Rules -> m Rules
 mapBodies g (Rules mp) = do
@@ -69,12 +89,13 @@ mapBodies g (Rules mp) = do
 ruleAllFreeVars (Rules r) = freeVars (concatMap (map ruleBody) (Map.elems r))
 
 ruleFreeVars ::  Rules -> TVr -> Set.Set Int
-ruleFreeVars (Rules r) tvr = case Map.lookup tvr r of
+ruleFreeVars (Rules r) tvr = case Map.lookup (tvrIdent tvr) r of
     Nothing -> mempty
     --Just rs -> mconcat (map ruleFvs rs) -- (freeVars (map ruleBody rs) Set.\\ freeVars (map ruleArgs rs))
     Just rs -> (freeVars (map ruleBody rs) Set.\\ freeVars (map ruleArgs rs))
-ruleFreeVars' ::  Rules -> Int -> Set.Set Int
-ruleFreeVars' (Rules r) tvr = case Map.lookup (tVr tvr undefined) r of
+
+ruleFreeVars' ::  Rules -> Id -> Set.Set Int
+ruleFreeVars' (Rules r) tvr = case Map.lookup tvr r of
     Nothing -> mempty
     --Just rs -> mconcat (map ruleFvs rs) -- (freeVars (map ruleBody rs) Set.\\ freeVars (map ruleArgs rs))
     Just rs -> (freeVars (map ruleBody rs) Set.\\ freeVars (map ruleArgs rs))
@@ -94,21 +115,22 @@ instance Monoid Rules where
 
 
 fromRules :: [Rule] -> Rules
-fromRules rs = Rules $ Map.map snds $ Map.fromList $ sortGroupUnderF fst [ (ruleHead r,f r) | r <- rs ] where
+fromRules rs = Rules $ Map.map snds $ Map.fromList $ sortGroupUnderF fst [ (tvrIdent $ ruleHead r,f r) | r <- rs ] where
     f rule = rule
     --f rule = rule { ruleFvs = fvs rule } where
     --fvs rule = (freeVars $ ruleBody rule) Set.\\ freeVars (ruleArgs rule)
 
+getARules :: Monad m => Rules -> Id -> m ARules
+getARules (Rules mp) tvr = liftM arules (Map.lookup tvr mp)
 
-preludeError = nameValue "Prelude" "error"
-ruleError = toAtom "Rule.error/EError"
+
 
 
 applyRule'' _ (TVr { tvrIdent = n }) (ty:s:rs) | n == preludeError, Just s' <- toString s  = do
         mtick ruleError
         return $ Just ((EError ("Prelude.error: " ++ s') ty),rs)
 applyRule'' (Rules rules) tvr xs = ans where
-    ans = case Map.lookup tvr rules of
+    ans = case Map.lookup (tvrIdent tvr) rules of
             Just rs -> f rs
             _ -> return Nothing
     f [] = return Nothing
@@ -121,4 +143,37 @@ applyRule'' (Rules rules) tvr xs = ans where
     f (_:rs) = f rs
 
 
+-- | invarients for ARules
+-- sorted by number of arguments rule takes
+-- all hidden rule fields filled in
+
+newtype ARules = ARules [Rule]
+    deriving(Show,Typeable)
+
+arules xs = ARules (sortUnder ruleNArgs (map f xs)) where
+    f rule = rule { ruleNArgs = length  (ruleArgs rule) }
+
+
+applyRules :: [Rule] -> [E] -> IO (Maybe (E,[E]))
+applyRules rs xs = f rs where
+    lxs = length xs
+    f [] = return Nothing
+    f (r:_) | ruleNArgs r > lxs = return Nothing
+    f (r:_) | Just ss <- sequence (zipWith unify (ruleArgs r) xs) = ans ss where
+        ans ss = do
+            mtick (ruleName r)
+            let b = substMap (IM.fromList [ (i,x) | ~(~(EVar (TVr { tvrIdent = i })),x) <- concat ss ]) (ruleBody r)
+            return $ Just (b,drop (ruleNArgs r) xs)
+    f (_:rs) = f rs
+
+
+preludeError = nameValue "Prelude" "error"
+ruleError = toAtom "Rule.error/EError"
+
+hasBuiltinRule TVr { tvrIdent = n } = n `Set.member` Set.fromList [preludeError]
+builtinRule TVr { tvrIdent = n } (ty:s:rs)
+    | n == preludeError, Just s' <- toString s  = do
+        mtick ruleError
+        return $ Just ((EError ("Prelude.error: " ++ s') ty),rs)
+builtinRule _ _ = return Nothing
 
