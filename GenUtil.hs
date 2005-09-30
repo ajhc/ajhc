@@ -107,8 +107,7 @@ module GenUtil(
     ) where
 
 import Char(isAlphaNum, isSpace, toLower, ord, chr)
-import List(group,sort)
-import List(intersperse, sortBy, groupBy, transpose)
+import List
 import Monad
 import qualified IO
 import qualified System
@@ -118,6 +117,14 @@ import CPUTime
 
 {-# SPECIALIZE snub :: [String] -> [String] #-}
 {-# SPECIALIZE snub :: [Int] -> [Int] #-}
+
+{-# RULES "snub/snub" forall x . snub (snub x) = snub x #-}
+{-# RULES "snub/nub" forall x . snub (nub x) = snub x #-}
+{-# RULES "nub/snub" forall x . nub (snub x) = snub x #-}
+{-# RULES "snub/sort" forall x . snub (sort x) = snub x #-}
+{-# RULES "sort/snub" forall x . sort (snub x) = snub x #-}
+{-# RULES "snub/[]" snub [] = [] #-}
+{-# RULES "snub/[x]" forall x . snub [x] = [x] #-}
 
 -- | sorted nub of list, much more efficient than nub, but doesnt preserve ordering.
 snub :: Ord a => [a] -> [a]
@@ -152,6 +159,7 @@ sortGroupUnderFG f g xs = [ (f x, map g xs) |  xs@(x:_) <- sortGroupUnder f xs]
 
 minimumUnder :: Ord b => (a -> b) -> [a] -> a
 minimumUnder _ [] = error "minimumUnder: empty list"
+minimumUnder _ [x] = x
 minimumUnder f (x:xs) = g (f x) x xs where
     g _ x [] = x
     g fb b (x:xs)
@@ -161,6 +169,7 @@ minimumUnder f (x:xs) = g (f x) x xs where
 
 maximumUnder :: Ord b => (a -> b) -> [a] -> a
 maximumUnder _ [] = error "maximumUnder: empty list"
+maximumUnder _ [x] = x
 maximumUnder f (x:xs) = g (f x) x xs where
     g _ x [] = x
     g fb b (x:xs)
@@ -260,6 +269,9 @@ repeatM x = sequence $ repeat x
 repeatM_ :: Monad m => m a -> m ()
 repeatM_ x = sequence_ $ repeat x
 
+{-# RULES "replicateM/0" replicateM 0 = const (return []) #-}
+{-# RULES "replicateM_/0" replicateM_ 0 = const (return ()) #-}
+
 {-# INLINE replicateM #-}
 {-# SPECIALIZE replicateM :: Int -> IO a -> IO [a] #-}
 replicateM :: Monad m => Int -> m a -> m [a]
@@ -349,8 +361,11 @@ paragraph maxn xs = drop 1 (f maxn (words xs)) where
     f _ [] = "\n"
 
 chunk :: Int -> [a] -> [[a]]
-chunk mw s | length s < mw = [s]
-chunk mw s = case splitAt mw s of (a,b) -> a : chunk mw b
+chunk 0 _  = repeat []
+chunk _ [] = []
+chunk mw s = case splitAt mw s of
+    (a,[]) -> [a]
+    (a,b) -> a : chunk mw b
 
 chunkText :: Int -> String -> String
 chunkText mw s = concatMap (unlines . chunk mw) $ lines s
@@ -502,7 +517,11 @@ foldl' f a (x:xs) = (foldl' f $! f a x) xs
 
 -- | count elements of list that have a given property
 count :: (a -> Bool) -> [a] -> Int
-count f = length . filter f
+count f xs = g 0 xs where
+    g n [] = n
+    g n (x:xs)
+        | f x = let x = n + 1 in x `seq` g x xs
+        | otherwise = g n xs
 
 -- | randomly permute a list, using the standard random number generator.
 randomPermuteIO :: [a] -> IO [a]
