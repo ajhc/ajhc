@@ -1,4 +1,19 @@
-module Info.Info(T,Info(..),Entry(..),Info.Info.lookup,insertWith,insert,singleton,delete, fetch, extend, empty) where
+module Info.Info(
+    T,
+    Info(..),
+    Entry(..),
+    Info.Info.lookup,
+    insertWith,
+    insert,
+    maybeInsert,
+    singleton,
+    delete,
+    fetch,
+    extend,
+    empty,
+    infoMap,
+    infoMapM
+    ) where
 
 import Data.Dynamic
 import Data.Generics
@@ -67,22 +82,31 @@ insertWith f x (Info mp) = Info (Map.insert typ (newEntry typ nx) mp) where
 
 newEntry typ x = Entry { entryThing = toDyn x, entryString = show x, entryType = typ }
 
-{-
-insertWith f x (Info ds) = Info (g ds []) where
-    g [] rs = (toDyn x:rs)
-    g (d:ds) rs
-        | Just y <- fromDynamic d = toDyn (f x y):(ds ++ rs)
-        | otherwise = g ds (d:rs)
--}
 
 insert :: (Show a,Typeable a) => a -> Info -> Info
 insert x info = insertWith const x info
 
+maybeInsert :: (Show a, Typeable a) => Maybe a -> Info -> Info
+maybeInsert Nothing = id
+maybeInsert (Just x) = insert x
+
 singleton :: (Show a,Typeable a) => a -> Info
 singleton x = insert x empty
 
+infoMapM :: (Typeable a, Typeable b, Show b, Monad m) => (a -> m b) -> Info -> m Info
+infoMapM f i = case Info.Info.lookup i of
+    Just x -> do
+        n <- f x
+        return (insert n (delete x i))
+    Nothing -> return i
+
+infoMap :: (Typeable a, Typeable b, Show b) => (a -> b) -> Info ->  Info
+infoMap f i = case Info.Info.lookup i of
+    Just x -> insert (f x) (delete x i)
+    Nothing -> i
+
 delete :: (Typeable a) => a -> Info -> Info
-delete x info = error "Info.delete"
+delete x = let typ = createTyp x in  \ (Info mp) -> Info (Map.delete typ mp)
 
 fetch :: (Monoid a, Typeable a) => Info -> a
 fetch info = maybe mempty id  (Info.Info.lookup info)
