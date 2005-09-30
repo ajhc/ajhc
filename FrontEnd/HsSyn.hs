@@ -57,7 +57,10 @@ instance Show SrcSpan where
     show (SrcSpan { srcSpanBegin =  sl1, srcSpanEnd = sl2 } ) = show sl1 ++ "-" ++ show sl2
 
 newtype Module = Module String
-  deriving(Data,Typeable,Eq,Ord,Show,ToAtom,FromAtom)
+  deriving(Data,Typeable,Eq,Ord,ToAtom,FromAtom)
+
+instance Show Module where
+    showsPrec _ (Module n) = showString n
 
 fromModule (Module s) = s
 
