@@ -1,23 +1,39 @@
-module Info.Info where
+module Info.Info(T,Info(..),Entry(..),Info.Info.lookup,insertWith,insert,singleton,delete, fetch, extend, empty) where
 
 import Data.Dynamic
 import Data.Generics
 import Data.Monoid
 import Monad
-import qualified Data.Set as Set
+import qualified Data.Map as Map
 
-
+import Atom
+import GenUtil
 import Util.HasSize
 
 -- extensible type indexed product
 
 type T = Info
 
-newtype Info = Info [Dynamic]
+data Entry = Entry {
+    entryThing   :: Dynamic,
+    entryString  :: String,
+    entryType    :: Atom
+    }
+
+instance Eq Entry where
+    a == b = entryType a == entryType b
+
+instance Show Entry where
+    showsPrec _ x = showString (entryString x)
+
+instance Ord Entry where
+    compare a b = compare (entryType a) (entryType b)
+
+newtype Info = Info (Map.Map Atom Entry)
     deriving(HasSize,Typeable)
 
 instance Show Info where
-    show (Info ds) = show ds
+    show (Info ds) = show (sortUnder (show . entryType) (Map.elems ds))
 
 instance Data Info where
     toConstr = undefined
@@ -25,26 +41,44 @@ instance Data Info where
 
 instance Monoid Info where
     mempty = empty
-    mappend (Info as) (Info bs) = Info ([ b | b <- bs, not (show b `Set.member` ass) ] ++ as) where
-        ass = Set.fromList $ map show as
+    mappend (Info as) (Info bs) = Info (Map.union as bs)
 
 
 lookup :: forall a m .  (Monad m,Typeable a) => Info -> m a
-lookup (Info ds)  = case msum (map fromDynamic ds) of
-    Just x -> return x
-    Nothing -> fail $ "Info: could not find " ++ show (typeOf (undefined :: a))
+lookup (Info mp) = do
+    let typ = createTyp (undefined :: a)
+    case Map.lookup typ mp of
+        Just Entry { entryThing = x } -> case fromDynamic x of
+            Just x -> return x
+            Nothing -> error "Info.lookup: this can't happen"
+        Nothing -> fail $ "Info: could not find " ++ show typ
 
-insertWith :: (Typeable a) => (a -> a -> a) -> a -> Info -> Info
+
+createTyp :: Typeable a => a -> Atom
+createTyp x = toAtom (show (typeOf x))
+
+insertWith :: (Show a,Typeable a) => (a -> a -> a) -> a -> Info -> Info
+insertWith f x (Info mp) = Info (Map.insert typ (newEntry typ nx) mp) where
+    typ = createTyp x
+    nx = case Map.lookup typ mp of
+        Nothing -> x
+        Just Entry { entryThing = d } -> f x (fromDyn d (error "can't happen"))
+
+
+newEntry typ x = Entry { entryThing = toDyn x, entryString = show x, entryType = typ }
+
+{-
 insertWith f x (Info ds) = Info (g ds []) where
     g [] rs = (toDyn x:rs)
     g (d:ds) rs
         | Just y <- fromDynamic d = toDyn (f x y):(ds ++ rs)
         | otherwise = g ds (d:rs)
+-}
 
-insert :: (Typeable a) => a -> Info -> Info
+insert :: (Show a,Typeable a) => a -> Info -> Info
 insert x info = insertWith const x info
 
-singleton :: (Typeable a) => a -> Info
+singleton :: (Show a,Typeable a) => a -> Info
 singleton x = insert x empty
 
 delete :: (Typeable a) => a -> Info -> Info
@@ -53,11 +87,11 @@ delete x info = error "Info.delete"
 fetch :: (Monoid a, Typeable a) => Info -> a
 fetch info = maybe mempty id  (Info.Info.lookup info)
 
-extend :: (Monoid a, Typeable a) => a -> Info -> Info
+extend :: (Show a,Monoid a, Typeable a) => a -> Info -> Info
 extend x info = insertWith mappend x info
 
 empty :: Info
-empty = Info []
+empty = Info Map.empty
 
 {-
 

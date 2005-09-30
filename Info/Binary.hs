@@ -3,19 +3,23 @@ module Info.Binary() where
 import Data.Dynamic
 import qualified Data.Map as Map
 
+import Atom
 import Binary
 import GenUtil
 import Info.Info
 import Info.Types
-import PackedString
 
 
-data Binable = forall a . (Typeable a, Binary a) => Binable a
+data Binable = forall a . (Typeable a, Binary a, Show a) => Binable a
 
 u :: (Typeable a, Binary a) => a
 u = u
 
-cb x = (packString (show (toDyn x)), Binable x)
+createTyp :: Typeable a => a -> Atom
+createTyp x = toAtom (show (typeOf x))
+newEntry typ x = Entry { entryThing = toDyn x, entryString = show x, entryType = typ }
+
+cb x = (createTyp x, Binable x)
 
 binTable = Map.fromList [
     cb (u :: Properties),
@@ -23,7 +27,7 @@ binTable = Map.fromList [
     ]
 
 
-putDyn :: BinHandle -> (PackedString,Dynamic,Binable) -> IO ()
+putDyn :: BinHandle -> (Atom,Dynamic,Binable) -> IO ()
 putDyn h (ps,d,Binable (_::a)) = do
     put_ h ps
     put_ h (fromDyn d (error (show d)) :: a)
@@ -34,24 +38,26 @@ putDyn h (ps,d,Binable (_::a)) = do
 
 
 getDyn h = do
-    (ps::PackedString) <- get h
+    (ps::Atom) <- get h
     b <- Map.lookup ps binTable
     case b of
-        (Binable (_ :: a)) -> ((get h :: IO a) >>= return . toDyn)
+        (Binable (_ :: a)) -> do
+            x <- get h :: IO a
+            return $ newEntry ps x
 
 instance Binary Info where
     put_ h (Info ds) = do
         let ds' = concatMap (\d -> do
-                let ps = packString $ show d
+                let ps = entryType d
                 x <- Map.lookup ps binTable
-                return (ps,d,x)
-              )  ds
+                return (ps,entryThing d,x)
+              )  (Map.elems ds)
         put_ h (length ds')
         mapM_ (putDyn h) ds'
     get h = do
         (n::Int) <- get h
         xs <- replicateM n (getDyn h)
-        return (Info xs)
+        return (Info $ Map.fromList [ (entryType x, x) | x <- xs])
 
 
 

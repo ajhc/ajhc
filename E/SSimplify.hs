@@ -44,7 +44,7 @@ combineOccInfo k a b | a == b = a
 combineOccInfo k a b =  error $ "Conflicting occurance info: " ++ show (k,a,b)
 
 data StrictInfo = NoStrict | Strict
-    deriving(Typeable)
+    deriving(Typeable,Show)
 
 -- | This collects occurance info for variables, deletes dead expressions, and reorders let-bound variables in dependency order.
 collectOcc :: SimplifyOpts ->  E -> (E,Set.Set Int,Map.Map TVr Occurance)

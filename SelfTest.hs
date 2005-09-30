@@ -2,6 +2,7 @@ module SelfTest(selfTest) where
 
 import Data.Monoid
 import Monad
+import qualified Data.Set as Set
 import System.IO
 import Test.QuickCheck
 
@@ -119,7 +120,7 @@ testBinary = do
     x <- getFile fn
     if (x /= test) then fail "Test Failed" else return ()
     let fn = "/tmp/jhc.info.bin"
-        t = Arity 3
+        t = Properties (Set.singleton prop_INLINE)
         nf = (Info.insert "food" $ Info.insert t mempty)
     print nf
     putFile fn nf
