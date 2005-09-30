@@ -34,6 +34,9 @@ module Binary
    putByte,
    getByte,
 
+   getNList,
+   putNList,
+
    -- lazy Bin I/O
    lazyGet,
    lazyPut,
@@ -460,6 +463,18 @@ instance Binary [Char] where
         ps <- get bh
         return $ unpackPS ps
 -}
+
+-- | put length prefixed list.
+putNList :: Binary a => BinHandle -> [a] -> IO ()
+putNList bh xs = do
+    put_ bh (length xs)
+    mapM_ (put_ bh) xs
+
+-- | get length prefixed list.
+getNList :: Binary a => BinHandle -> IO [a]
+getNList bh = do
+    n <- get bh
+    sequence $ replicate n (get bh)
 
 instance Binary a => Binary [a] where
     put_ bh []     = putByte bh 0
