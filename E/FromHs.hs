@@ -4,6 +4,7 @@ import Control.Monad.Identity
 import Control.Monad.State
 import Data.FunctorM
 import Data.Generics
+import List(isPrefixOf)
 import Prelude hiding((&&),(||),not,and,or,any,all)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -27,6 +28,7 @@ import E.Values
 import FreeVars
 import GenUtil
 import HsSyn
+import Info.Types
 import Name
 import NameMonad
 import Options
@@ -183,7 +185,7 @@ createMethods :: Monad m => DataTable -> ClassHierarchy -> (Map.Map Name (TVr,E)
 createMethods dataTable classHierarchy funcs = return ans where
     ans = concatMap cClass (classRecords classHierarchy)
     cClass classRecord =  [ method classRecord n | n :>: _ <- classAssumps classRecord ]
-    method classRecord n = (methodName ,tVr ( nameToInt methodName) ty,v) where
+    method classRecord n = (methodName ,setProperty prop_METHOD (tVr ( nameToInt methodName) ty),v) where
         methodName = toName Name.Val n
         Just (deftvr@(TVr { tvrType = ty}),defe) = findName (toName Name.Val (defaultInstanceName n))
         (EPi tvr t) = ty
@@ -213,7 +215,7 @@ createMethods dataTable classHierarchy funcs = return ans where
 methodNames ::  ClassHierarchy ->  [TVr]
 methodNames  classHierarchy =  ans where
     ans = concatMap cClass (classRecords classHierarchy)
-    cClass classRecord =  [ tVr (nameToInt $ toName Name.Val n) (convertOneVal t) | n :>: t <- classAssumps classRecord ]
+    cClass classRecord =  [ setProperty prop_METHOD $ tVr (nameToInt $ toName Name.Val n) (convertOneVal t) | n :>: t <- classAssumps classRecord ]
 
 unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
 unbox dataTable e vn wtd = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] te) (wtd tvra)] Nothing where
@@ -234,10 +236,12 @@ createFunc dataTable ns es ee = foldr ELam eee tvrs where
 
 
 convertDecls :: Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
-convertDecls classHierarchy assumps dataTable hsDecls = return (concatMap cDecl hsDecls) where
+convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ concatMap cDecl hsDecls) where
     doNegate e = eAp (eAp (func_negate funcs) (getType e)) e
     Identity funcs = fmapM (return . EVar . toTVr assumps) nameFuncNames
-
+    anninst (a,b,c)
+        | "Instance@" `isPrefixOf` show a = (a,setProperty prop_INSTANCE b, c)
+        | otherwise = (a,b,c)
     pval = convertVal assumps
     cDecl :: HsDecl -> [(Name,TVr,E)]
     cDecl (HsForeignDecl _ ForeignPrimitive s n _) = [(name,var, lamt (foldr ($) (EPrim (primPrim s) (map EVar es) rt) (map ELam es)))]  where

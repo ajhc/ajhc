@@ -12,6 +12,7 @@ import Name
 import qualified Data.Set as Set
 import Ratio
 import VConsts
+import Info.Types
 
 
 eIf e a b = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 tBool),  eCaseAlts =  [Alt vTrue a,Alt vFalse b], eCaseDefault = Nothing }
@@ -145,5 +146,9 @@ from_integralCast _ = fail "Not integralCast primitive"
 
 tPtr t = ELit (LitCons (toName TypeConstructor ("Foreign.Ptr","Ptr")) [t] eStar)
 
+instance HasProperties TVr where
+    setProperty prop tvr = tvrInfo_u (setProperty prop) tvr
+    unsetProperty prop tvr = tvrInfo_u (unsetProperty prop) tvr
+    getProperty prop tvr = getProperty prop (tvrInfo tvr)
 
 

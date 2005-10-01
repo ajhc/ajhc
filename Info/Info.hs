@@ -7,6 +7,7 @@ module Info.Info(
     insert,
     maybeInsert,
     singleton,
+    member,
     delete,
     fetch,
     extend,
@@ -110,6 +111,9 @@ delete x = let typ = createTyp x in  \ (Info mp) -> Info (Map.delete typ mp)
 
 fetch :: (Monoid a, Typeable a) => Info -> a
 fetch info = maybe mempty id  (Info.Info.lookup info)
+
+member :: (Typeable a) => a -> Info -> Bool
+member x (Info s) = Map.member (createTyp x) s
 
 extend :: (Show a,Monoid a, Typeable a) => a -> Info -> Info
 extend x info = insertWith mappend x info

@@ -98,6 +98,18 @@ testInfo = do
     unless (Info.lookup i == (Just 3 :: Maybe Int)) $ fail "test failed..."
     unless (Info.fetch (insert (5 :: Int) i) == ([] :: [Int])) $ fail "test failed..."
 
+    let x = Properties mempty
+        x' = setProperty prop_METHOD $ setProperty prop_INLINE x
+    print (x',getProperty prop_METHOD x', getProperty prop_INSTANCE x')
+    let x'' = setProperty prop_INSTANCE $ unsetProperty prop_METHOD x'
+    print (x'',getProperty prop_METHOD x'', getProperty prop_INSTANCE x'')
+
+    let x = Info.empty
+        x' = setProperty prop_METHOD $ setProperty prop_INLINE x
+    print (x',getProperty prop_METHOD x', getProperty prop_INSTANCE x')
+    let x'' = setProperty prop_INSTANCE $ unsetProperty prop_METHOD x'
+    print (x'',getProperty prop_METHOD x'', getProperty prop_INSTANCE x'')
+
 putFile fn a = do
     h <- openBinaryFile fn WriteMode
     bh <- openBinIO h
