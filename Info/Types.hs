@@ -77,3 +77,7 @@ instance HasProperties Info where
     getProperty prop info = getProperty prop (Info.fetch info :: Properties)
 
 
+setProperties :: HasProperties a => [Atom] -> a -> a
+setProperties [] nfo = nfo
+setProperties (p:ps) nfo = setProperty p (setProperties ps nfo)
+

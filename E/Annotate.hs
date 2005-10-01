@@ -15,9 +15,9 @@ import Info.Types
 
 annotate :: Monad m =>
     (Map.Map Id (Maybe E))
-    -> (Id -> m Info)   -- ^ annotate based on Id map
-    -> (E -> m Info) -- ^ annotate letbound bindings
-    -> (E -> m Info) -- ^ annotate lambdabound bindings
+    -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
+    -> (E -> Info -> m Info) -- ^ annotate letbound bindings
+    -> (E -> Info -> m Info) -- ^ annotate lambdabound bindings
     ->  E            -- ^ term to annotate
     -> m E
 annotate imap idann letann lamann e = runReaderT (f e) imap where
@@ -34,8 +34,8 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
     f (EPrim x es e) = liftM2 (EPrim x) (mapM f es) (f e)
     f (ELetRec dl e) = do
         dl' <- flip mapM dl $ \ (t,e) -> do
-            nfo <- lift $ letann e
-            return (t,Info.insert LetBound nfo)
+            nfo <- lift $ letann e (tvrInfo t)
+            return (tvrInfo_u (Info.insert LetBound) t { tvrInfo = nfo })
         (as,rs) <- liftM unzip $ mapMntvr dl'
         local (mconcat rs) $ do
             ds <- mapM f (snds dl)
@@ -46,11 +46,12 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
     f e@(ESort {}) = return e
     f ec@(ECase {}) = do
         e' <- f $ eCaseScrutinee ec
-        (b',r) <- ntvr (Info.singleton CaseDefault) [] $ eCaseBind ec
+        let caseBind = eCaseBind ec
+        (b',r) <- ntvr [] $ caseBind { tvrInfo = Info.insert CaseDefault (tvrInfo caseBind) }
         d <- local r $ fmapM f $ eCaseDefault ec
         let da (Alt (LitCons s vs t) e) = do
                 t' <- f t
-                (as,rs) <- liftM unzip $ mapMntvr (zip vs (repeat (Info.singleton CasePattern)))
+                (as,rs) <- liftM unzip $ mapMntvr (map (tvrInfo_u (Info.insert CasePattern)) vs)
                 e' <- local (mconcat rs) $ f e
                 return $ Alt (LitCons s as t') e'
             da (Alt l e) = do
@@ -61,31 +62,33 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         return  ECase { eCaseScrutinee = e', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts }
     lp bnd lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == 0  = do
         t' <- f t
-        nfo <- lift $ lamann e
+        nfo <- lift $ lamann e (tvrInfo tvr)
+        nfo <- lift $ idann n nfo
         e' <- local (Map.insert n Nothing) $ f e
-        return $ lam (tvr { tvrIdent =  0, tvrType =  t',  tvrInfo = tvrInfo tvr `mappend` Info.insert bnd nfo}) e'
+        return $ lam (tvr { tvrIdent =  0, tvrType =  t', tvrInfo =  Info.insert bnd nfo}) e'
     lp bnd lam tvr e = do
-        nfo <- lift $ lamann e
-        (tv,r) <- ntvr (Info.insert bnd nfo) [] tvr
+        nfo <- lift $ lamann e (tvrInfo tvr)
+        (tv,r) <- ntvr  [] tvr { tvrInfo = nfo }
         e' <- local r $ f e
         return $ lam tv e'
     mapMntvr ts = f ts [] where
         f [] xs = return $ reverse xs
-        f ((t,nfo):ts) rs = do
-            (t',r) <- ntvr nfo vs t
+        f (t:ts) rs = do
+            (t',r) <- ntvr vs t
             local r $ f ts ((t',r):rs)
-        vs = [ tvrNum x | (x,_) <- ts ]
+        vs = [ tvrNum x | x <- ts ]
     -- ntvr :: Monad m => Info -> [Int] -> TVr -> ReaderT (Map.Map Int (Maybe E)) m (TVr, (Map.Map Int (Maybe E)) -> (Map.Map Int (Maybe E)))
-    ntvr nfo xs tvr@(TVr { tvrIdent = 0, tvrType =  t}) = do
+    ntvr xs tvr@(TVr { tvrIdent = 0, tvrType =  t}) = do
         t' <- f t
-        let nvr = (tvr { tvrType =  t', tvrInfo = tvrInfo tvr `mappend` nfo})
+        nfo <- lift $ idann 0 (tvrInfo tvr)
+        let nvr = (tvr { tvrType =  t', tvrInfo = nfo})
         return (nvr,id)
-    ntvr nfo xs tvr@(TVr {tvrIdent = i, tvrType =  t}) = do
+    ntvr xs tvr@(TVr {tvrIdent = i, tvrType =  t}) = do
         t' <- f t
         ss <- ask
-        nfo' <- lift $ idann i
+        nfo' <- lift $ idann i (tvrInfo tvr)
         let i' = mnv xs i ss
-        let nvr = (tvr { tvrIdent =  i', tvrType =  t', tvrInfo = tvrInfo tvr `mappend` nfo `mappend` nfo'})
+        let nvr = (tvr { tvrIdent =  i', tvrType =  t', tvrInfo =  nfo'})
         case i == i' of
             True -> return (nvr,Map.insert i (Just $ EVar nvr))
             False -> return (nvr,Map.insert i (Just $ EVar nvr) . Map.insert i' Nothing)

@@ -109,18 +109,18 @@ manifestLambdas e = Arity (f 0 e) where
     f n (ELam _ e) = let n' = n + 1 in n' `seq` f n' e
     f n _ = n
 
-lamann _ = return mempty
-letann e = return (Info.singleton $ manifestLambdas e)
-idann rs ps i = return (props ps i `mappend` rules rs i) where
+lamann _ nfo = return nfo
+letann e nfo = return (Info.insert (manifestLambdas e) nfo)
+idann rs ps i nfo = return (props ps i nfo `mappend` rules rs i) where
     props ps i = case tvrName (tvr { tvrIdent = i }) of
         Just n -> case Map.lookup n ps of
-            Just ps ->  Info.singleton (Properties $ Set.fromList ps)
-            Nothing ->  mempty
-        Nothing -> mempty
+            Just ps ->  setProperties ps
+            Nothing ->  id
+        Nothing -> id
     rules rs i = Info.maybeInsert (getARules rs i) Info.empty
 
 annotateMethods ch rs ps = (Map.fromList [ (tvrIdent t, Just (EVar t)) | t <- ts ]) where
-    ts = [ let Identity x = idann rs ps (tvrIdent t) in t { tvrInfo = x `mappend` tvrInfo t } | t <-methodNames ch ]
+    ts = [ let Identity x = idann rs ps (tvrIdent t) (tvrInfo t) in t { tvrInfo = x  } | t <-methodNames ch ]
 
 processInitialHo :: Ho -> IO Ho
 processInitialHo ho = do
@@ -163,8 +163,8 @@ processDecls stats ho ho' tiData = do
             g tvr@(TVr { tvrIdent = n, tvrType = k})
                 | sortStarLike k =  tAbsurd k
                 | otherwise = EVar tvr
-        nfo <- idann (hoRules ho') (hoProps ho') (tvrIdent v)
-        v <- return  v { tvrInfo = nfo `mappend` tvrInfo v }
+        nfo <- idann (hoRules ho') (hoProps ho') (tvrIdent v) (tvrInfo v)
+        v <- return  v { tvrInfo = nfo }
         fvs <- return $ foldr IM.delete (freeVars lc)  inscope
         when (IM.size fvs > 0) $ do
             putDocM putErr $ parens $ text "Absurded vars:" <+> align (hsep $ map pprint (IM.elems fvs))
@@ -173,7 +173,7 @@ processDecls stats ho ho' tiData = do
         lc <- mangle False "deNewtype" (return . deNewtype fullDataTable) lc
         lc <- doopt' False stats "FixupLets..." (\stats x -> atomizeApps stats x >>= coalesceLets stats)  lc
         lc <- mangle False ("Barendregt: " ++ show n) (return . barendregt) lc
-        lc <- mangle False ("Annotate") (annotate annmap (idann (hoRules ho `mappend` hoRules ho') (hoProps ho `mappend` hoProps ho')) letann (\_ -> return mempty)) lc
+        lc <- mangle False ("Annotate") (annotate annmap (idann (hoRules ho `mappend` hoRules ho') (hoProps ho `mappend` hoProps ho')) letann lamann) lc
         let cm stats e = do
             let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable, SS.so_properties = (if fopts FO.InlinePragmas then  hoProps ho else mempty) }
             let (e',stat,occ) = SS.simplify sopt e
@@ -183,9 +183,9 @@ processDecls stats ho ho' tiData = do
         lc <- doopt' False stats "SuperSimplify" cm lc
         wdump FD.Lambdacube $ printCheckName fullDataTable lc
         wdump FD.Progress $ putErr "."
-        nfo <- letann lc
+        nfo <- letann lc (tvrInfo v)
         nfo <- return $ if isExported n then Info.insert Exported nfo else nfo
-        v <- return $ v { tvrInfo = Info.insert LetBound nfo `mappend` tvrInfo v }
+        v <- return $ v { tvrInfo = Info.insert LetBound nfo }
         return ((n,v,lc):ds, (Map.insert (tvrNum v) lc smap, Map.insert (tvrNum v) (Just (EVar v)) annmap))
     let reached = Set.fromList [ tvrNum b | (_,b,_) <- reachable graph  [ tvrNum b | (n,b,_) <- ds, isExported n]]
         graph =  (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c))
