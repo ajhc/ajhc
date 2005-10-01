@@ -146,6 +146,7 @@ floatInward rules e = f e [] where
 
 type FVarSet = Set.Set Int
 type Binds = [Either ((TVr,E),FVarSet) [((TVr,E),FVarSet)]]
+--type Binds = [(FVarSet,Either (TVr,E) [(TVr,E)])]
 
 
 sepDupableBinds fvs xs = partition ind xs where
@@ -160,24 +161,24 @@ sameLength [] [] = True
 sameLength (_:xs) (_:ys) = sameLength xs ys
 sameLength _ _ = False
 
+-- | seperate bindings based on whether they can be floated inward
+
 sepByDropPoint ::
-    [FVarSet]    -- ^ list of possible drop points
-    -> Binds     -- ^ list of bindings and their free variables
+    [FVarSet]           -- ^ list of possible drop points
+    -> Binds            -- ^ list of bindings and their free variables
     -> (Binds,[Binds])  -- ^ bindings seperated into those which must be dropped outside of all drop points, and those which can be floated inward into each branch
 sepByDropPoint ds [] = ([], [ [] | _ <- ds ])
 sepByDropPoint ds fs' | sameShape1 xs ds && sum (length r:map length xs) == length fs' = (r,xs) where
-    --fs =  ( G.scc $  G.newGraph (concatMap fromScc fs')  (tvrNum . fst . fst) (Set.toList . snd) )
     (r,xs) = f fs'
     f [] = ([], [ [] | _ <- ds ])
     f (b:bs)
-        --  | nu == 0 = f bs -- not (any (`Set.member` allSet) (fvDecls b)) = f bs
+        | nu == 0 = f bs
         | nu == 1 =   case sepByDropPoint [ if v then d `mappend` fb' else d | (d,v) <- ds'  ] bs of
             (gb,ds'') | sameShape1 ds' ds'' -> (gb, [ if v then b:d else d | d <- ds'' | (_,v) <- ds' ])
         | otherwise = case sepByDropPoint [ d `mappend` fb' | d <- ds  ] bs of
             (gb,ds'') | sameShape1 ds'' ds -> (b:gb,ds'')
       where
         fb' = fvBind b
-        fb = Set.toList $ fb'
         ds' = [ (d,any  (`Set.member` d) (fvDecls b)) | d <- ds ]
         nu = length (filter snd ds')
     fvDecls (Left ((t,_),_)) = [tvrNum t]

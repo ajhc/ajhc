@@ -99,6 +99,13 @@ ruleFreeVars' (Rules r) tvr = case Map.lookup tvr r of
     --Just rs -> mconcat (map ruleFvs rs) -- (freeVars (map ruleBody rs) Set.\\ freeVars (map ruleArgs rs))
     Just rs -> (freeVars (map ruleBody rs) Set.\\ freeVars (map ruleArgs rs))
 
+
+instance FreeVars Rule b => FreeVars ARules b where
+    freeVars (ARules rs) = freeVars rs
+
+instance FreeVars Rule (Set.Set TVr) where
+    freeVars rule = freeVars (ruleBody rule) Set.\\ freeVars (ruleArgs rule)
+
 printRule rule = do
     putErrLn $ fromAtom (ruleName rule)
     putErr $ "    " ++ render (ePretty (foldl EAp (EVar $ ruleHead rule) (ruleArgs rule)))
