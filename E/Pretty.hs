@@ -126,6 +126,7 @@ eDoc e PrettyOpt {optExpanded = expanded, optColors = colors, optNames = optName
     prettylit pbind (LitInt i _) = atom $ (col "blue" (text $ show i))
     prettylit pbind (LitCons n [] t) | t == rawType "tag#" = atom $ (col "blue" (text $ show n))
     prettylit pbind (LitCons s es _) | Just n <- isTup (snd $ (snd $ fromName s :: (String,String))), n == length es = atom $ tupled (map (unparse . pbind) es)
+    prettylit pbind (LitCons s es _) | Just n <- fromUnboxedNameTuple s, n == length es = atom $ encloseSep (text "(# ") (text " #)") (text ", ") (map (unparse . pbind) es)
     prettylit pbind (LitCons n [a,b] _) | vCons == n  = (pbind a) `cons` (pbind b)
     prettylit pbind (LitCons n [e] _) | toName TypeConstructor ("Prelude","[]") == n = atom   (char '[' <> unparse (pbind e)  <> char ']')
     prettylit pbind (LitCons s es _) | not expanded = foldl app  (atom $ text (snd $ fromName s)) ( map pbind es)
@@ -152,9 +153,9 @@ eDoc e PrettyOpt {optExpanded = expanded, optColors = colors, optNames = optName
         (EVar tvr) | expanded -> prettytvr tvr
         (EVar (TVr { tvrIdent = i })) -> atom $ prettyI i
         Unknown -> symbol (char  '?')
-        e | e == eStar -> symbol UC.star
-        e | e == eBox -> symbol UC.box
-        e | e == eHash -> symbol (text "#")
+        ESort EStar -> symbol UC.star
+        ESort EBox -> symbol UC.box
+        ESort EHash -> symbol (text "#")
         (ELit l) -> prettylit prettye l
         (ELetRec bg e) -> rtup (Fix L (-10)) $ let
             bg' = map ((<> bc ';') . unparse . prettydecl ) bg
