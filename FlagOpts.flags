@@ -13,4 +13,4 @@ boehm use Boehm garbage collector
 
 
 !Default settings
-@default inline-pragmas rules wrapper float-in
+@default inline-pragmas rules wrapper float-in strictness

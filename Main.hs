@@ -140,6 +140,8 @@ processDecls ::
 processDecls stats ho ho' tiData = do
     --mapM_ print [ (EVar t) | (t,_) <- (Map.elems (hoEs ho))]
 
+    let allHo = ho `mappend` ho'
+
     let isExported n | "Instance@" `isPrefixOf` show n = True
         isExported n = n `Set.member` exports
         exports = Set.fromList $ concat $ Map.elems (hoExports ho')
@@ -153,7 +155,7 @@ processDecls stats ho ho' tiData = do
     rules <- createInstanceRules (hoClassHierarchy ho' `mappend` hoClassHierarchy initialHo)   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
     let allRules = hoRules ho `mappend` rules
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
-    let inscope =  [ tvrNum n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrNum n | (_,n,_) <- ds ] ++ map tvrNum (methodNames (hoClassHierarchy ho `mappend` hoClassHierarchy ho'))
+    let inscope =  [ tvrNum n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrNum n | (_,n,_) <- ds ] ++ map tvrNum (methodNames (hoClassHierarchy allHo))
     let mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
     let doopt' = doopt mangle
     let f (ds,(smap,annmap)) (n,v,lc) = do
@@ -167,14 +169,14 @@ processDecls stats ho ho' tiData = do
         fvs <- return $ foldr IM.delete (freeVars lc)  inscope
         when (IM.size fvs > 0) $ do
             putDocM putErr $ parens $ text "Absurded vars:" <+> align (hsep $ map pprint (IM.elems fvs))
-        lc <- mangle False ("Annotate") (annotate annmap (idann (hoRules ho `mappend` hoRules ho') (hoProps ho `mappend` hoProps ho')) letann lamann) lc
+        lc <- mangle False ("Annotate") (annotate annmap (idann (hoRules allHo) (hoProps allHo)) letann lamann) lc
         lc <- mangle False ("Absurdize") (return . substMap (IM.map g fvs)) lc
         lc <- mangle False ("Barendregt: " ++ show n) (return . barendregt) lc
         lc <- mangle False "deNewtype" (return . deNewtype fullDataTable) lc
         lc <- doopt' False stats "FixupLets..." (\stats x -> atomizeApps stats x >>= coalesceLets stats)  lc
         lc <- mangle False ("Barendregt: " ++ show n) (return . barendregt) lc
         let cm stats e = do
-            let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable, SS.so_properties = (if fopts FO.InlinePragmas then  hoProps ho else mempty) }
+            let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
             let (e',stat,occ) = SS.simplify sopt e
             Stats.tickStat stats stat
             return e'
@@ -190,7 +192,7 @@ processDecls stats ho ho' tiData = do
         graph =  (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c))
         (_,dog)  = findLoopBreakers (const 0) graph
 
-    let imap = annotateMethods (hoClassHierarchy ho `mappend` hoClassHierarchy ho') allRules (hoProps ho `mappend` hoProps ho')
+    let imap = annotateMethods (hoClassHierarchy allHo) allRules (hoProps allHo)
     let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))] `mappend` imap
     (ds,_) <- foldM f ([],(Map.fromList [ (tvrNum v,e) | (v,e) <- Map.elems (hoEs ho)], initMap)) [ x | x@(_,b,_) <- dog, tvrNum b `Set.member` reached ]
     wdump FD.Progress $ putErrLn "!"
@@ -249,7 +251,7 @@ compileModEnv' stats ho = do
     lc <- mangle dataTable True "Barendregt" (return . barendregt) lco
     wdump FD.Progress $ printEStats lc
     let cm stats e = do
-        let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable, SS.so_properties = (if fopts FO.InlinePragmas then  hoProps ho else mempty) }
+        let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable }
         let (e',stat,occ) = SS.simplify sopt e
         Stats.tickStat stats stat
         return e'
@@ -258,21 +260,14 @@ compileModEnv' stats ho = do
     lc <- return $ runIdentity $ annotate mempty (idann rules (hoProps ho) ) letann lamann lc
     lc <- opt "SuperSimplify" cm lc
 
-    -- (lc,_) <- return $ E.CPR.cprAnalyze mempty lc
-    -- sequence_ [ putStrLn $ (tvrShowName t) <+> show (maybe E.CPR.Top id (Info.lookup (tvrInfo t)) ::  E.CPR.Val) | (t,_,_) <- scCombinators $ eToSC dataTable lc ]
-    --lc <- opt "Simplification..." esimplify lc
+    --(lc,_) <- return $ E.CPR.cprAnalyze mempty lc
+    --sequence_ [ putStrLn $ (tvrShowName t) <+> show (maybe E.CPR.Top id (Info.lookup (tvrInfo t)) ::  E.CPR.Val) | (t,_,_) <- scCombinators $ eToSC dataTable lc ]
     lc <- mangle dataTable True "Barendregt" (return . barendregt) lc
-    --wdump FD.Progress $ printEStats lc
     lc <- if fopts FO.FloatIn then  opt "Float Inward..." (\stats x -> return (floatInward rules  x))  lc  else return lc
-    --wdump FD.Progress $ printEStats lc
-    --wdump FD.Lambdacube $ printCheckName dataTable lc
     vs <- if fopts FO.Strictness then (collectSolve lc) else return []
-    --mapM_ putErrLn $  sort [ tshow x <+> "->" <+> tshow y | (x@(E.Strictness.V i),y@Lam {}) <- vs, odd i]
-    --let esimplify = E.Simplify.simplify mempty { so_dataTable = dataTable, so_properties = (if fopts FO.InlinePragmas then  hoProps ho else mempty), so_rules = rules, so_strictness = Map.fromList [ (i,S n) | (E.Strictness.V i,S n) <- vs] }
-    --lc <- opt "Strictness Simplification..." (\ss e -> esimplify ss e >>= \e' -> printCheckName dataTable e' >> return e' ) lc
-    -- lc <- opt "Strictness Simplification..." esimplify lc
+    mapM_ putErrLn $  sort [ tshow x <+> "->" <+> tshow y | (x@(E.Strictness.V i),y@Lam {}) <- vs, odd i]
     let cm stats e = do
-        let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable, SS.so_properties = (if fopts FO.InlinePragmas then  hoProps ho else mempty), SS.so_strictness = Map.fromList [ (i,S n) | (E.Strictness.V i,S n) <- vs] }
+        let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable,  SS.so_strictness = Map.fromList [ (i,S n) | (E.Strictness.V i,S n) <- vs] }
         let (e',stat,occ) = SS.simplify sopt e
         Stats.tickStat stats stat
         return e'

@@ -434,7 +434,9 @@ simplify sopts e = (e'',stat,occ) where
     match m [] (_,Nothing) = error $ "End of match: " ++ show m
     match m as d = error $ "Odd Match: " ++ show ((m,getType m),as,d)
 
-    forceInline x | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_INLINE p
+    forceInline x
+        | not (fopts FO.InlinePragmas) = False
+        | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_INLINE p
 
 
     applyRule v xs  = do
