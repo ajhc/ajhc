@@ -4,6 +4,7 @@ module Main(main) where
 import Char
 import Control.Exception
 import Control.Monad.Identity
+import Data.Monoid
 import List hiding(group)
 import Maybe
 import Prelude hiding(putStrLn, putStr,print)
@@ -16,7 +17,6 @@ import C.FromGrin
 import CharIO
 import Class
 import DataConstructors
-import Data.Monoid
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
@@ -56,7 +56,6 @@ import qualified Grin.Simplify
 import qualified Info.Info as Info
 import qualified Stats
 import Util.Graph
-import Util.Once
 
 ---------------
 -- ∀α∃β . α → β
@@ -168,12 +167,12 @@ processDecls stats ho ho' tiData = do
         fvs <- return $ foldr IM.delete (freeVars lc)  inscope
         when (IM.size fvs > 0) $ do
             putDocM putErr $ parens $ text "Absurded vars:" <+> align (hsep $ map pprint (IM.elems fvs))
+        lc <- mangle False ("Annotate") (annotate annmap (idann (hoRules ho `mappend` hoRules ho') (hoProps ho `mappend` hoProps ho')) letann lamann) lc
         lc <- mangle False ("Absurdize") (return . substMap (IM.map g fvs)) lc
         lc <- mangle False ("Barendregt: " ++ show n) (return . barendregt) lc
         lc <- mangle False "deNewtype" (return . deNewtype fullDataTable) lc
         lc <- doopt' False stats "FixupLets..." (\stats x -> atomizeApps stats x >>= coalesceLets stats)  lc
         lc <- mangle False ("Barendregt: " ++ show n) (return . barendregt) lc
-        lc <- mangle False ("Annotate") (annotate annmap (idann (hoRules ho `mappend` hoRules ho') (hoProps ho `mappend` hoProps ho')) letann lamann) lc
         let cm stats e = do
             let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable, SS.so_properties = (if fopts FO.InlinePragmas then  hoProps ho else mempty) }
             let (e',stat,occ) = SS.simplify sopt e
@@ -228,15 +227,18 @@ compileModEnv' stats ho = do
     when (dump FD.Class) $ do
         putStrLn "  ---- class hierarchy ---- "
         printClassHierarchy (hoClassHierarchy ho)
-    es' <- createMethods dataTable (hoClassHierarchy ho) (hoEs ho)
 
-    es' <- return [ (x,y,floatInward rules z) | (x,y,z) <- es' ]
+    let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
+    es' <- createMethods dataTable (hoClassHierarchy ho) (hoEs ho)
+    let Identity (ELetRec es'' (ESort 0)) = annotate initMap (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec [ (y,z) | (x,y,z) <- es']  eStar)
+
+    es' <- return [ (x,y,floatInward rules z) | (x,_,_) <- es' | (y,z) <- es'' ]
     wdump FD.Class $ do
         sequence_ [ putDocM CharIO.putErr (pprint $ ELetRec [(y,z)] Unknown) >> putErrLn "" |  (x,y,z) <- es']
     let es = Map.fromList [ (x,(y,z)) |  (x,y,z) <- es'] `mappend` hoEs ho
     (_,main,mainv) <- getMainFunction mainFunc es
     let ds = ((main,mainv):Map.elems es)
-    let ds' = reachable (newGraph ds (tvrNum . fst) (\(t,e) -> freeVars e `mappend` Set.toList (ruleFreeVars rules t)) ) [tvrNum main]
+    let ds' = reachable (newGraph ds (tvrNum . fst) (\ (t,e) -> Set.toList $ freeVars e `mappend` freeVars (Info.fetch (tvrInfo t) :: ARules))) [tvrNum main]
 
     let lco = ELetRec ds'  (EVar main)
     --typecheck dataTable lco

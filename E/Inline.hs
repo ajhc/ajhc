@@ -1,23 +1,23 @@
---module E.Inline(TravM, newVarName, lookupBinding, newBinding, traverse,Binding(..),emapE,emapE', TravOptions(..),travOptions ) where
-module E.Inline(inlineDecompose, basicDecompose, emapE, emapE',emapEG,emapE_) where
+module E.Inline(inlineDecompose, basicDecompose, emapE, emapE',emapEG, emapE_, bindingFreeVars) where
 
+import Control.Monad.Writer
+import Data.FunctorM
+import Data.Monoid
 
 import E.E
 import E.Rules
 import E.Values
-
-import Control.Monad.Writer
-import Data.Monoid
-import Util.Graph
-import Util.HasSize
 import FreeVars
 import GenUtil
-import Data.FunctorM
-import qualified Data.Set as Set
+import Info.Info as Info
+import Util.Graph
+import Util.HasSize
 
 
 
 -- To decide whether to inline, we take a few things into account
+
+bindingFreeVars t e = freeVars (tvrType t) `mappend` freeVars e `mappend` freeVars (Info.fetch (tvrInfo t) :: ARules)
 
 
 baseInlinability e
@@ -32,7 +32,7 @@ basicDecompose ::
     -> [(TVr,E)]     -- ^ incoming bindings
     -> [Either (TVr,E) [(TVr,E)]]     -- ^ bindings pruned and ordered by inlinability value
 basicDecompose prune rules body ds = ans where
-    zs = [ ((t,e), tvrNum t, freeVars (tvrType t) `mappend` freeVars e `mappend` Set.toList (ruleFreeVars rules t)) |  (t,e) <- ds ]
+    zs = [ ((t,e), tvrNum t, bindingFreeVars t e ) |  (t,e) <- ds ]
     cg zs =  newGraph zs (\ (_,x,_) -> x) ( \ (_,_,x) -> x)
     tg = cg zs
     scc' = scc tg
