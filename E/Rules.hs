@@ -9,6 +9,7 @@ module E.Rules(
     printRule,
     printRules,
     mapBodies,
+    mapABodies,
     hasBuiltinRule,
     getARules,
     arules,
@@ -42,7 +43,6 @@ import Stats
 
 data Rule = Rule {
     ruleHead :: TVr,
---    ruleFvs :: Set.Set Int,
     ruleBinds :: [TVr],
     ruleArgs :: [E],
     ruleNArgs :: {-# UNPACK #-} !Int,
@@ -58,7 +58,6 @@ instance Show Rule where
 emptyRule :: Rule
 emptyRule = Rule {
     ruleHead = error "ruleHead undefined",
---    ruleFvs = error "ruleFvs undefined",
     ruleArgs = [],
     ruleNArgs = 0,
     ruleBinds = [],
@@ -106,6 +105,12 @@ instance FreeVars Rule b => FreeVars ARules b where
 instance FreeVars Rule (Set.Set TVr) where
     freeVars rule = freeVars (ruleBody rule) Set.\\ freeVars (ruleArgs rule)
 
+instance FreeVars Rule (Set.Set Id) where
+    freeVars rule = freeVars (ruleBody rule) Set.\\ freeVars (ruleArgs rule)
+
+instance FreeVars Rule [Id] where
+    freeVars rule = Set.toList $ freeVars rule
+
 printRule rule = do
     putErrLn $ fromAtom (ruleName rule)
     putErr $ "    " ++ render (ePretty (foldl EAp (EVar $ ruleHead rule) (ruleArgs rule)))
@@ -126,6 +131,13 @@ fromRules rs = Rules $ Map.map snds $ Map.fromList $ sortGroupUnderF fst [ (tvrI
 getARules :: Monad m => Rules -> Id -> m ARules
 getARules (Rules mp) tvr = liftM arules (Map.lookup tvr mp)
 
+mapABodies :: Monad m => (E -> m E) -> ARules -> m ARules
+mapABodies g (ARules rs) = do
+    let f rule = do
+            b <- g (ruleBody rule)
+            return rule { ruleBody = b }
+    rs' <- mapM f rs
+    return $ ARules $ rs'
 
 -- | invarients for ARules
 -- sorted by number of arguments rule takes
