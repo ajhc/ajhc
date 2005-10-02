@@ -439,8 +439,8 @@ ctgen t = map snd $ snubFst $ Seq.toList $ everything (Seq.<>) (mkQ Seq.empty gg
 
 integer_cutoff = 500000000
 
-intConvert i | abs i > integer_cutoff  =  ELit (LitCons (toName DataConstructor ("Prelude","Integer")) [ELit $ LitInt (fromInteger i) (ELit (LitCons (toName RawType "intmax_t") [] eStar))] tInteger)
-intConvert i =  ELit (LitCons (toName DataConstructor ("Prelude","Int")) [ELit $ LitInt (fromInteger i) (ELit (LitCons (toName RawType "int") [] eStar))] tInt)
+intConvert i | abs i > integer_cutoff  =  ELit (LitCons dc_Integer [ELit $ LitInt (fromInteger i) (rawType "intmax_t")] tInteger)
+intConvert i =  ELit (LitCons dc_Int [ELit $ LitInt (fromInteger i) (rawType "int")] tInt)
 
 --litconvert (HsInt i) t  =  LitInt (fromInteger i) t
 litconvert (HsChar i) t | t == tChar =  LitInt (fromIntegral $ ord i) tCharzh

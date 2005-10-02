@@ -135,14 +135,13 @@ createIO_ pv = toIO tUnit (ELam tvrWorld $  eStrictLet tvrWorld2 (pv tvrWorld)  
     tvrWorld = tVr 256 tWorld__
 
 
-prim_number v t et@(ELit (LitCons cn' _ _)) = ELit (LitCons cn [ELit (LitInt v st)] et) where
-    st = ELit (LitCons (toName RawType t) [] eStar)
+prim_number v t et@(ELit (LitCons cn' _ _)) = ELit (LitCons cn [ELit (LitInt v (rawType t))] et) where
     cn = toName DataConstructor $ nameName cn'
 prim_number _ _ _ = error "prim_number: invalid arg"
 
 
 prim_const s t et@(ELit (LitCons cn' _ _)) =  eStrictLet (tVr 2 st) (EPrim (APrim (CConst s t) mempty) [] st) (ELit (LitCons cn [EVar $ tVr 2 st] et)) where
-    st = ELit (LitCons (toName RawType t) [] eStar)
+    st = rawType t
     cn = toName DataConstructor $ nameName cn'
 prim_const _ _ _ = error "prim_const: invalid arg"
 -- prim_const s t et = EPrim (APrim (CConst s t) mempty) [] et

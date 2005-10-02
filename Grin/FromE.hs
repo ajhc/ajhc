@@ -103,7 +103,7 @@ toEntry (n,as,e)
     | Just nm <- intToAtom (tvrNum n)  = f (toAtom ('f':show (fromAtom nm :: Name)))
     | otherwise = f (toAtom ('f':show (tvrNum n))) where
         f x = (x,map (toty (TyPtr TyNode) . tvrType ) as,toty TyNode (getType (e::E) :: E))
-        toty node (ELit (LitCons n [] es)) |  es == eStar, RawType <- nameType n = (Ty $ toAtom (show n))
+        toty node (ELit (LitCons n [] es)) |  es == eHash, RawType <- nameType n = (Ty $ toAtom (show n))
         toty node _ = node
 
 
@@ -219,8 +219,8 @@ constantCaf dataTable (SC _ ds) = ans where
     res = Map.fromList [ (v,length vs) | (v,vs,_) <- ds]
     coMap = Map.fromList [  (v,ce)| (v,_,ce) <- fst ans]
     conv :: E -> Val
-    conv (ELit (LitInt i (ELit (LitCons n [] (ESort 0))))) | RawType <- nameType n =  Lit i (Ty $ toAtom (show n))
-    conv (ELit (LitInt i (ELit (LitCons n [] (ESort 0))))) | Just pt <- Prelude.lookup (show n) allCTypes = ( Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
+    conv (ELit (LitInt i (ELit (LitCons n [] (ESort EHash))))) | RawType <- nameType n =  Lit i (Ty $ toAtom (show n))
+    conv (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Prelude.lookup (show n) allCTypes = ( Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
     conv e | Just (a,_) <- from_unsafeCoerce e = conv a
 --    conv e | Just (a,_) <- from_integralCast e = conv a
     conv (ELit lc@(LitCons n es _)) | Just nn <- getName lc = (Const (NodeC nn (map conv es)))
@@ -229,6 +229,7 @@ constantCaf dataTable (SC _ ds) = ans where
     conv e | (EVar x,as) <- fromAp e, Just vs <- Map.lookup x res, vs > length as = Const (NodeC (partialTag (scTag x) (vs - length as)) (map conv as))
     conv (EVar v) | Just ce <- Map.lookup v coMap = ce
     conv (EVar v) = Var (cafNum v) (TyPtr TyNode)
+    conv x = error $ "conv: " ++ show x
     getName = getName' dataTable
 
 getName' :: (Show a,Monad m) => DataTable -> Lit a E -> m Atom
@@ -245,7 +246,7 @@ getName' dataTable v@(LitCons n es _)
     nargs = length (conSlots cons)
 
 instance ToVal TVr where
-    toVal (TVr { tvrIdent = num, tvrType = (ELit (LitCons n [] es))}) | es == eStar, RawType <- nameType n  = Var (V num) (Ty $ toAtom (show n))
+    toVal (TVr { tvrIdent = num, tvrType = (ELit (LitCons n [] es))}) | es == eHash, RawType <- nameType n  = Var (V num) (Ty $ toAtom (show n))
     toVal tvr = Var  (V (tvrNum tvr)) (TyPtr TyNode) -- (toTy $ tvrType tvr)
 
 -- constraints during compilation:
@@ -723,8 +724,8 @@ compile' dataTable cenv (tvr,as,e) = cr e >>= \x -> return (nn,(Tup (map toVal a
                             --case constant e of
                             --    Just x -> return x
                             --    Nothing -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
-    constant (ELit (LitInt i (ELit (LitCons n [] (ESort 0))))) | RawType <- nameType n = return $ Lit i (Ty $ toAtom (show n))
-    constant (ELit (LitInt i (ELit (LitCons n [] (ESort 0))))) | Just pt <- Prelude.lookup (show n) allCTypes = (return $ Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
+    constant (ELit (LitInt i (ELit (LitCons n [] (ESort EHash))))) | RawType <- nameType n = return $ Lit i (Ty $ toAtom (show n))
+    constant (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Prelude.lookup (show n) allCTypes = (return $ Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
     constant (ELit lc@(LitCons n es _)) | Just es <- mapM constant es, Just nn <- getName lc = (return $ Const (NodeC nn es))
     constant (EPi (TVr { tvrIdent = 0, tvrType = a}) b) | Just a <- constant a, Just b <- constant b = return $ Const $ NodeC tagArrow [a,b]
     constant e | Just (a,_) <- from_unsafeCoerce e = constant a

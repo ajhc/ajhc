@@ -17,8 +17,9 @@ import Monad(when)
 
 -- Fast (and lazy, and perhaps unsafe) typeof
 typ ::  E -> E
-typ (ESort 0) =  eBox
-typ (ESort 1) = error "Box inhabits nowhere."
+typ (ESort EStar) =  eBox
+typ (ESort EHash) =  eBox
+typ (ESort EBox) = error "Box inhabits nowhere."
 typ (ESort _) = error "What sort of sort is this?"
 typ (ELit l) = getType l
 typ (EVar v) =  getType v

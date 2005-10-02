@@ -107,13 +107,13 @@ tunboxedtuple n = [typeCons,dataCons] where
             conExpr = tipe,
             conClosures = False,
             conAlias = False,
-            conInhabits = tStar,
+            conInhabits = tHash,
             conChildren = Just [dc]
            }
 
         dc = unboxedNameTuple DataConstructor n
         tc = unboxedNameTuple TypeConstructor n
-        tipe = ELit (LitCons tc [] eStar)
+        tipe = ELit (LitCons tc [] eHash)
 
 
 tabsurd = Constructor {
@@ -144,13 +144,13 @@ tarrow = Constructor {
 primitiveTable = concatMap f allCTypes ++ map g (snub $ snds allCTypes) where
     g n = Constructor {
         conName = rn,
-        conType = eStar,
+        conType = eHash,
         conSlots = [],
         conDeriving = [],
-        conExpr = ELit (LitCons rn [] eStar),
+        conExpr = ELit (LitCons rn [] eHash),
         conClosures = False,
         conAlias = False,
-        conInhabits = tStar,
+        conInhabits = tHash,
         conChildren = Nothing
        } where rn = toName RawType n
     f (x,y) | x /= "Prelude.()" = [typeCons,dataCons] where
@@ -178,7 +178,7 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ snds allCTypes) where
            }
 
         rn = toName RawType y
-        rt = ELit (LitCons rn [] eStar)
+        rt = ELit (LitCons rn [] eHash)
         dc = parseName DataConstructor x
         tc = parseName TypeConstructor x
         tipe = ELit (LitCons tc [] eStar)

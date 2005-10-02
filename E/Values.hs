@@ -28,7 +28,7 @@ eTuple' es = ELit $ LitCons (unboxedNameTuple DataConstructor (length es)) es (l
     ts = map getType es
 
 ltTuple ts = ELit $ LitCons (nameTuple TypeConstructor (length ts)) ts eStar
-ltTuple' ts = ELit $ LitCons (unboxedNameTuple TypeConstructor (length ts)) ts eStar
+ltTuple' ts = ELit $ LitCons (unboxedNameTuple TypeConstructor (length ts)) ts eHash
 
 
 
@@ -143,7 +143,7 @@ prim_unsafeCoerce e t = p e' where
 from_unsafeCoerce (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = return (e,t)
 from_unsafeCoerce _ = fail "Not unsafeCoerce primitive"
 
-rawType s  = ELit (LitCons (toName RawType s) [] eStar)
+rawType s  = ELit (LitCons (toName RawType s) [] eHash)
 
 unsafeCoerceOpt (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = f (0::Int) e t where
     f n e t | Just (e',_) <- from_unsafeCoerce e = f (n + 1) e' t

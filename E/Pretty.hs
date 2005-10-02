@@ -107,7 +107,7 @@ prettyI 0 = (char '_')
 prettyI i | Just x <- intToAtom i  = (text $ show  $ (fromAtom x :: Name))
 prettyI i = (text $ 'x':show i)
 
-rawType s  = ELit (LitCons (toName RawType s) [] eStar)
+rawType s  = ELit (LitCons (toName RawType s) [] eHash)
 
 eDoc e PrettyOpt {optExpanded = expanded, optColors = colors, optNames = optNames} = unparse (prettye e) where
     retOp x = col "lightgreen" x
@@ -154,7 +154,7 @@ eDoc e PrettyOpt {optExpanded = expanded, optColors = colors, optNames = optName
         Unknown -> symbol (char  '?')
         e | e == eStar -> symbol UC.star
         e | e == eBox -> symbol UC.box
-        (ESort n) -> symbol $ text "Sort" <> tshow n
+        e | e == eHash -> symbol (text "#")
         (ELit l) -> prettylit prettye l
         (ELetRec bg e) -> rtup (Fix L (-10)) $ let
             bg' = map ((<> bc ';') . unparse . prettydecl ) bg

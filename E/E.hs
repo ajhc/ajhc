@@ -33,8 +33,8 @@ data Lit e t = LitInt Number t |  LitCons Name [e] t
 
 
 instance (Show e,Show t) => Show (Lit e t) where
-    show (LitInt x _) = show x
-    show (LitCons n es t) = parens $  hsep (show n:map show es) <> "::" <> show t
+    showsPrec _ (LitInt x t) = parens $  shows x <> showString "::" <> shows t
+    showsPrec _ (LitCons n es t) = parens $  hsep (shows n:map shows es) <> showString "::" <> shows t
 
 instance Functor (Lit e) where
     fmap f x = runIdentity $ fmapM (return . f) x
@@ -49,13 +49,15 @@ data ESort =
     EStar     -- ^ the sort of types
     | EHash   -- ^ the sort of unboxed types
     | EBox    -- ^ the sort of types of types
+    deriving(Data,Eq, Ord, Typeable, Show)
+    {-! derive: is, GhcBinary !-}
 
 data E = EAp E E
     | ELam TVr E
     | EPi TVr E
     | EVar TVr
     | Unknown
-    | ESort !Int
+    | ESort ESort
     | ELit !(Lit E E)
     | ELetRec [(TVr, E)] E
     | EPrim APrim [E] E
@@ -195,7 +197,7 @@ isWHNF _ = False
 -----------
 
 instance TypeNames E where
-    tStar = ESort 0
+    tStar = eStar
     tInt = ELit (LitCons tInt [] eStar)
     tRational = ELit (LitCons (toName TypeConstructor ("Ratio","Ratio")) [tInteger] eStar)
     tChar = ELit (LitCons tChar [] eStar)
@@ -204,9 +206,9 @@ instance TypeNames E where
     tString =  (ELit (litCons TypeConstructor ("Prelude","[]") [tChar] eStar))
     tInteger = ELit (LitCons tInteger [] eStar)
     tWorld__ = ELit (LitCons tWorld__ [] eStar)
-    tIntzh = ELit (LitCons tIntzh [] eStar)
-    tIntegerzh = ELit (LitCons tIntegerzh [] eStar)
-    tCharzh = ELit (LitCons tCharzh [] eStar)
+    tIntzh = ELit (LitCons tIntzh [] eHash)
+    tIntegerzh = ELit (LitCons tIntegerzh [] eHash)
+    tCharzh = ELit (LitCons tCharzh [] eHash)
 
 instance ConNames E where
     vTrue = ELit vTrue
@@ -244,10 +246,13 @@ litCons t x y z = LitCons (toName t x) y z
 
 
 eBox :: E
-eBox = ESort 1
+eBox = ESort EBox
 
 eStar :: E
-eStar = ESort 0
+eStar = ESort EStar
+
+eHash :: E
+eHash = ESort EHash
 
 
 sortLetDecls ds = sortBy f ds where
@@ -340,4 +345,6 @@ dc_Addr = toName DataConstructor ("Jhc.Addr","Addr")
 dc_Char = toName DataConstructor ("Prelude","Char")
 dc_JustIO = toName DataConstructor ("Jhc.IO", "JustIO")
 dc_Rational = toName DataConstructor ("Ratio",":%")
+dc_Int = toName DataConstructor ("Prelude","Int")
+dc_Integer = toName DataConstructor ("Prelude","Integer")
 

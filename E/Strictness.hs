@@ -8,6 +8,7 @@ import qualified Data.Map as Map
 
 import Boolean.Algebra
 import C.Prims
+import Data.Typeable
 import E.E
 import E.Subst
 import E.Values
@@ -35,7 +36,7 @@ data SA =
     | SAnd SA SA    -- A and B
     | Lam [SA]      -- Lambda Function
     | If Var Int SA SA  -- if
-        deriving(Ord,Eq,Show)
+        deriving(Ord,Eq,Show,Typeable)
 
 type SAMap = Map.Map Var SA
 

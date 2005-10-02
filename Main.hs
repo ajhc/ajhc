@@ -33,6 +33,7 @@ import E.Strictness
 import E.Subst
 import E.Traverse
 import E.TypeCheck
+import E.WorkerWrapper
 import FreeVars
 import FrontEnd.FrontEnd
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
@@ -125,7 +126,7 @@ processInitialHo :: Ho -> IO Ho
 processInitialHo ho = do
     putStrLn $ "Initial annotate: " ++ show (Map.keys $ hoModules ho)
     let imap = annotateMethods (hoClassHierarchy ho) (hoRules ho) (hoProps ho)
-    let Identity (ELetRec ds (ESort 0)) = annotate imap (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec (Map.elems $ hoEs ho) eStar)
+    let Identity (ELetRec ds (ESort EStar)) = annotate imap (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec (Map.elems $ hoEs ho) eStar)
     return ho { hoEs = Map.fromAscList [ (k,d) | k <- Map.keys $ hoEs ho | d <- ds ] }
 
 
@@ -232,7 +233,7 @@ compileModEnv' stats ho = do
 
     let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
     es' <- createMethods dataTable (hoClassHierarchy ho) (hoEs ho)
-    let Identity (ELetRec es'' (ESort 0)) = annotate initMap (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec [ (y,z) | (x,y,z) <- es']  eStar)
+    let Identity (ELetRec es'' (ESort EStar)) = annotate initMap (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec [ (y,z) | (x,y,z) <- es']  eStar)
 
     es' <- return [ (x,y,floatInward rules z) | (x,_,_) <- es' | (y,z) <- es'' ]
     wdump FD.Class $ do

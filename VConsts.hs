@@ -12,6 +12,7 @@ class TypeNames a where
     tIntegerzh :: a
     tCharzh :: a
     tStar :: a
+    tHash :: a
     tBool :: a
     tUnit :: a
     tString :: a
@@ -29,6 +30,7 @@ class TypeNames a where
     tUnit = error "tUnit"
     tString = error "tString"
     tInteger = error "tInteger"
+    tHash = error "tHash"
     tWorld__ = error "tWorld"
 
 
