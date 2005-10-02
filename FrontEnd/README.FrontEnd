@@ -1,6 +1,6 @@
 
 much of the FrontEnd has been derived from other sources, such as the 'hatchet' type checking tool.
-various documents from the original sources follow. 
+various documents from the original sources follow.
 
 Most files contain modifications by John Meacham (c) 2003-2005
 
@@ -17,38 +17,38 @@ utilized record syntax.
 typechecks instance and class decls now
 keeps type variables around.
 annotates every use of a variable or data constructor with the type is was instantiated with
-lifts instance declarations to their own functions 
+lifts instance declarations to their own functions
 records the type of every variable, pattern, useage of a variable, wildcard match etc. for direct conversion to a TIL.
 much more efficient, makes about 2 passes over the syntax rather than 5.
 got rid of TidyModule, it didn't help much and just generated lots of garbage during conversion.
 used DrIFT when appropriate.
 suport hierchical module names
 monadified parser and lexer using code from the latest Language.Haskell.ParserMonad
-added support for record syntax and record desugaring 
+added support for record syntax and record desugaring
 added location info to ambiguity and context reduction errors
 
 
 Hatchet License:
 
-Hatchet version 0.1 is derived from a number of sources 
-each with their own Copyright and License restrictions. 
+Hatchet version 0.1 is derived from a number of sources
+each with their own Copyright and License restrictions.
 See each file for the respective Copyright and
 License information.
 
 Special License and Copyright information for all work
 derived directly and indirectly from "Typing Haskell
 in Haskell" by Mark Jones (http://www.cse.ogi.edu/~mpj/thih/)
-is provided in the file "License.thih". Please read 
+is provided in the file "License.thih". Please read
 that file carefully and abide by its contents.
 
 Hatchet is free software. Permission is granted to
-all good lifeforms and machines to use and distribute 
-it in whole or part, as source or binary, modified or 
-unmodified, for any purpose providing the Licenses 
-and Copyrights of the component sources are also 
+all good lifeforms and machines to use and distribute
+it in whole or part, as source or binary, modified or
+unmodified, for any purpose providing the Licenses
+and Copyrights of the component sources are also
 respected and followed.
 
-No warranty for any aspect of this software is 
+No warranty for any aspect of this software is
 provided, neither explicitly nor implicitly,
 by anyone anywhere anyhow at any time past, present
 or future.

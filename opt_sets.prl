@@ -1,4 +1,4 @@
-#!/usr/bin/perl 
+#!/usr/bin/perl
 
 
 use strict;
@@ -59,7 +59,7 @@ print "data Flag =\n      ";
 print join "\n    | ", @ds;
 print "\n    deriving(Eq,Ord,Bounded)\n";
 
-print "\ninstance Show Flag where\n"; 
+print "\ninstance Show Flag where\n";
 foreach (@l) {
     print "    show $_->[0] = \"$_->[1]\"\n";
 }
@@ -67,7 +67,7 @@ print "\n";
 
 
 foreach (keys %h) {
-    if ($h{$_}{hname}) { 
+    if ($h{$_}{hname}) {
         print "one \"$_\" = Right \$ Set.insert $h{$_}{hname}\n";
         print "one \"no-$_\" = Right \$ Set.delete $h{$_}{hname}\n";
     } else {

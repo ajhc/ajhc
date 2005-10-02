@@ -1,11 +1,11 @@
-#!/usr/bin/perl -w 
+#!/usr/bin/perl -w
 
 use strict;
 
 
 my $mod = shift @ARGV;
 
-print "module $mod where\n\n\n"; 
+print "module $mod where\n\n\n";
 
 while (@ARGV) {
     my $fn = shift @ARGV;

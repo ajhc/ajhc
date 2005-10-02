@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w 
+#!/usr/bin/perl -w
 
 use strict;
 use Data::Dumper;
@@ -23,8 +23,8 @@ while(<OP>) {
     foreach my $y (@add) {
         push @{$stuff{$y}}, \@a;
     }
-#    push @fl, \@a unless $add eq 'int'; 
-#    push @in, \@a unless $add eq 'float'; 
+#    push @fl, \@a unless $add eq 'int';
+#    push @in, \@a unless $add eq 'float';
 }
 
 my @ds;
@@ -39,7 +39,7 @@ while(<PR>) {
 
 #print Dumper(\@fl,\@in,\@ds);
 
-my @inst; 
+my @inst;
 my @meth;
 my @cmeth;
 my @names;
@@ -51,18 +51,18 @@ sub const($$@) {
     if ($v =~ /^\d/) {
         return "prim_number $v $ct $t";
 
-        #return "ELit (LitInt $v $t)"; 
-    } else {       
+        #return "ELit (LitInt $v $t)";
+    } else {
         #return "EPrim \"prim_const.$v\" [] $t"
         #return "EPrim (primPrim \"prim_const.$v\") [] $t"
         return "prim_const \"$v\" $ct $t";
     }
-} 
+}
 
 #print STDERR Dumper(\%stuff);
 
 my %tcon;
-sub tcon($) { 
+sub tcon($) {
     return $tcon{$_[0]}[0] if $tcon{$_[0]};
     my $n = $_[0];
     $n =~ s/\W/_/g;
@@ -73,7 +73,7 @@ sub tcon($) {
 }
 
 my %dcon;
-sub dcon($) { 
+sub dcon($) {
     return $dcon{$_[0]}[0] if $dcon{$_[0]};
     my $n = $_[0];
     $n =~ s/\W/_/g;
@@ -84,7 +84,7 @@ sub dcon($) {
 }
 
 my %hsname;
-sub hsname($) { 
+sub hsname($) {
     return $hsname{$_[0]}[0] if $hsname{$_[0]};
     my $n = $_[0];
     $n =~ s/\W/_/g;
@@ -95,7 +95,7 @@ sub hsname($) {
 }
 
 my %tycon;
-sub tycon($) { 
+sub tycon($) {
     return $tycon{$_[0]}[0] if $tycon{$_[0]};
     my $n = $_[0];
     $n =~ s/\W/_/g;
@@ -124,9 +124,9 @@ foreach my $d (@ds) {
     push @cmeth, "(toInstName \"Foreign.Storable.peek.$d->[0]\", buildPeek $cncons $t \"$d->[1]\")";
     push @cmeth, "(toInstName \"Prelude.maxBound.$d->[0]\", " . const($d->[3],$t,"\"$d->[1]\"") . ")";
     push @cmeth, "(toInstName \"Prelude.minBound.$d->[0]\", " . const($d->[4],$t,"\"$d->[1]\"") . ")";
-    my $ivar = "(tVr 2 tInt)"; 
-    my $ivart = "(tVr 2 tInteger)"; 
-    my $tvar = "(tVr 2 $t)"; 
+    my $ivar = "(tVr 2 tInt)";
+    my $ivart = "(tVr 2 tInteger)";
+    my $tvar = "(tVr 2 $t)";
     if ($d->[0] eq "Prelude.Int") {
         push @cmeth, "(toInstName \"Prelude.fromInt.$d->[0]\", ELam $ivar (EVar $ivar))";
         push @cmeth, "(toInstName \"Prelude.toInt.$d->[0]\", ELam $ivar (EVar $ivar))";
@@ -174,17 +174,17 @@ print "$head\n";
 #print "toHsName x = nameName \$ parseName TypeConstructor x\n\n";
 #print "toInstName x = toName Val (\"Instance@\",'i':x)\n\n";
 #print 'buildAbs v t = eIf (EPrim (primPrim "prim_op_aaB.<") [EVar v,(ELit (LitInt 0 t))] tBool) (EPrim (primPrim "prim_op_aa.-") [EVar v] t) (EVar v)'. "\n\n";
-#print 'buildSignum v t = eCase (EVar v) [Alt (LitInt 0 t) (ELit (LitInt 0 t))] (eIf (EPrim (primPrim "prim_op_aaB.<") [EVar v,(ELit (LitInt 0 t))] tBool) (ELit (LitInt (-1) t)) (ELit (LitInt 1  t)))' . "\n\n";  
+#print 'buildSignum v t = eCase (EVar v) [Alt (LitInt 0 t) (ELit (LitInt 0 t))] (eIf (EPrim (primPrim "prim_op_aaB.<") [EVar v,(ELit (LitInt 0 t))] tBool) (ELit (LitInt (-1) t)) (ELit (LitInt 1  t)))' . "\n\n";
 print "primitiveInsts = [\n   ", join("\n  ,",@inst), " ]\n\n";
 print "constantMethods = [\n   ", join("\n  ,",@cmeth), " ]\n\n";
 print "theMethods = [\n   ", join("\n  ,",@meth), " ]\n\n";
 push @names, "(\"Prelude.()\",\"void\")";
 print "allCTypes = [\n   ", join("  ,",@names), " ]\n\n";
 
-print join("\n",map { $_->[1] } values %tcon) . "\n\n"; 
-print join("\n",map { $_->[1] } values %tycon) . "\n\n"; 
-print join("\n",map { $_->[1] } values %hsname) . "\n\n"; 
-print join("\n",map { $_->[1] } values %dcon) . "\n\n"; 
+print join("\n",map { $_->[1] } values %tcon) . "\n\n";
+print join("\n",map { $_->[1] } values %tycon) . "\n\n";
+print join("\n",map { $_->[1] } values %hsname) . "\n\n";
+print join("\n",map { $_->[1] } values %dcon) . "\n\n";
 
 print "\n\n";
 

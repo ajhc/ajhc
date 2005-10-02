@@ -1,7 +1,7 @@
 
 
 
-[int,float,char,ptr] 
+[int,float,char,ptr]
 aaB, ==, Prelude.Eq, ==
 # aaB, /=, Prelude.Eq, !=
 aaB, >=, Prelude.Ord, >=
@@ -10,7 +10,7 @@ aaB, >, Prelude.Ord, >
 aaB, <, Prelude.Ord, <
 
 
-[int,float] 
+[int,float]
 aaa, +, Prelude.Num, +
 aaa, -, Prelude.Num, -
 aaa, *, Prelude.Num, *
@@ -31,6 +31,6 @@ aIa, shiftL, Data.Bits.Bits, <<
 aIa, shiftR, Data.Bits.Bits, >>
 
 
-# [float] 
+# [float]
 # aaa, /, Prelude.Fractional, /
 

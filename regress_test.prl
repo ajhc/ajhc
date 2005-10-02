@@ -19,22 +19,22 @@ my $err;
 
 
 while(<F>) {
-        next unless /^\-\-R ([A-Z.a-z_'0-9]+)\s+(.+?)\s*$/; 
+        next unless /^\-\-R ([A-Z.a-z_'0-9]+)\s+(.+?)\s*$/;
         my ($v,$r) = ($1,$2);
-        print "=> $v -> $r\n"; 
+        print "=> $v -> $r\n";
         my $st = time;
         system("./jhc",$file, '-m', $v, @ARGV)  == 0 or (1 ? (print "Program failed: $?\n") : (die "Program failed: $?"));
         system("./hs.out")  == 0 or (1 ? (print "Program failed: $?\n") : (die "Program failed: $?")) if $? == 0;
         #push @gc, ("$v - " . `cat jhc.stat`);
 
-        #print "-> $v -> $r\n"; 
+        #print "-> $v -> $r\n";
         $err++ if $?;
         my $t = time - $st;
         push @summary, sprintf "%s %13s: %5.1f %i", $ARGV,$v, $t, $?;
         last if $? > 64000;
         #system("./jhc '$file' -I -m '$v' +RTS -Pa && mv jhc.prof prof/$v.prof") == 0 or die "Program failed: $?";
-} 
-   
+}
+
 my $now_string = strftime "%a %b %e %H:%M:%S %Y", localtime;
 my $args = "$file " . join(" ", @ARGV);
 print "---\n",join("\n",@summary),"\n";

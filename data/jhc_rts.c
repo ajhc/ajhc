@@ -40,28 +40,28 @@ static char *jhc_progname;
 static int jhc_stdrnd[2] A_UNUSED = { 1 , 1 };
 
 
-int 
-main(int argc, char *argv[]) 
-{ 
+int
+main(int argc, char *argv[])
+{
         jhc_argc = argc - 1;
         jhc_argv = argv + 1;
         jhc_progname = argv[0];
         setlocale(LC_ALL,"");
         XAmain();
-        return 0; 
+        return 0;
 }
 
 static void  A_NORETURN A_UNUSED
-jhc_error(char *s) { 
-    fputs(s,stderr); 
+jhc_error(char *s) {
+    fputs(s,stderr);
     fputs("\n",stderr);
-    exit(255); 
+    exit(255);
 }
 
 static void  A_NORETURN A_UNUSED
 jhc_case_fell_off(int n) {
         fflush(stdout);
-        fprintf(stderr, "\n%s:%i: case fell off\n", __FILE__, n); 
+        fprintf(stderr, "\n%s:%i: case fell off\n", __FILE__, n);
         abort();
 }
 

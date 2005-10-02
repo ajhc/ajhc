@@ -8,7 +8,7 @@ Prelude.Int, int, int, INT_MAX, INT_MIN
 Prelude.Integer, intmax_t, int, INTMAX_MAX, INTMAX_MIN
 
 Data.Int.Int8, int8_t, int, INT8_MAX, INT8_MIN
-Data.Int.Int16, int16_t, int, INT16_MAX, INT16_MIN 
+Data.Int.Int16, int16_t, int, INT16_MAX, INT16_MIN
 Data.Int.Int32, int32_t, int, INT32_MAX, INT32_MIN
 Data.Int.Int64, int64_t, int, INT64_MAX, INT64_MIN
 Data.Int.IntMax, intmax_t, int, INTMAX_MAX, INTMAX_MIN
@@ -16,7 +16,7 @@ Data.Int.IntPtr, intptr_t, int, INTPTR_MAX, INTPTR_MIN
 
 Data.Word.Word, unsigned int, int, UINT_MAX, 0
 Data.Word.Word8, uint8_t, int, UINT8_MAX, 0
-Data.Word.Word16, uint16_t, int, UINT16_MAX, 0 
+Data.Word.Word16, uint16_t, int, UINT16_MAX, 0
 Data.Word.Word32, uint32_t, int, UINT32_MAX, 0
 Data.Word.Word64, uint64_t, int, UINT64_MAX, 0
 Data.Word.WordMax, uintmax_t, int, UINTMAX_MAX, 0
@@ -25,12 +25,12 @@ Data.Word.WordPtr, uintptr_t, int, UINTPTR_MAX, 0
 Prelude.Float, float, float, FLT_MAX, FLT_MIN
 Prelude.Double, double, float, DBL_MAX, DBL_MIN
 
-Jhc.Addr.Addr, HsPtr, ptr,UINTPTR_MAX, 0 
-Jhc.Addr.FunAddr, HsFunPtr, ptr,UINTPTR_MAX,0 
+Jhc.Addr.Addr, HsPtr, ptr,UINTPTR_MAX, 0
+Jhc.Addr.FunAddr, HsFunPtr, ptr,UINTPTR_MAX,0
 
-Foreign.C.Types.CChar, char, int, CHAR_MAX, CHAR_MIN 
-Foreign.C.Types.CShort, short, int, SHORT_MAX, SHORT_MIN 
-Foreign.C.Types.CInt, int, int, INT_MAX, INT_MIN 
+Foreign.C.Types.CChar, char, int, CHAR_MAX, CHAR_MIN
+Foreign.C.Types.CShort, short, int, SHORT_MAX, SHORT_MIN
+Foreign.C.Types.CInt, int, int, INT_MAX, INT_MIN
 Foreign.C.Types.CUInt, unsigned int, int, UINT_MAX, 0
 Foreign.C.Types.CSize, size_t, int, UINTPTR_MAX, 0
 Foreign.C.Types.CWchar, wchar_t, int, 0x10FFF, 0
