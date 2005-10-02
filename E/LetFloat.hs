@@ -25,6 +25,7 @@ import E.Traverse
 import E.Values
 import FreeVars
 import GenUtil
+import qualified Info.Info as Info
 import qualified Util.Graph as G
 import Stats
 import Util.SameShape
@@ -107,48 +108,39 @@ fvBind (Left (_,fv)) = fv
 fvBind (Right xs) = Set.unions (snds xs)
 
 
---    f (ELetRec ds e) xs = g (G.scc $  G.newGraph [ (d, freeVars (tvrType $ fst d) `mappend` freeVars' (fst d) (snd d))  | d <- ds ] (tvrNum . fst . fst) (Set.toList . snd) ) xs where
-
 
 floatInward ::
     Rules -- ^ rules to augment free variables of definitons
     -> E  -- ^ input term
     -> E  -- ^ output term
 floatInward rules e = f e [] where
-    --freeVars' v e = freeVars e `mappend` ruleFreeVars rules v
-    freeVars' v e = augment (freeVars (tvrType v) `mappend` freeVars e)
-    augment fvs = mconcat (fvs:[ ruleFreeVars' rules x | x <- Set.toList fvs ])
+    augment fvs = fvs
     f (ECase e b as d) xs = letRec p' $ ECase (f e pe) b [ Alt l (f e pn) | Alt l e <- as | pn <- ps ] (fmap (flip f pd) d)  where
         (p',_:pe:pd:ps) = sepByDropPoint (mconcat [freeVars l | Alt l _ <- as ]:freeVars e: tvrNum b `Set.delete` freeVars d :[freeVars a | a <- as ]) xs
-    f (ELetRec ds e) xs = g (G.scc $  G.newGraph [ (d,freeVars' x y) | d@(x,y) <- ds ] (tvrNum . fst . fst) (Set.toList . snd) ) xs where
+    f (ELetRec ds e) xs = g (G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- ds ] (tvrNum . fst . fst) (Set.toList . snd) ) xs where
         g [] p' = f e p'
-        g ((Left ((v,ev),fv)):xs) p = g xs (p0 ++ [Left ((v,ev'),freeVars' v ev')] ++ p') where
+        g ((Left ((v,ev),fv)):xs) p = g xs (p0 ++ [Left ((v,ev'),bindingFreeVars v ev')] ++ p') where
             ev' = f ev pv
-            (p',[p0,pv,_]) = sepByDropPoint [augment (frest xs), freeVars' v ev, freeVars (tvrType v)] p
-        g (Right bs:xs) p =  g xs (p0 ++ [Right [ let ev' = f ev pv in ((v,ev'),freeVars' v ev') | ((v,ev),_) <- bs | pv <- ps ]] ++ p') where
+            (p',[p0,pv,_]) = sepByDropPoint [augment (frest xs), bindingFreeVars v ev, freeVars (tvrType v)] p
+        g (Right bs:xs) p =  g xs (p0 ++ [Right [ let ev' = f ev pv in ((v,ev'),bindingFreeVars v ev') | ((v,ev),_) <- bs | pv <- ps ]] ++ p') where
             (p',_:p0:ps) = sepByDropPoint (freeVars (map (tvrType . fst . fst) bs) :augment (frest xs):snds bs) p
         frest xs = mconcat (freeVars e:map fvBind xs)
-    f e xs |  not (null ls) = letRec unsafe_binds (foldr ELam (f b safe_binds) ls) where
-        (unsafe_binds,safe_binds) =  sepDupableBinds (freeVars $ map tvrType ls) xs
-        (b,ls) = fromLam e
+    f e xs |  (b,ls@(_:_)) <- fromLam e = letRec xs (foldr ELam (f b []) ls)
     f e (Left ((v',ev),_):xs)
-        | (EVar v,as) <- fromAp e, v == v', tvrNum v' `notElem` freeVars as  = f (runIdentity $ app (ev,as) {- foldl EAp ev as -} ) xs
-    --    | otherwise = f (EVar v) xs
-    --    | otherwise = error $ "floatInward: shouldn't happen:" <+>  tshow (EVar v) <+> tshow (v')
+        | (EVar v,as) <- fromAp e, v == v', not (tvrNum v' `Set.member` freeVars as)  = f (runIdentity $ app (ev,as) {- foldl EAp ev as -} ) xs
     f e xs = letRec xs e
     letRec [] e = e
     letRec xs e = f (G.scc $ G.newGraph (concatMap G.fromScc xs) (tvrNum . fst . fst) (Set.toList . snd)) where
         f [] = e
         f (Left (te,_):rs) = eLetRec [te] $ f rs
         f (Right ds:rs) = eLetRec (fsts ds) $ f rs
-    --letRec p e = eLetRec  (concatMap (map fst . fromScc) p) e
-    --letRec p e = foldr eLetRec e (reverse $ map (map fst . fromScc) p)
 
 type FVarSet = Set.Set Int
 type Binds = [Either ((TVr,E),FVarSet) [((TVr,E),FVarSet)]]
 --type Binds = [(FVarSet,Either (TVr,E) [(TVr,E)])]
 
 
+{-
 sepDupableBinds fvs xs = partition ind xs where
     g = G.reachable (G.newGraph (concatMap G.fromScc xs) (tvrNum . fst . fst) (Set.toList . snd)) (fvs `mappend` (map (tvrNum . fst . fst) $ concatMap G.fromScc unsafe_ones))
     uso = map (tvrNum . fst . fst) g
@@ -156,10 +148,7 @@ sepDupableBinds fvs xs = partition ind xs where
     std (Left ((_,e),_)) = safeToDup e
     std (Right zs) = all safeToDup (snds $ fsts zs)
     ind x = any ( (`elem` uso) . tvrNum . fst . fst ) (G.fromScc x)
-
-sameLength [] [] = True
-sameLength (_:xs) (_:ys) = sameLength xs ys
-sameLength _ _ = False
+-}
 
 -- | seperate bindings based on whether they can be floated inward
 
@@ -168,15 +157,18 @@ sepByDropPoint ::
     -> Binds            -- ^ list of bindings and their free variables
     -> (Binds,[Binds])  -- ^ bindings seperated into those which must be dropped outside of all drop points, and those which can be floated inward into each branch
 sepByDropPoint ds [] = ([], [ [] | _ <- ds ])
-sepByDropPoint ds fs' | sameShape1 xs ds && sum (length r:map length xs) == length fs' = (r,xs) where
+--sepByDropPoint ds fs' | sameShape1 xs ds && sum (length r:map length xs) <= length fs' = (r,xs) where
+sepByDropPoint ds fs' = (r,xs) where
     (r,xs) = f fs'
     f [] = ([], [ [] | _ <- ds ])
     f (b:bs)
         | nu == 0 = f bs
         | nu == 1 =   case sepByDropPoint [ if v then d `mappend` fb' else d | (d,v) <- ds'  ] bs of
-            (gb,ds'') | sameShape1 ds' ds'' -> (gb, [ if v then b:d else d | d <- ds'' | (_,v) <- ds' ])
+            (gb,ds'')  -> (gb, [ if v then b:d else d | d <- ds'' | (_,v) <- ds' ])
+            -- (gb,ds'') | sameShape1 ds' ds'' -> (gb, [ if v then b:d else d | d <- ds'' | (_,v) <- ds' ])
         | otherwise = case sepByDropPoint [ d `mappend` fb' | d <- ds  ] bs of
-            (gb,ds'') | sameShape1 ds'' ds -> (b:gb,ds'')
+            (gb,ds'')  -> (b:gb,ds'')
+            --(gb,ds'') | sameShape1 ds'' ds -> (b:gb,ds'')
       where
         fb' = fvBind b
         ds' = [ (d,any  (`Set.member` d) (fvDecls b)) | d <- ds ]
