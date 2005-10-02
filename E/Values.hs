@@ -1,18 +1,20 @@
 module E.Values where
 
-import CanType
 import Char
+import Control.Monad.Identity
+import qualified Data.Set as Set
+import Ratio
+
+import CanType
 import C.Prims
 import E.E
 import E.FreeVars()
 import E.Subst
 import E.TypeCheck
 import FreeVars
-import Name
-import qualified Data.Set as Set
-import Ratio
-import VConsts
 import Info.Types
+import Name
+import VConsts
 
 
 eIf e a b = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 tBool),  eCaseAlts =  [Alt vTrue a,Alt vFalse b], eCaseDefault = Nothing }
@@ -119,8 +121,22 @@ safeToDup e = whnfOrBot e || isELam e || isEPi e
 eStrictLet t@(TVr { tvrType =  ty }) v e | sortStarLike ty && isAtomic v = subst t v e
 eStrictLet t v e = ECase v t [] (Just e)
 
+tTag = rawType "tag#"
+vTag n = ELit $ LitCons n [] tTag
+
 prim_seq a b | isWHNF a = b
 prim_seq a b = ECase a (tVr 0 (getType a)) [] (Just b)
+
+prim_toTag e = f e where
+    f (ELit (LitCons n _ _)) = vTag n
+    f (ELit (LitInt {})) = error "toTag applied to integer"
+    f (ELetRec ds e) = ELetRec ds (prim_toTag e)
+    f (EError err _) = EError err tTag
+    f ec@ECase {} = nx where
+        Identity nx = caseBodiesMapM (return . prim_toTag) ec
+    f e = EPrim (primPrim "toTag") [e] tTag
+
+-- prim_fromTag e t = EPrim (primPrim "fromTag") [e] t
 
 prim_unsafeCoerce e t = p e' where
     (_,e',p) = unsafeCoerceOpt $ EPrim (primPrim "unsafeCoerce") [e] t
@@ -136,6 +152,8 @@ unsafeCoerceOpt (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = f (0::Int) e
     f n (EError err _) t = (n,EError err t,id)
     f n (ELit (LitInt x _)) t = (n,ELit (LitInt x t),id)
     f n (ELit (LitCons x y _)) t = (n,ELit (LitCons x y t),id)
+    f n ec@ECase {} t = (n,nx,id) where
+        Identity nx = caseBodiesMapM (return . flip prim_unsafeCoerce t) ec
     f n e t | getType e == t = (n,e,id)
     f n e t = (n,e,flip prim_unsafeCoerce t)
 unsafeCoerceOpt e = (0,e,id)

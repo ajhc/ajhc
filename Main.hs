@@ -260,9 +260,9 @@ compileModEnv' stats ho = do
     lc <- return $ runIdentity $ annotate mempty (idann rules (hoProps ho) ) letann lamann lc
     lc <- opt "SuperSimplify" cm lc
 
-    --(lc,_) <- return $ E.CPR.cprAnalyze mempty lc
-    --sequence_ [ putStrLn $ (tvrShowName t) <+> show (maybe E.CPR.Top id (Info.lookup (tvrInfo t)) ::  E.CPR.Val) | (t,_,_) <- scCombinators $ eToSC dataTable lc ]
     lc <- mangle dataTable True "Barendregt" (return . barendregt) lc
+    (lc,_) <- return $ E.CPR.cprAnalyze mempty lc
+    sequence_ [ putStrLn $ (tvrShowName t) <+> show (maybe E.CPR.Top id (Info.lookup (tvrInfo t)) ::  E.CPR.Val) | (t,_,_) <- scCombinators $ eToSC dataTable lc ]
     lc <- if fopts FO.FloatIn then  opt "Float Inward..." (\stats x -> return (floatInward rules  x))  lc  else return lc
     vs <- if fopts FO.Strictness then (collectSolve lc) else return []
     mapM_ putErrLn $  sort [ tshow x <+> "->" <+> tshow y | (x@(E.Strictness.V i),y@Lam {}) <- vs, odd i]
@@ -403,6 +403,7 @@ typecheck dataTable e = case inferType dataTable [] e of
             True -> return Unknown
             False -> putErrDie "Type Error in E"
     Right v -> return v
+
 
 
 

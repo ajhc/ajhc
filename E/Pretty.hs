@@ -107,8 +107,8 @@ prettyI 0 = (char '_')
 prettyI i | Just x <- intToAtom i  = (text $ show  $ (fromAtom x :: Name))
 prettyI i = (text $ 'x':show i)
 
+rawType s  = ELit (LitCons (toName RawType s) [] eStar)
 
---(eDoc,tvrDoc) :: Monad m => E -> m Doc,Mona
 eDoc e PrettyOpt {optExpanded = expanded, optColors = colors, optNames = optNames} = unparse (prettye e) where
     retOp x = col "lightgreen" x
 
@@ -117,7 +117,6 @@ eDoc e PrettyOpt {optExpanded = expanded, optColors = colors, optNames = optName
     col n x = if colors then  (attrColor (attr oob) n x) else x
 
     keyword x = bold' (text x)
-    --symbol x = atom (col 1 x)
     symbol x = atom (bold' x)
 
     atomize (x,_) = (x,Atom)
@@ -125,7 +124,7 @@ eDoc e PrettyOpt {optExpanded = expanded, optColors = colors, optNames = optName
     prettylit :: (a -> Unparse Doc) -> Lit a E -> Unparse Doc
     prettylit pbind (LitInt c t) | t == tChar = atom $ (col "blue" (text (show $ chr $ fromIntegral  c)))
     prettylit pbind (LitInt i _) = atom $ (col "blue" (text $ show i))
---    prettylit pbind (LitFrac f _) = atom $ (col 94 (text (show f)))
+    prettylit pbind (LitCons n [] t) | t == rawType "tag#" = atom $ (col "blue" (text $ show n))
     prettylit pbind (LitCons s es _) | Just n <- isTup (snd $ (snd $ fromName s :: (String,String))), n == length es = atom $ tupled (map (unparse . pbind) es)
     prettylit pbind (LitCons n [a,b] _) | vCons == n  = (pbind a) `cons` (pbind b)
     prettylit pbind (LitCons n [e] _) | toName TypeConstructor ("Prelude","[]") == n = atom   (char '[' <> unparse (pbind e)  <> char ']')
