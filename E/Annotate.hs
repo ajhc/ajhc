@@ -6,6 +6,7 @@ import Data.Monoid
 import qualified Data.Map as Map
 
 import E.E
+import E.Rules
 import E.Subst
 import GenUtil
 import Info.Info as Info
@@ -47,6 +48,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
     f ec@(ECase {}) = do
         e' <- f $ eCaseScrutinee ec
         let caseBind = eCaseBind ec
+        caseBind <- procRules caseBind
         (b',r) <- ntvr [] $ caseBind { tvrInfo = Info.insert CaseDefault (tvrInfo caseBind) }
         d <- local r $ fmapM f $ eCaseDefault ec
         let da (Alt (LitCons s vs t) e) = do
@@ -62,6 +64,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         return  ECase { eCaseScrutinee = e', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts }
     lp bnd lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == 0  = do
         t' <- f t
+        tvr <- procRules tvr
         nfo <- lift $ lamann e (tvrInfo tvr)
         nfo <- lift $ idann n nfo
         e' <- local (Map.insert n Nothing) $ f e
@@ -80,18 +83,26 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
     -- ntvr :: Monad m => Info -> [Int] -> TVr -> ReaderT (Map.Map Int (Maybe E)) m (TVr, (Map.Map Int (Maybe E)) -> (Map.Map Int (Maybe E)))
     ntvr xs tvr@(TVr { tvrIdent = 0, tvrType =  t}) = do
         t' <- f t
+        tvr <- procRules tvr
         nfo <- lift $ idann 0 (tvrInfo tvr)
         let nvr = (tvr { tvrType =  t', tvrInfo = nfo})
         return (nvr,id)
     ntvr xs tvr@(TVr {tvrIdent = i, tvrType =  t}) = do
         t' <- f t
         ss <- ask
+        tvr <- procRules tvr
         nfo' <- lift $ idann i (tvrInfo tvr)
         let i' = mnv xs i ss
         let nvr = (tvr { tvrIdent =  i', tvrType =  t', tvrInfo =  nfo'})
         case i == i' of
             True -> return (nvr,Map.insert i (Just $ EVar nvr))
             False -> return (nvr,Map.insert i (Just $ EVar nvr) . Map.insert i' Nothing)
+
+    procRules tvr = case Info.lookup (tvrInfo tvr) of
+        Nothing -> return tvr
+        Just r -> do
+            r' <- mapABodies f r
+            return tvr { tvrInfo = Info.insert r' (tvrInfo tvr) }
 
 mnv xs i ss
     | i <= 0 || i `Map.member` ss = nv (Map.fromList [ (x,undefined) | x <- xs ] `mappend` ss)
