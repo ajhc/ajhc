@@ -1,7 +1,7 @@
 = Using jhc =
 
 Installation of jhc involves building the jhc binary, placing it somewhere you
-can execute it and putting the libraries somewhere. 
+can execute it and putting the libraries somewhere.
 
 === Building jhc ===
 
@@ -9,20 +9,20 @@ building jhc requires the most recent version of DrIFT which can be gotten at
 http://repetae.net/john/computer/haskell/DrIFT/, GHC 6.4, happy, Perl, and having
 darcs will help keep updated with the newest version and submit patches.
 
-==== Getting the source ==== 
+==== Getting the source ====
 
 Because jhc uses subrepositories, you need to use multiple darcs commands to
 pull everything needed to build jhc.
 
-  darcs get http://repetae.net/john/repos/jhc 
+  darcs get http://repetae.net/john/repos/jhc
   cd jhc
-  darcs get http://repetae.net/john/repos/Boolean 
+  darcs get http://repetae.net/john/repos/Boolean
   darcs get http://repetae.net/john/repos/Doc
 
 ==== making it ====
 
 Assuming you have ghc 6.4, happy, and DrIFT installed, you may now type 'make'
-and get a binary 'jhc' out if nothing went wrong.  
+and get a binary 'jhc' out if nothing went wrong.
 
 === Installing the libraries ====
 
@@ -44,9 +44,9 @@ being the first time you run jhc, it will take much longer than future runs.
 === Running jhc ===
 
 jhc always runs in a mode similar to 'ghc --make' and will find all
-dependencies automatically. just run jhc on your file containing the Main module.  
+dependencies automatically. just run jhc on your file containing the Main module.
 
-  jhc -v Main.hs 
+  jhc -v Main.hs
 
 it is HIGHLY HIGHLY recommended you pass the '-v' flag to jhc. jhc takes a very
 long time to compile programs and without feedback you won't know if there is a
@@ -63,15 +63,15 @@ general options
 
 <include text `/home/john/bin/jhc --help 2>&1`>
 
-things to pass to -d 
+things to pass to -d
 
 <include text `/home/john/bin/jhc -dhelp  2>&1`>
 
-things to pass to -f 
+things to pass to -f
 
 <include text `/home/john/bin/jhc -fhelp 2>&1 `>
 
----- 
+----
 
 http://repetae.net/john/computer/jhc
 

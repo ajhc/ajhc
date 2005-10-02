@@ -1,4 +1,4 @@
-= Jhc = 
+= Jhc =
 
 Jhc is a compiler for Haskell that aims to produce very efficient code as well as
 explore novel compilation techniques in an attempt to make them practical.
@@ -9,13 +9,13 @@ aims to determine how to bring them to a full-scale Haskell compiler. (or die
 trying)
 
 Although jhc is not ready for general use, I think some of its ideas or code
-might be useful to other people so I am deciding to release it in this state. 
+might be useful to other people so I am deciding to release it in this state.
 
 
 == Jhc Bullet Points ==
 
 * Full support for Haskell 98, The FFI and some extensions. (modulo some bugs
-being worked on and some libraries that need to be filled out) 
+being worked on and some libraries that need to be filled out)
 
 * Produces 100% portable ISO C. The same C file can compile on machines of
 different byte order or bit-width without trouble.
@@ -28,7 +28,7 @@ any Haskell compiler. (main = putStrLn "Hello, World!" compiles to
 
 * No garbage collector. A variant of Region Inference is in the works.
 
-* Compilation by transformation with 2 general intermediate languages. 
+* Compilation by transformation with 2 general intermediate languages.
 
 * First Intermediate language based on Henk, Pure Type Systems and the Lambda
 cube. This is similar enough to GHCs core that many optimizations may be
@@ -60,24 +60,24 @@ lot across the whole project)
 
 * All indirect jumps are transformed away, jhc's final code is very similar to
 hand-written imperative code, using only branches and static function calls. A
-simple basic-blocks analysis is enough to transform tail-calls into loops. 
+simple basic-blocks analysis is enough to transform tail-calls into loops.
 
 * Full transparent support for mutually recursive modules.
 
-== More in depth == 
+== More in depth ==
 
 
-=== Type Classes === 
+=== Type Classes ===
 
 One of the most novel things about jhc is its implementation of type classes
 which differs significantly from the standard dictionary passing approach used
-by other Haskell compilers. 
+by other Haskell compilers.
 
 Jhc's unique approach is made possible by 2 other design choices, the use of a
 pure type system with no distinction between types and values and its use of
 whole-program analysis. The basic idea is that instead of passing a
 dictionary, a case statement directly scrutinizes the type parameter of a
-function and calls the appropriate overloaded routine directly. 
+function and calls the appropriate overloaded routine directly.
 
 This has a number of interesting properties
 
@@ -91,7 +91,7 @@ function pointed to in the dictionary are replaced by a single case of an
 algebraic data type and calls to statically known functions. This is exactly
 the transformation that the GRIN points-to analysis does, but much sooner and
 with much better optimization potential. Calls to statically known functions
-are MUCH more efficient. 
+are MUCH more efficient.
 
 * Standard case coalescing optimizations have a dramatically enhanced effect
 when dealing with overloaded functions. imagine the code snipped (x*(y + z)/z) :: a .
@@ -109,17 +109,17 @@ as the compiler is concerned, arbitrary functions may be being passed in the
 dictionaries, it does not know that they come in specific correlated sets.
 
 * Functional Dependencies actually lead to run-time savings. each functional
-dependency transforms into a case statement which may be omitted. 
+dependency transforms into a case statement which may be omitted.
 
 * Although a whole-world analysis is needed to generate full versions of
 type class methods, this is actually rarely needed in practice, as it is often
 the case the compiler is able to statically prove only a certain subset of
 types are needed at any given point and is able to generate specialized
 versions on the spot. This is implemented in a manner very similar to GHC's
-rules. 
+rules.
 
 * Advanced compile-time and run-time specializations are possible via pragmas.
-(see below) 
+(see below)
 
 
 === E ===
@@ -134,9 +134,9 @@ Grin is basically a first-order monadic functional language. It is very
 similar to the Graph Reduction Intermediate Language as defined by Boquist but
 has a few notable changes.
 
-* It is typed. 
+* It is typed.
 
-* It has multiple return values as a primitive (unboxed tuples) 
+* It has multiple return values as a primitive (unboxed tuples)
 
 * My target is higher level C or C-- rather than RISC code, so some
 transformations are less important as the C compiler can be assumed to take
@@ -151,13 +151,13 @@ been implemented, however certain intermediate states in Boquist's scheme are
 actually invalid in the strongly typed Grin of jhc so need to be combined or
 modified.
 
-A whole lot can be learned from the Grin data type and Grin is fully defined by the following  
+A whole lot can be learned from the Grin data type and Grin is fully defined by the following
 
  infixr 1  :->, :>>=
-  
+
  data Lam = Val :-> Exp
     deriving(Eq,Ord,Show)
-  
+
  data Exp =
      Exp :>>= !Lam
     | App Atom [Val]  -- ^ this handles applications of functions and built-ins
@@ -170,7 +170,7 @@ A whole lot can be learned from the Grin data type and Grin is fully defined by 
     | Error String Ty -- ^ abort with an error message, non recoverably.
     | Cast Val Ty     -- ^ reinterpret Val as a different type, also used to box\/unbox lifted types
     deriving(Eq,Show,Ord)
-  
+
  data Val =
     NodeC !Tag [Val]
     | NodeV !Var [Val]
@@ -181,7 +181,7 @@ A whole lot can be learned from the Grin data type and Grin is fully defined by 
     | Tup [Val]
     | ValPrim APrim
     deriving(Eq,Show,Ord)
-  
+
  data Ty =
     TyTag           -- ^ a lone tag
     | TyPtr Ty      -- ^ pointer to a heap location which contains its argument
@@ -198,7 +198,7 @@ A whole lot can be learned from the Grin data type and Grin is fully defined by 
 Jhc implements several extensions to Haskell 98
 
 ==== Standard Extensions ====
- 
+
 * The FFI is almost fully supported except for calling Haskell code from C.
 
 * Hierarchical module names are supported as described in the addendum. The
@@ -233,14 +233,14 @@ Jhc implements several extensions to Haskell 98
   preprocessor such as hsc2hs and allowing portable C code to be generated by
   jhc.
 
-* ERROR_ANNOTATE pragma. This is a generalization of GHCs assert magic. A
-  function which is given an ERROR_ANNOTATE pragma will be replaced with an
+* SRCLOC_ANNOTATE pragma. This is a generalization of GHCs assert magic. A
+  function which is given an SRCLOC_ANNOTATE pragma will be replaced with an
   alternate version that takes the functions use site as an argument. This
   allows error messages to be in terms of where said function was used. The
-  alternate function is named <code>[function]_err_ann__</code> and must be in 
-  the same module as the original function. Jhc does no checking to ensure both 
+  alternate function is named <code>[function]_srcloc_ann__</code> and must be in
+  the same module as the original function. Jhc does no checking to ensure both
   functions have the same effect, it is up to the user to ensure that. An
-  example is 
+  example is
 
 <pre>
 
@@ -248,18 +248,18 @@ Jhc implements several extensions to Haskell 98
   head (x:xs) = x
   head [] = error "head - empty list"
 
-  {-# ERROR_ANNOTATE head #-}
-  
-  head_err_ann__ :: String -> [a] -> a
-  head_err_ann__ pos (x:xs) = x
-  head_err_ann__ pos [] = error $ pos ++ ": head - empty list"
+  {-# SRCLOC_ANNOTATE head #-}
+
+  head_srcloc_ann__ :: String -> [a] -> a
+  head_srcloc_ann__ pos (x:xs) = x
+  head_srcloc_ann__ pos [] = error $ pos ++ ": head - empty list"
 
   -- Now, a call to head on an empty list will produce an error message like
   -- "Main.hs:23: head - empty list"
 
 </pre>
-  
-  
+
+
 
 * SUPERSPECIALIZE pragma. This pragma has the same affect as the SPECIALIZE
   pragma, but in addition to doing compile-time specialization,
@@ -272,7 +272,7 @@ Jhc implements several extensions to Haskell 98
   hundreds of additions and multiplications, each of which must test what type
   its argument are. If we SUPERSPECIALIZE the multiply routine instead, a single
   run-time test will be performed and the much much more efficient specialized
-  routine will be used, even if it could not be proven at compile time. 
+  routine will be used, even if it could not be proven at compile time.
 
 * MULTISPECIALIZE pragma. This is equivalent to calling SPECIALIZE against
   every possible type. It's main cost is compile time and memory usage. It
@@ -282,7 +282,7 @@ Jhc implements several extensions to Haskell 98
 
 * MULTISUPERSPECIALIZE pragma. This is equivalent to calling SUPERSPECIALIZE
   against every possible type. If not careful, this can result in massive code
-  bloat but might be a big win in certain cases. 
+  bloat but might be a big win in certain cases.
 
 == The story of jhc ==
 
@@ -303,12 +303,12 @@ at me like I am crazy, but I can detect no flaw in my logic.
 
 In any case, I worked on jhc on and off for a while, the project got boosts a
 few times, such as when hatchet was released and I used it to replace my front
-end. 
+end.
 
 Recently, with my purchase of a faster machine actually beefy enough to run
 jhc and the realization I was getting good optimizations from my
 implementation of type classes combined with the small binary size of produced
-files I decided to make a push for jhc to become a usable compiler. 
+files I decided to make a push for jhc to become a usable compiler.
 
 == All is not well in jhc-land ==
 
@@ -322,7 +322,7 @@ grasp
 * It takes ridiculous amounts of memory and CPU. A gigabyte of RAM usage is
 not unheard of.
 
-* There are still some major bugs 
+* There are still some major bugs
 
 * It leaks memory. The Region inference algorithm is still in the tweaking
 stage and programs are known to leak memory. for short running programs,
@@ -342,7 +342,7 @@ or be able to learn from or borrow of the code.
 compiler to quit with an 'error' or pattern match failure.
 
 
-== References == 
+== References ==
 
 * Boquist Thesis - http://www.cs.chalmers.se/~boquist/phd/index.html
 
@@ -362,6 +362,6 @@ compiler to quit with an 'error' or pattern match failure.
 
 ----
 
-http://repetae.net/john/computer/jhc  
+http://repetae.net/john/computer/jhc
 
 

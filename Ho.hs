@@ -36,6 +36,7 @@ import FrontEnd.ParseMonad
 import FrontEnd.Unlit
 import GenUtil hiding(putErrLn,putErr,putErrDie)
 import HsSyn
+import Info.Types
 import KindInfer
 import MapBinaryInstance()
 import Maybe
@@ -478,9 +479,9 @@ loadLibraries = f initialHo (optHls options)  where
 
 initialHo = mempty { hoEs = es , hoClassHierarchy = ch  }  where
     ch = foldl addOneInstanceToHierarchy mempty (map ((,) False) primitiveInsts)
-    es = Map.fromList [  (n,(tVr (atomIndex $ toAtom n) (getType v),v)) |  (n,v) <- constantMethods ] `mappend` es'
+    es = Map.fromList [  (n,(setProperty prop_INSTANCE $ tVr (atomIndex $ toAtom n) (getType v),v)) |  (n,v) <- constantMethods ] `mappend` es'
     --es' = Map.fromList [ (n,(tVr (atomIndex $ toAtom n) (getType v),v)) | (n,t,p,d) <- theMethods, let v = f n t p d  ]
-    es' = Map.fromList [ (n,(tVr (atomIndex $ toAtom n) (error "f no longer relevant"),v)) | (n,t,p,d) <- theMethods, let v = f n t p d  ]
+    es' = Map.fromList [ (n,(setProperty prop_INSTANCE $ tVr (atomIndex $ toAtom n) (error "f no longer relevant"),v)) | (n,t,p,d) <- theMethods, let v = f n t p d  ]
     f _ _ _ _ = error "f no longer relevant"
 
 

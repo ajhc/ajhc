@@ -39,10 +39,10 @@ instance Show Properties where
 -- These are set by user pragmas
 prop_INLINE = toAtom "INLINE"
 prop_NOINLINE = toAtom "NOINLINE"
-prop_ERROR_ANNOTATE = toAtom "ERROR_ANNOTATE"
+prop_SRCLOC_ANNOTATE = toAtom "SRCLOC_ANNOTATE"
 
 -- | this is set on functions which are the target of an error annotated function
-prop_ERROR_ANNOTATE_FUN = toAtom "_ERROR_ANNOTATE_FUN"
+prop_SRCLOC_ANNOTATE_FUN = toAtom "_SRCLOC_ANNOTATE_FUN"
 
 -- | this is an internal flag set on instance functions
 prop_INSTANCE = toAtom "_INSTANCE"
