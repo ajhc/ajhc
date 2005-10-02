@@ -3,11 +3,12 @@ module E.CPR(Val(..), cprAnalyzeBinds, cprAnalyze) where
 import Control.Monad.Writer
 import Data.Generics
 import Data.Monoid()
+import qualified Data.Map as Map
+
 import Doc.DocLike
 import E.E
 import E.FreeVars
 import Name
-import qualified Data.Map as Map
 import qualified Doc.Chars as C
 import qualified Info.Info as Info
 

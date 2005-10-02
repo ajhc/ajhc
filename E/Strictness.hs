@@ -1,19 +1,20 @@
 module E.Strictness where
 
-import Boolean.Algebra
-import Prelude hiding((&&),(||),not,and,or,any,all)
-import E.E
-import Data.Monoid
-import MonoidUtil()
-import GenUtil
-import C.Prims
-import Control.Monad.Writer
-import FindFixpoint
 import Control.Monad.Identity
-import E.Values
-import E.Subst
-
+import Control.Monad.Writer
+import Data.Monoid
+import Prelude hiding((&&),(||),not,and,or,any,all)
 import qualified Data.Map as Map
+
+import Boolean.Algebra
+import C.Prims
+import E.E
+import E.Subst
+import E.Values
+import FindFixpoint
+import GenUtil
+import MonoidUtil()
+
 
 newtype Var = V Int
     deriving(Eq,Ord)
