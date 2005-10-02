@@ -53,6 +53,9 @@ prop_METHOD = toAtom "_METHOD"
 -- | whether a function is exported
 prop_EXPORTED = toAtom "_EXPORTED"
 
+prop_WORKER = toAtom "_WORKER"
+prop_WRAPPER = toAtom "_WRAPPER"
+
 
 class HasProperties a where
     setProperty :: Atom -> a -> a
