@@ -1,12 +1,11 @@
 
 module Main(main) where
 
-import Char
 import Control.Exception
 import Control.Monad.Identity
+import Control.Monad.Writer
 import Data.Monoid
 import List hiding(group)
-import Maybe
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.IntMap as IM
 import qualified Data.Map as Map
@@ -158,11 +157,12 @@ processDecls stats ho ho' tiData = do
         exports = getExports ho'
 
     -- initial pass over functions to put them into a normalized form
-    ds <- flip mapM ds $ \ (n,v,lc) -> do
-        lc <- postProcessE stats n inscope fullDataTable lc
+    let procE (ds,usedIds) (n,v,lc) = do
+        lc <- postProcessE stats n inscope usedIds fullDataTable lc
         nfo <- idann (hoRules ho') (hoProps ho') (tvrIdent v) (tvrInfo v)
         v <- return $ v { tvrInfo = Info.insert LetBound nfo }
-        return (n, shouldBeExported exports v,lc)
+        return ((n, shouldBeExported exports v,lc):ds,usedIds `mappend` collectIds lc)
+    (ds,allIds) <- foldM procE ([],hoUsedIds ho) ds
 
     -- This is the main function that optimizes the routines before writing them out
     let f (ds,(smap,annmap)) (n,v,lc) = do
@@ -191,17 +191,18 @@ processDecls stats ho ho' tiData = do
     (ds,_) <- foldM f ([],(Map.fromList [ (tvrNum v,e) | (v,e) <- Map.elems (hoEs ho)], initMap)) [ x | x@(_,b,_) <- dog, tvrNum b `Set.member` reached ]
     wdump FD.Progress $ putErrLn "!"
 
+
     let ds' = reachable (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c)) [ tvrNum b | (n,b,_) <- ds, getProperty prop_EXPORTED b]
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
-    return ho' { hoDataTable = dataTable, hoEs = Map.fromList [ (x,(y,z)) | (x,y,z) <- ds'], hoRules = rules }
+    return ho' { hoDataTable = dataTable, hoEs = Map.fromList [ (x,(y,z)) | (x,y,z) <- ds'], hoRules = rules, hoUsedIds = collectIds (ELetRec [ (b,c) | (_,b,c) <- ds'] Unknown) }
 
 -- | take E directly generated from haskell source and bring it into line with
 -- expected invarients. this only needs be done once.  it replaces all
 -- ambiguous types with the absurd one, gets rid of all newtypes, does a basic
 -- renaming pass, and makes sure applications are only to atomic variables.
 
-postProcessE :: Stats.Stats -> Name -> [Id] -> DataTable -> E -> IO E
-postProcessE stats n inscope dataTable lc = do
+postProcessE :: Stats.Stats -> Name -> [Id] -> Set.Set Id -> DataTable -> E -> IO E
+postProcessE stats n inscope usedIds dataTable lc = do
     let g (TVr { tvrIdent = 0 }) = error "absurded zero"
         g tvr@(TVr { tvrIdent = n, tvrType = k})
             | sortStarLike k =  tAbsurd k
@@ -212,8 +213,8 @@ postProcessE stats n inscope dataTable lc = do
     let mangle = mangle' (Just $ Set.fromList $ inscope) dataTable
     lc <- mangle (return ()) False ("Absurdize") (return . substMap (IM.map g fvs)) lc
     lc <- mangle (return ()) False "deNewtype" (return . deNewtype dataTable) lc
-    lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
-    lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeApps stats x >>= coalesceLets stats)  lc
+    --lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
+    lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeApps usedIds stats x >>= coalesceLets stats)  lc
     return lc
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
@@ -222,6 +223,7 @@ shouldBeExported exports tvr
     | otherwise = tvr
 
 
+collectIds e = execWriter $ annotate mempty (\id nfo -> tell (Set.singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 
 compileModEnv' stats ho = do
 
@@ -290,7 +292,7 @@ compileModEnv' stats ho = do
 
     wdump FD.LambdacubeBeforeLift $ printCheckName dataTable lc
     lc <- mangle dataTable (return ()) True "LambdaLift" (lambdaLiftE stats dataTable) lc
-    lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeApps stats x >>= coalesceLets stats)  lc
+    lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeApps mempty stats x >>= coalesceLets stats)  lc
     wdump FD.Lambdacube $ printCheckName dataTable lc
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     wdump FD.Progress $ printEStats lc

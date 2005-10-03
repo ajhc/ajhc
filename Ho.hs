@@ -8,6 +8,7 @@ import IO(bracket)
 import List
 import Prelude hiding(print,putStrLn)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 import System.IO hiding(print,putStrLn)
 import System.Posix.Files
@@ -91,7 +92,8 @@ data Ho = Ho {
     -- Filled in by E generation
     hoDataTable :: DataTable,
     hoEs :: Map.Map Name (TVr,E),
-    hoRules :: Rules
+    hoRules :: Rules,
+    hoUsedIds :: Set.Set Id
     }
     {-! derive: GhcBinary, Monoid !-}
 

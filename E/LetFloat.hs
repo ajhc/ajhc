@@ -22,13 +22,10 @@ import E.Inline
 import E.Rules
 import E.Subst(app)
 import E.Traverse
-import E.Values
 import FreeVars
 import GenUtil
-import qualified Info.Info as Info
 import qualified Util.Graph as G
 import Stats
-import Util.SameShape
 
 
 
@@ -50,8 +47,8 @@ varElim stats n = do
 propRec stats n = do
     ticks stats n (toAtom "E.Simplify.copy-propegate")
 
-atomizeApps :: Stats -> E -> IO E
-atomizeApps stats e = traverse travOptions { pruneRecord = varElim stats } f mempty mempty e where
+atomizeApps :: Set.Set Id -> Stats -> E -> IO E
+atomizeApps usedIds stats e = traverse travOptions { pruneRecord = varElim stats } f mempty (Map.fromAscList [ (i,NotKnown) | i <- Set.toAscList usedIds ]) e where
     --f 0 (EPi (TVr Nothing t) b,[])  = do
     --    (t',ds1) <- at t
     --    (b',ds2) <- at b
@@ -66,6 +63,7 @@ atomizeApps stats e = traverse travOptions { pruneRecord = varElim stats } f mem
     f 0 (x,xs) = do
         (xs',dss) <- fmap unzip (mapM at xs)
         doLetRec stats (concat dss) (foldl EAp x xs')
+    f _ _ = error "LetFloat: odd f"
     at e | not (isAtomic e) = do
         --lift $ putErrLn $ "Atomizing: " ++ render (ePretty e)
         e <- f 0 (e,[])
