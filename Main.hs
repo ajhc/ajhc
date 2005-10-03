@@ -272,7 +272,8 @@ compileModEnv' stats ho = do
 
     lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lc
     --(lc@(ELetRec defs v),_) <- return $ E.CPR.cprAnalyze mempty lc
-    --lc <- return $ ELetRec (concatMap (uncurry $ workWrap dataTable) ds) v
+    --lc <- return $ ELetRec (concatMap (uncurry $ workWrap dataTable) defs) v
+    --lc <- opt "SuperSimplify" cm lc
     --flip mapM_ defs $ \ (t,e) -> do
     --    let xs = workWrap dataTable t e
     --    when (length xs > 1) $ do

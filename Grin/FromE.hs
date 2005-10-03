@@ -190,8 +190,6 @@ convertName n = toAtom (t':s) where
        | otherwise = error $ "convertName: " ++ show (t,s)
 
 primTyEnv = TyEnv . Map.fromList $ [
-    --(toAtom "CChar",([tCharzh],TyNode)),
-    --(toAtom "CInt",([tIntzh],TyNode)),
     (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode)),
     (toAtom "TAbsurd#", ([],TyNode)),
     (funcInitCafs, ([],tyUnit)),
@@ -475,7 +473,7 @@ compile' dataTable cenv (tvr,as,e) = cr e >>= \x -> return (nn,(Tup (map toVal a
     ce e = error $ "ce: " ++ show (funcName,e)
     fromIORT e | ELit (LitCons tn [x,y] star) <- followAliases dataTable e, tn == tupNamet2, star == eStar, x == tWorld__ = lookupCType dataTable y
     fromIORT e = fail $ "fromIORT: " ++ show e
-    retIO v = Return (NodeC (toAtom "CPrelude.(,)") [pworld__,v])
+    retIO v = Return (NodeC tn_2Tup [pworld__,v])
     tupNamet2 = (nameTuple TypeConstructor 2)
     cpa :: E -> IO (Val,Val,Exp)
     cpa e = do
@@ -600,10 +598,11 @@ compile' dataTable cenv (tvr,as,e) = cr e >>= \x -> return (nn,(Tup (map toVal a
         --let addt (TyEnv mp) =  TyEnv $ Map.insert tl (replicate (length args) (TyPtr TyNode),TyNode) mp
         --modifyIORef (tyEnv cenv) addt
         return s
-    addNewFunction tl@(n,Tup args :-> _) = do
+    addNewFunction tl@(n,Tup args :-> body) = do
         modifyIORef (funcBaps cenv) (tl:)
         tenv <- readIORef (tyEnv cenv)
         args' <- mapM (typecheck tenv) args
+        --rb <- typecheck tenv body
         let addt (TyEnv mp) =  TyEnv $ Map.insert n (args',TyNode) mp
         modifyIORef (tyEnv cenv) addt
 
@@ -768,7 +767,7 @@ compile' dataTable cenv (tvr,as,e) = cr e >>= \x -> return (nn,(Tup (map toVal a
             return (NodeC (partialTag cn (nargs - length es)) $ args es)
         where
         cn = convertName n
-        Just cons = getConstructor n dataTable
+        cons = runIdentity $ getConstructor n dataTable
         nargs = length (conSlots cons)
 
     con _ = fail "not constructor"
