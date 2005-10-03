@@ -437,7 +437,7 @@ instance HasType a => HasType [a] where
 
 
 same _ t1 t2 | t1 == t2 = return t1
-same msg t1 t2 = fail $ "Types not the same:" <+> msg <+> tshow t1 <+> tshow t2
+same msg t1 t2 = fail $ "Types not the same:" <+> parens msg <+> parens (tshow t1) <+> parens (tshow t2)
 
 typLam te (x :-> y) = do
     x <- typecheck te x

@@ -102,10 +102,13 @@ cafNum n = V $ - atomIndex (partialTag t 0)
 toEntry (n,as,e)
     | Just nm <- intToAtom (tvrNum n)  = f (toAtom ('f':show (fromAtom nm :: Name)))
     | otherwise = f (toAtom ('f':show (tvrNum n))) where
-        f x = (x,map (toty (TyPtr TyNode) . tvrType ) as,toty TyNode (getType (e::E) :: E))
-        toty node (ELit (LitCons n [] es)) |  es == eHash, RawType <- nameType n = (Ty $ toAtom (show n))
-        toty node _ = node
+        f x = (x,map (toType (TyPtr TyNode) . tvrType ) as,toType TyNode (getType (e::E) :: E))
 
+toType :: Ty -> E -> Ty
+toType node = toty where
+    toty (ELit (LitCons n es ty)) |  ty == eHash, TypeConstructor <- nameType n, Just _ <- fromUnboxedNameTuple n = (TyTup (map (toType (TyPtr TyNode) ) es))
+    toty (ELit (LitCons n [] es)) |  es == eHash, RawType <- nameType n = (Ty $ toAtom (show n))
+    toty _ = node
 
 compile ::  DataTable -> Map Int Name -> SC -> IO Grin
 compile dataTable nmap sc@SC { scMain = mt, scCombinators = cm } = do
@@ -232,6 +235,7 @@ constantCaf dataTable (SC _ ds) = ans where
 
 getName' :: (Show a,Monad m) => DataTable -> Lit a E -> m Atom
 getName' dataTable v@(LitCons n es _)
+    | Just _ <- fromUnboxedNameTuple n = fail $ "unboxed tuples don't have names silly"
     | conAlias cons = error $ "Alias still exists: " ++ show v
     | length es == nargs  = do
         return cn
@@ -263,13 +267,17 @@ dropCoerce e | Just (x,_) <- from_unsafeCoerce e = x
 dropCoerce x = x
 
 compile' ::  DataTable -> CEnv -> (TVr,[TVr],E) -> IO (Atom,Lam)
-compile' dataTable cenv (tvr,as,e) = cr e >>= \x -> return (nn,(Tup (map toVal as) :-> x)) where
+compile' dataTable cenv (tvr,as,e) = ans where
+    ans = do
+        --putStrLn $ "Compiling: " ++ show nn
+        x <- cr e
+        return (nn,(Tup (map toVal as) :-> x))
     funcName = maybe (show $ tvrNum tvr) show (fmap fromAtom ( intToAtom $ tvrNum tvr) :: Maybe Name)
     cc, ce, cr :: E -> IO Exp
     (nn,_,_) = runIdentity $ Map.lookup (tvrNum tvr) (scMap cenv)
     cr x = ce x
     ce (ELetRec ds e) = ce e >>= \e -> doLet ds e
-    ce (EError s e) = return (Error s TyNode)
+    ce (EError s e) = return (Error s (toType TyNode e))
     ce (EVar tvr@(TVr { tvrType = (ELit (LitCons n [] _))})) | RawType <- nameType n = do
         return (Return (toVal tvr))
     ce e |  (v,as) <- fromAp e, EVar v <- dropCoerce v = do
@@ -433,7 +441,7 @@ compile' dataTable cenv (tvr,as,e) = cr e >>= \x -> return (nn,(Tup (map toVal a
         let p = Primitive { primName = toAtom s, primRets = Nothing, primType = (TyTup [ptype,ptype],ptype), primAPrim = aprim }
         return $ x1 :>>= node p1 :-> x2 :>>= node p2 :-> Prim p [p1,p2] :>>= p3 :-> Return (node p3)
         -}
-    ce (ECase e _ [Alt (LitCons n xs _) wh] Nothing) | Just _ <- fromUnboxedNameTuple n = do
+    ce (ECase e _ [Alt (LitCons n xs _) wh] _) | Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n  = do
         e <- ce e
         wh <- ce wh
         return $ e :>>= Tup (map toVal xs) :-> wh
@@ -494,16 +502,10 @@ compile' dataTable cenv (tvr,as,e) = cr e >>= \x -> return (nn,(Tup (map toVal a
         nv <- nnv
         x <- ce e
         return [nv :-> x]
---    cp (PatWildCard,ELam tvr e) = do
---        x <- ce e
---        v <- newNodeVar
---        return (v :-> Store v :>>= toVal tvr :-> x)
---    cp (PatWildCard,e) = do
---        x <- ce e
---        v <- newNodeVar
---        w <- newNodePtrVar
---        m <- newNodeVar
---        return (v :-> Store v :>>= w :-> x :>>= m :-> gApply m w)
+    cp (Alt lc@(LitCons n es _) e) | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = do
+        putStrLn $ "Print alt: " ++ show lc
+        x <- ce e
+        return (Tup (map toVal es) :-> x)
     cp (Alt lc@(LitCons n es _) e) = do
         --let (e',as') = fromLam e
         x <- ce e
@@ -602,8 +604,8 @@ compile' dataTable cenv (tvr,as,e) = cr e >>= \x -> return (nn,(Tup (map toVal a
         modifyIORef (funcBaps cenv) (tl:)
         tenv <- readIORef (tyEnv cenv)
         args' <- mapM (typecheck tenv) args
-        --rb <- typecheck tenv body
-        let addt (TyEnv mp) =  TyEnv $ Map.insert n (args',TyNode) mp
+        rb <- typecheck tenv body
+        let addt (TyEnv mp) =  TyEnv $ Map.insert n (args',rb) mp
         modifyIORef (tyEnv cenv) addt
 
     {-
@@ -725,6 +727,7 @@ compile' dataTable cenv (tvr,as,e) = cr e >>= \x -> return (nn,(Tup (map toVal a
                             --    Nothing -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
     constant (ELit (LitInt i (ELit (LitCons n [] (ESort EHash))))) | RawType <- nameType n = return $ Lit i (Ty $ toAtom (show n))
     constant (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Prelude.lookup (show n) allCTypes = (return $ Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
+--    constant (ELit lc@(LitCons n es _)) | Just es <- mapM constant es, Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n = (return $ Const (Tup es))
     constant (ELit lc@(LitCons n es _)) | Just es <- mapM constant es, Just nn <- getName lc = (return $ Const (NodeC nn es))
     constant (EPi (TVr { tvrIdent = 0, tvrType = a}) b) | Just a <- constant a, Just b <- constant b = return $ Const $ NodeC tagArrow [a,b]
     constant e | Just (a,_) <- from_unsafeCoerce e = constant a
@@ -761,6 +764,8 @@ compile' dataTable cenv (tvr,as,e) = cr e >>= \x -> return (nn,(Tup (map toVal a
         return $  NodeC tagArrow (args [x,y])
     con v@(ELit (LitCons n es _))
         | conAlias cons = error $ "Alias still exists: " ++ show v
+        | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = do
+            return (Tup (args es))
         | length es == nargs  = do
             return ((NodeC cn (args es)))
         | nameType n == TypeConstructor && length es < nargs = do

@@ -91,9 +91,9 @@ collectOcc sopts  e = (e',fvs,occ) where
             (lb,ds'') = findLoopBreakers (\ (_,(e,_,_)) -> loopFunc e) gr'
             cycNodes = Set.fromList $ [ v | (v,_) <- cyclicNodes gr']
             calcStrictInfo t e
-                | t `Set.member` cycNodes = NoStrict
-                | Just (Strict.S _) <- Map.lookup (tvrNum t) (so_strictness sopts) = Strict
-                | otherwise = NoStrict
+                | t `Set.member` cycNodes = Strict.L
+                | Just s <- Map.lookup (tvrNum t) (so_strictness sopts) = s
+                | otherwise = Strict.L
         let dvars = map (tvrNum . fst) ds
             fvs = foldr Set.delete (mconcat (fve:[ fv `mappend` freeVars t | (TVr { tvrType =  t},(_,fv,_)) <- ds'' ])) dvars
             finalS = Map.union (Map.fromList [(n,LoopBreaker) | (TVr { tvrIdent = n },_) <- lb ]) $   foldl andOM se ([ s | (_,(_,_,s)) <- ds'' ])
