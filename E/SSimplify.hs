@@ -434,8 +434,10 @@ simplify sopts e = (e'',stat,occ) where
 
     forceInline x
         | not (fopts FO.InlinePragmas) = False
-        | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_INLINE p
+        | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_INLINE p  || Set.member prop_WRAPPER p
 
+    forceNoinline x
+        | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_NOINLINE p || Set.member prop_WORKER p
 
     applyRule v xs  = do
         z <- builtinRule v xs
@@ -443,7 +445,7 @@ simplify sopts e = (e'',stat,occ) where
             Nothing | fopts FO.Rules -> applyRules (Info.fetch (tvrInfo v)) xs
             x -> return x
 
-    h (EVar v) xs' inb | Properties p <- Info.fetch (tvrInfo v), Set.member prop_NOINLINE p = do
+    h (EVar v) xs' inb | forceNoinline v = do
         z <- applyRule v xs'
         case z of
             Just (x,xs) -> h x xs inb

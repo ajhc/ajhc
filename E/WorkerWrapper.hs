@@ -21,6 +21,7 @@ topLike _ = False
 wrapable (Fun x) (ELam _ e) = f x e where
     f (Fun x) (ELam _ e) = f x e
     f (Tup _) _ = True
+    f (Tag [_]) _ = True
     f _ _ = False
 wrapable _ _ = False
 
@@ -49,6 +50,7 @@ workWrap dataTable tvr e | wrapable cpr e = ans where
     (cname,args,body) = f cpr e []
     f (Fun x) (ELam a e) as = f x e (a:as)
     f (Tup n) e as = (n,reverse as,e)
+    f (Tag [n]) e as = (n,reverse as,e)
     f x y z = error $ show (x,y,z)
 workWrap _dataTable tvr e = [(tvr,e)]
 
