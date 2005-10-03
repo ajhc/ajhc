@@ -11,6 +11,7 @@ import E.FreeVars
 import Name
 import qualified Doc.Chars as C
 import qualified Info.Info as Info
+import Binary
 
 newtype Env = Env (Map.Map TVr Val)
     deriving(Monoid)
@@ -22,6 +23,7 @@ data Val =
     | Tag [Name]  -- A nullary constructor, like True, False
     | Bot         -- the bottom
     deriving(Eq,Ord,Typeable)
+    {-! derive: GhcBinary !-}
 
 instance Show Val where
     showsPrec _ Top = C.top

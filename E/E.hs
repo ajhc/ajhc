@@ -17,7 +17,7 @@ import C.Prims
 import Char(chr)
 import Data.Monoid
 import Number
-import Info.Binary()
+import {-# SOURCE #-} Info.Binary(putInfo,getInfo)
 import qualified Info.Info as Info
 
 
@@ -112,20 +112,20 @@ instance Binary TVr where
     put_ bh (TVr { tvrIdent = 0, tvrType =  e, tvrInfo = nf} ) = do
         put_ bh (TvrBinaryNone)
         put_ bh e
-        put_ bh nf
+        putInfo bh nf
     put_ bh (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) | Just x <- intToAtom i = do
         put_ bh (TvrBinaryAtom x)
         put_ bh e
-        put_ bh nf
+        putInfo bh nf
     put_ bh (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) = do
         unless (even i) $ fail "number not even"
         put_ bh (TvrBinaryInt i)
         put_ bh e
-        put_ bh nf
+        putInfo bh nf
     get bh = do
         (x ) <- get bh
         e <- get bh
-        nf <- get bh
+        nf <- getInfo bh
         case x of
             TvrBinaryNone -> return $ TVr 0 e nf
             TvrBinaryAtom a -> return $ TVr (atomIndex a) e nf

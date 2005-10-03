@@ -1,4 +1,4 @@
-module Info.Binary() where
+module Info.Binary(putInfo, getInfo) where
 
 import Data.Dynamic
 import qualified Data.Map as Map
@@ -8,6 +8,8 @@ import Binary
 import GenUtil
 import Info.Info
 import Info.Types
+import E.CPR
+
 
 
 data Binable = forall a . (Typeable a, Binary a, Show a) => Binable a
@@ -23,7 +25,9 @@ cb x = (createTyp x, Binable x)
 
 binTable = Map.fromList [
     cb (u :: Properties),
-    cb (u :: ExportStatus)
+    cb (u :: ExportStatus),
+    cb (u :: E.CPR.Val)
+ --   cb (u :: E.Strictness.SA)
     ]
 
 
@@ -46,20 +50,23 @@ getDyn h = do
             return $ newEntry ps x
 
 instance Binary Info where
-    put_ h (Info ds) = do
-        let ds' = concatMap (\d -> do
-                let ps = entryType d
-                x <- Map.lookup ps binTable
-                return (ps,entryThing d,x)
-              )  (Map.elems ds)
-        put_ h (length ds')
-        mapM_ (putDyn h) ds'
-    get h = do
-        (n::Int) <- get h
-        xs <- replicateM n (getDyn h)
-        return (Info $ Map.fromList [ (entryType x, x) | x <- xs])
+    put_ h nfo = putInfo h nfo
+    get h = getInfo h
 
 
+putInfo h (Info ds) = do
+    let ds' = concatMap (\d -> do
+            let ps = entryType d
+            x <- Map.lookup ps binTable
+            return (ps,entryThing d,x)
+          )  (Map.elems ds)
+    put_ h (length ds')
+    mapM_ (putDyn h) ds'
+
+getInfo h = do
+    (n::Int) <- get h
+    xs <- replicateM n (getDyn h)
+    return (Info $ Map.fromList [ (entryType x, x) | x <- xs])
 
 
 
