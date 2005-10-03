@@ -33,6 +33,7 @@ import Util.SameShape
 
 
 doLetRec stats [] e = return e
+doLetRec stats ds _ | hasRepeatUnder fst ds = error "doLetRec: repeated variables!"
 doLetRec stats ds e = do
     return $ ELetRec ds e
     {-

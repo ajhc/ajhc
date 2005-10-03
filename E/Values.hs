@@ -31,6 +31,8 @@ ltTuple ts = ELit $ LitCons (nameTuple TypeConstructor (length ts)) ts eStar
 ltTuple' ts = ELit $ LitCons (unboxedNameTuple TypeConstructor (length ts)) ts eHash
 
 
+unboxedTuple es =  LitCons (unboxedNameTuple DataConstructor (length es)) es (ltTuple' ts) where
+    ts = map getType es
 
 class ToE a where
     toE :: a -> E
@@ -104,7 +106,9 @@ eLet TVr { tvrIdent = 0 } _ = id
 eLet t@(TVr { tvrType =  ty}) e | sortStarLike ty && isAtomic e = subst t e
 eLet t e = ELetRec [(t,e)]
 
-
+-- | strict version of let, evaluates argument before assigning it.
+eStrictLet t@(TVr { tvrType =  ty }) v e | sortStarLike ty && isAtomic v = subst t v e
+eStrictLet t v e = ECase v t [] (Just e)
 
 
 isLifted x = sortTermLike x
@@ -118,8 +122,6 @@ whnfOrBot e = isAtomic e
 
 safeToDup e = whnfOrBot e || isELam e || isEPi e
 
-eStrictLet t@(TVr { tvrType =  ty }) v e | sortStarLike ty && isAtomic v = subst t v e
-eStrictLet t v e = ECase v t [] (Just e)
 
 tTag = rawType "tag#"
 vTag n = ELit $ LitCons n [] tTag

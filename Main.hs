@@ -139,70 +139,87 @@ processDecls ::
     -> TiData -- ^ front end output
     -> IO Ho  -- ^ final haskell object file
 processDecls stats ho ho' tiData = do
-    --mapM_ print [ (EVar t) | (t,_) <- (Map.elems (hoEs ho))]
-
+    -- some useful values
     let allHo = ho `mappend` ho'
-
-    let isExported n | "Instance@" `isPrefixOf` show n = True
+        isExported n | "Instance@" `isPrefixOf` show n = True
         isExported n = n `Set.member` exports
         exports = Set.fromList $ concat $ Map.elems (hoExports ho')
-    let decls = concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ] ++ Map.elems (tiDataLiftedInstances tiData)
+        decls = concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ] ++ Map.elems (tiDataLiftedInstances tiData)
+
+    -- build datatables
     let dataTable = toDataTable (Map.fromList $[ (toName TypeConstructor x,y) | (x,y)<- Map.toList (hoKinds ho')] ) (tiAllAssumptions tiData) decls
-    let fullDataTable =  (dataTable `mappend` hoDataTable ho)
+    let fullDataTable = (dataTable `mappend` hoDataTable ho)
+    wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
+
+    -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
     ds <- convertDecls (hoClassHierarchy ho') allAssumps  fullDataTable decls
-    wdump FD.Progress $ do
-        putErrLn $ show (length ds) ++ " declarations converted."
+
+    -- Build rules
     rules <- createInstanceRules (hoClassHierarchy ho' `mappend` hoClassHierarchy initialHo)   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
     let allRules = hoRules ho `mappend` rules
-    wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
+
+    -- some more useful values including reachable names
     let inscope =  [ tvrNum n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrNum n | (_,n,_) <- ds ] ++ map tvrNum (methodNames (hoClassHierarchy allHo))
     let mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
-    let doopt' = doopt mangle
+    let reached = Set.fromList [ tvrNum b | (_,b,_) <- reachable graph  [ tvrNum b | (n,b,_) <- ds, isExported n]]
+        graph =  (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c))
+        (_,dog)  = findLoopBreakers (const 0) graph
+
+    -- This is the main function that processes the E's before passing them into the ho file.
     let f (ds,(smap,annmap)) (n,v,lc) = do
         wdump FD.Lambdacube $ putErrLn (show n)
-        let g (TVr { tvrIdent = 0 }) = error "absurded zero"
-            g tvr@(TVr { tvrIdent = n, tvrType = k})
-                | sortStarLike k =  tAbsurd k
-                | otherwise = EVar tvr
+        lc <- postProcessE stats n inscope fullDataTable lc
         nfo <- idann (hoRules ho') (hoProps ho') (tvrIdent v) (tvrInfo v)
         v <- return  v { tvrInfo = nfo }
-        fvs <- return $ foldr IM.delete (freeVars lc)  inscope
-        when (IM.size fvs > 0) $ do
-            putDocM putErr $ parens $ text "Absurded vars:" <+> align (hsep $ map pprint (IM.elems fvs))
         lc <- mangle False ("Annotate") (annotate annmap (idann (hoRules allHo) (hoProps allHo)) letann lamann) lc
-        lc <- mangle False ("Absurdize") (return . substMap (IM.map g fvs)) lc
-        lc <- mangle False ("Barendregt: " ++ show n) (return . barendregt) lc
-        lc <- mangle False "deNewtype" (return . deNewtype fullDataTable) lc
-        lc <- doopt' False stats "FixupLets..." (\stats x -> atomizeApps stats x >>= coalesceLets stats)  lc
         lc <- mangle False ("Barendregt: " ++ show n) (return . barendregt) lc
         let cm stats e = do
             let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
             let (e',stat,occ) = SS.simplify sopt e
             Stats.tickStat stats stat
             return e'
-        lc <- doopt' False stats "Float Inward..." (\stats x -> return (floatInward allRules x))  lc
-        lc <- doopt' False stats "SuperSimplify" cm lc
+        lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x))  lc
+        lc <- doopt mangle False stats "SuperSimplify" cm lc
         wdump FD.Lambdacube $ printCheckName fullDataTable lc
         wdump FD.Progress $ putErr "."
         nfo <- letann lc (tvrInfo v)
-        nfo <- return $ if isExported n then Info.insert Exported nfo else nfo
+        nfo <- return $ if isExported n then setProperty prop_EXPORTED nfo else nfo
         v <- return $ v { tvrInfo = Info.insert LetBound nfo }
         return ((n,v,lc):ds, (Map.insert (tvrNum v) lc smap, Map.insert (tvrNum v) (Just (EVar v)) annmap))
-    let reached = Set.fromList [ tvrNum b | (_,b,_) <- reachable graph  [ tvrNum b | (n,b,_) <- ds, isExported n]]
-        graph =  (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c))
-        (_,dog)  = findLoopBreakers (const 0) graph
 
     let imap = annotateMethods (hoClassHierarchy allHo) allRules (hoProps allHo)
     let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))] `mappend` imap
     (ds,_) <- foldM f ([],(Map.fromList [ (tvrNum v,e) | (v,e) <- Map.elems (hoEs ho)], initMap)) [ x | x@(_,b,_) <- dog, tvrNum b `Set.member` reached ]
     wdump FD.Progress $ putErrLn "!"
 
-    let ds' = reachable (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c)) [ tvrNum b | (n,b,_) <- ds, isExported n]
-    wdump FD.Progress $ putErrLn $ "Functions culled: " ++ show (length ds - length ds')
+    let ds' = reachable (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c)) [ tvrNum b | (n,b,_) <- ds, getProperty prop_EXPORTED b]
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     return ho' { hoDataTable = dataTable, hoEs = Map.fromList [ (x,(y,z)) | (x,y,z) <- ds'], hoRules = rules }
 
+-- | take E directly generated from haskell source and bring it into line with
+-- expected invarients. this only needs be done once.  it replaces all
+-- ambiguous types with the absurd one, gets rid of all newtypes, does a basic
+-- renaming pass, and makes sure applications are only to atomic variables.
+
+postProcessE :: Stats.Stats -> Name -> [Id] -> DataTable -> E -> IO E
+postProcessE stats n inscope dataTable lc = do
+    let g (TVr { tvrIdent = 0 }) = error "absurded zero"
+        g tvr@(TVr { tvrIdent = n, tvrType = k})
+            | sortStarLike k =  tAbsurd k
+            | otherwise = EVar tvr
+    fvs <- return $ foldr IM.delete (freeVars lc)  inscope
+    when (IM.size fvs > 0 && dump FD.Progress) $ do
+        putDocM putErr $ parens $ text "Absurded vars:" <+> align (hsep $ map pprint (IM.elems fvs))
+    let mangle = mangle' (Just $ Set.fromList $ inscope) dataTable
+    lc <- mangle False ("Absurdize") (return . substMap (IM.map g fvs)) lc
+    lc <- mangle False "deNewtype" (return . deNewtype dataTable) lc
+    lc <- mangle False ("Barendregt: " ++ show n) (return . barendregt) lc
+    lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeApps stats x >>= coalesceLets stats)  lc
+    return lc
+
+getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
+shouldBeExported exports tvr =  tvrIdent tvr `Set.member` exports || getProperty prop_INSTANCE tvr || getProperty prop_SRCLOC_ANNOTATE_FUN tvr
 
 doopt mangle dmp stats name func lc = do
     stats' <- Stats.new
@@ -262,8 +279,13 @@ compileModEnv' stats ho = do
     lc <- opt "SuperSimplify" cm lc
 
     lc <- mangle dataTable True "Barendregt" (return . barendregt) lc
-    (lc,_) <- return $ E.CPR.cprAnalyze mempty lc
-    sequence_ [ putStrLn $ (tvrShowName t) <+> show (maybe E.CPR.Top id (Info.lookup (tvrInfo t)) ::  E.CPR.Val) | (t,_,_) <- scCombinators $ eToSC dataTable lc ]
+    --(lc@(ELetRec defs v),_) <- return $ E.CPR.cprAnalyze mempty lc
+    --lc <- return $ ELetRec (concatMap (uncurry $ workWrap dataTable) ds) v
+    --flip mapM_ defs $ \ (t,e) -> do
+    --    let xs = workWrap dataTable t e
+    --    when (length xs > 1) $ do
+    --        putStrLn (prettyE (ELetRec xs Unknown))
+    --sequence_ [ putStrLn $ (tvrShowName t) <+> show (maybe E.CPR.Top id (Info.lookup (tvrInfo t)) ::  E.CPR.Val) | (t,_,_) <- scCombinators $ eToSC dataTable lc ]
     lc <- if fopts FO.FloatIn then  opt "Float Inward..." (\stats x -> return (floatInward rules  x))  lc  else return lc
     vs <- if fopts FO.Strictness then (collectSolve lc) else return []
     mapM_ putErrLn $  sort [ tshow x <+> "->" <+> tshow y | (x@(E.Strictness.V i),y@Lam {}) <- vs, odd i]
