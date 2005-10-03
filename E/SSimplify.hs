@@ -190,8 +190,6 @@ dosub sub e = do
 
 simplify :: SimplifyOpts -> E -> (E,Stat, Map.Map TVr Occurance)
 simplify sopts e = (e'',stat,occ) where
-    exports = Set.fromList (so_exports sopts)
-    --(e',fvs,occ) = collectOcc (Set.toList exports) (so_rules sopts) (so_dataTable sopts)  e
     (e',fvs,occ) = collectOcc sopts  e
     addN = do
         addNames (map tvrNum $ Map.keys occ)

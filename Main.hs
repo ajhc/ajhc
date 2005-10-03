@@ -63,10 +63,6 @@ import Util.Graph
 ---------------
 
 
-printCheckName dataTable e = do
-    putErrLn  ( render $ hang 4 (pprint e <+> text "::") )
-    ty <- typecheck dataTable e
-    putErrLn  ( render $ hang 4 (pprint ty))
 
 
 bracketHtml action = do
@@ -97,7 +93,7 @@ processFiles [] | Just (b,m) <- optMainFunc options = do
     stats <- Stats.new
     me <- parseFiles [] [Module m] processInitialHo (processDecls stats)
     compileModEnv' stats me
-processFiles  fs = do
+processFiles fs = do
     stats <- Stats.new
     me <- parseFiles  fs [] processInitialHo (processDecls stats)
     compileModEnv' stats me
@@ -141,9 +137,6 @@ processDecls ::
 processDecls stats ho ho' tiData = do
     -- some useful values
     let allHo = ho `mappend` ho'
-        isExported n | "Instance@" `isPrefixOf` show n = True
-        isExported n = n `Set.member` exports
-        exports = Set.fromList $ concat $ Map.elems (hoExports ho')
         decls = concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ] ++ Map.elems (tiDataLiftedInstances tiData)
 
     -- build datatables
@@ -159,37 +152,42 @@ processDecls stats ho ho' tiData = do
     rules <- createInstanceRules (hoClassHierarchy ho' `mappend` hoClassHierarchy initialHo)   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
     let allRules = hoRules ho `mappend` rules
 
-    -- some more useful values including reachable names
+    -- some more useful values.
     let inscope =  [ tvrNum n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrNum n | (_,n,_) <- ds ] ++ map tvrNum (methodNames (hoClassHierarchy allHo))
-    let mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
-    let reached = Set.fromList [ tvrNum b | (_,b,_) <- reachable graph  [ tvrNum b | (n,b,_) <- ds, isExported n]]
-        graph =  (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c))
-        (_,dog)  = findLoopBreakers (const 0) graph
+        mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
+        exports = getExports ho'
 
-    -- This is the main function that processes the E's before passing them into the ho file.
-    let f (ds,(smap,annmap)) (n,v,lc) = do
-        wdump FD.Lambdacube $ putErrLn (show n)
+    -- initial pass over functions to put them into a normalized form
+    ds <- flip mapM ds $ \ (n,v,lc) -> do
         lc <- postProcessE stats n inscope fullDataTable lc
         nfo <- idann (hoRules ho') (hoProps ho') (tvrIdent v) (tvrInfo v)
-        v <- return  v { tvrInfo = nfo }
-        lc <- mangle False ("Annotate") (annotate annmap (idann (hoRules allHo) (hoProps allHo)) letann lamann) lc
-        lc <- mangle False ("Barendregt: " ++ show n) (return . barendregt) lc
+        v <- return $ v { tvrInfo = Info.insert LetBound nfo }
+        return (n, shouldBeExported exports v,lc)
+
+    -- This is the main function that optimizes the routines before writing them out
+    let f (ds,(smap,annmap)) (n,v,lc) = do
+        wdump FD.Lambdacube $ putErrLn ("----\n" ++ show n)
+        lc <- mangle (return ()) False ("Annotate") (annotate annmap (idann (hoRules allHo) (hoProps allHo)) letann lamann) lc
         let cm stats e = do
             let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
             let (e',stat,occ) = SS.simplify sopt e
             Stats.tickStat stats stat
             return e'
-        lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x))  lc
+        lc <- doopt mangle False stats "SuperSimplify" cm lc
+        lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
+        lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
         lc <- doopt mangle False stats "SuperSimplify" cm lc
         wdump FD.Lambdacube $ printCheckName fullDataTable lc
         wdump FD.Progress $ putErr "."
         nfo <- letann lc (tvrInfo v)
-        nfo <- return $ if isExported n then setProperty prop_EXPORTED nfo else nfo
-        v <- return $ v { tvrInfo = Info.insert LetBound nfo }
         return ((n,v,lc):ds, (Map.insert (tvrNum v) lc smap, Map.insert (tvrNum v) (Just (EVar v)) annmap))
 
+    -- preparing for optimization
     let imap = annotateMethods (hoClassHierarchy allHo) allRules (hoProps allHo)
-    let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))] `mappend` imap
+        initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))] `mappend` imap
+        reached = Set.fromList [ tvrNum b | (_,b,_) <- reachable graph  [ tvrNum b | (n,b,_) <- ds, getProperty prop_EXPORTED b]]
+        graph =  (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c))
+        (_,dog)  = findLoopBreakers (const 0) graph
     (ds,_) <- foldM f ([],(Map.fromList [ (tvrNum v,e) | (v,e) <- Map.elems (hoEs ho)], initMap)) [ x | x@(_,b,_) <- dog, tvrNum b `Set.member` reached ]
     wdump FD.Progress $ putErrLn "!"
 
@@ -212,25 +210,18 @@ postProcessE stats n inscope dataTable lc = do
     when (IM.size fvs > 0 && dump FD.Progress) $ do
         putDocM putErr $ parens $ text "Absurded vars:" <+> align (hsep $ map pprint (IM.elems fvs))
     let mangle = mangle' (Just $ Set.fromList $ inscope) dataTable
-    lc <- mangle False ("Absurdize") (return . substMap (IM.map g fvs)) lc
-    lc <- mangle False "deNewtype" (return . deNewtype dataTable) lc
-    lc <- mangle False ("Barendregt: " ++ show n) (return . barendregt) lc
+    lc <- mangle (return ()) False ("Absurdize") (return . substMap (IM.map g fvs)) lc
+    lc <- mangle (return ()) False "deNewtype" (return . deNewtype dataTable) lc
+    lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
     lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeApps stats x >>= coalesceLets stats)  lc
     return lc
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
-shouldBeExported exports tvr =  tvrIdent tvr `Set.member` exports || getProperty prop_INSTANCE tvr || getProperty prop_SRCLOC_ANNOTATE_FUN tvr
+shouldBeExported exports tvr
+    | tvrIdent tvr `Set.member` exports || getProperty prop_INSTANCE tvr || getProperty prop_SRCLOC_ANNOTATE_FUN tvr  = setProperty prop_EXPORTED tvr
+    | otherwise = tvr
 
-doopt mangle dmp stats name func lc = do
-    stats' <- Stats.new
-    lc <- mangle dmp name (func stats') lc
-    t' <- Stats.getTicks stats'
-    case t'  of
-        0 -> return lc
-        _ -> do
-            when ((dmp && dump FD.Progress) || dump FD.Pass) $ Stats.print "Optimization" stats'
-            Stats.combine stats stats'
-            doopt mangle dmp stats name func lc
+
 
 compileModEnv' stats ho = do
 
@@ -261,12 +252,11 @@ compileModEnv' stats ho = do
     let ds' = reachable (newGraph ds (tvrNum . fst) (\ (t,e) -> Set.toList $ freeVars e `mappend` freeVars (Info.fetch (tvrInfo t) :: ARules))) [tvrNum main]
 
     let lco = ELetRec ds'  (EVar main)
-    --typecheck dataTable lco
     wdump FD.Rules $ printRules rules
-    let mangle = mangle' (Just mempty)
+    let mangle = mangle'  (Just mempty)
     let opt = doopt (mangle dataTable) True stats
 
-    lc <- mangle dataTable True "Barendregt" (return . barendregt) lco
+    lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lco
     wdump FD.Progress $ printEStats lc
     let cm stats e = do
         let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable }
@@ -278,7 +268,7 @@ compileModEnv' stats ho = do
     lc <- return $ runIdentity $ annotate mempty (idann rules (hoProps ho) ) letann lamann lc
     lc <- opt "SuperSimplify" cm lc
 
-    lc <- mangle dataTable True "Barendregt" (return . barendregt) lc
+    lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lc
     --(lc@(ELetRec defs v),_) <- return $ E.CPR.cprAnalyze mempty lc
     --lc <- return $ ELetRec (concatMap (uncurry $ workWrap dataTable) ds) v
     --flip mapM_ defs $ \ (t,e) -> do
@@ -299,8 +289,8 @@ compileModEnv' stats ho = do
     let ELetRec ds _ = lc in mapM_ (\t -> putStrLn (prettyE (EVar t) <+> show (tvrInfo t))) (fsts ds)
 
     wdump FD.LambdacubeBeforeLift $ printCheckName dataTable lc
-    lc <- mangle dataTable True "LambdaLift" (lambdaLiftE stats dataTable) lc
-    lc <- mangle dataTable True  "FixupLets..." (\x -> atomizeApps stats x >>= coalesceLets stats)  lc
+    lc <- mangle dataTable (return ()) True "LambdaLift" (lambdaLiftE stats dataTable) lc
+    lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeApps stats x >>= coalesceLets stats)  lc
     wdump FD.Lambdacube $ printCheckName dataTable lc
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     wdump FD.Progress $ printEStats lc
@@ -370,18 +360,55 @@ compileModEnv' stats ho = do
         return ()
 
 
+mangle ::
+    DataTable                -- ^ the datatable used for typechecking
+    -> Maybe (Set.Set Id)    -- ^ acceptable free variables
+    -> String                -- ^ the name of the pass
+    -> Bool                  -- ^ whether to dump progress
+    -> Int                   -- ^ maximum number of passes to run. -1 for unlimited
+    -> Stats.Stats                 -- ^ the stats to add results to
+    -> (Stats.Stats -> E -> IO E)  -- ^ the modification routine
+    -> E                     -- ^ the input term
+    -> IO E                  -- ^ out it comes
+mangle dataTable fv name dumpProgress count stats action e = do
+    --when ((dumpProgress && dump FD.Progress) || dump FD.Pass) $ putErrLn $ "-- " ++ name
+    let opt 0 e = return e
+        opt n e = do
+            stats' <- Stats.new
+            e' <- mangle' fv dataTable (Stats.print "stats" stats') dumpProgress name (action stats') e
+            t <- Stats.getTicks stats'
+            case t of
+                0 -> return e'
+                _ -> do
+                    when ((dumpProgress && dump FD.Progress) || dump FD.Pass) $ Stats.print "Optimization" stats'
+                    Stats.combine stats stats'
+                    opt (n - 1) e'
+    opt count e
+
+-- these are way to complicated and should be simplified
+
+doopt mangle dmp stats name func lc = do
+    stats' <- Stats.new
+    lc <- mangle (Stats.print "stats" stats') dmp name (func stats') lc
+    t' <- Stats.getTicks stats'
+    case t'  of
+        0 -> return lc
+        _ -> do
+            when ((dmp && dump FD.Progress) || dump FD.Pass) $ Stats.print "Optimization" stats'
+            Stats.combine stats stats'
+            doopt mangle dmp stats name func lc
 
 
---mangle = mangle' (Just mempty)
-
-mangle' :: Maybe (Set.Set Int) -- ^ Acceptable free variables
-    -> DataTable
-    -> Bool    -- ^ Whether to dump progress
-    -> String      -- ^ Name of pass
-    -> (E -> IO E) -- ^ Mangling function
-    -> E           -- ^ What to mangle
-    -> IO E        -- ^ Out it comes
-mangle' fv dataTable b  s action e = do
+mangle' ::
+    Maybe (Set.Set Id)  -- ^ Acceptable free variables
+    -> DataTable        -- ^ The datatable needed for typechecking
+    -> IO ()            -- ^ run on error
+    -> Bool             -- ^ Whether to dump progress
+    -> String           -- ^ Name of pass
+    -> (E -> IO E)      -- ^ Mangling function
+    -> E                -- ^ What to mangle
+    -> IO E             -- ^ Out it comes
+mangle'  fv dataTable erraction b  s action e = do
     when ((b && dump FD.Progress) || dump FD.Pass) $ putErrLn $ "-- " ++ s
     e' <- action e
     if not flint then return e' else do
@@ -395,6 +422,7 @@ mangle' fv dataTable b  s action e = do
                 putDocM CharIO.putErr (ePretty e)
                 putErrLn $ "\n>>>After" <+> s
                 printEStats e'
+                erraction
                 --let (_,e'') = E.Diff.diff e e'
                 let e''' = findOddFreeVars xs e'
                 putDocM CharIO.putErr (ePrettyEx e''')
@@ -409,6 +437,7 @@ mangle' fv dataTable b  s action e = do
                 putDocM CharIO.putErr (ePretty e)
                 putErrLn $ "\n>>>After" <+> s
                 printEStats e'
+                erraction
                 let (_,e'') = E.Diff.diff e e'
                 putDocM CharIO.putErr (ePretty e'')
                 putErrLn $ "\n>>> internal error:\n" ++ unlines (tail ss)
@@ -427,6 +456,10 @@ typecheck dataTable e = case inferType dataTable [] e of
             False -> putErrDie "Type Error in E"
     Right v -> return v
 
+printCheckName dataTable e = do
+    putErrLn  ( render $ hang 4 (pprint e <+> text "::") )
+    ty <- typecheck dataTable e
+    putErrLn  ( render $ hang 4 (pprint ty))
 
 
 
