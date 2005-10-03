@@ -167,7 +167,6 @@ nameTuple _ n | n < 2 = error "attempt to create tuple of length < 2"
 nameTuple t n = toName t  $ (toTuple n:: (String,String)) -- Qual (HsIdent ("(" ++ replicate (n - 1) ',' ++ ")"))
 
 unboxedNameTuple t n = toName t $ "(#" ++ show n ++ "#)"
---unboxedNameTuple t n = toName t $ "(#": replicate (n - 1) ',' ++ "#)"
 
 fromUnboxedNameTuple n = case show n of
     '(':'#':xs | (ns@(_:_),"#)") <- span isDigit xs -> return (read ns::Int)

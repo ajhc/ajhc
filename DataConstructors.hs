@@ -82,12 +82,14 @@ instance HasSize DataTable where
     size (DataTable d) = Map.size d
 
 getConstructor :: Monad m => Name -> DataTable -> m Constructor
+getConstructor n _ | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = return $ snd $ tunboxedtuple v
+getConstructor n _ | Just v <- fromUnboxedNameTuple n, TypeConstructor <- nameType n = return $ fst $ tunboxedtuple v
 getConstructor n (DataTable map) = case Map.lookup n map of
     Just x -> return x
     Nothing -> fail $ "getConstructor: " ++ show n
 
 
-tunboxedtuple n = [typeCons,dataCons] where
+tunboxedtuple n = (typeCons,dataCons) where
         dataCons = Constructor {
             conName = dc,
             conType = tipe,
@@ -101,7 +103,7 @@ tunboxedtuple n = [typeCons,dataCons] where
            }
         typeCons = Constructor {
             conName = tc,
-            conType = eStar,
+            conType = eHash,
             conSlots = [],
             conDeriving = [],
             conExpr = tipe,

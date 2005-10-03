@@ -418,11 +418,6 @@ p3 = Var v3 (TyPtr TyNode)
 
 
 
-instance ConNames Val where
-    vTrue = NodeC (toAtom "CPrelude.True") []
-    vFalse = NodeC (toAtom "CPrelude.False") []
-    vUnit =  NodeC (toAtom "CPrelude.()") []
-    vOrdering x = NodeC (toAtom $ "CPrelude." ++ show x) []
 
 -- typechecking
 class HasType a where

@@ -1,4 +1,4 @@
-module Grin.Val(FromVal(..),ToVal(..),cChar,cInt,world__,pworld__) where
+module Grin.Val(FromVal(..),ToVal(..),cChar,cInt,tn_2Tup,world__,pworld__) where
 
 import Grin.Grin
 import Atom
@@ -11,6 +11,16 @@ cons =  (toAtom "CPrelude.:")
 
 cChar = toAtom "CPrelude.Char"
 cInt = toAtom "CPrelude.Int"
+tn_2Tup = toAtom "CPrelude.(,)"
+tn_True = toAtom "CPrelude.True"
+tn_False = toAtom "CPrelude.False"
+tn_unit = toAtom "CPrelude.()"
+
+instance ConNames Val where
+    vTrue = NodeC tn_True []
+    vFalse = NodeC tn_False []
+    vUnit =  NodeC tn_unit []
+    vOrdering x = NodeC (toAtom $ "CPrelude." ++ show x) []
 
 world__ = NodeC (toAtom "CJhc.IO.World__") []
 pworld__ = Const world__
@@ -40,13 +50,13 @@ instance ToVal a => ToVal [a] where
     toVal [] = NodeC nil []
     toVal (x:xs) =  NodeC cons [Const (toVal x),Const (toVal xs)]
 instance  ToVal (Val,Val) where
-    toVal (x,y) = NodeC (toAtom "CPrelude.(,)") [x,y]
+    toVal (x,y) = NodeC tn_2Tup [x,y]
 
 instance ToVal Char where
     toVal c = NodeC cChar [toUnVal c]
     toUnVal c =   Lit (fromIntegral $ ord c) (Ty cChar)
 instance ToVal Int where
-    toVal c = NodeC (toAtom "CPredule.Int") [toUnVal c]
+    toVal c = NodeC cInt [toUnVal c]
     toUnVal c =  Lit (fromIntegral c) tIntzh
 
 
