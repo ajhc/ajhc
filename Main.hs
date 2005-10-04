@@ -19,7 +19,7 @@ import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
-import E.Annotate(annotate)
+import E.Annotate(annotate,annotateDs)
 import E.Arbitrary()
 import E.Diff
 import E.E
@@ -165,31 +165,37 @@ processDecls stats ho ho' tiData = do
     (ds,allIds) <- foldM procE ([],hoUsedIds ho) ds
 
     -- This is the main function that optimizes the routines before writing them out
-    let f (ds,(smap,annmap)) (n,v,lc) = do
-        wdump FD.Lambdacube $ putErrLn ("----\n" ++ show n)
-        wdump FD.Lambdacube $ printCheckName fullDataTable lc
-        lc <- mangle (return ()) False ("Annotate") (annotate annmap (idann (hoRules allHo) (hoProps allHo)) letann lamann) lc
-        let cm stats e = do
-            let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
-            let (e',stat,occ) = SS.simplify sopt e
-            Stats.tickStat stats stat
-            return e'
-        lc <- doopt mangle False stats "SuperSimplify" cm lc
-        lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
-        lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
-        lc <- doopt mangle False stats "SuperSimplify" cm lc
-        wdump FD.Lambdacube $ printCheckName fullDataTable lc
-        wdump FD.Progress $ putErr "."
-        nfo <- letann lc (tvrInfo v)
-        return ((n,v,lc):ds, (Map.insert (tvrNum v) lc smap, Map.insert (tvrNum v) (Just (EVar v)) annmap))
+    let f (ds,(smap,annmap)) (rec,ns) = do
+        let names = [ n | (n,_,_) <- ns]
+        wdump FD.Lambdacube $ putErrLn ("----\n" ++ show names)
+        cds <- annotateDs annmap (idann (hoRules allHo) (hoProps allHo)) letann lamann [ (t,e) | (_,t,e) <- ns]
+        cds <- flip mapM (zip names cds) $ \ (n,(v,lc)) -> do
+            let cm stats e = do
+                let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
+                let (e',stat,occ) = SS.simplify sopt e
+                Stats.tickStat stats stat
+                return e'
+            lc <- doopt mangle False stats "SuperSimplify" cm lc
+            lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
+            lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
+            lc <- doopt mangle False stats "SuperSimplify" cm lc
+            wdump FD.Lambdacube $ printCheckName fullDataTable lc
+            return (v,lc)
+            --return ((n,v,lc):ds, (Map.insert (tvrNum v) lc smap, Map.insert (tvrNum v) (Just (EVar v)) annmap))
+        cds <- return $ fst (E.CPR.cprAnalyzeBinds mempty cds)
+        cds <- annotateDs annmap (\_ -> return) letann lamann cds
+        let nvls = [ (n,t,e) | n <- names | (t,e) <- cds ]
+
+        wdump FD.Progress $ putErr (if rec then "*" else ".")
+        return (nvls ++ ds, (Map.fromList [ (tvrIdent v,lc) | (_,v,lc) <- nvls] `mappend` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (_,v,_) <- nvls] `mappend` annmap ) )
 
     -- preparing for optimization
     let imap = annotateMethods (hoClassHierarchy allHo) allRules (hoProps allHo)
         initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))] `mappend` imap
-        reached = Set.fromList [ tvrNum b | (_,b,_) <- reachable graph  [ tvrNum b | (n,b,_) <- ds, getProperty prop_EXPORTED b]]
         graph =  (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c))
-        (_,dog)  = findLoopBreakers (const 0) graph
-    (ds,_) <- foldM f ([],(Map.fromList [ (tvrNum v,e) | (v,e) <- Map.elems (hoEs ho)], initMap)) [ x | x@(_,b,_) <- dog, tvrNum b `Set.member` reached ]
+        fscc (Left n) = (False,[n])
+        fscc (Right ns) = (True,ns)
+    (ds,_) <- foldM f ([],(Map.fromList [ (tvrNum v,e) | (v,e) <- Map.elems (hoEs ho)], initMap)) (map fscc $ scc graph)
     wdump FD.Progress $ putErrLn "!"
 
 
@@ -290,7 +296,7 @@ compileModEnv' stats ho = do
         return e'
     lc <- opt "SuperSimplify" cm lc
 
-    -- let ELetRec ds _ = lc in mapM_ (\t -> putStrLn (prettyE (EVar t) <+> show (tvrInfo t))) (fsts ds)
+    let ELetRec ds _ = lc in mapM_ (\t -> putStrLn (prettyE (EVar t) <+> show (tvrInfo t))) (fsts ds)
 
     wdump FD.LambdacubeBeforeLift $ printCheckName dataTable lc
     finalStats <- Stats.new

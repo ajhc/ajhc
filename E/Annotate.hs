@@ -12,7 +12,17 @@ import GenUtil
 import Info.Info as Info
 import Info.Types
 
+annotateDs :: Monad m =>
+    (Map.Map Id (Maybe E))
+    -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
+    -> (E -> Info -> m Info) -- ^ annotate letbound bindings
+    -> (E -> Info -> m Info) -- ^ annotate lambdabound bindings
+    -> [(TVr,E)]            -- ^ terms to annotate
+    -> m [(TVr,E)]
 
+annotateDs imap idann letann lamann ds = do
+    ELetRec ds' Unknown <- annotate imap idann letann lamann (ELetRec ds Unknown)
+    return ds'
 
 annotate :: Monad m =>
     (Map.Map Id (Maybe E))
