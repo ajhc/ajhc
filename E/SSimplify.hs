@@ -445,7 +445,7 @@ simplify sopts e = (e'',stat,occ) where
         | Properties p <- Info.fetch (tvrInfo x) =  Set.member prop_SUPERINLINE p
 
     forceNoinline x
-        | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_NOINLINE p || Set.member prop_WORKER p
+        | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_NOINLINE p -- || Set.member prop_WORKER p
 
     applyRule v xs  = do
         z <- builtinRule v xs

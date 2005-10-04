@@ -86,7 +86,7 @@ getConstructor n _ | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameTy
 getConstructor n _ | Just v <- fromUnboxedNameTuple n, TypeConstructor <- nameType n = return $ fst $ tunboxedtuple v
 getConstructor n (DataTable map) = case Map.lookup n map of
     Just x -> return x
-    Nothing -> fail $ "getConstructor: " ++ show n
+    Nothing -> fail $ "getConstructor: " ++ show (nameType n,n)
 
 
 tunboxedtuple n = (typeCons,dataCons) where

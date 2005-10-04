@@ -6,6 +6,7 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Monoid
 import List hiding(group)
+import Maybe
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.IntMap as IM
 import qualified Data.Map as Map
@@ -179,12 +180,28 @@ processDecls stats ho ho' tiData = do
             lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
             lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             lc <- doopt mangle False stats "SuperSimplify" cm lc
-            wdump FD.Lambdacube $ printCheckName fullDataTable lc
+            --wdump FD.Lambdacube $ printCheckName' fullDataTable lc
             return (v,lc)
             --return ((n,v,lc):ds, (Map.insert (tvrNum v) lc smap, Map.insert (tvrNum v) (Just (EVar v)) annmap))
         cds <- return $ fst (E.CPR.cprAnalyzeBinds mempty cds)
+        cds' <- return $ concatMap (uncurry (workWrap fullDataTable)) cds
+        let wws = length cds' - length cds
+        wdump FD.Progress $ putErr (replicate wws 'w')
+        cds <- flip mapM (cds') $ \ (v,lc) -> do
+            let cm stats e = do
+                let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
+                let (e',stat,occ) = SS.simplify sopt e
+                Stats.tickStat stats stat
+                return e'
+            lc <- mangle (return ()) False ("Barendregt: ") (return . barendregt) lc
+            lc <- doopt mangle False stats "SuperSimplify" cm lc
+            --lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
+            --lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
+            --lc <- doopt mangle False stats "SuperSimplify" cm lc
+            wdump FD.Lambdacube $ printCheckName' fullDataTable v lc
+            return (v,lc)
         cds <- annotateDs annmap (\_ -> return) letann lamann cds
-        let nvls = [ (n,t,e) | n <- names | (t,e) <- cds ]
+        let nvls = [ (fromJust (fromId (tvrIdent t)),t,e)  | (t,e) <- cds ]
 
         wdump FD.Progress $ putErr (if rec then "*" else ".")
         return (nvls ++ ds, (Map.fromList [ (tvrIdent v,lc) | (_,v,lc) <- nvls] `mappend` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (_,v,_) <- nvls] `mappend` annmap ) )
@@ -301,6 +318,7 @@ compileModEnv' stats ho = do
     wdump FD.LambdacubeBeforeLift $ printCheckName dataTable lc
     finalStats <- Stats.new
     lc <- mangle dataTable (return ()) True "LambdaLift" (lambdaLiftE finalStats dataTable) lc
+    lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeApps mempty finalStats x >>= coalesceLets finalStats)  lc
     let SC v rs = eToSC dataTable lc
 
     rs' <- flip mapM rs $ \ (t,ls,e) -> do
@@ -315,7 +333,6 @@ compileModEnv' stats ho = do
 
     lc <- return $ scToE (SC v rs')
 
-    --lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeApps mempty stats x >>= coalesceLets stats)  lc
     wdump FD.Lambdacube $ printCheckName dataTable lc
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     wdump FD.Progress $ printEStats lc
@@ -481,10 +498,15 @@ typecheck dataTable e = case inferType dataTable [] e of
             False -> putErrDie "Type Error in E"
     Right v -> return v
 
+
 printCheckName dataTable e = do
     putErrLn  ( render $ hang 4 (pprint e <+> text "::") )
     ty <- typecheck dataTable e
-    putErrLn  ( render $ hang 4 (pprint ty))
+    putErrLn  ( render $ indent 4 (pprint ty))
 
+printCheckName' dataTable tvr e = do
+    putErrLn  ( render $ hang 4 (pprint tvr <+> equals <+> pprint e <+> text "::") )
+    ty <- typecheck dataTable e
+    putErrLn  ( render $ indent 4 (pprint ty))
 
 
