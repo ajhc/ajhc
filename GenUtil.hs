@@ -1,5 +1,5 @@
 
---  $Id: GenUtil.hs,v 1.45 2005/09/30 04:57:28 john Exp $
+--  $Id: GenUtil.hs,v 1.46 2005/10/04 07:01:10 john Exp $
 -- arch-tag: 835e46b7-8ffd-40a0-aaf9-326b7e347760
 
 
@@ -43,7 +43,7 @@ module GenUtil(
     -- ** Random routines
     repMaybe,
     liftT2, liftT3, liftT4,
-    snub, snubFst, sortFst, groupFst, foldl',
+    snub, snubFst, snubUnder, smerge, sortFst, groupFst, foldl',
     fmapLeft,fmapRight,isDisjoint,isConjoint,
     groupUnder,
     sortUnder,
@@ -134,6 +134,10 @@ snub = map head . group . sort
 snubFst :: Ord a => [(a,b)] -> [(a,b)]
 snubFst = map head . groupBy (\(x,_) (y,_) -> x == y) . sortBy (\(x,_) (y,_) -> compare x y)
 
+-- | sorted nub of list based on function of values
+snubUnder :: Ord b => (a -> b) -> [a] -> [a]
+snubUnder f = map head . groupUnder f . sortUnder f
+
 -- | sort list of tuples, based on first element of each tuple.
 sortFst :: Ord a => [(a,b)] -> [(a,b)]
 sortFst = sortBy (\(x,_) (y,_) -> compare x y)
@@ -148,6 +152,15 @@ groupUnder f = groupBy (\x y -> f x == f y)
 -- | sort a list based on a function of the values.
 sortUnder :: Ord b => (a -> b) -> [a] -> [a]
 sortUnder f = sortBy (\x y -> f x `compare` f y)
+
+-- | merge sorted lists in linear time
+smerge :: Ord a => [a] -> [a] -> [a]
+smerge (x:xs) (y:ys)
+    | x == y = x:smerge xs ys
+    | x < y = x:smerge xs (y:ys)
+    | otherwise = y:smerge (x:xs) ys
+smerge [] ys = ys
+smerge xs [] = xs
 
 sortGroupUnder :: Ord a => (b -> a) -> [b] -> [[b]]
 sortGroupUnder f = groupUnder f . sortUnder f
@@ -687,5 +700,6 @@ getPrefix a b = f a b where
     f (p:ps) (s:ss)
         | p == s = f ps ss
         | otherwise = fail $ "getPrefix: " ++ a ++ " " ++ b
+
 
 

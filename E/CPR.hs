@@ -5,13 +5,14 @@ import Data.Generics
 import Data.Monoid()
 import qualified Data.Map as Map
 
+import Binary
 import Doc.DocLike
 import E.E
 import E.FreeVars
+import GenUtil
 import Name
 import qualified Doc.Chars as C
 import qualified Info.Info as Info
-import Binary
 
 newtype Env = Env (Map.Map TVr Val)
     deriving(Monoid)
@@ -52,14 +53,6 @@ instance Monoid Val where
     mempty = Bot
     mappend = lub
 
-
-smerge :: Ord a => [a] -> [a] -> [a]
-smerge (x:xs) (y:ys)
-    | x == y = x:smerge xs ys
-    | x < y = x:smerge xs (y:ys)
-    | otherwise = y:smerge (x:xs) ys
-smerge [] ys = ys
-smerge xs [] = xs
 
 cprAnalyzeBinds :: Env -> [(TVr,E)] -> ([(TVr,E)],Env)
 cprAnalyzeBinds env bs = f env  (decomposeDefns bs) [] where

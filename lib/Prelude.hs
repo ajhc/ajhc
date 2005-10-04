@@ -377,7 +377,7 @@ undefined = error "Prelude.undefined"
 
 -- Basic combinators
 
-{-# INLINE id, const, (.), ($), ($!), flip #-}
+{-# SUPERINLINE id, const, (.), ($), ($!), flip #-}
 
 id x = x
 const x _ = x
@@ -434,7 +434,7 @@ until p f x
 -- as an infix operator, and its typing forces its first argument
 -- (which is usually overloaded) to have the same type as the second.
 
-{-# INLINE asTypeOf #-}
+{-# SUPERINLINE asTypeOf #-}
 asTypeOf         :: a -> a -> a
 asTypeOf         =  const
 
@@ -495,7 +495,7 @@ concatMap f = foldr ((++) . f) []
 -- rather than the beginning.
 
 
-{-# INLINE head, tail, null #-}
+{-# SUPERINLINE head, tail, null #-}
 head             :: [a] -> a
 head (x:_)       =  x
 head []          =  error "Prelude.head: empty list"
@@ -813,7 +813,7 @@ unzip3           :: [(a,b,c)] -> ([a],[b],[c])
 unzip3           =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
                           ([],[],[])
 
-
+-- We don't inline this so there is a better chance calls to it will be recognized as bottom
 
 {-# NOINLINE error #-}
 error s = unsafePerformIO $ do

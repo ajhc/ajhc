@@ -38,6 +38,7 @@ instance Show Properties where
 
 -- These are set by user pragmas
 prop_INLINE = toAtom "INLINE"
+prop_SUPERINLINE = toAtom "SUPERINLINE"
 prop_NOINLINE = toAtom "NOINLINE"
 prop_SRCLOC_ANNOTATE = toAtom "SRCLOC_ANNOTATE"
 

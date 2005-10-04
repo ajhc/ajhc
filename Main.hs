@@ -167,9 +167,10 @@ processDecls stats ho ho' tiData = do
     -- This is the main function that optimizes the routines before writing them out
     let f (ds,(smap,annmap)) (n,v,lc) = do
         wdump FD.Lambdacube $ putErrLn ("----\n" ++ show n)
+        wdump FD.Lambdacube $ printCheckName fullDataTable lc
         lc <- mangle (return ()) False ("Annotate") (annotate annmap (idann (hoRules allHo) (hoProps allHo)) letann lamann) lc
         let cm stats e = do
-            let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
+            let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
             let (e',stat,occ) = SS.simplify sopt e
             Stats.tickStat stats stat
             return e'
@@ -261,7 +262,7 @@ compileModEnv' stats ho = do
     lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lco
     wdump FD.Progress $ printEStats lc
     let cm stats e = do
-        let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable }
+        let sopt = mempty { SS.so_superInline = True, SS.so_rules = rules, SS.so_dataTable = dataTable }
         let (e',stat,occ) = SS.simplify sopt e
         Stats.tickStat stats stat
         return e'

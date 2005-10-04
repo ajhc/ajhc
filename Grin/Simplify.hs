@@ -1,18 +1,19 @@
 module Grin.Simplify(simplify) where
 
+import Control.Monad.Identity
+import Control.Monad.State
+import Control.Monad.Trans
+import Data.Map as Map
+import Data.Monoid
+import Data.Set as Set
+import List
+
+import Atom
+import FreeVars
 import Grin.Grin
 import Grin.Whiz
-import Control.Monad.State
-import Stats
-import Data.Map as Map
-import Data.Set as Set
-import FreeVars
-import Data.Monoid
 import MonoidUtil()
-import List
-import Atom
-import GenUtil
-import Control.Monad.Identity
+import Stats
 
 -- perform a number of simple simplifications.
 -- inline very small and builtin-wrapper functions
@@ -20,8 +21,6 @@ import Control.Monad.Identity
 -- CSE / constant propegation
 -- dispose of code unreachable via Error
 
-import Control.Monad.State
-import Control.Monad.Trans
 
 at_OptSimplifyInline  = toAtom "Optimize.simplify.inline"
 at_OptSimplifyCopyProp  = toAtom "Optimize.simplify.copy-propagate"

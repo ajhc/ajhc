@@ -6,6 +6,7 @@ import Data.FunctorM
 import Data.Generics
 import Data.Monoid
 import List
+import Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -154,6 +155,7 @@ orMany xs = if all (== Once) xs then ManyBranch else Many
 
 
 data SimplifyOpts = SimpOpts {
+    so_superInline :: Bool,
     so_boundVars :: Map.Map Int E,
     so_properties :: Map.Map Name [Atom],
     so_rules :: Rules,
@@ -266,13 +268,13 @@ simplify sopts e = (e'',stat,occ) where
                     Nothing -> return (tvrNum t,Many,t',e)
                     -- Nothing -> error $ "No Occurance info for " ++ show t
             w ((t,Once,t',e):rs) sub inb ds = do
-                mtick $ "E.Simplify.inline.Once.{" ++ tvrShowName (tVr t Unknown) ++ "}"
+                mtick $ "E.Simplify.inline.Once.{" ++ showName t ++ "}"
                 w rs (Map.insert t (Susp e sub) sub) inb ds
             w ((t,n,t',e):rs) sub inb ds = do
                 e' <- f e sub inb
                 case isAtomic e' && n /= LoopBreaker of
                     True -> do
-                        when (n /= Unused) $ mtick $ "E.Simplify.inline.Atomic.{" ++ tvrShowName (tVr t Unknown) ++ "}"
+                        when (n /= Unused) $ mtick $ "E.Simplify.inline.Atomic.{" ++ showName t ++ "}"
                         w rs (Map.insert t (Done e') sub) (envInScope_u (Map.insert (tvrNum t') (IsBoundTo n e')) inb) ((t',e'):ds)
                     -- False | worthStricting e', Strict <- Info.lookup (tvrInfo t') -> w rs sub
                     False -> w rs sub (if n /= LoopBreaker then (envInScope_u (Map.insert (tvrNum t') (IsBoundTo n e')) inb) else inb) ((t',e'):ds)
@@ -311,6 +313,8 @@ simplify sopts e = (e'',stat,occ) where
                     return $ eLetRec nds  e'
                   -}
     g e _ _ = error $ "SSimplify.simplify.g: " ++ show e
+    showName t | odd t = tvrShowName (tVr t Unknown)
+             | otherwise = "(epheremal)"
 
     nname tvr@(TVr { tvrIdent = n, tvrType =  t}) sub inb  = do
         t' <- dosub sub t
@@ -434,7 +438,11 @@ simplify sopts e = (e'',stat,occ) where
 
     forceInline x
         | not (fopts FO.InlinePragmas) = False
-        | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_INLINE p  || Set.member prop_WRAPPER p
+        | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_INLINE p  || Set.member prop_WRAPPER p || Set.member prop_SUPERINLINE p
+
+    forceSuperInline x
+        | not (fopts FO.InlinePragmas) = False
+        | Properties p <- Info.fetch (tvrInfo x) =  Set.member prop_SUPERINLINE p
 
     forceNoinline x
         | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_NOINLINE p || Set.member prop_WORKER p
@@ -444,6 +452,24 @@ simplify sopts e = (e'',stat,occ) where
         case z of
             Nothing | fopts FO.Rules -> applyRules (Info.fetch (tvrInfo v)) xs
             x -> return x
+
+    h v xs' inb  | so_superInline sopts, si@(_:_) <- [ (tvr,fromJust body) | EVar tvr <- xs', forceSuperInline tvr, let body = haveBody tvr, isJust body ] = do
+        mapM_ (\v -> mtick  (toAtom $ "E.Simplify.inline.superforced.{" ++ tvrShowName v  ++ "}")) (fsts si)
+        let siName x = case fromId x of
+                Just y ->  [toId (toName Val ("SI@",'f':show y ++ "$" ++ show i)) | i <- [(1::Int)..] ]
+                Nothing -> [toId (toName Val ("SI@",'f':show x ++ "$" ++ show i)) | i <- [(1::Int)..] ]
+        zs <- flip mapM si $ \ (t,b) -> do
+            nn <- newNameFrom (siName (tvrIdent t))
+            let t' = unsetProperty prop_SUPERINLINE t { tvrIdent = nn }
+            return (t,t',subst t (EVar t') b)
+        let xs'' = map (substLet [ (t,EVar t') | (t,t',_) <- zs]) xs'
+        e <- app (v,xs'')
+        return (eLetRec [ (t',b) | (_,t',b) <- zs] e)
+       where
+            haveBody tvr = case Map.lookup (tvrIdent tvr) (envInScope inb) of
+                (Just (IsBoundTo _ e)) -> Just e
+                _ -> Nothing
+
 
     h (EVar v) xs' inb | forceNoinline v = do
         z <- applyRule v xs'
@@ -462,13 +488,13 @@ simplify sopts e = (e'',stat,occ) where
                     mtick  (toAtom $ "E.Simplify.inline.forced.{" ++ tvrShowName v  ++ "}")
                     didInline inb (e,xs')
                 Just (IsBoundTo OnceInLam e) | safeToDup e && someBenefit e xs' -> do
-                    mtick  (toAtom $ "E.Simplify.inline.OnceInLam.{" ++ tvrShowName v  ++ "}")
+                    mtick  (toAtom $ "E.Simplify.inline.OnceInLam.{" ++ showName (tvrIdent v)  ++ "}")
                     didInline inb (e,xs')
                 Just (IsBoundTo ManyBranch e) | multiInline e xs' -> do
-                    mtick  (toAtom $ "E.Simplify.inline.ManyBranch.{" ++ tvrShowName v  ++ "}")
+                    mtick  (toAtom $ "E.Simplify.inline.ManyBranch.{" ++ showName (tvrIdent v)  ++ "}")
                     didInline inb (e,xs')
                 Just (IsBoundTo Many e) | safeToDup e && multiInline e xs' -> do
-                    mtick  (toAtom $ "E.Simplify.inline.Many.{" ++ tvrShowName v  ++ "}")
+                    mtick  (toAtom $ "E.Simplify.inline.Many.{" ++ showName (tvrIdent v)  ++ "}")
                     didInline inb (e,xs')
                 Just _ -> app (EVar v,xs')
                 Nothing  -> app (EVar v,xs')

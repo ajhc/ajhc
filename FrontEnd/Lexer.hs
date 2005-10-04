@@ -570,6 +570,7 @@ pragmas_raw = [["OPTIONS", "JHC_OPTIONS", "OPTIONS_JHC" ]]
 -- pragmas for which we want to parse the insides of
 pragmas_std = [
     ["INLINE"],
+    ["SUPERINLINE"],
     ["NOINLINE","NOTINLINE"],
     ["SPECIALIZE", "SPECIALISE"],
     ["MULTISPECIALIZE", "MULTISPECIALISE"],

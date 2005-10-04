@@ -151,7 +151,7 @@ arules xs = ARules (sortUnder ruleNArgs (map f xs)) where
 
 instance Monoid ARules where
     mempty = ARules []
-    mappend (ARules a) (ARules b) = ARules (sortUnder ruleNArgs (a ++ b))
+    mappend (ARules a) (ARules b) = ARules (sortUnder ruleNArgs (snubUnder ruleName $ a ++ b))
 
 
 -- applyRules :: ARules -> [E] -> IO (Maybe (E,[E]))
