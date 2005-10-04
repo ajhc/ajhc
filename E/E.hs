@@ -256,7 +256,7 @@ eHash = ESort EHash
 
 
 sortLetDecls ds = sortBy f ds where
-    f (TVr { tvrIdent = i },_) (TVr { tvrIdent = j } ,_) = compare i j
+    f (TVr { tvrIdent = i },_) (TVr { tvrIdent = j } ,_) = compare (maybe (show i) show $ fromId i) (maybe (show j) show $ fromId j)
 
 ePi a b = EPi a b
 

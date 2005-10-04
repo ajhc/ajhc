@@ -58,9 +58,12 @@ data S = S { funcName :: Atom, topVars :: Set.Set Int, isStrict :: Bool, declEnv
     {-! derive: update !-}
 
 etaReduce :: E -> (E,Int)
-etaReduce (ELam t (EAp x (EVar t'))) | t == t' && not (tvrNum t `Set.member` freeVars x) = case etaReduce x of
-    (x',i) -> (x',i + 1)
-etaReduce e = (e,0)
+etaReduce e = case f e 0 of
+        (ELam {},_) -> (e,0)
+        x -> x
+    where
+        f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && not (tvrNum t `Set.member` freeVars x) = f x (n + 1)
+        f e n = (e,n)
 
 lambdaLift :: Stats -> DataTable -> SC -> IO SC
 lambdaLift stats dataTable sc = do
@@ -74,7 +77,7 @@ lambdaLift stats dataTable sc = do
         f e@(ELetRec ds _)  = do
             local (declEnv_u (ds ++)) $ do
                 let (ds',e') = decomposeLet e
-                h (concatMap G.fromScc ds') e' []
+                h ds' e' []
         f e = do
             st <- asks isStrict
             if (isELam e || (shouldLift e && not st)) then do
@@ -111,39 +114,58 @@ lambdaLift stats dataTable sc = do
                     | otherwise = f ss e x
                 fvs'' = reverse $ topSort $ newGraph fvs' tvrNum freeVars
             f ss e False
-        h ((t,e):ds) rest ds' | shouldLift e = do
+        h (Left (t,e):ds) rest ds' | shouldLift e = do
             (e,fvs'') <- pLift e
             case fvs'' of
                 [] -> doLift t e (h ds rest ds')
                 fs -> doBigLift e fs (\e'' -> h ds rest ((t,e''):ds'))
 
-        h ((t,e):ds) rest ds'  = do
+        h (Left (t,e):ds) rest ds'  = do
             let fvs =  freeVars e
             gs <- asks topVars
             let fvs' = filter (not . (`Set.member` gs) ) fvs
             case fvs' of
                 [] -> doLift t e (h ds rest ds')  -- We always lift CAFS to the top level for now. (GC?)
                 _ ->  local (isStrict_s False) (f e) >>= \e'' -> h ds rest ((t,e''):ds')
-        h ((t,e):ds) e' ds' = local (isStrict_s False) (f e) >>= \e'' -> h ds e' ((t,e''):ds')
+        --h (Left (t,e):ds) e' ds' = local (isStrict_s False) (f e) >>= \e'' -> h ds e' ((t,e''):ds')
+        h (Right rs:ds) rest ds' | any shouldLift (snds rs)  = do
+            gs <- asks topVars
+            let fvs =  freeVars (snds rs)--   (Set.fromList (map tvrIdent $ fsts rs) `Set.union` gs)
+            let fvs' = filter (not . (`Set.member` (Set.fromList (map tvrIdent $ fsts rs) `Set.union` gs) ) . tvrIdent) fvs
+                fvs'' = reverse $ topSort $ newGraph fvs' tvrNum freeVars
+            case fvs'' of
+                [] -> doLiftR rs (h ds rest ds')  -- We always lift CAFS to the top level for now. (GC?)
+                fs -> doBigLiftR rs fs (\rs' -> h ds rest (rs' ++ ds'))
+        h (Right rs:ds) e' ds'   = do
+            local (isStrict_s False) $ do
+                rs' <- flip mapM rs $ \ (t,e) -> do
+                    e'' <- f e
+                    return (t,e'')
+                h ds e' (rs' ++ ds')
         h [] e ds = f e >>= return . eLetRec ds
-        shouldLift EError {} = True
-        shouldLift ECase {} = True
-        shouldLift ELam {} = True
-        shouldLift _ = False
         doLift t e r = local (topVars_u (Set.insert (tvrNum t)) ) $ do
-            (e,tn) <- return $ etaReduce e
+            --(e,tn) <- return $ etaReduce e
             let (e',ls) = fromLam e
-            mtick (toAtom $ "E.LambdaLift.doLift." ++ show (length ls))
-            mticks tn (toAtom $ "E.LambdaLift.doLift.etaReduce")
+            mtick (toAtom $ "E.LambdaLift.doLift." ++ typeLift e ++ "." ++ show (length ls))
+            --mticks tn (toAtom $ "E.LambdaLift.doLift.etaReduce")
             e'' <- local (isStrict_s True) $ f e'
             tell [(t,ls,e'')]
+            r
+        doLiftR rs r = local (topVars_u (Set.union (Set.fromList (map (tvrNum . fst) rs)) )) $ do
+            flip mapM_ rs $ \ (t,e) -> do
+                --(e,tn) <- return $ etaReduce e
+                let (e',ls) = fromLam e
+                mtick (toAtom $ "E.LambdaLift.doLiftR." ++ typeLift e ++ "." ++ show (length ls))
+                --mticks tn (toAtom $ "E.LambdaLift.doLift.etaReduce")
+                e'' <- local (isStrict_s True) $ f e'
+                tell [(t,ls,e'')]
             r
         newName tt = do
             un <-  newUniq
             n <- asks funcName
-            return $ tVr (atomIndex (n `mappend` toAtom '$' `mappend` toAtom (show  un))) tt
+            return $ tVr (atomIndex (n `mappend` toAtom ("$" ++ show un))) tt
         doBigLift e fs  dr = do
-            mtick (toAtom $ "E.LambdaLift.doBigLift." ++ show (length fs))
+            mtick (toAtom $ "E.LambdaLift.doBigLift." ++ typeLift e ++ "." ++ show (length fs))
             ds <- asks declEnv
             let tt = typeInfer' dataTable ds (foldr ELam e fs)
             tvr <- newName tt
@@ -152,6 +174,25 @@ lambdaLift stats dataTable sc = do
             tell [(tvr,fs ++ ls,e'')]
             let e'' = foldl EAp (EVar tvr) (map EVar fs)
             dr e''
+        doBigLiftR rs fs dr = do
+            ds <- asks declEnv
+            rst <- flip mapM rs $ \ (t,e) -> do
+                case shouldLift e of
+                    True -> do
+                        mtick (toAtom $ "E.LambdaLift.doBigLiftR." ++ typeLift e ++ "." ++ show (length fs))
+                        let tt = typeInfer' dataTable ds (foldr ELam e fs)
+                        tvr <- newName tt
+                        let (e',ls) = fromLam e
+                        e'' <- local (isStrict_s True) $ f e'
+                        --tell [(tvr,fs ++ ls,e'')]
+                        let e''' = foldl EAp (EVar tvr) (map EVar fs)
+                        return ((t,e'''),[(tvr,fs ++ ls,e'')])
+                    False -> do
+                        mtick (toAtom $ "E.LambdaLift.skipBigLiftR." ++ show (length fs))
+                        return ((t,e),[])
+            let (rs',ts) = unzip rst
+            tell [ (t,ls,eLetRec rs' e) | (t,ls,e) <- concat ts]
+            dr rs'
 
         intToAtom' x = case intToAtom x of
             Just y -> y
@@ -160,6 +201,15 @@ lambdaLift stats dataTable sc = do
     ncs <- readIORef fc
     return $ SC m ncs
 
+shouldLift EError {} = True
+shouldLift ECase {} = True
+shouldLift ELam {} = True
+shouldLift _ = False
+
+typeLift EError {} = "Error"
+typeLift ECase {} = "Case"
+typeLift ELam {} = "Lambda"
+typeLift _ = "Other"
 
 removeType t v e  = subst' t v e
 removeType t v e = ans where

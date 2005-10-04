@@ -171,7 +171,7 @@ inferType dataTable ds e = rfc e where
 --        x
 --    -- | Check that the type of e1 is the same as t2 within the given context
     fceq nds e1 t2 = do
-        withContextDoc (hsep [text "fceq:", parens $ prettyE e1, parens $ prettyE t2]) $ do
+        withContextDoc (hsep [text "fceq:", align $ vcat [parens $ prettyE e1,  parens $ prettyE t2]]) $ do
         t1 <- inferType' nds e1
         eq' nds t1 t2
         --flip (eq' nds) t2 t

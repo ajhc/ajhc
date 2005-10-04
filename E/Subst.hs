@@ -197,4 +197,76 @@ eAp (ELit (LitCons n es t)) b = (ELit (LitCons n (es ++ [b]) (eAp t b)))
 eAp (EError s t) b = EError s (eAp t b)
 eAp a b = EAp a b
 
+{-
 
+-- Monadic code is so much nicer
+typeSubst :: Map.Map Int (Maybe E) -> E -> E
+typeSubst bm e  = f e (False,bm) where
+    f :: E -> Map.Map Int (Maybe E) -> E
+    f eo@(EVar tvr@(TVr { tvrIdent = i, tvrType =  t })) = do
+        (v,mp) <- ask
+        case (v,Map.lookup i mp) of
+          (True,Just (Just v)) -> return v
+          _ -> return eo
+    f (ELam tvr e) = lp ELam tvr e
+    f (EPi tvr e) = lp EPi tvr e
+    f (EAp a b) = liftM2 EAp (f a) (f b)
+    f (EError x e) = liftM (EError x) (f e)
+    f (EPrim x es e) = liftM2 (EPrim x) (mapM f es) (f e)
+    f (ELetRec dl e) = do
+        (as,rs) <- liftM unzip $ mapMntvr (fsts dl)
+        local (mconcat rs) $ do
+            ds <- mapM f (snds dl)
+            e' <- f e
+            return $ ELetRec (zip as ds) e'
+    f (ELit l) = liftM ELit $ litSMapM f l
+    f Unknown = return Unknown
+    f e@(ESort {}) = return e
+    f ec@(ECase {}) = do
+        e' <- f $ eCaseScrutinee ec
+        (b',r) <- ntvr [] $ eCaseBind ec
+        d <- local r $ fmapM f $ eCaseDefault ec
+        let da (Alt (LitCons s vs t) e) = do
+                t' <- f t
+                (as,rs) <- liftM unzip $ mapMntvr vs
+                e' <- local (mconcat rs) $ f e
+                return $ Alt (LitCons s as t') e'
+            da (Alt l e) = do
+                l' <- fmapM f l
+                e' <- f e
+                return $ Alt l' e'
+        alts <- (mapM da $ eCaseAlts ec)
+        return  ECase { eCaseScrutinee = e', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts }
+        lp lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == 0 = do
+        t' <- f t
+        e' <- local (Map.insert n Nothing) $ f e
+        return $ lam (tvr { tvrIdent =  0, tvrType =  t'}) e'
+    lp lam tvr e = do
+        (tv,r) <- ntvr [] tvr
+        e' <- local r $ f e
+        return $ lam tv e'
+    mapMntvr ts = f ts [] where
+        f [] xs = return $ reverse xs
+        f (t:ts) rs = do
+            (t',r) <- ntvr vs t
+            local r $ f ts ((t',r):rs)
+        vs = [ tvrNum x | x <- ts ]
+
+    --mapMntvr [] = return []
+    --mapMntvr (t:ts) = do
+    --    (t',r) <- ntvr t
+    --    ts' <- local r (mapMntvr ts)
+    --    return ((t',r):ts')
+    --ntvr :: TVr -> Map Int (Maybe E) -> (TVr, Map Int (Maybe E) -> Map Int (Maybe E))
+    ntvr xs tvr@(TVr { tvrIdent = 0, tvrType =  t}) = do
+        t' <- f t
+        let nvr = (tvr { tvrType =  t'})
+        return (nvr,id)
+    ntvr xs tvr@(TVr {tvrIdent = i, tvrType =  t}) = do
+        t' <- f t
+        i' <- mnv allShadow xs i
+        let nvr = (tvr { tvrIdent =  i', tvrType =  t'})
+        case i == i' of
+            True -> return (nvr,Map.insert i (Just $ EVar nvr))
+            False -> return (nvr,Map.insert i (Just $ EVar nvr) . Map.insert i' Nothing)
+-}

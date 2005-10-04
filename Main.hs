@@ -281,7 +281,7 @@ compileModEnv' stats ho = do
     --sequence_ [ putStrLn $ (tvrShowName t) <+> show (maybe E.CPR.Top id (Info.lookup (tvrInfo t)) ::  E.CPR.Val) | (t,_,_) <- scCombinators $ eToSC dataTable lc ]
     lc <- if fopts FO.FloatIn then  opt "Float Inward..." (\stats x -> return (floatInward rules  x))  lc  else return lc
     vs <- if fopts FO.Strictness then (collectSolve lc) else return []
-    mapM_ putErrLn $  sort [ tshow x <+> "->" <+> tshow y | (x@(E.Strictness.V i),y@Lam {}) <- vs, odd i]
+    -- mapM_ putErrLn $  sort [ tshow x <+> "->" <+> tshow y | (x@(E.Strictness.V i),y@Lam {}) <- vs, odd i]
     let cm stats e = do
         let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable,  SS.so_strictness = Map.fromList [ (i,S n) | (E.Strictness.V i,S n) <- vs] }
         let (e',stat,occ) = SS.simplify sopt e
@@ -289,11 +289,26 @@ compileModEnv' stats ho = do
         return e'
     lc <- opt "SuperSimplify" cm lc
 
-    let ELetRec ds _ = lc in mapM_ (\t -> putStrLn (prettyE (EVar t) <+> show (tvrInfo t))) (fsts ds)
+    -- let ELetRec ds _ = lc in mapM_ (\t -> putStrLn (prettyE (EVar t) <+> show (tvrInfo t))) (fsts ds)
 
     wdump FD.LambdacubeBeforeLift $ printCheckName dataTable lc
-    lc <- mangle dataTable (return ()) True "LambdaLift" (lambdaLiftE stats dataTable) lc
-    lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeApps mempty stats x >>= coalesceLets stats)  lc
+    finalStats <- Stats.new
+    lc <- mangle dataTable (return ()) True "LambdaLift" (lambdaLiftE finalStats dataTable) lc
+    let SC v rs = eToSC dataTable lc
+
+    rs' <- flip mapM rs $ \ (t,ls,e) -> do
+        let cm stats e = do
+            let sopt = mempty {  SS.so_dataTable = dataTable }
+            let (e',stat,occ) = SS.simplify sopt e
+            Stats.tickStat stats stat
+            return e'
+        e' <- doopt (mangle dataTable) False finalStats "SuperSimplify" cm e
+        return (t,ls,e')
+    wdump FD.Progress $ Stats.print "PostLifting" finalStats
+
+    lc <- return $ scToE (SC v rs')
+
+    --lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeApps mempty stats x >>= coalesceLets stats)  lc
     wdump FD.Lambdacube $ printCheckName dataTable lc
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     wdump FD.Progress $ printEStats lc
@@ -453,7 +468,7 @@ mangle'  fv dataTable erraction b  s action e = do
 typecheck dataTable e = case inferType dataTable [] e of
     Left ss -> do
         putErrLn (render $ ePretty e)
-        putErrLn $ "\n>>> internal error:\n" ++ unlines (tail ss)
+        putErrLn $ "\n>>> internal error:\n" ++ unlines (intersperse "----" $ tail ss)
         case optKeepGoing options of
             True -> return Unknown
             False -> putErrDie "Type Error in E"
