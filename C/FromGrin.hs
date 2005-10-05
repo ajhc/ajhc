@@ -89,17 +89,18 @@ cVal (Const h) = do
 cVal (Lit i _) = return $ CEDoc (show i)
 cVal (Tag t) = return $ CEIdent (toTag t)
 cVal (Tup [x]) = cVal x
---cVal (Tup xs) = do
---    xs' <- mapM cVal xs
---    ts <-   mapM (toType . getType) xs
---    t <-   newAnonStruct ts
---    tup <-  newAuto t
---    addStmts [ anonField tup i `CSAssign` x  | i <- [0..] | x <- xs' ]
---    return tup
+cVal (Tup []) = return $ CEDoc "/* () */"
+cVal (Tup xs) = do
+    xs' <- mapM cVal xs
+    ts <-   mapM (toType . getType) xs
+    t <-   newAnonStruct ts
+    tup <-  newAuto t
+    addStmts [ anonField tup i `CSAssign` x  | i <- [0..] | x <- xs' ]
+    return tup
 
 
 
-cVal x = return $  CEDoc  ("/* cVal: " ++ show x  ++ " */")
+cVal x = return $  CEDoc  ("/* ERROR cVal: " ++ show x  ++ " */")
 
 
 -- cb (Fetch (Var n _) :>>= Var n' t :-> e ) = return [CSAuto (toType t) (toVName n'), CSAssign (CEIdent (]
@@ -109,7 +110,7 @@ cVal x = return $  CEDoc  ("/* cVal: " ++ show x  ++ " */")
 statement s = addStatement s
 newAuto t = do
     nn <- newIdent
-    let n = "auto" ++ n
+    let n = "auto" ++ nn
     addStatement (CSAuto t n)
     return $ CEIdent n
 
@@ -153,7 +154,9 @@ cexp (Cast x t) = do
 cexp (Error s t) = do
     statement (CSExpr (CEFunCall "jhc_error" [CEDoc (show s)]))
     t' <- toType t
-    return $ CECast t' (CEDoc "0")
+    case t' of
+        CTypeStruct _ -> newAuto t'
+        _ -> return $ CECast t' (CEDoc "0")
 cexp (App a vs) = do
     vs' <- mapM cVal vs
     return $ CEFunCall (toTag a) vs'
@@ -278,6 +281,28 @@ cb (e :>>= v@(Var _ _) :-> e') = do
     ss' <- cb e'
     v'' <- declVar v
     return (v'':ss ++ ss')
+cb (e :>>= Tup [x] :-> e') = cb (e :>>= x :-> e')
+cb (e :>>= Tup xs :-> e') = do
+    (rs,ret) <- lift $ runSubCGen $ do
+        ts <- mapM (toType . getType) xs
+        st <- newAnonStruct ts
+        ret <- newAuto st
+        return ret
+    ss <- local (const (TodoExp ret)) (cb e)
+    ss' <- cb e'
+    vs <- mapM cVal xs
+    vds <- mapM declVar xs
+    return $ vds ++ rs ++ ss ++ [ v `CSAssign` anonField ret i | v <- vs | i <- [0..] ]  ++ ss'
+
+{-
+    return []
+
+    v' <- cVal v
+    ss <- local (const (TodoExp v')) (cb e)
+    ss' <- cb e'
+    v'' <- declVar v
+    return (v'':ss ++ ss')
+    -}
 cb (Case v@(Var _ t) ls) | t == TyNode = do
     v' <- cVal v
     let tag = CEIndirect v' "any.tag"
@@ -333,16 +358,17 @@ compileGrin grin = (hsffi_h ++ jhc_rts_c ++ P.render ans ++ "\n", snub (reqLibra
     tags = (tagHole,[]):sortUnder (show . fst) [ (t,runIdentity $ findArgs (grinTypeEnv grin) t) | t <- Set.toList $ freeVars (snds $ grinFunctions grin) `mappend` freeVars (snds $ grinCafs grin), tagIsTag t]
     et = text "typedef enum {" $$ nest 4 (P.fsep (punctuate P.comma (map (toTag . fst) tags))) $$ text  "} tag_t;"
     --ans = vcat $ [text "#include \"HsFFI.h\"",text "#include <stdlib.h>",text "#include <stdio.h>",text "#include <string.h>",text "#include <unistd.h>",text "#include <malloc.h>",text "",et,text "",text "typedef union node node_t;",text ""] ++ map cs tags ++ [text "",cn,text "",so,text "",text "/* Begin CAFS */"] ++ map ccaf (grinCafs grin) ++ [text "", consts, text "",text  "/* Begin Functions */",jhc_error] ++ map prettyFuncP funcs ++ (map prettyFunc funcs) ++ [mf]
-    ans = vcat $ map include (snub $ reqIncludes req) ++ [text "",et,text ""] ++ map cs tags ++ [text "",cn,text "",so,text "",text "/* Begin CAFS */"] ++ map ccaf (grinCafs grin) ++ [text "", consts, text "",text  "/* Begin Functions */"] ++ map prettyFuncP funcs ++ (map prettyFunc funcs)
+    ans = vcat $ map include (snub $ reqIncludes req) ++ [text "",et,text ""] ++ decls' ++ map cs tags ++ [text "",cn,text "",so,text "",text "/* Begin CAFS */"] ++ map ccaf (grinCafs grin) ++ [text "", consts, text "",text  "/* Begin Functions */"] ++ map prettyFuncP funcs ++ (map prettyFunc funcs)
     cs (t,ts) = prettyDecl $ CStruct (toStruct t) ((tag_t, "tag"):map cst (zip [1..] ts))
     cst (i,t) = (runIdentity $ toType' t, text $ 'a':show i)
     cn = text $  "union node {\n  struct { tag_t tag; } any;\n" <> mconcat (map cu (fsts tags)) <> text "};"
     cu t = text "  struct" <+> (toStruct t) <+> toStruct t <> text ";\n"
-    so = prettyDecl $ CFunc size_t "jhc_sizeof" [(tag_t,"tag")] [CSDoc $ "switch(tag) {\n" ++ concatMap cs (fsts tags) ++ "}\n_exit(33);"] where
+    so = prettyDecl $ CFunc size_t "jhc_sizeof" [(tag_t,"tag")] [CSDoc $ "switch(tag) {\n" ++ concatMap cs (fsts tags) ++ "}\n_exit(33);"]  where
         cs t = text "  case " <> toTag t <> char ':' <+> text "return sizeof(struct " <> toStruct t <> text ");\n"
     funcs = sortUnder cFuncName funcs'
+    decls' = map prettyDecl decls
     --(funcs',fh) =  runState sdo emptyHcHash
-    ((funcs',CGenState { genStateRequires = req, genStateDecls = d }),fh) = runState  (runCGen 1 (mapM (cfunc $ grinTypeEnv grin) $ grinFunctions grin)) emptyHcHash
+    ((funcs',CGenState { genStateRequires = req, genStateDecls = decls }),fh) = runState  (runCGen 1 (mapM (cfunc $ grinTypeEnv grin) $ grinFunctions grin)) emptyHcHash
     consts = P.vcat (map cc (Grin.HashConst.toList fh)) where
         cc nn@(HcNode a zs,i) = comm $$ cd $$ def where
             comm = text "/* " <> tshow (nn) <> text " */"

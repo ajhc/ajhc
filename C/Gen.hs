@@ -168,11 +168,10 @@ addStmts x = addStatements x
 
 runSubCGen :: Monad m => CGen m a -> CGen m ([CStatement], a)
 runSubCGen (CGen x) = CGen $ do
-    CGenState { genUnique = v } <- get
-    --(r,CGenState { genStateDecls = d, genStateStatements = s, genUnique = v' }) <- lift $ runCGen v x -- runStateT x ([],[],v)
-    (r,CGenState { genStateDecls = d, genStateStatements = s, genUnique = v' }) <- lift $ runStateT x cGenState { genUnique = v }
+    CGenState { genUnique = v, genStateAnonStructs = anonS } <- get
+    (r,CGenState { genStateRequires = req, genStateAnonStructs = as, genStateDecls = d, genStateStatements = s, genUnique = v' }) <- lift $ runStateT x cGenState { genUnique = v, genStateAnonStructs = anonS }
     unCGen $ addDecls d
-    modify (\cg -> cg { genUnique = v' })
+    modify (genUnique_s v' . genStateRequires_u (mappend req) . genStateAnonStructs_s as)
     return (s,r)
 
 addDecl d = addDecls [d]
@@ -191,18 +190,6 @@ newIdent' = CGen $ do
     CGenState { genUnique = i } <- get
     modify f
     return ('_':show i)
-
-{-
-
-instance Monad m => Unique (CGen m) where
-    modifyGetUniqueState f = do
-	modify (\(x,y,z) -> (x,y,f z))
-	(_,_,z) <- get
-	return z
-
-instance Monad m => UniqueProducer (CGen m) where
-    newUniq = newUniq_d
--}
 
 ---------------------------------------
 -- utility functions for declaring code
