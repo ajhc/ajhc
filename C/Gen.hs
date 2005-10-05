@@ -1,19 +1,51 @@
-module C.Gen where
+module C.Gen(
+    CType(..),
+    CDecl(..),
+    CStatement(..),
+    CExpr(..),
+    CLit(..),
+    CFunction(..),
+    CGenState(..),
+    CIdent,
+    CGen,
+    runCGen,
+    runSubCGen,
+    addDecl,
+    addStmts,
+    addStatement,
+    MonadCGen(..),
+    addRequires,
+    prettyC,
+    ceIdent,
+    ceFunCall,
+    cAssign,
+    addComment,
+    ToCIdent(..),
+    cfunction,
+    prettyFuncP,
+    prettyFunc,
+    prettyDecl,
+    anonField,
+    addFunction
+
+    ) where
 
 
---import Pretty
-import qualified Text.PrettyPrint.HughesPJ as P
-import Text.PrettyPrint.HughesPJ(nest,render,($$),($+$))
-import List(partition)
-import Control.Monad.State
-import GenUtil
-import Numeric
 import Char
-import Atom
-import Doc.DocLike
-import Doc.PPrint
+import Control.Monad.State
+import Data.Monoid
 import List
 import Maybe
+import Numeric
+import qualified Data.Map as Map
+import qualified Text.PrettyPrint.HughesPJ as P
+import Text.PrettyPrint.HughesPJ(nest,render,($$),($+$))
+
+import Atom
+import C.Prims
+import Doc.DocLike
+import Doc.PPrint
+import GenUtil
 
 
 data CType = CTypeBasic String | CTypePointer CType | CTypeStruct String
@@ -54,12 +86,6 @@ prettyFuncP cf = prettyProto (fdecl cf)
 fdecl cf = CFunc (cFuncReturnType cf) (cFuncName cf) (cFuncArgs cf) (cFuncBody cf)
 
 
-data CCode = CCode {
-    cCodeIncludes :: [String],
-    cCodeFunctions :: [CFunction]
-    --cCodeGlobalVars :: [(CType,String)]
-    }
-
 newtype CIdent = CIdent String
 
 class ToCIdent a where
@@ -91,40 +117,76 @@ instance Show CIdent where
 
 
 data CGenState = CGenState {
+    genStateAnonStructs :: Map.Map [CType] CType,
     genStateDecls :: [CDecl],
     genStateStatements :: [CStatement],
+    genStateFunctions :: [CFunction],
+    genStateRequires :: Requires,
     genUnique :: {-# UNPACK #-} !Int
     }
+    {-! derive: update !-}
 
 cGenState = CGenState {
+    genStateAnonStructs = Map.empty,
     genStateDecls = [],
     genStateStatements = [],
+    genStateFunctions = [],
+    genStateRequires = mempty,
     genUnique = 1
     }
 
 newtype CGen m a = CGen (StateT CGenState m a)
-    deriving(Monad, MonadState CGenState, MonadTrans)
+    deriving(Monad, MonadTrans)
+
+
+class Monad m => MonadCGen m where
+    addDecls :: [CDecl] -> m ()
+    addStatements :: [CStatement] -> m ()
+    newIdent :: m String
+    newAnonStruct :: [CType] -> m CType
+
+
+instance (Monad (m t), MonadTrans m, MonadCGen t) => MonadCGen (m t) where
+    newIdent = lift newIdent
+    addStatements x = lift $ addStatements x
+    addDecls x = lift $ addDecls x
+    newAnonStruct xs = lift $ newAnonStruct xs
+
+instance Monad m => MonadCGen (CGen m) where
+    addDecls d' = CGen $ modify f where
+        f cg = cg { genStateDecls = genStateDecls cg ++ d'}
+    addStatements s' = CGen $ modify f where
+        f cg  =  cg { genStateStatements = genStateStatements cg ++ s'}
+    newIdent = newIdent'
+    newAnonStruct xs =  newAnonStruct' xs
+
 
 runCGen u (CGen x) = runStateT x (cGenState { genUnique = u })
+unCGen (CGen x) = x
+
+addStmts x = addStatements x
 
 runSubCGen :: Monad m => CGen m a -> CGen m ([CStatement], a)
-runSubCGen x = do
+runSubCGen (CGen x) = CGen $ do
     CGenState { genUnique = v } <- get
-    (r,CGenState { genStateDecls = d, genStateStatements = s, genUnique = v' }) <- lift $ runCGen v x -- runStateT x ([],[],v)
-    addDecls d
+    --(r,CGenState { genStateDecls = d, genStateStatements = s, genUnique = v' }) <- lift $ runCGen v x -- runStateT x ([],[],v)
+    (r,CGenState { genStateDecls = d, genStateStatements = s, genUnique = v' }) <- lift $ runStateT x cGenState { genUnique = v }
+    unCGen $ addDecls d
     modify (\cg -> cg { genUnique = v' })
     return (s,r)
 
-addDecls :: Monad m => [CDecl] -> CGen m ()
-addDecls d' = modify f where
-    f cg = cg { genStateDecls = genStateDecls cg ++ d'}
+addDecl d = addDecls [d]
 
-addStmts :: Monad m => [CStatement] -> CGen m ()
-addStmts s' = modify f where
-    f cg  =  cg { genStateStatements = genStateStatements cg ++ s'}
+addStatement s = addStmts [s]
+addRequires r = CGen $ modify (genStateRequires_u (mappend r))
 
-newIdent :: Monad m => CGen m String
-newIdent = do
+
+addFunction :: Monad m => CFunction -> CGen m ()
+addFunction fn = CGen $ modify f where
+    f cg = cg { genStateFunctions = genStateFunctions cg ++ [fn]}
+
+newIdent' :: Monad m => CGen m String
+newIdent' = CGen $ do
     let f cg  =  cg { genUnique = genUnique cg + 1}
     CGenState { genUnique = i } <- get
     modify f
@@ -183,75 +245,39 @@ cAssign n e = CSAssign (autoE n) e
 
 addComment s = addStmts [CSDoc (text "/* " <> text s <> text " */")]
 
-{-
-cCase :: Monad m => CExpr -> ([(CLit,(CGen m CExpr))],(CGen m CExpr)) -> (CGen m CExpr)
-cCase e (as,d) = do
-    r <- newIdent
-    te <- newIdent
-    fas <- mapM (f r) as
-    gd <- g r d
-    addStmts [CSAuto cVoidStar r, CSAuto tEv te,CSAssign (ceIdent te) e]
-    addStmts  [CSDoc ( text "switch" <> parens (prettyExpr $ CECast ctInt e) <> text "{" $$ nest 8 (vcat fas $$ gd) $$ text "}")]
-    return (ceIdent r)  where
-	f r (l,v)  = do
-	    s <- cBlock (v >>= \e -> addStmts [CSAssign (ceIdent r) e])
-	    return $ (text "case" <+> prettyLit l <> colon ) $$  prettyCode s $$ text "break;"
-	g r v = do
-	    s <- cBlock (v >>= \e -> addStmts [CSAssign (ceIdent r) e])
-	    return $ text "default:" $$ prettyCode s $$ text "break;"
--}
-{-
-cCase :: Monad m => CExpr -> ([(CLit,(CGen m CExpr))],(CGen m CExpr)) -> (CGen m CExpr)
-cCase e (as,d) = do
-    r <- newIdent
-    te <- newIdent
-    fas <- mapM (f r) as
-    gd <- g r d
-    addStmts [CSAuto cVoidStar r, CSAuto tEv te,CSAssign (ceIdent te) e]
-    addStmts  [CSDoc ( text "switch" <> parens (prettyExpr $ CECast ctInt (CEEval (ceIdent te))) <> text "{" $$ nest 8 (vcat fas $$ gd) $$ text "}")]
-    return (ceIdent r)  where
-	f r (l,v)  = do
-	    s <- cBlock (v >>= \e -> addStmts [CSAssign (ceIdent r) e])
-	    return $ (text "case" <+> prettyLit l <> colon ) $$  prettyCode s $$ text "break;"
-	g r v = do
-	    s <- cBlock (v >>= \e -> addStmts [CSAssign (ceIdent r) e])
-	    return $ text "default:" $$ prettyCode s $$ text "break;"
--}
 
+{-
 cBlock :: Monad m => CGen m () -> CGen m [CStatement]
 cBlock v = do
     (s,()) <- runSubCGen v
     let (as, ns) = partition isAuto s
     addStmts as
     return ns
-{-
-
-cBlock v = do
-    (_,_,i) <- get
-    ((),(d,s,ni)) <- lift ( runCGen i v) -- runStateT v ([],[], i))
-    addDecls d
-    let (as, ns) = partition isAuto s
-    addStmts as
-    modify $ liftT3 (id,id,const ni)
-    return ns
-
--}
+  -}
 
 
-declThunk :: String -> CDecl
-declThunk n = CVar (CTypePointer (CTypeBasic "thunk_t")) n
+tup_names = [ 't':show i | i <- [ (1::Int) .. ]]
 
-cThunkInd :: String -> CExpr
-cThunkInd n = CEIndirect (ceIdent "thunk") n
 
-cInd n v = CEIndirect (autoE n) ('v':show v)
-cTInd n = CEIndirect (ceIdent "thunk") ('v':show n)
 
-cStructClosure n vs = [CStruct n ((cVoidStar, "eval"):map f vs)] where
-    f n = (cThunk, n)
 
-cAlloc t = CECast (CTypePointer t) $ CEFunCall "malloc" [CESizeof t]
-cAllocThunk i = cAlloc (CTypeStruct ('s':show i))
+anonField :: CExpr -> Int -> CExpr
+anonField c i = CEDot c (tup_names !! i)
+
+newAnonStruct' :: Monad m => [CType] -> CGen m CType
+newAnonStruct' ts = CGen $ do
+    x <- gets genStateAnonStructs
+    case Map.lookup ts x of
+        Just t -> return t
+        Nothing -> do
+            id <- unCGen newIdent
+            let nid = ("tup" ++ id)
+            unCGen $ addDecls [CStruct  nid (zip ts tup_names)]
+            let tp = (CTypeStruct nid)
+            modify (genStateAnonStructs_u $ Map.insert ts tp)
+            return tp
+
+
 
 
 ----------------------------------
@@ -348,4 +374,9 @@ prettyType (CTypeBasic s) = text s
 prettyType (CTypePointer t) = prettyType t <> text "*"
 prettyType (CTypeStruct s) = text "struct" <+> text s
 
+
+
+instance MonadState x m => MonadState x (CGen m) where
+    get = lift $ get
+    put x = lift $ put x
 

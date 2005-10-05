@@ -25,14 +25,25 @@ import Grin.Show
 import qualified Util.Seq as Seq
 import RawFiles
 import VConsts
+import CanType
 
 
-toType TyTag = tag_t
-toType (TyNode) = pnode_t
-toType (TyTup []) = CTypeBasic "void"
+toType TyTag = return tag_t
+toType (TyNode) = return pnode_t
+toType (TyTup []) = return $ CTypeBasic "void"
 toType (TyPtr TyNode) = toType TyNode  -- for now, we use pointers to nodes for everything
+toType (TyTup [x]) = toType x
+toType (TyTup xs) = do xs' <- mapM toType xs; newAnonStruct xs'
+toType (Ty s) = return $ CTypeBasic $ fromAtom s
+
+toType' TyTag = return tag_t
+toType' (TyNode) = return pnode_t
+toType' (TyTup []) = return $ CTypeBasic "void"
+toType' (TyPtr TyNode) = toType' TyNode  -- for now, we use pointers to nodes for everything
+toType' (TyTup [x]) = toType' x
+toType' (Ty s) = return $ CTypeBasic $ fromAtom s
+
 --toType (TyPtr t) = CTypePointer (toType t)
-toType (Ty s) = CTypeBasic $ fromAtom s
 --    | a == tIntzh = CTypeBasic "HsInt"
 --    | a == tCharzh = CTypeBasic "HsChar"
 --    | otherwise = CTypeBasic (fromAtom s)
@@ -55,15 +66,21 @@ toVName (V n) = text $ 'v':show n
 
 data Todo = TodoReturn | TodoExp CExpr | TodoNothing
 
+ccaf :: (Var,Val) -> P.Doc
 ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ render (prettyVal val)) <> text "*/\n" <> text "static node_t _" <> toVName v <> text ";\n" <> text "#define " <> toVName v <+>  text "(&_" <> toVName v <> text ")\n";
+
+--cfunc :: Monad m => TyEnv -> (Atom,Lam) -> m CFunction
 cfunc te (n,Tup as :-> body) = do
         s <- runReaderT (cb body) TodoReturn
-        return $ cfunction { cFuncComments = show n, cFuncReturnType = toType r, cFuncName = toTag n, cFuncArgs = [ (toType t, toVName v) | Var v t <- as  ], cFuncBody = s  } where
+        fr <-  toType r
+        as' <- flip mapM as $ \ (Var v t) -> do
+            t' <- toType t
+            return (t',toVName v)
+        return $ cfunction { cFuncComments = show n, cFuncReturnType = fr, cFuncName = toTag n, cFuncArgs = as', cFuncBody = s  } where
     Identity (_,r) = findArgsType te n
 
 
-
-cVal :: MonadState HcHash m => Val -> m CExpr
+--cVal :: Val -> ReaderT Todo (CGen (State HcHash)) CExpr
 cVal (Var n _) = return $  CEIdent (toVName n)
 cVal (Const (NodeC h _)) | h == tagHole = return $ CEIdent "NULL"
 cVal (Const h) = do
@@ -71,12 +88,30 @@ cVal (Const h) = do
     return $ CEIdent ( 'c':show i )
 cVal (Lit i _) = return $ CEDoc (show i)
 cVal (Tag t) = return $ CEIdent (toTag t)
+cVal (Tup [x]) = cVal x
+--cVal (Tup xs) = do
+--    xs' <- mapM cVal xs
+--    ts <-   mapM (toType . getType) xs
+--    t <-   newAnonStruct ts
+--    tup <-  newAuto t
+--    addStmts [ anonField tup i `CSAssign` x  | i <- [0..] | x <- xs' ]
+--    return tup
+
+
+
 cVal x = return $  CEDoc  ("/* cVal: " ++ show x  ++ " */")
 
 
 -- cb (Fetch (Var n _) :>>= Var n' t :-> e ) = return [CSAuto (toType t) (toVName n'), CSAssign (CEIdent (]
 
-statement s = tell $ (Seq.single s,mempty)
+--statement s = tell $ (Seq.single s,mempty)
+
+statement s = addStatement s
+newAuto t = do
+    nn <- newIdent
+    let n = "auto" ++ n
+    addStatement (CSAuto t n)
+    return $ CEIdent n
 
 newNode (NodeC t _) | t == tagHole = do
     return $  CEFunCall "malloc" [CESizeof node_t]
@@ -111,14 +146,18 @@ cexp (Fetch v) = cVal v
 cexp (Store n@NodeC {}) = newNode n
 cexp (Return n@NodeC {}) = newNode n
 cexp (Return x) = cVal x
-cexp (Cast x t) = cVal x >>= return . CECast (toType t)
+cexp (Cast x t) = do
+    x' <- cVal x
+    t' <-  toType t
+    return $ CECast t' x'
 cexp (Error s t) = do
     statement (CSExpr (CEFunCall "jhc_error" [CEDoc (show s)]))
-    return $ CECast (toType t) (CEDoc "0")
+    t' <- toType t
+    return $ CECast t' (CEDoc "0")
 cexp (App a vs) = do
     vs' <- mapM cVal vs
     return $ CEFunCall (toTag a) vs'
-cexp (Prim p vs) | APrim _ req <- primAPrim p  = tell (mempty,req) >> convertPrim p vs
+cexp (Prim p vs) | APrim _ req <- primAPrim p  =  (addRequires req) >> convertPrim p vs
 cexp e = return $ CEDoc ("/* ERROR " ++ show e ++ " */")
 
 convertPrim p vs
@@ -194,15 +233,20 @@ convertPrim p vs
 
 --bops = [(toAtom "@primTimes", "*"), (toAtom "@primPlus", "+"), (toAtom "@primMinus","-")]
 
-declVar (Var n t) = CSAuto (toType t) (toVName n)
+declVar (Var n t) = do
+    t' <- toType t
+    return $ CSAuto t' (toVName n)
 
+cb :: Exp -> ReaderT Todo (CGen (State HcHash)) [CStatement]
 cb (Prim p [a,b] :>>= Tup [q,r] :-> e') | primName p == toAtom "@primQuotRem" = do
     a' <- cVal a
     b' <- cVal b
     r' <- cVal r
     q' <- cVal q
     ss' <- cb e'
-    return $ [declVar q, declVar r, CSAssign q' (CEOp "/" a' b'), CSAssign r' (CEOp "%" a' b') ] ++ ss'
+    q'' <- declVar q
+    r'' <- declVar r
+    return $ [q'', r'' , CSAssign q' (CEOp "/" a' b'), CSAssign r' (CEOp "%" a' b') ] ++ ss'
 
 cb (Return v :>>= (NodeC t as) :-> e') = do
     v' <- cVal v
@@ -212,7 +256,8 @@ cb (Return v :>>= (NodeC t as) :-> e') = do
     --let ass = [CSAssign  a (CEIndirect tmp ('a':show i)) | a <- as' | i <- [1 ..] ]
     let ass = [CSAssign  a (CEDot tmp ('a':show i)) | a <- as' | i <- [1 ..] ]
     ss' <- cb e'
-    return (map declVar as  ++ ass ++ ss')
+    as' <- mapM declVar as
+    return (as'  ++ ass ++ ss')
 cb (Fetch v :>>= (NodeC t as) :-> e') = do
     v' <- cVal v
     --let tmp = CECast (toStructTP t)  v'
@@ -221,7 +266,8 @@ cb (Fetch v :>>= (NodeC t as) :-> e') = do
     --let ass = [CSAssign  a (CEIndirect tmp ('a':show i)) | a <- as' | i <- [1 ..] ]
     let ass = [CSAssign  a (CEDot tmp ('a':show i)) | a <- as' | i <- [1 ..] ]
     ss' <- cb e'
-    return (map declVar as  ++ ass ++ ss')
+    as' <- mapM declVar as
+    return (as'  ++ ass ++ ss')
 cb (e :>>= Tup [] :-> e') = do
     ss <- local (const (TodoNothing)) (cb e)
     ss' <- cb e'
@@ -230,14 +276,16 @@ cb (e :>>= v@(Var _ _) :-> e') = do
     v' <- cVal v
     ss <- local (const (TodoExp v')) (cb e)
     ss' <- cb e'
-    return (declVar v:ss ++ ss')
+    v'' <- declVar v
+    return (v'':ss ++ ss')
 cb (Case v@(Var _ t) ls) | t == TyNode = do
     v' <- cVal v
     let tag = CEIndirect v' "any.tag"
         da (v@(Var {}) :-> e) = do
             v'' <- cVal v
             e' <- cb e
-            return $ (Nothing,[declVar v,CSAssign v'' v'] ++ e')
+            v''' <- declVar v
+            return $ (Nothing,[v''',CSAssign v'' v'] ++ e')
         da ((NodeC t as) :-> e) = do
             as' <- mapM cVal as
             e' <- cb e
@@ -245,7 +293,8 @@ cb (Case v@(Var _ t) ls) | t == TyNode = do
             let tmp = CEIndirect v' (toStruct t)
             --let ass = [CSAssign  a (CEIndirect tmp ('a':show i)) | a <- as' | i <- [1 ..] ]
             let ass = [CSAssign  a (CEDot tmp ('a':show i)) | a <- as' | i <- [1 ..] ]
-            return $ (Just (toTag t), map declVar as ++ ass ++ e')
+            as' <- mapM declVar as
+            return $ (Just (toTag t), as' ++ ass ++ e')
     ls' <- mapM da ls
     return [CSSwitch tag ls' ]
 cb (Case v@(Var _ t) ls) = do
@@ -254,10 +303,12 @@ cb (Case v@(Var _ t) ls) = do
     let da (v@(Var {}) :-> e) = do
             v'' <- cVal v
             e' <- cb e
-            return $ (Nothing,[declVar v,CSAssign v'' v'] ++ e')
+            v''' <- declVar v
+            return $ (Nothing,[v''',CSAssign v'' v'] ++ e')
         da ((Lit i _) :-> e) = do
             e' <- cb e
             return $ (Just (show i), e')
+        da (Tup [x] :-> e) = da ( x :-> e )
     ls' <- mapM da ls
     return [CSSwitch v'' ls' ]
 
@@ -265,9 +316,7 @@ cb (Case v@(Var _ t) ls) = do
 
 cb e = do
     x <- ask
-    (e,(ss',req)) <- runWriterT $ cexp e
-    tell req
-    let ss = Seq.toList ss'
+    (ss,e) <- lift $  runSubCGen $ cexp e
     case x of
         TodoReturn -> return $ ss ++ [CSReturn e]
         TodoExp v -> return $ ss ++ [CSAssign v e]
@@ -286,14 +335,14 @@ compileGrin grin = (hsffi_h ++ jhc_rts_c ++ P.render ans ++ "\n", snub (reqLibra
     --ans = vcat $ [text "#include \"HsFFI.h\"",text "#include <stdlib.h>",text "#include <stdio.h>",text "#include <string.h>",text "#include <unistd.h>",text "#include <malloc.h>",text "",et,text "",text "typedef union node node_t;",text ""] ++ map cs tags ++ [text "",cn,text "",so,text "",text "/* Begin CAFS */"] ++ map ccaf (grinCafs grin) ++ [text "", consts, text "",text  "/* Begin Functions */",jhc_error] ++ map prettyFuncP funcs ++ (map prettyFunc funcs) ++ [mf]
     ans = vcat $ map include (snub $ reqIncludes req) ++ [text "",et,text ""] ++ map cs tags ++ [text "",cn,text "",so,text "",text "/* Begin CAFS */"] ++ map ccaf (grinCafs grin) ++ [text "", consts, text "",text  "/* Begin Functions */"] ++ map prettyFuncP funcs ++ (map prettyFunc funcs)
     cs (t,ts) = prettyDecl $ CStruct (toStruct t) ((tag_t, "tag"):map cst (zip [1..] ts))
-    cst (i,t) = (toType t, text $ 'a':show i)
+    cst (i,t) = (runIdentity $ toType' t, text $ 'a':show i)
     cn = text $  "union node {\n  struct { tag_t tag; } any;\n" <> mconcat (map cu (fsts tags)) <> text "};"
     cu t = text "  struct" <+> (toStruct t) <+> toStruct t <> text ";\n"
     so = prettyDecl $ CFunc size_t "jhc_sizeof" [(tag_t,"tag")] [CSDoc $ "switch(tag) {\n" ++ concatMap cs (fsts tags) ++ "}\n_exit(33);"] where
         cs t = text "  case " <> toTag t <> char ':' <+> text "return sizeof(struct " <> toStruct t <> text ");\n"
     funcs = sortUnder cFuncName funcs'
     --(funcs',fh) =  runState sdo emptyHcHash
-    ((funcs',req),fh) = runState  (runWriterT (mapM (cfunc $ grinTypeEnv grin) $ grinFunctions grin)) emptyHcHash
+    ((funcs',CGenState { genStateRequires = req, genStateDecls = d }),fh) = runState  (runCGen 1 (mapM (cfunc $ grinTypeEnv grin) $ grinFunctions grin)) emptyHcHash
     consts = P.vcat (map cc (Grin.HashConst.toList fh)) where
         cc nn@(HcNode a zs,i) = comm $$ cd $$ def where
             comm = text "/* " <> tshow (nn) <> text " */"
