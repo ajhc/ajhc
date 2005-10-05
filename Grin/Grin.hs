@@ -41,21 +41,23 @@ module Grin.Grin(
     funcMain,
     findArgsType, findArgs) where
 
-import Atom
-import Boolean.Algebra
 import Char
 import Control.Monad.Identity
-import C.Prims
 import Data.IORef
 import Data.Monoid
-import Doc.DocLike
-import FreeVars
-import GenUtil
 import List(isPrefixOf)
-import Number
 import Prelude hiding((&&),(||),not,and,or,any,all)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+
+import Atom
+import Boolean.Algebra
+import CanType
+import C.Prims
+import Doc.DocLike
+import FreeVars
+import GenUtil
+import Number
 import VConsts
 
 -- Extremely simple first order monadic code with basic type system.  similar
@@ -506,6 +508,16 @@ instance HasType Val where
         as'' <- mapM (typecheck te) as
         if as'' == as' then return TyNode else
             fail $ "NodeC: arguments do not match " ++ show n ++ show (as'',as')
+instance CanType Val Ty where
+    getType (Tag _) = TyTag
+    getType (Var _ t) = t
+    getType (Lit _ t) = t
+    getType (NodeV {}) = TyNode
+    getType (Tup xs) = TyTup (map getType xs)
+    getType (Const t) = TyPtr (getType t)
+    getType (NodeC {}) = TyNode
+    getType (Addr _) = TyPtr (error "typecheck: Addr")
+    getType (ValPrim _) = error "ValPrim"
 
 instance FreeVars Lam (Set.Set Var) where
     freeVars (x :-> y) = freeVars y Set.\\ freeVars x
