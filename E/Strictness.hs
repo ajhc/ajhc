@@ -60,7 +60,7 @@ solveDs ds = do
         vs = concatMap collect ds'
     cr <- E.Strictness.solve [ c | c@(x,_) <- vs, x /= tvrSilly ]
     let idm = Map.fromList $ (0,L):[ (tvrIdent x,y) | (x,y) <- cr]
-    mapM_ (\ (tvr,n) -> print (tvrShowName tvr,n)) cr
+    --mapM_ (\ (tvr,n) -> print (tvrShowName tvr,n)) cr
     let idann id nfo = case Map.lookup id idm of
             Just x -> return $ Info.insert x nfo
             Nothing -> return nfo -- error $ "Could not find :" ++ tvrShowName tvr { tvrIdent = id }
@@ -74,7 +74,7 @@ solve vs = ans where
     mp = Map.fromList [ ((x, case y of Lam _ -> True ; _ -> False) ,i) | (x,y) <- vs | i <- [0..] ]
     wts = [ sol y | (_,y) <- vs]
     ans = do
-        bs <- FindFixpoint.solve (Just "Strictness") L wts
+        bs <- FindFixpoint.solve Nothing L wts
         return [ (x,b) |  (x,_) <- vs | b <- bs ]
     getVal' x
         | Just i <- Map.lookup x mp = getVal i
