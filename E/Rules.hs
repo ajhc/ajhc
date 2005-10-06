@@ -151,7 +151,16 @@ arules xs = ARules (sortUnder ruleNArgs (map f xs)) where
 
 instance Monoid ARules where
     mempty = ARules []
-    mappend (ARules a) (ARules b) = ARules (sortUnder ruleNArgs (snubUnder ruleName $ a ++ b))
+    mappend = joinARules
+
+
+joinARules ar@(ARules a) br@(ARules b)
+    | [] <- rs = ARules []
+    | all (== r) rs = ARules (sortUnder ruleNArgs (snubUnder ruleName $ a ++ b))
+    | otherwise = error $ "mixing rules!" ++ show (ar,br) where
+   rs@(r:_) = map ruleHead a ++ map ruleHead b
+
+
 
 
 -- applyRules :: ARules -> [E] -> IO (Maybe (E,[E]))
