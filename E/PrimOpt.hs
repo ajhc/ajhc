@@ -1,5 +1,9 @@
 module E.PrimOpt(primOpt,primOpt') where
 
+import List
+import Monad
+import qualified Data.Map as Map
+
 import Atom
 import CanType
 import C.Prims
@@ -11,9 +15,8 @@ import E.E
 import E.Values
 import FreeVars
 import GenUtil
-import List
-import Monad
 import NameMonad
+import PrimitiveOperators
 import Stats
 
 
@@ -40,14 +43,17 @@ unbox dataTable e vn wtd = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] te) (wtd 
 
 intt = rawType "int"
 
+rawMap = Map.fromList [ (rawType w,toAtom t) | (_,w,t) <- allCTypes]
+typ_float = toAtom "float"
+
 primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
     mtick (toAtom $ "E.PrimOpt." ++ braces (pprint s) )
     primOpt' dataTable  n  where
         primopt (PrimPrim "seq") [x,y] _  = return $ prim_seq x y
         --primopt (PrimPrim "prim_op_aaB.==") [e,(ELit (LitInt x t)) ] rt = return $ eCase e [Alt (LitInt x t) (prim_unsafeCoerce vTrue rt)] (prim_unsafeCoerce vFalse rt)
         --primopt (PrimPrim "prim_op_aaB.==") [(ELit (LitInt x t)),e ] rt = return $ eCase e [Alt (LitInt x t) (prim_unsafeCoerce vTrue rt)] (prim_unsafeCoerce vFalse rt)
-        primopt (Operator "==" [ta,tb] tr) [e,(ELit (LitInt x t))] rt = return $ eCase e [Alt (LitInt x t) (ELit (LitInt 1 intt)) ] (ELit (LitInt 0 intt))
-        primopt (Operator "==" [ta,tb] tr) [(ELit (LitInt x t)),e] rt = return $ eCase e [Alt (LitInt x t) (ELit (LitInt 1 intt)) ] (ELit (LitInt 0 intt))
+        primopt (Operator "==" [ta,tb] tr) [e,(ELit (LitInt x t))] rt | Map.lookup t rawMap /= Just typ_float = return $ eCase e [Alt (LitInt x t) (ELit (LitInt 1 intt)) ] (ELit (LitInt 0 intt))
+        primopt (Operator "==" [ta,tb] tr) [(ELit (LitInt x t)),e] rt | Map.lookup t rawMap /= Just typ_float = return $ eCase e [Alt (LitInt x t) (ELit (LitInt 1 intt)) ] (ELit (LitInt 0 intt))
         primopt (Operator "-" [ta] tr) [ELit (LitInt x t)] rt | ta == tr && rt == t = return $ ELit (LitInt (negate x) t)
 
         {-

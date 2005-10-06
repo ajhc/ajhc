@@ -1,16 +1,21 @@
 
 {- This file is generated -}
-module PrimitiveOperators(primitiveInsts,constantMethods,theMethods,allCTypes) where
+module PrimitiveOperators(primitiveInsts,constantMethods,theMethods,allCTypes,ctypeMap) where
 
-import Representation
-import E.E
-import E.Values
-import C.Prims
-import VConsts
-import Name
 import Data.Monoid
-import E.TypeCheck()
+import qualified Data.Map as Map
+
 import CanType
+import C.Prims
+import E.E
+import E.TypeCheck()
+import E.Values
+import Name
+import Representation
+import VConsts
+
+
+ctypeMap = Map.fromList [ (parseName TypeConstructor n,v) | (n,v,_) <- allCTypes ]
 
 toHsName x = nameName $ parseName TypeConstructor x
 

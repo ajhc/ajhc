@@ -199,7 +199,7 @@ primTyEnv = TyEnv . Map.fromList $ [
     (funcEval, ([TyPtr TyNode],TyNode)),
     (funcApply, ([TyNode, TyPtr TyNode],TyNode)),
     (tagHole, ([],TyNode))
-    ] ++ [ (toAtom ('C':x), ([Ty $ toAtom y],TyNode)) | (x,y) <- allCTypes, y /= "void" ]
+    ] ++ [ (toAtom ('C':x), ([Ty $ toAtom y],TyNode)) | (x,y,_) <- allCTypes, y /= "void" ]
 
 
 -- constant CAF analysis
@@ -221,7 +221,7 @@ constantCaf dataTable (SC _ ds) = ans where
     coMap = Map.fromList [  (v,ce)| (v,_,ce) <- fst ans]
     conv :: E -> Val
     conv (ELit (LitInt i (ELit (LitCons n [] (ESort EHash))))) | RawType <- nameType n =  Lit i (Ty $ toAtom (show n))
-    conv (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Prelude.lookup (show n) allCTypes = ( Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
+    conv (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Map.lookup n ctypeMap = ( Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
     conv e | Just (a,_) <- from_unsafeCoerce e = conv a
 --    conv e | Just (a,_) <- from_integralCast e = conv a
     conv (ELit lc@(LitCons n es _)) | Just nn <- getName lc = (Const (NodeC nn (map conv es)))
@@ -726,7 +726,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
                             --    Just x -> return x
                             --    Nothing -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
     constant (ELit (LitInt i (ELit (LitCons n [] (ESort EHash))))) | RawType <- nameType n = return $ Lit i (Ty $ toAtom (show n))
-    constant (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Prelude.lookup (show n) allCTypes = (return $ Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
+    constant (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Map.lookup n ctypeMap = (return $ Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
 --    constant (ELit lc@(LitCons n es _)) | Just es <- mapM constant es, Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n = (return $ Const (Tup es))
     constant (ELit lc@(LitCons n es _)) | Just es <- mapM constant es, Just nn <- getName lc = (return $ Const (NodeC nn es))
     constant (EPi (TVr { tvrIdent = 0, tvrType = a}) b) | Just a <- constant a, Just b <- constant b = return $ Const $ NodeC tagArrow [a,b]
