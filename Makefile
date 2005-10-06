@@ -3,23 +3,18 @@ JHC_VERSION=0.1
 all:   jhc
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches -fno-warn-unused-binds    # -O2 -ddump-simpl-stats -ddump-rules
+GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
 GHCINC=  -iFrontEnd
-PACKAGES= -package mtl  -package unix -package QuickCheck  #  -prof -auto-all
+PACKAGES= -package mtl  -package unix -package QuickCheck
 GHCOPTS=   -O -ignore-package lang  -pgmF drift-ghc  -F $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) -fwarn-type-defaults   -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
 
 HC = ghc
+HCI = ghci
 HC_OPTS = $(GHCOPTS)
-
-DRIFT= ../DrIFT/src/DrIFT
-
-ALLHS:=$(shell find . Grin Boolean Doc C E  FrontEnd DerivingDrift -maxdepth 1 -follow \( -name \*.hs -or -name \*.lhs \) -and \( \! -name Try\*.hs \) | sed -e 's@^\./@@')
 
 BUILTSOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs Version.hs VersionCtx.hs
 
-
-# OBJS is defined in 'depend.make'
-# OBJS=$(shell perl ./collect_deps.prl Main.o < depend.make)
-#
+# HSFILES is defined here, it can be updated with 'make depend' whenever a new source file is added
 -include depend.make
 
 
@@ -28,62 +23,46 @@ SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
 
 MAIN=Main.hs
 
-%.o: %.hs
-	$(HC) -i.  $(HCFLAGS) $(GHCOPTS) -o $@ -c $<
-%.o: %.lhs
-	$(HC) -i.  $(HCFLAGS) $(GHCOPTS) -o $@ -c $<
+jhcp: $(HSFILES)
+	$(HC) $(GHCOPTS) $(EXTRAOPTS) $(GHCPROFOPTS) --make Main.hs -o $@
 
-%.hi: %.o
-	@:
+jhc: $(HSFILES)
+	$(HC) $(GHCOPTS) $(EXTRAOPTS) --make Main.hs -o $@
 
-%.hi-boot: %.o-boot
-	@:
-
-%.o-boot: %.hs-boot
-	$(HC) $(HCFLAGS) $(GHCOPTS) -c $<
+i:
+	ghci $(GHCOPTS) $(EXTRAOPTS) Main.hs
 
 
-jhc: $(OBJS)
-	$(HC) $(GHCOPTS) $(EXTRAOPTS) $(OBJS) -o $@
+tags: $(HSFILES)
+	hasktags $(HSFILES)
 
-tags: $(ALLHS)
-	hasktags $(ALLHS)
-
-regress: jhc Try-Regress.hs
-	time ./regress_test.prl try/Try-Regress.hs
-	time ./regress_test.prl try/Try-Foo.hs
-	time ./regress_test.prl try/Try-Lam.hs
-	time ./regress_test.prl try/Try-Case.hs
-#	$(MAKE) -C regress
-#	(cd regress; ./regress)
-#
-#
+regress: jhc
+	time ./regress_test.prl test/Try-Regress.hs
+	time ./regress_test.prl test/Try-Foo.hs
+	time ./regress_test.prl test/Try-Lam.hs
+	time ./regress_test.prl test/Try-Case.hs
 
 hsdocs:
-	haddock -h $(filter-out DataConstructors.hs SelfTest.hs %/HsParser.hs FrontEnd/Representation.hs C/Gen.hs , $(OBJS:.o=.hs)) -o hsdocs
+	haddock -h $(filter-out DataConstructors.hs SelfTest.hs %/HsParser.hs FrontEnd/Representation.hs C/Gen.hs , $(HSFILES)) -o hsdocs
 
 printos:
-	echo $(ALLHS)
-	echo $(OBJS)
+	echo $(HSFILES)
 
 
-depend: depend.make
-
-depend.make: $(BUILTSOURCES) $(ALLHS)
-	$(HC) -M -optdep-f -optdepdepend.make $(HC_OPTS) Main.hs
-	sed -e '/^#.*DELETE: End/q' -i depend.make
-	echo OBJS=`perl ./collect_deps.prl Main.o < depend.make ` >> depend.make
-
-# $(ALLHS)
+depend: $(BUILTSOURCES)
+	$(HC) -M -optdep-f -optdepdep.tmp $(HC_OPTS) $(MAIN)
+	echo HSFILES=`egrep -o '[A-Za-z/.]+.hs' dep.tmp | sed -e 's/^\.\///' | sort` > depend.make
+	rm -f dep.tmp
 
 clean:
-	rm -f $(OBJS) jhc *.hs_code.c `find . -name \*.hi -or -name \*.o-boot -or -name \*.hi-boot`
+	rm -f  jhc jhcp *.hs_code.c `find . -name \*.hi -or -name \*.o-boot -or -name \*.hi-boot -or -name \*.o`
 
 
 realclean: clean
 	rm -f $(BUILTSOURCES) depend.make
 
 builtfiles: $(BUILTSOURCES)
+
 clean-ho:
 	rm -f -- `find -name \*.ho`
 
@@ -117,5 +96,5 @@ Version.hs: _darcs/inventory
 	| wc -l | perl -e 'print "darcsPatches = \"".(<>-1)."\"\n"'    >> $@
 	echo 'basePackages = ["base-0.1", "haskell98-0.1"]'            >> $@
 
-.PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs
+.PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs i
 
