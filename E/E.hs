@@ -164,7 +164,6 @@ patToLitEE (LitCons n [a,b] t) | t == eStar, n == tArrow = EPi (tVr 0 (EVar a)) 
 patToLitEE (LitCons n xs t) = ELit $ LitCons n (map EVar xs) t
 patToLitEE (LitInt x t) = ELit $ LitInt x t
 
-tArrow = toName TypeConstructor ("Prelude","->")
 
 caseBodies :: E -> [E]
 caseBodies ec = [ b | Alt _ b <- eCaseAlts ec] ++ maybeToMonad (eCaseDefault ec)
@@ -221,13 +220,6 @@ instance ConNames (Lit x E) where
     vUnit  = (LitCons vUnit [] tUnit)
 
 
-vWorld__ = ELit (litCons DataConstructor ("Jhc.IO","World__") [] tWorld__)
-
--- types
-etIO t = ELit (litCons TypeConstructor ("Prelude.IO","IO") [t] tStar)
---etWorld = ELit (litCons TypeConstructor ("Jhc.IO","World__") [] tStar)
---tRational = ELit (litCons TypeConstructor ("Prelude.Ratio","Rational") [] tStar)
-tAbsurd k = ELit (litCons TypeConstructor "Absurd#" [] k)
 
 tFunc a b = ePi (tVr 0 a) b
 
@@ -341,10 +333,24 @@ toString x = toList x >>= mapM fromChar where
     fromChar (ELit (LitCons dc [ELit (LitInt ch t)] _ot)) | dc == dc_Char && t == tCharzh = return (chr $ fromIntegral ch)
     fromChar _ = fail "fromChar: not char"
 
+
+tAbsurd k = ELit (litCons TypeConstructor "Absurd#" [] k)
+vWorld__ = ELit (litCons DataConstructor ("Jhc.IO","World__") [] tWorld__)
+
 dc_Addr = toName DataConstructor ("Jhc.Addr","Addr")
 dc_Char = toName DataConstructor ("Prelude","Char")
 dc_JustIO = toName DataConstructor ("Jhc.IO", "JustIO")
 dc_Rational = toName DataConstructor ("Ratio",":%")
 dc_Int = toName DataConstructor ("Prelude","Int")
 dc_Integer = toName DataConstructor ("Prelude","Integer")
+dc_EmptyList = toName DataConstructor ("Prelude","[]")
+tc_List = toName TypeConstructor ("Prelude","[]")
+tc_IO = toName TypeConstructor ("Jhc.IO", "IO")
+tc_IOResult = toName TypeConstructor ("Jhc.IO","IOResult")
+tc_Arrow = toName TypeConstructor ("Prelude","->")
+p_unsafeCoerce = primPrim "unsafeCoerce"
+p_integralCast = primPrim "integralCast"
+
+tArrow = tc_Arrow
+
 
