@@ -1,4 +1,4 @@
-module E.Strictness where
+module E.Strictness(SA(..), solveDs) where
 
 import Control.Monad.Identity
 import Control.Monad.Writer
@@ -9,11 +9,11 @@ import Prelude hiding((&&),(||),not,and,or,any,all)
 import qualified Data.Map as Map
 
 import Boolean.Algebra
+import Binary
 import C.Prims
 import E.Annotate
 import E.E
-import E.Subst
-import E.Values
+import E.Inline
 import FindFixpoint
 import GenUtil
 import Info.Info as Info
@@ -40,6 +40,7 @@ data SA =
     | Lam [SA]      -- Lambda Function
     | If TVr Int SA SA  -- if
         deriving(Ord,Eq,Show,Typeable)
+        {-! derive: GhcBinary !-}
 
 type SAMap = Map.Map TVr SA
 

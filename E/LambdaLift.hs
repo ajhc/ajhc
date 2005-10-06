@@ -14,6 +14,7 @@ import E.FreeVars
 import E.Subst
 import E.Traverse
 import E.TypeCheck
+import E.Values
 import FreeVars
 import GenUtil
 import Name
@@ -191,7 +192,7 @@ lambdaLift stats dataTable sc = do
                         mtick (toAtom $ "E.LambdaLift.skipBigLiftR." ++ show (length fs))
                         return ((t,e),[])
             let (rs',ts) = unzip rst
-            tell [ (t,ls,eLetRec rs' e) | (t,ls,e) <- concat ts]
+            tell [ (t,ls,substLet rs' e) | (t,ls,e) <- concat ts]
             dr rs'
 
         intToAtom' x = case intToAtom x of

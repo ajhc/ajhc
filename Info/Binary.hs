@@ -9,6 +9,7 @@ import GenUtil
 import Info.Info
 import Info.Types
 import E.CPR
+import E.Strictness
 
 
 
@@ -26,8 +27,8 @@ cb x = (createTyp x, Binable x)
 binTable = Map.fromList [
     cb (u :: Properties),
     cb (u :: ExportStatus),
-    cb (u :: E.CPR.Val)
- --   cb (u :: E.Strictness.SA)
+    cb (u :: E.CPR.Val),
+    cb (u :: E.Strictness.SA)
     ]
 
 

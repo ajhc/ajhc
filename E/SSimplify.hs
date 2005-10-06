@@ -14,6 +14,7 @@ import Atom
 import CanType
 import DataConstructors
 import E.E
+import E.Inline
 import E.PrimOpt
 import E.Rules
 import E.Subst
@@ -92,16 +93,22 @@ collectOcc sopts  e = (e',fvs,occ) where
         let gr' = newGraph nn (tvrNum . fst) (gfv . snd )
             (lb,ds'') = findLoopBreakers (\ (_,(e,_,_)) -> loopFunc e) gr'
             cycNodes = Set.fromList $ [ v | (v,_) <- cyclicNodes gr']
+            calcStrictInfo t _
+                | t `Set.member` cycNodes = setProperty prop_CYCLIC
+                | otherwise = id
+
+            {-
             calcStrictInfo t e
                 | t `Set.member` cycNodes = Strict.L
                 | Just s <- Info.lookup (tvrInfo t) = s
                 | otherwise = Strict.L
+            -}
         let dvars = map (tvrNum . fst) ds
             fvs = foldr Set.delete (mconcat (fve:[ fv `mappend` freeVars t | (TVr { tvrType =  t},(_,fv,_)) <- ds'' ])) dvars
             finalS = Map.union (Map.fromList [(n,LoopBreaker) | (TVr { tvrIdent = n },_) <- lb ]) $   foldl andOM se ([ s | (_,(_,_,s)) <- ds'' ])
         tell $ Seq.singleton (Map.fromList [ (t,Map.findWithDefault Unused n (Map.mapWithKey frules finalS)) | (t@(TVr { tvrIdent = n }),_) <- ds'' ])
-        -- return (eLetRec [ (tvrInfo_u (Info.insert (calcStrictInfo v e)) v,e) | (v,(e,_,_)) <- ds'' ] e', fvs, finalS  )
-        return (eLetRec [ (v,e) | (v,(e,_,_)) <- ds'' ] e', fvs, finalS  )
+        return (eLetRec [ (tvrInfo_u ((calcStrictInfo v e)) v,e) | (v,(e,_,_)) <- ds'' ] e', fvs, finalS  )
+        --return (substLet' [ (v,e) | (v,(e,_,_)) <- ds'' ] e', fvs, finalS  )
     f e@(EAp a b)  = case runIdentity $ app (fromAp e) of
             EAp a' b' | a == a' && b == b' -> error $ "SSimplify.collectOcc.f: " ++ show e
             e -> f e
@@ -287,7 +294,7 @@ simplify sopts e = (e'',stat,occ) where
         (ds',sub',inb') <- w s' sub'' (envInScope_u (Map.fromList [ (tvrNum t',NotKnown) | (_,n,t',_) <- s', n /= Once] `Map.union`) inb) []
         e' <- f e sub' inb'
         case ds' of
-            [(t,e)] | worthStricting e, Just (Strict.S _) <- Info.lookup (tvrInfo t) -> do
+            [(t,e)] | worthStricting e, Just (Strict.S _) <- Info.lookup (tvrInfo t), not (getProperty prop_CYCLIC t) -> do
                 mtick "E.Simplify.strictness.let-to-case"
                 return $ eStrictLet t e e'
             _ -> do
@@ -336,7 +343,7 @@ simplify sopts e = (e'',stat,occ) where
     doCase (ELetRec ds e) b as d sub inb = do
         mtick "E.Simplify.let-from-case"
         e' <- doCase e b as d sub inb
-        return $ ELetRec ds e'
+        return $ substLet' ds e'
 
     doCase (EVar v) b as d sub inb |  Just (IsBoundTo _ (ELit l)) <- Map.lookup (tvrNum v) (envInScope inb)  = doConstCase l b as d sub inb
     doCase (ELit l) b as d sub inb  = doConstCase l b as d sub inb

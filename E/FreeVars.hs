@@ -6,6 +6,7 @@ import E.E
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 import Data.Monoid
 import GenUtil
 import Data.Graph as G
@@ -39,6 +40,8 @@ instance FreeVars (Alt E) (Set.Set Int) where
     freeVars as@(Alt l e) = Set.unions $ freeVars (getLitTyp l):(freeVars e Set.\\ Set.fromList [ tvrNum t | t <- litBinds l]):( map (freeVars . getTyp) $ litBinds l)
 instance (FreeVars E x) => FreeVars (Lit TVr E) x where
     freeVars l =  mconcat $ freeVars (getLitTyp l :: E ):(map (freeVars . (getTyp :: TVr -> E) ) $ litBinds l)
+instance FreeVars E (Map.Map Id (Maybe E)) where
+    freeVars e = Map.fromAscList [ (v,Nothing) |  v <- IM.keys (freeVars e :: IM.IntMap TVr )]
 
 
 

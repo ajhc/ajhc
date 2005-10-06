@@ -2,6 +2,9 @@ module E.Values where
 
 import Char
 import Control.Monad.Identity
+import Data.Monoid
+import List
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Ratio
 
@@ -73,17 +76,17 @@ instance ToE Rational where
     typeE _ = tRational
 
 instance ToE Integer where
-    toE ch = ELit (litCons DataConstructor ("Prelude","Integer") [toEzh ch] tInteger)
+    toE ch = ELit (LitCons dc_Integer [toEzh ch] tInteger)
     typeE _ = tInteger
 
 instance ToE Int where
-    toE ch = ELit (litCons DataConstructor ("Prelude","Int") [toEzh ch] tInt)
+    toE ch = ELit (LitCons dc_Int [toEzh ch] tInt)
     typeE _ = tInt
 
 instance ToE a => ToE [a] where
     toE xs@[] = eNil (typeE xs)
     toE (x:xs) = eCons (toE x) (toE xs)
-    typeE (_::[a]) = ELit (litCons TypeConstructor ("Prelude","[]") [typeE (undefined::a)] eStar)
+    typeE (_::[a]) = ELit (LitCons tc_List [typeE (undefined::a)] eStar)
 
 
 --eInt x = ELit $ LitInt x tInt
@@ -94,22 +97,42 @@ eNil t = ELit $ LitCons vEmptyList [] t
 eCaseTup e vs w = ECase e (tVr 0 (getType e)) [Alt (LitCons (toTuple (length vs)) vs (getType e)) w] Nothing
 eCaseTup' e vs w = ECase e (tVr 0 (getType e)) [Alt (LitCons (unboxedNameTuple DataConstructor (length vs)) vs (getType e)) w] Nothing
 
-eJustIO w x = ELit (LitCons dc_JustIO [w,x] (ELit (LitCons (toName TypeConstructor ("Jhc.IO","IOResult")) [getType x] eStar)))
-tIO t = ELit (LitCons (toName TypeConstructor ("Jhc.IO", "IO")) [t] eStar)
+eJustIO w x = ELit (LitCons dc_JustIO [w,x] (ELit (LitCons tc_IOResult [getType x] eStar)))
+tIO t = ELit (LitCons tc_IO [t] eStar)
 
 eCase e alts Unknown = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseDefault = Nothing, eCaseAlts =  alts }
 eCase e alts els = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseDefault = Just els, eCaseAlts =  alts }
 
 -- | This takes care of types right away, it simplifies various other things to do it this way.
 eLet :: TVr -> E -> E -> E
-eLet TVr { tvrIdent = 0 } _ = id
-eLet t@(TVr { tvrType =  ty}) e | sortStarLike ty && isAtomic e = subst t e
-eLet t e = ELetRec [(t,e)]
+eLet TVr { tvrIdent = 0 } _ e' = e'
+eLet t@(TVr { tvrType =  ty}) e e' | sortStarLike ty && isAtomic e = subst t e e'
+eLet t@(TVr { tvrType =  ty}) e e' | sortStarLike ty = ELetRec [(t,e)] (typeSubst mempty (Map.singleton (tvrIdent t) e) e')
+eLet t e e' = ELetRec [(t,e)] e'
 
 -- | strict version of let, evaluates argument before assigning it.
-eStrictLet t@(TVr { tvrType =  ty }) v e | sortStarLike ty && isAtomic v = subst t v e
+eStrictLet t@(TVr { tvrType =  ty }) v e | sortStarLike ty  = eLet t v e
 eStrictLet t v e = ECase v t [] (Just e)
 
+substLet :: [(TVr,E)] -> E -> E
+substLet ds e  = ans where
+    (as,nas) = partition (isAtomic . snd) (filter ((/= 0) . tvrNum . fst) ds)
+    tas = filter (sortStarLike . tvrType . fst) nas
+    ans = eLetRec (as ++ nas) (typeSubst' (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- as]) (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas]) e)
+
+substLet' :: [(TVr,E)] -> E -> E
+substLet' ds e  = ans where
+    nas = filter ((/= 0) . tvrNum . fst) ds
+    tas = filter (sortStarLike . tvrType . fst) nas
+    ans = case (nas,tas) of
+        ([],_) -> e
+        (nas,[]) -> ELetRec nas e
+        _  -> let
+                    f = typeSubst' mempty (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas])
+                    nas' = [ (v,f e) | (v,e) <- nas]
+               in ELetRec nas' (f e)
+
+eLetRec = substLet'
 
 isLifted x = sortTermLike x
 
@@ -141,7 +164,7 @@ prim_toTag e = f e where
 -- prim_fromTag e t = EPrim (primPrim "fromTag") [e] t
 
 prim_unsafeCoerce e t = p e' where
-    (_,e',p) = unsafeCoerceOpt $ EPrim (primPrim "unsafeCoerce") [e] t
+    (_,e',p) = unsafeCoerceOpt $ EPrim p_unsafeCoerce [e] t
 from_unsafeCoerce (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = return (e,t)
 from_unsafeCoerce _ = fail "Not unsafeCoerce primitive"
 
@@ -160,7 +183,7 @@ unsafeCoerceOpt (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = f (0::Int) e
     f n e t = (n,e,flip prim_unsafeCoerce t)
 unsafeCoerceOpt e = (0,e,id)
 
-prim_integralCast e t = EPrim (primPrim "integralCast") [e] t
+prim_integralCast e t = EPrim p_integralCast [e] t
 from_integralCast (EPrim (APrim (PrimPrim "integralCast") _) [e] t) = return (e,t)
 from_integralCast _ = fail "Not integralCast primitive"
 

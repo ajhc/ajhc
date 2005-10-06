@@ -158,9 +158,10 @@ processDecls stats ho ho' tiData = do
 
     -- some more useful values.
     let inscope =  [ tvrNum n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrNum n | (_,n,_) <- ds ] ++ map tvrNum (methodNames (hoClassHierarchy allHo))
-        --mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
-        mangle = mangle' Nothing fullDataTable
+        mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
         exports = getExports ho'
+        classNames = Set.fromList $ map tvrNum (methodNames (hoClassHierarchy allHo))
+        namesInscope = Set.fromList inscope -- classNames `Set.union` (Set.fromAscList $ Map.keys smap)
 
     -- initial pass over functions to put them into a normalized form
     let procE (ds,usedIds) (n,v,lc) = do
@@ -173,6 +174,7 @@ processDecls stats ho ho' tiData = do
     -- This is the main function that optimizes the routines before writing them out
     let f (ds,(smap,annmap)) (rec,ns) = do
         let names = [ n | (n,_,_) <- ns]
+        let namesInscope' = Set.fromAscList (Map.keys smap) `Set.union` namesInscope
         wdump FD.Lambdacube $ putErrLn ("----\n" ++ show names)
         let cm stats e = do
             let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
@@ -180,6 +182,7 @@ processDecls stats ho ho' tiData = do
             Stats.tickStat stats stat
             return e'
         cds <- annotateDs annmap (idann (hoRules allHo) (hoProps allHo)) letann lamann [ (t,e) | (_,t,e) <- ns]
+        let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds)) fullDataTable
         cds <- flip mapM (zip names cds) $ \ (n,(v,lc)) -> do
             lc <- doopt mangle False stats "SuperSimplify" cm lc
             lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
@@ -197,6 +200,7 @@ processDecls stats ho ho' tiData = do
         cds' <- return $ concatMap (uncurry (workWrap fullDataTable)) cds
         let wws = length cds' - length cds
         wdump FD.Progress $ putErr (replicate wws 'w')
+        let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds')) fullDataTable
         cds <- flip mapM (cds') $ \ (v,lc) -> do
             lc <- mangle (return ()) False ("Barendregt: ") (return . barendregt) lc
             lc <- doopt mangle False stats "SuperSimplify" cm lc
@@ -335,7 +339,7 @@ compileModEnv' stats ho = do
             let (e',stat,occ) = SS.simplify sopt e
             Stats.tickStat stats stat
             return e'
-        e' <- doopt (mangle dataTable) False finalStats "SuperSimplify" cm e
+        e' <- doopt (mangle' Nothing dataTable) False finalStats "SuperSimplify" cm e
         return (t,ls,e')
     wdump FD.Progress $ Stats.print "PostLifting" finalStats
 

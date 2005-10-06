@@ -1,15 +1,18 @@
-module E.Inline(inlineDecompose, basicDecompose, emapE, emapE',emapEG, emapE_, bindingFreeVars) where
+module E.Inline(inlineDecompose, basicDecompose, emapE, emapE',emapEG, app, emapE_, bindingFreeVars) where
 
 import Control.Monad.Writer
 import Data.FunctorM
 import Data.Monoid
 
+import Atom
 import E.E
 import E.Rules
+import E.Subst
 import E.Values
 import FreeVars
 import GenUtil
 import Info.Info as Info
+import Stats
 import Util.Graph
 import Util.HasSize
 
@@ -67,6 +70,31 @@ inlineDecompose prune body ds = ans where
         (_,i,_,_) = minimumUnder (\ (_,_,_,x) -> x) ms
     f [] xs = reverse xs
 
+app (e,[]) = return e
+app (e,xs) = app' e xs
+
+app' (ELit (LitCons n xs t)) (a:as)  = do
+    mtick (toAtom $ "E.Simplify.typecon-reduce.{" ++ show n ++ "}" )
+    app (ELit (LitCons n (xs ++ [a]) (eAp t a)),as)
+app' (ELam tvr e) (a:as) = do
+    mtick (toAtom "E.Simplify.beta-reduce")
+    app (subst tvr a e,as)   -- TODO Fix quadradic substitution
+app' (EPi tvr e) (a:as) = do
+    mtick (toAtom "E.Simplify.pi-reduce")
+    app (subst tvr a e,as)     -- Okay, types are small
+app' ec@ECase {} xs = do
+    mtick (toAtom "E.Simplify.case-application")
+    let f e = app' e xs
+    caseBodiesMapM f ec
+app' (ELetRec ds e) xs = do
+    mtick (toAtom "E.Simplify.let-application")
+    e' <- app' e xs
+    return $ eLetRec ds e'
+app' (EError s t) xs = do
+    mtick (toAtom "E.Simplify.error-application")
+    return $ EError s (foldl eAp t xs)
+app' e as = do
+    return $ foldl EAp e as
 
 
 {-

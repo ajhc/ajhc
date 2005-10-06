@@ -20,8 +20,8 @@ import Atom
 import E.E
 import E.Inline
 import E.Rules
-import E.Subst(app)
 import E.Traverse
+import E.Values
 import FreeVars
 import GenUtil
 import qualified Util.Graph as G
@@ -32,7 +32,7 @@ import Stats
 doLetRec stats [] e = return e
 doLetRec stats ds _ | hasRepeatUnder fst ds = error "doLetRec: repeated variables!"
 doLetRec stats ds e = do
-    return $ ELetRec ds e
+    return $ substLet ds e
     {-
     let fakeDs = (TVr (-1) undefined,e)
     let ds' = reachable (newGraph (fakeDs:ds) (tvrNum . fst) (freeVars . snd)) [-1]

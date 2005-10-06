@@ -264,10 +264,10 @@ discardArgs _ _ = error "discardArgs"
 
 
 -- | construct a letret, throwing away empty declarations
-eLetRec :: [(TVr,E)] -> E -> E
-eLetRec ds e = f (filter ((/= 0) . tvrNum . fst) ds) where
-    f [] = e
-    f ds = ELetRec ds e
+--eLetRec :: [(TVr,E)] -> E -> E
+--eLetRec ds e = f (filter ((/= 0) . tvrNum . fst) ds) where
+--    f [] = e
+--    f ds = ELetRec ds e
 
 
 tvrName :: Monad m => TVr  -> m Name

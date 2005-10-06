@@ -20,7 +20,6 @@ typ ::  E -> E
 typ (ESort EStar) =  eBox
 typ (ESort EHash) =  eBox
 typ (ESort EBox) = error "Box inhabits nowhere."
-typ (ESort _) = error "What sort of sort is this?"
 typ (ELit l) = getType l
 typ (EVar v) =  getType v
 typ (EPi _ b) = typ b
