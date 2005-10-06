@@ -73,6 +73,10 @@ bracketHtml action = do
 
 main = runMain $ bracketHtml $ do
     o <- processOptions
+    wdump FD.Progress $ do
+        name <- System.getProgName
+        args <- System.getArgs
+        putStrLn (simpleQuote (name:args))
     case o of
         Opt { optShowHo = xs@(_:_) } -> mapM_ dumpHoFile xs
         Opt { optBuildHl = hlName@(_:_) } -> buildHl hlName (optArgs o)
