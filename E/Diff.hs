@@ -21,6 +21,7 @@ diff a b = f a b where
 -- show terms which contain interesting free variables
 findOddFreeVars  :: [TVr] -> E -> E
 findOddFreeVars fs (ELetRec ds e) = ELetRec [ ds | ds@(_,e) <- ds, any (`elem` fs) (freeVars e) ] e
+findOddFreeVars _ e = e
 
 
 printEStats :: E -> IO ()

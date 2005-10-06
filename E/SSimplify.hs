@@ -17,6 +17,7 @@ import E.E
 import E.PrimOpt
 import E.Rules
 import E.Subst
+import E.TypeCheck
 import E.Values
 import FreeVars
 import GenUtil
@@ -93,13 +94,14 @@ collectOcc sopts  e = (e',fvs,occ) where
             cycNodes = Set.fromList $ [ v | (v,_) <- cyclicNodes gr']
             calcStrictInfo t e
                 | t `Set.member` cycNodes = Strict.L
-                | Just s <- Map.lookup (tvrNum t) (so_strictness sopts) = s
+                | Just s <- Info.lookup (tvrInfo t) = s
                 | otherwise = Strict.L
         let dvars = map (tvrNum . fst) ds
             fvs = foldr Set.delete (mconcat (fve:[ fv `mappend` freeVars t | (TVr { tvrType =  t},(_,fv,_)) <- ds'' ])) dvars
             finalS = Map.union (Map.fromList [(n,LoopBreaker) | (TVr { tvrIdent = n },_) <- lb ]) $   foldl andOM se ([ s | (_,(_,_,s)) <- ds'' ])
         tell $ Seq.singleton (Map.fromList [ (t,Map.findWithDefault Unused n (Map.mapWithKey frules finalS)) | (t@(TVr { tvrIdent = n }),_) <- ds'' ])
-        return (eLetRec [ (tvrInfo_u (Info.insert (calcStrictInfo v e)) v,e) | (v,(e,_,_)) <- ds'' ] e', fvs, finalS  )
+        -- return (eLetRec [ (tvrInfo_u (Info.insert (calcStrictInfo v e)) v,e) | (v,(e,_,_)) <- ds'' ] e', fvs, finalS  )
+        return (eLetRec [ (v,e) | (v,(e,_,_)) <- ds'' ] e', fvs, finalS  )
     f e@(EAp a b)  = case runIdentity $ app (fromAp e) of
             EAp a' b' | a == a' && b == b' -> error $ "SSimplify.collectOcc.f: " ++ show e
             e -> f e
@@ -285,8 +287,8 @@ simplify sopts e = (e'',stat,occ) where
         (ds',sub',inb') <- w s' sub'' (envInScope_u (Map.fromList [ (tvrNum t',NotKnown) | (_,n,t',_) <- s', n /= Once] `Map.union`) inb) []
         e' <- f e sub' inb'
         case ds' of
-            [(t,e)] | worthStricting e, Just Strict <- Info.lookup (tvrInfo t) -> do
-                mtick "E.Simplify.let-to-case"
+            [(t,e)] | worthStricting e, Just (Strict.S _) <- Info.lookup (tvrInfo t) -> do
+                mtick "E.Simplify.strictness.let-to-case"
                 return $ eStrictLet t e e'
             _ -> do
                 let fn ds (ELetRec ds' e) | not (hasRepeatUnder fst (ds ++ ds')) = fn (ds' ++ ds) e
@@ -522,7 +524,11 @@ multiInline e xs = length xs + 2 >= nsize   where
     size' _ = 100
 
 
-worthStricting x = isLifted x && not (isELit x)
+worthStricting EError {} = True
+worthStricting ELit {} = False
+worthStricting ELam {} = False
+worthStricting x = sortTermLike x
+--worthStricting x = isLifted x && not (isELit x)
 
 
 coerceOpt :: MonadStats m =>  (E -> m E) -> E -> m E

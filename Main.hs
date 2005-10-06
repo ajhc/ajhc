@@ -154,7 +154,8 @@ processDecls stats ho ho' tiData = do
 
     -- some more useful values.
     let inscope =  [ tvrNum n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrNum n | (_,n,_) <- ds ] ++ map tvrNum (methodNames (hoClassHierarchy allHo))
-        mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
+        --mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
+        mangle = mangle' Nothing fullDataTable
         exports = getExports ho'
 
     -- initial pass over functions to put them into a normalized form
@@ -169,38 +170,41 @@ processDecls stats ho ho' tiData = do
     let f (ds,(smap,annmap)) (rec,ns) = do
         let names = [ n | (n,_,_) <- ns]
         wdump FD.Lambdacube $ putErrLn ("----\n" ++ show names)
+        let cm stats e = do
+            let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
+            let (e',stat,occ) = SS.simplify sopt e
+            Stats.tickStat stats stat
+            return e'
         cds <- annotateDs annmap (idann (hoRules allHo) (hoProps allHo)) letann lamann [ (t,e) | (_,t,e) <- ns]
         cds <- flip mapM (zip names cds) $ \ (n,(v,lc)) -> do
-            let cm stats e = do
-                let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
-                let (e',stat,occ) = SS.simplify sopt e
-                Stats.tickStat stats stat
-                return e'
             lc <- doopt mangle False stats "SuperSimplify" cm lc
             lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
             lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
-            lc <- doopt mangle False stats "SuperSimplify" cm lc
-            --wdump FD.Lambdacube $ printCheckName' fullDataTable lc
             return (v,lc)
-            --return ((n,v,lc):ds, (Map.insert (tvrNum v) lc smap, Map.insert (tvrNum v) (Just (EVar v)) annmap))
+        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
+        cds <- E.Strictness.solveDs cds
+        cds <- flip mapM (zip names cds) $ \ (n,(v,lc)) -> do
+            lc <- doopt mangle False stats "SuperSimplify" cm lc
+            lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
+            return (v,lc)
+
+        -- cds <- E.Strictness.solveDs cds
         cds <- return $ fst (E.CPR.cprAnalyzeBinds mempty cds)
         cds' <- return $ concatMap (uncurry (workWrap fullDataTable)) cds
         let wws = length cds' - length cds
         wdump FD.Progress $ putErr (replicate wws 'w')
         cds <- flip mapM (cds') $ \ (v,lc) -> do
-            let cm stats e = do
-                let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
-                let (e',stat,occ) = SS.simplify sopt e
-                Stats.tickStat stats stat
-                return e'
             lc <- mangle (return ()) False ("Barendregt: ") (return . barendregt) lc
             lc <- doopt mangle False stats "SuperSimplify" cm lc
             --lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
             --lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             --lc <- doopt mangle False stats "SuperSimplify" cm lc
-            wdump FD.Lambdacube $ printCheckName' fullDataTable v lc
+            --wdump FD.Lambdacube $ printCheckName' fullDataTable v lc
             return (v,lc)
+        cds <- E.Strictness.solveDs cds
+        cds <- return $ fst (E.CPR.cprAnalyzeBinds mempty cds)
         cds <- annotateDs annmap (\_ -> return) letann lamann cds
+        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
         let nvls = [ (fromJust (fromId (tvrIdent t)),t,e)  | (t,e) <- cds ]
 
         wdump FD.Progress $ putErr (if rec then "*" else ".")
@@ -303,11 +307,11 @@ compileModEnv' stats ho = do
     --    when (length xs > 1) $ do
     --        putStrLn (prettyE (ELetRec xs Unknown))
     --sequence_ [ putStrLn $ (tvrShowName t) <+> show (maybe E.CPR.Top id (Info.lookup (tvrInfo t)) ::  E.CPR.Val) | (t,_,_) <- scCombinators $ eToSC dataTable lc ]
-    lc <- if fopts FO.FloatIn then  opt "Float Inward..." (\stats x -> return (floatInward rules  x))  lc  else return lc
-    vs <- if fopts FO.Strictness then (collectSolve lc) else return []
+    --lc <- if fopts FO.FloatIn then  opt "Float Inward..." (\stats x -> return (floatInward rules  x))  lc  else return lc
+    --vs <- if fopts FO.Strictness then (collectSolve lc) else return []
     -- mapM_ putErrLn $  sort [ tshow x <+> "->" <+> tshow y | (x@(E.Strictness.V i),y@Lam {}) <- vs, odd i]
     let cm stats e = do
-        let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable,  SS.so_strictness = Map.fromList [ (i,S n) | (E.Strictness.V i,S n) <- vs] }
+        let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable }
         let (e',stat,occ) = SS.simplify sopt e
         Stats.tickStat stats stat
         return e'
