@@ -41,6 +41,7 @@ prop_INLINE = toAtom "INLINE"
 prop_SUPERINLINE = toAtom "SUPERINLINE"
 prop_NOINLINE = toAtom "NOINLINE"
 prop_SRCLOC_ANNOTATE = toAtom "SRCLOC_ANNOTATE"
+prop_MULTISPECIALIZE = toAtom "MULTISPECIALIZE"
 
 -- | this is set on functions which are the target of an error annotated function
 prop_SRCLOC_ANNOTATE_FUN = toAtom "_SRCLOC_ANNOTATE_FUN"
