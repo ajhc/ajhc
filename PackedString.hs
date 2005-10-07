@@ -231,7 +231,7 @@ hashPS' (PS (UArray 0 (I# e) ba)) = fromIntegral $ unpackFoldlUtf8# f 5381 ba (e
 hashPS :: PackedString -> Word
 hashPS (PS (UArray 0 (I# e) ba)) =  W# (f (unsafeCoerce# 5381#) 0#) where
     f m c
-        | c ==# (e +# 1#) = m
+        | c >=# (e +# 1#) = m
         | otherwise = f (((m `uncheckedShiftL#` 5#) `plusWord#` m ) `xor#`  (((indexWord8Array# ba c)))) (c +# 1#)
 
 

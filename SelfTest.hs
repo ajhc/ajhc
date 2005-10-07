@@ -47,6 +47,14 @@ testPackedString = do
     quickCheck prop_pslen
     quickCheck prop_psappend
     quickCheck prop_psappend'
+    pshash "Hello"
+    pshash "Foo"
+    pshash "Bar"
+    pshash "Baz"
+    pshash ""
+    pshash "\2321\3221x.y\3421\2222"
+
+pshash xs = putStrLn $ xs ++ ": " ++ show (hashPS (packString xs ))
 
 testName = do
     putStrLn "Testing Name"
