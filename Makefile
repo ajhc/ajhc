@@ -1,6 +1,6 @@
 JHC_VERSION=0.1
 
-all:   jhc
+all: jhc jhcp
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches -fno-warn-unused-binds    # -O2 -ddump-simpl-stats -ddump-rules
 GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
@@ -24,10 +24,14 @@ SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
 MAIN=Main.hs
 
 jhcp: $(HSFILES)
-	$(HC) $(GHCOPTS) $(EXTRAOPTS) $(GHCPROFOPTS) --make Main.hs -o $@
+	date '+%y%m%d%H%M.%S' > /tmp/$@.date.tmp
+	$(HC) $(GHCOPTS) $(EXTRAOPTS) $(GHCPROFOPTS) --make $(MAIN) -o $@
+	touch -t `cat /tmp/$@.date.tmp` $@
 
 jhc: $(HSFILES)
-	$(HC) $(GHCOPTS) $(EXTRAOPTS) --make Main.hs -o $@
+	date '+%y%m%d%H%M.%S' > /tmp/$@.date.tmp
+	$(HC) $(GHCOPTS) $(EXTRAOPTS) --make $(MAIN) -o $@
+	touch -t `cat /tmp/$@.date.tmp` $@
 
 i:
 	ghci $(GHCOPTS) $(EXTRAOPTS) Main.hs
