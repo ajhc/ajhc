@@ -1,4 +1,4 @@
-module NameMonad(NameMonad(..), GenName(..), NameMT, runNameMT, freeNames) where
+module NameMonad(NameMonad(..), GenName(..), NameMT, runNameMT, runNameMT', freeNames) where
 
 -- This may be horrid overdesign. I broke several principles I usually use to
 -- prevent ones natural tendancy to overdesign.
@@ -58,6 +58,10 @@ newtype NameMT n m a = NameMT (StateT (Set.Set n, Set.Set n) m a)
 runNameMT :: (Monad m) => NameMT a1 m a -> m a
 runNameMT (NameMT x) = liftM fst $ runStateT x (Set.empty,Set.empty)
 
+runNameMT' :: (Monad m) => NameMT a1 m a -> m (a,Set.Set a1)
+runNameMT' (NameMT x) = do
+    (r,(used,bound)) <- runStateT x (Set.empty,Set.empty)
+    return (r,bound)
 
 fromNameMT :: NameMT n m a -> StateT (Set.Set n, Set.Set n) m a
 fromNameMT (NameMT x) = x
@@ -80,8 +84,5 @@ instance (GenName n,Ord n,Monad m) => NameMonad n (NameMT n m) where
     newName  = NameMT $ do
         (used,bound) <- get
         fromNameMT $ newNameFrom  (genNames (Set.size used + Set.size bound))
-
-    --getNames  = NameMT $ do
-    --    fmap Set.toList get
 
 

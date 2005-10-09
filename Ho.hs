@@ -1,11 +1,14 @@
 module Ho(Ho(..),HoHeader(..),FileDep(..),findModule,showHoCounts,initialHo,dumpHoFile,loadLibraries,recordHoFile) where
 
 
+import Control.Monad.Identity
 import Data.Graph(stronglyConnComp,SCC(..))
 import Data.IORef
 import Data.Monoid
 import IO(bracket)
 import List
+import Maybe
+import Monad
 import Prelude hiding(print,putStrLn)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -19,15 +22,17 @@ import Binary
 import CanType
 import CharIO
 import Class
-import Control.Monad.Identity
 import DataConstructors
 import Directory
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
+import E.CPR
 import E.E
 import E.Inline(emapE)
+import E.Pretty
 import E.Rules
+import E.Strictness
 import E.Subst(substMap'')
 import E.TypeCheck()
 import FilterInput
@@ -40,8 +45,6 @@ import HsSyn
 import Info.Types
 import KindInfer
 import MapBinaryInstance()
-import Maybe
-import Monad
 import Name
 import Options
 import PackedString
@@ -471,20 +474,33 @@ showHoCounts ho = do
 
 
 loadLibraries :: IO Ho
-loadLibraries = f initialHo (optHls options)  where
-    f ho [] = return ho
-    f ho (fn:rs) = checkForHoFile fn >>= \x -> case x of
-        Nothing -> putErrDie $ "Library not found or invalid: " ++ show fn
-        Just (_,ho') -> f (ho' `mappend` ho) rs
+loadLibraries = do
+    initialHo <- getInitialHo
+    f initialHo (optHls options)  where
+        f ho [] = return ho
+        f ho (fn:rs) = checkForHoFile fn >>= \x -> case x of
+            Nothing -> putErrDie $ "Library not found or invalid: " ++ show fn
+            Just (_,ho') -> f (ho' `mappend` ho) rs
 
 
 
 initialHo = mempty { hoEs = es , hoClassHierarchy = ch  }  where
     ch = foldl addOneInstanceToHierarchy mempty (map ((,) False) primitiveInsts)
-    es = Map.fromList [  (n,(setProperty prop_INSTANCE $ tVr (atomIndex $ toAtom n) (getType v),v)) |  (n,v) <- constantMethods ] `mappend` es'
+    es = Map.fromList [  (n,(setProperties [prop_INSTANCE] $ tVr (atomIndex $ toAtom n) (getType v),v)) |  (n,v) <- constantMethods ] `mappend` es'
     --es' = Map.fromList [ (n,(tVr (atomIndex $ toAtom n) (getType v),v)) | (n,t,p,d) <- theMethods, let v = f n t p d  ]
     es' = Map.fromList [ (n,(setProperty prop_INSTANCE $ tVr (atomIndex $ toAtom n) (error "f no longer relevant"),v)) | (n,t,p,d) <- theMethods, let v = f n t p d  ]
     f _ _ _ _ = error "f no longer relevant"
+
+getInitialHo :: IO Ho
+getInitialHo = do
+    return initialHo
+{-
+    let ds = Map.elems $ hoEs initialHo
+    cds <- E.Strictness.solveDs ds
+    cds <- return $ fst (E.CPR.cprAnalyzeBinds mempty cds)
+    mapM_ (\t -> putStrLn (prettyE (EVar t) <+> show (tvrInfo t))) (fsts cds)
+    return initialHo { hoEs = Map.fromList [ (n,v) | v <- cds | n <- Map.keys (hoEs initialHo) ] }
+    -}
 
 
 

@@ -79,6 +79,7 @@ app' (ELit (LitCons n xs t)) (a:as)  = do
 app' (ELam tvr e) (a:as) = do
     mtick (toAtom "E.Simplify.beta-reduce")
     app (subst tvr a e,as)   -- TODO Fix quadradic substitution
+    --app (eLet tvr a e,as)   -- TODO Fix quadradic substitution
 app' (EPi tvr e) (a:as) = do
     mtick (toAtom "E.Simplify.pi-reduce")
     app (subst tvr a e,as)     -- Okay, types are small

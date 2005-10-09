@@ -71,7 +71,7 @@ lookup (Info mp) = do
 
 
 createTyp :: Typeable a => a -> Atom
-createTyp x = toAtom (show (typeOf x))
+createTyp (_::a) = toAtom (show (typeOf (undefined :: a)))
 
 insertWith :: (Show a,Typeable a) => (a -> a -> a) -> a -> Info -> Info
 insertWith f x (Info mp) = Info (Map.insert typ (newEntry typ nx) mp) where

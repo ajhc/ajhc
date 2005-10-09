@@ -1,23 +1,25 @@
 
-module E.Traverse(TravM, newVarName, lookupBinding, newBinding, traverse, renameTraverse, renameTraverse', TravOptions(..), Binding(..), travOptions, emapE, emapE') where
+module E.Traverse(TravM, newVarName, lookupBinding, newBinding, traverse, renameTraverse, renameTraverse', runRename, TravOptions(..), Binding(..), travOptions, emapE, emapE') where
 
-import E.E
-import E.Rules
-import E.TypeCheck
-import Data.FunctorM
-
+import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
+import Data.FunctorM
 import Data.Monoid
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+
 import DataConstructors()
+import E.E
 import E.Inline
+import E.Rules
 import E.Strictness as Strict
+import E.TypeCheck
 import E.Values
 import FreeVars
 import GenUtil
 import Name
 import NameMonad
-import qualified Data.Map as Map
 
 -- Generic traversal routines rock.
 
@@ -27,10 +29,14 @@ instance Monoid MInt where
     mempty = MInt 0
     mappend (MInt a) (MInt b) = a `seq` b `seq` MInt (a + b)
 
+
 renameTraverse e = (e',c) where
-    (e',MInt c) = runWriter $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> lift (tell (MInt 1)) >> (return $ foldl EAp x xs)) mempty mempty  e
+    (e',MInt c) = runWriter $ liftM fst $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> lift (tell (MInt 1)) >> (return $ foldl EAp x xs)) mempty mempty  e
 renameTraverse' e = e' where
-    e' = traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty mempty  e
+    e' = liftM fst $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty mempty  e
+
+runRename :: Set.Set Int -> E -> (E,Set.Set Int)
+runRename set e = runIdentity $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty (Map.fromList [ (v,NotKnown) | v <- Set.toAscList set])  e
 
 data  TravOptions m = TravOptions {
     pruneUnreachable :: Maybe [Int],
@@ -105,8 +111,8 @@ newVar' _ n = n
 
 -}
 
-traverse :: (MonadFix m,Monad m) => TravOptions m -> (Int -> (E,[E]) -> TravM m E) -> Subst -> (Map.Map Int Binding) -> E -> m E
-traverse (tOpt :: TravOptions m) func subst smap e = runNameMT $ initNames >> runReaderT (f e) (smap,subst,0::Int)  where
+traverse :: (MonadFix m,Monad m) => TravOptions m -> (Int -> (E,[E]) -> TravM m E) -> Subst -> (Map.Map Int Binding) -> E -> m (E,Set.Set Int)
+traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> runReaderT (f e) (smap,subst,0::Int)  where
     initNames = do
         addNames $ freeVars e
         addNames (Map.keys subst)

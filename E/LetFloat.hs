@@ -48,7 +48,7 @@ propRec stats n = do
     ticks stats n (toAtom "E.Simplify.copy-propegate")
 
 atomizeApps :: Set.Set Id -> Stats -> E -> IO E
-atomizeApps usedIds stats e = traverse travOptions { pruneRecord = varElim stats } f mempty (Map.fromAscList [ (i,NotKnown) | i <- Set.toAscList usedIds ]) e where
+atomizeApps usedIds stats e = liftM fst $ traverse travOptions { pruneRecord = varElim stats } f mempty (Map.fromAscList [ (i,NotKnown) | i <- Set.toAscList usedIds ]) e where
     --f 0 (EPi (TVr Nothing t) b,[])  = do
     --    (t',ds1) <- at t
     --    (b',ds2) <- at b
@@ -207,7 +207,7 @@ annotateBindings min e = ans where
 
 
 coalesceLets :: Stats -> E -> IO E
-coalesceLets stats e = traverse travOptions { pruneRecord = varElim stats } f mempty mempty e where
+coalesceLets stats e = liftM fst $ traverse travOptions { pruneRecord = varElim stats } f mempty mempty e where
     f n (x,xs) = do
         (x',xs') <- lift $ doCoalesce stats (x,xs)
         return $ foldl EAp x' xs'
