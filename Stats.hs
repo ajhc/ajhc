@@ -1,22 +1,23 @@
 module Stats(Stats,new,tick,ticks,getTicks,Stats.print,clear,MonadStats(..),combine, printStat, Stat, mtick, mticks, runStatT, runStatIO, tickStat, StatT, theStats ) where
 
 
-import qualified Data.HashTable as H
-import Atom
-import GenUtil
-import List(sort,groupBy)
-import CharIO
-import Data.Tree
-import qualified Doc.Chars as C
 import Char
-import Data.IORef
 import Control.Exception
-import Control.Monad.Writer
-import Control.Monad.Reader
-import Control.Monad.Identity
 import Control.Monad.Fix
-import System.IO.Unsafe
+import Control.Monad.Identity
+import Control.Monad.Reader
+import Control.Monad.Writer
+import Data.IORef
+import Data.Tree
+import List(sort,groupBy)
+import qualified Data.HashTable as H
 import qualified Data.Map as Map
+import System.IO.Unsafe
+
+import Atom
+import CharIO
+import GenUtil
+import qualified Doc.Chars as C
 
 
 data Stats = Stats !(IORef Int) !(H.HashTable Atom Int)
@@ -144,6 +145,7 @@ instance Monoid Stat where
 newtype StatT m a = StatT (WriterT Stat m a)
     deriving(MonadIO, Functor, MonadFix, MonadTrans, Monad)
 
+runStatT :: Monad m => StatT m a -> m (a,Stat)
 runStatT (StatT m) =  runWriterT m
 
 class Monad m => MonadStats m where
