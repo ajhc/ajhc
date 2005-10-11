@@ -14,6 +14,8 @@ import Control.Monad.Trans
 class Monad m => NameMonad n m | m -> n  where
     -- | Add to list of used names
     addNames :: [n] -> m ()
+    -- | Add to list of bound names
+    addBoundNames :: [n] -> m ()
     -- | Choose a new name, adding it to both bound and used sets.
     newName :: m n
     -- | choose the first available name from list
@@ -21,9 +23,8 @@ class Monad m => NameMonad n m | m -> n  where
     -- | choose a new name if n is bound, else return n adding n to the bound names list
     uniqueName :: n -> m n
 
-
-    --  | get bound names
-    -- getNames :: m [n]
+    -- in case we only have a concept of bound names
+    addNames = addBoundNames
 
 -- | Generating names.
 
@@ -44,6 +45,7 @@ freeNames s  = filter (not . (`Set.member` s)) (genNames (Set.size s))
 
 instance (Monad m, Monad (t m), MonadTrans t, NameMonad n m) => NameMonad n (t m) where
     addNames n = lift $ addNames n
+    addBoundNames n = lift $ addBoundNames n
     newName = lift  newName
     newNameFrom y = lift $ newNameFrom y
     uniqueName y = lift $ uniqueName y
@@ -69,6 +71,9 @@ fromNameMT (NameMT x) = x
 instance (GenName n,Ord n,Monad m) => NameMonad n (NameMT n m) where
     addNames ns = NameMT $ do
         modify (\ (used,bound) -> (Set.fromList ns `Set.union` used, bound) )
+    addBoundNames ns = NameMT $ do
+        let nset = Set.fromList ns
+        modify (\ (used,bound) -> (nset `Set.union` used, nset `Set.union` bound) )
     uniqueName n = NameMT $ do
         (used,bound) <- get
         if n `Set.member` bound then fromNameMT newName else put (Set.insert n used,Set.insert n bound) >> return n
