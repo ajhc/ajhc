@@ -39,6 +39,7 @@ import FrontEnd.FrontEnd
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadFunctions
 import Grin.FromE
+import CanType
 import Grin.Grin hiding (typecheck)
 import Grin.Show
 import Grin.Whiz
@@ -57,6 +58,7 @@ import qualified Grin.Simplify
 import qualified Info.Info as Info
 import qualified Stats
 import Util.Graph
+import E.TypeAnalysis
 
 ---------------
 -- ∀α∃β . α → β
@@ -309,6 +311,13 @@ compileModEnv' stats ho = do
     let mangle = mangle'  (Just mempty)
     let opt = doopt (mangle dataTable) True stats
 
+    let showTVr t = prettyE (EVar t) <> show (tvrInfo t)
+
+    let ELetRec ds _ = lco in do
+        putStrLn "Supercombinators"
+        ds' <- typeAnalyze ds
+        mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (showTVr t) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ds'
+
     lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lco
     wdump FD.Progress $ printEStats lc
     let cm stats e = do
@@ -340,7 +349,8 @@ compileModEnv' stats ho = do
         return e'
     lc <- opt "SuperSimplify" cm lc
 
-    let ELetRec ds _ = lc in mapM_ (\t -> putStrLn (prettyE (EVar t) <+> show (tvrInfo t))) (fsts ds)
+
+
 
     wdump FD.LambdacubeBeforeLift $ printCheckName dataTable lc
     finalStats <- Stats.new
