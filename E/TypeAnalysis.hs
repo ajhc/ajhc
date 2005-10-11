@@ -21,23 +21,8 @@ import GenUtil
 import Name
 import qualified Info.Info as Info
 
-data Typ = L (Map.Map Name [Typ]) (Set.Set Name)
-    deriving(Show,Typeable,Eq,Ord)
 
-
-instance Fixable Typ where
-    bottom = L Map.empty Set.empty
-    isBottom (L map set) = Set.null set && Map.null map
-    lub (L as ns) (L as' ns') = pruneTyp $ L (Map.unionWith (zipWith lub) as as') (Set.union ns ns')
-    minus (L n1 w1) (L n2 w2) = pruneTyp $ L (Map.fromList $ [
-            case Map.lookup n n2 of
-                Just vs ->  (n,[ a `minus` v | v <- vs | a <- as ])
-                Nothing ->  (n,as)
-        | (n,as) <- Map.toList n1 ] ) (w1 Set.\\ w2)
-
-pruneTyp (L map set) = L map' set where
-    map' = Map.filter f map
-    f vs = any (not . isBottom) vs
+type Typ = VMap Name
 
 extractValMap :: [(TVr,E)] -> Map.Map Id [Value Typ]
 extractValMap ds = Map.fromList [ (tvrIdent t,f e []) | (t,e) <- ds] where
@@ -54,7 +39,7 @@ typeAnalyze ds = do
             rv <- readValue (runIdentity $ Info.lookup nfo)
             return (Info.insert (rv :: Typ) $ Info.delete (undefined :: Value Typ) nfo)
         lamdel _ nfo = return (Info.delete (undefined :: Value Typ) nfo)
-    ds <- annotateDs mempty lambind lambind lambind ds
+    ds <- annotateDs mempty lambind (\_ -> return) (\_ -> return) ds
     calcDs (extractValMap ds) ds
     findFixpoint fixer
     ds <- annotateDs mempty (\_ -> return) (\_ -> return) lamread ds
@@ -69,36 +54,26 @@ calcDs env ds = mapM_ d ds >> mapM_ (calcE env) (snds ds) where
         t' `isSuperSetOf` v
     d (t, ELit (LitCons n xs _)) = do
         let Just t' = Info.lookup (tvrInfo t)
-        t' `isSuperSetOf` (value $ L mempty (Set.singleton n))
+            v = vmapSingleton n
+        t' `isSuperSetOf` (value v)
         xs' <- mapM getValue xs
-        flip mapM_ [0.. length xs' - 1]  $ \i -> do
-            modifiedSuperSetOf t' (xs' !! i) $ \v ->
-                L (Map.singleton n [ if x == i then v else bottom | x <- [0 .. length xs' - 1]]) Set.empty
-                {-
+        flip mapM_ (zip xs' [0.. ])  $ \ (v,i) -> do
+            modifiedSuperSetOf t' v (vmapArgSingleton n i)
     d (t,e) | (EVar v,as) <- fromAp e = do
         let Just t' = Info.lookup (tvrInfo t)
             Just v' = Info.lookup (tvrInfo v)
         as' <- mapM getValue as
-        dynamicRule v' $ \ (L mp st) -> do
-            flip mapM_ (Set.toList st) $ \n -> do
-                undefined
-        flip mapM_ [0.. length xs' - 1]  $ \i -> do
-            modifiedSuperSetOf t' (xs' !! i) $ \v ->
-                L (Map.singleton n [ if x == i then v else bottom | x <- [0 .. length xs' - 1]]) Set.empty
-
--}
-
+        dynamicRule v' $ \ v -> flip mapM_ (vmapHeads v) $ \ h -> do
+            t' `isSuperSetOf` value (vmapSingleton h)
+            flip mapM_ (zip as' [0.. ])  $ \ (a,i) -> do
+                modifiedSuperSetOf t' a $ \ v -> vmapArgSingleton h i v
     d (t,e) = fail $ "calcDs: " ++ show (t,e)
 
 calcAlt env v (Alt (LitCons n xs _) e) = do
+    calcE env e
     flip mapM_ (zip [0..] xs) $ \ (i,t) -> do
         let Just t' = Info.lookup (tvrInfo t)
-        modifiedSuperSetOf t' v (\ (L map _) -> case Map.lookup n map of
-            Just xs -> xs !! i
-            Nothing -> bottom
-            )
-
-
+        modifiedSuperSetOf t' v (vmapArg n i)
 
 
 calcE :: Map.Map Id [Value Typ] -> E -> IO ()
@@ -119,13 +94,13 @@ calcE _ EPrim {} = return ()
 calcE _ EError {} = return ()
 calcE _ ESort {} = return ()
 calcE _ Unknown = return ()
-calcE _ EAp {} = return ()
 calcE env e | (EVar v,as@(_:_)) <- fromAp e, Just ts <- Map.lookup (tvrIdent v) env = do
     flip mapM_ (zip as ts) $ \ (a,t) -> do
         when (sortStarLike (getType a)) $ do
             a' <- getValue a
             t `isSuperSetOf` a'
 calcE _ EVar {} = return ()
+calcE _ EAp {} = return ()
 calcE _ e = fail $ "odd calcE: " ++ show e
 
 calcScrut _ = return ()
@@ -136,9 +111,10 @@ getValue (EVar v)
 getValue e | Just c <- typConstant e = return $ value c
 getValue e = fail $ "getValue: " ++ show e
 
+typConstant :: Monad m => E -> m Typ
 typConstant (ELit (LitCons n xs _)) = do
     xs' <- mapM typConstant xs
-    return $  L (Map.singleton n xs') (Set.singleton n)
+    return $ vmapValue n xs'
 typConstant e = fail $ "typConstant: " ++ show e
 
 
@@ -148,6 +124,20 @@ data VMap n = VMap (Map.Map (n,Int) (VMap n)) (Set.Set n)
     deriving(Typeable)
 
 vmapSingleton n = VMap Map.empty (Set.singleton n)
+
+vmapArgSingleton n i v
+    | isBottom v = bottom
+    | otherwise = VMap (Map.singleton (n,i) v) Set.empty
+
+vmapArg n i (VMap map _) = case Map.lookup (n,i) map of
+    Just x -> x
+    Nothing -> bottom
+
+vmapValue :: Ord n => n -> [VMap n] -> VMap n
+vmapValue n xs = pruneVMap $ VMap (Map.fromAscList (zip (zip (repeat n) [0..]) xs)) (Set.singleton n)
+
+vmapHeads (VMap _ set) = Set.toList set
+vmapJustHeads (VMap _ set) = VMap Map.empty set
 
 pruneVMap (VMap map set) = VMap map' set where
     map' = Map.filter f map
