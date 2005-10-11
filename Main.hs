@@ -57,7 +57,6 @@ import qualified Grin.Simplify
 import qualified Info.Info as Info
 import qualified Stats
 import Util.Graph
-import qualified Util.Histogram as Histogram
 
 ---------------
 -- ∀α∃β . α → β
@@ -127,12 +126,12 @@ processInitialHo :: Ho -> IO Ho
 processInitialHo ho = do
     putStrLn $ "Initial annotate: " ++ show (Map.keys $ hoModules ho)
     let imap = annotateMethods (hoClassHierarchy ho) (hoRules ho) (hoProps ho)
-    let f (ds,used) (v,lc) = ((v,lc'):ds,used `mappend` used') where
-            (lc',used') = runRename used lc
-        (nds,allUsed) = foldl f ([],Set.empty) (Map.elems $ hoEs ho)
-    let Identity (ELetRec ds (ESort EStar)) = annotate imap (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec nds eStar)
+    --let f (ds,used) (v,lc) = ((v,lc'):ds,used `mappend` used') where
+    --        (lc',used') = runRename used lc
+    --    (nds,allUsed) = foldl f ([],Set.empty) (Map.elems $ hoEs ho)
+    let Identity (ELetRec ds (ESort EStar)) = annotate imap (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec (Map.elems $ hoEs ho) eStar)
     wdump FD.Rules $ printRules (hoRules ho)
-    return ho { hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds ], hoUsedIds = allUsed }
+    return ho { hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds ] }
 
 
 -- | this is called on parsed, typechecked haskell code to convert it to the internal representation
@@ -174,19 +173,20 @@ processDecls stats ho ho' tiData = do
         lc <- postProcessE stats n inscope usedIds fullDataTable lc
         nfo <- idann (hoRules ho') (hoProps ho') (tvrIdent v) (tvrInfo v)
         v <- return $ v { tvrInfo = Info.insert LetBound nfo }
-        let (lc',used') = runRename usedIds lc
-        return ((n, shouldBeExported exports v,lc'):ds,usedIds `mappend` used')
-    (ds,allIds) <- foldM procE ([],hoUsedIds ho) ds
+        let used' = collectIds lc
+        --let (lc',used') = runRename usedIds lc
+        return ((n, shouldBeExported exports v,lc):ds,usedIds `mappend` used')
+    (ds,_allIds) <- foldM procE ([],hoUsedIds ho) ds
 
 
     -- This is the main function that optimizes the routines before writing them out
-    let f (ds,(smap,annmap,idHist')) (rec,ns) = do
+    let f (retds,(smap,annmap,idHist')) (rec,ns) = do
         let names = [ n | (n,_,_) <- ns]
         let namesInscope' = Set.fromAscList (Map.keys smap) `Set.union` namesInscope
         when (dump FD.Lambdacube || dump FD.Pass) $ putErrLn ("----\n" ++ show names)
         cds <- annotateDs annmap (idann (hoRules allHo) mempty) letann lamann [ (t,e) | (_,t,e) <- ns]
-        putStrLn "*** After annotate"
-        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) ([ (x,y) | (_,x,y) <- ns])
+        --putStrLn "*** After annotate"
+        --wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
         let cm stats e = do
             let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
             let (e',stat,occ) = SS.simplify sopt e
@@ -213,7 +213,7 @@ processDecls stats ho ho' tiData = do
         let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds')) fullDataTable
         let dd  (ds,used) (v,lc) = do
                 --lc <- mangle (return ()) False ("Barendregt: ") (return . barendregt) lc
-                let (lc', used') = runRename used lc
+                let (lc', _) = runRename used lc
                 lc <- doopt mangle False stats "SuperSimplify" cm lc'
                 let (lc', used') = runRename used lc
                 return ((v,lc):ds,used' `mappend` used)
@@ -230,7 +230,7 @@ processDecls stats ho ho' tiData = do
         --print idHist
 
         wdump FD.Progress $ putErr (if rec then "*" else ".")
-        return (nvls ++ ds, (Map.fromList [ (tvrIdent v,lc) | (_,v,lc) <- nvls] `mappend` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (_,v,_) <- nvls] `Map.union` annmap `Map.union` uidMap , idHist' ))
+        return (nvls ++ retds, (Map.fromList [ (tvrIdent v,lc) | (_,v,lc) <- nvls] `mappend` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (_,v,_) <- nvls] `Map.union` annmap , idHist' ))
 
     -- preparing for optimization
     let imap = annotateMethods (hoClassHierarchy allHo) allRules (hoProps allHo)
@@ -274,7 +274,7 @@ shouldBeExported exports tvr
 
 
 collectIds e = execWriter $ annotate mempty (\id nfo -> tell (Set.singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
-idHistogram e = execWriter $ annotate mempty (\id nfo -> tell (Histogram.singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
+--idHistogram e = execWriter $ annotate mempty (\id nfo -> tell (Histogram.singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 
 compileModEnv' stats ho = do
 
