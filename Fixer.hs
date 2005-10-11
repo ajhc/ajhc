@@ -16,13 +16,14 @@ module Fixer(
     ) where
 
 import Data.IORef
+import Data.Typeable
 import Data.Unique
 import IO(hFlush, stdout)
 import Monad
 import qualified Data.Set as Set
 
 
-class Show a => Fixable a where
+class Fixable a where
     bottom :: a
     isBottom :: a -> Bool
     lub :: a -> a -> a
@@ -44,6 +45,11 @@ newFixer = do
     return Fixer { vars = v, todo = t }
 
 data Value a = ConstValue a | IV (RvValue a)
+    deriving(Typeable)
+
+instance Show a => Show (Value a) where
+    showsPrec _ (ConstValue a) = showString "<<" . shows a . showString ">>"
+    showsPrec _ (IV a) = showString "<<" . shows (hashUnique $ ident a) . showString ">>"
 
 
 data RvValue a = RvValue {
