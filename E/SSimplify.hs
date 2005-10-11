@@ -84,11 +84,11 @@ collectOcc sopts  e = (e',fvs,occ) where
         return (ECase e' b as' d', fvs, sa `andOM` orMaps (sb:ass) )
     f (ELetRec ds e) = do
         ds' <- mapM  (censor (const mempty) . listen . f . snd) ds
+        (e',fve,se) <- f e
         let gfv (_,fv,i) = fvs ++ Set.toList (mconcat (map (ruleFreeVars' rules) (fvs)))  where
                 fvs = Set.toList (Set.fromAscList (Map.keys i) `Set.union` fv)
-        let gr = newGraph (zip (fsts ds) ds') (tvrNum . fst) (gfv . fst . snd )
-        (e',fve,se) <- f e
-        let nn' = reachable gr (Set.toList fve ++ Map.keys se ++  topLevels)
+            gr = newGraph (zip (fsts ds) ds') (tvrNum . fst) (gfv . fst . snd )
+            nn' = reachable gr (Set.toList fve ++ Map.keys se ++  topLevels)
         nn <- sequence [ tell t >> return (x,y) |  (x,(y,t)) <- nn' ]
         let gr' = newGraph nn (tvrNum . fst) (gfv . snd )
             (lb,ds'') = findLoopBreakers (\ (_,(e,_,_)) -> loopFunc e) gr'
@@ -96,13 +96,6 @@ collectOcc sopts  e = (e',fvs,occ) where
             calcStrictInfo t _
                 | t `Set.member` cycNodes = setProperty prop_CYCLIC
                 | otherwise = id
-
-            {-
-            calcStrictInfo t e
-                | t `Set.member` cycNodes = Strict.L
-                | Just s <- Info.lookup (tvrInfo t) = s
-                | otherwise = Strict.L
-            -}
         let dvars = map (tvrNum . fst) ds
             fvs = foldr Set.delete (mconcat (fve:[ fv `mappend` freeVars t | (TVr { tvrType =  t},(_,fv,_)) <- ds'' ])) dvars
             finalS = Map.union (Map.fromList [(n,LoopBreaker) | (TVr { tvrIdent = n },_) <- lb ]) $   foldl andOM se ([ s | (_,(_,_,s)) <- ds'' ])
@@ -120,22 +113,6 @@ collectOcc sopts  e = (e',fvs,occ) where
         return (Alt l e',foldr Set.delete (freeVars l `mappend` b) (map tvrNum $ litBinds l),foldr Map.delete c (map tvrNum $ litBinds l))
     args as = ans where
         ans = Map.fromList [ (i,Many) | Just (EVar (TVr { tvrIdent = i }),_) <- map (\e -> from_unsafeCoerce e `mplus` Just (e,Unknown)) as]
-        {-
-    f (ELetRec ds e) = do
-        ds' <- mapM  (f . snd) ds
-        let gfv (_,fv,i) = fvs ++ Set.toList (mconcat (map (ruleFreeVars' rules) (fvs)))  where
-                fvs = Set.toList (Set.fromAscList (Map.keys i) `Set.union` fv)
-        let gr = newGraph (zip (fsts ds) ds') (tvrNum . fst) (gfv . snd)
-        (e',fve,se) <- f e
-        let nn = reachable gr (Set.toList fve ++ Map.keys se ++  topLevels)
-        let gr' = newGraph nn (tvrNum . fst) (gfv . snd)
-            (lb,ds'') = findLoopBreakers (\ (_,(e,_,_)) -> loopFunc e) gr'
-        let dvars = map (tvrNum . fst) ds
-            fvs = foldr Set.delete (mconcat (fve:[ fv `mappend` freeVars t | (TVr _ t,(_,fv,_)) <- ds'' ])) dvars
-            finalS = Map.union (Map.fromList [(n,LoopBreaker) | (TVr n _,_) <- lb ]) $   foldl andOM se ([ s | (_,(_,_,s)) <- ds'' ])
-        tell $ Seq.singleton (Map.fromList [ (t,Map.findWithDefault Unused n (Map.mapWithKey frules finalS)) | (t@(TVr n _),_) <- ds'' ])
-        return (eLetRec [ (v,e) | (v,(e,_,_)) <- ds'' ] e', fvs, finalS  )
-        -}
 
 -- this should use the occurance info
 loopFunc EVar {} = 0
