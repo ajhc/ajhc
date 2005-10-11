@@ -41,10 +41,10 @@ tags: $(HSFILES)
 	hasktags $(HSFILES)
 
 regress: jhc
-	time ./regress_test.prl test/Try-Regress.hs
-	time ./regress_test.prl test/Try-Foo.hs
-	time ./regress_test.prl test/Try-Lam.hs
-	time ./regress_test.prl test/Try-Case.hs
+	time ./utils/regress_test.prl test/Try-Regress.hs
+	time ./utils/regress_test.prl test/Try-Foo.hs
+	time ./utils/regress_test.prl test/Try-Lam.hs
+	time ./utils/regress_test.prl test/Try-Case.hs
 
 hsdocs:
 	haddock -h $(filter-out DataConstructors.hs SelfTest.hs %/HsParser.hs FrontEnd/Representation.hs C/Gen.hs , $(HSFILES)) -o hsdocs
@@ -73,21 +73,21 @@ clean-ho:
 
 # Various rules for generated Haskell files
 
-%.hs: %.flags  ./opt_sets.prl
-	perl ./opt_sets.prl -n $< $<  > $@
+%.hs: %.flags  ./utils/opt_sets.prl
+	perl ./utils/opt_sets.prl -n $< $<  > $@
 
-PrimitiveOperators.hs: op_process.prl data/operators.txt data/primitives.txt data/PrimitiveOperators-in.hs
-	perl ./op_process.prl > $@ || rm -f $@
+PrimitiveOperators.hs: utils/op_process.prl data/operators.txt data/primitives.txt data/PrimitiveOperators-in.hs
+	perl ./utils/op_process.prl > $@ || rm -f $@
 
 RawFiles.hs:  data/HsFFI.h data/jhc_rts.c
-	perl ./op_raw.prl $(basename $@)  $^ > $@
+	perl ./utils/op_raw.prl $(basename $@)  $^ > $@
 
 FrontEnd/HsParser.hs: FrontEnd/HsParser.ly
 	happy -a -g -c FrontEnd/HsParser.ly
 
 VersionCtx.hs: _darcs/inventory
 	darcs changes --context > changes.txt  || echo "No darcs Context Available!" > changes.txt
-	perl ./op_raw.prl $(basename $@) changes.txt > $@
+	perl ./utils/op_raw.prl $(basename $@) changes.txt > $@
 	rm -f changes.txt
 
 Version.hs: _darcs/inventory

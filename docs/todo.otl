@@ -1,0 +1,18 @@
+front end
+	replace HsName with Name everywhere
+middle end
+	enforce strict fields
+	|  strict fields that are RawTypes should be unboxed, otherwise a seq should be inserted.
+	IO actions too strict
+	|  they evaluate their arguments on IO action creating time rather than execution time. this inhibits CPR analysis
+	CPR enumerated values
+back end
+	grin
+		stronger typing
+		|  App and Prim should have types directly in the grin so we need not look
+		|  them up in the environment. ValPrim should too.
+
+	codegen
+		primitives
+		|  a type should be assosiated with AddrOf
+
