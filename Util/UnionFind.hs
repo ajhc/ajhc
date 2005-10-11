@@ -1,4 +1,4 @@
-module UnionFind(
+module Util.UnionFind(
     Element,
     T,
     new,
@@ -13,8 +13,8 @@ module UnionFind(
 
 import Control.Monad.Trans
 import Data.IORef
-import Monad(when,liftM)
 import Data.Unique
+import Monad(when,liftM)
 
 data Element w a = Element a {-# UNPACK #-} !Int {-# UNPACK #-} !(IORef (Link w a))
 data Link w a = Weight {-# UNPACK #-} !Int w | Next (Element w a)
@@ -37,7 +37,7 @@ find x@(Element a _ r) = liftIO $  do
     case e of
         Weight _ _ -> return x
         Next next -> do
-            last <- UnionFind.find next
+            last <- Util.UnionFind.find next
             when (next /= last) $ writeIORef r (Next last)
             return last
 

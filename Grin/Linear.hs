@@ -9,7 +9,7 @@ import Control.Monad.State
 
 import Atom
 import Grin.Grin
-import UnionFind
+import Util.UnionFind
 
 data W = One | Omega | LessThan (Set.Set E)
     deriving(Ord,Eq,Show)
