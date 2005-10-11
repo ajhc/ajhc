@@ -36,7 +36,7 @@ renameTraverse' e = e' where
     e' = liftM fst $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty mempty  e
 
 runRename :: Set.Set Int -> E -> (E,Set.Set Int)
-runRename set e = runIdentity $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty (Map.fromList [ (v,NotKnown) | v <- Set.toAscList set])  e
+runRename set e = runIdentity $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty (Map.fromAscList [ (v,NotKnown) | v <- Set.toAscList set])  e
 
 data  TravOptions m = TravOptions {
     pruneUnreachable :: Maybe [Int],
@@ -114,9 +114,9 @@ newVar' _ n = n
 traverse :: (MonadFix m,Monad m) => TravOptions m -> (Int -> (E,[E]) -> TravM m E) -> Subst -> (Map.Map Int Binding) -> E -> m (E,Set.Set Int)
 traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> runReaderT (f e) (smap,subst,0::Int)  where
     initNames = do
-        addNames $ freeVars e
-        addNames (Map.keys subst)
-        addNames (Map.keys smap)
+        addBoundNames $ freeVars e
+        addBoundNames (Map.keys subst)
+        addBoundNames (Map.keys smap)
     f :: E -> ReaderT (Map.Map Int Binding, Subst, Int) (NameMT Int m) E
     f' e = do
         local (\ (a,b,c) -> (a,b,c + 1)) $  f e
@@ -151,16 +151,19 @@ traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> r
         es' <- mapM l es
         t' <- f' t
         return $ EPrim n es' t'
-    g (ECase e b as d) = do
+    g ec@(ECase e b as d) = do
         e' <- f e
+        addNames $ map tvrIdent (caseBinds ec)
         (ob,b') <- ntvr f' b
         localSubst [(ob,EVar b')] $ do
-            as' <- mapM (da [ v  | EVar v <- [e',EVar b']] [ v  | EVar v <- [e,EVar b]])   as
+            as' <- mapM (da [ v  | EVar v <- [e',EVar b']])   as
             d' <- localVars [ (tvrNum v,NotAmong [ n | Alt (LitCons n _ _) _ <- as]) | EVar v <- [e',EVar b'] ] $ fmapM f d
             return $ ECase e' b' as' d'
     g (ELam tvr e) = lp f' ELam tvr e
     g (EPi tvr e) = lp f EPi tvr e
-    g (ELetRec ds e) = z (basicDecompose  (pruneUnreachable tOpt) (trav_rules tOpt) e ds) e  where
+    g (ELetRec ds e) = do
+            addNames $ map ( tvrIdent . fst ) ds
+            z (basicDecompose  (pruneUnreachable tOpt) (trav_rules tOpt) e ds) e  where
         z [] e = f e
         z (Left (tvr,x):rs) e | worthStricting x, Just (S _) <- Map.lookup (tvrNum tvr) (trav_strictness tOpt)  = do
             (n,tvrn) <- ntvr f' tvr
@@ -198,14 +201,14 @@ traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> r
     eLetCoalesce ds e = ELetRec ds e
     l x@EAp {} = f x
     l x = g x
-    da vs _ (Alt p@(LitCons n xs t) l) = do
+    da vs (Alt p@(LitCons n xs t) l) = do
         t' <- f' t
         xs' <-  mapM (ntvr f') xs
         localVars [ (tvrNum v, IsBoundTo (ELit $ LitCons n (map (EVar . snd) xs') t')) |  v <- vs ] $ do
             localSubst [ (x,EVar y) | (x,y) <- xs'] $ do
                 l' <- f l
                 return (Alt (LitCons n (snds xs') t') l')
-    da vs _ (Alt p l) = do
+    da vs (Alt p@LitInt {} l) = do
         p' <- fmapM f' p
         localVars [ (tvrNum v, IsBoundTo (patToLitEE p')) |  v <- vs ] $ do
             l' <- f l
