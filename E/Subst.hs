@@ -1,4 +1,4 @@
-module E.Subst(subst,subst',eAp, substMap,substMap',noShadow,doSubst,typeSubst,typeSubst',substMap'',litSMapM ) where
+module E.Subst(subst,subst',eAp, substMap,substMap',doSubst,typeSubst,typeSubst',substMap'',litSMapM ) where
 
 -- This is tricky.
 
@@ -29,8 +29,7 @@ subst ::
     -> E  -- ^ input term
     -> E  -- ^ output term
 subst (TVr { tvrIdent = 0 }) _ e = e
---subst (TVr { tvrIdent = i }) w e = doSubst False False (Map.insert i (Just w) $ Map.fromList [ (x,Nothing) | x <- freeVars (getType w) ++ freeVars e ]) e
-subst (TVr { tvrIdent = i }) w e = doSubst False False (Map.insert i (Just w) $ Map.fromList [ (x,Nothing) | x <- freeVars w ++ freeVars e ]) e
+subst (TVr { tvrIdent = i }) w e = doSubst False False (Map.insert i (Just w) $ (freeVars w `Map.union` freeVars e))  e
 
 -- | Identitcal to 'subst' except that it substitutes inside the local types
 -- for variables in expressions. This should not be used because it breaks the
@@ -40,12 +39,9 @@ subst (TVr { tvrIdent = i }) w e = doSubst False False (Map.insert i (Just w) $ 
 
 subst' :: TVr -> E -> E -> E
 subst' (TVr { tvrIdent = 0 }) _ e = e
---subst' (TVr { tvrIdent = (i) }) w e = doSubst True False (Map.insert i (Just w) $ Map.fromList [ (x,Nothing) | x <- freeVars (getType w) ++ freeVars e ]) e
-subst' (TVr { tvrIdent = (i) }) w e = doSubst True False (Map.insert i (Just w) $ Map.fromList [ (x,Nothing) | x <- freeVars w ++ freeVars e ]) e
+subst' (TVr { tvrIdent = (i) }) w e = doSubst True False (Map.insert i (Just w) $ (freeVars w `Map.union` freeVars e)) e
 
 
-substMap :: IM.IntMap E -> E -> E
-substMap im e = substMapScope im (IS.unions $ freeVars e: (map freeVars (IM.elems im))) e
 
 
 litSMapM f (LitCons s es t) = do
@@ -55,7 +51,6 @@ litSMapM f (LitCons s es t) = do
 litSMapM f (LitInt n t) = do
     t' <- f t
     return $ LitInt n t'
---litSMapM f l = fmapM f l
 
 
 substMapScope :: IM.IntMap E -> IS.IntSet -> E -> E
@@ -64,11 +59,11 @@ substMapScope im ss e = substMapScope' False im ss e
 substMapScope' :: Bool -> IM.IntMap E -> IS.IntSet -> E -> E
 substMapScope' allShadow im ss e = doSubst False allShadow (Map.fromAscList [ (x,Just y) |  (x,y) <-  IM.toAscList im] `Map.union` Map.fromAscList [ (x,Nothing) | x <- IS.toAscList ss ]) e
 
-noShadow :: E -> E
-noShadow e = doSubst False False (Map.fromList [ (x,Nothing) | x <- freeVars e ]) e
-
 allShadow :: E -> E
 allShadow e = doSubst False True (Map.fromList [ (x,Nothing) | x <- freeVars e ]) e
+
+substMap :: IM.IntMap E -> E -> E
+substMap im e = substMapScope im (IS.unions $ freeVars e: (map freeVars (IM.elems im))) e
 
 substMap' :: Map.Map Id E -> E -> E
 substMap' im e = doSubst False False (Map.fromList [ (x,Map.lookup x im) | x <- (freeVars e ++ freeVars (Map.elems im)) ]) e
@@ -181,9 +176,16 @@ typeSubst' termSub typeSub e = typeSubst  (Map.map Just termSub `Map.union` Map.
     fvs = Set.toAscList (freeVars e `Set.union` fvmap termSub `Set.union` fvmap typeSub)
     fvmap m = Set.unions (map freeVars (Map.elems m))
 
-substType t e e' = typeSubst (freeVars e) (Map.singleton t e) e'
--- Monadic code is so much nicer
-typeSubst :: Map.Map Id (Maybe E) -> Map.Map Id E -> E -> E
+substType t e e' = typeSubst (freeVars e `Map.union` freeVars e') (Map.singleton t e) e'
+
+-- | substitution routine that can substitute different values at the term and type level.
+-- this is useful to enforce the invarient that let-bound variables must not occur at the type level, yet
+-- non-atomic values (even typelike ones) cannot appear in argument positions at the term level.
+
+typeSubst ::
+    Map.Map Id (Maybe E)  -- ^ substitution to carry out at term level as well as a list of in-scope variables
+    -> Map.Map Id E       -- ^ substitution to carry out at type level
+    -> (E -> E)           -- ^ the substitution function
 typeSubst termSubst typeSubst e | Map.null termSubst && Map.null typeSubst = e
 typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
     termSubst' = termSubst `Map.union` Map.map (const Nothing) typeSubst
