@@ -49,8 +49,13 @@ data ESort =
     EStar     -- ^ the sort of types
     | EHash   -- ^ the sort of unboxed types
     | EBox    -- ^ the sort of types of types
-    deriving(Data,Eq, Ord, Typeable, Show)
+    deriving(Data,Eq, Ord, Typeable)
     {-! derive: is, GhcBinary !-}
+
+instance Show ESort where
+    showsPrec _ EStar = showString "*"
+    showsPrec _ EHash = showString "#"
+    showsPrec _ EBox = showString "BOX"
 
 data E = EAp E E
     | ELam TVr E
