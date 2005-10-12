@@ -210,11 +210,12 @@ processDecls stats ho ho' tiData = do
         -- cds <- E.Strictness.solveDs cds
         cds <- return $ fst (E.CPR.cprAnalyzeBinds mempty cds)
         cds' <- return $ concatMap (uncurry (workWrap fullDataTable)) cds
+        -- let (cds',st) = performWorkWrap fullDataTable cds
+        --Stats.tickStat stats st
         let wws = length cds' - length cds
         wdump FD.Progress $ putErr (replicate wws 'w')
         let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds')) fullDataTable
         let dd  (ds,used) (v,lc) = do
-                --lc <- mangle (return ()) False ("Barendregt: ") (return . barendregt) lc
                 let (lc', _) = runRename used lc
                 lc <- doopt mangle False stats "SuperSimplify" cm lc'
                 let (lc', used') = runRename used lc
@@ -313,10 +314,11 @@ compileModEnv' stats ho = do
 
     let showTVr t = prettyE (EVar t) <> show (tvrInfo t)
 
-    let ELetRec ds _ = lco in do
-        putStrLn "Supercombinators"
-        ds' <- typeAnalyze ds
-        mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (showTVr t) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ds'
+    when (fopts  FO.TypeAnalysis) $ do
+        let ELetRec ds _ = lco in do
+            putStrLn "Supercombinators"
+            ds' <- typeAnalyze ds
+            mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (showTVr t) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ds'
 
     lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lco
     wdump FD.Progress $ printEStats lc
