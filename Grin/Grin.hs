@@ -1,4 +1,4 @@
-{-# OPTIONS -funbox-strict-fields #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Grin.Grin(
     tagIsWHNF,
@@ -31,7 +31,7 @@ module Grin.Grin(
     funcApply,
     funcInitCafs,
     Grin(..),
-    HasType(..),
+    CanTypeCheck(..),
     Primitive(..),
     Builtin,
     Props(..),
@@ -133,16 +133,16 @@ data Lam = Val :-> Exp
     deriving(Eq,Ord,Show)
 
 data Exp =
-     Exp :>>= !Lam
-    | App Atom [Val]  -- ^ this handles applications of functions and builtins
-    | Prim Primitive [Val]
-    | Case Val [Lam]
+     Exp :>>= Lam
+    | App { expFunction :: Atom, expArgs :: [Val] }    -- ^ this handles applications of functions and builtins
+    | Prim { expPrimitive :: Primitive, expArgs :: [Val] }
+    | Case { expValue :: Val, expAlts :: [Lam] }
     | Return { expValue :: Val }
     | Store { expValue :: Val }
     | Fetch { expAddress :: Val }
     | Update { expAddress :: Val, expValue :: Val }
-    | Error String Ty -- ^ abort with an error message, non recoverably.
-    | Cast Val Ty     -- ^ reinterpret Val as a different type, also used to box\/unbox lifted types
+    | Error { expError :: String, expType :: Ty }      -- ^ abort with an error message, non recoverably.
+    | Cast { expValue :: Val, expType :: Ty }          -- ^ reinterpret Val as a different type, also used to box\/unbox lifted types
     deriving(Eq,Show,Ord)
 
 data Val =
@@ -192,10 +192,8 @@ instance SemiBooleanAlgebra Flag where
 data Primitive = Primitive {
     primName :: Atom,
     primRets :: Maybe [Atom],
-    primType :: (Ty,Ty),
+    primType :: ([Ty],Ty),
     primAPrim :: APrim
-    --primProps :: Props
-    --primCallingConvention :: (),
     } deriving(Show)
 
 instance Eq Primitive where
@@ -315,59 +313,9 @@ tagIsWHNF t
 valIsNF (NodeC t vs) = tagIsWHNF t && all valIsNF vs
 valIsNF (Tup xs) = all valIsNF xs
 valIsNF (Tag _) = True
---valIsNF Unit = True
 valIsNF Const {} = True
 valIsNF Lit {} = True
 valIsNF _ = False
-
-
-{-
-
--- create an eval suitable for inlining.
-createEval' :: Bool -> TyEnv -> [Tag] -> Lam
-createEval' shared  te ts
-
-    | null cs = p1 :-> Error "Empty Eval" TyNode
-    | all tagIsWHNF [ t | t <- ts , tagIsTag t] = p1 :-> Fetch p1
-    | otherwise = p1 :->
-        Fetch p1 :>>= n2 :->
-        Case n2 cs :>>= n3 :->
-        Update p1 n3 :>>= unit :->
-        Return n3
-    where
-    cs = [f t | t <- ts, tagIsTag t ]
-    g t vs
-        | tagIsWHNF t = Return n2
-        | 'F':fn <- fromAtom t  = ap ('f':fn) vs
-        | 'B':fn <- fromAtom t  = ap ('b':fn) vs
-        | otherwise = Error ("Bad Tag: " ++ fromAtom t) TyNode
-    f t = (NodeC t vs :-> g t vs ) where
-        (ts,_) = runIdentity $ findArgsType te t
-        vs = [ Var v ty |  v <- [V 4 .. ] | ty <- ts]
-    ap n vs
-    --    | shared =  App (toAtom $ n) vs :>>= n3 :-> Update p1 n3 :>>= unit :-> Return n3
-        | otherwise = App (toAtom $ n) vs
-
-
-createEval :: TyEnv -> [Tag] -> Exp
-createEval  te ts
-    | null cs = Error ("Empty Eval:" ++ show ts) TyNode
-    | otherwise =
-        Fetch p1 :>>= n2 :->
-        Case n2 cs :>>= n3 :->
-        Update p1 n3 :>>= unit :->
-        Return n3
-    where
-    cs = [f t | t <- ts, tagIsTag t ]
-    g t vs
-        | tagIsWHNF t = Return n2
-        | 'F':fn <- fromAtom t  = App (toAtom $ 'f':fn) vs -- :>>= n3 :-> Update p1 n3 :>>= unit :-> Return n3
-        | 'B':fn <- fromAtom t  = App (toAtom $ 'b':fn) vs
-        | otherwise = Error ("Bad Tag: " ++ fromAtom t) TyNode
-    f t = (NodeC t vs :-> g t vs ) where
-        (ts,_) = runIdentity $ findArgsType te t
-        vs = [ Var v ty |  v <- [V 4 .. ] | ty <- ts]
-        -}
 
 
 ---------
@@ -420,15 +368,7 @@ p3 = Var v3 (TyPtr TyNode)
 
 
 
-
--- typechecking
-class HasType a where
-    typecheck :: Monad m => TyEnv -> a -> m Ty
-    tc :: Monad m => TyEnv -> a -> m Ty
-    tc = typecheck
-
-
-instance HasType a => HasType [a] where
+instance CanTypeCheck TyEnv a Ty => CanTypeCheck TyEnv [a] Ty where
     typecheck _ [] = fail "empty list"
     typecheck te xs = do
         ts <- mapM (typecheck te) xs
@@ -448,14 +388,14 @@ typLam te (x :-> y) = do
 
 
 
-instance HasType Exp where
+instance CanTypeCheck TyEnv Exp Ty where
     typecheck te (e :>>= (v :-> e2)) = do
         t1 <- typecheck te e
         t2 <- typecheck te v
         same (":>>=" <+> show e <+> show v) t1 t2
         typecheck te e2
     typecheck te n@(Prim p as) = do
-        let (TyTup as',t') = primType p
+        let (as',t') = primType p
         as'' <- mapM (typecheck te) as
         if as'' == as' then return t' else
             fail $ "Prim: arguments do not match " ++ show n
@@ -488,7 +428,7 @@ instance HasType Exp where
     tc te (_ :>>= (_ :-> e)) = tc te e
     tc te e = typecheck te e
 
-instance HasType Val where
+instance CanTypeCheck TyEnv Val Ty where
     typecheck _ (Tag _) = return TyTag
 --    typecheck _ Unit = return tyUnit
     typecheck _ (Var _ t) = return t
@@ -508,6 +448,7 @@ instance HasType Val where
         as'' <- mapM (typecheck te) as
         if as'' == as' then return TyNode else
             fail $ "NodeC: arguments do not match " ++ show n ++ show (as'',as')
+
 instance CanType Val Ty where
     getType (Tag _) = TyTag
     getType (Var _ t) = t

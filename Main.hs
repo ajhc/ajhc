@@ -38,7 +38,7 @@ import FrontEnd.FrontEnd
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadFunctions
 import Grin.FromE
-import CanType
+import CanType(getType)
 import Grin.Grin hiding (typecheck)
 import Grin.Show
 import Grin.Whiz

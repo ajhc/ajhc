@@ -316,31 +316,31 @@ compile' dataTable cenv (tvr,as,e) = ans where
         fail $ "Unrecognized PrimPrim: " ++ show ep
         return $ App (toAtom $ 'b':s ) (args es)
     ce (EPrim ap@(APrim (Func True fn as "void") _) (_:es) _) = do
-        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = (TyTup (map (Ty . toAtom) as),tyUnit), primAPrim = ap }
+        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ((map (Ty . toAtom) as),tyUnit), primAPrim = ap }
         return $  Prim p (args es) :>>= unit :-> Return world__
     ce (EPrim ap@(APrim (Func True fn as r) _) (_:es) rt) = do
-        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = (TyTup (map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
+        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ((map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
             ptv = Var v2 pt
             pt = Ty (toAtom r)
         return $ Prim p (args es) :>>= ptv :-> Return (Tup [pworld__,ptv])
     ce (EPrim ap@(APrim (Func False _ as r) _) es (ELit (LitCons tname [] _))) | RawType <- nameType tname = do
-        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = (TyTup (map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
+        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ((map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
         return $ Prim p (args es)
     ce (EPrim ap@(APrim (Peek pt') _) [_,addr] rt) = do
-        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = (TyTup [Ty (toAtom "HsPtr")],pt), primAPrim = ap }
+        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ([Ty (toAtom "HsPtr")],pt), primAPrim = ap }
             ptv = Var v2 pt
             pt = Ty (toAtom pt')
         return $  Prim p (args [addr]) :>>= ptv :-> Return (Tup [pworld__,ptv])
     ce (EPrim ap@(APrim (Poke pt') _) [_,addr,val] _) = do
-        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = (TyTup [Ty (toAtom "HsPtr"),pt],tyUnit), primAPrim = ap }
+        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ([Ty (toAtom "HsPtr"),pt],tyUnit), primAPrim = ap }
             pt = Ty (toAtom pt')
         return $  Prim p (args [addr,val]) :>>= unit :-> Return world__
     ce (EPrim aprim@(APrim (AddrOf s) _) [] (ELit (LitCons tname [] _))) | RawType <- nameType tname = do
-        let p = Primitive { primName = toAtom ('&':s), primRets = Nothing, primType = (tyUnit,ptype), primAPrim = aprim }
+        let p = Primitive { primName = toAtom ('&':s), primRets = Nothing, primType = ([],ptype), primAPrim = aprim }
             ptype = Ty $ toAtom (show tname)
         return $ Prim p []
     ce (EPrim aprim@(APrim (CConst s t) _) [] (ELit (LitCons n [] _))) | RawType <- nameType n = do
-        let p = Primitive { primName = toAtom s, primRets = Nothing, primType = (tyUnit,ptype), primAPrim = aprim }
+        let p = Primitive { primName = toAtom s, primRets = Nothing, primType = ([],ptype), primAPrim = aprim }
             ptype = Ty $ toAtom t
         return $ Prim p []
 --    ce (EPrim ap@(APrim (Peek pt') _) [_,addr] rt) = do
@@ -383,10 +383,10 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce ee@(EPrim aprim@(APrim (CCast from to) _) [e] t)  = do
         let ptypeto' = Ty $ toAtom to
             ptypefrom' = Ty $ toAtom from
-        let p = Primitive { primName = toAtom ("(" ++ to ++ ")"), primRets = Nothing, primType = (TyTup [ptypefrom'],ptypeto'), primAPrim = aprim }
+        let p = Primitive { primName = toAtom ("(" ++ to ++ ")"), primRets = Nothing, primType = ([ptypefrom'],ptypeto'), primAPrim = aprim }
         return $  Prim p (args [e])
     ce (EPrim ap@(APrim (Operator n as r) _) es (ELit (LitCons tname [] _))) | RawType <- nameType tname = do
-        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = (TyTup (map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
+        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ((map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
         return $ Prim p (args es)
         {-
     ce (EPrim ap@(APrim (Operator n as r) _) es rt) = do
