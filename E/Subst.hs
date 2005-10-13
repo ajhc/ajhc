@@ -1,4 +1,4 @@
-module E.Subst(subst,subst',eAp, substMap,substMap',doSubst,typeSubst,typeSubst',substMap'',litSMapM ) where
+module E.Subst(subst,subst',eAp, substMap,doSubst,typeSubst,typeSubst',substMap'',litSMapM ) where
 
 -- This is tricky.
 
@@ -6,10 +6,7 @@ import Control.Monad.Reader
 import Data.FunctorM
 import Data.Monoid
 import List
-import qualified Data.IntMap as IM
-import qualified Data.IntSet as IS
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 
 import E.E
 import E.FreeVars()
@@ -53,20 +50,13 @@ litSMapM f (LitInt n t) = do
     return $ LitInt n t'
 
 
-substMapScope :: IM.IntMap E -> IS.IntSet -> E -> E
-substMapScope im ss e = substMapScope' False im ss e
-
-substMapScope' :: Bool -> IM.IntMap E -> IS.IntSet -> E -> E
-substMapScope' allShadow im ss e = doSubst False allShadow (Map.fromAscList [ (x,Just y) |  (x,y) <-  IM.toAscList im] `Map.union` Map.fromAscList [ (x,Nothing) | x <- IS.toAscList ss ]) e
-
 allShadow :: E -> E
 allShadow e = doSubst False True (Map.fromList [ (x,Nothing) | x <- freeVars e ]) e
 
-substMap :: IM.IntMap E -> E -> E
-substMap im e = substMapScope im (IS.unions $ freeVars e: (map freeVars (IM.elems im))) e
 
-substMap' :: Map.Map Id E -> E -> E
-substMap' im e = doSubst False False (Map.fromList [ (x,Map.lookup x im) | x <- (freeVars e ++ freeVars (Map.elems im)) ]) e
+substMap :: Map.Map Id E -> E -> E
+--substMap im e = doSubst False False (Map.fromList [ (x,Map.lookup x im) | x <- (freeVars e ++ freeVars (Map.elems im)) ]) e
+substMap im e = doSubst False False (Map.map ( (`Map.lookup` im) . tvrIdent) (Map.unions $ (freeVars e :: Map.Map Id TVr):map freeVars (Map.elems im))) e
 
 -- | doesn't seed with free variables.
 substMap'' :: Map.Map Id E -> E -> E
@@ -172,9 +162,13 @@ eAp a b = EAp a b
 
 typeSubst' :: Map.Map Id E -> Map.Map Id E -> E -> E
 typeSubst' termSub typeSub e | Map.null termSub && Map.null typeSub = e
-typeSubst' termSub typeSub e = typeSubst  (Map.map Just termSub `Map.union` Map.fromAscList [ (x,Map.lookup x termSub) | x <- fvs]) typeSub e  where
-    fvs = Set.toAscList (freeVars e `Set.union` fvmap termSub `Set.union` fvmap typeSub)
-    fvmap m = Set.unions (map freeVars (Map.elems m))
+--typeSubst' termSub typeSub e = typeSubst  (Map.map Just termSub `Map.union` Map.fromAscList [ (x,Map.lookup x termSub) | x <- fvs]) typeSub e  where
+--    fvs = Set.toAscList (freeVars e `Set.union` fvmap termSub `Set.union` fvmap typeSub)
+--    fvmap m = Set.unions (map freeVars (Map.elems m))
+typeSubst' termSub typeSub e = typeSubst  (Map.map Just termSub `Map.union` Map.map ((`Map.lookup` termSub) . tvrIdent) fvs) typeSub e  where
+    fvs :: Map.Map Id TVr
+    fvs = (freeVars e `Map.union` fvmap termSub `Map.union` fvmap typeSub)
+    fvmap m = Map.unions (map freeVars (Map.elems m))
 
 substType t e e' = typeSubst (freeVars e `Map.union` freeVars e') (Map.singleton t e) e'
 

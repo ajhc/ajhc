@@ -8,7 +8,6 @@ import Data.Monoid
 import List hiding(group)
 import Maybe
 import Prelude hiding(putStrLn, putStr,print)
-import qualified Data.IntMap as IM
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified System
@@ -260,11 +259,11 @@ postProcessE stats n inscope usedIds dataTable lc = do
         g tvr@(TVr { tvrIdent = n, tvrType = k})
             | sortStarLike k =  tAbsurd k
             | otherwise = EVar tvr
-    fvs <- return $ foldr IM.delete (freeVars lc)  inscope
-    when (IM.size fvs > 0 && dump FD.Progress) $ do
-        putDocM putErr $ parens $ text "Absurded vars:" <+> align (hsep $ map pprint (IM.elems fvs))
+    fvs <- return $ foldr Map.delete (freeVars lc)  inscope
+    when (Map.size fvs > 0 && dump FD.Progress) $ do
+        putDocM putErr $ parens $ text "Absurded vars:" <+> align (hsep $ map pprint (Map.elems fvs))
     let mangle = mangle' (Just $ Set.fromList $ inscope) dataTable
-    lc <- mangle (return ()) False ("Absurdize") (return . substMap (IM.map g fvs)) lc
+    lc <- mangle (return ()) False ("Absurdize") (return . substMap (Map.map g fvs)) lc
     lc <- mangle (return ()) False "deNewtype" (return . deNewtype dataTable) lc
     --lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
     lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeApps usedIds stats x >>= coalesceLets stats)  lc

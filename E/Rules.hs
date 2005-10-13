@@ -171,7 +171,7 @@ applyRules (ARules rs) xs = f rs where
     f (r:_) | Just ss <- sequence (zipWith unify (ruleArgs r) xs) = ans ss where
         ans ss = do
             mtick (ruleName r)
-            let b = substMap (IM.fromList [ (i,x) | ~(~(EVar (TVr { tvrIdent = i })),x) <- concat ss ]) (ruleBody r)
+            let b = substMap (Map.fromList [ (i,x) | ~(~(EVar (TVr { tvrIdent = i })),x) <- concat ss ]) (ruleBody r)
             return $ Just (b,drop (ruleNArgs r) xs)
     f (_:rs) = f rs
 

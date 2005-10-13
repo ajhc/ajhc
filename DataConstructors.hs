@@ -298,7 +298,7 @@ toDataTable km cm ds = DataTable $ Map.union dataTablePrims  (Map.fromList [ (co
             } where
             nm' =  toName Name.DataConstructor (hsConDeclName x)
             (rt@(ELit (LitCons _ xs _)) ,ts') = fromPi ty'
-            subst = substMap $ IM.fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
+            subst = substMap $ Map.fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
             ts = [ tvr { tvrIdent =  (x)}   | tvr <- ts' | x <- [2,4..] ]
             ty' = tipe ty
             (Forall _ (_ :=> ty)) = runIdentity $ Map.lookup nm' cm
@@ -321,7 +321,7 @@ slotTypes wdt@(DataTable dt) n (ELit (LitCons pn xs _))
     where
     Identity mc = getConstructor n wdt
     Just pc = Map.lookup (conInhabits mc) dt
-    sub = substMap $ IM.fromList [ (i,sl) | sl <- xs | i <- [2,4..] ]
+    sub = substMap $ Map.fromDistinctAscList [ (i,sl) | sl <- xs | i <- [2,4..] ]
 slotTypes wdt n e | Just fa <- followAlias wdt e  = slotTypes wdt n fa
 slotTypes _ n e = error $ "slotTypes: error in " ++ show n ++ ": " ++ show e
 
