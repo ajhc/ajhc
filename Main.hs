@@ -377,7 +377,7 @@ compileModEnv' stats ho = do
     wdump FD.Progress $ putErrLn "Converting to Grin..."
     x <- Grin.FromE.compile dataTable (error "vmap") (eToSC dataTable lc)
     Stats.print "Grin" Stats.theStats
-    wdump FD.Grin $ printGrin x
+    --wdump FD.Grin $ printGrin x
     x <- return $ normalizeGrin x
     typecheckGrin x
     let opt x = do

@@ -32,8 +32,10 @@ import Name
 import Options
 import PrimitiveOperators
 import qualified FlagDump as FD
-import Stats
+import qualified Stats
+import Stats(mtick)
 import Util.Graph as G
+import Util.Once
 import VConsts
 
 
@@ -62,6 +64,7 @@ data CEnv = CEnv {
     tyEnv :: IORef TyEnv,
     funcBaps :: IORef [(Atom,Lam)],
     constMap :: Map Int Val,
+    errorOnce :: OnceMap (Ty,String) Atom,
     counter :: IORef Int
 
 }
@@ -104,7 +107,7 @@ toType node = toty where
     toty _ = node
 
 compile ::  DataTable -> Map Int Name -> SC -> IO Grin
-compile dataTable nmap sc@SC { scMain = mt, scCombinators = cm } = do
+compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
     tyEnv <- newIORef initTyEnv
     funcBaps <- newIORef []
     counter <- newIORef 100000  -- TODO real number
@@ -115,16 +118,22 @@ compile dataTable nmap sc@SC { scMain = mt, scCombinators = cm } = do
         putErrLn $ "Found" <+> tshow (length cc) <+> "CAFs to convert to constants," <+> tshow (length reqcc) <+> "of which are recursive."
         putDocMLn putStr $ vcat [ pprint v  | v <- reqcc ]
         putDocMLn putStr $ vcat [ pprint v <+> pprint n <+> pprint e | (v,n,e) <- cc ]
+    errorOnce <- newOnceMap
     let doCompile = compile' dataTable CEnv {
             funcBaps = funcBaps,
             tyEnv = tyEnv,
             scMap = scMap,
             counter = counter,
             constMap = mempty,
+            errorOnce = errorOnce,
             ccafMap = Map.fromList [ (tvrNum v,e) |(v,_,e) <- cc]
             }
     ds <- mapM doCompile [ c | c@(v,_,_) <- cm, v `notElem` [x | (x,_,_) <- cc]]
     (_,(Tup [] :-> theMain)) <- doCompile ((mt,[],EAp (EVar mt) vWorld__))
+
+    wdump FD.Progress $ do
+        os <- onceMapToList errorOnce
+        mapM_ print os
     let tf a = a:tagToFunction a
     ds <- return $ flattenScc $ stronglyConnComp [ (a,x, concatMap tf (freeVars z)) | a@(x,(_ :-> z)) <- ds]
     te <- readIORef tyEnv
@@ -438,7 +447,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
     app' e as = do
         mtick "Grin.FromE.lazy-app-bap"
         V vn <- newVar
-        let t = toAtom $ "Bap_" ++ show (length as) ++ "_" ++ funcName ++ "_" ++ show vn
+        let t  = toAtom $ "Bap_" ++ show (length as) ++ "_" ++ funcName ++ "_" ++ show vn
             tl = toAtom $ "bap_" ++ show (length as) ++ "_" ++  funcName ++ "_" ++ show vn
             args = [Var v (TyPtr TyNode) | v <- [v1..] | _ <- (undefined:as)]
             s = Store (NodeC t (e:as))
@@ -451,8 +460,16 @@ compile' dataTable cenv (tvr,as,e) = ans where
         modifyIORef (tyEnv cenv) addt
 
     cc e | Just z <- constant e = return (Return z)
-    cc e | Just z <- con e = do
-        return (Store z)
+    cc e | Just z <- con e = return (Store z)
+    cc (EError s e) = do
+        let ty = toType TyNode e
+        a <- runOnceMap (errorOnce cenv) (ty,s) $ do
+            u <- newUniq
+            let t  = toAtom $ "Berr_" ++ show u
+                tl = toAtom $ "berr_" ++ show u
+            addNewFunction (tl,Tup [] :-> Error s ty)
+            return t
+        return $ Return (Const (NodeC a []))
     cc (ELetRec ds e) = cc e >>= \e -> doLet ds e
     cc e |  (v,as) <- fromAp e, EVar v <- dropCoerce v = do
         as <- return $ args as

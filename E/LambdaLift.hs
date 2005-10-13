@@ -202,7 +202,7 @@ lambdaLift stats dataTable sc = do
     ncs <- readIORef fc
     return $ SC m ncs
 
-shouldLift EError {} = True
+--shouldLift EError {} = True
 shouldLift ECase {} = True
 shouldLift ELam {} = True
 shouldLift _ = False

@@ -11,6 +11,7 @@ back end
 		stronger typing
 		|  App and Prim should have types directly in the grin so we need not look
 		|  them up in the environment. ValPrim should too.
+		suspended errors should be constants, since they are never updated
 
 	codegen
 		primitives
