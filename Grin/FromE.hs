@@ -68,9 +68,6 @@ data CEnv = CEnv {
 
 dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ fromAtom n <+> hsep (map show as) <+> "::" <+> show t |  (n,(as,t)) <- Map.toList tt]
 
---compile ::  DataTable -> Map Int Name -> SC -> IO ()
---compile dataTable nmap sc@SC { scMain = mt, scCombinators = cm } = do
---    where
 
 flattenScc xs = concatMap f xs where
     f (AcyclicSCC x) = [x]
@@ -94,10 +91,6 @@ cafNum n = V $ - atomIndex (partialTag t 0)
     where
     (t,_,_) = toEntry (n,undefined,undefined)
 
---toEntry (n,as,e)
---    --  | Just nm <- Map.lookup (tvrNum n) nmap = ((toAtom ('f':show nm)),map (const $ TyPtr TyNode) as,TyNode)
---    | Just nm <- intToAtom (tvrNum n)  = ((toAtom ('f':show (fromAtom nm :: Name))),map (const $ TyPtr TyNode) as,TyNode)
---    | otherwise = ((toAtom ('f':show (tvrNum n))),map (const $ TyPtr TyNode) as,TyNode)
 
 toEntry (n,as,e)
     | Just nm <- intToAtom (tvrNum n)  = f (toAtom ('f':show (fromAtom nm :: Name)))
@@ -171,19 +164,6 @@ compile dataTable nmap sc@SC { scMain = mt, scCombinators = cm } = do
         in  (n,(as,TyNode))
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode))
 
-        {-
-    toTyEnv (n,Tup ps :-> e) = (n,(map (runIdentity . tc initTyEnv) ps,TyNode))
-    toEntry (n,as,e)
-        | Just nm <- Map.lookup (tvrNum n) nmap = ((toAtom ('f':show nm)),map (toTy.tvrType) as,toTy (typ e))
-        | otherwise = ((toAtom ('f':show (tvrNum n))),map (toTy.tvrType) as,toTy (typ e))
-    scMap = fromList [ (tvrNum t,toEntry x) |  x@(t,_,_) <- scCombinators sc]
-    initTyEnv = TyEnv $ fromList $ [ (a,(b,c)) | (_,(a,b,c)) <-  Map.toList scMap] ++ [con x| x <- Map.elems $ constructorMap dataTable]
-    con c = (n,(as,toTy t)) where
-        n | sortStarLike (conType c) = toAtom ('T':show (conName c))
-          | otherwise = toAtom ('C':show (conName c))
-        as = [ toTy $ tvrType tvr |  EVar tvr <- es]
-        (ELit (LitCons _ es t),_) = fromLam $ conExpr c
-        -}
 
 convertName n = toAtom (t':s) where
     (t,s) = fromName n
@@ -223,7 +203,6 @@ constantCaf dataTable (SC _ ds) = ans where
     conv (ELit (LitInt i (ELit (LitCons n [] (ESort EHash))))) | RawType <- nameType n =  Lit i (Ty $ toAtom (show n))
     conv (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Map.lookup n ctypeMap = ( Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
     conv e | Just (a,_) <- from_unsafeCoerce e = conv a
---    conv e | Just (a,_) <- from_integralCast e = conv a
     conv (ELit lc@(LitCons n es _)) | Just nn <- getName lc = (Const (NodeC nn (map conv es)))
     conv (EPi (TVr { tvrIdent = 0, tvrType =  a}) b)  =  Const $ NodeC tagArrow [conv a,conv b]
     conv (EVar v) | v `Set.member` lbs = Var (cafNum v) (TyPtr TyNode)
@@ -260,10 +239,10 @@ instance ToVal TVr where
 --
 -- right after compilation, everything has type TyNode or (TyPtr TyNode) since
 -- Haskell does not natively support anything other than boxed types.
+-- This also isn't true.
 --
 
 dropCoerce e | Just (x,_) <- from_unsafeCoerce e = x
---dropCoerce e | Just (x,_) <- from_integralCast e = x
 dropCoerce x = x
 
 compile' ::  DataTable -> CEnv -> (TVr,[TVr],E) -> IO (Atom,Lam)
@@ -312,9 +291,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce e | Just z <- constant e = return (gEval z)
     ce e | Just z <- con e = return (Return z)
     ce e | Just (a,_) <- from_unsafeCoerce e = ce a
-    --ce ep@(EPrim (APrim (PrimPrim s) _) es _) = do
-    --    fail $ "Unrecognized PrimPrim: " ++ show ep
-    --    return $ App (toAtom $ 'b':s ) (args es)
     ce (EPrim ap@(APrim (Func True fn as "void") _) (_:es) _) = do
         let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ((map (Ty . toAtom) as),tyUnit), primAPrim = ap }
         return $  Prim p (args es) :>>= unit :-> Return world__
@@ -343,43 +319,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
         let p = Primitive { primName = toAtom s, primRets = Nothing, primType = ([],ptype), primAPrim = aprim }
             ptype = Ty $ toAtom t
         return $ Prim p []
---    ce (EPrim ap@(APrim (Peek pt') _) [_,addr] rt) = do
---        (v,b,w) <- cpa addr
---        (c,_) <- fromIORT rt
---        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = (TyTup [Ty (toAtom "HsPtr")],pt), primAPrim = ap }
---            ptv = Var v2 pt
---            pt = Ty (toAtom pt')
---        return $ w :>>= b :-> Prim p [v] :>>= ptv :->  Store (NodeC (toAtom $ 'C':show c) [ptv]) :>>= p3 :-> retIO p3
---    ce (EPrim ap@(APrim (Poke pt') _) [_,addr,val] _) = do
---        (v,b,w) <- cpa addr
---        (v',b',w') <- cpa val
---        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = (TyTup [Ty (toAtom "HsPtr"),pt],tyUnit), primAPrim = ap }
---            ptv = Var v2 pt
---            pt = Ty (toAtom pt')
---        return $ w :>>= b :-> w' :>>= b' :-> Prim p [v,v'] :>>= unit :-> Return world__
---    ce (EPrim ap@(APrim (Func True fn as "void") _) (_:es) _) = do
---        es' <- mapM cpa es
---        let fr = foldl (.) id [ (\e -> w :>>= b :-> e) | (_,b,w) <- es' ]
---            p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = (TyTup (map (Ty . toAtom) as),tyUnit), primAPrim = ap }
---        return $ fr ( Prim p [ x | (x,_,_) <- es' ] :>>= unit :-> Return world__)
---    ce (EPrim ap@(APrim (Func True fn as r) _) (_:es) rt) = do
---        es' <- mapM cpa es
---        (c,rr) <- fromIORT rt
---        let fr = foldl (.) id [ (\e -> w :>>= b :-> e) | (_,b,w) <- es' ]
---            p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = (TyTup (map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
---            ptv = Var v2 pt
---            pt = Ty (toAtom r)
---        return $ fr ( Prim p [ x | (x,_,_) <- es' ] :>>= ptv :-> Store (NodeC (toAtom $ 'C':show c) [ptv]) :>>= p3 :-> retIO p3)
-    --ce (EPrim aprim@(APrim (AddrOf s) _) [] t) | Just (c,ptype') <- lookupCType dataTable t = do
-    --    let cname = 'C':show c
-    --        ptype = Ty $ toAtom ptype'
-    --    let p = Primitive { primName = toAtom ('&':s), primRets = Nothing, primType = (tyUnit,ptype), primAPrim = aprim }
-    --    return $ Prim p [] :>>= Var v1 ptype :-> Return (NodeC (toAtom cname) [Var v1 ptype])
-    --ce (EPrim aprim@(APrim (CConst s _) _) [] t) |  Just (c,ptype') <- lookupCType dataTable t = do
-    --    let cname = 'C':show c
-    --        ptype = Ty $ toAtom ptype'
-    --    let p = Primitive { primName = toAtom s, primRets = Nothing, primType = (tyUnit,ptype), primAPrim = aprim }
-    --    return $ Prim p [] :>>= Var v1 ptype :-> Return (NodeC (toAtom cname) [Var v1 ptype])
     ce ee@(EPrim aprim@(APrim (CCast from to) _) [e] t)  = do
         let ptypeto' = Ty $ toAtom to
             ptypefrom' = Ty $ toAtom from
@@ -388,59 +327,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce (EPrim ap@(APrim (Operator n as r) _) es (ELit (LitCons tname [] _))) | RawType <- nameType tname = do
         let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ((map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
         return $ Prim p (args es)
-        {-
-    ce (EPrim ap@(APrim (Operator n as r) _) es rt) = do
-        es' <- mapM cpa es
-        Just (c,rr) <- return $ lookupCType dataTable rt
-        True <- return $ rr == r
-        let fr = foldl (.) id [ (\e -> w :>>= b :-> e) | (_,b,w) <- es' ]
-            p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = (TyTup (map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
-            ptv = Var v2 pt
-            pt = Ty (toAtom r)
-        return $ fr ( Prim p [ x | (x,_,_) <- es' ] :>>= ptv :-> Return (NodeC (toAtom $ 'C':show c) [ptv]) )
-        {-
-    ce (EPrim ap@(APrim (Func False fn as r) _) es rt) = do
-        es' <- mapM cpa es
-        Just (c,rr) <- return $ lookupCType dataTable rt
-        let fr = foldl (.) id [ (\e -> w :>>= b :-> e) | (_,b,w) <- es' ]
-            p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = (TyTup (map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
-            ptv = Var v2 pt
-            pt = Ty (toAtom r)
-        return $ fr ( Prim p [ x | (x,_,_) <- es' ] :>>= ptv :-> Return (NodeC (toAtom $ 'C':show c) [ptv]) )
-        -}
-    ce ee@(EPrim aprim@(APrim (CCast from to) _) [e] t)  = do
-        fd <- ce e
-        Just (cfrom,ptypefrom) <- return $ lookupCType dataTable (typ e)
-        Just (cto,ptypeto) <- return $ lookupCType dataTable t
-        unless (ptypefrom == from && ptypeto == to) $ fail ("CCast no match: " ++ show ee)
-        let namecto = toAtom $ 'C':show cto
-            ptypeto' = Ty $ toAtom ptypeto
-            namecfrom = toAtom $ 'C':show cfrom
-            ptypefrom' = Ty $ toAtom ptypefrom
-            vfrom = Var v1 ptypefrom'
-            vto = Var v2 ptypeto'
-        let p = Primitive { primName = toAtom ("(" ++ to ++ ")"), primRets = Nothing, primType = (TyTup [ptypefrom'],ptypeto'), primAPrim = aprim }
-        return $ fd :>>= NodeC namecfrom [vfrom] :-> Prim p [vfrom] :>>= vto :-> Return (NodeC namecto [vto])
-
-        x1 <- ce e1
-        x2 <- ce e2
-        (cons1,ctp1) <- lookupCType dataTable (typ e1)
-        (cons2,ctp2) <- lookupCType dataTable (typ e2)
-        (consr,ctpr) <- lookupCType dataTable t
-        True <- return $ t1 == ctp1
-        True <- return $ t2 == ctp2
-        True <- return $ rt == ctpr
-
-        let cname = 'C':show c
-        let p1 = Var v1 ptype
-            p2 = Var v2 ptype
-            p3 = Var v3 ptype
-            Just ptype' = Prelude.lookup (show c) allCTypes
-            node x = NodeC (toAtom cname) [x]
-            ptype = Ty $ toAtom ptype'
-        let p = Primitive { primName = toAtom s, primRets = Nothing, primType = (TyTup [ptype,ptype],ptype), primAPrim = aprim }
-        return $ x1 :>>= node p1 :-> x2 :>>= node p2 :-> Prim p [p1,p2] :>>= p3 :-> Return (node p3)
-        -}
     ce (ECase e _ [Alt (LitCons n xs _) wh] _) | Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n  = do
         e <- ce e
         wh <- ce wh
@@ -525,46 +411,8 @@ compile' dataTable cenv (tvr,as,e) = ans where
             (_,tp) <- isBasic l
             z <- return $ Lit i tp
             return (z :-> x)
---        f (PatLit l@(LitChar i),e) = do
---            x <- ce e
---            --z <- const $ ELit l
---            z <- return $ Lit (ord i) tCharzh
---            return (z :-> x)
---        f (PatWildCard,ELam (TVr Nothing _)  e) = do
---            x <- ce e
---            nv <- newPrimVar (Ty cons)
---            return (nv :-> x)
---        f (PatWildCard,ELam tvr e) = do
---            x <- ce e
---            nv' <- newPrimVar (Ty cons)
---            return (nv' :-> Store (NodeC cons [nv]) :>>= toVal tvr :-> x)
---        f (PatWildCard,e) = do
---            x <- ce e
---            w <- newNodePtrVar
---            m <- newNodeVar
---            nv' <- newPrimVar (Ty cons)
---            return (nv' :-> Store (NodeC cons [nv]) :>>= w :-> x :>>= m :-> gApply m w)
 
     getName x = getName' dataTable x
-{-
-    getName v@(LitCons n es _)
-        | conAlias cons = error $ "Alias still exists: " ++ show v
-        | length es == nargs  = do
-            return cn
-        | nameType n == TypeConstructor && length es < nargs = do
-            return ((partialTag cn (nargs - length es)))
-        where
-        cn = convertName n
-        cons = runIdentity $ getConstructor n dataTable
-        nargs = length (conSlots cons)
--}
-{-
-    cp (PatLit (LitCons n es _),e) = do
-        x <- ce e
-        es <- mapM (\_ -> newNodePtrVar) es
-        x <- app x es
-        return (NodeC (convertName n) es :-> x)
--}
 
     app e [] = return e
     app e (a:as) = do
@@ -596,34 +444,12 @@ compile' dataTable cenv (tvr,as,e) = ans where
             s = Store (NodeC t (e:as))
         d <- app (gEval p1) (tail args)
         addNewFunction (tl,Tup (args) :-> d)
-        --modifyIORef (funcBaps cenv) ((tl,Tup (args) :-> d):)
-        --let addt (TyEnv mp) =  TyEnv $ Map.insert tl (replicate (length args) (TyPtr TyNode),TyNode) mp
-        --modifyIORef (tyEnv cenv) addt
         return s
     addNewFunction tl@(n,Tup args :-> body) = do
         modifyIORef (funcBaps cenv) (tl:)
-        tenv <- readIORef (tyEnv cenv)
-        args' <- mapM (typecheck tenv) args
-        rb <- typecheck tenv body
-        let addt (TyEnv mp) =  TyEnv $ Map.insert n (args',rb) mp
+        let addt (TyEnv mp) =  TyEnv $ Map.insert n (map getType args,getType body) mp
         modifyIORef (tyEnv cenv) addt
 
-    {-
-    app' e (a:as) = do
-        v <- newNodePtrVar
-        let s = Store (NodeC tagApply [e,a])
-        r <- app' v as
-        return (s :>>= v :-> r)
-    -}
-
-    --cc e | Just c <- const e = do
-    --    return (Return (Const c))
-    --cc (EPi (TVr 0 a) b) = do
-    --    a' <- cc a
-    --    b' <- cc b
-    --    p1 <- newNodePtrVar
-    --    p2 <- newNodePtrVar
-    --    return (a' :>>= p1 :-> b' :>>= p2 :-> Store (NodeC tagArrow [p1,p2]))
     cc e | Just z <- constant e = return (Return z)
     cc e | Just z <- con e = do
         return (Store z)
@@ -647,21 +473,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
                 | [] <- as -> return $ Return (toVal v)
                 | otherwise  -> app' (toVal v) as
     cc e | Just (x,_) <- from_unsafeCoerce e = cc x
---    cc e | Just (x,_) <- from_integralCast e = cc x
---    cc (EPrim aprim@(APrim (PrimPrim s) _) es pt) = do
---        V vn <- newVar
---        te <- readIORef (tyEnv cenv)
---        let fn = toAtom ('b':s ++ "_" ++ show vn)
---            fn' = toAtom ('B':s ++ "_" ++ show vn)
---        case findArgsType te fn of
---            Just _ -> return $ Store $ NodeC fn' (args es)
---            Nothing -> do
---                let es' = args es
---                ts <- mapM (typecheck te) es'
---                let nvs = [ Var v t | t <- ts | v <- [v2,V 4..] ]
---                x <- ce (EPrim aprim [ EVar (TVr v t) | t <- map typ es | v <- [2,4..]] pt)
---                addNewFunction (fn,Tup nvs :-> x)
---                return $ Store $ NodeC fn' es'
     cc (EPrim aprim@(APrim prim _) es pt) = do
         V vn <- newVar
         te <- readIORef (tyEnv cenv)
@@ -677,8 +488,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
                 x <- ce (EPrim aprim [ EVar (tvr { tvrIdent = v, tvrType =  t}) | t <- map getType es | v <- [2,4..]] pt)
                 addNewFunction (fn,Tup nvs :-> x)
                 return $ Store $ NodeC fn' es'
-    --cc (EPrim (APrim (PrimPrim s) _) es _) = do
-    --    return $ Store $ NodeC (toAtom $ "B" ++ s ) (args es)
     cc e = error $ "cc: " ++ show e
     doLet ds e = f (decomposeDefns ds) e where
         f [] x = return x
@@ -702,7 +511,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
             let r = (foldr (\a b -> a :>>= unit :-> b) v xs)
             return $ foldr g r bs
 
-            --fail "can't handle recursion just yet."
     -- This avoids a blind update on recursive thunks
     doUpdate vr (Store n) = Update vr n
     doUpdate vr (x :>>= v :-> e) = x :>>= v :-> doUpdate vr e
@@ -712,7 +520,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
         f x | Just z <- constant x =  z
         f (EVar tvr) = toVal tvr
         f e | Just (x,_) <- from_unsafeCoerce e = f x
---        f e | Just (x,_) <- from_integralCast e = f x
         f x = error $ "invalid argument: " ++ show x
 
     -- Takes an E and returns something constant of type (TyPtr TyNode)
@@ -731,32 +538,10 @@ compile' dataTable cenv (tvr,as,e) = ans where
     constant (ELit lc@(LitCons n es _)) | Just es <- mapM constant es, Just nn <- getName lc = (return $ Const (NodeC nn es))
     constant (EPi (TVr { tvrIdent = 0, tvrType = a}) b) | Just a <- constant a, Just b <- constant b = return $ Const $ NodeC tagArrow [a,b]
     constant e | Just (a,_) <- from_unsafeCoerce e = constant a
---    constant e | Just (a,_) <- from_integralCast e = constant a
     constant _ = fail "not a constant term"
 
     caforconst e = constant e
 
-    {-
-    caforconst :: Monad m =>  E -> m Val
-    caforconst (EVar tvr)  | Just (v,as,_) <- Map.lookup (tvrNum tvr) (scMap cenv)
-                         , t <- partialTag v (length as)  = case tagIsWHNF t of
-                            True -> return $ Const $ NodeC t []
-                            False -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
-    caforconst e = liftM Const $ const e
-
-    const :: Monad m => E -> m Val  --needed for polymorphic recursion
-    const (EVar tvr)  | Just (v,as,_) <- Map.lookup (tvrNum tvr) (scMap cenv)
-                         , t <- partialTag v (length as)  = case tagIsWHNF t of
-                            True -> return $ NodeC t []
-                            False -> fail "const: CAF"
-    --const (ELit (LitInt i t)) | t == tChar = (return (NodeC (toAtom "CChar") [(Lit ( fromIntegral i) tCharzh)]))
-    --const (ELit (LitInt i t))   = (return (NodeC (toAtom "CInt") [(Lit (fromIntegral i) tIntzh)]))
-    const (ELit (LitInt i (ELit (LitCons n [] (ESort 0))))) | Just pt <- Prelude.lookup (show n) allCTypes = (return (NodeC (toAtom $ 'C':show n) [(Lit (fromIntegral i) (Ty (toAtom pt)))]))
-    const (ELit lc@(LitCons n es _)) | Just es <- mapM const es, Just nn <- getName lc = (return (NodeC nn (map Const es)))
-    const (EPi (TVr 0 a) b) | Just a <- const a, Just b <- const b = return $ NodeC tagArrow [Const a,Const b]
-    --const e@(EPi {}) | (ELit (LitCons n as' t),as) <- fromPi e, as == [ v | EVar v <- as'] = const (ELit (LitCons n [] undefined))
-    const _ = fail "not a constant term"
-      -}
     con :: Monad m => E -> m Val
     --con e | Just z <- const e = return z
     --con e | Just (Const z) <- constant e = return z
@@ -780,7 +565,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
 
     scInfo tvr | Just n <- Map.lookup (tvrNum tvr) (scMap cenv) = return n
     scInfo tvr = fail $ "not a supercombinator:" <+> show tvr
-    --newVar' = fmap (\x -> Var x TyNode) newVar
     newNodeVar =  fmap (\x -> Var x TyNode) newVar
     newPrimVar ty =  fmap (\x -> Var x ty) newVar
     newNodePtrVar =  fmap (\x -> Var x (TyPtr TyNode)) newVar
@@ -789,76 +573,3 @@ compile' dataTable cenv (tvr,as,e) = ans where
         writeIORef (counter cenv) $! (i + 2)
         return $! V i
 
-    --ce (EPi (TVr Nothing x) y) = do
-    --    return $ Return $ NodeC (toAtom "T->") (args [x,y])
-    --ce (ELit (LitCons n es _)) = do
-    --    return (Return (NodeC (convertName n) (args es)))
---        f (EVar tvr)
---            | Just (v,as,_) <- Map.lookup (tvrNum tvr) (scMap cenv) =
---                    let pt = partialTag v (length as) in
---                      (Const $ NodeC pt [])
---            | otherwise  = toVal tvr
-    --cc e@EPi {} = do
-    --   v <- newNodeVar
-    --    x <- ce e
-    --    return (x :>>= (v,Store v))
-
---    ce e | Just (a,_) <- from_integralCast e = ce a
-    --ce (EPrim "seq" [a,b] _) = do
-    --    a <- ce a
-    --    b <- ce b
-    --    return $ a :>>= n0 :-> b
---    ce (EPrim aprim@(APrim (PrimPrim s) _) [] t) | "prim_const." `isPrefixOf` s, Just (c,ptype') <- lookupCType dataTable t = do
---        let cname = 'C':show c
---        --let Just ptype' = Prelude.lookup (show c) allCTypes
---            ptype = Ty $ toAtom ptype'
---        let p = Primitive { primName = toAtom s, primRets = Nothing, primType = (tyUnit,ptype), primAPrim = aprim }
---        return $ Prim p [] :>>= Var v1 ptype :-> Return (NodeC (toAtom cname) [Var v1 ptype])
---    ce (EPrim aprim@(APrim (PrimPrim s) _) [e] (ELit (LitCons c [] (ESort 0)))) | "prim_op_aa." `isPrefixOf` s = do
---        x <- ce e
---        let cname = 'C':show c
---        let p1 = Var v1 ptype
---            p2 = Var v2 ptype
---            node x = NodeC (toAtom cname) [x]
---            Just ptype' = Prelude.lookup (show c) allCTypes
---            ptype = Ty $ toAtom ptype'
---        let p = Primitive { primName = toAtom s, primRets = Nothing, primType = (TyTup [ptype],ptype), primAPrim = aprim }
---        return $ x :>>= node p1 :-> Prim p [p1] :>>= p2 :-> Return (node p2)
---    ce (EPrim aprim@(APrim (PrimPrim s) _) [e1,e2] (ELit (LitCons c [] (ESort 0)))) | "prim_op_aaa." `isPrefixOf` s = do
---        x1 <- ce e1
---        x2 <- ce e2
---        let cname = 'C':show c
---        let p1 = Var v1 ptype
---            p2 = Var v2 ptype
---            p3 = Var v3 ptype
---            Just ptype' = Prelude.lookup (show c) allCTypes
---            node x = NodeC (toAtom cname) [x]
---            ptype = Ty $ toAtom ptype'
---        let p = Primitive { primName = toAtom s, primRets = Nothing, primType = (TyTup [ptype,ptype],ptype), primAPrim = aprim }
---        return $ x1 :>>= node p1 :-> x2 :>>= node p2 :-> Prim p [p1,p2] :>>= p3 :-> Return (node p3)
---    ce (EPrim aprim@(APrim (PrimPrim s) _) [e1,e2] (ELit (LitCons c [] (ESort 0)))) | "prim_op_aaa." `isPrefixOf` s = do
---        x1 <- ce e1
---        x2 <- ce e2
---        let cname = 'C':show c
---        let p1 = Var v1 ptype
---            p2 = Var v2 ptype
---            p3 = Var v3 ptype
---            Just ptype' = Prelude.lookup (show c) allCTypes
---            node x = NodeC (toAtom cname) [x]
---            ptype = Ty $ toAtom ptype'
---        let p = Primitive { primName = toAtom s, primRets = Nothing, primType = (TyTup [ptype,ptype],ptype), primAPrim = aprim }
---        return $ x1 :>>= node p1 :-> x2 :>>= node p2 :-> Prim p [p1,p2] :>>= p3 :-> Return (node p3)
---    ce (EPrim aprim@(APrim (PrimPrim s) _) [e1,e2] tBool) | "prim_op_aaB." `isPrefixOf` s = do
---        x1 <- ce e1
---        x2 <- ce e2
---        let cname = 'C':show c
---            p1 = Var v1 ptype
---            p2 = Var v2 ptype
---            p3 = Var v3 intT
---            (ELit (LitCons c [] (ESort 0))) = followAliases dataTable (typ e1)
---            intT =   (Ty (toAtom "int"))
---            Just ptype' = Prelude.lookup (show c) allCTypes
---            node x = NodeC (toAtom cname) [x]
---            ptype = Ty $ toAtom ptype'
---            p = Primitive { primName = toAtom s, primRets = Nothing, primType = (TyTup [ptype,ptype],intT), primAPrim = aprim }
---        return $ x1 :>>= node p1 :-> x2 :>>= node p2 :-> Prim p [p1,p2] :>>= p3 :-> Case p3 [Lit 0 intT :-> Return vFalse, Var v0 intT :-> Return vTrue]
