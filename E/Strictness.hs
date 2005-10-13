@@ -135,15 +135,18 @@ collect e = ans where
     f e = error $ "Strictness: " ++ show e
     fin ts sm = do
         tell [ (tvr,Map.findWithDefault A tvr sm) | tvr <- ts]
-        return $ Map.fromAscList [ (i,L) | (i,v) <- Map.toAscList sm, i `notElem` ts]
+        --return $ Map.fromAscList [ (i,L) | (i,v) <- Map.toAscList sm, i `notElem` ts]
+        return $ Map.map (const L) $ Map.filterWithKey (\i _ -> i `notElem` ts) sm -- Map.fromAscList [ (i,L) | (i,v) <- Map.toAscList sm, i `notElem` ts]
     finS ts sm = do
-        return $ Map.fromAscList [ (i,v) | (i,v) <- Map.toAscList sm, i `notElem` ts]
+        return $ Map.filterWithKey (\i _ -> i `notElem` ts) sm -- Map.fromAscList [ (i,v) | (i,v) <- Map.toAscList sm, i `notElem` ts]
     g (t,e)  = ans where
         (b,as) = fromLam e
+        las = length as
         ans = do
             samap <- f b
             unless (null as) $ tell [(t,Lam [ Map.findWithDefault A tvr samap |  tvr <- as])]
-            return $ Map.fromAscList [ (i,saIf t (length as) v L) | (i,v) <- Map.toAscList samap, i `notElem`  as]
+            -- return $ Map.fromAscList [ (i,saIf t (length as) v L) | (i,v) <- Map.toAscList samap, i `notElem`  as]
+            return $ Map.map (\v -> saIf t las v L) $  Map.filterWithKey (\i _ -> i `notElem` as) samap -- Map.fromAscList [ (i,saIf t (length as) v L) | (i,v) <- Map.toAscList samap, i `notElem`  as]
     arg sa (EVar tvr) = Map.singleton tvr sa
     arg sa (ELit _) = mempty
     arg sa (EPi _ _) = mempty
