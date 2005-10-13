@@ -37,14 +37,14 @@ evaluate Grin { grinTypeEnv = tyEnv, grinFunctions = ts, grinCafs = cafs } =  do
     stats <- Stats.new
     cafMap <- createCafMap cafs
     let f x = interpret stats tyEnv cafMap builtinMap (fromList  ts) x
-        g (App t [l@Lit {}]) | t == funcEval = return l
-        g (App t [Const n]) | t == funcEval = return n
+        g (App t [l@Lit {}] _) | t == funcEval = return l
+        g (App t [Const n] _) | t == funcEval = return n
         g e = f e >>= \x -> case x of
             NodeC t xs -> do
                 xs <- mapM (g . gEval) xs
                 return $ NodeC t xs
             z -> return z
-    v <- g (App funcMain [])
+    v <- g (App funcMain [] tyUnit)
     return (v,stats)
 
 funcCalls = toAtom "Function Calls"
@@ -59,13 +59,13 @@ interpret stats te cafMap primMap scMap e = f mempty e where
         r <- f env e1
         be <- bind v r
         f (be `mappend` env) e2
-    f env (App a xs) = do
+    f env (App a xs ty) = do
         wdump FD.Steps $ do
-            putErrLn $ render (prettyExp mempty $ App a xs')
+            putErrLn $ render (prettyExp mempty $ App a xs' ty)
         Stats.tick stats funcCalls
         Stats.tick stats (toAtom $ "Function." ++ fromAtom a)
         case Map.lookup a scMap of
-            Nothing -> error $ "Unknown App: " ++ show (App a xs')
+            Nothing -> error $ "Unknown App: " ++ show (App a xs' ty)
             Just ((Tup as :-> e)) -> f (Map.fromList (zip [ v | Var v _ <- as] xs')) e
             --Just (Right action) -> do action xs'
       where xs' = map (le env) xs
@@ -124,7 +124,7 @@ interpret stats te cafMap primMap scMap e = f mempty e where
     le _ x = x
 
     doApply (NodeC t xs) y
-        | n == (1::Int) = f mempty (App (toAtom $ 'f':rs) (xs ++ [y]))
+        | n == (1::Int) = f mempty (App (toAtom $ 'f':rs) (xs ++ [y]) TyNode)  -- TODO, right?
         | n > 1 = return $ NodeC (toAtom $ 'P':show (n - 1) ++ "_" ++ rs) (xs ++ [y])
         where
         ('P':cs) = fromAtom t
@@ -136,8 +136,8 @@ interpret stats te cafMap primMap scMap e = f mempty e where
         | 'T':_ <- t' = return x
         | 'C':_ <- t' = return x
 --        | t == tagApply = f mempty (Eval (xs !! 0) :>>= (n1, Apply n1 (xs !! 1)))
-        | 'F':rs <- t' = f mempty (App (toAtom $ 'f':rs) xs)
-        | 'B':rs <- t' = f mempty (App (toAtom $ 'b':rs) xs)
+        | 'F':rs <- t' = f mempty (App (toAtom $ 'f':rs) xs TyNode)  -- TODO, right?
+        | 'B':rs <- t' = f mempty (App (toAtom $ 'b':rs) xs TyNode)  -- TODO, right?
         where
         t' = fromAtom t
     doEval x = error $ "doEval " ++ show x

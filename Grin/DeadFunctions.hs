@@ -166,9 +166,9 @@ findDeadCode stats fs = ans where
 pHole = Const (NodeC tagHole [])
 
 removeDeadArgs stats fs (a,l) =  whizExps f l >>= return . (,) a where
-    f (App fn as) = do
+    f (App fn as ty) = do
         as <- dff fn as
-        return $ App fn as
+        return $ App fn as ty
     f (Return (NodeC fn as)) | Just fn' <- tagToFunction fn = do
         as <- dff fn' as
         return $ Return (NodeC fn as)
@@ -202,9 +202,9 @@ collectArgInfo exp@(Tup as :-> _) = ans where
         Nothing -> Unused
     ans = [ lv x |  Var x _ <- as ]
     f e = g e >> return e
-    g (App a [e]) | a == funcEval =  tell (Seq.fromList [ (v,Used) | v <- freeVars e ])
-    g (App a [x,y]) | a == funcApply =  tell (Seq.fromList [ (v,Used) | v <- freeVars (x,y) ])
-    g (App a vs) = tell (Seq.fromList $ concat [ [ (x,Passed [(a,i)]) | x <- freeVars v] | v <- vs | i <- [0..] ])
+    g (App a [e] _) | a == funcEval =  tell (Seq.fromList [ (v,Used) | v <- freeVars e ])
+    g (App a [x,y] _) | a == funcApply =  tell (Seq.fromList [ (v,Used) | v <- freeVars (x,y) ])
+    g (App a vs _) = tell (Seq.fromList $ concat [ [ (x,Passed [(a,i)]) | x <- freeVars v] | v <- vs | i <- [0..] ])
     g (Store (NodeC x vs)) | Just a <- tagToFunction x = tell (Seq.fromList $ concat [ [ (x,Passed [(a,i)]) | x <- freeVars v] | v <- vs | i <- [0..] ])
     g (Return (NodeC x vs)) | Just a <- tagToFunction x = tell (Seq.fromList $ concat [ [ (x,Passed [(a,i)]) | x <- freeVars v] | v <- vs | i <- [0..] ])
     g (Update _ (NodeC x vs)) | Just a <- tagToFunction x = tell (Seq.fromList $ concat [ [ (x,Passed [(a,i)]) | x <- freeVars v] | v <- vs | i <- [0..] ])

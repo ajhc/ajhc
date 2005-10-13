@@ -80,8 +80,8 @@ funcFetch = toAtom "@fetch"
 funcInitCafs = toAtom "@initcafs"
 funcMain = toAtom "@main"
 
-gEval x = App funcEval [x]
-gApply x y = App funcApply [x,y]
+gEval x = App funcEval [x] TyNode
+gApply x y = App funcApply [x,y] TyNode
 
 
 instance TypeNames Ty where
@@ -134,7 +134,7 @@ data Lam = Val :-> Exp
 
 data Exp =
      Exp :>>= Lam
-    | App { expFunction :: Atom, expArgs :: [Val] }    -- ^ this handles applications of functions and builtins
+    | App { expFunction :: Atom, expArgs :: [Val], expType :: Ty }    -- ^ this handles applications of functions and builtins
     | Prim { expPrimitive :: Primitive, expArgs :: [Val] }
     | Case { expValue :: Val, expAlts :: [Lam] }
     | Return { expValue :: Val }
@@ -168,7 +168,6 @@ instance Ord (IORef a) where
 data Grin = Grin {
     grinTypeEnv :: TyEnv,
     grinFunctions :: [(Atom,Lam)],
---    grinPrimitives :: [(Primitive,Builtin)],
     grinCafs :: [(Var,Val)]
 }
 
@@ -399,11 +398,13 @@ instance CanTypeCheck TyEnv Exp Ty where
         as'' <- mapM (typecheck te) as
         if as'' == as' then return t' else
             fail $ "Prim: arguments do not match " ++ show n
-    typecheck te a@(App fn as) = do
+    typecheck te a@(App fn as t) = do
         (as',t') <- findArgsType te fn
         as'' <- mapM (typecheck te) as
-        if as'' == as' then return t' else
-            fail $ "App: arguments do not match: " ++ show a
+        if t' == t then
+            if as'' == as' then return t' else
+                fail $ "App: arguments do not match: " ++ show a
+         else fail $ "App: results do not match: " ++ show a
     typecheck te (Store v) = do
         t <- typecheck te v
         return (TyPtr t)
@@ -430,7 +431,6 @@ instance CanTypeCheck TyEnv Exp Ty where
 
 instance CanTypeCheck TyEnv Val Ty where
     typecheck _ (Tag _) = return TyTag
---    typecheck _ Unit = return tyUnit
     typecheck _ (Var _ t) = return t
     typecheck _ (Lit _ t) = return t
     typecheck _ (NodeV {}) = return TyNode
@@ -440,7 +440,6 @@ instance CanTypeCheck TyEnv Val Ty where
     typecheck x (Const t) = do
         v <- typecheck x t
         return (TyPtr v)
---    typecheck _ (NodeC {}) = return TyNode
     typecheck _ (Addr _) = return $ TyPtr (error "typecheck: Addr")
     typecheck _ (ValPrim _) = error "ValPrim"
     typecheck te n@(NodeC tg as) = do
@@ -448,6 +447,21 @@ instance CanTypeCheck TyEnv Val Ty where
         as'' <- mapM (typecheck te) as
         if as'' == as' then return TyNode else
             fail $ "NodeC: arguments do not match " ++ show n ++ show (as'',as')
+
+instance CanType Exp Ty where
+    getType (_ :>>= (_ :-> e2)) = getType e2
+    getType (Prim p _) = snd (primType p)
+    getType App { expType = t } = t
+    getType (Store v) = TyPtr (getType v)
+    getType (Return v) = getType v
+    getType (Fetch v) = case getType v of
+        TyPtr t -> t
+        _ -> error "Exp.getType: fetch of non-pointer type"
+    getType (Error _ t) = t
+    getType (Update w v) = tyUnit
+    getType (Case _ []) = error "empty case"
+    getType (Case _ ((_ :-> e):_)) = getType e
+    getType (Cast _ t) =  t
 
 instance CanType Val Ty where
     getType (Tag _) = TyTag
@@ -477,7 +491,7 @@ instance FreeVars Val (Set.Set Var) where
 
 instance FreeVars Exp (Set.Set Var) where
     freeVars (a :>>= b) = freeVars (a,b)
-    freeVars (App a vs) =  freeVars vs
+    freeVars (App a vs _) =  freeVars vs
     freeVars (Case x xs) = freeVars (x,xs)
     freeVars (Return v) = freeVars v
     freeVars (Store v) = freeVars v
@@ -514,7 +528,7 @@ instance FreeVars Lam (Set.Set Tag) where
 
 instance FreeVars Exp (Set.Set Tag) where
     freeVars (a :>>= b) = freeVars (a,b)
-    freeVars (App a vs) = Set.singleton a `Set.union` freeVars vs
+    freeVars (App a vs _) = Set.singleton a `Set.union` freeVars vs
     freeVars (Case x xs) = freeVars (x,xs)
     freeVars (Return v) = freeVars v
     freeVars (Store v) = freeVars v

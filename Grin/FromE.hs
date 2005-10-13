@@ -137,8 +137,8 @@ compile dataTable nmap sc@SC { scMain = mt, scCombinators = cm } = do
     te <- readIORef tyEnv
     fbaps <- readIORef funcBaps
     --sequence_ [ typecheck te c >>= when False . print . (,) a  | (a,_,c) <-  ds ]
-    let (main,as,_) = runIdentity $ Map.lookup (tvrNum mt) scMap
-        main' =  if not $ null as then  (Return $ NodeC (partialTag main (length as)) []) else App main []
+    let (main,as,rtype) = runIdentity $ Map.lookup (tvrNum mt) scMap
+        main' =  if not $ null as then  (Return $ NodeC (partialTag main (length as)) []) else App main [] rtype
         tags = Set.toList $ ep $ Set.unions (freeVars (main',initCafs):[ freeVars e | (_,(_ :-> e)) <- ds ])
         ep s = Set.fromList $ concatMap partialLadder $ Set.toList s
         --ev = (funcEval,(Tup [p1] :-> createEval te tags))
@@ -156,7 +156,7 @@ compile dataTable nmap sc@SC { scMain = mt, scCombinators = cm } = do
             --grinFunctions = (funcMain ,[], App funcInitCafs [] :>>= (Unit,Store main') :>>= (p1,gEval p1)): ds',
             --grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] :>>= unit :-> main' :>>= n3 :-> App funcApply [n3,pworld__] )) : ds',
             --grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] :>>= unit :->  main' :>>= n3 :-> App funcApply [n3,pworld__] :>>= n0 :-> Return unit )) : ds',
-            grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] :>>= unit :->  theMain :>>= n0 :-> Return unit )) : ds',
+            grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  theMain :>>= n0 :-> Return unit )) : ds',
             grinCafs = cafs -- [ (n,NodeC t []) | (n,t) <- cafs]
             }
     typecheckGrin grin
@@ -293,7 +293,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
             Just (v,as',es)
                 | length as >= length as' -> do
                     let (x,y) = splitAt (length as') as
-                    app (App v x) y
+                    app (App v x es) y
                 | otherwise -> do
                     let pt = partialTag v (length as' - length as)
                     return $ Return (NodeC pt as)
@@ -312,9 +312,9 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce e | Just z <- constant e = return (gEval z)
     ce e | Just z <- con e = return (Return z)
     ce e | Just (a,_) <- from_unsafeCoerce e = ce a
-    ce ep@(EPrim (APrim (PrimPrim s) _) es _) = do
-        fail $ "Unrecognized PrimPrim: " ++ show ep
-        return $ App (toAtom $ 'b':s ) (args es)
+    --ce ep@(EPrim (APrim (PrimPrim s) _) es _) = do
+    --    fail $ "Unrecognized PrimPrim: " ++ show ep
+    --    return $ App (toAtom $ 'b':s ) (args es)
     ce (EPrim ap@(APrim (Func True fn as "void") _) (_:es) _) = do
         let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ((map (Ty . toAtom) as),tyUnit), primAPrim = ap }
         return $  Prim p (args es) :>>= unit :-> Return world__

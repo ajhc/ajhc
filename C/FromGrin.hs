@@ -157,7 +157,7 @@ cexp (Error s t) = do
     case t' of
         CTypeStruct _ -> newAuto t'
         _ -> return $ CECast t' (CEDoc "0")
-cexp (App a vs) = do
+cexp (App a vs _) = do
     vs' <- mapM cVal vs
     return $ CEFunCall (toTag a) vs'
 cexp (Prim p vs) | APrim _ req <- primAPrim p  =  (addRequires req) >> convertPrim p vs

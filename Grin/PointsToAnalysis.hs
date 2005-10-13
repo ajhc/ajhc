@@ -1,29 +1,29 @@
 module Grin.PointsToAnalysis(grinInlineEvalApply) where
 
-import Atom
-import CharIO
 import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Writer
+import Data.IORef
 import Data.Monoid
-import Doc.DocLike
-import GenUtil
-import Grin.Grin
-import Grin.HashConst
-import List(sort)
-import List(intersperse)
+import List(sort,intersperse)
 import Maybe
 import Monad
-import Options
-import Data.IORef
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+
+import Atom
+import CharIO
+import Doc.DocLike
+import Fixer
+import GenUtil
+import Grin.EvalInline
+import Grin.Grin
+import Grin.HashConst
+import Grin.Linear
+import Options
 import qualified Doc.Chars as U
 import qualified FlagDump as FD
 import UniqueMonad
-import Grin.EvalInline
-import Fixer
-import Grin.Linear
 import Util.Once
 
 
@@ -292,16 +292,16 @@ grinInlineEvalApply  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFun
         mapM_ CharIO.print [ v  | v@(_,_) <-  Map.toList (ptHeap pt)]
 
     let f (l :-> e) = l :-> g e
-        g (App a [vr@(Var v _)] :>>= vb :-> Return vb' :>>= node@(NodeC {}) :-> e)
+        g (App a [vr@(Var v _)] _ :>>= vb :-> Return vb' :>>= node@(NodeC {}) :-> e)
             | vb == vb', a == funcEval = (Return vr :>>= createEval (HoistedUpdate node) typeEnv (tagsp v)) :>>= vb :-> Return vb' :>>= node :-> g e
         g (e1 :>>= l) = g e1 :>>= f l
-        g (App a [vr@(Var v _)])
+        g (App a [vr@(Var v _)] _)
             | a == funcEval = Return vr :>>= createEval TrailingUpdate typeEnv (tagsp v)
-        g app@(App a [vr@(Var v _),y])
+        g app@(App a [vr@(Var v _),y] _)
             | a == funcApply = case (tags v) of
                 Just ts ->  Return (Tup [vr,y]) :>>= createApply typeEnv ts
                 Nothing -> error $ "InlineEvalApply: " ++ show app
-        g n@(App a _)
+        g n@(App a _ _)
             | a == funcApply || a == funcEval = error $ "Invalid evap: " ++ show n
         g (Store vr@(Var v _)) | Just ts <- tags v = Return vr :>>= createStore typeEnv ts
         g st@(Store (Var {})) = Error ("Store of basic: " ++ show st) (TyPtr TyNode)
@@ -361,18 +361,18 @@ collect lmap hc st fname (Tup vs :-> exp')
         f exp2
     f exp = g exp
 
-    g (App fe [v]) | fe == funcEval = do
+    g (App fe [v] _) | fe == funcEval = do
         x <- toPos v
         tell mempty { appEq = [(funcEval,[x])] }
         return $ Complex funcEval [Complex funcFetch [x]]
-    g (App fe [v,x]) | fe == funcApply = do
+    g (App fe [v,x] _) | fe == funcApply = do
         v <- toPos v
         x <- toPos x
         tell mempty { applyEq = [(v,x)] }
         return $ Complex funcApply [v,x]
         --return $ Complex funcEval (Complex funcApply x)
 
-    g (App a vs ) | a `notElem` [funcEval,funcApply]  = do
+    g (App a vs _) | a `notElem` [funcEval,funcApply]  = do
         vs' <- mapM toPos vs
         tell mempty { appEq = [(a,vs')] }
         return $ Func a

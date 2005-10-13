@@ -153,9 +153,9 @@ fizz tyEnv sub te tf inState start = res where
 
 applySubstE env x = f x where
     g = applySubst env
-    f (App a vs) = do
+    f (App a vs t) = do
         vs' <- mapM g vs
-        return $ App a vs'
+        return $ App a vs' t
     f (Return v) = do
         v <- g v
         return $ Return v

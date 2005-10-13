@@ -56,9 +56,9 @@ prettyExp vl (Return v) = vl <> keyword "return" <+> pVal v
 prettyExp vl (Store v) = vl <> keyword "store" <+> pVal v
 prettyExp vl (Fetch v) = vl <> keyword "fetch" <+> pVal v
 prettyExp vl (Error s _) = vl <> keyword "error" <+> tshow s
-prettyExp vl (App t [v]) | t == funcEval = vl <> keyword "eval" <+> pVal v
-prettyExp vl (App t [a,b]) | t == funcApply = vl <> keyword "apply" <+> pVal a <+> pVal b
-prettyExp vl (App a vs)  = vl <> func (fromAtom a) <+> hsep (map pVal vs)
+prettyExp vl (App t [v] _) | t == funcEval = vl <> keyword "eval" <+> pVal v
+prettyExp vl (App t [a,b] _) | t == funcApply = vl <> keyword "apply" <+> pVal a <+> pVal b
+prettyExp vl (App a vs _)  = vl <> func (fromAtom a) <+> hsep (map pVal vs)
 prettyExp vl (Prim Primitive { primName = nm } vs)  = vl <> prim (fromAtom nm) <+> hsep (map pVal vs)
 prettyExp vl (Update x y) = vl <> keyword "update" <+> pVal x <+> pVal y
 prettyExp vl (Cast x _) = vl <> keyword "cast" <+> pVal x

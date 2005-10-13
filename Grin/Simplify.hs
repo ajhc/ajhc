@@ -84,7 +84,7 @@ simplify stats grin = do
         | isSimple (a,fn) = True
         | otherwise = False
       --  where n = fromAtom a
-    inline app@(App fn as)
+    inline app@(App fn as _)
         | Just l <- Map.lookup fn funcMap = do
             lift $ tick stats at_OptSimplifyInline -- (toAtom $ fromAtom at_OptSimplifyInline ++ "." ++ fromAtom fn)
             return $ Return (Tup as) :>>= l
@@ -99,17 +99,17 @@ simplify stats grin = do
             Nothing -> return x
     --getCS (b,app@(App ev _)) | ev == funcEval = return $ Map.single app (Return b)
     --getCS (b,app@(App ev _)) | ev == funcApply = return $ Map.single app (Return b)
-    getCS (b,app@(App a [vr@Var {}])) | a == funcEval = return $ Map.fromList [(app,Return b), (Store b,Return vr)]
+    getCS (b,app@(App a [vr@Var {}] _)) | a == funcEval = return $ Map.fromList [(app,Return b), (Store b,Return vr)]
     getCS (b,app@App{})  = return $ Map.singleton app (Return b)
-    getCS (b@Var {},Store v@(Var _ _)) = return $ Map.singleton (App funcEval [b]) (Return v)     -- TODO - only works if node stores have always been evaluated.
-    getCS (b@Var {},Store v@(NodeC t _)) | tagIsWHNF t, t /= tagHole = return $ Map.fromList [(Store v,Return b),(Fetch b,Return v),(App funcEval [b],Return v)]
+    getCS (b@Var {},Store v@(Var _ _)) = return $ Map.singleton (App funcEval [b] TyNode) (Return v)     -- TODO - only works if node stores have always been evaluated.
+    getCS (b@Var {},Store v@(NodeC t _)) | tagIsWHNF t, t /= tagHole = return $ Map.fromList [(Store v,Return b),(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
     getCS (b@Var {},Store v@(NodeC t _)) | t /= tagHole = return $ Map.fromList [(Store v,Return b)]
-    getCS (b@Var {},Return (Const v)) = return $ Map.fromList [(Fetch b,Return v),(App funcEval [b],Return v)]
+    getCS (b@Var {},Return (Const v)) = return $ Map.fromList [(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
     getCS (b@Var {},Return v) = return $ Map.fromList [(Return b,Return v), (Store b, Store v), (Fetch b, Fetch v)]
     getCS _ = return mempty
 
 cseStat n = toAtom $ "Optimize.simplify.cse." ++ g n where
-    g (App n _) = fromAtom n
+    g App { expFunction = n } = fromAtom n
     g Fetch {} = "Fetch"
     g Store {} = "Store"
     g _ = "Misc"
@@ -134,7 +134,7 @@ isSimple (fn,x) = f (3::Int) x where
     f n _ | n <= 0 = False
     f n (p :-> a :>>= b ) = (f (n - 1) (p :-> a)) &&  (f (n - 1) b)
     f _ (_ :-> Case {}) = False
-    f _ (_ :-> App fn' _) | fn == fn' = False
+    f _ (_ :-> App { expFunction = fn' }) | fn == fn' = False
     f _ _ = True
 
     {-

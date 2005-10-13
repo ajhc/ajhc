@@ -52,9 +52,9 @@ go (fm:: Map.Map (Atom,Int) E) storeVars (fn,Tup vs :-> fb) = f fb (Map.fromList
         let z (x,y) (x',y') = (max x x',y)
         return (Map.unionsWith z ms)
     g e mp = execStateT (h e) mp
-    h (App a [_,b]) | a == funcApply = omegaize b
-    h (App a [Var v _]) | a == funcEval = eval v
-    h (App a vs) = fuse a vs
+    h (App a [_,b] _) | a == funcApply = omegaize b
+    h (App a [Var v _] _) | a == funcEval = eval v
+    h (App a vs _) = fuse a vs
     h Store { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
     h Update { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
     h Return { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs

@@ -47,9 +47,12 @@ createEval shared  te ts
         vs = [ Var v ty |  v <- [V 4 .. ] | ty <- ts]
     ap n vs
     --    | shared =  App (toAtom $ n) vs :>>= n3 :-> Update p1 n3 :>>= unit :-> Return n3
-        | HoistedUpdate udp@(NodeC t [v]) <- shared = App (toAtom n) vs :>>= n3 :-> Return n3 :>>= udp :-> Update p1 udp :>>= unit :-> Return v
-        | HoistedUpdate udp <- shared = App (toAtom n) vs :>>= n3 :-> (Return n3 :>>= udp :-> Update p1 udp) :>>= unit :-> Return n3
-        | otherwise = App (toAtom n) vs
+        | HoistedUpdate udp@(NodeC t [v]) <- shared = App fname vs ty :>>= n3 :-> Return n3 :>>= udp :-> Update p1 udp :>>= unit :-> Return v
+        | HoistedUpdate udp <- shared = App fname vs ty :>>= n3 :-> (Return n3 :>>= udp :-> Update p1 udp) :>>= unit :-> Return n3
+        | otherwise = App fname vs ty
+     where
+        fname = toAtom n
+        Just (_,ty) = findArgsType te fname
 
 createApply :: TyEnv -> [Tag] -> Lam
 createApply te ts
@@ -64,6 +67,11 @@ createApply te ts
         (n','_':rs) = span isDigit cs
         n = read n'
         g
-            | n == (1::Int) =  App (toAtom $ 'f':rs) (vs ++ [p2])
+            | n == (1::Int) =  App fname (vs ++ [p2]) ty
             | n > 1 = Return $ NodeC (toAtom $ 'P':show (n - 1) ++ "_" ++ rs) (vs ++ [p2])
             | otherwise = error "createApply"
+         where
+            fname = (toAtom $ 'f':rs)
+            Just (_,ty) = findArgsType te fname
+
+
