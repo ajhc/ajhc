@@ -1,5 +1,5 @@
 {-# OPTIONS -fglasgow-exts #-}
-module E.FreeVars where
+module E.FreeVars(decomposeLet, decomposeDefns) where
 
 import FreeVars
 import E.E
@@ -20,30 +20,41 @@ getTyp tvr = tvrType tvr
 getLitTyp (LitInt _ t) = t
 getLitTyp (LitCons _ _ t) = t
 
-instance FreeVars E IS.IntSet where
-    freeVars e = IS.fromAscList (fsts . IM.toAscList $ freeVs e)
-instance FreeVars E (Set.Set Int) where
-    freeVars e = Set.fromAscList (fsts . IM.toAscList $ freeVs e)
-instance FreeVars E [Int] where
-    freeVars e =  IM.keys $ freeVs e
-instance FreeVars E (IM.IntMap TVr) where
-    freeVars = freeVs
-instance FreeVars E (Set.Set TVr) where
-    freeVars x = Set.fromAscList $ IM.elems (freeVs x)
-instance FreeVars E [TVr] where
-    freeVars x = IM.elems $ freeVars x
 instance FreeVars (Alt E) (IM.IntMap TVr) where
     freeVars as@(Alt l e) = IM.unions $ freeVars (getLitTyp l):(freeVars e IM.\\ IM.fromList [ (tvrNum t,t) | t <- litBinds l]):( map (freeVars . getTyp) $ litBinds l)
+instance FreeVars E IS.IntSet where
+    freeVars e = IS.fromDistinctAscList (fsts . IM.toAscList $ freeVs e)
+instance FreeVars E (IM.IntMap TVr) where
+    freeVars = freeVs
+
+instance FreeVars E [TVr] where
+    freeVars x = IM.elems $ freeVars x
+instance FreeVars E [Int] where
+    freeVars e =  IM.keys $ freeVs e
+
 instance FreeVars E t => FreeVars TVr t where
     freeVars tvr = freeVars (getTyp tvr :: E)
-instance FreeVars (Alt E) (Set.Set Int) where
-    freeVars as@(Alt l e) = Set.unions $ freeVars (getLitTyp l):(freeVars e Set.\\ Set.fromList [ tvrNum t | t <- litBinds l]):( map (freeVars . getTyp) $ litBinds l)
+
+instance FreeVars E (Map.Map Id TVr) where
+    freeVars e = freeVsMap e
+instance FreeVars E (Map.Map Id (Maybe E)) where
+    freeVars e = Map.map (const Nothing) (freeVsMap e)
+instance FreeVars E (Set.Set Id) where
+    freeVars e = Set.mapMonotonic tvrIdent (freeVsSet e)
+instance FreeVars E (Set.Set TVr) where
+    freeVars  = freeVsSet
+
 instance (FreeVars E x) => FreeVars (Lit TVr E) x where
     freeVars l =  mconcat $ freeVars (getLitTyp l :: E ):(map (freeVars . (getTyp :: TVr -> E) ) $ litBinds l)
-instance FreeVars E (Map.Map Id (Maybe E)) where
-    freeVars e = Map.fromAscList [ (v,Nothing) |  v <- IM.keys (freeVars e :: IM.IntMap TVr )]
 
 
+instance FreeVars (Alt E) (Map.Map Id TVr) where
+    freeVars as@(Alt l e) = Map.unions $ freeVars (getLitTyp l):(freeVars e Map.\\ Map.fromList [ (tvrIdent t,t) | t <- litBinds l]):( map (freeVars . getTyp) $ litBinds l)
+
+instance FreeVars (Alt E) (Set.Set Id) where
+    freeVars as = Set.mapMonotonic tvrIdent $ (freeVars as :: Set.Set TVr)
+instance FreeVars (Alt E) (Set.Set TVr) where
+    freeVars as@(Alt l e) = Set.unions $ freeVars (getLitTyp l):(freeVars e Set.\\ Set.fromList (litBinds l)):(map (freeVars . getTyp) $ litBinds l)
 
 freeVs ::  E -> IM.IntMap TVr
 freeVs =   fv where
@@ -65,7 +76,46 @@ freeVs =   fv where
     fvLit (LitCons _ es e) = IM.unions $ fv e:map fv es
     fvLit l = freeVs (getLitTyp l)
 
+freeVsSet ::  E -> Set.Set TVr
+freeVsSet e = fv e where
+    (<>) = Set.union
+    delete = Set.delete
+    fv (EAp e1 e2) = fv e1 <> fv e2
+    fv (EVar tvr@(TVr { tvrType =  t })) = Set.insert tvr (fv t)
+    fv (ELam tvr@(TVr { tvrType = t}) e) =  (delete tvr $ fv e <> fv t)
+    fv (EPi  tvr@(TVr {  tvrType = t}) e) =  (delete tvr $ fv e <> fv t)
+    fv (ELetRec dl e) =  ((tl <> bl <> fv e) Set.\\ Set.fromList ll)  where
+        (ll,tl,bl) = liftT3 (id,Set.unions,Set.unions) $ unzip3 $
+            map (\(tvr@(TVr {  tvrType =  t}),y) -> (tvr, fv t, fv y)) dl
+    fv (EError _ e) = fv e
+    fv (ELit l) = fvLit l
+    fv (EPrim _ es e) = Set.unions $ fv e : map fv es
+    fv (ECase e b as d) = Set.unions ( fv e:freeVars (getTyp  b):(Set.delete b $ Set.unions (freeVars d:map freeVars as)  ):[])
+    fv Unknown = Set.empty
+    fv ESort {} = Set.empty
+    fvLit (LitCons _ es e) = Set.unions $ fv e:map fv es
+    fvLit l = freeVsSet (getLitTyp l)
 
+freeVsMap ::  E -> Map.Map Int TVr
+freeVsMap e = fv e where
+    (<>) = Map.union
+    delete = Map.delete
+    freeVars' = fv
+    fv (EAp e1 e2) = fv e1 <> fv e2
+    fv (EVar tvr@(TVr { tvrIdent =  ( i), tvrType =  t })) = Map.insert i tvr (fv t)
+    fv (ELam (TVr { tvrIdent = i, tvrType = t}) e) =  (delete i $ fv e <> fv t)
+    fv (EPi (TVr { tvrIdent =  i, tvrType = t}) e) =  (delete i $ fv e <> fv t)
+    fv (ELetRec dl e) =  ((tl <> bl <> fv e) Map.\\ Map.fromList ll)  where
+        (ll,tl,bl) = liftT3 (id,Map.unions,Map.unions) $ unzip3 $
+            map (\(tvr@(TVr { tvrIdent = j, tvrType =  t}),y) -> ((j,tvr), fv t, fv y)) dl
+    fv (EError _ e) = fv e
+    fv (ELit l) = fvLit l
+    fv (EPrim _ es e) = Map.unions $ fv e : map fv es
+    fv (ECase e b as d) = Map.unions ( fv e:freeVars' (getTyp  b):(Map.delete (tvrNum b) $ Map.unions (freeVars d:map freeVars as)  ):[])
+    fv Unknown = Map.empty
+    fv ESort {} = Map.empty
+    fvLit (LitCons _ es e) = Map.unions $ fv e:map fv es
+    fvLit l = freeVars' (getLitTyp l)
 
 -- | separate out recursive strongly connected components from a declaration list
 
