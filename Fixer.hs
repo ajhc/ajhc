@@ -82,7 +82,7 @@ newValue fixer@Fixer { vars = vars } v = do
     let value =  IV rv
         rv =  RvValue { ident = ident, fixer = fixer, current = current, pending = pending, action = action }
     modifyIORef vars (MkFixable rv:)
-    propegateValue v value
+    propegateValue v rv
     return value
 
 
@@ -98,12 +98,14 @@ addAction (IV v) act = do
 -- | the function must satisfy the rule that if a >= b then f(a) >= f(b)
 
 modifiedSuperSetOf :: (Fixable a, Fixable b) =>  Value b -> Value a -> (a -> b) -> IO ()
-modifiedSuperSetOf v1 (ConstValue cv) r = propegateValue (r cv) v1
-modifiedSuperSetOf v1 v2 r = addAction v2 (\x -> propegateValue (r x) v1)
+modifiedSuperSetOf (IV rv) (ConstValue cv) r = propegateValue (r cv) rv
+modifiedSuperSetOf (IV rv) v2 r = addAction v2 (\x -> propegateValue (r x) rv)
+modifiedSuperSetOf ConstValue {} _ _ =  fail "Fixer: You cannot modify a constant value"
 
 isSuperSetOf :: Fixable a => Value a -> Value a -> IO ()
-v1 `isSuperSetOf` (ConstValue v2) = propegateValue v2 v1
-v1 `isSuperSetOf` v2 = addAction v2 (\x -> propegateValue x v1)
+(IV rv) `isSuperSetOf` (ConstValue v2) = propegateValue v2 rv
+(IV rv) `isSuperSetOf` v2 = addAction v2 (\x -> propegateValue x rv)
+ConstValue {} `isSuperSetOf` _ =   fail "Fixer: You cannot modify a constant value"
 
 -- | the function must satisfy the rule that if a >= b then f(a) implies f(b)
 conditionalRule :: Fixable a => (a -> Bool) -> Value a -> Rules -> IO ()
@@ -112,21 +114,12 @@ conditionalRule cond v act = addAction v (\x -> if cond x then act else return (
 dynamicRule  :: Fixable a =>  Value a -> (a -> Rules) -> IO ()
 dynamicRule v dr = addAction v dr
 
-propegateValue :: Fixable a => a -> Value a -> IO ()
-propegateValue a _ | isBottom a = return ()
-propegateValue _ (ConstValue _) = fail "Fixer: You cannot modify a constant value"
-propegateValue p (IV v) = do
+propegateValue :: Fixable a => a -> RvValue a -> IO ()
+propegateValue p v = do
     if isBottom p then return () else do
     (modifyIORef (todo $ fixer v) (Set.insert $ MkFixable v))
     modifyIORef (pending v) (lub p)
-    {-
-    c <- readIORef (current v)
-    let diff = p `minus` c
-    if isBottom diff then return () else do
-    as <- readIORef (action v)
-    writeIORef (current v) (p `lub` c)
-    mapM_ ($ diff) as
-    -}
+
 
 
 readValue :: Value a -> IO a

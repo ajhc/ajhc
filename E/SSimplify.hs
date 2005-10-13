@@ -86,7 +86,7 @@ collectOcc sopts  e = (e',fvs,occ) where
         ds' <- mapM  (censor (const mempty) . listen . f . snd) ds
         (e',fve,se) <- f e
         let gfv (_,fv,i) = fvs ++ Set.toList (mconcat (map (ruleFreeVars' rules) (fvs)))  where
-                fvs = Set.toList (Set.fromAscList (Map.keys i) `Set.union` fv)
+                fvs = Set.toList (Map.keysSet i `Set.union` fv)
             gr = newGraph (zip (fsts ds) ds') (tvrNum . fst) (gfv . fst . snd )
             nn' = reachable gr (Set.toList fve ++ Map.keys se ++  topLevels)
         nn <- sequence [ tell t >> return (x,y) |  (x,(y,t)) <- nn' ]
@@ -158,6 +158,7 @@ type Subst = Map.Map Int Range
 
 type InScope = Map.Map Int Binding
 data Binding = NotAmong [Name] | IsBoundTo Occurance E | NotKnown
+    {-! derive: is !-}
 
 data Env = Env {
     envInScope :: Map.Map Int Binding,
@@ -166,8 +167,8 @@ data Env = Env {
     {-! derive: Monoid, update !-}
 
 applySubst :: Subst -> E -> E
-applySubst s = substMap'' (f s) where
-    f s = Map.fromAscList [ (x,g y) | (x,y) <- Map.toAscList s ]
+applySubst s = substMap'' tm where
+    tm = Map.map g s
     g (Done e) = e
     g (Susp e s') = applySubst s' e
 
@@ -182,7 +183,7 @@ simplify sopts e = (e'',stat,occ) where
     addN = do
         addNames (map tvrNum $ Map.keys occ)
         addNames (Set.toList fvs)
-    initialB = mempty { envInScope = Map.fromAscList [ (i,IsBoundTo Many e)  | (i,e) <- Map.toAscList $ so_boundVars sopts] }
+    initialB = mempty { envInScope =  Map.map (\e -> IsBoundTo Many e) (so_boundVars sopts) }
     (e'',stat)  = runIdentity $ runStatT (runNameMT (addN >> f e' mempty initialB)) -- (e,mempty)
     go e inb = do
         let (e',_,_) = collectOcc sopts  e
@@ -304,7 +305,7 @@ simplify sopts e = (e'',stat,occ) where
 
     nname tvr@(TVr { tvrIdent = n, tvrType =  t}) sub inb  = do
         t' <- dosub sub t
-        let t'' = substMap'' (Map.fromAscList [ (t,e) | (t,IsBoundTo _ e) <- Map.toAscList (envInScope inb) ]) t'
+        let t'' = substMap'' (Map.map (\ (IsBoundTo _ e) -> e) $ Map.filter isIsBoundTo (envInScope inb)) t'  --  (Map.fromAscList [ (t,e) | (t,IsBoundTo _ e) <- Map.toAscList (envInScope inb) ]) t'
         n' <- uniqueName n
         return $ tvr { tvrIdent = n', tvrType =  t'' }
 --        case n `Map.member` inb of
