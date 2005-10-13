@@ -8,6 +8,7 @@ import Control.Monad.Writer
 import Control.Monad.Trans
 import Data.Monoid
 import Control.Monad.Identity
+import CanType
 
 type WhizState = Either (Set.Set Int) Int
 type WhizEnv = Map.Map Var Val
@@ -123,7 +124,7 @@ fizz tyEnv sub te tf inState start = res where
             h ((p,v):rs) = v :>>= p :-> h rs
         return $ h [ (p,v) |  Just (p,v) <- reverse ts]
     f a@(Error msg ty) ((senv,p,b):xs) env = do
-        lift $ tf (Error msg (runIdentity $ tc tyEnv b))
+        lift $ tf (Error msg (getType b))
     f a ((senv,p,b):xs) env = do
         a <- g env a
         (p,env') <- renamePattern p

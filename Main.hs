@@ -39,7 +39,7 @@ import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadFunctions
 import Grin.FromE
 import CanType(getType)
-import Grin.Grin hiding (typecheck)
+import Grin.Grin
 import Grin.Show
 import Grin.Whiz
 import Ho

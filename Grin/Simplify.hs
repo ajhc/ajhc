@@ -9,6 +9,7 @@ import Data.Set as Set
 import List
 
 import Atom
+import CanType
 import FreeVars
 import Grin.Grin
 import Grin.Whiz

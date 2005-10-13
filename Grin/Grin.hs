@@ -31,7 +31,6 @@ module Grin.Grin(
     funcApply,
     funcInitCafs,
     Grin(..),
-    CanTypeCheck(..),
     Primitive(..),
     Builtin,
     Props(..),
@@ -373,8 +372,6 @@ instance CanTypeCheck TyEnv a Ty => CanTypeCheck TyEnv [a] Ty where
         ts <- mapM (typecheck te) xs
         foldl1M_ (same "list") ts
         return (head ts)
-    tc _ [] = fail "empty list"
-    tc te (x:_) = tc te x
 
 
 same _ t1 t2 | t1 == t2 = return t1
@@ -426,8 +423,6 @@ instance CanTypeCheck TyEnv Exp Ty where
         foldl1M_ (same "case pat") (tv:ps)
         foldl1M (same $ "case exp: " ++ show (map head $ sortGroupUnder fst (zip es as)) ) (es)
     typecheck te (Cast _ t) = return t
-    tc te (_ :>>= (_ :-> e)) = tc te e
-    tc te e = typecheck te e
 
 instance CanTypeCheck TyEnv Val Ty where
     typecheck _ (Tag _) = return TyTag

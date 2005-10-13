@@ -12,6 +12,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom
+import CanType
 import CharIO
 import Doc.DocLike
 import Fixer
@@ -319,7 +320,7 @@ grinInlineEvalApply  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFun
             vs = getHeaps x
             Just x = Map.lookup v (ptVars pt)
         docase v xs Nothing =  Case v xs
-        docase _ ((_ :-> x):_) (Just []) = Error "No Valid alternatives. This Should Not be reachable." (runIdentity $ tc typeEnv x)
+        docase _ ((_ :-> x):_) (Just []) = Error "No Valid alternatives. This Should Not be reachable." (getType x)
         --docase v xs (Just ts) | null vs && any (`notElem` ns') ts = error $ "Odd Case: " ++ show (v,ns',ts)  where
         --    (ns,vs) = span isNodeC xs
         --    ns' = [ t | NodeC t _ :-> _ <- ns ]
@@ -334,7 +335,7 @@ grinInlineEvalApply  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFun
             isNodeC _ = False
             --simple (NodeC t [Lit {}] :-> _) = False
             --simple (NodeC t _ :-> _) = True
-        docase _ ((_ :-> x):_) _ = Error "No Valid alternatives. This Should Not be reachable." (runIdentity $ tc typeEnv x)
+        docase _ ((_ :-> x):_) _ = Error "No Valid alternatives. This Should Not be reachable." (getType x)
         docase _ _ _ = error $ "docase: strange argument"
     return grin { grinFunctions = map (mapSnd f) grinFunctions }
 
