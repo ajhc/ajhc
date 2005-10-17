@@ -1,16 +1,17 @@
 module DataConstructors(
     Constructor(..),
-    getConstructor,
-    toDataTable,
     DataTable(..),
-    showDataTable,
-    slotTypes,
+    followAliases,
+    getConstructor,
+    getConstructorArities,
+    getProduct,
+    getSiblings,
     lookupCType,
     lookupCType',
-    followAliases,
-    typesCompatable,
-    getConstructorArities,
-    getSiblings
+    showDataTable,
+    slotTypes,
+    toDataTable,
+    typesCompatable
     ) where
 
 import Control.Monad.Identity
@@ -87,6 +88,14 @@ getConstructor n _ | Just v <- fromUnboxedNameTuple n, TypeConstructor <- nameTy
 getConstructor n (DataTable map) = case Map.lookup n map of
     Just x -> return x
     Nothing -> fail $ "getConstructor: " ++ show (nameType n,n)
+
+-- | return the single constructor of product types
+
+getProduct :: Monad m => DataTable -> E -> m Constructor
+getProduct dataTable e | (ELit (LitCons cn _ _)) <- followAliases dataTable e, Just c <- getConstructor cn dataTable = f c where
+    f c | Just [x] <- conChildren c = getConstructor x dataTable
+        | otherwise = fail "Not Product type"
+getProduct _ _ = fail "Not Product type"
 
 
 tunboxedtuple n = (typeCons,dataCons) where
