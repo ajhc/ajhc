@@ -23,12 +23,12 @@ SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
 
 MAIN=Main.hs
 
-jhcp: $(HSFILES)
+jhcp: $(BUILTSOURCES) $(HSFILES)
 	date '+%y%m%d%H%M.%S' > /tmp/$@.date.tmp
 	$(HC) $(GHCOPTS) $(EXTRAOPTS) $(GHCPROFOPTS) --make $(MAIN) -o $@
 	touch -t `cat /tmp/$@.date.tmp` $@
 
-jhc: $(HSFILES)
+jhc: $(BUILTSOURCES) $(HSFILES)
 	date '+%y%m%d%H%M.%S' > /tmp/$@.date.tmp
 	$(HC) $(GHCOPTS) $(EXTRAOPTS) --make $(MAIN) -o $@
 	touch -t `cat /tmp/$@.date.tmp` $@
