@@ -1,4 +1,4 @@
-module E.SSimplify(Occurance(..), simplify, SimplifyOpts(..)) where
+module E.SSimplify(Occurance(..), simplifyE, simplifyDs, SimplifyOpts(..)) where
 
 import Control.Monad.Identity
 import Control.Monad.Writer
@@ -13,6 +13,7 @@ import qualified Data.Set as Set
 import Atom
 import CanType
 import DataConstructors
+import E.Annotate
 import E.E
 import E.Inline
 import E.PrimOpt
@@ -41,7 +42,7 @@ data Occurance =
     | ManyBranch  -- ^ used once in several branches
     | Many        -- ^ used many or an unknown number of times
     | LoopBreaker -- ^ chosen as a loopbreaker
-    deriving(Show,Eq,Ord)
+    deriving(Show,Eq,Ord,Typeable)
 
 
 
@@ -173,14 +174,30 @@ applySubst s = substMap'' tm where
 
 dosub sub e = coerceOpt return $ applySubst sub e
 
-simplify :: SimplifyOpts -> E -> (E,Stat, Map.Map TVr Occurance)
-simplify sopts e = (e'',stat,occ) where
-    (e',fvs,occ) = collectOcc sopts  e
-    addN = do
-        addNames (map tvrNum $ Map.keys occ)
+simplifyE :: SimplifyOpts -> E -> (Stat,E)
+simplifyE sopts e = (stat,e') where
+    (stat,[(_,e')]) =  simplifyDs sopts [(tvrSilly,e)]
+
+simplifyDs :: SimplifyOpts -> [(TVr,E)] -> (Stat,[(TVr,E)])
+simplifyDs sopts dsIn = (stat,dsOut) where
+    collocc dsIn = do
+        let ((ELetRec dsIn' _),fvs,occ) = collectOcc sopts (ELetRec dsIn (eTuple (map EVar (fsts dsIn))))
+        addNames (map tvrIdent $ Map.keys occ)
         addNames (Set.toList fvs)
+        let occ' = Map.mapKeysMonotonic tvrIdent occ
+            dsIn'' = runIdentity $ annotateDs mempty (\t nfo -> return $ maybe (Info.delete Many nfo) (flip Info.insert nfo) (Map.lookup t occ')) (\_ -> return) (\_ -> return) dsIn'
+        return dsIn''
     initialB = mempty { envInScope =  Map.map (\e -> IsBoundTo Many e) (so_boundVars sopts) }
-    (e'',stat)  = runIdentity $ runStatT (runNameMT (addN >> f e' mempty initialB)) -- (e,mempty)
+    initialB' = mempty { envInScope =  Map.map (\e -> NotKnown) (so_boundVars sopts) }
+    (dsOut,stat)  = runIdentity $ runStatT (runNameMT doit)
+    doit = do
+        ds' <- collocc dsIn
+        let g (t,e) = do
+                e' <- if forceInline t then
+                        f e mempty initialB'  -- ^ do not inline into functions which themself will be inlined
+                            else f e mempty initialB
+                return (t,e')
+        mapM g ds'
     go e inb = do
         let (e',_,_) = collectOcc sopts  e
         f e' mempty inb
@@ -221,14 +238,6 @@ simplify sopts e = (e'',stat,occ) where
     g (EError s t) sub inb = do
         t' <- dosub sub t
         return $ EError s t'
-    --g (EVar v) sub inb = do
-    --    case Map.lookup (tvrNum v) sub of
-   --         Just (Done e) -> return e
-    --        Just (Susp e s) -> do
-    --            e' <- f e s inb
-    --            return e'
-            --Nothing -> return (EVar v)
-    --        Nothing -> error $ "vvar with no subst: " ++ show (EVar v) -- h (EVar v) xs' inb
     g ec@(ECase e b as d) sub inb = do
         addNames (map tvrNum $ caseBinds ec)
         e' <- f e sub inb
@@ -244,7 +253,7 @@ simplify sopts e = (e'',stat,occ) where
         -- let z (t,e) | worthStricting e && Just (S _) <- Map.lookup (tvrNum t) (so_strictness sopts)= do
         let z (t,e) = do
                 t' <- nname t sub inb
-                case Map.lookup t occ of
+                case Info.lookup (tvrInfo t) of
                     Just Once -> return (tvrNum t,Once,error $ "Once: " ++ show t,e)
                     Just n -> return (tvrNum t,n,t',e)
                     Nothing -> return (tvrNum t,Many,t',e)

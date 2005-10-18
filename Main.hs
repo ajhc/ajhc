@@ -190,7 +190,7 @@ processDecls stats ho ho' tiData = do
         --wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
         let cm stats e = do
             let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
-            let (e',stat,occ) = SS.simplify sopt e
+            let (stat, e') = SS.simplifyE sopt e
             Stats.tickStat stats stat
             return e'
         let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds)) fullDataTable
@@ -323,7 +323,7 @@ compileModEnv' stats ho = do
     wdump FD.Progress $ printEStats lc
     let cm stats e = do
         let sopt = mempty { SS.so_superInline = True, SS.so_rules = rules, SS.so_dataTable = dataTable }
-        let (e',stat,occ) = SS.simplify sopt e
+        let (stat, e') = SS.simplifyE sopt e
         Stats.tickStat stats stat
         return e'
 
@@ -345,7 +345,7 @@ compileModEnv' stats ho = do
     -- mapM_ putErrLn $  sort [ tshow x <+> "->" <+> tshow y | (x@(E.Strictness.V i),y@Lam {}) <- vs, odd i]
     let cm stats e = do
         let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable }
-        let (e',stat,occ) = SS.simplify sopt e
+        let (stat, e') = SS.simplifyE sopt e
         Stats.tickStat stats stat
         return e'
     lc <- opt "SuperSimplify" cm lc
@@ -365,7 +365,7 @@ compileModEnv' stats ho = do
     rs' <- flip mapM rs $ \ (t,ls,e) -> do
         let cm stats e = do
             let sopt = mempty {  SS.so_dataTable = dataTable }
-            let (e',stat,occ) = SS.simplify sopt e
+            let (stat, e') = SS.simplifyE sopt e
             Stats.tickStat stats stat
             return e'
         e' <- doopt (mangle' Nothing dataTable) False finalStats "SuperSimplify" cm e
