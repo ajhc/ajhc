@@ -131,6 +131,8 @@ inLam Once = OnceInLam
 inLam _ = Many
 
 andOM x y = Map.unionWith andOcc x y
+andOcc Unused x = x
+andOcc x Unused = x
 andOcc _ _ = Many
 
 orMaps ms = Map.map orMany $ foldl (Map.unionWith (++)) mempty (map (Map.map (:[])) ms)
