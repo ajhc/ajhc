@@ -250,8 +250,11 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     g (ELetRec [] e) sub inb = g e sub inb
     g (ELetRec ds e) sub inb = do
         addNames $ map (tvrNum . fst) ds
-        -- let z (t,e) | worthStricting e && Just (S _) <- Map.lookup (tvrNum t) (so_strictness sopts)= do
-        let z (t,e) = do
+        let z (t,EVar t') | t == t' = do    -- look for simple loops and replace them with errors.
+                t'' <- nname t sub inb
+                mtick $ "E.Simplify.<<loop>>.{" ++ showName (tvrIdent t) ++ "}"
+                return (tvrNum t,Many,t'',EError "<<loop>>" (getType t))
+            z (t,e) = do
                 t' <- nname t sub inb
                 case Info.lookup (tvrInfo t) of
                     Just Once -> return (tvrNum t,Once,error $ "Once: " ++ show t,e)
