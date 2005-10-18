@@ -351,6 +351,9 @@ compileModEnv' stats ho = do
     lc <- opt "SuperSimplify" cm lc
 
 
+    let ELetRec ds _ = lco in do
+        putStrLn "Supercombinators"
+        mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (showTVr t) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ds
 
 
     wdump FD.LambdacubeBeforeLift $ printCheckName dataTable lc

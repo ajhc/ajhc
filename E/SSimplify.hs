@@ -141,12 +141,11 @@ orMany xs = if all (== Once) xs then ManyBranch else Many
 
 
 data SimplifyOpts = SimpOpts {
-    so_superInline :: Bool,
+    so_noInlining :: Bool,                 -- ^ this inhibits all inlining inside functions which will always be inlined
+    so_superInline :: Bool,                -- ^ whether to do superinlining
     so_boundVars :: Map.Map Int E,
-    so_properties :: Map.Map Name [Atom],
     so_rules :: Rules,
-    so_dataTable :: DataTable,
-    so_strictness :: Map.Map Int Strict.SA,
+    so_dataTable :: DataTable,             -- ^ the data table
     so_exports :: [Int]
     }
     {-! derive: Monoid !-}
@@ -172,10 +171,7 @@ applySubst s = substMap'' tm where
     g (Done e) = e
     g (Susp e s') = applySubst s' e
 
-dosub sub e = do
-    coerceOpt return $ applySubst sub e
---dosub sub e = coerceOpt (return . applySubst sub) e
---coerceOpt f e = f e
+dosub sub e = coerceOpt return $ applySubst sub e
 
 simplify :: SimplifyOpts -> E -> (E,Stat, Map.Map TVr Occurance)
 simplify sopts e = (e'',stat,occ) where
@@ -205,7 +201,6 @@ simplify sopts e = (e'',stat,occ) where
         x' <- g x sub inb
         x'' <- coerceOpt return x'
         x <- primOpt' (so_dataTable sopts) x''
-        --x' <- coerceOpt (\x -> g x sub inb) x
         h x xs' inb
         --app (x,xs')
     g (EPrim a es t) sub inb = do
@@ -513,7 +508,6 @@ worthStricting EError {} = True
 worthStricting ELit {} = False
 worthStricting ELam {} = False
 worthStricting x = sortTermLike x
---worthStricting x = isLifted x && not (isELit x)
 
 
 coerceOpt :: MonadStats m =>  (E -> m E) -> E -> m E
@@ -525,196 +519,3 @@ coerceOpt fn e = do
 
 stat_unsafeCoerce = toAtom "E.Simplify.unsafeCoerce"
 
-{-
-    simp (p@EPrim {},xs) = do
-        p' <- primOpt dataTable stats p
-        cont (p',xs)
-    f (ec@(ECase e _ _ _),[]) | isBottom e = do
-        tick stats (toAtom "E.Simplify.case-of-bottom")
-        f (prim_unsafeCoerce e (typ ec),[])
-    f (ECase e b as (Just (ECase e' b' as' d')),[]) | e == e' = do
-        tick stats (toAtom "E.Simplify.case-merging")
-        let (nb,mdc)
-                | tvrNum b == 0 = (b',id)
-                | tvrNum b' == 0 = (b,id)
-                | otherwise = (b,ELetRec [(b',EVar b)]) -- error "case-default-case: double bind"
-            nas' = filter ( (`notElem` map altHead as) . altHead) as'
-        f (ECase e nb (as ++ nas') (fmap mdc d'),[])
-    f (oc@(ECase ic@(ECase e b as d) b' as' d'),[]) | length (filter (not . isBottom) (caseBodies ic)) <= 1 || all whnfOrBot (caseBodies ic) || all whnfOrBot (caseBodies oc) = do
-        tick stats (toAtom "E.Simplify.case-of-case")
-        let f (Alt l e) = Alt l (g e)
-            g x = ECase x b' as' d'
-        cont (ECase e b (map f as) (fmap g d),[])      -- we duplicate code so continue for next renaming pass before going further.
-
-    f ec@(ECase e b as@(Alt (LitCons n _ _) _:_) (Just d),[]) | Just ss <- getSiblings dataTable n, length ss <= length as = do
-        when (length ss < length as) $ fail ("Bad case: " ++ show ec)
-        tick stats (toAtom "E.Simplify.case-no-default")
-        f (ECase e b as Nothing,[])
-    f (ECase e b [] (Just d),[]) | not (isLifted e) = do
-        tick stats (toAtom "E.Simplify.case-unlifted")
-        f (eLet b e d,[])
-
-    f (ECase e (TVr 0 _) as (Just (ELetRec ds (ECase e' b' as' d'))),[]) | e == e' = do
-        tick stats (toAtom "E.Simplify.case-merging")
-        let nas' = filter ( (`notElem` map altHead as) . altHead) as'
-        f (ELetRec ds  $ ECase e b' (as ++ nas') d',[])
-
-    f (ec@ECase { eCaseScrutinee = el@(ELit l), eCaseAlts = [], eCaseDefault = Just e },[]) | isFullyConst el = do
-        tick stats (toAtom "E.Simplify.case-fully-const")
-        cont (subst (eCaseBind ec) el e,[])
-    f (ec@ECase { eCaseScrutinee = el@(ELit l) },[]) = do
-        (x,as) <- match l (eCaseAlts ec) (eCaseDefault ec)
-        cont (eLet (eCaseBind ec) el (foldl eAp x as),[])
-        --liftM (mapFst $ eLet (eCaseBind ec) el) $
-    f (EError s t,xs@(_:_)) = do
-        ticks stats (length xs) (toAtom "E.Simplify.error-application")
-        f (EError s (foldl eAp t xs),[])
-    f (ec@ECase { eCaseScrutinee = (EVar tvr)} ,[]) = do
-        e <- lookupBinding tvr
-        case e of
-            IsBoundTo el@(ELit l) -> liftM (mapFst $ eLet (eCaseBind ec) el) $ match l (eCaseAlts ec) (eCaseDefault ec)
-            NotAmong na | ECase e b [] (Just d) <- ec { eCaseAlts =  filtAlts na $ eCaseAlts ec } ->  do
-                tick stats (toAtom "E.Simplify.seq-evaled")
-                f (eLet b e d,[])
---    f ec@(ECase e b as@(Alt (LitCons n _ _) _:_) (Just d),[]) | Just ss <- getSiblings dataTable n, length ss <= length as = do
- --       when (length ss < length as) $ fail ("Bad case: " ++ show ec)
- --       tick stats (toAtom "E.Simplify.case-no-default")
---        f (ECase e b as Nothing,[])
-            _ -> cont (ec,[])
-    f (x@(EVar v),xs) = do
-        z <- applyRule' stats (so_rules sopts) v xs
-        case z of
-            Just (x,xs) -> f (x,xs)
-            Nothing -> do
-                e <- lookupBinding v
-                case e of
-                    IsBoundTo exp | forceInline v -> do
-                        tick stats (toAtom $ "E.Simplify.inline.forced.{" ++ tvrShowName v  ++ "}")
-                        cont (exp,xs)
-                    IsBoundTo (EVar v') -> do
-                        tick stats (toAtom "E.Simplify.inline.copy-propagate")
-                        f (EVar v',xs)
-                    IsBoundTo (ELit l) -> do
-                        tick stats (toAtom "E.Simplify.inline.constant-folding")
-                        cont (ELit l,xs)
-                    IsBoundTo x@(EError s t) -> do
-                        tick stats (toAtom "E.Simplify.inline.error-folding")
-                        ticks stats (length xs) (toAtom "E.Simplify.error-application")
-                        f (EError s (foldl eAp t xs),[])
-                    IsBoundTo exp
-                        | shouldInline exp xs -> do
-                            let name = tvrShowName v
-                                name' = if  ("Instance@." `isPrefixOf` name) then "Instance@" else name
-                            tick stats (toAtom $ "E.Simplify.inline.value.{" ++ name'  ++ "}")
-                            cont (exp,xs)
-                        | otherwise -> cont (x,xs)
-                    _ -> cont (x,xs)
-    f (x,xs) = cont (x,xs)
-    cont (x,xs) = do
-        x <- g' x
-        xs <- mapM g' xs
-        liftIO $ doCoalesce stats (x,xs)
-    isGood (LitCons _ (_:_) _) = False
-    isGood _ = True
-    --match :: Lit E -> [(Pat E,E)] -> IO (E,[E])
-    match (LitCons c xs _) ((Alt (LitCons c' bs _) e):_) _ | c == c' = do
-        tick stats (toAtom $ "E.Simplify.known-case." ++ show c )
-        cont (ELetRec (zip bs xs) e,[])
-    match l ((Alt l' e):_) _ | litMatch l l' = do
-        tick stats (toAtom $ "E.Simplify.known-case." ++ show l')
-        f (e,[])
-    --match l ((PatWildCard,e):_) = do
-    --    tick stats (toAtom "E.Simplify.known-case._")
-    --    f (e,[ELit l])
-    match m (_:xs) d = match m xs d
-    match l [] (Just e) = do
-        tick stats (toAtom "E.Simplify.known-case._")
-        f (e,[])
-    match m [] Nothing = error $ "End of match: " ++ show m
-
-
-    g' (EPrim p xs t) = do
-        xs' <- mapM g' xs
-        return $ EPrim p xs' t
-    g' (ELit (LitCons p xs t)) = do
-        xs' <- mapM g' xs
-        return $ ELit (LitCons p xs' t)
-    g' x = do
-        (x',[]) <- g (x,[])
-        return x'
-    g (ELam (TVr n t) e,[]) | n /= 0,  n `notElem` freeVars e = do
-        tick stats (toAtom "E.Simplify.blank-lam")
-        return (ELam (TVr 0 t) e,[])
-    g (EPi (TVr n t) e,[]) | n /= 0,  n `notElem` freeVars e = do
-        tick stats (toAtom "E.Simplify.blank-pi")
-        return (EPi (TVr 0 t) e,[])
---    g (EPi (TVr (Just i) _) (EAp a (EVar (TVr (Just i') _))),[]) | i == i' && not (i `elem` freeVars a) = do
---        tick stats (toAtom "E.Simplify.eta-reduce-pi")
---        g (a,[])
---    g (ELam (TVr (Just i) _) (EAp a (EVar (TVr (Just i') _))),[]) | i == i' && not (i `elem` freeVars a) = do
---        tick stats (toAtom "E.Simplify.eta-reduce-lam")
---        g (a,[])
-
-    g (x@(EVar v),xs@[]) = do
-        e <- lookupBinding v
-        case e of
-            IsBoundTo (EVar v') -> do
-                tick stats (toAtom "E.Simplify.inline.copy-propagate")
-                g (EVar v',xs)
-            IsBoundTo e | Just _ <- fullyConst e -> do
-                tick stats (toAtom $ "E.Simplify.inline.constant-folding")
-                return (e,xs)
-            IsBoundTo e | Just (EVar _,_) <- from_unsafeCoerce e -> do
-                tick stats (toAtom "E.Simplify.inline.arg-unsafeCoerce")
-                return (e,xs)
-            IsBoundTo (ELit l) | isGood l -> do
-                tick stats (toAtom "E.Simplify.inline.constant-folding2")
-                return (ELit l,xs)
-            --IsBoundTo x@(EError {}) -> do
-            --    tick stats (toAtom "E.Simplify.error-folding")
-            --    return (x,xs)
-            --Just z | sortTypeLike z -> do
-            --    tick stats (toAtom "E.Simplify.constant-folding")
-            --    f (z,xs)
-            _ -> return (x,xs)
-    g (x,[]) = return (x,[])
-    forceInline x | Just n <- tvrName x, Just xs <- Map.lookup n funcProps  = toAtom "INLINE" `elem` xs
-    forceInline _ = False
-
-filtAlts ns (Alt (LitCons n _ _) _:as) | n `elem` ns  = filtAlts ns as
-filtAlts ns (a:as) = a:filtAlts ns as
-filtAlts ns [] = []
-
-litMatch (LitInt a _) (LitInt b _) = a == b
---litMatch (LitFrac a _) (LitFrac b _) = a == b
-litMatch LitCons {} LitCons {} = False -- taken care of above
-litMatch x y = error $ "litMatch: " ++ show (x,y)
--}
-
-
-
-
-                {-
-                --Just (IsBoundTo n e) | isAtomic e -> do
-                --    mtick (toAtom "E.Simplify.inline.copy-propegate")
-                --    h  e xs' inb
-                Just (IsBoundTo n e) |  length xs <= length xs' -> case x of
-                        ELit {} -> do
-                            mtick (toAtom "E.Simplify.inline.const")
-                            app (e,xs')
-                        EPi {} -> do
-                            mtick (toAtom "E.Simplify.inline.const")
-                            app (e,xs')
-                        EError {} -> do
-                            mtick (toAtom "E.Simplify.inline.error")
-                            app (e,xs')
-                        EPrim {} | length xs > 0 -> do
-                            mtick (toAtom "E.Simplify.inline.prim")
-                            app (e,xs')
-                        EVar {} -> do
-                            mtick (toAtom "E.Simplify.inline.simple")
-                            app (e,xs')
-                        _ -> app (EVar v,xs')
-                    where (x,xs) = fromLam e
-
-                -}

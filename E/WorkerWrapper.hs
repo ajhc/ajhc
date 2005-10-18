@@ -30,9 +30,30 @@ wrapable (Fun x) (ELam _ e) = f x e where
     f _ _ = False
 wrapable _ _ = False
 
+
+{-
+wrappable :: Monad m =>
+    DataTable   -- ^ data table
+    -> TVr      -- ^ function name we want to workwrap
+    -> E        -- ^ function body
+    -> m (E,[TVr])  -- ^ (Body,Args)
+wrappable dataTable tvr e@ELam {} = ans where
+    cpr = maybe Top id (Info.lookup (tvrInfo tvr))
+    Lam sa = maybe (Lam (repeat L)) id (Info.lookup (tvrInfo tvr))
+    ans = f e sa cpr
+    f (ELam t e) (s:ss) (Fun x) =
+    -}
+
+
+wrappable _ _ _ = fail "Only lambdas are wrappable"
+
 workWrap dataTable tvr e = case workWrap' dataTable tvr e of
     Nothing -> [(tvr,e)]
     Just (x,y) -> [x,y]
+
+workerName x = case fromId x of
+    Just y -> toId (toName Val ("W@",'f':show y))
+    Nothing -> toId (toName Val ("W@",'f':show x))
 
 workWrap' :: Monad m => DataTable -> TVr -> E -> m ((TVr,E),(TVr,E))
 workWrap' dataTable tvr e | wrapable cpr e = ans where
@@ -40,9 +61,6 @@ workWrap' dataTable tvr e | wrapable cpr e = ans where
     sa = maybe L id (Info.lookup (tvrInfo tvr))
     ans = return ((setProperty prop_WRAPPER tvr,wrapper),(setProperty prop_WORKER tvr',worker))
     tvr' = TVr { tvrIdent = workerName (tvrIdent tvr), tvrInfo = mempty, tvrType = wt }
-    workerName x = case fromId x of
-        Just y -> toId (toName Val ("W@",'f':show y))
-        Nothing -> toId (toName Val ("W@",'f':show x))
     wt = typeInfer dataTable  worker
     worker = foldr ELam body' args where
         body' = eCase body [cb] Unknown
