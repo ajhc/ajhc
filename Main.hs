@@ -332,26 +332,17 @@ compileModEnv' stats ho = do
     lc <- opt "SuperSimplify" cm lc
 
     lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lc
-    --(lc@(ELetRec defs v),_) <- return $ E.CPR.cprAnalyze mempty lc
-    --lc <- return $ ELetRec (concatMap (uncurry $ workWrap dataTable) defs) v
-    --lc <- opt "SuperSimplify" cm lc
-    --flip mapM_ defs $ \ (t,e) -> do
-    --    let xs = workWrap dataTable t e
-    --    when (length xs > 1) $ do
-    --        putStrLn (prettyE (ELetRec xs Unknown))
-    --sequence_ [ putStrLn $ (tvrShowName t) <+> show (maybe E.CPR.Top id (Info.lookup (tvrInfo t)) ::  E.CPR.Val) | (t,_,_) <- scCombinators $ eToSC dataTable lc ]
-    --lc <- if fopts FO.FloatIn then  opt "Float Inward..." (\stats x -> return (floatInward rules  x))  lc  else return lc
-    --vs <- if fopts FO.Strictness then (collectSolve lc) else return []
-    -- mapM_ putErrLn $  sort [ tshow x <+> "->" <+> tshow y | (x@(E.Strictness.V i),y@Lam {}) <- vs, odd i]
+    lc <- annotate mempty (\_ nfo -> return $ Info.delete (mempty :: ARules) nfo) (\_ -> return) (\_ -> return) lc
     let cm stats e = do
-        let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable }
+        let sopt = mempty { SS.so_dataTable = dataTable }
         let (stat, e') = SS.simplifyE sopt e
         Stats.tickStat stats stat
         return e'
-    lc <- opt "SuperSimplify" cm lc
+
+    lc <- opt "SuperSimplify no Rules" cm lc
 
 
-    let ELetRec ds _ = lco in do
+    let ELetRec ds _ = lc in do
         putStrLn "Supercombinators"
         mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (showTVr t) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ds
 
