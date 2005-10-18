@@ -185,6 +185,15 @@ inferType dataTable ds e = rfc e where
     --valid e = withContextDoc (text "valid:" <+> prettyE e) (rfc e >>= valid)
 
 
+instance CanTypeCheck DataTable E E where
+    typecheck dataTable e = case typeInfer'' dataTable [] e of
+        Left ss -> fail $ "\n>>> internal error:\n" ++ unlines (tail ss)
+        Right v -> return v
+
+instance CanTypeCheck DataTable [(TVr,E)] [E] where
+    typecheck dataTable ds = do mapM (typecheck dataTable) (snds ds)
+
+
 -- | Determine type of term using full algorithm with substitutions. This
 -- should be used instead of 'typ' when let-bound type variables exist or you
 -- wish a more thorough checking of types.
