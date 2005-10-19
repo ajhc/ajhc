@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -ffi #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.PackedString
@@ -69,7 +70,7 @@ module PackedString (
 	splitPS,     -- :: Char -> PackedString -> [PackedString]
 	splitWithPS, -- :: (Char -> Bool) -> PackedString -> [PackedString]
 
-	-- * I\/O with @PackedString@s	
+	-- * I\/O with @PackedString@s
 	hPutPS,      -- :: Handle -> PackedString -> IO ()
 	hGetPS,      -- :: Handle -> Int -> IO PackedString
     -}
@@ -77,22 +78,17 @@ module PackedString (
 
     ) where
 
-import Prelude
-
-
-import Data.Array.Unboxed
 import Data.Array.IO
 import Data.Typeable
 import Data.Char
 
-import Int
 import Bits
 import GHC.Exts
 import Data.Array.Base
 import Word
 import Data.Monoid
-import Data.Generics
-import Data.Generics.Basics
+import Data.Generics(Data(..))
+import Foreign.C.Types
 
 instance Monoid PackedString where
     mempty = nilPS
@@ -115,16 +111,33 @@ instance Data PackedString where
 
 
 instance Eq PackedString where
-   (PS x) == (PS y)  =  x == y
+    (==) (PS x) (PS y) =  x == y
+    (/=) (PS x) (PS y) =  x /= y
+    {-
+   (PS (UArray _ (I# e) ba)) == (PS (UArray _ (I# e') ba'))
+    | e ==# e' = c_memcmp ba ba' (e +# 1#) ==# 0#
+    | otherwise = False
+    -}
 
 instance Ord PackedString where
     compare (PS x) (PS y) = compare x y
-
+    {-
+    compare (PS (UArray _ (I# e) ba)) (PS (UArray _ (I# e') ba'))
+        | e <# e' =  f LT (c_memcmp ba ba' (e +# 1#))
+        | e ># e' =  f GT (c_memcmp ba ba' (e' +# 1#))
+        | e ==# e' = f EQ (c_memcmp ba ba' (e +# 1#))
+            where
+            f eq 0# = eq
+            f _ x | x ># 0# = GT
+            f _ _ = LT
+     -}
 
 instance Show PackedString where
     showsPrec p ps r = showsPrec p (unpackPS ps) r
 --instance Read PackedString: ToDo
 
+-- this is effectivly pure.
+--foreign import ccall unsafe "memcmp" c_memcmp :: ByteArray# -> ByteArray# -> Int# -> Int#
 
 -- -----------------------------------------------------------------------------
 -- Constructor functions

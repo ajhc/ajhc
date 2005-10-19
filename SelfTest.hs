@@ -1,6 +1,7 @@
 module SelfTest(selfTest) where
 
 import Data.Monoid
+import List(sort)
 import Monad
 import qualified Data.Set as Set
 import System.IO
@@ -12,6 +13,7 @@ import Binary
 import Boolean.TestCases
 import E.Arbitrary
 import E.E
+import GenUtil
 import HsSyn
 import Info.Binary()
 import Info.Info as Info
@@ -37,16 +39,25 @@ selfTest _ = do
 
 prop_atomid xs = fromAtom (toAtom xs) == (xs::String)
 
+
+--strings = [ "foo", "foobar", "baz", "", "bob"]
+strings =  ["h","n\206^um\198(","\186","yOw\246$\187x#",";\221x<n","\201\209\236\213J\244\233","\189eW\176v\175\209"]
+
 testPackedString = do
     putStrLn "Testing PackedString"
     let prop_psid xs = unpackPS (packString xs) == (xs::String)
         prop_pslen xs = lengthPS (packString xs) == length (xs::String)
         prop_psappend (xs,ys) = (packString xs `appendPS` packString ys) == packString ((xs::String) ++ ys)
         prop_psappend' (xs,ys) = unpackPS (packString xs `appendPS` packString ys) == ((xs::String) ++ ys)
+        prop_sort xs = sort (map packString xs) == map packString (sort xs)
     quickCheck prop_psid
     quickCheck prop_pslen
+    doTime "prop_sort" $ quickCheck prop_sort
     quickCheck prop_psappend
     quickCheck prop_psappend'
+    print $ map packString strings
+    print $ sort $ map packString strings
+    print $ sort strings
     pshash "Hello"
     pshash "Foo"
     pshash "Bar"

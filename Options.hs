@@ -1,17 +1,17 @@
 {-# OPTIONS -w -funbox-strict-fields #-}
 module Options(processOptions, Opt(..), options, putVerbose, putVerboseLn, verbose, verbose2, dump, wdump, fopts, flint, fileOptions) where
 
-import Control.Monad.Error
 import Data.Version
-import GenUtil
 import Monad
 import qualified Data.Set as S
-import qualified FlagDump
-import qualified FlagOpts
 import System
 import System.Console.GetOpt
 import System.Info
 import System.IO.Unsafe
+
+import GenUtil
+import qualified FlagDump
+import qualified FlagOpts
 import {-# SOURCE #-} SelfTest(selfTest)
 import Version
 import VersionCtx
