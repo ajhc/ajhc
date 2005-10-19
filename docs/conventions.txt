@@ -16,6 +16,7 @@ an 'f' to names that start with a capital letter.
 
 * W@ - this is the worker of a worker/wrapper split.
 
+* X@ - various temporary names generated from existing names
 
 when a name is one of several generated from an existing one, the convention
 is to append '$n' for some number that makes the name unique.

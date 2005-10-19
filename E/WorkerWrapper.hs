@@ -2,6 +2,7 @@ module E.WorkerWrapper(workWrap,performWorkWrap) where
 
 import Control.Monad.Identity
 import Data.Monoid
+import Maybe
 import Monad
 
 import Atom
@@ -11,8 +12,9 @@ import E.CPR
 import E.E
 import E.Inline
 import E.Strictness
-import E.TypeCheck
+import E.TypeCheck()
 import E.Values
+import GenUtil
 import Info.Info as Info
 import Info.Types
 import Name
@@ -23,27 +25,25 @@ topLike Top = True
 topLike (Fun v) = topLike v
 topLike _ = False
 
-wrapable (Fun x) (ELam _ e) = f x e where
-    f (Fun x) (ELam _ e) = f x e
-    f (Tup _) _ = True
-    f (Tag [_]) _ = True
-    f _ _ = False
-wrapable _ _ = False
 
-
-{-
 wrappable :: Monad m =>
     DataTable   -- ^ data table
     -> TVr      -- ^ function name we want to workwrap
     -> E        -- ^ function body
-    -> m (E,[TVr])  -- ^ (Body,Args)
+    -> m (Name,E,[(Maybe (Constructor,[TVr]),TVr)])  -- ^ (Body,Args)
 wrappable dataTable tvr e@ELam {} = ans where
     cpr = maybe Top id (Info.lookup (tvrInfo tvr))
     Lam sa = maybe (Lam (repeat L)) id (Info.lookup (tvrInfo tvr))
-    ans = f e sa cpr
-    f (ELam t e) (s:ss) (Fun x) =
-    -}
-
+    ans = f e ( sa ++ repeat L) cpr []
+    f (ELam t e) (S _:ss) (Fun x) ts
+       | Just con <- getProduct dataTable tt = f e ss x ((Just (con,as con),t):ts)
+         where
+            as con = [ tvr { tvrIdent = n, tvrType = st } | st <- slotTypes dataTable (conName con) tt | n <- tmpNames Val (tvrIdent t) ]
+            tt = getType t
+    f (ELam t e) (_:ss) (Fun x) ts = f e ss x ((Nothing,t):ts)
+    f e _ (Tup n) ts = return (n,e,reverse ts)
+    f e _ (Tag [n]) ts = return (n,e,reverse ts)
+    f _ _ _ _ = fail "not workwrapable"
 
 wrappable _ _ _ = fail "Only lambdas are wrappable"
 
@@ -55,30 +55,39 @@ workerName x = case fromId x of
     Just y -> toId (toName Val ("W@",'f':show y))
     Nothing -> toId (toName Val ("W@",'f':show x))
 
+tmpNames ns x = case fromId x of
+    Just y  -> [toId (toName ns ("X@",'f':show y ++ "@" ++ show i)) | i <- [(1::Int)..] ]
+    Nothing -> [toId (toName ns ("X@",'f':show x ++ "@" ++ show i)) | i <- [(1::Int)..] ]
+
 workWrap' :: Monad m => DataTable -> TVr -> E -> m ((TVr,E),(TVr,E))
-workWrap' dataTable tvr e | wrapable cpr e = ans where
-    cpr = maybe Top id (Info.lookup (tvrInfo tvr))
-    sa = maybe L id (Info.lookup (tvrInfo tvr))
+workWrap' dataTable tvr e | isJust res = ans where
+    res@(~(Just (cname,body,sargs))) = wrappable dataTable tvr e
+    args = snds sargs
+    args' = concatMap f sargs where
+        f (Nothing,t) = [t]
+        f (Just (c,ts),_) = ts
+    lets = concatMap f sargs where
+        f (Nothing,_) = []
+        f (Just (c,ts),t) = [(t,ELit (LitCons (conName c) (map EVar ts) (getType t)))]
+    cases e = f sargs where
+        f [] = e
+        f ((Nothing,_):rs) = f rs
+        f ((Just (c,ts),t):rs) = eCase (EVar t) [Alt (LitCons (conName c) ts (getType t)) (f rs)] Unknown
     ans = return ((setProperty prop_WRAPPER tvr,wrapper),(setProperty prop_WORKER tvr',worker))
     tvr' = TVr { tvrIdent = workerName (tvrIdent tvr), tvrInfo = mempty, tvrType = wt }
-    wt = typeInfer dataTable  worker
-    worker = foldr ELam body' args where
-        body' = eCase body [cb] Unknown
+    worker = foldr ELam body' args' where
+        body' = eLetRec lets $ eCase body [cb] Unknown
         cb = Alt (LitCons cname vars bodyTyp) (if isSingleton then EVar sv else (ELit $ unboxedTuple (map EVar vars)))
     wrapper = foldr ELam ne args where
-        ne | isSingleton = eStrictLet sv (foldl EAp (EVar tvr') (map EVar args))  (ELit $ LitCons cname [EVar sv] bodyTyp)
-           | otherwise = eCase (foldl EAp (EVar tvr') (map EVar args)) [ca] Unknown
+        ne | isSingleton = cases $ eStrictLet sv (foldl EAp (EVar tvr') (map EVar args'))  (ELit $ LitCons cname [EVar sv] bodyTyp)
+           | otherwise = cases $ eCase (foldl EAp (EVar tvr') (map EVar args')) [ca] Unknown
         ca = Alt (unboxedTuple vars) (ELit $ LitCons cname (map EVar vars) bodyTyp)
     vars@(~[sv]) = [  tVr i t | t <- slotTypes dataTable cname bodyTyp | i <- [2,4..] ]
     isSingleton = case vars of
         [v] -> getType (getType v) == eHash
         _ -> False
-    bodyTyp = typeInfer dataTable body
-    (cname,args,body) = f cpr e []
-    f (Fun x) (ELam a e) as = f x e (a:as)
-    f (Tup n) e as = (n,reverse as,e)
-    f (Tag [n]) e as = (n,reverse as,e)
-    f x y z = error $ show (x,y,z)
+    Just wt = typecheck dataTable  worker
+    Just bodyTyp = typecheck dataTable body
 workWrap' _dataTable tvr e = fail "not workWrapable"
 
 
