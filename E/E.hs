@@ -332,20 +332,23 @@ toString x = toList x >>= mapM fromChar where
     fromChar _ = fail "fromChar: not char"
 
 
-tAbsurd k = ELit (litCons TypeConstructor "Absurd#" [] k)
-vWorld__ = ELit (litCons DataConstructor ("Jhc.IO","World__") [] tWorld__)
+tAbsurd k = ELit (LitCons tc_Absurd [] k)
+vWorld__ = ELit (LitCons dc_World__ [] tWorld__)
 
 dc_Addr = toName DataConstructor ("Jhc.Addr","Addr")
 dc_Char = toName DataConstructor ("Prelude","Char")
+dc_EmptyList = toName DataConstructor ("Prelude","[]")
+dc_Integer = toName DataConstructor ("Prelude","Integer")
+dc_Int = toName DataConstructor ("Prelude","Int")
 dc_JustIO = toName DataConstructor ("Jhc.IO", "JustIO")
 dc_Rational = toName DataConstructor ("Ratio",":%")
-dc_Int = toName DataConstructor ("Prelude","Int")
-dc_Integer = toName DataConstructor ("Prelude","Integer")
-dc_EmptyList = toName DataConstructor ("Prelude","[]")
-tc_List = toName TypeConstructor ("Prelude","[]")
-tc_IO = toName TypeConstructor ("Jhc.IO", "IO")
-tc_IOResult = toName TypeConstructor ("Jhc.IO","IOResult")
+dc_World__ = toName DataConstructor ("Jhc.IO","World__")
+tc_World__ = toName TypeConstructor ("Jhc.IO","World__")
+tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
 tc_Arrow = toName TypeConstructor ("Prelude","->")
+tc_IOResult = toName TypeConstructor ("Jhc.IO","IOResult")
+tc_IO = toName TypeConstructor ("Jhc.IO", "IO")
+tc_List = toName TypeConstructor ("Prelude","[]")
 p_unsafeCoerce = primPrim "unsafeCoerce"
 p_integralCast = primPrim "integralCast"
 

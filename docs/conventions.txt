@@ -18,6 +18,10 @@ an 'f' to names that start with a capital letter.
 
 * X@ - various temporary names generated from existing names
 
+* Jhc@ - A finite set of built in special names that never occur in haskell source
+
+* F@ - bindings that have been floated out of top level definitions
+
 when a name is one of several generated from an existing one, the convention
 is to append '$n' for some number that makes the name unique.
 

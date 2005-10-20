@@ -92,7 +92,7 @@ getConstructor n (DataTable map) = case Map.lookup n map of
 -- | return the single constructor of product types
 
 getProduct :: Monad m => DataTable -> E -> m Constructor
-getProduct dataTable e | (ELit (LitCons cn _ _)) <- followAliases dataTable e, Just c <- getConstructor cn dataTable = f c where
+getProduct dataTable e | (ELit (LitCons cn _ _)) <- followAliases dataTable e, cn /= tc_World__, Just c <- getConstructor cn dataTable = f c where
     f c | Just [x] <- conChildren c = getConstructor x dataTable
         | otherwise = fail "Not Product type"
 getProduct _ _ = fail "Not Product type"

@@ -217,12 +217,13 @@ unbox dataTable e vn wtd = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] te) (wtd 
     tvra = tVr vn sta
     Just (cna,sta,ta) = lookupCType' dataTable te
 
-createFunc :: DataTable -> [Int] -> [E] -> ([(TVr,String)] -> E) -> E
+createFunc :: DataTable -> [Int] -> [E] -> ([(TVr,String)] -> (E -> E,E)) -> E
 createFunc dataTable ns es ee = foldr ELam eee tvrs where
     xs = [(tVr n te,n',runIdentity $ lookupCType' dataTable te) | te <- es | n <- ns | n' <- drop (length es) ns ]
     tvrs' = [ (tVr n' sta,rt) | (_,n',(_,sta,rt)) <- xs ]
     tvrs = [ t | (t,_,_) <- xs]
-    eee = foldr esr (ee tvrs') xs
+    (me,innerE) = ee tvrs'
+    eee = me $ foldr esr innerE xs
     esr (tvr,n',(cn,st,_)) e = ECase (EVar tvr) (tVr 0 te) [Alt (LitCons cn [tVr n' st] te) e] Nothing  where
         te = getType $ EVar tvr
 
@@ -245,20 +246,18 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         (ts,rt) = argTypes' ty
         es = [ (tVr ( n) t) |  t <- ts, not (sortStarLike t) | n <- localVars ]
     cDecl (HsForeignDecl _ ForeignCCall s n _)
-        | Func _ s _ _ <- p, not isIO =  expr $ createFunc dataTable [4,6..] (map tvrType es) $ \rs -> eStrictLet rtVar' (EPrim (APrim (Func False s (snds rs) rtt) req) [ EVar t | (t,_) <- rs ] rtt') (ELit $ LitCons cn [EVar rtVar'] rt')
+        | Func _ s _ _ <- p, not isIO =  expr $ createFunc dataTable [4,6..] (map tvrType es) $ \rs -> (,) id $ eStrictLet rtVar' (EPrim (APrim (Func False s (snds rs) rtt) req) [ EVar t | (t,_) <- rs ] rtt') (ELit $ LitCons cn [EVar rtVar'] rt')
         | Func _ s _ _ <- p, "void" <- toExtType rt' =
-                expr $ (createFunc dataTable [4,6..] (map tvrType es) $ \rs -> ELam tvrWorld $
+                expr $ (createFunc dataTable [4,6..] (map tvrType es) $ \rs -> (,) (ELam tvrWorld) $
                     eStrictLet tvrWorld2 (EPrim (APrim (Func True s (snds rs) "void") req) (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit))
         | Func _ s _ _ <- p =
-                expr $ (createFunc dataTable [4,6..] (map tvrType es) $ \rs -> ELam tvrWorld $
+                expr $ (createFunc dataTable [4,6..] (map tvrType es) $ \rs -> (,) (ELam tvrWorld) $
                     eCaseTup' (EPrim (APrim (Func True s (snds rs) rtt) req) (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ LitCons cn [EVar rtVar'] rt') (eJustIO (EVar tvrWorld2) (EVar rtVar))))
-        --  | AddrOf _ <- p = expr $ EPrim (APrim p req) [] rt
         | AddrOf _ <- p = let
             (cn,st,ct) = runIdentity (lookupCType' dataTable rt)
             (var:_) = freeNames (freeVars rt)
             vr = tVr var st
           in expr $ eStrictLet vr (EPrim (APrim p req) [] st) (ELit (LitCons cn [EVar vr] rt))
-        --  | otherwise = [(name,var, lamt (foldr ELam p' es))]
         where
         expr x = [(name,var,lamt x)]
         Just (APrim p req) = parsePrimString s

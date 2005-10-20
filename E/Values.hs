@@ -143,6 +143,7 @@ whnfOrBot (ELit (LitCons _ xs _)) = all isAtomic xs
 whnfOrBot (EPi (TVr { tvrIdent =  j, tvrType =  x }) y) | not (j `Set.member` freeVars y) = isAtomic x && isAtomic y
 whnfOrBot e = isAtomic e
 
+safeToDup ec@ECase {} | EVar _ <- eCaseScrutinee ec = all safeToDup (caseBodies ec)
 safeToDup e = whnfOrBot e || isELam e || isEPi e
 
 
