@@ -60,15 +60,10 @@ tipe (TArrow t1 t2) =  EPi (tVr 0 (tipe t1)) (tipe t2)
 tipe (TCon (Tycon n k)) =  ELit (LitCons (toName TypeConstructor n) [] (kind k))
 tipe (TVar (Tyvar _ n k _)) = EVar (tVr (lt n) (kind k))
 tipe (TGen _ (Tyvar _ n k _)) = EVar (tVr (lt n) (kind k))
---tipe (TTuple ts) = ltTuple (map tipe ts)
---    tipe (TCon (Tycon n k)) = foldr ($) (ELit (LitCons (getName n) (map EVar es) rt)) (map ELam es) where
---        (ts,rt) = argTypes' (kind k)
---        es = [ (TVr (Just n) t) |  t <- ts | n <- localVars ]
 
 kind Star = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."
-
 
 
 simplifyDecl (HsPatBind sl (HsPVar n)  rhs wh) = HsFunBind [HsMatch sl n [] rhs wh]
@@ -111,7 +106,6 @@ convertOneVal (Forall _ (_ :=> t)) = (mp EPi ts (tipe t)) where
 Identity nameFuncNames = fmapM (return . toName Val) sFuncNames
 toTVr assumps n = tVr ( nameToInt n) (typeOfName n) where
     typeOfName n = fst $ convertVal assumps n
-    --lt n = nameToInt (fromTypishHsName  n)
 
 matchesConv ms = map v ms where
     v (HsMatch _ _ ps rhs wh) = (map simplifyHsPat ps,rhs,wh)

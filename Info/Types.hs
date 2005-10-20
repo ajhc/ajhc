@@ -58,6 +58,7 @@ prop_EXPORTED = toAtom "_EXPORTED"
 prop_WORKER = toAtom "_WORKER"
 prop_WRAPPER = toAtom "_WRAPPER"
 prop_CYCLIC = toAtom "_CYCLIC"
+prop_PLACEHOLDER = toAtom "_PLACEHOLDER"
 
 
 class HasProperties a where

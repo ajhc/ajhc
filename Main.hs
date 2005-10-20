@@ -6,15 +6,16 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Monoid
 import List hiding(group)
-import Maybe
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified System
 
+import CanType(getType)
 import C.FromGrin
 import CharIO
 import Class
+import C.Prims
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
@@ -24,6 +25,7 @@ import E.Arbitrary()
 import E.Diff
 import E.E
 import E.FromHs
+import E.Inline
 import E.LambdaLift
 import E.LetFloat
 import E.Pretty
@@ -31,6 +33,7 @@ import E.Rules
 import E.Strictness
 import E.Subst
 import E.Traverse
+import E.TypeAnalysis
 import E.TypeCheck
 import E.WorkerWrapper
 import FreeVars
@@ -38,7 +41,6 @@ import FrontEnd.FrontEnd
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadFunctions
 import Grin.FromE
-import CanType(getType)
 import Grin.Grin
 import Grin.Show
 import Grin.Whiz
@@ -57,7 +59,6 @@ import qualified Grin.Simplify
 import qualified Info.Info as Info
 import qualified Stats
 import Util.Graph
-import E.TypeAnalysis
 
 ---------------
 -- ∀α∃β . α → β
@@ -120,17 +121,17 @@ idann rs ps i nfo = return (props ps i nfo `mappend` rules rs i) where
         Nothing -> id
     rules rs i = Info.maybeInsert (getARules rs i) Info.empty
 
-annotateMethods ch rs ps = (Map.fromList [ (tvrIdent t, Just (EVar t)) | t <- ts ]) where
-    ts = [ let Identity x = idann rs ps (tvrIdent t) (tvrInfo t) in t { tvrInfo = x  } | t <-methodNames ch ]
+--annotateMethods ch rs ps = (Map.fromList [ (tvrIdent t, Just (EVar t)) | t <- ts ]) where
+--    ts = [ let Identity x = idann rs ps (tvrIdent t) (tvrInfo t) in t { tvrInfo = x  } | t <-methodNames ch ]
 
 processInitialHo :: Ho -> IO Ho
 processInitialHo ho = do
     putStrLn $ "Initial annotate: " ++ show (Map.keys $ hoModules ho)
-    let imap = annotateMethods (hoClassHierarchy ho) (hoRules ho) (hoProps ho)
+    --let imap = annotateMethods (hoClassHierarchy ho) (hoRules ho) (hoProps ho)
     --let f (ds,used) (v,lc) = ((v,lc'):ds,used `mappend` used') where
     --        (lc',used') = runRename used lc
     --    (nds,allUsed) = foldl f ([],Set.empty) (Map.elems $ hoEs ho)
-    let Identity (ELetRec ds (ESort EStar)) = annotate imap (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec (Map.elems $ hoEs ho) eStar)
+    let Identity (ELetRec ds (ESort EStar)) = annotate mempty (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec (Map.elems $ hoEs ho) eStar)
     wdump FD.Rules $ printRules (hoRules ho)
     return ho { hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds ] }
 
@@ -155,24 +156,27 @@ processDecls stats ho ho' tiData = do
 
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
-    ds <- convertDecls (hoClassHierarchy ho') allAssumps  fullDataTable decls
+    ds' <- convertDecls (hoClassHierarchy ho') allAssumps  fullDataTable decls
+    let mnames = methodNames (hoClassHierarchy ho')
+        ds = ds' ++ [ (runIdentity $ fromId (tvrIdent t),setProperties [prop_PLACEHOLDER,prop_EXPORTED] t, EPrim (primPrim ("Placeholder: " ++ tvrShowName t)) [] (getType t)) | t <- mnames, not $ t `Set.member` cnames]
+        cnames = Set.fromList $ fsts $ Map.elems $ hoEs ho
 
     -- Build rules
     rules <- createInstanceRules (hoClassHierarchy ho' `mappend` hoClassHierarchy initialHo)   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
-    let allRules = hoRules ho `mappend` rules
+    let allRules = hoRules ho `mappend` rules `mappend` hoRules ho'
     wdump FD.Rules $ printRules allRules
 
     -- some more useful values.
-    let inscope =  [ tvrNum n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrNum n | (_,n,_) <- ds ] ++ map tvrNum (methodNames (hoClassHierarchy allHo))
+    let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (_,n,_) <- ds ] ++ map tvrIdent (methodNames (hoClassHierarchy allHo))
         mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
         exports = getExports ho'
-        classNames = Set.fromList $ map tvrNum (methodNames (hoClassHierarchy allHo))
+        classNames = Set.fromList $ map tvrIdent (methodNames (hoClassHierarchy allHo))
         namesInscope = Set.fromList inscope -- classNames `Set.union` (Set.fromAscList $ Map.keys smap)
 
     -- initial pass over functions to put them into a normalized form
     let procE (ds,usedIds) (n,v,lc) = do
         lc <- postProcessE stats n inscope usedIds fullDataTable lc
-        nfo <- idann (hoRules ho') (hoProps ho') (tvrIdent v) (tvrInfo v)
+        nfo <- idann  allRules (hoProps ho') (tvrIdent v) (tvrInfo v)
         v <- return $ v { tvrInfo = Info.insert LetBound nfo }
         let used' = collectIds lc
         --let (lc',used') = runRename usedIds lc
@@ -225,7 +229,10 @@ processDecls stats ho ho' tiData = do
         cds <- annotateDs annmap (\_ -> return) letann lamann cds
         --mapM_ (\t -> putStrLn (prettyE (EVar t) <+> show (tvrInfo t))) (fsts cds)
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
-        let nvls = [ (fromJust (fromId (tvrIdent t)),t,e)  | (t,e) <- cds ]
+        let toName t
+                | Just n <- fromId (tvrIdent t) = n
+                | otherwise = error $ "toName: " ++ tvrShowName t
+        let nvls = [ (toName t,t,e)  | (t,e) <- cds ]
         --let uidMap = Map.fromAscList [  (id,Nothing :: Maybe E) | id <- Set.toAscList $ Set.unions [ collectIds e| (t,e) <- cds]]
         let uidMap = Map.fromAscList [  (id,Nothing :: Maybe E) | id <- Set.toAscList usedids ]
         --let idHist = idHist' `mappend` Histogram.unions [ idHistogram e| (t,e) <- cds]
@@ -235,16 +242,16 @@ processDecls stats ho ho' tiData = do
         return (nvls ++ retds, (Map.fromList [ (tvrIdent v,lc) | (_,v,lc) <- nvls] `mappend` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (_,v,_) <- nvls] `Map.union` annmap , idHist' ))
 
     -- preparing for optimization
-    let imap = annotateMethods (hoClassHierarchy allHo) allRules (hoProps allHo)
-        initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))] `mappend` imap
-        graph =  (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c))
+    -- let imap = annotateMethods (hoClassHierarchy allHo) allRules (hoProps allHo)
+    let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
+        graph =  (newGraph ds (\ (_,b,_) -> tvrIdent b) (\ (_,b,c) -> bindingFreeVars b c))
         fscc (Left n) = (False,[n])
         fscc (Right ns) = (True,ns)
-    (ds,_) <- foldM f ([],(Map.fromList [ (tvrNum v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
+    (ds,_) <- foldM f ([],(Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
     wdump FD.Progress $ putErrLn "!"
 
 
-    let ds' = reachable (newGraph ds (\ (_,b,_) -> tvrNum b) (\ (_,_,c) -> freeVars c)) [ tvrNum b | (n,b,_) <- ds, getProperty prop_EXPORTED b]
+    let ds' = reachable (newGraph ds (\ (_,b,_) -> tvrIdent b) (\ (_,b,c) -> bindingFreeVars b c)) [ tvrIdent b | (n,b,_) <- ds, getProperty prop_EXPORTED b]
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     return ho' { hoDataTable = dataTable, hoEs = Map.fromList [ (x,(y,z)) | (x,y,z) <- ds'], hoRules = rules, hoUsedIds = collectIds (ELetRec [ (b,c) | (_,b,c) <- ds'] Unknown) }
 
@@ -294,17 +301,18 @@ compileModEnv' stats ho = do
         putStrLn "  ---- class hierarchy ---- "
         printClassHierarchy (hoClassHierarchy ho)
 
-    let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
     es' <- createMethods dataTable (hoClassHierarchy ho) (hoEs ho)
-    let Identity (ELetRec es'' (ESort EStar)) = annotate initMap (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec [ (y,z) | (x,y,z) <- es']  eStar)
+    let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho)), not $ t `Set.member` tmap]
+        tmap = Set.fromList $ [ t | (_,t,_) <- es' ]
+    let Identity es'' = annotateDs initMap (idann (hoRules ho) (hoProps ho) ) letann lamann [ (y,z) | (x,y,z) <- es']
 
     es' <- return [ (x,y,floatInward rules z) | (x,_,_) <- es' | (y,z) <- es'' ]
     wdump FD.Class $ do
-        sequence_ [ putDocM CharIO.putErr (pprint $ ELetRec [(y,z)] Unknown) >> putErrLn "" |  (x,y,z) <- es']
+        sequence_ [ print x >> printCheckName' dataTable y z |  (x,y,z) <- es']
     let es = Map.fromList [ (x,(y,z)) |  (x,y,z) <- es'] `mappend` hoEs ho
     (_,main,mainv) <- getMainFunction mainFunc es
     let ds = ((main,mainv):Map.elems es)
-    let ds' = reachable (newGraph ds (tvrNum . fst) (\ (t,e) -> Set.toList $ freeVars e `mappend` freeVars (Info.fetch (tvrInfo t) :: ARules))) [tvrNum main]
+    let ds' = reachable (newGraph ds (tvrIdent . fst) (\ (t,e) -> bindingFreeVars t e)) [tvrIdent main]
 
     let lco = ELetRec ds'  (EVar main)
     wdump FD.Rules $ printRules rules
@@ -486,7 +494,7 @@ mangle'  fv dataTable erraction b  s action e = do
     when ((b && dump FD.Progress) || dump FD.Pass) $ putErrLn $ "-- " ++ s
     e' <- action e
     if not flint then return e' else do
-        let ufreevars e | Just as <- fv = filter ( not . (`Set.member` as) . tvrNum) (freeVars e)
+        let ufreevars e | Just as <- fv = filter ( not . (`Set.member` as) . tvrIdent) (freeVars e)
             ufreevars e = []
         case inferType dataTable [] e' of
             Right _ |  xs@(_:_) <- ufreevars e' -> do
@@ -541,5 +549,8 @@ printCheckName' dataTable tvr e = do
     putErrLn  ( render $ hang 4 (pprint tvr <+> equals <+> pprint e <+> text "::") )
     ty <- typecheck dataTable e
     putErrLn  ( render $ indent 4 (pprint ty))
+
+
+
 
 

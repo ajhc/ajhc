@@ -30,7 +30,7 @@ wrappable :: Monad m =>
     DataTable   -- ^ data table
     -> TVr      -- ^ function name we want to workwrap
     -> E        -- ^ function body
-    -> m (Name,E,[(Maybe (Constructor,[TVr]),TVr)])  -- ^ (Body,Args)
+    -> m (Maybe Name,E,[(Maybe (Constructor,[TVr]),TVr)])  -- ^ (Body,Args)
 wrappable dataTable tvr e@ELam {} = ans where
     cpr = maybe Top id (Info.lookup (tvrInfo tvr))
     Lam sa = maybe (Lam (repeat L)) id (Info.lookup (tvrInfo tvr))
@@ -41,8 +41,9 @@ wrappable dataTable tvr e@ELam {} = ans where
             as con = [ tvr { tvrIdent = n, tvrType = st } | st <- slotTypes dataTable (conName con) tt | n <- tmpNames Val (tvrIdent t) ]
             tt = getType t
     f (ELam t e) (_:ss) (Fun x) ts = f e ss x ((Nothing,t):ts)
-    f e _ (Tup n) ts = return (n,e,reverse ts)
-    f e _ (Tag [n]) ts = return (n,e,reverse ts)
+    f e _ (Tup n) ts = return (Just n,e,reverse ts)
+    f e _ (Tag [n]) ts = return (Just n,e,reverse ts)
+    f e _ _ ts | any (isJust . fst) ts = return (Nothing ,e,reverse ts)
     f _ _ _ _ = fail "not workwrapable"
 
 wrappable _ _ _ = fail "Only lambdas are wrappable"
@@ -76,13 +77,15 @@ workWrap' dataTable tvr e | isJust res = ans where
     ans = return ((setProperty prop_WRAPPER tvr,wrapper),(setProperty prop_WORKER tvr',worker))
     tvr' = TVr { tvrIdent = workerName (tvrIdent tvr), tvrInfo = mempty, tvrType = wt }
     worker = foldr ELam body' args' where
-        body' = eLetRec lets $ eCase body [cb] Unknown
-        cb = Alt (LitCons cname vars bodyTyp) (if isSingleton then EVar sv else (ELit $ unboxedTuple (map EVar vars)))
+        body' = eLetRec lets $ case cname of
+            Just cname -> eCase body [cb] Unknown where
+                cb = Alt (LitCons cname vars bodyTyp) (if isSingleton then EVar sv else (ELit $ unboxedTuple (map EVar vars)))
+            Nothing -> body
     wrapper = foldr ELam ne args where
-        ne | isSingleton = cases $ eStrictLet sv (foldl EAp (EVar tvr') (map EVar args'))  (ELit $ LitCons cname [EVar sv] bodyTyp)
-           | otherwise = cases $ eCase (foldl EAp (EVar tvr') (map EVar args')) [ca] Unknown
-        ca = Alt (unboxedTuple vars) (ELit $ LitCons cname (map EVar vars) bodyTyp)
-    vars@(~[sv]) = [  tVr i t | t <- slotTypes dataTable cname bodyTyp | i <- [2,4..] ]
+        ne | Just cname <- cname, isSingleton = cases $ eStrictLet sv (foldl EAp (EVar tvr') (map EVar args'))  (ELit $ LitCons cname [EVar sv] bodyTyp)
+           | Just cname <- cname = let ca = Alt (unboxedTuple vars) (ELit $ LitCons cname (map EVar vars) bodyTyp) in  cases $ eCase (foldl EAp (EVar tvr') (map EVar args')) [ca] Unknown
+           | otherwise = cases $ (foldl EAp (EVar tvr') (map EVar args'))
+    vars@(~[sv]) = [  tVr i t | t <- slotTypes dataTable (fromJust cname) bodyTyp | i <- [2,4..] ]
     isSingleton = case vars of
         [v] -> getType (getType v) == eHash
         _ -> False

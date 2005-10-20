@@ -259,6 +259,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
             z (t,e) = do
                 t' <- nname t sub inb
                 case Info.lookup (tvrInfo t) of
+                    _ | forceNoinline t -> return (tvrNum t,Many,t',e)
                     Just Once -> return (tvrNum t,Once,error $ "Once: " ++ show t,e)
                     Just n -> return (tvrNum t,n,t',e)
                     Nothing -> return (tvrNum t,Many,t',e)
@@ -432,16 +433,19 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     match m [] (_,Nothing) = error $ "End of match: " ++ show m
     match m as d = error $ "Odd Match: " ++ show ((m,getType m),as,d)
 
+    -- NOINLINE must take precidence because it is sometimes needed for correctness, while INLINE is surely an optimization.
     forceInline x
+        | forceNoinline x = False
         | not (fopts FO.InlinePragmas) = False
         | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_INLINE p  || Set.member prop_WRAPPER p || Set.member prop_SUPERINLINE p
 
     forceSuperInline x
+        | forceNoinline x = False
         | not (fopts FO.InlinePragmas) = False
         | Properties p <- Info.fetch (tvrInfo x) =  Set.member prop_SUPERINLINE p
 
     forceNoinline x
-        | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_NOINLINE p -- || Set.member prop_WORKER p
+        | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_NOINLINE p || Set.member prop_PLACEHOLDER p
 
     applyRule v xs  = do
         z <- builtinRule v xs
