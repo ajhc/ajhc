@@ -10,6 +10,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom
+import CanType
 import CharIO
 import FindFixpoint
 import FreeVars
@@ -181,9 +182,14 @@ removeDeadArgs stats fs (a,l) =  whizExps f l >>= return . (,) a where
     f x = return x
     dff fn as = mapM df  (zip as [0..]) where
         xs = lup fn
-        df (a,i) | a /= pHole && i `elem` xs  = do
+        deadVal (Lit 0 _) = True
+        deadVal x =  x `elem` [pHole,Tag tagHole]
+        df (a,i) | not (deadVal a) && i `elem` xs  = do
             tick stats $ toAtom "Optimize.dead-arg"
-            return pHole
+            case getType a of
+                TyPtr TyNode -> return pHole
+                TyTag -> return (Tag tagHole)
+                ty@(Ty _) -> return (Lit 0 ty)
             --return $ Const (NodeC (toAtom $ "@hole:" ++ show (fn,i)) [])-- pHole
         df (a,_)  = return a
     lup fn = case Map.lookup fn m of

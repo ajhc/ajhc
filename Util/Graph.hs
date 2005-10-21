@@ -3,11 +3,11 @@
 
 module Util.Graph where
 
-import qualified Data.Graph
+import Array
 import Data.Graph hiding(Graph)
 import GenUtil
-import Array
 import List(sort,sortBy,group,delete)
+import qualified Data.Graph(Graph)
 
 
 data Graph n k = Graph Data.Graph.Graph (Vertex -> n) (k -> Maybe Vertex) (n -> k)
@@ -27,9 +27,10 @@ fromScc (Right n) = n
 -- loopbreakers have a minimum of their  incoming edges ignored.
 findLoopBreakers ::
     (n -> Int)    -- ^ fitness function, greater numbers mean more likely to be a loopbreaker
+    -> (n -> Bool) -- ^ whether a node is suitable at all for a choice as loopbreaker
     -> Graph n k  -- ^ the graph
     ->  ([n],[n]) -- ^ (loop breakers,dependency ordered nodes after loopbreaking)
-findLoopBreakers func (Graph g ln kv fn) = ans where
+findLoopBreakers func ex (Graph g ln kv fn) = ans where
     scc = Data.Graph.scc g
     ans = f g scc [] [] where
         f g (Node v []:sccs) fs lb
@@ -37,7 +38,9 @@ findLoopBreakers func (Graph g ln kv fn) = ans where
             | otherwise = f g sccs (v:fs) lb
 
         f g (n:_) fs lb = f ng (Data.Graph.scc ng) [] (mv:lb) where
-            ((mv,_):_) = sortBy (\ a b -> compare (snd b) (snd a)) [ (v,func (ln v)) | v <- ns]
+            mv = case  sortBy (\ a b -> compare (snd b) (snd a)) [ (v,func (ln v)) | v <- ns, ex (ln v) ] of
+                ((mv,_):_) -> mv
+                [] -> error "findLoopBreakers: no valid loopbreakers"
             ns = dec n []
             ng = fmap (List.delete mv) g
 

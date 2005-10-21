@@ -77,6 +77,7 @@ go (fm:: Map.Map (Atom,Int) E) storeVars (fn,Tup vs :-> fb) = f fb (Map.fromList
             Just (_,v) -> toOmega v
     omegaize x = fail $ "omegaize: " ++ show x
     farg (_,Const {}) = return ()
+    farg (_,Lit {}) = return ()
     farg z@(an,Var v _) = do
         eval v
         ea <- Map.lookup an fm
@@ -84,6 +85,7 @@ go (fm:: Map.Map (Atom,Int) E) storeVars (fn,Tup vs :-> fb) = f fb (Map.fromList
         case Map.lookup v mp of
             Just (_,ev) -> ea `isLessThan` ev
             Nothing -> return ()
+    farg x = fail ("Grin.Linear.farg: " ++ show x)
     eval v = do
         mp <- get
         case Map.lookup v mp of

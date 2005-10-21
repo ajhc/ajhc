@@ -131,7 +131,7 @@ processInitialHo ho = do
     --let f (ds,used) (v,lc) = ((v,lc'):ds,used `mappend` used') where
     --        (lc',used') = runRename used lc
     --    (nds,allUsed) = foldl f ([],Set.empty) (Map.elems $ hoEs ho)
-    let Identity (ELetRec ds (ESort EStar)) = annotate mempty (idann (hoRules ho) (hoProps ho) ) letann lamann (ELetRec (Map.elems $ hoEs ho) eStar)
+    let Identity ds = annotateDs mempty (idann (hoRules ho) (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
     wdump FD.Rules $ printRules (hoRules ho)
     return ho { hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds ] }
 
@@ -217,13 +217,25 @@ processDecls stats ho ho' tiData = do
         --Stats.tickStat stats st
         let wws = length cds' - length cds
         wdump FD.Progress $ putErr (replicate wws 'w')
+
+        let graph = (newGraph cds' (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
+            (lb,os) = findLoopBreakers (const 1) nogood graph
+            nogood (b,_) = not $ getProperty prop_PLACEHOLDER b || getProperty prop_WRAPPER b
+            cds = [ if x `elem` fsts lb then (setProperty prop_NOINLINE x,y) else (x,y) | (x,y) <- os  ]
+        cds <- annotateDs annmap (\_ -> return) letann lamann cds
+
         let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds')) fullDataTable
         let dd  (ds,used) (v,lc) = do
+                let cm stats e = do
+                    let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = Map.fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `Map.union` smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
+                    let (stat, e') = SS.simplifyE sopt e
+                    Stats.tickStat stats stat
+                    return e'
                 let (lc', _) = runRename used lc
                 lc <- doopt mangle False stats "SuperSimplify" cm lc'
                 let (lc', used') = runRename used lc
                 return ((v,lc):ds,used' `mappend` used)
-        (cds,usedids) <- foldM dd ([],hoUsedIds ho) cds'
+        (cds,usedids) <- foldM dd ([],hoUsedIds ho) cds
         cds <- E.Strictness.solveDs cds
         cds <- return $ fst (E.CPR.cprAnalyzeBinds mempty cds)
         cds <- annotateDs annmap (\_ -> return) letann lamann cds
@@ -239,7 +251,7 @@ processDecls stats ho ho' tiData = do
         --print idHist
 
         wdump FD.Progress $ putErr (if rec then "*" else ".")
-        return (nvls ++ retds, (Map.fromList [ (tvrIdent v,lc) | (_,v,lc) <- nvls] `mappend` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (_,v,_) <- nvls] `Map.union` annmap , idHist' ))
+        return (nvls ++ retds, (Map.fromList [ (tvrIdent v,lc) | (_,v,lc) <- nvls] `Map.union` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (_,v,_) <- nvls] `Map.union` annmap , idHist' ))
 
     -- preparing for optimization
     -- let imap = annotateMethods (hoClassHierarchy allHo) allRules (hoProps allHo)
@@ -549,6 +561,8 @@ printCheckName' dataTable tvr e = do
     putErrLn  ( render $ hang 4 (pprint tvr <+> equals <+> pprint e <+> text "::") )
     ty <- typecheck dataTable e
     putErrLn  ( render $ indent 4 (pprint ty))
+
+
 
 
 

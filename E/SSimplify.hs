@@ -14,6 +14,7 @@ import Atom
 import CanType
 import DataConstructors
 import E.Annotate
+import C.Prims
 import E.E
 import E.Inline
 import E.PrimOpt
@@ -92,7 +93,7 @@ collectOcc sopts  e = (e',fvs,occ) where
             nn' = reachable gr (Set.toList fve ++ Map.keys se ++  topLevels)
         nn <- sequence [ tell t >> return (x,y) |  (x,(y,t)) <- nn' ]
         let gr' = newGraph nn (tvrNum . fst) (gfv . snd )
-            (lb,ds'') = findLoopBreakers (\ (_,(e,_,_)) -> loopFunc e) gr'
+            (lb,ds'') = findLoopBreakers (\ (_,(e,_,_)) -> loopFunc e) (const True) gr'
             cycNodes = Set.fromList $ [ v | (v,_) <- cyclicNodes gr']
             calcStrictInfo t _
                 | t `Set.member` cycNodes = setProperty prop_CYCLIC
@@ -116,6 +117,7 @@ collectOcc sopts  e = (e',fvs,occ) where
         ans = Map.fromList [ (i,Many) | Just (EVar (TVr { tvrIdent = i }),_) <- map (\e -> from_unsafeCoerce e `mplus` Just (e,Unknown)) as]
 
 -- this should use the occurance info
+loopFunc (EPrim (APrim (PrimPrim s) _) _ _) | "Place" `isPrefixOf` s = -100
 loopFunc EVar {} = 0
 loopFunc ELit {} = 1
 loopFunc EPi {} = 1
@@ -509,7 +511,8 @@ simplifyDs sopts dsIn = (stat,dsOut) where
 
 
 someBenefit _ _ = True
-multiInline e xs = length xs + 2 >= nsize   where
+
+multiInline e xs = length xs + 2 >= (nsize + if safeToDup b then negate 4 else 0)  where
     (b,as) = fromLam e
     nsize = size b + abs (length as - length xs)
     size e | (x,xs) <- fromAp e = size' x + length xs
@@ -518,8 +521,11 @@ multiInline e xs = length xs + 2 >= nsize   where
     size' (EPi _ _) = 1
     size' (ESort _) = 1
     size' (EPrim _ _ _) = 1
-    size' (EError _ _) = 1
-    size' _ = 100
+    size' (EError _ _) = -1
+    size' ec@ECase {} | EVar v <- eCaseScrutinee ec, v `elem` as = sum (map size (caseBodies ec)) - 3
+    size' ec@ECase {} = size (eCaseScrutinee ec) + sum (map size (caseBodies ec))
+    size' (ELetRec ds e) = size e + sum (map (size . snd) ds)
+    size' _ = 2
 
 
 worthStricting EError {} = True

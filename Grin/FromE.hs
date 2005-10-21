@@ -201,7 +201,7 @@ primTyEnv = TyEnv . Map.fromList $ [
 --type ConstantCafMap = Map.Map Int -> Val
 --constantCaf :: DataTable -> SC -> [(TVr,Val)]
 constantCaf dataTable (SC _ ds) = ans where
-    (lbs',cafs) = G.findLoopBreakers (const 0) $ G.newGraph [ (v,e) | (v,[],e) <- ds, canidate e] (tvrNum . fst) (freeVars . snd)
+    (lbs',cafs) = G.findLoopBreakers (const 0) (const True) $ G.newGraph [ (v,e) | (v,[],e) <- ds, canidate e] (tvrNum . fst) (freeVars . snd)
     lbs = Set.fromList $ fsts lbs'
     canidate (ELit _) = True
     canidate (EPi _ _) = True
