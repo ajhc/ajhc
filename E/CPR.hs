@@ -6,6 +6,8 @@ import Data.Monoid()
 import qualified Data.Map as Map
 
 import Binary
+import Number
+import Util.SameShape
 import Doc.DocLike
 import E.E
 import E.FreeVars
@@ -18,11 +20,12 @@ newtype Env = Env (Map.Map TVr Val)
     deriving(Monoid)
 
 data Val =
-    Top           -- the top.
-    | Fun Val     -- function taking an arg
-    | Tup Name    -- A constructed product
-    | Tag [Name]  -- A nullary constructor, like True, False
-    | Bot         -- the bottom
+    Top               -- the top.
+    | Fun Val         -- function taking an arg
+    | Tup Name [Val]  -- A constructed product
+    | VInt Number     -- A number
+    | Tag [Name]      -- A nullary constructor, like True, False
+    | Bot             -- the bottom
     deriving(Eq,Ord,Typeable)
     {-! derive: GhcBinary !-}
 
@@ -30,8 +33,8 @@ instance Show Val where
     showsPrec _ Top = C.top
     showsPrec _ Bot = C.bot
     showsPrec n (Fun v) = C.lambda <> showsPrec n v
-    showsPrec _ (Tup n) = shows n
-    -- showsPrec _ (Tag [n]) = shows n
+    showsPrec _ (Tup n xs) = shows n <> tupled (map shows xs)
+    showsPrec _ (VInt n) = shows n
     showsPrec _ (Tag ns) = shows ns
 
 lub :: Val -> Val -> Val
@@ -39,14 +42,17 @@ lub Bot a = a
 lub a Bot = a
 lub Top a = Top
 lub a Top = Top
-lub (Tup a) (Tup b)
-    | a == b = Tup a
+lub (Tup a xs) (Tup b ys)
+    | a == b, sameShape1 xs ys = Tup a (zipWith lub xs ys)
+    | a == b = error "CPR.lub this shouldn't happen"
     | otherwise = Top
 lub (Fun l) (Fun r) = Fun (lub l r)
+lub (VInt n) (VInt n') | n == n' = VInt n
 lub (Tag xs) (Tag ys) = Tag (smerge xs ys)
-lub (Tag _) (Tup _) = Top
-lub (Tup _) (Tag _) = Top
-lub a b = error $ "CPR.lub: " ++ show (a,b)
+lub (Tag _) (Tup _ _) = Top
+lub (Tup _ _) (Tag _) = Top
+lub _ _ = Top
+--lub a b = error $ "CPR.lub: " ++ show (a,b)
 
 
 instance Monoid Val where
@@ -92,19 +98,14 @@ cprAnalyze env (EAp fun arg) = (EAp fun_cpr arg,res_res) where
         Bot -> Bot
         v -> error $ "cprAnalyze.res_res: " ++ show v
 cprAnalyze env  e = (e,f e) where
-    f (ELit (LitInt {})) = Top
+    f (ELit (LitInt n _)) = VInt n
     f (ELit (LitCons n [] _)) = Tag [n]
-    f (ELit (LitCons n _  _)) = Tup n
-    f (EPi _ _) = Tup tc_Arrow
+    f (ELit (LitCons n xs  _)) = Tup n (map g xs)
+    f (EPi t e) = Tup tc_Arrow [g $ tvrType t, g e]
     f (EPrim {}) = Top -- TODO fix primitives
     f (EError {}) = Bot
     f e = error $ "cprAnalyze.f: " ++ show e
-    {-
-    f (ELam t e) = Fun (cprAnalyze (Env $ Map.insert t Top mp)  e)
-    f (EVar v)
-        | Just v <- Map.lookup v mp = v
-        | otherwise = Top
-     -}
+    g = snd . cprAnalyze env
 
 
 

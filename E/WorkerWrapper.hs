@@ -41,7 +41,7 @@ wrappable dataTable tvr e@ELam {} = ans where
             as con = [ tvr { tvrIdent = n, tvrType = st } | st <- slotTypes dataTable (conName con) tt | n <- tmpNames Val (tvrIdent t) ]
             tt = getType t
     f (ELam t e) (_:ss) (Fun x) ts = f e ss x ((Nothing,t):ts)
-    f e _ (Tup n) ts = return (Just n,e,reverse ts)
+    f e _ (Tup n _) ts = return (Just n,e,reverse ts)
     f e _ (Tag [n]) ts = return (Just n,e,reverse ts)
     f e _ _ ts | any (isJust . fst) ts = return (Nothing ,e,reverse ts)
     f _ _ _ _ = fail "not workwrapable"
