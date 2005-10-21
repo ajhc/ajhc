@@ -246,6 +246,9 @@ lookupCType' dataTable e = case followAliases dataTable e of
     e' -> fail $ "lookupCType': " ++ show (e,e')
 
 followAlias :: Monad m => DataTable -> E -> m E
+followAlias dataTable (EAp a b) = do
+    a' <- followAlias dataTable a
+    return (eAp a' b)
 followAlias dataTable (ELit (LitCons c ts e))
     | Just con <- jcon, Just [cn] <- jcn, conAlias ccon  = return ans where
         jcn@(~(Just [cn])) = conChildren con
@@ -256,6 +259,9 @@ followAlias dataTable (ELit (LitCons c ts e))
 followAlias _ e = fail "followAlias: not an alias"
 
 followAliases :: DataTable -> E -> E
+followAliases dataTable ap@EAp {} = case followAlias dataTable ap of
+    Just x -> followAliases dataTable x
+    Nothing -> ap
 followAliases dataTable (ELit (LitCons c ts e))
     | Just con <- jcon, Just [cn] <- jcn, conAlias ccon  = followAliases dataTable ans where
         jcn@(~(Just [cn])) = conChildren con
