@@ -165,7 +165,7 @@ litHead (LitCons s _ _) = LitCons s [] ()
 litBinds ((LitCons _ xs _) ) = xs
 litBinds _ = []
 
-patToLitEE (LitCons n [a,b] t) | t == eStar, n == tArrow = EPi (tVr 0 (EVar a)) (EVar b)
+patToLitEE (LitCons n [a,b] t) | t == eStar, n == tc_Arrow = EPi (tVr 0 (EVar a)) (EVar b)
 patToLitEE (LitCons n xs t) = ELit $ LitCons n (map EVar xs) t
 patToLitEE (LitInt x t) = ELit $ LitInt x t
 
@@ -334,6 +334,7 @@ toString x = toList x >>= mapM fromChar where
 
 tAbsurd k = ELit (LitCons tc_Absurd [] k)
 vWorld__ = ELit (LitCons dc_World__ [] tWorld__)
+tPtr t = ELit (LitCons tc_Ptr [t] eStar)
 
 dc_Addr = toName DataConstructor ("Jhc.Addr","Addr")
 dc_Char = toName DataConstructor ("Prelude","Char")
@@ -345,13 +346,12 @@ dc_Rational = toName DataConstructor ("Ratio",":%")
 dc_World__ = toName DataConstructor ("Jhc.IO","World__")
 tc_World__ = toName TypeConstructor ("Jhc.IO","World__")
 tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
-tc_Arrow = toName TypeConstructor ("Prelude","->")
+tc_Arrow = toName TypeConstructor ("Jhc@","->")
 tc_IOResult = toName TypeConstructor ("Jhc.IO","IOResult")
 tc_IO = toName TypeConstructor ("Jhc.IO", "IO")
 tc_List = toName TypeConstructor ("Prelude","[]")
+tc_Ptr = toName TypeConstructor ("Foreign.Ptr","Ptr")
 p_unsafeCoerce = primPrim "unsafeCoerce"
 p_integralCast = primPrim "integralCast"
-
-tArrow = tc_Arrow
 
 

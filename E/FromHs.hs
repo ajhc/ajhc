@@ -122,8 +122,8 @@ argTypes' :: E -> ([E],E)
 argTypes' e = let (x,y) = fromPi e in (map tvrType y,x)
 
 
-getMainFunction :: Monad m => Name -> (Map.Map Name (TVr,E)) -> m (Name,TVr,E)
-getMainFunction name ds = ans where
+getMainFunction :: Monad m => DataTable -> Name -> (Map.Map Name (TVr,E)) -> m (Name,TVr,E)
+getMainFunction dataTable name ds = ans where
     ans = do
         main <- findName name
         runMain <- findName (func_runMain nameFuncNames)
@@ -132,8 +132,10 @@ getMainFunction name ds = ans where
               | otherwise = case ioLike (getType maine) of
                 Just x ->  EAp (EAp (EVar runMain)  x ) maine
                 Nothing ->  EAp (EAp (EVar runExpr) ty) maine
-            theMain = (theMainName,theMainTvr,e)
-            theMainTvr =  tVr (nameToInt theMainName) (getType e)
+            ans' = eStrictLet (tvr { tvrIdent = 0, tvrType = (infertype dataTable be)}) be vUnit
+            be = eAp e vWorld__
+            theMain = (theMainName,theMainTvr,be)
+            theMainTvr =  tVr (nameToInt theMainName) (getType be)
             tvm@(TVr { tvrType =  ty}) =  main
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs ]
             (ty',xs) = fromPi ty
@@ -164,7 +166,7 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
         Identity (deftvr@(TVr { tvrType = ty}),_) = findName defaultName
         defaultName =  (toName Name.Val (defaultInstanceName n))
         valToPat' (ELit (LitCons x ts t)) = ELit $ LitCons x [ EVar (tVr ( j) (getType z)) | z <- ts | j <- [2,4 ..]]  t
-        valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ LitCons tArrow [ EVar (tVr ( j) (getType z)) | z <- [a,b] | j <- [2,4 ..]]  eStar
+        valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ LitCons tc_Arrow [ EVar (tVr ( j) (getType z)) | z <- [a,b] | j <- [2,4 ..]]  eStar
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
         as = [ rule  t | (_ :=> IsIn _ t ) <- snub (classInsts classRecord) ]
         rule t = emptyRule { ruleHead = methodVar, ruleArgs = [valToPat' (tipe t)], ruleBody = body, ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
@@ -200,7 +202,7 @@ createMethods dataTable classHierarchy funcs = return ans where
             calt e =  Alt (LitCons x [ tvr | ~(EVar tvr) <- vs ]  ct)  e
             (x,vs,ct) = case tipe t of
                 (ELit (LitCons x' vs' ct')) -> (x',vs',ct')
-                (EPi (TVr { tvrType = a}) b) -> (tArrow,[a,b],eStar)
+                (EPi (TVr { tvrType = a}) b) -> (tc_Arrow,[a,b],eStar)
                 e -> error $ "FromHs.createMethods: " ++ show e
     findName name = case Map.lookup name funcs of
         Nothing -> fail $ "Cannot find: " ++ show name

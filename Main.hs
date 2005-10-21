@@ -310,7 +310,7 @@ compileModEnv' stats ho = do
     wdump FD.Class $ do
         sequence_ [ print x >> printCheckName' dataTable y z |  (x,y,z) <- es']
     let es = Map.fromList [ (x,(y,z)) |  (x,y,z) <- es'] `mappend` hoEs ho
-    (_,main,mainv) <- getMainFunction mainFunc es
+    (_,main,mainv) <- getMainFunction dataTable mainFunc es
     let ds = ((main,mainv):Map.elems es)
     let ds' = reachable (newGraph ds (tvrIdent . fst) (\ (t,e) -> bindingFreeVars t e)) [tvrIdent main]
 

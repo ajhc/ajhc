@@ -88,7 +88,10 @@ inferType dataTable ds e = rfc e where
                 return nt
             x -> fail $ "App: " ++ render (tupled [ePretty x,ePretty a, ePretty b])
     fc (ELetRec vs e) = do
-        let ck (tv@(TVr { tvrType =  t}),e) = withContextDoc (hsep [text "Checking Let: ", parens (pprint tv),text  " = ", parens $ prettyE e ])  $  valid' nds t >>  fceq nds e t
+        let ck (tv@(TVr { tvrType =  t}),e) = withContextDoc (hsep [text "Checking Let: ", parens (pprint tv),text  " = ", parens $ prettyE e ])  $ do
+                when (getType t == eHash && not (isEPi t)) $ fail $ "Let binding unboxed value: " ++ show (tv,e)
+                valid' nds t
+                fceq nds e t
             nds = vs ++ ds
         mapM_ ck vs
         when (hasRepeatUnder (tvrNum . fst) vs) $ fail "Repeat Variable in ELetRec"

@@ -46,6 +46,7 @@ wrappable dataTable tvr e@ELam {} = ans where
     f e _ _ ts | any (isJust . fst) ts = return (Nothing ,e,reverse ts)
     f _ _ _ _ = fail "not workwrapable"
 
+
 wrappable _ _ _ = fail "Only lambdas are wrappable"
 
 workWrap dataTable tvr e = case workWrap' dataTable tvr e of
@@ -76,21 +77,25 @@ workWrap' dataTable tvr e | isJust res = ans where
         f ((Just (c,ts),t):rs) = eCase (EVar t) [Alt (LitCons (conName c) ts (getType t)) (f rs)] Unknown
     ans = return ((setProperty prop_WRAPPER tvr,wrapper),(setProperty prop_WORKER tvr',worker))
     tvr' = TVr { tvrIdent = workerName (tvrIdent tvr), tvrInfo = mempty, tvrType = wt }
-    worker = foldr ELam body' args' where
+    worker = foldr ELam body' (args' ++ navar) where
         body' = eLetRec lets $ case cname of
             Just cname -> eCase body [cb] Unknown where
                 cb = Alt (LitCons cname vars bodyTyp) (if isSingleton then EVar sv else (ELit $ unboxedTuple (map EVar vars)))
             Nothing -> body
     wrapper = foldr ELam ne args where
-        ne | Just cname <- cname, isSingleton = cases $ eStrictLet sv (foldl EAp (EVar tvr') (map EVar args'))  (ELit $ LitCons cname [EVar sv] bodyTyp)
-           | Just cname <- cname = let ca = Alt (unboxedTuple vars) (ELit $ LitCons cname (map EVar vars) bodyTyp) in  cases $ eCase (foldl EAp (EVar tvr') (map EVar args')) [ca] Unknown
-           | otherwise = cases $ (foldl EAp (EVar tvr') (map EVar args'))
+        workerCall = (foldl EAp (EVar tvr') (map EVar args' ++ navalue))
+        ne | Just cname <- cname, isSingleton = cases $ eStrictLet sv workerCall  (ELit $ LitCons cname [EVar sv] bodyTyp)
+           | Just cname <- cname = let ca = Alt (unboxedTuple vars) (ELit $ LitCons cname (map EVar vars) bodyTyp) in  cases $ eCase workerCall [ca] Unknown
+           | otherwise = cases $ workerCall
     vars@(~[sv]) = [  tVr i t | t <- slotTypes dataTable (fromJust cname) bodyTyp | i <- [2,4..] ]
     isSingleton = case vars of
         [v] -> getType (getType v) == eHash
         _ -> False
     Just wt = typecheck dataTable  worker
     Just bodyTyp = typecheck dataTable body
+    -- This is to add a dummy arg so workers arn't turned into updatable CAFs
+    needsArg =  all (isJust . fst) sargs && null (concat [ xs | (Just (_,xs),_) <- sargs])
+    (navar,navalue) = if needsArg then ([tvr { tvrType = ltTuple' []}],[eTuple' []]) else ([],[])
 workWrap' _dataTable tvr e = fail "not workWrapable"
 
 

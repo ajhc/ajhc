@@ -14,7 +14,6 @@ module Grin.Grin(
     partialTag,
     gEval,
     tagApply,
-    tagArrow,
     tagHole,
     Exp(..),
     Ty(..),
@@ -71,7 +70,6 @@ newtype TyEnv = TyEnv (Map.Map Atom ([Ty],Ty))
 
 
 tagApply = toAtom "Bap"
-tagArrow = toAtom "TPrelude.->"
 tagHole = toAtom "@hole"
 funcApply = toAtom "@apply"
 funcEval = toAtom "@eval"
@@ -230,6 +228,7 @@ props _ = error "props"
 
 
 type Builtin = [Val] -> IO Val
+
 
 partialTag :: Tag -> Int -> Tag
 partialTag v c = case fromAtom v of

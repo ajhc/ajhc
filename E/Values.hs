@@ -106,8 +106,11 @@ eCase e alts els = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), 
 -- | This takes care of types right away, it simplifies various other things to do it this way.
 eLet :: TVr -> E -> E -> E
 eLet TVr { tvrIdent = 0 } _ e' = e'
-eLet t@(TVr { tvrType =  ty}) e e' | sortStarLike ty && isAtomic e = subst t e e'
-eLet t@(TVr { tvrType =  ty}) e e' | sortStarLike ty = ELetRec [(t,e)] (typeSubst mempty (Map.singleton (tvrIdent t) e) e')
+eLet t@(TVr { tvrType =  ty}) e e'
+    | sortStarLike ty && isAtomic e = subst t e e'
+    | sortStarLike ty = ELetRec [(t,e)] (typeSubst mempty (Map.singleton (tvrIdent t) e) e')
+    | isUnboxed ty && isAtomic e = subst t e e'
+    | isUnboxed ty  = eStrictLet t e e'
 eLet t e e' = ELetRec [(t,e)] e'
 
 -- | strict version of let, evaluates argument before assigning it.
@@ -120,17 +123,21 @@ substLet ds e  = ans where
     tas = filter (sortStarLike . tvrType . fst) nas
     ans = eLetRec (as ++ nas) (typeSubst' (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- as]) (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas]) e)
 
+
 substLet' :: [(TVr,E)] -> E -> E
-substLet' ds e  = ans where
+substLet' ds' e  = ans where
+    (hh,ds) = partition (isUnboxed . tvrType . fst) ds'
     nas = filter ((/= 0) . tvrNum . fst) ds
     tas = filter (sortStarLike . tvrType . fst) nas
     ans = case (nas,tas) of
-        ([],_) -> e
-        (nas,[]) -> ELetRec nas e
+        ([],_) -> hhh hh $ e
+        (nas,[]) -> hhh hh $ ELetRec nas e
         _  -> let
                     f = typeSubst' mempty (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas])
                     nas' = [ (v,f e) | (v,e) <- nas]
-               in ELetRec nas' (f e)
+               in hhh hh $ ELetRec nas' (f e)
+    hhh [] e = e
+    hhh ((h,v):hh) e = eLet h v (hhh hh e)
 
 eLetRec = substLet'
 
@@ -143,7 +150,15 @@ whnfOrBot (ELit (LitCons _ xs _)) = all isAtomic xs
 whnfOrBot (EPi (TVr { tvrIdent =  j, tvrType =  x }) y) | not (j `Set.member` freeVars y) = isAtomic x && isAtomic y
 whnfOrBot e = isAtomic e
 
-safeToDup ec@ECase {} | EVar _ <- eCaseScrutinee ec = all safeToDup (caseBodies ec)
+-- Determine if a type represents an unboxed value
+isUnboxed :: E -> Bool
+isUnboxed e@EPi {} = False
+isUnboxed e = getType e == eHash
+
+safeToDup ec@ECase {}
+    | EVar _ <- eCaseScrutinee ec = all safeToDup (caseBodies ec)
+    | EPrim p _ _ <- eCaseScrutinee ec, aprimIsCheap p = all safeToDup (caseBodies ec)
+safeToDup (EPrim p _ _) = aprimIsCheap p
 safeToDup e = whnfOrBot e || isELam e || isEPi e
 
 
@@ -187,8 +202,6 @@ unsafeCoerceOpt e = (0,e,id)
 prim_integralCast e t = EPrim p_integralCast [e] t
 from_integralCast (EPrim (APrim (PrimPrim "integralCast") _) [e] t) = return (e,t)
 from_integralCast _ = fail "Not integralCast primitive"
-
-tPtr t = ELit (LitCons (toName TypeConstructor ("Foreign.Ptr","Ptr")) [t] eStar)
 
 instance HasProperties TVr where
     setProperty prop tvr = tvrInfo_u (setProperty prop) tvr

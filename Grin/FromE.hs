@@ -71,6 +71,14 @@ data CEnv = CEnv {
 
 dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ fromAtom n <+> hsep (map show as) <+> "::" <+> show t |  (n,(as,t)) <- Map.toList tt]
 
+tagArrow = convertName tc_Arrow
+
+convertName n = toAtom (t':s) where
+    (t,s) = fromName n
+    t' | t == TypeConstructor = 'T'
+       | t == DataConstructor = 'C'
+       | t == Val = 'f'
+       | otherwise = error $ "convertName: " ++ show (t,s)
 
 flattenScc xs = concatMap f xs where
     f (AcyclicSCC x) = [x]
@@ -129,7 +137,7 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
             ccafMap = Map.fromList [ (tvrNum v,e) |(v,_,e) <- cc]
             }
     ds <- mapM doCompile [ c | c@(v,_,_) <- cm, v `notElem` [x | (x,_,_) <- cc]]
-    (_,(Tup [] :-> theMain)) <- doCompile ((mt,[],EAp (EVar mt) vWorld__))
+    (_,(Tup [] :-> theMain)) <- doCompile ((mt,[],EVar mt))
 
     wdump FD.Progress $ do
         os <- onceMapToList errorOnce
@@ -139,10 +147,10 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
     te <- readIORef tyEnv
     fbaps <- readIORef funcBaps
     --sequence_ [ typecheck te c >>= when False . print . (,) a  | (a,_,c) <-  ds ]
-    let (main,as,rtype) = runIdentity $ Map.lookup (tvrNum mt) scMap
-        main' =  if not $ null as then  (Return $ NodeC (partialTag main (length as)) []) else App main [] rtype
-        tags = Set.toList $ ep $ Set.unions (freeVars (main',initCafs):[ freeVars e | (_,(_ :-> e)) <- ds ])
-        ep s = Set.fromList $ concatMap partialLadder $ Set.toList s
+    -- let (main,as,rtype) = runIdentity $ Map.lookup (tvrNum mt) scMap
+        -- main' =  if not $ null as then  (Return $ NodeC (partialTag main (length as)) []) else App main [] rtype
+        -- tags = Set.toList $ ep $ Set.unions (freeVars (main',initCafs):[ freeVars e | (_,(_ :-> e)) <- ds ])
+    let ep s = Set.fromList $ concatMap partialLadder $ Set.toList s
         --ev = (funcEval,(Tup [p1] :-> createEval te tags))
         --ap = (funcApply,(createApply te tags))
         cafs = [ ((V $ - atomIndex tag),NodeC tag []) | (x,(Tup [] :-> _)) <- ds, let tag = partialTag x 0 ] ++ [ (y,z') |(x,y,z) <- cc, y `elem` reqcc, let Const z' = z ]
@@ -174,16 +182,10 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode))
 
 
-convertName n = toAtom (t':s) where
-    (t,s) = fromName n
-    t' | t == TypeConstructor = 'T'
-       | t == DataConstructor = 'C'
-       | t == Val = 'f'
-       | otherwise = error $ "convertName: " ++ show (t,s)
 
 primTyEnv = TyEnv . Map.fromList $ [
     (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode)),
-    (toAtom "TAbsurd#", ([],TyNode)),
+    (convertName tc_Absurd, ([],TyNode)),
     (funcInitCafs, ([],tyUnit)),
     (funcEval, ([TyPtr TyNode],TyNode)),
     (funcApply, ([TyNode, TyPtr TyNode],TyNode)),
