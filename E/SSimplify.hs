@@ -42,7 +42,7 @@ data Occurance =
     | OnceInLam   -- ^ used once inside a lambda
     | ManyBranch  -- ^ used once in several branches
     | Many        -- ^ used many or an unknown number of times
-    | LoopBreaker -- ^ chosen as a loopbreaker
+    | LoopBreaker -- ^ chosen as a loopbreaker, never inline
     deriving(Show,Eq,Ord,Typeable)
 
 
@@ -261,10 +261,11 @@ simplifyDs sopts dsIn = (stat,dsOut) where
             z (t,e) = do
                 t' <- nname t sub inb
                 case Info.lookup (tvrInfo t) of
-                    _ | forceNoinline t -> return (tvrNum t,Many,t',e)
+                    _ | forceNoinline t -> return (tvrNum t,LoopBreaker,t',e)
                     Just Once -> return (tvrNum t,Once,error $ "Once: " ++ show t,e)
                     Just n -> return (tvrNum t,n,t',e)
-                    Nothing -> return (tvrNum t,Many,t',e)
+                    -- We don't want to inline things we don't have occurance info for because they might lead to an infinite loop. hopefully the next pass will fix it.
+                    Nothing -> return (tvrNum t,LoopBreaker,t',e)
                     -- Nothing -> error $ "No Occurance info for " ++ show t
             w ((t,Once,t',e):rs) sub inb ds = do
                 mtick $ "E.Simplify.inline.Once.{" ++ showName t ++ "}"
