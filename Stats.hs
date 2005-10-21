@@ -1,4 +1,4 @@
-module Stats(Stats,new,tick,ticks,getTicks,Stats.print,clear,MonadStats(..),combine, printStat, Stat, mtick, mticks, runStatT, runStatIO, tickStat, StatT, theStats ) where
+module Stats(Stats,new,tick,setPrintStats,ticks,getTicks,Stats.print,clear,MonadStats(..),combine, printStat, Stat, mtick, mticks, runStatT, runStatIO, tickStat, StatT, theStats ) where
 
 
 import Char
@@ -28,7 +28,12 @@ data Stats = Stats !(IORef Int) !(H.HashTable Atom Int)
 theStats :: Stats
 theStats = unsafePerformIO new
 
+{-# NOINLINE printStats #-}
+printStats :: IORef Bool
+printStats = unsafePerformIO $ newIORef False
 
+setPrintStats :: Bool -> IO ()
+setPrintStats b = writeIORef printStats b
 
 combine :: Stats -> Stats -> IO ()
 combine stats (Stats _ h2) = do
@@ -116,7 +121,11 @@ runStatIO stats action = do
     return a
 
 instance MonadStats IO where
-    mticks' n a = ticks theStats n a
+    mticks' 0 _ = return ()
+    mticks' n a = do
+        p <- readIORef printStats
+        when p (CharIO.putStrLn $ (show a ++ ": " ++ show n))
+        ticks theStats n a
 
 -- Pure varients
 
