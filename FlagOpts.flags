@@ -12,6 +12,7 @@ type-analysis perhaps a basic points-to analysis on types right after method gen
 lint perform lots of extra type checks
 cpp pass code through cpp
 boehm use Boehm garbage collector
+profile embed profiling code
 
 
 !Default settings

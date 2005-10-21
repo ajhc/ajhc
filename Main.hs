@@ -351,6 +351,10 @@ compileModEnv' stats ho = do
     lc <- return $ runIdentity $ annotate mempty (idann rules (hoProps ho) ) letann lamann lc
     lc <- opt "SuperSimplify" cm lc
 
+
+    --let flLevels = annotateBindings mempty lc
+    --print flLevels
+    --printCheckName dataTable lc
     lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lc
     lc <- annotate mempty (\_ nfo -> return $ Info.delete (mempty :: ARules) nfo) (\_ -> return) (\_ -> return) lc
     let cm stats e = do
@@ -447,7 +451,9 @@ compileModEnv' stats ho = do
         writeFile cf $ cg -- toUTF8  (prettyC z ++ concatMap (\(i,n) -> "//" ++ 'v':show i ++ " -> " ++ n ++ "\n") (snd us))
         let boehmOpts | fopts FO.Boehm = ["-DUSE_BOEHM_GC", "-lgc"]
                       | otherwise = []
-        let comm = shellQuote $ [optCC options, "-std=gnu99", "-foptimize-sibling-calls", "-O", {- "-funit-at-a-time", -} "-g", "-Wall", "-o", fn, cf ] ++ rls ++ optCCargs options  ++ boehmOpts
+        let profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE"]
+                      | otherwise = []
+        let comm = shellQuote $ [optCC options, "-std=gnu99", "-foptimize-sibling-calls", "-O", {- "-funit-at-a-time", -} "-g", "-Wall", "-o", fn, cf ] ++ rls ++ optCCargs options  ++ boehmOpts ++ profileOpts
         wdump FD.Progress $ putErrLn ("Running: " ++ comm)
         r <- System.system comm
         when (r /= System.ExitSuccess) $ fail "C code did not compile."

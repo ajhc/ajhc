@@ -39,6 +39,33 @@ static char *jhc_progname;
 
 static int jhc_stdrnd[2] A_UNUSED = { 1 , 1 };
 
+#ifdef _JHC_PROFILE
+static uintmax_t prof_memory_allocated;
+static uintmax_t prof_function_calls;
+static uintmax_t prof_case_statements;
+static uintmax_t prof_updates;
+
+#define malloc(n) ( prof_memory_allocated += (n), malloc( (n) ) )
+#define update_inc() prof_updates++
+#define function_inc() prof_function_calls++
+#define case_inc() prof_case_statements++
+#else
+#define update_inc()  do { } while(0)
+#define function_inc()  do { } while(0)
+#define case_inc()  do { } while(0)
+#endif
+
+
+
+static void
+jhc_print_profile(void) {
+#ifdef _JHC_PROFILE
+        wprintf(L"Memory Allocated: %llu\n", (long long)prof_memory_allocated);
+        wprintf(L"Function Calls:   %llu\n", (long long)prof_function_calls);
+        wprintf(L"Case Statements:  %llu\n", (long long)prof_case_statements);
+        wprintf(L"Updates:          %llu\n", (long long)prof_updates);
+#endif
+}
 
 int
 main(int argc, char *argv[])
@@ -48,14 +75,22 @@ main(int argc, char *argv[])
         jhc_progname = argv[0];
         setlocale(LC_ALL,"");
         XAmain();
+        jhc_print_profile();
         return 0;
+}
+
+static void A_NORETURN A_UNUSED
+jhc_exit(int n) {
+        jhc_print_profile();
+        exit(n);
 }
 
 static void  A_NORETURN A_UNUSED
 jhc_error(char *s) {
-    fputs(s,stderr);
-    fputs("\n",stderr);
-    exit(255);
+        fputs(s,stderr);
+        fputs("\n",stderr);
+        jhc_print_profile();
+        exit(255);
 }
 
 static void  A_NORETURN A_UNUSED

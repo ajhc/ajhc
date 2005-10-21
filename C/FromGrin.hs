@@ -76,8 +76,9 @@ cfunc te (n,Tup as :-> body) = do
         as' <- flip mapM as $ \ (Var v t) -> do
             t' <- toType t
             return (t',toVName v)
-        return $ cfunction { cFuncComments = show n, cFuncReturnType = fr, cFuncName = toTag n, cFuncArgs = as', cFuncBody = s  } where
+        return $ cfunction { cFuncComments = show n, cFuncReturnType = fr, cFuncName = toTag n, cFuncArgs = as', cFuncBody = finc:s  } where
     Identity (_,r) = findArgsType te n
+    finc = CSExpr (CEFunCall "function_inc" [])
 
 
 --cVal :: Val -> ReaderT Todo (CGen (State HcHash)) CExpr
@@ -133,6 +134,7 @@ cexp (Update v@Var {} (NodeC t as)) = do
     v' <- cVal v
     as' <- mapM cVal as
     let tmp' = CECast (toStructTP t) v'
+    statement (CSExpr $ CEFunCall "update_inc" [])
     statement (CSAssign  (CEIndirect tmp' "tag") (CEDoc (toTag t)) )
     as' <- mapM cVal as
     mapM_ statement [CSAssign  (CEIndirect tmp' ('a':show i)) a | a <- as' | i <- [1 ..] ]
@@ -142,6 +144,7 @@ cexp (Update v z) = do  -- TODO eliminate unknown updates
     v' <- cVal v
     z' <- cVal z
     let tag = CEIndirect z' "any.tag"
+    statement (CSExpr $ CEFunCall "update_inc" [])
     return $ CEFunCall "memcpy" [v',z',CEFunCall "jhc_sizeof" [tag]]
 cexp (Fetch v) = cVal v
 cexp (Store n@NodeC {}) = newNode n
@@ -321,7 +324,7 @@ cb (Case v@(Var _ t) ls) | t == TyNode = do
             as' <- mapM declVar as
             return $ (Just (toTag t), as' ++ ass ++ e')
     ls' <- mapM da ls
-    return [CSSwitch tag ls' ]
+    return [case_inc, CSSwitch tag ls' ]
 cb (Case v@(Var _ t) ls) = do
     v' <- cVal v
     v'' <- return (if t `elem` ptrs then CECast (CTypeBasic "uintptr_t") v' else v')
@@ -335,7 +338,7 @@ cb (Case v@(Var _ t) ls) = do
             return $ (Just (show i), e')
         da (Tup [x] :-> e) = da ( x :-> e )
     ls' <- mapM da ls
-    return [CSSwitch v'' ls' ]
+    return [case_inc, CSSwitch v'' ls' ]
 
 
 
@@ -348,11 +351,13 @@ cb e = do
         TodoNothing | e == CEDoc "" -> return ss
         TodoNothing -> return $ ss ++ [CSExpr e]
 
+case_inc = (CSExpr $ CEFunCall "case_inc" [])
 
 ptrs = [Ty $ toAtom "HsPtr", Ty $ toAtom "HsFunPtr"]
 
 include fn = text "#include <" <> text fn <> text ">"
 
+{-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
 compileGrin grin = (hsffi_h ++ jhc_rts_c ++ P.render ans ++ "\n", snub (reqLibraries req))  where
     tags = (tagHole,[]):sortUnder (show . fst) [ (t,runIdentity $ findArgs (grinTypeEnv grin) t) | t <- Set.toList $ freeVars (snds $ grinFunctions grin) `mappend` freeVars (snds $ grinCafs grin), tagIsTag t]

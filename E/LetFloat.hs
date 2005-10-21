@@ -192,7 +192,7 @@ annotateBindings min e = ans where
             scc = G.scc (G.newGraph ds' (tvrNum . fst) snd)
             g (Left (t,fv)) = tell (Map.singleton t (maximum $ 0:[Map.findWithDefault 0 (tVr v Unknown) ans | v <- fv]))
             g (Right ts) = do
-                let ln = maximum [Map.findWithDefault 0 (tVr v Unknown) ans | v <- (snub $ concat (snds ts))  List.\\ [ i | (TVr { tvrIdent = i },_) <- ts ] ]
+                let ln = maximum $ 0:[Map.findWithDefault 0 (tVr v Unknown) ans | v <- (snub $ concat (snds ts))  List.\\ [ i | (TVr { tvrIdent = i },_) <- ts ] ]
                 tell (Map.fromList [ (t,ln) | (t,_) <- ts])
         mapM_ g scc
         mapM_ (f n) (snds ds)
