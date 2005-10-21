@@ -3,17 +3,16 @@ front end
 middle end
 	enforce strict fields
 	|  strict fields that are RawTypes should be unboxed, otherwise a seq should be inserted.
-	IO actions too strict
-	|  they evaluate their arguments on IO action creating time rather than execution time. this inhibits CPR analysis
 	CPR enumerated values
+	full lazyness transformation
+	better strictness analyzer (HORN?)
+	use typeanalysis to prune class methods and instantiate polymorphic functions called monomorphically
+	collectOcc should annotate variables directly rather than returning a map
+	CPR should be performed recursivly on data types
 back end
 	grin
-		stronger typing
-		|  App and Prim should have types directly in the grin so we need not look
-		|  them up in the environment. ValPrim should too.
-		suspended errors should be constants, since they are never updated
-
+		remove dead arguments completly from functions
+		calculate appropriate size of heap values statically rather than using jhc_sizeof
 	codegen
-		primitives
-		|  a type should be assosiated with AddrOf
+		preserve mapping of c variables rather than declaring a ton of temporaries
 
