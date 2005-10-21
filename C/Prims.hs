@@ -29,6 +29,19 @@ data Prim =
     deriving(Typeable, Data, Eq, Ord, Show)
     {-! derive: GhcBinary !-}
 
+-- | These primitives may safely be duplicated without affecting performance or
+-- correctness too adversly. either because they are cheap to begin with, or
+-- will be recombined in a later pass.
+
+primIsCheap :: Prim -> Bool
+primIsCheap AddrOf {} = True
+primIsCheap CCast {} = True
+primIsCheap CConst {} = True
+primIsCheap Operator {} = True
+primIsCheap _ = False
+
+aprimIsCheap (APrim p _) = primIsCheap p
+
 parsePrimString s = do
     ws@(_:_) <- return $ words s
     let v = case last ws of
