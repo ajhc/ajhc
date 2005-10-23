@@ -15,7 +15,7 @@ import E.E
 import E.Values
 import FreeVars
 import GenUtil
-import NameMonad
+import Util.NameMonad
 import PrimitiveOperators
 import Stats
 

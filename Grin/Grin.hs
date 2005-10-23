@@ -56,7 +56,7 @@ import Doc.DocLike
 import FreeVars
 import GenUtil
 import Number
-import VConsts
+import Name.VConsts
 
 -- Extremely simple first order monadic code with basic type system.  similar
 -- to GRIN except for the explicit typing on variables. Note, that certain

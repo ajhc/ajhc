@@ -39,8 +39,9 @@ module FrontEnd.Desugar ( doToExp, desugarHsModule) where
 import Control.Monad.State
 import FrontEnd.Deriving
 import HsSyn
-import VConsts
-import Name()
+import Name.VConsts
+import Name.Name
+import Name.Names
 import GenUtil
 
 removeSynonymsFromType _ t = t
@@ -102,11 +103,11 @@ runPatSM = flip runState
 
 -- a new (unique) name introduced in pattern selector functions
 newPatVarName :: HsName
-newPatVarName = hsUnqualValName "patvar@0"
+newPatVarName = nameName $ toName Val "patvar@0"
 
 -- a new (unique) name introduced in expressions
 newVarName :: HsName
-newVarName = hsUnqualValName "var@0"
+newVarName = nameName $ toName Val  "var@0"
 
 remSynsSig :: HsDecl -> PatSM HsDecl
 remSynsSig sig
@@ -209,7 +210,7 @@ desugarDecl pb@(HsPatBind sloc (HsPVar n) rhs wheres) = do
 desugarDecl pb@(HsPatBind sloc pat rhs wheres) = do
     rhs <- desugarRhs rhs
     unique <- getUnique
-    let newRhsName = UnQual $ HsIdent $ "patrhs@" ++ show unique
+    let newRhsName = nameName $ toName Val ("patrhs@" ++ show unique)
     newWheres <- mapM desugarDecl wheres
     let newTopDeclForRhs
                = HsPatBind sloc (HsPVar newRhsName) rhs (concat newWheres)
@@ -261,8 +262,8 @@ createSelectors _sloc ds = ans where
         pat c i l = HsPApp c [ if p == i then HsPVar var else HsPWildCard | p <- [0 .. l - 1]]
         els = HsMatch _sloc n [HsPWildCard] (HsUnGuardedRhs (HsApp (HsVar err) (HsLit (HsString (show n))))) []
 
-    var = UnQual (HsIdent "x")
-    err = UnQual (HsIdent "error")
+    var = nameName $ toName Val "x"
+    err = nameName $ toUnqualified $ v_error
 
 
 
@@ -427,14 +428,14 @@ desugarExp (HsLambda sloc pats e) = z where
     ne e ((n,p):zs) =  do
         e' <- ne e zs
         let a1 =  HsAlt sloc p (HsUnGuardedAlt e') []
-            a2 =  HsAlt sloc HsPWildCard (HsUnGuardedAlt (HsApp (HsVar (UnQual $ HsIdent "error")) (HsLit $ HsString $ show sloc ++ " failed pattern match in lambda"))) []
+            a2 =  HsAlt sloc HsPWildCard (HsUnGuardedAlt (HsApp (HsVar (nameName $ toUnqualified v_error)) (HsLit $ HsString $ show sloc ++ " failed pattern match in lambda"))) []
         return $ HsCase (HsVar n) [a1, a2 ]
 
     f (HsPVar x) = return (x,[])
     f (HsPAsPat n p) = return (n,[(n,p)])
     f p = do
         unique <- getUnique
-        let n = UnQual $ HsIdent $ "lambind@" ++ show unique
+        let n = nameName $ toName Val ("lambind@" ++ show unique)
         return (n,[(n,p)])
 
 
@@ -487,7 +488,7 @@ desugarExp (HsLeftSection e1 e2)
 desugarExp (HsRightSection e1 e2) = do
         newE1 <- desugarExp e1
         newE2 <- desugarExp e2
-        let nv = (hsUnqualValName "rsection@")
+        let nv = (nameName $ toName Val "rsection@")
         return (HsLambda bogusASrcLoc [HsPVar nv ] (HsApp (HsRightSection newE1 newE2) (HsVar nv)))
 
 desugarExp (HsRecConstr n fus) = do
@@ -637,6 +638,11 @@ remSynsQualType qualtype
 
 doToExp :: [HsStmt] -> HsExp
 
+f_bind = nameName $ toUnqualified (func_bind sFuncNames)
+f_bind_ = nameName $ toUnqualified (func_bind_ sFuncNames)
+f_concatMap = nameName $ toUnqualified v_concatMap
+f_fail = nameName $ toUnqualified v_fail
+
 doToExp [] = error "doToExp: empty statements in do notation"
 doToExp [HsQualifier e] = e
 doToExp [gen@(HsGenerator srcLoc _pat _e)]
@@ -644,13 +650,13 @@ doToExp [gen@(HsGenerator srcLoc _pat _e)]
 doToExp [letst@(HsLetStmt _decls)]
    = error $ "doToExp: last expression n do notation is a let statement"
 doToExp ((HsQualifier e):ss)
-   = HsInfixApp (hsParen e) (HsVar (hsUnqualValName ">>")) (hsParen $ doToExp ss)
+   = HsInfixApp (hsParen e) (HsVar f_bind_) (hsParen $ doToExp ss)
 doToExp ((HsGenerator _srcLoc pat@(HsPVar {}) e):ss)
-   = HsInfixApp (hsParen e) (HsVar (hsUnqualValName ">>=")) (HsLambda _srcLoc [pat] (doToExp ss))
-doToExp ((HsGenerator srcLoc pat e):ss) = HsInfixApp (hsParen e) (HsVar (hsUnqualValName ">>=")) (HsLambda srcLoc [HsPVar newPatVarName] kase)  where
+   = HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda _srcLoc [pat] (doToExp ss))
+doToExp ((HsGenerator srcLoc pat e):ss) = HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda srcLoc [HsPVar newPatVarName] kase)  where
    kase = HsCase (HsVar newPatVarName) [a1, a2 ]
    a1 =  HsAlt srcLoc pat (HsUnGuardedAlt (doToExp ss)) []
-   a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedAlt (HsApp (HsVar (hsUnqualValName "fail")) (HsLit $ HsString $ show srcLoc ++ " failed pattern match in do"))) []
+   a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedAlt (HsApp (HsVar f_fail) (HsLit $ HsString $ show srcLoc ++ " failed pattern match in do"))) []
 doToExp ((HsLetStmt decls):ss)
    = HsLet decls (doToExp ss)
 
@@ -659,7 +665,7 @@ listCompToExp exp ss = hsParen (f ss) where
     f [] = HsList [exp]
     f ((HsLetStmt ds):ss) = hsParen (HsLet ds (f ss))
     f (HsQualifier e:ss) = hsParen (HsIf e (f ss) (HsList []))
-    f ((HsGenerator srcLoc pat e):ss) = hsParen $ HsApp (HsApp (HsVar (hsUnqualValName "concatMap"))  (hsParen $ HsLambda srcLoc [HsPVar newPatVarName] kase)) e where
+    f ((HsGenerator srcLoc pat e):ss) = hsParen $ HsApp (HsApp (HsVar f_concatMap)  (hsParen $ HsLambda srcLoc [HsPVar newPatVarName] kase)) e where
         kase = HsCase (HsVar newPatVarName) [a1, a2 ]
         a1 =  HsAlt srcLoc pat (HsUnGuardedAlt (f ss)) []
         a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedAlt $ HsList []) []

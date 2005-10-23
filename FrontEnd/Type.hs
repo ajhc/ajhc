@@ -50,7 +50,7 @@ import qualified Data.Map as Map
 
 import HsSyn   (HsName (..))
 import Representation
-import VConsts
+import Name.VConsts
 import Data.IORef
 
 

@@ -47,7 +47,7 @@ import Grin.Whiz
 import Ho
 import HsSyn
 import Info.Types
-import Name
+import Name.Name
 import Options
 import qualified E.CPR
 import qualified E.SSimplify as SS

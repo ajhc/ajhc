@@ -7,7 +7,7 @@ import qualified Data.Set as Set
 import System.IO
 import Test.QuickCheck
 
-import ArbitraryInstances()
+import Util.ArbitraryInstances()
 import Atom
 import Binary
 import Boolean.TestCases
@@ -18,7 +18,8 @@ import HsSyn
 import Info.Binary()
 import Info.Info as Info
 import Info.Types
-import Name
+import Name.Name
+import Name.Names
 import PackedString
 import Util.HasSize
 

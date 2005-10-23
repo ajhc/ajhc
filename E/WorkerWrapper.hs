@@ -17,7 +17,7 @@ import E.Values
 import GenUtil
 import Info.Info as Info
 import Info.Types
-import Name
+import Name.Name
 import qualified Stats
 
 

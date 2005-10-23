@@ -6,7 +6,7 @@ import Doc.PPrint
 import Doc.DocLike
 import Atom
 import Char
-import VConsts
+import Name.VConsts
 import Grin.Val
 import Number
 import Monad

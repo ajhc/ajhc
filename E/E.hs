@@ -9,8 +9,9 @@ import Data.FunctorM
 import Maybe
 import List
 import Doc.DocLike
-import VConsts
-import Name
+import Name.VConsts
+import Name.Name
+import Name.Names
 import Binary
 import Atom
 import C.Prims
@@ -336,22 +337,7 @@ tAbsurd k = ELit (LitCons tc_Absurd [] k)
 vWorld__ = ELit (LitCons dc_World__ [] tWorld__)
 tPtr t = ELit (LitCons tc_Ptr [t] eStar)
 
-dc_Addr = toName DataConstructor ("Jhc.Addr","Addr")
-dc_Char = toName DataConstructor ("Prelude","Char")
-dc_EmptyList = toName DataConstructor ("Prelude","[]")
-dc_Integer = toName DataConstructor ("Prelude","Integer")
-dc_Int = toName DataConstructor ("Prelude","Int")
-dc_JustIO = toName DataConstructor ("Jhc.IO", "JustIO")
-dc_Rational = toName DataConstructor ("Ratio",":%")
-dc_World__ = toName DataConstructor ("Jhc.IO","World__")
-tc_World__ = toName TypeConstructor ("Jhc.IO","World__")
-tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
-tc_Arrow = toName TypeConstructor ("Jhc@","->")
-tc_IOResult = toName TypeConstructor ("Jhc.IO","IOResult")
-tc_IO = toName TypeConstructor ("Jhc.IO", "IO")
-tc_List = toName TypeConstructor ("Prelude","[]")
-tc_Ptr = toName TypeConstructor ("Foreign.Ptr","Ptr")
+
 p_unsafeCoerce = primPrim "unsafeCoerce"
 p_integralCast = primPrim "integralCast"
-
 

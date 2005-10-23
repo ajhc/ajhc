@@ -29,17 +29,18 @@ import FreeVars
 import GenUtil
 import HsSyn
 import Info.Types
-import Name
-import NameMonad
+import Name.Name as Name
+import Name.Names
+import Util.NameMonad
 import Options
 import qualified FlagOpts as FO
 import qualified Util.Seq as Seq
 import Representation
 import Utils
-import VConsts
+import Name.VConsts
 
 localVars = [10,12..]
-theMainName = toName Name.Val (UnQual $ HsIdent "theMain")
+theMainName = toName Name.Val "theMain"
 ump sl e = EError  (srcLocShow sl ++ ": Unmatched pattern") e
 srcLocShow sl = concat [srcLocFileName sl, ":",show $ srcLocLine sl,":", show $ srcLocColumn sl ]
 nameToInt n = atomIndex $ toAtom n
@@ -82,8 +83,8 @@ simplifyHsPat (HsPLit (HsString s)) = simplifyHsPat (HsPList (map f s)) where
 simplifyHsPat (HsPAsPat n p) = HsPAsPat n (simplifyHsPat p)
 simplifyHsPat (HsPTypeSig _ p _) = simplifyHsPat p
 simplifyHsPat (HsPList ps) = pl ps where
-    pl [] = HsPApp (Qual prelude_mod (HsIdent "[]")) []
-    pl (p:xs) = HsPApp (Qual prelude_mod (HsIdent ":")) [simplifyHsPat p, pl xs]
+    pl [] = HsPApp (nameName $ dc_EmptyList) []
+    pl (p:xs) = HsPApp (nameName $ dc_Cons) [simplifyHsPat p, pl xs]
 simplifyHsPat (HsPApp n xs) = HsPApp n (map simplifyHsPat xs)
 simplifyHsPat (HsPIrrPat p) = simplifyHsPat p -- TODO irrefutable patterns!
 simplifyHsPat p@HsPVar {} = p
@@ -103,7 +104,6 @@ convertOneVal (Forall _ (_ :=> t)) = (mp EPi ts (tipe t)) where
     ts = ctgen t
     lt n =  nameToInt (fromTypishHsName  n)
 
-Identity nameFuncNames = fmapM (return . toName Val) sFuncNames
 toTVr assumps n = tVr ( nameToInt n) (typeOfName n) where
     typeOfName n = fst $ convertVal assumps n
 
@@ -126,8 +126,8 @@ getMainFunction :: Monad m => DataTable -> Name -> (Map.Map Name (TVr,E)) -> m (
 getMainFunction dataTable name ds = ans where
     ans = do
         main <- findName name
-        runMain <- findName (func_runMain nameFuncNames)
-        runExpr <- findName (func_runExpr nameFuncNames)
+        runMain <- findName (func_runMain sFuncNames)
+        runExpr <- findName (func_runExpr sFuncNames)
         let e | not (fopts FO.Wrapper) = maine
               | otherwise = case ioLike (getType maine) of
                 Just x ->  EAp (EAp (EVar runMain)  x ) maine
@@ -235,7 +235,7 @@ createFunc dataTable ns es ee = foldr ELam eee tvrs where
 convertDecls :: Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
 convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ concatMap cDecl hsDecls) where
     doNegate e = eAp (eAp (func_negate funcs) (getType e)) e
-    Identity funcs = fmapM (return . EVar . toTVr assumps) nameFuncNames
+    Identity funcs = fmapM (return . EVar . toTVr assumps) sFuncNames
     anninst (a,b,c)
         | "Instance@" `isPrefixOf` show a = (a,setProperty prop_INSTANCE b, c)
         | otherwise = (a,b,c)

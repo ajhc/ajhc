@@ -21,7 +21,6 @@ module E.Rules(
 import Data.Typeable
 import Data.Monoid
 import Monad(liftM)
-import qualified Data.IntMap as IM
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -35,7 +34,8 @@ import FreeVars
 import GenUtil
 import Util.HasSize
 import MapBinaryInstance()
-import Name
+import Name.Name
+import Name.Names
 import Stats
 
 
@@ -176,7 +176,7 @@ applyRules (ARules rs) xs = f rs where
     f (_:rs) = f rs
 
 
-preludeError = nameValue "Prelude" "error"
+preludeError = toId v_error
 ruleError = toAtom "Rule.error/EError"
 
 hasBuiltinRule TVr { tvrIdent = n } = n `Set.member` Set.fromList [preludeError]

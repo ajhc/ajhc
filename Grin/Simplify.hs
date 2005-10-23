@@ -13,7 +13,7 @@ import CanType
 import FreeVars
 import Grin.Grin
 import Grin.Whiz
-import MonoidUtil()
+import Util.Inst()
 import Stats
 
 -- perform a number of simple simplifications.

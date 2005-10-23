@@ -18,7 +18,7 @@ import E.E hiding(isBottom)
 import E.TypeCheck
 import Fixer
 import GenUtil
-import Name
+import Name.Name
 import qualified Info.Info as Info
 
 

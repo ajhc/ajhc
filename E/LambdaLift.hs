@@ -17,9 +17,9 @@ import E.TypeCheck
 import E.Values
 import FreeVars
 import GenUtil
-import Name
+import Name.Name
 import Stats
-import UniqueMonad
+import Util.UniqueMonad
 import Util.Graph as G
 
 

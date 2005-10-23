@@ -18,8 +18,8 @@ import E.TypeCheck
 import E.Values
 import FreeVars
 import GenUtil
-import Name
-import NameMonad
+import Name.Name
+import Util.NameMonad
 
 -- Generic traversal routines rock.
 

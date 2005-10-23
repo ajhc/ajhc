@@ -23,9 +23,10 @@ import GenUtil
 import Ho
 import HsSyn
 import KindInfer
-import MonoidUtil
+import Util.Inst()
+import Util.Gen
 import MultiModuleBasics
-import Name
+import Name.Name as Name
 import Options
 import qualified FlagDump as FD
 import qualified HsPretty

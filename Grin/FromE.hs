@@ -28,7 +28,9 @@ import GenUtil
 import Grin.Grin
 import Grin.Show
 import Grin.Val
-import Name
+import Name.Name
+import Name.Names
+import Name.VConsts
 import Options
 import PrimitiveOperators
 import qualified FlagDump as FD
@@ -36,7 +38,6 @@ import qualified Stats
 import Stats(mtick)
 import Util.Graph as G
 import Util.Once
-import VConsts
 
 
 

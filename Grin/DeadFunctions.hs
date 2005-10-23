@@ -17,7 +17,7 @@ import FreeVars
 import GenUtil hiding(replicateM_)
 import Grin.Grin
 import Grin.Whiz
-import MonoidUtil()
+import Util.Inst()
 import Stats
 import Util.Seq as Seq
 

@@ -22,7 +22,7 @@ module MultiModuleBasics where
 import HsSyn
 import qualified Data.Map as M
 import Options
-import Name
+import Name.Name
 import FrontEnd.Infix
 
 --------------------------------------------------------------------------------

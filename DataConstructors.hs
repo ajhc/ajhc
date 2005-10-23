@@ -18,7 +18,6 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Map as Map hiding(map)
 import List(sortBy)
-import qualified Data.IntMap as IM
 
 import Binary
 import Doc.DocLike
@@ -30,13 +29,14 @@ import E.Subst
 import GenUtil
 import HsSyn
 import MapBinaryInstance()
-import Name
+import Name.Name as Name
+import Name.Names
 import PrimitiveOperators
 import qualified Util.Seq as Seq
 import Representation
 import Util.HasSize
 import Util.SameShape
-import VConsts
+import Name.VConsts
 
 
 tipe (TAp t1 t2) = eAp (tipe t1) (tipe t2)

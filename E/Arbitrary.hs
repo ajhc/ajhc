@@ -13,7 +13,7 @@ import E.Pretty
 import Data.Monoid
 import GenUtil
 import FreeVars
-import VConsts
+import Name.VConsts
 import CanType
 import CharIO
 

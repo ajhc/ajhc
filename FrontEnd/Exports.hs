@@ -13,7 +13,7 @@ import HsSyn
 import List
 import Maybe
 import MultiModuleBasics
-import Name
+import Name.Name as Name
 import Options
 import Prelude hiding (putStr,putStrLn)
 import qualified Data.Map as Map

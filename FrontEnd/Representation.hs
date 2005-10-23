@@ -34,21 +34,24 @@ module Representation(
     )where
 
 
+import Control.Monad.Trans
+import Data.Generics
+import Data.IORef
+import qualified Data.Map as Map
+import Text.PrettyPrint.HughesPJ(nest,Doc)
+
 import Atom
 import Binary
-import Data.Generics
 import Doc.DocLike
 import Doc.PPrint(pprint,PPrint)
 import HsSyn
+import Name.Name
+import Name.Names
+import Name.VConsts
 import Options
-import qualified Data.Map as Map
 import qualified Doc.DocLike as D
 import qualified FlagDump as FD
-import Text.PrettyPrint.HughesPJ(nest,Doc)
-import Control.Monad.Trans
 import Utils
-import VConsts
-import Data.IORef
 
 
 --------------------------------------------------------------------------------
@@ -65,12 +68,12 @@ data Type  = TVar {-# UNPACK #-} !Tyvar
     {-! derive: GhcBinary !-}
 
 instance TypeNames Type where
-    tBool = TCon (Tycon (Qual (Module "Prelude") (HsIdent "Bool")) Star)
+    tBool = TCon (Tycon (nameName tc_Bool) Star)
     tString = TAp tList tChar
-    tChar      = TCon (Tycon (Qual (Module "Prelude") (HsIdent "Char")) Star)
-    tUnit = TCon (Tycon (Qual (Module "Prelude") (HsIdent "()")) Star)
+    tChar      = TCon (Tycon (nameName tc_Char) Star)
+    tUnit = TCon (Tycon (nameName tc_Unit) Star)
 
-tList = TCon (Tycon (Qual (Module "Prelude") (HsIdent "[]")) (Kfun Star Star))
+tList = TCon (Tycon (nameName tc_List) (Kfun Star Star))
 
 instance Eq Type where
     (TVar a) == (TVar b) = a == b
@@ -357,7 +360,7 @@ type Subst = Map.Map Tyvar Type
 
 getTypeCons (TCon (Tycon n _)) = n
 getTypeCons (TAp a _) = getTypeCons a
-getTypeCons (TArrow {}) = Qual (Module "Prelude") $ HsIdent "->"
+getTypeCons (TArrow {}) = nameName tc_Arrow
 getTypeCons x = error $ "getTypeCons: " ++ show x
 
 -- schemes

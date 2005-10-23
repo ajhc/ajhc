@@ -1,4 +1,4 @@
-module UniqueMonad(UniqT,Uniq, runUniq, runUniqT, execUniq1, execUniq, execUniqT) where
+module Util.UniqueMonad(UniqT,Uniq, runUniq, runUniqT, execUniq1, execUniq, execUniqT) where
 
 
 import GenUtil

@@ -8,8 +8,8 @@ import Monad
 import Prelude hiding((&&),(||),not,and,or,any,all)
 import qualified Data.Map as Map
 
-import Boolean.Algebra
 import Binary
+import Boolean.Algebra
 import C.Prims
 import E.Annotate
 import E.E
@@ -17,7 +17,7 @@ import E.Inline
 import FindFixpoint
 import GenUtil
 import Info.Info as Info
-import MonoidUtil()
+import Util.Inst()
 
 
 newtype Var = V Int

@@ -7,7 +7,7 @@ module HsErrors where
 import Class
 import HsSyn
 import Monad
-import VConsts
+import Name.VConsts
 import Warning
 
 

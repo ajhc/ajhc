@@ -3,7 +3,7 @@ module Grin.Val(FromVal(..),ToVal(..),cChar,cInt,tn_2Tup,world__,pworld__) where
 import Grin.Grin
 import Atom
 import Char
-import VConsts
+import Name.VConsts
 import Number
 
 nil = (toAtom "CPrelude.[]")

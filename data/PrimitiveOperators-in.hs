@@ -10,9 +10,10 @@ import C.Prims
 import E.E
 import E.TypeCheck()
 import E.Values
-import Name
+import Name.Name
+import Name.Names
 import Representation
-import VConsts
+import Name.VConsts
 
 
 ctypeMap = Map.fromList [ (parseName TypeConstructor n,v) | (n,v,_) <- allCTypes ]

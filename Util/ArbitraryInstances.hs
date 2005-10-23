@@ -1,4 +1,4 @@
-module ArbitraryInstances() where
+module Util.ArbitraryInstances() where
 
 import Test.QuickCheck
 import Monad

@@ -20,8 +20,9 @@ import Char
 import Control.Monad.Identity
 import Doc.DocLike
 import Doc.PPrint
-import VConsts
-import Name()
+import Name.VConsts
+import Name.Names
+import Name.Name
 import qualified Data.Map as Map
 
 
@@ -102,7 +103,7 @@ nameSupply
 nameOfTyCon :: HsType -> HsName
 nameOfTyCon (HsTyCon n) = n
 nameOfTyCon (HsTyTuple xs) = toTuple (length xs)
-nameOfTyCon (HsTyFun _ _) = hsTypName ("Prelude","->")
+nameOfTyCon (HsTyFun _ _) = nameName tc_Arrow
 nameOfTyCon t = error $ "nameOfTyCon: " ++ show t
 
 groupEquations :: [HsDecl] -> [(HsName, HsDecl)]

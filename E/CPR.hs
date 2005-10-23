@@ -12,7 +12,8 @@ import Doc.DocLike
 import E.E
 import E.FreeVars
 import GenUtil
-import Name
+import Name.Name
+import Name.Names
 import qualified Doc.Chars as C
 import qualified Info.Info as Info
 

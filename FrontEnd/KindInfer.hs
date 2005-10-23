@@ -23,7 +23,7 @@ import System.IO.Unsafe
 
 import DependAnalysis
 import HsSyn
-import MonadUtil
+import Util.ContextMonad
 import qualified Util.Seq as Seq
 import Representation hiding (Subst)
 import Type(quantify,tv,tTTuple)

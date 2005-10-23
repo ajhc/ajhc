@@ -1,4 +1,4 @@
-module MonadUtil where
+module Util.ContextMonad where
 
 import Control.Monad.Error
 import Control.Monad.Identity
@@ -8,8 +8,6 @@ import Control.Monad
 class Monad m => ContextMonad c m | m -> c where
     withContext :: c -> m a -> m a
 
---class Monad m => UniqueProducerMonad m where
---    newUniq :: m Int
 
 instance Error [String] where
     noMsg = []
@@ -25,8 +23,4 @@ runSimpleContextMonad :: Either [String] a -> a
 runSimpleContextMonad (Left ss) = error $ unlines ss
 runSimpleContextMonad (Right x) = x
 
-
-
-instance Show a => Show (Identity a) where
-    show x = show $ runIdentity x
 

@@ -51,30 +51,31 @@ module Class(
     topDefaults
     ) where
 
-import Binary
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Generics
 import Data.Monoid
+import List((\\), partition)
+import qualified Data.Map as Map
+import Text.PrettyPrint.HughesPJ as PPrint
+
+import Binary
 import Doc.PPrint
-import GenUtil(concatInter)
-import GenUtil(snub)
-import Util.HasSize
+import GenUtil(snub,concatInter)
 import HsSyn
 import KindInfer
-import List((\\), partition)
 import MapBinaryInstance()
 import Maybe
 import Monad
-import MonoidUtil
-import Name
-import qualified Data.Map as Map
+import Name.Name
+import Name.Names
+import Name.VConsts
 import Representation
-import Text.PrettyPrint.HughesPJ as PPrint
 import Type
 import TypeUtils
+import Util.HasSize
+import Util.Inst()
 import Utils
-import VConsts
 
 --------------------------------------------------------------------------------
 
@@ -479,8 +480,8 @@ deriveableClasses = ["Eq", "Ord", "Enum", "Bounded", "Show", "Read"]
 makeDerivation kt ch name args cs ds = ([],[])
 makeDerivation kt ch name args cs ds = ([],concatMap f ds) where
     f n
-        | n == classEnum = [cia  (hsValName ("Prelude","toEnum")), cia $ hsValName ("Prelude","fromEnum")]
-        | n == classBounded = [cia  (hsValName ("Prelude","minBound")), cia $ hsValName ("Prelude","maxBound")]
+        | n == classEnum = [cia  (nameName v_toEnum), cia $ nameName (v_fromEnum)]
+        | n == classBounded = [cia  (nameName v_minBound), cia $ nameName v_maxBound]
         | otherwise = error "cannot derive"
         where
         cia = createInstanceAssump kt methodSigs [] n arg
@@ -509,8 +510,8 @@ instanceToTopDecls _ _ _ = mempty
 
 getHsTypeCons (HsTyCon n) = n
 getHsTypeCons (HsTyApp a _) = getHsTypeCons a
-getHsTypeCons (HsTyFun {}) = Qual (Module "Prelude") $ HsIdent "->"
-getHsTypeCons (HsTyTuple xs) = Qual (Module "Prelude") $ HsIdent ("(" ++ replicate (length xs - 1) ',' ++ ")")
+getHsTypeCons (HsTyFun {}) = nameName (tc_Arrow)
+getHsTypeCons (HsTyTuple xs) = nameName $ toTuple (length xs)
 getHsTypeCons x = error $ "getHsTypeCons: " ++ show x
 
 
@@ -716,8 +717,8 @@ topDefaults h ps
           vs  = [ v  | (v,qs,ts) <- ams ]
 
 defaults    :: [Type]
-defaults     = map (\name -> TCon (Tycon (Qual (Module "Prelude") (HsIdent name)) Star))
-                   ["Integer", "Double"]
+defaults     = map (\name -> TCon (Tycon (nameName name) Star))
+                   [tc_Integer, tc_Double]
 
 
 

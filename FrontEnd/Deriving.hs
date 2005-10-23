@@ -2,28 +2,32 @@ module FrontEnd.Deriving(deriveInstances) where
 
 import HsSyn
 import Class
-import VConsts
-import Name
+import Name.VConsts
+import Name.Name
+import Name.Names
 
 
-vars = [ UnQual (HsIdent ('d':show v ++ "_derive@") ) |  v <- [1::Int ..]]
 
 deriveInstances :: Monad m => SrcLoc -> HsName -> [HsName] -> [HsConDecl] -> [HsName] -> m [HsDecl]
 deriveInstances sloc name args cons ds = return []
+
+{-
+vars = [ UnQual (HsIdent ('d':show v ++ "_derive@") ) |  v <- [1::Int ..]]
 deriveInstances sloc name args cons ds = return $ concatMap f ds where
     f n
-        | n == hsUnqualValName "Bounded" = [inst n (mkBounded cons)]
-        | n == hsUnqualValName "Enum" = [inst n (mkEnum cons)]
+        | show n == hs "Bounded" = [inst n (mkBounded cons)]
+        | show n ==  "Enum" = [inst n (mkEnum cons)]
         | otherwise = error $ "unknown deriving: " ++ show n
     inst n ds = HsInstDecl sloc (HsQualType [] (HsTyApp (HsTyCon n) tipe))  ds
     tipe = foldr HsTyApp (HsTyCon name) (map HsTyVar args)
     patBind n v = HsPatBind sloc (HsPVar n) (HsUnGuardedRhs v) []
     match n ps v = HsMatch sloc n ps (HsUnGuardedRhs v) []
-    mkBounded cs = [patBind (hsValName ("@Prelude","minBound")) (HsCon $ hsConDeclName (head cs)),  patBind (hsValName ("Prelude","maxBound")) (HsCon $ hsConDeclName (last cs))]
+    mkBounded cs = [patBind (nameName v_minBound) (HsCon $ hsConDeclName (head cs)),  patBind (nameName (v_maxBound)) (HsCon $ hsConDeclName (last cs))]
     mkEnum cs = [HsFunBind (map f (zip cs [0..])),  HsFunBind $ (map g (zip cs [0..])) ++ [err]] where
-        f (c,n) = match (hsValName ("@Prelude","fromEnum")) [HsPApp (hsConDeclName c) []] (HsLit $ HsInt ( n))
-        g (c,n) =  match (hsValName ("@Prelude","toEnum")) [HsPLit (HsInt ( n))] (HsCon (hsConDeclName c))
-        err = match (hsValName ("@Prelude","toEnum"))  [HsPWildCard] (HsApp (HsVar (hsValName ("@Prelude","error"))) (HsLit $ HsString $ "toEnum: " ++ show name))
+        f (c,n) = match (nameName v_fromEnum) [HsPApp (hsConDeclName c) []] (HsLit $ HsInt ( n))
+        g (c,n) =  match (nameName v_toEnum) [HsPLit (HsInt ( n))] (HsCon (hsConDeclName c))
+        err = match (nameName v_toEnum)  [HsPWildCard] (HsApp (HsVar (nameName v_error)) (HsLit $ HsString $ "toEnum: " ++ show name))
+        -}
 
 {-
 data Statement = DataStmt | NewTypeStmt deriving (Eq,Show)

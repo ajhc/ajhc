@@ -45,7 +45,7 @@ import HsSyn
 import Info.Types
 import KindInfer
 import MapBinaryInstance()
-import Name
+import Name.Name
 import Options
 import PackedString
 import PrimitiveOperators

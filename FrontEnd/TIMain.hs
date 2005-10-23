@@ -45,7 +45,7 @@ import Utils                    (fromHsName,
 
 import DependAnalysis           (getBindGroups)
 import TypeSigs                 (SigEnv)
-import VConsts
+import Name.VConsts
 
 import DeclsDepends             (getDeclDeps)
 import Control.Monad.Error

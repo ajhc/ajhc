@@ -23,7 +23,7 @@ import Data.Monoid
 import Util.HasSize
 import HsSyn
 import MapBinaryInstance()
-import Name
+import Name.Name
 import qualified Data.Map as Map
 
 ----------------------------------------------------------------------------

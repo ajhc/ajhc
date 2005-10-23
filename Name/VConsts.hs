@@ -1,4 +1,4 @@
-module VConsts where
+module Name.VConsts where
 
 import Data.FunctorM
 
@@ -71,9 +71,6 @@ instance ToTuple (String,String) where
     toTuple n = ("Prelude",toTuple n)
 
 
---class Tupleable a where
---    toTuple :: [a] -> a
-
 
 -- This is stupid
 class ClassNames a where
@@ -94,16 +91,6 @@ class ClassNames a where
     classRealFrac :: a
     classRealFloat :: a
 
-class ValName a where
-    hsValName :: (String,String) -> a
-    hsUnqualValName :: String -> a
-    hsTypName ::  (String,String) -> a
-    hsUnqualTypName :: String -> a
-
-    hsUnqualValName s = hsValName ("",s)
-    hsTypName = hsValName
-    hsUnqualTypName = hsUnqualValName
-
 
 -- | various functions needed for desugaring.
 data FuncNames a = FuncNames {
@@ -120,18 +107,6 @@ data FuncNames a = FuncNames {
     }
     {-! derive: FunctorM !-}
 
-sFuncNames = FuncNames {
-    func_bind = ("Prelude",">>="),
-    func_bind_ = ("Prelude",">>"),
-    func_negate = ("Prelude","negate"),
-    func_runMain = ("Prelude.IO","runMain"),
-    func_fromInt = ("Prelude","fromInt"),
-    func_fromInteger = ("Prelude","fromInteger"),
-    func_fromRational = ("Prelude","fromRational"),
-    func_runExpr = ("Prelude.IO","runExpr"),
-    func_equals = ("Prelude","=="),
-    func_concatMap = ("Prelude","concatMap")
-    }
 
 
 instance ClassNames (String,String) where

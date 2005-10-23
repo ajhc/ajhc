@@ -1,10 +1,9 @@
-module NameMonad(NameMonad(..), GenName(..), NameMT, runNameMT, runNameMT', freeNames) where
+module Util.NameMonad(NameMonad(..), GenName(..), NameMT, runNameMT, runNameMT', freeNames) where
 
 -- This may be horrid overdesign. I broke several principles I usually use to
 -- prevent ones natural tendancy to overdesign.
 
 import qualified Data.Set as Set
-import Atom
 import Control.Monad.State
 import Control.Monad.Trans
 
@@ -35,9 +34,6 @@ class GenName n where
 instance GenName Int where
     genNames i = [st, st + 2 ..]  where
         st = abs i + 2 + abs i `mod` 2
-
-instance GenName Atom where
-    genNames i = map (toAtom . show) [abs i..]
 
 -- | Generate an infinite list of names not present in the given set.
 freeNames :: (Ord n,GenName n) => Set.Set n -> [n]

@@ -3,7 +3,7 @@ module Grin.Primitives(primSc, builtins) where
 import Grin.Val
 import Grin.Grin
 import GenUtil
-import VConsts
+import Name.VConsts
 import Atom
 import Char(chr,ord)
 import Options

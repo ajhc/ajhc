@@ -30,7 +30,7 @@ import HsSyn
 import Options
 import qualified Doc.PPrint as P
 import qualified Text.PrettyPrint.HughesPJ as P
-import VConsts
+import Name.VConsts
 
 infixl 5 $$$
 

@@ -24,7 +24,7 @@ import Grin.Linear
 import Options
 import qualified Doc.Chars as U
 import qualified FlagDump as FD
-import UniqueMonad
+import Util.UniqueMonad
 import Util.Once
 
 

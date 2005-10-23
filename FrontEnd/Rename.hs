@@ -66,20 +66,25 @@ module FrontEnd.Rename(unRename, collectDefsHsModule, renameModule, FieldMap ) w
 import Char
 import Control.Monad.State
 import Control.Monad.Writer
+import Control.Monad.Identity
+import Data.FunctorM
 import Data.FiniteMap
 import Data.Monoid
+import List
+import qualified Data.Map as Map
+
 import Doc.DocLike(tupled)
 import FrontEnd.Desugar (doToExp)
 import GenUtil hiding(replicateM)
 import HsErrors
 import HsSyn hiding(srcLoc)
-import List
-import MonadUtil
-import MonoidUtil
-import Name hiding(qualifyName)
-import qualified Data.Map as Map
+import Name.Name as Name hiding(qualifyName)
+import Name.Names
+import qualified Name.VConsts as V
+import Util.ContextMonad
+import Util.Gen
+import Util.Inst()
 import Utils
-import VConsts hiding(func_fromInt, func_fromInteger, func_fromRational)
 import Warning
 
 
@@ -154,7 +159,7 @@ addTopLevels  hsDecls = do
         nm = listToFM $ foldl f [] (fsts ns)
         tm = listToFM $ foldl f [] (fsts ts)
         f r hsName@Qual {}
-            | Just _ <- fromTupname hsName, Module "Prelude" <- mod
+            | Just _ <- V.fromTupname hsName, Module "Prelude" <- mod
                 = let nn = hsName in (nn,nn):r
             | otherwise = error $ "strong bad: " ++ fromHsName hsName
         f r z@(UnQual n) = let nn = Qual mod n in (z,nn):(nn,nn):r
@@ -608,9 +613,13 @@ renameHsGuardedRhs (HsGuardedRhs srcLoc hsExp1 hsExp2) subTable = do
 renameHsExps :: [HsExp] -> SubTable -> ScopeSM ([HsExp])
 renameHsExps = mapRename renameHsExp
 
-func_fromInt = (HsVar (hsUnqualValName "fromInt"))
-func_fromInteger = (HsVar (hsUnqualValName "fromInteger"))
-func_fromRational = (HsVar (hsUnqualValName "fromRational"))
+
+uqFuncNames :: V.FuncNames HsName
+Identity uqFuncNames = fmapM (return . nameName . toUnqualified) sFuncNames
+
+func_fromInt = (HsVar $ V.func_fromInt uqFuncNames)
+func_fromInteger = (HsVar $ V.func_fromInteger uqFuncNames)
+func_fromRational = (HsVar $ V.func_fromRational uqFuncNames)
 
 newVar = do
     unique <- getUnique
@@ -775,12 +784,12 @@ renameHsExp (HsIrrPat hsExp) subTable = do
     hsExp' <- renameHsExp hsExp subTable
     return (HsIrrPat hsExp')
 
-desugarEnum s as = foldl HsApp (HsVar (hsUnqualValName s)) as
+desugarEnum s as = foldl HsApp (HsVar (nameName $ toName Val s)) as
 
 
 createError s = do
     sl <- gets srcLoc
-    pe <- wrapInAsPat (HsVar (hsValName ("Prelude","error")))
+    pe <- wrapInAsPat (HsVar (nameName v_error))
     return $ HsParen $ HsApp pe (HsLit (HsString (show sl ++ ": " ++ s)))
 
 failRename s = do
@@ -928,7 +937,7 @@ renameHsName hsName subTable = case lookupFM subTable  hsName of
     Just name@(Qual _ _) -> return name
     Just _ -> error "renameHsName"
     Nothing
-        | Just n <- fromTupname hsName -> return hsName
+        | Just n <- V.fromTupname hsName -> return hsName
         | otherwise -> do
             sl <- gets srcLoc
             et <- gets errorTable
@@ -1330,15 +1339,15 @@ instance Renameable HsExportSpec where
       = let a # b = a $ (replaceName f b)
         in case hsexportspec of
             HsEVar  name               ->
-                HsEVar  # name			
+                HsEVar  # name
             HsEAbs  name               ->
-                HsEAbs  # name			
+                HsEAbs  # name
             HsEThingAll  name		 ->
-                HsEThingAll  # name		
+                HsEThingAll  # name
             HsEThingWith  name names	 ->
-                HsEThingWith  # name # names	
+                HsEThingWith  # name # names
             HsEModuleContents mod	 ->
-                HsEModuleContents mod	
+                HsEModuleContents mod
 
 
 instance Renameable HsImportDecl where
@@ -1357,13 +1366,13 @@ instance Renameable HsImportSpec where
       = let a # b = a $ (replaceName f b)
         in case object of
             HsIVar  name			 ->
-                HsIVar  # name			
+                HsIVar  # name
             HsIAbs  name			 ->
-                HsIAbs  # name			
+                HsIAbs  # name
             HsIThingAll  name		 ->
-                HsIThingAll  # name		
+                HsIThingAll  # name
             HsIThingWith  name names	 ->
-                HsIThingWith  # name # names	
+                HsIThingWith  # name # names
 
 
 {-
@@ -1549,11 +1558,11 @@ instance Renameable (HsExp) where
             HsExpTypeSig  srcloc exp qualtyp ->
                 HsExpTypeSig  # srcloc # exp # qualtyp
             HsAsPat  name exp		 ->
-                HsAsPat  # name # exp		
+                HsAsPat  # name # exp
             HsWildCard sl 			 ->
-                HsWildCard sl			
+                HsWildCard sl
             HsIrrPat  exp		 ->
-                HsIrrPat  # exp		
+                HsIrrPat  # exp
 
 instance Renameable HsPat where
     replaceName f object

@@ -16,7 +16,7 @@ import Doc.DocLike
 import GenUtil
 import HsErrors
 import HsSyn
-import Name
+import Name.Name
 import Util.HasSize
 import Warning
 

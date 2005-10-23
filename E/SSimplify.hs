@@ -25,8 +25,8 @@ import E.Values
 import FreeVars
 import GenUtil
 import Info.Types
-import Name
-import NameMonad
+import Name.Name
+import Util.NameMonad
 import Options
 import qualified E.Strictness as Strict
 import qualified FlagOpts as FO
@@ -34,7 +34,7 @@ import qualified Info.Info as Info
 import qualified Util.Seq as Seq
 import Stats hiding(new,print,Stats)
 import Util.Graph
-import VConsts
+import Name.VConsts
 
 data Occurance =
     Unused        -- ^ unused means a var is not used at the term level, but might be at the type level

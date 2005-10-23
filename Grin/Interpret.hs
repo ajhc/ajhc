@@ -13,7 +13,7 @@ import E.Pretty(render)
 import Grin.Show
 import CharIO
 import Char
-import VConsts
+import Name.VConsts
 --import Grin.Primitives
 import Doc.Pretty
 import Doc.DocLike

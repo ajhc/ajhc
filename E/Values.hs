@@ -16,8 +16,9 @@ import E.Subst
 import E.TypeCheck
 import FreeVars
 import Info.Types
-import Name
-import VConsts
+import Name.Name
+import Name.Names
+import Name.VConsts
 
 
 eIf e a b = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 tBool),  eCaseAlts =  [Alt vTrue a,Alt vFalse b], eCaseDefault = Nothing }

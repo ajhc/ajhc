@@ -12,12 +12,13 @@ import E.E
 import E.FreeVars()
 import FreeVars
 import GenUtil
-import Name
+import Name.Name
+import Name.Names
 import Options
 import qualified Doc.Chars as UC
 import qualified FlagDump as FD
 import Unparse
-import VConsts
+import Name.VConsts
 
 -----------------
 -- Pretty Print E

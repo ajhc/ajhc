@@ -24,7 +24,7 @@ import Grin.HashConst
 import Grin.Show
 import qualified Util.Seq as Seq
 import RawFiles
-import VConsts
+import Name.VConsts
 import CanType
 
 
