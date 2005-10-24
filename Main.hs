@@ -212,9 +212,9 @@ processDecls stats ho ho' tiData = do
 
         -- cds <- E.Strictness.solveDs cds
         cds <- return $ fst (E.CPR.cprAnalyzeBinds mempty cds)
-        cds' <- return $ concatMap (uncurry (workWrap fullDataTable)) cds
-        -- let (cds',st) = performWorkWrap fullDataTable cds
-        --Stats.tickStat stats st
+        --cds' <- return $ concatMap (uncurry (workWrap fullDataTable)) cds
+        let (cds',st) = performWorkWrap fullDataTable cds
+        Stats.tickStat stats st
         let wws = length cds' - length cds
         wdump FD.Progress $ putErr (replicate wws 'w')
 
@@ -264,7 +264,8 @@ processDecls stats ho ho' tiData = do
 
 
     let ds' = reachable (newGraph ds (\ (_,b,_) -> tvrIdent b) (\ (_,b,c) -> bindingFreeVars b c)) [ tvrIdent b | (n,b,_) <- ds, getProperty prop_EXPORTED b]
-    wdump FD.OptimizationStats $ Stats.print "Optimization" stats
+    --wdump FD.OptimizationStats $ Stats.print "Optimization" stats
+    Stats.print "Optimization" stats
     return ho' { hoDataTable = dataTable, hoEs = Map.fromList [ (x,(y,z)) | (x,y,z) <- ds'], hoRules = rules, hoUsedIds = collectIds (ELetRec [ (b,c) | (_,b,c) <- ds'] Unknown) }
 
 -- | take E directly generated from haskell source and bring it into line with

@@ -1,6 +1,7 @@
 module E.WorkerWrapper(workWrap,performWorkWrap) where
 
 import Control.Monad.Identity
+import Control.Monad.Writer
 import Data.Monoid
 import Maybe
 import Monad
@@ -18,7 +19,7 @@ import GenUtil
 import Info.Info as Info
 import Info.Types
 import Name.Name
-import qualified Stats
+import Stats
 
 
 topLike Top = True
@@ -33,7 +34,7 @@ wrappable :: Monad m =>
     -> m (Maybe Name,E,[(Maybe (Constructor,[TVr]),TVr)])  -- ^ (Body,Args)
 wrappable dataTable tvr e@ELam {} = ans where
     cpr = maybe Top id (Info.lookup (tvrInfo tvr))
-    Lam sa = maybe (Lam (repeat L)) id (Info.lookup (tvrInfo tvr))
+    sa = maybe ((repeat L)) id (Info.lookup (tvrInfo tvr))
     ans = f e ( sa ++ repeat L) cpr []
     f (ELam t e) (S _:ss) (Fun x) ts
        | Just con <- getProduct dataTable tt = f e ss x ((Just (con,as con),t):ts)
@@ -45,14 +46,15 @@ wrappable dataTable tvr e@ELam {} = ans where
     f e _ (Tag [n]) ts = return (Just n,e,reverse ts)
     f e _ _ ts | any (isJust . fst) ts = return (Nothing ,e,reverse ts)
     f _ _ _ _ = fail "not workwrapable"
-
-
 wrappable _ _ _ = fail "Only lambdas are wrappable"
 
+workWrap = undefined
+
+{-
 workWrap dataTable tvr e = case workWrap' dataTable tvr e of
     Nothing -> [(tvr,e)]
     Just (x,y) -> [x,y]
-
+-}
 workerName x = case fromId x of
     Just y -> toId (toName Val ("W@",'f':show y))
     Nothing -> toId (toName Val ("W@",'f':show x))
@@ -61,7 +63,7 @@ tmpNames ns x = case fromId x of
     Just y  -> [toId (toName ns ("X@",'f':show y ++ "@" ++ show i)) | i <- [(1::Int)..] ]
     Nothing -> [toId (toName ns ("X@",'f':show x ++ "@" ++ show i)) | i <- [(1::Int)..] ]
 
-workWrap' :: Monad m => DataTable -> TVr -> E -> m ((TVr,E),(TVr,E))
+workWrap' :: MonadStats m => DataTable -> TVr -> E -> m ((TVr,E),(TVr,E))
 workWrap' dataTable tvr e | isJust res = ans where
     res@(~(Just (cname,body,sargs))) = wrappable dataTable tvr e
     args = snds sargs
@@ -75,7 +77,7 @@ workWrap' dataTable tvr e | isJust res = ans where
         f [] = e
         f ((Nothing,_):rs) = f rs
         f ((Just (c,ts),t):rs) = eCase (EVar t) [Alt (LitCons (conName c) ts (getType t)) (f rs)] Unknown
-    ans = return ((setProperty prop_WRAPPER tvr,wrapper),(setProperty prop_WORKER tvr',worker))
+    ans = doTicks >> return ((setProperty prop_WRAPPER tvr,wrapper),(setProperty prop_WORKER tvr',worker))
     tvr' = TVr { tvrIdent = workerName (tvrIdent tvr), tvrInfo = mempty, tvrType = wt }
     worker = foldr ELam body' (args' ++ navar) where
         body' = eLetRec lets $ case cname of
@@ -96,25 +98,33 @@ workWrap' dataTable tvr e | isJust res = ans where
     -- This is to add a dummy arg so workers arn't turned into updatable CAFs
     needsArg =  all (isJust . fst) sargs && null (concat [ xs | (Just (_,xs),_) <- sargs])
     (navar,navalue) = if needsArg then ([tvr { tvrType = ltTuple' []}],[eTuple' []]) else ([],[])
+    doTicks = do
+        case cname of
+            Just n -> mtick ("E.Workwrap.CPR.{" ++ tvrShowName tvr ++ "." ++ show n ++ "}")
+            _ -> return ()
+        flip mapM_ sargs $ \ x -> case x of
+            (Just (n,_),_) ->  mtick ("E.Workwrap.arg.{" ++ tvrShowName tvr ++ "." ++ show (conName n) ++ "}")
+            _ -> return ()
 workWrap' _dataTable tvr e = fail "not workWrapable"
 
 
 a_workWrap = toAtom "E.Simplify.WorkerWrapper"
 
 performWorkWrap :: DataTable -> [(TVr,E)] -> ([(TVr,E)],Stats.Stat)
-performWorkWrap dataTable ds = runIdentity $ Stats.runStatT (wwDs ds) where
-    wwDs :: [(TVr,E)] -> Stats.StatT Identity [(TVr,E)]
+performWorkWrap dataTable ds = runWriter (wwDs ds) where
+    --wwDs :: [(TVr,E)] -> Stats.StatT Identity [(TVr,E)]
     wwDs ds = liftM concat $ mapM wwDef ds
-    wwDef :: (TVr,E) -> Stats.StatT Identity [(TVr,E)]
-    wwDef (tvr,e) = case workWrap' dataTable tvr e of
-        Just ((tx,x),(ty,y)) -> do
-            Stats.mtick a_workWrap
+    --wwDef :: (TVr,E) -> Stats.StatT Identity [(TVr,E)]
+    wwDef (tvr,e) = case runStatT (workWrap' dataTable tvr e) of
+        Just (((tx,x),(ty,y)),st) -> do
+            --Stats.mtick a_workWrap
+            tell st
             y' <- wwE y
             return ([ (tx,x), (ty,y') ] :: [(TVr,E)])
         Nothing -> do
             e' <- wwE e
             return ([(tvr,e')]:: [(TVr,E)])
-    wwE :: E -> Stats.StatT Identity E
+    --wwE :: E -> Stats.StatT Identity E
     wwE (ELetRec ds e) = do
         ds' <- wwDs ds
         e' <- wwE e

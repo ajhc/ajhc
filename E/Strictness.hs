@@ -33,7 +33,6 @@ data SA =
     S Int     -- Strict, argument is number of args guarenteed to be passed to it
     | L       -- Lazy. We don't know whether it will be evaluated
     | A       -- Absent. definitly not evaluated
---    | U [SA]  -- Unary Constructor.
     | O TVr Int Int -- depends on some other value, called with first int number of arguments and is the second ints argument number.
     | SOr SA SA     -- A or B
     | SAnd SA SA    -- A and B
@@ -44,6 +43,8 @@ data SA =
 
 type SAMap = Map.Map TVr SA
 
+isLam Lam {} = True
+isLam _ = False
 
 
 type CResult = [(TVr,SA)]
@@ -55,15 +56,21 @@ collectSolve e = ans where
 
 solveDs :: [(TVr,E)] -> IO [(TVr,E)]
 solveDs ds = do
-    let idclear _ nfo = return $ Info.delete L nfo
+    let idclear _ nfo = return $ Info.delete L (Info.delete [L] nfo)
         ds' = runIdentity (annotateDs mempty idclear (\_ -> return) (\_ -> return) ds)
         vs = concatMap collect ds'
     cr <- E.Strictness.solve [ c | c@(x,_) <- vs, x /= tvrSilly ]
-    let idm = Map.fromList $ [ (tvrIdent x,y) | (x,y) <- cr]
-    --mapM_ (\ (tvr,n) -> print (tvrShowName tvr,n)) cr
-    let idann id nfo = case Map.lookup id idm of
-            Just x -> return $ Info.insert x nfo
-            Nothing -> return nfo -- error $ "Could not find :" ++ tvrShowName tvr { tvrIdent = id }
+    let idm = Map.fromList $ [ (tvrIdent x,y) | (x,y) <- cr, not (isLam y)]
+        lmap = Map.fromList $ [ (tvrIdent x,y) | (x,y) <- cr, isLam y]
+    --mapM_ (\ (tvr,n) -> print (tvrShowName tvr,n)) vs
+    let idann id nfo = nfo'' where
+            nfo'' = case Map.lookup id lmap of
+                Just (Lam xs) -> return $ Info.insert xs nfo'
+                Nothing -> return nfo'
+                _ -> error "solveDs: odd lam"
+            nfo' = case Map.lookup id idm of
+                Just x ->  Info.insert x nfo
+                Nothing ->  nfo -- error $ "Could not find :" ++ tvrShowName tvr { tvrIdent = id }
     return $ runIdentity (annotateDs mempty idann (\_ -> return) (\_ -> return) ds')
 
 
