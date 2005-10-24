@@ -94,7 +94,6 @@ partialLadder t
 
 typecheckGrin grin = do
     let errs = [  (err ++ "\n" ++ render (prettyFun a) ) | (a,Left err) <-  [ (a,typecheck (grinTypeEnv grin) c:: Either String Ty)   | a@(_,(_ :-> c)) <-  grinFunctions grin ]]
-    print (grinPhase grin)
     mapM_ putErrLn  errs
     when (not $ null errs) $ fail "There were type errors!"
 

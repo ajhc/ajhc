@@ -99,29 +99,13 @@ deadFunctions stats keeps grin = do
         fs =  [ f | f@(a,_) <- grinFunctions grin, a `Set.member` rs ]
         cu = Set.fromList $ concatMap functionCafsUsed reach
         (nc,uuc) = List.partition ((`Set.member` cu) . fst)  (grinCafs grin)
-    replicateM_ (length (grinFunctions grin) - length reach) $ tick stats $ (toAtom "Optimize.dead-function")
-    --CharIO.putStr "Dead Functions: "
-    --CharIO.print [ a | (a,_) <- grinFunctions grin, not $ a `Set.member` rs ]
-    --mapM cleanupDeadArgs
-    --let f n | null $ functionUnusedArgs n = ""
-    --        | otherwise = show (functionName n) ++ show (functionUnusedArgs n) ++ "\n"
-    --mapM (CharIO.putStr . f) reach
-    when (not $ null uuc) $ do
-        replicateM_ (length uuc) $ tick stats $ (toAtom "Optimize.caf-cleanup")
-        --CharIO.putStr "Dead Cafs: "
-        --CharIO.print uuc
-    --mapM_ CharIO.print reach
+    ticks stats (length (grinFunctions grin) - length reach) (toAtom "Optimize.dead.function")
+    ticks stats (length uuc) (toAtom "Optimize.dead.caf")
     reach <- findDeadCode stats  reach
 
     fs <- mapM (removeDeadArgs stats reach) fs
     return $ grin { grinFunctions = fs, grinCafs = nc }
 
-
-{-
-class  FixIn b a | b -> a where
-    getSafeDependencies :: Maybe (b -> [a])
-    getSafeDependencies = Nothing
--}
 
 
 findFixpoint :: (Show a,Ord a,Eq b,Monoid b) => Maybe String -> (x -> a) -> ((a -> Ms b b) -> x -> Ms b b) -> [x] -> IO [(x,b)]
@@ -155,7 +139,7 @@ findDeadCode stats fs = ans where
     g getVal (Passed xs)  = mapM getVal xs >>= return . or
     rs ((x,Passed _), False) = do
         --CharIO.print x
-        tick stats $ toAtom "Optimize.rec-dead-arg"
+        tick stats $ toAtom "Optimize.dead.rec-arg"
         rs' (x,False)
     rs ((x,_),y) = rs' (x,y)
     rs' (x,True) = return []
@@ -183,7 +167,7 @@ removeDeadArgs stats fs (a,l) =  whizExps f l >>= return . (,) a where
         deadVal (Lit 0 _) = True
         deadVal x =  x `elem` [pHole,Tag tagHole]
         df (a,i) | not (deadVal a) && i `elem` xs  = do
-            tick stats $ toAtom "Optimize.dead-arg"
+            tick stats $ toAtom "Optimize.dead.arg"
             case getType a of
                 TyPtr TyNode -> return pHole
                 TyTag -> return (Tag tagHole)
