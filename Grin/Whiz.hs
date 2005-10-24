@@ -25,7 +25,7 @@ normalizeGrin :: Grin -> Grin
 normalizeGrin grin@Grin { grinFunctions = fs } = grin { grinFunctions = f fs [] (Right 1) } where
     f [] xs _ = reverse xs
     f ((a,lm):xs) ys set = f xs ((a,lm'):ys) set' where
-        (Identity (lm',set')) = fizz (grinTypeEnv grin) (\_ x -> x) (return . Just) return set lm
+        (Identity (lm',set')) = fizz  (\_ x -> x) (return . Just) return set lm
 
 normalizeGrin' :: Grin -> Grin
 normalizeGrin' grin@Grin { grinFunctions = fs } = grin { grinFunctions = f fs [] } where
@@ -105,14 +105,13 @@ whiz sub te tf inState start = res where
 -- fizz also removes all statements past an Error.
 
 fizz :: Monad m =>
-    TyEnv ->
     (forall a . Val -> m a -> m a)         -- ^ called for each sub-code block, such as in case statements
     -> ((Val,Exp) -> m (Maybe (Val,Exp)))  -- ^ routine to transform or omit simple bindings
     -> (Exp -> m Exp)       -- ^ routine to transform final statement in code block
     -> WhizState            -- ^ Initial state
     -> Lam                  -- ^ input lambda expression
     -> m (Lam,WhizState)
-fizz tyEnv sub te tf inState start = res where
+fizz sub te tf inState start = res where
     res = runStateT (dc mempty start) inState
     f (a :>>= (v :-> b)) xs env = f a ((env,v,b):xs) env
     f a@(Return (Tup xs@(_:_))) ((senv,p@(Tup ys@(_:_)),b):rs) env | length xs == length ys  = do

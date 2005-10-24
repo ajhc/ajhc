@@ -422,6 +422,7 @@ compileModEnv' stats ho = do
     x <- Grin.PointsToAnalysis.grinInlineEvalApply x
     typecheckGrin x
     wdump FD.GrinPreeval $ printGrin x
+    stats <- Stats.new
     x <- return $ normalizeGrin x
     typecheckGrin x
     let opt (0::Int) x = return x

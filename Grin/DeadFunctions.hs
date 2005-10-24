@@ -88,23 +88,24 @@ deadFunctions ::
     -> Grin    -- ^ input
     -> IO Grin -- ^ output
 deadFunctions stats keeps grin = do
-    let (graph,lv,kv) = graphFromEdges [ (gf, functionName gf, functionCalls gf) |  gf <- map (getFunctionInfo (grinCafs grin) indirect ) $ grinFunctions grin ]
-        reach = [ x|  (x,_,_) <- map lv $ snub $ concatMap (reachable graph) (map la keeps)]
-        rs = Set.fromList (map functionName reach)
+    let -- (graph,lv,kv) = graphFromEdges [ (gf, functionName gf, functionCalls gf) |  gf <- map (getFunctionInfo (grinCafs grin) indirect ) $ grinFunctions grin ]
+        -- reach = [ x|  (x,_,_) <- map lv $ snub $ concatMap (reachable graph) (map la keeps)]
+        -- rs = Set.fromList (map functionName reach)
         -- | Whether to count indirect function calls. (used before eval\/apply inlining)
         indirect = not $ phaseEvalInlined $ grinPhase grin
-        la a = case kv a  of
-            Just n -> n
-            Nothing -> error $ "DeadFunctions, CannotFind: " ++ show a
-        fs =  [ f | f@(a,_) <- grinFunctions grin, a `Set.member` rs ]
-        cu = Set.fromList $ concatMap functionCafsUsed reach
-        (nc,uuc) = List.partition ((`Set.member` cu) . fst)  (grinCafs grin)
-    ticks stats (length (grinFunctions grin) - length reach) (toAtom "Optimize.dead.function")
-    ticks stats (length uuc) (toAtom "Optimize.dead.caf")
-    reach <- findDeadCode stats  reach
+        -- la a = case kv a  of
+        --    Just n -> n
+        --    Nothing -> error $ "DeadFunctions, CannotFind: " ++ show a
+        fs = map (getFunctionInfo (grinCafs grin) indirect ) $ grinFunctions grin
+        -- fs =  [ f | f@(a,_) <- grinFunctions grin, a `Set.member` rs ]
+        --cu = Set.fromList $ concatMap functionCafsUsed fs
+        --(nc,uuc) = List.partition ((`Set.member` cu) . fst)  (grinCafs grin)
+    -- ticks stats (length (grinFunctions grin) - length reach) (toAtom "Optimize.dead.function")
+    --ticks stats (length uuc) (toAtom "Optimize.dead.caf")
+    fs <- findDeadCode stats  fs
 
-    fs <- mapM (removeDeadArgs stats reach) fs
-    return $ grin { grinFunctions = fs, grinCafs = nc }
+    fs <- mapM (removeDeadArgs stats fs) [ (functionName f, functionBody f) |  f <- fs]
+    return $ grin { grinFunctions = fs }
 
 
 

@@ -1,6 +1,5 @@
 module Grin.Simplify(simplify) where
 
-import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Trans
 import Data.Map as Map
@@ -9,12 +8,20 @@ import Data.Set as Set
 import List
 
 import Atom
+import CharIO
+import GenUtil hiding(putErrLn)
 import CanType
+import Doc.Pretty
+import Doc.PPrint
 import FreeVars
 import Grin.Grin
+import Grin.Show
 import Grin.Whiz
-import Util.Inst()
 import Stats
+import Util.Graph
+import Util.Inst()
+import Util.Seq as Seq
+import Util.Histogram as Hist
 
 -- perform a number of simple simplifications.
 -- inline very small and builtin-wrapper functions
@@ -30,11 +37,13 @@ at_OptSimplifyDeadVar  = toAtom "Optimize.simplify.dead-var"
 at_OptSimplifyTrivialCase  = toAtom "Optimize.simplify.trivial-case"
 at_OptSimplifyBadAssignment  = toAtom "Optimize.simplify.bad-assignment"
 
+-- contains functions that should be inlined
+type SimpEnv = Map.Map Atom (Atom,Lam)
 
-simplify :: Stats -> Grin -> IO Grin
-simplify stats grin = do
-    gfn <- sequence [  do (x,_) <- (evalStateT (whiz fn gv f whizState l) mempty ); return (n,x) |  (n,l) <- grinFunctions grin]
-    deadVars stats  grin { grinFunctions = gfn }
+simplify1 :: Stats -> SimpEnv -> (Atom,Lam) -> IO (Atom,Lam)
+simplify1 stats env (n,l) = do
+    (l,_) <- evalStateT (whiz fn gv f whizState l) mempty
+    return (n,l)
     where
     fn _ m = do
         s <- get
@@ -69,7 +78,7 @@ simplify stats grin = do
         (env,_) <- get
         e <- (applySubstE env e)
         case e of
-            Return v | Just n <- varBind grin p v -> do
+            Return v | Just n <- varBind p v -> do
                 lift $ tick stats at_OptSimplifyCopyProp
                 modify (`mappend` (n,mempty))
                 return Nothing
@@ -78,7 +87,7 @@ simplify stats grin = do
                 mz <- getCS (p,e)
                 modify (mappend (mempty,mz))
                 return $ Just (p,e)
-    funcMap = Map.fromList $ [  fn | fn <- grinFunctions grin, doInline fn]
+    -- funcMap = Map.fromList $ [  fn | fn <- grinFunctions grin, doInline fn]
     doInline (a,fn)
         --  | 'b':_ <- n, not ("bap" `isPrefixOf` n) = True
         --  | "fInstance@" `isPrefixOf` n = True
@@ -86,8 +95,8 @@ simplify stats grin = do
         | otherwise = False
       --  where n = fromAtom a
     inline app@(App fn as _)
-        | Just l <- Map.lookup fn funcMap = do
-            lift $ tick stats at_OptSimplifyInline -- (toAtom $ fromAtom at_OptSimplifyInline ++ "." ++ fromAtom fn)
+        | Just (itype,l) <- Map.lookup fn env = do
+            lift $ tick stats itype
             return $ Return (Tup as) :>>= l
         | otherwise = tryCSE app
     inline x = tryCSE x
@@ -115,27 +124,21 @@ cseStat n = toAtom $ "Optimize.simplify.cse." ++ g n where
     g Store {} = "Store"
     g _ = "Misc"
 
-varBind :: Monad m => Grin -> Val -> Val -> m (Map Var Val)
-varBind _ (Var v t) nv@(Var v' t') | t == t' = return $ Map.singleton v nv
-varBind _ (Lit i t) (Lit i' t') | i == i' && t == t' = return mempty
---varBind _ Unit Unit = return mempty
-varBind grin (Tup xs) (Tup ys) | length xs == length ys  = liftM mconcat $ sequence $  zipWith (varBind grin) xs ys
-varBind _ (Tag i) (Tag i') | i == i' = return mempty
---varBind (NodeV v vs) (NodeV t vs') = do
---    be <- sequence $  zipWith varBind vs vs'
---    b <- varBind v t
---    return (mconcat $ b:be)
-varBind grin (NodeC t vs) (NodeC t' vs') | t == t' = do
-    liftM mconcat $ sequence $  zipWith (varBind grin) vs vs'
-varBind grin v r  | runIdentity (typecheck (grinTypeEnv grin) v) == runIdentity (typecheck (grinTypeEnv grin) r)  = fail "unvarBindable"    -- check type to be sure
-varBind _ x y = error $ "varBind: " ++ show (x,y)
+varBind :: Monad m => Val -> Val -> m (Map Var Val)
+varBind (Var v t) nv@(Var v' t') | t == t' = return $ Map.singleton v nv
+varBind (Lit i t) (Lit i' t') | i == i' && t == t' = return mempty
+varBind (Tup xs) (Tup ys) | length xs == length ys  = liftM mconcat $ sequence $  zipWith varBind xs ys
+varBind (Tag i) (Tag i') | i == i' = return mempty
+varBind (NodeC t vs) (NodeC t' vs') | t == t' = do
+    liftM mconcat $ sequence $  zipWith varBind vs vs'
+varBind v r | (getType v) == (getType r)  = fail "unvarBindable"    -- check type to be sure
+varBind x y = error $ "varBind: " ++ show (x,y)
 
 isSimple :: (Atom,Lam) -> Bool
-isSimple (fn,x) = f (3::Int) x where
+isSimple (fn,x) = f (2::Int) x where
     f n _ | n <= 0 = False
     f n (p :-> a :>>= b ) = (f (n - 1) (p :-> a)) &&  (f (n - 1) b)
     f _ (_ :-> Case {}) = False
-    f _ (_ :-> App { expFunction = fn' }) | fn == fn' = False
     f _ _ = True
 
     {-
@@ -163,10 +166,10 @@ isSimple (fn,_ :-> x) = f x where
     -}
 
 
-deadVars :: Stats -> Grin -> IO Grin
-deadVars stats grin = do
-    gfn <- sequence [  do (x,_) <- (evalStateT (fizz (grinTypeEnv grin) fn gv f whizState l) (mempty :: Set.Set Var) ); return (n,x) |  (n,l) <- grinFunctions grin]
-    return $ grin { grinFunctions =  gfn }
+deadVars :: Stats -> (Atom,Lam) -> IO (Atom,Lam)
+deadVars stats (n,l) = do
+    (x,_) <- (evalStateT (fizz fn gv f whizState l) (mempty :: Set.Set Var) );
+    return (n,x)
     where
     fn _ m = m
     f x = do
@@ -191,4 +194,70 @@ isOmittable (Store {}) = True
 isOmittable (Cast {}) = True
 isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
 isOmittable _ = False
+
+
+simplify ::
+    Stats     -- ^ stats to update
+    -> Grin   -- ^ input grin
+    -> IO Grin
+simplify stats grin = do
+    let postEval = phaseEvalInlined (grinPhase grin)
+        fs = grinFunctions grin
+        uf = [ ((a,l),collectUsedFuncs l) | (a,l) <- fs ]
+        graph = newGraph uf (\ ((a,_),_) -> a) (\ (_,(fi,fd)) -> (if postEval then [] else fi) ++ fd)
+        rf = reachable graph (grinEntryPoints grin)
+        reached = Set.fromList $ Prelude.map  (\ ((a,_),_) -> a) rf
+        graph' = if postEval then graph else newGraph rf (\ ((a,_),_) -> a) (\ (_,(_,fd)) -> fd)
+        (lb,os) = findLoopBreakers ( fromEnum . not . isSimple . fst) (const True) graph'
+        loopBreakers = Set.fromList [ a | ((a,_),_) <- lb ]
+        indirectFuncs = if postEval then Set.empty else Set.fromList (concat [ fi | (_,(fi,_)) <- rf ])
+        hist =  Hist.fromList $ concat [ fd | (_,(_,fd)) <- rf ]
+    let opt env a n l = do
+                (_,nl) <- deadVars stats (a,l)
+                (_,nl) <- simplify1 stats env (a,nl)
+                return nl
+                {-
+        opt env a n l = do
+            stats' <- Stats.new
+            (_,nl) <- deadVars stats (a,l)  -- if the deadVars did not enable any other transformations we don't need to iterate as deadVars is idempotent
+            (_,nl) <- simplify1 stats' env (a,nl)
+            t <- Stats.getTicks stats'
+            case t of
+                0 -> return nl
+                _ -> do
+                    -- when (n > 2) $ Stats.print (show a) stats'
+                    Stats.combine stats stats'
+                    -- tick stats $ "Optimize.repeat.{" ++ show a ++ "}"
+                    opt env a (n + 1 :: Int) nl
+                    -}
+        procF (out,env) ((a,_),_) | False <- a `Set.member` reached = do
+            tick stats (toAtom "Optimize.dead.function")
+            return (out,env)
+        procF (out,env) ((a,l),_) = do
+            nl <- opt env a 0 l
+            let iname t = toAtom $ "Optimize.simplify.inline." ++ t ++ ".{" ++ fromAtom a  ++ "}"
+                inline
+                    | a `Set.member` loopBreakers = Map.empty
+                    | Hist.find a hist == 1 = Map.singleton a (iname "once",nl)
+                    | a `Set.member` indirectFuncs = Map.empty
+                    | isSimple (a,nl) = Map.singleton a (iname "simple",nl)
+                    | otherwise = Map.empty
+            return ((a,nl):out , inline `Map.union` env)
+
+    (nf,_) <- foldM procF ([],mempty) os
+    return grin { grinFunctions = nf }
+
+
+
+-- TODO have this collect CAF info ignoring updates.
+
+collectUsedFuncs :: Lam -> ([Atom],[Atom])
+collectUsedFuncs (Tup as :-> exp) = (snub $ concatMap tagToFunction (Seq.toList iu),sort $ Seq.toList du) where
+    (iu,du) =  f exp
+    f (e1 :>>= _ :-> e2) = f e1 `mappend` f e2
+    f (App a vs _) =  (Seq.fromList (freeVars vs), Seq.singleton a)
+    f (Case e alts) =  mconcat ((Seq.fromList (freeVars e) , Seq.empty):[ f e | _ :-> e <- alts])
+    f e = (Seq.fromList [ v | v <- freeVars e ],Seq.empty)
+
+
 
