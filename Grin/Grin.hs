@@ -17,6 +17,8 @@ module Grin.Grin(
     tagHole,
     Exp(..),
     Ty(..),
+    Phase(..),
+    phaseEvalInlined,
     Tag,
     TyEnv(..),
     Val(..),
@@ -161,8 +163,15 @@ instance Ord (IORef a) where
     compare a b = EQ
 
 
+data Phase = PhaseInit | PostInlineEval
+    deriving(Show,Eq,Ord,Enum)
+
+phaseEvalInlined PostInlineEval = True
+phaseEvalInlined _ = False
+
 
 data Grin = Grin {
+    grinPhase :: Phase,
     grinTypeEnv :: TyEnv,
     grinFunctions :: [(Atom,Lam)],
     grinCafs :: [(Var,Val)]

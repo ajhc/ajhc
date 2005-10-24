@@ -1,6 +1,5 @@
 module Grin.DeadFunctions(deadFunctions) where
 
-import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Graph
 import Data.Monoid
@@ -11,7 +10,6 @@ import qualified Data.Set as Set
 
 import Atom
 import CanType
-import CharIO
 import FindFixpoint
 import FreeVars
 import GenUtil hiding(replicateM_)
@@ -85,16 +83,16 @@ getFunctionInfo cafs indirect (a,b@(Tup as :-> e)) = FunctionInfo {
 -- | Remove dead functions
 
 deadFunctions ::
-    Bool       -- ^ Whether to count indirect function calls. (used before eval\/apply inlining)
-    -> Stats   -- ^ stats to update with what was done
+    Stats   -- ^ stats to update with what was done
     -> [Atom]  -- ^ roots
     -> Grin    -- ^ input
     -> IO Grin -- ^ output
-deadFunctions indirect stats keeps grin = do
-    let (graph,lv,kv) = graphFromEdges [ (gf, functionName gf, functionCalls gf) |  gf <- map (getFunctionInfo (grinCafs grin) indirect) $ grinFunctions grin ]
+deadFunctions stats keeps grin = do
+    let (graph,lv,kv) = graphFromEdges [ (gf, functionName gf, functionCalls gf) |  gf <- map (getFunctionInfo (grinCafs grin) indirect ) $ grinFunctions grin ]
         reach = [ x|  (x,_,_) <- map lv $ snub $ concatMap (reachable graph) (map la keeps)]
         rs = Set.fromList (map functionName reach)
-        --la a = case Map.lookup a $ Map.fromList $  zip (sort $ fsts (grinFunctions grin)) [0..] of
+        -- | Whether to count indirect function calls. (used before eval\/apply inlining)
+        indirect = not $ phaseEvalInlined $ grinPhase grin
         la a = case kv a  of
             Just n -> n
             Nothing -> error $ "DeadFunctions, CannotFind: " ++ show a

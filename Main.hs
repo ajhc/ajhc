@@ -406,7 +406,7 @@ compileModEnv' stats ho = do
     let opt x = do
         wdump FD.Progress $ putErrLn "Optimization Pass..."
         t <- Stats.getTicks stats
-        x <- deadFunctions True stats [funcMain] x
+        x <- deadFunctions stats [funcMain] x
         x <- Grin.Simplify.simplify stats x
         when flint $ typecheckGrin x
         t' <- Stats.getTicks stats
@@ -428,7 +428,7 @@ compileModEnv' stats ho = do
         opt n x = do
         wdump FD.Progress $ putErrLn "AE Optimization Pass..."
         t <- Stats.getTicks stats
-        x <- deadFunctions False stats [funcMain] x
+        x <- deadFunctions stats [funcMain] x
         x <- Grin.Simplify.simplify stats x
         typecheckGrin x
         t' <- Stats.getTicks stats

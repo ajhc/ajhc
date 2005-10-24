@@ -337,7 +337,7 @@ grinInlineEvalApply  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFun
             --simple (NodeC t _ :-> _) = True
         docase _ ((_ :-> x):_) _ = Error "No Valid alternatives. This Should Not be reachable." (getType x)
         docase _ _ _ = error $ "docase: strange argument"
-    return grin { grinFunctions = map (mapSnd f) grinFunctions }
+    return grin { grinPhase = PostInlineEval, grinFunctions = map (mapSnd f) grinFunctions }
 
 collect :: Map.Map Var W -> HcHash -> Int -> Atom -> Lam -> (PointsToEq,HcHash)
 collect lmap hc st fname (Tup vs :-> exp')

@@ -94,6 +94,7 @@ partialLadder t
 
 typecheckGrin grin = do
     let errs = [  (err ++ "\n" ++ render (prettyFun a) ) | (a,Left err) <-  [ (a,typecheck (grinTypeEnv grin) c:: Either String Ty)   | a@(_,(_ :-> c)) <-  grinFunctions grin ]]
+    print (grinPhase grin)
     mapM_ putErrLn  errs
     when (not $ null errs) $ fail "There were type errors!"
 
@@ -159,16 +160,11 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
         ic = (funcInitCafs,(Tup [] :-> initCafs) )
         --ds' = ic:ev:ap:ds
         ds' = ic:(ds ++ fbaps)
-    --wdump FD.Grin $ do
-        --mapM_ putStrLn [ show (x, freeVarsL z :: [Tag]) | (x,_,z) <- ds ]
-        --mapM_ (putErrLn . render) $ map prettyFun ds'
     let grin = Grin {
+            grinPhase = PhaseInit,
             grinTypeEnv = te,
-            --grinFunctions = (funcMain ,[], App funcInitCafs [] :>>= (Unit,Store main') :>>= (p1,gEval p1)): ds',
-            --grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] :>>= unit :-> main' :>>= n3 :-> App funcApply [n3,pworld__] )) : ds',
-            --grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] :>>= unit :->  main' :>>= n3 :-> App funcApply [n3,pworld__] :>>= n0 :-> Return unit )) : ds',
             grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  theMain :>>= n0 :-> Return unit )) : ds',
-            grinCafs = cafs -- [ (n,NodeC t []) | (n,t) <- cafs]
+            grinCafs = cafs
             }
     typecheckGrin grin
     return grin
