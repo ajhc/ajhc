@@ -1,12 +1,10 @@
 module E.WorkerWrapper(workWrap,performWorkWrap) where
 
-import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Monoid
 import Maybe
 import Monad
 
-import Atom
 import CanType
 import DataConstructors
 import E.CPR
@@ -100,15 +98,15 @@ workWrap' dataTable tvr e | isJust res = ans where
     (navar,navalue) = if needsArg then ([tvr { tvrType = ltTuple' []}],[eTuple' []]) else ([],[])
     doTicks = do
         case cname of
-            Just n -> mtick ("E.Workwrap.CPR.{" ++ tvrShowName tvr ++ "." ++ show n ++ "}")
+            --Just n -> mtick ("E.Workwrap.CPR.{" ++ tvrShowName tvr ++ "." ++ show n ++ "}")
+            Just n -> mtick ("E.Workwrap.CPR.{"  ++ show n ++ "}")
             _ -> return ()
         flip mapM_ sargs $ \ x -> case x of
-            (Just (n,_),_) ->  mtick ("E.Workwrap.arg.{" ++ tvrShowName tvr ++ "." ++ show (conName n) ++ "}")
+            --(Just (n,_),_) ->  mtick ("E.Workwrap.arg.{" ++ tvrShowName tvr ++ "." ++ show (conName n) ++ "}")
+            (Just (n,_),_) ->  mtick ("E.Workwrap.arg.{"  ++ show (conName n) ++ "}")
             _ -> return ()
 workWrap' _dataTable tvr e = fail "not workWrapable"
 
-
-a_workWrap = toAtom "E.Simplify.WorkerWrapper"
 
 performWorkWrap :: DataTable -> [(TVr,E)] -> ([(TVr,E)],Stats.Stat)
 performWorkWrap dataTable ds = runWriter (wwDs ds) where

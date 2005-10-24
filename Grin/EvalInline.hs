@@ -54,11 +54,12 @@ createEval shared  te ts
         fname = toAtom n
         Just (_,ty) = findArgsType te fname
 
-createApply :: TyEnv -> [Tag] -> Lam
-createApply te ts
-    | null cs = Tup [n1,p2] :-> Error ("Empty Apply:" ++ show ts)  TyNode
-    | otherwise = Tup [n1,p2] :-> Case n1 cs
+createApply :: Ty -> Ty -> TyEnv -> [Tag] -> Lam
+createApply argType retType te ts
+    | null cs = Tup [n1,a2] :-> Error ("Empty Apply:" ++ show ts)  retType
+    | otherwise = Tup [n1,a2] :-> Case n1 cs
     where
+    a2 = Var v2 argType
     cs = [ f t | t <- ts, tagIsPartialAp t]
     f t = (NodeC t vs :-> g ) where
         (ts,_) = runIdentity $ findArgsType te t
@@ -67,8 +68,8 @@ createApply te ts
         (n','_':rs) = span isDigit cs
         n = read n'
         g
-            | n == (1::Int) =  App fname (vs ++ [p2]) ty
-            | n > 1 = Return $ NodeC (toAtom $ 'P':show (n - 1) ++ "_" ++ rs) (vs ++ [p2])
+            | n == (1::Int) =  App fname (vs ++ [a2]) ty
+            | n > 1 = Return $ NodeC (toAtom $ 'P':show (n - 1) ++ "_" ++ rs) (vs ++ [a2])
             | otherwise = error "createApply"
          where
             fname = (toAtom $ 'f':rs)

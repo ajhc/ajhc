@@ -273,26 +273,28 @@ compile' dataTable cenv (tvr,as,e) = ans where
         return (Return (toVal tvr))
     ce e |  (v,as) <- fromAp e, EVar v <- dropCoerce v = do
         as <- return $ args as
+        let fty = toType TyNode (getType e)
         case Map.lookup (tvrNum v) (scMap cenv) of
             Just (_,[],_) -> do
                 case constant (EVar v) of
-                    Just (Const x) -> app (Return x) as
-                    Just x@Var {} -> app (gEval x) as
+                    Just (Const x) -> app fty (Return x) as
+                    Just x@Var {} -> app fty (gEval x) as
                     Nothing -> do
                         var@Var {} <- caforconst (EVar v)
-                        app (gEval var) as   -- CAFs are looked up in global env
+                        app fty (gEval var) as   -- CAFs are looked up in global env
             Just (v,as',es)
                 | length as >= length as' -> do
                     let (x,y) = splitAt (length as') as
-                    app (App v x es) y
+                    app fty (App v x es) y
                 | otherwise -> do
                     let pt = partialTag v (length as' - length as)
                     return $ Return (NodeC pt as)
-            Nothing -> app (gEval $ toVal v) as
+            Nothing -> app fty (gEval $ toVal v) as
     ce e | (v,as@(_:_)) <- fromAp e = do
+        let fty = toType TyNode (getType e)
         as <- return $ args as
         e <- ce v
-        app e as
+        app fty e as
     ce (EPi (TVr { tvrIdent = 0, tvrType = a}) b) = do
         a' <- cc a
         b' <- cc b
@@ -405,10 +407,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
         x <- ce e
         return (Tup (map toVal es) :-> x)
     cp (Alt lc@(LitCons n es _) e) = do
-        --let (e',as') = fromLam e
         x <- ce e
-        --es <- mapM (\_ -> newNodePtrVar) (drop (length as') es)
-        --x <- app x es
         nn <- getName lc
         return (NodeC nn (map toVal es) :-> x)
     cp x = error $ "cp: " ++ show (funcName,x)
@@ -419,17 +418,19 @@ compile' dataTable cenv (tvr,as,e) = ans where
     cp' nv cons p = f p where
         f (Alt l@(LitInt i _) e) = do
             x <- ce e
-            --z <- const $ ELit l
             (_,tp) <- isBasic l
             z <- return $ Lit i tp
             return (z :-> x)
 
     getName x = getName' dataTable x
 
-    app e [] = return e
-    app e (a:as) = do
+    app _ e [] = return e
+    app ty e [a] = do
         v <- newNodeVar
-        app (e :>>= v :-> gApply v a) as
+        return (e :>>= v :-> App funcApply [v,a] ty)
+    app ty e (a:as) = do
+        v <- newNodeVar
+        app ty (e :>>= v :-> gApply v a) as
     app' e [] = return $ Return e
     app' (Const (NodeC t cs)) (a:as) | tagIsPartialAp t = do
         let ('P':rs') = fromAtom t
@@ -454,7 +455,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
             tl = toAtom $ "bap_" ++ show (length as) ++ "_" ++  funcName ++ "_" ++ show vn
             args = [Var v (TyPtr TyNode) | v <- [v1..] | _ <- (undefined:as)]
             s = Store (NodeC t (e:as))
-        d <- app (gEval p1) (tail args)
+        d <- app TyNode (gEval p1) (tail args) --TODO
         addNewFunction (tl,Tup (args) :-> d)
         return s
     addNewFunction tl@(n,Tup args :-> body) = do
@@ -485,7 +486,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
                     nv <- newNodePtrVar
                     z <- app' nv y
                     return $ s :>>= nv :-> z
-                    --fail "thinking still..."
                 | otherwise -> do
                     let pt = partialTag v (length as' - length as)
                     return $ Store (NodeC pt as)
@@ -522,10 +522,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
                     v' <- newNodeVar
                     e <- cc e
                     return $ doUpdate (toVal tvr) e
-
-                    --return (e :>>= v :->
-                    --        Fetch v :>>= v' :->
-                    --        Update (toVal tvr) v')
             xs <- mapM u bs
             v <- f ds x
             let r = (foldr (\a b -> a :>>= unit :-> b) v xs)

@@ -298,9 +298,9 @@ grinInlineEvalApply  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFun
         g (e1 :>>= l) = g e1 :>>= f l
         g (App a [vr@(Var v _)] _)
             | a == funcEval = Return vr :>>= createEval TrailingUpdate typeEnv (tagsp v)
-        g app@(App a [vr@(Var v _),y] _)
+        g app@(App a [vr@(Var v _),y] ty)
             | a == funcApply = case (tags v) of
-                Just ts ->  Return (Tup [vr,y]) :>>= createApply typeEnv ts
+                Just ts ->  Return (Tup [vr,y]) :>>= createApply (getType y) ty typeEnv ts
                 Nothing -> error $ "InlineEvalApply: " ++ show app
         g n@(App a _ _)
             | a == funcApply || a == funcEval = error $ "Invalid evap: " ++ show n

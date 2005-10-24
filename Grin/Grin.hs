@@ -394,6 +394,10 @@ instance CanTypeCheck TyEnv Exp Ty where
         as'' <- mapM (typecheck te) as
         if as'' == as' then return t' else
             fail $ "Prim: arguments do not match " ++ show n
+    typecheck te ap@(App fn [v,a] t) | fn == funcApply = do
+        [v',a'] <- mapM (typecheck te) [v,a]
+        if v' == TyNode then return t
+         else fail $ "App apply arg doesn't match: " ++ show ap
     typecheck te a@(App fn as t) = do
         (as',t') <- findArgsType te fn
         as'' <- mapM (typecheck te) as
