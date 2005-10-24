@@ -20,7 +20,6 @@ import Doc.Pretty
 import E.E
 import E.FreeVars
 import E.LambdaLift
-import E.Pretty(render)
 import E.TypeCheck
 import E.Values
 import FreeVars
@@ -160,6 +159,7 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
         --ds' = ic:ev:ap:ds
         ds' = ic:(ds ++ fbaps)
     let grin = Grin {
+            grinEntryPoints = [funcMain],
             grinPhase = PhaseInit,
             grinTypeEnv = te,
             grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  theMain :>>= n0 :-> Return unit )) : ds',

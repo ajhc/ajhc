@@ -171,6 +171,7 @@ phaseEvalInlined _ = False
 
 
 data Grin = Grin {
+    grinEntryPoints :: [Atom],
     grinPhase :: Phase,
     grinTypeEnv :: TyEnv,
     grinFunctions :: [(Atom,Lam)],

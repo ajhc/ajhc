@@ -1,24 +1,21 @@
 module Grin.Interpret(evaluate) where
 
-import Data.IORef
-import Grin.Grin
 import Atom
-import Control.Monad.Identity
-import qualified FlagDump as FD
-import Options
-import Data.Monoid
-import qualified Stats
-import Data.Map as Map hiding(map)
-import E.Pretty(render)
-import Grin.Show
-import CharIO
 import Char
-import Name.VConsts
---import Grin.Primitives
-import Doc.Pretty
+import CharIO
+import Control.Monad.Identity
+import Data.IORef
+import Data.Map as Map hiding(map)
+import Data.Monoid
 import Doc.DocLike
-import E.Pretty
+import Doc.Pretty
 import GenUtil hiding(putErrLn,putErr)
+import Grin.Grin
+import Grin.Show
+import Name.VConsts
+import Options
+import qualified FlagDump as FD
+import qualified Stats
 
 builtins = []
 --createCafMap as = f vars [] >>= return . Map.fromList  where

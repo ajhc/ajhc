@@ -6,25 +6,21 @@ import Control.Monad.State
 import Control.Monad.Writer
 import Data.Monoid
 import List
-import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
-import Text.PrettyPrint.HughesPJ(nest,($$),($+$))
+import Text.PrettyPrint.HughesPJ(nest,($$))
 
 import Atom
 import C.Gen
 import C.Prims
 import Doc.DocLike
 import Doc.PPrint
-import E.Pretty(render)
 import FreeVars
 import GenUtil
 import Grin.Grin
 import Grin.HashConst
 import Grin.Show
-import qualified Util.Seq as Seq
 import RawFiles
-import Name.VConsts
 import CanType
 
 
@@ -126,7 +122,7 @@ newNode (NodeC t as) = do
     statement (CSAssign tmp $ CEFunCall "malloc" [CESizeof (if tagIsWHNF t then toStructT t else node_t)])
     statement (CSAssign  (CEDot tmp' "tag") (CEDoc (toTag t)) )
     as' <- mapM cVal as
-    mapM_ statement [CSAssign  (CEDot tmp' ('a':show i)) a | a <- as' | i <- [1 ..] ]
+    mapM_ statement [CSAssign  (CEDot tmp' ('a':show i)) a | a <- as' | i <- [(1 :: Int) ..] ]
     return $ CECast pnode_t tmp
 
 
@@ -137,7 +133,7 @@ cexp (Update v@Var {} (NodeC t as)) = do
     statement (CSExpr $ CEFunCall "update_inc" [])
     statement (CSAssign  (CEIndirect tmp' "tag") (CEDoc (toTag t)) )
     as' <- mapM cVal as
-    mapM_ statement [CSAssign  (CEIndirect tmp' ('a':show i)) a | a <- as' | i <- [1 ..] ]
+    mapM_ statement [CSAssign  (CEIndirect tmp' ('a':show i)) a | a <- as' | i <- [(1 :: Int) ..] ]
     return $ CEDoc ""
 
 cexp (Update v z) = do  -- TODO eliminate unknown updates
@@ -260,7 +256,7 @@ cb (Return v :>>= (NodeC t as) :-> e') = do
     let tmp = CEIndirect v' (toStruct t)
     as' <- mapM cVal as
     --let ass = [CSAssign  a (CEIndirect tmp ('a':show i)) | a <- as' | i <- [1 ..] ]
-    let ass = [CSAssign  a (CEDot tmp ('a':show i)) | a <- as' | i <- [1 ..] ]
+    let ass = [CSAssign  a (CEDot tmp ('a':show i)) | a <- as' | i <- [( 1 :: Int) ..] ]
     ss' <- cb e'
     as' <- mapM declVar as
     return (as'  ++ ass ++ ss')
@@ -270,7 +266,7 @@ cb (Fetch v :>>= (NodeC t as) :-> e') = do
     let tmp = CEIndirect v' (toStruct t)
     as' <- mapM cVal as
     --let ass = [CSAssign  a (CEIndirect tmp ('a':show i)) | a <- as' | i <- [1 ..] ]
-    let ass = [CSAssign  a (CEDot tmp ('a':show i)) | a <- as' | i <- [1 ..] ]
+    let ass = [CSAssign  a (CEDot tmp ('a':show i)) | a <- as' | i <- [(1 :: Int) ..] ]
     ss' <- cb e'
     as' <- mapM declVar as
     return (as'  ++ ass ++ ss')
@@ -320,7 +316,7 @@ cb (Case v@(Var _ t) ls) | t == TyNode = do
             --let tmp = CECast (toStructTP t)  v'
             let tmp = CEIndirect v' (toStruct t)
             --let ass = [CSAssign  a (CEIndirect tmp ('a':show i)) | a <- as' | i <- [1 ..] ]
-            let ass = [CSAssign  a (CEDot tmp ('a':show i)) | a <- as' | i <- [1 ..] ]
+            let ass = [CSAssign  a (CEDot tmp ('a':show i)) | a <- as' | i <- [(1 :: Int) ..] ]
             as' <- mapM declVar as
             return $ (Just (toTag t), as' ++ ass ++ e')
     ls' <- mapM da ls

@@ -28,7 +28,7 @@ import E.FromHs
 import E.Inline
 import E.LambdaLift
 import E.LetFloat
-import E.Pretty
+import E.Pretty hiding(render)
 import E.Rules
 import E.Strictness
 import E.Subst
