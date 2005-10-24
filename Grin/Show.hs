@@ -1,4 +1,4 @@
-module Grin.Show(prettyFun,prettyVal,prettyExp,printGrin) where
+module Grin.Show(prettyFun,prettyVal,prettyExp,printGrin,render) where
 
 import Grin.Grin
 import Doc.Pretty
@@ -12,7 +12,6 @@ import Number
 import Monad
 import CharIO
 import Doc.Attr
-import E.Pretty(render)
 import qualified FlagDump as FD
 import Options
 
@@ -94,6 +93,8 @@ instance DocLike d => PPrint d Var where
 prettyFun :: (Atom,Lam) -> Doc
 prettyFun (n,(Tup as :-> e)) = func (fromAtom n) <+> hsep (map pVal as) <+> operator "=" <+> keyword "do" <$> indent 2 (prettyExp empty e)
 
+render :: Doc -> String
+render doc =  displayS (renderPretty 0.95 (optColumns options)  doc) ""
 
 printGrin :: Grin -> IO ()
 printGrin Grin { grinFunctions = ds', grinCafs = cafs } = do
