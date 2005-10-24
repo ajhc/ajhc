@@ -132,10 +132,10 @@ getMainFunction dataTable name ds = ans where
               | otherwise = case ioLike (getType maine) of
                 Just x ->  EAp (EAp (EVar runMain)  x ) maine
                 Nothing ->  EAp (EAp (EVar runExpr) ty) maine
-            ans' = eStrictLet (tvr { tvrIdent = 0, tvrType = (infertype dataTable be)}) be vUnit
+            -- ans' = eStrictLet (tvr { tvrIdent = 0, tvrType = (infertype dataTable be)}) be vUnit
             be = eAp e vWorld__
             theMain = (theMainName,theMainTvr,be)
-            theMainTvr =  tVr (nameToInt theMainName) (getType be)
+            theMainTvr =  tVr (nameToInt theMainName) (infertype dataTable be)
             tvm@(TVr { tvrType =  ty}) =  main
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs ]
             (ty',xs) = fromPi ty

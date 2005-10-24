@@ -390,9 +390,13 @@ compileModEnv' stats ho = do
 
     lc <- return $ scToE (SC v rs')
 
+
     wdump FD.Lambdacube $ printCheckName dataTable lc
+
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     wdump FD.Progress $ printEStats lc
+
+    stats <- Stats.new
     wdump FD.Progress $ putErrLn "Converting to Grin..."
     x <- Grin.FromE.compile dataTable (error "vmap") (eToSC dataTable lc)
     Stats.print "Grin" Stats.theStats
