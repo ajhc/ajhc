@@ -456,7 +456,10 @@ compileModEnv' stats ho = do
         let fn = optOutName options
         let cf = (fn ++ "_code.c")
         wdump FD.Progress $ putErrLn ("Writing " ++ show cf)
-        writeFile cf $ cg -- toUTF8  (prettyC z ++ concatMap (\(i,n) -> "//" ++ 'v':show i ++ " -> " ++ n ++ "\n") (snd us))
+        name <- System.getProgName
+        args <- System.getArgs
+        let argstring = simpleQuote (name:args)
+        writeFile cf $ "char jhc_command[] = \"" ++ argstring ++ "\";\n" ++  cg
         let boehmOpts | fopts FO.Boehm = ["-DUSE_BOEHM_GC", "-lgc"]
                       | otherwise = []
         let profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE"]

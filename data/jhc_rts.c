@@ -40,12 +40,11 @@ static char *jhc_progname;
 static int jhc_stdrnd[2] A_UNUSED = { 1 , 1 };
 
 #ifdef _JHC_PROFILE
-static uintmax_t prof_memory_allocated;
 static uintmax_t prof_function_calls;
 static uintmax_t prof_case_statements;
 static uintmax_t prof_updates;
+static void *prof_memstart;
 
-#define malloc(n) ( prof_memory_allocated += (n), malloc( (n) ) )
 #define update_inc() prof_updates++
 #define function_inc() prof_function_calls++
 #define case_inc() prof_case_statements++
@@ -56,11 +55,19 @@ static uintmax_t prof_updates;
 #endif
 
 
+static void *jhc_mem;
+
+static inline void *jhc_malloc(size_t n) {
+        void *ret = jhc_mem;
+        jhc_mem += n;
+        return ret;
+}
 
 static void
 jhc_print_profile(void) {
 #ifdef _JHC_PROFILE
-        wprintf(L"Memory Allocated: %llu\n", (long long)prof_memory_allocated);
+        wprintf(L"Command: %s\n", jhc_command);
+        wprintf(L"Memory Allocated: %llu\n", (long long)(jhc_mem - prof_memstart));
         wprintf(L"Function Calls:   %llu\n", (long long)prof_function_calls);
         wprintf(L"Case Statements:  %llu\n", (long long)prof_case_statements);
         wprintf(L"Updates:          %llu\n", (long long)prof_updates);
@@ -70,6 +77,12 @@ jhc_print_profile(void) {
 int
 main(int argc, char *argv[])
 {
+        /* one gig of memory pre-allocated */
+        jhc_mem = malloc(1000000000);
+#ifdef _JHC_PROFILE
+        prof_memstart = jhc_mem;
+#endif
+
         jhc_argc = argc - 1;
         jhc_argv = argv + 1;
         jhc_progname = argv[0];

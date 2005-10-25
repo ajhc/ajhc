@@ -112,14 +112,14 @@ newAuto t = do
     return $ CEIdent n
 
 newNode (NodeC t _) | t == tagHole = do
-    return $  CEFunCall "malloc" [CESizeof node_t]
+    return $  CEFunCall "jhc_malloc" [CESizeof node_t]
 newNode (NodeC t as) = do
     statement (CSAuto pnode_t "tmp")
     --let tmp = CEVar (CTypePointer (toStructT t)) "tmp"
     let tmp = CEIdent "tmp"
         --tmp' = CECast (toStructTP t) tmp
         tmp' = CEIndirect tmp (toStruct t)
-    statement (CSAssign tmp $ CEFunCall "malloc" [CESizeof (if tagIsWHNF t then toStructT t else node_t)])
+    statement (CSAssign tmp $ CEFunCall "jhc_malloc" [CESizeof (if tagIsWHNF t then toStructT t else node_t)])
     statement (CSAssign  (CEDot tmp' "tag") (CEDoc (toTag t)) )
     as' <- mapM cVal as
     mapM_ statement [CSAssign  (CEDot tmp' ('a':show i)) a | a <- as' | i <- [(1 :: Int) ..] ]
