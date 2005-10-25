@@ -299,6 +299,10 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
                 mtick "Grin.eval.hoisted"
                 e' <- g e
                 return $ (Return vr :>>= createEval (HoistedUpdate node) typeEnv (tagsp v)) :>>= vb :-> Return vb' :>>= node :-> e'
+        g (App a [vr@(Var v _)] _ :>>= node@(NodeC {}) :-> e) | a == funcEval = do
+                mtick "Grin.eval.hoisted2"
+                e' <- g e
+                return $ (Return vr :>>= createEval (HoistedUpdate node) typeEnv (tagsp v)) :>>= node :-> e'
         --g (App a [vr@(Var v _)] _ :>>= Var r _ :-> _ )
         --    | a == funcEval = Return vr :>>= createEval (SwitchingUpdate ) typeEnv (tagsp v)
         g (e1 :>>= l) = do e1' <- g e1; l' <- f l; return $ e1' :>>= l'

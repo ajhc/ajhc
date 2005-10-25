@@ -10,7 +10,7 @@ import Control.Monad.Identity
 import Atom
 import Char
 
-data UpdateType = NoUpdate | TrailingUpdate | HoistedUpdate Val
+data UpdateType = NoUpdate | TrailingUpdate | HoistedUpdate Val | SwitchingUpdate [Atom]
 
 -- create an eval suitable for inlining.
 createEval :: UpdateType -> TyEnv -> [Tag] -> Lam
@@ -27,7 +27,15 @@ createEval shared  te ts
         Fetch p1 :>>= n2 :->
         Case n2 cs :>>= v :->
         Return (NodeC t [v])
-    | otherwise = p1 :->
+    | HoistedUpdate (NodeC t []) <- shared = p1 :->
+        Fetch p1 :>>= n2 :->
+        Case n2 cs :>>= Tup [] :->
+        Return (NodeC t [])
+    | HoistedUpdate (NodeC t vs) <- shared = p1 :->
+        Fetch p1 :>>= n2 :->
+        Case n2 cs :>>= Tup vs :->
+        Return (NodeC t vs)
+    | NoUpdate <- shared = p1 :->
         Fetch p1 :>>= n2 :->
         Case n2 cs
     where
@@ -38,6 +46,10 @@ createEval shared  te ts
         | tagIsWHNF t, HoistedUpdate (NodeC t' [v]) <- shared  = case vs of
             [x] -> Return x
             _ -> error "createEval: bad thing"
+        | tagIsWHNF t, HoistedUpdate (NodeC t' []) <- shared  = case vs of
+            [] -> Return (Tup [])
+            _ -> error "createEval: bad thing"
+        | tagIsWHNF t, HoistedUpdate (NodeC t' vars) <- shared  = Return (Tup vs)
         | tagIsWHNF t = Return n2
         | 'F':fn <- fromAtom t  = ap ('f':fn) vs
         | 'B':fn <- fromAtom t  = ap ('b':fn) vs
@@ -47,8 +59,9 @@ createEval shared  te ts
         vs = [ Var v ty |  v <- [V 4 .. ] | ty <- ts]
     ap n vs
     --    | shared =  App (toAtom $ n) vs :>>= n3 :-> Update p1 n3 :>>= unit :-> Return n3
-        | HoistedUpdate udp@(NodeC t [v]) <- shared = App fname vs ty :>>= n3 :-> Return n3 :>>= udp :-> Update p1 udp :>>= unit :-> Return v
-        | HoistedUpdate udp <- shared = App fname vs ty :>>= n3 :-> (Return n3 :>>= udp :-> Update p1 udp) :>>= unit :-> Return n3
+        | HoistedUpdate udp@(NodeC t []) <- shared = App fname vs ty :>>= n3 :-> Update p1 udp
+        | HoistedUpdate udp@(NodeC t [v]) <- shared = App fname vs ty :>>= n3 :-> Return n3 :>>= udp :-> (Update p1 udp :>>= unit :-> Return v)
+        | HoistedUpdate udp@(NodeC t vars) <- shared = App fname vs ty :>>= n3 :-> (Return n3 :>>= udp :-> (Update p1 udp) :>>= unit :-> Return (Tup vars))
         | otherwise = App fname vs ty
      where
         fname = toAtom n
