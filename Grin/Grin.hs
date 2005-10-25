@@ -154,7 +154,7 @@ data Val =
     | Tup [Val]
     | ValPrim APrim
     | Addr {-# UNPACK #-} !(IORef Val)  -- used only in interpreter
-    deriving(Eq,Show,Ord)
+    deriving(Eq,Ord)
 
 
 instance Show (IORef a) where
@@ -162,6 +162,23 @@ instance Show (IORef a) where
 instance Ord (IORef a) where
     compare a b = EQ
 
+instance Show Val where
+    -- showsPrec _ s | Just st <- fromVal s = text $ show (st::String)
+    showsPrec _ (NodeC t []) = parens $ (fromAtom t)
+    showsPrec _ (NodeC t vs) = parens $ (fromAtom t) <+> hsep (map shows vs)
+    showsPrec _ (NodeV (V i) vs) = parens $ char 't' <> tshow i <+> hsep (map shows vs)
+    showsPrec _ (Tag t) = (fromAtom t)
+    showsPrec _ (Var (V i) t)
+        | TyPtr _ <- t = char 'p' <> tshow i
+        | TyNode <- t = char 'n' <> tshow i
+        | Ty _ <- t  = char 'l' <> tshow i
+        | TyTag <- t  = char 't' <> tshow i
+        | otherwise = char 'v' <> tshow i
+    showsPrec _ (Lit i t) | t == tCharzh, i >= 0x20 && i < 0x7f, Just x <- toIntegral i = tshow (chr x)
+    showsPrec _ (Lit i _)  = tshow i
+    showsPrec _ (Tup xs)  = tupled $ map shows xs
+    showsPrec _ (Const v) = char '&' <> shows v
+    showsPrec _ (Addr _) = text "<ref>"
 
 data Phase = PhaseInit | PostInlineEval
     deriving(Show,Eq,Ord,Enum)
