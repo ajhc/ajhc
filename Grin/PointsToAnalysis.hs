@@ -26,6 +26,8 @@ import qualified Doc.Chars as U
 import qualified FlagDump as FD
 import Util.UniqueMonad
 import Util.Once
+import Stats
+import Util.SameShape
 
 
 sameLength (_:xs) (_:ys) = sameLength xs ys
@@ -279,8 +281,8 @@ createStore  te ts
         (ts,_) = runIdentity $ findArgsType te t
         vs = [ Var v ty |  v <- [V 4 .. ] | ty <- ts]
 
-grinInlineEvalApply :: Grin -> IO Grin
-grinInlineEvalApply  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinCafs = cafs }) = do
+grinInlineEvalApply :: Stats -> Grin -> IO Grin
+grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinCafs = cafs }) = do
     pt <- analyze grin
     wdump FD.Progress $ do
         CharIO.putStrLn (pointsToStats pt)
@@ -292,23 +294,28 @@ grinInlineEvalApply  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFun
         CharIO.putStrLn "heap:"
         mapM_ CharIO.print [ v  | v@(_,_) <-  Map.toList (ptHeap pt)]
 
-    let f (l :-> e) = l :-> g e
-        g (App a [vr@(Var v _)] _ :>>= vb :-> Return vb' :>>= node@(NodeC {}) :-> e)
-            | vb == vb', a == funcEval = (Return vr :>>= createEval (HoistedUpdate node) typeEnv (tagsp v)) :>>= vb :-> Return vb' :>>= node :-> g e
-        g (e1 :>>= l) = g e1 :>>= f l
-        g (App a [vr@(Var v _)] _)
-            | a == funcEval = Return vr :>>= createEval TrailingUpdate typeEnv (tagsp v)
-        g app@(App a [vr@(Var v _),y] ty)
-            | a == funcApply = case (tags v) of
-                Just ts ->  Return (Tup [vr,y]) :>>= createApply (getType y) ty typeEnv ts
+    let f (l :-> e) = do e' <- g e; return $ l :-> e'
+        g (App a [vr@(Var v _)] _ :>>= vb :-> Return vb' :>>= node@(NodeC {}) :-> e) | vb == vb', a == funcEval = do
+                mtick "Grin.eval.hoisted"
+                e' <- g e
+                return $ (Return vr :>>= createEval (HoistedUpdate node) typeEnv (tagsp v)) :>>= vb :-> Return vb' :>>= node :-> e'
+        --g (App a [vr@(Var v _)] _ :>>= Var r _ :-> _ )
+        --    | a == funcEval = Return vr :>>= createEval (SwitchingUpdate ) typeEnv (tagsp v)
+        g (e1 :>>= l) = do e1' <- g e1; l' <- f l; return $ e1' :>>= l'
+        g (App a [vr@(Var v _)] _) | a == funcEval = do
+            mtick "Grin.eval.trailing"
+            return $ Return vr :>>= createEval TrailingUpdate typeEnv (tagsp v)
+        g app@(App a [vr@(Var v _),y] ty) | a == funcApply = do
+            mtick "Grin.eval.apply"
+            case (tags v) of
+                Just ts ->  return $ Return (Tup [vr,y]) :>>= createApply (getType y) ty typeEnv ts
                 Nothing -> error $ "InlineEvalApply: " ++ show app
-        g n@(App a _ _)
-            | a == funcApply || a == funcEval = error $ "Invalid evap: " ++ show n
-        g (Store vr@(Var v _)) | Just ts <- tags v = Return vr :>>= createStore typeEnv ts
-        g st@(Store (Var {})) = Error ("Store of basic: " ++ show st) (TyPtr TyNode)
-        g (Case v@(Var vr _) xs) = docase v (map f xs) (tags vr)
-        g (Case v xs) = Case v (map f xs)
-        g x = x
+        g n@(App a _ _) | a == funcApply || a == funcEval = error $ "Invalid evap: " ++ show n
+        g (Store vr@(Var v _)) | Just ts <- tags v = return $ Return vr :>>= createStore typeEnv ts
+        g st@(Store (Var {})) = return $ Error ("Store of basic: " ++ show st) (TyPtr TyNode)
+        g (Case v@(Var vr _) xs) = do xs' <- mapM f xs;  docase v xs' (tags vr)
+        g (Case v xs) = do xs' <- mapM f xs;  return $ Case v xs'
+        g x = return x
         tags v = if isVsBas x then Nothing else Just [ t | t <- Set.toList vs] where
               vs = getNodes   x
               x = case Map.lookup v (ptVars pt) of
@@ -319,25 +326,28 @@ grinInlineEvalApply  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFun
                 Just h = Map.lookup  n (ptHeap pt)
             vs = getHeaps x
             Just x = Map.lookup v (ptVars pt)
-        docase v xs Nothing =  Case v xs
-        docase _ ((_ :-> x):_) (Just []) = Error "No Valid alternatives. This Should Not be reachable." (getType x)
+        docase v xs Nothing =  return $ Case v xs
+        docase _ ((_ :-> x):_) (Just []) = return $ Error "No Valid alternatives. This Should Not be reachable." (getType x)
         --docase v xs (Just ts) | null vs && any (`notElem` ns') ts = error $ "Odd Case: " ++ show (v,ns',ts)  where
         --    (ns,vs) = span isNodeC xs
         --    ns' = [ t | NodeC t _ :-> _ <- ns ]
         --    isNodeC (NodeC {} :-> _) = True
         --   isNodeC _ = False
-        docase v xs (Just ts) | not (null ns && null vs) = if length ns == length ts  then Case v ns else Case v (ns ++ vs) where
-            (ns,vs) = span isNodeC (filter g xs)
-            g (NodeC t _ :-> _) = t `elem` ts
-            g (Var {} :-> _ ) = True
-            g _ = False
-            isNodeC (NodeC {} :-> _) = True
-            isNodeC _ = False
-            --simple (NodeC t [Lit {}] :-> _) = False
-            --simple (NodeC t _ :-> _) = True
-        docase _ ((_ :-> x):_) _ = Error "No Valid alternatives. This Should Not be reachable." (getType x)
+        docase v xs (Just ts) = do
+            let (ns,vs) = span isNodeC (filter g xs)
+                g (NodeC t _ :-> _) = t `elem` ts
+                g (Var {} :-> _ ) = True
+                g _ = False
+                isNodeC (NodeC {} :-> _) = True
+                isNodeC _ = False
+                xs' = if sameShape1 ns ts  then  ns else (ns ++ vs)
+            mticks (length xs - length xs') "Grin.eval.case-elim"
+            return $ if null xs' then  Error "No Valid alternatives. This Should Not be reachable." (getType (Case v xs)) else (Case v xs')
+        -- docase _ ((_ :-> x):_) _ = return $ Error "No Valid alternatives. This Should Not be reachable." (getType x)
         docase _ _ _ = error $ "docase: strange argument"
-    return grin { grinPhase = PostInlineEval, grinFunctions = map (mapSnd f) grinFunctions }
+    let (sts,funcs) = unzip [ (stat,(a,l')) | (a,l) <- grinFunctions, let (l',stat) = runStatM (f l) ]
+    tickStat stats (mconcat sts)
+    return grin { grinPhase = PostInlineEval, grinFunctions = funcs }
 
 collect :: Map.Map Var W -> HcHash -> Int -> Atom -> Lam -> (PointsToEq,HcHash)
 collect lmap hc st fname (Tup vs :-> exp')

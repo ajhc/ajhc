@@ -419,7 +419,9 @@ compileModEnv' stats ho = do
     typecheckGrin x
     wdump FD.GrinPreeval $ printGrin x
     wdump FD.Progress $ putErrLn "Points-to analysis..."
-    x <- Grin.PointsToAnalysis.grinInlineEvalApply x
+    stats <- Stats.new
+    x <- Grin.PointsToAnalysis.grinInlineEvalApply stats x
+    wdump FD.Progress $ Stats.print "EvalInline" stats
     typecheckGrin x
     wdump FD.GrinPreeval $ printGrin x
     stats <- Stats.new

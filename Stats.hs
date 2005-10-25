@@ -1,4 +1,4 @@
-module Stats(Stats,new,tick,setPrintStats,ticks,getTicks,Stats.print,clear,MonadStats(..),combine, printStat, Stat, mtick, mticks, runStatT, runStatIO, tickStat, StatT, theStats ) where
+module Stats(Stats,new,tick,setPrintStats,ticks,getTicks,Stats.print,clear,MonadStats(..),combine, printStat, Stat, mtick, mticks, runStatT, runStatIO, tickStat, StatT, theStats,StatM,runStatM ) where
 
 
 import Char
@@ -154,8 +154,15 @@ instance Monoid Stat where
 newtype StatT m a = StatT (WriterT Stat m a)
     deriving(MonadIO, Functor, MonadFix, MonadTrans, Monad)
 
+newtype StatM a = StatM (StatT Identity a)
+    deriving(Functor, MonadFix, Monad, MonadStats)
+
+
 runStatT :: Monad m => StatT m a -> m (a,Stat)
 runStatT (StatT m) =  runWriterT m
+
+runStatM ::  StatM a -> (a,Stat)
+runStatM (StatM (StatT m)) = runIdentity $ runWriterT m
 
 class Monad m => MonadStats m where
     mticks' ::  Int -> Atom -> m ()
