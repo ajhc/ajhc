@@ -2,10 +2,12 @@ module Grin.Simplify(simplify) where
 
 import Control.Monad.State
 import Control.Monad.Trans
+import Control.Monad.Identity
 import Data.Map as Map
 import Data.Monoid
 import Data.Set as Set
 import List
+import Maybe
 
 import Atom
 import CharIO
@@ -16,6 +18,7 @@ import Doc.PPrint
 import FreeVars
 import Grin.Grin
 import Grin.Show
+import C.Prims
 import Grin.Whiz
 import Stats
 import Util.Graph
@@ -141,30 +144,87 @@ isSimple (fn,x) = f (2::Int) x where
     f _ (_ :-> Case {}) = False
     f _ _ = True
 
-    {-
+isManifestNode :: Monad m => Exp -> m [Atom]
+isManifestNode (Return (NodeC t _)) = return [t]
+isManifestNode Error {} = return []
+isManifestNode (Case _ ls) = do
+    cs <- Prelude.mapM isManifestNode [ e | _ :-> e <- ls ]
+    return $ concat cs
+isManifestNode (_ :>>= _ :-> e) = isManifestNode e
+isManifestNode _ = fail "not manifest node"
 
-isSimple :: (Atom,Lam) -> Bool
-isSimple (fn,_ :-> x) = f x where
- f x| App fn' _ <- x , fn /= fn' = True
-    | Return {} <- x = True
-    | Fetch {}  <- x = True
-    | Store {}  <- x = True
-    | Prim {}   <- x = True
-    | Error {}  <- x = True
-    | Cast {}   <- x = True
-    | Update {} <- x = True
-    | z :>>= _ :-> Return {} <- x = f z
-    | Return {} :>>= _ :-> z <- x = f z
-    | Fetch {} :>>= _ :-> z <- x = f z
-    | Store {} :>>= _ :-> z <- x = f z
-    | Prim {} :>>= _ :-> z <- x = f z
-    | Update {} :>>= _ :-> z <- x = f z
-    | z :>>= _ :-> Error {} <- x = f z
-    | Cast {} :>>= _ :-> z <- x = f z
-    | z :>>= _ :-> Cast {} <- x = f z
-    | otherwise = False
-    -}
+manifestNodes as = Prelude.map (isManifestNode . lamExp) as
 
+lamExp (_ :-> e) = e
+lamBind (b :-> _) = b
+
+isVar Var {} = True
+isVar _ = False
+
+optimize1 ::  (Atom,Lam) -> StatM Lam
+optimize1 (n,l) = g l where
+    g (b :-> e) = f e >>= return . (b :->)
+    f (Return n@NodeC {} :>>= b :-> Case b' as :>>= lr) | b == b' = do
+        c <- knownCase n as
+        r <- f (c :>>= lr)
+        return (Return n :>>= b :-> r)
+    f (Return n@NodeC {} :>>= b :-> Case b' as ) | b == b' = do
+        kc <- knownCase n as
+        r <- f kc
+        return (Return n :>>= b :-> r)
+    f (Case x as :>>= Tup [] :-> (Case x' as') :>>= lr) | x == x', not $ any (isVar . lamBind) as = do
+        c <- caseCombine x as as'
+        f (c :>>= lr)
+    f (Case x as :>>= Tup [] :-> (Case x' as')) | x == x', not $ any (isVar . lamBind) as = do
+        c <- caseCombine x as as'
+        f c
+        {-
+    f (Case x as :>>= b :-> m) | count (/= Just []) (manifestNodes as) <= 1 = do
+        mtick "Optimize.optimize.case-pullin"
+        f $ Case x [ x :-> (e :>>= b :-> m) |  x :-> e <- as ]
+        -}
+    f (Case x as :>>= v@(Var vnum _) :-> rc@(Case v' as') :>>= lr) | v == v', count (== Nothing ) (Prelude.map (isManifestNode . lamExp) as) <= 1, not (vnum `Set.member` freeVars lr) = do
+        c <- caseHoist x as v as' (getType rc)
+        f (c :>>= lr)
+    f (Case x as :>>= v :-> rc@(Case v' as')) | v == v', count (== Nothing ) (Prelude.map (isManifestNode . lamExp) as) <= 1 = do
+        ch <- caseHoist x as v as' (getType rc)
+        f ch
+    f (e1 :>>= _ :-> err@Error {}) | isErrOmittable e1 = do
+        mtick "Optimize.optimize.del-error"
+        return err
+    f (e1 :>>= l :-> e2) = do
+        e1' <- f e1
+        e2' <- f e2
+        return (e1' :>>= l :-> e2')
+    f (Case x as) = do
+       as' <- sequence [ f e >>= return . (b :->)| b :-> e <- as ]
+       return $ Case x as'
+    f e = return e
+    caseHoist x as v as' ty = do
+        mtick $ "Optimize.optimize.case-hoist" -- .{" ++ show (Prelude.map (isManifestNode . lamExp) as :: [Maybe [Atom]])
+        let nc = Case x [ b :-> e :>>= v :-> Case v as' | b :-> e <- as ]
+            z (Error s _) = Error s ty
+            z (e1 :>>= b :-> e2) = e1 :>>= b :-> z e2
+            z e = e :>>= v :-> Case v as'
+        return nc
+    knownCase n@(NodeC t vs) as = do
+        mtick $ "Optimize.optimize.known-case.{" ++ show t
+        --let f [] = error $ "no known case:" ++ show (n,as)
+        let f [] =  Error "known-case: No known case" (getType (Case n as))
+            f ((v@Var {} :-> b):_) = Return n :>>= v :-> b
+            f ((NodeC t' vs' :-> b):_) | t == t' =  Return (Tup vs) :>>= Tup vs' :-> b
+            -- f ((NodeC t' vs' :-> b):_) | t == t' = let (xs,ys) = unzip [ (Var x t,y) | (x,y@(Var _ t)) <- Map.toList mp] in Return (Tup ys) :>>= Tup xs :-> b
+            f (_:as) = f as
+        return $ f as
+    caseCombine x as as' = do
+        mtick $ "Optimize.optimize.case-combine"
+        let etags = [ bd | bd@(NodeC t _ :-> _) <- as, t `notElem` [ t | NodeC t _ :-> _ <- as' ] ]
+            as'' = Prelude.map f as'
+            f (v@Var {} :-> b) = v :-> Case v etags :>>= unit :-> b
+            f (n@(NodeC t _) :-> b) = case [ a | a@(NodeC t' _ :-> _) <-  as, t == t'] of
+                [bind :-> body] -> n :-> Return n :>>= bind :-> body :>>= unit :-> b
+            -- f r
+        return $ Case x as''
 
 deadVars :: Stats -> (Atom,Lam) -> IO (Atom,Lam)
 deadVars stats (n,l) = do
@@ -192,9 +252,15 @@ isOmittable (Fetch {}) = True
 isOmittable (Return {}) = True
 isOmittable (Store {}) = True
 isOmittable (Cast {}) = True
+isOmittable Prim { expPrimitive = Primitive { primAPrim = aprim } } = aprimIsCheap aprim
 isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
+isOmittable (e1 :>>= _ :-> e2) = isOmittable e1 && isOmittable e2
 isOmittable _ = False
 
+isErrOmittable Update {} = True
+isErrOmittable (e1 :>>= _ :-> e2) = isErrOmittable e1 && isErrOmittable e2
+isErrOmittable (Case x ds) = all isErrOmittable [ e | _ :-> e <- ds ]
+isErrOmittable x = isOmittable x
 
 simplify ::
     Stats     -- ^ stats to update
@@ -215,7 +281,11 @@ simplify stats grin = do
     let opt env a n l = do
                 (_,nl) <- deadVars stats (a,l)
                 (_,nl) <- simplify1 stats env (a,nl)
-                return nl
+                let Identity nl'' = whizExps return nl
+                -- putDocM CharIO.putErr (prettyFun (a,nl''))
+                let (nl',stat) = runStatM (optimize1 (a,nl''))
+                tickStat stats stat
+                return nl'
                 {-
         opt env a n l = do
             stats' <- Stats.new
