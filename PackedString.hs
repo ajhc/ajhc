@@ -25,6 +25,7 @@ module PackedString (
          -- * Converting to and from @PackedString@s
 	packString,  -- :: String -> PackedString
 	unpackPS,    -- :: PackedString -> String
+        showsPS,
         -- toString,
         toUTF8,
         lengthPS,
@@ -162,6 +163,10 @@ packString str = PS $ listArray (0, I# (utfCount str -# 1#)) (toUTF str)
 
 unpackPS :: PackedString -> String
 unpackPS (PS (UArray _ (I# e) ba)) = unpackFoldrUtf8# (ba) (e +# 1#) f [] where
+    f ch r = C# ch : r
+
+showsPS :: PackedString -> String -> String
+showsPS  (PS (UArray _ (I# e) ba)) xs = unpackFoldrUtf8# (ba) (e +# 1#) f xs where
     f ch r = C# ch : r
 
 

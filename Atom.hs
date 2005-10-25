@@ -33,7 +33,7 @@ data Atom = Atom {-# UNPACK #-} !Int !PackedString
     deriving(Typeable, Data)
 
 instance Show Atom where
-    show = toString
+    showsPrec _ (Atom _ ps) = showsPS ps
 
 instance Read Atom where
     readsPrec p s = [ (fromString x,y) |  (x,y) <- readsPrec p s]
@@ -52,6 +52,8 @@ instance ToAtom String where
     toAtom = fromString
 instance FromAtom String where
     fromAtom = toString
+instance FromAtom (String -> String) where
+    fromAtom x = showsPS (fromAtom x)
 
 instance ToAtom PackedString where
     toAtom x = unsafePerformIO $ fromPackedStringIO x
