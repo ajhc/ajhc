@@ -345,6 +345,7 @@ prettyExpr (CELiteral l) = prettyLit l
 prettyExpr (CEFunCall n ce) = text n <> parens (hcat (intersperse (text ", ") (map prettyExpr ce)))
 prettyExpr (CEDot (CEIndirect (CEIdent n) x) y) = text n <> text "->" <> text x <> text "." <> text y
 prettyExpr (CEDot (CEIndirect e x) y) = (parens $ prettyExpr e) <> text "->" <> text x <> text "." <> text y
+prettyExpr (CEIndirect e "") = text "*" <> (parens $ prettyExpr e)
 prettyExpr (CEIndirect (CEIdent i) n) = text i <> text "->" <> text n
 prettyExpr (CEIndirect e n) = (parens $ prettyExpr e) <> text "->" <> text n
 prettyExpr (CEDot e n) = (parens $ prettyExpr e) <> text "." <> text n
