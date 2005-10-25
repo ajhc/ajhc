@@ -403,17 +403,18 @@ compileModEnv' stats ho = do
     --wdump FD.Grin $ printGrin x
     x <- return $ normalizeGrin x
     typecheckGrin x
-    let opt x = do
-        wdump FD.Progress $ putErrLn "Optimization Pass..."
-        t <- Stats.getTicks stats
-        x <- deadFunctions stats [funcMain] x
-        x <- Grin.Simplify.simplify stats x
+    let opt s  x = do
+        stats' <- Stats.new
+        x <- deadFunctions stats' [funcMain] x
+        x <- Grin.Simplify.simplify stats' x
         when flint $ typecheckGrin x
-        t' <- Stats.getTicks stats
-        case t == t' of
-            False -> opt x
-            True -> return x
-    x <- opt x
+        t' <- Stats.getTicks stats'
+        wdump FD.Progress $ Stats.print s stats'
+        Stats.combine stats stats'
+        case t' of
+            0 -> return x
+            _ -> opt s x
+    x <- opt "Optimization" x
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     x <- return $ normalizeGrin x
     typecheckGrin x
@@ -427,20 +428,8 @@ compileModEnv' stats ho = do
     stats <- Stats.new
     x <- return $ normalizeGrin x
     typecheckGrin x
-    let opt (0::Int) x = return x
-        opt n x = do
-        wdump FD.Progress $ putErrLn "AE Optimization Pass..."
-        t <- Stats.getTicks stats
-        x <- deadFunctions stats [funcMain] x
-        x <- Grin.Simplify.simplify stats x
-        typecheckGrin x
-        t' <- Stats.getTicks stats
-        case t == t' of
-            False -> opt (n - 1) x
-            True -> return x
-    x <- opt (-1) x
+    x <- opt "AE Optimization" x
     wdump FD.OptimizationStats $ Stats.print "AE Optimization" stats
-
     x <- return $ normalizeGrin x
     typecheckGrin x
     wdump FD.Grin $ printGrin x

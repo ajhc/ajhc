@@ -58,7 +58,7 @@ createEval shared  te ts
             [] -> Return (Tup [])
             _ -> error "createEval: bad thing"
         | tagIsWHNF t, HoistedUpdate (NodeC t' vars) <- shared  = Return (Tup vs)
-        | tagIsWHNF t = Return n2
+        | tagIsWHNF t = Return (NodeC t vs)
         | 'F':fn <- fromAtom t  = ap ('f':fn) vs
         | 'B':fn <- fromAtom t  = ap ('b':fn) vs
         | otherwise = Error ("Bad Tag: " ++ fromAtom t) TyNode
