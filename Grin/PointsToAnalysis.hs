@@ -299,12 +299,23 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
                 mtick "Grin.eval.hoisted"
                 e' <- g e
                 return $ (Return vr :>>= createEval (HoistedUpdate node) typeEnv (tagsp v)) :>>= vb :-> Return vb' :>>= node :-> e'
-        g (App a [vr@(Var v _)] _ :>>= node@(NodeC {}) :-> e) | a == funcEval = do
-                mtick "Grin.eval.hoisted2"
-                e' <- g e
-                return $ (Return vr :>>= createEval (HoistedUpdate node) typeEnv (tagsp v)) :>>= node :-> e'
-        --g (App a [vr@(Var v _)] _ :>>= Var r _ :-> _ )
-        --    | a == funcEval = Return vr :>>= createEval (SwitchingUpdate ) typeEnv (tagsp v)
+        --g (App a [vr@(Var v _)] _ :>>= vb :-> Case vb' rs :>>= rl ) | vb == vb', a == funcEval = trailingCase vr vb rs (Just rl)
+        --g (App a [vr@(Var v _)] _ :>>= vb :-> Case vb' rs ) | vb == vb', a == funcEval = trailingCase vr vb rs Nothing
+        g (App a [vr@(Var v _)] _ :>>= vb@(Var vbv _) :-> e) | a == funcEval = do
+                let Just stags = tags vbv
+                case stags of
+                    [] ->  return $ (Return vr :>>= createEval NoUpdate typeEnv (tagsp v)) :>>= vb :-> Error "Update: no alternatives" (getType e)
+                    [t] -> do
+                        e' <- g e
+                        mtick "Grin.eval.hoisted2"
+                        let node = NodeC t vs
+                            (ts,_) = runIdentity $ findArgsType typeEnv t
+                            vs = [ Var v ty |  v <- [V 4 .. ] | ty <- ts]
+                        return $ (Return vr :>>= createEval (HoistedUpdate node) typeEnv (tagsp v)) :>>= vb :-> e'
+                    _ -> do
+                        e' <- g e
+                        mtick "Grin.eval.switched"
+                        return $ (Return vr :>>= createEval (SwitchingUpdate stags) typeEnv (tagsp v)) :>>= vb :-> e'
         g (e1 :>>= l) = do e1' <- g e1; l' <- f l; return $ e1' :>>= l'
         g (App a [vr@(Var v _)] _) | a == funcEval = do
             mtick "Grin.eval.trailing"
@@ -320,6 +331,21 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
         g (Case v@(Var vr _) xs) = do xs' <- mapM f xs;  docase v xs' (tags vr)
         g (Case v xs) = do xs' <- mapM f xs;  return $ Case v xs'
         g x = return x
+        {-
+        trailingCase vr@Var {expVar = v} vb rs rl = do
+                mtick "Grin.eval.case"
+                rl' <- fmapM f rl
+                let eval = createEval NoUpdate typeEnv (tagsp v)
+                    rs' = [  l :-> rs ]
+                g (Case vb rs)
+                return $ (Return vr :>>= eval) :>>= vb :-> Return vb' :>>= node :-> e'
+
+        g (App a [vr@(Var v _)] _ :>>= vb :-> Return vb' :>>= node@(NodeC {}) :-> e) | vb == vb', a == funcEval = do
+                mtick "Grin.eval.hoisted"
+                e' <- g e
+                return $ (Return vr :>>= createEval (HoistedUpdate node) typeEnv (tagsp v)) :>>= vb :-> Return vb' :>>= node :-> e'
+                -}
+
         tags v = if isVsBas x then Nothing else Just [ t | t <- Set.toList vs] where
               vs = getNodes   x
               x = case Map.lookup v (ptVars pt) of

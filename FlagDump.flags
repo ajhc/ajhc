@@ -41,6 +41,7 @@ rules show all rules
 !Grin code
 tags list of all tags and their types
 grin-preeval show grin code just before eval/apply inlining
+grin-posteval show grin code just before eval/apply inlining
 grin show final grin code
 steps show interpreter go
 eval show detailed eval inlining info

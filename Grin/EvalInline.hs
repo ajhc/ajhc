@@ -38,6 +38,14 @@ createEval shared  te ts
     | NoUpdate <- shared = p1 :->
         Fetch p1 :>>= n2 :->
         Case n2 cs
+    | SwitchingUpdate sts <- shared = let
+            lf = createEval NoUpdate te ts
+            cu t | tagIsTag t && tagIsWHNF t = return ans where
+                (ts,_) = runIdentity $ findArgsType te t
+                vs = [ Var v ty |  v <- [V 4 .. ] | ty <- ts]
+                ans = NodeC t vs :-> Update p1 (NodeC t vs)
+            cu t = error $ "not updatable:" ++ show t
+        in (p1 :-> (Return p1 :>>= lf) :>>= n3 :-> Case n3 (concatMap cu sts) :>>= unit :-> Return n3)
     where
     cs = [f t | t <- ts, tagIsTag t, isGood t ]
     isGood t | tagIsWHNF t, HoistedUpdate (NodeC t' _) <- shared, t /= t' = False
