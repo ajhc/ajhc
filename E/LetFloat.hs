@@ -45,7 +45,7 @@ varElim :: Stats -> Int -> IO ()
 varElim stats n = do
     ticks stats n (toAtom "E.Simplify.var-elimination")
 propRec stats n = do
-    ticks stats n (toAtom "E.Simplify.copy-propegate")
+    ticks stats n (toAtom "E.Simplify.copy-propagate")
 
 atomizeApps :: Set.Set Id -> Stats -> E -> IO E
 atomizeApps usedIds stats e = liftM fst $ traverse travOptions { pruneRecord = varElim stats } f mempty (Map.fromAscList [ (i,NotKnown) | i <- Set.toAscList usedIds ]) e where

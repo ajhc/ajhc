@@ -41,7 +41,7 @@ runRename set e = runIdentity $ traverse travOptions { pruneUnreachable = Nothin
 data  TravOptions m = TravOptions {
     pruneUnreachable :: Maybe [Int],
     pruneRecord :: Int -> m (),
-    propegateRecord :: Int -> m (),
+    propagateRecord :: Int -> m (),
     letToCaseRecord :: Int -> m (),
     trav_rules :: Rules,
     trav_strictness :: Map.Map Int Strict.SA,
@@ -52,7 +52,7 @@ travOptions :: Monad m => TravOptions m
 travOptions = TravOptions {
     pruneUnreachable = Just mempty,
     pruneRecord = \_ -> return (),
-    propegateRecord = \_ -> return (),
+    propagateRecord = \_ -> return (),
     letToCaseRecord = \_ -> return (),
     trav_rules = mempty,
     trav_strictness = mempty,
@@ -136,7 +136,7 @@ traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> r
         case Map.lookup n im of
             Just n'@(EVar t) | tvrNum t == n -> return $ n'
             Just n' -> do
-                lift $ lift $  propegateRecord tOpt 1
+                lift $ lift $  propagateRecord tOpt 1
                 return $ n'
             Nothing -> return e
     g  (ELit (LitCons n xs t)) = do

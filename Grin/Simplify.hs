@@ -28,8 +28,8 @@ import Util.Histogram as Hist
 
 -- perform a number of simple simplifications.
 -- inline very small and builtin-wrapper functions
--- copy propegation
--- CSE / constant propegation
+-- copy propagation
+-- CSE / constant propagation
 -- dispose of code unreachable via Error
 
 
