@@ -79,8 +79,8 @@ solveDs ds = do
 solve :: CResult -> IO CResult
 solve vs = ans where
     mp = Map.fromList [ ((x, case y of Lam _ -> True ; _ -> False) ,i) | (x,y) <- vs | i <- [0..] ]
-    wts = [ sol y | (_,y) <- vs]
     ans = do
+        let wts = [ sol y | (_,y) <- vs]
         bs <- FindFixpoint.solve Nothing L wts
         return [ (x,b) |  (x,_) <- vs | b <- bs ]
     getVal' x
@@ -151,6 +151,7 @@ collect e = ans where
         las = length as
         ans = do
             samap <- f b
+            fin as samap -- tell [(t,Lam [ Map.findWithDefault A tvr samap |  tvr <- as])]
             unless (null as) $ tell [(t,Lam [ Map.findWithDefault A tvr samap |  tvr <- as])]
             -- return $ Map.fromAscList [ (i,saIf t (length as) v L) | (i,v) <- Map.toAscList samap, i `notElem`  as]
             return $ Map.map (\v -> saIf t las v L) $  Map.filterWithKey (\i _ -> i `notElem` as) samap -- Map.fromAscList [ (i,saIf t (length as) v L) | (i,v) <- Map.toAscList samap, i `notElem`  as]

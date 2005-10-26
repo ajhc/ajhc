@@ -203,7 +203,6 @@ processDecls stats ho ho' tiData = do
             lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
             lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             return (v,lc)
-        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
         cds <- E.Strictness.solveDs cds
         cds <- flip mapM (zip names cds) $ \ (n,(v,lc)) -> do
             lc <- doopt mangle False stats "SuperSimplify" cm lc
@@ -213,6 +212,7 @@ processDecls stats ho ho' tiData = do
         -- cds <- E.Strictness.solveDs cds
         cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
         --cds' <- return $ concatMap (uncurry (workWrap fullDataTable)) cds
+        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
         let (cds',st) = performWorkWrap fullDataTable cds
         Stats.tickStat stats st
         let wws = length cds' - length cds

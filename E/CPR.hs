@@ -10,6 +10,7 @@ import DataConstructors
 import Doc.DocLike
 import E.E
 import E.FreeVars
+import E.Strictness
 import GenUtil
 import Name.Name
 import Name.Names
@@ -30,6 +31,11 @@ data Val =
     | Bot             -- the bottom
     deriving(Eq,Ord,Typeable)
     {-! derive: GhcBinary !-}
+
+toVal c = case conSlots c of
+    [] -> Tag [conName c]
+    ss -> Tup (conName c) [ Top | _ <- ss]
+
 
 instance Show Val where
     showsPrec _ Top = C.top
@@ -89,6 +95,11 @@ cprAnalyze dataTable env e = cprAnalyze' env e where
     cprAnalyze' env (ELetRec ds e) = (ELetRec ds' e',val) where
         (ds',env') = cprAnalyzeBinds dataTable env ds
         (e',val) = cprAnalyze' (env' `mappend` env) e
+
+    cprAnalyze' env (ELam t e)
+        | Just (S _) <- Info.lookup (tvrInfo t), Just c <- getProduct dataTable (tvrType t) = let
+            (e',val) = cprAnalyze' (envInsert t (toVal c) env) e
+            in (ELam t e',Fun val)
     cprAnalyze' env (ELam t e) = (ELam t e',Fun val) where
         (e',val) = cprAnalyze' (envInsert t Top env) e
     cprAnalyze' env ec@(ECase {}) = runWriter (caseBodiesMapM f ec) where
