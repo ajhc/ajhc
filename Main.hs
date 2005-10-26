@@ -211,7 +211,7 @@ processDecls stats ho ho' tiData = do
             return (v,lc)
 
         -- cds <- E.Strictness.solveDs cds
-        cds <- return $ fst (E.CPR.cprAnalyzeBinds mempty cds)
+        cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
         --cds' <- return $ concatMap (uncurry (workWrap fullDataTable)) cds
         let (cds',st) = performWorkWrap fullDataTable cds
         Stats.tickStat stats st
@@ -237,7 +237,7 @@ processDecls stats ho ho' tiData = do
                 return ((v,lc):ds,used' `mappend` used)
         (cds,usedids) <- foldM dd ([],hoUsedIds ho) cds
         cds <- E.Strictness.solveDs cds
-        cds <- return $ fst (E.CPR.cprAnalyzeBinds mempty cds)
+        cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
         cds <- annotateDs annmap (\_ -> return) letann lamann cds
         --mapM_ (\t -> putStrLn (prettyE (EVar t) <+> show (tvrInfo t))) (fsts cds)
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds

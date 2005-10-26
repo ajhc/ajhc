@@ -1,4 +1,4 @@
-module E.CPR(Val(..), cprAnalyzeBinds, cprAnalyze) where
+module E.CPR(Val(..), cprAnalyzeDs) where
 
 import Control.Monad.Writer
 import Data.Generics
@@ -6,16 +6,17 @@ import Data.Monoid()
 import qualified Data.Map as Map
 
 import Binary
-import Number
-import Util.SameShape
+import DataConstructors
 import Doc.DocLike
 import E.E
 import E.FreeVars
 import GenUtil
 import Name.Name
 import Name.Names
+import Number
 import qualified Doc.Chars as C
 import qualified Info.Info as Info
+import Util.SameShape
 
 newtype Env = Env (Map.Map TVr Val)
     deriving(Monoid)
@@ -60,15 +61,18 @@ instance Monoid Val where
     mempty = Bot
     mappend = lub
 
+cprAnalyzeDs :: DataTable -> [(TVr,E)] -> [(TVr,E)]
+cprAnalyzeDs dataTable ds = fst $ cprAnalyzeBinds dataTable mempty ds
 
-cprAnalyzeBinds :: Env -> [(TVr,E)] -> ([(TVr,E)],Env)
-cprAnalyzeBinds env bs = f env  (decomposeDefns bs) [] where
-    f env (Left (t,e):rs) zs = case cprAnalyze env e of
+
+cprAnalyzeBinds :: DataTable -> Env -> [(TVr,E)] -> ([(TVr,E)],Env)
+cprAnalyzeBinds dataTable env bs = f env  (decomposeDefns bs) [] where
+    f env (Left (t,e):rs) zs = case cprAnalyze dataTable env e of
         (e',v) -> f (envInsert t v env) rs ((tvrInfo_u (Info.insert v) t,e'):zs)
     f env (Right xs:rs) zs = g (length xs + 2) ([ (t,(e,Bot)) | (t,e) <- xs]) where
         g 0 mp =  f nenv rs ([ (tvrInfo_u (Info.insert b) t,e)   | (t,(e,b)) <- mp] ++ zs)  where
             nenv = Env (Map.fromList [ (t,b) | (t,(e,b)) <- mp]) `mappend` env
-        g n mp = g (n - 1) [ (t,cprAnalyze nenv e)  | (t,e) <- xs] where
+        g n mp = g (n - 1) [ (t,cprAnalyze dataTable nenv e)  | (t,e) <- xs] where
             nenv = Env (Map.fromList [ (t,b) | (t,(e,b)) <- mp]) `mappend` env
     f env [] zs = (reverse zs,env)
 
@@ -76,37 +80,38 @@ cprAnalyzeBinds env bs = f env  (decomposeDefns bs) [] where
 envInsert :: TVr -> Val -> Env -> Env
 envInsert tvr val (Env mp) = Env $ Map.insert tvr val mp
 
-cprAnalyze :: Env -> E -> (E,Val)
-cprAnalyze (Env mp) (EVar v)
-    | Just t <- Map.lookup v mp = (EVar v,t)
-    | Just t <- Info.lookup (tvrInfo v)  = (EVar v,t)
-    | otherwise = (EVar v,Top)
-cprAnalyze env (ELetRec ds e) = (ELetRec ds' e',val) where
-    (ds',env') = cprAnalyzeBinds env ds
-    (e',val) = cprAnalyze (env' `mappend` env) e
-cprAnalyze env (ELam t e) = (ELam t e',Fun val) where
-    (e',val) = cprAnalyze (envInsert t Top env) e
-cprAnalyze env ec@(ECase {}) = runWriter (caseBodiesMapM f ec) where
-    f e = do
-        (e',v) <- return $ cprAnalyze env e
-        tell v
-        return e'
-cprAnalyze env (EAp fun arg) = (EAp fun_cpr arg,res_res) where
-    (fun_cpr, fun_res) = cprAnalyze env fun
-    res_res = case fun_res of
-        Fun x -> x
-        Top -> Top
-        Bot -> Bot
-        v -> error $ "cprAnalyze.res_res: " ++ show v
-cprAnalyze env  e = (e,f e) where
-    f (ELit (LitInt n _)) = VInt n
-    f (ELit (LitCons n [] _)) = Tag [n]
-    f (ELit (LitCons n xs  _)) = Tup n (map g xs)
-    f (EPi t e) = Tup tc_Arrow [g $ tvrType t, g e]
-    f (EPrim {}) = Top -- TODO fix primitives
-    f (EError {}) = Bot
-    f e = error $ "cprAnalyze.f: " ++ show e
-    g = snd . cprAnalyze env
+cprAnalyze :: DataTable -> Env -> E -> (E,Val)
+cprAnalyze dataTable env e = cprAnalyze' env e where
+    cprAnalyze' (Env mp) (EVar v)
+        | Just t <- Map.lookup v mp = (EVar v,t)
+        | Just t <- Info.lookup (tvrInfo v)  = (EVar v,t)
+        | otherwise = (EVar v,Top)
+    cprAnalyze' env (ELetRec ds e) = (ELetRec ds' e',val) where
+        (ds',env') = cprAnalyzeBinds dataTable env ds
+        (e',val) = cprAnalyze' (env' `mappend` env) e
+    cprAnalyze' env (ELam t e) = (ELam t e',Fun val) where
+        (e',val) = cprAnalyze' (envInsert t Top env) e
+    cprAnalyze' env ec@(ECase {}) = runWriter (caseBodiesMapM f ec) where
+        f e = do
+            (e',v) <- return $ cprAnalyze' env e
+            tell v
+            return e'
+    cprAnalyze' env (EAp fun arg) = (EAp fun_cpr arg,res_res) where
+        (fun_cpr, fun_res) = cprAnalyze' env fun
+        res_res = case fun_res of
+            Fun x -> x
+            Top -> Top
+            Bot -> Bot
+            v -> error $ "cprAnalyze'.res_res: " ++ show v
+    cprAnalyze' env  e = (e,f e) where
+        f (ELit (LitInt n _)) = VInt n
+        f (ELit (LitCons n [] _)) = Tag [n]
+        f (ELit (LitCons n xs  _)) = Tup n (map g xs)
+        f (EPi t e) = Tup tc_Arrow [g $ tvrType t, g e]
+        f (EPrim {}) = Top -- TODO fix primitives
+        f (EError {}) = Bot
+        f e = error $ "cprAnalyze'.f: " ++ show e
+        g = snd . cprAnalyze' env
 
 
 
