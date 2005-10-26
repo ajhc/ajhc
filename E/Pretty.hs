@@ -110,7 +110,8 @@ prettyI i = (text $ 'x':show i)
 
 rawType s  = ELit (LitCons (toName RawType s) [] eHash)
 
-eDoc e PrettyOpt {optExpanded = expanded, optColors = colors, optNames = optNames} = unparse (prettye e) where
+eDoc e PrettyOpt {optExpanded = optExpanded, optColors = colors, optNames = optNames} = unparse (prettye e) where
+    expanded = optExpanded || dump FD.EVerbose
     retOp x = col "lightgreen" x
 
     bold' = if colors then bold else id
@@ -139,6 +140,7 @@ eDoc e PrettyOpt {optExpanded = expanded, optColors = colors, optNames = optName
     app = bop (L,100) (text " ")
     cons = bop (R,5) (text ":")
 
+    prettytvr TVr { tvrIdent = i, tvrType =  t, tvrInfo = nfo} | dump FD.EInfo = atom (prettyI i <> tshow nfo)  `inhabit` prettye t
     prettytvr TVr { tvrIdent = i, tvrType =  t} = atom (prettyI i) `inhabit` prettye t
 
     prettye me =  case me of

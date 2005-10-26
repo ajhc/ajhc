@@ -36,6 +36,8 @@ pass show optimization passes over intermediate code
 datatable show data table of constructors
 optimization-stats show combined stats of optimization passes
 rules show all rules
+e-info show info tags on all bound variables
+e-verbose print very verbose version of E code always
 
 
 !Grin code
