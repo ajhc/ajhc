@@ -1,0 +1,327 @@
+(I apologize in advance if this message seems self congradulatory, but after
+a long time of being disheartened by only marginal gains over ghc, I am
+finally seeing some substantial benefits, many of which are the result of
+optimizations that can actually be ported back to ghc)
+
+
+So, what started out as a simple pat on my own back for getting strictness and
+CPR finally working turned into an adventure in assembly language.  An
+incidental discovery revealed a result that completly surprised me, for tight
+mathematical inner loops jhc is producing code that runs 3-7x faster than ghc.
+
+This surprised me because I expected them to be identical, they determine the
+same strictness and produce the same worker/wrapper split, but due to a quirk
+of how ghc generates C code, it ends up producing an ultimatly slower result.
+fortunatly, I think the problem is easy to mitigate. (and jhc loses its lead
+once again :) )
+
+(all the following snippets are unedited/unreformatted output of the programs
+specified except for the removal of some profiling tags)
+
+
+the motivating example is the plain old basic accumulating factorial function:
+
+fac :: Int -> Int -> Int
+fac 1 r = r
+fac n r = fac (n - 1) (n*r)
+
+the strictness info is correctly infered that fac is strict in all its
+arguments and returns a CAF so it is translated into a nice and speedy
+version that takes unboxed arguments and returns unboxed results.
+
+here is the C code that jhc generates. (As an aside, I am very proud of how
+readable and how much structure the jhc generated C code preserves of the
+original haskell. it's a small thing, perhaps only implementors appreciate it,
+but I am glad I spent the time needed to do so.)
+
+/* fW@.fMain.fac */
+static int
+fWXAXDfMainXDfac(int v94, int v95)
+{
+        int v96;
+        int v97;
+        int v98;
+        int v99;
+        switch (v94) {
+        case 1:
+            return v95;
+            break;
+        default:
+            v96 = v94;
+            v97 = (int)(v94 - 1);
+            v98 = (int)(v94 * v95);
+            v99 = fWXAXDfMainXDfac(v97, v98);
+            return v99;
+        break;
+        }
+}
+
+notice that besides being a bit verbose and using a tailcall, this is exactly
+what A C programmer would write. In fact, the generated assembly is quite
+nice and I think perhaps provably optimal even compared to hand-coded assembly :)
+
+jhc assembly output:
+
+fWXAXDfMainXDfac:
+.L108:
+	cmpl	$1, %edi
+	je	.L110
+	imull	%edi, %esi
+	decl	%edi
+	jmp	.L108
+.L110:
+	movl	%esi, %eax
+	ret
+
+
+notice, a tiny inner loop, 4 instructions and one conditional jump. no memory
+acceses whatsoever.
+
+
+now, lets look at what ghc does with the same function:
+
+the generated C code:
+
+EI_(Main_zdwfac_info);
+FN_(Main_zdwfac_entry) {
+W_ _s27g;
+W_ _s27i;
+W_ _s27l;
+FB_
+_s27g = *Sp;
+if (_s27g != 0x1UL) goto _c282;
+R1.p = (P_)(Sp[1]);
+Sp=Sp+2;
+JMP_(*Sp);
+_c282:
+_s27l = _s27g * (Sp[1]);
+_s27i = _s27g - 0x1UL;
+Sp[1] = _s27l;
+*Sp = _s27i;
+JMP_((W_)&Main_zdwfac_info);
+FE_
+}
+
+it looks complicated, but what it effectivly does is pop the arguments off the
+stack, run the code but with an explicit jump rather than recursion and push
+the result back onto the stack. other than the stack stuff at the beginnig and
+end, we would expect this to get compiled to roughly the same assembly as the
+jhc version with a nice tight inner loop and just some stack futzing
+boilerplate.
+
+and now the generated assembly.
+
+Main_zdwfac_info:
+.text
+	.align 8
+	.text
+	movq	(%rbp), %rdx
+	cmpq	$1, %rdx
+	jne	.L2
+	movq	8(%rbp), %r13
+	leaq	16(%rbp), %rbp
+	movq	(%rbp), %rax
+.L4:
+	jmp	*%rax
+.L2:
+	movq	%rdx, %rax
+	imulq	8(%rbp), %rax
+	movq	%rax, 8(%rbp)
+	leaq	-1(%rdx), %rax
+	movq	%rax, (%rbp)
+	movl	$Main_zdwfac_info, %eax
+	jmp	.L4
+
+
+ack! lets count what happens on each iteration of the loop: we have 5 (!)
+memory acceses and two jumps, one of them being indirect! in fact, each time
+through the loop, it loads the same values into the same registers.
+
+
+this is really bad compared to the jhc assembly. the basic issue is an
+interaction between ghc's use of global registers, a stack, and indirect
+calls.
+
+an indirect jump is very expensive. modern processors are pipelined,
+having many instructions in the queue at once, looking ahead and beginning to
+evaluate what is coming up. when an indirect jump is encountered, the CPU has
+no choice but to flush the whole pipeline because it has no idea where it
+goes, even with conditional branches cpus can predict with good accuracy
+which branch will be taken and at worst, it discards the pipeline, but with
+an indirect jump, there is no chance of it having a full pipeline.
+
+
+However the major issue is the following.  %rbp is the global stack pointer
+pointing to the STG stack, since it is global it can be modified from
+anywhere, since gcc can't know if the function it jumps to modified said
+register it has no choice but to load all values relative to it every time
+through the loop because it may have changed.
+
+furthermore gotos and labels are very problematic for gcc to optimize around.
+for various tiresome reasons gcc cannot perform (most) code motion
+optimizations across explicit labels and gotos, especially when they deal with
+the global register variables and memory stores and loads. since these are
+arguably some of the most important optimizations, this is quite bad for the
+generated assembly.
+
+loop:
+
+if () goto loop;
+
+is not equivalent to a do-while loop, loop invarients cannot be hoisted out of
+the above for instance (except in some cases... it is all quite tricky and we
+want gcc to have as much freedom as possible).
+
+all in all, this makes the code generated by gcc compiling something
+generated by ghc not very good at all.
+
+there are a couple of things we can do to mitigate these problems:
+
+get rid of indirect jumps whenever possible.
+
+use C control constructs rather than gotos.
+
+
+A couple simple rules seem to help greatly.
+
+* turn anything of the form JMP_((W_)&self) where self is oneself into a goto
+that gotos a label at the beginning of the function.
+
+* do simple pattern matthing on the basic blocks to recognize where C control
+constructs can be placed.
+
+for instance turn
+
+if (x) { goto  y; }
+blah..
+baz..
+JMP_(foo)
+
+into
+
+if (x) { goto  y; } else {
+blah..
+baz..
+JMP_(foo)
+}
+
+extending the else to after the next jump or goto.
+
+
+* getting stack dereferences out of your loops.
+
+
+manually performing the first two optimizations mentioned above we get:
+
+EI_(Main_zdwfac_info);
+FN_(Main_zdwfac_entry) {
+W_ _s27g;
+W_ _s27i;
+W_ _s27l;
+FB_
+fac_entry:
+_s27g = *Sp;
+if (_s27g != 0x1UL) { goto _c282; } else {
+R1.p = (P_)(Sp[1]);
+Sp=Sp+2;
+JMP_(*Sp);
+}
+_c282:
+_s27l = _s27g * (Sp[1]);
+_s27i = _s27g - 0x1UL;
+Sp[1] = _s27l;
+*Sp = _s27i;
+goto fac_entry;
+FE_
+}
+
+and this produces the assembly:
+
+Main_zdwfac_info:
+.text
+	.align 8
+	.text
+	movq	%rbp, %rdx
+	movq	(%rbp), %rcx
+	cmpq	$1, %rcx
+	je	.L3
+.L6:
+	movq	%rcx, %rax
+	imulq	8(%rdx), %rax
+	movq	%rax, 8(%rdx)
+	leaq	-1(%rcx), %rax
+	movq	%rax, (%rbp)
+.L4:
+	movq	%rbp, %rdx
+	movq	%rax, %rcx
+	cmpq	$1, %rax
+	jne	.L6
+.L3:
+	movq	8(%rdx), %r13
+	leaq	16(%rdx), %rbp
+	jmp	*(%rbp)
+
+we still have some unnecesarry memory accesses, but the indirect jump and the
+spurious jump are gone and we have less instructions in the main loop making
+this code noticably faster.
+
+in order to get rid of the unessesary memory accesess, we need to either
+
+1. fully convert it to use C control constructs, so gcc will do it for us.
+(code motion and loop invarient being inhibited again by gotos)
+
+or
+
+2. do it ourselves by analyzing when the consumer of what we are putting on
+the stack is ourselves.
+
+the first is greatly preferable but not always possible.
+
+
+These should be straightforward to implement in the C code generator. it also
+suggests we might want to try to use the native C calling convention on leaf
+nodes that deal with unboxed values (so we get register passing and return
+values for free) or taking groups of mutually recursive functions and turning
+them all into one function with explicit jumps between them.
+
+
+
+to show they are actually optimizing the same function, here are both of their
+core representaions, other than syntax, they are identical:
+
+jhc core: (uses unicode, utf8 formatted)
+
+   W@.fMain.fac∷int → int → int = λx9216∷int.λx9222∷int.(case x9216 of
+            1 → x9222 ;
+            x9238∷case <(int)-(int,int) x9216 1∷int> of
+                    x9252∷int → case <(int)*(int,int) x9216 x9222∷int> of
+                        x34∷int → case W@.fMain.fac x9252 x34 of
+                            x9208∷int → x9208;;;;;)
+
+ghc core:
+
+  %rec
+  {zdwfac :: GHCziPrim.Intzh -> GHCziPrim.Intzh -> GHCziPrim.Intzh =
+     \ (ww::GHCziPrim.Intzh) (ww1::GHCziPrim.Intzh) ->
+	 %case (GHCziPrim.Intzh) ww %of (ds::GHCziPrim.Intzh)
+	   {%_ ->
+	      Main.zdwfac (GHCziPrim.zmzh ds (1::GHCziPrim.Intzh))
+	      (GHCziPrim.ztzh ds ww1);
+	    (1::GHCziPrim.Intzh) ->
+	      ww1}};
+
+
+
+some random notes:
+
+the 3x-7x factor was tested on an i386, on x86_64 the margin is much much
+greater for reasons that are still unclear.
+
+while testing this I noticed that jhc and ghc have dramatically different
+results on x86_64 pretty much across the board, if their programs take
+comparable amounts of time on i386, the jhc one will run twice as fast as the
+ghc one on x86_64. I think ghc must be tickling the x86_64 in a particularly
+bad way for this dramatic of an effect to be observed. I will poke around the
+generated assembly of ghc some more and see if I can find the culprit.
+
+
