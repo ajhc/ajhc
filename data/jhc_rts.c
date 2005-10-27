@@ -22,17 +22,25 @@
 #define A_PURE __attribute__ ((pure))
 #define A_CONST __attribute__ ((const))
 #define A_UNUSED __attribute__ ((unused))
+#define A_MALLOC __attribute__ ((malloc))
 #else
 #define A_NORETURN
 #define A_PURE
 #define A_CONST
 #define A_UNUSED
+#define A_MALLOC
+#endif
+
+#if defined(__GNUC__) && defined(__i386__)
+#define A_REGPARM __attribute__ ((regparm(2)))
+#else
+#define A_REGPARM
 #endif
 
 #define STR(s) #s
 #define XSTR(s) STR(s)
 
-static void XAmain();
+static void XAmain(void) A_REGPARM;
 static int jhc_argc;
 static char **jhc_argv;
 static char *jhc_progname;

@@ -297,16 +297,19 @@ prettyC (cf) = render (header $$$
 a $$$ b = a $$ text "" $$ b
 
 
+attributes CTypePointer {} = text "A_REGPARM" <+> text "A_MALLOC"
+attributes _ = text "A_REGPARM"
+
 prettyArgs [] = text "void"
 prettyArgs args = hcat (punctuate (text ", ") (map (\(t,i) -> prettyType t <+> text i) $ args))
 
-prettyDecl (CFunc rt n args code) = text "static" <+> prettyType rt $$ text n <> text "(" <> prettyArgs args <> text ")" $+$
+prettyDecl (CFunc rt n args code) = text "static" <+> prettyType rt <+> attributes rt $$ text n <> text "(" <> prettyArgs args <> text ")" $+$
     text "{" $+$ nest 8 (prettyCode code) $+$ text "}"
 prettyDecl  (CVar t n) = prettyType t <+> text n <> semi
 prettyDecl (CStruct n vs) = text "struct" <+> text n <+> text "{" $$ nest 8 (vcat (map sd vs)) $$ text "};" where
     sd (t,n) = prettyType t <+> text n <> semi
 
-prettyProto (CFunc rt n args _) = text "static" <+> prettyType rt <+> text n <> parens (prettyArgs args) <> semi
+prettyProto (CFunc rt n args _) = text "static" <+> prettyType rt <+> text n <> parens (prettyArgs args) <+> attributes rt <> semi
 prettyProto (CStruct n _) = text "struct" <+> text n <> semi
 --prettyProto (CStruct n vs) = text "struct" <+> text n <+> text "{" $$ nest 8 (vcat (map sd vs)) $$ text "};" where
 --    sd (t,n) = prettyType t <+> text n <> semi
