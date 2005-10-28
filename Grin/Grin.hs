@@ -141,7 +141,7 @@ data Exp =
     | Fetch { expAddress :: Val }
     | Update { expAddress :: Val, expValue :: Val }
     | Error { expError :: String, expType :: Ty }      -- ^ abort with an error message, non recoverably.
-    | Cast { expValue :: Val, expType :: Ty }          -- ^ reinterpret Val as a different type, also used to box\/unbox lifted types
+    | Cast { expValue :: Val, expType :: Ty }          -- ^ reinterpret Val as a different type  (this should be a primitive)
     deriving(Eq,Show,Ord)
 
 data Val =

@@ -1,0 +1,464 @@
+Sorry if this is a bit raw or wrong, it is an idea congealing as it is being
+written (asynchronously, of course). feel free to skip to the bullet points at
+the end for the short version as it is rather long.
+
+I have recently been thinking about writing a c-- backend for jhc, printing out
+and reading the various c-- papers in preparation. As I expected, the
+translation would be quite simple and straightforward, but I found the section
+on continuations and cut to particulary inspiring. Adding them to Grin
+(graph-reduction-intermediate-form, the last form of jhc programs before code
+generation) would give me exactly the features I have been missing and having
+to do in an ad-hoc manner in the code generator or do without, exceptions, join
+points, loops. I formulated how to add them to Grin, verified it still followed
+the monad laws and think I might have come up with something that is not only
+practically useful to me now, but has implications for c-- optimizers and
+implementations in general which is what this message is about.
+
+I will be careful to use 'register' to mean a modifyable variable like an auto
+in C or a local register in c--. I will use 'name' to refer to something bound
+by a lambda expression on the right side of a monadic bind operator, 'value' to
+refer to some specific result like a number or memory address, and I will use
+'variable' when I am _intentionally_ being ambiguous for reasons that will
+become clear.
+
+jhcs grin is defined exactly so:
+
+infixr 1  :->, :>>=
+
+data Lam = Val :-> Exp
+
+data Exp =
+    Exp :>>= Lam
+    | App { expFunction :: Atom, expArgs :: [Val], expType :: Ty }
+    | Prim { expPrimitive :: Primitive, expArgs :: [Val] }
+    | Case { expValue :: Val, expAlts :: [Lam] }
+    | Return { expValue :: Val }
+    | Store { expValue :: Val }
+    | Fetch { expAddress :: Val }
+    | Update { expAddress :: Val, expValue :: Val }
+    | Error { expError :: String, expType :: Ty }
+    | Cast { expValue :: Val, expType :: Ty }
+
+data Val =
+    Lit !Number Ty
+    | Var !Var Ty
+    | Tup [Val]
+        .
+        .
+
+
+
+notice a few things, (:>>=) and Return form a Monad. their names arn't a
+coincedence. (:->) plays the exact same role as (->) in haskell lambda
+expressions and case statements. Grin is not higher order, the only place a Lam
+may occur is on the right side of the monadic bind or as a binding in a case
+statement. Grin is strict, all evaluation is explicit. Grin is explicitly typed
+(we will ignore this for now). Nothing may be partially applied, a complete
+Lambda _must_ appear to the right of a bind. this is statically enforced.
+
+by declaring a handy fixity, this lets us write Grin code in haskell that
+strongly resembles haskell monadic code. the standard accumulating factorial is
+
+n = Var (V 1)
+r = Var (V 2)
+x = Var (V 3)
+y = Var (V 4)
+any = Var (V 0)
+
+g_fact = function "fact" $ Tup [n,r] :->
+        Case n [
+            1 :->
+                Return r,
+            any :->
+                App "minus" [n,1] :>>= x :->
+                App "times" [n,r] :>>= y :->
+                App "fact" [x,y]
+           ]
+
+in any case, the point being, Grin is a monad, all the monad transformations
+apply, many optimizing transformations are possible and provably correct
+because of these laws. Many examples of good optimizations on this form were
+explored by boquist.
+
+now lets add continuations
+
+data Exp =
+    Exp :>>= Lam
+    | MkContinuation Lam
+    | CutTo Val [Val]
+    ...
+
+data Val =
+    | Cont Cont -- ^ some abstract representation of an instantiated continuation. _NOT_ a Lam.
+    ...
+
+
+the meaning is straightforward and have the same interpretation as them in C--
+for the cases where C-- allows. all names bound before the continuation are
+available within its body, CutTo never returns, a continuation may take
+arguments. note that unlike c-- a continuation's Name is bound just like any
+other and does not have special syntax:
+
+MkContinuation ( x :-> .. ) :>>= myCont :-> ....
+
+now we can express join points, continuations, and all sorts of good stuff..
+
+(from now on I will use haskell do-notation, but keep in mind we are building
+up an AST with :>>= and :->, not executing anything)
+
+
+for example, a join point:
+
+myfunc = \ (a,b) ->  do     -- ^ note, tupled, no currying
+        cont <- mkContinuation $ \ x -> do
+                return (x + 4)
+        case a - b of
+                3 -> return -1
+                5 -> cutTo (cont 2)
+                z -> cutTo (cont z)
+
+yay! Grin has gained a whole lot of power from stealing this idea from c--.
+
+There is one gotcha though that is sort of hacky, but can be thought of as syntatic sugar.
+
+how do you create mutually recursive continuations when it's name is only
+available in the lambda to the right of the declaring monadic action? The brute
+force approach would be to pass all the continuations names as arguments to
+every continuation, seeded from one called at the very end when all names are
+available. of course, this is untenable. the answer is that our monad is
+actually a member of MonadFix and fixpointable. In theory we could add a
+primitive (FixIt Lam) that computes the fixpoint, but that would be quite a
+hassle and noticing that the only things that can be passed as arguments to the
+fixed function are continuations, we rather choose a convinient hack. every
+code block is implicitly wrapped in a fixpoint operator that passes all
+continuations back into the top under the _first_ name they were bound to. code
+blocks are exactly the bodies of lambdas. i.e. function bodies and arms of case
+statements. note that this is exactly what we would expect, lambdas are the
+only 'fixable' things so every lambda is inherently fixed. it is a little hacky
+for a number of reasons, mainly the transformation to explicit fixpoint form is
+complicated by things like shadowing and cut-tos, but it would be
+straightforward if you wanted to do it for some reason. Doing continuations
+this way rather than declaring a special syntax or just arbitrarily saying they
+scope over everything is important to ensure we don't lose our precious monadic
+properties and 'fixable' monads have been well studied and are used in practice
+in Haskell.
+
+Grin is starting to become very expressive, but can we make it as expressive as
+c--?
+
+
+= Cmf - C minus minus monadic form =
+
+This is the meat, after reducing grin more and more I realized I had come up
+with something much more useful than my original intent. Cmf means
+'C minus minus monadic form'
+
+
+let's disect and simplify grin some:
+
+data Lam = Val :-> Exp
+
+data Exp =
+    Exp :>>= Lam
+    | App String [Val]
+    | Case Val [Lam]
+    | Return Val
+    | MkContinuation Lam
+    | CutTo Val [Val]
+     -- store is nothing more than a call to 'malloc' and a couple 'pokes' into ram so we can discard it.
+    | Store { expValue :: Val }
+     -- fetch is nothing more than a couple peeks into ram so we can discard it
+    | Fetch { expAddress :: Val }
+     -- likewise, but with pokes
+    | Update { expAddress :: Val, expValue :: Val }
+     -- error we can simulate with a 'cut to' an error routine
+    | Error { expError :: String, expType :: Ty }
+     -- unneeded since we are ignoring types for now
+    | Cast { expValue :: Val, expType :: Ty }
+
+    -- now lets add some primitives for convinience
+    | Peek Val         -- read from memory
+    | Poke Val Val     -- write to memory
+
+data Val =
+    Lit Number
+    | Nam Name  -- ^ note it is a 'Name' now.
+    | Tup [Val]
+
+so far our Cmf looks good, nice and simple. lets add a couple more primitives and call it done.
+
+data Lam = Val :-> Exp
+data Exp =
+    Exp :>>= Lam
+    | App String [Val]
+    | Case Val [Lam]
+    | Return Val
+    | MkContinuation Lam
+    | CutTo Val [Val]
+    | Peek Val            -- read from memory
+    | Poke Val Val        -- write to memory
+    | NewReg Val          -- allocate a 'register' (in the c-- sense, not the hardware sense)
+    | WriteReg Val Val    -- write to register
+    | ReadReg Val         -- read from register
+    | JumpTo String [Val] -- might as well make this explicit
+data Val =
+    Lit Number
+    | Nam Name
+    | Tup [Val]
+
+
+=== The Key ===
+
+This is the key point, registers and names are completly distint in Cmf.
+Boquist's Grin and SSA form all have 'variables' that don't vary, but must
+eventually be mapped to varying registers, they are meant to turn into
+registers via some external register allocation algorithm which presumably will
+also turn tail calls into loops and parameters into local varying registers.
+
+these transformations must necessarily happen outside of Grin, since there is
+no way to express the fact you want to 'reuse' say eax later or update a value
+each time through a loop.
+
+let's look at how this helps us. take the factorial example from above as Grin
+would leave it in its final form (with an explicit tailcall):
+
+fact = \ (n,r) -> do
+        case n of
+           1 -> return r
+           _ -> do
+                x <- n - 1
+                y <- n * r
+                jumpTo (fact (x,y))
+
+This certainly compiles to decent C code, but from now on we have to give up
+our nice monadic form, there is no further work you can do in Grin.
+
+Assuming instead it is in Cmf, we can apply a number of simple transformations.
+
+the first is that any explicit tailcall to oneself can be turned into a continuation
+
+fact = \ (n,r) -> do
+        fact' <- mkContinuation $ \ (n',r') -> do
+                case n' of
+                   1 -> return r'
+                   _ -> do
+                        x <- n' - 1
+                        y <- n' * r'
+                        cutTo (fact' (x,y))
+        cutTo fact' (n,r)
+
+now it is closer, that looks a whole lot more like a loop, but the code
+generator will still have to have magic in it to determine those parameters
+passed back into it can actually be placed in varying registers
+
+now here is a transformation I call 'register-introduction' (this is distinct
+from boquists use of the term, as he just meant creating more variables)
+
+register introduction (in one of its forms) goes like so
+
+
+cutTo foo (y1,y2,...)
+foo <- mkContinuation \ (x1,x2,...) -> do
+                ....
+                cutTo foo (z1,z2,...)
+
+===>
+
+r_x1 <- newReg y1
+cutTo foo (y2,...)
+foo <- mkContinuation \ (x2,...) -> do
+                x1 <- readReg r_x1
+                ....
+                writeReg r_x1 z1
+                cutTo foo (z2,...)
+
+this is just one of the forms of register introduction, but they all follow the
+same pattern preceding uses of something with a read and its binding with a
+write and getting rid of the name. some of the cases are tricky, this one
+is simple because foo is called only once with the same arguments, and there
+are some cases where they can't be fully applied (which means something
+interesting :)) .
+
+so. applying it to our factorial twice
+
+fact = \ (n,r) -> do
+        r_n <- newReg n
+        r_r <- newReg r
+        fact' <- mkContinuation $ \ () -> do
+                n' <- readReg r_n
+                r' <- readReg r_r
+                case n' of
+                   1 -> return r'
+                   _ -> do
+                        x <- n' - 1
+                        y <- n' * r'
+                        writeReg r_n x
+                        writeReg r_r y
+                        cutTo (fact' ())
+        cutTo fact' ()
+
+and look at this! our continuation no longer has any arguments, we have
+transformed them all away, and this means
+
+_ The continuations that take no arguments are exactly those that can be turned into gotos _  (for continutions declared in the current scope that is)
+
+ah! so now not only do we have the power of c-- gotos, we have made the
+imperative loop explicit! the fact that we are storing r and n in updatable
+registers and we have a simple loop is right there in the monadic Cmf :)
+
+this is a non-trivial optimization, carried out by simple meaning preserving
+source->source transformations.
+
+This form is perfect for transforming to C or C-- as is.  The newRegs turn into
+local register declarations and the continuation turns into a label and a goto.
+
+we could stop here... but lets see what happens if we keep going... in a
+production system, Jhc stops here and the C-- compiler takes over from now on..
+
+
+now lets take it a step or two further:
+
+lets do some simple code motion to clean things up some and replace some
+primitives with some lower level ones:
+
+fact = \ (n,r) -> do
+        r_n <- newReg n
+        r_r <- newReg r
+        cutTo fact' ()             -- a cutTo right before what it is cutting to can just fall through.
+        fact' <- mkContinuation $ \ () -> do
+                n' <- readReg r_n
+                case n' of
+                   1 -> readReg r_r          -- lets move the reading and writing of registers as close as we can to their uses.
+                   _ -> do
+                        n' <- readReg r_n
+                        x <- n' - 1
+                        writeReg r_n x
+                        r' <- readReg r_r
+                        n' <- readReg r_n
+                        y  <- r' * n'
+                        writeReg r_r y
+                        cutTo (fact' ())
+
+now lets replace some of the primitives with some more "concrete" ones :)
+
+fact = \ (n,r) -> do
+        r_n <- newReg n
+        r_r <- newReg r
+        cutTo fact' ()
+        fact' <- mkContinuation $ \ () -> do
+                n' <- readReg r_n
+                case n' of
+                   1 -> readReg r_r
+                   _ -> do
+                        "subl" [r_n,1] -- n' <- readReg r_n   (what it is replacing)
+                                       -- x <- n' - 1
+                                       -- writeReg r_n x
+
+                        "imul" [r_r,r_n] -- n' <- readReg r_n
+                                         -- r' <- readReg r_r
+                                         -- y <- n' * r'
+                                         -- writeReg r_r y
+                        cutTo (fact' ())
+
+heh, notice those are i386 opcodes? now, lets define a few global names.
+
+eax = Nam (name of eax)
+ebx = Nam (name of ebx)
+ecx = Nam (name of ecx)
+edx = Nam (name of edx)
+
+and lets perform some substitutions
+
+fact = \ (n,r) -> do
+        writeReg eax n
+        writeReg ebx r
+        cutTo fact' ()
+        fact' <- mkContinuation $ \ () -> do
+                n' <- readReg eax
+                case n' of
+                   1 -> readReg ebx
+                   _ -> do
+                        "subl" [eax,1]
+                        "imul" [ebx,eax]
+                        cutTo (fact' ())
+
+we can go further and replace the case statement with a special 'If' that takes
+a bool and translates to a conditional jump, getting rid of the n'
+
+but notice what was done, all the monadic names went away. (or will, once the
+case is transformed away, and the arguments are poped off the stack rather than
+being bound)
+
+so, the whole point of all these transformations is that eventually _every name disapears_
+All monadic bindings turn from (>>=) into (>>) forms.
+
+names do not corespond to registers, monadically bound names are simply used to
+_route_ where results go.
+
+x <- return 3
+f(x)
+
+does not mean "bind x to three and then pass it to f"
+it means
+"route 3 to the first argument of f"
+
+after transformation (assuming c calling convention)
+
+"push" 3
+"call" [f]
+"pop"
+
+similarly the arguments to functions will disapear and instead be replaced with
+whatever is appropriate to get the values as specified by your calling
+convention.
+
+so we went from a very high level monad to assembly. without ever leaving the
+monadic framework.
+
+the key reason we were able to do this is the seperation of monadically bound
+names from run-time values and registers. once all the names are transformed
+away, all we have left is executable assembly statements seperated by the
+monadic (>>) operator.
+
+
+= the other way =
+
+I meant to talk more about this, but basically the idea is we can start with
+c-- and transform each local register into a 'newReg' statement and gotos into
+continuations with no arguments, and then apply a simple set of rewriting rules
+to _get rid_ of every register access, returning us to a pure functional form
+that can be optimized!
+
+There is a coorespondence between Cmf (monads in general), SSA, and CPS that
+opens up a wealth of optimizations.
+
+the ability to go the other direction is what I find very intriguing, we can
+take c--, recover its monadic form, optimize the heck out of it, and transform
+it back to c--.
+
+
+Bullet points:
+
+* C-- can be formulated as a true monad that captures most (all?) of its features.
+
+* non-trivial optimizations usually done in an ad-hoc or specialized manner can
+  be expressed as straightforward rewriting rules on this monadic code.
+
+* it is suitable for transforming between very high-level (jhc or ghc core)
+  all the way down to the very low level (through register
+  assignment and instruction selection) while retaining all its
+  theoretical properties.
+
+* this transformation is not a one-way ratchet, higher level forms can be
+  reconstructed from lower level forms by applying rewriting rules in reverse.
+  This would be particularly useful in a c-- to c-- optimizer.
+
+* the seperation of the concepts of names used to route where values go,
+  the actual registers that hold them, and the values themselves is a natural
+  and useful distinction and is what allows Cmf to remain valid all the way to
+  instruction selection and the reversability of this transformation.
+
+* Monads are good.
+
+* Some of this might be novel.
+
