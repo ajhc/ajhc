@@ -50,7 +50,7 @@ import HsSyn
 import KindInfer             (KindEnv)
 import Representation
 import TypeSigs              (SigEnv)
-import Type                  ((@@), Instantiate (..), mgu)
+import Type                  (Instantiate (..), mgu)
 import Utils()
 import Warning
 
