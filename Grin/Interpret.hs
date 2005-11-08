@@ -67,6 +67,38 @@ interpret stats te cafMap primMap scMap e = f mempty e where
         where (Lit n _) = le env x
     f env (Prim Primitive { primAPrim = APrim Func { funcName = "putwchar" } _} [x]) = putChar (chr $ fromIntegral n) >> return unit
         where (Lit n _) = le env x
+    f env (Prim Primitive { primAPrim = APrim Operator { primOp = "<=" } _, primType = (_,t)} [x,y]) = if x' <= y' then return (Lit 1 t) else return (Lit 0 t)
+        where (Lit x' _) = le env x
+              (Lit y' _) = le env y
+    f env (Prim Primitive { primAPrim = APrim Operator { primOp = ">=" } _, primType = (_,t)} [x,y]) = if x' >= y' then return (Lit 1 t) else return (Lit 0 t)
+        where (Lit x' _) = le env x
+              (Lit y' _) = le env y
+    f env (Prim Primitive { primAPrim = APrim Operator { primOp = ">" } _, primType = (_,t)} [x,y]) = if x' > y' then return (Lit 1 t) else return (Lit 0 t)
+        where (Lit x' _) = le env x
+              (Lit y' _) = le env y
+    f env (Prim Primitive { primAPrim = APrim Operator { primOp = "<" } _, primType = (_,t)} [x,y]) = if x' < y' then return (Lit 1 t) else return (Lit 0 t)
+        where (Lit x' _) = le env x
+              (Lit y' _) = le env y
+    f env (Prim Primitive { primAPrim = APrim Operator { primOp = "==" } _, primType = (_,t)} [x,y]) = if x' == y' then return (Lit 1 t) else return (Lit 0 t)
+        where (Lit x' _) = le env x
+              (Lit y' _) = le env y
+    f env (Prim Primitive { primAPrim = APrim Operator { primOp = "+" } _, primType = (_,t)} [x,y]) = return (Lit (x' + y') t)
+        where (Lit x' _) = le env x
+              (Lit y' _) = le env y
+    f env (Prim Primitive { primAPrim = APrim Operator { primOp = "/" } _, primType = (_,t)} [x,y]) = return (Lit (x' `div` y') t)
+        where (Lit x' _) = le env x
+              (Lit y' _) = le env y
+    f env (Prim Primitive { primAPrim = APrim Operator { primOp = "%" } _, primType = (_,t)} [x,y]) = return (Lit (x' `mod` y') t)
+        where (Lit x' _) = le env x
+              (Lit y' _) = le env y
+    f env (Prim Primitive { primAPrim = APrim Operator { primOp = "-" } _, primType = (_,t)} [x,y]) = return (Lit (x' - y') t)
+        where (Lit x' _) = le env x
+              (Lit y' _) = le env y
+    f env (Prim Primitive { primAPrim = APrim Operator { primOp = "*" } _, primType = (_,t)} [x,y]) = return (Lit (x' * y') t)
+        where (Lit x' _) = le env x
+              (Lit y' _) = le env y
+    f env (Prim Primitive { primAPrim = APrim Operator { primOp = "-" } _, primType = (_,t)} [x]) = return (Lit (negate x') t)
+        where (Lit x' _) = le env x
     f env (Prim p xs) = do
         let a = primName p
             xs' = map (le env) xs
@@ -117,7 +149,7 @@ interpret stats te cafMap primMap scMap e = f mempty e where
             Just (Tag t) -> t
             z' -> error $ "Invalid tag variable in NodeV: " ++ show (z,z')
     le env z@(Var v _) = case Map.lookup v env `mplus` Map.lookup v cafMap of
-        Just x -> x
+        Just x -> le env x
         Nothing -> error $ "le" ++ show (z,env)
     le _ x = x
 
@@ -133,7 +165,6 @@ interpret stats te cafMap primMap scMap e = f mempty e where
         | 'P':_ <- t' = return x
         | 'T':_ <- t' = return x
         | 'C':_ <- t' = return x
---        | t == tagApply = f mempty (Eval (xs !! 0) :>>= (n1, Apply n1 (xs !! 1)))
         | 'F':rs <- t' = f mempty (App (toAtom $ 'f':rs) xs TyNode)  -- TODO, right?
         | 'B':rs <- t' = f mempty (App (toAtom $ 'b':rs) xs TyNode)  -- TODO, right?
         where
@@ -141,10 +172,9 @@ interpret stats te cafMap primMap scMap e = f mempty e where
     doEval x = error $ "doEval " ++ show x
 
     bind :: Monad m => Val -> Val -> m (Map Var Val)
---    bind (Var (V 0) _) _ = return mempty
+    bind (Var (V 0) _) _ = return mempty
     bind (Var v _) r = return $ singleton v r
     bind (Lit i _) (Lit i' _) | i == i' = return mempty
---    bind Unit Unit = return mempty
     bind (Tup xs) (Tup ys) = liftM mconcat $ sequence $  zipWith bind xs ys
     bind (Tag i) (Tag i') | i == i' = return mempty
     bind (NodeV v vs) (NodeC t vs') = do

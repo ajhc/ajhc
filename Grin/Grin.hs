@@ -13,7 +13,6 @@ module Grin.Grin(
     gApply,
     partialTag,
     gEval,
-    tagApply,
     tagHole,
     Exp(..),
     Ty(..),
@@ -71,7 +70,6 @@ newtype TyEnv = TyEnv (Map.Map Atom ([Ty],Ty))
     deriving(Monoid)
 
 
-tagApply = toAtom "Bap"
 tagHole = toAtom "@hole"
 funcApply = toAtom "@apply"
 funcEval = toAtom "@eval"
@@ -359,7 +357,6 @@ findArgsType (TyEnv m) a | ('P':rs) <- fromAtom a, (ns,'_':rs) <- span isDigit r
 findArgsType (TyEnv m) a | ('Y':rs) <- fromAtom a, (ns,'_':rs) <- span isDigit rs  = case Map.lookup (toAtom ('T':rs)) m of
     Just (ts,n) -> return (take (length ts - read ns) ts,n)
     Nothing -> fail $ "findArgsType: " ++ show a
---findArgsType _ a | a == tagApply = return ([TyPtr TyNode,TyPtr TyNode],TyNode)
 findArgsType _ a | a == toAtom "TAbsurd#" = return ([],TyNode)
 findArgsType _ a | a == funcEval = return ([TyPtr TyNode],TyNode)
 findArgsType _ a | a == funcApply = return ([TyNode, TyPtr TyNode],TyNode)
