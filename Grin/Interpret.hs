@@ -1,9 +1,11 @@
 module Grin.Interpret(evaluate) where
 
 import Atom
+import CanType
 import Char
 import CharIO
 import Control.Monad.Identity
+import C.Prims
 import Data.IORef
 import Data.Map as Map hiding(map)
 import Data.Monoid
@@ -18,10 +20,6 @@ import qualified FlagDump as FD
 import qualified Stats
 
 builtins = []
---createCafMap as = f vars [] >>= return . Map.fromList  where
---    f [] xs = return xs
---    f ((x,y):xs) ys = newIORef (NodeC y []) >>= \y -> f xs ((x,Addr y):ys)
---    vars = [ ((V $ - atomIndex tag) ,tag) | (x,[],_) <- as, x /= funcInitCafs, let tag = partialTag x 0]
 builtinMap = Map.fromList [ (x,y) | (x,y) <- builtins ]
 
 createCafMap as = f vars [] >>= return . Map.fromList  where
@@ -64,8 +62,11 @@ interpret stats te cafMap primMap scMap e = f mempty e where
         case Map.lookup a scMap of
             Nothing -> error $ "Unknown App: " ++ show (App a xs' ty)
             Just ((Tup as :-> e)) -> f (Map.fromList (zip [ v | Var v _ <- as] xs')) e
-            --Just (Right action) -> do action xs'
       where xs' = map (le env) xs
+    f env (Prim Primitive { primAPrim = APrim CCast {} _, primType = (_,t)} [x]) = return $ (Lit n t)
+        where (Lit n _) = le env x
+    f env (Prim Primitive { primAPrim = APrim Func { funcName = "putwchar" } _} [x]) = putChar (chr $ fromIntegral n) >> return unit
+        where (Lit n _) = le env x
     f env (Prim p xs) = do
         let a = primName p
             xs' = map (le env) xs
@@ -151,7 +152,8 @@ interpret stats te cafMap primMap scMap e = f mempty e where
         return (be `mappend` singleton v (Tag t))
     bind (NodeC t vs) (NodeC t' vs') | t == t' = do
         liftM mconcat $ sequence $  zipWith bind vs vs'
-    bind v r   = fail "unbindable"    -- check type to be sure
-    --bind v r | runIdentity (tc te v) == runIdentity (tc te r)  = fail "unbindable"    -- check type to be sure
-    --bind x y = error $ "bad bind: " ++ show (x,y)
+    bind v r | getType v == getType r = fail $ "unbindable: "  ++ show (v,r,getType v,getType r)   -- check type to be sure
+    bind x y = error $ "bad bind: " ++ show (x,y)
+
+
 

@@ -18,14 +18,14 @@ emptyExtType = ""
 
 data Prim =
     PrimPrim String          -- Special primitive implemented in the compiler somehow.
-    | CConst String ExtType  -- C code which evaluates to a constant
-    | Operator String  [ExtType] ExtType   -- C operator
-    | Func Bool String [ExtType] ExtType   -- function call with C calling convention
-    | IFunc [ExtType] ExtType              -- indirect function call
-    | AddrOf String                        -- address of linker name
-    | Peek ExtType                         -- read value from memory
-    | Poke ExtType                         -- write value to memory
-    | CCast ExtType ExtType                -- Cast from one basic type to another, possibly lossy.
+    | CConst { primConst :: String, primRetType :: ExtType }  -- C code which evaluates to a constant
+    | Operator { primOp :: String, primArgTypes ::  [ExtType], primRetType :: ExtType }   -- C operator
+    | Func { funcIOLike :: Bool, funcName :: String, primArgTypes :: [ExtType], primRetType :: ExtType }   -- function call with C calling convention
+    | IFunc { primArgTypes :: [ExtType], primRetType :: ExtType }-- indirect function call
+    | AddrOf String                                              -- address of linker name
+    | Peek { primArgType :: ExtType }                            -- read value from memory
+    | Poke { primArgType :: ExtType }                            -- write value to memory
+    | CCast { primArgType :: ExtType, primRetType :: ExtType }   -- Cast from one basic type to another, possibly lossy.
     deriving(Typeable, Data, Eq, Ord, Show)
     {-! derive: GhcBinary !-}
 
