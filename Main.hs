@@ -57,6 +57,7 @@ import qualified Grin.Interpret
 import qualified Grin.PointsToAnalysis
 import qualified Grin.Simplify
 import qualified Info.Info as Info
+import qualified Interactive
 import qualified Stats
 import Util.Graph
 
@@ -303,6 +304,8 @@ compileModEnv' stats ho = do
     let dataTable = hoDataTable ho
     let rules = hoRules ho
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
+
+    if optInteractive options then Interactive.interact ho else do
 
     --mapM_ putErrLn ([ show x <+> "::" <+> render (ePretty ty) | (x,(TVr _ ty,_)) <- Map.toList $ hoEs ho])
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
@@ -567,9 +570,6 @@ printCheckName' dataTable tvr e = do
     putErrLn  ( render $ hang 4 (pprint tvr <+> equals <+> pprint e <+> text "::") )
     ty <- typecheck dataTable e
     putErrLn  ( render $ indent 4 (pprint ty))
-
-
-
 
 
 

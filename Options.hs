@@ -1,5 +1,5 @@
 {-# OPTIONS -w -funbox-strict-fields #-}
-module Options(processOptions, Opt(..), options, putVerbose, putVerboseLn, verbose, verbose2, dump, wdump, fopts, flint, fileOptions) where
+module Options(processOptions, Opt(..), options, putVerbose, putVerboseLn, verbose, verbose2, dump, wdump, fopts, flint, fileOptions, versionString) where
 
 import Data.Version
 import Monad
@@ -132,6 +132,8 @@ postProcess' o = case FlagOpts.process (optFOptsSet o) (optFOpts o) of
                 f [] = ""
                 f xs = "Unrecognized flag passed to '-f': " ++ unwords xs ++ "\nValid flags:\n\n" ++ FlagOpts.helpMsg
 
+versionString = concat ["jhc ", jhcVersion, " ", compileDate, " (", darcsTag, "+",darcsPatches, ")\n"]
+                 ++ "compiled by " ++ compilerName ++ "-" ++ showVersion compilerVersion ++ " on a " ++ arch ++ " running " ++ os
 
 {-# NOINLINE processOptions #-}
 -- | Parse commandline options.
@@ -143,9 +145,7 @@ processOptions = do
 	  (o,ns,[]) -> case postProcess (foldl (flip ($)) opt o) of
                 (o,"") -> case postProcess' o of
                     (Opt { optVersion = True },_) -> do
-                        putStr $ concat ["jhc ", jhcVersion, " ", compileDate, " (", darcsTag, "+",darcsPatches, ")\n"]
-                        putStr $ "compiled by " ++ compilerName ++ "-" ++ showVersion compilerVersion
-                        putStrLn $ " on a " ++ arch ++ " running " ++ os
+                        putStrLn versionString
                         exitSuccess
                     (Opt { optVersionCtx = True },_) -> do
                         putStrLn changes_txt
