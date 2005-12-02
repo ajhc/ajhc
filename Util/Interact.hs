@@ -47,7 +47,7 @@ extra_help = [
 basicParse :: String ->  Either (String,String) String
 basicParse s = f s' where
     s' = reverse $ dropWhile isSpace (reverse $ dropWhile isSpace s)
-    f (':':rs) = Left (':':as,dropWhile isSpace rest) where
+    f (':':rs) = Left (':':map toLower as,dropWhile isSpace rest) where
         (as,rest) = span isAlpha rs
     f _ = Right s'
 

@@ -24,13 +24,12 @@ printDoc doc = do
     displayIO stdout (renderPretty 0.9 80 doc)
     putStrLn ""
 
-{-
- 'f' - normal value
- 'C' - data constructor
- 'T' - type constructor
- 'L' - class
- '?' - odd
--}
+grep_opts = [
+ "f - match normal value",
+ "C - match data constructor",
+ "T - match type constructor",
+ "L - match class"
+ ]
 
 nameTag :: NameType -> Char
 nameTag TypeConstructor = 'T'
@@ -48,13 +47,20 @@ interact ho = beginInteraction emptyInteract { interactSettables = ["prog", "arg
         return act
     cmd_grep = InteractCommand { commandName = ":grep", commandHelp = "show names matching a regex", commandAction = do_grep }
     do_grep act _ "" = do
-        putStrLn ":grep <regex>"
+        putStrLn ":grep [options] <regex>"
+        putStrLn "Valid options:"
+        putStr $ unlines grep_opts
         return act
     do_grep act _ arg = do
-        rx <- catch ( Just `fmap` regcomp arg regExtended) (\_ -> return Nothing)
+        let (opt,reg) = case simpleUnquote arg of
+                [x] -> ("TCLf",x)
+                xs -> f "" xs where
+            f opt [x] = (opt,x)
+            f opt (x:xs) = f (x ++ opt) xs
+        rx <- catch ( Just `fmap` regcomp reg regExtended) (\_ -> return Nothing)
         case rx of
             Nothing -> putStrLn $ "Invalid regex: " ++ arg
-            Just rx -> mapM_ putStrLn $ sort [ nameTag (nameType v):' ':show v | v <- Map.keys (hoDefs ho), isJust (matchRegex rx (show v)) ]
+            Just rx -> mapM_ putStrLn $ sort [ nameTag (nameType v):' ':show v | v <- Map.keys (hoDefs ho), isJust (matchRegex rx (show v)), nameTag (nameType v) `elem` opt ]
         return act
 
 
