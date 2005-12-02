@@ -111,6 +111,9 @@ beginInteraction act = do
                     sequence_ [ putStrLn $ "Unknown option: " ++ a | (a,_) <- ts, a `notElem` interactSettables act]
                     beginInteraction act { interactSet = Map.fromList [ x | x@(a,_) <- ts, a `elem` interactSettables act ] `Map.union` interactSet act }
             [":unset"] -> beginInteraction act { interactSet = interactSet act Map.\\ Map.fromList [ (cleanupWhitespace rs,"") | rs <- simpleUnquote arg] }
+            [m] -> let [a] =  [ a | InteractCommand { commandName = n, commandAction = a } <-  interactCommands act, n == m] in do
+                act' <- a act m arg
+                beginInteraction act'
             (_:_:_) -> putStrLn "Ambiguous command, possibilites are:" >> putStr  (unlines $ buildTableLL $ args cmd)
             [] -> putStrLn $ "Unknown command (use :help for help): " ++ cmd
     beginInteraction act

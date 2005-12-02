@@ -133,7 +133,7 @@ idann rs ps i nfo = return (props ps i nfo `mappend` rules rs i) where
 
 processInitialHo :: Ho -> IO Ho
 processInitialHo ho = do
-    putStrLn $ "Initial annotate: " ++ show (Map.keys $ hoModules ho)
+    --putStrLn $ "Initial annotate: " ++ show (Map.keys $ hoModules ho)
     --let imap = annotateMethods (hoClassHierarchy ho) (hoRules ho) (hoProps ho)
     --let f (ds,used) (v,lc) = ((v,lc'):ds,used `mappend` used') where
     --        (lc',used') = runRename used lc
@@ -583,6 +583,7 @@ printCheckName' dataTable tvr e = do
     putErrLn  ( render $ hang 4 (pprint tvr <+> equals <+> pprint e <+> text "::") )
     ty <- typecheck dataTable e
     putErrLn  ( render $ indent 4 (pprint ty))
+
 
 
 
