@@ -93,7 +93,13 @@ buildHl fname ms = do
     return ()
 
 processFiles [] | Nothing <- optMainFunc options = do
-    putErrDie "jhc: no input files"
+    int <- isInteractive
+    stats <- Stats.new
+    case int of
+        False -> putErrDie "jhc: no input files"
+        True -> do
+            me <- parseFiles [] [Module "Prelude"] processInitialHo (processDecls stats)
+            compileModEnv' stats me
 processFiles [] | Just (b,m) <- optMainFunc options = do
     m <- return $ parseName Val m
     Module m <- getModule m
@@ -299,13 +305,20 @@ shouldBeExported exports tvr
 collectIds e = execWriter $ annotate mempty (\id nfo -> tell (Set.singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 --idHistogram e = execWriter $ annotate mempty (\id nfo -> tell (Histogram.singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 
+isInteractive :: IO Bool
+isInteractive = do
+    pn <- System.getProgName
+    return $ optInteractive options || "ichj" `isPrefixOf` reverse pn
+
+
 compileModEnv' stats ho = do
 
     let dataTable = hoDataTable ho
     let rules = hoRules ho
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
 
-    if optInteractive options then Interactive.interact ho else do
+    int <- isInteractive
+    if int then Interactive.interact ho else do
 
     --mapM_ putErrLn ([ show x <+> "::" <+> render (ePretty ty) | (x,(TVr _ ty,_)) <- Map.toList $ hoEs ho])
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
