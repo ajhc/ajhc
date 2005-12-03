@@ -38,6 +38,7 @@ import E.TypeCheck
 import E.WorkerWrapper
 import FreeVars
 import FrontEnd.FrontEnd
+import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadFunctions
 import Grin.FromE
@@ -157,7 +158,8 @@ processDecls stats ho ho' tiData = do
         decls = concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ] ++ Map.elems (tiDataLiftedInstances tiData)
 
     -- build datatables
-    let dataTable = toDataTable (Map.fromList $[ (toName TypeConstructor x,y) | (x,y)<- Map.toList (hoKinds ho')] ) (tiAllAssumptions tiData) decls
+    --let dataTable = toDataTable (Map.fromList $[ (toName TypeConstructor x,y) | (x,y)<- Map.toList (hoKinds ho')] ) (tiAllAssumptions tiData) decls
+    let dataTable = toDataTable (getConstructorKinds (hoKinds ho')) (tiAllAssumptions tiData) decls
     let fullDataTable = (dataTable `mappend` hoDataTable ho)
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
 

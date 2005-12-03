@@ -19,7 +19,7 @@ module TypeSigs (collectSigs,
 
 import Type             (assumpToPair)
 
-import KindInfer        (KindEnv)
+import FrontEnd.KindInfer        (KindEnv)
 
 import Representation   (Scheme)
 

@@ -4,6 +4,7 @@ module FrontEnd.FrontEnd(
     ) where
 
 import Doc.DocLike
+import Doc.PPrint
 import FrontEnd.Exports
 import FrontEnd.Rename
 import GenUtil
@@ -17,7 +18,6 @@ import qualified Doc.PPrint as PPrint
 import qualified FlagDump as FD
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 import TIModule
-import Utils
 import Warning
 
 
@@ -42,7 +42,7 @@ parseFiles fs deps ifunc func = do
     processIOErrors
     when (dump FD.AllKind) $
          do {putStrLn " ---- kind information ---- \n";
-             putStr $ PPrint.render $ pprintEnvMap (hoKinds ho)}
+             putStr $ PPrint.render $ pprint (hoKinds ho)}
     --when  (dump FD.AllDcons) $
     --    do {putStr " ---- data constructor assumptions ---- \n";
     --         putStrLn $ PPrint.render $ pprintEnv (hoDConsAssumptions ho)}

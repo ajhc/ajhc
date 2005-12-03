@@ -36,8 +36,7 @@ import Class                    (ClassHierarchy,
 import TIMonad
 
 
-import Utils                    (fromHsName,
-                                 getDeclName,
+import Utils                    (getDeclName,
                                  fst3,
                                  snd3,
                                  trd3)
@@ -49,7 +48,7 @@ import Name.VConsts
 
 import DeclsDepends             (getDeclDeps)
 import Control.Monad.Error
-import KindInfer(KindEnv)
+import FrontEnd.KindInfer(KindEnv)
 import qualified Data.Map as Map
 import Doc.PPrint as PPrint
 import qualified Text.PrettyPrint.HughesPJ as PPrint
@@ -551,9 +550,9 @@ tiExpl env (sc, decl) = withContext
        --unify t' t
        --unify t t'
        if sc /= sc' then
-           fail $ "signature too general for " ++ fromHsName (getDeclName decl) ++ "\n Given: " ++ show sc ++ "\n Infered: " ++ show sc'
+           fail $ "signature too general for " ++ show (getDeclName decl) ++ "\n Given: " ++ show sc ++ "\n Infered: " ++ show sc'
         else if not (null rs) then
-           fail $ "context too weak for "  ++ fromHsName (getDeclName decl) ++ "\nGiven: " ++ PPrint.render (pprint  sc) ++ "\nInfered: " ++ PPrint.render (pprint sc') ++"\nContext: " ++ PPrint.render (pprint  rs)
+           fail $ "context too weak for "  ++ show (getDeclName decl) ++ "\nGiven: " ++ PPrint.render (pprint  sc) ++ "\nInfered: " ++ PPrint.render (pprint sc') ++"\nContext: " ++ PPrint.render (pprint  rs)
         else
            return (sc', ds,  env')
            --return (sc', ds, env')

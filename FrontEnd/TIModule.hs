@@ -22,7 +22,7 @@ import FrontEnd.Rename
 import GenUtil
 import Ho
 import HsSyn
-import KindInfer
+import FrontEnd.KindInfer
 import Util.Inst()
 import Util.Gen
 import MultiModuleBasics
@@ -38,9 +38,7 @@ import TypeSyns
 import Utils
 import Warning
 
-trimEnv env = (Map.fromList [ n | n@(name,_) <- Map.toList env,  isGlobal name ])
-trimMapEnv env = (Map.fromAscList [ n | n@(name,_) <- Map.toAscList env,  isGlobal name ])
---------------------------------------------------------------------------------
+trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env -- (Map.fromList [ n | n@(name,_) <- Map.toList env,  isGlobal name ])
 
 getDeclNames ::  HsDecl -> [HsName]
 getDeclNames (HsTypeSig _ ns _ ) =  ns
@@ -154,7 +152,7 @@ tiModules' me ms = do
     when (dump FD.Kind) $
          do {putStrLn " \n ---- kind information ---- \n";
              --mapM_ (putStrLn . show) (envToList kindInfo);
-             putStr $ PPrint.render $ pprintEnvMap kindInfo}
+             putStr $ PPrint.render $ pprint kindInfo}
 
     -- collect types for data constructors
 
@@ -246,7 +244,7 @@ tiModules' me ms = do
                 kindInfo                       -- kind information about classes and type constructors
                 cHierarchyWithInstances        -- class hierarchy with instances
                 globalDConsEnv                 -- data constructor type environment
-                (importVarEnv  )               -- type environment
+                importVarEnv                   -- type environment
                 program                        -- binding groups
 
 
@@ -254,9 +252,11 @@ tiModules' me ms = do
          do {putStrLn " ---- the types of identifiers ---- ";
              putStrLn $ PPrint.render $ pprintEnv (if verbose2 then localVarEnv else trimEnv localVarEnv) }
 
-    let externalEnv = Map.fromList [ v | v@(x@(Qual m i) ,s) <- Map.toList localVarEnv, isGlobal x, m `elem` map modInfoName ms ]  `Map.union` noDefaultSigs
+    --let externalEnv = Map.fromList [ v | v@(x@(Qual m i) ,s) <- Map.toList localVarEnv, isGlobal x, m `elem` map modInfoName ms ]  `Map.union` noDefaultSigs
+    let externalEnv = Map.filterWithKey (\ x@(Qual m _) _ -> isGlobal x && (m `elem` map modInfoName ms)) localVarEnv `Map.union` noDefaultSigs
     localVarEnv <- return $  localVarEnv `Map.union` noDefaultSigs
-    let externalKindEnv = Map.fromList [ v | v@(x@(Qual m i) ,s) <- Map.toList kindInfo, isGlobal x, m `elem` map modInfoName ms ]
+    --let externalKindEnv = Map.fromList [ v | v@(x@(Qual m i) ,s) <- Map.toList kindInfo, isGlobal x, m `elem` map modInfoName ms ]
+    let externalKindEnv = restrictKindEnv (\ x@(Qual m _)  -> isGlobal x && (m `elem` map modInfoName ms)) kindInfo
 
     let pragmaProps = Map.fromListWith (\a b -> snub $ a ++ b ) [ (toName Name.Val x,[toAtom w]) |  HsPragmaProps _ w xs <- ds, x <- xs ]
 

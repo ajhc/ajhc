@@ -43,7 +43,7 @@ import FrontEnd.Unlit
 import GenUtil hiding(putErrLn,putErr,putErrDie)
 import HsSyn
 import Info.Types
-import KindInfer
+import FrontEnd.KindInfer
 import MapBinaryInstance()
 import Name.Name
 import Options

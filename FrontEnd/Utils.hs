@@ -77,13 +77,6 @@ hsNameToOrig n = hsNameIdent_u (hsIdentString_u dn) n where
 
 
 
-fromHsName :: HsName -> String
-fromHsName (UnQual i) = hsIdentString i
-fromHsName (Qual (Module m) i) = m ++ "." ++ (hsIdentString i)
-
-
-
-
 isSigDecl :: HsDecl -> Bool
 isSigDecl HsTypeSig {} = True
 isSigDecl _ = False

@@ -160,7 +160,7 @@ instance FlattenType t => FlattenType (Map.Map x t) where
 instance Show (IORef a) where
     showsPrec _ _ = ("<IORef>" ++)
 
-tyvar n k = Tyvar (fromString $ fromHsName n) n k
+tyvar n k = Tyvar (fromString $ show n) n k
 
 instance Eq Tyvar where
     Tyvar { tyvarAtom = x } == Tyvar { tyvarAtom = y } = x == y

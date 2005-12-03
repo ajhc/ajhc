@@ -30,8 +30,7 @@ import Type                     (tv,
                                  tTTuple,
                                  assumpId)
 
-import Utils   (fromHsName)
-import KindInfer
+import FrontEnd.KindInfer
 import Atom
 import Control.Monad.Identity
 
@@ -91,4 +90,4 @@ qualifyAssump mod assump
    ident :: HsName
    ident = assumpId assump
    newQualIdent :: HsName
-   newQualIdent = Qual mod $ HsIdent $ fromHsName ident
+   newQualIdent = Qual mod $ HsIdent $ show ident

@@ -63,7 +63,7 @@ import Binary
 import Doc.PPrint
 import GenUtil(snub,concatInter)
 import HsSyn
-import KindInfer
+import FrontEnd.KindInfer
 import MapBinaryInstance()
 import Maybe
 import Monad
@@ -496,7 +496,7 @@ instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsInstDecl _ qualType met
    HsQualType _ (HsTyApp (HsTyCon className) _) = qualType
    methodGroups = groupEquations methods
    methodSigs = case Map.lookup className classHierarchy  of
-           Nothing -> error $ "instanceToTopDecls: could not find class " ++ fromHsName className ++ "in class hierarchy"
+           Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
            Just sigs -> classAssumps sigs
 instanceToTopDecls kt classHierarchy decl@HsDataDecl {} =
      (makeDerivation kt classHierarchy (hsDeclName decl) (hsDeclArgs decl) (hsDeclCons decl)) (hsDeclDerives decl)

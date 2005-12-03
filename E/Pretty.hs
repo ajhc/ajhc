@@ -33,12 +33,6 @@ instance PPrint Doc E where
 instance DocLike d => PPrint d TVr where
     pprint TVr { tvrIdent = i }  = prettyI i
 
-{-
-fromHsName :: HsName -> String
-fromHsName (UnQual i) =  hsIdentString i
-fromHsName (Qual (Module "Prelude") i) =  hsIdentString i
-fromHsName (Qual (Module m) i) =  m ++ "." ++ hsIdentString i
--}
 
 
 isTup ('(':',':xs) | (a,")") <- span (== ',') xs = return (length a + 2)
@@ -66,12 +60,6 @@ prettyE :: E -> String
 prettyE e = render $ ePrettyN Map.empty e
 prettyENameEx m e = render $ ePrettyNEx m e
 
-{-
-pName nm = \i -> case IM.lookup i m of {Just d -> d ; Nothing -> text ('x':show i)} where
-        m = IM.fromList [(i,text $  gn n) | (n,i) <- nm ]
-        gn (Left n) = fromHsName n --  $ fromAtom $ getName n
-        gn (Right n) = UC.uArrow ++ fromHsName n --  (fromAtom $ getName n)
--}
 
 pName m i = case Map.lookup i m of
     Nothing -> text $ 'x':show i

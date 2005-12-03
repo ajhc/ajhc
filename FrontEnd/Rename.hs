@@ -161,10 +161,10 @@ addTopLevels  hsDecls = do
         f r hsName@Qual {}
             | Just _ <- V.fromTupname hsName, Module "Prelude" <- mod
                 = let nn = hsName in (nn,nn):r
-            | otherwise = error $ "strong bad: " ++ fromHsName hsName
+            | otherwise = error $ "strong bad: " ++ show hsName
         f r z@(UnQual n) = let nn = Qual mod n in (z,nn):(nn,nn):r
         z ns = mapM mult (filter (\x -> length x > 1) $ groupBy (\a b -> fst a == fst b) (sort ns))
-        mult xs@((n,sl):_) = warn sl "multiply-defined" (fromHsName n ++ " is defined multiple times: " ++ show xs )
+        mult xs@((n,sl):_) = warn sl "multiply-defined" (show n ++ " is defined multiple times: " ++ show xs )
     z ns >> z ts
     modify (\s -> s { globalSubTable = nm `plusFM` globalSubTable s })
     modify (\s -> s { typeSubTable = tm `plusFM` typeSubTable s })
@@ -943,7 +943,7 @@ renameHsName hsName subTable = case lookupFM subTable  hsName of
             et <- gets errorTable
             let err = case lookupFM et hsName of {
                 Just s -> s;
-                Nothing -> "Unknown name: " ++ fromHsName hsName }
+                Nothing -> "Unknown name: " ++ show hsName }
             warn sl "undefined-name" err
             -- e <- createError ("Undefined Name: " ++ show hsName)
             return $ hsName

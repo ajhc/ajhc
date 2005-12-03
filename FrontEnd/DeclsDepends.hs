@@ -18,7 +18,7 @@ module DeclsDepends (getDeclDeps, debugDeclBindGroups) where
 
 import HsSyn
 import DependAnalysis           (debugBindGroups)
-import Utils                    (getDeclName, fromHsName)
+import Utils                    (getDeclName)
 import FrontEnd.Rename          (unRename)
 
 --------------------------------------------------------------------------------
@@ -27,7 +27,7 @@ import FrontEnd.Rename          (unRename)
 
 debugDeclBindGroups :: [[HsDecl]] -> String
 debugDeclBindGroups groups
-   = debugBindGroups groups (fromHsName . unRename . getDeclName)
+   = debugBindGroups groups (show . unRename . getDeclName)
                             getDeclName
                             getDeclDeps
 

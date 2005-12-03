@@ -32,7 +32,7 @@ import HsSyn
 import Representation
 import Type                     (assumpToPair, makeAssump, Types (..), quantify)
 import TypeUtils                (aHsTypeToType)
-import KindInfer
+import FrontEnd.KindInfer
 import qualified Data.Map as Map
 
 --------------------------------------------------------------------------------

@@ -47,7 +47,7 @@ import Class                 (ClassHierarchy)
 import Diagnostic
 import Doc.PPrint(pprint,PPrint)
 import HsSyn
-import KindInfer             (KindEnv)
+import FrontEnd.KindInfer             (KindEnv)
 import Representation
 import TypeSigs              (SigEnv)
 import Type                  (Instantiate (..), mgu)
