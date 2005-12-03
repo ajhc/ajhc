@@ -9,17 +9,18 @@ import Text.Regex.Posix(regcomp,regExtended)
 
 
 import DataConstructors
+import FrontEnd.HsParser(parseHsStmt)
+import FrontEnd.ParseMonad
 import Doc.DocLike
-import Doc.Pretty
 import Doc.PPrint
-import Representation
+import Doc.Pretty
 import GenUtil
 import Ho
 import HsSyn
 import Name.Name
 import Options
-import Util.Interact
 import qualified Text.PrettyPrint.HughesPJ as PP
+import Util.Interact
 
 printDoc doc = do
     displayIO stdout (renderPretty 0.9 80 doc)
@@ -40,7 +41,7 @@ nameTag Val = 'f'
 nameTag _ = '?'
 
 interact :: Ho -> IO ()
-interact ho = beginInteraction emptyInteract { interactSettables = ["prog", "args"], interactVersion = versionString, interactCommands = commands } where
+interact ho = beginInteraction emptyInteract { interactSettables = ["prog", "args"], interactVersion = versionString, interactCommands = commands, interactExpr = do_expr } where
     dataTable = hoDataTable ho
     commands = [cmd_mods,cmd_grep]
     cmd_mods = InteractCommand { commandName = ":mods", commandHelp = "mods currently loaded modules", commandAction = do_mods }
@@ -58,7 +59,8 @@ interact ho = beginInteraction emptyInteract { interactSettables = ["prog", "arg
                 [x] -> ("TCLf",x)
                 xs -> f "" xs where
             f opt [x] = (opt,x)
-            f opt (x:xs) = f (x ++ opt) xs
+            f opt ~(x:xs) = f (x ++ opt) xs
+            f _ _ = undefined
         rx <- catch ( Just `fmap` regcomp reg regExtended) (\_ -> return Nothing)
         case rx of
             Nothing -> putStrLn $ "Invalid regex: " ++ arg
@@ -66,5 +68,15 @@ interact ho = beginInteraction emptyInteract { interactSettables = ["prog", "arg
         return act
     ptype k | Just r <- Map.lookup k (hoAssumps ho) = show (pprint r:: PP.Doc)
     ptype x = pprintTypeOfCons dataTable x
+    do_expr :: Interact -> String -> IO Interact
+    do_expr act s = case parseStmt s of
+        Left m -> putStrLn m >> return act
+        Right e -> putStrLn (show e) >> return act
+
+
+parseStmt ::  Monad m => String -> m HsStmt
+parseStmt s = case runParserWithMode ParseMode { parseFilename = "(jhci)" } parseHsStmt  s  of
+                      ParseOk e -> return e
+                      ParseFailed sl err -> fail $ show sl ++ ": " ++ err
 
 
