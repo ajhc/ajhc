@@ -36,10 +36,7 @@ import Class                    (ClassHierarchy,
 import TIMonad
 
 
-import Utils                    (getDeclName,
-                                 fst3,
-                                 snd3,
-                                 trd3)
+import FrontEnd.Utils                    (getDeclName)
 
 
 import DependAnalysis           (getBindGroups)
@@ -60,6 +57,13 @@ isBindDecl :: HsDecl -> Bool
 isBindDecl HsPatBind {} = True
 isBindDecl HsFunBind {} = True
 isBindDecl _ = False
+
+fst3 :: (a,b,c) -> a
+fst3 (a,_,_) = a
+snd3 :: (a,b,c) -> b
+snd3 (_,b,_) = b
+trd3 :: (a,b,c) -> c
+trd3 (_,_,c) = c
 
 strace _ s = s
 

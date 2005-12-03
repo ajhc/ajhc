@@ -51,7 +51,7 @@ import FrontEnd.KindInfer             (KindEnv)
 import Representation
 import TypeSigs              (SigEnv)
 import Type                  (Instantiate (..), mgu)
-import Utils()
+import FrontEnd.Utils()
 import Warning
 
 --------------------------------------------------------------------------------

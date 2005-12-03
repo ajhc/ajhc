@@ -18,7 +18,7 @@ module DeclsDepends (getDeclDeps, debugDeclBindGroups) where
 
 import HsSyn
 import DependAnalysis           (debugBindGroups)
-import Utils                    (getDeclName)
+import FrontEnd.Utils                    (getDeclName)
 import FrontEnd.Rename          (unRename)
 
 --------------------------------------------------------------------------------

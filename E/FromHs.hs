@@ -36,7 +36,7 @@ import Options
 import qualified FlagOpts as FO
 import qualified Util.Seq as Seq
 import Representation
-import Utils
+import FrontEnd.Utils
 import Name.VConsts
 
 localVars = [10,12..]

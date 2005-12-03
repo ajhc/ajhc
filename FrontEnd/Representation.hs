@@ -51,7 +51,6 @@ import Name.VConsts
 import Options
 import qualified Doc.DocLike as D
 import qualified FlagDump as FD
-import Utils
 
 
 --------------------------------------------------------------------------------
@@ -191,7 +190,7 @@ instance ToTuple Scheme where
 -- pretty printing for types etc:
 
 instance PPrint Doc Type where
-  pprint t = fst $ runVarName [] Utils.nameSupply $ prettyPrintTypeM t
+  pprint t = fst $ runVarName [] nameSupply $ prettyPrintTypeM t
 
 -- the trickery is to map TVars and TGens into nice
 -- variable names: a, b, c, d, and so on when we print them
@@ -293,7 +292,7 @@ data Pred   = IsIn Class Type
 instance PPrint Doc Pred where
   -- pprint (IsIn c t) = pprint c <+> pprint t
   pprint pred
-     = fst $ runVarName [] Utils.nameSupply $ prettyPrintPredM pred
+     = fst $ runVarName [] nameSupply $ prettyPrintPredM pred
 
 prettyPrintPredM :: Pred -> VarName Doc
 prettyPrintPredM (IsIn c t)
@@ -339,10 +338,10 @@ type Class = HsName
 --  pprint (ps :=> t) = pptuple ps <+> text "=>" <+> pprint t
 
 instance PPrint Doc (Qual Pred) where
-    pprint inst = fst $ runVarName [] Utils.nameSupply $ prettyPrintQualPredM inst
+    pprint inst = fst $ runVarName [] nameSupply $ prettyPrintQualPredM inst
 
 instance PPrint Doc (Qual Type) where
-    pprint inst = fst $ runVarName [] Utils.nameSupply $ prettyPrintQualTypeM inst
+    pprint inst = fst $ runVarName [] nameSupply $ prettyPrintQualTypeM inst
 
 --prettyPrintInst :: Inst -> Doc
 --prettyPrintInst inst
@@ -370,7 +369,7 @@ data Scheme = Forall [Kind] (Qual Type)
 
 instance PPrint Doc Scheme where
   pprint scheme
-    = fst $ runVarName [] Utils.nameSupply $ prettyPrintSchemeM scheme
+    = fst $ runVarName [] nameSupply $ prettyPrintSchemeM scheme
 
 prettyPrintSchemeM :: Scheme -> VarName Doc
 prettyPrintSchemeM (Forall _kinds qType)
@@ -454,3 +453,29 @@ instance Binary Tyvar where
     --ad <- newIORef Nothing
     return (Tyvar aa ab ac Nothing)
 
+-- an infinite list of alphabetic strings in the usual order
+nameSupply :: [String]
+nameSupply = [ x++[y] | x <- []:nameSupply, y <- ['a'..'z'] ]
+
+instance FromTupname HsName where
+    fromTupname (Qual (Module "Prelude") (HsIdent xs))  = fromTupname xs
+    fromTupname _ = fail "fromTupname: not Prelude"
+
+instance ToTuple HsName where
+    toTuple n = (Qual (Module "Prelude") (HsIdent $ toTuple n))
+
+-- pretty printing a HsName, Module and HsIdentifier
+
+instance DocLike d => PPrint d HsName where
+   pprint (Qual mod ident)
+      -- don't print the Prelude module qualifier
+      | mod == Module "Prelude" = pprint ident
+      | otherwise               = pprint mod <> text "." <> pprint ident
+   pprint (UnQual ident)
+      = pprint ident
+
+instance DocLike d => PPrint d Module where
+   pprint (Module s) = text s
+
+instance DocLike d => PPrint d HsIdentifier where
+   pprint (HsIdent   s) = text s

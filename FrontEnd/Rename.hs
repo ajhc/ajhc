@@ -84,7 +84,7 @@ import qualified Name.VConsts as V
 import Util.ContextMonad
 import Util.Gen
 import Util.Inst()
-import Utils
+import FrontEnd.Utils
 import Warning
 
 
@@ -1679,28 +1679,7 @@ data Binding
    | FunPat             -- pattern binding in a function declaration
    | Constr             -- name is a data constructor
 
-{-
-printIdentTable :: IdentTable -> IO ()
-printIdentTable idt
-   = putStr $ unlines $ map showIdentTabEntry $ toListFM idt
-   where
-   showIdentTabEntry :: (HsName, (SrcLoc, Binding)) -> String
-   showIdentTabEntry (name, (SrcLoc fn row col, bind))
-      = lJustify 40 (fromHsName name) ++
-        fn ++ ":" ++ showPos (row, col) ++
-        rJustify 10 (show bind)
-   showPos pos@(row, col)
-      | row < 0 || col < 0 = rJustify 10 "none"
-      | otherwise          = rJustify 10 $ show pos
 
--- returns the binding type of a given identifier
-
-bindOfId :: IdentTable -> HsName -> Binding
-bindOfId idtab i
-   = case lookupFM idtab i of
-        Nothing -> error $ "bindOfId: could not find binding for this identifier: " ++ show i
-        Just (_sloc, bind) -> bind
-addToIdentTable :: HsName -> (SrcLoc,Binding) -> ScopeSM ()
-addToIdentTable hsName srcLocAndBinding
-   = modify (\state -> state {identTable = addToFM (identTable state) hsName srcLocAndBinding })
--}
+qualifyName :: Module -> HsName -> HsName
+qualifyName _ name@(Qual {}) = name
+qualifyName mod (UnQual name) = Qual mod name

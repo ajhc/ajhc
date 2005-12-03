@@ -36,7 +36,7 @@ import Representation hiding (Subst)
 import Type(quantify,tv,tTTuple)
 import Util.ContextMonad
 import Util.HasSize
-import Utils
+import FrontEnd.Utils
 
 
 
@@ -398,9 +398,9 @@ dataAndClassDeps (HsDataDecl _sloc cntxt _name _args condecls _derives)
 dataAndClassDeps (HsNewTypeDecl _sloc cntxt _name _args condecl _derives)
    = nub $ namesFromContext cntxt ++ (concatMap namesFromType $ conDeclToTypes condecl)
 dataAndClassDeps (HsClassDecl _sloc (HsQualType cntxt _classApp) decls)
-   = nub $ namesFromContext cntxt ++ (concat [ namesFromQualType (typeFromSig s) | s <- decls,  isSigDecl s])
+   = nub $ namesFromContext cntxt ++ (concat [ namesFromQualType (typeFromSig s) | s <- decls,  isHsTypeSig s])
 dataAndClassDeps (HsClassDecl _sloc (HsUnQualType _classApp) decls)
-   = nub $ concat [ namesFromQualType (typeFromSig s) | s <- decls,  isSigDecl s]
+   = nub $ concat [ namesFromQualType (typeFromSig s) | s <- decls,  isHsTypeSig s]
 
 namesFromQualType :: HsQualType -> [HsName]
 namesFromQualType (HsQualType cntxt t)
@@ -465,7 +465,7 @@ declsToKindGroup (HsClassDecl _sloc qualType sigsAndDefaults : decls)
       newClassBodies++restClassBodies)
    where
    (restClassDecls, restDataHeads, restContext, restDataBodies, restClassBodies) = declsToKindGroup decls
-   newClassBodies = map typeFromSig $ filter isSigDecl sigsAndDefaults
+   newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
    --rn = runIdentity $ applyTU (full_tdTU $ adhocTU (constTU ([])) f) newClassBodies
    --f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = return [n']
    --f _ = return []

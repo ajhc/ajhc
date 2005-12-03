@@ -4,7 +4,7 @@
 
 module HsErrors where
 
-import Class
+import Class()
 import HsSyn
 import Monad
 import Name.VConsts

@@ -75,7 +75,7 @@ import Type
 import TypeUtils
 import Util.HasSize
 import Util.Inst()
-import Utils
+import FrontEnd.Utils
 
 --------------------------------------------------------------------------------
 
@@ -792,3 +792,15 @@ showListAndSepInWidth f width sep things
 
 pretty  :: PPrint Doc a => a -> String
 pretty   = render . pprint
+
+nameOfTyCon :: HsType -> HsName
+nameOfTyCon (HsTyCon n) = n
+nameOfTyCon (HsTyTuple xs) = toTuple (length xs)
+nameOfTyCon (HsTyFun _ _) = nameName tc_Arrow
+nameOfTyCon t = error $ "nameOfTyCon: " ++ show t
+
+groupEquations :: [HsDecl] -> [(HsName, HsDecl)]
+groupEquations [] = []
+groupEquations (d:ds) = (getDeclName d, d) : groupEquations ds
+
+
