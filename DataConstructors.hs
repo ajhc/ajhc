@@ -11,6 +11,7 @@ module DataConstructors(
     showDataTable,
     slotTypes,
     toDataTable,
+    pprintTypeOfCons,
     typesCompatable
     ) where
 
@@ -36,7 +37,9 @@ import qualified Util.Seq as Seq
 import Representation
 import Util.HasSize
 import Util.SameShape
+import Util.VarName
 import Name.VConsts
+import Unparse
 
 
 tipe (TAp t1 t2) = eAp (tipe t1) (tipe t2)
@@ -361,6 +364,38 @@ getSiblings :: DataTable -> Name -> Maybe [Name]
 getSiblings (DataTable mp) n
     | Just c <- Map.lookup n mp, Just s <- Map.lookup (conInhabits c) mp = conChildren s
     | otherwise =  Nothing
+
+
+pprintTypeOfCons :: DocLike a => DataTable -> Name -> a
+pprintTypeOfCons dataTable name | Just c <- getConstructor name dataTable = pprintTypeAsHs (conType c)
+                                | otherwise = text "?"
+
+
+
+
+pprintTypeAsHs :: DocLike a => E -> a
+pprintTypeAsHs e = unparse $ runVarName (f e) where
+    f e | e == eStar = return $ atom $ text "*"
+        | e == eHash = return $ atom $ text "#"
+    f (EPi (TVr { tvrIdent = 0, tvrType = t1 }) t2) = do
+        t1 <- f t1
+        t2 <- f t2
+        return $ t1 `arr` t2
+    f (ELit (LitCons n as _)) | (a:as') <- reverse as = f $ EAp (ELit (LitCons n (reverse as') undefined)) a
+    f (ELit (LitCons n [] _)) = return $ atom $ text $ show n
+    f (EAp a b) = do
+        a <- f a
+        b <- f b
+        return $ a `app` b
+    f (EVar v) = do
+        vo <- newLookupName ['a' .. ] () (tvrIdent v)
+        return $ atom $ char vo
+    arr = bop (R,0) (space <> text "->" <> space)
+    app = bop (L,100) (text " ")
+
+
+--pprintTypeAsHs (EPi (TVr { tvrIdent = 0, tvrType = t1 }) t2) =
+
 --    | otherwise = error $ "getSiblings: " ++ show n ++ show (Map.keys mp) ++ show (n `elem` (Map.keys mp))
 
 

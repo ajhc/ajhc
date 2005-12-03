@@ -1,24 +1,25 @@
 module Interactive(Interactive.interact) where
 
-import Data.Version
 import IO(stdout)
 import List(sort)
 import Maybe
 import qualified Data.Map as Map
-import System.Info
 import Text.Regex
 import Text.Regex.Posix(regcomp,regExtended)
 
 
+import DataConstructors
 import Doc.DocLike
 import Doc.Pretty
+import Doc.PPrint
+import Representation
 import GenUtil
 import Ho
 import HsSyn
 import Name.Name
 import Options
 import Util.Interact
-import Version
+import qualified Text.PrettyPrint.HughesPJ as PP
 
 printDoc doc = do
     displayIO stdout (renderPretty 0.9 80 doc)
@@ -40,6 +41,7 @@ nameTag _ = '?'
 
 interact :: Ho -> IO ()
 interact ho = beginInteraction emptyInteract { interactSettables = ["prog", "args"], interactVersion = versionString, interactCommands = commands } where
+    dataTable = hoDataTable ho
     commands = [cmd_mods,cmd_grep]
     cmd_mods = InteractCommand { commandName = ":mods", commandHelp = "mods currently loaded modules", commandAction = do_mods }
     do_mods act _ _ = do
@@ -60,7 +62,9 @@ interact ho = beginInteraction emptyInteract { interactSettables = ["prog", "arg
         rx <- catch ( Just `fmap` regcomp reg regExtended) (\_ -> return Nothing)
         case rx of
             Nothing -> putStrLn $ "Invalid regex: " ++ arg
-            Just rx -> mapM_ putStrLn $ sort [ nameTag (nameType v):' ':show v | v <- Map.keys (hoDefs ho), isJust (matchRegex rx (show v)), nameTag (nameType v) `elem` opt ]
+            Just rx -> mapM_ putStrLn $ sort [ nameTag (nameType v):' ':show v <+> "::" <+> ptype v  | v <- Map.keys (hoDefs ho), isJust (matchRegex rx (show v)), nameTag (nameType v) `elem` opt ]
         return act
+    ptype k | Just r <- Map.lookup k (hoAssumps ho) = show (pprint r:: PP.Doc)
+    ptype x = pprintTypeOfCons dataTable x
 
 

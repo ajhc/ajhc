@@ -137,7 +137,6 @@ instance FlattenType t => FlattenType (Qual t) where
 instance FlattenType Type where
     flattenType' tv =  do
         tv' <- findType tv
-        --tv' <- refType tv'
         let ft (TAp x y) = do
                 x' <- flattenType' x
                 y' <- flattenType' y
@@ -222,8 +221,8 @@ prettyPrintTypeM t
                                 Nothing -> do
                                     nm <- nextName
                                     updateVMap (t, nm)
-                                    --return (text nm)
-                                    return (text nm <> parens (text (show tv)))
+                                    return (text nm)
+                                    --return (text nm <> parens (text (show tv)))
                                 Just v  -> return $ text v <> tyvar (text (show tv))
            TArrow t1 t2 -> do doc1 <- maybeParensArrow t1
                               doc2 <- prettyPrintTypeM t2
@@ -270,7 +269,6 @@ instance DocLike d => PPrint d Kind where
    pprint Star = text "*"
    pprint (Kfun Star Star) = text "* -> *"
    pprint (Kfun k1   Star) = text "(" <> pprint k1 <> text ")" <> text " -> *"
-   --pprint (Kfun Star k2)   = text "*->" <> text "(" <> pprint k2 <> text ")"
    pprint (Kfun Star k2)   = text "* -> " <> pprint k2
    pprint (Kfun k1   k2)   = text "(" <> pprint k1 <> text ") -> (" <> pprint k2 <> text ")"
    pprint (KVar kindVar)   = pprint kindVar

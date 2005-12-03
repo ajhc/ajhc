@@ -99,10 +99,6 @@ bold = attrBold (attr oob)
 
 
 
-instance Unparsable Doc where
-    unparseCat  =  (<>)
-    unparseSpace  =  (<>)
-    unparseGroup  = parens
 
 prettyI 0 = (char '_')
 prettyI i | Just x <- intToAtom i  = (text $ show  $ (fromAtom x :: Name))
@@ -121,7 +117,7 @@ eDoc e PrettyOpt {optExpanded = optExpanded, optColors = colors, optNames = optN
     keyword x = bold' (text x)
     symbol x = atom (bold' x)
 
-    atomize (x,_) = (x,Atom)
+    --atomize (x,_) = (x,Atom)
 
     prettylit :: (a -> Unparse Doc) -> Lit a E -> Unparse Doc
     prettylit pbind (LitInt c t) | t == tChar = atom $ (col "blue" (text (show $ chr $ fromIntegral  c)))
@@ -160,11 +156,11 @@ eDoc e PrettyOpt {optExpanded = optExpanded, optColors = colors, optNames = optN
         ESort EBox -> symbol UC.box
         ESort EHash -> symbol (text "#")
         (ELit l) -> prettylit prettye l
-        (ELetRec bg e) -> rtup (Fix L (-10)) $ let
+        (ELetRec bg e) -> fixitize (L,(-10)) $ let
             bg' = map ((<> bc ';') . unparse . prettydecl ) bg
             e' = unparse  (prettye e)
             in group ( nest 4  ( keyword "let" </> (align $ sep bg') </> (keyword "in" <+> e')) )
-        ec@(ECase { eCaseScrutinee = e, eCaseAlts = alts }) -> rtup (Fix L (-10)) $ let
+        ec@(ECase { eCaseScrutinee = e, eCaseAlts = alts }) -> fixitize ((L,(-10))) $ let
             e' = unparse $ prettye e
             alts' = map  ((<> bc ';') . prettyalt b) alts ++ dcase
             b = eCaseBind ec
