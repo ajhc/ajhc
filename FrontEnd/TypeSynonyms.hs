@@ -2,7 +2,8 @@
 module TypeSynonyms (
     removeSynonymsFromType,
     declsToTypeSynonyms,
-    TypeSynonyms
+    TypeSynonyms,
+    showSynonym
     ) where
 
 import Control.Monad.Identity
@@ -23,6 +24,11 @@ import Warning
 
 newtype TypeSynonyms = TypeSynonyms (Map.Map Name ([HsName], HsType, SrcLoc))
     deriving(Monoid,Binary,HasSize)
+
+showSynonym :: (DocLike d,Monad m) => (HsType -> d) -> Name -> TypeSynonyms -> m d
+showSynonym pprint n (TypeSynonyms m) = do
+    (ns, t, _) <- Map.lookup n m
+    return $ hsep (tshow n:map tshow ns) <+> text "=" <+> pprint t
 
 -- | convert a set of type synonym declarations to a synonym map used for efficient synonym
 -- expansion

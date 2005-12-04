@@ -9,17 +9,20 @@ import Text.Regex.Posix(regcomp,regExtended)
 
 
 import DataConstructors
-import FrontEnd.HsParser(parseHsStmt)
-import FrontEnd.ParseMonad
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
+import FrontEnd.HsParser(parseHsStmt)
+import FrontEnd.KindInfer
+import FrontEnd.ParseMonad
 import GenUtil
 import Ho
 import HsSyn
 import Name.Name
 import Options
 import qualified Text.PrettyPrint.HughesPJ as PP
+import Representation
+import TypeSynonyms(showSynonym)
 import Util.Interact
 
 printDoc doc = do
@@ -74,7 +77,8 @@ interact ho = mre where
         rx <- catch ( Just `fmap` regcomp reg regExtended) (\_ -> return Nothing)
         case rx of
             Nothing -> putStrLn $ "Invalid regex: " ++ arg
-            Just rx -> mapM_ putStrLn $ sort [ nameTag (nameType v):' ':show v <+> "::" <+> ptype v  | v <- Map.keys (hoDefs ho), isJust (matchRegex rx (show v)), nameTag (nameType v) `elem` opt ]
+            --Just rx -> mapM_ putStrLn $ sort [ nameTag (nameType v):' ':show v <+> "::" <+> ptype v  | v <- Map.keys (hoDefs ho), isJust (matchRegex rx (show v)), nameTag (nameType v) `elem` opt ]
+            Just rx -> mapM_ putStrLn $ sort [ pshow opt v  | v <- Map.keys (hoDefs ho), isJust (matchRegex rx (show v)), nameTag (nameType v) `elem` opt ]
         return act
     ptype k | Just r <- Map.lookup k (hoAssumps ho) = show (pprint r:: PP.Doc)
     ptype x = pprintTypeOfCons dataTable x
@@ -82,6 +86,9 @@ interact ho = mre where
     do_expr act s = case parseStmt s of
         Left m -> putStrLn m >> return act
         Right e -> putStrLn (show e) >> return act
+    pshow _opt v
+        | Just d <- showSynonym (show . (pprint :: Type -> PP.Doc) . aHsTypeToType (hoKinds ho)) v (hoTypeSynonyms ho) = nameTag (nameType v):' ':d
+        | otherwise = nameTag (nameType v):' ':show v <+> "::" <+> ptype v
 
 
 parseStmt ::  Monad m => String -> m HsStmt
