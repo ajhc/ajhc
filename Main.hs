@@ -310,7 +310,7 @@ collectIds e = execWriter $ annotate mempty (\id nfo -> tell (Set.singleton id) 
 isInteractive :: IO Bool
 isInteractive = do
     pn <- System.getProgName
-    return $ optInteractive options || "ichj" `isPrefixOf` reverse pn
+    return $ optInteractive options || "ichj" `isPrefixOf` reverse pn || not (null $ optStmts options)
 
 
 compileModEnv' stats ho = do

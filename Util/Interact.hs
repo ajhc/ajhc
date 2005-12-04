@@ -1,17 +1,21 @@
 -- This module contains routines to provide an interactive shell prompt and is
 -- built on top of the readline library.
 
-module Util.Interact(Interact(..),InteractCommand(..),beginInteraction,emptyInteract) where
+module Util.Interact(
+    Interact(..),
+    InteractCommand(..),
+    beginInteraction,
+    runInteraction,
+    runInteractions,
+    emptyInteract) where
 
 import Char
 import Control.Monad.Identity
-import Data.Version
 import List
 import qualified Data.Map as Map
 import System
 import System.Console.Readline
 import System.Directory
-import System.Info
 
 import GenUtil
 
@@ -35,6 +39,7 @@ commands = [
     (":pwd", "show current directory"),
     (":set", "set options"),
     (":unset", "unset options"),
+    (":execfile", "run sequence of commands from a file"),
     (":help", "print help table")
     ]
 
@@ -77,8 +82,16 @@ emptyInteract = Interact {
 
 cleanupWhitespace s = reverse $ dropWhile isSpace (reverse $ dropWhile isSpace s)
 
-beginInteraction :: Interact -> IO ()
-beginInteraction act = do
+runInteractions :: Interact -> [String] -> IO Interact
+runInteractions act [] = return act
+runInteractions act (x:xs) = do
+    act' <- runInteraction act x
+    runInteractions act' xs
+
+-- | run a command as if typed at prompt
+
+runInteraction :: Interact -> String -> IO Interact
+runInteraction act s = do
     let commands' = commands ++ [ (n,h) | InteractCommand { commandName = n, commandHelp = h } <- interactCommands act ]
         help_text = unlines $ buildTableLL (commands' ++ extra_help)
     let args s =  [ bb | bb@(n,_) <- commands', s `isPrefixOf` n ]
@@ -91,30 +104,44 @@ beginInteraction act = do
                 setable = [ "  " ++ a | a <- sort $ interactSettables act, not $ a `Map.member` interactSet act]
             when (not $ null set) $ putStrLn "Set options:" >> putStr (unlines set)
             when (not $ null setable) $ putStrLn "Setable options:" >> putStr (unlines setable)
-    s <- readLine (interactPrompt act) (return . expand)
     case basicParse s of
-        Right "" -> beginInteraction act
-        Right ('!':rest) -> System.system rest >> return ()
+        Right "" -> return act
+        Right ('!':rest) -> System.system rest >> return act
         Right s -> do
             act' <- interactExpr act act s
-            beginInteraction act'
+            return act'
         Left (cmd,arg) -> case fsts $ args cmd of
             [":quit"] -> putStrLn "Bye!" >> exitSuccess
-            [":help"] -> putStrLn help_text
-            [":version"] -> putStrLn (interactVersion act)
-            [":cd"] -> catch (setCurrentDirectory arg) (\_ -> putStrLn $ "Could not change to directory: " ++ arg)
-            [":pwd"] -> catch getCurrentDirectory (\_ -> putStrLn "Could not get current directory." >> return "") >>= putStrLn
+            [":help"] -> putStrLn help_text >> return act
+            [":version"] -> putStrLn (interactVersion act) >> return act
+            [":cd"] -> catch (setCurrentDirectory arg) (\_ -> putStrLn $ "Could not change to directory: " ++ arg) >> return act
+            [":pwd"] -> (catch getCurrentDirectory (\_ -> putStrLn "Could not get current directory." >> return "") >>= putStrLn)  >> return act
             [":set"] -> case simpleUnquote arg of
-                [] -> showSet
+                [] -> showSet >> return act
                 rs -> do
                     let ts = [ let (a,b) = span (/= '=') x in (cleanupWhitespace a,drop 1 b) | x <- rs ]
                     sequence_ [ putStrLn $ "Unknown option: " ++ a | (a,_) <- ts, a `notElem` interactSettables act]
-                    beginInteraction act { interactSet = Map.fromList [ x | x@(a,_) <- ts, a `elem` interactSettables act ] `Map.union` interactSet act }
-            [":unset"] -> beginInteraction act { interactSet = interactSet act Map.\\ Map.fromList [ (cleanupWhitespace rs,"") | rs <- simpleUnquote arg] }
+                    return act { interactSet = Map.fromList [ x | x@(a,_) <- ts, a `elem` interactSettables act ] `Map.union` interactSet act }
+            [":unset"] -> return act { interactSet = interactSet act Map.\\ Map.fromList [ (cleanupWhitespace rs,"") | rs <- simpleUnquote arg] }
+            [":execfile"] -> do
+                fc <- catch (readFile arg) (\_ -> putStrLn "Could not read file." >> return "")
+                runInteractions act (lines fc)
             [m] -> let [a] =  [ a | InteractCommand { commandName = n, commandAction = a } <-  interactCommands act, n == m] in do
                 act' <- a act m arg
-                beginInteraction act'
-            (_:_:_) -> putStrLn "Ambiguous command, possibilites are:" >> putStr  (unlines $ buildTableLL $ args cmd)
-            [] -> putStrLn $ "Unknown command (use :help for help): " ++ cmd
-    beginInteraction act
+                return act'
+            (_:_:_) -> putStrLn "Ambiguous command, possibilites are:" >> putStr  (unlines $ buildTableLL $ args cmd) >> return act
+            [] -> (putStrLn $ "Unknown command (use :help for help): " ++ cmd)  >> return act
+
+
+-- | begin interactive interaction
+
+beginInteraction :: Interact -> IO ()
+beginInteraction act = do
+    let commands' = commands ++ [ (n,h) | InteractCommand { commandName = n, commandHelp = h } <- interactCommands act ]
+        args s =  [ bb | bb@(n,_) <- commands', s `isPrefixOf` n ]
+        expand s = fsts (args s) ++ filter (isPrefixOf s) (interactSettables act)
+    s <- readLine (interactPrompt act) (return . expand)
+    act' <- runInteraction act s
+    beginInteraction act'
+
 

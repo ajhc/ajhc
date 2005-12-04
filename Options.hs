@@ -22,6 +22,7 @@ data Opt = Opt {
     optDebug       :: !Bool,      -- ^ Debugging.
     optSelfTest    :: !Bool,      -- ^ Perform self-test
     optDump        ::  [String],  -- ^ Dump options (raw).
+    optStmts       ::  [String],  -- ^ statements to execute
     optFOpts       ::  [String],  -- ^ Flag options (raw).
     optIncdirs     ::  [String],  -- ^ Include directories.
     optProgArgs    ::  [String],  -- ^ Arguments to pass to the interpreted program.
@@ -58,6 +59,7 @@ opt = Opt {
     optBuildHl     = "",
     optProgArgs    = [],
     optDump        = [],
+    optStmts       = [],
     optFOpts       = ["default"],
     optShowHo      = [],
     optCCargs      = [],
@@ -100,7 +102,8 @@ theoptions =
     , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))  "keep going on errors."
     , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output."
     , Option ['m'] ["main"]      (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point."
-    , Option ['e'] []            (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression."
+    , Option []    ["entry"]     (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression."
+    , Option ['e'] []            (ReqArg (\d -> optStmts_u (d:)) "<statement>")  "run given statement as if on jhci prompt"
     , Option []    ["debug"]     (NoArg  (optDebug_s True)) "debugging"
     , Option []    ["show-ho"]   (ReqArg  (\d -> optShowHo_u (++ [d])) "file.ho") "Show ho file"
     , Option []    ["noauto"]    (NoArg  (optNoAuto_s True)) "Don't automatically load base and haskell98 packages"
