@@ -571,7 +571,7 @@ newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
    newQualType = everywhere (mkT at) $ quantify (tv qt) qt
    at (Tyvar _ n k r) =  tyvar (hsNameIdent_u (hsIdentString_u (++ foo)) n) k r
    qt = (map (aHsAsstToPred kt) newCntxt ++ restContext) :=> (everywhere (mkT ct) t)
-   ct n | n == classArg =  aHsTypeToType kt instanceType
+   ct n | n == classArg =  runIdentity $ hsTypeToType kt instanceType
    ct n =  n
 
 {-

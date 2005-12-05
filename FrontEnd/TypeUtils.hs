@@ -15,8 +15,7 @@
 
 -------------------------------------------------------------------------------}
 
-module TypeUtils (aHsTypeToType,
-                  aHsTypeSigToAssumps,
+module TypeUtils (aHsTypeSigToAssumps,
                   aHsAsstToPred,
                   flattenLeftTypeApplication) where
 

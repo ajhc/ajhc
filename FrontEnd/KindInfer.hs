@@ -12,7 +12,7 @@ module FrontEnd.KindInfer (
     kindOfClass,
     kindOf,
     restrictKindEnv,
-    aHsTypeToType,
+    hsTypeToType,
     getConstructorKinds
     ) where
 
@@ -532,6 +532,9 @@ aHsTypeToType kt (HsTyVar name) = TVar $ tyvar  name (kindOf name kt) Nothing
 -- currently unqualified
 
 aHsTypeToType kt (HsTyCon name) = TCon $ Tycon name (kindOf name kt)
+
+aHsTypeToType kt (HsTyForall vs qt) = TForAll (aHsQualTypeToScheme kt qt)
+
 aHsTypeToType _ t = error $ "aHsTypeToType: " ++ show t
 
 
@@ -559,6 +562,8 @@ forallHoist (HsTyForall vs qt) | HsTyForall vs' qt' <- hsQualTypeType qt  = fora
 forallHoist (HsTyFun a b) = case forallHoist b of
     HsTyForall as qt -> HsTyForall as HsQualType { hsQualTypeContext = hsQualTypeHsContext qt, hsQualTypeType = HsTyFun a (hsQualTypeType qt) }
     b' -> HsTyFun (forallHoist a) b'
+forallHoist (HsTyTuple ts) = HsTyTuple (map forallHoist ts)
+forallHoist (HsTyApp a b) = HsTyApp (forallHoist a) (forallHoist b)
 forallHoist t = t
 
 hsAsstToPred :: KindEnv -> HsAsst -> Pred
@@ -569,4 +574,8 @@ hsAsstToPred kt (className, varName)
 hsQualTypeToScheme :: Monad m => KindEnv -> HsQualType -> m Scheme
 hsQualTypeToScheme kt qualType =  return $ aHsQualTypeToScheme newEnv qualType where
    newEnv = kiHsQualType kt qualType
+
+
+hsTypeToType :: Monad m => KindEnv -> HsType -> m Type
+hsTypeToType kt t = return $ aHsTypeToType kt (forallHoist t)
 

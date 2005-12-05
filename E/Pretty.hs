@@ -11,7 +11,6 @@ import Doc.Pretty
 import E.E
 import E.FreeVars()
 import FreeVars
-import GenUtil
 import Name.Name
 import Name.Names
 import Options
@@ -144,11 +143,11 @@ eDoc e PrettyOpt {optExpanded = optExpanded, optColors = colors, optNames = optN
         ESort EBox -> symbol UC.box
         ESort EHash -> symbol (text "#")
         (ELit l) -> prettylit prettye l
-        (ELetRec bg e) -> fixitize (L,(-10)) $ let
+        (ELetRec bg e) -> fixitize (L,(-10)) $ atom $ let
             bg' = map ((<> bc ';') . unparse . prettydecl ) bg
             e' = unparse  (prettye e)
             in group ( nest 4  ( keyword "let" </> (align $ sep bg') </> (keyword "in" <+> e')) )
-        ec@(ECase { eCaseScrutinee = e, eCaseAlts = alts }) -> fixitize ((L,(-10))) $ let
+        ec@(ECase { eCaseScrutinee = e, eCaseAlts = alts }) -> fixitize ((L,(-10))) $ atom $ let
             e' = unparse $ prettye e
             alts' = map  ((<> bc ';') . prettyalt b) alts ++ dcase
             b = eCaseBind ec

@@ -2,7 +2,7 @@ module Unparse(Unparse(), Unparsable(..), unparse, unparse', Side(..), atom, ato
 
 import Doc.DocLike
 
-data Unparse a = Atom a | Pre a (Unparse a) | Fix (Unparse a) a (Unparse a) !Side !Int | Atomized (Unparse a) | Fixitized  !Side !Int a
+data Unparse a = Atom a | Pre a (Unparse a) | Fix (Unparse a) a (Unparse a) !Side !Int | Atomized (Unparse a) | Fixitized  !Side !Int (Unparse a)
 
 data Side = R | L | N
     deriving(Eq)
@@ -15,7 +15,7 @@ atomize (Atomized x) = Atomized x
 atomize (Atom a) = Atom a
 atomize x = Atomized x
 
-fixitize :: (Side,Int) -> a -> Unparse a
+fixitize :: (Side,Int) -> Unparse a -> Unparse a
 fixitize (s,i) a = Fixitized s i a
 
 pop :: a -> Unparse a -> Unparse a
@@ -39,7 +39,7 @@ unparse' :: Unparsable a -> Unparse a -> a
 unparse' Unparsable { unparseGroup = upg, unparseCat = (<>) } up = fst $ f up where
     f (Atom a) = atom a
     f (Atomized a) = (fst $ f a, FAtom)
-    f (Fixitized s i a) = (a, FFix s i)
+    f (Fixitized s i a) = (fst $ f a, FFix s i)
     f (Pre a up) = pop a (f up)
     f (Fix a op b s i) = bop (s,i) op (f a) (f b)
 

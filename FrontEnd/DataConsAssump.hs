@@ -27,12 +27,13 @@
 
 module DataConsAssump (dataConsEnv) where
 
+import Control.Monad.Identity
+import qualified Data.Map as Map
 
 import HsSyn
 import Representation
 import Type                     (Types (..), quantify)
 import FrontEnd.KindInfer
-import qualified Data.Map as Map
 
 --------------------------------------------------------------------------------
 
@@ -92,6 +93,6 @@ conDeclType modName kt preds tResult rd@(HsRecDecl _sloc conName _)
    qualConType = preds :=> conType
 
 bangTypeToType :: KindEnv -> HsBangType -> Type
-bangTypeToType kt (HsBangedTy t) = aHsTypeToType kt t
-bangTypeToType kt (HsUnBangedTy t) = aHsTypeToType kt t
+bangTypeToType kt (HsBangedTy t) = runIdentity $ hsTypeToType kt t
+bangTypeToType kt (HsUnBangedTy t) = runIdentity $ hsTypeToType kt t
 

@@ -81,8 +81,8 @@ interact ho = mre where
             --Just rx -> mapM_ putStrLn $ sort [ nameTag (nameType v):' ':show v <+> "::" <+> ptype v  | v <- Map.keys (hoDefs ho), isJust (matchRegex rx (show v)), nameTag (nameType v) `elem` opt ]
             Just rx -> mapM_ putStrLn $ sort [ pshow opt v  | v <- Map.keys (hoDefs ho), isJust (matchRegex rx (show v)), nameTag (nameType v) `elem` opt ]
         return act
+    ptype x | Just r <- pprintTypeOfCons dataTable x = r
     ptype k | Just r <- Map.lookup k (hoAssumps ho) = show (pprint r:: PP.Doc)
-    ptype x = pprintTypeOfCons dataTable x
     do_expr :: Interact -> String -> IO Interact
     do_expr act s = case parseStmt s of
         Left m -> putStrLn m >> return act

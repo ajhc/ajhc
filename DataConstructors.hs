@@ -47,6 +47,8 @@ tipe (TArrow t1 t2) =  EPi (tVr 0 (tipe t1)) (tipe t2)
 tipe (TCon (Tycon n k)) =  ELit (LitCons (toName TypeConstructor n) [] (kind k))
 tipe (TGen n (Tyvar { tyvarKind = k })) = EVar (tVr ((n + 1) * 2 ) (kind k))
 tipe (TVar Tyvar {}) = error "tipe': Tyvar"
+tipe (TForAll (Forall [] (_ :=> t))) = tipe t
+tipe (TForAll (Forall xs (_ :=> t))) = foldr ELam (tipe t) [ tVr n (kind k) | n <- [2..] | k <- xs ]
 kind Star = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."
@@ -319,7 +321,7 @@ toDataTable km cm ds = DataTable $ Map.union dataTablePrims  (Map.fromList [ (co
             subst = substMap $ Map.fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
             ts = [ tvr { tvrIdent =  (x)}   | tvr <- ts' | x <- [2,4..] ]
             ty' = tipe ty
-            (Forall _ (_ :=> ty)) = runIdentity $ Map.lookup nm' cm
+            Just (Forall _ (_ :=> ty)) = Map.lookup nm' cm
 
 
 
@@ -366,9 +368,10 @@ getSiblings (DataTable mp) n
     | otherwise =  Nothing
 
 
-pprintTypeOfCons :: DocLike a => DataTable -> Name -> a
-pprintTypeOfCons dataTable name | Just c <- getConstructor name dataTable = pprintTypeAsHs (conType c)
-                                | otherwise = text "?"
+pprintTypeOfCons :: (Monad m,DocLike a) => DataTable -> Name -> m a
+pprintTypeOfCons dataTable name = do
+    c <- getConstructor name dataTable
+    return $ pprintTypeAsHs (conType c)
 
 
 
@@ -390,6 +393,10 @@ pprintTypeAsHs e = unparse $ runVarName (f e) where
     f (EVar v) = do
         vo <- newLookupName ['a' .. ] () (tvrIdent v)
         return $ atom $ char vo
+    f v | (e,ts@(_:_)) <- fromLam v = do
+        ts' <- mapM (newLookupName ['a'..] () . tvrIdent) ts
+        r <- f e
+        return $ fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text ". ")  (atomize r)
     arr = bop (R,0) (space <> text "->" <> space)
     app = bop (L,100) (text " ")
 

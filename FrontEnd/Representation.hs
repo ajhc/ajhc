@@ -63,6 +63,7 @@ data Type  = TVar {-# UNPACK #-} !Tyvar
            | TAp  Type Type
            | TGen {-# UNPACK #-} !Int {-# UNPACK #-} !Tyvar
            | TArrow Type Type
+           | TForAll Scheme
              deriving(Data,Typeable, Ord, Show)
     {-! derive: GhcBinary !-}
 
@@ -226,6 +227,9 @@ prettyPrintTypeM t
            TArrow t1 t2 -> do doc1 <- maybeParensArrow t1
                               doc2 <- prettyPrintTypeM t2
                               return $ doc1 <> text " -> " <> doc2
+           TForAll scheme -> do
+            r <- prettyPrintSchemeM scheme
+            return $ text "(forall . " <> r <> text ")"
     where
     -- puts parentheses around the doc for a type if needed
     maybeParensAp :: Type -> VarName Doc
@@ -372,8 +376,9 @@ instance PPrint Doc Scheme where
     = fst $ runVarName [] nameSupply $ prettyPrintSchemeM scheme
 
 prettyPrintSchemeM :: Scheme -> VarName Doc
-prettyPrintSchemeM (Forall _kinds qType)
-   = prettyPrintQualTypeM qType
+prettyPrintSchemeM (Forall _kinds qType) = do
+    r <- prettyPrintQualTypeM qType
+    return r
 
 --------------------------------------------------------------------------------
 

@@ -93,6 +93,7 @@ instance HasKind Type where
                      x -> error $ "Type.kind: Invalid kind in type application for "++show t++": "++show x
   kind (TArrow _l _r) = Star
   kind (TGen _ tv) = kind tv
+  kind (TForAll (Forall _ (_ :=> t))) = kind t
   --kind x = error $ "Type:kind: " ++ show x
 
 -----------------------------------------------------------------------------
