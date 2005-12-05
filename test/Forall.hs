@@ -21,20 +21,41 @@ data Empty
 -- forall in type synonym
 type IdentityFunc = forall a . a -> a
 
+type Arg2 f b = f b
+
+type IO' a = IO a
+
 -- explicit forall
 id1 :: forall a . a -> a
 id1 x = x
 
 
+-- type synonym with forall
+id2 :: IdentityFunc
+id2 x = x
+
+
+
 
 -- forall hoisting
-id2 :: a -> IdentityFunc
-id2 _ x = x
+--id3 :: a -> IdentityFunc
+--id3 _ x = x
+
+--id4 :: a -> forall a . a -> a
+--id4 _ x = x
+
 
 -- this should be rejected.
 --id3 :: forall a . b -> a -> a
 --id3 _ x = x
 
+-- synonyms may be partially applied in arguments to other type synonyms
+synPart :: Arg2 IO' Int
+synPart = undefined
+
+-- incomplete partially applied synonym. should be rejected
+--synPart' :: Arg2 IO
+--synPart' = undefined
 
 main = do
     putStrLn "Done."

@@ -134,6 +134,7 @@ tiModules' me ms = do
     let ts = thisTypeSynonyms  `mappend` hoTypeSynonyms me
     let f x = expandTypeSyns ts (modInfoHsModule x) >>= FrontEnd.Infix.infixHsModule fixityMap >>= \z -> return (modInfoHsModule_s ( z) x)
     ms <- mapM f ms
+    processIOErrors
     let ds = concat [ hsModuleDecls $ modInfoHsModule m | m <- ms ]
 
     wdump FD.Decls $ do

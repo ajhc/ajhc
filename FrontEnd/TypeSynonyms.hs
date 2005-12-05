@@ -36,9 +36,8 @@ showSynonym pprint n (TypeSynonyms m) = do
 declsToTypeSynonyms :: [HsDecl] -> TypeSynonyms
 declsToTypeSynonyms ts = TypeSynonyms $ Map.fromList [ (toName TypeConstructor name,( args , quantifyHsType args (HsUnQualType t) , sl)) | (HsTypeDecl sl name args t) <- ts]
 
-removeSynonymsFromType :: TypeSynonyms -> HsType -> HsType
-removeSynonymsFromType syns t
-   = runIdentity $ evalTypeSyms  syns t
+removeSynonymsFromType :: MonadWarn m => TypeSynonyms -> HsType -> m HsType
+removeSynonymsFromType syns t = evalTypeSyms  syns t
 
 quantifyHsType :: [HsName] -> HsQualType -> HsType
 quantifyHsType inscope t
@@ -56,7 +55,7 @@ evalTypeSyms (TypeSynonyms tmap) t = eval [] t where
     eval stack x@(HsTyCon n) | Just (args, t, sl) <- Map.lookup (toName TypeConstructor n) tmap = do
         let excess = length stack - length args
         if (excess < 0) then do
-            warn sl "partialap" ("Partially applied typesym:" <+> show n <+> "need" <+> show (- excess) <+> "more arguments.")
+            warn sl "type-synonym-partialap" ("Partially applied typesym:" <+> show n <+> "need" <+> show (- excess) <+> "more arguments.")
             unwind x stack
           else do
             eval (drop (length args) stack) (subst (Map.fromList [(a,s) | a <- args | s <- stack]) t)

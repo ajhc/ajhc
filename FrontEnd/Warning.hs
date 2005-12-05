@@ -63,7 +63,7 @@ processErrors ws = mapM_ s ws' >> when die exitFailure where
     die = (not $ null $ intersect (map warnType ws') fatal) && not (optKeepGoing options)
 
 fatal = ["undefined-name", "ambiguous-name", "multiply-defined",
-    "ambiguous-export", "unknown-import", "parse-error", "missing-dep" ]
+    "ambiguous-export", "unknown-import", "parse-error", "missing-dep", "type-synonym-partialap" ]
 ignore = ["h98-emptydata"]
 
 instance Show Warning where

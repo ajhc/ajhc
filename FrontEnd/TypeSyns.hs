@@ -30,7 +30,7 @@ setSrcLoc e = modify (\s -> s { srcLoc = e `mappend` srcLoc s})
 
 
 expandTypeSyns :: MonadWarn m => TypeSynonyms -> HsModule -> m HsModule
-expandTypeSyns syns m = return rm where
+expandTypeSyns syns m = ans where
     startState = ScopeState {
         errors         = [],
         synonyms       =  syns,
@@ -38,7 +38,11 @@ expandTypeSyns syns m = return rm where
         currentModule  = hsModuleName m
         }
 
-    (rm, _) = runState (renameDecls m) startState
+    (rm, fs) = runState (renameDecls m) startState
+    ans = do
+        mapM_ addWarning (errors fs)
+        return rm
+
 
 
 -- This is Bryn's modification to make the code a bit easier to understand for
@@ -206,9 +210,7 @@ renameHsType' dovar t st = pp (rt t st) where
     pp t = do
         t' <- t
         syns <- gets synonyms
-        --addDiag $ show ("pp", t')
-        --return t'
-        return (removeSynonymsFromType syns t')
+        removeSynonymsFromType syns t'
 
 renameHsMatches :: [HsMatch] -> SubTable -> ScopeSM [HsMatch]
 renameHsMatches = mapRename renameHsMatch
@@ -719,15 +721,15 @@ instance Renameable HsExportSpec where
       = let a # b = a $ (replaceName f b)
         in case hsexportspec of
             HsEVar  name               ->
-                HsEVar  # name			
+                HsEVar  # name
             HsEAbs  name               ->
-                HsEAbs  # name			
+                HsEAbs  # name
             HsEThingAll  name		 ->
-                HsEThingAll  # name		
+                HsEThingAll  # name
             HsEThingWith  name names	 ->
-                HsEThingWith  # name # names	
+                HsEThingWith  # name # names
             HsEModuleContents mod	 ->
-                HsEModuleContents mod	
+                HsEModuleContents mod
 
 
 instance Renameable HsImportDecl where
@@ -746,13 +748,13 @@ instance Renameable HsImportSpec where
       = let a # b = a $ (replaceName f b)
         in case object of
             HsIVar  name			 ->
-                HsIVar  # name			
+                HsIVar  # name
             HsIAbs  name			 ->
-                HsIAbs  # name			
+                HsIAbs  # name
             HsIThingAll  name		 ->
-                HsIThingAll  # name		
+                HsIThingAll  # name
             HsIThingWith  name names	 ->
-                HsIThingWith  # name # names	
+                HsIThingWith  # name # names
 
 
 {-
@@ -930,11 +932,11 @@ instance Renameable (HsExp) where
             HsExpTypeSig  srcloc exp qualtyp ->
                 HsExpTypeSig  # srcloc # exp # qualtyp
             HsAsPat  name exp		 ->
-                HsAsPat  # name # exp		
+                HsAsPat  # name # exp
             HsWildCard x 	      	 ->
-                HsWildCard x			
+                HsWildCard x
             HsIrrPat  exp		 ->
-                HsIrrPat  # exp		
+                HsIrrPat  # exp
 
 instance Renameable HsPat where
     replaceName f object
