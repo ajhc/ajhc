@@ -547,11 +547,19 @@ aHsQualTypeToQualType kt (HsUnQualType t) = [] :=> aHsTypeToType kt t
 -- hopefully everything has been renamed to something unique
 
 aHsQualTypeToScheme :: KindEnv -> HsQualType -> Scheme
-aHsQualTypeToScheme kt HsQualType { hsQualTypeContext = cntxt, hsQualTypeType = HsTyForall vs qt } = aHsQualTypeToScheme kt HsQualType { hsQualTypeContext = cntxt ++ hsQualTypeHsContext qt, hsQualTypeType = hsQualTypeType qt }
-aHsQualTypeToScheme kt HsUnQualType { hsQualTypeType = t } = aHsQualTypeToScheme kt HsQualType { hsQualTypeContext = [], hsQualTypeType = t } 
+aHsQualTypeToScheme kt HsQualType { hsQualTypeContext = cntxt, hsQualTypeType = qt  } | HsTyForall vs qt' <- forallHoist qt = aHsQualTypeToScheme kt HsQualType { hsQualTypeContext = cntxt ++ hsQualTypeHsContext qt', hsQualTypeType = hsQualTypeType qt' }
+aHsQualTypeToScheme kt HsUnQualType { hsQualTypeType = t } = aHsQualTypeToScheme kt HsQualType { hsQualTypeContext = [], hsQualTypeType = t }
 aHsQualTypeToScheme kt qualType = quantify vars qt where
    qt = aHsQualTypeToQualType kt qualType
    vars = tv qt
+
+
+forallHoist :: HsType -> HsType
+forallHoist (HsTyForall vs qt) | HsTyForall vs' qt' <- hsQualTypeType qt  = forallHoist (HsTyForall (vs ++ vs') HsQualType { hsQualTypeType = hsQualTypeType qt', hsQualTypeContext = hsQualTypeHsContext qt ++ hsQualTypeHsContext qt' })
+forallHoist (HsTyFun a b) = case forallHoist b of
+    HsTyForall as qt -> HsTyForall as HsQualType { hsQualTypeContext = hsQualTypeHsContext qt, hsQualTypeType = HsTyFun a (hsQualTypeType qt) }
+    b' -> HsTyFun (forallHoist a) b'
+forallHoist t = t
 
 hsAsstToPred :: KindEnv -> HsAsst -> Pred
 hsAsstToPred kt (className, varName)

@@ -38,12 +38,19 @@ id2 x = x
 
 
 -- forall hoisting
---id3 :: a -> IdentityFunc
---id3 _ x = x
+id3 :: a -> IdentityFunc
+id3 _ x = x
 
---id4 :: a -> forall a . a -> a
---id4 _ x = x
+-- ghc does not accept the following 2 without the parens
 
+id4 :: a -> (forall a . a -> a)
+id4 _ x = x
+
+id5 :: a -> (forall b . (forall c . (forall d . b -> c -> d -> a)))
+id5 a _ _ _ = a
+
+id6 :: a -> (forall b . Show b => (forall d . (Eq b, Show d) => (b,d)))
+id6 = undefined
 
 -- this should be rejected.
 --id3 :: forall a . b -> a -> a
