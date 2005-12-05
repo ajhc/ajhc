@@ -357,11 +357,16 @@ kiType varExist tap@(HsTyTuple ts) = do
         mapM_ (\k -> unify k Star) tsKs
         return Star
 
+kiType varExist tap@(HsTyForall { hsTypeVars = vs, hsTypeType = qt }) = do
+    argKindVars <- mapM (newNameVar . hsTyVarBindName) vs
+    let newEnv = KindEnv $ Map.fromList $ argKindVars
+    extendEnv newEnv
+    kiQualType varExist qt
+
 newNameVar :: HsName -> KI (HsName, Kind)
-newNameVar n
-   = do
-        newVar <- newKindVar
-        return (n, newVar)
+newNameVar n = do
+    newVar <- newKindVar
+    return (n, newVar)
 
 
 --------------------------------------------------------------------------------
@@ -409,18 +414,15 @@ namesFromQualType (HsUnQualType t)
    = namesFromType t
 
 namesFromType :: HsType -> [HsName]
-namesFromType (HsTyFun t1 t2)
-   = namesFromType t1 ++ namesFromType t2
-namesFromType (HsTyTuple ts)
-   = concatMap namesFromType ts
-namesFromType (HsTyApp t1 t2)
-   = namesFromType t1 ++ namesFromType t2
+namesFromType (HsTyFun t1 t2) = namesFromType t1 ++ namesFromType t2
+namesFromType (HsTyTuple ts) = concatMap namesFromType ts
+namesFromType (HsTyApp t1 t2) = namesFromType t1 ++ namesFromType t2
 namesFromType (HsTyVar _) = []
 namesFromType (HsTyCon n) = [n]
+namesFromType HsTyForall { hsTypeVars = vs } = map hsTyVarBindName vs
 
 namesFromContext :: HsContext -> [HsName]
-namesFromContext cntxt
-   = map fst cntxt
+namesFromContext cntxt = map fst cntxt
 
 --------------------------------------------------------------------------------
 

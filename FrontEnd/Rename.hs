@@ -305,7 +305,7 @@ renameHsDecl (HsForeignDecl a b c n t) subTable = do
 
 --renameHsDecl (HsFunBind srcLoc hsMatches) subTable
 renameHsDecl (HsFunBind hsMatches) subTable = do
-    hsMatches' <- renameHsMatches hsMatches subTable
+    hsMatches' <- renameAny hsMatches subTable
     -- return (HsFunBind srcLoc hsMatches')
     return (HsFunBind hsMatches')
 
@@ -471,20 +471,33 @@ renameHsType' dovar t st = pp (rt t st) where
         hsName' <- renameTypeHsName hsName subTable
         return (HsTyCon hsName')
     rt (HsTyForall ts v) subTable  = do
-        False <- return dovar
-        v <- renameHsQualType v subTable
-        return $ HsTyForall ts v
+        -- False <- return dovar
+        subTable' <- updateSubTableWithHsNames subTable (map hsTyVarBindName ts)
+        ts' <- renameAny ts subTable'
+        v' <- renameHsQualType v subTable'
+        return $ HsTyForall ts' v'
     pp t | not dovar = t
     pp t = t
---    pp t = do
---        t' <- t
---        syns <- gets synonyms
-        --addDiag $ show ("pp", t')
-        --return t'
---        return (removeSynonymsFromType syns t')
 
-renameHsMatches :: [HsMatch] -> SubTable -> ScopeSM [HsMatch]
-renameHsMatches = mapRename renameHsMatch
+
+class RenameAny a where
+    renameAny :: a -> SubTable -> ScopeSM a
+    renameAny x _ = return x
+
+instance RenameAny SrcLoc where
+
+instance RenameAny a => RenameAny [a] where
+    renameAny xs t = mapM (`renameAny` t) xs
+
+instance RenameAny HsTyVarBind where
+    renameAny tvb@HsTyVarBind { hsTyVarBindName = n } t = do
+        n' <- renameTypeHsName n t
+        return tvb { hsTyVarBindName = n' }
+
+
+instance RenameAny HsMatch where
+    renameAny = renameHsMatch
+
 
 -- note that for renameHsMatch, the 'wheres' dominate the 'pats'
 
@@ -493,15 +506,16 @@ renameHsMatch (HsMatch srcLoc hsName hsPats hsRhs {-where-} hsDecls) subTable = 
     setSrcLoc srcLoc
     hsName' <- renameHsName hsName subTable
     subTable' <- updateSubTableWithHsPats subTable hsPats srcLoc FunPat
-    hsPats' <- renameHsPats hsPats subTable'
+    hsPats' <- renameAny hsPats subTable'
     subTable'' <- updateSubTableWithHsDecls subTable' hsDecls WhereFun
     hsDecls' <- renameHsDecls hsDecls subTable''
     hsRhs' <- renameHsRhs hsRhs subTable''
     return (HsMatch srcLoc hsName' hsPats' hsRhs' {-where-} hsDecls')
 
 
-renameHsPats :: [HsPat] -> SubTable -> ScopeSM ([HsPat])
-renameHsPats = mapRename renameHsPat
+
+instance RenameAny HsPat where
+    renameAny = renameHsPat
 
 renameHsPat :: HsPat -> SubTable -> ScopeSM (HsPat)
 renameHsPat (HsPVar hsName) subTable = do
@@ -518,14 +532,14 @@ renameHsPat (HsPInfixApp hsPat1 hsName hsPat2) subTable = do
       hsName' <- renameHsName hsName subTable
       return (HsPInfixApp hsPat1' hsName' hsPat2')
 renameHsPat (HsPApp hsName hsPats) subTable = do
-      hsPats' <- renameHsPats hsPats subTable
+      hsPats' <- renameAny hsPats subTable
       hsName' <- renameHsName hsName subTable
       return (HsPApp hsName' hsPats')  -- NOTE: Bryn changed this so we also rename hsName and not just the hsPats
 renameHsPat (HsPTuple hsPats) subTable = do
-      hsPats' <- renameHsPats hsPats subTable
+      hsPats' <- renameAny hsPats subTable
       return (HsPTuple hsPats')
 renameHsPat (HsPList hsPats) subTable = do
-      hsPats' <- renameHsPats hsPats subTable
+      hsPats' <- renameAny hsPats subTable
       return (HsPList hsPats')
 renameHsPat (HsPParen hsPat) subTable = do
       hsPat' <- renameHsPat hsPat subTable
@@ -680,7 +694,7 @@ renameHsExp (HsNegApp hsExp) subTable = do
 renameHsExp (HsLambda srcLoc hsPats hsExp) subTable = do
     setSrcLoc srcLoc
     subTable' <- updateSubTableWithHsPats subTable hsPats srcLoc LamPat
-    hsPats' <- renameHsPats hsPats subTable'
+    hsPats' <- renameAny hsPats subTable'
     hsExp' <- renameHsExp hsExp subTable'
     return (HsLambda srcLoc hsPats' hsExp')
 renameHsExp (HsLet hsDecls hsExp) subTable = do

@@ -24,13 +24,16 @@ module HsPretty (PPLayout(..),PPHsMode(..),defaultMode,
 		ppHsQName) where
 
 import Char
+import qualified Text.PrettyPrint.HughesPJ as P
+
+import Doc.PPrint(pprint)
 import FlagDump as FD
 import FrontEnd.Rename(unRename)
 import HsSyn
-import Options
-import qualified Doc.PPrint as P
-import qualified Text.PrettyPrint.HughesPJ as P
 import Name.VConsts
+import Options
+import qualified Doc.DocLike as DL
+import qualified Doc.PPrint as P
 
 infixl 5 $$$
 
@@ -86,7 +89,7 @@ instance Monad (DocM s) where
 {-# INLINE getPPEnv #-}
 thenDocM m k = DocM $ (\s -> case unDocM m $ s of a -> unDocM (k a) $ s)
 then_DocM m k = DocM $ (\s ->case unDocM m $ s of a ->  unDocM k $ s)
-retDocM a = DocM (\s -> a)	
+retDocM a = DocM (\s -> a)
 unDocM :: DocM s a -> (s -> a)
 unDocM (DocM f) = f
 
@@ -293,7 +296,7 @@ ppHsDecl (HsInstDecl pos qualType declList) =
 	   --blankline $
 	   mySep [text "instance", ppHsQualType qualType, text "where"]
 	   $$$ body classIndent (map ppHsDecl declList)
-		
+
 ppHsDecl (HsDefaultDecl pos htype) =
 	   --blankline $
 	   text "default" <+> ppHsType htype
@@ -319,7 +322,7 @@ ppHsDecl (HsPatBind pos pat rhs whereDecls)
 
 ppHsDecl (HsInfixDecl pos assoc prec nameList) =
 	   --blankline $
-	   mySep ([ppAssoc assoc, int prec]	
+	   mySep ([ppAssoc assoc, int prec]
 	     ++ (punctuate comma . map ppHsNameInfix $ nameList))
 	    where
 	    ppAssoc HsAssocNone  = text "infix"
@@ -350,7 +353,7 @@ ppHsConstr (HsConDecl pos name typeList)
 ppField :: ([HsName],HsBangType) -> Doc
 ppField (names, ty) = myFsepSimple $  (punctuate comma . map ppHsName $ names) ++
 			      [text "::", ppHsBangType ty]
-	
+
 ppHsBangType :: HsBangType -> Doc
 ppHsBangType (HsBangedTy ty) = char '!' <> ppHsTypeArg ty
 ppHsBangType (HsUnBangedTy ty) = ppHsTypeArg ty
@@ -396,6 +399,9 @@ ppHsTypePrec p (HsTyVar name) = ppHsName name
 -- special case
 --ppHsTypePrec p (HsTyCon (Qual (Module "Prelude") n)) = ppHsNameParen (UnQual n)
 ppHsTypePrec p (HsTyCon name) = ppHsQName name
+ppHsTypePrec p HsTyForall { hsTypeVars = vs, hsTypeType = qt } = parensIf (p > 1) $ do
+    pp <- ppHsQualType qt
+    return $ DL.text "forall" DL.<+> DL.hsep (map pprint vs) DL.<+> DL.char '.' DL.<+> pp
 
 ------------------------- Expressions -------------------------
 ppHsRhs :: HsRhs -> Doc
@@ -526,7 +532,7 @@ ppHsPatField (HsPFieldPat name pat) = myFsep[ppHsQName name, equals, ppHsPat pat
 
 ------------------------- Case bodies  -------------------------
 ppHsAlt :: HsAlt -> Doc
-ppHsAlt (HsAlt pos exp gAlts decls) = 	
+ppHsAlt (HsAlt pos exp gAlts decls) =
 	ppHsPat exp <+> ppGAlts gAlts $$$ ppWhere decls
 
 ppGAlts :: HsGuardedAlts -> Doc
@@ -648,7 +654,7 @@ a $$$ b = layoutChoice (a $$) (a <+>) b
 
 mySep :: [Doc] -> Doc
 mySep = layoutChoice mySep' hsep
-	where			
+	where
 	-- ensure paragraph fills with indentation.
 	mySep' [x]    = x
 	mySep' (x:xs) = x <+> fsep xs
@@ -687,3 +693,7 @@ instance P.PPrint P.Doc HsType where
 
 instance P.PPrint P.Doc HsQualType where
     pprint d = unDocM (ppHsQualType d) defaultMode
+
+instance P.PPrint P.Doc  HsTyVarBind where
+   pprint d = P.text (show $ hsTyVarBindName d)
+

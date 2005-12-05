@@ -199,7 +199,7 @@ renameHsType' dovar t st = pp (rt t st) where
         hsName' <- renameTypeHsName hsName subTable
         return (HsTyCon hsName')
     rt (HsTyForall ts v) subTable  = do
-        False <- return dovar
+        -- False <- return dovar
         v <- renameHsQualType v subTable
         return $ HsTyForall ts v
     pp t | not dovar = t
