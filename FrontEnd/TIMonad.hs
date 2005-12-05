@@ -159,9 +159,7 @@ dConScheme conName
    = do
         env <- getDConsTypeEnv
         case Map.lookup conName env of
-           Nothing
-            --  | Just n <- fromTupname conName -> return (toTuple n)
-            | otherwise -> error $ "dConScheme: constructor not found: " ++ show conName ++
+           Nothing -> error $ "dConScheme: constructor not found: " ++ show conName ++
                               "\nin this environment:\n" ++ show env
            Just s -> return s
 

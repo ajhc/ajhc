@@ -40,18 +40,21 @@ module Type (kind,
              pairToAssump,
              assumpId,
              tTTuple,
+             schemeToType,
              Instantiate (..)
              ) where
 
 import Control.Monad.Error
 import Control.Monad.Trans
+import Control.Monad.Writer
+import Data.IORef
 import List    (union, nub)
 import qualified Data.Map as Map
 
+import GenUtil
 import HsSyn   (HsName (..))
-import Representation
 import Name.VConsts
-import Data.IORef
+import Representation
 
 
 --------------------------------------------------------------------------------
@@ -93,7 +96,7 @@ instance HasKind Type where
                      x -> error $ "Type.kind: Invalid kind in type application for "++show t++": "++show x
   kind (TArrow _l _r) = Star
   kind (TGen _ tv) = kind tv
-  kind (TForAll (Forall _ (_ :=> t))) = kind t
+  kind (TForAll _ (_ :=> t)) = kind t
   --kind x = error $ "Type:kind: " ++ show x
 
 -----------------------------------------------------------------------------
@@ -255,6 +258,24 @@ unQuantify (Forall _ (ps :=> t)) =  map uq' ps :=> uq t where
     uq (TGen _ tv) = TVar tv
     uq x = x
     uq' (IsIn s t) = IsIn s (uq t)
+
+schemeToType :: Scheme -> Type
+schemeToType (Forall _ (ps :=> t)) = tForAll (snub xs) (ps' :=> t') where
+    ((ps',t'),xs) = runWriter $ do
+        ps' <- mapM uq' ps
+        t' <- uq t
+        return (ps',t')
+    uq (TAp a b) = liftM2 TAp (uq a) (uq b)
+    uq (TArrow a b) = liftM2 TArrow (uq a) (uq b)
+    uq (TGen _ tv) = do
+        tell [tv]
+        return $ TVar tv
+    uq (TForAll xs (ps :=> t)) = do
+        ps' <- mapM uq' ps
+        t' <- uq t
+        return $ tForAll xs (ps' :=> t')
+    uq x = return x
+    uq' (IsIn s t) = liftM (IsIn s) (uq t)
 
 -----------------------------------------------------------------------------
 

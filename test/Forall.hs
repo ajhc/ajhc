@@ -4,7 +4,7 @@ module Main where
 
 -- useful bits
 newtype Id x = Id x
-    deriving(Show)
+--    deriving(Show)
 
 -- interesting haskell 98 types
 newtype Rec f = In (f (Rec f))
@@ -69,10 +69,10 @@ synPart = undefined
 data Bob  = Bob (forall a . a -> a)
 
 -- this can't be handled yet
---data Fred = Fred (forall a . a -> a) ((forall a . (forall b . b -> a ) -> a) -> Int)
+data Fred = Fred (forall a . a -> a) ((forall a . (forall b . b -> a ) -> a) -> Int)
 
-f (Bob x) = x 'y'
+--f (Bob x) = x 'y'
 
 main = do
-    putChar $ f (Bob id)
+--    putChar $ f (Bob id)
     putStrLn "Done."

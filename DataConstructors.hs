@@ -27,6 +27,7 @@ import E.E
 import E.Pretty
 import E.Shadow
 import E.Subst
+import Type(schemeToType)
 import GenUtil
 import HsSyn
 import MapBinaryInstance()
@@ -34,6 +35,7 @@ import Name.Name as Name
 import Name.Names
 import PrimitiveOperators
 import qualified Util.Seq as Seq
+import Util.VarName
 import Representation
 import Util.HasSize
 import Util.SameShape
@@ -41,14 +43,28 @@ import Util.VarName
 import Name.VConsts
 import Unparse
 
+tipe t = runVarName (tipe' t) where
+    tipe' (TAp t1 t2) = liftM2 eAp (tipe' t1) (tipe' t2)
+    tipe' (TArrow t1 t2) =  do
+        t1' <- tipe' t1
+        t2' <- tipe' t2
+        return $ EPi (tVr 0 (t1')) t2'
+    tipe' (TCon (Tycon n k)) =  return $ ELit (LitCons (toName TypeConstructor n) [] (kind k))
+    tipe' (TGen n (Tyvar { tyvarKind = k })) = return $  EVar (tVr ((n + 1) * 2 ) (kind k))
+    tipe' (TVar tv@Tyvar { tyvarKind = k}) = do
+        v <- lookupName tv
+        return $ EVar $ tVr v (kind k)
+    tipe' (TForAll [] (_ :=> t)) = tipe' t
+    tipe' (TForAll xs (_ :=> t)) = do
+        xs' <- flip mapM xs $ \tv -> do
+            v <- newName [70,72..] () tv
+            return $ tVr v (kind $ tyvarKind tv)
+        t' <- tipe' t
+        return $ foldr EPi t' xs' -- [ tVr n (kind k) | n <- [2,4..] | k <- xs ]
 
-tipe (TAp t1 t2) = eAp (tipe t1) (tipe t2)
-tipe (TArrow t1 t2) =  EPi (tVr 0 (tipe t1)) (tipe t2)
-tipe (TCon (Tycon n k)) =  ELit (LitCons (toName TypeConstructor n) [] (kind k))
-tipe (TGen n (Tyvar { tyvarKind = k })) = EVar (tVr ((n + 1) * 2 ) (kind k))
-tipe (TVar Tyvar {}) = error "tipe': Tyvar"
-tipe (TForAll (Forall [] (_ :=> t))) = tipe t
-tipe (TForAll (Forall xs (_ :=> t))) = foldr ELam (tipe t) [ tVr n (kind k) | n <- [2..] | k <- xs ]
+--tipe (TForAll (Forall xs (_ :=> t))) = foldr EPi (tipe t) [ tVr n (kind k) | n <- [2,4..] | k <- xs ]
+
+
 kind Star = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."
@@ -307,7 +323,7 @@ toDataTable km cm ds = DataTable $ Map.union dataTablePrims  (Map.fromList [ (co
         dc x = let z = dc' x in tell (Seq.singleton z) >> return (conName z)
         dc' x = Constructor {
             conName = nm',
-            conType = ty',
+            conType =tipe $ schemeToType scheme, -- ty',
             conSlots = map (subst . tvrType) ts,  -- XXX TODO fix this mapping
             conExpr = foldr ($) (ELit (LitCons  nm' (map EVar ts) rt)) (map ELam ts),
             conInhabits = nm,
@@ -321,7 +337,8 @@ toDataTable km cm ds = DataTable $ Map.union dataTablePrims  (Map.fromList [ (co
             subst = substMap $ Map.fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
             ts = [ tvr { tvrIdent =  (x)}   | tvr <- ts' | x <- [2,4..] ]
             ty' = tipe ty
-            Just (Forall _ (_ :=> ty)) = Map.lookup nm' cm
+            --ty' = tipe $ schemeToType scheme
+            Just scheme@(Forall _ (_ :=> ty)) = Map.lookup nm' cm
 
 
 
@@ -393,7 +410,7 @@ pprintTypeAsHs e = unparse $ runVarName (f e) where
     f (EVar v) = do
         vo <- newLookupName ['a' .. ] () (tvrIdent v)
         return $ atom $ char vo
-    f v | (e,ts@(_:_)) <- fromLam v = do
+    f v | (e,ts@(_:_)) <- fromPi v = do
         ts' <- mapM (newLookupName ['a'..] () . tvrIdent) ts
         r <- f e
         return $ fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text ". ")  (atomize r)

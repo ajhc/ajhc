@@ -30,6 +30,7 @@ module Representation(
     Scheme(..),
     FlattenType(..),
     Assump(..),
+    tForAll,
     tList
     )where
 
@@ -63,7 +64,7 @@ data Type  = TVar {-# UNPACK #-} !Tyvar
            | TAp  Type Type
            | TGen {-# UNPACK #-} !Int {-# UNPACK #-} !Tyvar
            | TArrow Type Type
-           | TForAll Scheme
+           | TForAll [Tyvar] (Qual Type)
              deriving(Data,Typeable, Ord, Show)
     {-! derive: GhcBinary !-}
 
@@ -93,6 +94,10 @@ data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !HsName, t
 instance Show Tyvar where
     showsPrec _ Tyvar { tyvarName = hn, tyvarKind = k, tyvarRef = Just _ } = shows hn . (":-" ++) . shows k
     showsPrec _ Tyvar { tyvarName = hn, tyvarKind = k } = shows hn . ("::" ++) . shows k
+
+tForAll [] ([] :=> t) = t
+tForAll vs (ps :=> TForAll vs' (ps' :=> t)) = tForAll (vs ++ vs') ((ps ++ ps') :=> t)
+tForAll x y = TForAll x y
 
 findType :: MonadIO m => Type -> m Type
 findType tv@(TVar Tyvar {tyvarRef = Just r }) = liftIO $ do
@@ -227,9 +232,9 @@ prettyPrintTypeM t
            TArrow t1 t2 -> do doc1 <- maybeParensArrow t1
                               doc2 <- prettyPrintTypeM t2
                               return $ doc1 <> text " -> " <> doc2
-           TForAll scheme -> do
-            r <- prettyPrintSchemeM scheme
-            return $ text "(forall . " <> r <> text ")"
+           TForAll vs t  -> do
+            r <- prettyPrintQualTypeM t
+            return $ text "(forall" <+> hsep (map pprint vs) <> text " . " <> r <> text ")"
     where
     -- puts parentheses around the doc for a type if needed
     maybeParensAp :: Type -> VarName Doc
@@ -391,6 +396,8 @@ data Assump =  (:>:) HsName Scheme
 instance  PPrint Doc Assump where
   pprint (i :>: s) = (text (show i) <+> text ":>:") <$> nest 2 (pprint s)
 
+instance  DocLike d => PPrint d Tyvar where
+  pprint tv = tshow (tyvarName tv)
 
 --------------------------------------------------------------------------------
 
@@ -435,8 +442,8 @@ updateVMap newEntry
 
 nextName :: VarName String
 nextName
-   = VarName (\state -> let oldNames = names state
-                        in (head oldNames, state {names = tail oldNames}))
+   = VarName (\state -> let (nn:rns) = names state
+                        in (nn, state {names = rns}))
 
 lookupInMap :: Type -> VarName (Maybe String)
 lookupInMap t = do

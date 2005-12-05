@@ -192,13 +192,13 @@ tiExpr env (HsCase e alts)
         let tsPats   = map snd pstsPats
         let pstsEs   = map trd3 psastsAlts
         let psEs     = concatMap fst pstsEs
-        let tsEs     = map snd pstsEs
+        let tsEs@(htsEs:_)  = map snd pstsEs
         let envAlts  = Map.unions $ map snd3 psastsAlts
         unifyList (te:tsPats)
         unifyList tsEs
         -- the list of rhs alternatives must be non-empty
         -- so it is safe to call head here
-        return (pse ++ psPats ++ psEs, env1 `Map.union` envAlts, head tsEs)
+        return (pse ++ psPats ++ psEs, env1 `Map.union` envAlts, htsEs)
 
 
 tiExpr env (HsDo stmts)
@@ -229,11 +229,11 @@ tiExpr env expr@(HsList exps@(_:_))
    = withContext (makeMsg "in the list " $ render $ ppHsExp expr) $
         do
         psasts <- mapM (tiExpr env) exps
-        let typeList = map trd3 psasts
+        let typeList@(htl:_) = map trd3 psasts
         unifyList typeList
         let preds = concatMap fst3 psasts
         let env1 = Map.unions $ map snd3 psasts
-        return (preds, env1, TAp tList (head typeList))
+        return (preds, env1, TAp tList htl)
 
 
 
@@ -398,12 +398,12 @@ tiGuardedAlts env (HsGuardedAlts gAlts)
         let guardPs    = concatMap fst3 guardsPsEnvTs
         let rhsPs      = concatMap fst3 rhsPsEnvTs
         let guardTs    = map trd3 guardsPsEnvTs
-        let rhsTs      = map trd3 rhsPsEnvTs
+        let rhsTs@(h':_) = map trd3 rhsPsEnvTs
         let guardEnv   = Map.unions $ map snd3 guardsPsEnvTs
         let rhsEnv      = Map.unions $ map snd3 rhsPsEnvTs
         unifyList (tBool:guardTs)                -- make sure these are all booleans
         unifyList rhsTs
-        return (guardPs ++ rhsPs, guardEnv `Map.union` rhsEnv, head rhsTs)
+        return (guardPs ++ rhsPs, guardEnv `Map.union` rhsEnv, h')
 
 
 -- basically the same as tiGuardedRhs
@@ -439,10 +439,10 @@ tiDecl env decl@(HsPatBind sloc pat rhs wheres) = withContext (declDiagnostic de
 tiDecl env decl@(HsFunBind matches)  = withContext (declDiagnostic decl) $ do
         psEnvts <- mapM (tiMatch env) matches
         let ps' = concatMap fst3 psEnvts
-        let ts' = map trd3 psEnvts
+        let ts'@(h':_) = map trd3 psEnvts
         let matchesEnv = Map.unions $ map snd3 psEnvts
         unifyList ts'  -- all matches must have the same type
-        return (ps', matchesEnv, head ts')
+        return (ps', matchesEnv, h')
 
 declDiagnostic ::  (HsDecl) -> Diagnostic
 declDiagnostic decl@(HsPatBind sloc (HsPVar {}) _ _) = locMsg sloc "in the declaration" $ render $ ppHsDecl decl
@@ -492,12 +492,12 @@ tiRhs env (HsGuardedRhss rhss)
         let guardPs    = concatMap fst3 guardsPsEnvTs
         let rhsPs      = concatMap fst3 rhsPsEnvTs
         let guardTs    = map trd3 guardsPsEnvTs
-        let rhsTs      = map trd3 rhsPsEnvTs
+        let rhsTs@(h':_)      = map trd3 rhsPsEnvTs
         let guardEnv    = Map.unions $ map snd3 guardsPsEnvTs
         let rhsEnv      = Map.unions $ map snd3 rhsPsEnvTs
         unifyList (tBool:guardTs)                -- make sure these are all booleans
         unifyList rhsTs
-        return (guardPs ++ rhsPs, guardEnv `Map.union` rhsEnv, head rhsTs)
+        return (guardPs ++ rhsPs, guardEnv `Map.union` rhsEnv, h')
 
 
 tiGuardedRhs ::  TypeEnv -> (HsGuardedRhs) -> TI (([Pred], TypeEnv, Type), ([Pred], TypeEnv, Type))
@@ -778,9 +778,9 @@ tiPat (HsPList [])
 
 tiPat (HsPList pats@(_:_))
    = do
-        (ps, env, ts) <- tiPats pats
+        (ps, env, ts@(hts:_)) <- tiPats pats
         unifyList ts
-        return (ps, env, TAp tList (head ts))
+        return (ps, env, TAp tList hts)
 
 tiPat HsPWildCard
  = do v <- newTVar Star

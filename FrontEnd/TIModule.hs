@@ -52,7 +52,7 @@ data TiData = TiData {
     tiAllAssumptions :: Map.Map Name Scheme
 }
 
-isGlobal (Qual _ x) =  not $ isDigit $ head (hsIdentString x)
+isGlobal (Qual _ x) | (h:_) <- hsIdentString x =  not $ isDigit h
 isGlobal _ = error "isGlobal"
 
 modInfoDecls = hsModuleDecls . modInfoHsModule
@@ -66,7 +66,7 @@ getImports ModInfo { modInfoHsModule = mod }  = [  (hsImportDeclModule x) | x <-
 pprintEnv :: PPrint Doc a => Map.Map HsName a -> Doc
 pprintEnv env = pl global $+$ pl local_norm $+$ pl local_sys  where
     es = Map.toList env
-    (local,global) = partition (\(x,_) -> isDigit $ head (hsIdentString (hsNameIdent x)) ) es
+    (local,global) = partition (\ (x,_) -> not (isGlobal x)) es -- isDigit $ head (hsIdentString (hsNameIdent x)) ) es
     (local_sys,local_norm) = partition (\(x,_) -> last (hsIdentString (hsNameIdent x)) == '@' ) local
     pl es = vcat [((pprint a) <+> (text "::") <+> (pprint b)) | (a, b) <- es]
 
@@ -238,7 +238,8 @@ tiModules' me ms = do
 
     wdump FD.Progress $ do
         putErrLn $ "Type inference"
-    let moduleName = modInfoName (head ms)
+    let moduleName = modInfoName tms
+        (tms:_) = ms
     localVarEnv <- tiProgram
                 moduleName                     -- name of the module
                 sigEnv                         -- environment of type signatures

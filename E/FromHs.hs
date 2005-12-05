@@ -5,7 +5,7 @@ import Control.Monad.State
 import Data.FunctorM
 import Data.Generics
 import List(isPrefixOf)
-import Prelude hiding((&&),(||),not,and,or,any,all)
+import Prelude hiding((&&),(||),not,and,or,any,all,head)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
@@ -45,6 +45,8 @@ ump sl e = EError  (srcLocShow sl ++ ": Unmatched pattern") e
 srcLocShow sl = concat [srcLocFileName sl, ":",show $ srcLocLine sl,":", show $ srcLocColumn sl ]
 nameToInt n = atomIndex $ toAtom n
 
+head (x:_) = x
+head _ = error "FromHsHeadError"
 
 --newVars :: MonadState Int m => [E] -> m [TVr]
 newVars xs = f xs [] where
