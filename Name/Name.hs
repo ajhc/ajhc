@@ -58,11 +58,11 @@ fromTypishHsName, fromValishHsName :: HsName -> Name
 fromTypishHsName name
     | isUpper x || x `elem` ":(" = toName TypeConstructor name
     | otherwise = toName TypeVal name
-    where x = head (hsIdentString . hsNameIdent  $ name)
+    where (x:_) = (hsIdentString . hsNameIdent  $ name)
 fromValishHsName name
     | isUpper x || x `elem` ":(" = toName DataConstructor name
     | otherwise = toName Val name
-    where x = head (hsIdentString . hsNameIdent  $ name)
+    where (x:_) = (hsIdentString . hsNameIdent  $ name)
 
 createName _ "" i = error $ "createName: empty module "  ++ i
 createName _ m "" = error $ "createName: empty ident "   ++ m

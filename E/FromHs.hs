@@ -476,7 +476,7 @@ convertMatches funcs dataTable tv cType bs ms err = evalState (match bs ms err) 
             | Just () <- mapM_ fromHsPLitInt patternHeads = do
                 let tb = getType b
                 [bv] <- newVars [tb]
-                let gps = [ (p,[ (ps,e) |  (_:ps,e) <- xs ]) | (p,xs) <- sortGroupUnderF (head . fst) ps]
+                let gps = [ (p,[ (ps,e) |  (_:ps,e) <- xs ]) | (p,xs) <- sortGroupUnderF ((\ (x:_) -> x) . fst) ps]
                     eq = EAp (func_equals funcs) tb
                     f els (HsPLit (HsInt i),ps) = do
                         --let ip = (EAp (EAp fromInt tb) (ELit (LitInt (fromIntegral i) tInt)))
@@ -492,7 +492,7 @@ convertMatches funcs dataTable tv cType bs ms err = evalState (match bs ms err) 
                 e <- foldlM f err gps
                 return $ eLetRec [(bv,b)] e
             | all isHsPLit patternHeads = do
-                let gps = [ (p,[ (ps,e) |  (_:ps,e) <- xs ]) | (p,xs) <- sortGroupUnderF (head . fst) ps]
+                let gps = [ (p,[ (ps,e) |  (_:ps,e) <- xs ]) | (p,xs) <- sortGroupUnderF ((\ (x:_) -> x) . fst) ps]
                     f (HsPLit l,ps) = do
                         m <- match bs ps err
                         return (Alt  (litconvert l (getType b)) m)
@@ -501,9 +501,9 @@ convertMatches funcs dataTable tv cType bs ms err = evalState (match bs ms err) 
                 return $ unbox dataTable b vr $ \tvr -> eCase (EVar tvr) as err
                 --return $ eCase b as err
             | all isHsPApp patternHeads = do
-                let gps =  sortGroupUnderF (hsPatName . head . fst) ps
+                let gps =  sortGroupUnderF (hsPatName . (\ (x:_) -> x) . fst) ps
                     f (name,ps) = do
-                        let spats = hsPatPats $ head $ fst (head ps)
+                        let spats = hsPatPats $ (\ (x:_) -> x) $ fst ((\ (x:_) -> x) ps)
                             nargs = length spats
                         vs <- newVars (slotTypes dataTable (toName DataConstructor name) (getType b))
                         ps' <- mapM pp ps
@@ -516,8 +516,8 @@ convertMatches funcs dataTable tv cType bs ms err = evalState (match bs ms err) 
                 return $ eCase b as err
             | otherwise = error $ "Heterogenious list: " ++ show patternHeads
             where
-            patternHeads = map (head . fst) ps
-        patternGroups = groupUnder (isStrictPat . head . fst) ps
+            patternHeads = map ((\ (x:_) -> x) . fst) ps
+        patternGroups = groupUnder (isStrictPat . (\ (x:_) -> x) . fst) ps
         procAs b (HsPNeg p:ps, ef) =  (p:ps,ef)  -- TODO, negative patterns
         procAs b (HsPAsPat n p:ps, ef) =  (p:ps,eLetRec [((tv n),b)] . ef)
         procAs b (HsPIrrPat p:ps, ef) =  (p:ps, ef) -- TODO, irrefutable patterns
