@@ -64,5 +64,11 @@ synPart = undefined
 --synPart' :: Arg2 IO
 --synPart' = undefined
 
+
+-- polymorphic components
+data Bob  = Bob (forall a . a -> a)
+f (Bob x) = x 'y'
+
 main = do
+    putChar $ f (Bob id)
     putStrLn "Done."

@@ -30,8 +30,7 @@ module DataConsAssump (dataConsEnv) where
 
 import HsSyn
 import Representation
-import Type                     (assumpToPair, makeAssump, Types (..), quantify)
-import TypeUtils                (aHsTypeToType)
+import Type                     (Types (..), quantify)
 import FrontEnd.KindInfer
 import qualified Data.Map as Map
 
@@ -79,16 +78,15 @@ dataDeclEnv _modName _kt _anyOtherDecl
 hsContextToPreds :: KindEnv -> HsContext -> [Pred]
 hsContextToPreds kt assts = map (hsAsstToPred kt) assts
 
-unitEnv (x,y) = Map.singleton x y
 
 conDeclType :: Module -> KindEnv -> [Pred] -> Type -> HsConDecl -> Map.Map HsName Scheme
 conDeclType modName kt preds tResult (HsConDecl _sloc conName bangTypes)
-   = unitEnv $ assumpToPair $ makeAssump conName $ quantify (tv qualConType) qualConType
+   = Map.singleton conName $ quantify (tv qualConType) qualConType
    where
    conType = foldr fn tResult (map (bangTypeToType kt) bangTypes)
    qualConType = preds :=> conType
 conDeclType modName kt preds tResult rd@(HsRecDecl _sloc conName _)
-   = unitEnv $ assumpToPair $ makeAssump conName $ quantify (tv qualConType) qualConType
+   = Map.singleton conName $ quantify (tv qualConType) qualConType
    where
    conType = foldr fn tResult (map (bangTypeToType kt) (hsConDeclArgs rd))
    qualConType = preds :=> conType
