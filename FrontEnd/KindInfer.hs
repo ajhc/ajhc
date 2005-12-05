@@ -536,19 +536,20 @@ aHsTypeToType _ t = error $ "aHsTypeToType: " ++ show t
 
 
 aHsQualTypeToQualType :: KindEnv -> HsQualType -> Qual Type
-aHsQualTypeToQualType kt (HsQualType cntxt t)
-   = map (hsAsstToPred kt) cntxt :=> aHsTypeToType kt t
-aHsQualTypeToQualType kt (HsUnQualType t)
-   = [] :=> aHsTypeToType kt t
+aHsQualTypeToQualType kt (HsQualType cntxt t) = map (hsAsstToPred kt) cntxt :=> aHsTypeToType kt t
+aHsQualTypeToQualType kt (HsUnQualType t) = [] :=> aHsTypeToType kt t
 
 -- this version quantifies all the type variables
 -- perhaps there should be a version that is
 -- parameterised with which variables to quantify
 
+-- TODO take vs in forall type into account
+-- hopefully everything has been renamed to something unique
+
 aHsQualTypeToScheme :: KindEnv -> HsQualType -> Scheme
-aHsQualTypeToScheme kt qualType
-   = quantify vars qt
-   where
+aHsQualTypeToScheme kt HsQualType { hsQualTypeContext = cntxt, hsQualTypeType = HsTyForall vs qt } = aHsQualTypeToScheme kt HsQualType { hsQualTypeContext = cntxt ++ hsQualTypeHsContext qt, hsQualTypeType = hsQualTypeType qt }
+aHsQualTypeToScheme kt HsUnQualType { hsQualTypeType = t } = aHsQualTypeToScheme kt HsQualType { hsQualTypeContext = [], hsQualTypeType = t } 
+aHsQualTypeToScheme kt qualType = quantify vars qt where
    qt = aHsQualTypeToQualType kt qualType
    vars = tv qt
 

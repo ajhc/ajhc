@@ -1,3 +1,5 @@
+module Main where
+
 -- Test program for various uses of higher order polymorphism
 
 -- useful bits
@@ -23,8 +25,15 @@ type IdentityFunc = forall a . a -> a
 id1 :: forall a . a -> a
 id1 x = x
 
+
+
+-- forall hoisting
 id2 :: a -> IdentityFunc
 id2 _ x = x
+
+-- this should be rejected.
+--id3 :: forall a . b -> a -> a
+--id3 _ x = x
 
 
 main = do

@@ -1299,22 +1299,16 @@ getNewHsNamesFromHsType _subTable (HsTyCon _hsName)
   = [] -- don't rename the Constructors
 
 getHsNamesFromHsQualType :: HsQualType -> [HsName]
-getHsNamesFromHsQualType (HsQualType _hsContext hsType)
-  = getHsNamesFromHsType hsType
-getHsNamesFromHsQualType (HsUnQualType hsType)
-  = getHsNamesFromHsType hsType
+getHsNamesFromHsQualType (HsQualType _hsContext hsType) = getHsNamesFromHsType hsType
+getHsNamesFromHsQualType (HsUnQualType hsType) = getHsNamesFromHsType hsType
 
 getHsNamesFromHsType :: HsType -> [HsName]
-getHsNamesFromHsType (HsTyFun hsType1 hsType2)
-  = (getHsNamesFromHsType hsType1) ++ (getHsNamesFromHsType hsType2)
-getHsNamesFromHsType (HsTyTuple hsTypes)
-  = concat $ map getHsNamesFromHsType hsTypes
-getHsNamesFromHsType (HsTyApp hsType1 hsType2)
-  = (getHsNamesFromHsType hsType1) ++ (getHsNamesFromHsType hsType2)
-getHsNamesFromHsType (HsTyVar hsName)
-  = [hsName]
-getHsNamesFromHsType (HsTyCon _hsName)
-  = [] -- don't rename the Constructors
+getHsNamesFromHsType (HsTyFun hsType1 hsType2) = (getHsNamesFromHsType hsType1) ++ (getHsNamesFromHsType hsType2)
+getHsNamesFromHsType (HsTyTuple hsTypes) = concat $ map getHsNamesFromHsType hsTypes
+getHsNamesFromHsType (HsTyApp hsType1 hsType2) = (getHsNamesFromHsType hsType1) ++ (getHsNamesFromHsType hsType2)
+getHsNamesFromHsType (HsTyVar hsName) = [hsName]
+getHsNamesFromHsType (HsTyCon _hsName) = [] -- don't rename the Constructors
+getHsNamesFromHsType (HsTyForall _bs t) = getHsNamesFromHsQualType t -- TODO, scoping?
 
 
 -- gets the names of the functions declared in a class declaration

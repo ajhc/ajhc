@@ -17,6 +17,7 @@ import FrontEnd.KindInfer
 import FrontEnd.ParseMonad
 import GenUtil
 import Ho
+import HsPretty()
 import HsSyn
 import Name.Name
 import Options
@@ -87,7 +88,7 @@ interact ho = mre where
         Left m -> putStrLn m >> return act
         Right e -> putStrLn (show e) >> return act
     pshow _opt v
-        | Just d <- showSynonym (show . (pprint :: Type -> PP.Doc) . aHsTypeToType (hoKinds ho)) v (hoTypeSynonyms ho) = nameTag (nameType v):' ':d
+        | Just d <- showSynonym (show . (pprint :: HsType -> PP.Doc) ) v (hoTypeSynonyms ho) = nameTag (nameType v):' ':d
         | otherwise = nameTag (nameType v):' ':show v <+> "::" <+> ptype v
 
 
