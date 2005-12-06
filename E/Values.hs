@@ -25,7 +25,7 @@ eIf e a b = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 tBool),  eCaseAlts = 
 
 eTuple []  = vUnit
 eTuple [e] = e
-eTuple es = ELit $ LitCons (toTuple (length es)) es (ltTuple ts) where
+eTuple es = ELit $ LitCons (nameTuple DataConstructor (length es)) es (ltTuple ts) where
     ts = map getType es
 
 eTuple' es = ELit $ LitCons (unboxedNameTuple DataConstructor (length es)) es (ltTuple' ts) where
@@ -95,7 +95,7 @@ instance ToE a => ToE [a] where
 eCons x xs = ELit $ LitCons vCons [x,xs] (getType xs)
 eNil t = ELit $ LitCons vEmptyList [] t
 
-eCaseTup e vs w = ECase e (tVr 0 (getType e)) [Alt (LitCons (toTuple (length vs)) vs (getType e)) w] Nothing
+eCaseTup e vs w = ECase e (tVr 0 (getType e)) [Alt (LitCons (nameTuple DataConstructor (length vs)) vs (getType e)) w] Nothing
 eCaseTup' e vs w = ECase e (tVr 0 (getType e)) [Alt (LitCons (unboxedNameTuple DataConstructor (length vs)) vs (getType e)) w] Nothing
 
 eJustIO w x = ELit (LitCons dc_JustIO [w,x] (ELit (LitCons tc_IOResult [getType x] eStar)))

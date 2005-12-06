@@ -5,6 +5,7 @@
 -- dc_foo for data constructors
 -- s_foo for sort names
 -- rt_foo for raw names
+-- class_foo for classes
 
 module Name.Names where
 
@@ -33,22 +34,12 @@ instance ConNames Name where
     vUnit = dc_Unit
     vCons = dc_Cons
 
-{-
--- These should go away
-instance ValName Name where
-    hsValName (a,b) = toName Val (a,b)
-    hsTypName (a,b) = toName TypeVal (a,b)
-    hsUnqualTypName b = toName TypeVal b
-
-instance ValName HsName where
-    hsValName (a,b) = Qual (Module a) $ HsIdent b
-    hsUnqualValName b = UnQual $ HsIdent b
--}
 
 -- Tuple handling
 
-instance ToTuple Name where
-    toTuple n = toName DataConstructor (toTuple n :: (String,String))
+--No tuple instance because it is easy to get the namespace wrong. use 'nameTuple'
+--instance ToTuple Name where
+--    toTuple n = toName DataConstructor (toTuple n :: (String,String))
 
 nameTuple _ n | n < 2 = error "attempt to create tuple of length < 2"
 nameTuple t n = toName t  $ (toTuple n:: (String,String)) -- Qual (HsIdent ("(" ++ replicate (n - 1) ',' ++ ")"))

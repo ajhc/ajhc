@@ -72,25 +72,6 @@ instance ToTuple (String,String) where
 
 
 
--- This is stupid
-class ClassNames a where
-    classEq :: a
-    classOrd :: a
-    classEnum :: a
-    classBounded :: a
-    classShow :: a
-    classRead :: a
-    classIx :: a
-    classFunctor :: a
-    classMonad :: a
-    classNum  :: a
-    classReal :: a
-    classIntegral :: a
-    classFractional :: a
-    classFloating :: a
-    classRealFrac :: a
-    classRealFloat :: a
-
 
 -- | various functions needed for desugaring.
 data FuncNames a = FuncNames {
@@ -109,61 +90,3 @@ data FuncNames a = FuncNames {
 
 
 
-instance ClassNames (String,String) where
-    classEq = ("Prelude","Eq")
-    classOrd = ("Prelude","Ord")
-    classEnum = ("Prelude","Enum")
-    classBounded = ("Prelude","Bounded")
-    classShow = ("Prelude.Text","Show")
-    classRead = ("Prelude.Text","Read")
-    classIx = ("Ix","Ix")
-    classFunctor = ("Prelude","Functor")
-    classMonad = ("Prelude","Monad")
-    classNum = ("Prelude","Num")
-    classReal = ("Prelude","Real")
-    classIntegral = ("Prelude","Integral")
-    classFractional = ("Prelude","Fractional")
-    classFloating = ("Prelude","Floating")
-    classRealFrac = ("Prelude","RealFrac")
-    classRealFloat = ("Prelude","RealFloat")
-
-_derivableClasses,_numClasses,_stdClasses :: ClassNames a => [a]
-
-_stdClasses = [
-    classEq,
-    classOrd,
-    classEnum,
-    classBounded,
-    classShow,
-    classRead,
-    classIx,
-    classFunctor,
-    classMonad,
-    classNum ,
-    classReal,
-    classIntegral,
-    classFractional,
-    classFloating,
-    classRealFrac,
-    classRealFloat
-    ]
-
-_numClasses = [
-    classNum ,
-    classReal,
-    classIntegral,
-    classFractional,
-    classFloating,
-    classRealFrac,
-    classRealFloat
-    ]
-
-
-_derivableClasses = [
-    classEq,
-    classOrd,
-    classEnum,
-    classBounded,
-    classShow,
-    classRead
-    ]

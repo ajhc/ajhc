@@ -517,7 +517,7 @@ instanceToTopDecls _ _ _ = mempty
 getHsTypeCons (HsTyCon n) = n
 getHsTypeCons (HsTyApp a _) = getHsTypeCons a
 getHsTypeCons (HsTyFun {}) = nameName (tc_Arrow)
-getHsTypeCons (HsTyTuple xs) = nameName $ toTuple (length xs)
+getHsTypeCons (HsTyTuple xs) = toTuple (length xs)
 getHsTypeCons x = error $ "getHsTypeCons: " ++ show x
 
 
