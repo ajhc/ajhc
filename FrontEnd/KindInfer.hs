@@ -37,6 +37,7 @@ import Type(quantify,tv,tTTuple)
 import Util.ContextMonad
 import Util.HasSize
 import FrontEnd.Utils
+import GenUtil
 
 
 newtype KindEnv = KindEnv (Map.Map Name Kind)
@@ -131,8 +132,8 @@ instance Monad KI where
     fail x = KI (\s -> fail (unlines $ reverse (x:kiContext s)))
 
 
-restrictKindEnv :: (HsName -> Bool) -> KindEnv -> KindEnv
-restrictKindEnv f (KindEnv m) = KindEnv $ Map.filterWithKey (\k _ -> f (nameName k)) m
+restrictKindEnv :: (Name -> Bool) -> KindEnv -> KindEnv
+restrictKindEnv f (KindEnv m) = KindEnv $ Map.filterWithKey (\k _ -> f k) m
 
 --------------------------------------------------------------------------------
 
@@ -379,35 +380,32 @@ kiHsQualTypePredPred inputEnv qt@(HsQualType cntxt (HsTyApp (HsTyCon className) 
 --------------------------------------------------------------------------------
 
 getDataAndClassBg :: [HsDecl] -> [[HsDecl]]
-getDataAndClassBg decls
-   = getBindGroups decls getDeclName dataAndClassDeps
+getDataAndClassBg decls = getBindGroups decls getDeclName dataAndClassDeps
 
-dataAndClassDeps :: HsDecl -> [HsName]
+dataAndClassDeps :: HsDecl -> [Name]
 dataAndClassDeps (HsDataDecl _sloc cntxt _name _args condecls _derives)
-   = nub $ namesFromContext cntxt ++ (concatMap namesFromType $ concatMap conDeclToTypes condecls)
+   = snub $ namesFromContext cntxt ++ (concatMap namesFromType $ concatMap conDeclToTypes condecls)
 dataAndClassDeps (HsNewTypeDecl _sloc cntxt _name _args condecl _derives)
-   = nub $ namesFromContext cntxt ++ (concatMap namesFromType $ conDeclToTypes condecl)
+   = snub $ namesFromContext cntxt ++ (concatMap namesFromType $ conDeclToTypes condecl)
 dataAndClassDeps (HsClassDecl _sloc (HsQualType cntxt _classApp) decls)
-   = nub $ namesFromContext cntxt ++ (concat [ namesFromQualType (typeFromSig s) | s <- decls,  isHsTypeSig s])
+   = snub $ namesFromContext cntxt ++ (concat [ namesFromQualType (typeFromSig s) | s <- decls,  isHsTypeSig s])
 dataAndClassDeps (HsClassDecl _sloc (HsUnQualType _classApp) decls)
-   = nub $ concat [ namesFromQualType (typeFromSig s) | s <- decls,  isHsTypeSig s]
+   = snub $ concat [ namesFromQualType (typeFromSig s) | s <- decls,  isHsTypeSig s]
 
-namesFromQualType :: HsQualType -> [HsName]
-namesFromQualType (HsQualType cntxt t)
-   = namesFromContext cntxt ++ namesFromType t
-namesFromQualType (HsUnQualType t)
-   = namesFromType t
+namesFromQualType :: HsQualType -> [Name]
+namesFromQualType (HsQualType cntxt t) = namesFromContext cntxt ++ namesFromType t
+namesFromQualType (HsUnQualType t) = namesFromType t
 
-namesFromType :: HsType -> [HsName]
+namesFromType :: HsType -> [Name]
 namesFromType (HsTyFun t1 t2) = namesFromType t1 ++ namesFromType t2
 namesFromType (HsTyTuple ts) = concatMap namesFromType ts
 namesFromType (HsTyApp t1 t2) = namesFromType t1 ++ namesFromType t2
 namesFromType (HsTyVar _) = []
-namesFromType (HsTyCon n) = [n]
-namesFromType HsTyForall { hsTypeVars = vs } = map hsTyVarBindName vs
+namesFromType (HsTyCon n) = [toName TypeConstructor n]
+namesFromType HsTyForall { hsTypeVars = vs } = map (toName TypeVal . hsTyVarBindName) vs
 
-namesFromContext :: HsContext -> [HsName]
-namesFromContext cntxt = map fst cntxt
+namesFromContext :: HsContext -> [Name]
+namesFromContext cntxt = map fst (hsContextToContext cntxt)
 
 --------------------------------------------------------------------------------
 
@@ -478,20 +476,16 @@ typeFromSig (HsTypeSig _sloc _names qualType) = qualType
 
 --------------------------------------------------------------------------------
 
-kindOf :: HsName -> KindEnv -> Kind
-kindOf name (KindEnv env)
-   = case Map.lookup (toName TypeConstructor name) env of
-        Nothing -> case Map.lookup (toName TypeVal name) env of
-            Nothing -> Star
+kindOf :: Name -> KindEnv -> Kind
+kindOf name (KindEnv env) = case Map.lookup name env of
+            Nothing | nameType name `elem` [TypeConstructor,TypeVal] -> Star
             Just k -> k
-        --Nothing -> error $ "kindOf: could not find kind of : " ++ show name
-        Just k -> k
+            _ -> error $ "kindOf: could not find kind of : " ++ show (nameType name,name)
 
-kindOfClass :: HsName -> KindEnv -> [Kind]
-kindOfClass name (KindEnv env)
-   = case Map.lookup (toName ClassName name) env of
+kindOfClass :: Name -> KindEnv -> [Kind]
+kindOfClass name (KindEnv env) = case Map.lookup name env of
         --Nothing -> Star
-        Nothing -> error $ "kindOf: could not find kind of class : " ++ show name
+        Nothing -> error $ "kindOf: could not find kind of class : " ++ show (nameType name,name)
         Just k -> [k]
 
 ----------------------
@@ -518,14 +512,16 @@ aHsTypeToType kt (HsTyVar name) = TVar $ toTyvar kt name --  tyvar  name (kindOf
 -- here we also qualify the type constructor if it is
 -- currently unqualified
 
-aHsTypeToType kt (HsTyCon name) = TCon $ Tycon name (kindOf name kt)
+aHsTypeToType kt (HsTyCon name) = TCon $ Tycon nn (kindOf nn kt)  where
+    nn =  (toName TypeConstructor name)
 
 --aHsTypeToType kt (HsTyForall vs qt) = TForAll map (kindOf (aHsQualTypeToScheme kt qt)
 aHsTypeToType kt (HsTyForall vs qt) = TForAll (map (toTyvar kt . hsTyVarBindName) vs) (aHsQualTypeToQualType kt qt)
 
 aHsTypeToType _ t = error $ "aHsTypeToType: " ++ show t
 
-toTyvar kt name =  tyvar  name (kindOf name kt) Nothing
+toTyvar kt name =  tyvar  nn (kindOf nn kt) Nothing where
+    nn = toName TypeVal name
 
 aHsQualTypeToQualType :: KindEnv -> HsQualType -> Qual Type
 aHsQualTypeToQualType kt (HsQualType cntxt t) = map (hsAsstToPred kt) cntxt :=> aHsTypeToType kt t
@@ -558,7 +554,7 @@ forallHoist t = t
 hsAsstToPred :: KindEnv -> HsAsst -> Pred
 hsAsstToPred kt (className, varName)
    -- = IsIn className (TVar $ Tyvar varName (kindOf varName kt))
-   = IsIn className (TVar $ tyvar varName (head $ kindOfClass className kt) Nothing)
+   = IsIn (toName ClassName className) (TVar $ tyvar (toName TypeVal varName) (head $ kindOfClass (toName ClassName className) kt) Nothing)
 
 hsQualTypeToScheme :: Monad m => KindEnv -> HsQualType -> m Scheme
 hsQualTypeToScheme kt qualType =  return $ aHsQualTypeToScheme newEnv qualType where

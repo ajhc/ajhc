@@ -32,12 +32,13 @@ import qualified Data.Map as Map
 
 import HsSyn
 import Representation
+import Name.Name
 import Type                     (Types (..), quantify)
 import FrontEnd.KindInfer
 
 --------------------------------------------------------------------------------
 
-dataConsEnv :: Module -> KindEnv -> [HsDecl] -> Map.Map HsName Scheme
+dataConsEnv :: Module -> KindEnv -> [HsDecl] -> Map.Map Name Scheme
 dataConsEnv modName kt decls
    = Map.unions $ map (dataDeclEnv modName kt) decls
 
@@ -45,31 +46,33 @@ dataConsEnv modName kt decls
 -- we should only apply this function to data decls and newtype decls
 -- howver the fall through case is just there for completeness
 
-dataDeclEnv :: Module -> KindEnv -> (HsDecl) -> Map.Map HsName Scheme
+dataDeclEnv :: Module -> KindEnv -> (HsDecl) -> Map.Map Name Scheme
 dataDeclEnv modName kt (HsDataDecl _sloc context typeName args condecls _)
    = Map.unions $ map (conDeclType modName kt preds resultType) $ condecls
    where
-   typeKind = kindOf typeName kt
+   typeName' = toName TypeConstructor typeName
+   typeKind = kindOf typeName' kt
    resultType = foldl TAp tycon argVars
-   tycon = TCon (Tycon typeName typeKind)
+   tycon = TCon (Tycon typeName' typeKind)
    argVars = map fromHsNameToTyVar $ zip argKinds args
    argKinds = init $ unfoldKind typeKind
    fromHsNameToTyVar :: (Kind, HsName) -> Type
    fromHsNameToTyVar (k, n)
-      = TVar (tyvar n k Nothing)
+      = TVar (tyvar (toName TypeVal n) k Nothing)
    preds = hsContextToPreds kt context
 
 dataDeclEnv modName kt (HsNewTypeDecl _sloc context typeName args condecl _)
    = conDeclType modName kt preds resultType condecl
    where
-   typeKind = kindOf typeName kt
+   typeName' = toName TypeConstructor typeName
+   typeKind = kindOf typeName' kt
    resultType = foldl TAp tycon argVars
-   tycon = TCon (Tycon typeName typeKind)
+   tycon = TCon (Tycon typeName' typeKind)
    argVars = map fromHsNameToTyVar $ zip argKinds args
    argKinds = init $ unfoldKind typeKind
    fromHsNameToTyVar :: (Kind, HsName) -> Type
    fromHsNameToTyVar (k, n)
-      = TVar (tyvar n k Nothing)
+      = TVar (tyvar (toName TypeVal n) k Nothing)
    preds = hsContextToPreds kt context
 
 dataDeclEnv _modName _kt _anyOtherDecl
@@ -80,14 +83,14 @@ hsContextToPreds :: KindEnv -> HsContext -> [Pred]
 hsContextToPreds kt assts = map (hsAsstToPred kt) assts
 
 
-conDeclType :: Module -> KindEnv -> [Pred] -> Type -> HsConDecl -> Map.Map HsName Scheme
+conDeclType :: Module -> KindEnv -> [Pred] -> Type -> HsConDecl -> Map.Map Name Scheme
 conDeclType modName kt preds tResult (HsConDecl _sloc conName bangTypes)
-   = Map.singleton conName $ quantify (tv qualConType) qualConType
+   = Map.singleton (toName DataConstructor conName) $ quantify (tv qualConType) qualConType
    where
    conType = foldr fn tResult (map (bangTypeToType kt) bangTypes)
    qualConType = preds :=> conType
 conDeclType modName kt preds tResult rd@(HsRecDecl _sloc conName _)
-   = Map.singleton conName $ quantify (tv qualConType) qualConType
+   = Map.singleton (toName DataConstructor conName) $ quantify (tv qualConType) qualConType
    where
    conType = foldr fn tResult (map (bangTypeToType kt) (hsConDeclArgs rd))
    qualConType = preds :=> conType

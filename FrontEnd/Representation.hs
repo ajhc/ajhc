@@ -69,12 +69,12 @@ data Type  = TVar {-# UNPACK #-} !Tyvar
     {-! derive: GhcBinary !-}
 
 instance TypeNames Type where
-    tBool = TCon (Tycon (nameName tc_Bool) Star)
+    tBool = TCon (Tycon tc_Bool Star)
     tString = TAp tList tChar
-    tChar      = TCon (Tycon (nameName tc_Char) Star)
-    tUnit = TCon (Tycon (nameName tc_Unit) Star)
+    tChar      = TCon (Tycon tc_Char Star)
+    tUnit = TCon (Tycon tc_Unit Star)
 
-tList = TCon (Tycon (nameName tc_List) (Kfun Star Star))
+tList = TCon (Tycon tc_List (Kfun Star Star))
 
 instance Eq Type where
     (TVar a) == (TVar b) = a == b
@@ -87,7 +87,7 @@ instance Eq Type where
 
 -- Unquantified type variables
 
-data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !HsName, tyvarKind :: Kind, tyvarRef :: Maybe (IORef (Maybe Type)) }
+data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !Name, tyvarKind :: Kind, tyvarRef :: Maybe (IORef (Maybe Type)) }
     deriving(Data,Typeable)
     {-  derive: GhcBinary -}
 
@@ -182,12 +182,12 @@ instance Ord Tyvar where
 
 -- Type constructors
 
-data Tycon = Tycon HsName Kind
+data Tycon = Tycon Name Kind
     deriving(Data,Typeable, Eq, Show,Ord)
     {-! derive: GhcBinary !-}
 
 instance ToTuple Tycon where
-    toTuple n = Tycon (toTuple n) (foldr Kfun Star $ replicate n Star)
+    toTuple n = Tycon (nameTuple TypeConstructor n) (foldr Kfun Star $ replicate n Star)
 instance ToTuple Type where
     toTuple n = TCon $ toTuple n
 instance ToTuple Scheme where
@@ -341,7 +341,7 @@ prettyPrintQualTypeM (preds :=> t)
                                return $ hsep [predsDoc, text "=>", typeDoc]
 
 -- Class
-type Class = HsName
+type Class = Name
 
 --instance PPrint Doc t => PPrint Doc (Qual t) where
 --  pprint (ps :=> t) = pptuple ps <+> text "=>" <+> pprint t
@@ -366,7 +366,7 @@ type Subst = Map.Map Tyvar Type
 
 getTypeCons (TCon (Tycon n _)) = n
 getTypeCons (TAp a _) = getTypeCons a
-getTypeCons (TArrow {}) = nameName tc_Arrow
+getTypeCons (TArrow {}) = tc_Arrow
 getTypeCons x = error $ "getTypeCons: " ++ show x
 
 -- schemes
@@ -389,7 +389,7 @@ prettyPrintSchemeM (Forall _kinds qType) = do
 
 -- assumptions
 
-data Assump =  (:>:) HsName Scheme
+data Assump =  (:>:) Name Scheme
     deriving(Ord,Eq,Data,Typeable, Show)
     {-! derive: GhcBinary !-}
 

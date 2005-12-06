@@ -53,6 +53,7 @@ import TypeSigs(SigEnv)
 import Type(Instantiate (..), mgu)
 import FrontEnd.Utils()
 import Warning
+import Name.Name
 
 --------------------------------------------------------------------------------
 
@@ -65,7 +66,7 @@ data TcEnv = TcEnv {
       tcModuleName        :: Module,
       tcDiagnostics       :: [Diagnostic],   -- list of information that might help diagnosis
       tcVarnum            :: IORef Int,
-      tcDConsEnv          :: Map.Map HsName Scheme,
+      tcDConsEnv          :: Map.Map Name Scheme,
       tcSigs              :: SigEnv
     }
    {-! derive: update !-}
@@ -95,7 +96,7 @@ instance MonadSrcLoc TI where
             _ -> return bogusASrcLoc
 
 
-runTI :: Map.Map HsName Scheme-> ClassHierarchy -> KindEnv -> SigEnv -> Module -> TI a -> IO a
+runTI :: Map.Map Name Scheme-> ClassHierarchy -> KindEnv -> SigEnv -> Module -> TI a -> IO a
 runTI env' ch' kt' st' mod' (TI tim) = do
     vn <- newIORef 0
     runReaderT tim tcenv {  tcVarnum = vn } where
@@ -126,7 +127,7 @@ getErrorContext = asks tcDiagnostics
 
 
 
-getDConsTypeEnv :: TI (Map.Map HsName Scheme)
+getDConsTypeEnv :: TI (Map.Map Name Scheme)
 getDConsTypeEnv = asks tcDConsEnv
 
 getClassHierarchy  :: TI ClassHierarchy
@@ -143,7 +144,7 @@ getModName = asks tcModuleName
 
 
 
-dConScheme :: HsName -> TI Scheme
+dConScheme :: Name -> TI Scheme
 dConScheme conName
    = do
         env <- getDConsTypeEnv
@@ -184,7 +185,8 @@ newTVar k   = do
     te <- ask
     n <- liftIO $ readIORef (tcVarnum te)
     r <- liftIO $ newIORef Nothing
-    let ident = Qual (tcModuleName te) $ HsIdent $ "v" ++ show n
+    --let ident = Qual (tcModuleName te) $ HsIdent $ "v" ++ show n
+    let ident = toName TypeVal (show $ tcModuleName te,'v':show n)
         v = tyvar ident k (Just r)
     liftIO $ writeIORef (tcVarnum te) $! n + 1
     return $ TVar v

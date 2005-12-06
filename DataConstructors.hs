@@ -35,7 +35,6 @@ import Name.Name as Name
 import Name.Names
 import PrimitiveOperators
 import qualified Util.Seq as Seq
-import Util.VarName
 import Representation
 import Util.HasSize
 import Util.SameShape
@@ -49,7 +48,7 @@ tipe t = runVarName (tipe' t) where
         t1' <- tipe' t1
         t2' <- tipe' t2
         return $ EPi (tVr 0 (t1')) t2'
-    tipe' (TCon (Tycon n k)) =  return $ ELit (LitCons (toName TypeConstructor n) [] (kind k))
+    tipe' (TCon (Tycon n k)) =  return $ ELit (LitCons n [] (kind k))
     tipe' (TGen n (Tyvar { tyvarKind = k })) = return $  EVar (tVr ((n + 1) * 2 ) (kind k))
     tipe' (TVar tv@Tyvar { tyvarKind = k}) = do
         v <- lookupName tv

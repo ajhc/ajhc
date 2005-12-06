@@ -100,7 +100,7 @@ sub hsname($) {
     my $n = $_[0];
     $n =~ s/\W/_/g;
     $n = "n_" . $n;
-    my $v = "$n = toHsName \"$_[0]\"";
+    my $v = "$n = toClassName \"$_[0]\"";
     $hsname{$_[0]} = [$n,$v];
     return $n;
 }
@@ -111,7 +111,7 @@ sub tycon($) {
     my $n = $_[0];
     $n =~ s/\W/_/g;
     $n = "tc_" . $n;
-    my $v = "$n = TCon (Tycon (toHsName \"$_[0]\") Star)";
+    my $v = "$n = TCon (Tycon (toTypeName \"$_[0]\") Star)";
     $tycon{$_[0]} = [$n,$v];
     return $n;
 }

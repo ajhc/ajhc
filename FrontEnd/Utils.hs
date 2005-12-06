@@ -18,21 +18,21 @@ import Representation()
 --------------------------------------------------------------------------------
 
 
-maybeGetDeclName :: Monad m => HsDecl -> m HsName
-maybeGetDeclName (HsPatBind sloc (HsPVar name) rhs wheres) = return name
-maybeGetDeclName (HsFunBind ((HsMatch _ name _ _ _):_)) = return name
-maybeGetDeclName (HsDataDecl _ _ name  _ _ _) = return name
-maybeGetDeclName (HsNewTypeDecl _ _ name  _ _ _) = return name
+maybeGetDeclName :: Monad m => HsDecl -> m Name
+maybeGetDeclName (HsPatBind sloc (HsPVar name) rhs wheres) = return (toName Val name)
+maybeGetDeclName (HsFunBind ((HsMatch _ name _ _ _):_)) = return (toName Val name)
+maybeGetDeclName (HsDataDecl _ _ name  _ _ _) = return (toName TypeConstructor name)
+maybeGetDeclName (HsNewTypeDecl _ _ name  _ _ _) = return (toName TypeConstructor name)
 maybeGetDeclName (HsClassDecl _ qualType _) = case qualType of
             HsQualType _cntxt t -> return $ leftMostTyCon t
             HsUnQualType t -> return $ leftMostTyCon t
         where
-            leftMostTyCon (HsTyTuple ts) = toTuple (length ts)
+            leftMostTyCon (HsTyTuple ts) = error "lehtMostTyCon applied to tuple" -- toTuple (length ts)
             leftMostTyCon (HsTyApp t1 _) = leftMostTyCon t1
             leftMostTyCon (HsTyVar _) = error "leftMostTyCon: applied to a variable"
-            leftMostTyCon (HsTyCon n) = n
+            leftMostTyCon (HsTyCon n) = (toName ClassName n)
             leftMostTyCon x = error $ "leftMostTyCon: " ++ show x
-maybeGetDeclName (HsForeignDecl _ _ _ n _) = return n
+maybeGetDeclName (HsForeignDecl _ _ _ n _) = return (toName Val n)
 --maybeGetDeclName (HsTypeSig _ [n] _ ) = return n
 maybeGetDeclName d = fail  $ "getDeclName: could not find name for a decl: " ++ show d
 
@@ -58,4 +58,7 @@ lJustify n s = take n $ s ++ repeat ' '
 
 pprintEnvMap m = vcat [ pprint x <+> text "::" <+> pprint y | (x,y) <- Map.toList m ]
 
+type Context = [(Name,Name)]
+hsContextToContext :: HsContext -> [(Name,Name)]
+hsContextToContext xs = [ (toName ClassName c, toName TypeVal t) | (c,t) <- xs]
 

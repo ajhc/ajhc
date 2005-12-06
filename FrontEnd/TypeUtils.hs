@@ -15,9 +15,7 @@
 
 -------------------------------------------------------------------------------}
 
-module TypeUtils (aHsTypeSigToAssumps,
-                  aHsAsstToPred,
-                  flattenLeftTypeApplication) where
+module TypeUtils (aHsTypeSigToAssumps,flattenLeftTypeApplication) where
 
 import HsSyn
 import Representation
@@ -31,6 +29,7 @@ import Type                     (tv,
 
 import FrontEnd.KindInfer
 import Atom
+import Name.Name
 import Control.Monad.Identity
 
 -- one sig can be given to multiple names, hence
@@ -47,16 +46,16 @@ aHsTypeSigToAssumps kt sig@(HsTypeSig _ names qualType)
 -}
 
 
-aHsAsstToPred :: KindEnv -> HsAsst -> Pred
-aHsAsstToPred kt (className, varName)
+--aHsAsstToPred :: KindEnv -> HsAsst -> Pred
+--aHsAsstToPred kt (className, varName)
    -- = IsIn className (TVar $ Tyvar varName (kindOf varName kt))
-   = IsIn className (TVar $ tyvar varName (kindOf className kt) Nothing)
+--   = IsIn className (TVar $ tyvar varName (kindOf className kt) Nothing)
 
 -- one sig can be given to multiple names, hence
 -- the multiple assumptions in the output
 
 aHsTypeSigToAssumps :: KindEnv -> HsDecl -> [Assump]
-aHsTypeSigToAssumps kt sig@(HsTypeSig _ names qualType) = [n :>: scheme | n <- names] where
+aHsTypeSigToAssumps kt sig@(HsTypeSig _ names qualType) = [ toName Val n :>: scheme | n <- names] where
     Identity scheme = hsQualTypeToScheme kt qualType
    --scheme = aHsQualTypeToScheme newEnv qualType
    --newEnv = kiHsQualType kt qualType
@@ -79,14 +78,15 @@ flattenLeftTypeApplication t
 -- qualifies a type assumption to a given module, unless
 -- it is already qualified
 
-qualifyAssump :: Module -> Assump -> Assump
-qualifyAssump mod assump
-   | isQual ident = assump  -- do nothing
-   | otherwise = makeAssump newQualIdent scheme
-   where
-   scheme :: Scheme
-   scheme = assumpScheme assump
-   ident :: HsName
-   ident = assumpId assump
-   newQualIdent :: HsName
-   newQualIdent = Qual mod $ HsIdent $ show ident
+--qualifyAssump :: Module -> Assump -> Assump
+--qualifyAssump mod assump
+--   | isQual ident = assump  -- do nothing
+--   | otherwise = makeAssump newQualIdent scheme
+--   where
+--   scheme :: Scheme
+--   scheme = assumpScheme assump
+--   ident :: Name
+--   ident = assumpId assump
+--   newQualIdent :: Name
+--   newQualIdent = Qual mod $ HsIdent $ show ident
+

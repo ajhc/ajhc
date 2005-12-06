@@ -1180,8 +1180,10 @@ collectDefsHsModule m = execWriter (mapM_ f (hsModuleDecls m)) where
         cs' = concatMap (namesHsConDecl' toName) cs
     f (HsNewTypeDecl sl _ n _ c _) = do tellF $ (toName TypeConstructor n,sl,snub [ x |(x,_,_) <- cs']): cs' ; zup [c] where
         cs' = namesHsConDecl' toName c
-    f cd@(HsClassDecl sl _ ds) = tellF $ (toName ClassName z,sl,snub $ fsts cs):[ (n,a,[]) | (n,a) <- cs]  where
-        Just z = maybeGetDeclName cd
+    f cd@(HsClassDecl sl _ ds) = tellF $ (toName Name.ClassName (nameName z),sl,snub $ fsts cs):[ (n,a,[]) | (n,a) <- cs]  where
+        z = case maybeGetDeclName cd of
+            Just x | nameType x == ClassName -> x
+            --       | otherwise ->  parseName ClassName (show x ++ show (nameType x)) 
         cs = fst (mconcatMap (namesHsDeclTS' toName) ds)
     f _ = return ()
     zup cs = tellS (map g cs) where
@@ -1232,8 +1234,10 @@ namesHsDecl (HsPatBind srcLoc p _ _) = (map (rtup srcLoc) (getHsNamesFromHsPat p
 namesHsDecl (HsTypeDecl sl n _ _) = ([],[(n,sl)])
 namesHsDecl (HsDataDecl sl _ n _ cs _) = ( (concatMap namesHsConDecl cs) ,[(n,sl)])
 namesHsDecl (HsNewTypeDecl sl _ n _ c _) = ( (namesHsConDecl c),[(n,sl)])
-namesHsDecl cd@(HsClassDecl sl _ ds) = (mconcatMap namesHsDeclTS ds) `mappend` ([],[(z,sl)]) where
-    Just z = maybeGetDeclName cd
+namesHsDecl cd@(HsClassDecl sl _ ds) = (mconcatMap namesHsDeclTS ds) `mappend` ([],[(nameName z,sl)]) where
+    z = case maybeGetDeclName cd of
+        Just x | nameType x == ClassName -> x
+        --       | otherwise ->  parseName ClassName (show x ++ show (nameType x)) 
 namesHsDecl _ = mempty
 
 namesHsDeclTS (HsTypeSig sl ns _) = ((map (rtup sl) ns),[])

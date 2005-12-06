@@ -17,9 +17,10 @@
 module DeclsDepends (getDeclDeps, debugDeclBindGroups) where
 
 import HsSyn
-import DependAnalysis           (debugBindGroups)
-import FrontEnd.Utils                    (getDeclName)
-import FrontEnd.Rename          (unRename)
+import DependAnalysis(debugBindGroups)
+import FrontEnd.Utils(getDeclName)
+import FrontEnd.Rename(unRename)
+import Name.Name
 
 --------------------------------------------------------------------------------
 
@@ -27,8 +28,8 @@ import FrontEnd.Rename          (unRename)
 
 debugDeclBindGroups :: [[HsDecl]] -> String
 debugDeclBindGroups groups
-   = debugBindGroups groups (show . unRename . getDeclName)
-                            getDeclName
+   = debugBindGroups groups (show . unRename . nameName . getDeclName)
+                            (nameName . getDeclName)
                             getDeclDeps
 
 -- HsDecl getDeps function
@@ -36,37 +37,28 @@ debugDeclBindGroups groups
 
 getDeclDeps :: HsDecl -> [HsName]
 
-getDeclDeps (HsPatBind _pat _ rhs wheres)
-   = getRhsDeps rhs ++ foldr (++) [] (map getLocalDeclDeps wheres)
-
-getDeclDeps (HsFunBind matches)
-   = foldr (++) [] (map getMatchDeps matches)
-
+getDeclDeps (HsPatBind _pat _ rhs wheres) = getRhsDeps rhs ++ foldr (++) [] (map getLocalDeclDeps wheres)
+getDeclDeps (HsFunBind matches) = foldr (++) [] (map getMatchDeps matches)
 getDeclDeps _ = []
 
 
 getMatchDeps :: HsMatch -> [HsName]
-getMatchDeps (HsMatch _sloc _name _pats rhs wheres)
-   = getRhsDeps rhs ++ foldr (++) [] (map getLocalDeclDeps wheres)
+getMatchDeps (HsMatch _sloc _name _pats rhs wheres) = getRhsDeps rhs ++ foldr (++) [] (map getLocalDeclDeps wheres)
 
 -- get the dependencies from the local definitions in a function
 
 getLocalDeclDeps :: HsDecl -> [HsName]
-getLocalDeclDeps (HsFunBind matches)
-   = foldr (++) [] (map getMatchDeps matches)
+getLocalDeclDeps (HsFunBind matches) = foldr (++) [] (map getMatchDeps matches)
 
-getLocalDeclDeps (HsPatBind _sloc _hspat rhs wheres)
-   = getRhsDeps rhs ++ foldr (++) [] (map getLocalDeclDeps wheres)
+getLocalDeclDeps (HsPatBind _sloc _hspat rhs wheres) = getRhsDeps rhs ++ foldr (++) [] (map getLocalDeclDeps wheres)
 
 getLocalDeclDeps _ = []
 
 -- get the dependencies from the rhs of a function
 
 getRhsDeps :: HsRhs -> [HsName]
-getRhsDeps (HsUnGuardedRhs e)
-   = getExpDeps e
-getRhsDeps (HsGuardedRhss rhss)
-   = foldr (++) [] (map getGuardedRhsDeps rhss)
+getRhsDeps (HsUnGuardedRhs e) = getExpDeps e
+getRhsDeps (HsGuardedRhss rhss) = foldr (++) [] (map getGuardedRhsDeps rhss)
 
 getGuardedRhsDeps :: HsGuardedRhs -> [HsName]
 getGuardedRhsDeps (HsGuardedRhs _sloc guardExp rhsExp)

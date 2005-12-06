@@ -127,9 +127,9 @@ instance ClassNames (String,String) where
     classRealFrac = ("Prelude","RealFrac")
     classRealFloat = ("Prelude","RealFloat")
 
-derivableClasses,numClasses,stdClasses :: ClassNames a => [a]
+_derivableClasses,_numClasses,_stdClasses :: ClassNames a => [a]
 
-stdClasses = [
+_stdClasses = [
     classEq,
     classOrd,
     classEnum,
@@ -148,7 +148,7 @@ stdClasses = [
     classRealFloat
     ]
 
-numClasses = [
+_numClasses = [
     classNum ,
     classReal,
     classIntegral,
@@ -159,7 +159,7 @@ numClasses = [
     ]
 
 
-derivableClasses = [
+_derivableClasses = [
     classEq,
     classOrd,
     classEnum,

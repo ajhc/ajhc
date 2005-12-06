@@ -116,3 +116,22 @@ sFuncNames = FuncNames {
     func_concatMap = toName Val ("Prelude","concatMap")
     }
 
+
+
+class_Eq = toName ClassName ("Prelude","Eq")
+class_Ord = toName ClassName ("Prelude","Ord")
+class_Enum = toName ClassName ("Prelude","Enum")
+class_Bounded = toName ClassName ("Prelude","Bounded")
+class_Show = toName ClassName ("Prelude.Text","Show")
+class_Read = toName ClassName ("Prelude.Text","Read")
+class_Ix = toName ClassName ("Ix","Ix")
+class_Functor = toName ClassName ("Prelude","Functor")
+class_Monad = toName ClassName ("Prelude","Monad")
+class_Num = toName ClassName ("Prelude","Num")
+class_Real = toName ClassName ("Prelude","Real")
+class_Integral = toName ClassName ("Prelude","Integral")
+class_Fractional = toName ClassName ("Prelude","Fractional")
+class_Floating = toName ClassName ("Prelude","Floating")
+class_RealFrac = toName ClassName ("Prelude","RealFrac")
+class_RealFloat = toName ClassName ("Prelude","RealFloat")
+

@@ -18,7 +18,8 @@ import Name.VConsts
 
 ctypeMap = Map.fromList [ (parseName TypeConstructor n,v) | (n,v,_) <- allCTypes ]
 
-toHsName x = nameName $ parseName TypeConstructor x
+toTypeName x = parseName TypeConstructor x
+toClassName x = parseName ClassName x
 
 toInstName x = toName Val ("Instance@",'i':x)
 

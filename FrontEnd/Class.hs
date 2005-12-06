@@ -48,7 +48,10 @@ module Class(
     classRecords,
     makeClassHierarchy,
     splitReduce,
-    topDefaults
+    topDefaults,
+    derivableClasses,
+    stdClasses,
+    numClasses
     ) where
 
 import Control.Monad.Identity
@@ -179,18 +182,19 @@ showInst :: Inst -> String
 showInst = PPrint.render . pprint
 
 showPred :: Pred -> String
-showPred (IsIn c t)
-   = show c ++ " " ++ (pretty t)
+showPred (IsIn c t) = show c ++ " " ++ (pretty t)
 
-makeDeriveInstances :: [Pred] -> Type -> [Class] -> [Inst]
-makeDeriveInstances context t [] = []
-makeDeriveInstances context t (c:cs)
-   | c `elem` derivableClasses
-        = (context :=> IsIn c t) : makeDeriveInstances context t cs
-   | otherwise
-        = error $ "makeDeriveInstances: attempt to make type " ++ pretty t ++
-                  "\nan instance of a non-derivable class " ++ show c
 
+--makeDeriveInstances :: [Pred] -> Type -> [Class] -> [Inst]
+--makeDeriveInstances context t [] = []
+--makeDeriveInstances context t (c:cs)
+--   | c `elem` derivableClasses
+--        = (context :=> IsIn c t) : makeDeriveInstances context t cs
+--   | otherwise
+--        = error $ "makeDeriveInstances: attempt to make type " ++ pretty t ++
+--                  "\nan instance of a non-derivable class " ++ show c
+
+{-
 toHsName (x,y) = Qual (Module x) (HsIdent y)
 instance ClassNames HsName where
     classEq = toHsName classEq
@@ -209,17 +213,19 @@ instance ClassNames HsName where
     classFloating = toHsName classFloating
     classRealFrac = toHsName classRealFrac
     classRealFloat = toHsName classRealFloat
-
+-}
 
 
 toHsQualType (HsUnQualType t) = HsQualType [] t
 toHsQualType qt = qt
 
 addClassToHierarchy :: Monad m =>  KindEnv -> HsDecl -> ClassHierarchy -> m ClassHierarchy
-addClassToHierarchy  kt (HsClassDecl _ t decls) (ClassHierarchy h) |   (HsQualType cntxt (HsTyApp (HsTyCon className) (HsTyVar argName)))  <- toHsQualType t = let
+addClassToHierarchy  kt (HsClassDecl _ t decls) (ClassHierarchy h) |   (HsQualType cntxt (HsTyApp (HsTyCon className') (HsTyVar argName')))  <- toHsQualType t = let
    qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
    newClassContext = [(className, argName)]
-   in return $ ClassHierarchy $ Map.insertWith combineClassRecords  className ClassRecord { className = className, classSupers = map fst cntxt, classInsts = [], classDerives = [], classAssumps = qualifiedMethodAssumps } h
+   className = toName ClassName className'
+   argName = toName TypeVal argName'
+   in return $ ClassHierarchy $ Map.insertWith combineClassRecords  className ClassRecord { classSrcLoc = bogusASrcLoc, className = className, classSupers = map fst (hsContextToContext cntxt), classInsts = [], classDerives = [], classAssumps = qualifiedMethodAssumps } h
 
 
 addClassToHierarchy  _ _ ch = return ch
@@ -234,15 +240,15 @@ addClassToHierarchy  _ _ ch = return ch
 --qualifyMethod cntxt (HsTypeSig sloc names (HsUnQualType t))
 --   = HsTypeSig sloc names (HsQualType cntxt t)
 
-qualifyMethod :: HsContext -> (HsDecl) -> (HsDecl)
+qualifyMethod :: Context -> (HsDecl) -> (HsDecl)
 qualifyMethod [(c,n)] (HsTypeSig sloc names (HsQualType oc t))
-    = HsTypeSig sloc names (HsQualType ((c,n'):oc) t) where
+    = HsTypeSig sloc names (HsQualType ((nameName c,n'):oc) t) where
         --n' = fromJust $ applyTU (once_tdTU $ adhocTU failTU f) t
         --f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig n = return n'
         --f (HsTyVar n')  = return n'
         --f _ = mzero
         Just n' = (something (mkQ mzero f)) t
-        f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig n = return n'
+        f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig (nameName n) = return n'
         f _ = mzero
 
 
@@ -262,7 +268,7 @@ printClassHierarchy :: ClassHierarchy -> IO ()
 printClassHierarchy (ClassHierarchy h)
    = mapM_ printClassDetails $  Map.toList h
    where
-   printClassDetails :: (HsName, ClassRecord) -> IO ()
+   printClassDetails :: (Name, ClassRecord) -> IO ()
    printClassDetails (cname, (ClassRecord { classSupers = supers, classInsts = insts, classAssumps = methodAssumps}))
       = do
             putStrLn "..........."
@@ -362,7 +368,7 @@ hsInstDeclToInst kt (HsInstDecl _sloc qType _decls)
    (cntxt, classType, argType)
       = case toHsQualType qType of
            HsQualType context (HsTyApp cType@(HsTyCon _) aType)
-              -> (map (aHsAsstToPred kt) context, cType, aType)
+              -> (map (hsAsstToPred kt) context, cType, aType)
    {-
       Note:
       kind (Either) = *->*->*
@@ -379,7 +385,7 @@ hsInstDeclToInst kt (HsInstDecl _sloc qType _decls)
       = case argType of
            HsTyTuple args -> (Star, tTTuple $ map toType $ zip args $ repeat Star)
            _anythingElse
-              -> let tyConName = nameOfTyCon tyCon
+              -> let tyConName = nameOfTyCon TypeConstructor tyCon
                      numArgs = (length flatType) - 1
                      flatType = flattenLeftTypeApplication argType
                      flatTyConKind = unfoldKind tyConKind
@@ -388,14 +394,14 @@ hsInstDeclToInst kt (HsInstDecl _sloc qType _decls)
                      typeKindPairs = (tyCon, tyConKind) : (zip (tail flatType) flatTyConKind)
                      in (foldr1 Kfun $ drop numArgs flatTyConKind,
                          convType typeKindPairs)
-   className = nameOfTyCon classType
+   className = nameOfTyCon ClassName classType
    [classKind] = kindOfClass className kt
 
 -- derive statements
-hsInstDeclToInst kt (HsDataDecl _sloc cntxt tyConName argNames _condecls derives@(_:_))
+hsInstDeclToInst kt (HsDataDecl _sloc _cntxt tyConName argNames _condecls derives@(_:_))
    = return $ map ((,) True) newInstances
    where
-   tyConKind = kindOf tyConName kt
+   tyConKind = kindOf (toName TypeConstructor tyConName) kt
    flatTyConKind = unfoldKind tyConKind
    argTypeKind = foldr1 Kfun $ drop (length argNames) flatTyConKind
    argsAsTypeList = map (\n -> HsTyVar n) argNames
@@ -403,14 +409,14 @@ hsInstDeclToInst kt (HsDataDecl _sloc cntxt tyConName argNames _condecls derives
    typeKindPairs = (HsTyCon tyConName, tyConKind) : zip argsAsTypeList flatTyConKind
    convertedType :: Type
    convertedType = convType typeKindPairs
-   newContext = map (aHsAsstToPred kt) cntxt
+   --newContext = map (hsAsstToPred kt) cntxt
    --newInstances = makeDeriveInstances newContext convertedType derives
    newInstances = mempty
 
-hsInstDeclToInst kt (HsNewTypeDecl _sloc cntxt tyConName argNames _condecls derives@(_:_))
+hsInstDeclToInst kt (HsNewTypeDecl _sloc _cntxt tyConName argNames _condecls derives@(_:_))
    = return $ map ((,) True) newInstances
    where
-   tyConKind = kindOf tyConName kt
+   tyConKind = kindOf (toName TypeConstructor tyConName) kt
    flatTyConKind = unfoldKind tyConKind
    argTypeKind = foldr1 Kfun $ drop (length argNames) flatTyConKind
    argsAsTypeList = map (\n -> HsTyVar n) argNames
@@ -418,7 +424,7 @@ hsInstDeclToInst kt (HsNewTypeDecl _sloc cntxt tyConName argNames _condecls deri
    typeKindPairs = (HsTyCon tyConName, tyConKind) : zip argsAsTypeList flatTyConKind
    convertedType :: Type
    convertedType = convType typeKindPairs
-   newContext = map (aHsAsstToPred kt) cntxt
+   --newContext = map (hsAsstToPred kt) cntxt
    --newInstances = makeDeriveInstances newContext convertedType derives
    newInstances = mempty
 
@@ -431,8 +437,8 @@ convType tsks
    = foldl1 TAp (map toType tsks)
 
 toType :: (HsType, Kind) -> Type
-toType (HsTyCon n, k) = TCon $ Tycon n k
-toType (HsTyVar n, k) = TVar $ tyvar n k Nothing
+toType (HsTyCon n, k) = TCon $ Tycon (toName TypeConstructor n) k
+toType (HsTyVar n, k) = TVar $ tyvar (toName TypeVal n) k Nothing
 toType (HsTyFun x y, Star) = TArrow (toType (x,Star)) (toType (y,Star))
 toType x = error $ "toType: " ++ show x
 
@@ -480,8 +486,8 @@ deriveableClasses = ["Eq", "Ord", "Enum", "Bounded", "Show", "Read"]
 makeDerivation kt ch name args cs ds = ([],[])
 makeDerivation kt ch name args cs ds = ([],concatMap f ds) where
     f n
-        | n == classEnum = [cia  (nameName v_toEnum), cia $ nameName (v_fromEnum)]
-        | n == classBounded = [cia  (nameName v_minBound), cia $ nameName v_maxBound]
+        | n == class_Enum = [cia $  v_toEnum, cia $ v_fromEnum]
+        | n == class_Bounded = [cia  ( v_minBound), cia $  v_maxBound]
         | otherwise = error "cannot derive"
         where
         cia = createInstanceAssump kt methodSigs [] n arg
@@ -495,13 +501,13 @@ instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsInstDecl _ qualType met
    = unzip $ map (methodToTopDecls kt methodSigs qualType) $ methodGroups where
    HsQualType _ (HsTyApp (HsTyCon className) _) = qualType
    methodGroups = groupEquations methods
-   methodSigs = case Map.lookup className classHierarchy  of
+   methodSigs = case Map.lookup (toName ClassName className) classHierarchy  of
            Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
            Just sigs -> classAssumps sigs
 instanceToTopDecls kt classHierarchy decl@HsDataDecl {} =
-     (makeDerivation kt classHierarchy (hsDeclName decl) (hsDeclArgs decl) (hsDeclCons decl)) (hsDeclDerives decl)
+     (makeDerivation kt classHierarchy (hsDeclName decl) (hsDeclArgs decl) (hsDeclCons decl)) (map (toName ClassName) $ hsDeclDerives decl)
 instanceToTopDecls kt classHierarchy decl@HsNewTypeDecl {} =
-    (makeDerivation kt classHierarchy (hsDeclName decl) (hsDeclArgs decl) [(hsDeclCon decl)]) (hsDeclDerives decl)
+    (makeDerivation kt classHierarchy (hsDeclName decl) (hsDeclArgs decl) [(hsDeclCon decl)]) (map (toName ClassName) $ hsDeclDerives decl)
 
 
 instanceToTopDecls _ _ _ = mempty
@@ -515,16 +521,17 @@ getHsTypeCons (HsTyTuple xs) = nameName $ toTuple (length xs)
 getHsTypeCons x = error $ "getHsTypeCons: " ++ show x
 
 
-instanceName n t = Qual (Module "Instance@") $ HsIdent ('i':show n ++ "." ++ show t)
-defaultInstanceName n = Qual (Module "Instance@") $ HsIdent ('i':show n ++ ".default")
+instanceName n t = toName Val $ Qual (Module "Instance@") $ HsIdent ('i':show n ++ "." ++ show t)
+defaultInstanceName n = toName Val $ Qual (Module "Instance@") $ HsIdent ('i':show n ++ ".default")
 
+createInstanceAssump :: KindEnv -> [Assump] -> HsContext -> Class -> HsType -> Name -> Assump
 createInstanceAssump kt methodSigs cntxt className argType methodName
    = newMethodName :>: instantiatedSig where
     newMethodName = instanceName methodName (getHsTypeCons argType)
     [sigFromClass] = [ s | n :>: s <- methodSigs, n == methodName]
     instantiatedSig = newMethodSig' kt methodName cntxt sigFromClass argType
 
-methodToTopDecls :: KindEnv -> [Assump] -> HsQualType -> (HsName, HsDecl) -> (HsDecl,Assump)
+methodToTopDecls :: KindEnv -> [Assump] -> HsQualType -> (Name, HsDecl) -> (HsDecl,Assump)
 
 methodToTopDecls kt methodSigs (HsQualType cntxt classApp) (methodName, methodDecls)
    = (renamedMethodDecls,newMethodName :>: instantiatedSig) where
@@ -539,21 +546,21 @@ methodToTopDecls kt methodSigs (HsQualType cntxt classApp) (methodName, methodDe
     renamedMethodDecls
        = renameOneDecl newMethodName methodDecls
 
-renameOneDecl :: HsName -> HsDecl -> HsDecl
+renameOneDecl :: Name -> HsDecl -> HsDecl
 renameOneDecl newName (HsFunBind matches)
    = HsFunBind  (map (renameOneMatch newName) matches)
 -- all pattern bindings are simple by this stage
 -- (ie no compound patterns)
 renameOneDecl newName (HsPatBind sloc (HsPVar patName) rhs wheres)
-   = HsPatBind sloc (HsPVar newName) rhs wheres
+   = HsPatBind sloc (HsPVar (nameName newName)) rhs wheres
 
-renameOneMatch :: HsName -> HsMatch -> HsMatch
+renameOneMatch :: Name -> HsMatch -> HsMatch
 renameOneMatch newName (HsMatch sloc oldName pats rhs wheres)
-   = HsMatch sloc newName pats rhs wheres
+   = HsMatch sloc (nameName newName) pats rhs wheres
 
 
 
-newMethodSig' :: KindEnv -> HsName -> HsContext -> Scheme -> HsType -> Scheme
+newMethodSig' :: KindEnv -> Name -> HsContext -> Scheme -> HsType -> Scheme
 newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
    ((IsIn _ classArg:restContext) :=> t) = unQuantify qt'
    -- the assumption is that the context is non-empty and that
@@ -569,8 +576,10 @@ newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
    --ct n | n == classArg = return $ aHsTypeToType kt instanceType
    --ct n = return n
    newQualType = everywhere (mkT at) $ quantify (tv qt) qt
-   at (Tyvar _ n k r) =  tyvar (hsNameIdent_u (hsIdentString_u (++ foo)) n) k r
-   qt = (map (aHsAsstToPred kt) newCntxt ++ restContext) :=> (everywhere (mkT ct) t)
+   at (Tyvar _ n k r) =  tyvar (updateName (++ foo) n) k r
+   updateName f n = toName nt (md,f nm) where
+        (nt,(md::String,nm)) = fromName n
+   qt = (map (hsAsstToPred kt) newCntxt ++ restContext) :=> (everywhere (mkT ct) t)
    ct n | n == classArg =  runIdentity $ hsTypeToType kt instanceType
    ct n =  n
 
@@ -717,7 +726,7 @@ topDefaults h ps
           vs  = [ v  | (v,qs,ts) <- ams ]
 
 defaults    :: [Type]
-defaults     = map (\name -> TCon (Tycon (nameName name) Star))
+defaults     = map (\name -> TCon (Tycon name Star))
                    [tc_Integer, tc_Double]
 
 
@@ -733,8 +742,8 @@ makeClassHierarchy (ClassHierarchy ch) kt ds = return (ClassHierarchy ans) where
     f (HsClassDecl sl t decls)
         | HsTyApp (HsTyCon className) (HsTyVar argName)  <- tbody = do
             let qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
-                newClassContext = [(className, argName)]
-            tell [ClassRecord { className = className, classSrcLoc = sl, classSupers = map fst cntxt, classInsts = [], classDerives = [], classAssumps = qualifiedMethodAssumps }]
+                newClassContext = hsContextToContext [(className, argName)]
+            tell [ClassRecord { className = toName ClassName className, classSrcLoc = sl, classSupers = map fst $ hsContextToContext cntxt, classInsts = [], classDerives = [], classAssumps = qualifiedMethodAssumps }]
         | otherwise = failSl sl "Invalid Class declaration."
         where
         HsQualType cntxt tbody = toHsQualType t
@@ -793,14 +802,55 @@ showListAndSepInWidth f width sep things
 pretty  :: PPrint Doc a => a -> String
 pretty   = render . pprint
 
-nameOfTyCon :: HsType -> HsName
-nameOfTyCon (HsTyCon n) = n
-nameOfTyCon (HsTyTuple xs) = toTuple (length xs)
-nameOfTyCon (HsTyFun _ _) = nameName tc_Arrow
-nameOfTyCon t = error $ "nameOfTyCon: " ++ show t
+nameOfTyCon :: NameType -> HsType -> Name
+nameOfTyCon t (HsTyCon n) = toName t n
+nameOfTyCon t (HsTyTuple xs) = nameTuple t (length xs)
+nameOfTyCon t (HsTyFun _ _) = tc_Arrow
+nameOfTyCon _ t = error $ "nameOfTyCon: " ++ show t
 
-groupEquations :: [HsDecl] -> [(HsName, HsDecl)]
+groupEquations :: [HsDecl] -> [(Name, HsDecl)]
 groupEquations [] = []
 groupEquations (d:ds) = (getDeclName d, d) : groupEquations ds
 
 
+
+derivableClasses,numClasses,stdClasses ::  [Name]
+
+stdClasses = [
+    class_Eq,
+    class_Ord,
+    class_Enum,
+    class_Bounded,
+    class_Show,
+    class_Read,
+    class_Ix,
+    class_Functor,
+    class_Monad,
+    class_Num ,
+    class_Real,
+    class_Integral,
+    class_Fractional,
+    class_Floating,
+    class_RealFrac,
+    class_RealFloat
+    ]
+
+numClasses = [
+    class_Num ,
+    class_Real,
+    class_Integral,
+    class_Fractional,
+    class_Floating,
+    class_RealFrac,
+    class_RealFloat
+    ]
+
+
+derivableClasses = [
+    class_Eq,
+    class_Ord,
+    class_Enum,
+    class_Bounded,
+    class_Show,
+    class_Read
+    ]

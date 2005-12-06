@@ -4,6 +4,7 @@ import Char
 import Control.Monad.Writer
 import IO
 import List
+import Maybe
 import Monad
 import qualified Data.Map as Map
 import Text.PrettyPrint.HughesPJ as PPrint
@@ -40,19 +41,19 @@ import Warning
 
 trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env -- (Map.fromList [ n | n@(name,_) <- Map.toList env,  isGlobal name ])
 
-getDeclNames ::  HsDecl -> [HsName]
-getDeclNames (HsTypeSig _ ns _ ) =  ns
+getDeclNames ::  HsDecl -> [Name]
+getDeclNames (HsTypeSig _ ns _ ) =  map (toName Val) ns
 getDeclNames d = maybeGetDeclName d
 
 -- Extra data produced by the front end, used to fill in the Ho file.
 data TiData = TiData {
-    tiDataLiftedInstances :: Map.Map HsName HsDecl,
+    tiDataLiftedInstances :: Map.Map Name HsDecl,
     tiDataModules :: [(Module,HsModule)],
     tiModuleOptions :: [(Module,Opt)],
     tiAllAssumptions :: Map.Map Name Scheme
 }
 
-isGlobal (Qual _ x) | (h:_) <- hsIdentString x =  not $ isDigit h
+isGlobal x |  (_,(_::String,(h:_))) <- fromName x =  not $ isDigit h
 isGlobal _ = error "isGlobal"
 
 modInfoDecls = hsModuleDecls . modInfoHsModule
@@ -63,11 +64,11 @@ getImports ModInfo { modInfoHsModule = mod }  = [  (hsImportDeclModule x) | x <-
 --    Just z -> z
 --    Nothing -> error $ "lookupMod: " ++ show s
 
-pprintEnv :: PPrint Doc a => Map.Map HsName a -> Doc
+pprintEnv :: PPrint Doc a => Map.Map Name a -> Doc
 pprintEnv env = pl global $+$ pl local_norm $+$ pl local_sys  where
     es = Map.toList env
     (local,global) = partition (\ (x,_) -> not (isGlobal x)) es -- isDigit $ head (hsIdentString (hsNameIdent x)) ) es
-    (local_sys,local_norm) = partition (\(x,_) -> last (hsIdentString (hsNameIdent x)) == '@' ) local
+    (local_sys,local_norm) = partition (\(x,_) -> last (show x) == '@' ) local
     pl es = vcat [((pprint a) <+> (text "::") <+> (pprint b)) | (a, b) <- es]
 
 --buildFieldLabelMap ::  Map.Map Name (SrcLoc,[Name]) -> Map.Map Name [(Name,Int,Int)]
@@ -120,8 +121,8 @@ or' fs x = or [ f x | f <- fs ]
 
 tiModules' ::  Ho -> [ModInfo] -> IO (Ho,TiData)
 tiModules' me ms = do
-    let importVarEnv = Map.fromList [ (n,y) | (x,y) <- Map.toList $ hoAssumps me, let (t,n) = fromName x, t == Name.Val ]
-        importDConsEnv = Map.fromList [ (n,y) | (x,y) <- Map.toList $ hoAssumps me, let (t,n) = fromName x, t == Name.DataConstructor ]
+    let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
+        importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
         importClassHierarchy = hoClassHierarchy me
         importKindEnv = hoKinds me
     wdump FD.Progress $ do
@@ -161,7 +162,7 @@ tiModules' me ms = do
 
     when  (dump FD.Dcons) $
          do {putStr "\n ---- data constructor assumptions ---- \n";
-             putStrLn $ PPrint.render $ pprintEnv localDConsEnv}
+             putStrLn $ PPrint.render $ pprint localDConsEnv}
 
 
     let globalDConsEnv = localDConsEnv `Map.union` importDConsEnv
@@ -219,10 +220,9 @@ tiModules' me ms = do
         classDefaults  = snub [ getDeclName z | z <- cDefBinds, isHsFunBind z || isHsPatBind z ]
         classNoDefaults = snub (concat [ getDeclNames z | z <- cDefBinds ])  List.\\ classDefaults
         noDefaultSigs = Map.fromList [ (n,maybe (error $ "sigEnv:"  ++ show n) id $ Map.lookup n sigEnv) | n <- classNoDefaults ]
-        fakeForeignDecls = [ [HsForeignDecl bogusASrcLoc ForeignPrimitive "" x (HsUnQualType $ HsTyTuple []) ] | (x,_) <- Map.toList noDefaultSigs]
+        fakeForeignDecls = [ [HsForeignDecl bogusASrcLoc ForeignPrimitive "" (nameName x) (HsUnQualType $ HsTyTuple []) ] | (x,_) <- Map.toList noDefaultSigs]
     --when verbose2 $ putStrLn (show bindings)
-    let programBgs
-           = getBindGroups bindings getDeclName getDeclDeps
+    let programBgs = getBindGroups bindings (nameName . getDeclName) getDeclDeps
 
     when (dump FD.Bindgroups) $
          do {putStrLn " \n ---- toplevel variable binding groups ---- ";
@@ -255,16 +255,17 @@ tiModules' me ms = do
              putStrLn $ PPrint.render $ pprintEnv (if verbose2 then localVarEnv else trimEnv localVarEnv) }
 
     --let externalEnv = Map.fromList [ v | v@(x@(Qual m i) ,s) <- Map.toList localVarEnv, isGlobal x, m `elem` map modInfoName ms ]  `Map.union` noDefaultSigs
-    let externalEnv = Map.filterWithKey (\ x@(Qual m _) _ -> isGlobal x && (m `elem` map modInfoName ms)) localVarEnv `Map.union` noDefaultSigs
+    let externalEnv = Map.filterWithKey (\ x _ -> isGlobal x && (fromJust (getModule x) `elem` map modInfoName ms)) localVarEnv `Map.union` noDefaultSigs
     localVarEnv <- return $  localVarEnv `Map.union` noDefaultSigs
     --let externalKindEnv = Map.fromList [ v | v@(x@(Qual m i) ,s) <- Map.toList kindInfo, isGlobal x, m `elem` map modInfoName ms ]
-    let externalKindEnv = restrictKindEnv (\ x@(Qual m _)  -> isGlobal x && (m `elem` map modInfoName ms)) kindInfo
+    let externalKindEnv = restrictKindEnv (\ x  -> isGlobal x && (fromJust (getModule x) `elem` map modInfoName ms)) kindInfo
 
     let pragmaProps = Map.fromListWith (\a b -> snub $ a ++ b ) [ (toName Name.Val x,[toAtom w]) |  HsPragmaProps _ w xs <- ds, x <- xs ]
 
-    let allAssumps = Map.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Map.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Map.toList localVarEnv ]
+    let allAssumps = localDConsEnv `Map.union` localVarEnv -- Map.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Map.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Map.toList localVarEnv ]
         --expAssumps = M.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Env.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Env.toList $ trimEnv localVarEnv ]
-        expAssumps = Map.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Map.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Map.toList $ externalEnv ]
+        --expAssumps = Map.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Map.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Map.toList $ externalEnv ]
+        expAssumps = localDConsEnv `Map.union` externalEnv -- Map.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Map.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Map.toList $ externalEnv ]
     let ho = mempty {
         hoExports = Map.fromList [ (modInfoName m,modInfoExport m) | m <- ms ],
         hoDefs =  Map.fromList [ (x,(y,z)) | (x,y,z) <- concat $ map modInfoDefs ms],

@@ -52,7 +52,7 @@ import List    (union, nub)
 import qualified Data.Map as Map
 
 import GenUtil
-import HsSyn   (HsName (..))
+import Name.Name
 import Name.VConsts
 import Representation
 
@@ -279,10 +279,10 @@ schemeToType (Forall _ (ps :=> t)) = tForAll (snub xs) (ps' :=> t') where
 
 -----------------------------------------------------------------------------
 
-assumpToPair :: Assump -> (HsName, Scheme)
+assumpToPair :: Assump -> (Name, Scheme)
 assumpToPair (n :>: s) = (n,s)
 
-pairToAssump :: (HsName, Scheme) -> Assump
+pairToAssump :: (Name, Scheme) -> Assump
 pairToAssump (n,s) = (n :>: s)
 
 instance Types Assump where
@@ -290,11 +290,11 @@ instance Types Assump where
   tv (i :>: sc)      = tv sc
 
 
-assumpId :: Assump -> HsName
+assumpId :: Assump -> Name
 assumpId (id :>: _scheme) = id
 
 assumpScheme :: Assump -> Scheme
 assumpScheme (_id :>: scheme) = scheme
 
-makeAssump :: HsName -> Scheme -> Assump
+makeAssump :: Name -> Scheme -> Assump
 makeAssump name scheme = name :>: scheme

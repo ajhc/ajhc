@@ -4,9 +4,11 @@
 
 module HsErrors where
 
-import Class()
+import Class
 import HsSyn
 import Monad
+import Name.Name
+import Name.Names
 import Name.VConsts
 import Warning
 
@@ -24,14 +26,16 @@ hsQualType x  = hsType (hsQualTypeType x)
 
 
 hsDecl :: MonadWarn m => HsDecl -> m ()
-hsDecl HsDataDecl { hsDeclSrcLoc = sl, hsDeclCons = cs, hsDeclDerives = ds } = do
+hsDecl HsDataDecl { hsDeclSrcLoc = sl, hsDeclCons = cs, hsDeclDerives = ds' } = do
+    let ds = map (toName ClassName) ds'
     when (null cs) $ warn sl "h98-emptydata" "data types with no constructors are a non-haskell98 feature"
     checkDeriving sl False ds
     let isEnum = all (\x ->  null (hsConDeclArgs x)) cs
-    when (not isEnum && classEnum `elem` ds) $ warn sl "derive-enum" "Cannot derive enum from non enumeration type"
-    when (not isEnum && length cs /= 1 && classBounded `elem` ds) $ warn sl "derive-bounded" "Cannot derive bounded from non enumeration or unary type"
+    when (not isEnum && class_Enum `elem` ds) $ warn sl "derive-enum" "Cannot derive enum from non enumeration type"
+    when (not isEnum && length cs /= 1 && class_Bounded `elem` ds) $ warn sl "derive-bounded" "Cannot derive bounded from non enumeration or unary type"
     return ()
-hsDecl HsNewTypeDecl { hsDeclSrcLoc = sl, hsDeclDerives = ds } = do
+hsDecl HsNewTypeDecl { hsDeclSrcLoc = sl, hsDeclDerives = ds' } = do
+    let ds = map (toName ClassName) ds'
     checkDeriving sl True ds
     return ()
 hsDecl _ = return ()

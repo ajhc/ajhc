@@ -56,11 +56,12 @@ newVars xs = f xs [] where
         put $! s + 2
         f xs (tVr ( s) x:ys)
 
-lt n =  atomIndex $ toAtom $ toName TypeVal n
+lt :: Name -> Int
+lt n | nameType n == TypeVal =  atomIndex $ toAtom $  n
 
 tipe (TAp t1 t2) = eAp (tipe t1) (tipe t2)
 tipe (TArrow t1 t2) =  EPi (tVr 0 (tipe t1)) (tipe t2)
-tipe (TCon (Tycon n k)) =  ELit (LitCons (toName TypeConstructor n) [] (kind k))
+tipe (TCon (Tycon n k)) =  ELit (LitCons n [] (kind k))
 tipe (TVar (Tyvar _ n k _)) = EVar (tVr (lt n) (kind k))
 tipe (TGen _ (Tyvar _ n k _)) = EVar (tVr (lt n) (kind k))
 
@@ -98,13 +99,15 @@ convertVal assumps n = (mp EPi ts (tipe t), mp eLam ts) where
     mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (lt n) (kind k)) (mp fn rs t)
     mp _ [] t = t
     ts = ctgen t
-    lt n =  nameToInt (fromTypishHsName  n)
+    --lt n =  nameToInt (fromTypishHsName  n)
+    lt n =  nameToInt n
 
 convertOneVal (Forall _ (_ :=> t)) = (mp EPi ts (tipe t)) where
     mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (lt n) (kind k)) (mp fn rs t)
     mp _ [] t = t
     ts = ctgen t
-    lt n =  nameToInt (fromTypishHsName  n)
+    --lt n =  nameToInt (fromTypishHsName  n)
+    lt n =  nameToInt n
 
 toTVr assumps n = tVr ( nameToInt n) (typeOfName n) where
     typeOfName n = fst $ convertVal assumps n
@@ -164,15 +167,15 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
 
     method classRecord n = as where
         methodVar = tVr ( nameToInt methodName) ty
-        methodName = toName Name.Val n
+        methodName =  n
         Identity (deftvr@(TVr { tvrType = ty}),_) = findName defaultName
-        defaultName =  (toName Name.Val (defaultInstanceName n))
+        defaultName =  (defaultInstanceName n)
         valToPat' (ELit (LitCons x ts t)) = ELit $ LitCons x [ EVar (tVr ( j) (getType z)) | z <- ts | j <- [2,4 ..]]  t
         valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ LitCons tc_Arrow [ EVar (tVr ( j) (getType z)) | z <- [a,b] | j <- [2,4 ..]]  eStar
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
         as = [ rule  t | (_ :=> IsIn _ t ) <- snub (classInsts classRecord) ]
         rule t = emptyRule { ruleHead = methodVar, ruleArgs = [valToPat' (tipe t)], ruleBody = body, ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
-            name = (toName Name.Val (instanceName n (getTypeCons t)))
+            name = ((instanceName n (getTypeCons t)))
             ELit (LitCons _ vs _) = valToPat' (tipe t)
             body = case findName name of Just (n,_) -> foldl EAp (EVar n) vs  ; Nothing -> EAp (EVar deftvr) (valToPat' (tipe t))
     findName name = case Map.lookup name funcs of
@@ -184,8 +187,8 @@ createMethods dataTable classHierarchy funcs = return ans where
     ans = concatMap cClass (classRecords classHierarchy)
     cClass classRecord =  [ method classRecord n | n :>: _ <- classAssumps classRecord ]
     method classRecord n = (methodName ,setProperty prop_METHOD (tVr ( nameToInt methodName) ty),v) where
-        methodName = toName Name.Val n
-        Just (deftvr@(TVr { tvrType = ty}),defe) = findName (toName Name.Val (defaultInstanceName n))
+        methodName =  n
+        Just (deftvr@(TVr { tvrType = ty}),defe) = findName ((defaultInstanceName n))
         (EPi tvr t) = ty
         --els = eAp (EVar deftvr) (EVar tvr)
         els = EError ("Bad: " ++ show methodName) t -- eAp (EVar deftvr) (EVar tvr)
@@ -199,7 +202,7 @@ createMethods dataTable classHierarchy funcs = return ans where
                 | ELam x e <- defe, isAtomic (tipe t) = return $ calt $ subst x (tipe t) e -- [(x,tipe t)] e
                 | not (isAtomic (tipe t)) = return $ calt $  (EAp (EVar deftvr) (EVar tvr))
                 | otherwise = return $ calt $ EAp (EVar deftvr) (tipe t) where -- fail "Instance does not exist" where
-            name = toName Name.Val (instanceName n (getTypeCons t))
+            name = (instanceName n (getTypeCons t))
             -- calt  tvr =  Alt (LitCons x [ tvr | ~(EVar tvr) <- vs ]  ct) (foldl EAp (EVar tvr) vs)
             calt e =  Alt (LitCons x [ tvr | ~(EVar tvr) <- vs ]  ct)  e
             (x,vs,ct) = case tipe t of
@@ -213,7 +216,7 @@ createMethods dataTable classHierarchy funcs = return ans where
 methodNames ::  ClassHierarchy ->  [TVr]
 methodNames  classHierarchy =  ans where
     ans = concatMap cClass (classRecords classHierarchy)
-    cClass classRecord =  [ setProperty prop_METHOD $ tVr (nameToInt $ toName Name.Val n) (convertOneVal t) | n :>: t <- classAssumps classRecord ]
+    cClass classRecord =  [ setProperty prop_METHOD $ tVr (nameToInt $ n) (convertOneVal t) | n :>: t <- classAssumps classRecord ]
 
 unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
 unbox dataTable e vn wtd = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] te) (wtd tvra)] Nothing where
@@ -315,12 +318,12 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         rt = discardArgs (length targs + numberPatterns) t
         numberPatterns = length ps
         z e = foldr (eLam) e bs'
-    cDecl HsNewTypeDecl {  hsDeclName = dname, hsDeclArgs = dargs, hsDeclCon = dcon, hsDeclDerives = derives } = makeDerives dname dargs [dcon] derives
-    cDecl HsDataDecl {  hsDeclName = dname, hsDeclArgs = dargs, hsDeclCons = dcons, hsDeclDerives = derives } = makeDerives dname dargs dcons derives
+    cDecl HsNewTypeDecl {  hsDeclName = dname, hsDeclArgs = dargs, hsDeclCon = dcon, hsDeclDerives = derives } = makeDerives dname dargs [dcon] (map (toName ClassName) derives)
+    cDecl HsDataDecl {  hsDeclName = dname, hsDeclArgs = dargs, hsDeclCons = dcons, hsDeclDerives = derives } = makeDerives dname dargs dcons (map (toName ClassName) derives)
     cDecl cd@(HsClassDecl {}) = cClassDecl cd
     cDecl _ = []
     makeDerives dname dargs dcons derives  = concatMap f derives where
-        f n | n == classBounded, all (null . hsConDeclArgs) dcons  = []
+        f n | n == class_Bounded, all (null . hsConDeclArgs) dcons  = []
         f _ = []
     cExpr (HsAsPat n' (HsVar n)) = spec t t' $ EVar (tv n) where
         (Forall _ (_ :=> t)) = getAssump n
@@ -386,10 +389,10 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
     cGuard (HsGuardedRhss (HsGuardedRhs _ g e:gs)) els = eIf (cExpr g) (cExpr e) (cGuard (HsGuardedRhss gs) els)
     cGuard (HsGuardedRhss []) e = e
 
-    getAssumpCon n = case Map.lookup (toName Name.DataConstructor n) assumps of
+    getAssumpCon n  = case Map.lookup (toName Name.DataConstructor n) assumps of
         Just z -> z
         Nothing -> error $ "Lookup failed: " ++ (show n)
-    getAssump n = case Map.lookup (toName Name.Val n) assumps of
+    getAssump n  = case Map.lookup (toName Name.Val n) assumps of
         Just z -> z
         Nothing -> error $ "Lookup failed: " ++ (show n)
     tv n = toTVr assumps (toName Name.Val n)
@@ -417,11 +420,11 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
 
     cClassDecl (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon name) _)) decls) = ans where
         ds = map simplifyDecl decls
-        cr = findClassRecord classHierarchy name
+        cr = findClassRecord classHierarchy (toName ClassName name)
         ans = concatMap method [  n | n :>: _ <- classAssumps cr]
         method n = return (defaultName,tVr ( nameToInt defaultName) ty,els) where
-            defaultName = toName Name.Val $ defaultInstanceName n
-            (TVr { tvrType = ty}) = tv n
+            defaultName = defaultInstanceName n
+            (TVr { tvrType = ty}) = tv (nameName n)
             els = case [ d | d <- ds, maybeGetDeclName d == Just n] of
                 [d] | [(_,_,v)] <- cDecl d -> v
                 -- []  -> EError ((show n) ++ ": no instance or default.") ty
