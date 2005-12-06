@@ -24,10 +24,8 @@
 module TIMonad (TI,
                 inst,
                 runTI,
-                getErrorContext,
                 withContext,
                 getClassHierarchy,
-                getKindEnv,
                 getSigEnv,
                 unify,
                 freshInst,
@@ -37,20 +35,22 @@ module TIMonad (TI,
                 newTVar) where
 
 
+import Control.Monad.Fix
+import Control.Monad.Reader
 import Control.Monad.Trans
 import Data.IORef
 import Monad
 import qualified Data.Map as Map
-import Text.PrettyPrint.HughesPJ(render,Doc)
+import Text.PrettyPrint.HughesPJ(render,Doc())
 
-import Class                 (ClassHierarchy)
+import Class(ClassHierarchy())
 import Diagnostic
-import Doc.PPrint(pprint,PPrint)
+import Doc.PPrint(PPrint(..))
 import HsSyn
-import FrontEnd.KindInfer             (KindEnv)
+import FrontEnd.KindInfer(KindEnv())
 import Representation
-import TypeSigs              (SigEnv)
-import Type                  (Instantiate (..), mgu)
+import TypeSigs(SigEnv)
+import Type(Instantiate (..), mgu)
 import FrontEnd.Utils()
 import Warning
 
@@ -65,57 +65,48 @@ data TcEnv = TcEnv {
       tcModuleName        :: Module,
       tcDiagnostics       :: [Diagnostic],   -- list of information that might help diagnosis
       tcVarnum            :: IORef Int,
-      -- tcSubst             :: IORef Subst,
       tcDConsEnv          :: Map.Map HsName Scheme,
       tcSigs              :: SigEnv
     }
    {-! derive: update !-}
 
 
-newtype TI a = TI (TcEnv -> IO a)
 
-instance MonadIO TI where
-    liftIO x = TI (\_ -> x)
-
---instance MonadReader TcEnv TI  where
-{-# INLINE ask #-}
-{-# INLINE local #-}
-{-# INLINE asks #-}
-
-ask = TI (\t -> return t)
-local f (TI c) = TI (\t -> c (f t))
-asks f = liftM f ask
+newtype TI a = TI (ReaderT TcEnv IO a)
+    deriving(MonadFix,MonadIO,MonadReader TcEnv,Functor)
 
 instance Monad TI where
-    {-# INLINE return #-}
-    {-# INLINE (>>=) #-}
-    {-# INLINE (>>) #-}
-    return a = TI (\_ -> return a)
-    TI comp >>= fun = TI (\t -> comp t >>= \x -> case fun x of
-        TI r -> r t)
-    TI a >> TI b = TI (\t -> a t >> b t)
-    fail s = TI $ \st -> do
-        processIOErrors
-        typeError (Failure s) (tcDiagnostics st)
+    return a = TI $ return a
+    TI comp >>= fun = TI $ do x <- comp; case fun x of TI m -> m
+    TI a >> TI b = TI $ a >> b
+    fail s = TI $ do
+        st <- ask
+        liftIO $ processIOErrors
+        liftIO $ typeError (Failure s) (tcDiagnostics st)
 
-instance Functor TI where
-    fmap = liftM
+instance MonadWarn TI where
+    addWarning w = liftIO $ processErrors [w]
 
-runTI     :: Map.Map HsName Scheme-> ClassHierarchy -> KindEnv -> SigEnv -> Module -> TI a -> IO a
-runTI env' ch' kt' st' mod' (TI c) = do
+instance MonadSrcLoc TI where
+    getSrcLoc = do
+        xs <- asks tcDiagnostics
+        case xs of
+            (Msg (Just sl) _:_) -> return sl
+            _ -> return bogusASrcLoc
+
+
+runTI :: Map.Map HsName Scheme-> ClassHierarchy -> KindEnv -> SigEnv -> Module -> TI a -> IO a
+runTI env' ch' kt' st' mod' (TI tim) = do
     vn <- newIORef 0
-    -- sub <- newIORef nullSubst
-    c tcenv {  tcVarnum = vn } where
+    runReaderT tim tcenv {  tcVarnum = vn } where
     tcenv = TcEnv {
         tcClassHierarchy = ch',
         tcKinds = kt',
         tcModuleName = mod',
         tcSigs = st',
         tcVarnum = undefined,
-        -- tcSubst = undefined,
         tcDConsEnv = env',
         tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ fromModule mod']
-
         }
 
 
@@ -134,11 +125,9 @@ getErrorContext :: TI [Diagnostic]
 getErrorContext = asks tcDiagnostics
 
 
---getSubst :: TI Subst
---getSubst = TI $ \t -> readIORef (tcSubst t) -- gets subst
 
 getDConsTypeEnv :: TI (Map.Map HsName Scheme)
-getDConsTypeEnv = TI $ \t -> return (tcDConsEnv t) -- gets env
+getDConsTypeEnv = asks tcDConsEnv
 
 getClassHierarchy  :: TI ClassHierarchy
 getClassHierarchy = asks tcClassHierarchy
@@ -178,21 +167,6 @@ unify t1 t2 = do
                                            pretty t2')
                             diagnosis
 
-{-
---s <- getSubst
---let t1' = apply s t1
---    t2' = apply s t2
-
-                 case mgu t1' t2' of
-                   Just u  -> extSubst u
-                   Nothing -> do
-                              diagnosis <- getErrorContext
-                              typeError (Unification $ "attempted to unify " ++
-                                                       pretty t1' ++
-                                                       " with " ++
-                                                       pretty t2')
-                                        diagnosis
--}
 
 unifyList :: [Type] -> TI ()
 unifyList [] = return ()
@@ -203,18 +177,17 @@ unifyList (t1:t2:ts) = do
 
 
 extSubst   :: Subst -> TI ()
---extSubst s' = TI (\t -> modifyIORef (tcSubst t) (s' @@))
 extSubst s = sequence_ [ do y' <- findType y ; liftIO $ writeIORef r (Just y') | (Tyvar { tyvarRef = ~(Just r)} ,y) <- Map.toList s]
 
 newTVar    :: Kind -> TI Type
-newTVar k   = TI $ \te -> do
-                n <- readIORef (tcVarnum te)
-                r <- newIORef Nothing
-                let ident = Qual (tcModuleName te) $ HsIdent $ "v" ++ show n
-                    v = tyvar ident k (Just r)
-                writeIORef (tcVarnum te) $! n + 1
-                return $ TVar v
-
+newTVar k   = do
+    te <- ask
+    n <- liftIO $ readIORef (tcVarnum te)
+    r <- liftIO $ newIORef Nothing
+    let ident = Qual (tcModuleName te) $ HsIdent $ "v" ++ show n
+        v = tyvar ident k (Just r)
+    liftIO $ writeIORef (tcVarnum te) $! n + 1
+    return $ TVar v
 
 
 freshInst :: Scheme -> TI (Qual Type)
@@ -226,3 +199,4 @@ freshInst (Forall ks qt) = do
 
 pretty  :: PPrint Doc a => a -> String
 pretty   = render . pprint
+
