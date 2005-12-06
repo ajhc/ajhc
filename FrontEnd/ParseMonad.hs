@@ -26,10 +26,11 @@ module FrontEnd.ParseMonad(
 	) where
 
 import HsSyn(SrcLoc(..))
+import Warning
 
 -- | The result of a parse.
 data ParseResult a
-	= ParseOk a		-- ^ The parse succeeded, yielding a value.
+	= ParseOk [Warning] a	-- ^ The parse succeeded, yielding a value and a set of warnings.
 	| ParseFailed SrcLoc String
 				-- ^ The parse failed at the specified
 				-- source location, with an error message.
@@ -42,11 +43,15 @@ data ParseStatus a = Ok ParseState a | Failed SrcLoc String
 data LexContext = NoLayout | Layout Int
 	deriving (Eq,Ord,Show)
 
-type ParseState = [LexContext]
+--type ParseState = [LexContext]
+data ParseState = ParseState { psLexContext :: [LexContext], psWarnings :: [Warning] }
+    deriving(Show)
 
 indentOfParseState :: ParseState -> Int
-indentOfParseState (Layout n:_) = n
+indentOfParseState ParseState { psLexContext = (Layout n:_) } = n
 indentOfParseState _            = 0
+
+emptyParseState = ParseState { psLexContext = [], psWarnings = [] }
 
 -- | Static parameters governing a parse.
 -- More to come later, e.g. literate mode, language extensions.
@@ -78,8 +83,8 @@ newtype P a = P { runP ::
 		}
 
 runParserWithMode :: ParseMode -> P a -> String -> ParseResult a
-runParserWithMode mode (P m) s = case m s 0 1 start [] mode of
-	Ok _ a -> ParseOk a
+runParserWithMode mode (P m) s = case m s 0 1 start emptyParseState mode of
+	Ok s a -> ParseOk (psWarnings s) a
 	Failed loc msg -> ParseFailed loc msg
     where start = SrcLoc {
 		srcLocFileName = parseFilename mode,
@@ -106,8 +111,13 @@ thenP = (>>=)
 atSrcLoc :: P a -> SrcLoc -> P a
 P m `atSrcLoc` loc = P $ \i x y _l -> m i x y loc
 
-getSrcLoc :: P SrcLoc
-getSrcLoc = P $ \_i _x _y l s _m -> Ok s l
+--getSrcLoc :: P SrcLoc
+
+instance MonadSrcLoc P where
+    getSrcLoc = P $ \_i _x _y l s _m -> Ok s l
+
+instance MonadWarn P where
+    addWarning w = P $ \_i _x _y _l s _m -> Ok s { psWarnings = w:psWarnings s } ()
 
 -- Enter a new layout context.  If we are already in a layout context,
 -- ensure that the new indent is greater than the indent of that context.
@@ -126,13 +136,13 @@ currentIndent = P $ \_r _x _y loc stk _mode -> Ok stk (indentOfParseState stk)
 pushContext :: LexContext -> P ()
 pushContext ctxt =
 --trace ("pushing lexical scope: " ++ show ctxt ++"\n") $
-	P $ \_i _x _y _l s _m -> Ok (ctxt:s) ()
+	P $ \_i _x _y _l s _m -> Ok s { psLexContext = ctxt:psLexContext s } ()
 
 popContext :: P ()
 popContext = P $ \_i _x _y _l stk _m ->
-      case stk of
+      case psLexContext stk of
    	(_:s) -> --trace ("popping lexical scope, context now "++show s ++ "\n") $
-            Ok s ()
+            Ok stk { psLexContext = s } ()
         []    -> error "Internal error: empty context in popContext"
 
 -- Monad for lexical analysis:
@@ -145,6 +155,11 @@ instance Monad (Lex r) where
 	Lex v >>= f = Lex $ \k -> v (\a -> runL (f a) k)
 	Lex v >> Lex w = Lex $ \k -> v (\_ -> w k)
 	fail s = Lex $ \_ -> fail s
+
+instance MonadWarn (Lex r) where
+    addWarning w = Lex $ \k -> addWarning w >> k ()
+instance MonadSrcLoc (Lex r) where
+    getSrcLoc = Lex $ \k -> getSrcLoc >>= k
 
 -- Operations on this monad
 
@@ -232,11 +247,11 @@ getOffside = Lex $ \cont -> P $ \r x y loc stk ->
 
 pushContextL :: LexContext -> Lex a ()
 pushContextL ctxt = Lex $ \cont -> P $ \r x y loc stk ->
-		runP (cont ()) r x y loc (ctxt:stk)
+		runP (cont ()) r x y loc stk { psLexContext = ctxt:psLexContext stk }
 
 popContextL :: String -> Lex a ()
-popContextL fn = Lex $ \cont -> P $ \r x y loc stk -> case stk of
-		(_:ctxt) -> runP (cont ()) r x y loc ctxt
+popContextL fn = Lex $ \cont -> P $ \r x y loc stk -> case psLexContext stk of
+		(_:ctxt) -> runP (cont ()) r x y loc stk { psLexContext = ctxt }
 		[]       -> error ("Internal error: empty context in " ++ fn)
 
 

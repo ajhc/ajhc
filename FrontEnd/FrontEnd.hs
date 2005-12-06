@@ -64,8 +64,8 @@ doModules func ho ms  = do
 
 modInfo m = do
     opt <- case fileOptions (hsModuleOptions m) of
-        Right o -> return o
-        Left s -> warn (srcLoc m) "unknown-option" ("Unknown OPTIONS in pragma module" <+> fromModule (hsModuleName m) <+>  s) >> return options
+        Just o -> return o
+        Nothing -> warn (srcLoc m) "unknown-option" ("Unknown OPTIONS in pragma module" <+> fromModule (hsModuleName m) <+>  show (hsModuleOptions m)) >> return options
     let (xs,ys) = collectDefsHsModule m
     return ModInfo {
         modInfoName = hsModuleName m,

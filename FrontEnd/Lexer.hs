@@ -24,6 +24,7 @@ import FrontEnd.ParseMonad
 import Char
 import Data.Ratio
 import qualified Data.Map as Map
+import Warning
 
 data Token
         = VarId String
@@ -39,6 +40,7 @@ data Token
 	| Character Char
         | StringTok String
         | PragmaOptions [String]
+        | PragmaRules
         | PragmaStart String
         | PragmaEnd
 
@@ -193,7 +195,14 @@ lexWhiteSpace :: Bool -> Lex a Bool
 lexWhiteSpace bol = do
 	s <- getInput
 	case s of
-            '{':'-':'#':s | takeWhile isAlphaNum (dropWhile isSpace s) `Map.member` pragmas -> return bol
+            '{':'-':'#':s
+                | pname `Map.member` pragmas -> return bol
+                | otherwise -> do
+                    addWarn "unknown-pragma" $ "The pragma '" ++ pname ++ "' is unknown"
+                    discard 2
+                    bol <- lexNestedComment bol
+                    lexWhiteSpace bol
+                   where pname =  takeWhile isIdent (dropWhile isSpace s)
 	    '{':'-':_ -> do
 		discard 2
 		bol <- lexNestedComment bol
@@ -275,10 +284,10 @@ lexToken = do
         '{':'-':'#':s' -> do
             discard 3
             lexWhile isSpace
-            w <- lexWhile isAlphaNum
+            w <- lexWhile isIdent
             case normPragma w  of
-                (False,w') -> return (PragmaStart w')
-                (True,w') -> lexRawPragma w'
+                Right t -> return t
+                Left w' -> lexRawPragma w'
         '#':'-':'}':_ -> do
             discard 3
             return PragmaEnd
@@ -567,7 +576,8 @@ parseInteger radix ds =
 
 -- pragmas for which we just want the raw contents of
 pragmas_raw = [["OPTIONS", "JHC_OPTIONS", "OPTIONS_JHC" ]]
--- pragmas for which we want to parse the insides of
+
+-- pragmas which just have a simple string based start rule.
 pragmas_std = [
     ["INLINE"],
     ["SUPERINLINE"],
@@ -577,10 +587,16 @@ pragmas_std = [
     ["SRCLOC_ANNOTATE"]
     ]
 
+-- pragmas with a special starting token
+pragmas_parsed = [
+    (["RULES"],PragmaRules)
+    ]
 
-pragmas = Map.fromList $ [ (y,(True,x)) | xs@(x:_)  <- pragmas_raw, y <- xs] ++  [ (y,(False,x)) | xs@(x:_)  <- pragmas_std , y <- xs]
+pragmas_all = pragmas_parsed ++ [ (xs,PragmaStart x) | xs@(~(x:_)) <- pragmas_std ]
 
-normPragma :: String -> (Bool,String)
-normPragma s | Just v <- Map.lookup s pragmas  = v
+pragmas = Map.fromList $ [ (y,Left x) | xs@(x:_)  <- pragmas_raw, y <- xs] ++  [ (y,Right w) | (xs@(~(x:_)),w)  <- pragmas_all , y <- xs]
+
+normPragma :: String -> Either String Token
+normPragma s | ~(Just v) <- Map.lookup s pragmas  = v
 
 

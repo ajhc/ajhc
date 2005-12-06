@@ -25,7 +25,7 @@ driftDerive hsModule = ans where
     hsMod' = hsModule { hsModuleDecls = hsModuleDecls hsModule ++ ndcls }
     --hsMod = case parse (unlines ss) (SrcLoc (show $ hsModuleName hsModule) 1 1) 0 [] of
     hsMod = case runParser parse (unlines ss)  of
-        ParseOk e -> e
+        ParseOk _ e -> e
         ParseFailed sl err -> error $ "driftDerive: " ++ show sl ++ err
     ndcls = hsModuleDecls hsMod
     ss = [ n | Just n <- map driftDerive' $ hsModuleDecls hsModule, any (not . isSpace) n ]

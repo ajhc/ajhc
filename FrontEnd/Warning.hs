@@ -1,4 +1,4 @@
-module Warning(Warning(..), MonadWarn(..), processErrors, warn, warnF, err, addDiag, addWarn, processIOErrors) where
+module Warning(Warning(..), MonadWarn(..), MonadSrcLoc(..), processErrors, warn, warnF, err, addDiag, addWarn, processIOErrors) where
 
 import HsSyn
 import List

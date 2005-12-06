@@ -400,7 +400,7 @@ searchPaths m = ans where
 
 parseHsSource :: String -> String -> IO HsModule
 parseHsSource fn s = case runParserWithMode ParseMode { parseFilename = fn } parse  s'  of
-                      ParseOk e -> return e
+                      ParseOk ws e -> processErrors ws >> return e
                       ParseFailed sl err -> putErrDie $ show sl ++ ": " ++ err
     where
     s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s else s

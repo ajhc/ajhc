@@ -94,7 +94,7 @@ interact ho = mre where
 
 parseStmt ::  Monad m => String -> m HsStmt
 parseStmt s = case runParserWithMode ParseMode { parseFilename = "(jhci)" } parseHsStmt  s  of
-                      ParseOk e -> return e
+                      ParseOk _ e -> return e
                       ParseFailed sl err -> fail $ show sl ++ ": " ++ err
 
 
