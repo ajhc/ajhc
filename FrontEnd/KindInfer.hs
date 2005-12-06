@@ -39,12 +39,7 @@ import Util.HasSize
 import FrontEnd.Utils
 
 
-
---------------------------------------------------------------------------------
-
--- the many interesting types and classes
-
-newtype KindEnv = KindEnv (Map.Map HsName Kind)
+newtype KindEnv = KindEnv (Map.Map Name Kind)
     deriving(Binary,Typeable,Show,HasSize,Monoid)
 
 type Subst = [(Kindvar, Kind)]
@@ -135,24 +130,15 @@ instance Monad KI where
         = KI (\v  -> comp v >>= \r -> case fun r   of KI x -> x v)
     fail x = KI (\s -> fail (unlines $ reverse (x:kiContext s)))
 
-data State = State {
-      env :: KindEnv,     -- the environment of kind assumptions
-      subst :: Subst     -- the current substitution
-   }
-
 
 restrictKindEnv :: (HsName -> Bool) -> KindEnv -> KindEnv
-restrictKindEnv f (KindEnv m) = KindEnv $ Map.filterWithKey (\k _ -> f k) m
+restrictKindEnv f (KindEnv m) = KindEnv $ Map.filterWithKey (\k _ -> f (nameName k)) m
 
 --------------------------------------------------------------------------------
 
 -- useful operations in the inference monad
 
---runKI     :: KindEnv -> KI a -> (a, State)
---runKI kindEnv (KI comp) = (result, newState) where
---   (result,newState) = comp (State { context = [], env = kindEnv, subst = nullSubst, varnum = 0})
-
-runKI :: KindEnv -> KI a -> IO (a, State)
+runKI :: KindEnv -> KI a -> IO (a, KindEnv)
 runKI env (KI ki) = (kienv >>= ki') where
     kienv = do
         env <- newIORef env
@@ -162,8 +148,7 @@ runKI env (KI ki) = (kienv >>= ki') where
     ki' e = do
         x <- ki e
         env <- readIORef (kiEnv e)
-        subst <- readIORef (kiSubst e)
-        return (x,State { env = env, subst = subst })
+        return (x,env)
 
 
 instance ContextMonad String KI where
@@ -211,7 +196,7 @@ newKindVar
         incVarNum
         return (KVar (Kindvar n))
 
-lookupKindEnv :: HsName -> KI (Maybe Kind)
+lookupKindEnv :: Name -> KI (Maybe Kind)
 lookupKindEnv name
    = do KindEnv env <- getEnv
         return $ Map.lookup name env
@@ -232,14 +217,14 @@ envVarsToStars
 
 
 getConstructorKinds :: KindEnv -> Map.Map Name Kind
-getConstructorKinds (KindEnv m) = Map.fromList [ (toName TypeConstructor x,y) | (x,y)<- Map.toList m]
+getConstructorKinds (KindEnv m) = m -- Map.fromList [ (toName TypeConstructor x,y) | (x,y)<- Map.toList m]
 
 --------------------------------------------------------------------------------
 
 -- kind inference proper
 -- this is what gets called from outside of this module
 kiDecls :: KindEnv -> [HsDecl] -> IO KindEnv
-kiDecls inputEnv classAndDataDecls = run >>= return . env . snd  where
+kiDecls inputEnv classAndDataDecls = run >>= return . snd where
    run =   runKI inputEnv $ mapM_ kiKindGroup kindGroups
    kindGroups = map declsToKindGroup depGroups
    depGroups = getDataAndClassBg classAndDataDecls
@@ -263,28 +248,28 @@ kiTyConDecl :: DataDeclHead -> KI ()
 kiTyConDecl (tyconName, args) = do
         argKindVars <- mapM newNameVar args
         let tyConKind = foldr Kfun Star $ map snd argKindVars
-        let newEnv = KindEnv $ Map.fromList $ [(tyconName, tyConKind)] ++ argKindVars
+        let newEnv = KindEnv $ Map.fromList $ [(toName TypeConstructor tyconName, tyConKind)] ++ argKindVars
         extendEnv newEnv
 
 kiClassDecl :: (HsName,[HsName]) -> KI ()
 --kiClassDecl nn | trace ("kiClassDecl: " ++ show nn) False = undefined
 kiClassDecl (className, argNames) = do
         varKind <- newKindVar
-        let newEnv = KindEnv $ Map.fromList $ (className, varKind): [(argName, varKind) | argName <- argNames]
+        let newEnv = KindEnv $ Map.fromList $ (toName ClassName className, varKind): [(toName TypeVal argName, varKind) | argName <- argNames]
         extendEnv newEnv
 
 -- here we expext the classname to be already defined and should be in the
 -- environment, we do not require that the variables will be defined
 kiAsst :: HsAsst -> KI Kind
 kiAsst x@(className, argName) = withContext ("kiAsst: " ++ show x) $ do
-    classKind <- lookupKindEnv className
+    classKind <- lookupKindEnv (toName ClassName className)
     case classKind of
            Nothing -> error $ "kiAsst: could not find kind information for class: " ++ show className
-           Just ck -> do argKind <- lookupKindEnv argName
+           Just ck -> do argKind <- lookupKindEnv (toName TypeVal argName)
                          case argKind of
                             --Nothing -> error  $ "kiAsst: could not find kind information for class/arg: " ++ show className ++ "/" ++ show argName
                             Nothing -> do varKind <- newKindVar
-					  extendEnv $ KindEnv $ Map.singleton argName varKind
+					  extendEnv $ KindEnv $ Map.singleton (toName TypeVal argName) varKind
                                           unify ck varKind
                                           return ck
                             Just ak -> do unify ck ak
@@ -305,7 +290,7 @@ kiQualType varExist qt@(HsQualType cntxt t) = do
 kiType :: Bool -> HsType -> KI Kind
 kiType _ tap@(HsTyCon name) = do
         withContext ("kiType: " ++ show tap) $ do
-        tyConKind <- lookupKindEnv name
+        tyConKind <- lookupKindEnv (toName TypeConstructor name)
         case tyConKind of
            Nothing
               -> do env <- getEnv
@@ -315,14 +300,14 @@ kiType _ tap@(HsTyCon name) = do
 
 kiType varExist tap@(HsTyVar name) = do
         withContext ("kiType: " ++ show tap) $ do
-        varKind <- lookupKindEnv name
+        varKind <- lookupKindEnv (toName TypeVal name)
         case varKind of
            Nothing
               -> case varExist of
                     True
                        -> error $ "kiType: could not find kind for this type variable: " ++ show name
                     False -> do varKind <- newKindVar
-				extendEnv $ KindEnv $ Map.singleton name varKind
+				extendEnv $ KindEnv $ Map.singleton (toName TypeVal name) varKind
                                 return varKind
            Just k -> return k
 
@@ -363,10 +348,10 @@ kiType varExist tap@(HsTyForall { hsTypeVars = vs, hsTypeType = qt }) = do
     extendEnv newEnv
     kiQualType varExist qt
 
-newNameVar :: HsName -> KI (HsName, Kind)
+newNameVar :: HsName -> KI (Name, Kind)
 newNameVar n = do
     newVar <- newKindVar
-    return (n, newVar)
+    return (toName TypeVal n, newVar)
 
 
 --------------------------------------------------------------------------------
@@ -374,7 +359,7 @@ newNameVar n = do
 -- code for getting the kinds of variables in type sigs
 
 kiHsQualType :: KindEnv -> HsQualType -> KindEnv
-kiHsQualType inputEnv qualType = env newState where
+kiHsQualType inputEnv qualType = newState where
     (_, newState) = unsafePerformIO $ runKI inputEnv $ do
         kiQualType False qualType
         envVarsToStars
@@ -495,14 +480,16 @@ typeFromSig (HsTypeSig _sloc _names qualType) = qualType
 
 kindOf :: HsName -> KindEnv -> Kind
 kindOf name (KindEnv env)
-   = case Map.lookup name env of
-        Nothing -> Star
-        Nothing -> error $ "kindOf: could not find kind of : " ++ show name
+   = case Map.lookup (toName TypeConstructor name) env of
+        Nothing -> case Map.lookup (toName TypeVal name) env of
+            Nothing -> Star
+            Just k -> k
+        --Nothing -> error $ "kindOf: could not find kind of : " ++ show name
         Just k -> k
 
 kindOfClass :: HsName -> KindEnv -> [Kind]
 kindOfClass name (KindEnv env)
-   = case Map.lookup name env of
+   = case Map.lookup (toName ClassName name) env of
         --Nothing -> Star
         Nothing -> error $ "kindOf: could not find kind of class : " ++ show name
         Just k -> [k]
