@@ -260,15 +260,15 @@ unQuantify (Forall _ (ps :=> t)) =  map uq' ps :=> uq t where
     uq' (IsIn s t) = IsIn s (uq t)
 
 schemeToType :: Scheme -> Type
-schemeToType (Forall _ (ps :=> t)) = tForAll (snub xs) (ps' :=> t') where
+schemeToType (Forall _ (ps :=> t)) = tForAll ( snds $ snubFst xs) (ps' :=> t') where
     ((ps',t'),xs) = runWriter $ do
         ps' <- mapM uq' ps
         t' <- uq t
         return (ps',t')
     uq (TAp a b) = liftM2 TAp (uq a) (uq b)
     uq (TArrow a b) = liftM2 TArrow (uq a) (uq b)
-    uq (TGen _ tv) = do
-        tell [tv]
+    uq (TGen n tv) = do
+        tell [(n,tv)]
         return $ TVar tv
     uq (TForAll xs (ps :=> t)) = do
         ps' <- mapM uq' ps
