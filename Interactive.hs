@@ -83,6 +83,8 @@ interact ho = mre where
         return act
     ptype x | Just r <- pprintTypeOfCons dataTable x = r
     ptype k | Just r <- Map.lookup k (hoAssumps ho) = show (pprint r:: PP.Doc)
+    ptype x | nameType x == ClassName = hsep (map kindShow $ kindOfClass x (hoKinds ho))
+    ptype x = "UNKNOWN: " ++ show (nameType x,x)
     do_expr :: Interact -> String -> IO Interact
     do_expr act s = case parseStmt s of
         Left m -> putStrLn m >> return act
@@ -91,6 +93,8 @@ interact ho = mre where
         | Just d <- showSynonym (show . (pprint :: HsType -> PP.Doc) ) v (hoTypeSynonyms ho) = nameTag (nameType v):' ':d
         | otherwise = nameTag (nameType v):' ':show v <+> "::" <+> ptype v
 
+kindShow Star = "*"
+kindShow x = parens (pprint x)
 
 parseStmt ::  Monad m => String -> m HsStmt
 parseStmt s = case runParserWithMode ParseMode { parseFilename = "(jhci)" } parseHsStmt  s  of
