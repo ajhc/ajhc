@@ -67,7 +67,10 @@ data TcEnv = TcEnv {
       tcDiagnostics       :: [Diagnostic],   -- list of information that might help diagnosis
       tcVarnum            :: IORef Int,
       tcDConsEnv          :: Map.Map Name Scheme,
-      tcSigs              :: SigEnv
+      tcSigs              :: SigEnv,
+      -- Used by new typechecker only
+      tcCollectedEnv      :: IORef (Map.Map Name Scheme),
+      tcCurrentEnv        :: Map.Map Name Scheme
     }
    {-! derive: update !-}
 

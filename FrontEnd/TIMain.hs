@@ -18,7 +18,7 @@
 
 -------------------------------------------------------------------------------}
 
-module TIMain (tiProgram, makeProgram, getFunDeclsBg) where
+module TIMain (tiProgram, makeProgram) where
 
 import Control.Monad.Error
 import List((\\), intersect, union)
@@ -62,6 +62,13 @@ strace _ s = s
 
 -- a TypeEnv maps identifier names to type schemes
 type TypeEnv = Map.Map Name Scheme
+type Expl = (Scheme, HsDecl)
+type Impl = HsDecl
+-- this is different than the "Typing Haskell in Haskell" paper
+-- we do not further sub-divide the implicitly typed declarations in
+-- a binding group.
+type BindGroup = ([Expl], [Impl])
+type Program = [BindGroup]
 
 instance Types a => Types (Name, a) where
    apply s (x, y) = (x, apply s y)
@@ -508,7 +515,6 @@ tiGuardedRhs env gRhs@(HsGuardedRhs sloc eGuard eRhs)
 
 -- type check explicitly typed bindings
 
-type Expl = (Scheme, HsDecl)
 
 
 tiExpl ::  TypeEnv -> Expl -> TI (Scheme, [Pred], TypeEnv)
@@ -558,7 +564,6 @@ tiExpl env (sc, decl) = withContext
 
 -- type check implicitly typed bindings
 
-type Impl = HsDecl
 
 restricted   :: [Impl] -> Bool
 restricted bs
@@ -612,10 +617,6 @@ getImplsNames impls = map getDeclName impls
 -----------------------------------------------------------------------------
 
 
--- this is different than the "Typing Haskell in Haskell" paper
--- we do not further sub-divide the implicitly typed declarations in
--- a binding group.
-type BindGroup = ([Expl], [Impl])
 
 tiBindGroup env (es, is)
    = do
@@ -680,7 +681,6 @@ collectBindDecls = filter isBindDecl
 
 -----------------------------------------------------------------------------
 
-type Program = [BindGroup]
 
 tiProgram ::  Module -> SigEnv -> KindEnv -> ClassHierarchy -> TypeEnv -> TypeEnv -> Program -> IO TypeEnv
 tiProgram modName sEnv kt h dconsEnv env bgs = runTI dconsEnv h kt sEnv modName $
