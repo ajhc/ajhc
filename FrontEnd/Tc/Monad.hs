@@ -4,6 +4,7 @@ module FrontEnd.Tc.Monad(
     localEnv,
     addToCollectedEnv,
     tcInfoEmpty,
+    runTc,
     TcInfo(..)
     ) where
 
@@ -12,16 +13,17 @@ import Control.Monad.Trans
 import Data.IORef
 import Data.Monoid
 import qualified Data.Map as Map
+import Text.PrettyPrint.HughesPJ(Doc)
 
 
 import Class(ClassHierarchy)
 import Diagnostic
 import Doc.DocLike
 import Doc.PPrint
-import Doc.Pretty
 import FrontEnd.KindInfer
 import GenUtil
 import FrontEnd.SrcLoc(bogusASrcLoc)
+import Type
 import Name.Name
 import Options(Opt)
 import Representation
@@ -66,6 +68,17 @@ addToCollectedEnv te = do
     liftIO $ modifyIORef v (te `Map.union`)
 
 
+runTc :: TcInfo -> Tc a -> IO a
+runTc tcInfo  (Tc tim) = do
+    vn <- newIORef 0
+    ce <- newIORef mempty
+    runReaderT tim TcEnv {
+        tcCollectedEnv = ce,
+        tcCurrentEnv = tcInfoEnv tcInfo,
+        tcVarnum = vn,
+        tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ tcInfoModName tcInfo],
+        tcInfo = tcInfo
+        }
 
 
 {-
@@ -112,11 +125,31 @@ getModName = asks ( tcInfoModName . tcInfo)
 
 dConScheme :: Name -> Tc Sigma
 dConScheme conName = do
-        env <- asks ( tcInfoEnv . tcInfo)
-        case Map.lookup conName env of
-           Nothing -> error $ "dConScheme: constructor not found: " ++ show conName ++
+    env <- asks ( tcInfoEnv . tcInfo)
+    case Map.lookup conName env of
+        Just s -> return s
+        Nothing -> error $ "dConScheme: constructor not found: " ++ show conName ++
                               "\nin this environment:\n" ++ show env
-           Just s -> return s
+
+
+unify      :: Tau -> Tau -> Tc ()
+unify t1 t2 = do
+    t1' <- findType t1
+    t2' <- findType t2
+    b <- mgu t1' t2'
+    case b of
+        Just u -> return () -- extSubst u
+        Nothing -> do
+                  diagnosis <- getErrorContext
+                  typeError (Unification $ "attempted to unify " ++
+                                           pretty t1' ++
+                                           " with " ++
+                                           pretty t2')
+                            diagnosis
+
+unifyList :: [Type] -> Tc ()
+unifyList (t1:t2:ts) = unify t1 t2 >> unifyList (t2:ts)
+unifyList _ = return ()
 
 {-
 
@@ -164,7 +197,7 @@ freshInst (Forall ks qt) = do
 -}
 
 
-                                          
+
 ----------------------------------------
 -- Declaration of instances, boilerplate
 ----------------------------------------

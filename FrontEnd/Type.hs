@@ -159,14 +159,14 @@ mapSubstitution s fm =(Map.map (\v -> apply s v) fm)
 
 -- unification
 
-mgu     :: MonadIO m => Type -> Type -> m (Maybe Subst)
+mgu     :: (MonadIO m,Monad m2) => Type -> Type -> m (m2 Subst)
 varBind :: Monad m => Tyvar -> Type -> m Subst
 
 mgu x y = do
     r <- runErrorT (mgu'' x y)
     case r of
-        Right x -> return (Just x)
-        Left (_::String) -> return Nothing
+        Right x -> return (return x)
+        Left (err::String) -> return (fail err)
 
 
 mgu'' x y = do
@@ -193,6 +193,8 @@ mgu' (TCon tc1) (TCon tc2)
            | tc1==tc2 = return nullSubst
            | otherwise = fail "mgu: Constructors don't match"
 --mgu (TGen n tv) (TGen n' tv') | n == n' = varBind tv' (TVar tv)
+mgu' TForAll {} _ = error "attempt to unify TForall"
+mgu' _ TForAll {} = error "attempt to unify TForall"
 mgu' t1 t2  = fail "mgu: types do not unify"
 
 varBind' u t | t == TVar u      = return nullSubst
@@ -201,7 +203,7 @@ varBind' u t | t == TVar u      = return nullSubst
                 Nothing <- liftIO $ readIORef r
                 liftIO $ writeIORef r (Just t)
                 return (u +-> t)
-            | otherwise        = fail "varBind: kinds do not match"
+            | otherwise        = error "varBind: kinds do not match"
 
 
 varBind u t | t == TVar u      = return nullSubst
