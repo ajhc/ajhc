@@ -5,6 +5,9 @@ module FrontEnd.Tc.Monad(
     addToCollectedEnv,
     tcInfoEmpty,
     runTc,
+    lookupName,
+    freshInst,
+    unify,
     TcInfo(..)
     ) where
 
@@ -16,16 +19,16 @@ import qualified Data.Map as Map
 import Text.PrettyPrint.HughesPJ(Doc)
 
 
+import Atom
 import Class(ClassHierarchy)
 import Diagnostic
-import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.KindInfer
 import GenUtil
 import FrontEnd.SrcLoc(bogusASrcLoc)
-import Type
+import Type(mgu)
 import Name.Name
-import Options(Opt)
+import Options(Opt,options)
 import Representation
 import Warning
 
@@ -178,6 +181,14 @@ unifyList (t1:t2:ts) = do
 -}
 
 
+lookupName :: Name -> Tc Sigma
+lookupName n = do
+    env <- asks (tcInfoEnv . tcInfo)
+    case Map.lookup n env of
+        Just x -> return x
+        Nothing -> fail $ "Could not find var in tcEnv:" ++ show (nameType n,n)
+
+
 newTVar    :: Kind -> Tc Type
 newTVar k   = do
     te <- ask
@@ -186,6 +197,41 @@ newTVar k   = do
     let ident = toName TypeVal (tcInfoModName $ tcInfo te,'v':show n)
         v = tyvar ident k (Just r)
     return $ TVar v
+
+
+class Instantiate a where
+    inst:: Map.Map Atom Type -> a -> a
+
+
+instance Instantiate Type where
+    inst ts (TAp l r)     = TAp (inst ts l) (inst ts r)
+    inst ts (TArrow l r)  = TArrow (inst ts l) (inst ts r)
+    inst ts t@TGen {}     = error $ "inst TGen " ++ show (ts,t)
+    inst  _ t@TCon {}     = t
+    inst ts (TVar tv )
+        | Nothing == tyvarRef tv  = t'  where Just t' = Map.lookup (tyvarAtom tv) ts
+    inst  _ t@TVar {}     = t
+    inst _ TBox {}        = error "instantiating something with a box"
+    inst ts (TForAll as qt) = TForAll as (inst (foldr Map.delete ts (map tyvarAtom as)) qt)
+
+    --inst ts t@(TGen n tv) | Just t <- Map.lookup (tyvarAtom tv) ts = t
+    --                      | otherwise = error $ "inst TGen " ++ show (ts,t)
+
+instance Instantiate a => Instantiate [a] where
+  inst ts = map (inst ts)
+
+instance Instantiate t => Instantiate (Qual t) where
+  inst ts (ps :=> t) = inst ts ps :=> inst ts t
+
+instance Instantiate Pred where
+  inst ts (IsIn c t) = IsIn c (inst ts t)
+
+
+freshInst :: Sigma -> Tc (Qual Type)
+freshInst (TForAll as qt) = do
+        ts <- mapM newTVar (map tyvarKind as)
+        return (inst (Map.fromList $ zip (map tyvarAtom as) ts) qt)
+freshInst x = return ([] :=> x)
 
 
 {-
@@ -237,5 +283,7 @@ tcInfoEmpty = TcInfo {
     tcInfoEnv = mempty,
     tcInfoModName = "(unknown)",
     tcInfoKindInfo = mempty,
-    tcInfoClassHierarchy = mempty
+    tcInfoClassHierarchy = mempty,
+    tcInfoSigEnv = mempty,
+    tcInfoOptions = options
 }
