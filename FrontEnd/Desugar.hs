@@ -37,12 +37,14 @@
 module FrontEnd.Desugar ( doToExp, desugarHsModule) where
 
 import Control.Monad.State
+
 import FrontEnd.Deriving
+import FrontEnd.SrcLoc
+import GenUtil
 import HsSyn
-import Name.VConsts
 import Name.Name
 import Name.Names
-import GenUtil
+import Name.VConsts
 
 removeSynonymsFromType _ t = t
 removeSynsFromSig _ t = t

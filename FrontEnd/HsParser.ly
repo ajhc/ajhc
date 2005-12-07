@@ -21,6 +21,7 @@ ToDo: Differentiate between record updates and labeled construction.
 > import FrontEnd.ParseMonad
 > import FrontEnd.Lexer
 > import FrontEnd.ParseUtils hiding(readInteger,readRational)
+> import FrontEnd.SrcLoc
 >
 >
 >
@@ -260,7 +261,7 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >	| topdecl			{ [$1] }
 
 > topdecl :: { HsDecl }
->	: 'type' simpletype srcloc '=' type	
+>	: 'type' simpletype srcloc '=' type
 >			{ HsTypeDecl $3 (fst $2) (snd $2) $5 }
 >       | 'data' ctype srcloc deriving
 >           {% checkDataHeader $2 `thenP` \(cs,c,t) ->
@@ -273,9 +274,9 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >			   returnP (HsNewTypeDecl $3 cs c t $5 $6) }
 >	| 'class' srcloc ctype optfundep optcbody
 >			{ HsClassDecl $2 $3 $5 }
->	| 'instance' srcloc ctype optvaldefs	
+>	| 'instance' srcloc ctype optvaldefs
 >			{ HsInstDecl $2 $3 $4 }
->	| 'default' srcloc type		
+>	| 'default' srcloc type
 >			{ HsDefaultDecl $2 $3 }
 >	| srcloc 'foreign' 'import' cconv STRING var '::' ctype
 >			{ HsForeignDecl $1 $4 $5 $6 $8}
@@ -437,7 +438,7 @@ Datatype declarations
 >	: vars '::' stype		{ (reverse $1, $3) }
 
 > stype :: { HsBangType }
->	: type				{ HsUnBangedTy $1 }	
+>	: type				{ HsUnBangedTy $1 }
 >	| '!' atype			{ HsBangedTy   $2 }
 
 > deriving :: { [HsName] }
@@ -705,7 +706,7 @@ Variables, Constructors and Operators.
 >	| '`' qvarid '`'	{ $2 }
 
 > conop :: { HsName }
->	: consym		{ $1 }	
+>	: consym		{ $1 }
 >	| '`' conid '`'		{ $2 }
 
 > qconop :: { HsName }

@@ -1,10 +1,11 @@
 module FrontEnd.Deriving(deriveInstances) where
 
-import HsSyn
 import Class
-import Name.VConsts
+import FrontEnd.SrcLoc
+import HsSyn
 import Name.Name
 import Name.Names
+import Name.VConsts
 
 
 

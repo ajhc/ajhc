@@ -25,7 +25,7 @@ module Diagnostic (
 
 import List  (find)
 import Maybe (isJust)
-import HsSyn
+import FrontEnd.SrcLoc
 import Data.Monoid
 
 --------------------------------------------------------------------------------

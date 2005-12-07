@@ -3,21 +3,23 @@
 
 module FrontEnd.Exports(determineExports) where
 
-import CharIO
 import Control.Monad.Identity
 import Data.Monoid
-import Doc.DocLike
-import FindFixpoint
-import FlagDump as FD
-import HsSyn
 import List
 import Maybe
-import MultiModuleBasics
-import Name.Name as Name
-import Options
 import Prelude hiding (putStr,putStrLn)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+
+import CharIO
+import Doc.DocLike
+import FindFixpoint
+import FlagDump as FD
+import FrontEnd.SrcLoc
+import HsSyn
+import MultiModuleBasics
+import Name.Name as Name
+import Options
 import Util.Relation as R
 import Warning
 

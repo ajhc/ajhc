@@ -75,16 +75,17 @@ import qualified Data.Map as Map
 
 import Doc.DocLike(tupled)
 import FrontEnd.Desugar (doToExp)
+import FrontEnd.SrcLoc hiding(srcLoc)
+import FrontEnd.Utils
 import GenUtil hiding(replicateM)
 import HsErrors
-import HsSyn hiding(srcLoc)
+import HsSyn
 import Name.Name as Name hiding(qualifyName)
 import Name.Names
 import qualified Name.VConsts as V
 import Util.ContextMonad
 import Util.Gen
 import Util.Inst()
-import FrontEnd.Utils
 import Warning
 
 
@@ -1183,7 +1184,7 @@ collectDefsHsModule m = execWriter (mapM_ f (hsModuleDecls m)) where
     f cd@(HsClassDecl sl _ ds) = tellF $ (toName Name.ClassName (nameName z),sl,snub $ fsts cs):[ (n,a,[]) | (n,a) <- cs]  where
         z = case maybeGetDeclName cd of
             Just x | nameType x == ClassName -> x
-            --       | otherwise ->  parseName ClassName (show x ++ show (nameType x)) 
+            --       | otherwise ->  parseName ClassName (show x ++ show (nameType x))
         cs = fst (mconcatMap (namesHsDeclTS' toName) ds)
     f _ = return ()
     zup cs = tellS (map g cs) where
@@ -1237,7 +1238,7 @@ namesHsDecl (HsNewTypeDecl sl _ n _ c _) = ( (namesHsConDecl c),[(n,sl)])
 namesHsDecl cd@(HsClassDecl sl _ ds) = (mconcatMap namesHsDeclTS ds) `mappend` ([],[(nameName z,sl)]) where
     z = case maybeGetDeclName cd of
         Just x | nameType x == ClassName -> x
-        --       | otherwise ->  parseName ClassName (show x ++ show (nameType x)) 
+        --       | otherwise ->  parseName ClassName (show x ++ show (nameType x))
 namesHsDecl _ = mempty
 
 namesHsDeclTS (HsTypeSig sl ns _) = ((map (rtup sl) ns),[])

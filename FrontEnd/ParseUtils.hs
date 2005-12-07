@@ -36,6 +36,7 @@ module FrontEnd.ParseUtils (
  ) where
 
 import HsSyn
+import FrontEnd.SrcLoc
 import FrontEnd.ParseMonad
 import Char
 import Ratio

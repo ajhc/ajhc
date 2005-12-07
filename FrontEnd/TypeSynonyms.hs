@@ -14,6 +14,7 @@ import qualified Data.Map as Map
 
 import Binary
 import Doc.DocLike
+import FrontEnd.SrcLoc
 import GenUtil
 import HsErrors
 import HsSyn

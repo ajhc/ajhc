@@ -5,36 +5,12 @@ module HsSyn where
 import Atom
 import Binary
 import Data.Generics
-import Data.Monoid
 import PackedString
-
-bogusASrcLoc = SrcLoc "bogus#" (-1) (-1)
-bogusSrcSpan = srcSpan bogusASrcLoc bogusASrcLoc
-
-
-data SrcLoc = SrcLoc { srcLocFileName :: String, srcLocLine :: !Int, srcLocColumn :: !Int}
-    deriving(Data,Typeable,Eq,Ord)
-    {-! derive: update, GhcBinary !-}
-
-data SrcSpan = SrcSpan { srcSpanBegin :: !SrcLoc, srcSpanEnd :: !SrcLoc }
-    deriving(Data,Typeable,Eq,Ord)
-    {-! derive: update !-}
-
-srcSpan :: SrcLoc -> SrcLoc -> SrcSpan
-srcSpan = SrcSpan
-
-instance Monoid SrcLoc where
-    mempty = bogusASrcLoc
-    mappend a b
-        | a == bogusASrcLoc = b
-        | otherwise = a
+import FrontEnd.SrcLoc
 
 
 
-class HasLocation a where
-    srcLoc :: a -> SrcLoc
-    getSrcSpan :: a -> SrcSpan
-    getSrcSpan x = bogusSrcSpan { srcSpanBegin = srcLoc x }
+
 
 instance HasLocation HsAlt where
     srcLoc (HsAlt sl _ _ _) = sl
@@ -46,15 +22,6 @@ instance HasLocation HsExp where
     srcLoc _ = bogusASrcLoc
 
 
-instance HasLocation a => HasLocation [a] where
-    srcLoc xs = mconcat (map srcLoc xs)
-
-instance Show SrcLoc where
-    show (SrcLoc fn l c) = fn ++ f l ++ f c where
-        f (-1) = ""
-        f n = ':':show n
-instance Show SrcSpan where
-    show (SrcSpan { srcSpanBegin =  sl1, srcSpanEnd = sl2 } ) = show sl1 ++ "-" ++ show sl2
 
 newtype Module = Module String
   deriving(Data,Typeable,Eq,Ord,ToAtom,FromAtom)

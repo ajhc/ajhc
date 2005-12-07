@@ -1,6 +1,5 @@
 module Warning(Warning(..), MonadWarn(..), MonadSrcLoc(..), processErrors, warn, warnF, err, addDiag, addWarn, processIOErrors) where
 
-import HsSyn
 import List
 import GenUtil
 import Options
@@ -8,6 +7,7 @@ import Control.Monad.Writer
 import System.IO.Unsafe
 import Data.IORef
 import Control.Monad.Identity
+import FrontEnd.SrcLoc
 
 {-# NOINLINE ioWarnings #-}
 ioWarnings :: IORef [Warning]

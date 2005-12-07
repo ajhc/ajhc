@@ -64,9 +64,11 @@ import Text.PrettyPrint.HughesPJ as PPrint
 
 import Binary
 import Doc.PPrint
+import FrontEnd.KindInfer
+import FrontEnd.SrcLoc
+import FrontEnd.Utils
 import GenUtil(snub,concatInter)
 import HsSyn
-import FrontEnd.KindInfer
 import MapBinaryInstance()
 import Maybe
 import Monad
@@ -78,7 +80,6 @@ import Type
 import TypeUtils
 import Util.HasSize
 import Util.Inst()
-import FrontEnd.Utils
 
 --------------------------------------------------------------------------------
 

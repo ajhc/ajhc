@@ -19,13 +19,14 @@ import DerivingDrift.Drift
 import Doc.PPrint as PPrint
 import FrontEnd.Desugar
 import FrontEnd.Infix
+import FrontEnd.KindInfer
 import FrontEnd.Rename
+import FrontEnd.SrcLoc
+import FrontEnd.Tc.Monad()
+import FrontEnd.Utils
 import GenUtil
 import Ho
 import HsSyn
-import FrontEnd.KindInfer
-import Util.Inst()
-import Util.Gen
 import MultiModuleBasics
 import Name.Name as Name
 import Options
@@ -36,10 +37,9 @@ import TIMain
 import TypeSigs           (collectSigs, listSigsToSigEnv)
 import TypeSynonyms
 import TypeSyns
-import FrontEnd.Utils
+import Util.Gen
+import Util.Inst()
 import Warning
-
-import FrontEnd.Tc.Monad()
 
 trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env -- (Map.fromList [ n | n@(name,_) <- Map.toList env,  isGlobal name ])
 

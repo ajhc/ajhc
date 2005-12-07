@@ -32,6 +32,7 @@ import Info.Types
 import Name.Name as Name
 import Name.Names
 import Util.NameMonad
+import FrontEnd.SrcLoc
 import Options
 import qualified FlagOpts as FO
 import qualified Util.Seq as Seq

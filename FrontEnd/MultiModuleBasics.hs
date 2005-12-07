@@ -20,6 +20,7 @@
 module MultiModuleBasics where
 
 import HsSyn
+import FrontEnd.SrcLoc
 import qualified Data.Map as M
 import Options
 import Name.Name

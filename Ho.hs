@@ -37,6 +37,7 @@ import E.Subst(substMap'')
 import E.TypeCheck()
 import FilterInput
 import FrontEnd.HsParser
+import FrontEnd.SrcLoc
 import FrontEnd.Infix
 import FrontEnd.ParseMonad
 import FrontEnd.Unlit

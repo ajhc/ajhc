@@ -2,9 +2,11 @@ module TypeSyns( expandTypeSyns ) where
 
 import Control.Monad.State
 import Control.Monad.Writer
-import FrontEnd.Desugar (doToExp)
-import HsSyn hiding(srcLoc)
 import List
+
+import FrontEnd.Desugar (doToExp)
+import FrontEnd.SrcLoc hiding(srcLoc)
+import HsSyn
 import TypeSynonyms
 import Warning
 

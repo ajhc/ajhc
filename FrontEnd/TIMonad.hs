@@ -46,14 +46,15 @@ import Text.PrettyPrint.HughesPJ(render,Doc())
 import Class(ClassHierarchy())
 import Diagnostic
 import Doc.PPrint(PPrint(..))
-import HsSyn
 import FrontEnd.KindInfer(KindEnv())
-import Representation
-import TypeSigs(SigEnv)
-import Type(Instantiate (..), mgu)
+import FrontEnd.SrcLoc
 import FrontEnd.Utils()
-import Warning
+import HsSyn
 import Name.Name
+import Representation
+import Type(Instantiate (..), mgu)
+import TypeSigs(SigEnv)
+import Warning
 
 --------------------------------------------------------------------------------
 

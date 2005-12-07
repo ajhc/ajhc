@@ -35,6 +35,7 @@ import FrontEnd.KindInfer(KindEnv)
 import FrontEnd.Utils(getDeclName)
 import HsPretty
 import HsSyn
+import FrontEnd.SrcLoc
 import Name.Name
 import Name.Names
 import Name.VConsts

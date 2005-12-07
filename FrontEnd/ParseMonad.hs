@@ -25,7 +25,7 @@ module FrontEnd.ParseMonad(
 		pushContextL, popContextL
 	) where
 
-import HsSyn(SrcLoc(..))
+import FrontEnd.SrcLoc
 import Warning
 
 -- | The result of a parse.

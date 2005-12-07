@@ -14,17 +14,18 @@ import Data.Monoid
 import qualified Data.Map as Map
 
 
-import HsSyn(bogusASrcLoc)
-import Warning
+import Class(ClassHierarchy)
+import Diagnostic
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
-import Name.Name
-import Representation
-import Class(ClassHierarchy)
-import Diagnostic
 import FrontEnd.KindInfer
 import GenUtil
+import FrontEnd.SrcLoc(bogusASrcLoc)
+import Name.Name
+import Options(Opt)
+import Representation
+import Warning
 
 type TypeEnv = Map.Map Name Sigma
 
@@ -48,7 +49,8 @@ data TcInfo = TcInfo {
     tcInfoSigEnv :: TypeEnv, -- type signatures used for binding analysis
     tcInfoModName :: String,
     tcInfoKindInfo :: KindEnv,
-    tcInfoClassHierarchy :: ClassHierarchy
+    tcInfoClassHierarchy :: ClassHierarchy,
+    tcInfoOptions :: Opt  -- module specific options
     }
 
 -- | run a computation with a local environment

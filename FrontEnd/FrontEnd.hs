@@ -3,20 +3,22 @@ module FrontEnd.FrontEnd(
     TiData(..)
     ) where
 
+import Monad
+import qualified Data.Map as Map
+import qualified Text.PrettyPrint.HughesPJ as PPrint
+
 import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.Exports
 import FrontEnd.Rename
+import FrontEnd.SrcLoc
 import GenUtil
 import Ho
 import HsSyn
-import Monad
 import MultiModuleBasics
 import Options
-import qualified Data.Map as Map
 import qualified Doc.PPrint as PPrint
 import qualified FlagDump as FD
-import qualified Text.PrettyPrint.HughesPJ as PPrint
 import TIModule
 import Warning
 
