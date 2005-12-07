@@ -39,6 +39,8 @@ import TypeSyns
 import FrontEnd.Utils
 import Warning
 
+import FrontEnd.Tc.Monad()
+
 trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env -- (Map.fromList [ n | n@(name,_) <- Map.toList env,  isGlobal name ])
 
 getDeclNames ::  HsDecl -> [Name]

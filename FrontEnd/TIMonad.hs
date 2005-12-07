@@ -32,10 +32,10 @@ module TIMonad (TI,
                 dConScheme,
                 unifyList,
                 getModName,
-                newTVar) where
+                newTVar
+                ) where
 
 
-import Control.Monad.Fix
 import Control.Monad.Reader
 import Control.Monad.Trans
 import Data.IORef
@@ -67,17 +67,14 @@ data TcEnv = TcEnv {
       tcDiagnostics       :: [Diagnostic],   -- list of information that might help diagnosis
       tcVarnum            :: IORef Int,
       tcDConsEnv          :: Map.Map Name Scheme,
-      tcSigs              :: SigEnv,
-      -- Used by new typechecker only
-      tcCollectedEnv      :: IORef (Map.Map Name Scheme),
-      tcCurrentEnv        :: Map.Map Name Scheme
+      tcSigs              :: SigEnv
     }
    {-! derive: update !-}
 
 
 
 newtype TI a = TI (ReaderT TcEnv IO a)
-    deriving(MonadFix,MonadIO,MonadReader TcEnv,Functor)
+    deriving(MonadIO,MonadReader TcEnv,Functor)
 
 instance Monad TI where
     return a = TI $ return a

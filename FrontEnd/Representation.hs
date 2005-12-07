@@ -31,7 +31,10 @@ module Representation(
     FlattenType(..),
     Assump(..),
     tForAll,
-    tList
+    tList,
+    Sigma,
+    Rho,
+    Tau
     )where
 
 
@@ -59,20 +62,28 @@ import qualified FlagDump as FD
 -- Types
 
 
-data Type  = TVar {-# UNPACK #-} !Tyvar
-           | TCon !Tycon
+data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
+           | TCon { typeCon :: !Tycon }
            | TAp  Type Type
-           | TGen {-# UNPACK #-} !Int {-# UNPACK #-} !Tyvar
+           | TGen { typeSeq :: {-# UNPACK #-} !Int, typeVar :: {-# UNPACK #-} !Tyvar }
            | TArrow Type Type
-           | TForAll [Tyvar] (Qual Type)
+           | TForAll { typeArgs :: [Tyvar], typeBody :: (Qual Rho) }
+           | TBox { typeBox :: IORef Type }     -- ^ used only in typechecker
              deriving(Data,Typeable, Ord, Show)
     {-! derive: GhcBinary !-}
+
+type Sigma = Type
+type Rho = Type
+type Tau = Type
 
 instance TypeNames Type where
     tBool = TCon (Tycon tc_Bool Star)
     tString = TAp tList tChar
     tChar      = TCon (Tycon tc_Char Star)
     tUnit = TCon (Tycon tc_Unit Star)
+
+instance Ord (IORef a)
+instance Binary (IORef a)
 
 tList = TCon (Tycon tc_List (Kfun Star Star))
 
