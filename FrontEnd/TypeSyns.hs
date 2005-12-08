@@ -681,16 +681,12 @@ getHsNamesFromHsPatField :: HsPatField -> [HsName]
 getHsNamesFromHsPatField (HsPFieldPun _hsName)
   = []
   -}
-getHsNamesFromHsPatField (HsPFieldPat _hsName hsPat)
-  = getHsNamesFromHsPat hsPat
+getHsNamesFromHsPatField (HsPFieldPat _hsName hsPat) = getHsNamesFromHsPat hsPat
 
 getHsNamesAndASrcLocsFromHsStmt :: HsStmt -> [(HsName, SrcLoc)]
-getHsNamesAndASrcLocsFromHsStmt (HsGenerator srcLoc hsPat _hsExp)
-  = zip (getHsNamesFromHsPat hsPat) (repeat srcLoc)
-getHsNamesAndASrcLocsFromHsStmt (HsQualifier _hsExp)
-  = []
-getHsNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls)
-  = concat $ map getHsNamesAndASrcLocsFromHsDecl hsDecls
+getHsNamesAndASrcLocsFromHsStmt (HsGenerator srcLoc hsPat _hsExp) = zip (getHsNamesFromHsPat hsPat) (repeat srcLoc)
+getHsNamesAndASrcLocsFromHsStmt (HsQualifier _hsExp) = []
+getHsNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls) = concat $ map getHsNamesAndASrcLocsFromHsDecl hsDecls
 
 
 -- the getNew... functions are used only inside class declarations to avoid _re_ renaming things
@@ -698,22 +694,16 @@ getHsNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls)
 
 
 getHsNamesFromHsQualType :: HsQualType -> [HsName]
-getHsNamesFromHsQualType (HsQualType _hsContext hsType)
-  = getHsNamesFromHsType hsType
-getHsNamesFromHsQualType (HsUnQualType hsType)
-  = getHsNamesFromHsType hsType
+getHsNamesFromHsQualType (HsQualType _hsContext hsType) = getHsNamesFromHsType hsType
+getHsNamesFromHsQualType (HsUnQualType hsType) = getHsNamesFromHsType hsType
 
 getHsNamesFromHsType :: HsType -> [HsName]
-getHsNamesFromHsType (HsTyFun hsType1 hsType2)
-  = (getHsNamesFromHsType hsType1) ++ (getHsNamesFromHsType hsType2)
-getHsNamesFromHsType (HsTyTuple hsTypes)
-  = concat $ map getHsNamesFromHsType hsTypes
-getHsNamesFromHsType (HsTyApp hsType1 hsType2)
-  = (getHsNamesFromHsType hsType1) ++ (getHsNamesFromHsType hsType2)
-getHsNamesFromHsType (HsTyVar hsName)
-  = [hsName]
-getHsNamesFromHsType (HsTyCon _hsName)
-  = [] -- don't rename the Constructors
+getHsNamesFromHsType (HsTyFun hsType1 hsType2) = (getHsNamesFromHsType hsType1) ++ (getHsNamesFromHsType hsType2)
+getHsNamesFromHsType (HsTyTuple hsTypes) = concat $ map getHsNamesFromHsType hsTypes
+getHsNamesFromHsType (HsTyApp hsType1 hsType2) = (getHsNamesFromHsType hsType1) ++ (getHsNamesFromHsType hsType2)
+getHsNamesFromHsType (HsTyVar hsName) = [hsName]
+getHsNamesFromHsType (HsTyForall vs qt) = getHsNamesFromHsQualType qt List.\\ map hsTyVarBindName vs
+getHsNamesFromHsType (HsTyCon _hsName) = [] -- don't rename the Constructors
 
 
 -- gets the names of the functions declared in a class declaration
