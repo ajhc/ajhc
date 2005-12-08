@@ -140,7 +140,7 @@ getModName = asks ( tcInfoModName . tcInfo)
 
 dConScheme :: Name -> Tc Sigma
 dConScheme conName = do
-    env <- asks ( tcInfoEnv . tcInfo)
+    env <- asks tcCurrentEnv
     case Map.lookup conName env of
         Just s -> return s
         Nothing -> error $ "dConScheme: constructor not found: " ++ show conName ++
@@ -204,7 +204,7 @@ unifyList (t1:t2:ts) = do
 
 lookupName :: Name -> Tc Sigma
 lookupName n = do
-    env <- asks (tcInfoEnv . tcInfo)
+    env <- asks tcCurrentEnv
     case Map.lookup n env of
         Just x -> return x
         Nothing -> fail $ "Could not find var in tcEnv:" ++ show (nameType n,n)

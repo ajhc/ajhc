@@ -72,8 +72,8 @@ subsumes t@(TArrow _ _) (TBox _ box) = do
 -- BMONO & MONO
 subsumes a b | isTau a = case b of
     (TBox _ b) -> fillBox b a
+    _ | isTau b -> unify a b -- TODO verify? fail $ "taus don't match in MONO" ++ show (a,b)
 --    _ | a == b -> return ()
-      | isTau b -> unify a b -- TODO verify? fail $ "taus don't match in MONO" ++ show (a,b)
 
 -- -- MONO
 -- subsumes (TCon a) (TCon b) | a == b = return ()
@@ -101,14 +101,14 @@ boxyMatch (TArrow s1 s2) (TArrow s3 s4) = do
     boxyMatch s1 s3
     boxyMatch s2 s4
 
--- SEQ1 
---boxyMatch 
+-- SEQ1
+--boxyMatch
 
 -- MEQ1 MEQ2
 boxyMatch a b | isTau a = case b of
     (TBox _ b) -> fillBox b a
+    _ | isTau b -> unify a b -- TODO, verify? fail $ "taus don't match in MEQ[12]" ++ show (a,b)
 --    _ | a == b -> return ()
-      | isTau b -> unify a b -- TODO, verify? fail $ "taus don't match in MEQ[12]" ++ show (a,b)
 
 -- SYM (careful!)
 boxyMatch a b = boxyMatch b a

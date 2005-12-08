@@ -80,6 +80,9 @@ tiExpr (HsAsPat n e) typ = do
     addToCollectedEnv (Map.singleton (toName Val n) typ)
     return (HsAsPat n e)
 
+--tiExpr (HsExpTypeSig sloc e qt) typ =  withContext (locMsg sloc "in the annotated expression" $ render $ ppHsExp expr) $ do
+
+
 
 tiExpr expr@(HsApp e1 e2) typ = withContext (makeMsg "in the application" $ render $ ppHsExp expr) $ do
     (e1,e2) <- tcApp e1 e2 typ
