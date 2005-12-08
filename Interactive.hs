@@ -8,6 +8,7 @@ import Monad
 import qualified Data.Map as Map
 import Text.Regex
 import Text.Regex.Posix(regcomp,regExtended)
+import qualified Text.PrettyPrint.HughesPJ as P
 
 
 import DataConstructors
@@ -18,20 +19,22 @@ import FrontEnd.HsParser(parseHsStmt)
 import FrontEnd.KindInfer
 import FrontEnd.ParseMonad
 import FrontEnd.Rename
-import qualified FrontEnd.Infix
-import qualified HsPretty
-import TypeSyns
+import FrontEnd.SrcLoc
 import GenUtil
 import Ho
 import HsPretty()
 import HsSyn
-import Warning
 import Name.Name
 import Options
+import qualified FrontEnd.Infix
+import qualified HsPretty
 import qualified Text.PrettyPrint.HughesPJ as PP
 import Representation
+import TIMain
 import TypeSynonyms(showSynonym)
+import TypeSyns
 import Util.Interact
+import Warning
 
 printDoc doc = do
     displayIO stdout (renderPretty 0.9 80 doc)
@@ -135,11 +138,27 @@ executeStatement is@IS { stateHo = ho } stmt = do
     b <- printIOErrors
     if b then return () else do
     printStatement stmt'''
+    tcStatement is stmt'''
 
---executeStatement _ HsLetStmt {} = putStrLn "let statements not yet supported"
---executeStatement _ HsGenerator {} = putStrLn "generators not yet supported"
---executeStatement _ (HsQualifier e) = putStrLn (show e)
-
+tcStatement _ HsLetStmt {} = putStrLn "let statements not yet supported"
+tcStatement _ HsGenerator {} = putStrLn "generators not yet supported"
+tcStatement is@IS { stateHo = ho } (HsQualifier e) = do
+    let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps ho, nameType x == Val ]
+        importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps ho, nameType x ==  DataConstructor ]
+        ansName = Qual (stateModule is) (HsIdent "ans")
+        ansName' = toName Val ansName
+    localVarEnv <- tiProgram
+                (stateModule is)               -- name of the module
+                mempty                         -- environment of type signatures
+                (hoKinds ho)                   -- kind information about classes and type constructors
+                (hoClassHierarchy ho)        -- class hierarchy with instances
+                importDConsEnv                 -- data constructor type environment
+                importVarEnv                   -- type environment
+                [([],[HsPatBind bogusASrcLoc (HsPVar ansName) (HsUnGuardedRhs e) []])]                        -- binding groups
+    b <- printIOErrors
+    if b then return () else do
+    vv <- Map.lookup ansName' localVarEnv
+    putStrLn $ show (text "::" <+> pprint vv :: P.Doc)
 
 calcImports :: Monad m => Ho -> Bool -> Module -> m [(Name,[Name])]
 calcImports ho qual mod = case Map.lookup mod (hoExports ho) of
