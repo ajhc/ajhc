@@ -554,7 +554,8 @@ forallHoist t = t
 hsAsstToPred :: KindEnv -> HsAsst -> Pred
 hsAsstToPred kt (className, varName)
    -- = IsIn className (TVar $ Tyvar varName (kindOf varName kt))
-   = IsIn (toName ClassName className) (TVar $ tyvar (toName TypeVal varName) (head $ kindOfClass (toName ClassName className) kt) Nothing)
+   | isConstructorLike (hsIdentString . hsNameIdent $ varName) = IsIn  (toName ClassName className) (TCon (Tycon (toName TypeConstructor varName) (head $ kindOfClass (toName ClassName className) kt)))
+   | otherwise = IsIn (toName ClassName className) (TVar $ tyvar (toName TypeVal varName) (head $ kindOfClass (toName ClassName className) kt) Nothing)
 
 hsQualTypeToScheme :: Monad m => KindEnv -> HsQualType -> m Scheme
 hsQualTypeToScheme kt qualType =  return $ aHsQualTypeToScheme newEnv qualType where

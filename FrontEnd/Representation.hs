@@ -68,7 +68,7 @@ data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
            | TGen { typeSeq :: {-# UNPACK #-} !Int, typeVar :: {-# UNPACK #-} !Tyvar }
            | TArrow Type Type
            | TForAll { typeArgs :: [Tyvar], typeBody :: (Qual Rho) }
-           | TBox { typeBox :: IORef Type }     -- ^ used only in typechecker
+           | TBox { typeKind :: Kind, typeBox :: IORef Type }     -- ^ used only in typechecker
              deriving(Data,Typeable, Ord, Show)
     {-! derive: GhcBinary !-}
 
@@ -246,6 +246,8 @@ prettyPrintTypeM t
            TForAll vs t  -> do
             r <- prettyPrintQualTypeM t
             return $ text "(forall" <+> hsep (map pprint vs) <> text " . " <> r <> text ")"
+           TBox Star _ -> text "_"
+           TBox k _ -> return $ parens $ text "_ :: " <> pprint k
     where
     -- puts parentheses around the doc for a type if needed
     maybeParensAp :: Type -> VarName Doc

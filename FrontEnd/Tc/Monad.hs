@@ -169,10 +169,10 @@ unifyList _ = return ()
 
 -- | returns a new box and a function to read said box.
 
-newBox :: Tc (Tc Type,Type)
-newBox = do
+newBox :: Kind -> Tc (Tc Type,Type)
+newBox k = do
     r <- liftIO $ newIORef (error "empty box")
-    return (liftIO $ readIORef r, TBox r)
+    return (liftIO $ readIORef r, TBox k r)
 
 
 {-
@@ -279,7 +279,7 @@ instance Monad Tc where
     fail s = Tc $ do
         st <- ask
         liftIO $ processIOErrors
-        liftIO $ typeError (Failure s) (tcDiagnostics st)
+        liftIO $ fail s -- typeError (Failure s) (tcDiagnostics st)
 
 instance MonadWarn Tc where
     addWarning w = liftIO $ processErrors [w]

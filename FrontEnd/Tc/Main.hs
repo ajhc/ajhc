@@ -46,6 +46,13 @@ instance Types TypeEnv where
 addPreds :: [Pred] -> Tc ()
 addPreds = tell
 
+tcApp e1 e2 typ = do
+    (br,bt) <- newBox Star
+    e1 <- tiExpr e1 (bt `fn` typ)
+    t <- br
+    e2 <- tiExpr e2 t  -- TODO Poly
+    return (e1,e2)
+
 tiExpr ::  HsExp -> Type ->  Tc HsExp
 
 -- TODO should subsume for rank-n
@@ -53,19 +60,19 @@ tiExpr (HsVar v) typ = do
     sc <- lookupName (toName Val v)
     (ps :=> t) <- freshInst sc
     addPreds ps
-    unify t typ
+    t `subsumes` typ
     return (HsVar v)
 
 tiExpr (HsCon conName) typ = do
     sc <- lookupName (toName DataConstructor conName)
     ((ps :=> t)) <- freshInst sc
-    unify t typ
     addPreds ps
+    t `subsumes` typ
     return (HsCon conName)
 
 tiExpr (HsLit l) typ = do
     t <- tiLit l
-    unify t typ
+    t `subsumes` typ
     return (HsLit l)
 
 tiExpr (HsAsPat n e) typ = do
@@ -73,14 +80,14 @@ tiExpr (HsAsPat n e) typ = do
     addToCollectedEnv (Map.singleton (toName Val n) typ)
     return (HsAsPat n e)
 
+
 tiExpr expr@(HsApp e1 e2) typ = withContext (makeMsg "in the application" $ render $ ppHsExp expr) $ do
-    (br,bt) <- newBox
-    e1 <- tiExpr e1 (bt `TArrow` typ)
-    t <- br
-    e2 <- tiExpr e2 t
+    (e1,e2) <- tcApp e1 e2 typ
     return (HsApp e1 e2)
 
-
+tiExpr expr@(HsInfixApp e1 e2 e3) typ = withContext (makeMsg "in the infix application" $ render $ ppHsExp expr) $ do
+    (HsApp e2 e1,e3) <- tcApp (HsApp e2 e1) e3 typ   -- TODO, preserve
+    return (HsInfixApp e1 e2 e3)
 
 -- we need to fix the type to to be in the class
 -- cNum, just for cases such as:
@@ -91,27 +98,53 @@ tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression"
         addPreds [IsIn class_Num typ]
         return (HsNegApp e)
 
-{-
-tiExpr expr@(HsLambda sloc pats e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show pats ++ " -> ...") $ do
-        ts <- mapM (const newBox) pats
-        (ps, envP) <- tiPats pats ts
-        (br,bt) <- newBox
-        qs <- localEnv envP $ do
-            tiExpr e bt
-        t <- br
-        unify (foldr fn t ts) typ
-        return (ps ++ qs)
-        --(ps, envP, ts) <- tiPats pats
-        --(qs, envE, t)  <- tiExpr (envP `Map.union` env) e
 
-        --return (ps++qs, envP `Map.union` envE, foldr fn t ts)  -- Boba
--}
+-- ABS1
+tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show ps ++ " -> ...") $ do
+    let lam (p:ps) e (TBox _ box) rs = do -- ABS2
+            (_,b1) <- newBox Star
+            (_,b2) <- newBox Star
+            lam (p:ps) e (b1 `fn` b2) rs
+        lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
+            (br,box) <- newBox Star
+            s1' `boxyMatch` box
+            s1 <- br
+            (p',env) <- tiPat p s1
+            localEnv env $ do
+                lam ps e s2' (p':rs)  -- TODO poly
+        lam [] e typ rs = do
+            e' <- tiExpr e typ
+            return (HsLambda sloc (reverse rs) e')
+        lam _ _ _ _ = fail "lambda type mismatch"
+    lam ps e typ []
+
+
 tiExpr (HsIf e e1 e2) typ = withContext (simpleMsg $ "in the if expression\n   if " ++ show e ++ "...") $ do
     e <- tiExpr e tBool
     e1 <- tiExpr e1 typ
     e2 <- tiExpr e2 typ
     return (HsIf e e1 e2)
 
+-- tuples can't be empty, () is not a tuple
+--tiExpr env tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ render $ ppHsExp tuple) $ do
+--    psasts <- mapM tiExpr exps
+--    let typeList = map trd3 psasts
+--    let preds = concatMap fst3 psasts
+--    let env1 = Map.unions $ map snd3 psasts
+--    return (preds, env1, tTTuple typeList)
+
+-- special case for the empty list
+tiExpr (HsList []) typ = do
+        v <- newTVar Star
+        (TAp tList v) `subsumes` typ
+        return (HsList [])
+
+-- non empty list
+tiExpr expr@(HsList exps@(_:_)) typ = withContext (makeMsg "in the list " $ render $ ppHsExp expr) $ do
+        v <- newTVar Star
+        exps' <- mapM (`tiExpr` v) exps
+        (TAp tList v) `subsumes` typ
+        return (HsList exps')
 
 tiExpr (HsParen e) typ = tiExpr e typ
 
@@ -120,23 +153,28 @@ tiExpr (HsDo stmts) typ = do
         withContext (simpleMsg "in a do expression")
                     (tiExpr newExp typ)
 
-tiExpr e typ = error $ "tiExpr: not implemented for: " ++ show (e,typ)
+--tiExpr env expr@(HsLet decls e) = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
+--         sigEnv <- getSigEnv
+--         let bgs = getFunDeclsBg sigEnv decls
+--         (ps, env1) <- tiSeq tiBindGroup env bgs
+--         (qs, env2, t) <- tiExpr (env1 `Map.union` env) e
+--         -- keep the let bound type assumptions in the environment
+
+tiExpr e typ = fail $ "tiExpr: not implemented for: " ++ show (e,typ)
 
 -- Typing Patterns
 
 --tiPat :: HsPat -> TI ([Pred], Map.Map Name Scheme, Type)
-tiPat :: HsPat -> Type -> Tc (HsPat, Map.Map Name Scheme)
+tiPat :: HsPat -> Type -> Tc (HsPat, Map.Map Name Sigma)
 
 tiPat (HsPVar i) typ = do
         v <- newTVar Star
-        unify v typ
-        --let newAssump = assumpToPair $ makeAssump i (toScheme v)
-        --let newAssump = (i,toScheme v)
-        return (HsPVar i, Map.singleton (toName Val i) (toScheme v))
+        v `subsumes` typ
+        return (HsPVar i, Map.singleton (toName Val i) v)
 
 tiPat (HsPLit l) typ = do
     t <- tiLit l
-    unify t typ
+    t `subsumes` typ
     return (HsPLit l,Map.empty)
 
 -- this is for negative literals only

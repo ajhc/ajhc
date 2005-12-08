@@ -212,7 +212,7 @@ tcStatementTc (HsQualifier e) = do
 
         }
     runTc tcInfo $ do
-    (rbox,box) <- newBox
+    (rbox,box) <- newBox Star
     (_,ps') <- listen $ tiExpr e box
     vv <- rbox
     let ps = Class.simplify (hoClassHierarchy ho) ps'
