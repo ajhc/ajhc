@@ -23,7 +23,7 @@ import FrontEnd.KindInfer
 import FrontEnd.Rename
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Monad()
-import FrontEnd.Tc.Main()
+--import FrontEnd.Tc.Main()
 import FrontEnd.Utils
 import GenUtil
 import Ho

@@ -8,10 +8,15 @@ module FrontEnd.Tc.Monad(
     lookupName,
     freshInst,
     unify,
+    newTVar,
+    newBox,
+    withContext,
+    inst,
     TcInfo(..)
     ) where
 
 import Control.Monad.Reader
+import Control.Monad.Writer
 import Control.Monad.Trans
 import Data.IORef
 import Data.Monoid
@@ -45,8 +50,8 @@ data TcEnv = TcEnv {
     }
    {-! derive: update !-}
 
-newtype Tc a = Tc (ReaderT TcEnv IO a)
-    deriving(MonadFix,MonadIO,MonadReader TcEnv,Functor)
+newtype Tc a = Tc (ReaderT TcEnv (WriterT [Pred] IO) a)
+    deriving(MonadFix,MonadIO,MonadReader TcEnv,MonadWriter [Pred],Functor)
 
 -- | information that is passed into the type checker.
 data TcInfo = TcInfo {
@@ -75,13 +80,14 @@ runTc :: TcInfo -> Tc a -> IO a
 runTc tcInfo  (Tc tim) = do
     vn <- newIORef 0
     ce <- newIORef mempty
-    runReaderT tim TcEnv {
+    (a,out) <- runWriterT $ runReaderT tim TcEnv {
         tcCollectedEnv = ce,
         tcCurrentEnv = tcInfoEnv tcInfo,
         tcVarnum = vn,
         tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ tcInfoModName tcInfo],
         tcInfo = tcInfo
         }
+    return a
 
 
 {-
@@ -153,6 +159,15 @@ unify t1 t2 = do
 unifyList :: [Type] -> Tc ()
 unifyList (t1:t2:ts) = unify t1 t2 >> unifyList (t2:ts)
 unifyList _ = return ()
+
+
+-- | returns a new box and a function to read said box.
+
+newBox :: Tc (Tc Type,Type)
+newBox = do
+    r <- liftIO $ newIORef (error "empty box")
+    return (liftIO $ readIORef r, TBox r)
+
 
 {-
 

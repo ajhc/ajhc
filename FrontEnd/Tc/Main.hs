@@ -22,6 +22,7 @@ import Representation
 import Type
 
 import FrontEnd.Tc.Monad
+import FrontEnd.Tc.Type
 
 
 fst3 :: (a,b,c) -> a
@@ -51,13 +52,203 @@ instance Types TypeEnv where
 
 tiExpr ::  HsExp -> Type ->  Tc [Pred]
 
+-- TODO should subsume for rank-n
 tiExpr (HsVar v) typ = do
     sc <- lookupName (toName Val v)
     (ps :=> t) <- freshInst sc
     unify t typ
     return ps
 
+tiExpr (HsCon conName) typ = do
+      sc <- lookupName (toName DataConstructor conName)
+      ((ps :=> t)) <- freshInst sc
+      unify t typ
+      return ps
+
+tiExpr (HsLit l) typ = do
+    (ps,t) <- tiLit l
+    unify t typ
+    return ps
+
+tiExpr (HsAsPat n e) typ = do
+    --(br,bt) <- newBox
+    ps <- tiExpr e typ
+    --t <- br
+    addToCollectedEnv (Map.singleton (toName Val n) typ)
+    return ps
+
+tiExpr expr@(HsApp e1 e2) typ = withContext (makeMsg "in the application" $ render $ ppHsExp expr) $ do
+    (br,bt) <- newBox
+    ps <- tiExpr e1 (bt `TArrow` typ)
+    t <- br
+    qs <- tiExpr e2 t
+    return (ps ++ qs)
+
+
+
+-- we need to fix the type to to be in the class
+-- cNum, just for cases such as:
+-- foo = \x -> -x
+
+tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression" $ render $ ppHsExp expr) $ do
+        ps <- tiExpr e typ
+        return (IsIn class_Num typ : ps)
+
+tiExpr expr@(HsLambda sloc pats e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show pats ++ " -> ...") $ do
+        ts <- mapM (const newBox) pats
+        (ps, envP) <- tiPats pats ts
+        (br,bt) <- newBox
+        qs <- localEnv envP $ do
+            tiExpr e bt
+        t <- br
+        unify (foldr fn t ts) typ
+        return (ps ++ qs)
+        --(ps, envP, ts) <- tiPats pats
+        --(qs, envE, t)  <- tiExpr (envP `Map.union` env) e
+
+        --return (ps++qs, envP `Map.union` envE, foldr fn t ts)  -- Boba
+
+tiExpr (HsIf e e1 e2) typ = withContext (simpleMsg $ "in the if expression\n   if " ++ show e ++ "...") $ do
+    ps <- tiExpr e tBool
+    qs <- tiExpr e1 typ
+    rs <- tiExpr e2 typ
+    return (ps ++ qs ++ rs)
+
+
+tiExpr (HsParen e) typ = tiExpr e typ
+
+
+
+tiExpr (HsDo stmts) typ = do
+        let newExp = doToExp stmts
+        withContext (simpleMsg "in a do expression")
+                    (tiExpr newExp typ)
+
+tiExpr e typ = error $ "tiExpr: not implemented for: " ++ (show e,show typ)
+
+-- Typing Patterns
+
+--tiPat :: HsPat -> TI ([Pred], Map.Map Name Scheme, Type)
+tiPat :: HsPat -> Type -> Tc ([Pred], Map.Map Name Scheme)
+
+tiPat (HsPVar i) typ = do
+        v <- newTVar Star
+        unify v typ
+        --let newAssump = assumpToPair $ makeAssump i (toScheme v)
+        --let newAssump = (i,toScheme v)
+        return ([], Map.singleton (toName Val i) (toScheme v))
+
+tiPat (HsPLit l) typ = do
+    (ps, t) <- tiLit l
+    unify t typ
+    return (ps, Map.empty)
+
+-- this is for negative literals only
+-- so the pat must be a literal
+-- it is safe not to make any predicates about
+-- the pat, since the type checking of the literal
+-- will do this for us
+tiPat (HsPNeg pat) = tiPat pat
+
+
+tiPat (HsPApp conName pats) = do
+    (ps,env,ts) <- tiPats pats
+    t'         <- newTVar Star
+    sc <- dConScheme (toName DataConstructor conName)
+    (qs :=> t) <- freshInst sc
+    unify t (foldr fn t' ts)
+    return (ps++qs, env, t')
+
+
+tiPat (HsPList []) typ = do
+        v <- newTVar Star
+        unify (TAp tList v) typ
+        return ([], Map.empty)
+
+tiPat (HsPList pats@(_:_)) = do
+        (ps, env, ts@(hts:_)) <- tiPats pats
+        unifyList ts
+        return (ps, env, TAp tList hts)
+
+tiPat HsPWildCard
+ = do v <- newTVar Star
+      return ([], Map.empty, v)
+
+tiPat (HsPAsPat i pat)
+ = do (ps, env, t) <- tiPat pat
+      --let newAssump = makeAssump i $ toScheme t
+      --let newEnv = addToEnv (assumpToPair newAssump) env
+      let newEnv = Map.insert  (toName Val i) (toScheme t) env
+      return (ps, newEnv, t)
+
+tiPat (HsPIrrPat p) = tiPat p
+
+tiPat (HsPParen p) = tiPat p
+
+tiPats :: [HsPat] -> TI ([Pred], Map.Map Name Scheme, [Type])
+tiPats pats =
+  do psEnvts <- mapM tiPat pats
+     let ps = [ p | (ps,_,_) <- psEnvts, p<-ps ]
+         env = Map.unions $ map snd3 psEnvts
+         ts = [ t | (_,_,t) <- psEnvts ]
+     return (ps, env, ts)
+
+     {-
+tiPat (HsPInfixApp pLeft conName pRight) = do
+        (psLeft, envLeft, tLeft)    <- tiPat pLeft
+        (psRight, envRight, tRight) <- tiPat pRight
+        t'                         <- newTVar Star
+        sc <- dConScheme (toName DataConstructor conName)
+        (qs :=> t) <-  freshInst sc
+        unify t (tLeft `fn` (tRight `fn` t'))
+        return (psLeft ++ psRight, envLeft `Map.union` envRight, t')
+
+tiPat tuple@(HsPTuple pats) = do
+        (ps, env, ts) <- tiPats pats
+        return (ps, env, tTTuple ts)
+
+  -}
+
 {-
+
+tiExpr env expr@(HsLet decls e) = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
+         sigEnv <- getSigEnv
+         let bgs = getFunDeclsBg sigEnv decls
+         (ps, env1) <- tiSeq tiBindGroup env bgs
+         (qs, env2, t) <- tiExpr (env1 `Map.union` env) e
+         -- keep the let bound type assumptions in the environment
+
+ tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n   case " ++ show e ++ " of ...") $ do
+        (pse, env1, te)    <- tiExpr env e
+        psastsAlts     <- mapM (tiAlt env) alts
+        let pstsPats = map fst3 psastsAlts
+        let psPats   = concatMap fst pstsPats
+        let tsPats   = map snd pstsPats
+        let pstsEs   = map trd3 psastsAlts
+        let psEs     = concatMap fst pstsEs
+        let tsEs@(htsEs:_)  = map snd pstsEs
+        let envAlts  = Map.unions $ map snd3 psastsAlts
+        unifyList (te:tsPats)
+        unifyList tsEs
+        -- the list of rhs alternatives must be non-empty
+        -- so it is safe to call head here
+        return (pse ++ psPats ++ psEs, env1 `Map.union` envAlts, htsEs)           return (ps ++ qs, env1 `Map.union` env2, t)
+
+{-
+tiExpr expr@(HsInfixApp e1 e2 e3) = withContext (makeMsg "in the infix application" $ render $ ppHsExp expr) $ do
+       (ps, env1, te1) <- tiExpr env e1
+       (qs, env2, te2) <- tiExpr env e2
+       (rs, env3, te3) <- tiExpr env e3
+       tout      <- newTVar Star
+       unify (te1 `fn` (te3 `fn` tout)) te2
+       return (ps ++ qs ++ rs, env1 `Map.union` env2 `Map.union` env3, tout)
+       -}
+
+ -}
+
+
+{-
+
 tiExpr env (HsVar v) | Just sc <- Map.lookup (toName Val v) env = do
           (ty@(ps :=> t)) <- freshInst sc
           --addInstance ((v,n),ty)
@@ -635,21 +826,6 @@ tiProgram modName sEnv kt h dconsEnv env bgs = runTI dconsEnv h kt sEnv modName 
 
 --------------------------------------------------------------------------------
 
--- Typing Literals
-
-tiLit            :: HsLiteral -> TI ([Pred],Type)
-tiLit (HsChar _) = return ([], tChar)
-tiLit (HsInt _)
-   = do
-        v <- newTVar Star
-        return ([IsIn class_Num v], v)
-
-tiLit (HsFrac _)
-   = do
-        v <- newTVar Star
-        return ([IsIn class_Fractional v], v)
-
-tiLit (HsString _)  = return ([], tString)
 
 --------------------------------------------------------------------------------
 
@@ -737,6 +913,22 @@ tiPats pats =
      return (ps, env, ts)
 
   -}
+
+-- Typing Literals
+
+tiLit            :: HsLiteral -> Tc ([Pred],Type)
+tiLit (HsChar _) = return ([], tChar)
+tiLit (HsInt _) = do
+        v <- newTVar Star
+        return ([IsIn class_Num v], v)
+
+tiLit (HsFrac _) = do
+        v <- newTVar Star
+        return ([IsIn class_Fractional v], v)
+
+tiLit (HsString _)  = return ([], tString)
+
+
 
 tiProgram = undefined
 
