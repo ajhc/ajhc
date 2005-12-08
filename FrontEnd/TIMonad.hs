@@ -83,7 +83,7 @@ instance Monad TI where
     TI a >> TI b = TI $ a >> b
     fail s = TI $ do
         st <- ask
-        liftIO $ processIOErrors
+        liftIO $ printIOErrors
         liftIO $ typeError (Failure s) (tcDiagnostics st)
 
 instance MonadWarn TI where

@@ -1,7 +1,7 @@
 module Interactive(Interactive.interact) where
 
 import Data.Monoid
-import IO(stdout)
+import IO(stdout,ioeGetErrorString)
 import List(sort)
 import Maybe
 import Monad
@@ -110,7 +110,9 @@ interact ho = mre where
     do_expr :: Interact -> String -> IO Interact
     do_expr act s = case parseStmt s of
         Left m -> putStrLn m >> return act
-        Right e -> executeStatement isInitial { stateHo = ho, stateInteract = act } e >> return act
+        Right e -> do
+            catch (executeStatement isInitial { stateHo = ho, stateInteract = act } e)$ (\e -> putStrLn $ ioeGetErrorString e)
+            return act
     pshow _opt v
         | Just d <- showSynonym (show . (pprint :: HsType -> PP.Doc) ) v (hoTypeSynonyms ho) = nameTag (nameType v):' ':d
         | otherwise = nameTag (nameType v):' ':show v <+> "::" <+> ptype v

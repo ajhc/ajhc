@@ -36,9 +36,9 @@ data TypeError
         | Failure String
 
 
-typeError :: TypeError -> [Diagnostic] -> a
+typeError :: Monad m => TypeError -> [Diagnostic] -> m a
 typeError err ds
-   = error $ "\n" ++
+   = fail $ "\n" ++
              "What:    " ++ whatStr ++ "\n" ++
              "Why:     " ++ whyStr ++ "\n" ++
              "Where:   " ++ dumpDiagnostic 3 ds
