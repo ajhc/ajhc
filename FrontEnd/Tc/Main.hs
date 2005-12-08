@@ -1,4 +1,4 @@
-module FrontEnd.Tc.Main (tiProgram, makeProgram ) where
+module FrontEnd.Tc.Main (tiExpr, makeProgram ) where
 
 import Control.Monad.Error
 import List((\\), intersect, union)
@@ -94,6 +94,7 @@ tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression"
         ps <- tiExpr e typ
         return (IsIn class_Num typ : ps)
 
+{-
 tiExpr expr@(HsLambda sloc pats e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show pats ++ " -> ...") $ do
         ts <- mapM (const newBox) pats
         (ps, envP) <- tiPats pats ts
@@ -107,7 +108,7 @@ tiExpr expr@(HsLambda sloc pats e) typ = withContext (locSimple sloc $ "in the l
         --(qs, envE, t)  <- tiExpr (envP `Map.union` env) e
 
         --return (ps++qs, envP `Map.union` envE, foldr fn t ts)  -- Boba
-
+-}
 tiExpr (HsIf e e1 e2) typ = withContext (simpleMsg $ "in the if expression\n   if " ++ show e ++ "...") $ do
     ps <- tiExpr e tBool
     qs <- tiExpr e1 typ
@@ -124,7 +125,7 @@ tiExpr (HsDo stmts) typ = do
         withContext (simpleMsg "in a do expression")
                     (tiExpr newExp typ)
 
-tiExpr e typ = error $ "tiExpr: not implemented for: " ++ (show e,show typ)
+tiExpr e typ = error $ "tiExpr: not implemented for: " ++ show (e,typ)
 
 -- Typing Patterns
 
@@ -148,8 +149,9 @@ tiPat (HsPLit l) typ = do
 -- it is safe not to make any predicates about
 -- the pat, since the type checking of the literal
 -- will do this for us
-tiPat (HsPNeg pat) = tiPat pat
+tiPat (HsPNeg pat) typ = tiPat pat typ
 
+{-
 
 tiPat (HsPApp conName pats) = do
     (ps,env,ts) <- tiPats pats
@@ -209,6 +211,7 @@ tiPat tuple@(HsPTuple pats) = do
 
   -}
 
+-}
 {-
 
 tiExpr env expr@(HsLet decls e) = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
@@ -930,7 +933,7 @@ tiLit (HsString _)  = return ([], tString)
 
 
 
-tiProgram = undefined
+--tiProgram = undefined
 
 ------------------------------------------
 -- Binding analysis and program generation

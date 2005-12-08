@@ -12,6 +12,7 @@ module FrontEnd.Tc.Monad(
     newBox,
     withContext,
     inst,
+    unifyList,
     TcInfo(..)
     ) where
 
@@ -33,9 +34,9 @@ import GenUtil
 import FrontEnd.SrcLoc(bogusASrcLoc)
 import Type(mgu)
 import Name.Name
-import Options(Opt,options)
 import Representation
 import Warning
+import Options
 
 type TypeEnv = Map.Map Name Sigma
 
@@ -46,7 +47,8 @@ data TcEnv = TcEnv {
     tcVarnum            :: IORef Int,
     -- Used by new typechecker only
     tcCollectedEnv      :: IORef (Map.Map Name Sigma),
-    tcCurrentEnv        :: Map.Map Name Sigma
+    tcCurrentEnv        :: Map.Map Name Sigma,
+    tcOptions           :: Opt  -- module specific options
     }
    {-! derive: update !-}
 
@@ -59,8 +61,7 @@ data TcInfo = TcInfo {
     tcInfoSigEnv :: TypeEnv, -- type signatures used for binding analysis
     tcInfoModName :: String,
     tcInfoKindInfo :: KindEnv,
-    tcInfoClassHierarchy :: ClassHierarchy,
-    tcInfoOptions :: Opt  -- module specific options
+    tcInfoClassHierarchy :: ClassHierarchy
     }
 
 -- | run a computation with a local environment
@@ -76,8 +77,10 @@ addToCollectedEnv te = do
     liftIO $ modifyIORef v (te `Map.union`)
 
 
-runTc :: TcInfo -> Tc a -> IO a
+runTc :: (MonadIO m,OptionMonad m) => TcInfo -> Tc a -> m a
 runTc tcInfo  (Tc tim) = do
+    opt <- getOptions
+    liftIO $ do
     vn <- newIORef 0
     ce <- newIORef mempty
     (a,out) <- runWriterT $ runReaderT tim TcEnv {
@@ -85,10 +88,13 @@ runTc tcInfo  (Tc tim) = do
         tcCurrentEnv = tcInfoEnv tcInfo,
         tcVarnum = vn,
         tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ tcInfoModName tcInfo],
-        tcInfo = tcInfo
+        tcInfo = tcInfo,
+        tcOptions = opt
         }
     return a
 
+instance OptionMonad Tc where
+    getOptions = asks tcOptions
 
 {-
 runTI :: Map.Map Name Scheme-> ClassHierarchy -> KindEnv -> SigEnv -> Module -> TI a -> IO a
@@ -299,6 +305,7 @@ tcInfoEmpty = TcInfo {
     tcInfoModName = "(unknown)",
     tcInfoKindInfo = mempty,
     tcInfoClassHierarchy = mempty,
-    tcInfoSigEnv = mempty,
-    tcInfoOptions = options
+    tcInfoSigEnv = mempty
 }
+
+

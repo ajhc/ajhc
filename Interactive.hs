@@ -1,16 +1,16 @@
 module Interactive(Interactive.interact) where
 
+import Control.Monad.Reader
+import Control.Monad.Trans
 import Data.Monoid
 import IO(stdout,ioeGetErrorString)
 import List(sort)
-import Control.Monad.Reader
-import Control.Monad.Trans
 import Maybe
 import Monad
 import qualified Data.Map as Map
+import qualified Text.PrettyPrint.HughesPJ as P
 import Text.Regex
 import Text.Regex.Posix(regcomp,regExtended)
-import qualified Text.PrettyPrint.HughesPJ as P
 
 
 import DataConstructors
@@ -22,6 +22,8 @@ import FrontEnd.KindInfer
 import FrontEnd.ParseMonad
 import FrontEnd.Rename
 import FrontEnd.SrcLoc
+import FrontEnd.Tc.Main
+import FrontEnd.Tc.Monad
 import GenUtil
 import Ho
 import HsPretty()
@@ -32,7 +34,8 @@ import qualified FrontEnd.Infix
 import qualified HsPretty
 import qualified Text.PrettyPrint.HughesPJ as PP
 import Representation
-import TIMain
+import TIMain(tiProgram)
+import Type(schemeToType,quantify,tv)
 import TypeSynonyms(showSynonym)
 import TypeSyns
 import Util.Interact
@@ -165,13 +168,14 @@ executeStatement stmt = do
     stmt'' <- expandTypeSynsStmt (hoTypeSynonyms ho) (stateModule is) stmt'
     stmt''' <- FrontEnd.Infix.infixStatement (hoFixities ho) stmt''
     procErrors $ do
-    printStatement stmt'''
+    --printStatement stmt'''
     tcStatement stmt'''
 
 tcStatement :: HsStmt -> In ()
 tcStatement HsLetStmt {} = liftIO $ putStrLn "let statements not yet supported"
 tcStatement HsGenerator {} = liftIO $ putStrLn "generators not yet supported"
 tcStatement (HsQualifier e) = do
+    tcStatementTc (HsQualifier e)
     is@IS { stateHo = ho } <- ask
     let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps ho, nameType x == Val ]
         importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps ho, nameType x ==  DataConstructor ]
@@ -190,6 +194,29 @@ tcStatement (HsQualifier e) = do
     procErrors $ do
     vv <- Map.lookup ansName' localVarEnv
     liftIO $ putStrLn $ show (text "::" <+> pprint vv :: P.Doc)
+
+
+tcStatementTc :: HsStmt -> In ()
+tcStatementTc HsLetStmt {} = liftIO $ putStrLn "let statements not yet supported"
+tcStatementTc HsGenerator {} = liftIO $ putStrLn "generators not yet supported"
+tcStatementTc (HsQualifier e) = do
+    is@IS { stateHo = ho } <- ask
+    let tcInfo = tcInfoEmpty {
+        tcInfoEnv = Map.map schemeToType (hoAssumps ho),
+        tcInfoSigEnv = mempty,
+        tcInfoModName =  show (stateModule is),
+        tcInfoKindInfo = (hoKinds ho),
+        tcInfoClassHierarchy = (hoClassHierarchy ho)
+
+        }
+    runTc tcInfo $ do
+    (rbox,box) <- newBox
+    ps <- tiExpr e box
+    vv <- rbox
+    qt <- flattenType (ps :=> vv)
+    let vv' = quantify (tv vv) qt
+    liftIO $ putStrLn $ show (text "::" <+> pprint vv' :: P.Doc)
+
 
 calcImports :: Monad m => Ho -> Bool -> Module -> m [(Name,[Name])]
 calcImports ho qual mod = case Map.lookup mod (hoExports ho) of
