@@ -51,6 +51,7 @@ module Class(
     topDefaults,
     derivableClasses,
     stdClasses,
+    simplify,
     numClasses
     ) where
 

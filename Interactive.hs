@@ -1,6 +1,7 @@
 module Interactive(Interactive.interact) where
 
 import Control.Monad.Reader
+import Control.Monad.Writer
 import Control.Monad.Trans
 import Data.Monoid
 import IO(stdout,ioeGetErrorString)
@@ -25,6 +26,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Main
 import FrontEnd.Tc.Monad
 import GenUtil
+import Class
 import Ho
 import HsPretty()
 import HsSyn
@@ -211,8 +213,9 @@ tcStatementTc (HsQualifier e) = do
         }
     runTc tcInfo $ do
     (rbox,box) <- newBox
-    ps <- tiExpr e box
+    (_,ps') <- listen $ tiExpr e box
     vv <- rbox
+    let ps = Class.simplify (hoClassHierarchy ho) ps'
     qt <- flattenType (ps :=> vv)
     let vv' = quantify (tv vv) qt
     liftIO $ putStrLn $ show (text "::" <+> pprint vv' :: P.Doc)
@@ -227,10 +230,3 @@ calcImports ho qual mod = case Map.lookup mod (hoExports ho) of
             ls' = concat [ zip (concat nns) (repeat [n]) | (n,nns) <- ls ]
         return $ Map.toList $ Map.map snub $ Map.fromListWith (++) ls'
 
-{-
-    let thisFixityMap = buildFixityMap (concat [ filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
-    let fixityMap = thisFixityMap `mappend` hoFixities me
-    let thisTypeSynonyms =  (declsToTypeSynonyms $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
-    let ts = thisTypeSynonyms  `mappend` hoTypeSynonyms me
-    let f x = expandTypeSyns ts (modInfoHsModule x) >>= FrontEnd.Infix.infixHsModule fixityMap >>= \z -> return (modInfoHsModule_s ( z) x)
--}

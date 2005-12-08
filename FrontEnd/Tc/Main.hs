@@ -1,6 +1,7 @@
 module FrontEnd.Tc.Main (tiExpr, makeProgram ) where
 
 import Control.Monad.Error
+import Control.Monad.Writer
 import List((\\), intersect, union)
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
@@ -25,13 +26,6 @@ import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 
 
-fst3 :: (a,b,c) -> a
-fst3 (a,_,_) = a
-snd3 :: (a,b,c) -> b
-snd3 (_,b,_) = b
-trd3 :: (a,b,c) -> c
-trd3 (_,_,c) = c
-
 
 type Expl = (Sigma, HsDecl)
 type Impl = HsDecl
@@ -49,40 +43,42 @@ instance Types TypeEnv where
    apply s = Map.map (\e -> apply s e)
    tv env = tv $ Map.elems env
 
+addPreds :: [Pred] -> Tc ()
+addPreds = tell
 
-tiExpr ::  HsExp -> Type ->  Tc [Pred]
+tiExpr ::  HsExp -> Type ->  Tc HsExp
 
 -- TODO should subsume for rank-n
 tiExpr (HsVar v) typ = do
     sc <- lookupName (toName Val v)
     (ps :=> t) <- freshInst sc
+    addPreds ps
     unify t typ
-    return ps
+    return (HsVar v)
 
 tiExpr (HsCon conName) typ = do
-      sc <- lookupName (toName DataConstructor conName)
-      ((ps :=> t)) <- freshInst sc
-      unify t typ
-      return ps
+    sc <- lookupName (toName DataConstructor conName)
+    ((ps :=> t)) <- freshInst sc
+    unify t typ
+    addPreds ps
+    return (HsCon conName)
 
 tiExpr (HsLit l) typ = do
-    (ps,t) <- tiLit l
+    t <- tiLit l
     unify t typ
-    return ps
+    return (HsLit l)
 
 tiExpr (HsAsPat n e) typ = do
-    --(br,bt) <- newBox
-    ps <- tiExpr e typ
-    --t <- br
+    e <- tiExpr e typ
     addToCollectedEnv (Map.singleton (toName Val n) typ)
-    return ps
+    return (HsAsPat n e)
 
 tiExpr expr@(HsApp e1 e2) typ = withContext (makeMsg "in the application" $ render $ ppHsExp expr) $ do
     (br,bt) <- newBox
-    ps <- tiExpr e1 (bt `TArrow` typ)
+    e1 <- tiExpr e1 (bt `TArrow` typ)
     t <- br
-    qs <- tiExpr e2 t
-    return (ps ++ qs)
+    e2 <- tiExpr e2 t
+    return (HsApp e1 e2)
 
 
 
@@ -91,8 +87,9 @@ tiExpr expr@(HsApp e1 e2) typ = withContext (makeMsg "in the application" $ rend
 -- foo = \x -> -x
 
 tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression" $ render $ ppHsExp expr) $ do
-        ps <- tiExpr e typ
-        return (IsIn class_Num typ : ps)
+        e <- tiExpr e typ
+        addPreds [IsIn class_Num typ]
+        return (HsNegApp e)
 
 {-
 tiExpr expr@(HsLambda sloc pats e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show pats ++ " -> ...") $ do
@@ -110,15 +107,13 @@ tiExpr expr@(HsLambda sloc pats e) typ = withContext (locSimple sloc $ "in the l
         --return (ps++qs, envP `Map.union` envE, foldr fn t ts)  -- Boba
 -}
 tiExpr (HsIf e e1 e2) typ = withContext (simpleMsg $ "in the if expression\n   if " ++ show e ++ "...") $ do
-    ps <- tiExpr e tBool
-    qs <- tiExpr e1 typ
-    rs <- tiExpr e2 typ
-    return (ps ++ qs ++ rs)
+    e <- tiExpr e tBool
+    e1 <- tiExpr e1 typ
+    e2 <- tiExpr e2 typ
+    return (HsIf e e1 e2)
 
 
 tiExpr (HsParen e) typ = tiExpr e typ
-
-
 
 tiExpr (HsDo stmts) typ = do
         let newExp = doToExp stmts
@@ -130,19 +125,19 @@ tiExpr e typ = error $ "tiExpr: not implemented for: " ++ show (e,typ)
 -- Typing Patterns
 
 --tiPat :: HsPat -> TI ([Pred], Map.Map Name Scheme, Type)
-tiPat :: HsPat -> Type -> Tc ([Pred], Map.Map Name Scheme)
+tiPat :: HsPat -> Type -> Tc (HsPat, Map.Map Name Scheme)
 
 tiPat (HsPVar i) typ = do
         v <- newTVar Star
         unify v typ
         --let newAssump = assumpToPair $ makeAssump i (toScheme v)
         --let newAssump = (i,toScheme v)
-        return ([], Map.singleton (toName Val i) (toScheme v))
+        return (HsPVar i, Map.singleton (toName Val i) (toScheme v))
 
 tiPat (HsPLit l) typ = do
-    (ps, t) <- tiLit l
+    t <- tiLit l
     unify t typ
-    return (ps, Map.empty)
+    return (HsPLit l,Map.empty)
 
 -- this is for negative literals only
 -- so the pat must be a literal
@@ -919,17 +914,19 @@ tiPats pats =
 
 -- Typing Literals
 
-tiLit            :: HsLiteral -> Tc ([Pred],Type)
-tiLit (HsChar _) = return ([], tChar)
+tiLit :: HsLiteral -> Tc Tau
+tiLit (HsChar _) = return tChar
 tiLit (HsInt _) = do
         v <- newTVar Star
-        return ([IsIn class_Num v], v)
+        addPreds [IsIn class_Num v]
+        return v
 
 tiLit (HsFrac _) = do
         v <- newTVar Star
-        return ([IsIn class_Fractional v], v)
+        addPreds [IsIn class_Fractional v]
+        return v
 
-tiLit (HsString _)  = return ([], tString)
+tiLit (HsString _)  = return tString
 
 
 
