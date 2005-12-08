@@ -530,7 +530,8 @@ Expressions
 >	: '\\' aexps srcloc '->' exp	{% checkPatterns (reverse $2) `thenP` \ps ->
 >					   returnP (HsLambda $3 ps $5) }
 >  	| 'let' decllist 'in' exp	{ HsLet $2 $4 }
->	| 'if' exp 'then' exp 'else' exp { HsIf $2 $4 $6 }
+-- >	| 'if' exp 'then' exp 'else' exp { HsIf $2 $4 $6 }
+>	| 'if' exp 'then' exp optsemi 'else' exp { HsIf $2 $4 $7 }
 >   	| 'case' exp 'of' altslist	{ HsCase $2 $4 }
 >	| '-' fexp			{ HsNegApp $2 }
 >  	| 'do' stmtlist			{ HsDo $2 }
