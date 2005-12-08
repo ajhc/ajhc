@@ -3,6 +3,8 @@ module Interactive(Interactive.interact) where
 import Data.Monoid
 import IO(stdout,ioeGetErrorString)
 import List(sort)
+import Control.Monad.Reader
+import Control.Monad.Trans
 import Maybe
 import Monad
 import qualified Data.Map as Map
@@ -57,14 +59,33 @@ nameTag _ = '?'
 data InteractiveState = IS {
     stateHo :: Ho,
     stateInteract :: Interact,
-    stateModule :: Module
+    stateModule :: Module,
+    stateOptions :: Opt
     }
 
 isInitial = IS {
     stateHo = mempty,
     stateInteract = emptyInteract,
-    stateModule = Module "Main"
+    stateModule = Module "Main",
+    stateOptions = options
     }
+
+
+
+
+newtype In a = MkIn (ReaderT InteractiveState IO a)
+    deriving(MonadIO,Monad,Functor,MonadReader InteractiveState)
+
+runIn :: InteractiveState -> In a -> IO a
+runIn is (MkIn x) = runReaderT x is
+
+instance OptionMonad In where
+    getOptions = asks stateOptions
+
+instance MonadWarn In where
+    addWarning x = liftIO $ addWarning x
+
+
 
 interact :: Ho -> IO ()
 interact ho = mre where
@@ -111,7 +132,7 @@ interact ho = mre where
     do_expr act s = case parseStmt s of
         Left m -> putStrLn m >> return act
         Right e -> do
-            catch (executeStatement isInitial { stateHo = ho, stateInteract = act } e)$ (\e -> putStrLn $ ioeGetErrorString e)
+            catch (runIn isInitial { stateHo = ho, stateInteract = act } $ executeStatement e) $ (\e -> putStrLn $ ioeGetErrorString e)
             return act
     pshow _opt v
         | Just d <- showSynonym (show . (pprint :: HsType -> PP.Doc) ) v (hoTypeSynonyms ho) = nameTag (nameType v):' ':d
@@ -126,41 +147,49 @@ parseStmt s = case runParserWithMode ParseMode { parseFilename = "(jhci)" } pars
                       ParseFailed sl err -> fail $ show sl ++ ": " ++ err
 
 printStatement stmt = do
-        putStrLn $ HsPretty.render $ HsPretty.ppHsStmt $  stmt
+        liftIO $ putStrLn $ HsPretty.render $ HsPretty.ppHsStmt $  stmt
 
-executeStatement :: InteractiveState -> HsStmt -> IO ()
-executeStatement is@IS { stateHo = ho } stmt = do
+procErrors :: In a -> In ()
+procErrors act = do
+    b <- liftIO $ printIOErrors
+    if b then return () else act >> return ()
+
+
+executeStatement :: HsStmt -> In ()
+executeStatement stmt = do
+    is@IS { stateHo = ho } <- ask
     defs <- calcImports ho False (Module "Prelude")
     stmt' <- renameStatement mempty defs (stateModule is) stmt
-    b <- printIOErrors
-    if b then return () else do
+    procErrors $ do
     --printStatement stmt'
     stmt'' <- expandTypeSynsStmt (hoTypeSynonyms ho) (stateModule is) stmt'
     stmt''' <- FrontEnd.Infix.infixStatement (hoFixities ho) stmt''
-    b <- printIOErrors
-    if b then return () else do
+    procErrors $ do
     printStatement stmt'''
-    tcStatement is stmt'''
+    tcStatement stmt'''
 
-tcStatement _ HsLetStmt {} = putStrLn "let statements not yet supported"
-tcStatement _ HsGenerator {} = putStrLn "generators not yet supported"
-tcStatement is@IS { stateHo = ho } (HsQualifier e) = do
+tcStatement :: HsStmt -> In ()
+tcStatement HsLetStmt {} = liftIO $ putStrLn "let statements not yet supported"
+tcStatement HsGenerator {} = liftIO $ putStrLn "generators not yet supported"
+tcStatement (HsQualifier e) = do
+    is@IS { stateHo = ho } <- ask
     let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps ho, nameType x == Val ]
         importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps ho, nameType x ==  DataConstructor ]
         ansName = Qual (stateModule is) (HsIdent "ans")
         ansName' = toName Val ansName
-    localVarEnv <- tiProgram
+    opt <- getOptions
+    localVarEnv <- liftIO $ tiProgram
+                opt                            -- options
                 (stateModule is)               -- name of the module
                 mempty                         -- environment of type signatures
                 (hoKinds ho)                   -- kind information about classes and type constructors
-                (hoClassHierarchy ho)        -- class hierarchy with instances
+                (hoClassHierarchy ho)          -- class hierarchy with instances
                 importDConsEnv                 -- data constructor type environment
                 importVarEnv                   -- type environment
                 [([],[HsPatBind bogusASrcLoc (HsPVar ansName) (HsUnGuardedRhs e) []])]                        -- binding groups
-    b <- printIOErrors
-    if b then return () else do
+    procErrors $ do
     vv <- Map.lookup ansName' localVarEnv
-    putStrLn $ show (text "::" <+> pprint vv :: P.Doc)
+    liftIO $ putStrLn $ show (text "::" <+> pprint vv :: P.Doc)
 
 calcImports :: Monad m => Ho -> Bool -> Module -> m [(Name,[Name])]
 calcImports ho qual mod = case Map.lookup mod (hoExports ho) of

@@ -244,6 +244,7 @@ tiModules' me ms = do
     let moduleName = modInfoName tms
         (tms:_) = ms
     localVarEnv <- tiProgram
+                (modInfoOptions tms)           -- choose options from one of recursive group
                 moduleName                     -- name of the module
                 sigEnv                         -- environment of type signatures
                 kindInfo                       -- kind information about classes and type constructors

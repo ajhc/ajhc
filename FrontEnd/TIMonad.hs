@@ -101,8 +101,8 @@ instance MonadSrcLoc TI where
 instance OptionMonad TI where
     getOptions = asks tcOptions
 
-runTI :: Map.Map Name Scheme-> ClassHierarchy -> KindEnv -> SigEnv -> Module -> TI a -> IO a
-runTI env' ch' kt' st' mod' (TI tim) = do
+runTI :: Opt -> Map.Map Name Scheme-> ClassHierarchy -> KindEnv -> SigEnv -> Module -> TI a -> IO a
+runTI opt  env' ch' kt' st' mod' (TI tim) = do
     vn <- newIORef 0
     runReaderT tim tcenv {  tcVarnum = vn } where
     tcenv = TcEnv {
@@ -112,7 +112,7 @@ runTI env' ch' kt' st' mod' (TI tim) = do
         tcSigs = st',
         tcVarnum = undefined,
         tcDConsEnv = env',
-        tcOptions = options,
+        tcOptions = opt,
         tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ fromModule mod']
         }
 

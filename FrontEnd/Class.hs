@@ -726,15 +726,16 @@ topDefaults     :: OptionMonad m => ClassHierarchy -> [Pred] -> m Subst
 topDefaults h ps  =  flagOpt FO.Defaulting >>= \b -> case b of
 --    False -> return mempty
     _
-      | any null tss -> fail $ "topDefaults: ambiguity " ++ (render $ pprint ps)
+      | any null tss -> fail $ " ambiguity " ++ (render $ pprint ps)
       | otherwise    -> return $ listToFM (zip vs (map head tss))
         where ams = ambig h [] ps
               tss = [ ts | (v,qs,ts) <- ams ]
               vs  = [ v  | (v,qs,ts) <- ams ]
 
 defaults    :: [Type]
-defaults     = map (\name -> TCon (Tycon name Star))
-                   [tc_Integer, tc_Double]
+defaults
+    | not $ fopts FO.Defaulting = []
+    | otherwise = map (\name -> TCon (Tycon name Star)) [tc_Integer, tc_Double]
 
 
 

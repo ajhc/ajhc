@@ -684,19 +684,21 @@ collectBindDecls = filter isBindDecl
 -----------------------------------------------------------------------------
 
 
-tiProgram ::  Module -> SigEnv -> KindEnv -> ClassHierarchy -> TypeEnv -> TypeEnv -> Program -> IO TypeEnv
-tiProgram modName sEnv kt h dconsEnv env bgs = runTI dconsEnv h kt sEnv modName $
+tiProgram ::  Opt -> Module -> SigEnv -> KindEnv -> ClassHierarchy -> TypeEnv -> TypeEnv -> Program -> IO TypeEnv
+tiProgram opt modName sEnv kt h dconsEnv env bgs = runTI opt dconsEnv h kt sEnv modName $
   do (ps, env1) <- tiSeq tiBindGroup env bgs
      s         <- getSubst
      ps <- flattenType ps
      ([], rs) <- split h [] (apply s ps)
      opt <- getOptions
      case withOptionsT opt $ topDefaults h rs of
-       Right s' -> do
-        env1' <- flattenType env1
-        return $  apply  s'  env1'
-       --Nothing -> return $  apply  s env1
-       Left s -> fail $ show modName ++ s
+        Right s' -> do
+            env1' <- flattenType env1
+            return $  apply  s'  env1'
+        Left s -> fail $ show modName ++ s
+        --Left _ -> do
+        --    env1' <- flattenType env1
+        --    return  env1'
 
 
 --------------------------------------------------------------------------------
