@@ -1,4 +1,4 @@
-module Warning(Warning(..), MonadWarn(..), MonadSrcLoc(..), processErrors, warn, warnF, err, addDiag, addWarn, processIOErrors) where
+module Warning(Warning(..), MonadWarn(..), MonadSrcLoc(..), processErrors, warn, warnF, err, addDiag, addWarn, processIOErrors, printIOErrors) where
 
 import List
 import GenUtil
@@ -49,11 +49,23 @@ pad n s = case length s of
 processIOErrors :: IO ()
 processIOErrors = do
     ws <- readIORef ioWarnings
-    processErrors ws
+    processErrors' True ws
     writeIORef ioWarnings []
 
+-- | just show IO errors and return whether it would have died
+printIOErrors :: IO Bool
+printIOErrors = do
+    ws <- readIORef ioWarnings
+    b <- processErrors' False ws
+    writeIORef ioWarnings []
+    return b
+
 processErrors :: [Warning] -> IO ()
-processErrors ws = mapM_ s ws' >> when die exitFailure where
+processErrors ws = processErrors' True ws >> return ()
+
+
+processErrors' :: Bool -> [Warning] -> IO Bool
+processErrors' doDie ws = mapM_ s ws' >> when (die && doDie) exitFailure >> return die where
     ws' = filter ((`notElem` ignore) . warnType ) $ snub ws
     s Warning { warnSrcLoc = sl, warnType = t, warnMessage = m } | sl == bogusASrcLoc = putErrLn $ msg t m
     s Warning { warnSrcLoc = SrcLoc { srcLocFileName = fn, srcLocLine = -1 }, warnType = t ,warnMessage = m } =

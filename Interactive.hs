@@ -1,8 +1,10 @@
 module Interactive(Interactive.interact) where
 
+import Data.Monoid
 import IO(stdout)
 import List(sort)
 import Maybe
+import Monad
 import qualified Data.Map as Map
 import Text.Regex
 import Text.Regex.Posix(regcomp,regExtended)
@@ -15,10 +17,12 @@ import Doc.Pretty
 import FrontEnd.HsParser(parseHsStmt)
 import FrontEnd.KindInfer
 import FrontEnd.ParseMonad
+import FrontEnd.Rename
 import GenUtil
 import Ho
 import HsPretty()
 import HsSyn
+import Warning
 import Name.Name
 import Options
 import qualified Text.PrettyPrint.HughesPJ as PP
@@ -43,6 +47,11 @@ nameTag DataConstructor = 'C'
 nameTag ClassName = 'L'
 nameTag Val = 'f'
 nameTag _ = '?'
+
+data InteractiveState = IS {
+    stateHo :: Ho,
+    stateInteract :: Interact
+    }
 
 interact :: Ho -> IO ()
 interact ho = mre where
@@ -88,7 +97,7 @@ interact ho = mre where
     do_expr :: Interact -> String -> IO Interact
     do_expr act s = case parseStmt s of
         Left m -> putStrLn m >> return act
-        Right e -> putStrLn (show e) >> return act
+        Right e -> executeStatement IS { stateHo = ho, stateInteract = act } e >> return act
     pshow _opt v
         | Just d <- showSynonym (show . (pprint :: HsType -> PP.Doc) ) v (hoTypeSynonyms ho) = nameTag (nameType v):' ':d
         | otherwise = nameTag (nameType v):' ':show v <+> "::" <+> ptype v
@@ -101,4 +110,24 @@ parseStmt s = case runParserWithMode ParseMode { parseFilename = "(jhci)" } pars
                       ParseOk _ e -> return e
                       ParseFailed sl err -> fail $ show sl ++ ": " ++ err
 
+
+executeStatement :: InteractiveState -> HsStmt -> IO ()
+executeStatement IS { stateHo = ho } stmt = do
+    defs <- calcImports ho False (Module "Prelude")
+    stmt' <- renameStatement mempty defs (Module "Main") stmt
+    b <- printIOErrors
+    when (not b) $ putStrLn (show stmt')
+executeStatement _ HsLetStmt {} = putStrLn "let statements not yet supported"
+executeStatement _ HsGenerator {} = putStrLn "generators not yet supported"
+executeStatement _ (HsQualifier e) = putStrLn (show e)
+
+
+calcImports :: Monad m => Ho -> Bool -> Module -> m [(Name,[Name])]
+calcImports ho qual mod = case Map.lookup mod (hoExports ho) of
+    Nothing -> fail $ "calcImports: module not known " ++ show mod
+    Just es -> do
+        let ls = sortGroupUnderFG fst snd
+                [ (n,if qual then [setModule mod n] else [setModule mod n,toUnqualified n]) | n <- es]
+            ls' = concat [ zip (concat nns) (repeat [n]) | (n,nns) <- ls ]
+        return $ Map.toList $ Map.map snub $ Map.fromListWith (++) ls'
 

@@ -61,7 +61,7 @@
 
 -------------------------------------------------------------------------------}
 
-module FrontEnd.Rename(unRename, collectDefsHsModule, renameModule, FieldMap ) where
+module FrontEnd.Rename(unRename, collectDefsHsModule, renameModule, FieldMap, renameStatement ) where
 
 import Char
 import Control.Monad.State
@@ -213,6 +213,30 @@ renameModule fls ns m = mapM_ addWarning (errors finalState) >> return renamedMo
         }
 
     (renamedMod, finalState) = runScopeSM startState (renameDecls m initialGlobalSubTable)
+
+renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] -> Module -> HsStmt -> m HsStmt
+renameStatement fls ns modName stmt = mapM_ addWarning (errors finalState) >> return renamedStmt where
+    initialGlobalSubTable = listToFM [ (x,y) | ((typ,x),[y]) <- ns', typ == Val || typ == DataConstructor ]
+    initialTypeSubTable = listToFM [ (x,y) | ((typ,x),[y]) <- ns', typ == TypeConstructor || typ == ClassName ]
+    ns' = map fn ns
+    fn (n,ns) = (fromName n, map nameName ns)
+
+    errorTab =  listToFM [ (x,ambig x ys) | ((typ,x),ys@(_:_:_)) <- ns' ]
+
+    startState = ScopeState {
+        typeSubTable   = initialTypeSubTable,
+        errorTable     = errorTab,
+        nameMap        = Map.empty,
+        errors         = [],
+        srcLoc         = mempty,
+        unique         = 1,   -- start the counting at 1
+        globalSubTable = initialGlobalSubTable,
+        fieldLabels    = fls,
+        currentModule  = modName
+        }
+
+    (renamedStmt, finalState) = runScopeSM startState (renameHsStmt stmt initialGlobalSubTable)
+
 
 {-
 -- takes a list of qualified HsNames that the current module needs to know
