@@ -55,6 +55,7 @@ import Representation
 import Type(Instantiate (..), mgu)
 import TypeSigs(SigEnv)
 import Warning
+import Options
 
 --------------------------------------------------------------------------------
 
@@ -68,7 +69,8 @@ data TcEnv = TcEnv {
       tcDiagnostics       :: [Diagnostic],   -- list of information that might help diagnosis
       tcVarnum            :: IORef Int,
       tcDConsEnv          :: Map.Map Name Scheme,
-      tcSigs              :: SigEnv
+      tcSigs              :: SigEnv,
+      tcOptions           :: Opt
     }
    {-! derive: update !-}
 
@@ -96,6 +98,8 @@ instance MonadSrcLoc TI where
             (Msg (Just sl) _:_) -> return sl
             _ -> return bogusASrcLoc
 
+instance OptionMonad TI where
+    getOptions = asks tcOptions
 
 runTI :: Map.Map Name Scheme-> ClassHierarchy -> KindEnv -> SigEnv -> Module -> TI a -> IO a
 runTI env' ch' kt' st' mod' (TI tim) = do
@@ -108,6 +112,7 @@ runTI env' ch' kt' st' mod' (TI tim) = do
         tcSigs = st',
         tcVarnum = undefined,
         tcDConsEnv = env',
+        tcOptions = options,
         tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ fromModule mod']
         }
 

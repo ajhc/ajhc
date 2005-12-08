@@ -1,6 +1,29 @@
 {-# OPTIONS -w -funbox-strict-fields #-}
-module Options(processOptions, Opt(..), options, putVerbose, putVerboseLn, verbose, verbose2, dump, wdump, fopts, flint, fileOptions, versionString) where
+module Options(
+    processOptions,
+    Opt(..),
+    options,
+    putVerbose,
+    putVerboseLn,
+    verbose,
+    verbose2,
+    dump,
+    wdump,
+    fopts,
+    flint,
+    fileOptions,
+    versionString,
+    withOptions,
+    withOptionsT,
+    OptM(),
+    OptT(),
+    OptionMonad(..),
+    flagOpt
+    ) where
 
+import Control.Monad.Identity
+import Control.Monad.Reader
+import Control.Monad.Trans
 import Data.Version
 import Monad
 import qualified Data.Set as S
@@ -213,3 +236,33 @@ initialIncludes = unsafePerformIO $ do
     p <- lookupEnv "JHCPATH"
     let x = maybe "" id p
     return (".":(tokens (== ':') x))
+
+
+class Monad m => OptionMonad m where
+    getOptions :: m Opt
+    getOptions = return options
+
+instance OptionMonad Identity
+
+newtype OptT m a = OptT (ReaderT Opt m a)
+    deriving(MonadIO,Monad,Functor,MonadTrans)
+
+type OptM = OptT Identity
+
+instance Monad m => OptionMonad (OptT m) where
+    getOptions = OptT ask
+
+
+
+withOptions :: Opt -> OptM a -> a
+withOptions opt (OptT x) = runIdentity (runReaderT x opt)
+
+withOptionsT :: Opt -> OptT m a -> m a
+withOptionsT opt (OptT x) = runReaderT x opt
+
+
+flagOpt :: OptionMonad m => FlagOpts.Flag -> m Bool
+flagOpt flag = do
+    opt <- getOptions
+    return (flag `S.member` optFOptsSet opt)
+

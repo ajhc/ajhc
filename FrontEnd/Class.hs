@@ -75,6 +75,8 @@ import Monad
 import Name.Name
 import Name.Names
 import Name.VConsts
+import Options
+import qualified FlagOpts as FO
 import Representation
 import Type
 import TypeUtils
@@ -609,7 +611,7 @@ classMethodAssumps hierarchy = concatMap classAssumps $ classRecords hierarchy
 
 --------------------------------------------------------------------------------
 
-splitReduce :: Monad m => ClassHierarchy -> [Tyvar] -> [Tyvar] -> [Pred] -> m ([Pred], [Pred], [(Tyvar,Type)])
+splitReduce :: OptionMonad m => ClassHierarchy -> [Tyvar] -> [Tyvar] -> [Pred] -> m ([Pred], [Pred], [(Tyvar,Type)])
 
 splitReduce h fs gs ps = do
     (ds, rs) <- split h fs ps
@@ -620,7 +622,7 @@ splitReduce h fs gs ps = do
 -- This is the 'split' from THIH
 
 
-reduce :: Monad m => ClassHierarchy -> [Tyvar] -> [Tyvar] -> [Pred] -> m ([Pred], [Pred])
+reduce :: OptionMonad m => ClassHierarchy -> [Tyvar] -> [Tyvar] -> [Pred] -> m ([Pred], [Pred])
 
 reduce h fs gs ps = do
     (ds, rs) <- split h fs ps
@@ -709,22 +711,26 @@ genDefaults h vs ps = do
         vs  = [ (v,t)  | (v,qs,t) <- ams ]
     return (ps \\ ps',  vs)
 
-useDefaults     :: Monad m => ClassHierarchy -> [Tyvar] -> [Pred] -> m [Pred]
-useDefaults h vs ps
-  | any null tss = fail $ "useDefaults.ambiguity: " ++ (render $ pprint ps) ++  show ps
-  | otherwise = fail $ "Zambiguity: " ++ (render $ pprint ps) ++  show (ps,ps',ams)
-  | otherwise    = return $ ps \\ ps'
-    where ams = ambig h vs ps
-          tss = [ ts | (v,qs,ts) <- ams ]
-          ps' = [ p | (v,qs,ts) <- ams, p<-qs ]
+useDefaults     :: OptionMonad m => ClassHierarchy -> [Tyvar] -> [Pred] -> m [Pred]
+useDefaults h vs ps = flagOpt FO.Defaulting >>= \b -> case b of
+ --   False -> return ps
+    _
+      | any null tss -> fail $ "useDefaults.ambiguity: " ++ (render $ pprint ps) ++  show ps
+      | otherwise -> fail $ "Zambiguity: " ++ (render $ pprint ps) ++  show (ps,ps',ams)
+--      | otherwise    = return $ ps \\ ps'
+        where ams = ambig h vs ps
+              tss = [ ts | (v,qs,ts) <- ams ]
+              ps' = [ p | (v,qs,ts) <- ams, p<-qs ]
 
-topDefaults     :: Monad m => ClassHierarchy -> [Pred] -> m Subst
-topDefaults h ps
-  | any null tss = fail $ "topDefaults: ambiguity " ++ (render $ pprint ps)
-  | otherwise    = return $ listToFM (zip vs (map head tss))
-    where ams = ambig h [] ps
-          tss = [ ts | (v,qs,ts) <- ams ]
-          vs  = [ v  | (v,qs,ts) <- ams ]
+topDefaults     :: OptionMonad m => ClassHierarchy -> [Pred] -> m Subst
+topDefaults h ps  =  flagOpt FO.Defaulting >>= \b -> case b of
+--    False -> return mempty
+    _
+      | any null tss -> fail $ "topDefaults: ambiguity " ++ (render $ pprint ps)
+      | otherwise    -> return $ listToFM (zip vs (map head tss))
+        where ams = ambig h [] ps
+              tss = [ ts | (v,qs,ts) <- ams ]
+              vs  = [ v  | (v,qs,ts) <- ams ]
 
 defaults    :: [Type]
 defaults     = map (\name -> TCon (Tycon name Star))

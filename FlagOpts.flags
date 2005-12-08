@@ -8,6 +8,7 @@ float-in perform float inward transform
 strictness perform strictness analysis
 cpr do CPR analysis
 type-analysis perhaps a basic points-to analysis on types right after method generation
+defaulting perform defaulting of ambiguous types
 
 lint perform lots of extra type checks
 cpp pass code through cpp
@@ -16,4 +17,4 @@ profile embed profiling code
 
 
 !Default settings
-@default inline-pragmas rules wrapper float-in strictness
+@default inline-pragmas rules wrapper float-in strictness defaulting

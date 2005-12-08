@@ -32,13 +32,14 @@ import Diagnostic
 import Doc.PPrint as PPrint
 import FrontEnd.Desugar(doToExp)
 import FrontEnd.KindInfer(KindEnv)
+import FrontEnd.SrcLoc
 import FrontEnd.Utils(getDeclName)
 import HsPretty
 import HsSyn
-import FrontEnd.SrcLoc
 import Name.Name
 import Name.Names
 import Name.VConsts
+import Options
 import Representation
 import TIMonad
 import Type
@@ -689,7 +690,8 @@ tiProgram modName sEnv kt h dconsEnv env bgs = runTI dconsEnv h kt sEnv modName 
      s         <- getSubst
      ps <- flattenType ps
      ([], rs) <- split h [] (apply s ps)
-     case topDefaults h rs of
+     opt <- getOptions
+     case withOptionsT opt $ topDefaults h rs of
        Right s' -> do
         env1' <- flattenType env1
         return $  apply  s'  env1'
