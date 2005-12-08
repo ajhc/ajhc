@@ -18,6 +18,9 @@ import FrontEnd.HsParser(parseHsStmt)
 import FrontEnd.KindInfer
 import FrontEnd.ParseMonad
 import FrontEnd.Rename
+import qualified FrontEnd.Infix
+import qualified HsPretty
+import TypeSyns
 import GenUtil
 import Ho
 import HsPretty()
@@ -50,7 +53,14 @@ nameTag _ = '?'
 
 data InteractiveState = IS {
     stateHo :: Ho,
-    stateInteract :: Interact
+    stateInteract :: Interact,
+    stateModule :: Module
+    }
+
+isInitial = IS {
+    stateHo = mempty,
+    stateInteract = emptyInteract,
+    stateModule = Module "Main"
     }
 
 interact :: Ho -> IO ()
@@ -97,7 +107,7 @@ interact ho = mre where
     do_expr :: Interact -> String -> IO Interact
     do_expr act s = case parseStmt s of
         Left m -> putStrLn m >> return act
-        Right e -> executeStatement IS { stateHo = ho, stateInteract = act } e >> return act
+        Right e -> executeStatement isInitial { stateHo = ho, stateInteract = act } e >> return act
     pshow _opt v
         | Just d <- showSynonym (show . (pprint :: HsType -> PP.Doc) ) v (hoTypeSynonyms ho) = nameTag (nameType v):' ':d
         | otherwise = nameTag (nameType v):' ':show v <+> "::" <+> ptype v
@@ -110,16 +120,25 @@ parseStmt s = case runParserWithMode ParseMode { parseFilename = "(jhci)" } pars
                       ParseOk _ e -> return e
                       ParseFailed sl err -> fail $ show sl ++ ": " ++ err
 
+printStatement stmt = do
+        putStrLn $ HsPretty.render $ HsPretty.ppHsStmt $  stmt
 
 executeStatement :: InteractiveState -> HsStmt -> IO ()
-executeStatement IS { stateHo = ho } stmt = do
+executeStatement is@IS { stateHo = ho } stmt = do
     defs <- calcImports ho False (Module "Prelude")
-    stmt' <- renameStatement mempty defs (Module "Main") stmt
+    stmt' <- renameStatement mempty defs (stateModule is) stmt
     b <- printIOErrors
-    when (not b) $ putStrLn (show stmt')
-executeStatement _ HsLetStmt {} = putStrLn "let statements not yet supported"
-executeStatement _ HsGenerator {} = putStrLn "generators not yet supported"
-executeStatement _ (HsQualifier e) = putStrLn (show e)
+    if b then return () else do
+    --printStatement stmt'
+    stmt'' <- expandTypeSynsStmt (hoTypeSynonyms ho) (stateModule is) stmt'
+    stmt''' <- FrontEnd.Infix.infixStatement (hoFixities ho) stmt''
+    b <- printIOErrors
+    if b then return () else do
+    printStatement stmt'''
+
+--executeStatement _ HsLetStmt {} = putStrLn "let statements not yet supported"
+--executeStatement _ HsGenerator {} = putStrLn "generators not yet supported"
+--executeStatement _ (HsQualifier e) = putStrLn (show e)
 
 
 calcImports :: Monad m => Ho -> Bool -> Module -> m [(Name,[Name])]
@@ -131,3 +150,10 @@ calcImports ho qual mod = case Map.lookup mod (hoExports ho) of
             ls' = concat [ zip (concat nns) (repeat [n]) | (n,nns) <- ls ]
         return $ Map.toList $ Map.map snub $ Map.fromListWith (++) ls'
 
+{-
+    let thisFixityMap = buildFixityMap (concat [ filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
+    let fixityMap = thisFixityMap `mappend` hoFixities me
+    let thisTypeSynonyms =  (declsToTypeSynonyms $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
+    let ts = thisTypeSynonyms  `mappend` hoTypeSynonyms me
+    let f x = expandTypeSyns ts (modInfoHsModule x) >>= FrontEnd.Infix.infixHsModule fixityMap >>= \z -> return (modInfoHsModule_s ( z) x)
+-}

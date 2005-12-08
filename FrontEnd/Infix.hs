@@ -16,7 +16,7 @@
 
 -------------------------------------------------------------------------------}
 
-module FrontEnd.Infix (buildFixityMap, infixHsModule, FixityMap,size) where
+module FrontEnd.Infix (buildFixityMap, infixHsModule, FixityMap,size, infixStatement) where
 
 import Binary
 import Data.Monoid
@@ -69,6 +69,8 @@ infixHsModule (FixityMap ism) m = return $ hsModuleDecls_u f m where
     f = map (processDecl ism)
     --ism = buildSMap is
 
+infixStatement :: Monad m => FixityMap -> HsStmt -> m HsStmt
+infixStatement (FixityMap ism) m = return $ processStmt ism m
 
 
 

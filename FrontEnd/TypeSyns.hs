@@ -1,4 +1,4 @@
-module TypeSyns( expandTypeSyns ) where
+module TypeSyns( expandTypeSyns, expandTypeSynsStmt ) where
 
 import Control.Monad.State
 import Control.Monad.Writer
@@ -45,6 +45,19 @@ expandTypeSyns syns m = ans where
         mapM_ addWarning (errors fs)
         return rm
 
+expandTypeSynsStmt :: MonadWarn m => TypeSynonyms -> Module -> HsStmt -> m HsStmt
+expandTypeSynsStmt syns mod m = ans where
+    startState = ScopeState {
+        errors         = [],
+        synonyms       =  syns,
+        srcLoc         = bogusASrcLoc,
+        currentModule  = mod
+        }
+
+    (rm, fs) = runState (renameHsStmt m ()) startState
+    ans = do
+        mapM_ addWarning (errors fs)
+        return rm
 
 
 -- This is Bryn's modification to make the code a bit easier to understand for
