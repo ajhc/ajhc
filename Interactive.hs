@@ -178,6 +178,7 @@ tcStatement HsLetStmt {} = liftIO $ putStrLn "let statements not yet supported"
 tcStatement HsGenerator {} = liftIO $ putStrLn "generators not yet supported"
 tcStatement (HsQualifier e) = do
     tcStatementTc (HsQualifier e)
+    when False $ do
     is@IS { stateHo = ho } <- ask
     let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps ho, nameType x == Val ]
         importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps ho, nameType x ==  DataConstructor ]
@@ -214,6 +215,7 @@ tcStatementTc (HsQualifier e) = do
     runTc tcInfo $ do
     (rbox,box) <- newBox Star
     (_,ps') <- listen $ tiExpr e box
+    ps' <- flattenType ps'
     vv <- rbox
     let ps = Class.simplify (hoClassHierarchy ho) ps'
     qt <- flattenType (ps :=> vv)

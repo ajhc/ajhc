@@ -161,6 +161,11 @@ instance FlattenType Type where
                 x' <- flattenType' x
                 y' <- flattenType' y
                 return $ TArrow x' y'
+            ft (TForAll vs qt) = do
+                qt' <- flattenType' qt
+                return $ TForAll vs qt'
+            ft (TBox _ box) = do
+                readIORef box
             ft t = return t
         ft tv'
 

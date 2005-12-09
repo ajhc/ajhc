@@ -8,6 +8,7 @@ module FrontEnd.KindInfer (
     kiDecls,
     KindEnv(),
     hsQualTypeToScheme,
+    hsQualTypeToSigma,
     hsAsstToPred,
     kindOfClass,
     kindOf,
@@ -33,7 +34,7 @@ import MapBinaryInstance()
 import Name.Name
 import qualified Util.Seq as Seq
 import Representation hiding (Subst)
-import Type(quantify,tv,tTTuple)
+import Type(quantify,tv,tTTuple,schemeToType)
 import Util.ContextMonad
 import Util.HasSize
 import FrontEnd.Utils
@@ -561,6 +562,9 @@ hsQualTypeToScheme :: Monad m => KindEnv -> HsQualType -> m Scheme
 hsQualTypeToScheme kt qualType =  return $ aHsQualTypeToScheme newEnv qualType where
    newEnv = kiHsQualType kt qualType
 
+hsQualTypeToSigma :: Monad m => KindEnv -> HsQualType -> m Sigma
+hsQualTypeToSigma kt qualType =  return $ schemeToType $ aHsQualTypeToScheme newEnv qualType where
+   newEnv = kiHsQualType kt qualType
 
 hsTypeToType :: Monad m => KindEnv -> HsType -> m Type
 hsTypeToType kt t = return $ aHsTypeToType kt (forallHoist t)

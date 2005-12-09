@@ -7,12 +7,15 @@ import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import Class(ClassHierarchy, entails, split, topDefaults, splitReduce)
+import Control.Monad.Reader
 import DeclsDepends(getDeclDeps)
 import DependAnalysis(getBindGroups)
 import Diagnostic
 import Doc.PPrint as PPrint
 import FrontEnd.Desugar(doToExp)
-import FrontEnd.KindInfer(KindEnv)
+import FrontEnd.KindInfer(KindEnv,hsQualTypeToSigma)
+import FrontEnd.Tc.Monad
+import FrontEnd.Tc.Type
 import FrontEnd.Utils(getDeclName)
 import HsPretty
 import HsSyn
@@ -21,9 +24,6 @@ import Name.Names
 import Name.VConsts
 import Representation
 import Type
-
-import FrontEnd.Tc.Monad
-import FrontEnd.Tc.Type
 
 
 
@@ -43,31 +43,34 @@ instance Types TypeEnv where
    apply s = Map.map (\e -> apply s e)
    tv env = tv $ Map.elems env
 
-addPreds :: [Pred] -> Tc ()
-addPreds = tell
 
 tcApp e1 e2 typ = do
     (br,bt) <- newBox Star
     e1 <- tiExpr e1 (bt `fn` typ)
-    t <- br
-    e2 <- tiExpr e2 t  -- TODO Poly
+    t <- br >>= findType
+    e2 <- tiExprPoly e2 t  -- TODO Poly
     return (e1,e2)
+
+tiExprPoly ::  HsExp -> Type ->  Tc HsExp
+
+tiExprPoly e t@TBox {} = tiExpr e t
+tiExprPoly e t = do
+    t' <- freshInstance t
+    tiExpr e t'
 
 tiExpr ::  HsExp -> Type ->  Tc HsExp
 
 -- TODO should subsume for rank-n
 tiExpr (HsVar v) typ = do
     sc <- lookupName (toName Val v)
-    (ps :=> t) <- freshInst sc
-    addPreds ps
-    t `subsumes` typ
+    sc <- freshInstance sc
+    sc `subsumes` typ
     return (HsVar v)
 
 tiExpr (HsCon conName) typ = do
     sc <- lookupName (toName DataConstructor conName)
-    ((ps :=> t)) <- freshInst sc
-    addPreds ps
-    t `subsumes` typ
+    sc <- freshInstance sc
+    sc `subsumes` typ
     return (HsCon conName)
 
 tiExpr (HsLit l) typ = do
@@ -80,7 +83,16 @@ tiExpr (HsAsPat n e) typ = do
     addToCollectedEnv (Map.singleton (toName Val n) typ)
     return (HsAsPat n e)
 
---tiExpr (HsExpTypeSig sloc e qt) typ =  withContext (locMsg sloc "in the annotated expression" $ render $ ppHsExp expr) $ do
+-- comb LET-S and VAR
+tiExpr expr@(HsExpTypeSig sloc e qt) typ =  withContext (locMsg sloc "in the annotated expression" $ render $ ppHsExp expr) $ do
+    kt <- getKindEnv
+    s <- hsQualTypeToSigma kt qt
+    r <- freshInstance s
+    e' <- tiExpr e r
+    s' <- freshSigma s
+    s' `subsumes` typ
+    return (HsExpTypeSig sloc e' qt)
+
 
 
 
@@ -105,20 +117,30 @@ tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression"
 -- ABS1
 tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show ps ++ " -> ...") $ do
     let lam (p:ps) e (TBox _ box) rs = do -- ABS2
-            (_,b1) <- newBox Star
-            (_,b2) <- newBox Star
-            lam (p:ps) e (b1 `fn` b2) rs
+            (rs1,b1) <- newBox Star
+            (rs2,b2) <- newBox Star
+            r <- lam (p:ps) e (b1 `fn` b2) rs
+            s1 <- rs1 >>= findType
+            s2 <- rs2 >>= findType
+            fillBox box (s1 `fn` s2)
+            return r
         lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
             (br,box) <- newBox Star
             s1' `boxyMatch` box
-            s1 <- br
+            s1 <- br >>= findType
             (p',env) <- tiPat p s1
             localEnv env $ do
-                lam ps e s2' (p':rs)  -- TODO poly
+                lamPoly ps e s2' (p':rs)  -- TODO poly
         lam [] e typ rs = do
             e' <- tiExpr e typ
             return (HsLambda sloc (reverse rs) e')
         lam _ _ _ _ = fail "lambda type mismatch"
+        lamPoly ps e s@TBox {} rs = lam ps e s rs
+        lamPoly ps e s rs = do
+            s <- freshInstance s
+            lam ps e s rs
+
+
     lam ps e typ []
 
 
@@ -156,12 +178,14 @@ tiExpr (HsDo stmts) typ = do
         withContext (simpleMsg "in a do expression")
                     (tiExpr newExp typ)
 
---tiExpr env expr@(HsLet decls e) = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
---         sigEnv <- getSigEnv
---         let bgs = getFunDeclsBg sigEnv decls
---         (ps, env1) <- tiSeq tiBindGroup env bgs
---         (qs, env2, t) <- tiExpr (env1 `Map.union` env) e
---         -- keep the let bound type assumptions in the environment
+tiExpr expr@(HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u) []] t) typ = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
+    (rb,tb) <- newBox Star
+    u' <- tiExpr u tb
+    rr <- rb >>= findType
+    rr <- generalize rr
+    t' <- localEnv (Map.singleton (toName Val x) rr) $ do
+        tiExpr t typ
+    return (HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u') []] t')
 
 tiExpr e typ = fail $ "tiExpr: not implemented for: " ++ show (e,typ)
 

@@ -1,19 +1,23 @@
 module FrontEnd.Tc.Monad(
-    TypeEnv(),
-    Tc(),
-    localEnv,
+    addPreds,
     addToCollectedEnv,
-    tcInfoEmpty,
-    runTc,
-    lookupName,
-    freshInst,
-    unify,
-    newTVar,
-    newBox,
-    withContext,
+    freshInstance,
+    freshSigma,
+    getKindEnv,
     inst,
+    localEnv,
+    lookupName,
+    newBox,
+    newTVar,
+    runTc,
+    Tc(),
+    TcInfo(..),
+    tcInfoEmpty,
+    TypeEnv(),
+    unify,
     unifyList,
-    TcInfo(..)
+    generalize,
+    withContext
     ) where
 
 import Control.Monad.Reader
@@ -32,7 +36,7 @@ import Doc.PPrint
 import FrontEnd.KindInfer
 import GenUtil
 import FrontEnd.SrcLoc(bogusASrcLoc)
-import Type(mgu)
+import Type(mgu,tv)
 import Name.Name
 import Representation
 import Warning
@@ -254,8 +258,57 @@ freshInst (TForAll as qt) = do
         return (inst (Map.fromList $ zip (map tyvarAtom as) ts) qt)
 freshInst x = return ([] :=> x)
 
+freshInstance :: Sigma -> Tc Rho
+freshInstance (TForAll as qt) = do
+    ts <- mapM newTVar (map tyvarKind as)
+    let (ps :=> t) = (inst (Map.fromList $ zip (map tyvarAtom as) ts) qt)
+    addPreds ps
+    return t
+freshInstance x = return x
+
+addPreds :: [Pred] -> Tc ()
+addPreds = tell
+
+newVar :: Kind -> Tc Tyvar
+newVar k = do
+    te <- ask
+    n <- newUniq
+    let ident = toName TypeVal (tcInfoModName $ tcInfo te,'v':show n)
+        v = tyvar ident k Nothing
+    return v
+
+-- rename the bound variables of a sigma, just in case.
+freshSigma :: Sigma -> Tc Sigma
+freshSigma (TForAll [] ([] :=> t)) = return t
+freshSigma (TForAll vs qt) = do
+    nvs <- mapM (newVar . tyvarKind) vs
+    return (TForAll nvs $ inst (Map.fromList $ zip (map tyvarAtom vs) (map TVar nvs)) qt)
+freshSigma x = return x
+
+-- | replace bound variables with arbitrary new ones and drop the binding
+-- TODO predicates?
+
+skolomize :: Type -> Tc ([Tyvar],Type)
+skolomize s = freshSigma s >>= \x -> case x of
+    TForAll as (_ :=> r) -> return (as,r)
 
 {-
+boxyInstantiate :: Sigma -> Tc Rho
+boxyInstantiate (TForAll as (ps :=> r)) = do
+
+
+
+--    sub (TForAll as (_ :=> r1))  r2 | isRho' r2 = do
+        bs <- mapM (const $ newBox Star) as
+        inst (Map.fromList $ zip (map tyvarAtom as) (snds bs)) r1 `subsumes` r2
+  -}
+{-
+newSigma :: Sigma -> Tc ([Tyvar],Rho)
+newSigma (TForAll vs qt) = do
+    nvs <- mapM (newVar . tyvarKind) vs
+    return (nvs,inst (Map.fromList $ zip (map tyvarAtom vs) (map TVar nvs)) qt)
+newSigma x = return ([],x)
+
 freshInst :: Scheme -> TI (Qual Type)
 freshInst (Forall ks qt) = do
         ts <- mapM newTVar ks
@@ -263,6 +316,9 @@ freshInst (Forall ks qt) = do
         return (v)
 -}
 
+generalize :: Rho -> Tc Sigma
+generalize r = do
+    freshSigma (TForAll (tv r) ([] :=> r))
 
 
 ----------------------------------------
