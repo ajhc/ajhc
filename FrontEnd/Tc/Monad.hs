@@ -16,6 +16,7 @@ module FrontEnd.Tc.Monad(
     TypeEnv(),
     unify,
     skolomize,
+    boxySpec,
     boxyInstantiate,
     unifyList,
     generalize,
@@ -27,6 +28,7 @@ import Control.Monad.Writer
 import Control.Monad.Trans
 import Data.IORef
 import Data.Monoid
+import List
 import qualified Data.Map as Map
 import Text.PrettyPrint.HughesPJ(Doc)
 
@@ -271,7 +273,7 @@ freshInstance (TForAll as qt) = do
 freshInstance x = return x
 
 addPreds :: [Pred] -> Tc ()
-addPreds = tell
+addPreds ps = Tc $ tell ps
 
 newVar :: Kind -> Tc Tyvar
 newVar k = do
@@ -305,6 +307,22 @@ boxyInstantiate (TForAll as qt) = do
         return r
 boxyInstantiate x = return x
 
+boxySpec :: Sigma -> Tc ([(BoundTV,[Sigma'])],Rho')
+boxySpec (TForAll as qt@(ps :=> t)) = do
+    let f (TVar t) vs | t `elem` vs = do
+            (_,b) <- lift (newBox $ tyvarKind t)
+            tell [(t,b)]
+            return b
+        f e@TCon {} _ = return e
+        f (TAp a b) vs = liftM2 TAp (f a vs) (f b vs)
+        f (TArrow a b) vs = liftM2 TArrow (f a vs) (f b vs)
+        f (TForAll as (ps :=> t)) vs = do
+            t' <- f t (vs List.\\ as)
+            return (TForAll as (ps :=> t'))
+        f t _ = error $ "boxySpec: " ++ show t
+    (t',vs) <- runWriterT (f t as)
+    addPreds $ inst (Map.fromList [ (tyvarAtom bt,s) | (bt,s) <- vs ]) ps
+    return (sortGroupUnderFG fst snd vs,t')
 
 {-
 newSigma :: Sigma -> Tc ([Tyvar],Rho)

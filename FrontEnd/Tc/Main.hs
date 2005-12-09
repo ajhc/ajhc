@@ -64,13 +64,15 @@ tiExpr ::  HsExp -> Type ->  Tc HsExp
 -- TODO should subsume for rank-n
 tiExpr (HsVar v) typ = do
     sc <- lookupName (toName Val v)
-    sc <- freshInstance sc
+    sc <- freshSigma sc
+--    sc <- freshInstance sc
     sc `subsumes` typ
     return (HsVar v)
 
 tiExpr (HsCon conName) typ = do
     sc <- lookupName (toName DataConstructor conName)
-    sc <- freshInstance sc
+    sc <- freshSigma sc
+ --   sc <- freshInstance sc
     sc `subsumes` typ
     return (HsCon conName)
 

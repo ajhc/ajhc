@@ -26,6 +26,11 @@ type MetaTV = Tyvar
 type SkolemTV = Tyvar
 type BoundTV = Tyvar
 
+isMetaTV :: Tyvar -> Bool
+isMetaTV Tyvar { tyvarRef = Just _ } = True
+isMetaTV _ = False
+
+
 openBox :: MonadIO m => Box -> m Sigma
 openBox x = liftIO $ readIORef x
 

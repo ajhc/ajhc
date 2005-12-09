@@ -25,16 +25,24 @@ subsumes s1 s2 = do
 
     -- SKOL needs to be after SBOXY
     sub s1 fa@TForAll {} = do
-        r1 <- freshInstance fa
-        s1 `subsumes` r1
+        (_,r2) <- skolomize fa
+        --r1 <- freshInstance fa
+        s1 `subsumes` r2
 
     -- SPEC
-    sub (TForAll as (_ :=> r1))  r2 | isRho' r2 = do
-        bs <- mapM (const $ newBox Star) as
-        inst (Map.fromList $ zip (map tyvarAtom as) (snds bs)) r1 `subsumes` r2
+    sub s1@(TForAll as (_ :=> _))  r2 | isRho' r2 = do
+        --r1' <- boxyInstantiate s1
+        (bs,r1') <- boxySpec s1
+        r1' `subsumes` r2
+        let f (_,bs) = do
+            bs' <- sequence [ openBox b >>= findType | ~TBox { typeBox = b } <- bs]
+            unifyList bs'
+        mapM_ f bs
+        --bs <- mapM (const $ newBox Star) as
+        --inst (Map.fromList $ zip (map tyvarAtom as) (snds bs)) r1 `subsumes` r2
 
     -- CON (??)
-    sub s1@TAp {} s2 = s1 `boxyMatch` s2
+    sub s1 s2 | (TCon _,_) <- fromTAp s1 = s1 `boxyMatch` s2
 
     -- F1
     sub (TArrow s1 s2) (TArrow s3 s4) = do
@@ -53,9 +61,9 @@ subsumes s1 s2 = do
     sub a b | isTau a = case b of
         (TBox {typeBox = b}) -> fillBox b a
         _ | isTau b -> unify a b -- TODO verify? fail $ "taus don't match in MONO" ++ show (a,b)
-        _ -> fail $ "subsumes: " ++ show (a,b)
+        _ -> fail $ "subsumes failure: " ++ show (a,b)
 
-    sub a b = fail $ "subsumes: " ++ show (a,b)
+    sub a b = fail $ "subsumes failure: " ++ show (a,b)
 
 
 boxyMatch :: Sigma' -> Sigma' -> Tc ()
@@ -96,9 +104,9 @@ boxyMatch s1 s2 = do
 
     -- CEQ1
 
-    bm a (TBox _ box) | (TCon ca,as) <- fromTAp a = do
-        bs <- mapM (const $ newBox Star) as
-        sequence_ [boxyMatch x y | x <- as | y <- snds bs]
+    bm a (TBox { typeBox = box }) | (TCon ca,as) <- fromTAp a = do
+        bs <- mapM (newBox . kind) as
+        a `boxyMatch` foldl TAp (TCon ca) (snds bs)
         bs <- sequence $ fsts bs
         fillBox box (foldl TAp (TCon ca) bs)
         return False
@@ -137,4 +145,6 @@ boxyMatch s1 s2 = do
         _ | isTau b -> unify a b >> return False -- TODO, verify? fail $ "taus don't match in MEQ[12]" ++ show (a,b)
           | otherwise -> return True
     bm _ _ = return True
+
+
 
