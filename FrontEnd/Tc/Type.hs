@@ -1,10 +1,21 @@
-module FrontEnd.Tc.Type(module FrontEnd.Tc.Type, Type(..),Kind(..),findType,fn,Qual(..),Tyvar(..),Tycon(..)) where
+module FrontEnd.Tc.Type(
+    module FrontEnd.Tc.Type,
+    Type(..),
+    Kind(..),
+    findType,
+    fn,
+    Qual(..),
+    Tyvar(..),
+    Tycon(..),
+    kind
+    ) where
 
 import Control.Monad.Trans
 import Control.Monad.Writer
 import Data.IORef
 
 import Representation
+import Type(kind)
 
 type Box = IORef Type
 type Sigma' = Sigma

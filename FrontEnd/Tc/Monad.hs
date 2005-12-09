@@ -15,6 +15,8 @@ module FrontEnd.Tc.Monad(
     tcInfoEmpty,
     TypeEnv(),
     unify,
+    skolomize,
+    boxyInstantiate,
     unifyList,
     generalize,
     withContext
@@ -289,20 +291,20 @@ freshSigma x = return x
 -- | replace bound variables with arbitrary new ones and drop the binding
 -- TODO predicates?
 
-skolomize :: Type -> Tc ([Tyvar],Type)
+skolomize :: Sigma' -> Tc ([SkolemTV],Rho')
 skolomize s = freshSigma s >>= \x -> case x of
     TForAll as (_ :=> r) -> return (as,r)
 
-{-
-boxyInstantiate :: Sigma -> Tc Rho
-boxyInstantiate (TForAll as (ps :=> r)) = do
+boxyInstantiate :: Sigma -> Tc Rho'
+boxyInstantiate (TForAll as qt) = do
+        bs <- mapM (newBox . tyvarKind) as
+        let mp = Map.fromList $ zip (map tyvarAtom as) (snds bs)
+            (ps :=> r) = inst mp qt
+        addPreds ps
+        return r
+boxyInstantiate x = return x
 
 
-
---    sub (TForAll as (_ :=> r1))  r2 | isRho' r2 = do
-        bs <- mapM (const $ newBox Star) as
-        inst (Map.fromList $ zip (map tyvarAtom as) (snds bs)) r1 `subsumes` r2
-  -}
 {-
 newSigma :: Sigma -> Tc ([Tyvar],Rho)
 newSigma (TForAll vs qt) = do
