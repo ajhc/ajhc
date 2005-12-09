@@ -1,0 +1,343 @@
+= GADT based type classes and auto-reification in jhc =
+
+The type class implementaion in jhc is based on pattern matching on GADTs
+rather than dictionary passing. This is an attempt to document how this works
+theoreticaly and practically as well as discuss the advantages/disadvantages of
+implementing classes this way rather than via dictionary passing. Another
+related feature in jhc is auto-reification of types to values and that is also
+discussed. Though some of this is new (the use of GADTs to implement
+Haskell-compatable type classes and the optimizations that specifically take
+advantage of it) a whole lot of it is just re-hashing of Tim Sheard and SPJ's
+work and discussions about the future of GHC. (writing about things helps me
+think about them). It is also serving as a sort of gameplan for jhc
+development.
+
+I have not tried to document my type class system before because when I
+implemented this system initially, I had not heard of GADTs and independently
+implemented them as many have done before. So, in addition to "first-class
+phantom types", "guarded recursive data type", and "generalized algebraic data
+types", you can add "that type class case typing hack" or TTCCTHs to the list
+of things they have been called. Before I heard about GADTs I had not done much
+formal work proving soundness of my extensions so it was a great relief to find
+out not only other people have done the work, but there is a rich lexicon of
+terms as well as a concrete syntax implemented in GHC available to express
+them. It made me feel like a real theorist to be able to change comments like
+
+ -- XXX hack to get class method case branches to typecheck properly
+
+to
+
+ -- perform GADT based type refinement
+
+I will use GHC syntax rather than jhc internal syntax throughout.
+
+
+==  overview ==
+
+The jhc intermediate language is based on the lambda-cube rather than system F.
+what this means is that types are values and are bound by lambda expressions
+and normal application just like any other value. The upshot of this is that it
+allows you to perform 'case' matching on _types_ since the bound types scope
+over the entire body of the lambda at the term and type level.
+
+What this effectively means is that there is an inherent extensible GADT
+defined that reifies all types which we can think of as being defined as below:
+(and is perfectly implementable in GHC-haskell too)
+
+
+ data Type a where
+         Prelude.Int :: Type Prelude.Int
+         Prelude.Char :: Type Prelude.Char
+         IO.IO :: Type a -> Type (IO.IO a)
+         (:->) :: Type a -> Type b -> Type (a -> b)
+         ....
+
+Note that while in ghc this declaration will create data constructors which
+mirror the names of the type constructors, in jhc you pattern match and create
+values with the type constructors themselves. so the same a that is passed into
+a function can both be pattern matched on and used in type signatures to type
+things properly.
+
+
+
+== optimization opprotunities ==
+
+Implementing classes in this fashion opens up a number of interesting
+optimization opprotunites.
+
+=== less data passed ===
+
+rather than dictionaries of higher order functions, a simple algebraic datatype
+is passed. For each type variable in a function only a single value is passed,
+no matter how many class constraints it occurs in.
+
+ f :: (Ord a, Num a, MonadIO m, StateMonad a m) => a -> m a
+ ==>
+ f :: Type a -> Type m -> a -> m a
+
+whereas a traditional implementaion would require 4 extra arguments each
+containing as many values as there are methods in the class.
+
+case statements are also much faster than indirect function calls in many cases
+on modern CPUs so time is saved there too.
+
+=== case coalescing ===
+
+case coalescing becomes a very powerful optimization in this framework. imagine
+we had the following.
+
+ class Num a where
+         a + b :: a -> a -> a
+         a - b :: a -> a -> a
+         a `div` b :: a -> a -> a
+
+ class Ord a where
+         a <= b :: a -> a -> Bool
+
+ instance Num Int where
+         (I# a) + (I# b) = a +# b  -- unboxed, very fast.
+         (I# a) - (I# b) = a -# b  -- unboxed, very fast.
+         (I# a) `div` (I# b) = div# a b  -- unboxed, very fast.
+
+ instance Ord Int where
+         (I# a) <= (I# b) = a <=# b  -- unboxed, very fast.
+
+ instance Num Integer where
+         a + b = addIntegers a b       -- slow
+         a - b = subtractIntegars a b
+         a `div` b = divIntegers a b
+
+ instance Ord Integer where
+         a <= b = lteInteger a b
+
+
+now take the following function
+
+ f :: (Ord a, Num a) => a -> a -> Bool
+ f x y = (x + y) <= (x - y)
+
+now, first desugaring goes to
+
+ f a x y = case a of
+         Prelude.Int -> case (case a of
+                 Prelude.Int -> case (x,y) of
+                         (I# x',I# y') -> I# (x' +# y')
+                 Prelude.Integer -> ...
+                 ) of
+                   (I# xpy') -> xpy' <=# ...
+         Prelude.Integer -> ....
+
+but you get the idea, now if we apply the very standard transformations
+described in the ghc unboxing paper, along with alternative elimination based
+on type refinement we end up with the following.
+
+
+ f :: (Ord a, Num a) => a -> a -> Bool
+ f a x y = case a of
+         Prelude.Int -> case (x,y) of
+                         (I# x',I# y') -> (x' +# y') <=# (x' -# y')
+         Prelude.Integer -> addIntegers x y `lteInteger` subtractIntegers x y
+         .....
+
+
+notice we have done gotten fully unboxed versions of the routines without ever
+losing polymorphism! f is still polymorphic in a yet is able to take advantage
+of type dependent optimizations.
+
+the key thing that allows this is that this class implementation captures the
+invarient that figuring out any particular method on a type statically
+determines all the methods from all classes on that type. this is not possible
+
+Of course, willy-nilly inlining of classes like this can lead to code explosion
+so there are many different pragmas in jhc to carefully control its behavior.
+
+one interesting possibility is run-time specialization. traditionally you can
+only call a specialized version of a routine if you can determine its type at
+compile-time, but when a function is declared SUPERSPECIALIZED it does a single
+case scrutination of the type immediatly and then calls the appropriate
+specialized routine. you can SUPERSPECIALIZE at just certain types letting the
+rest fall through to the generic version, superspecializing complicated math
+routines with 'Int' can be very advantagous.
+
+
+
+=== functional dependencies ===
+
+an interesting side effect is that fundeps are not only useful for refining
+classes at compile time, but they have signifigant run-time benefits.
+
+ class StateMonad m a | m -> a where ...
+ f :: (... , StateMonad m a, ...) => ...
+
+now, a single scrutination of 'm' will not only tell you statically method of every
+class on 'm', but also every method of every class on 'a' too.
+
+
+== implementation notes ==
+
+=== run-time type passing ===
+
+The first obvious issue is what happens to all these types at run-time? The
+answer is that they are treated just like any other data type so actually may
+be passed at runtime and in fact grin code makes no distinction between type
+and data constructors anywhere.
+
+However, the first thing done after conversion to Grin from E is a standard
+dead-code elimination pass getting rid of arguments to functions that arn't
+used by either being passed to a primitive or pattern matched on. (calculated
+via fixpoint iteration). the key result of this is that:
+
+All types end up being eliminated except in the exact places where a dictionary
+would have been passed in a traditional implementation.
+
+In addition, any unused normal arguments to functions are eliminated too. there
+is no need for a special type-erasure pass, a standard optimization takes care
+of it. And since types are only erased if they are not used, one is free to
+experiment with other methods of using run-time type information without
+modifying the back end.
+
+=== points-to analysis ===
+
+A naive implementaion would end up creating huge case statements for each
+method. which is exactly what a naive implementation of the 'eval' operation in
+GRIN would do. Fortunately the exact same solution works for both. after the E
+has been converted to GRIN and simplified, it will still have free references
+to 'evals' (evaluate a thunk) and class methods. A points to analysis is then
+performed which annotates every such call with all the possible values of its
+argument. A specialized version of the routine is then instantiated which
+contains only those cases that might possibly be passed to that point.
+
+It should be noted that this case actually rarely comes up because
+optimizations at the lambda-cube level can often narrow down the types
+something will be called with and specialization will take place there. there
+are also a lot of PRAGMAS with which you can fine tune how aggresively class
+methods are inlined at their use sites. Partial inlining is possible too, where
+you just consider the instances in scope and
+
+
+=== separate compilation ===
+
+While this technique is not ammenable to traditional C style separate
+compilation, it does allow 'semi-separate compilation' which I hope to support
+as a faster alternative to whole program analysis in jhc. What this means is
+that each module is compiled seperately into its own '.o' and '.hi' file as in
+ghc, jhc is run once more right before linking and it goes through collecting
+the addresses of all eval-points and class methods and outputs generic eval and
+method functions to be used when optimizations couldn't create specialized ones
+locally. Strong local points-to analysis would be a key optimization in this case.
+
+=== super delayed class resolution ===
+
+another interesting property is that since we don't have to decide on a
+dictionary at a functions use point, we can propagate class predicates such as
+'Num Char' outwards rather than rejecting them when they appear, and then only
+reject them if such an instance is never defined. I am not sure how useful this
+would be though.
+
+== reification in general ==
+
+Although at the moment (Type a) is not exported in jhc. this will change as
+soon as my types in the front end become wobbly enough. This section deals with
+Haskell level programming assuming a suitable (Type a) defined as above is made
+available to the user. Many others have made these observations before, but
+they are interesting nonetheless. Most of this is just rehashing Sheards work
+with the Omega varient of Haskell.
+
+=== Special syntax ===
+
+While defining an actual GADT like above would be perfectly fine, and could
+even be done by a preprocessor with full-program analysis capabilities right
+now for ghc, it would be nice to have some syntatic sugar since you ideally
+want to interpret type names in the type namespace.
+
+the special syntax I am thinking about for jhc is:
+
+ f :: * -> String -> Int
+ f = ...
+
+ foo = f (Int :: *) "hello"
+
+
+where * is just syntactic sugar for (Type a) and (Int :: *) is just sugar for
+the constructor (Prelude.Int) defined above (or whatever type name 'Int' is in
+scope). since they are just simple rewriting rules that can be carried out
+before type checking, they don't affect the type checking algorithms at all.
+
+A special syntax in jhc also has the advantage that the compiler need not
+actually create the data-type even when users write their own case statements
+on types since it can know to translate them into appropirate matching on the
+type constructors directly internally.
+
+it is very tempting to allow things like
+
+ f (x :: a) y = g (a :: *) y
+
+where the a is taken from the scoped type variable, but this goes beyond simple
+syntatic sugar and have to think about it more.
+
+
+=== Data.Typeable ===
+
+TypeReps in Data.Typeable have a particularly compelling implementation:
+
+ newtype TypeRep = exists a . TypeRep (Type a)
+
+which is precicely what we want, a TypeRep is a (Type a) for some value of 'a'.
+we can recover said value by pattern matching on (Type a) and that is how the
+Eq and Ord instances could be defined.
+
+Another interesting thing is that Data.Dynamic can be implemented without unsafeCoerce
+
+ data Dynamic = exists e . Dynamic (Type e) e
+
+ fromDyn :: forall a . Dynamic -> Type a -> Maybe a
+ fromDyn (Dynamic e x) a = case a of
+         Prelude.Int -> case e of
+                 Prelude.Int -> Just x   -- note, both types have been refined to Prelude.Int at this point
+                 _ -> Nothing
+         IO y -> case e of
+                 IO ye -> fromDyn (Dynamic ye x) y
+                 _ -> Nothing
+         ....
+
+
+I am still working out the details, but every type in jhc will automatically
+get a (Typeable) instance. however, I will probably keep the Typeable class
+around since the predicates the type checker collects of the form Typeable a =>
+... can be useful hints in guiding optimizations. (but are not necessary)
+
+=== kinds ===
+
+when combined with user created kinds (a planned feature), the auto-reification
+feature of jhc becomes more interesting.
+
+ kind Nat = Z | S Nat
+
+would define the following.
+
+the new kind 'Nat'
+
+the type constructors:
+
+ data Z
+ data S (a :: Nat)
+
+
+and the reified version of said types
+
+ data Nat (a :: Nat) where
+         Z :: Nat Z
+         S :: (Nat a) -> Nat (S Nat)
+
+note that the type 'Nat a' is effectivly a closed version of 'Type a' which
+suggests 'Type' might better be called '*' or 'Star'
+
+
+=== impredicativity ===
+
+The jhc type system is impredicative using the boxy types algorithm of SPJ. so
+things like  (Type (forall a . a -> a)) are allowed.  though, I have not
+explored the implications of this. Although the idea of writing class instances
+for polymorphic values is intriging, I can't think of any particular use.
+
+
