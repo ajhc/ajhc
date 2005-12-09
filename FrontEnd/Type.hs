@@ -97,7 +97,7 @@ instance HasKind Type where
   kind (TArrow _l _r) = Star
   kind (TGen _ tv) = kind tv
   kind (TForAll _ (_ :=> t)) = kind t
-  kind (TBox k _) = k
+  kind (TBox { typeKind = k }) = k
   --kind x = error $ "Type:kind: " ++ show x
 
 -----------------------------------------------------------------------------

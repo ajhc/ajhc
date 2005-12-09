@@ -117,7 +117,7 @@ tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression"
 
 -- ABS1
 tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show ps ++ " -> ...") $ do
-    let lam (p:ps) e (TBox _ box) rs = do -- ABS2
+    let lam (p:ps) e TBox { typeBox = box} rs = do -- ABS2
             (rs1,b1) <- newBox Star
             (rs2,b2) <- newBox Star
             r <- lam (p:ps) e (b1 `fn` b2) rs

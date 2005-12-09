@@ -178,8 +178,9 @@ unifyList _ = return ()
 
 newBox :: Kind -> Tc (Tc Type,Type)
 newBox k = do
+    u <- newUniq
     r <- liftIO $ newIORef (error "empty box")
-    return (liftIO $ readIORef r, TBox k r)
+    return (liftIO $ readIORef r, TBox k u r)
 
 
 {-

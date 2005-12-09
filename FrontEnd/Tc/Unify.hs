@@ -2,20 +2,26 @@
 module FrontEnd.Tc.Unify(subsumes,boxyMatch) where
 
 import Control.Monad.Writer
-import qualified Data.Map as Map
+import qualified Text.PrettyPrint.HughesPJ as P
 
+import Doc.PPrint
+import Doc.DocLike
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Monad
 import GenUtil
+
+pretty vv = show ( pprint vv :: P.Doc)
+ppretty vv = parens (pretty vv)
 
 subsumes :: Sigma' -> Sigma' -> Tc ()
 subsumes s1 s2 = do
     s1 <- findType s1
     s2 <- findType s2
+    liftIO $ putStrLn $ "subsumes: " <> ppretty s1 <+> ppretty s2
     sub s1 s2
    where
     -- SBOXY
-    sub (TBox k a) b = boxyMatch (TBox k a) b
+    sub tb@TBox {} b = boxyMatch tb b
 
     -- SKOL needs to be after SBOXY
     sub s1 fa@TForAll {} = do
@@ -35,7 +41,7 @@ subsumes s1 s2 = do
         boxyMatch s3 s1
         s2 `subsumes` s4
     -- F2
-    sub t@(TArrow s1 s2) (TBox _ box) = do
+    sub t@(TArrow s1 s2) (TBox { typeBox = box}) = do
         (oa,a) <- newBox (kind s1)
         (ob,b) <- newBox (kind s2)
         subsumes t (a `fn` b)
@@ -45,7 +51,7 @@ subsumes s1 s2 = do
 
     -- BMONO & MONO
     sub a b | isTau a = case b of
-        (TBox _ b) -> fillBox b a
+        (TBox {typeBox = b}) -> fillBox b a
         _ | isTau b -> unify a b -- TODO verify? fail $ "taus don't match in MONO" ++ show (a,b)
         _ -> fail $ "subsumes: " ++ show (a,b)
 
@@ -56,14 +62,16 @@ boxyMatch :: Sigma' -> Sigma' -> Tc ()
 boxyMatch s1 s2 = do
     s1 <- findType s1
     s2 <- findType s2
+    liftIO $ putStrLn $ "boxyMatch: " <> ppretty s1 <+> ppretty s2
     b <- bm s1 s2
     if b then do
+        liftIO $ putStrLn $ "boxyMatch: " <> ppretty s2 <+> ppretty s1
         b' <- bm s2 s1
         when b' $  fail $ "boxyMatch failure: " ++ show (s1,s2)
      else return ()
    where
     -- BBEQ
-    bm (TBox k1 ba) (TBox k2 bb) = do
+    bm TBox { typeKind = k1, typeBox = ba} TBox { typeKind = k2, typeBox = bb} = do
         when (k1 /= k2) $ error "boxyMatch kinds"
         tt <- newTVar k1
         fillBox ba tt
@@ -71,7 +79,7 @@ boxyMatch s1 s2 = do
         return False
 
     -- AEQ1
-    bm (TArrow s1 s2) (TBox _ box) = do
+    bm (TArrow s1 s2) TBox { typeBox = box} = do
         (ra,a) <- newBox Star
         (rb,b) <- newBox Star
         boxyMatch (s1 `fn` s2) (a `fn` b)
@@ -105,7 +113,7 @@ boxyMatch s1 s2 = do
 
 
     -- SEQ1
-    bm (TForAll vs (ps :=> t)) (TBox k box) = do
+    bm (TForAll vs (ps :=> t)) (TBox { typeKind = k, typeBox = box }) = do
         (ra,a) <- newBox k
         boxyMatch t a
         a <- ra >>= findType
@@ -125,7 +133,7 @@ boxyMatch s1 s2 = do
 
     -- MEQ1 MEQ2  SYM
     bm a b | isTau a = case b of
-        (TBox _ b) -> fillBox b a >> return False
+        (TBox { typeBox = b}) -> fillBox b a >> return False
         _ | isTau b -> unify a b >> return False -- TODO, verify? fail $ "taus don't match in MEQ[12]" ++ show (a,b)
           | otherwise -> return True
     bm _ _ = return True
