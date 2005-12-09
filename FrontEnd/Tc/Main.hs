@@ -16,6 +16,7 @@ import FrontEnd.Desugar(doToExp)
 import FrontEnd.KindInfer(KindEnv,hsQualTypeToSigma)
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
+import FrontEnd.Tc.Unify
 import FrontEnd.Utils(getDeclName)
 import HsPretty
 import HsSyn

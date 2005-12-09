@@ -34,13 +34,14 @@ import Class(ClassHierarchy)
 import Diagnostic
 import Doc.PPrint
 import FrontEnd.KindInfer
-import GenUtil
 import FrontEnd.SrcLoc(bogusASrcLoc)
-import Type(mgu,tv)
+import FrontEnd.Tc.Type
+import GenUtil
 import Name.Name
-import Representation
-import Warning
 import Options
+import Representation
+import Type(mgu,tv)
+import Warning
 
 type TypeEnv = Map.Map Name Sigma
 
