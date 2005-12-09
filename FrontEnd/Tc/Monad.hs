@@ -15,6 +15,7 @@ module FrontEnd.Tc.Monad(
     tcInfoEmpty,
     TypeEnv(),
     unify,
+    varBind,
     skolomize,
     boxySpec,
     boxyInstantiate,
@@ -26,6 +27,7 @@ module FrontEnd.Tc.Monad(
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.Trans
+import Control.Monad.Error
 import Data.IORef
 import Data.Monoid
 import List
@@ -44,7 +46,7 @@ import GenUtil
 import Name.Name
 import Options
 import Representation
-import Type(mgu,tv)
+import Type(tv)
 import Warning
 
 type TypeEnv = Map.Map Name Sigma
@@ -105,21 +107,6 @@ runTc tcInfo  (Tc tim) = do
 instance OptionMonad Tc where
     getOptions = asks tcOptions
 
-{-
-runTI :: Map.Map Name Scheme-> ClassHierarchy -> KindEnv -> SigEnv -> Module -> TI a -> IO a
-runTI env' ch' kt' st' mod' (TI tim) = do
-    vn <- newIORef 0
-    runReaderT tim tcenv {  tcVarnum = vn } where
-    tcenv = TcEnv {
-        tcClassHierarchy = ch',
-        tcKinds = kt',
-        tcModuleName = mod',
-        tcSigs = st',
-        tcVarnum = undefined,
-        tcDConsEnv = env',
-        tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ fromModule mod']
-        }
--}
 
 -- | given a diagnostic and a computation to take place inside the TI-monad,
 --   run the computation but during it have the diagnostic at the top of the
@@ -162,13 +149,13 @@ unify t1 t2 = do
     t2' <- findType t2
     b <- mgu t1' t2'
     case b of
-        Just u -> return () -- extSubst u
-        Nothing -> do
+        Nothing -> return ()
+        Just err -> do
                   diagnosis <- getErrorContext
                   typeError (Unification $ "attempted to unify " ++
                                            pretty t1' ++
                                            " with " ++
-                                           pretty t2')
+                                           pretty t2' ++ "\n" ++ err)
                             diagnosis
 
 unifyList :: [Type] -> Tc ()
@@ -182,8 +169,38 @@ newBox :: Kind -> Tc (Tc Type,Type)
 newBox k = do
     u <- newUniq
     r <- liftIO $ newIORef (error "empty box")
-    return (liftIO $ readIORef r, TBox k u r)
+    return (liftIO $ readIORef r >>= flattenType, TBox k u r)
 
+mgu     :: (MonadIO m) => Type -> Type -> m (Maybe String)
+
+mgu x y = do
+    r <- runErrorT (mgu'' x y)
+    case r of
+        Right _ -> return Nothing
+        Left (err::String) -> return (Just err)
+mgu'' x y = do
+    x' <- findType x
+    y' <- findType y
+    mgu' x' y'
+mgu' (TAp l r) (TAp l' r')
+   = do s1 <- mgu'' l l'
+        s2 <- mgu'' r r'
+        return ()
+mgu' (TArrow l r) (TArrow l' r')
+   = do s1 <- mgu'' l l'
+        s2 <- mgu'' r r'
+        return ()
+mgu' (TVar u) t | isMetaTV u  = varBind u t
+mgu' t (TVar u) | isMetaTV u  = varBind u t
+mgu' (TVar a) (TVar b) | a == b = return ()
+mgu' c1@(TCon tc1) c2@(TCon tc2)
+           | tc1==tc2 = return ()
+           | otherwise = fail $ "mgu: Constructors don't match:" ++ show (c1,c2)
+mgu' TForAll {} _ = error "attempt to unify TForall"
+mgu' _ TForAll {} = error "attempt to unify TForall"
+mgu' _ TBox {} = error "attempt to unify TBox"
+mgu' TBox {} _ = error "attempt to unify TBox"
+mgu' t1 t2  = fail $ "mgu: types do not unify:" ++ show (t1,t2)
 
 {-
 
@@ -295,8 +312,10 @@ freshSigma x = return x
 -- TODO predicates?
 
 skolomize :: Sigma' -> Tc ([SkolemTV],Rho')
-skolomize s = freshSigma s >>= \x -> case x of
+skolomize s@TForAll {} = freshSigma s >>= \x -> case x of
     TForAll as (_ :=> r) -> return (as,r)
+    r -> return ([],r)
+skolomize s = return ([],s)
 
 boxyInstantiate :: Sigma -> Tc Rho'
 boxyInstantiate (TForAll as qt) = do
@@ -319,29 +338,30 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
         f (TForAll as (ps :=> t)) vs = do
             t' <- f t (vs List.\\ as)
             return (TForAll as (ps :=> t'))
-        f t _ = error $ "boxySpec: " ++ show t
+        f t _ = return t
+        -- f t _ = error $ "boxySpec: " ++ show t
     (t',vs) <- runWriterT (f t as)
     addPreds $ inst (Map.fromList [ (tyvarAtom bt,s) | (bt,s) <- vs ]) ps
     return (sortGroupUnderFG fst snd vs,t')
 
-{-
-newSigma :: Sigma -> Tc ([Tyvar],Rho)
-newSigma (TForAll vs qt) = do
-    nvs <- mapM (newVar . tyvarKind) vs
-    return (nvs,inst (Map.fromList $ zip (map tyvarAtom vs) (map TVar nvs)) qt)
-newSigma x = return ([],x)
-
-freshInst :: Scheme -> TI (Qual Type)
-freshInst (Forall ks qt) = do
-        ts <- mapM newTVar ks
-        let v = (inst ts qt)
-        return (v)
--}
 
 generalize :: Rho -> Tc Sigma
 generalize r = do
-    freshSigma (TForAll (tv r) ([] :=> r))
+    let mtvs = (filter isMetaTV (tv r))
+    nvs <- mapM (newVar . tyvarKind) [ t | t <- mtvs]
+    sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- mtvs ]
+    freshSigma (tForAll nvs ([] :=> r))
 
+varBind :: (MonadIO m) => Tyvar -> Type -> m ()
+varBind u t | not (isMetaTV u) = error "varBind: not metatv"
+            | t == TVar u   = return ()
+            | u `elem` tv t = fail "varBind: occurs check fails"
+            | kind u == kind t, Just r <- tyvarRef u = do
+                x <- liftIO $ readIORef r
+                case x of
+                    Just r -> fail $ "varBind: bining unfree: " ++ show (u,t,r)
+                    Nothing -> liftIO $ writeIORef r (Just t)
+            | otherwise        = error $ "varBind: kinds do not match:" ++ show (u,t)
 
 ----------------------------------------
 -- Declaration of instances, boilerplate

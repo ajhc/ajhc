@@ -48,16 +48,16 @@ instance Types TypeEnv where
 tcApp e1 e2 typ = do
     (br,bt) <- newBox Star
     e1 <- tiExpr e1 (bt `fn` typ)
-    t <- br >>= findType
+    t <- br
     e2 <- tiExprPoly e2 t  -- TODO Poly
     return (e1,e2)
 
 tiExprPoly ::  HsExp -> Type ->  Tc HsExp
 
-tiExprPoly e t@TBox {} = tiExpr e t
-tiExprPoly e t = do
-    t' <- freshInstance t
-    tiExpr e t'
+tiExprPoly e t@TBox {} = tiExpr e t   -- GEN2
+tiExprPoly e t = do                   -- GEN1
+    -- (_,t) <- skolomize t
+    tiExpr e t
 
 tiExpr ::  HsExp -> Type ->  Tc HsExp
 
@@ -123,14 +123,14 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
             (rs1,b1) <- newBox Star
             (rs2,b2) <- newBox Star
             r <- lam (p:ps) e (b1 `fn` b2) rs
-            s1 <- rs1 >>= findType
-            s2 <- rs2 >>= findType
+            s1 <- rs1
+            s2 <- rs2
             fillBox box (s1 `fn` s2)
             return r
         lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
             (br,box) <- newBox Star
             s1' `boxyMatch` box
-            s1 <- br >>= findType
+            s1 <- br
             (p',env) <- tiPat p s1
             localEnv env $ do
                 lamPoly ps e s2' (p':rs)  -- TODO poly
@@ -140,7 +140,7 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
         lam _ _ _ _ = fail "lambda type mismatch"
         lamPoly ps e s@TBox {} rs = lam ps e s rs
         lamPoly ps e s rs = do
-            s <- freshInstance s
+            --(_,s) <- skolomize s
             lam ps e s rs
 
 
@@ -185,6 +185,7 @@ tiExpr expr@(HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u) []] t) typ = with
     (rb,tb) <- newBox Star
     u' <- tiExpr u tb
     rr <- rb >>= findType
+    rr <- flattenType rr
     rr <- generalize rr
     t' <- localEnv (Map.singleton (toName Val x) rr) $ do
         tiExpr t typ

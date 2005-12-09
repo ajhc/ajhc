@@ -9,6 +9,7 @@ import Doc.DocLike
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Monad
 import GenUtil
+import Data.IORef
 
 pretty vv = show ( pprint vv :: P.Doc)
 ppretty vv = parens (pretty vv)
@@ -22,6 +23,17 @@ subsumes s1 s2 = do
    where
     -- SBOXY
     sub tb@TBox {} b = boxyMatch tb b
+
+    sub (TArrow a b) (TVar t) | isMetaTV t = do
+        a' <- newTVar (kind a)
+        b' <- newTVar (kind b)
+        varBind t (TArrow a' b')
+        (TArrow a b) `subsumes` (TArrow a' b')
+    sub (TAp a b) (TVar t) | isMetaTV t = do
+        a' <- newTVar (kind a)
+        b' <- newTVar (kind b)
+        varBind t (TAp a' b')
+        (TAp a b) `subsumes` (TAp a' b')
 
     -- SKOL needs to be after SBOXY
     sub s1 fa@TForAll {} = do
@@ -61,7 +73,10 @@ subsumes s1 s2 = do
     sub a b | isTau a = case b of
         (TBox {typeBox = b}) -> fillBox b a
         _ | isTau b -> unify a b -- TODO verify? fail $ "taus don't match in MONO" ++ show (a,b)
-        _ -> fail $ "subsumes failure: " ++ show (a,b)
+        _ -> do
+            a' <- findType a
+            b' <- findType b
+            fail $ "subsumes failure: " ++ show ((a,b),(a',b'))
 
     sub a b = fail $ "subsumes failure: " ++ show (a,b)
 
@@ -138,6 +153,18 @@ boxyMatch s1 s2 = do
      --   fillBox box (TForAll vs (ps :=> a))
      --   return False
 
+    bm (TArrow a b) (TVar t) | isMetaTV t = do
+        a' <- newTVar (kind a)
+        b' <- newTVar (kind b)
+        varBind t (TArrow a' b')
+        (TArrow a b) `boxyMatch` (TArrow a' b')
+        return False
+    bm (TAp a b) (TVar t) | isMetaTV t = do
+        a' <- newTVar (kind a)
+        b' <- newTVar (kind b)
+        varBind t (TAp a' b')
+        (TAp a b) `boxyMatch` (TAp a' b')
+        return False
 
     -- MEQ1 MEQ2  SYM
     bm a b | isTau a = case b of
@@ -145,6 +172,5 @@ boxyMatch s1 s2 = do
         _ | isTau b -> unify a b >> return False -- TODO, verify? fail $ "taus don't match in MEQ[12]" ++ show (a,b)
           | otherwise -> return True
     bm _ _ = return True
-
 
 

@@ -7,6 +7,7 @@ module FrontEnd.Tc.Type(
     Qual(..),
     Tyvar(..),
     Tycon(..),
+    tv,
     kind
     ) where
 
@@ -15,7 +16,7 @@ import Control.Monad.Writer
 import Data.IORef
 
 import Representation
-import Type(kind)
+import Type(kind,tv)
 
 type Box = IORef Type
 type Sigma' = Sigma
