@@ -33,11 +33,11 @@ subsumes s1 s2 = do
     -- F1
     sub (TArrow s1 s2) (TArrow s3 s4) = do
         boxyMatch s3 s1
-        subsumes s2 s4
+        s2 `subsumes` s4
     -- F2
-    sub t@(TArrow _ _) (TBox _ box) = do
-        (oa,a) <- newBox Star
-        (ob,b) <- newBox Star
+    sub t@(TArrow s1 s2) (TBox _ box) = do
+        (oa,a) <- newBox (kind s1)
+        (ob,b) <- newBox (kind s2)
         subsumes t (a `fn` b)
         na <- oa
         nb <- ob
@@ -100,14 +100,15 @@ boxyMatch s1 s2 = do
 
     bm a b | (TCon ca,as) <- fromTAp a, (TCon cb,bs) <- fromTAp b = case ca == cb of
         False -> fail $ "constructor mismatch: " ++ show (a,b)
-        True -> sequence_ [boxyMatch x y | x <- as | y <- bs] >> return False
+        True | length as == length bs -> sequence_ [boxyMatch x y | x <- as | y <- bs] >> return False
+        _ ->   fail $ "constructor args mismatch: " ++ show (a,b)
 
 
     -- SEQ1
-    bm (TForAll vs (ps :=> t)) (TBox _ box) = do
-        (ra,a) <- newBox Star
+    bm (TForAll vs (ps :=> t)) (TBox k box) = do
+        (ra,a) <- newBox k
         boxyMatch t a
-        a <- ra
+        a <- ra >>= findType
         fillBox box (TForAll vs (ps :=> a))
         return False
 
