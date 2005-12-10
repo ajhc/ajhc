@@ -25,6 +25,7 @@ import FrontEnd.Rename
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Main
 import FrontEnd.Tc.Monad
+import FrontEnd.Tc.Type
 import GenUtil
 import Class
 import Ho
@@ -35,9 +36,9 @@ import Options
 import qualified FrontEnd.Infix
 import qualified HsPretty
 import qualified Text.PrettyPrint.HughesPJ as PP
-import Representation
+import Representation hiding(flattenType)
 import TIMain(tiProgram)
-import Type(schemeToType,quantify,tv)
+import Type(schemeToType)
 import TypeSynonyms(showSynonym)
 import TypeSyns
 import Util.Interact
@@ -218,9 +219,10 @@ tcStatementTc (HsQualifier e) = do
     ps' <- flattenType ps'
     vv <- rbox
     let ps = Class.simplify (hoClassHierarchy ho) ps'
-    qt <- flattenType (ps :=> vv)
-    let vv' = quantify (tv vv) qt
-    liftIO $ putStrLn $ show (text "::" <+> pprint vv' :: P.Doc)
+    (ps :=> vv) <- flattenType (ps :=> vv)
+    TForAll vs ([] :=> t) <- generalize vv -- quantify (tv vv) qt
+    --liftIO $ putStrLn $ show (text "::" <+> pprint vv' :: P.Doc)
+    liftIO $ putStrLn $   "::" <+> prettyPrintType (TForAll vs (ps :=> t))
 
 
 calcImports :: Monad m => Ho -> Bool -> Module -> m [(Name,[Name])]

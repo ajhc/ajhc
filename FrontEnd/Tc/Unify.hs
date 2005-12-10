@@ -9,7 +9,6 @@ import Doc.DocLike
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Monad
 import GenUtil
-import Data.IORef
 
 pretty vv = show ( pprint vv :: P.Doc)
 ppretty vv = parens (pretty vv)
@@ -24,12 +23,12 @@ subsumes s1 s2 = do
     -- SBOXY
     sub tb@TBox {} b = boxyMatch tb b
 
-    sub (TArrow a b) (TVar t) | isMetaTV t = do
+    sub (TArrow a b) t | Just t <- extractMetaTV t = do
         a' <- newTVar (kind a)
         b' <- newTVar (kind b)
         varBind t (TArrow a' b')
         (TArrow a b) `subsumes` (TArrow a' b')
-    sub (TAp a b) (TVar t) | isMetaTV t = do
+    sub (TAp a b) t | Just t <- extractMetaTV t = do
         a' <- newTVar (kind a)
         b' <- newTVar (kind b)
         varBind t (TAp a' b')
@@ -153,13 +152,13 @@ boxyMatch s1 s2 = do
      --   fillBox box (TForAll vs (ps :=> a))
      --   return False
 
-    bm (TArrow a b) (TVar t) | isMetaTV t = do
+    bm (TArrow a b) t | Just t <- extractMetaTV t = do
         a' <- newTVar (kind a)
         b' <- newTVar (kind b)
         varBind t (TArrow a' b')
         (TArrow a b) `boxyMatch` (TArrow a' b')
         return False
-    bm (TAp a b) (TVar t) | isMetaTV t = do
+    bm (TAp a b) t | Just t <- extractMetaTV t = do
         a' <- newTVar (kind a)
         b' <- newTVar (kind b)
         varBind t (TAp a' b')

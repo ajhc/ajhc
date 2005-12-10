@@ -272,7 +272,7 @@ prettyPrintTypeM t
     tyvar d = if dump FD.Tyvar then parens d else empty
 
 
-instance PPrint Doc Tycon where
+instance DocLike d => PPrint d Tycon where
    pprint (Tycon i _) = pprint i
 
 infixr      4 `fn`

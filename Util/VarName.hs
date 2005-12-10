@@ -1,5 +1,6 @@
 module Util.VarName(
     VarNameT(),
+    VarName(),
     runVarNameT,
     runVarName,
     newName,

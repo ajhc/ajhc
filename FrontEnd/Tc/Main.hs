@@ -23,7 +23,7 @@ import HsSyn
 import Name.Name
 import Name.Names
 import Name.VConsts
-import Representation
+--import Representation
 import Type
 
 
@@ -153,6 +153,14 @@ tiExpr (HsIf e e1 e2) typ = withContext (simpleMsg $ "in the if expression\n   i
     e2 <- tiExpr e2 typ
     return (HsIf e e1 e2)
 
+--tiExpr env tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ render $ ppHsExp tuple) $ do
+--    psasts <- mapM tiExpr exps
+--    let typeList = map trd3 psasts
+--    let preds = concatMap fst3 psasts
+--    let env1 = Map.unions $ map snd3 psasts
+--    return (preds, env1, tTTuple typeList)
+
+
 -- tuples can't be empty, () is not a tuple
 --tiExpr env tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ render $ ppHsExp tuple) $ do
 --    psasts <- mapM tiExpr exps
@@ -187,6 +195,7 @@ tiExpr expr@(HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u) []] t) typ = with
     rr <- rb >>= findType
     rr <- flattenType rr
     rr <- generalize rr
+    addToCollectedEnv $ (Map.singleton (toName Val x) rr)
     t' <- localEnv (Map.singleton (toName Val x) rr) $ do
         tiExpr t typ
     return (HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u') []] t')
@@ -214,6 +223,9 @@ tiPat (HsPLit l) typ = do
 -- the pat, since the type checking of the literal
 -- will do this for us
 tiPat (HsPNeg pat) typ = tiPat pat typ
+
+tiPat (HsPIrrPat p) typ = tiPat p typ
+tiPat (HsPParen p) typ = tiPat p typ
 
 {-
 
@@ -247,9 +259,6 @@ tiPat (HsPAsPat i pat)
       let newEnv = Map.insert  (toName Val i) (toScheme t) env
       return (ps, newEnv, t)
 
-tiPat (HsPIrrPat p) = tiPat p
-
-tiPat (HsPParen p) = tiPat p
 
 tiPats :: [HsPat] -> TI ([Pred], Map.Map Name Scheme, [Type])
 tiPats pats =

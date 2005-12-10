@@ -45,8 +45,6 @@ import FrontEnd.Tc.Type
 import GenUtil
 import Name.Name
 import Options
-import Representation
-import Type(tv)
 import Warning
 
 type TypeEnv = Map.Map Name Sigma
@@ -169,7 +167,7 @@ newBox :: Kind -> Tc (Tc Type,Type)
 newBox k = do
     u <- newUniq
     r <- liftIO $ newIORef (error "empty box")
-    return (liftIO $ readIORef r >>= flattenType, TBox k u r)
+    return (liftIO $ readIORef r >>= flattenMetaVars, TBox k u r)
 
 mgu     :: (MonadIO m) => Type -> Type -> m (Maybe String)
 
@@ -347,15 +345,16 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
 
 generalize :: Rho -> Tc Sigma
 generalize r = do
-    let mtvs = (filter isMetaTV (tv r))
+    let mtvs = freeMetaVars r
     nvs <- mapM (newVar . tyvarKind) [ t | t <- mtvs]
     sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- mtvs ]
-    freshSigma (tForAll nvs ([] :=> r))
+    r <- flattenMetaVars r
+    return $ TForAll nvs ([] :=> r)
 
 varBind :: (MonadIO m) => Tyvar -> Type -> m ()
 varBind u t | not (isMetaTV u) = error "varBind: not metatv"
             | t == TVar u   = return ()
-            | u `elem` tv t = fail "varBind: occurs check fails"
+            | u `elem` freeMetaVars t = fail "varBind: occurs check fails"
             | kind u == kind t, Just r <- tyvarRef u = do
                 x <- liftIO $ readIORef r
                 case x of
