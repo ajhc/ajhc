@@ -2,7 +2,6 @@
 module FrontEnd.Tc.Unify(subsumes,boxyMatch) where
 
 import Control.Monad.Writer
-import qualified Text.PrettyPrint.HughesPJ as P
 
 import Doc.PPrint
 import Doc.DocLike
@@ -10,7 +9,7 @@ import FrontEnd.Tc.Type
 import FrontEnd.Tc.Monad
 import GenUtil
 
-pretty vv = show ( pprint vv :: P.Doc)
+pretty vv = prettyPrintType vv
 ppretty vv = parens (pretty vv)
 
 subsumes :: Sigma' -> Sigma' -> Tc ()
@@ -73,11 +72,9 @@ subsumes s1 s2 = do
         (TBox {typeBox = b}) -> fillBox b a
         _ | isTau b -> unify a b -- TODO verify? fail $ "taus don't match in MONO" ++ show (a,b)
         _ -> do
-            a' <- findType a
-            b' <- findType b
-            fail $ "subsumes failure: " ++ show ((a,b),(a',b'))
+            fail $ "subsumes failure: "  <> ppretty s1 <+> ppretty s2
 
-    sub a b = fail $ "subsumes failure: " ++ show (a,b)
+    sub a b = fail $ "subsumes failure: " <> ppretty s1 <+> ppretty s2
 
 
 boxyMatch :: Sigma' -> Sigma' -> Tc ()
@@ -89,7 +86,7 @@ boxyMatch s1 s2 = do
     if b then do
         liftIO $ putStrLn $ "boxyMatch: " <> ppretty s2 <+> ppretty s1
         b' <- bm s2 s1
-        when b' $  fail $ "boxyMatch failure: " ++ show (s1,s2)
+        when b' $  fail $ "boxyMatch failure: " <> ppretty s1 <+> ppretty s2
      else return ()
    where
     -- BBEQ

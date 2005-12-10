@@ -240,7 +240,7 @@ newTVar k   = do
     te <- ask
     n <- newUniq
     r <- liftIO $ newIORef Nothing
-    let ident = toName TypeVal (tcInfoModName $ tcInfo te,'v':show n)
+    let ident = toName TypeVal ('v':show n)
         v = tyvar ident k (Just r)
     return $ TVar v
 

@@ -18,15 +18,15 @@ module FrontEnd.Tc.Type(
     ) where
 
 import Control.Monad.Writer
-import List
 import Data.IORef
+import List
 
 import Doc.DocLike
-import Util.VarName
-import Unparse
 import Doc.PPrint
 import Representation
 import Type(kind)
+import Unparse
+import Util.VarName
 
 type Box = IORef Type
 type Sigma' = Sigma
@@ -83,11 +83,11 @@ fromTAp t = f t [] where
 
 extractMetaTV :: Monad m => Type -> m MetaTV
 extractMetaTV (TVar t) | isMetaTV t = return t
-extractMetaTV t = fail $ "not a metaTyVar:" ++ prettyPrintType t
+extractMetaTV t = fail $ "not a metaTyVar:" ++ show t
 
 extractTyVar ::  Monad m => Type -> m Tyvar
 extractTyVar (TVar t) | not $ isMetaTV t = return t
-extractTyVar t = fail $ "not a Var:" ++ prettyPrintType t
+extractTyVar t = fail $ "not a Var:" ++ show t
 
 
 prettyPrintType :: DocLike d => Type -> d
@@ -105,9 +105,16 @@ prettyPrintType t  = unparse $ runVarName (f t) where
         ps' <- mapM fp ps
         return $ fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text ". " <> if null ps then empty else tupled (map unparse ps') <+> text "=> ")  (atomize t')
     f (TCon tycon) = return $ atom (pprint tycon)
-    f (TVar tyvar) = do
+    f t | Just tyvar <- extractTyVar t = do
         vo <- newLookupName ['a' .. ] () tyvar
         return $ atom $ char vo
+           -- check for the Prelude.[] special case
+    f t | Just tyvar <- extractMetaTV t = do
+        --vo <- newLookupName ['a' .. ] () tyvar
+        return $ atom $  pprint tyvar
+    --f t | Just tyvar <- extractMetaTV t = do
+    --    vo <- newLookupName ['a' .. ] () tyvar
+    --    return $ atom $  text (vo:"'")
            -- check for the Prelude.[] special case
     f (TAp t1 t2) = do
         t1 <- f t1
