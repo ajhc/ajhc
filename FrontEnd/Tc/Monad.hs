@@ -1,25 +1,27 @@
 module FrontEnd.Tc.Monad(
     addPreds,
     addToCollectedEnv,
+    boxyInstantiate,
+    boxySpec,
     freshInstance,
     freshSigma,
+    generalize,
+    getClassHierarchy,
     getKindEnv,
     inst,
     localEnv,
+    quantify,
     lookupName,
     newBox,
     newTVar,
     runTc,
+    skolomize,
     Tc(),
     TcInfo(..),
     tcInfoEmpty,
     TypeEnv(),
-    varBind,
-    skolomize,
-    boxySpec,
-    boxyInstantiate,
     unificationError,
-    generalize,
+    varBind,
     withContext
     ) where
 
@@ -278,12 +280,16 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
 
 
 generalize :: Rho -> Tc Sigma
-generalize r = do
-    let mtvs = freeMetaVars r
-    nvs <- mapM (newVar . tyvarKind) [ t | t <- mtvs]
-    sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- mtvs ]
-    r <- flattenMetaVars r
-    return $ TForAll nvs ([] :=> r)
+generalize r = quantify (freeMetaVars r) [] r
+
+
+quantify :: [MetaTV] -> [Pred] -> Rho -> Tc Sigma
+quantify vs ps r | all isMetaTV vs = do
+    r <- flattenType r
+    nvs <- mapM (newVar . tyvarKind) [ t | t <- vs]
+    sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- vs ]
+    r <- flattenType (ps :=> r)
+    return $ TForAll nvs r
 
 varBind :: Tyvar -> Type -> Tc ()
 varBind u t | not (isMetaTV u) = error "varBind: not metatv"
@@ -310,7 +316,8 @@ instance Monad Tc where
     fail s = Tc $ do
         st <- ask
         liftIO $ processIOErrors
-        liftIO $ fail s -- typeError (Failure s) (tcDiagnostics st)
+        Left x <- typeError (Failure s) (tcDiagnostics st)
+        liftIO $ fail x
 
 instance MonadWarn Tc where
     addWarning w = liftIO $ processErrors [w]
