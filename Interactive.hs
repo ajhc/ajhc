@@ -103,8 +103,14 @@ interact ho = mre where
         putStrLn "Welcome to the jhc interactive experience. use :help for help."
         putStrLn versionString
         putStrLn "--------------------------------------------------------------"
+        runInteraction initialInteract ":execfile jhci.rc"
         beginInteraction initialInteract
-    initialInteract = emptyInteract { interactSettables = ["prog", "args"], interactVersion = versionString, interactCommands = commands, interactExpr = do_expr }
+    initialInteract = emptyInteract {
+        interactSettables = ["prog", "args"],
+        interactVersion = versionString,
+        interactCommands = commands,
+        interactExpr = do_expr
+        }
     dataTable = hoDataTable ho
     commands = [cmd_mods,cmd_grep]
     cmd_mods = InteractCommand { commandName = ":mods", commandHelp = "mods currently loaded modules", commandAction = do_mods }

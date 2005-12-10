@@ -40,6 +40,9 @@ commands = [
     (":set", "set options"),
     (":unset", "unset options"),
     (":execfile", "run sequence of commands from a file"),
+--    (":execfile!", "run sequence of commands from a file if it exists"),
+    (":echo", "echo argument to screen"),
+    (":addhist", "add argument to command line history"),
     (":help", "print help table")
     ]
 
@@ -68,7 +71,9 @@ data Interact = Interact {
     interactSettables :: [String],          -- ^ possible things that may be set
     interactVersion :: String,              -- ^ version string to print
     interactSet :: Map.Map String String,   -- ^ vars that are actually set
-    interactExpr :: Interact -> String -> IO Interact -- ^ what to run on a bare expression
+    interactExpr :: Interact -> String -> IO Interact, -- ^ what to run on a bare expression
+    interactRC   :: [String],               -- ^ commands to run at startup
+    interactEcho :: Bool                    -- ^ whether to echo commands
     }
 
 emptyInteract = Interact {
@@ -77,7 +82,9 @@ emptyInteract = Interact {
     interactSettables = [],
     interactVersion = "(none)",
     interactSet = Map.empty,
-    interactExpr = \i s -> putStrLn ("Unknown Command: " ++ s) >> return i
+    interactExpr = \i s -> putStrLn ("Unknown Command: " ++ s) >> return i,
+    interactRC = [],
+    interactEcho = False
     }
 
 cleanupWhitespace s = reverse $ dropWhile isSpace (reverse $ dropWhile isSpace s)
@@ -92,6 +99,7 @@ runInteractions act (x:xs) = do
 
 runInteraction :: Interact -> String -> IO Interact
 runInteraction act s = do
+    act <- runInteractions act { interactRC = [] } (interactRC act)
     let commands' = commands ++ [ (n,h) | InteractCommand { commandName = n, commandHelp = h } <- interactCommands act ]
         help_text = unlines $ buildTableLL (commands' ++ extra_help)
     let args s =  [ bb | bb@(n,_) <- commands', s `isPrefixOf` n ]
@@ -108,12 +116,15 @@ runInteraction act s = do
         Right "" -> return act
         Right ('!':rest) -> System.system rest >> return act
         Right s -> do
+            when (interactEcho act) $ putStrLn $ (interactPrompt act) ++ s
             act' <- interactExpr act act s
             return act'
         Left (cmd,arg) -> case fsts $ args cmd of
             [":quit"] -> putStrLn "Bye!" >> exitSuccess
             [":help"] -> putStrLn help_text >> return act
             [":version"] -> putStrLn (interactVersion act) >> return act
+            [":echo"] -> putStrLn arg >> return act
+            [":addhist"] -> addHistory arg >> return act
             [":cd"] -> catch (setCurrentDirectory arg) (\_ -> putStrLn $ "Could not change to directory: " ++ arg) >> return act
             [":pwd"] -> (catch getCurrentDirectory (\_ -> putStrLn "Could not get current directory." >> return "") >>= putStrLn)  >> return act
             [":set"] -> case simpleUnquote arg of
@@ -124,8 +135,12 @@ runInteraction act s = do
                     return act { interactSet = Map.fromList [ x | x@(a,_) <- ts, a `elem` interactSettables act ] `Map.union` interactSet act }
             [":unset"] -> return act { interactSet = interactSet act Map.\\ Map.fromList [ (cleanupWhitespace rs,"") | rs <- simpleUnquote arg] }
             [":execfile"] -> do
-                fc <- catch (readFile arg) (\_ -> putStrLn "Could not read file." >> return "")
-                runInteractions act (lines fc)
+                fc <- catch (readFile arg) (\_ -> putStrLn ("Could not read file: " ++ arg) >> return "")
+                act <- runInteractions act { interactEcho = True } (lines fc)
+                return act { interactEcho = False }
+            [":execfile!"] -> do
+                fc <- catch (readFile arg) (\_ -> return "")
+                runInteractions act { interactEcho = True } (lines fc)
             [m] -> let [a] =  [ a | InteractCommand { commandName = n, commandAction = a } <-  interactCommands act, n == m] in do
                 act' <- a act m arg
                 return act'
