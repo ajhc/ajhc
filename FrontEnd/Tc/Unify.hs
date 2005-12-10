@@ -32,6 +32,16 @@ subsumes s1 s2 = do
         b' <- newTVar (kind b)
         varBind t (TAp a' b')
         (TAp a b) `subsumes` (TAp a' b')
+    sub t (TArrow a b) | Just t <- extractMetaTV t = do
+        a' <- newTVar (kind a)
+        b' <- newTVar (kind b)
+        varBind t (TArrow a' b')
+        (TArrow a' b') `subsumes` (TArrow a b)
+    sub t (TAp a b) | Just t <- extractMetaTV t = do
+        a' <- newTVar (kind a)
+        b' <- newTVar (kind b)
+        varBind t (TAp a' b')
+        (TAp a' b') `subsumes` (TAp a b)
 
     -- SKOL needs to be after SBOXY
     sub s1 fa@TForAll {} = do
@@ -126,9 +136,11 @@ boxyMatch s1 s2 = do
     -- CEQ2
 
     bm a b | (TCon ca,as) <- fromTAp a, (TCon cb,bs) <- fromTAp b = case ca == cb of
-        False -> fail $ "constructor mismatch: " ++ show (a,b)
+        -- False -> fail $ "constructor mismatch: " ++ show (a,b)
+        False -> unificationError a b
         True | length as == length bs -> sequence_ [boxyMatch x y | x <- as | y <- bs] >> return False
-        _ ->   fail $ "constructor args mismatch: " ++ show (a,b)
+        -- _ ->   fail $ "constructor args mismatch: " ++ show (a,b)
+        _ -> unificationError a b
 
 
     -- SEQ1
@@ -162,6 +174,12 @@ boxyMatch s1 s2 = do
         (TAp a b) `boxyMatch` (TAp a' b')
         return False
 
+    -- XXX app
+    bm (TAp a b) (TAp c d) = do
+        a `boxyMatch` c
+        b `boxyMatch` d
+        return False
+
     -- MEQ1 MEQ2  SYM
     bm a b | isTau a = case b of
         (TBox { typeBox = b}) -> fillBox b a >> return False
@@ -170,3 +188,33 @@ boxyMatch s1 s2 = do
     bm _ _ = return True
 
 
+unify      :: Tau -> Tau -> Tc ()
+unify t1 t2 = do
+    t1' <- findType t1
+    t2' <- findType t2
+    mgu t1' t2'
+
+mgu (TAp l r) (TAp l' r')
+   = do s1 <- unify l l'
+        s2 <- unify r r'
+        return ()
+mgu (TArrow l r) (TArrow l' r')
+   = do s1 <- unify l l'
+        s2 <- unify r r'
+        return ()
+mgu (TVar u) t | isMetaTV u  = varBind u t
+mgu t (TVar u) | isMetaTV u  = varBind u t
+mgu (TVar a) (TVar b) | a == b = return ()
+mgu c1@(TCon tc1) c2@(TCon tc2)
+           | tc1==tc2 = return ()
+           -- | otherwise = fail $ "mgu: Constructors don't match:" ++ show (c1,c2)
+           | otherwise = unificationError c1 c2
+mgu TForAll {} _ = error "attempt to unify TForall"
+mgu _ TForAll {} = error "attempt to unify TForall"
+mgu _ TBox {} = error "attempt to unify TBox"
+mgu TBox {} _ = error "attempt to unify TBox"
+mgu t1 t2  = unificationError t1 t2
+
+unifyList :: [Type] -> Tc ()
+unifyList (t1:t2:ts) = unify t1 t2 >> unifyList (t2:ts)
+unifyList _ = return ()

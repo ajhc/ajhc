@@ -14,12 +14,11 @@ module FrontEnd.Tc.Monad(
     TcInfo(..),
     tcInfoEmpty,
     TypeEnv(),
-    unify,
     varBind,
     skolomize,
     boxySpec,
     boxyInstantiate,
-    unifyList,
+    unificationError,
     generalize,
     withContext
     ) where
@@ -141,25 +140,6 @@ dConScheme conName = do
                               "\nin this environment:\n" ++ show env
 
 
-unify      :: Tau -> Tau -> Tc ()
-unify t1 t2 = do
-    t1' <- findType t1
-    t2' <- findType t2
-    b <- mgu t1' t2'
-    case b of
-        Nothing -> return ()
-        Just err -> do
-                  diagnosis <- getErrorContext
-                  typeError (Unification $ "attempted to unify " ++
-                                           pretty t1' ++
-                                           " with " ++
-                                           pretty t2' ++ "\n" ++ err)
-                            diagnosis
-
-unifyList :: [Type] -> Tc ()
-unifyList (t1:t2:ts) = unify t1 t2 >> unifyList (t2:ts)
-unifyList _ = return ()
-
 
 -- | returns a new box and a function to read said box.
 
@@ -169,62 +149,16 @@ newBox k = do
     r <- liftIO $ newIORef (error "empty box")
     return (liftIO $ readIORef r >>= flattenMetaVars, TBox k u r)
 
-mgu     :: (MonadIO m) => Type -> Type -> m (Maybe String)
 
-mgu x y = do
-    r <- runErrorT (mgu'' x y)
-    case r of
-        Right _ -> return Nothing
-        Left (err::String) -> return (Just err)
-mgu'' x y = do
-    x' <- findType x
-    y' <- findType y
-    mgu' x' y'
-mgu' (TAp l r) (TAp l' r')
-   = do s1 <- mgu'' l l'
-        s2 <- mgu'' r r'
-        return ()
-mgu' (TArrow l r) (TArrow l' r')
-   = do s1 <- mgu'' l l'
-        s2 <- mgu'' r r'
-        return ()
-mgu' (TVar u) t | isMetaTV u  = varBind u t
-mgu' t (TVar u) | isMetaTV u  = varBind u t
-mgu' (TVar a) (TVar b) | a == b = return ()
-mgu' c1@(TCon tc1) c2@(TCon tc2)
-           | tc1==tc2 = return ()
-           | otherwise = fail $ "mgu: Constructors don't match:" ++ show (c1,c2)
-mgu' TForAll {} _ = error "attempt to unify TForall"
-mgu' _ TForAll {} = error "attempt to unify TForall"
-mgu' _ TBox {} = error "attempt to unify TBox"
-mgu' TBox {} _ = error "attempt to unify TBox"
-mgu' t1 t2  = fail $ "mgu: types do not unify:" ++ show (t1,t2)
 
-{-
+throwError s t1 t2 = do
+    diagnosis <- getErrorContext
+    typeError (Unification $ "attempted to unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2) diagnosis
 
-unify      :: Type -> Type -> TI ()
-unify t1 t2 = do
-    t1' <- findType t1
-    t2' <- findType t2
-    b <- mgu t1' t2'
-    case b of
-        Just u -> return () -- extSubst u
-        Nothing -> do
-                  diagnosis <- getErrorContext
-                  typeError (Unification $ "attempted to unify " ++
-                                           pretty t1' ++
-                                           " with " ++
-                                           pretty t2')
-                            diagnosis
 
-unifyList :: [Type] -> TI ()
-unifyList [] = return ()
-unifyList [_] = return ()
-unifyList (t1:t2:ts) = do
-       unify t1 t2
-       unifyList (t2:ts)
-
--}
+unificationError t1 t2 = do
+    diagnosis <- getErrorContext
+    typeError (Unification $ "attempted to unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2) diagnosis
 
 
 lookupName :: Name -> Tc Sigma
@@ -351,14 +285,14 @@ generalize r = do
     r <- flattenMetaVars r
     return $ TForAll nvs ([] :=> r)
 
-varBind :: (MonadIO m) => Tyvar -> Type -> m ()
+varBind :: Tyvar -> Type -> Tc ()
 varBind u t | not (isMetaTV u) = error "varBind: not metatv"
             | t == TVar u   = return ()
-            | u `elem` freeMetaVars t = fail "varBind: occurs check fails"
+            | u `elem` freeMetaVars t = unificationError (TVar u) t -- occurs check
             | kind u == kind t, Just r <- tyvarRef u = do
                 x <- liftIO $ readIORef r
                 case x of
-                    Just r -> fail $ "varBind: bining unfree: " ++ show (u,t,r)
+                    Just r -> error $ "varBind: bining unfree: " ++ show (u,t,r)
                     Nothing -> liftIO $ writeIORef r (Just t)
             | otherwise        = error $ "varBind: kinds do not match:" ++ show (u,t)
 
