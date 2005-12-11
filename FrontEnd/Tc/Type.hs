@@ -26,6 +26,8 @@ import Doc.PPrint
 import Representation
 import Type(kind)
 import Unparse
+import Name.Names
+import Name.VConsts
 import Util.VarName
 
 type Box = IORef Type
@@ -79,7 +81,7 @@ isRho r = isRho' r && not (isBoxy r)
 
 fromTAp t = f t [] where
     f (TAp a b) rs = f a (b:rs)
-    f t rs = (t,reverse rs)
+    f t rs = (t,rs)
 
 extractMetaTV :: Monad m => Type -> m MetaTV
 extractMetaTV (TVar t) | isMetaTV t = return t
@@ -94,28 +96,30 @@ prettyPrintType :: DocLike d => Type -> d
 prettyPrintType t  = unparse $ runVarName (f t) where
     arr = bop (R,0) (space <> text "->" <> space)
     app = bop (L,100) (text " ")
---    fp :: DocLike d => Pred -> VarName Atom Char (Unparse d)
     fp (IsIn cn t) = do
         t' <- f t
         return (atom (text $ show cn) `app` t')
---    f :: DocLike d => Type -> VarName Atom Char (Unparse d)
+    f (TForAll [] ([] :=> t)) = f t
     f (TForAll vs (ps :=> t)) = do
         ts' <- mapM (newLookupName ['a'..] ()) vs
         t' <- f t
         ps' <- mapM fp ps
-        return $ fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text ". " <> if null ps then empty else tupled (map unparse ps') <+> text "=> ")  (atomize t')
+        return $ case ps' of
+            [] ->  fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text ". ")  (atomize t')
+            [p] -> fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text "." <+> unparse p <+> text "=> ")  (atomize t')
+            ps ->  fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text "." <+> tupled (map unparse ps) <+> text "=> ")  (atomize t')
     f (TCon tycon) = return $ atom (pprint tycon)
     f t | Just tyvar <- extractTyVar t = do
         vo <- newLookupName ['a' .. ] () tyvar
         return $ atom $ char vo
-           -- check for the Prelude.[] special case
     f t | Just tyvar <- extractMetaTV t = do
-        --vo <- newLookupName ['a' .. ] () tyvar
         return $ atom $  pprint tyvar
-    --f t | Just tyvar <- extractMetaTV t = do
-    --    vo <- newLookupName ['a' .. ] () tyvar
-    --    return $ atom $  text (vo:"'")
-           -- check for the Prelude.[] special case
+    f (TAp (TCon (Tycon n _)) x) | n == tc_List = do
+        x <- f x
+        return $ atom (char '[' <> unparse x <> char ']')
+    f ta@(TAp {}) | (TCon (Tycon c _),xs) <- fromTAp ta, Just _ <- fromTupname c = do
+        xs <- mapM f xs
+        return $ atom (tupled (map unparse xs))
     f (TAp t1 t2) = do
         t1 <- f t1
         t2 <- f t2

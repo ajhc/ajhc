@@ -656,6 +656,7 @@ inHnf (IsIn c t) = hnf t
        hnf (TCon tc) = False
        hnf (TAp t _) = hnf t
        hnf (TArrow _t1 _t2) = False
+       hnf TForAll {} = False
 --       hnf (TTuple _args) = False
 
 --simplify          :: ClassHierarchy -> [Pred] -> [Pred] -> [Pred]

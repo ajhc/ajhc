@@ -49,6 +49,12 @@ fromUnboxedNameTuple n = case show n of
     '(':'#':xs | (ns@(_:_),"#)") <- span isDigit xs -> return (read ns::Int)
     _ -> fail $ "Not unboxed tuple: " ++ show n
 
+instance FromTupname Name where
+    fromTupname name | m == "Prelude" = fromTupname (nn::String) where
+        (_,(m,nn)) = fromName name
+    fromTupname _ = fail "not a tuple"
+
+
 
 -- The constructors
 

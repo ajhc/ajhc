@@ -23,8 +23,6 @@ import HsSyn
 import Name.Name
 import Name.Names
 import Name.VConsts
---import Representation
-import Type
 
 
 
@@ -36,13 +34,11 @@ type Impl = HsDecl
 type BindGroup = ([Expl], [Impl])
 type Program = [BindGroup]
 
-instance Types a => Types (Name, a) where
-   apply s (x, y) = (x, apply s y)
-   tv (_, y) = tv y
 
-instance Types TypeEnv where
-   apply s = Map.map (\e -> apply s e)
-   tv env = tv $ Map.elems env
+--tcApps e as typ = f e as typ [] where
+--    f e (a:as) typ rs = do
+--        (e1,e2) <- tcApp e a typ
+
 
 
 tcApp e1 e2 typ = do
@@ -153,26 +149,24 @@ tiExpr (HsIf e e1 e2) typ = withContext (simpleMsg $ "in the if expression\n   i
     e2 <- tiExpr e2 typ
     return (HsIf e e1 e2)
 
---tiExpr env tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ render $ ppHsExp tuple) $ do
---    psasts <- mapM tiExpr exps
---    let typeList = map trd3 psasts
---    let preds = concatMap fst3 psasts
---    let env1 = Map.unions $ map snd3 psasts
---    return (preds, env1, tTTuple typeList)
+tiExpr tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ render $ ppHsExp tuple) $ do
+    apps <- tiExpr (foldl HsApp (HsCon (toTuple (length exps))) exps) typ
+    let f (HsApp a b) exps = f a (b:exps)
+        f (HsCon {}) exps = reverse exps
+    return $ HsTuple (f apps [])
+    --psasts <- mapM tiExpr exps
+    --let typeList = map trd3 psasts
+    --let preds = concatMap fst3 psasts
+    --let env1 = Map.unions $ map snd3 psasts
+    --return (preds, env1, tTTuple typeList)
 
 
--- tuples can't be empty, () is not a tuple
---tiExpr env tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ render $ ppHsExp tuple) $ do
---    psasts <- mapM tiExpr exps
---    let typeList = map trd3 psasts
---    let preds = concatMap fst3 psasts
---    let env1 = Map.unions $ map snd3 psasts
---    return (preds, env1, tTTuple typeList)
 
 -- special case for the empty list
 tiExpr (HsList []) typ = do
-        v <- newTVar Star
-        (TAp tList v) `subsumes` typ
+        --v <- newTVar Star
+        (_,box) <- newBox Star
+        (TAp tList box) `subsumes` typ
         return (HsList [])
 
 -- non empty list
@@ -190,11 +184,15 @@ tiExpr (HsDo stmts) typ = do
                     (tiExpr newExp typ)
 
 tiExpr expr@(HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u) []] t) typ = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
+    ch <- getClassHierarchy
     (rb,tb) <- newBox Star
-    u' <- tiExpr u tb
+    (u',ds) <- listen $ tiExpr u tb
     rr <- rb >>= findType
-    rr <- flattenType rr
-    rr <- generalize rr
+    ds :=> rr <- flattenType (ds :=> rr)
+    let tvs = freeMetaVars rr
+    (ds,rs) <- (split ch tvs ds)
+    addPreds ds
+    rr <- quantify tvs rs rr
     addToCollectedEnv $ (Map.singleton (toName Val x) rr)
     t' <- localEnv (Map.singleton (toName Val x) rr) $ do
         tiExpr t typ
@@ -294,7 +292,7 @@ tiExpr env expr@(HsLet decls e) = withContext (makeMsg "in the let binding" $ re
          (qs, env2, t) <- tiExpr (env1 `Map.union` env) e
          -- keep the let bound type assumptions in the environment
 
- tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n   case " ++ show e ++ " of ...") $ do
+tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n   case " ++ show e ++ " of ...") $ do
         (pse, env1, te)    <- tiExpr env e
         psastsAlts     <- mapM (tiAlt env) alts
         let pstsPats = map fst3 psastsAlts
@@ -310,48 +308,8 @@ tiExpr env expr@(HsLet decls e) = withContext (makeMsg "in the let binding" $ re
         -- so it is safe to call head here
         return (pse ++ psPats ++ psEs, env1 `Map.union` envAlts, htsEs)           return (ps ++ qs, env1 `Map.union` env2, t)
 
-{-
-tiExpr expr@(HsInfixApp e1 e2 e3) = withContext (makeMsg "in the infix application" $ render $ ppHsExp expr) $ do
-       (ps, env1, te1) <- tiExpr env e1
-       (qs, env2, te2) <- tiExpr env e2
-       (rs, env3, te3) <- tiExpr env e3
-       tout      <- newTVar Star
-       unify (te1 `fn` (te3 `fn` tout)) te2
-       return (ps ++ qs ++ rs, env1 `Map.union` env2 `Map.union` env3, tout)
-       -}
-
- -}
 
 
-{-
-
-tiExpr env (HsVar v) | Just sc <- Map.lookup (toName Val v) env = do
-          (ty@(ps :=> t)) <- freshInst sc
-          --addInstance ((v,n),ty)
-          return (ps, Map.empty, t)
-tiExpr env (HsVar v) = error $ "tiExpr: could not find type scheme for: " ++ show v ++ " " ++ show env
-
-{-
-
- = do let sc = case lookupEnv v env of
-                  Nothing -> error $ "tiExpr: could not find type scheme for: " ++
-		                     show v ++ " " ++ showEnv env
-                  Just scheme -> scheme
-      (ty@(ps :=> t)) <- freshInst sc
-      --addInstance ((v,n),ty)
-      return (ps, Map.empty, t)
--}
-
-tiExpr env (HsCon conName)
- = do
-      sc <- dConScheme (toName DataConstructor conName)
-      (ty@(ps :=> t)) <- freshInst sc
-      --addInstance ((conName,n),ty)
-      return (ps, Map.empty, t)
-
-tiExpr _env (HsLit l)
- = do (ps,t) <- tiLit l
-      return (ps, Map.empty, t)
 
 tiExpr env (HsAsPat n e) = do
     (ps,nenv, t) <- tiExpr env e
