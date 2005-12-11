@@ -29,6 +29,9 @@ import Binary
 import DependAnalysis
 import Doc.DocLike
 import Doc.PPrint
+import FrontEnd.Tc.Type(Sigma())
+import FrontEnd.Utils
+import GenUtil
 import HsSyn
 import MapBinaryInstance()
 import Name.Name
@@ -37,8 +40,6 @@ import Representation hiding (Subst)
 import Type(quantify,tv,tTTuple,schemeToType)
 import Util.ContextMonad
 import Util.HasSize
-import FrontEnd.Utils
-import GenUtil
 
 
 newtype KindEnv = KindEnv (Map.Map Name Kind)

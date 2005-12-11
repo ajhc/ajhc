@@ -31,10 +31,7 @@ module Representation(
     FlattenType(..),
     Assump(..),
     tForAll,
-    tList,
-    Sigma,
-    Rho,
-    Tau
+    tList
     )where
 
 
@@ -67,14 +64,11 @@ data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
            | TAp  Type Type
            | TGen { typeSeq :: {-# UNPACK #-} !Int, typeVar :: {-# UNPACK #-} !Tyvar }
            | TArrow Type Type
-           | TForAll { typeArgs :: [Tyvar], typeBody :: (Qual Rho) }
-           | TBox { typeKind :: Kind, typeSeq :: !Int, typeBox :: IORef Type }     -- ^ used only in typechecker
+           | TForAll { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
+           | TBox { typeKind :: Kind, typeSeq :: !Int, typeBox :: IORef (Maybe Type) }     -- ^ used only in typechecker
              deriving(Data,Typeable, Ord, Show)
     {-! derive: GhcBinary !-}
 
-type Sigma = Type
-type Rho = Type
-type Tau = Type
 
 instance TypeNames Type where
     tBool = TCon (Tycon tc_Bool Star)
@@ -164,8 +158,9 @@ instance FlattenType Type where
             ft (TForAll vs qt) = do
                 qt' <- flattenType' qt
                 return $ TForAll vs qt'
-            ft (TBox _ _ box) = do
-                readIORef box
+            --ft (TBox _ _ box) = do
+            --    readIORef box
+            ft TBox {} = error "odd box"
             ft t = return t
         ft tv'
 

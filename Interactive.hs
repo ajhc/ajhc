@@ -220,12 +220,11 @@ tcStatementTc (HsQualifier e) = do
 
         }
     runTc tcInfo $ do
-    (rbox,box) <- newBox Star
+    box <- newBox Star
     (_,ps') <- listen $ tiExpr e box
     ps' <- flattenType ps'
-    vv <- rbox
     let ps = Class.simplify (hoClassHierarchy ho) ps'
-    (ps :=> vv) <- flattenType (ps :=> vv)
+    (ps :=> vv) <- flattenType (ps :=> box)
     TForAll vs ([] :=> t) <- generalize vv -- quantify (tv vv) qt
     --liftIO $ putStrLn $ show (text "::" <+> pprint vv' :: P.Doc)
     liftIO $ putStrLn $   "::" <+> prettyPrintType (TForAll vs (ps :=> t))

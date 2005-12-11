@@ -23,17 +23,20 @@ import List
 
 import Doc.DocLike
 import Doc.PPrint
-import Representation
+import Representation hiding(flattenType)
 import Type(kind)
 import Unparse
 import Name.Names
 import Name.VConsts
 import Util.VarName
 
-type Box = IORef Type
+type Box = IORef (Maybe Type)
 type Sigma' = Sigma
 type Tau' = Tau
 type Rho' = Rho
+type Sigma = Type
+type Rho = Type
+type Tau = Type
 
 type MetaTV = Tyvar
 type SkolemTV = Tyvar
@@ -44,11 +47,17 @@ isMetaTV Tyvar { tyvarRef = Just _ } = True
 isMetaTV _ = False
 
 
-openBox :: MonadIO m => Box -> m Sigma
+openBox :: MonadIO m => Box -> m (Maybe Sigma)
 openBox x = liftIO $ readIORef x
 
 fillBox :: MonadIO m => Box -> Type -> m ()
-fillBox x t | not (isBoxy t) = liftIO $ writeIORef x t
+fillBox x t  = liftIO $ do
+    t <- flattenType t
+    when (isBoxy t) $ error "filling with boxes"
+    ct <- readIORef x
+    case ct of
+        Just _ -> fail "box is already filled"
+        Nothing -> writeIORef x (Just t)
 fillBox x t = error "attempt to fillBox with boxy type"
 
 isTau :: Type -> Bool
@@ -167,7 +176,9 @@ instance UnVar Type where
                 qt' <- unVar' opt qt
                 return $ TForAll vs qt'
             ft t@TBox { typeBox = box }
-                | openBoxes opt =  readIORef box >>= unVar' opt
+                | openBoxes opt =  readIORef box >>= \x -> case x of
+                    Just x -> unVar' opt x
+                    Nothing -> error "unVar: empty box"
                 | otherwise = return t
             ft t | Just tv <- extractMetaTV t = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return (TVar tv)
             ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)

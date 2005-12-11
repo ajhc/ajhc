@@ -32,6 +32,7 @@ import Control.Monad.Error
 import Data.IORef
 import Data.Monoid
 import List
+import Maybe
 import qualified Data.Map as Map
 import Text.PrettyPrint.HughesPJ(Doc)
 
@@ -145,11 +146,11 @@ dConScheme conName = do
 
 -- | returns a new box and a function to read said box.
 
-newBox :: Kind -> Tc (Tc Type,Type)
+newBox :: Kind -> Tc Type
 newBox k = do
     u <- newUniq
-    r <- liftIO $ newIORef (error "empty box")
-    return (liftIO $ readIORef r >>= flattenMetaVars, TBox k u r)
+    r <- liftIO $ newIORef Nothing
+    return (TBox k u r)
 
 
 
@@ -254,7 +255,7 @@ skolomize s = return ([],s)
 boxyInstantiate :: Sigma -> Tc Rho'
 boxyInstantiate (TForAll as qt) = do
         bs <- mapM (newBox . tyvarKind) as
-        let mp = Map.fromList $ zip (map tyvarAtom as) (snds bs)
+        let mp = Map.fromList $ zip (map tyvarAtom as) bs
             (ps :=> r) = inst mp qt
         addPreds ps
         return r
@@ -263,7 +264,7 @@ boxyInstantiate x = return x
 boxySpec :: Sigma -> Tc ([(BoundTV,[Sigma'])],Rho')
 boxySpec (TForAll as qt@(ps :=> t)) = do
     let f (TVar t) vs | t `elem` vs = do
-            (_,b) <- lift (newBox $ tyvarKind t)
+            b <- lift (newBox $ tyvarKind t)
             tell [(t,b)]
             return b
         f e@TCon {} _ = return e

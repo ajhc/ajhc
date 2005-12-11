@@ -38,18 +38,16 @@ type Program = [BindGroup]
 
 tcApps e as typ = do
     bs <- sequence [ newBox Star | _ <- as ]
-    e' <- tiExpr e (foldr fn typ (snds bs))
-    rs <- sequence (fsts bs)
-    as' <- sequence [ tiExprPoly a r | r <- rs | a <- as ]
+    e' <- tiExpr e (foldr fn typ bs)
+    as' <- sequence [ tiExprPoly a r | r <- bs | a <- as ]
     return (e',as')
 
 
 
 tcApp e1 e2 typ = do
-    (br,bt) <- newBox Star
+    bt <- newBox Star
     e1 <- tiExpr e1 (bt `fn` typ)
-    t <- br
-    e2 <- tiExprPoly e2 t  -- TODO Poly
+    e2 <- tiExprPoly e2 bt  -- TODO Poly
     return (e1,e2)
 
 tiExprPoly ::  HsExp -> Type ->  Tc HsExp
@@ -144,18 +142,15 @@ tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression"
 -- ABS1
 tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show ps ++ " -> ...") $ do
     let lam (p:ps) e TBox { typeBox = box} rs = do -- ABS2
-            (rs1,b1) <- newBox Star
-            (rs2,b2) <- newBox Star
+            b1 <- newBox Star
+            b2 <- newBox Star
             r <- lam (p:ps) e (b1 `fn` b2) rs
-            s1 <- rs1
-            s2 <- rs2
-            fillBox box (s1 `fn` s2)
+            fillBox box (b1 `fn` b2)
             return r
         lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
-            (br,box) <- newBox Star
+            box <- newBox Star
             s1' `boxyMatch` box
-            s1 <- br
-            (p',env) <- tiPat p s1
+            (p',env) <- tiPat p box
             localEnv env $ do
                 lamPoly ps e s2' (p':rs)  -- TODO poly
         lam [] e typ rs = do
@@ -184,14 +179,14 @@ tiExpr tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ re
 
 -- special case for the empty list
 tiExpr (HsList []) typ = do
-        v <- newTVar Star
-        --(_,box) <- newBox Star
+        v <- newBox Star
         (TAp tList v) `subsumes` typ
         return (HsList [])
 
 -- non empty list
 tiExpr expr@(HsList exps@(_:_)) typ = withContext (makeMsg "in the list " $ render $ ppHsExp expr) $ do
-        v <- newTVar Star
+        --v <- newTVar Star
+        v <- newBox Star
         exps' <- mapM (`tiExpr` v) exps
         (TAp tList v) `subsumes` typ
         return (HsList exps')
@@ -203,6 +198,7 @@ tiExpr (HsDo stmts) typ = do
         withContext (simpleMsg "in a do expression")
                     (tiExpr newExp typ)
 
+{-
 tiExpr expr@(HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u) []] t) typ = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
     ch <- getClassHierarchy
     (rb,tb) <- newBox Star
@@ -217,7 +213,7 @@ tiExpr expr@(HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u) []] t) typ = with
     t' <- localEnv (Map.singleton (toName Val x) rr) $ do
         tiExpr t typ
     return (HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u') []] t')
-
+-}
 tiExpr e typ = fail $ "tiExpr: not implemented for: " ++ show (e,typ)
 
 -- Typing Patterns
@@ -226,8 +222,8 @@ tiExpr e typ = fail $ "tiExpr: not implemented for: " ++ show (e,typ)
 tiPat :: HsPat -> Type -> Tc (HsPat, Map.Map Name Sigma)
 
 tiPat (HsPVar i) typ = do
-        v <- newTVar Star
-        --(_,v) <- newBox Star
+        --v <- newTVar Star
+        (v) <- newBox Star
         v `subsumes` typ
         return (HsPVar i, Map.singleton (toName Val i) v)
 
@@ -975,13 +971,13 @@ tiLit :: HsLiteral -> Tc Tau
 tiLit (HsChar _) = return tChar
 tiLit (HsInt _) = do
         --v <- newTVar Star
-        (_,v) <- newBox Star
+        (v) <- newBox Star
         addPreds [IsIn class_Num v]
         return v
 
 tiLit (HsFrac _) = do
         --v <- newTVar Star
-        (_,v) <- newBox Star
+        (v) <- newBox Star
         addPreds [IsIn class_Fractional v]
         return v
 

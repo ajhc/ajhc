@@ -12,10 +12,22 @@ import GenUtil
 pretty vv = prettyPrintType vv
 ppretty vv = parens (pretty vv)
 
+aquireType :: Sigma' -> Tc Sigma'
+aquireType s = do
+    s <- findType s
+    case s of
+        TBox { typeBox = box } -> do
+            r <- openBox box
+            case r of
+                Just t -> aquireType t
+                Nothing -> return s
+        _ -> return s
+
+
 subsumes :: Sigma' -> Sigma' -> Tc ()
 subsumes s1 s2 = do
-    s1 <- findType s1
-    s2 <- findType s2
+    s1 <- aquireType s1
+    s2 <- aquireType s2
     liftIO $ putStrLn $ "subsumes: " <> ppretty s1 <+> ppretty s2
     sub s1 s2
    where
@@ -51,13 +63,13 @@ subsumes s1 s2 = do
 
     -- SPEC
     sub s1@(TForAll as (_ :=> _))  r2 | isRho' r2 = do
-        --r1' <- boxyInstantiate s1
-        (bs,r1') <- boxySpec s1
+        r1' <- boxyInstantiate s1
+        --(bs,r1') <- boxySpec s1
         r1' `subsumes` r2
-        let f (_,bs) = do
-            bs' <- sequence [ openBox b >>= findType | ~TBox { typeBox = b } <- bs]
-            unifyList bs'
-        mapM_ f bs
+--        let f (_,bs) = do
+--            bs' <- sequence [ openBox b >>= findType | ~TBox { typeBox = b } <- bs]
+--            unifyList bs'
+--        mapM_ f bs
         --bs <- mapM (const $ newBox Star) as
         --inst (Map.fromList $ zip (map tyvarAtom as) (snds bs)) r1 `subsumes` r2
 
@@ -70,12 +82,10 @@ subsumes s1 s2 = do
         s2 `subsumes` s4
     -- F2
     sub t@(TArrow s1 s2) (TBox { typeBox = box}) = do
-        (oa,a) <- newBox (kind s1)
-        (ob,b) <- newBox (kind s2)
+        a <- newBox (kind s1)
+        b <- newBox (kind s2)
         subsumes t (a `fn` b)
-        na <- oa
-        nb <- ob
-        fillBox box (na `fn` nb)
+        fillBox box (a `fn` b)
 
     -- BMONO & MONO
     sub a b | isTau a = case b of
@@ -89,8 +99,8 @@ subsumes s1 s2 = do
 
 boxyMatch :: Sigma' -> Sigma' -> Tc ()
 boxyMatch s1 s2 = do
-    s1 <- findType s1
-    s2 <- findType s2
+    s1 <- aquireType s1
+    s2 <- aquireType s2
     liftIO $ putStrLn $ "boxyMatch: " <> ppretty s1 <+> ppretty s2
     b <- bm s1 s2
     if b then do
@@ -109,12 +119,10 @@ boxyMatch s1 s2 = do
 
     -- AEQ1
     bm (TArrow s1 s2) TBox { typeBox = box} = do
-        (ra,a) <- newBox Star
-        (rb,b) <- newBox Star
+        a <- newBox (kind s1)
+        b <- newBox (kind s2)
         boxyMatch (s1 `fn` s2) (a `fn` b)
-        x <- ra
-        y <- rb
-        fillBox box (x `fn` y)
+        fillBox box (a `fn` b)
         return False
 
     -- AEQ2
@@ -127,8 +135,7 @@ boxyMatch s1 s2 = do
 
     bm a (TBox { typeBox = box }) | (TCon ca,as) <- fromTAp a = do
         bs <- mapM (newBox . kind) as
-        a `boxyMatch` foldl TAp (TCon ca) (snds bs)
-        bs <- sequence $ fsts bs
+        a `boxyMatch` foldl TAp (TCon ca) bs
         fillBox box (foldl TAp (TCon ca) bs)
         return False
 
@@ -145,9 +152,8 @@ boxyMatch s1 s2 = do
 
     -- SEQ1
     bm (TForAll vs (ps :=> t)) (TBox { typeKind = k, typeBox = box }) = do
-        (ra,a) <- newBox k
+        a <- newBox k
         boxyMatch t a
-        a <- ra >>= findType
         fillBox box (TForAll vs (ps :=> a))
         return False
 
