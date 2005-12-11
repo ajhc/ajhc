@@ -18,6 +18,7 @@ import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Unify
 import FrontEnd.Utils(getDeclName)
+import GenUtil
 import HsPretty
 import HsSyn
 import Name.Name
@@ -35,9 +36,12 @@ type BindGroup = ([Expl], [Impl])
 type Program = [BindGroup]
 
 
---tcApps e as typ = f e as typ [] where
---    f e (a:as) typ rs = do
---        (e1,e2) <- tcApp e a typ
+tcApps e as typ = do
+    bs <- sequence [ newBox Star | _ <- as ]
+    e' <- tiExpr e (foldr fn typ (snds bs))
+    rs <- sequence (fsts bs)
+    as' <- sequence [ tiExprPoly a r | r <- rs | a <- as ]
+    return (e',as')
 
 
 
@@ -93,6 +97,29 @@ tiExpr expr@(HsExpTypeSig sloc e qt) typ =  withContext (locMsg sloc "in the ann
     return (HsExpTypeSig sloc e' qt)
 
 
+tiExpr (HsLeftSection e1 e2) typ = do
+    (e1,e2) <- tcApp e1 e2 typ
+    return (HsLeftSection e1 e2)
+
+-- I know this looks weird but it appears to be correct
+-- e1 :: b
+-- e2 :: a -> b -> c
+-- e1 e2 :: a -> c
+
+-- (: [])  \x -> x : []   `fn`
+
+--tiExpr (HsRightSection e1 e2) typ = do
+--        (e2,e1) <- tcApp e2 e1 typ
+--        return (HsRightSection e1 e2)
+--        (rb,box) <- newBox Star
+--        tcExpr e2 (box `fn` )
+--        (e1Ps, envE1, e1T) <- tiExpr env e1
+--        (e2Ps, envE2, e2T) <- tiExpr env e2
+--        tv1         <- newTVar Star
+--        tv2         <- newTVar Star
+--        unify e2T (tv1 `fn` (e1T `fn` tv2))
+--        return (e1Ps ++ e2Ps, envE1 `Map.union` envE2, tv1 `fn` tv2)
+
 
 
 tiExpr expr@(HsApp e1 e2) typ = withContext (makeMsg "in the application" $ render $ ppHsExp expr) $ do
@@ -100,8 +127,9 @@ tiExpr expr@(HsApp e1 e2) typ = withContext (makeMsg "in the application" $ rend
     return (HsApp e1 e2)
 
 tiExpr expr@(HsInfixApp e1 e2 e3) typ = withContext (makeMsg "in the infix application" $ render $ ppHsExp expr) $ do
-    (HsApp e2 e1,e3) <- tcApp (HsApp e2 e1) e3 typ   -- TODO, preserve
-    return (HsInfixApp e1 e2 e3)
+    (e2',[e1',e3']) <- tcApps e2 [e1,e3] typ
+    -- (HsApp e2 e1,e3) <- tcApp (HsApp e2 e1) e3 typ   -- TODO, preserve
+    return (HsInfixApp e1' e2' e3')
 
 -- we need to fix the type to to be in the class
 -- cNum, just for cases such as:
@@ -150,23 +178,15 @@ tiExpr (HsIf e e1 e2) typ = withContext (simpleMsg $ "in the if expression\n   i
     return (HsIf e e1 e2)
 
 tiExpr tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ render $ ppHsExp tuple) $ do
-    apps <- tiExpr (foldl HsApp (HsCon (toTuple (length exps))) exps) typ
-    let f (HsApp a b) exps = f a (b:exps)
-        f (HsCon {}) exps = reverse exps
-    return $ HsTuple (f apps [])
-    --psasts <- mapM tiExpr exps
-    --let typeList = map trd3 psasts
-    --let preds = concatMap fst3 psasts
-    --let env1 = Map.unions $ map snd3 psasts
-    --return (preds, env1, tTTuple typeList)
-
+    (HsCon _,exps') <- tcApps (HsCon (toTuple (length exps))) exps typ
+    return (HsTuple exps')
 
 
 -- special case for the empty list
 tiExpr (HsList []) typ = do
-        --v <- newTVar Star
-        (_,box) <- newBox Star
-        (TAp tList box) `subsumes` typ
+        v <- newTVar Star
+        --(_,box) <- newBox Star
+        (TAp tList v) `subsumes` typ
         return (HsList [])
 
 -- non empty list
@@ -190,7 +210,7 @@ tiExpr expr@(HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u) []] t) typ = with
     rr <- rb >>= findType
     ds :=> rr <- flattenType (ds :=> rr)
     let tvs = freeMetaVars rr
-    (ds,rs) <- (split ch tvs ds)
+    (ds,rs) <- (Class.split ch tvs ds)
     addPreds ds
     rr <- quantify tvs rs rr
     addToCollectedEnv $ (Map.singleton (toName Val x) rr)
@@ -207,6 +227,7 @@ tiPat :: HsPat -> Type -> Tc (HsPat, Map.Map Name Sigma)
 
 tiPat (HsPVar i) typ = do
         v <- newTVar Star
+        --(_,v) <- newBox Star
         v `subsumes` typ
         return (HsPVar i, Map.singleton (toName Val i) v)
 
@@ -953,12 +974,14 @@ tiPats pats =
 tiLit :: HsLiteral -> Tc Tau
 tiLit (HsChar _) = return tChar
 tiLit (HsInt _) = do
-        v <- newTVar Star
+        --v <- newTVar Star
+        (_,v) <- newBox Star
         addPreds [IsIn class_Num v]
         return v
 
 tiLit (HsFrac _) = do
-        v <- newTVar Star
+        --v <- newTVar Star
+        (_,v) <- newBox Star
         addPreds [IsIn class_Fractional v]
         return v
 
