@@ -1,12 +1,10 @@
 module FrontEnd.Tc.Type(
-    findType,
     fn,
-    kind,
+    HasKind(..),
     Kind(..),
-    Sigma(),
     Pred(..),
-    Tau(),
-    Rho(),
+    MetaVar(..),
+    MetaVarType(..),
     tForAll,
     module FrontEnd.Tc.Type,
     Qual(..),
@@ -23,11 +21,11 @@ import List
 
 import Doc.DocLike
 import Doc.PPrint
-import Representation hiding(flattenType)
-import Type(kind)
-import Unparse
 import Name.Names
 import Name.VConsts
+import Representation hiding(flattenType, findType)
+import Type(HasKind(..))
+import Unparse
 import Util.VarName
 
 type Box = IORef (Maybe Type)
@@ -62,19 +60,24 @@ fillBox x t = error "attempt to fillBox with boxy type"
 
 isTau :: Type -> Bool
 isTau TForAll {} = False
-isTau TBox {} = False
+isTau TBox {} = error "isTau: Box"
 isTau (TAp a b) = isTau a && isTau b
 isTau (TArrow a b) = isTau a && isTau b
+isTau (TMetaVar MetaVar { metaType = t })
+    | t == Tau = True
+    | otherwise = False
 isTau _ = True
 
 isTau' :: Type -> Bool
 isTau' TForAll {} = False
+isTau' TBox {} = error "isTau': Box"
 isTau' (TAp a b) = isTau a && isTau b
 isTau' (TArrow a b) = isTau a && isTau b
 isTau' _ = True
 
 isBoxy :: Type -> Bool
-isBoxy TBox {} = True
+isBoxy TBox {} = error "isBoxy: Box"
+isBoxy (TMetaVar MetaVar { metaType = t }) | t > Tau = True
 isBoxy (TForAll _ (_ :=> t)) = isBoxy t
 isBoxy (TAp a b) = isBoxy a || isBoxy b
 isBoxy (TArrow a b) = isBoxy a || isBoxy b
@@ -92,13 +95,21 @@ fromTAp t = f t [] where
     f (TAp a b) rs = f a (b:rs)
     f t rs = (t,rs)
 
-extractMetaTV :: Monad m => Type -> m MetaTV
-extractMetaTV (TVar t) | isMetaTV t = return t
-extractMetaTV t = fail $ "not a metaTyVar:" ++ show t
+--extractMetaTV :: Monad m => Type -> m MetaTV
+--extractMetaTV (TVar t) | isMetaTV t = return t
+--extractMetaTV t = fail $ "not a metaTyVar:" ++ show t
 
 extractTyVar ::  Monad m => Type -> m Tyvar
 extractTyVar (TVar t) | not $ isMetaTV t = return t
 extractTyVar t = fail $ "not a Var:" ++ show t
+
+extractMetaVar :: Monad m => Type -> m MetaVar
+extractMetaVar (TMetaVar t)  = return t
+extractMetaVar t = fail $ "not a metaTyVar:" ++ show t
+
+extractBox :: Monad m => Type -> m MetaVar
+extractBox (TMetaVar mv) | metaType mv > Tau  = return mv
+extractBox t = fail $ "not a metaTyVar:" ++ show t
 
 
 prettyPrintType :: DocLike d => Type -> d
@@ -121,8 +132,8 @@ prettyPrintType t  = unparse $ runVarName (f t) where
     f t | Just tyvar <- extractTyVar t = do
         vo <- newLookupName ['a' .. ] () tyvar
         return $ atom $ char vo
-    f t | Just tyvar <- extractMetaTV t = do
-        return $ atom $  pprint tyvar
+    --f t | Just tyvar <- extractMetaTV t = do
+    --    return $ atom $  pprint tyvar
     f (TAp (TCon (Tycon n _)) x) | n == tc_List = do
         x <- f x
         return $ atom (char '[' <> unparse x <> char ']')
@@ -137,8 +148,21 @@ prettyPrintType t  = unparse $ runVarName (f t) where
         t1 <- f t1
         t2 <- f t2
         return $ t1 `arr` t2
+    f (TMetaVar mv) = return $ atom $ pprint mv
     f (TBox Star i _) = return $ atom $ text "_" <> tshow i
     f t | ~(TBox k i _) <- t = return $ atom $ parens $ text "_" <> tshow i <> text " :: " <> pprint k
+
+
+instance DocLike d => PPrint d MetaVarType where
+    pprint  t = case t of
+        Tau -> char 't'
+        Rho -> char 'r'
+        Sigma -> char 's'
+
+instance DocLike d => PPrint d MetaVar where
+    pprint MetaVar { metaUniq = u, metaKind = k, metaType = t }
+        | Star <- k =  pprint t <> tshow u
+        | otherwise = parens $ pprint t <> tshow u <> text " :: " <> pprint k
 
 
 
@@ -180,15 +204,25 @@ instance UnVar Type where
                     Just x -> unVar' opt x
                     Nothing -> error "unVar: empty box"
                 | otherwise = return t
-            ft t | Just tv <- extractMetaTV t = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return (TVar tv)
+            ft t@(TMetaVar _) = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return t
+            --ft t | Just tv <- extractMetaTV t = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return (TVar tv)
             ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
         tv' <- findType tv
         ft tv'
 
 
 
-freeMetaVars :: Type -> [MetaTV]
-freeMetaVars t = filter isMetaTV $ allFreeVars t
+findType :: MonadIO m => Type -> m Type
+findType tv@(TMetaVar MetaVar {metaRef = r }) = liftIO $ do
+    rt <- readIORef r
+    case rt of
+        Nothing -> return tv
+        Just t -> do
+            t' <- findType t
+            writeIORef r (Just t')
+            return t'
+findType tv = return tv
+
 
 freeTyVars :: Type -> [Tyvar]
 freeTyVars t = filter (not . isMetaTV) $ allFreeVars t
@@ -199,4 +233,13 @@ allFreeVars (TArrow l r)  = allFreeVars l `union` allFreeVars r
 allFreeVars TCon {}       = []
 allFreeVars TBox {}       = []
 allFreeVars typ | ~(TForAll vs (_ :=> t)) <- typ = allFreeVars t List.\\ vs
+
+freeMetaVars :: Type -> [MetaVar]
+freeMetaVars (TVar u)      = []
+freeMetaVars (TAp l r)     = freeMetaVars l `union` freeMetaVars r
+freeMetaVars (TArrow l r)  = freeMetaVars l `union` freeMetaVars r
+freeMetaVars TCon {}       = []
+freeMetaVars TBox {}       = []
+freeMetaVars (TMetaVar mv) = [mv]
+freeMetaVars typ | ~(TForAll vs (_ :=> t)) <- typ = freeMetaVars t
 

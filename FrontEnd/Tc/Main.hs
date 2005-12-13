@@ -38,26 +38,34 @@ type Program = [BindGroup]
 
 tcApps e as typ = do
     bs <- sequence [ newBox Star | _ <- as ]
-    e' <- tiExpr e (foldr fn typ bs)
-    as' <- sequence [ tiExprPoly a r | r <- bs | a <- as ]
+    e' <- tcExpr e (foldr fn typ bs)
+    as' <- sequence [ tcExprPoly a r | r <- bs | a <- as ]
     return (e',as')
 
 
 
 tcApp e1 e2 typ = do
     bt <- newBox Star
-    e1 <- tiExpr e1 (bt `fn` typ)
-    e2 <- tiExprPoly e2 bt  -- TODO Poly
+    e1 <- tcExpr e1 (bt `fn` typ)
+    e2 <- tcExprPoly e2 bt  -- TODO Poly
     return (e1,e2)
 
-tiExprPoly ::  HsExp -> Type ->  Tc HsExp
+tiExprPoly,tcExprPoly ::  HsExp -> Type ->  Tc HsExp
 
-tiExprPoly e t@TBox {} = tiExpr e t   -- GEN2
+tcExprPoly e t = do
+    t <- findType t
+    tiExprPoly e t
+
+tiExprPoly e t@TMetaVar {} = tcExpr e t   -- GEN2
 tiExprPoly e t = do                   -- GEN1
     -- (_,t) <- skolomize t
-    tiExpr e t
+    tcExpr e t
 
-tiExpr ::  HsExp -> Type ->  Tc HsExp
+tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp
+
+tcExpr e t = do
+    t <- findType t
+    tiExpr e t
 
 -- TODO should subsume for rank-n
 tiExpr (HsVar v) typ = do
@@ -80,7 +88,7 @@ tiExpr (HsLit l) typ = do
     return (HsLit l)
 
 tiExpr (HsAsPat n e) typ = do
-    e <- tiExpr e typ
+    e <- tcExpr e typ
     addToCollectedEnv (Map.singleton (toName Val n) typ)
     return (HsAsPat n e)
 
@@ -88,10 +96,12 @@ tiExpr (HsAsPat n e) typ = do
 tiExpr expr@(HsExpTypeSig sloc e qt) typ =  withContext (locMsg sloc "in the annotated expression" $ render $ ppHsExp expr) $ do
     kt <- getKindEnv
     s <- hsQualTypeToSigma kt qt
-    r <- freshInstance s
-    e' <- tiExpr e r
-    s' <- freshSigma s
-    s' `subsumes` typ
+    s `subsumes` typ
+    e' <- tcExprPoly e s
+    --s'@(TForall _ (ps :=> r)) <- freshSigma s
+    --addPreds ps
+    --e' <- tiExpr e r
+    --s' `subsumes` typ
     return (HsExpTypeSig sloc e' qt)
 
 
@@ -134,7 +144,7 @@ tiExpr expr@(HsInfixApp e1 e2 e3) typ = withContext (makeMsg "in the infix appli
 -- foo = \x -> -x
 
 tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression" $ render $ ppHsExp expr) $ do
-        e <- tiExpr e typ
+        e <- tcExpr e typ
         addPreds [IsIn class_Num typ]
         return (HsNegApp e)
 
@@ -154,7 +164,7 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
             localEnv env $ do
                 lamPoly ps e s2' (p':rs)  -- TODO poly
         lam [] e typ rs = do
-            e' <- tiExpr e typ
+            e' <- tcExpr e typ
             return (HsLambda sloc (reverse rs) e')
         lam _ _ _ _ = fail "lambda type mismatch"
         lamPoly ps e s@TBox {} rs = lam ps e s rs
@@ -167,9 +177,9 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
 
 
 tiExpr (HsIf e e1 e2) typ = withContext (simpleMsg $ "in the if expression\n   if " ++ show e ++ "...") $ do
-    e <- tiExpr e tBool
-    e1 <- tiExpr e1 typ
-    e2 <- tiExpr e2 typ
+    e <- tcExpr e tBool
+    e1 <- tcExpr e1 typ
+    e2 <- tcExpr e2 typ
     return (HsIf e e1 e2)
 
 tiExpr tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ render $ ppHsExp tuple) $ do
@@ -187,33 +197,32 @@ tiExpr (HsList []) typ = do
 tiExpr expr@(HsList exps@(_:_)) typ = withContext (makeMsg "in the list " $ render $ ppHsExp expr) $ do
         --v <- newTVar Star
         v <- newBox Star
-        exps' <- mapM (`tiExpr` v) exps
+        exps' <- mapM (`tcExpr` v) exps
         (TAp tList v) `subsumes` typ
         return (HsList exps')
 
-tiExpr (HsParen e) typ = tiExpr e typ
+tiExpr (HsParen e) typ = tcExpr e typ
 
 tiExpr (HsDo stmts) typ = do
         let newExp = doToExp stmts
         withContext (simpleMsg "in a do expression")
-                    (tiExpr newExp typ)
+                    (tcExpr newExp typ)
 
-{-
 tiExpr expr@(HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u) []] t) typ = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
     ch <- getClassHierarchy
-    (rb,tb) <- newBox Star
-    (u',ds) <- listen $ tiExpr u tb
-    rr <- rb >>= findType
-    ds :=> rr <- flattenType (ds :=> rr)
+    tb <- newBox Star
+    tb' <- newTVar Star
+    (u',ds) <- listen $ localEnv (Map.singleton (toName Val x) tb') $ tcExpr u tb
+    tb' `boxyMatch` tb
+    ds :=> rr <- flattenType (ds :=> tb)
     let tvs = freeMetaVars rr
-    (ds,rs) <- (Class.split ch tvs ds)
+    --(ds,rs) <- (Class.split ch tvs ds)
     addPreds ds
-    rr <- quantify tvs rs rr
+    rr <- quantify tvs ds rr
     addToCollectedEnv $ (Map.singleton (toName Val x) rr)
     t' <- localEnv (Map.singleton (toName Val x) rr) $ do
-        tiExpr t typ
+        tcExpr t typ
     return (HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u') []] t')
--}
 tiExpr e typ = fail $ "tiExpr: not implemented for: " ++ show (e,typ)
 
 -- Typing Patterns

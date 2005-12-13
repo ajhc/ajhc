@@ -11,7 +11,7 @@ import GenUtil
 
 pretty vv = prettyPrintType vv
 ppretty vv = parens (pretty vv)
-
+    {-
 aquireType :: Sigma' -> Tc Sigma'
 aquireType s = do
     s <- findType s
@@ -22,39 +22,40 @@ aquireType s = do
                 Just t -> aquireType t
                 Nothing -> return s
         _ -> return s
-
+ -}
 
 subsumes :: Sigma' -> Sigma' -> Tc ()
 subsumes s1 s2 = do
-    s1 <- aquireType s1
-    s2 <- aquireType s2
+    s1 <- findType s1
+    s2 <- findType s2
     liftIO $ putStrLn $ "subsumes: " <> ppretty s1 <+> ppretty s2
     sub s1 s2
    where
     -- SBOXY
-    sub tb@TBox {} b = boxyMatch tb b
+    sub tb@TMetaVar {} b = boxyMatch tb b
 
-    sub (TArrow a b) t | Just t <- extractMetaTV t = do
+{-
+    sub (TArrow a b) t | Just t <- extractMetaVar t = do
         a' <- newTVar (kind a)
         b' <- newTVar (kind b)
         varBind t (TArrow a' b')
         (TArrow a b) `subsumes` (TArrow a' b')
-    sub (TAp a b) t | Just t <- extractMetaTV t = do
+    sub (TAp a b) t | Just t <- extractMetaVar t = do
         a' <- newTVar (kind a)
         b' <- newTVar (kind b)
         varBind t (TAp a' b')
         (TAp a b) `subsumes` (TAp a' b')
-    sub t (TArrow a b) | Just t <- extractMetaTV t = do
+    sub t (TArrow a b) | Just t <- extractMetaVar t = do
         a' <- newTVar (kind a)
         b' <- newTVar (kind b)
         varBind t (TArrow a' b')
         (TArrow a' b') `subsumes` (TArrow a b)
-    sub t (TAp a b) | Just t <- extractMetaTV t = do
+    sub t (TAp a b) | Just t <- extractMetaVar t = do
         a' <- newTVar (kind a)
         b' <- newTVar (kind b)
         varBind t (TAp a' b')
         (TAp a' b') `subsumes` (TAp a b)
-
+-}
     -- SKOL needs to be after SBOXY
     sub s1 fa@TForAll {} = do
         (_,r2) <- skolomize fa
@@ -62,7 +63,7 @@ subsumes s1 s2 = do
         s1 `subsumes` r2
 
     -- SPEC
-    sub s1@(TForAll as (_ :=> _))  r2 | isRho' r2 = do
+    sub s1@(TForAll as (_ :=> _))  r2  = do   -- isRho' r2
         r1' <- boxyInstantiate s1
         --(bs,r1') <- boxySpec s1
         r1' `subsumes` r2
@@ -81,26 +82,23 @@ subsumes s1 s2 = do
         boxyMatch s3 s1
         s2 `subsumes` s4
     -- F2
-    sub t@(TArrow s1 s2) (TBox { typeBox = box}) = do
-        a <- newBox (kind s1)
-        b <- newBox (kind s2)
+    sub t@(TArrow s1 s2) (TMetaVar mv) = do
+        a <- newMetaVar (metaType mv) (kind s1)
+        b <- newMetaVar (metaType mv) (kind s2)
+        varBind mv (a `fn` b)
         subsumes t (a `fn` b)
-        fillBox box (a `fn` b)
+        --fillBox box (a `fn` b)
 
     -- BMONO & MONO
-    sub a b | isTau a = case b of
-        (TBox {typeBox = b}) -> fillBox b a
-        _ | isTau b -> unify a b -- TODO verify? fail $ "taus don't match in MONO" ++ show (a,b)
-        _ -> do
-            fail $ "subsumes failure: "  <> ppretty s1 <+> ppretty s2
+    sub a b | isTau a && isTau b = unify a b
 
     sub a b = fail $ "subsumes failure: " <> ppretty s1 <+> ppretty s2
 
 
 boxyMatch :: Sigma' -> Sigma' -> Tc ()
 boxyMatch s1 s2 = do
-    s1 <- aquireType s1
-    s2 <- aquireType s2
+    s1 <- findType s1
+    s2 <- findType s2
     liftIO $ putStrLn $ "boxyMatch: " <> ppretty s1 <+> ppretty s2
     b <- bm s1 s2
     if b then do
@@ -110,19 +108,20 @@ boxyMatch s1 s2 = do
      else return ()
    where
     -- BBEQ
-    bm TBox { typeKind = k1, typeBox = ba} TBox { typeKind = k2, typeBox = bb} = do
-        when (k1 /= k2) $ error "boxyMatch kinds"
-        tt <- newTVar k1
-        fillBox ba tt
-        fillBox bb tt
+    bm (TMetaVar v1) (TMetaVar v2) = do
+        when (kind v1 /= kind v2) $ error "BBEQ boxyMatch kinds"
+        -- create a new metavar to enforce tauness.
+        tt <- newMetaVar Tau (kind v1)
+        varBind v1 tt
+        varBind v2 tt
         return False
 
     -- AEQ1
-    bm (TArrow s1 s2) TBox { typeBox = box} = do
+    bm (TArrow s1 s2) (TMetaVar mv) = do
         a <- newBox (kind s1)
         b <- newBox (kind s2)
         boxyMatch (s1 `fn` s2) (a `fn` b)
-        fillBox box (a `fn` b)
+        varBind mv (a `fn` b)
         return False
 
     -- AEQ2
@@ -133,10 +132,10 @@ boxyMatch s1 s2 = do
 
     -- CEQ1
 
-    bm a (TBox { typeBox = box }) | (TCon ca,as) <- fromTAp a = do
+    bm a (TMetaVar mv) | (TCon ca,as) <- fromTAp a = do
         bs <- mapM (newBox . kind) as
         a `boxyMatch` foldl TAp (TCon ca) bs
-        fillBox box (foldl TAp (TCon ca) bs)
+        varBind mv (foldl TAp (TCon ca) bs)
         return False
 
 
@@ -151,10 +150,10 @@ boxyMatch s1 s2 = do
 
 
     -- SEQ1
-    bm (TForAll vs (ps :=> t)) (TBox { typeKind = k, typeBox = box }) = do
-        a <- newBox k
+    bm (TForAll vs (ps :=> t)) (TMetaVar mv) = do
+        a <- newBox (kind mv)
         boxyMatch t a
-        fillBox box (TForAll vs (ps :=> a))
+        varBind mv (TForAll vs (ps :=> a))
         return False
 
     -- SEQ2
@@ -167,19 +166,6 @@ boxyMatch s1 s2 = do
      --   fillBox box (TForAll vs (ps :=> a))
      --   return False
 
-    bm (TArrow a b) t | Just t <- extractMetaTV t = do
-        a' <- newTVar (kind a)
-        b' <- newTVar (kind b)
-        varBind t (TArrow a' b')
-        (TArrow a b) `boxyMatch` (TArrow a' b')
-        return False
-    bm (TAp a b) t | Just t <- extractMetaTV t = do
-        a' <- newTVar (kind a)
-        b' <- newTVar (kind b)
-        varBind t (TAp a' b')
-        (TAp a b) `boxyMatch` (TAp a' b')
-        return False
-
     -- XXX app
     bm (TAp a b) (TAp c d) = do
         a `boxyMatch` c
@@ -187,10 +173,25 @@ boxyMatch s1 s2 = do
         return False
 
     -- MEQ1 MEQ2  SYM
-    bm a b | isTau a = case b of
-        (TBox { typeBox = b}) -> fillBox b a >> return False
-        _ | isTau b -> unify a b >> return False -- TODO, verify? fail $ "taus don't match in MEQ[12]" ++ show (a,b)
-          | otherwise -> return True
+    bm a b
+        | isTau a, TMetaVar mv <- b = varBind mv a >> return False
+        | isTau a && isTau b = unify a b >> return False
+
+{-
+    bm (TArrow a b) t | Just t <- extractMetaVar t = do
+        a' <- newTVar (kind a)
+        b' <- newTVar (kind b)
+        varBind t (TArrow a' b')
+        (TArrow a b) `boxyMatch` (TArrow a' b')
+        return False
+    bm (TAp a b) t | Just t <- extractMetaVar t = do
+        a' <- newTVar (kind a)
+        b' <- newTVar (kind b)
+        varBind t (TAp a' b')
+        (TAp a b) `boxyMatch` (TAp a' b')
+        return False
+  -}
+
     bm _ _ = return True
 
 
@@ -198,6 +199,7 @@ unify      :: Tau -> Tau -> Tc ()
 unify t1 t2 = do
     t1' <- findType t1
     t2' <- findType t2
+    liftIO $ putStrLn $ "unify: " <> ppretty t1 <+> ppretty t2
     mgu t1' t2'
 
 mgu (TAp l r) (TAp l' r')
@@ -208,8 +210,8 @@ mgu (TArrow l r) (TArrow l' r')
    = do s1 <- unify l l'
         s2 <- unify r r'
         return ()
-mgu (TVar u) t | isMetaTV u  = varBind u t
-mgu t (TVar u) | isMetaTV u  = varBind u t
+mgu (TMetaVar u) t = varBind u t
+mgu t (TMetaVar u) = varBind u t
 mgu (TVar a) (TVar b) | a == b = return ()
 mgu c1@(TCon tc1) c2@(TCon tc2)
            | tc1==tc2 = return ()

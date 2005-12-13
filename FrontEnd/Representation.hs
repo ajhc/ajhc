@@ -31,6 +31,8 @@ module Representation(
     FlattenType(..),
     Assump(..),
     tForAll,
+    MetaVarType(..),
+    MetaVar(..),
     tList
     )where
 
@@ -58,6 +60,9 @@ import qualified FlagDump as FD
 
 -- Types
 
+data MetaVarType = Tau | Rho | Sigma
+             deriving(Data,Typeable,Eq,Ord,Show)
+    {-! derive: GhcBinary !-}
 
 data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
            | TCon { typeCon :: !Tycon }
@@ -66,9 +71,19 @@ data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
            | TArrow Type Type
            | TForAll { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
            | TBox { typeKind :: Kind, typeSeq :: !Int, typeBox :: IORef (Maybe Type) }     -- ^ used only in typechecker
-             deriving(Data,Typeable, Ord, Show)
+           | TMetaVar { metaVar :: MetaVar }
+             deriving(Data,Typeable,Ord,Show)
     {-! derive: GhcBinary !-}
 
+data MetaVar = MetaVar { metaUniq :: !Int, metaKind :: Kind, metaRef :: (IORef (Maybe Type)), metaType :: MetaVarType } -- ^ used only in typechecker
+             deriving(Data,Typeable,Show)
+    {-! derive: GhcBinary !-}
+
+instance Eq MetaVar where
+    a == b = metaUniq a == metaUniq b
+
+instance Ord MetaVar where
+    compare a b = compare (metaUniq a) (metaUniq b)
 
 instance TypeNames Type where
     tBool = TCon (Tycon tc_Bool Star)

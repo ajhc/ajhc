@@ -13,6 +13,7 @@ module FrontEnd.Tc.Monad(
     quantify,
     lookupName,
     newBox,
+    newMetaVar,
     newTVar,
     runTc,
     skolomize,
@@ -148,9 +149,10 @@ dConScheme conName = do
 
 newBox :: Kind -> Tc Type
 newBox k = do
-    u <- newUniq
-    r <- liftIO $ newIORef Nothing
-    return (TBox k u r)
+    newMetaVar Sigma k
+    --u <- newUniq
+    --r <- liftIO $ newIORef Nothing
+    --return (TBox k u r)
 
 
 
@@ -171,20 +173,20 @@ lookupName n = do
         Just x -> return x
         Nothing -> fail $ "Could not find var in tcEnv:" ++ show (nameType n,n)
 
+newTVar :: Kind -> Tc Type
+newTVar k = newMetaVar Sigma k
 
-newTVar    :: Kind -> Tc Type
-newTVar k   = do
+
+newMetaVar :: MetaVarType -> Kind -> Tc Type
+newMetaVar t k = do
     te <- ask
     n <- newUniq
     r <- liftIO $ newIORef Nothing
-    let ident = toName TypeVal ('v':show n)
-        v = tyvar ident k (Just r)
-    return $ TVar v
+    return $ TMetaVar MetaVar { metaUniq = n, metaKind = k, metaRef = r, metaType = t }
 
 
 class Instantiate a where
     inst:: Map.Map Atom Type -> a -> a
-
 
 instance Instantiate Type where
     inst ts (TAp l r)     = TAp (inst ts l) (inst ts r)
@@ -210,19 +212,13 @@ instance Instantiate Pred where
   inst ts (IsIn c t) = IsIn c (inst ts t)
 
 
-freshInst :: Sigma -> Tc (Qual Type)
-freshInst (TForAll as qt) = do
-        ts <- mapM newTVar (map tyvarKind as)
-        return (inst (Map.fromList $ zip (map tyvarAtom as) ts) qt)
-freshInst x = return ([] :=> x)
-
-freshInstance :: Sigma -> Tc Rho
-freshInstance (TForAll as qt) = do
-    ts <- mapM newTVar (map tyvarKind as)
+freshInstance :: MetaVarType -> Sigma -> Tc Rho
+freshInstance typ (TForAll as qt) = do
+    ts <- mapM (newMetaVar typ) (map tyvarKind as)
     let (ps :=> t) = (inst (Map.fromList $ zip (map tyvarAtom as) ts) qt)
     addPreds ps
     return t
-freshInstance x = return x
+freshInstance _ x = return x
 
 addPreds :: [Pred] -> Tc ()
 addPreds ps = Tc $ tell ps
@@ -284,19 +280,18 @@ generalize :: Rho -> Tc Sigma
 generalize r = quantify (freeMetaVars r) [] r
 
 
-quantify :: [MetaTV] -> [Pred] -> Rho -> Tc Sigma
-quantify vs ps r | all isMetaTV vs = do
+quantify :: [MetaVar] -> [Pred] -> Rho -> Tc Sigma
+quantify vs ps r = do
     r <- flattenType r
-    nvs <- mapM (newVar . tyvarKind) [ t | t <- vs]
+    nvs <- mapM (newVar . metaKind) vs
     sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- vs ]
     r <- flattenType (ps :=> r)
     return $ TForAll nvs r
 
-varBind :: Tyvar -> Type -> Tc ()
-varBind u t | not (isMetaTV u) = error "varBind: not metatv"
-            | t == TVar u   = return ()
-            | u `elem` freeMetaVars t = unificationError (TVar u) t -- occurs check
-            | kind u == kind t, Just r <- tyvarRef u = do
+varBind :: MetaVar -> Type -> Tc ()
+varBind u t | t == TMetaVar u   = return ()
+            | u `elem` freeMetaVars t = unificationError (TMetaVar u) t -- occurs check
+            | kind u == kind t, r <- metaRef u = do
                 x <- liftIO $ readIORef r
                 case x of
                     Just r -> error $ "varBind: bining unfree: " ++ show (u,t,r)

@@ -23,8 +23,7 @@
 
 -------------------------------------------------------------------------------}
 
-module Type (kind,
-             nullSubst,
+module Type (nullSubst,
              (@@),
              Types (..),
              (+->),
@@ -38,6 +37,7 @@ module Type (kind,
              assumpScheme,
              assumpToPair,
              pairToAssump,
+             HasKind(..),
              assumpId,
              tTTuple,
              schemeToType,
@@ -98,7 +98,10 @@ instance HasKind Type where
   kind (TGen _ tv) = kind tv
   kind (TForAll _ (_ :=> t)) = kind t
   kind (TBox { typeKind = k }) = k
+  kind (TMetaVar mv) = kind mv
   --kind x = error $ "Type:kind: " ++ show x
+instance HasKind MetaVar where
+    kind = metaKind
 
 -----------------------------------------------------------------------------
 
