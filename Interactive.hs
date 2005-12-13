@@ -1,6 +1,7 @@
 module Interactive(Interactive.interact) where
 
 import Control.Monad.Reader
+import Control.Monad.Identity
 import Control.Monad.Writer
 import Control.Monad.Trans
 import Data.Monoid
@@ -66,6 +67,7 @@ data InteractiveState = IS {
     stateHo :: Ho,
     stateInteract :: Interact,
     stateModule :: Module,
+    stateImports :: [(Name,[Name])],
     stateOptions :: Opt
     }
 
@@ -73,10 +75,9 @@ isInitial = IS {
     stateHo = mempty,
     stateInteract = emptyInteract,
     stateModule = Module "Main",
+    stateImports = [],
     stateOptions = options
     }
-
-
 
 
 newtype In a = MkIn (ReaderT InteractiveState IO a)
@@ -109,6 +110,7 @@ interact ho = mre where
         interactSettables = ["prog", "args"],
         interactVersion = versionString,
         interactCommands = commands,
+        interactWords = map (show . fst ) $ stateImports isStart,
         interactExpr = do_expr
         }
     dataTable = hoDataTable ho
@@ -140,11 +142,12 @@ interact ho = mre where
     ptype k | Just r <- Map.lookup k (hoAssumps ho) = show (pprint r:: PP.Doc)
     ptype x | nameType x == ClassName = hsep (map kindShow $ kindOfClass x (hoKinds ho))
     ptype x = "UNKNOWN: " ++ show (nameType x,x)
+    isStart =  isInitial { stateHo = ho, stateImports = runIdentity $ calcImports ho False (Module "Prelude") }
     do_expr :: Interact -> String -> IO Interact
     do_expr act s = case parseStmt s of
         Left m -> putStrLn m >> return act
         Right e -> do
-            catch (runIn isInitial { stateHo = ho, stateInteract = act } $ executeStatement e) $ (\e -> putStrLn $ ioeGetErrorString e)
+            catch (runIn isStart { stateInteract = act } $ executeStatement e) $ (\e -> putStrLn $ ioeGetErrorString e)
             return act
     pshow _opt v
         | Just d <- showSynonym (show . (pprint :: HsType -> PP.Doc) ) v (hoTypeSynonyms ho) = nameTag (nameType v):' ':d
@@ -170,8 +173,7 @@ procErrors act = do
 executeStatement :: HsStmt -> In ()
 executeStatement stmt = do
     is@IS { stateHo = ho } <- ask
-    defs <- calcImports ho False (Module "Prelude")
-    stmt' <- renameStatement mempty defs (stateModule is) stmt
+    stmt' <- renameStatement mempty (stateImports is) (stateModule is) stmt
     procErrors $ do
     --printStatement stmt'
     stmt'' <- expandTypeSynsStmt (hoTypeSynonyms ho) (stateModule is) stmt'

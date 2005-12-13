@@ -73,6 +73,7 @@ data Interact = Interact {
     interactSet :: Map.Map String String,   -- ^ vars that are actually set
     interactExpr :: Interact -> String -> IO Interact, -- ^ what to run on a bare expression
     interactRC   :: [String],               -- ^ commands to run at startup
+    interactWords :: [String],              -- ^ list of words to autocomplete
     interactEcho :: Bool                    -- ^ whether to echo commands
     }
 
@@ -84,6 +85,7 @@ emptyInteract = Interact {
     interactSet = Map.empty,
     interactExpr = \i s -> putStrLn ("Unknown Command: " ++ s) >> return i,
     interactRC = [],
+    interactWords = [],
     interactEcho = False
     }
 
@@ -154,7 +156,7 @@ beginInteraction :: Interact -> IO ()
 beginInteraction act = do
     let commands' = commands ++ [ (n,h) | InteractCommand { commandName = n, commandHelp = h } <- interactCommands act ]
         args s =  [ bb | bb@(n,_) <- commands', s `isPrefixOf` n ]
-        expand s = fsts (args s) ++ filter (isPrefixOf s) (interactSettables act)
+        expand s = snub $ fsts (args s) ++ filter (isPrefixOf s) (interactSettables act ++ interactWords act)
     s <- readLine (interactPrompt act) (return . expand)
     act' <- runInteraction act s
     beginInteraction act'
