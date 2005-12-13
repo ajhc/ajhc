@@ -8,7 +8,6 @@ module FrontEnd.Tc.Monad(
     generalize,
     getClassHierarchy,
     getKindEnv,
-    inst,
     localEnv,
     quantify,
     lookupName,
@@ -191,16 +190,15 @@ class Instantiate a where
 instance Instantiate Type where
     inst ts (TAp l r)     = TAp (inst ts l) (inst ts r)
     inst ts (TArrow l r)  = TArrow (inst ts l) (inst ts r)
-    inst ts t@TGen {}     = error $ "inst TGen " ++ show (ts,t)
     inst  _ t@TCon {}     = t
     inst ts (TVar tv )
-        | Nothing == tyvarRef tv  = t'  where Just t' = Map.lookup (tyvarAtom tv) ts
-    inst  _ t@TVar {}     = t
-    inst _ TBox {}        = error "instantiating something with a box"
+        | Nothing == tyvarRef tv  = case Map.lookup (tyvarAtom tv) ts of
+            Just t'  -> t'
+            Nothing -> (TVar tv)
     inst ts (TForAll as qt) = TForAll as (inst (foldr Map.delete ts (map tyvarAtom as)) qt)
+    inst ts (TMetaVar mv) = TMetaVar mv
+    inst _ t = error $ "inst: " ++ show t
 
-    --inst ts t@(TGen n tv) | Just t <- Map.lookup (tyvarAtom tv) ts = t
-    --                      | otherwise = error $ "inst TGen " ++ show (ts,t)
 
 instance Instantiate a => Instantiate [a] where
   inst ts = map (inst ts)

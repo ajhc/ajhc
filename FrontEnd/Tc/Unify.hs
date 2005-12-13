@@ -94,6 +94,9 @@ subsumes s1 s2 = do
 
     sub a b = fail $ "subsumes failure: " <> ppretty s1 <+> ppretty s2
 
+printRule :: String -> Tc ()
+printRule s = liftIO $ putStrLn s
+
 
 boxyMatch :: Sigma' -> Sigma' -> Tc ()
 boxyMatch s1 s2 = do
@@ -102,6 +105,8 @@ boxyMatch s1 s2 = do
     liftIO $ putStrLn $ "boxyMatch: " <> ppretty s1 <+> ppretty s2
     b <- bm s1 s2
     if b then do
+        s1 <- findType s1
+        s2 <- findType s2
         liftIO $ putStrLn $ "boxyMatch: " <> ppretty s2 <+> ppretty s1
         b' <- bm s2 s1
         when b' $  fail $ "boxyMatch failure: " <> ppretty s1 <+> ppretty s2
@@ -109,6 +114,7 @@ boxyMatch s1 s2 = do
    where
     -- BBEQ
     bm (TMetaVar v1) (TMetaVar v2) = do
+        printRule "BBEQ"
         when (kind v1 /= kind v2) $ error "BBEQ boxyMatch kinds"
         -- create a new metavar to enforce tauness.
         tt <- newMetaVar Tau (kind v1)
@@ -118,6 +124,7 @@ boxyMatch s1 s2 = do
 
     -- AEQ1
     bm (TArrow s1 s2) (TMetaVar mv) = do
+        printRule "AEQ1"
         a <- newBox (kind s1)
         b <- newBox (kind s2)
         boxyMatch (s1 `fn` s2) (a `fn` b)
@@ -126,6 +133,7 @@ boxyMatch s1 s2 = do
 
     -- AEQ2
     bm (TArrow s1 s2) (TArrow s3 s4) = do
+        printRule "AEQ2"
         boxyMatch s1 s3
         boxyMatch s2 s4
         return False
@@ -144,13 +152,16 @@ boxyMatch s1 s2 = do
     bm a b | (TCon ca,as) <- fromTAp a, (TCon cb,bs) <- fromTAp b = case ca == cb of
         -- False -> fail $ "constructor mismatch: " ++ show (a,b)
         False -> unificationError a b
-        True | length as == length bs -> sequence_ [boxyMatch x y | x <- as | y <- bs] >> return False
+        True | length as == length bs -> do
+            printRule "CEQ2"
+            sequence_ [boxyMatch x y | x <- as | y <- bs] >> return False
         -- _ ->   fail $ "constructor args mismatch: " ++ show (a,b)
         _ -> unificationError a b
 
 
     -- SEQ1
     bm (TForAll vs (ps :=> t)) (TMetaVar mv) = do
+        printRule "SEQ1"
         a <- newBox (kind mv)
         boxyMatch t a
         varBind mv (TForAll vs (ps :=> a))
@@ -168,6 +179,7 @@ boxyMatch s1 s2 = do
 
     -- XXX app
     bm (TAp a b) (TAp c d) = do
+        printRule "XXX App"
         a `boxyMatch` c
         b `boxyMatch` d
         return False

@@ -58,7 +58,7 @@ tcExprPoly e t = do
 
 tiExprPoly e t@TMetaVar {} = tcExpr e t   -- GEN2
 tiExprPoly e t = do                   -- GEN1
-    -- (_,t) <- skolomize t
+    (_,t) <- skolomize t
     tcExpr e t
 
 tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp
