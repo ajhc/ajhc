@@ -206,7 +206,6 @@ tiExpr (HsDo stmts) typ = do
 
 tiExpr expr@(HsLet decls e) typ = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
     sigEnv <- getSigEnv
-    liftIO $ print sigEnv
     let bgs = getFunDeclsBg sigEnv decls
         f (bg:bgs) rs = do
             (ds,env) <- tcBindGroup bg
@@ -216,21 +215,6 @@ tiExpr expr@(HsLet decls e) typ = withContext (makeMsg "in the let binding" $ re
             return (HsLet rs e')
     f bgs []
 
-tiExpr expr@(HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u) []] t) typ = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
-    ch <- getClassHierarchy
-    tb <- newBox Star
-    tb' <- newTVar Star
-    (u',ds) <- listen $ localEnv (Map.singleton (toName Val x) tb') $ tcExpr u tb
-    tb' `boxyMatch` tb
-    ds :=> rr <- flattenType (ds :=> tb)
-    let tvs = freeMetaVars rr
-    --(ds,rs) <- (Class.split ch tvs ds)
-    addPreds ds
-    rr <- quantify tvs ds rr
-    addToCollectedEnv $ (Map.singleton (toName Val x) rr)
-    t' <- localEnv (Map.singleton (toName Val x) rr) $ do
-        tcExpr t typ
-    return (HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u') []] t')
 
 tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n   case " ++ show e ++ " of ...") $ do
     scrutinee <- newBox Star
@@ -240,6 +224,15 @@ tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n 
 
 tiExpr e typ = fail $ "tiExpr: not implemented for: " ++ show (e,typ)
 
+tcWheres :: [HsDecl] -> Tc ([HsDecl],TypeEnv)
+tcWheres decls = do
+    sigEnv <- getSigEnv
+    let bgs = getFunDeclsBg sigEnv decls
+        f (bg:bgs) rs cenv  = do
+            (ds,env) <- tcBindGroup bg
+            localEnv env $ f bgs (ds ++ rs) (env `mappend` cenv)
+        f [] rs cenv = return (rs,cenv)
+    f bgs [] mempty
 
 -----------------------------------------------------------------------------
 
@@ -248,15 +241,17 @@ tiExpr e typ = fail $ "tiExpr: not implemented for: " ++ show (e,typ)
 
 tcAlt ::  Sigma -> Sigma -> HsAlt -> Tc HsAlt
 
-tcAlt scrutinee typ alt@(HsAlt sloc pat gAlts [])  = withContext (locMsg sloc "in the alternative" $ render $ ppHsAlt alt) $ do
+tcAlt scrutinee typ alt@(HsAlt sloc pat gAlts wheres)  = withContext (locMsg sloc "in the alternative" $ render $ ppHsAlt alt) $ do
+    (wheres', env) <- tcWheres wheres
+    localEnv env $ do
     (pat',env) <- tcPat pat scrutinee
     localEnv env $ case gAlts of
         HsUnGuardedAlt e -> do
             e' <- tcExpr e typ
-            return (HsAlt sloc pat' (HsUnGuardedAlt e') [])
+            return (HsAlt sloc pat' (HsUnGuardedAlt e') wheres')
         HsGuardedAlts as -> do
             gas <- mapM (tcGuardedAlt typ) as
-            return (HsAlt sloc pat' (HsGuardedAlts gas) [])
+            return (HsAlt sloc pat' (HsGuardedAlts gas) wheres')
 
 tcGuardedAlt typ gAlt@(HsGuardedAlt sloc eGuard e) = withContext (locMsg sloc "in the guarded alternative" $ render $ ppGAlt gAlt) $ do
     g' <- tcExpr eGuard tBool
@@ -369,14 +364,16 @@ tcDecl d@(HsForeignDecl _ _ _ n _) typ = do
 
 
 
-tcDecl decl@(HsPatBind sloc (HsPVar v) rhs []) typ = withContext (declDiagnostic decl) $ do
+tcDecl decl@(HsPatBind sloc (HsPVar v) rhs wheres) typ = withContext (declDiagnostic decl) $ do
+    (wheres', env) <- tcWheres wheres
+    localEnv env $ do
     case rhs of
         HsUnGuardedRhs e -> do
             e' <- tcExpr e typ
-            return (HsPatBind sloc (HsPVar v) (HsUnGuardedRhs e') [], Map.singleton (toName Val v) typ)
+            return (HsPatBind sloc (HsPVar v) (HsUnGuardedRhs e') wheres', Map.singleton (toName Val v) typ)
         HsGuardedRhss as -> do
             gas <- mapM (tcGuardedRhs typ) as
-            return (HsPatBind sloc (HsPVar v) (HsGuardedRhss gas) [], Map.singleton (toName Val v) typ)
+            return (HsPatBind sloc (HsPVar v) (HsGuardedRhss gas) wheres', Map.singleton (toName Val v) typ)
 
 
 tcDecl decl@(HsFunBind matches) typ = withContext (declDiagnostic decl) $ do
@@ -384,7 +381,9 @@ tcDecl decl@(HsFunBind matches) typ = withContext (declDiagnostic decl) $ do
         return (HsFunBind matches', Map.singleton (getDeclName decl) typ)
 
 tcMatch ::  HsMatch -> Sigma -> Tc HsMatch
-tcMatch (HsMatch sloc funName pats rhs []) typ = withContext (locMsg sloc "in" $ show funName) $ do
+tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "in" $ show funName) $ do
+    (wheres', env) <- tcWheres wheres
+    localEnv env $ do
     let lam (p:ps) (TMetaVar mv) rs = do -- ABS2
             b1 <- newBox Star
             b2 <- newBox Star
@@ -399,7 +398,7 @@ tcMatch (HsMatch sloc funName pats rhs []) typ = withContext (locMsg sloc "in" $
                 lamPoly ps s2' (p':rs)  -- TODO poly
         lam [] typ rs = do
             rhs <- tcRhs rhs typ
-            return (HsMatch sloc funName (reverse rs) rhs [])
+            return (HsMatch sloc funName (reverse rs) rhs wheres')
         lam _ _ _ = fail "lambda type mismatch"
         lamPoly ps s@TBox {} rs = lam ps s rs
         lamPoly ps s rs = do
@@ -461,17 +460,6 @@ tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typ
 {-
 
 
-tiExpr env expr@(HsLet decls e)
- = withContext
-       (makeMsg "in the let binding" $ render $ ppHsExp expr) $
-         do
-         sigEnv <- getSigEnv
-         let bgs = getFunDeclsBg sigEnv decls
-         (ps, env1) <- tiSeq tiBindGroup env bgs
-         (qs, env2, t) <- tiExpr (env1 `Map.union` env) e
-         -- keep the let bound type assumptions in the environment
-         return (ps ++ qs, env1 `Map.union` env2, t)
-
 
 --------------------------------------------------------------------------------
 
@@ -522,39 +510,6 @@ tiStmt env stmt@(HsLetStmt decls)
 --------------------------------------------------------------------------------
 
 
--- NOTE: there's no need to do tiDecl with error contexts as the unification
---       doesn't happen until after this function is finished with
-tiDecl ::  TypeEnv -> HsDecl -> TI ([Pred], TypeEnv, Type)
-
-tiDecl env (HsForeignDecl _ _ _ n _) = do
-    sigEnv <- getSigEnv
-    let Just qt =  Map.lookup (toName Val n) sigEnv
-    ((ps :=> t)) <- freshInst qt
-    return (ps, env, t)
-
-tiDecl env decl@(HsPatBind sloc pat rhs wheres) = withContext (declDiagnostic decl) $ do
-        sigEnv <- getSigEnv
-        let wheresBgs = getFunDeclsBg sigEnv wheres
-        (ps, env1)     <- tiSeq tiBindGroup env wheresBgs
-        (qs, env2, t)  <- tiRhs (env1 `Map.union` env) rhs
-        return (ps ++ qs, env1 `Map.union` env2, t)
-
-
-tiDecl env decl@(HsFunBind matches)  = withContext (declDiagnostic decl) $ do
-        psEnvts <- mapM (tiMatch env) matches
-        let ps' = concatMap fst3 psEnvts
-        let ts'@(h':_) = map trd3 psEnvts
-        let matchesEnv = Map.unions $ map snd3 psEnvts
-        unifyList ts'  -- all matches must have the same type
-        return (ps', matchesEnv, h')
-
---    where
---    matchLoc
---       = case matches of
---            [] -> bogusASrcLoc  -- this should never happen, there should be no empty match list
---            (m:_) -> case m of
---                        HsMatch sloc _name _pats _rhs _decls -> sloc
-
 
 tiDeclTop ::  TypeEnv -> HsDecl -> Type -> TI ([Pred], TypeEnv)
 tiDeclTop env decl t
@@ -562,52 +517,9 @@ tiDeclTop env decl t
         unify t t'
         return (ps, env)
 
---------------------------------------------------------------------------------
-
-tiMatch ::  TypeEnv -> (HsMatch) -> TI ([Pred], TypeEnv, Type)
-tiMatch env (HsMatch sloc funName pats rhs wheres)
-   = withContext (locMsg sloc "in" $ show funName) $
-     do
-        -- pats must be done before wheres b/c variables bound in patterns
-        -- may be referenced in the where clause
-        (patsPs, patsEnv, patsTs) <- tiPats pats
-        sigEnv <- getSigEnv
-        let wheresBgs = getFunDeclsBg sigEnv wheres
-        (wheresPs, wheresEnv) <- tiSeq tiBindGroup (patsEnv `Map.union` env) wheresBgs
-        (rhsPs, rhsEnv, rhsT)   <- tiRhs (wheresEnv `Map.union` patsEnv `Map.union` env) rhs
-        return (wheresPs++patsPs++rhsPs, patsEnv `Map.union` rhsEnv `Map.union` wheresEnv, foldr fn rhsT patsTs)  --Boba
 
 -----------------------------------------------------------------------------
 
-
-tiRhs env (HsUnGuardedRhs e)
-   = tiExpr env e
-
-
-tiRhs env (HsGuardedRhss rhss)
-   = do
-        psEnvTs <- mapM (tiGuardedRhs env) rhss
-        let guardsPsEnvTs = map fst psEnvTs
-        let rhsPsEnvTs    = map snd psEnvTs
-        let guardPs    = concatMap fst3 guardsPsEnvTs
-        let rhsPs      = concatMap fst3 rhsPsEnvTs
-        let guardTs    = map trd3 guardsPsEnvTs
-        let rhsTs@(h':_)      = map trd3 rhsPsEnvTs
-        let guardEnv    = Map.unions $ map snd3 guardsPsEnvTs
-        let rhsEnv      = Map.unions $ map snd3 rhsPsEnvTs
-        unifyList (tBool:guardTs)                -- make sure these are all booleans
-        unifyList rhsTs
-        return (guardPs ++ rhsPs, guardEnv `Map.union` rhsEnv, h')
-
-
-tiGuardedRhs ::  TypeEnv -> (HsGuardedRhs) -> TI (([Pred], TypeEnv, Type), ([Pred], TypeEnv, Type))
-tiGuardedRhs env gRhs@(HsGuardedRhs sloc eGuard eRhs)
-   = withContext (locMsg sloc "in the guarded right hand side" $ render $ ppHsGuardedRhs gRhs) $
-     do
-        (guardPs, guardEnv, guardT) <- tiExpr env eGuard
-        unify tBool guardT
-        (rhsPs, rhsEnv, rhsT)       <- tiExpr env eRhs
-        return ((guardPs, guardEnv, guardT), (rhsPs, rhsEnv, rhsT))
 
 
 
@@ -716,30 +628,6 @@ getImplsNames impls = map getDeclName impls
 
 -----------------------------------------------------------------------------
 
-
-
-tiBindGroup env (es, is)
-   = do
-     modName <- getModName
-     --let env1 = Map.fromList [assumpToPair $ getDeclName decl :>: sc | (sc,decl) <- es ]
-     let env1 = Map.fromList [(getDeclName decl, sc) | (sc,decl) <- es ]
-     (implPs, implEnv) <- tiImpls (env1 `Map.union` env) is
-     explPsEnv   <- mapM (tiExpl (implEnv `Map.union` env1 `Map.union` env)) es
-     let explPs = concat [ x | (_,x,_) <- explPsEnv]
-     let explEnv = Map.unions $ [ x | (_,_,x) <- explPsEnv]
-     --let env2 = Map.fromList [ assumpToPair (getDeclName decl :>: sc) | (sc,_,_) <- explPsEnv | (_,decl) <- es ]
-     let env2 = Map.fromList [ (getDeclName decl,sc) | (sc,_,_) <- explPsEnv | (_,decl) <- es ]
-     return (implPs ++ explPs, env2 `Map.union` explEnv `Map.union` implEnv)
-
-tiSeq ti env []
- = return ([],Map.empty)
-tiSeq ti env (bs:bss)
- = do (ps,env1)  <- ti env bs
-      (qs,env2) <- tiSeq ti (env1 `Map.union` env) bss
-      return (ps++qs, env2 `Map.union` env1)
-
-
------------------------------------------------------------------------------
 
 
 tiProgram ::  Module -> SigEnv -> KindEnv -> ClassHierarchy -> TypeEnv -> TypeEnv -> Program -> IO TypeEnv
