@@ -43,11 +43,8 @@ tcApps e as typ = do
     return (e',as')
 
 
-
 tcApp e1 e2 typ = do
-    bt <- newBox Star
-    e1 <- tcExpr e1 (bt `fn` typ)
-    e2 <- tcExprPoly e2 bt  -- TODO Poly
+    (e1,[e2]) <- tcApps e1 [e2] typ
     return (e1,e2)
 
 tiExprPoly,tcExprPoly ::  HsExp -> Type ->  Tc HsExp
@@ -130,13 +127,18 @@ tiExpr (HsLeftSection e1 e2) typ = do
 
 
 
-tiExpr expr@(HsApp e1 e2) typ = withContext (makeMsg "in the application" $ render $ ppHsExp expr) $ do
-    (e1,e2) <- tcApp e1 e2 typ
-    return (HsApp e1 e2)
+tiExpr expr@HsApp {} typ = withContext (makeMsg "in the application" $ render $ ppHsExp $ backToApp h as) $ do
+    (h,as) <- tcApps h as typ
+    return $ backToApp h as
+    where
+    backToApp h as = foldl HsApp h as
+    (h,as) = fromHsApp expr
+    fromHsApp t = f t [] where
+        f (HsApp a b) rs = f a (b:rs)
+        f t rs = (t,rs)
 
 tiExpr expr@(HsInfixApp e1 e2 e3) typ = withContext (makeMsg "in the infix application" $ render $ ppHsExp expr) $ do
     (e2',[e1',e3']) <- tcApps e2 [e1,e3] typ
-    -- (HsApp e2 e1,e3) <- tcApp (HsApp e2 e1) e3 typ   -- TODO, preserve
     return (HsInfixApp e1' e2' e3')
 
 -- we need to fix the type to to be in the class

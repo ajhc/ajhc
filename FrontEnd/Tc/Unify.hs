@@ -112,6 +112,7 @@ boxyMatch s1 s2 = do
         when b' $  fail $ "boxyMatch failure: " <> ppretty s1 <+> ppretty s2
      else return ()
    where
+    bm (TMetaVar v1) (TMetaVar v2) | v1 == v2 = return False
     -- BBEQ
     bm (TMetaVar v1) (TMetaVar v2) = do
         printRule "BBEQ"
