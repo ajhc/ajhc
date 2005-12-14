@@ -111,6 +111,8 @@ interact ho = mre where
         interactVersion = versionString,
         interactCommands = commands,
         interactWords = map (show . fst ) $ stateImports isStart,
+        interactHistFile = Just ".jhci-hist",
+        interactComment = Just "--",
         interactExpr = do_expr
         }
     dataTable = hoDataTable ho
@@ -144,7 +146,7 @@ interact ho = mre where
     ptype x = "UNKNOWN: " ++ show (nameType x,x)
     isStart =  isInitial { stateHo = ho, stateImports = runIdentity $ calcImports ho False (Module "Prelude") }
     do_expr :: Interact -> String -> IO Interact
-    do_expr act s = case parseStmt s of
+    do_expr act s = case parseStmt (s ++ "\n") of
         Left m -> putStrLn m >> return act
         Right e -> do
             catch (runIn isStart { stateInteract = act } $ executeStatement e) $ (\e -> putStrLn $ ioeGetErrorString e)

@@ -16,6 +16,7 @@ import qualified Data.Map as Map
 import System
 import System.Console.Readline
 import System.Directory
+import IO
 
 import GenUtil
 
@@ -52,9 +53,10 @@ extra_help = [
 
 
 
-basicParse :: String ->  Either (String,String) String
-basicParse s = f s' where
+basicParse :: Maybe String -> String ->  Either (String,String) String
+basicParse comm s = f s' where
     s' = reverse $ dropWhile isSpace (reverse $ dropWhile isSpace s)
+    f xs | Just c <- comm, c `isPrefixOf` xs = Right ""
     f (':':rs) = Left (':':map toLower as,dropWhile isSpace rest) where
         (as,rest) = span isAlpha rs
     f _ = Right s'
@@ -74,7 +76,9 @@ data Interact = Interact {
     interactExpr :: Interact -> String -> IO Interact, -- ^ what to run on a bare expression
     interactRC   :: [String],               -- ^ commands to run at startup
     interactWords :: [String],              -- ^ list of words to autocomplete
-    interactEcho :: Bool                    -- ^ whether to echo commands
+    interactEcho :: Bool,                   -- ^ whether to echo commands
+    interactHistFile :: Maybe String,       -- ^ filename to store history of commands in
+    interactComment :: Maybe String         -- ^ comment initializer
     }
 
 emptyInteract = Interact {
@@ -86,7 +90,9 @@ emptyInteract = Interact {
     interactExpr = \i s -> putStrLn ("Unknown Command: " ++ s) >> return i,
     interactRC = [],
     interactWords = [],
-    interactEcho = False
+    interactEcho = False,
+    interactHistFile = Nothing,
+    interactComment = Nothing
     }
 
 cleanupWhitespace s = reverse $ dropWhile isSpace (reverse $ dropWhile isSpace s)
@@ -114,7 +120,7 @@ runInteraction act s = do
                 setable = [ "  " ++ a | a <- sort $ interactSettables act, not $ a `Map.member` interactSet act]
             when (not $ null set) $ putStrLn "Set options:" >> putStr (unlines set)
             when (not $ null setable) $ putStrLn "Setable options:" >> putStr (unlines setable)
-    case basicParse s of
+    case basicParse (interactComment act) s of
         Right "" -> return act
         Right ('!':rest) -> System.system rest >> return act
         Right s -> do
@@ -154,10 +160,19 @@ runInteraction act s = do
 
 beginInteraction :: Interact -> IO ()
 beginInteraction act = do
+    hist <- case interactHistFile act of
+        Nothing -> return Nothing
+        Just fn -> do
+            ch <- catch (readFile fn >>= return . lines) (\_ -> return [])
+            mapM_ addHistory (map head $ group ch)
+            catch (openFile fn AppendMode >>= return . Just) (\_ -> return Nothing)
     let commands' = commands ++ [ (n,h) | InteractCommand { commandName = n, commandHelp = h } <- interactCommands act ]
         args s =  [ bb | bb@(n,_) <- commands', s `isPrefixOf` n ]
         expand s = snub $ fsts (args s) ++ filter (isPrefixOf s) (interactSettables act ++ interactWords act)
     s <- readLine (interactPrompt act) (return . expand)
+    case (hist,s) of
+        (Just h,(_:_)) -> catch (hPutStrLn h s) (const (return ()))
+        _ -> return ()
     act' <- runInteraction act s
     beginInteraction act'
 
