@@ -27,6 +27,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Main
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
+import FrontEnd.Desugar(desugarHsStmt)
 import GenUtil
 import Class
 import Ho
@@ -175,6 +176,7 @@ procErrors act = do
 executeStatement :: HsStmt -> In ()
 executeStatement stmt = do
     is@IS { stateHo = ho } <- ask
+    stmt <- desugarHsStmt stmt
     stmt' <- renameStatement mempty (stateImports is) (stateModule is) stmt
     procErrors $ do
     --printStatement stmt'
