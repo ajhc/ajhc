@@ -1,4 +1,4 @@
-module FrontEnd.Tc.Main (tiExpr, makeProgram ) where
+module FrontEnd.Tc.Main (tiExpr, tiProgram, makeProgram ) where
 
 import Control.Monad.Error
 import Control.Monad.Writer
@@ -85,6 +85,7 @@ tiExpr (HsLit l) typ = do
 
 tiExpr (HsAsPat n e) typ = do
     e <- tcExpr e typ
+    --typ <- flattenType typ
     addToCollectedEnv (Map.singleton (toName Val n) typ)
     return (HsAsPat n e)
 
@@ -150,14 +151,14 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
     let lam (p:ps) e (TMetaVar mv) rs = do -- ABS2
             b1 <- newBox Star
             b2 <- newBox Star
-            r <- lam (p:ps) e (b1 `fn` b2) rs
             varBind mv (b1 `fn` b2)
-            return r
+            lam (p:ps) e (b1 `fn` b2) rs
         lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
             box <- newBox Star
             s1' `boxyMatch` box
-            (p',env) <- tiPat p box
+            (p',env) <- tcPat p box
             localEnv env $ do
+                s2' <- findType s2'
                 lamPoly ps e s2' (p':rs)  -- TODO poly
         lam [] e typ rs = do
             e' <- tcExpr e typ
@@ -242,9 +243,10 @@ tcWheres decls = do
 tcAlt ::  Sigma -> Sigma -> HsAlt -> Tc HsAlt
 
 tcAlt scrutinee typ alt@(HsAlt sloc pat gAlts wheres)  = withContext (locMsg sloc "in the alternative" $ render $ ppHsAlt alt) $ do
-    (wheres', env) <- tcWheres wheres
-    localEnv env $ do
+    scrutinee <- findType scrutinee
     (pat',env) <- tcPat pat scrutinee
+    localEnv env $ do
+    (wheres', env) <- tcWheres wheres
     localEnv env $ case gAlts of
         HsUnGuardedAlt e -> do
             e' <- tcExpr e typ
@@ -254,11 +256,13 @@ tcAlt scrutinee typ alt@(HsAlt sloc pat gAlts wheres)  = withContext (locMsg slo
             return (HsAlt sloc pat' (HsGuardedAlts gas) wheres')
 
 tcGuardedAlt typ gAlt@(HsGuardedAlt sloc eGuard e) = withContext (locMsg sloc "in the guarded alternative" $ render $ ppGAlt gAlt) $ do
+    typ <- findType typ
     g' <- tcExpr eGuard tBool
     e' <- tcExpr e typ
     return  (HsGuardedAlt sloc g' e')
 
 tcGuardedRhs typ gAlt@(HsGuardedRhs sloc eGuard e) = withContext (locMsg sloc "in the guarded alternative" $ render $ ppHsGuardedRhs gAlt) $ do
+    typ <- findType typ
     g' <- tcExpr eGuard tBool
     e' <- tcExpr e typ
     return  (HsGuardedRhs sloc g' e')
@@ -273,9 +277,9 @@ tcPat p typ = do
     tiPat p typ
 
 tiPat (HsPVar i) typ = do
-        --v <- newTVar Star
-        (v) <- newBox Star
+        v <- newBox Star
         v `subsumes` typ
+        addToCollectedEnv (Map.singleton (toName Val i) v)
         return (HsPVar i, Map.singleton (toName Val i) v)
 
 tiPat (HsPLit l) typ = do
@@ -299,12 +303,14 @@ tiPat (HsPApp conName pats) typ = do
     bs <- sequence [ newBox Star | _ <- pats ]
     s <- lookupName (toName DataConstructor conName)
     s `subsumes` (foldr fn typ bs)
+    --(foldr fn typ bs) `subsumes` s
     pats' <- sequence [ tcPat a r | r <- bs | a <- pats ]
     return (HsPApp conName (fsts pats'), mconcat (snds pats'))
 
 tiPat pl@(HsPList []) typ = do
     v <- newBox Star
     TAp tList v `subsumes` typ
+    --TAp tList v `subsumes` typ
     return (pl,mempty)
 
 
@@ -382,28 +388,29 @@ tcDecl decl@(HsFunBind matches) typ = withContext (declDiagnostic decl) $ do
 
 tcMatch ::  HsMatch -> Sigma -> Tc HsMatch
 tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "in" $ show funName) $ do
-    (wheres', env) <- tcWheres wheres
-    localEnv env $ do
     let lam (p:ps) (TMetaVar mv) rs = do -- ABS2
             b1 <- newBox Star
             b2 <- newBox Star
-            r <- lam (p:ps) (b1 `fn` b2) rs
             varBind mv (b1 `fn` b2)
-            return r
+            lam (p:ps) (b1 `fn` b2) rs
         lam (p:ps) (TArrow s1' s2') rs = do -- ABS1
             box <- newBox Star
             s1' `boxyMatch` box
-            (p',env) <- tiPat p box
+            (p',env) <- tcPat p box
+            liftIO $ print (p',env)
             localEnv env $ do
+                s2' <- findType s2'
                 lamPoly ps s2' (p':rs)  -- TODO poly
         lam [] typ rs = do
-            rhs <- tcRhs rhs typ
+            (wheres', env) <- tcWheres wheres
+            rhs <- localEnv env $ tcRhs rhs typ
             return (HsMatch sloc funName (reverse rs) rhs wheres')
         lam _ _ _ = fail "lambda type mismatch"
-        lamPoly ps s@TBox {} rs = lam ps s rs
+        lamPoly ps s@TMetaVar {} rs = lam ps s rs
         lamPoly ps s rs = do
             (_,s) <- skolomize s
             lam ps s rs
+    typ <- findType typ
     lam pats typ []
 
 declDiagnostic ::  (HsDecl) -> Diagnostic
@@ -648,6 +655,12 @@ tiProgram modName sEnv kt h dconsEnv env bgs = runTI dconsEnv h kt sEnv modName 
 
 
 -}
+tiProgram ::  [BindGroup] -> Tc [HsDecl]
+tiProgram bgs = f bgs [] mempty where
+    f (bg:bgs) rs cenv  = do
+        (ds,env) <- tcBindGroup bg
+        localEnv env $ f bgs (ds ++ rs) (env `mappend` cenv)
+    f [] rs _cenv = return rs
 
 -- Typing Literals
 

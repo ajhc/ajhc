@@ -41,11 +41,11 @@ module Type (nullSubst,
              assumpId,
              tTTuple,
              schemeToType,
+             typeToScheme,
              Instantiate (..)
              ) where
 
 import Control.Monad.Error
-import Control.Monad.Trans
 import Control.Monad.Writer
 import Data.IORef
 import List    (union, nub)
@@ -291,6 +291,9 @@ schemeToType (Forall _ (ps :=> t)) = tForAll ( snds $ snubFst xs) (ps' :=> t') w
     uq x = return x
     uq' (IsIn s t) = liftM (IsIn s) (uq t)
 
+typeToScheme :: Type -> Scheme
+typeToScheme (TForAll as qt) = quantify as qt
+typeToScheme t = toScheme t
 -----------------------------------------------------------------------------
 
 assumpToPair :: Assump -> (Name, Scheme)

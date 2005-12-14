@@ -33,6 +33,7 @@ import Name.Name as Name
 import Name.Names
 import Util.NameMonad
 import FrontEnd.SrcLoc
+import FrontEnd.Tc.Type(prettyPrintType)
 import Options
 import qualified FlagOpts as FO
 import qualified Util.Seq as Seq
@@ -416,7 +417,8 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         gg' _ (TGen _ _) = error "Something impossible happened!"
         gg' (TGen n _) t = [(n,t)]
         gg' (TVar a) (TVar b) | a == b = []
-        gg' a b = error $ "specialization: " <> parens  (show a) <+> parens (show b) <+> "in spec" <+> hsep (map parens [show g, show s, show e])
+        gg' (TMetaVar a) (TMetaVar b) | a == b = []
+        gg' a b = error $ "specialization: " <> parens  (prettyPrintType a) <+> parens (prettyPrintType b) <+> "in spec" <+> hsep (map parens [prettyPrintType g, prettyPrintType s, show e])
     cType (n::HsName) = fst $ pval (toName Name.Val n)
 
     cClassDecl (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon name) _)) decls) = ans where

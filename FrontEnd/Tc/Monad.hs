@@ -45,14 +45,15 @@ import Text.PrettyPrint.HughesPJ(Doc)
 import Atom
 import Class(ClassHierarchy)
 import Diagnostic
+import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc(bogusASrcLoc)
 import FrontEnd.Tc.Type
-import Util.Inst
 import GenUtil
 import Name.Name
 import Options
+import Util.Inst
 import Warning
 
 type TypeEnv = Map.Map Name Sigma
@@ -97,7 +98,7 @@ getCollectedEnv :: Tc TypeEnv
 getCollectedEnv = do
     v <- asks tcCollectedEnv
     r <- liftIO $ readIORef v
-    fmapM flattenType r
+    r <- fmapM flattenType r
     return r
 
 
@@ -309,7 +310,7 @@ varBind u t | t == TMetaVar u   = return ()
             | kind u == kind t, r <- metaRef u = do
                 x <- liftIO $ readIORef r
                 case x of
-                    Just r -> error $ "varBind: bining unfree: " ++ show (u,t,r)
+                    Just r -> error $ "varBind: binding unfree: " ++ tupled [pprint u,prettyPrintType t,prettyPrintType r]
                     Nothing -> liftIO $ writeIORef r (Just t)
             | otherwise        = error $ "varBind: kinds do not match:" ++ show (u,t)
 

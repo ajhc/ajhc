@@ -20,6 +20,7 @@ import Options
 import qualified Doc.PPrint as PPrint
 import qualified FlagDump as FD
 import TIModule
+import qualified FrontEnd.Tc.Module
 import Warning
 
 
@@ -59,7 +60,7 @@ doModules func ho ms  = do
          putStrLn $ " ---- Definitions for" <+> show (modInfoName m) <+> "----";
          mapM_ print ( modInfoDefs m)
     ms <- determineExports [ (x,y,z) | (x,(y,z)) <- Map.toList $ hoDefs ho] (Map.toList $ hoExports ho) ms
-    (ho',tiData) <- tiModules' ho ms
+    (ho',tiData) <- FrontEnd.Tc.Module.tiModules' ho ms
     ho'' <- func ho ho' tiData
     return ho''
     --me <- foldM tiModules emptyModEnv mss

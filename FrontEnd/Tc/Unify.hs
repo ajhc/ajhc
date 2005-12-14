@@ -92,7 +92,7 @@ subsumes s1 s2 = do
     -- BMONO & MONO
     sub a b | isTau a && isTau b = unify a b
 
-    sub a b = fail $ "subsumes failure: " <> ppretty s1 <+> ppretty s2
+    sub a b = fail $ "subsumes failure: " <> ppretty a <+> ppretty b
 
 printRule :: String -> Tc ()
 printRule s = liftIO $ putStrLn s
@@ -143,8 +143,8 @@ boxyMatch s1 s2 = do
 
     bm a (TMetaVar mv) | (TCon ca,as) <- fromTAp a = do
         bs <- mapM (newBox . kind) as
-        a `boxyMatch` foldl TAp (TCon ca) bs
         varBind mv (foldl TAp (TCon ca) bs)
+        a `boxyMatch` foldl TAp (TCon ca) bs
         return False
 
 
@@ -164,8 +164,8 @@ boxyMatch s1 s2 = do
     bm (TForAll vs (ps :=> t)) (TMetaVar mv) = do
         printRule "SEQ1"
         a <- newBox (kind mv)
-        boxyMatch t a
         varBind mv (TForAll vs (ps :=> a))
+        boxyMatch t a
         return False
 
     -- SEQ2

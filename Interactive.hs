@@ -199,7 +199,7 @@ tcStatement (HsQualifier e) = do
         ansName = Qual (stateModule is) (HsIdent "ans")
         ansName' = toName Val ansName
     opt <- getOptions
-    localVarEnv <- liftIO $ tiProgram
+    localVarEnv <- liftIO $ TIMain.tiProgram
                 opt                            -- options
                 (stateModule is)               -- name of the module
                 mempty                         -- environment of type signatures
