@@ -17,6 +17,7 @@ import FrontEnd.KindInfer(KindEnv,hsQualTypeToSigma)
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Unify
+import FrontEnd.SrcLoc
 import FrontEnd.Utils(getDeclName)
 import GenUtil
 import HsPretty
@@ -28,12 +29,10 @@ import Name.VConsts
 
 
 type Expl = (Sigma, HsDecl)
-type Impl = HsDecl
 -- TODO: this is different than the "Typing Haskell in Haskell" paper
 -- we do not further sub-divide the implicitly typed declarations in
 -- a binding group.
-type BindGroup = ([Expl], [Impl])
-type Program = [BindGroup]
+type BindGroup = ([Expl], [HsDecl])
 
 
 tcApps e as typ = do
@@ -166,7 +165,7 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
         lam _ _ _ _ = fail "lambda type mismatch"
         lamPoly ps e s@TBox {} rs = lam ps e s rs
         lamPoly ps e s rs = do
-            --(_,s) <- skolomize s
+            (_,s) <- skolomize s
             lam ps e s rs
 
 
@@ -205,6 +204,18 @@ tiExpr (HsDo stmts) typ = do
         withContext (simpleMsg "in a do expression")
                     (tcExpr newExp typ)
 
+tiExpr expr@(HsLet decls e) typ = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
+    sigEnv <- getSigEnv
+    liftIO $ print sigEnv
+    let bgs = getFunDeclsBg sigEnv decls
+        f (bg:bgs) rs = do
+            (ds,env) <- tcBindGroup bg
+            localEnv env $ f bgs (ds ++ rs)
+        f [] rs = do
+            e' <- tcExpr e typ
+            return (HsLet rs e')
+    f bgs []
+
 tiExpr expr@(HsLet [HsPatBind sl (HsPVar x) (HsUnGuardedRhs u) []] t) typ = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
     ch <- getClassHierarchy
     tb <- newBox Star
@@ -229,6 +240,12 @@ tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n 
 
 tiExpr e typ = fail $ "tiExpr: not implemented for: " ++ show (e,typ)
 
+
+-----------------------------------------------------------------------------
+
+-- type check implicitly typed bindings
+
+
 tcAlt ::  Sigma -> Sigma -> HsAlt -> Tc HsAlt
 
 tcAlt scrutinee typ alt@(HsAlt sloc pat gAlts [])  = withContext (locMsg sloc "in the alternative" $ render $ ppHsAlt alt) $ do
@@ -245,6 +262,11 @@ tcGuardedAlt typ gAlt@(HsGuardedAlt sloc eGuard e) = withContext (locMsg sloc "i
     g' <- tcExpr eGuard tBool
     e' <- tcExpr e typ
     return  (HsGuardedAlt sloc g' e')
+
+tcGuardedRhs typ gAlt@(HsGuardedRhs sloc eGuard e) = withContext (locMsg sloc "in the guarded alternative" $ render $ ppHsGuardedRhs gAlt) $ do
+    g' <- tcExpr eGuard tBool
+    e' <- tcExpr e typ
+    return  (HsGuardedRhs sloc g' e')
 
 -- Typing Patterns
 
@@ -302,12 +324,140 @@ tiPat HsPWildCard typ = return (HsPWildCard, mempty)
 
 tiPat (HsPAsPat i pat) typ = do
     (pat',env) <- tcPat pat typ
+    addToCollectedEnv (Map.singleton (toName Val i) typ)
     return (HsPAsPat i pat', Map.insert (toName Val i) typ env)
 
 tiPat (HsPInfixApp pLeft conName pRight) typ =  tiPat (HsPApp conName [pLeft,pRight]) typ
 
 tiPat tuple@(HsPTuple pats) typ = tiPat (HsPApp (toTuple (length pats)) pats) typ
 
+tcBindGroup :: BindGroup -> Tc ([HsDecl], TypeEnv)
+tcBindGroup (es, is) = do
+     let env1 = Map.fromList [(getDeclName decl, sc) | (sc,decl) <- es ]
+     localEnv env1 $ do
+         (impls, implEnv) <- tiImpls is
+         localEnv implEnv $ do
+             expls   <- mapM tiExpl es
+             return (impls ++ fsts expls, mconcat (implEnv:env1:snds expls))
+
+tiImpls ::  [HsDecl] -> Tc ([HsDecl], TypeEnv)
+tiImpls [] = return ([],Map.empty)
+tiImpls bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ (show (map getDeclName bs)))) $ do
+    liftIO $ putStrLn $ "tiimpls " ++ show (map getDeclName bs)
+    ss <- sequence [newTVar Star | _ <- bs]
+    rs <- localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ss]) $ sequence [ tcDecl d s | d <- bs | s <- ss ]
+    nenv <- sequence [ flattenType s >>= generalize >>= return . (,) n | (n,s) <- Map.toAscList $ mconcat $ snds rs]
+    addToCollectedEnv (Map.fromAscList nenv)
+    return (fsts rs, Map.fromAscList nenv)
+
+tcRhs :: HsRhs -> Sigma -> Tc HsRhs
+tcRhs rhs typ = case rhs of
+    HsUnGuardedRhs e -> do
+        e' <- tcExpr e typ
+        return (HsUnGuardedRhs e')
+    HsGuardedRhss as -> do
+        gas <- mapM (tcGuardedRhs typ) as
+        return (HsGuardedRhss gas)
+
+
+tcDecl ::  HsDecl -> Sigma -> Tc (HsDecl,TypeEnv)
+
+tcDecl d@(HsForeignDecl _ _ _ n _) typ = do
+    s <- lookupName (toName Val n)
+    s `subsumes` typ
+    return (d,mempty)
+
+
+
+tcDecl decl@(HsPatBind sloc (HsPVar v) rhs []) typ = withContext (declDiagnostic decl) $ do
+    case rhs of
+        HsUnGuardedRhs e -> do
+            e' <- tcExpr e typ
+            return (HsPatBind sloc (HsPVar v) (HsUnGuardedRhs e') [], Map.singleton (toName Val v) typ)
+        HsGuardedRhss as -> do
+            gas <- mapM (tcGuardedRhs typ) as
+            return (HsPatBind sloc (HsPVar v) (HsGuardedRhss gas) [], Map.singleton (toName Val v) typ)
+
+
+tcDecl decl@(HsFunBind matches) typ = withContext (declDiagnostic decl) $ do
+        matches' <- mapM (`tcMatch` typ) matches
+        return (HsFunBind matches', Map.singleton (getDeclName decl) typ)
+
+tcMatch ::  HsMatch -> Sigma -> Tc HsMatch
+tcMatch (HsMatch sloc funName pats rhs []) typ = withContext (locMsg sloc "in" $ show funName) $ do
+    let lam (p:ps) (TMetaVar mv) rs = do -- ABS2
+            b1 <- newBox Star
+            b2 <- newBox Star
+            r <- lam (p:ps) (b1 `fn` b2) rs
+            varBind mv (b1 `fn` b2)
+            return r
+        lam (p:ps) (TArrow s1' s2') rs = do -- ABS1
+            box <- newBox Star
+            s1' `boxyMatch` box
+            (p',env) <- tiPat p box
+            localEnv env $ do
+                lamPoly ps s2' (p':rs)  -- TODO poly
+        lam [] typ rs = do
+            rhs <- tcRhs rhs typ
+            return (HsMatch sloc funName (reverse rs) rhs [])
+        lam _ _ _ = fail "lambda type mismatch"
+        lamPoly ps s@TBox {} rs = lam ps s rs
+        lamPoly ps s rs = do
+            (_,s) <- skolomize s
+            lam ps s rs
+    lam pats typ []
+
+declDiagnostic ::  (HsDecl) -> Diagnostic
+declDiagnostic decl@(HsPatBind sloc (HsPVar {}) _ _) = locMsg sloc "in the declaration" $ render $ ppHsDecl decl
+declDiagnostic decl@(HsPatBind sloc pat _ _) = locMsg sloc "in the pattern binding" $ render $ ppHsDecl decl
+declDiagnostic decl@(HsFunBind matches) = locMsg (srcLoc decl) "in the function binding" $ render $ ppHsDecl decl
+
+tiExpl ::  Expl -> Tc (HsDecl,TypeEnv)
+tiExpl (sc, decl@HsForeignDecl {}) = do return (decl,Map.empty)
+tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typed " ++  (render $ ppHsDecl decl))) $ do
+    liftIO $ putStrLn $ "typing expl: " ++ show (getDeclName decl)
+    addToCollectedEnv (Map.singleton (getDeclName decl) sc)
+    (_,sc) <- skolomize sc
+    tcDecl decl sc
+    {-
+       cHierarchy <- getClassHierarchy
+       --(qs :=> t) <- -fmap snd $ freshInst sc
+       let (qs :=> t) = unQuantify sc
+       t <- flattenType t
+       qs <- flattenType qs
+       --liftIO $ putStrLn  $ show sc
+       (ps, env') <- tiDeclTop env decl t
+       --liftIO $ putStrLn  $ show ps
+       ps <- flattenType ps
+
+       --qs' <- flattenType qs
+       --ps'' <- flattenType ps
+       fs <- liftM tv (flattenType env)
+       --qs' <- sequence [ flattenType y >>= return . IsIn x | IsIn x y <- qs]
+       s          <- getSubst
+       let qs'     = apply s qs
+           t'      = apply s t
+           ps'     = [ p | p <- apply s ps, not (entails cHierarchy qs' p) ]
+       --    fs      = tv (apply s env)
+           gs      = tv t' {- \\ fs  -} -- TODO fix this!
+           sc'     = quantify gs (qs':=>t')
+       -- (ds,rs) <- reduce cHierarchy fs gs ps'
+       --liftIO $ putStrLn  $ show (gs,ps')
+       (ds,rs,nsub) <- splitReduce cHierarchy fs gs ps'
+       --liftIO $ putStrLn  $ show (ds,rs,nsub)
+       sequence_ [ unify  (TVar tv) t | (tv,t) <- nsub ]
+       --extSubst nsub
+       --unify t' t
+       --unify t t'
+       if sc /= sc' then
+           fail $ "signature too general for " ++ show (getDeclName decl) ++ "\n Given: " ++ show sc ++ "\n Infered: " ++ show sc'
+        else if not (null rs) then
+           fail $ "context too weak for "  ++ show (getDeclName decl) ++ "\nGiven: " ++ PPrint.render (pprint  sc) ++ "\nInfered: " ++ PPrint.render (pprint sc') ++"\nContext: " ++ PPrint.render (pprint  rs)
+        else
+           return (sc', ds,  env')
+           --return (sc', ds, env')
+
+-}
 {-
 
 
@@ -398,10 +548,6 @@ tiDecl env decl@(HsFunBind matches)  = withContext (declDiagnostic decl) $ do
         unifyList ts'  -- all matches must have the same type
         return (ps', matchesEnv, h')
 
-declDiagnostic ::  (HsDecl) -> Diagnostic
-declDiagnostic decl@(HsPatBind sloc (HsPVar {}) _ _) = locMsg sloc "in the declaration" $ render $ ppHsDecl decl
-declDiagnostic decl@(HsPatBind sloc pat _ _) = locMsg sloc "in the pattern binding" $ render $ ppHsDecl decl
-declDiagnostic decl@(HsFunBind matches) = locMsg (srcLoc decl) "in the function binding" $ render $ ppHsDecl decl
 --    where
 --    matchLoc
 --       = case matches of
@@ -646,10 +792,8 @@ tiLit (HsString _)  = return tString
 -- type sigs. Type sigs are associated with corresponding
 -- decls if they exist
 
-getFunDeclsBg :: TypeEnv -> [HsDecl] -> Program
-getFunDeclsBg sigEnv decls
-   = makeProgram sigEnv equationGroups
-   where
+getFunDeclsBg :: TypeEnv -> [HsDecl] -> [BindGroup]
+getFunDeclsBg sigEnv decls = makeProgram sigEnv equationGroups where
    equationGroups :: [[HsDecl]]
    equationGroups = getBindGroups bindDecls (nameName . getDeclName) getDeclDeps
    --equationGroups = getBindGroups bindDecls (hsNameIdent_u (hsIdentString_u ("equationGroup" ++)) . getDeclName) getDeclDeps
@@ -657,9 +801,8 @@ getFunDeclsBg sigEnv decls
    bindDecls = collectBindDecls decls
 
 -- | make a program from a set of binding groups
-makeProgram :: TypeEnv -> [[HsDecl]] -> Program
-makeProgram sigEnv groups
-   = map (makeBindGroup sigEnv ) groups
+makeProgram :: TypeEnv -> [[HsDecl]] -> [BindGroup]
+makeProgram sigEnv groups = map (makeBindGroup sigEnv ) groups
 
 
 -- reunite decls with their signatures, if ever they had one

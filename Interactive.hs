@@ -43,6 +43,7 @@ import TIMain(tiProgram)
 import Type(schemeToType)
 import TypeSynonyms(showSynonym)
 import TypeSyns
+import TypeSigs
 import Util.Interact
 import Warning
 
@@ -219,7 +220,7 @@ tcStatementTc (HsQualifier e) = do
     is@IS { stateHo = ho } <- ask
     let tcInfo = tcInfoEmpty {
         tcInfoEnv = Map.map schemeToType (hoAssumps ho),
-        tcInfoSigEnv = mempty,
+        tcInfoSigEnv = Map.map schemeToType $ collectSigEnv (hoKinds ho) (HsQualifier e),
         tcInfoModName =  show (stateModule is),
         tcInfoKindInfo = (hoKinds ho),
         tcInfoClassHierarchy = (hoClassHierarchy ho)
@@ -234,6 +235,8 @@ tcStatementTc (HsQualifier e) = do
     TForAll vs ([] :=> t) <- generalize vv -- quantify (tv vv) qt
     --liftIO $ putStrLn $ show (text "::" <+> pprint vv' :: P.Doc)
     liftIO $ putStrLn $   "::" <+> prettyPrintType (TForAll vs (ps :=> t))
+    ce <- getCollectedEnv
+    liftIO $ mapM_ putStrLn [ pprint n <+>  "::" <+> prettyPrintType s |  (n,s) <- Map.toList ce]
 
 
 calcImports :: Monad m => Ho -> Bool -> Module -> m [(Name,[Name])]

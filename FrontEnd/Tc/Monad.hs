@@ -1,13 +1,17 @@
 module FrontEnd.Tc.Monad(
     addPreds,
     addToCollectedEnv,
+    getCollectedEnv,
     boxyInstantiate,
     boxySpec,
     freshInstance,
+    toSigma,
     freshSigma,
     generalize,
     getClassHierarchy,
     getKindEnv,
+    getSigEnv,
+    getModName,
     localEnv,
     quantify,
     lookupName,
@@ -31,6 +35,7 @@ import Control.Monad.Trans
 import Control.Monad.Error
 import Data.IORef
 import Data.Monoid
+import Data.FunctorM
 import List
 import Maybe
 import qualified Data.Map as Map
@@ -44,6 +49,7 @@ import Doc.PPrint
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc(bogusASrcLoc)
 import FrontEnd.Tc.Type
+import Util.Inst
 import GenUtil
 import Name.Name
 import Options
@@ -87,6 +93,13 @@ addToCollectedEnv te = do
     v <- asks tcCollectedEnv
     liftIO $ modifyIORef v (te `Map.union`)
 
+getCollectedEnv :: Tc TypeEnv
+getCollectedEnv = do
+    v <- asks tcCollectedEnv
+    r <- liftIO $ readIORef v
+    fmapM flattenType r
+    return r
+
 
 runTc :: (MonadIO m,OptionMonad m) => TcInfo -> Tc a -> m a
 runTc tcInfo  (Tc tim) = do
@@ -96,7 +109,7 @@ runTc tcInfo  (Tc tim) = do
     ce <- newIORef mempty
     (a,out) <- runWriterT $ runReaderT tim TcEnv {
         tcCollectedEnv = ce,
-        tcCurrentEnv = tcInfoEnv tcInfo,
+        tcCurrentEnv = tcInfoEnv tcInfo `mappend` tcInfoSigEnv tcInfo,
         tcVarnum = vn,
         tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ tcInfoModName tcInfo],
         tcInfo = tcInfo,
@@ -236,6 +249,10 @@ freshSigma (TForAll vs qt) = do
     nvs <- mapM (newVar . tyvarKind) vs
     return (TForAll nvs $ inst (Map.fromList $ zip (map tyvarAtom vs) (map TVar nvs)) qt)
 freshSigma x = return x
+
+toSigma :: Sigma -> Sigma
+toSigma t@TForAll {} = t
+toSigma t = TForAll [] ([] :=> t)
 
 -- | replace bound variables with arbitrary new ones and drop the binding
 -- TODO predicates?

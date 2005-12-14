@@ -13,6 +13,7 @@
 -------------------------------------------------------------------------------}
 
 module TypeSigs (collectSigs,
+                 collectSigEnv,
                  SigEnv,
                  listSigsToSigEnv) where
 
@@ -27,6 +28,11 @@ import HsSyn
 import qualified Data.Map as Map
 
 --------------------------------------------------------------------------------
+
+collectSigEnv :: KindEnv -> HsStmt -> SigEnv
+collectSigEnv kindInfo stmt = sigEnv where
+    allTypeSigs = collectSigsFromStmt stmt
+    sigEnv = listSigsToSigEnv kindInfo allTypeSigs
 
 collectSigs :: [(HsDecl)] -> [(HsDecl)]
 collectSigs ds = collectSigsFromDecls ds
