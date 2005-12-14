@@ -164,16 +164,22 @@ beginInteraction act = do
         Nothing -> return Nothing
         Just fn -> do
             ch <- catch (readFile fn >>= return . lines) (\_ -> return [])
-            mapM_ addHistory (map head $ group ch)
+            let cl = (map head $ group ch)
+            mapM_ addHistory cl
+            putStrLn $ show (length cl) ++ " lines of history added from " ++ fn
             catch (openFile fn AppendMode >>= return . Just) (\_ -> return Nothing)
-    let commands' = commands ++ [ (n,h) | InteractCommand { commandName = n, commandHelp = h } <- interactCommands act ]
-        args s =  [ bb | bb@(n,_) <- commands', s `isPrefixOf` n ]
-        expand s = snub $ fsts (args s) ++ filter (isPrefixOf s) (interactSettables act ++ interactWords act)
-    s <- readLine (interactPrompt act) (return . expand)
-    case (hist,s) of
-        (Just h,(_:_)) -> catch (hPutStrLn h s) (const (return ()))
-        _ -> return ()
-    act' <- runInteraction act s
-    beginInteraction act'
+    go hist act
+    where
+    go hist act = do
+        let commands' = commands ++ [ (n,h) | InteractCommand { commandName = n, commandHelp = h } <- interactCommands act ]
+            args s =  [ bb | bb@(n,_) <- commands', s `isPrefixOf` n ]
+            expand s = snub $ fsts (args s) ++ filter (isPrefixOf s) (interactSettables act ++ interactWords act)
+        s <- readLine (interactPrompt act) (return . expand)
+        case (hist,s) of
+            (Just h,(_:_)) -> do
+                catch (hPutStrLn h s >> hFlush h) (const (return ()))
+            _ -> return ()
+        act' <- runInteraction act s
+        go hist act'
 
 
