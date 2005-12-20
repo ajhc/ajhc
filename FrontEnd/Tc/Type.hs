@@ -45,6 +45,7 @@ isMetaTV Tyvar { tyvarRef = Just _ } = True
 isMetaTV _ = False
 
 
+{-
 openBox :: MonadIO m => Box -> m (Maybe Sigma)
 openBox x = liftIO $ readIORef x
 
@@ -57,6 +58,7 @@ fillBox x t  = liftIO $ do
         Just _ -> fail "box is already filled"
         Nothing -> writeIORef x (Just t)
 fillBox x t = error "attempt to fillBox with boxy type"
+-}
 
 isTau :: Type -> Bool
 isTau TForAll {} = False
@@ -90,6 +92,8 @@ isRho' _ = True
 isRho :: Type -> Bool
 isRho r = isRho' r && not (isBoxy r)
 
+
+isBoxyMetaVar MetaVar { metaType = t } = t > Tau
 
 fromTAp t = f t [] where
     f (TAp a b) rs = f a (b:rs)
@@ -130,10 +134,10 @@ prettyPrintType t  = unparse $ runVarName (f t) where
             ps ->  fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text "." <+> tupled (map unparse ps) <+> text "=> ")  (atomize t')
     f (TCon tycon) = return $ atom (pprint tycon)
     f t | Just tyvar <- extractTyVar t = do
-        vo <- newLookupName ['a' .. ] () tyvar
-        return $ atom $ char vo
-    --f t | Just tyvar <- extractMetaTV t = do
-    --    return $ atom $  pprint tyvar
+        vo <- maybeLookupName tyvar
+        case vo of
+            Just c  -> return $ atom $ char c
+            Nothing -> return $ atom $ tshow (tyvarAtom tyvar)
     f (TAp (TCon (Tycon n _)) x) | n == tc_List = do
         x <- f x
         return $ atom (char '[' <> unparse x <> char ']')
@@ -242,4 +246,24 @@ freeMetaVars TCon {}       = []
 freeMetaVars TBox {}       = []
 freeMetaVars (TMetaVar mv) = [mv]
 freeMetaVars typ | ~(TForAll vs (_ :=> t)) <- typ = freeMetaVars t
+
+
+-- returns (new type, any open boxes, any open tauvars)
+unbox :: MonadIO m => Type -> m (Type,Bool,Bool)
+unbox tv = do
+    let ft (TAp x y) = liftM2 TAp (ft' x) (ft' y)
+        ft (TArrow x y) = liftM2 TArrow (ft' x) (ft' y)
+        ft t@TCon {} = return t
+        ft (TForAll vs (ps :=> t)) = do
+            when (any isMetaTV vs) $ error "metatv in forall binding"
+            ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
+            t' <- ft' t
+            return $ TForAll vs (ps' :=> t')
+        ft t@(TMetaVar mv)
+            | isBoxyMetaVar mv = tell ([True],[]) >> return t
+            | otherwise =  tell ([],[True]) >> return t
+        ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
+        ft' t = findType t >>= ft
+    (tv,(eb,et)) <- runWriterT (ft' tv)
+    return (tv,or eb, or et)
 

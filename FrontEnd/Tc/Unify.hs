@@ -26,36 +26,16 @@ aquireType s = do
 
 subsumes :: Sigma' -> Sigma' -> Tc ()
 subsumes s1 s2 = do
-    s1 <- findType s1
-    s2 <- findType s2
+    --s1 <- findType s1
+    --s2 <- findType s2
+    (s1,_,_) <- unbox s1
+    (s2,_,_) <- unbox s2
     liftIO $ putStrLn $ "subsumes: " <> ppretty s1 <+> ppretty s2
     sub s1 s2
    where
     -- SBOXY
     sub tb@TMetaVar {} b = boxyMatch tb b
 
-{-
-    sub (TArrow a b) t | Just t <- extractMetaVar t = do
-        a' <- newTVar (kind a)
-        b' <- newTVar (kind b)
-        varBind t (TArrow a' b')
-        (TArrow a b) `subsumes` (TArrow a' b')
-    sub (TAp a b) t | Just t <- extractMetaVar t = do
-        a' <- newTVar (kind a)
-        b' <- newTVar (kind b)
-        varBind t (TAp a' b')
-        (TAp a b) `subsumes` (TAp a' b')
-    sub t (TArrow a b) | Just t <- extractMetaVar t = do
-        a' <- newTVar (kind a)
-        b' <- newTVar (kind b)
-        varBind t (TArrow a' b')
-        (TArrow a' b') `subsumes` (TArrow a b)
-    sub t (TAp a b) | Just t <- extractMetaVar t = do
-        a' <- newTVar (kind a)
-        b' <- newTVar (kind b)
-        varBind t (TAp a' b')
-        (TAp a' b') `subsumes` (TAp a b)
--}
     -- SKOL needs to be after SBOXY
     sub s1 fa@TForAll {} = do
         (_,r2) <- skolomize fa
@@ -85,8 +65,8 @@ subsumes s1 s2 = do
     sub t@(TArrow s1 s2) (TMetaVar mv) = do
         a <- newMetaVar (metaType mv) (kind s1)
         b <- newMetaVar (metaType mv) (kind s2)
-        varBind mv (a `fn` b)
         subsumes t (a `fn` b)
+        varBind mv (a `fn` b)
         --fillBox box (a `fn` b)
 
     -- BMONO & MONO
@@ -100,8 +80,10 @@ printRule s = liftIO $ putStrLn s
 
 boxyMatch :: Sigma' -> Sigma' -> Tc ()
 boxyMatch s1 s2 = do
-    s1 <- findType s1
-    s2 <- findType s2
+    --s1 <- findType s1
+    --s2 <- findType s2
+    (s1,_,_) <- unbox s1
+    (s2,_,_) <- unbox s2
     liftIO $ putStrLn $ "boxyMatch: " <> ppretty s1 <+> ppretty s2
     b <- bm s1 s2
     if b then do
@@ -143,8 +125,8 @@ boxyMatch s1 s2 = do
 
     bm a (TMetaVar mv) | (TCon ca,as) <- fromTAp a = do
         bs <- mapM (newBox . kind) as
-        varBind mv (foldl TAp (TCon ca) bs)
         a `boxyMatch` foldl TAp (TCon ca) bs
+        varBind mv (foldl TAp (TCon ca) bs)
         return False
 
 
@@ -164,8 +146,8 @@ boxyMatch s1 s2 = do
     bm (TForAll vs (ps :=> t)) (TMetaVar mv) = do
         printRule "SEQ1"
         a <- newBox (kind mv)
-        varBind mv (TForAll vs (ps :=> a))
         boxyMatch t a
+        varBind mv (TForAll vs (ps :=> a))
         return False
 
     -- SEQ2
@@ -223,8 +205,8 @@ mgu (TArrow l r) (TArrow l' r')
    = do s1 <- unify l l'
         s2 <- unify r r'
         return ()
-mgu (TMetaVar u) t = varBind u t
-mgu t (TMetaVar u) = varBind u t
+mgu (TMetaVar u) t | not $ isBoxyMetaVar u = varBind u t
+mgu t (TMetaVar u) | not $ isBoxyMetaVar u = varBind u t
 mgu (TVar a) (TVar b) | a == b = return ()
 mgu c1@(TCon tc1) c2@(TCon tc2)
            | tc1==tc2 = return ()

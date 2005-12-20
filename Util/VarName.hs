@@ -5,6 +5,7 @@ module Util.VarName(
     runVarName,
     newName,
     lookupName,
+    maybeLookupName,
     newLookupName) where
 
 import Control.Monad.State
@@ -40,6 +41,12 @@ lookupName t = VarName $ do
         Just x -> return x
         Nothing -> fail $ "lookupName not found: " ++ show t
 
+maybeLookupName :: (Ord ni, Monad m,Show ni) => ni -> VarNameT nc ni no m (Maybe no)
+maybeLookupName t = VarName $ do
+    (nim,_) <- get
+    case Map.lookup t nim of
+        Just x -> return (Just x)
+        Nothing -> return $ fail $ "lookupName not found: " ++ show t
 
 newLookupName :: (Ord ni, Ord nc,Monad m) => [no] -> nc -> ni -> VarNameT nc ni no m no
 newLookupName ns nc ni = VarName $ do

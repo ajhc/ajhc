@@ -161,13 +161,7 @@ dConScheme conName = do
 -- | returns a new box and a function to read said box.
 
 newBox :: Kind -> Tc Type
-newBox k = do
-    newMetaVar Sigma k
-    --u <- newUniq
-    --r <- liftIO $ newIORef Nothing
-    --return (TBox k u r)
-
-
+newBox k = newMetaVar Sigma k
 
 throwError s t1 t2 = do
     diagnosis <- getErrorContext
@@ -183,7 +177,7 @@ lookupName :: Name -> Tc Sigma
 lookupName n = do
     env <- asks tcCurrentEnv
     case Map.lookup n env of
-        Just x -> return x
+        Just x -> freshSigma x
         Nothing -> fail $ "Could not find var in tcEnv:" ++ show (nameType n,n)
 
 newTVar :: Kind -> Tc Type
@@ -265,13 +259,7 @@ skolomize s@TForAll {} = freshSigma s >>= \x -> case x of
 skolomize s = return ([],s)
 
 boxyInstantiate :: Sigma -> Tc Rho'
-boxyInstantiate (TForAll as qt) = do
-        bs <- mapM (newBox . tyvarKind) as
-        let mp = Map.fromList $ zip (map tyvarAtom as) bs
-            (ps :=> r) = inst mp qt
-        addPreds ps
-        return r
-boxyInstantiate x = return x
+boxyInstantiate = freshInstance Sigma
 
 boxySpec :: Sigma -> Tc ([(BoundTV,[Sigma'])],Rho')
 boxySpec (TForAll as qt@(ps :=> t)) = do
@@ -297,7 +285,7 @@ generalize r = quantify (freeMetaVars r) [] r
 
 
 quantify :: [MetaVar] -> [Pred] -> Rho -> Tc Sigma
-quantify vs ps r = do
+quantify vs ps r | not $ any isBoxyMetaVar vs = do
     r <- flattenType r
     nvs <- mapM (newVar . metaKind) vs
     sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- vs ]
@@ -305,14 +293,17 @@ quantify vs ps r = do
     return $ TForAll nvs r
 
 varBind :: MetaVar -> Type -> Tc ()
-varBind u t | t == TMetaVar u   = return ()
-            | u `elem` freeMetaVars t = unificationError (TMetaVar u) t -- occurs check
-            | kind u == kind t, r <- metaRef u = do
-                x <- liftIO $ readIORef r
-                case x of
-                    Just r -> error $ "varBind: binding unfree: " ++ tupled [pprint u,prettyPrintType t,prettyPrintType r]
-                    Nothing -> liftIO $ writeIORef r (Just t)
-            | otherwise        = error $ "varBind: kinds do not match:" ++ show (u,t)
+varBind u t
+    | kind u /= kind t = error $ "varBind: kinds do not match:" ++ show (u,t)
+    | otherwise = do
+        (t,be,_) <- unbox t
+        when be $ error $ "binding boxy: " ++ tupled [pprint u,prettyPrintType t]
+        when (u `elem` freeMetaVars t) $ unificationError (TMetaVar u) t -- occurs check
+        let r = metaRef u
+        x <- liftIO $ readIORef r
+        case x of
+            Just r -> error $ "varBind: binding unfree: " ++ tupled [pprint u,prettyPrintType t,prettyPrintType r]
+            Nothing -> liftIO $ writeIORef r (Just t)
 
 ----------------------------------------
 -- Declaration of instances, boilerplate

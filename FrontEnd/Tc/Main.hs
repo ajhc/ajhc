@@ -1,10 +1,7 @@
 module FrontEnd.Tc.Main (tiExpr, tiProgram, makeProgram ) where
 
-import Control.Monad.Error
 import Control.Monad.Writer
-import List((\\), intersect, union)
 import qualified Data.Map as Map
-import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import Class(ClassHierarchy, entails, split, topDefaults, splitReduce)
 import Control.Monad.Reader
@@ -13,7 +10,7 @@ import DependAnalysis(getBindGroups)
 import Diagnostic
 import Doc.PPrint as PPrint
 import FrontEnd.Desugar(doToExp)
-import FrontEnd.KindInfer(KindEnv,hsQualTypeToSigma)
+import FrontEnd.KindInfer
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Unify
@@ -54,33 +51,35 @@ tcExprPoly e t = do
 
 tiExprPoly e t@TMetaVar {} = tcExpr e t   -- GEN2
 tiExprPoly e t = do                   -- GEN1
-    (_,t) <- skolomize t
+    --(_,t) <- skolomize t
     tcExpr e t
 
 tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp
 
 tcExpr e t = do
     t <- findType t
-    tiExpr e t
+    e <- tiExpr e t
+    (_,False,_) <- unbox t
+    return e
 
 -- TODO should subsume for rank-n
 tiExpr (HsVar v) typ = do
     sc <- lookupName (toName Val v)
-    sc <- freshSigma sc
+--    sc <- freshSigma sc
 --    sc <- freshInstance sc
     sc `subsumes` typ
     return (HsVar v)
 
 tiExpr (HsCon conName) typ = do
     sc <- lookupName (toName DataConstructor conName)
-    sc <- freshSigma sc
+--    sc <- freshSigma sc
  --   sc <- freshInstance sc
     sc `subsumes` typ
     return (HsCon conName)
 
 tiExpr (HsLit l) typ = do
     t <- tiLit l
-    t `subsumes` typ
+    t `boxyMatch` typ
     return (HsLit l)
 
 tiExpr (HsAsPat n e) typ = do
@@ -89,6 +88,7 @@ tiExpr (HsAsPat n e) typ = do
     addToCollectedEnv (Map.singleton (toName Val n) typ)
     return (HsAsPat n e)
 
+{-
 -- comb LET-S and VAR
 tiExpr expr@(HsExpTypeSig sloc e qt) typ =  withContext (locMsg sloc "in the annotated expression" $ render $ ppHsExp expr) $ do
     kt <- getKindEnv
@@ -100,7 +100,7 @@ tiExpr expr@(HsExpTypeSig sloc e qt) typ =  withContext (locMsg sloc "in the ann
     --e' <- tiExpr e r
     --s' `subsumes` typ
     return (HsExpTypeSig sloc e' qt)
-
+ -}
 
 tiExpr (HsLeftSection e1 e2) typ = do
     (e1,e2) <- tcApp e1 e2 typ
@@ -151,8 +151,9 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
     let lam (p:ps) e (TMetaVar mv) rs = do -- ABS2
             b1 <- newBox Star
             b2 <- newBox Star
+            l' <- lam (p:ps) e (b1 `fn` b2) rs
             varBind mv (b1 `fn` b2)
-            lam (p:ps) e (b1 `fn` b2) rs
+            return l'
         lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
             box <- newBox Star
             s1' `boxyMatch` box
@@ -166,7 +167,7 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
         lam _ _ _ _ = fail "lambda type mismatch"
         lamPoly ps e s@TBox {} rs = lam ps e s rs
         lamPoly ps e s rs = do
-            (_,s) <- skolomize s
+            --(_,s) <- skolomize s
             lam ps e s rs
 
 
@@ -278,13 +279,13 @@ tcPat p typ = do
 
 tiPat (HsPVar i) typ = do
         v <- newBox Star
-        v `subsumes` typ
+        v `boxyMatch` typ
         addToCollectedEnv (Map.singleton (toName Val i) v)
         return (HsPVar i, Map.singleton (toName Val i) v)
 
 tiPat (HsPLit l) typ = do
     t <- tiLit l
-    t `subsumes` typ
+    t `boxyMatch` typ
     return (HsPLit l,Map.empty)
 
 -- this is for negative literals only
@@ -302,21 +303,21 @@ tiPat (HsPParen p) typ = tiPat p typ
 tiPat (HsPApp conName pats) typ = do
     bs <- sequence [ newBox Star | _ <- pats ]
     s <- lookupName (toName DataConstructor conName)
-    s `subsumes` (foldr fn typ bs)
+    s `boxyMatch` (foldr fn typ bs)
     --(foldr fn typ bs) `subsumes` s
     pats' <- sequence [ tcPat a r | r <- bs | a <- pats ]
     return (HsPApp conName (fsts pats'), mconcat (snds pats'))
 
 tiPat pl@(HsPList []) typ = do
     v <- newBox Star
-    TAp tList v `subsumes` typ
+    TAp tList v `boxyMatch` typ
     --TAp tList v `subsumes` typ
     return (pl,mempty)
 
 
 tiPat (HsPList pats@(_:_)) typ = do
     v <- newBox Star
-    TAp tList v `subsumes` typ
+    TAp tList v `boxyMatch` typ
     ps <- mapM (`tcPat` v) pats
     return (HsPList (fsts ps), mconcat (snds ps))
 
@@ -363,14 +364,16 @@ tcRhs rhs typ = case rhs of
 
 tcDecl ::  HsDecl -> Sigma -> Tc (HsDecl,TypeEnv)
 
+{-
 tcDecl d@(HsForeignDecl _ _ _ n _) typ = do
     s <- lookupName (toName Val n)
     s `subsumes` typ
     return (d,mempty)
-
+-}
 
 
 tcDecl decl@(HsPatBind sloc (HsPVar v) rhs wheres) typ = withContext (declDiagnostic decl) $ do
+    typ <- findType typ
     (wheres', env) <- tcWheres wheres
     localEnv env $ do
     case rhs of
@@ -383,20 +386,22 @@ tcDecl decl@(HsPatBind sloc (HsPVar v) rhs wheres) typ = withContext (declDiagno
 
 
 tcDecl decl@(HsFunBind matches) typ = withContext (declDiagnostic decl) $ do
-        matches' <- mapM (`tcMatch` typ) matches
-        return (HsFunBind matches', Map.singleton (getDeclName decl) typ)
+    typ <- findType typ
+    matches' <- mapM (`tcMatch` typ) matches
+    return (HsFunBind matches', Map.singleton (getDeclName decl) typ)
 
 tcMatch ::  HsMatch -> Sigma -> Tc HsMatch
 tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "in" $ show funName) $ do
     let lam (p:ps) (TMetaVar mv) rs = do -- ABS2
             b1 <- newBox Star
             b2 <- newBox Star
+            l' <- lam (p:ps) (b1 `fn` b2) rs
             varBind mv (b1 `fn` b2)
-            lam (p:ps) (b1 `fn` b2) rs
+            return l'
         lam (p:ps) (TArrow s1' s2') rs = do -- ABS1
             box <- newBox Star
-            s1' `boxyMatch` box
             (p',env) <- tcPat p box
+            s1' `boxyMatch` box
             liftIO $ print (p',env)
             localEnv env $ do
                 s2' <- findType s2'
@@ -408,7 +413,7 @@ tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "i
         lam _ _ _ = fail "lambda type mismatch"
         lamPoly ps s@TMetaVar {} rs = lam ps s rs
         lamPoly ps s rs = do
-            (_,s) <- skolomize s
+            --(_,s) <- skolomize s
             lam ps s rs
     typ <- findType typ
     lam pats typ []
@@ -421,10 +426,14 @@ declDiagnostic decl@(HsFunBind matches) = locMsg (srcLoc decl) "in the function 
 tiExpl ::  Expl -> Tc (HsDecl,TypeEnv)
 tiExpl (sc, decl@HsForeignDecl {}) = do return (decl,Map.empty)
 tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typed " ++  (render $ ppHsDecl decl))) $ do
-    liftIO $ putStrLn $ "typing expl: " ++ show (getDeclName decl)
+    liftIO $ putStrLn $ "** typing expl: " ++ show (getDeclName decl) ++ " " ++ prettyPrintType sc
     addToCollectedEnv (Map.singleton (getDeclName decl) sc)
-    (_,sc) <- skolomize sc
-    tcDecl decl sc
+    --tcDecl decl sc
+    sc <- freshSigma sc
+    case sc of
+        TForAll _ (_ :=> t) -> tcDecl decl t
+        t -> tcDecl decl t
+    --(_,sc) <- skolomize sc
     {-
        cHierarchy <- getClassHierarchy
        --(qs :=> t) <- -fmap snd $ freshInst sc
