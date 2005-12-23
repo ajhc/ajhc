@@ -12,7 +12,7 @@ HC = ghc
 HCI = ghci
 HC_OPTS = $(GHCOPTS)
 
-BUILTSOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs Version.hs VersionCtx.hs
+BUILTSOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs Version/Raw.hs Version/Ctx.hs
 
 # HSFILES is defined here, it can be updated with 'make depend' whenever a new source file is added
 -include depend.make
@@ -85,20 +85,19 @@ RawFiles.hs:  data/HsFFI.h data/jhc_rts.c
 FrontEnd/HsParser.hs: FrontEnd/HsParser.ly
 	happy -a -g -c FrontEnd/HsParser.ly
 
-VersionCtx.hs: _darcs/inventory
+Version/Ctx.hs: _darcs/inventory
 	darcs changes --context > changes.txt  || echo "No darcs Context Available!" > changes.txt
-	perl ./utils/op_raw.prl $(basename $@) changes.txt > $@
+	perl ./utils/op_raw.prl Version.Ctx changes.txt > $@
 	rm -f changes.txt
 
-Version.hs: _darcs/inventory
-	echo "module Version where"                                     > $@
+Version/Raw.hs: _darcs/inventory
+	echo "module Version.Raw where"                                > $@
 	echo "jhcVersion = \"$(JHC_VERSION)\""                         >> $@
 	date +'compileDate = "%Y%m%d"'                                 >> $@
 	darcs changes -t '.' \
 	|  perl -e '<>;$$_=<>;s/^\s*tagged\s+/darcsTag = "/;s/$$/"/;print' >> $@
 	darcs changes --from-tag='' --xml-output | grep '</patch>' \
 	| wc -l | perl -e 'print "darcsPatches = \"".(<>-1)."\"\n"'    >> $@
-	echo 'basePackages = ["base-0.1", "haskell98-0.1"]'            >> $@
 
 .PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs i
 

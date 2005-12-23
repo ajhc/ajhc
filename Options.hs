@@ -12,7 +12,6 @@ module Options(
     fopts,
     flint,
     fileOptions,
-    versionString,
     withOptions,
     withOptionsT,
     OptM(),
@@ -21,23 +20,19 @@ module Options(
     flagOpt
     ) where
 
+import Control.Monad.Error()    -- IO MonadPlus instance
 import Control.Monad.Identity
 import Control.Monad.Reader
-import Control.Monad.Trans
-import Data.Version
-import Monad
 import qualified Data.Set as S
 import System
 import System.Console.GetOpt
-import System.Info
 import System.IO.Unsafe
 
 import GenUtil
 import qualified FlagDump
 import qualified FlagOpts
-import {-# SOURCE #-} SelfTest(selfTest)
-import Version
-import VersionCtx
+
+basePackages = ["base-0.1", "haskell98-0.1"]
 
 data Opt = Opt {
     optColumns     :: !Int,       -- ^ Width of terminal.
@@ -158,9 +153,6 @@ postProcess' o = case FlagOpts.process (optFOptsSet o) (optFOpts o) of
                 f [] = ""
                 f xs = "Unrecognized flag passed to '-f': " ++ unwords xs ++ "\nValid flags:\n\n" ++ FlagOpts.helpMsg
 
-versionString = concat ["jhc ", jhcVersion, " ", compileDate, " (", darcsTag, "+",darcsPatches, ")\n"]
-                 ++ "compiled by " ++ compilerName ++ "-" ++ showVersion compilerVersion ++ " on a " ++ arch ++ " running " ++ os
-
 {-# NOINLINE processOptions #-}
 -- | Parse commandline options.
 processOptions :: IO Opt
@@ -170,16 +162,6 @@ processOptions = do
     case (getOpt Permute theoptions argv) of
 	  (o,ns,[]) -> case postProcess (foldl (flip ($)) opt o) of
                 (o,"") -> case postProcess' o of
-                    (Opt { optVersion = True },_) -> do
-                        putStrLn versionString
-                        exitSuccess
-                    (Opt { optVersionCtx = True },_) -> do
-                        putStrLn changes_txt
-                        exitSuccess
-                    (Opt { optSelfTest = True},_) -> do
-                        putStrLn "Starting self testing..."
-                        SelfTest.selfTest ns
-                        exitSuccess
                     (o,"") -> case optNoAuto o of
                                True -> return (o { optArgs = ns })
                                False-> return (o { optArgs = ns, optHls  = basePackages ++ optHls o })

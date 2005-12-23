@@ -50,6 +50,7 @@ import HsSyn
 import Info.Types
 import Name.Name
 import Options
+import SelfTest(selfTest)
 import qualified E.CPR
 import qualified E.SSimplify as SS
 import qualified FlagDump as FD
@@ -61,12 +62,14 @@ import qualified Info.Info as Info
 import qualified Interactive
 import qualified Stats
 import Util.Graph
+import Version
 
 ---------------
 -- ∀α∃β . α → β
 ---------------
 
-
+progress str = wdump FD.Progress (putErrLn str)
+progressM c  = wdump FD.Progress (c >>= putErrLn)
 
 
 bracketHtml action = do
@@ -77,14 +80,20 @@ bracketHtml action = do
 
 main = runMain $ bracketHtml $ do
     o <- processOptions
-    wdump FD.Progress $ do
+    progressM $ do
         name <- System.getProgName
         args <- System.getArgs
-        putStrLn (simpleQuote (name:args))
+        return (simpleQuote (name:args))
     case o of
-        Opt { optShowHo = xs@(_:_) } -> mapM_ dumpHoFile xs
-        Opt { optBuildHl = hlName@(_:_) } -> buildHl hlName (optArgs o)
-        _ -> processFiles  (optArgs o)
+        Opt { optShowHo     = xs@(_:_) }     -> mapM_ dumpHoFile xs
+        Opt { optBuildHl    = hlName@(_:_) } -> buildHl hlName (optArgs o)
+        Opt { optVersion    = True }         -> putStrLn versionString
+        Opt { optVersionCtx = True }         -> putStrLn changes_txt
+        Opt { optSelfTest   = True }         -> do putStrLn "Starting self testing..."
+                                                   SelfTest.selfTest (optArgs o)
+        _                                    -> processFiles  (optArgs o)
+
+
 
 buildHl fname [] = putErrDie "Cannot build hl file without list of input modules"
 buildHl fname ms = do
@@ -269,7 +278,7 @@ processDecls stats ho ho' tiData = do
         fscc (Left n) = (False,[n])
         fscc (Right ns) = (True,ns)
     (ds,_) <- foldM f ([],(Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
-    wdump FD.Progress $ putErrLn "!"
+    progress "!"
 
 
     let ds' = reachable (newGraph ds (\ (_,b,_) -> tvrIdent b) (\ (_,b,c) -> bindingFreeVars b c)) [ tvrIdent b | (n,b,_) <- ds, getProperty prop_EXPORTED b]
@@ -415,7 +424,7 @@ compileModEnv' stats ho = do
     wdump FD.Progress $ printEStats lc
 
     stats <- Stats.new
-    wdump FD.Progress $ putErrLn "Converting to Grin..."
+    progress "Converting to Grin..."
     x <- Grin.FromE.compile dataTable (error "vmap") (eToSC dataTable lc)
     Stats.print "Grin" Stats.theStats
     --wdump FD.Grin $ printGrin x
@@ -437,7 +446,7 @@ compileModEnv' stats ho = do
     x <- return $ normalizeGrin x
     typecheckGrin x
     wdump FD.GrinPreeval $ printGrin x
-    wdump FD.Progress $ putErrLn "Points-to analysis..."
+    progress "Points-to analysis..."
     stats <- Stats.new
     x <- Grin.PointsToAnalysis.grinInlineEvalApply stats x
     wdump FD.Progress $ Stats.print "EvalInline" stats
@@ -452,7 +461,7 @@ compileModEnv' stats ho = do
     typecheckGrin x
     wdump FD.Grin $ printGrin x
     when (optInterpret options) $ do
-        wdump FD.Progress $ putErrLn "Interpreting..."
+        progress "Interpreting..."
         (v,stats) <- Grin.Interpret.evaluate x
         CharIO.putStrLn $ render $ Grin.Show.prettyVal v
         wdump FD.Stats $  Stats.print "Stats" stats
@@ -462,7 +471,7 @@ compileModEnv' stats ho = do
         let (cg,rls) = compileGrin x
         let fn = optOutName options
         let cf = (fn ++ "_code.c")
-        wdump FD.Progress $ putErrLn ("Writing " ++ show cf)
+        progress ("Writing " ++ show cf)
         name <- System.getProgName
         args <- System.getArgs
         let argstring = simpleQuote (name:args)
@@ -472,7 +481,7 @@ compileModEnv' stats ho = do
         let profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE"]
                       | otherwise = []
         let comm = shellQuote $ [optCC options, "-std=gnu99", "-foptimize-sibling-calls", "-O", {- "-funit-at-a-time", -} "-g", "-Wall", "-o", fn, cf ] ++ rls ++ optCCargs options  ++ boehmOpts ++ profileOpts
-        wdump FD.Progress $ putErrLn ("Running: " ++ comm)
+        progress ("Running: " ++ comm)
         r <- System.system comm
         when (r /= System.ExitSuccess) $ fail "C code did not compile."
         return ()

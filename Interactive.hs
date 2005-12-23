@@ -45,6 +45,7 @@ import TypeSynonyms(showSynonym)
 import TypeSyns
 import TypeSigs
 import Util.Interact
+import Version(versionString)
 import Warning
 
 printDoc doc = do
