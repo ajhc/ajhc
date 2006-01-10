@@ -1,5 +1,8 @@
 # -f code options
 
+!Typechecking
+boxy use the new boxy typechecker
+
 !Code Options
 inline-pragmas use inline pragmas
 rules use rules
