@@ -416,24 +416,32 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         return $ ECase e b' as' d'
 
     doConstCase l b as d sub inb = do
-        (bs,e) <- match l as (b,d)
-        let bs' = [ x | x@(TVr { tvrIdent = n },_) <- bs, n /= 0]
-        binds <- mapM (\ (v,e) -> nname v sub inb >>= return . (,,) e v) bs'
-        e' <- f e (Map.fromList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] `Map.union` sub)   (envInScope_u (Map.fromList [ (n,IsBoundTo Many e) | (e,_,TVr { tvrIdent = n }) <- binds] `Map.union`) inb)
-        return $ eLetRec [ (v,e) | (e,_,v) <- binds ] e'
+        mr <- match l as (b,d)
+        case mr of
+            Just (bs,e) -> do
+                let bs' = [ x | x@(TVr { tvrIdent = n },_) <- bs, n /= 0]
+                binds <- mapM (\ (v,e) -> nname v sub inb >>= return . (,,) e v) bs'
+                e' <- f e (Map.fromList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] `Map.union` sub)   (envInScope_u (Map.fromList [ (n,IsBoundTo Many e) | (e,_,TVr { tvrIdent = n }) <- binds] `Map.union`) inb)
+                return $ eLetRec [ (v,e) | (e,_,v) <- binds ] e'
+            Nothing -> do
+                let t = getType (ECase (ELit l) b as d)
+                return $ EError "match falls off bottom" t
 
     match m@(LitCons c xs _) ((Alt (LitCons c' bs _) e):rs) d | c == c' = do
         mtick (toAtom $ "E.Simplify.known-case." ++ show c )
-        return ((zip bs xs),e)
+        return $ Just ((zip bs xs),e)
          | otherwise = match m rs d
     match m@(LitInt a _) ((Alt (LitInt b _) e):rs) d | a == b = do
         mtick (toAtom $ "E.Simplify.known-case." ++ show a)
-        return ([],e)
+        return $ Just ([],e)
          | otherwise = match m rs d
     match l [] (b,Just e) = do
         mtick (toAtom "E.Simplify.known-case._")
-        return ([(b,ELit l)],e)
-    match m [] (_,Nothing) = error $ "End of match: " ++ show m
+        return $ Just ([(b,ELit l)],e)
+    --match m [] (_,Nothing) = error $ "End of match: " ++ show m
+    match m [] (_,Nothing) = do
+        mtick (toAtom "E.Simplify.known-case.unmatch")
+        return Nothing
     match m as d = error $ "Odd Match: " ++ show ((m,getType m),as,d)
 
     -- NOINLINE must take precidence because it is sometimes needed for correctness, while INLINE is surely an optimization.

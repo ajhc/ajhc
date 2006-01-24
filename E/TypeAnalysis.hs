@@ -1,7 +1,7 @@
 -- | examine all uses of types in a program to determine which ones are
 -- actually needed in the method generation
 
-module E.TypeAnalysis(typeAnalyze) where
+module E.TypeAnalysis(typeAnalyze, pruneE) where
 
 import Control.Monad.Identity
 import Data.Monoid
@@ -15,10 +15,12 @@ import CanType
 import Doc.DocLike
 import E.Annotate
 import E.E hiding(isBottom)
+import E.Inline(emapE')
 import E.TypeCheck
 import Fixer
 import GenUtil
 import Name.Name
+import Name.Names
 import qualified Info.Info as Info
 
 
@@ -69,11 +71,13 @@ calcDs env ds = mapM_ d ds >> mapM_ (calcE env) (snds ds) where
                 modifiedSuperSetOf t' a $ \ v -> vmapArgSingleton h i v
     d (t,e) = fail $ "calcDs: " ++ show (t,e)
 
+-- TODO - make default case conditional
 calcAlt env v (Alt (LitCons n xs _) e) = do
-    calcE env e
-    flip mapM_ (zip [0..] xs) $ \ (i,t) -> do
-        let Just t' = Info.lookup (tvrInfo t)
-        modifiedSuperSetOf t' v (vmapArg n i)
+    conditionalRule (\ (VMap _ vs) -> n `Set.member` vs) v $ do
+        calcE env e
+        flip mapM_ (zip [0..] xs) $ \ (i,t) -> do
+            let Just t' = Info.lookup (tvrInfo t)
+            modifiedSuperSetOf t' v (vmapArg n i)
 
 
 calcE :: Map.Map Id [Value Typ] -> E -> IO ()
@@ -112,13 +116,39 @@ getValue e | Just c <- typConstant e = return $ value c
 getValue e = fail $ "getValue: " ++ show e
 
 typConstant :: Monad m => E -> m Typ
+typConstant (EPi TVr { tvrType = a} b) = do
+    ab <- mapM typConstant [a,b]
+    return $ vmapValue tc_Arrow ab
 typConstant (ELit (LitCons n xs _)) = do
     xs' <- mapM typConstant xs
     return $ vmapValue n xs'
 typConstant e = fail $ "typConstant: " ++ show e
 
 
--- VMap general structure
+-- pruning the unused branches of typecase statements
+
+
+pruneE :: E -> IO E
+pruneE ec@ECase { eCaseScrutinee = EVar v } | sortStarLike (getType v), Just (VMap _ ns) <- Info.lookup (tvrInfo v) = do
+    ec' <- pruneCase ec ns
+    emapE' pruneE ec'
+pruneE e = emapE' pruneE e
+
+pruneCase :: Monad m => E -> Set.Set Name -> m E
+pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
+    err = EError "pruneCase: all alternatives pruned" (getType ec)
+    nec = ec { eCaseAlts = f [] $ eCaseAlts ec, eCaseDefault = cd (eCaseDefault ec)}
+    f xs [] = reverse xs
+    f xs (alt@(Alt (LitCons n _ _) _):rs) | not (n `Set.member` ns) = f xs rs
+    f xs (alt:rs) = f (alt:xs) rs
+    cd (Just d) | or [ n `notElem` as | n <- Set.toList ns ] = Just d
+    cd _ = Nothing
+    as = [ n | LitCons n _ _ <- casePats ec ]
+
+
+
+
+-- VMap general data type for finding the fixpoint of a general tree-like structure.
 
 data VMap n = VMap (Map.Map (n,Int) (VMap n)) (Set.Set n)
     deriving(Typeable)

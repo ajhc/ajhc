@@ -361,13 +361,18 @@ compileModEnv' stats ho = do
 
     let showTVr t = prettyE (EVar t) <> show (tvrInfo t)
 
-    when (fopts  FO.TypeAnalysis) $ do
-        let ELetRec ds _ = lco in do
-            putStrLn "Supercombinators"
-            ds' <- typeAnalyze ds
-            mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (showTVr t) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ds'
 
     lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lco
+
+    lc <- if (fopts  FO.TypeAnalysis) then do
+        let ELetRec ds mn = lc in do
+            ds' <- typeAnalyze ds
+            putStrLn "Type analyzed methods"
+            mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) (filter (getProperty prop_METHOD . fst) ds')
+            ds' <- sequence [ pruneE e >>= return . (,) t | (t,e) <- ds' ]
+            return $ ELetRec ds' mn
+        else return lc
+
     wdump FD.Progress $ printEStats lc
     let cm stats e = do
         let sopt = mempty { SS.so_superInline = True, SS.so_rules = rules, SS.so_dataTable = dataTable }

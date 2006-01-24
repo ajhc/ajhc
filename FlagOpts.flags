@@ -20,4 +20,4 @@ profile embed profiling code
 
 
 !Default settings
-@default inline-pragmas rules wrapper float-in strictness defaulting
+@default inline-pragmas rules wrapper float-in strictness defaulting type-analysis
