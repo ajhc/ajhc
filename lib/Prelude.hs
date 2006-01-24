@@ -709,12 +709,17 @@ words s          =  case dropWhile Char.isSpace s of
 
 
 unlines          :: [String] -> String
-unlines          =  concatMap (++ "\n")
+unlines [] = []
+unlines (l:ls) = l ++ '\n' : unlines ls
+--unlines          =  concatMap (++ "\n")
 
 
 unwords          :: [String] -> String
-unwords []       =  ""
-unwords ws       =  foldr1 (\w s -> w ++ ' ':s) ws
+unwords []		=  ""
+unwords [w]		= w
+unwords (w:ws)		= w ++ ' ' : unwords ws
+--unwords []       =  ""
+--unwords ws       =  foldr1 (\w s -> w ++ ' ':s) ws
 
 -- reverse xs returns the elements of xs in reverse order.  xs must be finite.
 
@@ -758,8 +763,14 @@ lookup key ((x,y):xys)
 -- sum and product compute the sum or product of a finite list of numbers.
 
 sum, product     :: (Num a) => [a] -> a
-sum              =  foldl (+) 0
-product          =  foldl (*) 1
+--sum              =  foldl (+) 0
+--product          =  foldl (*) 1
+sum l	= sum' l 0 where
+    sum' []     a = a
+    sum' (x:xs) a = sum' xs (a+x)
+product	l = prod l 1 where
+    prod []     a = a
+    prod (x:xs) a = prod xs (a*x)
 
 -- maximum and minimum return the maximum or minimum value from a list,
 -- which must be non-empty, finite, and of an ordered type.

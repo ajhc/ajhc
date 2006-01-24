@@ -50,11 +50,27 @@ findIndices             :: (a -> Bool) -> [a] -> [Int]
 findIndices p xs        =  [ i | (x,i) <- zip xs [0..], p x ]
 
 nub                     :: Eq a => [a] -> [a]
-nub                     =  nubBy (==)
+nub l                   = nub' l [] where
+    nub' [] _		= []
+    nub' (x:xs) ls
+	| x `elem` ls   = nub' xs ls
+	| otherwise     = x : nub' xs (x:ls)
+
+--nub                     =  nubBy (==)
 
 nubBy                   :: (a -> a -> Bool) -> [a] -> [a]
-nubBy eq []             =  []
-nubBy eq (x:xs)         =  x : nubBy eq (filter (\y -> not (eq x y)) xs)
+nubBy eq l              = nubBy' l []
+  where
+    nubBy' [] _		= []
+    nubBy' (y:ys) xs
+       | elem_by eq y xs = nubBy' ys xs
+       | otherwise	 = y : nubBy' ys (y:xs)
+    elem_by :: (a -> a -> Bool) -> a -> [a] -> Bool
+    elem_by _  _ []		=  False
+    elem_by eq y (x:xs)	=  x `eq` y || elem_by eq y xs
+
+--nubBy eq []             =  []
+--nubBy eq (x:xs)         =  x : nubBy eq (filter (\y -> not (eq x y)) xs)
 
 delete                  :: Eq a => a -> [a] -> [a]
 delete                  =  deleteBy (==)
@@ -152,7 +168,32 @@ sort                    :: (Ord a) => [a] -> [a]
 sort                    =  sortBy compare
 
 sortBy                  :: (a -> a -> Ordering) -> [a] -> [a]
-sortBy cmp              =  foldr (insertBy cmp) []
+sortBy cmp l = mergesort cmp l where
+    mergesort :: (a -> a -> Ordering) -> [a] -> [a]
+    mergesort cmp = mergesort' cmp . map wrap
+
+    mergesort' :: (a -> a -> Ordering) -> [[a]] -> [a]
+    mergesort' cmp [] = []
+    mergesort' cmp [xs] = xs
+    mergesort' cmp xss = mergesort' cmp (merge_pairs cmp xss)
+
+    merge_pairs :: (a -> a -> Ordering) -> [[a]] -> [[a]]
+    merge_pairs cmp [] = []
+    merge_pairs cmp [xs] = [xs]
+    merge_pairs cmp (xs:ys:xss) = merge cmp xs ys : merge_pairs cmp xss
+
+    merge :: (a -> a -> Ordering) -> [a] -> [a] -> [a]
+    merge cmp xs [] = xs
+    merge cmp [] ys = ys
+    merge cmp (x:xs) (y:ys)
+     = case x `cmp` y of
+            GT -> y : merge cmp (x:xs)   ys
+            _  -> x : merge cmp    xs (y:ys)
+
+    wrap :: a -> [a]
+    wrap x = [x]
+
+-- sortBy cmp              =  foldr (insertBy cmp) []
 
 insert                  :: (Ord a) => a -> [a] -> [a]
 insert                  = insertBy compare
