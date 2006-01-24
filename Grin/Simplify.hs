@@ -39,6 +39,7 @@ at_OptSimplifyCopyPropConst  = toAtom "Optimize.simplify.copy-propagate-const"
 at_OptSimplifyNodeReduction  = toAtom "Optimize.simplify.node-reduction"
 at_OptSimplifyDeadVar  = toAtom "Optimize.simplify.dead-var"
 at_OptSimplifyConstApply  = toAtom "Optimize.simplify.const-apply"
+at_OptSimplifyConstFetch  = toAtom "Optimize.simplify.const-fetch"
 at_OptSimplifyConstEval  = toAtom "Optimize.simplify.const-eval"
 at_OptSimplifyTrivialCase  = toAtom "Optimize.simplify.trivial-case"
 at_OptSimplifyBadAssignment  = toAtom "Optimize.simplify.bad-assignment"
@@ -76,6 +77,9 @@ simplify1 stats env (n,l) = do
         gs (doApply n v typ)
     gs (App a [Const n] typ) | a == funcEval = do
         lift $ tick stats at_OptSimplifyConstEval
+        gs (Return n)
+    gs (Fetch (Const n)) = do
+        lift $ tick stats at_OptSimplifyConstFetch
         gs (Return n)
     gs x = return x
     gv (p,Case x ds) = do
