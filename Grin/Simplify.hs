@@ -201,6 +201,10 @@ lamBind (b :-> _) = b
 isVar Var {} = True
 isVar _ = False
 
+isKnown NodeC {} = True
+isKnown Lit {} = True
+isKnown _ = False
+
 optimize1 ::  (Atom,Lam) -> StatM Lam
 optimize1 (n,l) = g l where
     g (b :-> e) = f e >>= return . (b :->)
@@ -208,17 +212,17 @@ optimize1 (n,l) = g l where
     --    f (Return v :>>= v2)
     --f (Case v [v2@(Var {} :-> _)] :>>= lr) = do
     --    f ((Return v :>>= v2) :>>= lr)
-    f (Case n@NodeC {} as) = do
+    f (Case n as) | isKnown n = do
         kc <- knownCase n as
         f kc
-    f (Case n@NodeC {} as :>>= lr) = do
+    f (Case n as :>>= lr) | isKnown n = do
         kc <- knownCase n as
         f (kc :>>= lr)
-    f (Return n@NodeC {} :>>= b :-> Case b' as :>>= lr) | b == b' = do
+    f (Return n :>>= b :-> Case b' as :>>= lr) | isKnown n, b == b' = do
         c <- knownCase n as
         r <- f (c :>>= lr)
         return (Return n :>>= b :-> r)
-    f (Return n@NodeC {} :>>= b :-> Case b' as ) | b == b' = do
+    f (Return n :>>= b :-> Case b' as ) | isKnown n, b == b' = do
         kc <- knownCase n as
         r <- f kc
         return (Return n :>>= b :-> r)
@@ -264,6 +268,13 @@ optimize1 (n,l) = g l where
             f ((v@Var {} :-> b):_) = Return n :>>= v :-> b
             f ((NodeC t' vs' :-> b):_) | t == t' =  Return (Tup vs) :>>= Tup vs' :-> b
             -- f ((NodeC t' vs' :-> b):_) | t == t' = let (xs,ys) = unzip [ (Var x t,y) | (x,y@(Var _ t)) <- Map.toList mp] in Return (Tup ys) :>>= Tup xs :-> b
+            f (_:as) = f as
+        return $ f as
+    knownCase n@(Lit l _) as = do
+        mtick $ "Optimize.optimize.known-case.{" ++ show n
+        let f [] =  Error "known-case: No known case" (getType (Case n as))
+            f ((v@Var {} :-> b):_) = Return n :>>= v :-> b
+            f ((Lit l' _ :-> b):_) | l == l' = b
             f (_:as) = f as
         return $ f as
     caseCombine x as as' = do
