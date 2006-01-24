@@ -15,7 +15,7 @@ import CanType
 import Doc.DocLike
 import E.Annotate
 import E.E hiding(isBottom)
-import E.Inline(emapE')
+import E.Inline(emapE',emapE_)
 import E.TypeCheck
 import Fixer
 import GenUtil
@@ -25,15 +25,18 @@ import qualified Info.Info as Info
 
 
 type Typ = VMap Name
+type Env = (Value (Set.Set TVr),Map.Map Id [Value Typ])
 
 extractValMap :: [(TVr,E)] -> Map.Map Id [Value Typ]
 extractValMap ds = Map.fromList [ (tvrIdent t,f e []) | (t,e) <- ds] where
     f (ELam tvr e) rs | sortStarLike (getType tvr) = f e (runIdentity (Info.lookup $ tvrInfo tvr):rs)
     f _ rs = reverse rs
 
-typeAnalyze :: [(TVr,E)] -> IO [(TVr,E)]
-typeAnalyze ds = do
+-- all variables _must_ be unique before running this
+typeAnalyze :: [(TVr,E)] -> E -> IO [(TVr,E)]
+typeAnalyze ds seed = do
     fixer <- newFixer
+    usedVals <- newValue fixer Set.empty
     let lambind _ nfo = do
             x <- newValue fixer ( bottom :: Typ)
             return $ Info.insert x nfo
@@ -42,14 +45,20 @@ typeAnalyze ds = do
             return (Info.insert (rv :: Typ) $ Info.delete (undefined :: Value Typ) nfo)
         lamdel _ nfo = return (Info.delete (undefined :: Value Typ) nfo)
     ds <- annotateDs mempty lambind (\_ -> return) (\_ -> return) ds
-    calcDs (extractValMap ds) ds
+    calcDs (usedVals,extractValMap ds) ds
+    calcE (usedVals,extractValMap ds) seed
     findFixpoint fixer
     ds <- annotateDs mempty (\_ -> return) (\_ -> return) lamread ds
     ds <- annotateDs mempty lamdel (\_ -> return) (\_ -> return) ds
     return ds
 
-calcDs :: Map.Map Id [Value Typ] -> [(TVr,E)] -> IO ()
-calcDs env ds = mapM_ d ds >> mapM_ (calcE env) (snds ds) where
+calcDs ::  Env -> [(TVr,E)] -> IO ()
+calcDs env@(usedVals,_) ds = do
+    mapM_ d ds
+    flip mapM_ ds $ \ (v,e) -> do
+        conditionalRule (v `Set.member`) usedVals (calcE env e)
+     where
+        --mapM_ d ds >> mapM_ (calcE env) (snds ds) where
     d (t,e) | not (sortStarLike (getType t)) = return ()
     d (t,e) | Just v <- getValue e = do
         let Just t' = Info.lookup (tvrInfo t)
@@ -80,34 +89,35 @@ calcAlt env v (Alt (LitCons n xs _) e) = do
             modifiedSuperSetOf t' v (vmapArg n i)
 
 
-calcE :: Map.Map Id [Value Typ] -> E -> IO ()
-calcE env (ELetRec ds e) = calcDs nenv ds >> calcE nenv e where
-    nenv = extractValMap ds `Map.union` env
+calcE :: Env -> E -> IO ()
+calcE (usedVals,env) (ELetRec ds e) = calcDs nenv ds >> calcE nenv e where
+    nenv = (usedVals,extractValMap ds `Map.union` env)
 calcE env e | (e',(_:_)) <- fromLam e = calcE env e'
 calcE env ec@ECase {} | sortStarLike (getType $ eCaseScrutinee ec) = do
     calcE env (eCaseScrutinee ec)
     fmapM_ (calcE env) (eCaseDefault ec)
     v <- getValue (eCaseScrutinee ec)
     mapM_ (calcAlt env v) (eCaseAlts ec)
-    calcScrut (eCaseScrutinee ec)
 calcE env ec@ECase {} = do
     calcE env (eCaseScrutinee ec)
     mapM_ (calcE env) (caseBodies ec)
-calcE _ ELit {} = return ()
-calcE _ EPrim {} = return ()
+calcE env e@ELit {} = tagE env e
+calcE env e@EPrim {} = tagE env e
 calcE _ EError {} = return ()
 calcE _ ESort {} = return ()
 calcE _ Unknown = return ()
-calcE env e | (EVar v,as@(_:_)) <- fromAp e, Just ts <- Map.lookup (tvrIdent v) env = do
+calcE env e | (EVar v,as@(_:_)) <- fromAp e, Just ts <- Map.lookup (tvrIdent v) (snd env) = do
+    tagE env e
     flip mapM_ (zip as ts) $ \ (a,t) -> do
         when (sortStarLike (getType a)) $ do
             a' <- getValue a
             t `isSuperSetOf` a'
-calcE _ EVar {} = return ()
-calcE _ EAp {} = return ()
+calcE env e@EVar {} = tagE env e
+calcE env e@EAp {} = tagE env e
 calcE _ e = fail $ "odd calcE: " ++ show e
 
-calcScrut _ = return ()
+tagE (usedVals,_) (EVar v) = usedVals `isSuperSetOf` value (Set.singleton v)
+tagE env e  = emapE_ (tagE env) e
 
 getValue (EVar v)
     | Just x <- Info.lookup (tvrInfo v) = return x

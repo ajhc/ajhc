@@ -366,7 +366,7 @@ compileModEnv' stats ho = do
 
     lc <- if (fopts  FO.TypeAnalysis) then do
         let ELetRec ds mn = lc in do
-            ds' <- typeAnalyze ds
+            ds' <- typeAnalyze ds mn
             putStrLn "Type analyzed methods"
             mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) (filter (getProperty prop_METHOD . fst) ds')
             ds' <- sequence [ pruneE e >>= return . (,) t | (t,e) <- ds' ]
