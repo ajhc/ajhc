@@ -189,13 +189,12 @@ primTyEnv = TyEnv . Map.fromList $ [
     ] ++ [ (toAtom ('C':x), ([Ty $ toAtom y],TyNode)) | (x,y,_) <- allCTypes, y /= "void" ]
 
 
--- constant CAF analysis
+-- | constant CAF analysis
 -- In grin, partial applications are constant data, rather than functions. Since
 -- many cafs consist of constant applications, we preprocess them into values
 -- beforehand. This also catches recursive constant toplevel bindings.
 
---type ConstantCafMap = Map.Map Int -> Val
---constantCaf :: DataTable -> SC -> [(TVr,Val)]
+constantCaf :: DataTable -> SC -> ([(TVr,Var,Val)],[Var])
 constantCaf dataTable (SC _ ds) = ans where
     (lbs',cafs) = G.findLoopBreakers (const 0) (const True) $ G.newGraph [ (v,e) | (v,[],e) <- ds, canidate e] (tvrNum . fst) (freeVars . snd)
     lbs = Set.fromList $ fsts lbs'
@@ -208,7 +207,7 @@ constantCaf dataTable (SC _ ds) = ans where
     coMap = Map.fromList [  (v,ce)| (v,_,ce) <- fst ans]
     conv :: E -> Val
     conv (ELit (LitInt i (ELit (LitCons n [] (ESort EHash))))) | RawType <- nameType n =  Lit i (Ty $ toAtom (show n))
-    conv (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Map.lookup n ctypeMap = ( Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
+    --conv (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Map.lookup n ctypeMap = ( Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
     conv e | Just (a,_) <- from_unsafeCoerce e = conv a
     conv (ELit lc@(LitCons n es _)) | Just nn <- getName lc = (Const (NodeC nn (map conv es)))
     conv (EPi (TVr { tvrIdent = 0, tvrType =  a}) b)  =  Const $ NodeC tagArrow [conv a,conv b]
@@ -262,6 +261,8 @@ compile' dataTable cenv (tvr,as,e) = ans where
     cc, ce, cr :: E -> IO Exp
     (nn,_,_) = runIdentity $ Map.lookup (tvrNum tvr) (scMap cenv)
     cr x = ce x
+
+    -- | ce evaluates something in strict context returning the evaluated result of its argument.
     ce (ELetRec ds e) = ce e >>= \e -> doLet ds e
     ce (EError s e) = return (Error s (toType TyNode e))
     ce (EVar tvr@(TVr { tvrType = (ELit (LitCons n [] _))})) | RawType <- nameType n = do
@@ -274,9 +275,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
                 case constant (EVar v) of
                     Just (Const x) -> app fty (Return x) as
                     Just x@Var {} -> app fty (gEval x) as
-                    Nothing -> do
-                        var@Var {} <- caforconst (EVar v)
-                        app fty (gEval var) as   -- CAFs are looked up in global env
             Just (v,as',es)
                 | length as >= length as' -> do
                     let (x,y) = splitAt (length as') as
@@ -350,21 +348,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
             def <- createDef d (return (toVal b))
             return $
                 e :>>= v :-> Case v (as' ++ def)
-
-    ce (ECase e b as d) | any isJust  ls = ans where
-        ans = do
-            v <- newPrimVar ty
-            nv <- newNodeVar
-            e <- ce e
-            as' <- mapM (cp' v cons) as
-            def <- createDef d (newPrimVar ty)
-            return $
-                e :>>= nv :->
-                Store nv :>>= toVal b :->
-                Return nv :>>= NodeC cons [v] :->
-                Case v (as' ++ def)
-        ls = map isBasic [ a | Alt a _ <- as]
-        Just (cons,ty) = msum ls
     ce (ECase e b as d)  = do
         v <- newNodeVar
         e <- ce e
@@ -379,20 +362,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
     fromIORT e = fail $ "fromIORT: " ++ show e
     retIO v = Return (NodeC tn_2Tup [pworld__,v])
     tupNamet2 = (nameTuple TypeConstructor 2)
-    cpa :: E -> IO (Val,Val,Exp)
-    cpa e = do
-        v <- newVar
-        (c,t) <- case lookupCType dataTable (getType e) of
-            Right x -> return x
-            Left m -> fail (m <+> show e)
-        let var = Var v (Ty $ toAtom t)
-        w <- ce e
-        return (var,NodeC (toAtom $ 'C':show c) [var],w)
 
-    isBasic ( (LitInt _ t)) | Just (c,pt) <- lookupCType dataTable t = return (toAtom $ 'C':show c, Ty $ toAtom pt)
-    --isBasic ( (LitInt _ (ELit (LitCons c [] _)))) | Just pt <- Prelude.lookup (show c) allCTypes = return (toAtom $ 'C':show c, Ty $ toAtom pt)
-    --isBasic (PatLit (LitChar {})) = return tCharzh
-    isBasic e = fail $ "Not Basic: " ++ show e
     createDef Nothing _ = return []
     createDef (Just e) nnv = do
         nv <- nnv
@@ -410,13 +380,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
     cp'' (Alt (LitInt i (ELit (LitCons nn [] _))) e) = do
         x <- ce e
         return (Lit i (Ty $ toAtom (show nn)) :-> x)
-
-    cp' nv cons p = f p where
-        f (Alt l@(LitInt i _) e) = do
-            x <- ce e
-            (_,tp) <- isBasic l
-            z <- return $ Lit i tp
-            return (z :-> x)
 
     getName x = getName' dataTable x
 
@@ -459,6 +422,8 @@ compile' dataTable cenv (tvr,as,e) = ans where
         let addt (TyEnv mp) =  TyEnv $ Map.insert n (map getType args,getType body) mp
         modifyIORef (tyEnv cenv) addt
 
+    -- | cc evaluates something in lazy context, returning a pointer to a node which when evaluated will produce the strict result.
+    -- it is an invarient that evaling (cc e) produces the same value as (ce e)
     cc e | Just _ <- literal e = error "literal in lazy context"
     cc e | Just z <- constant e = return (Return z)
     cc e | Just z <- con e = return (Store z)
@@ -529,7 +494,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
     doUpdate vr (x :>>= v :-> e) = x :>>= v :-> doUpdate vr e
     doUpdate vr x = error $ "doUpdate: " ++ show x
     args es = map f es where
-        --f x | Just z <- caforconst x =  z
         f x | Just z <- literal x = z
         f x | Just z <- constant x =  z
         f (EVar tvr) = toVal tvr
@@ -542,8 +506,14 @@ compile' dataTable cenv (tvr,as,e) = ans where
     literal _ = fail "not a literal term"
 
 
-    -- | Takes an E and returns something constant which is either a pointer to a constant heap location or a CAF which may be evaluated or a literal
-    -- constant is sort of a misnomer here, it means a compile time constant, the CAFs may be updated at runtime when evaluated.
+    -- | Takes an E and returns something constant which is either a pointer to
+    -- a constant heap location only pointing to global values or constants.
+    -- this includes a CAF which may be evaluated, a literal, a saturated
+    -- application of constant values to a supercombinator, or a constructor
+    -- containing constant values. constant is sort of a misnomer here when
+    -- runtime behavior is considered, it means a compile time constant, the
+    -- CAFs may be updated with evaluated values.
+
     constant :: Monad m =>  E -> m Val
     constant (EVar tvr) | Just c <- Map.lookup (tvrNum tvr) (ccafMap cenv) = return c
                         | Just (v,as,_) <- Map.lookup (tvrNum tvr) (scMap cenv)
@@ -553,20 +523,14 @@ compile' dataTable cenv (tvr,as,e) = ans where
                             --case constant e of
                             --    Just x -> return x
                             --    Nothing -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
---    constant (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Map.lookup n ctypeMap = (return $ Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
---    constant (ELit lc@(LitCons n es _)) | Just es <- mapM constant es, Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n = (return $ Const (Tup es))
     constant e | Just l <- literal e = return l
     constant (ELit lc@(LitCons n es _)) | Just es <- mapM constant es, Just nn <- getName lc = (return $ Const (NodeC nn es))
     constant (EPi (TVr { tvrIdent = 0, tvrType = a}) b) | Just a <- constant a, Just b <- constant b = return $ Const $ NodeC tagArrow [a,b]
     constant e | Just (a,_) <- from_unsafeCoerce e = constant a
     constant _ = fail "not a constant term"
 
-    caforconst e = constant e
-
-    -- | convert a constructor into a Val
+    -- | convert a constructor into a Val, arguments may depend on local vars.
     con :: Monad m => E -> m Val
-    --con e | Just z <- const e = return z
-    --con e | Just (Const z) <- constant e = return z
     con (EPi (TVr {tvrIdent =  0, tvrType = x}) y) = do
         return $  NodeC tagArrow (args [x,y])
     con v@(ELit (LitCons n es _))
@@ -574,7 +538,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
         | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = do
             return (Tup (args es))
         | length es == nargs  = do
-            return ((NodeC cn (args es)))
+            return (NodeC cn (args es))
         | nameType n == TypeConstructor && length es < nargs = do
             return (NodeC (partialTag cn (nargs - length es)) $ args es)
         where
