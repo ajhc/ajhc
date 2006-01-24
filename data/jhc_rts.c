@@ -66,7 +66,7 @@ static void *prof_memstart;
 
 
 #ifndef USE_BOEHM_GC
-static void *jhc_mem;
+static void *jhc_mem = NULL;
 
 static inline void *jhc_malloc(size_t n) {
         void *ret = jhc_mem;
@@ -93,8 +93,11 @@ int
 main(int argc, char *argv[])
 {
 #ifndef USE_BOEHM_GC
-        /* one gig of memory pre-allocated */
-        jhc_mem = malloc(1000000000);
+        size_t mem_size = 1000000000;
+        while(!jhc_mem) {
+                jhc_mem = malloc(mem_size);
+                mem_size *= 0.80;
+        }
 #ifdef _JHC_PROFILE
         prof_memstart = jhc_mem;
 #endif
