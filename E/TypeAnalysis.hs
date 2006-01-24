@@ -142,7 +142,9 @@ pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
     f xs (alt@(Alt (LitCons n _ _) _):rs) | not (n `Set.member` ns) = f xs rs
     f xs (alt:rs) = f (alt:xs) rs
     cd (Just d) | or [ n `notElem` as | n <- Set.toList ns ] = Just d
-    cd _ = Nothing
+    cd Nothing = Nothing
+    -- The reason we do this is because for a typecase, we need a valid default in order to get the most general type
+    cd (Just d) = Just $ EError "pruneCase: default pruned" (getType d)
     as = [ n | LitCons n _ _ <- casePats ec ]
 
 

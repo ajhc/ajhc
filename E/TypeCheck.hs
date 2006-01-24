@@ -99,6 +99,15 @@ inferType dataTable ds e = rfc e where
         strong nds et
     fc (EError _ e) = valid e >> (strong'  e)
     fc (EPrim _ ts t) = mapM_ valid ts >> valid t >> ( strong' t)
+    fc ec@(ECase e@ELit {} b as (Just d)) | sortTypeLike e = do   -- TODO - this is a hack to get around case of constants.
+        et <- rfc e
+        eq et (getType b)
+        dt <- rfc d
+        verifyPats (casePats ec)
+        -- skip checking alternatives
+        ps <- mapM (strong' . getType) $ casePats ec
+        eqAll (et:ps)
+        return dt
     fc ec@(ECase e b as (Just d)) | sortTypeLike e  = do   -- TODO - we should substitute the tested for value into the default type.
         et <- rfc e
         eq et (getType b)
