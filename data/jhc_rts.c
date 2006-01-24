@@ -12,8 +12,8 @@
 
 #ifdef USE_BOEHM_GC
 #include <gc/gc.h>
-#define malloc GC_malloc
-#define free GC_free
+#define jhc_malloc GC_malloc
+#define jhc_free GC_free
 #endif
 
 
@@ -51,7 +51,9 @@ static int jhc_stdrnd[2] A_UNUSED = { 1 , 1 };
 static uintmax_t prof_function_calls;
 static uintmax_t prof_case_statements;
 static uintmax_t prof_updates;
+#ifndef USE_BOEHM_GC
 static void *prof_memstart;
+#endif
 
 #define update_inc() prof_updates++
 #define function_inc() prof_function_calls++
@@ -63,6 +65,7 @@ static void *prof_memstart;
 #endif
 
 
+#ifndef USE_BOEHM_GC
 static void *jhc_mem;
 
 static inline void *jhc_malloc(size_t n) {
@@ -71,11 +74,15 @@ static inline void *jhc_malloc(size_t n) {
         return ret;
 }
 
+#endif
+
 static void
 jhc_print_profile(void) {
 #ifdef _JHC_PROFILE
         wprintf(L"Command: %s\n", jhc_command);
+#ifndef USE_BOEHM_GC
         wprintf(L"Memory Allocated: %llu\n", (long long)(jhc_mem - prof_memstart));
+#endif
         wprintf(L"Function Calls:   %llu\n", (long long)prof_function_calls);
         wprintf(L"Case Statements:  %llu\n", (long long)prof_case_statements);
         wprintf(L"Updates:          %llu\n", (long long)prof_updates);
@@ -85,10 +92,12 @@ jhc_print_profile(void) {
 int
 main(int argc, char *argv[])
 {
+#ifndef USE_BOEHM_GC
         /* one gig of memory pre-allocated */
         jhc_mem = malloc(1000000000);
 #ifdef _JHC_PROFILE
         prof_memstart = jhc_mem;
+#endif
 #endif
 
         jhc_argc = argc - 1;
