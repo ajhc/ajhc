@@ -135,11 +135,9 @@ simplify1 stats env (n,l) = do
                 lift $ tick stats (cseStat x)
                 return v
             Nothing -> return x
-    --getCS (b,app@(App ev _)) | ev == funcEval = return $ Map.single app (Return b)
-    --getCS (b,app@(App ev _)) | ev == funcApply = return $ Map.single app (Return b)
     getCS (b,app@(App a [vr@Var {}] _)) | a == funcEval = return $ Map.fromList [(app,Return b), (Store b,Return vr)]
     getCS (b,app@App{})  = return $ Map.singleton app (Return b)
-    getCS (b@Var {},Store v@(Var _ _)) = return $ Map.singleton (App funcEval [b] TyNode) (Return v)     -- TODO - only works if node stores have always been evaluated.
+    --getCS (b@Var {},Store v@(Var _ _)) = return $ Map.singleton (App funcEval [b] TyNode) (Return v)     -- TODO - only works if node stores have always been evaluated.
     getCS (b@Var {},Store v@(NodeC t _)) | tagIsWHNF t, t /= tagHole = return $ Map.fromList [(Store v,Return b),(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
     getCS (b@Var {},Store v@(NodeC t _)) | t /= tagHole = return $ Map.fromList [(Store v,Return b)]
     getCS (b@Var {},Return (Const v)) = return $ Map.fromList [(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
@@ -212,10 +210,12 @@ isKnown _ = False
 optimize1 ::  (Atom,Lam) -> StatM Lam
 optimize1 (n,l) = g l where
     g (b :-> e) = f e >>= return . (b :->)
-    --f (Case v [v2@(Var {} :-> _)]) = do
-    --    f (Return v :>>= v2)
-    --f (Case v [v2@(Var {} :-> _)] :>>= lr) = do
-    --    f ((Return v :>>= v2) :>>= lr)
+    f (Store t :>>= v :-> Fetch v' :>>= lr) | v == v' = do
+        mtick "Optimize.optimize.store-fetch"
+        f (Store t :>>= v :-> Return t :>>= lr)
+    f (Update v t :>>= Tup [] :-> Fetch v' :>>= lr) | v == v' = do
+        mtick "Optimize.optimize.update-fetch"
+        f (Update v t :>>= Tup [] :-> Return t :>>= lr)
     f (Case n as) | isKnown n = do
         kc <- knownCase n as
         f kc
