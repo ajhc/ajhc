@@ -35,10 +35,14 @@ import Util.Histogram as Hist
 
 at_OptSimplifyInline  = toAtom "Optimize.simplify.inline"
 at_OptSimplifyCopyProp  = toAtom "Optimize.simplify.copy-propagate"
+at_OptSimplifyCopyPropConst  = toAtom "Optimize.simplify.copy-propagate-const"
 at_OptSimplifyNodeReduction  = toAtom "Optimize.simplify.node-reduction"
 at_OptSimplifyDeadVar  = toAtom "Optimize.simplify.dead-var"
+at_OptSimplifyConstApply  = toAtom "Optimize.simplify.const-apply"
+at_OptSimplifyConstEval  = toAtom "Optimize.simplify.const-eval"
 at_OptSimplifyTrivialCase  = toAtom "Optimize.simplify.trivial-case"
 at_OptSimplifyBadAssignment  = toAtom "Optimize.simplify.bad-assignment"
+at_OptSimplifyConstStore  = toAtom "Optimize.simplify.const-store"
 
 -- contains functions that should be inlined
 type SimpEnv = Map.Map Atom (Atom,Lam)
@@ -53,6 +57,7 @@ simplify1 stats env (n,l) = do
         x <- m
         put s
         return x
+
     f (Case x [d]) = do
         (env,_) <- get
         x <- applySubst env  x
@@ -61,7 +66,18 @@ simplify1 stats env (n,l) = do
     f x = do
         (env,_) <- get
         x <- applySubstE env  x
+        x <- gs x
         inline x
+    gs (Store n) | valIsNF n = do
+        lift $ tick stats at_OptSimplifyConstStore
+        gs (Return (Const n))
+    gs (App a [n@NodeC {},v] typ) | a == funcApply = do
+        lift $ tick stats at_OptSimplifyConstApply
+        gs (doApply n v typ)
+    gs (App a [Const n] typ) | a == funcEval = do
+        lift $ tick stats at_OptSimplifyConstEval
+        gs (Return n)
+    gs x = return x
     gv (p,Case x ds) = do
         (env,_) <- get
         x <- applySubst env x
@@ -80,7 +96,12 @@ simplify1 stats env (n,l) = do
     gv (p,e) = do
         (env,_) <- get
         e <- (applySubstE env e)
+        e <- gs e
         case e of
+            Return v | valIsNF v, Just n <- varBind' p v -> do
+                lift $ tick stats at_OptSimplifyCopyPropConst
+                modify (`mappend` (n,mempty))
+                return Nothing
             Return v | Just n <- varBind p v -> do
                 lift $ tick stats at_OptSimplifyCopyProp
                 modify (`mappend` (n,mempty))
@@ -127,6 +148,14 @@ cseStat n = toAtom $ "Optimize.simplify.cse." ++ g n where
     g Store {} = "Store"
     g _ = "Misc"
 
+doApply (NodeC t xs) y typ
+    | n == 1 = (App v (xs ++ [y]) typ)
+    | n > 1 = Return (NodeC (partialTag v (n - 1)) (xs ++ [y]))
+        where
+        Just (n,v) = tagUnfunction t
+doApply n y typ = error $ show ("doApply", n,y,typ)
+
+-- This only binds variables to variables
 varBind :: Monad m => Val -> Val -> m (Map Var Val)
 varBind (Var v t) nv@(Var v' t') | t == t' = return $ Map.singleton v nv
 varBind (Lit i t) (Lit i' t') | i == i' && t == t' = return mempty
@@ -136,6 +165,17 @@ varBind (NodeC t vs) (NodeC t' vs') | t == t' = do
     liftM mconcat $ sequence $  zipWith varBind vs vs'
 varBind v r | (getType v) == (getType r)  = fail "unvarBindable"    -- check type to be sure
 varBind x y = error $ "varBind: " ++ show (x,y)
+
+-- This binds variables to anything
+varBind' :: Monad m => Val -> Val -> m (Map Var Val)
+varBind' (Var v t) nv | t == getType nv = return $ Map.singleton v nv
+varBind' (Lit i t) (Lit i' t') | i == i' && t == t' = return mempty
+varBind' (Tup xs) (Tup ys) | length xs == length ys  = liftM mconcat $ sequence $  zipWith varBind' xs ys
+varBind' (Tag i) (Tag i') | i == i' = return mempty
+varBind' (NodeC t vs) (NodeC t' vs') | t == t' = do
+    liftM mconcat $ sequence $  zipWith varBind' vs vs'
+varBind' v r | (getType v) == (getType r)  = fail "unvarBind'able"    -- check type to be sure
+varBind' x y = error $ "varBind': " ++ show (x,y)
 
 isSimple :: (Atom,Lam) -> Bool
 isSimple (fn,x) = f (2::Int) x where
@@ -164,6 +204,16 @@ isVar _ = False
 optimize1 ::  (Atom,Lam) -> StatM Lam
 optimize1 (n,l) = g l where
     g (b :-> e) = f e >>= return . (b :->)
+    --f (Case v [v2@(Var {} :-> _)]) = do
+    --    f (Return v :>>= v2)
+    --f (Case v [v2@(Var {} :-> _)] :>>= lr) = do
+    --    f ((Return v :>>= v2) :>>= lr)
+    f (Case n@NodeC {} as) = do
+        kc <- knownCase n as
+        f kc
+    f (Case n@NodeC {} as :>>= lr) = do
+        kc <- knownCase n as
+        f (kc :>>= lr)
     f (Return n@NodeC {} :>>= b :-> Case b' as :>>= lr) | b == b' = do
         c <- knownCase n as
         r <- f (c :>>= lr)
@@ -304,7 +354,7 @@ simplify stats grin = do
             tick stats (toAtom "Optimize.dead.function")
             return (out,env)
         procF (out,env) ((a,l),_) = do
-            nl <- opt env a 0 l
+            nl <- opt env a (0::Int) l
             let iname t = toAtom $ "Optimize.simplify.inline." ++ t ++ ".{" ++ fromAtom a  ++ "}"
                 inline
                     | a `Set.member` loopBreakers = Map.empty
@@ -328,6 +378,8 @@ collectUsedFuncs (Tup as :-> exp) = (snub $ concatMap tagToFunction (Seq.toList 
     f (App a vs _) =  (Seq.fromList (freeVars vs), Seq.singleton a)
     f (Case e alts) =  mconcat ((Seq.fromList (freeVars e) , Seq.empty):[ f e | _ :-> e <- alts])
     f e = (Seq.fromList [ v | v <- freeVars e ],Seq.empty)
+
+
 
 
 
