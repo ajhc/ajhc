@@ -39,25 +39,25 @@ runExpr x = runMain (print x)
 ioError    ::  IOError -> IO a
 ioError e   =  (IO $ \w -> FailIO w e)
 
-	
+
 catch      ::  IO a -> (IOError -> IO a) -> IO a
 catch (IO x) fn  = IO $ \w -> case x w of
     JustIO w' z  -> JustIO w' z
     FailIO w' z -> case fn z of
         IO f -> f w'
-	
-	
+
+
 putStr     :: String -> IO ()
 putStr s   =  mapM_ putChar s
-	
+
 putStrLn   :: String -> IO ()
 putStrLn s =  do putStr s
-                 putStr "\n"
-	
+                 putChar '\n'
+
 print      :: Show a => a -> IO ()
 print x    =  putStrLn (show x)
-	
-	
+
+
 getLine    :: IO String
 getLine    =  do c <- getChar
                  if c == '\n' then return "" else
@@ -124,10 +124,10 @@ interact f  =  do hSetBuffering stdin  NoBuffering
 
 -}
 
-	
+
 writeFile  :: FilePath -> String -> IO ()
 writeFile  =  error "writeFile"
-	
+
 appendFile :: FilePath -> String -> IO ()
 appendFile =  error "appendFile"
 

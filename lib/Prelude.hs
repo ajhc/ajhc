@@ -303,11 +303,22 @@ sequence_      =  foldr (>>) (return ())
 -- The xxxM functions take list arguments, but lift the function or
 -- list element to a monad type
 
+-- manually deforested for now
+
 mapM             :: Monad m => (a -> m b) -> [a] -> m [b]
-mapM f as        =  sequence (map f as)
+--mapM f as        =  sequence (map f as)
+mapM f as = go as where
+    go [] = return []
+    go (a:as) = do
+        a' <- f a
+        as' <- go as
+        return (a':as')
 
 mapM_            :: Monad m => (a -> m b) -> [a] -> m ()
-mapM_ f as       =  sequence_ (map f as)
+--mapM_ f as       =  sequence_ (map f as)
+mapM_ f as = go as where
+    go [] = return ()
+    go (a:as) = f a >> go as
 
 (=<<)            :: Monad m => (a -> m b) -> m a -> m b
 f =<< x          =  x >>= f
