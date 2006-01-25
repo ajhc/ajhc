@@ -157,6 +157,12 @@ doApply (NodeC t xs) y typ
         Just (n,v) = tagUnfunction t
 doApply n y typ = error $ show ("doApply", n,y,typ)
 
+doEval n@(NodeC t xs) typ
+    | tagIsWHNF t = Return n
+    | tagIsSuspFunction t = App (tagFlipFunction t) xs typ
+doEval n typ = error $ show ("doEval", n,typ)
+
+
 -- This only binds variables to variables
 varBind :: Monad m => Val -> Val -> m (Map Var Val)
 varBind (Var v t) nv@(Var v' t') | t == t' = return $ Map.singleton v nv
@@ -222,6 +228,18 @@ optimize1 (n,l) = g l where
     f (Return t@NodeC {} :>>= v :-> App fa [v',a] typ) | fa == funcApply, v == v' = do
         mtick "Optimize.optimize.return-apply"
         f (Return t :>>= v :-> doApply t a typ)
+    f (Store t@NodeC {} :>>= v :-> App fa [v'] typ :>>= lr) | fa == funcEval, v == v' = do
+        mtick "Optimize.optimize.store-eval"
+        f (Store t :>>= v :-> doEval t typ :>>= lr)
+    f (Store t@NodeC {} :>>= v :-> App fa [v'] typ) | fa == funcEval, v == v' = do
+        mtick "Optimize.optimize.store-eval"
+        f (Store t :>>= v :-> doEval t typ)
+    f (Update v t@NodeC {} :>>= Tup [] :-> App fa [v'] typ :>>= lr) | fa == funcEval, v == v' = do
+        mtick "Optimize.optimize.update-eval"
+        f (Update v t :>>= Tup [] :-> doEval t typ :>>= lr)
+    f (Update v t@NodeC {} :>>= Tup [] :-> App fa [v'] typ) | fa == funcEval, v == v' = do
+        mtick "Optimize.optimize.update-eval"
+        f (Update v t :>>= Tup [] :-> doEval t typ)
     f (Case n as) | isKnown n = do
         kc <- knownCase n as
         f kc
