@@ -19,6 +19,7 @@ module Fixer.Fixer(
     value
     ) where
 
+import Control.Monad.Trans
 import Data.IORef
 import Data.Monoid
 import Data.Typeable
@@ -42,8 +43,8 @@ data Fixer  = Fixer {
     }
 
 
-newFixer :: IO Fixer
-newFixer = do
+newFixer :: MonadIO m => m Fixer
+newFixer = liftIO $ do
     v <- newIORef []
     t <- newIORef Set.empty
     return Fixer { vars = v, todo = t }
@@ -85,8 +86,8 @@ instance Ord MkFixable where
 value :: a -> Value a
 value x = ConstValue x
 
-newValue :: Fixable a => Fixer -> a -> IO (Value a)
-newValue fixer@Fixer { vars = vars } v = do
+newValue :: (MonadIO m,Fixable a) => Fixer -> a -> m (Value a)
+newValue fixer@Fixer { vars = vars } v = liftIO $ do
     ident <- newUnique
     pending <- newIORef bottom
     current <- newIORef bottom
@@ -106,8 +107,8 @@ addAction (IV v) act = do
     unless (isBottom c) (act c)
 
 -- | add a rule to the current set
-addRule :: Rule -> IO ()
-addRule (Rule act) = act
+addRule :: MonadIO m => Rule -> m ()
+addRule (Rule act) = liftIO act
 
 -- | turn an IO action into a Rule
 ioToRule :: IO () -> Rule
@@ -140,13 +141,13 @@ propagateValue p v = do
 
 
 
-readValue :: Value a -> IO a
-readValue (IV v) = readIORef (current v)
+readValue :: MonadIO m => Value a -> m a
+readValue (IV v) = liftIO $ readIORef (current v)
 readValue (ConstValue v) = return v
 
 
-findFixpoint :: Fixer -> IO ()
-findFixpoint Fixer { vars = vars, todo = todo } = do
+findFixpoint :: MonadIO m => Fixer -> m ()
+findFixpoint Fixer { vars = vars, todo = todo } = liftIO $ do
     to <- readIORef todo
     vars <- readIORef vars
     putStrLn $ "Fixer: " ++ show (length vars)
