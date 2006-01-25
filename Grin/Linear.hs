@@ -15,19 +15,24 @@ data W = One | Omega | LessThan (Set.Set E)
     deriving(Ord,Eq,Show)
 type E = Element W Var
 
+{-
 instance Monoid W where
-    mappend Omega Omega = Omega
-    mappend One One = One
+    --mappend Omega Omega = Omega
+    mappend Omega _ = Omega
+    mappend _ Omega = Omega
+    mappend One x = x
+    mappend x One = x
     mappend (LessThan xs) (LessThan ys) = LessThan (Set.union xs ys)
-    mappend x LessThan {} = x
-    mappend LessThan {} x = x
     mappend x y = error $ "mappend: " ++ show (x,y)
     mempty = LessThan Set.empty
+-}
+
+emptyW = LessThan Set.empty
 
 grinLinear :: Grin -> IO [(Var,W)]
 grinLinear  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinCafs = cafs }) = do
     fm <- flip mapM grinFunctions $ \ (a,Tup xs :-> _) ->  do
-        xs' <- flip mapM xs $ \ (Var v _) -> new (mempty :: W) v
+        xs' <- flip mapM xs $ \ (Var v _) -> new (emptyW :: W) v
         return $ Map.fromList [ ((a,x),y) | x <- [0::Int ..] | y <- xs']
     storeVars <- newIORef []
     mapM_ (go (Map.unions fm) storeVars) grinFunctions
@@ -39,7 +44,7 @@ grinLinear  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, g
 go (fm:: Map.Map (Atom,Int) E) storeVars (fn,Tup vs :-> fb) = f fb (Map.fromList [ (v,(0::Int, runIdentity $ Map.lookup (fn,z) fm)) | ~(Var v _) <- vs | z <- [ 0 ..]]) where
     f (e@Store {} :>>= (Var v (TyPtr TyNode)) :-> fb) mp = do
         mp' <- g e mp
-        ee <- new mempty v
+        ee <- new emptyW v
         modifyIORef storeVars (ee:)
         mp' <- f fb (Map.insert v (0,ee) mp')
         return mp'
@@ -114,6 +119,7 @@ toOmega e = do
             updateW (const Omega) e
             mapM_ toOmega (Set.toList ss)
 
+{-
 unify e1 e2 = do
     w1 <- getW e1
     w2 <- getW e2
@@ -122,4 +128,4 @@ unify e1 e2 = do
         f _ _ = return ()
     f w1 w2
     f w2 w1
-
+-}

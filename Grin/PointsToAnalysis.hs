@@ -226,6 +226,7 @@ analyze :: Grin -> IO PointsTo
 analyze grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinCafs = cafs }) = do
     wdump FD.Progress $ CharIO.putErrLn "Linear nodes analysis..."
     lr <- Grin.Linear.grinLinear grin
+    flip mapM_ lr $ \ (x,y) -> CharIO.putStrLn $ show x ++ " - " ++ show y
 
     let f (eq,hc) (n,l) | n == funcEval = (eq,hc)
         f (eq,hc) (n,l) | n == funcApply = (eq,hc)
@@ -411,8 +412,6 @@ collect lmap hc st fname (Tup vs :-> exp')
         x <- toPos x
         tell mempty { applyEq = [(v,x)] }
         return $ Complex funcApply [v,x]
-        --return $ Complex funcEval (Complex funcApply x)
-
     g (App a vs _) | a `notElem` [funcEval,funcApply]  = do
         vs' <- mapM toPos vs
         tell mempty { appEq = [(a,vs')] }
