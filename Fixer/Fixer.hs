@@ -57,11 +57,16 @@ instance Monoid Rule where
     mappend (Rule a) (Rule b) = Rule (a >> b)
     mconcat rs = Rule $ sequence_ $ map unRule rs
 
-data Value a = ConstValue a | IV (RvValue a)
+instance Fixable a => Monoid (Value a) where
+    mempty = value bottom
+    mappend a b = UnionValue a b
+
+data Value a = UnionValue (Value a) (Value a) | ConstValue a | IV (RvValue a)
     deriving(Typeable)
 
 instance Show a => Show (Value a) where
     showsPrec _ (ConstValue a) = showString "<<" . shows a . showString ">>"
+    showsPrec _ (UnionValue a b) = showString "<<" . shows a . shows b . showString ">>"
     showsPrec _ (IV a) = showString "<<" . shows (hashUnique $ ident a) . showString ">>"
 
 
@@ -101,6 +106,7 @@ newValue fixer@Fixer { vars = vars } v = liftIO $ do
 
 addAction :: Fixable a => Value a -> (a -> IO ())  -> IO ()
 addAction (ConstValue n) act = act n
+addAction (UnionValue a b) act = addAction a act >> addAction b act
 addAction (IV v) act = do
     modifyIORef (action v) (act:)
     c <- readIORef (current v)
@@ -120,11 +126,13 @@ modifiedSuperSetOf :: (Fixable a, Fixable b) =>  Value b -> Value a -> (a -> b) 
 modifiedSuperSetOf (IV rv) (ConstValue cv) r = Rule $ propagateValue (r cv) rv
 modifiedSuperSetOf (IV rv) v2 r = Rule $ addAction v2 (\x -> propagateValue (r x) rv)
 modifiedSuperSetOf ConstValue {} _ _ =  Rule $ fail "Fixer: You cannot modify a constant value"
+modifiedSuperSetOf UnionValue {} _ _ =  Rule $ fail "Fixer: You cannot modify a union value"
 
 isSuperSetOf :: Fixable a => Value a -> Value a -> Rule
 (IV rv) `isSuperSetOf` (ConstValue v2) = Rule $ propagateValue v2 rv
 (IV rv) `isSuperSetOf` v2 = Rule $ addAction v2 (\x -> propagateValue x rv)
 ConstValue {} `isSuperSetOf` _ = Rule $  fail "Fixer: You cannot modify a constant value"
+UnionValue {} `isSuperSetOf` _ = Rule $  fail "Fixer: You cannot modify a union value"
 
 -- | the function must satisfy the rule that if a >= b then f(a) implies f(b)
 conditionalRule :: Fixable a => (a -> Bool) -> Value a -> Rule -> Rule
@@ -141,9 +149,13 @@ propagateValue p v = do
 
 
 
-readValue :: MonadIO m => Value a -> m a
+readValue :: (Fixable a,MonadIO m) => Value a -> m a
 readValue (IV v) = liftIO $ readIORef (current v)
 readValue (ConstValue v) = return v
+readValue (UnionValue a b) = liftIO $ do
+    a' <- readValue a
+    b' <- readValue b
+    return (lub a' b')
 
 
 findFixpoint :: MonadIO m => Fixer -> m ()

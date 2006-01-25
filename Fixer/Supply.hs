@@ -33,7 +33,7 @@ supplyValue (Supply fixer ref) b = liftIO $ do
             modifyIORef ref (Map.insert b v)
             return v
 
-supplyReadValues :: MonadIO m => Supply b a -> m [(b,a)]
+supplyReadValues :: (Fixable a,MonadIO m) => Supply b a -> m [(b,a)]
 supplyReadValues (Supply _fixer ref) = liftIO $ do
     mp <- readIORef ref
     flip mapM (Map.toList mp) $ \ (b,va) -> do
