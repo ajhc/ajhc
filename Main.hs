@@ -41,6 +41,7 @@ import FrontEnd.FrontEnd
 import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadFunctions
+import Grin.DeadCode
 import Grin.FromE
 import Grin.Grin
 import Grin.Show
