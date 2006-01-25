@@ -17,7 +17,7 @@ import E.Annotate
 import E.E hiding(isBottom)
 import E.Inline(emapE',emapE_)
 import E.TypeCheck
-import Fixer
+import Fixer.Fixer
 import GenUtil
 import Name.Name
 import Name.Names
@@ -56,37 +56,35 @@ calcDs ::  Env -> [(TVr,E)] -> IO ()
 calcDs env@(usedVals,_) ds = do
     mapM_ d ds
     flip mapM_ ds $ \ (v,e) -> do
-        conditionalRule (v `Set.member`) usedVals (calcE env e)
+        addRule $ conditionalRule (v `Set.member`) usedVals (ioToRule $ calcE env e)
      where
         --mapM_ d ds >> mapM_ (calcE env) (snds ds) where
     d (t,e) | not (sortStarLike (getType t)) = return ()
     d (t,e) | Just v <- getValue e = do
         let Just t' = Info.lookup (tvrInfo t)
-        t' `isSuperSetOf` v
+        addRule $ t' `isSuperSetOf` v
     d (t, ELit (LitCons n xs _)) = do
         let Just t' = Info.lookup (tvrInfo t)
             v = vmapSingleton n
-        t' `isSuperSetOf` (value v)
+        addRule $ t' `isSuperSetOf` (value v)
         xs' <- mapM getValue xs
         flip mapM_ (zip xs' [0.. ])  $ \ (v,i) -> do
-            modifiedSuperSetOf t' v (vmapArgSingleton n i)
+            addRule $ modifiedSuperSetOf t' v (vmapArgSingleton n i)
     d (t,e) | (EVar v,as) <- fromAp e = do
         let Just t' = Info.lookup (tvrInfo t)
             Just v' = Info.lookup (tvrInfo v)
         as' <- mapM getValue as
-        dynamicRule v' $ \ v -> flip mapM_ (vmapHeads v) $ \ h -> do
-            t' `isSuperSetOf` value (vmapSingleton h)
-            flip mapM_ (zip as' [0.. ])  $ \ (a,i) -> do
-                modifiedSuperSetOf t' a $ \ v -> vmapArgSingleton h i v
+        addRule $ dynamicRule v' $ \ v -> mconcat $ flip map (vmapHeads v) $ \ h -> 
+            mconcat $ t' `isSuperSetOf` value (vmapSingleton h) : (flip map (zip as' [0.. ])  $ \ (a,i) -> modifiedSuperSetOf t' a $ \ v -> vmapArgSingleton h i v)
     d (t,e) = fail $ "calcDs: " ++ show (t,e)
 
 -- TODO - make default case conditional
 calcAlt env v (Alt (LitCons n xs _) e) = do
-    conditionalRule (\ (VMap _ vs) -> n `Set.member` vs) v $ do
+    addRule $ conditionalRule (\ (VMap _ vs) -> n `Set.member` vs) v $ ioToRule $ do
         calcE env e
         flip mapM_ (zip [0..] xs) $ \ (i,t) -> do
             let Just t' = Info.lookup (tvrInfo t)
-            modifiedSuperSetOf t' v (vmapArg n i)
+            addRule $ modifiedSuperSetOf t' v (vmapArg n i)
 
 
 calcE :: Env -> E -> IO ()
@@ -111,12 +109,12 @@ calcE env e | (EVar v,as@(_:_)) <- fromAp e, Just ts <- Map.lookup (tvrIdent v) 
     flip mapM_ (zip as ts) $ \ (a,t) -> do
         when (sortStarLike (getType a)) $ do
             a' <- getValue a
-            t `isSuperSetOf` a'
+            addRule $ t `isSuperSetOf` a'
 calcE env e@EVar {} = tagE env e
 calcE env e@EAp {} = tagE env e
 calcE _ e = fail $ "odd calcE: " ++ show e
 
-tagE (usedVals,_) (EVar v) = usedVals `isSuperSetOf` value (Set.singleton v)
+tagE (usedVals,_) (EVar v) = addRule $ usedVals `isSuperSetOf` value (Set.singleton v)
 tagE env e  = emapE_ (tagE env) e
 
 getValue (EVar v)

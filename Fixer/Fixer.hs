@@ -1,21 +1,25 @@
 {-# OPTIONS_GHC -fglasgow-exts #-}
 -- find fixpoint of constraint problem
 
-module Fixer(
+module Fixer.Fixer(
     Fixable(..),
     Value,
-    newValue,
+    Rule,
+    addRule,
+    ioToRule,
+    conditionalRule,
+    dynamicRule,
     findFixpoint,
-    readValue,
     isSuperSetOf,
-    value,
     modifiedSuperSetOf,
     newFixer,
-    conditionalRule,
-    dynamicRule
+    newValue,
+    readValue,
+    value
     ) where
 
 import Data.IORef
+import Data.Monoid
 import Data.Typeable
 import Data.Unique
 import IO(hFlush, stdout)
@@ -30,7 +34,6 @@ class Fixable a where
     minus :: a -> a -> a
 
 data MkFixable = forall a . Fixable a => MkFixable (RvValue a)
-type Rules = IO ()
 
 data Fixer  = Fixer {
     vars :: !(IORef [MkFixable]),
@@ -43,6 +46,14 @@ newFixer = do
     v <- newIORef []
     t <- newIORef Set.empty
     return Fixer { vars = v, todo = t }
+
+newtype Rule = Rule { unRule :: IO () }
+    deriving(Typeable)
+
+instance Monoid Rule where
+    mempty = Rule (return ())
+    mappend (Rule a) (Rule b) = Rule (a >> b)
+    mconcat rs = Rule $ sequence_ $ map unRule rs
 
 data Value a = ConstValue a | IV (RvValue a)
     deriving(Typeable)
@@ -93,26 +104,32 @@ addAction (IV v) act = do
     c <- readIORef (current v)
     unless (isBottom c) (act c)
 
+-- | add a rule to the current set
+addRule :: Rule -> IO ()
+addRule (Rule act) = act
 
+-- | turn an IO action into a Rule
+ioToRule :: IO () -> Rule
+ioToRule act = Rule act
 
 -- | the function must satisfy the rule that if a >= b then f(a) >= f(b)
 
-modifiedSuperSetOf :: (Fixable a, Fixable b) =>  Value b -> Value a -> (a -> b) -> IO ()
-modifiedSuperSetOf (IV rv) (ConstValue cv) r = propagateValue (r cv) rv
-modifiedSuperSetOf (IV rv) v2 r = addAction v2 (\x -> propagateValue (r x) rv)
-modifiedSuperSetOf ConstValue {} _ _ =  fail "Fixer: You cannot modify a constant value"
+modifiedSuperSetOf :: (Fixable a, Fixable b) =>  Value b -> Value a -> (a -> b) -> Rule
+modifiedSuperSetOf (IV rv) (ConstValue cv) r = Rule $ propagateValue (r cv) rv
+modifiedSuperSetOf (IV rv) v2 r = Rule $ addAction v2 (\x -> propagateValue (r x) rv)
+modifiedSuperSetOf ConstValue {} _ _ =  Rule $ fail "Fixer: You cannot modify a constant value"
 
-isSuperSetOf :: Fixable a => Value a -> Value a -> IO ()
-(IV rv) `isSuperSetOf` (ConstValue v2) = propagateValue v2 rv
-(IV rv) `isSuperSetOf` v2 = addAction v2 (\x -> propagateValue x rv)
-ConstValue {} `isSuperSetOf` _ =   fail "Fixer: You cannot modify a constant value"
+isSuperSetOf :: Fixable a => Value a -> Value a -> Rule
+(IV rv) `isSuperSetOf` (ConstValue v2) = Rule $ propagateValue v2 rv
+(IV rv) `isSuperSetOf` v2 = Rule $ addAction v2 (\x -> propagateValue x rv)
+ConstValue {} `isSuperSetOf` _ = Rule $  fail "Fixer: You cannot modify a constant value"
 
 -- | the function must satisfy the rule that if a >= b then f(a) implies f(b)
-conditionalRule :: Fixable a => (a -> Bool) -> Value a -> Rules -> IO ()
-conditionalRule cond v act = addAction v (\x -> if cond x then act else return ())
+conditionalRule :: Fixable a => (a -> Bool) -> Value a -> Rule -> Rule
+conditionalRule cond v (Rule act) = Rule $ addAction v (\x -> if cond x then act else return ())
 
-dynamicRule  :: Fixable a =>  Value a -> (a -> Rules) -> IO ()
-dynamicRule v dr = addAction v dr
+dynamicRule  :: Fixable a =>  Value a -> (a -> Rule) -> Rule
+dynamicRule v dr = Rule $ addAction v (unRule . dr)
 
 propagateValue :: Fixable a => a -> RvValue a -> IO ()
 propagateValue p v = do

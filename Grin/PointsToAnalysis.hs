@@ -15,7 +15,7 @@ import Atom
 import CanType
 import CharIO
 import Doc.DocLike
-import Fixer
+import Fixer.Fixer
 import GenUtil
 import Grin.EvalInline
 import Grin.Grin
@@ -375,7 +375,7 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
             mticks (length xs - length xs') "Grin.eval.case-elim"
             return $ if null xs' then  Error "No Valid alternatives. This Should Not be reachable." (getType (Case v xs)) else (Case v xs')
         -- docase _ ((_ :-> x):_) _ = return $ Error "No Valid alternatives. This Should Not be reachable." (getType x)
-        docase _ _ _ = error $ "docase: strange argument"
+        --docase _ _ _ = error $ "docase: strange argument"
     let (sts,funcs) = unzip [ (stat,(a,l')) | (a,l) <- grinFunctions, let (l',stat) = runStatM (f l) ]
     tickStat stats (mconcat sts)
     return grin { grinPhase = PostInlineEval, grinFunctions = funcs }
@@ -531,74 +531,74 @@ findFixpoint' grin (HcHash _ mp) eq = do
         z (Left i) = VsBas (show i)
 
     let procPos self p = pp p where
-            pp p | Just c <- constPos p = self `isSuperSetOf` value c
-            pp p | Just e <- simplePos p = self `isSuperSetOf` e
+            pp p | Just c <- constPos p = addRule $ self `isSuperSetOf` value c
+            pp p | Just e <- simplePos p = addRule $ self `isSuperSetOf` e
             pp (Union ps) = mapM_ pp ps
             pp (Tuple ts) = pp (Con tupleName ts)
             pp (DownTup p n) = pp (Down p tupleName n)
             pp (PIf True p a t) = do
                 p' <- newVal p
                 t' <- newVal t
-                conditionalRule (Set.member a . getNodes) p' $ do self `isSuperSetOf` t'
+                addRule $ conditionalRule (Set.member a . getNodes) p' $  self `isSuperSetOf` t'
             pp (PCase p vs e) = do
                 p' <- newVal p
                 e' <- newVal e
                 flip mapM_ vs $ \ (a,w) -> do
                     w' <- newVal w
-                    conditionalRule (Set.member a . getNodes) p' $ do self `isSuperSetOf` w'
+                    addRule $ conditionalRule (Set.member a . getNodes) p' $  self `isSuperSetOf` w'
                 once <- newOnce
-                conditionalRule (\x -> not $ or [ Set.member a (getNodes x) | (a,_) <- vs]) p' $ do runOnce once (self `isSuperSetOf` e')
+                addRule $ conditionalRule (\x -> not $ or [ Set.member a (getNodes x) | (a,_) <- vs]) p' $ ioToRule $  runOnce once (addRule $ self `isSuperSetOf` e')
             pp cc@(Complex a [p])
                 | a == funcEval = do
                     p' <- newVal p
-                    modifiedSuperSetOf self p' (\n -> pruneNodes $ VsNodes (Map.filterWithKey (\ (t,_) _ -> tagIsWHNF t) (getNodeArgs n)) (Set.filter tagIsWHNF (getNodes n)))
-                    dynamicRule p' $ \p -> do
+                    addRule $ modifiedSuperSetOf self p' (\n -> pruneNodes $ VsNodes (Map.filterWithKey (\ (t,_) _ -> tagIsWHNF t) (getNodeArgs n)) (Set.filter tagIsWHNF (getNodes n)))
+                    addRule $ dynamicRule p' $ \p -> ioToRule $ do
                         flip mapM_ (Map.toList $ getNodeArgs p) $ \ ((n,i),v) -> do
                             when (tagIsSuspFunction n) $ do
                                 a <- getArg (tagFlipFunction n) i
-                                a `isSuperSetOf` value v
+                                addRule $ a `isSuperSetOf` value v
                 | a == funcFetch = do
                     p' <- newVal p
-                    dynamicRule p' $ \v -> flip mapM_ (Set.toList (getHeaps' ("funcFetch" ++ show cc) v)) $ \u -> do
+                    addRule $ dynamicRule p' $ \v -> mconcat $ flip map (Set.toList (getHeaps' ("funcFetch" ++ show cc) v)) $ \u -> ioToRule $ do
                         case Map.lookup u heapMap of
-                            Just (x,_) -> self `isSuperSetOf` x
+                            Just (x,_) -> addRule $ self `isSuperSetOf` x
                             Nothing -> do
                                 z <- Map.lookup u cheaps
-                                self `isSuperSetOf` value z
+                                addRule $ self `isSuperSetOf` value z
             pp cc@(Complex a [v,x]) | a == funcApply = do
                 v' <- newVal v
                 x' <- newVal x
-                modifiedSuperSetOf self v' $ \v -> let
+                addRule $ modifiedSuperSetOf self v' $ \v -> let
                     ns = Set.fromList $ concatMap incp (Set.toList (getNodes v))
                     as = Map.fromList $  [ ((nn,i),v) | ((n,i),v) <- Map.toList (getNodeArgs v), nn <- incp n ]
                    in VsNodes as ns
 
-                dynamicRule v' $ \v -> do
+                addRule $ dynamicRule v' $ \v -> ioToRule $ do
                     flip mapM_ (concat [  fmap ((,) n) (incp n)  | n <- (allNodes v) ]) $ \(on,n) -> do
                         (ts,_) <- findArgsType (grinTypeEnv grin) n
                         --let mm = Map.fromList $ concat [ Map.lookup (on,i) (getNodeArgs v) >>= return . ((,) (n,i)) |  i <- [0 .. length ts ]]
                         --self `isSuperSetOf` value (pruneNodes $ VsNodes mm mempty)
-                        modifiedSuperSetOf self x' $ \x ->
+                        addRule $ modifiedSuperSetOf self x' $ \x ->
                                 pruneNodes $ VsNodes (Map.singleton (n,length ts - 1) x) Set.empty
                         return ()
                     flip mapM_ (Set.toList (getNodes v)) $ \n -> do
                          case tagUnfunction n of
-                            Just (1,fn) -> self `isSuperSetOf` (fst $ runIdentity $ Map.lookup fn funcMap)
+                            Just (1,fn) -> addRule $ self `isSuperSetOf` (fst $ runIdentity $ Map.lookup fn funcMap)
                             _ -> return ()
                     --sequence_ $ concat [  papp'' n i a | ((n,i),a) <- Map.toList (getNodeArgs v) ]
             pp (Down p a i) = do
                 p' <- newVal p
-                modifiedSuperSetOf self p' $ \p -> case Map.lookup (a,i) (getNodeArgs p) of
+                addRule $ modifiedSuperSetOf self p' $ \p -> case Map.lookup (a,i) (getNodeArgs p) of
                     Just v -> v
                     Nothing -> mempty
             pp arg@(Arg a i) = do
                 x <- getArg a i
-                self `isSuperSetOf` x
+                addRule $ self `isSuperSetOf` x
             pp (Con n as) = do
                 as'' <- mapM newVal as
-                self `isSuperSetOf` value (VsNodes mempty (Set.singleton n))
+                addRule $ self `isSuperSetOf` value (VsNodes mempty (Set.singleton n))
                 flip mapM_ (zip [(0 :: Int) ..] as'') $ \ (i,a) -> do
-                    modifiedSuperSetOf self a $ \a' -> pruneNodes $ VsNodes (Map.singleton (n,i) a') (Set.singleton n)
+                    addRule $ modifiedSuperSetOf self a $ \a' -> pruneNodes $ VsNodes (Map.singleton (n,i) a') (Set.singleton n)
             pp e = fail $ "pp: " ++ show e
             incp t | Just (n,fn) <- tagUnfunction t, n > 1 = return (partialTag fn (n - 1))
             incp _ = fail "not incp"
@@ -606,21 +606,21 @@ findFixpoint' grin (HcHash _ mp) eq = do
         procUpdate p1 p2 = do
             p1' <- newVal p1
             p2' <- newVal p2
-            dynamicRule p1' $ \p1 -> flip mapM_ (Set.toList (getHeaps' "update" p1)) $ \h ->
+            addRule $ dynamicRule p1' $ \p1 -> ioToRule $ flip mapM_ (Set.toList (getHeaps' "update" p1)) $ \h ->
                 case Map.lookup h heapMap of
-                    Just (e,_) -> e `isSuperSetOf` p2'
+                    Just (e,_) -> addRule $ e `isSuperSetOf` p2'
                     Nothing -> return ()
         procApply xp1 xp2 = do
             p1' <- newVal xp1
             p2' <- newVal xp2
-            dynamicRule p1' $ \p1 -> do
+            addRule $ dynamicRule p1' $ \p1 -> ioToRule $ do
                 argMap <- readIORef argMap
                 flip mapM_ (Map.toList (getNodeArgs p1)) $ \ ((a,i),v) -> do
                     case tagUnfunction a of
                         Just (1,fn) -> do
                             case Map.lookup (fn,i) argMap of
                                 Just arg -> do
-                                    arg `isSuperSetOf` value v
+                                    addRule $ arg `isSuperSetOf` value v
                                 _  -> return ()
                         _ -> return ()
 
@@ -628,15 +628,15 @@ findFixpoint' grin (HcHash _ mp) eq = do
                     case tagUnfunction a of
                         Just (1,fn) -> do
                             case Map.lookup (fn,length (fst $ runIdentity $  findArgsType (grinTypeEnv grin) fn) - 1) argMap of
-                                Just arg -> arg `isSuperSetOf` p2'
+                                Just arg -> addRule $ arg `isSuperSetOf` p2'
                                 _ -> return ()
                         _ -> return ()
         procApp a [p] | a == funcEval = do
             p' <- newVal p
-            dynamicRule p' $ \p -> flip mapM_ (Set.toList (getHeaps p)) $ \h -> do
+            addRule $ dynamicRule p' $ \p -> ioToRule $ flip mapM_ (Set.toList (getHeaps p)) $ \h -> do
                 case Map.lookup h heapMap of
-                    Just (e',(x,_)) | True || x /= UnsharedEval -> dynamicRule e' $ \e -> do
-                        flip mapM_ (fsts [ runIdentity $ Map.lookup (tagFlipFunction n) funcMap | n <- (Set.toList $ getNodes e), tagIsSuspFunction n ]) $ \z -> do
+                    Just (e',(x,_)) | True || x /= UnsharedEval -> addRule $ dynamicRule e' $ \e ->
+                        mconcat $ flip map (fsts [ runIdentity $ Map.lookup (tagFlipFunction n) funcMap | n <- (Set.toList $ getNodes e), tagIsSuspFunction n ]) $ \z ->
                             e' `isSuperSetOf` z
                     _ -> return ()
 
