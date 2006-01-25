@@ -6,6 +6,8 @@ import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Control.Monad.State
+import Fixer.Supply
+import Fixer.Fixer
 
 import Atom
 import Grin.Grin

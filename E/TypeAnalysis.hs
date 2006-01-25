@@ -18,6 +18,7 @@ import E.E hiding(isBottom)
 import E.Inline(emapE',emapE_)
 import E.TypeCheck
 import Fixer.Fixer
+import Fixer.VMap
 import GenUtil
 import Name.Name
 import Name.Names
@@ -74,7 +75,7 @@ calcDs env@(usedVals,_) ds = do
         let Just t' = Info.lookup (tvrInfo t)
             Just v' = Info.lookup (tvrInfo v)
         as' <- mapM getValue as
-        addRule $ dynamicRule v' $ \ v -> mconcat $ flip map (vmapHeads v) $ \ h -> 
+        addRule $ dynamicRule v' $ \ v -> mconcat $ flip map (vmapHeads v) $ \ h ->
             mconcat $ t' `isSuperSetOf` value (vmapSingleton h) : (flip map (zip as' [0.. ])  $ \ (a,i) -> modifiedSuperSetOf t' a $ \ v -> vmapArgSingleton h i v)
     d (t,e) = fail $ "calcDs: " ++ show (t,e)
 
@@ -156,66 +157,4 @@ pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
     as = [ n | LitCons n _ _ <- casePats ec ]
 
 
-
-
--- VMap general data type for finding the fixpoint of a general tree-like structure.
-
-data VMap n = VMap (Map.Map (n,Int) (VMap n)) (Set.Set n)
-    deriving(Typeable)
-
-vmapSingleton n = VMap Map.empty (Set.singleton n)
-
-vmapArgSingleton n i v
-    | isBottom v = bottom
-    | otherwise = VMap (Map.singleton (n,i) v) Set.empty
-
-vmapArg n i (VMap map _) = case Map.lookup (n,i) map of
-    Just x -> x
-    Nothing -> bottom
-
-vmapValue :: Ord n => n -> [VMap n] -> VMap n
-vmapValue n xs = pruneVMap $ VMap (Map.fromAscList (zip (zip (repeat n) [0..]) xs)) (Set.singleton n)
-
-vmapHeads (VMap _ set) = Set.toList set
-vmapJustHeads (VMap _ set) = VMap Map.empty set
-
-pruneVMap (VMap map set) = VMap map' set where
-    map' = Map.filter f map
-    f vs = not $ isBottom vs
-
-instance (Ord n,Show n) => Show (VMap n) where
-    showsPrec _ (VMap n s) = braces (hcat (intersperse (char ',') $ (map f $ snub $ fsts  (Map.keys n) ++ Set.toList s) )) where
-        f a = (if a `Set.member` s then tshow a else char '#' <> tshow a) <> tshow (g a)
-        g a = sortUnder fst [ (i,v) | ((a',i),v) <- Map.toList n, a' == a ]
-
-instance Ord n => Fixable (VMap n) where
-    bottom = VMap Map.empty Set.empty
-    isBottom (VMap m s) = Map.null m && Set.null s
-    lub (VMap as ns) (VMap as' ns') = pruneVMap $ VMap (Map.unionWith lub as as') (Set.union ns ns')
-    minus (VMap n1 w1) (VMap n2 w2) = pruneVMap $ VMap (Map.fromAscList $ [
-            case Map.lookup (a,i) n2 of
-                Just v' ->  ((a,i),v `minus` v')
-                Nothing ->  ((a,i),v)
-        | ((a,i),v) <- Map.toAscList n1 ] ) (w1 Set.\\ w2)
-
-instance Ord n => Monoid (VMap n) where
-    mempty = bottom
-    mappend = lub
-
-
-instance Ord n => Fixable (Set.Set n)  where
-    bottom = Set.empty
-    isBottom = Set.null
-    lub a b = Set.union a b
-    minus a b = a Set.\\ b
-
-
-instance Fixable Bool where
-    bottom = False
-    isBottom x = x == False
-    lub a b = a || b
-    minus True False = True
-    minus False True = False
-    minus True True = False
-    minus False False = False
 

@@ -3,8 +3,9 @@
 
 module Fixer.Fixer(
     Fixable(..),
-    Value,
-    Rule,
+    Value(),
+    Rule(),
+    Fixer(),
     addRule,
     ioToRule,
     conditionalRule,
@@ -171,6 +172,48 @@ findFixpoint Fixer { vars = vars, todo = todo } = do
     f (Set.toList to) (0::Int)
 
 
+-- some useful instances
+
+instance Ord n => Fixable (Set.Set n)  where
+    bottom = Set.empty
+    isBottom = Set.null
+    lub a b = Set.union a b
+    minus a b = a Set.\\ b
 
 
+instance Fixable Bool where
+    bottom = False
+    isBottom x = x == False
+    lub a b = a || b
+    minus True False = True
+    minus False True = False
+    minus True True = False
+    minus False False = False
+
+-- bottom is zero and the lub is the maximum of integer values, as in this is the lattice of maximum, not the additive one.
+instance Fixable Int where
+    bottom = 0
+    isBottom = (0 ==)
+    lub a b = max a b
+    minus a b | a > b = a
+    minus _ _ = 0
+
+instance (Fixable a,Fixable b) => Fixable (a,b) where
+    bottom = (bottom,bottom)
+    isBottom (a,b) = isBottom a && isBottom b
+    lub (x,y) (x',y') = (lub x x', lub y y')
+    minus (x,y) (x',y') = (minus x x', minus y y')
+
+
+-- the maybe instance creates a new bottom of nothing. note that (Just bottom) is a distinct point.
+instance Fixable a => Fixable (Maybe a) where
+    bottom = Nothing
+    isBottom Nothing = True
+    isBottom _ = False
+    lub Nothing b = b
+    lub a Nothing = a
+    lub (Just a) (Just b) = Just (lub a b)
+    minus (Just a) (Just b) = Just (minus a b)
+    minus (Just a) Nothing = Just a
+    minus Nothing _ = Nothing
 
