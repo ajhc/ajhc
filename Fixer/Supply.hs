@@ -2,6 +2,7 @@ module Fixer.Supply(
     Supply(),
     newSupply,
     supplyReadValues,
+    sValue,
     supplyValue
     ) where
 
@@ -32,6 +33,9 @@ supplyValue (Supply fixer ref) b = liftIO $ do
             v <- newValue fixer bottom
             modifyIORef ref (Map.insert b v)
             return v
+
+sValue :: (Ord b, Fixable a) => Supply b a -> b -> (Value a)
+sValue s b = ioValue (supplyValue s b)
 
 supplyReadValues :: (Fixable a,MonadIO m) => Supply b a -> m [(b,a)]
 supplyReadValues (Supply _fixer ref) = liftIO $ do

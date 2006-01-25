@@ -14,6 +14,7 @@ module Fixer.Fixer(
     isSuperSetOf,
     modifiedSuperSetOf,
     newFixer,
+    ioValue,
     newValue,
     readValue,
     value
@@ -61,12 +62,13 @@ instance Fixable a => Monoid (Value a) where
     mempty = value bottom
     mappend a b = UnionValue a b
 
-data Value a = UnionValue (Value a) (Value a) | ConstValue a | IV (RvValue a)
+data Value a = IOValue (IO (Value a)) | UnionValue (Value a) (Value a) | ConstValue a | IV (RvValue a)
     deriving(Typeable)
 
 instance Show a => Show (Value a) where
     showsPrec _ (ConstValue a) = showString "<<" . shows a . showString ">>"
     showsPrec _ (UnionValue a b) = showString "<<" . shows a . shows b . showString ">>"
+    showsPrec _ (IOValue _) = showString "<<IO>>"
     showsPrec _ (IV a) = showString "<<" . shows (hashUnique $ ident a) . showString ">>"
 
 
@@ -91,6 +93,10 @@ instance Ord MkFixable where
 value :: a -> Value a
 value x = ConstValue x
 
+-- | mainly for internal use
+ioValue :: IO (Value a) -> Value a
+ioValue iov = IOValue iov
+
 newValue :: (MonadIO m,Fixable a) => Fixer -> a -> m (Value a)
 newValue fixer@Fixer { vars = vars } v = liftIO $ do
     ident <- newUnique
@@ -107,6 +113,7 @@ newValue fixer@Fixer { vars = vars } v = liftIO $ do
 addAction :: Fixable a => Value a -> (a -> IO ())  -> IO ()
 addAction (ConstValue n) act = act n
 addAction (UnionValue a b) act = addAction a act >> addAction b act
+addAction (IOValue v) act = v >>= (`addAction` act)
 addAction (IV v) act = do
     modifyIORef (action v) (act:)
     c <- readIORef (current v)
@@ -125,12 +132,14 @@ ioToRule act = Rule act
 modifiedSuperSetOf :: (Fixable a, Fixable b) =>  Value b -> Value a -> (a -> b) -> Rule
 modifiedSuperSetOf (IV rv) (ConstValue cv) r = Rule $ propagateValue (r cv) rv
 modifiedSuperSetOf (IV rv) v2 r = Rule $ addAction v2 (\x -> propagateValue (r x) rv)
+modifiedSuperSetOf (IOValue iov) v2 r = Rule $ iov >>= \v1 -> unRule $ modifiedSuperSetOf v1 v2 r
 modifiedSuperSetOf ConstValue {} _ _ =  Rule $ fail "Fixer: You cannot modify a constant value"
 modifiedSuperSetOf UnionValue {} _ _ =  Rule $ fail "Fixer: You cannot modify a union value"
 
 isSuperSetOf :: Fixable a => Value a -> Value a -> Rule
 (IV rv) `isSuperSetOf` (ConstValue v2) = Rule $ propagateValue v2 rv
 (IV rv) `isSuperSetOf` v2 = Rule $ addAction v2 (\x -> propagateValue x rv)
+(IOValue iov) `isSuperSetOf` v2 = Rule $ iov >>= unRule . (`isSuperSetOf` v2)
 ConstValue {} `isSuperSetOf` _ = Rule $  fail "Fixer: You cannot modify a constant value"
 UnionValue {} `isSuperSetOf` _ = Rule $  fail "Fixer: You cannot modify a union value"
 
@@ -151,6 +160,7 @@ propagateValue p v = do
 
 readValue :: (Fixable a,MonadIO m) => Value a -> m a
 readValue (IV v) = liftIO $ readIORef (current v)
+readValue (IOValue iov) = liftIO iov >>= readValue
 readValue (ConstValue v) = return v
 readValue (UnionValue a b) = liftIO $ do
     a' <- readValue a
