@@ -28,6 +28,7 @@ import Util.UniqueMonad
 import Util.Once
 import Stats
 import Util.SameShape
+import Util.Gen
 
 
 sameLength (_:xs) (_:ys) = sameLength xs ys
@@ -305,7 +306,7 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
         g (App a [vr@(Var v _)] _ :>>= vb@(Var vbv _) :-> e) | a == funcEval = do
                 let Just stags = tags vbv
                 case stags of
-                    [] ->  return $ (Return vr :>>= createEval NoUpdate typeEnv (tagsp v)) :>>= vb :-> Error "Update: no alternatives" (getType e)
+                    [] ->  return $ (Return vr :>>= createEval NoUpdate typeEnv (tagsp v)) -- :>>= vb :-> Error "Update: no alternatives" (getType e)
                     [t] -> do
                         e' <- g e
                         mtick "Grin.eval.hoisted2"
@@ -551,8 +552,10 @@ findFixpoint' grin (HcHash _ mp) eq = do
             pp cc@(Complex a [p])
                 | a == funcEval = do
                     p' <- newVal p
-                    addRule $ modifiedSuperSetOf self p' (\n -> pruneNodes $ VsNodes (Map.filterWithKey (\ (t,_) _ -> tagIsWHNF t) (getNodeArgs n)) (Set.filter tagIsWHNF (getNodes n)))
+                    let evaledSuperSetOf a b =  modifiedSuperSetOf a b (\n -> pruneNodes $ VsNodes (Map.filterWithKey (\ (t,_) _ -> tagIsWHNF t) (getNodeArgs n)) (Set.filter tagIsWHNF (getNodes n)))
+                    addRule $ evaledSuperSetOf self p'
                     addRule $ dynamicRule p' $ \p -> ioToRule $ do
+                        addRule $ mconcatMap (self `evaledSuperSetOf`) (fsts [ runIdentity $ Map.lookup (tagFlipFunction n) funcMap | n <- (Set.toList $ getNodes p), tagIsSuspFunction n ])
                         flip mapM_ (Map.toList $ getNodeArgs p) $ \ ((n,i),v) -> do
                             when (tagIsSuspFunction n) $ do
                                 a <- getArg (tagFlipFunction n) i
@@ -635,9 +638,8 @@ findFixpoint' grin (HcHash _ mp) eq = do
             p' <- newVal p
             addRule $ dynamicRule p' $ \p -> ioToRule $ flip mapM_ (Set.toList (getHeaps p)) $ \h -> do
                 case Map.lookup h heapMap of
-                    Just (e',(x,_)) | True || x /= UnsharedEval -> addRule $ dynamicRule e' $ \e ->
-                        mconcat $ flip map (fsts [ runIdentity $ Map.lookup (tagFlipFunction n) funcMap | n <- (Set.toList $ getNodes e), tagIsSuspFunction n ]) $ \z ->
-                            e' `isSuperSetOf` z
+                    Just (e',(x,_)) | x /= UnsharedEval -> addRule $ dynamicRule e' $ \e ->
+                        mconcatMap (e' `isSuperSetOf`) (fsts [ runIdentity $ Map.lookup (tagFlipFunction n) funcMap | n <- (Set.toList $ getNodes e), tagIsSuspFunction n ])
                     _ -> return ()
 
         procApp a ps = do

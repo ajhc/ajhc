@@ -6,19 +6,21 @@ import Control.Monad.State
 import Fixer.Fixer
 import Fixer.Supply
 import Grin.Grin
+import GenUtil
 
-data W = One | Omega
+data W = Zero | One | Omega
     deriving(Ord,Eq,Show)
 
 instance Fixable W where
-    bottom = One
-    isBottom One = True
+    bottom = Zero
+    isBottom Zero = True
     isBottom _ = False
     lub a b = max a b
     minus a b | a > b = a
     minus _ _ = bottom
 
 
+{-# NOINLINE grinLinear #-}
 grinLinear :: Grin -> IO [(Var,W)]
 grinLinear  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinCafs = cafs }) = do
     fixer <- newFixer
@@ -26,6 +28,8 @@ grinLinear  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, g
     varSupply <- newSupply fixer
     mapM_ (go argSupply varSupply) grinFunctions
     findFixpoint fixer
+    as <- supplyReadValues argSupply
+    mapM_ print $ sortGroupUnderFG fst (snd . snd)  [ (n,(a,v)) | ((n,a),v) <- as ]
     supplyReadValues varSupply
 
 go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
@@ -51,9 +55,9 @@ go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
     h (App a [_,b] _) | a == funcApply = omegaize b
     h (App a [Var v _] _) | a == funcEval = eval v
     h (App a vs _) = fuse a vs
-    h Store { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
-    h Update { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
-    h Return { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
+    -- h Store { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
+    -- h Update { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
+    -- h Return { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
     h Store { expValue = NodeC a vs } = mapM_ omegaize vs
     h Update { expValue = NodeC a vs } = mapM_ omegaize vs
     h Return { expValue = NodeC a vs } = mapM_ omegaize vs
@@ -61,7 +65,7 @@ go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
     h Error {} = return ()
     h Cast {} = return ()   -- casts argument is never a node pointer
     h Return { } = return ()
-    h Store { } = return ()
+    h Store {} = return ()
     h e = fail ("Grin.Linear.h: " ++ show e)
     fuse a vs = mapM_ farg $ zip (zip (repeat a) [0..]) vs
     omegaize Const {} = return ()
@@ -70,23 +74,25 @@ go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
         mp <- get
         case Map.lookup v mp of
             Nothing -> return ()
-            Just (_,v) -> lift $ toOmega v
+            Just (_,v) -> toOmega v
     omegaize x = fail $ "omegaize: " ++ show x
     farg (_,Const {}) = return ()
     farg (_,Lit {}) = return ()
     farg z@(an,Var v _) = do
         eval v
-        ea <- lift $ supplyValue argSupply an
+        ea <-  supplyValue argSupply an
         mp <- get
         case Map.lookup v mp of
-            Just (_,ev) -> lift $ addRule $ ev `isSuperSetOf` ea
+            Just (_,ev) -> addRule $ ev `isSuperSetOf` ea
             Nothing -> return ()
     farg x = fail ("Grin.Linear.farg: " ++ show x)
     eval v = do
         mp <- get
         case Map.lookup v mp of
-            Just (0,e) -> modify (Map.insert v (1,e))
-            Just (1,e) -> lift $ toOmega e
+            Just (0,e) -> do
+                addRule $ e `isSuperSetOf` value One
+                modify (Map.insert v (1,e))
+            Just (1,e) -> toOmega e
             Nothing -> return ()
 
 
