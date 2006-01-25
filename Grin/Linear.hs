@@ -1,53 +1,42 @@
-module Grin.Linear(grinLinear,W(One,Omega)) where
+module Grin.Linear(grinLinear,W(..)) where
 
-import Control.Monad.Identity
-import Data.IORef
-import Data.Monoid
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import Control.Monad.State
-import Fixer.Supply
+
 import Fixer.Fixer
-
-import Atom
+import Fixer.Supply
 import Grin.Grin
-import Util.UnionFind
 
-data W = One | Omega | LessThan (Set.Set E)
+data W = One | Omega
     deriving(Ord,Eq,Show)
-type E = Element W Var
 
-{-
-instance Monoid W where
-    --mappend Omega Omega = Omega
-    mappend Omega _ = Omega
-    mappend _ Omega = Omega
-    mappend One x = x
-    mappend x One = x
-    mappend (LessThan xs) (LessThan ys) = LessThan (Set.union xs ys)
-    mappend x y = error $ "mappend: " ++ show (x,y)
-    mempty = LessThan Set.empty
--}
+instance Fixable W where
+    bottom = One
+    isBottom One = True
+    isBottom _ = False
+    lub a b = max a b
+    minus a b | a > b = a
+    minus _ _ = bottom
 
-emptyW = LessThan Set.empty
 
 grinLinear :: Grin -> IO [(Var,W)]
 grinLinear  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinCafs = cafs }) = do
-    fm <- flip mapM grinFunctions $ \ (a,Tup xs :-> _) ->  do
-        xs' <- flip mapM xs $ \ (Var v _) -> new (emptyW :: W) v
-        return $ Map.fromList [ ((a,x),y) | x <- [0::Int ..] | y <- xs']
-    storeVars <- newIORef []
-    mapM_ (go (Map.unions fm) storeVars) grinFunctions
-    svs <- readIORef storeVars
-    mapM_ (updateW (\x -> case x of LessThan {} -> One ; _ -> x)) svs
-    svs <- mapM (\x -> do w <- getW x; return (fromElement x,w))  svs
-    return svs
+    fixer <- newFixer
+    argSupply <- newSupply fixer
+    varSupply <- newSupply fixer
+    mapM_ (go argSupply varSupply) grinFunctions
+    findFixpoint fixer
+    supplyReadValues varSupply
 
-go (fm:: Map.Map (Atom,Int) E) storeVars (fn,Tup vs :-> fb) = f fb (Map.fromList [ (v,(0::Int, runIdentity $ Map.lookup (fn,z) fm)) | ~(Var v _) <- vs | z <- [ 0 ..]]) where
+go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
+    ans = do
+        ms <- flip mapM [ (v,z) | ~(Var v _) <- vs | z <- [ 0::Int ..]] $ \ (v,z) -> do
+            vv <- supplyValue argSupply (fn,z)
+            return (v,(0::Int,vv))
+        f fb (Map.fromList ms)
     f (e@Store {} :>>= (Var v (TyPtr TyNode)) :-> fb) mp = do
         mp' <- g e mp
-        ee <- new emptyW v
-        modifyIORef storeVars (ee:)
+        ee <- supplyValue varSupply v
         mp' <- f fb (Map.insert v (0,ee) mp')
         return mp'
     f (e :>>= _ :-> fb) mp = do
@@ -70,7 +59,7 @@ go (fm:: Map.Map (Atom,Int) E) storeVars (fn,Tup vs :-> fb) = f fb (Map.fromList
     h Return { expValue = NodeC a vs } = mapM_ omegaize vs
     h Prim {} = return ()
     h Error {} = return ()
-    h Cast {} = return ()   -- casts argument are never node pointers
+    h Cast {} = return ()   -- casts argument is never a node pointer
     h Return { } = return ()
     h Store { } = return ()
     h e = fail ("Grin.Linear.h: " ++ show e)
@@ -81,53 +70,27 @@ go (fm:: Map.Map (Atom,Int) E) storeVars (fn,Tup vs :-> fb) = f fb (Map.fromList
         mp <- get
         case Map.lookup v mp of
             Nothing -> return ()
-            Just (_,v) -> toOmega v
+            Just (_,v) -> lift $ toOmega v
     omegaize x = fail $ "omegaize: " ++ show x
     farg (_,Const {}) = return ()
     farg (_,Lit {}) = return ()
     farg z@(an,Var v _) = do
         eval v
-        ea <- Map.lookup an fm
+        ea <- lift $ supplyValue argSupply an
         mp <- get
         case Map.lookup v mp of
-            Just (_,ev) -> ea `isLessThan` ev
+            Just (_,ev) -> lift $ addRule $ ev `isSuperSetOf` ea
             Nothing -> return ()
     farg x = fail ("Grin.Linear.farg: " ++ show x)
     eval v = do
         mp <- get
         case Map.lookup v mp of
             Just (0,e) -> modify (Map.insert v (1,e))
-            Just (1,e) -> toOmega e
+            Just (1,e) -> lift $ toOmega e
             Nothing -> return ()
 
 
+toOmega e = addRule $ e `isSuperSetOf` value Omega
 
 
-e1 `isLessThan` e2 = do
-    w <- getW e2
-    case w of
-        Omega -> return ()
-        _ -> do
-            w <- getW e1
-            case w of
-                Omega -> toOmega e2
-                LessThan xs -> updateW (const $ LessThan $ Set.insert e2 xs) e1
 
-toOmega e = do
-    w <- getW e
-    case w of
-        Omega -> return ()
-        LessThan ss -> do
-            updateW (const Omega) e
-            mapM_ toOmega (Set.toList ss)
-
-{-
-unify e1 e2 = do
-    w1 <- getW e1
-    w2 <- getW e2
-    union mappend e1 e2
-    let f Omega (LessThan ss) = mapM_ toOmega (Set.toList ss)
-        f _ _ = return ()
-    f w1 w2
-    f w2 w1
--}
