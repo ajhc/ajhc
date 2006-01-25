@@ -216,6 +216,12 @@ optimize1 (n,l) = g l where
     f (Update v t :>>= Tup [] :-> Fetch v' :>>= lr) | v == v' = do
         mtick "Optimize.optimize.update-fetch"
         f (Update v t :>>= Tup [] :-> Return t :>>= lr)
+    f (Return t@NodeC {} :>>= v :-> App fa [v',a] typ :>>= lr) | fa == funcApply, v == v' = do
+        mtick "Optimize.optimize.return-apply"
+        f (Return t :>>= v :-> doApply t a typ :>>= lr)
+    f (Return t@NodeC {} :>>= v :-> App fa [v',a] typ) | fa == funcApply, v == v' = do
+        mtick "Optimize.optimize.return-apply"
+        f (Return t :>>= v :-> doApply t a typ)
     f (Case n as) | isKnown n = do
         kc <- knownCase n as
         f kc
