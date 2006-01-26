@@ -22,9 +22,11 @@ import Name.Names
 import PackedString
 import Util.ArbitraryInstances()
 import Util.HasSize
+import qualified C.Generate
 
 
 
+{-# NOINLINE selfTest #-}
 selfTest :: [String] -> IO ()
 selfTest _ = do
     putStrLn "Testing Boolean Library"
@@ -36,6 +38,7 @@ selfTest _ = do
     testName
     testInfo
     testBinary
+    C.Generate.test
     -- testE
 
 prop_atomid xs = fromAtom (toAtom xs) == (xs::String)
