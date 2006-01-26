@@ -39,7 +39,10 @@ deadCode stats roots grin = do
         addRule $ x `implies` f
 
     mapM_ (go fixer usedFuncs usedArgs usedCafs postInline) (grinFunctions grin)
-    findFixpoint fixer
+    calcFixpoint "Dead Code" fixer
+    supplyReadValues usedArgs >>= mapM_ print
+    supplyReadValues usedFuncs >>= mapM_ print
+    supplyReadValues usedCafs >>= mapM_ print
     return grin
 
 combineArgs fn as = [ ((fn,n),a) | (n,a) <- zip [0..] as]

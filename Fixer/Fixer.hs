@@ -11,6 +11,7 @@ module Fixer.Fixer(
     conditionalRule,
     dynamicRule,
     findFixpoint,
+    calcFixpoint,
     isSuperSetOf,
     modifiedSuperSetOf,
     newFixer,
@@ -25,10 +26,20 @@ import Data.IORef
 import Data.Monoid
 import Data.Typeable
 import Data.Unique
-import IO(hFlush, stdout)
+import IO(hFlush, stdout, Handle, hPutStr)
 import Monad
 import qualified Data.Set as Set
 
+
+-- | Fixable class, must satisfy the following rules
+--
+-- isBottom bottom == True
+-- x `lub` x == x
+-- x `lub` y == y `lub` x
+-- x `lub` bottom == x
+-- x `minus` bottom == x
+-- bottom `minus` x == bottom
+-- x `minus` y == z --> y `lub` z == x
 
 class Fixable a where
     bottom :: a
@@ -157,9 +168,11 @@ propagateValue p v = do
     modifyIORef (pending v) (lub p)
 
 
-
+-- | read result, calculating fixpoint if needed
 readValue :: (Fixable a,MonadIO m) => Value a -> m a
-readValue (IV v) = liftIO $ readIORef (current v)
+readValue (IV v) = liftIO $ do
+    findFixpoint Nothing (fixer v)
+    readIORef (current v)
 readValue (IOValue iov) = liftIO iov >>= readValue
 readValue (ConstValue v) = return v
 readValue (UnionValue a b) = liftIO $ do
@@ -168,17 +181,21 @@ readValue (UnionValue a b) = liftIO $ do
     return (lub a' b')
 
 
-findFixpoint :: MonadIO m => Fixer -> m ()
-findFixpoint Fixer { vars = vars, todo = todo } = liftIO $ do
+calcFixpoint :: MonadIO m => String -> Fixer -> m ()
+calcFixpoint s fixer = findFixpoint (Just (s,stdout)) fixer
+
+-- | find fixpoint, perhaps printing debugging information to specified handle. will not print anything if no calculation needed.
+findFixpoint :: MonadIO m => Maybe (String,Handle) ->  Fixer -> m ()
+findFixpoint msh@(~(Just (mstring,_))) Fixer { vars = vars, todo = todo } = liftIO $ do
     to <- readIORef todo
+    if Set.null to then return () else do
     vars <- readIORef vars
-    putStrLn $ "Fixer: " ++ show (length vars)
     let f [] n | n > 0 = do
             vs <- readIORef todo
             writeIORef todo Set.empty
-            putStr "(" >> putStr (show n) >> putStr ")" >> hFlush stdout
+            mputStr "(" >> mputStr (show n) >> mputStr ")" >> mFlush
             f (Set.toList vs) 0
-        f [] _ = putStrLn "" >> return ()
+        f [] _ = mputStr "\n" >> mFlush >> return ()
         f (MkFixable v:vs) n = do
             p <- readIORef (pending v)
             c <- readIORef (current v)
@@ -192,7 +209,16 @@ findFixpoint Fixer { vars = vars, todo = todo } = liftIO $ do
             --putStr "]"
             mapM_ ($ diff) as
             f vs $! (n + 1)
+        mputStr s = case msh of
+            Nothing -> return ()
+            Just (_,h) -> hPutStr h s
+        mFlush = case msh of
+            Nothing -> return ()
+            Just (_,h) -> hFlush h
+    mputStr $ "Finding fixpoint for " ++ mstring ++ ": " ++ "[" ++ show (Set.size to) ++ "]"
+    mFlush
     f (Set.toList to) (0::Int)
+
 
 
 -- some useful instances

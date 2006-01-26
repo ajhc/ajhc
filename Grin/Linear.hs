@@ -27,7 +27,7 @@ grinLinear  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, g
     argSupply <- newSupply fixer
     varSupply <- newSupply fixer
     mapM_ (go argSupply varSupply) grinFunctions
-    findFixpoint fixer
+    calcFixpoint "linear nodes" fixer
     as <- supplyReadValues argSupply
     mapM_ print $ sortGroupUnderFG fst (snd . snd)  [ (n,(a,v)) | ((n,a),v) <- as ]
     supplyReadValues varSupply

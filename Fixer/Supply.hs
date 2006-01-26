@@ -3,6 +3,7 @@ module Fixer.Supply(
     newSupply,
     supplyReadValues,
     sValue,
+    readSValue,
     supplyValue
     ) where
 
@@ -44,4 +45,8 @@ supplyReadValues (Supply _fixer ref) = liftIO $ do
         a <- readValue va
         return (b,a)
 
+readSValue :: (MonadIO m, Ord b, Fixable a) => Supply b a -> b -> m a
+readSValue s b = do
+    v <- supplyValue s b
+    readValue v
 

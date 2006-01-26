@@ -48,7 +48,7 @@ typeAnalyze ds seed = do
     ds <- annotateDs mempty lambind (\_ -> return) (\_ -> return) ds
     calcDs (usedVals,extractValMap ds) ds
     calcE (usedVals,extractValMap ds) seed
-    findFixpoint fixer
+    calcFixpoint "type analysis" fixer
     ds <- annotateDs mempty (\_ -> return) (\_ -> return) lamread ds
     ds <- annotateDs mempty lamdel (\_ -> return) (\_ -> return) ds
     return ds

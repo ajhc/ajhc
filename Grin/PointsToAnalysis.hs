@@ -680,8 +680,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
     mapM_ (uncurry procApply) (applyEq eq)
     mapM_ (uncurry procApp) (appEq eq)
 
-    CharIO.putStrLn "About to solve fixpoint.."
-    findFixpoint fr
+    calcFixpoint "points-to" fr
 
     let readMap m = fmap Map.fromList $ flip mapM (Map.toList m) $ \ (v,(e,_)) -> do
                 x <- readValue e
