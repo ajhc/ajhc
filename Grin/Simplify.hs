@@ -41,6 +41,7 @@ at_OptSimplifyTrivialCase  = toAtom "Optimize.simplify.trivial-case"
 at_OptSimplifyBadAssignment  = toAtom "Optimize.simplify.bad-assignment"
 at_OptSimplifyHoleAssignment  = toAtom "Optimize.simplify.hole-assignment"
 at_OptSimplifyConstStore  = toAtom "Optimize.simplify.const-store"
+at_OptSimplifyConstUpdate  = toAtom "Optimize.simplify.const-update"
 
 -- contains functions that should be inlined
 type SimpEnv = Map.Map Atom (Atom,Lam)
@@ -66,6 +67,9 @@ simplify1 stats env (n,l) = do
         x <- applySubstE env  x
         x <- gs x
         inline x
+    gs (Update Const {} Var {}) = do
+        lift $ tick stats at_OptSimplifyConstUpdate
+        gs (Return unit)
     gs (Store n) | valIsNF n = do
         lift $ tick stats at_OptSimplifyConstStore
         gs (Return (Const n))

@@ -16,6 +16,7 @@ import CanType
 import CharIO
 import Doc.DocLike
 import Fixer.Fixer
+import Fixer.Supply
 import GenUtil
 import Grin.EvalInline
 import Grin.Grin
@@ -519,9 +520,15 @@ findFixpoint' grin (HcHash _ mp) eq = do
                 return (v,(x,p))
             return $ Map.fromList vs
     varMap <- cmap (varEq eq)
-    funcMap <- cmap (funcEq eq)
     heapMap <- cmap (heapEq eq)
+    --funcMap <- cmap (funcEq eq)
     argMap <- newIORef mempty
+    funcSupply <- newSupply fr
+    funcMap <- do
+        vs <- flip mapM (funcEq eq) $ \ (v,p) -> do
+            x <- supplyValue funcSupply v
+            return (v,(x,p))
+        return $ Map.fromList vs
 
 
     let cheaps = Map.fromList [ ((-x),setNodes [(t,(map z xs))]) | (HcNode t xs,x) <- Map.toList mp ] where
@@ -555,7 +562,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
                     let evaledSuperSetOf a b =  modifiedSuperSetOf a b (\n -> pruneNodes $ VsNodes (Map.filterWithKey (\ (t,_) _ -> tagIsWHNF t) (getNodeArgs n)) (Set.filter tagIsWHNF (getNodes n)))
                     addRule $ evaledSuperSetOf self p'
                     addRule $ dynamicRule p' $ \p -> ioToRule $ do
-                        addRule $ mconcatMap (self `evaledSuperSetOf`) (fsts [ runIdentity $ Map.lookup (tagFlipFunction n) funcMap | n <- (Set.toList $ getNodes p), tagIsSuspFunction n ])
+                        addRule $ mconcatMap (self `evaledSuperSetOf`) [ sValue funcSupply (tagFlipFunction n) | n <- (Set.toList $ getNodes p), tagIsSuspFunction n ]
                         flip mapM_ (Map.toList $ getNodeArgs p) $ \ ((n,i),v) -> do
                             when (tagIsSuspFunction n) $ do
                                 a <- getArg (tagFlipFunction n) i
@@ -586,7 +593,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
                         return ()
                     flip mapM_ (Set.toList (getNodes v)) $ \n -> do
                          case tagUnfunction n of
-                            Just (1,fn) -> addRule $ self `isSuperSetOf` (fst $ runIdentity $ Map.lookup fn funcMap)
+                            Just (1,fn) -> addRule $ self `isSuperSetOf` sValue funcSupply fn
                             _ -> return ()
                     --sequence_ $ concat [  papp'' n i a | ((n,i),a) <- Map.toList (getNodeArgs v) ]
             pp (Down p a i) = do
@@ -639,7 +646,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
             addRule $ dynamicRule p' $ \p -> ioToRule $ flip mapM_ (Set.toList (getHeaps p)) $ \h -> do
                 case Map.lookup h heapMap of
                     Just (e',(x,_)) | x /= UnsharedEval -> addRule $ dynamicRule e' $ \e ->
-                        mconcatMap (e' `isSuperSetOf`) (fsts [ runIdentity $ Map.lookup (tagFlipFunction n) funcMap | n <- (Set.toList $ getNodes e), tagIsSuspFunction n ])
+                        mconcatMap (e' `isSuperSetOf`) [ sValue funcSupply (tagFlipFunction n) | n <- (Set.toList $ getNodes e), tagIsSuspFunction n ]
                     _ -> return ()
 
         procApp a ps = do
@@ -654,9 +661,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
         simplePos var@(Variable v) = case Map.lookup v varMap of
             Just (x,_) -> return x
             Nothing -> error $ "varMap has no var:" ++ show var
-        simplePos (Func v) = case Map.lookup v funcMap of
-            Just (x,_) -> return x
-            Nothing -> error "funcMap has no var"
+        simplePos (Func v) = return $ sValue funcSupply v
         simplePos _ = fail "this pos is not simple"
         getArg a i = do
             when (not $ tagIsFunction a) $ fail "getArg: tag not function"

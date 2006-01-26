@@ -40,7 +40,6 @@ import FreeVars
 import FrontEnd.FrontEnd
 import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
-import Grin.DeadFunctions
 import Grin.DeadCode
 import Grin.FromE
 import Grin.Grin
@@ -438,13 +437,15 @@ compileModEnv' stats ho = do
     typecheckGrin x
     let opt s  x = do
         stats' <- Stats.new
-        deadFunctions stats' [funcMain] x
-        x <- deadCode stats' [funcMain] x  -- XXX
+        --deadFunctions stats' [funcMain] x
         x <- Grin.Simplify.simplify stats' x
+        wdump FD.Steps $ printGrin x
+        x <- deadCode stats' [funcMain] x  -- XXX
         when flint $ typecheckGrin x
         t' <- Stats.getTicks stats'
         wdump FD.Progress $ Stats.print s stats'
         Stats.combine stats stats'
+
         case t' of
             0 -> return x
             _ -> opt s x

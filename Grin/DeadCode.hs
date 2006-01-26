@@ -53,7 +53,7 @@ deadCode stats roots grin = do
         if u then return [(x,y)] else return []
     newFuncs <- flip mconcatMapM (grinFunctions grin) $ \ (x,y) -> do
         u <- readSValue usedFuncs x
-        if not u then tick stats "Optimize.dead-code.func" >> return [] else do
+        if not u then tick stats ("Optimize.dead-code.func.{" ++ show x) >> return [] else do
         r <- runStatIO stats $ removeDeadArgs postInline cafSet argSet (x,y)
         return [r]
 
@@ -71,35 +71,45 @@ go fixer usedFuncs usedArgs usedCafs postInline (fn,~(Tup as) :-> body) = ans wh
             addRule $ v `implies` x
         -- a lot of things are predicated on this so that CAFS are not held on to unnecesarily
         fn' <- supplyValue usedFuncs fn
-        let useVar v | v < v0 = addRule $ fn' `implies` sValue usedCafs v
-            useVar v = addRule $ fn' `implies` sValue usedVars v
-            varValue v | v < v0 = sValue usedCafs v
+        let varValue v | v < v0 = sValue usedCafs v
                        | otherwise = sValue usedVars v
             f e = g e >> return e
-            g (App a [e] _) | a == funcEval =  mapM_ useVar (freeVars e)
-            g (App a [x,y] _) | a == funcApply =  mapM_ useVar (freeVars (x,y))
-            g (Case e _) =  mapM_ useVar (freeVars e)
-            g Prim { expArgs = as } = mapM_ useVar (freeVars as)
+            g (App a [e] _) | a == funcEval =  addRule (doNode e)
+            g (App a [x,y] _) | a == funcApply =  addRule (doNode x `mappend` doNode y)
+            g (Case e _) =  addRule (doNode e)
+            g Prim { expArgs = as } = addRule (mconcatMap doNode as)
             g (App a vs _) = do
                 addRule $ conditionalRule id fn' $ mconcat [ mconcatMap (implies (sValue usedArgs fn) . varValue) (freeVars a) | (fn,a) <- combineArgs a vs]
                 addRule $ fn' `implies` sValue usedFuncs a
-            g (Update ~(Var v _) n@(NodeC x vs))
+                addRule (mconcatMap doConst vs)
+            g (Update (Var v _) n@(~(NodeC x vs)))
                 | v < v0 = do
                     v' <- supplyValue usedCafs v
                     addRule $ conditionalRule id v' $ doNode n
                 | otherwise = addRule $ doNode n
             g (Store n) = addRule $ doNode n
-            g x@Fetch {} = mapM_ useVar (freeVars x)
+            g (Fetch x) = addRule $ doNode x
+            g (Cast x _) = addRule $ doNode x
             g Error {} = return ()
             -- TODO - handle function and case return values smartier.
             g (Return n) = addRule $ doNode n
+            g x = error $ "deadcode.g: " ++ show x
             h' (p,e) = h (p,e) >> return (Just (p,e))
             h (p,Store v) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
             h (p,Return v) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
-            h (p,Fetch v) = addRule $ mconcat $ [ mconcatMap (implies (varValue pv) . varValue) (freeVars v) | pv <- freeVars p]
+            h (p,Fetch v) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
+            h (p,Cast v _) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
+            --h (p,Fetch v) = addRule $ mconcat $ [ mconcatMap (implies (varValue pv) . varValue) (freeVars v) | pv <- freeVars p]
+            --h (p,Cast v _) = addRule $ mconcat $ [ mconcatMap (implies (varValue pv) . varValue) (freeVars v) | pv <- freeVars p]
             h (p,e) = g e
-            doNode (NodeC n as) | not postInline, Just (x,fn) <- tagUnfunction n  = mconcat $ implies fn' (sValue usedFuncs fn):[ mconcatMap (implies (sValue usedArgs fn) . varValue) (freeVars a) | (fn,a) <- combineArgs fn as]
-            doNode x = mconcatMap (implies fn' . varValue) (freeVars x)
+            doNode (NodeC n as) | not postInline, Just (x,fn) <- tagUnfunction n  = mappend (mconcatMap doConst as) $ mconcat (implies fn' (sValue usedFuncs fn):[ mconcatMap (implies (sValue usedArgs fn) . varValue) (freeVars a) | (fn,a) <- combineArgs fn as])
+            doNode x = doConst x `mappend` mconcatMap (implies fn' . varValue) (freeVars x)
+            doConst _ | postInline  = mempty
+            doConst (Const n) = doNode n
+            doConst (Tup ns) = mconcatMap doConst ns
+            doConst (NodeC n as) = mconcatMap doConst as
+            doConst (NodeV n as) = mconcatMap doConst as
+            doConst _ = mempty
 
 
 {-
