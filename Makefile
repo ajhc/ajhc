@@ -55,7 +55,7 @@ printos:
 
 depend: $(BUILTSOURCES)
 	$(HC) -M -optdep-f -optdepdep.tmp $(HC_OPTS) $(MAIN)
-	echo HSFILES=`egrep -o '[A-Za-z/.]+.hs' dep.tmp | sed -e 's/^\.\///' | sort` > depend.make
+	echo HSFILES=`egrep -o '[A-Za-z0-9/.]+.hs' dep.tmp | sed -e 's/^\.\///' | sort` > depend.make
 	rm -f dep.tmp
 
 clean:
