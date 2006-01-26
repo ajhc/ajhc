@@ -55,9 +55,10 @@ go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
     h (App a [_,b] _) | a == funcApply = omegaize b
     h (App a [Var v _] _) | a == funcEval = eval v
     h (App a vs _) = fuse a vs
-    -- h Store { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
-    -- h Update { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
-    -- h Return { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
+    -- TODO if result of a P1_ partial ap is used once, then the function arguments should be fuse'd rather than omegaized
+    h Store { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
+    h Update { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
+    h Return { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
     h Store { expValue = NodeC a vs } = mapM_ omegaize vs
     h Update { expValue = NodeC a vs } = mapM_ omegaize vs
     h Return { expValue = NodeC a vs } = mapM_ omegaize vs
