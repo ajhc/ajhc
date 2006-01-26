@@ -12,7 +12,7 @@ import qualified Data.Set as Set
 import qualified System
 
 import CanType(getType)
-import C.FromGrin
+import C.FromGrin2
 import CharIO
 import Class
 import C.Prims

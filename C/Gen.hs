@@ -52,12 +52,18 @@ data CType = CTypeBasic String | CTypePointer CType | CTypeStruct String
     deriving(Ord,Eq)
 data CDecl = CFunc CType String [(CType,String)] [CStatement] | CVar CType String | CStruct String [(CType,String)]
     deriving(Ord,Eq)
-data CStatement = CSAssign CExpr CExpr | CSExpr CExpr | CSAuto CType String | CSReturn CExpr | CSDoc String | CSSwitch CExpr [(Maybe String,[CStatement])]
+data CStatement = CSAssign CExpr CExpr | CSExpr CExpr | CSAuto CType String | CSReturn CExpr | CSDoc String | CSSDoc P.Doc | CSSwitch CExpr [(Maybe String,[CStatement])]
     deriving(Ord,Eq)
 data CExpr = CEIdent String | CEFunCall String [CExpr] | CELiteral CLit | CEDot CExpr String | CEIndirect CExpr String | CESizeof CType | CECast CType CExpr | CEEval CExpr | CEDoc String | CEVar CType String | CETernary CExpr CExpr CExpr | CEOp String CExpr CExpr  | CEUOp String CExpr
     deriving(Ord,Eq)
 data CLit = CLitChar Char | CLitInt Int | CLitNull
     deriving(Ord,Eq)
+
+instance Ord P.Doc where
+    compare _ _ = EQ
+
+instance Eq P.Doc where
+    _ == _ = True
 
 data CFunction = CFunction {
     cFuncComments :: String,
@@ -325,6 +331,7 @@ prettyCode' showSa (ss) = vcat $ map ps ((if showSa then snub sa else [])  ++ sb
         sc (Nothing,ss) = text "default:" $$ nest 4  (prettyCode' False ss) $$ text "break;"
         md = if any isNothing (fsts ts) then empty else text "default: jhc_case_fell_off(__LINE__);"
     ps (CSDoc d) = text d
+    ps (CSSDoc d) = d
     sa = collectAuto ss
     sb = filter (not . isAuto) ss
     collectAuto ss = filter isAuto ss ++ concatMap f ss where

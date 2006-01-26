@@ -51,4 +51,4 @@ instance MonadReader s m => MonadReader s (UniqT m) where
     local f (UniqT x) = UniqT $ local f x
 
 -- | Unique integer generator monad.
-type Uniq a = UniqT Identity a
+type Uniq = UniqT Identity
