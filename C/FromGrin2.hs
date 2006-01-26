@@ -2,25 +2,26 @@
 module C.FromGrin2(compileGrin) where
 
 import Control.Monad.Identity
-import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.RWS
+import Control.Monad.State
 import Data.Monoid
+import List(intersperse)
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
 import Text.PrettyPrint.HughesPJ(nest,($$))
 
+import Atom
+import CanType
 import C.Generate
 import C.Prims
 import Doc.DocLike
 import Doc.PPrint
-import Grin.Grin
 import FreeVars
+import GenUtil
+import Grin.Grin
 import Grin.HashConst
 import Grin.Show
-import CanType
-import GenUtil
-import Atom
 import RawFiles
 import Util.UniqueMonad
 
@@ -34,8 +35,11 @@ runC :: C a -> (a,HcHash,Requires)
 runC (C m) =  execUniq1 (runRWST m TodoNothing emptyHcHash)
 
 
-fetchVar :: Var -> C Expression
-fetchVar v = return $ (variable $ varName v)
+fetchVar :: Var -> Ty -> C Expression
+fetchVar v@(V n) _ | n < 0 = return $ (variable  $ varName v)
+fetchVar v ty = do
+    t <- convertType ty
+    return $ (localVariable t (varName v))
 
 varName (V n) | n < 0 = name $ 'g':show (- n)
 varName (V n) = name $ 'v':show n
@@ -50,7 +54,7 @@ profile_case_inc = expr $ functionCall (name "case_inc") []
 profile_function_inc = expr $ functionCall (name "function_inc") []
 
 convertVal :: Val -> C Expression
-convertVal (Var v _) = fetchVar v
+convertVal (Var v ty) = fetchVar v ty
 convertVal (Const (NodeC h _)) | h == tagHole = return nullPtr
 convertVal (Const h) = do
     (_,i) <- newConst h
@@ -59,16 +63,21 @@ convertVal (Lit i _) = return (constant $ number (fromIntegral i))
 convertVal (Tup [x]) = convertVal x
 convertVal (Tup []) = return emptyExpression
 convertVal (Tup xs) = do
+    ts <- mapM convertType (map getType xs)
     xs <- mapM convertVal xs
-    return (structAnon xs)
+    return (structAnon (zip xs ts))
 convertVal (Tag t) = return $ constant (enum $ nodeTagName t)
 convertVal x = return $ err (show x)
 
 convertExp :: Exp -> C (Statement,Expression)
 convertExp (Error s t) = do
-    let f (TyPtr _) = nullPtr
-        f x = err $ "error-type " ++ show x
-    return (expr $ functionCall (name "jhc_error") [string s],f t)
+    let f (TyPtr _) = return nullPtr
+        f TyNode = return nullPtr
+        f (TyTup xs) = do ts <- mapM convertType xs; xs <- mapM f xs ; return $ structAnon (zip xs ts)
+        f (Ty x) = return $ cast (basicType (show x)) (constant $ number 0)
+        f x = return $ err $ "error-type " ++ show x
+    ev <- f t
+    return (expr $ functionCall (name "jhc_error") [string s],ev)
 convertExp (App a vs _) = do
     vs' <- mapM convertVal vs
     return $ (mempty, functionCall (toName (toString a)) vs')
@@ -91,7 +100,7 @@ convertExp (Prim p vs) | APrim _ req <- primAPrim p  =  do
 convertExp (Update v@Var {} (NodeC t as)) = do
     v' <- convertVal v
     as' <- mapM convertVal as
-    nt <- nodeType t
+    nt <- nodeTypePtr t
     let tmp' = cast nt v'
         s = project' tag tmp' `assign` constant (enum (nodeTagName t))
         ass = [project' (arg i) tmp' `assign` a | a <- as' | i <- [(1 :: Int) ..] ]
@@ -125,7 +134,7 @@ nodeFuncName a = toName (toString a)
 nodeStructName :: Atom -> Name
 nodeStructName a = toName ('s':toString a)
 
-nodeType a = return $ basicType ("struct " ++ show (nodeStructName a))
+nodeType a = return $ structType (nodeStructName a)
 nodeTypePtr a = liftM ptrType (nodeType a)
 
 jhc_malloc = name "jhc_malloc"
@@ -138,7 +147,7 @@ newNode (NodeC t as) = do
     st <- nodeType t
     as' <- mapM convertVal as
     tmp <- newVar pnode_t
-    let tmp' = project (nodeStructName t) (dereference tmp)
+    let tmp' = project' (nodeStructName t) tmp
         malloc =  tmp `assign` functionCall jhc_malloc [sizeof  (if tagIsWHNF t then st else node_t)]
         tagassign = project tag tmp' `assign` constant (enum $ nodeTagName t)
         ass = [ project (arg i) tmp' `assign` a | a <- as' | i <- [(1 :: Int) ..] ]
@@ -273,34 +282,34 @@ convertFunc (n,Tup as :-> body) = do
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
 compileGrin grin = (hsffi_h ++ jhc_rts_c ++ P.render ans ++ "\n", snub (reqLibraries req))  where
-
-    --ans = vcat $ includes ++ [line,enum_tag_t,line] ++ decls' ++ map cs tags ++ [text "",cn,text "",so,text "",text "/* Begin CAFS */"] ++ map ccaf (grinCafs grin) ++ [text "", consts, text "",text  "/* Begin Functions */"] ++ map prettyFuncP funcs ++ (map prettyFunc funcs)
-    ans = vcat $ includes ++ [line,enum_tag_t,line,header,line,union_node,line,text "/* Begin CAFS */"] ++ map ccaf (grinCafs grin) ++ [line, buildConstants finalHcHash, line,text  "/* Begin Functions */",body]
-
+    ans = vsep $ [vcat includes,enum_tag_t,header,union_node,text "/* CAFS */", vcat $ map ccaf (grinCafs grin), text "/* Constant Data */", buildConstants finalHcHash,text  "/* Functions */",body]
     includes =  map include (snub $ reqIncludes req)
-
-    (header,body) = generateC (jhc_sizeof:functions) []
-{-
-    cs (t,ts) = prettyDecl $ CStruct (toStruct t) ((tag_t, "tag"):map cst (zip [1..] ts))
-    cst (i,t) = (runIdentity $ toType' t, text $ 'a':show i)
-    -}
+    (header,body) = generateC (jhc_sizeof:functions) structs
 
     -- this is a list of every tag used in the program
     tags = (tagHole,[]):sortUnder (show . fst) [ (t,runIdentity $ findArgs (grinTypeEnv grin) t) | t <- Set.toList $ freeVars (snds $ grinFunctions grin) `mappend` freeVars (snds $ grinCafs grin), tagIsTag t]
-    (functions,finalHcHash,req) = runC (mapM convertFunc $ grinFunctions grin)
+    ((functions,structs),finalHcHash,req) = runC $ do
+        funcs <- mapM convertFunc $ grinFunctions grin
+        sts <- flip mapM tags $ \ (n,ts) -> do
+            ts' <- mapM convertType ts
+            return (nodeStructName n,zip [ name $ 'a':show i | i <-  [1 ..] ] ts')
+        return (funcs,sts)
+
+
     enum_tag_t = text "typedef enum {" $$ nest 4 (P.fsep (punctuate P.comma (map (tshow . nodeTagName . fst) tags))) $$ text  "} tag_t;"
     jhc_sizeof =  function (name "jhc_sizeof") size_t [(name "tag",tag_t)] [] ( statementRaw $  "switch(tag) {\n" ++ concatMap cs (fsts tags) ++ "}\n_exit(33);")  where
-        cs t = text "  case " <> tshow (nodeTagName t) <> char ':' <+> text "return sizeof(" <> tshow (nodeStructName t) <>  text ");\n"
+        cs t = text "  case " <> tshow (nodeTagName t) <> char ':' <+> text "return sizeof(struct " <> tshow (nodeStructName t) <>  text ");\n"
     union_node = text $  "union node {\n  struct { tag_t tag; } any;\n" <> mconcat (map cu (fsts tags)) <> text "};" where
         cu t = text "  struct" <+> (tshow $ nodeStructName t) <+> (tshow $ nodeStructName t) <> text ";\n"
 
 include fn = text "#include <" <> text fn <> text ">"
 line = text ""
+vsep xs = vcat $ intersperse line xs
 
 buildConstants fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
     cc nn@(HcNode a zs,i) = comm $$ cd $$ def where
         comm = text "/* " <> tshow (nn) <> text " */"
-        cd = text "static " <> tshow (nodeStructName a) <+> text "_c" <> tshow i <+> text "= {" <> hsep (punctuate P.comma (tshow (nodeTagName a):rs)) <> text "};"
+        cd = text "static struct " <> tshow (nodeStructName a) <+> text "_c" <> tshow i <+> text "= {" <> hsep (punctuate P.comma (tshow (nodeTagName a):rs)) <> text "};"
         def = text "#define c" <> tshow i <+> text "((node_t *)&_c" <> tshow i <> text ")"
         rs = [ f z undefined |  z <- zs ]
         f (Right i) = text $ 'c':show i

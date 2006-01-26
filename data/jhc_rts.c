@@ -40,7 +40,7 @@
 #define STR(s) #s
 #define XSTR(s) STR(s)
 
-static void XAmain(void) A_REGPARM;
+static void _amain(void) A_REGPARM;
 static int jhc_argc;
 static char **jhc_argv;
 static char *jhc_progname;
@@ -107,7 +107,7 @@ main(int argc, char *argv[])
         jhc_argv = argv + 1;
         jhc_progname = argv[0];
         setlocale(LC_ALL,"");
-        XAmain();
+        _amain();
         jhc_print_profile();
         return 0;
 }

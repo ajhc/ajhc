@@ -40,6 +40,7 @@ module C.Generate(
     ptrType,
     voidStarType,
     structAnon,
+    structType,
     assign,
     renderG,
     generateC,
@@ -49,35 +50,37 @@ module C.Generate(
     test
     ) where
 
-import Data.Monoid
-import Control.Monad
-import Control.Monad.RWS
 import Char
-import Text.PrettyPrint.HughesPJ(Doc,render,nest,($$),($+$))
-import Numeric
-import Maybe(isNothing)
+import Control.Monad.RWS
+import Data.Monoid
 import List(intersperse)
+import Maybe(isNothing)
+import Numeric
+import qualified Data.Map as Map
+import Text.PrettyPrint.HughesPJ(Doc,render,nest,($$),($+$))
 
-import Util.UniqueMonad
-import GenUtil
 import Doc.DocLike
-import C.Prims
+import GenUtil
 
-newtype G a = G (RWS () [()] Int a)
-    deriving(Monad,MonadWriter [()],MonadState Int)
+
+newtype G a = G (RWS () [(Name,Type)] (Int,Map.Map [Type] Name) a)
+    deriving(Monad,MonadWriter [(Name,Type)],MonadState (Int,Map.Map [Type] Name))
 
 
 newtype Name = Name String
+    deriving(Eq,Ord)
 
 
 instance Show Name where
     show (Name n) = n
 
-data Type = T (G Doc)
 data TypeHint = ThNone | ThConst | ThPtr
 data Expression = Exp TypeHint E
-data Statement = SD (G Doc)
+newtype Statement = SD (G Doc)
 newtype Constant = C (G Doc)
+
+data Type = TB String | TPtr Type | TAnon [Type] | TNStruct Name
+    deriving(Eq,Ord)
 
 data E = ED (G Doc) | EP E | EE
 
@@ -118,15 +121,26 @@ instance Draw Constant where
     err s = C $ terr s
 
 instance Draw Type where
-    draw (T x) = x
-    err s = T $ terr s
+    draw (TB x) = text x
+    draw (TPtr x) = draw x <> char '*'
+    draw (TAnon ts) = do
+        (n,mp) <- get
+        case Map.lookup ts mp of
+            Just x -> text "struct" <+> draw x
+            Nothing -> do
+                let nm = name ("tup" ++ show n)
+                put (n + 1,Map.insert ts nm mp)
+                text "struct" <+> draw nm
+    draw (TNStruct n) = text "struct" <+> draw n
+
+    err s = TB $ terr s
 
 -- expressions
 sizeof :: Type -> Expression
-sizeof t = expC (parens $ draw t)
+sizeof t = expC (text "sizeof" <> parens $ draw t)
 
 cast :: Type -> Expression -> Expression
-cast t e = expD (parens (draw t) <> pdraw e)
+cast t e = expDC (parens (draw t) <> pdraw e)
 
 
 tif :: Expression -> Expression -> Expression -> Expression
@@ -145,16 +159,18 @@ project :: Name -> Expression -> Expression
 project n e = expD (pdraw e <> char '.' <> draw n)
 
 project' :: Name -> Expression -> Expression
-project' n e = project n $ dereference e
+project' n e = expD (pdraw e <> text "->" <> draw n)
 
 projectAnon :: Int -> Expression -> Expression
-projectAnon n e = project (Name $ 'a':show n) e
+projectAnon n e = project (Name $ 't':show n) e
 
 variable :: Name -> Expression
 variable n = expD (draw n)
 
 localVariable :: Type -> Name -> Expression
-localVariable _t n = variable n
+localVariable t n = expD $ do
+    tell [(n,t)]
+    draw n
 
 emptyExpression = Exp ThNone EE
 
@@ -168,8 +184,21 @@ structUnnamed :: Type -> [Expression] -> Expression
 globalVar :: Name -> Type -> Expression
 -}
 
-structAnon :: [Expression] -> Expression
-structAnon es = err "structAnon"
+commaExpression :: [Expression] -> Expression
+commaExpression [] = emptyExpression
+commaExpression [e] = e
+commaExpression ss = expD $ do
+    ds <- mapM draw ss
+    return (tupled ds)
+
+structAnon :: [(Expression,Type)] -> Expression
+--structAnon _ = err "structAnon"
+structAnon es = Exp ThNone $ ED $ do
+    (n,mp) <- get
+    put (n + 1,mp)
+    let nm = name ("_t" ++ show n)
+        lv = localVariable (anonStructType (snds es)) nm
+    draw $ commaExpression $ [operator "=" (projectAnon i lv) e | e <- fsts es | i <- [0..] ] ++ [lv]
 
 
 operator :: String -> Expression -> Expression -> Expression
@@ -231,7 +260,7 @@ withVars xs act = undefined
 
 newVar t = do
     u <- newUniq
-    return (localVariable t (name $ '_':'u':show u))
+    return (localVariable t (name $ 'x':show u))
 
 
 --switch :: Expression -> [(Constant,Statement)] -> Maybe Statement -> Statement
@@ -273,25 +302,32 @@ function n t as o s = F "" n t as o s
 
 drawFunction f = do
     frt <- draw (functionReturnType f)
-    body <- draw (functionBody f)
+    (body,uv) <- listen (draw (functionBody f))
+    uv' <- flip mapM [ (x,t) | (x,t) <- snubUnder fst uv, x `notElem` fsts (functionArgs f)] $ \ (n,t) -> do
+        t <- draw t
+        return $ t <+> tshow n <> semi
     name <- draw (functionName f)
     fas <- flip mapM (functionArgs f) $ \ (n,t) -> do
         n <- draw n
         t <- draw t
         return $ t <+> n
-    let proto = text "static" <+> frt <+> name <> tupled fas <> semi
-        proto' = text "static" <+> frt $$ name <> tupled fas
-    return (proto, proto' $+$ char '{' $+$ nest 8 body $+$ char '}')
+    let fas' = if null fas then [text "void"] else fas
+    let proto = text "static" <+> frt <+> name <> tupled fas' <> semi
+        proto' = text "static" <+> frt $$ name <> tupled fas'
+    return (proto, proto' $+$ lbrace $+$ nest 8 (vcat uv' $$ body) $+$ rbrace)
 
 -- types
 anonStructType :: [Type] -> Type
-anonStructType ts = err "anonStructType"
+anonStructType ts = TAnon ts
 
 basicType :: String -> Type
-basicType s = T (text s)
+basicType s = TB s
+
+structType :: Name -> Type
+structType n = TNStruct n
 
 ptrType :: Type -> Type
-ptrType t = T (draw t <> char '*')
+ptrType t = TPtr t
 
 --namedStructType :: Name -> [(Name,Type)] -> Type
 --structType :: Name -> [Type] -> Type
@@ -346,9 +382,23 @@ generateC fs ss = ans where
     G ga = do
         fs <- mapM drawFunction fs
         let (protos,bodys) = unzip fs
-        return (vcat protos $$ line $$  vsep bodys)
-    (fns,_,written) = runRWS ga () 1
-    ans = (empty,fns)
+        let shead = vcat $ map (text . (++ ";") . ("struct " ++) . show . fst) ss
+        shead2 <- declStructs True ss
+        return (shead $$ line $$ shead2, vcat protos $$ line $$  vsep bodys)
+    ((hd,fns),(_,ass),written) = runRWS ga () (1,Map.empty)
+
+    anons = [ (n, fields ts ) | (ts,n) <- Map.toList ass ] where
+        fields :: [Type] -> [(Name,Type)]
+        fields ts = [ (name ('t':show tn),t) | t <- ts | tn <- [0::Int .. ]]
+    G anons' = declStructs False anons
+    (anons'',_,_) = runRWS anons' () (1,Map.empty)
+
+    declStructs ht ss = liftM vsep $ flip mapM ss $ \ (n,ts) -> do
+            ts' <- flip mapM ts $ \ (n,t) -> do
+                t <- draw t
+                return $ t <+> tshow n <> semi
+            return $ text "struct" <+> tshow n <+> lbrace $$ nest 4 (vcat $ (if ht then text "tag_t tag;" else empty):ts') $$ rbrace <> semi
+    ans = (hd $$ anons'',fns)
 
 line = text ""
 vsep xs = vcat $ intersperse line xs
@@ -372,6 +422,6 @@ renderG x = render $ drawG x
 drawG :: Draw d => d -> Doc
 drawG x = fns where
     G ga = draw x
-    (fns,_,_) = runRWS ga () 1
+    (fns,_,_) = runRWS ga () (1,Map.empty)
 
 
