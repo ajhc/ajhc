@@ -7,3 +7,5 @@ import List
 
 mconcatMap f xs = mconcat (map f xs)
 mconcatInter x xs = mconcat (intersperse x xs)
+
+mconcatMapM f xs = mapM f xs >>= return . mconcat

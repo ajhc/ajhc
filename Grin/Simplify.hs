@@ -10,14 +10,10 @@ import List
 import Maybe
 
 import Atom
-import CharIO
 import GenUtil hiding(putErrLn)
 import CanType
-import Doc.Pretty
-import Doc.PPrint
 import FreeVars
 import Grin.Grin
-import Grin.Show
 import C.Prims
 import Grin.Whiz
 import Stats
@@ -43,6 +39,7 @@ at_OptSimplifyConstFetch  = toAtom "Optimize.simplify.const-fetch"
 at_OptSimplifyConstEval  = toAtom "Optimize.simplify.const-eval"
 at_OptSimplifyTrivialCase  = toAtom "Optimize.simplify.trivial-case"
 at_OptSimplifyBadAssignment  = toAtom "Optimize.simplify.bad-assignment"
+at_OptSimplifyHoleAssignment  = toAtom "Optimize.simplify.hole-assignment"
 at_OptSimplifyConstStore  = toAtom "Optimize.simplify.const-store"
 
 -- contains functions that should be inlined
@@ -94,6 +91,9 @@ simplify1 stats env (n,l) = do
     gv (NodeC t xs,Return (NodeC t' xs')) | t == t' = do
             lift $ tick stats at_OptSimplifyNodeReduction
             gv (Tup xs,Return (Tup xs'))
+    gv (NodeC t xs,Return (NodeC t' [])) |  t' == tagHole = do
+            lift $ tick stats at_OptSimplifyHoleAssignment
+            gv (Tup xs, Return $ Tup $ Prelude.map (properHole . getType) xs)
     gv (NodeC t xs,Return (NodeC t' xs')) | t /= t' = do
             lift $ tick stats at_OptSimplifyBadAssignment
             gv (NodeC t xs,Error ("Bad Assignment: " ++ show (t,t')) TyNode)
@@ -150,11 +150,9 @@ cseStat n = toAtom $ "Optimize.simplify.cse." ++ g n where
     g Store {} = "Store"
     g _ = "Misc"
 
-doApply (NodeC t xs) y typ
-    | n == 1 = (App v (xs ++ [y]) typ)
-    | n > 1 = Return (NodeC (partialTag v (n - 1)) (xs ++ [y]))
-        where
-        Just (n,v) = tagUnfunction t
+doApply (NodeC t xs) y typ | Just (n,v) <- tagUnfunction t = case n of
+    1 -> (App v (xs ++ [y]) typ)
+    _ -> Return (NodeC (partialTag v (n - 1)) (xs ++ [y]))
 doApply n y typ = error $ show ("doApply", n,y,typ)
 
 doEval n@(NodeC t xs) typ

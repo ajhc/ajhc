@@ -438,7 +438,8 @@ compileModEnv' stats ho = do
     typecheckGrin x
     let opt s  x = do
         stats' <- Stats.new
-        x <- deadFunctions stats' [funcMain] x
+        deadFunctions stats' [funcMain] x
+        x <- deadCode stats' [funcMain] x  -- XXX
         x <- Grin.Simplify.simplify stats' x
         when flint $ typecheckGrin x
         t' <- Stats.getTicks stats'

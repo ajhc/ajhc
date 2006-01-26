@@ -13,6 +13,8 @@ module Grin.Grin(
     gApply,
     partialTag,
     gEval,
+    properHole,
+    isHole,
     tagHole,
     Exp(..),
     Ty(..),
@@ -339,6 +341,13 @@ valIsNF Const {} = True
 valIsNF Lit {} = True
 valIsNF _ = False
 
+properHole x = case x of
+    TyPtr TyNode -> Const (properHole TyNode)
+    TyTag -> (Tag tagHole)
+    ty@(Ty _) -> (Lit 0 ty)
+    TyNode -> (NodeC tagHole [])
+
+isHole x = x `elem` map properHole [TyPtr TyNode, TyNode, TyTag]
 
 ---------
 -- Look up stuff in the typing environment.
