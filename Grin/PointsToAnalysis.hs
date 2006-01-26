@@ -307,18 +307,22 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
         g (App a [vr@(Var v _)] _ :>>= vb@(Var vbv _) :-> e) | a == funcEval = do
                 let Just stags = tags vbv
                 case stags of
-                    [] ->  return $ (Return vr :>>= createEval NoUpdate typeEnv (tagsp v)) -- :>>= vb :-> Error "Update: no alternatives" (getType e)
+                    [] ->  do
+                        mtick "Grin.eval.update-no-alts"
+                        return $ (Return vr :>>= createEval NoUpdate typeEnv (tagsp v))
                     [t] -> do
                         e' <- g e
                         mtick "Grin.eval.hoisted2"
                         let node = NodeC t vs
                             (ts,_) = runIdentity $ findArgsType typeEnv t
                             vs = [ Var v ty |  v <- [V 4 .. ] | ty <- ts]
-                        return $ (Return vr :>>= createEval (HoistedUpdate node) typeEnv (tagsp v)) :>>= vb :-> e'
+                        update <- getNeedUpdate (HoistedUpdate node) v
+                        return $ (Return vr :>>= createEval update typeEnv (tagsp v)) :>>= vb :-> e'
                     _ -> do
                         e' <- g e
                         mtick "Grin.eval.switched"
-                        return $ (Return vr :>>= createEval (SwitchingUpdate stags) typeEnv (tagsp v)) :>>= vb :-> e'
+                        update <- getNeedUpdate (SwitchingUpdate stags) v
+                        return $ (Return vr :>>= createEval update typeEnv (tagsp v)) :>>= vb :-> e'
         g (e1 :>>= l) = do e1' <- g e1; l' <- f l; return $ e1' :>>= l'
         g (App a [vr@(Var v _)] _) | a == funcEval = do
             mtick "Grin.eval.trailing"
@@ -334,21 +338,6 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
         g (Case v@(Var vr _) xs) = do xs' <- mapM f xs;  docase v xs' (tags vr)
         g (Case v xs) = do xs' <- mapM f xs;  return $ Case v xs'
         g x = return x
-        {-
-        trailingCase vr@Var {expVar = v} vb rs rl = do
-                mtick "Grin.eval.case"
-                rl' <- fmapM f rl
-                let eval = createEval NoUpdate typeEnv (tagsp v)
-                    rs' = [  l :-> rs ]
-                g (Case vb rs)
-                return $ (Return vr :>>= eval) :>>= vb :-> Return vb' :>>= node :-> e'
-
-        g (App a [vr@(Var v _)] _ :>>= vb :-> Return vb' :>>= node@(NodeC {}) :-> e) | vb == vb', a == funcEval = do
-                mtick "Grin.eval.hoisted"
-                e' <- g e
-                return $ (Return vr :>>= createEval (HoistedUpdate node) typeEnv (tagsp v)) :>>= vb :-> Return vb' :>>= node :-> e'
-                -}
-
         tags v = if isVsBas x then Nothing else Just [ t | t <- Set.toList vs] where
               vs = getNodes   x
               x = case Map.lookup v (ptVars pt) of
@@ -359,13 +348,17 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
                 Just h = Map.lookup  n (ptHeap pt)
             vs = getHeaps x
             Just x = Map.lookup v (ptVars pt)
+        getNeedUpdate u v | notNeedUpdate v = do
+            mtick "Grin.eval.update-linear"
+            return NoUpdate
+        getNeedUpdate u _ = return u
+
+        notNeedUpdate v = all (== UnsharedEval) hs where
+            hs = concatMap (`Map.lookup` ptHeapType pt) hls
+            hls = Set.toList $ getHeaps x
+            Just x = Map.lookup v (ptVars pt)
         docase v xs Nothing =  return $ Case v xs
         docase _ ((_ :-> x):_) (Just []) = return $ Error "No Valid alternatives. This Should Not be reachable." (getType x)
-        --docase v xs (Just ts) | null vs && any (`notElem` ns') ts = error $ "Odd Case: " ++ show (v,ns',ts)  where
-        --    (ns,vs) = span isNodeC xs
-        --    ns' = [ t | NodeC t _ :-> _ <- ns ]
-        --    isNodeC (NodeC {} :-> _) = True
-        --   isNodeC _ = False
         docase v xs (Just ts) = do
             let (ns,vs) = span isNodeC (filter g xs)
                 g (NodeC t _ :-> _) = t `elem` ts
@@ -376,8 +369,6 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
                 xs' = if sameShape1 ns ts  then  ns else (ns ++ vs)
             mticks (length xs - length xs') "Grin.eval.case-elim"
             return $ if null xs' then  Error "No Valid alternatives. This Should Not be reachable." (getType (Case v xs)) else (Case v xs')
-        -- docase _ ((_ :-> x):_) _ = return $ Error "No Valid alternatives. This Should Not be reachable." (getType x)
-        --docase _ _ _ = error $ "docase: strange argument"
     let (sts,funcs) = unzip [ (stat,(a,l')) | (a,l) <- grinFunctions, let (l',stat) = runStatM (f l) ]
     tickStat stats (mconcat sts)
     return grin { grinPhase = PostInlineEval, grinFunctions = funcs }
