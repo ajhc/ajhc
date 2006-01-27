@@ -218,6 +218,12 @@ isKnown _ = False
 optimize1 ::  (Atom,Lam) -> StatM Lam
 optimize1 (n,l) = g l where
     g (b :-> e) = f e >>= return . (b :->)
+    f (e :>>= Tup [] :-> Return (Tup []) :>>= lr) = do
+        mtick "Optimize.optimize.unit-unit"
+        f (e :>>= lr)
+    f (e :>>= Tup [] :-> Return (Tup [])) = do
+        mtick "Optimize.optimize.unit-unit"
+        f e
     f (Store t :>>= v :-> Fetch v' :>>= lr) | v == v' = do
         mtick "Optimize.optimize.store-fetch"
         f (Store t :>>= v :-> Return t :>>= lr)

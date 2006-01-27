@@ -61,6 +61,7 @@ import qualified Grin.Simplify
 import qualified Info.Info as Info
 import qualified Interactive
 import qualified Stats
+import Grin.Unboxing
 import Util.Graph
 import Version
 
@@ -457,12 +458,14 @@ compileModEnv' stats ho = do
     progress "Points-to analysis..."
     stats <- Stats.new
     x <- Grin.PointsToAnalysis.grinInlineEvalApply stats x
-    mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinReturnTags x)
-    mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinArgTags x)
+    --mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinReturnTags x)
+    --mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinArgTags x)
     wdump FD.Progress $ Stats.print "EvalInline" stats
     typecheckGrin x
     wdump FD.GrinPosteval $ printGrin x
     stats <- Stats.new
+    x <- unboxReturnValues x
+    --mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinReturnTags x)
     x <- return $ normalizeGrin x
     typecheckGrin x
     x <- opt "AE Optimization" x

@@ -602,6 +602,12 @@ data HeapValue = HV Int (Either (HeapType,Item) Val)  -- either a heap location 
 data NodeValue = NV Tag [Item]
     deriving(Ord,Eq)
 
+instance CanType Item Ty where
+    getType (HeapValue _) = TyPtr TyNode
+    getType NodeValue {} = TyNode
+    getType (BasicValue ty) = ty
+    getType (TupledValue xs) = TyTup (map getType xs)
+
 
 -- heap locations are given a unique integer to break cycles.
 instance Eq HeapValue where
