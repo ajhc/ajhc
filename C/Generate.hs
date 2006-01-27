@@ -4,9 +4,9 @@ module C.Generate(
     Name(),
     Expression(),
     Statement(),
+    FunctionOpts(..),
     sizeof,
     cast,
-    tif,
     functionCall,
     function,
     dereference,
@@ -294,7 +294,8 @@ data Function = F {
     functionBody :: Statement
     }
 
-data FunctionOpts = Public
+data FunctionOpts = Public | Attribute String
+    deriving(Eq)
 
 function :: Name -> Type -> [(Name,Type)] -> [FunctionOpts] -> Statement -> Function
 function n t as o s = F "" n t as o s
@@ -312,8 +313,10 @@ drawFunction f = do
         t <- draw t
         return $ t <+> n
     let fas' = if null fas then [text "void"] else fas
-    let proto = text "static" <+> frt <+> name <> tupled fas' <> semi
-        proto' = text "static" <+> frt $$ name <> tupled fas'
+        proto = static <+> frt <+> name <> tupled fas' <> parms <> semi
+        proto' = static <+> frt <> parms $$ name <> tupled fas'
+        static = if Public `elem` functionOptions f then empty else text "static"
+        parms = char ' ' <> hsep [ text s | Attribute s <- functionOptions f]
     return (proto, proto' $+$ lbrace $+$ nest 8 (vcat uv' $$ body) $+$ rbrace)
 
 -- types

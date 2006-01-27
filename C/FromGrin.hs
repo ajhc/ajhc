@@ -137,18 +137,18 @@ nodeStructName a = toName ('s':toString a)
 nodeType a = return $ structType (nodeStructName a)
 nodeTypePtr a = liftM ptrType (nodeType a)
 
-jhc_malloc = name "jhc_malloc"
+jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
 tag = name "tag"
 arg i = name $ 'a':show i
 
 newNode (NodeC t _) | t == tagHole = do
-    return $  (mempty,functionCall jhc_malloc [sizeof node_t])
+    return $  (mempty,jhc_malloc (sizeof node_t))
 newNode (NodeC t as) = do
     st <- nodeType t
     as' <- mapM convertVal as
     tmp <- newVar pnode_t
     let tmp' = project' (nodeStructName t) tmp
-        malloc =  tmp `assign` functionCall jhc_malloc [sizeof  (if tagIsWHNF t then st else node_t)]
+        malloc =  tmp `assign` jhc_malloc (sizeof  (if tagIsWHNF t then st else node_t))
         tagassign = project tag tmp' `assign` constant (enum $ nodeTagName t)
         ass = [ project (arg i) tmp' `assign` a | a <- as' | i <- [(1 :: Int) ..] ]
     return (mconcat $ malloc:tagassign:ass, cast pnode_t tmp)
@@ -270,14 +270,23 @@ convertBody' e todo = localTodo TodoReturn $ convertBody e
 localTodo :: Todo -> C a -> C a
 localTodo todo (C act) = C $ local (const todo) act
 
+perhapsM :: Monad m => Bool -> a -> m a
+perhapsM True a = return a
+perhapsM False _ = fail "perhapsM"
+
 convertFunc :: (Atom,Lam) -> C Function
 convertFunc (n,Tup as :-> body) = do
         s <- localTodo TodoReturn (convertBody body)
-        fr <- convertType (getType body)
+        let bt = getType body
+            mmalloc (TyPtr _) = [Attribute "A_MALLOC"]
+            mmalloc TyNode = [Attribute "A_MALLOC"]
+            mmalloc _ = []
+            ats = Attribute "A_REGPARM":mmalloc bt
+        fr <- convertType bt
         as' <- flip mapM as $ \ (Var v t) -> do
             t' <- convertType t
             return (varName v,t')
-        return $ function (nodeFuncName n) fr as' [] s
+        return $ function (nodeFuncName n) fr as' ats s
 
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
