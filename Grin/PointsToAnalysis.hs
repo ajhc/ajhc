@@ -21,6 +21,7 @@ import GenUtil
 import Grin.EvalInline
 import Grin.Grin
 import Grin.HashConst
+import Grin.Show()
 import Grin.Linear
 import Options
 import qualified Doc.Chars as U
@@ -114,7 +115,7 @@ getNodeArgs x = error $ "getNodeArgs: " ++ show x
 
 vsBas = VsBas ""
 setNodes [] = VsEmpty
-setNodes xs = pruneNodes $ VsNodes (Map.fromList $ concat [ [ ((n,i),a) | a <- as | i <- [0..] ] | (n,as) <- xs]) (Set.fromList (fsts xs))
+setNodes xs = pruneNodes $ VsNodes (Map.fromList $ concat [ [ ((n,i),a) | a <- as | i <- naturals ] | (n,as) <- xs]) (Set.fromList (fsts xs))
 setHeaps [] = VsEmpty
 setHeaps xs = VsHeaps (Set.fromList xs)
 
@@ -164,6 +165,7 @@ instance Show ValueSet where
 data PointsTo = PointsTo {
     ptVars :: Map.Map Var ValueSet,
     ptFunc :: Map.Map Atom ValueSet,
+    ptConstMap :: Map.Map Int Val,
     ptFuncArgs :: Map.Map (Atom,Int) (Ty,ValueSet),
     ptHeap :: Map.Map Int ValueSet,
     ptHeapType :: Map.Map Int HeapType
@@ -187,6 +189,7 @@ data PointsToEq = PointsToEq {
     funcEq :: [(Atom,Pos)],
     heapEq :: [(Int,(HeapType,Pos))],
     updateEq :: [(Pos,Pos)],
+    constValEq :: [(Int,Val)],
     applyEq :: [(Pos,Pos)],
     appEq  :: [(Atom,[Pos])]
 
@@ -216,12 +219,12 @@ newHeap' ht p = do
 bind (Var v _) p = tell mempty { varEq = [(v, p)] }
 bind (NodeC t [Lit {}]) _ = return ()
 bind (NodeC t vs) p | sameLength vs vs' = tell mempty { varEq = vs' }  where
-    vs' = [ (v,if basicType ty then Basic else Down p t i) | Var v ty <- vs | i <- [0..] ]
+    vs' = [ (v,if basicType ty then Basic else Down p t i) | Var v ty <- vs | i <- naturals ]
     basicType (Ty _) = True
     basicType _ = False
 bind (Tup []) _ = return ()
 bind (Tup vs) p | sameLength vs vs' = tell mempty { varEq = vs'  }  where
-    vs' = [ (v,if basicType ty then Basic else DownTup p i) | Var v ty <- vs | i <- [0..] ]
+    vs' = [ (v,if basicType ty then Basic else DownTup p i) | Var v ty <- vs | i <- naturals ]
     basicType (Ty _) = True
     basicType _ = False
 bind x y = error $ unwords ["bind:",show x,show y]
@@ -239,8 +242,8 @@ analyze grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinC
         --toHEq (NodeC t []) | not (tagIsWHNF t) = return (SharedEval,Union [Con t [], func (fromAtom t) ] )
         toHEq (NodeC t []) | not (tagIsWHNF t) = return (SharedEval,Con t []  )
         toHEq node = toPos node >>= return . (,) Constant
-        (heapEq',hc') = runState (sequence [ toHEq node >>= return . (,) h | (v,node) <- cafs | h <- [1..] ]) emptyHcHash
-        eq = mempty {
+        (((heapEq',feq),hc')) = runState (runWriterT $ sequence [ toHEq node >>= return . (,) h | (v,node) <- cafs | h <- [1..] ]) emptyHcHash
+        eq = feq {
             --heapEq = [ (h,(SharedEval,Union [Con t [], func (fromAtom t) ] )) | (v,NodeC t []) <- cafs | h <- [1..] ],
             --varEq =  [ (v,Ptr h) | (v,NodeC t []) <- cafs | h <- [1..] ]
             heapEq = heapEq', -- [ (h,toHEq node) | (v,node) <- cafs | h <- [1..] ],
@@ -286,6 +289,7 @@ createStore  te ts
         (ts,_) = runIdentity $ findArgsType te t
         vs = [ Var v ty |  v <- [V 4 .. ] | ty <- ts]
 
+{-# NOINLINE grinInlineEvalApply #-}
 grinInlineEvalApply :: Stats -> Grin -> IO Grin
 grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinCafs = cafs }) = do
     pt <- analyze grin
@@ -395,7 +399,9 @@ valueSetToItem te pt TyNode (VsNodes as n) = NodeValue (Set.mapMonotonic f n) wh
     f n = NV n [ valueSetToItem te pt ty (Map.findWithDefault VsEmpty (n,i) as)  | ty <- ts | i <- naturals ] where
         Just (ts,_) = findArgsType te n
 valueSetToItem te pt (TyPtr _) (VsHeaps ss) = HeapValue (Set.mapMonotonic f ss) where -- depends on int being first value in HeapValue
-    f n = HV n (if n < 0 then Constant else hType) (valueSetToItem te pt TyNode vs) where   -- TODO heap locations of different types
+    f n | n < 0 = HV n (Right val) where
+        Just val = Map.lookup n (ptConstMap pt)
+    f n = HV n (Left (hType,(valueSetToItem te pt TyNode vs))) where   -- TODO heap locations of different types
         Just hType = Map.lookup n (ptHeapType pt)
         Just vs = Map.lookup n (ptHeap pt)
 valueSetToItem te pt (TyTup xs) (VsNodes as n)
@@ -511,10 +517,10 @@ toPos (NodeC tag vs) = do
     vs' <- mapM toPos vs
     return $ Con tag vs'
 toPos (Const v) = do
-    (_,h) <- newConst' True v
+    (_,h) <- newConst' False v
+    tell mempty { constValEq = [(negate h,v)] }
+    toPos v -- XXX discard
     return $ Ptr (-h)
---    p <- toPos v
---    newHeap Constant p
 toPos (Tup []) = return Basic
 toPos (Tup xs) = do
     vs' <- mapM toPos xs
@@ -735,10 +741,13 @@ findFixpoint' grin (HcHash _ mp) eq = do
         CharIO.putStrLn "argMap"
         argMap <- readIORef argMap
         mapM_  (\ (ai,x) -> readValue x >>= \x' -> CharIO.print (ai,x')) (Map.toList argMap)
+    --CharIO.putStrLn "ConstValEq"
+    --mapM_ CharIO.print (snubUnder fst $ constValEq eq)
 
     return PointsTo {
         ptVars = ptVars,
         ptFunc = ptFunc,
+        ptConstMap = Map.fromList (constValEq eq),
         ptFuncArgs = Map.fromList ptFuncArgs,
         ptHeap = ptHeap `Map.union`  cheaps,
         ptHeapType = Map.fromList [ (h,t) | (h,(t,_)) <- heapEq eq ]

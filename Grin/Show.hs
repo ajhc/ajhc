@@ -1,30 +1,33 @@
 module Grin.Show(prettyFun,prettyVal,prettyExp,printGrin,render) where
 
-import Grin.Grin
-import Doc.Pretty
-import Doc.PPrint
-import Doc.DocLike
-import Atom
 import Char
-import Name.VConsts
-import Grin.Val
-import Number
 import Monad
+import qualified Data.Set as Set
+
+import Atom
 import CharIO
 import Doc.Attr
-import qualified FlagDump as FD
+import Doc.DocLike
+import Doc.PPrint
+import Doc.Pretty
+import Grin.Grin
+import Grin.Val
+import Name.VConsts
+import Number
 import Options
+import qualified FlagDump as FD
 
-instance PPrint Doc Val   where
+instance DocLike d => PPrint d Val   where
     pprint v = prettyVal v
+
 
 instance PPrint Doc Exp   where
     pprint v = prettyExp empty v
 
 pVar v | v == unit = empty
-pVar v  = pVal v <+> operator "<- "
+pVar v  = prettyVal v <+> operator "<- "
 
-pVar' v  = pVal v <+> operator "<- "
+pVar' v  = prettyVal v <+> operator "<- "
 
 attr = if dump FD.Html then html else ansi
 
@@ -38,51 +41,51 @@ color n x = attrColor (attr oob) n x
 
 operator = bold . text
 keyword = bold . text
-tag = text
+tag x = text x
 func = color "lightgreen" . text
 prim = color "red" . text
 --func = text
 --tag = color 92 . text
 
-prettyVal = pVal
 
 isComplex (_ :>>= _) = True
 isComplex _ = False
 {-# NOINLINE prettyExp #-}
 prettyExp vl (e1 :>>= v :-> e2) | isComplex e1 = align $ ((pVar' v) <> (prettyExp empty e1)) <$> prettyExp vl e2
 prettyExp vl (e1 :>>= v :-> e2) = align (prettyExp (pVar v) e1 <$> prettyExp vl e2)
-prettyExp vl (Return v) = vl <> keyword "return" <+> pVal v
-prettyExp vl (Store v) = vl <> keyword "store" <+> pVal v
-prettyExp vl (Fetch v) = vl <> keyword "fetch" <+> pVal v
+prettyExp vl (Return v) = vl <> keyword "return" <+> prettyVal v
+prettyExp vl (Store v) = vl <> keyword "store" <+> prettyVal v
+prettyExp vl (Fetch v) = vl <> keyword "fetch" <+> prettyVal v
 prettyExp vl (Error s _) = vl <> keyword "error" <+> tshow s
-prettyExp vl (App t [v] _) | t == funcEval = vl <> keyword "eval" <+> pVal v
-prettyExp vl (App t [a,b] _) | t == funcApply = vl <> keyword "apply" <+> pVal a <+> pVal b
-prettyExp vl (App a vs _)  = vl <> func (fromAtom a) <+> hsep (map pVal vs)
-prettyExp vl (Prim Primitive { primName = nm } vs)  = vl <> prim (fromAtom nm) <+> hsep (map pVal vs)
-prettyExp vl (Update x y) = vl <> keyword "update" <+> pVal x <+> pVal y
-prettyExp vl (Cast x _) = vl <> keyword "cast" <+> pVal x
-prettyExp vl (Case v vs) = vl <> keyword "case" <+> pVal v <+> keyword "of" <$> indent 2 (vsep (map f vs)) where
-    f (v :-> e) = pVal v <+> operator "->" <+> keyword "do" <$> indent 2 (prettyExp empty e)
+prettyExp vl (App t [v] _) | t == funcEval = vl <> keyword "eval" <+> prettyVal v
+prettyExp vl (App t [a,b] _) | t == funcApply = vl <> keyword "apply" <+> prettyVal a <+> prettyVal b
+prettyExp vl (App a vs _)  = vl <> func (fromAtom a) <+> hsep (map prettyVal vs)
+prettyExp vl (Prim Primitive { primName = nm } vs)  = vl <> prim (fromAtom nm) <+> hsep (map prettyVal vs)
+prettyExp vl (Update x y) = vl <> keyword "update" <+> prettyVal x <+> prettyVal y
+prettyExp vl (Cast x _) = vl <> keyword "cast" <+> prettyVal x
+prettyExp vl (Case v vs) = vl <> keyword "case" <+> prettyVal v <+> keyword "of" <$> indent 2 (vsep (map f vs)) where
+    f (v :-> e) = prettyVal v <+> operator "->" <+> keyword "do" <$> indent 2 (prettyExp empty e)
 
-pVal s | Just st <- fromVal s = text $ show (st::String)
-pVal (NodeC t []) = parens $ tag (fromAtom t)
-pVal (NodeC t vs) = parens $ tag (fromAtom t) <+> hsep (map pVal vs)
-pVal (NodeV (V i) vs) = parens $ char 't' <> tshow i <+> hsep (map pVal vs)
-pVal (Tag t) = tag (fromAtom t)
-pVal (Var (V i) t)
+prettyVal :: DocLike d => Val -> d
+prettyVal s | Just st <- fromVal s = text $ show (st::String)
+prettyVal (NodeC t []) = parens $ tag (fromAtom t)
+prettyVal (NodeC t vs) = parens $ tag (fromAtom t) <+> hsep (map prettyVal vs)
+prettyVal (NodeV (V i) vs) = parens $ char 't' <> tshow i <+> hsep (map prettyVal vs)
+prettyVal (Tag t) = tag (fromAtom t)
+prettyVal (Var (V i) t)
     | TyPtr _ <- t = char 'p' <> tshow i
     | TyNode <- t = char 'n' <> tshow i
     | t == Ty cChar = char 'c' <> tshow i
     | t == tIntzh  = char 'i' <> tshow i
     | Ty _ <- t  = char 'l' <> tshow i
     | TyTag <- t  = char 't' <> tshow i
-pVal (Var (V i) _) = char 'v' <> tshow i
-pVal (Lit i t) | t == tCharzh, i >= 0x20 && i < 0x7f, Just x <- toIntegral i = tshow (chr x)
-pVal (Lit i _)  = tshow i
---pVal Unit = text "()"
-pVal (Tup xs)  = tupled $ map pVal xs
-pVal (Const v) = char '&' <> pVal v
-pVal (Addr _) = text "<ref>"
+prettyVal (Var (V i) _) = char 'v' <> tshow i
+prettyVal (Lit i t) | t == tCharzh, i >= 0x20 && i < 0x7f, Just x <- toIntegral i = tshow (chr x)
+prettyVal (Lit i _)  = tshow i
+--prettyVal Unit = text "()"
+prettyVal (Tup xs)  = tupled $ map prettyVal xs
+prettyVal (Const v) = char '&' <> prettyVal v
+prettyVal (Addr _) = text "<ref>"
 
 instance DocLike d => PPrint d Var where
     pprint (V i) = text $ 'v':show i
@@ -91,7 +94,7 @@ instance DocLike d => PPrint d Var where
 
 
 prettyFun :: (Atom,Lam) -> Doc
-prettyFun (n,(Tup as :-> e)) = func (fromAtom n) <+> hsep (map pVal as) <+> operator "=" <+> keyword "do" <$> indent 2 (prettyExp empty e)
+prettyFun (n,(Tup as :-> e)) = func (fromAtom n) <+> hsep (map prettyVal as) <+> operator "=" <+> keyword "do" <$> indent 2 (prettyExp empty e)
 
 render :: Doc -> String
 render doc =  displayS (renderPretty 0.95 (optColumns options)  doc) ""
@@ -104,3 +107,22 @@ printGrin Grin { grinFunctions = ds', grinCafs = cafs } = do
     putErrLn "-- Functions"
     mapM_ (putErrLn . render) $ map prettyFun ds'
 
+instance Show Item where
+    show (BasicValue ty) = "<" ++ show ty ++ ">"
+    show (HeapValue hv) = braces $ hcat $ punctuate "," (map show (Set.toList hv))
+    show (NodeValue hv) = braces $ hcat $ punctuate "," (map show (Set.toList hv))
+    show (TupledValue xs) = tupled (map show xs)
+
+instance Show NodeValue where
+    show (NV t as) = parens $ hsep (show t:map show as)
+
+instance Show HeapValue where
+    show (HV _ (Right v)) = prettyVal v
+    show (HV n (Left (ht,_))) = show ht ++ "-" ++ show n
+
+instance Show HeapType where
+    show Constant = "C"
+    show SharedEval = "Es"
+    show UnsharedEval = "Eu"
+    show Reference = "Ref"
+    show RecursiveThunk = "Rt"

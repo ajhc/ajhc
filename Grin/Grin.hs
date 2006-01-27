@@ -593,32 +593,21 @@ instance FreeVars Exp (Set.Set Tag) where
 -- Points to information
 
 data HeapType = Constant | SharedEval | UnsharedEval | Reference | RecursiveThunk
-    deriving(Eq,Ord,Show)
+    deriving(Eq,Ord)
 
 
 data Item = HeapValue (Set.Set HeapValue) | NodeValue (Set.Set NodeValue) | BasicValue Ty | TupledValue [Item]
     deriving(Ord,Eq)
-data HeapValue = HV Int HeapType Item
+data HeapValue = HV Int (Either (HeapType,Item) Val)  -- either a heap location or a constant
 data NodeValue = NV Tag [Item]
     deriving(Ord,Eq)
 
-instance Show Item where
-    show (BasicValue ty) = "<" ++ show ty ++ ">"
-    show (HeapValue hv) = braces $ hcat $ punctuate "," (map show $ sortGroupUnderFG (\ (HV _ t _) -> t) (\ (HV x _ _) -> x) (Set.toList hv))
-    show (NodeValue hv) = braces $ hcat $ punctuate "," (map show (Set.toList hv))
-    show (TupledValue xs) = tupled (map show xs)
-
-instance Show NodeValue where
-    show (NV t as) = parens $ hsep (show t:map show as)
-
-instance Show HeapValue where
-    show (HV n t _) = show (t,n)
 
 -- heap locations are given a unique integer to break cycles.
 instance Eq HeapValue where
-    (HV x _ _) == (HV y _ _) = x == y
+    (HV x _) == (HV y _) = x == y
 instance Ord HeapValue where
-    compare (HV x _ _) (HV y _ _) = compare x y
+    compare (HV x _) (HV y _) = compare x y
 
 combineItem :: Item -> Item -> Item
 combineItem (BasicValue ty) (BasicValue ty') | ty == ty' = BasicValue ty
