@@ -457,6 +457,8 @@ compileModEnv' stats ho = do
     progress "Points-to analysis..."
     stats <- Stats.new
     x <- Grin.PointsToAnalysis.grinInlineEvalApply stats x
+    mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinReturnTags x)
+    mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinArgTags x)
     wdump FD.Progress $ Stats.print "EvalInline" stats
     typecheckGrin x
     wdump FD.GrinPosteval $ printGrin x
@@ -494,6 +496,8 @@ compileModEnv' stats ho = do
         when (r /= System.ExitSuccess) $ fail "C code did not compile."
         return ()
 
+
+buildShowTableLL xs = buildTableLL [ (show x,show y) | (x,y) <- xs ]
 
 mangle ::
     DataTable                -- ^ the datatable used for typechecking

@@ -36,8 +36,6 @@ sameLength (_:xs) (_:ys) = sameLength xs ys
 sameLength [] [] = True
 sameLength _ _ = False
 
-data HeapType = Constant | SharedEval | UnsharedEval | Reference | RecursiveThunk
-    deriving(Eq,Ord,Show)
 
 -- These names make no sense
 -- this analysis could probably be strongly typed.
@@ -103,6 +101,9 @@ getHeaps VsEmpty = Set.empty
 getHeaps (VsHeaps s) = s
 getHeaps x = error $ "getHeaps: " ++ show x
 
+mgetHeaps (VsHeaps s) = s
+mgetHeaps _ = mempty
+
 getNodes VsEmpty = Set.empty
 getNodes (VsNodes _ s) = s
 getNodes x = error $ "getNodes: " ++ show x
@@ -163,6 +164,7 @@ instance Show ValueSet where
 data PointsTo = PointsTo {
     ptVars :: Map.Map Var ValueSet,
     ptFunc :: Map.Map Atom ValueSet,
+    ptFuncArgs :: Map.Map (Atom,Int) (Ty,ValueSet),
     ptHeap :: Map.Map Int ValueSet,
     ptHeapType :: Map.Map Int HeapType
     }
@@ -296,6 +298,8 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
         mapM_ CharIO.print [ v  | v@(_,_) <-  Map.toList (ptVars pt)]
         CharIO.putStrLn "heap:"
         mapM_ CharIO.print [ v  | v@(_,_) <-  Map.toList (ptHeap pt)]
+        CharIO.putStrLn "heapType:"
+        mapM_ CharIO.print [ v  | v@(_,_) <-  Map.toList (ptHeapType pt)]
 
     let f (l :-> e) = do e' <- g e; return $ l :-> e'
         g (App a [vr@(Var v _)] _ :>>= vb :-> Return vb' :>>= node@(NodeC {}) :-> e) | vb == vb', a == funcEval = do
@@ -343,11 +347,16 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
               x = case Map.lookup v (ptVars pt) of
                 Just x -> x
                 Nothing -> error $ "Tags: " ++ show v
-        tagsp v = snub (concat [ f n |  n <- Set.toList vs ]) where
-            f n = [ t | t <- Set.toList $ getNodes h ]  where
+        --tagsp v = snub (concat [ f n |  n <- Set.toList vs ]) where
+        --    f n = [ t | t <- Set.toList $ getNodes h ]  where
+        --        Just h = Map.lookup  n (ptHeap pt)
+        --    vs = getHeaps x
+        --    Just x = Map.lookup v (ptVars pt)
+        tagsp v = tagsp' x where Just x = Map.lookup v (ptVars pt)
+        tagsp' v = Set.toList (Set.unions [ f n |  n <- Set.toList vs ]) where
+            f n = getNodes h  where
                 Just h = Map.lookup  n (ptHeap pt)
-            vs = getHeaps x
-            Just x = Map.lookup v (ptVars pt)
+            vs = mgetHeaps v
         getNeedUpdate u v | notNeedUpdate v = do
             mtick "Grin.eval.update-linear"
             return NoUpdate
@@ -369,9 +378,42 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
                 xs' = if sameShape1 ns ts  then  ns else (ns ++ vs)
             mticks (length xs - length xs') "Grin.eval.case-elim"
             return $ if null xs' then  Error "No Valid alternatives. This Should Not be reachable." (getType (Case v xs)) else (Case v xs')
+        vsToItem = valueSetToItem (grinTypeEnv grin) pt
+        te = grinTypeEnv grin
     let (sts,funcs) = unzip [ (stat,(a,l')) | (a,l) <- grinFunctions, let (l',stat) = runStatM (f l) ]
     tickStat stats (mconcat sts)
-    return grin { grinPhase = PostInlineEval, grinFunctions = funcs }
+    return grin { grinPhase = PostInlineEval, grinFunctions = funcs, grinArgTags = Map.map (\ (t,v) -> vsToItem t v) $ ptFuncArgs pt, grinReturnTags = Map.mapWithKey (funcReturn te pt) $ ptFunc pt }
+
+
+funcReturn te pt fn vs = valueSetToItem te pt ty vs where
+    Just (_,ty) = findArgsType te fn
+
+valueSetToItem :: TyEnv -> PointsTo -> Ty -> ValueSet -> Item
+valueSetToItem _ _ ty VsEmpty = itemEmpty ty
+valueSetToItem _ _ ty VsBas {} = BasicValue ty
+valueSetToItem te pt TyNode (VsNodes as n) = NodeValue (Set.mapMonotonic f n) where  -- depends on tag being first value in NodeValue
+    f n = NV n [ valueSetToItem te pt ty (Map.findWithDefault VsEmpty (n,i) as)  | ty <- ts | i <- naturals ] where
+        Just (ts,_) = findArgsType te n
+valueSetToItem te pt (TyPtr _) (VsHeaps ss) = HeapValue (Set.mapMonotonic f ss) where -- depends on int being first value in HeapValue
+    f n = HV n (if n < 0 then Constant else hType) (valueSetToItem te pt TyNode vs) where   -- TODO heap locations of different types
+        Just hType = Map.lookup n (ptHeapType pt)
+        Just vs = Map.lookup n (ptHeap pt)
+valueSetToItem te pt (TyTup xs) (VsNodes as n)
+    | tupleName `Set.member` n = TupledValue [ valueSetToItem te pt t (Map.findWithDefault VsEmpty (tupleName,i) as) | i <- naturals | t <- xs]
+    | otherwise = itemEmpty (TyTup xs)
+valueSetToItem _ _ ty v = error $ "valueSetToItem " ++ show (ty,v)
+
+
+
+itemEmpty TyNode = NodeValue mempty
+itemEmpty (TyPtr _) = HeapValue mempty
+itemEmpty (TyTup xs) = TupledValue (map itemEmpty xs)
+itemEmpty ty  = BasicValue ty
+
+
+
+getTags (VsNodes _ s) = Set.toList s
+getTags _ = []
 
 collect :: Map.Map Var W -> HcHash -> Int -> Atom -> Lam -> (PointsToEq,HcHash)
 collect lmap hc st fname (Tup vs :-> exp')
@@ -512,7 +554,6 @@ findFixpoint' grin (HcHash _ mp) eq = do
             return $ Map.fromList vs
     varMap <- cmap (varEq eq)
     heapMap <- cmap (heapEq eq)
-    --funcMap <- cmap (funcEq eq)
     argMap <- newIORef mempty
     funcSupply <- newSupply fr
     funcMap <- do
@@ -685,6 +726,11 @@ findFixpoint' grin (HcHash _ mp) eq = do
     ptFunc <- readMap funcMap
     ptHeap <- readMap heapMap
 
+
+    let makeEntry v i n ty | Just x <- Map.lookup v ptVars = ((n,i),(ty,x))
+        ptFuncArgs = [ makeEntry v i n ty | (n,~(Tup xs) :-> _) <- grinFunctions grin, (i,~(Var v ty)) <- zip naturals xs]
+
+
     wdump FD.Eval $ do
         CharIO.putStrLn "argMap"
         argMap <- readIORef argMap
@@ -693,7 +739,10 @@ findFixpoint' grin (HcHash _ mp) eq = do
     return PointsTo {
         ptVars = ptVars,
         ptFunc = ptFunc,
+        ptFuncArgs = Map.fromList ptFuncArgs,
         ptHeap = ptHeap `Map.union`  cheaps,
         ptHeapType = Map.fromList [ (h,t) | (h,(t,_)) <- heapEq eq ]
         }
 
+
+naturals = [0::Int ..]

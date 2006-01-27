@@ -1,46 +1,53 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Grin.Grin(
-    tagIsWHNF,
-    tagIsPartialAp,
-    tagIsTag,
-    tagIsSuspFunction,
-    tagIsFunction,
-    tagToFunction,
-    tagFlipFunction,
-    tagUnfunction,
-    valIsNF,
-    gApply,
-    partialTag,
-    gEval,
-    properHole,
-    isHole,
-    tagHole,
+    Builtin,
     Exp(..),
-    Ty(..),
+    Grin(..),
+    HeapType(..),
+    HeapValue(HV),
+    Item(..),
+    Lam(..),
+    NodeValue(NV),
     Phase(..),
-    phaseEvalInlined,
+    Primitive(..),
+    Props(..),
     Tag,
+    Ty(..),
     TyEnv(..),
     Val(..),
-    v0,v1,v2,v3,
-    p0,p1,p2,p3,
-    n0,n1,n2,n3,
     Var(..),
-    sequenceG_,
+    emptyGrin,
+    findArgs,
+    findArgsType,
+    funcApply,
     funcEval,
     funcFetch,
-    funcApply,
     funcInitCafs,
-    Grin(..),
-    Primitive(..),
-    Builtin,
-    Props(..),
-    Lam(..),
-    unit,
-    tyUnit,
     funcMain,
-    findArgsType, findArgs) where
+    gApply,
+    gEval,
+    isHole,
+    n0,n1,n2,n3,
+    p0,p1,p2,p3,
+    partialTag,
+    phaseEvalInlined,
+    properHole,
+    sequenceG_,
+    tagFlipFunction,
+    tagHole,
+    tagIsFunction,
+    tagIsPartialAp,
+    tagIsSuspFunction,
+    tagIsTag,
+    tagIsWHNF,
+    tagToFunction,
+    tagUnfunction,
+    tyUnit,
+    unit,
+    v0,v1,v2,v3,
+    valIsNF
+    ) where
 
 import Char
 import Control.Monad.Identity
@@ -192,7 +199,20 @@ data Grin = Grin {
     grinPhase :: Phase,
     grinTypeEnv :: TyEnv,
     grinFunctions :: [(Atom,Lam)],
+    grinReturnTags :: Map.Map Atom Item,
+    grinArgTags :: Map.Map (Atom,Int) Item,
     grinCafs :: [(Var,Val)]
+}
+
+
+emptyGrin = Grin {
+    grinEntryPoints = [],
+    grinPhase = PhaseInit,
+    grinTypeEnv = mempty,
+    grinFunctions = [],
+    grinReturnTags = mempty,
+    grinArgTags = mempty,
+    grinCafs = mempty
 }
 
 data Flag = No | Maybe | Yes
@@ -570,4 +590,44 @@ instance FreeVars Exp (Set.Set Tag) where
     freeVars Error {} = Set.empty
 
 
+-- Points to information
+
+data HeapType = Constant | SharedEval | UnsharedEval | Reference | RecursiveThunk
+    deriving(Eq,Ord,Show)
+
+
+data Item = HeapValue (Set.Set HeapValue) | NodeValue (Set.Set NodeValue) | BasicValue Ty | TupledValue [Item]
+    deriving(Ord,Eq)
+data HeapValue = HV Int HeapType Item
+data NodeValue = NV Tag [Item]
+    deriving(Ord,Eq)
+
+instance Show Item where
+    show (BasicValue ty) = "<" ++ show ty ++ ">"
+    show (HeapValue hv) = braces $ hcat $ punctuate "," (map show $ sortGroupUnderFG (\ (HV _ t _) -> t) (\ (HV x _ _) -> x) (Set.toList hv))
+    show (NodeValue hv) = braces $ hcat $ punctuate "," (map show (Set.toList hv))
+    show (TupledValue xs) = tupled (map show xs)
+
+instance Show NodeValue where
+    show (NV t as) = parens $ hsep (show t:map show as)
+
+instance Show HeapValue where
+    show (HV n t _) = show (t,n)
+
+-- heap locations are given a unique integer to break cycles.
+instance Eq HeapValue where
+    (HV x _ _) == (HV y _ _) = x == y
+instance Ord HeapValue where
+    compare (HV x _ _) (HV y _ _) = compare x y
+
+combineItem :: Item -> Item -> Item
+combineItem (BasicValue ty) (BasicValue ty') | ty == ty' = BasicValue ty
+combineItem (HeapValue s1) (HeapValue s2) = HeapValue (Set.union s1 s2)
+combineItem (NodeValue ns1) (NodeValue ns2) = NodeValue ns where
+    ns2map = Map.fromAscList [ (t,NV t as)| NV t as <- (Set.toAscList ns2)]
+    ns = Set.fromAscList [ NV t1 (zipWith combineItem as1 as2) | NV t1 as1 <- Set.toAscList ns1, NV _ as2 <- Map.lookup t1 ns2map  ] `Set.union` ns1
+
+combineItems :: [Item] -> Item
+combineItems [] = error "cannot combine no items"
+combineItems xs = foldl1 combineItem xs
 

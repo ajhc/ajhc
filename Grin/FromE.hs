@@ -158,7 +158,7 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
         ic = (funcInitCafs,(Tup [] :-> initCafs) )
         --ds' = ic:ev:ap:ds
         ds' = ic:(ds ++ fbaps)
-    let grin = Grin {
+    let grin = emptyGrin {
             grinEntryPoints = [funcMain],
             grinPhase = PhaseInit,
             grinTypeEnv = te,
