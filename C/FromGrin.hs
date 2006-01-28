@@ -235,10 +235,22 @@ convertBody (Case v@(Var _ t) ls) | t == TyNode = do
             as' <- mapM convertVal as
             e' <- convertBody e
             let tmp = project' (nodeStructName t) scrut
-            let ass = mconcat [assign  a (project (arg i) tmp) | a <- as' | i <- [(1 :: Int) ..] ]
+                ass = mconcat [if needed a then assign  a' (project (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
+                fve = freeVars e
+                needed (Var v _) = v `Set.member` fve
             return $ (Just (enum (nodeTagName t)), ass `mappend` e')
     ls' <- mapM da ls
     return $ profile_case_inc `mappend` switch' tag ls'
+
+convertBody (Case v@(Var _ t) [p1 :-> e1, p2 :-> e2]) | Set.null ((freeVars p2 :: Set.Set Var) `Set.intersection` freeVars e2) = do
+    scrut <- convertVal v
+    let ptrs = [Ty $ toAtom "HsPtr", Ty $ toAtom "HsFunPtr"]
+        scrut' = (if t `elem` ptrs then cast (basicType "uintptr_t") scrut else scrut)
+        cp (Lit i _) = constant (number $ fromIntegral i)
+        cp (Tag t) = constant (enum (nodeTagName t))
+    e1' <- convertBody e1
+    e2' <- convertBody e2
+    return $ profile_case_inc `mappend` cif (operator "==" (cp p1) scrut') e1' e2'
 
 convertBody (Case v@(Var _ t) ls) = do
     scrut <- convertVal v

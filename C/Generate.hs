@@ -7,6 +7,7 @@ module C.Generate(
     FunctionOpts(..),
     sizeof,
     cast,
+    cif,
     commaExpression,
     functionCall,
     function,
@@ -273,6 +274,15 @@ switch' e ts = SD $ text "switch" <+> parens (draw e) <+> char '{' <$> vcat (map
     sc (Just x,ss) = do ss <- draw ss ; x <- draw x; return $ text "case" <+> x <> char ':' $$ nest 4 (ss $$ text "break;")
     sc (Nothing,ss) = do ss <- draw ss; return $ text "default:"  $$  ( nest 4 ss $$ text "break;")
     md = if any isNothing (fsts ts) then empty else text "default: jhc_case_fell_off(__LINE__);"
+
+
+cif :: Expression -> Statement -> Statement -> Statement
+cif exp thn els = SD $ do
+    thn <- draw thn
+    els <- draw els
+    exp <- draw exp
+    return $ text "if" <+> parens exp <+> lbrace <$> nest 4 thn <$> rbrace <+> text "else" <+> lbrace <$> nest 4 els <$> rbrace
+
 {-
 creturn_ :: Statement
 withVars :: [Type] -> ([Expression] -> Statement) -> Statement
