@@ -252,6 +252,8 @@ lamBind (b :-> _) = b
 
 isVar Var {} = True
 isVar _ = False
+isTup Tup {} = True
+isTup _ = False
 
 isKnown Tag {} = True
 isKnown NodeC {} = True
@@ -261,10 +263,16 @@ isKnown _ = False
 optimize1 ::  Bool -> (Atom,Lam) -> StatM Lam
 optimize1 postEval (n,l) = g l where
     g (b :-> e) = f e >>= return . (b :->)
-    f (e :>>= v1 :-> Return v2 :>>= lr) | v1 == v2 = do
-        mtick "Optimize.optimize.unit-unit"
-        f (e :>>= lr)
-    f (e :>>= v1 :-> Return v2) | v1 == v2 = do
+    --f (e :>>= v1 :-> Return v2 :>>= lr) | (isTup v1 || isVar v1) && v1 == v2 = do
+    --    mtick "Optimize.optimize.unit-unit"
+    --    f (e :>>= lr)
+    f (Return t@NodeC {} :>>= v@Var {} :-> Update w v' :>>= lr) | v == v' = do
+        mtick "Optimize.optimize.return-update"
+        f (Return t :>>= v :-> Update w t :>>= lr)
+    f (Return t@NodeV {} :>>= v@Var {} :-> Update w v' :>>= lr) | v == v' = do
+        mtick "Optimize.optimize.return-update"
+        f (Return t :>>= v :-> Update w t :>>= lr)
+    f (e :>>= v1 :-> Return v2) | (isTup v1 || isVar v1) && v1 == v2 = do
         mtick "Optimize.optimize.unit-unit"
         f e
     f (Store t :>>= v :-> Fetch v' :>>= lr) | v == v' = do
