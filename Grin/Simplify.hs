@@ -16,8 +16,9 @@ import GenUtil hiding(putErrLn)
 import Grin.Grin
 import Grin.Whiz
 import qualified Util.Histogram as Hist
-import Stats
+import Stats hiding(combine)
 import Support.CanType
+import Support.Tuple
 import Util.Graph
 import Util.Inst()
 import Util.Seq as Seq
@@ -212,6 +213,34 @@ isManifestNode _ = fail "not manifest node"
 
 manifestNodes as = Prelude.map (isManifestNode . lamExp) as
 
+-- returns nothing if can return a tag, or just atom if can return an atom
+isCombinable :: Monad m => Bool -> Exp -> m (Maybe (Atom,[Ty]))
+isCombinable postEval e = ans where
+    ans = do
+        mn <- f e
+        equal mn
+    equal [] = fail "empty isCombinable"
+    equal [x] = return x
+    equal (x:y:rs) = if x == y then equal (y:rs) else fail "not equal"
+    f (Return (NodeV t [])) | postEval = return [Nothing]
+    f (Return (NodeC t [])) | postEval = return [Nothing]
+    f (Return (NodeC t xs)) = return [Just (t,map getType xs)]
+    f Error {} = return []
+    f (Case _ ls) = do
+        cs <- Prelude.mapM f [ e | _ :-> e <- ls ]
+        return $ concat cs
+    f (_ :>>= _ :-> e) = f e
+    f _ = fail "not combinable"
+
+combine nty (Return (NodeV t [])) = Return (Var t TyTag)
+combine nty (Return (NodeC t [])) = Return (Tag t)
+combine nty (Return (NodeC t xs)) = Return (tuple xs)
+combine nty (Error s ty) = Error s nty
+combine nty (Case x ls) = Case x (map (combineLam nty) ls)
+combine nty (e1 :>>= p :-> e2) = e1 :>>= p :-> combine nty e2
+combineLam nty (p :-> e) = p :-> combine nty e
+
+
 lamExp (_ :-> e) = e
 lamBind (b :-> _) = b
 
@@ -286,6 +315,17 @@ optimize1 postEval (n,l) = g l where
     f (Case x as :>>= v :-> rc@(Case v' as')) | v == v', count (== Nothing ) (Prelude.map (isManifestNode . lamExp) as) <= 1 = do
         ch <- caseHoist x as v as' (getType rc)
         f ch
+    f cs@(Case x as) | Just Nothing <- isCombinable postEval cs = do
+        mtick "Optimize.optimize.case-unbox-tag"
+        let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
+            (va:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
+        f (Case x (map (combineLam TyTag) as) :>>= Var va TyTag :-> Return (NodeV va []))
+    f cs@(Case x as) | Just (Just (t,ts)) <- isCombinable postEval cs = do
+        mtick $ "Optimize.optimize.case-unbox-node.{" ++ show t
+        let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
+            vs = [ v | v <- [v1..], not $ v `Set.member` fv ]
+            vars = [ Var v t | v <- vs | t <- ts ]
+        f (Case x (map (combineLam (tuple ts)) as) :>>= tuple vars  :-> Return (NodeC t vars))
     f cs@(Case x as) | postEval && all isEnum [ p | p :-> _ <- as] = do
         mtick "Optimize.optimize.case-enum"
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
@@ -329,9 +369,13 @@ optimize1 postEval (n,l) = g l where
     caseCombine x as as' = do
         mtick $ "Optimize.optimize.case-combine"
         let etags = [ bd | bd@(NodeC t _ :-> _) <- as, t `notElem` [ t | NodeC t _ :-> _ <- as' ] ]
+            ttags = [ bd | bd@(Tag t:-> _) <- as, t `notElem` [ t | Tag t :-> _ <- as' ] ]
             as'' = Prelude.map f as'
+            f (v@Var {} :-> b) | getType v == TyTag = v :-> Case v ttags :>>= unit :-> b
             f (v@Var {} :-> b) = v :-> Case v etags :>>= unit :-> b
             f (n@(NodeC t _) :-> b) = case [ a | a@(NodeC t' _ :-> _) <-  as, t == t'] of
+                [bind :-> body] -> n :-> Return n :>>= bind :-> body :>>= unit :-> b
+            f (n@(Tag t) :-> b) = case [ a | a@(Tag t' :-> _) <-  as, t == t'] of
                 [bind :-> body] -> n :-> Return n :>>= bind :-> body :>>= unit :-> b
             -- f r
         return $ Case x as''
