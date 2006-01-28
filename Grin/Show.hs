@@ -17,6 +17,8 @@ import Number
 import Options
 import qualified FlagDump as FD
 
+
+
 instance DocLike d => PPrint d Val   where
     pprint v = prettyVal v
 
@@ -67,7 +69,9 @@ prettyExp vl (Case v vs) = vl <> keyword "case" <+> prettyVal v <+> keyword "of"
     f (v :-> e) = prettyVal v <+> operator "->" <+> keyword "do" <$> indent 2 (prettyExp empty e)
 
 prettyVal :: DocLike d => Val -> d
+prettyVal s | Just [] <- valToList s = text "[]"
 prettyVal s | Just st <- fromVal s = text $ show (st::String)
+prettyVal s | Just vs <- valToList s = list $ map prettyVal vs
 prettyVal (NodeC t []) = parens $ tag (fromAtom t)
 prettyVal (NodeC t vs) = parens $ tag (fromAtom t) <+> hsep (map prettyVal vs)
 prettyVal (NodeV (V i) vs) = parens $ char 't' <> tshow i <+> hsep (map prettyVal vs)
@@ -82,7 +86,6 @@ prettyVal (Var (V i) t)
 prettyVal (Var (V i) _) = char 'v' <> tshow i
 prettyVal (Lit i t) | t == tCharzh, i >= 0x20 && i < 0x7f, Just x <- toIntegral i = tshow (chr x)
 prettyVal (Lit i _)  = tshow i
---prettyVal Unit = text "()"
 prettyVal (Tup xs)  = tupled $ map prettyVal xs
 prettyVal (Const v) = char '&' <> prettyVal v
 prettyVal (Addr _) = text "<ref>"

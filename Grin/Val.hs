@@ -1,4 +1,4 @@
-module Grin.Val(FromVal(..),ToVal(..),cChar,cInt,tn_2Tup,world__,pworld__) where
+module Grin.Val(FromVal(..),ToVal(..),cChar,cInt,tn_2Tup,world__,pworld__,valToList) where
 
 import Grin.Grin
 import Atom
@@ -96,3 +96,9 @@ instance FromVal Bool  where
     fromVal n = fail $ "Val is not Bool: " ++ show n
 instance FromVal Val where
     fromVal n = return n
+
+valToList (NodeC n []) | n == nil = return []
+valToList (NodeC n [a,Const b]) | n == cons = do
+        xs <- valToList b
+        return (a:xs)
+valToList n = fail $ "Val is not [a]: " ++ show n

@@ -247,21 +247,6 @@ combine postEval nty (e1 :>>= p :-> e2) = e1 :>>= p :-> combine postEval nty e2
 combineLam postEval nty (p :-> e) = p :-> combine postEval nty e
 
 
-modifyTail lam@(_ :-> lb) e = f e where
-    f (Error s ty) = Error s (getType lb)
-    f (Case x ls) = Case x (map g ls)
-    f (e1 :>>= p :-> e2) = e1 :>>= p :-> f e2
-    f e = e :>>= lam
-    g (p :-> e) = p :-> f e
-
-
-lamExp (_ :-> e) = e
-lamBind (b :-> _) = b
-
-isVar Var {} = True
-isVar _ = False
-isTup Tup {} = True
-isTup _ = False
 
 isKnown Tag {} = True
 isKnown NodeC {} = True
@@ -542,15 +527,6 @@ collectUsedFuncs (Tup as :-> exp) = (snub $ concatMap tagToFunction (Seq.toList 
     f e = (Seq.fromList [ v | v <- freeVars e ],Seq.empty)
 
 
-valIsConstant :: Val -> Bool
-valIsConstant (Tup xs) = all valIsConstant xs
-valIsConstant (NodeC _ xs) = all valIsConstant xs
-valIsConstant Tag {} = True
-valIsConstant Lit {} = True
-valIsConstant Const {} = True
-valIsConstant (Var v _) | v < v0 = True
-valIsConstant ValPrim {} = True
-valIsConstant _ = False
 
 
 

@@ -46,7 +46,8 @@ module Grin.Grin(
     tyUnit,
     unit,
     itemTag,
-    v0,v1,v2,v3,
+    v0,v1,v2,v3,lamExp,lamBind,
+    isVar,isTup,modifyTail,valIsConstant,
     valIsNF
     ) where
 
@@ -654,3 +655,28 @@ instance FromTuple Item where
     fromTuple (TupledValue ts) = ts
     fromTuple x = [x]
 
+lamExp (_ :-> e) = e
+lamBind (b :-> _) = b
+
+isVar Var {} = True
+isVar _ = False
+
+isTup Tup {} = True
+isTup _ = False
+
+modifyTail lam@(_ :-> lb) e = f e where
+    f (Error s ty) = Error s (getType lb)
+    f (Case x ls) = Case x (map g ls)
+    f (e1 :>>= p :-> e2) = e1 :>>= p :-> f e2
+    f e = e :>>= lam
+    g (p :-> e) = p :-> f e
+
+valIsConstant :: Val -> Bool
+valIsConstant (Tup xs) = all valIsConstant xs
+valIsConstant (NodeC _ xs) = all valIsConstant xs
+valIsConstant Tag {} = True
+valIsConstant Lit {} = True
+valIsConstant Const {} = True
+valIsConstant (Var v _) | v < v0 = True
+valIsConstant ValPrim {} = True
+valIsConstant _ = False
