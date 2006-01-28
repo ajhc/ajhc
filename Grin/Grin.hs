@@ -60,13 +60,14 @@ import qualified Data.Set as Set
 
 import Atom
 import Boolean.Algebra
-import Support.CanType
 import C.Prims
 import Doc.DocLike
 import FreeVars
 import GenUtil
-import Number
 import Name.VConsts
+import Number
+import Support.CanType
+import Support.Tuple
 
 -- Extremely simple first order monadic code with basic type system.  similar
 -- to GRIN except for the explicit typing on variables. Note, that certain
@@ -625,4 +626,28 @@ combineItem (NodeValue ns1) (NodeValue ns2) = NodeValue ns where
 combineItems :: [Item] -> Item
 combineItems [] = error "cannot combine no items"
 combineItems xs = foldl1 combineItem xs
+
+
+instance Tuple Val where
+    tupleMany vs = Tup vs
+
+instance Tuple Ty where
+    tupleMany ts = TyTup ts
+
+
+instance FromTuple Val where
+    fromTuple (Tup vs) = vs
+    fromTuple v = [v]
+
+instance FromTuple Ty where
+    fromTuple (TyTup ts) = ts
+    fromTuple v = [v]
+
+
+instance Tuple Item where
+    tupleMany vs = TupledValue vs
+
+instance FromTuple Item where
+    fromTuple (TupledValue ts) = ts
+    fromTuple x = [x]
 

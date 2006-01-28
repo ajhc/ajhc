@@ -1,5 +1,7 @@
 module Support.Tuple where
 
+import List(intersperse)
+
 class Tuple a where
     tupleNil :: a
     tupleOne :: a -> a

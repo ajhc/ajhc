@@ -9,6 +9,7 @@ import qualified Data.Set as Set
 import Ratio
 
 import Support.CanType
+import Support.Tuple
 import C.Prims
 import E.E
 import E.FreeVars()
@@ -21,12 +22,15 @@ import Name.Names
 import Name.VConsts
 
 
+instance Tuple E where
+    tupleNil = vUnit
+    tupleMany es = ELit $ LitCons (nameTuple DataConstructor (length es)) es (ltTuple ts) where 
+        ts = map getType es
+
 eIf e a b = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 tBool),  eCaseAlts =  [Alt vTrue a,Alt vFalse b], eCaseDefault = Nothing }
 
-eTuple []  = vUnit
-eTuple [e] = e
-eTuple es = ELit $ LitCons (nameTuple DataConstructor (length es)) es (ltTuple ts) where
-    ts = map getType es
+eTuple :: [E] -> E
+eTuple = tuple
 
 eTuple' es = ELit $ LitCons (unboxedNameTuple DataConstructor (length es)) es (ltTuple' ts) where
     ts = map getType es
