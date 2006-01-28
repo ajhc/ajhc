@@ -1,5 +1,5 @@
 
---  $Id: GenUtil.hs,v 1.46 2005/10/04 07:01:10 john Exp $
+--  $Id: GenUtil.hs,v 1.47 2006/01/28 02:15:30 john Exp $
 -- arch-tag: 835e46b7-8ffd-40a0-aaf9-326b7e347760
 
 
@@ -38,6 +38,7 @@ module GenUtil(
     putErr,putErrLn,putErrDie,
     -- ** Simple deconstruction
     fromLeft,fromRight,fsts,snds,splitEither,rights,lefts,
+    isLeft,isRight,
     -- ** System routines
     exitSuccess, System.exitFailure, epoch, lookupEnv,endOfTime,
     -- ** Random routines
@@ -52,8 +53,10 @@ module GenUtil(
     sortGroupUnder,
     sortGroupUnderF,
     sortGroupUnderFG,
+    sameLength,
 
     -- ** Monad routines
+    perhapsM,
     repeatM, repeatM_, replicateM, replicateM_, maybeToMonad,
     toMonadM, ioM, ioMp, foldlM, foldlM_, foldl1M, foldl1M_,
     -- ** Text Routines
@@ -326,6 +329,20 @@ splitEither  (r:rs) = case splitEither rs of
         Left x -> (x:xs,ys)
         Right y -> (xs,y:ys)
 splitEither          [] = ([],[])
+
+isLeft Left {} = True
+isLeft _ = False
+
+isRight Right {} = True
+isRight _ = False
+
+perhapsM :: Monad m => Bool -> a -> m a
+perhapsM True a = return a
+perhapsM False _ = fail "perhapsM"
+
+sameLength (_:xs) (_:ys) = sameLength xs ys
+sameLength [] [] = True
+sameLength _ _ = False
 
 fromEither :: Either a a -> a
 fromEither (Left x) = x
@@ -700,6 +717,7 @@ getPrefix a b = f a b where
     f (p:ps) (s:ss)
         | p == s = f ps ss
         | otherwise = fail $ "getPrefix: " ++ a ++ " " ++ b
+
 
 
 

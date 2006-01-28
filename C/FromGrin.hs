@@ -270,9 +270,6 @@ convertBody' e todo = localTodo TodoReturn $ convertBody e
 localTodo :: Todo -> C a -> C a
 localTodo todo (C act) = C $ local (const todo) act
 
-perhapsM :: Monad m => Bool -> a -> m a
-perhapsM True a = return a
-perhapsM False _ = fail "perhapsM"
 
 convertFunc :: (Atom,Lam) -> C Function
 convertFunc (n,Tup as :-> body) = do

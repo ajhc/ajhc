@@ -33,9 +33,6 @@ import Util.SameShape
 import Util.Gen
 
 
-sameLength (_:xs) (_:ys) = sameLength xs ys
-sameLength [] [] = True
-sameLength _ _ = False
 
 
 -- These names make no sense
@@ -394,6 +391,7 @@ funcReturn te pt fn vs = valueSetToItem te pt ty vs where
 
 valueSetToItem :: TyEnv -> PointsTo -> Ty -> ValueSet -> Item
 valueSetToItem _ _ ty VsEmpty = itemEmpty ty
+valueSetToItem _ _ ty (VsBas "()") = TupledValue []
 valueSetToItem _ _ ty VsBas {} = BasicValue ty
 valueSetToItem te pt TyNode (VsNodes as n) = NodeValue (Set.mapMonotonic f n) where  -- depends on tag being first value in NodeValue
     f n = NV n [ valueSetToItem te pt ty (Map.findWithDefault VsEmpty (n,i) as)  | ty <- ts | i <- naturals ] where

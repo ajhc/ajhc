@@ -7,6 +7,7 @@ import CanType
 import GenUtil
 import Atom
 import Maybe
+import Monad
 import Util.Graph
 
 
@@ -57,6 +58,19 @@ unboxFunction fn (NodeValue vs) | [NV t args] <- Set.toList vs  =  let
     unboxCall (App a as _) | a == fn = App a as returnType :>>= Tup vars :-> Return (NodeC t vars)
     vars  = [Var v t | v <- [v1 ..] | t <- map getType args ]
     in return (unboxReturn, unboxCall, returnType, TupledValue args)
+-- returning known node of several arguments
+unboxFunction fn (TupledValue vs) | any isLeft rvs = return (unboxReturn, unboxCall, returnType, nvs) where
+    rvs = [ case constantItem v of Just x -> Left x ; _ -> Right v | v <- vs ]
+    nvs = tupledValue (rights rvs)
+    returnType = getType nvs
+    unboxReturn e = e :>>= Tup vars :-> Return (tup vars')
+    unboxCall (App a as _) | a == fn = App a as returnType :>>= tup vars' :-> Return (tup [ case x of Left x -> x ; Right _ -> v |  v <- vars | x <- rvs ])
+    vars  = [Var v t | v <- [v1 ..] | t <- map getType vs ]
+    vars' = concat [ perhapsM (isRight r) (Var v t)  | v <- [v1 ..] | t <- map getType vs | r <- rvs ]
+    tup [x] = x
+    tup xs = Tup xs
+    tupledValue [x] = x
+    tupledValue xs = TupledValue xs
 
 unboxFunction _ item = fail "function not unboxable" -- (id,id,getType item)
 
@@ -96,11 +110,12 @@ unboxReturnValues grin = do
     putStrLn "Unboxed return values"
     mapM_ putStrLn [ "  " ++ show fn ++ " - " ++  show nt | (fn,(_,_,nt,_)) <- Map.toList fns]
 
-    return grin {
+    let newgrin = grin {
         grinReturnTags = Map.mapWithKey retTag (grinReturnTags grin),
         grinTypeEnv = mtenv (grinTypeEnv grin),
         grinFunctions = map doFunc (grinFunctions grin)
         }
+    if Map.null fns then return newgrin else unboxReturnValues newgrin
 
 
 convertReturns unboxReturn lam = g lam where
