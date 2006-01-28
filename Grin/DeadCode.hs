@@ -53,7 +53,8 @@ deadCode stats roots grin = do
         if u then return [(x,y)] else return []
     newFuncs <- flip mconcatMapM (grinFunctions grin) $ \ (x,y) -> do
         u <- readSValue usedFuncs x
-        if not u then tick stats ("Optimize.dead-code.func.{" ++ show x) >> return [] else do
+        --if not u then tick stats ("Optimize.dead-code.func.{" ++ show x) >> return [] else do
+        if not u then tick stats "Optimize.dead-code.func" >> return [] else do
         r <- runStatIO stats $ removeDeadArgs postInline cafSet argSet (x,y)
         return [r]
 

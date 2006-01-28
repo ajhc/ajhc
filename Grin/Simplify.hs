@@ -12,7 +12,7 @@ import qualified Data.Set as Set
 import Atom
 import C.Prims
 import FreeVars
-import GenUtil hiding(putErrLn)
+import GenUtil hiding(putErrLn,replicateM_)
 import Grin.Grin
 import Grin.Whiz
 import qualified Util.Histogram as Hist
@@ -247,6 +247,14 @@ combine postEval nty (e1 :>>= p :-> e2) = e1 :>>= p :-> combine postEval nty e2
 combineLam postEval nty (p :-> e) = p :-> combine postEval nty e
 
 
+modifyTail lam@(_ :-> lb) e = f e where
+    f (Error s ty) = Error s (getType lb)
+    f (Case x ls) = Case x (map g ls)
+    f (e1 :>>= p :-> e2) = e1 :>>= p :-> f e2
+    f e = e :>>= lam
+    g (p :-> e) = p :-> f e
+
+
 lamExp (_ :-> e) = e
 lamBind (b :-> _) = b
 
@@ -324,6 +332,15 @@ optimize1 postEval (n,l) = g l where
         mtick "Optimize.optimize.case-pullin"
         f $ Case x [ x :-> (e :>>= b :-> m) |  x :-> e <- as ]
         -}
+    f (Case x alts :>>= v :-> Return v' :>>= NodeC t as :-> lr ) | v == v' = do
+        mtick "Optimize.optimize.case-hoist-return"
+        let (va:_) = [ v | v <- [v1..], not $ v `Set.member` fv ]
+            var = Var va TyNode
+            fv = freeVars as
+            mc = modifyTail ( var :-> Return var :>>=  NodeC t as :-> Return (tuple as))
+        f (mc (Case x alts) :>>= tuple as :-> Return (NodeC t as) :>>= v :-> lr)
+
+
     f (Case x as :>>= v@(Var vnum _) :-> rc@(Case v' as') :>>= lr) | v == v', count (== Nothing ) (Prelude.map (isManifestNode . lamExp) as) <= 1, not (vnum `Set.member` freeVars lr) = do
         c <- caseHoist x as v as' (getType rc)
         f (c :>>= lr)
@@ -428,10 +445,16 @@ deadVars stats (n,l) = do
         if  any (`Set.member` uv) (freeVars v) then
             f e >> return (Just w)
          else lift (tick stats at_OptSimplifyDeadVar) >> return Nothing
-    gv w@(vs,Case x xs) = do
+    gv w@(Tup vs,Case x xs) = do
         uv <- get
         put $ (Set.union uv (freeVars x))
-        return (Just w)
+        let used v = any (`Set.member` uv) (freeVars v)
+        case partition used vs of
+            (_,[]) -> return $ Just w
+            (nvs,unused) -> do
+                replicateM_ (length unused) $ lift (tick stats "Optimize.simplify.dead-var-case-tup")
+                let ml = modifyTail (tuple vs :-> Return (tuple nvs))
+                return (Just (tuple nvs,ml (Case x xs) ))
     gv w@(_,e) = f e >> return (Just w)
 
 
