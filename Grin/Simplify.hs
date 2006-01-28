@@ -11,7 +11,7 @@ import Maybe
 
 import Atom
 import GenUtil hiding(putErrLn)
-import CanType
+import Support.CanType
 import FreeVars
 import Grin.Grin
 import C.Prims

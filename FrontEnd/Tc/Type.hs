@@ -25,7 +25,7 @@ import Name.Names
 import Name.VConsts
 import Representation hiding(flattenType, findType)
 import Type(HasKind(..))
-import Unparse
+import Support.Unparse
 import Util.VarName
 
 type Box = IORef (Maybe Type)

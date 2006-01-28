@@ -3,7 +3,7 @@ module Grin.Unboxing(unboxReturnValues) where
 import Grin.Grin
 import qualified Data.Set as Set
 import qualified Data.Map as Map
-import CanType
+import Support.CanType
 import GenUtil
 import Atom
 import Maybe

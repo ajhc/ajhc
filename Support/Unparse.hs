@@ -1,4 +1,4 @@
-module Unparse(Unparse(), Unparsable(..), unparse, unparse', Side(..), atom, atomize, bop, pop, fixitize) where
+module Support.Unparse(Unparse(), Unparsable(..), unparse, unparse', Side(..), atom, atomize, bop, pop, fixitize) where
 
 import Doc.DocLike
 

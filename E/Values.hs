@@ -8,7 +8,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Ratio
 
-import CanType
+import Support.CanType
 import C.Prims
 import E.E
 import E.FreeVars()

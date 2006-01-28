@@ -5,7 +5,7 @@ import Monad
 import qualified Data.Map as Map
 
 import Atom
-import CanType
+import Support.CanType
 import C.Prims
 import DataConstructors
 import Data.Monoid

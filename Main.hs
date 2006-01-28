@@ -11,7 +11,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified System
 
-import CanType(getType)
+import Support.CanType(getType)
 import C.FromGrin
 import CharIO
 import Class

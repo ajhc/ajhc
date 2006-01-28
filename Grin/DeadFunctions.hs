@@ -9,7 +9,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom
-import CanType
+import Support.CanType
 import FindFixpoint
 import FreeVars
 import GenUtil hiding(replicateM_)

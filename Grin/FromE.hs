@@ -10,7 +10,7 @@ import Maybe
 import qualified Data.Set as Set
 
 import Atom
-import CanType
+import Support.CanType
 import Control.Monad.Identity
 import C.Prims
 import DataConstructors

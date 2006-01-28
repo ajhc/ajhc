@@ -16,7 +16,7 @@ import Name.Names
 import Options
 import qualified Doc.Chars as UC
 import qualified FlagDump as FD
-import Unparse
+import Support.Unparse
 import Name.VConsts
 
 -----------------

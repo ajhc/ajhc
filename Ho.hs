@@ -19,7 +19,7 @@ import System.Posix.IO
 
 import Atom
 import Binary
-import CanType
+import Support.CanType
 import CharIO
 import Class
 import DataConstructors

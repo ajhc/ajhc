@@ -1,7 +1,7 @@
 module Grin.Interpret(evaluate) where
 
 import Atom
-import CanType
+import Support.CanType
 import Char
 import CharIO
 import Control.Monad.Identity

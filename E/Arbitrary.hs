@@ -14,7 +14,7 @@ import Data.Monoid
 import GenUtil
 import FreeVars
 import Name.VConsts
-import CanType
+import Support.CanType
 import CharIO
 
 

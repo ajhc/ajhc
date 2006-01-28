@@ -12,7 +12,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom
-import CanType
+import Support.CanType
 import CharIO
 import Doc.DocLike
 import Fixer.Fixer

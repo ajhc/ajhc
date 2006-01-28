@@ -1,4 +1,4 @@
-module CanType where
+module Support.CanType where
 
 import Control.Monad.Error()
 

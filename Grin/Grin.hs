@@ -60,7 +60,7 @@ import qualified Data.Set as Set
 
 import Atom
 import Boolean.Algebra
-import CanType
+import Support.CanType
 import C.Prims
 import Doc.DocLike
 import FreeVars

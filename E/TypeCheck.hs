@@ -1,6 +1,6 @@
 module E.TypeCheck(eAp, sortStarLike, sortTypeLike,  sortTermLike, inferType, typeInfer, typeInfer') where
 
-import CanType
+import Support.CanType
 import {-# SOURCE #-} DataConstructors
 import Doc.DocLike
 import Doc.PPrint

@@ -12,7 +12,7 @@ import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import Atom
 import Boolean.Algebra
-import CanType
+import Support.CanType
 import Char
 import Class
 import C.Prims

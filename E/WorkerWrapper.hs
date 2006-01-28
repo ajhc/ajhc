@@ -5,7 +5,7 @@ import Data.Monoid
 import Maybe
 import Monad
 
-import CanType
+import Support.CanType
 import DataConstructors
 import E.CPR
 import E.E

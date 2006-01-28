@@ -2,7 +2,7 @@ module Grin.Embed((.>>=),(.>>),GG,VVar,TyNode,TyTag,TyPtr,TyRaw,embedTest) where
 
 import Grin.Grin
 import Util.UniqueMonad
-import CanType
+import Support.CanType
 import Atom
 import GenUtil
 import Grin.Show

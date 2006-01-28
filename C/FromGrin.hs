@@ -12,7 +12,7 @@ import qualified Text.PrettyPrint.HughesPJ as P
 import Text.PrettyPrint.HughesPJ(nest,($$))
 
 import Atom
-import CanType
+import Support.CanType
 import C.Generate
 import C.Prims
 import Doc.DocLike

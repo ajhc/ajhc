@@ -11,7 +11,7 @@ import Fixer.Supply
 import FreeVars
 import Grin.Grin
 import Grin.Whiz
-import CanType
+import Support.CanType
 import Stats hiding(print)
 import Util.Gen
 

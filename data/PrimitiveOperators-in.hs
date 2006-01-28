@@ -5,7 +5,7 @@ module PrimitiveOperators(primitiveInsts,constantMethods,theMethods,allCTypes,ct
 import Data.Monoid
 import qualified Data.Map as Map
 
-import CanType
+import Support.CanType
 import C.Prims
 import E.E
 import E.TypeCheck()

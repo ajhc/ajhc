@@ -27,20 +27,20 @@ import E.E
 import E.Pretty
 import E.Shadow
 import E.Subst
-import Type(schemeToType)
 import GenUtil
 import HsSyn
 import MapBinaryInstance()
 import Name.Name as Name
 import Name.Names
+import Name.VConsts
 import PrimitiveOperators
 import qualified Util.Seq as Seq
 import Representation
+import Type(schemeToType)
 import Util.HasSize
 import Util.SameShape
+import Support.Unparse
 import Util.VarName
-import Name.VConsts
-import Unparse
 
 tipe t = runVarName (tipe' t) where
     tipe' (TAp t1 t2) = liftM2 eAp (tipe' t1) (tipe' t2)

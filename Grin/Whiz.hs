@@ -8,7 +8,7 @@ import Control.Monad.Writer
 import Control.Monad.Trans
 import Data.Monoid
 import Control.Monad.Identity
-import CanType
+import Support.CanType
 
 type WhizState = Either (Set.Set Int) Int
 type WhizEnv = Map.Map Var Val

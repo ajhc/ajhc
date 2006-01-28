@@ -11,7 +11,7 @@ import List(intersperse)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 
-import CanType
+import Support.CanType
 import Doc.DocLike
 import E.Annotate
 import E.E hiding(isBottom)

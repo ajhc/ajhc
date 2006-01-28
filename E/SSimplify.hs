@@ -11,7 +11,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom
-import CanType
+import Support.CanType
 import DataConstructors
 import E.Annotate
 import C.Prims
