@@ -214,8 +214,11 @@ isManifestNode _ = fail "not manifest node"
 
 manifestNodes as = Prelude.map (isManifestNode . lamExp) as
 
+data UnboxingResult = UnboxTag | UnboxTup (Atom,[Ty]) | UnboxConst Val
+    deriving(Eq,Ord)
+
 -- returns nothing if can return a tag, or just atom if can return an atom
-isCombinable :: Monad m => Bool -> Exp -> m (Maybe (Atom,[Ty]))
+isCombinable :: Monad m => Bool -> Exp -> m UnboxingResult
 isCombinable postEval e = ans where
     ans = do
         mn <- f e
@@ -223,9 +226,10 @@ isCombinable postEval e = ans where
     equal [] = fail "empty isCombinable"
     equal [x] = return x
     equal (x:y:rs) = if x == y then equal (y:rs) else fail "not equal"
-    f (Return (NodeV t [])) | postEval = return [Nothing]
-    f (Return (NodeC t [])) | postEval = return [Nothing]
-    f (Return (NodeC t xs)) = return [Just (t,map getType xs)]
+    f (Return (NodeV t [])) | postEval = return [UnboxTag]
+    f (Return (NodeC t [])) | postEval = return [UnboxTag]
+    f (Return z) | z /= unit && valIsConstant z = return [UnboxConst z]
+    f (Return (NodeC t xs)) = return [UnboxTup (t,map getType xs)]
     f Error {} = return []
     f (Case _ ls) = do
         cs <- Prelude.mapM f [ e | _ :-> e <- ls ]
@@ -233,13 +237,14 @@ isCombinable postEval e = ans where
     f (_ :>>= _ :-> e) = f e
     f _ = fail "not combinable"
 
-combine nty (Return (NodeV t [])) = Return (Var t TyTag)
-combine nty (Return (NodeC t [])) = Return (Tag t)
-combine nty (Return (NodeC t xs)) = Return (tuple xs)
-combine nty (Error s ty) = Error s nty
-combine nty (Case x ls) = Case x (map (combineLam nty) ls)
-combine nty (e1 :>>= p :-> e2) = e1 :>>= p :-> combine nty e2
-combineLam nty (p :-> e) = p :-> combine nty e
+combine postEval nty (Return (NodeV t [])) = Return (Var t TyTag)
+combine postEval nty (Return (NodeC t [])) | postEval  = Return (Tag t)
+combine postEval nty (Return v) | valIsConstant v  = Return unit
+combine postEval nty (Return (NodeC t xs)) = Return (tuple xs)
+combine postEval nty (Error s ty) = Error s nty
+combine postEval nty (Case x ls) = Case x (map (combineLam postEval nty) ls)
+combine postEval nty (e1 :>>= p :-> e2) = e1 :>>= p :-> combine postEval nty e2
+combineLam postEval nty (p :-> e) = p :-> combine postEval nty e
 
 
 lamExp (_ :-> e) = e
@@ -317,17 +322,20 @@ optimize1 postEval (n,l) = g l where
     f (Case x as :>>= v :-> rc@(Case v' as')) | v == v', count (== Nothing ) (Prelude.map (isManifestNode . lamExp) as) <= 1 = do
         ch <- caseHoist x as v as' (getType rc)
         f ch
-    f cs@(Case x as) | Just Nothing <- isCombinable postEval cs = do
+    f cs@(Case x as) | Just UnboxTag <- isCombinable postEval cs = do
         mtick "Optimize.optimize.case-unbox-tag"
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
             (va:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
-        f (Case x (map (combineLam TyTag) as) :>>= Var va TyTag :-> Return (NodeV va []))
-    f cs@(Case x as) | Just (Just (t,ts)) <- isCombinable postEval cs = do
+        f (Case x (map (combineLam postEval TyTag) as) :>>= Var va TyTag :-> Return (NodeV va []))
+    f cs@(Case x as) | Just (UnboxTup (t,ts)) <- isCombinable postEval cs = do
         mtick $ "Optimize.optimize.case-unbox-node.{" ++ show t
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
             vs = [ v | v <- [v1..], not $ v `Set.member` fv ]
             vars = [ Var v t | v <- vs | t <- ts ]
-        f (Case x (map (combineLam (tuple ts)) as) :>>= tuple vars  :-> Return (NodeC t vars))
+        f (Case x (map (combineLam postEval (tuple ts)) as) :>>= tuple vars  :-> Return (NodeC t vars))
+    f cs@(Case x as) | Just (UnboxConst val) <- isCombinable postEval cs = do
+        mtick $ "Optimize.optimize.case-unbox-const.{" ++ show val
+        f (Case x (map (combineLam postEval tyUnit) as) :>>= unit :-> Return val)
     f cs@(Case x as) | postEval && all isEnum [ p | p :-> _ <- as] = do
         mtick "Optimize.optimize.case-enum"
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
@@ -500,6 +508,16 @@ collectUsedFuncs (Tup as :-> exp) = (snub $ concatMap tagToFunction (Seq.toList 
     f (Case e alts) =  mconcat ((Seq.fromList (freeVars e) , Seq.empty):[ f e | _ :-> e <- alts])
     f e = (Seq.fromList [ v | v <- freeVars e ],Seq.empty)
 
+
+valIsConstant :: Val -> Bool
+valIsConstant (Tup xs) = all valIsConstant xs
+valIsConstant (NodeC _ xs) = all valIsConstant xs
+valIsConstant Tag {} = True
+valIsConstant Lit {} = True
+valIsConstant Const {} = True
+valIsConstant (Var v _) | v < v0 = True
+valIsConstant ValPrim {} = True
+valIsConstant _ = False
 
 
 

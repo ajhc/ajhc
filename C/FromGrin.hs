@@ -73,6 +73,7 @@ convertExp :: Exp -> C (Statement,Expression)
 convertExp (Error s t) = do
     let f (TyPtr _) = return nullPtr
         f TyNode = return nullPtr
+        f (TyTup []) = return emptyExpression
         f (TyTup xs) = do ts <- mapM convertType xs; xs <- mapM f xs ; return $ structAnon (zip xs ts)
         f (Ty x) = return $ cast (basicType (show x)) (constant $ number 0)
         f x = return $ err $ "error-type " ++ show x
