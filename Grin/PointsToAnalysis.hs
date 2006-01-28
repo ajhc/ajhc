@@ -224,6 +224,8 @@ bind (Tup vs) p | sameLength vs vs' = tell mempty { varEq = vs'  }  where
     vs' = [ (v,if basicType ty then Basic else DownTup p i) | Var v ty <- vs | i <- naturals ]
     basicType (Ty _) = True
     basicType _ = False
+-- TODO - follow tags through
+-- bind (NodeV t []) _ = tell mempty { varEq = [(t, Basic)] }
 bind x y = error $ unwords ["bind:",show x,show y]
 
 analyze :: Grin -> IO PointsTo
@@ -524,8 +526,8 @@ toPos (Tup xs) = do
     vs' <- mapM toPos xs
     return $ Tuple vs'
 toPos (Lit {}) = return Basic
+toPos Tag {} = return Basic
 toPos (Var v _)  = return $ Variable v
-toPos u | u == unit = return Basic
 toPos x  = error $ unwords ["toPos:",show x]
 
 

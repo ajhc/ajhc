@@ -1,26 +1,26 @@
 module Grin.Simplify(simplify) where
 
+import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Trans
-import Control.Monad.Identity
-import Data.Map as Map
 import Data.Monoid
-import Data.Set as Set
 import List
 import Maybe
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Atom
-import GenUtil hiding(putErrLn)
-import Support.CanType
-import FreeVars
-import Grin.Grin
 import C.Prims
+import FreeVars
+import GenUtil hiding(putErrLn)
+import Grin.Grin
 import Grin.Whiz
+import qualified Util.Histogram as Hist
 import Stats
+import Support.CanType
 import Util.Graph
 import Util.Inst()
 import Util.Seq as Seq
-import Util.Histogram as Hist
 
 -- perform a number of simple simplifications.
 -- inline very small and builtin-wrapper functions
@@ -173,7 +173,7 @@ doEval n typ = error $ show ("doEval", n,typ)
 
 
 -- This only binds variables to variables
-varBind :: Monad m => Val -> Val -> m (Map Var Val)
+varBind :: Monad m => Val -> Val -> m (Map.Map Var Val)
 varBind (Var v t) nv@(Var v' t') | t == t' = return $ Map.singleton v nv
 varBind (Lit i t) (Lit i' t') | i == i' && t == t' = return mempty
 varBind (Tup xs) (Tup ys) | length xs == length ys  = liftM mconcat $ sequence $  zipWith varBind xs ys
@@ -184,7 +184,7 @@ varBind v r | (getType v) == (getType r)  = fail "unvarBindable"    -- check typ
 varBind x y = error $ "varBind: " ++ show (x,y)
 
 -- This binds variables to anything
-varBind' :: Monad m => Val -> Val -> m (Map Var Val)
+varBind' :: Monad m => Val -> Val -> m (Map.Map Var Val)
 varBind' (Var v t) nv | t == getType nv = return $ Map.singleton v nv
 varBind' (Lit i t) (Lit i' t') | i == i' && t == t' = return mempty
 varBind' (Tup xs) (Tup ys) | length xs == length ys  = liftM mconcat $ sequence $  zipWith varBind' xs ys
@@ -222,8 +222,8 @@ isKnown NodeC {} = True
 isKnown Lit {} = True
 isKnown _ = False
 
-optimize1 ::  (Atom,Lam) -> StatM Lam
-optimize1 (n,l) = g l where
+optimize1 ::  Bool -> (Atom,Lam) -> StatM Lam
+optimize1 postEval (n,l) = g l where
     g (b :-> e) = f e >>= return . (b :->)
     f (e :>>= Tup [] :-> Return (Tup []) :>>= lr) = do
         mtick "Optimize.optimize.unit-unit"
@@ -286,6 +286,12 @@ optimize1 (n,l) = g l where
     f (Case x as :>>= v :-> rc@(Case v' as')) | v == v', count (== Nothing ) (Prelude.map (isManifestNode . lamExp) as) <= 1 = do
         ch <- caseHoist x as v as' (getType rc)
         f ch
+    f cs@(Case x as) | postEval && all isEnum [ p | p :-> _ <- as] = do
+        mtick "Optimize.optimize.case-enum"
+        let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
+            (va:vb:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
+        f (Return x :>>= NodeV va [] :-> Case (Var va TyTag) (Prelude.map (untagPat vb) as))
+
     f (e1 :>>= _ :-> err@Error {}) | isErrOmittable e1 = do
         mtick "Optimize.optimize.del-error"
         return err
@@ -329,6 +335,14 @@ optimize1 (n,l) = g l where
                 [bind :-> body] -> n :-> Return n :>>= bind :-> body :>>= unit :-> b
             -- f r
         return $ Case x as''
+
+isEnum (NodeC t []) = True
+isEnum (Var t TyNode) = True
+isEnum _ = False
+
+untagPat _ (NodeC t [] :-> e) = Tag t :-> e
+untagPat vb (v@Var{} :-> e) = Var vb TyTag :-> Return (NodeV vb []) :>>= v :-> e
+
 
 deadVars :: Stats -> (Atom,Lam) -> IO (Atom,Lam)
 deadVars stats (n,l) = do
@@ -387,7 +401,7 @@ simplify stats grin = do
                 (_,nl) <- simplify1 stats env (a,nl)
                 let Identity nl'' = whizExps return nl
                 -- putDocM CharIO.putErr (prettyFun (a,nl''))
-                let (nl',stat) = runStatM (optimize1 (a,nl''))
+                let (nl',stat) = runStatM (optimize1 postEval (a,nl''))
                 tickStat stats stat
                 return nl'
                 {-

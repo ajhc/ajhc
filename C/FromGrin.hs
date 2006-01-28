@@ -250,6 +250,9 @@ convertBody (Case v@(Var _ t) ls) = do
         da ((Lit i _) :-> e) = do
             e' <- convertBody e
             return $ (Just (number $ fromIntegral i), e')
+        da (Tag t :-> e) = do
+            e' <- convertBody e
+            return $ (Just (enum (nodeTagName t)), e')
         da (Tup [x] :-> e) = da ( x :-> e )
     ls' <- mapM da ls
     return $ profile_case_inc `mappend` switch' scrut' ls'
