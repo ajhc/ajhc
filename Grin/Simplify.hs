@@ -203,6 +203,7 @@ isSimple (fn,x) = f (2::Int) x where
     f _ _ = True
 
 isManifestNode :: Monad m => Exp -> m [Atom]
+isManifestNode (Return (Tag t)) = return [t]
 isManifestNode (Return (NodeC t _)) = return [t]
 isManifestNode Error {} = return []
 isManifestNode (Case _ ls) = do
@@ -247,6 +248,7 @@ lamBind (b :-> _) = b
 isVar Var {} = True
 isVar _ = False
 
+isKnown Tag {} = True
 isKnown NodeC {} = True
 isKnown Lit {} = True
 isKnown _ = False
@@ -351,7 +353,7 @@ optimize1 postEval (n,l) = g l where
             z e = e :>>= v :-> Case v as'
         return nc
     knownCase n@(NodeC t vs) as = do
-        mtick $ "Optimize.optimize.known-case.{" ++ show t
+        mtick $ "Optimize.optimize.known-case-node.{" ++ show t
         --let f [] = error $ "no known case:" ++ show (n,as)
         let f [] =  Error "known-case: No known case" (getType (Case n as))
             f ((v@Var {} :-> b):_) = Return n :>>= v :-> b
@@ -360,10 +362,17 @@ optimize1 postEval (n,l) = g l where
             f (_:as) = f as
         return $ f as
     knownCase n@(Lit l _) as = do
-        mtick $ "Optimize.optimize.known-case.{" ++ show n
+        mtick $ "Optimize.optimize.known-case-lit.{" ++ show n
         let f [] =  Error "known-case: No known case" (getType (Case n as))
             f ((v@Var {} :-> b):_) = Return n :>>= v :-> b
             f ((Lit l' _ :-> b):_) | l == l' = b
+            f (_:as) = f as
+        return $ f as
+    knownCase (Tag t) as = do
+        mtick $ "Optimize.optimize.known-case-tag.{" ++ show t
+        let f [] =  Error "known-case: No known case" (getType (Case (Tag t) as))
+            f ((v@Var {} :-> b):_) = Return (Tag t) :>>= v :-> b
+            f ((Tag t' :-> b):_) | t == t' = b
             f (_:as) = f as
         return $ f as
     caseCombine x as as' = do
