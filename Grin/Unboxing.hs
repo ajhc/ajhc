@@ -1,13 +1,15 @@
 module Grin.Unboxing(unboxReturnValues) where
 
-import Grin.Grin
-import qualified Data.Set as Set
-import qualified Data.Map as Map
-import Support.CanType
-import GenUtil
-import Atom
 import Maybe
 import Monad
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+
+import Atom
+import GenUtil
+import Grin.Grin
+import Support.CanType
+import Support.Tuple
 import Util.Graph
 
 
@@ -27,50 +29,33 @@ isEnum _ = False
 
 
 unboxFunction :: Monad m => Atom -> Item -> m (Exp -> Exp, Exp -> Exp, Ty, Item)
--- any fully constant values are done first
-unboxFunction fn x | getType x /= tyUnit, Just v <- constantItem  x  =  let
-    returnType = tyUnit
-    unboxReturn Return {} = Return unit
-    unboxReturn e = e :>>= var :-> Return unit
-    unboxCall (App a as _) | a == fn = App a as returnType :>>= unit :-> Return v
-    var = Var v1 (getType x)
-    in return (unboxReturn, unboxCall, returnType, TupledValue [])
+unboxFunction _ x | getType x == tyUnit = fail "unboxFunction: return type is already ()"
+-- get rid of any fully constant values in return
+unboxFunction fn item | any isLeft rvs = return (unboxReturn, unboxCall, returnType, nvs) where
+    vs = fromTuple item
+    rvs = [ case constantItem v of Just x -> Left x ; _ -> Right v | v <- vs ]
+    nvs = tuple (rights rvs)
+    returnType = getType nvs
+    unboxReturn e = e :>>= tuple vars :-> Return (tuple vars')
+    unboxCall (App a as _) | a == fn = App a as returnType :>>= tuple vars' :-> Return (tuple [ case x of Left x -> x ; Right _ -> v |  v <- vars | x <- rvs ])
+    vars  = [Var v t | v <- [v1 ..] | t <- map getType vs ]
+    vars' = concat [ perhapsM (isRight r) (Var v t)  | v <- [v1 ..] | t <- map getType vs | r <- rvs ]
+
 --unboxFunction fn (NodeValue vs) | all isEnum (Set.toList vs) = (unboxReturn, unboxCall, TyTag) where
 --    unboxReturn (Return (NodeC t [])) = Return t
 --    unboxReturn (App a as ty) | a == fn = App a as TyTag
 --    unboxCall (App a as ty) = (App a as TyTag :>>= (Var v1 TyTag) :-> Return (NodeV v1 []))
 
--- returning node of exactly one value
-unboxFunction fn (NodeValue vs) | [NV t [arg]] <- Set.toList vs  =  let
-    returnType = getType arg
-    unboxReturn (Return (NodeC t' [x])) | t == t' = Return x
-                                        | otherwise = error "returning wrong node"
-    unboxReturn e = e :>>= NodeC t [var] :-> Return var
-    unboxCall (App a as _) | a == fn = App a as returnType :>>= var :-> Return (NodeC t [var])
-    var = Var v1 returnType
-    in return (unboxReturn, unboxCall, returnType, arg)
--- returning known node of several arguments
+-- returning a known node type
 unboxFunction fn (NodeValue vs) | [NV t args] <- Set.toList vs  =  let
-    returnType = TyTup (map getType args)
-    unboxReturn (Return (NodeC t' xs)) | t == t' = Return (Tup xs)
-                                        | otherwise = error "returning wrong node"
-    unboxReturn e = e :>>= NodeC t vars :-> Return (Tup vars)
-    unboxCall (App a as _) | a == fn = App a as returnType :>>= Tup vars :-> Return (NodeC t vars)
+    returnType = tuple (map getType args)
+    unboxReturn (Return (NodeC t' xs))
+        | t == t' = Return (tuple xs)
+        | otherwise = error "returning wrong node"
+    unboxReturn e = e :>>= NodeC t vars :-> Return (tuple vars)
+    unboxCall (App a as _) | a == fn = App a as returnType :>>= tuple vars :-> Return (NodeC t vars)
     vars  = [Var v t | v <- [v1 ..] | t <- map getType args ]
-    in return (unboxReturn, unboxCall, returnType, TupledValue args)
--- returning known node of several arguments
-unboxFunction fn (TupledValue vs) | any isLeft rvs = return (unboxReturn, unboxCall, returnType, nvs) where
-    rvs = [ case constantItem v of Just x -> Left x ; _ -> Right v | v <- vs ]
-    nvs = tupledValue (rights rvs)
-    returnType = getType nvs
-    unboxReturn e = e :>>= Tup vars :-> Return (tup vars')
-    unboxCall (App a as _) | a == fn = App a as returnType :>>= tup vars' :-> Return (tup [ case x of Left x -> x ; Right _ -> v |  v <- vars | x <- rvs ])
-    vars  = [Var v t | v <- [v1 ..] | t <- map getType vs ]
-    vars' = concat [ perhapsM (isRight r) (Var v t)  | v <- [v1 ..] | t <- map getType vs | r <- rvs ]
-    tup [x] = x
-    tup xs = Tup xs
-    tupledValue [x] = x
-    tupledValue xs = TupledValue xs
+    in return (unboxReturn, unboxCall, returnType, tuple args)
 
 unboxFunction _ item = fail "function not unboxable" -- (id,id,getType item)
 
