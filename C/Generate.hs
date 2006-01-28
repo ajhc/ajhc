@@ -1,4 +1,5 @@
 module C.Generate(
+    Annotate(..),
     Function(),
     Type(),
     Name(),

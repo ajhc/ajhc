@@ -224,6 +224,27 @@ convertBody (e :>>= Tup xs :-> e') = do
     vs <- mapM convertVal xs
     return $  ss `mappend` mconcat [ v `assign` projectAnon i st | v <- vs | i <- [0..] ] `mappend` ss'
 
+convertBody (Case v@(Var _ ty) [p1@(NodeC t _) :-> e1,p2 :-> e2]) | ty == TyNode = do
+    scrut <- convertVal v
+    let tag = project' anyTag scrut
+        da v@Var {} _ = do
+            v'' <- convertVal v
+            return $ assign v'' scrut
+        da (NodeC t as) e = do
+            as' <- mapM convertVal as
+            let tmp = project' (nodeStructName t) scrut
+                ass = mconcat [if needed a then assign  a' (project (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
+                fve = freeVars e
+                needed (Var v _) = v `Set.member` fve
+            return ass
+        am | isVar p2 = id
+           | otherwise = annotate (show p2)
+    e1' <- convertBody e1
+    e2' <- convertBody e2
+    p1' <- da p1 e1
+    p2' <- liftM am $ da p2 e2
+    return $ profile_case_inc `mappend` cif (operator "==" (constant $ enum (nodeTagName t)) tag) (p1' `mappend` e1') (p2' `mappend` e2')
+
 convertBody (Case v@(Var _ t) ls) | t == TyNode = do
     scrut <- convertVal v
     let tag = project' anyTag scrut
@@ -248,9 +269,11 @@ convertBody (Case v@(Var _ t) [p1 :-> e1, p2 :-> e2]) | Set.null ((freeVars p2 :
         scrut' = (if t `elem` ptrs then cast (basicType "uintptr_t") scrut else scrut)
         cp (Lit i _) = constant (number $ fromIntegral i)
         cp (Tag t) = constant (enum (nodeTagName t))
+        am | isVar p2 = id
+           | otherwise = annotate (show p2)
     e1' <- convertBody e1
     e2' <- convertBody e2
-    return $ profile_case_inc `mappend` cif (operator "==" (cp p1) scrut') e1' e2'
+    return $ profile_case_inc `mappend` cif (operator "==" (cp p1) scrut') e1' (am e2')
 
 convertBody (Case v@(Var _ t) ls) = do
     scrut <- convertVal v
@@ -357,4 +380,7 @@ buildConstants fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
 ccaf :: (Var,Val) -> P.Doc
 ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ render (prettyVal val)) <> text "*/\n" <> text "static node_t _" <> tshow (varName v) <> text ";\n" <> text "#define " <> tshow (varName v) <+>  text "(&_" <> tshow (varName v) <> text ")\n";
 
+
+isVar Var {} = True
+isVar _ = False
 

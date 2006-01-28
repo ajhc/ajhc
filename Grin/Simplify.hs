@@ -261,10 +261,10 @@ isKnown _ = False
 optimize1 ::  Bool -> (Atom,Lam) -> StatM Lam
 optimize1 postEval (n,l) = g l where
     g (b :-> e) = f e >>= return . (b :->)
-    f (e :>>= Tup [] :-> Return (Tup []) :>>= lr) = do
+    f (e :>>= v1 :-> Return v2 :>>= lr) | v1 == v2 = do
         mtick "Optimize.optimize.unit-unit"
         f (e :>>= lr)
-    f (e :>>= Tup [] :-> Return (Tup [])) = do
+    f (e :>>= v1 :-> Return v2) | v1 == v2 = do
         mtick "Optimize.optimize.unit-unit"
         f e
     f (Store t :>>= v :-> Fetch v' :>>= lr) | v == v' = do
@@ -440,6 +440,8 @@ isErrOmittable Update {} = True
 isErrOmittable (e1 :>>= _ :-> e2) = isErrOmittable e1 && isErrOmittable e2
 isErrOmittable (Case x ds) = all isErrOmittable [ e | _ :-> e <- ds ]
 isErrOmittable x = isOmittable x
+
+{-# NOINLINE simplify #-}
 
 simplify ::
     Stats     -- ^ stats to update
