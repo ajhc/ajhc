@@ -45,6 +45,7 @@ module Grin.Grin(
     tagUnfunction,
     tyUnit,
     unit,
+    itemTag,
     v0,v1,v2,v3,
     valIsNF
     ) where
@@ -534,7 +535,7 @@ instance  FreeVars Exp (Set.Set Var,Set.Set Tag) where
 
 instance FreeVars Val (Set.Set Var) where
     freeVars (NodeC t xs) = freeVars xs
-    freeVars (NodeV _ xs) = freeVars xs
+    freeVars (NodeV v xs) = Set.insert v $ freeVars xs
     freeVars (Const v) = freeVars v
     freeVars (Var v _) = Set.singleton v
     freeVars (Tup vs) = freeVars vs
@@ -602,6 +603,8 @@ data Item = HeapValue (Set.Set HeapValue) | NodeValue (Set.Set NodeValue) | Basi
 data HeapValue = HV Int (Either (HeapType,Item) Val)  -- either a heap location or a constant
 data NodeValue = NV Tag [Item]
     deriving(Ord,Eq)
+
+itemTag = BasicValue TyTag
 
 instance CanType Item Ty where
     getType (HeapValue _) = TyPtr TyNode

@@ -42,6 +42,7 @@ at_OptSimplifyBadAssignment  = toAtom "Optimize.simplify.bad-assignment"
 at_OptSimplifyHoleAssignment  = toAtom "Optimize.simplify.hole-assignment"
 at_OptSimplifyConstStore  = toAtom "Optimize.simplify.const-store"
 at_OptSimplifyConstUpdate  = toAtom "Optimize.simplify.const-update"
+at_OptSimplifyEnumAssignment  = toAtom "Optimize.simplify.enum-assignment"
 
 -- contains functions that should be inlined
 type SimpEnv = Map.Map Atom (Atom,Lam)
@@ -101,6 +102,12 @@ simplify1 stats env (n,l) = do
     gv (NodeC t xs,Return (NodeC t' xs')) | t /= t' = do
             lift $ tick stats at_OptSimplifyBadAssignment
             gv (NodeC t xs,Error ("Bad Assignment: " ++ show (t,t')) TyNode)
+    gv (NodeV v [],Return (NodeC t' [])) = do
+            lift $ tick stats at_OptSimplifyEnumAssignment
+            gv (Var v TyTag, Return (Tag t'))
+    gv (NodeV v [],Return (NodeV v' [])) = do
+            lift $ tick stats at_OptSimplifyEnumAssignment
+            gv (Var v TyTag, Return (Var v' TyTag))
     gv (p,e) = do
         (env,_) <- get
         e <- (applySubstE env e)

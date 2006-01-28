@@ -7,6 +7,7 @@ module C.Generate(
     FunctionOpts(..),
     sizeof,
     cast,
+    commaExpression,
     functionCall,
     function,
     dereference,

@@ -84,6 +84,8 @@ convertExp (App a vs _) = do
 convertExp (Fetch v) = do
     v <- convertVal v
     return (mempty,v)
+convertExp (Store n@NodeV {}) = newNode n
+convertExp (Return n@NodeV {}) = newNode n
 convertExp (Store n@NodeC {}) = newNode n
 convertExp (Return n@NodeC {}) = newNode n
 convertExp (Return v) = do
@@ -109,7 +111,7 @@ convertExp (Update v@Var {} (NodeC t as)) = do
 convertExp (Update v z) = do  -- TODO eliminate unknown updates
     v' <- convertVal v
     z' <- convertVal z
-    let tag = project' (name "any.tag") z'
+    let tag = project' anyTag z'
     return $ (profile_update_inc,functionCall (name "memcpy") [v',z',functionCall  (name "jhc_sizeof") [tag]])
 convertExp e = return (err (show e),err "nothing")
 
@@ -139,8 +141,16 @@ nodeTypePtr a = liftM ptrType (nodeType a)
 
 jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
 tag = name "tag"
+anyTag = name "any.tag"
 arg i = name $ 'a':show i
 
+newNode (NodeV t []) = do
+    tmp <- newVar pnode_t
+    var <- fetchVar t TyTag
+    let tmp' = project' anyTag tmp
+        malloc =  tmp `assign` jhc_malloc (sizeof  node_t)
+        tagassign = tmp' `assign` var
+    return (mappend malloc tagassign, tmp)
 newNode (NodeC t _) | t == tagHole = do
     return $  (mempty,jhc_malloc (sizeof node_t))
 newNode (NodeC t as) = do
@@ -190,20 +200,11 @@ convertBody (Prim p [a,b] :>>= Tup [q,r] :-> e') | primName p == toAtom "@primQu
     ss' <- convertBody e'
     return $ mconcat [ assign q' (operator "/" a' b'), assign r' (operator "%" a' b'), ss' ]
 
-convertBody (Return v :>>= (NodeC t as) :-> e') = do
-    v' <- convertVal v
-    let tmp = project' (nodeStructName t) v'
-    as' <- mapM convertVal as
-    let ass = [assign  a (project (arg i) tmp) | a <- as' | i <- [( 1 :: Int) ..] ]
-    ss' <- convertBody e'
-    return $  mconcat (ass ++ [ss'])
-convertBody (Fetch v :>>= (NodeC t as) :-> e') = do
-    v' <- convertVal v
-    let tmp = project' (nodeStructName t) v'
-    as' <- mapM convertVal as
-    let ass = [assign a (project (arg i) tmp) | a <- as' | i <- [(1 :: Int) ..] ]
-    ss' <- convertBody e'
-    return (mconcat ass `mappend` ss')
+
+convertBody (Return v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
+convertBody (Fetch v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
+convertBody (Return v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
+convertBody (Fetch v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
 convertBody (e :>>= v@(Var _ _) :-> e') = do
     v' <- convertVal v
     ss <- localTodo (TodoExp v')  (convertBody e)
@@ -224,7 +225,7 @@ convertBody (e :>>= Tup xs :-> e') = do
 
 convertBody (Case v@(Var _ t) ls) | t == TyNode = do
     scrut <- convertVal v
-    let tag = project' (name "any.tag") scrut
+    let tag = project' anyTag scrut
         da (v@(Var {}) :-> e) = do
             v'' <- convertVal v
             e' <- convertBody e
@@ -265,7 +266,20 @@ convertBody e = do
 
 convertBody e = return $ err (show e)
 
-convertBody' e todo = localTodo TodoReturn $ convertBody e
+nodeAssign v t as e' = do
+    v' <- convertVal v
+    let tmp = project' (nodeStructName t) v'
+    as' <- mapM convertVal as
+    let ass = [assign  a (project (arg i) tmp) | a <- as' | i <- [( 1 :: Int) ..] ]
+    ss' <- convertBody e'
+    return $  mconcat ass `mappend` ss'
+
+nodeAssignV v t e' = do
+    v' <- convertVal v
+    var <- fetchVar t TyTag
+    ss' <- convertBody e'
+    return $ assign var (project' anyTag v') `mappend` ss'
+
 
 localTodo :: Todo -> C a -> C a
 localTodo todo (C act) = C $ local (const todo) act
@@ -326,4 +340,5 @@ buildConstants fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
 
 ccaf :: (Var,Val) -> P.Doc
 ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ render (prettyVal val)) <> text "*/\n" <> text "static node_t _" <> tshow (varName v) <> text ";\n" <> text "#define " <> tshow (varName v) <+>  text "(&_" <> tshow (varName v) <> text ")\n";
+
 

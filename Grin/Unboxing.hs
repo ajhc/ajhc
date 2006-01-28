@@ -41,10 +41,13 @@ unboxFunction fn item | any isLeft rvs = return (unboxReturn, unboxCall, returnT
     vars  = [Var v t | v <- [v1 ..] | t <- map getType vs ]
     vars' = concat [ perhapsM (isRight r) (Var v t)  | v <- [v1 ..] | t <- map getType vs | r <- rvs ]
 
---unboxFunction fn (NodeValue vs) | all isEnum (Set.toList vs) = (unboxReturn, unboxCall, TyTag) where
---    unboxReturn (Return (NodeC t [])) = Return t
---    unboxReturn (App a as ty) | a == fn = App a as TyTag
---    unboxCall (App a as ty) = (App a as TyTag :>>= (Var v1 TyTag) :-> Return (NodeV v1 []))
+-- unbox enumerated types
+unboxFunction fn (NodeValue vs) | all isEnum (Set.toList vs) = return (unboxReturn, unboxCall, TyTag, itemTag) where
+    unboxReturn (Return (NodeC t [])) = Return (Tag t)
+    unboxReturn e = e :>>= nodev :-> Return var
+    unboxCall (App a as ty) = App a as TyTag :>>= var :-> Return nodev
+    var = Var v1 TyTag
+    nodev = NodeV v1 []
 
 -- returning a known node type
 unboxFunction fn (NodeValue vs) | [NV t args] <- Set.toList vs  =  let
@@ -76,10 +79,7 @@ unboxReturnValues grin = do
         ubc a | Just v <- Map.lookup a (grinReturnTags grin) = unboxingCandidate v
         ubc _ = False
         cfns = filter ubc (fsts $ grinFunctions grin)
-    --putStrLn "Candidate Unboxings"
-    --mapM_ print cfns
-
-    let pf fn | Just item <- Map.lookup fn (grinReturnTags grin) =
+        pf fn | Just item <- Map.lookup fn (grinReturnTags grin) =
             do x <- unboxFunction fn item ; return $ Map.singleton fn x
         fns = Map.unions $ concatMap pf cfns
         retTag fn _ | Just (_,_,_,ret) <- Map.lookup fn fns = ret
