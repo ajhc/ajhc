@@ -26,20 +26,7 @@ isEnum _ = False
 
 
 unboxFunction :: Monad m => Atom -> Item -> m (Exp -> Exp, Exp -> Exp, Ty, Item)
---unboxFunction fn (NodeValue vs) | all isEnum (Set.toList vs) = (unboxReturn, unboxCall, TyTag) where
---    unboxReturn (Return (NodeC t [])) = Return t
---    unboxReturn (App a as ty) | a == fn = App a as TyTag
---    unboxCall (App a as ty) = (App a as TyTag :>>= (Var v1 TyTag) :-> Return (NodeV v1 []))
-
-unboxFunction fn (NodeValue vs) | [NV t [arg]] <- Set.toList vs  =  let
-    returnType = getType arg
-    unboxReturn (Return (NodeC t' [x])) | t == t' = Return x
-                                        | otherwise = error "returning wrong node"
-    unboxReturn e = e :>>= NodeC t [var] :-> Return var
-    unboxCall (App a as _) | a == fn = App a as returnType :>>= var :-> Return (NodeC t [var])
-    --unboxCall x = x
-    var = Var v1 returnType
-    in return (unboxReturn, unboxCall, returnType, arg)
+-- any fully constant values are done first
 unboxFunction fn x | getType x /= tyUnit, Just v <- constantItem  x  =  let
     returnType = tyUnit
     unboxReturn Return {} = Return unit
@@ -47,6 +34,29 @@ unboxFunction fn x | getType x /= tyUnit, Just v <- constantItem  x  =  let
     unboxCall (App a as _) | a == fn = App a as returnType :>>= unit :-> Return v
     var = Var v1 (getType x)
     in return (unboxReturn, unboxCall, returnType, TupledValue [])
+--unboxFunction fn (NodeValue vs) | all isEnum (Set.toList vs) = (unboxReturn, unboxCall, TyTag) where
+--    unboxReturn (Return (NodeC t [])) = Return t
+--    unboxReturn (App a as ty) | a == fn = App a as TyTag
+--    unboxCall (App a as ty) = (App a as TyTag :>>= (Var v1 TyTag) :-> Return (NodeV v1 []))
+
+-- returning node of exactly one value
+unboxFunction fn (NodeValue vs) | [NV t [arg]] <- Set.toList vs  =  let
+    returnType = getType arg
+    unboxReturn (Return (NodeC t' [x])) | t == t' = Return x
+                                        | otherwise = error "returning wrong node"
+    unboxReturn e = e :>>= NodeC t [var] :-> Return var
+    unboxCall (App a as _) | a == fn = App a as returnType :>>= var :-> Return (NodeC t [var])
+    var = Var v1 returnType
+    in return (unboxReturn, unboxCall, returnType, arg)
+-- returning known node of several arguments
+unboxFunction fn (NodeValue vs) | [NV t args] <- Set.toList vs  =  let
+    returnType = TyTup (map getType args)
+    unboxReturn (Return (NodeC t' xs)) | t == t' = Return (Tup xs)
+                                        | otherwise = error "returning wrong node"
+    unboxReturn e = e :>>= NodeC t vars :-> Return (Tup vars)
+    unboxCall (App a as _) | a == fn = App a as returnType :>>= Tup vars :-> Return (NodeC t vars)
+    vars  = [Var v t | v <- [v1 ..] | t <- map getType args ]
+    in return (unboxReturn, unboxCall, returnType, TupledValue args)
 
 unboxFunction _ item = fail "function not unboxable" -- (id,id,getType item)
 

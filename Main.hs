@@ -465,7 +465,7 @@ compileModEnv' stats ho = do
     wdump FD.GrinPosteval $ printGrin x
     stats <- Stats.new
     x <- unboxReturnValues x
-    --mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinReturnTags x)
+    mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinReturnTags x)
     x <- return $ normalizeGrin x
     typecheckGrin x
     x <- opt "AE Optimization" x
