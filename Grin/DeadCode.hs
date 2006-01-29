@@ -11,8 +11,8 @@ import Fixer.Supply
 import FreeVars
 import Grin.Grin
 import Grin.Whiz
-import Support.CanType
 import Stats hiding(print)
+import Support.CanType
 import Util.Gen
 
 
@@ -29,6 +29,8 @@ deadCode stats roots grin = do
     usedFuncs <- newSupply fixer
     usedArgs <- newSupply fixer
     usedCafs <- newSupply fixer
+    pappFuncs <- newValue fixer bottom
+    suspFuncs <- newValue fixer bottom
     -- set all roots as used
     flip mapM_ roots $ \r -> do
         addRule $ value True `implies` sValue usedFuncs r
@@ -40,29 +42,39 @@ deadCode stats roots grin = do
         f <- supplyValue usedFuncs (tagFlipFunction a)
         addRule $ x `implies` f
 
-    mapM_ (go fixer usedFuncs usedArgs usedCafs postInline) (grinFunctions grin)
+    mapM_ (go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline) (grinFunctions grin)
     calcFixpoint "Dead Code" fixer
-    --supplyReadValues usedFuncs >>= mapM_ print
     ua <- supplyReadValues usedArgs
     uc <- supplyReadValues usedCafs
+    uf <- supplyReadValues usedFuncs
     let cafSet = fg uc
         argSet = fg ua
+        funSet = fg uf
         fg xs = Set.fromList [ x | (x,True) <- xs ]
     newCafs <- flip mconcatMapM (grinCafs grin) $ \ (x,y) -> do
-        u <- readSValue usedCafs x
-        if u then return [(x,y)] else return []
+        if x `Set.member` cafSet then return [(x,y)] else tick stats "Optimize.dead-code.caf" >> return []
     newFuncs <- flip mconcatMapM (grinFunctions grin) $ \ (x,y) -> do
-        u <- readSValue usedFuncs x
-        --if not u then tick stats ("Optimize.dead-code.func.{" ++ show x) >> return [] else do
-        if not u then tick stats "Optimize.dead-code.func" >> return [] else do
+        if not $ x `Set.member` funSet then tick stats "Optimize.dead-code.func" >> return [] else do
         r <- runStatIO stats $ removeDeadArgs postInline cafSet argSet (x,y)
         return [r]
-
-    return grin { grinCafs = newCafs, grinFunctions = newFuncs }
+    pappFuncs <- readValue pappFuncs
+    suspFuncs <- readValue suspFuncs
+    --putStrLn "partialapplied:"
+    --mapM_ print $ Set.toList pappFuncs
+    --putStrLn "suspended:"
+    --mapM_ print $ Set.toList suspFuncs
+    --putStrLn "none:"
+    --mapM_ print $ Set.toList $ funSet Set.\\ suspFuncs Set.\\ pappFuncs
+    return grin {
+        grinCafs = newCafs,
+        grinFunctions = newFuncs,
+        grinPartFunctions = pappFuncs,
+        grinSuspFunctions = suspFuncs
+        }
 
 combineArgs fn as = [ ((fn,n),a) | (n,a) <- zip [0 :: Int ..] as]
 
-go fixer usedFuncs usedArgs usedCafs postInline (fn,~(Tup as) :-> body) = ans where
+go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as) :-> body) = ans where
     ans = do
         usedVars <- newSupply fixer
 
@@ -100,10 +112,13 @@ go fixer usedFuncs usedArgs usedCafs postInline (fn,~(Tup as) :-> body) = ans wh
             h (p,Return v) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
             h (p,Fetch v) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
             h (p,Cast v _) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
-            --h (p,Fetch v) = addRule $ mconcat $ [ mconcatMap (implies (varValue pv) . varValue) (freeVars v) | pv <- freeVars p]
-            --h (p,Cast v _) = addRule $ mconcat $ [ mconcatMap (implies (varValue pv) . varValue) (freeVars v) | pv <- freeVars p]
             h (p,e) = g e
-            doNode (NodeC n as) | not postInline, Just (x,fn) <- tagUnfunction n  = mappend (mconcatMap doConst as) $ mconcat (implies fn' (sValue usedFuncs fn):[ mconcatMap (implies (sValue usedArgs fn) . varValue) (freeVars a) | (fn,a) <- combineArgs fn as])
+            doNode (NodeC n as) | not postInline, Just (x,fn) <- tagUnfunction n  = let
+                consts = (mconcatMap doConst as)
+                usedfn = implies fn' (sValue usedFuncs fn)
+                suspfn | x > 0 = conditionalRule id fn' (pappFuncs `isSuperSetOf` value (Set.singleton fn))
+                       | otherwise = conditionalRule id fn' (suspFuncs `isSuperSetOf` value (Set.singleton fn))
+                in mappend consts $ mconcat (usedfn:suspfn:[ mconcatMap (implies (sValue usedArgs fn) . varValue) (freeVars a) | (fn,a) <- combineArgs fn as])
             doNode x = doConst x `mappend` mconcatMap (implies fn' . varValue) (freeVars x)
             doConst _ | postInline  = mempty
             doConst (Const n) = doNode n
@@ -111,16 +126,6 @@ go fixer usedFuncs usedArgs usedCafs postInline (fn,~(Tup as) :-> body) = ans wh
             doConst (NodeC n as) = mconcatMap doConst as
             doConst (NodeV n as) = mconcatMap doConst as
             doConst _ = mempty
-
-
-{-
-            g (Store (NodeC x vs)) | Just a <- tagToFunction x = tell (Seq.fromList $ concat [ [ (x,Passed [(a,i)]) | x <- freeVars v] | v <- vs | i <- [0..] ])
-            g (Return (NodeC x vs)) | Just a <- tagToFunction x = tell (Seq.fromList $ concat [ [ (x,Passed [(a,i)]) | x <- freeVars v] | v <- vs | i <- [0..] ])
-            g (Update _ (NodeC x vs)) | Just a <- tagToFunction x = tell (Seq.fromList $ concat [ [ (x,Passed [(a,i)]) | x <- freeVars v] | v <- vs | i <- [0..] ])
-            g (Case e _) = tell (Seq.fromList [ (v,Used) | v <- freeVars e ])
-            g e = tell (Seq.fromList [ (v,Used) | v <- freeVars e ])
-            g _ = return ()
-            -}
 
         (nl,_) <- whiz (\_ -> id) h' f whizState (Tup as :-> body)
         return nl

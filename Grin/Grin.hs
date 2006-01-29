@@ -204,6 +204,8 @@ data Grin = Grin {
     grinFunctions :: [(Atom,Lam)],
     grinReturnTags :: Map.Map Atom Item,
     grinArgTags :: Map.Map (Atom,Int) Item,
+    grinSuspFunctions :: Set.Set Atom,
+    grinPartFunctions :: Set.Set Atom,
     grinCafs :: [(Var,Val)]
 }
 
@@ -215,6 +217,8 @@ emptyGrin = Grin {
     grinFunctions = [],
     grinReturnTags = mempty,
     grinArgTags = mempty,
+    grinSuspFunctions = mempty,
+    grinPartFunctions = mempty,
     grinCafs = mempty
 }
 
