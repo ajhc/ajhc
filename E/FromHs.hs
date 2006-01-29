@@ -1,4 +1,15 @@
-module E.FromHs(matchesConv,altConv,guardConv,convertDecls,getMainFunction,createMethods,createInstanceRules,theMainName,deNewtype,methodNames) where
+module E.FromHs(
+    altConv,
+    convertDecls,
+    createInstanceRules,
+    createMethods,
+    deNewtype,
+    getMainFunction,
+    guardConv,
+    matchesConv,
+    methodNames,
+    theMainName
+    ) where
 
 import Control.Monad.Identity
 import Control.Monad.State
@@ -101,14 +112,12 @@ convertVal assumps n = (mp EPi ts (tipe t), mp eLam ts) where
     mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (lt n) (kind k)) (mp fn rs t)
     mp _ [] t = t
     ts = ctgen t
-    --lt n =  nameToInt (fromTypishHsName  n)
     lt n =  nameToInt n
 
 convertOneVal (Forall _ (_ :=> t)) = (mp EPi ts (tipe t)) where
     mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (lt n) (kind k)) (mp fn rs t)
     mp _ [] t = t
     ts = ctgen t
-    --lt n =  nameToInt (fromTypishHsName  n)
     lt n =  nameToInt n
 
 toTVr assumps n = tVr ( nameToInt n) (typeOfName n) where
@@ -139,7 +148,6 @@ getMainFunction dataTable name ds = ans where
               | otherwise = case ioLike (getType maine) of
                 Just x ->  EAp (EAp (EVar runMain)  x ) maine
                 Nothing ->  EAp (EAp (EVar runExpr) ty) maine
-            -- ans' = eStrictLet (tvr { tvrIdent = 0, tvrType = (infertype dataTable be)}) be vUnit
             be = eAp e vWorld__
             theMain = (theMainName,theMainTvr,be)
             theMainTvr =  tVr (nameToInt theMainName) (infertype dataTable be)
@@ -151,12 +159,6 @@ getMainFunction dataTable name ds = ans where
         ELit (LitCons n [x] _) -> if show n ==  "Jhc.IO.IO" then Just x else Nothing
         _ -> Nothing
     smplE = id
-
-        {-
-    lco = ELetRec [ (_,x,y) hoEs ds]
-    main = toTVr (hoAssumps ho) (parseName Val wt)
-    -}
-    --nameMap = Map.fromList [ (n,t) |  (n,t,_) <- ds]
     findName name = case Map.lookup name ds of
         Nothing -> fail $ "Cannot find: " ++ show name
         Just (n,_) -> return n
@@ -164,7 +166,6 @@ getMainFunction dataTable name ds = ans where
 createInstanceRules :: Monad m => ClassHierarchy -> (Map.Map Name (TVr,E)) -> m Rules
 createInstanceRules classHierarchy funcs = return $ fromRules ans where
     ans = concatMap cClass (classRecords classHierarchy)
-    --cClass ClassRecord { className = name, classInsts = is, classAssumps = as } =  concat [ method n | n :>: _ <- as ]
     cClass classRecord =  concat [ method classRecord n | n :>: Forall _ (_ :=> t) <- classAssumps classRecord ]
 
     method classRecord n = as where
@@ -344,8 +345,6 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         es = [ (tVr ( n) t) |  t <- ts | n <- localVars ]
     cExpr (HsLit (HsString s)) = E.Values.toE s
     cExpr (HsLit (HsInt i)) = intConvert i
-    --cExpr (HsLit (HsInt i)) | abs i > integer_cutoff  =  ELit (LitCons (toName DataConstructor ("Prelude","Integer")) [ELit $ LitInt (fromInteger i) (ELit (LitCons (toName RawType "intmax_t") [] eStar))] tInteger)
-    --cExpr (HsLit (HsInt i))  =  ELit (LitCons (toName DataConstructor ("Prelude","Int")) [ELit $ LitInt (fromInteger i) (ELit (LitCons (toName RawType "int") [] eStar))] tInt)
     cExpr (HsLit (HsChar ch))  =  toE ch -- ELit (LitCons (toName DataConstructor ("Prelude","Char")) [ELit $ LitInt (fromIntegral $ ord i) (ELit (LitCons (toName RawType "uint32_t") [] eStar))] tChar)
     cExpr (HsLit (HsFrac i))  =  toE i -- ELit $ LitInt (fromRational i) tRational -- LitFrac i (error "litfrac?")
     cExpr (HsLambda sl ps e)
@@ -545,8 +544,6 @@ isStrictPat (HsPIrrPat p) = isStrictPat p  -- TODO irrefutable patterns
 isStrictPat _ = True
 
 
---convertVMap vmap = Map.fromList [ (y,x) |  (x,y) <- Map.toList vmap]
-
 deNewtype :: DataTable -> E -> E
 deNewtype dataTable e = f e where
     f (ELit (LitCons n [x] t)) | alias =  (f x)  where
@@ -556,118 +553,5 @@ deNewtype dataTable e = f e where
     f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons n [v] t) z):_) } | alias = eLet v (f e)  (f z) where
         Just Constructor { conAlias = alias } = getConstructor n dataTable
     f e = runIdentity $ emapE (return . f) e
-
-{-
-deNewtype :: DataTable -> E -> E
-deNewtype dataTable e = f e where
-    f (ELit (LitCons n [x] t)) | alias =  prim_unsafeCoerce (f x) t where
-        Just Constructor { conAlias = alias } = getConstructor n dataTable
-    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons n [v] t) z):_) } | alias = eLet v (prim_unsafeCoerce (f e) (getType v)) (f z) where
-        Just Constructor { conAlias = alias } = getConstructor n dataTable
-        --((nt:_),_) = argTypes' (typ z)
-    f e = runIdentity $ emapE (return . f) e
---    f (ECase e ((PatLit ((LitCons n [_] t)),z):_)) | alias = EAp (f z) (EPrim "unsafeCoerce" [f e] nt) where
---        Just Constructor { conAlias = alias } = getConstructor n dataTable
---        ((nt:_),_) = argTypes' (typ z)
-
--}
-
-{-
-
-toLC' :: Monad m => DataTable -> NameAssoc ->  ModEnv -> String -> m E
-toLC' dataTable nameAssoc mi wt = return $  eLetRec (theMain : (concatMap cClass (classRecords $ modEnvClassHierarchy mi)  ++ concatMap cDecl  decls)) (EVar theMainTvr)  where
-    decls = concat [ hsModuleDecls $ modInfoHsModule m | m <- Map.elems (modEnvModules mi) ] ++ Map.elems (modEnvLiftedInstances mi)
-    assumps = modEnvAllAssumptions mi -- `plusFM` modEnvDConsAssumptions mi
-    theMainTvr =  TVr (Just $ nameToInt theMainName) (typ (snd theMain))
-    --theMain = (theMainTvr,case ioLike  of Just x ->  EAp (EAp runMain  x ) (EVar tvm) ; Nothing -> EVar tvm)  where
-    theMain = (theMainTvr,case ioLike  of Just x ->  EAp (EAp runMain  x ) (EVar tvm) ; Nothing ->  EAp (EAp runExpr ty) (EVar tvm))  where
-        tvm@(TVr _ ty ) =  main
-        ioLike = case smplE ty of
-            ELit (LitCons n [x] _) -> if show n ==  "Jhc.IO.IO" then Just x else Nothing
-            _ -> Nothing
-    --nameToInt n = case Map.lookup n nameAssoc of
-    --    Nothing -> error $ "Not found: " ++ show n
-    --    Just z -> z
-
-    main = toTVr (parseName Val wt)
-    negate  = EVar $ toTVr (toName Val ("Prelude","negate"))
-    runMain = EVar $ toTVr (toName Val ("Prelude.IO","runMain"))
-    runExpr = EVar $ toTVr (toName Val ("Prelude.IO","runExpr"))
-
-
-    --tv n = TVr (zm (Left n)) (cType n)
-    --cClass :: (HsName,([Class], [Qual Pred], [Assump])) -> [(TVr,E)]
-    cClass :: ClassRecord -> [(TVr,E)]
-    cClass ClassRecord { className = name, classInsts = is, classAssumps = as } =  concat [ method n | n :>: _ <- as ] where
-        method n = return (tv n, v) where
-            els = case [ d | d <- ds, maybeGetDeclName d == Just n] of
-                [d] | [(_,v)] <- cDecl d -> eAp v (EVar tvr)
-                []  -> EError ((show n) ++ ": no instance or default.") t
-                _ -> error "This shouldn't happen"
-            --v = if null as then
-            --     snd $ head $ head [ cDecl d | d <- ds, maybeGetDeclName d == Just n]
-            --            else eLam tvr (eCase (EVar tvr) as els)
-            v = eLam tvr (eCase (EVar tvr) as els)
-            as = [(valToPat [] ( ty t), (EVar $ toTVr name)) | (_ :=> IsIn _ t ) <- is, let name =(toName Name.Val (instanceName n (getTypeCons t))), isJust $ Map.lookup name  assumps ] -- ++ [(valToPat [] ( ty t), (EVar $ toTVr name)) | (_ :=> IsIn _ t ) <- is, let name =(toName Name.Val (instanceName n (getTypeCons t))), isJust $ Map.lookup name  assumps ]
-            (EPi tvr@(TVr _ _) t) = cType n
-            valToPat xs (ELit (LitCons x ts t)) = PatLit $ LitCons x (replicate (length ts) Unknown)  (foldr EPi t xs)
-            valToPat _ e = errorDoc $ text "valToPat:" <+> ePretty e
-            --valToPat xs (ELam tvr e) = valToPat (tvr:xs) e
-            --valToPat xs (EAp (ELam tvr b) e) = valToPat xs (subst tvr e b)
-        [ds] = [ map simplifyDecl decls | (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon n) _)) decls)  <- decls, n == name]
-
-
-    --pvalCache =   Map.fromList $ map (\x -> let y = toName Name.Val x in (y,pval' y)) $ lefts vars
-    --pval n = case Map.lookup  (toName Name.Val n) pvalCache of
-    --    Just z -> z
-     --   Nothing -> error $ "pval Lookup failed: " ++ (show n)
-    ft n = snd $ pval (toName Name.Val n)
-    --specialize a quantified type to a specific one by applying the expression to types
-    ty (TAp t1 t2) = eAp (ty t1) (ty t2)
-    ty (TArrow t1 t2) =  EPi (TVr Nothing (ty t1)) (ty t2)
-    ty (TCon (Tycon n k)) =  ELit (LitCons (toName TypeConstructor n) [] (kd k))
---    ty (TCon (Tycon n k)) = foldr ($) (ELit (LitCons (getName n) (map EVar es) rt)) (map ELam es) where
---        (ts,rt) = argTypes' (kd k)
---        es = [ (TVr (Just n) t) |  t <- ts | n <- localVars ]
-    ty (TVar (Tyvar _ n k)) = EVar (TVr (lt n) (kd k))
-    ty (TGen _ (Tyvar _ n k)) = EVar (TVr (lt n) (kd k))
-
-
-        --gg' _ _ = []
-
-createMethods :: Monad m => ClassHierarchy -> (Map.Map Name (TVr,E))  -> m [(Name,TVr,E)]
-createMethods classHierarchy funcs = return ans where
-    ans = concatMap cClass (classRecords classHierarchy)
-    --cClass ClassRecord { className = name, classInsts = is, classAssumps = as } =  concat [ method n | n :>: _ <- as ]
-    cClass classRecord =  [ method classRecord n | n :>: _ <- classAssumps classRecord ]
-
-    method classRecord n = (methodName ,TVr ( nameToInt methodName) ty,v) where
-        methodName = toName Name.Val n
-        Just (deftvr@(TVr _ ty),_) = findName (toName Name.Val (defaultInstanceName n))
-        els = eAp (EVar deftvr) (EVar tvr)
-        --els = case [ d | d <- ds, maybeGetDeclName d == Just n] of
-        --    [d] | [(_,v)] <- cDecl d -> eAp v (EVar tvr)
-        --    []  -> EError ((show n) ++ ": no instance or default.") t
-        --    _ -> error "This shouldn't happen"
-        --v = if null as then
-        --     snd $ head $ head [ cDecl d | d <- ds, maybeGetDeclName d == Just n]
-        --            else eLam tvr (eCase (EVar tvr) as els)
-        v = eLam tvr (eCase (EVar tvr) as els)
-        --as = [Alt (valToPat [] (tipe t)) ((EVar $ fst $ runIdentity $ findName name)) | (_ :=> IsIn _ t ) <- classInsts classRecord, let name =(toName Name.Val (instanceName n (getTypeCons t))), isJust $ findName name ] -- ++ [(valToPat [] ( ty t), (EVar $ toTVr name)) | (_ :=> IsIn _ t ) <- is, let name =(toName Name.Val (instanceName n (getTypeCons t))), isJust $ Map.lookup name  assumps ]
-        as = [calt (tipe t) (fst $ runIdentity $ findName name) | (_ :=> IsIn _ t ) <- classInsts classRecord, let name =(toName Name.Val (instanceName n (getTypeCons t))), isJust $ findName name ] -- ++ [(valToPat [] ( ty t), (EVar $ toTVr name)) | (_ :=> IsIn _ t ) <- is, let name =(toName Name.Val (instanceName n (getTypeCons t))), isJust $ Map.lookup name  assumps ]
-        (EPi tvr@(TVr _ _) t) = ty
-        calt (ELit (LitCons x vs t)) tvr =  Alt (LitCons x [ tvr | ~(EVar tvr) <- vs ]  t) (foldl EAp (EVar tvr) vs)
-        --valToPat xs (ELit (LitCons x ts t)) = PatLit $ LitCons x (replicate (length ts) Unknown)  (foldr EPi t xs)
-        valToPat [] (ELit (LitCons x [] t)) =  LitCons x []  t
-        valToPat [] (ELit (LitCons x vs t)) =  LitCons x [ tvr | ~(EVar tvr) <- vs ]  t
-        --valToPat xs (ELit (LitCons x ts t)) =  LitCons x (replicate (length ts) Unknown)  (foldr EPi t xs)
-        valToPat [] e = errorDoc $ text "valToPat:" <+> ePretty e
-        --valToPat xs (ELam tvr e) = valToPat (tvr:xs) e
-        --valToPat xs (EAp (ELam tvr b) e) = valToPat xs (subst tvr e b)
-    --nameMap = Map.fromList [ (n,(t,e)) |  (n,t,e) <- funcs]
-    findName name = case Map.lookup name funcs of
-        Nothing -> fail $ "Cannot find: " ++ show name
-        Just n -> return n
--}
 
 

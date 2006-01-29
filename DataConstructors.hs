@@ -148,7 +148,7 @@ tunboxedtuple n = (typeCons,dataCons) where
 
 
 tabsurd = Constructor {
-            conName = toName TypeConstructor "Absurd#",
+            conName = tc_Absurd,
             conType = eStar,
             conSlots = [],
             conDeriving = [],
@@ -160,7 +160,7 @@ tabsurd = Constructor {
     }
 
 tarrow = Constructor {
-            conName = toName TypeConstructor ("Prelude","->"),
+            conName = tc_Arrow,
             conType = EPi (tVr 0 eStar) (EPi (tVr 0 eStar) eStar),
             conSlots = [eStar,eStar],
             conDeriving = [],
@@ -293,6 +293,7 @@ followAliases _ e = e
 
 dataTablePrims =  Map.fromList [ (conName x,x) | x <- tabsurd:tarrow:primitiveTable ]
 
+{-# NOINLINE toDataTable #-}
 toDataTable :: (Map Name Kind) -> (Map Name Scheme) -> [HsDecl] -> DataTable
 toDataTable km cm ds = DataTable $ Map.union dataTablePrims  (Map.fromList [ (conName x,x) | x <- ds' ])  where
     ds' = Seq.toList $ execWriter (mapM_ f ds)
@@ -334,7 +335,7 @@ toDataTable km cm ds = DataTable $ Map.union dataTablePrims  (Map.fromList [ (co
             nm' =  toName Name.DataConstructor (hsConDeclName x)
             (rt@(ELit (LitCons _ xs _)) ,ts') = fromPi ty'
             subst = substMap $ Map.fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
-            ts = [ tvr { tvrIdent =  (x)}   | tvr <- ts' | x <- [2,4..] ]
+            ts = [ tvr { tvrIdent =  (x)}   | tvr <- ts' | x <- drop (5 + length ts') [2,4..] ]
             ty' = tipe ty
             --ty' = tipe $ schemeToType scheme
             Just scheme@(Forall _ (_ :=> ty)) = Map.lookup nm' cm
@@ -417,23 +418,3 @@ pprintTypeAsHs e = unparse $ runVarName (f e) where
     app = bop (L,100) (text " ")
 
 
---pprintTypeAsHs (EPi (TVr { tvrIdent = 0, tvrType = t1 }) t2) =
-
---    | otherwise = error $ "getSiblings: " ++ show n ++ show (Map.keys mp) ++ show (n `elem` (Map.keys mp))
-
-
--- These will eventually be described in the Prelude directly as boxed versions of the
--- underlying unboxed type.
---
--- TODO float, double, integer
-
---builtinTypes = [ btype tInt, btype tChar ]
-
---btype x = Data {
---    dtName =  x,
---    dtType = tStar,
---    dtArgs = [],
---    dtAlias = False,
---    dtCLosures = True,
---    dtCons = Nothing
---}

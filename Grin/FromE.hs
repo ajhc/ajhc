@@ -165,10 +165,10 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
     where
     scMap = fromList [ (tvrNum t,toEntry x) |  x@(t,_,_) <- scCombinators sc]
     initTyEnv = mappend primTyEnv $ TyEnv $ fromList $ [ (a,(b,c)) | (_,(a,b,c)) <-  Map.toList scMap] ++ [con x| x <- Map.elems $ constructorMap dataTable]
-    con c | (ELit (LitCons _ es t),_) <- fromLam $ conExpr c = let
+    con c | (ELit (LitCons _ es _),_) <- fromLam $ conExpr c = let
             n | sortStarLike (conType c) = toAtom ('T':show (conName c))
               | otherwise = toAtom ('C':show (conName c))
-            as = [ TyPtr TyNode |  EVar tvr <- es]
+            as = [ TyPtr TyNode |  ~(EVar tvr) <- es]
         in  (n,(as,TyNode))
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode))
 
