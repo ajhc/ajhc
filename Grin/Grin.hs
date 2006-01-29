@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Grin.Grin(
-    Builtin,
     Exp(..),
     Grin(..),
     HeapType(..),
@@ -281,8 +280,6 @@ props Cast {} = mempty
 props _ = error "props"
 
 
-type Builtin = [Val] -> IO Val
-
 
 partialTag :: Tag -> Int -> Tag
 partialTag v c = case fromAtom v of
@@ -381,23 +378,9 @@ isHole x = x `elem` map properHole [TyPtr TyNode, TyNode, TyTag]
 ---------
 
 findArgsType (TyEnv m) a | Just x <-  Map.lookup a m = return x
-findArgsType (TyEnv m) a | ('F':rs) <- fromAtom a = case Map.lookup (toAtom ('f':rs)) m of
-    Just x -> return x
-    Nothing -> fail $ "findArgsType: " ++ show a
-findArgsType (TyEnv m) a | ('B':rs) <- fromAtom a = case Map.lookup (toAtom ('b':rs)) m of
-    Just x -> return x
-    Nothing -> fail $ "findArgsType: " ++ show a
-findArgsType (TyEnv m) a | ('P':rs) <- fromAtom a, (ns,'_':rs) <- span isDigit rs  = case Map.lookup (toAtom ('f':rs)) m of
-    Just (ts,n) -> return (take (length ts - read ns) ts,n)
-    Nothing -> fail $ "findArgsType: " ++ show a
 findArgsType (TyEnv m) a | ('Y':rs) <- fromAtom a, (ns,'_':rs) <- span isDigit rs  = case Map.lookup (toAtom ('T':rs)) m of
     Just (ts,n) -> return (take (length ts - read ns) ts,n)
     Nothing -> fail $ "findArgsType: " ++ show a
-findArgsType _ a | a == toAtom "TAbsurd#" = return ([],TyNode)
-findArgsType _ a | a == funcEval = return ([TyPtr TyNode],TyNode)
-findArgsType _ a | a == funcApply = return ([TyNode, TyPtr TyNode],TyNode)
-findArgsType _ a | a == funcMain = return ([],tyUnit)
-findArgsType _ a | a == tagHole = return ([],TyNode)
 findArgsType _ a | "@hole" `isPrefixOf` fromAtom a  = return ([],TyNode)
 findArgsType _ a =  fail $ "findArgsType: " ++ show a
 

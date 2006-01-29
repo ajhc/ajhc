@@ -19,6 +19,8 @@ import Options
 import qualified FlagDump as FD
 import qualified Stats
 
+type Builtin = [Val] -> IO Val
+
 builtins = []
 builtinMap = Map.fromList [ (x,y) | (x,y) <- builtins ]
 

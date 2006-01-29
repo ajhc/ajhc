@@ -438,10 +438,11 @@ compileModEnv' stats ho = do
     typecheckGrin x
     let opt s  x = do
         stats' <- Stats.new
-        --deadFunctions stats' [funcMain] x
         x <- Grin.Simplify.simplify stats' x
         wdump FD.Steps $ printGrin x
         x <- deadCode stats' [funcMain] x  -- XXX
+        wdump FD.Tags $ do
+            dumpTyEnv (grinTypeEnv x)
         when flint $ typecheckGrin x
         t' <- Stats.getTicks stats'
         wdump FD.Progress $ Stats.print s stats'
@@ -598,6 +599,7 @@ typecheck dataTable e = case inferType dataTable [] e of
             False -> putErrDie "Type Error in E"
     Right v -> return v
 
+dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ show n <+> hsep (map show as) <+> "::" <+> show t |  (n,(as,t)) <- Map.toList tt]
 
 printCheckName dataTable e = do
     putErrLn  ( render $ hang 4 (pprint e <+> text "::") )

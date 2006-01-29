@@ -4,11 +4,13 @@ module Grin.DeadCode(deadCode) where
 import Data.Monoid
 import Monad
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 
 import Atom
 import Fixer.Fixer
 import Fixer.Supply
 import FreeVars
+import GenUtil
 import Grin.Grin
 import Grin.Whiz
 import Stats hiding(print)
@@ -47,18 +49,31 @@ deadCode stats roots grin = do
     ua <- supplyReadValues usedArgs
     uc <- supplyReadValues usedCafs
     uf <- supplyReadValues usedFuncs
+    pappFuncs <- readValue pappFuncs
+    suspFuncs <- readValue suspFuncs
     let cafSet = fg uc
         argSet = fg ua
         funSet = fg uf
+        directFuncs =  funSet Set.\\ suspFuncs Set.\\ pappFuncs
         fg xs = Set.fromList [ x | (x,True) <- xs ]
     newCafs <- flip mconcatMapM (grinCafs grin) $ \ (x,y) -> do
         if x `Set.member` cafSet then return [(x,y)] else tick stats "Optimize.dead-code.caf" >> return []
     newFuncs <- flip mconcatMapM (grinFunctions grin) $ \ (x,y) -> do
         if not $ x `Set.member` funSet then tick stats "Optimize.dead-code.func" >> return [] else do
-        r <- runStatIO stats $ removeDeadArgs postInline cafSet argSet (x,y)
+        r <- runStatIO stats $ removeDeadArgs postInline funSet directFuncs cafSet argSet (x,y)
         return [r]
-    pappFuncs <- readValue pappFuncs
-    suspFuncs <- readValue suspFuncs
+    let (TyEnv mp) = grinTypeEnv grin
+    mp' <- flip mconcatMapM (Map.toList mp) $ \ (x,(ts,rt)) -> case Just x  of
+        Just _ | tagIsFunction x, not $ x `Set.member` funSet -> return []
+        Just fn | fn `Set.member` directFuncs -> do
+            let da (t,i)
+                    | Set.member (fn,i) argSet = return [t]
+                    | otherwise = tick stats ("Optimize.dead-code.arg-func.{" ++ show x ++ "-" ++ show i) >> return []
+            ts' <- mconcatMapM da (zip ts naturals)
+            return [(x,(ts',rt))]
+        _ -> return [(x,(ts,rt))]
+
+
     --putStrLn "partialapplied:"
     --mapM_ print $ Set.toList pappFuncs
     --putStrLn "suspended:"
@@ -69,6 +84,7 @@ deadCode stats roots grin = do
         grinCafs = newCafs,
         grinFunctions = newFuncs,
         grinPartFunctions = pappFuncs,
+        grinTypeEnv = TyEnv $ Map.fromList mp',
         grinSuspFunctions = suspFuncs
         }
 
@@ -131,8 +147,10 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as
         return nl
 
 
-removeDeadArgs :: MonadStats m => Bool -> (Set.Set Var) -> (Set.Set (Atom,Int)) -> (Atom,Lam) -> m (Atom,Lam)
-removeDeadArgs postInline usedCafs usedArgs (a,l) =  whizExps f l >>= return . (,) a where
+removeDeadArgs :: MonadStats m => Bool -> Set.Set Atom -> Set.Set Atom -> (Set.Set Var) -> (Set.Set (Atom,Int)) -> (Atom,Lam) -> m (Atom,Lam)
+removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps f (margs l) >>= return . (,) a where
+    margs (Tup as :-> e) | a `Set.member` directFuncs = (Tup (removeArgs a as) :-> e)
+    margs x = x
     f (App fn as ty) | fn `notElem` [funcApply, funcEval] = do
         as <- dff fn as
         as <- mapM clearCaf as
@@ -153,11 +171,12 @@ removeDeadArgs postInline usedCafs usedArgs (a,l) =  whizExps f l >>= return . (
         as <- mapM clearCaf as
         return $ Update p (NodeC fn as)
     f x = return x
-    dff' fn as | postInline = return as
-    dff' fn as = dff fn as
-    dff fn as = mapM df  (zip as [0..]) where
-        deadVal (Lit 0 _) = True
-        deadVal x =  isHole x
+    dff' fn as | fn `Set.member` directFuncs = return as
+    dff' fn as = dff'' fn as
+    dff fn as | fn `Set.member` directFuncs = return (removeArgs fn as)
+    dff fn as = dff'' fn as
+    dff'' fn as | not (fn `Set.member` funSet) = return as -- if function was dropped, we don't have argument use information.
+    dff'' fn as = mapM df  (zip as naturals) where
         df (a,i) | not (deadVal a) && not (Set.member (fn,i) usedArgs) = do
             mtick $ toAtom "Optimize.dead-code.func-arg"
             return $ properHole (getType a)
@@ -178,6 +197,9 @@ removeDeadArgs postInline usedCafs usedArgs (a,l) =  whizExps f l >>= return . (
         a <- clearCaf a
         return $ Const a
     clearCaf x = return x
-    deadCaf v =  v < v0 && not (v `Set.member` usedCafs)
+    deadCaf v = v < v0 && not (v `Set.member` usedCafs)
+    deadVal (Lit 0 _) = True
+    deadVal x = isHole x
+    removeArgs fn as = concat [ perhapsM ((fn,i) `Set.member` usedArgs) a | a <- as | i <- naturals ]
 
 

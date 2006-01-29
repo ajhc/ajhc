@@ -754,4 +754,3 @@ findFixpoint' grin (HcHash _ mp) eq = do
         }
 
 
-naturals = [0::Int ..]

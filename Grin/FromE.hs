@@ -119,8 +119,6 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
     tyEnv <- newIORef initTyEnv
     funcBaps <- newIORef []
     counter <- newIORef 100000  -- TODO real number
-    wdump FD.Tags $ do
-        dumpTyEnv initTyEnv
     let (cc,reqcc) = constantCaf dataTable sc
     wdump FD.Progress $ do
         putErrLn $ "Found" <+> tshow (length cc) <+> "CAFs to convert to constants," <+> tshow (length reqcc) <+> "of which are recursive."
@@ -144,7 +142,10 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
         mapM_ print os
     let tf a = a:tagToFunction a
     ds <- return $ flattenScc $ stronglyConnComp [ (a,x, concatMap tf (freeVars z)) | a@(x,(_ :-> z)) <- ds]
-    te <- readIORef tyEnv
+    TyEnv endTyEnv <- readIORef tyEnv
+    let newTyEnv = TyEnv $ Map.fromList $ concatMap makePartials (Map.toList endTyEnv)
+    wdump FD.Tags $ do
+        dumpTyEnv newTyEnv
     fbaps <- readIORef funcBaps
     --sequence_ [ typecheck te c >>= when False . print . (,) a  | (a,_,c) <-  ds ]
     -- let (main,as,rtype) = runIdentity $ Map.lookup (tvrNum mt) scMap
@@ -161,7 +162,7 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
     let grin = emptyGrin {
             grinEntryPoints = [funcMain],
             grinPhase = PhaseInit,
-            grinTypeEnv = te,
+            grinTypeEnv = newTyEnv,
             grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  theMain :>>= n0 :-> Return unit )) : ds',
             grinCafs = cafs
             }
@@ -178,6 +179,10 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode))
 
 
+makePartials (fn,(ts,rt)) | tagIsFunction fn, head (show fn) /= '@'  = (fn,(ts,rt)):[(partialTag fn i,(reverse $ drop i $ reverse ts ,TyNode)) |  i <- [0.. end] ]  where
+    end | 'b':_ <- show fn = 0
+        | otherwise = length ts
+makePartials x = [x]
 
 primTyEnv = TyEnv . Map.fromList $ [
     (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode)),
@@ -185,6 +190,7 @@ primTyEnv = TyEnv . Map.fromList $ [
     (funcInitCafs, ([],tyUnit)),
     (funcEval, ([TyPtr TyNode],TyNode)),
     (funcApply, ([TyNode, TyPtr TyNode],TyNode)),
+    (funcMain, ([],tyUnit)),
     (tagHole, ([],TyNode))
     ] ++ [ (toAtom ('C':x), ([Ty $ toAtom y],TyNode)) | (x,y,_) <- allCTypes, y /= "void" ]
 

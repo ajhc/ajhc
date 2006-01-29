@@ -1,5 +1,5 @@
 
---  $Id: GenUtil.hs,v 1.47 2006/01/28 02:15:30 john Exp $
+--  $Id: GenUtil.hs,v 1.48 2006/01/29 05:22:26 john Exp $
 -- arch-tag: 835e46b7-8ffd-40a0-aaf9-326b7e347760
 
 
@@ -54,6 +54,7 @@ module GenUtil(
     sortGroupUnderF,
     sortGroupUnderFG,
     sameLength,
+    naturals,
 
     -- ** Monad routines
     perhapsM,
@@ -719,5 +720,8 @@ getPrefix a b = f a b where
         | otherwise = fail $ "getPrefix: " ++ a ++ " " ++ b
 
 
+{-# INLINE naturals #-}
+naturals :: [Int]
+naturals = [0..]
 
 
