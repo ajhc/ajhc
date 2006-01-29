@@ -308,8 +308,9 @@ convertBody e = return $ err (show e)
 nodeAssign v t as e' = do
     v' <- convertVal v
     let tmp = project' (nodeStructName t) v'
+        fve = freeVars e'
     as' <- mapM convertVal as
-    let ass = [assign  a (project (arg i) tmp) | a <- as' | i <- [( 1 :: Int) ..] ]
+    let ass = concat [perhapsM (a `Set.member` fve) $ assign  a' (project (arg i) tmp) | a' <- as' | Var a _ <- as |  i <- [( 1 :: Int) ..] ]
     ss' <- convertBody e'
     return $  mconcat ass `mappend` ss'
 
