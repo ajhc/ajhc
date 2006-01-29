@@ -79,7 +79,7 @@ prettyVal (Tag t) = tag (fromAtom t)
 prettyVal (Var (V i) t)
     | TyPtr _ <- t = char 'p' <> tshow i
     | TyNode <- t = char 'n' <> tshow i
-    | t == Ty "uint32_t" = char 'c' <> tshow i
+    | t == Ty (toAtom "uint32_t") = char 'c' <> tshow i
     | t == tIntzh  = char 'i' <> tshow i
     | Ty _ <- t  = char 'l' <> tshow i
     | TyTag <- t  = char 't' <> tshow i
@@ -110,10 +110,15 @@ printGrin Grin { grinFunctions = ds', grinCafs = cafs } = do
     putErrLn "-- Functions"
     mapM_ (putErrLn . render) $ map prettyFun ds'
 
+showSome xs = f 7 xs [] where
+    f 0 _ xs = reverse ("...":xs)
+    f _ [] xs = reverse xs
+    f n (x:xs) rs = f (n - 1) xs (x:rs)
+
 instance Show Item where
     show (BasicValue ty) = "<" ++ show ty ++ ">"
-    show (HeapValue hv) = braces $ hcat $ punctuate "," (map show (Set.toList hv))
-    show (NodeValue hv) = braces $ hcat $ punctuate "," (map show (Set.toList hv))
+    show (HeapValue hv) = braces $ hcat $ punctuate "," (showSome $ map show (Set.toList hv))
+    show (NodeValue hv) = braces $ hcat $ punctuate "," (showSome $ map show (Set.toList hv))
     show (TupledValue xs) = tupled (map show xs)
 
 instance Show NodeValue where

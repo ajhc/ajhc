@@ -43,6 +43,7 @@ import Grin.FromE
 import Grin.Grin
 import Grin.Show
 import Grin.Unboxing
+import Grin.Arity
 import Grin.Whiz
 import Ho
 import HsSyn
@@ -476,8 +477,15 @@ compileModEnv' stats ho = do
     wdump FD.OptimizationStats $ Stats.print "AE Optimization" stats
     x <- return $ normalizeGrin x
     typecheckGrin x
+--    x <- grinRaiseArity x
+--    x <- return $ normalizeGrin x
+--    typecheckGrin x
+--    x <- opt "After Arity Optimization" x
+--    wdump FD.OptimizationStats $ Stats.print "AE Optimization" stats
+--    x <- return $ normalizeGrin x
+
     printTable "Return points-to" (grinReturnTags x)
-    printTable "Argument points-to" (Map.map (map dereferenceItem) $ grinArgTags x)
+    printTable "Argument points-to" (grinArgTags x)
     wdump FD.Grin $ printGrin x
     when (optInterpret options) $ do
         progress "Interpreting..."
