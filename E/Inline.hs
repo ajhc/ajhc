@@ -9,7 +9,7 @@ import E.E
 import E.Rules
 import E.Subst
 import E.Values
-import FreeVars
+import Support.FreeVars
 import GenUtil
 import Info.Info as Info
 import Stats

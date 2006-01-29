@@ -17,7 +17,7 @@ import C.Generate
 import C.Prims
 import Doc.DocLike
 import Doc.PPrint
-import FreeVars
+import Support.FreeVars
 import GenUtil
 import Grin.Grin
 import Grin.HashConst

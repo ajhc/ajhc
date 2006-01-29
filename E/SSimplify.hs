@@ -22,7 +22,7 @@ import E.Rules
 import E.Subst
 import E.TypeCheck
 import E.Values
-import FreeVars
+import Support.FreeVars
 import GenUtil
 import Info.Types
 import Name.Name

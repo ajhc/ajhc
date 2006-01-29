@@ -25,7 +25,7 @@ import E.Subst
 import E.Traverse
 import E.TypeCheck
 import E.Values
-import FreeVars
+import Support.FreeVars
 import GenUtil
 import HsSyn
 import Info.Types

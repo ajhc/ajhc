@@ -10,7 +10,7 @@ import Doc.PPrint
 import Doc.Pretty
 import E.E
 import E.FreeVars()
-import FreeVars
+import Support.FreeVars
 import Name.Name
 import Name.Names
 import Options

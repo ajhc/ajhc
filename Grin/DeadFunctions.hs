@@ -11,7 +11,7 @@ import qualified Data.Set as Set
 import Atom
 import Support.CanType
 import FindFixpoint
-import FreeVars
+import Support.FreeVars
 import GenUtil hiding(replicateM_)
 import Grin.Grin
 import Grin.Whiz

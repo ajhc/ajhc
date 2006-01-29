@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 module E.FreeVars(decomposeLet, decomposeDefns) where
 
-import FreeVars
+import Support.FreeVars
 import E.E
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS

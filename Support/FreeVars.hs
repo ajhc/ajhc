@@ -1,5 +1,5 @@
 
-module FreeVars where
+module Support.FreeVars where
 
 import Data.Monoid
 

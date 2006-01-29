@@ -6,7 +6,7 @@ module E.Diff where
 
 import E.E
 import E.Inline
-import FreeVars
+import Support.FreeVars
 import Stats
 
 -- | take two expressions and return (hopefully smaller) expressions with their differences

@@ -13,7 +13,7 @@ import Doc.DocLike
 import Doc.PPrint
 import E.E
 import E.Values
-import FreeVars
+import Support.FreeVars
 import GenUtil
 import Util.NameMonad
 import PrimitiveOperators

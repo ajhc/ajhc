@@ -15,7 +15,7 @@ import E.E
 import E.FreeVars()
 import E.Subst
 import E.TypeCheck
-import FreeVars
+import Support.FreeVars
 import Info.Types
 import Name.Name
 import Name.Names

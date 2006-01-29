@@ -12,7 +12,7 @@ import Doc.Pretty (putDoc, Doc)
 import E.Pretty
 import Data.Monoid
 import GenUtil
-import FreeVars
+import Support.FreeVars
 import Name.VConsts
 import Support.CanType
 import CharIO

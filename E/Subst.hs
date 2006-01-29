@@ -10,7 +10,7 @@ import qualified Data.Map as Map
 
 import E.E
 import E.FreeVars()
-import FreeVars
+import Support.FreeVars
 import GenUtil
 
 eLetRec :: [(TVr,E)] -> E -> E

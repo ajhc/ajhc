@@ -63,7 +63,7 @@ import Atom
 import Boolean.Algebra
 import C.Prims
 import Doc.DocLike
-import FreeVars
+import Support.FreeVars
 import GenUtil
 import Name.VConsts
 import Number

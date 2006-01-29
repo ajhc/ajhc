@@ -9,7 +9,7 @@ import qualified Data.Map as Map
 import Atom
 import Fixer.Fixer
 import Fixer.Supply
-import FreeVars
+import Support.FreeVars
 import GenUtil
 import Grin.Grin
 import Grin.Whiz

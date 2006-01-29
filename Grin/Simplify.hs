@@ -11,7 +11,7 @@ import qualified Data.Set as Set
 
 import Atom
 import C.Prims
-import FreeVars
+import Support.FreeVars
 import GenUtil hiding(putErrLn,replicateM_)
 import Grin.Grin
 import Grin.Whiz

@@ -22,7 +22,7 @@ import E.FreeVars
 import E.LambdaLift
 import E.TypeCheck
 import E.Values
-import FreeVars
+import Support.FreeVars
 import GenUtil
 import Grin.Grin
 import Grin.Show

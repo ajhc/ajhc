@@ -36,7 +36,7 @@ import E.Traverse
 import E.TypeAnalysis
 import E.TypeCheck
 import E.WorkerWrapper
-import FreeVars
+import Support.FreeVars
 import FrontEnd.FrontEnd
 import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)

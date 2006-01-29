@@ -30,7 +30,7 @@ import E.E
 import E.Eval
 import E.Pretty
 import E.Subst
-import FreeVars
+import Support.FreeVars
 import GenUtil
 import Util.HasSize
 import MapBinaryInstance()

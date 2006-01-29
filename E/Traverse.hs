@@ -16,7 +16,7 @@ import E.Rules
 import E.Strictness as Strict
 import E.TypeCheck
 import E.Values
-import FreeVars
+import Support.FreeVars
 import GenUtil
 import Name.Name
 import Util.NameMonad

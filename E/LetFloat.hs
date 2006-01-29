@@ -22,7 +22,7 @@ import E.Inline
 import E.Rules
 import E.Traverse
 import E.Values
-import FreeVars
+import Support.FreeVars
 import GenUtil
 import qualified Util.Graph as G
 import Stats
