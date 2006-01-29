@@ -383,9 +383,12 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
             return $ if null xs' then  Error "No Valid alternatives. This Should Not be reachable." (getType (Case v xs)) else (Case v xs')
         vsToItem = valueSetToItem (grinTypeEnv grin) pt
         te = grinTypeEnv grin
+        convertArgs fa = Map.fromList $ map f (Map.keys $ ptFunc pt) where
+            f atom = (atom,[ uncurry vsToItem $ Map.findWithDefault (t,VsEmpty) (atom,i) fa  |  t <- ts | i <- naturals]) where
+                Just (ts,_) = findArgsType te atom
     let (sts,funcs) = unzip [ (stat,(a,l')) | (a,l) <- grinFunctions, let (l',stat) = runStatM (f l) ]
     tickStat stats (mconcat sts)
-    return grin { grinPhase = PostInlineEval, grinFunctions = funcs, grinArgTags = Map.map (\ (t,v) -> vsToItem t v) $ ptFuncArgs pt, grinReturnTags = Map.mapWithKey (funcReturn te pt) $ ptFunc pt }
+    return grin { grinPhase = PostInlineEval, grinFunctions = funcs, grinArgTags = convertArgs $ ptFuncArgs pt, grinReturnTags = Map.mapWithKey (funcReturn te pt) $ ptFunc pt }
 
 
 funcReturn te pt fn vs = valueSetToItem te pt ty vs where

@@ -202,7 +202,7 @@ data Grin = Grin {
     grinTypeEnv :: TyEnv,
     grinFunctions :: [(Atom,Lam)],
     grinReturnTags :: Map.Map Atom Item,
-    grinArgTags :: Map.Map (Atom,Int) Item,
+    grinArgTags :: Map.Map Atom [Item],
     grinSuspFunctions :: Set.Set Atom,
     grinPartFunctions :: Set.Set Atom,
     grinCafs :: [(Var,Val)]

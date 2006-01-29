@@ -120,7 +120,7 @@ instance Show NodeValue where
     show (NV t as) = parens $ hsep (show t:map show as)
 
 instance Show HeapValue where
-    show (HV _ (Right v)) = prettyVal v
+    show (HV _ (Right v)) = prettyVal (Const v)
     show (HV n (Left (ht,_))) = show ht ++ "-" ++ show n
 
 instance Show HeapType where

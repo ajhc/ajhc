@@ -56,8 +56,7 @@ deadCode stats roots grin = do
         funSet = fg uf
         directFuncs =  funSet Set.\\ suspFuncs Set.\\ pappFuncs
         fg xs = Set.fromList [ x | (x,True) <- xs ]
-    newCafs <- flip mconcatMapM (grinCafs grin) $ \ (x,y) -> do
-        if x `Set.member` cafSet then return [(x,y)] else tick stats "Optimize.dead-code.caf" >> return []
+    newCafs <- flip mconcatMapM (grinCafs grin) $ \ (x,y) -> if x `Set.member` cafSet then return [(x,y)] else tick stats "Optimize.dead-code.caf" >> return []
     newFuncs <- flip mconcatMapM (grinFunctions grin) $ \ (x,y) -> do
         if not $ x `Set.member` funSet then tick stats "Optimize.dead-code.func" >> return [] else do
         r <- runStatIO stats $ removeDeadArgs postInline funSet directFuncs cafSet argSet (x,y)
@@ -72,6 +71,13 @@ deadCode stats roots grin = do
             ts' <- mconcatMapM da (zip ts naturals)
             return [(x,(ts',rt))]
         _ -> return [(x,(ts,rt))]
+    let newArgTags = concatMap foo (Map.toList $ grinArgTags grin)
+        foo (fn,ts) | not $ fn `Set.member` funSet = []
+        foo (fn,ts) | fn `Set.member` directFuncs = [(fn,concatMap da (zip ts naturals))] where
+            da (t,i) | Set.member (fn,i) argSet = [t]
+                     | otherwise =  []
+        foo (fn,ts) = [(fn,ts)]
+
 
 
     --putStrLn "partialapplied:"
@@ -85,6 +91,7 @@ deadCode stats roots grin = do
         grinFunctions = newFuncs,
         grinPartFunctions = pappFuncs,
         grinTypeEnv = TyEnv $ Map.fromList mp',
+        grinArgTags = Map.fromList newArgTags,
         grinSuspFunctions = suspFuncs
         }
 

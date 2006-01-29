@@ -11,11 +11,10 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified System
 
-import Support.CanType(getType)
 import C.FromGrin
+import C.Prims
 import CharIO
 import Class
-import C.Prims
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
@@ -36,7 +35,6 @@ import E.Traverse
 import E.TypeAnalysis
 import E.TypeCheck
 import E.WorkerWrapper
-import Support.FreeVars
 import FrontEnd.FrontEnd
 import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
@@ -44,6 +42,7 @@ import Grin.DeadCode
 import Grin.FromE
 import Grin.Grin
 import Grin.Show
+import Grin.Unboxing
 import Grin.Whiz
 import Ho
 import HsSyn
@@ -51,6 +50,11 @@ import Info.Types
 import Name.Name
 import Options
 import SelfTest(selfTest)
+import Support.CanType(getType)
+import Support.FreeVars
+import Support.ShowTable
+import Util.Graph
+import Version
 import qualified E.CPR
 import qualified E.SSimplify as SS
 import qualified FlagDump as FD
@@ -61,9 +65,6 @@ import qualified Grin.Simplify
 import qualified Info.Info as Info
 import qualified Interactive
 import qualified Stats
-import Grin.Unboxing
-import Util.Graph
-import Version
 
 ---------------
 -- ∀α∃β . α → β
@@ -459,6 +460,8 @@ compileModEnv' stats ho = do
     progress "Points-to analysis..."
     stats <- Stats.new
     x <- Grin.PointsToAnalysis.grinInlineEvalApply stats x
+    --printTable "Return points-to" (grinReturnTags x)
+    --printTable "Argument points-to" (grinArgTags x)
     --mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinReturnTags x)
     --mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinArgTags x)
     wdump FD.Progress $ Stats.print "EvalInline" stats
@@ -466,13 +469,15 @@ compileModEnv' stats ho = do
     wdump FD.GrinPosteval $ printGrin x
     stats <- Stats.new
     x <- unboxReturnValues x
-    mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinReturnTags x)
+    --mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinReturnTags x)
     x <- return $ normalizeGrin x
     typecheckGrin x
     x <- opt "AE Optimization" x
     wdump FD.OptimizationStats $ Stats.print "AE Optimization" stats
     x <- return $ normalizeGrin x
     typecheckGrin x
+    printTable "Return points-to" (grinReturnTags x)
+    printTable "Argument points-to" (grinArgTags x)
     wdump FD.Grin $ printGrin x
     when (optInterpret options) $ do
         progress "Interpreting..."
