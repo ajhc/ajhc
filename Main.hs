@@ -477,7 +477,7 @@ compileModEnv' stats ho = do
     x <- return $ normalizeGrin x
     typecheckGrin x
     printTable "Return points-to" (grinReturnTags x)
-    printTable "Argument points-to" (grinArgTags x)
+    printTable "Argument points-to" (Map.map (map dereferenceItem) $ grinArgTags x)
     wdump FD.Grin $ printGrin x
     when (optInterpret options) $ do
         progress "Interpreting..."
@@ -505,6 +505,10 @@ compileModEnv' stats ho = do
         when (r /= System.ExitSuccess) $ fail "C code did not compile."
         return ()
 
+dereferenceItem (HeapValue hvs) | not $ Set.null hvs = combineItems (map f $ Set.toList hvs) where
+    f (HV _ (Right v)) = valToItem v
+    f (HV _ (Left (_,i))) = i
+dereferenceItem x = x
 
 buildShowTableLL xs = buildTableLL [ (show x,show y) | (x,y) <- xs ]
 

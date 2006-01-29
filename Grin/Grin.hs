@@ -10,7 +10,6 @@ module Grin.Grin(
     NodeValue(NV),
     Phase(..),
     Primitive(..),
-    Props(..),
     Tag,
     Ty(..),
     TyEnv(..),
@@ -35,6 +34,7 @@ module Grin.Grin(
     sequenceG_,
     tagFlipFunction,
     tagHole,
+    valToItem,
     tagIsFunction,
     tagIsPartialAp,
     tagIsSuspFunction,
@@ -43,6 +43,7 @@ module Grin.Grin(
     tagToFunction,
     tagUnfunction,
     tyUnit,
+    combineItems,
     unit,
     itemTag,
     v0,v1,v2,v3,lamExp,lamBind,
@@ -252,32 +253,8 @@ instance Eq Primitive where
 instance Ord Primitive where
     compare a b = compare (primName a) (primName b)
 
-data Props = Props {
-    hasSideEffects :: Flag,  -- ^ has side effects
-    causesError    :: Flag,  -- ^ contains Error or aborting primitive
-    allocsMem      :: Flag   -- ^ calls store (does not count as side effect)
-    } deriving(Show)
-
-instance Monoid Props where
-    mempty = Props mempty mempty mempty
-    Props x y z `mappend` Props a b c = Props (mappend x a) (mappend y b) (mappend z c)
-instance SemiBooleanAlgebra Props where
-    Props x y z && Props a b c = Props ((&&) x a) ((&&) y b) ((&&) z c)
-    Props x y z || Props a b c = Props ((||) x a) ((||) y b) ((||) z c)
 
 
-propsMaybe = Props { hasSideEffects = Maybe, causesError = Maybe, allocsMem = Maybe }
-
-props :: Exp -> Props
-props (x :>>= (_ :-> y)) = props x && props y
-props (Case _ xs) = or1 [ props x | _ :-> x <- xs ]
-props Return {} = mempty
-props Store {} = mempty { allocsMem = Yes }
-props Fetch {} = mempty
-props Update {} = mempty { hasSideEffects = Yes }
-props Error {} = mempty { causesError = Yes }
-props Cast {} = mempty
-props _ = error "props"
 
 
 
@@ -591,6 +568,12 @@ data Item = HeapValue (Set.Set HeapValue) | NodeValue (Set.Set NodeValue) | Basi
 data HeapValue = HV Int (Either (HeapType,Item) Val)  -- either a heap location or a constant
 data NodeValue = NV Tag [Item]
     deriving(Ord,Eq)
+
+valToItem (Const v) = HeapValue (Set.singleton (HV (-1) (Right v)))
+valToItem (NodeC t as) = NodeValue (Set.singleton (NV t (map valToItem as)))
+valToItem (Lit _ ty) = BasicValue ty
+valToItem (Tup as) = TupledValue (map valToItem as)
+valToItem (Tag _) = BasicValue TyTag
 
 itemTag = BasicValue TyTag
 

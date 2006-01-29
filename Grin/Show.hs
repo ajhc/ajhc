@@ -79,7 +79,7 @@ prettyVal (Tag t) = tag (fromAtom t)
 prettyVal (Var (V i) t)
     | TyPtr _ <- t = char 'p' <> tshow i
     | TyNode <- t = char 'n' <> tshow i
-    | t == Ty cChar = char 'c' <> tshow i
+    | t == Ty "uint32_t" = char 'c' <> tshow i
     | t == tIntzh  = char 'i' <> tshow i
     | Ty _ <- t  = char 'l' <> tshow i
     | TyTag <- t  = char 't' <> tshow i

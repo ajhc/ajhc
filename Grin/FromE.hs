@@ -73,12 +73,6 @@ dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ fromAtom n <+> hsep (map show as)
 
 tagArrow = convertName tc_Arrow
 
-convertName n = toAtom (t':s) where
-    (t,s) = fromName n
-    t' | t == TypeConstructor = 'T'
-       | t == DataConstructor = 'C'
-       | t == Val = 'f'
-       | otherwise = error $ "convertName: " ++ show (t,s)
 
 flattenScc xs = concatMap f xs where
     f (AcyclicSCC x) = [x]

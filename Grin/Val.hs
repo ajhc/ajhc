@@ -1,20 +1,21 @@
-module Grin.Val(FromVal(..),ToVal(..),cChar,cInt,tn_2Tup,world__,pworld__,valToList) where
+module Grin.Val(FromVal(..),ToVal(..),tn_2Tup,world__,pworld__,valToList,convertName) where
 
-import Grin.Grin
 import Atom
 import Char
+import Grin.Grin
 import Name.VConsts
+import Name.Names
+import Name.Name
 import Number
 
-nil = (toAtom "CPrelude.[]")
-cons =  (toAtom "CPrelude.:")
-
-cChar = toAtom "CPrelude.Char"
-cInt = toAtom "CPrelude.Int"
-tn_2Tup = toAtom "CPrelude.(,)"
-tn_True = toAtom "CPrelude.True"
-tn_False = toAtom "CPrelude.False"
-tn_unit = toAtom "CPrelude.()"
+nil      = convertName dc_EmptyList -- (toAtom "CPrelude.[]")
+cons     = convertName dc_Cons -- (toAtom "CPrelude.:")
+cChar    = convertName dc_Char -- toAtom "CPrelude.Char"
+cInt     = convertName dc_Int --toAtom "CPrelude.Int"
+tn_2Tup  = convertName $ nameTuple DataConstructor 2
+tn_True  = convertName dc_True  -- toAtom "CPrelude.True"
+tn_False = convertName dc_False -- toAtom "CPrelude.False"
+tn_unit  = convertName dc_Unit -- toAtom "CPrelude.()"
 
 instance ConNames Val where
     vTrue = NodeC tn_True []
@@ -22,7 +23,7 @@ instance ConNames Val where
     vUnit =  NodeC tn_unit []
     vOrdering x = NodeC (toAtom $ "CPrelude." ++ show x) []
 
-world__ = NodeC (toAtom "CJhc.IO.World__") []
+world__ = NodeC (convertName $ dc_World__) []
 pworld__ = Const world__
 
 class ToVal a where
@@ -102,3 +103,12 @@ valToList (NodeC n [a,Const b]) | n == cons = do
         xs <- valToList b
         return (a:xs)
 valToList n = fail $ "Val is not [a]: " ++ show n
+
+convertName n = toAtom (t':s) where
+    (t,s) = fromName n
+    t' | t == TypeConstructor = 'T'
+       | t == DataConstructor = 'C'
+       | t == Val = 'f'
+       | otherwise = error $ "convertName: " ++ show (t,s)
+
+
