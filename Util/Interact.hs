@@ -44,6 +44,8 @@ commands = [
 --    (":execfile!", "run sequence of commands from a file if it exists"),
     (":echo", "echo argument to screen"),
     (":addhist", "add argument to command line history"),
+    (":command", "enter command mode"),
+    (":normal", "enter normal mode"),
     (":help", "print help table")
     ]
 
@@ -54,12 +56,11 @@ extra_help = [
 
 
 basicParse :: Maybe String -> String ->  Either (String,String) String
-basicParse comm s = f s' where
-    s' = reverse $ dropWhile isSpace (reverse $ dropWhile isSpace s)
+basicParse comm s = f (cleanupWhitespace s) where
     f xs | Just c <- comm, c `isPrefixOf` xs = Right ""
-    f (':':rs) = Left (':':map toLower as,dropWhile isSpace rest) where
+    f (':':rs) = Left (':':dropWhile (== ':')  (map toLower as),dropWhile isSpace rest) where
         (as,rest) = span isAlpha rs
-    f _ = Right s'
+    f s = Right s
 
 data InteractCommand = InteractCommand {
     commandName :: String,
@@ -77,6 +78,7 @@ data Interact = Interact {
     interactRC   :: [String],               -- ^ commands to run at startup
     interactWords :: [String],              -- ^ list of words to autocomplete
     interactEcho :: Bool,                   -- ^ whether to echo commands
+    interactCommandMode :: Bool,                -- ^ whether we are in command mode
     interactHistFile :: Maybe String,       -- ^ filename to store history of commands in
     interactComment :: Maybe String         -- ^ comment initializer
     }
@@ -91,6 +93,7 @@ emptyInteract = Interact {
     interactRC = [],
     interactWords = [],
     interactEcho = False,
+    interactCommandMode = False,
     interactHistFile = Nothing,
     interactComment = Nothing
     }
@@ -102,6 +105,9 @@ runInteractions act [] = return act
 runInteractions act (x:xs) = do
     act' <- runInteraction act x
     runInteractions act' xs
+
+thePrompt Interact { interactCommandMode = False, interactPrompt = p } = p
+thePrompt Interact { interactCommandMode = True } = ":"
 
 -- | run a command as if typed at prompt
 
@@ -120,7 +126,7 @@ runInteraction act s = do
                 setable = [ "  " ++ a | a <- sort $ interactSettables act, not $ a `Map.member` interactSet act]
             when (not $ null set) $ putStrLn "Set options:" >> putStr (unlines set)
             when (not $ null setable) $ putStrLn "Setable options:" >> putStr (unlines setable)
-    case basicParse (interactComment act) s of
+    case basicParse (interactComment act) (if interactCommandMode act then ':':s else s) of
         Right "" -> return act
         Right ('!':rest) -> System.system rest >> return act
         Right s -> do
@@ -149,6 +155,8 @@ runInteraction act s = do
             [":execfile!"] -> do
                 fc <- catch (readFile arg) (\_ -> return "")
                 runInteractions act { interactEcho = True } (lines fc)
+            [":command"] -> return act { interactCommandMode = True }
+            [":normal"] -> return act {interactCommandMode = False }
             [m] -> let [a] =  [ a | InteractCommand { commandName = n, commandAction = a } <-  interactCommands act, n == m] in do
                 act' <- a act m arg
                 return act'
@@ -174,7 +182,7 @@ beginInteraction act = do
         let commands' = commands ++ [ (n,h) | InteractCommand { commandName = n, commandHelp = h } <- interactCommands act ]
             args s =  [ bb | bb@(n,_) <- commands', s `isPrefixOf` n ]
             expand s = snub $ fsts (args s) ++ filter (isPrefixOf s) (interactSettables act ++ interactWords act)
-        s <- readLine (interactPrompt act) (return . expand)
+        s <- readLine (thePrompt act) (return . expand)
         case (hist,s) of
             (Just h,(_:_)) -> do
                 catch (hPutStrLn h s >> hFlush h) (const (return ()))
