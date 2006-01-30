@@ -19,8 +19,7 @@ import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
-import E.Annotate(annotate,annotateDs)
-import E.Arbitrary()
+import E.Annotate(annotate,annotateDs,annotateProgram)
 import E.Diff
 import E.E
 import E.FromHs
@@ -382,6 +381,10 @@ compileModEnv' stats ho = do
             --mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ds'
             programMapBodies pruneE prog
         else return prog
+
+    -- make sure properties and rules are attached everywhere
+    prog <- return $ runIdentity $ annotateProgram mempty (idann rules (hoProps ho) ) letann lamann prog
+
     let lc = programE prog
 
     wdump FD.Progress $ printEStats lc
@@ -391,15 +394,10 @@ compileModEnv' stats ho = do
         Stats.tickStat stats stat
         return e'
 
-    --let imap = annotateMethods (hoClassHierarchy ho) (hoRules ho) (hoProps ho)
-    lc <- return $ runIdentity $ annotate mempty (idann rules (hoProps ho) ) letann lamann lc
+    -- run first optimization
     lc <- opt "SuperSimplify" cm lc
-
-
-    --let flLevels = annotateBindings mempty lc
-    --print flLevels
-    --printCheckName dataTable lc
     lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lc
+
     lc <- annotate mempty (\_ nfo -> return $ Info.delete (mempty :: ARules) nfo) (\_ -> return) (\_ -> return) lc
     let cm stats e = do
         let sopt = mempty { SS.so_dataTable = dataTable }
@@ -407,6 +405,7 @@ compileModEnv' stats ho = do
         Stats.tickStat stats stat
         return e'
 
+    -- run optimization again with no rules enabled
     lc <- opt "SuperSimplify no Rules" cm lc
 
 
@@ -471,14 +470,11 @@ compileModEnv' stats ho = do
     x <- Grin.PointsToAnalysis.grinInlineEvalApply stats x
     --printTable "Return points-to" (grinReturnTags x)
     --printTable "Argument points-to" (grinArgTags x)
-    --mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinReturnTags x)
-    --mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinArgTags x)
     wdump FD.Progress $ Stats.print "EvalInline" stats
     typecheckGrin x
     wdump FD.GrinPosteval $ printGrin x
     stats <- Stats.new
     x <- unboxReturnValues x
-    --mapM_ putStrLn (buildShowTableLL $ Map.toList $ grinReturnTags x)
     x <- return $ normalizeGrin x
     typecheckGrin x
     x <- opt "AE Optimization" x
@@ -636,6 +632,7 @@ printCheckName' dataTable tvr e = do
     putErrLn  ( render $ hang 4 (pprint tvr <+> equals <+> pprint e <+> text "::") )
     ty <- typecheck dataTable e
     putErrLn  ( render $ indent 4 (pprint ty))
+
 
 
 
