@@ -338,7 +338,8 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
 --        Forall [] ((_ :=> t')) = getAssump n'
 --        (ts,rt) = argTypes' (ty t')
 --        es = [ (TVr (Just n) t) |  t <- ts | n <- localVars ]
-    cExpr (HsAsPat n' (HsCon n)) =  foldr ($)  (ELit (LitCons (toName DataConstructor n) (map EVar es) rt)) (map ELam es) where -- (spec t t' (cType n))) where
+--    cExpr (HsAsPat n' (HsCon n)) =  foldr ($)  (ELit (LitCons (toName DataConstructor n) (map EVar es) rt)) (map ELam es) where -- (spec t t' (cType n))) where
+    cExpr (HsAsPat n' (HsCon n)) =  constructionExpression dataTable (toName DataConstructor n) rt where
         (Forall _ (_ :=> t)) = getAssumpCon n
         Forall [] ((_ :=> t')) = getAssump n'
         (ts,rt) = argTypes' (ty t')

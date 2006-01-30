@@ -1,6 +1,7 @@
 module DataConstructors(
     Constructor(..),
     DataTable(..),
+    constructionExpression,
     followAliases,
     getConstructor,
     getConstructorArities,
@@ -27,6 +28,7 @@ import E.E
 import E.Pretty
 import E.Shadow
 import E.Subst
+import E.Values
 import GenUtil
 import HsSyn
 import MapBinaryInstance()
@@ -36,10 +38,10 @@ import Name.VConsts
 import PrimitiveOperators
 import qualified Util.Seq as Seq
 import Representation
+import Support.Unparse
 import Type(schemeToType)
 import Util.HasSize
 import Util.SameShape
-import Support.Unparse
 import Util.VarName
 
 tipe t = runVarName (tipe' t) where
@@ -325,27 +327,45 @@ toDataTable km cm ds = DataTable $ Map.union dataTablePrims  (Map.fromList [ (co
             conName = nm',
             conType =tipe $ schemeToType scheme, -- ty',
             conSlots = map (subst . tvrType) ts,  -- XXX TODO fix this mapping
-            conExpr = foldr ($) (ELit (LitCons  nm' (map EVar ts) rt)) (map ELam ts),
+            conExpr = foldr ($) (strictize $ ELit (LitCons  nm' (map EVar ts) rt)) (map ELam ts),
             conInhabits = nm,
             conDeriving = [],
             conAlias = alias,
             conClosures = False,
             conChildren = Nothing
             } where
+            strictize con = E.Subst.subst tvr { tvrIdent = -1 } Unknown $ f (zip (map isHsBangedTy args) ts) con where
+                f ((False,_):rs) con = f rs con
+                f ((True,var):rs) con = eStrictLet var (EVar var) con
+                f [] con = con
             nm' =  toName Name.DataConstructor (hsConDeclName x)
+            args = hsConDeclArgs x
             (rt@(ELit (LitCons _ xs _)) ,ts') = fromPi ty'
             subst = substMap $ Map.fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
-            ts = [ tvr { tvrIdent =  (x)}   | tvr <- ts' | x <- drop (5 + length ts') [2,4..] ]
+            ts = [ tvr {tvrIdent = x} | tvr <- ts' | x <- drop (5 + length ts') [2,4..] ]
             ty' = tipe ty
             --ty' = tipe $ schemeToType scheme
             Just scheme@(Forall _ (_ :=> ty)) = Map.lookup nm' cm
 
+isHsBangedTy HsBangedTy {} = True
+isHsBangedTy _ = False
 
 
 getConstructorArities  :: DataTable -> [(Name,Int)]
 getConstructorArities (DataTable dt) = [ (n,length $ conSlots c) | (n,c) <- Map.toList dt]
 
 
+constructionExpression ::
+    DataTable -- ^ table of data constructors
+    -> Name   -- ^ name of said constructor
+    -> E      -- ^ type of eventual constructor
+    -> E      -- ^ saturated lambda calculus term
+constructionExpression wdt@(DataTable dt) n (ELit (LitCons pn xs _)) | pn == conName pc = sub (conExpr mc) where
+    Identity mc = getConstructor n wdt
+    Just pc = Map.lookup (conInhabits mc) dt
+    sub = substMap $ Map.fromDistinctAscList [ (i,sl) | sl <- xs | i <- [2,4..] ]
+constructionExpression wdt n e | Just fa <- followAlias wdt e  = constructionExpression wdt n fa
+constructionExpression _ n e = error $ "constructionExpression: error in " ++ show n ++ ": " ++ show e
 
 
 slotTypes ::

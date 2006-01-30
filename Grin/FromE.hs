@@ -146,12 +146,9 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
         -- main' =  if not $ null as then  (Return $ NodeC (partialTag main (length as)) []) else App main [] rtype
         -- tags = Set.toList $ ep $ Set.unions (freeVars (main',initCafs):[ freeVars e | (_,(_ :-> e)) <- ds ])
     let ep s = Set.fromList $ concatMap partialLadder $ Set.toList s
-        --ev = (funcEval,(Tup [p1] :-> createEval te tags))
-        --ap = (funcApply,(createApply te tags))
         cafs = [ ((V $ - atomIndex tag),NodeC tag []) | (x,(Tup [] :-> _)) <- ds, let tag = partialTag x 0 ] ++ [ (y,z') |(x,y,z) <- cc, y `elem` reqcc, let Const z' = z ]
         initCafs = sequenceG_ [ Update (Var v (TyPtr TyNode)) node | (v,node) <- cafs ]
         ic = (funcInitCafs,(Tup [] :-> initCafs) )
-        --ds' = ic:ev:ap:ds
         ds' = ic:(ds ++ fbaps)
     let grin = emptyGrin {
             grinEntryPoints = [funcMain],
@@ -164,13 +161,12 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
     return grin
     where
     scMap = fromList [ (tvrNum t,toEntry x) |  x@(t,_,_) <- scCombinators sc]
-    initTyEnv = mappend primTyEnv $ TyEnv $ fromList $ [ (a,(b,c)) | (_,(a,b,c)) <-  Map.toList scMap] ++ [con x| x <- Map.elems $ constructorMap dataTable]
-    con c | (ELit (LitCons _ es _),_) <- fromLam $ conExpr c = let
-            n | sortStarLike (conType c) = toAtom ('T':show (conName c))
-              | otherwise = toAtom ('C':show (conName c))
-            as = [ TyPtr TyNode |  ~(EVar tvr) <- es]
-        in  (n,(as,TyNode))
+    initTyEnv = mappend primTyEnv $ TyEnv $ fromList $ [ (a,(b,c)) | (_,(a,b,c)) <-  Map.toList scMap] ++ [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode))
+    con c = (n,(as,TyNode)) where
+        n | sortStarLike (conType c) = convertName (conName c)
+          | otherwise = convertName (conName c)
+        as = [ toType (TyPtr TyNode) (getType s) |  s <- conSlots c]
 
 
 makePartials (fn,(ts,rt)) | tagIsFunction fn, head (show fn) /= '@'  = (fn,(ts,rt)):[(partialTag fn i,(reverse $ drop i $ reverse ts ,TyNode)) |  i <- [0.. end] ]  where
