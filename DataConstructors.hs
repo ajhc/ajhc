@@ -38,6 +38,7 @@ import Name.VConsts
 import PrimitiveOperators
 import qualified Util.Seq as Seq
 import Representation
+import Support.CanType
 import Support.Unparse
 import Type(schemeToType)
 import Util.HasSize
@@ -303,49 +304,52 @@ toDataTable km cm ds = DataTable $ Map.union dataTablePrims  (Map.fromList [ (co
     f decl@HsDataDecl {  hsDeclCons = cs } = dt decl False  cs
     f _ = return ()
     dt decl alias cs = do
-        cs' <- mapM dc cs
-        tell $ Seq.singleton d { conChildren = Just cs' }
+        let dataCons = map makeData cs
+        tell (Seq.fromList dataCons)
+        tell $ Seq.singleton theType { conChildren = Just (map conName dataCons) }
         where
-        as = hsDeclArgs decl
-        name = hsDeclName decl
-        d = Constructor {
-            conName = nm,
-            conType = kind $ runIdentity (Map.lookup nm km),
-            conSlots = map tvrType ts,
-            conExpr = foldr ($) (ELit (LitCons  nm (map EVar ts) rt)) (map ELam ts),
+        -- as = hsDeclArgs decl
+        --name = hsDeclName decl
+        theTypeName = toName Name.TypeConstructor (hsDeclName decl)
+        theKind = kind $ runIdentity (Map.lookup theTypeName km)
+        (theTypeFKind,theTypeKArgs') = fromPi theKind
+        theTypeArgs = [ tvr { tvrIdent = x } | tvr  <- theTypeKArgs' | x <- [2,4..] ]
+        theTypeExpr =  (ELit (LitCons theTypeName (map EVar theTypeArgs) theTypeFKind))
+        theType = Constructor {
+            conName = theTypeName,
+            conType = theKind,
+            conSlots = map tvrType theTypeArgs,
+            conExpr = foldr ($) theTypeExpr (map ELam theTypeArgs),
             conClosures = True,
             conDeriving = [ toName ClassName n | n <- hsDeclDerives decl],
             conAlias = False,
             conInhabits = tStar,
             conChildren = undefined
-            }
-        (rt,ts') = fromPi (conType d)
-        ts = [ tvr { tvrIdent = x } | tvr  <- ts' | x <- [2,4..] ]
-        nm = toName Name.TypeConstructor name
-        dc x = let z = dc' x in tell (Seq.singleton z) >> return (conName z)
-        dc' x = Constructor {
-            conName = nm',
-            conType =tipe $ schemeToType scheme, -- ty',
-            conSlots = map (subst . tvrType) ts,  -- XXX TODO fix this mapping
-            conExpr = foldr ($) (strictize $ ELit (LitCons  nm' (map EVar ts) rt)) (map ELam ts),
-            conInhabits = nm,
+            } where
+        makeData x = Constructor {
+            conName = dataConsName,
+            conType =foldr ($) (getType theExpr) (map ELam theTypeArgs),-- tipe $ schemeToType scheme, -- ty',
+            conSlots =  slots,
+            conExpr = theExpr,
+            conInhabits = theTypeName,
             conDeriving = [],
             conAlias = alias,
             conClosures = False,
             conChildren = Nothing
             } where
-            strictize con = E.Subst.subst tvr { tvrIdent = -1 } Unknown $ f (zip (map isHsBangedTy args) ts) con where
+            theExpr =  foldr ($) (strictize $ ELit (LitCons dataConsName (map EVar vars) theTypeExpr)) (map ELam vars)
+            slots = map (subst . tvrType) ts -- XXX TODO fix this mapping
+            vars = [ tvr { tvrType = t } | tvr <- ts | t <- slots ]
+            strictize con = E.Subst.subst tvr { tvrIdent = -1 } Unknown $ f (zip (map isHsBangedTy args) vars) con where
                 f ((False,_):rs) con = f rs con
                 f ((True,var):rs) con = eStrictLet var (EVar var) con
                 f [] con = con
-            nm' =  toName Name.DataConstructor (hsConDeclName x)
+            dataConsName =  toName Name.DataConstructor (hsConDeclName x)
             args = hsConDeclArgs x
-            (rt@(ELit (LitCons _ xs _)) ,ts') = fromPi ty'
+            (ELit (LitCons _ xs _) ,ts') = fromPi $ tipe ty
             subst = substMap $ Map.fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
-            ts = [ tvr {tvrIdent = x} | tvr <- ts' | x <- drop (5 + length ts') [2,4..] ]
-            ty' = tipe ty
-            --ty' = tipe $ schemeToType scheme
-            Just scheme@(Forall _ (_ :=> ty)) = Map.lookup nm' cm
+            ts = [ tvr {tvrIdent = x} | tvr <- ts' | x <- drop (5 + length theTypeArgs) [2,4..] ]
+            Just (Forall _ (_ :=> ty)) = Map.lookup dataConsName cm
 
 isHsBangedTy HsBangedTy {} = True
 isHsBangedTy _ = False

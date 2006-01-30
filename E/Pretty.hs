@@ -136,7 +136,7 @@ eDoc e PrettyOpt {optExpanded = optExpanded, optColors = colors, optNames = optN
         (EPi (TVr { tvrIdent = j, tvrType =  e1}) e) | j `notElem` freeVars e -> prettye e1 `arr` prettye e
         (EPi (TVr { tvrIdent = i, tvrType =  z}) e) | z == eStar ->  (pop (retOp UC.forall) (atom $ prettyI i)) `dot` prettye e
         (EPi t e) ->  (pop (retOp UC.pI) (atomize $ prettytvr t)) `dot` prettye e
-        (EVar tvr) | expanded -> prettytvr tvr
+        --(EVar tvr) | expanded -> prettytvr tvr
         (EVar (TVr { tvrIdent = i })) -> atom $ prettyI i
         Unknown -> symbol (char  '?')
         ESort EStar -> symbol UC.star
