@@ -6,6 +6,7 @@ import Data.Monoid
 import qualified Data.Map as Map
 
 import E.E
+import E.Program
 import E.Rules
 import E.Subst
 import GenUtil
@@ -23,6 +24,18 @@ annotateDs :: Monad m =>
 annotateDs imap idann letann lamann ds = do
     ELetRec ds' Unknown <- annotate imap idann letann lamann (ELetRec ds Unknown)
     return ds'
+
+annotateProgram :: Monad m =>
+    (Map.Map Id (Maybe E))
+    -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
+    -> (E -> Info -> m Info)    -- ^ annotate letbound bindings
+    -> (E -> Info -> m Info)    -- ^ annotate lambdabound bindings
+    -> Program                -- ^ terms to annotate
+    -> m Program
+annotateProgram imap idann letann lamann prog = do
+    ds <- annotateDs imap idann letann lamann (programDs prog)
+    return $ programSetDs ds prog
+
 
 annotate :: Monad m =>
     (Map.Map Id (Maybe E))

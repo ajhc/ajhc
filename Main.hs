@@ -26,6 +26,7 @@ import E.E
 import E.FromHs
 import E.Inline
 import E.LambdaLift
+import E.Program
 import E.LetFloat
 import E.Pretty hiding(render)
 import E.Rules
@@ -289,6 +290,10 @@ processDecls stats ho ho' tiData = do
     Stats.print "Optimization" stats
     return ho' { hoDataTable = dataTable, hoEs = Map.fromList [ (x,(y,z)) | (x,y,z) <- ds'], hoRules = rules, hoUsedIds = collectIds (ELetRec [ (b,c) | (_,b,c) <- ds'] Unknown) }
 
+programPruneUnreachable :: Program -> Program
+programPruneUnreachable prog = programSetDs ds' prog where
+    ds' = reachable (newGraph (programDs prog) (tvrIdent . fst) (\ (t,e) -> bindingFreeVars t e)) (map tvrIdent $ progEntryPoints prog)
+
 -- | take E directly generated from haskell source and bring it into line with
 -- expected invarients. this only needs be done once.  it replaces all
 -- ambiguous types with the absurd one, gets rid of all newtypes, does a basic
@@ -327,54 +332,57 @@ isInteractive = do
 
 compileModEnv' stats ho = do
 
-    let dataTable = hoDataTable ho
-    let rules = hoRules ho
+    let dataTable = progDataTable prog
+        rules = hoRules ho
+        prog = hoToProgram ho
+
+    -- dump final version of various requested things
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
-
-    int <- isInteractive
-    if int then Interactive.interact ho else do
-
-    --mapM_ putErrLn ([ show x <+> "::" <+> render (ePretty ty) | (x,(TVr _ ty,_)) <- Map.toList $ hoEs ho])
-    let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
-
     when (dump FD.ClassSummary) $ do
         putStrLn "  ---- class summary ---- "
         printClassSummary (hoClassHierarchy ho)
     when (dump FD.Class) $ do
         putStrLn "  ---- class hierarchy ---- "
         printClassHierarchy (hoClassHierarchy ho)
-
-    es' <- createMethods dataTable (hoClassHierarchy ho) (hoEs ho)
-    let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho)), not $ t `Set.member` tmap]
-        tmap = Set.fromList $ [ t | (_,t,_) <- es' ]
-    let Identity es'' = annotateDs initMap (idann (hoRules ho) (hoProps ho) ) letann lamann [ (y,z) | (x,y,z) <- es']
-
-    es' <- return [ (x,y,floatInward rules z) | (x,_,_) <- es' | (y,z) <- es'' ]
-    wdump FD.Class $ do
-        sequence_ [ print x >> printCheckName' dataTable y z |  (x,y,z) <- es']
-    let es = Map.fromList [ (x,(y,z)) |  (x,y,z) <- es'] `mappend` hoEs ho
-    (_,main,mainv) <- getMainFunction dataTable mainFunc es
-    let ds = ((main,mainv):Map.elems es)
-    let ds' = reachable (newGraph ds (tvrIdent . fst) (\ (t,e) -> bindingFreeVars t e)) [tvrIdent main]
-
-    let lco = ELetRec ds'  (EVar main)
     wdump FD.Rules $ printRules rules
+
+    -- enter interactive mode
+    int <- isInteractive
+    if int then Interactive.interact ho else do
+
+    let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
+    (_,main,mainv) <- getMainFunction dataTable mainFunc (programEsMap prog)
+    prog <- return prog { progMainEntry = main, progEntryPoints = [main], progCombinators = (main,[],mainv):progCombinators prog }
+
+    cmethods <- do
+        es' <- createMethods dataTable (hoClassHierarchy ho) (programEsMap prog)
+        let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- programDs prog, not $ t `Set.member` tmap]
+            tmap = Set.fromList $ [ t | (_,t,_) <- es' ]
+        let Identity es'' = annotateDs initMap (idann (hoRules ho) (hoProps ho) ) letann lamann [ (y,z) | (x,y,z) <- es']
+        es' <- return [ (x,y,floatInward rules z) | (x,_,_) <- es' | (y,z) <- es'' ]
+        wdump FD.Class $ do
+            sequence_ [ print x >> printCheckName' dataTable y z |  (x,y,z) <- es']
+        return [ (y,z) | (_,y,z) <- es' ]
+
+    prog <- return $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
+    prog <- return $ programPruneUnreachable prog
+
     let mangle = mangle'  (Just mempty)
     let opt = doopt (mangle dataTable) True stats
-
     let showTVr t = prettyE (EVar t) <> show (tvrInfo t)
 
+    ne <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) (programE prog)
+    prog <- return $ programSetE ne prog
 
-    lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lco
 
-    lc <- if (fopts  FO.TypeAnalysis) then do
-        let ELetRec ds mn = lc in do
-            ds' <- typeAnalyze ds mn
+    prog <- if (fopts  FO.TypeAnalysis) then do
+            prog <- typeAnalyze prog
             putStrLn "Type analyzed methods"
-            mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) (filter (getProperty prop_METHOD . fst) ds')
-            ds' <- sequence [ pruneE e >>= return . (,) t | (t,e) <- ds' ]
-            return $ ELetRec ds' mn
-        else return lc
+            mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) (filter (getProperty prop_METHOD . fst) (programDs prog))
+            --mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ds'
+            programMapBodies pruneE prog
+        else return prog
+    let lc = programE prog
 
     wdump FD.Progress $ printEStats lc
     let cm stats e = do

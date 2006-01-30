@@ -1,4 +1,15 @@
-module Ho(Ho(..),HoHeader(..),FileDep(..),findModule,showHoCounts,initialHo,dumpHoFile,loadLibraries,recordHoFile) where
+module Ho(
+    FileDep(..),
+    Ho(..),
+    HoHeader(..),
+    dumpHoFile,
+    findModule,
+    hoToProgram,
+    initialHo,
+    loadLibraries,
+    recordHoFile,
+    showHoCounts
+    ) where
 
 
 import Control.Monad.Identity
@@ -28,6 +39,7 @@ import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.CPR
+import E.Program
 import E.E
 import E.Inline(emapE)
 import E.Pretty
@@ -483,6 +495,11 @@ loadLibraries = do
             Nothing -> putErrDie $ "Library not found or invalid: " ++ show fn
             Just (_,ho') -> f (ho' `mappend` ho) rs
 
+hoToProgram :: Ho -> Program
+hoToProgram ho = programSetDs (Map.elems $ hoEs ho) program {
+    progClassHierarchy = hoClassHierarchy ho,
+    progDataTable = hoDataTable ho
+    }
 
 
 initialHo = mempty { hoEs = es , hoClassHierarchy = ch  }  where

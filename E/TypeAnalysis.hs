@@ -11,11 +11,11 @@ import List(intersperse)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 
-import Support.CanType
 import Doc.DocLike
 import E.Annotate
 import E.E hiding(isBottom)
 import E.Inline(emapE',emapE_)
+import E.Program
 import E.TypeCheck
 import Fixer.Fixer
 import Fixer.VMap
@@ -23,6 +23,7 @@ import GenUtil
 import Name.Name
 import Name.Names
 import qualified Info.Info as Info
+import Support.CanType
 
 
 type Typ = VMap Name
@@ -34,8 +35,8 @@ extractValMap ds = Map.fromList [ (tvrIdent t,f e []) | (t,e) <- ds] where
     f _ rs = reverse rs
 
 -- all variables _must_ be unique before running this
-typeAnalyze :: [(TVr,E)] -> E -> IO [(TVr,E)]
-typeAnalyze ds seed = do
+typeAnalyze :: Program -> IO Program
+typeAnalyze prog = do
     fixer <- newFixer
     usedVals <- newValue fixer Set.empty
     let lambind _ nfo = do
@@ -45,13 +46,13 @@ typeAnalyze ds seed = do
             rv <- readValue (runIdentity $ Info.lookup nfo)
             return (Info.insert (rv :: Typ) $ Info.delete (undefined :: Value Typ) nfo)
         lamdel _ nfo = return (Info.delete (undefined :: Value Typ) nfo)
-    ds <- annotateDs mempty lambind (\_ -> return) (\_ -> return) ds
+    ds <- annotateDs mempty lambind (\_ -> return) (\_ -> return) (programDs prog)
     calcDs (usedVals,extractValMap ds) ds
-    calcE (usedVals,extractValMap ds) seed
+    mapM_ (calcE (usedVals,extractValMap ds) . EVar ) (progEntryPoints prog)
     calcFixpoint "type analysis" fixer
     ds <- annotateDs mempty (\_ -> return) (\_ -> return) lamread ds
     ds <- annotateDs mempty lamdel (\_ -> return) (\_ -> return) ds
-    return ds
+    return $ programSetDs ds prog
 
 calcDs ::  Env -> [(TVr,E)] -> IO ()
 calcDs env@(usedVals,_) ds = do
