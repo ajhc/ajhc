@@ -290,18 +290,6 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         (cn,rtt',rtt) = case lookupCType' dataTable rt' of
             Right x -> x
             Left err -> error $ "Odd RetType foreign: " ++ err
-        {-
-        p' = case p of
-            --AddrOf _ -> EPrim (APrim p req) (map EVar es) rt
-            Func _ s _ _ -> let ep = EPrim (APrim (Func isIO s (map (toExtType . tvrType) es) (toExtType rt')) req)  in case isIO of
-                False -> error "false"
-                --False -> ep (map EVar es) rt
-                --True | toExtType rt' /= "void" -> prim_unsafeCoerce (ELam tvrWorld $  eCaseTup  (ep (map EVar (tvrWorld:es))  rttIO) [tvrWorld2,rtVar] (eJustIO (EVar tvrWorld2) (EVar rtVar))) rt
-                --     | otherwise -> prim_unsafeCoerce (ELam tvrWorld $ eStrictLet tvrWorld2 (ep (map EVar (tvrWorld:es))  tWorld__) (eJustIO (EVar tvrWorld2) vUnit)) rt
-                True | toExtType rt' /= "void" -> ELam tvrWorld $  eCaseTup  (ep (map EVar (tvrWorld:es))  rttIO) [tvrWorld2,rtVar] (eJustIO (EVar tvrWorld2) (EVar rtVar))
-                     | otherwise -> ELam tvrWorld $ eStrictLet tvrWorld2 (ep (map EVar (tvrWorld:es))  tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
-                 --    | otherwise -> eStrictLet tvrWorld2 (ep (map EVar (tvrWorld:es))  tWorld__) (prim_unsafeCoerce (ELam tvrWorld $  eJustIO (EVar tvrWorld2) vUnit) rt)
-        -}
     cDecl (HsPatBind sl p rhs wh) | (HsPVar n) <- simplifyHsPat p = let
         name = toName Name.Val n
         var = tVr (nameToInt name) ty -- lp ps (hsLet wh e)
@@ -331,23 +319,13 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
     cExpr (HsAsPat n' (HsVar n)) = spec t t' $ EVar (tv n) where
         (Forall _ (_ :=> t)) = getAssump n
         Forall [] ((_ :=> t')) = getAssump n'
---    cExpr (HsAsPat n' (HsCon n)) =  (ELit (LitCons (getName n) [] (ty t'))) where
---        Forall [] ((_ :=> t')) = getAssump n'
---    cExpr (HsAsPat n' (HsCon n v)) =  foldr ($)  (ELit (LitCons (getName n) (map EVar es) rt)) (map ELam es) where -- (spec t t' (cType n))) where
---        (Forall _ (_ :=> t)) = gFalse n
---        Forall [] ((_ :=> t')) = getAssump n'
---        (ts,rt) = argTypes' (ty t')
---        es = [ (TVr (Just n) t) |  t <- ts | n <- localVars ]
---    cExpr (HsAsPat n' (HsCon n)) =  foldr ($)  (ELit (LitCons (toName DataConstructor n) (map EVar es) rt)) (map ELam es) where -- (spec t t' (cType n))) where
     cExpr (HsAsPat n' (HsCon n)) =  constructionExpression dataTable (toName DataConstructor n) rt where
-        (Forall _ (_ :=> t)) = getAssumpCon n
         Forall [] ((_ :=> t')) = getAssump n'
-        (ts,rt) = argTypes' (ty t')
-        es = [ (tVr ( n) t) |  t <- ts | n <- localVars ]
+        (_,rt) = argTypes' (ty t')
     cExpr (HsLit (HsString s)) = E.Values.toE s
     cExpr (HsLit (HsInt i)) = intConvert i
-    cExpr (HsLit (HsChar ch))  =  toE ch -- ELit (LitCons (toName DataConstructor ("Prelude","Char")) [ELit $ LitInt (fromIntegral $ ord i) (ELit (LitCons (toName RawType "uint32_t") [] eStar))] tChar)
-    cExpr (HsLit (HsFrac i))  =  toE i -- ELit $ LitInt (fromRational i) tRational -- LitFrac i (error "litfrac?")
+    cExpr (HsLit (HsChar ch)) = toE ch
+    cExpr (HsLit (HsFrac i))  = toE i
     cExpr (HsLambda sl ps e)
         | all isHsPVar ps' =  lp ps' (cExpr e)
         | otherwise = error $ "Invalid HSLambda at: " ++ show sl
@@ -376,7 +354,6 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
     cExpr (HsAsPat n (HsList xs)) = cl xs where
         cl (x:xs) = eCons (cExpr x) (cl xs)
         cl [] = eNil (cType n)
-    --cExpr (HsAsPat _ e) = cExpr e
     cExpr e = error ("Cannot convert: " ++ show e)
     hsLetE [] e =  e
     hsLetE dl e =  ELetRec [ (b,c) | (_,b,c) <- (concatMap cDecl dl)] e
@@ -401,7 +378,6 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
     lp  [] e = e
     lp  (HsPVar n:ps) e = eLam (tv n) $ lp  ps e
     lp  p e  =  error $ "unsupported pattern:" <+> tshow p  <+> tshow e
-    --cRhs sl rhs = g where g = cGuard rhs (ump sl $ getType g) --deliciously lazy
     cRhs sl (HsUnGuardedRhs e) = cExpr e
     cRhs sl (HsGuardedRhss []) = error "HsGuardedRhss: empty"
     cRhs sl (HsGuardedRhss gs@(HsGuardedRhs _ _ e:_)) = f gs where
@@ -445,9 +421,7 @@ integer_cutoff = 500000000
 intConvert i | abs i > integer_cutoff  =  ELit (LitCons dc_Integer [ELit $ LitInt (fromInteger i) (rawType "intmax_t")] tInteger)
 intConvert i =  ELit (LitCons dc_Int [ELit $ LitInt (fromInteger i) (rawType "int")] tInt)
 
---litconvert (HsInt i) t  =  LitInt (fromInteger i) t
 litconvert (HsChar i) t | t == tChar =  LitInt (fromIntegral $ ord i) tCharzh
---litconvert (HsFrac i) t =  LitInt (fromRational i) t -- LitFrac i t
 litconvert e t = error $ "litconvert: shouldn't happen: " ++ show (e,t)
 
 
