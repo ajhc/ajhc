@@ -2,17 +2,18 @@ module DataConstructors(
     Constructor(..),
     DataTable(..),
     constructionExpression,
+    deconstructionExpression,
     followAliases,
     getConstructor,
     getConstructorArities,
     getProduct,
     getSiblings,
-    lookupCType,
     lookupCType',
+    lookupCType,
+    pprintTypeOfCons,
     showDataTable,
     slotTypes,
     toDataTable,
-    pprintTypeOfCons,
     typesCompatable
     ) where
 
@@ -308,8 +309,6 @@ toDataTable km cm ds = DataTable $ Map.union dataTablePrims  (Map.fromList [ (co
         tell (Seq.fromList dataCons)
         tell $ Seq.singleton theType { conChildren = Just (map conName dataCons) }
         where
-        -- as = hsDeclArgs decl
-        --name = hsDeclName decl
         theTypeName = toName Name.TypeConstructor (hsDeclName decl)
         theKind = kind $ runIdentity (Map.lookup theTypeName km)
         (theTypeFKind,theTypeKArgs') = fromPi theKind
@@ -364,13 +363,27 @@ constructionExpression ::
     -> Name   -- ^ name of said constructor
     -> E      -- ^ type of eventual constructor
     -> E      -- ^ saturated lambda calculus term
-constructionExpression wdt@(DataTable dt) n (ELit (LitCons pn xs _)) | pn == conName pc = sub (conExpr mc) where
-    Identity mc = getConstructor n wdt
-    Just pc = Map.lookup (conInhabits mc) dt
+constructionExpression dataTable n (ELit (LitCons pn xs _)) | pn == conName pc = sub (conExpr mc) where
+    Just mc = getConstructor n dataTable
+    Just pc = getConstructor (conInhabits mc) dataTable
     sub = substMap $ Map.fromDistinctAscList [ (i,sl) | sl <- xs | i <- [2,4..] ]
 constructionExpression wdt n e | Just fa <- followAlias wdt e  = constructionExpression wdt n fa
 constructionExpression _ n e = error $ "constructionExpression: error in " ++ show n ++ ": " ++ show e
 
+deconstructionExpression ::
+    DataTable -- ^ table of data constructors
+    -> Name   -- ^ name of said constructor
+    -> E      -- ^ type of pattern
+    -> [TVr]  -- ^ variables to be bound
+    -> [TVr]  -- ^ name supply, types ignored, must be at least as many as bound variables exist
+    -> E      -- ^ body of alt
+    -> Alt E  -- ^ resulting alternative
+deconstructionExpression dataTable name typ@(ELit (LitCons pn xs _)) vs _vs' e | pn == conName pc = ans where
+    Just mc = getConstructor name dataTable
+    Just pc = getConstructor (conInhabits mc) dataTable
+    ans = Alt (LitCons name vs typ) e
+deconstructionExpression wdt n ty vs vs' e | Just fa <- followAlias wdt ty  = deconstructionExpression wdt n fa vs vs' e
+deconstructionExpression _ n e _ _ _ = error $ "deconstructionExpression: error in " ++ show n ++ ": " ++ show e
 
 slotTypes ::
     DataTable -- ^ table of data constructors

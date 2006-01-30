@@ -488,9 +488,12 @@ convertMatches funcs dataTable tv cType bs ms err = evalState (match bs ms err) 
                         let spats = hsPatPats $ (\ (x:_) -> x) $ fst ((\ (x:_) -> x) ps)
                             nargs = length spats
                         vs <- newVars (slotTypes dataTable (toName DataConstructor name) (getType b))
+                        vs' <- newVars (map (const Unknown) vs)
+
                         ps' <- mapM pp ps
                         m <- match (map EVar vs ++ bs) ps' err
-                        return (Alt (LitCons (toName DataConstructor name) vs (getType b))  m)
+                        return $ deconstructionExpression dataTable (toName DataConstructor name) (getType b) vs vs' m
+                        --return (Alt (LitCons (toName DataConstructor name) vs (getType b))  m)
                     --pp :: Monad m =>  ([HsPat], E->E) -> m ([HsPat], E->E)
                     pp (HsPApp n ps:rps,e)  = do
                         return $ (ps ++ rps , e)
