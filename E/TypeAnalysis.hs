@@ -3,15 +3,13 @@
 
 module E.TypeAnalysis(typeAnalyze, pruneE) where
 
+import Control.Monad.Reader
 import Control.Monad.Identity
 import Data.Monoid
-import Data.Typeable
 import Data.FunctorM
-import List(intersperse)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 
-import Doc.DocLike
 import E.Annotate
 import E.E hiding(isBottom)
 import E.Inline(emapE',emapE_)
@@ -139,10 +137,11 @@ typConstant e = fail $ "typConstant: " ++ show e
 
 
 pruneE :: E -> IO E
-pruneE ec@ECase { eCaseScrutinee = EVar v } | sortStarLike (getType v), Just (VMap _ ns) <- Info.lookup (tvrInfo v) = do
-    ec' <- pruneCase ec ns
-    emapE' pruneE ec'
-pruneE e = emapE' pruneE e
+pruneE e = return $ runIdentity (prune e)  where
+    prune ec@ECase { eCaseScrutinee = EVar v } | sortStarLike (getType v), Just (VMap _ ns) <- Info.lookup (tvrInfo v) = do
+        ec' <- pruneCase ec ns
+        emapE' prune ec'
+    prune e = emapE' prune e
 
 pruneCase :: Monad m => E -> Set.Set Name -> m E
 pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
@@ -156,6 +155,26 @@ pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
     -- The reason we do this is because for a typecase, we need a valid default in order to get the most general type
     cd (Just d) = Just $ EError "pruneCase: default pruned" (getType d)
     as = [ n | LitCons n _ _ <- casePats ec ]
+
+
+{-
+
+specializeProgram :: Program -> Program
+specializeProgram prog = ans where
+    entries = Set.fromList $ progEntryPoints -- must not be specialized
+    ans = runReader (programMapDs f prog) (cenv $ programDs prog)
+    f (t,e) = do
+        env <- ask
+        ne <- case Map.lookup t env of
+            Just (cd,_) -> cd e
+            Nothing -> return e
+        ne' <- de e
+        return (t,ne')
+    cenv ds = undefined
+    de = undefined
+
+-}
+
 
 
 

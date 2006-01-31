@@ -63,4 +63,7 @@ programMapBodies f prog = do
      ds <- sequence [ f e >>= return . (,) t | (t,e) <- programDs prog ]
      return $ programSetDs ds prog
 
+programMapDs f prog = do
+     ds <- mapM f (programDs prog)
+     return $ programSetDs ds prog
 
