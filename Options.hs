@@ -113,7 +113,7 @@ theoptions =
     , Option []    ["progc"]     (ReqArg (\d -> optCC_s d) "CC") "c compiler to use"
     , Option []    ["arg"]       (ReqArg (\d -> optProgArgs_u (++ [d])) "arg") "arguments to pass interpreted program"
     , Option ['N'] ["noprelude"] (NoArg  (optPrelude_s False))   "no implicit prelude"
-    , Option ['C'] ["justcheck"] (NoArg  (optMode_s CompileHo))   "don't compile. just typecheck."
+    , Option ['C'] ["justcheck"] (NoArg  (optMode_s CompileHo))   "Typecheck and compile ho."
     , Option ['I'] ["interpret"] (NoArg  (optMode_s Interpret)) "interpret."
     , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))  "keep going on errors."
     , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output."
