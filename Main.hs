@@ -87,15 +87,14 @@ main = runMain $ bracketHtml $ do
         name <- System.getProgName
         args <- System.getArgs
         return (simpleQuote (name:args))
-    case o of
-        Opt { optShowHo     = xs@(_:_) }     -> mapM_ dumpHoFile xs
-        Opt { optBuildHl    = hlName@(_:_) } -> buildHl hlName (optArgs o)
-        Opt { optVersion    = True }         -> putStrLn versionString
-        Opt { optVersionCtx = True }         -> putStrLn changes_txt
-        Opt { optSelfTest   = True }         -> do putStrLn "Starting self testing..."
-                                                   SelfTest.selfTest (optArgs o)
-        _                                    -> processFiles  (optArgs o)
-
+    case optMode o of
+      BuildHl hl -> buildHl hl (optArgs o)
+      SelfTest   -> do putStrLn "Starting self testing..."
+                       SelfTest.selfTest (optArgs o)
+      ShowHo ho  -> dumpHoFile ho
+      Version    -> putStrLn versionString
+      VersionCtx -> putStrLn changes_txt
+      _          -> processFiles  (optArgs o)
 
 
 buildHl fname [] = putErrDie "Cannot build hl file without list of input modules"
@@ -326,7 +325,9 @@ collectIds e = execWriter $ annotate mempty (\id nfo -> tell (Set.singleton id) 
 isInteractive :: IO Bool
 isInteractive = do
     pn <- System.getProgName
-    return $ optInteractive options || "ichj" `isPrefixOf` reverse pn || not (null $ optStmts options)
+    return $ (optMode options == Interactive) 
+          || "ichj" `isPrefixOf` reverse pn 
+          || not (null $ optStmts options)
 
 
 compileModEnv' stats ho = do
@@ -491,14 +492,14 @@ compileModEnv' stats ho = do
     printTable "Return points-to" (grinReturnTags x)
     printTable "Argument points-to" (grinArgTags x)
     wdump FD.Grin $ printGrin x
-    when (optInterpret options) $ do
+    when (optMode options == Interpret) $ do
         progress "Interpreting..."
         (v,stats) <- Grin.Interpret.evaluate x
         CharIO.putStrLn $ render $ Grin.Show.prettyVal v
         wdump FD.Stats $  Stats.print "Stats" stats
         return ()
 
-    when (optCompile options) $ do
+    when (optMode options == CompileExe) $ do
         let (cg,rls) = compileGrin x
         let fn = optOutName options
         let cf = (fn ++ "_code.c")

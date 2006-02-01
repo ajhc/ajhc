@@ -3,6 +3,7 @@ module Options(
     processOptions,
     Opt(..),
     options,
+    Mode(..),
     putVerbose,
     putVerboseLn,
     verbose,
@@ -34,26 +35,30 @@ import qualified FlagOpts
 
 basePackages = ["base-0.1", "haskell98-0.1"]
 
+data Mode = BuildHl String -- ^ Load the specified hl-files (haskell libraries).
+          | Interactive    -- ^ Run interactively.
+          | SelfTest       -- ^ Perform self-test
+          | Version        -- ^ Print version and die.
+          | VersionCtx     -- ^ Print version context and die.
+          | Interpret      -- ^ Interpret.
+          | CompileHo      -- ^ Compile ho
+          | CompileExe     -- ^ Compile executable
+          | ShowHo String  -- ^ Show ho-file.
+            deriving(Eq,Show)
+
 data Opt = Opt {
+    optMode        :: Mode,       -- ^ Mode of interaction
     optColumns     :: !Int,       -- ^ Width of terminal.
-    optCompile     :: !Bool,      -- ^ Compile.
     optDebug       :: !Bool,      -- ^ Debugging.
-    optSelfTest    :: !Bool,      -- ^ Perform self-test
     optDump        ::  [String],  -- ^ Dump options (raw).
     optStmts       ::  [String],  -- ^ statements to execute
     optFOpts       ::  [String],  -- ^ Flag options (raw).
     optIncdirs     ::  [String],  -- ^ Include directories.
     optProgArgs    ::  [String],  -- ^ Arguments to pass to the interpreted program.
-    optShowHo      ::  [String],  -- ^ Show ho-file.
     optCCargs      ::  [String],  -- ^ Optional arguments to the C compiler.
     optHls         ::  [String],  -- ^ Load the specified hl-files (haskell libraries).
-    optBuildHl     ::  String,    -- ^ Build a hl (haskell library) from the set of modules given.
     optCC          ::  String,    -- ^ C compiler.
     optArgs        ::  [String],
-    optInteractive :: !Bool,      -- ^ Run interactively.
-    optVersion     :: !Bool,      -- ^ Print version and die.
-    optVersionCtx  :: !Bool,      -- ^ Print version context and die.
-    optInterpret   :: !Bool,      -- ^ Interpret.
     optKeepGoing   :: !Bool,      -- ^ Keep going when encountering errors.
     optMainFunc    ::  Maybe (Bool,String),    -- ^ Entry point name for the main function.
     optOutName     ::  String,                 -- ^ Name of output file.
@@ -68,32 +73,25 @@ data Opt = Opt {
 
 
 opt = Opt {
+    optMode        = CompileExe,
     optColumns     = getColumns,
-    optCompile     = True,
     optDebug       = False,
-    optSelfTest    = False,
     optIncdirs     = initialIncludes,
     optHls         = [],
-    optBuildHl     = "",
     optProgArgs    = [],
     optDump        = [],
     optStmts       = [],
     optFOpts       = ["default"],
-    optShowHo      = [],
     optCCargs      = [],
     optCC          = "gcc",
     optArgs        = [],
-    optInteractive = False,
     optIgnoreHo    = False,
     optNoWriteHo   = False,
-    optInterpret   = False,
     optKeepGoing   = False,
     optMainFunc    = Nothing,
     optOutName     = "hs.out",
     optPrelude     = True,
     optVerbose     = 0,
-    optVersion     = False,
-    optVersionCtx  = False,
     optNoAuto      = True,
     optDumpSet     = S.empty,
     optFOptsSet    = S.empty
@@ -104,8 +102,8 @@ idu d ds = ds ++ [d]
 
 theoptions :: [OptDescr (Opt -> Opt)]
 theoptions =
-    [ Option ['V'] ["version"]   (NoArg  (optVersion_s True))    "print version info and exit"
-    , Option []    ["version-context"] (NoArg  (optVersionCtx_s True)) "print version context (darcs changes) info and exit"
+    [ Option ['V'] ["version"]   (NoArg  (optMode_s Version))    "print version info and exit"
+    , Option []    ["version-context"] (NoArg  (optMode_s VersionCtx)) "print version context (darcs changes) info and exit"
     , Option ['v'] ["verbose"]   (NoArg  (optVerbose_u (+1)))    "chatty output on stderr"
     , Option ['d'] []            (ReqArg (\d -> optDump_u (d:)) "dump-flag")  "dump specified data to stdout"
     , Option ['f'] []            (ReqArg (\d -> optFOpts_u (d:)) "flag")  "set compilation options"
@@ -115,22 +113,22 @@ theoptions =
     , Option []    ["progc"]     (ReqArg (\d -> optCC_s d) "CC") "c compiler to use"
     , Option []    ["arg"]       (ReqArg (\d -> optProgArgs_u (++ [d])) "arg") "arguments to pass interpreted program"
     , Option ['N'] ["noprelude"] (NoArg  (optPrelude_s False))   "no implicit prelude"
-    , Option ['C'] ["justcheck"] (NoArg  (optCompile_s False))   "don't compile. just typecheck."
-    , Option ['I'] ["interpret"] (NoArg  (optInterpret_s True . optCompile_s False)) "interpret."
+    , Option ['C'] ["justcheck"] (NoArg  (optMode_s CompileHo))   "don't compile. just typecheck."
+    , Option ['I'] ["interpret"] (NoArg  (optMode_s Interpret)) "interpret."
     , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))  "keep going on errors."
     , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output."
     , Option ['m'] ["main"]      (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point."
     , Option []    ["entry"]     (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression."
     , Option ['e'] []            (ReqArg (\d -> optStmts_u (d:)) "<statement>")  "run given statement as if on jhci prompt"
     , Option []    ["debug"]     (NoArg  (optDebug_s True)) "debugging"
-    , Option []    ["show-ho"]   (ReqArg  (\d -> optShowHo_u (++ [d])) "file.ho") "Show ho file"
+    , Option []    ["show-ho"]   (ReqArg  (optMode_s . ShowHo) "file.ho") "Show ho file"
     , Option []    ["noauto"]    (NoArg  (optNoAuto_s True)) "Don't automatically load base and haskell98 packages"
     , Option ['p'] []            (ReqArg (\d -> optHls_u (++ [d])) "file.hl") "Load given haskell library .hl file"
-    , Option []    ["build-hl"]  (ReqArg (\d -> optBuildHl_s d) "file.hl") "Build hakell library from given list of modules"
-    , Option []    ["interactive"] (NoArg  (optInteractive_s True)) "run interactivly"
+    , Option []    ["build-hl"]  (ReqArg (optMode_s . BuildHl) "file.hl") "Build hakell library from given list of modules"
+    , Option []    ["interactive"] (NoArg  (optMode_s Interactive)) "run interactivly"
     , Option []    ["ignore-ho"]  (NoArg  (optIgnoreHo_s True)) "Ignore existing haskell object files"
     , Option []    ["nowrite-ho"] (NoArg  (optNoWriteHo_s True)) "Do not write new haskell object files"
-    , Option []    ["selftest"]   (NoArg  (optSelfTest_s True)) "Perform internal integrity testing"
+    , Option []    ["selftest"]   (NoArg  (optMode_s SelfTest)) "Perform internal integrity testing"
     ]
 
 -- | Width of terminal.
