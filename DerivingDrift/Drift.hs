@@ -54,5 +54,6 @@ toData name args cons derives = ans where
 rulesMap = Map.fromList [ (t,f) | (t,f,_,_,_) <- standardRules]
 
 derive d wh | Just fn <- Map.lookup wh rulesMap = render $ fn d
-
+            | otherwise                         =
+  error ("derive: Tried to use non-existing rule "++wh++" for "++name d)
 
