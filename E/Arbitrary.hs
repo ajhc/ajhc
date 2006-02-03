@@ -9,7 +9,7 @@ import Random
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty (putDoc, Doc)
-import E.Pretty
+import E.Show
 import Data.Monoid
 import GenUtil
 import Support.FreeVars

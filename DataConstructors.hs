@@ -26,7 +26,7 @@ import Binary
 import Doc.DocLike
 import Doc.Pretty
 import E.E
-import E.Pretty
+import E.Show
 import E.Shadow
 import E.Subst
 import E.Values

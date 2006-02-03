@@ -42,7 +42,7 @@ import E.CPR
 import E.Program
 import E.E
 import E.Inline(emapE)
-import E.Pretty
+import E.Show
 import E.Rules
 import E.Strictness
 import E.Subst(substMap'')

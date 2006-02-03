@@ -24,11 +24,10 @@ import E.Diff
 import E.E
 import E.FromHs
 import E.Inline
-import E.Show
 import E.LambdaLift
 import E.Program
 import E.LetFloat
-import E.Pretty hiding(render)
+import E.Show hiding(render)
 import E.Rules
 import E.Strictness
 import E.Subst
@@ -326,8 +325,8 @@ collectIds e = execWriter $ annotate mempty (\id nfo -> tell (Set.singleton id) 
 isInteractive :: IO Bool
 isInteractive = do
     pn <- System.getProgName
-    return $ (optMode options == Interactive) 
-          || "ichj" `isPrefixOf` reverse pn 
+    return $ (optMode options == Interactive)
+          || "ichj" `isPrefixOf` reverse pn
           || not (null $ optStmts options)
 
 

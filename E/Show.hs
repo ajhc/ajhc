@@ -1,4 +1,4 @@
-module E.Show(ePretty) where
+module E.Show(ePretty,render,prettyE,ePrettyEx) where
 
 import Char
 import Control.Monad.Identity
@@ -18,6 +18,13 @@ import qualified FlagDump as FD
 import Support.Unparse
 import Util.VarName
 
+render :: Doc -> String
+render doc =  displayS (renderPretty 0.95 (optColumns options)  doc) ""
+
+prettyE :: E -> String
+prettyE e = render $ ePretty e
+
+ePrettyEx = ePretty
 
 showId :: DocLike d => Id -> d
 showId 0 = (char '_')

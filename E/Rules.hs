@@ -28,7 +28,7 @@ import Atom(toAtom,fromAtom,Atom)
 import Binary
 import E.E
 import E.Eval
-import E.Pretty
+import E.Show
 import E.Subst
 import Support.FreeVars
 import GenUtil

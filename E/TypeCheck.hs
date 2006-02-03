@@ -7,7 +7,7 @@ import Doc.PPrint
 import Doc.Pretty
 import E.E
 import E.Eval(strong)
-import E.Pretty
+import E.Show
 import E.Subst
 import GenUtil
 import Util.ContextMonad
