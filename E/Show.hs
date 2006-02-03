@@ -51,7 +51,7 @@ showLit ::
     -> SEM (Unparse Doc)       -- ^ the final result
 showLit showBind l = do
     let const_color = col "blue"
-    let f (LitInt c t) | t == tCharzh, i >= 0x20 && i < 0x7f = return $ atom $ (const_color (tshow $ chr i)) where
+    let f (LitInt c t) | t == tCharzh = return $ atom $ (const_color (tshow $ chr i)) where
             i = fromIntegral c
         f (LitInt i _) = return $ atom $ (const_color (text $ show i))
         f (LitCons n [] t) | t == tTag = return $  atom $ (const_color (text $ show n))

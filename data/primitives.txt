@@ -2,7 +2,7 @@
 
 # limits.h, float.h, inttypes.h
 
-Prelude.Char, uint32_t, char, UINT32_MAX, 0
+Prelude.Char, HsChar, char, UINT32_MAX, 0
 Prelude.Int, int, int, INT_MAX, INT_MIN
 # Prelude.Integer, int, int, INT_MAX, INT_MIN
 Prelude.Integer, intmax_t, int, INTMAX_MAX, INTMAX_MIN

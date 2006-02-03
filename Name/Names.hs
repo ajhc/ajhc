@@ -23,7 +23,7 @@ instance TypeNames Name where
     tHash = s_Hash
     tUnit = tc_Unit
     tIntzh = rt_int
-    tCharzh = rt_uint32_t
+    tCharzh = rt_hschar
     tIntegerzh = rt_intmax_t
     tWorld__ = tc_World__
 
@@ -89,6 +89,8 @@ tc_Unit = toName TypeConstructor  ("Prelude","()")
 rt_int = toName RawType "int"
 rt_uint32_t = toName RawType "uint32_t"
 rt_intmax_t = toName RawType "intmax_t"
+rt_hschar   = toName RawType "HsChar"
+
 s_Star = toName SortName ("Jhc@","*")
 s_Hash = toName SortName ("Jhc@","#")
 

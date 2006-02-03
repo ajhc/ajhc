@@ -95,7 +95,7 @@ gApply x y = App funcApply [x,y] TyNode
 
 instance TypeNames Ty where
     tIntzh = Ty (toAtom "int")
-    tCharzh = Ty (toAtom "uint32_t")
+    tCharzh = Ty (toAtom "HsChar")
     tStar = Ty (toAtom "*")
 
 data Ty =
@@ -184,7 +184,7 @@ instance Show Val where
         | Ty _ <- t  = char 'l' <> tshow i
         | TyTag <- t  = char 't' <> tshow i
         | otherwise = char 'v' <> tshow i
-    showsPrec _ (Lit i t) | t == tCharzh, i >= 0x20 && i < 0x7f, Just x <- toIntegral i = tshow (chr x)
+    showsPrec _ (Lit i t) | t == tCharzh, Just x <- toIntegral i = tshow (chr x)
     showsPrec _ (Lit i _)  = tshow i
     showsPrec _ (Tup xs)  = tupled $ map shows xs
     showsPrec _ (Const v) = char '&' <> shows v
