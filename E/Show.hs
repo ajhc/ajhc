@@ -2,6 +2,7 @@ module E.Show(ePretty,render,prettyE,ePrettyEx) where
 
 import Char
 import Control.Monad.Identity
+import qualified Data.Set as Set
 
 import Atom
 import Doc.Attr
@@ -9,6 +10,8 @@ import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.E
+import E.FreeVars()
+import Support.FreeVars
 import Name.Name
 import Name.Names
 import Name.VConsts
@@ -38,7 +41,7 @@ instance PPrint Doc E where
     pprint x = ePretty x
 
 
-newtype SEM a = SEM (Identity a)
+newtype SEM a = SEM { unSEM :: VarNameT E Id String Identity a }
     deriving(Monad,Functor)
 
 
@@ -76,15 +79,36 @@ app = bop (L,100) (text " ")
 col n x = attrColor (attr oob) n x
 attr = if dump FD.Html then html else ansi
 
+showI i = do
+    n <- SEM $ maybeLookupName i
+    case n of
+        Nothing -> showId i
+        Just n -> text n
+
 
 showTVr :: TVr -> SEM (Unparse Doc)
 showTVr TVr { tvrIdent = i, tvrType =  t, tvrInfo = nfo}  = do
     let si = if dump FD.EInfo then (<> tshow nfo) else id
     ty <- showE t
-    return $ atom (si (showId i)) `inhabit` ty
-showTVr' TVr { tvrIdent = i} = return $ atom $ showId i
+    ii <- showI i
+    return $ atom (si ii) `inhabit` ty
+showTVr' TVr { tvrIdent = i} = do
+    ii <- showI i
+    return $ atom ii
 
 
+allocTVr :: TVr -> SEM a -> SEM a
+allocTVr tvr action | tvrIdent tvr == 0 = action
+allocTVr tvr action | tvrType tvr == eStar  = do
+    SEM $ newName (map (:[]) ['a' ..]) eStar (tvrIdent tvr)
+    action
+allocTVr tvr action | tvrType tvr == eStar `tFunc` eStar  = do
+    SEM $ newName (map (('f':) . show) [0::Int ..])  (tvrType tvr) (tvrIdent tvr)
+    action
+allocTVr tvr action | even (tvrIdent tvr) = do
+    SEM $ newName (map (('v':) . show) [1::Int ..]) Unknown (tvrIdent tvr)
+    action
+allocTVr _ action = action
 
 
 showE :: E -> SEM (Unparse Doc)
@@ -95,22 +119,23 @@ showE e = do
             xs <- mapM (fmap unparse . showE) xs
             return $ atom $ list xs
         f (EAp a b) = liftM2 app (showE a) (showE b)
-        f (ELam tvr@TVr {tvrType =  z} e) | z == eStar =  do
-            tvr <- showTVr tvr
-            liftM2 dot (return $ pop (retOp UC.lAmbda) tvr) (showE e)
         f (EPi (TVr { tvrIdent = 0, tvrType =  e1}) e2) = liftM2 arr (showE e1) (showE e2)
-        f (EPi tvr@(TVr {  tvrType =  z}) e) | z == eStar = do
+        f (EPi (TVr { tvrIdent = n, tvrType =  e1}) e2) | not $ n `Set.member` freeVars e2 = liftM2 arr (showE e1) (showE e2)
+        f (EPi tvr@(TVr {  tvrType =  z}) e) | z == eStar = allocTVr tvr $ do
             tvr <- showTVr' tvr
             liftM2 dot (return $ pop (retOp UC.forall) tvr) (showE e)
-        f (EPi t e) = do
+        f (EPi t e) = allocTVr t $ do
             tvr <- showTVr t
             e <- showE e
             return $ (pop (retOp UC.pI) tvr) `dot` e
-        f (ELam t e) = do
+        f (ELam tvr@TVr {tvrType =  z} e) | z == eStar = allocTVr tvr $ do
+            tvr <- showTVr' tvr
+            liftM2 dot (return $ pop (retOp UC.lAmbda) tvr) (showE e)
+        f (ELam t e) = allocTVr t $ do
             tvr <- showTVr t
             e <- showE e
             return $ (pop (retOp UC.lambda) tvr) `dot` e
-        f (EVar TVr { tvrIdent = i }) = return $ atom $ showId i
+        f (EVar tvr) = showTVr' tvr
         f Unknown = return $ symbol (char  '?')
         f (ESort EStar) = return $ symbol UC.star
         f (ESort EBox) = return $ symbol UC.box
@@ -128,25 +153,28 @@ showE e = do
             ds <- mapM (fmap unparse . showDecl) ds
             return $ fixitize (L,(-10)) $ atom $ group (nest 4  ( keyword "let" </> (align $ sep (map (<> bc ';') ds) </> (keyword "in" <+> e))))
 
-        f ec@(ECase { eCaseScrutinee = e, eCaseAlts = alts }) = do
+        f ec@(ECase { eCaseScrutinee = e, eCaseAlts = alts }) = allocTVr (eCaseBind ec) $ do
             scrut <- fmap unparse $ showE e
             alts <- mapM showAlt alts
             dcase <- case (eCaseDefault ec) of
                 Nothing -> return []
                 Just e -> do
-                    db <- showTVr (eCaseBind ec)
+                    let ecb = eCaseBind ec
+
+                    db <- showTVr (if tvrIdent ecb `Set.member` freeVars e then ecb else ecb { tvrIdent = 0 })
                     e <- showE e
                     return [unparse db <+> UC.rArrow <+> unparse e]
             let alts' = map (<> bc ';') (alts ++ dcase)
             return $ fixitize ((L,(-10))) $ atom $
                 group ( nest 4 ( keyword "case" <+> scrut <+> keyword "of" <$>  (align $ sep (alts'))) )
-        showAlt (Alt l e) = do
-            l <- showLit showTVr l
-            e <- showE e
-            return $ nest 4 $ fill 10 ((unparse l) <+>  UC.rArrow </> (unparse e))
+        showAlt (Alt l e) = foldr allocTVr ans (litBinds l) where
+            ans = do
+                l <- showLit showTVr l
+                e <- showE e
+                return $ nest 4 $ fill 10 ((unparse l) <+>  UC.rArrow </> (unparse e))
         showDecl (t,e) = do
-            t <- showTVr t
-            e <- showE e
+            t <- subSEM $ showTVr t
+            e <- subSEM $ showE e
             return $ atom $ nest 4 $ unparse t <+> retOp (char '=') </> unparse e
         bold' = bold
         bc = bold' . char
@@ -157,6 +185,8 @@ showE e = do
 
     f e
 
+subSEM (SEM act) = SEM $ subVarName act
+
 
 retOp x = col "lightgreen" x
 inhabit = bop (N,-2) $ retOp UC.coloncolon
@@ -164,7 +194,8 @@ bold :: Doc -> Doc
 bold = attrBold (attr oob)
 
 ePretty e = unparse pe where
-    (SEM (Identity pe)) = showE e
+    (SEM pe') = showE e
+    Identity pe = runVarNameT pe'
 
 tTag = rawType "tag#"
 rawType s  = ELit (LitCons (toName RawType s) [] eHash)

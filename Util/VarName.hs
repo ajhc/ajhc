@@ -4,6 +4,7 @@ module Util.VarName(
     runVarNameT,
     runVarName,
     newName,
+    subVarName,
     lookupName,
     maybeLookupName,
     newLookupName) where
@@ -23,6 +24,13 @@ runVarNameT  (VarName sm) = evalStateT sm (Map.empty, Map.empty)
 
 runVarName ::  VarName ni no a -> a
 runVarName v = runIdentity $ runVarNameT v
+
+subVarName ::  Monad m => VarNameT nc ni no m a -> VarNameT nc ni no m a
+subVarName (VarName action) = VarName $ do
+    x <- get
+    r <- action
+    put x
+    return r
 
 
 newName :: (Ord ni, Ord nc,Monad m) => [no] -> nc -> ni -> VarNameT nc ni no m no
