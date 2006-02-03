@@ -1,5 +1,19 @@
-module E.Pretty(ePretty, ePrettyNEx, ePrettyEx, ePrettyN, prettyE, render ) where
+module E.Pretty(ePretty, ePrettyEx, prettyE, render ) where
 
+import E.E
+import E.Show
+import Doc.Pretty
+import Options
+
+render :: Doc -> String
+render doc =  displayS (renderPretty 0.95 (optColumns options)  doc) ""
+
+prettyE :: E -> String
+prettyE e = render $ ePretty e
+
+ePrettyEx = ePretty
+
+{-
 import Char
 import qualified Data.Map as Map
 
@@ -51,13 +65,11 @@ prettyOpt = PrettyOpt { optExpanded = False, optColors = True, optNames = pName 
 
 
 
-ePretty e = ePrettyN Map.empty e
-ePrettyEx e = (eDoc e prettyOpt { optExpanded = True})
-ePrettyN m e = (eDoc e prettyOpt { optNames = pName m})
-ePrettyNEx m e = (eDoc e prettyOpt { optExpanded = True, optNames = pName m})
+ePretty e = eDoc e prettyOpt
+ePrettyEx e = eDoc e prettyOpt { optExpanded = True}
+
 prettyE :: E -> String
-prettyE e = render $ ePrettyN Map.empty e
-prettyENameEx m e = render $ ePrettyNEx m e
+prettyE e = render $ ePretty e
 
 
 pName m i = case Map.lookup i m of
@@ -161,4 +173,4 @@ eDoc e PrettyOpt {optExpanded = optExpanded, optColors = colors, optNames = optN
 
 
     prettydecl (t,e) =  atom $ nest 4 $ unparse (prettytvr t) <+> retOp (char '=') </> unparse (prettye e)
-
+ -}

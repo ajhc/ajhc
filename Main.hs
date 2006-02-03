@@ -24,6 +24,7 @@ import E.Diff
 import E.E
 import E.FromHs
 import E.Inline
+import E.Show
 import E.LambdaLift
 import E.Program
 import E.LetFloat
