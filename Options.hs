@@ -42,8 +42,10 @@ data Mode = BuildHl String -- ^ Load the specified hl-files (haskell libraries).
           | VersionCtx     -- ^ Print version context and die.
           | Interpret      -- ^ Interpret.
           | CompileHo      -- ^ Compile ho
+          | CompileHoGrin  -- ^ Compile ho and grin
           | CompileExe     -- ^ Compile executable
           | ShowHo String  -- ^ Show ho-file.
+          | ListLibraries  -- ^ List libraries
             deriving(Eq,Show)
 
 data Opt = Opt {
@@ -57,6 +59,7 @@ data Opt = Opt {
     optProgArgs    ::  [String],  -- ^ Arguments to pass to the interpreted program.
     optCCargs      ::  [String],  -- ^ Optional arguments to the C compiler.
     optHls         ::  [String],  -- ^ Load the specified hl-files (haskell libraries).
+    optHlPath      ::  [String],  -- ^ Path to look for libraries.
     optCC          ::  String,    -- ^ C compiler.
     optArgs        ::  [String],
     optKeepGoing   :: !Bool,      -- ^ Keep going when encountering errors.
@@ -78,6 +81,7 @@ opt = Opt {
     optDebug       = False,
     optIncdirs     = initialIncludes,
     optHls         = [],
+    optHlPath      = initialIncludes,
     optProgArgs    = [],
     optDump        = [],
     optStmts       = [],
@@ -108,12 +112,13 @@ theoptions =
     , Option ['d'] []            (ReqArg (\d -> optDump_u (d:)) "dump-flag")  "dump specified data to stdout"
     , Option ['f'] []            (ReqArg (\d -> optFOpts_u (d:)) "flag")  "set compilation options"
     , Option ['o'] ["output"]    (ReqArg (optOutName_s) "FILE")  "output to FILE"
-    , Option ['i'] ["include"]   (ReqArg (\d -> optIncdirs_u (idu d)) "DIR") "library directory"
-    , Option []    ["optc"]      (ReqArg (\d -> optCCargs_u (idu d)) "option") "extra options to pass to c compiler"
+    , Option ['i'] ["include"]   (ReqArg (optIncdirs_u . idu) "DIR") "library directory"
+    , Option []    ["optc"]      (ReqArg (optCCargs_u . idu) "option") "extra options to pass to c compiler"
     , Option []    ["progc"]     (ReqArg (\d -> optCC_s d) "CC") "c compiler to use"
     , Option []    ["arg"]       (ReqArg (\d -> optProgArgs_u (++ [d])) "arg") "arguments to pass interpreted program"
     , Option ['N'] ["noprelude"] (NoArg  (optPrelude_s False))   "no implicit prelude"
-    , Option ['C'] ["justcheck"] (NoArg  (optMode_s CompileHo))   "Typecheck and compile ho."
+    , Option ['C'] ["justcheck"] (NoArg  (optMode_s CompileHoGrin))   "Typecheck, compile ho and grin."
+    , Option ['c'] [] (NoArg  (optMode_s CompileHo))   "Typecheck and compile ho."
     , Option ['I'] ["interpret"] (NoArg  (optMode_s Interpret)) "interpret."
     , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))  "keep going on errors."
     , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output."
@@ -124,11 +129,13 @@ theoptions =
     , Option []    ["show-ho"]   (ReqArg  (optMode_s . ShowHo) "file.ho") "Show ho file"
     , Option []    ["noauto"]    (NoArg  (optNoAuto_s True)) "Don't automatically load base and haskell98 packages"
     , Option ['p'] []            (ReqArg (\d -> optHls_u (++ [d])) "file.hl") "Load given haskell library .hl file"
+    , Option ['L'] []            (ReqArg (optHlPath_u . idu) "path") "Look for haskell libraries in the given directory."
     , Option []    ["build-hl"]  (ReqArg (optMode_s . BuildHl) "file.hl") "Build hakell library from given list of modules"
     , Option []    ["interactive"] (NoArg  (optMode_s Interactive)) "run interactivly"
     , Option []    ["ignore-ho"]  (NoArg  (optIgnoreHo_s True)) "Ignore existing haskell object files"
     , Option []    ["nowrite-ho"] (NoArg  (optNoWriteHo_s True)) "Do not write new haskell object files"
     , Option []    ["selftest"]   (NoArg  (optMode_s SelfTest)) "Perform internal integrity testing"
+    , Option []    ["list-libraries"]   (NoArg  (optMode_s ListLibraries)) "List of installed libraries."
     ]
 
 -- | Width of terminal.

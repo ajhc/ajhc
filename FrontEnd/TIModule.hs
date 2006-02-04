@@ -26,7 +26,7 @@ import FrontEnd.Tc.Monad()
 --import FrontEnd.Tc.Main()
 import FrontEnd.Utils
 import GenUtil
-import Ho
+import Ho.Type
 import HsSyn
 import MultiModuleBasics
 import Name.Name as Name

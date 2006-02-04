@@ -1,13 +1,12 @@
-module Ho(
-    FileDep(..),
-    Ho(..),
-    HoHeader(..),
+module Ho.Build (
+    module Ho.Type,
     dumpHoFile,
     findModule,
     hoToProgram,
     initialHo,
-    loadLibraries,
     recordHoFile,
+    checkForHoFile,
+    checkForHoModule,
     showHoCounts
     ) where
 
@@ -22,7 +21,6 @@ import Maybe
 import Monad
 import Prelude hiding(print,putStrLn)
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 import System.IO hiding(print,putStrLn)
 import System.Posix.Files
@@ -38,39 +36,31 @@ import Directory
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
-import E.CPR
 import E.Program
 import E.E
 import E.Inline(emapE)
-import E.Show
 import E.Rules
-import E.Strictness
 import E.Subst(substMap'')
 import E.TypeCheck()
 import FilterInput
 import FrontEnd.HsParser
-import FrontEnd.SrcLoc
 import FrontEnd.Infix
 import FrontEnd.ParseMonad
 import FrontEnd.Unlit
 import GenUtil hiding(putErrLn,putErr,putErrDie)
+import Ho.Type
 import HsSyn
 import Info.Types
-import FrontEnd.KindInfer
 import MapBinaryInstance()
-import Name.Name
 import Options
 import PackedString
 import PrimitiveOperators
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
-import Representation
-import TypeSynonyms
 import Warning
 
-
 version :: Int
-version = 5
+version = 6
 
 magic = (packString "jhc Haskell Object File",version)
 magic2 = packString "John's Haskell Compiler"
@@ -87,44 +77,6 @@ shortenPath x@('/':_) = do
 shortenPath x = return x
 
 
-data HoHeader = HoHeader {
-    hohGeneration :: Int,
-    hohDepends :: [FileDep],            -- ^ Haskell Source files depended on
-    hohModDepends :: [(Module,FileDep)] -- ^ Other objects depended on
-    }
-    {-! derive: GhcBinary !-}
-
-data Ho = Ho {
-    -- filled in by front end
-    hoModules :: Map.Map Module FileDep,     -- ^ Map of module to ho file, This never actually ends up in the binary file on disk, but is filled in when the file is read.
-    hoExports :: Map.Map Module [Name],
-    hoDefs :: Map.Map Name (SrcLoc,[Name]),
-    hoAssumps :: Map.Map Name Scheme,        -- used for typechecking
-    hoFixities :: FixityMap,
-    hoKinds :: KindEnv,                      -- used for typechecking
-    hoClassHierarchy :: ClassHierarchy,
-    hoTypeSynonyms :: TypeSynonyms,
-    hoProps :: Map.Map Name [Atom],
-    -- Filled in by E generation
-    hoDataTable :: DataTable,
-    hoEs :: Map.Map Name (TVr,E),
-    hoRules :: Rules,
-    hoUsedIds :: Set.Set Id
-    }
-    {-! derive: GhcBinary, Monoid !-}
-
-
--- | Contains hopefully enough meta-info to uniquely identify a file
--- independent of its name.
-
-data FileDep = FileDep {
-    fileName :: Atom,
-    fileModifyTime :: Int,
-    fileDeviceID :: Atom,
-    fileFileID :: Int,
-    fileFileSize :: Int
-    } deriving(Show)
-    {-! derive: GhcBinary !-}
 
 emptyFileDep = FileDep mempty 0 mempty 0 0
 
@@ -161,7 +113,7 @@ findModule have need ifunc func  = do
     let f (Left (Module m)) = (m,searchPaths m)
         f (Right n) = (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
         (name,files) = f need
-    (ho,ms) <- Ho.getModule have name files
+    (ho,ms) <- getModule have name files
     processIOErrors
     let scc = map f $  stronglyConnComp [ (x,fromModule $ hsModuleName hs,hsModuleRequires hs) | x@(hs,fd,honm) <- ms ]
         f (AcyclicSCC x) = [x]
@@ -173,10 +125,21 @@ findModule have need ifunc func  = do
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
                 mods' = [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
                 mdeps = [ (m,runIdentity $ Map.lookup m (hoModules ho)) | m <- mods']
-            ho' <- recordHoFile ho' [ x | (_,_,x) <- sc ] HoHeader { hohGeneration = 0, hohDepends = [ x | (_,x,_) <- sc], hohModDepends = mdeps }
+            let hoh = HoHeader { hohGeneration = 0, 
+                                 hohDepends    = [ x | (_,x,_) <- sc], 
+                                 hohModDepends = mdeps, 
+                                 hohMetaInfo   = []
+                               }
+            ho' <- recordHoFile ho' [ x | (_,_,x) <- sc ] hoh
             f (ho `mappend` ho') scs
     ho <- ifunc (ho `mappend` have)
     f ho scc
+
+checkForHoModule :: Module -> IO (Maybe (HoHeader,Ho))
+checkForHoModule (Module m) = loop $ map snd $ searchPaths m
+    where loop []     = fail ("checkForHoModule: Module "++m++" not found.")
+          loop (f:fs) = do e <- doesFileExist f
+                           if e then checkForHoFile f else loop fs
 
 checkForHoFile :: String            -- ^ file name to check for
     -> IO (Maybe (HoHeader,Ho))
@@ -224,7 +187,6 @@ readHoFile fn = do
     hClose fh
     return (hh,ho)
 
-
 {-# NOINLINE dumpHoFile #-}
 dumpHoFile :: String -> IO ()
 dumpHoFile fn = do
@@ -233,6 +195,8 @@ dumpHoFile fn = do
     putStrLn $ "Generation:" <+> tshow (hohGeneration hoh)
     putStrLn $ "Dependencies:" <+>  pprint (sortUnder (show . fileName) $ hohDepends hoh)
     putStrLn $ "ModDependencies:" <+>  pprint (sortUnder fst $ hohModDepends hoh)
+    putStrLn $ "MetaInfo:" <+> vcat [show k <+> show v | (k,v) <- hohMetaInfo hoh]
+    putStrLn $ "Libraries:" <+> pprint (sort $ Map.keys $ hoLibraries ho)
     putStrLn $ "hoMods:" <+> tshow (map fromModule $ Map.keys $  hoExports ho)
     putStrLn $ "hoExports:" <+> tshow (size $ hoExports ho)
     putStrLn $ "hoDefs:" <+> tshow (size $ hoDefs ho)
@@ -267,9 +231,6 @@ dumpHoFile fn = do
         putStrLn $ PPrint.render $ pprint (hoAssumps ho)
 
 
-
-instance (PPrint d a, PPrint d b) => PPrint d (Map.Map a b) where
-    pprint m = vcat [ pprint x <+> text "=>" <+> pprint y | (x,y) <- Map.toList m]
 
 --recordHoFile :: Ho -> [(HsModule,FileDep,String,[FileDep])] -> [FileDep] -> IO [FileDep]
 
@@ -325,7 +286,8 @@ recordHoFile ho fs header = do
     return (ho { hoModules = fmap (const dep) (hoExports ho) })
     --return [ hsdep | (hs,hsdep,honm,ds) <- sc]
 
-
+-- | Check that ho library dependencies are right
+hoLibraryDeps newHo oldHo = hoLibraries newHo `Map.isSubmapOf` hoLibraries oldHo
 
 -- | Find a module, returning the combined up to date Ho files and the parsed
 -- contents of files that still need to be processed, This chases dependencies so
@@ -359,7 +321,7 @@ getModule ho name files  = do
                             r <- checkHoDep a
                             if r then f as else return False
                         f [] = return True
-                    r <- f (hohModDepends hh)
+                    r <- if hoLibraryDeps ho' ho then f (hohModDepends hh) else return False
                     case r of
                         True -> do
                             fixups <- readIORef fixup_ref
@@ -485,16 +447,6 @@ showHoCounts ho = do
     putErrLn $ "hoProps:" <+> tshow (size $  hoProps ho)
     putErrLn $ "hoRules:" <+> tshow (size $  hoRules ho)
 
-
-loadLibraries :: IO Ho
-loadLibraries = do
-    initialHo <- getInitialHo
-    f initialHo (optHls options)  where
-        f ho [] = return ho
-        f ho (fn:rs) = checkForHoFile fn >>= \x -> case x of
-            Nothing -> putErrDie $ "Library not found or invalid: " ++ show fn
-            Just (_,ho') -> f (ho' `mappend` ho) rs
-
 hoToProgram :: Ho -> Program
 hoToProgram ho = programSetDs (Map.elems $ hoEs ho) program {
     progClassHierarchy = hoClassHierarchy ho,
@@ -509,9 +461,6 @@ initialHo = mempty { hoEs = es , hoClassHierarchy = ch  }  where
     es' = Map.fromList [ (n,(setProperty prop_INSTANCE $ tVr (atomIndex $ toAtom n) (error "f no longer relevant"),v)) | (n,t,p,d) <- theMethods, let v = f n t p d  ]
     f _ _ _ _ = error "f no longer relevant"
 
-getInitialHo :: IO Ho
-getInitialHo = do
-    return initialHo
 {-
     let ds = Map.elems $ hoEs initialHo
     cds <- E.Strictness.solveDs ds

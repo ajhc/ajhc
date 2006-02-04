@@ -13,7 +13,8 @@ import FrontEnd.Exports
 import FrontEnd.Rename
 import FrontEnd.SrcLoc
 import GenUtil
-import Ho
+import Ho.Build
+import Ho.Library(loadLibraries)
 import HsSyn
 import MultiModuleBasics
 import Options

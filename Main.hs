@@ -45,7 +45,9 @@ import Grin.Show
 import Grin.Unboxing
 import Grin.Arity
 import Grin.Whiz
-import Ho
+import Ho.Build
+import Ho.Library
+import Ho.LibraryMap
 import HsSyn
 import Info.Types
 import Name.Name
@@ -88,40 +90,41 @@ main = runMain $ bracketHtml $ do
         args <- System.getArgs
         return (simpleQuote (name:args))
     case optMode o of
-      BuildHl hl -> buildHl hl (optArgs o)
-      SelfTest   -> do putStrLn "Starting self testing..."
-                       SelfTest.selfTest (optArgs o)
-      ShowHo ho  -> dumpHoFile ho
-      Version    -> putStrLn versionString
-      VersionCtx -> putStrLn changes_txt
-      _          -> processFiles  (optArgs o)
+      BuildHl hl    -> buildHl hl (optArgs o)
+      ListLibraries -> sequence_ [ putStrLn name | (name,_) <- libraryList ]
+      SelfTest      -> do putStrLn "Starting self testing..."
+                          SelfTest.selfTest (optArgs o)
+      ShowHo ho     -> dumpHoFile ho
+      Version       -> putStrLn versionString
+      VersionCtx    -> putStrLn changes_txt
+      _             -> processFiles  (optArgs o)
 
 
-buildHl fname [] = putErrDie "Cannot build hl file without list of input modules"
-buildHl fname ms = do
-    stats <- Stats.new
-    me <- parseFiles [] (map Module ms) processInitialHo (processDecls stats)
-    recordHoFile me [fname] HoHeader { hohGeneration = 0, hohDepends = [], hohModDepends = [] }
-    return ()
+buildHl fname [pd] = do pd <- CharIO.readFile pd
+                        createLibrary fname $ parseLibraryDescription pd
+buildHl fname _    = do putErrDie "Syntax: --build-hl hl-file package-description-file"
 
 processFiles [] | Nothing <- optMainFunc options = do
     int <- isInteractive
-    stats <- Stats.new
-    case int of
-        False -> putErrDie "jhc: no input files"
-        True -> do
-            me <- parseFiles [] [Module "Prelude"] processInitialHo (processDecls stats)
-            compileModEnv' stats me
+    when (not int) $ putErrDie "jhc: no input files"
+    processFilesModules [] [Module "Prelude"]
 processFiles [] | Just (b,m) <- optMainFunc options = do
     m <- return $ parseName Val m
     Module m <- getModule m
-    stats <- Stats.new
-    me <- parseFiles [] [Module m] processInitialHo (processDecls stats)
-    compileModEnv' stats me
-processFiles fs = do
-    stats <- Stats.new
-    me <- parseFiles  fs [] processInitialHo (processDecls stats)
-    compileModEnv' stats me
+    processFilesModules [] [Module m]
+processFiles cs = do
+    (ms,fs) <- return $ splitEither $ map fileOrModule cs
+    processFilesModules fs ms
+
+processFilesModules fs ms = do
+    s <- Stats.new
+    compileModEnv' s =<< parseFiles fs ms processInitialHo (processDecls s)
+
+fileOrModule f = case reverse f of
+                   ('s':'h':'.':_)     -> Right f
+                   ('s':'h':'l':'.':_) -> Right f
+                   _                   -> Left $ Module f
+
 
 barendregt e = runIdentity  (renameTraverse' e)
 
@@ -349,6 +352,7 @@ compileModEnv' stats ho = do
     -- enter interactive mode
     int <- isInteractive
     if int then Interactive.interact ho else do
+    if optMode options == CompileHo then return () else do
 
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
     (_,main,mainv) <- getMainFunction dataTable mainFunc (programEsMap prog)

@@ -27,7 +27,7 @@ import FrontEnd.Tc.Main
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import GenUtil
-import Ho
+import Ho.Type
 import HsSyn
 import MultiModuleBasics
 import Name.Name as Name
