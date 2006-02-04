@@ -97,7 +97,7 @@ formatCalendarTime l fmt ct@(CalendarTime year mon day hour min sec sdec
         decode 'T' = doFmt "%H:%M:%S"
         decode 't' = "\t"
         decode 'S' = show2 sec
-        decode 's' = ...                -- Implementation-dependent
+--        decode 's' = ...                -- Implementation-dependent
         decode 'U' = show2 ((yday + 7 - fromEnum wday) `div` 7)
         decode 'u' = show (let n = fromEnum wday in
                            if n == 0 then 7 else n)

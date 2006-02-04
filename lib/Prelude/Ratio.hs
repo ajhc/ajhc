@@ -34,18 +34,20 @@ instance  (Integral a)  => Num (Ratio a)  where
     signum (x:%y)       =  signum x :% 1
     fromInteger x       =  fromInteger x :% 1
 
+{-
 instance  (Integral a)  => Real (Ratio a)  where
-    toRational (x:%y)   =  toInteger x :% toInteger y
+    toRational x        =  toIntegral x :% 1
 
 instance  (Integral a)  => Fractional (Ratio a)  where
-    (x:%y) / (x':%y')   =  (x*y') % (y*x')
-    recip (x:%y)        =  y % x
+    (x:%y) / (x':%y')   =  (x*y') :% (y*x')
+    recip (x:%y)        =  y :% x
     fromRational (x:%y) =  fromInteger x :% fromInteger y
 
 instance  (Integral a)  => RealFrac (Ratio a)  where
     properFraction (x:%y) = (fromIntegral q, r:%y)
                             where (q,r) = quotRem x y
 
+-}
 {-
 instance  (Integral a)  => Enum (Ratio a)  where
     succ x           =  x+1
@@ -57,6 +59,8 @@ instance  (Integral a)  => Enum (Ratio a)  where
 --    enumFromTo       =  numericEnumFromTo	-- but not exported from it!
 --    enumFromThenTo   =  numericEnumFromThenTo
 -}
+
+ratPrec = 0 -- FIXME
 
 instance  (Read a, Integral a)  => Read (Ratio a)  where
     readsPrec p  =  readParen (p > ratPrec)

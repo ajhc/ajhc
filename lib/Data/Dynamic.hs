@@ -62,4 +62,4 @@ dynApp f x = case dynApply f x of
                                " to argument " ++ show x)
 
 
-foreign primitive "unsafeCoerce" unsafeCoerce :: a -> b
+foreign import primitive "unsafeCoerce" unsafeCoerce :: a -> b

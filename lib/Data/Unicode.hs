@@ -1,13 +1,14 @@
 module Data.Unicode where
 
 import Foreign.C.String
+import System.IO.Unsafe
 
 newtype CType = CType Int
 
 -- | Get a ctype other than one of the defaults.
 
 ctype :: String -> IO CType
-ctype s = withCString s >>= c_wctype
+ctype s = withCString s c_wctype
 
 
 t_alnum, t_alpha, t_blank, t_cntrl,
