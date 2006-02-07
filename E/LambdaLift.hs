@@ -181,12 +181,10 @@ lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs 
     ncs <- readIORef fc
     return $ prog { progCombinators =  ncs }
 
---shouldLift EError {} = True
 shouldLift ECase {} = True
 shouldLift ELam {} = True
 shouldLift _ = False
 
-typeLift EError {} = "Error"
 typeLift ECase {} = "Case"
 typeLift ELam {} = "Lambda"
 typeLift _ = "Other"

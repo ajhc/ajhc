@@ -56,10 +56,10 @@ programSetE :: E -> Program -> Program
 programSetE (ELetRec ds (EVar v)) prog = programSetDs ds prog { progMainEntry = v }
 programSetE (ELetRec ds mainBody) prog = programSetDs ((main,mainBody):ds) prog { progMainEntry = main } where
     main = (tVr num (typeInfer (progDataTable prog) mainBody))
-    Just num = List.find (`notElem` [ n  | (TVr { tvrIdent = n },_) <- ds ]) [2,4 ..]
+    Just num = List.find (`notElem` [ n  | (TVr { tvrIdent = n },_) <- ds ]) [toId $ toName Val (show $ progModule prog,"main" ++ show n) |  n <- [1 :: Int ..] ]
 programSetE e prog = prog { progCombinators = [(main,as,mainBody)], progMainEntry = main } where
     (mainBody,as) = fromLam e
-    main = tVr 2 (typeInfer (progDataTable prog) e)
+    main = tVr (toId $ toName Val (show $ progModule prog,"main")) (typeInfer (progDataTable prog) e)
 
 programMapBodies f prog = do
      ds <- sequence [ f e >>= return . (,) t | (t,e) <- programDs prog ]
