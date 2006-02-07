@@ -381,7 +381,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         where
         te = getType e
         dt = (so_dataTable sopts)
-    doCase e b [] (Just d) sub inb | not (isLifted e) = do
+    doCase e b [] (Just d) sub inb | not (isLifted e || isUnboxed (getType e)) = do
         mtick "E.Simplify.case-unlifted"
         b' <- nname b sub inb
         d' <- f d (Map.insert (tvrNum b) (Done (EVar b')) sub) (envInScope_u  (Map.insert (tvrNum b') (IsBoundTo Many e)) inb)
@@ -390,6 +390,9 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         mtick "E.Simplify.case-evaled"
         d' <- f d (Map.insert (tvrNum b) (Done (EVar v)) sub) inb
         return d'
+    doCase scrut v [] (Just sc@ECase { eCaseScrutinee = EVar v'} ) sub inb | v == v', not $ tvrNum v `Set.member` freeVars (caseBodies sc)  = do
+        mtick "E.Simplify.case-default-case"
+        f sc { eCaseScrutinee = scrut } sub inb
     doCase e b as d sub inb = do
         b' <- nname b sub inb
         let dd e' = f e' (Map.insert (tvrNum b) (Done $ EVar b') sub) (envInScope_u (newinb `Map.union`) inb) where

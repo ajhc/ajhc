@@ -24,7 +24,7 @@ import Name.VConsts
 
 instance Tuple E where
     tupleNil = vUnit
-    tupleMany es = ELit $ LitCons (nameTuple DataConstructor (length es)) es (ltTuple ts) where 
+    tupleMany es = ELit $ LitCons (nameTuple DataConstructor (length es)) es (ltTuple ts) where
         ts = map getType es
 
 eIf e a b = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 tBool),  eCaseAlts =  [Alt vTrue a,Alt vFalse b], eCaseDefault = Nothing }
@@ -146,7 +146,9 @@ substLet' ds' e  = ans where
 
 eLetRec = substLet'
 
-isLifted x = sortTermLike x
+-- | determine if term can contain _|_
+isLifted :: E -> Bool
+isLifted x = sortTermLike x && not (isUnboxed (getType x))
 
 -- Note: This does not treat lambdas as whnf
 whnfOrBot :: E -> Bool
