@@ -1,4 +1,4 @@
-module E.LambdaLift(lambdaLiftE)  where
+module E.LambdaLift(lambdaLift)  where
 
 import Control.Monad.Reader
 import Control.Monad.Writer
@@ -8,10 +8,10 @@ import List
 import qualified Data.Set as Set
 
 import Atom
-import DataConstructors
 import E.E
 import E.FreeVars
 import E.Subst
+import E.Program
 import E.Traverse
 import E.TypeCheck
 import E.Values
@@ -23,29 +23,8 @@ import Util.UniqueMonad
 import Util.Graph as G
 
 
--- super combinators
-data SC = SC { scMain :: TVr, scCombinators ::  [(TVr,[TVr],E)] }
-    deriving(Eq,Show)
 
-scToE :: SC -> E
-scToE (SC v ds) = ELetRec ds' (EVar v) where
-    ds' = sortLetDecls [ (t,foldr ELam e as) |  (t,as,e) <- ds]
-
-eToSC :: DataTable -> E -> SC
-eToSC _ (ELetRec ds (EVar v)) = SC v ds' where
-    ds' = [ (a,b,c) | (a,(c,b)) <- [ (t,fromLam e) | (t,e) <- ds ]]
-eToSC dt (ELetRec ds e) = SC tvr ((tvr,as,e'):ds') where
-    (e',as) = fromLam e
-    tvr = (tVr num (typeInfer dt e))
-    --num = -2
-    Just num = List.find (`notElem` [ n  | (TVr { tvrIdent = n },_) <- ds ]) [200000,200002 ..]
-    ds' = [ (a,b,c) | (a,(c,b)) <- [ (t,fromLam e) | (t,e) <- ds ]]
-eToSC dt v = SC tvr [(tvr,as,e')] where
-    (e',as) = fromLam v
-    tvr = (tVr num (typeInfer dt v))
-    num = 200000
--- eToSC (ELetRec ds v) = error $ "eToSC: " ++ show v
-
+{-
 -- | pull lets from just in definitions to top level, as they can obscure lambdas.
 flattenSC :: SC -> SC
 flattenSC (SC v cs) = SC v (concatMap f cs) where
@@ -54,6 +33,7 @@ flattenSC (SC v cs) = SC v (concatMap f cs) where
     fd (t,e) =  let (c,b) = fromLam e in (t,b,c)
 
 lambdaLiftE stats dt e = fmap scToE (lambdaLift stats dt (eToSC dt e))
+-}
 
 data S = S { funcName :: Atom, topVars :: Set.Set Int, isStrict :: Bool, declEnv :: [(TVr,E)] }
     {-! derive: update !-}
@@ -66,9 +46,8 @@ etaReduce e = case f e 0 of
         f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && not (tvrNum t `Set.member` freeVars x) = f x (n + 1)
         f e n = (e,n)
 
-lambdaLift :: Stats -> DataTable -> SC -> IO SC
-lambdaLift stats dataTable sc = do
-    let SC m cs = sc -- flattenSC sc
+lambdaLift :: Stats -> Program -> IO Program
+lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs } = do
     let wp =  Set.fromList [ tvrNum x | (x,_,_) <- cs ]
     fc <- newIORef []
     let z (n,as,v) = do
@@ -200,7 +179,7 @@ lambdaLift stats dataTable sc = do
             Nothing -> toAtom $ toName Val ("LL@",'f':show x)
     mapM_ z cs
     ncs <- readIORef fc
-    return $ SC m ncs
+    return $ prog { progCombinators =  ncs }
 
 --shouldLift EError {} = True
 shouldLift ECase {} = True
@@ -213,11 +192,12 @@ typeLift ELam {} = "Lambda"
 typeLift _ = "Other"
 
 removeType t v e  = subst' t v e
+{-
 removeType t v e = ans where
     (b,ls) = fromLam e
     ans = foldr f (substLet [(t,v)] e) ls
     f tv@(TVr { tvrType = ty} ) e = ELam nt (subst tv (EVar nt) e) where nt = tv { tvrType = (subst t v ty) }
-
+-}
 
 
 

@@ -420,10 +420,13 @@ compileModEnv' stats ho = do
         mapM_ (\ (t,ts,e) -> putStrLn $  (showTVr t) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ]) ds
 
 
-    wdump FD.LambdacubeBeforeLift $ printCheckName dataTable lc
+    wdump FD.LambdacubeBeforeLift $ printProgram prog -- printCheckName dataTable lc
     finalStats <- Stats.new
-    lc <- mangle dataTable (return ()) True "LambdaLift" (lambdaLiftE finalStats dataTable) lc
-    lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeApps mempty finalStats x >>= coalesceLets finalStats)  lc
+    prog <- lambdaLift finalStats prog
+
+    --lc <- mangle dataTable (return ()) True "LambdaLift" (lambdaLiftE finalStats dataTable) lc
+
+    lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeApps mempty finalStats x >>= coalesceLets finalStats)  (programE prog)
 
     prog <- return $ programSetE lc prog
 
@@ -441,7 +444,7 @@ compileModEnv' stats ho = do
     prog <- return $ prog { progCombinators = rs' }
 
 
-    wdump FD.Lambdacube $ printCheckName dataTable (programE prog)
+    wdump FD.Lambdacube $ printProgram prog -- printCheckName dataTable (programE prog)
 
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     wdump FD.Progress $ printEStats (programE prog)
@@ -641,7 +644,17 @@ printCheckName' dataTable tvr e = do
     ty <- typecheck dataTable e
     putErrLn  ( render $ indent 4 (pprint ty))
 
+printProgram prog@Program {progCombinators = cs, progDataTable = dataTable } = do
+    sequence_ $ intersperse (putErrLn "") [ printCheckName'' dataTable v (foldr ELam e as) | (v,as,e) <- cs]
+    putErrLn $ "Entry: " ++ pprint (progMainEntry prog)
 
+printCheckName'' :: DataTable -> TVr -> E -> IO ()
+printCheckName'' dataTable tvr e = do
+    let ty = case inferType dataTable [] e of
+            Left err -> vcat $ map text (intersperse "---" $ tail err)
+            Right ty -> pprint ty
+    putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> ty))
+    putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
 
 
 

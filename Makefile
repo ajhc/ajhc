@@ -63,11 +63,11 @@ clean:
 
 tests: helloworld calendar primes
 
-helloworld: jhc
+helloworld: test/HelloWorld.hs jhc
 	./jhc -v $(JHC_TEST) test/HelloWorld.hs -o $@ 2>&1 | tee $@.log
-calendar: jhc
+calendar: test/Calendar.hs jhc
 	./jhc -v $(JHC_TEST) test/Calendar.hs -o $@ 2>&1 | tee $@.log
-primes: jhc
+primes: test/Primes.hs jhc
 	./jhc -v $(JHC_TEST) test/Primes.hs -o $@ 2>&1 | tee $@.log
 
 realclean: clean

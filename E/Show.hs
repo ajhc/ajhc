@@ -176,7 +176,7 @@ showE e = do
                     return [unparse db <+> UC.rArrow <+> unparse e]
             let alts' = map (<> bc ';') (alts ++ dcase)
             return $ fixitize ((L,(-10))) $ atom $
-                group ( nest 4 ( keyword "case" <+> scrut <+> keyword "of" <$>  (align $ sep (alts'))) )
+                group ( nest 4 ( keyword "case" <+> scrut <+> keyword "of" <$>  (align $ vcat (alts'))) )
         showAlt (Alt l e) = foldr allocTVr ans (litBinds l) where
             ans = do
                 l <- showLit showTVr l
