@@ -2,10 +2,6 @@ module E.LetFloat(
     atomizeApps,
     coalesceLets,
     annotateBindings,
-    doCoalesce,
-    doLetRec,
-    varElim,
-    propRec,
     floatInward
   ) where
 
@@ -23,6 +19,7 @@ import E.Rules
 import E.Traverse
 import E.Values
 import Support.FreeVars
+import Options
 import GenUtil
 import qualified Util.Graph as G
 import Stats
@@ -30,22 +27,12 @@ import Stats
 
 
 doLetRec stats [] e = return e
-doLetRec stats ds _ | hasRepeatUnder fst ds = error "doLetRec: repeated variables!"
-doLetRec stats ds e = do
-    return $ substLet ds e
-    {-
-    let fakeDs = (TVr (-1) undefined,e)
-    let ds' = reachable (newGraph (fakeDs:ds) (tvrNum . fst) (freeVars . snd)) [-1]
-    let ds'' = [ d | d@(t,_) <- ds', tvrNum t /= -1 ]
-    liftIO $ ticks stats (length ds - length ds'') (toAtom "E.LetFloat.var-elimination")
-    return $ ELetRec ds'' e
-    -}
+doLetRec stats ds _ | flint && hasRepeatUnder fst ds = error "doLetRec: repeated variables!"
+doLetRec stats ds e = return $ substLet ds e
 
 varElim :: Stats -> Int -> IO ()
 varElim stats n = do
     ticks stats n (toAtom "E.Simplify.var-elimination")
-propRec stats n = do
-    ticks stats n (toAtom "E.Simplify.copy-propagate")
 
 atomizeApps :: Set.Set Id -> Stats -> E -> IO E
 atomizeApps usedIds stats e = liftM fst $ traverse travOptions { pruneRecord = varElim stats } f mempty (Map.fromAscList [ (i,NotKnown) | i <- Set.toAscList usedIds ]) e where
@@ -65,7 +52,6 @@ atomizeApps usedIds stats e = liftM fst $ traverse travOptions { pruneRecord = v
         doLetRec stats (concat dss) (foldl EAp x xs')
     f _ _ = error "LetFloat: odd f"
     at e | not (isAtomic e) = do
-        --lift $ putErrLn $ "Atomizing: " ++ render (ePretty e)
         e <- f 0 (e,[])
         lift $ tick stats (toAtom "E.LetFloat.atomizeApps")
         nb@(tvr,_) <- newBinding e
@@ -211,50 +197,6 @@ coalesceLets stats e = liftM fst $ traverse travOptions { pruneRecord = varElim 
     f n (x,xs) = do
         (x',xs') <- lift $ doCoalesce stats (x,xs)
         return $ foldl EAp x' xs'
-    {-
-    f n (x,xs) = do
-        (xs',dss) <- fmap unzip (mapM at xs)
-        case x of
-            ECase (ELetRec ds' (ELetRec ds'' x')) as -> do
-                lift $ tick stats (toAtom "LetFloat.coalesce.fromLet")
-                fromLet2 (concat $ ds'':ds':dss) (foldl EAp x' xs')
-            ECase (ELetRec ds' x') as -> do
-                lift $ tick stats (toAtom "LetFloat.coalesce.fromCase")
-                fromLet2 (concat $ ds':dss) (foldl EAp (ECase x' as) xs')
-            ELetRec ds' x' | not (null xs) -> do
-                lift $ tick stats (toAtom "LetFloat.coalesce.fromAp")
-                fromLet2 (concat $ ds':dss) (foldl EAp x' xs')
-            x -> fromLet2 (concat dss) (foldl EAp x xs')
-    at (ELetRec ds e) = do
-        lift $ tick stats (toAtom "LetFloat.coalesce.fromArg")
-        return (e,ds)
-    at e = return (e,[])
-    at' (t,(ELetRec ds e)) = do
-        lift $ tick stats (toAtom "LetFloat.coalesce.fromLet2")
-        return ((t,e),ds)
-    at' e = return (e,[])
-    fromLet2 ds e = do
-        (ds',dss) <- fmap unzip (mapM at' ds)
-        doLetRec stats (concat $ ds':dss) e
 
-    -}
 
-letFloat :: Stats -> String -> E -> IO (E,[(TVr,E)])
-letFloat stats s e = do
-    return (e,[])
-
---notAtomic e | Just _ <- fullyConst e = False
---notAtomic e | sortTypeLike e = False
---notAtomic e = not $ isAtomic e
-
---notAtomic (ELetRec _ e) = notAtomic e
-----notAtomic x | sortTypeLike x  = False
---notAtomic ECase {} = True
---notAtomic EAp {} = True
---notAtomic ELam {} = True
---notAtomic EPrim {} = True
---notAtomic e | Just _ <- fullyConst e = False
---notAtomic (ELit (LitCons n (_:_) _)) = True
---notAtomic EPi {} = True
---notAtomic _ = False
 
