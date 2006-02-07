@@ -1,4 +1,4 @@
-module E.LambdaLift(SC(..), scToE, eToSC, lambdaLift, lambdaLiftE)  where
+module E.LambdaLift(lambdaLiftE)  where
 
 import Control.Monad.Reader
 import Control.Monad.Writer

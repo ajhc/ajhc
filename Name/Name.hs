@@ -13,6 +13,8 @@ module Name.Name(
     isConstructorLike,
     toId,
     fromId,
+    Module,
+    mainModule,
     setModule
     ) where
 
@@ -145,4 +147,5 @@ toId x = atomIndex (toAtom x)
 fromId :: Monad m => Int -> m Name
 fromId i = liftM Name (intToAtom i)
 
+mainModule = Module "Main@"
 

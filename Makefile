@@ -61,8 +61,10 @@ depend: $(BUILTSOURCES)
 clean:
 	rm -f  jhc jhcp *.hs_code.c `find . -name \*.hi -or -name \*.o-boot -or -name \*.hi-boot -or -name \*.o`
 
-tests: calendar primes
+tests: helloworld calendar primes
 
+helloworld: jhc
+	./jhc -v $(JHC_TEST) test/HelloWorld.hs -o $@ 2>&1 | tee $@.log
 calendar: jhc
 	./jhc -v $(JHC_TEST) test/Calendar.hs -o $@ 2>&1 | tee $@.log
 primes: jhc

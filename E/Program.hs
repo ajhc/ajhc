@@ -21,6 +21,7 @@ data Program = Program {
     progDataTable :: DataTable,
     progEntryPoints :: [TVr],
     progMainEntry :: TVr,
+    progModule :: Module,
     progStats :: Stats.Stat
     }
 
@@ -31,6 +32,7 @@ program = Program {
     progDataTable = mempty,
     progEntryPoints = mempty,
     progMainEntry = tvr,
+    progModule = mainModule,
     progStats = mempty
     }
 

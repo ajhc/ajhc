@@ -10,7 +10,6 @@ import Maybe
 import qualified Data.Set as Set
 
 import Atom
-import Support.CanType
 import Control.Monad.Identity
 import C.Prims
 import DataConstructors
@@ -19,10 +18,9 @@ import Doc.PPrint
 import Doc.Pretty
 import E.E
 import E.FreeVars
-import E.LambdaLift
+import E.Program
 import E.TypeCheck
 import E.Values
-import Support.FreeVars
 import GenUtil
 import Grin.Grin
 import Grin.Show
@@ -35,8 +33,11 @@ import PrimitiveOperators
 import qualified FlagDump as FD
 import qualified Stats
 import Stats(mtick)
+import Support.CanType
+import Support.FreeVars
 import Util.Graph as G
 import Util.Once
+import Util.UniqueMonad()
 
 
 
@@ -108,12 +109,12 @@ toType node = toty where
     toty (ELit (LitCons n [] es)) |  es == eHash, RawType <- nameType n = (Ty $ toAtom (show n))
     toty _ = node
 
-compile ::  DataTable -> Map Int Name -> SC -> IO Grin
-compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
+compile :: Program -> IO Grin
+compile prog@Program { progDataTable = dataTable, progCombinators = cm, progMainEntry = mt } = do
     tyEnv <- newIORef initTyEnv
     funcBaps <- newIORef []
     counter <- newIORef 100000  -- TODO real number
-    let (cc,reqcc) = constantCaf dataTable sc
+    let (cc,reqcc) = constantCaf prog
     wdump FD.Progress $ do
         putErrLn $ "Found" <+> tshow (length cc) <+> "CAFs to convert to constants," <+> tshow (length reqcc) <+> "of which are recursive."
         putDocMLn putStr $ vcat [ pprint v  | v <- reqcc ]
@@ -160,7 +161,7 @@ compile dataTable _ sc@SC { scMain = mt, scCombinators = cm } = do
     typecheckGrin grin
     return grin
     where
-    scMap = fromList [ (tvrNum t,toEntry x) |  x@(t,_,_) <- scCombinators sc]
+    scMap = fromList [ (tvrNum t,toEntry x) |  x@(t,_,_) <- progCombinators prog]
     initTyEnv = mappend primTyEnv $ TyEnv $ fromList $ [ (a,(b,c)) | (_,(a,b,c)) <-  Map.toList scMap] ++ [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode))
     con c = (n,(as,TyNode)) where
@@ -190,8 +191,8 @@ primTyEnv = TyEnv . Map.fromList $ [
 -- many cafs consist of constant applications, we preprocess them into values
 -- beforehand. This also catches recursive constant toplevel bindings.
 
-constantCaf :: DataTable -> SC -> ([(TVr,Var,Val)],[Var])
-constantCaf dataTable (SC _ ds) = ans where
+constantCaf :: Program -> ([(TVr,Var,Val)],[Var])
+constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans where
     (lbs',cafs) = G.findLoopBreakers (const 0) (const True) $ G.newGraph [ (v,e) | (v,[],e) <- ds, canidate e] (tvrNum . fst) (freeVars . snd)
     lbs = Set.fromList $ fsts lbs'
     canidate (ELit _) = True

@@ -413,8 +413,9 @@ compileModEnv' stats ho = do
     -- run optimization again with no rules enabled
     lc <- opt "SuperSimplify no Rules" cm lc
 
+    prog <- return $ programSetE lc prog
 
-    let ds = scCombinators $ eToSC dataTable lc in do
+    let ds = progCombinators prog in do
         putStrLn "Supercombinators"
         mapM_ (\ (t,ts,e) -> putStrLn $  (showTVr t) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ]) ds
 
@@ -423,9 +424,11 @@ compileModEnv' stats ho = do
     finalStats <- Stats.new
     lc <- mangle dataTable (return ()) True "LambdaLift" (lambdaLiftE finalStats dataTable) lc
     lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeApps mempty finalStats x >>= coalesceLets finalStats)  lc
-    let SC v rs = eToSC dataTable lc
 
-    rs' <- flip mapM rs $ \ (t,ls,e) -> do
+    prog <- return $ programSetE lc prog
+
+
+    rs' <- flip mapM (progCombinators prog) $ \ (t,ls,e) -> do
         let cm stats e = do
             let sopt = mempty {  SS.so_dataTable = dataTable }
             let (stat, e') = SS.simplifyE sopt e
@@ -435,17 +438,17 @@ compileModEnv' stats ho = do
         return (t,ls,e')
     wdump FD.Progress $ Stats.print "PostLifting" finalStats
 
-    lc <- return $ scToE (SC v rs')
+    prog <- return $ prog { progCombinators = rs' }
 
 
-    wdump FD.Lambdacube $ printCheckName dataTable lc
+    wdump FD.Lambdacube $ printCheckName dataTable (programE prog)
 
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
-    wdump FD.Progress $ printEStats lc
+    wdump FD.Progress $ printEStats (programE prog)
 
     stats <- Stats.new
     progress "Converting to Grin..."
-    x <- Grin.FromE.compile dataTable (error "vmap") (eToSC dataTable lc)
+    x <- Grin.FromE.compile prog
     Stats.print "Grin" Stats.theStats
     --wdump FD.Grin $ printGrin x
     x <- return $ normalizeGrin x
