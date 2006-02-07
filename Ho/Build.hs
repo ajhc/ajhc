@@ -125,9 +125,9 @@ findModule have need ifunc func  = do
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
                 mods' = [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
                 mdeps = [ (m,runIdentity $ Map.lookup m (hoModules ho)) | m <- mods']
-            let hoh = HoHeader { hohGeneration = 0, 
-                                 hohDepends    = [ x | (_,x,_) <- sc], 
-                                 hohModDepends = mdeps, 
+            let hoh = HoHeader { hohGeneration = 0,
+                                 hohDepends    = [ x | (_,x,_) <- sc],
+                                 hohModDepends = mdeps,
                                  hohMetaInfo   = []
                                }
             ho' <- recordHoFile ho' [ x | (_,_,x) <- sc ] hoh

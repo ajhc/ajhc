@@ -1,4 +1,4 @@
-module Ho.LibraryMap 
+module Ho.LibraryMap
     (libraryMapFind,libraryList,LibraryName,CheckSum
     ) where
 

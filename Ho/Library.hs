@@ -20,7 +20,7 @@ import Data.Monoid
 import System.IO
 
 
-data Library = Library { 
+data Library = Library {
     libraryDesc :: [(PackedString,PackedString)],
     libraryHo   :: Ho,
     libraryFP   :: FilePath,
@@ -56,8 +56,8 @@ loadLibraries = do
 
 -- Write a library and mutilate it to fit the description
 
-createLibrary :: FilePath 
-              -> [(String,String)] 
+createLibrary :: FilePath
+              -> [(String,String)]
               -> IO ()
 createLibrary fp desc = do
   let field x = lookup x desc
@@ -77,7 +77,7 @@ createLibrary fp desc = do
   when (homods /= allmods) $
       putErrDie ("Final ho consists of wrong modules:\nexpected: \t"
                  ++show allmods++"\nencountered: \t"++show homods)
-  let ho' = ho { hoExports = Map.difference (hoExports ho) 
+  let ho' = ho { hoExports = Map.difference (hoExports ho)
                              (Map.fromList [(Module x,()) | x <- hmods]) }
   let pdesc = [(packString n, packString v) | (n,v) <- desc ]
   writeLibraryFile fp $ Library pdesc ho "" 0
@@ -103,9 +103,9 @@ readLibraryFile fp mbcs = do
     mho <- checkForHoFile fp
     case mho of
       Nothing       -> putErrDie ("Loading library "++fp++" failed due to missing dependencies")
-      Just (hoh,ho) -> return $ 
+      Just (hoh,ho) -> return $
           Library { libraryDesc= hohMetaInfo hoh,
-                    libraryFP  = fp, 
+                    libraryFP  = fp,
                     libraryMD5 = pkgCS,
                     libraryHo  = ho
                   }

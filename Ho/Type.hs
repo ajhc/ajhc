@@ -29,7 +29,7 @@ data HoHeader = HoHeader {
     -- * FIXME - is this used for something?
     hohGeneration :: Int,
     -- * Haskell Source files depended on
-    hohDepends    :: [FileDep],             
+    hohDepends    :: [FileDep],
     -- * Other objects depended on
     hohModDepends :: [(Module,FileDep)],
     -- * metainformation, filled for hl-files, empty for normal objects.
