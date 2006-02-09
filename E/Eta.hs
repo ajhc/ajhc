@@ -46,12 +46,16 @@ etaExpandE dataTable e = f e where
         ds' <- sequence [ do e' <- ee e; e'' <- f e'; return (t,e'') | (t,e) <- ds]
         e' <- f e
         return $ ELetRec ds' e'
+    f ec@ECase {} = do
+        ec' <- caseBodiesMapM ee ec
+        emapE' f ec'
     f e = emapE' f e
     ee e@EVar {} = return e
-    ee (ELam t e) = do
-        e' <- ee e
+    ee e = ee' e
+    ee' (ELam t e) = do
+        e' <- ee' e
         return (ELam t e')
-    ee e | (EVar t,as) <- fromAp e , Just (Arity n) <- Info.lookup (tvrInfo t), n > length as = do
+    ee' e | (EVar t,as) <- fromAp e , Just (Arity n) <- Info.lookup (tvrInfo t), n > length as = do
         let (_,ts) = fromPi' dataTable (getType e)
             ets = (take (n - length as) ts)
         replicateM_ (length ets) $ mtick ("EtaExpand.{" ++ tvrShowName t)
@@ -59,7 +63,7 @@ etaExpandE dataTable e = f e where
             f map ((n,t):rs) = t { tvrType = substMap map (tvrType t)} : f (Map.insert n (EVar t) map) rs
             f _ [] = []
         return (foldr ELam (foldl EAp e (map EVar tvrs)) tvrs)
-    ee e = return e
+    ee' e = return e
 
 
 -- | only reduce if all lambdas can be discarded. otherwise leave them in place
