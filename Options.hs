@@ -143,44 +143,39 @@ getColumns :: Int
 getColumns = read $ unsafePerformIO (getEnv "COLUMNS" `mplus` return "80")
 
 
-postProcess :: Opt -> (Opt, String)
-postProcess o = case FlagDump.process (optDumpSet o) (optDump o ++ vv) of
-        (s,errs) -> (o { optDumpSet = s }, f errs) where
-                f [] = ""
-                f xs = "Unrecognized dump flag passed to '-d': " ++ unwords xs ++ "\nValid dump flags:\n\n" ++ FlagDump.helpMsg
+postProcessFD :: Monad m => Opt -> m Opt
+postProcessFD o = case FlagDump.process (optDumpSet o) (optDump o ++ vv) of
+        (s,[]) -> return $ o { optDumpSet = s }
+        (_,xs) -> fail ("Unrecognized dump flag passed to '-d': "
+                        ++ unwords xs ++ "\nValid dump flags:\n\n" ++ FlagDump.helpMsg)
     where
     vv | optVerbose o >= 2 = ["veryverbose"]
        | optVerbose o >= 1 = ["verbose"]
        | otherwise = []
 
-postProcess' o = case FlagOpts.process (optFOptsSet o) (optFOpts o) of
-        (s,errs) -> (o { optFOptsSet = s }, f errs) where
-                f [] = ""
-                f xs = "Unrecognized flag passed to '-f': " ++ unwords xs ++ "\nValid flags:\n\n" ++ FlagOpts.helpMsg
+postProcessFO :: Monad m => Opt -> m Opt
+postProcessFO o = case FlagOpts.process (optFOptsSet o) (optFOpts o) of
+        (s,[]) -> return $ o { optFOptsSet = s }
+        (_,xs) -> fail ("Unrecognized flag passed to '-f': "
+                        ++ unwords xs ++ "\nValid flags:\n\n" ++ FlagOpts.helpMsg)
 
 {-# NOINLINE processOptions #-}
 -- | Parse commandline options.
 processOptions :: IO Opt
-processOptions = do
-    argv <- System.getArgs
+processOptions = System.getArgs >>= (\argv -> either putErrDie return $ do
     let header = "Usage: jhc [OPTION...] Main.hs"
-    case (getOpt Permute theoptions argv) of
-	  (o,ns,[]) -> case postProcess (foldl (flip ($)) opt o) of
-                (o,"") -> case postProcess' o of
-                    (o,"") -> case optNoAuto o of
-                               True -> return (o { optArgs = ns })
-                               False-> return (o { optArgs = ns, optHls  = basePackages ++ optHls o })
-                    (_,err) -> putErrDie err
-                (_,err) -> putErrDie err
-	  --(_,_,[]) -> putErrDie (usageInfo header options)
-	  (_,_,errs) -> putErrDie (concat errs ++ usageInfo header theoptions)
+    let (o,ns,rc) = getOpt Permute theoptions argv
+    when (rc /= []) $ fail (concat rc ++ usageInfo header theoptions)
+    o1 <- postProcessFD (foldl (flip ($)) opt o)
+    o2 <- postProcessFO o1
+    case optNoAuto o2 of
+      True -> return (o2 { optArgs = ns })
+      False-> return (o2 { optArgs = ns, optHls  = basePackages ++ optHls o2 }))
 
 {-# NOINLINE fileOptions #-}
 fileOptions :: Monad m => [String] -> m Opt
 fileOptions xs = case getOpt Permute theoptions xs of
-    (os,[],[]) -> case postProcess (foldl (flip ($)) options os) of
-            (o,"") -> return o
-            (_,err) -> fail err
+    (os,[],[]) -> postProcessFD (foldl (flip ($)) options os)
     (_,_,errs) -> fail (concat errs)
 
 {-# NOINLINE options #-}
