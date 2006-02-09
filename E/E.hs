@@ -204,11 +204,11 @@ isWHNF _ = False
 instance TypeNames E where
     tStar = eStar
     tInt = ELit (LitCons tInt [] eStar)
-    tRational = ELit (LitCons (toName TypeConstructor ("Ratio","Ratio")) [tInteger] eStar)
+    tRational = ELit (LitCons tc_Ratio [tInteger] eStar)
     tChar = ELit (LitCons tChar [] eStar)
     tBool = ELit (LitCons tBool [] eStar)
     tUnit = ELit (LitCons tUnit [] eStar)
-    tString =  (ELit (litCons TypeConstructor ("Prelude","[]") [tChar] eStar))
+    tString =  (ELit (LitCons tc_List [tChar] eStar))
     tInteger = ELit (LitCons tInteger [] eStar)
     tWorld__ = ELit (LitCons tWorld__ [] eStar)
     tIntzh = ELit (LitCons tIntzh [] eHash)
@@ -238,9 +238,6 @@ tvrSilly = tVr ((-1)) Unknown
 -----------------
 -- E constructors
 -----------------
-
-litCons t x y z = LitCons (toName t x) y z
-
 
 
 eBox :: E

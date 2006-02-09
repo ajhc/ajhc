@@ -73,17 +73,19 @@ dc_World__ = toName DataConstructor ("Jhc.IO","World__")
 
 tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
 tc_Arrow = toName TypeConstructor ("Jhc@","->")
+
 tc_IOResult = toName TypeConstructor ("Jhc.IO","IOResult")
 tc_IO = toName TypeConstructor ("Jhc.IO", "IO")
-tc_List = toName TypeConstructor ("Prelude","[]")
-tc_Ptr = toName TypeConstructor ("Foreign.Ptr","Ptr")
 tc_World__ = toName TypeConstructor ("Jhc.IO","World__")
 
-tc_Int = toName TypeConstructor ("Prelude","Int")
 tc_Bool = toName TypeConstructor ("Prelude","Bool")
-tc_Integer = toName TypeConstructor ("Prelude","Integer")
-tc_Double = toName TypeConstructor ("Prelude","Double")
 tc_Char = toName TypeConstructor ("Prelude","Char")
+tc_Double = toName TypeConstructor ("Prelude","Double")
+tc_Integer = toName TypeConstructor ("Prelude","Integer")
+tc_Int = toName TypeConstructor ("Prelude","Int")
+tc_List = toName TypeConstructor ("Prelude","[]")
+tc_Ptr = toName TypeConstructor ("Foreign.Ptr","Ptr")
+tc_Ratio = toName TypeConstructor ("Ratio","Ratio")
 tc_Unit = toName TypeConstructor  ("Prelude","()")
 
 rt_int = toName RawType "int"

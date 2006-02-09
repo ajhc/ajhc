@@ -23,7 +23,6 @@ import FrontEnd.KindInfer
 import FrontEnd.Rename
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Monad()
---import FrontEnd.Tc.Main()
 import FrontEnd.Utils
 import GenUtil
 import Ho.Type
@@ -42,7 +41,7 @@ import Util.Gen
 import Util.Inst()
 import Warning
 
-trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env -- (Map.fromList [ n | n@(name,_) <- Map.toList env,  isGlobal name ])
+trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env
 
 getDeclNames ::  HsDecl -> [Name]
 getDeclNames (HsTypeSig _ ns _ ) =  map (toName Val) ns
@@ -63,9 +62,6 @@ modInfoDecls = hsModuleDecls . modInfoHsModule
 
 getImports ModInfo { modInfoHsModule = mod }  = [  (hsImportDeclModule x) | x <-  hsModuleImports mod]
 
---lookupMod ModEnv { modEnvModules  = m } s =  case  M.lookup s m of
---    Just z -> z
---    Nothing -> error $ "lookupMod: " ++ show s
 
 pprintEnv :: PPrint Doc a => Map.Map Name a -> Doc
 pprintEnv env = pl global $+$ pl local_norm $+$ pl local_sys  where
@@ -74,8 +70,6 @@ pprintEnv env = pl global $+$ pl local_norm $+$ pl local_sys  where
     (local_sys,local_norm) = partition (\(x,_) -> last (show x) == '@' ) local
     pl es = vcat [((pprint a) <+> (text "::") <+> (pprint b)) | (a, b) <- es]
 
---buildFieldLabelMap ::  Map.Map Name (SrcLoc,[Name]) -> Map.Map Name [(Name,Int,Int)]
---buildFieldLabelMap fm = Map.fromList $ sortGroupUnderF fst $ concat [ [ (y,(x,i,length ys)) |  y <- ys | i <- [0..] ]  | (x,(_,ys)) <- Map.toList fm, nameType x == DataConstructor ]
 
 buildFieldMap :: Ho -> [ModInfo] -> FieldMap
 buildFieldMap ho ms = (ans',ans) where

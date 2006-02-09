@@ -70,6 +70,13 @@ showLit showBind l = do
             e <- showBind e
             return $  atom   (char '[' <> unparse e  <> char ']')
         f (LitCons n [] _) | dc_EmptyList == n = return $ atom $ text "[]"
+        f (LitCons n [v] _)
+            | n == dc_Integer = go "Integer#"
+            | n == dc_Int     = go "Int#"
+            | n == dc_Char    = go "Char#"
+          where go n = do
+                    se <- showBind v
+                    return $ atom (text n) `app` se
         f (LitCons s es t) = do
             es' <- mapM showBind es
             return $ foldl app (atom (tshow s)) es' -- `inhabit` prettye t
@@ -119,6 +126,17 @@ showE e = do
         f e | Just xs <- toList e = do
             xs <- mapM (fmap unparse . showE) xs
             return $ atom $ list xs
+        f e | e == tBool     = return $ atom $ text "Bool"
+        f e | e == tChar     = return $ atom $ text "Char"
+        f e | e == tInt      = return $ atom $ text "Int"
+        f e | e == tInteger  = return $ atom $ text "Integer"
+        f e | e == tRational = return $ atom $ text "Rational"
+        f e | e == tString   = return $ atom $ text "String"
+        f e | e == tUnit     = return $ atom $ text "()"
+        f e | e == tWorld__  = return $ atom $ text "World__"
+        f e | e == vFalse    = return $ atom $ text "False"
+        f e | e == vTrue     = return $ atom $ text "True"
+        f e | e == vUnit     = return $ atom $ text "()"
         f (EAp a b) = liftM2 app (showE a) (showE b)
         f (EPi (TVr { tvrIdent = 0, tvrType =  e1}) e2) = liftM2 arr (showE e1) (showE e2)
         f (EPi (TVr { tvrIdent = n, tvrType =  e1}) e2) | not $ n `Set.member` freeVars e2 = liftM2 arr (showE e1) (showE e2)
@@ -203,6 +221,7 @@ inhabit = bop (N,-2) $ retOp UC.coloncolon
 bold :: Doc -> Doc
 bold = attrBold (attr oob)
 
+{-# NOINLINE ePretty #-}
 ePretty e = unparse pe where
     (SEM pe') = showE e
     Identity pe = runVarNameT pe'
