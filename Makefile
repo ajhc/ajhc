@@ -64,10 +64,13 @@ clean:
 tests: helloworld calendar primes
 
 helloworld: test/HelloWorld.hs jhc
+	-[ -e $@.log ] && mv -f $@.log $@.log.bak
 	./jhc -v $(JHC_TEST) test/HelloWorld.hs -o $@ 2>&1 | tee $@.log
 calendar: test/Calendar.hs jhc
+	-[ -e $@.log ] && mv -f $@.log $@.log.bak
 	./jhc -v $(JHC_TEST) test/Calendar.hs -o $@ 2>&1 | tee $@.log
 primes: test/Primes.hs jhc
+	-[ -e $@.log ] && mv -f $@.log $@.log.bak
 	./jhc -v $(JHC_TEST) test/Primes.hs -o $@ 2>&1 | tee $@.log
 
 realclean: clean
