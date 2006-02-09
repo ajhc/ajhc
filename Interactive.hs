@@ -209,6 +209,7 @@ tcStatement (HsQualifier e) = do
                 importDConsEnv                 -- data constructor type environment
                 importVarEnv                   -- type environment
                 [([],[HsPatBind bogusASrcLoc (HsPVar ansName) (HsUnGuardedRhs e) []])]                        -- binding groups
+                []
     procErrors $ do
     vv <- Map.lookup ansName' localVarEnv
     liftIO $ putStrLn $ show (text "::" <+> pprint vv :: P.Doc)

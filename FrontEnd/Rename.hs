@@ -191,6 +191,7 @@ ambig x ys = "Ambiguous Name: " ++ show x ++ "\nCould refer to: " ++ tupled (map
 
 -- | Main entry point.
 
+{-# NOINLINE renameModule #-}
 renameModule :: MonadWarn m => FieldMap -> [(Name,[Name])] -> HsModule -> m HsModule
 renameModule fls ns m = mapM_ addWarning (errors finalState) >> return renamedMod where
     initialGlobalSubTable = listToFM [ (x,y) | ((typ,x),[y]) <- ns', typ == Val || typ == DataConstructor ]
@@ -214,6 +215,7 @@ renameModule fls ns m = mapM_ addWarning (errors finalState) >> return renamedMo
 
     (renamedMod, finalState) = runScopeSM startState (renameDecls m initialGlobalSubTable)
 
+{-# NOINLINE renameStatement #-}
 renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] -> Module -> HsStmt -> m HsStmt
 renameStatement fls ns modName stmt = mapM_ addWarning (errors finalState) >> return renamedStmt where
     initialGlobalSubTable = listToFM [ (x,y) | ((typ,x),[y]) <- ns', typ == Val || typ == DataConstructor ]
@@ -401,19 +403,19 @@ renameHsDecl (HsInstDecl srcLoc hsQualType hsDecls) subTable = do
     return (HsInstDecl srcLoc hsQualType' hsDecls')
 renameHsDecl (HsInfixDecl srcLoc assoc int hsNames) subTable = do
     setSrcLoc srcLoc
-    -- can't do this as we might already have an import
     hsNames' <- renameHsNames hsNames subTable
-    -- we really just want to qualify the names with the
-    -- current module
-    {-
-    modName <- getCurrentModule
-    let hsNames' = map (Utils.qualifyName modName) hsNames
-    -}
     return $ HsInfixDecl srcLoc assoc int hsNames'
 renameHsDecl (HsPragmaProps srcLoc prop hsNames) subTable = do
     setSrcLoc srcLoc
     hsNames' <- renameHsNames hsNames subTable
     return (HsPragmaProps  srcLoc prop hsNames')
+renameHsDecl prules@HsPragmaRules { hsDeclSrcLoc = srcLoc, hsDeclFreeVars = fvs, hsDeclLeftExpr = e1, hsDeclRightExpr = e2 } subTable = do
+    setSrcLoc srcLoc
+    subTable' <- updateSubTableWithHsNames subTable fvs
+    fvs' <- renameHsNames fvs subTable'
+    e1' <- renameHsExp e1 subTable'
+    e2' <- renameHsExp e2 subTable'
+    return prules {  hsDeclFreeVars = fvs', hsDeclLeftExpr = e1', hsDeclRightExpr = e2' }
 
 renameHsDecl otherHsDecl _ = return otherHsDecl
 

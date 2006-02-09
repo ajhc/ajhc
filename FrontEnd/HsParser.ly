@@ -55,6 +55,7 @@ Conflicts: 10 shift/reduce
 >	STRING   { StringTok $$ }
 >       PRAGMAOPTIONS { PragmaOptions $$ }
 >       PRAGMASTART { PragmaStart $$ }
+>       PRAGMARULES { PragmaRules }
 >       PRAGMAEND { PragmaEnd }
 
 Symbols
@@ -282,7 +283,17 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >			{ HsForeignDecl $1 $4 $5 $6 $8}
 >	| srcloc 'foreign' 'import' cconv var '::' ctype
 >			{ HsForeignDecl $1 $4 (show $5) $5 $7}
+>       | srcloc PRAGMARULES STRING mfreevars exp '=' exp PRAGMAEND
+>                       { HsPragmaRules { hsDeclSrcLoc = $1, hsDeclString = $3, hsDeclFreeVars = $4, hsDeclLeftExpr = $5, hsDeclRightExpr = $7 } }
 >       | decl		{ $1 }
+
+> mfreevars :: { [HsName] }
+>       : 'forall' vbinds '.' { $2 }
+>       | { [] }
+
+> vbinds :: { [HsName] }
+>       : vbinds var                  { $2 : $1 }
+>       | var                         { [$1] }
 
 > cconv :: { ForeignType }
 >        : varid  { if show $1 == "primitive" then ForeignPrimitive else ForeignCCall }

@@ -246,6 +246,8 @@ tiModules' me ms = do
                 globalDConsEnv                 -- data constructor type environment
                 importVarEnv                   -- type environment
                 program                        -- binding groups
+                ds                             -- all decls
+
 
 
     when (dump FD.Types) $

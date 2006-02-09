@@ -8,6 +8,7 @@ module E.FromHs(
     guardConv,
     matchesConv,
     methodNames,
+    convertRules,
     theMainName
     ) where
 
@@ -57,6 +58,10 @@ theMainName = toName Name.Val "theMain"
 ump sl e = EError  (srcLocShow sl ++ ": Unmatched pattern") e
 srcLocShow sl = concat [srcLocFileName sl, ":",show $ srcLocLine sl,":", show $ srcLocColumn sl ]
 nameToInt n = atomIndex $ toAtom n
+
+concatMapM f xs = do
+    xs <- mapM f xs
+    return $ concat xs
 
 head (x:_) = x
 head _ = error "FromHsHeadError"
@@ -237,7 +242,23 @@ createFunc dataTable ns es ee = foldr ELam eee tvrs where
     esr (tvr,n',(cn,st,_)) e = ECase (EVar tvr) (tVr 0 te) [Alt (LitCons cn [tVr n' st] te) e] Nothing  where
         te = getType $ EVar tvr
 
+convertRules ::  Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(String,[TVr],E,E)]
+convertRules classHierarchy assumps dataTable hsDecls = concatMapM f hsDecls where
+    f pr@HsPragmaRules {} = do
+        let ce = convertE classHierarchy assumps dataTable (hsDeclSrcLoc pr)
+        e1 <- ce (hsDeclLeftExpr pr)
+        e2 <- ce (hsDeclRightExpr pr)
+        cs <- mapM ce [ HsVar v | v <- hsDeclFreeVars pr ]
+        return [(hsDeclString pr,[ v | ~(EVar v) <- cs],e1,e2)]
+    f _ = return []
 
+convertE :: Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> SrcLoc -> HsExp -> m E
+convertE classHierarchy assumps dataTable srcLoc exp = do
+    [(_,_,e)] <- convertDecls classHierarchy assumps dataTable [HsPatBind srcLoc (HsPVar sillyName') (HsUnGuardedRhs exp) []]
+    return e
+
+sillyName = toName Val ("Jhc@","silly")
+sillyName' = nameName sillyName
 
 
 convertDecls :: Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
@@ -290,6 +311,8 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         (cn,rtt',rtt) = case lookupCType' dataTable rt' of
             Right x -> x
             Left err -> error $ "Odd RetType foreign: " ++ err
+    cDecl (HsPatBind sl p (HsUnGuardedRhs exp) []) | (HsPVar n) <- simplifyHsPat p, n == sillyName' = let
+        in [(sillyName,tvr,cExpr exp)]
     cDecl (HsPatBind sl p rhs wh) | (HsPVar n) <- simplifyHsPat p = let
         name = toName Name.Val n
         var = tVr (nameToInt name) ty -- lp ps (hsLet wh e)

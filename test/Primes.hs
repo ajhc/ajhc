@@ -10,6 +10,14 @@ isdivs n x = mod x n /= 0
 the_filter :: [Int] -> [Int]
 the_filter (n:ns) = filter (isdivs n) ns
 
+{-
+the_filter :: [Int] -> [Int]
+the_filter (n:ns) = f ns where
+    f [] = []
+    f (x:ns) | isdivs n x = (x:f ns)
+    f (_:ns) = f ns
+-}
+
 primes :: [Int]
 primes = map head (iterate the_filter (iterate suCC 2))
 

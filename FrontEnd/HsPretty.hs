@@ -256,6 +256,9 @@ ppHsImportSpec (HsIThingWith name nameList)      = ppHsName name <>
 
 -------------------------  Declarations ------------------------------
 ppHsDecl :: HsDecl -> Doc
+ppHsDecl prules@HsPragmaRules {} = text ("{-# RULES " ++ show (hsDeclString prules)) <+> text "forall" <+> vars <+> text "." $$ nest 4 rest $$ text "#-}" where
+    vars = hsep (map ppHsName $ hsDeclFreeVars prules)
+    rest = ppHsExp (hsDeclLeftExpr prules) <+> text "=" <+> ppHsExp (hsDeclRightExpr prules)
 ppHsDecl fd@(HsForeignDecl _ _ s n qt) = text "ForeignDecl" <+> ppHsName n <+> ppHsQualType qt <+> text (show fd)
 ppHsDecl (HsTypeDecl loc name nameList htype) =
 	   --blankline $

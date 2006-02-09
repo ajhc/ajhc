@@ -181,6 +181,13 @@ processDecls stats ho ho' tiData = do
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
     ds' <- convertDecls (hoClassHierarchy ho') allAssumps  fullDataTable decls
+    rs <- convertRules (hoClassHierarchy ho') allAssumps fullDataTable decls
+    flip mapM_ rs $ \ (n,vs,e1,e2) -> do
+        putStrLn n
+        print vs
+        printCheckName' fullDataTable tvr e1
+        printCheckName' fullDataTable tvr e2
+
     let mnames = methodNames (hoClassHierarchy ho')
         ds = ds' ++ [ (runIdentity $ fromId (tvrIdent t),setProperties [prop_PLACEHOLDER,prop_EXPORTED] t, EPrim (primPrim ("Placeholder: " ++ tvrShowName t)) [] (getType t)) | t <- mnames, not $ t `Set.member` cnames]
         cnames = Set.fromList $ fsts $ Map.elems $ hoEs ho

@@ -150,6 +150,7 @@ data HsDecl
 	 | HsPatBind	 SrcLoc HsPat HsRhs {-where-} [HsDecl]
 	 | HsForeignDecl SrcLoc ForeignType String HsName HsQualType
          | HsPragmaProps SrcLoc String [HsName]
+	 | HsPragmaRules { hsDeclSrcLoc :: SrcLoc, hsDeclString :: String, hsDeclFreeVars :: [HsName], hsDeclLeftExpr :: HsExp, hsDeclRightExpr :: HsExp }
   deriving(Data,Typeable,Eq,Show)
   {-! derive: is !-}
 

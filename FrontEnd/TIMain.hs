@@ -21,6 +21,7 @@
 module TIMain (tiProgram, makeProgram) where
 
 import Control.Monad.Error
+import Data.Monoid
 import List((\\), intersect, union)
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
@@ -411,14 +412,33 @@ tiGuardedAlts env (HsGuardedAlts gAlts)
 -- basically the same as tiGuardedRhs
 tiGuardedAlt ::  TypeEnv  -> (HsGuardedAlt) -> TI (([Pred], TypeEnv, Type), ([Pred], TypeEnv, Type))
 tiGuardedAlt env gAlt@(HsGuardedAlt sloc eGuard eRhs)
-   = withContext (locMsg sloc "in the guarded alternative" $ render $ ppGAlt gAlt) $
-     do
+   = withContext (locMsg sloc "in the guarded alternative" $ render $ ppGAlt gAlt) $ do
         (guardPs, guardEnv, guardT) <- tiExpr env eGuard
         (rhsPs, rhsEnv, rhsT)     <- tiExpr env eRhs
         return ((guardPs, guardEnv, guardT), (rhsPs, rhsEnv, rhsT))
 
 
 -----------------------------------------------------------------------------
+
+tiPragmaRules :: TypeEnv -> HsDecl -> TI TypeEnv
+tiPragmaRules env prule@HsPragmaRules { hsDeclFreeVars = vs, hsDeclLeftExpr = e1, hsDeclRightExpr = e2, hsDeclSrcLoc = sloc } =
+    withContext (locMsg sloc "in the RULES pragma" $ hsDeclString prule) ans where
+        ans = do
+            vs' <- mapM dv vs
+            let (envs,vs'') = unzip vs'
+                nenv = mconcat envs
+            (_,env1,t1) <- tiExpr (env `mappend` nenv) e1
+            (_,env2,t2) <- tiExpr (env `mappend` nenv) e2
+            unify t1 t2
+
+            return (nenv `mappend` env1 `mappend` env2)
+
+        dv n = do
+            v <- newTVar Star
+            return (Map.singleton (toName Val n) (toScheme v),v)
+
+
+
 
 -- NOTE: there's no need to do tiDecl with error contexts as the unification
 --       doesn't happen until after this function is finished with
@@ -684,16 +704,17 @@ collectBindDecls = filter isBindDecl
 -----------------------------------------------------------------------------
 
 
-tiProgram ::  Opt -> Module -> SigEnv -> KindEnv -> ClassHierarchy -> TypeEnv -> TypeEnv -> Program -> IO TypeEnv
-tiProgram opt modName sEnv kt h dconsEnv env bgs = runTI opt dconsEnv h kt sEnv modName $
+tiProgram ::  Opt -> Module -> SigEnv -> KindEnv -> ClassHierarchy -> TypeEnv -> TypeEnv -> Program -> [HsDecl] -> IO TypeEnv
+tiProgram opt modName sEnv kt h dconsEnv env bgs rules = runTI opt dconsEnv h kt sEnv modName $
   do (ps, env1) <- tiSeq tiBindGroup env bgs
      s         <- getSubst
+     envs <- mapM (tiPragmaRules (env `mappend` env1)) (filter isHsPragmaRules rules)
      ps <- flattenType ps
      ([], rs) <- split h [] (apply s ps)
      opt <- getOptions
      case withOptionsT opt $ topDefaults h rs of
         Right s' -> do
-            env1' <- flattenType env1
+            env1' <- flattenType (mconcat $ env1:envs)
             return $  apply  s'  env1'
         Left s -> fail $ show modName ++ s
         --Left _ -> do
@@ -731,8 +752,7 @@ tiPat (HsPVar i) = do
         --let newAssump = (i,toScheme v)
         return ([], Map.singleton (toName Val i) (toScheme v), v)
 
-tiPat (HsPLit l)
-   = do
+tiPat (HsPLit l) = do
         (ps, t) <- tiLit l
         return (ps, Map.empty, t)
 
