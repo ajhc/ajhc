@@ -22,6 +22,7 @@ import Doc.Pretty
 import E.Annotate(annotate,annotateDs,annotateProgram)
 import E.Diff
 import E.E
+import E.Eta
 import E.FromHs
 import E.Inline
 import E.LambdaLift
@@ -390,6 +391,7 @@ compileModEnv' stats ho = do
     -- make sure properties and rules are attached everywhere
     prog <- return $ runIdentity $ annotateProgram mempty (idann rules (hoProps ho) ) letann lamann prog
 
+
     let lc = programE prog
 
     wdump FD.Progress $ printEStats lc
@@ -400,6 +402,17 @@ compileModEnv' stats ho = do
         return e'
 
     -- run first optimization
+    lc <- opt "SuperSimplify" cm lc
+    lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lc
+
+    prog <- return $ programSetE lc prog
+    prog <- etaExpand prog
+
+    --ne <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) (programE prog)
+    --prog <- return $ programSetE ne prog
+
+    lc <- return $ programE prog
+
     lc <- opt "SuperSimplify" cm lc
     lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lc
 
@@ -421,13 +434,12 @@ compileModEnv' stats ho = do
 
 
     wdump FD.LambdacubeBeforeLift $ printProgram prog -- printCheckName dataTable lc
+
+
     finalStats <- Stats.new
     prog <- lambdaLift finalStats prog
 
-    --lc <- mangle dataTable (return ()) True "LambdaLift" (lambdaLiftE finalStats dataTable) lc
-
     lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeApps mempty finalStats x >>= coalesceLets finalStats)  (programE prog)
-
     prog <- return $ programSetE lc prog
 
 
