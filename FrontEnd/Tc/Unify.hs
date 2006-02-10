@@ -30,12 +30,14 @@ subsumes s1 s2 = do
 
     -- SKOL needs to be after SBOXY
     sub s1 fa@TForAll {} = do
+        printRule "SKOL"
         (_,r2) <- skolomize fa
         --r1 <- freshInstance fa
         s1 `subsumes` r2
 
     -- SPEC
     sub s1@(TForAll as (_ :=> _))  r2  = do   -- isRho' r2
+        printRule "SPEC"
         r1' <- boxyInstantiate s1
         --(bs,r1') <- boxySpec s1
         r1' `subsumes` r2
@@ -107,8 +109,8 @@ boxyMatch s1 s2 = do
     -- AEQ1
     bm (TArrow s1 s2) (TMetaVar mv) = do
         printRule "AEQ1"
-        a <- newBox (kind s1)
-        b <- newBox (kind s2)
+        a <- newMetaVar Tau (kind s1)
+        b <- newMetaVar Tau (kind s2)
         boxyMatch (s1 `fn` s2) (a `fn` b)
         varBind mv (a `fn` b)
         return False
@@ -120,13 +122,17 @@ boxyMatch s1 s2 = do
         boxyMatch s2 s4
         return False
 
+
+
     -- CEQ1
 
-    bm a (TMetaVar mv) | (TCon ca,as) <- fromTAp a = do
-        bs <- mapM (newBox . kind) as
-        a `boxyMatch` foldl TAp (TCon ca) bs
-        varBind mv (foldl TAp (TCon ca) bs)
-        return False
+    --bm a (TMetaVar mv) | (TCon ca,as) <- fromTAp a = do
+    --    varBind mv a
+    --    return False
+        --bs <- mapM (newBox . kind) as
+        --a `boxyMatch` foldl TAp (TCon ca) bs
+        --varBind mv (foldl TAp (TCon ca) bs)
+        --return False
 
 
     -- CEQ2
@@ -140,14 +146,7 @@ boxyMatch s1 s2 = do
         -- _ ->   fail $ "constructor args mismatch: " ++ show (a,b)
         _ -> unificationError a b
 
-    -- XXX app
-    bm a b | (t1,as1@(_:_)) <- fromTAp a, (t2,as2) <- fromTAp b = case sameLength as1 as2 of
-        False -> unificationError a b
-        True -> do
-            t1 `boxyMatch` t2
-            sequence_ [boxyMatch x y | x <- as1 | y <- as2] >> return False
-            printRule "XXX Apps"
-            return False
+
 
 
     -- SEQ1
@@ -167,7 +166,21 @@ boxyMatch s1 s2 = do
     --    a <- ra
      --   fillBox box (TForAll vs (ps :=> a))
      --   return False
+    bm a (TMetaVar mv)  = do
+        varBind mv a
+        return False
+    --bm (TMetaVar mv) b  = do
+    --    varBind mv b
+    --    return False
 
+    -- XXX app
+    bm a b | (t1,as1@(_:_)) <- fromTAp a, (t2,as2) <- fromTAp b = case sameLength as1 as2 of
+        False -> unificationError a b
+        True -> do
+            t1 `boxyMatch` t2
+            sequence_ [boxyMatch x y | x <- as1 | y <- as2] >> return False
+            printRule "XXX Apps"
+            return False
 {-
     -- XXX app
     bm (TAp a b) (TAp c d) = do

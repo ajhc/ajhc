@@ -327,7 +327,7 @@ varBind u t
         let r = metaRef u
         x <- liftIO $ readIORef r
         case x of
-            Just r -> error $ "varBind: binding unfree: " ++ tupled [pprint u,prettyPrintType tt,prettyPrintType r]
+            Just r -> fail $ "varBind: binding unfree: " ++ tupled [pprint u,prettyPrintType tt,prettyPrintType r]
             Nothing -> liftIO $ do
                 putStrLn $ "varBind: " ++ pprint u <+> prettyPrintType t 
                 writeIORef r (Just tt)
