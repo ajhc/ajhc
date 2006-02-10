@@ -20,8 +20,8 @@ subsumes :: Sigma' -> Sigma' -> Tc ()
 subsumes s1 s2 = do
     s1 <- findType s1
     s2 <- findType s2
-    --(s1,_,_) <- unbox s1
-    --(s2,_,_) <- unbox s2
+    (s1,_,_) <- unbox s1
+    (s2,_,_) <- unbox s2
     liftIO $ putStrLn $ "subsumes: " <> ppretty s1 <+> ppretty s2
     sub s1 s2
    where
@@ -36,20 +36,13 @@ subsumes s1 s2 = do
         s1 `subsumes` r2
 
     -- SPEC
-    sub s1@(TForAll as (_ :=> _))  r2  = do   -- isRho' r2
+    sub s1@(TForAll as (_ :=> _))  r2 | isRho' r2 = do   -- isRho' r2
         printRule "SPEC"
         r1' <- boxyInstantiate s1
-        --(bs,r1') <- boxySpec s1
         r1' `subsumes` r2
---        let f (_,bs) = do
---            bs' <- sequence [ openBox b >>= findType | ~TBox { typeBox = b } <- bs]
---            unifyList bs'
---        mapM_ f bs
-        --bs <- mapM (const $ newBox Star) as
-        --inst (Map.fromList $ zip (map tyvarAtom as) (snds bs)) r1 `subsumes` r2
 
-    -- CON (??)
-    sub s1 s2 | (TCon _,_) <- fromTAp s1 = s1 `boxyMatch` s2
+    -- CON
+    sub s1 s2 | (_,(_:_)) <- fromTAp s1 = s1 `boxyMatch` s2
 
     -- F1
     sub (TArrow s1 s2) (TArrow s3 s4) = do
@@ -68,9 +61,10 @@ subsumes s1 s2 = do
                 boxyMatch t ty
         --fillBox box (a `fn` b)
 
-    -- BMONO & MONO
-    sub a b = boxyMatch a b
-    --sub a b | isTau a && isTau b = unify a b
+    -- BMONO
+    sub a (TMetaVar mv) | isTau a  = varBind mv a
+    -- MONO
+    sub a b | isTau a && isTau b = unify a b
 
 
     sub a b = fail $ "subsumes failure: " <> ppretty a <+> ppretty b
@@ -83,8 +77,8 @@ boxyMatch :: Sigma' -> Sigma' -> Tc ()
 boxyMatch s1 s2 = do
     s1 <- findType s1
     s2 <- findType s2
-    --(s1,_,_) <- unbox s1
-    --(s2,_,_) <- unbox s2
+    (s1,_,_) <- unbox s1
+    (s2,_,_) <- unbox s2
     liftIO $ putStrLn $ "boxyMatch: " <> ppretty s1 <+> ppretty s2
     b <- bm s1 s2
     if b then do

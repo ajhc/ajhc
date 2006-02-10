@@ -52,7 +52,7 @@ tcExprPoly e t = do
 
 tiExprPoly e t@TMetaVar {} = tcExpr e t   -- GEN2
 tiExprPoly e t = do                   -- GEN1
-    --(_,t) <- skolomize t
+    (_,t) <- skolomize t
     tcExpr e t
 
 tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp
@@ -66,21 +66,17 @@ tcExpr e t = do
 -- TODO should subsume for rank-n
 tiExpr (HsVar v) typ = do
     sc <- lookupName (toName Val v)
---    sc <- freshSigma sc
---    sc <- freshInstance sc
     sc `subsumes` typ
     return (HsVar v)
 
 tiExpr (HsCon conName) typ = do
     sc <- lookupName (toName DataConstructor conName)
---    sc <- freshSigma sc
- --   sc <- freshInstance sc
     sc `subsumes` typ
     return (HsCon conName)
 
 tiExpr (HsLit l) typ = do
     t <- tiLit l
-    t `boxyMatch` typ
+    t `subsumes` typ
     return (HsLit l)
 
 tiExpr (HsAsPat n e) typ = do
@@ -154,14 +150,14 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
     let lam (p:ps) e (TMetaVar mv) rs = do -- ABS2
             b1 <- newBox Star
             b2 <- newBox Star
+            varBind mv (b1 `fn` b2)
             l' <- lam (p:ps) e (b1 `fn` b2) rs
-            --varBind mv (b1 `fn` b2)
-            boxyMatch (TMetaVar mv) (b1 `fn` b2)
+            --boxyMatch (TMetaVar mv) (b1 `fn` b2)
             return l'
         lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
-            box <- newBox Star
-            s1' `boxyMatch` box
-            (p',env) <- tcPat p box
+            --box <- newBox Star
+            --s1' `boxyMatch` box
+            (p',env) <- tcPat p s1'
             localEnv env $ do
                 s2' <- findType s2'
                 lamPoly ps e s2' (p':rs)  -- TODO poly
@@ -170,7 +166,7 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
             return (HsLambda sloc (reverse rs) e')
         lam _ _ _ _ = fail "lambda type mismatch"
         lamPoly ps e s rs = do
-            --(_,s) <- skolomize s
+            (_,s) <- skolomize s
             lam ps e s rs
 
 
@@ -313,13 +309,21 @@ tiPat (HsPApp conName pats) typ = do
     pats' <- sequence [ tcPat a r | r <- bs | a <- pats ]
     return (HsPApp conName (fsts pats'), mconcat (snds pats'))
 
+{-
 tiPat pl@(HsPList []) typ = do
     v <- newBox Star
     --TAp tList v `boxyMatch` typ
     typ `subsumes` TAp tList v
     --TAp tList v `subsumes` typ
     return (pl,mempty)
+-}
 
+tiPat (HsPList pats@(_:_)) (TAp t v) | t == tList = do
+    --v <- newBox Star
+    --TAp tList v `boxyMatch` typ
+    --typ `subsumes` TAp tList v
+    ps <- mapM (`tcPat` v) pats
+    return (HsPList (fsts ps), mconcat (snds ps))
 
 tiPat (HsPList pats@(_:_)) typ = do
     v <- newBox Star
@@ -409,14 +413,14 @@ tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "i
     let lam (p:ps) (TMetaVar mv) rs = do -- ABS2
             b1 <- newBox Star
             b2 <- newBox Star
+            varBind mv (b1 `fn` b2)
             l' <- lam (p:ps) (b1 `fn` b2) rs
-            --varBind mv (b1 `fn` b2)
-            (TMetaVar mv) `boxyMatch`  (b1 `fn` b2)
+            --(TMetaVar mv) `boxyMatch`  (b1 `fn` b2)
             return l'
         lam (p:ps) (TArrow s1' s2') rs = do -- ABS1
-            box <- newBox Star
-            (p',env) <- tcPat p box
-            s1' `boxyMatch` box
+            --box <- newBox Star
+            (p',env) <- tcPat p s1'
+            --s1' `boxyMatch` box
             --liftIO $ print (p',env)
             localEnv env $ do
                 s2' <- findType s2'
@@ -428,7 +432,7 @@ tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "i
         lam _ _ _ = fail "lambda type mismatch"
         lamPoly ps s@TMetaVar {} rs = lam ps s rs
         lamPoly ps s rs = do
-            --(_,s) <- skolomize s
+            (_,s) <- skolomize s
             lam ps s rs
     typ <- findType typ
     lam pats typ []
@@ -693,16 +697,18 @@ tiProgram bgs = f bgs [] mempty where
 tiLit :: HsLiteral -> Tc Tau
 tiLit (HsChar _) = return tChar
 tiLit (HsInt _) = do
-        --v <- newTVar Star
-        (v) <- newBox Star
-        addPreds [IsIn class_Num v]
-        return v
+    v <- newVar Star
+    return $ TForAll [v] ([IsIn class_Num (TVar v)] :=> TVar v)
+    --(v) <- newBox Star
+    --addPreds [IsIn class_Num v]
+    --return v
 
 tiLit (HsFrac _) = do
-        --v <- newTVar Star
-        (v) <- newBox Star
-        addPreds [IsIn class_Fractional v]
-        return v
+    v <- newVar Star
+    return $ TForAll [v] ([IsIn class_Fractional (TVar v)] :=> TVar v)
+    --    (v) <- newBox Star
+    --    addPreds [IsIn class_Fractional v]
+    --    return v
 
 tiLit (HsString _)  = return tString
 

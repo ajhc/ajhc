@@ -18,6 +18,7 @@ module FrontEnd.Tc.Monad(
     newBox,
     newMetaVar,
     newTVar,
+    newVar,
     runTc,
     skolomize,
     Tc(),
@@ -39,6 +40,7 @@ import Data.FunctorM
 import List
 import Maybe
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Text.PrettyPrint.HughesPJ(Doc)
 
 
@@ -64,9 +66,9 @@ data TcEnv = TcEnv {
     tcInfo              :: TcInfo,
     tcDiagnostics       :: [Diagnostic],   -- list of information that might help diagnosis
     tcVarnum            :: IORef Int,
-    -- Used by new typechecker only
     tcCollectedEnv      :: IORef (Map.Map Name Sigma),
     tcCurrentEnv        :: Map.Map Name Sigma,
+    tcCurrentScope      :: Set.Set Atom,
     tcOptions           :: Opt  -- module specific options
     }
    {-! derive: update !-}
@@ -86,6 +88,10 @@ data TcInfo = TcInfo {
 -- | run a computation with a local environment
 localEnv :: TypeEnv -> Tc a -> Tc a
 localEnv te = local (tcCurrentEnv_u (te `Map.union`))
+
+-- | run a computation with a local environment
+--localScopeEnv :: [Tyvar] -> Tc a -> Tc a
+--localScopeEnv te = local (tcCurrentScope_u (te `Set.union`))
 
 -- | add to the collected environment which will be used to annotate uses of variables with their instantiated types.
 -- should contain @-aliases for each use of a polymorphic variable or pattern match.
@@ -283,18 +289,24 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
 
 
 generalize :: Rho -> Tc Sigma
-generalize r = quantify (freeMetaVars r) [] r
+generalize r = do
+    r <- flattenType r
+    quantify (freeMetaVars r) [] r
 
 
 quantify :: [MetaVar] -> [Pred] -> Rho -> Tc Sigma
 quantify vs ps r | not $ any isBoxyMetaVar vs = do
     r <- flattenType r
     nvs <- mapM (newVar . metaKind) vs
-    let mm =  Map.fromList  [ (metaUniq mv,(TVar v)) | v <- nvs |  mv <- vs ]
-        rr = inst mm mempty r
-        ps' = inst mm mempty ps
+    sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- vs ]
+    ret <- flattenType (ps :=> r)
+    return $ TForAll nvs ret
+    --return $ TForAll nvs (ps' :=> rr)
+    --let mm =  Map.fromList  [ (metaUniq mv,(TVar v)) | v <- nvs |  mv <- vs ]
+    --    rr = inst mm mempty r
+    --    ps' = inst mm mempty ps
     --r <- flattenType (ps :=> r)
-    return $ TForAll nvs (ps' :=> rr)
+    --return $ TForAll nvs (ps' :=> rr)
 
 
 -- this removes all boxes, replacing them with tau vars
@@ -332,7 +344,7 @@ varBind u t
         case x of
             Just r -> fail $ "varBind: binding unfree: " ++ tupled [pprint u,prettyPrintType tt,prettyPrintType r]
             Nothing -> liftIO $ do
-                putStrLn $ "varBind: " ++ pprint u <+> prettyPrintType t 
+                putStrLn $ "varBind: " ++ pprint u <+> prettyPrintType t
                 writeIORef r (Just tt)
 
 
