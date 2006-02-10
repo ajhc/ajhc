@@ -353,12 +353,18 @@ tiImpls ::  [HsDecl] -> Tc ([HsDecl], TypeEnv)
 tiImpls [] = return ([],Map.empty)
 tiImpls bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ (show (map getDeclName bs)))) $ do
     liftIO $ putStrLn $ "tiimpls " ++ show (map getDeclName bs)
-    ss <- sequence [newTVar Star | _ <- bs]
+    ss <- sequence [newMetaVar Tau Star | _ <- bs]
     rs <- localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ss]) $ sequence [ tcDecl d s | d <- bs | s <- ss ]
-    nenv <- sequence [ flattenType s >>= generalize >>= return . (,) n | (n,s) <- Map.toAscList $ mconcat $ snds rs]
-    liftIO $ mapM_ putStrLn $ sort [ show x ++ "  " ++ prettyPrintType y | (x,y) <- nenv]
-    addToCollectedEnv (Map.fromAscList nenv)
-    return (fsts rs, Map.fromAscList nenv)
+    let f n s = do
+            liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
+            s <- flattenType s
+            liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
+            s <- generalize s
+            liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
+            return (n,s)
+    nenv <- sequence [ f n s | (n,s) <- Map.toAscList $ mconcat $ snds rs]
+    addToCollectedEnv (Map.fromList nenv)
+    return (fsts rs, Map.fromList nenv)
 
 tcRhs :: HsRhs -> Sigma -> Tc HsRhs
 tcRhs rhs typ = case rhs of

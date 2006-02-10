@@ -71,7 +71,6 @@ fillBox x t = error "attempt to fillBox with boxy type"
 
 isTau :: Type -> Bool
 isTau TForAll {} = False
-isTau TBox {} = error "isTau: Box"
 isTau (TAp a b) = isTau a && isTau b
 isTau (TArrow a b) = isTau a && isTau b
 isTau (TMetaVar MetaVar { metaType = t })
@@ -81,13 +80,11 @@ isTau _ = True
 
 isTau' :: Type -> Bool
 isTau' TForAll {} = False
-isTau' TBox {} = error "isTau': Box"
 isTau' (TAp a b) = isTau a && isTau b
 isTau' (TArrow a b) = isTau a && isTau b
 isTau' _ = True
 
 isBoxy :: Type -> Bool
-isBoxy TBox {} = error "isBoxy: Box"
 isBoxy (TMetaVar MetaVar { metaType = t }) | t > Tau = True
 isBoxy (TForAll _ (_ :=> t)) = isBoxy t
 isBoxy (TAp a b) = isBoxy a || isBoxy b
@@ -162,8 +159,6 @@ prettyPrintType t  = unparse $ runVarName (f t) where
         t2 <- f t2
         return $ t1 `arr` t2
     f (TMetaVar mv) = return $ atom $ pprint mv
-    f (TBox Star i _) = return $ atom $ text "_" <> tshow i
-    f t | ~(TBox k i _) <- t = return $ atom $ parens $ text "_" <> tshow i <> text " :: " <> pprint k
 
 
 instance DocLike d => PPrint d MetaVarType where
@@ -212,11 +207,6 @@ instance UnVar Type where
                 when (any isMetaTV vs) $ error "metatv in forall binding"
                 qt' <- unVar' opt qt
                 return $ TForAll vs qt'
-            ft t@TBox { typeBox = box }
-                | openBoxes opt =  readIORef box >>= \x -> case x of
-                    Just x -> unVar' opt x
-                    Nothing -> error "unVar: empty box"
-                | otherwise = return t
             ft t@(TMetaVar _) = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return t
             --ft t | Just tv <- extractMetaTV t = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return (TVar tv)
             ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
@@ -266,7 +256,6 @@ allFreeVars (TVar u)      = [u]
 allFreeVars (TAp l r)     = allFreeVars l `union` allFreeVars r
 allFreeVars (TArrow l r)  = allFreeVars l `union` allFreeVars r
 allFreeVars TCon {}       = []
-allFreeVars TBox {}       = []
 allFreeVars typ | ~(TForAll vs (_ :=> t)) <- typ = allFreeVars t List.\\ vs
 
 freeMetaVars :: Type -> [MetaVar]
@@ -274,7 +263,6 @@ freeMetaVars (TVar u)      = []
 freeMetaVars (TAp l r)     = freeMetaVars l `union` freeMetaVars r
 freeMetaVars (TArrow l r)  = freeMetaVars l `union` freeMetaVars r
 freeMetaVars TCon {}       = []
-freeMetaVars TBox {}       = []
 freeMetaVars (TMetaVar mv) = [mv]
 freeMetaVars typ | ~(TForAll vs (_ :=> t)) <- typ = freeMetaVars t
 

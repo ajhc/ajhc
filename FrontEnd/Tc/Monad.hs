@@ -194,35 +194,36 @@ newMetaVar t k = do
 
 
 class Instantiate a where
-    inst:: Map.Map Atom Type -> a -> a
+    inst:: Map.Map Int Type -> Map.Map Atom Type -> a -> a
 
 instance Instantiate Type where
-    inst ts (TAp l r)     = TAp (inst ts l) (inst ts r)
-    inst ts (TArrow l r)  = TArrow (inst ts l) (inst ts r)
-    inst  _ t@TCon {}     = t
-    inst ts (TVar tv )
+    inst mm ts (TAp l r)     = TAp (inst mm ts l) (inst mm ts r)
+    inst mm ts (TArrow l r)  = TArrow (inst mm ts l) (inst mm ts r)
+    inst mm  _ t@TCon {}     = t
+    inst mm ts (TVar tv )
         | Nothing == tyvarRef tv  = case Map.lookup (tyvarAtom tv) ts of
             Just t'  -> t'
             Nothing -> (TVar tv)
-    inst ts (TForAll as qt) = TForAll as (inst (foldr Map.delete ts (map tyvarAtom as)) qt)
-    inst ts (TMetaVar mv) = TMetaVar mv
-    inst _ t = error $ "inst: " ++ show t
+    inst mm ts (TForAll as qt) = TForAll as (inst mm (foldr Map.delete ts (map tyvarAtom as)) qt)
+    inst mm ts (TMetaVar mv) | Just t <- Map.lookup (metaUniq mv) mm  = t
+    inst mm ts (TMetaVar mv) = TMetaVar mv
+    inst mm _ t = error $ "inst: " ++ show t
 
 
 instance Instantiate a => Instantiate [a] where
-  inst ts = map (inst ts)
+  inst mm ts = map (inst mm ts)
 
 instance Instantiate t => Instantiate (Qual t) where
-  inst ts (ps :=> t) = inst ts ps :=> inst ts t
+  inst mm ts (ps :=> t) = inst mm ts ps :=> inst mm ts t
 
 instance Instantiate Pred where
-  inst ts (IsIn c t) = IsIn c (inst ts t)
+  inst mm ts (IsIn c t) = IsIn c (inst mm ts t)
 
 
 freshInstance :: MetaVarType -> Sigma -> Tc Rho
 freshInstance typ (TForAll as qt) = do
     ts <- mapM (newMetaVar typ) (map tyvarKind as)
-    let (ps :=> t) = (inst (Map.fromList $ zip (map tyvarAtom as) ts) qt)
+    let (ps :=> t) = (inst mempty (Map.fromList $ zip (map tyvarAtom as) ts) qt)
     addPreds ps
     return t
 freshInstance _ x = return x
@@ -243,7 +244,7 @@ freshSigma :: Sigma -> Tc Sigma
 freshSigma (TForAll [] ([] :=> t)) = return t
 freshSigma (TForAll vs qt) = do
     nvs <- mapM (newVar . tyvarKind) vs
-    return (TForAll nvs $ inst (Map.fromList $ zip (map tyvarAtom vs) (map TVar nvs)) qt)
+    return (TForAll nvs $ inst mempty (Map.fromList $ zip (map tyvarAtom vs) (map TVar nvs)) qt)
 freshSigma x = return x
 
 toSigma :: Sigma -> Sigma
@@ -277,7 +278,7 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
         f t _ = return t
         -- f t _ = error $ "boxySpec: " ++ show t
     (t',vs) <- runWriterT (f t as)
-    addPreds $ inst (Map.fromList [ (tyvarAtom bt,s) | (bt,s) <- vs ]) ps
+    addPreds $ inst mempty (Map.fromList [ (tyvarAtom bt,s) | (bt,s) <- vs ]) ps
     return (sortGroupUnderFG fst snd vs,t')
 
 
@@ -289,9 +290,11 @@ quantify :: [MetaVar] -> [Pred] -> Rho -> Tc Sigma
 quantify vs ps r | not $ any isBoxyMetaVar vs = do
     r <- flattenType r
     nvs <- mapM (newVar . metaKind) vs
-    sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- vs ]
-    r <- flattenType (ps :=> r)
-    return $ TForAll nvs r
+    let mm =  Map.fromList  [ (metaUniq mv,(TVar v)) | v <- nvs |  mv <- vs ]
+        rr = inst mm mempty r
+        ps' = inst mm mempty ps
+    --r <- flattenType (ps :=> r)
+    return $ TForAll nvs (ps' :=> rr)
 
 
 -- this removes all boxes, replacing them with tau vars
