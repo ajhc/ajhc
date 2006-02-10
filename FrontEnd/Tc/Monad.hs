@@ -47,6 +47,7 @@ import Class(ClassHierarchy)
 import Diagnostic
 import Doc.DocLike
 import Doc.PPrint
+import Support.CanType
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc(bogusASrcLoc)
 import FrontEnd.Tc.Type
@@ -292,18 +293,68 @@ quantify vs ps r | not $ any isBoxyMetaVar vs = do
     r <- flattenType (ps :=> r)
     return $ TForAll nvs r
 
+
+-- this removes all boxes, replacing them with tau vars
+unBox ::  Type -> Tc Type
+unBox tv = ft' tv where
+    ft (TAp x y) = liftM2 TAp (ft' x) (ft' y)
+    ft (TArrow x y) = liftM2 TArrow (ft' x) (ft' y)
+    ft t@TCon {} = return t
+    ft (TForAll vs (ps :=> t)) = do
+        when (any isMetaTV vs) $ error "metatv in forall binding"
+        ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
+        t' <- ft' t
+        return $ TForAll vs (ps' :=> t')
+    ft t@(TMetaVar mv)
+        | isBoxyMetaVar mv = do
+            tmv <- newMetaVar Tau (getType mv)
+            varBind mv tmv
+            return tmv
+        | otherwise =  return t
+    ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
+    ft' t = findType t >>= ft
+
+
+-- Bind mv to type, first filling in any boxes in type with tau vars
 varBind :: MetaVar -> Type -> Tc ()
 varBind u t
-    | kind u /= kind t = error $ "varBind: kinds do not match:" ++ show (u,t)
+    | getType u /= getType t = error $ "varBind: kinds do not match:" ++ show (u,t)
     | otherwise = do
-        (t,be,_) <- unbox t
-        when be $ error $ "binding boxy: " ++ tupled [pprint u,prettyPrintType t]
-        when (u `elem` freeMetaVars t) $ unificationError (TMetaVar u) t -- occurs check
+        tt <- unBox t
+        --(t,be,_) <- unbox t
+        --when be $ error $ "binding boxy: " ++ tupled [pprint u,prettyPrintType t]
+        when (u `elem` freeMetaVars tt) $ unificationError (TMetaVar u) tt -- occurs check
         let r = metaRef u
         x <- liftIO $ readIORef r
         case x of
-            Just r -> error $ "varBind: binding unfree: " ++ tupled [pprint u,prettyPrintType t,prettyPrintType r]
-            Nothing -> liftIO $ writeIORef r (Just t)
+            Just r -> error $ "varBind: binding unfree: " ++ tupled [pprint u,prettyPrintType tt,prettyPrintType r]
+            Nothing -> liftIO $ do
+                putStrLn $ "varBind: " ++ pprint u <+> prettyPrintType t 
+                writeIORef r (Just tt)
+
+
+
+
+zonkBox :: MetaVar -> Tc Type
+zonkBox mv | isBoxyMetaVar mv = findType (TMetaVar mv)
+zonkBox mv = fail $ "zonkBox: nonboxy" ++ show mv
+
+readFilledBox :: MetaVar -> Tc Type
+readFilledBox mv | isBoxyMetaVar mv = zonkBox mv >>= \v -> case v of
+    TMetaVar mv' | mv == mv' -> fail $ "readFilledBox: " ++ show mv
+    t -> return t
+readFilledBox mv = error $ "readFilledBox: nonboxy" ++ show mv
+
+elimBox :: MetaVar -> Tc Type
+elimBox mv | isBoxyMetaVar mv = do
+    t <- readMetaVar mv
+    case t of
+        Just t -> return t
+        Nothing -> newMetaVar Tau (getType mv)
+
+elimBox mv = error $ "elimBox: nonboxy" ++ show mv
+
+
 
 ----------------------------------------
 -- Declaration of instances, boilerplate

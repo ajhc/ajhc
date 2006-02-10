@@ -4,7 +4,9 @@ module FrontEnd.Tc.Type(
     Kind(..),
     Pred(..),
     MetaVar(..),
+    followTaus,
     MetaVarType(..),
+    readMetaVar,
     tForAll,
     module FrontEnd.Tc.Type,
     Qual(..),
@@ -22,6 +24,7 @@ import List
 import Doc.DocLike
 import Doc.PPrint
 import Name.Names
+import Support.CanType
 import Name.VConsts
 import Representation hiding(flattenType, findType)
 import Type(HasKind(..))
@@ -43,6 +46,12 @@ type BoundTV = Tyvar
 isMetaTV :: Tyvar -> Bool
 isMetaTV Tyvar { tyvarRef = Just _ } = True
 isMetaTV _ = False
+
+
+typeOfType :: Type -> (MetaVarType,Bool)
+typeOfType TForAll { typeArgs = as, typeBody = _ :=> t } = (Sigma,isBoxy t)
+typeOfType t | isTau' t = (Tau,isBoxy t)
+typeOfType t = (Rho,isBoxy t)
 
 
 {-
@@ -214,6 +223,16 @@ instance UnVar Type where
         tv' <- findType tv
         ft tv'
 
+followTaus :: MonadIO m => Type -> m Type
+followTaus tv@(TMetaVar mv@MetaVar {metaRef = r }) | not (isBoxyMetaVar mv) = liftIO $ do
+    rt <- readIORef r
+    case rt of
+        Nothing -> return tv
+        Just t -> do
+            t' <- followTaus t
+            writeIORef r (Just t')
+            return t'
+followTaus tv = return tv
 
 
 findType :: MonadIO m => Type -> m Type
@@ -226,6 +245,18 @@ findType tv@(TMetaVar MetaVar {metaRef = r }) = liftIO $ do
             writeIORef r (Just t')
             return t'
 findType tv = return tv
+
+
+readMetaVar :: MonadIO m => MetaVar -> m (Maybe Type)
+readMetaVar MetaVar { metaRef = r }  = liftIO $ do
+    rt <- readIORef r
+    case rt of
+        Nothing -> return Nothing
+        Just t -> do
+            t' <- findType t
+            writeIORef r (Just t')
+            return (Just t')
+
 
 
 freeTyVars :: Type -> [Tyvar]
@@ -266,4 +297,19 @@ unbox tv = do
         ft' t = findType t >>= ft
     (tv,(eb,et)) <- runWriterT (ft' tv)
     return (tv,or eb, or et)
+
+
+instance CanType MetaVar Kind where
+    getType mv = metaKind mv
+
+instance CanType Type Kind where
+    getType = kind
+
+instance CanType Tycon Kind where
+    getType = kind
+
+instance CanType Tyvar Kind where
+    getType = kind
+
+
 

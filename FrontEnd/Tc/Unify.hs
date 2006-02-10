@@ -11,30 +11,22 @@ import GenUtil
 
 pretty vv = prettyPrintType vv
 ppretty vv = parens (pretty vv)
-    {-
-aquireType :: Sigma' -> Tc Sigma'
-aquireType s = do
-    s <- findType s
-    case s of
-        TBox { typeBox = box } -> do
-            r <- openBox box
-            case r of
-                Just t -> aquireType t
-                Nothing -> return s
-        _ -> return s
- -}
+
+-- | this ensures the first argument is at least as polymorphic as the second
+-- actual/offered <= expected
+-- actual/offered `subsumes` expected
 
 subsumes :: Sigma' -> Sigma' -> Tc ()
 subsumes s1 s2 = do
-    --s1 <- findType s1
-    --s2 <- findType s2
-    (s1,_,_) <- unbox s1
-    (s2,_,_) <- unbox s2
+    s1 <- findType s1
+    s2 <- findType s2
+    --(s1,_,_) <- unbox s1
+    --(s2,_,_) <- unbox s2
     liftIO $ putStrLn $ "subsumes: " <> ppretty s1 <+> ppretty s2
     sub s1 s2
    where
     -- SBOXY
-    sub tb@TMetaVar {} b = boxyMatch tb b
+    sub tb@(TMetaVar mv) b  = boxyMatch tb b
 
     -- SKOL needs to be after SBOXY
     sub s1 fa@TForAll {} = do
@@ -62,15 +54,22 @@ subsumes s1 s2 = do
         boxyMatch s3 s1
         s2 `subsumes` s4
     -- F2
-    sub t@(TArrow s1 s2) (TMetaVar mv) = do
-        a <- newMetaVar (metaType mv) (kind s1)
-        b <- newMetaVar (metaType mv) (kind s2)
-        subsumes t (a `fn` b)
-        varBind mv (a `fn` b)
+    sub t@(TArrow s1 s2) (TMetaVar mv) | isBoxyMetaVar mv = do
+        mvb <- readMetaVar mv
+        case mvb of
+            Nothing -> do
+                a <- newMetaVar (metaType mv) (kind s1)
+                b <- newMetaVar (metaType mv) (kind s2)
+                subsumes t (a `fn` b)
+                varBind mv (a `fn` b)
+            Just ty -> do
+                boxyMatch t ty
         --fillBox box (a `fn` b)
 
     -- BMONO & MONO
-    sub a b | isTau a && isTau b = unify a b
+    sub a b = boxyMatch a b
+    --sub a b | isTau a && isTau b = unify a b
+
 
     sub a b = fail $ "subsumes failure: " <> ppretty a <+> ppretty b
 
@@ -80,10 +79,10 @@ printRule s = liftIO $ putStrLn s
 
 boxyMatch :: Sigma' -> Sigma' -> Tc ()
 boxyMatch s1 s2 = do
-    --s1 <- findType s1
-    --s2 <- findType s2
-    (s1,_,_) <- unbox s1
-    (s2,_,_) <- unbox s2
+    s1 <- findType s1
+    s2 <- findType s2
+    --(s1,_,_) <- unbox s1
+    --(s2,_,_) <- unbox s2
     liftIO $ putStrLn $ "boxyMatch: " <> ppretty s1 <+> ppretty s2
     b <- bm s1 s2
     if b then do
@@ -141,6 +140,15 @@ boxyMatch s1 s2 = do
         -- _ ->   fail $ "constructor args mismatch: " ++ show (a,b)
         _ -> unificationError a b
 
+    -- XXX app
+    bm a b | (t1,as1@(_:_)) <- fromTAp a, (t2,as2) <- fromTAp b = case sameLength as1 as2 of
+        False -> unificationError a b
+        True -> do
+            t1 `boxyMatch` t2
+            sequence_ [boxyMatch x y | x <- as1 | y <- as2] >> return False
+            printRule "XXX Apps"
+            return False
+
 
     -- SEQ1
     bm (TForAll vs (ps :=> t)) (TMetaVar mv) = do
@@ -160,12 +168,14 @@ boxyMatch s1 s2 = do
      --   fillBox box (TForAll vs (ps :=> a))
      --   return False
 
+{-
     -- XXX app
     bm (TAp a b) (TAp c d) = do
         printRule "XXX App"
         a `boxyMatch` c
         b `boxyMatch` d
         return False
+        -}
 
     -- MEQ1 MEQ2  SYM
     bm a b
