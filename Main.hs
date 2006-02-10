@@ -155,7 +155,7 @@ processInitialHo ho = do
     --        (lc',used') = runRename used lc
     --    (nds,allUsed) = foldl f ([],Set.empty) (Map.elems $ hoEs ho)
     let Identity ds = annotateDs mempty (idann (hoRules ho) (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
-    wdump FD.Rules $ printRules (hoRules ho)
+    --wdump FD.Rules $ printRules (hoRules ho)
     return ho { hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds ] }
 
 
@@ -181,34 +181,18 @@ processDecls stats ho ho' tiData = do
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
     ds' <- convertDecls (hoClassHierarchy ho') allAssumps  fullDataTable decls
-    rs <- convertRules (hoClassHierarchy ho') allAssumps fullDataTable decls
-    {-
-    flip mapM_ rs $ \ (n,vs,e1,e2) -> do
-        let p v = parens $ pprint v <> text "::" <> pprint (getType v)
-        putDocM putStr $ (tshow n) <+> text "forall" <+> hsep (map p vs) <+> text "." <> text "\n"
-        let ty = case inferType dataTable [] e1 of
-                Left err -> vcat $ map text (intersperse "---" $ tail err)
-                Right ty -> pprint ty
-        let ty2 = case inferType dataTable [] e2 of
-                Left err -> vcat $ map text (intersperse "---" $ tail err)
-                Right ty -> pprint ty
-        putDocM putStr (indent 2 (pprint e1))
-        putDocM putStr $ text " ====>"
-        putDocM putStr (indent 2 (pprint e2))
-        putDocM putStr (indent 2 (text "::" <+> ty))
-        putDocM putStr (indent 2 (text "::" <+> ty2))
-        -}
-    let nrules = mconcat [ makeRule n vs head args e2 | (n,vs,e1,e2) <- rs, let (EVar head,args) = fromAp e1 ]
-
     let mnames = methodNames (hoClassHierarchy ho')
         ds = ds' ++ [ (runIdentity $ fromId (tvrIdent t),setProperties [prop_PLACEHOLDER,prop_EXPORTED] t, EPrim (primPrim ("Placeholder: " ++ tvrShowName t)) [] (getType t)) | t <- mnames, not $ t `Set.member` cnames]
         cnames = Set.fromList $ fsts $ Map.elems $ hoEs ho
 
     -- Build rules
     rules' <- createInstanceRules (hoClassHierarchy ho' `mappend` hoClassHierarchy initialHo)   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
+    rawRules <- convertRules (hoClassHierarchy ho') allAssumps fullDataTable decls
+    let nrules = mconcat [ makeRule n vs head args e2 | (n,vs,e1,e2) <- rawRules, let (EVar head,args) = fromAp e1 ]
     let rules = rules' `mappend` nrules
+    wdump FD.Rules $ printRules rules
+    printRules rules
     let allRules = hoRules ho `mappend` rules `mappend` hoRules ho'
-    wdump FD.Rules $ printRules allRules
 
     -- some more useful values.
     let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (_,n,_) <- ds ] ++ map tvrIdent (methodNames (hoClassHierarchy allHo))
@@ -310,7 +294,7 @@ processDecls stats ho ho' tiData = do
     let ds' = reachable (newGraph ds (\ (_,b,_) -> tvrIdent b) (\ (_,b,c) -> bindingFreeVars b c)) [ tvrIdent b | (n,b,_) <- ds, getProperty prop_EXPORTED b]
     --wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     Stats.print "Optimization" stats
-    return ho' { hoDataTable = dataTable, hoEs = Map.fromList [ (x,(y,z)) | (x,y,z) <- ds'], hoRules = rules, hoUsedIds = collectIds (ELetRec [ (b,c) | (_,b,c) <- ds'] Unknown) }
+    return ho' { hoDataTable = dataTable, hoEs = Map.fromList [ (x,(y,z)) | (x,y,z) <- ds'], hoRules = hoRules ho' `mappend` rules, hoUsedIds = collectIds (ELetRec [ (b,c) | (_,b,c) <- ds'] Unknown) }
 
 programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = programSetDs ds' prog where

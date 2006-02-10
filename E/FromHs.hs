@@ -33,6 +33,8 @@ import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
 import E.E
+import E.LetFloat(atomizeApps)
+import E.Eval(eval)
 import E.Rules
 import E.Subst
 import E.Traverse
@@ -51,6 +53,7 @@ import FrontEnd.Tc.Type(prettyPrintType)
 import Options
 import qualified FlagOpts as FO
 import qualified Util.Seq as Seq
+import qualified Stats
 import Representation
 import FrontEnd.Utils
 import Name.VConsts
@@ -247,7 +250,7 @@ createFunc dataTable ns es ee = foldr ELam eee tvrs where
 instance GenName String where
    genNames i = map (('x':) . show) [i..]
 
-convertRules ::  Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(String,[TVr],E,E)]
+convertRules ::  ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> IO [(String,[TVr],E,E)]
 convertRules classHierarchy assumps dataTable hsDecls = concatMapM f hsDecls where
     f pr@HsPragmaRules {} = do
         let ce = convertE classHierarchy assumps dataTable (hsDeclSrcLoc pr)
@@ -266,7 +269,9 @@ convertRules classHierarchy assumps dataTable hsDecls = concatMapM f hsDecls whe
         let smt = substMap $ Map.fromList [ (x,EVar y)| (x,y) <- ts ]
             sma = substMap $ Map.fromList [ (x,EVar y)| (x,y) <- cs' ]
             cs' =  [ (x,(tvrType_u smt y))| (x,y) <- cs ]
-        return [(hsDeclString pr,( snds (cs' ++ ts) ),smt $ sma e1,smt $ sma e2)]
+            e2' = deNewtype dataTable $ smt $ sma e2
+        e2 <- atomizeApps mempty Stats.theStats e2'
+        return [(hsDeclString pr,( snds (cs' ++ ts) ),eval $ smt $ sma e1,e2)]
     f _ = return []
 
 convertE :: Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> SrcLoc -> HsExp -> m E

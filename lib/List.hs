@@ -315,3 +315,6 @@ unzip7          =  foldr (\(a,b,c,d,e,f,g) ~(as,bs,cs,ds,es,fs,gs) ->
                                 (a:as,b:bs,c:cs,d:ds,e:es,f:fs,g:gs))
                          ([],[],[],[],[],[],[])
 -}
+
+{-# RULES "sort/sort"  forall  xs . sort (sort xs) = sort xs #-}
+{-# RULES "nub/nub"  forall  xs . nub (nub xs) = nub xs #-}

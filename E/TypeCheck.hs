@@ -1,4 +1,8 @@
-module E.TypeCheck(eAp, sortStarLike, sortTypeLike,  sortTermLike, inferType, typeInfer, typeInfer') where
+module E.TypeCheck(eAp, sortStarLike, sortTypeLike,  sortTermLike, inferType, typeInfer, typeInfer', match) where
+
+import Monad(when,liftM)
+import qualified Data.Set as Set
+import Control.Monad.Writer
 
 import Support.CanType
 import {-# SOURCE #-} DataConstructors
@@ -11,7 +15,7 @@ import E.Show
 import E.Subst
 import GenUtil
 import Util.ContextMonad
-import Monad(when)
+import qualified Util.Seq as Seq
 
 
 
@@ -262,4 +266,31 @@ typeInfer'' dataTable ds e = rfc e where
     fc e = failDoc $ text "what's this? " </> (prettyE e)
 
 
+
+-- | find substitution that will transform the left term into the right one,
+-- only substituting for the vars in the list
+
+match :: Monad m => [TVr] -> E -> E -> m [(TVr,E)]
+match vs e1 e2 = liftM Seq.toList $ execWriterT (un e1 e2 () (0::Int)) where
+    bvs = Set.fromList (map tvrIdent vs)
+    un (EAp a b) (EAp a' b') mm c = do
+        un a a' mm c
+        un b b' mm c
+    un (EVar tvr@TVr { tvrIdent = i, tvrType = t}) b mm c | i `Set.member` bvs = do
+        --un t (getType b) mm c
+        tell (Seq.single (tvr,b))
+    un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | i == j = un t u mm c
+    un (ELam va ea) (ELam vb eb) mm c = lam va ea vb eb mm c
+    un (EPi va ea) (EPi vb eb) mm c = lam va ea vb eb mm c
+    un (EPrim s xs t) (EPrim s' ys t') mm c | length xs == length ys = do
+        sequence_ [ un x y mm c | x <- xs | y <- ys]
+        un t t' mm c
+    un (ESort x) (ESort y) mm c | x == y = return ()
+    un (ELit (LitInt x t1))  (ELit (LitInt y t2)) mm c | x == y = un t1 t2 mm c
+    un (ELit (LitCons n xs t))  (ELit (LitCons n' ys t')) mm c | n == n' && length xs == length ys = do
+        sequence_ [ un x y mm c | x <- xs | y <- ys]
+        un t t' mm c
+    un a b _ _ = fail $ "Expressions do not unify: " ++ show a ++ show b
+    lam va ea vb eb mm c = do
+        un ea eb mm c
 

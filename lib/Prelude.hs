@@ -932,4 +932,16 @@ instance Real Int where
     toRational = fromInt
 
 
+
+{-# RULES "concat/Map" forall f xs . concat (map f xs) = concatMap f xs #-}
+{-# RULES "sequence/map" forall f xs . sequence (map f xs) = mapM f xs #-}
+{-# RULES "sequence_/map" forall f xs . sequence_ (map f xs) = mapM_ f xs #-}
+{-# RULES "++/emptyl"  forall xs . [] ++ xs = xs #-}
+{-# RULES "++/emptyr"  forall xs . xs ++ [] = xs #-}
+{-# RULES "++/tick"  forall  x xs ys . (x:xs) ++ ys = x:(xs ++ ys) #-}
+{-# RULES "++/refix"  forall  xs ys zs . (xs ++ ys) ++ zs = xs ++ (ys ++ zs) #-}
+{-# RULES "map/map"  forall f g xs . map f (map g xs) = map (\x -> f (g x)) xs #-}
+{-# RULES "concatMap/map"  forall f g xs . concatMap f (map g xs) = concatMap (\x -> f (g x)) xs #-}
+{-# RULES "concat/tick"  forall x xs . concat (x:xs) = x ++ concat xs #-}
+
 default(Int,Double)

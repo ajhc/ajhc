@@ -23,6 +23,7 @@ import Data.Monoid
 import Data.Typeable
 import List
 import Monad(liftM)
+import Control.Monad.Trans
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -118,25 +119,20 @@ instance FreeVars Rule (Set.Set Id) where
 
 instance FreeVars Rule [Id] where
     freeVars rule = Set.toList $ freeVars rule
-{-
-printRule rule = do
-    putErrLn $ fromAtom (ruleName rule)
-    putErr $ "    " ++ render (ePretty (foldl EAp (EVar $ ruleHead rule) (ruleArgs rule)))
-    putErrLn $ " -> " ++ render (ePretty (ruleBody rule))
--}
+
 printRules (Rules rules) = mapM_ printRule (concat $ Map.elems rules)
 
 printRule Rule {ruleName = n, ruleBinds = vs, ruleBody = e2, ruleHead = head, ruleArgs = args } = do
     let e1 = foldl EAp (EVar head) args
     let p v = parens $ pprint v <> text "::" <> pprint (getType v)
-    putDocMLn CharIO.putStr $  (tshow n) <+> text "forall" <+> hsep (map p vs) <+> text "." <> text "\n"
+    putDocMLn CharIO.putStr $  (tshow n) <+> text "forall" <+> hsep (map p vs) <+> text "."
     let ty = pprint $ getType e1 -- case inferType dataTable [] e1 of
-        ty2 = pprint $ getType e2
+    --    ty2 = pprint $ getType e2
     putDocMLn CharIO.putStr (indent 2 (pprint e1))
     putDocMLn CharIO.putStr $ text " ====>"
     putDocMLn CharIO.putStr (indent 2 (pprint e2))
     putDocMLn CharIO.putStr (indent 2 (text "::" <+> ty))
-    putDocMLn CharIO.putStr (indent 2 (text "::" <+> ty2))
+    --putDocMLn CharIO.putStr (indent 2 (text "::" <+> ty2))
 
 combineRules as bs = map head $ sortGroupUnder ruleName (as ++ bs)
 
@@ -188,14 +184,21 @@ applyRules (ARules rs) xs = f rs where
     lxs = length xs
     f [] = return Nothing
     f (r:_) | ruleNArgs r > lxs = return Nothing
-    f (r:_) | Just ss <- sequence (zipWith unify (ruleArgs r) xs) = ans ss where
-        ans ss = do
+    --f (r:_) | Just ss <- sequence (zipWith unify (ruleArgs r) xs) = ans ss where
+    f (r:rs) = case sequence (zipWith (match (ruleBinds r)) (ruleArgs r) xs) of
+        Just ss -> do
             mtick (ruleName r)
-            let b = substMap (Map.fromList [ (i,x) | ~(~(EVar (TVr { tvrIdent = i })),x) <- concat ss ]) (ruleBody r)
+            let b = substMap (Map.fromList [ (i,x) | (TVr { tvrIdent = i },x) <- concat ss ]) (ruleBody r)
             return $ Just (b,drop (ruleNArgs r) xs)
-    f (_:rs) = f rs
-
-
+        Nothing -> do f rs
+            {-
+            liftIO $ do
+                putStrLn "rule didn't match:"
+                printRule r
+                putDocMLn CharIO.putStr (hsep (map (parens . pprint) xs))
+                putStrLn err
+            f rs
+            -}
 preludeError = toId v_error
 ruleError = toAtom "Rule.error/EError"
 
@@ -215,5 +218,5 @@ makeRule ::
     -> E        -- ^ the body
     -> Rules
 makeRule name fvs head args body = fromRules [rule] where
-    rule = emptyRule {  ruleHead = head, ruleBinds = fvs, ruleArgs = args, ruleNArgs = length args, ruleBody = body, ruleName = toAtom $ "Rule." ++ name }
+    rule = emptyRule {  ruleHead = head, ruleBinds = fvs, ruleArgs = args, ruleNArgs = length args, ruleBody = body, ruleName = toAtom $ "Rule.User." ++ name }
 

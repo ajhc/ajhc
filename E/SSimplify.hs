@@ -464,7 +464,11 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     applyRule v xs  = do
         z <- builtinRule v xs
         case z of
-            Nothing | fopts FO.Rules -> applyRules (Info.fetch (tvrInfo v)) xs
+            Nothing | fopts FO.Rules -> do
+                applyRules (Info.fetch (tvrInfo v)) xs
+                --case z of
+                --    Just (x,xs) -> app (x,xs)
+                --    Nothing -> return Nothing
             x -> return x
 
     h v xs' inb  | so_superInline sopts, si@(_:_) <- [ (tvr,fromJust body) | EVar tvr <- xs', forceSuperInline tvr, let body = haveBody tvr, isJust body ] = do
@@ -488,13 +492,13 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     h (EVar v) xs' inb | forceNoinline v = do
         z <- applyRule v xs'
         case z of
-            Just (x,xs) -> h x xs inb
+            Just (x,xs) -> didInline inb (x,xs) --h x xs inb
             Nothing -> app (EVar v, xs')
 
     h (EVar v) xs' inb = do
         z <- applyRule v xs'
         case z of
-            Just (x,xs) -> h x xs inb
+            Just (x,xs) -> didInline inb (x,xs) -- h x xs inb
             Nothing -> case Map.lookup (tvrNum v) (envInScope inb) of
                 Just (IsBoundTo LoopBreaker _) -> app (EVar v,xs')
                 Just (IsBoundTo Once _) -> error "IsBoundTo: Once"
