@@ -15,6 +15,7 @@ module E.FromHs(
 import Control.Monad.Identity
 import Control.Monad.State
 import Data.FunctorM
+import Data.Monoid
 import Data.Generics
 import List(isPrefixOf)
 import Prelude hiding((&&),(||),not,and,or,any,all,head)
@@ -45,6 +46,7 @@ import Name.Name as Name
 import Name.Names
 import Util.NameMonad
 import FrontEnd.SrcLoc
+import FrontEnd.Rename(unRename)
 import FrontEnd.Tc.Type(prettyPrintType)
 import Options
 import qualified FlagOpts as FO
@@ -242,14 +244,29 @@ createFunc dataTable ns es ee = foldr ELam eee tvrs where
     esr (tvr,n',(cn,st,_)) e = ECase (EVar tvr) (tVr 0 te) [Alt (LitCons cn [tVr n' st] te) e] Nothing  where
         te = getType $ EVar tvr
 
+instance GenName String where
+   genNames i = map (('x':) . show) [i..]
+
 convertRules ::  Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(String,[TVr],E,E)]
 convertRules classHierarchy assumps dataTable hsDecls = concatMapM f hsDecls where
     f pr@HsPragmaRules {} = do
         let ce = convertE classHierarchy assumps dataTable (hsDeclSrcLoc pr)
         e1 <- ce (hsDeclLeftExpr pr)
         e2 <- ce (hsDeclRightExpr pr)
-        cs <- mapM ce [ HsVar v | v <- hsDeclFreeVars pr ]
-        return [(hsDeclString pr,[ v | ~(EVar v) <- cs],e1,e2)]
+        (ts,cs) <- runNameMT $ do
+            ts <- flip mapM (filter (sortStarLike . getType) $ freeVars e1) $ \tvr -> do
+                --return (tvrIdent tvr,tvr)
+                nn <- newNameFrom (map (:[]) ['a' ..])
+                return (tvrIdent tvr,tvr { tvrIdent = toId (toName TypeVal nn) })
+            cs <- flip mapM [toTVr assumps (toName Val v) | v <- hsDeclFreeVars pr ] $ \tvr -> do
+                let ur = show $ unRename $ nameName (toUnqualified $ runIdentity $ fromId (tvrIdent tvr))
+                nn <- newNameFrom (ur:map (\v -> ur ++ show v) [1 ::Int ..])
+                return (tvrIdent tvr,tvr { tvrIdent = toId (toName Val nn) })
+            return (ts,cs)
+        let smt = substMap $ Map.fromList [ (x,EVar y)| (x,y) <- ts ]
+            sma = substMap $ Map.fromList [ (x,EVar y)| (x,y) <- cs' ]
+            cs' =  [ (x,(tvrType_u smt y))| (x,y) <- cs ]
+        return [(hsDeclString pr,( snds (cs' ++ ts) ),smt $ sma e1,smt $ sma e2)]
     f _ = return []
 
 convertE :: Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> SrcLoc -> HsExp -> m E

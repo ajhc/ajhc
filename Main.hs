@@ -183,10 +183,19 @@ processDecls stats ho ho' tiData = do
     ds' <- convertDecls (hoClassHierarchy ho') allAssumps  fullDataTable decls
     rs <- convertRules (hoClassHierarchy ho') allAssumps fullDataTable decls
     flip mapM_ rs $ \ (n,vs,e1,e2) -> do
-        putStrLn n
-        print vs
-        printCheckName' fullDataTable tvr e1
-        printCheckName' fullDataTable tvr e2
+        let p v = parens $ pprint v <> text "::" <> pprint (getType v)
+        putStrLn $ render $  (tshow n) <+> text "forall" <+> hsep (map p vs) <+> text "." <> text "\n"
+        let ty = case inferType dataTable [] e1 of
+                Left err -> vcat $ map text (intersperse "---" $ tail err)
+                Right ty -> pprint ty
+        let ty2 = case inferType dataTable [] e2 of
+                Left err -> vcat $ map text (intersperse "---" $ tail err)
+                Right ty -> pprint ty
+        putStrLn (render $ indent 2 (pprint e1))
+        putStrLn $ text " ====>"
+        putStrLn (render $ indent 2 (pprint e2))
+        putStrLn (render $ indent 2 (text "::" <+> ty))
+        putStrLn (render $ indent 2 (text "::" <+> ty2))
 
     let mnames = methodNames (hoClassHierarchy ho')
         ds = ds' ++ [ (runIdentity $ fromId (tvrIdent t),setProperties [prop_PLACEHOLDER,prop_EXPORTED] t, EPrim (primPrim ("Placeholder: " ++ tvrShowName t)) [] (getType t)) | t <- mnames, not $ t `Set.member` cnames]
