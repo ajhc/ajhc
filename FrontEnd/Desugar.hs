@@ -34,7 +34,7 @@
 -- Type synonyms are no longer handled here. only 'local' desugaring is done.
 -- Does this module need to exist?
 
-module FrontEnd.Desugar ( doToExp, desugarHsModule, desugarHsStmt) where
+module FrontEnd.Desugar ( doToExp, desugarHsModule, desugarHsStmt, desugarHsExp) where
 
 import Control.Monad.State
 
@@ -150,6 +150,10 @@ desugarHsModule m = hsModuleDecls_s ds' m where
 
 desugarHsStmt :: Monad m => HsStmt -> m HsStmt
 desugarHsStmt s = return $ fst $ runPatSM (0::Int, undefined) $ desugarStmt s
+
+desugarHsExp :: Monad m => HsExp -> m HsExp
+desugarHsExp s = return $ fst $ runPatSM (0::Int, undefined) $ desugarExp s
+
 
 --desugarTidyModule :: [HsDecl] -> TidyModule -> TidyModule
 --desugarTidyModule importSyns tidy

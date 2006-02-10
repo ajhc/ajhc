@@ -13,30 +13,38 @@ module E.Rules(
     hasBuiltinRule,
     getARules,
     arules,
+    makeRule,
     ARules,
     applyRules,
     builtinRule
     )where
 
-import Data.Typeable
 import Data.Monoid
+import Data.Typeable
+import List
 import Monad(liftM)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom(toAtom,fromAtom,Atom)
 import Binary
+import Doc.DocLike
+import Doc.PPrint
+import Doc.Pretty
 import E.E
 import E.Eval
 import E.Show
 import E.Subst
-import Support.FreeVars
+import E.TypeCheck
 import GenUtil
-import Util.HasSize
 import MapBinaryInstance()
 import Name.Name
 import Name.Names
+import qualified CharIO
 import Stats
+import Support.CanType
+import Support.FreeVars
+import Util.HasSize
 
 
 
@@ -110,13 +118,25 @@ instance FreeVars Rule (Set.Set Id) where
 
 instance FreeVars Rule [Id] where
     freeVars rule = Set.toList $ freeVars rule
-
+{-
 printRule rule = do
     putErrLn $ fromAtom (ruleName rule)
     putErr $ "    " ++ render (ePretty (foldl EAp (EVar $ ruleHead rule) (ruleArgs rule)))
     putErrLn $ " -> " ++ render (ePretty (ruleBody rule))
-
+-}
 printRules (Rules rules) = mapM_ printRule (concat $ Map.elems rules)
+
+printRule Rule {ruleName = n, ruleBinds = vs, ruleBody = e2, ruleHead = head, ruleArgs = args } = do
+    let e1 = foldl EAp (EVar head) args
+    let p v = parens $ pprint v <> text "::" <> pprint (getType v)
+    putDocMLn CharIO.putStr $  (tshow n) <+> text "forall" <+> hsep (map p vs) <+> text "." <> text "\n"
+    let ty = pprint $ getType e1 -- case inferType dataTable [] e1 of
+        ty2 = pprint $ getType e2
+    putDocMLn CharIO.putStr (indent 2 (pprint e1))
+    putDocMLn CharIO.putStr $ text " ====>"
+    putDocMLn CharIO.putStr (indent 2 (pprint e2))
+    putDocMLn CharIO.putStr (indent 2 (text "::" <+> ty))
+    putDocMLn CharIO.putStr (indent 2 (text "::" <+> ty2))
 
 combineRules as bs = map head $ sortGroupUnder ruleName (as ++ bs)
 
@@ -185,4 +205,15 @@ builtinRule TVr { tvrIdent = n } (ty:s:rs)
         mtick ruleError
         return $ Just ((EError ("Prelude.error: " ++ s') ty),rs)
 builtinRule _ _ = return Nothing
+
+
+makeRule ::
+    String      -- ^ the rule name
+    -> [TVr]    -- ^ the free variables
+    -> TVr      -- ^ the head
+    -> [E]      -- ^ the args
+    -> E        -- ^ the body
+    -> Rules
+makeRule name fvs head args body = fromRules [rule] where
+    rule = emptyRule {  ruleHead = head, ruleBinds = fvs, ruleArgs = args, ruleNArgs = length args, ruleBody = body, ruleName = toAtom $ "Rule." ++ name }
 
