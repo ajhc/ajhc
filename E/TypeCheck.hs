@@ -270,8 +270,13 @@ typeInfer'' dataTable ds e = rfc e where
 -- | find substitution that will transform the left term into the right one,
 -- only substituting for the vars in the list
 
-match :: Monad m => [TVr] -> E -> E -> m [(TVr,E)]
-match vs e1 e2 = liftM Seq.toList $ execWriterT (un e1 e2 () (0::Int)) where
+match :: Monad m =>
+    (Id -> Maybe E)      -- ^ function to look up values in the environment
+    -> [TVr]              -- ^ vars which may be substituted
+    -> E                  -- ^ pattern to match
+    -> E                  -- ^ input expression
+    -> m [(TVr,E)]
+match lup vs e1 e2 = liftM Seq.toList $ execWriterT (un e1 e2 () (0::Int)) where
     bvs = Set.fromList (map tvrIdent vs)
     un (EAp a b) (EAp a' b') mm c = do
         un a a' mm c
@@ -290,6 +295,8 @@ match vs e1 e2 = liftM Seq.toList $ execWriterT (un e1 e2 () (0::Int)) where
     un (ELit (LitCons n xs t))  (ELit (LitCons n' ys t')) mm c | n == n' && length xs == length ys = do
         sequence_ [ un x y mm c | x <- xs | y <- ys]
         un t t' mm c
+    un a@EVar {} b mm c = fail $ "Expressions do not unify: " ++ show a ++ show b
+    un a (EVar tvr) mm c | Just b <- lup (tvrIdent tvr), not $ isEVar b = un a b mm c
     un a b _ _ = fail $ "Expressions do not unify: " ++ show a ++ show b
     lam va ea vb eb mm c = do
         un ea eb mm c

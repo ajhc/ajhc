@@ -459,16 +459,16 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         | Properties p <- Info.fetch (tvrInfo x) =  Set.member prop_SUPERINLINE p
 
     forceNoinline x
+        | Just (_x :: ARules) <- Info.lookup (tvrInfo x) = True
         | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_NOINLINE p || Set.member prop_PLACEHOLDER p
 
-    applyRule v xs  = do
+    applyRule v xs inb  = do
         z <- builtinRule v xs
+        let lup x = case Map.lookup x (envInScope inb) of
+                Just (IsBoundTo _ e) -> Just e
+                _ -> Nothing
         case z of
-            Nothing | fopts FO.Rules -> do
-                applyRules (Info.fetch (tvrInfo v)) xs
-                --case z of
-                --    Just (x,xs) -> app (x,xs)
-                --    Nothing -> return Nothing
+            Nothing | fopts FO.Rules -> applyRules lup (Info.fetch (tvrInfo v)) xs
             x -> return x
 
     h v xs' inb  | so_superInline sopts, si@(_:_) <- [ (tvr,fromJust body) | EVar tvr <- xs', forceSuperInline tvr, let body = haveBody tvr, isJust body ] = do
@@ -490,13 +490,13 @@ simplifyDs sopts dsIn = (stat,dsOut) where
 
 
     h (EVar v) xs' inb | forceNoinline v = do
-        z <- applyRule v xs'
+        z <- applyRule v xs' inb
         case z of
             Just (x,xs) -> didInline inb (x,xs) --h x xs inb
             Nothing -> app (EVar v, xs')
 
     h (EVar v) xs' inb = do
-        z <- applyRule v xs'
+        z <- applyRule v xs' inb
         case z of
             Just (x,xs) -> didInline inb (x,xs) -- h x xs inb
             Nothing -> case Map.lookup (tvrNum v) (envInScope inb) of

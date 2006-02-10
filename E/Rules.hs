@@ -179,26 +179,17 @@ joinARules ar@(ARules a) br@(ARules b)
 
 
 
--- applyRules :: ARules -> [E] -> IO (Maybe (E,[E]))
-applyRules (ARules rs) xs = f rs where
+applyRules lup (ARules rs) xs = f rs where
     lxs = length xs
     f [] = return Nothing
     f (r:_) | ruleNArgs r > lxs = return Nothing
-    --f (r:_) | Just ss <- sequence (zipWith unify (ruleArgs r) xs) = ans ss where
-    f (r:rs) = case sequence (zipWith (match (ruleBinds r)) (ruleArgs r) xs) of
+    f (r:rs) = case sequence (zipWith (match lup (ruleBinds r)) (ruleArgs r) xs) of
         Just ss -> do
             mtick (ruleName r)
             let b = substMap (Map.fromList [ (i,x) | (TVr { tvrIdent = i },x) <- concat ss ]) (ruleBody r)
             return $ Just (b,drop (ruleNArgs r) xs)
         Nothing -> do f rs
-            {-
-            liftIO $ do
-                putStrLn "rule didn't match:"
-                printRule r
-                putDocMLn CharIO.putStr (hsep (map (parens . pprint) xs))
-                putStrLn err
-            f rs
-            -}
+
 preludeError = toId v_error
 ruleError = toAtom "Rule.error/EError"
 
