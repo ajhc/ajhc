@@ -32,7 +32,7 @@ import DependAnalysis(getBindGroups)
 import Diagnostic
 import Doc.PPrint as PPrint
 import FrontEnd.Desugar(doToExp)
-import FrontEnd.KindInfer(KindEnv)
+import FrontEnd.KindInfer(KindEnv,hsQualTypeToScheme)
 import FrontEnd.SrcLoc
 import FrontEnd.Utils(getDeclName)
 import HsPretty
@@ -320,11 +320,16 @@ tiExpr env (HsListComp e stmts)
 
 -- This should be desugared already
 -- e :: t   ----> let {v::t; v=e} in v
-tiExpr env (HsExpTypeSig _sloc e qt)
-   = error $ "tiExpr: unexpected sugared explicitly typed expression " ++ show e
+tiExpr env expr@(HsExpTypeSig sloc e qt) = withContext (locMsg sloc "in the explicitly typed" $ render $ ppHsExp expr) $ do
+    kt <- getKindEnv
+    qts <- hsQualTypeToScheme kt qt
+    (ps,env,t) <- tiExpr env e
+    (ps' :=> t') <- freshInst qts
+    unify t t'
+    return (ps' ++ ps,env,t)
 
-tiExpr _env e
-   = error $ "tiExpr: not implemented for: " ++ show e
+
+tiExpr _env e = error $ "tiExpr: not implemented for: " ++ show e
 
 --------------------------------------------------------------------------------
 
