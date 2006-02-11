@@ -211,7 +211,7 @@ processDecls stats ho ho' tiData = do
     prog <- return $ programSetDs [ (t,e) | (_,t,e) <- ds] prog
     let entries = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t) (tell [t])) prog
     prog <- return $ prog { progEntryPoints = entries }
-
+    prog <- return $ programPruneUnreachable prog
 
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
@@ -223,11 +223,14 @@ processDecls stats ho ho' tiData = do
         --wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
         let cm stats e = do
             let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
-            let (stat, e') = SS.simplifyE sopt e
+            let (e',stat') = Stats.runStatM $ etaExpandE (progDataTable prog) e
+            let (stat, e'') = SS.simplifyE sopt e'
             Stats.tickStat stats stat
-            return e'
+            Stats.tickStat stats stat'
+            return e''
         let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds)) fullDataTable
         cds <- flip mapM (zip names cds) $ \ (n,(v,lc)) -> do
+            lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             lc <- doopt mangle False stats "SuperSimplify" cm lc
             lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
             lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc

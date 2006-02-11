@@ -1,4 +1,4 @@
-module E.Eta(etaExpand) where
+module E.Eta(etaExpand,etaExpandE) where
 
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -35,6 +35,12 @@ etaExpand prog = do
     Stats.printStat "EtaExpansion" stat
     return p
 
+{-# NOINLINE etaExpandDs #-}
+etaExpandDs :: MonadStats m => DataTable -> [(TVr,E)] -> m [(TVr,E)]
+etaExpandDs dataTable ds = do
+    let Identity ds' = annotateDs mempty (const return) letann lamann ds
+    sequence [ do e <- etaExpandE dataTable e; return (t,e) | (t,e) <- ds' ]
+
 fromPi' :: DataTable ->  E -> (E,[TVr])
 fromPi' dataTable e = f [] (followAliases dataTable e) where
     f as (EPi v e) = f (v:as) (followAliases dataTable e)
@@ -44,6 +50,7 @@ etaExpandE :: MonadStats m => DataTable -> E -> m E
 etaExpandE dataTable e = f e where
     f (ELetRec ds e) = do
         ds' <- sequence [ do e' <- ee e; e'' <- f e'; return (t,e'') | (t,e) <- ds]
+        e <- ee e
         e' <- f e
         return $ ELetRec ds' e'
     f ec@ECase {} = do
