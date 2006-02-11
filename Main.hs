@@ -12,7 +12,6 @@ import qualified Data.Set as Set
 import qualified System
 
 import C.FromGrin
-import C.Prims
 import CharIO
 import Class
 import DataConstructors
@@ -176,10 +175,7 @@ processDecls stats ho ho' tiData = do
 
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
-    ds' <- convertDecls (hoClassHierarchy ho') allAssumps  fullDataTable decls
-    let mnames = methodNames (hoClassHierarchy ho')
-        ds = ds' ++ [ (runIdentity $ fromId (tvrIdent t),setProperties [prop_PLACEHOLDER] t, EPrim (primPrim ("Placeholder: " ++ tvrShowName t)) [] (getType t)) | t <- mnames, not $ t `Set.member` cnames]
-        cnames = Set.fromList $ fsts $ Map.elems $ hoEs ho
+    ds <- convertDecls (hoClassHierarchy ho') allAssumps  fullDataTable decls
 
     -- Build rules
     rules' <- createInstanceRules (hoClassHierarchy ho' `mappend` hoClassHierarchy initialHo)   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
@@ -190,10 +186,9 @@ processDecls stats ho ho' tiData = do
     let allRules = hoRules allHo `mappend` rules
 
     -- some more useful values.
-    let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (_,n,_) <- ds ] ++ map tvrIdent (methodNames (hoClassHierarchy allHo))
+    let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (_,n,_) <- ds ]
         mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
-        classNames = Set.fromList $ map tvrIdent (methodNames (hoClassHierarchy allHo))
-        namesInscope = Set.fromList inscope -- classNames `Set.union` (Set.fromAscList $ Map.keys smap)
+        namesInscope = Set.fromList inscope
 
     -- initial pass over functions to put them into a normalized form
     let procE (ds,usedIds) (n,v,lc) = do
@@ -294,7 +289,7 @@ processDecls stats ho ho' tiData = do
     printProgram prog
 
     Stats.print "Optimization" stats
-    return ho' { hoDataTable = dataTable, hoEs = programEsMap prog , hoRules = hoRules ho' `mappend` rules, hoUsedIds = collectIds (ELetRec [ (b,c) | (_,b,c) <- ds'] Unknown) }
+    return ho' { hoDataTable = dataTable, hoEs = programEsMap prog , hoRules = hoRules ho' `mappend` rules, hoUsedIds = collectIds (ELetRec (programDs prog) Unknown) }
 
 programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = programSetDs ds' prog where
@@ -316,7 +311,7 @@ postProcessE stats n inscope usedIds dataTable lc = do
         putDocM putErr $ parens $ text "Absurded vars:" <+> align (hsep $ map pprint (Map.elems fvs))
     let mangle = mangle' (Just $ Set.fromList $ inscope) dataTable
     lc <- mangle (return ()) False ("Absurdize") (return . substMap (Map.map g fvs)) lc
-    lc <- mangle (return ()) False "deNewtype" (return . deNewtype dataTable) lc
+    --lc <- mangle (return ()) False "deNewtype" (return . deNewtype dataTable) lc
     --lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
     lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeApps usedIds stats x >>= coalesceLets stats)  lc
     return lc

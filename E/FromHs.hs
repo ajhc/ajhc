@@ -4,11 +4,9 @@ module E.FromHs(
     convertRules,
     createInstanceRules,
     createMethods,
-    deNewtype,
     getMainFunction,
     guardConv,
     matchesConv,
-    methodNames,
     theMainName
     ) where
 
@@ -178,20 +176,22 @@ createInstanceRules :: Monad m => ClassHierarchy -> (Map.Map Name (TVr,E)) -> m 
 createInstanceRules classHierarchy funcs = return $ fromRules ans where
     ans = concatMap cClass (classRecords classHierarchy)
     cClass classRecord =  concat [ method classRecord n | n :>: Forall _ (_ :=> t) <- classAssumps classRecord ]
-
-    method classRecord n = as where
+    method classRecord methodName = as where
         methodVar = tVr ( nameToInt methodName) ty
-        methodName =  n
-        Identity (deftvr@(TVr { tvrType = ty}),_) = findName defaultName
-        defaultName =  (defaultInstanceName n)
+        Identity (TVr {tvrType = ty},_) = findName methodName
+        defaultName =  (defaultInstanceName methodName)
         valToPat' (ELit (LitCons x ts t)) = ELit $ LitCons x [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..]]  t
         valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ LitCons tc_Arrow [ EVar (tVr j (getType z)) | z <- [a,b] | j <- [2,4 ..]]  eStar
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
         as = [ rule  t | (_ :=> IsIn _ t ) <- snub (classInsts classRecord) ]
         rule t = emptyRule { ruleHead = methodVar, ruleArgs = [valToPat' (tipe t)], ruleBinds = [ t | ~(EVar t) <- vs], ruleBody = body, ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
-            name = ((instanceName n (getTypeCons t)))
+            name = ((instanceName methodName (getTypeCons t)))
             ELit (LitCons _ vs _) = valToPat' (tipe t)
-            body = case findName name of Just (n,_) -> foldl EAp (EVar n) vs  ; Nothing -> EAp (EVar deftvr) (valToPat' (tipe t))
+            body = case findName name of
+                Just (n,_) -> foldl EAp (EVar n) vs
+                Nothing -> case findName defaultName of
+                    Just (deftvr,_) -> EAp (EVar deftvr) (valToPat' (tipe t))
+                    Nothing -> EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) (eAp ty (valToPat' (tipe t)))
     findName name = case Map.lookup name funcs of
         Nothing -> fail $ "Cannot find: " ++ show name
         Just n -> return n
@@ -284,8 +284,8 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
     doNegate e = eAp (eAp (func_negate funcs) (getType e)) e
     Identity funcs = fmapM (return . EVar . toTVr assumps) sFuncNames
     anninst (a,b,c)
-        | "Instance@" `isPrefixOf` show a = (a,setProperty prop_INSTANCE b, c)
-        | otherwise = (a,b,c)
+        | "Instance@" `isPrefixOf` show a = (a,setProperty prop_INSTANCE b, deNewtype dataTable c)
+        | otherwise = (a,b, deNewtype dataTable c)
     pval = convertVal assumps
     cDecl :: HsDecl -> [(Name,TVr,E)]
     cDecl (HsForeignDecl _ ForeignPrimitive s n _) = [(name,var, lamt (foldr ($) (EPrim (primPrim s) (map EVar es) rt) (map ELam es)))]  where
@@ -441,13 +441,15 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
     cClassDecl (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon name) _)) decls) = ans where
         ds = map simplifyDecl decls
         cr = findClassRecord classHierarchy (toName ClassName name)
-        ans = concatMap method [  n | n :>: _ <- classAssumps cr]
+        ans = cClass cr ++ concatMap method [  n | n :>: _ <- classAssumps cr]
         method n = [(defaultName,tVr (nameToInt defaultName) ty,els) | els <- mels] where
             defaultName = defaultInstanceName n
             (TVr { tvrType = ty}) = tv (nameName n)
             mels = case [ d | d <- ds, maybeGetDeclName d == Just n] of
                 [] -> []
                 (d:_) | ~[(_,_,v)] <- cDecl d -> [v]
+        cClass classRecord =  [ f n (nameToInt n) (convertOneVal t) | n :>: t <- classAssumps classRecord ] where
+            f n i t = (n,setProperties [prop_METHOD,prop_PLACEHOLDER] $ tVr i t, EPrim (primPrim ("Placeholder: " ++ show n)) [] t)
     cClassDecl _ = error "cClassDecl"
 
 
