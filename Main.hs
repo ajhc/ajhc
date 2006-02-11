@@ -24,7 +24,6 @@ import E.Diff
 import E.E
 import E.Eta
 import E.FromHs
-import E.Inline
 import E.LambdaLift
 import E.Program
 import E.LetFloat
@@ -44,7 +43,6 @@ import Grin.FromE
 import Grin.Grin
 import Grin.Show
 import Grin.Unboxing
-import Grin.Arity
 import Grin.Whiz
 import Ho.Build
 import Ho.Library
@@ -58,7 +56,7 @@ import Support.CanType(getType)
 import Support.FreeVars
 import Support.ShowTable
 import Util.Graph
-import Version
+import Version(versionString,versionContext)
 import qualified E.CPR
 import qualified E.SSimplify as SS
 import qualified FlagDump as FD
@@ -97,7 +95,7 @@ main = runMain $ bracketHtml $ do
                           SelfTest.selfTest (optArgs o)
       ShowHo ho     -> dumpHoFile ho
       Version       -> putStrLn versionString
-      VersionCtx    -> putStrLn changes_txt
+      VersionCtx    -> putStrLn versionContext
       _             -> processFiles  (optArgs o)
 
 
