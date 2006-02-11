@@ -173,7 +173,6 @@ processDecls stats ho ho' tiData = do
         decls = concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ] ++ Map.elems (tiDataLiftedInstances tiData)
 
     -- build datatables
-    --let dataTable = toDataTable (Map.fromList $[ (toName TypeConstructor x,y) | (x,y)<- Map.toList (hoKinds ho')] ) (tiAllAssumptions tiData) decls
     let dataTable = toDataTable (getConstructorKinds (hoKinds ho')) (tiAllAssumptions tiData) decls
     let fullDataTable = (dataTable `mappend` hoDataTable ho)
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
@@ -191,7 +190,6 @@ processDecls stats ho ho' tiData = do
     let nrules = mconcat [ makeRule n vs head args e2 | (n,vs,e1,e2) <- rawRules, let (EVar head,args) = fromAp e1 ]
     let rules = rules' `mappend` nrules
     wdump FD.Rules $ printRules rules
-    printRules rules
     let allRules = hoRules allHo `mappend` rules
 
     let prog = program { progClassHierarchy = hoClassHierarchy allHo, progDataTable = fullDataTable }
@@ -287,8 +285,6 @@ processDecls stats ho ho' tiData = do
         wdump FD.Progress $ putErr (if rec then "*" else ".")
         return (nvls ++ retds, (Map.fromList [ (tvrIdent v,lc) | (_,v,lc) <- nvls] `Map.union` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (_,v,_) <- nvls] `Map.union` annmap , idHist' ))
 
-    -- preparing for optimization
-    -- let imap = annotateMethods (hoClassHierarchy allHo) allRules (hoProps allHo)
     let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
         graph =  (newGraph ds (\ (_,b,_) -> tvrIdent b) (\ (_,b,c) -> bindingFreeVars b c))
         fscc (Left n) = (False,[n])
@@ -301,9 +297,6 @@ processDecls stats ho ho' tiData = do
     prog <- return $ programPruneUnreachable prog
     printProgram prog
 
-
-    --let ds' = reachable (newGraph ds (\ (_,b,_) -> tvrIdent b) (\ (_,b,c) -> bindingFreeVars b c)) [ tvrIdent b | (n,b,_) <- ds, getProperty prop_EXPORTED b]
-    --wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     Stats.print "Optimization" stats
     return ho' { hoDataTable = dataTable, hoEs = programEsMap prog , hoRules = hoRules ho' `mappend` rules, hoUsedIds = collectIds (ELetRec [ (b,c) | (_,b,c) <- ds'] Unknown) }
 

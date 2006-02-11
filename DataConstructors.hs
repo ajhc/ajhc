@@ -390,11 +390,11 @@ slotTypes ::
     -> Name   -- ^ name of constructor
     -> E      -- ^ type of value
     -> [E]    -- ^ type of each slot
-slotTypes wdt@(DataTable dt) n (ELit (LitCons pn xs _))
+slotTypes wdt n (ELit (LitCons pn xs _))
     | pn == conName pc = [sub x | x <- conSlots mc ]
     where
     Identity mc = getConstructor n wdt
-    Just pc = Map.lookup (conInhabits mc) dt
+    Identity pc = getConstructor (conInhabits mc) wdt
     sub = substMap $ Map.fromDistinctAscList [ (i,sl) | sl <- xs | i <- [2,4..] ]
 slotTypes wdt n e | Just fa <- followAlias wdt e  = slotTypes wdt n fa
 slotTypes _ n e = error $ "slotTypes: error in " ++ show n ++ ": " ++ show e
@@ -417,8 +417,8 @@ showDataTable (DataTable mp) = vcat xs where
 
 
 getSiblings :: DataTable -> Name -> Maybe [Name]
-getSiblings (DataTable mp) n
-    | Just c <- Map.lookup n mp, Just s <- Map.lookup (conInhabits c) mp = conChildren s
+getSiblings dt n
+    | Just c <- getConstructor n dt, Just s <- getConstructor (conInhabits c) dt = conChildren s
     | otherwise =  Nothing
 
 
