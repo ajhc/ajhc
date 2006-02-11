@@ -69,3 +69,11 @@ programMapDs f prog = do
      ds <- mapM f (programDs prog)
      return $ programSetDs ds prog
 
+programMapDs_ f prog = mapM_ f (programDs prog)
+
+{-
+programMapRecGroups :: Monad m => ([(TVr,E)] -> m [(TVr,E)]) -> Program -> m Program
+programMapRecGroups f prog = do
+    let pds = programDs prog
+-}
+

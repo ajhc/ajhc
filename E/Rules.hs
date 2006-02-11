@@ -1,22 +1,23 @@
 module E.Rules(
-    Rules,
+    ARules,
     Rule(ruleHead,ruleBinds,ruleArgs,ruleBody,ruleName),
-    ruleFreeVars,
-    ruleAllFreeVars,
-    ruleFreeVars',
-    fromRules,
+    Rules,
+    applyRules,
+    arules,
+    bindingFreeVars,
+    builtinRule,
     emptyRule,
+    fromRules,
+    getARules,
+    hasBuiltinRule,
+    makeRule,
+    mapABodies,
+    mapBodies,
     printRule,
     printRules,
-    mapBodies,
-    mapABodies,
-    hasBuiltinRule,
-    getARules,
-    arules,
-    makeRule,
-    ARules,
-    applyRules,
-    builtinRule
+    ruleAllFreeVars,
+    ruleFreeVars',
+    ruleFreeVars
     )where
 
 import Data.Monoid
@@ -42,6 +43,7 @@ import MapBinaryInstance()
 import Name.Name
 import Name.Names
 import qualified CharIO
+import qualified Info.Info as Info
 import Stats
 import Support.CanType
 import Support.FreeVars
@@ -112,10 +114,10 @@ instance FreeVars Rule b => FreeVars ARules b where
     freeVars (ARules rs) = freeVars rs
 
 instance FreeVars Rule (Set.Set TVr) where
-    freeVars rule = freeVars (ruleBody rule) Set.\\ freeVars (ruleArgs rule)
+    freeVars rule = freeVars (ruleBody rule) Set.\\ Set.fromList (ruleBinds rule)
 
 instance FreeVars Rule (Set.Set Id) where
-    freeVars rule = freeVars (ruleBody rule) Set.\\ freeVars (ruleArgs rule)
+    freeVars rule = freeVars (ruleBody rule) Set.\\ Set.fromList (map tvrIdent $ ruleBinds rule)
 
 instance FreeVars Rule [Id] where
     freeVars rule = Set.toList $ freeVars rule
@@ -210,4 +212,7 @@ makeRule ::
     -> Rules
 makeRule name fvs head args body = fromRules [rule] where
     rule = emptyRule {  ruleHead = head, ruleBinds = fvs, ruleArgs = args, ruleNArgs = length args, ruleBody = body, ruleName = toAtom $ "Rule.User." ++ name }
+
+-- | this determines all free variables of a definition taking rules into account
+bindingFreeVars t e = freeVars (tvrType t) `mappend` freeVars e `mappend` freeVars (Info.fetch (tvrInfo t) :: ARules)
 

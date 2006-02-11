@@ -192,7 +192,9 @@ processDecls stats ho ho' tiData = do
     let rules = rules' `mappend` nrules
     wdump FD.Rules $ printRules rules
     printRules rules
-    let allRules = hoRules ho `mappend` rules `mappend` hoRules ho'
+    let allRules = hoRules allHo `mappend` rules
+
+    let prog = program { progClassHierarchy = hoClassHierarchy allHo, progDataTable = fullDataTable }
 
     -- some more useful values.
     let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (_,n,_) <- ds ] ++ map tvrIdent (methodNames (hoClassHierarchy allHo))
@@ -210,6 +212,10 @@ processDecls stats ho ho' tiData = do
         --let (lc',used') = runRename usedIds lc
         return ((n, shouldBeExported exports v,lc):ds,usedIds `mappend` used')
     (ds,_allIds) <- foldM procE ([],hoUsedIds ho) ds
+
+    prog <- return $ programSetDs [ (t,e) | (_,t,e) <- ds] prog
+    let entries = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t) (tell [t])) prog
+    prog <- return $ prog { progEntryPoints = entries }
 
 
     -- This is the main function that optimizes the routines before writing them out
@@ -291,10 +297,15 @@ processDecls stats ho ho' tiData = do
     progress "!"
 
 
-    let ds' = reachable (newGraph ds (\ (_,b,_) -> tvrIdent b) (\ (_,b,c) -> bindingFreeVars b c)) [ tvrIdent b | (n,b,_) <- ds, getProperty prop_EXPORTED b]
+    prog <- return $ programSetDs [ (t,e) | (_,t,e) <- ds] prog
+    prog <- return $ programPruneUnreachable prog
+    printProgram prog
+
+
+    --let ds' = reachable (newGraph ds (\ (_,b,_) -> tvrIdent b) (\ (_,b,c) -> bindingFreeVars b c)) [ tvrIdent b | (n,b,_) <- ds, getProperty prop_EXPORTED b]
     --wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     Stats.print "Optimization" stats
-    return ho' { hoDataTable = dataTable, hoEs = Map.fromList [ (x,(y,z)) | (x,y,z) <- ds'], hoRules = hoRules ho' `mappend` rules, hoUsedIds = collectIds (ELetRec [ (b,c) | (_,b,c) <- ds'] Unknown) }
+    return ho' { hoDataTable = dataTable, hoEs = programEsMap prog , hoRules = hoRules ho' `mappend` rules, hoUsedIds = collectIds (ELetRec [ (b,c) | (_,b,c) <- ds'] Unknown) }
 
 programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = programSetDs ds' prog where
@@ -662,7 +673,11 @@ printCheckName' dataTable tvr e = do
 
 printProgram prog@Program {progCombinators = cs, progDataTable = dataTable } = do
     sequence_ $ intersperse (putErrLn "") [ printCheckName'' dataTable v (foldr ELam e as) | (v,as,e) <- cs]
-    putErrLn $ "Entry: " ++ pprint (progMainEntry prog)
+    when (progMainEntry prog /= tvr) $
+        putErrLn $ "MainEntry: " ++ pprint (progMainEntry prog)
+    when (progEntryPoints prog /= [progMainEntry prog]) $
+        putErrLn $ "EntryPoints: " ++ hsep (map pprint (progEntryPoints prog))
+
 
 printCheckName'' :: DataTable -> TVr -> E -> IO ()
 printCheckName'' dataTable tvr e = do

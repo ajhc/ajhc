@@ -1,30 +1,50 @@
-module E.Inline(inlineDecompose, basicDecompose, emapE, emapE',emapEG, app, emapE_, bindingFreeVars) where
+module E.Inline(
+    basicDecompose,
+    emapE,
+    emapE',
+    emapEG,
+    app,
+    emapE_,
+    programMapRecGroups,
+    forceInline,
+    forceSuperInline,
+    forceNoinline,
+    baseInlinability,
+    decomposeDs
+    ) where
 
 import Control.Monad.Writer
 import Data.FunctorM
 import Data.Monoid
+import qualified Data.Set as Set
 
 import Atom
 import E.E
+import E.Program
 import E.Rules
 import E.Subst
 import E.Values
-import Support.FreeVars
 import GenUtil
 import Info.Info as Info
+import Info.Types
+import Options
+import qualified Data.Graph as G
+import qualified FlagOpts as FO
 import Stats
+import Support.FreeVars
 import Util.Graph
 import Util.HasSize
 
 
 
--- To decide whether to inline, we take a few things into account
-
-bindingFreeVars t e = freeVars (tvrType t) `mappend` freeVars e `mappend` freeVars (Info.fetch (tvrInfo t) :: ARules)
 
 
-baseInlinability e
-    | isAtomic e = 5
+-- | higher numbers mean we want to inline it more
+baseInlinability t e
+    | forceNoinline t = -15
+    | forceSuperInline t = 10
+    | forceInline t = 7
+    | isAtomic e = 6
     | whnfOrBot e = 4
     | otherwise = 0
 
@@ -49,26 +69,21 @@ basicDecompose prune rules body ds = ans where
         g (Right xs) = Right (map f xs)
 
 
-inlineDecompose ::
-    Maybe [Int]  -- ^ Just a set of values not to prune or nothing to not prune at all.
-    -> E             -- ^ body for pruning info
-    -> [(TVr,E)]     -- ^ incoming bindings
-    -> [(TVr,E)]     -- ^ bindings pruned and ordered by inlinability value
-inlineDecompose prune body ds = ans where
-    zs = [ ((t,e), tvrNum t, freeVars e, inlinability e) |  (t,e) <- ds ]
-    cg zs =  newGraph zs (\ (_,x,_,_) -> x) ( \ (_,_,x,_) -> x)
-    tg = cg zs
-    scc' = scc tg
-    scc'' = case prune of
-        Nothing -> scc'
-        Just s -> scc $ cg $ reachable tg (freeVars body ++ s )
-    inlinability e = baseInlinability e - size (fst $ fromLam e)
-    ans = f scc'' []
-    f (Left (v,_,_,_):ds) xs = f ds (v:xs)
-    f (Right ms:ds) xs = f (scc' ++ ds) xs where
-        scc' = scc (cg [ (a,b,filter (/= i) c,d) | (a,b,c,d) <- ms])
-        (_,i,_,_) = minimumUnder (\ (_,_,_,x) -> x) ms
-    f [] xs = reverse xs
+
+-- NOINLINE must take precidence because it is sometimes needed for correctness, while INLINE is surely an optimization.
+forceInline x
+    | forceNoinline x = False
+    | not (fopts FO.InlinePragmas) = False
+    | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_INLINE p  || Set.member prop_WRAPPER p || Set.member prop_SUPERINLINE p
+
+forceSuperInline x
+    | forceNoinline x = False
+    | not (fopts FO.InlinePragmas) = False
+    | Properties p <- Info.fetch (tvrInfo x) =  Set.member prop_SUPERINLINE p
+
+forceNoinline x
+    | Just (_x :: ARules) <- Info.lookup (tvrInfo x) = True
+    | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_NOINLINE p || Set.member prop_PLACEHOLDER p
 
 app (e,[]) = return e
 app (e,xs) = app' e xs
@@ -97,76 +112,22 @@ app' (EError s t) xs = do
 app' e as = do
     return $ foldl EAp e as
 
+programMapRecGroups :: Monad m =>
+    ((Bool,[(TVr,E)]) -> m [(TVr,E)])  -- ^ bool is true if group is recursive.
+    -> Program
+    -> m Program
+programMapRecGroups f prog = do
+    let g (Left d) = f (False,[d])
+        g (Right ds) = f (True,ds)
+    nds <- mapM g $ decomposeDs (programDs prog)
+    return $ programSetDs (concat nds) prog
 
-{-
-inlineDecompose prune body ds = ans where
-    zs = [ ((t,e), tvrNum t, freeVars e, inlinability e) |  (t,e) <- ds ]
-    --tg = newGraph zs (\ (_,x,_,_) -> x) ( \ (_,_,x,_) -> x)
-    scc = stronglyConnComp [ (x,a,b) | x@(_,a,b,_) <- zs ]
-    inlinability e = baseInlinability e - size (fst $ fromLam e)
-    ans = f scc []
-    f (AcyclicSCC (v,_,_,_):ds) xs = f ds (v:xs)
-    f (CyclicSCC ms:ds) xs = f (scc' ++ ds) xs where
-        scc' = stronglyConnComp [ (x,a,filter (/= i) b) | x@(_,a,b,_) <- ms ]
-        (_,i,_,_) = minimumUnder (\ (_,_,_,x) -> x) ms
-    f [] xs = reverse xs
+decomposeDs :: [(TVr, E)] -> [Either (TVr, E) [(TVr,E)]]
+decomposeDs bs = map f mp where
+    mp = G.stronglyConnComp [ (v,i,bindingFreeVars t e) | v@(t@TVr { tvrIdent = i },e) <- bs]
+    f (G.AcyclicSCC v) = Left v
+    f (G.CyclicSCC vs) = Right vs
 
-emapE f (EAp aa ab) = do aa <- f aa;ab <- f ab; return $ EAp aa ab
-emapE f (ELam aa ab) = do aa <- mapmTvr f aa; ab <- f ab; return $ ELam aa ab
-emapE f (EPi aa ab) = do aa <- mapmTvr f aa; ab <- f ab; return $ EPi aa ab
---emapE f (EVar aa) = do aa <- mapmTvr f aa; return $ EVar aa
-emapE f (EVar aa) = do return $ EVar aa
-emapE f (Unknown) = do return $ Unknown
-emapE f (ESort aa) = do return $ ESort aa
-emapE f (ELit aa) = do aa <- litSMapM f aa; return $ ELit aa
-emapE f (ELetRec aa ab) = do aa <- mapM (\x -> do x <- (do (aa,ab) <- return x; aa <- mapmTvr f aa;ab <- f ab;return (aa,ab)); return x) aa;ab <- f ab; return $ ELetRec aa ab
-emapE f (ECase e b as d) = do
-    e' <- f e
-    b' <- fmapM f b
-    as' <- mapmAlt as
-    d' <- fmapM f d
-    return (ECase e' b' as' d')
---    aa ab) = do aa <- f aa;ab <- mapM (\(x,y) -> do x <- fmapM f x; y <- f y; return (x,y)) ab; return $ ECase aa ab
-emapE f (EPrim aa ab ac) = do ab <- mapM f ab;ac <- f ac; return $ EPrim aa ab ac
-emapE f (EError aa ab) = do ab <- f ab; return $ EError aa ab
-
-
--- do not traverse into types
-emapE' f (EAp aa ab) = do aa <- f aa;ab <- f ab; return $ EAp aa ab
-emapE' f (ELam aa ab) = do ab <- f ab; return $ ELam aa ab
-emapE' f (EPi aa ab) = do aa <- mapmTvr f aa; ab <- f ab; return $ EPi aa ab
---emapE' f (EPi aa ab) = do  ab <- f ab; return $ EPi aa ab
-emapE' f (EVar aa) = do return $ EVar aa
-emapE' f (Unknown) = do return $ Unknown
-emapE' f (ESort aa) = do return $ ESort aa
-emapE' f (ELit (LitCons a es e)) = do es <- mapM f es;  return $ ELit (LitCons a es e)
-emapE' f (ELit aa) = do aa <- fmapM f aa; return $ ELit aa
-emapE' f (ELetRec aa ab) = do aa <- mapM (\x -> do x <- (do (aa,ab) <- return x; ab <- f ab;return (aa,ab)); return x) aa;ab <- f ab; return $ ELetRec aa ab
-emapE' f (ECase e b as d) = do
-    e' <- f e
-    as' <- mapmAlt' as
-    d' <- fmapM f d
-    return (ECase e' b as' d')
---emapE' f (ECase aa ab) = do aa <- f aa;ab <- mapM (\(x,y) -> do x <- patFmap' f x; y <- f y; return (x,y)) ab; return $ ECase aa ab
-emapE' f (EPrim aa ab ac) = do ab <- mapM f ab; return $ EPrim aa ab ac
-emapE' f (EError aa ab) =  return $ EError aa ab
-
-mapmTvr f (TVr x e) = f e >>= return . TVr x
-mapmAlt f (Alt l e) = do
-    e' <- f e
-    l' <- litSMapM f l
-    return (Alt l' e')
-mapmAlt' f (Alt l e) = do
-    e' <- f e
-    return (Alt l e')
-
-
---patFmap' f PatWildCard = return PatWildCard
---patFmap' f (PatLit l) = litFmap' f l >>= return . PatLit
-litFmap' f (LitCons a es e) = do es <- mapM f es; return $ (LitCons a es e)
-litFmap' _ l = return l
-
--}
 
 emapE_ :: Monad m => (E -> m a) -> E -> m ()
 emapE_ f e = emapEG f' f' e >> return () where

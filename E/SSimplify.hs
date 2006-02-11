@@ -93,7 +93,7 @@ collectOcc sopts  e = (e',fvs,occ) where
             nn' = reachable gr (Set.toList fve ++ Map.keys se ++  topLevels)
         nn <- sequence [ tell t >> return (x,y) |  (x,(y,t)) <- nn' ]
         let gr' = newGraph nn (tvrNum . fst) (gfv . snd )
-            (lb,ds'') = findLoopBreakers (\ (_,(e,_,_)) -> loopFunc e) (const True) gr'
+            (lb,ds'') = findLoopBreakers (\ (t,(e,_,_)) -> loopFunc e) (const True) gr'
             cycNodes = Set.fromList $ [ v | (v,_) <- cyclicNodes gr']
             calcStrictInfo t _
                 | t `Set.member` cycNodes = setProperty prop_CYCLIC
@@ -447,20 +447,6 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         return Nothing
     match m as d = error $ "Odd Match: " ++ show ((m,getType m),as,d)
 
-    -- NOINLINE must take precidence because it is sometimes needed for correctness, while INLINE is surely an optimization.
-    forceInline x
-        | forceNoinline x = False
-        | not (fopts FO.InlinePragmas) = False
-        | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_INLINE p  || Set.member prop_WRAPPER p || Set.member prop_SUPERINLINE p
-
-    forceSuperInline x
-        | forceNoinline x = False
-        | not (fopts FO.InlinePragmas) = False
-        | Properties p <- Info.fetch (tvrInfo x) =  Set.member prop_SUPERINLINE p
-
-    forceNoinline x
-        | Just (_x :: ARules) <- Info.lookup (tvrInfo x) = True
-        | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_NOINLINE p || Set.member prop_PLACEHOLDER p
 
     applyRule v xs inb  = do
         z <- builtinRule v xs
