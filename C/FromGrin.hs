@@ -76,6 +76,7 @@ convertExp (Error s t) = do
         f (TyTup []) = return emptyExpression
         f (TyTup xs) = do ts <- mapM convertType xs; xs <- mapM f xs ; return $ structAnon (zip xs ts)
         f (Ty x) = return $ cast (basicType (show x)) (constant $ number 0)
+        f TyTag  = return $ constant (enum $ nodeTagName tagHole)
         f x = return $ err $ "error-type " ++ show x
     ev <- f t
     return (expr $ functionCall (name "jhc_error") [string s],ev)
