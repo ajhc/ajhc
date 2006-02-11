@@ -56,6 +56,7 @@ Conflicts: 10 shift/reduce
 >       PRAGMAOPTIONS { PragmaOptions $$ }
 >       PRAGMASTART { PragmaStart $$ }
 >       PRAGMARULES { PragmaRules }
+>       PRAGMASPECIALIZE { PragmaSpecialize $$ }
 >       PRAGMAEND { PragmaEnd }
 
 Symbols
@@ -285,6 +286,8 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >			{ HsForeignDecl $1 $4 (show $5) $5 $7}
 >       | srcloc PRAGMARULES STRING mfreevars exp '=' exp PRAGMAEND
 >                       { HsPragmaRules { hsDeclSrcLoc = $1, hsDeclString = $3, hsDeclFreeVars = $4, hsDeclLeftExpr = $5, hsDeclRightExpr = $7 } }
+>       | srcloc PRAGMASPECIALIZE var '::' type PRAGMAEND
+>                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $3, hsDeclType = $5 } }
 >       | decl		{ $1 }
 
 > mfreevars :: { [HsName] }

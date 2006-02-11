@@ -127,6 +127,8 @@ instance HasLocation HsDecl where
     srcLoc HsDataDecl	 { hsDeclSrcLoc  = sl } = sl
     srcLoc HsInfixDecl   { hsDeclSrcLoc = sl } = sl
     srcLoc HsNewTypeDecl { hsDeclSrcLoc = sl } = sl
+    srcLoc HsPragmaSpecialize { hsDeclSrcLoc = sl } = sl
+    srcLoc HsPragmaRules { hsDeclSrcLoc = sl } = sl
     srcLoc (HsClassDecl	 sl _ _) = sl
     srcLoc (HsInstDecl	 sl _ _) = sl
     srcLoc (HsDefaultDecl sl _) = sl
@@ -151,6 +153,7 @@ data HsDecl
 	 | HsForeignDecl SrcLoc ForeignType String HsName HsQualType
          | HsPragmaProps SrcLoc String [HsName]
 	 | HsPragmaRules { hsDeclSrcLoc :: SrcLoc, hsDeclString :: String, hsDeclFreeVars :: [HsName], hsDeclLeftExpr :: HsExp, hsDeclRightExpr :: HsExp }
+         | HsPragmaSpecialize { hsDeclSrcLoc :: SrcLoc, hsDeclBool :: Bool, hsDeclName :: HsName, hsDeclType :: HsType }
   deriving(Data,Typeable,Eq,Show)
   {-! derive: is !-}
 

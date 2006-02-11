@@ -183,11 +183,11 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
         methodName =  n
         Identity (deftvr@(TVr { tvrType = ty}),_) = findName defaultName
         defaultName =  (defaultInstanceName n)
-        valToPat' (ELit (LitCons x ts t)) = ELit $ LitCons x [ EVar (tVr ( j) (getType z)) | z <- ts | j <- [2,4 ..]]  t
-        valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ LitCons tc_Arrow [ EVar (tVr ( j) (getType z)) | z <- [a,b] | j <- [2,4 ..]]  eStar
+        valToPat' (ELit (LitCons x ts t)) = ELit $ LitCons x [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..]]  t
+        valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ LitCons tc_Arrow [ EVar (tVr j (getType z)) | z <- [a,b] | j <- [2,4 ..]]  eStar
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
         as = [ rule  t | (_ :=> IsIn _ t ) <- snub (classInsts classRecord) ]
-        rule t = emptyRule { ruleHead = methodVar, ruleArgs = [valToPat' (tipe t)], ruleBody = body, ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
+        rule t = emptyRule { ruleHead = methodVar, ruleArgs = [valToPat' (tipe t)], ruleBinds = [ t | ~(EVar t) <- vs], ruleBody = body, ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
             name = ((instanceName n (getTypeCons t)))
             ELit (LitCons _ vs _) = valToPat' (tipe t)
             body = case findName name of Just (n,_) -> foldl EAp (EVar n) vs  ; Nothing -> EAp (EVar deftvr) (valToPat' (tipe t))

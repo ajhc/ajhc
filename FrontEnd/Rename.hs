@@ -416,6 +416,11 @@ renameHsDecl prules@HsPragmaRules { hsDeclSrcLoc = srcLoc, hsDeclFreeVars = fvs,
     e1' <- renameHsExp e1 subTable'
     e2' <- renameHsExp e2 subTable'
     return prules {  hsDeclFreeVars = fvs', hsDeclLeftExpr = e1', hsDeclRightExpr = e2' }
+renameHsDecl prules@HsPragmaSpecialize { hsDeclSrcLoc = srcLoc, hsDeclName = n, hsDeclType = t } subTable = do
+    setSrcLoc srcLoc
+    n <- renameAny n subTable
+    t <- renameAny t subTable
+    return prules {  hsDeclName = n, hsDeclType = t }
 
 renameHsDecl otherHsDecl _ = return otherHsDecl
 
@@ -524,6 +529,11 @@ instance RenameAny HsTyVarBind where
 
 instance RenameAny HsMatch where
     renameAny = renameHsMatch
+
+instance RenameAny HsName where
+    renameAny = renameHsName
+instance RenameAny HsType where
+    renameAny = renameHsType
 
 
 -- note that for renameHsMatch, the 'wheres' dominate the 'pats'

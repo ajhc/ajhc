@@ -144,18 +144,10 @@ idann rs ps i nfo = return (props ps i nfo `mappend` rules rs i) where
         Nothing -> id
     rules rs i = Info.maybeInsert (getARules rs i) Info.empty
 
---annotateMethods ch rs ps = (Map.fromList [ (tvrIdent t, Just (EVar t)) | t <- ts ]) where
---    ts = [ let Identity x = idann rs ps (tvrIdent t) (tvrInfo t) in t { tvrInfo = x  } | t <-methodNames ch ]
 
 processInitialHo :: Ho -> IO Ho
 processInitialHo ho = do
-    --putStrLn $ "Initial annotate: " ++ show (Map.keys $ hoModules ho)
-    --let imap = annotateMethods (hoClassHierarchy ho) (hoRules ho) (hoProps ho)
-    --let f (ds,used) (v,lc) = ((v,lc'):ds,used `mappend` used') where
-    --        (lc',used') = runRename used lc
-    --    (nds,allUsed) = foldl f ([],Set.empty) (Map.elems $ hoEs ho)
     let Identity ds = annotateDs mempty (idann (hoRules ho) (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
-    --wdump FD.Rules $ printRules (hoRules ho)
     return ho { hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds ] }
 
 
@@ -177,6 +169,13 @@ processDecls stats ho ho' tiData = do
     let fullDataTable = (dataTable `mappend` hoDataTable ho)
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
 
+    -- initial program
+    let prog = program {
+            progClassHierarchy = hoClassHierarchy allHo,
+            progDataTable = fullDataTable,
+            progModule = head (fsts $ tiDataModules tiData)
+            }
+
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
     ds' <- convertDecls (hoClassHierarchy ho') allAssumps  fullDataTable decls
@@ -187,12 +186,10 @@ processDecls stats ho ho' tiData = do
     -- Build rules
     rules' <- createInstanceRules (hoClassHierarchy ho' `mappend` hoClassHierarchy initialHo)   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
     rawRules <- convertRules (hoClassHierarchy ho') allAssumps fullDataTable decls
-    let nrules = mconcat [ makeRule n vs head args e2 | (n,vs,e1,e2) <- rawRules, let (EVar head,args) = fromAp e1 ]
+    let nrules = mconcat [ makeRule n (progModule prog,i) vs head args e2 | (n,vs,e1,e2) <- rawRules, let (EVar head,args) = fromAp e1 | i <- [1..] ]
     let rules = rules' `mappend` nrules
     wdump FD.Rules $ printRules rules
     let allRules = hoRules allHo `mappend` rules
-
-    let prog = program { progClassHierarchy = hoClassHierarchy allHo, progDataTable = fullDataTable }
 
     -- some more useful values.
     let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (_,n,_) <- ds ] ++ map tvrIdent (methodNames (hoClassHierarchy allHo))

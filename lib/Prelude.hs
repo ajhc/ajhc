@@ -933,15 +933,27 @@ instance Real Int where
 
 
 
-{-# RULES "concat/Map" forall f xs . concat (map f xs) = concatMap f xs #-}
-{-# RULES "sequence/map" forall f xs . sequence (map f xs) = mapM f xs #-}
+{-# RULES "concat/Map"    forall f xs . concat (map f xs) = concatMap f xs #-}
+{-# RULES "sequence/map"  forall f xs . sequence (map f xs) = mapM f xs #-}
 {-# RULES "sequence_/map" forall f xs . sequence_ (map f xs) = mapM_ f xs #-}
-{-# RULES "++/emptyl"  forall xs . [] ++ xs = xs #-}
-{-# RULES "++/emptyr"  forall xs . xs ++ [] = xs #-}
-{-# RULES "++/tick"  forall  x xs ys . (x:xs) ++ ys = x:(xs ++ ys) #-}
-{-# RULES "++/refix"  forall  xs ys zs . (xs ++ ys) ++ zs = xs ++ (ys ++ zs) #-}
-{-# RULES "map/map"  forall f g xs . map f (map g xs) = map (\x -> f (g x)) xs #-}
-{-# RULES "concatMap/map"  forall f g xs . concatMap f (map g xs) = concatMap (\x -> f (g x)) xs #-}
-{-# RULES "concat/tick"  forall x xs . concat (x:xs) = x ++ concat xs #-}
+{-# RULES "++/emptyr"     forall xs . xs ++ [] = xs #-}
+{-# RULES "++/refix"      forall xs ys zs . (xs ++ ys) ++ zs = xs ++ (ys ++ zs) #-}
+{-# RULES "++/tick4"      forall x y z x' xs ys . (x:y:z:x':xs) ++ ys = x:y:z:x':(xs ++ ys) #-}
+{-# RULES "++/tick2"      forall x y xs ys . (x:y:xs) ++ ys = x:y:(xs ++ ys) #-}
+{-# RULES "++/tick1"      forall x xs ys . (x:xs) ++ ys = x:(xs ++ ys) #-}
+{-# RULES "++/tick0"      forall xs . [] ++ xs = xs #-}
+{-# RULES "map/map"       forall f g xs . map f (map g xs) = map (\x -> f (g x)) xs #-}
+{-# RULES "concatMap/map" forall f g xs . concatMap f (map g xs) = concatMap (\x -> f (g x)) xs #-}
+{-# RULES "concat/tick"   forall x xs . concat (x:xs) = x ++ concat xs #-}
+{-# RULES "concat/[]"     concat [] = [] #-}
+{-# RULES "map/[]"        forall f . map f [] = [] #-}
+{-# RULES "concatMap/[]"  forall f . concatMap f [] = [] #-}
+{-# RULES "sequence/[]"   sequence [] = return [] #-}
+{-# RULES "sequence_/[]"  sequence_ [] = return () #-}
+{-# RULES "mapM/[]"       forall f . mapM f [] = return [] #-}
+{-# RULES "mapM_/[]"      forall f . mapM_ f [] = return () #-}
+{-# RULES "foldr/single"  forall k z x . foldr k z [x] = k x z #-}
+{-# RULES "foldr/nil"     forall k z . foldr k z [] = z #-}
+{-# RULES "foldr/id"      foldr (:) [] = \x -> x  #-}
 
 default(Int,Double)

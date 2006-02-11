@@ -1,6 +1,6 @@
 module E.Rules(
     ARules,
-    Rule(ruleHead,ruleBinds,ruleArgs,ruleBody,ruleName),
+    Rule(ruleHead,ruleBinds,ruleArgs,ruleBody,ruleUniq,ruleName),
     Rules,
     applyRules,
     arules,
@@ -58,6 +58,7 @@ data Rule = Rule {
     ruleArgs :: [E],
     ruleNArgs :: {-# UNPACK #-} !Int,
     ruleBody :: E,
+    ruleUniq :: (Module,Int),
     ruleName :: Atom
     }
  {-! derive: GhcBinary !-}
@@ -73,7 +74,8 @@ emptyRule = Rule {
     ruleNArgs = 0,
     ruleBinds = [],
     ruleBody = error "ruleBody undefined",
-    ruleName = error "ruleName undefined"
+    ruleName = error "ruleName undefined",
+    ruleUniq = error "ruleUniq undefined"
     }
 
 newtype Rules = Rules (Map.Map Id [Rule])
@@ -136,7 +138,7 @@ printRule Rule {ruleName = n, ruleBinds = vs, ruleBody = e2, ruleHead = head, ru
     putDocMLn CharIO.putStr (indent 2 (text "::" <+> ty))
     --putDocMLn CharIO.putStr (indent 2 (text "::" <+> ty2))
 
-combineRules as bs = map head $ sortGroupUnder ruleName (as ++ bs)
+combineRules as bs = map head $ sortGroupUnder ruleUniq (as ++ bs)
 
 instance Monoid Rules where
     mempty = Rules mempty
@@ -174,11 +176,9 @@ instance Monoid ARules where
 
 joinARules ar@(ARules a) br@(ARules b)
     | [] <- rs = ARules []
-    | all (== r) rs = ARules (sortUnder ruleNArgs (snubUnder ruleName $ a ++ b))
+    | all (== r) rs = ARules (sortUnder (\r -> (ruleNArgs r,ruleUniq r)) (snubUnder ruleUniq $ a ++ b))
     | otherwise = error $ "mixing rules!" ++ show (ar,br) where
    rs@(r:_) = map ruleHead a ++ map ruleHead b
-
-
 
 
 applyRules lup (ARules rs) xs = f rs where
@@ -205,13 +205,22 @@ builtinRule _ _ = return Nothing
 
 makeRule ::
     String      -- ^ the rule name
+    -> (Module,Int)  -- ^ a unique name for this rule
     -> [TVr]    -- ^ the free variables
     -> TVr      -- ^ the head
     -> [E]      -- ^ the args
     -> E        -- ^ the body
     -> Rules
-makeRule name fvs head args body = fromRules [rule] where
-    rule = emptyRule {  ruleHead = head, ruleBinds = fvs, ruleArgs = args, ruleNArgs = length args, ruleBody = body, ruleName = toAtom $ "Rule.User." ++ name }
+makeRule name uniq fvs head args body = fromRules [rule] where
+    rule = emptyRule {
+        ruleHead = head,
+        ruleBinds = fvs,
+        ruleArgs = args,
+        ruleNArgs = length args,
+        ruleBody = body,
+        ruleUniq = uniq,
+        ruleName = toAtom $ "Rule.User." ++ name
+        }
 
 -- | this determines all free variables of a definition taking rules into account
 bindingFreeVars t e = freeVars (tvrType t) `mappend` freeVars e `mappend` freeVars (Info.fetch (tvrInfo t) :: ARules)

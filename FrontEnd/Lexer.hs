@@ -41,6 +41,7 @@ data Token
         | StringTok String
         | PragmaOptions [String]
         | PragmaRules
+        | PragmaSpecialize Bool
         | PragmaStart String
         | PragmaEnd
 
@@ -582,14 +583,15 @@ pragmas_std = [
     ["INLINE"],
     ["SUPERINLINE"],
     ["NOINLINE","NOTINLINE"],
-    ["SPECIALIZE", "SPECIALISE"],
     ["MULTISPECIALIZE", "MULTISPECIALISE"],
     ["SRCLOC_ANNOTATE"]
     ]
 
 -- pragmas with a special starting token
 pragmas_parsed = [
-    (["RULES"],PragmaRules)
+    (["RULES"],PragmaRules),
+    (["SPECIALIZE", "SPECIALISE"],PragmaSpecialize False),
+    (["SUPERSPECIALIZE", "SUPERSPECIALISE"],PragmaSpecialize True)
     ]
 
 pragmas_all = pragmas_parsed ++ [ (xs,PragmaStart x) | xs@(~(x:_)) <- pragmas_std ]
