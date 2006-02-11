@@ -363,7 +363,10 @@ constructionExpression ::
     -> Name   -- ^ name of said constructor
     -> E      -- ^ type of eventual constructor
     -> E      -- ^ saturated lambda calculus term
-constructionExpression dataTable n (ELit (LitCons pn xs _)) | pn == conName pc = sub (conExpr mc) where
+constructionExpression dataTable n typ@(ELit (LitCons pn xs _))
+    | conAlias mc = ELam var (EVar var)
+    | pn == conName pc = sub (conExpr mc) where
+    var = tvr { tvrIdent = 2, tvrType = typ }
     Just mc = getConstructor n dataTable
     Just pc = getConstructor (conInhabits mc) dataTable
     sub = substMap $ Map.fromDistinctAscList [ (i,sl) | sl <- xs | i <- [2,4..] ]

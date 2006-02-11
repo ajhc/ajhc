@@ -178,7 +178,7 @@ processDecls stats ho ho' tiData = do
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
     ds' <- convertDecls (hoClassHierarchy ho') allAssumps  fullDataTable decls
     let mnames = methodNames (hoClassHierarchy ho')
-        ds = ds' ++ [ (runIdentity $ fromId (tvrIdent t),setProperties [prop_PLACEHOLDER,prop_EXPORTED] t, EPrim (primPrim ("Placeholder: " ++ tvrShowName t)) [] (getType t)) | t <- mnames, not $ t `Set.member` cnames]
+        ds = ds' ++ [ (runIdentity $ fromId (tvrIdent t),setProperties [prop_PLACEHOLDER] t, EPrim (primPrim ("Placeholder: " ++ tvrShowName t)) [] (getType t)) | t <- mnames, not $ t `Set.member` cnames]
         cnames = Set.fromList $ fsts $ Map.elems $ hoEs ho
 
     -- Build rules
@@ -192,7 +192,6 @@ processDecls stats ho ho' tiData = do
     -- some more useful values.
     let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (_,n,_) <- ds ] ++ map tvrIdent (methodNames (hoClassHierarchy allHo))
         mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
-        exports = getExports ho'
         classNames = Set.fromList $ map tvrIdent (methodNames (hoClassHierarchy allHo))
         namesInscope = Set.fromList inscope -- classNames `Set.union` (Set.fromAscList $ Map.keys smap)
 
@@ -202,8 +201,7 @@ processDecls stats ho ho' tiData = do
         nfo <- idann  allRules (hoProps ho') (tvrIdent v) (tvrInfo v)
         v <- return $ v { tvrInfo = Info.insert LetBound nfo }
         let used' = collectIds lc
-        --let (lc',used') = runRename usedIds lc
-        return ((n, shouldBeExported exports v,lc):ds,usedIds `mappend` used')
+        return ((n, shouldBeExported (getExports ho') v,lc):ds,usedIds `mappend` used')
     (ds,_allIds) <- foldM procE ([],hoUsedIds ho) ds
 
     prog <- return $ programSetDs [ (t,e) | (_,t,e) <- ds] prog
@@ -325,7 +323,7 @@ postProcessE stats n inscope usedIds dataTable lc = do
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
 shouldBeExported exports tvr
-    | tvrIdent tvr `Set.member` exports || getProperty prop_INSTANCE tvr || getProperty prop_SRCLOC_ANNOTATE_FUN tvr  = setProperty prop_EXPORTED tvr
+    | tvrIdent tvr `Set.member` exports || getProperty prop_SRCLOC_ANNOTATE_FUN tvr  = setProperty prop_EXPORTED tvr
     | otherwise = tvr
 
 
@@ -391,7 +389,8 @@ compileModEnv' stats ho = do
             putStrLn "Type analyzed methods"
             mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) (filter (getProperty prop_METHOD . fst) (programDs prog))
             --mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ds'
-            programMapBodies pruneE prog
+            prog <- programMapBodies pruneE prog
+            return $ programPruneUnreachable prog
         else return prog
 
     -- make sure properties and rules are attached everywhere

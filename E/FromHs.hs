@@ -1,6 +1,7 @@
 module E.FromHs(
     altConv,
     convertDecls,
+    convertRules,
     createInstanceRules,
     createMethods,
     deNewtype,
@@ -8,16 +9,16 @@ module E.FromHs(
     guardConv,
     matchesConv,
     methodNames,
-    convertRules,
     theMainName
     ) where
 
 import Control.Monad.Identity
 import Control.Monad.State
 import Data.FunctorM
-import Data.Monoid
 import Data.Generics
+import Data.Monoid
 import List(isPrefixOf)
+import Maybe
 import Prelude hiding((&&),(||),not,and,or,any,all,head)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -199,24 +200,19 @@ createMethods :: Monad m => DataTable -> ClassHierarchy -> (Map.Map Name (TVr,E)
 createMethods dataTable classHierarchy funcs = return ans where
     ans = concatMap cClass (classRecords classHierarchy)
     cClass classRecord =  [ method classRecord n | n :>: _ <- classAssumps classRecord ]
-    method classRecord n = (methodName ,setProperty prop_METHOD (tVr ( nameToInt methodName) ty),v) where
-        methodName =  n
-        Just (deftvr@(TVr { tvrType = ty}),defe) = findName ((defaultInstanceName n))
+    method classRecord methodName = (methodName ,setProperty prop_METHOD (tVr ( nameToInt methodName) ty),v) where
+        theDefault = findName (defaultInstanceName methodName)
+        Identity (TVr {tvrType = ty},_) = findName methodName
         (EPi tvr t) = ty
-        --els = eAp (EVar deftvr) (EVar tvr)
-        els = EError ("Bad: " ++ show methodName) t -- eAp (EVar deftvr) (EVar tvr)
+        els = EError ("Bad: " ++ show methodName) t
         v = eLam tvr (eCase (EVar tvr) as els)
         as = concatMap cinst [ t | (_ :=> IsIn _ t ) <- classInsts classRecord]
         cinst t | Nothing <- getConstructor x dataTable = fail "skip un-imported primitives"
                 | Just (tvr,_) <- findName name = return $ calt (foldl EAp (EVar tvr) vs)
-                | EError "Bad" _ <- defe = return $ calt $  EError ( show n ++ ": undefined at type " ++  PPrint.render (pprint  t) ) (getType els)
-                | otherwise = return $ calt $ ELetRec [(tvr,tipe t)] (EAp (EVar deftvr) (EVar tvr))
-                | ELam x e <- defe, not (isAtomic (tipe t)) = return $ calt $ substLet [(x,tipe t)] e
-                | ELam x e <- defe, isAtomic (tipe t) = return $ calt $ subst x (tipe t) e -- [(x,tipe t)] e
-                | not (isAtomic (tipe t)) = return $ calt $  (EAp (EVar deftvr) (EVar tvr))
-                | otherwise = return $ calt $ EAp (EVar deftvr) (tipe t) where -- fail "Instance does not exist" where
-            name = (instanceName n (getTypeCons t))
-            -- calt  tvr =  Alt (LitCons x [ tvr | ~(EVar tvr) <- vs ]  ct) (foldl EAp (EVar tvr) vs)
+                | Just (deftvr,defe) <- theDefault = return $ calt $ ELetRec [(tvr,tipe t)] (EAp (EVar deftvr) (EVar tvr))
+                | otherwise  = return $ calt $  EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) (getType els)
+            where
+            name = (instanceName methodName (getTypeCons t))
             calt e =  Alt (LitCons x [ tvr | ~(EVar tvr) <- vs ]  ct)  e
             (x,vs,ct) = case tipe t of
                 (ELit (LitCons x' vs' ct')) -> (x',vs',ct')
@@ -446,14 +442,12 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         ds = map simplifyDecl decls
         cr = findClassRecord classHierarchy (toName ClassName name)
         ans = concatMap method [  n | n :>: _ <- classAssumps cr]
-        method n = return (defaultName,tVr ( nameToInt defaultName) ty,els) where
+        method n = [(defaultName,tVr (nameToInt defaultName) ty,els) | els <- mels] where
             defaultName = defaultInstanceName n
             (TVr { tvrType = ty}) = tv (nameName n)
-            els = case [ d | d <- ds, maybeGetDeclName d == Just n] of
-                [d] | [(_,_,v)] <- cDecl d -> v
-                -- []  -> EError ((show n) ++ ": no instance or default.") ty
-                []  -> EError "Bad" ty
-                _ -> error "This shouldn't happen"
+            mels = case [ d | d <- ds, maybeGetDeclName d == Just n] of
+                [] -> []
+                (d:_) | ~[(_,_,v)] <- cDecl d -> [v]
     cClassDecl _ = error "cClassDecl"
 
 
@@ -569,10 +563,10 @@ isStrictPat _ = True
 
 deNewtype :: DataTable -> E -> E
 deNewtype dataTable e = f e where
-    f (ELit (LitCons n [x] t)) | alias =  (f x)  where
-        alias = case getConstructor n dataTable of
-                 Just v -> conAlias v
-                 x      -> error ("deNewtype for "++show n++": "++show x)
+--    f (ELit (LitCons n [x] t)) | alias =  (f x)  where
+--        alias = case getConstructor n dataTable of
+--                 Just v -> conAlias v
+--                 x      -> error ("deNewtype for "++show n++": "++show x)
     f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons n [v] t) z):_) } | alias = eLet v (f e)  (f z) where
         Just Constructor { conAlias = alias } = getConstructor n dataTable
     f e = runIdentity $ emapE (return . f) e
