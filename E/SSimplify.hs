@@ -93,7 +93,7 @@ collectOcc sopts  e = (e',fvs,occ) where
             nn' = reachable gr (Set.toList fve ++ Map.keys se ++  topLevels)
         nn <- sequence [ tell t >> return (x,y) |  (x,(y,t)) <- nn' ]
         let gr' = newGraph nn (tvrNum . fst) (gfv . snd )
-            (lb,ds'') = findLoopBreakers (\ (t,(e,_,_)) -> loopFunc e) (const True) gr'
+            (lb,ds'') = findLoopBreakers (\ (t,(e,_,_)) -> loopFunc t e) (const True) gr'
             cycNodes = Set.fromList $ [ v | (v,_) <- cyclicNodes gr']
             calcStrictInfo t _
                 | t `Set.member` cycNodes = setProperty prop_CYCLIC
@@ -117,7 +117,10 @@ collectOcc sopts  e = (e',fvs,occ) where
         ans = Map.fromList [ (i,Many) | Just (EVar (TVr { tvrIdent = i }),_) <- map (\e -> from_unsafeCoerce e `mplus` Just (e,Unknown)) as]
 
 -- this should use the occurance info
-loopFunc (EPrim (APrim (PrimPrim s) _) _ _) | "Place" `isPrefixOf` s = -100
+--loopFunc t (EPrim (APrim (PrimPrim s) _) _ _) | "Place" `isPrefixOf` s = -100
+loopFunc t _ | getProperty prop_PLACEHOLDER t = -100  -- we must not choose the placeholder as the loopbreaker
+loopFunc t e = negate (baseInlinability t e)
+{-
 loopFunc EVar {} = 0
 loopFunc ELit {} = 1
 loopFunc EPi {} = 1
@@ -125,7 +128,7 @@ loopFunc EPrim {} = 2
 loopFunc EError {} = 2
 loopFunc ELam {} = 3
 loopFunc _ = 4
-
+-}
 mapAndUnzip3M     :: (Monad m) => (a -> m (b,c,d)) -> [a] -> m ([b], [c], [d])
 mapAndUnzip3M f xs = sequence (map f xs) >>= return . unzip3
 
