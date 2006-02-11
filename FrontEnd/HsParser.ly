@@ -133,7 +133,7 @@ Module Header
 
 > modulep  :: { HsModule }
 > 	: 'module' modid maybeexports 'where' body	{ HsModule { hsModuleName = $2, hsModuleExports = $3, hsModuleImports = (fst $5), hsModuleDecls = (snd $5) } }
->	| body						{ HsModule { hsModuleName = main_mod, hsModuleExports = Nothing, hsModuleImports = (fst $1), hsModuleDecls = (snd $1) } }
+>	| body						{ HsModule { hsModuleName = main_mod, hsModuleExports = Just [HsEVar (UnQual (HsIdent "main"))], hsModuleImports = (fst $1), hsModuleDecls = (snd $1) } }
 
 > body :: { ([HsImportDecl],[HsDecl]) }
 >	:  '{' bodyaux '}'				{ $2 }
