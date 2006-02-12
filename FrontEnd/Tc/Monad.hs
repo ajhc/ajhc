@@ -13,11 +13,12 @@ module FrontEnd.Tc.Monad(
     getSigEnv,
     getModName,
     localEnv,
+    withMetaVars,
     quantify,
     lookupName,
     newBox,
+    unBox,
     newMetaVar,
-    newTVar,
     newVar,
     runTc,
     skolomize,
@@ -187,9 +188,6 @@ lookupName n = do
         Just x -> freshSigma x
         Nothing -> fail $ "Could not find var in tcEnv:" ++ show (nameType n,n)
 
-newTVar :: Kind -> Tc Type
-newTVar k = newMetaVar Sigma k
-
 
 newMetaVar :: MetaVarType -> Kind -> Tc Type
 newMetaVar t k = do
@@ -261,9 +259,10 @@ toSigma t = TForAll [] ([] :=> t)
 -- TODO predicates?
 
 skolomize :: Sigma' -> Tc ([SkolemTV],Rho')
-skolomize s@TForAll {} = freshSigma s >>= \x -> case x of
-    TForAll as (_ :=> r) -> return (as,r)
-    r -> return ([],r)
+skolomize (TForAll vs (_ :=> rho)) = return (vs,rho) 
+--freshSigma s >>= \x -> case x of
+--    TForAll as (_ :=> r) -> return (as,r)
+--    r -> return ([],r)
 skolomize s = return ([],s)
 
 boxyInstantiate :: Sigma -> Tc Rho'
@@ -416,3 +415,15 @@ tcInfoEmpty = TcInfo {
 }
 
 
+withMetaVars :: MetaVar -> [Kind] -> ([Sigma] -> Sigma) -> ([Sigma'] -> Tc a) -> Tc a
+withMetaVars mv ks sfunc bsfunc | isBoxyMetaVar mv = do
+    boxes <- mapM newBox ks
+    res <- bsfunc boxes
+    tys <- mapM readFilledBox [ mv | ~(TMetaVar mv) <- boxes]
+    varBind mv (sfunc tys)
+    return res
+withMetaVars mv ks sfunc bsfunc  = do
+    taus <- mapM (newMetaVar Tau) ks
+    varBind mv (sfunc taus)
+    bsfunc taus
+    

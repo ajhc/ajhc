@@ -60,7 +60,7 @@ tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp
 tcExpr e t = do
     t <- findType t
     e <- tiExpr e t
-    (_,False,_) <- unbox t
+    --(_,False,_) <- unbox t
     return e
 
 -- TODO should subsume for rank-n
@@ -148,12 +148,13 @@ tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression"
 -- ABS1
 tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show ps ++ " -> ...") $ do
     let lam (p:ps) e (TMetaVar mv) rs = do -- ABS2
-            b1 <- newBox Star
-            b2 <- newBox Star
-            varBind mv (b1 `fn` b2)
-            l' <- lam (p:ps) e (b1 `fn` b2) rs
+            withMetaVars mv [Star,Star] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) e (a `fn` b) rs
+            --b1 <- newBox Star
+            --b2 <- newBox Star
+            --varBind mv (b1 `fn` b2)
+            --l' <- lam (p:ps) e (b1 `fn` b2) rs
             --boxyMatch (TMetaVar mv) (b1 `fn` b2)
-            return l'
+            --return l'
         lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
             --box <- newBox Star
             --s1' `boxyMatch` box
@@ -185,14 +186,24 @@ tiExpr tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ re
 
 
 -- special case for the empty list
+tiExpr (HsList []) (TAp c v) | c == tList = do
+    unBox v
+    return (HsList [])
+
+-- special case for the empty list
 tiExpr (HsList []) typ = do
-        v <- newBox Star
-        (TAp tList v) `subsumes` typ
-        return (HsList [])
+    v <- newVar Star
+    let lt = TForAll [v] ([] :=> TAp tList (TVar v))
+    lt `subsumes` typ
+    return (HsList [])
+
+-- non empty list
+tiExpr expr@(HsList exps@(_:_)) (TAp tList' v) | tList == tList' = withContext (makeMsg "in the list " $ render $ ppHsExp expr) $ do
+        exps' <- mapM (`tcExpr` v) exps
+        return (HsList exps')
 
 -- non empty list
 tiExpr expr@(HsList exps@(_:_)) typ = withContext (makeMsg "in the list " $ render $ ppHsExp expr) $ do
-        --v <- newTVar Star
         v <- newBox Star
         exps' <- mapM (`tcExpr` v) exps
         (TAp tList v) `subsumes` typ
@@ -277,11 +288,12 @@ tcPat p typ = do
     tiPat p typ
 
 tiPat (HsPVar i) typ = do
-        v <- newBox Star
+        --v <- newMetaVar Tau Star
         --v `boxyMatch` typ
-        typ `subsumes` v
-        addToCollectedEnv (Map.singleton (toName Val i) v)
-        return (HsPVar i, Map.singleton (toName Val i) v)
+        --typ `subsumes` v
+        typ' <- unBox typ
+        addToCollectedEnv (Map.singleton (toName Val i) typ')
+        return (HsPVar i, Map.singleton (toName Val i) typ')
 
 tiPat (HsPLit l) typ = do
     t <- tiLit l
@@ -303,23 +315,19 @@ tiPat (HsPParen p) typ = tiPat p typ
 tiPat (HsPApp conName pats) typ = do
     bs <- sequence [ newBox Star | _ <- pats ]
     s <- lookupName (toName DataConstructor conName)
-    --s `boxyMatch` (foldr fn typ bs)
     s `subsumes` (foldr fn typ bs)
-    --(foldr fn typ bs) `subsumes` s
     pats' <- sequence [ tcPat a r | r <- bs | a <- pats ]
     return (HsPApp conName (fsts pats'), mconcat (snds pats'))
 
 
 tiPat pl@(HsPList []) (TAp t v) | t == tList = do
-    --typ `subsumes` TAp tList v
-    --v `subsumes` TAp tList v
-    v' <- newBox Star
-    v `subsumes` v'
+    unBox v
     return (pl,mempty)
 
 tiPat pl@(HsPList []) typ = do
     v <- newBox Star
-    typ `subsumes` TAp tList v
+    --typ `subsumes` TAp tList v
+    typ `boxyMatch` TAp tList v
     return (pl,mempty)
 
 tiPat (HsPList pats@(_:_)) (TAp t v) | t == tList = do
@@ -332,11 +340,11 @@ tiPat (HsPList pats@(_:_)) (TAp t v) | t == tList = do
 tiPat (HsPList pats@(_:_)) typ = do
     v <- newBox Star
     --TAp tList v `boxyMatch` typ
-    typ `subsumes` TAp tList v
     ps <- mapM (`tcPat` v) pats
+    typ `boxyMatch` TAp tList v
     return (HsPList (fsts ps), mconcat (snds ps))
 
-tiPat HsPWildCard typ = return (HsPWildCard, mempty)
+tiPat HsPWildCard typ = unBox typ >> return (HsPWildCard, mempty)
 
 
 tiPat (HsPAsPat i pat) typ = do

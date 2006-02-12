@@ -97,7 +97,6 @@ instance HasKind Type where
   kind (TArrow _l _r) = Star
   kind (TGen _ tv) = kind tv
   kind (TForAll _ (_ :=> t)) = kind t
-  kind (TBox { typeKind = k }) = k
   kind (TMetaVar mv) = kind mv
   --kind x = error $ "Type:kind: " ++ show x
 instance HasKind MetaVar where
@@ -179,9 +178,6 @@ mgu'' x y = do
     mgu' x' y'
 
 
---mgu' t (TBox box) = do
---    liftIO $ writeIORef box t
---    return nullSubst
 mgu' (TAp l r) (TAp l' r')
    = do s1 <- mgu'' l l'
         --s2 <- mgu'' (apply s1 r) (apply s1 r')
@@ -200,13 +196,8 @@ mgu' t (TVar u)        = varBind' u t
 mgu' (TCon tc1) (TCon tc2)
            | tc1==tc2 = return nullSubst
            | otherwise = fail "mgu: Constructors don't match"
---mgu (TGen n tv) (TGen n' tv') | n == n' = varBind tv' (TVar tv)
 mgu' TForAll {} _ = error "attempt to unify TForall"
 mgu' _ TForAll {} = error "attempt to unify TForall"
---mgu' (TBox box) t2 = do
---    t1 <- liftIO $ readIORef box
---    mgu'' t1 t2
---    return nullSubst
 mgu' t1 t2  = fail "mgu: types do not unify"
 
 varBind' u t | t == TVar u      = return nullSubst

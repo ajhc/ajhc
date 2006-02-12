@@ -70,7 +70,6 @@ data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
            | TGen { typeSeq :: {-# UNPACK #-} !Int, typeVar :: {-# UNPACK #-} !Tyvar }
            | TArrow Type Type
            | TForAll { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
-           | TBox { typeKind :: Kind, typeSeq :: !Int, typeBox :: IORef (Maybe Type) }     -- ^ used only in typechecker
            | TMetaVar { metaVar :: MetaVar }
              deriving(Data,Typeable,Ord,Show)
     {-! derive: GhcBinary !-}
@@ -173,9 +172,6 @@ instance FlattenType Type where
             ft (TForAll vs qt) = do
                 qt' <- flattenType' qt
                 return $ TForAll vs qt'
-            --ft (TBox _ _ box) = do
-            --    readIORef box
-            ft TBox {} = error "odd box"
             ft t = return t
         ft tv'
 
@@ -261,8 +257,6 @@ prettyPrintTypeM t
            TForAll vs t  -> do
             r <- prettyPrintQualTypeM t
             return $ text "(forall" <+> hsep (map pprint vs) <> text " . " <> r <> text ")"
-           TBox Star i _ -> text "_" <> tshow i
-           TBox k i _ -> return $ parens $ text "_" <> tshow i <> text " :: " <> pprint k
     where
     -- puts parentheses around the doc for a type if needed
     maybeParensAp :: Type -> VarName Doc
