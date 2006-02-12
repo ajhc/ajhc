@@ -262,16 +262,12 @@ processDecls stats ho ho' tiData = do
         cds <- E.Strictness.solveDs cds
         cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
         cds <- annotateDs annmap (\_ -> return) letann lamann cds
-        --mapM_ (\t -> putStrLn (prettyE (EVar t) <+> show (tvrInfo t))) (fsts cds)
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
         let toName t
                 | Just n <- fromId (tvrIdent t) = n
                 | otherwise = error $ "toName: " ++ tvrShowName t
         let nvls = [ (toName t,t,e)  | (t,e) <- cds ]
-        --let uidMap = Map.fromAscList [  (id,Nothing :: Maybe E) | id <- Set.toAscList $ Set.unions [ collectIds e| (t,e) <- cds]]
         let uidMap = Map.fromAscList [  (id,Nothing :: Maybe E) | id <- Set.toAscList usedids ]
-        --let idHist = idHist' `mappend` Histogram.unions [ idHistogram e| (t,e) <- cds]
-        --print idHist
 
         wdump FD.Progress $ putErr (if rec then "*" else ".")
         return (nvls ++ retds, (Map.fromList [ (tvrIdent v,lc) | (_,v,lc) <- nvls] `Map.union` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (_,v,_) <- nvls] `Map.union` annmap , idHist' ))

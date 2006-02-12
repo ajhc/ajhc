@@ -309,14 +309,18 @@ tiPat (HsPApp conName pats) typ = do
     pats' <- sequence [ tcPat a r | r <- bs | a <- pats ]
     return (HsPApp conName (fsts pats'), mconcat (snds pats'))
 
-{-
+
+tiPat pl@(HsPList []) (TAp t v) | t == tList = do
+    --typ `subsumes` TAp tList v
+    --v `subsumes` TAp tList v
+    v' <- newBox Star
+    v `subsumes` v'
+    return (pl,mempty)
+
 tiPat pl@(HsPList []) typ = do
     v <- newBox Star
-    --TAp tList v `boxyMatch` typ
     typ `subsumes` TAp tList v
-    --TAp tList v `subsumes` typ
     return (pl,mempty)
--}
 
 tiPat (HsPList pats@(_:_)) (TAp t v) | t == tList = do
     --v <- newBox Star
@@ -343,6 +347,8 @@ tiPat (HsPAsPat i pat) typ = do
 tiPat (HsPInfixApp pLeft conName pRight) typ =  tiPat (HsPApp conName [pLeft,pRight]) typ
 
 tiPat tuple@(HsPTuple pats) typ = tiPat (HsPApp (toTuple (length pats)) pats) typ
+
+tiPat p _ = error $ "tiPat: " ++ show p
 
 tcBindGroup :: BindGroup -> Tc ([HsDecl], TypeEnv)
 tcBindGroup (es, is) = do
