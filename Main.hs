@@ -530,12 +530,13 @@ compileModEnv' stats ho = do
         name <- System.getProgName
         args <- System.getArgs
         let argstring = simpleQuote (name:args)
-        writeFile cf $ "char jhc_command[] = \"" ++ argstring ++ "\";\n" ++  cg
-        let boehmOpts | fopts FO.Boehm = ["-DUSE_BOEHM_GC", "-lgc"]
+            boehmOpts | fopts FO.Boehm = ["-DUSE_BOEHM_GC", "-lgc"]
                       | otherwise = []
-        let profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE"]
+            profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE"]
                       | otherwise = []
-        let comm = shellQuote $ [optCC options, "-std=gnu99", "-foptimize-sibling-calls", "-O", {- "-funit-at-a-time", -} "-g", "-Wall", "-o", fn, cf ] ++ rls ++ optCCargs options  ++ boehmOpts ++ profileOpts
+            comm = shellQuote $ [optCC options, "-std=gnu99", "-foptimize-sibling-calls", "-O", {- "-funit-at-a-time", -} "-g", "-Wall", "-o", fn, cf ] ++ rls ++ optCCargs options  ++ boehmOpts ++ profileOpts
+            globalvar n c = "char " ++ n ++ "[] = \"" ++ c ++ "\";"
+        writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_jhc_command" argstring,globalvar "jhc_version" (head $ lines versionString),"",cg]
         progress ("Running: " ++ comm)
         r <- System.system comm
         when (r /= System.ExitSuccess) $ fail "C code did not compile."
