@@ -179,8 +179,10 @@ data UnVarOpt = UnVarOpt {
     failEmptyMetaVar :: Bool
     }
 
-flattenMetaVars t = unVar UnVarOpt { openBoxes = False, failEmptyMetaVar = False } t
+--flattenMetaVars t = unVar UnVarOpt { openBoxes = False, failEmptyMetaVar = False } t
 flattenType t =  unVar UnVarOpt { openBoxes = True, failEmptyMetaVar = False } t
+
+-- flattenType t = do (t,_,_) <- unbox t ; return t
 
 
 class UnVar t where

@@ -295,11 +295,23 @@ tiPat (HsPVar i) typ = do
         addToCollectedEnv (Map.singleton (toName Val i) typ')
         return (HsPVar i, Map.singleton (toName Val i) typ')
 
+tiPat pl@(HsPLit HsChar {}) typ = boxyMatch tChar typ >> return (pl,mempty)
+tiPat pl@(HsPLit HsString {}) typ = boxyMatch tString typ >> return (pl,mempty)
+tiPat pl@(HsPLit HsInt {}) typ = do
+    unBox typ
+    addPreds [IsIn class_Num typ]
+    return (pl,mempty)
+tiPat pl@(HsPLit HsFrac {}) typ = do
+    unBox typ
+    addPreds [IsIn class_Fractional typ]
+    return (pl,mempty)
+
+{-
 tiPat (HsPLit l) typ = do
     t <- tiLit l
     typ `subsumes` t -- `boxyMatch` typ
     return (HsPLit l,Map.empty)
-
+-}
 -- this is for negative literals only
 -- so the pat must be a literal
 -- it is safe not to make any predicates about
@@ -393,6 +405,22 @@ tcRhs rhs typ = case rhs of
         gas <- mapM (tcGuardedRhs typ) as
         return (HsGuardedRhss gas)
 
+tcPragmaDecl prule@HsPragmaRules { hsDeclFreeVars = vs, hsDeclLeftExpr = e1, hsDeclRightExpr = e2, hsDeclSrcLoc = sloc } =
+    withContext (locMsg sloc "in the RULES pragma" $ hsDeclString prule) ans where
+        ans = do
+            vs' <- mapM dv vs
+            tr <- newBox Star
+            let (vs,envs) = unzip vs'
+            localEnv (mconcat envs) $ do
+                     tcExpr e1 tr
+                     tcExpr e2 tr
+            mapM_ unBox vs
+            return [prule]
+        dv n = do
+            v <- newMetaVar Tau Star
+            let env = (Map.singleton (toName Val n) v)
+            addToCollectedEnv env
+            return (v,env)
 
 tcDecl ::  HsDecl -> Sigma -> Tc (HsDecl,TypeEnv)
 
@@ -425,12 +453,13 @@ tcDecl decl@(HsFunBind matches) typ = withContext (declDiagnostic decl) $ do
 tcMatch ::  HsMatch -> Sigma -> Tc HsMatch
 tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "in" $ show funName) $ do
     let lam (p:ps) (TMetaVar mv) rs = do -- ABS2
-            b1 <- newBox Star
-            b2 <- newBox Star
-            varBind mv (b1 `fn` b2)
-            l' <- lam (p:ps) (b1 `fn` b2) rs
+            withMetaVars mv [Star,Star] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) (a `fn` b) rs
+            --b1 <- newBox Star
+            --b2 <- newBox Star
+            --varBind mv (b1 `fn` b2)
+            --l' <- lam (p:ps) (b1 `fn` b2) rs
             --(TMetaVar mv) `boxyMatch`  (b1 `fn` b2)
-            return l'
+            --return l'
         lam (p:ps) (TArrow s1' s2') rs = do -- ABS1
             --box <- newBox Star
             (p',env) <- tcPat p s1'
@@ -699,12 +728,14 @@ tiProgram modName sEnv kt h dconsEnv env bgs = runTI dconsEnv h kt sEnv modName 
 
 
 -}
-tiProgram ::  [BindGroup] -> Tc [HsDecl]
-tiProgram bgs = f bgs [] mempty where
+tiProgram ::  [BindGroup] -> [HsDecl] -> Tc [HsDecl]
+tiProgram bgs es = f bgs [] mempty where
     f (bg:bgs) rs cenv  = do
         (ds,env) <- tcBindGroup bg
         localEnv env $ f bgs (ds ++ rs) (env `mappend` cenv)
-    f [] rs _cenv = return rs
+    f [] rs _cenv = do
+        mapM_ tcPragmaDecl (filter isHsPragmaRules es)
+        return rs
 
 -- Typing Literals
 

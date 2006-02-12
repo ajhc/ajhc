@@ -19,8 +19,8 @@ ppretty vv = parens (pretty vv)
 
 subsumes :: Sigma' -> Sigma' -> Tc ()
 subsumes s1 s2 = do
-    s1 <- findType s1
-    s2 <- findType s2
+    --s1 <- findType s1
+    --s2 <- findType s2
     (s1,_,_) <- unbox s1
     (s2,_,_) <- unbox s2
     liftIO $ putStrLn $ "subsumes: " <> ppretty s1 <+> ppretty s2
@@ -73,8 +73,8 @@ printRule s = liftIO $ putStrLn s
 
 boxyMatch :: Sigma' -> Sigma' -> Tc ()
 boxyMatch s1 s2 = do
-    s1 <- findType s1
-    s2 <- findType s2
+    --s1 <- findType s1
+    --s2 <- findType s2
     (s1,_,_) <- unbox s1
     (s2,_,_) <- unbox s2
     liftIO $ putStrLn $ "boxyMatch: " <> ppretty s1 <+> ppretty s2

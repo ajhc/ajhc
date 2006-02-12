@@ -81,11 +81,16 @@ newVars xs = f xs [] where
 lt :: Name -> Int
 lt n | nameType n == TypeVal =  atomIndex $ toAtom $  n
 
-tipe (TAp t1 t2) = eAp (tipe t1) (tipe t2)
-tipe (TArrow t1 t2) =  EPi (tVr 0 (tipe t1)) (tipe t2)
-tipe (TCon (Tycon n k)) =  ELit (LitCons n [] (kind k))
-tipe (TVar (Tyvar _ n k _)) = EVar (tVr (lt n) (kind k))
-tipe (TGen _ (Tyvar _ n k _)) = EVar (tVr (lt n) (kind k))
+tipe t = f t where
+    f (TAp t1 t2) = eAp (f t1) (f t2)
+    f (TArrow t1 t2) =  EPi (tVr 0 (f t1)) (f t2)
+    f (TCon (Tycon n k)) =  ELit (LitCons n [] (kind k))
+    f (TVar tv) = EVar (cvar tv)
+    f (TMetaVar mv) = cmvar mv
+    f (TGen _ (Tyvar _ n k _)) = EVar (tVr (lt n) (kind k))
+    f (TForAll vs (_ :=> t)) = foldr EPi (f t) (map cvar vs)
+    cvar (Tyvar _ n k _) = (tVr (lt n) (kind k))
+    cmvar MetaVar { metaKind = k } = tAbsurd (kind k)
 
 kind Star = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
@@ -117,7 +122,7 @@ simplifyHsPat p@HsPLit {} = p
 simplifyHsPat p = error $ "simplifyHsPat: " ++ show p
 
 convertVal assumps n = (mp EPi ts (tipe t), mp eLam ts) where
-    Just (Forall _ (_ :=> t)) = Map.lookup n assumps -- getAssump n
+    Identity (Forall _ (_ :=> t)) = Map.lookup n assumps -- getAssump n
     mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (lt n) (kind k)) (mp fn rs t)
     mp _ [] t = t
     ts = ctgen t

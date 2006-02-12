@@ -219,7 +219,7 @@ tiModules' me ms = do
         }
 
     localVarEnv <- withOptionsT (modInfoOptions tms) $ runTc tcInfo $ do
-        ds <- tiProgram program
+        ds <- tiProgram program ds
         ce <- getCollectedEnv
         liftIO $ mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType s |  (n,s) <- Map.toList ce]
         return (Map.map typeToScheme ce)

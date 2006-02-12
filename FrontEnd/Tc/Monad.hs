@@ -88,7 +88,9 @@ data TcInfo = TcInfo {
 
 -- | run a computation with a local environment
 localEnv :: TypeEnv -> Tc a -> Tc a
-localEnv te = local (tcCurrentEnv_u (te `Map.union`))
+localEnv te | isGood = local (tcCurrentEnv_u (te `Map.union`)) where
+    isGood = not $ any isBoxy (Map.elems te)
+localEnv te = fail $ "localEnv error!\n" ++ show te
 
 -- | run a computation with a local environment
 --localScopeEnv :: [Tyvar] -> Tc a -> Tc a
@@ -259,7 +261,7 @@ toSigma t = TForAll [] ([] :=> t)
 -- TODO predicates?
 
 skolomize :: Sigma' -> Tc ([SkolemTV],Rho')
-skolomize (TForAll vs (_ :=> rho)) = return (vs,rho) 
+skolomize (TForAll vs (_ :=> rho)) = return (vs,rho)
 --freshSigma s >>= \x -> case x of
 --    TForAll as (_ :=> r) -> return (as,r)
 --    r -> return ([],r)
@@ -290,8 +292,17 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
 generalize :: Rho -> Tc Sigma
 generalize r = do
     r <- flattenType r
-    quantify (freeMetaVars r) [] r
+    fmvenv <- freeMetaVarsEnv
+    liftIO $ mapM_ (putStrLn . pprint) (Set.toList fmvenv)
+    quantify ([ v  | v <- freeMetaVars r, not $ v `Set.member` fmvenv ]) [] r
 
+freeMetaVarsEnv :: Tc (Set.Set MetaVar)
+freeMetaVarsEnv = do
+    env <- asks tcCurrentEnv
+    xs <- flip mapM (Map.elems env)  $ \ x -> do
+        x <- flattenType x
+        return $ freeMetaVars x
+    return (Set.fromList $ concat xs)
 
 quantify :: [MetaVar] -> [Pred] -> Rho -> Tc Sigma
 quantify vs ps r | not $ any isBoxyMetaVar vs = do
@@ -426,4 +437,4 @@ withMetaVars mv ks sfunc bsfunc  = do
     taus <- mapM (newMetaVar Tau) ks
     varBind mv (sfunc taus)
     bsfunc taus
-    
+
