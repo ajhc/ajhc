@@ -595,14 +595,9 @@ scanl1 _ []      =  []
 -- above functions.
 
 
-foldr            :: (a -> b -> b) -> b -> [a] -> b
---foldr f z []     =  z
---foldr f z (x:xs) =  f x (foldr f z xs)
-
--- this version inlines better
-foldr k z xs = go xs where
-    go [] = z
-    go (y:ys) = y `k` go ys
+foldr :: (a -> b -> b) -> b -> [a] -> b
+foldr k z [] = z
+foldr k z (x:xs) = k x (foldr k z xs)
 
 
 foldr1           :: (a -> a -> a) -> [a] -> a
@@ -952,14 +947,23 @@ instance Real Int where
 {-# RULES "sequence_/[]"  sequence_ [] = return () #-}
 {-# RULES "mapM/[]"       forall f . mapM f [] = return [] #-}
 {-# RULES "mapM_/[]"      forall f . mapM_ f [] = return () #-}
-{-# RULES "foldr/triple"  forall c n x y z. foldr c n [x,y,z] = c x (c y (c z n)) #-}
-{-# RULES "foldr/double"  forall k z x y . foldr k z [x,y] = k x (k y z) #-}
 {-# RULES "foldr/single"  forall k z x . foldr k z [x] = k x z #-}
-{-# RULES "foldr/nil"     forall k z . foldr k z [] = z #-}
 {-# RULES "foldr/id"      foldr (:) [] = \x -> x  #-}
 {-# RULES "concatMap/++"  forall xs ys f . concatMap f (xs ++ ys) = concatMap f xs ++ concatMap f ys #-}
 {-# RULES "map/++"        forall xs ys f . map f (xs ++ ys) = map f xs ++ map f ys #-}
 {-# RULES "sequence_/++"  forall xs ys . sequence_ (xs ++ ys) = sequence_ xs >> sequence_ ys #-}
 {-# RULES "mapM_/++"      forall xs ys f . mapM_ f (xs ++ ys) = mapM_ f xs >> mapM_ f ys #-}
+
+{-# RULES "foldr/map" forall k z f xs . foldr k z (map f xs) = foldr (\x y -> k (f x) y) z xs #-}
+{-# RULES "foldr/concatMap" forall k z f xs . foldr k z (concatMap f xs) = foldr (\x y -> foldr k (f x) y) z xs #-}
+{-# RULES "foldr/filter" forall k z f xs . foldr k z (filter f xs) = foldr (\x y -> if f x then k x y else y) z xs #-}
+{-# RULES "foldr/++" forall k z xs ys . foldr k z (xs ++ ys) = foldr k (foldr k z ys) xs #-}
+{-# RULES "foldr/concat" forall k z xs . foldr k z (concat xs) = foldr (\x y -> foldr k y x) z xs #-}
+{-# RULES "foldr/repeat" forall k _z x . foldr k _z (repeat x) = let r = k x r in r #-}
+{-# RULES "foldr/[]" forall _k z . foldr _k z [] = z #-}
+{-# RULES "foldr/x:xs" forall k z x xs . foldr k z (x:xs) = k x (foldr k z xs) #-}
+{-# RULES "foldr/zip" forall k z xs ys . foldr k z (zip xs ys) = let zip' (a:as) (b:bs) = k (a,b) (zip' as bs); zip' _ _ = z in zip' xs ys #-}
+-- {-# RULES "foldr/sequence" forall k z xs . foldr k z (sequence xs) = foldr (\x y -> do rx <- x; ry <- y; return (k rx ry)) (return z) xs #-}
+-- {-# RULES "foldr/mapM" forall k z f xs . foldr k z (mapM f xs) = foldr (\x y -> do rx <- f x; ry <- y; return (k rx ry)) (return z) xs   #-}
 
 default(Int,Double)
