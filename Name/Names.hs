@@ -103,6 +103,10 @@ v_minBound = toName Val ("Prelude","minBound")
 v_maxBound = toName Val ("Prelude","maxBound")
 v_fail = toName Val ("Prelude","fail")
 v_concatMap = toName Val ("Prelude","concatMap")
+v_map = toName Val ("Prelude","map")
+v_and = toName Val ("Prelude","&&")
+v_filter = toName Val ("Prelude","filter")
+v_foldr = toName Val ("Prelude","foldr")
 
 sFuncNames = FuncNames {
     func_bind = toName Val ("Prelude",">>="),

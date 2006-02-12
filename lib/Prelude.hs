@@ -937,9 +937,9 @@ instance Real Int where
 {-# RULES "sequence/map"  forall f xs . sequence (map f xs) = mapM f xs #-}
 {-# RULES "sequence_/map" forall f xs . sequence_ (map f xs) = mapM_ f xs #-}
 {-# RULES "++/emptyr"     forall xs . xs ++ [] = xs #-}
-{-# RULES "++/refix"      forall xs ys zs . (xs ++ ys) ++ zs = xs ++ (ys ++ zs) #-}
-{-# RULES "++/tick4"      forall x y z x' xs ys . (x:y:z:x':xs) ++ ys = x:y:z:x':(xs ++ ys) #-}
-{-# RULES "++/tick2"      forall x y xs ys . (x:y:xs) ++ ys = x:y:(xs ++ ys) #-}
+-- {-# RULES "++/refix"      forall xs ys zs . (xs ++ ys) ++ zs = xs ++ (ys ++ zs) #-}
+--{-# RULES "++/tick4"      forall x y z x' xs ys . (x:y:z:x':xs) ++ ys = x:y:z:x':(xs ++ ys) #-}
+--{-# RULES "++/tick2"      forall x y xs ys . (x:y:xs) ++ ys = x:y:(xs ++ ys) #-}
 {-# RULES "++/tick1"      forall x xs ys . (x:xs) ++ ys = x:(xs ++ ys) #-}
 {-# RULES "++/tick0"      forall xs . [] ++ xs = xs #-}
 {-# RULES "map/map"       forall f g xs . map f (map g xs) = map (\x -> f (g x)) xs #-}
@@ -952,8 +952,14 @@ instance Real Int where
 {-# RULES "sequence_/[]"  sequence_ [] = return () #-}
 {-# RULES "mapM/[]"       forall f . mapM f [] = return [] #-}
 {-# RULES "mapM_/[]"      forall f . mapM_ f [] = return () #-}
+{-# RULES "foldr/triple"  forall c n x y z. foldr c n [x,y,z] = c x (c y (c z n)) #-}
+{-# RULES "foldr/double"  forall k z x y . foldr k z [x,y] = k x (k y z) #-}
 {-# RULES "foldr/single"  forall k z x . foldr k z [x] = k x z #-}
 {-# RULES "foldr/nil"     forall k z . foldr k z [] = z #-}
 {-# RULES "foldr/id"      foldr (:) [] = \x -> x  #-}
+{-# RULES "concatMap/++"  forall xs ys f . concatMap f (xs ++ ys) = concatMap f xs ++ concatMap f ys #-}
+{-# RULES "map/++"        forall xs ys f . map f (xs ++ ys) = map f xs ++ map f ys #-}
+{-# RULES "sequence_/++"  forall xs ys . sequence_ (xs ++ ys) = sequence_ xs >> sequence_ ys #-}
+{-# RULES "mapM_/++"      forall xs ys f . mapM_ f (xs ++ ys) = mapM_ f xs >> mapM_ f ys #-}
 
 default(Int,Double)

@@ -46,6 +46,7 @@ catch (IO x) fn  = IO $ \w -> case x w of
     FailIO w' z -> case fn z of
         IO f -> f w'
 
+{-# RULES "putStr/++"      forall xs ys . putStr (xs ++ ys) = putStr xs >> putStr ys #-}
 
 putStr     :: String -> IO ()
 putStr s   =  mapM_ putChar s

@@ -190,9 +190,12 @@ processDecls stats ho ho' tiData = do
         mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
         namesInscope = Set.fromList inscope
 
+    let initMap' = Map.fromList [ (tvrIdent tvr,EVar tvr) | tvr <- fsts $ Map.elems (hoEs ho)]
+
     -- initial pass over functions to put them into a normalized form
     let procE (ds,usedIds) (n,v,lc) = do
         lc <- postProcessE stats n inscope usedIds fullDataTable lc
+        lc <- return $ substMap initMap' lc
         nfo <- idann  allRules (hoProps ho') (tvrIdent v) (tvrInfo v)
         v <- return $ v { tvrInfo = Info.insert LetBound nfo }
         let used' = collectIds lc
@@ -215,13 +218,15 @@ processDecls stats ho ho' tiData = do
         let cm stats e = do
             let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
             let (e',stat') = Stats.runStatM $ etaExpandE (progDataTable prog) e
+            Stats.tickStat stats stat'
             let (stat, e'') = SS.simplifyE sopt e'
             Stats.tickStat stats stat
-            Stats.tickStat stats stat'
-            return e''
+            let (stat, e''') = SS.simplifyE sopt e''
+            Stats.tickStat stats stat
+            return e'''
         let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds)) fullDataTable
         cds <- flip mapM (zip names cds) $ \ (n,(v,lc)) -> do
-            lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
+            --lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             lc <- doopt mangle False stats "SuperSimplify" cm lc
             lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
             lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
@@ -250,7 +255,7 @@ processDecls stats ho ho' tiData = do
         let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds')) fullDataTable
         let dd  (ds,used) (v,lc) = do
                 let cm stats e = do
-                    let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = Map.fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `Map.union` smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
+                    let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = Map.fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `Map.union` smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
                     let (stat, e') = SS.simplifyE sopt e
                     Stats.tickStat stats stat
                     return e'
