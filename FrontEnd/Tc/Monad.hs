@@ -293,7 +293,7 @@ generalize :: Rho -> Tc Sigma
 generalize r = do
     r <- flattenType r
     fmvenv <- freeMetaVarsEnv
-    liftIO $ mapM_ (putStrLn . pprint) (Set.toList fmvenv)
+    -- liftIO $ mapM_ (putStrLn . pprint) (Set.toList fmvenv)
     quantify ([ v  | v <- freeMetaVars r, not $ v `Set.member` fmvenv ]) [] r
 
 freeMetaVarsEnv :: Tc (Set.Set MetaVar)
@@ -354,7 +354,7 @@ varBind u t
         case x of
             Just r -> fail $ "varBind: binding unfree: " ++ tupled [pprint u,prettyPrintType tt,prettyPrintType r]
             Nothing -> liftIO $ do
-                putStrLn $ "varBind: " ++ pprint u <+> prettyPrintType t
+                --putStrLn $ "varBind: " ++ pprint u <+> prettyPrintType t
                 writeIORef r (Just tt)
 
 

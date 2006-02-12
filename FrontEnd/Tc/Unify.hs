@@ -8,6 +8,8 @@ import Doc.DocLike
 import FrontEnd.Tc.Type
 import Support.CanType
 import FrontEnd.Tc.Monad
+import Options
+import qualified FlagDump as FD
 import GenUtil
 
 pretty vv = prettyPrintType vv
@@ -19,11 +21,15 @@ ppretty vv = parens (pretty vv)
 
 subsumes :: Sigma' -> Sigma' -> Tc ()
 subsumes s1 s2 = do
-    --s1 <- findType s1
-    --s2 <- findType s2
-    (s1,_,_) <- unbox s1
-    (s2,_,_) <- unbox s2
-    liftIO $ putStrLn $ "subsumes: " <> ppretty s1 <+> ppretty s2
+    (s1,s2) <- if dump FD.BoxySteps then do
+        (s1,_,_) <- unbox s1
+        (s2,_,_) <- unbox s2
+        return (s1,s2)
+      else do
+        s1 <- findType s1
+        s2 <- findType s2
+        return (s1,s2)
+    printRule $ "subsumes: " <> ppretty s1 <+> ppretty s2
     sub s1 s2
    where
     -- SBOXY
@@ -68,21 +74,28 @@ subsumes s1 s2 = do
     sub a b = fail $ "subsumes failure: " <> ppretty a <+> ppretty b
 
 printRule :: String -> Tc ()
-printRule s = liftIO $ putStrLn s
+printRule s
+    | dump FD.BoxySteps = liftIO $ putStrLn s
+    | otherwise = return ()
+
 
 
 boxyMatch :: Sigma' -> Sigma' -> Tc ()
 boxyMatch s1 s2 = do
-    --s1 <- findType s1
-    --s2 <- findType s2
-    (s1,_,_) <- unbox s1
-    (s2,_,_) <- unbox s2
-    liftIO $ putStrLn $ "boxyMatch: " <> ppretty s1 <+> ppretty s2
+    (s1,s2) <- if dump FD.BoxySteps then do
+        (s1,_,_) <- unbox s1
+        (s2,_,_) <- unbox s2
+        return (s1,s2)
+      else do
+        s1 <- findType s1
+        s2 <- findType s2
+        return (s1,s2)
+    printRule $ "boxyMatch: " <> ppretty s1 <+> ppretty s2
     b <- bm s1 s2
     if b then do
         s1 <- findType s1
         s2 <- findType s2
-        liftIO $ putStrLn $ "boxyMatch: " <> ppretty s2 <+> ppretty s1
+        printRule $ "boxyMatch: " <> ppretty s2 <+> ppretty s1
         b' <- bm s2 s1
         when b' $  fail $ "boxyMatch failure: " <> ppretty s1 <+> ppretty s2
      else return ()
@@ -195,7 +208,7 @@ unify      :: Tau -> Tau -> Tc ()
 unify t1 t2 = do
     t1' <- findType t1
     t2' <- findType t2
-    liftIO $ putStrLn $ "unify: " <> ppretty t1 <+> ppretty t2
+    printRule $ "unify: " <> ppretty t1 <+> ppretty t2
     mgu t1' t2'
 
 mgu (TAp l r) (TAp l' r')

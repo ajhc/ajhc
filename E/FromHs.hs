@@ -122,7 +122,9 @@ simplifyHsPat p@HsPLit {} = p
 simplifyHsPat p = error $ "simplifyHsPat: " ++ show p
 
 convertVal assumps n = (mp EPi ts (tipe t), mp eLam ts) where
-    Identity (Forall _ (_ :=> t)) = Map.lookup n assumps -- getAssump n
+    (Forall _ (_ :=> t)) = case Map.lookup n assumps of
+        Just z -> z
+        Nothing -> error $ "convertVal.Lookup failed: " ++ (show n)
     mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (lt n) (kind k)) (mp fn rs t)
     mp _ [] t = t
     ts = ctgen t

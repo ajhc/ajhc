@@ -2,6 +2,7 @@ module FrontEnd.Tc.Main (tiExpr, tiProgram, makeProgram ) where
 
 import Control.Monad.Writer
 import List
+import IO(hFlush,stdout)
 import qualified Data.Map as Map
 
 import Class(ClassHierarchy, entails, split, topDefaults, splitReduce)
@@ -382,15 +383,15 @@ tcBindGroup (es, is) = do
 tiImpls ::  [HsDecl] -> Tc ([HsDecl], TypeEnv)
 tiImpls [] = return ([],Map.empty)
 tiImpls bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ (show (map getDeclName bs)))) $ do
-    liftIO $ putStrLn $ "tiimpls " ++ show (map getDeclName bs)
+    --liftIO $ putStrLn $ "tiimpls " ++ show (map getDeclName bs)
     ss <- sequence [newMetaVar Tau Star | _ <- bs]
     rs <- localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ss]) $ sequence [ tcDecl d s | d <- bs | s <- ss ]
     let f n s = do
-            liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
+            --liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
             s <- flattenType s
-            liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
+            --liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
             s <- generalize s
-            liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
+            --liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
             return (n,s)
     nenv <- sequence [ f n s | (n,s) <- Map.toAscList $ mconcat $ snds rs]
     addToCollectedEnv (Map.fromList nenv)
@@ -421,6 +422,14 @@ tcPragmaDecl prule@HsPragmaRules { hsDeclFreeVars = vs, hsDeclLeftExpr = e1, hsD
             let env = (Map.singleton (toName Val n) v)
             addToCollectedEnv env
             return (v,env)
+
+tcPragmaDecl fd@(HsForeignDecl _ _ _ n qt) = do
+    kt <- getKindEnv
+    s <- hsQualTypeToSigma kt qt
+    addToCollectedEnv (Map.singleton (toName Val n) s)
+    return [fd]
+
+tcPragmaDecl _ = return []
 
 tcDecl ::  HsDecl -> Sigma -> Tc (HsDecl,TypeEnv)
 
@@ -488,7 +497,7 @@ declDiagnostic decl@(HsFunBind matches) = locMsg (srcLoc decl) "in the function 
 tiExpl ::  Expl -> Tc (HsDecl,TypeEnv)
 tiExpl (sc, decl@HsForeignDecl {}) = do return (decl,Map.empty)
 tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typed " ++  (render $ ppHsDecl decl))) $ do
-    liftIO $ putStrLn $ "** typing expl: " ++ show (getDeclName decl) ++ " " ++ prettyPrintType sc
+    --liftIO $ putStrLn $ "** typing expl: " ++ show (getDeclName decl) ++ " " ++ prettyPrintType sc
     addToCollectedEnv (Map.singleton (getDeclName decl) sc)
     --tcDecl decl sc
     --sc <- freshSigma sc
@@ -732,9 +741,13 @@ tiProgram ::  [BindGroup] -> [HsDecl] -> Tc [HsDecl]
 tiProgram bgs es = f bgs [] mempty where
     f (bg:bgs) rs cenv  = do
         (ds,env) <- tcBindGroup bg
+        liftIO $ do
+            putChar '.'
+            hFlush stdout
         localEnv env $ f bgs (ds ++ rs) (env `mappend` cenv)
     f [] rs _cenv = do
-        mapM_ tcPragmaDecl (filter isHsPragmaRules es)
+        mapM_ tcPragmaDecl es
+        liftIO $ putStrLn "!"
         return rs
 
 -- Typing Literals
