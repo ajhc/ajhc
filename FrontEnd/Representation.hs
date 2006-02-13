@@ -31,6 +31,7 @@ module Representation(
     FlattenType(..),
     Assump(..),
     tForAll,
+    tExists,
     MetaVarType(..),
     MetaVar(..),
     tList
@@ -70,6 +71,7 @@ data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
            | TGen { typeSeq :: {-# UNPACK #-} !Int, typeVar :: {-# UNPACK #-} !Tyvar }
            | TArrow Type Type
            | TForAll { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
+           | TExists { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
            | TMetaVar { metaVar :: MetaVar }
              deriving(Data,Typeable,Ord,Show)
     {-! derive: GhcBinary !-}
@@ -117,6 +119,10 @@ instance Show Tyvar where
 tForAll [] ([] :=> t) = t
 tForAll vs (ps :=> TForAll vs' (ps' :=> t)) = tForAll (vs ++ vs') ((ps ++ ps') :=> t)
 tForAll x y = TForAll x y
+
+tExists [] ([] :=> t) = t
+tExists vs (ps :=> TExists vs' (ps' :=> t)) = tExists (vs ++ vs') ((ps ++ ps') :=> t)
+tExists x y = TExists x y
 
 findType :: MonadIO m => Type -> m Type
 findType tv@(TVar Tyvar {tyvarRef = Just r }) = liftIO $ do
@@ -172,6 +178,9 @@ instance FlattenType Type where
             ft (TForAll vs qt) = do
                 qt' <- flattenType' qt
                 return $ TForAll vs qt'
+            ft (TExists vs qt) = do
+                qt' <- flattenType' qt
+                return $ TExists vs qt'
             ft t = return t
         ft tv'
 
@@ -257,6 +266,9 @@ prettyPrintTypeM t
            TForAll vs t  -> do
             r <- prettyPrintQualTypeM t
             return $ text "(forall" <+> hsep (map pprint vs) <> text " . " <> r <> text ")"
+           TExists vs t  -> do
+            r <- prettyPrintQualTypeM t
+            return $ text "(exists" <+> hsep (map pprint vs) <> text " . " <> r <> text ")"
     where
     -- puts parentheses around the doc for a type if needed
     maybeParensAp :: Type -> VarName Doc

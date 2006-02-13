@@ -138,6 +138,15 @@ prettyPrintType t  = unparse $ runVarName (f t) where
             [] ->  fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text ". ")  (atomize t')
             [p] -> fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text "." <+> unparse p <+> text "=> ")  (atomize t')
             ps ->  fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text "." <+> tupled (map unparse ps) <+> text "=> ")  (atomize t')
+    f (TExists [] ([] :=> t)) = f t
+    f (TExists vs (ps :=> t)) = do
+        ts' <- mapM (newLookupName ['a'..] ()) vs
+        t' <- f t
+        ps' <- mapM fp ps
+        return $ case ps' of
+            [] ->  fixitize (N,-3) $ pop (text "exists" <+> hsep (map char ts') <+> text ". ")  (atomize t')
+            [p] -> fixitize (N,-3) $ pop (text "exists" <+> hsep (map char ts') <+> text "." <+> unparse p <+> text "=> ")  (atomize t')
+            ps ->  fixitize (N,-3) $ pop (text "exists" <+> hsep (map char ts') <+> text "." <+> tupled (map unparse ps) <+> text "=> ")  (atomize t')
     f (TCon tycon) = return $ atom (pprint tycon)
     f t | Just tyvar <- extractTyVar t = do
         vo <- maybeLookupName tyvar
@@ -210,6 +219,10 @@ instance UnVar Type where
                 when (any isMetaTV vs) $ error "metatv in forall binding"
                 qt' <- unVar' opt qt
                 return $ TForAll vs qt'
+            ft (TExists vs qt) = do
+                when (any isMetaTV vs) $ error "metatv in forall binding"
+                qt' <- unVar' opt qt
+                return $ TExists vs qt'
             ft t@(TMetaVar _) = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return t
             --ft t | Just tv <- extractMetaTV t = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return (TVar tv)
             ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
@@ -259,7 +272,8 @@ allFreeVars (TVar u)      = [u]
 allFreeVars (TAp l r)     = allFreeVars l `union` allFreeVars r
 allFreeVars (TArrow l r)  = allFreeVars l `union` allFreeVars r
 allFreeVars TCon {}       = []
-allFreeVars typ | ~(TForAll vs (_ :=> t)) <- typ = allFreeVars t List.\\ vs
+allFreeVars typ | (TForAll vs (_ :=> t)) <- typ = allFreeVars t List.\\ vs
+allFreeVars typ | ~(TExists vs (_ :=> t)) <- typ = allFreeVars t List.\\ vs
 
 freeMetaVars :: Type -> [MetaVar]
 freeMetaVars (TVar u)      = []
@@ -267,7 +281,8 @@ freeMetaVars (TAp l r)     = freeMetaVars l `union` freeMetaVars r
 freeMetaVars (TArrow l r)  = freeMetaVars l `union` freeMetaVars r
 freeMetaVars TCon {}       = []
 freeMetaVars (TMetaVar mv) = [mv]
-freeMetaVars typ | ~(TForAll vs (_ :=> t)) <- typ = freeMetaVars t
+freeMetaVars typ | (TForAll vs (_ :=> t)) <- typ = freeMetaVars t
+freeMetaVars typ | ~(TExists vs (_ :=> t)) <- typ = freeMetaVars t
 
 
 -- returns (new type, any open boxes, any open tauvars)
@@ -281,6 +296,11 @@ unbox tv = do
             ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
             t' <- ft' t
             return $ TForAll vs (ps' :=> t')
+        ft (TExists vs (ps :=> t)) = do
+            when (any isMetaTV vs) $ error "metatv in forall binding"
+            ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
+            t' <- ft' t
+            return $ TExists vs (ps' :=> t')
         ft t@(TMetaVar mv)
             | isBoxyMetaVar mv = tell ([True],[]) >> return t
             | otherwise =  tell ([],[True]) >> return t

@@ -58,12 +58,20 @@ tipe t = runVarName (tipe' t) where
         v <- lookupName tv
         return $ EVar $ tVr v (kind k)
     tipe' (TForAll [] (_ :=> t)) = tipe' t
+    tipe' (TExists [] (_ :=> t)) = tipe' t
     tipe' (TForAll xs (_ :=> t)) = do
         xs' <- flip mapM xs $ \tv -> do
             v <- newName [70,72..] () tv
             return $ tVr v (kind $ tyvarKind tv)
         t' <- tipe' t
         return $ foldr EPi t' xs' -- [ tVr n (kind k) | n <- [2,4..] | k <- xs ]
+    tipe' (TExists xs (_ :=> t)) = do
+        xs' <- flip mapM xs $ \tv -> do
+            --v <- newName [70,72..] () tv
+            --return $ tVr v (kind $ tyvarKind tv)
+            return $ (kind $ tyvarKind tv)
+        t' <- tipe' t
+        return $ ELit (LitCons (unboxedNameTuple TypeConstructor (length xs' + 1)) (t':xs') eHash)
 
 --tipe (TForAll (Forall xs (_ :=> t))) = foldr EPi (tipe t) [ tVr n (kind k) | n <- [2,4..] | k <- xs ]
 

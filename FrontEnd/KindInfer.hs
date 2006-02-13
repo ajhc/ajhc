@@ -350,6 +350,11 @@ kiType varExist tap@(HsTyForall { hsTypeVars = vs, hsTypeType = qt }) = do
     let newEnv = KindEnv $ Map.fromList $ argKindVars
     extendEnv newEnv
     kiQualType varExist qt
+kiType varExist tap@(HsTyExists { hsTypeVars = vs, hsTypeType = qt }) = do
+    argKindVars <- mapM (newNameVar . hsTyVarBindName) vs
+    let newEnv = KindEnv $ Map.fromList $ argKindVars
+    extendEnv newEnv
+    kiQualType varExist qt
 
 newNameVar :: HsName -> KI (Name, Kind)
 newNameVar n = do
@@ -405,6 +410,7 @@ namesFromType (HsTyApp t1 t2) = namesFromType t1 ++ namesFromType t2
 namesFromType (HsTyVar _) = []
 namesFromType (HsTyCon n) = [toName TypeConstructor n]
 namesFromType HsTyForall { hsTypeVars = vs } = map (toName TypeVal . hsTyVarBindName) vs
+namesFromType HsTyExists { hsTypeVars = vs } = map (toName TypeVal . hsTyVarBindName) vs
 
 namesFromContext :: HsContext -> [Name]
 namesFromContext cntxt = map fst (hsContextToContext cntxt)
@@ -519,6 +525,7 @@ aHsTypeToType kt (HsTyCon name) = TCon $ Tycon nn (kindOf nn kt)  where
 
 --aHsTypeToType kt (HsTyForall vs qt) = TForAll map (kindOf (aHsQualTypeToScheme kt qt)
 aHsTypeToType kt (HsTyForall vs qt) = TForAll (map (toTyvar kt . hsTyVarBindName) vs) (aHsQualTypeToQualType kt qt)
+aHsTypeToType kt (HsTyExists vs qt) = TExists (map (toTyvar kt . hsTyVarBindName) vs) (aHsQualTypeToQualType kt qt)
 
 aHsTypeToType _ t = error $ "aHsTypeToType: " ++ show t
 

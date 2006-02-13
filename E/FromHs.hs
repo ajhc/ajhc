@@ -89,6 +89,9 @@ tipe t = f t where
     f (TMetaVar mv) = cmvar mv
     f (TGen _ (Tyvar _ n k _)) = EVar (tVr (lt n) (kind k))
     f (TForAll vs (_ :=> t)) = foldr EPi (f t) (map cvar vs)
+    f (TExists xs (_ :=> t)) = let
+        xs' = map (kind . tyvarKind) xs
+        in ELit (LitCons (unboxedNameTuple TypeConstructor (length xs' + 1)) (f t:xs') eHash)
     cvar (Tyvar _ n k _) = (tVr (lt n) (kind k))
     cmvar MetaVar { metaKind = k } = tAbsurd (kind k)
 
