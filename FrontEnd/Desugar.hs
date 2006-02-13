@@ -45,6 +45,8 @@ import HsSyn
 import Name.Name
 import Name.Names
 import Name.VConsts
+import Options
+import qualified FlagOpts as FO
 
 removeSynonymsFromType _ t = t
 removeSynsFromSig _ t = t
@@ -552,7 +554,11 @@ desugarExp (HsExpTypeSig sloc e qualType)
 -}
 
 desugarExp (HsExpTypeSig sloc e qualType)
-   = do
+    | fopts FO.Boxy = do
+        e' <- desugarExp e
+        newQualType <- remSynsQualType qualType
+        return (HsExpTypeSig sloc e' newQualType)
+    | otherwise = do
         newE <- desugarExp e
         newQualType <- remSynsQualType qualType
         let newTypeSig = HsTypeSig sloc [newVarName] newQualType

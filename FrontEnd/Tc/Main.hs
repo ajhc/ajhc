@@ -86,19 +86,13 @@ tiExpr (HsAsPat n e) typ = do
     addToCollectedEnv (Map.singleton (toName Val n) typ)
     return (HsAsPat n e)
 
-{-
 -- comb LET-S and VAR
 tiExpr expr@(HsExpTypeSig sloc e qt) typ =  withContext (locMsg sloc "in the annotated expression" $ render $ ppHsExp expr) $ do
     kt <- getKindEnv
     s <- hsQualTypeToSigma kt qt
     s `subsumes` typ
-    e' <- tcExprPoly e s
-    --s'@(TForall _ (ps :=> r)) <- freshSigma s
-    --addPreds ps
-    --e' <- tiExpr e r
-    --s' `subsumes` typ
+    e' <- tcExpr e typ
     return (HsExpTypeSig sloc e' qt)
- -}
 
 tiExpr (HsLeftSection e1 e2) typ = do
     (e1,e2) <- tcApp e1 e2 typ
