@@ -46,7 +46,7 @@ import Text.PrettyPrint.HughesPJ(Doc)
 
 
 import Atom
-import Class(ClassHierarchy)
+import Class(ClassHierarchy,simplify)
 import Diagnostic
 import Doc.DocLike
 import Doc.PPrint
@@ -69,7 +69,7 @@ data TcEnv = TcEnv {
     tcVarnum            :: IORef Int,
     tcCollectedEnv      :: IORef (Map.Map Name Sigma),
     tcCurrentEnv        :: Map.Map Name Sigma,
-    tcCurrentScope      :: Set.Set Atom,
+    tcCurrentScope      :: Set.Set MetaVar,
     tcOptions           :: Opt  -- module specific options
     }
    {-! derive: update !-}
@@ -124,6 +124,7 @@ runTc tcInfo  (Tc tim) = do
         tcVarnum = vn,
         tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ tcInfoModName tcInfo],
         tcInfo = tcInfo,
+        tcCurrentScope = mempty,
         tcOptions = opt
         }
     return a
@@ -289,12 +290,16 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
     return (sortGroupUnderFG fst snd vs,t')
 
 
-generalize :: Rho -> Tc Sigma
-generalize r = do
+generalize :: [Pred] -> Rho -> Tc Sigma
+generalize ps r = do
+    ch <- getClassHierarchy
     r <- flattenType r
     fmvenv <- freeMetaVarsEnv
     -- liftIO $ mapM_ (putStrLn . pprint) (Set.toList fmvenv)
-    quantify ([ v  | v <- freeMetaVars r, not $ v `Set.member` fmvenv ]) [] r
+    let mvs =  [ v  | v <- freeMetaVars r, not $ v `Set.member` fmvenv ]
+    let (rp,nps) = partition (\ (IsIn c t) -> any (`elem` mvs) (freeMetaVars t)) ps
+    addPreds nps
+    quantify mvs rp r
 
 freeMetaVarsEnv :: Tc (Set.Set MetaVar)
 freeMetaVarsEnv = do
@@ -309,14 +314,9 @@ quantify vs ps r | not $ any isBoxyMetaVar vs = do
     r <- flattenType r
     nvs <- mapM (newVar . metaKind) vs
     sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- vs ]
-    ret <- flattenType (ps :=> r)
-    return $ TForAll nvs ret
-    --return $ TForAll nvs (ps' :=> rr)
-    --let mm =  Map.fromList  [ (metaUniq mv,(TVar v)) | v <- nvs |  mv <- vs ]
-    --    rr = inst mm mempty r
-    --    ps' = inst mm mempty ps
-    --r <- flattenType (ps :=> r)
-    --return $ TForAll nvs (ps' :=> rr)
+    (ps :=> r) <- flattenType (ps :=> r)
+    ch <- getClassHierarchy
+    return $ TForAll nvs (Class.simplify ch ps :=> r)
 
 
 -- this removes all boxes, replacing them with tau vars

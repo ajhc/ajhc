@@ -220,13 +220,15 @@ tiModules' me ms = do
 
     localVarEnv <- withOptionsT (modInfoOptions tms) $ runTc tcInfo $ do
         ds <- tiProgram program ds
-        ce <- getCollectedEnv
-        liftIO $ mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType s |  (n,s) <- Map.toList ce]
-        return (Map.map typeToScheme ce)
+        getCollectedEnv
+        --liftIO $ mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType s |  (n,s) <- Map.toList ce]
+        --return (Map.map typeToScheme ce)
 
-    when (dump FD.Types) $
-         do {putStrLn " ---- the types of identifiers ---- ";
-             putStrLn $ PPrint.render $ pprintEnv (if verbose2 then localVarEnv else trimEnv localVarEnv) }
+    when (dump FD.Types) $ do
+        putStrLn " ---- the types of identifiers ---- "
+        mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType s |  (n,s) <- Map.toList (if verbose2 then localVarEnv else trimEnv localVarEnv)]
+
+    localVarEnv <- return $ Map.map typeToScheme localVarEnv
 
     --let externalEnv = Map.fromList [ v | v@(x@(Qual m i) ,s) <- Map.toList localVarEnv, isGlobal x, m `elem` map modInfoName ms ]  `Map.union` noDefaultSigs
     let externalEnv = Map.filterWithKey (\ x _ -> isGlobal x && (fromJust (getModule x) `elem` map modInfoName ms)) localVarEnv `Map.union` noDefaultSigs

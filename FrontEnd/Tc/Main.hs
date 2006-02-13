@@ -5,7 +5,7 @@ import List
 import IO(hFlush,stdout)
 import qualified Data.Map as Map
 
-import Class(ClassHierarchy, entails, split, topDefaults, splitReduce)
+import Class(ClassHierarchy, entails, split, topDefaults, splitReduce,simplify)
 import Control.Monad.Reader
 import DeclsDepends(getDeclDeps)
 import DependAnalysis(getBindGroups)
@@ -379,12 +379,15 @@ tiImpls [] = return ([],Map.empty)
 tiImpls bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ (show (map getDeclName bs)))) $ do
     --liftIO $ putStrLn $ "tiimpls " ++ show (map getDeclName bs)
     ss <- sequence [newMetaVar Tau Star | _ <- bs]
-    rs <- localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ss]) $ sequence [ tcDecl d s | d <- bs | s <- ss ]
+    (rs,ps) <- censor (const mempty) $ listen $ localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ss]) $ sequence [ tcDecl d s | d <- bs | s <- ss ]
+    ps <- mapM flattenType ps
+    ch <- getClassHierarchy
+    ps <- return $ Class.simplify ch ps
     let f n s = do
             --liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
             s <- flattenType s
             --liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
-            s <- generalize s
+            s <- generalize ps s
             --liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
             return (n,s)
     nenv <- sequence [ f n s | (n,s) <- Map.toAscList $ mconcat $ snds rs]
@@ -732,7 +735,14 @@ tiProgram modName sEnv kt h dconsEnv env bgs = runTI dconsEnv h kt sEnv modName 
 
 -}
 tiProgram ::  [BindGroup] -> [HsDecl] -> Tc [HsDecl]
-tiProgram bgs es = f bgs [] mempty where
+tiProgram bgs es = ans where
+    ans = do
+        (r,ps) <- listen $ f bgs [] mempty
+        ps <- flattenType ps
+        ch <- getClassHierarchy
+        ps <- return $ Class.simplify ch ps
+        liftIO $ mapM_ (putStrLn.show) ps
+        return r
     f (bg:bgs) rs cenv  = do
         (ds,env) <- tcBindGroup bg
         liftIO $ do

@@ -234,7 +234,7 @@ tcStatementTc (HsQualifier e) = do
     ps' <- flattenType ps'
     let ps = Class.simplify (hoClassHierarchy ho) ps'
     (ps :=> vv) <- flattenType (ps :=> box)
-    TForAll vs ([] :=> t) <- generalize vv -- quantify (tv vv) qt
+    TForAll vs (ps :=> t) <- generalize ps vv -- quantify (tv vv) qt
     --liftIO $ putStrLn $ show (text "::" <+> pprint vv' :: P.Doc)
     liftIO $ putStrLn $   "::" <+> prettyPrintType (TForAll vs (ps :=> t))
     ce <- getCollectedEnv
