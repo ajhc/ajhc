@@ -84,12 +84,12 @@ hsContextToPreds kt assts = map (hsAsstToPred kt) assts
 
 
 conDeclType :: Module -> KindEnv -> [Pred] -> Type -> HsConDecl -> Map.Map Name Scheme
-conDeclType modName kt preds tResult (HsConDecl _sloc conName bangTypes)
+conDeclType modName kt preds tResult (HsConDecl { hsConDeclName = conName, hsConDeclConArg = bangTypes })
    = Map.singleton (toName DataConstructor conName) $ quantify (tv qualConType) qualConType
    where
    conType = foldr fn tResult (map (bangTypeToType kt) bangTypes)
    qualConType = preds :=> conType
-conDeclType modName kt preds tResult rd@(HsRecDecl _sloc conName _)
+conDeclType modName kt preds tResult rd@HsRecDecl { hsConDeclName = conName }
    = Map.singleton (toName DataConstructor conName) $ quantify (tv qualConType) qualConType
    where
    conType = foldr fn tResult (map (bangTypeToType kt) (hsConDeclArgs rd))

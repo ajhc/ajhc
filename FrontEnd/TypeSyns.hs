@@ -173,16 +173,16 @@ renameHsConDecls :: [HsConDecl] -> SubTable -> ScopeSM ([HsConDecl])
 renameHsConDecls = mapRename renameHsConDecl
 
 renameHsConDecl :: HsConDecl -> SubTable -> ScopeSM (HsConDecl)
-renameHsConDecl (HsConDecl srcLoc hsName hsBangTypes) subTable = do
+renameHsConDecl cd@(HsConDecl { hsConDeclSrcLoc = srcLoc, hsConDeclName = hsName, hsConDeclConArg = hsBangTypes }) subTable = do
     setSrcLoc srcLoc
     hsName' <- renameHsName hsName subTable
     hsBangTypes' <- renameHsBangTypes hsBangTypes subTable
-    return (HsConDecl srcLoc hsName' hsBangTypes')
-renameHsConDecl (HsRecDecl srcLoc hsName stuff) subTable = do
+    return cd { hsConDeclName = hsName', hsConDeclConArg = hsBangTypes' }
+renameHsConDecl cd@HsRecDecl { hsConDeclSrcLoc = srcLoc, hsConDeclName = hsName, hsConDeclRecArg = stuff} subTable = do
     setSrcLoc srcLoc
     hsName' <- renameHsName hsName subTable
     stuff' <- sequence [ do ns' <- mapRename renameHsName ns subTable; t' <- renameHsBangType t subTable; return (ns',t')  |  (ns,t) <- stuff]
-    return (HsRecDecl srcLoc hsName' stuff')
+    return cd { hsConDeclName = hsName', hsConDeclRecArg = stuff' }
 
 renameHsBangTypes :: [HsBangType] -> SubTable -> ScopeSM ([HsBangType])
 renameHsBangTypes = mapRename renameHsBangType
@@ -218,9 +218,11 @@ renameHsType' dovar t st = pp (rt t st) where
         hsName' <- renameTypeHsName hsName subTable
         return (HsTyCon hsName')
     rt (HsTyForall ts v) subTable  = do
-        -- False <- return dovar
         v <- renameHsQualType v subTable
         return $ HsTyForall ts v
+    rt (HsTyExists ts v) subTable  = do
+        v <- renameHsQualType v subTable
+        return $ HsTyExists ts v
     pp t | not dovar = t
     pp t = do
         t' <- t
@@ -780,6 +782,8 @@ instance Renameable HsFixity where
 instance Renameable HsAssoc where
     replaceName _ object = object
 
+instance Renameable HsTyVarBind where
+    replaceName f = hsTyVarBindName_u (replaceName f)
 
 instance Renameable (HsDecl) where
     replaceName f object
@@ -817,13 +821,13 @@ instance Renameable (HsMatch) where
 
 
 instance Renameable HsConDecl where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsConDecl  srcloc name bangtyps ->
-                HsConDecl  # srcloc # name # bangtyps
-            HsRecDecl  srcloc name names_and_bangtyp ->
-                HsRecDecl  # srcloc # name # names_and_bangtyp
+    replaceName f = hsConDeclExists_u (replaceName f) . hsConDeclName_u (replaceName f) . hsConDeclRecArg_u (replaceName f) . hsConDeclConArg_u (replaceName f)
+--      let a # b = a $ (replaceName f b)
+--        in case object of
+--            HsConDecl  srcloc name bangtyps ->
+--                HsConDecl  # srcloc # name # bangtyps
+--            HsRecDecl  srcloc name names_and_bangtyp ->
+--                HsRecDecl  # srcloc # name # names_and_bangtyp
 
 
 

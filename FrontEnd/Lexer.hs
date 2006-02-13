@@ -105,6 +105,7 @@ data Token
 	| KW_Qualified
 	| KW_Foreign
 	| KW_Forall
+        | KW_Exists
 
         | EOF
         deriving (Eq,Show)
@@ -162,6 +163,7 @@ reserved_ids = [
  ( "type", 	KW_Type ),
  ( "foreign",   KW_Foreign ),
  ( "forall",    KW_Forall ),
+ ( "exists",    KW_Exists ),
  ( "where", 	KW_Where )
  ]
 

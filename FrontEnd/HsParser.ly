@@ -118,6 +118,7 @@ Reserved Ids
 >	'qualified'	{ KW_Qualified }
 >	'foreign'	{ KW_Foreign }
 >	'forall'	{ KW_Forall }
+>	'exists'	{ KW_Exists }
 
 > %monad { P } { thenP } { returnP }
 > %lexer { lexer } { EOF }
@@ -350,6 +351,7 @@ Types
 >	: btype '->' type		{ HsTyFun $1 $3 }
 >	| btype				{ $1 }
 >       | 'forall' tbinds '.' ctype     { HsTyForall { hsTypeVars = reverse $2, hsTypeType = $4 } }
+>       | 'exists' tbinds '.' ctype     { HsTyExists { hsTypeVars = reverse $2, hsTypeType = $4 } }
 
 > tbinds :: { [HsTyVarBind] }
 >       : tbinds tbind                  { $2 : $1 }
@@ -420,10 +422,14 @@ Datatype declarations
 >	| constr			{ [$1] }
 
 > constr :: { HsConDecl }
->	: srcloc scontype		{ HsConDecl $1 (fst $2) (snd $2) }
->	| srcloc sbtype conop sbtype	{ HsConDecl $1 $3 [$2,$4] }
->	| srcloc con '{' fielddecls '}'
->					{ HsRecDecl $1 $2 (reverse $4) }
+>	: srcloc mexists scontype		{ HsConDecl { hsConDeclSrcLoc = $1, hsConDeclName = (fst $3), hsConDeclConArg = (snd $3), hsConDeclExists = $2 } }
+>	| srcloc mexists sbtype conop sbtype	{ HsConDecl { hsConDeclSrcLoc = $1, hsConDeclName = $4, hsConDeclConArg = [$3,$5], hsConDeclExists = $2 } }
+>	| srcloc mexists con '{' fielddecls '}'
+>					{ HsRecDecl { hsConDeclSrcLoc = $1, hsConDeclName = $3, hsConDeclRecArg = (reverse $5), hsConDeclExists = $2 } }
+
+> mexists :: { [HsTyVarBind] }
+>         : 'exists' tbinds '.'         { $2 }
+>         |                             { [] }
 
 > scontype :: { (HsName, [HsBangType]) }
 >	: btype				{% splitTyConApp $1 `thenP` \(c,ts) ->

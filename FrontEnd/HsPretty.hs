@@ -342,10 +342,10 @@ ppWhere l = nest 2 (text "where" $$$ body whereIndent (map ppHsDecl l))
 
 ------------------------- Data & Newtype Bodies -------------------------
 ppHsConstr :: HsConDecl -> Doc
-ppHsConstr (HsRecDecl pos name fieldList) =
+ppHsConstr (HsRecDecl { hsConDeclName = name, hsConDeclRecArg = fieldList }) =
 	 ppHsName name
 	 <> (braceList . map ppField $ fieldList)
-ppHsConstr (HsConDecl pos name typeList)
+ppHsConstr (HsConDecl { hsConDeclName = name, hsConDeclConArg = typeList})
      | isSymbolName name && length typeList == 2 =
 	 let [l, r] = typeList in
 	 myFsep [ppHsBangType l, ppHsName name, ppHsBangType r]

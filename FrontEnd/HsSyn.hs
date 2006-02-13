@@ -165,10 +165,10 @@ data HsMatch
   deriving(Data,Typeable,Eq,Show)
 
 data HsConDecl
-	 = HsConDecl { hsConDeclSrcLoc :: SrcLoc, hsConDeclName :: HsName, hsConDeclConArg :: [HsBangType] }
-	 | HsRecDecl { hsConDeclSrcLoc :: SrcLoc, hsConDeclName :: HsName, hsConDeclRecArg :: [([HsName],HsBangType)] }
+	 = HsConDecl { hsConDeclSrcLoc :: SrcLoc, hsConDeclExists :: [HsTyVarBind], hsConDeclName :: HsName, hsConDeclConArg :: [HsBangType] }
+	 | HsRecDecl { hsConDeclSrcLoc :: SrcLoc, hsConDeclExists :: [HsTyVarBind], hsConDeclName :: HsName, hsConDeclRecArg :: [([HsName],HsBangType)] }
   deriving(Data,Typeable,Eq,Show)
-  {-! derive: is !-}
+  {-! derive: is, update !-}
 
 hsConDeclArgs HsConDecl { hsConDeclConArg = as } = as
 hsConDeclArgs HsRecDecl { hsConDeclRecArg = as } = concat [ replicate (length ns) t | (ns,t) <- as]
@@ -205,15 +205,18 @@ data HsType
          | HsTyForall {
             hsTypeVars :: [HsTyVarBind],
             hsTypeType :: HsQualType }
+         | HsTyExists {
+            hsTypeVars :: [HsTyVarBind],
+            hsTypeType :: HsQualType }
   deriving(Data,Typeable,Eq,Ord,Show)
-  {-! derive: GhcBinary !-}
+  {-! derive: GhcBinary, is !-}
 
 data HsTyVarBind = HsTyVarBind {
     hsTyVarBindSrcLoc :: SrcLoc,
     hsTyVarBindName :: HsName,
     hsTyVarBindKind :: Maybe HsKind }
   deriving(Data,Typeable,Eq,Ord,Show)
-  {-! derive: GhcBinary !-}
+  {-! derive: GhcBinary, update !-}
 
 hsTyVarBind = HsTyVarBind { hsTyVarBindSrcLoc = bogusASrcLoc, hsTyVarBindName = undefined, hsTyVarBindKind = Nothing }
 

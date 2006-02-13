@@ -263,7 +263,7 @@ desugarDecl anyOtherDecl = return [anyOtherDecl]
 
 createSelectors _sloc ds = ans where
     ds' :: [(HsName,[(HsName,HsBangType)])]
-    ds' = [ (c,[(n,t) | (ns,t) <- rs , n <- ns ]) | HsRecDecl _ c rs <- ds ]
+    ds' = [ (c,[(n,t) | (ns,t) <- rs , n <- ns ]) | HsRecDecl { hsConDeclName = c, hsConDeclRecArg = rs } <- ds ]
     ns = sortGroupUnderF fst $ concatMap f ds' -- [  | (c,nts) <- ds' ]
     f ::  (HsName,[(HsName,HsBangType)]) -> [ (HsName, (HsName,Int,Int)) ]
     f (c,nts) = [ (n,(c,i,length nts)) | (n,_) <- nts | i <- [0..]]
