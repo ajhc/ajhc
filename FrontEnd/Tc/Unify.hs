@@ -38,7 +38,7 @@ subsumes s1 s2 = do
     -- SKOL needs to be after SBOXY
     sub s1 fa@TForAll {} = do
         printRule "SKOL"
-        (_,r2) <- skolomize fa
+        (_,_,r2) <- skolomize fa
         s1 `subsumes` r2
 
     -- SPEC

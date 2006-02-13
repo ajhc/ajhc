@@ -48,6 +48,7 @@ module Class(
     classRecords,
     makeClassHierarchy,
     splitReduce,
+    toHnfs,
     topDefaults,
     derivableClasses,
     stdClasses,
@@ -89,8 +90,6 @@ import Util.Inst()
 -- Instance
 type Inst  = Qual Pred
 
-listToFM = Map.fromList
-
 bySuper :: ClassHierarchy -> Pred -> [Pred]
 bySuper h p@(IsIn c t)
  = p : concat (map (bySuper h) supers)
@@ -107,11 +106,9 @@ matchPred x@(IsIn c t) y@(IsIn c' t')
 
 reducePred :: Monad m => ClassHierarchy -> Pred -> m [Pred]
 reducePred h p@(IsIn c t)
-    | Just x <- foldr (|||) Nothing poss = return x
+    | Just x <- foldr mplus Nothing poss = return x
     | otherwise = fail "reducePred"
  where poss = map (byInst p) (instsOf h c)
-       Nothing ||| y = y
-       Just x  ||| y = Just x
 
 -----------------------------------------------------------------------------
 
@@ -295,14 +292,6 @@ printClassHierarchy (ClassHierarchy h)
 
             putStr "\n"
 
-{-
-genClassHierarchy :: [(HsDecl)] -> ClassHierarchy
-genClassHierarchy classes
-   = foldl (flip addClassToHierarchy) stdClassHierarchy classes
-   where
-   -- stdClassHierarchy = classListToHierarchy stdClasses
-   stdClassHierarchy = listToFM preludeClasses
--}
 
 --------------------------------------------------------------------------------
 
@@ -657,7 +646,6 @@ inHnf (IsIn c t) = hnf t
        hnf (TAp t _) = hnf t
        hnf (TArrow _t1 _t2) = False
        hnf TForAll {} = False
---       hnf (TTuple _args) = False
 
 --simplify          :: ClassHierarchy -> [Pred] -> [Pred] -> [Pred]
 --simplify h rs []     = rs
@@ -729,7 +717,7 @@ topDefaults h ps  =  flagOpt FO.Defaulting >>= \b -> case b of
 --    False -> return mempty
     _
       | any null tss -> fail $ " ambiguity " ++ (render $ pprint ps)
-      | otherwise    -> return $ listToFM (zip vs (map head tss))
+      | otherwise    -> return $ Map.fromList (zip vs (map head tss))
         where ams = ambig h [] ps
               tss = [ ts | (v,qs,ts) <- ams ]
               vs  = [ v  | (v,qs,ts) <- ams ]

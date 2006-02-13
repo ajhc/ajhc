@@ -7,7 +7,6 @@ module FrontEnd.Tc.Monad(
     freshInstance,
     toSigma,
     freshSigma,
-    generalize,
     getClassHierarchy,
     getKindEnv,
     getSigEnv,
@@ -26,14 +25,15 @@ module FrontEnd.Tc.Monad(
     TcInfo(..),
     tcInfoEmpty,
     TypeEnv(),
+    inst,
     unificationError,
+    freeMetaVarsEnv,
     varBind,
     withContext
     ) where
 
 import Control.Monad.Reader
 import Control.Monad.Writer
-import Control.Monad.Trans
 import Control.Monad.Error
 import Data.IORef
 import Data.Monoid
@@ -50,13 +50,13 @@ import Class(ClassHierarchy,simplify)
 import Diagnostic
 import Doc.DocLike
 import Doc.PPrint
-import Support.CanType
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc(bogusASrcLoc)
 import FrontEnd.Tc.Type
 import GenUtil
 import Name.Name
 import Options
+import Support.CanType
 import Util.Inst
 import Warning
 
@@ -261,12 +261,12 @@ toSigma t = TForAll [] ([] :=> t)
 -- | replace bound variables with arbitrary new ones and drop the binding
 -- TODO predicates?
 
-skolomize :: Sigma' -> Tc ([SkolemTV],Rho')
-skolomize (TForAll vs (_ :=> rho)) = return (vs,rho)
+skolomize :: Sigma' -> Tc ([SkolemTV],Preds,Rho')
+skolomize (TForAll vs (ps :=> rho)) = return (vs,ps,rho)
 --freshSigma s >>= \x -> case x of
 --    TForAll as (_ :=> r) -> return (as,r)
 --    r -> return ([],r)
-skolomize s = return ([],s)
+skolomize s = return ([],[],s)
 
 boxyInstantiate :: Sigma -> Tc Rho'
 boxyInstantiate = freshInstance Sigma
@@ -290,16 +290,7 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
     return (sortGroupUnderFG fst snd vs,t')
 
 
-generalize :: [Pred] -> Rho -> Tc Sigma
-generalize ps r = do
-    ch <- getClassHierarchy
-    r <- flattenType r
-    fmvenv <- freeMetaVarsEnv
-    -- liftIO $ mapM_ (putStrLn . pprint) (Set.toList fmvenv)
-    let mvs =  [ v  | v <- freeMetaVars r, not $ v `Set.member` fmvenv ]
-    let (rp,nps) = partition (\ (IsIn c t) -> any (`elem` mvs) (freeMetaVars t)) ps
-    addPreds nps
-    quantify mvs rp r
+
 
 freeMetaVarsEnv :: Tc (Set.Set MetaVar)
 freeMetaVarsEnv = do

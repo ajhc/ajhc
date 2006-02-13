@@ -4,8 +4,9 @@ import Control.Monad.Writer
 import List
 import IO(hFlush,stdout)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
-import Class(ClassHierarchy, entails, split, topDefaults, splitReduce,simplify)
+import Class(ClassHierarchy)
 import Control.Monad.Reader
 import DeclsDepends(getDeclDeps)
 import DependAnalysis(getBindGroups)
@@ -17,6 +18,7 @@ import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Unify
 import FrontEnd.SrcLoc
+import FrontEnd.Tc.Class
 import FrontEnd.Utils(getDeclName)
 import GenUtil
 import HsPretty
@@ -53,7 +55,7 @@ tcExprPoly e t = do
 
 tiExprPoly e t@TMetaVar {} = tcExpr e t   -- GEN2
 tiExprPoly e t = do                   -- GEN1
-    (_,t) <- skolomize t
+    (_,_,t) <- skolomize t
     tcExpr e t
 
 tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp
@@ -162,7 +164,7 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
             return (HsLambda sloc (reverse rs) e')
         lam _ _ _ _ = fail "lambda type mismatch"
         lamPoly ps e s rs = do
-            (_,s) <- skolomize s
+            (_,_,s) <- skolomize s
             lam ps e s rs
 
 
@@ -380,9 +382,9 @@ tiImpls bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ 
     --liftIO $ putStrLn $ "tiimpls " ++ show (map getDeclName bs)
     ss <- sequence [newMetaVar Tau Star | _ <- bs]
     (rs,ps) <- censor (const mempty) $ listen $ localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ss]) $ sequence [ tcDecl d s | d <- bs | s <- ss ]
-    ps <- mapM flattenType ps
-    ch <- getClassHierarchy
-    ps <- return $ Class.simplify ch ps
+    ps <- flattenType ps
+    --ch <- getClassHierarchy
+    --ps <- return $ Class.simplify ch ps
     let f n s = do
             --liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
             s <- flattenType s
@@ -481,7 +483,7 @@ tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "i
         lam _ _ _ = fail "lambda type mismatch"
         lamPoly ps s@TMetaVar {} rs = lam ps s rs
         lamPoly ps s rs = do
-            (_,s) <- skolomize s
+            (_,_,s) <- skolomize s
             lam ps s rs
     typ <- findType typ
     lam pats typ []
@@ -496,10 +498,16 @@ tiExpl (sc, decl@HsForeignDecl {}) = do return (decl,Map.empty)
 tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typed " ++  (render $ ppHsDecl decl))) $ do
     --liftIO $ putStrLn $ "** typing expl: " ++ show (getDeclName decl) ++ " " ++ prettyPrintType sc
     addToCollectedEnv (Map.singleton (getDeclName decl) sc)
-    --tcDecl decl sc
-    --sc <- freshSigma sc
-    (_,typ) <- skolomize sc
-    tcDecl decl typ
+    (_,qs,typ) <- skolomize sc
+    (ret,ps) <- censor (const mempty) $ listen (tcDecl decl typ)
+    ps <- flattenType ps
+    ch <- getClassHierarchy
+    env <- freeMetaVarsEnv
+    (ds,rs) <- splitReduce (Set.toList env) (freeMetaVarsPreds qs) ps
+    --liftIO $ putStrLn $ pprint ds
+    --addPreds ds
+    assertEntailment qs (rs ++ ds)
+    return ret
     --case sc of
     --    TForAll _ (_ :=> t) -> tcDecl decl t
     --    t -> tcDecl decl t
@@ -740,7 +748,7 @@ tiProgram bgs es = ans where
         (r,ps) <- listen $ f bgs [] mempty
         ps <- flattenType ps
         ch <- getClassHierarchy
-        ps <- return $ Class.simplify ch ps
+        ps <- return $ simplify ch ps
         liftIO $ mapM_ (putStrLn.show) ps
         return r
     f (bg:bgs) rs cenv  = do

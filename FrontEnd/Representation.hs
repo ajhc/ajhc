@@ -99,6 +99,7 @@ tList = TCon (Tycon tc_List (Kfun Star Star))
 
 instance Eq Type where
     (TVar a) == (TVar b) = a == b
+    (TMetaVar a) == (TMetaVar b) = a == b
     (TCon a) == (TCon b) = a == b
     (TAp a' a) == (TAp b' b) = a' == b' && b == a
     (TGen a _) == (TGen b _) = a == b

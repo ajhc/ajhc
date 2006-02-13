@@ -27,6 +27,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Main
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
+import FrontEnd.Tc.Class
 import FrontEnd.Desugar(desugarHsStmt)
 import GenUtil
 import Class

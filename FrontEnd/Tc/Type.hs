@@ -12,6 +12,7 @@ module FrontEnd.Tc.Type(
     Qual(..),
     Tycon(..),
     Type(..),
+    Preds(),
     tyvar,
     tList,
     Tyvar(..)
@@ -42,6 +43,8 @@ type Tau = Type
 type MetaTV = Tyvar
 type SkolemTV = Tyvar
 type BoundTV = Tyvar
+
+type Preds = [Pred]
 
 isMetaTV :: Tyvar -> Bool
 isMetaTV Tyvar { tyvarRef = Just _ } = True
@@ -176,6 +179,9 @@ instance DocLike d => PPrint d MetaVarType where
         Tau -> char 't'
         Rho -> char 'r'
         Sigma -> char 's'
+
+instance DocLike d => PPrint d Pred where
+    pprint (IsIn c t) = text (show c) <+> prettyPrintType t
 
 instance DocLike d => PPrint d MetaVar where
     pprint MetaVar { metaUniq = u, metaKind = k, metaType = t }
