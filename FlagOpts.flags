@@ -3,21 +3,24 @@
 !Typechecking
 boxy use the new boxy typechecker
 monomorphism-restriction enforce monomorphism restriction
+defaulting perform defaulting of ambiguous types
+cpp pass haskell source through cpp
 
-!Code Options
+!Debugging
+lint perform lots of extra type checks
+
+!Optimization Options
 inline-pragmas use inline pragmas
 rules use rules
-wrapper wrap main in exception handler
 float-in perform float inward transform
 strictness perform strictness analysis
 cpr do CPR analysis
 type-analysis perhaps a basic points-to analysis on types right after method generation
-defaulting perform defaulting of ambiguous types
 
-lint perform lots of extra type checks
-cpp pass code through cpp
+!Code Generation
+wrapper wrap main in exception handler
 boehm use Boehm garbage collector
-profile embed profiling code
+profile enable profiling code in generated executable
 
 
 !Default settings
