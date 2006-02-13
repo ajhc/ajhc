@@ -77,7 +77,9 @@ foreach (keys %h) {
 print "one x = Left x\n";
 
 
-print "\nprocess s xs = foldr f (s,[]) (map one xs) where\n";
+
+print "\n{-# NOINLINE process #-}\n";
+print "process s xs = foldr f (s,[]) (map one xs) where\n";
 print "   f (Right g) (s,xs) = (g s,xs)\n";
 print "   f (Left x) (s,xs) = (s,x:xs)\n";
 
@@ -91,7 +93,8 @@ foreach (@cat) {
     }
 }
 
-print "\nhelpMsg = \"$help\"\n";
+print "\n{-# NOINLINE helpMsg #-}\n";
+print "helpMsg = \"$help\"\n";
 
 
 

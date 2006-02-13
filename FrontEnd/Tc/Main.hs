@@ -17,6 +17,8 @@ import FrontEnd.KindInfer
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Unify
+import Options
+import qualified FlagOpts as FO
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Class
 import FrontEnd.Utils(getDeclName)
@@ -383,14 +385,9 @@ tiImpls bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ 
     ss <- sequence [newMetaVar Tau Star | _ <- bs]
     (rs,ps) <- censor (const mempty) $ listen $ localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ss]) $ sequence [ tcDecl d s | d <- bs | s <- ss ]
     ps <- flattenType ps
-    --ch <- getClassHierarchy
-    --ps <- return $ Class.simplify ch ps
     let f n s = do
-            --liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
             s <- flattenType s
-            --liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
             s <- generalize ps s
-            --liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
             return (n,s)
     nenv <- sequence [ f n s | (n,s) <- Map.toAscList $ mconcat $ snds rs]
     addToCollectedEnv (Map.fromList nenv)
@@ -411,9 +408,13 @@ tcPragmaDecl prule@HsPragmaRules { hsDeclFreeVars = vs, hsDeclLeftExpr = e1, hsD
             vs' <- mapM dv vs
             tr <- newBox Star
             let (vs,envs) = unzip vs'
+            ch <- getClassHierarchy
             localEnv (mconcat envs) $ do
-                     tcExpr e1 tr
-                     tcExpr e2 tr
+                    (e1,ps) <- censor (const mempty) $ listen (tcExpr e1 tr)
+                    ([],rs) <- splitPreds ch [] ps
+                    (e2,ps) <- censor (const mempty) $ listen (tcExpr e2 tr)
+                    ([],rs) <- splitPreds ch [] ps
+                    return ()
             mapM_ unBox vs
             return [prule]
         dv n = do
@@ -504,53 +505,15 @@ tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typ
     ch <- getClassHierarchy
     env <- freeMetaVarsEnv
     (ds,rs) <- splitReduce (Set.toList env) (freeMetaVarsPreds qs) ps
-    --liftIO $ putStrLn $ pprint ds
-    --addPreds ds
     assertEntailment qs (rs ++ ds)
     return ret
-    --case sc of
-    --    TForAll _ (_ :=> t) -> tcDecl decl t
-    --    t -> tcDecl decl t
-    --(_,sc) <- skolomize sc
-    {-
-       cHierarchy <- getClassHierarchy
-       --(qs :=> t) <- -fmap snd $ freshInst sc
-       let (qs :=> t) = unQuantify sc
-       t <- flattenType t
-       qs <- flattenType qs
-       --liftIO $ putStrLn  $ show sc
-       (ps, env') <- tiDeclTop env decl t
-       --liftIO $ putStrLn  $ show ps
-       ps <- flattenType ps
 
-       --qs' <- flattenType qs
-       --ps'' <- flattenType ps
-       fs <- liftM tv (flattenType env)
-       --qs' <- sequence [ flattenType y >>= return . IsIn x | IsIn x y <- qs]
-       s          <- getSubst
-       let qs'     = apply s qs
-           t'      = apply s t
-           ps'     = [ p | p <- apply s ps, not (entails cHierarchy qs' p) ]
-       --    fs      = tv (apply s env)
-           gs      = tv t' {- \\ fs  -} -- TODO fix this!
-           sc'     = quantify gs (qs':=>t')
-       -- (ds,rs) <- reduce cHierarchy fs gs ps'
-       --liftIO $ putStrLn  $ show (gs,ps')
-       (ds,rs,nsub) <- splitReduce cHierarchy fs gs ps'
-       --liftIO $ putStrLn  $ show (ds,rs,nsub)
-       sequence_ [ unify  (TVar tv) t | (tv,t) <- nsub ]
-       --extSubst nsub
-       --unify t' t
-       --unify t t'
-       if sc /= sc' then
-           fail $ "signature too general for " ++ show (getDeclName decl) ++ "\n Given: " ++ show sc ++ "\n Infered: " ++ show sc'
-        else if not (null rs) then
-           fail $ "context too weak for "  ++ show (getDeclName decl) ++ "\nGiven: " ++ PPrint.render (pprint  sc) ++ "\nInfered: " ++ PPrint.render (pprint sc') ++"\nContext: " ++ PPrint.render (pprint  rs)
-        else
-           return (sc', ds,  env')
-           --return (sc', ds, env')
+restricted   :: [HsDecl] -> Bool
+restricted bs = fopts FO.MonomorphismRestriction && any isSimpleDecl bs where
+   isSimpleDecl :: (HsDecl) -> Bool
+   isSimpleDecl (HsPatBind _sloc _pat _rhs _wheres) = True
+   isSimpleDecl _ = False
 
--}
 {-
 
 
@@ -742,23 +705,37 @@ tiProgram modName sEnv kt h dconsEnv env bgs = runTI dconsEnv h kt sEnv modName 
 
 
 -}
+
+getBindGroupName (expl,impls) =  map getDeclName (snds expl ++ impls)
+
+
 tiProgram ::  [BindGroup] -> [HsDecl] -> Tc [HsDecl]
 tiProgram bgs es = ans where
     ans = do
-        (r,ps) <- listen $ f bgs [] mempty
+        (r,ps) <- censor (const mempty) $ listen $ f bgs [] mempty
         ps <- flattenType ps
         ch <- getClassHierarchy
-        ps <- return $ simplify ch ps
-        liftIO $ mapM_ (putStrLn.show) ps
+        liftIO $ print ps
+        ([],rs) <- splitPreds ch [] ps
+        topDefaults rs
         return r
+        --ps <- return $ simplify ch ps
+        --liftIO $ mapM_ (putStrLn.show) ps
+        --return r
     f (bg:bgs) rs cenv  = do
-        (ds,env) <- tcBindGroup bg
-        liftIO $ do
-            putChar '.'
-            hFlush stdout
+        ((ds,env),ps) <- censor (const mempty) $ listen (tcBindGroup bg)
+        ch <- getClassHierarchy
+        withContext (makeMsg "in the binding group:" $ show (getBindGroupName bg)) $ do
+            ([],leftovers) <- splitPreds ch [] ps
+            topDefaults leftovers
+        liftIO $ do putChar '.'; hFlush stdout
         localEnv env $ f bgs (ds ++ rs) (env `mappend` cenv)
     f [] rs _cenv = do
-        mapM_ tcPragmaDecl es
+        ch <- getClassHierarchy
+        ((),ps) <- censor (const mempty) $ listen $ mapM_ tcPragmaDecl es
+        withContext (makeMsg "in the pragmas:" $ "rules") $ do
+            ([],leftovers) <- splitPreds ch [] ps
+            topDefaults leftovers
         liftIO $ putStrLn "!"
         return rs
 

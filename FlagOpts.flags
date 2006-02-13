@@ -2,6 +2,7 @@
 
 !Typechecking
 boxy use the new boxy typechecker
+monomorphism-restriction enforce monomorphism restriction
 
 !Code Options
 inline-pragmas use inline pragmas
@@ -20,4 +21,4 @@ profile embed profiling code
 
 
 !Default settings
-@default inline-pragmas rules wrapper float-in strictness defaulting type-analysis
+@default inline-pragmas rules wrapper float-in strictness defaulting type-analysis monomorphism-restriction

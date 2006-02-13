@@ -4,6 +4,7 @@ module FrontEnd.Tc.Class(
     splitPreds,
     generalize,
     splitReduce,
+    topDefaults,
     freeMetaVarsPreds,
     simplify,
     assertEntailment,
@@ -22,7 +23,7 @@ import Representation(Class)
 import Name.Names
 import Options
 import qualified FlagOpts as FO
-import Class hiding(split,simplify,toHnfs,entails,splitReduce)
+import Class hiding(split,simplify,toHnfs,entails,splitReduce,topDefaults)
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Monad
 import Doc.PPrint
@@ -136,7 +137,7 @@ match' t1 t2  = fail $ "match: " ++ show (t1,t2)
 splitReduce :: [MetaVar] -> [MetaVar] -> [Pred] -> Tc ([Pred], [Pred])
 splitReduce fs gs ps = do
     h <- getClassHierarchy
-    --liftIO $ putStrLn $ pprint (fs,gs,ps) 
+    --liftIO $ putStrLn $ pprint (fs,gs,ps)
     (ds, rs) <- splitPreds h fs ps
     (rs',sub) <- genDefaults h (fs++gs) rs
     sequence_ [ varBind x y | (x,y) <- sub]
@@ -170,7 +171,7 @@ ambig h vs ps
 assertEntailment :: Preds -> Preds -> Tc ()
 assertEntailment qs ps = do
     ch <- getClassHierarchy
-    let ns = [ p  | p <- ps, not $ entails ch qs p ] 
+    let ns = [ p  | p <- ps, not $ entails ch qs p ]
     if null ns then return () else
         fail $ "Signature too Weak: " ++ pprint ns
 {-
@@ -199,3 +200,15 @@ defaults
     | not $ fopts FO.Defaulting = []
     | otherwise = map (\name -> TCon (Tycon name Star)) [tc_Integer, tc_Double]
 
+topDefaults     :: [Pred] -> Tc ()
+topDefaults ps  = do
+    h <- getClassHierarchy
+    let ams = ambig h [] ps
+        tss = [ ts | (v,qs,ts) <- ams ]
+        vs  = [ v  | (v,qs,ts) <- ams ]
+    when (any null tss) $ fail $ "Top Level ambiguity " ++ (pprint ps)
+    return ()
+--      | otherwise    -> return $ Map.fromList (zip vs (map head tss))
+--        where ams = ambig h [] ps
+--              tss = [ ts | (v,qs,ts) <- ams ]
+--              vs  = [ v  | (v,qs,ts) <- ams ]
