@@ -64,6 +64,9 @@ mapHsTypeHsType f (HsTyApp a b) = do
 mapHsTypeHsType f (HsTyForall vs qt) = do
     x <- f $ hsQualTypeType qt
     return $ HsTyForall vs qt { hsQualTypeType = x }
+mapHsTypeHsType f (HsTyExists vs qt) = do
+    x <- f $ hsQualTypeType qt
+    return $ HsTyExists vs qt { hsQualTypeType = x }
 mapHsTypeHsType _ x = return x
 
 

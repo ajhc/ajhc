@@ -73,13 +73,13 @@ evalTypeSyms (TypeSynonyms tmap) t = execUniqT 1 (eval [] t) where
         unwind (HsTyApp t t1') rest
     subst sm (HsTyForall vs t) = do
         ns <- mapM (const newUniq) vs
-        let nvs = [ (hsTyVarBindName v,v { hsTyVarBindName = hsNameIdent_u (hsIdentString_u (++ ('@':show n))) (hsTyVarBindName v)})| (n,v) <- zip ns vs ]
+        let nvs = [ (hsTyVarBindName v,v { hsTyVarBindName = hsNameIdent_u (hsIdentString_u ((show n ++ "00") ++)) (hsTyVarBindName v)})| (n,v) <- zip ns vs ] 
             nsm = Map.fromList [ (v,HsTyVar $ hsTyVarBindName t)| (v,t) <- nvs] `Map.union` sm
         t' <- substqt nsm t
         return $ HsTyForall (snds nvs)  t'
     subst sm (HsTyExists vs t) = do
         ns <- mapM (const newUniq) vs
-        let nvs = [ (hsTyVarBindName v,v { hsTyVarBindName = hsNameIdent_u (hsIdentString_u (++ ('@':show n))) (hsTyVarBindName v)})| (n,v) <- zip ns vs ]
+        let nvs = [ (hsTyVarBindName v,v { hsTyVarBindName = hsNameIdent_u (hsIdentString_u ((show n ++ "00") ++)) (hsTyVarBindName v)})| (n,v) <- zip ns vs ] 
             nsm = Map.fromList [ (v,HsTyVar $ hsTyVarBindName t)| (v,t) <- nvs] `Map.union` sm
         t' <- substqt nsm t
         return $ HsTyExists (snds nvs)  t'

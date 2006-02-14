@@ -229,7 +229,7 @@ getConstructorKinds (KindEnv m) = m -- Map.fromList [ (toName TypeConstructor x,
 -- this is what gets called from outside of this module
 kiDecls :: KindEnv -> [HsDecl] -> IO KindEnv
 kiDecls inputEnv classAndDataDecls = run >>= return . snd where
-   run =   runKI inputEnv $ mapM_ kiKindGroup kindGroups
+   run = runKI inputEnv $ withContext ("kiDecls: " ++ show (map getDeclName classAndDataDecls)) $ mapM_ kiKindGroup kindGroups
    kindGroups = map declsToKindGroup depGroups
    depGroups = getDataAndClassBg classAndDataDecls
 
@@ -268,7 +268,7 @@ kiAsst :: HsAsst -> KI Kind
 kiAsst x@(className, argName) = withContext ("kiAsst: " ++ show x) $ do
     classKind <- lookupKindEnv (toName ClassName className)
     case classKind of
-           Nothing -> error $ "kiAsst: could not find kind information for class: " ++ show className
+           Nothing -> fail $ "kiAsst: could not find kind information for class: " ++ show className
            Just ck -> do argKind <- lookupKindEnv (toName TypeVal argName)
                          case argKind of
                             --Nothing -> error  $ "kiAsst: could not find kind information for class/arg: " ++ show className ++ "/" ++ show argName
@@ -284,6 +284,9 @@ kiQualType varExist qt@(HsQualType cntxt t) = do
         withContext ("kiQualType: " ++ show qt) $ do
         mapM_ kiAsst cntxt
         kiType varExist t
+kiQualType varExist qt@(HsUnQualType t) = do
+        withContext ("kiQualType: " ++ show qt) $ do
+        kiType varExist t
 --kiQualType varExist (HsUnQualType t)
 --   = kiType varExist t
 
@@ -298,8 +301,8 @@ kiType _ tap@(HsTyCon name) = do
         case tyConKind of
            Nothing
               -> do env <- getEnv
-                    error $ "kiType: could not find kind for this constructor: " ++ show name ++
-                         "\nin this kind environment:\n" ++ show env
+                    fail $ "kiType: could not find kind for this constructor: " ++ show name ++
+                         "\nin this kind environment:\n" ++ pprint env
            Just k -> return k
 
 kiType varExist tap@(HsTyVar name) = do
@@ -309,7 +312,7 @@ kiType varExist tap@(HsTyVar name) = do
            Nothing
               -> case varExist of
                     True
-                       -> error $ "kiType: could not find kind for this type variable: " ++ show name
+                       -> fail $ "kiType: could not find kind for this type variable: " ++ show name
                     False -> do varKind <- newKindVar
 				extendEnv $ KindEnv $ Map.singleton (toName TypeVal name) varKind
                                 return varKind
@@ -369,7 +372,7 @@ newNameVar n = do
 
 kiHsQualType :: KindEnv -> HsQualType -> KindEnv
 kiHsQualType inputEnv qualType = newState where
-    (_, newState) = unsafePerformIO $ runKI inputEnv $ do
+    (_, newState) = unsafePerformIO $ runKI inputEnv $ withContext ("kiHsQualType: " ++ show qualType) $ do
         kiQualType False qualType
         envVarsToStars
 
@@ -410,8 +413,9 @@ namesFromType (HsTyTuple ts) = concatMap namesFromType ts
 namesFromType (HsTyApp t1 t2) = namesFromType t1 ++ namesFromType t2
 namesFromType (HsTyVar _) = []
 namesFromType (HsTyCon n) = [toName TypeConstructor n]
-namesFromType HsTyForall { hsTypeVars = vs } = map (toName TypeVal . hsTyVarBindName) vs
-namesFromType HsTyExists { hsTypeVars = vs } = map (toName TypeVal . hsTyVarBindName) vs
+namesFromType (HsTyForall _vs qt) = namesFromQualType qt -- map (toName TypeVal . hsTyVarBindName) vs
+namesFromType (HsTyExists _vs qt) = namesFromQualType qt -- map (toName TypeVal . hsTyVarBindName) vs
+--namesFromType HsTyExists { hsTypeVars = vs } = map (toName TypeVal . hsTyVarBindName) vs
 
 namesFromContext :: HsContext -> [Name]
 namesFromContext cntxt = map fst (hsContextToContext cntxt)
@@ -592,6 +596,4 @@ hoistType t = f t where
         where
         na = f a
         nb = f b
-
-
 
