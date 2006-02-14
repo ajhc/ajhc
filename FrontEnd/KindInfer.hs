@@ -38,7 +38,7 @@ import MapBinaryInstance()
 import Name.Name
 import qualified Util.Seq as Seq
 import Representation hiding (Subst)
-import Type(quantify,tv,tTTuple,schemeToType)
+import Type(quantify,tv,tTTuple,schemeToType,typeToScheme)
 import Util.ContextMonad
 import Util.HasSize
 
@@ -537,29 +537,6 @@ aHsQualTypeToQualType :: KindEnv -> HsQualType -> Qual Type
 aHsQualTypeToQualType kt (HsQualType cntxt t) = map (hsAsstToPred kt) cntxt :=> aHsTypeToType kt t
 aHsQualTypeToQualType kt (HsUnQualType t) = [] :=> aHsTypeToType kt t
 
--- this version quantifies all the type variables
--- perhaps there should be a version that is
--- parameterised with which variables to quantify
-
--- TODO take vs in forall type into account
--- hopefully everything has been renamed to something unique
-
-aHsQualTypeToScheme :: KindEnv -> HsQualType -> Scheme
-aHsQualTypeToScheme kt HsQualType { hsQualTypeContext = cntxt, hsQualTypeType = qt  } | HsTyForall vs qt' <- forallHoist qt = aHsQualTypeToScheme kt HsQualType { hsQualTypeContext = cntxt ++ hsQualTypeHsContext qt', hsQualTypeType = hsQualTypeType qt' }
-aHsQualTypeToScheme kt HsUnQualType { hsQualTypeType = t } = aHsQualTypeToScheme kt HsQualType { hsQualTypeContext = [], hsQualTypeType = t }
-aHsQualTypeToScheme kt qualType = quantify vars qt where
-   qt = aHsQualTypeToQualType kt qualType
-   vars = tv qt
-
-
-forallHoist :: HsType -> HsType
-forallHoist (HsTyForall vs qt) | HsTyForall vs' qt' <- hsQualTypeType qt  = forallHoist (HsTyForall (vs ++ vs') HsQualType { hsQualTypeType = hsQualTypeType qt', hsQualTypeContext = hsQualTypeHsContext qt ++ hsQualTypeHsContext qt' })
-forallHoist (HsTyFun a b) = case forallHoist b of
-    HsTyForall as qt -> HsTyForall as HsQualType { hsQualTypeContext = hsQualTypeHsContext qt, hsQualTypeType = HsTyFun a (hsQualTypeType qt) }
-    b' -> HsTyFun (forallHoist a) b'
-forallHoist (HsTyTuple ts) = HsTyTuple (map forallHoist ts)
-forallHoist (HsTyApp a b) = HsTyApp (forallHoist a) (forallHoist b)
-forallHoist t = t
 
 hsAsstToPred :: KindEnv -> HsAsst -> Pred
 hsAsstToPred kt (className, varName)
@@ -568,12 +545,10 @@ hsAsstToPred kt (className, varName)
    | otherwise = IsIn (toName ClassName className) (TVar $ tyvar (toName TypeVal varName) (head $ kindOfClass (toName ClassName className) kt) Nothing)
 
 hsQualTypeToScheme :: Monad m => KindEnv -> HsQualType -> m Scheme
-hsQualTypeToScheme kt qualType =  return $ aHsQualTypeToScheme newEnv qualType where
-   newEnv = kiHsQualType kt qualType
+hsQualTypeToScheme kt qualType = liftM typeToScheme $ hsQualTypeToSigma kt qualType
 
-hsQualTypeToSigma :: Monad m => KindEnv -> HsQualType -> m Sigma
-hsQualTypeToSigma kt qualType =  return $ schemeToType $ aHsQualTypeToScheme newEnv qualType where
-   newEnv = kiHsQualType kt qualType
+
+hsQualTypeToSigma kt qualType = hsQualTypeToType kt (Just []) qualType
 
 hsTypeToType :: Monad m => KindEnv -> HsType -> m Type
 hsTypeToType kt t = return $ hoistType $ aHsTypeToType kt t -- (forallHoist t)

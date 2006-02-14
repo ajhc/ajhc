@@ -1360,6 +1360,7 @@ getHsNamesFromHsType (HsTyApp hsType1 hsType2) = (getHsNamesFromHsType hsType1) 
 getHsNamesFromHsType (HsTyVar hsName) = [hsName]
 getHsNamesFromHsType (HsTyCon _hsName) = [] -- don't rename the Constructors
 getHsNamesFromHsType (HsTyForall _bs t) = getHsNamesFromHsQualType t -- TODO, scoping?
+getHsNamesFromHsType (HsTyExists _bs t) = getHsNamesFromHsQualType t -- TODO, scoping?
 
 
 -- gets the names of the functions declared in a class declaration

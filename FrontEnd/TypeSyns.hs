@@ -705,6 +705,7 @@ getHsNamesFromHsType (HsTyTuple hsTypes) = concat $ map getHsNamesFromHsType hsT
 getHsNamesFromHsType (HsTyApp hsType1 hsType2) = (getHsNamesFromHsType hsType1) ++ (getHsNamesFromHsType hsType2)
 getHsNamesFromHsType (HsTyVar hsName) = [hsName]
 getHsNamesFromHsType (HsTyForall vs qt) = getHsNamesFromHsQualType qt List.\\ map hsTyVarBindName vs
+getHsNamesFromHsType (HsTyExists vs qt) = getHsNamesFromHsQualType qt List.\\ map hsTyVarBindName vs
 getHsNamesFromHsType (HsTyCon _hsName) = [] -- don't rename the Constructors
 
 
