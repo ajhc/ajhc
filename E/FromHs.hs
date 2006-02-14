@@ -10,6 +10,7 @@ module E.FromHs(
     theMainName
     ) where
 
+import Char
 import Control.Monad.Identity
 import Control.Monad.State
 import Data.FunctorM
@@ -24,38 +25,38 @@ import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import Atom
 import Boolean.Algebra
-import Support.CanType
-import Char
 import Class
 import C.Prims
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
 import E.E
-import E.LetFloat(atomizeApps)
 import E.Eval(eval)
+import E.LetFloat(atomizeApps)
 import E.Rules
 import E.Subst
 import E.Traverse
 import E.TypeCheck
 import E.Values
-import Support.FreeVars
+import FrontEnd.Rename(unRename)
+import FrontEnd.SrcLoc
+import FrontEnd.Tc.Type(prettyPrintType)
+import FrontEnd.Utils
 import GenUtil
 import HsSyn
 import Info.Types
 import Name.Name as Name
 import Name.Names
-import Util.NameMonad
-import FrontEnd.SrcLoc
-import FrontEnd.Rename(unRename)
-import FrontEnd.Tc.Type(prettyPrintType)
+import Name.VConsts
 import Options
 import qualified FlagOpts as FO
-import qualified Util.Seq as Seq
 import qualified Stats
+import qualified Util.Seq as Seq
 import Representation
-import FrontEnd.Utils
-import Name.VConsts
+import Support.CanType
+import Support.FreeVars
+import Type(schemeToType)
+import Util.NameMonad
 
 localVars = [10,12..]
 theMainName = toName Name.Val "theMain"
@@ -124,6 +125,7 @@ simplifyHsPat p@HsPVar {} = p
 simplifyHsPat p@HsPLit {} = p
 simplifyHsPat p = error $ "simplifyHsPat: " ++ show p
 
+{-
 convertVal assumps n = (mp EPi ts (tipe t), mp eLam ts) where
     (Forall _ (_ :=> t)) = case Map.lookup n assumps of
         Just z -> z
@@ -132,6 +134,18 @@ convertVal assumps n = (mp EPi ts (tipe t), mp eLam ts) where
     mp _ [] t = t
     ts = ctgen t
     lt n =  nameToInt n
+-}
+
+
+fromTyvar (Tyvar _ n k _) = tVr (toId n) (kind k)
+
+fromSigma (TForAll vs (_ :=> t)) = (map fromTyvar vs, tipe t)
+fromSigma t = ([], tipe t)
+
+convertVal assumps n = (foldr ePi t vs, flip (foldr eLam) vs) where
+    (vs,t) = case Map.lookup n assumps of
+        Just z -> fromSigma $ schemeToType z
+        Nothing -> error $ "convertVal.Lookup failed: " ++ (show n)
 
 convertOneVal (Forall _ (_ :=> t)) = (mp EPi ts (tipe t)) where
     mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (lt n) (kind k)) (mp fn rs t)
@@ -367,11 +381,15 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
     makeDerives dname dargs dcons derives  = concatMap f derives where
         f n | n == class_Bounded, all (null . hsConDeclArgs) dcons  = []
         f _ = []
-    cExpr (HsAsPat n' (HsVar n)) = spec t t' $ EVar (tv n) where
-        (Forall _ (_ :=> t)) = getAssump n
-        Forall [] ((_ :=> t')) = getAssump n'
+    cExpr (HsAsPat n' (HsVar n)) = foldl eAp (EVar (tv n)) (map ty $ specialize t t') where
+        t = getAssump n
+        t' = getAssump n'
+    --cExpr (HsAsPat n' (HsVar n)) = spec t t' $ EVar (tv n) where
+        --(Forall _ (_ :=> t)) = getAssump n
+        --Forall [] ((_ :=> t')) = getAssump n'
     cExpr (HsAsPat n' (HsCon n)) =  constructionExpression dataTable (toName DataConstructor n) rt where
-        Forall [] ((_ :=> t')) = getAssump n'
+        --Forall [] ((_ :=> t')) = getAssump n'
+        t' = getAssump n'
         (_,rt) = argTypes' (ty t')
     cExpr (HsLit (HsString s)) = E.Values.toE s
     cExpr (HsLit (HsInt i)) = intConvert i
@@ -420,10 +438,10 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
     cGuard (HsGuardedRhss []) e = e
 
     getAssumpCon n  = case Map.lookup (toName Name.DataConstructor n) assumps of
-        Just z -> z
+        Just z -> schemeToType z
         Nothing -> error $ "Lookup failed: " ++ (show n)
     getAssump n  = case Map.lookup (toName Name.Val n) assumps of
-        Just z -> z
+        Just z -> schemeToType z
         Nothing -> error $ "Lookup failed: " ++ (show n)
     tv n = toTVr assumps (toName Name.Val n)
     lp  [] e = e
@@ -445,7 +463,7 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         gg' (TGen n _) t = [(n,t)]
         gg' (TVar a) (TVar b) | a == b = []
         gg' (TMetaVar a) (TMetaVar b) | a == b = []
-        gg' a b = error $ "specialization: " <> parens  (prettyPrintType a) <+> parens (prettyPrintType b) <+> "in spec" <+> hsep (map parens [prettyPrintType g, prettyPrintType s, show e])
+        gg' a b = error $ "specialization: " <> parens  (prettyPrintType a) <+> parens (prettyPrintType b) <+> "\nin spec\n" <+> vcat (map parens [prettyPrintType g, prettyPrintType s, show e])
     cType (n::HsName) = fst $ pval (toName Name.Val n)
 
     cClassDecl (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon name) _)) decls) = ans where
@@ -462,6 +480,20 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
             f n i t = (n,setProperties [prop_METHOD,prop_PLACEHOLDER] $ tVr i t, EPrim (primPrim ("Placeholder: " ++ show n)) [] t)
     cClassDecl _ = error "cClassDecl"
 
+-- | determine what arguments must be passed to something of the first type, to transform it into something of the second type.
+specialize :: Type -> Type -> [Type]
+specialize TForAll {} TForAll {} = []  -- we assume program is typesafe
+specialize g@(TForAll vs (_ :=> t)) s = snds (gg t s)  where
+    ps = zip vs [0 :: Int ..]
+    gg a b = snubFst $ gg' a b
+    gg' (TAp t1 t2) (TAp ta tb) = gg' t1 ta ++ gg' t2 tb
+    gg' (TArrow t1 t2) (TArrow ta tb) = gg' t1 ta ++ gg' t2 tb
+    gg' (TCon a) (TCon b) = if a /= b then error "constructors don't match." else []
+    gg' (TVar a) t | Just n <- lookup a ps = [(n,t)]
+    gg' (TVar a) (TVar b) | a == b = []
+    gg' (TMetaVar a) (TMetaVar b) | a == b = []
+    gg' a b = error $ "specialization: " <> parens  (prettyPrintType a) <+> parens (prettyPrintType b) <+> "\nin spec\n" <+> vcat (map parens [prettyPrintType g, prettyPrintType s])
+specialize _g _s = []
 
 ctgen t = map snd $ snubFst $ Seq.toList $ everything (Seq.<>) (mkQ Seq.empty gg) t where
     gg (TGen n g) = Seq.single (n,g)

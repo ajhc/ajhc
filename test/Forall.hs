@@ -71,10 +71,17 @@ data Bob  = Bob (forall a . a -> a)
 -- this can't be handled yet
 data Fred = Fred (forall a . a -> a) ((forall a . (forall b . b -> a ) -> a) -> Int)
 
+xs :: [forall a . a -> a]
+xs = [id,const undefined,error "three"]
+
+myhead ::  [forall a . a -> a] -> (forall a . a -> a)
+myhead = head
+
 f (Bob x) = (x 'y',x (3::Int))
 
 main = do
     putChar $ fst $ f (Bob id)
+    putChar $ myhead xs 'z'
     putStrLn "Done."
 
 

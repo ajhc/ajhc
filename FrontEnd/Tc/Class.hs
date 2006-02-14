@@ -8,6 +8,7 @@ module FrontEnd.Tc.Class(
     freeMetaVarsPreds,
     simplify,
     assertEntailment,
+    assertEquivalant,
     Preds
 
     )where
@@ -183,6 +184,11 @@ assertEntailment qs ps = do
     let ns = [ p  | p <- ps, not $ entails ch qs p ]
     if null ns then return () else
         fail $ "Signature too Weak: " ++ pprint ns
+
+assertEquivalant :: Preds -> Preds -> Tc ()
+assertEquivalant qs ps = do
+    assertEntailment qs ps
+    assertEntailment ps qs
 {-
 
 reduce :: OptionMonad m => ClassHierarchy -> [Tyvar] -> [Tyvar] -> [Pred] -> m ([Pred], [Pred])

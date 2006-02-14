@@ -2,15 +2,17 @@
 module FrontEnd.Tc.Unify(subsumes,boxyMatch) where
 
 import Control.Monad.Writer
+import qualified Data.Map as Map
 
-import Doc.PPrint
 import Doc.DocLike
-import FrontEnd.Tc.Type
-import Support.CanType
+import Doc.PPrint
+import FrontEnd.Tc.Class
 import FrontEnd.Tc.Monad
+import FrontEnd.Tc.Type
+import GenUtil
 import Options
 import qualified FlagDump as FD
-import GenUtil
+import Support.CanType
 
 pretty vv = prettyPrintType vv
 ppretty vv = parens (pretty vv)
@@ -157,10 +159,14 @@ boxyMatch s1 s2 = do
 
     -- SEQ2
 
-    bm (TForAll vs (ps :=> t)) (TForAll vs' (ps' :=> t')) = fail "SEQ2"
-    --bm a (TMetaVar mv)  = do
-     --   varBind mv a
-     --   return False
+    bm t1@TForAll {} (TForAll as2 qt2) = do
+        TForAll as1 (ps1 :=> r1) <- freshSigma t1
+        let (ps2 :=> r2) = inst mempty (Map.fromList [ (tyvarAtom a2,TVar a1) | a1 <- as1 | a2 <- as2 ]) qt2
+        printRule "SEQ2"
+        boxyMatch r1 r2
+        assertEquivalant ps1 ps2
+        return False
+
 
     bm (TAp a b) (TAp c d) = do
         printRule "APP"
