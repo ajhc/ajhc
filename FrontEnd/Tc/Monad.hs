@@ -32,16 +32,17 @@ module FrontEnd.Tc.Monad(
     withContext
     ) where
 
+import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.Writer
-import Control.Monad.Error
+import Data.FunctorM
 import Data.IORef
 import Data.Monoid
-import Data.FunctorM
 import List
 import Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import System
 import Text.PrettyPrint.HughesPJ(Doc)
 
 
@@ -53,11 +54,11 @@ import Doc.PPrint
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc(bogusASrcLoc)
 import FrontEnd.Tc.Type
-import Options
-import qualified FlagDump as FD
 import GenUtil
 import Name.Name
 import Options
+import Options
+import qualified FlagDump as FD
 import Support.CanType
 import Util.Inst
 import Warning
@@ -176,14 +177,14 @@ dConScheme conName = do
 newBox :: Kind -> Tc Type
 newBox k = newMetaVar Sigma k
 
-throwError s t1 t2 = do
-    diagnosis <- getErrorContext
-    typeError (Unification $ "attempted to unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2) diagnosis
 
 
 unificationError t1 t2 = do
     diagnosis <- getErrorContext
-    typeError (Unification $ "attempted to unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2) diagnosis
+    let Left msg = typeError (Unification $ "attempted to unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2) diagnosis
+    liftIO $ processIOErrors
+    liftIO $ putErrLn msg
+    liftIO $ exitFailure
 
 
 lookupName :: Name -> Tc Sigma

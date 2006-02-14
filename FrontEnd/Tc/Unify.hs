@@ -58,10 +58,12 @@ subsumes s1 s2 = do
 
     -- F1
     sub (TArrow s1 s2) (TArrow s3 s4) = do
+        printRule "F1"
         boxyMatch s3 s1
         s2 `subsumes` s4
     -- F2
     sub t@(TArrow s1 s2) (TMetaVar mv) = do
+        printRule "F2"
         withMetaVars mv [getType s1, getType s2] (\ [a,b] -> TArrow a b) $ \ [a,b] -> do
         subsumes t (a `fn` b)
 
@@ -122,11 +124,13 @@ boxyMatch s1 s2 = do
     -- CEQ1
 
     bm a (TMetaVar mv) | (TCon ca,as) <- fromTAp a = do
+        --printRule $ "CEQ1: " ++ pprint a
         withMetaVars mv (map getType as) (\ ts -> foldl TAp (TCon ca) ts) $ \ ts ->
             sequence_ [ boxyMatch a t | t <- ts | a <- as ]
         return False
 
     bm a (TMetaVar mv) | (x,xs@(_:_)) <- fromTAp a = do
+        --printRule $ "CEQ1: " ++ pprint a
         let xxs = x:xs
         withMetaVars mv (map getType xxs) (\ (t:ts) -> foldl TAp t ts) $ \ ts ->
             sequence_ [ boxyMatch a t | t <- ts | a <- xxs ]
@@ -136,12 +140,10 @@ boxyMatch s1 s2 = do
     -- CEQ2
 
     bm a b | (TCon ca,as) <- fromTAp a, (TCon cb,bs) <- fromTAp b = case ca == cb of
-        -- False -> fail $ "constructor mismatch: " ++ show (a,b)
         False -> unificationError a b
         True | length as == length bs -> do
-            printRule "CEQ2"
+            printRule $ "CEQ2: " ++ pprint ca
             sequence_ [boxyMatch x y | x <- as | y <- bs] >> return False
-        -- _ ->   fail $ "constructor args mismatch: " ++ show (a,b)
         _ -> unificationError a b
 
 
@@ -160,16 +162,8 @@ boxyMatch s1 s2 = do
      --   varBind mv a
      --   return False
 
-    -- XXX app
- --   bm a b | (t1,as1@(_:_)) <- fromTAp a, (t2,as2) <- fromTAp b = case sameLength as1 as2 of
- --       False -> unificationError a b
- --       True -> do
- --           t1 `boxyMatch` t2
- --           sequence_ [boxyMatch x y | x <- as1 | y <- as2] >> return False
- --           printRule "XXX Apps"
- --           return False
     bm (TAp a b) (TAp c d) = do
-        printRule "XXX App"
+        printRule "APP"
         a `boxyMatch` c
         b `boxyMatch` d
         return False
