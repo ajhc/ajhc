@@ -195,7 +195,6 @@ processDecls stats ho ho' tiData = do
     -- initial pass over functions to put them into a normalized form
     let procE (ds,usedIds) (n,v,lc) = do
         lc <- postProcessE stats n inscope usedIds fullDataTable lc
-        lc <- return $ substMap initMap' lc
         nfo <- idann  allRules (hoProps ho') (tvrIdent v) (tvrInfo v)
         v <- return $ v { tvrInfo = Info.insert LetBound nfo }
         let used' = collectIds lc
@@ -221,9 +220,7 @@ processDecls stats ho ho' tiData = do
             Stats.tickStat stats stat'
             let (stat, e'') = SS.simplifyE sopt e'
             Stats.tickStat stats stat
-            let (stat, e''') = SS.simplifyE sopt e''
-            Stats.tickStat stats stat
-            return e'''
+            return e''
         let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds)) fullDataTable
         cds <- flip mapM (zip names cds) $ \ (n,(v,lc)) -> do
             --lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
