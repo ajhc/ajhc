@@ -353,7 +353,7 @@ varBind u t
         case x of
             Just r -> fail $ "varBind: binding unfree: " ++ tupled [pprint u,prettyPrintType tt,prettyPrintType r]
             Nothing -> liftIO $ do
-                when (dump FD.BoxySteps) $ putStrLn $ "varBind: " ++ pprint u <+> prettyPrintType t
+                when (dump FD.BoxySteps) $ putStrLn $ "varBind: " ++ pprint u <+> text ":=" <+> prettyPrintType t
                 writeIORef r (Just tt)
 
 

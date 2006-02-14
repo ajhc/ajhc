@@ -493,7 +493,7 @@ tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typ
     ps <- flattenType ps
     ch <- getClassHierarchy
     env <- freeMetaVarsEnv
-    (ds,rs) <- splitReduce (Set.toList env) (freeMetaVarsPreds qs) ps
+    (_,ds,rs) <- splitReduce (Set.toList env) (freeMetaVarsPreds qs) ps
     assertEntailment qs (rs ++ ds)
     return ret
 

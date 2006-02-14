@@ -39,9 +39,9 @@ generalize ps r = do
     fmvenv <- freeMetaVarsEnv
     let mvs =  [ v  | v <- freeMetaVars r, not $ v `Set.member` fmvenv ]
     --(nps,rp) <- splitPreds ch (Set.toList fmvenv) ps
-    (nps,rp) <- splitReduce (Set.toList fmvenv) mvs (simplify ch ps)
+    (mvs',nps,rp) <- splitReduce (Set.toList fmvenv) mvs (simplify ch ps)
     addPreds nps
-    quantify mvs rp r
+    quantify mvs' rp r
 
 freeMetaVarsPreds :: Preds -> [MetaVar]
 freeMetaVarsPreds ps = concat [ freeMetaVars t | IsIn _ t <- ps ]
@@ -135,14 +135,14 @@ match' (TCon tc1) (TCon tc2) | tc1==tc2 = return mempty
 match' t1 t2  = fail $ "match: " ++ show (t1,t2)
 
 
-splitReduce :: [MetaVar] -> [MetaVar] -> [Pred] -> Tc ([Pred], [Pred])
+splitReduce :: [MetaVar] -> [MetaVar] -> [Pred] -> Tc ([MetaVar],[Pred], [Pred])
 splitReduce fs gs ps = do
     h <- getClassHierarchy
     --liftIO $ putStrLn $ pprint (fs,gs,ps)
     (ds, rs) <- splitPreds h fs ps
     (rs',sub) <- genDefaults h (fs++gs) rs
     sequence_ [ varBind x y | (x,y) <- nub sub]
-    return (ds,rs')
+    return (nub gs List.\\ map fst sub, ds,rs')
 
 withDefaults     :: Monad m => ClassHierarchy ->  [MetaVar] -> [Pred] -> m [(MetaVar, [Pred], Type)]
 withDefaults h vs ps
