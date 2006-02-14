@@ -48,6 +48,7 @@ quantifyHsType inscope t
     g n = hsTyVarBind { hsTyVarBindName = n }
     fv (HsTyVar v) = tell [v]
     fv (HsTyForall vs qt) = tell $ snub (execWriter (fv $ hsQualTypeType qt)) \\ map hsTyVarBindName vs
+    fv (HsTyExists vs qt) = tell $ snub (execWriter (fv $ hsQualTypeType qt)) \\ map hsTyVarBindName vs
     fv x = mapHsTypeHsType (\x -> fv x >> return x) x >> return ()
 
 

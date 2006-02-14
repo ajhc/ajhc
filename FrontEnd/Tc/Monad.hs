@@ -214,6 +214,7 @@ instance Instantiate Type where
             Just t'  -> t'
             Nothing -> (TVar tv)
     inst mm ts (TForAll as qt) = TForAll as (inst mm (foldr Map.delete ts (map tyvarAtom as)) qt)
+    inst mm ts (TExists as qt) = TExists as (inst mm (foldr Map.delete ts (map tyvarAtom as)) qt)
     inst mm ts (TMetaVar mv) | Just t <- Map.lookup (metaUniq mv) mm  = t
     inst mm ts (TMetaVar mv) = TMetaVar mv
     inst mm _ t = error $ "inst: " ++ show t
@@ -323,6 +324,11 @@ unBox tv = ft' tv where
         ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
         t' <- ft' t
         return $ TForAll vs (ps' :=> t')
+    ft (TExists vs (ps :=> t)) = do
+        when (any isMetaTV vs) $ error "metatv in forall binding"
+        ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
+        t' <- ft' t
+        return $ TExists vs (ps' :=> t')
     ft t@(TMetaVar mv)
         | isBoxyMetaVar mv = do
             tmv <- newMetaVar Tau (getType mv)

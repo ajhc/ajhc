@@ -355,10 +355,11 @@ renameHsDecl (HsDataDecl srcLoc hsContext hsName hsNames1 hsConDecls hsNames2) s
 renameHsDecl (HsTypeDecl srcLoc name hsNames t) subTable = do
     setSrcLoc srcLoc
     hsName' <- renameTypeHsName name subTable
+    subTable' <- updateSubTableWithHsNames subTable hsNames
     --subTable' <- updateSubTableWithHsNames subTable hsNames
-    --hsNames' <- renameHsNames hsNames subTable'
-    t' <- renameHsType' False t emptyFM
-    return (HsTypeDecl srcLoc  hsName' hsNames t')
+    hsNames' <- renameHsNames hsNames subTable'
+    t' <- renameHsType' False t subTable'
+    return (HsTypeDecl srcLoc  hsName' hsNames' t')
 
 renameHsDecl (HsNewTypeDecl srcLoc hsContext hsName hsNames1 hsConDecl hsNames2) subTable = do
     setSrcLoc srcLoc

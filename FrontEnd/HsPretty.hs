@@ -405,6 +405,9 @@ ppHsTypePrec p (HsTyCon name) = ppHsQName name
 ppHsTypePrec p HsTyForall { hsTypeVars = vs, hsTypeType = qt } = parensIf (p > 1) $ do
     pp <- ppHsQualType qt
     return $ DL.text "forall" DL.<+> DL.hsep (map pprint vs) DL.<+> DL.char '.' DL.<+> pp
+ppHsTypePrec p HsTyExists { hsTypeVars = vs, hsTypeType = qt } = parensIf (p > 1) $ do
+    pp <- ppHsQualType qt
+    return $ DL.text "exists" DL.<+> DL.hsep (map pprint vs) DL.<+> DL.char '.' DL.<+> pp
 
 ------------------------- Expressions -------------------------
 ppHsRhs :: HsRhs -> Doc
