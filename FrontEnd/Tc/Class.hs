@@ -22,12 +22,15 @@ import Representation(Class)
 
 import Name.Names
 import Options
+import Doc.DocLike
 import Support.CanType
 import qualified FlagOpts as FO
+import qualified FlagDump as FD
 import Class hiding(split,simplify,toHnfs,entails,splitReduce,topDefaults)
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Monad
 import Doc.PPrint
+import Warning
 
 
 type Inst = Qual Pred
@@ -37,7 +40,7 @@ generalize ps r = do
     ch <- getClassHierarchy
     r <- flattenType r
     fmvenv <- freeMetaVarsEnv
-    let mvs =  [ v  | v <- freeMetaVars r, not $ v `Set.member` fmvenv ]
+    let mvs =  nub [ v  | v <- freeMetaVars r, not $ v `Set.member` fmvenv ]
     --(nps,rp) <- splitPreds ch (Set.toList fmvenv) ps
     (mvs',nps,rp) <- splitReduce (Set.toList fmvenv) mvs (simplify ch ps)
     addPreds nps
@@ -140,13 +143,18 @@ splitReduce fs gs ps = do
     h <- getClassHierarchy
     --liftIO $ putStrLn $ pprint (fs,gs,ps)
     (ds, rs) <- splitPreds h fs ps
+    --liftIO $ putStrLn $ pprint (ds,rs)
     (rs',sub) <- genDefaults h (fs++gs) rs
+    --liftIO $ putStrLn $ pprint (rs')
+    flip mapM_ sub $ \ (x,y) ->  do
+        wdump FD.BoxySteps $ liftIO $ putStrLn $ "defaulting: " <+> pprint x <+> "=>" <+> prettyPrintType y
+        addWarn "type-defaults" ("defaulting: " <+> pprint x <+> "=>" <+> prettyPrintType y)
     sequence_ [ varBind x y | (x,y) <- nub sub]
     return (nub gs List.\\ map fst sub, ds,rs')
 
 withDefaults     :: Monad m => ClassHierarchy ->  [MetaVar] -> [Pred] -> m [(MetaVar, [Pred], Type)]
 withDefaults h vs ps
-  | any null tss = fail $ "withDefaults.ambiguity: " ++ (pprint ps) -- ++ show vs ++ show ps
+  | any null tss = fail $ "withDefaults.ambiguity: " ++ (pprint ps)  ++ pprint vs -- ++ show ps
 --  | otherwise = fail $ "Zambiguity: " ++ (render $ pprint ps) ++  show (ps,ps',ams)
   | otherwise    = return $ [ (v,qs,head ts) | (v,qs,ts) <- ams ]
     where ams = ambig h vs ps
@@ -165,7 +173,7 @@ ambig :: ClassHierarchy -> [MetaVar] -> [Pred] -> [(MetaVar,[Pred],[Type])]
 
 ambig h vs ps
   = [ (v, qs, defs h v qs) |
-         v <- freeMetaVarsPreds ps \\ vs,
+         v <- nub (freeMetaVarsPreds ps) \\ vs,
          let qs = [ p | p<-ps, v `elem` freeMetaVarsPred p ] ]
 
 

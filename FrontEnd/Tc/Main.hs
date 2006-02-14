@@ -382,7 +382,9 @@ tiImpls bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ 
     ps <- flattenType ps
     let f n s = do
             s <- flattenType s
+            when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
             s <- generalize ps s
+            when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
             return (n,s)
     nenv <- sequence [ f n s | (n,s) <- Map.toAscList $ mconcat $ snds rs]
     addToCollectedEnv (Map.fromList nenv)
