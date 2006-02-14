@@ -20,6 +20,7 @@ import FrontEnd.Tc.Unify
 import Options
 import qualified FlagOpts as FO
 import qualified FlagDump as FD
+import Support.FreeVars
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Class
 import FrontEnd.Utils(getDeclName)
@@ -377,18 +378,30 @@ tiImpls ::  [HsDecl] -> Tc ([HsDecl], TypeEnv)
 tiImpls [] = return ([],Map.empty)
 tiImpls bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ (show (map getDeclName bs)))) $ do
     when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tiimpls " ++ show (map getDeclName bs)
-    ss <- sequence [newMetaVar Tau Star | _ <- bs]
-    (rs,ps) <- censor (const mempty) $ listen $ localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ss]) $ sequence [ tcDecl d s | d <- bs | s <- ss ]
-    ps <- flattenType ps
+    ts <- sequence [newMetaVar Tau Star | _ <- bs]
+    (res,ps) <- censor (const mempty) $ listen $ localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ts]) $ sequence [ tcDecl d s | d <- bs | s <- ts ]
+    ps' <- flattenType ps
+    ts' <- flattenType ts
+    fs <- freeMetaVarsEnv
+    let vss = map (Set.fromList . freeVars) ts'
+        gs = (Set.unions vss) Set.\\ fs
+    (mvs,ds,rs) <- splitReduce (Set.toList fs) (Set.toList $ foldr1 Set.intersect vss) ps'
+    addPreds ds
+    scs' <- if restricted bs then do
+        let gs' = gs Set.\\ Set.fromList (freeVars rs)
+        addPreds rs
+        mapM (quantify (Set.toList gs') []) ts'
+     else mapM (quantify (Set.toList gs) rs) ts'
     let f n s = do
-            s <- flattenType s
+            --s <- flattenType s
             when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
-            s <- generalize ps s
-            when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
+            --s <- generalize ps s
+            --when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
             return (n,s)
-    nenv <- sequence [ f n s | (n,s) <- Map.toAscList $ mconcat $ snds rs]
+    nenv <- sequence [ f (getDeclName d) t  | (d,_) <- res | t <- scs' ]
+    --nenv <- sequence [ f n s | (n,s) <- Map.toAscList $ mconcat $ snds res]
     addToCollectedEnv (Map.fromList nenv)
-    return (fsts rs, Map.fromList nenv)
+    return (fsts res, Map.fromList nenv)
 
 tcRhs :: HsRhs -> Sigma -> Tc HsRhs
 tcRhs rhs typ = case rhs of
