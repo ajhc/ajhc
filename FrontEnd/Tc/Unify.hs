@@ -188,7 +188,7 @@ var_meets_var tv1 tv2 = do
     f tv1 tv2 | tv1 == tv2 = return ()
     f tv1 tv2 | isBoxyMetaVar tv1 && isBoxyMetaVar tv2 = do
             printRule "BBEQ"
-            tt <- newMetaVar Tau (kind tv1)
+            tt <- newMetaVar Tau (getType tv1)
             varBind tv1 tt
             varBind tv2 tt
     f tv1 tv2 | isBoxyMetaVar tv1  = do

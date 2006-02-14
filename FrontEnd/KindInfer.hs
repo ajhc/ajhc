@@ -32,6 +32,7 @@ import Doc.PPrint
 import FrontEnd.Tc.Type(Sigma())
 import FrontEnd.Utils
 import GenUtil
+import Support.FreeVars
 import HsSyn
 import MapBinaryInstance()
 import Name.Name
@@ -575,5 +576,47 @@ hsQualTypeToSigma kt qualType =  return $ schemeToType $ aHsQualTypeToScheme new
    newEnv = kiHsQualType kt qualType
 
 hsTypeToType :: Monad m => KindEnv -> HsType -> m Type
-hsTypeToType kt t = return $ aHsTypeToType kt (forallHoist t)
+hsTypeToType kt t = return $ hoistType $ aHsTypeToType kt t -- (forallHoist t)
+
+hsQualTypeToType :: Monad m =>
+    KindEnv            -- ^ the kind environment
+    -> Maybe [HsName]  -- ^ universally quantify free variables excepting those in list.
+    -> HsQualType      -- ^ the type to convert
+    -> m Sigma
+hsQualTypeToType kindEnv qs qualType = return $ hoistType $ tForAll quantOver ( ps' :=> t') where
+   newEnv = kiHsQualType kindEnv qualType
+   Just t' = hsTypeToType newEnv (hsQualTypeType qualType)
+   ps = hsQualTypeHsContext qualType
+   ps' = map (hsAsstToPred newEnv) ps
+   quantOver = nub $ freeVars ps' ++ fvs
+   fvs = case qs of
+       Nothing -> []
+       Just xs -> [ v | v <- freeVars t', nameName (tyvarName v) `notElem` xs]
+
+hoistType :: Type -> Type
+hoistType t = f t where
+    f t@TVar {} = t
+    f t@TCon {} = t
+    f t@TMetaVar {} = t
+    f t@TGen {} = t
+    f (TAp a b) = TAp (f a) (f b)
+    f (TForAll vs (ps :=> t))
+        | (TForAll vs' (ps' :=> t')) <- nt = f $ TForAll (vs ++ vs') ((ps ++ ps') :=> t')
+        | otherwise = TForAll vs (ps :=> nt)
+        where
+        nt = f t
+    f (TExists vs (ps :=> t))
+        | (TExists vs' (ps' :=> t')) <- nt = f $ TExists (vs ++ vs') ((ps ++ ps') :=> t')
+        | otherwise = TExists vs (ps :=> nt)
+        where
+        nt = f t
+    f (TArrow a b)
+        | TForAll vs (ps :=> t) <- nb = f $ TForAll vs (ps :=> TArrow na t)
+        | TExists vs (ps :=> t) <- na = f $ TForAll vs (ps :=> TArrow t nb)
+        | otherwise = TArrow na nb
+        where
+        na = f a
+        nb = f b
+
+
 

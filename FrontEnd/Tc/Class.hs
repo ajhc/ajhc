@@ -22,6 +22,7 @@ import Representation(Class)
 
 import Name.Names
 import Options
+import Support.CanType
 import qualified FlagOpts as FO
 import Class hiding(split,simplify,toHnfs,entails,splitReduce,topDefaults)
 import FrontEnd.Tc.Type
@@ -128,7 +129,7 @@ match' (TArrow l r) (TArrow l' r') = do
     sr <- match r r'
     return $ mappend sl sr
 match' (TVar u) (TVar t) | u == t = return mempty
-match' (TVar mv) t | kind mv == kind t = return [(mv,t)]
+match' (TVar mv) t | getType mv == getType t = return [(mv,t)]
 --match' (TMetaVar mv) t | kind mv == kind t = return [(mv,t)]
 match' (TCon tc1) (TCon tc2) | tc1==tc2 = return mempty
 match' t1 t2  = fail $ "match: " ++ show (t1,t2)

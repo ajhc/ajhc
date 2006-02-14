@@ -1,6 +1,5 @@
 module FrontEnd.Tc.Type(
     fn,
-    HasKind(..),
     Kind(..),
     Pred(..),
     MetaVar(..),
@@ -26,13 +25,13 @@ import Doc.DocLike
 import Doc.PPrint
 import Name.Names
 import Support.CanType
+import Support.FreeVars
 import Name.VConsts
 import Representation hiding(flattenType, findType)
 import Type(HasKind(..))
 import Support.Unparse
 import Util.VarName
 
-type Box = IORef (Maybe Type)
 type Sigma' = Sigma
 type Tau' = Tau
 type Rho' = Rho
@@ -40,7 +39,6 @@ type Sigma = Type
 type Rho = Type
 type Tau = Type
 
-type MetaTV = Tyvar
 type SkolemTV = Tyvar
 type BoundTV = Tyvar
 
@@ -56,21 +54,6 @@ typeOfType TForAll { typeArgs = as, typeBody = _ :=> t } = (Sigma,isBoxy t)
 typeOfType t | isTau' t = (Tau,isBoxy t)
 typeOfType t = (Rho,isBoxy t)
 
-
-{-
-openBox :: MonadIO m => Box -> m (Maybe Sigma)
-openBox x = liftIO $ readIORef x
-
-fillBox :: MonadIO m => Box -> Type -> m ()
-fillBox x t  = liftIO $ do
-    t <- flattenType t
-    when (isBoxy t) $ error "filling with boxes"
-    ct <- readIORef x
-    case ct of
-        Just _ -> fail "box is already filled"
-        Nothing -> writeIORef x (Just t)
-fillBox x t = error "attempt to fillBox with boxy type"
--}
 
 isTau :: Type -> Bool
 isTau TForAll {} = False
@@ -108,9 +91,6 @@ fromTAp t = f t [] where
     f (TAp a b) rs = f a (b:rs)
     f t rs = (t,rs)
 
---extractMetaTV :: Monad m => Type -> m MetaTV
---extractMetaTV (TVar t) | isMetaTV t = return t
---extractMetaTV t = fail $ "not a metaTyVar:" ++ show t
 
 extractTyVar ::  Monad m => Type -> m Tyvar
 extractTyVar (TVar t) | not $ isMetaTV t = return t
@@ -271,25 +251,32 @@ readMetaVar MetaVar { metaRef = r }  = liftIO $ do
 
 
 
-freeTyVars :: Type -> [Tyvar]
-freeTyVars t = filter (not . isMetaTV) $ allFreeVars t
-
-allFreeVars (TVar u)      = [u]
-allFreeVars (TAp l r)     = allFreeVars l `union` allFreeVars r
-allFreeVars (TArrow l r)  = allFreeVars l `union` allFreeVars r
-allFreeVars TCon {}       = []
-allFreeVars typ | (TForAll vs (_ :=> t)) <- typ = allFreeVars t List.\\ vs
-allFreeVars typ | ~(TExists vs (_ :=> t)) <- typ = allFreeVars t List.\\ vs
-
 freeMetaVars :: Type -> [MetaVar]
 freeMetaVars (TVar u)      = []
 freeMetaVars (TAp l r)     = freeMetaVars l `union` freeMetaVars r
 freeMetaVars (TArrow l r)  = freeMetaVars l `union` freeMetaVars r
 freeMetaVars TCon {}       = []
 freeMetaVars (TMetaVar mv) = [mv]
-freeMetaVars typ | (TForAll vs (_ :=> t)) <- typ = freeMetaVars t
-freeMetaVars typ | ~(TExists vs (_ :=> t)) <- typ = freeMetaVars t
+freeMetaVars (TForAll vs qt) = freeVars qt
+freeMetaVars (TExists vs qt) = freeVars qt
 
+instance FreeVars Type [Tyvar] where
+    freeVars (TVar u)      = [u]
+    freeVars (TAp l r)     = freeVars l `union` freeVars r
+    freeVars (TArrow l r)  = freeVars l `union` freeVars r
+    freeVars TCon {}       = []
+    freeVars TMetaVar {}   = []
+    freeVars (TForAll vs qt) = freeVars qt List.\\ vs
+    freeVars (TExists vs qt) = freeVars qt List.\\ vs
+
+instance FreeVars Type [MetaVar] where
+    freeVars t = freeMetaVars t
+
+instance (FreeVars t b,FreeVars Pred b) => FreeVars (Qual t) b where
+    freeVars (ps :=> t)  = freeVars t `mappend` freeVars ps
+
+instance FreeVars Type b =>  FreeVars Pred b where
+    freeVars (IsIn _c t)  = freeVars t
 
 -- returns (new type, any open boxes, any open tauvars)
 unbox :: MonadIO m => Type -> m (Type,Bool,Bool)
