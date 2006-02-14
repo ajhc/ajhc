@@ -71,8 +71,10 @@ data Bob  = Bob (forall a . a -> a)
 -- this can't be handled yet
 data Fred = Fred (forall a . a -> a) ((forall a . (forall b . b -> a ) -> a) -> Int)
 
---f (Bob x) = x 'y'
+f (Bob x) = (x 'y',x (3::Int))
 
 main = do
---    putChar $ f (Bob id)
+    putChar $ fst $ f (Bob id)
     putStrLn "Done."
+
+

@@ -284,7 +284,7 @@ processDecls stats ho ho' tiData = do
 
     prog <- return $ programSetDs [ (t,e) | (_,t,e) <- ds] prog
     prog <- return $ programPruneUnreachable prog
-    printProgram prog
+    wdump FD.Lambdacube $ printProgram prog
 
     Stats.print "Optimization" stats
     return ho' { hoDataTable = dataTable, hoEs = programEsMap prog , hoRules = hoRules ho' `mappend` rules, hoUsedIds = collectIds (ELetRec (programDs prog) Unknown) }

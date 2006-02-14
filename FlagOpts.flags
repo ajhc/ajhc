@@ -24,4 +24,4 @@ profile enable profiling code in generated executable
 
 
 !Default settings
-@default inline-pragmas rules wrapper float-in strictness defaulting type-analysis monomorphism-restriction
+@default inline-pragmas rules wrapper float-in strictness defaulting type-analysis monomorphism-restriction boxy
