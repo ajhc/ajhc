@@ -53,6 +53,8 @@ import Doc.PPrint
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc(bogusASrcLoc)
 import FrontEnd.Tc.Type
+import Options
+import qualified FlagDump as FD
 import GenUtil
 import Name.Name
 import Options
@@ -345,7 +347,7 @@ varBind u t
         case x of
             Just r -> fail $ "varBind: binding unfree: " ++ tupled [pprint u,prettyPrintType tt,prettyPrintType r]
             Nothing -> liftIO $ do
-                --putStrLn $ "varBind: " ++ pprint u <+> prettyPrintType t
+                when (dump FD.BoxySteps) $ putStrLn $ "varBind: " ++ pprint u <+> prettyPrintType t
                 writeIORef r (Just tt)
 
 

@@ -140,7 +140,7 @@ splitReduce fs gs ps = do
     --liftIO $ putStrLn $ pprint (fs,gs,ps)
     (ds, rs) <- splitPreds h fs ps
     (rs',sub) <- genDefaults h (fs++gs) rs
-    sequence_ [ varBind x y | (x,y) <- sub]
+    sequence_ [ varBind x y | (x,y) <- nub sub]
     return (ds,rs')
 
 withDefaults     :: Monad m => ClassHierarchy ->  [MetaVar] -> [Pred] -> m [(MetaVar, [Pred], Type)]

@@ -93,8 +93,7 @@ boxyMatch s1 s2 = do
     printRule $ "boxyMatch: " <> ppretty s1 <+> ppretty s2
     b <- bm s1 s2
     if b then do
-        s1 <- findType s1
-        s2 <- findType s2
+        printRule "SYM"
         printRule $ "boxyMatch: " <> ppretty s2 <+> ppretty s1
         b' <- bm s2 s1
         when b' $  fail $ "boxyMatch failure: " <> ppretty s1 <+> ppretty s2
@@ -177,8 +176,8 @@ boxyMatch s1 s2 = do
 
     -- MEQ1 MEQ2  SYM
     bm a b
-        | isTau a, TMetaVar mv <- b = varBind mv a >> return False
-        | isTau a && isTau b = unify a b >> return False
+        | isTau a, TMetaVar mv <- b = printRule "MEQ1" >> varBind mv a >> return False
+        | isTau a && isTau b = printRule "MEQ2" >> unify a b >> return False
     bm _ _ = return True
 
 var_meets_var :: MetaVar -> MetaVar -> Tc ()

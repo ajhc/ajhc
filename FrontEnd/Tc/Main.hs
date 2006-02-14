@@ -19,6 +19,7 @@ import FrontEnd.Tc.Type
 import FrontEnd.Tc.Unify
 import Options
 import qualified FlagOpts as FO
+import qualified FlagDump as FD
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Class
 import FrontEnd.Utils(getDeclName)
@@ -57,7 +58,7 @@ tcExprPoly e t = do
 
 tiExprPoly e t@TMetaVar {} = tcExpr e t   -- GEN2
 tiExprPoly e t = do                   -- GEN1
-    (_,_,t) <- skolomize t
+    --(_,_,t) <- skolomize t
     tcExpr e t
 
 tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp
@@ -148,12 +149,6 @@ tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression"
 tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show ps ++ " -> ...") $ do
     let lam (p:ps) e (TMetaVar mv) rs = do -- ABS2
             withMetaVars mv [Star,Star] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) e (a `fn` b) rs
-            --b1 <- newBox Star
-            --b2 <- newBox Star
-            --varBind mv (b1 `fn` b2)
-            --l' <- lam (p:ps) e (b1 `fn` b2) rs
-            --boxyMatch (TMetaVar mv) (b1 `fn` b2)
-            --return l'
         lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
             --box <- newBox Star
             --s1' `boxyMatch` box
@@ -166,7 +161,7 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
             return (HsLambda sloc (reverse rs) e')
         lam _ _ _ _ = fail "lambda type mismatch"
         lamPoly ps e s rs = do
-            (_,_,s) <- skolomize s
+            --(_,_,s) <- skolomize s
             lam ps e s rs
 
 
@@ -381,7 +376,7 @@ tcBindGroup (es, is) = do
 tiImpls ::  [HsDecl] -> Tc ([HsDecl], TypeEnv)
 tiImpls [] = return ([],Map.empty)
 tiImpls bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ (show (map getDeclName bs)))) $ do
-    --liftIO $ putStrLn $ "tiimpls " ++ show (map getDeclName bs)
+    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tiimpls " ++ show (map getDeclName bs)
     ss <- sequence [newMetaVar Tau Star | _ <- bs]
     (rs,ps) <- censor (const mempty) $ listen $ localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ss]) $ sequence [ tcDecl d s | d <- bs | s <- ss ]
     ps <- flattenType ps
@@ -463,12 +458,6 @@ tcMatch ::  HsMatch -> Sigma -> Tc HsMatch
 tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "in" $ show funName) $ do
     let lam (p:ps) (TMetaVar mv) rs = do -- ABS2
             withMetaVars mv [Star,Star] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) (a `fn` b) rs
-            --b1 <- newBox Star
-            --b2 <- newBox Star
-            --varBind mv (b1 `fn` b2)
-            --l' <- lam (p:ps) (b1 `fn` b2) rs
-            --(TMetaVar mv) `boxyMatch`  (b1 `fn` b2)
-            --return l'
         lam (p:ps) (TArrow s1' s2') rs = do -- ABS1
             --box <- newBox Star
             (p',env) <- tcPat p s1'
@@ -484,7 +473,7 @@ tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "i
         lam _ _ _ = fail "lambda type mismatch"
         lamPoly ps s@TMetaVar {} rs = lam ps s rs
         lamPoly ps s rs = do
-            (_,_,s) <- skolomize s
+            --(_,_,s) <- skolomize s
             lam ps s rs
     typ <- findType typ
     lam pats typ []
@@ -497,7 +486,7 @@ declDiagnostic decl@(HsFunBind matches) = locMsg (srcLoc decl) "in the function 
 tiExpl ::  Expl -> Tc (HsDecl,TypeEnv)
 tiExpl (sc, decl@HsForeignDecl {}) = do return (decl,Map.empty)
 tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typed " ++  (render $ ppHsDecl decl))) $ do
-    --liftIO $ putStrLn $ "** typing expl: " ++ show (getDeclName decl) ++ " " ++ prettyPrintType sc
+    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "** typing expl: " ++ show (getDeclName decl) ++ " " ++ prettyPrintType sc
     addToCollectedEnv (Map.singleton (getDeclName decl) sc)
     (_,qs,typ) <- skolomize sc
     (ret,ps) <- censor (const mempty) $ listen (tcDecl decl typ)
