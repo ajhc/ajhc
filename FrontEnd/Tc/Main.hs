@@ -11,6 +11,7 @@ import Control.Monad.Reader
 import DeclsDepends(getDeclDeps)
 import DependAnalysis(getBindGroups)
 import Diagnostic
+import Doc.DocLike
 import Doc.PPrint as PPrint
 import FrontEnd.Desugar(doToExp)
 import FrontEnd.KindInfer
@@ -275,10 +276,9 @@ tcGuardedRhs typ gAlt@(HsGuardedRhs sloc eGuard e) = withContext (locMsg sloc "i
 
 -- Typing Patterns
 
---tiPat :: HsPat -> TI ([Pred], Map.Map Name Scheme, Type)
 tiPat,tcPat :: HsPat -> Type -> Tc (HsPat, Map.Map Name Sigma)
 
-tcPat p typ = do
+tcPat p typ = withContext (makeMsg "in the pattern: " $ render $ ppHsPat p) $ do
     typ <- findType typ
     tiPat p typ
 
@@ -320,11 +320,24 @@ tiPat (HsPParen p) typ = tiPat p typ
 
 -- TODO check that constructors are saturated
 tiPat (HsPApp conName pats) typ = do
-    bs <- sequence [ newBox Star | _ <- pats ]
     s <- lookupName (toName DataConstructor conName)
-    s `subsumes` (foldr fn typ bs)
-    pats' <- sequence [ tcPat a r | r <- bs | a <- pats ]
-    return (HsPApp conName (fsts pats'), mconcat (snds pats'))
+    nn <- deconstructorInstantiate s
+    let f (p:pats) (a `TArrow` rs) (ps,env) = do
+            (np,res) <- tiPat p a
+            f pats rs (np:ps,env `mappend` res)
+        f (p:pats) rs _ = do
+            fail $ "constructor applied to too many arguments:" <+> show p <+> prettyPrintType rs
+        f [] (_ `TArrow` _) _ = do
+            fail "constructor not applied to enough arguments"
+        f [] rs (ps,env) = do
+            rs `subsumes` typ
+            unBox typ
+            return (HsPApp conName (reverse ps), env)
+    f pats nn mempty
+    --bs <- sequence [ newBox Star | _ <- pats ]
+    --s `subsumes` (foldr fn typ bs)
+    --pats' <- sequence [ tcPat a r | r <- bs | a <- pats ]
+    --return (HsPApp conName (fsts pats'), mconcat (snds pats'))
 
 
 tiPat pl@(HsPList []) (TAp t v) | t == tList = do
@@ -379,7 +392,7 @@ tiImpls [] = return ([],Map.empty)
 tiImpls bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ (show (map getDeclName bs)))) $ do
     when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tiimpls " ++ show (map getDeclName bs)
     ts <- sequence [newMetaVar Tau Star | _ <- bs]
-    (res,ps) <- censor (const mempty) $ listen $ localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ts]) $ sequence [ tcDecl d s | d <- bs | s <- ts ]
+    (res,ps) <- listenPreds $ localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ts]) $ sequence [ tcDecl d s | d <- bs | s <- ts ]
     ps' <- flattenType ps
     ts' <- flattenType ts
     fs <- freeMetaVarsEnv
@@ -420,9 +433,9 @@ tcPragmaDecl prule@HsPragmaRules { hsDeclFreeVars = vs, hsDeclLeftExpr = e1, hsD
             let (vs,envs) = unzip vs'
             ch <- getClassHierarchy
             localEnv (mconcat envs) $ do
-                    (e1,ps) <- censor (const mempty) $ listen (tcExpr e1 tr)
+                    (e1,ps) <- listenPreds (tcExpr e1 tr)
                     ([],rs) <- splitPreds ch [] ps
-                    (e2,ps) <- censor (const mempty) $ listen (tcExpr e2 tr)
+                    (e2,ps) <- listenPreds (tcExpr e2 tr)
                     ([],rs) <- splitPreds ch [] ps
                     return ()
             mapM_ unBox vs
@@ -504,7 +517,7 @@ tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typ
     when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "** typing expl: " ++ show (getDeclName decl) ++ " " ++ prettyPrintType sc
     addToCollectedEnv (Map.singleton (getDeclName decl) sc)
     (_,qs,typ) <- skolomize sc
-    (ret,ps) <- censor (const mempty) $ listen (tcDecl decl typ)
+    (ret,ps) <- listenPreds (tcDecl decl typ)
     ps <- flattenType ps
     ch <- getClassHierarchy
     env <- freeMetaVarsEnv
@@ -716,7 +729,7 @@ getBindGroupName (expl,impls) =  map getDeclName (snds expl ++ impls)
 tiProgram ::  [BindGroup] -> [HsDecl] -> Tc [HsDecl]
 tiProgram bgs es = ans where
     ans = do
-        (r,ps) <- censor (const mempty) $ listen $ f bgs [] mempty
+        (r,ps) <- listenPreds $ f bgs [] mempty
         ps <- flattenType ps
         ch <- getClassHierarchy
         liftIO $ print ps
@@ -727,7 +740,7 @@ tiProgram bgs es = ans where
         --liftIO $ mapM_ (putStrLn.show) ps
         --return r
     f (bg:bgs) rs cenv  = do
-        ((ds,env),ps) <- censor (const mempty) $ listen (tcBindGroup bg)
+        ((ds,env),ps) <- listenPreds (tcBindGroup bg)
         ch <- getClassHierarchy
         withContext (makeMsg "in the binding group:" $ show (getBindGroupName bg)) $ do
             ([],leftovers) <- splitPreds ch [] ps
@@ -736,7 +749,7 @@ tiProgram bgs es = ans where
         localEnv env $ f bgs (ds ++ rs) (env `mappend` cenv)
     f [] rs _cenv = do
         ch <- getClassHierarchy
-        ((),ps) <- censor (const mempty) $ listen $ mapM_ tcPragmaDecl es
+        ((),ps) <- listenPreds $ mapM_ tcPragmaDecl es
         withContext (makeMsg "in the pragmas:" $ "rules") $ do
             ([],leftovers) <- splitPreds ch [] ps
             topDefaults leftovers

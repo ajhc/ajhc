@@ -341,17 +341,21 @@ ppWhere [] = empty
 ppWhere l = nest 2 (text "where" $$$ body whereIndent (map ppHsDecl l))
 
 ------------------------- Data & Newtype Bodies -------------------------
+mprintExists :: HsConDecl -> Doc
+mprintExists hcd = case hsConDeclExists hcd of
+    [] -> empty
+    vs -> text "exists" <+> hsep (map (return . pprint) vs) <+> char '.'
+
 ppHsConstr :: HsConDecl -> Doc
-ppHsConstr (HsRecDecl { hsConDeclName = name, hsConDeclRecArg = fieldList }) =
-	 ppHsName name
+ppHsConstr cd@HsRecDecl { hsConDeclName = name, hsConDeclRecArg = fieldList } =
+	 mprintExists cd <+> ppHsName name
 	 <> (braceList . map ppField $ fieldList)
-ppHsConstr (HsConDecl { hsConDeclName = name, hsConDeclConArg = typeList})
+ppHsConstr cd@HsConDecl { hsConDeclName = name, hsConDeclConArg = typeList}
      | isSymbolName name && length typeList == 2 =
 	 let [l, r] = typeList in
-	 myFsep [ppHsBangType l, ppHsName name, ppHsBangType r]
-     | otherwise =
-	 mySep $ (ppHsName name) :
-		 map ppHsBangType typeList
+	 mprintExists cd <+> myFsep [ppHsBangType l, ppHsName name, ppHsBangType r]
+     | otherwise = mprintExists cd <+> (mySep $ (ppHsName name) :
+		 map ppHsBangType typeList)
 
 ppField :: ([HsName],HsBangType) -> Doc
 ppField (names, ty) = myFsepSimple $  (punctuate comma . map ppHsName $ names) ++

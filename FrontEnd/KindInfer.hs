@@ -239,8 +239,8 @@ kiKindGroup tap@(classDecls, heads, context, dataBodies, classBodies) = do
         mapM_ kiClassDecl classDecls
         mapM_ kiTyConDecl heads
         mapM_ kiAsst context
-        dataBodyKinds <- mapM (kiType True) dataBodies        -- vars must be seen previously here (hence True)
-        --mapM_ (\k -> unify k Star) dataBodyKinds
+        dataBodyKinds <- mapM (kiType False) dataBodies        -- vars must be seen previously here (hence True)
+        --mapM_ (\k -> unify k Star) dataBodyKinds                set to true for existentials
         classBodyKinds <- mapM (kiQualType False) classBodies  -- vars may not have been seen previously here (hence False)
         --mapM_ (\k -> unify k Star) classBodyKinds
         currentSubst <- getSubst
@@ -390,9 +390,9 @@ getDataAndClassBg decls = getBindGroups decls getDeclName dataAndClassDeps
 
 dataAndClassDeps :: HsDecl -> [Name]
 dataAndClassDeps (HsDataDecl _sloc cntxt _name _args condecls _derives)
-   = snub $ namesFromContext cntxt ++ (concatMap namesFromType $ concatMap conDeclToTypes condecls)
+   = snub $ namesFromContext cntxt ++ (concatMap namesFromType $ concatMap conDeclToTypes condecls) ++ concatMap conDeclNames condecls
 dataAndClassDeps (HsNewTypeDecl _sloc cntxt _name _args condecl _derives)
-   = snub $ namesFromContext cntxt ++ (concatMap namesFromType $ conDeclToTypes condecl)
+   = snub $ namesFromContext cntxt ++ (concatMap namesFromType $ conDeclToTypes condecl) ++ conDeclNames condecl
 dataAndClassDeps (HsClassDecl _sloc (HsQualType cntxt _classApp) decls)
    = snub $ namesFromContext cntxt ++ (concat [ namesFromQualType (typeFromSig s) | s <- decls,  isHsTypeSig s])
 
@@ -418,6 +418,13 @@ namesFromContext cntxt = map fst (hsContextToContext cntxt)
 type DataDeclHead = (HsName, [HsName])
 -- (class decls, data decl heads, class and data contexts, types in body of data decl, types in body of class)
 type KindGroup = ([(HsName,[HsName])], [DataDeclHead], HsContext, [HsType], [HsQualType])
+-- data KindGroup = KindGroup {
+--     kgClassDecls :: [(HsName,[HsName])],
+--     kgDataDecls ::[DataDeclHead],
+--     kgContexts ::HsContext,
+--     kgTypes ::[HsType],
+--     kgQualTypes ::[HsQualType]
+--     }
 
 declsToKindGroup :: [HsDecl] -> KindGroup
 declsToKindGroup [] = ([], [], [], [], [])
@@ -468,6 +475,9 @@ declsToKindGroup (HsClassDecl _sloc qualType sigsAndDefaults : decls)
 
 conDeclToTypes :: HsConDecl -> [HsType]
 conDeclToTypes rd = map bangTypeToType (hsConDeclArgs rd)
+
+conDeclNames :: HsConDecl -> [Name]
+conDeclNames rd = map (toName TypeVal) $ map hsTyVarBindName $ hsConDeclExists rd
 --conDeclToTypes (HsConDecl _sloc name bangTypes)
 --   = map bangTypeToType bangTypes
 --   = error $ "conDeclToType (HsRecDecl _lsoc _name _recs): not implemented yet"

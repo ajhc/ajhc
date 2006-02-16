@@ -10,6 +10,7 @@ module FrontEnd.Tc.Monad(
     getClassHierarchy,
     getKindEnv,
     getSigEnv,
+    deconstructorInstantiate,
     getModName,
     localEnv,
     withMetaVars,
@@ -28,6 +29,7 @@ module FrontEnd.Tc.Monad(
     inst,
     unificationError,
     freeMetaVarsEnv,
+    listenPreds,
     varBind,
     withContext
     ) where
@@ -50,6 +52,7 @@ import Atom
 import Class(ClassHierarchy,simplify)
 import Diagnostic
 import Doc.DocLike
+import Support.FreeVars
 import Doc.PPrint
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc(bogusASrcLoc)
@@ -77,8 +80,15 @@ data TcEnv = TcEnv {
     }
    {-! derive: update !-}
 
-newtype Tc a = Tc (ReaderT TcEnv (WriterT [Pred] IO) a)
-    deriving(MonadFix,MonadIO,MonadReader TcEnv,MonadWriter [Pred],Functor)
+data Output = Output {
+    collectedPreds   :: Preds,
+    existentialPreds :: Preds,
+    existentialVars  :: [Tyvar]
+    }
+   {-! derive: update, Monoid !-}
+
+newtype Tc a = Tc (ReaderT TcEnv (WriterT Output IO) a)
+    deriving(MonadFix,MonadIO,MonadReader TcEnv,MonadWriter Output,Functor)
 
 -- | information that is passed into the type checker.
 data TcInfo = TcInfo {
@@ -91,13 +101,11 @@ data TcInfo = TcInfo {
 
 -- | run a computation with a local environment
 localEnv :: TypeEnv -> Tc a -> Tc a
-localEnv te | isGood = local (tcCurrentEnv_u (te `Map.union`)) where
-    isGood = not $ any isBoxy (Map.elems te)
-localEnv te = fail $ "localEnv error!\n" ++ show te
-
--- | run a computation with a local environment
---localScopeEnv :: [Tyvar] -> Tc a -> Tc a
---localScopeEnv te = local (tcCurrentScope_u (te `Set.union`))
+localEnv te act = do
+    te' <- mapM (\ (x,y) -> do y <- flattenType y; return (x,y)) (Map.toList te)
+    if any isBoxy (snds te') then
+        fail $ "localEnv error!\n" ++ show te
+     else local (tcCurrentEnv_u (Map.fromList te' `Map.union`)) act
 
 -- | add to the collected environment which will be used to annotate uses of variables with their instantiated types.
 -- should contain @-aliases for each use of a polymorphic variable or pattern match.
@@ -239,8 +247,12 @@ freshInstance typ (TForAll as qt) = do
     return t
 freshInstance _ x = return x
 
-addPreds :: [Pred] -> Tc ()
-addPreds ps = Tc $ tell ps
+addPreds :: Preds -> Tc ()
+addPreds ps = Tc $ tell mempty { collectedPreds = ps }
+
+
+listenPreds :: Tc a -> Tc (a,Preds)
+listenPreds action = censor (\x -> x { collectedPreds = mempty }) $ listens collectedPreds action
 
 newVar :: Kind -> Tc Tyvar
 newVar k = do
@@ -274,6 +286,16 @@ skolomize s = return ([],[],s)
 
 boxyInstantiate :: Sigma -> Tc Rho'
 boxyInstantiate = freshInstance Sigma
+
+deconstructorInstantiate :: Sigma -> Tc Rho'
+deconstructorInstantiate tfa@TForAll {} = do
+    TForAll vs qt@(_ :=> t) <- freshSigma tfa
+    let f (_ `TArrow` b) = f b
+        f b = b
+        eqvs = vs List.\\ freeVars (f t)
+    tell mempty { existentialVars = eqvs }
+    freshInstance Sigma (TForAll (vs List.\\ eqvs) qt)
+deconstructorInstantiate x = return x
 
 boxySpec :: Sigma -> Tc ([(BoundTV,[Sigma'])],Rho')
 boxySpec (TForAll as qt@(ps :=> t)) = do

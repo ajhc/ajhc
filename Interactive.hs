@@ -2,7 +2,6 @@ module Interactive(Interactive.interact) where
 
 import Control.Monad.Reader
 import Control.Monad.Identity
-import Control.Monad.Writer
 import Control.Monad.Trans
 import Data.Monoid
 import IO(stdout,ioeGetErrorString)
@@ -231,7 +230,7 @@ tcStatementTc (HsQualifier e) = do
         }
     runTc tcInfo $ do
     box <- newBox Star
-    (_,ps') <- listen $ tiExpr e box
+    (_,ps') <- listenPreds $ tiExpr e box
     ps' <- flattenType ps'
     let ps = Class.simplify (hoClassHierarchy ho) ps'
     (ps :=> vv) <- flattenType (ps :=> box)

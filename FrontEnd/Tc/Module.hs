@@ -136,9 +136,9 @@ tiModules' me ms = do
 
     let localDConsEnv = dataConsEnv (error "modName") kindInfo classAndDataDecls -- (rDataDecls ++ rNewTyDecls)
 
-    when  (dump FD.Dcons) $
-         do {putStr "\n ---- data constructor assumptions ---- \n";
-             putStrLn $ PPrint.render $ pprint localDConsEnv}
+    wdump FD.Dcons $ do
+        putStr "\n ---- data constructor assumptions ---- \n"
+        mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType (schemeToType s) |  (n,s) <- Map.toList localDConsEnv]
 
 
     let globalDConsEnv = localDConsEnv `Map.union` importDConsEnv

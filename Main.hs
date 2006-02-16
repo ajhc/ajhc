@@ -300,15 +300,15 @@ programPruneUnreachable prog = programSetDs ds' prog where
 
 postProcessE :: Stats.Stats -> Name -> [Id] -> Set.Set Id -> DataTable -> E -> IO E
 postProcessE stats n inscope usedIds dataTable lc = do
-    let g (TVr { tvrIdent = 0 }) = error "absurded zero"
-        g tvr@(TVr { tvrIdent = n, tvrType = k})
-            | sortStarLike k =  tAbsurd k
-            | otherwise = EVar tvr
-    fvs <- return $ foldr Map.delete (freeVars lc)  inscope
-    when (Map.size fvs > 0 && dump FD.Progress) $ do
-        putDocM putErr $ parens $ text "Absurded vars:" <+> align (hsep $ map pprint (Map.elems fvs))
+--    let g (TVr { tvrIdent = 0 }) = error "absurded zero"
+--        g tvr@(TVr { tvrIdent = n, tvrType = k})
+--            | sortStarLike k =  tAbsurd k
+--            | otherwise = EVar tvr
+--    fvs <- return $ foldr Map.delete (freeVars lc)  inscope
+ --   when (Map.size fvs > 0 && dump FD.Progress) $ do
+  --      putDocM putErr $ parens $ text "Absurded vars:" <+> align (hsep $ map pprint (Map.elems fvs))
     let mangle = mangle' (Just $ Set.fromList $ inscope) dataTable
-    lc <- mangle (return ()) False ("Absurdize") (return . substMap (Map.map g fvs)) lc
+    --lc <- mangle (return ()) False ("Absurdize") (return . substMap (Map.map g fvs)) lc
     --lc <- mangle (return ()) False "deNewtype" (return . deNewtype dataTable) lc
     --lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
     lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeApps usedIds stats x >>= coalesceLets stats)  lc

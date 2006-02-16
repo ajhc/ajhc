@@ -86,6 +86,7 @@ tipe t = f t where
     f (TAp t1 t2) = eAp (f t1) (f t2)
     f (TArrow t1 t2) =  EPi (tVr 0 (f t1)) (f t2)
     f (TCon (Tycon n k)) =  ELit (LitCons n [] (kind k))
+    f (TVar Tyvar { tyvarRef = Just {}, tyvarKind = k}) = tAbsurd (kind k)
     f (TVar tv) = EVar (cvar tv)
     f (TMetaVar mv) = cmvar mv
     f (TGen _ (Tyvar _ n k _)) = EVar (tVr (lt n) (kind k))
@@ -93,6 +94,7 @@ tipe t = f t where
     f (TExists xs (_ :=> t)) = let
         xs' = map (kind . tyvarKind) xs
         in ELit (LitCons (unboxedNameTuple TypeConstructor (length xs' + 1)) (f t:xs') eHash)
+    cvar Tyvar { tyvarRef = Just {}, tyvarKind = k}= error "tyvar is metaref"
     cvar (Tyvar _ n k _) = (tVr (lt n) (kind k))
     cmvar MetaVar { metaKind = k } = tAbsurd (kind k)
 
