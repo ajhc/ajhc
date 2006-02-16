@@ -3,15 +3,15 @@ module Jhc.IO where
 import Prelude.IOError
 
 
+-- this is treated specially by the compiler. it won't treat it as a product type.
 data World__ = World__
-    deriving(Show)
 
 data IOResult a = FailIO World__ IOError | JustIO World__ a
 newtype IO a = IO (World__ -> IOResult a)
 
 
 unsafePerformIO :: IO a -> a
-unsafePerformIO (IO x) = case x World__ of
+unsafePerformIO (IO x) = case x (newWorld__ x) of
     FailIO _ z -> error $ case z of IOError z ->  z
     JustIO _ a -> a
 
@@ -52,21 +52,11 @@ fixIO k = IO $ \w -> let
                 FailIO _ _ -> error $ "IOError"
                 JustIO _ z  -> z
                in r
---foreign import primitive unsafeCoerce :: a -> b
+
+-- | this creates a new world object that artificially depends on its argument to avoid CSE.
+foreign import primitive newWorld__ :: a -> World__
+
+-- throws away first argument. but causes second argument to artificially depend on it.
+foreign import primitive drop__ :: forall a b. a -> b -> b
 
 
-
-{-
-data World__ = World__
-
-data IO a = IO (World__ -> (World__,a))
-unIO (IO x) = x
-
-unsafePerformIO :: IO a -> a
-unsafePerformIO (IO x) = case x World__ of (_,z) -> z
---unsafePerformIO (IO x) = snd $ x undefined
-
-unsafeInterleaveIO :: IO a -> IO a
-unsafeInterleaveIO (IO m) = IO f where
-    f w = (w,case m w of (_,r) -> r)
--}

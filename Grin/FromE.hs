@@ -296,6 +296,9 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce e | Just z <- constant e = return (gEval z)
     ce e | Just z <- con e = return (Return z)
     ce e | Just (a,_) <- from_unsafeCoerce e = ce a
+    ce (EPrim ap@(APrim (PrimPrim "newWorld__") _) [_] _) = do
+        return $ Return world__
+    ce (EPrim ap@(APrim (PrimPrim "drop__") _) [_,e] _) = ce e
     ce (EPrim ap@(APrim (Func True fn as "void") _) (_:es) _) = do
         let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ((map (Ty . toAtom) as),tyUnit), primAPrim = ap }
         return $  Prim p (args es) :>>= unit :-> Return world__
@@ -421,6 +424,8 @@ compile' dataTable cenv (tvr,as,e) = ans where
 
     -- | cc evaluates something in lazy context, returning a pointer to a node which when evaluated will produce the strict result.
     -- it is an invarient that evaling (cc e) produces the same value as (ce e)
+    cc (EPrim (APrim (PrimPrim "newWorld__") _) [_] _) = return $ Return pworld__
+    cc (EPrim (APrim (PrimPrim "drop__") _) [_,e] _) = cc e
     cc e | Just _ <- literal e = error "literal in lazy context"
     cc e | Just z <- constant e = return (Return z)
     cc e | Just z <- con e = return (Store z)

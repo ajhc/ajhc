@@ -115,6 +115,7 @@ instance HasSize DataTable where
     size (DataTable d) = Map.size d
 
 getConstructor :: Monad m => Name -> DataTable -> m Constructor
+getConstructor n (DataTable dt) | n == tc_World__, Just c <- Map.lookup n dt = return c { conChildren = Nothing }
 getConstructor n _ | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = return $ snd $ tunboxedtuple v
 getConstructor n _ | Just v <- fromUnboxedNameTuple n, TypeConstructor <- nameType n = return $ fst $ tunboxedtuple v
 getConstructor n (DataTable map) = case Map.lookup n map of
