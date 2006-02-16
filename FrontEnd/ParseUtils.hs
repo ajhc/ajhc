@@ -86,9 +86,6 @@ checkDataHeader :: HsQualType -> P (HsContext,HsName,[HsName])
 checkDataHeader (HsQualType cs t) = do
 	(c,ts) <- checkSimple "data/newtype" t []
 	return (cs,c,ts)
-checkDataHeader (HsUnQualType t) = do
-	(c,ts) <- checkSimple "class" t []
-	return ([],c,ts)
 
 checkClassHeader :: HsQualType -> P (HsContext,HsName,[HsName])
 checkClassHeader (HsQualType cs t) = do
@@ -247,14 +244,14 @@ checkAlt (HsAlt loc p galts bs) = do
 	galts <- checkGAlts galts
 	return (HsAlt loc p galts bs)
 
-checkGAlts :: HsGuardedAlts -> P HsGuardedAlts
-checkGAlts (HsUnGuardedAlt e) = check1Expr e HsUnGuardedAlt
-checkGAlts (HsGuardedAlts galts) = do
+checkGAlts :: HsRhs -> P HsRhs
+checkGAlts (HsUnGuardedRhs e) = check1Expr e HsUnGuardedRhs
+checkGAlts (HsGuardedRhss galts) = do
 	galts <- mapM checkGAlt galts
-	return (HsGuardedAlts galts)
+	return (HsGuardedRhss galts)
 
-checkGAlt :: HsGuardedAlt -> P HsGuardedAlt
-checkGAlt (HsGuardedAlt loc e1 e2) = check2Exprs e1 e2 (HsGuardedAlt loc)
+checkGAlt :: HsGuardedRhs -> P HsGuardedRhs
+checkGAlt (HsGuardedRhs loc e1 e2) = check2Exprs e1 e2 (HsGuardedRhs loc)
 
 checkStmt :: HsStmt -> P HsStmt
 checkStmt (HsGenerator loc p e) = check1Expr e (HsGenerator loc p)

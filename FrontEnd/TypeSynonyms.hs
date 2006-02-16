@@ -36,7 +36,7 @@ showSynonym pprint n (TypeSynonyms m) = do
 -- expansion
 
 declsToTypeSynonyms :: [HsDecl] -> TypeSynonyms
-declsToTypeSynonyms ts = TypeSynonyms $ Map.fromList [ (toName TypeConstructor name,( args , quantifyHsType args (HsUnQualType t) , sl)) | (HsTypeDecl sl name args t) <- ts]
+declsToTypeSynonyms ts = TypeSynonyms $ Map.fromList [ (toName TypeConstructor name,( args , quantifyHsType args (HsQualType [] t) , sl)) | (HsTypeDecl sl name args t) <- ts]
 
 removeSynonymsFromType :: MonadWarn m => TypeSynonyms -> HsType -> m HsType
 removeSynonymsFromType syns t = evalTypeSyms  syns t
@@ -85,9 +85,6 @@ evalTypeSyms (TypeSynonyms tmap) t = execUniqT 1 (eval [] t) where
         return $ HsTyExists (snds nvs)  t'
     subst (sm::(Map.Map HsName HsType))  (HsTyVar n) | Just v <- Map.lookup n sm = return v
     subst sm t = mapHsTypeHsType (subst sm) t
-    substqt sm qt@HsUnQualType { hsQualTypeType = t } = do
-        t' <- subst sm t
-        return qt { hsQualTypeType = t'}
     substqt sm qt@HsQualType { hsQualTypeContext = ps, hsQualTypeType = t } = do
         t' <- subst sm t
         let ps' = [ case Map.lookup n sm of Just (HsTyVar n') -> (c,n') ; _ -> (c,n) | (c,n) <- ps ]

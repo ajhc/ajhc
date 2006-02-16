@@ -156,9 +156,6 @@ renameHsQualType (HsQualType hsContext hsType) subTable = do
       hsContext' <- renameHsContext hsContext subTable
       hsType' <- renameHsType hsType subTable
       return (HsQualType hsContext' hsType')
-renameHsQualType (HsUnQualType hsType) subTable = do
-      hsType' <- renameHsType hsType subTable
-      return (HsQualType [] hsType')
 
 renameHsContext :: HsContext -> SubTable -> ScopeSM (HsContext)
 renameHsContext = mapRename renameHsAsst
@@ -316,19 +313,10 @@ renameHsRhs (HsUnGuardedRhs hsExp) subTable = do
       hsExp' <- renameHsExp hsExp subTable
       return (HsUnGuardedRhs hsExp')
 renameHsRhs (HsGuardedRhss hsGuardedRhss) subTable = do
-      hsGuardedRhss' <- renameHsGuardedRhss hsGuardedRhss subTable
+      hsGuardedRhss' <- renameHsGuardedRhsList hsGuardedRhss subTable
       return (HsGuardedRhss hsGuardedRhss')
 
 
-renameHsGuardedRhss :: [HsGuardedRhs] -> SubTable -> ScopeSM ([HsGuardedRhs])
-renameHsGuardedRhss = mapRename renameHsGuardedRhs
-
-renameHsGuardedRhs :: HsGuardedRhs -> SubTable -> ScopeSM HsGuardedRhs
-renameHsGuardedRhs (HsGuardedRhs srcLoc hsExp1 hsExp2) subTable = do
-    setSrcLoc srcLoc
-    hsExp1' <- renameHsExp hsExp1 subTable
-    hsExp2' <- renameHsExp hsExp2 subTable
-    return (HsGuardedRhs srcLoc hsExp1' hsExp2')
 
 
 renameHsExps :: [HsExp] -> SubTable -> ScopeSM ([HsExp])
@@ -467,26 +455,26 @@ renameHsAlt (HsAlt srcLoc hsPat hsGuardedAlts {-where-} hsDecls) subTable = do
     hsPat' <- renameHsPat hsPat subTable'
     subTable'' <- updateSubTableWithHsDecls subTable' hsDecls WhereFun
     hsDecls' <- renameHsDecls hsDecls subTable''
-    hsGuardedAlts' <- renameHsGuardedAlts hsGuardedAlts subTable''
+    hsGuardedAlts' <- renameHsRhs hsGuardedAlts subTable''
     return (HsAlt srcLoc hsPat' hsGuardedAlts' hsDecls')
 
-renameHsGuardedAlts :: HsGuardedAlts -> SubTable -> ScopeSM (HsGuardedAlts)
-renameHsGuardedAlts (HsUnGuardedAlt hsExp) subTable = do
+renameHsGuardedRhss :: HsRhs -> SubTable -> ScopeSM (HsRhs)
+renameHsGuardedRhss (HsUnGuardedRhs hsExp) subTable = do
       hsExp' <- renameHsExp hsExp subTable
-      return (HsUnGuardedAlt hsExp')
-renameHsGuardedAlts (HsGuardedAlts hsGuardedAltList) subTable = do
-      hsGuardedAltList' <- renameHsGuardedAltList hsGuardedAltList subTable
-      return (HsGuardedAlts hsGuardedAltList')
+      return (HsUnGuardedRhs hsExp')
+renameHsGuardedRhss (HsGuardedRhss hsGuardedAltList) subTable = do
+      hsGuardedAltList' <- renameHsGuardedRhsList hsGuardedAltList subTable
+      return (HsGuardedRhss hsGuardedAltList')
 
-renameHsGuardedAltList :: [HsGuardedAlt] -> SubTable -> ScopeSM [HsGuardedAlt]
-renameHsGuardedAltList = mapRename renameHsGuardedAlt
+renameHsGuardedRhsList :: [HsGuardedRhs] -> SubTable -> ScopeSM [HsGuardedRhs]
+renameHsGuardedRhsList = mapRename renameHsGuardedRhs
 
-renameHsGuardedAlt :: HsGuardedAlt -> SubTable -> ScopeSM HsGuardedAlt
-renameHsGuardedAlt (HsGuardedAlt srcLoc hsExp1 hsExp2) subTable = do
+renameHsGuardedRhs :: HsGuardedRhs -> SubTable -> ScopeSM HsGuardedRhs
+renameHsGuardedRhs (HsGuardedRhs srcLoc hsExp1 hsExp2) subTable = do
     setSrcLoc srcLoc
     hsExp1' <- renameHsExp hsExp1 subTable
     hsExp2' <- renameHsExp hsExp2 subTable
-    return (HsGuardedAlt srcLoc hsExp1' hsExp2')
+    return (HsGuardedRhs srcLoc hsExp1' hsExp2')
 
 -- renameHsStmts is trickier than you would expect because
 -- the statements are only in scope after they have been declared
@@ -697,7 +685,6 @@ getHsNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls) = concat $ map getHsNamesAnd
 
 getHsNamesFromHsQualType :: HsQualType -> [HsName]
 getHsNamesFromHsQualType (HsQualType _hsContext hsType) = getHsNamesFromHsType hsType
-getHsNamesFromHsQualType (HsUnQualType hsType) = getHsNamesFromHsType hsType
 
 getHsNamesFromHsType :: HsType -> [HsName]
 getHsNamesFromHsType (HsTyFun hsType1 hsType2) = (getHsNamesFromHsType hsType1) ++ (getHsNamesFromHsType hsType2)
@@ -867,8 +854,6 @@ instance Renameable HsQualType where
         in case object of
             HsQualType    context typ ->
                 HsQualType  # context # typ
-            HsUnQualType  typ ->
-                HsUnQualType  # typ
 
 
 instance Renameable HsType where
@@ -1022,21 +1007,6 @@ instance Renameable (HsAlt) where
                 HsAlt  # srcloc # pat # guardedalts # objects
 
 
-instance Renameable (HsGuardedAlts) where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsUnGuardedAlt  exp ->
-                HsUnGuardedAlt  # exp
-            HsGuardedAlts   guardedalts ->
-                HsGuardedAlts  # guardedalts
-
-instance Renameable (HsGuardedAlt) where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsGuardedAlt  srcloc exp exp' ->
-                HsGuardedAlt  # srcloc # exp # exp'
 
 instance Renameable HsName where
     replaceName f name = f name

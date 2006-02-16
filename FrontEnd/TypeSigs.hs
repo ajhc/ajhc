@@ -173,17 +173,17 @@ collectSigsFromExp (HsIrrPat e)
 
 collectSigsFromAlt :: (HsAlt) -> [(HsDecl)]
 
-collectSigsFromAlt (HsAlt _ _ (HsUnGuardedAlt e) decls)
+collectSigsFromAlt (HsAlt _ _ (HsUnGuardedRhs e) decls)
    = collectSigsFromExp e ++
      collectSigsFromDecls decls
 
-collectSigsFromAlt (HsAlt _ _ (HsGuardedAlts alts) decls)
+collectSigsFromAlt (HsAlt _ _ (HsGuardedRhss alts) decls)
    = concatMap collectSigsFromGuardedAlt alts ++
      collectSigsFromDecls decls
 
-collectSigsFromGuardedAlt :: (HsGuardedAlt) -> [(HsDecl)]
+collectSigsFromGuardedAlt :: (HsGuardedRhs) -> [(HsDecl)]
 
-collectSigsFromGuardedAlt (HsGuardedAlt _ e1 e2)
+collectSigsFromGuardedAlt (HsGuardedRhs _ e1 e2)
    = collectSigsFromExp e1 ++
      collectSigsFromExp e2
 

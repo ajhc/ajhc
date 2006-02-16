@@ -189,12 +189,10 @@ data HsGuardedRhs
 
 data HsQualType
 	 = HsQualType   { hsQualTypeContext :: HsContext, hsQualTypeType :: HsType }
-	 | HsUnQualType { hsQualTypeType :: HsType }
   deriving(Data,Typeable,Eq,Ord,Show)
   {-! derive: GhcBinary !-}
 
 hsQualTypeHsContext HsQualType { hsQualTypeContext = c } = c
-hsQualTypeHsContext _ = []
 
 data HsType
 	 = HsTyFun   HsType HsType
@@ -312,17 +310,7 @@ data HsFieldUpdate
 	= HsFieldUpdate HsName HsExp
   deriving(Data,Typeable,Eq,Show)
 
-data HsAlt
-	= HsAlt SrcLoc HsPat HsGuardedAlts [HsDecl]
-  deriving(Data,Typeable,Eq,Show)
-
-data HsGuardedAlts
-	= HsUnGuardedAlt HsExp
-	| HsGuardedAlts  [HsGuardedAlt]
-  deriving(Data,Typeable,Eq,Show)
-
-data HsGuardedAlt
-	= HsGuardedAlt SrcLoc HsExp HsExp
+data HsAlt = HsAlt SrcLoc HsPat HsRhs [HsDecl]
   deriving(Data,Typeable,Eq,Show)
 
 data HsKind = HsKind {-# UNPACK #-} !Atom | HsKindFn HsKind HsKind

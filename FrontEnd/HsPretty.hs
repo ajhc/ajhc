@@ -371,7 +371,6 @@ ppHsQualType :: HsQualType -> Doc
 ppHsQualType (HsQualType [] htype) = ppHsType htype
 ppHsQualType (HsQualType context htype) = -- if it's HsQualType, context is never empty
 	     myFsep [ ppHsContext context, text "=>", ppHsType htype]
-ppHsQualType (HsUnQualType htype) = ppHsType htype
 
 parensIf :: Bool -> Doc -> Doc
 parensIf True = parens
@@ -541,11 +540,11 @@ ppHsAlt :: HsAlt -> Doc
 ppHsAlt (HsAlt pos exp gAlts decls) =
 	ppHsPat exp <+> ppGAlts gAlts $$$ ppWhere decls
 
-ppGAlts :: HsGuardedAlts -> Doc
-ppGAlts (HsUnGuardedAlt exp) = text "->" <+> ppHsExp exp
-ppGAlts (HsGuardedAlts altList) = myVcat . map ppGAlt $ altList
+ppGAlts :: HsRhs -> Doc
+ppGAlts (HsUnGuardedRhs exp) = text "->" <+> ppHsExp exp
+ppGAlts (HsGuardedRhss altList) = myVcat . map ppGAlt $ altList
 
-ppGAlt (HsGuardedAlt pos exp body) =
+ppGAlt (HsGuardedRhs pos exp body) =
 	 myFsep [char '|', ppHsExp exp, text "->", ppHsExp body]
 
 ------------------------- Statements in monads & list comprehensions -----

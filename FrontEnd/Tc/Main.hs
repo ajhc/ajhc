@@ -254,18 +254,18 @@ tcAlt scrutinee typ alt@(HsAlt sloc pat gAlts wheres)  = withContext (locMsg slo
     localEnv env $ do
     (wheres', env) <- tcWheres wheres
     localEnv env $ case gAlts of
-        HsUnGuardedAlt e -> do
+        HsUnGuardedRhs e -> do
             e' <- tcExpr e typ
-            return (HsAlt sloc pat' (HsUnGuardedAlt e') wheres')
-        HsGuardedAlts as -> do
+            return (HsAlt sloc pat' (HsUnGuardedRhs e') wheres')
+        HsGuardedRhss as -> do
             gas <- mapM (tcGuardedAlt typ) as
-            return (HsAlt sloc pat' (HsGuardedAlts gas) wheres')
+            return (HsAlt sloc pat' (HsGuardedRhss gas) wheres')
 
-tcGuardedAlt typ gAlt@(HsGuardedAlt sloc eGuard e) = withContext (locMsg sloc "in the guarded alternative" $ render $ ppGAlt gAlt) $ do
+tcGuardedAlt typ gAlt@(HsGuardedRhs sloc eGuard e) = withContext (locMsg sloc "in the guarded alternative" $ render $ ppGAlt gAlt) $ do
     typ <- findType typ
     g' <- tcExpr eGuard tBool
     e' <- tcExpr e typ
-    return  (HsGuardedAlt sloc g' e')
+    return  (HsGuardedRhs sloc g' e')
 
 tcGuardedRhs typ gAlt@(HsGuardedRhs sloc eGuard e) = withContext (locMsg sloc "in the guarded alternative" $ render $ ppHsGuardedRhs gAlt) $ do
     typ <- findType typ

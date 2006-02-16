@@ -393,11 +393,10 @@ tiAlt env alt@(HsAlt sloc pat gAlts wheres)
         return ((psPat, patT), envPat `Map.union` envAlt `Map.union` wheresEnv, (wheresPs ++ psAlt, tAlt)) --Boba
 
 
-tiGuardedAlts env (HsUnGuardedAlt e)
-   = tiExpr env e
+tiGuardedAlts env (HsUnGuardedRhs e) = tiExpr env e
 
 -- basically the same as HsGuardedRhss
-tiGuardedAlts env (HsGuardedAlts gAlts)
+tiGuardedAlts env (HsGuardedRhss gAlts)
    = withContext (simpleMsg "in guarded alternatives") $
      do
         psEnvTs <- mapM (tiGuardedAlt env) gAlts
@@ -415,8 +414,8 @@ tiGuardedAlts env (HsGuardedAlts gAlts)
 
 
 -- basically the same as tiGuardedRhs
-tiGuardedAlt ::  TypeEnv  -> (HsGuardedAlt) -> TI (([Pred], TypeEnv, Type), ([Pred], TypeEnv, Type))
-tiGuardedAlt env gAlt@(HsGuardedAlt sloc eGuard eRhs)
+tiGuardedAlt ::  TypeEnv  -> (HsGuardedRhs) -> TI (([Pred], TypeEnv, Type), ([Pred], TypeEnv, Type))
+tiGuardedAlt env gAlt@(HsGuardedRhs sloc eGuard eRhs)
    = withContext (locMsg sloc "in the guarded alternative" $ render $ ppGAlt gAlt) $ do
         (guardPs, guardEnv, guardT) <- tiExpr env eGuard
         (rhsPs, rhsEnv, rhsT)     <- tiExpr env eRhs

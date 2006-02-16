@@ -401,7 +401,7 @@ C a, or (C1 a, C2 b, ... Cn z) and convert it into a context.  Blaach!
 > ctype :: { HsQualType }
 >	: btype '=>' type		{% checkContext $1 `thenP` \c ->
 >					   returnP (HsQualType c $3) }
->	| type				{ HsUnQualType $1 }
+>	| type				{ HsQualType [] $1 }
 
 > types	:: { [HsType] }
 >	: types ',' type		{ $3 : $1 }
@@ -654,16 +654,16 @@ Case alternatives
 >				{% checkPattern $1 `thenP` \p ->
 >				   returnP (HsAlt $2 p $3 $5) }
 
-> ralt :: { HsGuardedAlts }
->	: '->' exp				{ HsUnGuardedAlt $2 }
->	| gdpats				{ HsGuardedAlts (reverse $1) }
+> ralt :: { HsRhs }
+>	: '->' exp				{ HsUnGuardedRhs $2 }
+>	| gdpats				{ HsGuardedRhss (reverse $1) }
 
-> gdpats :: { [HsGuardedAlt] }
+> gdpats :: { [HsGuardedRhs] }
 >	: gdpats gdpat				{ $2 : $1 }
 >	| gdpat					{ [$1] }
 
-> gdpat	:: { HsGuardedAlt }
->	: '|' exp srcloc '->' exp 		{ HsGuardedAlt $3 $2 $5 }
+> gdpat	:: { HsGuardedRhs }
+>	: '|' exp srcloc '->' exp 		{ HsGuardedRhs $3 $2 $5 }
 
 -----------------------------------------------------------------------------
 Statement sequences

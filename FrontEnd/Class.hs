@@ -217,7 +217,6 @@ instance ClassNames HsName where
 -}
 
 
-toHsQualType (HsUnQualType t) = HsQualType [] t
 toHsQualType qt = qt
 
 addClassToHierarchy :: Monad m =>  KindEnv -> HsDecl -> ClassHierarchy -> m ClassHierarchy

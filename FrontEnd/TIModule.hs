@@ -217,7 +217,7 @@ tiModules' me ms = do
         classDefaults  = snub [ getDeclName z | z <- cDefBinds, isHsFunBind z || isHsPatBind z ]
         classNoDefaults = snub (concat [ getDeclNames z | z <- cDefBinds ])  List.\\ classDefaults
         noDefaultSigs = Map.fromList [ (n,maybe (error $ "sigEnv:"  ++ show n) id $ Map.lookup n sigEnv) | n <- classNoDefaults ]
-        fakeForeignDecls = [ [HsForeignDecl bogusASrcLoc ForeignPrimitive "" (nameName x) (HsUnQualType $ HsTyTuple []) ] | (x,_) <- Map.toList noDefaultSigs]
+        fakeForeignDecls = [ [HsForeignDecl bogusASrcLoc ForeignPrimitive "" (nameName x) (HsQualType [] $ HsTyTuple []) ] | (x,_) <- Map.toList noDefaultSigs]
     --when verbose2 $ putStrLn (show bindings)
     let programBgs = getBindGroups bindings (nameName . getDeclName) getDeclDeps
 

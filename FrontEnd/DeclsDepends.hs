@@ -152,24 +152,20 @@ getAltDeps (HsAlt _sloc _pat guardedAlts wheres)
    = getGuardedAltsDeps guardedAlts ++
      foldr (++) [] (map getLocalDeclDeps wheres)
 
-getGuardedAltsDeps :: HsGuardedAlts -> [HsName]
-getGuardedAltsDeps (HsUnGuardedAlt e)
-   = getExpDeps e
+getGuardedAltsDeps :: HsRhs -> [HsName]
+getGuardedAltsDeps (HsUnGuardedRhs e) = getExpDeps e
 
-getGuardedAltsDeps (HsGuardedAlts gAlts)
-   = foldr (++) [] (map getGAltsDeps gAlts)
+getGuardedAltsDeps (HsGuardedRhss gAlts) = foldr (++) [] (map getGAltsDeps gAlts)
 
-getGAltsDeps :: HsGuardedAlt -> [HsName]
-getGAltsDeps (HsGuardedAlt _sloc e1 e2)
+getGAltsDeps :: HsGuardedRhs -> [HsName]
+getGAltsDeps (HsGuardedRhs _sloc e1 e2)
    = getExpDeps e1 ++
      getExpDeps e2
 
 getStmtDeps :: HsStmt -> [HsName]
-getStmtDeps (HsGenerator _srcLoc _pat e)
-   = getExpDeps e
+getStmtDeps (HsGenerator _srcLoc _pat e) = getExpDeps e
 
-getStmtDeps (HsQualifier e)
-   = getExpDeps e
+getStmtDeps (HsQualifier e) = getExpDeps e
 
 getStmtDeps (HsLetStmt decls)
    = foldr (++) [] (map getLocalDeclDeps decls)

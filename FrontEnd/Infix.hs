@@ -175,14 +175,14 @@ processAlt infixMap (HsAlt srcloc pat g_alts decls) = HsAlt srcloc (procPat infi
         new_decls = map (processDecl infixMap) decls
 
 
-processGAlts :: SymbolMap -> HsGuardedAlts -> HsGuardedAlts
+processGAlts :: SymbolMap -> HsRhs -> HsRhs
 processGAlts infixMap g_alts = case g_alts of
-    HsUnGuardedAlt exp     -> HsUnGuardedAlt $ fst $ processExp infixMap exp
-    HsGuardedAlts galts    -> HsGuardedAlts $ map (processGAlt infixMap) galts
+    HsUnGuardedRhs exp     -> HsUnGuardedRhs $ fst $ processExp infixMap exp
+    HsGuardedRhss galts    -> HsGuardedRhss $ map (processGAlt infixMap) galts
 
 
-processGAlt :: SymbolMap -> HsGuardedAlt -> HsGuardedAlt
-processGAlt infixMap (HsGuardedAlt srcloc e1 e2) = HsGuardedAlt srcloc new_e1 new_e2
+processGAlt :: SymbolMap -> HsGuardedRhs -> HsGuardedRhs
+processGAlt infixMap (HsGuardedRhs srcloc e1 e2) = HsGuardedRhs srcloc new_e1 new_e2
     where
         new_e1 = fst $ processExp infixMap e1
         new_e2 = fst $ processExp infixMap e2

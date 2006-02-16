@@ -284,11 +284,6 @@ kiQualType varExist qt@(HsQualType cntxt t) = do
         withContext ("kiQualType: " ++ show qt) $ do
         mapM_ kiAsst cntxt
         kiType varExist t
-kiQualType varExist qt@(HsUnQualType t) = do
-        withContext ("kiQualType: " ++ show qt) $ do
-        kiType varExist t
---kiQualType varExist (HsUnQualType t)
---   = kiType varExist t
 
 
 -- boolean arg = True = throw error if var does not exist
@@ -400,12 +395,9 @@ dataAndClassDeps (HsNewTypeDecl _sloc cntxt _name _args condecl _derives)
    = snub $ namesFromContext cntxt ++ (concatMap namesFromType $ conDeclToTypes condecl)
 dataAndClassDeps (HsClassDecl _sloc (HsQualType cntxt _classApp) decls)
    = snub $ namesFromContext cntxt ++ (concat [ namesFromQualType (typeFromSig s) | s <- decls,  isHsTypeSig s])
-dataAndClassDeps (HsClassDecl _sloc (HsUnQualType _classApp) decls)
-   = snub $ concat [ namesFromQualType (typeFromSig s) | s <- decls,  isHsTypeSig s]
 
 namesFromQualType :: HsQualType -> [Name]
 namesFromQualType (HsQualType cntxt t) = namesFromContext cntxt ++ namesFromType t
-namesFromQualType (HsUnQualType t) = namesFromType t
 
 namesFromType :: HsType -> [Name]
 namesFromType (HsTyFun t1 t2) = namesFromType t1 ++ namesFromType t2
@@ -539,7 +531,6 @@ toTyvar kt name =  tyvar  nn (kindOf nn kt) Nothing where
 
 aHsQualTypeToQualType :: KindEnv -> HsQualType -> Qual Type
 aHsQualTypeToQualType kt (HsQualType cntxt t) = map (hsAsstToPred kt) cntxt :=> aHsTypeToType kt t
-aHsQualTypeToQualType kt (HsUnQualType t) = [] :=> aHsTypeToType kt t
 
 
 hsAsstToPred :: KindEnv -> HsAsst -> Pred

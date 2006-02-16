@@ -25,7 +25,6 @@ maybeGetDeclName (HsDataDecl _ _ name  _ _ _) = return (toName TypeConstructor n
 maybeGetDeclName (HsNewTypeDecl _ _ name  _ _ _) = return (toName TypeConstructor name)
 maybeGetDeclName (HsClassDecl _ qualType _) = case qualType of
             HsQualType _cntxt t -> return $ leftMostTyCon t
-            HsUnQualType t -> return $ leftMostTyCon t
         where
             leftMostTyCon (HsTyTuple ts) = error "lehtMostTyCon applied to tuple" -- toTuple (length ts)
             leftMostTyCon (HsTyApp t1 _) = leftMostTyCon t1

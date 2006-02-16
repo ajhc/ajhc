@@ -162,8 +162,10 @@ matchesConv ms = map v ms where
 altConv as = map v as where
     v (HsAlt _ p rhs wh) = ([simplifyHsPat p],guardConv rhs,wh)
 
-guardConv (HsUnGuardedAlt e) = HsUnGuardedRhs e
-guardConv (HsGuardedAlts gs) = HsGuardedRhss (map (\(HsGuardedAlt s e1 e2) -> HsGuardedRhs s e1 e2) gs)
+guardConv x = x
+
+--guardConv (HsUnGuardedAlt e) = HsUnGuardedRhs e
+--guardConv (HsGuardedAlts gs) = HsGuardedRhss (map (\(HsGuardedAlt s e1 e2) -> HsGuardedRhs s e1 e2) gs)
 
 argTypes e = span ((== eBox) . getType) (map tvrType xs) where
     (_,xs) = fromPi e
