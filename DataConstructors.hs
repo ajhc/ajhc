@@ -1,6 +1,7 @@
 module DataConstructors(
     Constructor(..),
     DataTable(..),
+    dataTablePrims,
     constructionExpression,
     deconstructionExpression,
     followAliases,
@@ -20,7 +21,8 @@ module DataConstructors(
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Map as Map hiding(map)
-import List(sortBy)
+import qualified Data.Set as Set
+import List(sortBy,(\\))
 
 import Binary
 import Doc.DocLike
@@ -36,6 +38,7 @@ import MapBinaryInstance()
 import Name.Name as Name
 import Name.Names
 import Name.VConsts
+import Support.FreeVars
 import PrimitiveOperators
 import qualified Util.Seq as Seq
 import Representation
@@ -79,19 +82,9 @@ tipe t = runVarName (tipe' t) where
 kind Star = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."
-{-
-data DataType = Alias |
-    Boxed               -- ^ values are always tagged and the domain includes closures which evaluate to a term of this type as well as it's data constructors.
-    | BoxedPrimitive    -- ^ values are always tagged and the domain includes closures which evaluate to a term of this type, other values in the domain are system dependent however.
-    | UnboxedPrimitive  -- ^ values do not have a tag and the representation is system dependent
-    | Unboxed           -- ^ values do not have a tag, only a single constructor is allowed.
-    | UnboxedTagged     -- ^ values do have a tag, but closures not in the domain.
-    | Alias             -- ^ this type is isomorphic to an existing type
--}
 
 -- | Record describing a data type.
--- * is also a data type containing the type constructors, which are unboxed, yet tagged.
-
+-- * is also a data type containing the type constructors, which are unlifted, yet boxed.
 
 data Constructor = Constructor {
     conName :: Name,             -- name of constructor
@@ -99,7 +92,6 @@ data Constructor = Constructor {
     conExpr :: E,                -- expression which constructs this value
     conSlots :: [E],             -- slots
     conDeriving :: [Name],       -- classes this type derives
-    conClosures :: Bool,         -- does the domain contain closures?
     conAlias :: Bool,            -- whether this is a simple alias and has no tag of its own.
     conInhabits :: Name,         -- what constructor it inhabits, similar to conType, but not quite.
     conChildren :: Maybe [Name]  -- if nothing, then type is abstract
@@ -138,7 +130,6 @@ tunboxedtuple n = (typeCons,dataCons) where
             conSlots = [],
             conDeriving = [],
             conExpr = Unknown, -- error "expr" ELam (tVr 2 rt) (ELit (LitCons dc [EVar (tVr 2 rt)] tipe)),
-            conClosures = False,
             conAlias = False,
             conInhabits = tc,
             conChildren = Nothing
@@ -149,7 +140,6 @@ tunboxedtuple n = (typeCons,dataCons) where
             conSlots = [],
             conDeriving = [],
             conExpr = tipe,
-            conClosures = False,
             conAlias = False,
             conInhabits = tHash,
             conChildren = Just [dc]
@@ -166,7 +156,6 @@ tabsurd = Constructor {
             conSlots = [],
             conDeriving = [],
             conExpr = tAbsurd eStar,
-            conClosures = False,
             conAlias = False,
             conInhabits = tStar,
             conChildren = Nothing
@@ -178,7 +167,6 @@ tarrow = Constructor {
             conSlots = [eStar,eStar],
             conDeriving = [],
             conExpr = ELam (tVr 2 eStar) (ELam (tVr 4 eStar) (EPi (tVr 0 (EVar $ tVr 2 eStar)) (EVar $ tVr 4 eStar))),
-            conClosures = True,
             conAlias = False,
             conInhabits = tStar,
             conChildren = Nothing
@@ -192,7 +180,6 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,b,_) -> b) al
         conSlots = [],
         conDeriving = [],
         conExpr = ELit (LitCons rn [] eHash),
-        conClosures = False,
         conAlias = False,
         conInhabits = tHash,
         conChildren = Nothing
@@ -204,7 +191,6 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,b,_) -> b) al
             conSlots = [rt],
             conDeriving = [],
             conExpr = ELam (tVr 2 rt) (ELit (LitCons dc [EVar (tVr 2 rt)] tipe)),
-            conClosures = True,
             conAlias = False,
             conInhabits = tc,
             conChildren = Nothing
@@ -215,7 +201,6 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,b,_) -> b) al
             conSlots = [],
             conDeriving = [],
             conExpr = tipe,
-            conClosures = True,
             conAlias = False,
             conInhabits = tStar,
             conChildren = Just [dc]
@@ -266,11 +251,11 @@ typesCompatable dataTable a b = go a b where
     f _ _ _ _ = fail "Types don't match"
 
 
-lookupCType dataTable e = case followAliases dataTable e of
+lookupCType dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
     ELit (LitCons c [] _) | Just pt <- Map.lookup c ctypeMap -> return (c,pt)
     e' -> fail $ "lookupCType: " ++ show (e,e')
 
-lookupCType' dataTable e = case followAliases dataTable e of
+lookupCType' dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
     ELit (LitCons c [] _)
         | Just Constructor { conChildren = Just [cn] }  <- getConstructor c dataTable,
           Just Constructor { conSlots = [st@(ELit (LitCons n [] _))] } <- getConstructor cn dataTable
@@ -304,11 +289,13 @@ followAliases dataTable (ELit (LitCons c ts e))
         ans = doSubst False False (Map.fromList $ zip [2..] (map Just ts)) sl
 followAliases _ e = e
 
-dataTablePrims =  Map.fromList [ (conName x,x) | x <- tabsurd:tarrow:primitiveTable ]
+dataTablePrims = DataTable $ Map.fromList [ (conName x,x) | x <- tabsurd:tarrow:primitiveTable ]
 
 {-# NOINLINE toDataTable #-}
 toDataTable :: (Map Name Kind) -> (Map Name Scheme) -> [HsDecl] -> DataTable
-toDataTable km cm ds = DataTable $ Map.union dataTablePrims  (Map.fromList [ (conName x,x) | x <- ds' ])  where
+toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conName x,x) | x <- ds' ])  where
+    fixupMap k _ | Just n <- getConstructor k dataTablePrims = n
+    fixupMap _ n = n
     ds' = Seq.toList $ execWriter (mapM_ f ds)
     f decl@HsNewTypeDecl {  hsDeclCon = c } = dt decl True  [c]
     f decl@HsDataDecl {  hsDeclCons = cs } = dt decl False  cs
@@ -328,7 +315,6 @@ toDataTable km cm ds = DataTable $ Map.union dataTablePrims  (Map.fromList [ (co
             conType = theKind,
             conSlots = map tvrType theTypeArgs,
             conExpr = foldr ($) theTypeExpr (map ELam theTypeArgs),
-            conClosures = True,
             conDeriving = [ toName ClassName n | n <- hsDeclDerives decl],
             conAlias = False,
             conInhabits = tStar,
@@ -336,13 +322,12 @@ toDataTable km cm ds = DataTable $ Map.union dataTablePrims  (Map.fromList [ (co
             } where
         makeData x = Constructor {
             conName = dataConsName,
-            conType =foldr ($) (getType theExpr) (map ELam theTypeArgs),-- tipe $ schemeToType scheme, -- ty',
+            conType =foldr ($) (getType theExpr) (map EPi theTypeArgs),
             conSlots =  slots,
             conExpr = theExpr,
             conInhabits = theTypeName,
             conDeriving = [],
             conAlias = alias,
-            conClosures = False,
             conChildren = Nothing
             } where
             theExpr =  foldr ($) (strictize $ ELit (LitCons dataConsName (map EVar vars) theTypeExpr)) (map ELam vars)
@@ -355,8 +340,9 @@ toDataTable km cm ds = DataTable $ Map.union dataTablePrims  (Map.fromList [ (co
             dataConsName =  toName Name.DataConstructor (hsConDeclName x)
             args = hsConDeclArgs x
             (ELit (LitCons _ xs _) ,ts') = fromPi $ tipe ty
+            existentials = Set.toList $ freeVars (map getType ts') Set.\\ freeVars xs
             subst = substMap $ Map.fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
-            ts = [ tvr {tvrIdent = x} | tvr <- ts' | x <- drop (5 + length theTypeArgs) [2,4..] ]
+            ts = existentials ++ [ tvr {tvrIdent = x} | tvr <- ts' | x <- drop (5 + length theTypeArgs) [2,4..] ]
             Just (Forall _ (_ :=> ty)) = Map.lookup dataConsName cm
 
 isHsBangedTy HsBangedTy {} = True
@@ -412,19 +398,22 @@ slotTypes wdt n e | Just fa <- followAlias wdt e  = slotTypes wdt n fa
 slotTypes _ n e = error $ "slotTypes: error in " ++ show n ++ ": " ++ show e
 
 showDataTable (DataTable mp) = vcat xs where
-    c  const = vcat [t,e,cl,cs,al,ih,ch] where
-        t = text "::" <+> ePretty conType
-        e = text "=" <+> ePretty conExpr
-        cl = text "closures:" <+> tshow conClosures
+    c  const = vcat [t,e,cs,al,ih,ch] where
+        t  = text "::" <+> ePretty conType
+        e  = text "=" <+> ePretty conExpr
         cs = text "slots:" <+> tupled (map ePretty (conSlots const))
         al = text "alias:" <+> tshow conAlias
         ih = text "inhabits:" <+> tshow conInhabits
         ch = text "children:" <+> tshow conChildren
         Constructor {
-            conName = conName, conType = conType, conExpr = conExpr, conClosures = conClosures,
-                conAlias  = conAlias, conInhabits = conInhabits, conChildren = conChildren
-                    } = const
-    xs =  [ text x <+> hang 0  (c y) | (x,y) <- ds]
+            conName = conName,
+            conType = conType,
+            conExpr = conExpr,
+            conAlias = conAlias,
+            conInhabits = conInhabits,
+            conChildren = conChildren
+            } = const
+    xs = [text x <+> hang 0 (c y) | (x,y) <- ds]
     ds = sortBy (\(x,_) (y,_) -> compare x y) [ (show x,y)  | (x,y) <-  Map.toList mp]
 
 

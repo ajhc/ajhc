@@ -454,7 +454,7 @@ hoToProgram ho = programSetDs (Map.elems $ hoEs ho) program {
     }
 
 
-initialHo = mempty { hoEs = es , hoClassHierarchy = ch  }  where
+initialHo = mempty { hoEs = es , hoClassHierarchy = ch, hoDataTable = dataTablePrims  }  where
     ch = foldl addOneInstanceToHierarchy mempty (map ((,) False) primitiveInsts)
     es = Map.fromList [  (n,(setProperties [prop_INSTANCE] $ tVr (atomIndex $ toAtom n) (getType v),v)) |  (n,v) <- constantMethods ] `mappend` es'
     --es' = Map.fromList [ (n,(tVr (atomIndex $ toAtom n) (getType v),v)) | (n,t,p,d) <- theMethods, let v = f n t p d  ]
