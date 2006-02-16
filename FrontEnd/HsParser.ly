@@ -429,6 +429,7 @@ Datatype declarations
 
 > mexists :: { [HsTyVarBind] }
 >         : 'exists' tbinds '.'         { $2 }
+>         | 'forall' tbinds '.'         { $2 }  -- Allowed for GHC compatability
 >         |                             { [] }
 
 > scontype :: { (HsName, [HsBangType]) }
