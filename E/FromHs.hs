@@ -457,17 +457,6 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         f (HsGuardedRhs _ g e:gs) = eIf (cExpr g) (cExpr e) (f gs)
         f [] = ump sl $ getType (cExpr e)
     processGuards xs = [ (map simplifyHsPat ps,hsLetE wh . cGuard e) | (ps,e,wh) <- xs ]
-    spec g s e = ct (gg g s)  e  where
-        ct ts e = foldl eAp e $ map ty $ snds ts
-        gg a b = snubFst $ gg' a b
-        gg' (TAp t1 t2) (TAp ta tb) = gg' t1 ta ++ gg' t2 tb
-        gg' (TArrow t1 t2) (TArrow ta tb) = gg' t1 ta ++ gg' t2 tb
-        gg' (TCon a) (TCon b) = if a /= b then error "constructors don't match." else []
-        gg' _ (TGen _ _) = error "Something impossible happened!"
-        gg' (TGen n _) t = [(n,t)]
-        gg' (TVar a) (TVar b) | a == b = []
-        gg' (TMetaVar a) (TMetaVar b) | a == b = []
-        gg' a b = error $ "specialization: " <> parens  (prettyPrintType a) <+> parens (prettyPrintType b) <+> "\nin spec\n" <+> vcat (map parens [prettyPrintType g, prettyPrintType s, show e])
     cType (n::HsName) = fst $ pval (toName Name.Val n)
 
     cClassDecl (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon name) _)) decls) = ans where
@@ -496,6 +485,7 @@ specialize g@(TForAll vs (_ :=> t)) s = snds (gg t s)  where
     gg' (TVar a) t | Just n <- lookup a ps = [(n,t)]
     gg' (TVar a) (TVar b) | a == b = []
     gg' (TMetaVar a) (TMetaVar b) | a == b = []
+    gg' (TForAll as (_ :=> ta)) (TForAll bs (_ :=> tb)) | length as == length bs = gg' ta tb -- assume names are unique
     gg' a b = error $ "specialization: " <> parens  (prettyPrintType a) <+> parens (prettyPrintType b) <+> "\nin spec\n" <+> vcat (map parens [prettyPrintType g, prettyPrintType s])
 specialize _g _s = []
 
