@@ -7,19 +7,28 @@ module Data.IORef(
     atomicModifyIORef,-- :: IORef a -> (a -> (a,b)) -> IO b
     ) where
 
-import Prelude.IO
+import Jhc.IO
 
-data IORef a
+data Ref s a
 
-foreign import primitive newIORef :: a -> IO (IORef a)
-foreign import primitive readIORef :: IORef a -> IO a
-foreign import primitive writeIORef :: IORef a -> a -> IO ()
+type IORef = Ref World__
 
-foreign import primitive eqIORef :: IORef a -> IORef a -> Bool
+foreign import primitive newRef__ :: forall s . a -> s -> (s,Ref s a)
+foreign import primitive readRef__ :: forall s . Ref s a -> s -> (s,a)
+foreign import primitive writeRef__ :: forall s . Ref s a -> a -> s
+
+foreign import primitive eqRef__ :: forall s . Ref s a -> Ref s a -> Bool
+
+newIORef v = IO $ \world -> case newRef__ v world of
+    (world',r) -> JustIO world' r
+readIORef r = IO $ \world -> case readRef__ r world of
+    (world',v) -> JustIO world' v
+writeIORef r v = IO $ \world -> case writeRef__ r v of
+    world' -> JustIO world' ()
 
 instance Eq (IORef a) where
-    x == y = eqIORef x y
-    x /= y = not (eqIORef x y)
+    x == y = eqRef__ x y
+    x /= y = not (eqRef__ x y)
 
 modifyIORef :: IORef a -> (a -> a) -> IO ()
 modifyIORef ref f = writeIORef ref . f =<< readIORef ref
