@@ -134,16 +134,9 @@ jhc_case_fell_off(int n) {
         abort();
 }
 
-static int
-jhc_setjmp(jmp_buf *jb)
-{
-    return setjmp(*jb);
-}
-static void
-jhc_longjmp(jmp_buf *jb)
-{
-    longjmp(*jb,1);
-}
+#define jhc_setjmp(jb) setjmp(*(jmp_buf *)jb)
+#define jhc_longjmp(jb) longjmp(*(jmp_buf *)jb,1)
+
 
 
 typedef union node node_t;

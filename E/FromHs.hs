@@ -241,7 +241,7 @@ createMethods dataTable classHierarchy funcs = return ans where
                 | otherwise  = return $ calt $  EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) (getType els)
             where
             name = (instanceName methodName (getTypeCons t))
-            calt e =  Alt (LitCons x [ tvr | ~(EVar tvr) <- vs ]  ct)  e
+            calt e =  Alt (LitCons x [ case e of EVar tvr -> tvr; _ -> error $ "createMethods: "++ show e | e <- vs ]  ct)  e
             (x,vs,ct) = case tipe t of
                 (ELit (LitCons x' vs' ct')) -> (x',vs',ct')
                 (EPi (TVr { tvrType = a}) b) -> (tc_Arrow,[a,b],eStar)

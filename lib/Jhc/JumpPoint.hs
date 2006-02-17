@@ -1,22 +1,18 @@
 module Jhc.JumpPoint(IOCont(),newContinuation,callContinuation) where
 
 
---import Data.IORef
+import Jhc.Hole
 import Foreign.Ptr
 import Foreign.Marshal.Alloc
 
-type IORef a = a
-writeIORef _ _ = return ()
-newIORef a = return a
-readIORef a = return a
 
-data IOCont s a = IOCont !(IORef a) !JumpPoint
+data IOCont s a = IOCont (Hole a) JumpPoint
 newtype JumpPoint = JumpPoint (Ptr JumpPoint)
 
 newContinuation :: (forall s . IOCont s a -> IO b) -> (a -> IO b) -> IO b
 newContinuation act cc = do
     jp@(JumpPoint jp') <- newJumpPoint__
-    ref <- newIORef (error "shnizzle")
+    ref <- newHole
     r <- runJumpPoint__ jp
     case r of
         False -> do
@@ -25,15 +21,13 @@ newContinuation act cc = do
             return res
         True -> do
             free jp'
-            arg <- readIORef ref
-            cc arg
+            cc (readHole ref)
 
 
 callContinuation :: IOCont s a -> a -> IO b
 callContinuation (IOCont ref jp) x = do
-    writeIORef ref x
+    fillHole ref x
     jumpJumpPoint__ jp
-    return $ error "callContinuation: end of the line"
 
 
 
@@ -53,8 +47,8 @@ runJumpPoint__ jp = do
     r <- jhc_setjmp  jp
     return (r /= 0)
 
-jumpJumpPoint__ :: JumpPoint -> IO ()
-jumpJumpPoint__ jp = jhc_longjmp  jp
+jumpJumpPoint__ :: JumpPoint -> IO a
+jumpJumpPoint__ jp = jhc_longjmp  jp >> return (error "jumpJumpPoint__")
 
 
 

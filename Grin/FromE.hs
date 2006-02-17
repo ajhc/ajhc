@@ -35,6 +35,7 @@ import qualified Stats
 import Stats(mtick)
 import Support.CanType
 import Support.FreeVars
+import Support.Tuple
 import Util.Graph as G
 import Util.Once
 import Util.UniqueMonad()
@@ -73,6 +74,7 @@ data CEnv = CEnv {
 dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ fromAtom n <+> hsep (map show as) <+> "::" <+> show t |  (n,(as,t)) <- Map.toList tt]
 
 tagArrow = convertName tc_Arrow
+tagRef = toAtom "CData.IORef.Ref"
 
 
 flattenScc xs = concatMap f xs where
@@ -296,6 +298,13 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce e | Just z <- constant e = return (gEval z)
     ce e | Just z <- con e = return (Return z)
     ce e | Just (a,_) <- from_unsafeCoerce e = ce a
+    ce (EPrim ap@(APrim (PrimPrim "newHole_") _) [_] _) = do
+        let var = Var v2 (TyPtr TyNode)
+        return $ Store (NodeC (toAtom "@hole") []) :>>= var :-> Return (tuple [pworld__,var])
+    ce (EPrim ap@(APrim (PrimPrim "fillHole__") _) [r,v,_] _) = do
+        let var = Var v2 TyNode
+            [r',v'] = args [r,v]
+        return $ gEval v' :>>= n1 :-> Update r' n1 :>>= unit :-> Return world__
     ce (EPrim ap@(APrim (PrimPrim "newWorld__") _) [_] _) = do
         return $ Return world__
     ce (EPrim ap@(APrim (PrimPrim "drop__") _) [_,e] _) = ce e
@@ -357,7 +366,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
             e :>>= v :->
             Store v :>>= toVal b :->
             Case v (as ++ def)
-    ce e = error $ "ce: " ++ show (funcName,e)
+    ce e = error $ "ce: " ++ render (pprint (funcName,e))
     fromIORT e | ELit (LitCons tn [x,y] star) <- followAliases dataTable e, tn == tupNamet2, star == eStar, x == tWorld__ = lookupCType dataTable y
     fromIORT e = fail $ "fromIORT: " ++ show e
     retIO v = Return (NodeC tn_2Tup [pworld__,v])

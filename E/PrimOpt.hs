@@ -62,6 +62,9 @@ primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
         primopt (PrimPrim "readRef__") [x,y] rt  = return $ EAp (EAp (ELam x' $ ELam y' $ eCaseTup' (EPrim (primPrim "readRef_") [EVar x',EVar y'] (ltTuple' [a,b])) [a',b'] (eTuple [EVar a',EVar b']) ) x) y where
             [x',y',a',b'] = vars [getType x,getType y,a,b]
             ELit (LitCons _ [a,b] (ESort EStar)) = rt
+        primopt (PrimPrim "newHole__") [y] rt  = return $ EAp (ELam y' $ eCaseTup' (EPrim (primPrim "newHole_") [EVar y'] (ltTuple' [a,b])) [a',b'] (eTuple [EVar a',EVar b'])) y where
+            [y',a',b'] = vars [getType y,a,b]
+            ELit (LitCons _ [a,b] (ESort EStar)) = rt
 
         primopt (PrimPrim "divide") [a,b] t = ans where
             (vara:varb:varc:_) = freeNames (freeVars (a,b,t))
