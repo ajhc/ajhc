@@ -28,7 +28,6 @@ import System.Posix.IO
 
 import Atom
 import Binary
-import Support.CanType
 import CharIO
 import Class
 import DataConstructors
@@ -36,13 +35,12 @@ import Directory
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
-import E.Program
 import E.E
 import E.Inline(emapE)
+import E.Program
 import E.Rules
 import E.Subst(substMap'')
 import E.TypeCheck()
-import FilterInput
 import FrontEnd.HsParser
 import FrontEnd.Infix
 import FrontEnd.ParseMonad
@@ -57,6 +55,8 @@ import PackedString
 import PrimitiveOperators
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
+import Support.CanType
+import Util.FilterInput
 import Warning
 
 version :: Int

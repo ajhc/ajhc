@@ -46,24 +46,22 @@ intt = rawType "int"
 rawMap = Map.fromList [ (rawType w,toAtom t) | (_,w,t) <- allCTypes]
 typ_float = toAtom "float"
 
+vars :: [E] -> [TVr]
+vars ts = [ tVr n t | t <- ts | n <- [2,4 ..]]
+
 primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
     mtick (toAtom $ "E.PrimOpt." ++ braces (pprint s) )
     primOpt' dataTable  n  where
         primopt (PrimPrim "seq") [x,y] _  = return $ prim_seq x y
-        --primopt (PrimPrim "prim_op_aaB.==") [e,(ELit (LitInt x t)) ] rt = return $ eCase e [Alt (LitInt x t) (prim_unsafeCoerce vTrue rt)] (prim_unsafeCoerce vFalse rt)
-        --primopt (PrimPrim "prim_op_aaB.==") [(ELit (LitInt x t)),e ] rt = return $ eCase e [Alt (LitInt x t) (prim_unsafeCoerce vTrue rt)] (prim_unsafeCoerce vFalse rt)
         primopt (Operator "==" [ta,tb] tr) [e,(ELit (LitInt x t))] rt | Map.lookup t rawMap /= Just typ_float = return $ eCase e [Alt (LitInt x t) (ELit (LitInt 1 intt)) ] (ELit (LitInt 0 intt))
         primopt (Operator "==" [ta,tb] tr) [(ELit (LitInt x t)),e] rt | Map.lookup t rawMap /= Just typ_float = return $ eCase e [Alt (LitInt x t) (ELit (LitInt 1 intt)) ] (ELit (LitInt 0 intt))
         primopt (Operator "-" [ta] tr) [ELit (LitInt x t)] rt | ta == tr && rt == t = return $ ELit (LitInt (negate x) t)
-
-        {-
-        primopt (PrimPrim "divide") [a,b] t = do
-            (_,ta) <- lookupCType dataTable (typ a)
-            (_,tb) <- lookupCType dataTable (typ b)
-            (_,tr) <- lookupCType dataTable t
-            unless (ta == tb && tb == tr) $ fail "bad divide"
-            return $ EPrim (APrim (Operator "/" [ta,tb] tr) mempty) [a,b] t
-        -}
+        primopt (PrimPrim "newRef__") [x,y] rt  = return $ EAp (EAp (ELam x' $ ELam y' $ eCaseTup' (EPrim (primPrim "newRef_") [EVar x',EVar y'] (ltTuple' [a,b])) [a',b'] (eTuple [EVar a',EVar b']) ) x) y where
+            [x',y',a',b'] = vars [getType x,getType y,a,b]
+            ELit (LitCons _ [a,b] (ESort EStar)) = rt
+        primopt (PrimPrim "readRef__") [x,y] rt  = return $ EAp (EAp (ELam x' $ ELam y' $ eCaseTup' (EPrim (primPrim "readRef_") [EVar x',EVar y'] (ltTuple' [a,b])) [a',b'] (eTuple [EVar a',EVar b']) ) x) y where
+            [x',y',a',b'] = vars [getType x,getType y,a,b]
+            ELit (LitCons _ [a,b] (ESort EStar)) = rt
 
         primopt (PrimPrim "divide") [a,b] t = ans where
             (vara:varb:varc:_) = freeNames (freeVars (a,b,t))
@@ -77,96 +75,17 @@ primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
                     unbox dataTable b varb $ \tvrb ->
                         eStrictLet (tVr varc sta) (EPrim (APrim (Operator "/" [ta,ta] ta) mempty) [EVar tvra, EVar tvrb] sta) (ELit (LitCons cna [EVar (tVr varc sta)] t))
 
-                --return $ EPrim (APrim (Operator "/" [ta,tb] tr) mempty) [a,b] t
-
-        --primopt (PrimPrim pn) [] t | Just c <-  getPrefix "const." pn = do
-        --    (_,ta) <- lookupCType dataTable t
-        --    return $ EPrim (APrim (CConst c ta) mempty) [] t
         primopt (PrimPrim pn) [] t | Just c <-  getPrefix "const." pn = do
             (cn,st,ct) <- case lookupCType' dataTable t of
                 Right x -> return x
                 Left x -> error x
             let (var:_) = freeNames (freeVars t)
             return $ eStrictLet (tVr var st) (EPrim (APrim (CConst c ct) mempty) [] st) (ELit (LitCons cn [EVar $ tVr var st] t))
-
-
         primopt (PrimPrim "integralCast") [e] t = return $ create_integralCast dataTable e t
-        --primopt (PrimPrim "integralCast") [e] t | Just (_,ta) <- lookupCType dataTable (typ e), Just (_,tb) <- lookupCType dataTable t =
-        --    if ta == tb then return (prim_unsafeCoerce e t)  else return $ EPrim (APrim (CCast ta tb) mempty) [e] t
         primopt (PrimPrim "integralCast") es t = error $ "Invalid integralCast " ++ show (es,t)
         primopt (CCast _ _) [ELit (LitInt x _)] t = return $ ELit (LitInt x t)  -- TODO ensure constant fits
-        --primopt (CCast x y) [e] t | x == y = return $ prim_unsafeCoerce e t
         primopt _ _ _ = fail "No primitive optimization to apply"
 primOpt' _  x = return x
 
 
 
---primopt "primEqInt" [ELit (LitInt x _),ELit (LitInt y _) ] _ = return $ if x == y then vTrue else vFalse
---primopt "primEqChar" [ELit (LitInt x _),ELit (LitInt y _)] _ = return $ if x == y then vTrue else vFalse
---primopt "primEq" [ELit (LitInt x _),ELit (LitInt y _) ] _ = return $ if x == y then vTrue else vFalse
-{-
---primopt (PrimPrim "seq") [x,y] _ | isWHNF x  = return y
-primopt (PrimPrim "seq") [x,y] _  = return $ prim_seq x y
-primopt (PrimPrim "ord") [ELit (LitInt x t)] _ | t == tChar = return $ ELit (LitInt x tInt)
-primopt (PrimPrim "chr") [ELit (LitInt x t)] _ | t == tInt  = return $ ELit (LitInt x tChar)
---primopt "prim_op.==" [e,(ELit (LitInt x t)) ] _ = return $ eCase e [Alt (LitInt x t) vTrue] vFalse
---primopt "prim_op.==" [(ELit (LitInt x t)),e ] _ = return $ eCase e [Alt (LitInt x t) vTrue] vFalse
---primopt "prim_op.!=" [e,(ELit (LitInt x t)) ] _ = return $ eCase e [Alt (LitInt x t) vFalse] vTrue
---primopt "prim_op.!=" [(ELit (LitInt x t)),e ] _ = return $ eCase e [Alt (LitInt x t) vFalse] vTrue
-primopt (PrimPrim "unsafeCoerce") [e'] t | Just (x,_) <- from_unsafeCoerce e' = return $ prim_unsafeCoerce x t
-primopt (PrimPrim "unsafeCoerce") [EError err _] t  = return $ EError err t
-primopt (PrimPrim "unsafeCoerce") [ELit (LitInt x _)] t  = return $ ELit (LitInt x t)
---primopt (PrimPrim "unsafeCoerce") [ELit (LitFrac x _)] t  = return $ ELit (LitFrac x t)
-primopt (PrimPrim "unsafeCoerce") [ELit (LitCons x y _)] t  = return $ ELit (LitCons x y t)
-primopt (PrimPrim "unsafeCoerce") [x] t | typ x == t = return x
-
-primopt (PrimPrim "integralCast") [e'] t | Just (x,_) <- from_integralCast e' = return $ prim_integralCast x t
-primopt (PrimPrim "integralCast") [EError err _] t  = return $ EError err t
-primopt (PrimPrim "integralCast") [ELit (LitInt x _)] t  = return $ ELit (LitInt x t)
-primopt (PrimPrim "integralCast") [ELit (LitCons x y _)] t  = return $ ELit (LitCons x y t)
-primopt (PrimPrim "integralCast") [x] t | typ x == t = return x
-primopt _ _ _ = fail "No primitive optimization to apply"
-
---primopt "unsafeCoerce" [ELetRec ds e] t  = return $ ELetRec ds (EPrim "unsafeCoerce" [e] t)
---primopt "unsafeCoerce" [ELetRec ds e] t  = return $ ELetRec ds (EPrim "unsafeCoerce" [e] t)
-
-primOpt dataTable  stats (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
-    tick stats (toAtom $ "E.PrimOpt." ++ braces (pprint s) )
-    primOpt dataTable stats n  where
-        primopt (PrimPrim "seq") [x,y] _  = return $ prim_seq x y
-        primopt (PrimPrim "prim_op_aaB.==") [e,(ELit (LitInt x t)) ] rt = return $ eCase e [Alt (LitInt x t) (prim_unsafeCoerce vTrue rt)] (prim_unsafeCoerce vFalse rt)
-        primopt (PrimPrim "prim_op_aaB.==") [(ELit (LitInt x t)),e ] rt = return $ eCase e [Alt (LitInt x t) (prim_unsafeCoerce vTrue rt)] (prim_unsafeCoerce vFalse rt)
-        --primopt "prim_op.!=" [e,(ELit (LitInt x t)) ] _ = return $ eCase e [Alt (LitInt x t) vFalse] vTrue
-        --primopt "prim_op.!=" [(ELit (LitInt x t)),e ] _ = return $ eCase e [Alt (LitInt x t) vFalse] vTrue
-        primopt (PrimPrim "unsafeCoerce") [e'] t | Just (x,_) <- from_unsafeCoerce e' = return $ prim_unsafeCoerce x t
-        primopt (PrimPrim "unsafeCoerce") [EError err _] t  = return $ EError err t
-        primopt (PrimPrim "unsafeCoerce") [ELit (LitInt x _)] t  = return $ ELit (LitInt x t)
-        primopt (PrimPrim "unsafeCoerce") [ELit (LitCons x y _)] t  = return $ ELit (LitCons x y t)
-        primopt (PrimPrim "unsafeCoerce") [x] t | typ x == t = return x
-
-        primopt (PrimPrim "divide") [a,b] t = do
-            (_,ta) <- lookupCType dataTable (typ a)
-            (_,tb) <- lookupCType dataTable (typ b)
-            (_,tr) <- lookupCType dataTable t
-            unless (ta == tb && tb == tr) $ fail "bad divide"
-            return $ EPrim (APrim (Operator "/" [ta,tb] tr) mempty) [a,b] t
-
-        primopt (PrimPrim pn) [] t | Just c <-  getPrefix "const." pn = do
-            (_,ta) <- lookupCType dataTable t
-            return $ EPrim (APrim (CConst c ta) mempty) [] t
-
-
-        primopt (PrimPrim "integralCast") [e] t | Just (_,ta) <- lookupCType dataTable (typ e), Just (_,tb) <- lookupCType dataTable t =
-            if ta == tb then return (prim_unsafeCoerce e t)  else return $ EPrim (APrim (CCast ta tb) mempty) [e] t
-        primopt (PrimPrim "integralCast") es t = error $ "Invalid integralCast " ++ show (es,t)
-        primopt (CCast _ _) [ELit (LitInt x _)] t = return $ ELit (LitInt x t)  -- TODO ensure constant fits
-        primopt (CCast x y) [e] t | x == y = return $ prim_unsafeCoerce e t
-
-        --primopt (PrimPrim "integralCast") [e'] t | Just (x,_) <- from_integralCast e' = return $ prim_integralCast x t
-        --primopt (PrimPrim "integralCast") [EError err _] t  = return $ EError err t
-        --primopt (PrimPrim "integralCast") [ELit (LitInt x _)] t  = return $ ELit (LitInt x t)
-        --primopt (PrimPrim "integralCast") [ELit (LitCons x y _)] t  = return $ ELit (LitCons x y t)
-        --primopt (PrimPrim "integralCast") [x] t | typ x == t = return x
-        primopt _ _ _ = fail "No primitive optimization to apply"
-primOpt _ _stats x = return x
--}

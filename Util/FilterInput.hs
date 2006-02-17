@@ -1,4 +1,4 @@
-module FilterInput (filterInput) where
+module Util.FilterInput (filterInput) where
 
 import CharIO
 import Control.Monad (when)
