@@ -1,5 +1,7 @@
 module Prelude.IO(
-    IO,
+    IO(),
+    ioError,
+    catch,
     module Prelude.IO,
     userError) where
 
@@ -35,16 +37,6 @@ runMain main = do
 runExpr :: Show a => a -> IO ()
 runExpr x = runMain (print x)
 
-
-ioError    ::  IOError -> IO a
-ioError e   =  (IO $ \w -> FailIO w e)
-
-
-catch      ::  IO a -> (IOError -> IO a) -> IO a
-catch (IO x) fn  = IO $ \w -> case x w of
-    JustIO w' z  -> JustIO w' z
-    FailIO w' z -> case fn z of
-        IO f -> f w'
 
 {-# RULES "putStr/++"      forall xs ys . putStr (xs ++ ys) = putStr xs >> putStr ys #-}
 

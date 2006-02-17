@@ -67,6 +67,7 @@ go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
     h Cast {} = return ()   -- casts argument is never a node pointer
     h Return { } = return ()
     h Store {} = return ()
+    h Update {} = return ()
     h e = fail ("Grin.Linear.h: " ++ show e)
     fuse a vs = mapM_ farg $ zip (zip (repeat a) [0..]) vs
     omegaize Const {} = return ()

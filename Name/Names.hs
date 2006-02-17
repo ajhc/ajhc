@@ -73,6 +73,8 @@ dc_World__ = toName DataConstructor ("Jhc.IO","World__")
 
 tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
 tc_Arrow = toName TypeConstructor ("Jhc@","->")
+tc_IOCont = toName TypeConstructor ("Jhc.JumpPoint","IOCont")
+tc_IOError = toName TypeConstructor ("Prelude.IOError","IOError")
 
 tc_IOResult = toName TypeConstructor ("Jhc.IO","IOResult")
 tc_IO = toName TypeConstructor ("Jhc.IO", "IO")
@@ -107,6 +109,8 @@ v_map = toName Val ("Prelude","map")
 v_and = toName Val ("Prelude","&&")
 v_filter = toName Val ("Prelude","filter")
 v_foldr = toName Val ("Prelude","foldr")
+v_undefined = toName Val ("Prelude","undefined")
+v_undefinedIOErrorCont = toName Val ("Jhc.IO","undefinedIOErrorCont")
 
 sFuncNames = FuncNames {
     func_bind = toName Val ("Prelude",">>="),

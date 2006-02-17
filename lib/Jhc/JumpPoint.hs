@@ -1,6 +1,7 @@
-module Jhc.JumpPoint(IOCont(),newContinuation,callContinuation) where
+module Jhc.JumpPoint(IOCont(),newContinuation,callContinuation,newContinuation__) where
 
 
+import Jhc.IO
 import Jhc.Hole
 import Foreign.Ptr
 import Foreign.Marshal.Alloc
@@ -10,7 +11,12 @@ data IOCont s a = IOCont (Hole a) JumpPoint
 newtype JumpPoint = JumpPoint (Ptr JumpPoint)
 
 newContinuation :: (forall s . IOCont s a -> IO b) -> (a -> IO b) -> IO b
-newContinuation act cc = do
+newContinuation act cc = newContinuation__ act cc
+
+
+-- | this is unsafe and should only be used internally to the IO library
+newContinuation__ :: (IOCont World__ a -> IO b) -> (a -> IO b) -> IO b
+newContinuation__ act cc = do
     jp@(JumpPoint jp') <- newJumpPoint__
     ref <- newHole
     r <- runJumpPoint__ jp
@@ -34,7 +40,7 @@ callContinuation (IOCont ref jp) x = do
 
 newJumpPoint__ :: IO JumpPoint
 newJumpPoint__ = do
-    p <- mallocBytes jmp_buf_size
+    p <- _malloc jmp_buf_size
     return (JumpPoint p)
 
 
@@ -50,6 +56,7 @@ runJumpPoint__ jp = do
 jumpJumpPoint__ :: JumpPoint -> IO a
 jumpJumpPoint__ jp = jhc_longjmp  jp >> return (error "jumpJumpPoint__")
 
+foreign import ccall "stdlib.h malloc" _malloc :: Int -> IO (Ptr a)
 
 
 

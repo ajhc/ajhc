@@ -109,6 +109,11 @@ convertExp (Update v@Var {} (NodeC t as)) = do
         s = project' tag tmp' `assign` constant (enum (nodeTagName t))
         ass = [project' (arg i) tmp' `assign` a | a <- as' | i <- [(1 :: Int) ..] ]
     return (mconcat $ profile_update_inc:s:ass,emptyExpression)
+convertExp (Update v@Var {} (NodeV t [])) = do
+    v' <- convertVal v
+    t' <- convertVal (Var t TyTag)
+    let tag = project' anyTag v'
+    return (tag `assign` t',emptyExpression)
 
 convertExp (Update v z) = do  -- TODO eliminate unknown updates
     v' <- convertVal v

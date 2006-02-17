@@ -181,11 +181,12 @@ getMainFunction dataTable name ds = ans where
         main <- findName name
         runMain <- findName (func_runMain sFuncNames)
         runExpr <- findName (func_runExpr sFuncNames)
+        errorCont <- findName v_undefinedIOErrorCont
         let e | not (fopts FO.Wrapper) = maine
               | otherwise = case ioLike (getType maine) of
                 Just x ->  EAp (EAp (EVar runMain)  x ) maine
                 Nothing ->  EAp (EAp (EVar runExpr) ty) maine
-            be = eAp e vWorld__
+            be = eAp (eAp e (EVar errorCont)) vWorld__
             theMain = (theMainName,theMainTvr,be)
             theMainTvr =  tVr (nameToInt theMainName) (infertype dataTable be)
             tvm@(TVr { tvrType =  ty}) =  main
@@ -306,6 +307,9 @@ convertE classHierarchy assumps dataTable srcLoc exp = do
 sillyName = toName Val ("Jhc@","silly")
 sillyName' = nameName sillyName
 
+tCont = ELit $ LitCons tc_IOCont [tWorld__,ELit $ LitCons tc_IOError [] eStar] eStar
+tvrCont = tvr { tvrIdent = 0, tvrType = tCont }
+
 
 convertDecls :: Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
 convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ concatMap cDecl hsDecls) where
@@ -325,10 +329,10 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
     cDecl (HsForeignDecl _ ForeignCCall s n _)
         | Func _ s _ _ <- p, not isIO =  expr $ createFunc dataTable [4,6..] (map tvrType es) $ \rs -> (,) id $ eStrictLet rtVar' (EPrim (APrim (Func False s (snds rs) rtt) req) [ EVar t | (t,_) <- rs ] rtt') (ELit $ LitCons cn [EVar rtVar'] rt')
         | Func _ s _ _ <- p, "void" <- toExtType rt' =
-                expr $ (createFunc dataTable [4,6..] (map tvrType es) $ \rs -> (,) (ELam tvrWorld) $
+                expr $ (createFunc dataTable [4,6..] (map tvrType es) $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
                     eStrictLet tvrWorld2 (EPrim (APrim (Func True s (snds rs) "void") req) (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit))
         | Func _ s _ _ <- p =
-                expr $ (createFunc dataTable [4,6..] (map tvrType es) $ \rs -> (,) (ELam tvrWorld) $
+                expr $ (createFunc dataTable [4,6..] (map tvrType es) $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
                     eCaseTup' (EPrim (APrim (Func True s (snds rs) rtt) req) (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ LitCons cn [EVar rtVar'] rt') (eJustIO (EVar tvrWorld2) (EVar rtVar))))
         | AddrOf _ <- p = let
             (cn,st,ct) = runIdentity (lookupCType' dataTable rt)
