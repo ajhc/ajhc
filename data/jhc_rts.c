@@ -9,6 +9,7 @@
 #include <locale.h>
 #include <math.h>
 #include <float.h>
+#include <setjmp.h>
 
 #ifdef USE_BOEHM_GC
 #include <gc/gc.h>
@@ -131,6 +132,17 @@ jhc_case_fell_off(int n) {
         fflush(stdout);
         fprintf(stderr, "\n%s:%i: case fell off\n", __FILE__, n);
         abort();
+}
+
+static int
+jhc_setjmp(jmp_buf *jb)
+{
+    return setjmp(*jb);
+}
+static void
+jhc_longjmp(jmp_buf *jb)
+{
+    longjmp(*jb,1);
 }
 
 
