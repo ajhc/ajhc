@@ -21,8 +21,9 @@ pull everything needed to build jhc.
 
 ==== making it ====
 
-Assuming you have ghc 6.4, happy, and DrIFT installed, you may now type 'make'
-and get a binary 'jhc' out if nothing went wrong.
+Assuming you have ghc 6.4, happy, and DrIFT installed, you may now run GNU
+make by typing 'gmake' or just 'make' depending on your system and get a
+binary 'jhc' out if nothing went wrong.
 
 === Installing the libraries ====
 

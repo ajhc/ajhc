@@ -1,6 +1,6 @@
 JHC_VERSION=0.1
 
-all: jhc jhcp
+all: jhc
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches -fno-warn-unused-binds    # -O2 -ddump-simpl-stats -ddump-rules
 GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
