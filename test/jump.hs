@@ -1,4 +1,4 @@
-import Jhc.JumpPoint
+import System.IO.Continuation
 
 
 go :: IOCont s String -> IO ()

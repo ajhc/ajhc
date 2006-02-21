@@ -1,12 +1,13 @@
 module Jhc.IO where
 
+import Jhc.Hole
 import Jhc.JumpPoint
 import Prelude.IOError
 
 
 -- this is treated specially by the compiler. it won't treat it as a product type.
 data World__ = World__
-type IOErrorCont = IOCont World__ IOError
+type IOErrorCont = (JumpPoint,Hole IOError)
 
 --data IOResult a = FailIO World__ IOError | JustIO World__ a
 data IOResult a = JustIO World__ a
@@ -22,17 +23,17 @@ showError (IOError z) = do
     c_exit 255
     return undefined
 
-errorContinuation :: (IOErrorCont -> World__ -> IOResult a) -> IO a
-errorContinuation x = newContinuation__ (\ncont -> IO $ \_ w -> x ncont w) showError
+errorContinuation :: IO a -> IO a
+errorContinuation x = catch x showError
 
 unsafePerformIO :: IO a -> a
-unsafePerformIO (IO x) = case errorContinuation x of
+unsafePerformIO x = case errorContinuation x of
     IO y -> case y undefinedIOErrorCont (newWorld__ x) of
         JustIO _ a -> a
 
 -- we have to replace the error handler because the context might have quit by the time the value is evaluated.
 unsafeInterleaveIO :: IO a -> IO a
-unsafeInterleaveIO (IO action) = IO $ \c w -> JustIO w $ case action' c w of
+unsafeInterleaveIO action = IO $ \c w -> JustIO w $ case action' c w of
     JustIO _ a -> a
     where
     IO action' = errorContinuation action
@@ -49,15 +50,6 @@ instance Monad IO where
 instance Functor IO where
     fmap f a = a >>= \x -> return (f x)
 
-{-
-fixIO :: (a -> IO a) -> IO a
-fixIO k = IO $ \w -> let
-            r@(JustIO _ ans) = case k ans of
-                    IO z -> case z w of
-                        FailIO _ z -> error $ case z of IOError z ->  z
-                        z -> z
-              in r
--}
 
 fixIO :: (a -> IO a) -> IO a
 fixIO k = IO $ \c w -> let
@@ -67,12 +59,22 @@ fixIO k = IO $ \c w -> let
                 JustIO _ z  -> z
                in r
 
+getJumpPoint :: IO (JumpPoint,Hole IOError)
+getJumpPoint = IO $ \ jh w -> JustIO w jh
+
 ioError    ::  IOError -> IO a
-ioError e   =  (IO $ \c w -> case callContinuation c e of IO cont -> cont c w)
+ioError e   =  do
+    (jp,he) <- getJumpPoint
+    fillHole he e
+    jumpJumpPoint__ jp
 
 
 catch ::  IO a -> (IOError -> IO a) -> IO a
-catch (IO x) fn = newContinuation__ (\ncont -> IO $ \_ w -> x ncont w) fn
+catch (IO x) fn = do
+    hole <- newHole
+    withJumpPoint__ $ \jp b -> case b of
+        False -> IO $ \_ w -> x (jp,hole) w
+        True -> fn (readHole hole)
 
 -- | this creates a new world object that artificially depends on its argument to avoid CSE.
 foreign import primitive newWorld__ :: a -> World__

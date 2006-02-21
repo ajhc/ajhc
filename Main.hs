@@ -463,7 +463,7 @@ compileModEnv' stats ho = do
     progress "Converting to Grin..."
     x <- Grin.FromE.compile prog
     Stats.print "Grin" Stats.theStats
-    --wdump FD.Grin $ printGrin x
+    wdump FD.Grin $ printGrin x
     x <- return $ normalizeGrin x
     typecheckGrin x
     let opt s  x = do
