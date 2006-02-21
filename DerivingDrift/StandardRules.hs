@@ -224,7 +224,7 @@ ordfn d = let
 		      list xs ys = fsep [text "foldl", parens fn, text "EQ",
 			           bracketList (zipWith one xs ys)]
 		      fn = fsep $ texts  ["\\x y", "->", "if", "x", "==","EQ",
-			   "then", "compare", "y", "EQ", "else", "y"]
+			   "then", "compare", "y", "EQ", "else", "x"]
 		in if constructor b == constructor b' then
 		    text "compare" <+> fsep [head,
 			     list (varNames $ types b) (varNames' $ types b')]
