@@ -1,4 +1,18 @@
-module Jhc.IO where
+module Jhc.IO(
+    IO(..),
+    IOResult(..),
+    World__(),
+    catch,
+    drop__,
+    newWorld__,
+    fixIO,
+    ioError,
+    runExpr,
+    runMain,
+    undefinedIOErrorCont,
+    unsafeInterleaveIO,
+    unsafePerformIO
+    ) where
 
 import Jhc.Hole
 import Jhc.JumpPoint
@@ -83,3 +97,14 @@ foreign import primitive newWorld__ :: a -> World__
 foreign import primitive drop__ :: forall a b. a -> b -> b
 
 
+{-# INLINE runMain, runExpr #-}
+runMain :: IO a -> IO ()
+runMain main = do
+    catch main  (\e -> do
+        putStr "\nError..\n"
+        putStrLn $ showIOError e
+        return (error "runMain"))
+    return ()
+
+runExpr :: Show a => a -> IO ()
+runExpr x = runMain (print x)
