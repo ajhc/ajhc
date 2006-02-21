@@ -85,6 +85,7 @@ lt n | nameType n == TypeVal =  atomIndex $ toAtom $  n
 tipe t = f t where
     f (TAp t1 t2) = eAp (f t1) (f t2)
     f (TArrow t1 t2) =  EPi (tVr 0 (f t1)) (f t2)
+    f (TCon (Tycon n k)) | n == tc_World__ =  ELit (LitCons rt_Worldzh [] eHash)
     f (TCon (Tycon n k)) =  ELit (LitCons n [] (kind k))
     f (TVar Tyvar { tyvarRef = Just {}, tyvarKind = k}) = tAbsurd (kind k)
     f (TVar tv) = EVar (cvar tv)
@@ -186,7 +187,7 @@ getMainFunction dataTable name ds = ans where
               | otherwise = case ioLike (getType maine) of
                 Just x ->  EAp (EAp (EVar runMain)  x ) maine
                 Nothing ->  EAp (EAp (EVar runExpr) ty) maine
-            be = eAp (eAp e (EVar errorCont)) vWorld__
+            be = (eAp e (EVar errorCont))
             theMain = (theMainName,theMainTvr,be)
             theMainTvr =  tVr (nameToInt theMainName) (infertype dataTable be)
             tvm@(TVr { tvrType =  ty}) =  main
@@ -304,11 +305,8 @@ convertE classHierarchy assumps dataTable srcLoc exp = do
     [(_,_,e)] <- convertDecls classHierarchy assumps dataTable [HsPatBind srcLoc (HsPVar sillyName') (HsUnGuardedRhs exp) []]
     return e
 
-sillyName = toName Val ("Jhc@","silly")
-sillyName' = nameName sillyName
+sillyName' = nameName v_silly
 
-tCont = ELit $ LitCons tc_IOCont [tWorld__,ELit $ LitCons tc_IOError [] eStar] eStar
-tvrCont = tvr { tvrIdent = 0, tvrType = tCont }
 
 
 convertDecls :: Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
@@ -362,7 +360,7 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
             Right x -> x
             Left err -> error $ "Odd RetType foreign: " ++ err
     cDecl (HsPatBind sl p (HsUnGuardedRhs exp) []) | (HsPVar n) <- simplifyHsPat p, n == sillyName' = let
-        in [(sillyName,tvr,cExpr exp)]
+        in [(v_silly,tvr,cExpr exp)]
     cDecl (HsPatBind sl p rhs wh) | (HsPVar n) <- simplifyHsPat p = let
         name = toName Name.Val n
         var = tVr (nameToInt name) ty -- lp ps (hsLet wh e)

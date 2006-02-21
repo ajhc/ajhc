@@ -10,7 +10,7 @@ newContinuation act cc = do
     ref <- newHole
     withJumpPoint__ $ \jp r -> case r of
         False -> do act (IOCont ref jp)
-        True  -> do cc (readHole ref)
+        True  -> do readHole ref >>= cc
 
 callContinuation :: IOCont s a -> a -> IO b
 callContinuation (IOCont ref jp) x = do

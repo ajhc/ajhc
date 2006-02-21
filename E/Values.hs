@@ -42,6 +42,10 @@ ltTuple' ts = ELit $ LitCons (unboxedNameTuple TypeConstructor (length ts)) ts e
 unboxedTuple es =  LitCons (unboxedNameTuple DataConstructor (length es)) es (ltTuple' ts) where
     ts = map getType es
 
+-- the IOErrorCont type from Jhc.IO
+tCont = ltTuple [ELit $ LitCons tc_JumpPoint [] eStar, ELit $ LitCons tc_IOError [] eStar]
+tvrCont = tvr { tvrIdent = 0, tvrType = tCont }
+
 class ToE a where
     toE :: a -> E
     typeE :: a -> E -- lazy in a
@@ -169,7 +173,6 @@ safeToDup (EPrim p _ _) = aprimIsCheap p
 safeToDup e = whnfOrBot e || isELam e || isEPi e
 
 
-tTag = rawType "tag#"
 vTag n = ELit $ LitCons n [] tTag
 
 prim_seq a b | isWHNF a = b
@@ -191,7 +194,11 @@ prim_unsafeCoerce e t = p e' where
 from_unsafeCoerce (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = return (e,t)
 from_unsafeCoerce _ = fail "Not unsafeCoerce primitive"
 
-rawType s  = ELit (LitCons (toName RawType s) [] eHash)
+rawType s = ELit (LitCons (toName RawType s) [] eHash)
+
+tWorldzh = ELit (LitCons rt_Worldzh [] eHash)
+tTag = ELit (LitCons rt_tag [] eHash)
+vWorld__ = EPrim (APrim (PrimPrim "theWorld__") mempty) [] tWorld__
 
 unsafeCoerceOpt (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = f (0::Int) e t where
     f n e t | Just (e',_) <- from_unsafeCoerce e = f (n + 1) e' t

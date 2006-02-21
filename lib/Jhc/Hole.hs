@@ -13,8 +13,8 @@ import Jhc.IO
 newtype Hole a = Hole a
 
 -- | unchecked error if readHole is evaled before fillHole has filled it in.
-readHole :: Hole a -> a
-readHole (Hole x) = x
+readHole :: Hole a -> IO a
+readHole (Hole x) = return x
 
 -- | create a new hole containing a garbage value. must not be read until it has been filled.
 newHole :: IO (Hole a)

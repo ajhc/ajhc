@@ -190,6 +190,7 @@ print "primitiveInsts = [\n   ", join("\n  ,",@inst), " ]\n\n";
 print "constantMethods = [\n   ", join("\n  ,",@cmeth), " ]\n\n";
 print "theMethods = [\n   ", join("\n  ,",@meth), " ]\n\n";
 push @names, "(\"Prelude.()\",\"void\",\"void\")";
+push @names, "(\"Jhc.IO.World__\",\"void\",\"void\")";
 print "allCTypes = [\n   ", join("  ,",@names), " ]\n\n";
 
 print join("\n",map { $_->[1] } values %tcon) . "\n\n";

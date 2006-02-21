@@ -104,8 +104,6 @@ build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELi
 
 
 
-tCont = ELit $ LitCons tc_IOCont [tWorld__,ELit $ LitCons tc_IOError [] eStar] eStar
-tvrCont = tvr { tvrIdent = 0, tvrType = tCont }
 
 buildPeek cn t p = ELam tvr $ ELam tvrCont $ ELam tvrWorld (unbox' (EVar tvr) dc_Addr tvr' rest)  where
     tvr = (tVr 2 (tPtr t))

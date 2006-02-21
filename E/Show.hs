@@ -133,7 +133,7 @@ showE e = do
         f e | e == tRational = return $ atom $ text "Rational"
         f e | e == tString   = return $ atom $ text "String"
         f e | e == tUnit     = return $ atom $ text "()"
-        f e | e == tWorld__  = return $ atom $ text "World__"
+        --f e | e == tWorld__  = return $ atom $ text "World__"
         f e | e == vFalse    = return $ atom $ text "False"
         f e | e == vTrue     = return $ atom $ text "True"
         f e | e == vUnit     = return $ atom $ text "()"

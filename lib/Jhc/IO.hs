@@ -5,8 +5,8 @@ import Jhc.JumpPoint
 import Prelude.IOError
 
 
--- this is treated specially by the compiler. it won't treat it as a product type.
-data World__ = World__
+-- this is treated very specially by the compiler. it is unboxed.
+data World__
 type IOErrorCont = (JumpPoint,Hole IOError)
 
 --data IOResult a = FailIO World__ IOError | JustIO World__ a
@@ -74,7 +74,7 @@ catch (IO x) fn = do
     hole <- newHole
     withJumpPoint__ $ \jp b -> case b of
         False -> IO $ \_ w -> x (jp,hole) w
-        True -> fn (readHole hole)
+        True -> readHole hole >>= fn
 
 -- | this creates a new world object that artificially depends on its argument to avoid CSE.
 foreign import primitive newWorld__ :: a -> World__

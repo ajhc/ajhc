@@ -23,7 +23,7 @@ instance ConNames Val where
     vUnit =  NodeC tn_unit []
     vOrdering x = NodeC (toAtom $ "CPrelude." ++ show x) []
 
-world__ = NodeC (convertName $ dc_World__) []
+world__ = NodeC (toAtom "World#") []
 pworld__ = Const world__
 
 class ToVal a where

@@ -25,7 +25,7 @@ instance TypeNames Name where
     tIntzh = rt_int
     tCharzh = rt_hschar
     tIntegerzh = rt_intmax_t
-    tWorld__ = tc_World__
+    tWorld__ = rt_Worldzh
 
 instance ConNames Name where
     vTrue = dc_True
@@ -69,11 +69,11 @@ dc_JustIO = toName DataConstructor ("Jhc.IO", "JustIO")
 dc_Rational = toName DataConstructor ("Ratio",":%")
 dc_True = toName DataConstructor ("Prelude","True")
 dc_Unit = toName DataConstructor ("Prelude","()")
-dc_World__ = toName DataConstructor ("Jhc.IO","World__")
 
 tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
 tc_Arrow = toName TypeConstructor ("Jhc@","->")
-tc_IOCont = toName TypeConstructor ("Jhc.JumpPoint","IOCont")
+--tc_IOCont = toName TypeConstructor ("Jhc.JumpPoint","IOCont")
+tc_JumpPoint = toName TypeConstructor ("Jhc.JumpPoint","JumpPoint")
 tc_IOError = toName TypeConstructor ("Prelude.IOError","IOError")
 
 tc_IOResult = toName TypeConstructor ("Jhc.IO","IOResult")
@@ -95,6 +95,9 @@ rt_uint32_t = toName RawType "uint32_t"
 rt_intmax_t = toName RawType "intmax_t"
 rt_hschar   = toName RawType "HsChar"
 
+rt_Worldzh = toName RawType "World#"
+rt_tag = toName RawType "tag#"
+
 s_Star = toName SortName ("Jhc@","*")
 s_Hash = toName SortName ("Jhc@","#")
 
@@ -111,6 +114,7 @@ v_filter = toName Val ("Prelude","filter")
 v_foldr = toName Val ("Prelude","foldr")
 v_undefined = toName Val ("Prelude","undefined")
 v_undefinedIOErrorCont = toName Val ("Jhc.IO","undefinedIOErrorCont")
+v_silly = toName Val ("Jhc@","silly")
 
 sFuncNames = FuncNames {
     func_bind = toName Val ("Prelude",">>="),

@@ -152,6 +152,8 @@ simplify1 stats env (n,l) = do
     --getCS (b@Var {},Store v@(Var _ _)) = return $ Map.singleton (App funcEval [b] TyNode) (Return v)     -- TODO - only works if node stores have always been evaluated.
     getCS (b@Var {},Store v@(NodeC t _)) | tagIsWHNF t, t /= tagHole = return $ Map.fromList [(Store v,Return b),(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
     getCS (b@Var {},Store v@(NodeC t _)) | t /= tagHole = return $ Map.fromList [(Store v,Return b)]
+    --getCS (b@Var {},Store v@(NodeC t as)) | Just (0,fn) <- tagUnfunction t = return $ Map.fromList [(Store v,Return b),(App funcEval [b] TyNode, App fn as TyNode :>>= n1 :-> Update b n1 :>>= unit :-> Return n1)]
+    getCS (b@Var {},Store v@(NodeC t as)) | Just (0,fn) <- tagUnfunction t = return $ Map.fromList [(Store v,Return b)]
     getCS (b@Var {},Return (Const v)) = return $ Map.fromList [(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
     getCS (b@Var {},Return v) = return $ Map.fromList [(Return b,Return v), (Store b, Store v), (Fetch b, Fetch v)]
     getCS _ = return mempty

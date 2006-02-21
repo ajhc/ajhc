@@ -55,6 +55,7 @@ tipe t = runVarName (tipe' t) where
         t1' <- tipe' t1
         t2' <- tipe' t2
         return $ EPi (tVr 0 (t1')) t2'
+    tipe' (TCon (Tycon n k)) | n == tc_World__ = return $ ELit (LitCons rt_Worldzh [] eHash)
     tipe' (TCon (Tycon n k)) =  return $ ELit (LitCons n [] (kind k))
     tipe' (TGen n (Tyvar { tyvarKind = k })) = return $  EVar (tVr ((n + 1) * 2 ) (kind k))
     tipe' (TVar tv@Tyvar { tyvarKind = k}) = do
@@ -107,7 +108,6 @@ instance HasSize DataTable where
     size (DataTable d) = Map.size d
 
 getConstructor :: Monad m => Name -> DataTable -> m Constructor
-getConstructor n (DataTable dt) | n == tc_World__, Just c <- Map.lookup n dt = return c { conChildren = Nothing }
 getConstructor n _ | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = return $ snd $ tunboxedtuple v
 getConstructor n _ | Just v <- fromUnboxedNameTuple n, TypeConstructor <- nameType n = return $ fst $ tunboxedtuple v
 getConstructor n (DataTable map) = case Map.lookup n map of
@@ -117,7 +117,7 @@ getConstructor n (DataTable map) = case Map.lookup n map of
 -- | return the single constructor of product types
 
 getProduct :: Monad m => DataTable -> E -> m Constructor
-getProduct dataTable e | (ELit (LitCons cn _ _)) <- followAliases dataTable e, cn /= tc_World__, Just c <- getConstructor cn dataTable = f c where
+getProduct dataTable e | (ELit (LitCons cn _ _)) <- followAliases dataTable e, Just c <- getConstructor cn dataTable = f c where
     f c | Just [x] <- conChildren c = getConstructor x dataTable
         | otherwise = fail "Not Product type"
 getProduct _ _ = fail "Not Product type"
@@ -160,6 +160,44 @@ tabsurd = Constructor {
             conInhabits = tStar,
             conChildren = Nothing
     }
+
+worlds = [(rt_Worldzh,tWorld__),(tc_World__,tWorld__)] where
+    tWorld__ = Constructor {
+                conName = rt_Worldzh,
+                conType = eHash,
+                conSlots = [],
+                conDeriving = [],
+                conExpr = ELit (LitCons rt_Worldzh [] eHash),
+                conAlias = False,
+                conInhabits = tHash,
+                conChildren = Nothing
+        }
+{-
+    tWorld__ = Constructor {
+                conName = tc_World__,
+                conType = eStar,
+                conSlots = [],
+                conDeriving = [],
+                conExpr = ELit (LitCons tc_World__ [] eStar),
+                conAlias = False,
+                conInhabits = tStar,
+                conChildren = Just [conName dWorld__]
+        }
+
+    dWorld__ = Constructor {
+                conName = dc_World__,
+                conType = conExpr tWorld__,
+                conSlots = [conType tWorldzh],
+                conDeriving = [],
+                conExpr = ELam dtvr (ELit (LitCons dc_World__ [EVar dtvr] (conExpr tWorld__))),
+                conAlias = False,
+                conInhabits = tStar,
+                conChildren = Nothing
+        }
+    dtvr = (tVr 10 (conType tWorldzh))
+    -}
+
+
 
 tarrow = Constructor {
             conName = tc_Arrow,
@@ -289,7 +327,7 @@ followAliases dataTable (ELit (LitCons c ts e))
         ans = doSubst False False (Map.fromList $ zip [2..] (map Just ts)) sl
 followAliases _ e = e
 
-dataTablePrims = DataTable $ Map.fromList [ (conName x,x) | x <- tabsurd:tarrow:primitiveTable ]
+dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tabsurd:tarrow:primitiveTable ] ++ worlds)
 
 {-# NOINLINE toDataTable #-}
 toDataTable :: (Map Name Kind) -> (Map Name Scheme) -> [HsDecl] -> DataTable

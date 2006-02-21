@@ -210,7 +210,7 @@ instance TypeNames E where
     tUnit = ELit (LitCons tUnit [] eStar)
     tString =  (ELit (LitCons tc_List [tChar] eStar))
     tInteger = ELit (LitCons tInteger [] eStar)
-    tWorld__ = ELit (LitCons tWorld__ [] eStar)
+    tWorld__ = ELit (LitCons tWorld__ [] eHash)
     tIntzh = ELit (LitCons tIntzh [] eHash)
     tIntegerzh = ELit (LitCons tIntegerzh [] eHash)
     tCharzh = ELit (LitCons tCharzh [] eHash)
@@ -331,7 +331,6 @@ toString x = toList x >>= mapM fromChar where
 
 
 tAbsurd k = ELit (LitCons tc_Absurd [] k)
-vWorld__ = ELit (LitCons dc_World__ [] tWorld__)
 tPtr t = ELit (LitCons tc_Ptr [t] eStar)
 
 
