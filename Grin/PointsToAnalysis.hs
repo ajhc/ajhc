@@ -316,7 +316,8 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
                 case stags of
                     [] ->  do
                         mtick "Grin.eval.update-no-alts"
-                        return $ (Return vr :>>= createEval NoUpdate typeEnv (tagsp v))
+                        e' <- g e
+                        return $ (Return vr :>>= createEval NoUpdate typeEnv (tagsp v)) :>>= vb :-> e'
                     [t] -> do
                         e' <- g e
                         mtick "Grin.eval.hoisted2"

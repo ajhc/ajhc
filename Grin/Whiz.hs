@@ -122,8 +122,10 @@ fizz sub te tf inState start = res where
         let h [] = z
             h ((p,v):rs) = v :>>= p :-> h rs
         return $ h [ (p,v) |  Just (p,v) <- reverse ts]
-    f a@(Error msg ty) ((senv,p,b):xs) env = do
-        lift $ tf (Error msg (getType b))
+    f (Error msg ty) [] env = do
+        lift $ tf (Error msg ty)
+    f (Error msg ty) ((_,_,b):xs) env = do
+        f (Error msg (getType b)) xs env
     f a ((senv,p,b):xs) env = do
         a <- g env a
         (p,env') <- renamePattern p
