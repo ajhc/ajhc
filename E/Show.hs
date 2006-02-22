@@ -79,11 +79,12 @@ showLit showBind l = do
                     return $ atom (text n) `app` se
         f (LitCons s es t) = do
             es' <- mapM showBind es
-            return $ foldl app (atom (tshow s)) es' -- `inhabit` prettye t
+            return $ foldl appCon (atom (tshow s)) es' -- `inhabit` prettye t
         cons = bop (R,5) (text ":")
     f l
 
 app = bop (L,100) (text " ")
+appCon = bop (L,99) (text " ")
 col n x = attrColor (attr oob) n x
 attr = if dump FD.Html then html else ansi
 
@@ -154,7 +155,7 @@ showE e = do
             tvr <- showTVr t
             e <- showE e
             return $ (pop (retOp UC.lambda) tvr) `dot` e
-        f (EVar tvr) = showTVr' tvr
+        f (EVar tvr) = if dump FD.EVerbose then showTVr tvr else showTVr' tvr
         f Unknown = return $ symbol (char  '?')
         f (ESort EStar) = return $ symbol UC.star
         f (ESort EBox) = return $ symbol UC.box
@@ -184,7 +185,7 @@ showE e = do
             ds <- mapM (fmap unparse . showDecl) ds
             return $ fixitize (L,(-10)) $ atom $ group (nest 4  ( keyword "let" </> (align $ sep (map (<> bc ';') ds) </> (keyword "in" <+> e))))
 
-        f ec@(ECase { eCaseScrutinee = e, eCaseAlts = alts }) = allocTVr (eCaseBind ec) $ do
+        f ec@(ECase { eCaseScrutinee = e, eCaseAlts = alts }) = mt (showE (eCaseType ec)) $  allocTVr (eCaseBind ec) $ do
             scrut <- fmap unparse $ showE e
             alts <- mapM showAlt alts
             dcase <- case (eCaseDefault ec) of
@@ -213,6 +214,13 @@ showE e = do
         symbol x = atom (bold' x)
         arr = bop (R,0) $ retOp (space <> UC.rArrow <> space)
         dot = bop (R,-1) $ retOp (char '.')
+
+        mt t x | dump FD.EVerbose = do
+                    t <- t
+                    x <- x
+                    return $ x `inhabit` t
+        mt _ x = x
+
 
     f e
 
