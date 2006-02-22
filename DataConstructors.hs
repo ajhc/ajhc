@@ -5,6 +5,7 @@ module DataConstructors(
     constructionExpression,
     deconstructionExpression,
     followAliases,
+    followAlias,
     getConstructor,
     getConstructorArities,
     getProduct,
@@ -32,6 +33,7 @@ import E.Show
 import E.Shadow
 import E.Subst
 import E.Values
+import E.TypeCheck
 import GenUtil
 import HsSyn
 import MapBinaryInstance()
@@ -302,11 +304,12 @@ lookupCType' dataTable e = case followAliases (mappend dataTablePrims dataTable)
     e' -> fail $ "lookupCType': " ++ show (e,e')
 
 followAlias :: Monad m => DataTable -> E -> m E
+followAlias _ e | not (sortTypeLike e) = fail "followAlias: not a type"
 followAlias dataTable (EAp a b) = do
     a' <- followAlias dataTable a
     return (eAp a' b)
 followAlias dataTable (ELit (LitCons c ts e))
-    | Just con <- jcon, Just [cn] <- jcn, conAlias ccon  = return ans where
+    | Just _ <- jcon, sameLength (conSlots con) ts, Just [_] <- jcn, conAlias ccon  = return ans where
         jcn@(~(Just [cn])) = conChildren con
         Identity ccon = getConstructor cn dataTable
         jcon@(~(Just con)) = getConstructor c dataTable
@@ -315,17 +318,11 @@ followAlias dataTable (ELit (LitCons c ts e))
 followAlias _ e = fail "followAlias: not an alias"
 
 followAliases :: DataTable -> E -> E
-followAliases dataTable ap@EAp {} = case followAlias dataTable ap of
-    Just x -> followAliases dataTable x
-    Nothing -> ap
-followAliases dataTable (ELit (LitCons c ts e))
-    | Just con <- jcon, Just [cn] <- jcn, conAlias ccon  = followAliases dataTable ans where
-        jcn@(~(Just [cn])) = conChildren con
-        Identity ccon = getConstructor cn dataTable
-        jcon@(~(Just con)) = getConstructor c dataTable
-        [sl] = conSlots ccon
-        ans = doSubst False False (Map.fromList $ zip [2..] (map Just ts)) sl
-followAliases _ e = e
+followAliases dataTable l = f l 10 where
+    f l 0 = l
+    f l n = case followAlias dataTable l of
+        Just e -> f e (n - 1)
+        Nothing -> l
 
 dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tabsurd:tarrow:primitiveTable ] ++ worlds)
 
