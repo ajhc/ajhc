@@ -17,14 +17,16 @@ import Util.Seq as Seq
 
 eval :: E -> E
 eval term = eval' term []  where
+    -- final terms
     eval' t@EVar {} [] = t
     eval' (ELam v body) [] = check_eta $ ELam v (eval body)
     eval' (EPi v body) [] = check_eta $ EPi v (eval body)
     eval' e@Unknown [] = e
     eval' e@ESort {} [] = e
-
     eval' (ELit (LitCons n es t)) [] = ELit $ LitCons n (map eval es) t
     eval' e@ELit {} [] = e
+
+    -- argument applications
     eval' (ELit (LitCons n es ty@EPi {})) (t:rest) = eval' (ELit $ LitCons n (es ++ [t]) (eval $ EAp ty t)) rest
 
     eval' (ELam v body) (t:rest) = eval' (subst v t body) rest
@@ -35,6 +37,7 @@ eval term = eval' term []  where
         f [] e = e
         f (Left (x,y):ds) e =  subst x y (f ds e)
         f (Right _:_) _ = error $ "cannot eval recursive let"
+    eval' e@(ELit LitCons {}) stack = unwind e stack
     eval' e _ = error $ "Cannot eval: " ++ show e
 
     unwind t [] = t
@@ -43,40 +46,6 @@ eval term = eval' term []  where
     -- currently we do not do eta check. etas should only appear for good reason.
     check_eta x = x
 
-
-
--- TODO, this should take a set of free variables and α-convert lambdas
-
-unify :: Monad m => E -> E -> m [(E,E)]
-unify e1 e2 = liftM Seq.toList $ execWriterT (un e1 e2 () (-2::Int)) where
-    un _ _ _ c | c `seq` False = undefined
-    un (EAp a b) (EAp a' b') mm c = do
-        un a a' mm c
-        un b b' mm c
-    un a@(EVar (TVr { tvrIdent = i, tvrType =  t}))  b@(EVar (TVr { tvrIdent = j, tvrType =  u})) mm c | i == j || (i > 0 && j > 0) = do
-        un t u mm c
-        when (i /= j) $ tell (Seq.single (a,b))
-    --un (ELam (TVr Nothing ta) ea) (ELam (TVr Nothing tb) eb) mm c = un ta tb mm c >> un ea eb mm c
-    --un (EPi (TVr Nothing ta) ea) (EPi (TVr Nothing tb) eb) mm c = un ta tb mm c >> un ea eb mm c
-    un (ELam va ea) (ELam vb eb) mm c = lam va ea vb eb mm c
-    un (EPi va ea) (EPi vb eb) mm c = lam va ea vb eb mm c
-    un (EPrim s xs t) (EPrim s' ys t') mm c | length xs == length ys = do
-        sequence_ [ un x y mm c | x <- xs | y <- ys]
-        un t t' mm c
-    un (ESort x) (ESort y) mm c | x == y = return ()
-    un (ELit (LitInt x t1))  (ELit (LitInt y t2)) mm c | x == y = un t1 t2 mm c
---    un (ELit (LitChar x))  (ELit (LitChar y)) mm c | x == y = return ()
---    un (ELit (LitFrac x t1 ))  (ELit (LitFrac y t2)) mm c | x == y = un t1 t2 mm c
-    un (ELit (LitCons n xs t))  (ELit (LitCons n' ys t')) mm c | n == n' && length xs == length ys = do
-        sequence_ [ un x y mm c | x <- xs | y <- ys]
-        un t t' mm c
-    un a@EVar {} b _ _ = tell (Seq.single (a,b))
-    --un a b@EVar {} _ _ = tell (Seq.single (a,b))
-    un a b _ _ = fail $ "Expressions do not unify: " ++ show a ++ show b
-    lam va ea vb eb mm c = do
-        un (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb) mm (c - 2)
-
-    -- error "cannot handle lambdas yet"
 
 
 
@@ -101,7 +70,6 @@ strong dsMap' term = eval' dsMap term [] where
         check_eta $ EPi v' body'
     eval' ds e@Unknown [] = return e
     eval' ds e@ESort {} [] = return e
-    --eval' ds (ELetRec ds' e) = (Map.fromList ds'
     eval' ds (ELit (LitCons n es t)) [] = do
         es' <- mapM (\e -> eval' ds e []) es
         t' <-  (eval' ds t [])
@@ -119,22 +87,7 @@ strong dsMap' term = eval' dsMap term [] where
             tvr <- etvr ds v
             unwind ds (EVar tvr) stack
     eval' ds (ELetRec ds' e) stack = eval' (Map.fromList ds'  `mappend` ds) e  stack
-    --eval' ds (ELetRec ds' e) stack = eval' ds (f (decomposeDefns ds') e) stack where
-    --    f [] e = e
-    --    f (Left (x,y):ds) e =  subst x y (f ds e)
-    --    f (Right _:_) _ = error $ "cannot eval recursive let"
---    eval' ds (ECase e as) [] = do
---        e' <- eval' ds e []
---        let f (PatLit (LitCons n es t),e) = do
---                e' <- eval' ds e []
---                t' <- eval' ds t []
---                es' <- mapM (\e -> eval' ds e []) es
---                return (PatLit (LitCons n es' t'),e')
---            f (p,e) = do
---                e' <- eval' ds e []
---                return (p,e')
---        as' <- mapM f as
---        return $ ECase e' as'
+    eval' ds e@(ELit LitCons {}) stack = unwind ds e stack
 
     eval' ds e stack= fail $ "Cannot strong: \n" ++ render (pprint (e,stack))
 

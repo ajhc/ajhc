@@ -28,6 +28,7 @@ typ (ESort EBox) = error "Box inhabits nowhere."
 typ (ELit l) = getType l
 typ (EVar v) =  getType v
 typ (EPi _ b) = typ b
+typ (EAp (EPi tvr a) b) = getType (subst tvr b a)
 typ (EAp a b) = eAp (typ a) b
 typ (ELam (TVr { tvrIdent = x, tvrType =  a}) b) = EPi (tVr x a) (typ b)
 typ (ELetRec _ e) = typ e
@@ -169,33 +170,15 @@ inferType dataTable ds e = rfc e where
         | otherwise =  withContextDoc (text "valid:" <+> prettyE e) (do t <- inferType' nds s;  valid' nds t)
     eq t1 t2 = eq' ds t1 t2
     eq' nds t1 t2 = do
-        e1 <- strong nds t1
-        e2 <- strong nds t2
+        e1 <- strong nds (followAliases dataTable t1)
+        e2 <- strong nds (followAliases dataTable t2)
         case typesCompatable dataTable e1 e2 of
             Right () -> return (followAliases dataTable e1)
             Left s -> failDoc $ hsep [text "eq:",text s, align $ vcat [ prettyE (e1),prettyE (e2) ]  ]
-
---        let x
---            --  | e1 == e2 = e1
---              | allShadow e1 == allShadow e2 = return e1
---            --  | e1 == tInt || e2 == tInt = return e1
---              | otherwise = failDoc $ hsep [text "eq:",{- tupled (map pprint $ fsts nds), -} tupled [ prettyE (e1),prettyE (e2) ], tupled [ prettyE (allShadow e1), prettyE (allShadow e2)] {- , tupled [ text (show e1), text (show e2)] -}  ]
---        x
---    -- | Check that the type of e1 is the same as t2 within the given context
     fceq nds e1 t2 = do
         withContextDoc (hsep [text "fceq:", align $ vcat [parens $ prettyE e1,  parens $ prettyE t2]]) $ do
         t1 <- inferType' nds e1
         eq' nds t1 t2
-        --flip (eq' nds) t2 t
-    --eq t1 t2 | Just _ <- E.Eval.unify (smplE t1) (smplE t2) = return (smplE t1)
-    --eq t1 t2 | Just _ <- E.Eval.unify (smplE t2) (smplE t1) = return (smplE t1)
-    --eq t1 t2 | smplE t1 == smplE t2 = return t1
-    --eq t1 t2 | t1 == tInt || t2 == tInt = return t1  --TODO - hack.
-    --eq t1 t2 | Left d <- E.Eval.unify (smplE t1) (smplE t2) = failDoc $ hsep [text "eq:", tupled [text d, prettyE (smplE t1),prettyE (smplE t2) ] ]
-    --eq t1 t2  = failDoc $ hsep [text "eq:", tupled [ prettyE (smplE t1),prettyE (smplE t2) ] ]
-    --valid s | s == eBox = return ()
-    --valid Unknown = fail "valid: Unknown"
-    --valid e = withContextDoc (text "valid:" <+> prettyE e) (rfc e >>= valid)
 
 
 instance CanTypeCheck DataTable E E where

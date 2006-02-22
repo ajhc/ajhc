@@ -304,7 +304,7 @@ lookupCType' dataTable e = case followAliases (mappend dataTablePrims dataTable)
     e' -> fail $ "lookupCType': " ++ show (e,e')
 
 followAlias :: Monad m => DataTable -> E -> m E
-followAlias _ e | not (sortTypeLike e) = fail "followAlias: not a type"
+--followAlias _ e | not (sortTypeLike e) = fail "followAlias: not a type"
 followAlias dataTable (EAp a b) = do
     a' <- followAlias dataTable a
     return (eAp a' b)
