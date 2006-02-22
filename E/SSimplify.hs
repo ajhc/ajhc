@@ -179,6 +179,7 @@ simplifyE sopts e = (stat,e') where
 
 simplifyDs :: SimplifyOpts -> [(TVr,E)] -> (Stat,[(TVr,E)])
 simplifyDs sopts dsIn = (stat,dsOut) where
+    getType e = infertype (so_dataTable sopts) e
     collocc dsIn = do
         let ((ELetRec dsIn' _),fvs,occ) = collectOcc sopts (ELetRec dsIn (eTuple (map EVar (fsts dsIn))))
         addNames (map tvrIdent $ Map.keys occ)

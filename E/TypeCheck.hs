@@ -206,6 +206,16 @@ instance CanTypeCheck DataTable E E where
         Left ss -> fail $ "\n>>> internal error:\n" ++ unlines (tail ss)
         Right v -> return v
 
+instance CanTypeCheck DataTable TVr E where
+    typecheck _ tvr = return $ getType tvr
+
+instance CanTypeCheck DataTable (Lit a E) E where
+    typecheck _ l = return $ getType l
+
+-- TODO, types might be bound in scrutinization
+instance CanTypeCheck DataTable (Alt E) E where
+    typecheck dt (Alt _ e) = typecheck dt e
+
 instance CanTypeCheck DataTable [(TVr,E)] [E] where
     typecheck dataTable ds = do mapM (typecheck dataTable) (snds ds)
 
