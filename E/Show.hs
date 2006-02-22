@@ -131,6 +131,7 @@ showE e = do
         f e | e == tChar     = return $ atom $ text "Char"
         f e | e == tInt      = return $ atom $ text "Int"
         f e | e == tInteger  = return $ atom $ text "Integer"
+        f e | e == tCont     = return $ atom $ text "IOErrorCont"
         f e | e == tRational = return $ atom $ text "Rational"
         f e | e == tString   = return $ atom $ text "String"
         f e | e == tUnit     = return $ atom $ text "()"
@@ -157,7 +158,7 @@ showE e = do
             return $ (pop (retOp UC.lambda) tvr) `dot` e
         f (EVar tvr) = if dump FD.EVerbose then showTVr tvr else showTVr' tvr
         f Unknown = return $ symbol (char  '?')
-        f (ESort EStar) = return $ symbol UC.star
+        f (ESort EStar) = return $ symbol (text "*")
         f (ESort EBox) = return $ symbol UC.box
         f (ESort EHash) = return $ symbol (text "#")
         f (ELit l) = showLit showE l

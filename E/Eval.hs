@@ -1,4 +1,4 @@
-module E.Eval(eval, unify,strong) where
+module E.Eval(eval, strong) where
 
 -- Simple lambda Calculus interpreter
 -- does not handle recursive Let or Case statements, but those don't appear in types anyway.
@@ -25,7 +25,7 @@ eval term = eval' term []  where
 
     eval' (ELit (LitCons n es t)) [] = ELit $ LitCons n (map eval es) t
     eval' e@ELit {} [] = e
-    eval' (ELit (LitCons n es ty)) (t:rest) = eval' (ELit $ LitCons n (es ++ [t]) (eval $ EAp ty t)) rest
+    eval' (ELit (LitCons n es ty@EPi {})) (t:rest) = eval' (ELit $ LitCons n (es ++ [t]) (eval $ EAp ty t)) rest
 
     eval' (ELam v body) (t:rest) = eval' (subst v t body) rest
     eval' (EPi v body) (t:rest) = eval' (subst v t body) rest   -- fudge
@@ -107,7 +107,7 @@ strong dsMap' term = eval' dsMap term [] where
         t' <-  (eval' ds t [])
         return $ ELit $ LitCons n es' t'
     eval' ds e@ELit {} [] = return e
-    eval' ds (ELit (LitCons n es ty)) (t:rest) = do
+    eval' ds (ELit (LitCons n es ty@EPi {})) (t:rest) = do
         t' <- (eval' ds (EAp ty t) [])
         eval' ds (ELit $ LitCons n (es ++ [t]) t') rest
     eval' ds (ELam v body) (t:rest) = eval' ds (subst v t body) rest

@@ -334,7 +334,15 @@ toString x = toList x >>= mapM fromChar where
 tAbsurd k = ELit (LitCons tc_Absurd [] k)
 tPtr t = ELit (LitCons tc_Ptr [t] eStar)
 
+-- the IOErrorCont type from Jhc.IO
+tCont = ltTuple [ELit $ LitCons tc_JumpPoint [] eStar, ELit $ LitCons tc_IOError [] eStar]
+tvrCont = tvr { tvrIdent = 0, tvrType = tCont }
+
+ltTuple ts = ELit $ LitCons (nameTuple TypeConstructor (length ts)) ts eStar
+ltTuple' ts = ELit $ LitCons (unboxedNameTuple TypeConstructor (length ts)) ts eHash
 
 p_unsafeCoerce = primPrim "unsafeCoerce"
 p_integralCast = primPrim "integralCast"
+p_toTag = primPrim "toTag"
+p_fromTag = primPrim "fromTag"
 

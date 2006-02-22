@@ -75,7 +75,7 @@ doSubst substInVars allShadow bm e  = f e bm where
             | otherwise  -> return  eo
     f (ELam tvr e) = lp ELam tvr e
     f (EPi tvr e) = lp EPi tvr e
-    f (EAp a b) = liftM2 EAp (f a) (f b)
+    f (EAp a b) = liftM2 eAp (f a) (f b)
     f (EError x e) = liftM (EError x) (f e)
     f (EPrim x es e) = liftM2 (EPrim x) (mapM f es) (f e)
     f (ELetRec dl e) = do
@@ -157,7 +157,7 @@ nv' ss = v (2 * (Map.size ss + 1)) where
 eAp (EPi (TVr { tvrIdent =  0 }) b) _ = b
 eAp (EPi t b) e = subst t e b
 --eAp (EPrim n es t@(EPi _ _)) b = EPrim n (es ++ [b]) (eAp t b)  -- only apply if type is pi-like
-eAp (ELit (LitCons n es t)) b = (ELit (LitCons n (es ++ [b]) (eAp t b)))
+eAp (ELit (LitCons n es (EPi t r))) b = ELit (LitCons n (es ++ [b]) (subst t b r))
 eAp (EError s t) b = EError s (eAp t b)
 eAp a b = EAp a b
 
@@ -193,7 +193,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
           _ -> return eo
     f (ELam tvr e) = lp ELam tvr e
     f (EPi tvr e) = lp EPi tvr e
-    f (EAp a b) = liftM2 EAp (f a) (f b)
+    f (EAp a b) = liftM2 eAp (f a) (f b)
     f (EError x e) = liftM (EError x) (inType $ f e)
     f (EPrim x es e) = liftM2 (EPrim x) (mapM f es) (inType $ f e)
     f (ELetRec dl e) = do

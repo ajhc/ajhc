@@ -35,16 +35,11 @@ eTuple = tuple
 eTuple' es = ELit $ LitCons (unboxedNameTuple DataConstructor (length es)) es (ltTuple' ts) where
     ts = map getType es
 
-ltTuple ts = ELit $ LitCons (nameTuple TypeConstructor (length ts)) ts eStar
-ltTuple' ts = ELit $ LitCons (unboxedNameTuple TypeConstructor (length ts)) ts eHash
 
 
 unboxedTuple es =  LitCons (unboxedNameTuple DataConstructor (length es)) es (ltTuple' ts) where
     ts = map getType es
 
--- the IOErrorCont type from Jhc.IO
-tCont = ltTuple [ELit $ LitCons tc_JumpPoint [] eStar, ELit $ LitCons tc_IOError [] eStar]
-tvrCont = tvr { tvrIdent = 0, tvrType = tCont }
 
 class ToE a where
     toE :: a -> E
@@ -187,7 +182,7 @@ prim_toTag e = f e where
     f (EError err _) = EError err tTag
     f ec@ECase {} = nx where
         Identity nx = caseBodiesMapM (return . prim_toTag) ec
-    f e = EPrim (primPrim "toTag") [e] tTag
+    f e = EPrim p_toTag [e] tTag
 
 -- prim_fromTag e t = EPrim (primPrim "fromTag") [e] t
 

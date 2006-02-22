@@ -82,7 +82,7 @@ collectOcc sopts  e = (e',fvs,occ) where
             Nothing -> return (Nothing,mempty,mempty)
             Just e -> do (a,b,c) <- f e; return (Just a,b,c)
         (as',fvas,ass) <- mapAndUnzip3M alt as
-        let fvs = mconcat $ [fva,freeVars $ tvrType b, fvb] ++ fvas
+        let fvs = mconcat $ [fva,freeVars $ eCaseType ec, freeVars $ tvrType b, fvb] ++ fvas
         return (ec { eCaseScrutinee = e', eCaseAlts = as', eCaseDefault = d'}, fvs, sa `andOM` orMaps (sb:ass) )
     f (ELetRec ds e) = do
         ds' <- mapM  (censor (const mempty) . listen . f . snd) ds
