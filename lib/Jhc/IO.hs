@@ -3,8 +3,7 @@ module Jhc.IO(
     IOResult(..),
     World__(),
     catch,
-    drop__,
-    newWorld__,
+    dependingOn,
     fixIO,
     ioError,
     runExpr,
@@ -98,8 +97,12 @@ foreign import primitive newWorld__ :: a -> World__
 -- throws away first argument. but causes second argument to artificially depend on it.
 foreign import primitive drop__ :: forall a b. a -> b -> b
 
+-- like 'const' but creates an artificial dependency on its second argument to guide optimization.
+dependingOn :: b -> a -> b
+dependingOn = flip drop__
+
 -- throws away first argument. but causes second argument to artificially depend on it.
-foreign import primitive worldDep__ :: forall b. World__ -> b -> b
+foreign import primitive "drop__" worldDep__ :: forall b. World__ -> b -> b
 
 -- | this will return a value making it artificially depend on the state of the world. any uses of this value are guarenteed not to float before this point in the IO monad.
 strictReturn :: a -> IO a
