@@ -76,14 +76,14 @@ collectOcc sopts  e = (e',fvs,occ) where
     f e | Just (x,t) <- from_unsafeCoerce e  = do (a,b,c) <- f x ; return (prim_unsafeCoerce a t, b `mappend` freeVars t, c)
     f e | (EVar (TVr { tvrIdent = n, tvrType =  t}),xs) <- fromAp e = do
         return (e,freeVars (t:xs), Map.singleton n Once `andOM` args xs)
-    f ec@(ECase e b as d) = do
+    f ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d} = do
         (e',fva,sa) <- f e
         (d',fvb,sb) <- case d of
             Nothing -> return (Nothing,mempty,mempty)
             Just e -> do (a,b,c) <- f e; return (Just a,b,c)
         (as',fvas,ass) <- mapAndUnzip3M alt as
         let fvs = mconcat $ [fva,freeVars $ tvrType b, fvb] ++ fvas
-        return (ECase e' b as' d', fvs, sa `andOM` orMaps (sb:ass) )
+        return (ec { eCaseScrutinee = e', eCaseAlts = as', eCaseDefault = d'}, fvs, sa `andOM` orMaps (sb:ass) )
     f (ELetRec ds e) = do
         ds' <- mapM  (censor (const mempty) . listen . f . snd) ds
         (e',fve,se) <- f e
@@ -238,10 +238,10 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     g (EError s t) sub inb = do
         t' <- dosub sub t
         return $ EError s t'
-    g ec@(ECase e b as d) sub inb = do
+    g ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d} sub inb = do
         addNames (map tvrNum $ caseBinds ec)
         e' <- f e sub inb
-        doCase e' b as d sub inb
+        doCase e' (eCaseType ec) b as d sub inb
     g (ELam v e) sub inb  = do
         addNames [tvrNum v]
         v' <- nname v sub inb
@@ -327,40 +327,38 @@ simplifyDs sopts dsIn = (stat,dsOut) where
 
     -- TODO - case simplification
 
-    doCase (ELetRec ds e) b as d sub inb = do
+    doCase (ELetRec ds e) t b as d sub inb = do
         mtick "E.Simplify.let-from-case"
-        e' <- doCase e b as d sub inb
+        e' <- doCase e t b as d sub inb
         return $ substLet' ds e'
 
-    doCase (EVar v) b as d sub inb |  Just (IsBoundTo _ (ELit l)) <- Map.lookup (tvrNum v) (envInScope inb)  = doConstCase l b as d sub inb
-    doCase (ELit l) b as d sub inb  = doConstCase l b as d sub inb
+    doCase (EVar v) t b as d sub inb |  Just (IsBoundTo _ (ELit l)) <- Map.lookup (tvrNum v) (envInScope inb)  = doConstCase l t  b as d sub inb
+    doCase (ELit l) t b as d sub inb  = doConstCase l t b as d sub inb
 
-    doCase (EVar v) b as d sub inb | Just (IsBoundTo _ e) <- Map.lookup (tvrNum v) (envInScope inb) , isBottom e = do
+    doCase (EVar v) t b as d sub inb | Just (IsBoundTo _ e) <- Map.lookup (tvrNum v) (envInScope inb) , isBottom e = do
         mtick "E.Simplify.case-of-bottom'"
-        let t = getType (ECase (EVar v) b as d)
         t' <- dosub sub t
         return $ prim_unsafeCoerce (EVar v) t'
 
-    doCase ic@(ECase e b as d) b' as' d' sub inb | length (filter (not . isBottom) (caseBodies ic)) <= 1 || all whnfOrBot (caseBodies ic)  || all whnfOrBot (caseBodies (ECase Unknown b' as' d'))  = do
+    doCase ic@ECase { eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d' sub inb | length (filter (not . isBottom) (caseBodies ic)) <= 1 || all whnfOrBot (caseBodies ic)  || all whnfOrBot (caseBodies emptyCase { eCaseAlts = as', eCaseDefault = d'} )  = do
         mtick (toAtom "E.Simplify.case-of-case")
         let f (Alt l e) = do
-                e' <- doCase e b' as' d' sub (envInScope_u (Map.fromList [ (n,NotKnown) | TVr { tvrIdent = n } <- litBinds l ] `Map.union`) inb)
+                e' <- doCase e t b' as' d' sub (envInScope_u (Map.fromList [ (n,NotKnown) | TVr { tvrIdent = n } <- litBinds l ] `Map.union`) inb)
                 return (Alt l e')
             --g e >>= return . Alt l
-            g x = doCase x b' as' d' sub (envInScope_u (Map.insert (tvrNum b) NotKnown) inb)
+            g x = doCase x t b' as' d' sub (envInScope_u (Map.insert (tvrNum b) NotKnown) inb)
         as'' <- mapM f as
         d'' <- fmapM g d
-        return (ECase e b as'' d'')      -- we duplicate code so continue for next renaming pass before going further.
-    doCase e b as d sub inb | isBottom e = do
+        return ECase { eCaseScrutinee = e, eCaseType = t, eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
+    doCase e t b as d sub inb | isBottom e = do
         mtick "E.Simplify.case-of-bottom"
-        let t = getType (ECase e b as d)
         t' <- dosub sub t
         return $ prim_unsafeCoerce e t'
 
-    doCase e b as@(Alt (LitCons n _ _) _:_) (Just d) sub inb | Just ss <- getSiblings (so_dataTable sopts) n, length ss <= length as = do
+    doCase e t b as@(Alt (LitCons n _ _) _:_) (Just d) sub inb | Just ss <- getSiblings (so_dataTable sopts) n, length ss <= length as = do
         mtick "E.Simplify.case-no-default"
-        doCase e b as Nothing sub inb
-    doCase e b as (Just d) sub inb | te /= tWorld__, (ELit (LitCons cn _ _)) <- followAliases dt te, Just Constructor { conChildren = Just cs } <- getConstructor cn dt, length as == length cs - 1 || (False && length as < length cs && isAtomic d)  = do
+        doCase e t b as Nothing sub inb
+    doCase e t b as (Just d) sub inb | te /= tWorld__, (ELit (LitCons cn _ _)) <- followAliases dt te, Just Constructor { conChildren = Just cs } <- getConstructor cn dt, length as == length cs - 1 || (False && length as < length cs && isAtomic d)  = do
         let ns = [ n | Alt ~(LitCons n _ _) _ <- as ]
             ls = filter (`notElem` ns) cs
             f n = do
@@ -373,23 +371,23 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                 return $ Alt (LitCons n ts te) (eLet b wtd d)
         mtick $ "E.Simplify.case-improve-default.{" ++ show (sort ls) ++ "}"
         ls' <- mapM f ls
-        doCase e b (as ++ ls') Nothing sub inb
+        doCase e t b (as ++ ls') Nothing sub inb
         where
         te = getType e
         dt = (so_dataTable sopts)
-    doCase e b [] (Just d) sub inb | not (isLifted e || isUnboxed (getType e)) = do
+    doCase e _ b [] (Just d) sub inb | not (isLifted e || isUnboxed (getType e)) = do
         mtick "E.Simplify.case-unlifted"
         b' <- nname b sub inb
         d' <- f d (Map.insert (tvrNum b) (Done (EVar b')) sub) (envInScope_u  (Map.insert (tvrNum b') (IsBoundTo Many e)) inb)
         return $ eLet b' e d'
-    doCase (EVar v) b [] (Just d) sub inb | Just (NotAmong _) <-  Map.lookup (tvrNum v) (envInScope inb)  = do
+    doCase (EVar v) _ b [] (Just d) sub inb | Just (NotAmong _) <-  Map.lookup (tvrNum v) (envInScope inb)  = do
         mtick "E.Simplify.case-evaled"
         d' <- f d (Map.insert (tvrNum b) (Done (EVar v)) sub) inb
         return d'
-    doCase scrut v [] (Just sc@ECase { eCaseScrutinee = EVar v'} ) sub inb | v == v', not $ tvrNum v `Set.member` freeVars (caseBodies sc)  = do
+    doCase scrut _ v [] (Just sc@ECase { eCaseScrutinee = EVar v'} ) sub inb | v == v', not $ tvrNum v `Set.member` freeVars (caseBodies sc)  = do
         mtick "E.Simplify.case-default-case"
         f sc { eCaseScrutinee = scrut } sub inb
-    doCase e b as d sub inb = do
+    doCase e t b as d sub inb = do
         b' <- nname b sub inb
         let dd e' = f e' (Map.insert (tvrNum b) (Done $ EVar b') sub) (envInScope_u (newinb `Map.union`) inb) where
                 na = NotAmong [ n | Alt (LitCons n _ _) _ <- as]
@@ -412,9 +410,10 @@ simplifyDs sopts dsIn = (stat,dsOut) where
 
         d' <- fmapM dd d
         as' <- mapM da as
-        return $ ECase e b' as' d'
+        t' <- dosub sub t
+        return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind =  b', eCaseAlts = as', eCaseDefault = d'}
 
-    doConstCase l b as d sub inb = do
+    doConstCase l t b as d sub inb = do
         mr <- match l as (b,d)
         case mr of
             Just (bs,e) -> do
@@ -423,7 +422,6 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                 e' <- f e (Map.fromList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] `Map.union` sub)   (envInScope_u (Map.fromList [ (n,IsBoundTo Many e) | (e,_,TVr { tvrIdent = n }) <- binds] `Map.union`) inb)
                 return $ eLetRec [ (v,e) | (e,_,v) <- binds ] e'
             Nothing -> do
-                let t = getType (ECase (ELit l) b as d)
                 return $ EError "match falls off bottom" t
 
     match m@(LitCons c xs _) ((Alt (LitCons c' bs _) e):rs) d | c == c' = do

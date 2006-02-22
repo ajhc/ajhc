@@ -101,7 +101,9 @@ app' (EPi tvr e) (a:as) = do
 app' ec@ECase {} xs = do
     mtick (toAtom "E.Simplify.case-application")
     let f e = app' e xs
-    caseBodiesMapM f ec
+    ec' <- caseBodiesMapM f ec
+    let t = foldl eAp (eCaseType ec') xs
+    return ec' { eCaseType = t }
 app' (ELetRec ds e) xs = do
     mtick (toAtom "E.Simplify.let-application")
     e' <- app' e xs
@@ -145,12 +147,13 @@ emapEG f g e = z e where
     z (ELit (LitCons n es t)) = do t' <- g t; es' <- mapM f es; return $ ELit (LitCons n es' t')
     z (ELit aa) = do aa <- fmapM g aa; return $ ELit aa
     z (ELetRec aa ab) = do aa <- mapM (\x -> do x <- (do (aa,ab) <- return x; aa <- mapmTvr g aa;ab <- f ab;return (aa,ab)); return x) aa;ab <- f ab; return $ ELetRec aa ab
-    z (ECase e b as d) = do
-        e' <- f e
-        b' <- fmapM g b
-        as' <- mapM mapmAlt as
-        d' <- fmapM f d
-        return (ECase e' b' as' d')
+    z ec@ECase {} = do
+        e' <- f $ eCaseScrutinee ec
+        b' <- fmapM g (eCaseBind ec)
+        as' <- mapM mapmAlt (eCaseAlts ec)
+        d' <- fmapM f (eCaseDefault ec)
+        t' <- g (eCaseType ec)
+        return ECase { eCaseScrutinee =e', eCaseBind = b', eCaseAlts = as', eCaseDefault = d', eCaseType = t'}
     --    aa ab) = do aa <- f aa;ab <- mapM (\(x,y) -> do x <- fmapM f x; y <- f y; return (x,y)) ab; return $ ECase aa ab
     z (EPrim aa ab ac) = do ab <- mapM f ab;ac <- f ac; return $ EPrim aa ab ac
     z (EError aa ab) = do ab <- f ab; return $ EError aa ab

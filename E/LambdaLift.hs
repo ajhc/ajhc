@@ -72,14 +72,14 @@ lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs 
         -- easily proven so, so we avoid the whole mess by subtituting known
         -- type variables within lifted expressions. This can not duplicate work
         -- since types are unpointed, but might change space usage slightly.
-        g (ECase (EVar v) b as d) | sortStarLike (tvrType v) = do
+        g ec@ECase { eCaseScrutinee = (EVar v), eCaseAlts = as, eCaseDefault = d} | sortStarLike (tvrType v) = do
             True <- asks isStrict
             d' <- fmapM f d
             let z (Alt l e) = do
                     e' <- local (declEnv_u ((v,patToLitEE l):)) $ f e
                     return $ Alt l e'
             as' <- mapM z as
-            return $ ECase (EVar v) b as' d'
+            return ec { eCaseAlts = as', eCaseDefault = d'}
         g e = emapE' f e
         pLift e = do
             gs <- asks topVars

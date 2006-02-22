@@ -101,7 +101,8 @@ doSubst substInVars allShadow bm e  = f e bm where
                 e' <- f e
                 return $ Alt l' e'
         alts <- (mapM da $ eCaseAlts ec)
-        return  ECase { eCaseScrutinee = e', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts }
+        nty <- f (eCaseType ec)
+        return  ec { eCaseScrutinee = e', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts, eCaseType = nty }
     lp lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == 0 || (allShadow && n `notElem` freeVars e) = do
         t' <- f t
         e' <- local (Map.insert n Nothing) $ f e
@@ -218,7 +219,8 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
                 e' <- f e
                 return $ Alt (LitInt n t') e'
         alts <- (mapM da $ eCaseAlts ec)
-        return  ECase { eCaseScrutinee = e', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts }
+        nty <- inType (f $ eCaseType ec)
+        return  ec { eCaseScrutinee = e', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts, eCaseType = nty }
     lp lam tvr@(TVr { tvrIdent = 0, tvrType = t}) e  = do
         t' <- inType (f t)
         e' <- f e

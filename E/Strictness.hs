@@ -125,7 +125,7 @@ collect e = ans where
     f (EPi (TVr { tvrType = a }) b) = return $ arg L a `andsa` arg L b
     f (ELit (LitInt {})) = return mempty
     f e | (EVar tvr,as) <- fromAp e = return $ andSA  ((Map.singleton tvr (S (length as))):[ arg (saO tvr (length as) i) a | a <- as | i <- [0..] ])
-    f ec@(ECase e b as d) = do
+    f ec@ECase { eCaseScrutinee = e, eCaseBind =  b, eCaseAlts = as, eCaseDefault = d} = do
         fe <- f e
         fb <- mapM f (caseBodies ec)
         cb <- finS (caseBinds ec) (orSA fb)

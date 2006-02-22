@@ -70,7 +70,7 @@ freeVs =   fv where
     fv (EError _ e) = fv e
     fv (ELit l) = fvLit l
     fv (EPrim _ es e) = IM.unions $ fv e : map fv es
-    fv (ECase e b as d) = IM.unions ( fv e:freeVars (getTyp  b):(IM.delete (tvrNum b) $ IM.unions (freeVars d:map freeVars as)  ):[])
+    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = IM.unions ( fv e:freeVars (getTyp  b):freeVars ty:(IM.delete (tvrNum b) $ IM.unions (freeVars d:map freeVars as)  ):[])
     fv Unknown = IM.empty
     fv ESort {} = IM.empty
     fvLit (LitCons _ es e) = IM.unions $ fv e:map fv es
@@ -90,7 +90,7 @@ freeVsSet e = fv e where
     fv (EError _ e) = fv e
     fv (ELit l) = fvLit l
     fv (EPrim _ es e) = Set.unions $ fv e : map fv es
-    fv (ECase e b as d) = Set.unions ( fv e:freeVars (getTyp  b):(Set.delete b $ Set.unions (freeVars d:map freeVars as)  ):[])
+    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } =Set.unions ( fv e:freeVars ty:freeVars (getTyp  b):(Set.delete b $ Set.unions (freeVars d:map freeVars as)  ):[])
     fv Unknown = Set.empty
     fv ESort {} = Set.empty
     fvLit (LitCons _ es e) = Set.unions $ fv e:map fv es
@@ -111,7 +111,7 @@ freeVsMap e = fv e where
     fv (EError _ e) = fv e
     fv (ELit l) = fvLit l
     fv (EPrim _ es e) = Map.unions $ fv e : map fv es
-    fv (ECase e b as d) = Map.unions ( fv e:freeVars' (getTyp  b):(Map.delete (tvrNum b) $ Map.unions (freeVars d:map freeVars as)  ):[])
+    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = Map.unions ( fv e:freeVars' ty:freeVars' (getTyp  b):(Map.delete (tvrNum b) $ Map.unions (freeVars d:map freeVars as)  ):[])
     fv Unknown = Map.empty
     fv ESort {} = Map.empty
     fvLit (LitCons _ es e) = Map.unions $ fv e:map fv es

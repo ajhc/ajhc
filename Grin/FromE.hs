@@ -359,15 +359,15 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce (EPrim ap@(APrim (Operator n as r) _) es (ELit (LitCons tname [] _))) | RawType <- nameType tname = do
         let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ((map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
         return $ Prim p (args es)
-    ce (ECase e _ [Alt (LitCons n xs _) wh] _) | Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n  = do
+    ce ECase { eCaseScrutinee = e, eCaseAlts = [Alt (LitCons n xs _) wh] } | Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n  = do
         e <- ce e
         wh <- ce wh
         return $ e :>>= tuple (map toVal (filter (shouldKeep . getType) xs)) :-> wh
-    ce (ECase e _ [] (Just r)) | getType e == tWorld__ = do
+    ce ECase { eCaseScrutinee = e, eCaseAlts = [], eCaseDefault = (Just r)} | getType e == tWorld__ = do
         e <- ce e
         r <- ce r
         return $ e :>>= unit :-> r
-    ce (ECase e b as d) | (ELit (LitCons n [] _)) <- getType e, RawType <- nameType n = do
+    ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d } | (ELit (LitCons n [] _)) <- getType e, RawType <- nameType n = do
             let ty = Ty $ toAtom (show n)
             v <- newPrimVar ty
             e <- ce e
@@ -375,7 +375,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
             def <- createDef d (return (toVal b))
             return $
                 e :>>= v :-> Case v (as' ++ def)
-    ce (ECase e b as d)  = do
+    ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d }  = do
         v <- newNodeVar
         e <- ce e
         as <- mapM cp as

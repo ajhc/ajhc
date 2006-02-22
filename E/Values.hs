@@ -27,7 +27,7 @@ instance Tuple E where
     tupleMany es = ELit $ LitCons (nameTuple DataConstructor (length es)) es (ltTuple ts) where
         ts = map getType es
 
-eIf e a b = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 tBool),  eCaseAlts =  [Alt vTrue a,Alt vFalse b], eCaseDefault = Nothing }
+eIf e a b = ECase { eCaseScrutinee = e, eCaseType = getType a, eCaseBind = (tVr 0 tBool),  eCaseAlts =  [Alt vTrue a,Alt vFalse b], eCaseDefault = Nothing }
 
 eTuple :: [E] -> E
 eTuple = tuple
@@ -103,14 +103,16 @@ instance ToE a => ToE [a] where
 eCons x xs = ELit $ LitCons vCons [x,xs] (getType xs)
 eNil t = ELit $ LitCons vEmptyList [] t
 
-eCaseTup e vs w = ECase e (tVr 0 (getType e)) [Alt (LitCons (nameTuple DataConstructor (length vs)) vs (getType e)) w] Nothing
-eCaseTup' e vs w = ECase e (tVr 0 (getType e)) [Alt (LitCons (unboxedNameTuple DataConstructor (length vs)) vs (getType e)) w] Nothing
+emptyCase = ECase { eCaseDefault = Nothing, eCaseAlts = [], eCaseBind = error "emptyCase: bind", eCaseType = error "emptyCase: type", eCaseScrutinee = error "emptyCase: scrutinee" }
+
+eCaseTup e vs w = emptyCase { eCaseScrutinee = e, eCaseBind =  (tVr 0 (getType e)), eCaseType = getType w, eCaseAlts =  [Alt (LitCons (nameTuple DataConstructor (length vs)) vs (getType e)) w] }
+eCaseTup' e vs w = emptyCase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseType = getType w, eCaseAlts =  [Alt (LitCons (unboxedNameTuple DataConstructor (length vs)) vs (getType e)) w] }
 
 eJustIO w x = ELit (LitCons dc_JustIO [w,x] (ELit (LitCons tc_IOResult [getType x] eStar)))
 tIO t = ELit (LitCons tc_IO [t] eStar)
 
-eCase e alts Unknown = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseDefault = Nothing, eCaseAlts =  alts }
-eCase e alts els = ECase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseDefault = Just els, eCaseAlts =  alts }
+eCase e alts@(alt:_) Unknown = emptyCase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseType = getType alt,  eCaseAlts =  alts }
+eCase e alts els = emptyCase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseDefault = Just els, eCaseAlts =  alts, eCaseType = getType els }
 
 -- | This takes care of types right away, it simplifies various other things to do it this way.
 eLet :: TVr -> E -> E -> E
@@ -124,7 +126,7 @@ eLet t e e' = ELetRec [(t,e)] e'
 
 -- | strict version of let, evaluates argument before assigning it.
 eStrictLet t@(TVr { tvrType =  ty }) v e | sortStarLike ty  = eLet t v e
-eStrictLet t v e = ECase v t [] (Just e)
+eStrictLet t v e = emptyCase { eCaseScrutinee = v, eCaseBind = t, eCaseDefault = Just e, eCaseType = getType e }
 
 substLet :: [(TVr,E)] -> E -> E
 substLet ds e  = ans where
@@ -176,7 +178,7 @@ safeToDup e = whnfOrBot e || isELam e || isEPi e
 vTag n = ELit $ LitCons n [] tTag
 
 prim_seq a b | isWHNF a = b
-prim_seq a b = ECase a (tVr 0 (getType a)) [] (Just b)
+prim_seq a b = emptyCase { eCaseScrutinee = a, eCaseBind =  (tVr 0 (getType a)), eCaseDefault = Just b, eCaseType = getType b }
 
 prim_toTag e = f e where
     f (ELit (LitCons n _ _)) = vTag n

@@ -70,6 +70,7 @@ data E = EAp E E
     | EError String E
     | ECase {
        eCaseScrutinee :: E,
+       eCaseType :: E, -- due to GADTs and typecases, the final type of the expression might not be so obvious, so we include it here.
        eCaseBind :: TVr,
        eCaseAlts :: [Alt E],
        eCaseDefault :: (Maybe E)
@@ -313,11 +314,11 @@ isBottom _ = False
 
 
 caseBodiesMapM :: Monad m => (E -> m E) -> E -> m E
-caseBodiesMapM f (ECase e b as d) = do
+caseBodiesMapM f ec@ECase { eCaseAlts = as, eCaseDefault = d } = do
     let g (Alt l e) = f e >>= return . Alt l
     as' <- mapM g as
     d' <- fmapM f d
-    return $ ECase e b as' d'
+    return $ ec { eCaseAlts = as', eCaseDefault = d' }
 caseBodiesMapM _ _ = error "caseBodiesMapM"
 
 toList :: Monad m => E -> m  [E]

@@ -30,10 +30,10 @@ typ (EPi _ b) = typ b
 typ (EAp a b) = eAp (typ a) b
 typ (ELam (TVr { tvrIdent = x, tvrType =  a}) b) = EPi (tVr x a) (typ b)
 typ (ELetRec _ e) = typ e
-typ (ECase {eCaseScrutinee = e, eCaseDefault = Just d}) | sortTypeLike e = typ d
-typ (ECase {eCaseAlts = (x:_)}) = getType x
-typ (ECase {eCaseDefault = Just e}) = typ e
-typ (ECase _ _ [] Nothing) = error "empty case"
+typ ECase {eCaseScrutinee = e, eCaseDefault = Just d} | sortTypeLike e = typ d
+typ ECase {eCaseAlts = (x:_)} = getType x
+typ ECase {eCaseDefault = Just e} = typ e
+typ ECase {eCaseAlts = [], eCaseDefault =  Nothing} = error "empty case"
 typ (EError _ e) = e
 typ (EPrim _ _ t) = t
 typ Unknown = Unknown
@@ -103,7 +103,7 @@ inferType dataTable ds e = rfc e where
         strong nds et
     fc (EError _ e) = valid e >> (strong'  e)
     fc (EPrim _ ts t) = mapM_ valid ts >> valid t >> ( strong' t)
-    fc ec@(ECase e@ELit {} b as (Just d)) | sortTypeLike e = do   -- TODO - this is a hack to get around case of constants.
+    fc ec@ECase { eCaseScrutinee = e@ELit {}, eCaseBind = b, eCaseAlts = as, eCaseDefault =  (Just d) } | sortTypeLike e = do   -- TODO - this is a hack to get around case of constants.
         et <- rfc e
         eq et (getType b)
         dt <- rfc d
@@ -112,7 +112,7 @@ inferType dataTable ds e = rfc e where
         ps <- mapM (strong' . getType) $ casePats ec
         eqAll (et:ps)
         return dt
-    fc ec@(ECase e b as (Just d)) | sortTypeLike e  = do   -- TODO - we should substitute the tested for value into the default type.
+    fc ec@ECase {eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = Just d} | sortTypeLike e  = do   -- TODO - we should substitute the tested for value into the default type.
         et <- rfc e
         eq et (getType b)
         dt <- rfc d
@@ -123,7 +123,7 @@ inferType dataTable ds e = rfc e where
         ps <- mapM (strong' . getType) $ casePats ec
         eqAll (et:ps)
         return dt
-    fc ec@(ECase e b _ _) = do
+    fc ec@ECase { eCaseScrutinee =e, eCaseBind = b } = do
         et <- rfc e
         eq et (getType b)
         bs <- mapM rfc (caseBodies ec)
@@ -266,10 +266,10 @@ typeInfer'' dataTable ds e = rfc e where
         strong nds et
     fc (EError _ e) = (strong'  e)
     fc (EPrim _ ts t) = ( strong' t)
-    fc ec@(ECase e b as (Just d)) | sortTypeLike e  = do   -- TODO - we should substitute the tested for value into the default type.
+    fc ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = Just d} | sortTypeLike e  = do   -- TODO - we should substitute the tested for value into the default type.
         dt <- rfc' [ d | d@(v,_) <- ds, tvrNum b /= tvrNum v ] d
         return dt
-    fc ec@(ECase e b _ _) = do
+    fc ec@ECase { eCaseScrutinee = e, eCaseBind = b } = do
         --bs <- mapM rfc (caseBodies ec)
         --return (head bs)
         rfc (head $ caseBodies ec)

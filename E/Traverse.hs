@@ -151,14 +151,15 @@ traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> r
         es' <- mapM l es
         t' <- f' t
         return $ EPrim n es' t'
-    g ec@(ECase e b as d) = do
+    g ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d} = do
         e' <- f e
+        t' <- f' (eCaseType ec)
         addNames $ map tvrIdent (caseBinds ec)
         (ob,b') <- ntvr f' b
         localSubst [(ob,EVar b')] $ do
             as' <- mapM (da [ v  | EVar v <- [e',EVar b']])   as
             d' <- localVars [ (tvrNum v,NotAmong [ n | Alt (LitCons n _ _) _ <- as]) | EVar v <- [e',EVar b'] ] $ fmapM f d
-            return $ ECase e' b' as' d'
+            return $ ec { eCaseScrutinee = e', eCaseType = t', eCaseBind = b', eCaseAlts = as', eCaseDefault = d' }
     g (ELam tvr e) = lp f' ELam tvr e
     g (EPi tvr e) = lp f EPi tvr e
     g (ELetRec ds e) = do

@@ -23,7 +23,7 @@ toClassName x = parseName ClassName x
 
 toInstName x = toName Val ("Instance@",'i':x)
 
-unbox' e cn tvr wtd = ECase e (tVr 0 te) [Alt (LitCons cn [tvr] te) wtd] Nothing where
+unbox' e cn tvr wtd = eCase e [Alt (LitCons cn [tvr] te) wtd] Unknown where
     te = getType e
 
 oper_aa op ct e = EPrim (APrim (Operator op [ct] ct) mempty) [e] (rawType ct)

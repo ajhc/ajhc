@@ -25,7 +25,7 @@ import Stats
 primOpt dataTable stats e = do
     runStatIO stats (primOpt' dataTable e)
 
-create_integralCast dataTable e t = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] te) cc] Nothing  where
+create_integralCast dataTable e t = eCase e [Alt (LitCons cna [tvra] te) cc] Unknown  where
     te = getType e
     (vara:varb:_) = freeNames (freeVars (e,t))
     tvra =  tVr vara sta
@@ -36,7 +36,7 @@ create_integralCast dataTable e t = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] 
         eStrictLet  tvrb (EPrim (APrim (CCast ta tb) mempty) [EVar tvra] stb)  (ELit (LitCons cnb [EVar tvrb] t))
 
 unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
-unbox dataTable e vn wtd = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] te) (wtd tvra)] Nothing where
+unbox dataTable e vn wtd = eCase e  [Alt (LitCons cna [tvra] te) (wtd tvra)] Unknown where
     te = getType e
     tvra = tVr vn sta
     Just (cna,sta,ta) = lookupCType' dataTable te

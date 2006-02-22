@@ -258,7 +258,7 @@ methodNames  classHierarchy =  ans where
     cClass classRecord =  [ setProperty prop_METHOD $ tVr (nameToInt $ n) (convertOneVal t) | n :>: t <- classAssumps classRecord ]
 
 unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
-unbox dataTable e vn wtd = ECase e (tVr 0 te) [Alt (LitCons cna [tvra] te) (wtd tvra)] Nothing where
+unbox dataTable e vn wtd = eCase e [Alt (LitCons cna [tvra] te) (wtd tvra)] Unknown where
     te = getType e
     tvra = tVr vn sta
     Just (cna,sta,ta) = lookupCType' dataTable te
@@ -270,7 +270,7 @@ createFunc dataTable ns es ee = foldr ELam eee tvrs where
     tvrs = [ t | (t,_,_) <- xs]
     (me,innerE) = ee tvrs'
     eee = me $ foldr esr innerE xs
-    esr (tvr,n',(cn,st,_)) e = ECase (EVar tvr) (tVr 0 te) [Alt (LitCons cn [tVr n' st] te) e] Nothing  where
+    esr (tvr,n',(cn,st,_)) e = eCase (EVar tvr) [Alt (LitCons cn [tVr n' st] te) e] Unknown  where
         te = getType $ EVar tvr
 
 instance GenName String where

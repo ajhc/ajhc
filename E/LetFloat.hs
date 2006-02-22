@@ -100,7 +100,7 @@ floatInward ::
     -> E  -- ^ output term
 floatInward rules e = f e [] where
     augment fvs = fvs
-    f (ECase e b as d) xs = letRec p' $ ECase (f e pe) b [ Alt l (f e pn) | Alt l e <- as | pn <- ps ] (fmap (flip f pd) d)  where
+    f ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault =  d } xs = letRec p' $ ec { eCaseScrutinee = (f e pe), eCaseAlts = [ Alt l (f e pn) | Alt l e <- as | pn <- ps ], eCaseDefault = (fmap (flip f pd) d)}  where
         (p',_:pe:pd:ps) = sepByDropPoint (mconcat [freeVars l | Alt l _ <- as ]:freeVars e: tvrNum b `Set.delete` freeVars d :[freeVars a | a <- as ]) xs
     f (ELetRec ds e) xs = g (G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- ds ] (tvrNum . fst . fst) (Set.toList . snd) ) xs where
         g [] p' = f e p'
