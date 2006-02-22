@@ -48,11 +48,12 @@ eval term = eval' term []  where
 -- TODO, this should take a set of free variables and α-convert lambdas
 
 unify :: Monad m => E -> E -> m [(E,E)]
-unify e1 e2 = liftM Seq.toList $ execWriterT (un e1 e2 () (0::Int)) where
+unify e1 e2 = liftM Seq.toList $ execWriterT (un e1 e2 () (-2::Int)) where
+    un _ _ _ c | c `seq` False = undefined
     un (EAp a b) (EAp a' b') mm c = do
         un a a' mm c
         un b b' mm c
-    un a@(EVar (TVr { tvrIdent = (i), tvrType =  t}))  b@(EVar (TVr { tvrIdent = ( j), tvrType =  u})) mm c = do
+    un a@(EVar (TVr { tvrIdent = i, tvrType =  t}))  b@(EVar (TVr { tvrIdent = j, tvrType =  u})) mm c | i == j || (i > 0 && j > 0) = do
         un t u mm c
         when (i /= j) $ tell (Seq.single (a,b))
     --un (ELam (TVr Nothing ta) ea) (ELam (TVr Nothing tb) eb) mm c = un ta tb mm c >> un ea eb mm c
@@ -73,7 +74,7 @@ unify e1 e2 = liftM Seq.toList $ execWriterT (un e1 e2 () (0::Int)) where
     --un a b@EVar {} _ _ = tell (Seq.single (a,b))
     un a b _ _ = fail $ "Expressions do not unify: " ++ show a ++ show b
     lam va ea vb eb mm c = do
-        un ea eb mm c
+        un (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb) mm (c - 2)
 
     -- error "cannot handle lambdas yet"
 

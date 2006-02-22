@@ -286,9 +286,10 @@ match :: Monad m =>
     -> E                  -- ^ pattern to match
     -> E                  -- ^ input expression
     -> m [(TVr,E)]
-match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () (0::Int)) where
+match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () (-2::Int)) where
     bvs = Set.fromList (map tvrIdent vs)
 
+    un _ _ _ c | c `seq` False = undefined
     un (EAp a b) (EAp a' b') mm c = do
         un a a' mm c
         un b b' mm c
@@ -304,6 +305,7 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () (0::Int)) w
         un t t' mm c
 
     un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | i == j = un t u mm c
+    un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | i < 0 || j < 0  = fail "Expressions don't match"
     un (EVar tvr@TVr { tvrIdent = i, tvrType = t}) b mm c
         | i `Set.member` bvs = tell (Seq.single (tvr,b))
         | otherwise = fail $ "Expressions do not unify: " ++ show tvr ++ show b
@@ -311,5 +313,5 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () (0::Int)) w
 
     un a b _ _ = fail $ "Expressions do not unify: " ++ show a ++ show b
     lam va ea vb eb mm c = do
-        un ea eb mm c
+        un (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb) mm (c - 2)
 
