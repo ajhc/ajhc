@@ -836,16 +836,8 @@ unzip3           =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
 error s = unsafePerformIO $ do
     putStrLn "error:"
     putStrLn s
-    c_exit 255
-    return undefined
+    exitFailure
 
-
-
-
-
-
---foreign import primitive exit :: Int -> World__ -> IOResult ()
-foreign import ccall "exit" c_exit :: Int -> IO ()
 
 {-# INLINE seq #-}
 

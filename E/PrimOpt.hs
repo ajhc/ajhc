@@ -56,6 +56,7 @@ primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
         primopt (Operator "==" [ta,tb] tr) [e,(ELit (LitInt x t))] rt | Map.lookup t rawMap /= Just typ_float = return $ eCase e [Alt (LitInt x t) (ELit (LitInt 1 intt)) ] (ELit (LitInt 0 intt))
         primopt (Operator "==" [ta,tb] tr) [(ELit (LitInt x t)),e] rt | Map.lookup t rawMap /= Just typ_float = return $ eCase e [Alt (LitInt x t) (ELit (LitInt 1 intt)) ] (ELit (LitInt 0 intt))
         primopt (Operator "-" [ta] tr) [ELit (LitInt x t)] rt | ta == tr && rt == t = return $ ELit (LitInt (negate x) t)
+        primopt (PrimPrim "exitFailure__") [w] rt  = return $ EError "" rt
         primopt (PrimPrim "newRef__") [x,y] rt  = return $ EAp (EAp (ELam x' $ ELam y' $ eCaseTup' (EPrim (primPrim "newRef_") [EVar x',EVar y'] (ltTuple' [a,b])) [a',b'] (eTuple [EVar a',EVar b']) ) x) y where
             [x',y',a',b'] = vars [getType x,getType y,a,b]
             ELit (LitCons _ [a,b] (ESort EStar)) = rt

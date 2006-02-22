@@ -7,6 +7,7 @@ import Foreign.C.String
 import Foreign.Ptr
 import Foreign.Storable
 import Foreign.C.Types
+import Jhc.IO(exitFailure)
 
 data ExitCode = ExitSuccess | ExitFailure Int
             deriving (Eq, Ord, Read, Show)
@@ -25,7 +26,6 @@ exitWith ExitSuccess = do
 exitWith (ExitFailure n) = do
     c_exit n
     return undefined
-exitFailure = exitWith $ ExitFailure 255
 
 
 

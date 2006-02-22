@@ -9,6 +9,8 @@ module Jhc.IO(
     ioError,
     runExpr,
     runMain,
+    exitFailure,
+    strictReturn,
     undefinedIOErrorCont,
     unsafeInterleaveIO,
     unsafePerformIO
@@ -34,8 +36,7 @@ undefinedIOErrorCont = error "Jhc.IO.undefinedIOErrorCont"
 showError :: IOError -> IO b
 showError (IOError z) = do
     putStrLn z
-    c_exit 255
-    return undefined
+    exitFailure
 
 errorContinuation :: IO a -> IO a
 errorContinuation x = catch x showError
@@ -83,6 +84,7 @@ ioError e   =  do
     jumpJumpPoint__ jp
 
 
+
 catch ::  IO a -> (IOError -> IO a) -> IO a
 catch (IO x) fn = do
     hole <- newHole
@@ -96,15 +98,31 @@ foreign import primitive newWorld__ :: a -> World__
 -- throws away first argument. but causes second argument to artificially depend on it.
 foreign import primitive drop__ :: forall a b. a -> b -> b
 
+-- throws away first argument. but causes second argument to artificially depend on it.
+foreign import primitive worldDep__ :: forall b. World__ -> b -> b
+
+-- | this will return a value making it artificially depend on the state of the world. any uses of this value are guarenteed not to float before this point in the IO monad.
+strictReturn :: a -> IO a
+strictReturn a = IO $ \_ w -> JustIO w (worldDep__ w a)
 
 {-# INLINE runMain, runExpr #-}
+-- | this is wrapped around 'main' when compiling programs. it catches any exceptions and prints them to the screen and dies appropriatly.
 runMain :: IO a -> IO ()
 runMain main = do
-    catch main  (\e -> do
-        putStr "\nError..\n"
+    catch main $ \e -> do
+        putStrLn "\nUncaught Exception:"
         putStrLn $ showIOError e
-        return (error "runMain"))
+        exitFailure
     return ()
 
+-- | this is wrapped around arbitrary showable expressions when used as the main entry point
 runExpr :: Show a => a -> IO ()
 runExpr x = runMain (print x)
+
+exitFailure :: IO a
+exitFailure = IO $ \_ w -> exitFailure__ w
+
+foreign import primitive exitFailure__ :: World__ -> IOResult a
+
+
+

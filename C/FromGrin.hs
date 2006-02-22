@@ -79,7 +79,9 @@ convertExp (Error s t) = do
         f TyTag  = return $ constant (enum $ nodeTagName tagHole)
         f x = return $ err $ "error-type " ++ show x
     ev <- f t
-    return (expr $ functionCall (name "jhc_error") [string s],ev)
+    if null s
+      then return (expr $ functionCall (name "jhc_exit") [constant $ number 255],ev)
+       else return (expr $ functionCall (name "jhc_error") [string s],ev)
 convertExp (App a vs _) = do
     vs' <- mapM convertVal vs
     return $ (mempty, functionCall (toName (toString a)) vs')

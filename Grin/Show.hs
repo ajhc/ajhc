@@ -58,6 +58,7 @@ prettyExp vl (e1 :>>= v :-> e2) = align (prettyExp (pVar v) e1 <$> prettyExp vl 
 prettyExp vl (Return v) = vl <> keyword "return" <+> prettyVal v
 prettyExp vl (Store v) = vl <> keyword "store" <+> prettyVal v
 prettyExp vl (Fetch v) = vl <> keyword "fetch" <+> prettyVal v
+prettyExp vl (Error "" _) = vl <> prim "exitFailure"
 prettyExp vl (Error s _) = vl <> keyword "error" <+> tshow s
 prettyExp vl (App t [v] _) | t == funcEval = vl <> keyword "eval" <+> prettyVal v
 prettyExp vl (App t [a,b] _) | t == funcApply = vl <> keyword "apply" <+> prettyVal a <+> prettyVal b
