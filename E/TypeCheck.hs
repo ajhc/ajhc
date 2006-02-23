@@ -127,17 +127,17 @@ inferType dataTable ds e = rfc e where
         ps <- mapM (strong' . getType) $ casePats ec
         eqAll (et:ps)
         return dt
-    fc ec@ECase {eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = Just d} | sortTypeLike e  = do   -- TODO - we should substitute the tested for value into the default type.
+    fc ec@ECase {eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseType = dt } | sortTypeLike e  = do   -- TODO - we should substitute the tested for value into the default type.
         et <- rfc e
         eq et (getType b)
-        dt <- rfc d
+        --dt <- rfc d
         --bs <- mapM rfc (caseBodies ec)  -- these should be specializations of dt
         mapM_ (calt e) as
         --eqAll bs
         verifyPats (casePats ec)
         ps <- mapM (strong' . getType) $ casePats ec
         eqAll (et:ps)
-        return dt
+        strong' dt
     fc ec@ECase { eCaseScrutinee =e, eCaseBind = b } = do
         et <- rfc e
         eq et (getType b)

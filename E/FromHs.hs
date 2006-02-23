@@ -233,17 +233,18 @@ createMethods dataTable classHierarchy funcs = return ans where
     method classRecord methodName = (methodName ,setProperty prop_METHOD (tVr ( nameToInt methodName) ty),v) where
         theDefault = findName (defaultInstanceName methodName)
         Identity (TVr {tvrType = ty},_) = findName methodName
-        (EPi tvr t) = ty
-        els = EError ("Bad: " ++ show methodName) t
-        v = eLam tvr (eCase (EVar tvr) as els)
+        (EPi tvr finalType) = ty
+        --els = EError ("Bad: " ++ show methodName) t
+        v = eLam tvr emptyCase { eCaseScrutinee = EVar tvr, eCaseAlts = as, eCaseBind = tvr { tvrIdent = 0 }, eCaseType = finalType }
         as = concatMap cinst [ t | (_ :=> IsIn _ t ) <- classInsts classRecord]
         cinst t | Nothing <- getConstructor x dataTable = fail "skip un-imported primitives"
                 | Just (tvr,_) <- findName name = return $ calt (foldl EAp (EVar tvr) vs)
                 | Just (deftvr,defe) <- theDefault = return $ calt $ ELetRec [(tvr,tipe t)] (EAp (EVar deftvr) (EVar tvr))
-                | otherwise  = return $ calt $  EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) (getType els)
+                | otherwise  = return $ calt $  EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) errType
             where
             name = (instanceName methodName (getTypeCons t))
             calt e =  Alt (LitCons x [ case e of EVar tvr -> tvr; _ -> error $ "createMethods: "++ show e | e <- vs ]  ct)  e
+            errType = subst tvr (tipe t) finalType
             (x,vs,ct) = case tipe t of
                 (ELit (LitCons x' vs' ct')) -> (x',vs',ct')
                 (EPi (TVr { tvrType = a}) b) -> (tc_Arrow,[a,b],eStar)
