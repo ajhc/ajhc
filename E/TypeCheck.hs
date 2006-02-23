@@ -32,10 +32,7 @@ typ (EAp (EPi tvr a) b) = getType (subst tvr b a)
 typ (EAp a b) = eAp (typ a) b
 typ (ELam (TVr { tvrIdent = x, tvrType =  a}) b) = EPi (tVr x a) (typ b)
 typ (ELetRec _ e) = typ e
-typ ECase {eCaseScrutinee = e, eCaseDefault = Just d} | sortTypeLike e = typ d
-typ ECase {eCaseAlts = (x:_)} = getType x
-typ ECase {eCaseDefault = Just e} = typ e
-typ ECase {eCaseAlts = [], eCaseDefault =  Nothing} = error "empty case"
+typ ECase {eCaseType = ty} = ty
 typ (EError _ e) = e
 typ (EPrim _ _ t) = t
 typ Unknown = Unknown
@@ -252,25 +249,14 @@ typeInfer'' dataTable ds e = rfc e where
     fc (EAp a b) = do
         a' <- rfc a
         strong' (eAp (followAliases dataTable a') b)
-        {-
-        case followAliases dataTable a' of
-            (EPi tvr@(TVr { tvrType = t}) v) -> do
-                --withContextDoc (hsep [text "Application: ", parens $ prettyE a <> text "::" <> prettyE a', parens $ prettyE b]) $ fceq ds b t
-                b' <- if sortStarLike t then strong' b else return b
-                return (subst tvr b' v)
-            x -> fail $ "App: " ++ render (tupled [ePretty x,ePretty a, ePretty a',ePretty b])
-            -}
     fc (ELetRec vs e) = do
         let nds = vs ++ ds
         et <- inferType' nds e
         strong nds et
     fc (EError _ e) = strong' e
     fc (EPrim _ ts t) = strong' t
-    fc ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = Just d} | sortTypeLike e  = do   -- TODO - we should substitute the tested for value into the default type.
-        dt <- rfc' [ d | d@(v,_) <- ds, tvrNum b /= tvrNum v ] d
-        return dt
-    fc ec@ECase { eCaseScrutinee = e, eCaseBind = b } = do
-        rfc (head $ caseBodies ec)
+    fc ECase { eCaseType = ty } = do
+        strong' ty
     fc e = failDoc $ text "what's this? " </> (prettyE e)
 
 
