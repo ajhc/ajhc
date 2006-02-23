@@ -1,13 +1,9 @@
 module E.FromHs(
-    altConv,
     convertDecls,
     convertRules,
     createInstanceRules,
     createMethods,
-    getMainFunction,
-    guardConv,
-    matchesConv,
-    theMainName
+    getMainFunction
     ) where
 
 import Char
@@ -163,12 +159,7 @@ matchesConv ms = map v ms where
     v (HsMatch _ _ ps rhs wh) = (map simplifyHsPat ps,rhs,wh)
 
 altConv as = map v as where
-    v (HsAlt _ p rhs wh) = ([simplifyHsPat p],guardConv rhs,wh)
-
-guardConv x = x
-
---guardConv (HsUnGuardedAlt e) = HsUnGuardedRhs e
---guardConv (HsGuardedAlts gs) = HsGuardedRhss (map (\(HsGuardedAlt s e1 e2) -> HsGuardedRhs s e1 e2) gs)
+    v (HsAlt _ p rhs wh) = ([simplifyHsPat p],rhs,wh)
 
 argTypes e = span ((== eBox) . getType) (map tvrType xs) where
     (_,xs) = fromPi e
@@ -239,7 +230,7 @@ createMethods dataTable classHierarchy funcs = return ans where
         as = concatMap cinst [ t | (_ :=> IsIn _ t ) <- classInsts classRecord]
         cinst t | Nothing <- getConstructor x dataTable = fail "skip un-imported primitives"
                 | Just (tvr,_) <- findName name = return $ calt (foldl EAp (EVar tvr) vs)
-                | Just (deftvr,defe) <- theDefault = return $ calt $ ELetRec [(tvr,tipe t)] (EAp (EVar deftvr) (EVar tvr))
+                | Just (deftvr,defe) <- theDefault = return $ calt $ eLet tvr (tipe t) (EAp (EVar deftvr) (EVar tvr))
                 | otherwise  = return $ calt $  EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) errType
             where
             name = (instanceName methodName (getTypeCons t))
