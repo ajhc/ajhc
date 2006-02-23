@@ -37,7 +37,7 @@ pruneVMap (VMap map set) = VMap map' set where
 
 instance (Ord n,Show n) => Show (VMap n) where
     showsPrec _ (VMap n s) = braces (hcat (intersperse (char ',') $ (map f $ snub $ fsts  (Map.keys n) ++ Set.toList s) )) where
-        f a = (if a `Set.member` s then tshow a else char '#' <> tshow a) <> tshow (g a)
+        f a = (if a `Set.member` s then tshow a else char '#' <> tshow a) <> (if null (g a) then empty else tshow (g a))
         g a = sortUnder fst [ (i,v) | ((a',i),v) <- Map.toList n, a' == a ]
 
 instance Ord n => Fixable (VMap n) where

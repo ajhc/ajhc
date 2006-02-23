@@ -206,6 +206,18 @@ processDecls stats ho ho' tiData = do
     prog <- return $ prog { progEntryPoints = entries }
     prog <- return $ programPruneUnreachable prog
 
+    wdump FD.Lambdacube $ printProgram prog
+
+    if (fopts  FO.TypeAnalysis) then do
+            prog <- typeAnalyze prog
+            putStrLn "-- Type analyzed methods"
+            flip mapM_  (programDs prog) $ \ (t,e) -> case fromLam e of
+                (_,ts@(ft:_)) | sortStarLike (getType ft) -> putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts, sortStarLike (getType t) ]
+                _ -> return ()
+            prog <- programMapBodies pruneE prog
+            return $ programPruneUnreachable prog
+        else return prog
+
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
         let names = [ n | (n,_,_) <- ns]
@@ -355,6 +367,8 @@ compileModEnv' stats ho = do
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
     (_,main,mainv) <- getMainFunction dataTable mainFunc (programEsMap prog)
     prog <- return prog { progMainEntry = main, progEntryPoints = [main], progCombinators = (main,[],mainv):progCombinators prog }
+    return $ programPruneUnreachable prog
+
 
     cmethods <- do
         es' <- createMethods dataTable (hoClassHierarchy ho) (programEsMap prog)
@@ -367,6 +381,7 @@ compileModEnv' stats ho = do
         return [ (y,z) | (_,y,z) <- es' ]
 
     prog <- return $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
+    prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) (\_ nfo -> return nfo) (\_ nfo -> return nfo) prog
     prog <- return $ programPruneUnreachable prog
 
     let mangle = mangle'  (Just mempty)

@@ -1,7 +1,7 @@
 -- | examine all uses of types in a program to determine which ones are
 -- actually needed in the method generation
 
-module E.TypeAnalysis(typeAnalyze, pruneE) where
+module E.TypeAnalysis(typeAnalyze, Typ(), pruneE) where
 
 import Control.Monad.Reader
 import Control.Monad.Identity
@@ -18,6 +18,7 @@ import E.TypeCheck
 import Fixer.Fixer
 import Fixer.VMap
 import GenUtil
+import Info.Types
 import Name.Name
 import Name.Names
 import qualified Info.Info as Info
@@ -40,18 +41,28 @@ typeAnalyze prog = do
     let lambind _ nfo = do
             x <- newValue fixer ( bottom :: Typ)
             return $ Info.insert x nfo
-        lamread _ nfo = do
-            rv <- readValue (runIdentity $ Info.lookup nfo)
+        lamread _ nfo | Just v <- Info.lookup nfo = do
+            rv <- readValue v
             return (Info.insert (rv :: Typ) $ Info.delete (undefined :: Value Typ) nfo)
+        lamread _ nfo = return nfo
         lamdel _ nfo = return (Info.delete (undefined :: Value Typ) nfo)
     prog <- annotateProgram mempty lambind (\_ -> return) (\_ -> return) prog
     let ds = programDs prog
-    calcDs (usedVals,extractValMap ds) ds
-    mapM_ (calcE (usedVals,extractValMap ds) . EVar ) (progEntryPoints prog)
+        env = (usedVals,extractValMap ds)
+        entries = progEntryPoints prog ++ [ t | (t,_) <- ds, getProperty prop_INSTANCE t]
+    calcDs env ds
+    mapM_ (calcE env . EVar ) entries
+    mapM_ (sillyEntry env) entries
     calcFixpoint "type analysis" fixer
     prog <- annotateProgram mempty (\_ -> return) (\_ -> return) lamread prog
     prog <- annotateProgram mempty lamdel (\_ -> return) (\_ -> return) prog
     return prog
+
+sillyEntry :: Env -> TVr -> IO ()
+sillyEntry env t = mapM_ (addRule . (`isSuperSetOf` value (vmapSingleton v_silly))) args where
+    args = lookupArgs t env
+
+lookupArgs t (_,tm) = maybe [] id (Map.lookup (tvrIdent t) tm)
 
 calcDs ::  Env -> [(TVr,E)] -> IO ()
 calcDs env@(usedVals,_) ds = do
@@ -71,6 +82,13 @@ calcDs env@(usedVals,_) ds = do
         xs' <- mapM getValue xs
         flip mapM_ (zip xs' [0.. ])  $ \ (v,i) -> do
             addRule $ modifiedSuperSetOf t' v (vmapArgSingleton n i)
+    d (t, EPi TVr { tvrType = a} b) = do
+        let Just t' = Info.lookup (tvrInfo t)
+            v = vmapSingleton tc_Arrow
+        addRule $ t' `isSuperSetOf` (value v)
+        xs' <- mapM getValue [a,b]
+        flip mapM_ (zip xs' [0.. ])  $ \ (v,i) -> do
+            addRule $ modifiedSuperSetOf t' v (vmapArgSingleton tc_Arrow i)
     d (t,e) | (EVar v,as) <- fromAp e = do
         let Just t' = Info.lookup (tvrInfo t)
             Just v' = Info.lookup (tvrInfo v)
@@ -107,6 +125,7 @@ calcE _ ESort {} = return ()
 calcE _ Unknown = return ()
 calcE env e | (EVar v,as@(_:_)) <- fromAp e, Just ts <- Map.lookup (tvrIdent v) (snd env) = do
     tagE env e
+    when (length as < length ts) $ fail "calcE: unsaturated call to function"
     flip mapM_ (zip as ts) $ \ (a,t) -> do
         when (sortStarLike (getType a)) $ do
             a' <- getValue a

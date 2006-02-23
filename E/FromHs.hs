@@ -179,7 +179,7 @@ getMainFunction dataTable name ds = ans where
                 Just x ->  EAp (EAp (EVar runMain)  x ) maine
                 Nothing ->  EAp (EAp (EVar runExpr) ty) maine
             be = (eAp e (EVar errorCont))
-            theMain = (theMainName,theMainTvr,be)
+            theMain = (theMainName,setProperty prop_EXPORTED theMainTvr,be)
             theMainTvr =  tVr (nameToInt theMainName) (infertype dataTable be)
             tvm@(TVr { tvrType =  ty}) =  main
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs ]
