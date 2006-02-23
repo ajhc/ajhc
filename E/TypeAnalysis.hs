@@ -44,13 +44,14 @@ typeAnalyze prog = do
             rv <- readValue (runIdentity $ Info.lookup nfo)
             return (Info.insert (rv :: Typ) $ Info.delete (undefined :: Value Typ) nfo)
         lamdel _ nfo = return (Info.delete (undefined :: Value Typ) nfo)
-    ds <- annotateDs mempty lambind (\_ -> return) (\_ -> return) (programDs prog)
+    prog <- annotateProgram mempty lambind (\_ -> return) (\_ -> return) prog
+    let ds = programDs prog
     calcDs (usedVals,extractValMap ds) ds
     mapM_ (calcE (usedVals,extractValMap ds) . EVar ) (progEntryPoints prog)
     calcFixpoint "type analysis" fixer
-    ds <- annotateDs mempty (\_ -> return) (\_ -> return) lamread ds
-    ds <- annotateDs mempty lamdel (\_ -> return) (\_ -> return) ds
-    return $ programSetDs ds prog
+    prog <- annotateProgram mempty (\_ -> return) (\_ -> return) lamread prog
+    prog <- annotateProgram mempty lamdel (\_ -> return) (\_ -> return) prog
+    return prog
 
 calcDs ::  Env -> [(TVr,E)] -> IO ()
 calcDs env@(usedVals,_) ds = do

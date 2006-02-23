@@ -41,7 +41,14 @@ programDs :: Program -> [(TVr,E)]
 programDs prog = [ (t,foldr ELam e as)  | (t,as,e) <- progCombinators prog]
 
 programSetDs :: [(TVr,E)] -> Program -> Program
-programSetDs ds prog = prog { progCombinators = [ (t,as,body) | (t,e) <- ds, let (body,as) = fromLam e ] }
+programSetDs ds prog = prog {
+    progMainEntry = f (progMainEntry prog),
+    progEntryPoints = map f (progEntryPoints prog),
+    progCombinators = [ (t,as,body) | (t,e) <- ds, let (body,as) = fromLam e ]
+    } where
+    f tvr | Just n <- Map.lookup (tvrIdent tvr) mp = n
+          | otherwise = tvr
+    mp = Map.fromList [ (tvrIdent t,t) | (t,_) <- ds ]
 
 programAddDs :: [(TVr,E)] -> Program -> Program
 programAddDs ds prog = prog { progCombinators = [ (t,as,body) | (t,e) <- ds, let (body,as) = fromLam e ] ++ progCombinators prog }
