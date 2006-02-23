@@ -41,6 +41,9 @@ instance DocLike d => PPrint d TVr where
 instance PPrint Doc E where
     pprint x = ePretty x
 
+instance PPrint String E where
+    pprint x = prettyE x
+
 
 newtype SEM a = SEM { unSEM :: VarNameT E Id String Identity a }
     deriving(Monad,Functor)

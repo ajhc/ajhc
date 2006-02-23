@@ -207,7 +207,7 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
         as = [ rule  t | (_ :=> IsIn _ t ) <- snub (classInsts classRecord) ]
         rule t = emptyRule { ruleHead = methodVar, ruleArgs = [valToPat' (tipe t)], ruleBinds = [ t | ~(EVar t) <- vs], ruleBody = body, ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
             name = ((instanceName methodName (getTypeCons t)))
-            ELit (LitCons _ vs _) = valToPat' (tipe t)
+            ELit LitCons { litArgs =  vs } = valToPat' (tipe t)
             body = case findName name of
                 Just (n,_) -> foldl EAp (EVar n) vs
                 Nothing -> case findName defaultName of

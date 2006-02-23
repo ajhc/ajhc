@@ -28,6 +28,9 @@ typ (ESort EBox) = error "Box inhabits nowhere."
 typ (ELit l) = getType l
 typ (EVar v) =  getType v
 typ (EPi _ b) = typ b
+typ (EAp (ELit LitCons { litType = EPi tvr a }) b) = getType (subst tvr b a)
+typ e@(EAp (ELit LitCons { litType = ty }) b) | ty == eStar = eStar -- XXX functions might have unboxed return types in the future
+typ e@(EAp (ELit LitCons {}) b) = error $ "getType: application of type alias " ++ (render $ ePretty e)
 typ (EAp (EPi tvr a) b) = getType (subst tvr b a)
 typ (EAp a b) = eAp (typ a) b
 typ (ELam (TVr { tvrIdent = x, tvrType =  a}) b) = EPi (tVr x a) (typ b)
@@ -43,8 +46,7 @@ instance CanType E E where
 instance CanType TVr E where
     getType = tvrType
 instance CanType (Lit x t) t where
-    getType (LitInt _ t) = t
-    getType (LitCons _ _ t) = t
+    getType l = litType l
 instance CanType e t => CanType (Alt e) t where
     getType (Alt _ e) = getType e
 
@@ -59,8 +61,8 @@ simplifyAp :: Monad m => DataTable -> E -> E -> m E
 simplifyAp dataTable (EAp a b) c = do
     na <- simplifyAp dataTable a b
     simplifyAp dataTable na c
-simplifyAp _ (ELit (LitCons n xs (EPi tvr r))) b = do
-        return (ELit (LitCons n (xs ++ [b]) (subst tvr b r)))
+simplifyAp _ (ELit lc@LitCons { litArgs = xs, litType = EPi tvr r }) b = do
+        return (ELit lc { litArgs = (xs ++ [b]), litType = subst tvr b r })
 simplifyAp dataTable a@ELit {} b = case followAliases dataTable a  of
         ELit {} -> fail $ "simplifyAp: " ++ render (tupled [ePretty a, ePretty b])
         (EPi tvr e) -> do
@@ -80,7 +82,7 @@ inferType dataTable ds e = rfc e where
     rfc' nds e = withContextDoc (text "fullCheck:" </> prettyE e) (inferType' nds (followAliases dataTable e) >>=  strong')
     strong' e = withContextDoc (text "Strong:" </> prettyE e) $ strong ds (followAliases dataTable e)
     fc s@(ESort _) = return $ typ s
-    fc (ELit (LitCons _ es t)) = valid t >> mapM_ valid es >> (strong' t)
+    fc (ELit LitCons { litArgs = es, litType =  t}) = valid t >> mapM_ valid es >> (strong' t)
     fc e@(ELit _) = let t = typ e in valid t >> return t
     fc (EVar (TVr { tvrIdent = 0 })) = fail "variable with nothing!"
     fc (EVar (TVr { tvrType =  t})) = valid t >> strong' t
@@ -156,7 +158,7 @@ inferType dataTable ds e = rfc e where
         mapM_ verifyPats' xs
         when (hasRepeatUnder litHead xs) $ fail "Duplicate case alternatives"
 
-    verifyPats' (LitCons _ xs _) = when (hasRepeatUnder id (filter (/= 0) $ map tvrNum xs)) $ fail "Case pattern is non-linear"
+    verifyPats' LitCons { litArgs = xs } = when (hasRepeatUnder id (filter (/= 0) $ map tvrNum xs)) $ fail "Case pattern is non-linear"
     verifyPats' _ = return ()
 
     eqAll ts = withContextDoc (text "eqAll" </> list (map prettyE ts)) $ foldl1M_ eq ts
@@ -234,7 +236,7 @@ typeInfer'' dataTable ds e = rfc e where
     rfc' nds e =  withContextDoc (text "fullCheck':" </> prettyE e) (inferType' nds  (followAliases dataTable e) >>=  strong')
     strong' e = withContextDoc (text "Strong':" </> prettyE e) $ strong ds (followAliases dataTable e)
     fc s@ESort {} = return $ getType s
-    fc (ELit (LitCons _ es t)) = strong' t
+    fc (ELit LitCons { litType = t }) = strong' t
     fc e@ELit {} = strong' (getType e)
     fc (EVar TVr { tvrIdent = 0 }) = fail "variable with nothing!"
     fc (EVar TVr { tvrType =  t}) =  strong' t
@@ -284,7 +286,7 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () (-2::Int)) 
         un t t' mm c
     un (ESort x) (ESort y) mm c | x == y = return ()
     un (ELit (LitInt x t1))  (ELit (LitInt y t2)) mm c | x == y = un t1 t2 mm c
-    un (ELit (LitCons n xs t))  (ELit (LitCons n' ys t')) mm c | n == n' && length xs == length ys = do
+    un (ELit LitCons { litName = n, litArgs = xs, litType = t })  (ELit LitCons { litName = n', litArgs = ys, litType =  t'}) mm c | n == n' && length xs == length ys = do
         sequence_ [ un x y mm c | x <- xs | y <- ys]
         un t t' mm c
 

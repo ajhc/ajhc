@@ -28,7 +28,7 @@ import qualified Info.Info as Info
 
 type Id = Int
 
-data Lit e t = LitInt Number t |  LitCons Name [e] t
+data Lit e t = LitInt { litNumber :: Number, litType :: t } |  LitCons { litName :: Name, litArgs :: [e], litType :: t }
     deriving(Data,Eq,Ord,Typeable)
         {-!derive: is, GhcBinary !-}
 
