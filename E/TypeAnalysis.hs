@@ -25,7 +25,7 @@ import qualified Info.Info as Info
 import Support.CanType
 
 
-type Typ = VMap Name
+type Typ = VMap () Name
 type Env = (Value (Set.Set TVr),Map.Map Id [Value Typ])
 
 extractValMap :: [(TVr,E)] -> Map.Map Id [Value Typ]
@@ -59,7 +59,7 @@ typeAnalyze prog = do
     return prog
 
 sillyEntry :: Env -> TVr -> IO ()
-sillyEntry env t = mapM_ (addRule . (`isSuperSetOf` value (vmapSingleton v_silly))) args where
+sillyEntry env t = mapM_ (addRule . (`isSuperSetOf` value (vmapPlaceholder ()))) args where
     args = lookupArgs t env
 
 lookupArgs t (_,tm) = maybe [] id (Map.lookup (tvrIdent t) tm)
@@ -93,13 +93,14 @@ calcDs env@(usedVals,_) ds = do
         let Just t' = Info.lookup (tvrInfo t)
             Just v' = Info.lookup (tvrInfo v)
         as' <- mapM getValue as
-        addRule $ dynamicRule v' $ \ v -> mconcat $ flip map (vmapHeads v) $ \ h ->
-            mconcat $ t' `isSuperSetOf` value (vmapSingleton h) : (flip map (zip as' [0.. ])  $ \ (a,i) -> modifiedSuperSetOf t' a $ \ v -> vmapArgSingleton h i v)
+        addRule $ dynamicRule v' $ \ v -> mconcat $ (t' `isSuperSetOf` value (vmapDropArgs v)):case vmapHeads v of
+                Just vs -> concat $ flip map vs $ \h -> (flip map (zip as' [0.. ])  $ \ (a,i) -> modifiedSuperSetOf t' a $ \ v -> vmapArgSingleton h i v)
+                Nothing -> flip map (zip as' [0.. ])  $ \ (_,i) -> isSuperSetOf t' (value $ vmapProxyIndirect i v)
     d (t,e) = fail $ "calcDs: " ++ show (t,e)
 
 -- TODO - make default case conditional
 calcAlt env v (Alt (LitCons n xs _) e) = do
-    addRule $ conditionalRule (\ (VMap _ vs) -> n `Set.member` vs) v $ ioToRule $ do
+    addRule $ conditionalRule (n `vmapMember`) v $ ioToRule $ do
         calcE env e
         flip mapM_ (zip [0..] xs) $ \ (i,t) -> do
             let Just t' = Info.lookup (tvrInfo t)
@@ -158,19 +159,20 @@ typConstant e = fail $ "typConstant: " ++ show e
 
 pruneE :: E -> IO E
 pruneE e = return $ runIdentity (prune e)  where
-    prune ec@ECase { eCaseScrutinee = EVar v } | sortStarLike (getType v), Just (VMap _ ns) <- Info.lookup (tvrInfo v) = do
-        ec' <- pruneCase ec ns
+    prune ec@ECase { eCaseScrutinee = EVar v } | sortStarLike (getType v), Just vm <- Info.lookup (tvrInfo v) = do
+        ec' <- pruneCase ec vm
         emapE' prune ec'
     prune e = emapE' prune e
 
-pruneCase :: Monad m => E -> Set.Set Name -> m E
+pruneCase :: (Monad m) => E -> VMap () Name -> m E
 pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
     err = EError "pruneCase: all alternatives pruned" (getType ec)
     nec = ec { eCaseAlts = f [] $ eCaseAlts ec, eCaseDefault = cd (eCaseDefault ec)}
     f xs [] = reverse xs
-    f xs (alt@(Alt (LitCons n _ _) _):rs) | not (n `Set.member` ns) = f xs rs
+    f xs (alt@(Alt (LitCons n _ _) _):rs) | not (n `vmapMember` ns) = f xs rs
     f xs (alt:rs) = f (alt:xs) rs
-    cd (Just d) | or [ n `notElem` as | n <- Set.toList ns ] = Just d
+    cd (Just d) | Just nns <- vmapHeads ns, or [ n `notElem` as | n <- nns ] = Just d
+                | Nothing <- vmapHeads ns = Just d
     cd Nothing = Nothing
     -- The reason we do this is because for a typecase, we need a valid default in order to get the most general type
     cd (Just d) = Just $ EError "pruneCase: default pruned" (getType d)
