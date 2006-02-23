@@ -1,52 +1,84 @@
-module Fixer.VMap where
+module Fixer.VMap(
+    VMap(),
+    Proxy(..),
+    vmapSingleton,
+    vmapArgSingleton,
+    vmapArg,
+    vmapValue,
+    vmapMember,
+    vmapProxyIndirect,
+    vmapPlaceholder,
+    vmapDropArgs,
+    vmapHeads
+    )where
+
+import Data.Monoid
+import Data.Typeable
+import List(intersperse)
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Doc.DocLike
 import Fixer.Fixer
-import qualified Data.Set as Set
-import qualified Data.Map as Map
-import Data.Typeable
-import Data.Monoid
 import GenUtil
-import List(intersperse)
 
 
 -- VMap general data type for finding the fixpoint of a general tree-like structure.
 
-data VMap n = VMap {
-    vmapArgs :: (Map.Map (n,Int) (VMap n)),
-    vmapNodes :: (Set.Set n)
+data VMap p n = VMap {
+    vmapArgs    :: Map.Map (n,Int) (VMap p n),
+    vmapNodes   :: Set.Set (Either (Proxy p) n)
     }
     deriving(Typeable)
 
-emptyVMap :: Ord a => VMap a
+-- A placeholder is either a placeholder, or an indirection of a placeholder.
+data Proxy p = Proxy p | ProxyArg (Proxy p) Int
+    deriving(Eq,Ord,Typeable)
+
+instance Show p => Show (Proxy p) where
+    showsPrec n (Proxy p) = showsPrec n p
+    showsPrec n (ProxyArg p i) = showsPrec n p .  (('-':show i) ++)
+
+emptyVMap :: (Ord a,Ord b) => VMap a b
 emptyVMap = VMap { vmapArgs = mempty, vmapNodes = mempty }
 
-vmapSingleton n = emptyVMap { vmapNodes = (Set.singleton n) }
+vmapSingleton n = emptyVMap { vmapNodes = Set.singleton (Right n) }
 
 vmapArgSingleton n i v
     | isBottom v = emptyVMap
-    | otherwise = emptyVMap { vmapArgs = (Map.singleton (n,i) v) }
+    | otherwise = emptyVMap { vmapArgs = Map.singleton (n,i) v }
 
-vmapArg n i VMap { vmapArgs =  map } = case Map.lookup (n,i) map of
-    Just x -> x
-    Nothing -> bottom
+vmapArg n i vm@VMap { vmapArgs =  map } = case Map.lookup (n,i) map of
+    Just x -> x `lub` vmapProxyIndirect i vm
+    Nothing -> vmapProxyIndirect i vm
 
-vmapValue :: Ord n => n -> [VMap n] -> VMap n
-vmapValue n xs = pruneVMap VMap { vmapArgs = Map.fromAscList (zip (zip (repeat n) [0..]) xs), vmapNodes = Set.singleton n }
+vmapProxyIndirect :: (Ord n,Ord p) => Int -> VMap p n -> VMap p n
+vmapProxyIndirect i vm = emptyVMap {  vmapNodes = Set.fromList [  Left (ProxyArg p i) | Left p <- Set.toList $ vmapNodes vm] }
 
-vmapHeads VMap { vmapNodes = set } = Set.toList set
-vmapJustHeads VMap { vmapNodes = set } = emptyVMap { vmapNodes = set }
+vmapValue :: (Ord p,Ord n) => n -> [VMap p n] -> VMap p n
+vmapValue n xs = pruneVMap VMap { vmapArgs = Map.fromAscList (zip (zip (repeat n) [0..]) xs), vmapNodes = Set.singleton (Right n) }
+
+vmapPlaceholder :: (Ord p,Ord n) => p  -> VMap p n
+vmapPlaceholder p = emptyVMap { vmapNodes = Set.singleton $ Left (Proxy p) }
+
+vmapDropArgs vm = vm { vmapArgs = mempty }
+
+vmapHeads VMap { vmapNodes = set }
+    | any isLeft (Set.toList set) = fail "vmapHeads: VMap has a placeholder"
+    | otherwise = return $ rights $ Set.toList set
+vmapMember n VMap { vmapNodes = set } = Right n `Set.member` set || any isLeft (Set.toList set)
+
 
 pruneVMap VMap { vmapArgs = map, vmapNodes =  set} = VMap {vmapArgs = map', vmapNodes = set} where
     map' = Map.filter f map
     f vs = not $ isBottom vs
 
-instance (Ord n,Show n) => Show (VMap n) where
-    showsPrec _ (VMap n s) = braces (hcat (intersperse (char ',') $ (map f $ snub $ fsts  (Map.keys n) ++ Set.toList s) )) where
+instance (Ord p,Ord n,Show p,Show n) => Show (VMap p n) where
+    showsPrec _ VMap { vmapArgs = n, vmapNodes = s } = braces (hcat (intersperse (char ',') $ (map f $ snub $ (map Right $ fsts $ Map.keys n) ++ Set.toList s) )) where
         f a = (if a `Set.member` s then tshow a else char '#' <> tshow a) <> (if null (g a) then empty else tshow (g a))
-        g a = sortUnder fst [ (i,v) | ((a',i),v) <- Map.toList n, a' == a ]
+        g a = sortUnder fst [ (i,v) | ((a',i),v) <- Map.toList n, Right a' == a ]
 
-instance Ord n => Fixable (VMap n) where
+instance (Ord p,Ord n) => Fixable (VMap p n) where
     bottom = emptyVMap
     isBottom VMap { vmapArgs = m, vmapNodes = s } = Map.null m && Set.null s
     lub VMap { vmapArgs = as, vmapNodes = ns } VMap { vmapArgs = as', vmapNodes = ns'} = pruneVMap $ VMap {vmapArgs = Map.unionWith lub as as', vmapNodes = Set.union ns ns' }
@@ -56,7 +88,7 @@ instance Ord n => Fixable (VMap n) where
                 Nothing ->  ((a,i),v)
         | ((a,i),v) <- Map.toAscList n1 ], vmapNodes = (w1 Set.\\ w2) }
 
-instance Ord n => Monoid (VMap n) where
+instance (Ord p,Ord n) => Monoid (VMap p n) where
     mempty = bottom
     mappend = lub
 
