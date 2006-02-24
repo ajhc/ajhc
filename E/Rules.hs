@@ -12,6 +12,8 @@ module E.Rules(
     hasBuiltinRule,
     makeRule,
     mapABodies,
+    mapABodiesArgs,
+    dropArguments,
     mapBodies,
     printRule,
     printRules,
@@ -25,6 +27,7 @@ import Data.Typeable
 import List
 import Monad(liftM)
 import Control.Monad.Trans
+import Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -36,6 +39,7 @@ import Doc.Pretty
 import E.E
 import E.Eval
 import E.Show
+import E.Values
 import E.Subst
 import E.TypeCheck
 import GenUtil
@@ -157,7 +161,29 @@ mapABodies g (ARules rs) = do
             b <- g (ruleBody rule)
             return rule { ruleBody = b }
     rs' <- mapM f rs
-    return $ ARules $ rs'
+    return $ arules $ rs'
+
+mapABodiesArgs :: Monad m => (E -> m E) -> ARules -> m ARules
+mapABodiesArgs g (ARules rs) = do
+    let f rule = do
+            b <- g (ruleBody rule)
+            as <- mapM g (ruleArgs rule)
+            return rule { ruleArgs = as, ruleBody = b }
+    rs' <- mapM f rs
+    return $ arules $ rs'
+
+-- replace the given arguments with the E values, dropping impossible rules
+dropArguments :: [(Int,E)] -> ARules -> ARules
+dropArguments os (ARules rs) = arules (catMaybes $  map f rs) where
+    f r = do
+        let g (i,a) | Just v <- lookup i os = do
+                rs <- match (const Nothing) (ruleBinds r) a v
+                return (Right rs)
+            g (i,a) = return (Left a)
+        as' <- mapM g $ zip naturals (ruleArgs r)
+        let sb = substLet (concat $ rights as')
+            sa = substMap $ Map.fromList [ (tvrIdent t,v) |  Right ds <- as', (t,v) <- ds ]
+        return r { ruleArgs = map sa (lefts as'), ruleBody = sb (ruleBody r) }
 
 -- | invarients for ARules
 -- sorted by number of arguments rule takes
