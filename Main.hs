@@ -378,7 +378,7 @@ compileModEnv' stats ho = do
 
     prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return prog
     putStrLn "Type analyzed methods"
-    mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) (filter (getProperty prop_METHOD . fst) (programDs prog))
+    mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ({-filter (getProperty prop_METHOD . fst)-} (programDs prog))
     wdump FD.Lambdacube $ printProgram prog
 
     cmethods <- do

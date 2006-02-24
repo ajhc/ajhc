@@ -210,14 +210,16 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
         as = [ rule  t | (_ :=> IsIn _ t ) <- snub (classInsts classRecord) ]
         (_ft,_:args') = fromPi ty
         (args,_rargs) = span (sortStarLike . getType)  args'
-        rule t = emptyRule { ruleHead = methodVar, ruleArgs = valToPat' (tipe t):map EVar args, ruleBinds = [ t | ~(EVar t) <- vs] ++ args, ruleBody = foldl EAp body (map EVar args), ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
+        rule t = emptyRule { ruleHead = methodVar, ruleArgs = valToPat' (tipe t):map EVar args, ruleBinds = [ t | ~(EVar t) <- vs] ++ args, ruleBody = body, ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
             name = (instanceName methodName (getTypeCons t))
-            ELit LitCons { litArgs =  vs } = valToPat' (tipe t)
+            vp@(ELit LitCons { litArgs =  vs }) = valToPat' (tipe t)
             body = case findName name of
-                Just (n,_) -> foldl EAp (EVar n) vs
+                Just (n,_) -> foldl EAp (EVar n) (vs ++ map EVar args)
                 Nothing -> case findName defaultName of
-                    Just (deftvr,_) -> EAp (EVar deftvr) (valToPat' (tipe t))
-                    Nothing -> EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) (eAp ty (valToPat' (tipe t)))
+                    Just (deftvr,_) | null vs -> foldl EAp (EAp (EVar deftvr) vp) (map EVar args)
+                    Just (deftvr,_) -> eLet tv vp $ foldl EAp (EAp (EVar deftvr) (EVar tv)) (map EVar args) where
+                        tv = tvr { tvrIdent = head [ n | n <- [2,4..], n `notElem` freeVars vp], tvrType = getType vp }
+                    Nothing -> foldl EAp (EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) (eAp ty (valToPat' (tipe t)))) (map EVar args)
     method _ _ = []
     findName name = case Map.lookup name funcs of
         Nothing -> fail $ "Cannot find: " ++ show name

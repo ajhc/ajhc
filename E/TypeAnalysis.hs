@@ -1,7 +1,7 @@
 -- | examine all uses of types in a program to determine which ones are
 -- actually needed in the method generation
 
-module E.TypeAnalysis(typeAnalyze, Typ(), pruneE) where
+module E.TypeAnalysis(typeAnalyze, Typ()) where
 
 import Control.Monad.Reader
 import Control.Monad.Writer
@@ -15,8 +15,10 @@ import DataConstructors
 import Doc.PPrint
 import E.Annotate
 import E.E hiding(isBottom)
+import E.Subst
 import E.Inline(emapE',emapE_)
 import E.Program
+import Support.FreeVars
 import E.Rules
 import E.TypeCheck
 import E.Values
@@ -41,6 +43,7 @@ extractValMap ds = Map.fromList [ (tvrIdent t,f e []) | (t,e) <- ds] where
     f _ rs = reverse rs
 
 -- all variables _must_ be unique before running this
+{-# NOINLINE typeAnalyze #-}
 typeAnalyze :: Program -> IO Program
 typeAnalyze prog = do
     fixer <- newFixer
@@ -56,7 +59,7 @@ typeAnalyze prog = do
     prog <- annotateProgram mempty lambind (\_ -> return) (\_ -> return) prog
     let ds = programDs prog
         env = (usedVals,extractValMap ds)
-        entries = progEntryPoints prog ++ [ t | (t,_) <- ds, getProperty prop_INSTANCE t]
+        entries = progEntryPoints prog
     calcDs env ds
     mapM_ (calcE env . EVar ) entries
     mapM_ (sillyEntry env) entries
@@ -74,11 +77,25 @@ sillyEntry env t = mapM_ (addRule . (`isSuperSetOf` value (vmapPlaceholder ())))
 
 lookupArgs t (_,tm) = maybe [] id (Map.lookup (tvrIdent t) tm)
 
+
+calcDef :: Env -> (TVr,E) -> IO ()
+calcDef env (t,e) = do
+    let (_,ls) = fromLam e
+        tls = takeWhile (sortStarLike . getType) ls
+        rs = rulesFromARules (Info.fetch (tvrInfo t))
+        hr r = do
+            let vs = concatMap (hrg r) (zip tls (ruleArgs r))
+            calcE env (substMap (Map.fromList vs) $ ruleBody r)
+        hrg r (t,EVar a) | a `elem` ruleBinds r = [(tvrIdent a,EVar t)]
+        hrg r (t,e) =  [ (tvrIdent t, EVar $ tvrInfo_u (Info.insert (value (vmapPlaceholder () :: Typ))) t) | t <- freeVars e, t `elem` ruleBinds r ]
+    mapM_ hr rs
+    calcE env e
+
 calcDs ::  Env -> [(TVr,E)] -> IO ()
 calcDs env@(usedVals,_) ds = do
     mapM_ d ds
     flip mapM_ ds $ \ (v,e) -> do
-        addRule $ conditionalRule (v `Set.member`) usedVals (ioToRule $ calcE env e)
+        addRule $ conditionalRule (v `Set.member`) usedVals (ioToRule $ calcDef env (v,e))
      where
     d (t,e) | not (sortStarLike (getType t)) = return ()
     d (t,e) | Just v <- getValue e = do
@@ -145,7 +162,7 @@ calcE env e@EAp {} = tagE env e
 calcE env e@EPi {} = tagE env e
 calcE _ e = fail $ "odd calcE: " ++ show e
 
-tagE (usedVals,_) (EVar v) = addRule $ usedVals `isSuperSetOf` value (Set.singleton v)
+tagE (usedVals,_) (EVar v) | not $ getProperty prop_RULEBINDER v = addRule $ usedVals `isSuperSetOf` value (Set.singleton v)
 tagE env e  = emapE_ (tagE env) e
 
 getValue (EVar v)
@@ -206,7 +223,7 @@ specializeProgram prog = do
     return $ programSetDs nds prog
 
 
-specializeDef _dataTable (t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
+specializeDef _dataTable (t,e) | getProperty prop_PLACEHOLDER t || getProperty prop_INSTANCE t = return (t,e)
 specializeDef dataTable (tvr,e) = ans where
     sub = substLet  [ (t,v) | (t,Just v) <- sts ]
     sts = map spec ts

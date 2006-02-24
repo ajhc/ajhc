@@ -16,6 +16,7 @@ import DataConstructors
 import E.Annotate
 import C.Prims
 import E.E
+import Doc.PPrint
 import E.Inline
 import E.PrimOpt
 import E.Rules
@@ -422,7 +423,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                 e' <- f e (Map.fromList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] `Map.union` sub)   (envInScope_u (Map.fromList [ (n,IsBoundTo Many e) | (e,_,TVr { tvrIdent = n }) <- binds] `Map.union`) inb)
                 return $ eLetRec [ (v,e) | (e,_,v) <- binds ] e'
             Nothing -> do
-                return $ EError "match falls off bottom" t
+                return $ EError ("match falls off bottom: " ++ pprint l) t
 
     match m@(LitCons c xs _) ((Alt (LitCons c' bs _) e):rs) d | c == c' = do
         mtick (toAtom $ "E.Simplify.known-case." ++ show c )
