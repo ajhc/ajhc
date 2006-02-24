@@ -62,6 +62,7 @@ tmpNames ns x = case fromId x of
     Nothing -> [toId (toName ns ("X@",'f':show x ++ "@" ++ show i)) | i <- [(1::Int)..] ]
 
 workWrap' :: MonadStats m => DataTable -> TVr -> E -> m ((TVr,E),(TVr,E))
+workWrap' _dataTable tvr _e | getProperty prop_WORKER tvr || getProperty prop_WRAPPER tvr = fail "already workwrapped"
 workWrap' dataTable tvr e | isJust res = ans where
     res@(~(Just (cname,body,sargs))) = wrappable dataTable tvr e
     args = snds sargs
