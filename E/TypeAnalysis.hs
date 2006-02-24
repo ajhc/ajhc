@@ -47,7 +47,7 @@ typeAnalyze prog = do
     usedVals <- newValue fixer Set.empty
     let lambind _ nfo = do
             x <- newValue fixer ( bottom :: Typ)
-            return $ Info.insert x nfo
+            return $ Info.insert x (Info.delete (undefined :: Typ) nfo)
         lamread _ nfo | Just v <- Info.lookup nfo = do
             rv <- readValue v
             return (Info.insert (rv :: Typ) $ Info.delete (undefined :: Value Typ) nfo)
@@ -80,7 +80,6 @@ calcDs env@(usedVals,_) ds = do
     flip mapM_ ds $ \ (v,e) -> do
         addRule $ conditionalRule (v `Set.member`) usedVals (ioToRule $ calcE env e)
      where
-        --mapM_ d ds >> mapM_ (calcE env) (snds ds) where
     d (t,e) | not (sortStarLike (getType t)) = return ()
     d (t,e) | Just v <- getValue e = do
         let Just t' = Info.lookup (tvrInfo t)
@@ -207,7 +206,7 @@ specializeProgram prog = do
     return $ programSetDs nds prog
 
 
-specializeDef _dataTable (t,e) | getProperty prop_EXPORTED t || getProperty prop_INSTANCE t || getProperty prop_PLACEHOLDER t = return (t,e)
+specializeDef _dataTable (t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
 specializeDef dataTable (tvr,e) = ans where
     sub = substLet  [ (t,v) | (t,Just v) <- sts ]
     sts = map spec ts

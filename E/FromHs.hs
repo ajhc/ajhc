@@ -32,8 +32,10 @@ import E.LetFloat(atomizeApps)
 import E.Rules
 import E.Subst
 import E.Traverse
+import E.TypeAnalysis
 import E.TypeCheck
 import E.Values
+import Fixer.VMap
 import FrontEnd.Rename(unRename)
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Type(prettyPrintType)
@@ -46,6 +48,7 @@ import Name.Names
 import Name.VConsts
 import Options
 import qualified FlagOpts as FO
+import qualified Info.Info as Info
 import qualified Stats
 import qualified Util.Seq as Seq
 import Representation
@@ -226,14 +229,17 @@ createMethods dataTable classHierarchy funcs = return ans where
     cClass classRecord =  concat [ method classRecord n | n :>: _ <- classAssumps classRecord ]
     method classRecord methodName | isJust _methodTVr = [(methodName ,setProperty prop_METHOD (tVr ( nameToInt methodName) ty),v)] where
         theDefault = findName (defaultInstanceName methodName)
-        _methodTVr@(~(Just (TVr {tvrType = ty},_))) = findName methodName
+        _methodTVr@(~(Just (TVr {tvrType = ty},ELam TVr { tvrInfo = nfo } _))) = findName methodName
+        Just (vmap::Typ) = Info.lookup nfo
         (EPi tvr finalType) = ty
-        --els = EError ("Bad: " ++ show methodName) t
-        v = eLam tvr emptyCase { eCaseScrutinee = EVar tvr, eCaseAlts = as, eCaseBind = tvr { tvrIdent = 0 }, eCaseType = finalType }
+        v = eLam tvr (foldr ELam emptyCase { eCaseScrutinee = EVar tvr, eCaseAlts = as, eCaseBind = tvr { tvrIdent = 0 }, eCaseType = foldr EPi ft rargs } args)
         as = concatMap cinst [ t | (_ :=> IsIn _ t ) <- classInsts classRecord]
+        (ft,args') = fromPi finalType
+        (args,rargs) = span (sortStarLike . getType)  args'
         cinst t | Nothing <- getConstructor x dataTable = fail "skip un-imported primitives"
-                | Just (tvr,_) <- findName name = return $ calt (foldl EAp (EVar tvr) vs)
-                | Just (deftvr,defe) <- theDefault = return $ calt $ eLet tvr (tipe t) (EAp (EVar deftvr) (EVar tvr))
+                | not $ x `vmapMember` vmap = fail "unused instance"
+                | Just (tvr,_) <- findName name  = return $ calt (foldl EAp (EVar tvr) (vs ++ map EVar args))
+                | Just (deftvr,defe) <- theDefault = return $ calt $ eLet tvr (tipe t) (foldl EAp (EVar deftvr) (EVar tvr:map EVar args))
                 | otherwise  = return $ calt $  EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) errType
             where
             name = (instanceName methodName (getTypeCons t))

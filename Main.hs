@@ -376,6 +376,10 @@ compileModEnv' stats ho = do
     prog <- return prog { progMainEntry = main, progEntryPoints = [main], progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog] }
     prog <- return $ programPruneUnreachable prog
 
+    prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return prog
+    putStrLn "Type analyzed methods"
+    mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) (filter (getProperty prop_METHOD . fst) (programDs prog))
+    wdump FD.Lambdacube $ printProgram prog
 
     cmethods <- do
         es' <- createMethods dataTable (hoClassHierarchy ho) (programEsMap prog)
@@ -399,14 +403,14 @@ compileModEnv' stats ho = do
     prog <- return $ programSetE ne prog
 
 
-    prog <- if (fopts  FO.TypeAnalysis) then do
-            prog <- typeAnalyze prog
-            putStrLn "Type analyzed methods"
-            mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) (filter (getProperty prop_METHOD . fst) (programDs prog))
-            --mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ds'
-            prog <- programMapBodies pruneE prog
-            return $ programPruneUnreachable prog
-        else return prog
+--    prog <- if (fopts  FO.TypeAnalysis) then do
+--            prog <- typeAnalyze prog
+--            putStrLn "Type analyzed methods"
+--            mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) (filter (getProperty prop_METHOD . fst) (programDs prog))
+--            --mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ds'
+--            prog <- programMapBodies pruneE prog
+--            return $ programPruneUnreachable prog
+--        else return prog
 
     -- make sure properties and rules are attached everywhere
     prog <- return $ runIdentity $ annotateProgram mempty (idann rules (hoProps ho) ) letann lamann prog
