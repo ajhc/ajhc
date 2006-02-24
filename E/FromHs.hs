@@ -220,10 +220,10 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
 createMethods :: Monad m => DataTable -> ClassHierarchy -> (Map.Map Name (TVr,E))  -> m [(Name,TVr,E)]
 createMethods dataTable classHierarchy funcs = return ans where
     ans = concatMap cClass (classRecords classHierarchy)
-    cClass classRecord =  [ method classRecord n | n :>: _ <- classAssumps classRecord ]
-    method classRecord methodName = (methodName ,setProperty prop_METHOD (tVr ( nameToInt methodName) ty),v) where
+    cClass classRecord =  concat [ method classRecord n | n :>: _ <- classAssumps classRecord ]
+    method classRecord methodName | isJust _methodTVr = [(methodName ,setProperty prop_METHOD (tVr ( nameToInt methodName) ty),v)] where
         theDefault = findName (defaultInstanceName methodName)
-        Identity (TVr {tvrType = ty},_) = findName methodName
+        _methodTVr@(~(Just (TVr {tvrType = ty},_))) = findName methodName
         (EPi tvr finalType) = ty
         --els = EError ("Bad: " ++ show methodName) t
         v = eLam tvr emptyCase { eCaseScrutinee = EVar tvr, eCaseAlts = as, eCaseBind = tvr { tvrIdent = 0 }, eCaseType = finalType }
@@ -240,6 +240,7 @@ createMethods dataTable classHierarchy funcs = return ans where
                 (ELit (LitCons x' vs' ct')) -> (x',vs',ct')
                 (EPi (TVr { tvrType = a}) b) -> (tc_Arrow,[a,b],eStar)
                 e -> error $ "FromHs.createMethods: " ++ show e
+    method _ _ = []
     findName name = case Map.lookup name funcs of
         Nothing -> fail $ "Cannot find: " ++ show name
         Just n -> return n
