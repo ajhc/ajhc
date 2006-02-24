@@ -6,6 +6,7 @@ module E.Rules(
     arules,
     bindingFreeVars,
     builtinRule,
+    dropArguments,
     emptyRule,
     fromRules,
     getARules,
@@ -13,13 +14,13 @@ module E.Rules(
     makeRule,
     mapABodies,
     mapABodiesArgs,
-    dropArguments,
     mapBodies,
     printRule,
     printRules,
     ruleAllFreeVars,
+    ruleFreeVars,
     ruleFreeVars',
-    ruleFreeVars
+    rulesFromARules
     )where
 
 import Data.Monoid
@@ -48,6 +49,7 @@ import Name.Name
 import Name.Names
 import qualified CharIO
 import qualified Info.Info as Info
+import Info.Types
 import Stats
 import Support.CanType
 import Support.FreeVars
@@ -172,6 +174,9 @@ mapABodiesArgs g (ARules rs) = do
     rs' <- mapM f rs
     return $ arules $ rs'
 
+rulesFromARules :: ARules -> [Rule]
+rulesFromARules (ARules rs) = rs
+
 -- replace the given arguments with the E values, dropping impossible rules
 dropArguments :: [(Int,E)] -> ARules -> ARules
 dropArguments os (ARules rs) = arules (catMaybes $  map f rs) where
@@ -193,7 +198,14 @@ newtype ARules = ARules [Rule]
     deriving(Show,Typeable)
 
 arules xs = ARules (sortUnder ruleNArgs (map f xs)) where
-    f rule = rule { ruleNArgs = length  (ruleArgs rule) }
+    f rule = rule {
+        ruleNArgs = length  (ruleArgs rule),
+        ruleBinds = bs,
+        ruleBody = g (ruleBody rule),
+        ruleArgs = map g (ruleArgs rule)
+        } where
+        bs = map (setProperty prop_RULEBINDER) (ruleBinds rule)
+        g e = substMap (Map.fromList [ (tvrNum t, EVar t) | t <- bs ]) e
 
 instance Monoid ARules where
     mempty = ARules []
