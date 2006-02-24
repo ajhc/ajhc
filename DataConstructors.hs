@@ -429,6 +429,9 @@ slotTypes wdt n (ELit (LitCons pn xs _))
     Identity mc = getConstructor n wdt
     Identity pc = getConstructor (conInhabits mc) wdt
     sub = substMap $ Map.fromDistinctAscList [ (i,sl) | sl <- xs | i <- [2,4..] ]
+slotTypes wdt n kind
+    | sortStarLike kind, (e,ts) <- fromPi kind = drop (length ts) (conSlots mc)
+    where Identity mc = getConstructor n wdt
 slotTypes wdt n e | Just fa <- followAlias wdt e  = slotTypes wdt n fa
 slotTypes _ n e = error $ "slotTypes: error in " ++ show n ++ ": " ++ show e
 
