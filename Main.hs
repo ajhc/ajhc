@@ -206,24 +206,13 @@ processDecls stats ho ho' tiData = do
     prog <- return $ prog { progEntryPoints = entries }
     prog <- return $ programPruneUnreachable prog
 
-    wdump FD.Lambdacube $ printProgram prog
-
-    if (fopts  FO.TypeAnalysis) then do
-            prog <- typeAnalyze prog
-            putStrLn "-- Type analyzed methods"
-            flip mapM_  (programDs prog) $ \ (t,e) -> case fromLam e of
-                (_,ts@(ft:_)) | sortStarLike (getType ft) -> putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts, sortStarLike (getType t) ]
-                _ -> return ()
-            prog <- programMapBodies pruneE prog
-            return $ programPruneUnreachable prog
-        else return prog
 
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
-        let names = [ n | (n,_,_) <- ns]
+        let names = [ n | (n,_) <- ns]
         let namesInscope' = Set.fromAscList (Map.keys smap) `Set.union` namesInscope
-        when (dump FD.Lambdacube || dump FD.Pass) $ putErrLn ("----\n" ++ show names)
-        cds <- annotateDs annmap (idann (hoRules allHo) mempty) letann lamann [ (t,e) | (_,t,e) <- ns]
+        when (dump FD.Lambdacube || dump FD.Pass) $ putErrLn ("----\n" ++ pprint names)
+        cds <- annotateDs annmap (idann (hoRules allHo) mempty) letann lamann [ (t,e) | (t,e) <- ns]
         --putStrLn "*** After annotate"
         --wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
         let cm stats e = do
@@ -234,16 +223,16 @@ processDecls stats ho ho' tiData = do
             Stats.tickStat stats stat
             return e''
         let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds)) fullDataTable
-        cds <- flip mapM (zip names cds) $ \ (n,(v,lc)) -> do
+        cds <- flip mapM cds $ \ (v,lc) -> do
             --lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             lc <- doopt mangle False stats "SuperSimplify" cm lc
-            lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
+            lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             return (v,lc)
         cds <- E.Strictness.solveDs cds
-        cds <- flip mapM (zip names cds) $ \ (n,(v,lc)) -> do
+        cds <- flip mapM cds $ \ (v,lc) -> do
             lc <- doopt mangle False stats "SuperSimplify" cm lc
-            lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
+            lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             return (v,lc)
 
         -- cds <- E.Strictness.solveDs cds
@@ -280,22 +269,40 @@ processDecls stats ho ho' tiData = do
         let toName t
                 | Just n <- fromId (tvrIdent t) = n
                 | otherwise = error $ "toName: " ++ tvrShowName t
-        let nvls = [ (toName t,t,e)  | (t,e) <- cds ]
+        let nvls = [ (t,e)  | (t,e) <- cds ]
         let uidMap = Map.fromAscList [  (id,Nothing :: Maybe E) | id <- Set.toAscList usedids ]
 
         wdump FD.Progress $ putErr (if rec then "*" else ".")
-        return (nvls ++ retds, (Map.fromList [ (tvrIdent v,lc) | (_,v,lc) <- nvls] `Map.union` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (_,v,_) <- nvls] `Map.union` annmap , idHist' ))
+        return (nvls ++ retds, (Map.fromList [ (tvrIdent v,lc) | (v,lc) <- nvls] `Map.union` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (v,_) <- nvls] `Map.union` annmap , idHist' ))
 
     let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
-        graph =  (newGraph ds (\ (_,b,_) -> tvrIdent b) (\ (_,b,c) -> bindingFreeVars b c))
+        graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
         fscc (Left n) = (False,[n])
         fscc (Right ns) = (True,ns)
     (ds,_) <- foldM f ([],(Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
     progress "!"
-
-
-    prog <- return $ programSetDs [ (t,e) | (_,t,e) <- ds] prog
+    prog <- return $ programSetDs ds prog
     prog <- return $ programPruneUnreachable prog
+    Stats.print "Optimization" stats
+
+    prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return prog
+    wdump FD.Lambdacube $ printProgram prog
+    prog <- if null $ programDs prog then return prog else do
+        ne <- (return . barendregt) (programE prog)
+        return $ programSetE ne prog
+
+    Stats.clear stats
+
+    let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
+        fscc (Left n) = (False,[n])
+        fscc (Right ns) = (True,ns)
+    (ds,_) <- foldM f ([],(Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
+    progress "!"
+    prog <- return $ programSetDs ds prog
+    prog <- return $ programPruneUnreachable prog
+    Stats.print "Optimization" stats
+
+
     wdump FD.Lambdacube $ printProgram prog
 
     Stats.print "Optimization" stats
@@ -616,21 +623,22 @@ mangle'  fv dataTable erraction b  s action e = do
         let ufreevars e | Just as <- fv = filter ( not . (`Set.member` as) . tvrIdent) (freeVars e)
             ufreevars e = []
         case inferType dataTable [] e' of
-            Right _ |  xs@(_:_) <- ufreevars e' -> do
-                putErrLn $ "\n>>> internal error: Unaccountable Free Variables\n" ++ render (pprint (xs:: [TVr]))
-                putErrLn $ "\n>>>Before" <+> s
-                printEStats e
-                putDocM CharIO.putErr (ePretty e)
-                putErrLn $ "\n>>>After" <+> s
-                printEStats e'
-                erraction
-                --let (_,e'') = E.Diff.diff e e'
-                let e''' = findOddFreeVars xs e'
-                putDocM CharIO.putErr (ePrettyEx e''')
-                putErrLn $ "\n>>> internal error: Unaccountable Free Variables\n" ++ render (pprint (xs:: [TVr]))
-                case optKeepGoing options of
-                    True -> return e'
-                    False -> putErrDie "Unusual free vars in E"
+        -- temporarily disabled due to newtypes of functions
+--            Right _ |  xs@(_:_) <- ufreevars e' -> do
+--                putErrLn $ "\n>>> internal error: Unaccountable Free Variables\n" ++ render (pprint (xs:: [TVr]))
+--                putErrLn $ "\n>>>Before" <+> s
+--                printEStats e
+--                putDocM CharIO.putErr (ePretty e)
+--                putErrLn $ "\n>>>After" <+> s
+--                printEStats e'
+--                erraction
+--                --let (_,e'') = E.Diff.diff e e'
+--                let e''' = findOddFreeVars xs e'
+--                putDocM CharIO.putErr (ePrettyEx e''')
+--                putErrLn $ "\n>>> internal error: Unaccountable Free Variables\n" ++ render (pprint (xs:: [TVr]))
+--                case optKeepGoing options of
+--                    True -> return e'
+--                    False -> putErrDie "Unusual free vars in E"
             Left ss -> do
                 putErrLn "Type Error..."
                 putErrLn $ "\n>>>Before" <+> s
