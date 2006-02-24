@@ -4,24 +4,31 @@
 module E.TypeAnalysis(typeAnalyze, Typ(), pruneE) where
 
 import Control.Monad.Reader
+import Control.Monad.Writer
 import Control.Monad.Identity
 import Data.Monoid
 import Data.FunctorM
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 
+import DataConstructors
+import Doc.PPrint
 import E.Annotate
 import E.E hiding(isBottom)
 import E.Inline(emapE',emapE_)
 import E.Program
+import E.Rules
 import E.TypeCheck
+import E.Values
 import Fixer.Fixer
 import Fixer.VMap
 import GenUtil
+import Info.Info(infoMapM,infoMap)
 import Info.Types
 import Name.Name
 import Name.Names
 import qualified Info.Info as Info
+import Stats
 import Support.CanType
 
 
@@ -55,7 +62,10 @@ typeAnalyze prog = do
     mapM_ (sillyEntry env) entries
     calcFixpoint "type analysis" fixer
     prog <- annotateProgram mempty (\_ -> return) (\_ -> return) lamread prog
-    prog <- annotateProgram mempty lamdel (\_ -> return) (\_ -> return) prog
+    let (prog',stats) = runStatM $ specializeProgram prog
+    prog <- annotateProgram mempty lamdel (\_ -> return) (\_ -> return) prog'
+    printStat "TypeAnalysis" stats
+
     return prog
 
 sillyEntry :: Env -> TVr -> IO ()
@@ -133,6 +143,7 @@ calcE env e | (EVar v,as@(_:_)) <- fromAp e, Just ts <- Map.lookup (tvrIdent v) 
             addRule $ t `isSuperSetOf` a'
 calcE env e@EVar {} = tagE env e
 calcE env e@EAp {} = tagE env e
+calcE env e@EPi {} = tagE env e
 calcE _ e = fail $ "odd calcE: " ++ show e
 
 tagE (usedVals,_) (EVar v) = addRule $ usedVals `isSuperSetOf` value (Set.singleton v)
@@ -179,23 +190,60 @@ pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
     as = [ n | LitCons n _ _ <- casePats ec ]
 
 
-{-
 
-specializeProgram :: Program -> Program
-specializeProgram prog = ans where
-    entries = Set.fromList $ progEntryPoints -- must not be specialized
-    ans = runReader (programMapDs f prog) (cenv $ programDs prog)
-    f (t,e) = do
-        env <- ask
-        ne <- case Map.lookup t env of
-            Just (cd,_) -> cd e
-            Nothing -> return e
-        ne' <- de e
-        return (t,ne')
-    cenv ds = undefined
-    de = undefined
+getTyp :: Monad m => E -> DataTable -> Typ -> m E
+getTyp kind dataTable vm = f kind vm where
+    f kind vm | Just [] <- vmapHeads vm = return $ tAbsurd kind
+    f kind vm | Just [h] <- vmapHeads vm = do
+        let ss = slotTypes dataTable h kind
+            as = [ (s,vmapArg h i vm) | (s,i) <- zip ss [0..]]
+        as' <- mapM (uncurry f) as
+        return $ ELit (LitCons h as' kind)
+    f _ _  = fail "getTyp: not constant type"
 
--}
+specializeProgram :: (MonadStats m) => Program -> m Program
+specializeProgram prog = do
+    (nds,_) <- specializeDs (progDataTable prog) mempty (programDs prog)
+    return $ programSetDs nds prog
+
+
+specializeDef _dataTable (t,e) | getProperty prop_EXPORTED t || getProperty prop_INSTANCE t || getProperty prop_PLACEHOLDER t = return (t,e)
+specializeDef dataTable (tvr,e) = ans where
+    sub = substLet  [ (t,v) | (t,Just v) <- sts ]
+    sts = map spec ts
+    spec t | Just nt <- Info.lookup (tvrInfo t) >>= getTyp (getType t) dataTable, sortStarLike (getType t) = (t,Just nt)
+    spec t = (t,Nothing)
+    (fe,ts) = fromLam e
+    ne = sub $ foldr ELam fe [ t | (t,Nothing) <- sts]
+    ans = do
+        sequence_ [ mtick ("Specialize.body.{" ++ pprint tvr ++ "}.{" ++ pprint t ++ "}.{" ++ pprint v) | (t,Just v) <- sts ]
+        let vs = [ (n,v) | ((_,Just v),n) <- zip sts naturals ]
+            sd = not $ null vs
+        when sd $ tell (Map.singleton tvr (fsts vs))
+        return (if sd then tvr { tvrType = getType ne, tvrInfo = infoMap (dropArguments vs) (tvrInfo tvr) } else tvr,ne)
+
+
+specBody :: MonadStats m => DataTable -> Map.Map TVr [Int] -> E -> m E
+specBody dataTable env e | (EVar h,as) <- fromAp e, Just os <- Map.lookup h env = do
+    mtick $ "Specialize.use.{" ++ pprint h ++ "}"
+    return $ foldl EAp (EVar h) [ a | (a,i) <- zip as naturals, i `notElem` os ]
+specBody dataTable env (ELetRec ds e) = do
+    (nds,nenv) <- specializeDs dataTable env ds
+    e <- specBody dataTable nenv e
+    return $ ELetRec nds e
+specBody dataTable env e = emapE' (specBody dataTable env) e
+
+--specializeDs :: MonadStats m => DataTable -> Map.Map TVr [Int] -> [(TVr,E)] -> m ([(TVr,E)]
+specializeDs dataTable env ds = do
+    (ds,nenv) <- runWriterT $ mapM (specializeDef dataTable) ds
+    -- ds <- sequence [ specBody dataTable (nenv `mappend` env) e >>= return . (,) t | (t,e) <- ds]
+    let f (t,e) = do
+            e <- sb e
+            nfo <- infoMapM (mapABodiesArgs sb) (tvrInfo t)
+            return (t { tvrInfo = nfo }, e)
+        sb = specBody dataTable (nenv `mappend` env)
+    ds <- mapM f ds
+    return (ds,nenv `mappend` env)
 
 
 
