@@ -373,8 +373,8 @@ compileModEnv' stats ho = do
 
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
     (_,main,mainv) <- getMainFunction dataTable mainFunc (programEsMap prog)
-    prog <- return prog { progMainEntry = main, progEntryPoints = [main], progCombinators = (main,[],mainv):progCombinators prog }
-    return $ programPruneUnreachable prog
+    prog <- return prog { progMainEntry = main, progEntryPoints = [main], progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog] }
+    prog <- return $ programPruneUnreachable prog
 
 
     cmethods <- do
