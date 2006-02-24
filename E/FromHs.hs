@@ -197,22 +197,25 @@ createInstanceRules :: Monad m => ClassHierarchy -> (Map.Map Name (TVr,E)) -> m 
 createInstanceRules classHierarchy funcs = return $ fromRules ans where
     ans = concatMap cClass (classRecords classHierarchy)
     cClass classRecord =  concat [ method classRecord n | n :>: Forall _ (_ :=> t) <- classAssumps classRecord ]
-    method classRecord methodName = as where
-        methodVar = tVr ( nameToInt methodName) ty
-        Identity (TVr {tvrType = ty},_) = findName methodName
+    method classRecord methodName | isJust _methodName = as where
+        methodVar = tVr (nameToInt methodName) ty
+        _methodName@(~(Just (TVr {tvrType = ty},_))) = findName methodName
         defaultName =  (defaultInstanceName methodName)
-        valToPat' (ELit (LitCons x ts t)) = ELit $ LitCons x [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..]]  t
-        valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ LitCons tc_Arrow [ EVar (tVr j (getType z)) | z <- [a,b] | j <- [2,4 ..]]  eStar
+        valToPat' (ELit (LitCons x ts t)) = ELit $ LitCons x [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..], j `notElem` map tvrIdent args]  t
+        valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ LitCons tc_Arrow [ EVar (tVr j (getType z)) | z <- [a,b] | j <- [2,4 ..], j `notElem` map tvrIdent args]  eStar
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
         as = [ rule  t | (_ :=> IsIn _ t ) <- snub (classInsts classRecord) ]
-        rule t = emptyRule { ruleHead = methodVar, ruleArgs = [valToPat' (tipe t)], ruleBinds = [ t | ~(EVar t) <- vs], ruleBody = body, ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
-            name = ((instanceName methodName (getTypeCons t)))
+        (_ft,_:args') = fromPi ty
+        (args,_rargs) = span (sortStarLike . getType)  args'
+        rule t = emptyRule { ruleHead = methodVar, ruleArgs = valToPat' (tipe t):map EVar args, ruleBinds = [ t | ~(EVar t) <- vs] ++ args, ruleBody = foldl EAp body (map EVar args), ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
+            name = (instanceName methodName (getTypeCons t))
             ELit LitCons { litArgs =  vs } = valToPat' (tipe t)
             body = case findName name of
                 Just (n,_) -> foldl EAp (EVar n) vs
                 Nothing -> case findName defaultName of
                     Just (deftvr,_) -> EAp (EVar deftvr) (valToPat' (tipe t))
                     Nothing -> EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) (eAp ty (valToPat' (tipe t)))
+    method _ _ = []
     findName name = case Map.lookup name funcs of
         Nothing -> fail $ "Cannot find: " ++ show name
         Just n -> return n
@@ -466,7 +469,11 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
                 [] -> []
                 (d:_) | ~[(_,_,v)] <- cDecl d -> [v]
         cClass classRecord =  [ f n (nameToInt n) (convertOneVal t) | n :>: t <- classAssumps classRecord ] where
-            f n i t = (n,setProperties [prop_METHOD,prop_PLACEHOLDER] $ tVr i t, EPrim (primPrim ("Placeholder: " ++ show n)) [] t)
+            f n i t = (n,setProperties [prop_METHOD,prop_PLACEHOLDER] $ tVr i t, foldr ELam (EPrim (primPrim ("Placeholder: " ++ show n)) [] ft) args)  where
+                (ft',as) = fromPi t
+                (args,rargs) = span (sortStarLike . getType) as
+                ft :: E
+                ft = foldr EPi ft' rargs
     cClassDecl _ = error "cClassDecl"
 
 -- | determine what arguments must be passed to something of the first type, to transform it into something of the second type.
