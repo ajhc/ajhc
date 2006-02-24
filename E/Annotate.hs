@@ -125,7 +125,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
     procRules tvr = case Info.lookup (tvrInfo tvr) of
         Nothing -> return tvr
         Just r -> do
-            r' <- mapABodies f r
+            r' <- mapABodiesArgs f r
             return tvr { tvrInfo = Info.insert r' (tvrInfo tvr) }
 
 mnv xs i ss
