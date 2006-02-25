@@ -38,8 +38,8 @@ import Options
 import qualified FrontEnd.Infix
 import qualified HsPretty
 import qualified Text.PrettyPrint.HughesPJ as PP
+import qualified FrontEnd.TI.Main as TI(tiProgram)
 import Representation hiding(flattenType)
-import TIMain(tiProgram)
 import Type(schemeToType)
 import TypeSynonyms(showSynonym)
 import TypeSyns
@@ -200,7 +200,7 @@ tcStatement (HsQualifier e) = do
         ansName = Qual (stateModule is) (HsIdent "ans")
         ansName' = toName Val ansName
     opt <- getOptions
-    localVarEnv <- liftIO $ TIMain.tiProgram
+    localVarEnv <- liftIO $ TI.tiProgram
                 opt                            -- options
                 (stateModule is)               -- name of the module
                 mempty                         -- environment of type signatures

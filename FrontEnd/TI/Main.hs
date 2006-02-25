@@ -18,7 +18,7 @@
 
 -------------------------------------------------------------------------------}
 
-module TIMain (tiProgram, makeProgram) where
+module FrontEnd.TI.Main (tiProgram, makeProgram) where
 
 import Control.Monad.Error
 import Data.Monoid
@@ -42,7 +42,7 @@ import Name.Names
 import Name.VConsts
 import Options
 import Representation
-import TIMonad
+import FrontEnd.TI.Monad
 import Type
 import TypeSigs(SigEnv)
 

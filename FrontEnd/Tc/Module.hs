@@ -25,6 +25,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Main
 import FrontEnd.Tc.Type
+import FrontEnd.TiData
 import FrontEnd.Utils
 import GenUtil
 import Ho.Type
@@ -40,7 +41,6 @@ import TypeSynonyms
 import TypeSyns
 import Type
 import Util.Gen
-import TIModule(TiData(..))
 import Util.Inst()
 import Warning
 

@@ -1,4 +1,4 @@
-module TIModule (tiModules', TiData(..)) where
+module FrontEnd.TI.Module (tiModules') where
 
 import Char
 import Control.Monad.Writer
@@ -22,7 +22,7 @@ import FrontEnd.Infix
 import FrontEnd.KindInfer
 import FrontEnd.Rename
 import FrontEnd.SrcLoc
-import FrontEnd.Tc.Monad()
+import FrontEnd.TiData
 import FrontEnd.Utils
 import GenUtil
 import Ho.Type
@@ -33,7 +33,7 @@ import Options
 import qualified FlagDump as FD
 import qualified HsPretty
 import Representation
-import TIMain
+import FrontEnd.TI.Main
 import TypeSigs           (collectSigs, listSigsToSigEnv)
 import TypeSynonyms
 import TypeSyns
@@ -46,14 +46,6 @@ trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env
 getDeclNames ::  HsDecl -> [Name]
 getDeclNames (HsTypeSig _ ns _ ) =  map (toName Val) ns
 getDeclNames d = maybeGetDeclName d
-
--- Extra data produced by the front end, used to fill in the Ho file.
-data TiData = TiData {
-    tiDataLiftedInstances :: Map.Map Name HsDecl,
-    tiDataModules :: [(Module,HsModule)],
-    tiModuleOptions :: [(Module,Opt)],
-    tiAllAssumptions :: Map.Map Name Scheme
-}
 
 isGlobal x |  (_,(_::String,(h:_))) <- fromName x =  not $ isDigit h
 isGlobal _ = error "isGlobal"

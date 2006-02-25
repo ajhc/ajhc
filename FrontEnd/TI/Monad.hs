@@ -21,7 +21,7 @@
 
 -------------------------------------------------------------------------------}
 
-module TIMonad (TI,
+module FrontEnd.TI.Monad (TI,
                 inst,
                 runTI,
                 withContext,
