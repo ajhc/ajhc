@@ -52,13 +52,13 @@ vmapArg n i vm@VMap { vmapArgs =  map } = case Map.lookup (n,i) map of
     Just x -> x `lub` vmapProxyIndirect i vm
     Nothing -> vmapProxyIndirect i vm
 
-vmapProxyIndirect :: (Ord n,Ord p) => Int -> VMap p n -> VMap p n
-vmapProxyIndirect i vm = emptyVMap {  vmapNodes = Set.fromList [  Left (ProxyArg p i) | Left p <- Set.toList $ vmapNodes vm] }
+vmapProxyIndirect :: (Show p,Show n,Ord p,Ord n,Fixable (VMap p n)) => Int -> VMap p n -> VMap p n
+vmapProxyIndirect i vm = emptyVMap {  vmapNodes = Set.fromList [  Left p {- (ProxyArg p i) -} | Left p <- Set.toList $ vmapNodes vm] }
 
-vmapValue :: (Ord p,Ord n) => n -> [VMap p n] -> VMap p n
+vmapValue :: (Show p,Show n,Ord p,Ord n) => n -> [VMap p n] -> VMap p n
 vmapValue n xs = pruneVMap VMap { vmapArgs = Map.fromAscList (zip (zip (repeat n) [0..]) xs), vmapNodes = Set.singleton (Right n) }
 
-vmapPlaceholder :: (Ord p,Ord n) => p  -> VMap p n
+vmapPlaceholder :: (Show p,Show n,Ord p,Ord n) => p  -> VMap p n
 vmapPlaceholder p = emptyVMap { vmapNodes = Set.singleton $ Left (Proxy p) }
 
 vmapDropArgs vm = vm { vmapArgs = mempty }
@@ -78,7 +78,7 @@ instance (Ord p,Ord n,Show p,Show n) => Show (VMap p n) where
         f a = (if a `Set.member` s then tshow a else char '#' <> tshow a) <> (if null (g a) then empty else tshow (g a))
         g a = sortUnder fst [ (i,v) | ((a',i),v) <- Map.toList n, Right a' == a ]
 
-instance (Ord p,Ord n) => Fixable (VMap p n) where
+instance (Show p,Show n,Ord p,Ord n) => Fixable (VMap p n) where
     bottom = emptyVMap
     isBottom VMap { vmapArgs = m, vmapNodes = s } = Map.null m && Set.null s
     lub VMap { vmapArgs = as, vmapNodes = ns } VMap { vmapArgs = as', vmapNodes = ns'} = pruneVMap $ VMap {vmapArgs = Map.unionWith lub as as', vmapNodes = Set.union ns ns' }
@@ -87,8 +87,10 @@ instance (Ord p,Ord n) => Fixable (VMap p n) where
                 Just v' ->  ((a,i),v `minus` v')
                 Nothing ->  ((a,i),v)
         | ((a,i),v) <- Map.toAscList n1 ], vmapNodes = (w1 Set.\\ w2) }
+    lte x@VMap { vmapArgs = as, vmapNodes = ns } y@VMap { vmapArgs = as', vmapNodes = ns'} = any isLeft (Set.toList ns') || isBottom (x `minus` y)
+    showFixable x = show x
 
-instance (Ord p,Ord n) => Monoid (VMap p n) where
+instance (Show p,Show n,Ord p,Ord n) => Monoid (VMap p n) where
     mempty = bottom
     mappend = lub
 
