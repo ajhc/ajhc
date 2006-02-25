@@ -1,20 +1,20 @@
 module FrontEnd.Tc.Type(
-    fn,
     Kind(..),
-    Pred(..),
     MetaVar(..),
-    followTaus,
     MetaVarType(..),
-    readMetaVar,
-    tForAll,
-    module FrontEnd.Tc.Type,
+    Pred(..),
+    Preds(),
     Qual(..),
     Tycon(..),
     Type(..),
-    Preds(),
-    tyvar,
+    Tyvar(..),
+    fn,
+    followTaus,
+    module FrontEnd.Tc.Type,
+    readMetaVar,
+    tForAll,
     tList,
-    Tyvar(..)
+    tyvar
     ) where
 
 import Control.Monad.Writer
@@ -23,13 +23,14 @@ import List
 
 import Doc.DocLike
 import Doc.PPrint
+import Name.Name
 import Name.Names
-import Support.CanType
-import Support.FreeVars
 import Name.VConsts
 import Representation hiding(flattenType, findType)
-import Type(HasKind(..))
+import Support.CanType
+import Support.FreeVars
 import Support.Unparse
+import Type(HasKind(..))
 import Util.VarName
 
 type Sigma' = Sigma
@@ -193,6 +194,12 @@ instance UnVar t => UnVar [t] where
 instance UnVar Pred where
     unVar' opt (IsIn c t) = IsIn c `liftM` unVar' opt t
 
+instance (UnVar a,UnVar b) => UnVar (a,b) where
+    unVar' opt (a,b) = do
+        a <- unVar' opt a
+        b <- unVar' opt b
+        return (a,b)
+
 instance UnVar t => UnVar (Qual t) where
     unVar' opt (ps :=> t) = liftM2 (:=>) (unVar' opt ps) (unVar' opt t)
 
@@ -315,5 +322,15 @@ instance CanType Tycon Kind where
 instance CanType Tyvar Kind where
     getType = kind
 
+
+data Rule = RuleSpec {
+    ruleName :: Name,
+    ruleSuper :: Bool,
+    ruleType :: Type
+    } |
+    RuleUser {
+    ruleUniq :: (Module,Int),
+    ruleFreeTVars :: [(Name,Kind)]
+    }
 
 

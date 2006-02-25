@@ -152,7 +152,7 @@ data HsDecl
 	 | HsPatBind	 SrcLoc HsPat HsRhs {-where-} [HsDecl]
 	 | HsForeignDecl SrcLoc ForeignType String HsName HsQualType
          | HsPragmaProps SrcLoc String [HsName]
-	 | HsPragmaRules { hsDeclSrcLoc :: SrcLoc, hsDeclString :: String, hsDeclFreeVars :: [HsName], hsDeclLeftExpr :: HsExp, hsDeclRightExpr :: HsExp }
+	 | HsPragmaRules { hsDeclUniq :: (Module,Int), hsDeclSrcLoc :: SrcLoc, hsDeclString :: String, hsDeclFreeVars :: [HsName], hsDeclLeftExpr :: HsExp, hsDeclRightExpr :: HsExp }
          | HsPragmaSpecialize { hsDeclSrcLoc :: SrcLoc, hsDeclBool :: Bool, hsDeclName :: HsName, hsDeclType :: HsType }
   deriving(Data,Typeable,Eq,Show)
   {-! derive: is !-}

@@ -425,20 +425,42 @@ tcRhs rhs typ = case rhs of
         gas <- mapM (tcGuardedRhs typ) as
         return (HsGuardedRhss gas)
 
-tcPragmaDecl prule@HsPragmaRules { hsDeclFreeVars = vs, hsDeclLeftExpr = e1, hsDeclRightExpr = e2, hsDeclSrcLoc = sloc } =
+tcPragmaDecl spec@HsPragmaSpecialize { hsDeclSrcLoc = sloc, hsDeclName = n, hsDeclType = t } = do
+    withContext (locMsg sloc "in the SPECIALIZE pragma" $ show n) ans where
+    ans = do
+        kt <- getKindEnv
+        t <- hsTypeToType kt t
+        let nn = toName Val n
+        sc <- lookupName nn
+        sc `subsumes` t
+        addRule RuleSpec { ruleName = nn, ruleType = t, ruleSuper = hsDeclBool spec }
+        return [spec]
+
+
+tcPragmaDecl prule@HsPragmaRules { hsDeclUniq = uniq, hsDeclFreeVars = vs, hsDeclLeftExpr = e1, hsDeclRightExpr = e2, hsDeclSrcLoc = sloc } =
     withContext (locMsg sloc "in the RULES pragma" $ hsDeclString prule) ans where
         ans = do
             vs' <- mapM dv vs
             tr <- newBox Star
             let (vs,envs) = unzip vs'
             ch <- getClassHierarchy
-            localEnv (mconcat envs) $ do
-                    (e1,ps) <- listenPreds (tcExpr e1 tr)
-                    ([],rs) <- splitPreds ch [] ps
-                    (e2,ps) <- listenPreds (tcExpr e2 tr)
-                    ([],rs) <- splitPreds ch [] ps
-                    return ()
+            (rs1,rs2) <- localEnv (mconcat envs) $ do
+                    (e1,ps1) <- listenPreds (tcExpr e1 tr)
+                    (e2,ps2) <- listenPreds (tcExpr e2 tr)
+                    ([],rs1) <- splitPreds ch [] ps1
+                    ([],rs2) <- splitPreds ch [] ps2
+                    return (rs1,rs2)
             mapM_ unBox vs
+            vs <- flattenType vs
+            tr <- flattenType tr
+            let mvs = snub $ concatMap freeMetaVars (tr:vs)
+            nvs <- mapM (newVar . metaKind) mvs
+            sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- mvs ]
+            (rs1,rs2) <- flattenType (rs1,rs2)
+            ch <- getClassHierarchy
+            rs1 <- return $ simplify ch rs1
+            rs2 <- return $ simplify ch rs2
+            assertEntailment rs1 rs2
             return [prule]
         dv n = do
             v <- newMetaVar Tau Star

@@ -183,7 +183,7 @@ assertEntailment qs ps = do
     ch <- getClassHierarchy
     let ns = [ p  | p <- ps, not $ entails ch qs p ]
     if null ns then return () else
-        fail $ "Signature too Weak: " ++ pprint ns
+        fail $ "Signature too Weak: " ++ pprint qs ++ " does not imply " ++ pprint ns
 
 assertEquivalant :: Preds -> Preds -> Tc ()
 assertEquivalant qs ps = do

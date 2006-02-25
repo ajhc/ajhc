@@ -17,6 +17,7 @@ module FrontEnd.Tc.Monad(
     quantify,
     lookupName,
     newBox,
+    addRule,
     unBox,
     newMetaVar,
     newVar,
@@ -83,6 +84,7 @@ data TcEnv = TcEnv {
 data Output = Output {
     collectedPreds   :: Preds,
     existentialPreds :: Preds,
+    checkedRules     :: [Rule],
     existentialVars  :: [Tyvar]
     }
    {-! derive: update, Monoid !-}
@@ -151,6 +153,9 @@ instance OptionMonad Tc where
 withContext :: Diagnostic -> Tc a -> Tc a
 withContext diagnostic comp = do
     local (tcDiagnostics_u (diagnostic:)) comp
+
+addRule :: Rule -> Tc ()
+addRule r = tell mempty { checkedRules = [r] }
 
 
 getErrorContext :: Tc [Diagnostic]

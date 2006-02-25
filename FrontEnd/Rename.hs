@@ -85,6 +85,7 @@ import Name.Names
 import qualified Name.VConsts as V
 import Util.ContextMonad
 import Util.Gen
+import Util.UniqueMonad
 import Util.Inst()
 import Warning
 
@@ -128,10 +129,12 @@ runScopeSM s0 a = runState a s0
 instance MonadWarn ScopeSM where
     addWarning w = modify (\s -> s { errors = w: errors s})
 
+instance UniqueProducer ScopeSM where
+    newUniq = do
+        u <- gets unique
+        modify (\state -> state {unique = (unique state) + 1})
+        return u
 
-
-getUnique :: ScopeSM Int
-getUnique = gets unique
 
 getCurrentModule :: ScopeSM Module
 getCurrentModule = gets currentModule
@@ -143,8 +146,6 @@ setSrcLoc e = modify (\s -> s { srcLoc =  e `mappend` srcLoc s })
 
 -- functions to modify the ScopeSM
 
-incUnique :: ScopeSM ()
-incUnique = modify (\state -> state {unique = (unique state) + 1})
 
 
 -----------------------------------------------------------
@@ -416,7 +417,9 @@ renameHsDecl prules@HsPragmaRules { hsDeclSrcLoc = srcLoc, hsDeclFreeVars = fvs,
     fvs' <- renameHsNames fvs subTable'
     e1' <- renameHsExp e1 subTable'
     e2' <- renameHsExp e2 subTable'
-    return prules {  hsDeclFreeVars = fvs', hsDeclLeftExpr = e1', hsDeclRightExpr = e2' }
+    m <- getCurrentModule
+    i <- newUniq
+    return prules {  hsDeclUniq = (m,i), hsDeclFreeVars = fvs', hsDeclLeftExpr = e1', hsDeclRightExpr = e2' }
 renameHsDecl prules@HsPragmaSpecialize { hsDeclSrcLoc = srcLoc, hsDeclName = n, hsDeclType = t } subTable = do
     setSrcLoc srcLoc
     n <- renameAny n subTable
@@ -600,8 +603,7 @@ renameHsPat (HsPAsPat hsName hsPat) subTable = do
       hsPat' <- renameHsPat hsPat subTable
       return (HsPAsPat hsName' hsPat')
 renameHsPat HsPWildCard subTable = do
-      unique <- getUnique
-      incUnique
+      unique <- newUniq
       mod <- getCurrentModule
       let hsName' = Qual mod (HsIdent $ show unique ++ "_wild@")
       return (HsPVar hsName')
@@ -681,15 +683,13 @@ func_fromInteger = (HsVar $ V.func_fromInteger uqFuncNames)
 func_fromRational = (HsVar $ V.func_fromRational uqFuncNames)
 
 newVar = do
-    unique <- getUnique
-    incUnique
+    unique <- newUniq
     mod <- getCurrentModule
     let hsName'' = (Qual mod (HsIdent $ show unique {- ++ fromHsName hsName' -} ++ "_var@"))
     return hsName''
 
 wrapInAsPat e = do
-    unique <- getUnique
-    incUnique
+    unique <- newUniq
     mod <- getCurrentModule
     let hsName'' = (Qual mod (HsIdent $ show unique {- ++ fromHsName hsName' -} ++ "_as@"))
     return (HsAsPat hsName''  e )
@@ -765,8 +765,7 @@ renameHsExp (HsTuple hsExps) subTable = do
     hsExps' <- renameHsExps hsExps subTable
     return (HsTuple hsExps')
 renameHsExp (HsList hsExps) subTable = do
-    unique <- getUnique
-    incUnique
+    unique <- newUniq
     hsExps' <- renameHsExps hsExps subTable
     mod <- getCurrentModule
     let hsName' = Qual mod (HsIdent $ show unique ++ "_as@")
@@ -1054,11 +1053,10 @@ clobberHsNames [] subTable
 clobberHsName :: HsName -> SubTable -> ScopeSM (SubTable)
 clobberHsName hsName subTable
   = do
-      unique     <- getUnique
+      unique     <- newUniq
       currModule <- getCurrentModule
       let hsName'     = renameAndQualify hsName unique currModule
           subTable'   = addToFM subTable hsName hsName'
-      incUnique
       return (subTable')
 
 
