@@ -46,6 +46,11 @@ class Fixable a where
     isBottom :: a -> Bool
     lub :: a -> a -> a
     minus :: a -> a -> a
+    lte :: a -> a -> Bool
+    lte x y = isBottom (x `minus` y)
+    showFixable :: a -> String
+    showFixable x | isBottom x = "."
+                  | otherwise = "*"
 
 data MkFixable = forall a . Fixable a => MkFixable (RvValue a)
 
@@ -200,12 +205,13 @@ findFixpoint msh@(~(Just (mstring,_))) Fixer { vars = vars, todo = todo } = lift
             p <- readIORef (pending v)
             c <- readIORef (current v)
             let diff = p `minus` c
-            if isBottom diff then f vs n else do
+            --if isBottom diff then f vs n else do
+            if p `lte` c then f vs n else do
             as <- readIORef (action v)
             writeIORef (current v) (p `lub` c)
             writeIORef (pending v) bottom
             --putStr "["
-            --putStr (show diff)
+            --putStr (showFixable diff)
             --putStr "]"
             mapM_ ($ diff) as
             f vs $! (n + 1)
