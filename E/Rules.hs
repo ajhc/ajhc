@@ -10,6 +10,7 @@ module E.Rules(
     emptyRule,
     fromRules,
     getARules,
+    mapRules,
     hasBuiltinRule,
     makeRule,
     mapABodies,
@@ -176,6 +177,11 @@ mapABodiesArgs g (ARules rs) = do
 
 rulesFromARules :: ARules -> [Rule]
 rulesFromARules (ARules rs) = rs
+
+mapRules :: Monad m => (Rule -> m Rule) -> ARules -> m ARules
+mapRules f (ARules rules) = do
+    rs <- mapM f rules
+    return $ arules rs
 
 -- replace the given arguments with the E values, dropping impossible rules
 dropArguments :: [(Int,E)] -> ARules -> ARules

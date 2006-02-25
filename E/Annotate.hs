@@ -121,11 +121,19 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         case i == i' of
             True -> return (nvr,Map.insert i (Just $ EVar nvr))
             False -> return (nvr,Map.insert i (Just $ EVar nvr) . Map.insert i' Nothing)
-
+    mrule r = do
+        let g tvr = do
+            nfo <- lift $ idann (tvrIdent tvr) (tvrInfo tvr)
+            return (tvr { tvrInfo = nfo },Map.insert (tvrIdent tvr) (Just $ EVar tvr))
+        bs <- mapM g $ ruleBinds r
+        local (mconcat $ snds bs) $ do
+            args <- mapM f (ruleArgs r)
+            body <- f (ruleBody r)
+            return r { ruleBinds = fsts bs, ruleBody = body, ruleArgs = args }
     procRules tvr = case Info.lookup (tvrInfo tvr) of
         Nothing -> return tvr
         Just r -> do
-            r' <- mapABodiesArgs f r
+            r' <- mapRules mrule r
             return tvr { tvrInfo = Info.insert r' (tvrInfo tvr) }
 
 mnv xs i ss
