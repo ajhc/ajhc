@@ -96,7 +96,7 @@ calcDef env@(ur,uv,_) (t,e) = do
         rs = rulesFromARules (Info.fetch (tvrInfo t))
         hr r = do
             ruleUsed <- supplyValue ur (ruleUniq r)
-            addRule $ conditionalRule id ruleUsed (ioToRule $ putStrLn (pprint (ruleUniq r)) >> calcE env (ruleBody r))
+            addRule $ conditionalRule id ruleUsed (ioToRule $  calcE env (ruleBody r))
             let hrg r (t,EVar a) | a `elem` ruleBinds r = do
                     let (t'::Value Typ) = Info.fetch (tvrInfo t)
                     let (a'::Value Typ) = Info.fetch (tvrInfo a)
@@ -118,7 +118,6 @@ calcDef env@(ur,uv,_) (t,e) = do
             when (and rr) $ addRule (assert ruleUsed)
     valUsed <- supplyValue uv t
     addRule $ conditionalRule id valUsed $ ioToRule $ do
-        putStrLn (pprint t)
         mapM_ hr rs
         calcE env e
 
