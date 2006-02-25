@@ -23,8 +23,10 @@ import E.Rules
 import E.TypeCheck
 import E.Values
 import Fixer.Fixer
+import Fixer.Supply
 import Fixer.VMap
 import GenUtil
+import Util.Gen
 import Info.Info(infoMapM,infoMap)
 import Info.Types
 import Name.Name
@@ -35,7 +37,7 @@ import Support.CanType
 
 
 type Typ = VMap () Name
-type Env = (Value (Set.Set TVr),Map.Map Id [Value Typ])
+type Env = (Supply (Module,Int) Bool,Supply TVr Bool,Map.Map Id [Value Typ])
 
 extractValMap :: [(TVr,E)] -> Map.Map Id [Value Typ]
 extractValMap ds = Map.fromList [ (tvrIdent t,f e []) | (t,e) <- ds] where
@@ -47,7 +49,8 @@ extractValMap ds = Map.fromList [ (tvrIdent t,f e []) | (t,e) <- ds] where
 typeAnalyze :: Program -> IO Program
 typeAnalyze prog = do
     fixer <- newFixer
-    usedVals <- newValue fixer Set.empty
+    ur <- newSupply fixer
+    uv <- newSupply fixer
     let lambind _ nfo = do
             x <- newValue fixer ( bottom :: Typ)
             return $ Info.insert x (Info.delete (undefined :: Typ) nfo)
@@ -58,10 +61,12 @@ typeAnalyze prog = do
         lamdel _ nfo = return (Info.delete (undefined :: Value Typ) nfo)
     prog <- annotateProgram mempty lambind (\_ -> return) (\_ -> return) prog
     let ds = programDs prog
-        env = (usedVals,extractValMap ds)
+        env = (ur,uv,extractValMap ds)
         entries = progEntryPoints prog
     calcDs env ds
-    mapM_ (calcE env . EVar ) entries
+    flip mapM_ entries $ \tvr ->  do
+        vv <- supplyValue uv tvr
+        addRule $ assert vv
     mapM_ (sillyEntry env) entries
     calcFixpoint "type analysis" fixer
     prog <- annotateProgram mempty (\_ -> return) (\_ -> return) lamread prog
@@ -75,46 +80,65 @@ sillyEntry :: Env -> TVr -> IO ()
 sillyEntry env t = mapM_ (addRule . (`isSuperSetOf` value (vmapPlaceholder ()))) args where
     args = lookupArgs t env
 
-lookupArgs t (_,tm) = maybe [] id (Map.lookup (tvrIdent t) tm)
+lookupArgs t (_,_,tm) = maybe [] id (Map.lookup (tvrIdent t) tm)
 
+toLit (EPi TVr { tvrType = a } b) = return (tc_Arrow,[a,b])
+toLit (ELit (LitCons n ts _)) = return (n,ts)
+toLit _ = fail "not convertable to literal"
+
+assert :: Value Bool -> Fixer.Fixer.Rule
+assert v = v `isSuperSetOf` value True
 
 calcDef :: Env -> (TVr,E) -> IO ()
-calcDef env (t,e) = do
+calcDef env@(ur,uv,_) (t,e) = do
     let (_,ls) = fromLam e
         tls = takeWhile (sortStarLike . getType) ls
         rs = rulesFromARules (Info.fetch (tvrInfo t))
         hr r = do
-            let vs = concatMap (hrg r) (zip tls (ruleArgs r))
-            calcE env (substMap (Map.fromList vs) $ ruleBody r)
-        hrg r (t,EVar a) | a `elem` ruleBinds r = [(tvrIdent a,EVar t)]
-        hrg r (t,e) =  [ (tvrIdent t, EVar $ tvrInfo_u (Info.insert (value (vmapPlaceholder () :: Typ))) t) | t <- freeVars e, t `elem` ruleBinds r ]
-    mapM_ hr rs
-    calcE env e
+            ruleUsed <- supplyValue ur (ruleUniq r)
+            addRule $ conditionalRule id ruleUsed (ioToRule $ putStrLn (pprint (ruleUniq r)) >> calcE env (ruleBody r))
+            let hrg r (t,EVar a) | a `elem` ruleBinds r = do
+                    let (t'::Value Typ) = Info.fetch (tvrInfo t)
+                    let (a'::Value Typ) = Info.fetch (tvrInfo a)
+                    addRule $ a' `isSuperSetOf` t'
+                    return True
+                hrg r (t,e) | Just (n,as) <- toLit e = do
+                    let (vv::Value Typ) = Info.fetch (tvrInfo t)
+                    as' <- mapM getValue as
+                    addRule $ conditionalRule id ruleUsed $ ioToRule $ do
+                        flip mapM_ (zip [0..] as') $ \ (i,t') -> do
+                            addRule $ modifiedSuperSetOf t' vv (vmapArg n i)
+--                    addRule $ conditionalRule id ruleUsed $ ioToRule $ do
+--                        flip mapM_ (zip as' naturals)  $ \ (v,i) -> do
+--                            addRule $ modifiedSuperSetOf vv v (vmapArgSingleton n i)
+                    --addRule $ dynamicRule v $ \v' -> (mconcat [ t `isSuperSetOf` value (vmapArg n i v') | (t,i) <-  zip ts' naturals ])
+                    addRule $ conditionalRule (n `vmapMember`) vv (assert ruleUsed)
+                    return False
+            rr <- mapM (hrg r) (zip tls (ruleArgs r))
+            when (and rr) $ addRule (assert ruleUsed)
+    valUsed <- supplyValue uv t
+    addRule $ conditionalRule id valUsed $ ioToRule $ do
+        putStrLn (pprint t)
+        mapM_ hr rs
+        calcE env e
 
 calcDs ::  Env -> [(TVr,E)] -> IO ()
-calcDs env@(usedVals,_) ds = do
+calcDs env@(ur,uv,_) ds = do
     mapM_ d ds
-    flip mapM_ ds $ \ (v,e) -> do
-        addRule $ conditionalRule (v `Set.member`) usedVals (ioToRule $ calcDef env (v,e))
+    flip mapM_ ds $ \ (v,e) -> do calcDef env (v,e)
+      --  addRule $ conditionalRule id nv (ioToRule $ calcDef env (v,e))
      where
     d (t,e) | not (sortStarLike (getType t)) = return ()
     d (t,e) | Just v <- getValue e = do
         let Just t' = Info.lookup (tvrInfo t)
         addRule $ t' `isSuperSetOf` v
-    d (t, ELit (LitCons n xs _)) = do
+    d (t,e) | Just (n,xs) <- toLit e = do
         let Just t' = Info.lookup (tvrInfo t)
             v = vmapSingleton n
         addRule $ t' `isSuperSetOf` (value v)
         xs' <- mapM getValue xs
         flip mapM_ (zip xs' [0.. ])  $ \ (v,i) -> do
             addRule $ modifiedSuperSetOf t' v (vmapArgSingleton n i)
-    d (t, EPi TVr { tvrType = a} b) = do
-        let Just t' = Info.lookup (tvrInfo t)
-            v = vmapSingleton tc_Arrow
-        addRule $ t' `isSuperSetOf` (value v)
-        xs' <- mapM getValue [a,b]
-        flip mapM_ (zip xs' [0.. ])  $ \ (v,i) -> do
-            addRule $ modifiedSuperSetOf t' v (vmapArgSingleton tc_Arrow i)
     d (t,e) | (EVar v,as) <- fromAp e = do
         let Just t' = Info.lookup (tvrInfo t)
             Just v' = Info.lookup (tvrInfo v)
@@ -134,14 +158,14 @@ calcAlt env v (Alt (LitCons n xs _) e) = do
 
 
 calcE :: Env -> E -> IO ()
-calcE (usedVals,env) (ELetRec ds e) = calcDs nenv ds >> calcE nenv e where
-    nenv = (usedVals,extractValMap ds `Map.union` env)
+calcE (ur,uv,env) (ELetRec ds e) = calcDs nenv ds >> calcE nenv e where
+    nenv = (ur,uv,extractValMap ds `Map.union` env)
 calcE env e | (e',(_:_)) <- fromLam e = calcE env e'
-calcE env ec@ECase {} | sortStarLike (getType $ eCaseScrutinee ec) = do
-    calcE env (eCaseScrutinee ec)
-    fmapM_ (calcE env) (eCaseDefault ec)
-    v <- getValue (eCaseScrutinee ec)
-    mapM_ (calcAlt env v) (eCaseAlts ec)
+--calcE env ec@ECase {} | sortStarLike (getType $ eCaseScrutinee ec) = do
+--    calcE env (eCaseScrutinee ec)
+--    fmapM_ (calcE env) (eCaseDefault ec)
+--    v <- getValue (eCaseScrutinee ec)
+--    mapM_ (calcAlt env v) (eCaseAlts ec)
 calcE env ec@ECase {} = do
     calcE env (eCaseScrutinee ec)
     mapM_ (calcE env) (caseBodies ec)
@@ -150,7 +174,8 @@ calcE env e@EPrim {} = tagE env e
 calcE _ EError {} = return ()
 calcE _ ESort {} = return ()
 calcE _ Unknown = return ()
-calcE env e | (EVar v,as@(_:_)) <- fromAp e, Just ts <- Map.lookup (tvrIdent v) (snd env) = do
+calcE env e | (EVar v,as@(_:_)) <- fromAp e = do
+    let ts = lookupArgs v env
     tagE env e
     when (length as < length ts) $ fail "calcE: unsaturated call to function"
     flip mapM_ (zip as ts) $ \ (a,t) -> do
@@ -162,7 +187,9 @@ calcE env e@EAp {} = tagE env e
 calcE env e@EPi {} = tagE env e
 calcE _ e = fail $ "odd calcE: " ++ show e
 
-tagE (usedVals,_) (EVar v) | not $ getProperty prop_RULEBINDER v = addRule $ usedVals `isSuperSetOf` value (Set.singleton v)
+tagE (ur,uv,_) (EVar v) | not $ getProperty prop_RULEBINDER v = do
+    v <- supplyValue uv v
+    addRule $ assert v
 tagE env e  = emapE_ (tagE env) e
 
 getValue (EVar v)
