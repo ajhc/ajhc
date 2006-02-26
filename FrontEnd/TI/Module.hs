@@ -23,6 +23,7 @@ import FrontEnd.KindInfer
 import FrontEnd.Rename
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Monad()
+import FrontEnd.TiData
 import FrontEnd.Utils
 import GenUtil
 import Ho.Type
@@ -46,14 +47,6 @@ trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env
 getDeclNames ::  HsDecl -> [Name]
 getDeclNames (HsTypeSig _ ns _ ) =  map (toName Val) ns
 getDeclNames d = maybeGetDeclName d
-
--- Extra data produced by the front end, used to fill in the Ho file.
-data TiData = TiData {
-    tiDataLiftedInstances :: Map.Map Name HsDecl,
-    tiDataModules :: [(Module,HsModule)],
-    tiModuleOptions :: [(Module,Opt)],
-    tiAllAssumptions :: Map.Map Name Scheme
-}
 
 isGlobal x |  (_,(_::String,(h:_))) <- fromName x =  not $ isDigit h
 isGlobal _ = error "isGlobal"

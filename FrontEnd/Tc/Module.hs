@@ -41,20 +41,11 @@ import TypeSynonyms
 import TypeSyns
 import Type
 import Util.Gen
-import TIModule(TiData(..))
 import Util.Inst()
 import Warning
 
 trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env -- (Map.fromList [ n | n@(name,_) <- Map.toList env,  isGlobal name ])
 
--- Extra data produced by the front end, used to fill in the Ho file.
-data TiData = TiData {
-    tiDataLiftedInstances :: Map.Map Name HsDecl,
-    tiDataModules :: [(Module,HsModule)],
-    tiModuleOptions :: [(Module,Opt)],
-    tiCheckedRules :: [Rule],
-    tiAllAssumptions :: Map.Map Name Scheme
-}
 
 getDeclNames ::  HsDecl -> [Name]
 getDeclNames (HsTypeSig _ ns _ ) =  map (toName Val) ns
