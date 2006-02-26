@@ -60,6 +60,7 @@ prop_WRAPPER = toAtom "_WRAPPER"
 prop_CYCLIC = toAtom "_CYCLIC"
 prop_PLACEHOLDER = toAtom "_PLACEHOLDER"
 prop_RULEBINDER = toAtom "_RULEBINDER"
+prop_SCRUTINIZED = toAtom "_SCRUTINIZED"
 
 
 class HasProperties a where

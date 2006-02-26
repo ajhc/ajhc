@@ -87,15 +87,17 @@ tipe t = f t where
     f (TCon (Tycon n k)) | n == tc_World__ =  ELit (LitCons rt_Worldzh [] eHash)
     f (TCon (Tycon n k)) =  ELit (LitCons n [] (kind k))
     f (TVar Tyvar { tyvarRef = Just {}, tyvarKind = k}) = tAbsurd (kind k)
-    f (TVar tv) = EVar (cvar tv)
+    f (TVar tv) = EVar (cvar [] tv)
     f (TMetaVar mv) = cmvar mv
     f (TGen _ (Tyvar _ n k _)) = EVar (tVr (lt n) (kind k))
-    f (TForAll vs (_ :=> t)) = foldr EPi (f t) (map cvar vs)
+    f (TForAll vs (ps :=> t)) = foldr EPi (f t) (map (cvar $ freeVars ps) vs)
     f (TExists xs (_ :=> t)) = let
         xs' = map (kind . tyvarKind) xs
         in ELit (LitCons (unboxedNameTuple TypeConstructor (length xs' + 1)) (f t:xs') eHash)
-    cvar Tyvar { tyvarRef = Just {}, tyvarKind = k}= error "tyvar is metaref"
-    cvar (Tyvar _ n k _) = (tVr (lt n) (kind k))
+    cvar _ Tyvar { tyvarRef = Just {}, tyvarKind = k}= error "tyvar is metaref"
+    cvar fvs tv@Tyvar { tyvarName = n, tyvarKind = k }
+        | tv `elem` fvs = setProperty prop_SCRUTINIZED (tVr (lt n) (kind k))
+        | otherwise = tVr (lt n) (kind k)
     cmvar MetaVar { metaKind = k } = tAbsurd (kind k)
 
 kind Star = eStar
