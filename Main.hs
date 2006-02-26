@@ -35,6 +35,7 @@ import E.TypeAnalysis
 import E.TypeCheck
 import E.WorkerWrapper
 import FrontEnd.FrontEnd
+import qualified FrontEnd.Tc.Type as Type
 import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadCode
@@ -48,6 +49,7 @@ import Ho.Library
 import Ho.LibraryMap
 import HsSyn
 import Info.Types
+import Util.Gen
 import Name.Name
 import Options
 import SelfTest(selfTest)
@@ -148,6 +150,11 @@ processInitialHo ho = do
     return ho { hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds ] }
 
 
+procSpecs :: Monad m => (Map.Map Name [Type.Rule]) -> (TVr,E) -> m [(TVr,E)]
+procSpecs specMap (t,e) | Just n <- fromId (tvrIdent t), Just rs <- Map.lookup n specMap = do
+    return [(t,e)]
+procSpecs _specMap d = return [d]
+
 -- | this is called on parsed, typechecked haskell code to convert it to the internal representation
 
 processDecls ::
@@ -206,6 +213,9 @@ processDecls stats ho ho' tiData = do
     prog <- return $ prog { progEntryPoints = entries }
     prog <- return $ programPruneUnreachable prog
 
+    let specMap = Map.fromListWith (++) [ (n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- tiCheckedRules tiData]
+    nds <- mapM (procSpecs specMap) (programDs prog)
+    prog <- return $ programSetDs (concat nds) prog
 
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
