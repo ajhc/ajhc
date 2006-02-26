@@ -234,14 +234,15 @@ pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
 
 
 getTyp :: Monad m => E -> DataTable -> Typ -> m E
-getTyp kind dataTable vm = f kind vm where
-    f kind vm | Just [] <- vmapHeads vm = return $ tAbsurd kind
-    f kind vm | Just [h] <- vmapHeads vm = do
+getTyp kind dataTable vm = f 10 kind vm where
+    f n _ _ | n <= 0 = fail "getTyp: too deep"
+    f n kind vm | Just [] <- vmapHeads vm = return $ tAbsurd kind
+    f n kind vm | Just [h] <- vmapHeads vm = do
         let ss = slotTypes dataTable h kind
             as = [ (s,vmapArg h i vm) | (s,i) <- zip ss [0..]]
-        as' <- mapM (uncurry f) as
+        as' <- mapM (uncurry (f (n - 1))) as
         return $ ELit (LitCons h as' kind)
-    f _ _  = fail "getTyp: not constant type"
+    f _ _ _  = fail "getTyp: not constant type"
 
 specializeProgram :: (MonadStats m) => Program -> m Program
 specializeProgram prog = do
