@@ -1,38 +1,39 @@
 module FrontEnd.Tc.Monad(
-    addPreds,
-    addToCollectedEnv,
-    getCollectedEnv,
-    boxyInstantiate,
-    boxySpec,
-    freshInstance,
-    toSigma,
-    freshSigma,
-    getClassHierarchy,
-    getKindEnv,
-    getSigEnv,
-    deconstructorInstantiate,
-    getModName,
-    localEnv,
-    withMetaVars,
-    quantify,
-    lookupName,
-    newBox,
-    addRule,
-    unBox,
-    newMetaVar,
-    newVar,
-    runTc,
-    skolomize,
     Tc(),
     TcInfo(..),
-    tcInfoEmpty,
     TypeEnv(),
-    inst,
-    unificationError,
+    addPreds,
+    addRule,
+    addToCollectedEnv,
+    boxyInstantiate,
+    boxySpec,
+    deconstructorInstantiate,
     freeMetaVarsEnv,
+    freshInstance,
+    freshSigma,
+    getClassHierarchy,
+    getCollectedEnv,
+    getKindEnv,
+    getModName,
+    getSigEnv,
+    inst,
+    listenCheckedRules,
     listenPreds,
+    localEnv,
+    lookupName,
+    newBox,
+    newMetaVar,
+    newVar,
+    quantify,
+    runTc,
+    skolomize,
+    tcInfoEmpty,
+    toSigma,
+    unBox,
+    unificationError,
     varBind,
-    withContext
+    withContext,
+    withMetaVars
     ) where
 
 import Control.Monad.Error
@@ -258,6 +259,8 @@ addPreds ps = Tc $ tell mempty { collectedPreds = ps }
 
 listenPreds :: Tc a -> Tc (a,Preds)
 listenPreds action = censor (\x -> x { collectedPreds = mempty }) $ listens collectedPreds action
+listenCheckedRules :: Tc a -> Tc (a,[Rule])
+listenCheckedRules action = censor (\x -> x { checkedRules = mempty }) $ listens checkedRules action
 
 newVar :: Kind -> Tc Tyvar
 newVar k = do

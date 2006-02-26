@@ -1,4 +1,4 @@
-module FrontEnd.Tc.Module (tiModules') where
+module FrontEnd.Tc.Module (tiModules',TiData(..)) where
 
 import Char
 import Control.Monad.Writer
@@ -41,10 +41,20 @@ import TypeSynonyms
 import TypeSyns
 import Type
 import Util.Gen
+import TIModule(TiData(..))
 import Util.Inst()
 import Warning
 
 trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env -- (Map.fromList [ n | n@(name,_) <- Map.toList env,  isGlobal name ])
+
+-- Extra data produced by the front end, used to fill in the Ho file.
+data TiData = TiData {
+    tiDataLiftedInstances :: Map.Map Name HsDecl,
+    tiDataModules :: [(Module,HsModule)],
+    tiModuleOptions :: [(Module,Opt)],
+    tiCheckedRules :: [Rule],
+    tiAllAssumptions :: Map.Map Name Scheme
+}
 
 getDeclNames ::  HsDecl -> [Name]
 getDeclNames (HsTypeSig _ ns _ ) =  map (toName Val) ns
@@ -184,7 +194,6 @@ tiModules' me ms = do
     let sigEnv = Map.unions [listSigsToSigEnv kindInfo allTypeSigs,instanceEnv, classEnv]
     when (dump FD.Sigenv) $
          do {putStrLn "  ---- initial sigEnv information ---- ";
-             --mapM_ (putStrLn . show) (envToList kindInfo);
              putStrLn $ PPrint.render $ pprintEnvMap sigEnv}
     let bindings = (funPatBinds ++ [ z | z <- cDefBinds, isHsFunBind z || isHsPatBind z] ++ liftedInstances)
         classDefaults  = snub [ getDeclName z | z <- cDefBinds, isHsFunBind z || isHsPatBind z ]
@@ -218,11 +227,10 @@ tiModules' me ms = do
         tcInfoClassHierarchy = cHierarchyWithInstances
         }
 
-    localVarEnv <- withOptionsT (modInfoOptions tms) $ runTc tcInfo $ do
-        ds <- tiProgram program ds
-        getCollectedEnv
-        --liftIO $ mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType s |  (n,s) <- Map.toList ce]
-        --return (Map.map typeToScheme ce)
+    (localVarEnv,checkedRules) <- withOptionsT (modInfoOptions tms) $ runTc tcInfo $ do
+        (ds,cr) <- listenCheckedRules (tiProgram program ds)
+        env <- getCollectedEnv
+        return (env,cr)
 
     when (dump FD.Types) $ do
         putStrLn " ---- the types of identifiers ---- "
@@ -230,26 +238,20 @@ tiModules' me ms = do
 
     localVarEnv <- return $ Map.map typeToScheme localVarEnv
 
-    --let externalEnv = Map.fromList [ v | v@(x@(Qual m i) ,s) <- Map.toList localVarEnv, isGlobal x, m `elem` map modInfoName ms ]  `Map.union` noDefaultSigs
     let externalEnv = Map.filterWithKey (\ x _ -> isGlobal x && (fromJust (getModule x) `elem` map modInfoName ms)) localVarEnv `Map.union` noDefaultSigs
     localVarEnv <- return $  localVarEnv `Map.union` noDefaultSigs
-    --let externalKindEnv = Map.fromList [ v | v@(x@(Qual m i) ,s) <- Map.toList kindInfo, isGlobal x, m `elem` map modInfoName ms ]
     let externalKindEnv = restrictKindEnv (\ x  -> isGlobal x && (fromJust (getModule x) `elem` map modInfoName ms)) kindInfo
 
     let pragmaProps = Map.fromListWith (\a b -> snub $ a ++ b ) [ (toName Name.Val x,[toAtom w]) |  HsPragmaProps _ w xs <- ds, x <- xs ]
 
-    let allAssumps = localDConsEnv `Map.union` localVarEnv -- Map.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Map.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Map.toList localVarEnv ]
-        --expAssumps = M.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Env.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Env.toList $ trimEnv localVarEnv ]
-        --expAssumps = Map.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Map.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Map.toList $ externalEnv ]
-        expAssumps = localDConsEnv `Map.union` externalEnv -- Map.fromList $ [ (toName Name.DataConstructor x,y) | (x,y) <- Map.toList localDConsEnv ] ++ [ (toName Name.Val x,y) | (x,y) <- Map.toList $ externalEnv ]
+    let allAssumps = localDConsEnv `Map.union` localVarEnv
+        expAssumps = localDConsEnv `Map.union` externalEnv
     let ho = mempty {
         hoExports = Map.fromList [ (modInfoName m,modInfoExport m) | m <- ms ],
         hoDefs =  Map.fromList [ (x,(y,z)) | (x,y,z) <- concat $ map modInfoDefs ms],
         hoAssumps = expAssumps,
         hoFixities = thisFixityMap,
-        --hoKinds = trimMapEnv kindInfo,
         hoKinds = externalKindEnv,
-        --hoClassHierarchy = cHierarchyWithInstances,
         hoClassHierarchy = smallClassHierarchy,
         hoProps = pragmaProps,
         hoTypeSynonyms = thisTypeSynonyms
@@ -259,6 +261,7 @@ tiModules' me ms = do
             tiDataLiftedInstances = Map.fromList [ (getDeclName d,d) | d <- liftedInstances],
             tiDataModules = [ (modInfoName m, modInfoHsModule m) |  m <- ms],
             tiModuleOptions = [ (modInfoName m, modInfoOptions m) |  m <- ms],
+            tiCheckedRules = checkedRules,
             tiAllAssumptions = allAssumps
         }
     return (ho,tiData)
