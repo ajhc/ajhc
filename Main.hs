@@ -378,7 +378,10 @@ compileModEnv' stats ho = do
 
     prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return prog
     putStrLn "Type analyzed methods"
-    mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ({-filter (getProperty prop_METHOD . fst)-} (programDs prog))
+    flip mapM_ (programDs prog) $ \ (t,e) -> do
+        let (_,ts) = fromLam e
+            ts' = takeWhile (sortStarLike . getType) ts
+        when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
     wdump FD.Lambdacube $ printProgram prog
 
     cmethods <- do
@@ -402,15 +405,6 @@ compileModEnv' stats ho = do
     ne <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) (programE prog)
     prog <- return $ programSetE ne prog
 
-
---    prog <- if (fopts  FO.TypeAnalysis) then do
---            prog <- typeAnalyze prog
---            putStrLn "Type analyzed methods"
---            mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) (filter (getProperty prop_METHOD . fst) (programDs prog))
---            --mapM_ (\ (t,e) -> let (_,ts) = fromLam e in putStrLn $  (prettyE (EVar t)) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ] ) ds'
---            prog <- programMapBodies pruneE prog
---            return $ programPruneUnreachable prog
---        else return prog
 
     -- make sure properties and rules are attached everywhere
     prog <- return $ runIdentity $ annotateProgram mempty (idann rules (hoProps ho) ) letann lamann prog
