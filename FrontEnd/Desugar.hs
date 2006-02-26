@@ -200,9 +200,9 @@ desugarHsExp s = return $ fst $ runPatSM (0::Int, undefined) $ desugarExp s
 
 
 desugarDecl :: HsDecl -> PatSM [HsDecl]
-desugarDecl (HsForeignDecl sl ft s n qt) = do
-    qt' <- remSynsQualType qt
-    return [HsForeignDecl sl ft s n qt']
+desugarDecl (HsForeignDecl a b c d e qt) = do
+    qt <- remSynsQualType qt
+    return [HsForeignDecl a b c d e qt]
 desugarDecl (HsFunBind matches) = do
     newMatches <- mapM desugarMatch matches
     return [HsFunBind newMatches]

@@ -33,6 +33,8 @@ module FrontEnd.ParseUtils (
         , readRational
         , fixupHsDecls
         , parseError
+        , parseImport
+        , parseExport
  ) where
 
 import HsSyn
@@ -359,6 +361,37 @@ matchName (HsMatch _sloc name _pats _rhs _whereDecls) = name
 sameFun :: HsName -> HsDecl -> Bool
 sameFun name (HsFunBind matches@(_:_)) = name == (matchName $ head matches)
 sameFun _ _ = False
+
+-- FFI parsing
+
+parseExport :: Monad m => String -> HsName -> m HsForeignT
+parseExport cn hn =
+    case words cn of
+      [x] | isCName x -> return $ Export x
+      []              -> return $ Export $ show hn
+      _               -> fail ("Invalid cname in export declaration: "++show cn)
+
+parseImport :: Monad m => String -> HsName -> m HsForeignT
+parseImport cn hn =
+    case words cn of
+      ["dynamic"]   -> return Dynamic
+      ["wrapper"]   -> return Wrapper
+      []            -> return $ Import (show hn) [] []
+      ("static":xs) -> parseIS [] [] xs
+      xs            -> parseIS [] [] xs
+
+parseIS a b ['&':n] | isCName n = return $ AddrOf n a b
+parseIS a b [n]     | isCName n = return $ Import n a b
+parseIS a b ["&",n] | isCName n = return $ AddrOf n a b
+parseIS a b (('-':'l':l):r)     = parseIS a (l:b) r
+parseIS a b (i:r)               = parseIS (i:a) b r
+parseIS _ _ x                   = fail ("Syntax error parsing foreign import: "++show x)
+
+isCName []     = False
+isCName (c:cs) = p1 c && all p2 cs
+    where p1 c = isAlpha c    || any (c==) oa
+          p2 c = isAlphaNum c || any (c==) oa
+          oa   = "_-$"
 
 -- collects all the HsMatch equations from any FunBinds
 -- from a list of HsDecls

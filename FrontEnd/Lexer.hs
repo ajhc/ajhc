@@ -87,6 +87,7 @@ data Token
 	| KW_Deriving
 	| KW_Do
 	| KW_Else
+        | KW_Export
         | KW_Hiding
 	| KW_If
 	| KW_Import
@@ -104,6 +105,11 @@ data Token
 	| KW_Where
 	| KW_Qualified
 	| KW_Foreign
+        | KW_Safe
+        | KW_Unsafe
+        | KW_CCall
+        | KW_Stdcall
+        | KW_Primitive
 	| KW_Forall
         | KW_Exists
 
@@ -148,6 +154,7 @@ reserved_ids = [
  ( "deriving",  KW_Deriving ),
  ( "do",        KW_Do ),
  ( "else",      KW_Else ),
+ ( "export",    KW_Export ),
  ( "if",    	KW_If ),
  ( "import",    KW_Import ),
  ( "in", 	KW_In ),
@@ -162,6 +169,11 @@ reserved_ids = [
  ( "then", 	KW_Then ),
  ( "type", 	KW_Type ),
  ( "foreign",   KW_Foreign ),
+ ( "safe",      KW_Safe ),
+ ( "unsafe",    KW_Unsafe ),
+ ( "ccall",     KW_CCall ),
+ ( "stdcall",   KW_Stdcall ),
+ ( "primitive", KW_Primitive ),
  ( "forall",    KW_Forall ),
  ( "exists",    KW_Exists ),
  ( "where", 	KW_Where )

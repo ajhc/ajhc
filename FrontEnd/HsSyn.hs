@@ -31,8 +31,22 @@ instance Show Module where
 
 fromModule (Module s) = s
 
-data ForeignType = ForeignPrimitive | ForeignCCall
-    deriving(Data,Typeable, Eq, Ord, Show)
+-- Foreign Declarations
+
+data Safety = Safe | Unsafe deriving(Data,Eq,Ord,Show,Typeable)
+data CallConv = CCall | StdCall | Primitive deriving(Data,Eq,Ord,Show,Typeable)
+type Includes = [String]
+type Libs     = [String]
+type CName    = String
+
+data HsForeignT = AddrOf CName Libs Includes
+                | Dynamic
+                | Export CName
+                | Import CName Libs Includes
+                | Wrapper
+                  deriving(Data,Eq,Ord,Show,Typeable)
+
+-- Names
 
 data HsName
 	= Qual { hsNameModule :: Module, hsNameIdent ::  HsIdentifier}
@@ -129,13 +143,13 @@ instance HasLocation HsDecl where
     srcLoc HsNewTypeDecl { hsDeclSrcLoc = sl } = sl
     srcLoc HsPragmaSpecialize { hsDeclSrcLoc = sl } = sl
     srcLoc HsPragmaRules { hsDeclSrcLoc = sl } = sl
+    srcLoc HsForeignDecl { hsDeclSrcLoc = sl } = sl
     srcLoc (HsClassDecl	 sl _ _) = sl
     srcLoc (HsInstDecl	 sl _ _) = sl
     srcLoc (HsDefaultDecl sl _) = sl
     srcLoc (HsTypeSig	 sl _ _) = sl
     srcLoc (HsFunBind     ms) = srcLoc ms
     srcLoc (HsPatBind	 sl _ _ _) = sl
-    srcLoc (HsForeignDecl sl _ _ _ _) = sl
     srcLoc (HsPragmaProps sl _ _) = sl
 
 
@@ -150,7 +164,13 @@ data HsDecl
 	 | HsTypeSig	 SrcLoc [HsName] HsQualType
 	 | HsFunBind     [HsMatch]
 	 | HsPatBind	 SrcLoc HsPat HsRhs {-where-} [HsDecl]
-	 | HsForeignDecl SrcLoc ForeignType String HsName HsQualType
+         | HsForeignDecl { hsDeclSrcLoc   :: SrcLoc,
+                           hsDeclForeign  :: HsForeignT,
+                           hsDeclCallConv :: CallConv,
+                           hsDeclSafety   :: Safety,
+                           hsDeclName     :: HsName,
+                           hsDeclQualType :: HsQualType
+                         }
          | HsPragmaProps SrcLoc String [HsName]
 	 | HsPragmaRules { hsDeclUniq :: (Module,Int), hsDeclSrcLoc :: SrcLoc, hsDeclString :: String, hsDeclFreeVars :: [HsName], hsDeclLeftExpr :: HsExp, hsDeclRightExpr :: HsExp }
          | HsPragmaSpecialize { hsDeclSrcLoc :: SrcLoc, hsDeclBool :: Bool, hsDeclName :: HsName, hsDeclType :: HsType }

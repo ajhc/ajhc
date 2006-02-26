@@ -468,7 +468,7 @@ tcPragmaDecl prule@HsPragmaRules { hsDeclUniq = uniq, hsDeclFreeVars = vs, hsDec
             addToCollectedEnv env
             return (v,env)
 
-tcPragmaDecl fd@(HsForeignDecl _ _ _ n qt) = do
+tcPragmaDecl fd@(HsForeignDecl _ _ _ _ n qt) = do
     kt <- getKindEnv
     s <- hsQualTypeToSigma kt qt
     addToCollectedEnv (Map.singleton (toName Val n) s)

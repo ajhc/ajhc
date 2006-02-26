@@ -43,7 +43,7 @@ collectSigsFromDecls [] = []
 
 collectSigsFromDecls (d@(HsTypeSig {}):ds) = d : collectSigsFromDecls ds
 
-collectSigsFromDecls ((HsForeignDecl sl _ _ n qt):ds) = HsTypeSig sl [n] qt:collectSigsFromDecls ds
+collectSigsFromDecls ((HsForeignDecl sl _ _ _ n qt):ds) = HsTypeSig sl [n] qt:collectSigsFromDecls ds
 
 collectSigsFromDecls ((HsPatBind _ _ rhs wheres):ds)
    = collectSigsFromRhs rhs ++

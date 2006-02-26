@@ -100,6 +100,7 @@ Reserved Ids
 >	'deriving'	{ KW_Deriving }
 >	'do'		{ KW_Do }
 >	'else'		{ KW_Else }
+>       'export'        { KW_Export }
 >	'hiding'	{ KW_Hiding }
 >	'if'		{ KW_If }
 >	'import'	{ KW_Import }
@@ -117,6 +118,11 @@ Reserved Ids
 >	'where'		{ KW_Where }
 >	'qualified'	{ KW_Qualified }
 >	'foreign'	{ KW_Foreign }
+>       'safe'          { KW_Safe }
+>       'unsafe'        { KW_Unsafe }
+>       'ccall'         { KW_CCall }
+>       'stdcall'       { KW_Stdcall }
+>       'primitive'     { KW_Primitive }
 >	'forall'	{ KW_Forall }
 >	'exists'	{ KW_Exists }
 
@@ -281,10 +287,17 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >			{ HsInstDecl $2 $3 $4 }
 >	| 'default' srcloc type
 >			{ HsDefaultDecl $2 $3 }
->	| srcloc 'foreign' 'import' cconv STRING var '::' ctype
->			{ HsForeignDecl $1 $4 $5 $6 $8}
->	| srcloc 'foreign' 'import' cconv var '::' ctype
->			{ HsForeignDecl $1 $4 (show $5) $5 $7}
+>       | 'foreign' srcloc 'export' mcconv mstring var '::' ctype
+>                       {% parseExport $5 $6 >>= \x ->
+>                          return (HsForeignDecl $2 x $4 Safe $6 $8) }
+>       | 'foreign' srcloc 'import' 'primitive' mstring var '::' ctype
+>                       { let i = Import (if null $5 then show $6 else $5) [] []
+>                         in HsForeignDecl $2 i Primitive Safe $6 $8 }
+>       | 'foreign' srcloc 'import' mcconv msafety mstring var '::' ctype
+>                       {% parseImport $6 $7 >>= \x ->
+>                          return (HsForeignDecl $2 x $4 $5 $7 $9) }
+
+
 >       | srcloc PRAGMARULES STRING mfreevars exp '=' exp PRAGMAEND
 >                       { HsPragmaRules { hsDeclSrcLoc = $1, hsDeclString = $3, hsDeclFreeVars = $4, hsDeclLeftExpr = $5, hsDeclRightExpr = $7 } }
 >       | srcloc PRAGMASPECIALIZE var '::' type PRAGMAEND
@@ -298,9 +311,6 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 > vbinds :: { [HsName] }
 >       : vbinds var                  { $2 : $1 }
 >       | var                         { [$1] }
-
-> cconv :: { ForeignType }
->        : varid  { if show $1 == "primitive" then ForeignPrimitive else ForeignCCall }
 
 > decls :: { [HsDecl] }
 >	: decls1 optsemi		{ fixupHsDecls ( reverse $1 ) }
@@ -343,6 +353,22 @@ would require more lookahead. So let's check for ourselves...
 >	: vars ',' var			{ $3 : $1 }
 >	| qvar				{% checkUnQual $1 `thenP` \n ->
 >					   returnP [n] }
+
+FFI parts
+
+> mcconv :: { CallConv }
+> mcconv : 'ccall'        { CCall }
+>        | 'stdcall'      { StdCall }
+>        | {- empty -}    { CCall }
+>
+> msafety :: { Safety }
+> msafety : 'safe'        { Safe }
+>         | 'unsafe'      { Unsafe }
+>         | {- empty -}   { Safe }
+>
+> mstring :: { String }
+> mstring : STRING         { $1 }
+>         | {- empty -}    { "" }
 
 -----------------------------------------------------------------------------
 Types

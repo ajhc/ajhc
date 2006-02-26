@@ -448,9 +448,9 @@ tiPragmaRules env prule@HsPragmaRules { hsDeclFreeVars = vs, hsDeclLeftExpr = e1
 --       doesn't happen until after this function is finished with
 tiDecl ::  TypeEnv -> HsDecl -> TI ([Pred], TypeEnv, Type)
 
-tiDecl env (HsForeignDecl _ _ _ n _) = do
+tiDecl env d@HsForeignDecl {} = do
     sigEnv <- getSigEnv
-    let Just qt =  Map.lookup (toName Val n) sigEnv
+    let Just qt =  Map.lookup (toName Val $ hsDeclName d) sigEnv
     ((ps :=> t)) <- freshInst qt
     return (ps, env, t)
 

@@ -22,7 +22,7 @@ import qualified Text.PrettyPrint.HughesPJ as PPrint
 import Atom
 import Boolean.Algebra
 import Class
-import C.Prims
+import C.Prims as CP
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
@@ -41,7 +41,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Type(prettyPrintType)
 import FrontEnd.Utils
 import GenUtil
-import HsSyn
+import HsSyn as HS
 import Info.Types
 import Name.Name as Name
 import Name.Names
@@ -324,28 +324,27 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         | otherwise = (a,b, deNewtype dataTable c)
     pval = convertVal assumps
     cDecl :: HsDecl -> [(Name,TVr,E)]
-    cDecl (HsForeignDecl _ ForeignPrimitive s n _) = [(name,var, lamt (foldr ($) (EPrim (primPrim s) (map EVar es) rt) (map ELam es)))]  where
-        name = toName Name.Val n
-        var = tVr (nameToInt name) ty
+    cDecl (HsForeignDecl _ i@(Import {}) HS.Primitive _ n _) = result where 
+        result    = expr $ foldr ($) (EPrim (toPrim i) (map EVar es) rt) (map ELam es)
+        expr x    = [(name,var,lamt x)]
+        name      = toName Name.Val n
+        var       = tVr (nameToInt name) ty
         (ty,lamt) = pval name
-        (ts,rt) = argTypes' ty
-        es = [ (tVr ( n) t) |  t <- ts, not (sortStarLike t) | n <- localVars ]
-    cDecl (HsForeignDecl _ ForeignCCall s n _)
-        | Func _ s _ _ <- p, not isIO =  expr $ createFunc dataTable [4,6..] (map tvrType es) $ \rs -> (,) id $ eStrictLet rtVar' (EPrim (APrim (Func False s (snds rs) rtt) req) [ EVar t | (t,_) <- rs ] rtt') (ELit $ LitCons cn [EVar rtVar'] rt')
-        | Func _ s _ _ <- p, "void" <- toExtType rt' =
-                expr $ (createFunc dataTable [4,6..] (map tvrType es) $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
-                    eStrictLet tvrWorld2 (EPrim (APrim (Func True s (snds rs) "void") req) (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit))
-        | Func _ s _ _ <- p =
-                expr $ (createFunc dataTable [4,6..] (map tvrType es) $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
-                    eCaseTup' (EPrim (APrim (Func True s (snds rs) rtt) req) (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ LitCons cn [EVar rtVar'] rt') (eJustIO (EVar tvrWorld2) (EVar rtVar))))
-        | AddrOf _ <- p = let
-            (cn,st,ct) = runIdentity (lookupCType' dataTable rt)
-            (var:_) = freeNames (freeVars rt)
-            vr = tVr var st
-          in expr $ eStrictLet vr (EPrim (APrim p req) [] st) (ELit (LitCons cn [EVar vr] rt))
-        where
+        (ts,rt)   = argTypes' ty
+        es        = [ (tVr ( n) t) |  t <- ts, not (sortStarLike t) | n <- localVars ]
+        toPrim (Import cn is ls) = APrim (PrimPrim cn) (Requires is ls)
+    cDecl (HsForeignDecl _ i@HS.AddrOf {} _ _ n _) = result where
+        (cn,st,ct) = runIdentity (lookupCType' dataTable rt)
+        (ty,lamt)  = pval name
+        (ts,rt)    = argTypes' ty
+        name       = toName Name.Val n
+        hvar       = head $ freeNames $ freeVars rt
+        var        = tVr hvar st
+        expr x     = [(name,var,lamt x)]
+        prim       = APrim (CP.AddrOf cn) (Requires is ls) where HS.AddrOf cn is ls = i
+        result     = expr $ eStrictLet var (EPrim prim [] st) (ELit (LitCons cn [EVar var] rt))
+    cDecl (HsForeignDecl _ i@Import {} HS.CCall _ n _) = result where
         expr x = [(name,var,lamt x)]
-        Just (APrim p req) = parsePrimString s
         name = toName Name.Val n
         tvrWorld = tVr 256 tWorld__
         tvrWorld2 = tVr 258 tWorld__
@@ -365,6 +364,20 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         (cn,rtt',rtt) = case lookupCType' dataTable rt' of
             Right x -> x
             Left err -> error $ "Odd RetType foreign: " ++ err
+        prim io rs rtt = EPrim (APrim (Func io s (snds rs) rtt) (Requires is ls))
+            where Import s is ls = i
+        cFun    = expr . createFunc dataTable [4,6 ..] (map tvrType es)
+        result | not isIO =
+            cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim False rs rtt [ EVar t | (t,_) <- rs ] rtt') (ELit $ LitCons cn [EVar rtVar'] rt')
+               | "void" <- toExtType rt' =
+            cFun $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
+                    eStrictLet tvrWorld2 (prim True rs "void" (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
+                                                                                                                | otherwise =
+             cFun $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
+                    eCaseTup' (prim True rs rtt (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ LitCons cn [EVar rtVar'] rt') (eJustIO (EVar tvrWorld2) (EVar rtVar)))
+
+    cDecl x@HsForeignDecl {} = fail ("Unsupported foreign declaration: "++ show x)
+
     cDecl (HsPatBind sl p (HsUnGuardedRhs exp) []) | (HsPVar n) <- simplifyHsPat p, n == sillyName' = let
         in [(v_silly,tvr,cExpr exp)]
     cDecl (HsPatBind sl p rhs wh) | (HsPVar n) <- simplifyHsPat p = let
