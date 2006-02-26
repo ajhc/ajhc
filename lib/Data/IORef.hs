@@ -19,11 +19,11 @@ foreign import primitive writeRef__ :: forall s . Ref s a -> a -> s -> s
 
 foreign import primitive eqRef__ :: forall s . Ref s a -> Ref s a -> Bool
 
-newIORef v = IO $ \world -> case newRef__ v world of
+newIORef v = IO $ \_ world -> case newRef__ v world of
     (world',r) -> JustIO world' r
-readIORef r = IO $ \world -> case readRef__ r world of
+readIORef r = IO $ \_ world -> case readRef__ r world of
     (world',v) -> JustIO world' v
-writeIORef r v = IO $ \world -> case writeRef__ r v world of
+writeIORef r v = IO $ \_ world -> case writeRef__ r v world of
     world' -> JustIO world' ()
 
 --instance Eq (IORef a) where
