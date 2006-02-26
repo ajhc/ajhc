@@ -22,6 +22,8 @@ an 'f' to names that start with a capital letter.
 
 * F@ - bindings that have been floated out of top level definitions
 
+* Spec@ - specializations of polymorphic functions
+
 when a name is one of several generated from an existing one, the convention
 is to append '$n' for some number that makes the name unique.
 

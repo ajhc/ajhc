@@ -433,7 +433,7 @@ tcPragmaDecl spec@HsPragmaSpecialize { hsDeclSrcLoc = sloc, hsDeclName = n, hsDe
         let nn = toName Val n
         sc <- lookupName nn
         sc `subsumes` t
-        addRule RuleSpec { ruleName = nn, ruleType = t, ruleSuper = hsDeclBool spec }
+        addRule RuleSpec { ruleUniq = hsDeclUniq spec, ruleName = nn, ruleType = t, ruleSuper = hsDeclBool spec }
         return [spec]
 
 

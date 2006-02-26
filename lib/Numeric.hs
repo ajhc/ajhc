@@ -89,6 +89,8 @@ integerLogBase b i =
 
 
 -- Misc utilities to show integers and floats
+{-# SPECIALIZE showSigned :: (Int -> ShowS) -> Int -> Int -> ShowS #-}
+{-# SPECIALIZE showSigned :: (Integer -> ShowS) -> Int -> Integer -> ShowS #-}
 
 showSigned :: Real a => (a -> ShowS) -> Int -> a -> ShowS
 showSigned showPos p x
@@ -100,6 +102,9 @@ showInt, showOct, showHex :: Integral a => a -> ShowS
 showOct = showIntAtBase  8 intToDigit
 showInt = showIntAtBase 10 intToDigit
 showHex = showIntAtBase 16 intToDigit
+
+{-# SPECIALIZE showIntAtBase :: Int -> (Int -> Char) -> Int -> ShowS #-}
+{-# SPECIALIZE showIntAtBase :: Integer -> (Int -> Char) -> Integer -> ShowS #-}
 
 showIntAtBase :: Integral a
 	      => a              -- base
@@ -126,6 +131,9 @@ readSigned readPos = readParen False read'
 
 -- readInt reads a string of digits using an arbitrary base.
 -- Leading minus signs must be handled elsewhere.
+
+{-# SPECIALIZE readInt :: Int -> (Char -> Bool) -> (Char -> Int) -> ReadS Int #-}
+{-# SPECIALIZE readInt :: Integer -> (Char -> Bool) -> (Char -> Int) -> ReadS Integer #-}
 
 readInt :: (Integral a) => a -> (Char -> Bool) -> (Char -> Int) -> ReadS a
 readInt radix isDig digToInt s =

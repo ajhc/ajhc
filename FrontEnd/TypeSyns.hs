@@ -145,6 +145,15 @@ renameHsDecl (HsInfixDecl srcLoc assoc int hsNames) subTable = do
     setSrcLoc srcLoc
     hsNames' <- renameHsNames hsNames subTable
     return $ HsInfixDecl srcLoc assoc int hsNames'
+renameHsDecl prules@HsPragmaRules { hsDeclSrcLoc = srcLoc, hsDeclFreeVars = fvs, hsDeclLeftExpr = e1, hsDeclRightExpr = e2 } subTable = do
+    setSrcLoc srcLoc
+    e1' <- renameHsExp e1 subTable
+    e2' <- renameHsExp e2 subTable
+    return prules {  hsDeclLeftExpr = e1', hsDeclRightExpr = e2' }
+renameHsDecl prules@HsPragmaSpecialize { hsDeclSrcLoc = srcLoc, hsDeclName = n, hsDeclType = t } subTable = do
+    setSrcLoc srcLoc
+    t <- renameHsType t subTable
+    return prules {  hsDeclType = t }
 
 renameHsDecl otherHsDecl _ = return otherHsDecl
 

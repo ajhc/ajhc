@@ -324,6 +324,7 @@ instance CanType Tyvar Kind where
 
 
 data Rule = RuleSpec {
+    ruleUniq :: (Module,Int),
     ruleName :: Name,
     ruleSuper :: Bool,
     ruleType :: Type

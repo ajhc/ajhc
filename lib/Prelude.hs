@@ -242,6 +242,8 @@ even n           =  n `rem` 2 == 0
 odd              =  not . even
 
 
+{-# SPECIALIZE gcd :: Int -> Int -> Int #-}
+{-# SPECIALIZE gcd :: Integer -> Integer -> Integer #-}
 gcd              :: (Integral a) => a -> a -> a
 gcd 0 0          =  error "Prelude.gcd: gcd 0 0 is undefined"
 gcd x y          =  gcd' (abs x) (abs y)
@@ -249,6 +251,8 @@ gcd x y          =  gcd' (abs x) (abs y)
                           gcd' x y  =  gcd' y (x `rem` y)
 
 
+{-# SPECIALIZE lcm :: Int -> Int -> Int #-}
+{-# SPECIALIZE lcm :: Integer -> Integer -> Integer #-}
 lcm              :: (Integral a) => a -> a -> a
 lcm _ 0          =  0
 lcm 0 _          =  0

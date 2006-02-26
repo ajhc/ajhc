@@ -61,6 +61,7 @@ prop_CYCLIC = toAtom "_CYCLIC"
 prop_PLACEHOLDER = toAtom "_PLACEHOLDER"
 prop_RULEBINDER = toAtom "_RULEBINDER"
 prop_SCRUTINIZED = toAtom "_SCRUTINIZED"
+prop_SPECIALIZATION = toAtom "_SPECIALIZATION"
 
 
 class HasProperties a where

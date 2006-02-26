@@ -422,7 +422,9 @@ renameHsDecl prules@HsPragmaSpecialize { hsDeclSrcLoc = srcLoc, hsDeclName = n, 
     setSrcLoc srcLoc
     n <- renameAny n subTable
     t <- renameAny t subTable
-    return prules {  hsDeclName = n, hsDeclType = t }
+    m <- getCurrentModule
+    i <- newUniq
+    return prules { hsDeclUniq = (m,i), hsDeclName = n, hsDeclType = t }
 
 renameHsDecl otherHsDecl _ = return otherHsDecl
 
