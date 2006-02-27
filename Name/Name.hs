@@ -15,6 +15,8 @@ module Name.Name(
     fromId,
     Module,
     mainModule,
+    nameParts,
+    mapName,
     setModule
     ) where
 
@@ -85,34 +87,44 @@ instance ToName HsName where
 
 instance ToName (String,String) where
     toName nt (m,i) = createName nt m i
-    fromName n = (nameType n, mi ) where
-        nn = nameName n
-        mi  | Qual (Module m) (HsIdent i) <- nn = (m,i)
-            | UnQual (HsIdent i) <- nn = ("",i)
-            | otherwise = error "can't happen"
+    fromName n = case nameParts n of
+            (nt,Just m,i) -> (nt,(m,i))
+            (nt,Nothing,i) -> (nt,("",i))
+
+instance ToName (Maybe String,String) where
+    toName nt (Just m,i) = createName nt m i
+    toName nt (Nothing,i) = createUName nt i
+    fromName n = case nameParts n of
+        (nt,a,b) -> (nt,(a,b))
+
+instance ToName (Maybe Module,String) where
+    toName nt (Just (Module m),i) = createName nt m i
+    toName nt (Nothing,i) = createUName nt i
+    fromName n = case nameParts n of
+        (nt,a,b) -> (nt,(fmap Module a,b))
 
 instance ToName String where
     toName nt i = createUName nt i
-    fromName n = (nameType n, m ++ i ) where
-        nn = nameName n
-        (m,i)  | Qual (Module m) (HsIdent i) <- nn = (m ++ ".",i)
-               | UnQual (HsIdent i) <- nn = ("",i)
+    fromName n = (nameType n, mi ) where
+        mi = case snd $ fromName n of
+            (Just m,i) -> m ++ "." ++ i
+            (Nothing,i) -> i
 
 
 getModule :: Monad m => Name -> m Module
-getModule n = case nameName n of
-    Qual m _ -> return m
-    UnQual {} -> fail "Name is unqualified."
+getModule n = case nameParts n of
+    (_,Just m,_)  -> return (Module m)
+    _ -> fail "Name is unqualified."
 
 toUnqualified :: Name -> Name
-toUnqualified n = case fromName n of
-    (_,UnQual {}) -> n
-    (t,Qual m n) -> toName t (UnQual n)
+toUnqualified n = case nameParts n of
+    (_,Nothing,_) -> n
+    (t,Just _,i) -> toName t i
 
 qualifyName :: Module -> Name -> Name
-qualifyName m n = case fromName n of
-    (t,UnQual n) -> toName t (Qual m n)
-    (_,Qual {}) -> n
+qualifyName m n = case nameParts n of
+    (t,Nothing,n) -> toName t (Just m, n)
+    _ -> n
 
 setModule :: Module -> Name -> Name
 setModule m n = qualifyName m  $ toUnqualified n
@@ -135,6 +147,12 @@ nameName (Name a) = f $ tail (toString a) where
     f xs | (a,_:b) <- span (/= '\NUL') xs  = Qual (Module a) (HsIdent b)
     f _ = error "invalid Name"
 
+nameParts :: Name -> (NameType,Maybe String,String)
+nameParts n@(Name a) = f $ tail (toString a) where
+    f ('\NUL':xs) = (nameType n,Nothing,xs)
+    f xs = (nameType n,Just a,b) where
+        (a,_:b) = span (/= '\NUL') xs
+
 instance Show Name where
     show a = show $ nameName a
 
@@ -146,6 +164,11 @@ toId x = atomIndex (toAtom x)
 
 fromId :: Monad m => Int -> m Name
 fromId i = liftM Name (intToAtom i)
+
+mapName :: (String -> String,String -> String) -> Name -> Name
+mapName (f,g) n = case nameParts n of
+    (nt,Nothing,i) -> toName nt (g i)
+    (nt,Just m,i) -> toName nt (Just (f m :: String),g i)
 
 mainModule = Module "Main@"
 
