@@ -254,8 +254,8 @@ makeRule ::
     -> TVr      -- ^ the head
     -> [E]      -- ^ the args
     -> E        -- ^ the body
-    -> Rules
-makeRule name uniq fvs head args body = fromRules [rule] where
+    -> Rule
+makeRule name uniq fvs head args body = rule where
     rule = emptyRule {
         ruleHead = head,
         ruleBinds = fvs,
