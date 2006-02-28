@@ -25,7 +25,12 @@ Assuming you have ghc 6.4, happy, and DrIFT installed, you may now run GNU
 make by typing 'gmake' or just 'make' depending on your system and get a
 binary 'jhc' out if nothing went wrong.
 
-=== Installing the libraries ====
+Installation is done with 'gmake install' or for a custom installation
+prefix 'gmake install PREFIX=/foo/bar'. This will install jhc and jhci
+in ${PREFIX}/bin and base libraries in ${PREFIX}/lib, from where they
+are automatically included when needed.
+
+=== Installing the libraries - the old way ====
 
 The jhc libraries will be in the 'lib' directory. these may be installed
 anywhere or left in place but the directory where they are installed *must be

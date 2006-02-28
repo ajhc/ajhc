@@ -32,8 +32,7 @@ import System.IO.Unsafe
 import GenUtil
 import qualified FlagDump
 import qualified FlagOpts
-
-basePackages = ["base-0.1", "haskell98-0.1"]
+import Version.Raw(basePackages, libraryPath)
 
 data Mode = BuildHl String -- ^ Load the specified hl-files (haskell libraries).
           | Interactive    -- ^ Run interactively.
@@ -81,7 +80,7 @@ opt = Opt {
     optDebug       = False,
     optIncdirs     = initialIncludes,
     optHls         = [],
-    optHlPath      = initialIncludes,
+    optHlPath      = initialIncludes ++ libraryPath,
     optProgArgs    = [],
     optDump        = [],
     optStmts       = [],
@@ -96,7 +95,7 @@ opt = Opt {
     optOutName     = "hs.out",
     optPrelude     = True,
     optVerbose     = 0,
-    optNoAuto      = True,
+    optNoAuto      = False,
     optDumpSet     = S.empty,
     optFOptsSet    = S.empty
 }

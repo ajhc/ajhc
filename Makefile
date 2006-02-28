@@ -1,4 +1,5 @@
 JHC_VERSION=0.1
+PREFIX=/usr/local
 
 all: jhc
 
@@ -36,6 +37,23 @@ jhc: $(BUILTSOURCES) $(HSFILES)
 i:
 	ghci $(GHCOPTS) $(EXTRAOPTS) Main.hs
 
+ifdef DESTDIR
+DP=$(DESTDIR)/$(PREFIX)
+DC=--destdir=$(DESTDIR)
+else
+DP=$(PREFIX)
+DC=
+endif
+
+install: jhc
+	(cd lib && \
+	 runghc Setup.lhs configure --jhc -w ../jhc --prefix=$(PREFIX) && \
+	 runghc Setup.lhs build && \
+	 runghc Setup.lhs copy $(DC))
+	install -d "$(DP)/bin"
+	install jhc "$(DP)/bin"
+	(cd "$(DP)/bin" && rm -f jhci && ln -s jhc jhci)
+	strip -s "$(DP)/bin/jhc"
 
 tags: $(HSFILES)
 	hasktags $(HSFILES)
@@ -97,11 +115,13 @@ FrontEnd/HsParser.hs: FrontEnd/HsParser.ly
 	happy -a -g -c FrontEnd/HsParser.ly
 
 Version/Ctx.hs: _darcs/inventory
+	rm -f $@
 	darcs changes --context > changes.txt  || echo "No darcs Context Available!" > changes.txt
 	perl ./utils/op_raw.prl Version.Ctx changes.txt > $@
 	rm -f changes.txt
 
 Version/Raw.hs: _darcs/inventory
+	rm -f $@
 	echo "module Version.Raw where"                                > $@
 	echo "jhcVersion = \"$(JHC_VERSION)\""                         >> $@
 	date +'compileDate = "%Y%m%d"'                                 >> $@
@@ -109,6 +129,10 @@ Version/Raw.hs: _darcs/inventory
 	|  perl -e '<>;$$_=<>;s/^\s*tagged\s+/darcsTag = "/;s/$$/"/;print' >> $@
 	darcs changes --from-tag='' --xml-output | grep '</patch>' \
 	| wc -l | perl -e 'print "darcsPatches = \"".(<>-1)."\"\n"'    >> $@
+	echo '{-# NOINLINE libraryPath #-}'                            >> $@
+	echo 'libraryPath=["$(PREFIX)/lib/jhc-$(JHC_VERSION)"]'        >> $@
+	echo '{-# NOINLINE basePackages #-}'                           >> $@
+	echo 'basePackages=["base-1.0"]'                               >> $@
 
 .PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs i
 
