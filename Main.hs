@@ -6,6 +6,7 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Monoid
 import List hiding(group)
+import Maybe
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -696,10 +697,13 @@ printProgram prog@Program {progCombinators = cs, progDataTable = dataTable } = d
 
 printCheckName'' :: DataTable -> TVr -> E -> IO ()
 printCheckName'' dataTable tvr e = do
-    let ty = case inferType dataTable [] e of
-            Left err -> vcat $ map text (intersperse "---" $ tail err)
-            Right ty -> pprint ty
-    putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> ty))
+    let (ty,pty) = case inferType dataTable [] e of
+            Left err -> (Unknown,vcat $ map text (intersperse "---" $ tail err))
+            Right ty -> (ty,pprint ty)
+        tmatch = isJust $ match (const Nothing) [] ty (tvrType tvr)
+    putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
+    when (not tmatch) $
+        putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pprint (tvrType tvr)))
     putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
 
 
