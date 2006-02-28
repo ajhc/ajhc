@@ -17,7 +17,7 @@ import Doc.DocLike
 import FrontEnd.SrcLoc
 import GenUtil
 import Util.UniqueMonad
-import HsErrors
+import FrontEnd.HsErrors
 import HsSyn
 import Name.Name
 import Util.HasSize

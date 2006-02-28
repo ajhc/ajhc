@@ -1,4 +1,4 @@
-module Warning(Warning(..), MonadWarn(..), MonadSrcLoc(..), processErrors, warn, warnF, err, addDiag, addWarn, processIOErrors, printIOErrors) where
+module Warning(Warning(..), MonadWarn(..), processErrors, warn, warnF, err, addDiag, addWarn, processIOErrors, printIOErrors) where
 
 import List
 import GenUtil
@@ -17,8 +17,6 @@ ioWarnings = unsafePerformIO $ newIORef []
 data Warning = Warning { warnSrcLoc :: !SrcLoc, warnType :: String, warnMessage :: String }
     deriving(Eq,Ord)
 
-class Monad m => MonadSrcLoc m where
-    getSrcLoc :: m SrcLoc
 
 class Monad m => MonadWarn m where
     addWarning :: Warning -> m ()

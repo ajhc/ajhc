@@ -2,7 +2,7 @@
 -- Routines to check for several error and warning conditions which can be locally determined from syntax.
 --
 
-module HsErrors where
+module FrontEnd.HsErrors where
 
 import Class
 import HsSyn
@@ -17,6 +17,9 @@ import Warning
 
 hsType :: MonadWarn m => HsType -> m ()
 hsType x@HsTyForall {} = do
+    err "h98-forall" "Explicit quantification is a non-haskell98 feature"
+    hsQualType (hsTypeType x)
+hsType x@HsTyExists {} = do
     err "h98-forall" "Explicit quantification is a non-haskell98 feature"
     hsQualType (hsTypeType x)
 hsType x = mapHsTypeHsType (\x -> hsType x >> return x) x >> return ()

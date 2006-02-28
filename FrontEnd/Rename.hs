@@ -78,7 +78,7 @@ import FrontEnd.Desugar (doToExp)
 import FrontEnd.SrcLoc hiding(srcLoc)
 import FrontEnd.Utils
 import GenUtil hiding(replicateM)
-import HsErrors
+import FrontEnd.HsErrors as HsErrors
 import HsSyn
 import Name.Name as Name hiding(qualifyName)
 import Name.Names

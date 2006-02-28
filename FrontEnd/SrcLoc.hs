@@ -47,6 +47,27 @@ data Located x = Located SrcSpan x
 instance HasLocation (Located a) where
     srcSpan (Located x _) = x
 
+
+-----------------------
+-- srcloc monad classes
+-----------------------
+
+class Monad m => MonadSrcLoc m where
+    getSrcLoc  :: m SrcLoc
+    getSrcSpan :: m SrcSpan
+    getSrcSpan = getSrcLoc >>= return . srcSpan
+    getSrcLoc = getSrcSpan >>= return . srcLoc
+
+
+class MonadSrcLoc m => MonadSetSrcLoc m where
+    withSrcLoc :: SrcLoc -> m a -> m a
+    withSrcSpan :: SrcSpan -> m a -> m a
+    withSrcLoc sl a = withSrcSpan (srcSpan sl) a
+    withSrcSpan ss a = withSrcLoc (srcLoc ss) a
+
+withLocation :: (HasLocation l,MonadSetSrcLoc m) => l -> m a -> m a
+withLocation l = withSrcSpan (srcSpan l)
+
 -----------------
 -- show instances
 -----------------

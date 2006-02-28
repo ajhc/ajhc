@@ -57,7 +57,7 @@ import Doc.DocLike
 import Support.FreeVars
 import Doc.PPrint
 import FrontEnd.KindInfer
-import FrontEnd.SrcLoc(bogusASrcLoc)
+import FrontEnd.SrcLoc(bogusASrcLoc,MonadSrcLoc(..))
 import FrontEnd.Tc.Type
 import GenUtil
 import Name.Name
