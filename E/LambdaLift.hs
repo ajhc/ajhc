@@ -35,7 +35,7 @@ flattenSC (SC v cs) = SC v (concatMap f cs) where
 lambdaLiftE stats dt e = fmap scToE (lambdaLift stats dt (eToSC dt e))
 -}
 
-data S = S { funcName :: Atom, topVars :: Set.Set Int, isStrict :: Bool, declEnv :: [(TVr,E)] }
+data S = S { funcName :: Name, topVars :: Set.Set Int, isStrict :: Bool, declEnv :: [(TVr,E)] }
     {-! derive: update !-}
 
 etaReduce :: E -> (E,Int)
@@ -51,7 +51,7 @@ lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs 
     let wp =  Set.fromList [ tvrNum x | (x,_,_) <- cs ]
     fc <- newIORef []
     let z (n,as,v) = do
-            let ((v',cs'),stat) = runReader (runStatT $ execUniqT 1 $ runWriterT (f v)) S { funcName = (intToAtom' (tvrNum n)), topVars = wp,isStrict = True, declEnv = [] }
+            let ((v',cs'),stat) = runReader (runStatT $ execUniqT 1 $ runWriterT (f v)) S { funcName = mkFuncName (tvrIdent n), topVars = wp,isStrict = True, declEnv = [] }
             tickStat stats stat
             modifyIORef fc (\xs -> (n,as,v'):cs' ++ xs)
         f e@(ELetRec ds _)  = do
@@ -143,7 +143,7 @@ lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs 
         newName tt = do
             un <-  newUniq
             n <- asks funcName
-            return $ tVr (atomIndex (n `mappend` toAtom ("$" ++ show un))) tt
+            return $ tVr (toId $ mapName (id,(++ ('$':show un))) n) tt
         doBigLift e fs  dr = do
             mtick (toAtom $ "E.LambdaLift.doBigLift." ++ typeLift e ++ "." ++ show (length fs))
             ds <- asks declEnv
@@ -174,9 +174,9 @@ lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs 
             tell [ (t,ls,substLet rs' e) | (t,ls,e) <- concat ts]
             dr rs'
 
-        intToAtom' x = case intToAtom x of
+        mkFuncName x = case fromId x of
             Just y -> y
-            Nothing -> toAtom $ toName Val ("LL@",'f':show x)
+            Nothing -> toName Val ("LL@",'f':show x)
     mapM_ z cs
     ncs <- readIORef fc
     return $ prog { progCombinators =  ncs }
