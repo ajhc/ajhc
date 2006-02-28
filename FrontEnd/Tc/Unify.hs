@@ -14,6 +14,10 @@ import Options
 import qualified FlagDump as FD
 import Support.CanType
 
+
+ctId = CTId
+
+
 pretty vv = prettyPrintType vv
 ppretty vv = parens (pretty vv)
 
@@ -21,7 +25,7 @@ ppretty vv = parens (pretty vv)
 -- actual/offered <= expected
 -- actual/offered `subsumes` expected
 
-subsumes :: Sigma' -> Sigma' -> Tc ()
+subsumes :: Sigma' -> Sigma' -> Tc CoerceTerm
 subsumes s1 s2 = do
     (s1,s2) <- if dump FD.BoxySteps then do
         (s1,_,_) <- unbox s1
@@ -35,34 +39,40 @@ subsumes s1 s2 = do
     sub s1 s2
    where
     -- SBOXY
-    sub tb@(TMetaVar mv) b  = boxyMatch tb b
+    sub tb@(TMetaVar mv) b  = do
+        boxyMatch tb b
+        return ctId
 
     -- SKOL needs to be after SBOXY
     sub s1 fa@TForAll {} = do
         printRule "SKOL"
-        (_,_,r2) <- skolomize fa
-        s1 `subsumes` r2
+        (vs,_,r2) <- skolomize fa
+        f <- s1 `subsumes` r2
+        return (composeCoerce (CTAbs vs) f)
+        --return (CoerceTerm (\x -> CoerceLam vs (f x)))
 
     -- SPEC
     sub s1@(TForAll as (_ :=> _))  r2 | isRho' r2 = do   -- isRho' r2
         printRule "SPEC"
-        r1' <- boxyInstantiate s1
-        r1' `subsumes` r2
+        (ts,r1') <- boxyInstantiate s1
+        f <- r1' `subsumes` r2
+        return (f `composeCoerce` (CTAp ts))
+        --return (CoerceTerm (\x -> f (CoerceApp x ts)))
 
     -- CON
-    sub s1 s2 | (_,(_:_)) <- fromTAp s1 = s1 `boxyMatch` s2
-
-   -- sub s1 (TMetaVar mv) | (t,ts@(_:_)) <- fromTAp s1 = do
-   --     let ats = t:ts
-   --     withMetaVars mv (map getaType ats) (map  (\ (t:ts) -> TArrow a b) $ \ [a,b] -> do
-   --     subsumes t (a `fn` b)
-
+    sub s1 s2 | (_,(_:_)) <- fromTAp s1 = do
+        s1 `boxyMatch` s2
+        return ctId
 
     -- F1
     sub (TArrow s1 s2) (TArrow s3 s4) = do
         printRule "F1"
         boxyMatch s3 s1
-        s2 `subsumes` s4
+        f2 <- s2 `subsumes` s4
+        return (CTFun f2)
+        --return (CoerceTerm (\g -> CoerceFn f2 g))
+        --return (\g y -> f2 (runCoerce g y))
+
     -- F2
     sub t@(TArrow s1 s2) (TMetaVar mv) = do
         printRule "F2"
@@ -70,9 +80,9 @@ subsumes s1 s2 = do
         subsumes t (a `fn` b)
 
     -- BMONO
-    sub a (TMetaVar mv) | isTau a  = varBind mv a
+    sub a (TMetaVar mv) | isTau a  = varBind mv a >> return ctId
     -- MONO
-    sub a b | isTau a && isTau b = unify a b
+    sub a b | isTau a && isTau b = unify a b >> return ctId
 
 
     sub a b = fail $ "subsumes failure: " <> ppretty a <+> ppretty b

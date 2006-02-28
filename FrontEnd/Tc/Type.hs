@@ -335,3 +335,21 @@ data Rule = RuleSpec {
     }
 
 
+-- CTFun f => \g . \y -> f (g y)
+data CoerceTerm = CTId | CTAp [Type] | CTAbs [Tyvar] | CTFun CoerceTerm | CTCompose CoerceTerm CoerceTerm
+
+composeCoerce :: CoerceTerm -> CoerceTerm -> CoerceTerm
+composeCoerce CTId x = x
+composeCoerce x CTId = x
+composeCoerce x y = CTCompose x y
+
+
+instance UnVar Type => UnVar CoerceTerm where
+    unVar' opt (CTAp ts) = CTAp `liftM` unVar' opt ts
+    unVar' opt (CTFun ct) = CTFun `liftM` unVar' opt ct
+    unVar' opt (CTCompose c1 c2) = liftM2 CTCompose (unVar' opt c1) (unVar' opt c2)
+    unVar' _ x = return x
+
+
+
+

@@ -1,8 +1,11 @@
 module FrontEnd.Tc.Monad(
+    CoerceTerm(..),
     Tc(),
     TcInfo(..),
     TypeEnv(),
+    addCoerce,
     addPreds,
+    composeCoerce,
     addRule,
     addToCollectedEnv,
     boxyInstantiate,
@@ -13,6 +16,7 @@ module FrontEnd.Tc.Monad(
     freshSigma,
     getClassHierarchy,
     getCollectedEnv,
+    getCollectedCoerce,
     getKindEnv,
     getModName,
     getSigEnv,
@@ -76,6 +80,7 @@ data TcEnv = TcEnv {
     tcDiagnostics       :: [Diagnostic],   -- list of information that might help diagnosis
     tcVarnum            :: IORef Int,
     tcCollectedEnv      :: IORef (Map.Map Name Sigma),
+    tcCollectedCoerce   :: IORef (Map.Map Name CoerceTerm),
     tcCurrentEnv        :: Map.Map Name Sigma,
     tcCurrentScope      :: Set.Set MetaVar,
     tcOptions           :: Opt  -- module specific options
@@ -102,6 +107,12 @@ data TcInfo = TcInfo {
     tcInfoClassHierarchy :: ClassHierarchy
     }
 
+--data Coerce e = CoerceJust e | CoerceLam [Tyvar] (Coerce e) | CoerceApp (Coerce e) [Type] | CoerceFn (Coerce e -> Coerce e) (Coerce e)
+
+--newtype CoerceTerm = CoerceTerm (forall e . Coerce e -> Coerce e)
+
+
+
 -- | run a computation with a local environment
 localEnv :: TypeEnv -> Tc a -> Tc a
 localEnv te act = do
@@ -118,11 +129,23 @@ addToCollectedEnv te = do
     v <- asks tcCollectedEnv
     liftIO $ modifyIORef v (te `Map.union`)
 
+addCoerce :: Name -> CoerceTerm -> Tc ()
+addCoerce n te = do
+    v <- asks tcCollectedCoerce
+    liftIO $ modifyIORef v (Map.insert n te)
+
 getCollectedEnv :: Tc TypeEnv
 getCollectedEnv = do
     v <- asks tcCollectedEnv
     r <- liftIO $ readIORef v
     r <- fmapM flattenType r
+    return r
+
+getCollectedCoerce :: Tc (Map.Map Name CoerceTerm)
+getCollectedCoerce = do
+    v <- asks tcCollectedCoerce
+    r <- liftIO $ readIORef v
+    --r <- fmapM flattenType r
     return r
 
 
@@ -132,8 +155,10 @@ runTc tcInfo  (Tc tim) = do
     liftIO $ do
     vn <- newIORef 0
     ce <- newIORef mempty
+    cc <- newIORef mempty
     (a,out) <- runWriterT $ runReaderT tim TcEnv {
         tcCollectedEnv = ce,
+        tcCollectedCoerce = cc,
         tcCurrentEnv = tcInfoEnv tcInfo `mappend` tcInfoSigEnv tcInfo,
         tcVarnum = vn,
         tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ tcInfoModName tcInfo],
@@ -245,13 +270,13 @@ instance Instantiate Pred where
   inst mm ts (IsIn c t) = IsIn c (inst mm ts t)
 
 
-freshInstance :: MetaVarType -> Sigma -> Tc Rho
+freshInstance :: MetaVarType -> Sigma -> Tc ([Type],Rho)
 freshInstance typ (TForAll as qt) = do
     ts <- mapM (newMetaVar typ) (map tyvarKind as)
     let (ps :=> t) = (inst mempty (Map.fromList $ zip (map tyvarAtom as) ts) qt)
     addPreds ps
-    return t
-freshInstance _ x = return x
+    return (ts,t)
+freshInstance _ x = return ([],x)
 
 addPreds :: Preds -> Tc ()
 addPreds ps = Tc $ tell mempty { collectedPreds = ps }
@@ -292,7 +317,7 @@ skolomize (TForAll vs (ps :=> rho)) = return (vs,ps,rho)
 --    r -> return ([],r)
 skolomize s = return ([],[],s)
 
-boxyInstantiate :: Sigma -> Tc Rho'
+boxyInstantiate :: Sigma -> Tc ([Type],Rho')
 boxyInstantiate = freshInstance Sigma
 
 deconstructorInstantiate :: Sigma -> Tc Rho'
@@ -302,7 +327,8 @@ deconstructorInstantiate tfa@TForAll {} = do
         f b = b
         eqvs = vs List.\\ freeVars (f t)
     tell mempty { existentialVars = eqvs }
-    freshInstance Sigma (TForAll (vs List.\\ eqvs) qt)
+    (_,t) <- freshInstance Sigma (TForAll (vs List.\\ eqvs) qt)
+    return t
 deconstructorInstantiate x = return x
 
 boxySpec :: Sigma -> Tc ([(BoundTV,[Sigma'])],Rho')
