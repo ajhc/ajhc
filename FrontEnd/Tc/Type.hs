@@ -45,10 +45,6 @@ type BoundTV = Tyvar
 
 type Preds = [Pred]
 
-isMetaTV :: Tyvar -> Bool
-isMetaTV Tyvar { tyvarRef = Just _ } = True
-isMetaTV _ = False
-
 
 typeOfType :: Type -> (MetaVarType,Bool)
 typeOfType TForAll { typeArgs = as, typeBody = _ :=> t } = (Sigma,isBoxy t)
@@ -94,7 +90,6 @@ fromTAp t = f t [] where
 
 
 extractTyVar ::  Monad m => Type -> m Tyvar
-extractTyVar (TVar t) | not $ isMetaTV t = return t
 extractTyVar t = fail $ "not a Var:" ++ show t
 
 extractMetaVar :: Monad m => Type -> m MetaVar
@@ -209,11 +204,9 @@ instance UnVar Type where
             ft (TArrow x y) = liftM2 TArrow (unVar' opt x) (unVar' opt y)
             ft t@TCon {} = return t
             ft (TForAll vs qt) = do
-                when (any isMetaTV vs) $ error "metatv in forall binding"
                 qt' <- unVar' opt qt
                 return $ TForAll vs qt'
             ft (TExists vs qt) = do
-                when (any isMetaTV vs) $ error "metatv in forall binding"
                 qt' <- unVar' opt qt
                 return $ TExists vs qt'
             ft t@(TMetaVar _) = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return t
@@ -292,12 +285,10 @@ unbox tv = do
         ft (TArrow x y) = liftM2 TArrow (ft' x) (ft' y)
         ft t@TCon {} = return t
         ft (TForAll vs (ps :=> t)) = do
-            when (any isMetaTV vs) $ error "metatv in forall binding"
             ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
             t' <- ft' t
             return $ TForAll vs (ps' :=> t')
         ft (TExists vs (ps :=> t)) = do
-            when (any isMetaTV vs) $ error "metatv in forall binding"
             ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
             t' <- ft' t
             return $ TExists vs (ps' :=> t')
@@ -317,10 +308,10 @@ instance CanType Type Kind where
     getType = kind
 
 instance CanType Tycon Kind where
-    getType = kind
+    getType (Tycon _ k) = k
 
 instance CanType Tyvar Kind where
-    getType = kind
+    getType = tyvarKind
 
 
 data Rule = RuleSpec {
