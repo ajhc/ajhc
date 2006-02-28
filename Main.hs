@@ -151,10 +151,13 @@ processInitialHo ho = do
     return ho { hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds ] }
 
 
-procSpecs :: Monad m => (Map.Map Name [Type.Rule]) -> (TVr,E) -> m [(TVr,E)]
+procSpecs :: Monad m => (Map.Map Name [Type.Rule]) -> (TVr,E) -> m ([(TVr,E)],[Rule])
 procSpecs specMap (t,e) | Just n <- fromId (tvrIdent t), Just rs <- Map.lookup n specMap = do
-    return [(t,e)]
-procSpecs _specMap d = return [d]
+    hs <- mapM (makeSpec (t,e)) rs
+    let (defs,rls) = unzip hs
+        crules = Info.fetch (tvrInfo t)
+    return $ ((t { tvrInfo = Info.insert (mappend crules (arules rls)) $ tvrInfo t},e):defs,rls)
+procSpecs _specMap d = return ([d],[])
 
 -- | this is called on parsed, typechecked haskell code to convert it to the internal representation
 
@@ -216,14 +219,18 @@ processDecls stats ho ho' tiData = do
 
     let specMap = Map.fromListWith (++) [ (n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- tiCheckedRules tiData]
     nds <- mapM (procSpecs specMap) (programDs prog)
-    prog <- return $ programSetDs (concat nds) prog
+    prog <- return $ programSetDs (concat (fsts nds)) prog
+    let specRules = fromRules $ concat $ snds nds
+    wdump FD.Rules $ printRules specRules
+    rules <- return $ specRules `mappend` rules
+    allRules <- return $ allRules `mappend` rules
 
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
         let names = [ n | (n,_) <- ns]
         let namesInscope' = Set.fromAscList (Map.keys smap) `Set.union` namesInscope
         when (dump FD.Lambdacube || dump FD.Pass) $ putErrLn ("----\n" ++ pprint names)
-        cds <- annotateDs annmap (idann (hoRules allHo) mempty) letann lamann [ (t,e) | (t,e) <- ns]
+        cds <- annotateDs annmap (idann allRules mempty) letann lamann [ (t,e) | (t,e) <- ns]
         --putStrLn "*** After annotate"
         --wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
         let cm stats e = do

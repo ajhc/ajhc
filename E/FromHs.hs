@@ -3,6 +3,7 @@ module E.FromHs(
     convertRules,
     createInstanceRules,
     createMethods,
+    makeSpec,
     getMainFunction
     ) where
 
@@ -39,6 +40,7 @@ import Fixer.VMap
 import FrontEnd.Rename(unRename)
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Type(prettyPrintType)
+import qualified FrontEnd.Tc.Type as T(Rule(..))
 import FrontEnd.Utils
 import GenUtil
 import HsSyn as HS
@@ -626,14 +628,40 @@ isStrictPat (HsPIrrPat p) = isStrictPat p  -- TODO irrefutable patterns
 isStrictPat _ = True
 
 
+
+specializeE :: Monad m
+    => E   -- ^ the general type
+    -> E   -- ^ the specific type
+    -> m [E]  -- ^ what to apply the general type to to get the specific one
+specializeE gt st = do
+    let f zs x | Just mm <- match (const Nothing) zs x st = mapM (g mm) (reverse zs) where
+            g mm tvr = case lookup tvr mm of
+                Just x -> return x
+                Nothing -> fail $ "specializeE: variable not bound: " ++ pprint (((gt,st),(mm,tvr)),(zs,x))
+        f zs (EPi vbind exp) = f (vbind:zs) exp
+        f _ _ = fail "specializeE: attempt to specialize types that do not unify"
+    f [] gt
+
+
+
+makeSpec :: Monad m => (TVr,E) -> T.Rule -> m ((TVr,E),Rule)
+makeSpec (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (Module m,ui), T.ruleSuper = ss } = do
+    let nt = tipe rt
+    as <- specializeE (getType t) nt
+    let ntvr = tvr { tvrIdent = toId newName, tvrType = nt, tvrInfo = setProperties (prop_SPECIALIZATION:sspec) mempty }
+        Just nn = fromId (tvrIdent t)
+        (ntype,Just m,q) = nameParts nn
+        newName = toName ntype (Just $ "Spec@." ++ m ++ "." ++ show ui,'f':m ++ "." ++ q)
+        sspec = if ss then [prop_SUPERSPECIALIZE] else []
+        ar = makeRule ("Specialize.{" ++ show newName) (Module m,ui) [] t as (EVar ntvr)
+    return ((ntvr,foldl EAp e as),ar)
+
+
 deNewtype :: DataTable -> E -> E
 deNewtype dataTable e = f e where
---    f (ELit (LitCons n [x] t)) | alias =  (f x)  where
---        alias = case getConstructor n dataTable of
---                 Just v -> conAlias v
---                 x      -> error ("deNewtype for "++show n++": "++show x)
     f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons n [v] t) z):_) } | alias = eLet v (f e)  (f z) where
         Just Constructor { conAlias = alias } = getConstructor n dataTable
     f e = runIdentity $ emapE (return . f) e
+
 
 
