@@ -62,6 +62,7 @@ prop_PLACEHOLDER = toAtom "_PLACEHOLDER"
 prop_RULEBINDER = toAtom "_RULEBINDER"
 prop_SCRUTINIZED = toAtom "_SCRUTINIZED"
 prop_SPECIALIZATION = toAtom "_SPECIALIZATION"
+prop_SUPERSPECIALIZE = toAtom "_SUPERSPECIALIZE"
 
 
 class HasProperties a where
