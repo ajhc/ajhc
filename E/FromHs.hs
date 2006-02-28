@@ -324,7 +324,7 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         | otherwise = (a,b, deNewtype dataTable c)
     pval = convertVal assumps
     cDecl :: HsDecl -> [(Name,TVr,E)]
-    cDecl (HsForeignDecl _ i@(Import {}) HS.Primitive _ n _) = result where 
+    cDecl (HsForeignDecl _ i@(Import {}) HS.Primitive _ n _) = result where
         result    = expr $ foldr ($) (EPrim (toPrim i) (map EVar es) rt) (map ELam es)
         expr x    = [(name,var,lamt x)]
         name      = toName Name.Val n
@@ -338,11 +338,12 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         (ty,lamt)  = pval name
         (ts,rt)    = argTypes' ty
         name       = toName Name.Val n
-        hvar       = head $ freeNames $ freeVars rt
-        var        = tVr hvar st
+        newId      = head $ freeNames $ freeVars rt
+        uvar       = tVr newId st
+        var        = tVr (nameToInt name) ty
         expr x     = [(name,var,lamt x)]
         prim       = APrim (CP.AddrOf cn) (Requires is ls) where HS.AddrOf cn is ls = i
-        result     = expr $ eStrictLet var (EPrim prim [] st) (ELit (LitCons cn [EVar var] rt))
+        result     = expr $ eStrictLet uvar (EPrim prim [] st) (ELit (LitCons cn [EVar uvar] rt))
     cDecl (HsForeignDecl _ i@Import {} HS.CCall _ n _) = result where
         expr x = [(name,var,lamt x)]
         name = toName Name.Val n
