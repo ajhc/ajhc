@@ -13,6 +13,7 @@ module FrontEnd.KindInfer (
     kindOfClass,
     kindOf,
     restrictKindEnv,
+    hoistType,
     hsTypeToType,
     getConstructorKinds
     ) where
