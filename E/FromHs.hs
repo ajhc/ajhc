@@ -38,8 +38,10 @@ import E.TypeCheck
 import E.Values
 import Fixer.VMap
 import FrontEnd.Rename(unRename)
+import FrontEnd.KindInfer(hoistType)
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Type(prettyPrintType)
+import qualified FrontEnd.Tc.Monad as TM
 import qualified FrontEnd.Tc.Type as T(Rule(..))
 import FrontEnd.Utils
 import GenUtil
@@ -504,8 +506,13 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
 
 -- | determine what arguments must be passed to something of the first type, to transform it into something of the second type.
 specialize :: Type -> Type -> [Type]
-specialize TForAll {} TForAll {} = []  -- we assume program is typesafe
-specialize g@(TForAll vs (_ :=> t)) s = snds (gg t s)  where
+specialize (TForAll vs _) (TForAll vs' _) | sameLength vs vs'= []  -- we assume program is typesafe
+specialize (TForAll vs (ps :=> t)) b@(TForAll vs' _) | length vs' < length vs = specialize' (TForAll rs (ps :=> TForAll ls ([] :=> t))) b where
+    nd = length vs - length vs'
+    (rs,ls) = splitAt nd vs
+specialize x y = specialize' x y
+
+specialize' g@(TForAll vs (_ :=> t)) s = snds (gg t s)  where
     ps = zip vs [0 :: Int ..]
     gg a b = snubFst $ gg' a b
     gg' (TAp t1 t2) (TAp ta tb) = gg' t1 ta ++ gg' t2 tb
@@ -514,9 +521,11 @@ specialize g@(TForAll vs (_ :=> t)) s = snds (gg t s)  where
     gg' (TVar a) t | Just n <- lookup a ps = [(n,t)]
     gg' (TVar a) (TVar b) | a == b = []
     gg' (TMetaVar a) (TMetaVar b) | a == b = []
-    gg' (TForAll as (_ :=> ta)) (TForAll bs (_ :=> tb)) | length as == length bs = gg' ta tb -- assume names are unique
+    gg' (TForAll as1 (_ :=> r1)) (TForAll as2 (_ :=> r2)) | sameLength as1 as2 = do
+      let r2' = TM.inst mempty (Map.fromList [ (tyvarAtom a2,TVar a1) | a1 <- as1 | a2 <- as2 ]) r2
+      gg' r1 r2' -- assume names are unique
     gg' a b = error $ "specialization: " <> parens  (prettyPrintType a) <+> parens (prettyPrintType b) <+> "\nin spec\n" <+> vcat (map parens [prettyPrintType g, prettyPrintType s])
-specialize _g _s = []
+specialize' _g _s = []
 
 ctgen t = map snd $ snubFst $ Seq.toList $ everything (Seq.<>) (mkQ Seq.empty gg) t where
     gg (TGen n g) = Seq.single (n,g)
