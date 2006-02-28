@@ -44,7 +44,7 @@ import Util.Gen
 import Util.Inst()
 import Warning
 
-trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env -- (Map.fromList [ n | n@(name,_) <- Map.toList env,  isGlobal name ])
+trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env
 
 
 getDeclNames ::  HsDecl -> [Name]
@@ -218,10 +218,11 @@ tiModules' me ms = do
         tcInfoClassHierarchy = cHierarchyWithInstances
         }
 
-    (localVarEnv,checkedRules) <- withOptionsT (modInfoOptions tms) $ runTc tcInfo $ do
+    (localVarEnv,checkedRules,coercions) <- withOptionsT (modInfoOptions tms) $ runTc tcInfo $ do
         (ds,cr) <- listenCheckedRules (tiProgram program ds)
         env <- getCollectedEnv
-        return (env,cr)
+        cc <- getCollectedCoerce
+        return (env,cr,cc)
 
     when (dump FD.Types) $ do
         putStrLn " ---- the types of identifiers ---- "
@@ -253,6 +254,7 @@ tiModules' me ms = do
             tiDataModules = [ (modInfoName m, modInfoHsModule m) |  m <- ms],
             tiModuleOptions = [ (modInfoName m, modInfoOptions m) |  m <- ms],
             tiCheckedRules = checkedRules,
+            tiCoerce       = coercions,
             tiAllAssumptions = allAssumps
         }
     return (ho,tiData)

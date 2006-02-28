@@ -377,12 +377,10 @@ unBox tv = ft' tv where
     ft (TArrow x y) = liftM2 TArrow (ft' x) (ft' y)
     ft t@TCon {} = return t
     ft (TForAll vs (ps :=> t)) = do
-        when (any isMetaTV vs) $ error "metatv in forall binding"
         ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
         t' <- ft' t
         return $ TForAll vs (ps' :=> t')
     ft (TExists vs (ps :=> t)) = do
-        when (any isMetaTV vs) $ error "metatv in forall binding"
         ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
         t' <- ft' t
         return $ TExists vs (ps' :=> t')

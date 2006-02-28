@@ -90,6 +90,7 @@ fromTAp t = f t [] where
 
 
 extractTyVar ::  Monad m => Type -> m Tyvar
+extractTyVar (TVar tv) = return tv
 extractTyVar t = fail $ "not a Var:" ++ show t
 
 extractMetaVar :: Monad m => Type -> m MetaVar

@@ -187,6 +187,7 @@ processDecls stats ho ho' tiData = do
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
     ds <- convertDecls (hoClassHierarchy ho') allAssumps  fullDataTable decls
+    -- mapM_ (\(_,v,lc) -> printCheckName'' fullDataTable v lc) ds
 
     -- Build rules
     rules' <- createInstanceRules (hoClassHierarchy ho' `mappend` hoClassHierarchy initialHo)   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
