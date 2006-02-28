@@ -6,13 +6,11 @@ import HsSyn
 import Ho.Build
 import Ho.LibraryMap
 import Ho.Type
-import Binary
 import GenUtil
 import Options(options, optHls)
 import PackedString
 import Util.MD5(md5file)
 
-import Control.Exception
 import Control.Monad(when,foldM)
 import Data.List(sort)
 import qualified Data.Map as Map

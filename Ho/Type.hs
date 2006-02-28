@@ -10,7 +10,6 @@ import E.Rules(Rules)
 import E.TypeCheck()
 import FrontEnd.SrcLoc(SrcLoc)
 import FrontEnd.Infix(FixityMap)
-import Ho.LibraryMap(LibraryName,CheckSum)
 import HsSyn(Module)
 import FrontEnd.KindInfer(KindEnv)
 import MapBinaryInstance()
@@ -23,6 +22,9 @@ import TypeSynonyms(TypeSynonyms)
 import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+
+type CheckSum = Integer
+type LibraryName= String
 
 
 data HoHeader = HoHeader {

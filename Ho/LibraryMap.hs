@@ -1,19 +1,14 @@
 module Ho.LibraryMap
-    (libraryMapFind,libraryList,LibraryName,CheckSum
+    (libraryMapFind,libraryList
     ) where
 
+import Ho.Type
 import Options(options,optHlPath)
 
-import Data.Char(isAlphaNum)
-import Data.List(intersperse,sort)
 import Data.Map as Map
-import Data.Version
 import System.Directory
 import System.IO.Unsafe
-import Text.ParserCombinators.ReadP
 
-type CheckSum = Integer
-type LibraryName= String
 type LibraryMap = Map LibraryName FilePath
 
 ----
@@ -37,7 +32,7 @@ libraryList = Map.toList globalLibraryMap
 getLibraryMap :: [FilePath] -> IO LibraryMap
 getLibraryMap fps = fmap unions $ mapM getPM fps
 
-getPM fp = do
+getPM fp = flip catch (\_ -> return Map.empty) $ do
     raw <- getDirectoryContents fp
     return $ Map.fromList $ flip concatMap raw $ \e ->
         case reverse e of
