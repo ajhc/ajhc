@@ -299,5 +299,6 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () (-2::Int)) 
 
     un a b _ _ = fail $ "Expressions do not unify: " ++ show a ++ show b
     lam va ea vb eb mm c = do
+        un (tvrType va) (tvrType vb) mm c
         un (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb) mm (c - 2)
 
