@@ -10,6 +10,7 @@ module E.FromHs(
 import Char
 import Control.Monad.Identity
 import Control.Monad.State
+import Control.Monad.RWS
 import Data.FunctorM
 import Data.Generics
 import Data.Monoid
@@ -36,10 +37,13 @@ import E.Traverse
 import E.TypeAnalysis
 import E.TypeCheck
 import E.Values
+import E.Program
 import Fixer.VMap
 import FrontEnd.Rename(unRename)
 import FrontEnd.KindInfer(hoistType)
+import FrontEnd.TiData
 import FrontEnd.SrcLoc
+import Util.Gen
 import FrontEnd.Tc.Type(prettyPrintType)
 import qualified FrontEnd.Tc.Monad as TM
 import qualified FrontEnd.Tc.Type as T(Rule(..))
@@ -317,20 +321,31 @@ convertE classHierarchy assumps dataTable srcLoc exp = do
 
 sillyName' = nameName v_silly
 
+newtype Ce t a = Ce (StateT Int t a)
+    deriving(Monad,Functor,MonadTrans,MonadIO,MonadState Int)
+
+instance Monad m => UniqueProducer (Ce m) where
+    newUniq = do
+        i <- get
+        put $! (i + 1)
+        return i
 
 
 convertDecls :: Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
-convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ concatMap cDecl hsDecls) where
+convertDecls classHierarchy assumps dataTable hsDecls = evalStateT ans 2 where
+    Ce ans = do
+        nds <- mapM cDecl hsDecls
+        return (map anninst $ concat nds)
     doNegate e = eAp (eAp (func_negate funcs) (getType e)) e
     Identity funcs = fmapM (return . EVar . toTVr assumps) sFuncNames
     anninst (a,b,c)
         | "Instance@" `isPrefixOf` show a = (a,setProperty prop_INSTANCE b, deNewtype dataTable c)
         | otherwise = (a,b, deNewtype dataTable c)
     pval = convertVal assumps
-    cDecl :: HsDecl -> [(Name,TVr,E)]
+    cDecl :: Monad m => HsDecl -> Ce m [(Name,TVr,E)]
     cDecl (HsForeignDecl _ i@(Import {}) HS.Primitive _ n _) = result where
         result    = expr $ foldr ($) (EPrim (toPrim i) (map EVar es) rt) (map ELam es)
-        expr x    = [(name,var,lamt x)]
+        expr x    = return [(name,var,lamt x)]
         name      = toName Name.Val n
         var       = tVr (nameToInt name) ty
         (ty,lamt) = pval name
@@ -345,11 +360,11 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
         newId      = head $ freeNames $ freeVars rt
         uvar       = tVr newId st
         var        = tVr (nameToInt name) ty
-        expr x     = [(name,var,lamt x)]
+        expr x     = return [(name,var,lamt x)]
         prim       = APrim (CP.AddrOf cn) (Requires is ls) where HS.AddrOf cn is ls = i
         result     = expr $ eStrictLet uvar (EPrim prim [] st) (ELit (LitCons cn [EVar uvar] rt))
     cDecl (HsForeignDecl _ i@Import {} HS.CCall _ n _) = result where
-        expr x = [(name,var,lamt x)]
+        expr x = return [(name,var,lamt x)]
         name = toName Name.Val n
         tvrWorld = tVr 256 tWorld__
         tvrWorld2 = tVr 258 tWorld__
@@ -383,90 +398,112 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
 
     cDecl x@HsForeignDecl {} = fail ("Unsupported foreign declaration: "++ show x)
 
-    cDecl (HsPatBind sl p (HsUnGuardedRhs exp) []) | (HsPVar n) <- simplifyHsPat p, n == sillyName' = let
-        in [(v_silly,tvr,cExpr exp)]
-    cDecl (HsPatBind sl p rhs wh) | (HsPVar n) <- simplifyHsPat p = let
-        name = toName Name.Val n
-        var = tVr (nameToInt name) ty -- lp ps (hsLet wh e)
-        (ty,lamt) = pval name
-        in [(name,var,lamt $ hsLetE wh (cRhs sl rhs))]
-    cDecl (HsFunBind [(HsMatch sl n ps rhs wh)]) | ps' <- map simplifyHsPat ps, all isHsPVar ps' = [(name,var,lamt $ lp  ps' (hsLetE wh (cRhs sl rhs))) ] where
-        name = toName Name.Val n
-        var = tVr ( nameToInt name) ty -- lp ps (hsLet wh e)
-        (ty,lamt) = pval name
-    cDecl (HsFunBind ms@((HsMatch sl n ps _ _):_)) = [(name,v,lamt $ z $ cMatchs bs (matchesConv ms) (ump sl rt))] where
-        name = toName Name.Val n
-        v = tVr (nameToInt name) t -- lp ps (hsLet wh e)
-        (t,lamt) = pval name
-        (targs,eargs) = argTypes t
-        bs' = [(tVr (n) t) | n <- localVars | t <- take numberPatterns eargs]
-        bs  = map EVar bs'
-        rt = discardArgs (length targs + numberPatterns) t
-        numberPatterns = length ps
-        z e = foldr (eLam) e bs'
-    cDecl HsNewTypeDecl {  hsDeclName = dname, hsDeclArgs = dargs, hsDeclCon = dcon, hsDeclDerives = derives } = makeDerives dname dargs [dcon] (map (toName ClassName) derives)
-    cDecl HsDataDecl {  hsDeclName = dname, hsDeclArgs = dargs, hsDeclCons = dcons, hsDeclDerives = derives } = makeDerives dname dargs dcons (map (toName ClassName) derives)
+    cDecl (HsPatBind sl p (HsUnGuardedRhs exp) []) | (HsPVar n) <- simplifyHsPat p, n == sillyName' = do
+        e <- cExpr exp
+        return [(v_silly,tvr,e)]
+
+    cDecl (HsPatBind sl p rhs wh) | (HsPVar n) <- simplifyHsPat p = do
+        let name = toName Name.Val n
+            var = tVr (nameToInt name) ty
+            (ty,lamt) = pval name
+        rhs <- cRhs sl rhs
+        lv <- hsLetE wh rhs
+        return [(name,var,lamt lv)]
+    cDecl (HsFunBind [(HsMatch sl n ps rhs wh)]) | ps' <- map simplifyHsPat ps, all isHsPVar ps' = do
+        let name = toName Name.Val n
+            var = tVr ( nameToInt name) ty
+            (ty,lamt) = pval name
+        rhs <- cRhs sl rhs
+        lv <- hsLetE wh rhs
+        return [(name,var,lamt $ lp  ps' lv)]
+    cDecl (HsFunBind ms@((HsMatch sl n ps _ _):_)) = do
+        let name = toName Name.Val n
+            v = tVr (nameToInt name) t -- lp ps (hsLet wh e)
+            (t,lamt) = pval name
+            (targs,eargs) = argTypes t
+            bs' = [(tVr (n) t) | n <- localVars | t <- take numberPatterns eargs]
+            bs  = map EVar bs'
+            rt = discardArgs (length targs + numberPatterns) t
+            numberPatterns = length ps
+            z e = foldr (eLam) e bs'
+        ms <- cMatchs bs (matchesConv ms) (ump sl rt)
+        return [(name,v,lamt $ z ms )]
+    cDecl HsNewTypeDecl {  hsDeclName = dname, hsDeclArgs = dargs, hsDeclCon = dcon, hsDeclDerives = derives } = return $ makeDerives dname dargs [dcon] (map (toName ClassName) derives)
+    cDecl HsDataDecl {  hsDeclName = dname, hsDeclArgs = dargs, hsDeclCons = dcons, hsDeclDerives = derives } = return $ makeDerives dname dargs dcons (map (toName ClassName) derives)
     cDecl cd@(HsClassDecl {}) = cClassDecl cd
-    cDecl _ = []
+    cDecl _ = return []
     makeDerives dname dargs dcons derives  = concatMap f derives where
         f n | n == class_Bounded, all (null . hsConDeclArgs) dcons  = []
         f _ = []
-    cExpr (HsAsPat n' (HsVar n)) = foldl eAp (EVar (tv n)) (map ty $ specialize t t') where
+    cExpr :: Monad m => HsExp -> Ce m E
+    cExpr (HsAsPat n' (HsVar n)) = return $ foldl eAp (EVar (tv n)) (map tipe $ specialize t t') where
         t = getAssump n
         t' = getAssump n'
-    --cExpr (HsAsPat n' (HsVar n)) = spec t t' $ EVar (tv n) where
-        --(Forall _ (_ :=> t)) = getAssump n
-        --Forall [] ((_ :=> t')) = getAssump n'
-    cExpr (HsAsPat n' (HsCon n)) =  constructionExpression dataTable (toName DataConstructor n) rt where
-        --Forall [] ((_ :=> t')) = getAssump n'
+    cExpr (HsAsPat n' (HsCon n)) = return $ constructionExpression dataTable (toName DataConstructor n) rt where
         t' = getAssump n'
-        (_,rt) = argTypes' (ty t')
-    cExpr (HsLit (HsString s)) = E.Values.toE s
-    cExpr (HsLit (HsInt i)) = intConvert i
-    cExpr (HsLit (HsChar ch)) = toE ch
-    cExpr (HsLit (HsFrac i))  = toE i
-    cExpr (HsLambda sl ps e)
-        | all isHsPVar ps' =  lp ps' (cExpr e)
-        | otherwise = error $ "Invalid HSLambda at: " ++ show sl
-        where
-        ps' = map simplifyHsPat ps
-    cExpr (HsInfixApp e1 v e2) = eAp (eAp (cExpr v) (cExpr e1)) (cExpr e2)
-    cExpr (HsLeftSection op e) = eAp (cExpr op) (cExpr e)
-    cExpr (HsApp (HsRightSection e op) e') = eAp (eAp (cExpr op) (cExpr e')) (cExpr e)
-    cExpr (HsRightSection e op) = eLam var (eAp (eAp cop (EVar var)) ce)  where
-        (_,TVr { tvrType = ty}:_) = fromPi (getType cop)
-        var = (tVr ( nv) ty)
-        cop = cExpr op
-        ce = cExpr e
-        fvSet = (freeVars cop `Set.union` freeVars ce)
-        (nv:_) = [ v  | v <- localVars, not $  v `Set.member` fvSet  ]
-    cExpr (HsApp e1 e2) = eAp (cExpr e1) (cExpr e2)
+        (_,rt) = argTypes' (tipe t')
+    cExpr (HsLit (HsString s)) = return $ E.Values.toE s
+    cExpr (HsLit (HsInt i)) = return $ intConvert i
+    cExpr (HsLit (HsChar ch)) = return $ toE ch
+    cExpr (HsLit (HsFrac i))  = return $ toE i
+    cExpr (HsLambda sl ps e) | all isHsPVar ps' = do
+        e <- cExpr e
+        return $ lp ps' e
+      where ps' = map simplifyHsPat ps
+    cExpr (HsInfixApp e1 v e2) = do
+        v <- cExpr v
+        e1 <- cExpr e1
+        e2 <- cExpr e2
+        return $ eAp (eAp v e1) e2
+    cExpr (HsLeftSection op e) = liftM2 eAp (cExpr op) (cExpr e)
+    cExpr (HsApp (HsRightSection e op) e') = do
+        op <- cExpr op
+        e' <- cExpr e'
+        e <- cExpr e
+        return $ eAp (eAp op e') e
+    cExpr (HsRightSection e op) = do
+        cop <- cExpr op
+        ce <- cExpr e
+        let (_,TVr { tvrType = ty}:_) = fromPi (getType cop)
+        [var] <- newVars [ty]
+        return $ eLam var (eAp (eAp cop (EVar var)) ce)
+    cExpr (HsApp e1 e2) = liftM2 eAp (cExpr e1) (cExpr e2)
     cExpr (HsParen e) = cExpr e
     cExpr (HsExpTypeSig _ e _) = cExpr e
-    cExpr (HsNegApp e) = (doNegate (cExpr e))
+    cExpr (HsNegApp e) = liftM doNegate (cExpr e)
     cExpr (HsLet dl e) = hsLet dl e
-    cExpr (HsIf e a b) = eIf (cExpr e) (cExpr a) (cExpr b)
+    cExpr (HsIf e a b) = liftM3 eIf (cExpr e) (cExpr a) (cExpr b)
     cExpr (HsCase _ []) = error "empty case"
-    cExpr (HsAsPat n hs@(HsCase e alts)) = ans where
-        ans = cMatchs [cExpr e] (altConv alts) (EError ("No Match in Case expression at " ++ show (srcLoc hs))  ty)
-        ty = cType n
-    cExpr (HsTuple es) = eTuple (map cExpr es)
-    cExpr (HsAsPat n (HsList xs)) = cl xs where
-        cl (x:xs) = eCons (cExpr x) (cl xs)
-        cl [] = eNil (cType n)
-    cExpr e = error ("Cannot convert: " ++ show e)
-    hsLetE [] e =  e
-    hsLetE dl e =  ELetRec [ (b,c) | (_,b,c) <- (concatMap cDecl dl)] e
-    hsLet dl e = hsLetE dl (cExpr e)
+    cExpr (HsAsPat n hs@(HsCase e alts)) = do
+        let ty = cType n
+        scrut <- cExpr e
+        cMatchs [scrut] (altConv alts) (EError ("No Match in Case expression at " ++ show (srcLoc hs))  ty)
+    cExpr (HsTuple es) = liftM eTuple (mapM cExpr es)
+    cExpr (HsAsPat n (HsList xs)) = do
+        let cl (x:xs) = liftM2 eCons (cExpr x) (cl xs)
+            cl [] = return $ eNil (cType n)
+        cl xs
+    cExpr e = fail ("Cannot convert: " ++ show e)
+    hsLetE [] e = return  e
+    hsLetE dl e = do
+        nds <- mconcatMapM cDecl dl
+        return $ ELetRec [ (b,c) | (_,b,c) <- nds] e
+    hsLet dl e = do
+        e <- cExpr e
+        hsLetE dl e
 
-    ty x = tipe x
-    kd x = kind x
-    cMatchs :: [E] -> [([HsPat],HsRhs,[HsDecl])] -> E -> E
-    cMatchs bs ms els = convertMatches funcs dataTable tv cType bs (processGuards ms) els
+    cMatchs :: Monad m => [E] -> [([HsPat],HsRhs,[HsDecl])] -> E -> Ce m E
+    cMatchs bs ms els = do
+        pg <- processGuards ms
+        convertMatches funcs dataTable tv cType bs pg els
 
-    cGuard (HsUnGuardedRhs e) _ = cExpr e
-    cGuard (HsGuardedRhss (HsGuardedRhs _ g e:gs)) els = eIf (cExpr g) (cExpr e) (cGuard (HsGuardedRhss gs) els)
-    cGuard (HsGuardedRhss []) e = e
+    cGuard (HsUnGuardedRhs e) = liftM const $ cExpr e
+    cGuard (HsGuardedRhss (HsGuardedRhs _ g e:gs)) = do
+        g <- cExpr g
+        e <- cExpr e
+        fg <- cGuard (HsGuardedRhss gs)
+        return (\els -> eIf g e (fg els))
+    cGuard (HsGuardedRhss []) = return id
 
     getAssumpCon n  = case Map.lookup (toName Name.DataConstructor n) assumps of
         Just z -> schemeToType z
@@ -481,27 +518,34 @@ convertDecls classHierarchy assumps dataTable hsDecls = return (map anninst $ co
     cRhs sl (HsUnGuardedRhs e) = cExpr e
     cRhs sl (HsGuardedRhss []) = error "HsGuardedRhss: empty"
     cRhs sl (HsGuardedRhss gs@(HsGuardedRhs _ _ e:_)) = f gs where
-        f (HsGuardedRhs _ g e:gs) = eIf (cExpr g) (cExpr e) (f gs)
-        f [] = ump sl $ getType (cExpr e)
-    processGuards xs = [ (map simplifyHsPat ps,hsLetE wh . cGuard e) | (ps,e,wh) <- xs ]
+        f (HsGuardedRhs _ g e:gs) = liftM3 eIf (cExpr g) (cExpr e) (f gs)
+        f [] = do
+            e <- cExpr e
+            return $ ump sl $ getType e
+    processGuards xs = flip mapM xs $ \ (ps,e,wh) -> do
+        cg <- cGuard e
+        nds <- mconcatMapM cDecl wh
+        let elet = ELetRec [ (b,c) | (_,b,c) <- nds]
+        return (map simplifyHsPat ps,elet . cg )
     cType (n::HsName) = fst $ pval (toName Name.Val n)
 
-    cClassDecl (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon name) _)) decls) = ans where
-        ds = map simplifyDecl decls
-        cr = findClassRecord classHierarchy (toName ClassName name)
-        ans = cClass cr ++ concatMap method [  n | n :>: _ <- classAssumps cr]
-        method n = [(defaultName,tVr (nameToInt defaultName) ty,els) | els <- mels] where
-            defaultName = defaultInstanceName n
-            (TVr { tvrType = ty}) = tv (nameName n)
-            mels = case [ d | d <- ds, maybeGetDeclName d == Just n] of
-                [] -> []
-                (d:_) | ~[(_,_,v)] <- cDecl d -> [v]
-        cClass classRecord =  [ f n (nameToInt n) (convertOneVal t) | n :>: t <- classAssumps classRecord ] where
-            f n i t = (n,setProperties [prop_METHOD,prop_PLACEHOLDER] $ tVr i t, foldr ELam (EPrim (primPrim ("Placeholder: " ++ show n)) [] ft) args)  where
-                (ft',as) = fromPi t
-                (args,rargs) = span (sortStarLike . getType) as
-                ft :: E
-                ft = foldr EPi ft' rargs
+    cClassDecl (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon name) _)) decls) = do
+        let ds = map simplifyDecl decls
+            cr = findClassRecord classHierarchy (toName ClassName name)
+            method n = do
+                let defaultName = defaultInstanceName n
+                    (TVr { tvrType = ty}) = tv (nameName n)
+                tels <- case [ d | d <- ds, maybeGetDeclName d == Just n] of
+                    [] -> return []
+                    (d:_) -> cDecl d >>= \ [(_,_,v)] -> return [v]
+                return [(defaultName,tVr (toId defaultName) ty,els) | els <- tels ]
+            cClass classRecord =  [ f n (nameToInt n) (convertOneVal t) | n :>: t <- classAssumps classRecord ] where
+                f n i t = (n,setProperties [prop_METHOD,prop_PLACEHOLDER] $ tVr i t, foldr ELam (EPrim (primPrim ("Placeholder: " ++ show n)) [] ft) args)  where
+                    (ft',as) = fromPi t
+                    (args,rargs) = span (sortStarLike . getType) as
+                    ft = foldr EPi ft' rargs
+        mthds <- mconcatMapM method  [  n | n :>: _ <- classAssumps cr]
+        return (cClass cr ++ mthds)
     cClassDecl _ = error "cClassDecl"
 
 -- | determine what arguments must be passed to something of the first type, to transform it into something of the second type.
@@ -544,12 +588,12 @@ fromHsPLitInt (HsPLit l@(HsInt _)) = return l
 fromHsPLitInt (HsPLit l@(HsFrac _)) = return l
 fromHsPLitInt x = fail $ "fromHsPLitInt: " ++ show x
 
-convertMatches funcs dataTable tv cType bs ms err = evalState (match bs ms err) (20 + 2*length bs)  where
+convertMatches funcs dataTable tv cType bs ms err = match bs ms err where
     doNegate e = eAp (eAp (func_negate funcs) (getType e)) e
     fromInt = func_fromInt funcs
     fromInteger = func_fromInteger funcs
     fromRational = func_fromRational funcs
-    match :: [E] -> [([HsPat],E->E)] -> E -> State Int E
+    match :: Monad m => [E] -> [([HsPat],E->E)] -> E -> Ce m E
     match  [] ps err = f ps where
         f (([],e):ps) = do
             r <- f ps
