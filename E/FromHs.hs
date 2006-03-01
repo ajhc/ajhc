@@ -84,7 +84,7 @@ newVars xs = f xs [] where
     f [] xs = return $ reverse xs
     f (x:xs) ys = do
         s <- newUniq
-        f xs (tVr s x:ys)
+        f xs (tVr (2*s) x:ys)
 
 lt :: Name -> Int
 lt n | nameType n == TypeVal =  atomIndex $ toAtom $  n
@@ -199,7 +199,7 @@ getMainFunction dataTable name ds = ans where
             (ty',xs) = fromPi ty
         return theMain
     ioLike ty = case smplE ty of
-        ELit (LitCons n [x] _) -> if show n ==  "Jhc.IO.IO" then Just x else Nothing
+        ELit (LitCons n [x] _) -> if n ==  tc_IO then Just x else Nothing
         _ -> Nothing
     smplE = id
     findName name = case Map.lookup name ds of
@@ -277,15 +277,19 @@ unbox dataTable e vn wtd = eCase e [Alt (LitCons cna [tvra] te) (wtd tvra)] Unkn
     tvra = tVr vn sta
     Just (cna,sta,ta) = lookupCType' dataTable te
 
-createFunc :: DataTable -> [Int] -> [E] -> ([(TVr,String)] -> (E -> E,E)) -> E
-createFunc dataTable ns es ee = foldr ELam eee tvrs where
-    xs = [(tVr n te,n',runIdentity $ lookupCType' dataTable te) | te <- es | n <- ns | n' <- drop (length es) ns ]
-    tvrs' = [ (tVr n' sta,rt) | (_,n',(_,sta,rt)) <- xs ]
-    tvrs = [ t | (t,_,_) <- xs]
-    (me,innerE) = ee tvrs'
-    eee = me $ foldr esr innerE xs
-    esr (tvr,n',(cn,st,_)) e = eCase (EVar tvr) [Alt (LitCons cn [tVr n' st] te) e] Unknown  where
-        te = getType $ EVar tvr
+createFunc :: UniqueProducer m => DataTable -> [E] -> ([(TVr,String)] -> (E -> E,E)) -> m E
+createFunc dataTable es ee = do
+    xs <- flip mapM es $ \te -> do
+        res@(_,sta,rt) <- lookupCType' dataTable te
+        [n,n'] <- newVars [te,sta]
+        return (n,(n',rt),res)
+    let tvrs' = [ n' | (_,n',_) <- xs ]
+        tvrs = [ t | (t,_,_) <- xs]
+        (me,innerE) = ee tvrs'
+        eee = me $ foldr esr innerE xs
+        esr (tvr,(tvr',_),(cn,_,_)) e = eCase (EVar tvr) [Alt (LitCons cn [tvr'] te) e] Unknown  where
+            te = getType $ EVar tvr
+    return $ foldr ELam eee tvrs
 
 instance GenName String where
    genNames i = map (('x':) . show) [i..]
@@ -333,7 +337,7 @@ newtype Ce t a = Ce (RWST CeEnv () Int t a)
 instance Monad m => UniqueProducer (Ce m) where
     newUniq = do
         i <- get
-        put $! (i + 2)
+        put $! (i + 1)
         return i
 
 
@@ -374,38 +378,34 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         expr x     = return [(name,var,lamt x)]
         prim       = APrim (CP.AddrOf cn) (Requires is ls) where HS.AddrOf cn is ls = i
         result     = expr $ eStrictLet uvar (EPrim prim [] st) (ELit (LitCons cn [EVar uvar] rt))
-    cDecl (HsForeignDecl _ i@Import {} HS.CCall _ n _) = result where
-        expr x = return [(name,var,lamt x)]
-        name = toName Name.Val n
-        tvrWorld = tVr 256 tWorld__
-        tvrWorld2 = tVr 258 tWorld__
-        rtVar = tVr 260 rt'
-        rtVar' = tVr 262 rtt'
-        rttIO = ltTuple [tWorld__, rt']
-        rttIO' = ltTuple' [tWorld__, rtt']
-        (isIO,rt') = case  rt of
-            ELit (LitCons c [x] _) | show c == "Jhc.IO.IO" -> (True,x)
-            _ -> (False,rt)
-        toExtType e | Just (_,pt) <-  lookupCType dataTable e = pt
-        toExtType e = error $ "toExtType: " ++ show e
-        var = tVr (nameToInt name) ty
-        (ty,lamt) = pval name
-        (ts,rt) = argTypes' ty
-        es = [ (tVr ( n) t) |  t <- ts, not (sortStarLike t) | n <- localVars ]
-        (cn,rtt',rtt) = case lookupCType' dataTable rt' of
-            Right x -> x
-            Left err -> error $ "Odd RetType foreign: " ++ err
-        prim io rs rtt = EPrim (APrim (Func io s (snds rs) rtt) (Requires is ls))
-            where Import s is ls = i
-        cFun    = expr . createFunc dataTable [4,6 ..] (map tvrType es)
-        result | not isIO =
-            cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim False rs rtt [ EVar t | (t,_) <- rs ] rtt') (ELit $ LitCons cn [EVar rtVar'] rt')
-               | "void" <- toExtType rt' =
-            cFun $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
-                    eStrictLet tvrWorld2 (prim True rs "void" (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
-                                                                                                                | otherwise =
-             cFun $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
-                    eCaseTup' (prim True rs rtt (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ LitCons cn [EVar rtVar'] rt') (eJustIO (EVar tvrWorld2) (EVar rtVar)))
+    cDecl (HsForeignDecl _ i@Import {} HS.CCall _ n _) = do
+        let name = toName Name.Val n
+            (ty,lamt) = pval name
+            var = tVr (nameToInt name) ty
+            (ts,rt) = argTypes' ty
+            (isIO,rt') = case  rt of
+                ELit (LitCons c [x] _) | c == tc_IO -> (True,x)
+                _ -> (False,rt)
+        es <- newVars [ t |  t <- ts, not (sortStarLike t) ]
+        (_,pt) <- lookupCType dataTable rt'
+        [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
+        let cFun = createFunc dataTable (map tvrType es)
+            prim io rs rtt = EPrim (APrim (Func io s (snds rs) rtt) (Requires is ls))
+                where Import s is ls = i
+        result <- case (isIO,pt) of
+            (True,"void") -> cFun $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
+                        eStrictLet tvrWorld2 (prim True rs "void" (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
+            (False,"void") -> fail "pure foreign function must return a valid value"
+            _ -> do
+                (cn,rtt',rtt) <- lookupCType' dataTable rt'
+                [rtVar,rtVar'] <- newVars [rt',rtt']
+                let rttIO = ltTuple [tWorld__, rt']
+                    rttIO' = ltTuple' [tWorld__, rtt']
+                case isIO of
+                    False -> cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim False rs rtt [ EVar t | (t,_) <- rs ] rtt') (ELit $ LitCons cn [EVar rtVar'] rt')
+                    True -> cFun $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
+                                eCaseTup' (prim True rs rtt (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ LitCons cn [EVar rtVar'] rt') (eJustIO (EVar tvrWorld2) (EVar rtVar)))
+        return [(name,var,lamt result)]
 
     cDecl x@HsForeignDecl {} = fail ("Unsupported foreign declaration: "++ show x)
 
