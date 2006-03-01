@@ -67,9 +67,7 @@ import Util.Gen
 import Util.NameMonad
 
 theMainName = toName Name.Val "theMain"
-ump sl e = EError  (srcLocShow sl ++ ": Unmatched pattern") e
-srcLocShow sl = concat [srcLocFileName sl, ":",show $ srcLocLine sl,":", show $ srcLocColumn sl ]
-nameToInt n = atomIndex $ toAtom n
+ump sl e = EError (show sl ++ ": Unmatched pattern") e
 
 concatMapM f xs = do
     xs <- mapM f xs
@@ -85,8 +83,6 @@ newVars xs = f xs [] where
         s <- newUniq
         f xs (tVr (2*s) x:ys)
 
-lt :: Name -> Int
-lt n | nameType n == TypeVal =  atomIndex $ toAtom $  n
 
 tipe t = f t where
     f (TAp t1 t2) = eAp (f t1) (f t2)
@@ -106,6 +102,7 @@ tipe t = f t where
         | tv `elem` fvs = setProperty prop_SCRUTINIZED (tVr (lt n) (kind k))
         | otherwise = tVr (lt n) (kind k)
     cmvar MetaVar { metaKind = k } = tAbsurd (kind k)
+    lt n | nameType n == TypeVal = toId n  -- verifies namespace
 
 kind Star = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
@@ -136,22 +133,18 @@ simplifyHsPat p@HsPVar {} = p
 simplifyHsPat p@HsPLit {} = p
 simplifyHsPat p = error $ "simplifyHsPat: " ++ show p
 
-{-
-convertVal assumps n = (mp EPi ts (tipe t), mp eLam ts) where
-    (Forall _ (_ :=> t)) = case Map.lookup n assumps of
-        Just z -> z
-        Nothing -> error $ "convertVal.Lookup failed: " ++ (show n)
-    mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (lt n) (kind k)) (mp fn rs t)
-    mp _ [] t = t
-    ts = ctgen t
-    lt n =  nameToInt n
--}
-
 
 fromTyvar (Tyvar _ n k _) = tVr (toId n) (kind k)
 
 fromSigma (TForAll vs (_ :=> t)) = (map fromTyvar vs, tipe t)
 fromSigma t = ([], tipe t)
+
+convertValue n = do
+    assumps <- asks ceAssumps
+    t <- Map.lookup n assumps
+    let (vs,_) = fromSigma t
+        ty = tipe t
+    return (tVr (toId n) ty,ty,flip (foldr eLam) vs)
 
 convertVal assumps n = (foldr ePi t vs, flip (foldr eLam) vs) where
     (vs,t) = case Map.lookup n assumps of
@@ -159,12 +152,11 @@ convertVal assumps n = (foldr ePi t vs, flip (foldr eLam) vs) where
         Nothing -> error $ "convertVal.Lookup failed: " ++ (show n)
 
 convertOneVal (Forall _ (_ :=> t)) = (mp EPi ts (tipe t)) where
-    mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (lt n) (kind k)) (mp fn rs t)
+    mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (toId n) (kind k)) (mp fn rs t)
     mp _ [] t = t
     ts = ctgen t
-    lt n =  nameToInt n
 
-toTVr assumps n = tVr ( nameToInt n) (typeOfName n) where
+toTVr assumps n = tVr (toId n) (typeOfName n) where
     typeOfName n = fst $ convertVal assumps n
 
 matchesConv ms = map v ms where
@@ -192,7 +184,7 @@ getMainFunction dataTable name ds = ans where
                 Nothing ->  EAp (EAp (EVar runExpr) ty) maine
             be = (eAp e (EVar errorCont))
             theMain = (theMainName,setProperty prop_EXPORTED theMainTvr,be)
-            theMainTvr =  tVr (nameToInt theMainName) (infertype dataTable be)
+            theMainTvr =  tVr (toId theMainName) (infertype dataTable be)
             tvm@(TVr { tvrType =  ty}) =  main
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs ]
             (ty',xs) = fromPi ty
@@ -210,7 +202,7 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
     ans = concatMap cClass (classRecords classHierarchy)
     cClass classRecord =  concat [ method classRecord n | n :>: Forall _ (_ :=> t) <- classAssumps classRecord ]
     method classRecord methodName | isJust _methodName = as where
-        methodVar = tVr (nameToInt methodName) ty
+        methodVar = tVr (toId methodName) ty
         _methodName@(~(Just (TVr {tvrType = ty},_))) = findName methodName
         defaultName =  (defaultInstanceName methodName)
         valToPat' (ELit (LitCons x ts t)) = ELit $ LitCons x [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..], j `notElem` map tvrIdent args]  t
@@ -238,7 +230,7 @@ createMethods :: Monad m => DataTable -> ClassHierarchy -> (Map.Map Name (TVr,E)
 createMethods dataTable classHierarchy funcs = return ans where
     ans = concatMap cClass (classRecords classHierarchy)
     cClass classRecord =  concat [ method classRecord n | n :>: _ <- classAssumps classRecord ]
-    method classRecord methodName | isJust _methodTVr = [(methodName ,setProperty prop_METHOD (tVr ( nameToInt methodName) ty),v)] where
+    method classRecord methodName | isJust _methodTVr = [(methodName ,setProperty prop_METHOD (tVr (toId methodName) ty),v)] where
         theDefault = findName (defaultInstanceName methodName)
         _methodTVr@(~(Just (TVr {tvrType = ty},ELam TVr { tvrInfo = nfo } _))) = findName methodName
         Just (vmap::Typ) = Info.lookup nfo
@@ -268,7 +260,7 @@ createMethods dataTable classHierarchy funcs = return ans where
 methodNames ::  ClassHierarchy ->  [TVr]
 methodNames  classHierarchy =  ans where
     ans = concatMap cClass (classRecords classHierarchy)
-    cClass classRecord =  [ setProperty prop_METHOD $ tVr (nameToInt $ n) (convertOneVal t) | n :>: t <- classAssumps classRecord ]
+    cClass classRecord =  [ setProperty prop_METHOD $ tVr (toId n) (convertOneVal t) | n :>: t <- classAssumps classRecord ]
 
 unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
 unbox dataTable e vn wtd = eCase e [Alt (LitCons cna [tvra] te) (wtd tvra)] Unknown where
@@ -340,6 +332,7 @@ instance Monad m => UniqueProducer (Ce m) where
         return i
 
 
+
 convertDecls :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
 convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalRWST ans ceEnv 2 where
     ceEnv = CeEnv {
@@ -355,32 +348,28 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
     anninst (a,b,c)
         | "Instance@" `isPrefixOf` show a = (a,setProperty prop_INSTANCE b, deNewtype dataTable c)
         | otherwise = (a,b, deNewtype dataTable c)
-    pval = convertVal assumps
     cDecl :: Monad m => HsDecl -> Ce m [(Name,TVr,E)]
     cDecl (HsForeignDecl _ i@(Import {}) HS.Primitive _ n _) = do
         let name      = toName Name.Val n
-            var       = tVr (nameToInt name) ty
-            (ty,lamt) = pval name
-            (ts,rt)   = argTypes' ty
+        (var,ty,lamt) <- convertValue name
+        let (ts,rt)   = argTypes' ty
             toPrim (Import cn is ls) = APrim (PrimPrim cn) (Requires is ls)
         es <- newVars [ t |  t <- ts, not (sortStarLike t) ]
         let result    = foldr ($) (EPrim (toPrim i) (map EVar es) rt) (map ELam es)
         return [(name,var,lamt result)]
     cDecl (HsForeignDecl _ i@HS.AddrOf {} _ _ n _) = do
-        let (ty,lamt)  = pval name
-            (ts,rt)    = argTypes' ty
-            name       = toName Name.Val n
+        let name       = toName Name.Val n
+        (var,ty,lamt) <- convertValue name
+        let (ts,rt)    = argTypes' ty
         (cn,st,ct) <- lookupCType' dataTable rt
         [uvar] <- newVars [st]
-        let var        = tVr (nameToInt name) ty
-            expr x     = return [(name,var,lamt x)]
+        let expr x     = return [(name,var,lamt x)]
             prim       = APrim (CP.AddrOf cn) (Requires is ls) where HS.AddrOf cn is ls = i
         expr $ eStrictLet uvar (EPrim prim [] st) (ELit (LitCons cn [EVar uvar] rt))
     cDecl (HsForeignDecl _ i@Import {} HS.CCall _ n _) = do
         let name = toName Name.Val n
-            (ty,lamt) = pval name
-            var = tVr (nameToInt name) ty
-            (ts,rt) = argTypes' ty
+        (var,ty,lamt) <- convertValue name
+        let (ts,rt) = argTypes' ty
             (isIO,rt') = case  rt of
                 ELit (LitCons c [x] _) | c == tc_IO -> (True,x)
                 _ -> (False,rt)
@@ -413,30 +402,27 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
 
     cDecl (HsPatBind sl p rhs wh) | (HsPVar n) <- simplifyHsPat p = do
         let name = toName Name.Val n
-            var = tVr (nameToInt name) ty
-            (ty,lamt) = pval name
+        (var,ty,lamt) <- convertValue name
         rhs <- cRhs sl rhs
         lv <- hsLetE wh rhs
         return [(name,var,lamt lv)]
     cDecl (HsFunBind [(HsMatch sl n ps rhs wh)]) | ps' <- map simplifyHsPat ps, all isHsPVar ps' = do
         let name = toName Name.Val n
-            var = tVr ( nameToInt name) ty
-            (ty,lamt) = pval name
+        (var,ty,lamt) <- convertValue name
         rhs <- cRhs sl rhs
         lv <- hsLetE wh rhs
         return [(name,var,lamt $ lp  ps' lv)]
     cDecl (HsFunBind ms@((HsMatch sl n ps _ _):_)) = do
         let name = toName Name.Val n
-            v = tVr (nameToInt name) t -- lp ps (hsLet wh e)
-            (t,lamt) = pval name
-            (targs,eargs) = argTypes t
+        (var,t,lamt) <- convertValue name
+        let (targs,eargs) = argTypes t
             numberPatterns = length ps
         bs' <- newVars (take numberPatterns eargs)
         let bs  = map EVar bs'
             rt = discardArgs (length targs + numberPatterns) t
             z e = foldr eLam e bs'
         ms <- cMatchs bs (matchesConv ms) (ump sl rt)
-        return [(name,v,lamt $ z ms )]
+        return [(name,var,lamt $ z ms )]
     cDecl HsNewTypeDecl {  hsDeclName = dname, hsDeclArgs = dargs, hsDeclCon = dcon, hsDeclDerives = derives } = return $ makeDerives dname dargs [dcon] (map (toName ClassName) derives)
     cDecl HsDataDecl {  hsDeclName = dname, hsDeclArgs = dargs, hsDeclCons = dcons, hsDeclDerives = derives } = return $ makeDerives dname dargs dcons (map (toName ClassName) derives)
     cDecl cd@(HsClassDecl {}) = cClassDecl cd
@@ -504,7 +490,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
     cMatchs :: Monad m => [E] -> [([HsPat],HsRhs,[HsDecl])] -> E -> Ce m E
     cMatchs bs ms els = do
         pg <- processGuards ms
-        convertMatches funcs dataTable tv cType bs pg els
+        convertMatches funcs tv cType bs pg els
 
     cGuard (HsUnGuardedRhs e) = liftM const $ cExpr e
     cGuard (HsGuardedRhss (HsGuardedRhs _ g e:gs)) = do
@@ -536,7 +522,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         nds <- mconcatMapM cDecl wh
         let elet = ELetRec [ (b,c) | (_,b,c) <- nds]
         return (map simplifyHsPat ps,elet . cg )
-    cType (n::HsName) = fst $ pval (toName Name.Val n)
+    cType (n::HsName) = fst $ convertVal assumps (toName Name.Val n)
 
     cClassDecl (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon name) _)) decls) = do
         let ds = map simplifyDecl decls
@@ -548,7 +534,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
                     [] -> return []
                     (d:_) -> cDecl d >>= \ [(_,_,v)] -> return [v]
                 return [(defaultName,tVr (toId defaultName) ty,els) | els <- tels ]
-            cClass classRecord =  [ f n (nameToInt n) (convertOneVal t) | n :>: t <- classAssumps classRecord ] where
+            cClass classRecord =  [ f n (toId n) (convertOneVal t) | n :>: t <- classAssumps classRecord ] where
                 f n i t = (n,setProperties [prop_METHOD,prop_PLACEHOLDER] $ tVr i t, foldr ELam (EPrim (primPrim ("Placeholder: " ++ show n)) [] ft) args)  where
                     (ft',as) = fromPi t
                     (args,rargs) = span (sortStarLike . getType) as
@@ -597,7 +583,7 @@ fromHsPLitInt (HsPLit l@(HsInt _)) = return l
 fromHsPLitInt (HsPLit l@(HsFrac _)) = return l
 fromHsPLitInt x = fail $ "fromHsPLitInt: " ++ show x
 
-convertMatches funcs dataTable tv cType bs ms err = match bs ms err where
+convertMatches funcs tv cType bs ms err = match bs ms err where
     doNegate e = eAp (eAp (func_negate funcs) (getType e)) e
     fromInt = func_fromInt funcs
     fromInteger = func_fromInteger funcs
@@ -648,6 +634,7 @@ convertMatches funcs dataTable tv cType bs ms err = match bs ms err where
                         return (Alt  (litconvert l (getType b)) m)
                 as@(_:_) <- mapM f gps
                 [TVr { tvrIdent = vr }] <- newVars [Unknown]
+                dataTable <- asks ceDataTable
                 return $ unbox dataTable b vr $ \tvr -> eCase (EVar tvr) as err
                 --return $ eCase b as err
             | all isHsPApp patternHeads = do
@@ -655,6 +642,7 @@ convertMatches funcs dataTable tv cType bs ms err = match bs ms err where
                     f (name,ps) = do
                         let spats = hsPatPats $ (\ (x:_) -> x) $ fst ((\ (x:_) -> x) ps)
                             nargs = length spats
+                        dataTable <- asks ceDataTable
                         vs <- newVars (slotTypes dataTable (toName DataConstructor name) (getType b))
                         vs' <- newVars (map (const Unknown) vs)
 
