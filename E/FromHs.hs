@@ -66,7 +66,6 @@ import Type(schemeToType)
 import Util.Gen
 import Util.NameMonad
 
-localVars = [10,12..]
 theMainName = toName Name.Val "theMain"
 ump sl e = EError  (srcLocShow sl ++ ": Unmatched pattern") e
 srcLocShow sl = concat [srcLocFileName sl, ":",show $ srcLocLine sl,":", show $ srcLocColumn sl ]
@@ -358,26 +357,25 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         | otherwise = (a,b, deNewtype dataTable c)
     pval = convertVal assumps
     cDecl :: Monad m => HsDecl -> Ce m [(Name,TVr,E)]
-    cDecl (HsForeignDecl _ i@(Import {}) HS.Primitive _ n _) = result where
-        result    = expr $ foldr ($) (EPrim (toPrim i) (map EVar es) rt) (map ELam es)
-        expr x    = return [(name,var,lamt x)]
-        name      = toName Name.Val n
-        var       = tVr (nameToInt name) ty
-        (ty,lamt) = pval name
-        (ts,rt)   = argTypes' ty
-        es        = [ (tVr ( n) t) |  t <- ts, not (sortStarLike t) | n <- localVars ]
-        toPrim (Import cn is ls) = APrim (PrimPrim cn) (Requires is ls)
-    cDecl (HsForeignDecl _ i@HS.AddrOf {} _ _ n _) = result where
-        (cn,st,ct) = runIdentity (lookupCType' dataTable rt)
-        (ty,lamt)  = pval name
-        (ts,rt)    = argTypes' ty
-        name       = toName Name.Val n
-        newId      = head $ freeNames $ freeVars rt
-        uvar       = tVr newId st
-        var        = tVr (nameToInt name) ty
-        expr x     = return [(name,var,lamt x)]
-        prim       = APrim (CP.AddrOf cn) (Requires is ls) where HS.AddrOf cn is ls = i
-        result     = expr $ eStrictLet uvar (EPrim prim [] st) (ELit (LitCons cn [EVar uvar] rt))
+    cDecl (HsForeignDecl _ i@(Import {}) HS.Primitive _ n _) = do
+        let name      = toName Name.Val n
+            var       = tVr (nameToInt name) ty
+            (ty,lamt) = pval name
+            (ts,rt)   = argTypes' ty
+            toPrim (Import cn is ls) = APrim (PrimPrim cn) (Requires is ls)
+        es <- newVars [ t |  t <- ts, not (sortStarLike t) ]
+        let result    = foldr ($) (EPrim (toPrim i) (map EVar es) rt) (map ELam es)
+        return [(name,var,lamt result)]
+    cDecl (HsForeignDecl _ i@HS.AddrOf {} _ _ n _) = do
+        let (ty,lamt)  = pval name
+            (ts,rt)    = argTypes' ty
+            name       = toName Name.Val n
+        (cn,st,ct) <- lookupCType' dataTable rt
+        [uvar] <- newVars [st]
+        let var        = tVr (nameToInt name) ty
+            expr x     = return [(name,var,lamt x)]
+            prim       = APrim (CP.AddrOf cn) (Requires is ls) where HS.AddrOf cn is ls = i
+        expr $ eStrictLet uvar (EPrim prim [] st) (ELit (LitCons cn [EVar uvar] rt))
     cDecl (HsForeignDecl _ i@Import {} HS.CCall _ n _) = do
         let name = toName Name.Val n
             (ty,lamt) = pval name
@@ -432,11 +430,11 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
             v = tVr (nameToInt name) t -- lp ps (hsLet wh e)
             (t,lamt) = pval name
             (targs,eargs) = argTypes t
-            bs' = [(tVr (n) t) | n <- localVars | t <- take numberPatterns eargs]
-            bs  = map EVar bs'
-            rt = discardArgs (length targs + numberPatterns) t
             numberPatterns = length ps
-            z e = foldr (eLam) e bs'
+        bs' <- newVars (take numberPatterns eargs)
+        let bs  = map EVar bs'
+            rt = discardArgs (length targs + numberPatterns) t
+            z e = foldr eLam e bs'
         ms <- cMatchs bs (matchesConv ms) (ump sl rt)
         return [(name,v,lamt $ z ms )]
     cDecl HsNewTypeDecl {  hsDeclName = dname, hsDeclArgs = dargs, hsDeclCon = dcon, hsDeclDerives = derives } = return $ makeDerives dname dargs [dcon] (map (toName ClassName) derives)
