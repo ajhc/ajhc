@@ -145,7 +145,7 @@ getCollectedCoerce :: Tc (Map.Map Name CoerceTerm)
 getCollectedCoerce = do
     v <- asks tcCollectedCoerce
     r <- liftIO $ readIORef v
-    --r <- fmapM flattenType r
+    r <- fmapM flattenType r
     return r
 
 

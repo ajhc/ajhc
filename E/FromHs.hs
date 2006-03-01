@@ -31,22 +31,20 @@ import Doc.PPrint
 import E.E
 import E.Eval(eval)
 import E.LetFloat(atomizeApps)
+import E.Program
 import E.Rules
 import E.Subst
 import E.Traverse
 import E.TypeAnalysis
 import E.TypeCheck
 import E.Values
-import E.Program
 import Fixer.VMap
-import FrontEnd.Rename(unRename)
 import FrontEnd.KindInfer(hoistType)
-import FrontEnd.TiData
+import FrontEnd.Rename(unRename)
 import FrontEnd.SrcLoc
-import Util.Gen
+import FrontEnd.Tc.Type hiding(Rule(..), unbox)
 import FrontEnd.Tc.Type(prettyPrintType)
-import qualified FrontEnd.Tc.Monad as TM
-import qualified FrontEnd.Tc.Type as T(Rule(..))
+import FrontEnd.TiData
 import FrontEnd.Utils
 import GenUtil
 import HsSyn as HS
@@ -56,6 +54,8 @@ import Name.Names
 import Name.VConsts
 import Options
 import qualified FlagOpts as FO
+import qualified FrontEnd.Tc.Monad as TM
+import qualified FrontEnd.Tc.Type as T(Rule(..))
 import qualified Info.Info as Info
 import qualified Stats
 import qualified Util.Seq as Seq
@@ -63,6 +63,7 @@ import Representation
 import Support.CanType
 import Support.FreeVars
 import Type(schemeToType)
+import Util.Gen
 import Util.NameMonad
 
 localVars = [10,12..]
@@ -82,9 +83,8 @@ head _ = error "FromHsHeadError"
 newVars xs = f xs [] where
     f [] xs = return $ reverse xs
     f (x:xs) ys = do
-        s <- get
-        put $! s + 2
-        f xs (tVr ( s) x:ys)
+        s <- newUniq
+        f xs (tVr s x:ys)
 
 lt :: Name -> Int
 lt n | nameType n == TypeVal =  atomIndex $ toAtom $  n
@@ -290,10 +290,10 @@ createFunc dataTable ns es ee = foldr ELam eee tvrs where
 instance GenName String where
    genNames i = map (('x':) . show) [i..]
 
-convertRules ::  ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> IO [(String,[TVr],E,E)]
-convertRules classHierarchy assumps dataTable hsDecls = concatMapM f hsDecls where
+convertRules :: TiData -> ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> IO [(String,[TVr],E,E)]
+convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM f hsDecls where
     f pr@HsPragmaRules {} = do
-        let ce = convertE classHierarchy assumps dataTable (hsDeclSrcLoc pr)
+        let ce = convertE tiData classHierarchy assumps dataTable (hsDeclSrcLoc pr)
         e1 <- ce (hsDeclLeftExpr pr)
         e2 <- ce (hsDeclRightExpr pr)
         (ts,cs) <- runNameMT $ do
@@ -314,25 +314,36 @@ convertRules classHierarchy assumps dataTable hsDecls = concatMapM f hsDecls whe
         return [(hsDeclString pr,( snds (cs' ++ ts) ),eval $ smt $ sma e1,e2)]
     f _ = return []
 
-convertE :: Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> SrcLoc -> HsExp -> m E
-convertE classHierarchy assumps dataTable srcLoc exp = do
-    [(_,_,e)] <- convertDecls classHierarchy assumps dataTable [HsPatBind srcLoc (HsPVar sillyName') (HsUnGuardedRhs exp) []]
+convertE :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Scheme -> DataTable -> SrcLoc -> HsExp -> m E
+convertE tiData classHierarchy assumps dataTable srcLoc exp = do
+    [(_,_,e)] <- convertDecls tiData classHierarchy assumps dataTable [HsPatBind srcLoc (HsPVar sillyName') (HsUnGuardedRhs exp) []]
     return e
 
 sillyName' = nameName v_silly
 
-newtype Ce t a = Ce (StateT Int t a)
-    deriving(Monad,Functor,MonadTrans,MonadIO,MonadState Int)
+data CeEnv = CeEnv {
+    ceAssumps :: Map.Map Name Type,
+    ceCoerce :: Map.Map Name CoerceTerm,
+    ceDataTable :: DataTable
+    }
+
+newtype Ce t a = Ce (RWST CeEnv () Int t a)
+    deriving(Monad,Functor,MonadTrans,MonadIO,MonadReader CeEnv,MonadState Int)
 
 instance Monad m => UniqueProducer (Ce m) where
     newUniq = do
         i <- get
-        put $! (i + 1)
+        put $! (i + 2)
         return i
 
 
-convertDecls :: Monad m => ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
-convertDecls classHierarchy assumps dataTable hsDecls = evalStateT ans 2 where
+convertDecls :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
+convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalRWST ans ceEnv 2 where
+    ceEnv = CeEnv {
+        ceCoerce = tiCoerce tiData,
+        ceAssumps = Map.map schemeToType assumps,
+        ceDataTable = dataTable
+        }
     Ce ans = do
         nds <- mapM cDecl hsDecls
         return (map anninst $ concat nds)

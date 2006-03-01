@@ -186,12 +186,12 @@ processDecls stats ho ho' tiData = do
 
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
-    ds <- convertDecls (hoClassHierarchy ho') allAssumps  fullDataTable decls
+    ds <- convertDecls tiData (hoClassHierarchy ho') allAssumps  fullDataTable decls
     -- mapM_ (\(_,v,lc) -> printCheckName'' fullDataTable v lc) ds
 
     -- Build rules
     rules' <- createInstanceRules (hoClassHierarchy ho' `mappend` hoClassHierarchy initialHo)   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
-    rawRules <- convertRules (hoClassHierarchy ho') allAssumps fullDataTable decls
+    rawRules <- convertRules tiData (hoClassHierarchy ho') allAssumps fullDataTable decls
     let nrules = fromRules [ makeRule n (progModule prog,i) vs head args e2 | (n,vs,e1,e2) <- rawRules, let (EVar head,args) = fromAp e1 | i <- [1..] ]
     let rules = rules' `mappend` nrules
     wdump FD.Rules $ printRules rules
