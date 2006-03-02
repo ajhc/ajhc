@@ -143,9 +143,15 @@ fromSigma t = ([], tipe t)
 convertValue n = do
     assumps <- asks ceAssumps
     t <- Map.lookup n assumps
-    let (vs,_) = fromSigma t
-        ty = tipe t
-    return (tVr (toId n) ty,ty,flip (foldr eLam) vs)
+    let ty = tipe t
+    cc <- asks ceCoerce
+    lm <- case Map.lookup n cc of
+        Nothing -> do
+            let (vs,_) = fromSigma t
+            return (flip (foldr eLam) vs)
+        Just CTId -> do return id
+        Just (CTAbs ts) -> do return $ \e -> foldr eLam e (map fromTyvar ts)
+    return (tVr (toId n) ty,ty,lm)
 
 lookupCoercion n = do
     assumps <- asks ceAssumps
