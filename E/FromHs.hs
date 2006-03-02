@@ -303,7 +303,7 @@ convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM f hsDe
         (ts,cs) <- runNameMT $ do
             ts <- flip mapM (filter (sortStarLike . getType) $ freeVars e1) $ \tvr -> do
                 --return (tvrIdent tvr,tvr)
-                nn <- newNameFrom (map (:[]) ['a' ..])
+                nn <- newNameFrom (map (:'\'':[]) ['a' ..])
                 return (tvrIdent tvr,tvr { tvrIdent = toId (toName TypeVal nn) })
             cs <- flip mapM [toTVr assumps (toName Val v) | (v,_) <- hsDeclFreeVars pr ] $ \tvr -> do
                 let ur = show $ unRename $ nameName (toUnqualified $ runIdentity $ fromId (tvrIdent tvr))

@@ -304,13 +304,14 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $3, hsDeclType = $5 } }
 >       | decl		{ $1 }
 
-> mfreevars :: { [HsName] }
+> mfreevars :: { [(HsName,Maybe HsType)] }
 >       : 'forall' vbinds '.' { $2 }
 >       | { [] }
 
-> vbinds :: { [HsName] }
->       : vbinds var                  { $2 : $1 }
->       | var                         { [$1] }
+> vbinds :: { [(HsName,Maybe HsType)] }
+>       : vbinds '(' var '::' type ')' { ($3,Just $5) : $1 }
+>       | vbinds var                   { ($2,Nothing) : $1 }
+>       |                              { [] }
 
 > decls :: { [HsDecl] }
 >	: decls1 optsemi		{ fixupHsDecls ( reverse $1 ) }

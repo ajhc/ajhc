@@ -227,6 +227,9 @@ tiModules' me ms = do
     when (dump FD.Types) $ do
         putStrLn " ---- the types of identifiers ---- "
         mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType s |  (n,s) <- Map.toList (if verbose2 then localVarEnv else trimEnv localVarEnv)]
+    when (dump FD.Types) $ do
+        putStrLn " ---- the coersions of identifiers ---- "
+        mapM_ putStrLn [ show n ++  " --> " ++ show s |  (n,s) <- Map.toList coercions]
 
     localVarEnv <- return $ Map.map typeToScheme localVarEnv
 

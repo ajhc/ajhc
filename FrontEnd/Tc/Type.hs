@@ -340,11 +340,11 @@ ctAp xs = CTAp xs
 ctId = CTId
 
 composeCoerce :: CoerceTerm -> CoerceTerm -> CoerceTerm
-composeCoerce (CTFun a) (CTFun b) = ctFun (a `composeCoerce` b)
+--composeCoerce (CTFun a) (CTFun b) = ctFun (a `composeCoerce` b)
 composeCoerce CTId x = x
 composeCoerce x CTId = x
-composeCoerce (CTAbs ts) (CTAbs ts') = CTAbs (ts ++ ts')
-composeCoerce (CTAp ts) (CTAp ts') = CTAp (ts ++ ts')
+--composeCoerce (CTAbs ts) (CTAbs ts') = CTAbs (ts ++ ts')
+--composeCoerce (CTAp ts) (CTAp ts') = CTAp (ts ++ ts')
 --composeCoerce (CTAbs ts) (CTAp ts') = f ts ts' where
 --    f (t:ts) (TVar t':ts') | t == t' = f ts ts'
 --    f [] [] = CTId

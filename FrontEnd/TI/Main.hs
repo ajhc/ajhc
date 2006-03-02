@@ -437,9 +437,10 @@ tiPragmaRules env prule@HsPragmaRules { hsDeclFreeVars = vs, hsDeclLeftExpr = e1
 
             return (nenv `mappend` env1 `mappend` env2)
 
-        dv n = do
+        dv (n,Nothing) = do
             v <- newTVar Star
             return (Map.singleton (toName Val n) (toScheme v),v)
+        dv _ = fail "old typechecker can't handle type annotated rules"
 
 
 

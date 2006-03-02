@@ -253,11 +253,13 @@ ppHsImportSpec (HsIAbs name)                     = ppHsName name
 ppHsImportSpec (HsIThingAll name)                = ppHsName name <> text"(..)"
 ppHsImportSpec (HsIThingWith name nameList)      = ppHsName name <>
                                                    (parenList . map ppHsNameParen $ nameList)
+ppHsTName (n,Nothing) = ppHsName n
+ppHsTName (n,Just t) = parens (ppHsName n <+> text "::" <+> ppHsType t)
 
 -------------------------  Declarations ------------------------------
 ppHsDecl :: HsDecl -> Doc
 ppHsDecl prules@HsPragmaRules {} = text ("{-# RULES " ++ show (hsDeclString prules)) <+> text "forall" <+> vars <+> text "." $$ nest 4 rest $$ text "#-}" where
-    vars = hsep (map ppHsName $ hsDeclFreeVars prules)
+    vars = hsep (map ppHsTName $ hsDeclFreeVars prules)
     rest = ppHsExp (hsDeclLeftExpr prules) <+> text "=" <+> ppHsExp (hsDeclRightExpr prules)
 ppHsDecl fd@(HsForeignDecl _ _ _ _ n qt) = text "ForeignDecl" <+> ppHsName n <+> ppHsQualType qt <+> text (show fd)
 ppHsDecl (HsTypeDecl loc name nameList htype) =

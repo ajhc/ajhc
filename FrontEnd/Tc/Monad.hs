@@ -402,6 +402,7 @@ varBind u t
         tt <- unBox t
         --(t,be,_) <- unbox t
         --when be $ error $ "binding boxy: " ++ tupled [pprint u,prettyPrintType t]
+        tt <- flattenType tt
         when (u `elem` freeMetaVars tt) $ unificationError (TMetaVar u) tt -- occurs check
         let r = metaRef u
         x <- liftIO $ readIORef r

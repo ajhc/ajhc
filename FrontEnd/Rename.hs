@@ -71,6 +71,7 @@ import Data.FunctorM
 import Data.FiniteMap
 import Data.Monoid
 import List
+import Maybe
 import qualified Data.Map as Map
 
 import Doc.DocLike(tupled)
@@ -411,8 +412,9 @@ renameHsDecl (HsPragmaProps srcLoc prop hsNames) subTable = do
     return (HsPragmaProps  srcLoc prop hsNames')
 renameHsDecl prules@HsPragmaRules { hsDeclSrcLoc = srcLoc, hsDeclFreeVars = fvs, hsDeclLeftExpr = e1, hsDeclRightExpr = e2 } subTable = do
     setSrcLoc srcLoc
-    subTable' <- updateSubTableWithHsNames subTable fvs
-    fvs' <- renameHsNames fvs subTable'
+    subTable' <- updateSubTableWithHsNames subTable (fsts fvs)
+    subTable'' <- updateSubTableWithHsTypes subTable (catMaybes $ snds fvs)
+    fvs' <- sequence [ liftM2 (,) (renameAny x subTable') (renameAny y subTable'')| (x,y) <- fvs]
     e1' <- renameHsExp e1 subTable'
     e2' <- renameHsExp e2 subTable'
     m <- getCurrentModule
@@ -531,6 +533,13 @@ instance RenameAny SrcLoc where
 
 instance RenameAny a => RenameAny [a] where
     renameAny xs t = mapM (`renameAny` t) xs
+
+instance (RenameAny a,RenameAny b) => RenameAny (a,b) where
+    renameAny (a,b) t = liftM2 (,) (renameAny a t) (renameAny b t)
+
+instance RenameAny a => RenameAny (Maybe a) where
+    renameAny Nothing _ = return Nothing
+    renameAny (Just x) t = liftM Just (renameAny x t)
 
 instance RenameAny HsTyVarBind where
     renameAny tvb@HsTyVarBind { hsTyVarBindName = n } t = do
@@ -1155,6 +1164,11 @@ updateSubTableWithHsQualType subTable hsQualType = do
       subTable' <- clobberHsNames hsNames subTable
       return (subTable')
 
+updateSubTableWithHsTypes :: SubTable -> [HsType] -> ScopeSM (SubTable)
+updateSubTableWithHsTypes subTable hsType = do
+      let hsNames = nub $ concatMap getHsNamesFromHsType hsType
+      subTable' <- clobberHsNames hsNames subTable
+      return (subTable')
 
 
 -- takes a list of decls and examines only the class decls
