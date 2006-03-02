@@ -253,6 +253,10 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,b,_) -> b) al
         tipe = ELit (LitCons tc [] eStar)
     f _ = []
 
+isAbsurd (ELit (LitCons n [] _)) | n == tc_Absurd = True
+isAbsurd (ELit (LitCons _ xs@(_:_) _)) = all isAbsurd xs
+isAbsurd _ = False
+
 -- | determine if types are the same expanding newtypes and
 typesCompatable :: Monad m => DataTable -> E -> E -> m ()
 typesCompatable dataTable a b = go a b where
@@ -263,6 +267,9 @@ typesCompatable dataTable a b = go a b where
             go t t'
             when (not $ sameShape1 xs xs') $ fail "Arg lists don't match"
             zipWithM_ go xs xs'
+        g a b | isAbsurd a && isAbsurd b = do
+            go (getType a) (getType b)
+            return ()
         g (ESort a) (ESort b) = when (a /= b) $ fail "Sorts don't match"
         g (EVar a) (EVar b) = when (a /= b) $ fail "Vars don't match"
         g (EAp a b) (EAp a' b') = do
