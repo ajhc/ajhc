@@ -86,6 +86,14 @@ subsumes s1 s2 = do
 
     sub a b = fail $ "subsumes failure: " <> ppretty a <+> ppretty b
 
+-- might as well return flattened type
+-- we can skip the occurs check for boxy types
+occursCheck u@MetaVar { metaType = Tau } t = do
+    tt <- flattenType t
+    when (u `elem` freeMetaVars tt) $ unificationError (TMetaVar u) tt -- occurs check
+    return tt
+occursCheck u t = return t
+
 printRule :: String -> Tc ()
 printRule s
     | dump FD.BoxySteps = liftIO $ putStrLn s
@@ -117,8 +125,9 @@ boxyMatch s1 s2 = do
         return False
 
     -- AEQ1
-    bm (TArrow s1 s2) (TMetaVar mv) = do
+    bm a@(TArrow s1 s2) (TMetaVar mv) = do
         printRule "AEQ1"
+        occursCheck mv a
         withMetaVars mv [getType s1, getType s2] (\ [t1,t2] -> TArrow t1 t2) $ \ [t1,t2] ->
             boxyMatch s1 t1 >> boxyMatch s2 t2
         return False
@@ -135,7 +144,8 @@ boxyMatch s1 s2 = do
     -- CEQ1
 
     bm a (TMetaVar mv) | (TCon ca,as) <- fromTAp a = do
-        --printRule $ "CEQ1: " ++ pprint a
+        printRule $ "CEQ1: " ++ prettyPrintType a
+        a <- occursCheck mv a
         withMetaVars mv (map getType as) (\ ts -> foldl TAp (TCon ca) ts) $ \ ts ->
             sequence_ [ boxyMatch a t | t <- ts | a <- as ]
         return False
@@ -143,6 +153,7 @@ boxyMatch s1 s2 = do
     bm a (TMetaVar mv) | (x,xs@(_:_)) <- fromTAp a = do
         --printRule $ "CEQ1: " ++ pprint a
         let xxs = x:xs
+        a <- occursCheck mv a
         withMetaVars mv (map getType xxs) (\ (t:ts) -> foldl TAp t ts) $ \ ts ->
             sequence_ [ boxyMatch a t | t <- ts | a <- xxs ]
         return False
@@ -161,7 +172,8 @@ boxyMatch s1 s2 = do
 
 
     -- SEQ1
-    bm (TForAll vs (ps :=> tbody)) (TMetaVar mv) = do
+    bm a@(TForAll vs (ps :=> tbody)) (TMetaVar mv) = do
+        a <- occursCheck mv a
         withMetaVars mv [getType mv] (\ [t] -> TForAll vs (ps :=> t))  $ \ [t] ->
             boxyMatch tbody t
         return False
