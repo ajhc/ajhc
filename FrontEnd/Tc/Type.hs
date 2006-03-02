@@ -331,6 +331,11 @@ data Rule = RuleSpec {
 data CoerceTerm = CTId | CTAp [Type] | CTAbs [Tyvar] | CTFun CoerceTerm | CTCompose CoerceTerm CoerceTerm
     deriving(Show)
 
+
+instance Monoid CoerceTerm where
+    mempty = CTId
+    mappend = composeCoerce
+
 ctFun CTId = CTId
 ctFun x = CTFun x
 ctAbs [] = CTId

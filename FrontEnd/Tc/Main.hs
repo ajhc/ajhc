@@ -71,15 +71,16 @@ tcExpr e t = do
     --(_,False,_) <- unbox t
     return e
 
--- TODO should subsume for rank-n
 tiExpr (HsAsPat n (HsVar v)) typ = do
     sc <- lookupName (toName Val v)
     f <- sc `subsumes` typ
-    addCoerce (toName Val n) f
+    rc <- asks tcRecursiveCalls
+    if (toName Val v `Set.member` rc) then
+        tell mempty { outKnots = [(toName Val n,toName Val v)] }
+      else do addCoerce (toName Val n) f
     return (HsAsPat n $ HsVar v)
 
 {-
--- TODO should subsume for rank-n
 tiExpr (HsVar v) typ = do
     sc <- lookupName (toName Val v)
     sc `subsumes` typ
@@ -436,9 +437,13 @@ tiNonRecImpl decl = withContext (locSimple (srcLoc decl) ("in the implicitly typ
 tiImpls ::  [HsDecl] -> Tc ([HsDecl], TypeEnv)
 tiImpls [] = return ([],Map.empty)
 tiImpls bs = withContext (locSimple (srcLoc bs) ("in the recursive implicitly typed: " ++ (show (map getDeclName bs)))) $ do
-    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tiimpls " ++ show (map getDeclName bs)
+    let names = map getDeclName bs
+    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tiimpls " ++ show names
     ts <- sequence [newMetaVar Tau Star | _ <- bs]
-    (res,ps) <- listenPreds $ localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ts]) $ sequence [ tcDecl d s | d <- bs | s <- ts ]
+    (res,ps) <- listenPreds $
+        local (tcRecursiveCalls_u (Set.union $ Set.fromList names)) $
+            localEnv (Map.fromList [  (d,s) | d <- names | s <- ts]) $
+                sequence [ tcDecl d s | d <- bs | s <- ts ]
     ps' <- flattenType ps
     ts' <- flattenType ts
     fs <- freeMetaVarsEnv

@@ -219,10 +219,14 @@ tiModules' me ms = do
         }
 
     (localVarEnv,checkedRules,coercions) <- withOptionsT (modInfoOptions tms) $ runTc tcInfo $ do
-        (ds,cr) <- listenCheckedRules (tiProgram program ds)
+        (ds,out) <- listen (tiProgram program ds)
         env <- getCollectedEnv
         cc <- getCollectedCoerce
-        return (env,cr,cc)
+        let cc' = Map.union cc $ Map.fromList [ (as,lup v) | (as,v) <- outKnots out ]
+            lup v = case Map.lookup v cc of
+                Just (CTAbs xs) -> ctAp (map TVar xs)
+                _ -> ctId
+        return (env,checkedRules out,cc')
 
     when (dump FD.Types) $ do
         putStrLn " ---- the types of identifiers ---- "

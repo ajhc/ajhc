@@ -3,6 +3,9 @@ module FrontEnd.Tc.Monad(
     Tc(),
     TcInfo(..),
     TypeEnv(),
+    TcEnv(..),
+    tcRecursiveCalls_u,
+    Output(..),
     addCoerce,
     addPreds,
     composeCoerce,
@@ -72,6 +75,8 @@ import Support.CanType
 import Util.Inst
 import Warning
 
+
+data BindingType = RecursiveInfered | Supplied
 type TypeEnv = Map.Map Name Sigma
 
 -- read only environment, set up before type checking.
@@ -83,6 +88,7 @@ data TcEnv = TcEnv {
     tcCollectedCoerce   :: IORef (Map.Map Name CoerceTerm),
     tcCurrentEnv        :: Map.Map Name Sigma,
     tcCurrentScope      :: Set.Set MetaVar,
+    tcRecursiveCalls    :: Set.Set Name,
     tcOptions           :: Opt  -- module specific options
     }
    {-! derive: update !-}
@@ -91,7 +97,8 @@ data Output = Output {
     collectedPreds   :: Preds,
     existentialPreds :: Preds,
     checkedRules     :: [Rule],
-    existentialVars  :: [Tyvar]
+    existentialVars  :: [Tyvar],
+    outKnots         :: [(Name,Name)]
     }
    {-! derive: update, Monoid !-}
 
@@ -106,10 +113,6 @@ data TcInfo = TcInfo {
     tcInfoKindInfo :: KindEnv,
     tcInfoClassHierarchy :: ClassHierarchy
     }
-
---data Coerce e = CoerceJust e | CoerceLam [Tyvar] (Coerce e) | CoerceApp (Coerce e) [Type] | CoerceFn (Coerce e -> Coerce e) (Coerce e)
-
---newtype CoerceTerm = CoerceTerm (forall e . Coerce e -> Coerce e)
 
 
 
@@ -163,6 +166,7 @@ runTc tcInfo  (Tc tim) = do
         tcVarnum = vn,
         tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ tcInfoModName tcInfo],
         tcInfo = tcInfo,
+        tcRecursiveCalls = mempty,
         tcCurrentScope = mempty,
         tcOptions = opt
         }
@@ -310,12 +314,16 @@ toSigma t = TForAll [] ([] :=> t)
 -- | replace bound variables with arbitrary new ones and drop the binding
 -- TODO predicates?
 
-skolomize :: Sigma' -> Tc ([SkolemTV],Preds,Rho')
-skolomize (TForAll vs (ps :=> rho)) = return (vs,ps,rho)
+--skolomize :: Sigma' -> Tc ([SkolemTV],Preds,Rho')
+--skolomize (TForAll vs (ps :=> rho)) = return (vs,ps,rho)
 --freshSigma s >>= \x -> case x of
 --    TForAll as (_ :=> r) -> return (as,r)
 --    r -> return ([],r)
-skolomize s = return ([],[],s)
+--skolomize s = return ([],[],s)
+skolomize s = freshSigma s >>= \x -> case x of
+--skolomize s = return s >>= \x -> case x of
+    TForAll as (ps :=> r) -> return (as,ps,r)
+    r -> return ([],[],r)
 
 boxyInstantiate :: Sigma -> Tc ([Type],Rho')
 boxyInstantiate = freshInstance Sigma
