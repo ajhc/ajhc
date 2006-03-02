@@ -252,7 +252,7 @@ specializeProgram prog = do
 
 specializeDef _dataTable (t,e) | getProperty prop_PLACEHOLDER t || getProperty prop_INSTANCE t = return (t,e)
 specializeDef dataTable (tvr,e) = ans where
-    sub = substLet  [ (t,v) | (t,Just v) <- sts ]
+    sub = eLetRec  [ (t,v) | (t,Just v) <- sts ]
     sts = map spec ts
     spec t | Just nt <- Info.lookup (tvrInfo t) >>= getTyp (getType t) dataTable, sortStarLike (getType t) = (t,Just nt)
     spec t = (t,Nothing)
@@ -263,7 +263,7 @@ specializeDef dataTable (tvr,e) = ans where
         let vs = [ (n,v) | ((_,Just v),n) <- zip sts naturals ]
             sd = not $ null vs
         when sd $ tell (Map.singleton tvr (fsts vs))
-        return (if sd then tvr { tvrType = getType ne, tvrInfo = infoMap (dropArguments vs) (tvrInfo tvr) } else tvr,ne)
+        return (if sd then tvr { tvrType = infertype dataTable ne, tvrInfo = infoMap (dropArguments vs) (tvrInfo tvr) } else tvr,ne)
 
 
 specBody :: MonadStats m => DataTable -> Map.Map TVr [Int] -> E -> m E
