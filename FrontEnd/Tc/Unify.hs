@@ -15,7 +15,6 @@ import qualified FlagDump as FD
 import Support.CanType
 
 
-ctId = CTId
 
 
 pretty vv = prettyPrintType vv
@@ -48,7 +47,7 @@ subsumes s1 s2 = do
         printRule "SKOL"
         (vs,_,r2) <- skolomize fa
         f <- s1 `subsumes` r2
-        return (composeCoerce (CTAbs vs) f)
+        return (composeCoerce (ctAbs vs) f)
         --return (CoerceTerm (\x -> CoerceLam vs (f x)))
 
     -- SPEC
@@ -56,7 +55,7 @@ subsumes s1 s2 = do
         printRule "SPEC"
         (ts,r1') <- boxyInstantiate s1
         f <- r1' `subsumes` r2
-        return (f `composeCoerce` (CTAp ts))
+        return (f `composeCoerce` (ctAp ts))
         --return (CoerceTerm (\x -> f (CoerceApp x ts)))
 
     -- CON
@@ -69,7 +68,7 @@ subsumes s1 s2 = do
         printRule "F1"
         boxyMatch s3 s1
         f2 <- s2 `subsumes` s4
-        return (CTFun f2)
+        return (ctFun f2)
         --return (CoerceTerm (\g -> CoerceFn f2 g))
         --return (\g y -> f2 (runCoerce g y))
 

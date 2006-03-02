@@ -72,11 +72,19 @@ tcExpr e t = do
     return e
 
 -- TODO should subsume for rank-n
+tiExpr (HsAsPat n (HsVar v)) typ = do
+    sc <- lookupName (toName Val v)
+    f <- sc `subsumes` typ
+    addCoerce (toName Val n) f
+    return (HsAsPat n $ HsVar v)
+
+{-
+-- TODO should subsume for rank-n
 tiExpr (HsVar v) typ = do
     sc <- lookupName (toName Val v)
     sc `subsumes` typ
     return (HsVar v)
-
+-}
 tiExpr (HsCon conName) typ = do
     sc <- lookupName (toName DataConstructor conName)
     sc `subsumes` typ
@@ -462,11 +470,17 @@ tcPragmaDecl prule@HsPragmaRules { hsDeclUniq = uniq, hsDeclFreeVars = vs, hsDec
             rs2 <- return $ simplify ch rs2
             assertEntailment rs1 rs2
             return [prule]
-        dv n = do
+        dv (n,Nothing) = do
             v <- newMetaVar Tau Star
             let env = (Map.singleton (toName Val n) v)
             addToCollectedEnv env
             return (v,env)
+        dv (n,Just t) = do
+            kt <- getKindEnv
+            tt <- hsTypeToType kt t
+            let env = (Map.singleton (toName Val n) tt)
+            addToCollectedEnv env
+            return (tt,env)
 
 tcPragmaDecl fd@(HsForeignDecl _ _ _ _ n qt) = do
     kt <- getKindEnv

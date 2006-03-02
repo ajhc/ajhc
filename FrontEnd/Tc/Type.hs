@@ -329,10 +329,26 @@ data Rule = RuleSpec {
 
 -- CTFun f => \g . \y -> f (g y)
 data CoerceTerm = CTId | CTAp [Type] | CTAbs [Tyvar] | CTFun CoerceTerm | CTCompose CoerceTerm CoerceTerm
+    deriving(Show)
+
+ctFun CTId = CTId
+ctFun x = CTFun x
+ctAbs [] = CTId
+ctAbs xs = CTAbs xs
+ctAp [] = CTId
+ctAp xs = CTAp xs
+ctId = CTId
 
 composeCoerce :: CoerceTerm -> CoerceTerm -> CoerceTerm
+composeCoerce (CTFun a) (CTFun b) = ctFun (a `composeCoerce` b)
 composeCoerce CTId x = x
 composeCoerce x CTId = x
+composeCoerce (CTAbs ts) (CTAbs ts') = CTAbs (ts ++ ts')
+composeCoerce (CTAp ts) (CTAp ts') = CTAp (ts ++ ts')
+--composeCoerce (CTAbs ts) (CTAp ts') = f ts ts' where
+--    f (t:ts) (TVar t':ts') | t == t' = f ts ts'
+--    f [] [] = CTId
+--    f _ _ = CTCompose (CTAbs ts) (CTAp ts')
 composeCoerce x y = CTCompose x y
 
 

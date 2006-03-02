@@ -30,6 +30,7 @@ import Doc.DocLike
 import Doc.PPrint
 import E.E
 import E.Eval(eval)
+import E.Eta
 import E.LetFloat(atomizeApps)
 import E.Program
 import E.Rules
@@ -97,7 +98,7 @@ tipe t = f t where
     f (TExists xs (_ :=> t)) = let
         xs' = map (kind . tyvarKind) xs
         in ELit (LitCons (unboxedNameTuple TypeConstructor (length xs' + 1)) (f t:xs') eHash)
-    cvar _ Tyvar { tyvarRef = Just {}, tyvarKind = k}= error "tyvar is metaref"
+    cvar _ Tyvar { tyvarRef = Just {}, tyvarKind = k}= error $ "tyvar is metaref:" ++ prettyPrintType t
     cvar fvs tv@Tyvar { tyvarName = n, tyvarKind = k }
         | tv `elem` fvs = setProperty prop_SCRUTINIZED (tVr (lt n) (kind k))
         | otherwise = tVr (lt n) (kind k)
@@ -145,6 +146,14 @@ convertValue n = do
     let (vs,_) = fromSigma t
         ty = tipe t
     return (tVr (toId n) ty,ty,flip (foldr eLam) vs)
+
+lookupCoercion n = do
+    assumps <- asks ceAssumps
+    cs <- asks ceCoerce
+    case Map.lookup n assumps of
+        Just x -> return (Left x)
+        Nothing -> Right `liftM` Map.lookup n cs
+
 
 convertVal assumps n = (foldr ePi t vs, flip (foldr eLam) vs) where
     (vs,t) = case Map.lookup n assumps of
@@ -296,7 +305,7 @@ convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM f hsDe
                 --return (tvrIdent tvr,tvr)
                 nn <- newNameFrom (map (:[]) ['a' ..])
                 return (tvrIdent tvr,tvr { tvrIdent = toId (toName TypeVal nn) })
-            cs <- flip mapM [toTVr assumps (toName Val v) | v <- hsDeclFreeVars pr ] $ \tvr -> do
+            cs <- flip mapM [toTVr assumps (toName Val v) | (v,_) <- hsDeclFreeVars pr ] $ \tvr -> do
                 let ur = show $ unRename $ nameName (toUnqualified $ runIdentity $ fromId (tvrIdent tvr))
                 nn <- newNameFrom (ur:map (\v -> ur ++ show v) [1 ::Int ..])
                 return (tvrIdent tvr,tvr { tvrIdent = toId (toName Val nn) })
@@ -331,6 +340,19 @@ instance Monad m => UniqueProducer (Ce m) where
         put $! (i + 1)
         return i
 
+applyCoersion :: Monad m => CoerceTerm -> E -> Ce m E
+applyCoersion CTId e = return e
+applyCoersion ct e = etaReduce `liftM` f ct e where
+    f CTId e = return e
+    f (CTAp ts) e = return $ foldl eAp e (map tipe ts)
+    f (CTAbs ts) e = return $ foldr eLam e (map fromTyvar ts)
+    f (CTCompose ct1 ct2) e = f ct1 =<< (f ct2 e)
+    f (CTFun CTId) e = return e
+    f (CTFun ct) e = do
+        let EPi TVr { tvrType = ty } _ = getType e
+        [y] <- newVars [ty]
+        fgy <- f ct (EAp e (EVar y))
+        return (eLam y fgy)
 
 
 convertDecls :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
@@ -431,9 +453,12 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         f n | n == class_Bounded, all (null . hsConDeclArgs) dcons  = []
         f _ = []
     cExpr :: Monad m => HsExp -> Ce m E
-    cExpr (HsAsPat n' (HsVar n)) = return $ foldl eAp (EVar (tv n)) (map tipe $ specialize t t') where
-        t = getAssump n
-        t' = getAssump n'
+    cExpr (HsAsPat n' (HsVar n)) = do
+        cv <- lookupCoercion (toName Val n')
+        let t = getAssump n
+        case cv of
+            Left t' -> return $ foldl eAp (EVar (tv n)) (map tipe $ specialize t t')
+            Right c -> applyCoersion c $ EVar (tv n)
     cExpr (HsAsPat n' (HsCon n)) = return $ constructionExpression dataTable (toName DataConstructor n) rt where
         t' = getAssump n'
         (_,rt) = argTypes' (tipe t')

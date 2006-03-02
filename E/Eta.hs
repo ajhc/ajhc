@@ -1,4 +1,4 @@
-module E.Eta(etaExpand,etaExpandE) where
+module E.Eta(etaExpand,etaExpandE,etaReduce) where
 
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -72,10 +72,14 @@ etaExpandE dataTable e = f e where
         return (foldr ELam (foldl EAp e (map EVar tvrs)) tvrs)
     ee' e = return e
 
+etaReduce :: E -> E
+etaReduce e = f e where
+        f (ELam t (EAp x (EVar t'))) | t == t' && not (tvrNum t `Set.member` freeVars x) = f x
+        f e = e
 
 -- | only reduce if all lambdas can be discarded. otherwise leave them in place
-etaReduce :: E -> (E,Int)
-etaReduce e = case f e 0 of
+etaReduce' :: E -> (E,Int)
+etaReduce' e = case f e 0 of
         (ELam {},_) -> (e,0)
         x -> x
     where
