@@ -5,11 +5,11 @@ import List
 import IO(hFlush,stdout)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.Graph(stronglyConnComp, SCC(..))
 
 import Class(ClassHierarchy)
 import Control.Monad.Reader
 import DeclsDepends(getDeclDeps)
-import DependAnalysis(getBindGroups)
 import Diagnostic
 import Doc.DocLike
 import Doc.PPrint as PPrint
@@ -38,7 +38,7 @@ type Expl = (Sigma, HsDecl)
 -- TODO: this is different than the "Typing Haskell in Haskell" paper
 -- we do not further sub-divide the implicitly typed declarations in
 -- a binding group.
-type BindGroup = ([Expl], [HsDecl])
+type BindGroup = ([Expl], [Either HsDecl [HsDecl]])
 
 
 tcApps e as typ = do
@@ -390,14 +390,52 @@ tcBindGroup :: BindGroup -> Tc ([HsDecl], TypeEnv)
 tcBindGroup (es, is) = do
      let env1 = Map.fromList [(getDeclName decl, sc) | (sc,decl) <- es ]
      localEnv env1 $ do
-         (impls, implEnv) <- tiImpls is
+         (impls, implEnv) <- tiImplGroups is
          localEnv implEnv $ do
              expls   <- mapM tiExpl es
              return (impls ++ fsts expls, mconcat (implEnv:env1:snds expls))
 
+tiImplGroups :: [Either HsDecl [HsDecl]] -> Tc ([HsDecl], TypeEnv)
+tiImplGroups [] = return ([],mempty)
+tiImplGroups (Left x:xs) = do
+    (d,te) <- tiNonRecImpl x
+    (ds',te') <- localEnv te $ tiImplGroups xs
+    return (d:ds', te `mappend` te')
+tiImplGroups (Right x:xs) = do
+    (ds,te) <- tiImpls x
+    (ds',te') <- localEnv te $ tiImplGroups xs
+    return (ds ++ ds', te `mappend` te')
+
+tiNonRecImpl :: HsDecl -> Tc (HsDecl, TypeEnv)
+tiNonRecImpl decl = withContext (locSimple (srcLoc decl) ("in the implicitly typed: " ++ show (getDeclName decl))) $ do
+    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tiimpls " ++ show (getDeclName decl)
+    mv <- newMetaVar Sigma Star
+    (res,ps) <- listenPreds $ tcDecl decl mv
+    ps' <- flattenType ps
+    mv' <- flattenType mv
+    fs <- freeMetaVarsEnv
+    let vss = Set.fromList $ freeMetaVars mv'
+        gs = vss Set.\\ fs
+    (mvs,ds,rs) <- splitReduce (Set.toList fs) (Set.toList vss) ps'
+    addPreds ds
+    sc' <- if restricted [decl] then do
+        let gs' = gs Set.\\ Set.fromList (freeVars rs)
+        addPreds rs
+        quantify (Set.toList gs') [] mv'
+     else quantify (Set.toList gs) rs mv'
+    let f n s = do
+        let (TForAll vs _) = toSigma s
+        addCoerce n (ctAbs vs)
+        when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
+        return (n,s)
+    (n,s) <- f (getDeclName decl) sc'
+    let nenv = (Map.singleton n s)
+    addToCollectedEnv nenv
+    return (fst res, nenv)
+
 tiImpls ::  [HsDecl] -> Tc ([HsDecl], TypeEnv)
 tiImpls [] = return ([],Map.empty)
-tiImpls bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ (show (map getDeclName bs)))) $ do
+tiImpls bs = withContext (locSimple (srcLoc bs) ("in the recursive implicitly typed: " ++ (show (map getDeclName bs)))) $ do
     when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tiimpls " ++ show (map getDeclName bs)
     ts <- sequence [newMetaVar Tau Star | _ <- bs]
     (res,ps) <- listenPreds $ localEnv (Map.fromList [  (getDeclName d,s) | d <- bs | s <- ts]) $ sequence [ tcDecl d s | d <- bs | s <- ts ]
@@ -414,13 +452,11 @@ tiImpls bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ 
         mapM (quantify (Set.toList gs') []) ts'
      else mapM (quantify (Set.toList gs) rs) ts'
     let f n s = do
-            --s <- flattenType s
-            when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
-            --s <- generalize ps s
-            --when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
-            return (n,s)
+        let (TForAll vs _) = toSigma s
+        addCoerce n (ctAbs vs)
+        when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** " ++ show n ++ " :: " ++ prettyPrintType s
+        return (n,s)
     nenv <- sequence [ f (getDeclName d) t  | (d,_) <- res | t <- scs' ]
-    --nenv <- sequence [ f n s | (n,s) <- Map.toAscList $ mconcat $ snds res]
     addToCollectedEnv (Map.fromList nenv)
     return (fsts res, Map.fromList nenv)
 
@@ -551,9 +587,12 @@ tiExpl ::  Expl -> Tc (HsDecl,TypeEnv)
 tiExpl (sc, decl@HsForeignDecl {}) = do return (decl,Map.empty)
 tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typed " ++  (render $ ppHsDecl decl))) $ do
     when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "** typing expl: " ++ show (getDeclName decl) ++ " " ++ prettyPrintType sc
-    addToCollectedEnv (Map.singleton (getDeclName decl) sc)
-    (_,qs,typ) <- skolomize sc
-    (ret,ps) <- listenPreds (tcDecl decl typ)
+    (vs,qs,typ) <- skolomize sc
+    let sc' = (tForAll vs (qs :=> typ))
+        mp = (Map.singleton (getDeclName decl) sc')
+    addCoerce (getDeclName decl) (ctAbs vs)
+    addToCollectedEnv mp
+    (ret,ps) <- localEnv mp $ listenPreds (tcDecl decl typ)
     ps <- flattenType ps
     ch <- getClassHierarchy
     env <- freeMetaVarsEnv
@@ -620,146 +659,9 @@ tiStmt env stmt@(HsLetStmt decls)
 --------------------------------------------------------------------------------
 
 
-
-tiDeclTop ::  TypeEnv -> HsDecl -> Type -> TI ([Pred], TypeEnv)
-tiDeclTop env decl t
-   = do (ps,env,t') <- tiDecl env decl
-        unify t t'
-        return (ps, env)
-
-
------------------------------------------------------------------------------
-
-
-
-
------------------------------------------------------------------------------
-
--- type check explicitly typed bindings
-
-
-
-tiExpl ::  TypeEnv -> Expl -> TI (Scheme, [Pred], TypeEnv)
-tiExpl env (sc, HsForeignDecl {}) = do
-    return (sc,[],Map.empty)
-tiExpl env (sc, decl) = withContext
-       (locSimple (srcLoc decl) ("in the explicitly typed " ++  (render $ ppHsDecl decl))) $ do
-       --liftIO $ putStrLn  $ render (ppHsDecl decl)
-       cHierarchy <- getClassHierarchy
-       --(qs :=> t) <- -fmap snd $ freshInst sc
-       let (qs :=> t) = unQuantify sc
-       t <- flattenType t
-       qs <- flattenType qs
-       --liftIO $ putStrLn  $ show sc
-       (ps, env') <- tiDeclTop env decl t
-       --liftIO $ putStrLn  $ show ps
-       ps <- flattenType ps
-
-       --qs' <- flattenType qs
-       --ps'' <- flattenType ps
-       fs <- liftM tv (flattenType env)
-       --qs' <- sequence [ flattenType y >>= return . IsIn x | IsIn x y <- qs]
-       s          <- getSubst
-       let qs'     = apply s qs
-           t'      = apply s t
-           ps'     = [ p | p <- apply s ps, not (entails cHierarchy qs' p) ]
-       --    fs      = tv (apply s env)
-           gs      = tv t' {- \\ fs  -} -- TODO fix this!
-           sc'     = quantify gs (qs':=>t')
-       -- (ds,rs) <- reduce cHierarchy fs gs ps'
-       --liftIO $ putStrLn  $ show (gs,ps')
-       (ds,rs,nsub) <- splitReduce cHierarchy fs gs ps'
-       --liftIO $ putStrLn  $ show (ds,rs,nsub)
-       sequence_ [ unify  (TVar tv) t | (tv,t) <- nsub ]
-       --extSubst nsub
-       --unify t' t
-       --unify t t'
-       if sc /= sc' then
-           fail $ "signature too general for " ++ show (getDeclName decl) ++ "\n Given: " ++ show sc ++ "\n Infered: " ++ show sc'
-        else if not (null rs) then
-           fail $ "context too weak for "  ++ show (getDeclName decl) ++ "\nGiven: " ++ PPrint.render (pprint  sc) ++ "\nInfered: " ++ PPrint.render (pprint sc') ++"\nContext: " ++ PPrint.render (pprint  rs)
-        else
-           return (sc', ds,  env')
-           --return (sc', ds, env')
-
------------------------------------------------------------------------------
-
--- type check implicitly typed bindings
-
-
-restricted   :: [Impl] -> Bool
-restricted bs
-   = any isSimpleDecl bs
-   where
-   isSimpleDecl :: (HsDecl) -> Bool
-   isSimpleDecl (HsPatBind _sloc _pat _rhs _wheres) = True
-   isSimpleDecl _ = False
-
-tiImpls ::  TypeEnv -> [Impl] -> TI ([Pred], TypeEnv)
-tiImpls env [] = return ([],env)
-tiImpls env bs = withContext (locSimple (srcLoc bs) ("in the implicitly typed: " ++ (show (map getDeclName bs)))) $ do
-      --liftIO $ mapM (putStrLn .  render . ppHsDecl) bs
-      cHierarchy <- getClassHierarchy
-      ts <- mapM (\_ -> newTVar Star) bs
-      let
-          is      = getImplsNames bs
-          scs     = map toScheme ts
-          newEnv1 = Map.fromList $ zip is scs
-          env'    = newEnv1 `Map.union` env
-      pssEnvs <- sequence (zipWith (tiDeclTop env') bs ts)
-      let pss  = map fst pssEnvs
-      let envs = map snd pssEnvs
-      s   <- getSubst
-      ps' <- flattenType $ concat pss
-      ts' <- flattenType ts
-      fs <- liftM tv (flattenType env)
-      --let ps'     = apply s (concat pss)
-      --    ts'     = apply s ts
-      --    fs      = tv (apply s env)
-      let vss@(_:_)  = map tv ts'
-          gs      = foldr1 union vss \\ fs
-      -- (ds,rs) <- reduce cHierarchy fs (foldr1 intersect vss) ps'
-      (ds,rs,nsub) <- splitReduce cHierarchy fs (foldr1 intersect vss) ps'
-      sequence_ [ unify  (TVar tv) t | (tv,t) <- nsub ]
-      -- extSubst nsub
-      if restricted bs then
-          let gs'  = gs \\ tv rs
-              scs' = map (quantify gs' . ([]:=>)) ts'
-              newEnv2 = Map.fromList $ zip is scs' -- map assumpToPair $ zipWith makeAssump is scs'
-          in return (ds++rs,  (Map.unions envs) `Map.union` newEnv2)
-        else
-          let scs' = map (quantify gs . (rs:=>)) ts'
-              newEnv3 = Map.fromList $ zip is scs' -- map assumpToPair $ zipWith makeAssump is scs'
-          in return (ds,  (Map.unions envs) `Map.union` newEnv3)
-
-getImplsNames :: [Impl] -> [Name]
-getImplsNames impls = map getDeclName impls
-
-
------------------------------------------------------------------------------
-
-
-
-tiProgram ::  Module -> SigEnv -> KindEnv -> ClassHierarchy -> TypeEnv -> TypeEnv -> Program -> IO TypeEnv
-tiProgram modName sEnv kt h dconsEnv env bgs = runTI dconsEnv h kt sEnv modName $
-  do (ps, env1) <- tiSeq tiBindGroup env bgs
-     s         <- getSubst
-     ps <- flattenType ps
-     ([], rs) <- split h [] (apply s ps)
-     case topDefaults h rs of
-       Right s' -> do
-        env1' <- flattenType env1
-        return $  apply  s'  env1'
-       --Nothing -> return $  apply  s env1
-       Left s -> fail $ show modName ++ s
-
-
---------------------------------------------------------------------------------
-
-
 -}
 
-getBindGroupName (expl,impls) =  map getDeclName (snds expl ++ impls)
+getBindGroupName (expl,impls) =  map getDeclName (snds expl ++ concat (rights impls) ++ lefts impls)
 
 
 tiProgram ::  [BindGroup] -> [HsDecl] -> Tc [HsDecl]
@@ -829,20 +731,32 @@ getFunDeclsBg :: TypeEnv -> [HsDecl] -> [BindGroup]
 getFunDeclsBg sigEnv decls = makeProgram sigEnv equationGroups where
    equationGroups :: [[HsDecl]]
    equationGroups = getBindGroups bindDecls (nameName . getDeclName) getDeclDeps
-   --equationGroups = getBindGroups bindDecls (hsNameIdent_u (hsIdentString_u ("equationGroup" ++)) . getDeclName) getDeclDeps
-   -- just make sure we only deal with bindDecls and not others
    bindDecls = collectBindDecls decls
+
+getBindGroups :: Ord name =>
+                 [node]           ->    -- List of nodes
+                 (node -> name)   ->    -- Function to convert nodes to a unique name
+                 (node -> [name]) ->    -- Function to return dependencies of this node
+                 [[node]]               -- Bindgroups
+
+getBindGroups ns fn fd = map f $ stronglyConnComp [ (n, fn n, fd n) | n <- ns] where
+    f (AcyclicSCC x) = [x]
+    f (CyclicSCC xs) = xs
 
 -- | make a program from a set of binding groups
 makeProgram :: TypeEnv -> [[HsDecl]] -> [BindGroup]
 makeProgram sigEnv groups = map (makeBindGroup sigEnv ) groups
 
 
--- reunite decls with their signatures, if ever they had one
+-- | reunite decls with their signatures, if ever they had one
 
 makeBindGroup :: TypeEnv -> [HsDecl] -> BindGroup
-makeBindGroup sigEnv decls = (exps, impls) where
-   (exps, impls) = makeBindGroup' sigEnv decls
+makeBindGroup sigEnv decls = (exps, f impls) where
+    (exps, impls) = makeBindGroup' sigEnv decls
+    enames = map (nameName . getDeclName . snd) exps
+    f xs = map g $ stronglyConnComp [ (x, nameName $ getDeclName x,[ d | d <- getDeclDeps x, d `notElem` enames]) |  x <- xs]
+    g (AcyclicSCC x) = Left x
+    g (CyclicSCC xs) = Right xs
 
 makeBindGroup' _ [] = ([], [])
 makeBindGroup' sigEnv (d:ds)
