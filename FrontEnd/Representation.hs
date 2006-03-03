@@ -303,10 +303,13 @@ a `fn` b    = TArrow a b
 data Kind  = Star
            | Kfun Kind Kind
            | KVar Kindvar               -- variables aren't really allowed in haskell in kinds
-             deriving(Data,Typeable, Eq, Ord, Show)   -- but we need them for kind inference
+             deriving(Data,Typeable, Eq, Ord)   -- but we need them for kind inference
     {-! derive: GhcBinary !-}
 
 newtype Kindvar = Kindvar Int deriving(Data, Binary,Typeable, Ord, Eq, Show)
+
+instance Show Kind where
+    showsPrec _ k = pprint k
 
 instance DocLike d => PPrint d Kind where
    pprint Star = text "*"
