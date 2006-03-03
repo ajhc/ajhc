@@ -3,6 +3,7 @@ module FrontEnd.Tc.Main (tiExpr, tiProgram, makeProgram ) where
 import Control.Monad.Writer
 import List
 import IO(hFlush,stdout)
+import qualified Text.PrettyPrint.HughesPJ as P
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Graph(stronglyConnComp, SCC(..))
@@ -157,7 +158,7 @@ tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression"
 
 
 -- ABS1
-tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show ps ++ " -> ...") $ do
+tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show (pprint ps:: P.Doc) ++ " -> ...") $ do
     let lam (p:ps) e (TMetaVar mv) rs = do -- ABS2
             withMetaVars mv [Star,Star] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) e (a `fn` b) rs
         lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
@@ -170,7 +171,9 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
         lam [] e typ rs = do
             e' <- tcExpr e typ
             return (HsLambda sloc (reverse rs) e')
-        lam _ _ _ _ = fail "lambda type mismatch"
+        lam _ _ t _ = do
+            t <- flattenType t
+            fail $ "expected a -> b, found: " ++ prettyPrintType t
         lamPoly ps e s rs = do
             --(_,_,s) <- skolomize s
             lam ps e s rs
@@ -575,7 +578,9 @@ tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "i
             (wheres', env) <- tcWheres wheres
             rhs <- localEnv env $ tcRhs rhs typ
             return (HsMatch sloc funName (reverse rs) rhs wheres')
-        lam _ _ _ = fail "lambda type mismatch"
+        lam _ t _ = do
+            t <- flattenType t
+            fail $ "expected a -> b, found: " ++ prettyPrintType t
         lamPoly ps s@TMetaVar {} rs = lam ps s rs
         lamPoly ps s rs = do
             --(_,_,s) <- skolomize s

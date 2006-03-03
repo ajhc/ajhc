@@ -708,3 +708,8 @@ instance P.PPrint P.Doc HsQualType where
 instance P.PPrint P.Doc  HsTyVarBind where
    pprint d = P.text (show $ hsTyVarBindName d)
 
+instance P.PPrint P.Doc  HsPat where
+    pprint d = unDocM (ppHsPat d) defaultMode
+
+
+
