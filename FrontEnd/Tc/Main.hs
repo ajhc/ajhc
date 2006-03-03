@@ -42,11 +42,49 @@ type Expl = (Sigma, HsDecl)
 type BindGroup = ([Expl], [Either HsDecl [HsDecl]])
 
 
-tcApps e as typ = do
+tcKnownApp e nname vname as typ = do
+    sc <- lookupName vname
+    let (_,_,rt) = fromType sc
+    -- fall through if the type isn't arrowy enough (will produce type error)
+    if (length . fst $ fromTArrow rt) < length as then tcApps' e as typ else do
+    (ts,rt) <- freshInstance Sigma sc
+    addCoerce nname (ctAp ts)
+    let f (TArrow x y) (a:as) = do
+            a <- tcExprPoly a x
+            y <- findType y
+            (as,fc) <- f y as
+            return (a:as,fc)
+        f lt [] = do
+            fc <- lt `subsumes` typ
+            return ([],fc)
+    (nas,CTId) <- f rt as
+    return (e,nas)
+
+tcApps e@(HsAsPat n (HsVar v)) as typ = do
+    let vname = toName Val v
+    let nname = toName Val n
+    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "tcApps: " ++ (show nname ++ "@" ++ show vname)
+    rc <- asks tcRecursiveCalls
+    -- fall through if this is a recursive call to oneself
+    if (vname `Set.member` rc) then tcApps' e as typ else do
+    tcKnownApp e nname vname as typ
+
+tcApps e@(HsAsPat n (HsCon v)) as typ = do
+    let vname = toName DataConstructor v
+    let nname = toName Val n
+    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "tcApps: " ++ (show nname ++ "@" ++ show vname)
+    addToCollectedEnv (Map.singleton (toName Val n) typ)
+    tcKnownApp e nname vname as typ
+
+tcApps e as typ = tcApps' e as typ
+
+-- the fall through case
+tcApps' e as typ = do
     bs <- sequence [ newBox Star | _ <- as ]
     e' <- tcExpr e (foldr fn typ bs)
     as' <- sequence [ tcExprPoly a r | r <- bs | a <- as ]
     return (e',as')
+
 
 
 tcApp e1 e2 typ = do
@@ -61,8 +99,18 @@ tcExprPoly e t = do
 
 tiExprPoly e t@TMetaVar {} = tcExpr e t   -- GEN2
 tiExprPoly e t = do                   -- GEN1
-    --(_,_,t) <- skolomize t
-    tcExpr e t
+    (ts,_,t) <- skolomize t
+    e <- tcExpr e t
+    doCoerce (ctAbs ts) e
+
+doCoerce :: CoerceTerm -> HsExp -> Tc HsExp
+doCoerce CTId e = return e
+doCoerce ct e = do
+    nn <- newUniq
+    let n = toName Val ("As@",show nn)
+    addCoerce n ct
+    return (HsAsPat (nameName n) e)
+
 
 tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp
 
@@ -175,10 +223,9 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
             t <- flattenType t
             fail $ "expected a -> b, found: " ++ prettyPrintType t
         lamPoly ps e s rs = do
-            --(_,_,s) <- skolomize s
-            lam ps e s rs
-
-
+            (ts,_,s) <- skolomize s
+            e <- lam ps e s rs
+            doCoerce (ctAbs ts) e
     lam ps e typ []
 
 
@@ -189,7 +236,7 @@ tiExpr (HsIf e e1 e2) typ = withContext (simpleMsg $ "in the if expression\n   i
     return (HsIf e e1 e2)
 
 tiExpr tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ render $ ppHsExp tuple) $ do
-    (HsCon _,exps') <- tcApps (HsCon (toTuple (length exps))) exps typ
+    (_,exps') <- tcApps (HsCon (toTuple (length exps))) exps typ
     return (HsTuple exps')
 
 
@@ -566,14 +613,11 @@ tcMatch ::  HsMatch -> Sigma -> Tc HsMatch
 tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "in" $ show funName) $ do
     let lam (p:ps) (TMetaVar mv) rs = do -- ABS2
             withMetaVars mv [Star,Star] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) (a `fn` b) rs
-        lam (p:ps) (TArrow s1' s2') rs = do -- ABS1
-            --box <- newBox Star
+        lam (p:ps) ty@(TArrow s1' s2') rs = do -- ABS1
             (p',env) <- tcPat p s1'
-            --s1' `boxyMatch` box
-            --liftIO $ print (p',env)
             localEnv env $ do
                 s2' <- findType s2'
-                lamPoly ps s2' (p':rs)  -- TODO poly
+                lamPoly ps s2' (p':rs)
         lam [] typ rs = do
             (wheres', env) <- tcWheres wheres
             rhs <- localEnv env $ tcRhs rhs typ
@@ -583,10 +627,11 @@ tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "i
             fail $ "expected a -> b, found: " ++ prettyPrintType t
         lamPoly ps s@TMetaVar {} rs = lam ps s rs
         lamPoly ps s rs = do
-            --(_,_,s) <- skolomize s
+            (_,_,s) <- skolomize s
             lam ps s rs
     typ <- findType typ
-    lam pats typ []
+    res <- lam pats typ []
+    return res
 
 declDiagnostic ::  (HsDecl) -> Diagnostic
 declDiagnostic decl@(HsPatBind sloc (HsPVar {}) _ _) = locMsg sloc "in the declaration" $ render $ ppHsDecl decl
@@ -680,7 +725,6 @@ tiProgram bgs es = ans where
         (r,ps) <- listenPreds $ f bgs [] mempty
         ps <- flattenType ps
         ch <- getClassHierarchy
-        liftIO $ print ps
         ([],rs) <- splitPreds ch [] ps
         topDefaults rs
         return r
@@ -697,12 +741,12 @@ tiProgram bgs es = ans where
         localEnv env $ f bgs (ds ++ rs) (env `mappend` cenv)
     f [] rs _cenv = do
         ch <- getClassHierarchy
-        ((),ps) <- listenPreds $ mapM_ tcPragmaDecl es
+        (pdecls,ps) <- listenPreds $ mapM tcPragmaDecl es
         withContext (makeMsg "in the pragmas:" $ "rules") $ do
             ([],leftovers) <- splitPreds ch [] ps
             topDefaults leftovers
         liftIO $ putStrLn "!"
-        return rs
+        return (rs ++ concat pdecls)
 
 -- Typing Literals
 

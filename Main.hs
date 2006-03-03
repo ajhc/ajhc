@@ -170,10 +170,12 @@ processDecls ::
 processDecls stats ho ho' tiData = do
     -- some useful values
     let allHo = ho `mappend` ho'
-        decls = concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ] ++ Map.elems (tiDataLiftedInstances tiData)
+        decls | fopts FO.Boxy = tiDataDecls tiData
+              | otherwise = concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ] ++ Map.elems (tiDataLiftedInstances tiData)
+        originalDecls =  concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ]
 
     -- build datatables
-    let dataTable = toDataTable (getConstructorKinds (hoKinds ho')) (tiAllAssumptions tiData) decls
+    let dataTable = toDataTable (getConstructorKinds (hoKinds ho')) (tiAllAssumptions tiData) originalDecls
     let fullDataTable = (dataTable `mappend` hoDataTable ho)
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
 
@@ -187,7 +189,7 @@ processDecls stats ho ho' tiData = do
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
     ds <- convertDecls tiData (hoClassHierarchy ho') allAssumps  fullDataTable decls
-    mapM_ (\(_,v,lc) -> printCheckName'' fullDataTable v lc) ds
+    --mapM_ (\(_,v,lc) -> printCheckName'' fullDataTable v lc) ds
 
     -- Build rules
     rules' <- createInstanceRules (hoClassHierarchy ho' `mappend` hoClassHierarchy initialHo)   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
@@ -305,7 +307,6 @@ processDecls stats ho ho' tiData = do
     Stats.print "Optimization" stats
 
     prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return prog
-    wdump FD.Lambdacube $ printProgram prog
     prog <- if null $ programDs prog then return prog else do
         ne <- (return . barendregt) (programE prog)
         return $ programSetE ne prog
@@ -395,6 +396,7 @@ compileModEnv' stats ho = do
     prog <- return prog { progMainEntry = main, progEntryPoints = [main], progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog] }
     prog <- return $ programPruneUnreachable prog
 
+    wdump FD.Lambdacube $ printProgram prog
     prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return prog
     putStrLn "Type analyzed methods"
     flip mapM_ (programDs prog) $ \ (t,e) -> do

@@ -277,6 +277,8 @@ tiModules' me ms = do
             tiDataModules = [ (modInfoName m, modInfoHsModule m) |  m <- ms],
             tiModuleOptions = [ (modInfoName m, modInfoOptions m) |  m <- ms],
             tiCheckedRules = [],
+            tiCoerce = mempty,
+            tiDataDecls = mempty,
             tiAllAssumptions = allAssumps
         }
     return (ho,tiData)

@@ -218,7 +218,7 @@ tiModules' me ms = do
         tcInfoClassHierarchy = cHierarchyWithInstances
         }
 
-    (localVarEnv,checkedRules,coercions) <- withOptionsT (modInfoOptions tms) $ runTc tcInfo $ do
+    (localVarEnv,checkedRules,coercions,ds) <- withOptionsT (modInfoOptions tms) $ runTc tcInfo $ do
         (ds,out) <- listen (tiProgram program ds)
         env <- getCollectedEnv
         cc <- getCollectedCoerce
@@ -226,7 +226,11 @@ tiModules' me ms = do
             lup v = case Map.lookup v cc of
                 Just (CTAbs xs) -> ctAp (map TVar xs)
                 _ -> ctId
-        return (env,checkedRules out,cc')
+        return (env,checkedRules out,cc',ds)
+
+    when (dump FD.Renamed) $ do
+        putStrLn " \n ---- typechecked code ---- \n"
+        mapM_ (putStrLn . HsPretty.render . HsPretty.ppHsDecl) ds
 
     when (dump FD.Types) $ do
         putStrLn " ---- the types of identifiers ---- "
@@ -257,7 +261,9 @@ tiModules' me ms = do
 
         }
         tiData = TiData {
-            tiDataLiftedInstances = Map.fromList [ (getDeclName d,d) | d <- liftedInstances],
+            --tiDataLiftedInstances = Map.fromList [ (getDeclName d,d) | d <- liftedInstances],
+            tiDataLiftedInstances = error "tiDataLiftedInstances not used", -- Map.fromList [ (getDeclName d,d) | d <- ds],
+            tiDataDecls = ds,
             tiDataModules = [ (modInfoName m, modInfoHsModule m) |  m <- ms],
             tiModuleOptions = [ (modInfoName m, modInfoOptions m) |  m <- ms],
             tiCheckedRules = checkedRules,

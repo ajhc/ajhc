@@ -11,6 +11,7 @@ import Representation
 -- Extra data produced by the front end, used to fill in the Ho file.
 data TiData = TiData {
     tiDataLiftedInstances :: Map.Map Name HsDecl,
+    tiDataDecls      :: [HsDecl],
     tiDataModules    :: [(Module,HsModule)],
     tiModuleOptions  :: [(Module,Opt)],
     tiCheckedRules   :: [Rule],
