@@ -509,6 +509,12 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         let cl (x:xs) = liftM2 eCons (cExpr x) (cl xs)
             cl [] = return $ eNil (cType n)
         cl xs
+    cExpr (HsAsPat n' e) = do
+        e <- cExpr e
+        cc <- asks ceCoerce
+        case Map.lookup (toName Val n') cc of
+            Nothing -> return e
+            Just c -> applyCoersion c e
     cExpr e = fail ("Cannot convert: " ++ show e)
     hsLetE [] e = return  e
     hsLetE dl e = do
