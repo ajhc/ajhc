@@ -314,16 +314,8 @@ toSigma t = TForAll [] ([] :=> t)
 -- | replace bound variables with arbitrary new ones and drop the binding
 -- TODO predicates?
 
---skolomize :: Sigma' -> Tc ([SkolemTV],Preds,Rho')
---skolomize (TForAll vs (ps :=> rho)) = return (vs,ps,rho)
---freshSigma s >>= \x -> case x of
---    TForAll as (_ :=> r) -> return (as,r)
---    r -> return ([],r)
---skolomize s = return ([],[],s)
-skolomize s = freshSigma s >>= \x -> case x of
---skolomize s = return s >>= \x -> case x of
-    TForAll as (ps :=> r) -> return (as,ps,r)
-    r -> return ([],[],r)
+skolomize :: Sigma -> Tc ([Tyvar],[Pred],Type)
+skolomize s = freshSigma s >>= return . fromType
 
 boxyInstantiate :: Sigma -> Tc ([Type],Rho')
 boxyInstantiate = freshInstance Sigma

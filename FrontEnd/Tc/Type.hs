@@ -51,6 +51,10 @@ typeOfType TForAll { typeArgs = as, typeBody = _ :=> t } = (Sigma,isBoxy t)
 typeOfType t | isTau' t = (Tau,isBoxy t)
 typeOfType t = (Rho,isBoxy t)
 
+fromType :: Sigma -> ([Tyvar],[Pred],Type)
+fromType s = case s of
+    TForAll as (ps :=> r) -> (as,ps,r)
+    r -> ([],[],r)
 
 isTau :: Type -> Bool
 isTau TForAll {} = False
@@ -88,6 +92,9 @@ fromTAp t = f t [] where
     f (TAp a b) rs = f a (b:rs)
     f t rs = (t,rs)
 
+fromTArrow t = f t [] where
+    f (TArrow a b) rs = f b (a:rs)
+    f t rs = (reverse rs,t)
 
 extractTyVar ::  Monad m => Type -> m Tyvar
 extractTyVar (TVar tv) = return tv
