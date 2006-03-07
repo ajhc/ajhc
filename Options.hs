@@ -129,7 +129,7 @@ theoptions =
     , Option []    ["noauto"]    (NoArg  (optNoAuto_s True)) "Don't automatically load base and haskell98 packages"
     , Option ['p'] []            (ReqArg (\d -> optHls_u (++ [d])) "file.hl") "Load given haskell library .hl file"
     , Option ['L'] []            (ReqArg (optHlPath_u . idu) "path") "Look for haskell libraries in the given directory."
-    , Option []    ["build-hl"]  (ReqArg (optMode_s . BuildHl) "file.hl") "Build hakell library from given list of modules"
+    , Option []    ["build-hl"]  (ReqArg (optMode_s . BuildHl) "file.cabal") "Build hakell library from given library description file"
     , Option []    ["interactive"] (NoArg  (optMode_s Interactive)) "run interactivly"
     , Option []    ["ignore-ho"]  (NoArg  (optIgnoreHo_s True)) "Ignore existing haskell object files"
     , Option []    ["nowrite-ho"] (NoArg  (optNoWriteHo_s True)) "Do not write new haskell object files"

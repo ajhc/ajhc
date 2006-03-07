@@ -91,7 +91,7 @@ main = runMain $ bracketHtml $ do
         args <- System.getArgs
         return (simpleQuote (name:args))
     case optMode o of
-      BuildHl hl    -> buildHl hl (optArgs o)
+      BuildHl hl    -> createLibrary hl
       ListLibraries -> sequence_ [ putStrLn name | (name,_) <- libraryList ]
       SelfTest      -> do putStrLn "Starting self testing..."
                           SelfTest.selfTest (optArgs o)
@@ -101,9 +101,6 @@ main = runMain $ bracketHtml $ do
       _             -> processFiles  (optArgs o)
 
 
-buildHl fname [pd] = do pd <- CharIO.readFile pd
-                        createLibrary fname $ parseLibraryDescription pd
-buildHl fname _    = do putErrDie "Syntax: --build-hl hl-file package-description-file"
 
 processFiles [] | Nothing <- optMainFunc options = do
     int <- isInteractive

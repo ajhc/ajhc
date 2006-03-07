@@ -137,7 +137,7 @@ findModule have need ifunc func  = do
 
 checkForHoModule :: Module -> IO (Maybe (HoHeader,Ho))
 checkForHoModule (Module m) = loop $ map snd $ searchPaths m
-    where loop []     = fail ("checkForHoModule: Module "++m++" not found.")
+    where loop []     = return $ fail ("checkForHoModule: Module "++m++" not found.")
           loop (f:fs) = do e <- doesFileExist f
                            if e then checkForHoFile f else loop fs
 

@@ -1,21 +1,27 @@
-module Ho.Library
-    (loadLibraries, createLibrary, parseLibraryDescription
+module Ho.Library(
+    loadLibraries,
+    createLibrary
     ) where
-
-import HsSyn
-import Ho.Build
-import Ho.LibraryMap
-import Ho.Type
-import GenUtil
-import Options(options, optHls)
-import PackedString
-import Util.MD5(md5file)
 
 import Control.Monad(when,foldM)
 import Data.List(sort)
-import qualified Data.Map as Map
 import Data.Monoid
+import qualified Data.Map as Map
 import System.IO
+import Char
+
+import GenUtil
+import Ho.Build
+import Ho.LibraryMap
+import Ho.Type
+import HsSyn
+import Options
+import PackedString
+import qualified CharIO
+import qualified FlagDump as FD
+import Util.Gen
+import Util.MD5(md5file)
+
 
 
 data Library = Library {
@@ -54,41 +60,73 @@ loadLibraries = do
 
 -- Write a library and mutilate it to fit the description
 
+
+
 createLibrary :: FilePath
-              -> [(String,String)]
               -> IO ()
-createLibrary fp desc = do
-  let field x = lookup x desc
-  let jfield x = maybe (error "createLibrary: description lacks required field "++show x) id $ field x
-  let mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ field x
-  let name  = jfield "name"
-      hmods = mfield "hidden-modules"
-      emods = mfield "exposed-modules"
-  let noc _ hsm = fail ("createLibrary: won't compile anything, requested: "++show (map hsModuleName hsm))
-  let allmods  = sort $ map Module (emods ++ hmods)
-  let fun ho m = do mho <- checkForHoModule m
-                    case mho of
-                      Nothing      -> fail (show fp++" depends not done.")
-                      Just (_,ho') -> return $ mappend ho ho'
-  ho <- foldM fun mempty allmods
-  let homods = sort $ Map.keys (hoExports ho)
-  when (homods /= allmods) $
-      putErrDie ("Final ho consists of wrong modules:\nexpected: \t"
-                 ++show allmods++"\nencountered: \t"++show homods)
-  let ho' = ho { hoExports = Map.difference (hoExports ho)
-                             (Map.fromList [(Module x,()) | x <- hmods]) }
-  let pdesc = [(packString n, packString v) | (n,v) <- desc ]
-  writeLibraryFile fp $ Library pdesc ho "" 0
+createLibrary fp = do
+    putVerboseLn $ "Creating library from description file: " ++ show fp
+    desc <- readDescFile fp
+    when verbose2 $ mapM_ print desc
+    let field x = lookup x desc
+    let jfield x = maybe (error "createLibrary: description lacks required field "++show x) id $ field x
+    let mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ field x
+    let name  = jfield "name"
+        vers  = jfield "version"
+        hmods = mfield "hidden-modules"
+        emods = mfield "exposed-modules"
+    let noc _ hsm = fail ("createLibrary: won't compile anything, requested: "++show (map hsModuleName hsm))
+    let allmods  = sort $ map Module (emods ++ hmods)
+    let fun ho m = do mho <- checkForHoModule m
+                      case mho of
+                        Nothing      -> fail (show fp ++ ": could not find module " ++ show m)
+                        Just (_,ho') -> return $ mappend ho ho'
+    ho <- foldM fun mempty allmods
+    let homods = sort $ Map.keys (hoExports ho)
+    when (homods /= allmods) $
+        putErrDie ("Final ho consists of wrong modules:\nexpected: \t"
+                   ++show allmods++"\nencountered: \t"++show homods)
+    let ho' = ho { hoExports = Map.difference (hoExports ho)
+                               (Map.fromList [(Module x,()) | x <- hmods]) }
+    let pdesc = [(packString n, packString v) | (n,v) <- desc ]
+    let outName = case optOutName options of
+            "hs.out" -> name ++ "-" ++ vers ++ ".hl"
+            fn -> fn
+    writeLibraryFile outName $ Library pdesc ho "" 0
+
+parseLibraryDescription :: Monad m => String -> m [(String,String)]
+parseLibraryDescription fs =  g [] (lines (f [] fs)) where
+    --f rs ('\n':s:xs) | isSpace s = f rs (dropWhile isSpace xs)
+    f rs ('-':'-':xs) = f rs (dropWhile (/= '\n') xs)
+    f rs ('{':'-':xs) = eatCom rs xs
+    f rs (x:xs) = f (x:rs) xs
+    f rs [] = reverse rs
+    eatCom rs ('\n':xs) = eatCom ('\n':rs) xs
+    eatCom rs ('-':'}':xs) = f rs xs
+    eatCom rs (_:xs) = eatCom rs xs
+    eatCom rs [] = f rs []
+    g rs (s:ss) | all isSpace s = g rs ss
+    g rs (s:s':ss) | all isSpace s' = g rs (s:ss)
+    g rs (s:(h:cl):ss) | isSpace h = g rs ((s ++ h:cl):ss)
+    g rs (r:ss) | (':':bd') <- bd = g ((map toLower $ condenseWhitespace nm,condenseWhitespace bd'):rs) ss
+         | otherwise = fail $ "could not find ':' marker: " ++ show (rs,(r:ss)) where
+            (nm,bd) = break (== ':') r
+    g rs [] = return rs
+
+condenseWhitespace xs =  reverse $ dropWhile isSpace (reverse (dropWhile isSpace (cw xs))) where
+    cw (x:y:zs) | isSpace x && isSpace y = cw (' ':zs)
+    cw (x:xs) = x:cw xs
+    cw [] = []
 
 
-parseLibraryDescription :: String -> [(String,String)]
-parseLibraryDescription = map g . f . e . lines
-    where e = filter (any (not . space))
-          f (x:(c:r):t) | space c = f ((x++" "++dropWhile space r):t)
-          f (x:t)                 = x : f t
-          f []                    = []
-          g l = let (h,(_:t)) = break (':'==) l in (h,dropWhile space t)
-          space c = c == ' ' || c == '\t'
+
+readDescFile :: FilePath -> IO [(String,String)]
+readDescFile fp = do
+    wdump FD.Progress $ putStrLn $ "Reading: " ++ show fp
+    fc <- CharIO.readFile fp
+    case parseLibraryDescription fc of
+        Left err -> fail $ "Error reading library description file: " ++ show fp ++ " " ++ err
+        Right ps -> return ps
 
 -- IO with Libraries
 
