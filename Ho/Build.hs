@@ -6,8 +6,7 @@ module Ho.Build (
     initialHo,
     recordHoFile,
     checkForHoFile,
-    checkForHoModule,
-    showHoCounts
+    checkForHoModule
     ) where
 
 
@@ -187,16 +186,14 @@ dumpHoFile :: String -> IO ()
 dumpHoFile fn = do
     (hoh,ho) <- readHoFile fn
     putStrLn fn
-    putStrLn $ "Generation:" <+> tshow (hohGeneration hoh)
-    putStrLn $ "Dependencies:" <+>  pprint (sortUnder (show . fileName) $ hohDepends hoh)
-    putStrLn $ "ModDependencies:" <+>  pprint (sortUnder fst $ hohModDepends hoh)
-    putStrLn $ "MetaInfo:" <+> vcat [show k <+> show v | (k,v) <- hohMetaInfo hoh]
-    putStrLn $ "Libraries:" <+> pprint (sort $ Map.keys $ hoLibraries ho)
-    putStrLn $ "hoMods:" <+> tshow (map fromModule $ Map.keys $  hoExports ho)
-    putStrLn $ "hoExports:" <+> tshow (size $ hoExports ho)
-    putStrLn $ "hoDefs:" <+> tshow (size $ hoDefs ho)
+    --putStrLn $ "Generation:" <+> tshow (hohGeneration hoh)
+    when (not $ null (hohDepends hoh)) $ putStrLn $ "Dependencies:" <+>  pprint (sortUnder (show . fileName) $ hohDepends hoh)
+    when (not $ null (hohDepends hoh)) $ putStrLn $ "ModDependencies:" <+>  pprint (sortUnder fst $ hohModDepends hoh)
+    putStrLn $ "MetaInfo:\n" <> vcat (sort [text (' ':' ':unpackPS k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
+    putStrLn $ "Libraries depended on:" <+> pprint (sort $ Map.keys $ hoLibraries ho)
+    putStrLn $ "Modules contained:" <+> tshow (Map.keys $ hoExports ho)
+    putStrLn $ "number of definitions:" <+> tshow (size $ hoDefs ho)
     putStrLn $ "hoAssumps:" <+> tshow (Map.size $ hoAssumps ho)
-    --putErrLn $ "hoAssumps:" <+> vcat (map show $ Map.keys $ hoAssumps ho)
     putStrLn $ "hoFixities:" <+> tshow (size $  hoFixities ho)
     putStrLn $ "hoKinds:" <+> tshow (size $  hoKinds ho)
     putStrLn $ "hoClassHierarchy:" <+> tshow (size $  hoClassHierarchy ho)
@@ -296,7 +293,6 @@ getModule ::
     -> [(String,String)]  -- ^ files to search, and the cooresponding ho file
     -> IO (Ho,[(HsModule,FileDep,String)])
 getModule initialHo ho name files  = do
-    putVerboseLn $ "getModule: " ++ show name ++ show files
     ho_ref <- newIORef ho
     fixup_ref <- newIORef (getFixups (initialHo `mappend` ho))
     need_ref <- newIORef []
@@ -421,19 +417,6 @@ openGetStatus fn = do
     return (fh,fs)
 
 
-showHoCounts ho = do
-    putErrLn $ "hoMods:" <+> tshow (map fromModule $ Map.keys $  hoExports ho)
-    putErrLn $ "hoExports:" <+> tshow (size $ hoExports ho)
-    putErrLn $ "hoDefs:" <+> tshow (size $ hoDefs ho)
-    putErrLn $ "hoAssumps:" <+> vcat (map show $ Map.keys $ hoAssumps ho)
-    putErrLn $ "hoFixities:" <+> tshow (size $  hoFixities ho)
-    putErrLn $ "hoKinds:" <+> tshow (size $  hoKinds ho)
-    putErrLn $ "hoClassHierarchy:" <+> tshow (size $  hoClassHierarchy ho)
-    putErrLn $ "hoTypeSynonyms:" <+> tshow (size $  hoTypeSynonyms ho)
-    putErrLn $ "hoDataTable:" <+> tshow (size $  hoDataTable ho)
-    putErrLn $ "hoEs:" <+> tshow (size $  hoEs ho)
-    putErrLn $ "hoProps:" <+> tshow (size $  hoProps ho)
-    putErrLn $ "hoRules:" <+> tshow (size $  hoRules ho)
 
 hoToProgram :: Ho -> Program
 hoToProgram ho = programSetDs (Map.elems $ hoEs ho) program {

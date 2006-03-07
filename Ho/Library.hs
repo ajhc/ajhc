@@ -21,6 +21,7 @@ import qualified CharIO
 import qualified FlagDump as FD
 import Util.Gen
 import Util.MD5(md5file)
+import Version(versionString)
 
 
 
@@ -79,10 +80,10 @@ createLibrary fp wtd = do
         emods = mfield "exposed-modules"
     let allmods  = sort $ map Module (emods ++ hmods)
     ho <- wtd (map Module emods)
-    let pdesc = [(packString n, packString v) | (n,v) <- desc ]
     let outName = case optOutName options of
             "hs.out" -> name ++ "-" ++ vers ++ ".hl"
             fn -> fn
+    let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
     writeLibraryFile outName $ Library pdesc ho "" 0
 
 parseLibraryDescription :: Monad m => String -> m [(String,String)]
