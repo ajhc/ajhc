@@ -62,9 +62,11 @@ loadLibraries = do
 
 
 
-createLibrary :: FilePath
-              -> IO ()
-createLibrary fp = do
+createLibrary ::
+    FilePath
+    -> ([Module] -> IO Ho)
+    -> IO ()
+createLibrary fp wtd = do
     putVerboseLn $ "Creating library from description file: " ++ show fp
     desc <- readDescFile fp
     when verbose2 $ mapM_ print desc
@@ -75,19 +77,8 @@ createLibrary fp = do
         vers  = jfield "version"
         hmods = mfield "hidden-modules"
         emods = mfield "exposed-modules"
-    let noc _ hsm = fail ("createLibrary: won't compile anything, requested: "++show (map hsModuleName hsm))
     let allmods  = sort $ map Module (emods ++ hmods)
-    let fun ho m = do mho <- checkForHoModule m
-                      case mho of
-                        Nothing      -> fail (show fp ++ ": could not find module " ++ show m)
-                        Just (_,ho') -> return $ mappend ho ho'
-    ho <- foldM fun mempty allmods
-    let homods = sort $ Map.keys (hoExports ho)
-    when (homods /= allmods) $
-        putErrDie ("Final ho consists of wrong modules:\nexpected: \t"
-                   ++show allmods++"\nencountered: \t"++show homods)
-    let ho' = ho { hoExports = Map.difference (hoExports ho)
-                               (Map.fromList [(Module x,()) | x <- hmods]) }
+    ho <- wtd (map Module emods)
     let pdesc = [(packString n, packString v) | (n,v) <- desc ]
     let outName = case optOutName options of
             "hs.out" -> name ++ "-" ++ vers ++ ".hl"

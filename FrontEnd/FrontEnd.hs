@@ -4,6 +4,7 @@ module FrontEnd.FrontEnd(
     ) where
 
 import Monad
+import Data.Monoid
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
@@ -34,25 +35,20 @@ parseFiles :: [String]      -- ^ List of files to read
                -> [Module]  -- ^ List of modules to find
                -> (Ho -> IO Ho) -- ^ Process initial data loaded from ho files
                -> (Ho -> Ho -> TiData -> IO Ho)  -- ^ routine which takes the global ho, the partial local ho and the output of the front end, and returns the completed ho.
-               -> IO Ho     -- ^ the final combined ho.
+               -> IO (Ho,Ho)     -- ^ (the libraries and predifiend ho,the final combined ho of loaded code)
 parseFiles fs deps ifunc func = do
     wdump FD.Progress $ do
         putErrLn $ "Compiling " ++ show fs
+    initialHo <- loadLibraries
+    initialHo <- ifunc initialHo
     let xs = snub $ map Right fs ++ map Left deps
         f ho [] = return ho
         f ho (x:xs) = do
-            ho' <- findModule ho x ifunc (doModules func)
+            ho' <- findModule initialHo ho x ifunc (doModules func)
             f ho' xs
-    initialHo <- loadLibraries
-    ho <- f initialHo xs
+    ho <- f mempty  xs
     processIOErrors
-    when (dump FD.AllKind) $
-         do {putStrLn " ---- kind information ---- \n";
-             putStr $ PPrint.render $ pprint (hoKinds ho)}
-    --when  (dump FD.AllDcons) $
-    --    do {putStr " ---- data constructor assumptions ---- \n";
-    --         putStrLn $ PPrint.render $ pprintEnv (hoDConsAssumptions ho)}
-    return ho
+    return (initialHo,ho)
 
 -- Process modules found by Ho
 doModules :: (Ho -> Ho -> TiData -> IO Ho) -> Ho -> [HsModule] -> IO Ho

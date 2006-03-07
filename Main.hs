@@ -91,7 +91,7 @@ main = runMain $ bracketHtml $ do
         args <- System.getArgs
         return (simpleQuote (name:args))
     case optMode o of
-      BuildHl hl    -> createLibrary hl
+      BuildHl hl    -> createLibrary hl buildLibrary
       ListLibraries -> sequence_ [ putStrLn name | (name,_) <- libraryList ]
       SelfTest      -> do putStrLn "Starting self testing..."
                           SelfTest.selfTest (optArgs o)
@@ -99,6 +99,17 @@ main = runMain $ bracketHtml $ do
       Version       -> putStrLn versionString
       VersionCtx    -> putStrLn versionContext
       _             -> processFiles  (optArgs o)
+
+
+buildLibrary [] = do
+    putStrLn "WARNING: building empty library"
+    return mempty
+buildLibrary mods = do
+    putVerboseLn $ "Building library containing: " ++ show mods
+    s <- Stats.new
+    (_,ho) <- parseFiles [] mods processInitialHo (processDecls s)
+    -- TODO optimize, leaving out hidden module exports
+    return ho
 
 
 
@@ -367,7 +378,8 @@ isInteractive = do
           || not (null $ optStmts options)
 
 
-compileModEnv' stats ho = do
+compileModEnv' stats (initialHo,finalHo) = do
+    let ho = initialHo `mappend` finalHo
 
     let dataTable = progDataTable prog
         rules = hoRules ho

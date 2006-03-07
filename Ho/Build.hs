@@ -103,13 +103,16 @@ findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
 
 
 
-findModule :: Ho                                 -- ^ Accumulated Ho
+findModule :: Ho                                 -- ^ code loaded from libraries
+              -> Ho                              -- ^ Accumulated Ho
               -> (Either Module String)          -- ^ Either a module or filename to find
-              -> (Ho -> IO Ho)                   -- ^ Process initial ho loaded from files and library
+              -> (Ho -> IO Ho)                   -- ^ Process initial ho loaded from file
               -> (Ho -> [HsModule] -> IO Ho)     -- ^ Process set of mutually recursive modules to produce final Ho
               -> IO Ho                           -- ^ Final accumulated ho
-findModule have (Left m) ifunc _ | m `Map.member` (hoExports have) = ifunc have
-findModule have need ifunc func  = do
+findModule lhave have (Left m) ifunc _
+    | m `Map.member` (hoExports have) = return have
+    | m `Map.member` (hoExports lhave) = return mempty -- libraries need no processing
+findModule lhave have need ifunc func  = do
     let f (Left (Module m)) = (m,searchPaths m)
         f (Right n) = (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
         (name,files) = f need
@@ -121,7 +124,7 @@ findModule have need ifunc func  = do
     when (dump FD.SccModules) $ CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
     let f ho [] = return ho
         f ho (sc:scs) = do
-            ho' <- func ho [ hs | (hs,_,_) <- sc ]
+            ho' <- func (lhave `mappend` ho) [ hs | (hs,_,_) <- sc ]
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
                 mods' = [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
                 mdeps = [ (m,runIdentity $ Map.lookup m (hoModules ho)) | m <- mods']

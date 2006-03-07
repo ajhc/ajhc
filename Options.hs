@@ -34,7 +34,7 @@ import qualified FlagDump
 import qualified FlagOpts
 import Version.Raw(basePackages, libraryPath)
 
-data Mode = BuildHl String -- ^ Load the specified hl-files (haskell libraries).
+data Mode = BuildHl String -- ^ Build the specified hl-file given a description file.
           | Interactive    -- ^ Run interactively.
           | SelfTest       -- ^ Perform self-test
           | Version        -- ^ Print version and die.
@@ -68,6 +68,7 @@ data Opt = Opt {
     optIgnoreHo    :: !Bool,                   -- ^ Ignore ho-files.
     optNoWriteHo   :: !Bool,                   -- ^ Don't write ho-files.
     optNoAuto      :: !Bool,                   -- ^ Don't autoload packages
+    optFollowDeps  :: !Bool,                   -- ^ Don't follow dependencies, all deps must be loaded from packages or specified on the command line.
     optVerbose     :: !Int,                    -- ^ Verbosity
     optDumpSet     ::  S.Set FlagDump.Flag,    -- ^ Dump flags.
     optFOptsSet    ::  S.Set FlagOpts.Flag     -- ^ Flag options (-f\<opt\>).
@@ -94,6 +95,7 @@ opt = Opt {
     optMainFunc    = Nothing,
     optOutName     = "hs.out",
     optPrelude     = True,
+    optFollowDeps  = True,
     optVerbose     = 0,
     optNoAuto      = False,
     optDumpSet     = S.empty,
@@ -134,6 +136,7 @@ theoptions =
     , Option []    ["ignore-ho"]  (NoArg  (optIgnoreHo_s True)) "Ignore existing haskell object files"
     , Option []    ["nowrite-ho"] (NoArg  (optNoWriteHo_s True)) "Do not write new haskell object files"
     , Option []    ["no-ho"]      (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "same as --ignore-ho and --nowrite-ho"
+    , Option []    ["no-follow-deps"] (NoArg  (optFollowDeps_s False)) "Don't follow depencies not listed on command line."
     , Option []    ["selftest"]   (NoArg  (optMode_s SelfTest)) "Perform internal integrity testing"
     , Option []    ["list-libraries"]   (NoArg  (optMode_s ListLibraries)) "List of installed libraries."
     ]
