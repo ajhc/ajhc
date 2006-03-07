@@ -81,7 +81,7 @@ opt = Opt {
     optDebug       = False,
     optIncdirs     = initialIncludes,
     optHls         = [],
-    optHlPath      = initialIncludes ++ libraryPath,
+    optHlPath      = initialLibIncludes,
     optProgArgs    = [],
     optDump        = [],
     optStmts       = [],
@@ -221,6 +221,15 @@ initialIncludes = unsafePerformIO $ do
     p <- lookupEnv "JHCPATH"
     let x = maybe "" id p
     return (".":(tokens (== ':') x))
+
+-- | Include directories taken from JHCPATH enviroment variable.
+initialLibIncludes :: [String]
+initialLibIncludes = unsafePerformIO $ do
+    p <- lookupEnv "JHCLIBPATH"
+    h <- lookupEnv "HOME"
+    let x = maybe "" id p
+        mh = fmap (++ "/lib/jhc") h
+    return (mh ++ (tokens (== ':') x) ++ libraryPath)
 
 
 class Monad m => OptionMonad m where

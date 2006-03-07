@@ -60,8 +60,16 @@ problem. Much of the debugging output contains Unicode characters, it helps if
 your terminal is UTF8.
 
 While compiling, jhc will drop 'ho' files alongside your source code to speed
-up future compilation. feel free to delete these but having a set for the
-standard Haskell libraries pre-built will greatly speed up future builds.
+up future compilation. feel free to delete these if you want to. There are
+various options for controlling the writing and reading of these ho files.
+
+=== Environment Variables ===
+
+jhc understands the following environment variables
+
+ JHCPATH - path to search for haskell source files, seperated by colons.
+
+ JHCLIBPATH - path to search for jhc library files
 
 ==== Options ====
 

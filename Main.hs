@@ -91,14 +91,19 @@ main = runMain $ bracketHtml $ do
         args <- System.getArgs
         return (simpleQuote (name:args))
     case optMode o of
-      BuildHl hl    -> createLibrary hl buildLibrary
-      ListLibraries -> sequence_ [ putStrLn name | (name,_) <- libraryList ]
-      SelfTest      -> do putStrLn "Starting self testing..."
-                          SelfTest.selfTest (optArgs o)
-      ShowHo ho     -> dumpHoFile ho
-      Version       -> putStrLn versionString
-      VersionCtx    -> putStrLn versionContext
-      _             -> processFiles  (optArgs o)
+        BuildHl hl    -> createLibrary hl buildLibrary
+        ListLibraries -> do
+            putStrLn "Search path:"
+            mapM_ putStrLn (optHlPath options)
+            putStrLn "Libraries found:"
+            sequence_ [ putStrLn name | (name,_) <- libraryList ]
+        SelfTest      -> do
+            putStrLn "Starting self testing..."
+            SelfTest.selfTest (optArgs o)
+        ShowHo ho     -> dumpHoFile ho
+        Version       -> putStrLn versionString
+        VersionCtx    -> putStrLn versionContext
+        _             -> processFiles  (optArgs o)
 
 
 buildLibrary [] = do
