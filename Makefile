@@ -37,23 +37,18 @@ jhc: $(BUILTSOURCES) $(HSFILES)
 i:
 	ghci $(GHCOPTS) $(EXTRAOPTS) Main.hs
 
-ifdef DESTDIR
-DP=$(DESTDIR)/$(PREFIX)
-DC=--destdir=$(DESTDIR)
-else
+LIBRARYPATH="$(PREFIX)/lib/jhc-$(JHC_VERSION)"
 DP=$(PREFIX)
-DC=
-endif
 
-install: jhc
-	(cd lib && \
-	 runghc Setup.lhs configure --jhc -w ../jhc --prefix=$(PREFIX) && \
-	 runghc Setup.lhs build && \
-	 runghc Setup.lhs copy $(DC))
+base-1.0.hl: jhc lib/base.cabal
+	./jhc -v -ilib --noauto --build-hl lib/base.cabal -o base-1.0.hl
+
+install: jhc base-1.0.hl
 	install -d "$(DP)/bin"
 	install jhc "$(DP)/bin"
-	(cd "$(DP)/bin" && rm -f jhci && ln -s jhc jhci)
-	strip -s "$(DP)/bin/jhc"
+	ln -sf "$(DP)/bin/jhc" "$(DP)/bin/jhci"
+	install -d $(LIBRARYPATH)
+	install base-1.0.hl $(LIBRARYPATH)
 
 tags: $(HSFILES)
 	hasktags $(HSFILES)
