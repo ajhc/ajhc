@@ -111,12 +111,12 @@ findModule :: Ho                                 -- ^ code loaded from libraries
               -> IO Ho                           -- ^ Final accumulated ho
 findModule lhave have (Left m) ifunc _
     | m `Map.member` (hoExports have) = return have
-    | m `Map.member` (hoExports lhave) = return mempty -- libraries need no processing
+    | m `Map.member` (hoExports lhave) = return mempty
 findModule lhave have need ifunc func  = do
     let f (Left (Module m)) = (m,searchPaths m)
         f (Right n) = (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
         (name,files) = f need
-    (ho,ms) <- getModule have name files
+    (ho,ms) <- getModule lhave have name files
     processIOErrors
     let scc = map f $  stronglyConnComp [ (x,fromModule $ hsModuleName hs,hsModuleRequires hs) | x@(hs,fd,honm) <- ms ]
         f (AcyclicSCC x) = [x]
@@ -127,15 +127,16 @@ findModule lhave have need ifunc func  = do
             ho' <- func (lhave `mappend` ho) [ hs | (hs,_,_) <- sc ]
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
                 mods' = [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
-                mdeps = [ (m,runIdentity $ Map.lookup m (hoModules ho)) | m <- mods']
+                mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules ho)]
+                ldeps = Map.unions [ Map.singleton ln cs | m <- mods', Right (ln,cs) <- Map.lookup m (hoModules ho)]
             let hoh = HoHeader { hohGeneration = 0,
                                  hohDepends    = [ x | (_,x,_) <- sc],
                                  hohModDepends = mdeps,
                                  hohMetaInfo   = []
                                }
             ho' <- recordHoFile ho' [ x | (_,_,x) <- sc ] hoh
-            f (ho `mappend` ho') scs
-    ho <- ifunc (ho `mappend` have)
+            f (ho `mappend` ho' `mappend` mempty { hoLibraries = ldeps }) scs
+    ho <- ifunc ho
     f ho scc
 
 checkForHoModule :: Module -> IO (Maybe (HoHeader,Ho))
@@ -148,15 +149,6 @@ checkForHoFile :: String            -- ^ file name to check for
     -> IO (Maybe (HoHeader,Ho))
 checkForHoFile fn = flip catch (\e -> putErrLn (show e) >> return Nothing) $ do
     bracket (openGetFileDep fn) (hClose . fst) $ \ (fh,dep) -> do
-    -- (fh,dep) <- openGetFileDep fn
---    if optIgnoreHo options then do
---        wdump FD.Progress $ do
---            fn' <- shortenPath fn
---            putErrLn $ "Skipping haskell object file:" <+> fn'
---        return Nothing
---     else do
-    --wdump FD.Progress $ do
-    --    putErrLn $ "Found haskell object file:" <+> fn
     bh <- openBinIO fh
     x <- get bh
     if x /= magic then (putErrLn $ "Bad ho file:" <+> fn)  >> return Nothing else do
@@ -169,7 +161,7 @@ checkForHoFile fn = flip catch (\e -> putErrLn (show e) >> return Nothing) $ do
         wdump FD.Progress $ do
             fn' <- shortenPath fn
             putErrLn $ "Found object file:" <+> fn'
-        return $ Just (hh,ho { hoModules = fmap (const dep) (hoExports ho) })
+        return $ Just (hh,ho { hoModules = fmap (const (Left dep)) (hoExports ho) })
 
 checkDep fd = do
     fs <- getFileStatus (fromAtom $ fileName fd)
@@ -241,13 +233,13 @@ recordHoFile ::
     Ho               -- ^ File to record
     -> [String]      -- ^ files to write to
     -> HoHeader      -- ^ file header
-    -> IO Ho         -- ^ Ho updated with this recordfiel dependencies
+    -> IO Ho         -- ^ Ho updated with this recordfile dependencies
 recordHoFile ho fs header = do
     if optNoWriteHo options then do
         wdump FD.Progress $ do
             fs' <- mapM shortenPath fs
             putErrLn $ "Skipping Writing Ho Files: " ++ show fs'
-        return (ho { hoModules = fmap (const emptyFileDep) (hoExports ho) })
+        return (ho { hoModules = fmap (const $ Left emptyFileDep) (hoExports ho) })
       else do
     --let header = HoHeader { hohGeneration = 0, hohDepends = snub (fd ++ concat [ hsdep:ds | (hs,hsdep,honm,ds) <- sc] )}
     let removeLink' fn = catch  (removeLink fn)  (\_ -> return ())
@@ -286,7 +278,7 @@ recordHoFile ho fs header = do
             rename tfn fn
             return fd
     dep <- g fs
-    return (ho { hoModules = fmap (const dep) (hoExports ho) })
+    return (ho { hoModules = fmap (const $ Left dep) (hoExports ho) })
     --return [ hsdep | (hs,hsdep,honm,ds) <- sc]
 
 -- | Check that ho library dependencies are right
@@ -298,13 +290,15 @@ hoLibraryDeps newHo oldHo = hoLibraries newHo `Map.isSubmapOf` hoLibraries oldHo
 -- We only look for ho files where there is a cooresponding haskell source file.
 
 getModule ::
-    Ho          -- ^ Current set of modules, we assume anything in here is prefered to what is found on disk.
+    Ho          -- ^ initialHo
+    -> Ho       -- ^ Current set of modules, we assume anything in here is prefered to what is found on disk.
     -> String   -- ^ Module name for printing error messages
     -> [(String,String)]  -- ^ files to search, and the cooresponding ho file
     -> IO (Ho,[(HsModule,FileDep,String)])
-getModule ho name files  = do
+getModule initialHo ho name files  = do
+    putVerboseLn $ "getModule: " ++ show name ++ show files
     ho_ref <- newIORef ho
-    fixup_ref <- newIORef (getFixups ho)
+    fixup_ref <- newIORef (getFixups (initialHo `mappend` ho))
     need_ref <- newIORef []
     let loop name files  = do
             --wdump FD.Progress $ do
@@ -338,13 +332,14 @@ getModule ho name files  = do
             --wdump FD.Progress $ do
             --    putErrLn $ "checking dependency:" <+> show m <+> "at" <+> fromAtom (fileName fd)
             ho <- readIORef ho_ref
-            case Map.lookup m (hoModules ho) of
-                Just fd' | fd == fd' -> return True
-                Just fd' | fd /= emptyFileDep -> do
+            case Map.lookup m (hoModules (initialHo `mappend` ho)) of
+                Just (Left fd') | fd == fd' -> return True
+                Just (Left fd') | fd /= emptyFileDep -> do
                     wdump FD.Progress $ do
                         putErrLn $ "Found newer dependency:" <+> fromModule m <+> "at" <+> pprint (fd,fd')
                     return False
-                Just _ -> return False
+                Just (Left _) -> return False
+                Just (Right (cl,_)) -> putVerboseLn  (show m ++ " found in " ++ show cl) >> return True
                 Nothing -> do
                     xs <- readIORef need_ref
                     case lookup m xs of
@@ -382,7 +377,6 @@ parseHsSource fn s = case runParserWithMode ParseMode { parseFilename = fn } par
                       ParseFailed sl err -> putErrDie $ show sl ++ ": " ++ err
     where
     s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
-                      -- warnF fn "parse-error" err >> return emptyHsModule
 
 
 mapHoBodies  :: (E -> E) -> Ho -> Ho
@@ -407,15 +401,6 @@ applyFixups mie ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  runIdentity (E
 
 
 
-{-
-emptyHsModule = HsModule {
-    hsModuleName = Module "@invalid",
-    hsModuleImports = [],
-    hsModuleExports = Nothing,
-    hsModuleDecls = [],
-    hsModuleOptions = []
-    }
--}
 
 hGetFileDep fn fh = do
     fd <- handleToFd fh
@@ -464,62 +449,3 @@ initialHo = mempty { hoEs = es , hoClassHierarchy = ch, hoDataTable = dataTableP
     es' = Map.fromList [ (n,(setProperty prop_INSTANCE $ tVr (atomIndex $ toAtom n) (error "f no longer relevant"),v)) | (n,t,p,d) <- theMethods, let v = f n t p d  ]
     f _ _ _ _ = error "f no longer relevant"
 
-{-
-    let ds = Map.elems $ hoEs initialHo
-    cds <- E.Strictness.solveDs ds
-    cds <- return $ fst (E.CPR.cprAnalyzeBinds mempty cds)
-    mapM_ (\t -> putStrLn (prettyE (EVar t) <+> show (tvrInfo t))) (fsts cds)
-    return initialHo { hoEs = Map.fromList [ (n,v) | v <- cds | n <- Map.keys (hoEs initialHo) ] }
-    -}
-
-
-
-
-
-    {-
-    f n t p d = ans where
-        (r':as') = reverse t
-        r = tt r'
-        as = map tt (reverse as')
-        tt 'a' = ELit (LitCons (parseName TypeConstructor d) [] eStar)
-        tt 'B' = tBool
-        tt 'I' = tInt
-        tvs = [  (TVr i a) | a <- as | i <- [ 2,4 ..]]
-        ans = foldr ELam (EPrim (primPrim p) (map EVar tvs) r) tvs
-      -}
-
-
-
-
-    {-
-
-    -- Collect all complete 'ho' files and parsed code we need to compile
---getModule :: Set.Set String -> String -> [(String,String)] -> IO (Ho,[],[FileDep])
-getModule ws name files = do
-    --wdump FD.Progress $ do
-    --    putErrLn $ "getModule:" <+> tshow ws <+> tshow name <+> tshow files
-    (c,fd,honm) <- findFirstFile name files
-    if fd == emptyFileDep then return (mempty,mempty,mempty) else do
-    ho <- checkForHoFile honm
-    case ho of
-        Just (ds,ho) -> mapM_ (\x -> modifyIORef ws (Set.insert x)) (Map.keys $ hoExports ho) >> return (ho,mempty,ds)
-        Nothing -> do
-            hs <- parseHsSource (fromAtom $ fileName fd) c
-            wdump FD.Progress $ do
-                putErrLn $ "Found dependency:" <+> name <+> "at" <+> fromAtom (fileName fd)  <+> show (hsModuleRequires hs)
-            --print hs
-            modifyIORef ws $ Set.insert ( hsModuleName hs)
-            ws' <- readIORef ws
-            --mapM_ (modifyIORef ws) [Set.insert (Module x) | x <- hsModuleRequires hs]
-            let f x = do
-                ws' <- readIORef ws
-                case Module x `Set.member` ws' of
-                    True ->  return (mempty,mempty,mempty)
-                    False -> Ho.getModule ws x (searchPaths x)
-                --f x | Module x `Set.member` ws' = return (mempty,mempty,mempty)
-                --    | otherwise = Ho.getModule ws x (searchPaths x)
-            xs <- mapM f (hsModuleRequires hs)
-            let x@(_,_,ds) = mconcat xs
-            return $ mconcat [(mempty,[(hs,fd,honm,ds)],mempty),x]
-
-            -}

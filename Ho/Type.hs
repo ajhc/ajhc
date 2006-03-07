@@ -41,7 +41,7 @@ data HoHeader = HoHeader {
 
 data Ho = Ho {
     -- filled in by front end
-    hoModules :: Map.Map Module FileDep,     -- ^ Map of module to ho file, This never actually ends up in the binary file on disk, but is filled in when the file is read.
+    hoModules :: Map.Map Module (Either FileDep (LibraryName,CheckSum)),     -- ^ Map of module to ho file, This never actually ends up in the binary file on disk, but is filled in when the file is read, libraries have no non-library dependencies.
     -- * libraries depended on
     hoLibraries :: Map.Map LibraryName CheckSum,
     hoExports :: Map.Map Module [Name],

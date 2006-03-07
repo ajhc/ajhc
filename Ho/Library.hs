@@ -42,7 +42,7 @@ loadP mbcs got name = do
     case Map.lookup name got of
       Nothing -> do
         rfp <- libraryMapFind name
-        pkg <- readLibraryFile rfp mbcs
+        pkg <- readLibraryFile name rfp mbcs
         let got' = Map.insert name pkg got
         foldM (\gm (pn,cs) -> loadP (Just cs) gm pn) got' $ libraryDeps pkg
       Just pkg | mbcs == Nothing               -> return got
@@ -122,8 +122,8 @@ readDescFile fp = do
 -- IO with Libraries
 
 
-readLibraryFile :: FilePath -> Maybe CheckSum -> IO Library
-readLibraryFile fp mbcs = do
+readLibraryFile :: LibraryName -> FilePath -> Maybe CheckSum -> IO Library
+readLibraryFile lname fp mbcs = do
     pkgCS <- md5file fp
     when (maybe False (pkgCS /=) mbcs) $
         putErrDie ("Loading library "++show fp++" failed: Checksum does not match")
@@ -134,7 +134,7 @@ readLibraryFile fp mbcs = do
           Library { libraryDesc= hohMetaInfo hoh,
                     libraryFP  = fp,
                     libraryMD5 = pkgCS,
-                    libraryHo  = ho
+                    libraryHo  = ho { hoModules = Map.map (const $ Right (lname,pkgCS)) $ hoModules ho }
                   }
 
 writeLibraryFile :: FilePath -> Library -> IO ()
