@@ -129,12 +129,18 @@ tiExpr (HsAsPat n (HsVar v)) typ = do
       else do addCoerce (toName Val n) f
     return (HsAsPat n $ HsVar v)
 
-{-
-tiExpr (HsVar v) typ = do
-    sc <- lookupName (toName Val v)
-    sc `subsumes` typ
-    return (HsVar v)
--}
+tiExpr (HsAsPat ap (HsCase e alts)) typ = withContext (simpleMsg $ "in the case expression\n   case " ++ show e ++ " of ...") $ do
+    scrutinee <- newBox Star
+    e' <- tcExpr e scrutinee
+    alts' <- mapM (tcAlt scrutinee typ) alts
+    addToCollectedEnv (Map.singleton (toName Val ap) typ)
+    return (HsAsPat ap (HsCase e' alts'))
+
+tiExpr ec@HsCase {} typ = do
+    nn <- newUniq
+    let n = toName Val ("As@",show nn)
+    tiExpr (HsAsPat (nameName n) ec) typ
+
 tiExpr (HsCon conName) typ = do
     sc <- lookupName (toName DataConstructor conName)
     sc `subsumes` typ
@@ -283,11 +289,6 @@ tiExpr expr@(HsLet decls e) typ = withContext (makeMsg "in the let binding" $ re
     f bgs []
 
 
-tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n   case " ++ show e ++ " of ...") $ do
-    scrutinee <- newBox Star
-    e' <- tcExpr e scrutinee
-    alts' <- mapM (tcAlt scrutinee typ) alts
-    return (HsCase e' alts')
 
 tiExpr e typ = fail $ "tiExpr: not implemented for: " ++ show (e,typ)
 
