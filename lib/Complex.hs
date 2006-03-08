@@ -12,7 +12,8 @@ module Complex(
 
 infix  6  :+
 
-data  (RealFloat a)     => Complex a = !a :+ !a  deriving (Eq,Read,Show)
+-- the standard says this should have a RealFloat constraint, but that is silly.
+data  Complex a = !a :+ !a  deriving (Eq,Read,Show)
 
 
 realPart, imagPart :: (RealFloat a) => Complex a -> a
@@ -33,7 +34,7 @@ polar z  =  (magnitude z, phase z)
 
 magnitude :: (RealFloat a) => Complex a -> a
 magnitude (x:+y) =  scaleFloat k
-     (sqrt ((scaleFloat mk x)^2 + (scaleFloat mk y)^2))
+     (sqrt ((scaleFloat mk x)^(2::Int) + (scaleFloat mk y)^(2::Int)))
     where k  = max (exponent x) (exponent y)
           mk = - k
 
@@ -48,9 +49,10 @@ instance  (RealFloat a) => Num (Complex a)  where
     (x:+y) * (x':+y') =  (x*x'-y*y') :+ (x*y'+y*x')
     negate (x:+y) =  negate x :+ negate y
     abs z =  magnitude z :+ 0
-    signum 0 =  0
+    signum (0 :+ 0) =  0
     signum z@(x:+y) =  x/r :+ y/r  where r = magnitude z
     fromInteger n =  fromInteger n :+ 0
+    fromInt n =  fromInt n :+ 0
 
 instance  (RealFloat a) => Fractional (Complex a)  where
     (x:+y) / (x':+y') =  (x*x''+y*y'') / d :+ (y*x''-x*y'') / d
@@ -58,7 +60,7 @@ instance  (RealFloat a) => Fractional (Complex a)  where
              y'' = scaleFloat k y'
              k   = - max (exponent x') (exponent y')
              d   = x'*x'' + y'*y''
-             fromRational a =  fromRational a :+ 0
+    fromRational a =  fromRational a :+ 0
 
 instance  (RealFloat a) => Floating (Complex a) where
     pi             =  pi :+ 0
@@ -66,7 +68,7 @@ instance  (RealFloat a) => Floating (Complex a) where
                       where expx = exp x
     log z          =  log (magnitude z) :+ phase z
 
-    sqrt 0         =  0
+    sqrt (0 :+ 0)  =  0
     sqrt z@(x:+y)  =  u :+ (if y < 0 then -v else v)
                       where (u,v) = if x < 0 then (v',u') else (u',v')
                             v'    = abs y / (u'*2)
