@@ -35,7 +35,7 @@ modInfoModImports m =  mp  [ i | i <- hsModuleImports (modInfoHsModule m)] where
 determineExports :: [(Name,SrcLoc,[Name])] -> [(Module,[Name])] -> [ModInfo]  -> IO [ModInfo]
 determineExports defs ae ms = do
     wdump FD.Progress $ do
-        putErrLn $ "Determining Exports/Imports: " ++ show ([ m | Module m <- map modInfoName ms])
+        putErrLn $ "Determining Exports/Imports: " ++ show (sort [ m | m <- map modInfoName ms])
         --mapM_ CharIO.print [ (modInfoName m, map hsImportDeclModule $ modInfoModImports m) | m <- ms]
     let ds = [ (n,cs) | (n,_,cs) <- defs ++ concatMap modInfoDefs ms]
     ms <- determineExports' ds ae ms
