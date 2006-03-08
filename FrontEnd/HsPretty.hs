@@ -261,6 +261,9 @@ ppHsDecl :: HsDecl -> Doc
 ppHsDecl prules@HsPragmaRules {} = text ("{-# RULES " ++ show (hsDeclString prules)) <+> text "forall" <+> vars <+> text "." $$ nest 4 rest $$ text "#-}" where
     vars = hsep (map ppHsTName $ hsDeclFreeVars prules)
     rest = ppHsExp (hsDeclLeftExpr prules) <+> text "=" <+> ppHsExp (hsDeclRightExpr prules)
+ppHsDecl prules@HsPragmaSpecialize {} = text "{-# SPECIALIZE ... #-}" --  ++ show (hsDeclString prules)) <+> text "forall" <+> vars <+> text "." $$ nest 4 rest $$ text "#-}" where
+--    vars = hsep (map ppHsTName $ hsDeclFreeVars prules)
+--    rest = ppHsExp (hsDeclLeftExpr prules) <+> text "=" <+> ppHsExp (hsDeclRightExpr prules)
 ppHsDecl fd@(HsForeignDecl _ _ _ _ n qt) = text "ForeignDecl" <+> ppHsName n <+> ppHsQualType qt <+> text (show fd)
 ppHsDecl (HsTypeDecl loc name nameList htype) =
 	   --blankline $
