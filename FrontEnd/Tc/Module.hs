@@ -100,8 +100,8 @@ or' fs x = or [ f x | f <- fs ]
 
 tiModules' ::  Ho -> [ModInfo] -> IO (Ho,TiData)
 tiModules' me ms = do
-    let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
-        importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
+    let importVarEnv = Map.fromList [ (x,typeToScheme y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
+        importDConsEnv = Map.fromList [ (x,typeToScheme y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
         importClassHierarchy = hoClassHierarchy me
         importKindEnv = hoKinds me
     wdump FD.Progress $ do
@@ -189,7 +189,7 @@ tiModules' me ms = do
     let bindings = (funPatBinds ++ [ z | z <- cDefBinds, isHsFunBind z || isHsPatBind z] ++ liftedInstances)
         classDefaults  = snub [ getDeclName z | z <- cDefBinds, isHsFunBind z || isHsPatBind z ]
         classNoDefaults = snub (concat [ getDeclNames z | z <- cDefBinds ])  List.\\ classDefaults
-        noDefaultSigs = Map.fromList [ (n,maybe (error $ "sigEnv:"  ++ show n) id $ Map.lookup n sigEnv) | n <- classNoDefaults ]
+        noDefaultSigs = Map.fromList [ (n,schemeToType $ maybe (error $ "sigEnv:"  ++ show n) id $ Map.lookup n sigEnv) | n <- classNoDefaults ]
         fakeForeignDecls = [ [HsForeignDecl bogusASrcLoc (Import "" [] []) Primitive Safe (nameName x) (HsQualType [] $ HsTyTuple []) ] | (x,_) <- Map.toList noDefaultSigs]
     --when verbose2 $ putStrLn (show bindings)
     let programBgs = getBindGroups bindings (nameName . getDeclName) getDeclDeps
@@ -239,16 +239,14 @@ tiModules' me ms = do
         putStrLn " ---- the coersions of identifiers ---- "
         mapM_ putStrLn [ show n ++  " --> " ++ show s |  (n,s) <- Map.toList coercions]
 
-    localVarEnv <- return $ Map.map typeToScheme localVarEnv
-
     let externalEnv = Map.filterWithKey (\ x _ -> isGlobal x && (fromJust (getModule x) `elem` map modInfoName ms)) localVarEnv `Map.union` noDefaultSigs
     localVarEnv <- return $  localVarEnv `Map.union` noDefaultSigs
     let externalKindEnv = restrictKindEnv (\ x  -> isGlobal x && (fromJust (getModule x) `elem` map modInfoName ms)) kindInfo
 
     let pragmaProps = Map.fromListWith (\a b -> snub $ a ++ b ) [ (toName Name.Val x,[toAtom w]) |  HsPragmaProps _ w xs <- ds, x <- xs ]
 
-    let allAssumps = localDConsEnv `Map.union` localVarEnv
-        expAssumps = localDConsEnv `Map.union` externalEnv
+    let allAssumps = Map.map schemeToType localDConsEnv `Map.union` localVarEnv
+        expAssumps = Map.map schemeToType localDConsEnv `Map.union` externalEnv
     let ho = mempty {
         hoExports = Map.fromList [ (modInfoName m,modInfoExport m) | m <- ms ],
         hoDefs =  Map.fromList [ (x,(y,z)) | (x,y,z) <- concat $ map modInfoDefs ms],

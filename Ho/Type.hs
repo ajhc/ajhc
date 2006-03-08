@@ -15,7 +15,7 @@ import FrontEnd.KindInfer(KindEnv)
 import MapBinaryInstance()
 import Name.Name(Name)
 import PackedString(PackedString)
-import Representation(Scheme)
+import Representation(Type())
 import TypeSynonyms(TypeSynonyms)
 
 
@@ -46,7 +46,7 @@ data Ho = Ho {
     hoLibraries :: Map.Map LibraryName CheckSum,
     hoExports :: Map.Map Module [Name],
     hoDefs :: Map.Map Name (SrcLoc,[Name]),
-    hoAssumps :: Map.Map Name Scheme,        -- used for typechecking
+    hoAssumps :: Map.Map Name Type,        -- used for typechecking
     hoFixities :: FixityMap,
     hoKinds :: KindEnv,                      -- used for typechecking
     hoClassHierarchy :: ClassHierarchy,

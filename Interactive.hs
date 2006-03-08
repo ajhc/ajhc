@@ -38,10 +38,9 @@ import Options
 import qualified FrontEnd.Infix
 import qualified HsPretty
 import qualified Text.PrettyPrint.HughesPJ as PP
-import qualified FrontEnd.TI.Main as TI(tiProgram)
 import Representation hiding(flattenType)
-import Type(schemeToType)
 import TypeSynonyms(showSynonym)
+import Type(schemeToType)
 import TypeSyns
 import TypeSigs
 import Util.Interact
@@ -186,8 +185,9 @@ executeStatement stmt = do
     stmt''' <- FrontEnd.Infix.infixStatement (hoFixities ho) stmt''
     procErrors $ do
     printStatement stmt'''
-    tcStatement stmt'''
+    tcStatementTc stmt'''
 
+{-
 tcStatement :: HsStmt -> In ()
 tcStatement HsLetStmt {} = liftIO $ putStrLn "let statements not yet supported"
 tcStatement HsGenerator {} = liftIO $ putStrLn "generators not yet supported"
@@ -213,6 +213,7 @@ tcStatement (HsQualifier e) = do
     procErrors $ do
     vv <- Map.lookup ansName' localVarEnv
     liftIO $ putStrLn $ show (text "::" <+> pprint vv :: P.Doc)
+    -}
 
 
 tcStatementTc :: HsStmt -> In ()
@@ -221,7 +222,7 @@ tcStatementTc HsGenerator {} = liftIO $ putStrLn "generators not yet supported"
 tcStatementTc (HsQualifier e) = do
     is@IS { stateHo = ho } <- ask
     let tcInfo = tcInfoEmpty {
-        tcInfoEnv = Map.map schemeToType (hoAssumps ho),
+        tcInfoEnv = (hoAssumps ho),
         tcInfoSigEnv = Map.map schemeToType $ collectSigEnv (hoKinds ho) (HsQualifier e),
         tcInfoModName =  show (stateModule is),
         tcInfoKindInfo = (hoKinds ho),

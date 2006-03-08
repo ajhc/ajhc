@@ -16,5 +16,5 @@ data TiData = TiData {
     tiModuleOptions  :: [(Module,Opt)],
     tiCheckedRules   :: [Rule],
     tiCoerce         :: Map.Map Name CoerceTerm,
-    tiAllAssumptions :: Map.Map Name Scheme
+    tiAllAssumptions :: Map.Map Name Type
 }

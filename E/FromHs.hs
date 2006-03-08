@@ -63,7 +63,6 @@ import qualified Util.Seq as Seq
 import Representation
 import Support.CanType
 import Support.FreeVars
-import Type(schemeToType)
 import Util.Gen
 import Util.NameMonad
 
@@ -163,7 +162,7 @@ lookupCoercion n = do
 
 convertVal assumps n = (foldr ePi t vs, flip (foldr eLam) vs) where
     (vs,t) = case Map.lookup n assumps of
-        Just z -> fromSigma $ schemeToType z
+        Just z -> fromSigma  z
         Nothing -> error $ "convertVal.Lookup failed: " ++ (show n)
 
 convertOneVal (Forall _ (_ :=> t)) = (mp EPi ts (tipe t)) where
@@ -300,7 +299,7 @@ createFunc dataTable es ee = do
 instance GenName String where
    genNames i = map (('x':) . show) [i..]
 
-convertRules :: TiData -> ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> IO [(String,[TVr],E,E)]
+convertRules :: TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> [HsDecl] -> IO [(String,[TVr],E,E)]
 convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM f hsDecls where
     f pr@HsPragmaRules {} = do
         let ce = convertE tiData classHierarchy assumps dataTable (hsDeclSrcLoc pr)
@@ -324,7 +323,7 @@ convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM f hsDe
         return [(hsDeclString pr,( snds (cs' ++ ts) ),eval $ smt $ sma e1,e2)]
     f _ = return []
 
-convertE :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Scheme -> DataTable -> SrcLoc -> HsExp -> m E
+convertE :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> SrcLoc -> HsExp -> m E
 convertE tiData classHierarchy assumps dataTable srcLoc exp = do
     [(_,_,e)] <- convertDecls tiData classHierarchy assumps dataTable [HsPatBind srcLoc (HsPVar sillyName') (HsUnGuardedRhs exp) []]
     return e
@@ -361,11 +360,11 @@ applyCoersion ct e = etaReduce `liftM` f ct e where
         return (eLam y fgy)
 
 
-convertDecls :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Scheme -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
+convertDecls :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
 convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalRWST ans ceEnv 2 where
     ceEnv = CeEnv {
         ceCoerce = tiCoerce tiData,
-        ceAssumps = Map.map schemeToType assumps,
+        ceAssumps = assumps,
         ceDataTable = dataTable
         }
     Ce ans = do
@@ -538,10 +537,10 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
     cGuard (HsGuardedRhss []) = return id
 
     getAssumpCon n  = case Map.lookup (toName Name.DataConstructor n) assumps of
-        Just z -> schemeToType z
+        Just z -> z
         Nothing -> error $ "Lookup failed: " ++ (show n)
     getAssump n  = case Map.lookup (toName Name.Val n) assumps of
-        Just z -> schemeToType z
+        Just z -> z
         Nothing -> error $ "Lookup failed: " ++ (show n)
     tv n = toTVr assumps (toName Name.Val n)
     lp  [] e = e

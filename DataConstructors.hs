@@ -43,10 +43,11 @@ import Name.VConsts
 import Support.FreeVars
 import PrimitiveOperators
 import qualified Util.Seq as Seq
+import FrontEnd.Tc.Type
 import Representation
 import Support.CanType
+import Type(typeToScheme)
 import Support.Unparse
-import Type(schemeToType)
 import Util.HasSize
 import Util.SameShape
 import Util.VarName
@@ -334,7 +335,7 @@ followAliases dataTable l = f l 10 where
 dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tabsurd:tarrow:primitiveTable ] ++ worlds)
 
 {-# NOINLINE toDataTable #-}
-toDataTable :: (Map Name Kind) -> (Map Name Scheme) -> [HsDecl] -> DataTable
+toDataTable :: (Map Name Kind) -> (Map Name Type) -> [HsDecl] -> DataTable
 toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conName x,x) | x <- ds' ])  where
     fixupMap k _ | Just n <- getConstructor k dataTablePrims = n
     fixupMap _ n = n
@@ -385,7 +386,8 @@ toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conN
             existentials = Set.toList $ freeVars (map getType ts') Set.\\ freeVars xs
             subst = substMap $ Map.fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
             ts = existentials ++ [ tvr {tvrIdent = x} | tvr <- ts' | x <- drop (5 + length theTypeArgs) [2,4..] ]
-            Just (Forall _ (_ :=> ty)) = Map.lookup dataConsName cm
+            Just (Forall _ (_ :=> ty)) = fmap typeToScheme $ Map.lookup dataConsName cm
+            --Just (_,_,ty) = fmap fromType $ Map.lookup dataConsName cm
 
 isHsBangedTy HsBangedTy {} = True
 isHsBangedTy _ = False

@@ -228,6 +228,9 @@ processDecls stats ho ho' tiData = do
         return ((n, shouldBeExported (getExports ho') v,lc):ds,usedIds `mappend` used')
     (ds,_allIds) <- foldM procE ([],hoUsedIds ho) ds
 
+    Stats.print "PostProcess" stats
+    Stats.clear stats
+
     prog <- return $ programSetDs [ (t,e) | (_,t,e) <- ds] prog
     let entries = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t) (tell [t])) prog
     prog <- return $ prog { progEntryPoints = entries }

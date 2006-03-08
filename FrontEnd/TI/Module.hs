@@ -37,6 +37,7 @@ import Representation
 import FrontEnd.TI.Main
 import TypeSigs           (collectSigs, listSigsToSigEnv)
 import TypeSynonyms
+import Type
 import TypeSyns
 import Util.Gen
 import Util.Inst()
@@ -111,8 +112,8 @@ or' fs x = or [ f x | f <- fs ]
 
 tiModules' ::  Ho -> [ModInfo] -> IO (Ho,TiData)
 tiModules' me ms = do
-    let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
-        importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
+    let importVarEnv = Map.fromList [ (x,typeToScheme y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
+        importDConsEnv = Map.fromList [ (x,typeToScheme y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
         importClassHierarchy = hoClassHierarchy me
         importKindEnv = hoKinds me
     wdump FD.Progress $ do
@@ -262,7 +263,7 @@ tiModules' me ms = do
     let ho = mempty {
         hoExports = Map.fromList [ (modInfoName m,modInfoExport m) | m <- ms ],
         hoDefs =  Map.fromList [ (x,(y,z)) | (x,y,z) <- concat $ map modInfoDefs ms],
-        hoAssumps = expAssumps,
+        hoAssumps = Map.map schemeToType expAssumps,
         hoFixities = thisFixityMap,
         --hoKinds = trimMapEnv kindInfo,
         hoKinds = externalKindEnv,
@@ -279,7 +280,7 @@ tiModules' me ms = do
             tiCheckedRules = [],
             tiCoerce = mempty,
             tiDataDecls = mempty,
-            tiAllAssumptions = allAssumps
+            tiAllAssumptions = Map.map schemeToType allAssumps
         }
     return (ho,tiData)
 
