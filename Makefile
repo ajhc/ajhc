@@ -40,8 +40,8 @@ i:
 LIBRARYPATH="$(PREFIX)/lib/jhc-$(JHC_VERSION)"
 DP=$(PREFIX)
 
-base-1.0.hl: jhc lib/base.cabal
-	./jhc -v -ilib --noauto --build-hl lib/base.cabal -o base-1.0.hl
+base-1.0.hl: jhc lib/base/base.cabal
+	./jhc -v -ilib/base --noauto --build-hl lib/base/base.cabal -o base-1.0.hl
 
 install: jhc base-1.0.hl
 	install -d "$(DP)/bin"
