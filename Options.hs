@@ -222,7 +222,7 @@ initialIncludes = unsafePerformIO $ do
     let x = maybe "" id p
     return (".":(tokens (== ':') x))
 
--- | Include directories taken from JHCPATH enviroment variable.
+-- | Include directories taken from JHCLIBPATH enviroment variable.
 initialLibIncludes :: [String]
 initialLibIncludes = unsafePerformIO $ do
     p <- lookupEnv "JHCLIBPATH"

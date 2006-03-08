@@ -93,9 +93,10 @@ main = runMain $ bracketHtml $ do
     case optMode o of
         BuildHl hl    -> createLibrary hl buildLibrary
         ListLibraries -> do
-            putStrLn "Search path:"
-            mapM_ putStrLn (optHlPath options)
-            putStrLn "Libraries found:"
+            when (optVerbose options > 0) $ do
+                putStrLn "Search path:"
+                mapM_ putStrLn (optHlPath options)
+                putStrLn "Libraries found:"
             sequence_ [ putStrLn name | (name,_) <- libraryList ]
         SelfTest      -> do
             putStrLn "Starting self testing..."
