@@ -1,4 +1,6 @@
-module Directory (
+module System.Directory where
+{-
+ (
     Permissions( Permissions, readable, writable, executable, searchable ),
     createDirectory, removeDirectory, removeFile,
     renameDirectory, renameFile, getDirectoryContents,
@@ -35,4 +37,4 @@ setPermissions :: FilePath -> Permissions -> IO ()
 
 getModificationTime :: FilePath -> IO ClockTime
 
-
+-}
