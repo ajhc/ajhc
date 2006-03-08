@@ -51,7 +51,6 @@ import Foreign.Ptr
 import Foreign.Storable
 import Foreign.Marshal.Alloc
 import Prelude.IOError
-import Monad
 import Foreign.Marshal.Utils
 
 -- allocation
@@ -125,7 +124,9 @@ peekArray0 marker ptr  = do
 -- |Write the list elements consecutive into memory
 --
 pokeArray :: Storable a => Ptr a -> [a] -> IO ()
-pokeArray ptr vals =  zipWithM_ (pokeElemOff ptr) [0..] vals
+pokeArray ptr vals =  zipWithM_ (pokeElemOff ptr) [0..] vals where
+    zipWithM_         :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
+    zipWithM_ f xs ys =  sequence_ (zipWith f xs ys)
 
 -- |Write the list elements consecutive into memory and terminate them with the
 -- given marker element

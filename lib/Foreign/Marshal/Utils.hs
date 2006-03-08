@@ -47,7 +47,6 @@ module Foreign.Marshal.Utils (
 
 ) where
 
-import Maybe
 import Foreign.Ptr	        ( Ptr, nullPtr )
 import Foreign.Storable		( Storable(poke) )
 import Foreign.C.Types    	( CSize )

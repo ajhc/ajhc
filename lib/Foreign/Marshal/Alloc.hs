@@ -20,7 +20,6 @@ import Foreign.Storable
 import Prelude.IO
 import Foreign.C.Types
 import Foreign.Marshal.Utils
-import Monad
 import Prelude.IOError
 
 
