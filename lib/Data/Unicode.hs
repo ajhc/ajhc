@@ -1,14 +1,35 @@
-module Data.Unicode where
+module Data.Unicode(
+    CType(),
+    ctype,
+    isCType,
+    t_alnum,
+    t_alpha,
+    t_blank,
+    t_cntrl,
+    t_digit,
+    t_graph,
+    t_lower,
+    t_print,
+    t_punct,
+    t_space,
+    t_upper,
+    t_xdigit,
+    t_none
+    )where
 
 import Foreign.C.String
+import Foreign.C.Types
 import System.IO.Unsafe
 
-newtype CType = CType Int
+newtype CType = CType CInt
 
 -- | Get a ctype other than one of the defaults.
 
 ctype :: String -> IO CType
 ctype s = withCString s c_wctype
+
+isCType :: Char -> CType -> Bool
+isCType ch ct = unsafePerformIO (c_iswctype ch ct) /= 0
 
 
 t_alnum, t_alpha, t_blank, t_cntrl,
@@ -29,6 +50,11 @@ t_upper = unsafePerformIO (ctype "upper")
 t_xdigit = unsafePerformIO (ctype "xdigit")
 t_none = CType 0
 
+{-# NOINLINE
+ t_alnum, t_alpha, t_blank, t_cntrl,
+ t_digit, t_graph, t_lower, t_print,
+ t_punct, t_space, t_upper, t_xdigit
+ #-}
 
 
 foreign import ccall "wctype.h iswctype" c_iswctype :: Char -> CType -> IO Int

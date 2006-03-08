@@ -1,4 +1,17 @@
-module Prelude(module Prelude,  IO, IOError, putStr, putStrLn, module Prelude.IO, module Prelude.Text, Rational) where
+module Prelude(
+    -- export everything here
+    module Prelude,
+    -- export types from elsewhere
+    IO(),
+    IOError(),
+    Rational(),
+    -- functions from elsewhere
+    putStr,
+    putStrLn,
+    -- submodules
+    module Prelude.IO,
+    module Prelude.Text
+    ) where
 
 import Prelude.IO
 import Prelude.IOError
