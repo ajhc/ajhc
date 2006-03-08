@@ -17,11 +17,13 @@ import Control.Monad.Writer
 import Data.FunctorM
 import Data.Monoid
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 
 import Atom
 import E.E
 import E.Program
 import E.Rules
+import E.Annotate
 import E.Subst
 import E.Values
 import GenUtil
@@ -114,15 +116,35 @@ app' (EError s t) xs = do
 app' e as = do
     return $ foldl EAp e as
 
+
+-- | Map recursive groups, allowing an initial map to be passed in and it will
+-- also propagate changes in the tvrInfo properly, and make sure nothing
+-- shadows one of the global names.
+
 programMapRecGroups :: Monad m =>
-    ((Bool,[(TVr,E)]) -> m [(TVr,E)])  -- ^ bool is true if group is recursive.
+    Map.Map Id (Maybe E)        -- ^ initial map to apply
+    -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
+    -> (E -> Info -> m Info)    -- ^ annotate letbound bindings
+    -> (E -> Info -> m Info)    -- ^ annotate lambdabound bindings
+    -> ((Bool,[(TVr,E)]) -> m [(TVr,E)])  -- ^ bool is true if group is recursive.
     -> Program
     -> m Program
-programMapRecGroups f prog = do
-    let g (Left d) = f (False,[d])
-        g (Right ds) = f (True,ds)
-    nds <- mapM g $ decomposeDs (programDs prog)
-    return $ programSetDs (concat nds) prog
+programMapRecGroups imap idann letann lamann f prog = do
+    let g rs imap (Left d:rds) = do
+            [d'] <- annotateDs imap idann letann lamann [d]
+            nds <- f (False,[d'])
+            g (nds:rs) (bm nds imap) rds
+        g rs imap (Right ds:rds) = do
+            ds' <- annotateDs imap idann letann lamann ds
+            nds <- f (True,ds')
+            let imap' = (bm nds imap)
+            let smap = substMap'' $ Map.fromList [ (tvrIdent x,EVar x) | (x,y) <- nds]
+                nds' = [ (x,smap y) | (x,y) <- nds]
+            g (nds':rs) imap' rds
+        g rs _ [] = return $ concat rs
+        bm xs imap = Map.fromList [ (tvrIdent t,Just $ EVar t) | (t,_) <- xs ] `Map.union` imap
+    ds <- g [] imap $ decomposeDs (programDs prog)
+    return $ programSetDs ds prog
 
 decomposeDs :: [(TVr, E)] -> [Either (TVr, E) [(TVr,E)]]
 decomposeDs bs = map f mp where
