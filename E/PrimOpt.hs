@@ -49,13 +49,70 @@ typ_float = toAtom "float"
 vars :: [E] -> [TVr]
 vars ts = [ tVr n t | t <- ts | n <- [2,4 ..]]
 
+iTrue = (ELit (LitInt 1 intt))
+iFalse = (ELit (LitInt 0 intt))
+isIntegral t = Map.lookup t rawMap /= Just typ_float
+
+cextra Operator {} [] = ""
+cextra Operator {} xs = '.':map f xs where
+    f ELit {} = 'c'
+    f _ = 'e'
+cextra _ _ = ""
+
 primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
-    mtick (toAtom $ "E.PrimOpt." ++ braces (pprint s) )
+    mtick (toAtom $ "E.PrimOpt." ++ braces (pprint s) ++ cextra s xs )
     primOpt' dataTable  n  where
         primopt (PrimPrim "seq") [x,y] _  = return $ prim_seq x y
-        primopt (Operator "==" [ta,tb] tr) [e,(ELit (LitInt x t))] rt | Map.lookup t rawMap /= Just typ_float = return $ eCase e [Alt (LitInt x t) (ELit (LitInt 1 intt)) ] (ELit (LitInt 0 intt))
-        primopt (Operator "==" [ta,tb] tr) [(ELit (LitInt x t)),e] rt | Map.lookup t rawMap /= Just typ_float = return $ eCase e [Alt (LitInt x t) (ELit (LitInt 1 intt)) ] (ELit (LitInt 0 intt))
+
+        -- constant operations
+        primopt (Operator "+" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ (ELit (LitInt (l1 + l2) rt))
+        primopt (Operator "-" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ (ELit (LitInt (l1 - l2) rt))
+        primopt (Operator "*" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ (ELit (LitInt (l1 * l2) rt))
+        primopt (Operator "==" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ if l1 == l2 then iTrue else iFalse
+        primopt (Operator ">=" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ if l1 >= l2 then iTrue else iFalse
+        primopt (Operator "<=" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ if l1 <= l2 then iTrue else iFalse
+        primopt (Operator ">" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ if l1 > l2 then iTrue else iFalse
+        primopt (Operator "<" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ if l1 < l2 then iTrue else iFalse
+        -- compare of equals
+        primopt (Operator "==" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return iTrue
+        primopt (Operator ">=" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return iTrue
+        primopt (Operator "<=" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return iTrue
+        primopt (Operator ">" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return iFalse
+        primopt (Operator "<" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return iFalse
+        -- x + 0 = x
+        primopt (Operator "+" [ta,tb] tr) [e1,(ELit (LitInt 0 t))] rt  = return $ e1
+        primopt (Operator "+" [ta,tb] tr) [(ELit (LitInt 0 t)),e1] rt  = return $ e1
+        -- x * 0 = 0
+        primopt (Operator "*" [ta,tb] tr) [_,(ELit (LitInt 0 t))] rt  = return $ (ELit (LitInt 0 t))
+        primopt (Operator "*" [ta,tb] tr) [(ELit (LitInt 0 t)),_] rt  = return $ (ELit (LitInt 0 t))
+        -- x * 1 = x
+        primopt (Operator "*" [ta,tb] tr) [e1,(ELit (LitInt 1 t))] rt  = return $ e1
+        primopt (Operator "*" [ta,tb] tr) [(ELit (LitInt 1 t)),e1] rt  = return $ e1
+        -- x / 1 = x
+        primopt (Operator "/" [ta,tb] tr) [e1,(ELit (LitInt 1 t))] rt  = return $ e1
+        -- x / x = 1  - check for 0 / 0
+        --primopt (Operator "/" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return $ (ELit (LitInt 1 rt))
+        -- 0 / x = 0  - check for 0 / 0
+        --primopt (Operator "/" [ta,tb] tr) [(ELit (LitInt 0 t)),_] rt  = return $ (ELit (LitInt 0 t))
+        -- x - 0 = x
+        primopt (Operator "-" [ta,tb] tr) [e1,(ELit (LitInt 0 t))] rt  = return $ e1
+        -- 0 - x = -x
+        primopt (Operator "-" [ta,tb] tr) [(ELit (LitInt 0 t)),e1] rt  = return $ EPrim (APrim (Operator "-" [ta] tr) mempty) [e1] rt
+        -- x << 0 = x, x >> 0 = x
+        primopt (Operator "<<" [ta,tb] tr) [e1,(ELit (LitInt 0 t))] rt  = return $ e1
+        primopt (Operator ">>" [ta,tb] tr) [e1,(ELit (LitInt 0 t))] rt  = return $ e1
+        -- x % 1 = 0
+        primopt (Operator "%" [ta,tb] tr) [e1,(ELit (LitInt 1 t))] rt  = return $ (ELit (LitInt 0 rt))
+        -- x % x = 0 - check for 0 % 0
+        --primopt (Operator "%" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return $ (ELit (LitInt 0 rt))
+        -- 0 % x = 0 - check for 0 % 0
+        --primopt (Operator "%" [ta,tb] tr) [(ELit (LitInt 0 t)),_] rt  = return $ (ELit (LitInt 0 t))
+        -- eq to case
+        primopt (Operator "==" [ta,tb] tr) [e,(ELit (LitInt x t))] rt | isIntegral t  = return $ eCase e [Alt (LitInt x t) iTrue ] iFalse
+        primopt (Operator "==" [ta,tb] tr) [(ELit (LitInt x t)),e] rt | isIntegral t = return $ eCase e [Alt (LitInt x t) iTrue ] iFalse
+        -- negate of literal
         primopt (Operator "-" [ta] tr) [ELit (LitInt x t)] rt | ta == tr && rt == t = return $ ELit (LitInt (negate x) t)
+        -- various primitives
         primopt (PrimPrim "exitFailure__") [w] rt  = return $ EError "" rt
         primopt (PrimPrim "newRef__") [x,y] rt  = return $ EAp (EAp (ELam x' $ ELam y' $ eCaseTup' (EPrim (primPrim "newRef_") [EVar x',EVar y'] (ltTuple' [a,b])) [a',b'] (eTuple [EVar a',EVar b']) ) x) y where
             [x',y',a',b'] = vars [getType x,getType y,a,b]
