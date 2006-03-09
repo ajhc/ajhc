@@ -22,7 +22,7 @@ aa, negate, Prelude.Num, -
 aaa, .&., Data.Bits.Bits, &
 aaa, .|., Data.Bits.Bits, |
 aaa, xor, Data.Bits.Bits, ^
-aa, complement, Data.Bits,Bits, ~
+aa, complement, Data.Bits.Bits, ~
 aaa, quot, Prelude.Integral, /
 aaa, rem, Prelude.Integral, %
 aaa, div, Prelude.Integral, /
