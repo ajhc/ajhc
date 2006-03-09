@@ -362,7 +362,7 @@ applyCoersion ct e = etaReduce `liftM` f ct e where
 
 -- | return primitive instances associated with class given as argument
 primitiveInstances :: Name -> [(Name,TVr,E)]
-primitiveInstances name = [(n,setProperties [prop_INSTANCE] $ tVr (toId n) (getType v),v) | (cn,n,v) <- constantMethods, cn == name]
+primitiveInstances name = [(n,setProperties [prop_INSTANCE,prop_INLINE] $ tVr (toId n) (getType v),v) | (cn,n,v) <- constantMethods, cn == name]
 
 convertDecls :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
 convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalRWST ans ceEnv 2 where
