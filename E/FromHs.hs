@@ -26,6 +26,7 @@ import Boolean.Algebra
 import Class
 import C.Prims as CP
 import DataConstructors
+import PrimitiveOperators
 import Doc.DocLike
 import Doc.PPrint
 import E.E
@@ -359,6 +360,9 @@ applyCoersion ct e = etaReduce `liftM` f ct e where
         fgy <- f ct (EAp e (EVar y))
         return (eLam y fgy)
 
+-- | return primitive instances associated with class given as argument
+primitiveInstances :: Name -> [(Name,TVr,E)]
+primitiveInstances name = [(n,setProperties [prop_INSTANCE] $ tVr (toId n) (getType v),v) | (cn,n,v) <- constantMethods, cn == name]
 
 convertDecls :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
 convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalRWST ans ceEnv 2 where
@@ -562,7 +566,8 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
 
     cClassDecl (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon name) _)) decls) = do
         let ds = map simplifyDecl decls
-            cr = findClassRecord classHierarchy (toName ClassName name)
+            cr = findClassRecord classHierarchy className
+            className = (toName ClassName name)
             method n = do
                 let defaultName = defaultInstanceName n
                     (TVr { tvrType = ty}) = tv (nameName n)
@@ -575,8 +580,9 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
                     (ft',as) = fromPi t
                     (args,rargs) = span (sortStarLike . getType) as
                     ft = foldr EPi ft' rargs
-        mthds <- mconcatMapM method  [  n | n :>: _ <- classAssumps cr]
-        return (cClass cr ++ mthds)
+        --mthds <- mconcatMapM method  [  n | n :>: _ <- classAssumps cr]
+        let mthds = []
+        return (cClass cr ++ mthds ++ primitiveInstances className)
     cClassDecl _ = error "cClassDecl"
 
 -- | determine what arguments must be passed to something of the first type, to transform it into something of the second type.

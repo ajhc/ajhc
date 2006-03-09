@@ -33,6 +33,7 @@ import DataConstructors
 import Directory
 import Doc.DocLike
 import Doc.PPrint
+import Name.Name(Name())
 import Doc.Pretty
 import E.E
 import E.Inline(emapE)
@@ -425,10 +426,8 @@ hoToProgram ho = programSetDs (Map.elems $ hoEs ho) program {
     }
 
 
-initialHo = mempty { hoEs = es , hoClassHierarchy = ch, hoDataTable = dataTablePrims  }  where
-    ch = foldl addOneInstanceToHierarchy mempty (map ((,) False) primitiveInsts)
-    es = Map.fromList [  (n,(setProperties [prop_INSTANCE] $ tVr (atomIndex $ toAtom n) (getType v),v)) |  (n,v) <- constantMethods ] `mappend` es'
-    --es' = Map.fromList [ (n,(tVr (atomIndex $ toAtom n) (getType v),v)) | (n,t,p,d) <- theMethods, let v = f n t p d  ]
-    es' = Map.fromList [ (n,(setProperty prop_INSTANCE $ tVr (atomIndex $ toAtom n) (error "f no longer relevant"),v)) | (n,t,p,d) <- theMethods, let v = f n t p d  ]
-    f _ _ _ _ = error "f no longer relevant"
+
+initialHo = mempty { hoEs = mempty , hoClassHierarchy = mempty, hoDataTable = dataTablePrims  }  where
+    --ch = foldl addOneInstanceToHierarchy mempty (map ((,) False) primitiveInsts)
+    --es = Map.fromList [  (n,(setProperties [prop_INSTANCE] $ tVr (atomIndex $ toAtom n) (getType v),v)) |  (n,v) <- constantMethods ]
 

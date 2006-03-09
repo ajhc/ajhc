@@ -84,6 +84,7 @@ import Type
 import TypeUtils
 import Util.HasSize
 import Util.Inst()
+import PrimitiveOperators(primitiveInsts)
 
 --------------------------------------------------------------------------------
 
@@ -500,6 +501,13 @@ instanceToTopDecls kt classHierarchy decl@HsDataDecl {} =
      (makeDerivation kt classHierarchy (hsDeclName decl) (hsDeclArgs decl) (hsDeclCons decl)) (map (toName ClassName) $ hsDeclDerives decl)
 instanceToTopDecls kt classHierarchy decl@HsNewTypeDecl {} =
     (makeDerivation kt classHierarchy (hsDeclName decl) (hsDeclArgs decl) [(hsDeclCon decl)]) (map (toName ClassName) $ hsDeclDerives decl)
+instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsClassDecl _ qualType methods)
+   = unzip $ map (defaultMethodToTopDecls kt methodSigs qualType) $ methodGroups where
+   HsQualType _ (HsTyApp (HsTyCon className) _) = qualType
+   methodGroups = groupEquations (filter (\x -> isHsPatBind x || isHsFunBind x)  methods)
+   methodSigs = case Map.lookup (toName ClassName className) classHierarchy  of
+           Nothing -> error $ "defaultInstanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
+           Just sigs -> classAssumps sigs
 
 
 instanceToTopDecls _ _ _ = mempty
@@ -535,8 +543,19 @@ methodToTopDecls kt methodSigs (HsQualType cntxt classApp) (methodName, methodDe
     --instantiatedSig = newMethodSig' (kiHsQualTypePredPred kt qt) cntxt sigFromClass argType
     instantiatedSig = newMethodSig' kt methodName cntxt sigFromClass argType
      --  = newMethodSig cntxt newMethodName sigFromClass argType
-    renamedMethodDecls
-       = renameOneDecl newMethodName methodDecls
+    renamedMethodDecls = renameOneDecl newMethodName methodDecls
+
+defaultMethodToTopDecls :: KindEnv -> [Assump] -> HsQualType -> (Name, HsDecl) -> (HsDecl,Assump)
+
+defaultMethodToTopDecls kt methodSigs (HsQualType cntxt classApp) (methodName, methodDecls)
+   = (renamedMethodDecls,newMethodName :>: sigFromClass) where
+    (HsTyApp (HsTyCon className) _) = classApp
+    newMethodName = defaultInstanceName methodName
+    sigFromClass = case [ s | n :>: s <- methodSigs, n == methodName] of
+        [x] -> x
+        _ -> error $ "sigFromClass: " ++ show methodSigs ++ " " ++ show  methodName
+     --  = newMethodSig cntxt newMethodName sigFromClass argType
+    renamedMethodDecls = renameOneDecl newMethodName methodDecls
 
 renameOneDecl :: Name -> HsDecl -> HsDecl
 renameOneDecl newName (HsFunBind matches)
@@ -740,7 +759,8 @@ makeClassHierarchy (ClassHierarchy ch) kt ds = return (ClassHierarchy ans) where
         | HsTyApp (HsTyCon className) (HsTyVar argName)  <- tbody = do
             let qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
                 newClassContext = hsContextToContext [(className, argName)]
-            tell [ClassRecord { className = toName ClassName className, classSrcLoc = sl, classSupers = map fst $ hsContextToContext cntxt, classInsts = [], classDerives = [], classAssumps = qualifiedMethodAssumps }]
+            tell [ClassRecord { className = toName ClassName className, classSrcLoc = sl, classSupers = map fst $ hsContextToContext cntxt, classInsts = [ i | i@(_ :=> IsIn n _) <- primitiveInsts, nameName n == className], classDerives = [], classAssumps = qualifiedMethodAssumps }]
+
         | otherwise = failSl sl "Invalid Class declaration."
         where
         HsQualType cntxt tbody = toHsQualType t

@@ -124,38 +124,37 @@ foreach my $d (@ds) {
     #my $t =  "(ELit (LitCons $nn [] eStar) )";
     my $tycon = tycon($d->[0]);
     my $cncons = dcon($d->[0]);
-    #push @inst, "[] :=> IsIn (toHsName \"Prelude.Bounded\") (TCon \$ Tycon (toHsName \"$d->[0]\") Star)\n" unless $seen{'Prelude.Bounded',$d->[0]}++;
-    #push @inst, "[] :=> IsIn (toHsName \"Foreign.Storable.Storable\") (TCon \$ Tycon (toHsName \"$d->[0]\") Star)\n";
     my $prelude_bounded = hsname("Prelude.Bounded");
     my $foreign_storable = hsname("Foreign.Storable.Storable");
+    my $c_num = hsname("Prelude.Num");
     push @inst, "[] :=> IsIn $prelude_bounded $tycon";
     push @inst, "[] :=> IsIn $foreign_storable $tycon";
-    push @cmeth, "(toInstName \"Foreign.Storable.sizeOf.$d->[0]\", ELam (tVr 0 $t) \$ " . const("sizeof($d->[1])","tInt") . ")";
-    push @cmeth, "(toInstName \"Foreign.Storable.poke.$d->[0]\", buildPoke $cncons $t \"$d->[1]\")";
-    push @cmeth, "(toInstName \"Foreign.Storable.peek.$d->[0]\", buildPeek $cncons $t \"$d->[1]\")";
-    push @cmeth, "(toInstName \"Prelude.maxBound.$d->[0]\", " . const($d->[3],$t,"\"$d->[1]\"") . ")";
-    push @cmeth, "(toInstName \"Prelude.minBound.$d->[0]\", " . const($d->[4],$t,"\"$d->[1]\"") . ")";
+    push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.sizeOf.$d->[0]\", ELam (tVr 0 $t) \$ " . const("sizeof($d->[1])","tInt") . ")";
+    push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.poke.$d->[0]\", buildPoke $cncons $t \"$d->[1]\")";
+    push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.peek.$d->[0]\", buildPeek $cncons $t \"$d->[1]\")";
+    push @cmeth, "($prelude_bounded, toInstName \"Prelude.maxBound.$d->[0]\", " . const($d->[3],$t,"\"$d->[1]\"") . ")";
+    push @cmeth, "($prelude_bounded, toInstName \"Prelude.minBound.$d->[0]\", " . const($d->[4],$t,"\"$d->[1]\"") . ")";
     my $ivar = "(tVr 2 tInt)";
     my $ivart = "(tVr 2 tInteger)";
     my $tvar = "(tVr 2 $t)";
     if ($d->[0] eq "Prelude.Int") {
-        push @cmeth, "(toInstName \"Prelude.fromInt.$d->[0]\", ELam $ivar (EVar $ivar))";
-        push @cmeth, "(toInstName \"Prelude.toInt.$d->[0]\", ELam $ivar (EVar $ivar))";
+        push @cmeth, "($c_num, toInstName \"Prelude.fromInt.$d->[0]\", ELam $ivar (EVar $ivar))";
+        push @cmeth, "($c_num, toInstName \"Prelude.toInt.$d->[0]\", ELam $ivar (EVar $ivar))";
     } else {
-        push @cmeth, "(toInstName \"Prelude.fromInt.$d->[0]\", ELam $ivar (prim_integralCast (EVar $ivar) $t))";
-        push @cmeth, "(toInstName \"Prelude.toInt.$d->[0]\", ELam $tvar (prim_integralCast (EVar $tvar) tInt))" if $d->[2] =~ /int/ ;
+        push @cmeth, "($c_num, toInstName \"Prelude.fromInt.$d->[0]\", ELam $ivar (prim_integralCast (EVar $ivar) $t))";
+        push @cmeth, "($c_num, toInstName \"Prelude.toInt.$d->[0]\", ELam $tvar (prim_integralCast (EVar $tvar) tInt))" if $d->[2] =~ /int/ ;
     }
     if ($d->[0] eq "Prelude.Integer") {
-        push @cmeth, "(toInstName \"Prelude.fromInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
-        push @cmeth, "(toInstName \"Prelude.toInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
+        push @cmeth, "($c_num, toInstName \"Prelude.fromInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
+        push @cmeth, "($c_num, toInstName \"Prelude.toInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
     } else {
-        push @cmeth, "(toInstName \"Prelude.fromInteger.$d->[0]\", ELam $ivart (prim_integralCast (EVar $ivart) $t))";
-        push @cmeth, "(toInstName \"Prelude.toInteger.$d->[0]\", ELam $tvar (prim_integralCast (EVar $tvar) tInteger))" if $d->[2] =~ /int/ ;
+        push @cmeth, "($c_num, toInstName \"Prelude.fromInteger.$d->[0]\", ELam $ivart (prim_integralCast (EVar $ivart) $t))";
+        push @cmeth, "($c_num, toInstName \"Prelude.toInteger.$d->[0]\", ELam $tvar (prim_integralCast (EVar $tvar) tInteger))" if $d->[2] =~ /int/ ;
     }
     #push @cmeth, "(toInstName \"Prelude.abs.$d->[0]\", ELam $tvar (buildAbs $tvar $t))" if $d->[2] =~ /int/ ;
-    push @cmeth, "(toInstName \"Prelude.abs.$d->[0]\", ELam $tvar (build_abs \"$d->[1]\" $cncons (EVar $tvar)  ))" if $d->[2] =~ /int/ ;
+    push @cmeth, "($c_num, toInstName \"Prelude.abs.$d->[0]\", ELam $tvar (build_abs \"$d->[1]\" $cncons (EVar $tvar)  ))" if $d->[2] =~ /int/ ;
     #push @cmeth, "(toInstName \"Prelude.signum.$d->[0]\", ELam $tvar (buildSignum $tvar $t))" if $d->[2] =~ /int/ ;
-    push @cmeth, "(toInstName \"Prelude.signum.$d->[0]\", ELam $tvar (build_signum \"$d->[1]\" $cncons (EVar $tvar) ))" if $d->[2] =~ /int/ ;
+    push @cmeth, "($c_num, toInstName \"Prelude.signum.$d->[0]\", ELam $tvar (build_signum \"$d->[1]\" $cncons (EVar $tvar) ))" if $d->[2] =~ /int/ ;
     push @names, "(\"$d->[0]\", \"$d->[1]\", \"$d->[2]\")\n";
     foreach my $c (@cs) {
         my $tycon = tycon($d->[0]);
@@ -165,9 +164,9 @@ foreach my $d (@ds) {
         my $x = $c->[2];
         $x =~ s/^([\w.]+\.).*$/$1/;
         if ($c->[0] =~ /^a[aI][aIB]?$/) {
-        push @cmeth, "(toInstName \"$x$c->[1].$d->[0]\", op_$c->[0]  \"$c->[3]\" \"$d->[1]\" $cncons $t)";
+        push @cmeth, "($nn,toInstName \"$x$c->[1].$d->[0]\", op_$c->[0]  \"$c->[3]\" \"$d->[1]\" $cncons $t)";
         } else {
-        push @meth, "(toInstName \"$x$c->[1].$d->[0]\", \"$c->[0]\", \"prim_op_$c->[0].$c->[3]\", \"$d->[0]\")";
+        push @meth, "($nn,toInstName \"$x$c->[1].$d->[0]\", \"$c->[0]\", \"prim_op_$c->[0].$c->[3]\", \"$d->[0]\")";
     }
     }
 }
