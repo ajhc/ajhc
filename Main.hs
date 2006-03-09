@@ -203,7 +203,8 @@ processDecls stats ho ho' tiData = do
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
     ds <- convertDecls tiData (hoClassHierarchy ho') allAssumps  fullDataTable decls
-    mapM_ (\(_,v,lc) -> printCheckName'' fullDataTable v lc) ds
+    wdump FD.InitialCore $
+        mapM_ (\(_,v,lc) -> printCheckName'' fullDataTable v lc) ds
 
     -- Build rules
     rules' <- createInstanceRules (hoClassHierarchy ho')   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
@@ -227,8 +228,8 @@ processDecls stats ho ho' tiData = do
         v <- return $ v { tvrInfo = Info.insert LetBound nfo }
         let used' = collectIds lc
         return ((n, shouldBeExported (getExports ho') v,lc):ds,usedIds `mappend` used')
+    Stats.clear stats
     (ds,_allIds) <- foldM procE ([],hoUsedIds ho) ds
-
     Stats.print "PostProcess" stats
     Stats.clear stats
 

@@ -31,6 +31,7 @@ tyvar show original tyvars rather than renaming them.
 
 
 !Intermediate code
+initial-core show core right after E.FromHs conversion
 lambdacube show intermediate lambda cube code
 lambdacube-before-lift show intermediate lambda cube code just before lambda lifting
 pass show optimization passes over intermediate code
