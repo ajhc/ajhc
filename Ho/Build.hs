@@ -34,6 +34,7 @@ import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.E
+import E.Show
 import E.Traverse(emapE)
 import E.Program
 import E.Rules
@@ -219,8 +220,15 @@ dumpHoFile fn = do
     wdump FD.Types $ do
         putStrLn " ---- the types of identifiers ---- "
         putStrLn $ PPrint.render $ pprint (hoAssumps ho)
+    wdump FD.Lambdacube $ do
+        putStrLn " ---- lambdacube  ---- "
+        mapM_ (\ (v,lc) -> printCheckName'' (hoDataTable ho) v lc) (Map.elems $ hoEs ho)
 
 
+printCheckName'' :: DataTable -> TVr -> E -> IO ()
+printCheckName'' _dataTable tvr e = do
+    putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pprint (tvrType tvr)))
+    putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
 
 --recordHoFile :: Ho -> [(HsModule,FileDep,String,[FileDep])] -> [FileDep] -> IO [FileDep]
 
