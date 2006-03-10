@@ -41,7 +41,8 @@ LIBRARYPATH="$(PREFIX)/lib/jhc-$(JHC_VERSION)"
 DP=$(PREFIX)
 
 base-1.0.hl: jhc lib/base/base.cabal
-	./jhc -v -ilib/base --noauto --build-hl lib/base/base.cabal -o base-1.0.hl
+	-[ -e base.log ] && mv -f base.log base.log.bak
+	./jhc -v $(JHC_TEST) -ilib/base --noauto --build-hl lib/base/base.cabal -o base-1.0.hl 2>&1 | tee base.log
 
 install: jhc base-1.0.hl
 	install -d "$(DP)/bin"
