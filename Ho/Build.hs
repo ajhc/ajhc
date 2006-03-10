@@ -5,8 +5,7 @@ module Ho.Build (
     hoToProgram,
     initialHo,
     recordHoFile,
-    checkForHoFile,
-    checkForHoModule
+    checkForHoFile
     ) where
 
 
@@ -33,7 +32,6 @@ import DataConstructors
 import Directory
 import Doc.DocLike
 import Doc.PPrint
-import Name.Name(Name())
 import Doc.Pretty
 import E.E
 import E.Traverse(emapE)
@@ -48,14 +46,11 @@ import FrontEnd.Unlit
 import GenUtil hiding(putErrLn,putErr,putErrDie)
 import Ho.Type
 import HsSyn
-import Info.Types
 import MapBinaryInstance()
 import Options
 import PackedString
-import PrimitiveOperators
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
-import Support.CanType
 import Util.FilterInput
 import Warning
 
@@ -111,7 +106,7 @@ findModule :: Ho                                 -- ^ code loaded from libraries
               -> IO Ho                           -- ^ Final accumulated ho
 findModule lhave have (Left m) ifunc _
     | m `Map.member` (hoExports have) = return have
-    | m `Map.member` (hoExports lhave) = return mempty
+    | m `Map.member` (hoExports lhave) = return have
 findModule lhave have need ifunc func  = do
     let f (Left (Module m)) = (m,searchPaths m)
         f (Right n) = (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
@@ -139,11 +134,13 @@ findModule lhave have need ifunc func  = do
     ho <- ifunc ho
     f ho scc
 
+{-
 checkForHoModule :: Module -> IO (Maybe (HoHeader,Ho))
 checkForHoModule (Module m) = loop $ map snd $ searchPaths m
     where loop []     = return $ fail ("checkForHoModule: Module "++m++" not found.")
           loop (f:fs) = do e <- doesFileExist f
                            if e then checkForHoFile f else loop fs
+-}
 
 checkForHoFile :: String            -- ^ file name to check for
     -> IO (Maybe (HoHeader,Ho))
