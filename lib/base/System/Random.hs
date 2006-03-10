@@ -12,7 +12,7 @@ world..
 malcolm 2/00 - patched for nhc98
 -}
 
-module Random
+module System.Random
 	(
 	  RandomGen(next, split, genRange)
 	, StdGen
@@ -26,8 +26,7 @@ module Random
 	, newStdGen
 	) where
 
-import Char ( isSpace, chr, ord )
-
+import Data.Char ( isSpace, chr, ord )
 import Numeric
 import Foreign.Storable
 import Foreign.Ptr

@@ -1,4 +1,4 @@
-module Locale where
+module System.Locale where
 
 data TimeLocale = TimeLocale {
         wDays  :: [(String, String)],   -- full and abbreviated week days

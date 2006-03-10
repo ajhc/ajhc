@@ -1,4 +1,4 @@
-module Complex(
+module Data.Complex(
     Complex((:+)),
     realPart,
     imagPart,

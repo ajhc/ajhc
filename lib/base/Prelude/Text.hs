@@ -11,8 +11,8 @@ module Prelude.Text (
 import Prelude
 
 
-import Char(isSpace, isAlpha, isDigit, isAlphaNum,
-            showLitChar, readLitChar, lexLitChar)
+import Data.Char(isSpace, isAlpha, isDigit, isAlphaNum,
+                 showLitChar, readLitChar, lexLitChar)
 
 import Numeric(showSigned, showInt, readSigned, readDec, showFloat,
                readFloat, lexDigits)

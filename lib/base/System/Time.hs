@@ -14,12 +14,12 @@ module Time (
     formatCalendarTime
     ) where
 
-import Ix
-import Locale
-import System.IO.Unsafe
-import Foreign.Ptr
-import Char
+import Data.Char
+import Data.Ix
 import Foreign.C.Types
+import Foreign.Ptr
+import System.Locale
+import System.IO.Unsafe
 
 data ClockTime = TOD Integer Integer -- Implementation-dependent
     deriving(Eq,Ord)

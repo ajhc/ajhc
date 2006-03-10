@@ -9,7 +9,7 @@ import Prelude
 import Prelude.Text
 import Prelude.IOError
 import Jhc.IO
-import Char
+import Data.Char
 import Foreign.C.Types
 import Foreign.C.String
 import Foreign.Ptr

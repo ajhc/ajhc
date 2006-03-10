@@ -1,6 +1,6 @@
 -- Standard functions on rational numbers
 
-module  Ratio (
+module  Data.Ratio (
     Ratio, Rational, (%), numerator, denominator, approxRational ) where
 
 import Prelude.Text

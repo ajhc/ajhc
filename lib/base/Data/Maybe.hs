@@ -1,5 +1,5 @@
 
-module Maybe(
+module Data.Maybe(
     isJust, isNothing,
     fromJust, fromMaybe, listToMaybe, maybeToList,
     catMaybes, mapMaybe,

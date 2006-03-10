@@ -17,8 +17,8 @@ import Prelude.IO
 import Prelude.IOError
 import Prelude.Text
 import Prelude.Float
-import Ratio
-import qualified Char(isSpace,ord,chr)
+import Data.Ratio
+import qualified Data.Char as Char(isSpace,ord,chr)
 import Jhc.IO
 import Jhc.Tuples
 

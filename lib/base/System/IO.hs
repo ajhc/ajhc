@@ -1,4 +1,4 @@
-module IO(
+module System.IO(
     Handle,
     IOMode(..),
     BufferMode(..),
@@ -7,7 +7,7 @@ module IO(
     hPutStr,
     hPutStrLn,
     hPrint,
-    try,bracket,bracket_,hFlush,stdin,stdout,stderr,
+    try,hFlush,stdin,stdout,stderr,
     hGetContents,
     hClose,
     openFile,
@@ -33,7 +33,7 @@ import Prelude.IOError
 import Foreign.Ptr
 import Foreign.Storable
 import Foreign.C.Types
-import Char(ord)
+import Data.Char(ord)
 
 
 data BufferMode = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
@@ -47,26 +47,6 @@ try            :: IO a -> IO (Either IOError a)
 try f          =  catch (do r <- f
                             return (Right r))
                         (return . Left)
-
-bracket        :: IO a -> (a -> IO b) -> (a -> IO c) -> IO c
-bracket before after m = do
-        x  <- before
-        rs <- try (m x)
-        after x
-        case rs of
-           Right r -> return r
-           Left  e -> ioError e
-
--- variant of the above where middle computation doesn't want x
-bracket_        :: IO a -> (a -> IO b) -> IO c -> IO c
-bracket_ before after m = do
-         x  <- before
-         rs <- try m
-         after x
-         case rs of
-            Right r -> return r
-            Left  e -> ioError e
-
 
 
 

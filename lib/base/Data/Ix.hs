@@ -1,4 +1,4 @@
-module Ix ( Ix(range, index, inRange, rangeSize) ) where
+module Data.Ix ( Ix(range, index, inRange, rangeSize) ) where
 
 
 class  Ord a => Ix a  where

@@ -92,9 +92,9 @@ import Foreign.C.Types
 import Foreign.Ptr
 import Foreign.Storable
 
+import Data.Char ( chr, ord )
 import Data.Word
 
-import Char ( chr, ord )
 
 -----------------------------------------------------------------------------
 -- Strings

@@ -7,8 +7,8 @@ module Numeric(fromRat,
                showEFloat, showFFloat, showGFloat, showFloat,
                readFloat, lexDigits) where
 
-import Char   ( isDigit, isOctDigit, isHexDigit
-              , digitToInt, intToDigit )
+import Data.Char   ( isDigit, isOctDigit, isHexDigit
+                   , digitToInt, intToDigit )
 --import Ratio  ( (%), numerator, denominator )
 --import Array  ( (!), Array, array )
 import Prelude.Text

@@ -1,6 +1,6 @@
 module Prelude.Float() where
 
-import Ratio
+import Data.Ratio
 import Foreign.C.Types
 import Foreign.Ptr
 import Foreign.Marshal.Alloc
