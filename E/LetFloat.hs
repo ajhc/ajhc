@@ -1,5 +1,6 @@
 module E.LetFloat(
-    atomizeApps,
+--    atomizeApps,
+    atomizeAp,
     coalesceLets,
     annotateBindings,
     floatInward
@@ -13,22 +14,28 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom
+import DataConstructors
+import Doc.PPrint
 import E.E
 import E.Inline
 import E.Rules
 import E.Traverse
 import E.Values
-import Support.FreeVars
-import Options
 import GenUtil
+import Name.Name
+import Options
+import qualified CharIO as C
 import qualified Util.Graph as G
 import Stats
+import Support.CanType
+import Support.FreeVars
+import Util.UniqueMonad
 
 
 
 doLetRec stats [] e = return e
 doLetRec stats ds _ | flint && hasRepeatUnder fst ds = error "doLetRec: repeated variables!"
-doLetRec stats ds e = return $ substLet ds e
+doLetRec stats ds e = return $ ELetRec ds e
 
 varElim :: Stats -> Int -> IO ()
 varElim stats n = do
@@ -36,10 +43,11 @@ varElim stats n = do
 
 atomizeApps :: Set.Set Id -> Stats -> E -> IO E
 atomizeApps usedIds stats e = liftM fst $ traverse travOptions { pruneRecord = varElim stats } f mempty (Map.fromAscList [ (i,NotKnown) | i <- Set.toAscList usedIds ]) e where
-    --f 0 (EPi (TVr Nothing t) b,[])  = do
-    --    (t',ds1) <- at t
-    --    (b',ds2) <- at b
-    --    doLetRec stats
+    f 0 (ep@(EPi tvr@TVr {tvrIdent = i, tvrType = t} b),[]) | i == 0 || i `notElem` freeVars b = do
+        (t',ds1) <- at t
+        (b',ds2) <- at b
+        liftIO $ C.putStrLn $ "atomizeApps: " ++ pprint ep
+        doLetRec stats (ds1 ++ ds2) (EPi tvr { tvrIdent = 0, tvrType = t'} b')
     f 0 (EPrim n xs t,[]) = do
         (xs',dss) <- fmap unzip (mapM at xs)
         doLetRec stats (concat dss) (EPrim n xs' t)
@@ -51,12 +59,71 @@ atomizeApps usedIds stats e = liftM fst $ traverse travOptions { pruneRecord = v
         (xs',dss) <- fmap unzip (mapM at xs)
         doLetRec stats (concat dss) (foldl EAp x xs')
     f _ _ = error "LetFloat: odd f"
+    at (ELetRec ds e) = do
+        (x,xs) <- at e
+        return (x,ds ++ xs)
     at e | not (isAtomic e) = do
+        liftIO $ C.putStrLn $ "at: " ++ pprint e
         e <- f 0 (e,[])
         lift $ tick stats (toAtom "E.LetFloat.atomizeApps")
-        nb@(tvr,_) <- newBinding e
-        return (EVar tvr,[nb])
+        case e of
+            ELetRec ds e -> do
+                nb@(tvr,_) <- newBinding e
+                return (EVar tvr,nb:ds)
+            e -> do
+                nb@(tvr,_) <- newBinding e
+                return (EVar tvr,[nb])
+
     at e = return (e,[])
+
+atomizeAp :: DataTable -> Stats -> E -> IO E
+atomizeAp dataTable stats e = f e  where
+    f :: E -> IO E
+    f e = do
+        (x,ds) <- g e
+        ds' <- sequence [  f y >>= return . (,) x | (x,y) <- ds ]
+        doLetRec stats ds' x
+    g,h :: E -> IO (E,[(TVr,E)])
+    g (ELetRec ds e) = do
+        e' <- f e
+        return (e',ds)
+    g (ELam tvr e) = do
+        e' <- f e
+        return (ELam tvr e',[])
+    g (ELit (LitCons n xs t)) = do
+        (xs',dss) <- fmap unzip (mapM h xs)
+        return (ELit (LitCons n xs' t), concat dss)
+    g e@ELit {} = return (e,[])
+    g e@EError {} = return (e,[])
+    g ep@(EPi tvr@TVr {tvrIdent = i, tvrType = t} b) | i == 0 || i `notElem` freeVars b  = do
+        ([t',b'],dss) <- fmap unzip (mapM h [t,b])
+        return (EPi tvr { tvrIdent = 0, tvrType = t' } b', concat dss)
+    g (EPrim n xs t) = do
+        (xs',dss) <- fmap unzip (mapM h xs)
+        return (EPrim n xs' t, concat dss)
+    g ec@ECase { eCaseScrutinee = e } = do
+        ec' <- caseBodiesMapM f ec
+        e' <- f e
+        return (ec' { eCaseScrutinee = e' },[])
+    g e = case fromAp e of
+        (EVar x,xs) -> do
+            (xs',dss) <- fmap unzip (mapM h xs)
+            return (foldl EAp (EVar x) xs', concat dss)
+        (x,xs@(_:_)) -> do
+            (x',ds) <- g x
+            (xs',dss) <- fmap unzip (mapM h xs)
+            return (foldl EAp x' xs', concat (ds:dss))
+    h e | isAtomic e = return (e,[])
+    h (ELetRec ds e) = do
+        (e',ds') <- h e
+        return (e',ds' ++ ds)
+    h e = do
+        tick stats (toAtom "E.LetFloat.atomizeAp")
+        u <- newUniq
+        let n = toName Val ("A@",'v':show u)
+            tv = tvr { tvrIdent = toId n, tvrType = infertype dataTable e }
+        C.putStrLn $ show n ++ " = " ++ pprint e
+        return (EVar tv,[(tv,e)])
 
 doCoalesce :: Stats -> (E,[E]) -> IO (E,[E])
 doCoalesce stats (x,xs) = ans where

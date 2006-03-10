@@ -252,7 +252,7 @@ processDecls stats ho ho' tiData = do
         when (dump FD.Lambdacube || dump FD.Pass) $ putErrLn ("----\n" ++ pprint names)
         cds <- annotateDs annmap (idann allRules mempty) letann lamann [ (t,e) | (t,e) <- ns]
         --putStrLn "*** After annotate"
-        --wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
+        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
         let cm stats e = do
             let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
             let (stat, e'') = SS.simplifyE sopt e
@@ -265,6 +265,7 @@ processDecls stats ho ho' tiData = do
             lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             return (v,lc)
+        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
         cds <- E.Strictness.solveDs cds
         cds <- flip mapM cds $ \ (v,lc) -> do
             lc <- doopt mangle False stats "SuperSimplify" cm lc
@@ -365,7 +366,7 @@ postProcessE stats n inscope usedIds dataTable lc = do
     --lc <- mangle (return ()) False ("Absurdize") (return . substMap (Map.map g fvs)) lc
     --lc <- mangle (return ()) False "deNewtype" (return . deNewtype dataTable) lc
     --lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
-    lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeApps usedIds stats x >>= coalesceLets stats)  lc
+    lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeAp dataTable stats x >>= coalesceLets stats)  lc
     return lc
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
@@ -492,7 +493,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     finalStats <- Stats.new
     prog <- lambdaLift finalStats prog
 
-    lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeApps mempty finalStats x >>= coalesceLets finalStats)  (programE prog)
+    lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeAp dataTable finalStats x >>= coalesceLets finalStats)  (programE prog)
     prog <- return $ programSetE lc prog
 
 

@@ -513,8 +513,9 @@ simplifyDs sopts dsIn = (stat,dsOut) where
 
 
 
-someBenefit _ _ = True
+someBenefit _ _ = False
 
+multiInline x xs | not (someBenefit x xs) = False
 multiInline e xs = length xs + 2 >= (nsize + if safeToDup b then negate 4 else 0)  where
     (b,as) = fromLam e
     nsize = size b + abs (length as - length xs)

@@ -32,7 +32,7 @@ import Doc.PPrint
 import E.E
 import E.Eval(eval)
 import E.Eta
-import E.LetFloat(atomizeApps)
+import E.LetFloat(atomizeAp)
 import E.Program
 import E.Rules
 import E.Subst
@@ -320,7 +320,7 @@ convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM f hsDe
             sma = substMap $ Map.fromList [ (x,EVar y)| (x,y) <- cs' ]
             cs' =  [ (x,(tvrType_u smt y))| (x,y) <- cs ]
             e2' = deNewtype dataTable $ smt $ sma e2
-        e2 <- atomizeApps mempty Stats.theStats e2'
+        e2 <- atomizeAp dataTable Stats.theStats e2'
         return [(hsDeclString pr,( snds (cs' ++ ts) ),eval $ smt $ sma e1,e2)]
     f _ = return []
 
