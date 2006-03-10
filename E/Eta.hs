@@ -1,4 +1,9 @@
-module E.Eta(etaExpand,etaExpandE,etaReduce) where
+module E.Eta(
+    etaExpand,
+    etaExpandE,
+    etaExpandAp,
+    etaReduce
+    ) where
 
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -72,6 +77,7 @@ etaExpandE dataTable e = f e where
         return (foldr ELam (foldl EAp e (map EVar tvrs)) tvrs)
     ee' e = return e
 
+-- | eta reduce as much as possible
 etaReduce :: E -> E
 etaReduce e = f e where
         f (ELam t (EAp x (EVar t'))) | t == t' && not (tvrNum t `Set.member` freeVars x) = f x
@@ -85,3 +91,18 @@ etaReduce' e = case f e 0 of
     where
         f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && not (tvrNum t `Set.member` freeVars x) = f x (n + 1)
         f e n = (e,n)
+
+
+etaExpandAp :: MonadStats m => DataTable -> TVr -> [E] -> m (Maybe E)
+etaExpandAp dataTable t as | Just (Arity n) <- Info.lookup (tvrInfo t), n > length as = do
+    let e = foldl EAp (EVar t) as
+    let (_,ts) = fromPi' dataTable (getType e)
+        ets = (take (n - length as) ts)
+    mticks (length ets) ("EtaExpand.{" ++ tvrShowName t)
+    let tvrs = f mempty [ (tvrIdent t,t { tvrIdent = n }) |  n <- [2,4 :: Int ..], not $ n `Set.member` freeVars (e,ets) | t <- ets ]
+        f map ((n,t):rs) = t { tvrType = substMap map (tvrType t)} : f (Map.insert n (EVar t) map) rs
+        f _ [] = []
+    return (Just $ foldr ELam (foldl EAp e (map EVar tvrs)) tvrs)
+etaExpandAp _ t as = return Nothing
+
+
