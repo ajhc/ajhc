@@ -5,7 +5,7 @@
 module E.Diff where
 
 import E.E
-import E.Inline
+import E.Traverse
 import Support.FreeVars
 import Stats
 

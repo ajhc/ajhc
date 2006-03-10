@@ -11,7 +11,7 @@ import E.E
 import E.Subst
 import E.Annotate
 import E.Program
-import E.Inline(emapE')
+import E.Traverse(emapE')
 import GenUtil hiding(replicateM_)
 import DataConstructors
 import Support.CanType

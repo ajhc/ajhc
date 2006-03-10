@@ -9,7 +9,7 @@ import Support.CanType
 import DataConstructors
 import E.CPR
 import E.E
-import E.Inline
+import E.Traverse
 import E.Strictness
 import E.TypeCheck()
 import E.Values

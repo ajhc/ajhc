@@ -36,7 +36,7 @@ import Doc.PPrint
 import Name.Name(Name())
 import Doc.Pretty
 import E.E
-import E.Inline(emapE)
+import E.Traverse(emapE)
 import E.Program
 import E.Rules
 import E.Subst(substMap'')

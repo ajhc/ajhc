@@ -13,7 +13,8 @@ import Boolean.Algebra
 import C.Prims
 import E.Annotate
 import E.E
-import E.Inline
+import E.Subst
+import E.Values
 import FindFixpoint
 import GenUtil
 import Info.Info as Info
@@ -136,7 +137,7 @@ collect e = ans where
         ds' <- mapM g ds
         fe <- f e
         fin (fsts ds)  $ andSA (fe:ds')
-    f e@(EAp a b)  = case runIdentity $ app (fromAp e) of
+    f e@(EAp a b)  = case app (fromAp e) of
             EAp a' b' | a == a' && b == b' -> error $ "Strictness.f: " ++ show e
             e -> f e
     f e = error $ "Strictness: " ++ show e
@@ -224,5 +225,20 @@ sor a b = if x == SOr a b then sor' b a else x where
     sor' a b = SOr a b
     --sor' (a `SOr` b) c = sor' a (sor' b c)
 
+
+
+app (e,[]) = e
+app (e,xs) = app' e xs
+
+app' (ELit (LitCons n xs t@EPi {})) (a:as)  = app (ELit (LitCons n (xs ++ [a]) (eAp t a)),as)
+app' (ELam tvr e) (a:as) = app (subst tvr a e,as)
+app' (EPi tvr e) (a:as) = app (subst tvr a e,as)
+app' ec@ECase {} xs = ec' { eCaseType = t } where
+    f e = app' e xs
+    ec' = runIdentity $ caseBodiesMapM (return . f) ec
+    t = foldl eAp (eCaseType ec') xs
+app' (ELetRec ds e) xs =eLetRec ds (app' e xs)
+app' (EError s t) xs = EError s (foldl eAp t xs)
+app' e as = foldl eAp e as
 
 

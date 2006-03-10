@@ -16,7 +16,7 @@ import Doc.PPrint
 import E.Annotate
 import E.E hiding(isBottom)
 import E.Subst
-import E.Inline(emapE',emapE_)
+import E.Traverse(emapE',emapE_)
 import E.Program
 import Support.FreeVars
 import E.Rules
