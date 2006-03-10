@@ -11,31 +11,32 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom
-import Support.CanType
-import DataConstructors
-import E.Annotate
 import C.Prims
-import E.E
+import DataConstructors
 import Doc.PPrint
+import E.Annotate
+import E.E
+import E.Eta
 import E.Inline
 import E.PrimOpt
 import E.Rules
 import E.Subst
 import E.TypeCheck
 import E.Values
-import Support.FreeVars
 import GenUtil
 import Info.Types
 import Name.Name
-import Util.NameMonad
+import Name.VConsts
 import Options
 import qualified E.Strictness as Strict
 import qualified FlagOpts as FO
 import qualified Info.Info as Info
 import qualified Util.Seq as Seq
 import Stats hiding(new,print,Stats)
+import Support.CanType
+import Support.FreeVars
 import Util.Graph
-import Name.VConsts
+import Util.NameMonad
 
 data Occurance =
     Unused        -- ^ unused means a var is not used at the term level, but might be at the type level
@@ -481,7 +482,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         case z of
             Just (x,xs) -> didInline inb (x,xs) -- h x xs inb
             Nothing -> case Map.lookup (tvrNum v) (envInScope inb) of
-                Just (IsBoundTo LoopBreaker _) -> app (EVar v,xs')
+                Just (IsBoundTo LoopBreaker _) -> appVar v xs'
                 Just (IsBoundTo Once _) -> error "IsBoundTo: Once"
                 Just (IsBoundTo n e) | forceInline v -> do
                     mtick  (toAtom $ "E.Simplify.inline.forced.{" ++ tvrShowName v  ++ "}")
@@ -495,8 +496,8 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                 Just (IsBoundTo Many e) | safeToDup e && multiInline e xs' -> do
                     mtick  (toAtom $ "E.Simplify.inline.Many.{" ++ showName (tvrIdent v)  ++ "}")
                     didInline inb (e,xs')
-                Just _ -> app (EVar v,xs')
-                Nothing  -> app (EVar v,xs')
+                Just _ -> appVar v xs'
+                Nothing  -> appVar v xs'
                 -- Nothing | tvrNum v `Set.member` exports -> app (EVar v,xs')
                 -- Nothing -> error $ "Var not in scope: " ++ show v
     h e xs' inb = do
@@ -504,6 +505,11 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     didInline inb z = do
         e <- app z
         go e inb
+    appVar v xs = do
+        me <- etaExpandAp (so_dataTable sopts) v xs
+        case me of
+            Just e -> return e
+            Nothing -> app (EVar v,xs)
 
 
 

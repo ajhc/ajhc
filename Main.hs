@@ -22,7 +22,6 @@ import Doc.Pretty
 import E.Annotate(annotate,annotateDs,annotateProgram)
 import E.Diff
 import E.E
-import E.Eta
 import E.FromHs
 import E.LambdaLift
 import E.Program
@@ -256,9 +255,7 @@ processDecls stats ho ho' tiData = do
         --wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
         let cm stats e = do
             let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
-            let (e',stat') = Stats.runStatM $ etaExpandE (progDataTable prog) e
-            Stats.tickStat stats stat'
-            let (stat, e'') = SS.simplifyE sopt e'
+            let (stat, e'') = SS.simplifyE sopt e
             Stats.tickStat stats stat
             return e''
         let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds)) fullDataTable
@@ -464,10 +461,8 @@ compileModEnv' stats (initialHo,finalHo) = do
     lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lc
 
     prog <- return $ programSetE lc prog
-    prog <- etaExpand prog
 
     --ne <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) (programE prog)
-    --prog <- return $ programSetE ne prog
 
     lc <- return $ programE prog
 

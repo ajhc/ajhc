@@ -1,6 +1,4 @@
 module E.Eta(
-    etaExpand,
-    etaExpandE,
     etaExpandAp,
     etaReduce
     ) where
@@ -94,6 +92,7 @@ etaReduce' e = case f e 0 of
 
 
 etaExpandAp :: MonadStats m => DataTable -> TVr -> [E] -> m (Maybe E)
+etaExpandAp _ _ [] = return Nothing  -- so simple renames don't get eta-expanded
 etaExpandAp dataTable t as | Just (Arity n) <- Info.lookup (tvrInfo t), n > length as = do
     let e = foldl EAp (EVar t) as
     let (_,ts) = fromPi' dataTable (getType e)
