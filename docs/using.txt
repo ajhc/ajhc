@@ -18,6 +18,9 @@ pull everything needed to build jhc.
   cd jhc
   darcs get http://repetae.net/john/repos/Boolean
   darcs get http://repetae.net/john/repos/Doc
+  cd lib
+  darcs get http://darcs.haskell.org/packages/haskell98/
+  darcs get http://darcs.haskell.org/packages/QuickCheck/
 
 ==== making it ====
 

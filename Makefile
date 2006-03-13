@@ -39,20 +39,20 @@ jhc: $(BUILTSOURCES) $(HSFILES)
 i:
 	ghci $(GHCOPTS) $(EXTRAOPTS) Main.hs
 
-PACKAGES=base-1.0.hl haskell98-1.0.hl
+LIBPACKAGES=base-1.0.hl haskell98-1.0.hl
 LIBRARYPATH="$(PREFIX)/lib/jhc-$(JHC_VERSION)"
 DP=$(PREFIX)
 
 base-1.0.hl: jhc lib/base/base.cabal
 	-[ -e base.log ] && mv -f base.log base.log.bak
-	./jhc $(JHC_TEST) -ilib/base --noauto --build-hl lib/base/base.cabal -o base-1.0.hl 2>&1 | tee base.log
+	./jhc $(JHC_TEST) -ilib/base --noauto --build-hl lib/base/base.cabal -o $@ 2>&1 | tee base.log
 
 install: jhc base-1.0.hl
 	install -d "$(DP)/bin"
 	install jhc "$(DP)/bin"
 	ln -sf "$(DP)/bin/jhc" "$(DP)/bin/jhci"
 	install -d $(LIBRARYPATH)
-	install $(PACKAGES) $(LIBRARYPATH)
+	install $(LIBPACKAGES) $(LIBRARYPATH)
 
 tags: $(HSFILES)
 	hasktags $(HSFILES)
@@ -125,8 +125,6 @@ Version/Raw.hs: _darcs/inventory
 	| wc -l | perl -e 'print "darcsPatches = \"".(<>-1)."\"\n"'    >> $@
 	echo '{-# NOINLINE libraryPath #-}'                            >> $@
 	echo 'libraryPath=["$(PREFIX)/lib/jhc-$(JHC_VERSION)"]'        >> $@
-	echo '{-# NOINLINE basePackages #-}'                           >> $@
-	echo 'basePackages=["base-1.0"]'                               >> $@
 
 .PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs install i printos tests
 

@@ -32,7 +32,7 @@ import System.IO.Unsafe
 import GenUtil
 import qualified FlagDump
 import qualified FlagOpts
-import Version.Raw(basePackages, libraryPath)
+import Version.Raw(libraryPath)
 
 data Mode = BuildHl String -- ^ Build the specified hl-file given a description file.
           | Interactive    -- ^ Run interactively.
@@ -173,7 +173,7 @@ processOptions = System.getArgs >>= (\argv -> either putErrDie return $ do
     o2 <- postProcessFO o1
     case optNoAuto o2 of
       True -> return (o2 { optArgs = ns })
-      False-> return (o2 { optArgs = ns, optHls  = basePackages ++ optHls o2 }))
+      False-> return (o2 { optArgs = ns, optHls  = ("base":"haskell98":optHls o2) }))
 
 {-# NOINLINE fileOptions #-}
 fileOptions :: Monad m => [String] -> m Opt
