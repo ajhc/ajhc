@@ -19,16 +19,17 @@ import Options
 import PackedString
 import qualified CharIO
 import qualified FlagDump as FD
+import Util.Gen
 import Util.MD5(md5file)
 import Version(versionString)
 
 
 
 data Library = Library {
-    libraryDesc :: [(PackedString,PackedString)],
-    libraryHo   :: Ho,
-    libraryFP   :: FilePath,
-    libraryMD5  :: CheckSum
+    libraryDesc  :: [(PackedString,PackedString)],
+    libraryHo    :: Ho,
+    libraryFP    :: FilePath,
+    librarySHA1  :: CheckSum
     }
 type LMap = Map.Map LibraryName Library
 
@@ -45,9 +46,9 @@ loadP mbcs got name = do
         pkg <- readLibraryFile name rfp mbcs
         let got' = Map.insert name pkg got
         foldM (\gm (pn,cs) -> loadP (Just cs) gm pn) got' $ libraryDeps pkg
-      Just pkg | mbcs == Nothing               -> return got
-               | mbcs == Just (libraryMD5 pkg) -> return got
-               | otherwise                     -> fail ("Checksum mismatch for library "++name)
+      Just pkg | mbcs == Nothing                -> return got
+               | mbcs == Just (librarySHA1 pkg) -> return got
+               | otherwise                      -> fail ("Checksum mismatch for library "++name)
 
 -- load libraries
 
@@ -85,7 +86,7 @@ createLibrary fp wtd = do
             "hs.out" -> name ++ "-" ++ vers ++ ".hl"
             fn -> fn
     let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
-    writeLibraryFile outName $ Library pdesc ho "" 0
+    writeLibraryFile outName $ Library pdesc ho "" ""
 
 parseLibraryDescription :: Monad m => String -> m [(String,String)]
 parseLibraryDescription fs =  g [] (lines (f [] fs)) where
@@ -126,7 +127,6 @@ readDescFile fp = do
 
 readLibraryFile :: LibraryName -> FilePath -> Maybe CheckSum -> IO Library
 readLibraryFile lname fp mbcs = do
-    wdump FD.Progress $ putErrLn $ "Loading library: " ++ show lname ++ " @ " ++ show fp
     pkgCS <- md5file fp
     when (maybe False (pkgCS /=) mbcs) $
         putErrDie ("Loading library "++show fp++" failed: Checksum does not match")
@@ -134,10 +134,10 @@ readLibraryFile lname fp mbcs = do
     case mho of
       Nothing       -> putErrDie ("Loading library "++fp++" failed due to missing dependencies")
       Just (hoh,ho) -> return $
-          Library { libraryDesc= hohMetaInfo hoh,
-                    libraryFP  = fp,
-                    libraryMD5 = pkgCS,
-                    libraryHo  = ho { hoModules = Map.map (const $ Right (lname,pkgCS)) $ hoModules ho }
+          Library { libraryDesc = hohMetaInfo hoh,
+                    libraryFP   = fp,
+                    librarySHA1 = pkgCS,
+                    libraryHo   = ho { hoModules = Map.map (const $ Right (lname,pkgCS)) $ hoModules ho }
                   }
 
 writeLibraryFile :: FilePath -> Library -> IO ()

@@ -24,7 +24,7 @@ import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-type CheckSum = Integer
+type CheckSum = String
 type LibraryName= String
 
 
