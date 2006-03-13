@@ -292,10 +292,6 @@ eCompat x y = x == y
 
 
 
-isAtomic :: E -> Bool
---isAtomic e | sortTypeLike e = True
-isAtomic EVar {}  = True
-isAtomic e = isFullyConst e
 
 fullyConst :: Monad m => E -> m ()
 fullyConst (ELit (LitCons _ [] _)) = return ()

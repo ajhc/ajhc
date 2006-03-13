@@ -129,6 +129,11 @@ substLet ds e  = ans where
     tas = filter (sortStarLike . tvrType . fst) nas
     ans = eLetRec (as ++ nas) (typeSubst' (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- as]) (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas]) e)
 
+isAtomic :: E -> Bool
+--isAtomic e | sortTypeLike e = True
+isAtomic EVar {}  = True
+isAtomic e | sortTypeLike e = True
+isAtomic e = isFullyConst e
 
 substLet' :: [(TVr,E)] -> E -> E
 substLet' ds' e  = ans where

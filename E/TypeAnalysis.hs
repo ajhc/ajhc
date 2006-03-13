@@ -195,7 +195,15 @@ getValue (EVar v)
     | Just x <- Info.lookup (tvrInfo v) = return x
     | otherwise = fail $ "getValue: no varinfo: " ++ show v
 getValue e | Just c <- typConstant e = return $ value c
+getValue e = value `liftM` fuzzyConstant e  -- TODO - make more accurate
 getValue e = fail $ "getValue: " ++ show e
+
+fuzzyConstant e | Just c <- typConstant e = return c
+fuzzyConstant e | Just (n,as) <- toLit e = do
+    as' <- mapM fuzzyConstant as
+    return $ vmapValue n as'
+fuzzyConstant _ = return $ (vmapPlaceholder ())
+
 
 typConstant :: Monad m => E -> m Typ
 typConstant (EPi TVr { tvrType = a} b) = do
@@ -236,7 +244,7 @@ pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
 getTyp :: Monad m => E -> DataTable -> Typ -> m E
 getTyp kind dataTable vm = f 10 kind vm where
     f n _ _ | n <= 0 = fail "getTyp: too deep"
-    f n kind vm | Just [] <- vmapHeads vm = return $ tAbsurd kind
+    -- f n kind vm | Just [] <- vmapHeads vm = return $ tAbsurd kind  TODO - absurdize values properly
     f n kind vm | Just [h] <- vmapHeads vm = do
         let ss = slotTypes dataTable h kind
             as = [ (s,vmapArg h i vm) | (s,i) <- zip ss [0..]]

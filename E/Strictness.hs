@@ -15,6 +15,7 @@ import E.Annotate
 import E.E
 import E.Subst
 import E.Values
+import E.TypeCheck
 import FindFixpoint
 import GenUtil
 import Info.Info as Info
@@ -159,6 +160,7 @@ collect e = ans where
     arg sa (EVar tvr) = Map.singleton tvr sa
     arg sa (ELit _) = mempty
     arg sa (EPi _ _) = mempty
+    arg sa e@(EAp _ _) | sortTypeLike e = mempty
     arg sa (EPrim (APrim (PrimPrim "unsafeCoerce") _) [x] _) = arg sa x
     arg sa e = error $ "Strictness.arg: " ++ show (sa,e)
 

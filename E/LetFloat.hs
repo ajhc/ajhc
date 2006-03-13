@@ -20,6 +20,7 @@ import E.E
 import E.Inline
 import E.Rules
 import E.Traverse
+import E.TypeCheck
 import E.Values
 import GenUtil
 import Name.Name
@@ -76,8 +77,13 @@ atomizeApps usedIds stats e = liftM fst $ traverse travOptions { pruneRecord = v
 
     at e = return (e,[])
 
-atomizeAp :: DataTable -> Stats -> E -> IO E
-atomizeAp dataTable stats e = f e  where
+atomizeAp ::
+    Bool          -- ^ whether to atomize type arguments
+    -> DataTable  -- ^ the data table for expanding newtypes
+    -> Stats      -- ^ statistics
+    -> E          -- ^ input term
+    -> IO E
+atomizeAp atomizeTypes dataTable stats e = f e  where
     f :: E -> IO E
     f e = do
         (x,ds) <- g e
@@ -122,8 +128,12 @@ atomizeAp dataTable stats e = f e  where
         u <- newUniq
         let n = toName Val ("A@",'v':show u)
             tv = tvr { tvrIdent = toId n, tvrType = infertype dataTable e }
-        C.putStrLn $ show n ++ " = " ++ pprint e
+        --C.putStrLn $ show n ++ " = " ++ pprint e
         return (EVar tv,[(tv,e)])
+    isAtomic :: E -> Bool
+    isAtomic EVar {}  = True
+    isAtomic e | not atomizeTypes && sortTypeLike e = True
+    isAtomic e = isFullyConst e
 
 doCoalesce :: Stats -> (E,[E]) -> IO (E,[E])
 doCoalesce stats (x,xs) = ans where

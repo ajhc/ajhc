@@ -366,7 +366,7 @@ postProcessE stats n inscope usedIds dataTable lc = do
     --lc <- mangle (return ()) False ("Absurdize") (return . substMap (Map.map g fvs)) lc
     --lc <- mangle (return ()) False "deNewtype" (return . deNewtype dataTable) lc
     --lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
-    lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeAp dataTable stats x >>= coalesceLets stats)  lc
+    lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeAp False dataTable stats x >>= coalesceLets stats)  lc
     return lc
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
@@ -486,23 +486,18 @@ compileModEnv' stats (initialHo,finalHo) = do
         putStrLn "Supercombinators"
         mapM_ (\ (t,ts,e) -> putStrLn $  (showTVr t) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ]) ds
 
-
-    wdump FD.LambdacubeBeforeLift $ printProgram prog -- printCheckName dataTable lc
-
-
+    wdump FD.LambdacubeBeforeLift $ printProgram prog
     finalStats <- Stats.new
     prog <- lambdaLift finalStats prog
 
-    lc <- mangle dataTable (return ()) True  "FixupLets..." (\x -> atomizeAp dataTable finalStats x >>= coalesceLets finalStats)  (programE prog)
-    prog <- return $ programSetE lc prog
-
-
     rs' <- flip mapM (progCombinators prog) $ \ (t,ls,e) -> do
+        --putStrLn (pprint t)
         let cm stats e = do
             let sopt = mempty {  SS.so_dataTable = dataTable }
             let (stat, e') = SS.simplifyE sopt e
             Stats.tickStat stats stat
-            return e'
+            e'' <- atomizeAp True dataTable stats e'
+            return e''
         e' <- doopt (mangle' Nothing dataTable) False finalStats "SuperSimplify" cm e
         return (t,ls,e')
     wdump FD.Progress $ Stats.print "PostLifting" finalStats
