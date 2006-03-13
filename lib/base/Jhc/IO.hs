@@ -41,9 +41,10 @@ errorContinuation :: IO a -> IO a
 errorContinuation x = catch x showError
 
 unsafePerformIO :: IO a -> a
-unsafePerformIO x = case errorContinuation x of
-    IO y -> case y undefinedIOErrorCont (newWorld__ x) of
-        JustIO _ a -> a
+unsafePerformIO x = case newWorld__ x of
+    world -> case errorContinuation x of
+        IO y -> case y undefinedIOErrorCont world of
+            JustIO _ a -> a
 
 -- we have to replace the error handler because the context might have quit by the time the value is evaluated.
 unsafeInterleaveIO :: IO a -> IO a
