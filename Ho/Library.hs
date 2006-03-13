@@ -40,11 +40,11 @@ libraryDeps = Map.toList . hoLibraries . libraryHo
 
 loadP :: Maybe CheckSum -> LMap -> LibraryName -> IO LMap
 loadP mbcs got name = do
-    case Map.lookup name got of
+    (n',fp) <- libraryMapFind name
+    case Map.lookup n' got of
       Nothing -> do
-        rfp <- libraryMapFind name
-        pkg <- readLibraryFile name rfp mbcs
-        let got' = Map.insert name pkg got
+        pkg <- readLibraryFile n' fp mbcs
+        let got' = Map.insert n' pkg got
         foldM (\gm (pn,cs) -> loadP (Just cs) gm pn) got' $ libraryDeps pkg
       Just pkg | mbcs == Nothing                -> return got
                | mbcs == Just (librarySHA1 pkg) -> return got
@@ -56,7 +56,6 @@ loadP mbcs got name = do
 
 loadLibraries :: IO Ho
 loadLibraries = do
-    wdump FD.Progress $ putErrLn $ "Loading libraries: " ++ show (optHls options)
     ps <- foldM (loadP Nothing) Map.empty (optHls options)
     return $ fixupHo $ mconcat (initialHo : map libraryHo (Map.elems ps))
     --return $ mconcat (initialHo : map libraryHo (Map.elems ps))
@@ -116,7 +115,7 @@ condenseWhitespace xs =  reverse $ dropWhile isSpace (reverse (dropWhile isSpace
 
 readDescFile :: FilePath -> IO [(String,String)]
 readDescFile fp = do
-    wdump FD.Progress $ putErrLn $ "Reading: " ++ show fp
+    wdump FD.Progress $ putStrLn $ "Reading: " ++ show fp
     fc <- CharIO.readFile fp
     case parseLibraryDescription fc of
         Left err -> fail $ "Error reading library description file: " ++ show fp ++ " " ++ err

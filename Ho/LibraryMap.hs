@@ -19,13 +19,21 @@ globalLibraryMap = unsafePerformIO $ getLibraryMap $ optHlPath options
 
 ----
 
-libraryMapFind :: Monad m => LibraryName -> m FilePath
-libraryMapFind pn = case Map.lookup pn globalLibraryMap of
-                      Just x  -> return x
-                      Nothing -> fail ("LibraryMap: Library "++pn++" not found!")
+libraryMapFind :: Monad m => LibraryName -> m (LibraryName,FilePath)
+libraryMapFind pn =
+  case Map.lookup pn globalLibraryMap of
+    Just x  -> return (pn,x)
+    Nothing -> case range (pn++"-") (pn++"-"++repeat maxBound) globalLibraryMap of
+                 [] -> fail ("LibraryMap: Library "++pn++" not found!")
+                 xs -> return $ last xs
 
 libraryList :: [(LibraryName,FilePath)]
 libraryList = Map.toList globalLibraryMap
+
+---- range queries for Data.Map
+
+range :: Ord k => k -> k -> Map.Map k v -> [(k,v)]
+range low high = toList . fst . split high . snd . split low
 
 ----
 
