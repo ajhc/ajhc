@@ -72,7 +72,7 @@ dc_Unit = toName DataConstructor ("Prelude","()")
 
 tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
 tc_Arrow = toName TypeConstructor ("Jhc@","->")
---tc_IOCont = toName TypeConstructor ("Jhc.JumpPoint","IOCont")
+tc_IOErrorCont = toName TypeConstructor ("Jhc.IO","IOErrorCont")
 tc_JumpPoint = toName TypeConstructor ("Jhc.JumpPoint","JumpPoint")
 tc_IOError = toName TypeConstructor ("Prelude.IOError","IOError")
 

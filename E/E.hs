@@ -331,7 +331,7 @@ tAbsurd k = ELit (LitCons tc_Absurd [] k)
 tPtr t = ELit (LitCons tc_Ptr [t] eStar)
 
 -- the IOErrorCont type from Jhc.IO
-tCont = ltTuple [ELit $ LitCons tc_JumpPoint [] eStar, ELit $ LitCons tc_IOError [] eStar]
+tCont = ELit (LitCons tc_IOErrorCont [] eStar)
 tvrCont = tvr { tvrIdent = 0, tvrType = tCont }
 
 ltTuple ts = ELit $ LitCons (nameTuple TypeConstructor (length ts)) ts eStar

@@ -2,6 +2,7 @@ module Jhc.IO(
     IO(..),
     IOResult(..),
     World__(),
+    IOErrorCont(),
     catch,
     dependingOn,
     fixIO,
@@ -22,7 +23,7 @@ import Prelude.IOError
 
 -- this is treated very specially by the compiler. it is unboxed.
 data World__
-type IOErrorCont = (JumpPoint,Hole IOError)
+data IOErrorCont = IOErrorCont JumpPoint (Hole IOError)
 
 --data IOResult a = FailIO World__ IOError | JustIO World__ a
 data IOResult a = JustIO World__ a
@@ -74,12 +75,12 @@ fixIO k = IO $ \c w -> let
                 JustIO _ z  -> z
                in r
 
-getJumpPoint :: IO (JumpPoint,Hole IOError)
-getJumpPoint = IO $ \ jh w -> JustIO w jh
+getJumpPoint :: IO IOErrorCont
+getJumpPoint = IO $ \ ioe w -> JustIO w ioe
 
 ioError    ::  IOError -> IO a
 ioError e   =  do
-    (jp,he) <- getJumpPoint
+    IOErrorCont jp he <- getJumpPoint
     fillHole he e
     jumpJumpPoint__ jp
 
@@ -89,7 +90,7 @@ catch ::  IO a -> (IOError -> IO a) -> IO a
 catch (IO x) fn = do
     hole <- newHole
     withJumpPoint__ $ \jp b -> case b of
-        False -> IO $ \_ w -> x (jp,hole) w
+        False -> IO $ \_ w -> x (IOErrorCont jp hole) w
         True -> readHole hole >>= fn
 
 -- | this creates a new world object that artificially depends on its argument to avoid CSE.
