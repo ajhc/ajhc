@@ -3,6 +3,7 @@ module Grin.FromE(compile,typecheckGrin) where
 import Char
 import Data.Graph(stronglyConnComp, SCC(..))
 import Data.IORef
+import Data.Typeable
 import qualified Data.Map as Map
 import Data.Map(Map)
 import Data.Monoid
@@ -18,6 +19,7 @@ import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.E
+import qualified Info.Info as Info
 import E.FreeVars
 import E.Program
 import E.TypeCheck
@@ -69,8 +71,11 @@ data CEnv = CEnv {
     constMap :: Map Int Val,
     errorOnce :: OnceMap (Ty,String) Atom,
     counter :: IORef Int
-
 }
+
+-- after pruning the E, we should not accidentally turn things into CAFs that wern't already.
+newtype IsCAF = IsCAF Bool
+    deriving(Typeable,Show,Eq)
 
 dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ fromAtom n <+> hsep (map show as) <+> "::" <+> show t |  (n,(as,t)) <- Map.toList tt]
 
@@ -114,15 +119,20 @@ toType node = toty where
     toty _ = node
 
 compile :: Program -> IO Grin
-compile prog@Program { progDataTable = dataTable, progCombinators = cm, progMainEntry = mt } = do
+compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry } = do
+    prog <- return $ prog { progCombinators  = map stripTheWorld (progCombinators prog) }
     tyEnv <- newIORef initTyEnv
     funcBaps <- newIORef []
     counter <- newIORef 100000  -- TODO real number
-    let (cc,reqcc) = constantCaf prog
+    let (cc,reqcc,rcafs) = constantCaf prog
     wdump FD.Progress $ do
         putErrLn $ "Found" <+> tshow (length cc) <+> "CAFs to convert to constants," <+> tshow (length reqcc) <+> "of which are recursive."
+        putErrLn "Recursive"
         putDocMLn putStr $ vcat [ pprint v  | v <- reqcc ]
+        putErrLn "Constant"
         putDocMLn putStr $ vcat [ pprint v <+> pprint n <+> pprint e | (v,n,e) <- cc ]
+        putErrLn "CAFS"
+        putDocMLn putStr $ vcat [ pprint v <+> pprint n <+> pprint e | (v,n,e) <- rcafs ]
     errorOnce <- newOnceMap
     let doCompile = compile' dataTable CEnv {
             funcBaps = funcBaps,
@@ -131,10 +141,10 @@ compile prog@Program { progDataTable = dataTable, progCombinators = cm, progMain
             counter = counter,
             constMap = mempty,
             errorOnce = errorOnce,
-            ccafMap = Map.fromList [ (tvrNum v,e) |(v,_,e) <- cc]
+            ccafMap = Map.fromList $ [(tvrNum v,e) |(v,_,e) <- cc ]  ++ [ (tvrNum v,Var vv (TyPtr TyNode)) | (v,vv,_) <- rcafs]
             }
-    ds <- mapM doCompile [ c | c@(v,_,_) <- cm, v `notElem` [x | (x,_,_) <- cc]]
-    (_,(Tup [] :-> theMain)) <- doCompile ((mt,[],EVar mt))
+    ds <- mapM doCompile [ c | c@(v,_,_) <- progCombinators prog, v `notElem` [x | (x,_,_) <- cc]]
+    (_,(Tup [] :-> theMain)) <- doCompile ((mainEntry,[],EVar mainEntry))
 
     wdump FD.Progress $ do
         os <- onceMapToList errorOnce
@@ -151,7 +161,8 @@ compile prog@Program { progDataTable = dataTable, progCombinators = cm, progMain
         -- main' =  if not $ null as then  (Return $ NodeC (partialTag main (length as)) []) else App main [] rtype
         -- tags = Set.toList $ ep $ Set.unions (freeVars (main',initCafs):[ freeVars e | (_,(_ :-> e)) <- ds ])
     let ep s = Set.fromList $ concatMap partialLadder $ Set.toList s
-        cafs = [ ((V $ - atomIndex tag),NodeC tag []) | (x,(Tup [] :-> _)) <- ds, let tag = partialTag x 0 ] ++ [ (y,z') |(x,y,z) <- cc, y `elem` reqcc, let Const z' = z ]
+        -- cafs = [ ((V $ - atomIndex tag),NodeC tag []) | (x,(Tup [] :-> _)) <- ds, let tag = partialTag x 0 ] ++ [ (y,z') |(x,y,z) <- cc, y `elem` reqcc, let Const z' = z ]
+        cafs = [ (x,y) | (_,x,y) <- rcafs ]
         initCafs = sequenceG_ [ Update (Var v (TyPtr TyNode)) node | (v,node) <- cafs ]
         ic = (funcInitCafs,(Tup [] :-> initCafs) )
         ds' = ic:(ds ++ fbaps)
@@ -162,7 +173,7 @@ compile prog@Program { progDataTable = dataTable, progCombinators = cm, progMain
             grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  theMain :>>= n0 :-> Return unit )) : ds',
             grinCafs = cafs
             }
-    typecheckGrin grin
+    --typecheckGrin grin
     return grin
     where
     scMap = Map.fromList [ (tvrNum t,toEntry x) |  x@(t,_,_) <- map stripTheWorld $ progCombinators prog]
@@ -175,7 +186,8 @@ compile prog@Program { progDataTable = dataTable, progCombinators = cm, progMain
 
 
 stripTheWorld :: (TVr,[TVr],E) ->  (TVr,[TVr],E)
-stripTheWorld (t,as,e) = (t,filter (shouldKeep . getType) as,e)
+stripTheWorld (t,as,e) = (tvrInfo_u (Info.insert (IsCAF caf)) t,filter (shouldKeep . getType) as,e) where
+    caf = null as
 
 
 shouldKeep :: E -> Bool
@@ -203,17 +215,20 @@ primTyEnv = TyEnv . Map.fromList $ [
 -- many cafs consist of constant applications, we preprocess them into values
 -- beforehand. This also catches recursive constant toplevel bindings.
 
-constantCaf :: Program -> ([(TVr,Var,Val)],[Var])
+constantCaf :: Program -> ([(TVr,Var,Val)],[Var],[(TVr,Var,Val)])
 constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans where
-    (lbs',cafs) = G.findLoopBreakers (const 0) (const True) $ G.newGraph [ (v,e) | (v,[],e) <- ds, canidate e] (tvrNum . fst) (freeVars . snd)
+    -- All CAFS
+    ecafs = [ (v,e) | (v,[],e) <- ds, Just (IsCAF True) == Info.lookup (tvrInfo v) ]
+    -- just CAFS that can be converted to constants need dependency analysis
+    (lbs',cafs) = G.findLoopBreakers (const 0) (const True) $ G.newGraph (filter (canidate . snd) ecafs) (tvrNum . fst) (freeVars . snd)
     lbs = Set.fromList $ fsts lbs'
     canidate (ELit _) = True
     canidate (EPi _ _) = True
     canidate e | (EVar x,as) <- fromAp e, Just vs <- Map.lookup x res, vs > length (ff as) = True
     canidate _ = False
-    ans = ([ (v,cafNum v,conv e) | (v,e) <- cafs ],[ cafNum v | (v,_) <- cafs, v `Set.member` lbs ])
+    ans = ([ (v,cafNum v,conv e) | (v,e) <- cafs ],[ cafNum v | (v,_) <- cafs, v `Set.member` lbs ], [(v,cafNum v, NodeC (partialTag n 0) []) | (v,e) <- ecafs, not (canidate e), let n = scTag v ])
     res = Map.fromList [ (v,length $ ff vs) | (v,vs,_) <- ds]
-    coMap = Map.fromList [  (v,ce)| (v,_,ce) <- fst ans]
+    coMap = Map.fromList [  (v,ce)| (v,_,ce) <- fst3 ans]
     conv :: E -> Val
     conv (ELit (LitInt i (ELit (LitCons n [] (ESort EHash))))) | RawType <- nameType n =  Lit i (Ty $ toAtom (show n))
     --conv (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Map.lookup n ctypeMap = ( Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
@@ -227,6 +242,7 @@ constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans wh
     conv x = error $ "conv: " ++ show x
     getName = getName' dataTable
     ff x = filter (shouldKeep . getType) x
+    fst3 (x,_,_) = x
 
 getName' :: (Show a,Monad m) => DataTable -> Lit a E -> m Atom
 getName' dataTable v@(LitCons n es _)
@@ -282,19 +298,18 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce e |  (v,as) <- fromAp e, EVar v <- dropCoerce v = do
         as <- return $ args as
         let fty = toType TyNode (getType e)
-        case Map.lookup (tvrNum v) (scMap cenv) of
-            Just (_,[],_) -> do
-                case constant (EVar v) of
-                    Just (Const x) -> app fty (Return x) as
-                    Just x@Var {} -> app fty (gEval x) as
-            Just (v,as',es)
-                | length as >= length as' -> do
-                    let (x,y) = splitAt (length as') as
-                    app fty (App v x es) y
-                | otherwise -> do
-                    let pt = partialTag v (length as' - length as)
-                    return $ Return (NodeC pt as)
-            Nothing -> app fty (gEval $ toVal v) as
+        case Map.lookup (tvrNum v) (ccafMap cenv) of
+            Just (Const c) -> app fty (Return c) as
+            Just x@Var {} -> app fty (gEval x) as
+            Nothing -> case Map.lookup (tvrNum v) (scMap cenv) of
+                Just (v,as',es)
+                    | length as >= length as' -> do
+                        let (x,y) = splitAt (length as') as
+                        app fty (App v x es) y
+                    | otherwise -> do
+                        let pt = partialTag v (length as' - length as)
+                        return $ Return (NodeC pt as)
+                Nothing -> app fty (gEval $ toVal v) as
     ce e | (v,as@(_:_)) <- fromAp e = do
         let fty = toType TyNode (getType e)
         as <- return $ args as
@@ -543,12 +558,8 @@ compile' dataTable cenv (tvr,as,e) = ans where
     constant :: Monad m =>  E -> m Val
     constant (EVar tvr) | Just c <- Map.lookup (tvrNum tvr) (ccafMap cenv) = return c
                         | Just (v,as,_) <- Map.lookup (tvrNum tvr) (scMap cenv)
-                         , t <- partialTag v (length as)  = case tagIsWHNF t of
-                            True -> return $ Const $ NodeC t []
-                            False -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
-                            --case constant e of
-                            --    Just x -> return x
-                            --    Nothing -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
+                         , t <- partialTag v (length as), tagIsWHNF t = return $ Const $ NodeC t []
+    --                        False -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
     constant e | Just l <- literal e = return l
     constant (ELit lc@(LitCons n es _)) | Just es <- mapM constant (filter (shouldKeep . getType) es), Just nn <- getName lc = (return $ Const (NodeC nn es))
     constant (EPi (TVr { tvrIdent = 0, tvrType = a}) b) | Just a <- constant a, Just b <- constant b = return $ Const $ NodeC tagArrow [a,b]
