@@ -160,9 +160,15 @@ type Subst = Map.Map Int Range
 type InScope = Map.Map Int Binding
 data Binding =
     NotAmong [Name]
-    | IsBoundTo { bindingOccurance :: Occurance, bindingE :: E }
+    | IsBoundTo { bindingOccurance :: Occurance, bindingE :: E, bindingCheap :: Bool }
     | NotKnown
     {-! derive: is !-}
+
+isBoundTo o e = IsBoundTo {
+    bindingOccurance = o,
+    bindingE = e,
+    bindingCheap = isCheap e
+    }
 
 data Env = Env {
     envInScope :: Map.Map Int Binding,
@@ -192,7 +198,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         let occ' = Map.mapKeysMonotonic tvrIdent occ
             dsIn'' = runIdentity $ annotateDs mempty (\t nfo -> return $ maybe (Info.delete Many nfo) (flip Info.insert nfo) (Map.lookup t occ')) (\_ -> return) (\_ -> return) dsIn'
         return dsIn''
-    initialB = mempty { envInScope =  Map.map (\e -> IsBoundTo Many e) (so_boundVars sopts) }
+    initialB = mempty { envInScope =  Map.map (\e -> isBoundTo Many e) (so_boundVars sopts) }
     initialB' = mempty { envInScope =  Map.map (\e -> NotKnown) (so_boundVars sopts) }
     (dsOut,stat)  = runIdentity $ runStatT (runNameMT doit)
     doit = do
@@ -276,9 +282,9 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                 case isAtomic e' && n /= LoopBreaker of
                     True -> do
                         when (n /= Unused) $ mtick $ "E.Simplify.inline.Atomic.{" ++ showName t ++ "}"
-                        w rs (Map.insert t (Done e') sub) (envInScope_u (Map.insert (tvrNum t') (IsBoundTo n e')) inb) ((t',e'):ds)
+                        w rs (Map.insert t (Done e') sub) (envInScope_u (Map.insert (tvrNum t') (isBoundTo n e')) inb) ((t',e'):ds)
                     -- False | worthStricting e', Strict <- Info.lookup (tvrInfo t') -> w rs sub
-                    False -> w rs sub (if n /= LoopBreaker then (envInScope_u (Map.insert (tvrNum t') (IsBoundTo n e')) inb) else inb) ((t',e'):ds)
+                    False -> w rs sub (if n /= LoopBreaker then (envInScope_u (Map.insert (tvrNum t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
             w [] sub inb ds = return (ds,sub,inb)
         s' <- mapM z ds
         let
@@ -319,7 +325,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
 
     nname tvr@(TVr { tvrIdent = n, tvrType =  t}) sub inb  = do
         t' <- dosub sub t
-        let t'' = substMap'' (Map.map (\ IsBoundTo { bindingE = e } -> e) $ Map.filter isIsBoundTo (envInScope inb)) t'  --  (Map.fromAscList [ (t,e) | (t,IsBoundTo _ e) <- Map.toAscList (envInScope inb) ]) t'
+        let t'' = substMap'' (Map.map (\ IsBoundTo { bindingE = e } -> e) $ Map.filter isIsBoundTo (envInScope inb)) t'
         n' <- uniqueName n
         return $ tvr { tvrIdent = n', tvrType =  t'' }
 --        case n `Map.member` inb of
@@ -383,7 +389,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     doCase e _ b [] (Just d) sub inb | not (isLifted e || isUnboxed (getType e)) = do
         mtick "E.Simplify.case-unlifted"
         b' <- nname b sub inb
-        d' <- f d (Map.insert (tvrNum b) (Done (EVar b')) sub) (envInScope_u  (Map.insert (tvrNum b') (IsBoundTo Many e)) inb)
+        d' <- f d (Map.insert (tvrNum b) (Done (EVar b')) sub) (envInScope_u  (Map.insert (tvrNum b') (isBoundTo Many e)) inb)
         return $ eLet b' e d'
     doCase (EVar v) _ b [] (Just d) sub inb | Just (NotAmong _) <-  Map.lookup (tvrNum v) (envInScope inb)  = do
         mtick "E.Simplify.case-evaled"
@@ -410,7 +416,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                     ninb = Map.fromList [ (n,NotKnown)  | TVr { tvrIdent = n } <- ns' ]
                 e' <- f ae (nsub `Map.union` sub) (envInScope_u (ninb `Map.union`) $ mins e (patToLitEE p') inb)
                 return $ Alt p' e'
-            mins (EVar v) e = envInScope_u (Map.insert (tvrNum v) (IsBoundTo Many e))
+            mins (EVar v) e = envInScope_u (Map.insert (tvrNum v) (isBoundTo Many e))
             mins _ _ = id
 
         d' <- fmapM dd d
@@ -424,7 +430,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
             Just (bs,e) -> do
                 let bs' = [ x | x@(TVr { tvrIdent = n },_) <- bs, n /= 0]
                 binds <- mapM (\ (v,e) -> nname v sub inb >>= return . (,,) e v) bs'
-                e' <- f e (Map.fromList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] `Map.union` sub)   (envInScope_u (Map.fromList [ (n,IsBoundTo Many e) | (e,_,TVr { tvrIdent = n }) <- binds] `Map.union`) inb)
+                e' <- f e (Map.fromList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] `Map.union` sub)   (envInScope_u (Map.fromList [ (n,isBoundTo Many e) | (e,_,TVr { tvrIdent = n }) <- binds] `Map.union`) inb)
                 return $ eLetRec [ (v,e) | (e,_,v) <- binds ] e'
             Nothing -> do
                 return $ EError ("match falls off bottom: " ++ pprint l) t
@@ -482,16 +488,16 @@ simplifyDs sopts dsIn = (stat,dsOut) where
             _ -> case Map.lookup (tvrNum v) (envInScope inb) of
                 Just IsBoundTo { bindingOccurance = LoopBreaker } -> appVar v xs'
                 Just IsBoundTo { bindingOccurance = Once } -> error "IsBoundTo: Once"
-                Just (IsBoundTo n e) | forceInline v -> do
+                Just IsBoundTo { bindingE = e } | forceInline v -> do
                     mtick  (toAtom $ "E.Simplify.inline.forced.{" ++ tvrShowName v  ++ "}")
                     didInline inb e xs'
-                Just (IsBoundTo OnceInLam e) | isCheap e && someBenefit v e xs' -> do
+                Just IsBoundTo { bindingOccurance = OnceInLam, bindingE = e, bindingCheap = True } | someBenefit v e xs' -> do
                     mtick  (toAtom $ "E.Simplify.inline.OnceInLam.{" ++ showName (tvrIdent v)  ++ "}")
                     didInline inb e xs'
-                Just (IsBoundTo ManyBranch e) | multiInline v e xs' -> do
+                Just IsBoundTo { bindingOccurance = ManyBranch, bindingE = e } | multiInline v e xs' -> do
                     mtick  (toAtom $ "E.Simplify.inline.ManyBranch.{" ++ showName (tvrIdent v)  ++ "}")
                     didInline inb  e xs'
-                Just (IsBoundTo Many e) | isCheap e && multiInline v e xs' -> do
+                Just IsBoundTo { bindingOccurance = Many, bindingE = e, bindingCheap = True } | multiInline v e xs' -> do
                     mtick  (toAtom $ "E.Simplify.inline.Many.{" ++ showName (tvrIdent v)  ++ "}")
                     didInline inb  e xs'
                 Just _ -> appVar v xs'
