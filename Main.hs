@@ -413,14 +413,17 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- return prog { progMainEntry = main, progEntryPoints = [main], progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog] }
     prog <- return $ programPruneUnreachable prog
 
-    wdump FD.Lambdacube $ printProgram prog
+    lintCheckProgram prog
+
+    --wdump FD.Lambdacube $ printProgram prog
     prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return prog
     putStrLn "Type analyzed methods"
     flip mapM_ (programDs prog) $ \ (t,e) -> do
         let (_,ts) = fromLam e
             ts' = takeWhile (sortStarLike . getType) ts
         when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
-    wdump FD.Lambdacube $ printProgram prog
+    lintCheckProgram prog
+    --wdump FD.Lambdacube $ printProgram prog
 
     cmethods <- do
         let es' = concatMap expandPlaceholder (programDs prog)
@@ -436,6 +439,8 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- return $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
     prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) (\_ nfo -> return nfo) (\_ nfo -> return nfo) prog
     prog <- return $ programPruneUnreachable prog
+
+    lintCheckProgram prog
 
     let mangle = mangle'  (Just mempty)
     let opt = doopt (mangle dataTable) True stats
@@ -694,6 +699,20 @@ typecheck dataTable e = case inferType dataTable [] e of
             True -> return Unknown
             False -> putErrDie "Type Error in E"
     Right v -> return v
+
+lintCheckE dataTable tvr e | flint = case inferType dataTable [] e of
+    Left ss -> do
+        putErrLn  ( render $ hang 4 (pprint tvr <+> equals <+> pprint e))
+        putErrLn $ "\n>>> internal error:\n" ++ unlines (intersperse "----" $ tail ss)
+        case optKeepGoing options of
+            True -> return ()
+            False -> putErrDie "Type Error in E"
+    Right v -> return ()
+lintCheckE _ _ _ = return ()
+
+lintCheckProgram prog | flint = mapM_ f (programDs prog) where
+    f (tvr,e) = lintCheckE (progDataTable prog) tvr e
+lintCheckProgram _ = return ()
 
 dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ show n <+> hsep (map show as) <+> "::" <+> show t |  (n,(as,t)) <- Map.toList tt]
 
