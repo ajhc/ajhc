@@ -267,8 +267,9 @@ specializeProgram usedRules usedValues prog = do
     return $ programSetDs nds prog
 
 
-specializeDef _dataTable (t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
-specializeDef dataTable (tvr,e) = ans where
+specializeDef _(t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
+specializeDef (_,unusedVals,_,_) (tvr,e) | tvr `Set.member` unusedVals = return (tvr,EError "Unused" (tvrType tvr))
+specializeDef (_,_,dataTable,_) (tvr,e) = ans where
     sub = substMap''  $ Map.fromList [ (tvrNum t,v) | (t,Just v) <- sts ]
     sts = map spec ts
     spec t | Just nt <- Info.lookup (tvrInfo t) >>= getTyp (getType t) dataTable, sortStarLike (getType t) = (t,Just nt)
@@ -298,7 +299,7 @@ specBody env e = emapE' (specBody env) e
 
 --specializeDs :: MonadStats m => DataTable -> Map.Map TVr [Int] -> [(TVr,E)] -> m ([(TVr,E)]
 specializeDs env@(unusedRules,_,dataTable,_) ds = do
-    (ds,nenv) <- runWriterT $ mapM (specializeDef dataTable) ds
+    (ds,nenv) <- runWriterT $ mapM (specializeDef env) ds
     -- ds <- sequence [ specBody dataTable (nenv `mappend` env) e >>= return . (,) t | (t,e) <- ds]
     let f (t,e) = do
             e <- sb e
