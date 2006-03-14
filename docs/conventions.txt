@@ -18,9 +18,12 @@ an 'f' to names that start with a capital letter.
 
 * X@ - various temporary names generated from existing names
 
-* Jhc@ - A finite set of built in special names that never occur in haskell source
+* Jhc@ - A finite set of built in special names that never occur in haskell
+source. These are enumerated in Name.Names
 
 * F@ - bindings that have been floated out of top level definitions
+
+* A@ - bindings created by atomization of arguments
 
 * Spec@ - specializations of polymorphic functions
 
@@ -45,15 +48,16 @@ number, these can never conflict with top-levels.
 the C preprocessor should be avoided whenever possible, it should actually
 never be needed.
 
-Jhc is never targeted towards a particular architecture or bitwidth, Jhc
-should be able to produce code for any backend or architecture so no
-arch-dependent ifdefs or hardcoding of type sizes. Jhc itself should be
-entirely portable and produce identical results for identical target arches
-no matter what it is running on. (among other reasons, so we may
-cross-compile to embedded architectures and to aid in bootstrapping)
+Jhc is never targeted towards a particular architecture or bitwidth, any
+compiled version of Jhc running on any architecture should be able to produce
+code for any backend or architecture so no arch-dependent ifdefs or hardcoding
+of type sizes. Jhc itself should be entirely portable and produce identical
+results for identical target arches no matter what it is running on. (among
+other reasons, so we may cross-compile to embedded architectures and to aid in
+bootstrapping)
 
-non-literate sources are preferred to literate sources. haddock style comments
-should be included liberally.
+non-literate sources are preferred to literate sources. Correct haddock style
+comments should be included liberally, even for non-exported functions.
 
 The most recent released version of GHC Haskell is to be targeted. no need to
 not use the latest features or provide ifdefs for backwards compatibility.
@@ -62,7 +66,8 @@ However one should not use extensions without good reason and certain ones
 
 mutually recursive modules are too be generally avoided unless doing so would
 compromise code modularity and readability. a refactoring into multiple
-modules to avoid the recursion should be preferred when possible.
+modules to avoid the recursion should be preferred when possible, but a
+logical layout of the module hierachy takes precidence.
 
 
 == code style ==
@@ -77,6 +82,7 @@ and the otl files.
 * unless it can fit all on one line, a newline should come after let, do or
 where so that the code is always indented in units of 4 spaces
 
-* in general, I use under_scores for CAFs, global names, and tables. camelCaps
-for functions and CapCaps for data, type constructors, and classes.
+* in general, I use under_scores for CAFs, global non-function names, and
+tables. camelCaps for functions and CapCaps for data, type constructors, and
+classes.
 
