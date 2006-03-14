@@ -4,6 +4,7 @@ module Ho.Build (
     findModule,
     hoToProgram,
     initialHo,
+    fixupHo,
     recordHoFile,
     checkForHoFile
     ) where
@@ -387,6 +388,7 @@ mapHoBodies sm ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  runIdentity (E.
 
 
 
+
 eraseE :: E -> E
 eraseE e = runIdentity $ f e where
     f (EVar tv) = return $ EVar  tvr { tvrIdent = tvrIdent tv }
@@ -400,6 +402,8 @@ applyFixups mie ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  runIdentity (E
     f (t,e) = (t,sm e)
     sm = substMap'' mie
 
+fixupHo :: Ho -> Ho
+fixupHo ho = applyFixups (getFixups ho) ho
 
 
 

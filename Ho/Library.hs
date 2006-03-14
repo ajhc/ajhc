@@ -57,7 +57,7 @@ loadLibraries :: IO Ho
 loadLibraries = do
     wdump FD.Progress $ putErrLn $ "Loading libraries: " ++ show (optHls options)
     ps <- foldM (loadP Nothing) Map.empty (optHls options)
-    return $ mconcat (initialHo : map libraryHo (Map.elems ps))
+    return $ fixupHo $ mconcat (initialHo : map libraryHo (Map.elems ps))
 
 -- Write a library and mutilate it to fit the description
 
