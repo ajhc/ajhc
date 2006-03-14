@@ -204,6 +204,7 @@ processDecls stats ho ho' tiData = do
     ds <- convertDecls tiData (hoClassHierarchy ho') allAssumps  fullDataTable decls
     wdump FD.InitialCore $
         mapM_ (\(_,v,lc) -> printCheckName'' fullDataTable v lc) ds
+    sequence_ [lintCheckE fullDataTable v e | (_,v,e) <- ds ]
 
     -- Build rules
     rules' <- createInstanceRules (hoClassHierarchy ho')   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
@@ -709,8 +710,10 @@ lintCheckE dataTable tvr e | flint = case inferType dataTable [] e of
     Right v -> return ()
 lintCheckE _ _ _ = return ()
 
-lintCheckProgram prog | flint = mapM_ f (programDs prog) where
-    f (tvr,e) = lintCheckE (progDataTable prog) tvr e
+lintCheckProgram prog | flint = do
+    let f (tvr,e) = lintCheckE (progDataTable prog) tvr e
+    when (hasRepeatUnder fst (programDs prog)) $ fail "program has repeated toplevel definitions"
+    mapM_ f (programDs prog)
 lintCheckProgram _ = return ()
 
 dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ show n <+> hsep (map show as) <+> "::" <+> show t |  (n,(as,t)) <- Map.toList tt]
