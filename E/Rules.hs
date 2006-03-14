@@ -1,6 +1,6 @@
 module E.Rules(
     ARules,
-    Rule(ruleHead,ruleBinds,ruleArgs,ruleBody,ruleUniq,ruleName),
+    Rule(Rule,ruleHead,ruleBinds,ruleArgs,ruleBody,ruleUniq,ruleName),
     Rules,
     applyRules,
     arules,

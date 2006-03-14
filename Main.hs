@@ -423,14 +423,15 @@ compileModEnv' stats (initialHo,finalHo) = do
     wdump FD.Lambdacube $ printProgram prog
 
     cmethods <- do
-        es' <- createMethods dataTable (hoClassHierarchy ho) (programEsMap prog)
+        let es' = concatMap expandPlaceholder (programDs prog)
+        --es' <- createMethods dataTable (hoClassHierarchy ho) (programEsMap prog)
         let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- programDs prog, not $ t `Set.member` tmap]
-            tmap = Set.fromList $ [ t | (_,t,_) <- es' ]
-        let Identity es'' = annotateDs initMap (idann (hoRules ho) (hoProps ho) ) letann lamann [ (y,z) | (x,y,z) <- es']
-        es' <- return [ (x,y,floatInward rules z) | (x,_,_) <- es' | (y,z) <- es'' ]
+            tmap = Set.fromList [ t | (t,_) <- es' ]
+        let Identity es'' = annotateDs initMap (idann (hoRules ho) (hoProps ho) ) letann lamann es'
+        es' <- return [ (y,floatInward rules z) |  (y,z) <- es'' ]
         wdump FD.Class $ do
-            sequence_ [ print x >> printCheckName' dataTable y z |  (x,y,z) <- es']
-        return [ (y,z) | (_,y,z) <- es' ]
+            sequence_ [ printCheckName' dataTable y z |  (y,z) <- es']
+        return es'
 
     prog <- return $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
     prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) (\_ nfo -> return nfo) (\_ nfo -> return nfo) prog

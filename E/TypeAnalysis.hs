@@ -1,7 +1,7 @@
 -- | examine all uses of types in a program to determine which ones are
 -- actually needed in the method generation
 
-module E.TypeAnalysis(typeAnalyze, Typ()) where
+module E.TypeAnalysis(typeAnalyze, Typ(),expandPlaceholder) where
 
 import Control.Monad.Reader
 import Control.Monad.Writer
@@ -70,7 +70,9 @@ typeAnalyze prog = do
     mapM_ (sillyEntry env) entries
     calcFixpoint "type analysis" fixer
     prog <- annotateProgram mempty (\_ -> return) (\_ -> return) lamread prog
-    let (prog',stats) = runStatM $ specializeProgram prog
+    unusedRules <- supplyReadValues ur >>= return . fsts . filter (not . snd)
+    unusedValues <- supplyReadValues uv >>= return . fsts . filter (not . snd)
+    let (prog',stats) = runStatM $ specializeProgram (Set.fromList unusedRules) (Set.fromList unusedValues) prog
     prog <- annotateProgram mempty lamdel (\_ -> return) (\_ -> return) prog'
     printStat "TypeAnalysis" stats
 
@@ -241,6 +243,9 @@ pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
 
 
 
+type SpecEnv = (Set.Set (Module,Int),Set.Set TVr,DataTable,Map.Map TVr [Int])
+
+
 getTyp :: Monad m => E -> DataTable -> Typ -> m E
 getTyp kind dataTable vm = f 10 kind vm where
     f n _ _ | n <= 0 = fail "getTyp: too deep"
@@ -252,15 +257,19 @@ getTyp kind dataTable vm = f 10 kind vm where
         return $ ELit (LitCons h as' kind)
     f _ _ _  = fail "getTyp: not constant type"
 
-specializeProgram :: (MonadStats m) => Program -> m Program
-specializeProgram prog = do
-    (nds,_) <- specializeDs (progDataTable prog) mempty (programDs prog)
+specializeProgram :: (MonadStats m) =>
+    (Set.Set (Module,Int))  -- ^ used rules
+    -> (Set.Set TVr)        -- ^ used values
+    -> Program
+    -> m Program
+specializeProgram usedRules usedValues prog = do
+    (nds,_) <- specializeDs (usedRules,usedValues,progDataTable prog,mempty) (programDs prog)
     return $ programSetDs nds prog
 
 
-specializeDef _dataTable (t,e) | getProperty prop_PLACEHOLDER t || getProperty prop_INSTANCE t = return (t,e)
+specializeDef _dataTable (t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
 specializeDef dataTable (tvr,e) = ans where
-    sub = eLetRec  [ (t,v) | (t,Just v) <- sts ]
+    sub = substMap''  $ Map.fromList [ (tvrNum t,v) | (t,Just v) <- sts ]
     sts = map spec ts
     spec t | Just nt <- Info.lookup (tvrInfo t) >>= getTyp (getType t) dataTable, sortStarLike (getType t) = (t,Just nt)
     spec t = (t,Nothing)
@@ -274,27 +283,64 @@ specializeDef dataTable (tvr,e) = ans where
         return (if sd then tvr { tvrType = infertype dataTable ne, tvrInfo = infoMap (dropArguments vs) (tvrInfo tvr) } else tvr,ne)
 
 
-specBody :: MonadStats m => DataTable -> Map.Map TVr [Int] -> E -> m E
-specBody dataTable env e | (EVar h,as) <- fromAp e, Just os <- Map.lookup h env = do
+specBody :: MonadStats m => SpecEnv -> E -> m E
+specBody env@(_,unusedVars,dataTable,_) e | (EVar h,as) <- fromAp e, h `Set.member` unusedVars = do
+    mtick $ "Specialize.delete.{" ++ pprint h ++ "}"
+    return $ foldl EAp (EError ("Unused: " ++ pprint h) (getType h)) as
+specBody (_,_,_,dmap) e | (EVar h,as) <- fromAp e, Just os <- Map.lookup h dmap = do
     mtick $ "Specialize.use.{" ++ pprint h ++ "}"
     return $ foldl EAp (EVar h) [ a | (a,i) <- zip as naturals, i `notElem` os ]
-specBody dataTable env (ELetRec ds e) = do
-    (nds,nenv) <- specializeDs dataTable env ds
-    e <- specBody dataTable nenv e
+specBody env (ELetRec ds e) = do
+    (nds,nenv) <- specializeDs env ds
+    e <- specBody nenv e
     return $ ELetRec nds e
-specBody dataTable env e = emapE' (specBody dataTable env) e
+specBody env e = emapE' (specBody env) e
 
 --specializeDs :: MonadStats m => DataTable -> Map.Map TVr [Int] -> [(TVr,E)] -> m ([(TVr,E)]
-specializeDs dataTable env ds = do
+specializeDs env@(unusedRules,_,dataTable,_) ds = do
     (ds,nenv) <- runWriterT $ mapM (specializeDef dataTable) ds
     -- ds <- sequence [ specBody dataTable (nenv `mappend` env) e >>= return . (,) t | (t,e) <- ds]
     let f (t,e) = do
             e <- sb e
             nfo <- infoMapM (mapABodiesArgs sb) (tvrInfo t)
+            nfo <- infoMapM (return . arules . filter ( not . (`Set.member` unusedRules) . ruleUniq) . rulesFromARules) nfo
             return (t { tvrInfo = nfo }, e)
-        sb = specBody dataTable (nenv `mappend` env)
+        tenv = ((\ (a,b,c,d) -> (a,b,c,nenv `mappend` d)) env)
+        sb = specBody tenv
     ds <- mapM f ds
-    return (ds,nenv `mappend` env)
+    return (ds,tenv)
+
+
+expandPlaceholder :: Monad m => (TVr,E) -> m (TVr,E)
+expandPlaceholder (tvr,oe) | getProperty prop_PLACEHOLDER tvr = do
+    let rules = filter isBodyRule $  rulesFromARules $ Info.fetch (tvrInfo tvr)
+        isBodyRule Rule { ruleBody = e } | (EVar vv,_) <- fromAp e, getProperty prop_INSTANCE vv = True
+        isBodyRule _ = False
+    if null rules then return (unsetProperty prop_PLACEHOLDER tvr, EError "placeholder, no bodies" (getType tvr)) else do
+    let (oe',as) = fromLam oe
+        rule1:_ = rules
+        ct = getType $ foldr ELam oe' (drop (length $ ruleArgs rule1) as)
+        as'@(a:ras) = take (length $ ruleArgs rule1) as
+        ne = emptyCase {
+            eCaseScrutinee = EVar a,
+            eCaseAlts = map calt rules,
+            eCaseBind = a { tvrIdent = 0 },
+            eCaseType = ct
+            }
+        calt rule@Rule { ruleArgs = (arg:rs) } = Alt (valToPat' arg) (substMap (Map.fromList [ (tvrIdent v,EVar r) | ~(EVar v) <- rs | r <- ras ]) $ ruleBody rule)
+
+        valToPat' (ELit (LitCons x ts t)) = LitCons x [ z | ~(EVar z) <- ts ] t
+        valToPat' (EPi (TVr { tvrType =  EVar a}) (EVar b))  = LitCons tc_Arrow [a,b] eStar
+        valToPat' x = error $ "expandPlaceholder.valToPat': " ++ show x
+
+    return (unsetProperty prop_PLACEHOLDER tvr,foldr ELam ne as')
+
+expandPlaceholder _x = fail "not placeholder"
+
+
+
+
+
 
 
 
