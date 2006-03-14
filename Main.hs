@@ -497,15 +497,14 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- lambdaLift finalStats prog
 
     rs' <- flip mapM (progCombinators prog) $ \ (t,ls,e) -> do
-        --putStrLn (pprint t)
         let cm stats e = do
             let sopt = mempty {  SS.so_dataTable = dataTable }
             let (stat, e') = SS.simplifyE sopt e
             Stats.tickStat stats stat
-            e'' <- atomizeAp True dataTable stats e'
-            return e''
+            return e'
         e' <- doopt (mangle' Nothing dataTable) False finalStats "SuperSimplify" cm e
-        return (t,ls,e')
+        e'' <- atomizeAp True dataTable stats e'
+        return (t,ls,e'')
     wdump FD.Progress $ Stats.print "PostLifting" finalStats
 
     prog <- return $ prog { progCombinators = rs' }
