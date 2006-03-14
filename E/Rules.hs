@@ -224,6 +224,8 @@ joinARules ar@(ARules a) br@(ARules b)
     | otherwise = error $ "mixing rules!" ++ show (ar,br) where
    rs@(r:_) = map ruleHead a ++ map ruleHead b
 
+rsubstMap :: Map.Map Id E -> E -> E
+rsubstMap im e = doSubst False True (Map.map ( (`Map.lookup` im) . tvrIdent) (Map.unions $ (freeVars e :: Map.Map Id TVr):map freeVars (Map.elems im))) e
 
 applyRules lup (ARules rs) xs = f rs where
     lxs = length xs
@@ -232,7 +234,7 @@ applyRules lup (ARules rs) xs = f rs where
     f (r:rs) = case sequence (zipWith (match lup (ruleBinds r)) (ruleArgs r) xs) of
         Just ss -> do
             mtick (ruleName r)
-            let b = substMap (Map.fromList [ (i,x) | (TVr { tvrIdent = i },x) <- concat ss ]) (ruleBody r)
+            let b = rsubstMap (Map.fromList [ (i,x) | (TVr { tvrIdent = i },x) <- concat ss ]) (ruleBody r)
             return $ Just (b,drop (ruleNArgs r) xs)
         Nothing -> do f rs
 

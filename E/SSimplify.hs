@@ -158,7 +158,10 @@ data Range = Done E | Susp E Subst
 type Subst = Map.Map Int Range
 
 type InScope = Map.Map Int Binding
-data Binding = NotAmong [Name] | IsBoundTo Occurance E | NotKnown
+data Binding =
+    NotAmong [Name]
+    | IsBoundTo { bindingOccurance :: Occurance, bindingE :: E }
+    | NotKnown
     {-! derive: is !-}
 
 data Env = Env {
@@ -316,7 +319,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
 
     nname tvr@(TVr { tvrIdent = n, tvrType =  t}) sub inb  = do
         t' <- dosub sub t
-        let t'' = substMap'' (Map.map (\ (IsBoundTo _ e) -> e) $ Map.filter isIsBoundTo (envInScope inb)) t'  --  (Map.fromAscList [ (t,e) | (t,IsBoundTo _ e) <- Map.toAscList (envInScope inb) ]) t'
+        let t'' = substMap'' (Map.map (\ IsBoundTo { bindingE = e } -> e) $ Map.filter isIsBoundTo (envInScope inb)) t'  --  (Map.fromAscList [ (t,e) | (t,IsBoundTo _ e) <- Map.toAscList (envInScope inb) ]) t'
         n' <- uniqueName n
         return $ tvr { tvrIdent = n', tvrType =  t'' }
 --        case n `Map.member` inb of
@@ -334,10 +337,10 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         e' <- doCase e t b as d sub inb
         return $ substLet' ds e'
 
-    doCase (EVar v) t b as d sub inb |  Just (IsBoundTo _ (ELit l)) <- Map.lookup (tvrNum v) (envInScope inb)  = doConstCase l t  b as d sub inb
+    doCase (EVar v) t b as d sub inb |  Just IsBoundTo { bindingE = ELit l } <- Map.lookup (tvrNum v) (envInScope inb)  = doConstCase l t  b as d sub inb
     doCase (ELit l) t b as d sub inb  = doConstCase l t b as d sub inb
 
-    doCase (EVar v) t b as d sub inb | Just (IsBoundTo _ e) <- Map.lookup (tvrNum v) (envInScope inb) , isBottom e = do
+    doCase (EVar v) t b as d sub inb | Just IsBoundTo { bindingE = e } <- Map.lookup (tvrNum v) (envInScope inb) , isBottom e = do
         mtick "E.Simplify.case-of-bottom'"
         t' <- dosub sub t
         return $ prim_unsafeCoerce (EVar v) t'
@@ -407,7 +410,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                     ninb = Map.fromList [ (n,NotKnown)  | TVr { tvrIdent = n } <- ns' ]
                 e' <- f ae (nsub `Map.union` sub) (envInScope_u (ninb `Map.union`) $ mins e (patToLitEE p') inb)
                 return $ Alt p' e'
-            mins (EVar v) e = envInScope_u (Map.insert (tvrNum v) (IsBoundTo Many $  e))
+            mins (EVar v) e = envInScope_u (Map.insert (tvrNum v) (IsBoundTo Many e))
             mins _ _ = id
 
         d' <- fmapM dd d
@@ -447,7 +450,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     applyRule v xs inb  = do
         z <- builtinRule v xs
         let lup x = case Map.lookup x (envInScope inb) of
-                Just (IsBoundTo _ e) -> Just e
+                Just IsBoundTo { bindingE = e } -> Just e
                 _ -> Nothing
         case z of
             Nothing | fopts FO.Rules -> applyRules lup (Info.fetch (tvrInfo v)) xs
@@ -467,43 +470,38 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         return (eLetRec [ (t',b) | (_,t',b) <- zs] e)
        where
             haveBody tvr = case Map.lookup (tvrIdent tvr) (envInScope inb) of
-                (Just (IsBoundTo _ e)) -> Just e
+                Just IsBoundTo { bindingE = e } -> Just e
                 _ -> Nothing
 
 
-    h (EVar v) xs' inb | forceNoinline v = do
-        z <- applyRule v xs' inb
-        case z of
-            Just (x,xs) -> didInline inb (x,xs) --h x xs inb
-            Nothing -> app (EVar v, xs')
-
     h (EVar v) xs' inb = do
         z <- applyRule v xs' inb
-        case z of
-            Just (x,xs) -> didInline inb (x,xs) -- h x xs inb
-            Nothing -> case Map.lookup (tvrNum v) (envInScope inb) of
-                Just (IsBoundTo LoopBreaker _) -> appVar v xs'
-                Just (IsBoundTo Once _) -> error "IsBoundTo: Once"
+        case (z,forceNoinline v) of
+            (Just (x,xs),_) -> didInline inb x xs  -- h x xs inb
+            (_,True) -> app (EVar v, xs')
+            _ -> case Map.lookup (tvrNum v) (envInScope inb) of
+                Just IsBoundTo { bindingOccurance = LoopBreaker } -> appVar v xs'
+                Just IsBoundTo { bindingOccurance = Once } -> error "IsBoundTo: Once"
                 Just (IsBoundTo n e) | forceInline v -> do
                     mtick  (toAtom $ "E.Simplify.inline.forced.{" ++ tvrShowName v  ++ "}")
-                    didInline inb (e,xs')
-                Just (IsBoundTo OnceInLam e) | safeToDup e && someBenefit e xs' -> do
+                    didInline inb e xs'
+                Just (IsBoundTo OnceInLam e) | isCheap e && someBenefit v e xs' -> do
                     mtick  (toAtom $ "E.Simplify.inline.OnceInLam.{" ++ showName (tvrIdent v)  ++ "}")
-                    didInline inb (e,xs')
-                Just (IsBoundTo ManyBranch e) | multiInline e xs' -> do
+                    didInline inb e xs'
+                Just (IsBoundTo ManyBranch e) | multiInline v e xs' -> do
                     mtick  (toAtom $ "E.Simplify.inline.ManyBranch.{" ++ showName (tvrIdent v)  ++ "}")
-                    didInline inb (e,xs')
-                Just (IsBoundTo Many e) | safeToDup e && multiInline e xs' -> do
+                    didInline inb  e xs'
+                Just (IsBoundTo Many e) | isCheap e && multiInline v e xs' -> do
                     mtick  (toAtom $ "E.Simplify.inline.Many.{" ++ showName (tvrIdent v)  ++ "}")
-                    didInline inb (e,xs')
+                    didInline inb  e xs'
                 Just _ -> appVar v xs'
                 Nothing  -> appVar v xs'
                 -- Nothing | tvrNum v `Set.member` exports -> app (EVar v,xs')
                 -- Nothing -> error $ "Var not in scope: " ++ show v
     h e xs' inb = do
         app (e,xs')
-    didInline inb z = do
-        e <- app z
+    didInline inb z zs = do
+        e <- app (z,zs)
         go e inb
     appVar v xs = do
         me <- etaExpandAp (so_dataTable sopts) v xs
@@ -513,10 +511,20 @@ simplifyDs sopts dsIn = (stat,dsOut) where
 
 
 
-someBenefit _ _ = False
+someBenefit _ ELit {} _ = True
+someBenefit _ EPrim {} _ = True
+someBenefit _ e xs | f e xs = True where
+    f (ELam _ e) (x:xs) = f e xs
+    f ELam {} [] = False
+    f _ _ = True
+someBenefit v e xs = False
 
-multiInline x xs | not (someBenefit x xs) = False
-multiInline e xs = length xs + 2 >= (nsize + if safeToDup b then negate 4 else 0)  where
+multiInline _ e xs | isSmall (f e xs) = True  where -- should be noSizeIncrease
+    f e [] = e
+    f (ELam _ e) (_:xs) = f e xs
+    f e xs = foldl EAp e xs
+multiInline v e xs | not (someBenefit v e xs) = False
+multiInline _ e xs = length xs + 2 >= (nsize + if safeToDup b then negate 4 else 0)  where
     (b,as) = fromLam e
     nsize = size b + abs (length as - length xs)
     size e | (x,xs) <- fromAp e = size' x + length xs
