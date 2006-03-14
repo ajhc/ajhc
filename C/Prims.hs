@@ -42,6 +42,18 @@ primIsCheap _ = False
 
 aprimIsCheap (APrim p _) = primIsCheap p
 
+
+-- | whether a primitive represents a constant expression (assuming all its arguments are constant)
+-- TODO needs grin support
+primIsConstant :: Prim -> Bool
+-- primIsConstant CConst {} = True
+-- primIsConstant AddrOf {} = True
+-- primIsConstant CCast {} = True -- grin doesn't support this yet
+-- primIsConstant Operator {} = True -- inhibits rules matching, divide by zero.
+primIsConstant _ = False
+
+
+
 parsePrimString s = do
     ws@(_:_) <- return $ words s
     let v = case last ws of

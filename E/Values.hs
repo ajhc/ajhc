@@ -15,6 +15,7 @@ import E.E
 import E.FreeVars()
 import E.Subst
 import E.TypeCheck
+import qualified Info.Info as Info
 import Support.FreeVars
 import Info.Types
 import Name.Name
@@ -129,11 +130,6 @@ substLet ds e  = ans where
     tas = filter (sortStarLike . tvrType . fst) nas
     ans = eLetRec (as ++ nas) (typeSubst' (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- as]) (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas]) e)
 
-isAtomic :: E -> Bool
---isAtomic e | sortTypeLike e = True
-isAtomic EVar {}  = True
-isAtomic e | sortTypeLike e = True
-isAtomic e = isFullyConst e
 
 substLet' :: [(TVr,E)] -> E -> E
 substLet' ds' e  = ans where
@@ -151,28 +147,6 @@ substLet' ds' e  = ans where
     hhh ((h,v):hh) e = eLet h v (hhh hh e)
 
 eLetRec = substLet'
-
--- | determine if term can contain _|_
-isLifted :: E -> Bool
-isLifted x = sortTermLike x && not (isUnboxed (getType x))
-
--- Note: This does not treat lambdas as whnf
-whnfOrBot :: E -> Bool
-whnfOrBot (EError {}) = True
-whnfOrBot (ELit (LitCons _ xs _)) = all isAtomic xs
-whnfOrBot (EPi (TVr { tvrIdent =  j, tvrType =  x }) y) | not (j `Set.member` freeVars y) = isAtomic x && isAtomic y
-whnfOrBot e = isAtomic e
-
--- Determine if a type represents an unboxed value
-isUnboxed :: E -> Bool
-isUnboxed e@EPi {} = False
-isUnboxed e = getType e == eHash
-
-safeToDup ec@ECase {}
-    | EVar _ <- eCaseScrutinee ec = all safeToDup (caseBodies ec)
-    | EPrim p _ _ <- eCaseScrutinee ec, aprimIsCheap p = all safeToDup (caseBodies ec)
-safeToDup (EPrim p _ _) = aprimIsCheap p
-safeToDup e = whnfOrBot e || isELam e || isEPi e
 
 
 vTag n = ELit $ LitCons n [] tTag
@@ -224,4 +198,69 @@ instance HasProperties TVr where
     unsetProperty prop tvr = tvrInfo_u (unsetProperty prop) tvr
     getProperty prop tvr = getProperty prop (tvrInfo tvr)
 
+
+-- various routines used to classify expressions
+-- many assume atomicity constraints are in place
+
+-- | whether a value is a compile time constant
+isFullyConst :: E -> Bool
+isFullyConst (ELit (LitCons _ [] _)) = True
+isFullyConst (ELit (LitCons _ xs _)) = all isFullyConst xs
+isFullyConst ELit {} = True
+isFullyConst (EPi (TVr { tvrType = t }) x) =  isFullyConst t && isFullyConst x
+isFullyConst (EPrim (APrim p _) as _) = primIsConstant p && all isFullyConst as
+isFullyConst _ = False
+
+
+-- | whether a value may be used as an argument to an application, literal, or primitive
+-- these may be duplicated with no code size or runtime penalty
+isAtomic :: E -> Bool
+isAtomic EVar {}  = True
+isAtomic e | sortTypeLike e = True
+isAtomic e = isFullyConst e
+
+
+-- | whether an expression is small enough that it can be duplicated without code size growing too much. (work may be repeated)
+isSmall e | isAtomic e = True
+isSmall ELit {} = True
+isSmall EPrim {} = True
+isSmall EError {} = True
+isSmall e | (EVar _,xs) <- fromAp e = length xs <= 4
+isSmall _ = False
+
+-- | whether an expression may be duplicated or pushed inside a lambda without duplicating too much work
+
+isCheap :: E -> Bool
+isCheap x | isAtomic x = True
+isCheap EError {} = True
+isCheap ELit {} = True
+isCheap EPi {} = True
+isCheap ELam {} = True -- should exclude values dropped at compile time
+isCheap (EPrim p _ _) = aprimIsCheap p
+isCheap ec@ECase {} = isCheap (eCaseScrutinee ec) && all isCheap (caseBodies ec)
+isCheap e | (EVar v,xs) <- fromAp e, Just (Arity n) <- Info.lookup (tvrInfo v), length xs < n = True  -- Partial applications are cheap
+isCheap _ = False
+
+
+-- | determine if term can contain _|_
+isLifted :: E -> Bool
+isLifted x = sortTermLike x && not (isUnboxed (getType x))
+
+-- Note: This does not treat lambdas as whnf
+whnfOrBot :: E -> Bool
+whnfOrBot (EError {}) = True
+whnfOrBot (ELit (LitCons _ xs _)) = all isAtomic xs
+whnfOrBot (EPi (TVr { tvrIdent =  j, tvrType =  x }) y) | not (j `Set.member` freeVars y) = isAtomic x && isAtomic y
+whnfOrBot e = isAtomic e
+
+-- Determine if a type represents an unboxed value
+isUnboxed :: E -> Bool
+isUnboxed e@EPi {} = False
+isUnboxed e = getType e == eHash
+
+safeToDup ec@ECase {}
+    | EVar _ <- eCaseScrutinee ec = all safeToDup (caseBodies ec)
+    | EPrim p _ _ <- eCaseScrutinee ec, aprimIsCheap p = all safeToDup (caseBodies ec)
+safeToDup (EPrim p _ _) = aprimIsCheap p
+safeToDup e = whnfOrBot e || isELam e || isEPi e
 

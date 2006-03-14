@@ -293,17 +293,6 @@ eCompat x y = x == y
 
 
 
-fullyConst :: Monad m => E -> m ()
-fullyConst (ELit (LitCons _ [] _)) = return ()
-fullyConst (ELit (LitCons _ xs _)) = mapM_ fullyConst xs
-fullyConst ELit {} = return ()
-fullyConst (EPi (TVr { tvrType = t }) x) = do
-    fullyConst t
-    fullyConst x
-fullyConst _ = fail "not fully constant"
-
-isFullyConst :: E -> Bool
-isFullyConst = maybe False (const True) . fullyConst
 
 isBottom EError {} = True
 isBottom _ = False
