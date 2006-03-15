@@ -238,6 +238,7 @@ convertBody (Case v@(Var _ ty) [p1@(NodeC t _) :-> e1,p2 :-> e2]) | ty == TyNode
         da v@Var {} _ = do
             v'' <- convertVal v
             return $ assign v'' scrut
+        da n1@(NodeC t _) (Return n2@NodeC {}) | n1 == n2 = convertBody (Return v)
         da (NodeC t as) e = do
             as' <- mapM convertVal as
             let tmp = project' (nodeStructName t) scrut
@@ -260,6 +261,9 @@ convertBody (Case v@(Var _ t) ls) | t == TyNode = do
             v'' <- convertVal v
             e' <- convertBody e
             return $ (Nothing,assign v'' scrut `mappend` e')
+        da (n1@(NodeC t _) :-> Return n2@NodeC {}) | n1 == n2 = do
+            e' <- convertBody (Return v)
+            return (Just (enum (nodeTagName t)),e')
         da ((NodeC t as) :-> e) = do
             as' <- mapM convertVal as
             e' <- convertBody e
