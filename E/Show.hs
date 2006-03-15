@@ -113,15 +113,12 @@ showTVr' TVr { tvrIdent = i} = do
 
 allocTVr :: TVr -> SEM a -> SEM a
 allocTVr tvr action | tvrIdent tvr == 0 = action
-allocTVr tvr action | tvrType tvr == eStar  = do
-    SEM $ newName (map (:[]) ['a' ..]) eStar (tvrIdent tvr)
-    action
-allocTVr tvr action | tvrType tvr == eStar `tFunc` eStar  = do
-    SEM $ newName (map (('f':) . show) [0::Int ..])  (tvrType tvr) (tvrIdent tvr)
-    action
-allocTVr tvr action | even (tvrIdent tvr) = do
-    SEM $ newName (map (('v':) . show) [1::Int ..]) Unknown (tvrIdent tvr)
-    action
+allocTVr tvr (SEM action) | tvrType tvr == eStar  = do
+    SEM $ subVarName $ newName (map (:[]) ['a' ..]) eStar (tvrIdent tvr) >> action
+allocTVr tvr (SEM action) | tvrType tvr == eStar `tFunc` eStar  = do
+    SEM $ subVarName $ newName (map (('f':) . show) [0::Int ..])  (tvrType tvr) (tvrIdent tvr) >> action
+allocTVr tvr (SEM action) | even (tvrIdent tvr) = do
+    SEM $ subVarName $ newName (map (('v':) . show) [1::Int ..]) Unknown (tvrIdent tvr) >> action
 allocTVr _ action = action
 
 
