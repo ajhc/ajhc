@@ -100,8 +100,8 @@ or' fs x = or [ f x | f <- fs ]
 
 tiModules' ::  Ho -> [ModInfo] -> IO (Ho,TiData)
 tiModules' me ms = do
-    let importVarEnv = Map.fromList [ (x,typeToScheme y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
-        importDConsEnv = Map.fromList [ (x,typeToScheme y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
+    let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
+        importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
         importClassHierarchy = hoClassHierarchy me
         importKindEnv = hoKinds me
     wdump FD.Progress $ do
@@ -135,11 +135,11 @@ tiModules' me ms = do
 
     -- collect types for data constructors
 
-    let localDConsEnv = dataConsEnv (error "modName") kindInfo classAndDataDecls -- (rDataDecls ++ rNewTyDecls)
+    let localDConsEnv = Map.map schemeToType $ dataConsEnv (error "modName") kindInfo classAndDataDecls -- (rDataDecls ++ rNewTyDecls)
 
     wdump FD.Dcons $ do
         putStr "\n ---- data constructor assumptions ---- \n"
-        mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType (schemeToType s) |  (n,s) <- Map.toList localDConsEnv]
+        mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType s |  (n,s) <- Map.toList localDConsEnv]
 
 
     let globalDConsEnv = localDConsEnv `Map.union` importDConsEnv
@@ -210,7 +210,7 @@ tiModules' me ms = do
     let moduleName = modInfoName tms
         (tms:_) = ms
     let tcInfo = tcInfoEmpty {
-        tcInfoEnv = Map.map schemeToType (importVarEnv `mappend` globalDConsEnv),
+        tcInfoEnv = (importVarEnv `mappend` globalDConsEnv),
         tcInfoSigEnv = Map.map schemeToType $ sigEnv ,
         tcInfoModName =  show moduleName,
         tcInfoKindInfo = kindInfo,
@@ -227,7 +227,7 @@ tiModules' me ms = do
                 _ -> ctId
         return (env,checkedRules out,cc',tcDs)
 
-    when (dump FD.Renamed) $ do
+    when (dump FD.Decls) $ do
         putStrLn " \n ---- typechecked code ---- \n"
         mapM_ (putStrLn . HsPretty.render . HsPretty.ppHsDecl) tcDs
 
@@ -244,8 +244,8 @@ tiModules' me ms = do
 
     let pragmaProps = Map.fromListWith (\a b -> snub $ a ++ b ) [ (toName Name.Val x,[toAtom w]) |  HsPragmaProps _ w xs <- ds, x <- xs ]
 
-    let allAssumps = Map.map schemeToType localDConsEnv `Map.union` localVarEnv
-        expAssumps = Map.map schemeToType localDConsEnv `Map.union` externalEnv
+    let allAssumps = localDConsEnv `Map.union` localVarEnv
+        expAssumps = localDConsEnv `Map.union` externalEnv
     let ho = mempty {
         hoExports = Map.fromList [ (modInfoName m,modInfoExport m) | m <- ms ],
         hoDefs =  Map.fromList [ (x,(y,z)) | (x,y,z) <- concat $ map modInfoDefs ms],
