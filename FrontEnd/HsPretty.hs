@@ -451,7 +451,9 @@ ppHsExp (HsLit l) = ppHsLit l
 -- lambda stuff
 ppHsExp (HsInfixApp a op b) = myFsep[ppHsExp a, ppInfix op, ppHsExp b]
 	where
+	ppInfix (HsAsPat as (HsVar n)) | dump FD.Aspats = ppHsName as <> char '@' <> ppHsQNameInfix n
 	ppInfix (HsAsPat _ (HsVar n)) = ppHsQNameInfix n
+	ppInfix (HsAsPat as (HsCon n)) | dump FD.Aspats = ppHsName as <> char '@' <> ppHsQNameInfix n
 	ppInfix (HsAsPat _ (HsCon n)) = ppHsQNameInfix n
 	ppInfix (HsVar n) = ppHsQNameInfix n
 	ppInfix (HsCon n) = ppHsQNameInfix n

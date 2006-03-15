@@ -108,6 +108,8 @@ extractBox :: Monad m => Type -> m MetaVar
 extractBox (TMetaVar mv) | metaType mv > Tau  = return mv
 extractBox t = fail $ "not a metaTyVar:" ++ show t
 
+instance DocLike d => PPrint d Type where
+    pprint = prettyPrintType
 
 prettyPrintType :: DocLike d => Type -> d
 prettyPrintType t  = unparse $ runVarName (f t) where
@@ -336,8 +338,16 @@ data Rule = RuleSpec {
 
 -- CTFun f => \g . \y -> f (g y)
 data CoerceTerm = CTId | CTAp [Type] | CTAbs [Tyvar] | CTFun CoerceTerm | CTCompose CoerceTerm CoerceTerm
-    deriving(Show)
 
+instance Show CoerceTerm where
+    showsPrec _ CTId = showString "id"
+    showsPrec n (CTAp ts) = ptrans (n > 10) parens $ char '@' <+> hsep (map (parens . prettyPrintType) ts)
+    showsPrec n (CTAbs ts) = ptrans (n > 10) parens $ char '\\' <+> hsep (map pprint ts)
+    showsPrec n (CTFun ct) = ptrans (n > 10) parens $ text "->" <+> showsPrec 11 ct
+    showsPrec n (CTCompose ct1 ct2) = ptrans (n > 10) parens $ (showsPrec 11 ct1) <+> char '.' <+> (showsPrec 11 ct2)
+
+
+ptrans b f = if b then f else id
 
 instance Monoid CoerceTerm where
     mempty = CTId

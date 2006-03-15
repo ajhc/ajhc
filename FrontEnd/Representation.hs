@@ -227,8 +227,8 @@ instance ToTuple Scheme where
 
 -- pretty printing for types etc:
 
-instance PPrint Doc Type where
-  pprint t = fst $ runVarName [] nameSupply $ prettyPrintTypeM t
+--instance PPrint a Type where
+--  pprint t = fst $ runVarName [] nameSupply $ prettyPrintTypeM t
 
 -- the trickery is to map TVars and TGens into nice
 -- variable names: a, b, c, d, and so on when we print them
