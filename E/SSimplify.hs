@@ -360,7 +360,8 @@ simplifyDs sopts dsIn = (stat,dsOut) where
             g x = doCase x t b' as' d' sub (envInScope_u (Map.insert (tvrNum b) NotKnown) inb)
         as'' <- mapM f as
         d'' <- fmapM g d
-        return ECase { eCaseScrutinee = e, eCaseType = t, eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
+        t' <- dosub sub t
+        return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
     doCase e t b as d sub inb | isBottom e = do
         mtick "E.Simplify.case-of-bottom"
         t' <- dosub sub t
@@ -425,6 +426,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind =  b', eCaseAlts = as', eCaseDefault = d'}
 
     doConstCase l t b as d sub inb = do
+        t' <- dosub sub t
         mr <- match l as (b,d)
         case mr of
             Just (bs,e) -> do
@@ -433,7 +435,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                 e' <- f e (Map.fromList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] `Map.union` sub)   (envInScope_u (Map.fromList [ (n,isBoundTo Many e) | (e,_,TVr { tvrIdent = n }) <- binds] `Map.union`) inb)
                 return $ eLetRec [ (v,e) | (e,_,v) <- binds ] e'
             Nothing -> do
-                return $ EError ("match falls off bottom: " ++ pprint l) t
+                return $ EError ("match falls off bottom: " ++ pprint l) t'
 
     match m@(LitCons c xs _) ((Alt (LitCons c' bs _) e):rs) d | c == c' = do
         mtick (toAtom $ "E.Simplify.known-case." ++ show c )
