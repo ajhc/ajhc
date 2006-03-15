@@ -431,8 +431,8 @@ compileModEnv' stats (initialHo,finalHo) = do
         --es' <- createMethods dataTable (hoClassHierarchy ho) (programEsMap prog)
         let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- programDs prog, not $ t `Set.member` tmap]
             tmap = Set.fromList [ t | (t,_) <- es' ]
-        let Identity es'' = annotateDs initMap (idann (hoRules ho) (hoProps ho) ) letann lamann es'
-        es' <- return [ (y,floatInward rules z) |  (y,z) <- es'' ]
+        let Identity es'' = annotateDs initMap (idann mempty (hoProps ho) ) letann lamann es'
+        es' <- return [ (y,floatInward undefined z) |  (y,z) <- es'' ]
         wdump FD.Class $ do
             sequence_ [ printCheckName' dataTable y z |  (y,z) <- es']
         return es'
@@ -452,7 +452,7 @@ compileModEnv' stats (initialHo,finalHo) = do
 
 
     -- make sure properties and rules are attached everywhere
-    prog <- return $ runIdentity $ annotateProgram mempty (idann rules (hoProps ho) ) letann lamann prog
+    prog <- return $ runIdentity $ annotateProgram mempty (idann mempty (hoProps ho) ) letann lamann prog
 
 
     let lc = programE prog
@@ -477,6 +477,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     lc <- opt "SuperSimplify" cm lc
     lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lc
 
+    -- run optimization again with no rules enabled
     lc <- annotate mempty (\_ nfo -> return $ Info.delete (mempty :: ARules) nfo) (\_ -> return) (\_ -> return) lc
     let cm stats e = do
         let sopt = mempty { SS.so_dataTable = dataTable }
@@ -484,26 +485,28 @@ compileModEnv' stats (initialHo,finalHo) = do
         Stats.tickStat stats stat
         return e'
 
-    -- run optimization again with no rules enabled
     lc <- opt "SuperSimplify no Rules" cm lc
-
     prog <- return $ programSetE lc prog
 
-    let ds = progCombinators prog in do
-        putStrLn "Supercombinators"
-        mapM_ (\ (t,ts,e) -> putStrLn $  (showTVr t) ++ " \\" ++ concat [ "(" ++ show  (tvrInfo t) ++ ")" | t <- ts, sortStarLike (getType t) ]) ds
+    prog <- if null $ programDs prog then return prog else do
+        ne <- (return . barendregt) (programE prog)
+        return $ programSetE ne prog
 
+    -- perform lambda lifting
     wdump FD.LambdacubeBeforeLift $ printProgram prog
+    lintCheckProgram prog
     finalStats <- Stats.new
     prog <- lambdaLift finalStats prog
+    lintCheckProgram prog
 
+    -- final optimization pass to clean up lambda lifting droppings
     rs' <- flip mapM (progCombinators prog) $ \ (t,ls,e) -> do
         let cm stats e = do
             let sopt = mempty {  SS.so_dataTable = dataTable }
             let (stat, e') = SS.simplifyE sopt e
             Stats.tickStat stats stat
             return e'
-        e' <- doopt (mangle' Nothing dataTable) False finalStats "SuperSimplify" cm e
+        e' <- doopt (mangle' Nothing dataTable) False finalStats ("SuperSimplify: " ++ pprint t)  cm e
         e'' <- atomizeAp True dataTable stats e'
         return (t,ls,e'')
     wdump FD.Progress $ Stats.print "PostLifting" finalStats

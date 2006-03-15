@@ -62,6 +62,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
             return (tvrInfo_u (Info.insert LetBound) t { tvrInfo = nfo })
         (as,rs) <- liftM unzip $ mapMntvr dl'
         local (mconcat rs) $ do
+            as <- mapM procRules as
             ds <- mapM f (snds dl)
             e' <- f e
             return $ ELetRec (zip as ds) e'
