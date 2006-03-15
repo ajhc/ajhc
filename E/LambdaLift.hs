@@ -55,9 +55,11 @@ lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs 
             tickStat stats stat
             modifyIORef fc (\xs -> (n,as,v'):cs' ++ xs)
         f e@(ELetRec ds _)  = do
-            local (declEnv_u (ds ++)) $ do
-                let (ds',e') = decomposeLet e
-                h ds' e' []
+            let (ds',e') = decomposeLet e
+            h ds' e' []
+            --local (declEnv_u (ds ++)) $ do
+            --    let (ds',e') = decomposeLet e
+            --    h ds' e' []
         f e = do
             st <- asks isStrict
             if (isELam e || (shouldLift e && not st)) then do
