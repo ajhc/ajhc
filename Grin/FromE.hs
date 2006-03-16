@@ -291,13 +291,16 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce (EError s e) = return (Error s (toType TyNode e))
     ce (EVar tvr) | isUnboxed (getType tvr) = do
         return (Return (toVal tvr))
-    ce e |  (EVar v,as) <- fromAp e = do
+    ce (EVar tvr) | not $ isLifted (EVar tvr)  = do
+        mtick "Grin.FromE.strict-unlifted"
+        return (Fetch (toVal tvr))
+    ce e | (EVar tvr,as) <- fromAp e = do
         as <- return $ args as
         let fty = toType TyNode (getType e)
-        case Map.lookup (tvrNum v) (ccafMap cenv) of
+        case Map.lookup (tvrNum tvr) (ccafMap cenv) of
             Just (Const c) -> app fty (Return c) as
             Just x@Var {} -> app fty (gEval x) as
-            Nothing -> case Map.lookup (tvrNum v) (scMap cenv) of
+            Nothing -> case Map.lookup (tvrNum tvr) (scMap cenv) of
                 Just (v,as',es)
                     | length as >= length as' -> do
                         let (x,y) = splitAt (length as') as
@@ -305,18 +308,10 @@ compile' dataTable cenv (tvr,as,e) = ans where
                     | otherwise -> do
                         let pt = partialTag v (length as' - length as)
                         return $ Return (NodeC pt as)
-                Nothing -> app fty (gEval $ toVal v) as
-    ce e | (v,as@(_:_)) <- fromAp e = do
-        let fty = toType TyNode (getType e)
-        as <- return $ args as
-        e <- ce v
-        app fty e as
-    ce (EPi (TVr { tvrIdent = 0, tvrType = a}) b) = do
-        a' <- cc a
-        b' <- cc b
-        p1 <- newNodePtrVar
-        p2 <- newNodePtrVar
-        return (a' :>>= p1 :-> b' :>>= p2 :-> Return (NodeC tagArrow [p1,p2]))
+                Nothing | not (isLifted $ EVar tvr) -> do
+                    mtick "Grin.FromE.app-unlifted"
+                    app fty (Fetch $ toVal tvr) as
+                Nothing -> app fty (gEval $ toVal tvr) as
     ce e | Just z <- literal e = return (Return z)
     ce e | Just (Const z) <- constant e = return (Return z)
     ce e | Just z <- constant e = return (gEval z)
@@ -333,42 +328,37 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce (EPrim ap@(APrim (PrimPrim "theWorld__") _) [] _) = do
         return $ Return unit
     ce (EPrim ap@(APrim (PrimPrim "drop__") _) [_,e] _) = ce e
-    ce (EPrim ap@(APrim (Func True fn as "void") _) (_:es) _) = do
-        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ((map (Ty . toAtom) as),tyUnit), primAPrim = ap }
-        return $  Prim p (args es)
-    ce (EPrim ap@(APrim (Func True fn as r) _) (_:es) rt) = do
-        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ((map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
-            ptv = Var v2 pt
-            pt = Ty (toAtom r)
-        return $ Prim p (args es) :>>= ptv :-> Return (tuple [ptv])
-    ce (EPrim ap@(APrim (Func False _ as r) _) es (ELit (LitCons tname [] _))) | RawType <- nameType tname = do
-        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ((map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
-        return $ Prim p (args es)
-    ce (EPrim ap@(APrim (Peek pt') _) [_,addr] rt) = do
-        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ([Ty (toAtom "HsPtr")],pt), primAPrim = ap }
-            ptv = Var v2 pt
-            pt = Ty (toAtom pt')
-        return $  Prim p (args [addr]) :>>= ptv :-> Return (tuple [ptv])
-    ce (EPrim ap@(APrim (Poke pt') _) [_,addr,val] _) = do
-        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ([Ty (toAtom "HsPtr"),pt],tyUnit), primAPrim = ap }
-            pt = Ty (toAtom pt')
-        return $  Prim p (args [addr,val])
-    ce (EPrim aprim@(APrim (AddrOf s) _) [] (ELit (LitCons tname [] _))) | RawType <- nameType tname = do
-        let p = Primitive { primName = toAtom ('&':s), primRets = Nothing, primType = ([],ptype), primAPrim = aprim }
-            ptype = Ty $ toAtom (show tname)
-        return $ Prim p []
-    ce (EPrim aprim@(APrim (CConst s t) _) [] (ELit (LitCons n [] _))) | RawType <- nameType n = do
-        let p = Primitive { primName = toAtom s, primRets = Nothing, primType = ([],ptype), primAPrim = aprim }
-            ptype = Ty $ toAtom t
-        return $ Prim p []
-    ce ee@(EPrim aprim@(APrim (CCast from to) _) [e] t)  = do
-        let ptypeto' = Ty $ toAtom to
-            ptypefrom' = Ty $ toAtom from
-        let p = Primitive { primName = toAtom ("(" ++ to ++ ")"), primRets = Nothing, primType = ([ptypefrom'],ptypeto'), primAPrim = aprim }
-        return $  Prim p (args [e])
-    ce (EPrim ap@(APrim (Operator n as r) _) es (ELit (LitCons tname [] _))) | RawType <- nameType tname = do
-        let p = Primitive { primName = Atom.fromString (pprint ap), primRets = Nothing, primType = ((map (Ty . toAtom) as),Ty (toAtom r)), primAPrim = ap }
-        return $ Prim p (args es)
+    ce (EPrim ap@(APrim p _) xs ty) = let
+      prim = Primitive { primName = Atom.fromString (pprint ap), primAPrim = ap, primRets = Nothing, primType = ([],tyUnit) }
+      in case p of
+        Func True fn as "void" -> return $ Prim prim { primType = ((map (Ty . toAtom) as),tyUnit) } (args $ tail xs)
+        Func True fn as r -> do
+            let p = prim { primType = ((map (Ty . toAtom) as),Ty (toAtom r)) }
+                ptv = Var v2 pt
+                pt = Ty (toAtom r)
+            return $ Prim p (args $ tail xs)
+        Func False _ as r | Just _ <- fromRawType ty ->  do
+            let p = prim { primType = ((map (Ty . toAtom) as),Ty (toAtom r)) }
+            return $ Prim p (args xs)
+        Peek pt' -> do
+            let p = prim { primType = ([Ty $ toAtom (show rt_HsPtr)],pt) }
+                [_,addr] = xs
+                ptv = Var v2 pt
+                pt = Ty (toAtom pt')
+            return $ Prim p (args [addr])
+        Poke pt' ->  do
+            let p = prim { primType = ([Ty $ toAtom (show rt_HsPtr)],tyUnit) }
+                [_,addr,val] = xs
+                pt = Ty (toAtom pt')
+            return $  Prim p (args [addr,val])
+        CCast from to -> do
+            let ptypeto' = Ty $ toAtom to
+                ptypefrom' = Ty $ toAtom from
+            let p = prim { primName = toAtom ("(" ++ to ++ ")"), primType = ([ptypefrom'],ptypeto') }
+            return $  Prim p (args xs)
+        Operator n as r | Just _ <- fromRawType ty -> do
+            let p = prim { primType = ((map (Ty . toAtom) as),Ty (toAtom r)) }
+            return $ Prim p (args xs)
     ce ECase { eCaseScrutinee = e, eCaseAlts = [Alt (LitCons n xs _) wh] } | Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n  = do
         e <- ce e
         wh <- ce wh
@@ -395,16 +385,16 @@ compile' dataTable cenv (tvr,as,e) = ans where
             Store v :>>= toVal b :->
             Case v (as ++ def)
     ce e = error $ "ce: " ++ render (pprint (funcName,e))
+    fromRawType (ELit (LitCons tname [] _))
+        | RawType <- nameType tname = return (Ty $ toAtom (show tname))
+    fromRawType _ = fail "not a raw type"
+
 
     createDef Nothing _ = return []
     createDef (Just e) nnv = do
         nv <- nnv
         x <- ce e
         return [nv :-> x]
---    cp (Alt lc@(LitCons n es _) e) | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = do
---        putStrLn $ "Print alt: " ++ show lc
---        x <- ce e
---        return (Tup (map toVal es) :-> x)
     cp (Alt lc@(LitCons n es _) e) = do
         x <- ce e
         nn <- getName lc
@@ -457,10 +447,8 @@ compile' dataTable cenv (tvr,as,e) = ans where
 
     -- | cc evaluates something in lazy context, returning a pointer to a node which when evaluated will produce the strict result.
     -- it is an invarient that evaling (cc e) produces the same value as (ce e)
-    cc (EPrim (APrim (PrimPrim "newWorld__") _) [_] _) = return $ Return unit
-    cc (EPrim (APrim (PrimPrim "theWorld__") _) [] _) = return $ Return unit
     cc (EPrim (APrim (PrimPrim "drop__") _) [_,e] _) = cc e
-    cc e | Just _ <- literal e = error "literal in lazy context"
+    cc e | Just _ <- literal e = error "unboxed literal in lazy context"
     cc e | Just z <- constant e = return (Return z)
     cc e | Just z <- con e = return (Store z)
     cc (EError s e) = do
@@ -473,7 +461,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
             return t
         return $ Return (Const (NodeC a []))
     cc (ELetRec ds e) = cc e >>= \e -> doLet ds e
-    cc e |  (EVar v,as) <- fromAp e = do
+    cc e | (EVar v,as@(_:_)) <- fromAp e = do
         as <- return $ args as
         case Map.lookup (tvrNum v) (scMap cenv) of
             Just (_,[],_) | Just x <- constant (EVar v) -> app' x as
@@ -484,30 +472,28 @@ compile' dataTable cenv (tvr,as,e) = ans where
                     nv <- newNodePtrVar
                     z <- app' nv y
                     return $ s :>>= nv :-> z
-                | otherwise -> do
+                | length as < length as', all valIsConstant as -> do
                     let pt = partialTag v (length as' - length as)
-                    return $ Store (NodeC pt as)
-            Nothing
-                | [] <- as -> return $ Return (toVal v)
-                | otherwise  -> app' (toVal v) as
-    cc (EPrim aprim@(APrim prim _) es pt) = do
-        V vn <- newVar
-        te <- readIORef (tyEnv cenv)
-        let s = pprint prim
-            fn' = toAtom ('B':s ++ "_" ++ show vn)
-            fn = toAtom ('b':s ++ "_" ++ show vn)
-        case findArgsType te fn of
-            Just _ -> return $ Store $ NodeC fn' (args es)
-            Nothing -> do
-                let es' = args es
-                ts <- mapM (typecheck te) es'
-                let nvs = [ Var v t | t <- ts | v <- [v2,V 4..] ]
-                x <- ce (EPrim aprim [ EVar (tvr { tvrIdent = v, tvrType =  t}) | t <- map getType es | v <- [2,4..]] pt)
-                addNewFunction (fn,Tup nvs :-> x)
-                return $ Store $ NodeC fn' es'
+                    mtick "Grin.FromE.partial-constant"
+                    return $ Return (Const (NodeC pt as))
+                | length as < length as' -> do
+                    let pt = partialTag v (length as' - length as)
+                    return $ if all valIsConstant as then
+                        Return (Const (NodeC pt as))
+                            else Store (NodeC pt as)
+                | otherwise -> do -- length as == length as'
+                    return $ Store (NodeC (tagFlipFunction v) as)
+            Nothing -> app' (toVal v) as
     cc e = error $ "cc: " ++ show e
+
+
     doLet ds e = f (decomposeDefns ds) e where
         f [] x = return x
+        f (Left (t,e):ds) x | not (isLifted (EVar t)) = do
+            mtick "Grin.FromE.let-unlifted"
+            e <- ce e
+            v <- f ds x
+            return $ (e :>>= n1 :-> Store n1) :>>= toVal t :-> v
         f (Left (t,e):ds) x = do
             e <- cc e
             v <- f ds x
@@ -537,9 +523,9 @@ compile' dataTable cenv (tvr,as,e) = ans where
     -- | converts an unboxed literal
     literal :: Monad m =>  E -> m Val
     literal (ELit (LitInt i (ELit (LitCons n [] (ESort EHash))))) | RawType <- nameType n = return $ Lit i (Ty $ toAtom (show n))
-    literal (EPrim aprim@(APrim p _) xs (ELit (LitCons n [] (ESort EHash)))) | RawType <- nameType n, primIsConstant p = do
+    literal (EPrim aprim@(APrim p _) xs ty) | Just ptype <- fromRawType ty, primIsConstant p = do
         xs <- mapM literal xs
-        return $ ValPrim aprim xs (Ty $ toAtom (show n))
+        return $ ValPrim aprim xs ptype
     literal _ = fail "not a literal term"
 
 

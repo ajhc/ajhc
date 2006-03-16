@@ -54,6 +54,7 @@ go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
     g e mp = execStateT (h e) mp
     h (App a [_,b] _) | a == funcApply = omegaize b
     h (App a [Var v _] _) | a == funcEval = eval v
+    h (Fetch (Var v _)) = eval v -- XXX can this be weakened?
     h (App a vs _) = fuse a vs
     -- TODO if result of a P1_ partial ap is used once, then the function arguments should be fuse'd rather than omegaized
     h Store { expValue = NodeC a vs } | tagIsSuspFunction a =  fuse (tagFlipFunction a) vs
