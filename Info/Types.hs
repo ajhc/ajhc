@@ -63,6 +63,7 @@ prop_RULEBINDER = toAtom "_RULEBINDER"
 prop_SCRUTINIZED = toAtom "_SCRUTINIZED"
 prop_SPECIALIZATION = toAtom "_SPECIALIZATION"
 prop_SUPERSPECIALIZE = toAtom "_SUPERSPECIALIZE"
+prop_UNSHARED = toAtom "_UNSHARED"
 
 
 class HasProperties a where

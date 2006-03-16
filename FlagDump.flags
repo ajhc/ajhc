@@ -43,6 +43,7 @@ e-verbose print very verbose version of E code always
 
 
 !Grin code
+mangled-core de-typed core right before it is converted to grin
 tags list of all tags and their types
 grin-preeval show grin code just before eval/apply inlining
 grin-posteval show grin code just before eval/apply inlining

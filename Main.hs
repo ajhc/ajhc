@@ -43,6 +43,7 @@ import Grin.FromE
 import Grin.Grin
 import Grin.Show
 import Grin.Unboxing
+import qualified Grin.MangleE as Mangle(mangle)
 import Grin.Whiz
 import Ho.Build
 import Ho.Library
@@ -509,8 +510,8 @@ compileModEnv' stats (initialHo,finalHo) = do
             Stats.tickStat stats stat
             return e'
         e' <- doopt (mangle' Nothing dataTable) False finalStats ("SuperSimplify: " ++ pprint t)  cm e
-        e'' <- atomizeAp True dataTable stats e'
-        return (t,ls,e'')
+        --e'' <- atomizeAp True dataTable stats e'
+        return (t,ls,e')
     wdump FD.Progress $ Stats.print "PostLifting" finalStats
 
     prog <- return $ prog { progCombinators = rs' }
@@ -523,6 +524,8 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     stats <- Stats.new
     progress "Converting to Grin..."
+    prog <- Mangle.mangle prog
+    wdump FD.MangledCore $ printUntypedProgram prog -- printCheckName dataTable (programE prog)
     x <- Grin.FromE.compile prog
     Stats.print "Grin" Stats.theStats
     wdump FD.Grin $ printGrin x
@@ -741,6 +744,13 @@ printProgram prog@Program {progCombinators = cs, progDataTable = dataTable } = d
     when (progEntryPoints prog /= [progMainEntry prog]) $
         putErrLn $ "EntryPoints: " ++ hsep (map pprint (progEntryPoints prog))
 
+printUntypedProgram prog@Program {progCombinators = cs, progDataTable = dataTable } = do
+    let pp tvr e = putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
+    sequence_ $ intersperse (putErrLn "") [ pp v (foldr ELam e as) | (v,as,e) <- cs]
+    when (progMainEntry prog /= tvr) $
+        putErrLn $ "MainEntry: " ++ pprint (progMainEntry prog)
+    when (progEntryPoints prog /= [progMainEntry prog]) $
+        putErrLn $ "EntryPoints: " ++ hsep (map pprint (progEntryPoints prog))
 
 printCheckName'' :: DataTable -> TVr -> E -> IO ()
 printCheckName'' dataTable tvr e = do

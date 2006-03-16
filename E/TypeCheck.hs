@@ -149,6 +149,7 @@ inferType dataTable ds e = rfc e where
         ps <- mapM (strong' . getType) $ casePats ec
         eqAll (et:ps)
         return (head bs)
+    fc Unknown = return Unknown
     fc e = failDoc $ text "what's this? " </> (prettyE e)
     calt (EVar v) (Alt l e) = do
         let nv =  patToLitEE l
@@ -165,7 +166,7 @@ inferType dataTable ds e = rfc e where
     valid s = valid' ds s
     valid' nds s
         | s == eBox = return ()
-        | Unknown <- s = fail "valid: Unknown"
+        | Unknown <- s = return ()
         | otherwise =  withContextDoc (text "valid:" <+> prettyE e) (do t <- inferType' nds s;  valid' nds t)
     eq t1 t2 = eq' ds t1 t2
     eq' nds t1 t2 = do
@@ -259,6 +260,7 @@ typeInfer'' dataTable ds e = rfc e where
     fc (EPrim _ ts t) = strong' t
     fc ECase { eCaseType = ty } = do
         strong' ty
+    fc Unknown = return Unknown
     fc e = failDoc $ text "what's this? " </> (prettyE e)
 
 
