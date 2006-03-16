@@ -149,13 +149,15 @@ manifestLambdas e = Arity (f 0 e) where
 
 lamann _ nfo = return nfo
 letann e nfo = return (Info.insert (manifestLambdas e) nfo)
-idann rs ps i nfo = return (props ps i nfo `mappend` rules rs i) where
+idann rs ps i nfo = return (rules rs i (props ps i nfo)) where
     props ps i = case tvrName (tvr { tvrIdent = i }) of
         Just n -> case Map.lookup n ps of
             Just ps ->  setProperties ps
             Nothing ->  id
         Nothing -> id
-    rules rs i = Info.maybeInsert (getARules rs i) Info.empty
+    rules rs i = case getARules rs i of
+        Nothing -> id
+        Just x -> \nfo -> Info.insert (x `mappend` Info.fetch nfo) nfo
 
 
 processInitialHo :: Ho -> IO Ho
