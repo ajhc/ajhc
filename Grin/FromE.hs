@@ -232,7 +232,6 @@ constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans wh
     conv :: E -> Val
     conv (ELit (LitInt i (ELit (LitCons n [] (ESort EHash))))) | RawType <- nameType n =  Lit i (Ty $ toAtom (show n))
     --conv (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Map.lookup n ctypeMap = ( Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
-    conv e | Just (a,_) <- from_unsafeCoerce e = conv a
     conv (ELit lc@(LitCons n es _)) | Just nn <- getName lc = (Const (NodeC nn (map conv es)))
     conv (EPi (TVr { tvrIdent = 0, tvrType =  a}) b)  =  Const $ NodeC tagArrow [conv a,conv b]
     conv (EVar v) | v `Set.member` lbs = Var (cafNum v) (TyPtr TyNode)
@@ -275,8 +274,6 @@ instance ToVal TVr where
 -- This also isn't true.
 --
 
-dropCoerce e | Just (x,_) <- from_unsafeCoerce e = x
-dropCoerce x = x
 
 compile' ::  DataTable -> CEnv -> (TVr,[TVr],E) -> IO (Atom,Lam)
 compile' dataTable cenv (tvr,as,e) = ans where
@@ -292,10 +289,9 @@ compile' dataTable cenv (tvr,as,e) = ans where
     -- | ce evaluates something in strict context returning the evaluated result of its argument.
     ce (ELetRec ds e) = ce e >>= \e -> doLet ds e
     ce (EError s e) = return (Error s (toType TyNode e))
-    --ce e | getType e == tWorld__ = return $ Return unit
-    ce (EVar tvr@(TVr { tvrType = (ELit (LitCons n [] _))})) | RawType <- nameType n = do
+    ce (EVar tvr) | isUnboxed (getType tvr) = do
         return (Return (toVal tvr))
-    ce e |  (v,as) <- fromAp e, EVar v <- dropCoerce v = do
+    ce e |  (EVar v,as) <- fromAp e = do
         as <- return $ args as
         let fty = toType TyNode (getType e)
         case Map.lookup (tvrNum v) (ccafMap cenv) of
@@ -325,7 +321,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce e | Just (Const z) <- constant e = return (Return z)
     ce e | Just z <- constant e = return (gEval z)
     ce e | Just z <- con e = return (Return z)
-    ce e | Just (a,_) <- from_unsafeCoerce e = ce a
     ce (EPrim ap@(APrim (PrimPrim "newHole_") _) [_] _) = do
         let var = Var v2 (TyPtr TyNode)
         return $ Store (NodeC (toAtom "@hole") []) :>>= var :-> Return (tuple [var])
@@ -478,7 +473,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
             return t
         return $ Return (Const (NodeC a []))
     cc (ELetRec ds e) = cc e >>= \e -> doLet ds e
-    cc e |  (v,as) <- fromAp e, EVar v <- dropCoerce v = do
+    cc e |  (EVar v,as) <- fromAp e = do
         as <- return $ args as
         case Map.lookup (tvrNum v) (scMap cenv) of
             Just (_,[],_) | Just x <- constant (EVar v) -> app' x as
@@ -495,7 +490,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
             Nothing
                 | [] <- as -> return $ Return (toVal v)
                 | otherwise  -> app' (toVal v) as
-    cc e | Just (x,_) <- from_unsafeCoerce e = cc x
     cc (EPrim aprim@(APrim prim _) es pt) = do
         V vn <- newVar
         te <- readIORef (tyEnv cenv)
@@ -538,7 +532,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
         f x | Just z <- literal x = z
         f x | Just z <- constant x =  z
         f (EVar tvr) = toVal tvr
-        f e | Just (x,_) <- from_unsafeCoerce e = f x
         f x = error $ "invalid argument: " ++ show x
 
     -- | converts an unboxed literal
@@ -566,7 +559,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
     constant e | Just l <- literal e = return l
     constant (ELit lc@(LitCons n es _)) | Just es <- mapM constant (filter (shouldKeep . getType) es), Just nn <- getName lc = (return $ Const (NodeC nn es))
     constant (EPi (TVr { tvrIdent = 0, tvrType = a}) b) | Just a <- constant a, Just b <- constant b = return $ Const $ NodeC tagArrow [a,b]
-    constant e | Just (a,_) <- from_unsafeCoerce e = constant a
     constant _ = fail "not a constant term"
 
     -- | convert a constructor into a Val, arguments may depend on local vars.

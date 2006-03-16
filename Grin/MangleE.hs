@@ -2,6 +2,11 @@
 -- things, it destroys type information and gets rid of the world so E
 -- transformations are no longer safe after this is performed.
 --
+-- currently it:
+--  removes all type coercions.
+--  looks for unused types and gets rid of those.
+--  atomizes any complex types left in argument position
+--
 -- the types of unboxed values must remain accurate though.
 --
 
@@ -21,6 +26,7 @@ import E.LetFloat(atomizeAp)
 import E.Program
 import E.Traverse
 import E.TypeCheck(sortStarLike)
+import E.Values
 import Fixer.Fixer
 import Fixer.Supply
 import GenUtil
@@ -46,17 +52,20 @@ programPruneUnreachable prog = prog { progCombinators = ds' } where
 {-# NOINLINE mangle #-}
 mangle :: Program -> IO Program
 mangle prog = do
-    --[ (t,as,e) <- progCombinators prog ]
     prog <- typeAnalyze prog
     prog <- pruneTypes prog
 
     stats <- Stats.new
-
     prog <- programMapBodies (atomizeAp True (progDataTable prog) stats) prog
-
+    prog <- programMapBodies dropCoercions prog
     Stats.print "Mangle" stats
 
     return prog -- (programPruneUnreachable prog)
+
+dropCoercions e = f e where
+    f e = emapE f (dropCoerce e)
+    dropCoerce e | Just (x,_) <- from_unsafeCoerce e = dropCoerce x
+    dropCoerce x = x
 
 typeAnalyze :: Program -> IO Program
 typeAnalyze prog = do
