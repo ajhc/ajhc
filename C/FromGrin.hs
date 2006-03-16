@@ -366,7 +366,7 @@ convertFunc (n,Tup as :-> body) = do
         as' <- flip mapM as $ \ (Var v t) -> do
             t' <- convertType t
             return (varName v,t')
-        return $ function (nodeFuncName n) fr as' ats s
+        return $ function (nodeFuncName n) fr as' ats (profile_function_inc `mappend` s)
 
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])

@@ -598,7 +598,7 @@ compileModEnv' stats (initialHo,finalHo) = do
                       | otherwise = []
             comm = shellQuote $ [optCC options, "-std=gnu99", "-foptimize-sibling-calls", "-O", {- "-funit-at-a-time", -} "-g", "-Wall", "-o", fn, cf ] ++ (map ("-l" ++) rls) ++ optCCargs options  ++ boehmOpts ++ profileOpts
             globalvar n c = "char " ++ n ++ "[] = \"" ++ c ++ "\";"
-        writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_jhc_command" argstring,globalvar "jhc_version" (head $ lines versionString),"",cg]
+        writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" (head $ lines versionString),"",cg]
         progress ("Running: " ++ comm)
         r <- System.system comm
         when (r /= System.ExitSuccess) $ fail "C code did not compile."
