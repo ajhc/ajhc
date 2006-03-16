@@ -7,20 +7,15 @@
 
 module Grin.MangleE(mangle) where
 
+import Control.Monad.Identity
 import Data.Monoid
 import Data.Typeable
-import qualified Data.Set as Set
-import qualified Data.Map as Map
 import Monad
-import Control.Monad.Identity
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
-import Support.FreeVars
-import Util.Graph
 import Doc.PPrint
 import E.Annotate
-import Name.Name
-import Util.Gen
-import qualified Stats
 import E.E
 import E.LetFloat(atomizeAp)
 import E.Program
@@ -30,6 +25,11 @@ import Fixer.Fixer
 import Fixer.Supply
 import GenUtil
 import Info.Info as Info
+import Name.Name
+import qualified Stats
+import Support.FreeVars
+import Util.Gen
+import Util.Graph
 
 
 newtype IsUsed = IsUsed Bool
@@ -56,7 +56,7 @@ mangle prog = do
 
     Stats.print "Mangle" stats
 
-    return (programPruneUnreachable prog)
+    return prog -- (programPruneUnreachable prog)
 
 typeAnalyze :: Program -> IO Program
 typeAnalyze prog = do

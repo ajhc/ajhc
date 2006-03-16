@@ -59,13 +59,12 @@ programE prog = ELetRec (programDs prog) (EVar (progMainEntry prog))
 programEsMap :: Program -> Map.Map Name (TVr,E)
 programEsMap prog = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) | d@(v,_) <- programDs prog ]
 
--- | note, this will reset your entry points
 programSetE :: E -> Program -> Program
 programSetE (ELetRec ds (EVar v)) prog = programSetDs ds prog { progMainEntry = v }
-programSetE (ELetRec ds mainBody) prog = programSetDs ((main,mainBody):ds) prog { progEntryPoints = [main], progMainEntry = main } where
+programSetE (ELetRec ds mainBody) prog = programSetDs ((main,mainBody):ds) prog { progMainEntry = main } where
     main = (tVr num (typeInfer (progDataTable prog) mainBody))
     Just num = List.find (`notElem` [ n  | (TVr { tvrIdent = n },_) <- ds ]) [toId $ toName Val (show $ progModule prog,"main" ++ show n) |  n <- [1 :: Int ..] ]
-programSetE e prog = prog { progCombinators = [(main,as,mainBody)], progEntryPoints = [main], progMainEntry = main } where
+programSetE e prog = prog { progCombinators = [(main,as,mainBody)], progMainEntry = main } where
     (mainBody,as) = fromLam e
     main = tVr (toId $ toName Val (show $ progModule prog,"main")) (typeInfer (progDataTable prog) e)
 
