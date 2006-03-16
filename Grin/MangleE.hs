@@ -60,7 +60,7 @@ mangle prog = do
     prog <- programMapBodies dropCoercions prog
     Stats.print "Mangle" stats
 
-    return prog -- (programPruneUnreachable prog)
+    return (programPruneUnreachable prog)
 
 dropCoercions e = f e where
     f e = emapE f (dropCoerce e)
