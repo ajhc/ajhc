@@ -67,7 +67,24 @@ convertVal (Tup xs) = do
     xs <- mapM convertVal xs
     return (structAnon (zip xs ts))
 convertVal (Tag t) = return $ constant (enum $ nodeTagName t)
-convertVal x = return $ err (show x)
+convertVal (ValPrim (APrim p _) [] _) = case p of
+    CConst s _ -> return $ expressionRaw s
+    AddrOf t -> return $ expressionRaw ('&':t)
+    x -> return $ err ("convertVal: " ++ show x)
+convertVal (ValPrim (APrim p _) [x] _) = do
+    x' <- convertVal x
+    case p of
+        CCast _ to -> return $ cast (basicType to) x'
+        Operator n [_] r ->  return $ cast (basicType r) (uoperator n x')
+        x -> return $ err ("convertVal: " ++ show x)
+convertVal (ValPrim (APrim p _) [x,y] _) = do
+    x' <- convertVal x
+    y' <- convertVal y
+    case p of
+        Operator n [_,_] r -> return $ cast (basicType r) (operator n x' y')
+        x -> return $ err ("convertVal: " ++ show x)
+
+convertVal x = return $ err ("convertVal: " ++ show x)
 
 convertExp :: Exp -> C (Statement,Expression)
 convertExp (Error s t) = do
@@ -386,8 +403,36 @@ buildConstants fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
         rs = [ f z undefined |  z <- zs ]
         f (Right i) = text $ 'c':show i
         f (Left (Var n _)) = tshow $ varName n
-        f (Left (Lit i _)) = tshow i
-        f (Left (Tag t)) = tshow (nodeTagName t)
+        f (Left v) | Just e <- convertConst v = text (show $ drawG e)
+--        f (Left (Lit i _)) = tshow i
+--        f (Left vp@(ValPrim {})) = tshow i
+--        f (Left (Tag t)) = tshow (nodeTagName t)
+
+convertConst :: Monad m => Val -> m Expression
+convertConst (Const (NodeC h _)) | h == tagHole = return nullPtr
+convertConst (Lit i _) = return (constant $ number (fromIntegral i))
+convertConst (Tup [x]) = convertConst x
+convertConst (Tup []) = return emptyExpression
+convertConst (Tag t) = return $ constant (enum $ nodeTagName t)
+convertConst (ValPrim (APrim p _) [] _) = case p of
+    CConst s _ -> return $ expressionRaw s
+    AddrOf t -> return $ expressionRaw ('&':t)
+    x -> return $ err (show x)
+convertConst (ValPrim (APrim p _) [x] _) = do
+    x' <- convertConst x
+    case p of
+        CCast _ to -> return $ cast (basicType to) x'
+        Operator n [_] r ->  return $ cast (basicType r) (uoperator n x')
+        x -> return $ err (show x)
+convertConst (ValPrim (APrim p _) [x,y] _) = do
+    x' <- convertConst x
+    y' <- convertConst y
+    case p of
+        Operator n [_,_] r -> return $ cast (basicType r) (operator n x' y')
+        x -> return $ err (show x)
+
+convertConst x = fail "convertConst"
+
 
 
 ccaf :: (Var,Val) -> P.Doc

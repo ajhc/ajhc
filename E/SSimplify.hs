@@ -392,6 +392,10 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         b' <- nname b sub inb
         d' <- f d (Map.insert (tvrNum b) (Done (EVar b')) sub) (envInScope_u  (Map.insert (tvrNum b') (isBoundTo Many e)) inb)
         return $ eLet b' e d'
+    -- atomic unboxed values may be substituted or discarded without replicating work or affecting program semantics.
+    doCase e _ b [] (Just d) sub inb | isUnboxed (getType e), isAtomic e = do
+        mtick "E.Simplify.case-atomic-unboxed"
+        f d (Map.insert (tvrNum b) (Susp e sub) sub) inb
     doCase (EVar v) _ b [] (Just d) sub inb | Just (NotAmong _) <-  Map.lookup (tvrNum v) (envInScope inb)  = do
         mtick "E.Simplify.case-evaled"
         d' <- f d (Map.insert (tvrNum b) (Done (EVar v)) sub) inb

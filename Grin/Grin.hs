@@ -162,7 +162,7 @@ data Val =
     | Lit !Number Ty
     | Var !Var Ty
     | Tup [Val]
-    | ValPrim APrim
+    | ValPrim APrim [Val] Ty
     | Addr {-# UNPACK #-} !(IORef Val)  -- used only in interpreter
     deriving(Eq,Ord)
 
@@ -189,6 +189,7 @@ instance Show Val where
     showsPrec _ (Tup xs)  = tupled $ map shows xs
     showsPrec _ (Const v) = char '&' <> shows v
     showsPrec _ (Addr _) = text "<ref>"
+    showsPrec _ (ValPrim aprim xs _) = tshow aprim <> tupled (map tshow xs)
 
 data Phase = PhaseInit | PostInlineEval
     deriving(Show,Eq,Ord,Enum)
@@ -459,7 +460,7 @@ instance CanTypeCheck TyEnv Val Ty where
         v <- typecheck x t
         return (TyPtr v)
     typecheck _ (Addr _) = return $ TyPtr (error "typecheck: Addr")
-    typecheck _ (ValPrim _) = error "ValPrim"
+    typecheck _ (ValPrim _ _ ty) = return ty
     typecheck te n@(NodeC tg as) = do
         (as',_) <- findArgsType te tg
         as'' <- mapM (typecheck te) as
@@ -490,7 +491,7 @@ instance CanType Val Ty where
     getType (Const t) = TyPtr (getType t)
     getType (NodeC {}) = TyNode
     getType (Addr _) = TyPtr (error "typecheck: Addr")
-    getType (ValPrim _) = error "ValPrim"
+    getType (ValPrim _ _ ty) = ty
 
 instance FreeVars Lam (Set.Set Var) where
     freeVars (x :-> y) = freeVars y Set.\\ freeVars x

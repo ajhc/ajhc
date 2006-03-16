@@ -215,6 +215,7 @@ newHeap' ht p = do
 
 bind (Var v _) p = tell mempty { varEq = [(v, p)] }
 bind (NodeC t [Lit {}]) _ = return ()
+bind (NodeC t [ValPrim {}]) _ = return ()
 bind (NodeC t vs) p | sameLength vs vs' = tell mempty { varEq = vs' }  where
     vs' = [ (v,if basicType ty then Basic else Down p t i) | Var v ty <- vs | i <- naturals ]
     basicType (Ty _) = True
@@ -530,6 +531,7 @@ toPos (Tup xs) = do
     vs' <- mapM toPos xs
     return $ Tuple vs'
 toPos (Lit {}) = return Basic
+toPos (ValPrim {}) = return Basic
 toPos Tag {} = return Basic
 toPos (Var v _)  = return $ Variable v
 toPos x  = error $ unwords ["toPos:",show x]

@@ -46,10 +46,11 @@ aprimIsCheap (APrim p _) = primIsCheap p
 -- | whether a primitive represents a constant expression (assuming all its arguments are constant)
 -- TODO needs grin support
 primIsConstant :: Prim -> Bool
--- primIsConstant CConst {} = True
--- primIsConstant AddrOf {} = True
--- primIsConstant CCast {} = True -- grin doesn't support this yet
--- primIsConstant Operator {} = True -- inhibits rules matching, divide by zero.
+primIsConstant CConst {} = True
+primIsConstant AddrOf {} = True
+primIsConstant CCast {} = True
+primIsConstant Operator { primOp = op } | op `elem` safeOps = True  where
+    safeOps = ["+","-","*","==",">=","<=",">","<","&","|","^","~",">>","<<"]
 primIsConstant _ = False
 
 

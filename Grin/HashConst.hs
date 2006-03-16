@@ -28,6 +28,9 @@ newConst' fuzzy n = f n where
         let g (Lit i ty)
                 | fuzzy = return $ Left (Lit 0 ty)
                 | otherwise = return $ Left (Lit i ty)
+            g vp@(ValPrim _ _ ty)
+                | fuzzy = return $ Left (Lit 0 ty)
+                | otherwise = return $ Left vp
             g (Tag t)
                 | fuzzy = return $ Left (Tag tagHole)
                 | otherwise = return $ Left (Tag t)

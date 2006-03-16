@@ -72,6 +72,7 @@ go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
     fuse a vs = mapM_ farg $ zip (zip (repeat a) [0..]) vs
     omegaize Const {} = return ()
     omegaize Lit {} = return ()
+    omegaize ValPrim {} = return ()
     omegaize (Var v _) = do
         mp <- get
         case Map.lookup v mp of

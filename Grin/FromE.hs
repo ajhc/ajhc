@@ -544,6 +544,9 @@ compile' dataTable cenv (tvr,as,e) = ans where
     -- | converts an unboxed literal
     literal :: Monad m =>  E -> m Val
     literal (ELit (LitInt i (ELit (LitCons n [] (ESort EHash))))) | RawType <- nameType n = return $ Lit i (Ty $ toAtom (show n))
+    literal (EPrim aprim@(APrim p _) xs (ELit (LitCons n [] (ESort EHash)))) | RawType <- nameType n, primIsConstant p = do
+        xs <- mapM literal xs
+        return $ ValPrim aprim xs (Ty $ toAtom (show n))
     literal _ = fail "not a literal term"
 
 
