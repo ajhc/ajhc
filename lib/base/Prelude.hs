@@ -936,14 +936,56 @@ instance Real Int where
     toRational = fromInt
 
 
+filterIterate :: (a -> Bool) -> (a -> a) -> a -> [a]
+filterIterate p f x = fi x where
+    fi x | p x = x : fi (f x)
+    fi x = fi (f x)
 
+mapIterate :: (a -> b) -> (a -> a) -> a -> [b]
+mapIterate f g x = fi x where
+    fi x = f x : fi (g x)
+
+filterMap :: (b -> Bool) -> (a -> b) -> [a] -> [b]
+filterMap p f xs = fm xs where
+    fm (x:xs) = let nx = f x in if p nx then nx:fm xs else fm xs
+    fm [] = []
+
+mapFilter :: (a -> b) -> (a -> Bool) -> [a] -> [b]
+mapFilter f p xs = fm xs where
+    fm (x:xs) = if p x then f x:fm xs else fm xs
+    fm [] = []
+
+{-# RULES "map/filter" forall f p xs . map f (filter p xs) = mapFilter f p xs  #-}
+{-# RULES "filter/map" forall f p xs . filter p (map f xs) = filterMap p f xs  #-}
+{-# RULES "iterate/id" forall . iterate id = repeat #-}
+{-# RULES "map/iterate" forall f g x . map f (iterate g x) = mapIterate f g x  #-}
+{-# RULES "filter/iterate" forall p f x . filter p (iterate f x) = filterIterate p f x  #-}
+{-# RULES "head/iterate"  forall f x . head (iterate f x) = x #-}
+{-# RULES "head/repeat"   forall x . head (repeat x) = x #-}
+{-# RULES "tail/repeat"   forall x . tail (repeat x) = repeat x #-}
+{-# RULES "tail/iterate"  forall f x . tail (iterate f x) = iterate f (f x) #-}
+{-# RULES "drop/0"        forall . drop 0 = \xs -> xs #-}
+{-# RULES "drop/1"        forall x xs . drop 1 (x:xs) = xs #-}
+{-# RULES "drop/2"        forall x y xs . drop 2 (x:y:xs) = xs #-}
+{-# RULES "drop/3"        forall x y z xs . drop 3 (x:y:z:xs) = xs #-}
+{-# RULES "take/0"        forall xs . take 0 xs = [] #-}
+{-# RULES "take/1"        forall x xs . take 1 (x:xs) = [x] #-}
+{-# RULES "take/2"        forall x y xs . take 2 (x:y:xs) = [x,y] #-}
+{-# RULES "take/3"        forall x y z xs . take 3 (x:y:z:xs) = [x,y,z] #-}
+{-# RULES "!!/0"          forall x xs . (x:xs) !! 0 = x #-}
+{-# RULES "!!/1"          forall x y xs . (x:y:xs) !! 1 = y #-}
+{-# RULES "!!/2"          forall x y z xs . (x:y:z:xs) !! 2 = z #-}
+{-# RULES "tail/map"      forall f xs . tail (map f xs) = map f (tail xs) #-}
+{-# RULES "head/map"      forall f xs . head (map f xs) = f (head xs) #-}
+{-# RULES "head/:"        forall x xs . head (x:xs) = x #-}
+{-# RULES "tail/:"        forall x xs . tail (x:xs) = xs #-}
 {-# RULES "concat/Map"    forall f xs . concat (map f xs) = concatMap f xs #-}
 {-# RULES "sequence/map"  forall f xs . sequence (map f xs) = mapM f xs #-}
 {-# RULES "sequence_/map" forall f xs . sequence_ (map f xs) = mapM_ f xs #-}
 {-# RULES "++/emptyr"     forall xs . xs ++ [] = xs #-}
 -- {-# RULES "++/refix"      forall xs ys zs . (xs ++ ys) ++ zs = xs ++ (ys ++ zs) #-}
---{-# RULES "++/tick4"      forall x y z x' xs ys . (x:y:z:x':xs) ++ ys = x:y:z:x':(xs ++ ys) #-}
---{-# RULES "++/tick2"      forall x y xs ys . (x:y:xs) ++ ys = x:y:(xs ++ ys) #-}
+{-# RULES "++/tick4"      forall x y z x' xs ys . (x:y:z:x':xs) ++ ys = x:y:z:x':(xs ++ ys) #-}
+{-# RULES "++/tick2"      forall x y xs ys . (x:y:xs) ++ ys = x:y:(xs ++ ys) #-}
 {-# RULES "++/tick1"      forall x xs ys . (x:xs) ++ ys = x:(xs ++ ys) #-}
 {-# RULES "++/tick0"      forall xs . [] ++ xs = xs #-}
 {-# RULES "map/map"       forall f g xs . map f (map g xs) = map (\x -> f (g x)) xs #-}
