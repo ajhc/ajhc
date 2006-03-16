@@ -27,6 +27,9 @@ source. These are enumerated in Name.Names
 
 * Spec@ - specializations of polymorphic functions
 
+* TP@ - non type-erased version of function in case it was passed as an
+  argument to a rank-n function.
+
 when a name is one of several generated from an existing one, the convention
 is to append '$n' for some number that makes the name unique.
 

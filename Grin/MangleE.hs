@@ -56,7 +56,7 @@ mangle prog = do
 
     Stats.print "Mangle" stats
 
-    return prog -- (programPruneUnreachable prog)
+    return (programPruneUnreachable prog)
 
 typeAnalyze :: Program -> IO Program
 typeAnalyze prog = do
