@@ -162,6 +162,7 @@ collect e = ans where
     arg sa (EPi _ _) = mempty
     arg sa e@(EAp _ _) | sortTypeLike e = mempty
     arg sa (EPrim (APrim (PrimPrim "unsafeCoerce") _) [x] _) = arg sa x
+    arg sa EPrim {}  = mempty
     arg sa e = error $ "Strictness.arg: " ++ show (sa,e)
 
 
