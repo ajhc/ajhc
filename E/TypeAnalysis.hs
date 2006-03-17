@@ -18,6 +18,7 @@ import E.E hiding(isBottom)
 import E.Subst
 import E.Traverse(emapE',emapE_)
 import E.Program
+import E.Eta
 import Support.FreeVars
 import E.Rules
 import E.TypeCheck
@@ -59,7 +60,7 @@ typeAnalyze prog = do
             return (Info.insert (rv :: Typ) $ Info.delete (undefined :: Value Typ) nfo)
         lamread _ nfo = return nfo
         lamdel _ nfo = return (Info.delete (undefined :: Value Typ) nfo)
-    prog <- annotateProgram mempty lambind (\_ -> return) (\_ -> return) prog
+    prog <- annotateProgram mempty lambind (\_ -> return . deleteArity) (\_ -> return) prog
     let ds = programDs prog
         env = (ur,uv,extractValMap ds)
         entries = progEntryPoints prog

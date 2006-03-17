@@ -2,8 +2,10 @@ module E.Eta(
     ArityType(ATop,ABottom),
     etaExpandAp,
     annotateArity,
+    deleteArity,
     etaExpandDef,
     etaExpandDef',
+    etaExpandProgram,
     getArityInfo,
     etaReduce
     ) where
@@ -21,6 +23,7 @@ import E.E
 import E.Subst
 import E.Annotate
 import E.Program
+import E.Inline
 import E.Traverse(emapE')
 import E.Values
 import GenUtil hiding(replicateM_)
@@ -32,7 +35,13 @@ import Info.Types
 
 
 data ArityType = AFun Bool ArityType | ABottom | ATop
-    deriving(Eq,Ord,Show,Typeable)
+    deriving(Eq,Ord,Typeable)
+
+instance Show ArityType where
+    showsPrec _ ATop = ("ArT" ++)
+    showsPrec _ ABottom = ("ArB" ++)
+    showsPrec _ (AFun False r) = ('\\':) . shows r
+    showsPrec _ (AFun True r) = ("\\o" ++) . shows r
 
 arity at = f at 0 where
     f (AFun _ a) n = f a $! (1 + n)
@@ -75,6 +84,8 @@ annotateArity e nfo = annotateArity' (arityType e) nfo
 annotateArity' at nfo = Info.insert (Arity n (b == ABottom)) $ Info.insert at nfo where
     (b,n) = arity at
 
+-- delety any arity information
+deleteArity nfo = Info.delete  (undefined :: Arity) $ Info.delete (undefined :: Arity) nfo
 
 {-
 {-# NOINLINE etaExpand #-}
@@ -132,6 +143,29 @@ etaExpandE dataTable e = f e where
     ee' e = return e
 -}
 
+
+-- this annotates what it can, but only expands top-level definitions
+etaExpandProgram :: MonadStats m => Program -> m Program
+etaExpandProgram prog = programMapRecGroups mempty pass letann pass f prog where
+    pass = \_ -> return
+    letann = (\e nfo -> return $ annotateArity e nfo)
+    f (False,[(t,e)]) = do
+        te <- etaExpandDef' (progDataTable prog) t e
+        return [te]
+    f (True,ts) = do
+        ts' <- mapM z ts
+        g ts' (length ts + 2)
+    g ts 0 = return ts
+    g ts n = do
+        ts' <- annotateDs mempty pass letann pass ts
+        ts'' <- mapM z ts'
+        g ts'' (n - 1)
+    z (t,e) = etaExpandDef' (progDataTable prog) t e
+
+
+
+
+
 -- | eta reduce as much as possible
 etaReduce :: E -> E
 etaReduce e = f e where
@@ -149,7 +183,7 @@ etaReduce' e = case f e 0 of
 
 
 etaExpandDef' dataTable t e = etaExpandDef dataTable t e >>= \x -> case x of
-    Nothing -> return (t,e)
+    Nothing -> return (tvrInfo_u (annotateArity e) t,e)
     Just x -> return x
 
 -- | eta expand a definition

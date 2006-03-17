@@ -161,7 +161,9 @@ idann rs ps i nfo = return (rules rs i (props ps i nfo)) where
 processInitialHo :: Ho -> IO Ho
 processInitialHo ho = do
     let Identity ds = annotateDs mempty (idann (hoRules ho) (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
-    return ho { hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds ] }
+        Identity ds' = annotateDs mempty (\_ nfo -> return nfo) letann lamann ds
+        Identity ds'' = annotateDs mempty (\_ nfo -> return nfo) letann lamann ds'
+    return ho { hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds'' ] }
 
 
 procSpecs :: Monad m => (Map.Map Name [Type.Rule]) -> (TVr,E) -> m ([(TVr,E)],[Rule])
@@ -328,6 +330,7 @@ processDecls stats ho ho' tiData = do
 
     (prog,didSomething) <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return (prog,False)
 
+    prog <- Stats.runStatIO stats (etaExpandProgram prog)
 
     prog <- if didSomething then do
         prog <- if null $ programDs prog then return prog else do
@@ -441,8 +444,12 @@ compileModEnv' stats (initialHo,finalHo) = do
         return es'
 
     prog <- return $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
-    prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) (\_ nfo -> return nfo) (\_ nfo -> return nfo) prog
+    prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) letann (\_ nfo -> return nfo) prog
     prog <- return $ programPruneUnreachable prog
+
+    st <- Stats.new
+    prog <- Stats.runStatIO st (etaExpandProgram prog)
+    Stats.print "eta" st
 
     lintCheckProgram prog
 
@@ -454,7 +461,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- return $ programSetE ne prog
 
 
-    -- make sure properties and rules are attached everywhere
+    -- make sure properties and are attached everywhere
     prog <- return $ runIdentity $ annotateProgram mempty (idann mempty (hoProps ho) ) letann lamann prog
 
 
@@ -470,24 +477,31 @@ compileModEnv' stats (initialHo,finalHo) = do
     -- run first optimization
     lc <- opt "SuperSimplify" cm lc
     lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lc
-
     prog <- return $ programSetE lc prog
+
+    st <- Stats.new
+    prog <- Stats.runStatIO st (etaExpandProgram prog)
+    Stats.print "eta" st
 
     --ne <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) (programE prog)
 
     lc <- return $ programE prog
-
     lc <- opt "SuperSimplify" cm lc
     lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lc
+    prog <- return $ programSetE lc prog
+
 
     -- run optimization again with no rules enabled
-    lc <- annotate mempty (\_ nfo -> return $ Info.delete (mempty :: ARules) nfo) (\_ -> return) (\_ -> return) lc
+
+    -- delete rules
+    prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ Info.delete (mempty :: ARules) nfo) letann (\_ -> return) prog
+
     let cm stats e = do
         let sopt = mempty { SS.so_dataTable = dataTable }
         let (stat, e') = SS.simplifyE sopt e
         Stats.tickStat stats stat
         return e'
-
+    lc <- return $ programE prog
     lc <- opt "SuperSimplify no Rules" cm lc
     prog <- return $ programSetE lc prog
 
@@ -758,7 +772,7 @@ printCheckName'' dataTable tvr e = do
             Left err -> (Unknown,vcat $ map text (intersperse "---" $ tail err))
             Right ty -> (ty,pprint ty)
         tmatch = isJust $ match (const Nothing) [] ty (tvrType tvr)
-    wdump FD.EInfo $ putErrLn (show $ tvrInfo tvr)
+    when (dump FD.EInfo || verbose2) $ putErrLn (show $ tvrInfo tvr)
     putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
     when (not tmatch) $
         putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pprint (tvrType tvr)))
