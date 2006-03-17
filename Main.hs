@@ -326,21 +326,21 @@ processDecls stats ho ho' tiData = do
     prog <- return $ programPruneUnreachable prog
     Stats.print "Optimization" stats
 
-    prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return prog
-    prog <- if null $ programDs prog then return prog else do
-        ne <- (return . barendregt) (programE prog)
-        return $ programSetE ne prog
+    (prog,didSomething) <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return (prog,False)
 
-    Stats.clear stats
 
-    let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
-        fscc (Left n) = (False,[n])
-        fscc (Right ns) = (True,ns)
-    (ds,_) <- foldM f ([],(Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
-    progress "!"
-    prog <- return $ programSetDs ds prog
+    prog <- if didSomething then do
+        prog <- if null $ programDs prog then return prog else do
+            ne <- (return . barendregt) (programE prog)
+            return $ programSetE ne prog
+        let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
+            fscc (Left n) = (False,[n])
+            fscc (Right ns) = (True,ns)
+        (ds,_) <- foldM f ([],(Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
+        progress "!"
+        return $ programSetDs ds prog
+      else return prog
     prog <- return $ programPruneUnreachable prog
-    Stats.print "Optimization" stats
 
 
     wdump FD.Lambdacube $ printProgram prog
@@ -420,7 +420,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     lintCheckProgram prog
 
     --wdump FD.Lambdacube $ printProgram prog
-    prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return prog
+    (prog,_) <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return (prog,False)
     putStrLn "Type analyzed methods"
     flip mapM_ (programDs prog) $ \ (t,e) -> do
         let (_,ts) = fromLam e

@@ -130,6 +130,7 @@ instance MonadStats IO where
 -- Pure varients
 
 newtype Stat = Stat (Map.Map Atom Int)
+    deriving(Eq,Ord)
 
 printStat greets (Stat s) = do
     let fs = createForest 0 $ sort [(splitUp $ fromAtom x,y) | (x,y) <- Map.toList s]
