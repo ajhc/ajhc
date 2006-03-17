@@ -28,7 +28,7 @@ import DataConstructors
 import Support.CanType
 import Stats
 import qualified Info.Info as Info
-import Info.Types(Arity(..))
+import Info.Types
 
 
 data ArityType = AFun Bool ArityType | ABottom | ATop
@@ -42,7 +42,7 @@ getArityInfo tvr
     | Just at <- Info.lookup (tvrInfo tvr) = arity at
     | otherwise = (ATop,0)
 
-isOneShot x = False
+isOneShot x = getProperty prop_ONESHOT x
 
 arityType :: E -> ArityType
 arityType e = f e where
@@ -72,8 +72,8 @@ lamann _ nfo = return nfo
 
 annotateArity e nfo = annotateArity' (arityType e) nfo
 
-annotateArity' at nfo = Info.insert (Arity n) $ Info.insert at nfo where
-    (_,n) = arity at
+annotateArity' at nfo = Info.insert (Arity n (b == ABottom)) $ Info.insert at nfo where
+    (b,n) = arity at
 
 
 {-
@@ -152,6 +152,7 @@ etaExpandDef' dataTable t e = etaExpandDef dataTable t e >>= \x -> case x of
     Nothing -> return (t,e)
     Just x -> return x
 
+-- | eta expand a definition
 etaExpandDef :: MonadStats m => DataTable -> TVr -> E -> m (Maybe (TVr,E))
 etaExpandDef _ _ e | isAtomic e = return Nothing -- will be inlined
 etaExpandDef dataTable t e  = ans where
@@ -173,13 +174,14 @@ etaExpandDef dataTable t e  = ans where
     f _ e _ _ = do
         return (e,False)
 
+-- | eta expand a use of a value
 etaExpandAp :: MonadStats m => DataTable -> TVr -> [E] -> m (Maybe E)
 etaExpandAp _ _ [] = return Nothing  -- so simple renames don't get eta-expanded
 etaExpandAp dataTable t as | Just at <- Info.lookup (tvrInfo t),let n = snd (arity at), n > length as = do
     let e = foldl EAp (EVar t) as
     let (_,ts) = fromPi' dataTable (getType e)
         ets = (take (n - length as) ts)
-    mticks (length ets) ("EtaExpand.{" ++ tvrShowName t)
+    mticks (length ets) ("EtaExpand.use.{" ++ tvrShowName t)
     let tvrs = f mempty [ (tvrIdent t,t { tvrIdent = n }) |  n <- [2,4 :: Int ..], not $ n `Set.member` freeVars (e,ets) | t <- ets ]
         f map ((n,t):rs) = t { tvrType = substMap map (tvrType t)} : f (Map.insert n (EVar t) map) rs
         f _ [] = []

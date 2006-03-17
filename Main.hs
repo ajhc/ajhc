@@ -144,10 +144,6 @@ fileOrModule f = case reverse f of
 
 barendregt e = runIdentity  (renameTraverse' e)
 
-manifestLambdas :: E -> Arity
-manifestLambdas e = Arity (f 0 e) where
-    f n (ELam _ e) = let n' = n + 1 in n' `seq` f n' e
-    f n _ = n
 
 lamann _ nfo = return nfo
 letann e nfo = return (annotateArity e nfo)

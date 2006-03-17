@@ -238,7 +238,9 @@ isCheap EPi {} = True
 isCheap ELam {} = True -- should exclude values dropped at compile time
 isCheap (EPrim p _ _) = aprimIsCheap p
 isCheap ec@ECase {} = isCheap (eCaseScrutinee ec) && all isCheap (caseBodies ec)
-isCheap e | (EVar v,xs) <- fromAp e, Just (Arity n) <- Info.lookup (tvrInfo v), length xs < n = True  -- Partial applications are cheap
+isCheap e | (EVar v,xs) <- fromAp e, Just (Arity n b) <- Info.lookup (tvrInfo v) =
+        (length xs < n)  -- Partial applications are cheap
+          || (b && length xs >= n) -- bottoming out routines are cheap
 isCheap _ = False
 
 
@@ -251,7 +253,9 @@ whnfOrBot :: E -> Bool
 whnfOrBot (EError {}) = True
 whnfOrBot (ELit (LitCons _ xs _)) = all isAtomic xs
 whnfOrBot (EPi (TVr { tvrIdent =  j, tvrType =  x }) y) | not (j `Set.member` freeVars y) = isAtomic x && isAtomic y
-whnfOrBot e = isAtomic e
+whnfOrBot e | isAtomic e = True
+whnfOrBot e | (EVar v,xs) <- fromAp e, Just (Arity n True) <- Info.lookup (tvrInfo v), length xs >= n = True
+whnfOrBot _ = False
 
 -- Determine if a type represents an unboxed value
 isUnboxed :: E -> Bool

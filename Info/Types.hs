@@ -15,9 +15,9 @@ import MapBinaryInstance()
 newtype Properties = Properties (Set.Set Atom)
     deriving(Typeable,Eq,Binary,Monoid)
 
--- | how many manifest lambdas are in a functions definition
-newtype Arity = Arity Int
-    deriving(Typeable,Show,Ord,Eq,Num,Binary)
+-- | how many arguments a function my be applied to before it performs work and whether it bottoms out after that many arguments
+data Arity = Arity Int Bool
+    deriving(Typeable,Show,Ord,Eq)
 
 -- | how the variable is bound
 data BindType = CaseDefault | CasePattern | LetBound | LambdaBound | PiBound
@@ -64,6 +64,7 @@ prop_SCRUTINIZED = toAtom "_SCRUTINIZED"
 prop_SPECIALIZATION = toAtom "_SPECIALIZATION"
 prop_SUPERSPECIALIZE = toAtom "_SUPERSPECIALIZE"
 prop_UNSHARED = toAtom "_UNSHARED"
+prop_ONESHOT = toAtom "_ONESHOT"
 
 
 class HasProperties a where
