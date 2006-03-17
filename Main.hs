@@ -22,6 +22,7 @@ import Doc.Pretty
 import E.Annotate(annotate,annotateDs,annotateProgram)
 import E.Diff
 import E.E
+import E.Eta
 import E.FromHs
 import E.LambdaLift
 import E.Program
@@ -149,7 +150,7 @@ manifestLambdas e = Arity (f 0 e) where
     f n _ = n
 
 lamann _ nfo = return nfo
-letann e nfo = return (Info.insert (manifestLambdas e) nfo)
+letann e nfo = return (annotateArity e nfo)
 idann rs ps i nfo = return (rules rs i (props ps i nfo)) where
     props ps i = case tvrName (tvr { tvrIdent = i }) of
         Just n -> case Map.lookup n ps of
@@ -265,13 +266,16 @@ processDecls stats ho ho' tiData = do
         let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds)) fullDataTable
         cds <- flip mapM cds $ \ (v,lc) -> do
             --lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
+            (v,lc) <- Stats.runStatIO stats (etaExpandDef' fullDataTable v lc)
             lc <- doopt mangle False stats "SuperSimplify" cm lc
+            (v,lc) <- Stats.runStatIO stats (etaExpandDef' fullDataTable v lc)
             lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             return (v,lc)
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
         cds <- E.Strictness.solveDs cds
         cds <- flip mapM cds $ \ (v,lc) -> do
+            (v,lc) <- Stats.runStatIO stats (etaExpandDef' fullDataTable v lc)
             lc <- doopt mangle False stats "SuperSimplify" cm lc
             lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             return (v,lc)

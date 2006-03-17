@@ -207,6 +207,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                 e' <- if forceInline t then
                         f e mempty initialB'  -- ^ do not inline into functions which themself will be inlined
                             else f e mempty initialB
+                (t,e') <- etaExpandDef' (so_dataTable sopts) t e'
                 return (t,e')
         mapM g ds'
     go e inb = do

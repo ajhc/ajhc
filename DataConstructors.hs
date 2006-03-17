@@ -1,11 +1,13 @@
 module DataConstructors(
     Constructor(..),
     DataTable(..),
+    DataTableMonad(..),
     dataTablePrims,
     constructionExpression,
     deconstructionExpression,
     followAliases,
     followAlias,
+    expandAliases,
     getConstructor,
     getConstructorArities,
     getProduct,
@@ -501,5 +503,18 @@ pprintTypeAsHs e = unparse $ runVarName (f e) where
         return $ fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text ". ")  (atomize r)
     arr = bop (R,0) (space <> text "->" <> space)
     app = bop (L,100) (text " ")
+
+
+class Monad m => DataTableMonad m where
+    getDataTable :: m DataTable
+    getDataTable = return mempty
+
+
+instance DataTableMonad Identity
+
+expandAliases :: DataTableMonad m => E -> m E
+expandAliases e = do
+    dt <- getDataTable
+    return (followAliases dt e)
 
 
