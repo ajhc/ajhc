@@ -194,7 +194,8 @@ etaExpandDef dataTable t e  = ans where
     at = arityType e
     nameSupply = [ n |  n <- [2,4 :: Int ..], not $ n `Set.member` fvs  ]
     ans = do
-        (ne,flag) <- f at e (expandPis dataTable $ tvrType t) nameSupply
+        -- note that we can't use the type in the tvr, because it will not have the right free typevars.
+        (ne,flag) <- f at e (expandPis dataTable $ infertype dataTable e) nameSupply
         if flag then return (Just (tvrInfo_u (annotateArity' at) t,ne)) else return Nothing
     f (AFun _ a) (ELam tvr e) ty ns | (EPi _ rt) <- followAliases dataTable ty = do
         (ne,flag) <- f a e rt ns
