@@ -192,22 +192,21 @@ getMainFunction dataTable name ds = ans where
         main <- findName name
         runMain <- findName (func_runMain sFuncNames)
         runExpr <- findName (func_runExpr sFuncNames)
-        errorCont <- findName v_undefinedIOErrorCont
-        let e | not (fopts FO.Wrapper) = maine
-              | otherwise = case ioLike (getType maine) of
+        runNoWrapper <- findName (func_runNoWrapper sFuncNames)
+        let e = case ioLike (getType maine) of
+                Just x | not (fopts FO.Wrapper) -> EAp (EAp (EVar runNoWrapper) x) maine
                 Just x ->  EAp (EAp (EVar runMain)  x ) maine
                 Nothing ->  EAp (EAp (EVar runExpr) ty) maine
-            be = (eAp e (EVar errorCont))
-            theMain = (theMainName,setProperty prop_EXPORTED theMainTvr,be)
-            theMainTvr =  tVr (toId theMainName) (infertype dataTable be)
+            theMain = (theMainName,setProperty prop_EXPORTED theMainTvr,e)
+            theMainTvr =  tVr (toId theMainName) (infertype dataTable e)
             tvm@(TVr { tvrType =  ty}) =  main
-            maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs ]
+            maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs, sortStarLike k ]
             (ty',xs) = fromPi ty
         return theMain
-    ioLike ty = case smplE ty of
-        ELit (LitCons n [x] _) -> if n ==  tc_IO then Just x else Nothing
+    ioLike ty = case followAliases dataTable ty of
+        ELit (LitCons n [x] _) | n ==  tc_IO -> Just x
+        (EPi ioc (EPi tvr (ELit (LitCons n [x] _)))) | n == tc_IOResult -> Just x 
         _ -> Nothing
-    smplE = id
     findName name = case Map.lookup name ds of
         Nothing -> fail $ "Cannot find: " ++ show name
         Just (n,_) -> return n

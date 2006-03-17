@@ -77,14 +77,15 @@ instance ToTuple (String,String) where
 data FuncNames a = FuncNames {
     func_bind :: a,
     func_bind_ :: a,
-    func_negate :: a,
-    func_runMain :: a,
-    func_runExpr :: a,
+    func_concatMap :: a,
+    func_equals :: a,
     func_fromInt :: a,
     func_fromInteger :: a,
     func_fromRational :: a,
-    func_equals :: a,
-    func_concatMap :: a
+    func_negate :: a,
+    func_runExpr :: a,
+    func_runMain :: a,
+    func_runNoWrapper :: a
     }
     {-! derive: FunctorM !-}
 

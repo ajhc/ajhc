@@ -9,6 +9,7 @@ module Jhc.IO(
     ioError,
     runExpr,
     runMain,
+    runNoWrapper,
     exitFailure,
     strictReturn,
     undefinedIOErrorCont,
@@ -112,17 +113,25 @@ strictReturn a = IO $ \_ w -> JustIO w (worldDep__ w a)
 
 {-# INLINE runMain, runExpr #-}
 -- | this is wrapped around 'main' when compiling programs. it catches any exceptions and prints them to the screen and dies appropriatly.
-runMain :: IO a -> IO ()
-runMain main = do
-    catch main $ \e -> do
-        putStrLn "\nUncaught Exception:"
-        putStrLn $ showIOError e
-        exitFailure
-    return ()
+runMain :: IO a -> World__ -> World__
+runMain main w = case run undefinedIOErrorCont w of
+        JustIO w _ -> w
+    where
+    IO run = catch main $ \e -> do
+            putStrLn "\nUncaught Exception:"
+            putStrLn $ showIOError e
+            exitFailure
+
 
 -- | this is wrapped around arbitrary showable expressions when used as the main entry point
-runExpr :: Show a => a -> IO ()
-runExpr x = runMain (print x)
+runExpr :: Show a => a -> World__ -> World__
+runExpr x w = runMain (print x) w
+
+-- | when no exception wrapper is wanted
+runNoWrapper :: IO a -> World__ -> World__
+runNoWrapper (IO run) w =
+    case run undefinedIOErrorCont w of
+        JustIO w _ -> w
 
 exitFailure :: IO a
 exitFailure = IO $ \_ w -> exitFailure__ w

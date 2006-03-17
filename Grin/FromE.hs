@@ -170,7 +170,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry } = 
             grinEntryPoints = [funcMain],
             grinPhase = PhaseInit,
             grinTypeEnv = newTyEnv,
-            grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  theMain :>>= n0 :-> Return unit )) : ds',
+            grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  theMain )) : ds',
             grinCafs = cafs
             }
     --typecheckGrin grin
@@ -324,8 +324,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
             [r',v'] = args [r,v]
         return $ gEval v' :>>= n1 :-> Update r' n1
     ce (EPrim ap@(APrim (PrimPrim "newWorld__") _) [_] _) = do
-        return $ Return unit
-    ce (EPrim ap@(APrim (PrimPrim "theWorld__") _) [] _) = do
         return $ Return unit
     ce (EPrim ap@(APrim (PrimPrim "drop__") _) [_,e] _) = ce e
     ce (EPrim ap@(APrim p _) xs ty) = let

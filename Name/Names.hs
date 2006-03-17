@@ -121,14 +121,15 @@ v_silly = toName Val ("Jhc@","silly")
 sFuncNames = FuncNames {
     func_bind = toName Val ("Prelude",">>="),
     func_bind_ = toName Val ("Prelude",">>"),
-    func_negate = toName Val ("Prelude","negate"),
-    func_runMain = toName Val ("Jhc.IO","runMain"),
-    func_fromInt = toName Val ("Prelude","fromInt"),
-    func_fromInteger = toName Val ("Prelude","fromInteger"),
-    func_fromRational = toName Val ("Prelude","fromRational"),
-    func_runExpr = toName Val ("Jhc.IO","runExpr"),
+    func_concatMap = toName Val ("Prelude","concatMap"),
     func_equals = toName Val ("Prelude","=="),
-    func_concatMap = toName Val ("Prelude","concatMap")
+    func_fromInteger = toName Val ("Prelude","fromInteger"),
+    func_fromInt = toName Val ("Prelude","fromInt"),
+    func_fromRational = toName Val ("Prelude","fromRational"),
+    func_negate = toName Val ("Prelude","negate"),
+    func_runExpr = toName Val ("Jhc.IO","runExpr"),
+    func_runMain = toName Val ("Jhc.IO","runMain"),
+    func_runNoWrapper = toName Val ("Jhc.IO","runNoWrapper")
     }
 
 

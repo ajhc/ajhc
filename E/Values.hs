@@ -174,7 +174,6 @@ rawType s = ELit (LitCons (toName RawType s) [] eHash)
 
 tWorldzh = ELit (LitCons rt_Worldzh [] eHash)
 tTag = ELit (LitCons rt_tag [] eHash)
-vWorld__ = EPrim (APrim (PrimPrim "theWorld__") mempty) [] tWorld__
 
 unsafeCoerceOpt (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = f (0::Int) e t where
     f n e t | Just (e',_) <- from_unsafeCoerce e = f (n + 1) e' t
@@ -253,6 +252,7 @@ whnfOrBot :: E -> Bool
 whnfOrBot (EError {}) = True
 whnfOrBot (ELit (LitCons _ xs _)) = all isAtomic xs
 whnfOrBot (EPi (TVr { tvrIdent =  j, tvrType =  x }) y) | not (j `Set.member` freeVars y) = isAtomic x && isAtomic y
+whnfOrBot ELam {} = True
 whnfOrBot e | isAtomic e = True
 whnfOrBot e | (EVar v,xs) <- fromAp e, Just (Arity n True) <- Info.lookup (tvrInfo v), length xs >= n = True
 whnfOrBot _ = False
