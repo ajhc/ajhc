@@ -204,16 +204,16 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     doit = do
         ds' <- collocc dsIn
         let g (t,e) = do
+                (t,e) <- etaExpandDef' (so_dataTable sopts) t e
                 e' <- if forceInline t then
                         f e mempty initialB'  -- ^ do not inline into functions which themself will be inlined
                             else f e mempty initialB
-                (t,e') <- etaExpandDef' (so_dataTable sopts) t e'
                 return (t,e')
         mapM g ds'
+    go :: E -> Env -> NameMT Int (StatT Identity) E
     go e inb = do
         let (e',_,_) = collectOcc sopts  e
         f e' mempty inb
-    go :: E -> Env -> NameMT Int (StatT Identity) E
     f :: E -> Subst -> Env -> NameMT Int (StatT Identity) E
     f e sub inb | (EVar v,xs) <- fromAp e = do
         xs' <- mapM (dosub sub) xs
@@ -226,12 +226,15 @@ simplifyDs sopts dsIn = (stat,dsOut) where
             Nothing -> h (EVar v) xs' inb
             -- Nothing -> error $ "Var with no subst: " ++ show e ++ "\n" ++  show  sub -- h (EVar v) xs' inb
     f e sub inb | (x,xs) <- fromAp e = do
-        xs' <- mapM (dosub sub) xs
-        x' <- g x sub inb
-        x'' <- coerceOpt return x'
-        x <- primOpt' (so_dataTable sopts) x''
-        h x xs' inb
-        --app (x,xs')
+        eed <- etaExpandDef (so_dataTable sopts) tvr { tvrIdent = 0 } e
+        case eed of
+            Just (_,e) -> go e inb
+            Nothing -> do
+                xs' <- mapM (dosub sub) xs
+                x' <- g x sub inb
+                x'' <- coerceOpt return x'
+                x <- primOpt' (so_dataTable sopts) x''
+                h x xs' inb
     g (EPrim a es t) sub inb = do
         es' <- mapM (dosub sub) es
         t' <- dosub sub t
@@ -252,8 +255,12 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         return $ EError s t'
     g ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d} sub inb = do
         addNames (map tvrNum $ caseBinds ec)
-        e' <- f e sub inb
-        doCase e' (eCaseType ec) b as d sub inb
+        eed <- etaExpandDef (so_dataTable sopts) tvr { tvrIdent = 0 } ec
+        case eed of
+            Just (_,e) -> go e inb
+            Nothing -> do
+                e' <- f e sub inb
+                doCase e' (eCaseType ec) b as d sub inb
     g (ELam v e) sub inb  = do
         addNames [tvrNum v]
         v' <- nname v sub inb
@@ -287,6 +294,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                     -- False | worthStricting e', Strict <- Info.lookup (tvrInfo t') -> w rs sub
                     False -> w rs sub (if n /= LoopBreaker then (envInScope_u (Map.insert (tvrNum t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
             w [] sub inb ds = return (ds,sub,inb)
+        ds <- sequence [ etaExpandDef' (so_dataTable sopts) t e | (t,e) <- ds]
         s' <- mapM z ds
         let
             sub'' = {- Map.fromList [ (t,Susp e sub'') | (t,Once,_,e) <- s'] `Map.union`-} (Map.fromList [ (t,Done (EVar t'))  | (t,n,t',_) <- s', n /= Once]) `Map.union` sub
@@ -469,6 +477,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
             Nothing | fopts FO.Rules -> applyRules lup (Info.fetch (tvrInfo v)) xs
             x -> return x
 
+{-
     h v xs' inb  | so_superInline sopts, si@(_:_) <- [ (tvr,fromJust body) | EVar tvr <- xs', forceSuperInline tvr, let body = haveBody tvr, isJust body ] = do
         mapM_ (\v -> mtick  (toAtom $ "E.Simplify.inline.superforced.{" ++ tvrShowName v  ++ "}")) (fsts si)
         let siName x = case fromId x of
@@ -485,7 +494,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
             haveBody tvr = case Map.lookup (tvrIdent tvr) (envInScope inb) of
                 Just IsBoundTo { bindingE = e } -> Just e
                 _ -> Nothing
-
+  -}
 
     h (EVar v) xs' inb = do
         z <- applyRule v xs' inb
@@ -511,8 +520,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                 Nothing  -> appVar v xs'
                 -- Nothing | tvrNum v `Set.member` exports -> app (EVar v,xs')
                 -- Nothing -> error $ "Var not in scope: " ++ show v
-    h e xs' inb = do
-        app (e,xs')
+    h e xs' inb = do app (e,xs')
     didInline inb z zs = do
         e <- app (z,zs)
         go e inb

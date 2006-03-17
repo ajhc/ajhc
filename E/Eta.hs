@@ -166,7 +166,9 @@ etaExpandDef dataTable t e  = ans where
         (ne,flag) <- f a e rt ns
         return (ELam tvr ne,flag)
     f (AFun _ a) e (EPi tt rt) (n:ns) = do
-        mtick ("EtaExpand.def.{" ++ tvrShowName t)
+        if tvrIdent t == 0
+         then mtick ("EtaExpand.random")
+          else mtick ("EtaExpand.def.{" ++ tvrShowName t)
         let nv = tt { tvrIdent = n }
             eb = EAp e (EVar nv)
         (ne,_) <- f a eb rt ns
@@ -177,15 +179,22 @@ etaExpandDef dataTable t e  = ans where
 -- | eta expand a use of a value
 etaExpandAp :: MonadStats m => DataTable -> TVr -> [E] -> m (Maybe E)
 etaExpandAp _ _ [] = return Nothing  -- so simple renames don't get eta-expanded
-etaExpandAp dataTable t as | Just at <- Info.lookup (tvrInfo t),let n = snd (arity at), n > length as = do
-    let e = foldl EAp (EVar t) as
-    let (_,ts) = fromPi' dataTable (getType e)
-        ets = (take (n - length as) ts)
-    mticks (length ets) ("EtaExpand.use.{" ++ tvrShowName t)
-    let tvrs = f mempty [ (tvrIdent t,t { tvrIdent = n }) |  n <- [2,4 :: Int ..], not $ n `Set.member` freeVars (e,ets) | t <- ets ]
-        f map ((n,t):rs) = t { tvrType = substMap map (tvrType t)} : f (Map.insert n (EVar t) map) rs
-        f _ [] = []
-    return (Just $ foldr ELam (foldl EAp e (map EVar tvrs)) tvrs)
+etaExpandAp dataTable t as | Just (Arity n err) <- Info.lookup (tvrInfo t) = case () of
+    () | n > length as -> do
+            let e = foldl EAp (EVar t) as
+            let (_,ts) = fromPi' dataTable (infertype dataTable e)
+                ets = (take (n - length as) ts)
+            mticks (length ets) ("EtaExpand.use.{" ++ tvrShowName t)
+            let tvrs = f mempty [ (tvrIdent t,t { tvrIdent = n }) |  n <- [2,4 :: Int ..], not $ n `Set.member` freeVars (e,ets) | t <- ets ]
+                f map ((n,t):rs) = t { tvrType = substMap map (tvrType t)} : f (Map.insert n (EVar t) map) rs
+                f _ [] = []
+            return (Just $ foldr ELam (foldl EAp e (map EVar tvrs)) tvrs)
+       | err && length as > n -> do
+            let ot = infertype dataTable (foldl EAp (EVar t) as)
+            mticks (length as - n) ("EtaExpand.bottoming.{" ++ tvrShowName t)
+            return $ Just (prim_unsafeCoerce ot (foldl EAp (EVar t) (take n as)))  -- we can drop any extra arguments applied to something that bottoms out.
+       | otherwise -> return Nothing
+
 etaExpandAp _ t as = return Nothing
 
 

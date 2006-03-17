@@ -758,6 +758,7 @@ printCheckName'' dataTable tvr e = do
             Left err -> (Unknown,vcat $ map text (intersperse "---" $ tail err))
             Right ty -> (ty,pprint ty)
         tmatch = isJust $ match (const Nothing) [] ty (tvrType tvr)
+    wdump FD.EInfo $ putErrLn (show $ tvrInfo tvr)
     putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
     when (not tmatch) $
         putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pprint (tvrType tvr)))
