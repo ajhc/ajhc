@@ -54,11 +54,6 @@ install: jhc base-1.0.hl
 tags: $(HSFILES)
 	hasktags $(HSFILES)
 
-regress: jhc
-	time ./utils/regress_test.prl test/Try-Regress.hs
-	time ./utils/regress_test.prl test/Try-Foo.hs
-	time ./utils/regress_test.prl test/Try-Lam.hs
-	time ./utils/regress_test.prl test/Try-Case.hs
 
 hsdocs:
 	haddock -h $(filter-out DataConstructors.hs SelfTest.hs %/HsParser.hs FrontEnd/Representation.hs C/Gen.hs , $(HSFILES)) -o hsdocs
@@ -130,5 +125,5 @@ Version/Raw.hs: _darcs/inventory
 	echo '{-# NOINLINE basePackages #-}'                           >> $@
 	echo 'basePackages=["base-1.0"]'                               >> $@
 
-.PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs i
+.PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs install i printos tests
 
