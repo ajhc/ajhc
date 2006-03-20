@@ -4,6 +4,7 @@ import Control.Monad.Identity
 import Data.Monoid
 import List
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Class
 import DataConstructors
@@ -16,6 +17,7 @@ import Util.Graph
 
 
 data Program = Program {
+    progExternalNames :: Set.Set Id,
     progClassHierarchy :: ClassHierarchy,
     progCombinators :: [(TVr,[TVr],E)],
     progDataTable :: DataTable,
@@ -27,6 +29,7 @@ data Program = Program {
 
 
 program = Program {
+    progExternalNames = mempty,
     progClassHierarchy = mempty,
     progCombinators = mempty,
     progDataTable = mempty,

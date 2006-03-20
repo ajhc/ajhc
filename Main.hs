@@ -248,6 +248,8 @@ processDecls stats ho ho' tiData = do
     rules <- return $ specRules `mappend` rules
     allRules <- return $ allRules `mappend` rules
 
+    prog <- return $ etaAnnotateProgram prog
+
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
         let names = [ n | (n,_) <- ns]
@@ -266,7 +268,6 @@ processDecls stats ho ho' tiData = do
             --lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             (v,lc) <- Stats.runStatIO stats (etaExpandDef' fullDataTable v lc)
             lc <- doopt mangle False stats "SuperSimplify" cm lc
-            (v,lc) <- Stats.runStatIO stats (etaExpandDef' fullDataTable v lc)
             lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             return (v,lc)
@@ -318,6 +319,7 @@ processDecls stats ho ho' tiData = do
         wdump FD.Progress $ putErr (if rec then "*" else ".")
         return (nvls ++ retds, (Map.fromList [ (tvrIdent v,lc) | (v,lc) <- nvls] `Map.union` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (v,_) <- nvls] `Map.union` annmap , idHist' ))
 
+
     let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
         graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
         fscc (Left n) = (False,[n])
@@ -336,6 +338,7 @@ processDecls stats ho ho' tiData = do
         prog <- if null $ programDs prog then return prog else do
             ne <- (return . barendregt) (programE prog)
             return $ programSetE ne prog
+        prog <- return $ etaAnnotateProgram prog
         let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
             fscc (Left n) = (False,[n])
             fscc (Right ns) = (True,ns)
@@ -446,6 +449,8 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- return $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
     prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) letann (\_ nfo -> return nfo) prog
     prog <- return $ programPruneUnreachable prog
+
+    lintCheckProgram prog
 
     st <- Stats.new
     prog <- Stats.runStatIO st (etaExpandProgram prog)

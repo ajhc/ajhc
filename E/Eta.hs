@@ -7,10 +7,12 @@ module E.Eta(
     etaExpandDef',
     etaExpandProgram,
     getArityInfo,
+    etaAnnotateProgram,
     etaReduce
     ) where
 
 import Control.Monad.Identity
+import Control.Monad.State
 import Data.Monoid
 import Data.Typeable
 import Maybe
@@ -144,24 +146,25 @@ etaExpandE dataTable e = f e where
 -}
 
 
--- this annotates what it can, but only expands top-level definitions
+-- this annotates, but only expands top-level definitions
 etaExpandProgram :: MonadStats m => Program -> m Program
-etaExpandProgram prog = programMapRecGroups mempty pass letann pass f prog where
-    pass = \_ -> return
-    letann = (\e nfo -> return $ annotateArity e nfo)
-    f (False,[(t,e)]) = do
-        te <- etaExpandDef' (progDataTable prog) t e
-        return [te]
-    f (True,ts) = do
-        ts' <- mapM z ts
-        g ts' (length ts + 2)
-    g ts 0 = return ts
-    g ts n = do
-        ts' <- annotateDs mempty pass letann pass ts
-        ts'' <- mapM z ts'
-        g ts'' (n - 1)
-    z (t,e) = etaExpandDef' (progDataTable prog) t e
+etaExpandProgram prog = programMapDs f (etaAnnotateProgram prog) where
+    f (t,e) = etaExpandDef' (progDataTable prog) t e
 
+-- this annotates a program with its arity information, iterating until a fixpoint is reached.
+etaAnnotateProgram :: Program -> Program
+etaAnnotateProgram prog = runIdentity $ programMapRecGroups mempty pass iletann pass f prog where
+    pass _ = return
+    iletann e nfo = return $ annotateArity e nfo
+    letann e nfo = case Info.lookup nfo of
+        Nothing -> put True >> return (annotateArity e nfo)
+        Just at -> do
+            let at' = arityType e
+            when (at /= at') (put True)
+            return $ annotateArity' at' nfo
+    f (rec,ts) = do
+        let (ts',fs) = runState (annotateDs mempty pass letann pass ts) False
+        if fs then f (rec,ts') else return ts'
 
 
 
