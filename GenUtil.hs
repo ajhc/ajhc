@@ -1,5 +1,5 @@
 
---  $Id: GenUtil.hs,v 1.48 2006/01/29 05:22:26 john Exp $
+--  $Id: GenUtil.hs,v 1.49 2006/03/20 11:37:16 john Exp $
 -- arch-tag: 835e46b7-8ffd-40a0-aaf9-326b7e347760
 
 
@@ -104,6 +104,10 @@ module GenUtil(
     getOptContents,
     doTime,
     getPrefix,
+    rspan,
+    rdropWhile,
+    rtakeWhile,
+    rbdropWhile,
 
 
     -- * Classes
@@ -149,6 +153,39 @@ sortFst = sortBy (\(x,_) (y,_) -> compare x y)
 -- | group list of tuples, based only on equality of the first element of each tuple.
 groupFst :: Eq a => [(a,b)] -> [[(a,b)]]
 groupFst = groupBy (\(x,_) (y,_) -> x == y)
+
+concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
+concatMapM f xs = do
+    res <- mapM f xs
+    return $ concat res
+
+rspan :: (a -> Bool) -> [a] -> ([a], [a])
+rspan fn xs = f xs [] where
+    f [] rs = ([],reverse rs)
+    f (x:xs) rs
+        | fn x = f xs (x:rs)
+        | otherwise = (reverse rs ++ za,zb) where
+            (za,zb) = f xs []
+
+rbreak :: (a -> Bool) -> [a] -> ([a], [a])
+rbreak fn xs = rspan (not . fn) xs
+
+rdropWhile :: (a -> Bool) -> [a] -> [a]
+rdropWhile fn xs = f xs [] where
+    f [] _ = []
+    f (x:xs) rs
+        | fn x = f xs (x:rs)
+        | otherwise = reverse rs ++ (f xs [])
+
+rtakeWhile :: (a -> Bool) -> [a] -> [a]
+rtakeWhile fn xs = f xs [] where
+    f [] rs = reverse rs
+    f (x:xs) rs
+        | fn x = f xs (x:rs)
+        | otherwise = f xs []
+
+rbdropWhile :: (a -> Bool) -> [a] -> [a]
+rbdropWhile fn xs = rdropWhile fn (dropWhile fn xs)
 
 -- | group a list based on a function of the values.
 groupUnder :: Eq b => (a -> b) -> [a] -> [[a]]
@@ -526,8 +563,7 @@ indentLines n s = unlines $ map (replicate n ' ' ++)$ lines s
 
 -- | trim blank lines at beginning and end of string
 trimBlankLines :: String -> String
-trimBlankLines cs = unlines $ reverse (tb $ reverse (tb (lines cs))) where
-    tb = dropWhile (all isSpace)
+trimBlankLines cs = unlines $ rbdropWhile (all isSpace) (lines cs)
 
 buildTableRL :: [(String,String)] -> [String]
 buildTableRL ps = map f ps where
