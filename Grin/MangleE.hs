@@ -56,7 +56,7 @@ mangle prog = do
     prog <- pruneTypes prog
 
     stats <- Stats.new
-    prog <- programMapBodies (atomizeAp True (progDataTable prog) stats) prog
+    prog <- programMapBodies (atomizeAp True (progDataTable prog) stats (progModule prog)) prog
     prog <- programMapBodies dropCoercions prog
     Stats.print "Mangle" stats
 

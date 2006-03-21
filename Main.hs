@@ -224,7 +224,7 @@ processDecls stats ho ho' tiData = do
 
     -- initial pass over functions to put them into a normalized form
     let procE (ds,usedIds) (n,v,lc) = do
-        lc <- postProcessE stats n inscope usedIds fullDataTable lc
+        lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeAp False fullDataTable stats (progModule prog) x >>= coalesceLets stats)  lc
         nfo <- idann  allRules (hoProps ho') (tvrIdent v) (tvrInfo v)
         v <- return $ v { tvrInfo = Info.insert LetBound nfo }
         let used' = collectIds lc
@@ -361,26 +361,6 @@ programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = programSetDs ds' prog where
     ds' = reachable (newGraph (programDs prog) (tvrIdent . fst) (\ (t,e) -> bindingFreeVars t e)) (map tvrIdent $ progEntryPoints prog)
 
--- | take E directly generated from haskell source and bring it into line with
--- expected invarients. this only needs be done once.  it replaces all
--- ambiguous types with the absurd one, gets rid of all newtypes, does a basic
--- renaming pass, and makes sure applications are only to atomic variables.
-
-postProcessE :: Stats.Stats -> Name -> [Id] -> Set.Set Id -> DataTable -> E -> IO E
-postProcessE stats n inscope usedIds dataTable lc = do
---    let g (TVr { tvrIdent = 0 }) = error "absurded zero"
---        g tvr@(TVr { tvrIdent = n, tvrType = k})
---            | sortStarLike k =  tAbsurd k
---            | otherwise = EVar tvr
---    fvs <- return $ foldr Map.delete (freeVars lc)  inscope
- --   when (Map.size fvs > 0 && dump FD.Progress) $ do
-  --      putDocM putErr $ parens $ text "Absurded vars:" <+> align (hsep $ map pprint (Map.elems fvs))
-    let mangle = mangle' (Just $ Set.fromList $ inscope) dataTable
-    --lc <- mangle (return ()) False ("Absurdize") (return . substMap (Map.map g fvs)) lc
-    --lc <- mangle (return ()) False "deNewtype" (return . deNewtype dataTable) lc
-    --lc <- mangle (return ()) False ("Barendregt: " ++ show n) (return . barendregt) lc
-    lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeAp False dataTable stats x >>= coalesceLets stats)  lc
-    return lc
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
 shouldBeExported exports tvr

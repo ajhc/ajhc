@@ -1,5 +1,4 @@
 module E.LetFloat(
---    atomizeApps,
     atomizeAp,
     coalesceLets,
     annotateBindings,
@@ -42,48 +41,15 @@ varElim :: Stats -> Int -> IO ()
 varElim stats n = do
     ticks stats n (toAtom "E.Simplify.var-elimination")
 
-atomizeApps :: Set.Set Id -> Stats -> E -> IO E
-atomizeApps usedIds stats e = liftM fst $ traverse travOptions { pruneRecord = varElim stats } f mempty (Map.fromAscList [ (i,NotKnown) | i <- Set.toAscList usedIds ]) e where
-    f 0 (ep@(EPi tvr@TVr {tvrIdent = i, tvrType = t} b),[]) | i == 0 || i `notElem` freeVars b = do
-        (t',ds1) <- at t
-        (b',ds2) <- at b
-        liftIO $ C.putStrLn $ "atomizeApps: " ++ pprint ep
-        doLetRec stats (ds1 ++ ds2) (EPi tvr { tvrIdent = 0, tvrType = t'} b')
-    f 0 (EPrim n xs t,[]) = do
-        (xs',dss) <- fmap unzip (mapM at xs)
-        doLetRec stats (concat dss) (EPrim n xs' t)
-    f 0 (ELit (LitCons n xs t),[]) = do
-        (xs',dss) <- fmap unzip (mapM at xs)
-        doLetRec stats (concat dss) (ELit (LitCons n xs' t))
-    f n (x,xs) | n > 0 ||  all (isAtomic) xs = return $ foldl EAp x xs
-    f 0 (x,xs) = do
-        (xs',dss) <- fmap unzip (mapM at xs)
-        doLetRec stats (concat dss) (foldl EAp x xs')
-    f _ _ = error "LetFloat: odd f"
-    at (ELetRec ds e) = do
-        (x,xs) <- at e
-        return (x,ds ++ xs)
-    at e | not (isAtomic e) = do
-        liftIO $ C.putStrLn $ "at: " ++ pprint e
-        e <- f 0 (e,[])
-        lift $ tick stats (toAtom "E.LetFloat.atomizeApps")
-        case e of
-            ELetRec ds e -> do
-                nb@(tvr,_) <- newBinding e
-                return (EVar tvr,nb:ds)
-            e -> do
-                nb@(tvr,_) <- newBinding e
-                return (EVar tvr,[nb])
-
-    at e = return (e,[])
 
 atomizeAp ::
     Bool          -- ^ whether to atomize type arguments
     -> DataTable  -- ^ the data table for expanding newtypes
     -> Stats      -- ^ statistics
+    -> Module     -- ^ current module name
     -> E          -- ^ input term
     -> IO E
-atomizeAp atomizeTypes dataTable stats e = f e  where
+atomizeAp atomizeTypes dataTable stats modName e = f e  where
     f :: E -> IO E
     f e = do
         (x,ds) <- g e
@@ -126,7 +92,7 @@ atomizeAp atomizeTypes dataTable stats e = f e  where
     h e = do
         tick stats (toAtom "E.LetFloat.atomizeAp")
         u <- newUniq
-        let n = toName Val ("A@",'v':show u)
+        let n = toName Val (show modName,"a@" ++ show u)
             tv = tvr { tvrIdent = toId n, tvrType = infertype dataTable e }
         --C.putStrLn $ show n ++ " = " ++ pprint e
         return (EVar tv,[(tv,e)])
@@ -274,6 +240,42 @@ coalesceLets stats e = liftM fst $ traverse travOptions { pruneRecord = varElim 
     f n (x,xs) = do
         (x',xs') <- lift $ doCoalesce stats (x,xs)
         return $ foldl EAp x' xs'
+
+{-
+newtype Level = Level Int
+    deriving(Eq,Ord,Enum,Typeable)
+
+top_level = Level 0
+
+floatOutward :: Program -> IO Program
+floatOutward prog = do
+    -- set initial levels
+    let f (t,e) = return (tvrInfo_u (Info.insert top_level) t,g top_level e)
+        g n e | (b,ts@(_:_)) <- fromLam e = foldr ELam ts' (g n' b) where
+            n' = succ n
+            ts' = map (tvrInfo_u (Info.insert n')) ts
+        g n ec@ECase {} = runIdentity $ caseBodiesMapM g' ec { eCaseBind = m (eCaseBind ec), eCaseAlts = map ma (eCaseAlts ec) } where
+            m t = tvrInfo_u (Info.insert n) t
+            ma (Alt (LitCons n xs t)  b) = Alt (LitCons n (map m xs) t) b
+            ma a = a
+        g n e = runIdentity $ (emapE' (g' n) e)
+        g' n e = return $ g n e
+    prog <- programMapDs f prog
+    return prog
+
+-}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

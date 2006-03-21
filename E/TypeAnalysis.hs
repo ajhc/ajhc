@@ -267,8 +267,8 @@ specializeProgram usedRules usedValues prog = do
     return $ programSetDs nds prog
 
 
-specializeDef _(t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
 specializeDef (_,unusedVals,_,_) (tvr,e) | tvr `Set.member` unusedVals = return (tvr,EError "Unused" (tvrType tvr))
+specializeDef _(t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
 specializeDef (_,_,dataTable,_) (tvr,e) = ans where
     sub = substMap''  $ Map.fromList [ (tvrNum t,v) | (t,Just v) <- sts ]
     sts = map spec ts
