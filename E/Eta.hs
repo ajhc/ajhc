@@ -152,6 +152,9 @@ etaExpandDef _ _ e | isAtomic e = return Nothing -- will be inlined
 etaExpandDef dataTable t e  = ans where
     fvs = freeVars (e,tvrType t)
     at = arityType e
+    zeroName = case fromAp e of
+        (EVar v,_) -> "use.{" ++ tvrShowName v
+        _ -> "random"
     nameSupply = [ n |  n <- [2,4 :: Int ..], not $ n `Set.member` fvs  ]
     ans = do
         -- note that we can't use the type in the tvr, because it will not have the right free typevars.
@@ -162,7 +165,7 @@ etaExpandDef dataTable t e  = ans where
         return (ELam tvr ne,flag)
     f (AFun _ a) e (EPi tt rt) (n:ns) = do
         if tvrIdent t == 0
-         then mtick ("EtaExpand.random")
+         then mtick ("EtaExpand." ++ zeroName)
           else mtick ("EtaExpand.def.{" ++ tvrShowName t)
         let nv = tt { tvrIdent = n }
             eb = EAp e (EVar nv)
@@ -171,8 +174,15 @@ etaExpandDef dataTable t e  = ans where
     f _ e _ _ = do
         return (e,False)
 
+
+
 -- | eta expand a use of a value
 etaExpandAp :: MonadStats m => DataTable -> TVr -> [E] -> m (Maybe E)
+etaExpandAp dataTable tvr xs = do
+    r <- etaExpandDef dataTable tvr { tvrIdent = 0} (foldl EAp (EVar tvr) xs)
+    return (fmap snd r)
+
+{-
 etaExpandAp _ _ [] = return Nothing  -- so simple renames don't get eta-expanded
 etaExpandAp dataTable t as | Just (Arity n err) <- Info.lookup (tvrInfo t) = case () of
     () | n > length as -> do
@@ -191,5 +201,6 @@ etaExpandAp dataTable t as | Just (Arity n err) <- Info.lookup (tvrInfo t) = cas
        | otherwise -> return Nothing
 
 etaExpandAp _ t as = return Nothing
+-}
 
 

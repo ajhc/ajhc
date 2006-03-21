@@ -228,7 +228,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     f e sub inb | (x,xs) <- fromAp e = do
         eed <- etaExpandDef (so_dataTable sopts) tvr { tvrIdent = 0 } e
         case eed of
-            Just (_,e) -> go e inb
+            Just (_,e) -> f e sub inb -- go e inb
             Nothing -> do
                 xs' <- mapM (dosub sub) xs
                 x' <- g x sub inb
@@ -255,12 +255,8 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         return $ EError s t'
     g ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d} sub inb = do
         addNames (map tvrNum $ caseBinds ec)
-        eed <- etaExpandDef (so_dataTable sopts) tvr { tvrIdent = 0 } ec
-        case eed of
-            Just (_,e) -> go e inb
-            Nothing -> do
-                e' <- f e sub inb
-                doCase e' (eCaseType ec) b as d sub inb
+        e' <- f e sub inb
+        doCase e' (eCaseType ec) b as d sub inb
     g (ELam v e) sub inb  = do
         addNames [tvrNum v]
         v' <- nname v sub inb
