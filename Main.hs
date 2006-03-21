@@ -30,7 +30,6 @@ import E.LetFloat
 import E.Show hiding(render)
 import E.Rules
 import E.Strictness
-import E.Subst
 import E.Traverse
 import E.TypeAnalysis
 import E.TypeCheck
@@ -51,7 +50,6 @@ import Ho.Library
 import Ho.LibraryMap
 import HsSyn
 import Info.Types
-import Util.Gen
 import Name.Name
 import Options
 import SelfTest(selfTest)
@@ -198,6 +196,7 @@ processDecls stats ho ho' tiData = do
     let prog = program {
             progClassHierarchy = hoClassHierarchy allHo,
             progDataTable = fullDataTable,
+            progExternalNames = Set.fromList [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ],
             progModule = head (fsts $ tiDataModules tiData)
             }
 
@@ -239,6 +238,8 @@ processDecls stats ho ho' tiData = do
     let entries = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t) (tell [t])) prog
     prog <- return $ prog { progEntryPoints = entries }
     prog <- return $ programPruneUnreachable prog
+
+    lintCheckProgram prog
 
     let specMap = Map.fromListWith (++) [ (n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- tiCheckedRules tiData]
     nds <- mapM (procSpecs specMap) (programDs prog)
@@ -329,6 +330,7 @@ processDecls stats ho ho' tiData = do
     prog <- return $ programSetDs ds prog
     prog <- return $ programPruneUnreachable prog
     Stats.print "Optimization" stats
+    lintCheckProgram prog
 
     (prog,didSomething) <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return (prog,False)
 
@@ -347,6 +349,7 @@ processDecls stats ho ho' tiData = do
         return $ programSetDs ds prog
       else return prog
     prog <- return $ programPruneUnreachable prog
+    lintCheckProgram prog
 
 
     wdump FD.Lambdacube $ printProgram prog
@@ -712,9 +715,8 @@ mangle'  fv dataTable erraction b  s action e = do
                 let (_,e'') = E.Diff.diff e e'
                 putDocM CharIO.putErr (ePretty e'')
                 putErrLn $ "\n>>> internal error:\n" ++ unlines (tail ss)
-                case optKeepGoing options of
-                    True -> return e'
-                    False -> putErrDie "Type Error in E"
+                maybeDie
+                return e'
             Right _ -> wdump FD.Stats (printEStats e') >>  return e'
 
 
@@ -722,25 +724,34 @@ typecheck dataTable e = case inferType dataTable [] e of
     Left ss -> do
         putErrLn (render $ ePretty e)
         putErrLn $ "\n>>> internal error:\n" ++ unlines (intersperse "----" $ tail ss)
-        case optKeepGoing options of
-            True -> return Unknown
-            False -> putErrDie "Type Error in E"
+        maybeDie
+        return Unknown
     Right v -> return v
+
+maybeDie = case optKeepGoing options of
+    True -> return ()
+    False -> putErrDie "Internal Error"
 
 lintCheckE dataTable tvr e | flint = case inferType dataTable [] e of
     Left ss -> do
         putErrLn  ( render $ hang 4 (pprint tvr <+> equals <+> pprint e))
         putErrLn $ "\n>>> internal error:\n" ++ unlines (intersperse "----" $ tail ss)
-        case optKeepGoing options of
-            True -> return ()
-            False -> putErrDie "Type Error in E"
+        maybeDie
     Right v -> return ()
 lintCheckE _ _ _ = return ()
 
 lintCheckProgram prog | flint = do
     let f (tvr,e) = lintCheckE (progDataTable prog) tvr e
-    when (hasRepeatUnder fst (programDs prog)) $ fail "program has repeated toplevel definitions"
+    when (hasRepeatUnder fst (programDs prog)) $ do
+        putErrLn "program has repeated toplevel definitions"
+        maybeDie
     mapM_ f (programDs prog)
+    let ids = progExternalNames prog `mappend` Set.fromList (map tvrIdent $ fsts (programDs prog))
+        fvs = freeVars $ snds $ programDs prog :: Set.Set TVr
+        unaccounted = Set.filter (not . (`Set.member` ids) . tvrIdent) fvs
+    unless (Set.null unaccounted) $ do
+        putErrLn ("Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
+        maybeDie
 lintCheckProgram _ = return ()
 
 dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ show n <+> hsep (map show as) <+> "::" <+> show t |  (n,(as,t)) <- Map.toList tt]
