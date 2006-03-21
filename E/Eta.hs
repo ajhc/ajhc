@@ -89,22 +89,6 @@ annotateArity' at nfo = Info.insert (Arity n (b == ABottom)) $ Info.insert at nf
 -- delety any arity information
 deleteArity nfo = Info.delete  (undefined :: Arity) $ Info.delete (undefined :: Arity) nfo
 
-{-
-{-# NOINLINE etaExpand #-}
-etaExpand :: Program -> IO Program
-etaExpand prog = do
-    prog <- annotateProgram mempty (const return) annotateArity lamann prog
-    let (p,stat) = runStatM $ programMapBodies (etaExpandE $ progDataTable prog) prog
-    Stats.printStat "EtaExpansion" stat
-    return p
-
-{-# NOINLINE etaExpandDs #-}
-etaExpandDs :: MonadStats m => DataTable -> [(TVr,E)] -> m [(TVr,E)]
-etaExpandDs dataTable ds = do
-    let Identity ds' = annotateDs mempty (const return) annotateArity lamann ds
-    sequence [ do e <- etaExpandE dataTable e; return (t,e) | (t,e) <- ds' ]
-
--}
 
 expandPis :: DataTable -> E -> E
 expandPis dataTable e = f (followAliases dataTable e) where
@@ -117,33 +101,6 @@ fromPi' dataTable e = f [] (followAliases dataTable e) where
     f as (EPi v e) = f (v:as) (followAliases dataTable e)
     f as e  =  (e,reverse as)
 
-{-
-etaExpandE :: MonadStats m => DataTable -> E -> m E
-etaExpandE dataTable e = f e where
-    f (ELetRec ds e) = do
-        ds' <- sequence [ do e' <- ee e; e'' <- f e'; return (t,e'') | (t,e) <- ds]
-        e <- ee e
-        e' <- f e
-        return $ ELetRec ds' e'
-    f ec@ECase {} = do
-        ec' <- caseBodiesMapM ee ec
-        emapE' f ec'
-    f e = emapE' f e
-    ee e@EVar {} = return e
-    ee e = ee' e
-    ee' (ELam t e) = do
-        e' <- ee' e
-        return (ELam t e')
-    ee' e | (EVar t,as) <- fromAp e , Just (Arity n) <- Info.lookup (tvrInfo t), n > length as = do
-        let (_,ts) = expandPis dataTable (getType e)
-            ets = (take (n - length as) ts)
-        replicateM_ (length ets) $ mtick ("EtaExpand.{" ++ tvrShowName t)
-        let tvrs = f mempty [ (tvrIdent t,t { tvrIdent = n }) |  n <- [2,4 :: Int ..], not $ n `Set.member` freeVars (e,ets) | t <- ets ]
-            f map ((n,t):rs) = t { tvrType = substMap map (tvrType t)} : f (Map.insert n (EVar t) map) rs
-            f _ [] = []
-        return (foldr ELam (foldl EAp e (map EVar tvrs)) tvrs)
-    ee' e = return e
--}
 
 
 -- this annotates, but only expands top-level definitions
@@ -200,8 +157,8 @@ etaExpandDef dataTable t e  = ans where
         -- note that we can't use the type in the tvr, because it will not have the right free typevars.
         (ne,flag) <- f at e (expandPis dataTable $ infertype dataTable e) nameSupply
         if flag then return (Just (tvrInfo_u (annotateArity' at) t,ne)) else return Nothing
-    f (AFun _ a) (ELam tvr e) ty ns | (EPi _ rt) <- followAliases dataTable ty = do
-        (ne,flag) <- f a e rt ns
+    f (AFun _ a) (ELam tvr e) (EPi tvr' rt) ns = do
+        (ne,flag) <- f a e (subst tvr' (EVar tvr) rt) ns
         return (ELam tvr ne,flag)
     f (AFun _ a) e (EPi tt rt) (n:ns) = do
         if tvrIdent t == 0
@@ -209,7 +166,7 @@ etaExpandDef dataTable t e  = ans where
           else mtick ("EtaExpand.def.{" ++ tvrShowName t)
         let nv = tt { tvrIdent = n }
             eb = EAp e (EVar nv)
-        (ne,_) <- f a eb rt ns
+        (ne,_) <- f a eb (subst tt (EVar nv) rt) ns
         return (ELam nv ne,True)
     f _ e _ _ = do
         return (e,False)
