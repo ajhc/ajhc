@@ -76,7 +76,7 @@ typeAnalyze prog = do
     let (prog',stats) = runStatM $ specializeProgram (Set.fromList unusedRules) (Set.fromList unusedValues) prog
     prog <- annotateProgram mempty lamdel (\_ -> return) (\_ -> return) prog'
     when (stats /= mempty) $ printStat "TypeAnalysis" stats
-    return (prog,stats /= mempty)
+    return (prog { progStats = progStats prog `mappend` stats },stats /= mempty)
 
 sillyEntry :: Env -> TVr -> IO ()
 sillyEntry env t = mapM_ (addRule . (`isSuperSetOf` value (vmapPlaceholder ()))) args where

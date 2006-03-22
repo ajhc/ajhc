@@ -225,6 +225,9 @@ newtype CLevel = CLevel Level
 
 top_level = Level 0
 
+--notFloatOut e = isAtomic e || whnfOrBot e
+notFloatOut e = False
+
 floatOutward :: Program -> IO Program
 floatOutward prog = do
     -- set natural levels on all types
@@ -242,7 +245,10 @@ floatOutward prog = do
             imap' = Map.fromList [ (tvrIdent t,n) | t <- caseBinds ec] `Map.union` imap
         g n (ELetRec ds e) imap = dds (map G.fromScc $ decomposeDs ds) [] e imap where
             dds (ts:rs) nrs e imap = dds rs (ts':nrs) e imap' where
-                n' = maximum (top_level:[ n | t <- fvs, let Just n = Map.lookup t imap])
+                n' = maximum (top_level:[ lup t | t <- fvs ])
+                lup n = case Map.lookup n imap of
+                    Just x -> x
+                    Nothing -> error $ "LetFloat: could not find " ++ show tvr { tvrIdent = n }
                 cl = CLevel n
                 fvs = [ t | t <- freeVars (snds ts), t `notElem` (map (tvrIdent . fst) ts)]
                 ts' = [(tvrInfo_u (Info.insert cl . Info.insert n') t,g n e imap') |  (t,e) <- ts]
@@ -259,7 +265,7 @@ floatOutward prog = do
     let dofloat (ELetRec ds e) = do
             e' <- dofloat e
             ds' <- mapM df ds
-            return (ELetRec ds' e')
+            return (ELetRec (concat ds') e')
         dofloat e@ELam {} = do
             let (b,ts) = fromLam e
                 Just ln = Info.lookup (tvrInfo (head ts))
@@ -273,26 +279,33 @@ floatOutward prog = do
         df (t,e) | Just (CLevel cl) <- lcl, cl /= nl = ans where
             ans = do
                 e' <- dofloat e
-                if whnfOrBot e || isAtomic e then do
-                    mtick $ "LetFloat.Full-Lazy.skip.{" ++ tvrShowName t
-                    return (t,e')
-                  else do
                 mtick $ "LetFloat.Full-Lazy.float.{" ++ tvrShowName t
                 let nv = t { tvrIdent = toId nn }
                     nn = lfName (progModule prog) Val (tvrIdent t)
-                tell [(nl,(nv,e'))]
-                return (t,(EVar nv))
+                tell [(nl,(t,e'))]
+                return [] -- (t,(EVar nv))
             lcl = Info.lookup (tvrInfo t)
             Just nl = Info.lookup (tvrInfo t)
         df (t,e) = do
             e' <- dofloat e
-            return (t,e')
+            return [(t,e')]
+--        dtl (t,ELetRec ds e) = do
+--            (e',fs) <- runWriterT (dofloat e)
+--            return $ (t,e'):snds fs
         dtl (t,e) = do
             (e',fs) <- runWriterT (dofloat e)
-            return $ (t,letRec (snds fs) e')
-    let (nprog,stats) = runStatM (programMapDs dtl prog)
-    printStat "FullyLazy" stats
-    return nprog
+            let (e'',fs') = case e' of
+                    ELetRec ds e -> (e,ds++snds fs)
+                    _ -> (e',snds fs)
+            flip mapM_ (fsts $ fs') $ \t -> do
+                mtick $ "LetFloat.Full-Lazy.top_level.{" ++ tvrShowName t
+            let (fs'',sm') = unzip [ ((n,sm e),(t,EVar n)) | (t,e) <- fs', let n = nn t ]
+                sm = substLet sm'
+                nn tvr = tvr { tvrIdent = toId $ lfName (progModule prog) Val (tvrIdent tvr) }
+            return $ (t,sm e''):fs''
+    let (cds,stats) = runStatM (mapM dtl $ programDs prog)
+    let nprog = programSetDs (concat cds) prog
+    return nprog { progStats = progStats nprog `mappend` stats }
 
 
 lfName modName ns x = case fromId x of
@@ -326,7 +339,7 @@ letBindAll  dataTable modName e = f e  where
         b' <- g b
         return (foldr ELam b' ts)
     f e = emapE' f e
-    g e | isAtomic e || whnfOrBot e = return e
+    g e | notFloatOut e = return e
     g e = do
         u <- newUniq
         let n = toName Val (show modName,"af@" ++ show u)
