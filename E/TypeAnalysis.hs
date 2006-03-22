@@ -69,13 +69,13 @@ typeAnalyze prog = do
         vv <- supplyValue uv tvr
         addRule $ assert vv
     mapM_ (sillyEntry env) entries
-    calcFixpoint "type analysis" fixer
+    findFixpoint Nothing fixer
     prog <- annotateProgram mempty (\_ -> return) (\_ -> return) lamread prog
     unusedRules <- supplyReadValues ur >>= return . fsts . filter (not . snd)
     unusedValues <- supplyReadValues uv >>= return . fsts . filter (not . snd)
     let (prog',stats) = runStatM $ specializeProgram (Set.fromList unusedRules) (Set.fromList unusedValues) prog
     prog <- annotateProgram mempty lamdel (\_ -> return) (\_ -> return) prog'
-    when (stats /= mempty) $ printStat "TypeAnalysis" stats
+    --when (stats /= mempty) $ printStat "TypeAnalysis" stats
     return (prog { progStats = progStats prog `mappend` stats },stats /= mempty)
 
 sillyEntry :: Env -> TVr -> IO ()
