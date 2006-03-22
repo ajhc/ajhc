@@ -321,6 +321,7 @@ processDecls stats ho ho' tiData = do
         Stats.print "Initial Pass Stats" initialPassStats
     lintCheckProgram prog
 
+    prog <- Stats.runStatIO stats (etaExpandProgram prog)
 
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
@@ -411,7 +412,6 @@ processDecls stats ho ho' tiData = do
 
     (prog,didSomething) <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return (prog,False)
 
-    prog <- Stats.runStatIO stats (etaExpandProgram prog)
 
     prog <- if didSomething then do
         prog <- if null $ programDs prog then return prog else do
