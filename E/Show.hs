@@ -112,6 +112,7 @@ showTVr' TVr { tvrIdent = i} = do
 
 
 allocTVr :: TVr -> SEM a -> SEM a
+allocTVr _tvr action | dump FD.EVerbose = action
 allocTVr tvr action | tvrIdent tvr == 0 = action
 allocTVr tvr (SEM action) | tvrType tvr == eStar  = do
     SEM $ subVarName $ newName (map (:[]) ['a' ..]) eStar (tvrIdent tvr) >> action
@@ -143,7 +144,7 @@ showE e = do
         f e | e == vUnit     = return $ atom $ text "()"
         f (EAp a b) = liftM2 app (showE a) (showE b)
         f (EPi (TVr { tvrIdent = 0, tvrType =  e1}) e2) = liftM2 arr (showE e1) (showE e2)
-        f (EPi (TVr { tvrIdent = n, tvrType =  e1}) e2) | not $ n `Set.member` freeVars e2 = liftM2 arr (showE e1) (showE e2)
+        f (EPi (TVr { tvrIdent = n, tvrType =  e1}) e2) | not $ dump FD.EVerbose, not $ n `Set.member` freeVars e2 = liftM2 arr (showE e1) (showE e2)
         f (EPi tvr@(TVr {  tvrType =  z}) e) | z == eStar = allocTVr tvr $ do
             tvr <- showTVr' tvr
             liftM2 dot (return $ pop (retOp UC.forall) tvr) (showE e)
@@ -196,7 +197,7 @@ showE e = do
                 Just e -> do
                     let ecb = eCaseBind ec
 
-                    db <- showTVr (if tvrIdent ecb `Set.member` freeVars e then ecb else ecb { tvrIdent = 0 })
+                    db <- showTVr (if dump FD.EVerbose || (tvrIdent ecb `Set.member` freeVars e) then ecb else ecb { tvrIdent = 0 })
                     e <- showE e
                     return [unparse db <+> UC.rArrow <+> unparse e]
             let alts' = map (<> bc ';') (alts ++ dcase)
