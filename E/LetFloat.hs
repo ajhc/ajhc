@@ -157,7 +157,9 @@ floatInward rules e = f e [] where
         g (Right bs:xs) p =  g xs (p0 ++ [Right [ let ev' = f ev pv in ((v,ev'),bindingFreeVars v ev') | ((v,ev),_) <- bs | pv <- ps ]] ++ p') where
             (p',_:p0:ps) = sepByDropPoint (freeVars (map (tvrType . fst . fst) bs) :augment (frest xs):snds bs) p
         frest xs = mconcat (freeVars e:map fvBind xs)
-    f e xs |  (b,ls@(_:_)) <- fromLam e = letRec xs (foldr ELam (f b []) ls)
+    f e@ELam {} xs = letRec unsafe_to_dup (foldr ELam (f b safe_to_dup) ls) where
+        (unsafe_to_dup,safe_to_dup) = sepDupableBinds (freeVars ls) xs
+        (b,ls) = fromLam e
     f e (Left ((v',ev),_):xs)
         | (EVar v,as) <- fromAp e, v == v', not (tvrNum v' `Set.member` freeVars as)  = f (runIdentity $ app (ev,as) {- foldl EAp ev as -} ) xs
     f e xs = letRec xs e
@@ -169,8 +171,16 @@ floatInward rules e = f e [] where
 
 type FVarSet = Set.Set Int
 type Binds = [Either ((TVr,E),FVarSet) [((TVr,E),FVarSet)]]
---type Binds = [(FVarSet,Either (TVr,E) [(TVr,E)])]
 
+sepDupableBinds :: [Id] -> Binds -> (Binds,Binds)
+sepDupableBinds fvs xs = partition ind xs where
+    g = G.reachable (G.newGraph (concatMap G.fromScc xs) (tvrNum . fst . fst) (Set.toList . snd)) (fvs `mappend` unsafe_ones)
+    uso = map (tvrNum . fst . fst) g
+    --unsafe_ones = map (tvrIdent . fst . fst) $ concatMap G.fromScc $ filter (not . std) xs
+    --std (Left ((_,e),_)) = isCheap e
+    --std (Right zs) = all isCheap (snds $ fsts zs)
+    unsafe_ones = concat [ map (tvrIdent . fst . fst) vs | vs <- map G.fromScc xs,any (not . isCheap) (map (snd . fst) vs)]
+    ind x = any ( (`elem` uso) . tvrNum . fst . fst ) (G.fromScc x)
 
 {-
 sepDupableBinds fvs xs = partition ind xs where
@@ -277,11 +287,9 @@ floatOutward prog = do
         df (t,e) | Just (CLevel cl) <- lcl, cl /= nl = ans where
             ans = do
                 e' <- dofloat e
-                mtick $ "LetFloat.Full-Lazy.float.{" ++ tvrShowName t
-                let nv = t { tvrIdent = toId nn }
-                    nn = lfName (progModule prog) Val (tvrIdent t)
+                mtick $ "LetFloat.Full-Lazy.float.{" ++ maybeShowName t
                 tell [(nl,(t,e'))]
-                return [] -- (t,(EVar nv))
+                return []
             lcl = Info.lookup (tvrInfo t)
             Just nl = Info.lookup (tvrInfo t)
         df (t,e) = do
@@ -291,24 +299,33 @@ floatOutward prog = do
 --            (e',fs) <- runWriterT (dofloat e)
 --            return $ (t,e'):snds fs
         dtl (t,e) = do
-            (e',fs) <- runWriterT (dofloat e)
-            let (e'',fs') = case e' of
+            (e,fs) <- runWriterT (dofloat e)
+            let (e',fs') = case e of
                     ELetRec ds e -> (e,ds++snds fs)
-                    _ -> (e',snds fs)
-            flip mapM_ (fsts $ fs') $ \t -> do
-                mtick $ "LetFloat.Full-Lazy.top_level.{" ++ tvrShowName t
-            let (fs'',sm') = unzip [ ((n,sm e),(t,EVar n)) | (t,e) <- fs', let n = nn t ]
+                    _ -> (e,snds fs)
+                -- we imediatly float inward to clean up cruft and spurious outwards floatings
+                (e'',fs'') = cDefs $ floatInward mempty (ELetRec fs' e')
+                cDefs (ELetRec ds e) = (e',ds ++ ds') where
+                    (e',ds') = cDefs e
+                cDefs e = (e,[])
+            flip mapM_ (fsts $ fs'') $ \t -> do
+                mtick $ "LetFloat.Full-Lazy.top_level.{" ++ maybeShowName t
+            u <- newUniq
+            let (fs''',sm') = unzip [ ((n,sm e),(t,EVar n)) | (t,e) <- fs'', let n = nn t ]
                 sm = substLet sm'
-                nn tvr = tvr { tvrIdent = toId $ lfName (progModule prog) Val (tvrIdent tvr) }
-            return $ (t,sm e''):fs''
-    let (cds,stats) = runStatM (mapM dtl $ programDs prog)
+                nn tvr = tvr { tvrIdent = toId $ lfName u (progModule prog) Val (tvrIdent tvr) }
+            return $ (t,sm e''):fs'''
+    (cds,stats) <- runStatT (mapM dtl $ programDs prog)
     let nprog = programSetDs (concat cds) prog
     return nprog { progStats = progStats nprog `mappend` stats }
 
 
-lfName modName ns x = case fromId x of
-    Just y  -> toName ns (show modName, "fl@"++show y)
-    Nothing -> toName ns (show modName, "fl@"++show x)
+maybeShowName t = if '@' `elem` n then "(epheremal)" else n where
+    n = tvrShowName t
+
+lfName u modName ns x = case fromId x of
+    Just y  -> toName ns (show modName, "fl@"++show y ++ "$" ++ show u)
+    Nothing -> toName ns (show modName, "fl@"++show x ++ "$" ++ show u)
 
 
 mapMSnd f xs = sequence [ (,) x `liftM` f y | (x,y) <- xs]
@@ -326,12 +343,13 @@ letBindAll  dataTable modName e = f e  where
         e' <- g e
         return $ ELetRec ds' e'
     f ec@ECase {} = do
+        ec' <- caseBodiesMapM g ec
         let mv = case eCaseScrutinee ec of
                 EVar v -> subst (eCaseBind ec) (EVar v)
                 _ -> id
-        ec' <- caseBodiesMapM (g . mv) ec
+            nd = fmap mv (eCaseDefault ec')
         scrut' <- g (eCaseScrutinee ec)
-        return ec' { eCaseScrutinee = scrut' }
+        return ec' { eCaseScrutinee = scrut', eCaseDefault = nd }
     f e@ELam {} = do
         let (b,ts) = fromLam e
         b' <- g b
