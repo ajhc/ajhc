@@ -23,6 +23,7 @@ import E.Annotate(annotate,annotateDs,annotateProgram)
 import E.Diff
 import E.E
 import E.Eta
+import E.Inline
 import E.FromHs
 import E.LambdaLift
 import E.Program
@@ -249,7 +250,62 @@ processDecls stats ho ho' tiData = do
     rules <- return $ specRules `mappend` rules
     allRules <- return $ allRules `mappend` rules
 
-    prog <- return $ etaAnnotateProgram prog
+    let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
+
+    -- initial pass, performs
+    -- eta expansion of definitons
+    -- simplify
+    -- type analysis
+    -- floating outward
+    -- simplify
+    -- floating inward
+
+    let fint (rec,ns) = do
+        let names = [ n | (n,_) <- ns]
+        stats <- Stats.new
+        let mprog = programSetDs ns prog { progStats = mempty, progEntryPoints = fsts ns, progExternalNames = progExternalNames prog `mappend` (Set.fromList $ map tvrIdent $ fsts (programDs prog)) }
+        mprog <- return $ etaAnnotateProgram mprog
+        let cm stats e = do
+            let sopt = mempty { SS.so_rules = allRules, SS.so_exports = map tvrIdent $ progEntryPoints mprog, SS.so_dataTable = fullDataTable }
+            let (stat, e'') = SS.simplifyE sopt e
+            Stats.tickStat stats stat
+            return e''
+        let mangle = mangle' Nothing fullDataTable
+        ns <- flip mapM (programDs mprog) $ \ (v,lc) -> do
+            (v,lc) <- Stats.runStatIO stats (etaExpandDef' fullDataTable v lc)
+            lc <- doopt mangle False stats "SuperSimplify" cm lc
+            lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
+            return (v,lc)
+        mprog <- return $ programSetDs ns mprog
+        (mprog,_) <- typeAnalyze mprog
+
+        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
+        lintCheckProgram mprog
+        mprog <- floatOutward mprog
+        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
+        lintCheckProgram mprog
+        ns <- flip mapM (programDs mprog) $ \ (v,lc) -> do
+            (v,lc) <- Stats.runStatIO stats (etaExpandDef' fullDataTable v lc)
+            lc <- doopt mangle False stats "SuperSimplify" cm lc
+            lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
+            lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
+            return (v,lc)
+        ns <- E.Strictness.solveDs ns
+        mprog <- return $ programSetDs ns mprog
+        ns <- flip mapM (programDs mprog) $ \ (v,lc) -> do
+            --(v,lc) <- Stats.runStatIO stats (etaExpandDef' fullDataTable v lc)
+            lc <- doopt mangle False stats "SuperSimplify" cm lc
+            lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
+            return (v,lc)
+        mprog <- return $ programSetDs ns mprog
+
+        Stats.tickStat stats (progStats mprog)
+        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
+        Stats.print ("InitialOptimize:" ++ pprint names) stats
+        return (programDs mprog)
+    lintCheckProgram prog
+    prog <- programMapRecGroups initMap (const return) (const return) (const return) fint prog
+    lintCheckProgram prog
 
 
     -- This is the main function that optimizes the routines before writing them out
@@ -261,7 +317,7 @@ processDecls stats ho ho' tiData = do
         --putStrLn "*** After annotate"
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
         let cm stats e = do
-            let sopt = mempty { SS.so_superInline = True, SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
+            let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
             let (stat, e'') = SS.simplifyE sopt e
             Stats.tickStat stats stat
             return e''
@@ -323,8 +379,7 @@ processDecls stats ho ho' tiData = do
 
 
 
-    let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
-        graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
+    let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
         fscc (Left n) = (False,[n])
         fscc (Right ns) = (True,ns)
     (ds,_) <- foldM f ([],(Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
@@ -332,9 +387,6 @@ processDecls stats ho ho' tiData = do
     prog <- return $ programSetDs ds prog
     prog <- return $ programPruneUnreachable prog
     Stats.print "Optimization" stats
-    lintCheckProgram prog
-    prog <- floatOutward prog
-    lintCheckProgram prog
 
     (prog,_didSomething) <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return (prog,False)
 
@@ -461,7 +513,7 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     wdump FD.Progress $ printEStats lc
     let cm stats e = do
-        let sopt = mempty { SS.so_superInline = True, SS.so_rules = rules, SS.so_dataTable = dataTable }
+        let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable }
         let (stat, e') = SS.simplifyE sopt e
         Stats.tickStat stats stat
         return e'
