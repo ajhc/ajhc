@@ -251,6 +251,7 @@ processDecls stats ho ho' tiData = do
 
     prog <- return $ etaAnnotateProgram prog
 
+
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
         let names = [ n | (n,_) <- ns]
@@ -321,6 +322,7 @@ processDecls stats ho ho' tiData = do
         return (nvls ++ retds, (Map.fromList [ (tvrIdent v,lc) | (v,lc) <- nvls] `Map.union` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (v,_) <- nvls] `Map.union` annmap , idHist' ))
 
 
+
     let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
         graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
         fscc (Left n) = (False,[n])
@@ -331,12 +333,14 @@ processDecls stats ho ho' tiData = do
     prog <- return $ programPruneUnreachable prog
     Stats.print "Optimization" stats
     lintCheckProgram prog
+    prog <- floatOutward prog
+    lintCheckProgram prog
 
-    (prog,didSomething) <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return (prog,False)
+    (prog,_didSomething) <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return (prog,False)
 
     prog <- Stats.runStatIO stats (etaExpandProgram prog)
 
-    prog <- if didSomething then do
+    prog <- if True then do
         prog <- if null $ programDs prog then return prog else do
             ne <- (return . barendregt) (programE prog)
             return $ programSetE ne prog
@@ -350,7 +354,6 @@ processDecls stats ho ho' tiData = do
       else return prog
     prog <- return $ programPruneUnreachable prog
     lintCheckProgram prog
-
 
     wdump FD.Lambdacube $ printProgram prog
 
@@ -447,6 +450,7 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     ne <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) (programE prog)
     prog <- return $ programSetE ne prog
+
 
 
     -- make sure properties and are attached everywhere

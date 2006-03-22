@@ -1,13 +1,14 @@
 module E.LetFloat(
     atomizeAp,
     coalesceLets,
-    annotateBindings,
+    floatOutward,
     floatInward
   ) where
 
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Monoid
+import Data.Typeable
 import List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -16,7 +17,9 @@ import Atom
 import DataConstructors
 import Doc.PPrint
 import E.E
+import E.Program
 import E.Inline
+import Info.Info as Info
 import E.Rules
 import E.Traverse
 import E.TypeCheck
@@ -205,34 +208,6 @@ sepByDropPoint ds fs' = (r,xs) where
     fvDecls (Right ts) = [tvrNum t | ((t,_),_) <- ts ]
     comb (a,b) (c,d) = (a ++ c, zipWith (++) b d)
 
-floatOutward :: Map.Map Int Int -> E -> (E,[(TVr,E)])
-floatOutward bmap e = (e,[])
-
--- Beautiful use of lazyness.
-annotateBindings :: Map.Map TVr Int -> E -> Map.Map TVr Int
-annotateBindings min e = ans where
-    ans = min `mappend` execWriter (f 0 e)
-    f :: Int -> E -> Writer (Map.Map TVr Int) ()
-    f n ec@ECase {} = do
-        tell (Map.fromList [ (i,n) | i <- caseBinds ec ])
-        emapE_ (f n) ec
-    f n (ELetRec ds b) = do
-        let ds' = [ (t,freeVars e) | (t,e) <- ds]
-            scc = G.scc (G.newGraph ds' (tvrNum . fst) snd)
-            g (Left (t,fv)) = tell (Map.singleton t (maximum $ 0:[Map.findWithDefault 0 (tVr v Unknown) ans | v <- fv]))
-            g (Right ts) = do
-                let ln = maximum $ 0:[Map.findWithDefault 0 (tVr v Unknown) ans | v <- (snub $ concat (snds ts))  List.\\ [ i | (TVr { tvrIdent = i },_) <- ts ] ]
-                tell (Map.fromList [ (t,ln) | (t,_) <- ts])
-        mapM_ g scc
-        mapM_ (f n) (snds ds)
-        f n b
-    f n e | (b,ls@(_:_)) <- fromPi e = do   -- not really necessary
-        tell (Map.fromList [ (i,n + 1) | i  <- ls ])
-        f (n + 1) b
-    f n e | (b,ls@(_:_)) <- fromLam e = do
-        tell (Map.fromList [ (i,n + 1) | i  <- ls ])
-        f (n + 1) b
-    f n e = emapE_ (f n) e
 
 
 coalesceLets :: Stats -> E -> IO E
@@ -241,40 +216,85 @@ coalesceLets stats e = liftM fst $ traverse travOptions { pruneRecord = varElim 
         (x',xs') <- lift $ doCoalesce stats (x,xs)
         return $ foldl EAp x' xs'
 
-{-
 newtype Level = Level Int
-    deriving(Eq,Ord,Enum,Typeable)
+    deriving(Eq,Ord,Enum,Show,Typeable)
+
+newtype CLevel = CLevel Level
+    deriving(Eq,Ord,Enum,Show,Typeable)
 
 top_level = Level 0
 
 floatOutward :: Program -> IO Program
 floatOutward prog = do
-    -- set initial levels
-    let f (t,e) = return (tvrInfo_u (Info.insert top_level) t,g top_level e)
-        g n e | (b,ts@(_:_)) <- fromLam e = foldr ELam ts' (g n' b) where
+    -- set natural levels on all types
+    let tl (t,e) imap = (tvrInfo_u (Info.insert top_level) t,g top_level e imap)
+        f n (t,e) imap = (tvrInfo_u (Info.insert n) t,g n e)
+        g n e@ELam {} imap = foldr ELam (g n' b imap') ts' where
+            (b,ts) = fromLam e
             n' = succ n
             ts' = map (tvrInfo_u (Info.insert n')) ts
-        g n ec@ECase {} = runIdentity $ caseBodiesMapM g' ec { eCaseBind = m (eCaseBind ec), eCaseAlts = map ma (eCaseAlts ec) } where
+            imap' = Map.fromList [ (tvrIdent t,n') | t <- ts] `Map.union` imap
+        g n ec@ECase {} imap = runIdentity $ caseBodiesMapM (\e -> g' n e imap') ec { eCaseBind = m (eCaseBind ec), eCaseAlts = map ma (eCaseAlts ec) } where
             m t = tvrInfo_u (Info.insert n) t
             ma (Alt (LitCons n xs t)  b) = Alt (LitCons n (map m xs) t) b
             ma a = a
-        g n e = runIdentity $ (emapE' (g' n) e)
-        g' n e = return $ g n e
-    prog <- programMapDs f prog
-    return prog
-
--}
-
-
-
-
-
-
-
-
-
+            imap' = Map.fromList [ (tvrIdent t,n) | t <- caseBinds ec] `Map.union` imap
+        g n (ELetRec ds e) imap = dds (map G.fromScc $ decomposeDs ds) [] e imap where
+            dds (ts:rs) nrs e imap = dds rs (ts':nrs) e imap' where
+                n' = maximum (top_level:[ n | t <- fvs, let Just n = Map.lookup t imap])
+                cl = CLevel n
+                fvs = [ t | t <- freeVars (snds ts), t `notElem` (map (tvrIdent . fst) ts)]
+                ts' = [(tvrInfo_u (Info.insert cl . Info.insert n') t,g n e imap') |  (t,e) <- ts]
+                imap' = Map.fromList [ (tvrIdent t,n') | t <- fsts ts] `Map.union` imap
+            dds [] nrs e imap = ELetRec (concat nrs) (g n e imap)
+        g n e imap = runIdentity $ (emapE' (\e -> g' n e imap) e)
+        g' n e imap = return $ g n e imap
+    let imap = Map.fromList $ map (\x -> (x,top_level)) ([ tvrIdent t| (t,_) <-  programDs prog ] ++ Set.toList (progExternalNames prog))
+    prog <- programMapDs (\d -> return $ tl d imap) prog
 
 
+    let dofloat (ELetRec ds e) = do
+            e' <- dofloat e
+            ds' <- mapM df ds
+            return (ELetRec ds' e')
+        dofloat e@ELam {} = do
+            let (b,ts) = fromLam e
+                Just ln = Info.lookup (tvrInfo (head ts))
+            (b',fs) <- censor (const []) $ listen (dofloat b)
+            let (dh,de) = partition (\ (ll,bn) -> succ ll == ln) fs
+            tell de
+            return $ letRec (snds dh) (foldr ELam b' ts)
+        dofloat e = emapE' dofloat e
+        letRec [] e = e
+        letRec ds e = ELetRec ds e
+        df (t,e) | Just (CLevel cl) <- lcl, cl /= nl = ans where
+            ans = do
+                e' <- dofloat e
+                if whnfOrBot e || isAtomic e then do
+                    mtick $ "LetFloat.Full-Lazy.skip.{" ++ tvrShowName t
+                    return (t,e')
+                  else do
+                mtick $ "LetFloat.Full-Lazy.float.{" ++ tvrShowName t
+                let nv = t { tvrIdent = toId nn }
+                    nn = lfName (progModule prog) Val (tvrIdent t)
+                tell [(nl,(nv,e'))]
+                return (t,(EVar nv))
+            lcl = Info.lookup (tvrInfo t)
+            Just nl = Info.lookup (tvrInfo t)
+        df (t,e) = do
+            e' <- dofloat e
+            return (t,e')
+        dtl (t,e) = do
+            (e',fs) <- runWriterT (dofloat e)
+            return $ (t,letRec (snds fs) e')
+    let (nprog,stats) = runStatM (programMapDs dtl prog)
+    printStat "FullyLazy" stats
+    return nprog
+
+
+lfName modName ns x = case fromId x of
+    Just y  -> toName ns (show modName, "fl@"++show y)
+    Nothing -> toName ns (show modName, "fl@"++show x)
 
 
 
