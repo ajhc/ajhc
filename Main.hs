@@ -266,7 +266,12 @@ processDecls stats ho ho' tiData = do
         let mprog = programSetDs ns prog { progStats = mempty, progEntryPoints = fsts ns, progExternalNames = progExternalNames prog `mappend` (Set.fromList $ map tvrIdent $ fsts (programDs prog)) }
         mprog <- return $ etaAnnotateProgram mprog
         let cm stats e = do
-            let sopt = mempty { SS.so_rules = allRules, SS.so_exports = map tvrIdent $ progEntryPoints mprog, SS.so_dataTable = fullDataTable }
+            let sopt = mempty {
+                SS.so_boundVars = Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)],
+                SS.so_rules = allRules,
+                SS.so_exports = map tvrIdent $ progEntryPoints mprog,
+                SS.so_dataTable = fullDataTable
+                }
             let (stat, e'') = SS.simplifyE sopt e
             Stats.tickStat stats stat
             return e''
