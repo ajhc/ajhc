@@ -17,6 +17,7 @@ import Atom
 import DataConstructors
 import Doc.PPrint
 import E.E
+import E.Subst
 import E.Program
 import E.Inline
 import Info.Info as Info
@@ -250,7 +251,9 @@ floatOutward prog = do
         g n e imap = runIdentity $ (emapE' (\e -> g' n e imap) e)
         g' n e imap = return $ g n e imap
     let imap = Map.fromList $ map (\x -> (x,top_level)) ([ tvrIdent t| (t,_) <-  programDs prog ] ++ Set.toList (progExternalNames prog))
-    prog <- programMapDs (\d -> return $ tl d imap) prog
+    prog <- flip programMapDs prog (\ (t,e) -> do
+        e' <- letBindAll (progDataTable prog) (progModule prog) e
+        return $ tl (t,e') imap)
 
 
     let dofloat (ELetRec ds e) = do
@@ -296,6 +299,40 @@ lfName modName ns x = case fromId x of
     Just y  -> toName ns (show modName, "fl@"++show y)
     Nothing -> toName ns (show modName, "fl@"++show x)
 
+
+mapMSnd f xs = sequence [ (,) x `liftM` f y | (x,y) <- xs]
+
+
+letBindAll ::
+    DataTable  -- ^ the data table for expanding newtypes
+    -> Module     -- ^ current module name
+    -> E          -- ^ input term
+    -> IO E
+letBindAll  dataTable modName e = f e  where
+    f :: E -> IO E
+    f (ELetRec ds e) = do
+        ds' <- mapMSnd f ds
+        e' <- g e
+        return $ ELetRec ds' e'
+    f ec@ECase {} = do
+        let mv = case eCaseScrutinee ec of
+                EVar v -> subst (eCaseBind ec) (EVar v)
+                _ -> id
+        ec' <- caseBodiesMapM (g . mv) ec
+        scrut' <- g (eCaseScrutinee ec)
+        return ec' { eCaseScrutinee = scrut' }
+    f e@ELam {} = do
+        let (b,ts) = fromLam e
+        b' <- g b
+        return (foldr ELam b' ts)
+    f e = emapE' f e
+    g e | isAtomic e || whnfOrBot e = return e
+    g e = do
+        u <- newUniq
+        let n = toName Val (show modName,"af@" ++ show u)
+            tv = tvr { tvrIdent = toId n, tvrType = infertype dataTable e }
+        e' <- f e
+        return (ELetRec [(tv,e')] (EVar tv))
 
 
 
