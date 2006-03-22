@@ -274,8 +274,6 @@ floatOutward prog = do
             tell de
             return $ letRec (snds dh) (foldr ELam b' ts)
         dofloat e = emapE' dofloat e
-        letRec [] e = e
-        letRec ds e = ELetRec ds e
         df (t,e) | Just (CLevel cl) <- lcl, cl /= nl = ans where
             ans = do
                 e' <- dofloat e
@@ -340,12 +338,20 @@ letBindAll  dataTable modName e = f e  where
         return (foldr ELam b' ts)
     f e = emapE' f e
     g e | notFloatOut e = return e
+    g e | isUnboxed (getType e) = return e
     g e = do
         u <- newUniq
         let n = toName Val (show modName,"af@" ++ show u)
             tv = tvr { tvrIdent = toId n, tvrType = infertype dataTable e }
         e' <- f e
         return (ELetRec [(tv,e')] (EVar tv))
+
+
+
+letRec [] e = e
+letRec ds _ | flint && hasRepeatUnder fst ds = error "letRec: repeated variables!"
+letRec ds e | flint && any (isUnboxed .tvrType . fst) ds = error "letRec: binding unboxed!"
+letRec ds e = ELetRec ds e
 
 
 
