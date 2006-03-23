@@ -1,4 +1,14 @@
-module E.Subst(subst,subst',eAp, substMap,doSubst,typeSubst,typeSubst',substMap'',litSMapM ) where
+module E.Subst(
+    doSubst,
+    eAp,
+    litSMapM,
+    subst,
+    subst',
+    substMap,
+    substMap'',
+    typeSubst,
+    typeSubst'
+    ) where
 
 -- This is tricky.
 
@@ -49,9 +59,6 @@ litSMapM f (LitInt n t) = do
     t' <- f t
     return $ LitInt n t'
 
-
-allShadow :: E -> E
-allShadow e = doSubst False True (Map.fromList [ (x,Nothing) | x <- freeVars e ]) e
 
 
 substMap :: Map.Map Id E -> E -> E
