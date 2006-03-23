@@ -82,7 +82,17 @@ inferType dataTable ds e = rfc e where
     rfc' nds e = withContextDoc (text "fullCheck:" </> prettyE e) (inferType' nds (followAliases dataTable e) >>=  strong')
     strong' e = withContextDoc (text "Strong:" </> prettyE e) $ strong ds (followAliases dataTable e)
     fc s@(ESort _) = return $ typ s
-    fc (ELit LitCons { litArgs = es, litType =  t}) = valid t >> mapM_ valid es >> (strong' t)
+    fc (ELit LitCons { litName = n, litArgs = es, litType =  t}) = do
+        valid t
+        es' <- mapM rfc es
+        t' <- strong' t
+        let sts = slotTypes dataTable n t
+            les = length es
+            lsts = length sts
+        unless (les == lsts || (les < lsts && isEPi t')) $ do
+            fail "constructor with wrong number of arguments"
+        zipWithM_ eq sts es'
+        return t'
     fc e@(ELit _) = let t = typ e in valid t >> return t
     fc (EVar (TVr { tvrIdent = 0 })) = fail "variable with nothing!"
     fc (EVar (TVr { tvrType =  t})) = valid t >> strong' t
@@ -168,6 +178,8 @@ inferType dataTable ds e = rfc e where
         | s == eBox = return ()
         | Unknown <- s = return ()
         | otherwise =  withContextDoc (text "valid:" <+> prettyE e) (do t <- inferType' nds s;  valid' nds t)
+    eq Unknown t2 = return t2
+    eq t1 Unknown = return t1
     eq t1 t2 = eq' ds t1 t2
     eq' nds t1 t2 = do
         e1 <- strong nds (followAliases dataTable t1)
