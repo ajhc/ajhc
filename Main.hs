@@ -700,7 +700,15 @@ transformProgram ::
 transformProgram name dodump f prog = do
     when dodump $ putErrLn $ "-- " ++ name
     let istat = progStats prog
-    prog' <- f prog { progStats = mempty }
+    let ferr e = do
+        putErrLn $ "\n>>> Exception thrown"
+        putErrLn $ "\n>>> Before " ++ name
+        printProgram prog
+        putErrLn $ "\n>>>"
+        putErrLn (show e)
+        maybeDie
+        return prog
+    prog' <- Control.Exception.catch (f prog { progStats = mempty }) ferr
     let estat = progStats prog'
         onerr = do
             putErrLn $ "\n>>> Before " ++ name
