@@ -30,6 +30,7 @@ import List(sortBy,(\\))
 import Binary
 import Doc.DocLike
 import Doc.Pretty
+import Doc.PPrint
 import E.E
 import E.Show
 import E.Shadow
@@ -273,8 +274,8 @@ typesCompatable dataTable a b = go a b where
         g a b | isAbsurd a && isAbsurd b = do
             go (getType a) (getType b)
             return ()
-        g (ESort a) (ESort b) = when (a /= b) $ fail "Sorts don't match"
-        g (EVar a) (EVar b) = when (a /= b) $ fail "Vars don't match"
+        g (ESort a) (ESort b) = when (a /= b) $ fail $ "Sorts don't match: " ++ pprint (ESort a,ESort b)
+        g (EVar a) (EVar b) = when (a /= b) $ fail $ "Vars don't match: " ++ pprint (a,b)
         g (EAp a b) (EAp a' b') = do
             go a a'
             go b b'
@@ -294,11 +295,11 @@ typesCompatable dataTable a b = go a b where
             Right () -> return ()
             Left s' -> case f ys xs b a of
                 Right () -> return ()
-                Left s -> fail (s ++ ":" ++ s')
+                Left s -> fail (s ++ "\n" ++ s' ++ "\n")
     f :: Monad m => [Name] -> [Name] -> E -> E -> m ()
     f xs ys (ELit (LitCons n _ _)) _ | n `elem` xs = fail "Loop detected"
     f xs ys a@(ELit (LitCons n _ _)) b | Just x <- followAlias dataTable a = g' (n:xs) ys x b
-    f _ _ _ _ = fail "Types don't match"
+    f _ _ a b = fail $ "Types don't match: " ++ pprint (a,b)
 
 
 lookupCType dataTable e = case followAliases (mappend dataTablePrims dataTable) e of

@@ -8,7 +8,7 @@ import qualified Data.Map as Map
 -- | This is simplified to only work on things that only occur in types and is deterministic, so can be used to compare modulo naming differences.
 
 allShadow :: E -> E
-allShadow e  = f e (Map.empty,2) where
+allShadow e  = f e (Map.empty,-2) where
     f :: E -> (Map.Map Int E,Int) -> E
     f eo@(EVar (TVr { tvrIdent =  i})) = do
         (mp,_) <- ask
@@ -33,7 +33,7 @@ allShadow e  = f e (Map.empty,2) where
         t' <- f t
         (_,i') <- ask
         let nvr = (tvr { tvrIdent =  i', tvrType =  t'})
-        return (nvr,\ (a,b) -> (Map.insert i (EVar nvr) a,i' + 2))
+        return (nvr,\ (a,b) -> (Map.insert i (EVar nvr) a,i' - 2))
 
     {-
     f (ELetRec dl e) = do
