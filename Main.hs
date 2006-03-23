@@ -699,6 +699,7 @@ transformProgram ::
 
 transformProgram name dodump f prog = do
     when dodump $ putErrLn $ "-- " ++ name
+    when (dodump && dump FD.Steps) $ printProgram prog
     let istat = progStats prog
     let ferr e = do
         putErrLn $ "\n>>> Exception thrown"

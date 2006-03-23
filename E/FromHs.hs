@@ -34,6 +34,7 @@ import E.Eval(eval)
 import E.Eta
 import E.LetFloat(atomizeAp)
 import E.Program
+import E.PrimOpt
 import E.Rules
 import E.Subst
 import E.Traverse
@@ -205,7 +206,7 @@ getMainFunction dataTable name ds = ans where
         return theMain
     ioLike ty = case followAliases dataTable ty of
         ELit (LitCons n [x] _) | n ==  tc_IO -> Just x
-        (EPi ioc (EPi tvr (ELit (LitCons n [x] _)))) | n == tc_IOResult -> Just x 
+        (EPi ioc (EPi tvr (ELit (LitCons n [x] _)))) | n == tc_IOResult -> Just x
         _ -> Nothing
     findName name = case Map.lookup name ds of
         Nothing -> fail $ "Cannot find: " ++ show name
@@ -385,7 +386,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         let (ts,rt)   = argTypes' ty
             toPrim (Import cn is ls) = APrim (PrimPrim cn) (Requires is ls)
         es <- newVars [ t |  t <- ts, not (sortStarLike t) ]
-        let result    = foldr ($) (EPrim (toPrim i) (map EVar es) rt) (map ELam es)
+        let result    = foldr ($) (processPrimPrim dataTable $ EPrim (toPrim i) (map EVar es) rt) (map ELam es)
         return [(name,var,lamt result)]
     cDecl (HsForeignDecl _ i@HS.AddrOf {} _ _ n _) = do
         let name       = toName Name.Val n

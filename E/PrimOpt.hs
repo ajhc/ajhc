@@ -1,11 +1,13 @@
-module E.PrimOpt(primOpt,primOpt') where
+module E.PrimOpt(
+    primOpt',
+    processPrimPrim
+    ) where
 
 import List
 import Monad
 import qualified Data.Map as Map
 
 import Atom
-import Support.CanType
 import C.Prims
 import DataConstructors
 import Data.Monoid
@@ -13,17 +15,16 @@ import Doc.DocLike
 import Doc.PPrint
 import E.E
 import E.Values
-import Support.FreeVars
 import GenUtil
-import Util.NameMonad
+import Name.Names
+import Name.VConsts
 import PrimitiveOperators
 import Stats
+import Support.CanType
+import Support.FreeVars
+import Util.NameMonad
 
 
--- Some of these arn't optimizations, but rather important transformations.
-
-primOpt dataTable stats e = do
-    runStatIO stats (primOpt' dataTable e)
 
 create_integralCast dataTable e t = eCase e [Alt (LitCons cna [tvra] te) cc] Unknown  where
     te = getType e
@@ -47,7 +48,8 @@ rawMap = Map.fromList [ (rawType w,toAtom t) | (_,w,t) <- allCTypes]
 typ_float = toAtom "float"
 
 vars :: [E] -> [TVr]
-vars ts = [ tVr n t | t <- ts | n <- [2,4 ..]]
+vars ts = [ tVr n t | t <- ts | n <- [2,4 ..], n `notElem` fvs] where
+    fvs = freeVars ts
 
 iTrue = (ELit (LitInt 1 intt))
 iFalse = (ELit (LitInt 0 intt))
@@ -62,7 +64,6 @@ cextra _ _ = ""
 primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
     mtick (toAtom $ "E.PrimOpt." ++ braces (pprint s) ++ cextra s xs )
     primOpt' dataTable  n  where
-        primopt (PrimPrim "seq") [x,y] _  = return $ prim_seq x y
 
         -- constant operations
         primopt (Operator "+" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ (ELit (LitInt (l1 + l2) rt))
@@ -73,6 +74,7 @@ primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
         primopt (Operator "<=" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ if l1 <= l2 then iTrue else iFalse
         primopt (Operator ">" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ if l1 > l2 then iTrue else iFalse
         primopt (Operator "<" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ if l1 < l2 then iTrue else iFalse
+        primopt (Operator "-" [ta] tr) [ELit (LitInt x t)] rt | ta == tr && rt == t = return $ ELit (LitInt (negate x) t)
         -- compare of equals
         primopt (Operator "==" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return iTrue
         primopt (Operator ">=" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return iTrue
@@ -110,9 +112,17 @@ primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
         -- eq to case
         primopt (Operator "==" [ta,tb] tr) [e,(ELit (LitInt x t))] rt | isIntegral t  = return $ eCase e [Alt (LitInt x t) iTrue ] iFalse
         primopt (Operator "==" [ta,tb] tr) [(ELit (LitInt x t)),e] rt | isIntegral t = return $ eCase e [Alt (LitInt x t) iTrue ] iFalse
-        -- negate of literal
-        primopt (Operator "-" [ta] tr) [ELit (LitInt x t)] rt | ta == tr && rt == t = return $ ELit (LitInt (negate x) t)
-        -- various primitives
+        -- cast of constant
+        primopt (CCast _ _) [ELit (LitInt x _)] t = return $ ELit (LitInt x t)  -- TODO ensure constant fits
+        primopt _ _ _ = fail "No primitive optimization to apply"
+primOpt' _  x = return x
+
+
+processPrimPrim dataTable o@(EPrim (APrim prim _) es t) = case primopt prim es t of
+            Just e -> e
+            Nothing -> o
+        where
+        primopt (PrimPrim "seq") [x,y] _  = return $ prim_seq x y
         primopt (PrimPrim "exitFailure__") [w] rt  = return $ EError "" rt
         primopt (PrimPrim "newRef__") [x,y] rt  = return $ EAp (EAp (ELam x' $ ELam y' $ eCaseTup' (EPrim (primPrim "newRef_") [EVar x',EVar y'] (ltTuple' [a,b])) [a',b'] (eTuple [EVar a',EVar b']) ) x) y where
             [x',y',a',b'] = vars [getType x,getType y,a,b]
@@ -120,9 +130,9 @@ primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
         primopt (PrimPrim "readRef__") [x,y] rt  = return $ EAp (EAp (ELam x' $ ELam y' $ eCaseTup' (EPrim (primPrim "readRef_") [EVar x',EVar y'] (ltTuple' [a,b])) [a',b'] (eTuple [EVar a',EVar b']) ) x) y where
             [x',y',a',b'] = vars [getType x,getType y,a,b]
             ELit (LitCons _ [a,b] (ESort EStar)) = rt
-        primopt (PrimPrim "newHole__") [y] rt  = return $ EAp (ELam y' $ eCaseTup' (EPrim (primPrim "newHole_") [EVar y'] (ltTuple' [a,b])) [a',b'] (eTuple [EVar a',EVar b'])) y where
-            [y',a',b'] = vars [getType y,a,b]
-            ELit (LitCons _ [a,b] (ESort EStar)) = rt
+        primopt (PrimPrim "newHole__") [y] (ELit (LitCons name [b] (ESort EStar))) | name == tc_IOResult =
+            return $ eCaseTup' (EPrim (primPrim "newHole_") [y] (ltTuple' [tWorld__,b])) [a',b'] (eJustIO (EVar a') (EVar b')) where
+                (a':b':_) = vars [tWorld__,b,y]
 
         primopt (PrimPrim "divide") [a,b] t = ans where
             (vara:varb:varc:_) = freeNames (freeVars (a,b,t))
@@ -144,9 +154,6 @@ primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
             return $ eStrictLet (tVr var st) (EPrim (APrim (CConst c ct) mempty) [] st) (ELit (LitCons cn [EVar $ tVr var st] t))
         primopt (PrimPrim "integralCast") [e] t = return $ create_integralCast dataTable e t
         primopt (PrimPrim "integralCast") es t = error $ "Invalid integralCast " ++ show (es,t)
-        primopt (CCast _ _) [ELit (LitInt x _)] t = return $ ELit (LitInt x t)  -- TODO ensure constant fits
-        primopt _ _ _ = fail "No primitive optimization to apply"
-primOpt' _  x = return x
-
+        primopt _ _ _ = fail "not a primopt we care about"
 
 
