@@ -167,9 +167,8 @@ idann rs ps i nfo = return (rules rs i (props ps i nfo)) where
 processInitialHo :: Ho -> IO Ho
 processInitialHo ho = do
     let Identity ds = annotateDs mempty (idann (hoRules ho) (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
-        Identity ds' = annotateDs mempty (\_ nfo -> return nfo) letann lamann ds
-        Identity ds'' = annotateDs mempty (\_ nfo -> return nfo) letann lamann ds'
-    return ho { hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds'' ] }
+        ds' = programDs $ etaAnnotateProgram (programSetDs ds program)
+    return ho { hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds' ] }
 
 
 procSpecs :: Monad m => (Map.Map Name [Type.Rule]) -> (TVr,E) -> m ([(TVr,E)],[Rule])
@@ -232,7 +231,8 @@ processDecls stats ho ho' tiData = do
 
     -- initial pass over functions to put them into a normalized form
     let procE (ds,usedIds) (n,v,lc) = do
-        lc <- doopt mangle False stats "FixupLets..." (\stats x -> atomizeAp False fullDataTable stats (progModule prog) x >>= coalesceLets stats)  lc
+        lc <- atomizeAp False fullDataTable stats (progModule prog) lc -- doopt mangle False stats "FixupLets..." (\stats x -> atomizeAp False fullDataTable stats (progModule prog) x >>= coalesceLets stats)  lc
+        lc <- coalesceLets stats lc
         nfo <- idann  allRules (hoProps ho') (tvrIdent v) (tvrInfo v)
         v <- return $ v { tvrInfo = Info.insert LetBound nfo }
         let used' = collectIds lc
