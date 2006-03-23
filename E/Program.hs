@@ -24,6 +24,8 @@ data Program = Program {
     progEntryPoints :: [TVr],
     progMainEntry :: TVr,
     progModule :: Module,
+    progClosed :: Bool,           -- ^ whether the universe is closed other than the entry points and external names
+    progPasses :: [String],       -- ^ record of passes the program goes through
     progStats :: Stats.Stat
     }
 
@@ -35,7 +37,9 @@ program = Program {
     progDataTable = mempty,
     progEntryPoints = mempty,
     progMainEntry = tvr,
+    progClosed = False,
     progModule = mainModule,
+    progPasses = [],
     progStats = mempty
     }
 
