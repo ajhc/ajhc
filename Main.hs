@@ -143,6 +143,13 @@ fileOrModule f = case reverse f of
 
 barendregt e = runIdentity  (renameTraverse' e)
 
+barendregtProgram prog = programSetDs ds' prog where
+    Identity (ELetRec ds' Unknown) = renameTraverse' (ELetRec (programDs prog) Unknown)
+
+
+barendregtProg prog = do
+    transformProgram "Barendregt" (dump FD.Pass) (return . barendregtProgram) prog
+
 
 lamann _ nfo = return nfo
 letann e nfo = return (annotateArity e nfo)
@@ -206,7 +213,7 @@ processDecls stats ho ho' tiData = do
     ds <- convertDecls tiData (hoClassHierarchy ho') allAssumps  fullDataTable decls
     wdump FD.InitialCore $
         mapM_ (\(_,v,lc) -> printCheckName'' fullDataTable v lc) ds
-    sequence_ [lintCheckE fullDataTable v e | (_,v,e) <- ds ]
+    sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 
     -- Build rules
     rules' <- createInstanceRules (hoClassHierarchy ho')   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
@@ -238,9 +245,7 @@ processDecls stats ho ho' tiData = do
     prog <- return $ programSetDs [ (t,e) | (_,t,e) <- ds] prog
     let entries = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t) (tell [t])) prog
     prog <- return $ prog { progEntryPoints = entries }
-    prog <- return $ programPruneUnreachable prog
-
-    lintCheckProgram prog
+    prog <- programPrune prog
 
     let specMap = Map.fromListWith (++) [ (n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- tiCheckedRules tiData]
     nds <- mapM (procSpecs specMap) (programDs prog)
@@ -264,6 +269,7 @@ processDecls stats ho ho' tiData = do
 
     let fint (rec,ns) = do
         let names = [ n | (n,_) <- ns]
+        when (dump FD.Lambdacube || dump FD.Pass) $ putErrLn ("----\n" ++ pprint names)
         mstats <- Stats.new
         let mprog = programSetDs ns prog { progStats = mempty, progEntryPoints = fsts ns, progExternalNames = progExternalNames prog `mappend` (Set.fromList $ map tvrIdent $ fsts (programDs prog)) }
         mprog <- return $ etaAnnotateProgram mprog
@@ -278,18 +284,19 @@ processDecls stats ho ho' tiData = do
             Stats.tickStat mstats stat
             return e''
         let mangle = mangle' Nothing fullDataTable
-        lintCheckProgram mprog
+
+        lintCheckProgram onerrNone mprog
+        mprog <- barendregtProg mprog
         ns <- flip mapM (programDs mprog) $ \ (v,lc) -> do
             (v,lc) <- Stats.runStatIO mstats (etaExpandDef' fullDataTable v lc)
             lc <- doopt mangle False mstats "SuperSimplify" cm lc
-            lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             return (v,lc)
         mprog <- return $ programSetDs ns mprog
-        (mprog,_) <- typeAnalyze mprog
-
-        lintCheckProgram mprog
-        mprog <- floatOutward mprog
-        lintCheckProgram mprog
+        lintCheckProgram onerrNone mprog
+        mprog <- barendregtProg mprog
+        mprog <- transformProgram "typeAnalyze" (dump FD.Pass) (fmap fst . typeAnalyze) mprog
+        mprog <- transformProgram "floatOutward" (dump FD.Pass) floatOutward mprog
+        mprog <- barendregtProg mprog
         ns <- flip mapM (programDs mprog) $ \ (v,lc) -> do
             (v,lc) <- Stats.runStatIO mstats (etaExpandDef' fullDataTable v lc)
             lc <- doopt mangle False mstats "SuperSimplify" cm lc
@@ -298,13 +305,13 @@ processDecls stats ho ho' tiData = do
             return (v,lc)
         ns <- E.Strictness.solveDs ns
         mprog <- return $ programSetDs ns mprog
-        lintCheckProgram mprog
+        lintCheckProgram onerrNone mprog
         ns <- flip mapM (programDs mprog) $ \ (v,lc) -> do
             lc <- doopt mangle False mstats "SuperSimplify" cm lc
-            lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             return (v,lc)
         mprog <- return $ programSetDs ns mprog
-        lintCheckProgram mprog
+        lintCheckProgram onerrNone mprog
+        mprog <- barendregtProg mprog
 
         Stats.tickStat mstats (progStats mprog)
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
@@ -313,13 +320,13 @@ processDecls stats ho ho' tiData = do
         Stats.combine initialPassStats mstats
         wdump FD.Progress $ putErr (if rec then "*" else ".")
         return (programDs mprog)
-    lintCheckProgram prog
+    lintCheckProgram onerrNone prog
     progress "Initial optimization pass"
     prog <- programMapRecGroups initMap (const return) (const return) (const return) fint prog
     progress "!"
     wdump FD.Progress $
         Stats.print "Initial Pass Stats" initialPassStats
-    lintCheckProgram prog
+    lintCheckProgram onerrNone prog
 
     prog <- Stats.runStatIO stats (etaExpandProgram prog)
 
@@ -339,21 +346,21 @@ processDecls stats ho ho' tiData = do
         let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds)) fullDataTable
         cds <- flip mapM cds $ \ (v,lc) -> do
             --lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
-            lintCheckE fullDataTable v lc
+            lintCheckE onerrNone fullDataTable v lc
             (v,lc) <- Stats.runStatIO stats (etaExpandDef' fullDataTable v lc)
             lc <- doopt mangle False stats "SuperSimplify" cm lc
             lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
-            lintCheckE fullDataTable v lc
+            lintCheckE onerrNone fullDataTable v lc
             return (v,lc)
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
         cds <- E.Strictness.solveDs cds
         cds <- flip mapM cds $ \ (v,lc) -> do
-            lintCheckE fullDataTable v lc
+            lintCheckE onerrNone fullDataTable v lc
             (v,lc) <- Stats.runStatIO stats (etaExpandDef' fullDataTable v lc)
             lc <- doopt mangle False stats "SuperSimplify" cm lc
             lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
-            lintCheckE fullDataTable v lc
+            lintCheckE onerrNone fullDataTable v lc
             return (v,lc)
 
         -- cds <- E.Strictness.solveDs cds
@@ -369,9 +376,9 @@ processDecls stats ho ho' tiData = do
             (lb,os) = findLoopBreakers (const 1) nogood graph
             nogood (b,_) = not $ getProperty prop_PLACEHOLDER b || getProperty prop_WRAPPER b
             cds = [ if x `elem` fsts lb then (setProperty prop_NOINLINE x,y) else (x,y) | (x,y) <- os  ]
-        sequence_ [lintCheckE fullDataTable v e | (v,e) <- cds ]
+        sequence_ [lintCheckE onerrNone fullDataTable v e | (v,e) <- cds ]
         cds <- annotateDs annmap (\_ -> return) letann lamann cds
-        sequence_ [lintCheckE fullDataTable v e | (v,e) <- cds ]
+        sequence_ [lintCheckE onerrNone fullDataTable v e | (v,e) <- cds ]
 
         let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds')) fullDataTable
         let dd  (ds,used) (v,lc) = do
@@ -407,27 +414,24 @@ processDecls stats ho ho' tiData = do
     (ds,_) <- foldM f ([],(Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
     progress "!"
     prog <- return $ programSetDs ds prog
-    prog <- return $ programPruneUnreachable prog
+    prog <- programPrune prog
     Stats.print "Optimization" stats
 
     (prog,didSomething) <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return (prog,False)
 
 
     prog <- if didSomething then do
-        prog <- if null $ programDs prog then return prog else do
-            ne <- (return . barendregt) (programE prog)
-            return $ programSetE ne prog
+        prog <- barendregtProg prog
         prog <- return $ etaAnnotateProgram prog
+        progress "Post typeanalyis/etaexpansion pass"
         let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
             fscc (Left n) = (False,[n])
             fscc (Right ns) = (True,ns)
-        progress "Post typeanalyis/etaexpansion pass"
         (ds,_) <- foldM f ([],(Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
         progress "!"
         return $ programSetDs ds prog
       else return prog
-    prog <- return $ programPruneUnreachable prog
-    lintCheckProgram prog
+    prog <- programPrune prog
 
     wdump FD.Lambdacube $ printProgram prog
 
@@ -438,6 +442,8 @@ programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = programSetDs ds' prog where
     ds' = reachable (newGraph (programDs prog) (tvrIdent . fst) (\ (t,e) -> bindingFreeVars t e)) (map tvrIdent $ progEntryPoints prog)
 
+programPrune :: Program -> IO Program
+programPrune prog = transformProgram "Prune Unreachable" (dump FD.Pass) (return . programPruneUnreachable) prog
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
 shouldBeExported exports tvr
@@ -481,9 +487,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
     (_,main,mainv) <- getMainFunction dataTable mainFunc (programEsMap prog)
     prog <- return prog { progMainEntry = main, progEntryPoints = [main], progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog] }
-    prog <- return $ programPruneUnreachable prog
-
-    lintCheckProgram prog
+    prog <- programPrune prog
 
     --wdump FD.Lambdacube $ printProgram prog
     (prog,_) <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return (prog,False)
@@ -492,7 +496,7 @@ compileModEnv' stats (initialHo,finalHo) = do
         let (_,ts) = fromLam e
             ts' = takeWhile (sortStarLike . getType) ts
         when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
-    lintCheckProgram prog
+    lintCheckProgram onerrNone prog
     --wdump FD.Lambdacube $ printProgram prog
 
     cmethods <- do
@@ -508,24 +512,17 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     prog <- return $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
     prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) letann (\_ nfo -> return nfo) prog
-    prog <- return $ programPruneUnreachable prog
-
-    lintCheckProgram prog
+    prog <- programPrune prog
 
     st <- Stats.new
     prog <- Stats.runStatIO st (etaExpandProgram prog)
     Stats.print "eta" st
 
-    lintCheckProgram prog
-
     let mangle = mangle'  (Just mempty)
     let opt = doopt (mangle dataTable) True stats
     let showTVr t = prettyE (EVar t) <> show (tvrInfo t)
 
-    ne <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) (programE prog)
-    prog <- return $ programSetE ne prog
-
-
+    prog <- barendregtProg prog
 
     -- make sure properties and are attached everywhere
     prog <- return $ runIdentity $ annotateProgram mempty (idann mempty (hoProps ho) ) letann lamann prog
@@ -542,8 +539,8 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     -- run first optimization
     lc <- opt "SuperSimplify" cm lc
-    lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lc
     prog <- return $ programSetE lc prog
+    prog <- barendregtProg prog
 
     st <- Stats.new
     prog <- Stats.runStatIO st (etaExpandProgram prog)
@@ -553,8 +550,8 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     lc <- return $ programE prog
     lc <- opt "SuperSimplify" cm lc
-    lc <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) lc
     prog <- return $ programSetE lc prog
+    prog <- barendregtProg prog
 
 
     -- run optimization again with no rules enabled
@@ -571,16 +568,12 @@ compileModEnv' stats (initialHo,finalHo) = do
     lc <- opt "SuperSimplify no Rules" cm lc
     prog <- return $ programSetE lc prog
 
-    prog <- if null $ programDs prog then return prog else do
-        ne <- (return . barendregt) (programE prog)
-        return $ programSetE ne prog
+    prog <- barendregtProg prog
 
     -- perform lambda lifting
     wdump FD.LambdacubeBeforeLift $ printProgram prog
-    lintCheckProgram prog
     finalStats <- Stats.new
-    prog <- lambdaLift finalStats prog
-    lintCheckProgram prog
+    prog <- transformProgram "lambda lift" (dump FD.Progress) (lambdaLift finalStats) prog
 
     -- final optimization pass to clean up lambda lifting droppings
     rs' <- flip mapM (progCombinators prog) $ \ (t,ls,e) -> do
@@ -691,6 +684,29 @@ dereferenceItem x = x
 
 buildShowTableLL xs = buildTableLL [ (show x,show y) | (x,y) <- xs ]
 
+
+-- all transformation routines assume they are being passed a correct program, and only check the output
+
+transformProgram ::
+    String                      -- ^ name of pass
+    -> Bool                     -- ^ whether to dump progress
+    -> (Program -> IO Program)  -- ^ what to run
+    -> Program
+    -> IO Program
+
+transformProgram name dodump f prog = do
+    when dodump $ putErrLn $ "-- " ++ name
+    let istat = progStats prog
+    prog' <- f prog { progStats = mempty }
+    let estat = progStats prog'
+        onerr = do
+            putErrLn $ "\n>>> Before " ++ name
+            printProgram prog
+            Stats.printStat name estat
+            putErrLn $ "\n>>> After " ++ name
+    lintCheckProgram onerr prog'
+    return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
+
 mangle ::
     DataTable                -- ^ the datatable used for typechecking
     -> Maybe (Set.Set Id)    -- ^ acceptable free variables
@@ -790,28 +806,40 @@ maybeDie = case optKeepGoing options of
     True -> return ()
     False -> putErrDie "Internal Error"
 
-lintCheckE dataTable tvr e | flint = case inferType dataTable [] e of
+onerrNone = return ()
+onerrProg prog = putErrLn ">>> Before" >> printProgram prog
+
+lintCheckE onerr dataTable tvr e | flint = case inferType dataTable [] e of
     Left ss -> do
+        onerr
+        putErrLn ">>> Type Error"
         putErrLn  ( render $ hang 4 (pprint tvr <+> equals <+> pprint e))
         putErrLn $ "\n>>> internal error:\n" ++ unlines (intersperse "----" $ tail ss)
         maybeDie
     Right v -> return ()
-lintCheckE _ _ _ = return ()
+lintCheckE _ _ _ _ = return ()
 
-lintCheckProgram prog | flint = do
-    let f (tvr,e) = lintCheckE (progDataTable prog) tvr e
+lintCheckProgram onerr prog | flint = do
+    let f (tvr,e) = lintCheckE onerr (progDataTable prog) tvr e
     when (hasRepeatUnder fst (programDs prog)) $ do
+        onerr
+        putErrLn ">>> Repeated top level decls"
         printProgram prog
-        putErrLn "program has repeated toplevel definitions"
+        putErrLn ">>> program has repeated toplevel definitions"
         maybeDie
     mapM_ f (programDs prog)
     let ids = progExternalNames prog `mappend` Set.fromList (map tvrIdent $ fsts (programDs prog))
         fvs = freeVars $ snds $ programDs prog :: Set.Set TVr
         unaccounted = Set.filter (not . (`Set.member` ids) . tvrIdent) fvs
     unless (Set.null unaccounted) $ do
-        putErrLn ("Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
+        onerr
+        putErrLn (">>> Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
         maybeDie
-lintCheckProgram _ = return ()
+lintCheckProgram _ _ = return ()
+
+
+
+
 
 dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ show n <+> hsep (map show as) <+> "::" <+> show t |  (n,(as,t)) <- Map.toList tt]
 

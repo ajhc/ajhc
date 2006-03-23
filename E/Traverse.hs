@@ -214,6 +214,7 @@ traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> r
             h ds'' e []
     -}
     g x@(ESort {}) = return x
+    g Unknown = return Unknown
     g e = error $ "g: " ++ show e
     eLetCoalesce ds (ELetRec ds' e) = ELetRec (ds ++ ds') e
     eLetCoalesce ds e = ELetRec ds e

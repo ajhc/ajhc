@@ -48,6 +48,8 @@ data Occurance =
     deriving(Show,Eq,Ord,Typeable)
 
 
+newtype FreeVarSet = FreeVarSet (Set.Set Id)
+    deriving(Typeable,Show,Monoid)
 
 combineOccInfo k a b | a == b = a
 combineOccInfo k a b =  error $ "Conflicting occurance info: " ++ show (k,a,b)
