@@ -327,8 +327,7 @@ processDecls stats ho ho' tiData = do
     wdump FD.Progress $
         Stats.print "Initial Pass Stats" initialPassStats
     lintCheckProgram onerrNone prog
-
-    prog <- Stats.runStatIO stats (etaExpandProgram prog)
+    prog <- etaExpandProg prog
 
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
@@ -445,6 +444,11 @@ programPruneUnreachable prog = programSetDs ds' prog where
 programPrune :: Program -> IO Program
 programPrune prog = transformProgram "Prune Unreachable" (dump FD.Pass) (return . programPruneUnreachable) prog
 
+etaExpandProg :: Program -> IO Program
+etaExpandProg prog = do
+    let (prog',stats) = Stats.runStatM $  etaExpandProgram prog
+    transformProgram "eta expansion" (dump FD.Pass) (const $ return prog' { progStats = progStats prog' `mappend` stats }) prog
+
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
 shouldBeExported exports tvr
     | tvrIdent tvr `Set.member` exports || getProperty prop_SRCLOC_ANNOTATE_FUN tvr  = setProperty prop_EXPORTED tvr
@@ -515,8 +519,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- programPrune prog
 
     st <- Stats.new
-    prog <- Stats.runStatIO st (etaExpandProgram prog)
-    Stats.print "eta" st
+    prog <- etaExpandProg prog
 
     let mangle = mangle'  (Just mempty)
     let opt = doopt (mangle dataTable) True stats
