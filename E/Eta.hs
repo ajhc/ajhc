@@ -12,6 +12,7 @@ module E.Eta(
     ) where
 
 import Control.Monad.Identity
+import Control.Monad.Writer
 import Control.Monad.State
 import Data.Monoid
 import Data.Typeable
@@ -146,11 +147,13 @@ etaExpandDef' dataTable t e = etaExpandDef dataTable t e >>= \x -> case x of
     Nothing -> return (tvrInfo_u (annotateArity e) t,e)
     Just x -> return x
 
+collectIds e = execWriter $ annotate mempty (\id nfo -> tell (Set.singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 -- | eta expand a definition
 etaExpandDef :: MonadStats m => DataTable -> TVr -> E -> m (Maybe (TVr,E))
 etaExpandDef _ _ e | isAtomic e = return Nothing -- will be inlined
 etaExpandDef dataTable t e  = ans where
-    fvs = freeVars (e,tvrType t)
+    fvs = foldr Set.insert (freeVars (b,map getType rs,tvrType t)) (map tvrIdent rs) `mappend` collectIds e
+    (b,rs) = fromLam e
     at = arityType e
     zeroName = case fromAp e of
         (EVar v,_) -> "use.{" ++ tvrShowName v

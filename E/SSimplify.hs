@@ -204,9 +204,9 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     initialB' = mempty { envInScope =  Map.map (\e -> NotKnown) (so_boundVars sopts) }
     (dsOut,stat)  = runIdentity $ runStatT (runNameMT doit)
     doit = do
+        dsIn <- sequence [etaExpandDef' (so_dataTable sopts) t e | (t,e) <- dsIn ]
         ds' <- collocc dsIn
         let g (t,e) = do
-                (t,e) <- etaExpandDef' (so_dataTable sopts) t e
                 e' <- if forceInline t then
                         f e mempty initialB'  -- ^ do not inline into functions which themself will be inlined
                             else f e mempty initialB
