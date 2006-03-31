@@ -176,21 +176,9 @@ sepDupableBinds :: [Id] -> Binds -> (Binds,Binds)
 sepDupableBinds fvs xs = partition ind xs where
     g = G.reachable (G.newGraph (concatMap G.fromScc xs) (tvrNum . fst . fst) (Set.toList . snd)) (fvs `mappend` unsafe_ones)
     uso = map (tvrNum . fst . fst) g
-    --unsafe_ones = map (tvrIdent . fst . fst) $ concatMap G.fromScc $ filter (not . std) xs
-    --std (Left ((_,e),_)) = isCheap e
-    --std (Right zs) = all isCheap (snds $ fsts zs)
     unsafe_ones = concat [ map (tvrIdent . fst . fst) vs | vs <- map G.fromScc xs,any (not . isCheap) (map (snd . fst) vs)]
     ind x = any ( (`elem` uso) . tvrNum . fst . fst ) (G.fromScc x)
 
-{-
-sepDupableBinds fvs xs = partition ind xs where
-    g = G.reachable (G.newGraph (concatMap G.fromScc xs) (tvrNum . fst . fst) (Set.toList . snd)) (fvs `mappend` (map (tvrNum . fst . fst) $ concatMap G.fromScc unsafe_ones))
-    uso = map (tvrNum . fst . fst) g
-    (_,unsafe_ones) = partition std xs
-    std (Left ((_,e),_)) = safeToDup e
-    std (Right zs) = all safeToDup (snds $ fsts zs)
-    ind x = any ( (`elem` uso) . tvrNum . fst . fst ) (G.fromScc x)
--}
 
 -- | seperate bindings based on whether they can be floated inward
 

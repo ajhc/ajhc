@@ -177,7 +177,7 @@ inferType dataTable ds e = rfc e where
     valid' nds s
         | s == eBox = return ()
         | Unknown <- s = return ()
-        | otherwise =  withContextDoc (text "valid:" <+> prettyE e) (do t <- inferType' nds s;  valid' nds t)
+        | otherwise =  withContextDoc (text "valid:" <+> prettyE s) (do t <- inferType' nds s;  valid' nds t)
     eq Unknown t2 = return t2
     eq t1 Unknown = return t1
     eq t1 t2 = eq' ds t1 t2
