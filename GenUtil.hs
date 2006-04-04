@@ -1,5 +1,5 @@
 
---  $Id: GenUtil.hs,v 1.49 2006/03/20 11:37:16 john Exp $
+--  $Id: GenUtil.hs,v 1.50 2006/04/04 02:15:00 john Exp $
 -- arch-tag: 835e46b7-8ffd-40a0-aaf9-326b7e347760
 
 
@@ -108,6 +108,10 @@ module GenUtil(
     rdropWhile,
     rtakeWhile,
     rbdropWhile,
+    concatMapM,
+    on,
+    mapMsnd,
+    mapMfst,
 
 
     -- * Classes
@@ -158,6 +162,23 @@ concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
 concatMapM f xs = do
     res <- mapM f xs
     return $ concat res
+
+on :: (a -> a -> b) -> (c -> a) -> c -> c -> b
+(*) `on` f = \x y -> f x * f y
+
+mapMsnd :: Monad m => (b -> m c) -> [(a,b)] -> m [(a,c)]
+mapMsnd f xs = do
+    let g (a,b) = do
+            c <- f b
+            return (a,c)
+    mapM g xs
+
+mapMfst :: Monad m => (b -> m c) -> [(b,a)] -> m [(c,a)]
+mapMfst f xs = do
+    let g (a,b) = do
+            c <- f a
+            return (c,b)
+    mapM g xs
 
 rspan :: (a -> Bool) -> [a] -> ([a], [a])
 rspan fn xs = f xs [] where
