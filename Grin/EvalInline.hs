@@ -1,15 +1,24 @@
 module Grin.EvalInline(
     createEval,
     createApply,
+    createEvalApply,
     UpdateType(..)
     ) where
 
 
-import List
-import Grin.Grin
-import Control.Monad.Identity
-import Atom
 import Char
+import Control.Monad.Identity
+import List
+import qualified Data.Set as Set
+import qualified Data.Map as Map
+
+import Atom
+import Grin.Grin
+import GenUtil
+import Support.FreeVars
+import Support.CanType
+import Util.Once
+import Util.UniqueMonad
 
 data UpdateType = NoUpdate | TrailingUpdate | HoistedUpdate Val | SwitchingUpdate [Atom]
 
@@ -17,7 +26,7 @@ mapExp f (b :-> e) = b :-> f e
 
 -- create an eval suitable for inlining.
 createEval :: UpdateType -> TyEnv -> [Tag] -> Lam
-createEval shared  te ts
+createEval shared  te ts'
 
     | null cs = p1 :-> Error "Empty Eval" TyNode
     | all tagIsWHNF [ t | t <- ts , tagIsTag t] = p1 :-> Fetch p1
@@ -54,6 +63,7 @@ createEval shared  te ts
             cu t = error $ "not updatable:" ++ show t
         in (p1 :-> (Return p1 :>>= lf) :>>= sup p1 sts) --  n3 :-> Case n3 (concatMap cu sts) :>>= unit :-> Return n3)
     where
+    ts = sortUnder toPackedString ts'
     sup p sts = let
             cu t | tagIsTag t && tagIsWHNF t = return ans where
                 (ts,_) = runIdentity $ findArgsType te t
@@ -91,24 +101,66 @@ createEval shared  te ts
         Just (_,ty) = findArgsType te fname
 
 createApply :: Ty -> Ty -> TyEnv -> [Tag] -> Lam
-createApply argType retType te ts
+createApply argType retType te ts'
     | null cs = Tup [n1,a2] :-> Error ("Empty Apply:" ++ show ts)  retType
     | otherwise = Tup [n1,a2] :-> Case n1 cs
     where
+    ts = sortUnder toPackedString ts'
     a2 = Var v2 argType
-    cs = [ f t | t <- ts, tagIsPartialAp t]
+    cs = [ f t | t <- ts, tagGood t]
+    tagGood t | Just (n,fn) <- tagUnfunction t, n > 0 = let
+        ptag = argType == ts !! (length ts - n)
+        rtag = retType == TyNode || (n == 1 && rt == retType)
+        (ts,rt) = runIdentity $ findArgsType te fn
+        in rtag && ptag
+    tagGood _ = False
     f t = (NodeC t vs :-> g ) where
         (ts,_) = runIdentity $ findArgsType te t
         vs = [ Var v ty |  v <- [v3 .. ] | ty <- ts]
-        ('P':cs) = fromAtom t
-        (n','_':rs) = span isDigit cs
-        n = read n'
-        g
-            | n == (1::Int) =  App fname (vs ++ [a2]) ty
-            | n > 1 = Return $ NodeC (toAtom $ 'P':show (n - 1) ++ "_" ++ rs) (vs ++ [a2])
-            | otherwise = error "createApply"
+        Just (n,fn) = tagUnfunction t
+        g | n == 1 =  App fn (vs ++ [a2]) ty
+          | n > 1 = Return $ NodeC (partialTag fn (n - 1)) (vs ++ [a2])
+          | otherwise = error "createApply"
          where
-            fname = (toAtom $ 'f':rs)
-            Just (_,ty) = findArgsType te fname
+            Just (_,ty) = findArgsType te fn
+
+{-# NOINLINE createEvalApply #-}
+createEvalApply :: Grin -> IO Grin
+createEvalApply grin = do
+    let eval = (funcEval,Tup [earg] :-> ebody) where
+            earg :-> ebody  =  createEval TrailingUpdate (grinTypeEnv grin) tags
+        tags = Set.toList $ ftags `Set.union` plads
+        ftags = freeVars (map (lamExp . snd) $ grinFunctions grin)
+        plads = Set.fromList $ concatMap mplad (Set.toList ftags)
+        mplad t | Just (n,tag) <- tagUnfunction t, n > 1 = t:mplad (partialTag tag (n - 1))
+        mplad t = [t]
+    appMap <- newOnceMap
+    let f (ls :-> exp) = do
+            exp' <- g exp
+            return $ ls :-> exp'
+        g (exp :>>= lam) = do
+            exp' <- g exp
+            lam' <- f lam
+            return (exp' :>>= lam')
+        g (Case v ls) = do
+            ls' <- mapM f ls
+            return $ Case v ls'
+        g (App fn [fun,arg] ty) | fn == funcApply = do
+            fn' <- runOnceMap appMap (getType arg,ty) $ do
+                u <- newUniq
+                return (toAtom $ "@apply_" ++ show u)
+            return (App fn' [fun,arg] ty)
+        g x = return x
+    funcs <- mapMsnd f (grinFunctions grin)
+    as <- onceMapToList appMap
+    let (apps,ntyenv) = unzip $ map cf as
+        cf ((targ,tret),name) = ((name,appBody),(name,([TyNode,targ],tret))) where
+            appBody = createApply targ tret (grinTypeEnv grin) tags
+        TyEnv tyEnv = grinTypeEnv grin
+        appTyEnv = Map.fromList ntyenv
+    return $ grin { grinTypeEnv = TyEnv (tyEnv `Map.union` appTyEnv), grinFunctions = apps ++ eval:funcs}
+
+
+
 
 

@@ -40,6 +40,7 @@ import qualified FrontEnd.Tc.Type as Type
 import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadCode
+import Grin.EvalInline(createEvalApply)
 import Grin.FromE
 import Grin.Grin
 import Grin.Show
@@ -604,7 +605,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     wdump FD.MangledCore $ printUntypedProgram prog -- printCheckName dataTable (programE prog)
     x <- Grin.FromE.compile prog
     Stats.print "Grin" Stats.theStats
-    wdump FD.Grin $ printGrin x
+    --wdump FD.Grin $ printGrin x
     x <- return $ normalizeGrin x
     typecheckGrin x
     let opt s  x = do
@@ -648,6 +649,9 @@ compileModEnv' stats (initialHo,finalHo) = do
         wdump FD.Grin $ printGrin x
         when (optMode options == CompileExe) $ compileGrinToC x
      else do
+        x <- createEvalApply x
+        x <- return $ normalizeGrin x
+        typecheckGrin x
         wdump FD.Grin $ printGrin x
         when (optMode options == CompileExe) $ compileGrinToC x
 
