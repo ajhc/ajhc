@@ -109,6 +109,13 @@ convertExp (Store n@NodeV {}) = newNode n
 convertExp (Return n@NodeV {}) = newNode n
 convertExp (Store n@NodeC {}) = newNode n
 convertExp (Return n@NodeC {}) = newNode n
+convertExp (Store n@Var {}) = do
+    (ss,nn) <- newNode (NodeC tagHole [])
+    tmp <- newVar pnode_t
+    n <- convertVal n
+    let tag = project' anyTag n
+        update = expr (functionCall (name "memcpy") [tmp,n,functionCall  (name "jhc_sizeof") [tag]])
+    return (ss `mappend` (tmp `assign` nn) `mappend` update, tmp)
 convertExp (Return v) = do
     v <- convertVal v
     return (mempty,v)

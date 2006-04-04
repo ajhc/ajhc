@@ -20,6 +20,7 @@ import Doc.PPrint
 import Doc.Pretty
 import E.E
 import qualified Info.Info as Info
+import Info.Types
 import E.FreeVars
 import E.Program
 import E.TypeCheck
@@ -294,6 +295,12 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce (EVar tvr) | not $ isLifted (EVar tvr)  = do
         mtick "Grin.FromE.strict-unlifted"
         return (Fetch (toVal tvr))
+    ce (EVar tvr) | Just CaseDefault <- Info.lookup (tvrInfo tvr)  = do
+        mtick "Grin.FromE.strict-casedefault"
+        return (Fetch (toVal tvr))
+    ce (EVar tvr) | getProperty prop_WHNF tvr = do
+        mtick "Grin.FromE.strict-propevaled"
+        return (Fetch (toVal tvr))
     ce e | (EVar tvr,as) <- fromAp e = do
         as <- return $ args as
         let fty = toType TyNode (getType e)
@@ -373,15 +380,16 @@ compile' dataTable cenv (tvr,as,e) = ans where
             def <- createDef d (return (toVal b))
             return $
                 e :>>= v :-> Case v (as' ++ def)
-    ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d }  = do
+    ce ECase { eCaseScrutinee = scrut, eCaseBind = b, eCaseAlts = as, eCaseDefault = d }  = do
         v <- newNodeVar
-        e <- ce e
+        e <- ce scrut
         as <- mapM cp as
-        def <- createDef d (newNodeVar)
-        return $
-            e :>>= v :->
-            Store v :>>= toVal b :->
-            Case v (as ++ def)
+        def <- createDef d newNodeVar
+        return $ case (def,b,scrut) of
+            ([],_,_) -> e :>>= v :-> Case v as
+            (_,TVr {tvrIdent = 0 },_) -> e :>>= v :-> Case v (as ++ def)
+            (_,_,EVar etvr) ->  e :>>= v :-> Return (toVal etvr) :>>= toVal b :-> Case v (as ++ def)
+            (_,_,_) -> e :>>= v :-> Store v :>>= toVal b :-> Case v (as ++ def)
     ce e = error $ "ce: " ++ render (pprint (funcName,e))
     fromRawType (ELit (LitCons tname [] _))
         | RawType <- nameType tname = return (Ty $ toAtom (show tname))

@@ -65,6 +65,7 @@ prop_SPECIALIZATION = toAtom "_SPECIALIZATION"
 prop_SUPERSPECIALIZE = toAtom "_SUPERSPECIALIZE"
 prop_UNSHARED = toAtom "_UNSHARED"
 prop_ONESHOT = toAtom "_ONESHOT"
+prop_WHNF = toAtom "_WHNF"
 
 
 class HasProperties a where
