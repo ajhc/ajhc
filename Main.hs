@@ -618,7 +618,6 @@ compileModEnv' stats (initialHo,finalHo) = do
         t' <- Stats.getTicks stats'
         wdump FD.Progress $ Stats.print s stats'
         Stats.combine stats stats'
-
         case t' of
             0 -> return x
             _ -> opt s x
@@ -626,59 +625,57 @@ compileModEnv' stats (initialHo,finalHo) = do
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     x <- return $ normalizeGrin x
     typecheckGrin x
-    wdump FD.GrinPreeval $ printGrin x
-    progress "Points-to analysis..."
-    stats <- Stats.new
-    x <- Grin.PointsToAnalysis.grinInlineEvalApply stats x
-    --printTable "Return points-to" (grinReturnTags x)
-    --printTable "Argument points-to" (grinArgTags x)
-    wdump FD.Progress $ Stats.print "EvalInline" stats
-    typecheckGrin x
-    wdump FD.GrinPosteval $ printGrin x
-    stats <- Stats.new
-    x <- unboxReturnValues x
-    x <- return $ normalizeGrin x
-    typecheckGrin x
-    x <- opt "AE Optimization" x
-    wdump FD.OptimizationStats $ Stats.print "AE Optimization" stats
-    x <- return $ normalizeGrin x
-    typecheckGrin x
---    x <- grinRaiseArity x
---    x <- return $ normalizeGrin x
---    typecheckGrin x
---    x <- opt "After Arity Optimization" x
---    wdump FD.OptimizationStats $ Stats.print "AE Optimization" stats
---    x <- return $ normalizeGrin x
 
-    printTable "Return points-to" (grinReturnTags x)
-    printTable "Argument points-to" (grinArgTags x)
-    wdump FD.Grin $ printGrin x
+    if fopts FO.EvalOptimize then do
+        wdump FD.GrinPreeval $ printGrin x
+        progress "Points-to analysis..."
+        stats <- Stats.new
+        x <- Grin.PointsToAnalysis.grinInlineEvalApply stats x
+        wdump FD.Progress $ Stats.print "EvalInline" stats
+        typecheckGrin x
+        wdump FD.GrinPosteval $ printGrin x
+        stats <- Stats.new
+        x <- unboxReturnValues x
+        x <- return $ normalizeGrin x
+        typecheckGrin x
+        x <- opt "AE Optimization" x
+        wdump FD.OptimizationStats $ Stats.print "AE Optimization" stats
+        x <- return $ normalizeGrin x
+        typecheckGrin x
+
+        printTable "Return points-to" (grinReturnTags x)
+        printTable "Argument points-to" (grinArgTags x)
+        wdump FD.Grin $ printGrin x
+        when (optMode options == CompileExe) $ compileGrinToC x
+     else do
+        wdump FD.Grin $ printGrin x
+        when (optMode options == CompileExe) $ compileGrinToC x
+
+compileGrinToC grin = do
     when (optMode options == Interpret) $ do
         progress "Interpreting..."
-        (v,stats) <- Grin.Interpret.evaluate x
+        (v,stats) <- Grin.Interpret.evaluate grin
         CharIO.putStrLn $ render $ Grin.Show.prettyVal v
         wdump FD.Stats $  Stats.print "Stats" stats
         return ()
-
-    when (optMode options == CompileExe) $ do
-        let (cg,rls) = compileGrin x
-        let fn = optOutName options
-        let cf = (fn ++ "_code.c")
-        progress ("Writing " ++ show cf)
-        name <- System.getProgName
-        args <- System.getArgs
-        let argstring = simpleQuote (name:args)
-            boehmOpts | fopts FO.Boehm = ["-DUSE_BOEHM_GC", "-lgc"]
-                      | otherwise = []
-            profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE"]
-                      | otherwise = []
-            comm = shellQuote $ [optCC options, "-std=gnu99", "-foptimize-sibling-calls", "-O", {- "-funit-at-a-time", -} "-g", "-Wall", "-o", fn, cf ] ++ (map ("-l" ++) rls) ++ optCCargs options  ++ boehmOpts ++ profileOpts
-            globalvar n c = "char " ++ n ++ "[] = \"" ++ c ++ "\";"
-        writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" (head $ lines versionString),"",cg]
-        progress ("Running: " ++ comm)
-        r <- System.system comm
-        when (r /= System.ExitSuccess) $ fail "C code did not compile."
-        return ()
+    let (cg,rls) = compileGrin grin
+    let fn = optOutName options
+    let cf = (fn ++ "_code.c")
+    progress ("Writing " ++ show cf)
+    name <- System.getProgName
+    args <- System.getArgs
+    let argstring = simpleQuote (name:args)
+        boehmOpts | fopts FO.Boehm = ["-DUSE_BOEHM_GC", "-lgc"]
+                  | otherwise = []
+        profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE"]
+                  | otherwise = []
+        comm = shellQuote $ [optCC options, "-std=gnu99", "-foptimize-sibling-calls", "-O", {- "-funit-at-a-time", -} "-g", "-Wall", "-o", fn, cf ] ++ (map ("-l" ++) rls) ++ optCCargs options  ++ boehmOpts ++ profileOpts
+        globalvar n c = "char " ++ n ++ "[] = \"" ++ c ++ "\";"
+    writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" (head $ lines versionString),"",cg]
+    progress ("Running: " ++ comm)
+    r <- System.system comm
+    when (r /= System.ExitSuccess) $ fail "C code did not compile."
+    return ()
 
 dereferenceItem (HeapValue hvs) | not $ Set.null hvs = combineItems (map f $ Set.toList hvs) where
     f (HV _ (Right v)) = valToItem v

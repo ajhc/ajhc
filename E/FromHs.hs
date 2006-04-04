@@ -71,9 +71,6 @@ import Util.NameMonad
 theMainName = toName Name.Val "theMain"
 ump sl e = EError (show sl ++ ": Unmatched pattern") e
 
-concatMapM f xs = do
-    xs <- mapM f xs
-    return $ concat xs
 
 head (x:_) = x
 head _ = error "FromHsHeadError"
