@@ -86,6 +86,7 @@ prettyVal (Var (V i) t)
     | TyTag <- t  = char 't' <> tshow i
 prettyVal (Var (V i) _) = char 'v' <> tshow i
 prettyVal (Lit i t) | t == tCharzh, Just x <- toIntegral i = tshow (chr x)
+prettyVal (Lit i t) | t == Ty (toAtom "wchar_t"), Just x <- toIntegral i = tshow (chr x)
 prettyVal (Lit i _)  = tshow i
 prettyVal (Tup xs)  = tupled $ map prettyVal xs
 prettyVal (Const v) = char '&' <> prettyVal v

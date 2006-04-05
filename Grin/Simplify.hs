@@ -42,6 +42,7 @@ at_OptSimplifyTrivialCase  = toAtom "Optimize.simplify.trivial-case"
 at_OptSimplifyBadAssignment  = toAtom "Optimize.simplify.bad-assignment"
 at_OptSimplifyHoleAssignment  = toAtom "Optimize.simplify.hole-assignment"
 at_OptSimplifyConstStore  = toAtom "Optimize.simplify.const-store"
+at_OptSimplifyCastLit  = toAtom "Optimize.simplify.cast-lit"
 at_OptSimplifyConstUpdate  = toAtom "Optimize.simplify.const-update"
 at_OptSimplifyEnumAssignment  = toAtom "Optimize.simplify.enum-assignment"
 
@@ -72,6 +73,12 @@ simplify1 stats env (n,l) = do
     gs (Update Const {} Var {}) = do
         lift $ tick stats at_OptSimplifyConstUpdate
         gs (Return unit)
+    gs (Cast (Lit i _) nty) = do
+        lift $ tick stats at_OptSimplifyCastLit
+        return $ Return (Lit i nty)
+    gs (Prim Primitive { primAPrim = APrim CCast {} _, primType = (_,nty) } [Lit i _]) = do
+        lift $ tick stats at_OptSimplifyCastLit
+        return $ Return (Lit i nty)
     gs (Store n) | valIsNF n = do
         lift $ tick stats at_OptSimplifyConstStore
         gs (Return (Const n))
