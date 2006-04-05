@@ -45,6 +45,7 @@ import Grin.FromE
 import Grin.Grin
 import Grin.Show
 import Grin.Unboxing
+import Grin.Optimize
 import qualified Grin.MangleE as Mangle(mangle)
 import Grin.Whiz
 import Ho.Build
@@ -618,16 +619,15 @@ compileToGrin prog = do
     wdump FD.MangledCore $ printUntypedProgram prog -- printCheckName dataTable (programE prog)
     x <- Grin.FromE.compile prog
     Stats.print "Grin" Stats.theStats
-    --wdump FD.Grin $ printGrin x
     x <- return $ normalizeGrin x
+    wdump FD.Grin $ printGrin x
     lintCheckGrin x
     let opt s  x = do
         stats' <- Stats.new
-        x <- Grin.Simplify.simplify stats' x
+        nf <- mapMsnd (grinPush stats') (grinFunctions x)
+        x <- return x { grinFunctions = nf }
         wdump FD.Steps $ printGrin x
-        x <- deadCode stats' [funcMain] x  -- XXX
-        wdump FD.Tags $ do
-            dumpTyEnv (grinTypeEnv x)
+        x <- Grin.Simplify.simplify stats' x
         lintCheckGrin x
         t' <- Stats.getTicks stats'
         wdump FD.Progress $ Stats.print s stats'
@@ -635,9 +635,17 @@ compileToGrin prog = do
         case t' of
             0 -> return x
             _ -> opt s x
+    x <- deadCode stats (grinEntryPoints x) x  -- XXX
+    lintCheckGrin x
     x <- opt "Optimization" x
-    wdump FD.OptimizationStats $ Stats.print "Optimization" stats
+    lintCheckGrin x
+    x <- deadCode stats (grinEntryPoints x) x  -- XXX
+    lintCheckGrin x
+    x <- opt "Optimization" x
+    lintCheckGrin x
     x <- return $ normalizeGrin x
+
+    wdump FD.OptimizationStats $ Stats.print "Optimization" stats
 
     if fopts FO.EvalOptimize then do
         lintCheckGrin x
