@@ -98,7 +98,7 @@ partialLadder t
 typecheckGrin grin = do
     let errs = [  (err ++ "\n" ++ render (prettyFun a) ) | (a,Left err) <-  [ (a,typecheck (grinTypeEnv grin) c:: Either String Ty)   | a@(_,(_ :-> c)) <-  grinFunctions grin ]]
     mapM_ putErrLn  errs
-    when (not $ null errs) $ fail "There were type errors!"
+    unless (null errs || optKeepGoing options) $ fail "There were type errors!"
 
 scTag n = t where (t,_,_) = toEntry (n,undefined,undefined)
 
@@ -441,7 +441,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
         V vn <- newVar
         let t  = toAtom $ "Bap_" ++ show (length as) ++ "_" ++ funcName ++ "_" ++ show vn
             tl = toAtom $ "bap_" ++ show (length as) ++ "_" ++  funcName ++ "_" ++ show vn
-            args = [Var v (TyPtr TyNode) | v <- [v1..] | _ <- (undefined:as)]
+            args = [Var v ty | v <- [v1..] | ty <- (TyPtr TyNode:map getType as)]
             s = Store (NodeC t (e:as))
         d <- app TyNode (gEval p1) (tail args) --TODO
         addNewFunction (tl,Tup (args) :-> d)
