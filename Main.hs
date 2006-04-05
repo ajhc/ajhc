@@ -519,6 +519,16 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) letann (\_ nfo -> return nfo) prog
     prog <- programPrune prog
 
+    unless (fopts FO.GlobalOptimize) $ do
+        prog <- barendregtProg prog
+        wdump FD.LambdacubeBeforeLift $ printProgram prog
+        finalStats <- Stats.new
+        prog <- transformProgram "lambda lift" (dump FD.Progress) (lambdaLift finalStats) prog
+        wdump FD.Progress $ Stats.print "PostLifting" finalStats
+        wdump FD.Lambdacube $ printProgram prog -- printCheckName dataTable (programE prog)
+        compileToGrin prog
+        exitSuccess
+
     st <- Stats.new
     prog <- etaExpandProg prog
 
@@ -598,7 +608,10 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     wdump FD.Progress $ printEStats (programE prog)
+    compileToGrin prog
 
+
+compileToGrin prog = do
     stats <- Stats.new
     progress "Converting to Grin..."
     prog <- Mangle.mangle prog
@@ -607,7 +620,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     Stats.print "Grin" Stats.theStats
     --wdump FD.Grin $ printGrin x
     x <- return $ normalizeGrin x
-    typecheckGrin x
+    lintCheckGrin x
     let opt s  x = do
         stats' <- Stats.new
         x <- Grin.Simplify.simplify stats' x
@@ -615,7 +628,7 @@ compileModEnv' stats (initialHo,finalHo) = do
         x <- deadCode stats' [funcMain] x  -- XXX
         wdump FD.Tags $ do
             dumpTyEnv (grinTypeEnv x)
-        when flint $ typecheckGrin x
+        lintCheckGrin x
         t' <- Stats.getTicks stats'
         wdump FD.Progress $ Stats.print s stats'
         Stats.combine stats stats'
@@ -625,24 +638,24 @@ compileModEnv' stats (initialHo,finalHo) = do
     x <- opt "Optimization" x
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     x <- return $ normalizeGrin x
-    typecheckGrin x
 
     if fopts FO.EvalOptimize then do
+        lintCheckGrin x
         wdump FD.GrinPreeval $ printGrin x
         progress "Points-to analysis..."
         stats <- Stats.new
         x <- Grin.PointsToAnalysis.grinInlineEvalApply stats x
         wdump FD.Progress $ Stats.print "EvalInline" stats
-        typecheckGrin x
+        lintCheckGrin x
         wdump FD.GrinPosteval $ printGrin x
         stats <- Stats.new
         x <- unboxReturnValues x
         x <- return $ normalizeGrin x
-        typecheckGrin x
+        lintCheckGrin x
         x <- opt "AE Optimization" x
         wdump FD.OptimizationStats $ Stats.print "AE Optimization" stats
         x <- return $ normalizeGrin x
-        typecheckGrin x
+        lintCheckGrin x
 
         printTable "Return points-to" (grinReturnTags x)
         printTable "Argument points-to" (grinArgTags x)
@@ -651,7 +664,7 @@ compileModEnv' stats (initialHo,finalHo) = do
      else do
         x <- createEvalApply x
         x <- return $ normalizeGrin x
-        typecheckGrin x
+        lintCheckGrin x
         wdump FD.Grin $ printGrin x
         when (optMode options == CompileExe) $ compileGrinToC x
 
@@ -821,6 +834,8 @@ maybeDie = case optKeepGoing options of
 
 onerrNone = return ()
 onerrProg prog = putErrLn ">>> Before" >> printProgram prog
+
+lintCheckGrin grin = when flint $ typecheckGrin grin
 
 lintCheckE onerr dataTable tvr e | flint = case inferType dataTable [] e of
     Left ss -> do

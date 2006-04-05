@@ -17,12 +17,14 @@ strictness perform strictness analysis
 cpr do CPR analysis
 type-analysis perhaps a basic points-to analysis on types right after method generation
 eval-optimize perform eval-apply analysis and optimization
+global-optimize perform whole program E optimization
 
 !Code Generation
 wrapper wrap main in exception handler
 boehm use Boehm garbage collector
 profile enable profiling code in generated executable
 
-
 !Default settings
-@default inline-pragmas rules wrapper float-in strictness defaulting type-analysis monomorphism-restriction boxy eval-optimize
+@default inline-pragmas rules wrapper float-in strictness defaulting type-analysis monomorphism-restriction boxy eval-optimize global-optimize
+
+@fast no-eval-optimize no-global-optimize
