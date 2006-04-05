@@ -74,6 +74,8 @@ grinPush stats lam = ans where
     prefer (Store v@Var {}) = return v
     prefer (App fn [v@Var {}] _)  | fn == funcEval = return v
     prefer (App fn [v@Var {},_] _)  | fn == funcApply = return v
+    prefer (Update _ v@Var {}) = return v
+    prefer (Update v@Var {} _) = return v
     prefer _ = fail "no preference"
     prefered pexps exp = do
         v <- prefer exp

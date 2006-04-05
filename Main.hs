@@ -657,10 +657,19 @@ compileToGrin prog = do
         lintCheckGrin x
         wdump FD.GrinPosteval $ printGrin x
         stats <- Stats.new
+        x <- opt "AE Optimization 1" x
         x <- unboxReturnValues x
+        lintCheckGrin x
+        x <- deadCode stats (grinEntryPoints x) x
+        lintCheckGrin x
         x <- return $ normalizeGrin x
         lintCheckGrin x
-        x <- opt "AE Optimization" x
+        x <- opt "AE Optimization 2" x
+        x <- unboxReturnValues x
+        lintCheckGrin x
+        x <- deadCode stats (grinEntryPoints x) x
+        lintCheckGrin x
+        x <- opt "AE Optimization 3" x
         wdump FD.OptimizationStats $ Stats.print "AE Optimization" stats
         x <- return $ normalizeGrin x
         lintCheckGrin x
