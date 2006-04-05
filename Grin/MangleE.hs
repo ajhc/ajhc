@@ -77,6 +77,7 @@ typeAnalyze prog = do
         idread _ nfo | Just v <- Info.lookup nfo = do
             rv <- readValue v
             return (Info.insert (rv :: IsUsed) $ Info.delete (undefined :: Value IsUsed) nfo)
+        idread n nfo = return nfo
     prog <- annotateProgram mempty idann (\_ -> return) (\_ -> return) prog
     mapM_ (doComb (Set.fromList $ fsts $ programDs prog) funArg) (progCombinators prog)
     calcFixpoint "MangleE: used types" fixer

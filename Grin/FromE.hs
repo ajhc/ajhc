@@ -145,7 +145,8 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry } = 
             ccafMap = Map.fromList $ [(tvrNum v,e) |(v,_,e) <- cc ]  ++ [ (tvrNum v,Var vv (TyPtr TyNode)) | (v,vv,_) <- rcafs]
             }
     ds <- mapM doCompile [ c | c@(v,_,_) <- progCombinators prog, v `notElem` [x | (x,_,_) <- cc]]
-    (_,(Tup [] :-> theMain)) <- doCompile ((mainEntry,[],EVar mainEntry))
+    --(_,(Tup [] :-> theMain)) <- doCompile ((mainEntry,[],EVar mainEntry))
+    let theMain = App (scTag mainEntry) [] tyUnit
 
     wdump FD.Progress $ do
         os <- onceMapToList errorOnce
@@ -171,7 +172,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry } = 
             grinEntryPoints = [funcMain],
             grinPhase = PhaseInit,
             grinTypeEnv = newTyEnv,
-            grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  theMain )) : ds',
+            grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  discardResult theMain)) : ds',
             grinCafs = cafs
             }
     --typecheckGrin grin
@@ -185,6 +186,12 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry } = 
           | otherwise = convertName (conName c)
         as = [ toType (TyPtr TyNode) (getType s) |  s <- conSlots c, shouldKeep s]
 
+discardResult exp = case getType exp of
+    TyTup [] -> exp
+    t -> exp :>>= et t :-> Return unit
+    where
+    et (TyTup xs) = Tup (map et xs)
+    et t = Var v0 t
 
 stripTheWorld :: (TVr,[TVr],E) ->  (TVr,[TVr],E)
 stripTheWorld (t,as,e) = (tvrInfo_u (Info.insert (IsCAF caf)) t,filter (shouldKeep . getType) as,e) where
@@ -276,6 +283,14 @@ instance ToVal TVr where
 --
 
 
+evalVar tvr | Just CaseDefault <- Info.lookup (tvrInfo tvr)  = do
+        mtick "Grin.FromE.strict-casedefault"
+        return (Fetch (toVal tvr))
+evalVar tvr | getProperty prop_WHNF tvr = do
+        mtick "Grin.FromE.strict-propevaled"
+        return (Fetch (toVal tvr))
+evalVar tvr = return $ gEval (toVal tvr)
+
 compile' ::  DataTable -> CEnv -> (TVr,[TVr],E) -> IO (Atom,Lam)
 compile' dataTable cenv (tvr,as,e) = ans where
     ans = do
@@ -295,12 +310,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce (EVar tvr) | not $ isLifted (EVar tvr)  = do
         mtick "Grin.FromE.strict-unlifted"
         return (Fetch (toVal tvr))
-    ce (EVar tvr) | Just CaseDefault <- Info.lookup (tvrInfo tvr)  = do
-        mtick "Grin.FromE.strict-casedefault"
-        return (Fetch (toVal tvr))
-    ce (EVar tvr) | getProperty prop_WHNF tvr = do
-        mtick "Grin.FromE.strict-propevaled"
-        return (Fetch (toVal tvr))
     ce e | (EVar tvr,as) <- fromAp e = do
         as <- return $ args as
         let fty = toType TyNode (getType e)
@@ -318,7 +327,9 @@ compile' dataTable cenv (tvr,as,e) = ans where
                 Nothing | not (isLifted $ EVar tvr) -> do
                     mtick "Grin.FromE.app-unlifted"
                     app fty (Fetch $ toVal tvr) as
-                Nothing -> app fty (gEval $ toVal tvr) as
+                Nothing -> do
+                    ee <- evalVar tvr
+                    app fty ee as
     ce e | Just z <- literal e = return (Return z)
     ce e | Just (Const z) <- constant e = return (Return z)
     ce e | Just z <- constant e = return (gEval z)

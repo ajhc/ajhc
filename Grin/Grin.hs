@@ -425,7 +425,7 @@ instance CanTypeCheck TyEnv Exp Ty where
         if t' == t then
             if as'' == as' then return t' else
                 fail $ "App: arguments do not match: " ++ show (a,as',t')
-         else fail $ "App: results do not match: " ++ show a
+         else fail $ "App: results do not match: " ++ show (a,t,(as',t'))
     typecheck te (Store v) = do
         t <- typecheck te v
         return (TyPtr t)

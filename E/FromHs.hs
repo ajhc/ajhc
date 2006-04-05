@@ -195,8 +195,10 @@ getMainFunction dataTable name ds = ans where
                 Just x | not (fopts FO.Wrapper) -> EAp (EAp (EVar runNoWrapper) x) maine
                 Just x ->  EAp (EAp (EVar runMain)  x ) maine
                 Nothing ->  EAp (EAp (EVar runExpr) ty) maine
-            theMain = (theMainName,setProperty prop_EXPORTED theMainTvr,e)
-            theMainTvr =  tVr (toId theMainName) (infertype dataTable e)
+            ne = ELam worldVar (EAp e (EVar worldVar))
+            worldVar = tvr { tvrIdent = 2, tvrType = tWorld__ }
+            theMain = (theMainName,setProperty prop_EXPORTED theMainTvr,ne)
+            theMainTvr =  tVr (toId theMainName) (infertype dataTable ne)
             tvm@(TVr { tvrType =  ty}) =  main
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs, sortStarLike k ]
             (ty',xs) = fromPi ty
