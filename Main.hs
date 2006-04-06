@@ -532,16 +532,13 @@ compileModEnv' stats (initialHo,finalHo) = do
         compileToGrin prog
         exitSuccess
 
-    --prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze True prog else return prog
-    prog <- transformProgram "typeAnalyze" True (typeAnalyze True) prog
     st <- Stats.new
-    prog <- etaExpandProg prog
 
     let mangle = mangle'  (Just mempty)
     let opt = doopt (mangle dataTable) True stats
     let showTVr t = prettyE (EVar t) <> show (tvrInfo t)
 
-    prog <- barendregtProg prog
+    --prog <- barendregtProg prog
 
     -- make sure properties and are attached everywhere
     prog <- return $ runIdentity $ annotateProgram mempty (idann mempty (hoProps ho) ) letann lamann prog
@@ -562,8 +559,11 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- barendregtProg prog
 
     st <- Stats.new
-    prog <- Stats.runStatIO st (etaExpandProgram prog)
-    Stats.print "eta" st
+    --prog <- Stats.runStatIO st (etaExpandProgram prog)
+    --Stats.print "eta" st
+    prog <- etaExpandProg prog
+    prog <- barendregtProg prog
+    prog <- transformProgram "typeAnalyze" True (typeAnalyze True) prog
 
     --ne <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) (programE prog)
 
