@@ -145,6 +145,7 @@ fileOrModule f = case reverse f of
 
 barendregt e = runIdentity  (renameTraverse' e)
 
+barendregtProgram prog | null $ progCombinators prog = prog
 barendregtProgram prog = programSetDs ds' prog where
     Identity (ELetRec ds' Unknown) = renameTraverse' (ELetRec (programDs prog) Unknown)
 
