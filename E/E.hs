@@ -327,7 +327,6 @@ ltTuple ts = ELit $ LitCons (nameTuple TypeConstructor (length ts)) ts eStar
 ltTuple' ts = ELit $ LitCons (unboxedNameTuple TypeConstructor (length ts)) ts eHash
 
 p_unsafeCoerce = primPrim "unsafeCoerce"
-p_integralCast = primPrim "integralCast"
 p_toTag = primPrim "toTag"
 p_fromTag = primPrim "fromTag"
 

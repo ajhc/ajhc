@@ -16,6 +16,20 @@ import Representation
 import Name.VConsts
 
 
+create_integralCast c1 t1 c2 t2 e t = eCase e [Alt (LitCons c1 [tvra] te) cc] Unknown  where
+    te = getType e
+    ELit (LitCons n1 [] _) = t1
+    ELit (LitCons n2 [] _) = t2
+    tvra =  tVr 4 t1
+    tvrb =  tVr 6 t2
+    cc = if n1 == n2 then ELit (LitCons c2 [EVar tvra] t) else
+        eStrictLet  tvrb (EPrim (APrim (CCast (show n1) (show n2)) mempty) [EVar tvra] t2)  (ELit (LitCons c2 [EVar tvrb] t))
+
+create_integralCast_toInt c1 t1 e = create_integralCast c1 t1 dc_Int tIntzh e tInt
+create_integralCast_toInteger c1 t1 e = create_integralCast c1 t1 dc_Integer tIntegerzh e tInteger
+create_integralCast_fromInt c2 t2 e t = create_integralCast dc_Int tIntzh c2 t2 e t
+create_integralCast_fromInteger c2 t2 e t = create_integralCast dc_Integer tIntegerzh c2 t2 e t
+
 ctypeMap = Map.fromList [ (parseName TypeConstructor n,v) | (n,v,_) <- allCTypes ]
 
 toTypeName x = parseName TypeConstructor x
@@ -152,4 +166,16 @@ prim_const s t et@(ELit (LitCons cn' _ _)) =  eStrictLet (tVr 2 st) (EPrim (APri
     cn = toName DataConstructor $ nameName cn'
 prim_const _ _ _ = error "prim_const: invalid arg"
 -- prim_const s t et = EPrim (APrim (CConst s t) mempty) [] et
+
+
+v2_Int = tVr 2 tInt
+v2_Integer = tVr 2 tInteger
+v2 t = tVr 2 t
+
+v0 t = tVr 0 t
+
+{-# NOINLINE constantMethods #-}
+{-# NOINLINE primitiveInsts #-}
+{-# NOINLINE allCTypes #-}
+{-# NOINLINE ctypeMap #-}
 

@@ -188,9 +188,6 @@ unsafeCoerceOpt (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = f (0::Int) e
     f n e t = (n,e,flip prim_unsafeCoerce t)
 unsafeCoerceOpt e = (0,e,id)
 
-prim_integralCast e t = EPrim p_integralCast [e] t
-from_integralCast (EPrim (APrim (PrimPrim "integralCast") _) [e] t) = return (e,t)
-from_integralCast _ = fail "Not integralCast primitive"
 
 instance HasProperties TVr where
     setProperty prop tvr = tvrInfo_u (setProperty prop) tvr

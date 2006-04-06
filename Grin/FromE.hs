@@ -374,6 +374,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
         Operator n as r | Just _ <- fromRawType ty -> do
             let p = prim { primType = ((map (Ty . toAtom) as),Ty (toAtom r)) }
             return $ Prim p (args xs)
+        other -> fail $ "ce unknown primitive: " ++ show other
     ce ECase { eCaseScrutinee = e, eCaseAlts = [Alt (LitCons n xs _) wh] } | Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n  = do
         e <- ce e
         wh <- ce wh
