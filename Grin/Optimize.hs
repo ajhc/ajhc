@@ -34,6 +34,11 @@ justDeps :: [PExp] -> [Var] -> [Int]
 justDeps cs fs = deps where
     deps = [ pexpUniq c | c <- cs, not $ null $ fs `intersect` pexpProvides c ]
 
+-- | grinPush pushes the definitions of variables as far inward as they can go so
+-- peephole optimizations have a better chance of firing. when the order of definitons
+-- doesn't matter, it uses heuristics to decide which one to push to allow the most
+-- peephole optimizations.
+
 grinPush :: Stats -> Lam -> IO Lam
 grinPush stats lam = ans where
     ans = do
@@ -67,10 +72,8 @@ grinPush stats lam = ans where
                 _ -> reverse $ topSort $ newGraph reached pexpUniq pexpDeps
             ff pexp exp = pexpExp pexp :>>= pexpBind pexp :-> exp
         put (nn,[ x | x <- xs, pexpUniq x `notElem` (map pexpUniq reached) ])
-        --case  (prefered reached exp :: Maybe [PExp]) of
-        --    Just [x] -> lift $ Prelude.print  (x,[ r | r <- reached, pexpUniq x `elem` pexpDeps r ])
-        --    _ -> return ()
         return (foldr ff exp dropped :: Exp)
+    -- | preferentially pull definitons of the variable this returns right next to it as it admits a peephole optimization
     prefer (Store v@Var {}) = return v
     prefer (App fn [v@Var {}] _)  | fn == funcEval = return v
     prefer (App fn [v@Var {},_] _)  | fn == funcApply = return v
