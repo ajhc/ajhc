@@ -32,7 +32,7 @@ newtype IO a = IO (IOErrorCont -> World__ -> IOResult a)
 
 
 undefinedIOErrorCont :: IOErrorCont
-undefinedIOErrorCont = error "Jhc.IO.undefinedIOErrorCont"
+undefinedIOErrorCont = IOErrorCont errorJumpPoint errorHole
 
 showError :: IOError -> IO b
 showError (IOError z) = do

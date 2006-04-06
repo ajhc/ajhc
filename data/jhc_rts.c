@@ -45,6 +45,7 @@ static void _amain(void) A_REGPARM;
 static int jhc_argc;
 static char **jhc_argv;
 static char *jhc_progname;
+static jmp_buf jhc_uncaught;
 
 static int jhc_stdrnd[2] A_UNUSED = { 1 , 1 };
 
@@ -90,28 +91,6 @@ jhc_print_profile(void) {
 #endif
 }
 
-int
-main(int argc, char *argv[])
-{
-#ifndef USE_BOEHM_GC
-        size_t mem_size = 1000000000;
-        while(!jhc_mem) {
-                jhc_mem = malloc(mem_size);
-                mem_size *= 0.80;
-        }
-#ifdef _JHC_PROFILE
-        prof_memstart = jhc_mem;
-#endif
-#endif
-
-        jhc_argc = argc - 1;
-        jhc_argv = argv + 1;
-        jhc_progname = argv[0];
-        setlocale(LC_ALL,"");
-        _amain();
-        jhc_print_profile();
-        return 0;
-}
 
 static void A_NORETURN A_UNUSED
 jhc_exit(int n) {
@@ -134,10 +113,35 @@ jhc_case_fell_off(int n) {
         abort();
 }
 
-#define jhc_setjmp(jb) setjmp(*(jmp_buf *)jb)
-#define jhc_longjmp(jb) longjmp(*(jmp_buf *)jb,1)
+#define jhc_setjmp(jb) sigsetjmp(*(jmp_buf *)jb,0)
+#define jhc_longjmp(jb) siglongjmp(*(jmp_buf *)jb,1)
 
 
+int
+main(int argc, char *argv[])
+{
+#ifndef USE_BOEHM_GC
+        size_t mem_size = 1000000000;
+        while(!jhc_mem) {
+                jhc_mem = malloc(mem_size);
+                mem_size *= 0.80;
+        }
+#ifdef _JHC_PROFILE
+        prof_memstart = jhc_mem;
+#endif
+#endif
+
+        jhc_argc = argc - 1;
+        jhc_argv = argv + 1;
+        jhc_progname = argv[0];
+        setlocale(LC_ALL,"");
+        if (sigsetjmp(jhc_uncaught,0))
+                jhc_error("Uncaught Exception");
+        else
+                _amain();
+        jhc_print_profile();
+        return 0;
+}
 
 typedef union node node_t;
 

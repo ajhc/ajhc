@@ -1,4 +1,4 @@
-module Jhc.JumpPoint(JumpPoint(), withJumpPoint__, jumpJumpPoint__) where
+module Jhc.JumpPoint(JumpPoint(), withJumpPoint__, jumpJumpPoint__, errorJumpPoint) where
 
 import Jhc.IO
 import Jhc.Addr
@@ -19,6 +19,8 @@ withJumpPoint__ action = do
 jumpJumpPoint__ :: JumpPoint -> IO a
 jumpJumpPoint__ jp = jhc_longjmp  jp >> return (error "jumpJumpPoint__")
 
+-- | jumping to this jumppoint will always abort the program.
+foreign import ccall "&jhc_uncaught" errorJumpPoint :: JumpPoint
 
 foreign import ccall jhc_setjmp :: JumpPoint -> IO Int
 foreign import ccall jhc_longjmp :: JumpPoint -> IO ()
