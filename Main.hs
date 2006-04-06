@@ -296,7 +296,7 @@ processDecls stats ho ho' tiData = do
         mprog <- return $ programSetDs ns mprog
         lintCheckProgram onerrNone mprog
         mprog <- barendregtProg mprog
-        mprog <- transformProgram "typeAnalyze" (dump FD.Pass) (fmap fst . typeAnalyze) mprog
+        mprog <- transformProgram "typeAnalyze" (dump FD.Pass) (typeAnalyze True) mprog
         mprog <- transformProgram "floatOutward" (dump FD.Pass) floatOutward mprog
         mprog <- barendregtProg mprog
         ns <- flip mapM (programDs mprog) $ \ (v,lc) -> do
@@ -418,10 +418,11 @@ processDecls stats ho ho' tiData = do
     prog <- programPrune prog
     Stats.print "Optimization" stats
 
-    (prog,didSomething) <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return (prog,False)
+    --prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze True prog else return prog
+    prog <- transformProgram "typeAnalyze" True (typeAnalyze True) prog
 
 
-    prog <- if didSomething then do
+    prog <- if True then do
         prog <- barendregtProg prog
         prog <- return $ etaAnnotateProgram prog
         progress "Post typeanalyis/etaexpansion pass"
@@ -496,7 +497,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- programPrune prog
 
     --wdump FD.Lambdacube $ printProgram prog
-    (prog,_) <- if (fopts FO.TypeAnalysis) then do typeAnalyze prog else return (prog,False)
+    prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze False prog else return prog
     putStrLn "Type analyzed methods"
     flip mapM_ (programDs prog) $ \ (t,e) -> do
         let (_,ts) = fromLam e
@@ -520,6 +521,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) letann (\_ nfo -> return nfo) prog
     prog <- programPrune prog
 
+
     unless (fopts FO.GlobalOptimize) $ do
         prog <- barendregtProg prog
         wdump FD.LambdacubeBeforeLift $ printProgram prog
@@ -530,6 +532,8 @@ compileModEnv' stats (initialHo,finalHo) = do
         compileToGrin prog
         exitSuccess
 
+    --prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze True prog else return prog
+    prog <- transformProgram "typeAnalyze" True (typeAnalyze True) prog
     st <- Stats.new
     prog <- etaExpandProg prog
 

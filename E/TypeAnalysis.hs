@@ -47,8 +47,8 @@ extractValMap ds = Map.fromList [ (tvrIdent t,f e []) | (t,e) <- ds] where
 
 -- all variables _must_ be unique before running this
 {-# NOINLINE typeAnalyze #-}
-typeAnalyze :: Program -> IO (Program,Bool)
-typeAnalyze prog = do
+typeAnalyze :: Bool -> Program -> IO Program
+typeAnalyze doSpecialize prog = do
     fixer <- newFixer
     ur <- newSupply fixer
     uv <- newSupply fixer
@@ -71,12 +71,13 @@ typeAnalyze prog = do
     mapM_ (sillyEntry env) entries
     findFixpoint Nothing fixer
     prog <- annotateProgram mempty (\_ -> return) (\_ -> return) lamread prog
-    unusedRules <- supplyReadValues ur >>= return . fsts . filter (not . snd)
-    unusedValues <- supplyReadValues uv >>= return . fsts . filter (not . snd)
-    let (prog',stats) = runStatM $ specializeProgram (Set.fromList unusedRules) (Set.fromList unusedValues) prog
-    prog <- annotateProgram mempty lamdel (\_ -> return) (\_ -> return) prog'
-    --when (stats /= mempty) $ printStat "TypeAnalysis" stats
-    return (prog { progStats = progStats prog `mappend` stats },stats /= mempty)
+    if doSpecialize then do
+        unusedRules <- supplyReadValues ur >>= return . fsts . filter (not . snd)
+        unusedValues <- supplyReadValues uv >>= return . fsts . filter (not . snd)
+        let (prog',stats) = runStatM $ specializeProgram (Set.fromList unusedRules) (Set.fromList unusedValues) prog
+        prog <- annotateProgram mempty lamdel (\_ -> return) (\_ -> return) prog'
+        return prog { progStats = progStats prog `mappend` stats }
+     else return prog
 
 sillyEntry :: Env -> TVr -> IO ()
 sillyEntry env t = mapM_ (addRule . (`isSuperSetOf` value (vmapPlaceholder ()))) args where
