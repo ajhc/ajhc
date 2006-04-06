@@ -86,6 +86,7 @@ grinPush stats lam = ans where
 
 isOmittable (Fetch {}) = True
 isOmittable (Return {}) = True
+isOmittable (Store (NodeC n _)) | n == tagHole = False
 isOmittable (Store {}) = True
 isOmittable (Cast {}) = True
 isOmittable Prim { expPrimitive = Primitive { primAPrim = aprim } } = aprimIsCheap aprim
