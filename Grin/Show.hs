@@ -91,7 +91,7 @@ prettyVal (Lit i _)  = tshow i
 prettyVal (Tup xs)  = tupled $ map prettyVal xs
 prettyVal (Const v) = char '&' <> prettyVal v
 prettyVal (Addr _) = text "<ref>"
-prettyVal (ValPrim aprim xs ty) = tshow aprim <> tupled (map tshow xs)
+prettyVal (ValPrim aprim xs ty) = pprint aprim <> tupled (map tshow xs)
 
 instance DocLike d => PPrint d Var where
     pprint (V i) = text $ 'v':show i
