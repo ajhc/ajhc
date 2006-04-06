@@ -71,13 +71,11 @@ typeAnalyze doSpecialize prog = do
     mapM_ (sillyEntry env) entries
     findFixpoint Nothing fixer
     prog <- annotateProgram mempty (\_ -> return) (\_ -> return) lamread prog
-    if doSpecialize then do
-        unusedRules <- supplyReadValues ur >>= return . fsts . filter (not . snd)
-        unusedValues <- supplyReadValues uv >>= return . fsts . filter (not . snd)
-        let (prog',stats) = runStatM $ specializeProgram (Set.fromList unusedRules) (Set.fromList unusedValues) prog
-        prog <- annotateProgram mempty lamdel (\_ -> return) (\_ -> return) prog'
-        return prog { progStats = progStats prog `mappend` stats }
-     else return prog
+    unusedRules <- supplyReadValues ur >>= return . fsts . filter (not . snd)
+    unusedValues <- supplyReadValues uv >>= return . fsts . filter (not . snd)
+    let (prog',stats) = runStatM $ specializeProgram doSpecialize (Set.fromList unusedRules) (Set.fromList unusedValues) prog
+    prog <- annotateProgram mempty lamdel (\_ -> return) (\_ -> return) prog'
+    return prog { progStats = progStats prog `mappend` stats }
 
 sillyEntry :: Env -> TVr -> IO ()
 sillyEntry env t = mapM_ (addRule . (`isSuperSetOf` value (vmapPlaceholder ()))) args where
@@ -259,18 +257,19 @@ getTyp kind dataTable vm = f 10 kind vm where
     f _ _ _  = fail "getTyp: not constant type"
 
 specializeProgram :: (MonadStats m) =>
-    (Set.Set (Module,Int))  -- ^ used rules
-    -> (Set.Set TVr)        -- ^ used values
+    Bool                       -- ^ do specialization
+    -> (Set.Set (Module,Int))  -- ^ used rules
+    -> (Set.Set TVr)           -- ^ used values
     -> Program
     -> m Program
-specializeProgram usedRules usedValues prog = do
-    (nds,_) <- specializeDs (usedRules,usedValues,progDataTable prog,mempty) (programDs prog)
+specializeProgram doSpecialize usedRules usedValues prog = do
+    (nds,_) <- specializeDs doSpecialize (usedRules,usedValues,progDataTable prog,mempty) (programDs prog)
     return $ programSetDs nds prog
 
 
-specializeDef (_,unusedVals,_,_) (tvr,e) | tvr `Set.member` unusedVals = return (tvr,EError "Unused" (tvrType tvr))
-specializeDef _(t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
-specializeDef (_,_,dataTable,_) (tvr,e) = ans where
+specializeDef _ (_,unusedVals,_,_) (tvr,e) | tvr `Set.member` unusedVals = return (tvr,EError "Unused" (tvrType tvr))
+specializeDef _ _ (t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
+specializeDef True (_,_,dataTable,_) (tvr,e) = ans where
     sub = substMap''  $ Map.fromList [ (tvrNum t,v) | (t,Just v) <- sts ]
     sts = map spec ts
     spec t | Just nt <- Info.lookup (tvrInfo t) >>= getTyp (getType t) dataTable, sortStarLike (getType t) = (t,Just nt)
@@ -283,24 +282,25 @@ specializeDef (_,_,dataTable,_) (tvr,e) = ans where
             sd = not $ null vs
         when sd $ tell (Map.singleton tvr (fsts vs))
         return (if sd then tvr { tvrType = infertype dataTable ne, tvrInfo = infoMap (dropArguments vs) (tvrInfo tvr) } else tvr,ne)
+specializeDef _ _ (t,e) = return (t,e)
 
 
-specBody :: MonadStats m => SpecEnv -> E -> m E
-specBody env@(_,unusedVars,dataTable,_) e | (EVar h,as) <- fromAp e, h `Set.member` unusedVars = do
+specBody :: MonadStats m => Bool -> SpecEnv -> E -> m E
+specBody _ env@(_,unusedVars,dataTable,_) e | (EVar h,as) <- fromAp e, h `Set.member` unusedVars = do
     mtick $ "Specialize.delete.{" ++ pprint h ++ "}"
     return $ foldl EAp (EError ("Unused: " ++ pprint h) (getType h)) as
-specBody (_,_,_,dmap) e | (EVar h,as) <- fromAp e, Just os <- Map.lookup h dmap = do
+specBody True (_,_,_,dmap) e | (EVar h,as) <- fromAp e, Just os <- Map.lookup h dmap = do
     mtick $ "Specialize.use.{" ++ pprint h ++ "}"
     return $ foldl EAp (EVar h) [ a | (a,i) <- zip as naturals, i `notElem` os ]
-specBody env (ELetRec ds e) = do
-    (nds,nenv) <- specializeDs env ds
-    e <- specBody nenv e
+specBody doSpecialize env (ELetRec ds e) = do
+    (nds,nenv) <- specializeDs doSpecialize env ds
+    e <- specBody doSpecialize nenv e
     return $ ELetRec nds e
-specBody env e = emapE' (specBody env) e
+specBody doSpecialize env e = emapE' (specBody doSpecialize env) e
 
 --specializeDs :: MonadStats m => DataTable -> Map.Map TVr [Int] -> [(TVr,E)] -> m ([(TVr,E)]
-specializeDs env@(unusedRules,_,dataTable,_) ds = do
-    (ds,nenv) <- runWriterT $ mapM (specializeDef env) ds
+specializeDs doSpecialize env@(unusedRules,_,dataTable,_) ds = do
+    (ds,nenv) <- runWriterT $ mapM (specializeDef doSpecialize env) ds
     -- ds <- sequence [ specBody dataTable (nenv `mappend` env) e >>= return . (,) t | (t,e) <- ds]
     let f (t,e) = do
             e <- sb e
@@ -308,7 +308,7 @@ specializeDs env@(unusedRules,_,dataTable,_) ds = do
             nfo <- infoMapM (return . arules . filter ( not . (`Set.member` unusedRules) . ruleUniq) . rulesFromARules) nfo
             return (t { tvrInfo = nfo }, e)
         tenv = ((\ (a,b,c,d) -> (a,b,c,nenv `mappend` d)) env)
-        sb = specBody tenv
+        sb = specBody doSpecialize tenv
     ds <- mapM f ds
     return (ds,tenv)
 
