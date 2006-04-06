@@ -48,6 +48,8 @@ tags list of all tags and their types
 grin-preeval show grin code just before eval/apply inlining
 grin-posteval show grin code just before eval/apply inlining
 grin show final grin code
+grin-initial grin right after conversion from core
+grin-normalized grin right after first normalization
 steps show interpreter go
 eval show detailed eval inlining info
 

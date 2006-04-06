@@ -238,8 +238,7 @@ constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans wh
     res = Map.fromList [ (v,length $ ff vs) | (v,vs,_) <- ds]
     coMap = Map.fromList [  (v,ce)| (v,_,ce) <- fst3 ans]
     conv :: E -> Val
-    conv (ELit (LitInt i (ELit (LitCons n [] (ESort EHash))))) | RawType <- nameType n =  Lit i (Ty $ toAtom (show n))
-    --conv (ELit (LitInt i (ELit (LitCons n [] (ESort EStar))))) | Just pt <- Map.lookup n ctypeMap = ( Const (NodeC (toAtom $ 'C':show n) [(Lit i (Ty (toAtom pt)))]))
+    conv e | Just v <- literal e = v
     conv (ELit lc@(LitCons n es _)) | Just nn <- getName lc = (Const (NodeC nn (map conv es)))
     conv (EPi (TVr { tvrIdent = 0, tvrType =  a}) b)  =  Const $ NodeC tagArrow [conv a,conv b]
     conv (EVar v) | v `Set.member` lbs = Var (cafNum v) (TyPtr TyNode)
@@ -402,9 +401,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
             (_,_,EVar etvr) ->  e :>>= v :-> Return (toVal etvr) :>>= toVal b :-> Case v (as ++ def)
             (_,_,_) -> e :>>= v :-> Store v :>>= toVal b :-> Case v (as ++ def)
     ce e = error $ "ce: " ++ render (pprint (funcName,e))
-    fromRawType (ELit (LitCons tname [] _))
-        | RawType <- nameType tname = return (Ty $ toAtom (show tname))
-    fromRawType _ = fail "not a raw type"
 
 
     createDef Nothing _ = return []
@@ -501,7 +497,9 @@ compile' dataTable cenv (tvr,as,e) = ans where
                 | otherwise -> do -- length as == length as'
                     return $ Store (NodeC (tagFlipFunction v) as)
             Nothing -> app' (toVal v) as
-    cc e = error $ "cc: " ++ show e
+    cc (EVar v) = do
+        return $ Return (toVal v)
+    cc e = return $ error ("cc: " ++ show e)
 
 
     doLet ds e = f (decomposeDefns ds) e where
@@ -537,13 +535,6 @@ compile' dataTable cenv (tvr,as,e) = ans where
         f (EVar tvr) = toVal tvr
         f x = error $ "invalid argument: " ++ show x
 
-    -- | converts an unboxed literal
-    literal :: Monad m =>  E -> m Val
-    literal (ELit (LitInt i (ELit (LitCons n [] (ESort EHash))))) | RawType <- nameType n = return $ Lit i (Ty $ toAtom (show n))
-    literal (EPrim aprim@(APrim p _) xs ty) | Just ptype <- fromRawType ty, primIsConstant p = do
-        xs <- mapM literal xs
-        return $ ValPrim aprim xs ptype
-    literal _ = fail "not a literal term"
 
 
     -- | Takes an E and returns something constant which is either a pointer to
@@ -593,4 +584,16 @@ compile' dataTable cenv (tvr,as,e) = ans where
         i <- readIORef (counter cenv)
         writeIORef (counter cenv) $! (i + 2)
         return $! V i
+
+fromRawType (ELit (LitCons tname [] _))
+    | RawType <- nameType tname = return (Ty $ toAtom (show tname))
+fromRawType _ = fail "not a raw type"
+
+-- | converts an unboxed literal
+literal :: Monad m =>  E -> m Val
+literal (ELit (LitInt i ty)) | Just ptype <- fromRawType ty = return $ Lit i ptype
+literal (EPrim aprim@(APrim p _) xs ty) | Just ptype <- fromRawType ty, primIsConstant p = do
+    xs <- mapM literal xs
+    return $ ValPrim aprim xs ptype
+literal _ = fail "not a literal term"
 
