@@ -107,16 +107,18 @@ tiExprPoly e t = do                   -- GEN1
 doCoerce :: CoerceTerm -> HsExp -> Tc HsExp
 doCoerce CTId e = return e
 doCoerce ct e = do
-    nn <- newUniq
-    let n = toName Val ("As@",show nn)
+    (e',n) <- wrapInAsPat e
     addCoerce n ct
-    return (HsAsPat (nameName n) e)
+    return e'
 
 wrapInAsPat :: HsExp -> Tc (HsExp,Name)
 wrapInAsPat e = do
-    nn <- newUniq
-    let n = toName Val ("As@",show nn)
+    n <- newHsVar "As"
     return (HsAsPat (nameName n) e, n)
+
+newHsVar ns = do
+    nn <- newUniq
+    return $ toName Val (ns ++ "@",show nn)
 
 
 
@@ -431,7 +433,12 @@ tiPat (HsPList pats@(_:_)) typ = do
     typ `boxyMatch` TAp tList v
     return (HsPList (fsts ps), mconcat (snds ps))
 
-tiPat HsPWildCard typ = unBox typ >> return (HsPWildCard, mempty)
+--tiPat HsPWildCard typ = unBox typ >> return (HsPWildCard, mempty)
+tiPat HsPWildCard typ = do
+    n <- newHsVar "Wild"
+    typ' <- unBox typ
+    addToCollectedEnv (Map.singleton n typ')
+    return (HsPVar (nameName n), Map.singleton n typ')
 
 
 tiPat (HsPAsPat i pat) typ = do

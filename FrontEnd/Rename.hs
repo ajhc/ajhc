@@ -612,10 +612,11 @@ renameHsPat (HsPAsPat hsName hsPat) subTable = do
       hsPat' <- renameHsPat hsPat subTable
       return (HsPAsPat hsName' hsPat')
 renameHsPat HsPWildCard subTable = do
-      unique <- newUniq
-      mod <- getCurrentModule
-      let hsName' = Qual mod (HsIdent $ show unique ++ "_wild@")
-      return (HsPVar hsName')
+    return HsPWildCard
+--      unique <- newUniq
+--      mod <- getCurrentModule
+--      let hsName' = Qual mod (HsIdent $ show unique ++ "_wild@")
+--      return (HsPVar hsName')
 --renameHsPat (HsPWildCard) _subTable
 --  = return HsPWildCard
 renameHsPat (HsPIrrPat hsPat) subTable = do
@@ -709,19 +710,10 @@ renameHsExp (HsVar hsName) subTable = do
     hsName' <- renameHsName hsName subTable
     return (HsVar hsName')
 --    wrapInAsPat (HsVar hsName')
---    unique <- getUnique
---    incUnique
---    mod <- getCurrentModule
---    let hsName'' = (Qual mod (HsIdent $ show unique ++ fromHsName hsName' ++ "_as@"))
---    return (HsAsPat hsName'' $   HsVar hsName' )
+
 renameHsExp (HsCon hsName) subTable = do
     hsName' <- renameHsName hsName subTable
     wrapInAsPat (HsCon hsName')
---    unique <- getUnique
---    incUnique
---    mod <- getCurrentModule
---    let hsName'' = (Qual mod (HsIdent $ show unique ++ fromHsName hsName' ++ "_as@"))
---    return (HsAsPat hsName'' $ HsCon hsName')
 
 renameHsExp i@(HsLit (HsInt num)) st = do
     let fi = if abs num > 500000000 then func_fromInteger else func_fromInt
