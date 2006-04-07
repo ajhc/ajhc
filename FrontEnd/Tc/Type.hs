@@ -26,7 +26,7 @@ import Doc.PPrint
 import Name.Name
 import Name.Names
 import Name.VConsts
-import Representation hiding(flattenType, findType)
+import Representation
 import Support.CanType
 import Support.FreeVars
 import Support.Unparse

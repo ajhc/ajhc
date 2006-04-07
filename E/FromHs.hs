@@ -88,15 +88,12 @@ tipe t = f t where
     f (TArrow t1 t2) =  EPi (tVr 0 (f t1)) (f t2)
     f (TCon (Tycon n k)) | n == tc_World__ =  ELit (LitCons rt_Worldzh [] eHash)
     f (TCon (Tycon n k)) =  ELit (LitCons n [] (kind k))
-    f (TVar Tyvar { tyvarRef = Just {}, tyvarKind = k}) = tAbsurd (kind k)
     f (TVar tv) = EVar (cvar [] tv)
     f (TMetaVar mv) = cmvar mv
-    f (TGen _ (Tyvar _ n k _)) = EVar (tVr (lt n) (kind k))
     f (TForAll vs (ps :=> t)) = foldr EPi (f t) (map (cvar $ freeVars ps) vs)
     f (TExists xs (_ :=> t)) = let
         xs' = map (kind . tyvarKind) xs
         in ELit (LitCons (unboxedNameTuple TypeConstructor (length xs' + 1)) (f t:xs') eHash)
-    cvar _ Tyvar { tyvarRef = Just {}, tyvarKind = k}= error $ "tyvar is metaref:" ++ prettyPrintType t
     cvar fvs tv@Tyvar { tyvarName = n, tyvarKind = k }
         | tv `elem` fvs = setProperty prop_SCRUTINIZED (tVr (lt n) (kind k))
         | otherwise = tVr (lt n) (kind k)
@@ -133,7 +130,7 @@ simplifyHsPat p@HsPLit {} = p
 simplifyHsPat p = error $ "simplifyHsPat: " ++ show p
 
 
-fromTyvar (Tyvar _ n k _) = tVr (toId n) (kind k)
+fromTyvar (Tyvar _ n k) = tVr (toId n) (kind k)
 
 fromSigma (TForAll vs (_ :=> t)) = (map fromTyvar vs, tipe t)
 fromSigma t = ([], tipe t)
@@ -164,10 +161,18 @@ convertVal assumps n = (foldr ePi t vs, flip (foldr eLam) vs) where
         Just z -> fromSigma  z
         Nothing -> error $ "convertVal.Lookup failed: " ++ (show n)
 
+
+convertOneVal = tipe
+{-
 convertOneVal (Forall _ (_ :=> t)) = (mp EPi ts (tipe t)) where
     mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (toId n) (kind k)) (mp fn rs t)
     mp _ [] t = t
     ts = ctgen t
+convertOneVal (TForAll _ (_ :=> t)) = (mp EPi ts (tipe t)) where
+    mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (toId n) (kind k)) (mp fn rs t)
+    mp _ [] t = t
+    ts = ctgen t
+    -}
 
 toTVr assumps n = tVr (toId n) (typeOfName n) where
     typeOfName n = fst $ convertVal assumps n
@@ -214,7 +219,7 @@ getMainFunction dataTable name ds = ans where
 createInstanceRules :: Monad m => ClassHierarchy -> (Map.Map Name (TVr,E)) -> m Rules
 createInstanceRules classHierarchy funcs = return $ fromRules ans where
     ans = concatMap cClass (classRecords classHierarchy)
-    cClass classRecord =  concat [ method classRecord n | n :>: Forall _ (_ :=> t) <- classAssumps classRecord ]
+    cClass classRecord =  concat [ method classRecord n | (n,TForAll _ (_ :=> t)) <- classAssumps classRecord ]
     method classRecord methodName | isJust _methodName = as where
         methodVar = tVr (toId methodName) ty
         _methodName@(~(Just (TVr {tvrType = ty},_))) = findName methodName
@@ -243,7 +248,7 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
 createMethods :: Monad m => DataTable -> ClassHierarchy -> (Map.Map Name (TVr,E))  -> m [(Name,TVr,E)]
 createMethods dataTable classHierarchy funcs = return ans where
     ans = concatMap cClass (classRecords classHierarchy)
-    cClass classRecord =  concat [ method classRecord n | n :>: _ <- classAssumps classRecord ]
+    cClass classRecord =  concat [ method classRecord n | (n,_) <- classAssumps classRecord ]
     method classRecord methodName | isJust _methodTVr = [(methodName ,setProperty prop_METHOD (tVr (toId methodName) ty),v)] where
         theDefault = findName (defaultInstanceName methodName)
         _methodTVr@(~(Just (TVr {tvrType = ty},ELam TVr { tvrInfo = nfo } _))) = findName methodName
@@ -274,7 +279,7 @@ createMethods dataTable classHierarchy funcs = return ans where
 methodNames ::  ClassHierarchy ->  [TVr]
 methodNames  classHierarchy =  ans where
     ans = concatMap cClass (classRecords classHierarchy)
-    cClass classRecord =  [ setProperty prop_METHOD $ tVr (toId n) (convertOneVal t) | n :>: t <- classAssumps classRecord ]
+    cClass classRecord =  [ setProperty prop_METHOD $ tVr (toId n) (convertOneVal t) | (n,t) <- classAssumps classRecord ]
 
 unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
 unbox dataTable e vn wtd = eCase e [Alt (LitCons cna [tvra] te) (wtd tvra)] Unknown where
@@ -465,7 +470,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         cv <- lookupCoercion (toName Val n')
         let t = getAssump n
         case cv of
-            Left t' -> return $ foldl eAp (EVar (tv n)) (map tipe $ specialize t t')
+            -- Left t' -> return $ foldl eAp (EVar (tv n)) (map tipe $ specialize t t')
             Right c -> applyCoersion c $ EVar (tv n)
     cExpr (HsAsPat n' (HsCon n)) = return $ constructionExpression dataTable (toName DataConstructor n) rt where
         t' = getAssump n'
@@ -574,7 +579,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
                     [] -> return []
                     (d:_) -> cDecl d >>= \ [(_,_,v)] -> return [v]
                 return [(defaultName,tVr (toId defaultName) ty,els) | els <- tels ]
-            cClass classRecord =  [ f n (toId n) (convertOneVal t) | n :>: t <- classAssumps classRecord ] where
+            cClass classRecord =  [ f n (toId n) (convertOneVal t) | (n,t) <- classAssumps classRecord ] where
                 f n i t = (n,setProperties [prop_METHOD,prop_PLACEHOLDER] $ tVr i t, foldr ELam (EPrim (primPrim ("Placeholder: " ++ show n)) [] ft) args)  where
                     (ft',as) = fromPi t
                     (args,rargs) = span (sortStarLike . getType) as
@@ -584,6 +589,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         return (cClass cr ++ mthds ++ primitiveInstances className)
     cClassDecl _ = error "cClassDecl"
 
+{-
 -- | determine what arguments must be passed to something of the first type, to transform it into something of the second type.
 specialize :: Type -> Type -> [Type]
 specialize (TForAll vs _) (TForAll vs' _) | sameLength vs vs'= []  -- we assume program is typesafe
@@ -610,6 +616,7 @@ specialize' _g _s = []
 ctgen t = map snd $ snubFst $ Seq.toList $ everything (Seq.<>) (mkQ Seq.empty gg) t where
     gg (TGen n g) = Seq.single (n,g)
     gg _ =  Seq.empty
+-}
 
 integer_cutoff = 500000000
 

@@ -17,12 +17,11 @@ module TypeSigs (collectSigs,
                  SigEnv,
                  listSigsToSigEnv) where
 
+import Control.Monad.Identity
 
-import Type(assumpToPair)
-import FrontEnd.KindInfer(KindEnv)
-import Representation(Scheme)
-import TypeUtils(aHsTypeSigToAssumps)
+import FrontEnd.KindInfer
 import Name.Name
+import FrontEnd.Tc.Type
 
 import HsSyn
 import qualified Data.Map as Map
@@ -200,12 +199,13 @@ collectSigsFromStmt (HsLetStmt decls)
 
 --------------------------------------------------------------------------------
 
-type SigEnv = Map.Map Name Scheme
+type SigEnv = Map.Map Name Type
 
 listSigsToSigEnv :: KindEnv -> [HsDecl] -> SigEnv
 listSigsToSigEnv kt sigs
-   = Map.fromList $
-        map assumpToPair $
-        concatMap (aHsTypeSigToAssumps kt) sigs
+   = Map.fromList $ concatMap (aHsTypeSigToAssumps kt) sigs
 
+aHsTypeSigToAssumps :: KindEnv -> HsDecl -> [(Name,Type)]
+aHsTypeSigToAssumps kt sig@(HsTypeSig _ names qualType) = [ (toName Val n,typ) | n <- names] where
+    Identity typ = hsQualTypeToSigma kt qualType
 

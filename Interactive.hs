@@ -38,9 +38,8 @@ import Options
 import qualified FrontEnd.Infix
 import qualified HsPretty
 import qualified Text.PrettyPrint.HughesPJ as PP
-import Representation hiding(flattenType)
+import Representation
 import TypeSynonyms(showSynonym)
-import Type(schemeToType)
 import TypeSyns
 import TypeSigs
 import Util.Interact
@@ -223,7 +222,7 @@ tcStatementTc (HsQualifier e) = do
     is@IS { stateHo = ho } <- ask
     let tcInfo = tcInfoEmpty {
         tcInfoEnv = (hoAssumps ho),
-        tcInfoSigEnv = Map.map schemeToType $ collectSigEnv (hoKinds ho) (HsQualifier e),
+        tcInfoSigEnv =  collectSigEnv (hoKinds ho) (HsQualifier e),
         tcInfoModName =  show (stateModule is),
         tcInfoKindInfo = (hoKinds ho),
         tcInfoClassHierarchy = (hoClassHierarchy ho)

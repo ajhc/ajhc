@@ -7,7 +7,6 @@
 module FrontEnd.KindInfer (
     kiDecls,
     KindEnv(),
-    hsQualTypeToScheme,
     hsQualTypeToSigma,
     hsAsstToPred,
     kindOfClass,
@@ -39,7 +38,7 @@ import MapBinaryInstance()
 import Name.Name
 import qualified Util.Seq as Seq
 import Representation hiding (Subst)
-import Type(quantify,tv,tTTuple,schemeToType,typeToScheme)
+import Type(tTTuple)
 import Util.ContextMonad
 import Util.HasSize
 
@@ -531,13 +530,12 @@ aHsTypeToType kt (HsTyVar name) = TVar $ toTyvar kt name --  tyvar  name (kindOf
 aHsTypeToType kt (HsTyCon name) = TCon $ Tycon nn (kindOf nn kt)  where
     nn =  (toName TypeConstructor name)
 
---aHsTypeToType kt (HsTyForall vs qt) = TForAll map (kindOf (aHsQualTypeToScheme kt qt)
 aHsTypeToType kt (HsTyForall vs qt) = TForAll (map (toTyvar kt . hsTyVarBindName) vs) (aHsQualTypeToQualType kt qt)
 aHsTypeToType kt (HsTyExists vs qt) = TExists (map (toTyvar kt . hsTyVarBindName) vs) (aHsQualTypeToQualType kt qt)
 
 aHsTypeToType _ t = error $ "aHsTypeToType: " ++ show t
 
-toTyvar kt name =  tyvar  nn (kindOf nn kt) Nothing where
+toTyvar kt name =  tyvar  nn (kindOf nn kt) where
     nn = toName TypeVal name
 
 aHsQualTypeToQualType :: KindEnv -> HsQualType -> Qual Type
@@ -548,10 +546,8 @@ hsAsstToPred :: KindEnv -> HsAsst -> Pred
 hsAsstToPred kt (className, varName)
    -- = IsIn className (TVar $ Tyvar varName (kindOf varName kt))
    | isConstructorLike (hsIdentString . hsNameIdent $ varName) = IsIn  (toName ClassName className) (TCon (Tycon (toName TypeConstructor varName) (head $ kindOfClass (toName ClassName className) kt)))
-   | otherwise = IsIn (toName ClassName className) (TVar $ tyvar (toName TypeVal varName) (head $ kindOfClass (toName ClassName className) kt) Nothing)
+   | otherwise = IsIn (toName ClassName className) (TVar $ tyvar (toName TypeVal varName) (head $ kindOfClass (toName ClassName className) kt))
 
-hsQualTypeToScheme :: Monad m => KindEnv -> HsQualType -> m Scheme
-hsQualTypeToScheme kt qualType = liftM typeToScheme $ hsQualTypeToSigma kt qualType
 
 
 hsQualTypeToSigma kt qualType = hsQualTypeToType kt (Just []) qualType
@@ -579,7 +575,6 @@ hoistType t = f t where
     f t@TVar {} = t
     f t@TCon {} = t
     f t@TMetaVar {} = t
-    f t@TGen {} = t
     f (TAp a b) = TAp (f a) (f b)
     f (TForAll vs (ps :=> t))
         | (TForAll vs' (ps' :=> t')) <- nt = f $ TForAll (vs ++ vs') ((ps ++ ps') :=> t')

@@ -78,7 +78,6 @@ inHnf (IsIn c t) = hnf t
        hnf (TArrow _t1 _t2) = False
        hnf TForAll {} = False
        hnf TExists {} = False
-       hnf TGen {} = False
 
 reducePred :: Monad m => ClassHierarchy -> Pred -> m [Pred]
 reducePred h p@(IsIn c t)

@@ -49,7 +49,6 @@ import qualified Util.Seq as Seq
 import FrontEnd.Tc.Type
 import Representation
 import Support.CanType
-import Type(typeToScheme)
 import Support.Unparse
 import Util.HasSize
 import Util.SameShape
@@ -63,7 +62,6 @@ tipe t = runVarName (tipe' t) where
         return $ EPi (tVr 0 (t1')) t2'
     tipe' (TCon (Tycon n k)) | n == tc_World__ = return $ ELit (LitCons rt_Worldzh [] eHash)
     tipe' (TCon (Tycon n k)) =  return $ ELit (LitCons n [] (kind k))
-    tipe' (TGen n (Tyvar { tyvarKind = k })) = return $  EVar (tVr ((n + 1) * 2 ) (kind k))
     tipe' (TVar tv@Tyvar { tyvarKind = k}) = do
         v <- lookupName tv
         return $ EVar $ tVr v (kind k)
@@ -389,7 +387,7 @@ toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conN
             existentials = Set.toList $ freeVars (map getType ts') Set.\\ freeVars xs
             subst = substMap $ Map.fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
             ts = existentials ++ [ tvr {tvrIdent = x} | tvr <- ts' | x <- drop (5 + length theTypeArgs) [2,4..] ]
-            Just (Forall _ (_ :=> ty)) = fmap typeToScheme $ Map.lookup dataConsName cm
+            Just (TForAll _ (_ :=> ty)) =  Map.lookup dataConsName cm
             --Just (_,_,ty) = fmap fromType $ Map.lookup dataConsName cm
 
 isHsBangedTy HsBangedTy {} = True

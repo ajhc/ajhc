@@ -32,13 +32,14 @@ import qualified Data.Map as Map
 
 import HsSyn
 import Representation
+import FrontEnd.Tc.Type
 import Name.Name
-import Type                     (Types (..), quantify)
+import Type                     (Types (..))
 import FrontEnd.KindInfer
 
 --------------------------------------------------------------------------------
 
-dataConsEnv :: Module -> KindEnv -> [HsDecl] -> Map.Map Name Scheme
+dataConsEnv :: Module -> KindEnv -> [HsDecl] -> Map.Map Name Sigma
 dataConsEnv modName kt decls
    = Map.unions $ map (dataDeclEnv modName kt) decls
 
@@ -46,7 +47,7 @@ dataConsEnv modName kt decls
 -- we should only apply this function to data decls and newtype decls
 -- howver the fall through case is just there for completeness
 
-dataDeclEnv :: Module -> KindEnv -> (HsDecl) -> Map.Map Name Scheme
+dataDeclEnv :: Module -> KindEnv -> (HsDecl) -> Map.Map Name Sigma
 dataDeclEnv modName kt (HsDataDecl _sloc context typeName args condecls _)
    = Map.unions $ map (conDeclType modName kt preds resultType) $ condecls
    where
@@ -58,7 +59,7 @@ dataDeclEnv modName kt (HsDataDecl _sloc context typeName args condecls _)
    argKinds = init $ unfoldKind typeKind
    fromHsNameToTyVar :: (Kind, HsName) -> Type
    fromHsNameToTyVar (k, n)
-      = TVar (tyvar (toName TypeVal n) k Nothing)
+      = TVar (tyvar (toName TypeVal n) k)
    preds = hsContextToPreds kt context
 
 dataDeclEnv modName kt (HsNewTypeDecl _sloc context typeName args condecl _)
@@ -72,7 +73,7 @@ dataDeclEnv modName kt (HsNewTypeDecl _sloc context typeName args condecl _)
    argKinds = init $ unfoldKind typeKind
    fromHsNameToTyVar :: (Kind, HsName) -> Type
    fromHsNameToTyVar (k, n)
-      = TVar (tyvar (toName TypeVal n) k Nothing)
+      = TVar (tyvar (toName TypeVal n) k)
    preds = hsContextToPreds kt context
 
 dataDeclEnv _modName _kt _anyOtherDecl
@@ -82,15 +83,16 @@ dataDeclEnv _modName _kt _anyOtherDecl
 hsContextToPreds :: KindEnv -> HsContext -> [Pred]
 hsContextToPreds kt assts = map (hsAsstToPred kt) assts
 
+-- XXX we ignore predicates on data constructors because they don't mean anything
 
-conDeclType :: Module -> KindEnv -> [Pred] -> Type -> HsConDecl -> Map.Map Name Scheme
+conDeclType :: Module -> KindEnv -> [Pred] -> Type -> HsConDecl -> Map.Map Name Sigma
 conDeclType modName kt preds tResult (HsConDecl { hsConDeclName = conName, hsConDeclConArg = bangTypes })
-   = Map.singleton (toName DataConstructor conName) $ quantify (tv qualConType) qualConType
+   = Map.singleton (toName DataConstructor conName) $ tForAll (tv qualConType) qualConType
    where
    conType = foldr fn tResult (map (bangTypeToType kt) bangTypes)
    qualConType = preds :=> conType
 conDeclType modName kt preds tResult rd@HsRecDecl { hsConDeclName = conName }
-   = Map.singleton (toName DataConstructor conName) $ quantify (tv qualConType) qualConType
+   = Map.singleton (toName DataConstructor conName) $ tForAll (tv qualConType) qualConType
    where
    conType = foldr fn tResult (map (bangTypeToType kt) (hsConDeclArgs rd))
    qualConType = preds :=> conType

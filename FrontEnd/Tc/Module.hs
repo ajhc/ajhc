@@ -135,7 +135,7 @@ tiModules' me ms = do
 
     -- collect types for data constructors
 
-    let localDConsEnv = Map.map schemeToType $ dataConsEnv (error "modName") kindInfo classAndDataDecls -- (rDataDecls ++ rNewTyDecls)
+    let localDConsEnv =  dataConsEnv (error "modName") kindInfo classAndDataDecls -- (rDataDecls ++ rNewTyDecls)
 
     wdump FD.Dcons $ do
         putStr "\n ---- data constructor assumptions ---- \n"
@@ -160,9 +160,9 @@ tiModules' me ms = do
 
     let cDefBinds = concat [ [ z | z <- ds] | HsClassDecl _ _ ds <- ds]
     let myClassAssumps = concat  [ classAssumps as | as <- (classRecords cHierarchyWithInstances)]
-        instanceEnv   = Map.fromList $ [ (x,y) | (x :>: y) <-  instAssumps ]
+        instanceEnv   = Map.fromList instAssumps
         classDefs = snub (concatMap getDeclNames cDefBinds)
-        classEnv  = Map.fromList $ [ (x,y) | (x :>: y) <- myClassAssumps, x `elem` classDefs  ]
+        classEnv  = Map.fromList $ [ (x,y) | (x,y) <- myClassAssumps, x `elem` classDefs  ]
         (liftedInstances,instAssumps) =  mconcatMap (instanceToTopDecls kindInfo cHierarchyWithInstances) ds -- rInstDecls
 
 
@@ -189,7 +189,7 @@ tiModules' me ms = do
     let bindings = (funPatBinds ++  liftedInstances)
         classDefaults  = snub [ getDeclName z | z <- cDefBinds, isHsFunBind z || isHsPatBind z ]
         classNoDefaults = snub (concat [ getDeclNames z | z <- cDefBinds ]) -- List.\\ classDefaults
-        noDefaultSigs = Map.fromList [ (n,schemeToType $ maybe (error $ "sigEnv:"  ++ show n) id $ Map.lookup n sigEnv) | n <- classNoDefaults ]
+        noDefaultSigs = Map.fromList [ (n,maybe (error $ "sigEnv:"  ++ show n) id $ Map.lookup n sigEnv) | n <- classNoDefaults ]
     --when verbose2 $ putStrLn (show bindings)
     let programBgs = getBindGroups bindings (nameName . getDeclName) getDeclDeps
 
@@ -198,7 +198,7 @@ tiModules' me ms = do
              putStrLn " ---- Bindgroup # = [members] [vars depended on] [missing vars] ---- \n";
              putStr $ debugDeclBindGroups programBgs}
 
-    let program = makeProgram (Map.map schemeToType sigEnv) programBgs
+    let program = makeProgram sigEnv programBgs
     when (dump FD.Program) $ do
         putStrLn " ---- Program ---- "
         mapM_ putStrLn $ map (PPrint.render . PPrint.pprint) $  program
@@ -211,7 +211,7 @@ tiModules' me ms = do
         (tms:_) = ms
     let tcInfo = tcInfoEmpty {
         tcInfoEnv = (importVarEnv `mappend` globalDConsEnv),
-        tcInfoSigEnv = Map.map schemeToType $ sigEnv ,
+        tcInfoSigEnv = sigEnv,
         tcInfoModName =  show moduleName,
         tcInfoKindInfo = kindInfo,
         tcInfoClassHierarchy = cHierarchyWithInstances

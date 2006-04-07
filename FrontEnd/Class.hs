@@ -85,11 +85,13 @@ import TypeUtils
 import Util.HasSize
 import Util.Inst()
 import PrimitiveOperators(primitiveInsts)
+import FrontEnd.Tc.Type
 
 --------------------------------------------------------------------------------
 
 -- Instance
 type Inst  = Qual Pred
+type Assump = (Name,Sigma)
 
 bySuper :: ClassHierarchy -> Pred -> [Pred]
 bySuper h p@(IsIn c t)
@@ -131,7 +133,7 @@ data ClassRecord = ClassRecord {
     classSrcLoc :: SrcLoc,
     classSupers :: [Class],
     classInsts :: [Inst],
-    classAssumps :: [Assump],
+    classAssumps :: [(Name,Sigma)],
     classDerives :: [Inst]
     } deriving(Typeable,Data)
     {-! derive: GhcBinary !-}
@@ -219,6 +221,10 @@ instance ClassNames HsName where
 
 
 toHsQualType qt = qt
+
+aHsTypeSigToAssumps :: KindEnv -> HsDecl -> [(Name,Type)]
+aHsTypeSigToAssumps kt sig@(HsTypeSig _ names qualType) = [ (toName Val n,typ) | n <- names] where
+    Identity typ = hsQualTypeToSigma kt qualType
 
 addClassToHierarchy :: Monad m =>  KindEnv -> HsDecl -> ClassHierarchy -> m ClassHierarchy
 addClassToHierarchy  kt (HsClassDecl _ t decls) (ClassHierarchy h) |   (HsQualType cntxt (HsTyApp (HsTyCon className') (HsTyVar argName')))  <- toHsQualType t = let
@@ -431,7 +437,7 @@ convType tsks
 
 toType :: (HsType, Kind) -> Type
 toType (HsTyCon n, k) = TCon $ Tycon (toName TypeConstructor n) k
-toType (HsTyVar n, k) = TVar $ tyvar (toName TypeVal n) k Nothing
+toType (HsTyVar n, k) = TVar $ tyvar (toName TypeVal n) k
 toType (HsTyFun x y, Star) = TArrow (toType (x,Star)) (toType (y,Star))
 toType x = error $ "toType: " ++ show x
 
@@ -526,18 +532,18 @@ defaultInstanceName n = toName Val $ Qual (Module "Instance@") $ HsIdent ('i':sh
 
 createInstanceAssump :: KindEnv -> [Assump] -> HsContext -> Class -> HsType -> Name -> Assump
 createInstanceAssump kt methodSigs cntxt className argType methodName
-   = newMethodName :>: instantiatedSig where
+   = (newMethodName,instantiatedSig) where
     newMethodName = instanceName methodName (getHsTypeCons argType)
-    [sigFromClass] = [ s | n :>: s <- methodSigs, n == methodName]
+    [sigFromClass] = [ s | (n,s) <- methodSigs, n == methodName]
     instantiatedSig = newMethodSig' kt methodName cntxt sigFromClass argType
 
 methodToTopDecls :: KindEnv -> [Assump] -> HsQualType -> (Name, HsDecl) -> (HsDecl,Assump)
 
 methodToTopDecls kt methodSigs (HsQualType cntxt classApp) (methodName, methodDecls)
-   = (renamedMethodDecls,newMethodName :>: instantiatedSig) where
+   = (renamedMethodDecls,(newMethodName, instantiatedSig)) where
     (HsTyApp (HsTyCon className) argType) = classApp
     newMethodName = instanceName methodName (getHsTypeCons argType)
-    sigFromClass = case [ s | n :>: s <- methodSigs, n == methodName] of
+    sigFromClass = case [ s | (n, s) <- methodSigs, n == methodName] of
         [x] -> x
         _ -> error $ "sigFromClass: " ++ show methodSigs ++ " " ++ show  methodName
     --instantiatedSig = newMethodSig' (kiHsQualTypePredPred kt qt) cntxt sigFromClass argType
@@ -548,10 +554,10 @@ methodToTopDecls kt methodSigs (HsQualType cntxt classApp) (methodName, methodDe
 defaultMethodToTopDecls :: KindEnv -> [Assump] -> HsQualType -> (Name, HsDecl) -> (HsDecl,Assump)
 
 defaultMethodToTopDecls kt methodSigs (HsQualType cntxt classApp) (methodName, methodDecls)
-   = (renamedMethodDecls,newMethodName :>: sigFromClass) where
+   = (renamedMethodDecls,(newMethodName,sigFromClass)) where
     (HsTyApp (HsTyCon className) _) = classApp
     newMethodName = defaultInstanceName methodName
-    sigFromClass = case [ s | n :>: s <- methodSigs, n == methodName] of
+    sigFromClass = case [ s | (n, s) <- methodSigs, n == methodName] of
         [x] -> x
         _ -> error $ "sigFromClass: " ++ show methodSigs ++ " " ++ show  methodName
      --  = newMethodSig cntxt newMethodName sigFromClass argType
@@ -571,9 +577,9 @@ renameOneMatch newName (HsMatch sloc oldName pats rhs wheres)
 
 
 
-newMethodSig' :: KindEnv -> Name -> HsContext -> Scheme -> HsType -> Scheme
+newMethodSig' :: KindEnv -> Name -> HsContext -> Sigma -> HsType -> Sigma
 newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
-   ((IsIn _ classArg:restContext) :=> t) = unQuantify qt'
+   TForAll _ ((IsIn _ classArg:restContext) :=> t) = qt'
    -- the assumption is that the context is non-empty and that
    -- the class and variable that we are interested in are at the
    -- front of the old context - the method of inserting instance types into
@@ -586,8 +592,8 @@ newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
    --qt = (map (aHsAsstToPred kt) newCntxt ++ restContext) :=> (runIdentity $ applyTP (full_tdTP $ adhocTP idTP ct) t)
    --ct n | n == classArg = return $ aHsTypeToType kt instanceType
    --ct n = return n
-   newQualType = everywhere (mkT at) $ quantify (tv qt) qt
-   at (Tyvar _ n k r) =  tyvar (updateName (++ foo) n) k r
+   newQualType = everywhere (mkT at) $ tForAll (tv qt) qt
+   at (Tyvar _ n k) =  tyvar (updateName (++ foo) n) k
    updateName f n = toName nt (md,f nm) where
         (nt,(md::String,nm)) = fromName n
    qt = (map (hsAsstToPred kt) newCntxt ++ restContext) :=> (everywhere (mkT ct) t)

@@ -15,18 +15,11 @@
 
 -------------------------------------------------------------------------------}
 
-module TypeUtils (aHsTypeSigToAssumps,flattenLeftTypeApplication) where
+module TypeUtils (flattenLeftTypeApplication) where
 
 import HsSyn
 import Representation
-
-import Type                     (tv,
-                                 quantify,
-                                 makeAssump,
-                                 assumpScheme,
-                                 tTTuple,
-                                 assumpId)
-
+import Type           (tv,tTTuple)
 import FrontEnd.KindInfer
 import Atom
 import Name.Name
@@ -54,13 +47,13 @@ aHsTypeSigToAssumps kt sig@(HsTypeSig _ names qualType)
 -- one sig can be given to multiple names, hence
 -- the multiple assumptions in the output
 
+{-
 aHsTypeSigToAssumps :: KindEnv -> HsDecl -> [Assump]
 aHsTypeSigToAssumps kt sig@(HsTypeSig _ names qualType) = [ toName Val n :>: scheme | n <- names] where
     Identity scheme = hsQualTypeToScheme kt qualType
    --scheme = aHsQualTypeToScheme newEnv qualType
    --newEnv = kiHsQualType kt qualType
 
-{-
    converts leftmost type applications into lists
 
    (((TC v1) v2) v3) => [TC, v1, v2, v3]

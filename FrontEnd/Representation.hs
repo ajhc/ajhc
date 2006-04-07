@@ -22,14 +22,9 @@ module Representation(
     unfoldKind,
     Pred(..),
     Qual(..),
-    findType,
     Class,
     Subst,
     getTypeCons,
-    flattenType,
-    Scheme(..),
-    FlattenType(..),
-    Assump(..),
     tForAll,
     tExists,
     MetaVarType(..),
@@ -42,7 +37,7 @@ import Control.Monad.Trans
 import Data.Generics
 import Data.IORef
 import qualified Data.Map as Map
-import Text.PrettyPrint.HughesPJ(nest,Doc)
+import Text.PrettyPrint.HughesPJ(Doc)
 
 import Atom
 import Binary
@@ -68,7 +63,6 @@ data MetaVarType = Tau | Rho | Sigma
 data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
            | TCon { typeCon :: !Tycon }
            | TAp  Type Type
-           | TGen { typeSeq :: {-# UNPACK #-} !Int, typeVar :: {-# UNPACK #-} !Tyvar }
            | TArrow Type Type
            | TForAll { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
            | TExists { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
@@ -102,19 +96,17 @@ instance Eq Type where
     (TMetaVar a) == (TMetaVar b) = a == b
     (TCon a) == (TCon b) = a == b
     (TAp a' a) == (TAp b' b) = a' == b' && b == a
-    (TGen a _) == (TGen b _) = a == b
     (TArrow a' a) == (TArrow b' b) = a' == b' && b == a
     _ == _ = False
 
 
 -- Unquantified type variables
 
-data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !Name, tyvarKind :: Kind, tyvarRef :: Maybe (IORef (Maybe Type)) }
+data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !Name, tyvarKind :: Kind }
     deriving(Data,Typeable)
     {-  derive: GhcBinary -}
 
 instance Show Tyvar where
-    showsPrec _ Tyvar { tyvarName = hn, tyvarKind = k, tyvarRef = Just _ } = shows hn . (":-" ++) . shows k
     showsPrec _ Tyvar { tyvarName = hn, tyvarKind = k } = shows hn . ("::" ++) . shows k
 
 tForAll [] ([] :=> t) = t
@@ -125,74 +117,6 @@ tExists [] ([] :=> t) = t
 tExists vs (ps :=> TExists vs' (ps' :=> t)) = tExists (vs ++ vs') ((ps ++ ps') :=> t)
 tExists x y = TExists x y
 
-findType :: MonadIO m => Type -> m Type
-findType tv@(TVar Tyvar {tyvarRef = Just r }) = liftIO $ do
-    rt <- readIORef r
-    case rt of
-        Nothing -> return tv
-        Just t -> do
-            t' <- findType t
-            writeIORef r (Just t')
-            return t'
-findType tv = return tv
-
-refType (TVar tv@Tyvar {tyvarRef = Nothing}) = do
-    r <- newIORef Nothing
-    return $ TVar tv { tyvarRef = Just r }
-refType t = return t
-
-unrefType (TVar tv) =  TVar tv { tyvarRef = Nothing }
-unrefType t = t
-
-
-class FlattenType t where
-    flattenType' ::  t -> IO t
-
-flattenType :: (FlattenType t, MonadIO m) => t -> m t
-flattenType t = liftIO (flattenType' t)
-
-instance FlattenType t => FlattenType [t] where
-   flattenType' xs = mapM flattenType' xs
-
-instance FlattenType Pred where
-    flattenType' (IsIn c t) = do
-        t' <- flattenType' t
-        return $ IsIn c t'
-
-instance FlattenType t => FlattenType (Qual t) where
-    flattenType' (ps :=> t) = do
-        ps' <- flattenType' ps
-        t' <- flattenType' t
-        return $ ps' :=> t'
-
-instance FlattenType Type where
-    flattenType' tv =  do
-        tv' <- findType tv
-        let ft (TAp x y) = do
-                x' <- flattenType' x
-                y' <- flattenType' y
-                return $ TAp x' y'
-            ft (TArrow x y) = do
-                x' <- flattenType' x
-                y' <- flattenType' y
-                return $ TArrow x' y'
-            ft (TForAll vs qt) = do
-                qt' <- flattenType' qt
-                return $ TForAll vs qt'
-            ft (TExists vs qt) = do
-                qt' <- flattenType' qt
-                return $ TExists vs qt'
-            ft t = return t
-        ft tv'
-
-instance FlattenType Scheme where
-    flattenType' (Forall ks qt) = flattenType' qt >>= return . Forall ks
-
-instance FlattenType Assump where
-    flattenType' (ks :>: qt) = flattenType' qt >>= return . (:>:) ks
-
-instance FlattenType t => FlattenType (Map.Map x t) where
-    flattenType' mp = sequence [flattenType' y >>= return . (,) x| (x,y) <- Map.toAscList mp] >>= return . Map.fromDistinctAscList
 
 instance Show (IORef a) where
     showsPrec _ _ = ("<IORef>" ++)
@@ -222,8 +146,6 @@ instance ToTuple Tycon where
     toTuple n = Tycon (nameTuple TypeConstructor n) (foldr Kfun Star $ replicate n Star)
 instance ToTuple Type where
     toTuple n = TCon $ toTuple n
-instance ToTuple Scheme where
-    toTuple n = Forall [] ([] :=> toTuple n)
 
 -- pretty printing for types etc:
 
@@ -252,15 +174,6 @@ prettyPrintTypeM t
                                False -> do doc1 <- prettyPrintTypeM t1
                                            doc2 <- maybeParensAp t2
                                            return $ doc1 <+> doc2
-           TGen _ (Tyvar { tyvarName = tv })   -> do
-                            findResult <- lookupInMap t
-                            case findResult of
-                                Nothing -> do
-                                    nm <- nextName
-                                    updateVMap (t, nm)
-                                    return (text nm)
-                                    --return (text nm <> parens (text (show tv)))
-                                Just v  -> return $ text v <> tyvar (text (show tv))
            TArrow t1 t2 -> do doc1 <- maybeParensArrow t1
                               doc2 <- prettyPrintTypeM t2
                               return $ doc1 <> text " -> " <> doc2
@@ -306,7 +219,8 @@ data Kind  = Star
              deriving(Data,Typeable, Eq, Ord)   -- but we need them for kind inference
     {-! derive: GhcBinary !-}
 
-newtype Kindvar = Kindvar Int deriving(Data, Binary,Typeable, Ord, Eq, Show)
+newtype Kindvar = Kindvar Int deriving
+    (Data,Binary,Typeable,Ord,Eq,Show)
 
 instance Show Kind where
     showsPrec _ k = pprint k
@@ -407,32 +321,10 @@ getTypeCons (TAp a _) = getTypeCons a
 getTypeCons (TArrow {}) = tc_Arrow
 getTypeCons x = error $ "getTypeCons: " ++ show x
 
--- schemes
-
-
-data Scheme = Forall [Kind] (Qual Type)
-              deriving(Data,Typeable, Eq, Show, Ord)
-    {-! derive: GhcBinary !-}
-
-instance PPrint Doc Scheme where
-  pprint scheme
-    = fst $ runVarName [] nameSupply $ prettyPrintSchemeM scheme
-
-prettyPrintSchemeM :: Scheme -> VarName Doc
-prettyPrintSchemeM (Forall _kinds qType) = do
-    r <- prettyPrintQualTypeM qType
-    return r
 
 --------------------------------------------------------------------------------
 
--- assumptions
 
-data Assump =  (:>:) Name Scheme
-    deriving(Ord,Eq,Data,Typeable, Show)
-    {-! derive: GhcBinary !-}
-
-instance  PPrint Doc Assump where
-  pprint (i :>: s) = (text (show i) <+> text ":>:") <$> nest 2 (pprint s)
 
 instance  DocLike d => PPrint d Tyvar where
   pprint tv = tshow (tyvarName tv)
@@ -490,7 +382,7 @@ lookupInMap t = do
 
 
 instance Binary Tyvar where
-    put_ bh (Tyvar aa ab ac ad) = do
+    put_ bh (Tyvar aa ab ac) = do
             put_ bh aa
             put_ bh ab
             put_ bh ac
@@ -501,7 +393,7 @@ instance Binary Tyvar where
     ac <- get bh
     --ad <- get bh
     --ad <- newIORef Nothing
-    return (Tyvar aa ab ac Nothing)
+    return (Tyvar aa ab ac)
 
 -- an infinite list of alphabetic strings in the usual order
 nameSupply :: [String]

@@ -253,8 +253,7 @@ instance Instantiate Type where
     inst mm ts (TAp l r)     = TAp (inst mm ts l) (inst mm ts r)
     inst mm ts (TArrow l r)  = TArrow (inst mm ts l) (inst mm ts r)
     inst mm  _ t@TCon {}     = t
-    inst mm ts (TVar tv )
-        | Nothing == tyvarRef tv  = case Map.lookup (tyvarAtom tv) ts of
+    inst mm ts (TVar tv ) = case Map.lookup (tyvarAtom tv) ts of
             Just t'  -> t'
             Nothing -> (TVar tv)
     inst mm ts (TForAll as qt) = TForAll as (inst mm (foldr Map.delete ts (map tyvarAtom as)) qt)
@@ -296,7 +295,7 @@ newVar k = do
     te <- ask
     n <- newUniq
     let ident = toName TypeVal (tcInfoModName $ tcInfo te,'v':show n)
-        v = tyvar ident k Nothing
+        v = tyvar ident k
     return v
 
 -- rename the bound variables of a sigma, just in case.

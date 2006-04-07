@@ -28,21 +28,9 @@ module Type (nullSubst,
              Types (..),
              (+->),
              merge,
-             mgu,
-             match,
-             quantify,
-             unQuantify,
-             toScheme,
-             makeAssump,
-             assumpScheme,
-             assumpToPair,
-             pairToAssump,
              HasKind(..),
-             assumpId,
-             tTTuple,
-             schemeToType,
-             typeToScheme,
-             Instantiate (..)
+             match,
+             tTTuple
              ) where
 
 import Control.Monad.Error
@@ -63,24 +51,6 @@ class Types t where
   apply :: Subst -> t -> t
   tv    :: t -> [Tyvar]
 
-class Instantiate t where
-  inst  :: [Type] -> t -> t
-
-instance Instantiate Type where
-  inst ts (TAp l r)     = TAp (inst ts l) (inst ts r)
-  inst ts (TArrow l r)  = TArrow (inst ts l) (inst ts r)
-  inst ts t@(TGen n _)  | n < length ts = ts !! n
-                        | otherwise = error $ "inst TGen " ++ show (ts,t)
-  inst ts t             = t
-
-instance Instantiate a => Instantiate [a] where
-  inst ts = map (inst ts)
-
-instance Instantiate t => Instantiate (Qual t) where
-  inst ts (ps :=> t) = inst ts ps :=> inst ts t
-
-instance Instantiate Pred where
-  inst ts (IsIn c t) = IsIn c (inst ts t)
 
 class HasKind t where
   kind :: t -> Kind
@@ -88,6 +58,7 @@ instance HasKind Tyvar where
   kind Tyvar { tyvarKind = k} = k
 instance HasKind Tycon where
   kind (Tycon v k) = k
+
 instance HasKind Type where
   kind (TCon tc) = kind tc
   kind (TVar u)  = kind u
@@ -95,7 +66,6 @@ instance HasKind Type where
                      (Kfun _ k) -> k
                      x -> error $ "Type.kind: Invalid kind in type application for "++show t++": "++show x
   kind (TArrow _l _r) = Star
-  kind (TGen _ tv) = kind tv
   kind (TForAll _ (_ :=> t)) = kind t
   kind (TExists _ (_ :=> t)) = kind t
   kind (TMetaVar mv) = kind mv
@@ -162,6 +132,7 @@ mapSubstitution s fm =(Map.map (\v -> apply s v) fm)
 --------------------------------------------------------------------------------
 
 -- unification
+{-
 
 mgu     :: (MonadIO m,Monad m2) => Type -> Type -> m (m2 Subst)
 varBind :: Monad m => Tyvar -> Type -> m Subst
@@ -215,6 +186,8 @@ varBind u t | t == TVar u      = return nullSubst
             | kind u == kind t = return (u +-> t)
             | otherwise        = fail "varBind: kinds do not match"
 
+            -}
+
 match :: Monad m => Type -> Type -> m Subst
 
 match x y = do
@@ -242,68 +215,5 @@ match' t1 t2           = fail $ "match: " ++ show (t1,t2)
 
 tTTuple ts | length ts < 2 = error "tTTuple"
 tTTuple ts = foldl TAp (toTuple (length ts)) ts
------------------------------------------------------------------------------
-
-instance Types Scheme where
-  apply s (Forall ks qt) = Forall ks (apply s qt)
-  tv (Forall ks qt)      = tv qt
-
-quantify      :: [Tyvar] -> Qual Type -> Scheme
-quantify vs qt = Forall ks (apply s qt)
- where vs' = [ v | v <- tv qt, v `elem` vs ]
-       ks  = map kind vs'
-       s   = Map.fromList $ map (\(a,b) -> (a,b a)) $ zip vs' (map TGen [0..])
-
-toScheme      :: Type -> Scheme
-toScheme t     = Forall [] ([] :=> t)
-
-unQuantify :: Scheme -> (Qual Type)
-unQuantify (Forall _ (ps :=> t)) =  map uq' ps :=> uq t where
-    uq (TAp a b) = TAp (uq a) (uq b)
-    uq (TArrow a b) = TArrow (uq a) (uq b)
-    uq (TGen _ tv) = TVar tv
-    uq x = x
-    uq' (IsIn s t) = IsIn s (uq t)
-
-schemeToType :: Scheme -> Type
-schemeToType (Forall _ (ps :=> t)) = tForAll ( snds $ snubFst xs) (ps' :=> t') where
-    ((ps',t'),xs) = runWriter $ do
-        ps' <- mapM uq' ps
-        t' <- uq t
-        return (ps',t')
-    uq (TAp a b) = liftM2 TAp (uq a) (uq b)
-    uq (TArrow a b) = liftM2 TArrow (uq a) (uq b)
-    uq (TGen n tv) = do
-        tell [(n,tv)]
-        return $ TVar tv
-    uq (TForAll xs (ps :=> t)) = do
-        ps' <- mapM uq' ps
-        t' <- uq t
-        return $ tForAll xs (ps' :=> t')
-    uq x = return x
-    uq' (IsIn s t) = liftM (IsIn s) (uq t)
-
-typeToScheme :: Type -> Scheme
-typeToScheme (TForAll as qt) = quantify as qt
-typeToScheme t = toScheme t
------------------------------------------------------------------------------
-
-assumpToPair :: Assump -> (Name, Scheme)
-assumpToPair (n :>: s) = (n,s)
-
-pairToAssump :: (Name, Scheme) -> Assump
-pairToAssump (n,s) = (n :>: s)
-
-instance Types Assump where
-  apply s (i :>: sc) = i :>: (apply s sc)
-  tv (i :>: sc)      = tv sc
 
 
-assumpId :: Assump -> Name
-assumpId (id :>: _scheme) = id
-
-assumpScheme :: Assump -> Scheme
-assumpScheme (_id :>: scheme) = scheme
-
-makeAssump :: Name -> Scheme -> Assump
-makeAssump name scheme = name :>: scheme
