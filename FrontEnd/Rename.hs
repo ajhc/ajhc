@@ -757,7 +757,7 @@ renameHsExp (HsIf hsExp1 hsExp2 hsExp3) subTable = do
 renameHsExp (HsCase hsExp hsAlts) subTable = do
     hsExp' <- renameHsExp hsExp subTable
     hsAlts' <- renameHsAlts hsAlts subTable
-    wrapInAsPat (HsCase hsExp' hsAlts')
+    return (HsCase hsExp' hsAlts')
 renameHsExp (HsDo hsStmts) subTable = do
     let e = doToExp hsStmts
     renameHsExp e subTable

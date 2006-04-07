@@ -60,14 +60,12 @@ getUnique = do
     return n
 
 readUnique :: PatSM Int
-readUnique
-   = do
+readUnique = do
         state <- readPatSM
         return (fst state)
 
 readSyns :: PatSM [HsDecl]
-readSyns
-   = do
+readSyns = do
         state <- readPatSM
         return (snd state)
 
@@ -109,9 +107,6 @@ runPatSM = flip runState
 newPatVarName :: HsName
 newPatVarName = nameName $ toName Val "patvar@0"
 
--- a new (unique) name introduced in expressions
-newVarName :: HsName
-newVarName = nameName $ toName Val  "var@0"
 
 remSynsSig :: HsDecl -> PatSM HsDecl
 remSynsSig sig
@@ -499,8 +494,9 @@ desugarExp (HsLeftSection e1 e2)
 desugarExp (HsRightSection e1 e2) = do
         newE1 <- desugarExp e1
         newE2 <- desugarExp e2
-        let nv = (nameName $ toName Val "rsection@")
-        return (HsLambda bogusASrcLoc [HsPVar nv ] (HsApp (HsRightSection newE1 newE2) (HsVar nv)))
+        return (HsRightSection newE1 newE2)
+        --let nv = (nameName $ toName Val "rsection@")
+        --return (HsLambda bogusASrcLoc [HsPVar nv ] (HsApp (HsRightSection newE1 newE2) (HsVar nv)))
 
 desugarExp (HsRecConstr n fus) = do
     fus' <- mapM desugarFU fus
@@ -513,32 +509,27 @@ desugarExp (HsRecUpdate e fus) = do
     return $ HsRecUpdate e' fus'
 --   = error "desugarExp (HsRecUpdate _ _): not implemented"
 
-desugarExp (HsEnumFrom e)
-   = do
+desugarExp (HsEnumFrom e) = do
         newE <- desugarExp e
         return (HsEnumFrom newE)
 
-desugarExp (HsEnumFromTo e1 e2)
-   = do
+desugarExp (HsEnumFromTo e1 e2) = do
         newE1 <- desugarExp e1
         newE2 <- desugarExp e2
         return (HsEnumFromTo newE1 newE2)
 
-desugarExp (HsEnumFromThen e1 e2)
-   = do
+desugarExp (HsEnumFromThen e1 e2) = do
         newE1 <- desugarExp e1
         newE2 <- desugarExp e2
         return (HsEnumFromThen newE1 newE2)
 
-desugarExp (HsEnumFromThenTo e1 e2 e3)
-   = do
+desugarExp (HsEnumFromThenTo e1 e2 e3) = do
         newE1 <- desugarExp e1
         newE2 <- desugarExp e2
         newE3 <- desugarExp e3
         return (HsEnumFromThenTo newE1 newE2 newE3)
 
-desugarExp (HsListComp e stmts)
-   = do
+desugarExp (HsListComp e stmts) = do
         newE <- desugarExp e
         newStmts <- mapM desugarStmt stmts
         return (listCompToExp newE newStmts)
@@ -553,31 +544,20 @@ desugarExp (HsExpTypeSig sloc e qualType)
         return (HsExpTypeSig sloc newE newQualType)
 -}
 
-desugarExp (HsExpTypeSig sloc e qualType)
-    | fopts FO.Boxy = do
+desugarExp (HsExpTypeSig sloc e qualType) = do
         e' <- desugarExp e
         newQualType <- remSynsQualType qualType
         return (HsExpTypeSig sloc e' newQualType)
-    | otherwise = do
-        newE <- desugarExp e
-        newQualType <- remSynsQualType qualType
-        let newTypeSig = HsTypeSig sloc [newVarName] newQualType
-        let newVarDecl = HsPatBind sloc
-                                    (HsPVar newVarName)
-                                    (HsUnGuardedRhs newE) []
-        return (HsLet [newTypeSig, newVarDecl] (HsVar newVarName))
 
 
-desugarExp (HsAsPat name e)
-   = do
+desugarExp (HsAsPat name e) = do
         newE <- desugarExp e
         return (HsAsPat name e)
 
 desugarExp (HsWildCard x)
    = return (HsWildCard x)
 
-desugarExp (HsIrrPat e)
-   = do
+desugarExp (HsIrrPat e) = do
         newE <- desugarExp e
         return (HsIrrPat newE)
 
