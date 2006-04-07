@@ -54,32 +54,32 @@ import Util.HasSize
 import Util.SameShape
 import Util.VarName
 
-tipe t = runVarName (tipe' t) where
-    tipe' (TAp t1 t2) = liftM2 eAp (tipe' t1) (tipe' t2)
-    tipe' (TArrow t1 t2) =  do
-        t1' <- tipe' t1
-        t2' <- tipe' t2
-        return $ EPi (tVr 0 (t1')) t2'
-    tipe' (TCon (Tycon n k)) | n == tc_World__ = return $ ELit (LitCons rt_Worldzh [] eHash)
-    tipe' (TCon (Tycon n k)) =  return $ ELit (LitCons n [] (kind k))
-    tipe' (TVar tv@Tyvar { tyvarKind = k}) = do
-        v <- lookupName tv
-        return $ EVar $ tVr v (kind k)
-    tipe' (TForAll [] (_ :=> t)) = tipe' t
-    tipe' (TExists [] (_ :=> t)) = tipe' t
-    tipe' (TForAll xs (_ :=> t)) = do
-        xs' <- flip mapM xs $ \tv -> do
-            v <- newName [70,72..] () tv
-            return $ tVr v (kind $ tyvarKind tv)
-        t' <- tipe' t
-        return $ foldr EPi t' xs' -- [ tVr n (kind k) | n <- [2,4..] | k <- xs ]
-    tipe' (TExists xs (_ :=> t)) = do
-        xs' <- flip mapM xs $ \tv -> do
-            --v <- newName [70,72..] () tv
-            --return $ tVr v (kind $ tyvarKind tv)
-            return $ (kind $ tyvarKind tv)
-        t' <- tipe' t
-        return $ ELit (LitCons (unboxedNameTuple TypeConstructor (length xs' + 1)) (t':xs') eHash)
+tipe t = runVarName (tipe' t)
+tipe' (TAp t1 t2) = liftM2 eAp (tipe' t1) (tipe' t2)
+tipe' (TArrow t1 t2) =  do
+    t1' <- tipe' t1
+    t2' <- tipe' t2
+    return $ EPi (tVr 0 (t1')) t2'
+tipe' (TCon (Tycon n k)) | n == tc_World__ = return $ ELit (LitCons rt_Worldzh [] eHash)
+tipe' (TCon (Tycon n k)) =  return $ ELit (LitCons n [] (kind k))
+tipe' (TVar tv@Tyvar { tyvarKind = k}) = do
+    v <- lookupName tv
+    return $ EVar $ tVr v (kind k)
+tipe' (TForAll [] (_ :=> t)) = tipe' t
+tipe' (TExists [] (_ :=> t)) = tipe' t
+tipe' (TForAll xs (_ :=> t)) = do
+    xs' <- flip mapM xs $ \tv -> do
+        v <- newName [70,72..] () tv
+        return $ tVr v (kind $ tyvarKind tv)
+    t' <- tipe' t
+    return $ foldr EPi t' xs' -- [ tVr n (kind k) | n <- [2,4..] | k <- xs ]
+tipe' (TExists xs (_ :=> t)) = do
+    xs' <- flip mapM xs $ \tv -> do
+        --v <- newName [70,72..] () tv
+        --return $ tVr v (kind $ tyvarKind tv)
+        return $ (kind $ tyvarKind tv)
+    t' <- tipe' t
+    return $ ELit (LitCons (unboxedNameTuple TypeConstructor (length xs' + 1)) (t':xs') eHash)
 
 --tipe (TForAll (Forall xs (_ :=> t))) = foldr EPi (tipe t) [ tVr n (kind k) | n <- [2,4..] | k <- xs ]
 
@@ -383,11 +383,17 @@ toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conN
                 f [] con = con
             dataConsName =  toName Name.DataConstructor (hsConDeclName x)
             args = hsConDeclArgs x
-            (ELit (LitCons _ xs _) ,ts') = fromPi $ tipe ty
+            (ELit (LitCons _ xs _) ,ts') = fromPi $ runVarName $ do
+                flip mapM_ vs $ \tv -> do
+                    newName [2,4..] () tv
+                tipe' ty
             existentials = Set.toList $ freeVars (map getType ts') Set.\\ freeVars xs
             subst = substMap $ Map.fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
             ts = existentials ++ [ tvr {tvrIdent = x} | tvr <- ts' | x <- drop (5 + length theTypeArgs) [2,4..] ]
-            Just (TForAll _ (_ :=> ty)) =  Map.lookup dataConsName cm
+            (vs,ty) = case Map.lookup dataConsName cm of
+                Just (TForAll vs (_ :=> ty)) -> (vs,ty)
+                Just ty -> ([],ty)
+            -- =  Map.lookup dataConsName cm
             --Just (_,_,ty) = fmap fromType $ Map.lookup dataConsName cm
 
 isHsBangedTy HsBangedTy {} = True
