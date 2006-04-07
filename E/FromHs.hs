@@ -466,12 +466,6 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         f n | n == class_Bounded, all (null . hsConDeclArgs) dcons  = []
         f _ = []
     cExpr :: Monad m => HsExp -> Ce m E
-    cExpr (HsAsPat n' (HsVar n)) = do
-        cv <- lookupCoercion (toName Val n')
-        let t = getAssump n
-        case cv of
-            -- Left t' -> return $ foldl eAp (EVar (tv n)) (map tipe $ specialize t t')
-            Right c -> applyCoersion c $ EVar (tv n)
     cExpr (HsAsPat n' (HsCon n)) = return $ constructionExpression dataTable (toName DataConstructor n) rt where
         t' = getAssump n'
         (_,rt) = argTypes' (tipe t')
@@ -516,6 +510,14 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         let cl (x:xs) = liftM2 eCons (cExpr x) (cl xs)
             cl [] = return $ eNil (cType n)
         cl xs
+    cExpr (HsVar n) = do
+        return (EVar (tv n))
+    cExpr (HsAsPat n' (HsVar n)) = do
+        cv <- lookupCoercion (toName Val n')
+        let t = getAssump n
+        case cv of
+            -- Left t' -> return $ foldl eAp (EVar (tv n)) (map tipe $ specialize t t')
+            Right c -> applyCoersion c $ EVar (tv n)
     cExpr (HsAsPat n' e) = do
         e <- cExpr e
         cc <- asks ceCoerce

@@ -707,7 +707,8 @@ wrapInAsPat e = do
 renameHsExp :: HsExp -> SubTable -> ScopeSM HsExp
 renameHsExp (HsVar hsName) subTable = do
     hsName' <- renameHsName hsName subTable
-    wrapInAsPat (HsVar hsName')
+    return (HsVar hsName')
+--    wrapInAsPat (HsVar hsName')
 --    unique <- getUnique
 --    incUnique
 --    mod <- getCurrentModule
@@ -856,7 +857,7 @@ desugarEnum s as = foldl HsApp (HsVar (nameName $ toName Val s)) as
 
 createError s = do
     sl <- gets srcLoc
-    pe <- wrapInAsPat (HsVar (nameName v_error))
+    let pe = (HsVar (nameName v_error))
     return $ HsParen $ HsApp pe (HsLit (HsString (show sl ++ ": " ++ s)))
 
 failRename s = do
@@ -894,7 +895,7 @@ buildRecUpdate (amp,fls) n us = do
                 Nothing -> failRename $ "Unknown Constructor: " ++ show n
                 Just t -> do
                     vars <- replicateM t newVar
-                    vars' <- mapM wrapInAsPat (map HsVar vars)
+                    let vars' = (map HsVar vars)
                     let c' = nameName c
                     con <- wrapInAsPat (HsCon c')
                     let x = foldl HsApp con [ maybe v id (lookup i zs) | v <- vars' | i <- [ 0 .. t - 1] ]

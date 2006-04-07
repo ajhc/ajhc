@@ -42,13 +42,14 @@ type Expl = (Sigma, HsDecl)
 type BindGroup = ([Expl], [Either HsDecl [HsDecl]])
 
 
-tcKnownApp e nname vname as typ = do
+tcKnownApp e coerce vname as typ = do
     sc <- lookupName vname
     let (_,_,rt) = fromType sc
     -- fall through if the type isn't arrowy enough (will produce type error)
     if (length . fst $ fromTArrow rt) < length as then tcApps' e as typ else do
     (ts,rt) <- freshInstance Sigma sc
-    addCoerce nname (ctAp ts)
+    e' <- if coerce then doCoerce (ctAp ts) e else return e
+    --addCoerce nname (ctAp ts)
     let f (TArrow x y) (a:as) = do
             a <- tcExprPoly a x
             y <- findType y
@@ -58,23 +59,23 @@ tcKnownApp e nname vname as typ = do
             fc <- lt `subsumes` typ
             return ([],fc)
     (nas,CTId) <- f rt as
-    return (e,nas)
+    return (e',nas)
 
-tcApps e@(HsAsPat n (HsVar v)) as typ = do
+tcApps e@(HsVar v) as typ = do
     let vname = toName Val v
-    let nname = toName Val n
-    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "tcApps: " ++ (show nname ++ "@" ++ show vname)
+    --let nname = toName Val n
+    when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "tcApps: " ++ (show vname)
     rc <- asks tcRecursiveCalls
     -- fall through if this is a recursive call to oneself
     if (vname `Set.member` rc) then tcApps' e as typ else do
-    tcKnownApp e nname vname as typ
+    tcKnownApp e True vname as typ
 
 tcApps e@(HsAsPat n (HsCon v)) as typ = do
     let vname = toName DataConstructor v
     let nname = toName Val n
     when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "tcApps: " ++ (show nname ++ "@" ++ show vname)
     addToCollectedEnv (Map.singleton (toName Val n) typ)
-    tcKnownApp e nname vname as typ
+    tcKnownApp e False vname as typ
 
 tcApps e as typ = tcApps' e as typ
 
@@ -111,6 +112,13 @@ doCoerce ct e = do
     addCoerce n ct
     return (HsAsPat (nameName n) e)
 
+wrapInAsPat :: HsExp -> Tc (HsExp,Name)
+wrapInAsPat e = do
+    nn <- newUniq
+    let n = toName Val ("As@",show nn)
+    return (HsAsPat (nameName n) e, n)
+
+
 
 tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp
 
@@ -120,26 +128,25 @@ tcExpr e t = do
     --(_,False,_) <- unbox t
     return e
 
-tiExpr (HsAsPat n (HsVar v)) typ = do
+tiExpr (HsVar v) typ = do
     sc <- lookupName (toName Val v)
     f <- sc `subsumes` typ
     rc <- asks tcRecursiveCalls
-    if (toName Val v `Set.member` rc) then
-        tell mempty { outKnots = [(toName Val n,toName Val v)] }
-      else do addCoerce (toName Val n) f
-    return (HsAsPat n $ HsVar v)
+    if (toName Val v `Set.member` rc) then do
+        (e',n) <- wrapInAsPat (HsVar v)
+        tell mempty { outKnots = [(n,toName Val v)] }
+        return e'
+      else do
+        doCoerce f (HsVar v)
 
-tiExpr (HsAsPat ap (HsCase e alts)) typ = withContext (simpleMsg $ "in the case expression\n   case " ++ show e ++ " of ...") $ do
+tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n   case " ++ show e ++ " of ...") $ do
     scrutinee <- newBox Star
     e' <- tcExpr e scrutinee
     alts' <- mapM (tcAlt scrutinee typ) alts
-    addToCollectedEnv (Map.singleton (toName Val ap) typ)
-    return (HsAsPat ap (HsCase e' alts'))
+    (ne,ap) <- wrapInAsPat (HsCase e' alts')
+    addToCollectedEnv (Map.singleton ap typ)
+    return ne
 
-tiExpr ec@HsCase {} typ = do
-    nn <- newUniq
-    let n = toName Val ("As@",show nn)
-    tiExpr (HsAsPat (nameName n) ec) typ
 
 tiExpr (HsCon conName) typ = do
     sc <- lookupName (toName DataConstructor conName)
@@ -814,12 +821,9 @@ makeBindGroup sigEnv decls = (exps, f impls) where
     g (CyclicSCC xs) = Right xs
 
 makeBindGroup' _ [] = ([], [])
-makeBindGroup' sigEnv (d:ds)
-   = case Map.lookup funName sigEnv of
-        Nothing -- no type sig for this equation
-           -> (restExpls, d:restImpls)
-        Just scheme  -- this one has a type sig
-           -> ((scheme, d):restExpls, restImpls)
+makeBindGroup' sigEnv (d:ds) = case Map.lookup funName sigEnv of
+        Nothing -> (restExpls, d:restImpls)
+        Just scheme -> ((scheme, d):restExpls, restImpls)
    where
    funName = getDeclName d
    (restExpls, restImpls) = makeBindGroup' sigEnv ds
