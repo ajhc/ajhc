@@ -25,12 +25,11 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Main
 import FrontEnd.Tc.Type
-import FrontEnd.TiData
 import FrontEnd.Utils
+import FrontEnd.Exports
 import GenUtil
 import Ho.Type
 import HsSyn
-import MultiModuleBasics
 import Name.Name as Name
 import Options
 import qualified FlagDump as FD
@@ -51,6 +50,16 @@ getDeclNames ::  HsDecl -> [Name]
 getDeclNames (HsTypeSig _ ns _ ) =  map (toName Val) ns
 getDeclNames d = maybeGetDeclName d
 
+-- Extra data produced by the front end, used to fill in the Ho file.
+data TiData = TiData {
+    tiDataLiftedInstances :: Map.Map Name HsDecl,
+    tiDataDecls      :: [HsDecl],
+    tiDataModules    :: [(Module,HsModule)],
+    tiModuleOptions  :: [(Module,Opt)],
+    tiCheckedRules   :: [Rule],
+    tiCoerce         :: Map.Map Name CoerceTerm,
+    tiAllAssumptions :: Map.Map Name Type
+}
 
 isGlobal x |  (_,(_::String,(h:_))) <- fromName x =  not $ isDigit h
 isGlobal _ = error "isGlobal"

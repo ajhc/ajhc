@@ -1,7 +1,7 @@
 
 -- | determine export\/imports for modules via fixpoint recursion
 
-module FrontEnd.Exports(determineExports) where
+module FrontEnd.Exports(determineExports,ModInfo(..),modInfoHsModule_s) where
 
 import Control.Monad.Identity
 import Data.Monoid
@@ -17,11 +17,27 @@ import FindFixpoint
 import FlagDump as FD
 import FrontEnd.SrcLoc
 import HsSyn
-import MultiModuleBasics
 import Name.Name as Name
 import Options
 import Util.Relation as R
 import Warning
+
+data ModInfo = ModInfo {
+    modInfoName :: Module,
+    modInfoDefs :: [(Name,SrcLoc,[Name])],
+    modInfoConsArity :: [(Name,Int)],
+    modInfoExport :: [Name],
+    modInfoImport :: [(Name,[Name])],
+    modInfoHsModule :: HsModule,
+    modInfoOptions :: Opt
+    }
+   {-! derive: update !-}
+
+instance Eq ModInfo where
+    a == b = modInfoName a == modInfoName b
+
+instance Ord ModInfo where
+    compare a b = compare (modInfoName a) (modInfoName b)
 
 modInfoModImports m =  mp  [ i | i <- hsModuleImports (modInfoHsModule m)] where
     mp xs

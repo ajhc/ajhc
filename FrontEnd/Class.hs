@@ -81,7 +81,6 @@ import Options
 import qualified FlagOpts as FO
 import Representation
 import Type
-import TypeUtils
 import Util.HasSize
 import Util.Inst()
 import PrimitiveOperators(primitiveInsts)
@@ -440,6 +439,15 @@ toType (HsTyCon n, k) = TCon $ Tycon (toName TypeConstructor n) k
 toType (HsTyVar n, k) = TVar $ tyvar (toName TypeVal n) k
 toType (HsTyFun x y, Star) = TArrow (toType (x,Star)) (toType (y,Star))
 toType x = error $ "toType: " ++ show x
+
+flattenLeftTypeApplication :: HsType -> [HsType]
+flattenLeftTypeApplication t
+   = flatTypeAcc t []
+   where
+   flatTypeAcc (HsTyApp t1 t2) acc
+      = flatTypeAcc t1 (t2:acc)
+   flatTypeAcc nonTypApp acc
+      = nonTypApp:acc
 
 {-
 makeDeriveInstances :: [Pred] -> Type -> [Class] -> [Inst]

@@ -1,6 +1,6 @@
 module FrontEnd.FrontEnd(
     parseFiles,
-    TiData(..)
+    Tc.TiData(..)
     ) where
 
 import Monad
@@ -17,13 +17,11 @@ import GenUtil
 import Ho.Build
 import Ho.Library(loadLibraries)
 import HsSyn
-import MultiModuleBasics
 import Options
 import qualified Doc.PPrint as PPrint
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified FrontEnd.Tc.Module as Tc
-import FrontEnd.TiData
 import Warning
 
 
@@ -33,7 +31,7 @@ import Warning
 parseFiles :: [String]      -- ^ List of files to read
                -> [Module]  -- ^ List of modules to find
                -> (Ho -> IO Ho) -- ^ Process initial data loaded from ho files
-               -> (Ho -> Ho -> TiData -> IO Ho)  -- ^ routine which takes the global ho, the partial local ho and the output of the front end, and returns the completed ho.
+               -> (Ho -> Ho -> Tc.TiData -> IO Ho)  -- ^ routine which takes the global ho, the partial local ho and the output of the front end, and returns the completed ho.
                -> IO (Ho,Ho)     -- ^ (the libraries and predifiend ho,the final combined ho of loaded code)
 parseFiles fs deps ifunc func = do
     wdump FD.Progress $ do
@@ -50,7 +48,7 @@ parseFiles fs deps ifunc func = do
     return (initialHo,ho)
 
 -- Process modules found by Ho
-doModules :: (Ho -> Ho -> TiData -> IO Ho) -> Ho -> [HsModule] -> IO Ho
+doModules :: (Ho -> Ho -> Tc.TiData -> IO Ho) -> Ho -> [HsModule] -> IO Ho
 doModules func ho ms  = do
     ms <- mapM modInfo ms
     --putErrLn $ show (hoExports ho)

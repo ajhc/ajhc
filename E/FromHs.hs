@@ -46,8 +46,8 @@ import FrontEnd.KindInfer(hoistType)
 import FrontEnd.Rename(unRename)
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Type hiding(Rule(..), unbox)
+import FrontEnd.Tc.Module(TiData(..))
 import FrontEnd.Tc.Type(prettyPrintType)
-import FrontEnd.TiData
 import FrontEnd.Utils
 import GenUtil
 import HsSyn as HS
