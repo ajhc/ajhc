@@ -175,9 +175,6 @@ applySubstE env x = f x where
         b <- g b
         return $ Update a b
     f e@Error {} = return e
-    f (Cast v t) = do
-        v <- g v
-        return $ Cast v t
     f (Case e as) = do
         e <- g e
         return $ Case e as

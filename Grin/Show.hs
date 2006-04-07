@@ -65,7 +65,6 @@ prettyExp vl (App t [a,b] _) | t == funcApply = vl <> keyword "apply" <+> pretty
 prettyExp vl (App a vs _)  = vl <> func (fromAtom a) <+> hsep (map prettyVal vs)
 prettyExp vl (Prim Primitive { primName = nm } vs)  = vl <> prim (fromAtom nm) <+> hsep (map prettyVal vs)
 prettyExp vl (Update x y) = vl <> keyword "update" <+> prettyVal x <+> prettyVal y
-prettyExp vl (Cast x _) = vl <> keyword "cast" <+> prettyVal x
 prettyExp vl (Case v vs) = vl <> keyword "case" <+> prettyVal v <+> keyword "of" <$> indent 2 (vsep (map f vs)) where
     f (v :-> e) = prettyVal v <+> operator "->" <+> keyword "do" <$> indent 2 (prettyExp empty e)
 

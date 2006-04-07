@@ -123,7 +123,6 @@ interpret stats te cafMap primMap scMap e = f mempty e where
         (writeIORef x $! (le env v)) >> return unit
     f env (Update x v) | (Const x) <- le env x, x == le env v =  return unit
     f env (Update x v)  = fail $ "Bad update: " ++ show (le env x,le env v)
-    f env (Cast v nt) | Lit i _ <- le env v = return (Lit i nt)
     f env (Error s t) = fail $ render $  tshow (s,t) <$> (prettyEnv env)
 --    f env (Eval x)
 --        | otherwise = f env $ App funcEval [x]

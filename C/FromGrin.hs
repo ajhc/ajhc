@@ -119,10 +119,6 @@ convertExp (Store n@Var {}) = do
 convertExp (Return v) = do
     v <- convertVal v
     return (mempty,v)
-convertExp (Cast x t) = do
-    x' <- convertVal x
-    t' <- convertType t
-    return $ (mempty, cast t' x')
 convertExp (Prim p vs) | APrim _ req <- primAPrim p  =  do
     addRequires req
     e <- convertPrim p vs

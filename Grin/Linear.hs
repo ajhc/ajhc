@@ -65,7 +65,6 @@ go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
     h Return { expValue = NodeC a vs } = mapM_ omegaize vs
     h Prim {} = return ()
     h Error {} = return ()
-    h Cast {} = return ()   -- casts argument is never a node pointer
     h Return { } = return ()
     h Store {} = return ()
     h Update {} = return ()

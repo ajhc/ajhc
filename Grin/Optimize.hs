@@ -88,7 +88,6 @@ isOmittable (Fetch {}) = True
 isOmittable (Return {}) = True
 isOmittable (Store (NodeC n _)) | n == tagHole = False
 isOmittable (Store {}) = True
-isOmittable (Cast {}) = True
 isOmittable Prim { expPrimitive = Primitive { primAPrim = aprim } } = aprimIsCheap aprim
 isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
 isOmittable (e1 :>>= _ :-> e2) = isOmittable e1 && isOmittable e2

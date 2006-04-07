@@ -73,9 +73,6 @@ simplify1 stats env (n,l) = do
     gs (Update Const {} Var {}) = do
         lift $ tick stats at_OptSimplifyConstUpdate
         gs (Return unit)
-    gs (Cast (Lit i _) nty) = do
-        lift $ tick stats at_OptSimplifyCastLit
-        return $ Return (Lit i nty)
     gs (Prim Primitive { primAPrim = APrim CCast {} _, primType = (_,nty) } [Lit i _]) = do
         lift $ tick stats at_OptSimplifyCastLit
         return $ Return (Lit i nty)
@@ -458,7 +455,6 @@ deadVars stats (n,l) = do
 isOmittable (Fetch {}) = True
 isOmittable (Return {}) = True
 isOmittable (Store {}) = True
-isOmittable (Cast {}) = True
 isOmittable Prim { expPrimitive = Primitive { primAPrim = aprim } } = aprimIsCheap aprim
 isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
 isOmittable (e1 :>>= _ :-> e2) = isOmittable e1 && isOmittable e2

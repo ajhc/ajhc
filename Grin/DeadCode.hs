@@ -125,7 +125,6 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as
                 | otherwise = addRule $ doNode n
             g (Store n) = addRule $ doNode n
             g (Fetch x) = addRule $ doNode x
-            g (Cast x _) = addRule $ doNode x
             g Error {} = return ()
             -- TODO - handle function and case return values smartier.
             g (Return n) = addRule $ doNode n
@@ -134,7 +133,6 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as
             h (p,Store v) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
             h (p,Return v) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
             h (p,Fetch v) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
-            h (p,Cast v _) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
             h (p,e) = g e
             doNode (NodeC n as) | not postInline, Just (x,fn) <- tagUnfunction n  = let
                 consts = (mconcatMap doConst as)

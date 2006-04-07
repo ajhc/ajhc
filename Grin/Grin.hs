@@ -151,7 +151,6 @@ data Exp =
     | Fetch { expAddress :: Val }
     | Update { expAddress :: Val, expValue :: Val }
     | Error { expError :: String, expType :: Ty }      -- ^ abort with an error message, non recoverably.
-    | Cast { expValue :: Val, expType :: Ty }          -- ^ reinterpret Val as a different type  (this should be a primitive)
     deriving(Eq,Show,Ord)
 
 data Val =
@@ -446,7 +445,6 @@ instance CanTypeCheck TyEnv Exp Ty where
         (ps,es) <- liftM unzip $ mapM (typLam te) as
         foldl1M_ (same "case pat") (tv:ps)
         foldl1M (same $ "case exp: " ++ show (map head $ sortGroupUnder fst (zip es as)) ) (es)
-    typecheck te (Cast _ t) = return t
 
 instance CanTypeCheck TyEnv Val Ty where
     typecheck _ (Tag _) = return TyTag
@@ -480,7 +478,6 @@ instance CanType Exp Ty where
     getType (Update w v) = tyUnit
     getType (Case _ []) = error "empty case"
     getType (Case _ ((_ :-> e):_)) = getType e
-    getType (Cast _ t) =  t
 
 instance CanType Val Ty where
     getType (Tag _) = TyTag
@@ -516,7 +513,6 @@ instance FreeVars Exp (Set.Set Var) where
     freeVars (Store v) = freeVars v
     freeVars (Fetch v) = freeVars v
     freeVars (Update x y) = freeVars (x,y)
-    freeVars (Cast x _) = freeVars x
     freeVars (Prim _ x) = freeVars x
     freeVars Error {} = Set.empty
 
@@ -553,7 +549,6 @@ instance FreeVars Exp (Set.Set Tag) where
     freeVars (Store v) = freeVars v
     freeVars (Fetch v) = freeVars v
     freeVars (Update x y) = freeVars (x,y)
-    freeVars (Cast x _) = freeVars x
     freeVars (Prim _ x) = freeVars x
     freeVars Error {} = Set.empty
 

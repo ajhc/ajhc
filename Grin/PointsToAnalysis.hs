@@ -490,7 +490,6 @@ collect lmap hc st fname (Tup vs :-> exp')
         | (_,TyTup []) <- primType p = return Basic
         | (_,TyTup ts) <- primType p = return $ Tuple (replicate (length ts) Basic)
         | otherwise = return Basic
-    g (Cast v _) = toPos v
     g (Error {}) = return mempty
     g (Case d ls) = do
         p <- toPos d
