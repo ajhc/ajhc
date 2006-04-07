@@ -69,7 +69,7 @@ import Doc.PPrint
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc
 import FrontEnd.Utils
-import GenUtil(snub,concatInter)
+import GenUtil(snub,snubFst,concatInter)
 import HsSyn
 import MapBinaryInstance()
 import Maybe
@@ -151,7 +151,7 @@ combineClassRecords cra crb | className cra == className crb = ClassRecord {
     classSrcLoc = if classSrcLoc cra == bogusASrcLoc then classSrcLoc crb else classSrcLoc cra,
     classSupers = snub $ classSupers cra ++ classSupers crb,
     classInsts = snub $ classInsts cra ++ classInsts crb,
-    classAssumps = snub $ classAssumps cra ++ classAssumps crb,
+    classAssumps = snubFst $ classAssumps cra ++ classAssumps crb,
     classDerives = snub $ classDerives cra ++ classDerives crb
     }
 
@@ -553,7 +553,7 @@ methodToTopDecls kt methodSigs (HsQualType cntxt classApp) (methodName, methodDe
     newMethodName = instanceName methodName (getHsTypeCons argType)
     sigFromClass = case [ s | (n, s) <- methodSigs, n == methodName] of
         [x] -> x
-        _ -> error $ "sigFromClass: " ++ show methodSigs ++ " " ++ show  methodName
+        _ -> error $ "sigFromClass: " ++ pprint methodSigs ++ " " ++ show  methodName
     --instantiatedSig = newMethodSig' (kiHsQualTypePredPred kt qt) cntxt sigFromClass argType
     instantiatedSig = newMethodSig' kt methodName cntxt sigFromClass argType
      --  = newMethodSig cntxt newMethodName sigFromClass argType
