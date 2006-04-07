@@ -22,7 +22,6 @@ import Options
 import qualified Doc.PPrint as PPrint
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
-import qualified FrontEnd.TI.Module as TI
 import qualified FrontEnd.Tc.Module as Tc
 import FrontEnd.TiData
 import Warning
@@ -59,7 +58,7 @@ doModules func ho ms  = do
          putStrLn $ " ---- Definitions for" <+> show (modInfoName m) <+> "----";
          mapM_ print ( modInfoDefs m)
     ms <- determineExports [ (x,y,z) | (x,(y,z)) <- Map.toList $ hoDefs ho] (Map.toList $ hoExports ho) ms
-    (ho',tiData) <- if fopts FO.Boxy then Tc.tiModules' ho ms else TI.tiModules' ho ms
+    (ho',tiData) <- Tc.tiModules' ho ms
     ho'' <- func ho ho' tiData
     return ho''
     --me <- foldM tiModules emptyModEnv mss
