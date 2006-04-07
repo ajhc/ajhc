@@ -74,6 +74,7 @@ import qualified FlagDump as FD
 import Support.CanType
 import Util.Inst
 import Warning
+import Type()
 
 
 data BindingType = RecursiveInfered | Supplied

@@ -10,7 +10,10 @@ module FrontEnd.Tc.Type(
     Tyvar(..),
     fn,
     followTaus,
+    fromTAp,
+    fromTArrow,
     module FrontEnd.Tc.Type,
+    prettyPrintType,
     readMetaVar,
     tForAll,
     tList,
@@ -29,9 +32,6 @@ import Name.VConsts
 import Representation
 import Support.CanType
 import Support.FreeVars
-import Support.Unparse
-import Type(HasKind(..))
-import Util.VarName
 
 type Sigma' = Sigma
 type Tau' = Tau
@@ -88,13 +88,6 @@ isRho r = isRho' r && not (isBoxy r)
 
 isBoxyMetaVar MetaVar { metaType = t } = t > Tau
 
-fromTAp t = f t [] where
-    f (TAp a b) rs = f a (b:rs)
-    f t rs = (t,rs)
-
-fromTArrow t = f t [] where
-    f (TArrow a b) rs = f b (a:rs)
-    f t rs = (reverse rs,t)
 
 extractTyVar ::  Monad m => Type -> m Tyvar
 extractTyVar (TVar tv) = return tv
@@ -107,72 +100,6 @@ extractMetaVar t = fail $ "not a metaTyVar:" ++ show t
 extractBox :: Monad m => Type -> m MetaVar
 extractBox (TMetaVar mv) | metaType mv > Tau  = return mv
 extractBox t = fail $ "not a metaTyVar:" ++ show t
-
-instance DocLike d => PPrint d Type where
-    pprint = prettyPrintType
-
-prettyPrintType :: DocLike d => Type -> d
-prettyPrintType t  = unparse $ runVarName (f t) where
-    arr = bop (R,0) (space <> text "->" <> space)
-    app = bop (L,100) (text " ")
-    fp (IsIn cn t) = do
-        t' <- f t
-        return (atom (text $ show cn) `app` t')
-    f (TForAll [] ([] :=> t)) = f t
-    f (TForAll vs (ps :=> t)) = do
-        ts' <- mapM (newLookupName ['a'..] ()) vs
-        t' <- f t
-        ps' <- mapM fp ps
-        return $ case ps' of
-            [] ->  fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text ". ")  (atomize t')
-            [p] -> fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text "." <+> unparse p <+> text "=> ")  (atomize t')
-            ps ->  fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text "." <+> tupled (map unparse ps) <+> text "=> ")  (atomize t')
-    f (TExists [] ([] :=> t)) = f t
-    f (TExists vs (ps :=> t)) = do
-        ts' <- mapM (newLookupName ['a'..] ()) vs
-        t' <- f t
-        ps' <- mapM fp ps
-        return $ case ps' of
-            [] ->  fixitize (N,-3) $ pop (text "exists" <+> hsep (map char ts') <+> text ". ")  (atomize t')
-            [p] -> fixitize (N,-3) $ pop (text "exists" <+> hsep (map char ts') <+> text "." <+> unparse p <+> text "=> ")  (atomize t')
-            ps ->  fixitize (N,-3) $ pop (text "exists" <+> hsep (map char ts') <+> text "." <+> tupled (map unparse ps) <+> text "=> ")  (atomize t')
-    f (TCon tycon) = return $ atom (pprint tycon)
-    f t | Just tyvar <- extractTyVar t = do
-        vo <- maybeLookupName tyvar
-        case vo of
-            Just c  -> return $ atom $ char c
-            Nothing -> return $ atom $ tshow (tyvarAtom tyvar)
-    f (TAp (TCon (Tycon n _)) x) | n == tc_List = do
-        x <- f x
-        return $ atom (char '[' <> unparse x <> char ']')
-    f ta@(TAp {}) | (TCon (Tycon c _),xs) <- fromTAp ta, Just _ <- fromTupname c = do
-        xs <- mapM f xs
-        return $ atom (tupled (map unparse xs))
-    f (TAp t1 t2) = do
-        t1 <- f t1
-        t2 <- f t2
-        return $ t1 `app` t2
-    f (TArrow t1 t2) = do
-        t1 <- f t1
-        t2 <- f t2
-        return $ t1 `arr` t2
-    f (TMetaVar mv) = return $ atom $ pprint mv
-    f tv = return $ atom $ parens $ text ("FrontEnd.Tc.Type.pp: " ++ show tv)
-
-
-instance DocLike d => PPrint d MetaVarType where
-    pprint  t = case t of
-        Tau -> char 't'
-        Rho -> char 'r'
-        Sigma -> char 's'
-
-instance DocLike d => PPrint d Pred where
-    pprint (IsIn c t) = text (show c) <+> prettyPrintType t
-
-instance DocLike d => PPrint d MetaVar where
-    pprint MetaVar { metaUniq = u, metaKind = k, metaType = t }
-        | Star <- k =  pprint t <> tshow u
-        | otherwise = parens $ pprint t <> tshow u <> text " :: " <> pprint k
 
 
 
@@ -311,17 +238,6 @@ unbox tv = do
     return (tv,or eb, or et)
 
 
-instance CanType MetaVar Kind where
-    getType mv = metaKind mv
-
-instance CanType Type Kind where
-    getType = kind
-
-instance CanType Tycon Kind where
-    getType (Tycon _ k) = k
-
-instance CanType Tyvar Kind where
-    getType = tyvarKind
 
 
 data Rule = RuleSpec {

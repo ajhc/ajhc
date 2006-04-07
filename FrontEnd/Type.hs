@@ -23,15 +23,12 @@
 
 -------------------------------------------------------------------------------}
 
-module Type (nullSubst,
-             (@@),
-             Types (..),
-             (+->),
-             merge,
-             HasKind(..),
-             match,
-             tTTuple
-             ) where
+module Type (
+    Types (..),
+    match,
+    Subst,
+    tTTuple
+    ) where
 
 import Control.Monad.Error
 import Control.Monad.Writer
@@ -43,6 +40,7 @@ import GenUtil
 import Name.Name
 import Name.VConsts
 import Representation
+import Support.CanType
 
 
 --------------------------------------------------------------------------------
@@ -51,29 +49,27 @@ class Types t where
   apply :: Subst -> t -> t
   tv    :: t -> [Tyvar]
 
-
-class HasKind t where
-  kind :: t -> Kind
-instance HasKind Tyvar where
-  kind Tyvar { tyvarKind = k} = k
-instance HasKind Tycon where
-  kind (Tycon v k) = k
-
-instance HasKind Type where
-  kind (TCon tc) = kind tc
-  kind (TVar u)  = kind u
-  kind (TAp t _) = case (kind t) of
-                     (Kfun _ k) -> k
-                     x -> error $ "Type.kind: Invalid kind in type application for "++show t++": "++show x
-  kind (TArrow _l _r) = Star
-  kind (TForAll _ (_ :=> t)) = kind t
-  kind (TExists _ (_ :=> t)) = kind t
-  kind (TMetaVar mv) = kind mv
-  --kind x = error $ "Type:kind: " ++ show x
-instance HasKind MetaVar where
-    kind = metaKind
-
 -----------------------------------------------------------------------------
+
+instance CanType MetaVar Kind where
+    getType mv = metaKind mv
+
+instance CanType Tycon Kind where
+    getType (Tycon _ k) = k
+
+instance CanType Tyvar Kind where
+    getType = tyvarKind
+
+instance CanType Type Kind where
+  getType (TCon tc) = getType tc
+  getType (TVar u)  = getType u
+  getType (TAp t _) = case (getType t) of
+                     (Kfun _ k) -> k
+                     x -> error $ "Type.getType: Invalid getType in type application for "++show t++": "++show x
+  getType (TArrow _l _r) = Star
+  getType (TForAll _ (_ :=> t)) = getType t
+  getType (TExists _ (_ :=> t)) = getType t
+  getType (TMetaVar mv) = getType mv
 
 instance Types t => Types (Qual t) where
   apply s (ps :=> t) = apply s ps :=> apply s t
@@ -86,6 +82,7 @@ instance Types Pred where
 --------------------------------------------------------------------------------
 
 -- substitutions
+type Subst = Map.Map Tyvar Type
 
 nullSubst  :: Subst
 nullSubst   = Map.empty
@@ -129,71 +126,10 @@ merge s1 s2 = if agree then return s else fail $ "merge: substitutions don't agr
 
 mapSubstitution s fm =(Map.map (\v -> apply s v) fm)
 
---------------------------------------------------------------------------------
-
--- unification
-{-
-
-mgu     :: (MonadIO m,Monad m2) => Type -> Type -> m (m2 Subst)
-varBind :: Monad m => Tyvar -> Type -> m Subst
-
-mgu x y = do
-    r <- runErrorT (mgu'' x y)
-    case r of
-        Right x -> return (return x)
-        Left (err::String) -> return (fail err)
-
-
-mgu'' x y = do
-    x' <- findType x
-    y' <- findType y
-    mgu' x' y'
-
-
-mgu' (TAp l r) (TAp l' r')
-   = do s1 <- mgu'' l l'
-        --s2 <- mgu'' (apply s1 r) (apply s1 r')
-        s2 <- mgu'' r r'
-        return (s2 @@ s1)
-
-mgu' (TArrow l r) (TArrow l' r')
-   = do s1 <- mgu'' l l'
-        --s2 <- mgu'' (apply s1 r) (apply s1 r')
-        s2 <- mgu'' r r'
-        return (s2 @@ s1)
-
-mgu' t@(TVar Tyvar { tyvarRef = Nothing }) (TVar u@Tyvar { tyvarRef = Just _ } )  = varBind' u t
-mgu' (TVar u) t        = varBind' u t
-mgu' t (TVar u)        = varBind' u t
-mgu' (TCon tc1) (TCon tc2)
-           | tc1==tc2 = return nullSubst
-           | otherwise = fail "mgu: Constructors don't match"
-mgu' TForAll {} _ = error "attempt to unify TForall"
-mgu' _ TForAll {} = error "attempt to unify TForall"
-mgu' t1 t2  = fail "mgu: types do not unify"
-
-varBind' u t | t == TVar u      = return nullSubst
-            | u `elem` tv t    = fail "varBind: occurs check fails"
-            | kind u == kind t, Just r <- tyvarRef u = do
-                Nothing <- liftIO $ readIORef r
-                liftIO $ writeIORef r (Just t)
-                return (u +-> t)
-            | otherwise        = error "varBind: kinds do not match"
-
-
-varBind u t | t == TVar u      = return nullSubst
-            | u `elem` tv t    = fail "varBind: occurs check fails"
-            | kind u == kind t = return (u +-> t)
-            | otherwise        = fail "varBind: kinds do not match"
-
-            -}
 
 match :: Monad m => Type -> Type -> m Subst
 
-match x y = do
-    --x' <- findType x
-    --y' <- findType y
-    match' x y
+match x y = do match' x y
 
 match' (TAp l r) (TAp l' r')
    = do sl <- match l l'
@@ -206,7 +142,7 @@ match' (TArrow l r) (TArrow l' r')
         merge sl sr
 
 match' (TVar u) t
-   | kind u == kind t = return (u +-> t)
+   | getType u == getType t = return (u +-> t)
 
 match' (TCon tc1) (TCon tc2)
    | tc1==tc2         = return nullSubst

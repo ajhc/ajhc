@@ -37,7 +37,7 @@ import HsSyn
 import MapBinaryInstance()
 import Name.Name
 import qualified Util.Seq as Seq
-import Representation hiding (Subst)
+import Representation
 import Type(tTTuple)
 import Util.ContextMonad
 import Util.HasSize
