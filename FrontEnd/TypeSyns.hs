@@ -248,66 +248,11 @@ renameHsPats :: [HsPat] -> SubTable -> ScopeSM ([HsPat])
 renameHsPats = mapRename renameHsPat
 
 renameHsPat :: HsPat -> SubTable -> ScopeSM (HsPat)
-renameHsPat (HsPVar hsName) subTable = do
-      hsName' <- renameHsName hsName subTable
-      return (HsPVar hsName')
-renameHsPat (HsPLit hsLiteral) _subTable
-  = return (HsPLit hsLiteral)
-renameHsPat (HsPNeg hsPat) subTable = do
-      hsPat' <- renameHsPat hsPat subTable
-      return (HsPNeg hsPat')
-renameHsPat (HsPInfixApp hsPat1 hsName hsPat2) subTable = do
-      hsPat1' <- renameHsPat hsPat1 subTable
-      hsPat2' <- renameHsPat hsPat2 subTable
-      hsName' <- renameHsName hsName subTable
-      return (HsPInfixApp hsPat1' hsName' hsPat2')
-renameHsPat (HsPApp hsName hsPats) subTable = do
-      hsPats' <- renameHsPats hsPats subTable
-      hsName' <- renameHsName hsName subTable
-      return (HsPApp hsName' hsPats')  -- NOTE: Bryn changed this so we also rename hsName and not just the hsPats
-renameHsPat (HsPTuple hsPats) subTable = do
-      hsPats' <- renameHsPats hsPats subTable
-      return (HsPTuple hsPats')
-renameHsPat (HsPList hsPats) subTable = do
-      hsPats' <- renameHsPats hsPats subTable
-      return (HsPList hsPats')
-renameHsPat (HsPParen hsPat) subTable = do
-      hsPat' <- renameHsPat hsPat subTable
-      return (HsPParen hsPat')
-renameHsPat (HsPRec hsName hsPatFields) subTable = do
-      -- the hsName can be ignored as it is a Constructor
-      hsPatFields' <- renameHsPatFields hsPatFields subTable
-      return (HsPRec hsName hsPatFields)
-renameHsPat (HsPAsPat hsName hsPat) subTable = do
-      hsName' <- renameHsName hsName subTable
-      hsPat' <- renameHsPat hsPat subTable
-      return (HsPAsPat hsName' hsPat')
-renameHsPat HsPWildCard subTable = do
-      return HsPWildCard
---renameHsPat (HsPWildCard) _subTable
---  = return HsPWildCard
-renameHsPat (HsPIrrPat hsPat) subTable = do
-      hsPat' <- renameHsPat hsPat subTable
-      return (HsPIrrPat hsPat')
-
-
-renameHsPatFields :: [HsPatField] -> SubTable -> ScopeSM ([HsPatField])
-renameHsPatFields = mapRename renameHsPatField
-
--- although the hsNames here must be unique (field names),
--- I rename them for the sake of completeness
-renameHsPatField :: HsPatField -> SubTable -> ScopeSM (HsPatField)
-{-
-renameHsPatField (HsPFieldPun hsName) subTable
-  = do
-      hsName' <- renameHsName hsName subTable
-      return (HsPFieldPun hsName')
--}
-renameHsPatField (HsPFieldPat hsName hsPat) subTable = do
-    hsName' <- renameHsName hsName undefined
+renameHsPat (HsPTypeSig srcLoc hsPat qt) subTable = withSrcLoc srcLoc $ do
+    hsQualType' <- renameHsQualType qt subTable
     hsPat' <- renameHsPat hsPat subTable
-    return (HsPFieldPat hsName' hsPat')
-
+    return (HsPTypeSig srcLoc hsPat' hsQualType')
+renameHsPat p subTable = traverseHsPat (flip renameHsPat subTable) p
 
 renameHsRhs :: HsRhs -> SubTable -> ScopeSM HsRhs
 renameHsRhs (HsUnGuardedRhs hsExp) subTable = do
@@ -317,11 +262,6 @@ renameHsRhs (HsGuardedRhss hsGuardedRhss) subTable = do
       hsGuardedRhss' <- renameHsGuardedRhsList hsGuardedRhss subTable
       return (HsGuardedRhss hsGuardedRhss')
 
-
-
-
-renameHsExps :: [HsExp] -> SubTable -> ScopeSM ([HsExp])
-renameHsExps = mapRename renameHsExp
 
 renameHsExp :: HsExp -> SubTable -> ScopeSM HsExp
 renameHsExp (HsLambda srcLoc hsPats hsExp) subTable = withSrcLoc srcLoc $ do
