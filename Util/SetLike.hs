@@ -2,6 +2,8 @@ module Util.SetLike(
     EnumSet(),
     (\\),
     notMember,
+    union,
+    unions,
     SetLike(..),
     BuildSet(..)
     )
@@ -48,6 +50,12 @@ class SetLike s => BuildSet s t where
 
 
 notMember x t = not $ member x t
+
+union :: SetLike a => a -> a -> a
+union = mappend
+
+unions :: SetLike a => [a] -> a
+unions = mconcat
 
 --  int set
 
