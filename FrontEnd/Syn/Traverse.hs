@@ -144,6 +144,49 @@ traverseHsType f (HsTyForall vs qt) = do
 traverseHsType f (HsTyExists vs qt) = do
     x <- f $ hsQualTypeType qt
     return $ HsTyExists vs qt { hsQualTypeType = x }
-traverseHsType _ x = return x
+traverseHsType _ x@HsTyVar {} = return x
+traverseHsType _ x@HsTyCon {} = return x
+
+
+traverseHsPat :: MonadSetSrcLoc m => (HsPat -> m HsPat) -> HsPat -> m HsPat
+traverseHsPat fn p = f p where
+    f p@HsPVar {} = return p
+    f p@HsPLit {} = return p
+    f (HsPNeg hsPat)  = do
+          hsPat' <- fn hsPat
+          return (HsPNeg hsPat')
+    f (HsPInfixApp hsPat1 hsName hsPat2)  = do
+          hsPat1' <- fn hsPat1
+          hsPat2' <- fn hsPat2
+          return (HsPInfixApp hsPat1' hsName hsPat2')
+    f (HsPApp hsName hsPats)  = do
+          hsPats' <- mapM fn hsPats
+          return (HsPApp hsName hsPats')
+    f (HsPTuple hsPats)  = do
+          hsPats' <- mapM fn hsPats
+          return (HsPTuple hsPats')
+    f (HsPList hsPats)  = do
+          hsPats' <- mapM fn hsPats
+          return (HsPList hsPats')
+    f (HsPParen hsPat)  = do
+          hsPat' <- fn hsPat
+          return (HsPParen hsPat')
+    f (HsPAsPat hsName hsPat)  = do
+          hsPat' <- fn hsPat
+          return (HsPAsPat hsName hsPat')
+    f HsPWildCard  = do return HsPWildCard
+    f (HsPIrrPat hsPat)  = do
+          hsPat' <- fn hsPat
+          return (HsPIrrPat hsPat')
+    f (HsPTypeSig srcLoc hsPat qt) = withSrcLoc srcLoc $ do
+          hsPat' <- fn hsPat
+          return (HsPTypeSig srcLoc hsPat' qt)
+    f (HsPRec hsName hsPatFields)  = do
+          hsPatFields' <- mapM fField hsPatFields
+          return (HsPRec hsName hsPatFields')
+    fField (HsPFieldPat n p) = fn p >>= return . HsPFieldPat n
+
+
+
 
 
