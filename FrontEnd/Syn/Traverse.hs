@@ -6,6 +6,10 @@ import FrontEnd.SrcLoc
 
 
 
+traverseHsExp_ :: MonadSetSrcLoc m => (HsExp -> m ()) -> HsExp -> m ()
+traverseHsExp_ fn e = traverseHsExp (\e -> fn e >> return e) e >> return ()
+
+
 traverseHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsExp -> m HsExp
 traverseHsExp fn e = f e where
     fns = mapM fn
