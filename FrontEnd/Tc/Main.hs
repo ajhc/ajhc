@@ -558,12 +558,12 @@ tcPragmaDecl prule@HsPragmaRules { hsDeclUniq = uniq, hsDeclFreeVars = vs, hsDec
             tr <- newBox Star
             let (vs,envs) = unzip vs'
             ch <- getClassHierarchy
-            (rs1,rs2) <- localEnv (mconcat envs) $ do
+            ((e1,rs1),(e2,rs2)) <- localEnv (mconcat envs) $ do
                     (e1,ps1) <- listenPreds (tcExpr e1 tr)
                     (e2,ps2) <- listenPreds (tcExpr e2 tr)
                     ([],rs1) <- splitPreds ch [] ps1
                     ([],rs2) <- splitPreds ch [] ps2
-                    return (rs1,rs2)
+                    return ((e1,rs1),(e2,rs2))
             mapM_ unBox vs
             vs <- flattenType vs
             tr <- flattenType tr
@@ -575,7 +575,7 @@ tcPragmaDecl prule@HsPragmaRules { hsDeclUniq = uniq, hsDeclFreeVars = vs, hsDec
             rs1 <- return $ simplify ch rs1
             rs2 <- return $ simplify ch rs2
             assertEntailment rs1 rs2
-            return [prule]
+            return [prule { hsDeclLeftExpr = e1, hsDeclRightExpr = e2 }]
         dv (n,Nothing) = do
             v <- newMetaVar Tau Star
             let env = (Map.singleton (toName Val n) v)
