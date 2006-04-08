@@ -46,7 +46,7 @@ getBindGroups ns getName getDeps
 	nameGroups = buildNameGroups nameList nameEdges
 	nameList = map getName ns
 	nameEdges = buildNameEdges ns getName getDeps
-	nameToNodeFM = listToFM [ (getName x, x) | x <- ns ]	
+	nameToNodeFM = listToFM [ (getName x, x) | x <- ns ]
 
 getBindGroups ns toName getDeps = filter (not . null) (map (concatMap f) $ Scc.scc ds) where
     f n = case M.lookup n m of
@@ -196,7 +196,7 @@ debugBindGroups_ (n:ns) getAlias getName getDeps groupNum history
 	bgString = showBindGroup (expandBindGroup n getAlias getDeps newHistory)
 	newHistory = history ++ [(groupNum, [ getName x | x <- n ])]
 
-	
+
 --
 -- Expand bindgroups, generating dependancie and error information.
 --

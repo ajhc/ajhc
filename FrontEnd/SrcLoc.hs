@@ -1,5 +1,8 @@
 module FrontEnd.SrcLoc where
 
+import Control.Monad.Writer
+import Control.Monad.Identity
+
 import Data.Monoid
 import Data.Generics
 import Binary
@@ -67,6 +70,16 @@ class MonadSrcLoc m => MonadSetSrcLoc m where
 
 withLocation :: (HasLocation l,MonadSetSrcLoc m) => l -> m a -> m a
 withLocation l = withSrcSpan (srcSpan l)
+
+instance Monoid w => MonadSrcLoc (Writer w) where
+    getSrcLoc = return mempty
+instance Monoid w => MonadSetSrcLoc (Writer w) where
+    withSrcLoc _ a = a
+
+instance MonadSrcLoc Identity where
+    getSrcLoc = return mempty
+instance MonadSetSrcLoc Identity where
+    withSrcLoc _ a = a
 
 -----------------
 -- show instances

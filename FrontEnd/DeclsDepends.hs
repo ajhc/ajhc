@@ -1,26 +1,25 @@
 {-------------------------------------------------------------------------------
 
         Copyright:              The Hatchet Team (see file Contributors)
-
         Module:                 DeclsDepends
-
         Description:            Collect the names that a variable declaration
                                 depends upon, for use in dependency
                                 analysis.
-
         Primary Authors:        Bernie Pope, Robert Shelton
-
         Notes:                  See the file License for license information
 
 -------------------------------------------------------------------------------}
 
 module DeclsDepends (getDeclDeps, debugDeclBindGroups) where
 
+import Control.Monad.Writer
+
 import HsSyn
 import DependAnalysis(debugBindGroups)
 import FrontEnd.Utils(getDeclName)
 import FrontEnd.Rename(unRename)
 import Name.Name
+import FrontEnd.Syn.Traverse
 
 --------------------------------------------------------------------------------
 
@@ -64,87 +63,24 @@ getGuardedRhsDeps :: HsGuardedRhs -> [HsName]
 getGuardedRhsDeps (HsGuardedRhs _sloc guardExp rhsExp)
    = getExpDeps guardExp ++ getExpDeps rhsExp
 
+
+
 getExpDeps :: HsExp -> [HsName]
-getExpDeps (HsVar name)
-   = [name]
+getExpDeps e = execWriter (expDeps e)
 
-getExpDeps (HsCon _)
-   = []
-
-getExpDeps (HsLit _)
-   = []
-
-getExpDeps (HsInfixApp e1 e2 e3)
-   = getExpDeps e1 ++
-     getExpDeps e2 ++
-     getExpDeps e3
-
-getExpDeps (HsApp e1 e2)
-   = getExpDeps e1 ++ getExpDeps e2
-
-getExpDeps (HsNegApp e)
-   = getExpDeps e
-
-getExpDeps (HsLambda _ _ e)
-   = getExpDeps e
-
-getExpDeps (HsLet decls e)
-   = foldr (++) [] (map getLocalDeclDeps decls) ++
-     getExpDeps e
-
-getExpDeps (HsIf e1 e2 e3)
-   = getExpDeps e1 ++
-     getExpDeps e2 ++
-     getExpDeps e3
-
-getExpDeps (HsCase e alts)
-   = getExpDeps e ++
-     foldr (++) [] (map getAltDeps alts)
-
-getExpDeps (HsDo stmts)
-   = foldr (++) [] (map getStmtDeps stmts)
-
-getExpDeps (HsTuple exps)
-   = foldr (++) [] (map getExpDeps exps)
-
-getExpDeps (HsList exps)
-   = foldr (++) [] (map getExpDeps exps)
-
-getExpDeps (HsParen e)
-   = getExpDeps e
-
-getExpDeps (HsLeftSection e1 e2)
-   = getExpDeps e1 ++
-     getExpDeps e2
-
-getExpDeps (HsRightSection e1 e2)
-   = getExpDeps e1 ++
-     getExpDeps e2
-
-getExpDeps (HsEnumFrom e)
-   = getExpDeps e
-
-getExpDeps (HsEnumFromTo e1 e2)
-   = getExpDeps e1 ++
-     getExpDeps e2
-
-getExpDeps (HsEnumFromThen e1 e2)
-   = getExpDeps e1 ++
-     getExpDeps e2
-
-getExpDeps (HsEnumFromThenTo e1 e2 e3)
-   = getExpDeps e1 ++
-     getExpDeps e2 ++
-     getExpDeps e3
-getExpDeps (HsListComp e stmts) = getExpDeps e ++ foldr (++) [] (map getStmtDeps stmts)
-getExpDeps (HsExpTypeSig _sloc e _qualtype) = getExpDeps e
-getExpDeps (HsAsPat _name e) = getExpDeps e
-getExpDeps (HsWildCard _) = []
-getExpDeps (HsIrrPat e) = getExpDeps e
-getExpDeps (HsRecConstr _ fs) = concat [ getExpDeps e | HsFieldUpdate _ e <- fs ]
-getExpDeps (HsRecUpdate e fs) =  concat $ getExpDeps e:[ getExpDeps e | HsFieldUpdate _ e <- fs ]
-
-getExpDeps e = error $ "getExpDeps: " ++ show e
+expDeps (HsVar name) = tell [name]
+expDeps (HsLet decls e) = do
+    expDeps e
+    tell $ foldr (++) [] (map getLocalDeclDeps decls)
+expDeps (HsCase e alts) = do
+    expDeps e
+    tell $ foldr (++) [] (map getAltDeps alts)
+expDeps (HsDo stmts) = do
+    tell $ foldr (++) [] (map getStmtDeps stmts)
+expDeps (HsListComp e stmts) = do
+    expDeps e
+    tell $ foldr (++) [] (map getStmtDeps stmts)
+expDeps e = traverseHsExp_ expDeps e
 
 getAltDeps :: HsAlt -> [HsName]
 
