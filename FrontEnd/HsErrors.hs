@@ -11,6 +11,7 @@ import Name.Name
 import Name.Names
 import Name.VConsts
 import Warning
+import FrontEnd.Syn.Traverse
 
 
 
@@ -22,7 +23,7 @@ hsType x@HsTyForall {} = do
 hsType x@HsTyExists {} = do
     err "h98-forall" "Explicit quantification is a non-haskell98 feature"
     hsQualType (hsTypeType x)
-hsType x = mapHsTypeHsType (\x -> hsType x >> return x) x >> return ()
+hsType x = traverseHsType (\x -> hsType x >> return x) x >> return ()
 
 hsQualType x  = hsType (hsQualTypeType x)
 
@@ -44,32 +45,8 @@ hsDecl HsNewTypeDecl { hsDeclSrcLoc = sl, hsDeclDerives = ds' } = do
 hsDecl _ = return ()
 
 
-
---derivable = [ "Eq","Ord","Enum","Bounded","Show","Read" ]
-
 checkDeriving _ _ xs | all (`elem` derivableClasses) xs = return ()
 checkDerining sl True _ = warn sl "h98-newtypederiv" "arbitrary newtype derivations are a non-haskell98 feature"
 checkDerining sl False _ = warn sl "unknown-deriving" "attempt to derive from a non-derivable class"
-
-
-
-mapHsTypeHsType f (HsTyFun a b) = do
-    a <- f a
-    b <- f b
-    return $ HsTyFun a b
-mapHsTypeHsType f (HsTyTuple xs) = do
-    xs <- mapM f xs
-    return $ HsTyTuple xs
-mapHsTypeHsType f (HsTyApp a b) = do
-    a <- f a
-    b <- f b
-    return $ HsTyApp a b
-mapHsTypeHsType f (HsTyForall vs qt) = do
-    x <- f $ hsQualTypeType qt
-    return $ HsTyForall vs qt { hsQualTypeType = x }
-mapHsTypeHsType f (HsTyExists vs qt) = do
-    x <- f $ hsQualTypeType qt
-    return $ HsTyExists vs qt { hsQualTypeType = x }
-mapHsTypeHsType _ x = return x
 
 

@@ -4,10 +4,12 @@ import HsSyn
 import Control.Monad.Identity
 import FrontEnd.SrcLoc
 
+traverse_ :: Monad m => (a -> m b) -> a -> m a
+traverse_ fn x = fn x >> return x
 
 
 traverseHsExp_ :: MonadSetSrcLoc m => (HsExp -> m ()) -> HsExp -> m ()
-traverseHsExp_ fn e = traverseHsExp (\e -> fn e >> return e) e >> return ()
+traverseHsExp_ fn e = traverseHsExp (traverse_ fn) e >> return ()
 
 
 traverseHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsExp -> m HsExp
@@ -123,3 +125,25 @@ traverseHsExp fn e = f e where
         return (HsLet hsDecls' hsExp')
 
 -}
+
+
+traverseHsType f (HsTyFun a b) = do
+    a <- f a
+    b <- f b
+    return $ HsTyFun a b
+traverseHsType f (HsTyTuple xs) = do
+    xs <- mapM f xs
+    return $ HsTyTuple xs
+traverseHsType f (HsTyApp a b) = do
+    a <- f a
+    b <- f b
+    return $ HsTyApp a b
+traverseHsType f (HsTyForall vs qt) = do
+    x <- f $ hsQualTypeType qt
+    return $ HsTyForall vs qt { hsQualTypeType = x }
+traverseHsType f (HsTyExists vs qt) = do
+    x <- f $ hsQualTypeType qt
+    return $ HsTyExists vs qt { hsQualTypeType = x }
+traverseHsType _ x = return x
+
+
