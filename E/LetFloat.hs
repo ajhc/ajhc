@@ -9,9 +9,8 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Monoid
 import Data.Typeable
-import List
+import List  hiding(delete,insert)
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 
 import Atom
 import DataConstructors
@@ -20,7 +19,7 @@ import E.E
 import E.Subst
 import E.Program
 import E.Inline
-import Info.Info as Info
+import Info.Info as Info hiding(member,delete)
 import E.Rules
 import E.Traverse
 import E.TypeCheck
@@ -34,6 +33,8 @@ import Stats
 import Support.CanType
 import Support.FreeVars
 import Util.UniqueMonad
+import Util.SetLike
+import Name.Id
 
 
 
@@ -116,7 +117,7 @@ doCoalesce stats (x,xs) = ans where
             ec@ECase { eCaseScrutinee = (ELetRec ds' x') }  -> do
                 liftIO $ tick stats (toAtom "E.LetFloat.coalesce.fromCase")
                 fromLet2 (concat $ ds':dss) (foldl EAp (ec { eCaseScrutinee = x' } ) xs')
-            ELetRec ds' x' | not (null xs) -> do
+            ELetRec ds' x' | not (List.null xs) -> do
                 liftIO $ tick stats (toAtom "E.LetFloat.coalesce.fromAp")
                 fromLet2 (concat $ ds':dss) (foldl EAp x' xs')
             ELetRec ds x' -> do
@@ -137,7 +138,7 @@ doCoalesce stats (x,xs) = ans where
         return $ fromAp r
 
 fvBind (Left (_,fv)) = fv
-fvBind (Right xs) = Set.unions (snds xs)
+fvBind (Right xs) = unions (snds xs)
 
 
 
@@ -148,8 +149,8 @@ floatInward ::
 floatInward rules e = f e [] where
     augment fvs = fvs
     f ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault =  d } xs = letRec p' $ ec { eCaseScrutinee = (f e pe), eCaseAlts = [ Alt l (f e pn) | Alt l e <- as | pn <- ps ], eCaseDefault = (fmap (flip f pd) d)}  where
-        (p',_:pe:pd:ps) = sepByDropPoint (mconcat [freeVars l | Alt l _ <- as ]:freeVars e: tvrNum b `Set.delete` freeVars d :[freeVars a | a <- as ]) xs
-    f (ELetRec ds e) xs = g (G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- ds ] (tvrNum . fst . fst) (Set.toList . snd) ) xs where
+        (p',_:pe:pd:ps) = sepByDropPoint (mconcat [freeVars l | Alt l _ <- as ]:freeVars e: tvrIdent b `delete` freeVars d :[freeVars a | a <- as ]) xs
+    f (ELetRec ds e) xs = g (G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- ds ] (tvrIdent . fst . fst) (idSetToList . snd) ) xs where
         g [] p' = f e p'
         g ((Left ((v,ev),fv)):xs) p = g xs (p0 ++ [Left ((v,ev'),bindingFreeVars v ev')] ++ p') where
             ev' = f ev pv
@@ -161,23 +162,23 @@ floatInward rules e = f e [] where
         (unsafe_to_dup,safe_to_dup) = sepDupableBinds (freeVars ls) xs
         (b,ls) = fromLam e
     f e (Left ((v',ev),_):xs)
-        | (EVar v,as) <- fromAp e, v == v', not (tvrNum v' `Set.member` freeVars as)  = f (runIdentity $ app (ev,as) {- foldl EAp ev as -} ) xs
+        | (EVar v,as) <- fromAp e, v == v', not (tvrIdent v' `member` (freeVars as :: IdSet))  = f (runIdentity $ app (ev,as) {- foldl EAp ev as -} ) xs
     f e xs = letRec xs e
     letRec [] e = e
-    letRec xs e = f (G.scc $ G.newGraph (concatMap G.fromScc xs) (tvrNum . fst . fst) (Set.toList . snd)) where
+    letRec xs e = f (G.scc $ G.newGraph (concatMap G.fromScc xs) (tvrIdent . fst . fst) (idSetToList . snd)) where
         f [] = e
         f (Left (te,_):rs) = eLetRec [te] $ f rs
         f (Right ds:rs) = eLetRec (fsts ds) $ f rs
 
-type FVarSet = Set.Set Int
+type FVarSet = IdSet
 type Binds = [Either ((TVr,E),FVarSet) [((TVr,E),FVarSet)]]
 
 sepDupableBinds :: [Id] -> Binds -> (Binds,Binds)
 sepDupableBinds fvs xs = partition ind xs where
-    g = G.reachable (G.newGraph (concatMap G.fromScc xs) (tvrNum . fst . fst) (Set.toList . snd)) (fvs `mappend` unsafe_ones)
-    uso = map (tvrNum . fst . fst) g
+    g = G.reachable (G.newGraph (concatMap G.fromScc xs) (tvrIdent . fst . fst) (idSetToList . snd)) (fvs `mappend` unsafe_ones)
+    uso = map (tvrIdent . fst . fst) g
     unsafe_ones = concat [ map (tvrIdent . fst . fst) vs | vs <- map G.fromScc xs,any (not . isCheap) (map (snd . fst) vs)]
-    ind x = any ( (`elem` uso) . tvrNum . fst . fst ) (G.fromScc x)
+    ind x = any ( (`elem` uso) . tvrIdent . fst . fst ) (G.fromScc x)
 
 
 -- | seperate bindings based on whether they can be floated inward
@@ -201,10 +202,10 @@ sepByDropPoint ds fs' = (r,xs) where
             --(gb,ds'') | sameShape1 ds'' ds -> (b:gb,ds'')
       where
         fb' = fvBind b
-        ds' = [ (d,any  (`Set.member` d) (fvDecls b)) | d <- ds ]
+        ds' = [ (d,any  (`member` d) (fvDecls b)) | d <- ds ]
         nu = length (filter snd ds')
-    fvDecls (Left ((t,_),_)) = [tvrNum t]
-    fvDecls (Right ts) = [tvrNum t | ((t,_),_) <- ts ]
+    fvDecls (Left ((t,_),_)) = [tvrIdent t]
+    fvDecls (Right ts) = [tvrIdent t | ((t,_),_) <- ts ]
     comb (a,b) (c,d) = (a ++ c, zipWith (++) b d)
 
 
@@ -254,7 +255,7 @@ floatOutward prog = do
             dds [] nrs e imap = ELetRec (concat nrs) (g n e imap)
         g n e imap = runIdentity $ (emapE' (\e -> g' n e imap) e)
         g' n e imap = return $ g n e imap
-    let imap = Map.fromList $ map (\x -> (x,top_level)) ([ tvrIdent t| (t,_) <-  programDs prog ] ++ Set.toList (progExternalNames prog))
+    let imap = Map.fromList $ map (\x -> (x,top_level)) ([ tvrIdent t| (t,_) <-  programDs prog ] ++ idSetToList (progExternalNames prog))
     prog <- flip programMapDs prog (\ (t,e) -> do
         e' <- letBindAll (progDataTable prog) (progModule prog) e
         return $ tl (t,e') imap)

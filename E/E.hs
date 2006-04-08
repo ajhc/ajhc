@@ -20,13 +20,14 @@ import Data.Monoid
 import Number
 import {-# SOURCE #-} Info.Binary(putInfo,getInfo)
 import qualified Info.Info as Info
+import Name.Id
+import Util.SetLike as S
 
 
 --------------------------------------
 -- Lambda Cube (it's just fun to say.)
 --------------------------------------
 
-type Id = Int
 
 data Lit e t = LitInt { litNumber :: Number, litType :: t } |  LitCons { litName :: Name, litArgs :: [e], litType :: t }
     deriving(Data,Eq,Ord,Typeable)
@@ -144,7 +145,6 @@ instance Show a => Show (TVr' a) where
     show TVr { tvrIdent = (x), tvrType =  e} | Just n <- intToAtom x  = "(v" ++ show (fromAtom n::Name) ++ "::" ++ show e ++ ")"
     show TVr { tvrIdent = (x), tvrType = e}  = "(v" ++ show x ++ "::" ++ show e ++ ")"
 
-tvrNum TVr { tvrIdent =  n } = n
 
 
 instance FunctorM TVr' where
@@ -272,7 +272,7 @@ tvrName (TVr {tvrIdent =  n }) | Just a <- intToAtom n = return $ fromAtom a
 tvrName tvr = fail $ "TVr is not Name: " ++ show tvr
 
 tvrShowName :: TVr -> String
-tvrShowName t = maybe ('x':(show $ tvrNum t)) show (tvrName t)
+tvrShowName t = maybe ('x':(show $ tvrIdent t)) show (tvrName t)
 
 
 ---------------------------
@@ -329,4 +329,14 @@ ltTuple' ts = ELit $ LitCons (unboxedNameTuple TypeConstructor (length ts)) ts e
 p_unsafeCoerce = primPrim "unsafeCoerce"
 p_toTag = primPrim "toTag"
 p_fromTag = primPrim "fromTag"
+
+instance BuildSet IdSet (TVr' e) where
+    fromList xs = fromList (map tvrIdent xs)
+    fromDistinctAscList xs = fromDistinctAscList (map tvrIdent xs)
+    member x s = member (tvrIdent x) s
+    insert x s = S.insert (tvrIdent x) s
+    delete x s = S.delete (tvrIdent x) s
+    singleton x = singleton (tvrIdent x)
+
+
 

@@ -31,6 +31,7 @@ import Stats
 import Support.FreeVars
 import Util.Graph
 import Util.HasSize
+import Name.Id
 
 
 

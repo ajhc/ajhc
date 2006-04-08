@@ -126,7 +126,7 @@ eStrictLet t v e = emptyCase { eCaseScrutinee = v, eCaseBind = t, eCaseDefault =
 
 substLet :: [(TVr,E)] -> E -> E
 substLet ds e  = ans where
-    (as,nas) = partition (isAtomic . snd) (filter ((/= 0) . tvrNum . fst) ds)
+    (as,nas) = partition (isAtomic . snd) (filter ((/= 0) . tvrIdent . fst) ds)
     tas = filter (sortStarLike . tvrType . fst) nas
     ans = eLetRec (as ++ nas) (typeSubst' (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- as]) (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas]) e)
 
@@ -134,7 +134,7 @@ substLet ds e  = ans where
 substLet' :: [(TVr,E)] -> E -> E
 substLet' ds' e  = ans where
     (hh,ds) = partition (isUnboxed . tvrType . fst) ds'
-    nas = filter ((/= 0) . tvrNum . fst) ds
+    nas = filter ((/= 0) . tvrIdent . fst) ds
     tas = filter (sortStarLike . tvrType . fst) nas
     ans = case (nas,tas) of
         ([],_) -> hhh hh $ e

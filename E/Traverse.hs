@@ -23,7 +23,6 @@ import Control.Monad.Writer
 import Data.FunctorM
 import Data.Monoid
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 
 import DataConstructors()
 import Util.HasSize
@@ -37,6 +36,8 @@ import GenUtil
 import Name.Name
 import Util.NameMonad
 import Util.Graph
+import Name.Id
+import Util.SetLike as S
 
 -- Generic traversal routines rock.
 
@@ -52,8 +53,8 @@ renameTraverse e = (e',c) where
 renameTraverse' e = e' where
     e' = liftM fst $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty mempty  e
 
-runRename :: Set.Set Int -> E -> (E,Set.Set Int)
-runRename set e = runIdentity $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty (Map.fromAscList [ (v,NotKnown) | v <- Set.toAscList set])  e
+runRename :: IdSet -> E -> (E,IdSet)
+runRename set e = runIdentity $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty (Map.fromDistinctAscList [ (v,NotKnown) | v <- idSetToList set])  e
 
 data  TravOptions m = TravOptions {
     pruneUnreachable :: Maybe [Int],
@@ -88,7 +89,7 @@ data Binding = NotAmong [Name] | IsBoundTo E | NotKnown
 
 --newtype TravM m a = TravM (StateT (Map.Map Int Binding) m a)
 --    deriving(Monad,MonadTrans,Functor,MonadIO)
-newtype TravM m a = TravM (ReaderT (Map.Map Int Binding) (NameMT Int m) a)
+newtype TravM m a = TravM (ReaderT (Map.Map Int Binding) (IdNameT m) a)
     deriving(Monad,Functor,MonadIO)
 
 instance MonadTrans TravM where
@@ -128,30 +129,25 @@ newVar' _ n = n
 
 -}
 
-traverse :: (MonadFix m,Monad m) => TravOptions m -> (Int -> (E,[E]) -> TravM m E) -> Subst -> (Map.Map Int Binding) -> E -> m (E,Set.Set Int)
-traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> runReaderT (f e) (smap,subst,0::Int)  where
+traverse :: (MonadFix m,Monad m) => TravOptions m -> (Int -> (E,[E]) -> TravM m E) -> Subst -> (Map.Map Int Binding) -> E -> m (E,IdSet)
+traverse (tOpt :: TravOptions m) func subst smap e = runIdNameT' $ initNames >> runReaderT (f e) (smap,subst,0::Int)  where
     initNames = do
         addBoundNames $ freeVars e
         addBoundNames (Map.keys subst)
         addBoundNames (Map.keys smap)
-    f :: E -> ReaderT (Map.Map Int Binding, Subst, Int) (NameMT Int m) E
+    f :: E -> ReaderT (Map.Map Int Binding, Subst, Int) (IdNameT m) E
     f' e = do
         local (\ (a,b,c) -> (a,b,c + 1)) $  f e
-        --(y,z,n) <- get
-        --put (y,z,n + 1)
-        --put (y,z,n)
-        --return x
     f  e | (x,xs) <- fromAp e = do
         xs' <- mapM l xs
         x' <- g x
         (m,p,lvl) <- ask
         (z) <- lift $ runReaderT (fromTravM $ func lvl (x',xs')) m
-        --put (m,p,lvl)
         return z
     g  e@(EVar (TVr { tvrIdent = n, tvrType =  t})) = do
         (_,im,lvl) <- ask
         case Map.lookup n im of
-            Just n'@(EVar t) | tvrNum t == n -> return $ n'
+            Just n'@(EVar t) | tvrIdent t == n -> return $ n'
             Just n' -> do
                 lift $ lift $  propagateRecord tOpt 1
                 return $ n'
@@ -175,7 +171,7 @@ traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> r
         (ob,b') <- ntvr f' b
         localSubst [(ob,EVar b')] $ do
             as' <- mapM (da [ v  | EVar v <- [e',EVar b']])   as
-            d' <- localVars [ (tvrNum v,NotAmong [ n | Alt (LitCons n _ _) _ <- as]) | EVar v <- [e',EVar b'] ] $ fmapM f d
+            d' <- localVars [ (tvrIdent v,NotAmong [ n | Alt (LitCons n _ _) _ <- as]) | EVar v <- [e',EVar b'] ] $ fmapM f d
             return $ ec { eCaseScrutinee = e', eCaseType = t', eCaseBind = b', eCaseAlts = as', eCaseDefault = d' }
     g (ELam tvr e) = lp f' ELam tvr e
     g (EPi tvr e) = lp f EPi tvr e
@@ -183,7 +179,7 @@ traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> r
             addNames $ map ( tvrIdent . fst ) ds
             z (basicDecompose  (pruneUnreachable tOpt) (trav_rules tOpt) e ds) e  where
         z [] e = f e
-        z (Left (tvr,x):rs) e | worthStricting x, Just (S _) <- Map.lookup (tvrNum tvr) (trav_strictness tOpt)  = do
+        z (Left (tvr,x):rs) e | worthStricting x, Just (S _) <- Map.lookup (tvrIdent tvr) (trav_strictness tOpt)  = do
             (n,tvrn) <- ntvr f' tvr
             x' <- f x
             nr <- localSubst [(n,EVar tvrn)]   (z rs e)
@@ -192,12 +188,10 @@ traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> r
         z (Left (tvr,x):rs) e = do
             (n,tvrn) <- ntvr f' tvr
             x' <- f x
-            nr <- localVars [(tvrNum tvrn, IsBoundTo x')] $ localSubst [(n,EVar tvrn)]   (z rs e)
+            nr <- localVars [(tvrIdent tvrn, IsBoundTo x')] $ localSubst [(n,EVar tvrn)]   (z rs e)
             return $ eLetCoalesce [(tvrn,x')] nr
         z (Right ds:rs) e = do
             ds' <- mapM (ntvr f' . fst) ds
-            --let ds'' = inlineDecompose (pruneUnreachable tOpt) e ds
-            --lift $ lift $  pruneRecord tOpt (length ds - length ds'')
             let (fz,gz)  = unzip [ ((n',NotKnown),(n,EVar tvr)) |  (n,tvr@(TVr  { tvrIdent =  n' })) <- ds']
             localVars fz $ localSubst gz $ do
                 ds''' <- sequence [ f x >>= return . (,) tvr | (_,tvr) <- ds' | (_,x) <- ds ]
@@ -223,13 +217,13 @@ traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> r
     da vs (Alt p@(LitCons n xs t) l) = do
         t' <- f' t
         xs' <-  mapM (ntvr f') xs
-        localVars [ (tvrNum v, IsBoundTo (ELit $ LitCons n (map (EVar . snd) xs') t')) |  v <- vs ] $ do
+        localVars [ (tvrIdent v, IsBoundTo (ELit $ LitCons n (map (EVar . snd) xs') t')) |  v <- vs ] $ do
             localSubst [ (x,EVar y) | (x,y) <- xs'] $ do
                 l' <- f l
                 return (Alt (LitCons n (snds xs') t') l')
     da vs (Alt p@LitInt {} l) = do
         p' <- fmapM f' p
-        localVars [ (tvrNum v, IsBoundTo (patToLitEE p')) |  v <- vs ] $ do
+        localVars [ (tvrIdent v, IsBoundTo (patToLitEE p')) |  v <- vs ] $ do
             l' <- f l
             return (Alt p' l')
     --lp elam (TVr Nothing t) e = do
@@ -266,11 +260,11 @@ traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> r
         (_,tm,_) <- ask
         let (Just (EVar nt)) = Map.lookup n tm
         x' <- f x
-        localVars [(tvrNum nt, IsBoundTo x')] $ h dds e ((nt,x'):ds)
+        localVars [(tvrIdent nt, IsBoundTo x')] $ h dds e ((nt,x'):ds)
         --case isAtomic x' of
         --    False -> do
-                --modify (\ (a,b,c) -> (Map.insert (tvrNum nt) (IsBoundTo x') a,b,c))
-        --        localVars [(tvrNum nt, IsBoundTo x')] $ h dds e ((nt,x'):ds)
+                --modify (\ (a,b,c) -> (Map.insert (tvrIdent nt) (IsBoundTo x') a,b,c))
+        --        localVars [(tvrIdent nt, IsBoundTo x')] $ h dds e ((nt,x'):ds)
         --    True -> do
         --        localSubst [(n,x')] $ h dds e ((nt,x'):ds)
     {-
@@ -278,7 +272,7 @@ traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> r
         (_,tm,_) <- get
         let (Just nt) = Map.lookup n tm
         x' <- f x
-        modify (\ (a,b,c) -> (Map.insert (tvrNum nt) (Just x') a,b,c))
+        modify (\ (a,b,c) -> (Map.insert (tvrIdent nt) (Just x') a,b,c))
         h dds e ((nt,x'):ds)
     h (Right ds:dds) e rs = do
         let l ((TVr (Just n) _),x) = do
@@ -289,14 +283,14 @@ traverse (tOpt :: TravOptions m) func subst smap e = runNameMT' $ initNames >> r
         ds' <- mapM l ds
         h dds e (ds' ++ rs)
     da vs _ (Alt p@(LitCons n xs t) l) = do
-        localVars [ (tvrNum v, IsBoundTo (ELit $ patToLitEE p)) |  v <- vs ] $ do
+        localVars [ (tvrIdent v, IsBoundTo (ELit $ patToLitEE p)) |  v <- vs ] $ do
             t' <- f' t
             xs' <-  mapM (ntvr f') xs
             localSubst [ (x,EVar y) | (x,y) <- xs'] $ do
                 l' <- f l
                 return (Alt (LitCons n (snds xs') t') l')
     da vs _ (Alt p l) = do
-        localVars [ (tvrNum v, IsBoundTo (ELit $ patToLitEE p)) |  v <- vs ] $ do
+        localVars [ (tvrIdent v, IsBoundTo (ELit $ patToLitEE p)) |  v <- vs ] $ do
             p' <- fmapM f' p
             l' <- f l
             return (Alt p' l')
@@ -366,7 +360,7 @@ basicDecompose ::
     -> [(TVr,E)]     -- ^ incoming bindings
     -> [Either (TVr,E) [(TVr,E)]]     -- ^ bindings pruned and ordered by inlinability value
 basicDecompose prune rules body ds = ans where
-    zs = [ ((t,e), tvrNum t, bindingFreeVars t e ) |  (t,e) <- ds ]
+    zs = [ ((t,e), tvrIdent t, bindingFreeVars t e ) |  (t,e) <- ds ]
     cg zs =  newGraph zs (\ (_,x,_) -> x) ( \ (_,_,x) -> x)
     tg = cg zs
     scc' = scc tg

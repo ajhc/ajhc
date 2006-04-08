@@ -5,7 +5,7 @@ import Control.Exception
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Monoid
-import List hiding(group)
+import List hiding(group,union)
 import Maybe
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
@@ -60,6 +60,8 @@ import Support.CanType(getType)
 import Support.FreeVars
 import Support.ShowTable
 import Util.Graph
+import Name.Id
+import Util.SetLike as S hiding(null)
 import Version(versionString,versionContext)
 import qualified E.CPR
 import qualified E.SSimplify as SS
@@ -206,7 +208,7 @@ processDecls stats ho ho' tiData = do
     let prog = program {
             progClassHierarchy = hoClassHierarchy allHo,
             progDataTable = fullDataTable,
-            progExternalNames = Set.fromList [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ],
+            progExternalNames = fromList [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ],
             progModule = head (fsts $ tiDataModules tiData)
             }
 
@@ -227,8 +229,8 @@ processDecls stats ho ho' tiData = do
 
     -- some more useful values.
     let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (_,n,_) <- ds ]
-        mangle = mangle' (Just $ Set.fromList $ inscope) fullDataTable
-        namesInscope = Set.fromList inscope
+        mangle = mangle' (Just $ fromList inscope) fullDataTable
+        namesInscope = fromList inscope
 
     let initMap' = Map.fromList [ (tvrIdent tvr,EVar tvr) | tvr <- fsts $ Map.elems (hoEs ho)]
 
@@ -274,7 +276,7 @@ processDecls stats ho ho' tiData = do
         let names = [ n | (n,_) <- ns]
         when (dump FD.Lambdacube || dump FD.Pass) $ putErrLn ("----\n" ++ pprint names)
         mstats <- Stats.new
-        let mprog = programSetDs ns prog { progStats = mempty, progEntryPoints = fsts ns, progExternalNames = progExternalNames prog `mappend` (Set.fromList $ map tvrIdent $ fsts (programDs prog)) }
+        let mprog = programSetDs ns prog { progStats = mempty, progEntryPoints = fsts ns, progExternalNames = progExternalNames prog `mappend` (fromList $ map tvrIdent $ fsts (programDs prog)) }
         mprog <- return $ etaAnnotateProgram mprog
         let cm stats e = do
             let sopt = mempty {
@@ -335,7 +337,7 @@ processDecls stats ho ho' tiData = do
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
         let names = [ n | (n,_) <- ns]
-        let namesInscope' = Set.fromAscList (Map.keys smap) `Set.union` namesInscope
+        let namesInscope' = fromDistinctAscList (Map.keys smap) `union` namesInscope
         when (dump FD.Lambdacube || dump FD.Pass) $ putErrLn ("----\n" ++ pprint names)
         cds <- annotateDs annmap (idann allRules mempty) letann lamann [ (t,e) | (t,e) <- ns]
         --putStrLn "*** After annotate"
@@ -345,7 +347,7 @@ processDecls stats ho ho' tiData = do
             let (stat, e'') = SS.simplifyE sopt e
             Stats.tickStat stats stat
             return e''
-        let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds)) fullDataTable
+        let mangle = mangle' (Just $ namesInscope' `union` fromList (map (tvrIdent . fst) cds)) fullDataTable
         cds <- flip mapM cds $ \ (v,lc) -> do
             --lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             lintCheckE onerrNone fullDataTable v lc
@@ -382,7 +384,7 @@ processDecls stats ho ho' tiData = do
         cds <- annotateDs annmap (\_ -> return) letann lamann cds
         sequence_ [lintCheckE onerrNone fullDataTable v e | (v,e) <- cds ]
 
-        let mangle = mangle' (Just $ namesInscope' `Set.union` Set.fromList (map (tvrIdent . fst) cds')) fullDataTable
+        let mangle = mangle' (Just $ namesInscope' `union` fromList (map (tvrIdent . fst) cds')) fullDataTable
         let dd  (ds,used) (v,lc) = do
                 let cm stats e = do
                     let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = Map.fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `Map.union` smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
@@ -393,7 +395,7 @@ processDecls stats ho ho' tiData = do
                 lc <- doopt mangle False stats "SuperSimplify" cm lc'
                 let (lc', used') = runRename used lc
                 return ((v,lc):ds,used' `mappend` used)
-        (cds,usedids) <- foldM dd ([],hoUsedIds ho) cds
+        (cds,usedids) <- foldM dd ([],fromDistinctAscList $ Set.toList $ hoUsedIds ho) cds
         cds <- E.Strictness.solveDs cds
         cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
         cds <- annotateDs annmap (\_ -> return) letann lamann cds
@@ -402,7 +404,7 @@ processDecls stats ho ho' tiData = do
                 | Just n <- fromId (tvrIdent t) = n
                 | otherwise = error $ "toName: " ++ tvrShowName t
         let nvls = [ (t,e)  | (t,e) <- cds ]
-        let uidMap = Map.fromAscList [  (id,Nothing :: Maybe E) | id <- Set.toAscList usedids ]
+        let uidMap = Map.fromAscList [  (id,Nothing :: Maybe E) | id <- idSetToList usedids ]
 
         wdump FD.Progress $ putErr (if rec then "*" else ".")
         return (nvls ++ retds, (Map.fromList [ (tvrIdent v,lc) | (v,lc) <- nvls] `Map.union` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (v,_) <- nvls] `Map.union` annmap , idHist' ))
@@ -758,7 +760,7 @@ transformProgram name dodump f prog = do
 
 mangle ::
     DataTable                -- ^ the datatable used for typechecking
-    -> Maybe (Set.Set Id)    -- ^ acceptable free variables
+    -> Maybe IdSet           -- ^ acceptable free variables
     -> String                -- ^ the name of the pass
     -> Bool                  -- ^ whether to dump progress
     -> Int                   -- ^ maximum number of passes to run. -1 for unlimited
@@ -796,7 +798,7 @@ doopt mangle dmp stats name func lc = do
 
 
 mangle' ::
-    Maybe (Set.Set Id)  -- ^ Acceptable free variables
+    Maybe IdSet  -- ^ Acceptable free variables
     -> DataTable        -- ^ The datatable needed for typechecking
     -> IO ()            -- ^ run on error
     -> Bool             -- ^ Whether to dump progress
@@ -808,7 +810,7 @@ mangle'  fv dataTable erraction b  s action e = do
     when ((b && dump FD.Progress) || dump FD.Pass) $ putErrLn $ "-- " ++ s
     e' <- action e
     if not flint then return e' else do
-        let ufreevars e | Just as <- fv = filter ( not . (`Set.member` as) . tvrIdent) (freeVars e)
+        let ufreevars e | Just as <- fv = filter ( not . (`member` as) . tvrIdent) (freeVars e)
             ufreevars e = []
         case inferType dataTable [] e' of
         -- temporarily disabled due to newtypes of functions
@@ -879,9 +881,9 @@ lintCheckProgram onerr prog | flint = do
         putErrLn ">>> program has repeated toplevel definitions"
         maybeDie
     mapM_ f (programDs prog)
-    let ids = progExternalNames prog `mappend` Set.fromList (map tvrIdent $ fsts (programDs prog))
+    let ids = progExternalNames prog `mappend` fromList (map tvrIdent $ fsts (programDs prog))
         fvs = freeVars $ snds $ programDs prog :: Set.Set TVr
-        unaccounted = Set.filter (not . (`Set.member` ids) . tvrIdent) fvs
+        unaccounted = Set.filter (not . (`member` ids) . tvrIdent) fvs
     unless (Set.null unaccounted) $ do
         onerr
         putErrLn (">>> Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))

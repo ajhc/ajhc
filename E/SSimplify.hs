@@ -5,7 +5,7 @@ import Control.Monad.Writer
 import Data.FunctorM
 import Data.Generics
 import Data.Monoid
-import List
+import List hiding(delete,union)
 import Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -37,6 +37,8 @@ import Support.CanType
 import Support.FreeVars
 import Util.Graph
 import Util.NameMonad
+import Name.Id
+import Util.SetLike as S
 
 data Occurance =
     Unused        -- ^ unused means a var is not used at the term level, but might be at the type level
@@ -47,9 +49,6 @@ data Occurance =
     | LoopBreaker -- ^ chosen as a loopbreaker, never inline
     deriving(Show,Eq,Ord,Typeable)
 
-
-newtype FreeVarSet = FreeVarSet (Set.Set Id)
-    deriving(Typeable,Show,Monoid)
 
 combineOccInfo k a b | a == b = a
 combineOccInfo k a b =  error $ "Conflicting occurance info: " ++ show (k,a,b)
@@ -67,7 +66,7 @@ collectOcc sopts  e = (e',fvs,occ) where
     rule_set = ruleAllFreeVars rules
     occ = foldl (Map.unionWithKey combineOccInfo) mempty (Seq.toList occ')
     f e@(EPi (TVr { tvrIdent = 0, tvrType =  a}) b) = return (e,(freeVars [a,b]),(args [a,b]))
-    f e@(EPi tvr@(TVr { tvrIdent = n, tvrType =  a}) b) = if n `Set.member` fvs || n `Map.member` ags then return (e,Set.delete n fvs ,Map.delete n ags) else return (EPi (tvr { tvrIdent =  0 } ) b,fvs,ags)  where
+    f e@(EPi tvr@(TVr { tvrIdent = n, tvrType =  a}) b) = if n `member` fvs || n `Map.member` ags then return (e,delete n fvs ,Map.delete n ags) else return (EPi (tvr { tvrIdent =  0 } ) b,fvs,ags)  where
         fvs = (freeVars [a,b])
         ags = args [a,b]
     f e@(ELit (LitCons n as t)) = return (e,freeVars (t:as),args as)
@@ -76,7 +75,7 @@ collectOcc sopts  e = (e',fvs,occ) where
     f e@(EError _ t) =  return (e,freeVars t,mempty)
     f e@ELam {} | (b,as) <- fromLam e = do
         (b',fvs,bs) <- f b
-        return (foldr ELam b' as,foldr Set.delete  (freeVars (map tvrType as) `mappend` fvs) (map tvrNum as), Map.map inLam $ foldr Map.delete bs (map tvrNum as))
+        return (foldr ELam b' as,foldr delete  (freeVars (map tvrType as) `mappend` fvs) (map tvrIdent as), Map.map inLam $ foldr Map.delete bs (map tvrIdent as))
     f e | Just (x,t) <- from_unsafeCoerce e  = do (a,b,c) <- f x ; return (prim_unsafeCoerce a t, b `mappend` freeVars t, c)
     f e | (EVar (TVr { tvrIdent = n, tvrType =  t}),xs) <- fromAp e = do
         return (e,freeVars (t:xs), Map.singleton n Once `andOM` args xs)
@@ -91,19 +90,19 @@ collectOcc sopts  e = (e',fvs,occ) where
     f (ELetRec ds e) = do
         ds' <- mapM  (censor (const mempty) . listen . f . snd) ds
         (e',fve,se) <- f e
-        let gfv (_,fv,i) = fvs ++ Set.toList (mconcat (map (ruleFreeVars' rules) (fvs)))  where
-                fvs = Set.toList (Map.keysSet i `Set.union` fv)
-            gr = newGraph (zip (fsts ds) ds') (tvrNum . fst) (gfv . fst . snd )
+        let gfv (_,fv,i) = fvs ++ idSetToList (mconcat (map (ruleFreeVars' rules) (fvs)))  where
+                fvs = Set.toList (Map.keysSet i `union` fv)
+            gr = newGraph (zip (fsts ds) ds') (tvrIdent . fst) (gfv . fst . snd )
             nn' = reachable gr (Set.toList fve ++ Map.keys se ++  topLevels)
         nn <- sequence [ tell t >> return (x,y) |  (x,(y,t)) <- nn' ]
-        let gr' = newGraph nn (tvrNum . fst) (gfv . snd )
+        let gr' = newGraph nn (tvrIdent . fst) (gfv . snd )
             (lb,ds'') = findLoopBreakers (\ (t,(e,_,_)) -> loopFunc t e) (const True) gr'
-            cycNodes = Set.fromList $ [ v | (v,_) <- cyclicNodes gr']
+            cycNodes = (fromList $ [ v | (v,_) <- cyclicNodes gr'] :: IdSet)
             calcStrictInfo t _
-                | t `Set.member` cycNodes = setProperty prop_CYCLIC
+                | t `member` cycNodes = setProperty prop_CYCLIC
                 | otherwise = id
-        let dvars = map (tvrNum . fst) ds
-            fvs = foldr Set.delete (mconcat (fve:[ fv `mappend` freeVars t | (TVr { tvrType =  t},(_,fv,_)) <- ds'' ])) dvars
+        let dvars = map (tvrIdent . fst) ds
+            fvs = foldr delete (mconcat (fve:[ fv `mappend` freeVars t | (TVr { tvrType =  t},(_,fv,_)) <- ds'' ])) dvars
             finalS = Map.union (Map.fromList [(n,LoopBreaker) | (TVr { tvrIdent = n },_) <- lb ]) $   foldl andOM se ([ s | (_,(_,_,s)) <- ds'' ])
         tell $ Seq.singleton (Map.fromList [ (t,Map.findWithDefault Unused n (Map.mapWithKey frules finalS)) | (t@(TVr { tvrIdent = n }),_) <- ds'' ])
         return (eLetRec [ (tvrInfo_u ((calcStrictInfo v e)) v,e) | (v,(e,_,_)) <- ds'' ] e', fvs, finalS  )
@@ -112,11 +111,11 @@ collectOcc sopts  e = (e',fvs,occ) where
             EAp a' b' | a == a' && b == b' -> error $ "SSimplify.collectOcc.f: " ++ show e
             e -> f e
     f e = error $ "SSimplify.collectOcc.f: " ++ show e
-    frules k _ | k `Set.member` rule_set = Many
+    frules k _ | k `member` rule_set = Many
     frules _ x = x
     alt (Alt l e) = do
         (e',b,c) <- f e
-        return (Alt l e',foldr Set.delete (freeVars l `mappend` b) (map tvrNum $ litBinds l),foldr Map.delete c (map tvrNum $ litBinds l))
+        return (Alt l e',foldr delete (freeVars l `mappend` b) (map tvrIdent $ litBinds l),foldr Map.delete c (map tvrIdent $ litBinds l))
     args as = ans where
         ans = Map.fromList [ (i,Many) | Just (EVar (TVr { tvrIdent = i }),_) <- map (\e -> from_unsafeCoerce e `mplus` Just (e,Unknown)) as]
 
@@ -202,7 +201,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         return dsIn''
     initialB = mempty { envInScope =  Map.map (\e -> isBoundTo Many e) (so_boundVars sopts) }
     initialB' = mempty { envInScope =  Map.map (\e -> NotKnown) (so_boundVars sopts) }
-    (dsOut,stat)  = runIdentity $ runStatT (runNameMT doit)
+    (dsOut,stat)  = runIdentity $ runStatT (runIdNameT doit)
     doit = do
         dsIn <- sequence [etaExpandDef' (so_dataTable sopts) t e | (t,e) <- dsIn ]
         ds' <- collocc dsIn
@@ -212,14 +211,14 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                             else f e mempty initialB
                 return (t,e')
         mapM g ds'
-    go :: E -> Env -> NameMT Int (StatT Identity) E
+    go :: E -> Env -> IdNameT (StatT Identity) E
     go e inb = do
         let (e',_,_) = collectOcc sopts  e
         f e' mempty inb
-    f :: E -> Subst -> Env -> NameMT Int (StatT Identity) E
+    f :: E -> Subst -> Env -> IdNameT (StatT Identity) E
     f e sub inb | (EVar v,xs) <- fromAp e = do
         xs' <- mapM (dosub sub) xs
-        case Map.lookup (tvrNum v) sub of
+        case Map.lookup (tvrIdent v) sub of
             Just (Done e) -> h e xs' inb   -- e is var or trivial
             Just (Susp e s) -> do
                 e' <- f e s inb
@@ -256,29 +255,29 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         t' <- dosub sub t
         return $ EError s t'
     g ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d} sub inb = do
-        addNames (map tvrNum $ caseBinds ec)
+        addNames (map tvrIdent $ caseBinds ec)
         e' <- f e sub inb
         doCase e' (eCaseType ec) b as d sub inb
     g (ELam v e) sub inb  = do
-        addNames [tvrNum v]
+        addNames [tvrIdent v]
         v' <- nname v sub inb
-        e' <- f e (Map.insert (tvrNum v) (Done $ EVar v') sub) (envInScope_u (Map.insert (tvrNum v') NotKnown) inb)
+        e' <- f e (Map.insert (tvrIdent v) (Done $ EVar v') sub) (envInScope_u (Map.insert (tvrIdent v') NotKnown) inb)
         return $ ELam v' e'
     g (ELetRec [] e) sub inb = g e sub inb
     g (ELetRec ds e) sub inb = do
-        addNames $ map (tvrNum . fst) ds
+        addNames $ map (tvrIdent . fst) ds
         let z (t,EVar t') | t == t' = do    -- look for simple loops and replace them with errors.
                 t'' <- nname t sub inb
                 mtick $ "E.Simplify.<<loop>>.{" ++ showName (tvrIdent t) ++ "}"
-                return (tvrNum t,Many,t'',EError "<<loop>>" (getType t))
+                return (tvrIdent t,Many,t'',EError "<<loop>>" (getType t))
             z (t,e) = do
                 t' <- nname t sub inb
                 case Info.lookup (tvrInfo t) of
-                    _ | forceNoinline t -> return (tvrNum t,LoopBreaker,t',e)
-                    Just Once -> return (tvrNum t,Once,error $ "Once: " ++ show t,e)
-                    Just n -> return (tvrNum t,n,t',e)
+                    _ | forceNoinline t -> return (tvrIdent t,LoopBreaker,t',e)
+                    Just Once -> return (tvrIdent t,Once,error $ "Once: " ++ show t,e)
+                    Just n -> return (tvrIdent t,n,t',e)
                     -- We don't want to inline things we don't have occurance info for because they might lead to an infinite loop. hopefully the next pass will fix it.
-                    Nothing -> return (tvrNum t,LoopBreaker,t',e)
+                    Nothing -> return (tvrIdent t,LoopBreaker,t',e)
                     -- Nothing -> error $ "No Occurance info for " ++ show t
             w ((t,Once,t',e):rs) sub inb ds = do
                 mtick $ "E.Simplify.inline.Once.{" ++ showName t ++ "}"
@@ -288,15 +287,15 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                 case isAtomic e' && n /= LoopBreaker of
                     True -> do
                         when (n /= Unused) $ mtick $ "E.Simplify.inline.Atomic.{" ++ showName t ++ "}"
-                        w rs (Map.insert t (Done e') sub) (envInScope_u (Map.insert (tvrNum t') (isBoundTo n e')) inb) ((t',e'):ds)
+                        w rs (Map.insert t (Done e') sub) (envInScope_u (Map.insert (tvrIdent t') (isBoundTo n e')) inb) ((t',e'):ds)
                     -- False | worthStricting e', Strict <- Info.lookup (tvrInfo t') -> w rs sub
-                    False -> w rs sub (if n /= LoopBreaker then (envInScope_u (Map.insert (tvrNum t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
+                    False -> w rs sub (if n /= LoopBreaker then (envInScope_u (Map.insert (tvrIdent t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
             w [] sub inb ds = return (ds,sub,inb)
         ds <- sequence [ etaExpandDef' (so_dataTable sopts) t e | (t,e) <- ds]
         s' <- mapM z ds
         let
             sub'' = {- Map.fromList [ (t,Susp e sub'') | (t,Once,_,e) <- s'] `Map.union`-} (Map.fromList [ (t,Done (EVar t'))  | (t,n,t',_) <- s', n /= Once]) `Map.union` sub
-        (ds',sub',inb') <- w s' sub'' (envInScope_u (Map.fromList [ (tvrNum t',NotKnown) | (_,n,t',_) <- s', n /= Once] `Map.union`) inb) []
+        (ds',sub',inb') <- w s' sub'' (envInScope_u (Map.fromList [ (tvrIdent t',NotKnown) | (_,n,t',_) <- s', n /= Once] `Map.union`) inb) []
         e' <- f e sub' inb'
         case ds' of
             [(t,e)] | worthStricting e, Just (Strict.S _) <- Info.lookup (tvrInfo t), not (getProperty prop_CYCLIC t) -> do
@@ -350,10 +349,10 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         e' <- doCase e t b as d sub inb
         return $ substLet' ds e'
 
-    doCase (EVar v) t b as d sub inb |  Just IsBoundTo { bindingE = ELit l } <- Map.lookup (tvrNum v) (envInScope inb)  = doConstCase l t  b as d sub inb
+    doCase (EVar v) t b as d sub inb |  Just IsBoundTo { bindingE = ELit l } <- Map.lookup (tvrIdent v) (envInScope inb)  = doConstCase l t  b as d sub inb
     doCase (ELit l) t b as d sub inb  = doConstCase l t b as d sub inb
 
-    doCase (EVar v) t b as d sub inb | Just IsBoundTo { bindingE = e } <- Map.lookup (tvrNum v) (envInScope inb) , isBottom e = do
+    doCase (EVar v) t b as d sub inb | Just IsBoundTo { bindingE = e } <- Map.lookup (tvrIdent v) (envInScope inb) , isBottom e = do
         mtick "E.Simplify.case-of-bottom'"
         t' <- dosub sub t
         return $ prim_unsafeCoerce (EVar v) t'
@@ -364,7 +363,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                 e' <- doCase e t b' as' d' sub (envInScope_u (Map.fromList [ (n,NotKnown) | TVr { tvrIdent = n } <- litBinds l ] `Map.union`) inb)
                 return (Alt l e')
             --g e >>= return . Alt l
-            g x = doCase x t b' as' d' sub (envInScope_u (Map.insert (tvrNum b) NotKnown) inb)
+            g x = doCase x t b' as' d' sub (envInScope_u (Map.insert (tvrIdent b) NotKnown) inb)
         as'' <- mapM f as
         d'' <- fmapM g d
         t' <- dosub sub t
@@ -397,22 +396,22 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     doCase e _ b [] (Just d) sub inb | not (isLifted e || isUnboxed (getType e)) = do
         mtick "E.Simplify.case-unlifted"
         b' <- nname b sub inb
-        d' <- f d (Map.insert (tvrNum b) (Done (EVar b')) sub) (envInScope_u  (Map.insert (tvrNum b') (isBoundTo Many e)) inb)
+        d' <- f d (Map.insert (tvrIdent b) (Done (EVar b')) sub) (envInScope_u  (Map.insert (tvrIdent b') (isBoundTo Many e)) inb)
         return $ eLet b' e d'
     -- atomic unboxed values may be substituted or discarded without replicating work or affecting program semantics.
     doCase e _ b [] (Just d) sub inb | isUnboxed (getType e), isAtomic e = do
         mtick "E.Simplify.case-atomic-unboxed"
-        f d (Map.insert (tvrNum b) (Susp e sub) sub) inb
-    doCase (EVar v) _ b [] (Just d) sub inb | Just (NotAmong _) <-  Map.lookup (tvrNum v) (envInScope inb)  = do
+        f d (Map.insert (tvrIdent b) (Susp e sub) sub) inb
+    doCase (EVar v) _ b [] (Just d) sub inb | Just (NotAmong _) <-  Map.lookup (tvrIdent v) (envInScope inb)  = do
         mtick "E.Simplify.case-evaled"
-        d' <- f d (Map.insert (tvrNum b) (Done (EVar v)) sub) inb
+        d' <- f d (Map.insert (tvrIdent b) (Done (EVar v)) sub) inb
         return d'
-    doCase scrut _ v [] (Just sc@ECase { eCaseScrutinee = EVar v'} ) sub inb | v == v', not $ tvrNum v `Set.member` freeVars (caseBodies sc)  = do
+    doCase scrut _ v [] (Just sc@ECase { eCaseScrutinee = EVar v'} ) sub inb | v == v', not $ tvrIdent v `Set.member` freeVars (caseBodies sc)  = do
         mtick "E.Simplify.case-default-case"
         f sc { eCaseScrutinee = scrut } sub inb
     doCase e t b as d sub inb = do
         b' <- nname b sub inb
-        let dd e' = f e' (Map.insert (tvrNum b) (Done $ EVar b') sub) (envInScope_u (newinb `Map.union`) inb) where
+        let dd e' = f e' (Map.insert (tvrIdent b) (Done $ EVar b') sub) (envInScope_u (newinb `Map.union`) inb) where
                 na = NotAmong [ n | Alt (LitCons n _ _) _ <- as]
                 newinb = Map.fromList [ (n,na) | EVar (TVr { tvrIdent = n }) <- [e,EVar b']]
             da (Alt (LitInt n t) ae) = do
@@ -428,7 +427,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                     ninb = Map.fromList [ (n,NotKnown)  | TVr { tvrIdent = n } <- ns' ]
                 e' <- f ae (nsub `Map.union` sub) (envInScope_u (ninb `Map.union`) $ mins e (patToLitEE p') inb)
                 return $ Alt p' e'
-            mins (EVar v) e = envInScope_u (Map.insert (tvrNum v) (isBoundTo Many e))
+            mins (EVar v) e = envInScope_u (Map.insert (tvrIdent v) (isBoundTo Many e))
             mins _ _ = id
 
         d' <- fmapM dd d
@@ -499,7 +498,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         case (z,forceNoinline v) of
             (Just (x,xs),_) -> didInline inb x xs  -- h x xs inb
             (_,True) -> app (EVar v, xs')
-            _ -> case Map.lookup (tvrNum v) (envInScope inb) of
+            _ -> case Map.lookup (tvrIdent v) (envInScope inb) of
                 Just IsBoundTo { bindingOccurance = LoopBreaker } -> appVar v xs'
                 Just IsBoundTo { bindingOccurance = Once } -> error "IsBoundTo: Once"
                 Just IsBoundTo { bindingE = e } | forceInline v -> do
@@ -516,7 +515,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                     didInline inb  e xs'
                 Just _ -> appVar v xs'
                 Nothing  -> appVar v xs'
-                -- Nothing | tvrNum v `Set.member` exports -> app (EVar v,xs')
+                -- Nothing | tvrIdent v `Set.member` exports -> app (EVar v,xs')
                 -- Nothing -> error $ "Var not in scope: " ++ show v
     h e xs' inb = do app (e,xs')
     didInline inb z zs = do

@@ -35,6 +35,7 @@ import Name.Names
 import qualified Info.Info as Info
 import Stats
 import Support.CanType
+import Name.Id
 
 
 type Typ = VMap () Name
@@ -270,7 +271,7 @@ specializeProgram doSpecialize usedRules usedValues prog = do
 specializeDef _ (_,unusedVals,_,_) (tvr,e) | tvr `Set.member` unusedVals = return (tvr,EError "Unused" (tvrType tvr))
 specializeDef _ _ (t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
 specializeDef True (_,_,dataTable,_) (tvr,e) = ans where
-    sub = substMap''  $ Map.fromList [ (tvrNum t,v) | (t,Just v) <- sts ]
+    sub = substMap''  $ Map.fromList [ (tvrIdent t,v) | (t,Just v) <- sts ]
     sts = map spec ts
     spec t | Just nt <- Info.lookup (tvrInfo t) >>= getTyp (getType t) dataTable, sortStarLike (getType t) = (t,Just nt)
     spec t = (t,Nothing)

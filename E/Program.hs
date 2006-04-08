@@ -14,10 +14,11 @@ import E.TypeCheck
 import Name.Name
 import qualified Stats
 import Util.Graph
+import Name.Id
 
 
 data Program = Program {
-    progExternalNames :: Set.Set Id,
+    progExternalNames :: IdSet,
     progClassHierarchy :: ClassHierarchy,
     progCombinators :: [(TVr,[TVr],E)],
     progDataTable :: DataTable,

@@ -55,6 +55,8 @@ import Stats
 import Support.CanType
 import Support.FreeVars
 import Util.HasSize
+import Name.Id
+import Util.SetLike as S
 
 
 
@@ -104,19 +106,20 @@ mapBodies g (Rules mp) = do
     return $ Rules $ Map.fromAscList mp'
 
 
+ruleAllFreeVars :: Rules -> IdSet
 ruleAllFreeVars (Rules r) = freeVars (concatMap (map ruleBody) (Map.elems r))
 
-ruleFreeVars ::  Rules -> TVr -> Set.Set Int
+ruleFreeVars ::  Rules -> TVr -> IdSet
 ruleFreeVars (Rules r) tvr = case Map.lookup (tvrIdent tvr) r of
     Nothing -> mempty
     --Just rs -> mconcat (map ruleFvs rs) -- (freeVars (map ruleBody rs) Set.\\ freeVars (map ruleArgs rs))
-    Just rs -> (freeVars (map ruleBody rs) Set.\\ freeVars (map ruleArgs rs))
+    Just rs -> (freeVars (map ruleBody rs) S.\\ freeVars (map ruleArgs rs))
 
-ruleFreeVars' ::  Rules -> Id -> Set.Set Int
+ruleFreeVars' ::  Rules -> Id -> IdSet
 ruleFreeVars' (Rules r) tvr = case Map.lookup tvr r of
     Nothing -> mempty
     --Just rs -> mconcat (map ruleFvs rs) -- (freeVars (map ruleBody rs) Set.\\ freeVars (map ruleArgs rs))
-    Just rs -> (freeVars (map ruleBody rs) Set.\\ freeVars (map ruleArgs rs))
+    Just rs -> (freeVars (map ruleBody rs) S.\\ freeVars (map ruleArgs rs))
 
 
 instance FreeVars Rule b => FreeVars ARules b where
@@ -127,6 +130,9 @@ instance FreeVars Rule (Set.Set TVr) where
 
 instance FreeVars Rule (Set.Set Id) where
     freeVars rule = freeVars (ruleBody rule) Set.\\ Set.fromList (map tvrIdent $ ruleBinds rule)
+
+instance FreeVars Rule IdSet where
+    freeVars rule = freeVars (ruleBody rule) S.\\ fromList (map tvrIdent $ ruleBinds rule)
 
 instance FreeVars Rule [Id] where
     freeVars rule = Set.toList $ freeVars rule
@@ -211,7 +217,7 @@ arules xs = ARules (sortUnder ruleNArgs (map f xs)) where
         ruleArgs = map g (ruleArgs rule)
         } where
         bs = map (setProperty prop_RULEBINDER) (ruleBinds rule)
-        g e = substMap (Map.fromList [ (tvrNum t, EVar t) | t <- bs ]) e
+        g e = substMap (Map.fromList [ (tvrIdent t, EVar t) | t <- bs ]) e
 
 instance Monoid ARules where
     mempty = ARules []

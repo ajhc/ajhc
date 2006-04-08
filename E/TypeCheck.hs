@@ -1,7 +1,6 @@
 module E.TypeCheck(eAp, sortStarLike, sortTypeLike,  sortTermLike, inferType, typeInfer, typeInfer', match) where
 
 import Monad(when,liftM)
-import qualified Data.Set as Set
 import Control.Monad.Writer
 import Control.Monad.Reader
 
@@ -17,6 +16,8 @@ import E.Subst
 import GenUtil
 import Util.ContextMonad
 import qualified Util.Seq as Seq
+import Util.SetLike
+import Name.Id
 
 
 
@@ -96,11 +97,11 @@ inferType dataTable ds e = rfc e where
     fc e@(ELit _) = let t = typ e in valid t >> return t
     fc (EVar (TVr { tvrIdent = 0 })) = fail "variable with nothing!"
     fc (EVar (TVr { tvrType =  t})) = valid t >> strong' t
-    fc (EPi (TVr { tvrIdent = n, tvrType =  at}) b) = valid at >> rfc' [ d | d@(v,_) <- ds, tvrNum v /= n ] b
-    --fc (ELam tvr@(TVr n at) b) = valid at >> rfc' [ d | d@(v,_) <- ds, tvrNum v /= n ] b >>= \b' -> (strong' $ EPi tvr b')
+    fc (EPi (TVr { tvrIdent = n, tvrType =  at}) b) = valid at >> rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
+    --fc (ELam tvr@(TVr n at) b) = valid at >> rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b >>= \b' -> (strong' $ EPi tvr b')
     fc (ELam tvr@(TVr { tvrIdent = n, tvrType =  at}) b) = do
         valid at
-        b' <- rfc' [ d | d@(v,_) <- ds, tvrNum v /= n ] b
+        b' <- rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
         strong' $ EPi tvr b'
     fc (EAp (EPi tvr e) b) = rfc (subst tvr b e)
     fc (EAp a b) = do
@@ -125,7 +126,7 @@ inferType dataTable ds e = rfc e where
                 fceq nds e t
             nds = vs ++ ds
         mapM_ ck vs
-        when (hasRepeatUnder (tvrNum . fst) vs) $ fail "Repeat Variable in ELetRec"
+        when (hasRepeatUnder (tvrIdent . fst) vs) $ fail "Repeat Variable in ELetRec"
         et <- inferType' nds e
         strong nds et
     fc (EError _ e) = valid e >> (strong'  e)
@@ -169,7 +170,7 @@ inferType dataTable ds e = rfc e where
         mapM_ verifyPats' xs
         when (hasRepeatUnder litHead xs) $ fail "Duplicate case alternatives"
 
-    verifyPats' LitCons { litArgs = xs } = when (hasRepeatUnder id (filter (/= 0) $ map tvrNum xs)) $ fail "Case pattern is non-linear"
+    verifyPats' LitCons { litArgs = xs } = when (hasRepeatUnder id (filter (/= 0) $ map tvrIdent xs)) $ fail "Case pattern is non-linear"
     verifyPats' _ = return ()
 
     eqAll ts = withContextDoc (text "eqAll" </> list (map prettyE ts)) $ foldl1M_ eq ts
@@ -253,10 +254,10 @@ typeInfer'' dataTable ds e = rfc e where
     fc e@ELit {} = strong' (getType e)
     fc (EVar TVr { tvrIdent = 0 }) = fail "variable with nothing!"
     fc (EVar TVr { tvrType =  t}) =  strong' t
-    fc (EPi TVr { tvrIdent = n, tvrType = at} b) =  rfc' [ d | d@(v,_) <- ds, tvrNum v /= n ] b
+    fc (EPi TVr { tvrIdent = n, tvrType = at} b) =  rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
     fc (ELam tvr@TVr { tvrIdent = n, tvrType =  at} b) = do
         at' <- strong' at
-        b' <- rfc' [ d | d@(v,_) <- ds, tvrNum v /= n ] b
+        b' <- rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
         return (EPi (tVr n at') b')
     fc (EAp (EPi tvr e) b) = do
         b <- strong' b
@@ -287,7 +288,8 @@ match :: Monad m =>
     -> E                  -- ^ input expression
     -> m [(TVr,E)]
 match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () (-2::Int)) where
-    bvs = Set.fromList (map tvrIdent vs)
+    bvs :: IdSet
+    bvs = fromList (map tvrIdent vs)
 
     un _ _ _ c | c `seq` False = undefined
     un (EAp a b) (EAp a' b') mm c = do
@@ -307,7 +309,7 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () (-2::Int)) 
     un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | i == j = un t u mm c
     un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | i < 0 || j < 0  = fail "Expressions don't match"
     un (EVar tvr@TVr { tvrIdent = i, tvrType = t}) b mm c
-        | i `Set.member` bvs = tell (Seq.single (tvr,b))
+        | i `member` bvs = tell (Seq.single (tvr,b))
         | otherwise = fail $ "Expressions do not unify: " ++ show tvr ++ show b
     un a (EVar tvr) mm c | Just b <- lup (tvrIdent tvr), not $ isEVar b = un a b mm c
 

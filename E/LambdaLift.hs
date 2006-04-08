@@ -4,8 +4,7 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.FunctorM
 import Data.IORef
-import List
-import qualified Data.Set as Set
+import List hiding(insert)
 
 import Atom
 import E.E
@@ -21,6 +20,8 @@ import Name.Name
 import Stats
 import Util.UniqueMonad
 import Util.Graph as G
+import Util.SetLike
+import Name.Id
 
 
 
@@ -35,7 +36,7 @@ flattenSC (SC v cs) = SC v (concatMap f cs) where
 lambdaLiftE stats dt e = fmap scToE (lambdaLift stats dt (eToSC dt e))
 -}
 
-data S = S { funcName :: Name, topVars :: Set.Set Int, isStrict :: Bool, declEnv :: [(TVr,E)] }
+data S = S { funcName :: Name, topVars :: IdSet, isStrict :: Bool, declEnv :: [(TVr,E)] }
     {-! derive: update !-}
 
 etaReduce :: E -> (E,Int)
@@ -43,12 +44,12 @@ etaReduce e = case f e 0 of
         (ELam {},_) -> (e,0)
         x -> x
     where
-        f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && not (tvrNum t `Set.member` freeVars x) = f x (n + 1)
+        f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && not (tvrIdent t `member` (freeVars x :: IdSet)) = f x (n + 1)
         f e n = (e,n)
 
 lambdaLift :: Stats -> Program -> IO Program
 lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs } = do
-    let wp =  Set.fromList [ tvrNum x | (x,_,_) <- cs ]
+    let wp =  fromList [ x | (x,_,_) <- cs ]
     fc <- newIORef []
     let z (n,as,v) = do
             let ((v',cs'),stat) = runReader (runStatT $ execUniqT 1 $ runWriterT (f v)) S { funcName = mkFuncName (tvrIdent n), topVars = wp,isStrict = True, declEnv = [] }
@@ -87,14 +88,14 @@ lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs 
             gs <- asks topVars
             ds <- asks declEnv
             let fvs = freeVars e
-                fvs' = filter (not . (`Set.member` gs) . tvrNum) fvs
+                fvs' = filter (not . (`member` gs) . tvrIdent) fvs
                 ss = filter (sortStarLike . tvrType) fvs'
                 f [] e False = return (e,fvs'')
                 f [] e True = pLift e
                 f (s:ss) e x
                     | Just v <- lookup s ds = f ss (removeType s v e) True   -- TODO subst
                     | otherwise = f ss e x
-                fvs'' = reverse $ topSort $ newGraph fvs' tvrNum freeVars
+                fvs'' = reverse $ topSort $ newGraph fvs' tvrIdent freeVars
             f ss e False
         h (Left (t,e):ds) rest ds' | shouldLift e = do
             (e,fvs'') <- pLift e
@@ -103,9 +104,9 @@ lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs 
                 fs -> doBigLift e fs (\e'' -> h ds rest ((t,e''):ds'))
 
         h (Left (t,e):ds) rest ds'  = do
-            let fvs =  freeVars e
+            let fvs =  freeVars e :: [Id]
             gs <- asks topVars
-            let fvs' = filter (not . (`Set.member` gs) ) fvs
+            let fvs' = filter (not . (`member` gs) ) fvs
             case fvs' of
                 [] -> doLift t e (h ds rest ds')  -- We always lift CAFS to the top level for now. (GC?)
                 _ ->  local (isStrict_s False) (f e) >>= \e'' -> h ds rest ((t,e''):ds')
@@ -113,8 +114,8 @@ lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs 
         h (Right rs:ds) rest ds' | any shouldLift (snds rs)  = do
             gs <- asks topVars
             let fvs =  freeVars (snds rs)--   (Set.fromList (map tvrIdent $ fsts rs) `Set.union` gs)
-            let fvs' = filter (not . (`Set.member` (Set.fromList (map tvrIdent $ fsts rs) `Set.union` gs) ) . tvrIdent) fvs
-                fvs'' = reverse $ topSort $ newGraph fvs' tvrNum freeVars
+            let fvs' = filter (not . (`member` (fromList (map tvrIdent $ fsts rs) `mappend` gs) ) . tvrIdent) fvs
+                fvs'' = reverse $ topSort $ newGraph fvs' tvrIdent freeVars
             case fvs'' of
                 [] -> doLiftR rs (h ds rest ds')  -- We always lift CAFS to the top level for now. (GC?)
                 fs -> doBigLiftR rs fs (\rs' -> h ds rest (rs' ++ ds'))
@@ -125,7 +126,7 @@ lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs 
                     return (t,e'')
                 h ds e' (rs' ++ ds')
         h [] e ds = f e >>= return . eLetRec ds
-        doLift t e r = local (topVars_u (Set.insert (tvrNum t)) ) $ do
+        doLift t e r = local (topVars_u (insert (tvrIdent t)) ) $ do
             --(e,tn) <- return $ etaReduce e
             let (e',ls) = fromLam e
             mtick (toAtom $ "E.LambdaLift.doLift." ++ typeLift e ++ "." ++ show (length ls))
@@ -133,7 +134,7 @@ lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs 
             e'' <- local (isStrict_s True) $ f e'
             tell [(t,ls,e'')]
             r
-        doLiftR rs r = local (topVars_u (Set.union (Set.fromList (map (tvrNum . fst) rs)) )) $ do
+        doLiftR rs r = local (topVars_u (mappend (fromList (map (tvrIdent . fst) rs)) )) $ do
             flip mapM_ rs $ \ (t,e) -> do
                 --(e,tn) <- return $ etaReduce e
                 let (e',ls) = fromLam e
@@ -205,8 +206,8 @@ removeType t v e = ans where
 --        h ((t,e):ds) rest ds' | shouldLift e = do
 --            let fvs =  freeVars e
 --            gs <- asks topVars
---            let fvs' = filter (not . (`Set.member` gs) . tvrNum) fvs
---                fvs'' = reverse $ topSort $ newGraph fvs' tvrNum freeVars
+--            let fvs' = filter (not . (`Set.member` gs) . tvrIdent) fvs
+--                fvs'' = reverse $ topSort $ newGraph fvs' tvrIdent freeVars
 --            case fvs'' of
 --                [] -> doLift t e (h ds rest ds')
 --                fs -> doBigLift e fs (\e'' -> h ds rest ((t,e''):ds'))
@@ -217,8 +218,8 @@ removeType t v e = ans where
 --            if (isELam e || (shouldLift e && not st)) then do
 --                let (fvs :: [TVr]) = freeVars e
 --                (gs :: Set.Set Int) <- asks topVars
---                let fvs' = filter (not . (`Set.member` gs) . tvrNum) fvs
---                    fvs'' = reverse $ topSort $ newGraph fvs' tvrNum freeVars
+--                let fvs' = filter (not . (`Set.member` gs) . tvrIdent) fvs
+--                    fvs'' = reverse $ topSort $ newGraph fvs' tvrIdent freeVars
 --                doBigLift e fvs'' return
 --             else emapE' f e
 

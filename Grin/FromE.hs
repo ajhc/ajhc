@@ -108,8 +108,8 @@ cafNum n = V $ - atomIndex (partialTag t 0)
 
 
 toEntry (n,as,e)
-    | Just nm <- intToAtom (tvrNum n)  = f (toAtom ('f':show (fromAtom nm :: Name)))
-    | otherwise = f (toAtom ('f':show (tvrNum n))) where
+    | Just nm <- intToAtom (tvrIdent n)  = f (toAtom ('f':show (fromAtom nm :: Name)))
+    | otherwise = f (toAtom ('f':show (tvrIdent n))) where
         f x = (x,map (toType (TyPtr TyNode) . tvrType ) $ filter (shouldKeep . getType )as,toType TyNode (getType (e::E) :: E))
 
 toType :: Ty -> E -> Ty
@@ -142,7 +142,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry } = 
             counter = counter,
             constMap = mempty,
             errorOnce = errorOnce,
-            ccafMap = Map.fromList $ [(tvrNum v,e) |(v,_,e) <- cc ]  ++ [ (tvrNum v,Var vv (TyPtr TyNode)) | (v,vv,_) <- rcafs]
+            ccafMap = Map.fromList $ [(tvrIdent v,e) |(v,_,e) <- cc ]  ++ [ (tvrIdent v,Var vv (TyPtr TyNode)) | (v,vv,_) <- rcafs]
             }
     ds <- mapM doCompile [ c | c@(v,_,_) <- progCombinators prog, v `notElem` [x | (x,_,_) <- cc]]
     --(_,(Tup [] :-> theMain)) <- doCompile ((mainEntry,[],EVar mainEntry))
@@ -159,7 +159,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry } = 
         dumpTyEnv newTyEnv
     fbaps <- readIORef funcBaps
     --sequence_ [ typecheck te c >>= when False . print . (,) a  | (a,_,c) <-  ds ]
-    -- let (main,as,rtype) = runIdentity $ Map.lookup (tvrNum mt) scMap
+    -- let (main,as,rtype) = runIdentity $ Map.lookup (tvrIdent mt) scMap
         -- main' =  if not $ null as then  (Return $ NodeC (partialTag main (length as)) []) else App main [] rtype
         -- tags = Set.toList $ ep $ Set.unions (freeVars (main',initCafs):[ freeVars e | (_,(_ :-> e)) <- ds ])
     let ep s = Set.fromList $ concatMap partialLadder $ Set.toList s
@@ -178,7 +178,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry } = 
     --typecheckGrin grin
     return grin
     where
-    scMap = Map.fromList [ (tvrNum t,toEntry x) |  x@(t,_,_) <- map stripTheWorld $ progCombinators prog]
+    scMap = Map.fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- map stripTheWorld $ progCombinators prog]
     initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ [ (a,(b,c)) | (_,(a,b,c)) <-  Map.toList scMap] ++ [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode))
     con c = (n,(as,TyNode)) where
@@ -228,7 +228,7 @@ constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans wh
     -- All CAFS
     ecafs = [ (v,e) | (v,[],e) <- ds, Just (IsCAF True) == Info.lookup (tvrInfo v) ]
     -- just CAFS that can be converted to constants need dependency analysis
-    (lbs',cafs) = G.findLoopBreakers (const 0) (const True) $ G.newGraph (filter (canidate . snd) ecafs) (tvrNum . fst) (freeVars . snd)
+    (lbs',cafs) = G.findLoopBreakers (const 0) (const True) $ G.newGraph (filter (canidate . snd) ecafs) (tvrIdent . fst) (freeVars . snd)
     lbs = Set.fromList $ fsts lbs'
     canidate (ELit _) = True
     canidate (EPi _ _) = True
@@ -267,7 +267,7 @@ getName' dataTable v@(LitCons n es _)
 instance ToVal TVr where
     toVal (TVr { tvrIdent = num, tvrType = w}) | w == tWorld__ = Tup []-- Var v0 tyUnit -- es == eHash, RawType <- nameType n  = Var (V num) (Ty $ toAtom (show n))
     toVal (TVr { tvrIdent = num, tvrType = (ELit (LitCons n [] es))}) | es == eHash, RawType <- nameType n  = Var (V num) (Ty $ toAtom (show n))
-    toVal tvr = Var  (V (tvrNum tvr)) (TyPtr TyNode) -- (toTy $ tvrType tvr)
+    toVal tvr = Var  (V (tvrIdent tvr)) (TyPtr TyNode) -- (toTy $ tvrType tvr)
 
 -- constraints during compilation:
 --
@@ -296,9 +296,9 @@ compile' dataTable cenv (tvr,as,e) = ans where
         --putStrLn $ "Compiling: " ++ show nn
         x <- cr e
         return (nn,(Tup (map toVal (filter (shouldKeep . getType) as)) :-> x))
-    funcName = maybe (show $ tvrNum tvr) show (fmap fromAtom ( intToAtom $ tvrNum tvr) :: Maybe Name)
+    funcName = maybe (show $ tvrIdent tvr) show (fmap fromAtom ( intToAtom $ tvrIdent tvr) :: Maybe Name)
     cc, ce, cr :: E -> IO Exp
-    (nn,_,_) = runIdentity $ Map.lookup (tvrNum tvr) (scMap cenv)
+    (nn,_,_) = runIdentity $ Map.lookup (tvrIdent tvr) (scMap cenv)
     cr x = ce x
 
     -- | ce evaluates something in strict context returning the evaluated result of its argument.
@@ -312,10 +312,10 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce e | (EVar tvr,as) <- fromAp e = do
         as <- return $ args as
         let fty = toType TyNode (getType e)
-        case Map.lookup (tvrNum tvr) (ccafMap cenv) of
+        case Map.lookup (tvrIdent tvr) (ccafMap cenv) of
             Just (Const c) -> app fty (Return c) as
             Just x@Var {} -> app fty (gEval x) as
-            Nothing -> case Map.lookup (tvrNum tvr) (scMap cenv) of
+            Nothing -> case Map.lookup (tvrIdent tvr) (scMap cenv) of
                 Just (v,as',es)
                     | length as >= length as' -> do
                         let (x,y) = splitAt (length as') as
@@ -477,7 +477,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
     cc (ELetRec ds e) = cc e >>= \e -> doLet ds e
     cc e | (EVar v,as@(_:_)) <- fromAp e = do
         as <- return $ args as
-        case Map.lookup (tvrNum v) (scMap cenv) of
+        case Map.lookup (tvrIdent v) (scMap cenv) of
             Just (_,[],_) | Just x <- constant (EVar v) -> app' x as
             Just (v,as',es)
                 | length as > length as' -> do
@@ -547,8 +547,8 @@ compile' dataTable cenv (tvr,as,e) = ans where
     -- CAFs may be updated with evaluated values.
 
     constant :: Monad m =>  E -> m Val
-    constant (EVar tvr) | Just c <- Map.lookup (tvrNum tvr) (ccafMap cenv) = return c
-                        | Just (v,as,_) <- Map.lookup (tvrNum tvr) (scMap cenv)
+    constant (EVar tvr) | Just c <- Map.lookup (tvrIdent tvr) (ccafMap cenv) = return c
+                        | Just (v,as,_) <- Map.lookup (tvrIdent tvr) (scMap cenv)
                          , t <- partialTag v (length as), tagIsWHNF t = return $ Const $ NodeC t []
     --                        False -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
     constant e | Just l <- literal e = return l
@@ -576,7 +576,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
     con _ = fail "not constructor"
 
 
-    scInfo tvr | Just n <- Map.lookup (tvrNum tvr) (scMap cenv) = return n
+    scInfo tvr | Just n <- Map.lookup (tvrIdent tvr) (scMap cenv) = return n
     scInfo tvr = fail $ "not a supercombinator:" <+> show tvr
     newNodeVar =  fmap (\x -> Var x TyNode) newVar
     newPrimVar ty =  fmap (\x -> Var x ty) newVar

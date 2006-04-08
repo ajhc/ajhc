@@ -12,6 +12,7 @@ import E.Subst
 import GenUtil
 import Info.Info as Info
 import Info.Types
+import Name.Id
 
 annotateDs :: Monad m =>
     (Map.Map Id (Maybe E))
@@ -104,7 +105,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         f (t:ts) rs = do
             (t',r) <- ntvr vs t
             local r $ f ts ((t',r):rs)
-        vs = [ tvrNum x | x <- ts ]
+        vs = [ tvrIdent x | x <- ts ]
     -- ntvr :: Monad m => Info -> [Int] -> TVr -> ReaderT (Map.Map Int (Maybe E)) m (TVr, (Map.Map Int (Maybe E)) -> (Map.Map Int (Maybe E)))
     ntvr xs tvr@(TVr { tvrIdent = 0, tvrType =  t}) = do
         t' <- f t

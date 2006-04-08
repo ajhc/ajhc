@@ -66,7 +66,7 @@ allShadow e  = f e (Map.empty,-2) where
         f (t:ts) rs = do
             (t',r) <- ntvr vs t
             local r $ f ts ((t',r):rs)
-        vs = [ tvrNum x | x <- ts ]
+        vs = [ tvrIdent x | x <- ts ]
     -}
 
 

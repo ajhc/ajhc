@@ -2,24 +2,25 @@ module E.Show(ePretty,render,prettyE,ePrettyEx) where
 
 import Char
 import Control.Monad.Identity
-import qualified Data.Set as Set
 
 import Atom
+import C.Prims
 import Doc.Attr
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.E
-import C.Prims
 import E.FreeVars()
-import Support.FreeVars
+import Name.Id
 import Name.Name
 import Name.Names
 import Name.VConsts
 import Options
 import qualified Doc.Chars as UC
 import qualified FlagDump as FD
+import Support.FreeVars
 import Support.Unparse
+import Util.SetLike
 import Util.VarName
 
 render :: Doc -> String
@@ -144,7 +145,7 @@ showE e = do
         f e | e == vUnit     = return $ atom $ text "()"
         f (EAp a b) = liftM2 app (showE a) (showE b)
         f (EPi (TVr { tvrIdent = 0, tvrType =  e1}) e2) = liftM2 arr (showE e1) (showE e2)
-        f (EPi (TVr { tvrIdent = n, tvrType =  e1}) e2) | not $ dump FD.EVerbose, not $ n `Set.member` freeVars e2 = liftM2 arr (showE e1) (showE e2)
+        f (EPi (TVr { tvrIdent = n, tvrType =  e1}) e2) | not $ dump FD.EVerbose, not $ n `member` (freeVars e2 ::IdSet) = liftM2 arr (showE e1) (showE e2)
         f (EPi tvr@(TVr {  tvrType =  z}) e) | z == eStar = allocTVr tvr $ do
             tvr <- showTVr' tvr
             liftM2 dot (return $ pop (retOp UC.forall) tvr) (showE e)
@@ -197,7 +198,7 @@ showE e = do
                 Just e -> do
                     let ecb = eCaseBind ec
 
-                    db <- showTVr (if dump FD.EVerbose || (tvrIdent ecb `Set.member` freeVars e) then ecb else ecb { tvrIdent = 0 })
+                    db <- showTVr (if dump FD.EVerbose || (tvrIdent ecb `member` (freeVars e :: IdSet)) then ecb else ecb { tvrIdent = 0 })
                     e <- showE e
                     return [unparse db <+> UC.rArrow <+> unparse e]
             let alts' = map (<> bc ';') (alts ++ dcase)

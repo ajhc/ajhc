@@ -130,7 +130,7 @@ etaAnnotateProgram prog = runIdentity $ programMapRecGroups mempty pass iletann 
 -- | eta reduce as much as possible
 etaReduce :: E -> E
 etaReduce e = f e where
-        f (ELam t (EAp x (EVar t'))) | t == t' && not (tvrNum t `Set.member` freeVars x) = f x
+        f (ELam t (EAp x (EVar t'))) | t == t' && not (tvrIdent t `Set.member` freeVars x) = f x
         f e = e
 
 -- | only reduce if all lambdas can be discarded. otherwise leave them in place
@@ -139,7 +139,7 @@ etaReduce' e = case f e 0 of
         (ELam {},_) -> (e,0)
         x -> x
     where
-        f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && not (tvrNum t `Set.member` freeVars x) = f x (n + 1)
+        f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && not (tvrIdent t `Set.member` freeVars x) = f x (n + 1)
         f e n = (e,n)
 
 

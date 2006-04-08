@@ -5,7 +5,7 @@ import Binary
 import Atom(Atom)
 import Class(ClassHierarchy)
 import DataConstructors(DataTable)
-import E.E(TVr,Id,E)
+import E.E(TVr,E)
 import E.Rules(Rules)
 import E.TypeCheck()
 import FrontEnd.SrcLoc(SrcLoc)
@@ -17,6 +17,7 @@ import Name.Name(Name)
 import PackedString(PackedString)
 import Representation(Type())
 import TypeSynonyms(TypeSynonyms)
+import Name.Id
 
 
 import Data.Monoid

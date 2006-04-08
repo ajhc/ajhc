@@ -20,11 +20,12 @@ import qualified Data.Map as Map
 
 import E.E
 import E.FreeVars()
+import Name.Id
 import Support.FreeVars
 import GenUtil
 
 eLetRec :: [(TVr,E)] -> E -> E
-eLetRec ds e = f (filter ((/= 0) . tvrNum . fst) ds) where
+eLetRec ds e = f (filter ((/= 0) . tvrIdent . fst) ds) where
     f [] = e
     f ds = ELetRec ds e
 
@@ -123,7 +124,7 @@ doSubst substInVars allShadow bm e  = f e bm where
         f (t:ts) rs = do
             (t',r) <- ntvr vs t
             local r $ f ts ((t',r):rs)
-        vs = [ tvrNum x | x <- ts ]
+        vs = [ tvrIdent x | x <- ts ]
 
     --mapMntvr [] = return []
     --mapMntvr (t:ts) = do
@@ -241,7 +242,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
         f (t:ts) rs = do
             (t',r) <- ntvr vs t
             local r $ f ts ((t',r):rs)
-        vs = [ tvrNum x | x <- ts ]
+        vs = [ tvrIdent x | x <- ts ]
     inType = local (\ (_,trm,typ) -> (True,trm,typ) )
     addMap i (Just e) (b,trm,typ) = (b,Map.insert i (Just e) trm, Map.insert i e typ)
     addMap i Nothing (b,trm,typ) = (b,Map.insert i Nothing trm, typ)

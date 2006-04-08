@@ -1,5 +1,5 @@
 {-# OPTIONS -fglasgow-exts #-}
-module E.FreeVars(decomposeLet, decomposeDefns) where
+module E.FreeVars(decomposeLet, decomposeDefns, freeIds) where
 
 import Support.FreeVars
 import E.E
@@ -10,6 +10,8 @@ import qualified Data.Map as Map
 import Data.Monoid
 import GenUtil
 import Data.Graph as G
+import Name.Id
+import Util.SetLike as S
 
 -------------------------
 -- finding free variables
@@ -21,7 +23,7 @@ getLitTyp (LitInt _ t) = t
 getLitTyp (LitCons _ _ t) = t
 
 instance FreeVars (Alt E) (IM.IntMap TVr) where
-    freeVars as@(Alt l e) = IM.unions $ freeVars (getLitTyp l):(freeVars e IM.\\ IM.fromList [ (tvrNum t,t) | t <- litBinds l]):( map (freeVars . getTyp) $ litBinds l)
+    freeVars as@(Alt l e) = IM.unions $ freeVars (getLitTyp l):(freeVars e IM.\\ IM.fromList [ (tvrIdent t,t) | t <- litBinds l]):( map (freeVars . getTyp) $ litBinds l)
 instance FreeVars E IS.IntSet where
     freeVars e = IS.fromDistinctAscList (fsts . IM.toAscList $ freeVs e)
 instance FreeVars E (IM.IntMap TVr) where
@@ -56,6 +58,11 @@ instance FreeVars (Alt E) (Set.Set Id) where
 instance FreeVars (Alt E) (Set.Set TVr) where
     freeVars as@(Alt l e) = Set.unions $ freeVars (getLitTyp l):(freeVars e Set.\\ Set.fromList (litBinds l)):(map (freeVars . getTyp) $ litBinds l)
 
+instance FreeVars (Alt E) IdSet where
+    freeVars as@(Alt l e) = mconcat $ freeVars (getLitTyp l):(freeVars e S.\\ fromList [ tvrIdent t | t <- litBinds l]):(map (freeVars . getTyp) $ litBinds l)
+instance FreeVars E IdSet where
+    freeVars e = freeIds e
+
 freeVs ::  E -> IM.IntMap TVr
 freeVs =   fv where
     (<>) = IM.union
@@ -70,7 +77,7 @@ freeVs =   fv where
     fv (EError _ e) = fv e
     fv (ELit l) = fvLit l
     fv (EPrim _ es e) = IM.unions $ fv e : map fv es
-    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = IM.unions ( fv e:freeVars (getTyp  b):freeVars ty:(IM.delete (tvrNum b) $ IM.unions (freeVars d:map freeVars as)  ):[])
+    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = IM.unions ( fv e:freeVars (getTyp  b):freeVars ty:(IM.delete (tvrIdent b) $ IM.unions (freeVars d:map freeVars as)  ):[])
     fv Unknown = IM.empty
     fv ESort {} = IM.empty
     fvLit (LitCons _ es e) = IM.unions $ fv e:map fv es
@@ -111,7 +118,7 @@ freeVsMap e = fv e where
     fv (EError _ e) = fv e
     fv (ELit l) = fvLit l
     fv (EPrim _ es e) = Map.unions $ fv e : map fv es
-    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = Map.unions ( fv e:freeVars' ty:freeVars' (getTyp  b):(Map.delete (tvrNum b) $ Map.unions (freeVars d:map freeVars as)  ):[])
+    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = Map.unions ( fv e:freeVars' ty:freeVars' (getTyp  b):(Map.delete (tvrIdent b) $ Map.unions (freeVars d:map freeVars as)  ):[])
     fv Unknown = Map.empty
     fv ESort {} = Map.empty
     fvLit (LitCons _ es e) = Map.unions $ fv e:map fv es
@@ -129,4 +136,25 @@ decomposeDefns bs = map f mp where
 decomposeLet :: E ->  ([Either (TVr, E) [(TVr,E)]],E)
 decomposeLet (ELetRec ds e) = (decomposeDefns ds,e)
 decomposeLet e = ([],e)
+
+-- we export this to get a concrete type for free id sets.
+freeIds ::  E -> IdSet
+freeIds =   fv where
+    (<>) = mappend
+    fv (EAp e1 e2) = fv e1 <> fv e2
+    fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = insert i (fv t)
+    fv (ELam TVr { tvrIdent = i, tvrType = t} e) = delete i $ fv e <> fv t
+    fv (EPi  TVr { tvrIdent = i, tvrType = t} e) = delete i $ fv e <> fv t
+    fv (ELetRec dl e) =  ((tl <> bl <> fv e) S.\\ fromList ll)  where
+        (ll,tl,bl) = liftT3 (id,mconcat,mconcat) $ unzip3 $
+            map (\(tvr@(TVr { tvrIdent = j, tvrType =  t}),y) -> (j, fv t, fv y)) dl
+    fv (EError _ e) = fv e
+    fv (ELit l) = fvLit l
+    fv (EPrim _ es e) = mconcat $ fv e : map fv es
+    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = mconcat ( fv e:freeVars (getTyp  b):freeVars ty:(delete (tvrIdent b) $ mconcat (freeVars d:map freeVars as)  ):[])
+    fv Unknown = mempty
+    fv ESort {} = mempty
+    fvLit (LitCons _ es e) = mconcat $ fv e:map fv es
+    fvLit l = fv (getLitTyp l)
+
 
