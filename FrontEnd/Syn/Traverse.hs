@@ -126,6 +126,7 @@ traverseHsExp fn e = f e where
 
 -}
 
+traverseHsType_ fn p = traverseHsType (traverse_ fn) p >> return ()
 
 traverseHsType f (HsTyFun a b) = do
     a <- f a
@@ -147,6 +148,7 @@ traverseHsType f (HsTyExists vs qt) = do
 traverseHsType _ x@HsTyVar {} = return x
 traverseHsType _ x@HsTyCon {} = return x
 
+traverseHsPat_ fn p = traverseHsPat (traverse_ fn) p >> return ()
 
 traverseHsPat :: MonadSetSrcLoc m => (HsPat -> m HsPat) -> HsPat -> m HsPat
 traverseHsPat fn p = f p where
