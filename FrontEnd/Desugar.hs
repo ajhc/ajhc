@@ -46,7 +46,9 @@ import Name.Name
 import Name.Names
 import Name.VConsts
 import Options
+import FrontEnd.Syn.Traverse
 import qualified FlagOpts as FO
+import FrontEnd.SrcLoc
 
 removeSynonymsFromType _ t = t
 removeSynsFromSig _ t = t
@@ -73,28 +75,12 @@ readSyns = do
 incUnique :: PatSM ()
 incUnique = updatePatSM (\(u, s) -> (u + 1, s))
 
---newtype PatSM a = PatSM (PatState -> (a, PatState))  -- The monadic type
-
 type PatSM = State PatState
 
---instance Monad PatSM where
---  -- defines state propagation
---  PatSM c1 >>= fc2         =  PatSM (\s0 -> let (r,s1) = c1 s0
---                                                PatSM c2 = fc2 r in
---                                                c2 s1)
---  return k                  =  PatSM (\s -> (k,s))
---
--- -- extracts the state from the monad
---readPatSM                  :: PatSM PatState
---readPatSM                  =  PatSM (\s -> (s,s))
---
--- -- updates the state of the monad
---updatePatSM                :: (PatState -> PatState) -> PatSM ()  -- alters the state
---updatePatSM f              =  PatSM (\s -> ((), f s))
---
----- run a computation in the PatSM monad
---runPatSM                   :: PatState -> PatSM a -> (a, PatState)
---runPatSM s0 (PatSM c)     =  c s0
+instance MonadSrcLoc PatSM where
+instance MonadSetSrcLoc PatSM where
+    withSrcLoc _ a = a
+
 
 {------------------------------------------------------------------------------}
 
@@ -152,48 +138,6 @@ desugarHsExp :: Monad m => HsExp -> m HsExp
 desugarHsExp s = return $ fst $ runPatSM (0::Int, undefined) $ desugarExp s
 
 
---desugarTidyModule :: [HsDecl] -> TidyModule -> TidyModule
---desugarTidyModule importSyns tidy
---   = newTidy
---   where
---   (newTidy, _) = runPatSM (0::Int, synonyms) $ desugarTidyModuleM tidy
---   synonyms = tidyTyDecls tidy ++ importSyns
---
---desugarTidyModuleM :: TidyModule -> PatSM TidyModule
---desugarTidyModuleM tidy
---   = do let oldTyDecls    = tidyTyDecls tidy
---            oldDataDecls  = tidyDataDecls tidy
---            oldInFixDecls = tidyInFixDecls tidy
---            oldNewTyDecls = tidyNewTyDecls tidy
---            oldClassDecls = tidyClassDecls tidy
---            oldInstDecls  = tidyInstDecls tidy
---            oldDefs       = tidyDefDecls tidy
---            oldTySigs     = tidyTySigs tidy
---            oldFunBinds   = tidyFunBinds tidy
---            oldPatBinds   = tidyPatBinds tidy
---        newTyDecls    <- mapM desugarDecl oldTyDecls
---        newDataDecls  <- mapM desugarDecl oldDataDecls
---        newInFixDecls <- mapM desugarDecl oldInFixDecls
---        newNewTyDecls <- mapM desugarDecl oldNewTyDecls
---        newClassDecls <- mapM desugarDecl oldClassDecls
---        newInstDecls  <- mapM desugarDecl oldInstDecls
---        newDefs       <- mapM desugarDecl oldDefs
---        newTySigs     <- mapM desugarDecl oldTySigs
---        newFunBinds   <- mapM desugarDecl oldFunBinds
---        newPatBinds   <- mapM desugarDecl oldPatBinds
---        return tidy{tidyTyDecls    = concat newTyDecls, --[],  -- return the empty list of synonyms, we don't need them anymore
---                    tidyDataDecls  = concat newDataDecls,
---                    tidyInFixDecls = concat newInFixDecls,
---                    tidyNewTyDecls = concat newNewTyDecls,
---                    tidyClassDecls = concat newClassDecls,
---                    tidyInstDecls  = concat newInstDecls,
---                    tidyDefDecls   = concat newDefs,
---                    tidyTySigs     = concat newTySigs,
---                    tidyFunBinds   = concat newFunBinds,
---                    tidyPatBinds   = concat newPatBinds}
---
-
-
 desugarDecl :: HsDecl -> PatSM [HsDecl]
 desugarDecl (HsForeignDecl a b c d e qt) = do
     qt <- remSynsQualType qt
@@ -208,10 +152,6 @@ desugarDecl pb@(HsPatBind sloc (HsPVar n) rhs wheres) = do
     newWheres <- mapM desugarDecl wheres
     return [HsPatBind sloc (HsPVar n) newRhs (concat newWheres)]
 
-
--- constructor and tuple pattern bindings must be changed
--- XXX bjpop: what about nested parenthesised patterns that just bind
--- variables?
 
 desugarDecl pb@(HsPatBind sloc pat rhs wheres) = do
     rhs <- desugarRhs rhs
@@ -272,25 +212,6 @@ createSelectors _sloc ds = ans where
     err = nameName $ toUnqualified $ v_error
 
 
-
-{-
-
-remSynsFromCondecl :: HsConDecl -> PatSM HsConDecl
-remSynsFromCondecl (HsConDecl sloc name bangTypes)
-   = do
-        newBangTypes <- mapM remSynsFromBangType bangTypes
-        return (HsConDecl sloc name newBangTypes)
-remSynsFromCondecl rd@(HsRecDecl _ _ _) = return rd
---   = error $ "remSynsFromCondecl (HsRecDecl _ _ _) not implemented"
-
-remSynsFromBangType :: HsBangType -> PatSM HsBangType
-remSynsFromBangType (HsBangedTy t) = do
-    newType <- remSynsType t
-    return (HsBangedTy newType)
-remSynsFromBangType (HsUnBangedTy t) = do
-    newType <- remSynsType t
-    return (HsUnBangedTy newType)
--}
 
 
 desugarMatch :: (HsMatch) -> PatSM (HsMatch)
@@ -394,36 +315,10 @@ desugarGRhs (HsGuardedRhs sloc e1 e2)
         return (HsGuardedRhs sloc newE1 newE2)
 
 desugarExp :: (HsExp) -> PatSM (HsExp)
-
-desugarExp e@HsVar {} = return e
-
-desugarExp e@HsCon {} = return e
-
-desugarExp e@HsLit {} = return e
-
-desugarExp (HsInfixApp e1 e2 e3)
-   = do
-        newE1 <- desugarExp e1
-        newE2 <- desugarExp e2
-        newE3 <- desugarExp e3
-        return (HsInfixApp newE1 newE2 newE3)
-
-desugarExp (HsApp e1 e2)
-   = do
-        newE1 <- desugarExp e1
-        newE2 <- desugarExp e2
-        return (HsApp newE1 newE2)
-
-desugarExp (HsNegApp e)
-   = do
-        newE <- desugarExp e
-        return (HsNegApp newE)
-
 desugarExp (HsLambda sloc pats e)
     | all isHsPVar pats = do
         newE <- desugarExp e
         return (HsLambda sloc pats newE)
-
 desugarExp (HsLambda sloc pats e) = z where
     z = do
         ps <- mapM f pats
@@ -443,169 +338,63 @@ desugarExp (HsLambda sloc pats e) = z where
         unique <- getUnique
         let n = nameName $ toName Val ("lambind@" ++ show unique)
         return (n,[(n,p)])
-
-
-
-desugarExp (HsLet decls e)
-   = do
+desugarExp (HsLet decls e) = do
         newDecls <- mapM desugarDecl decls
         newE <- desugarExp e
         return (HsLet (concat newDecls) newE)
-
-desugarExp (HsIf e1 e2 e3)
-   = do
-        newE1 <- desugarExp e1
-        newE2 <- desugarExp e2
-        newE3 <- desugarExp e3
-        return (HsIf newE1 newE2 newE3)
-
-desugarExp (HsCase e alts)
-   = do
+desugarExp (HsCase e alts) = do
         newE <- desugarExp e
         newAlts <- mapM desugarAlt alts
         return (HsCase newE newAlts)
-
-desugarExp (HsDo stmts)
-   = do
+desugarExp (HsDo stmts) = do
         newStmts <- mapM desugarStmt stmts
         return (doToExp newStmts)
-
-desugarExp (HsTuple exps)
-   = do
-        newExps <- mapM desugarExp exps
-        return (HsTuple newExps)
-
-desugarExp (HsList exps)
-   = do
-        newExps <- mapM desugarExp exps
-        return (HsList newExps)
-
-desugarExp (HsParen e)
-   = do
-        newE <- desugarExp e
-        return (HsParen newE)
-
-desugarExp (HsLeftSection e1 e2)
-   = do
-        newE1 <- desugarExp e1
-        newE2 <- desugarExp e2
-        return (HsLeftSection newE1 newE2)
-
-desugarExp (HsRightSection e1 e2) = do
-        newE1 <- desugarExp e1
-        newE2 <- desugarExp e2
-        return (HsRightSection newE1 newE2)
-        --let nv = (nameName $ toName Val "rsection@")
-        --return (HsLambda bogusASrcLoc [HsPVar nv ] (HsApp (HsRightSection newE1 newE2) (HsVar nv)))
-
-desugarExp (HsRecConstr n fus) = do
-    fus' <- mapM desugarFU fus
-    return $ HsRecConstr n fus'
---   = error "desugarExp (HsRecConstr _ _): not implemented"
-
-desugarExp (HsRecUpdate e fus) = do
-    fus' <- mapM desugarFU fus
-    e' <- desugarExp e
-    return $ HsRecUpdate e' fus'
---   = error "desugarExp (HsRecUpdate _ _): not implemented"
-
-desugarExp (HsEnumFrom e) = do
-        newE <- desugarExp e
-        return (HsEnumFrom newE)
-
-desugarExp (HsEnumFromTo e1 e2) = do
-        newE1 <- desugarExp e1
-        newE2 <- desugarExp e2
-        return (HsEnumFromTo newE1 newE2)
-
-desugarExp (HsEnumFromThen e1 e2) = do
-        newE1 <- desugarExp e1
-        newE2 <- desugarExp e2
-        return (HsEnumFromThen newE1 newE2)
-
-desugarExp (HsEnumFromThenTo e1 e2 e3) = do
-        newE1 <- desugarExp e1
-        newE2 <- desugarExp e2
-        newE3 <- desugarExp e3
-        return (HsEnumFromThenTo newE1 newE2 newE3)
-
 desugarExp (HsListComp e stmts) = do
         newE <- desugarExp e
         newStmts <- mapM desugarStmt stmts
         return (listCompToExp newE newStmts)
-
--- e :: t  ---> let {v :: t, v = e} in e
-
-{-
-desugarExp (HsExpTypeSig sloc e qualType)
-   = do
-        newE <- desugarExp e
-        newQualType <- remSynsQualType qualType
-        return (HsExpTypeSig sloc newE newQualType)
--}
-
 desugarExp (HsExpTypeSig sloc e qualType) = do
         e' <- desugarExp e
         newQualType <- remSynsQualType qualType
         return (HsExpTypeSig sloc e' newQualType)
+desugarExp e = traverseHsExp desugarExp e
 
 
-desugarExp (HsAsPat name e) = do
-        newE <- desugarExp e
-        return (HsAsPat name e)
-
-desugarExp (HsWildCard x)
-   = return (HsWildCard x)
-
-desugarExp (HsIrrPat e) = do
-        newE <- desugarExp e
-        return (HsIrrPat newE)
-
-desugarFU (HsFieldUpdate n e) = do
-    e' <- desugarExp e
-    return $ HsFieldUpdate n e'
 
 desugarAlt :: (HsAlt) -> PatSM (HsAlt)
 
-desugarAlt (HsAlt sloc pat gAlts wheres)
-   = do
+desugarAlt (HsAlt sloc pat gAlts wheres) = do
         newGAlts <- desugarGAlts gAlts
         newWheres <- mapM desugarDecl wheres
         return (HsAlt sloc pat newGAlts (concat newWheres))
 
 desugarGAlts :: (HsRhs) -> PatSM (HsRhs)
 
-desugarGAlts (HsUnGuardedRhs e)
-   = do
+desugarGAlts (HsUnGuardedRhs e) = do
         newE <- desugarExp e
         return (HsUnGuardedRhs newE)
 
-desugarGAlts (HsGuardedRhss gAlts)
-   = do
+desugarGAlts (HsGuardedRhss gAlts) = do
         newGAlts <- mapM desugarGuardedAlt gAlts
         return (HsGuardedRhss newGAlts)
 
 desugarGuardedAlt :: (HsGuardedRhs) -> PatSM (HsGuardedRhs)
 
-desugarGuardedAlt (HsGuardedRhs sloc e1 e2)
-   = do
+desugarGuardedAlt (HsGuardedRhs sloc e1 e2) = do
         newE1 <- desugarExp e1
         newE2 <- desugarExp e2
         return (HsGuardedRhs sloc newE1 newE2)
 
 desugarStmt :: (HsStmt) -> PatSM (HsStmt)
-desugarStmt (HsGenerator srcLoc pat e)
-   = do
+desugarStmt (HsGenerator srcLoc pat e) = do
         newE <- desugarExp e
         return (HsGenerator srcLoc pat newE)
 
-desugarStmt (HsQualifier e)
-   = do
+desugarStmt (HsQualifier e) = do
         newE <- desugarExp e
         return (HsQualifier newE)
 
-desugarStmt (HsLetStmt decls)
-   = do
+desugarStmt (HsLetStmt decls) = do
         newDecls <- mapM desugarDecl decls
         return (HsLetStmt $ concat newDecls)
 
