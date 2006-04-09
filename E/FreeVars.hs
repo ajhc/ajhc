@@ -63,6 +63,13 @@ instance FreeVars (Alt E) IdSet where
 instance FreeVars E IdSet where
     freeVars e = freeIds e
 
+instance FreeVars (Alt E) (IdMap TVr) where
+    freeVars as@(Alt l e) = mconcat $ freeVars (getLitTyp l):(freeVars e S.\\ fromList [ (tvrIdent t,t) | t <- litBinds l]):(map (freeVars . getTyp) $ litBinds l)
+instance FreeVars E (IdMap TVr) where
+    freeVars e = freeIdMap e
+instance FreeVars E (IdMap (Maybe E)) where
+    freeVars e = fmap (const Nothing) $ freeIdMap e
+
 freeVs ::  E -> IM.IntMap TVr
 freeVs =   fv where
     (<>) = IM.union
@@ -152,6 +159,27 @@ freeIds =   fv where
     fv (ELit l) = fvLit l
     fv (EPrim _ es e) = mconcat $ fv e : map fv es
     fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = mconcat ( fv e:freeVars (getTyp  b):freeVars ty:(delete (tvrIdent b) $ mconcat (freeVars d:map freeVars as)  ):[])
+    fv Unknown = mempty
+    fv ESort {} = mempty
+    fvLit (LitCons _ es e) = mconcat $ fv e:map fv es
+    fvLit l = fv (getLitTyp l)
+
+
+-- we export this to get a concrete type for free id sets.
+freeIdMap ::  E -> IdMap TVr
+freeIdMap =   fv where
+    (<>) = mappend
+    fv (EAp e1 e2) = fv e1 <> fv e2
+    fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = minsert i tvr (fv t)
+    fv (ELam TVr { tvrIdent = i, tvrType = t} e) = mdelete i $ fv e <> fv t
+    fv (EPi  TVr { tvrIdent = i, tvrType = t} e) = mdelete i $ fv e <> fv t
+    fv (ELetRec dl e) =  ((tl <> bl <> fv e) S.\\ fromList ll)  where
+        (ll,tl,bl) = liftT3 (id,mconcat,mconcat) $ unzip3 $
+            map (\(tvr@(TVr { tvrIdent = j, tvrType =  t}),y) -> ((j,tvr), fv t, fv y)) dl
+    fv (EError _ e) = fv e
+    fv (ELit l) = fvLit l
+    fv (EPrim _ es e) = mconcat $ fv e : map fv es
+    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = mconcat ( fv e:freeVars (getTyp  b):freeVars ty:(mdelete (tvrIdent b) $ mconcat (freeVars d:map freeVars as)  ):[])
     fv Unknown = mempty
     fv ESort {} = mempty
     fvLit (LitCons _ es e) = mconcat $ fv e:map fv es
