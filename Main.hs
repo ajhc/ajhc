@@ -61,7 +61,7 @@ import Support.FreeVars
 import Support.ShowTable
 import Util.Graph
 import Name.Id
-import Util.SetLike as S hiding(null)
+import Util.SetLike as S
 import Version(versionString,versionContext)
 import qualified E.CPR
 import qualified E.SSimplify as SS
@@ -278,7 +278,7 @@ processDecls stats ho ho' tiData = do
         mprog <- return $ etaAnnotateProgram mprog
         let cm stats e = do
             let sopt = mempty {
-                SS.so_boundVars = Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)],
+                SS.so_boundVars = fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)],
                 SS.so_rules = allRules,
                 SS.so_exports = map tvrIdent $ progEntryPoints mprog,
                 SS.so_dataTable = fullDataTable
@@ -335,7 +335,7 @@ processDecls stats ho ho' tiData = do
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
         let names = [ n | (n,_) <- ns]
-        let namesInscope' = fromDistinctAscList (Map.keys smap) `union` namesInscope
+        let namesInscope' = fromDistinctAscList (mkeys smap) `union` namesInscope
         when (dump FD.Lambdacube || dump FD.Pass) $ putErrLn ("----\n" ++ pprint names)
         cds <- annotateDs annmap (idann allRules mempty) letann lamann [ (t,e) | (t,e) <- ns]
         --putStrLn "*** After annotate"

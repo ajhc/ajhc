@@ -67,6 +67,7 @@ import Support.CanType
 import Support.FreeVars
 import Util.Gen
 import Util.NameMonad
+import Util.SetLike
 
 theMainName = toName Name.Val "theMain"
 ump sl e = EError (show sl ++ ": Unmatched pattern") e
@@ -320,8 +321,8 @@ convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM f hsDe
                 nn <- newNameFrom (ur:map (\v -> ur ++ show v) [1 ::Int ..])
                 return (tvrIdent tvr,tvr { tvrIdent = toId (toName Val nn) })
             return (ts,cs)
-        let smt = substMap $ Map.fromList [ (x,EVar y)| (x,y) <- ts ]
-            sma = substMap $ Map.fromList [ (x,EVar y)| (x,y) <- cs' ]
+        let smt = substMap $ fromList [ (x,EVar y)| (x,y) <- ts ]
+            sma = substMap $ fromList [ (x,EVar y)| (x,y) <- cs' ]
             cs' =  [ (x,(tvrType_u smt y))| (x,y) <- cs ]
             e2' = deNewtype dataTable $ smt $ sma e2
         e2 <- atomizeAp False dataTable Stats.theStats mainModule e2'

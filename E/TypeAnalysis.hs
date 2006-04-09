@@ -36,13 +36,14 @@ import qualified Info.Info as Info
 import Stats
 import Support.CanType
 import Name.Id
+import Util.SetLike
 
 
 type Typ = VMap () Name
 type Env = (Supply (Module,Int) Bool,Supply TVr Bool,Map.Map Id [Value Typ])
 
 extractValMap :: [(TVr,E)] -> Map.Map Id [Value Typ]
-extractValMap ds = Map.fromList [ (tvrIdent t,f e []) | (t,e) <- ds] where
+extractValMap ds = fromList [ (tvrIdent t,f e []) | (t,e) <- ds] where
     f (ELam tvr e) rs | sortStarLike (getType tvr) = f e (runIdentity (Info.lookup $ tvrInfo tvr):rs)
     f _ rs = reverse rs
 
@@ -82,7 +83,7 @@ sillyEntry :: Env -> TVr -> IO ()
 sillyEntry env t = mapM_ (addRule . (`isSuperSetOf` value (vmapPlaceholder ()))) args where
     args = lookupArgs t env
 
-lookupArgs t (_,_,tm) = maybe [] id (Map.lookup (tvrIdent t) tm)
+lookupArgs t (_,_,tm) = maybe [] id (mlookup (tvrIdent t) tm)
 
 toLit (EPi TVr { tvrType = a } b) = return (tc_Arrow,[a,b])
 toLit (ELit (LitCons n ts _)) = return (n,ts)
@@ -160,7 +161,7 @@ calcAlt env v (Alt (LitCons n xs _) e) = do
 
 calcE :: Env -> E -> IO ()
 calcE (ur,uv,env) (ELetRec ds e) = calcDs nenv ds >> calcE nenv e where
-    nenv = (ur,uv,extractValMap ds `Map.union` env)
+    nenv = (ur,uv,extractValMap ds `union` env)
 calcE env e | (e',(_:_)) <- fromLam e = calcE env e'
 --calcE env ec@ECase {} | sortStarLike (getType $ eCaseScrutinee ec) = do
 --    calcE env (eCaseScrutinee ec)
@@ -271,7 +272,7 @@ specializeProgram doSpecialize usedRules usedValues prog = do
 specializeDef _ (_,unusedVals,_,_) (tvr,e) | tvr `Set.member` unusedVals = return (tvr,EError "Unused" (tvrType tvr))
 specializeDef _ _ (t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
 specializeDef True (_,_,dataTable,_) (tvr,e) = ans where
-    sub = substMap''  $ Map.fromList [ (tvrIdent t,v) | (t,Just v) <- sts ]
+    sub = substMap''  $ fromList [ (tvrIdent t,v) | (t,Just v) <- sts ]
     sts = map spec ts
     spec t | Just nt <- Info.lookup (tvrInfo t) >>= getTyp (getType t) dataTable, sortStarLike (getType t) = (t,Just nt)
     spec t = (t,Nothing)
@@ -281,7 +282,7 @@ specializeDef True (_,_,dataTable,_) (tvr,e) = ans where
         sequence_ [ mtick ("Specialize.body.{" ++ pprint tvr ++ "}.{" ++ pprint t ++ "}.{" ++ pprint v) | (t,Just v) <- sts ]
         let vs = [ (n,v) | ((_,Just v),n) <- zip sts naturals ]
             sd = not $ null vs
-        when sd $ tell (Map.singleton tvr (fsts vs))
+        when sd $ tell (msingleton tvr (fsts vs))
         return (if sd then tvr { tvrType = infertype dataTable ne, tvrInfo = infoMap (dropArguments vs) (tvrInfo tvr) } else tvr,ne)
 specializeDef _ _ (t,e) = return (t,e)
 
@@ -290,7 +291,7 @@ specBody :: MonadStats m => Bool -> SpecEnv -> E -> m E
 specBody _ env@(_,unusedVars,dataTable,_) e | (EVar h,as) <- fromAp e, h `Set.member` unusedVars = do
     mtick $ "Specialize.delete.{" ++ pprint h ++ "}"
     return $ foldl EAp (EError ("Unused: " ++ pprint h) (getType h)) as
-specBody True (_,_,_,dmap) e | (EVar h,as) <- fromAp e, Just os <- Map.lookup h dmap = do
+specBody True (_,_,_,dmap) e | (EVar h,as) <- fromAp e, Just os <- mlookup h dmap = do
     mtick $ "Specialize.use.{" ++ pprint h ++ "}"
     return $ foldl EAp (EVar h) [ a | (a,i) <- zip as naturals, i `notElem` os ]
 specBody doSpecialize env (ELetRec ds e) = do
@@ -330,7 +331,7 @@ expandPlaceholder (tvr,oe) | getProperty prop_PLACEHOLDER tvr = do
             eCaseBind = a { tvrIdent = 0 },
             eCaseType = ct
             }
-        calt rule@Rule { ruleArgs = (arg:rs) } = Alt (valToPat' arg) (substMap (Map.fromList [ (tvrIdent v,EVar r) | ~(EVar v) <- rs | r <- ras ]) $ ruleBody rule)
+        calt rule@Rule { ruleArgs = (arg:rs) } = Alt (valToPat' arg) (substMap (fromList [ (tvrIdent v,EVar r) | ~(EVar v) <- rs | r <- ras ]) $ ruleBody rule)
 
         valToPat' (ELit (LitCons x ts t)) = LitCons x [ z | ~(EVar z) <- ts ] t
         valToPat' (EPi (TVr { tvrType =  EVar a}) (EVar b))  = LitCons tc_Arrow [a,b] eStar
