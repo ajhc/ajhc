@@ -26,14 +26,13 @@ infixl 9 \\ --
 
 m1 \\ m2 = difference m1 m2
 
-class (Monoid s,HasSize s) => SetLike s where
+class (Monoid s,HasSize s,IsEmpty s) => SetLike s where
     difference :: s -> s -> s
     intersection :: s -> s -> s
     disjoint :: s -> s -> Bool
     isSubsetOf :: s -> s -> Bool
-    null :: s -> Bool
 
-    disjoint x y = Util.SetLike.null (x `intersection` y)
+    disjoint x y = isEmpty (x `intersection` y)
     isSubsetOf x y = size x <= size y && (size (x `intersection` y) == size x)
 
 
@@ -67,7 +66,6 @@ instance SetLike IS.IntSet where
     difference = IS.difference
     intersection = IS.intersection
     isSubsetOf = IS.isSubsetOf
-    null = IS.null
 
 instance BuildSet Int IS.IntSet where
     fromList xs = IS.fromList xs
@@ -85,7 +83,6 @@ instance Ord a => SetLike (S.Set a) where
     difference = S.difference
     intersection = S.intersection
     isSubsetOf = S.isSubsetOf
-    null = S.null
 
 instance Ord a => BuildSet a (S.Set a) where
     fromList xs = S.fromList xs
@@ -102,7 +99,6 @@ instance Ord a => ModifySet a (S.Set a) where
 instance Ord a => SetLike (IM.IntMap a) where    -- SIC
     difference = IM.difference
     intersection = IM.intersection
-    null = IM.null
 
 
 instance Ord a => BuildSet (Int,a) (IM.IntMap a) where
@@ -115,7 +111,6 @@ instance Ord a => BuildSet (Int,a) (IM.IntMap a) where
 instance Ord a => SetLike (M.Map a b) where
     difference = M.difference
     intersection = M.intersection
-    null = M.null
 
 instance Ord a => BuildSet (a,b) (M.Map a b) where
     fromList xs = M.fromList xs
@@ -135,6 +130,8 @@ class SetLike m => MapLike k v m | m -> k v where
     mmember :: k -> m -> Bool
     mlookup :: Monad g => k -> m -> g v
     melems :: m -> [v]
+    mkeys :: m -> [k]
+    mfilter :: (v -> Bool) -> m -> m
 
 instance Ord a => MapLike Int a (IM.IntMap a) where
     mdelete = IM.delete
@@ -143,18 +140,22 @@ instance Ord a => MapLike Int a (IM.IntMap a) where
         Nothing -> fail $ "IntMap: can't find " ++ show k
         Just x -> return x
     melems = IM.elems
+    mkeys = IM.keys
+    mfilter = IM.filter
 
 instance Ord k => MapLike k v (M.Map k v) where
     mdelete = M.delete
     mmember = M.member
     mlookup = M.lookup
     melems = M.elems
+    mkeys = M.keys
+    mfilter = M.filter
 
 
 -- EnumSet
 
 newtype EnumSet a = EnumSet IS.IntSet
-    deriving(Typeable,Monoid,SetLike,HasSize,Eq,Ord)
+    deriving(Typeable,Monoid,SetLike,HasSize,Eq,Ord,IsEmpty)
 
 instance Enum a => BuildSet a (EnumSet a) where
     fromList xs = EnumSet $ IS.fromList (map fromEnum xs)
