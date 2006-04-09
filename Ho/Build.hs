@@ -55,6 +55,8 @@ import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import Util.FilterInput
 import Warning
+import Name.Id
+import Util.SetLike
 
 version :: Int
 version = 6
@@ -187,8 +189,8 @@ dumpHoFile fn = do
     (hoh,ho) <- readHoFile fn
     putStrLn fn
     --putStrLn $ "Generation:" <+> tshow (hohGeneration hoh)
-    when (not $ null (hohDepends hoh)) $ putStrLn $ "Dependencies:" <+>  pprint (sortUnder (show . fileName) $ hohDepends hoh)
-    when (not $ null (hohDepends hoh)) $ putStrLn $ "ModDependencies:" <+>  pprint (sortUnder fst $ hohModDepends hoh)
+    when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "Dependencies:" <+>  pprint (sortUnder (show . fileName) $ hohDepends hoh)
+    when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "ModDependencies:" <+>  pprint (sortUnder fst $ hohModDepends hoh)
     putStrLn $ "MetaInfo:\n" <> vcat (sort [text (' ':' ':unpackPS k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
     putStrLn $ "Libraries depended on:" <+> pprint (sort $ Map.keys $ hoLibraries ho)
     putStrLn $ "Modules contained:" <+> tshow (Map.keys $ hoExports ho)
@@ -394,10 +396,10 @@ eraseE e = runIdentity $ f e where
     f (EVar tv) = return $ EVar  tvr { tvrIdent = tvrIdent tv }
     f e = emapE f e
 
-getFixups :: Ho -> Map.Map Int E
-getFixups ho = Map.fromList [ (tvrIdent x,EVar x) | (x,_) <- Map.elems (hoEs ho)]
+getFixups :: Ho -> IdMap E
+getFixups ho = fromList [ (tvrIdent x,EVar x) | (x,_) <- Map.elems (hoEs ho)]
 
-applyFixups :: Map.Map Int E -> Ho -> Ho
+applyFixups :: IdMap E -> Ho -> Ho
 applyFixups mie ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) } where
     f (t,e) = (t,sm e)
     sm = substMap'' mie
@@ -405,15 +407,11 @@ applyFixups mie ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  runIdentity (E
 fixupHo :: Ho -> Ho
 fixupHo ho = applyFixups (getFixups ho) ho
 
-
-
-
 hGetFileDep fn fh = do
     fd <- handleToFd fh
     fs <- getFdStatus fd
     fh <- fdToHandle fd
     return (fh,toFileDep fn fs)
-
 
 openGetFileDep fn = do
     (fh,fs) <- openGetStatus fn
@@ -425,8 +423,6 @@ openGetStatus fn = do
     fs <- getFdStatus fd
     fh <- fdToHandle fd
     return (fh,fs)
-
-
 
 hoToProgram :: Ho -> Program
 hoToProgram ho = programSetDs (Map.elems $ hoEs ho) program {
