@@ -4,6 +4,7 @@ module Util.Inst() where
 
 import Control.Monad.Identity
 import qualified Data.Map as Map
+import qualified Data.IntMap as IM
 import Data.FunctorM
 import Data.Monoid
 import List
@@ -25,4 +26,10 @@ instance Show a => Show (Identity a) where
 
 instance Ord a => FunctorM (Map.Map a) where
     fmapM_ f mp = mapM_ f (Map.elems mp)
-    fmapM f mp = sequence [ f y >>= return . (,) x | (x,y) <- Map.toAscList mp] >>= return . Map.fromAscList
+    fmapM f mp = sequence [ f y >>= return . (,) x | (x,y) <- Map.toAscList mp] >>= return . Map.fromDistinctAscList
+
+instance FunctorM IM.IntMap where
+    fmapM_ f mp = mapM_ f (IM.elems mp)
+    fmapM f mp = sequence [ f y >>= return . (,) x | (x,y) <- IM.toAscList mp] >>= return . IM.fromDistinctAscList
+
+
