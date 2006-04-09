@@ -109,8 +109,8 @@ findModule :: Ho                                 -- ^ code loaded from libraries
               -> (Ho -> [HsModule] -> IO Ho)     -- ^ Process set of mutually recursive modules to produce final Ho
               -> IO Ho                           -- ^ Final accumulated ho
 findModule lhave have (Left m) ifunc _
-    | m `Map.member` (hoExports have) = return have
-    | m `Map.member` (hoExports lhave) = return have
+    | m `mmember` (hoExports have) = return have
+    | m `mmember` (hoExports lhave) = return have
 findModule lhave have need ifunc func  = do
     let f (Left (Module m)) = (m,searchPaths m)
         f (Right n) = (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
@@ -126,8 +126,8 @@ findModule lhave have need ifunc func  = do
             ho' <- func (lhave `mappend` ho) [ hs | (hs,_,_) <- sc ]
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
                 mods' = [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
-                mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules ho)]
-                ldeps = Map.unions [ Map.singleton ln cs | m <- mods', Right (ln,cs) <- Map.lookup m (hoModules ho)]
+                mdeps = [ (m,dep) | m <- mods', Left dep <- mlookup m (hoModules ho)]
+                ldeps = unions [ msingleton ln cs | m <- mods', Right (ln,cs) <- mlookup m (hoModules ho)]
             let hoh = HoHeader { hohGeneration = 0,
                                  hohDepends    = [ x | (_,x,_) <- sc],
                                  hohModDepends = mdeps,
@@ -192,10 +192,10 @@ dumpHoFile fn = do
     when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "Dependencies:" <+>  pprint (sortUnder (show . fileName) $ hohDepends hoh)
     when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "ModDependencies:" <+>  pprint (sortUnder fst $ hohModDepends hoh)
     putStrLn $ "MetaInfo:\n" <> vcat (sort [text (' ':' ':unpackPS k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
-    putStrLn $ "Libraries depended on:" <+> pprint (sort $ Map.keys $ hoLibraries ho)
-    putStrLn $ "Modules contained:" <+> tshow (Map.keys $ hoExports ho)
+    putStrLn $ "Libraries depended on:" <+> pprint (sort $ mkeys $ hoLibraries ho)
+    putStrLn $ "Modules contained:" <+> tshow (mkeys $ hoExports ho)
     putStrLn $ "number of definitions:" <+> tshow (size $ hoDefs ho)
-    putStrLn $ "hoAssumps:" <+> tshow (Map.size $ hoAssumps ho)
+    putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps ho)
     putStrLn $ "hoFixities:" <+> tshow (size $  hoFixities ho)
     putStrLn $ "hoKinds:" <+> tshow (size $  hoKinds ho)
     putStrLn $ "hoClassHierarchy:" <+> tshow (size $  hoClassHierarchy ho)
@@ -225,7 +225,7 @@ dumpHoFile fn = do
         putStrLn $ PPrint.render $ pprint (hoAssumps ho)
     wdump FD.Lambdacube $ do
         putStrLn " ---- lambdacube  ---- "
-        mapM_ (\ (v,lc) -> printCheckName'' (hoDataTable ho) v lc) (Map.elems $ hoEs ho)
+        mapM_ (\ (v,lc) -> printCheckName'' (hoDataTable ho) v lc) (melems $ hoEs ho)
 
 
 printCheckName'' :: DataTable -> TVr -> E -> IO ()
@@ -276,7 +276,7 @@ recordHoFile ho fs header = do
             bh <- openBinIO fh
             put bh magic
             put bh header
-            put bh (mapHoBodies eraseE ho { hoModules = mempty })
+            put bh (mapHoBodies eraseE ho { hoUsedIds = mempty, hoModules = mempty })
             put bh magic2
             hFlush fh
             (fh,fd) <- hGetFileDep fn fh
@@ -326,10 +326,11 @@ getModule initialHo ho name files  = do
                     r <- if hoLibraryDeps ho' ho then f (hohModDepends hh) else return False
                     case r of
                         True -> do
-                            fixups <- readIORef fixup_ref
-                            let nfixups = getFixups ho' `mappend` fixups
-                            writeIORef fixup_ref nfixups
-                            modifyIORef ho_ref (applyFixups nfixups ho' `mappend`) >> hClose fh
+                            --fixups <- readIORef fixup_ref
+                            --let nfixups = getFixups ho' `mappend` fixups
+                            --writeIORef fixup_ref nfixups
+                            --modifyIORef ho_ref (applyFixups nfixups ho' `mappend`) >> hClose fh
+                            modifyIORef ho_ref ( ho' `mappend`) >> hClose fh
                         False -> addNeed name fd fh ho_name
                 Nothing -> addNeed name fd fh ho_name
         checkHoDep :: (Module,FileDep) -> IO Bool
@@ -337,7 +338,7 @@ getModule initialHo ho name files  = do
             --wdump FD.Progress $ do
             --    putErrLn $ "checking dependency:" <+> show m <+> "at" <+> fromAtom (fileName fd)
             ho <- readIORef ho_ref
-            case Map.lookup m (hoModules (initialHo `mappend` ho)) of
+            case mlookup m (hoModules (initialHo `mappend` ho)) of
                 Just (Left fd') | fd == fd' -> return True
                 Just (Left fd') | fd /= emptyFileDep -> do
                     wdump FD.Progress $ do
@@ -385,7 +386,7 @@ parseHsSource fn s = case runParserWithMode ParseMode { parseFilename = fn } par
 
 
 mapHoBodies  :: (E -> E) -> Ho -> Ho
-mapHoBodies sm ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) } where
+mapHoBodies sm ho = ho { hoEs = fmap f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) } where
     f (t,e) = (t,sm e)
 
 
@@ -397,10 +398,10 @@ eraseE e = runIdentity $ f e where
     f e = emapE f e
 
 getFixups :: Ho -> IdMap E
-getFixups ho = fromList [ (tvrIdent x,EVar x) | (x,_) <- Map.elems (hoEs ho)]
+getFixups ho = fromList [ (tvrIdent x,EVar x) | (x,_) <- melems (hoEs ho)]
 
 applyFixups :: IdMap E -> Ho -> Ho
-applyFixups mie ho = ho { hoEs = Map.map f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) } where
+applyFixups mie ho = ho { hoEs = fmap f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) } where
     f (t,e) = (t,sm e)
     sm = substMap'' mie
 
@@ -425,7 +426,7 @@ openGetStatus fn = do
     return (fh,fs)
 
 hoToProgram :: Ho -> Program
-hoToProgram ho = programSetDs (Map.elems $ hoEs ho) program {
+hoToProgram ho = programSetDs (melems $ hoEs ho) program {
     progClassHierarchy = hoClassHierarchy ho,
     progDataTable = hoDataTable ho
     }

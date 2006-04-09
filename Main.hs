@@ -173,7 +173,7 @@ processInitialHo :: Ho -> IO Ho
 processInitialHo ho = do
     let Identity ds = annotateDs mempty (idann (hoRules ho) (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
         ds' = programDs $ etaAnnotateProgram (programSetDs ds program)
-    return ho { hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds' ] }
+    return ho { hoUsedIds = collectIds (ELetRec ds' Unknown), hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds' ] }
 
 
 procSpecs :: Monad m => (Map.Map Name [Type.Rule]) -> (TVr,E) -> m ([(TVr,E)],[Rule])
