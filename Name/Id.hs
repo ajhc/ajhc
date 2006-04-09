@@ -16,10 +16,12 @@ import qualified Data.IntSet as IS
 import qualified Data.IntMap  as IM
 import Data.Monoid
 import Data.Typeable
+import Data.FunctorM
 
 import Util.SetLike as S
 import Util.HasSize
 import Util.NameMonad
+import Util.Inst()
 
 -- TODO - make this a newtype
 type Id = Int
@@ -42,7 +44,7 @@ idToInt = id
 -- IdMap
 
 newtype IdMap a = IdMap (IM.IntMap a)
-    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet (Id,a),MapLike Id a)
+    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet (Id,a),MapLike Id a,Functor,FunctorM)
 
 
 idSetToIdMap :: (Id -> a) -> IdSet -> IdMap a
