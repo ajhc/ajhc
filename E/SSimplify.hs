@@ -57,7 +57,7 @@ data StrictInfo = NoStrict | Strict
     deriving(Typeable,Show)
 
 -- | This collects occurance info for variables, deletes dead expressions, and reorders let-bound variables in dependency order.
-collectOcc :: SimplifyOpts ->  E -> (E,Set.Set Int,Map.Map TVr Occurance)
+collectOcc :: SimplifyOpts ->  E -> (E,IdSet,Map.Map TVr Occurance)
 collectOcc sopts  e = (e',fvs,occ) where
     topLevels = so_exports sopts
     rules  = so_rules sopts
@@ -91,9 +91,9 @@ collectOcc sopts  e = (e',fvs,occ) where
         ds' <- mapM  (censor (const mempty) . listen . f . snd) ds
         (e',fve,se) <- f e
         let gfv (_,fv,i) = fvs ++ idSetToList (mconcat (map (ruleFreeVars' rules) (fvs)))  where
-                fvs = Set.toList (Map.keysSet i `union` fv)
+                fvs = idSetToList (fromDistinctAscList (Map.keys i) `union` fv)
             gr = newGraph (zip (fsts ds) ds') (tvrIdent . fst) (gfv . fst . snd )
-            nn' = reachable gr (Set.toList fve ++ Map.keys se ++  topLevels)
+            nn' = reachable gr (idSetToList fve ++ Map.keys se ++  topLevels)
         nn <- sequence [ tell t >> return (x,y) |  (x,(y,t)) <- nn' ]
         let gr' = newGraph nn (tvrIdent . fst) (gfv . snd )
             (lb,ds'') = findLoopBreakers (\ (t,(e,_,_)) -> loopFunc t e) (const True) gr'
@@ -197,7 +197,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     collocc dsIn = do
         let ((ELetRec dsIn' _),fvs,occ) = collectOcc sopts (ELetRec dsIn (eTuple (map EVar (fsts dsIn))))
         addNames (map tvrIdent $ Map.keys occ)
-        addNames (Set.toList fvs)
+        addNames (idSetToList fvs)
         let occ' = Map.mapKeysMonotonic tvrIdent occ
             dsIn'' = runIdentity $ annotateDs mempty (\t nfo -> return $ maybe (Info.delete Many nfo) (flip Info.insert nfo) (mlookup t occ')) (\_ -> return) (\_ -> return) dsIn'
         return dsIn''
@@ -408,7 +408,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         mtick "E.Simplify.case-evaled"
         d' <- f d (minsert (tvrIdent b) (Done (EVar v)) sub) inb
         return d'
-    doCase scrut _ v [] (Just sc@ECase { eCaseScrutinee = EVar v'} ) sub inb | v == v', not $ tvrIdent v `Set.member` freeVars (caseBodies sc)  = do
+    doCase scrut _ v [] (Just sc@ECase { eCaseScrutinee = EVar v'} ) sub inb | v == v', tvrIdent v `notMember` (freeVars (caseBodies sc) :: IdSet)  = do
         mtick "E.Simplify.case-default-case"
         f sc { eCaseScrutinee = scrut } sub inb
     doCase e t b as d sub inb = do

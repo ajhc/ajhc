@@ -20,21 +20,23 @@ import Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Support.FreeVars
-import Util.NameMonad
-import E.E
-import E.Subst
+import DataConstructors
 import E.Annotate
-import E.Program
+import E.E
 import E.Inline
+import E.Program
+import E.Subst
 import E.Traverse(emapE')
 import E.Values
 import GenUtil hiding(replicateM_)
-import DataConstructors
-import Support.CanType
-import Stats
-import qualified Info.Info as Info
 import Info.Types
+import Name.Id
+import qualified Info.Info as Info
+import Stats
+import Support.CanType
+import Support.FreeVars
+import Util.NameMonad
+import Util.SetLike
 
 
 data ArityType = AFun Bool ArityType | ABottom | ATop
@@ -130,7 +132,7 @@ etaAnnotateProgram prog = runIdentity $ programMapRecGroups mempty pass iletann 
 -- | eta reduce as much as possible
 etaReduce :: E -> E
 etaReduce e = f e where
-        f (ELam t (EAp x (EVar t'))) | t == t' && not (tvrIdent t `Set.member` freeVars x) = f x
+        f (ELam t (EAp x (EVar t'))) | t == t' && (tvrIdent t `notMember` (freeVars x :: IdSet)) = f x
         f e = e
 
 -- | only reduce if all lambdas can be discarded. otherwise leave them in place
@@ -139,7 +141,7 @@ etaReduce' e = case f e 0 of
         (ELam {},_) -> (e,0)
         x -> x
     where
-        f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && not (tvrIdent t `Set.member` freeVars x) = f x (n + 1)
+        f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && (tvrIdent t `notMember` (freeVars x :: IdSet)) = f x (n + 1)
         f e n = (e,n)
 
 
@@ -147,18 +149,19 @@ etaExpandDef' dataTable t e = etaExpandDef dataTable t e >>= \x -> case x of
     Nothing -> return (tvrInfo_u (annotateArity e) t,e)
     Just x -> return x
 
-collectIds e = execWriter $ annotate mempty (\id nfo -> tell (Set.singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
+collectIds :: E -> IdSet
+collectIds e = execWriter $ annotate mempty (\id nfo -> tell (singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 -- | eta expand a definition
 etaExpandDef :: MonadStats m => DataTable -> TVr -> E -> m (Maybe (TVr,E))
 etaExpandDef _ _ e | isAtomic e = return Nothing -- will be inlined
 etaExpandDef dataTable t e  = ans where
-    fvs = foldr Set.insert (freeVars (b,map getType rs,tvrType t)) (map tvrIdent rs) `mappend` collectIds e
+    fvs = foldr insert (freeVars (b,map getType rs,tvrType t)) (map tvrIdent rs) `mappend` collectIds e
     (b,rs) = fromLam e
     at = arityType e
     zeroName = case fromAp e of
         (EVar v,_) -> "use.{" ++ tvrShowName v
         _ -> "random"
-    nameSupply = [ n |  n <- [2,4 :: Int ..], not $ n `Set.member` fvs  ]
+    nameSupply = [ n |  n <- [2,4 :: Int ..], n `notMember` fvs  ]
     ans = do
         -- note that we can't use the type in the tvr, because it will not have the right free typevars.
         (ne,flag) <- f at e (expandPis dataTable $ infertype dataTable e) nameSupply

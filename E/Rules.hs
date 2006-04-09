@@ -115,30 +115,24 @@ ruleAllFreeVars (Rules r) = freeVars (concatMap (map ruleBody) (Map.elems r))
 ruleFreeVars ::  Rules -> TVr -> IdSet
 ruleFreeVars (Rules r) tvr = case Map.lookup (tvrIdent tvr) r of
     Nothing -> mempty
-    --Just rs -> mconcat (map ruleFvs rs) -- (freeVars (map ruleBody rs) Set.\\ freeVars (map ruleArgs rs))
     Just rs -> (freeVars (map ruleBody rs) S.\\ freeVars (map ruleArgs rs))
 
 ruleFreeVars' ::  Rules -> Id -> IdSet
 ruleFreeVars' (Rules r) tvr = case Map.lookup tvr r of
     Nothing -> mempty
-    --Just rs -> mconcat (map ruleFvs rs) -- (freeVars (map ruleBody rs) Set.\\ freeVars (map ruleArgs rs))
     Just rs -> (freeVars (map ruleBody rs) S.\\ freeVars (map ruleArgs rs))
 
 
 instance FreeVars Rule b => FreeVars ARules b where
     freeVars (ARules rs) = freeVars rs
 
-instance FreeVars Rule (Set.Set TVr) where
-    freeVars rule = freeVars (ruleBody rule) Set.\\ Set.fromList (ruleBinds rule)
-
-instance FreeVars Rule (Set.Set Id) where
-    freeVars rule = freeVars (ruleBody rule) Set.\\ Set.fromList (map tvrIdent $ ruleBinds rule)
-
 instance FreeVars Rule IdSet where
     freeVars rule = freeVars (ruleBody rule) S.\\ fromList (map tvrIdent $ ruleBinds rule)
+instance FreeVars Rule (IdMap TVr) where
+    freeVars rule = freeVars (ruleBody rule) S.\\ fromList [ (tvrIdent t,t) | t <- ruleBinds rule]
 
 instance FreeVars Rule [Id] where
-    freeVars rule = Set.toList $ freeVars rule
+    freeVars rule = idSetToList $ freeVars rule
 
 printRules (Rules rules) = mapM_ printRule (concat $ Map.elems rules)
 
@@ -233,7 +227,7 @@ joinARules ar@(ARules a) br@(ARules b)
     | otherwise = error $ "mixing rules!" ++ show (ar,br) where
    rs@(r:_) = map ruleHead a ++ map ruleHead b
 
-rsubstMap :: Map.Map Id E -> E -> E
+rsubstMap :: IdMap E -> E -> E
 rsubstMap im e = doSubst False True (fmap ( (`mlookup` im) . tvrIdent) (unions $ (freeVars e :: IdMap TVr):map freeVars (melems im))) e
 
 applyRules lup (ARules rs) xs = f rs where
@@ -243,7 +237,7 @@ applyRules lup (ARules rs) xs = f rs where
     f (r:rs) = case sequence (zipWith (match lup (ruleBinds r)) (ruleArgs r) xs) of
         Just ss -> do
             mtick (ruleName r)
-            let b = rsubstMap (Map.fromList [ (i,x) | (TVr { tvrIdent = i },x) <- concat ss ]) (ruleBody r)
+            let b = rsubstMap (fromList [ (i,x) | (TVr { tvrIdent = i },x) <- concat ss ]) (ruleBody r)
             return $ Just (b,drop (ruleNArgs r) xs)
         Nothing -> do f rs
 

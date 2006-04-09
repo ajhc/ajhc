@@ -879,7 +879,7 @@ lintCheckProgram onerr prog | flint = do
         maybeDie
     mapM_ f (programDs prog)
     let ids = progExternalNames prog `mappend` fromList (map tvrIdent $ fsts (programDs prog))
-        fvs = freeVars $ snds $ programDs prog :: Set.Set TVr
+        fvs = Set.fromList $ melems (freeVars $ snds $ programDs prog :: IdMap TVr)
         unaccounted = Set.filter (not . (`member` ids) . tvrIdent) fvs
     unless (Set.null unaccounted) $ do
         onerr

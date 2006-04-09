@@ -21,6 +21,7 @@ import Info.Types
 import Name.Name
 import Name.Names
 import Name.VConsts
+import Name.Id
 import Util.SetLike
 
 
@@ -250,7 +251,7 @@ isLifted x = sortTermLike x && not (isUnboxed (getType x))
 whnfOrBot :: E -> Bool
 whnfOrBot (EError {}) = True
 whnfOrBot (ELit (LitCons _ xs _)) = all isAtomic xs
-whnfOrBot (EPi (TVr { tvrIdent =  j, tvrType =  x }) y) | not (j `Set.member` freeVars y) = isAtomic x && isAtomic y
+whnfOrBot (EPi (TVr { tvrIdent =  j, tvrType =  x }) y) | not (j `member` (freeVars y :: IdSet)) = isAtomic x && isAtomic y
 whnfOrBot ELam {} = True
 whnfOrBot e | isAtomic e = True
 whnfOrBot e | (EVar v,xs) <- fromAp e, Just (Arity n True) <- Info.lookup (tvrInfo v), length xs >= n = True

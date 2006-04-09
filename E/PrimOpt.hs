@@ -16,13 +16,16 @@ import Doc.PPrint
 import E.E
 import E.Values
 import GenUtil
+import Name.Id
 import Name.Names
 import Name.VConsts
 import PrimitiveOperators
 import Stats
 import Support.CanType
 import Support.FreeVars
-import Util.NameMonad
+import Util.HasSize
+import Util.NameMonad(genNames)
+import Util.SetLike
 
 
 
@@ -155,5 +158,10 @@ processPrimPrim dataTable o@(EPrim (APrim prim _) es t) = case primopt prim es t
         primopt (PrimPrim "integralCast") [e] t = return $ create_integralCast dataTable e t
         primopt (PrimPrim "integralCast") es t = error $ "Invalid integralCast " ++ show (es,t)
         primopt _ _ _ = fail "not a primopt we care about"
+
+
+-- | Generate an infinite list of names not present in the given set.
+freeNames :: IdSet -> [Id]
+freeNames s  = filter (not . (`member` s)) (genNames (size s))
 
 

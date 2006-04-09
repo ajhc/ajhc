@@ -24,7 +24,6 @@ module DataConstructors(
 import Control.Monad.Identity
 import Control.Monad.Writer
 import qualified Data.Map as Map hiding(map)
-import qualified Data.Set as Set
 import List(sortBy,(\\))
 
 import Binary
@@ -42,6 +41,7 @@ import HsSyn
 import MapBinaryInstance()
 import Name.Name as Name
 import Name.Names
+import Name.Id
 import Name.VConsts
 import Support.FreeVars
 import PrimitiveOperators
@@ -52,7 +52,7 @@ import Support.CanType
 import Support.Unparse
 import Util.HasSize
 import Util.SameShape
-import Util.SetLike
+import Util.SetLike as S
 import Util.VarName
 
 tipe t = runVarName (tipe' t)
@@ -388,7 +388,7 @@ toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conN
                 flip mapM_ vs $ \tv -> do
                     newName [2,4..] () tv
                 tipe' ty
-            existentials = Set.toList $ freeVars (map getType ts') Set.\\ freeVars xs
+            existentials = melems $ freeVars (map getType ts') S.\\ (freeVars xs :: IdMap TVr)
             subst = substMap $ fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
             ts = existentials ++ [ tvr {tvrIdent = x} | tvr <- ts' | x <- drop (5 + length theTypeArgs) [2,4..] ]
             (vs,ty) = case Map.lookup dataConsName cm of
