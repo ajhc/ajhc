@@ -7,11 +7,14 @@ module Util.HasSize where
 
 -- it is up to each instance to decide what 'size' means
 
-import qualified Data.Map(Map,size)
-import qualified Data.Set(Set,size)
-import qualified Data.IntMap(IntMap,size)
-import qualified Data.IntSet(IntSet,size)
+import qualified Data.Map(Map,size,null)
+import qualified Data.Set(Set,size,null)
+import qualified Data.IntMap(IntMap,size,null)
+import qualified Data.IntSet(IntSet,size,null)
 
+
+class IsEmpty a where
+    isEmpty :: a -> Bool
 
 class HasSize a where
     size :: a -> Int
@@ -49,14 +52,10 @@ instance HasSize [x] where
         f n (_:xs) = f (n - 1) xs
 
 
-
 instance HasSize (Data.Map.Map a b) where
     size = Data.Map.size
-
-
 instance HasSize (Data.Set.Set a) where
     size = Data.Set.size
-
 instance HasSize (Data.IntMap.IntMap v) where
     size = Data.IntMap.size
 instance HasSize Data.IntSet.IntSet where
@@ -74,7 +73,24 @@ instance (HasSize a,HasSize b) => HasSize (Either a b) where
 
 instance (HasSize a,HasSize b) => HasSize (a,b) where
     size (x,y) = size x + size y
-
 instance (HasSize a,HasSize b,HasSize c) => HasSize (a,b,c) where
     size (x,y,z) = size x + size y  + size z
+
+instance IsEmpty [x] where
+    isEmpty = null
+
+instance IsEmpty (Data.Map.Map a b) where
+    isEmpty = Data.Map.null
+instance IsEmpty (Data.Set.Set a) where
+    isEmpty = Data.Set.null
+instance IsEmpty (Data.IntMap.IntMap v) where
+    isEmpty = Data.IntMap.null
+instance IsEmpty Data.IntSet.IntSet where
+    isEmpty = Data.IntSet.null
+
+instance (IsEmpty a,IsEmpty b) => IsEmpty (a,b) where
+    isEmpty (x,y) = isEmpty x && isEmpty y
+instance (IsEmpty a,IsEmpty b,IsEmpty c) => IsEmpty (a,b,c) where
+    isEmpty (x,y,z) = isEmpty x && isEmpty y  && isEmpty z
+
 
