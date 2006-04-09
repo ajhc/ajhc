@@ -168,13 +168,15 @@ idann rs ps i nfo = return (rules rs i (props ps i nfo)) where
         Nothing -> id
         Just x -> \nfo -> Info.insert (x `mappend` Info.fetch nfo) nfo
 
+collectIdAnn r p id nfo = do
+    tell $ singleton id
+    idann r p id nfo
 
 processInitialHo :: Ho -> IO Ho
 processInitialHo ho = do
-    let Identity ds = annotateDs mempty (idann (hoRules ho) (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
+    let (ds,uids) = runWriter $ annotateDs mempty (collectIdAnn (hoRules ho) (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
         ds' = programDs $ etaAnnotateProgram (programSetDs ds program)
-    return ho { hoUsedIds = collectIds (ELetRec ds' Unknown), hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds' ] }
-
+    return ho { hoUsedIds = uids, hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds' ] }
 
 procSpecs :: Monad m => (Map.Map Name [Type.Rule]) -> (TVr,E) -> m ([(TVr,E)],[Rule])
 procSpecs specMap (t,e) | Just n <- fromId (tvrIdent t), Just rs <- Map.lookup n specMap = do
