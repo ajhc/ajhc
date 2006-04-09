@@ -170,7 +170,7 @@ eAp (EError s t) b = EError s (eAp t b)
 eAp a b = EAp a b
 
 typeSubst' :: IdMap E -> IdMap E -> E -> E
-typeSubst' termSub typeSub e | S.null termSub && S.null typeSub = e
+typeSubst' termSub typeSub e | isEmpty termSub && isEmpty typeSub = e
 --typeSubst' termSub typeSub e = typeSubst  (Map.map Just termSub `Map.union` Map.fromAscList [ (x,Map.lookup x termSub) | x <- fvs]) typeSub e  where
 --    fvs = Set.toAscList (freeVars e `Set.union` fvmap termSub `Set.union` fvmap typeSub)
 --    fvmap m = Set.unions (map freeVars (Map.elems m))
@@ -189,7 +189,7 @@ typeSubst ::
     IdMap (Maybe E)  -- ^ substitution to carry out at term level as well as a list of in-scope variables
     -> IdMap E       -- ^ substitution to carry out at type level
     -> (E -> E)           -- ^ the substitution function
-typeSubst termSubst typeSubst e | S.null termSubst && S.null typeSubst = e
+typeSubst termSubst typeSubst e | isEmpty termSubst && isEmpty typeSubst = e
 typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
     termSubst' = termSubst `union` fmap (const Nothing) typeSubst
     f :: E -> (Bool,IdMap (Maybe E),IdMap E) -> E

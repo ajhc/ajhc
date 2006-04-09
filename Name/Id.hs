@@ -33,7 +33,7 @@ type Id = Int
 
 
 newtype IdSet = IdSet IS.IntSet
-    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet Id,ModifySet Id)
+    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet Id,ModifySet Id,IsEmpty,Eq,Ord)
 
 
 idSetToList :: IdSet -> [Id]
@@ -46,7 +46,7 @@ idToInt = id
 -- IdMap
 
 newtype IdMap a = IdMap (IM.IntMap a)
-    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet (Id,a),MapLike Id a,Functor,FunctorM,Show)
+    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet (Id,a),MapLike Id a,Functor,FunctorM,Show,IsEmpty,Eq,Ord)
 
 
 idSetToIdMap :: (Id -> a) -> IdSet -> IdMap a
