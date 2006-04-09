@@ -376,7 +376,7 @@ processDecls stats ho ho' tiData = do
         let wws = length cds' - length cds
         wdump FD.Progress $ putErr (replicate wws 'w')
 
-        let graph = (newGraph cds' (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
+        let graph = (newGraph cds' (\ (b,_) -> tvrIdent b) (\ (b,c) -> idSetToList $ bindingFreeVars b c))
             (lb,os) = findLoopBreakers (const 1) nogood graph
             nogood (b,_) = not $ getProperty prop_PLACEHOLDER b || getProperty prop_WRAPPER b
             cds = [ if x `elem` fsts lb then (setProperty prop_NOINLINE x,y) else (x,y) | (x,y) <- os  ]
@@ -411,7 +411,7 @@ processDecls stats ho ho' tiData = do
 
 
 
-    let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
+    let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> idSetToList $ bindingFreeVars b c))
         fscc (Left n) = (False,[n])
         fscc (Right ns) = (True,ns)
     progress "Optimization pass with workwrapping/CPR"
@@ -429,7 +429,7 @@ processDecls stats ho ho' tiData = do
         prog <- barendregtProg prog
         prog <- return $ etaAnnotateProgram prog
         progress "Post typeanalyis/etaexpansion pass"
-        let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> bindingFreeVars b c))
+        let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> idSetToList $ bindingFreeVars b c))
             fscc (Left n) = (False,[n])
             fscc (Right ns) = (True,ns)
         (ds,_) <- foldM f ([],(Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
@@ -445,7 +445,7 @@ processDecls stats ho ho' tiData = do
 
 programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = programSetDs ds' prog where
-    ds' = reachable (newGraph (programDs prog) (tvrIdent . fst) (\ (t,e) -> bindingFreeVars t e)) (map tvrIdent $ progEntryPoints prog)
+    ds' = reachable (newGraph (programDs prog) (tvrIdent . fst) (\ (t,e) -> idSetToList $ bindingFreeVars t e)) (map tvrIdent $ progEntryPoints prog)
 
 programPrune :: Program -> IO Program
 programPrune prog = transformProgram "Prune Unreachable" (dump FD.Pass) (return . programPruneUnreachable) prog
@@ -889,8 +889,6 @@ lintCheckProgram onerr prog | flint = do
         putErrLn (">>> Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
         maybeDie
 lintCheckProgram _ _ = return ()
-
-
 
 
 

@@ -275,5 +275,6 @@ makeRule name uniq fvs head args body = rule where
         }
 
 -- | this determines all free variables of a definition taking rules into account
+bindingFreeVars :: TVr -> E -> IdSet
 bindingFreeVars t e = freeVars (tvrType t) `mappend` freeVars e `mappend` freeVars (Info.fetch (tvrInfo t) :: ARules)
 

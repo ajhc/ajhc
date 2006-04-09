@@ -125,7 +125,7 @@ programMapRecGroups imap idann letann lamann f prog = do
 
 decomposeDs :: [(TVr, E)] -> [Either (TVr, E) [(TVr,E)]]
 decomposeDs bs = map f mp where
-    mp = G.stronglyConnComp [ (v,i,bindingFreeVars t e) | v@(t@TVr { tvrIdent = i },e) <- bs]
+    mp = G.stronglyConnComp [ (v,i, idSetToList $ bindingFreeVars t e) | v@(t@TVr { tvrIdent = i },e) <- bs]
     f (G.AcyclicSCC v) = Left v
     f (G.CyclicSCC vs) = Right vs
 

@@ -360,7 +360,7 @@ basicDecompose ::
     -> [(TVr,E)]     -- ^ incoming bindings
     -> [Either (TVr,E) [(TVr,E)]]     -- ^ bindings pruned and ordered by inlinability value
 basicDecompose prune rules body ds = ans where
-    zs = [ ((t,e), tvrIdent t, bindingFreeVars t e ) |  (t,e) <- ds ]
+    zs = [ ((t,e), tvrIdent t, idSetToList $ bindingFreeVars t e ) |  (t,e) <- ds ]
     cg zs =  newGraph zs (\ (_,x,_) -> x) ( \ (_,_,x) -> x)
     tg = cg zs
     scc' = scc tg
