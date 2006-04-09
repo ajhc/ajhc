@@ -330,13 +330,4 @@ p_unsafeCoerce = primPrim "unsafeCoerce"
 p_toTag = primPrim "toTag"
 p_fromTag = primPrim "fromTag"
 
-instance BuildSet IdSet (TVr' e) where
-    fromList xs = fromList (map tvrIdent xs)
-    fromDistinctAscList xs = fromDistinctAscList (map tvrIdent xs)
-    member x s = member (tvrIdent x) s
-    insert x s = S.insert (tvrIdent x) s
-    delete x s = S.delete (tvrIdent x) s
-    singleton x = singleton (tvrIdent x)
-
-
 

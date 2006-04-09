@@ -49,7 +49,7 @@ etaReduce e = case f e 0 of
 
 lambdaLift :: Stats -> Program -> IO Program
 lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs } = do
-    let wp =  fromList [ x | (x,_,_) <- cs ]
+    let wp =  fromList [ tvrIdent x | (x,_,_) <- cs ]
     fc <- newIORef []
     let z (n,as,v) = do
             let ((v',cs'),stat) = runReader (runStatT $ execUniqT 1 $ runWriterT (f v)) S { funcName = mkFuncName (tvrIdent n), topVars = wp,isStrict = True, declEnv = [] }

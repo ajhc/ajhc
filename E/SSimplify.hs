@@ -97,9 +97,9 @@ collectOcc sopts  e = (e',fvs,occ) where
         nn <- sequence [ tell t >> return (x,y) |  (x,(y,t)) <- nn' ]
         let gr' = newGraph nn (tvrIdent . fst) (gfv . snd )
             (lb,ds'') = findLoopBreakers (\ (t,(e,_,_)) -> loopFunc t e) (const True) gr'
-            cycNodes = (fromList $ [ v | (v,_) <- cyclicNodes gr'] :: IdSet)
+            cycNodes = (fromList $ [ tvrIdent v | (v,_) <- cyclicNodes gr'] :: IdSet)
             calcStrictInfo t _
-                | t `member` cycNodes = setProperty prop_CYCLIC
+                | tvrIdent t `member` cycNodes = setProperty prop_CYCLIC
                 | otherwise = id
         let dvars = map (tvrIdent . fst) ds
             fvs = foldr delete (mconcat (fve:[ fv `mappend` freeVars t | (TVr { tvrType =  t},(_,fv,_)) <- ds'' ])) dvars
