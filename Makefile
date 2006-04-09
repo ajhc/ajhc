@@ -13,6 +13,8 @@ HC = ghc
 HCI = ghci
 HC_OPTS = $(GHCOPTS)
 
+PROF_OPTS = -P
+
 BUILTSOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs Version/Raw.hs Version/Ctx.hs
 
 # HSFILES is defined here, it can be updated with 'make depend' whenever a new source file is added
@@ -43,6 +45,10 @@ DP=$(PREFIX)
 base-1.0.hl: jhc lib/base/base.cabal
 	-[ -e base.log ] && mv -f base.log base.log.bak
 	./jhc -v $(JHC_TEST) -ilib/base --noauto --build-hl lib/base/base.cabal -o base-1.0.hl 2>&1 | tee base.log
+
+base-1.0.prof.hl: jhc lib/base/base.cabal
+	-[ -e base.prof.log ] && mv -f base.prof.log base.prof.log.bak
+	./jhcp -v $(JHC_TEST) -ilib/base --noauto --build-hl lib/base/base.cabal -o base-1.0.prof.hl +RTS $(PROF_OPTS)  2>&1 | tee base.log
 
 install: jhc base-1.0.hl
 	install -d "$(DP)/bin"
