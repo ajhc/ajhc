@@ -15,14 +15,15 @@ module E.Subst(
 import Control.Monad.Reader
 import Data.FunctorM
 import Data.Monoid
-import List
-import qualified Data.Map as Map
+import List hiding(union,insert,delete)
 
 import E.E
 import E.FreeVars()
 import Name.Id
 import Support.FreeVars
 import GenUtil
+import Util.SetLike as S
+import Util.HasSize
 
 eLetRec :: [(TVr,E)] -> E -> E
 eLetRec ds e = f (filter ((/= 0) . tvrIdent . fst) ds) where
@@ -37,7 +38,7 @@ subst ::
     -> E  -- ^ input term
     -> E  -- ^ output term
 subst (TVr { tvrIdent = 0 }) _ e = e
-subst (TVr { tvrIdent = i }) w e = doSubst False False (Map.insert i (Just w) $ (freeVars w `Map.union` freeVars e))  e
+subst (TVr { tvrIdent = i }) w e = doSubst False False (minsert i (Just w) $ (freeVars w `union` freeVars e))  e
 
 -- | Identitcal to 'subst' except that it substitutes inside the local types
 -- for variables in expressions. This should not be used because it breaks the
@@ -47,7 +48,7 @@ subst (TVr { tvrIdent = i }) w e = doSubst False False (Map.insert i (Just w) $ 
 
 subst' :: TVr -> E -> E -> E
 subst' (TVr { tvrIdent = 0 }) _ e = e
-subst' (TVr { tvrIdent = (i) }) w e = doSubst True False (Map.insert i (Just w) $ (freeVars w `Map.union` freeVars e)) e
+subst' (TVr { tvrIdent = (i) }) w e = doSubst True False (minsert i (Just w) $ (freeVars w `union` freeVars e)) e
 
 
 
@@ -62,21 +63,20 @@ litSMapM f (LitInt n t) = do
 
 
 
-substMap :: Map.Map Id E -> E -> E
---substMap im e = doSubst False False (Map.fromList [ (x,Map.lookup x im) | x <- (freeVars e ++ freeVars (Map.elems im)) ]) e
-substMap im e = doSubst False False (Map.map ( (`Map.lookup` im) . tvrIdent) (Map.unions $ (freeVars e :: Map.Map Id TVr):map freeVars (Map.elems im))) e
+substMap :: IdMap E -> E -> E
+substMap im e = doSubst False False (fmap ( (`mlookup` im) . tvrIdent) (unions $ (freeVars e :: IdMap TVr):map freeVars (melems im))) e
 
 -- | doesn't seed with free variables.
-substMap'' :: Map.Map Id E -> E -> E
-substMap'' im = doSubst False False (Map.map Just im) -- (Map.fromAscList [ (x,Just y) | (x,y) <- Map.toAscList im ]) e
+substMap'' :: IdMap E -> E -> E
+substMap'' im = doSubst False False (fmap Just im)
 
 -- Monadic code is so much nicer
-doSubst :: Bool -> Bool -> Map.Map Id (Maybe E) -> E -> E
+doSubst :: Bool -> Bool -> IdMap (Maybe E) -> E -> E
 doSubst substInVars allShadow bm e  = f e bm where
-    f :: E -> Map.Map Id (Maybe E) -> E
+    f :: E -> IdMap (Maybe E) -> E
     f eo@(EVar tvr@(TVr { tvrIdent = i, tvrType =  t })) = do
         mp <- ask
-        case Map.lookup i mp of
+        case mlookup i mp of
           Just (Just v) -> return v
           _
             | substInVars -> f t >>= \t' -> return $ EVar (tvr { tvrType =  t'})
@@ -113,7 +113,7 @@ doSubst substInVars allShadow bm e  = f e bm where
         return  ec { eCaseScrutinee = e', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts, eCaseType = nty }
     lp lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == 0 || (allShadow && n `notElem` freeVars e) = do
         t' <- f t
-        e' <- local (Map.insert n Nothing) $ f e
+        e' <- local (minsert n Nothing) $ f e
         return $ lam (tvr { tvrIdent =  0, tvrType =  t'}) e'
     lp lam tvr e = do
         (tv,r) <- ntvr [] tvr
@@ -141,23 +141,23 @@ doSubst substInVars allShadow bm e  = f e bm where
         i' <- mnv allShadow xs i
         let nvr = (tvr { tvrIdent =  i', tvrType =  t'})
         case i == i' of
-            True -> return (nvr,Map.insert i (Just $ EVar nvr))
-            False -> return (nvr,Map.insert i (Just $ EVar nvr) . Map.insert i' Nothing)
+            True -> return (nvr,minsert i (Just $ EVar nvr))
+            False -> return (nvr,minsert i (Just $ EVar nvr) . minsert i' Nothing)
 
 
 
 mnv allShadow xs i ss
     | allShadow = nv ss
-    | i <= 0 || i `Map.member` ss = nv (Map.fromList [ (x,undefined) | x <- xs ] `mappend` ss)
+    | i <= 0 || i `mmember` ss = nv (fromList [ (x,undefined) | x <- xs ] `mappend` ss)
     | otherwise = i
 
 
-nv ss = v (2 * (Map.size ss + 1)) where
-    v n | n `Map.member` ss = v (n + 2)
+nv ss = v (2 * (size ss + 1)) where
+    v n | n `mmember` ss = v (n + 2)
     v n = n
 
-nv' ss = v (2 * (Map.size ss + 1)) where
-    v n | (Just Nothing) <- Map.lookup n ss = v (n + 2)
+nv' ss = v (2 * (size ss + 1)) where
+    v n | (Just Nothing) <- mlookup n ss = v (n + 2)
     v n = n
 
 
@@ -169,33 +169,33 @@ eAp (ELit (LitCons n es (EPi t r))) b = ELit (LitCons n (es ++ [b]) (subst t b r
 eAp (EError s t) b = EError s (eAp t b)
 eAp a b = EAp a b
 
-typeSubst' :: Map.Map Id E -> Map.Map Id E -> E -> E
-typeSubst' termSub typeSub e | Map.null termSub && Map.null typeSub = e
+typeSubst' :: IdMap E -> IdMap E -> E -> E
+typeSubst' termSub typeSub e | S.null termSub && S.null typeSub = e
 --typeSubst' termSub typeSub e = typeSubst  (Map.map Just termSub `Map.union` Map.fromAscList [ (x,Map.lookup x termSub) | x <- fvs]) typeSub e  where
 --    fvs = Set.toAscList (freeVars e `Set.union` fvmap termSub `Set.union` fvmap typeSub)
 --    fvmap m = Set.unions (map freeVars (Map.elems m))
-typeSubst' termSub typeSub e = typeSubst  (Map.map Just termSub `Map.union` Map.map ((`Map.lookup` termSub) . tvrIdent) fvs) typeSub e  where
-    fvs :: Map.Map Id TVr
-    fvs = (freeVars e `Map.union` fvmap termSub `Map.union` fvmap typeSub)
-    fvmap m = Map.unions (map freeVars (Map.elems m))
+typeSubst' termSub typeSub e = typeSubst  (fmap Just termSub `union` fmap ((`mlookup` termSub) . tvrIdent) fvs) typeSub e  where
+    fvs :: IdMap TVr
+    fvs = (freeVars e `union` fvmap termSub `union` fvmap typeSub)
+    fvmap m = unions (map freeVars (melems m))
 
-substType t e e' = typeSubst (freeVars e `Map.union` freeVars e') (Map.singleton t e) e'
+substType t e e' = typeSubst (freeVars e `union` freeVars e') (msingleton t e) e'
 
 -- | substitution routine that can substitute different values at the term and type level.
 -- this is useful to enforce the invarient that let-bound variables must not occur at the type level, yet
 -- non-atomic values (even typelike ones) cannot appear in argument positions at the term level.
 
 typeSubst ::
-    Map.Map Id (Maybe E)  -- ^ substitution to carry out at term level as well as a list of in-scope variables
-    -> Map.Map Id E       -- ^ substitution to carry out at type level
+    IdMap (Maybe E)  -- ^ substitution to carry out at term level as well as a list of in-scope variables
+    -> IdMap E       -- ^ substitution to carry out at type level
     -> (E -> E)           -- ^ the substitution function
-typeSubst termSubst typeSubst e | Map.null termSubst && Map.null typeSubst = e
+typeSubst termSubst typeSubst e | S.null termSubst && S.null typeSubst = e
 typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
-    termSubst' = termSubst `Map.union` Map.map (const Nothing) typeSubst
-    f :: E -> (Bool,Map.Map Id (Maybe E),Map.Map Id E) -> E
+    termSubst' = termSubst `union` fmap (const Nothing) typeSubst
+    f :: E -> (Bool,IdMap (Maybe E),IdMap E) -> E
     f eo@(EVar tvr@(TVr { tvrIdent = i, tvrType =  t })) = do
         (wh,trm,tp) <- ask
-        case (wh,Map.lookup i trm, Map.lookup i tp) of
+        case (wh,mlookup i trm, mlookup i tp) of
           (False,(Just (Just v)),_) -> return v
           (True,_,(Just v)) -> return v
           _ -> return eo
@@ -244,8 +244,8 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
             local r $ f ts ((t',r):rs)
         vs = [ tvrIdent x | x <- ts ]
     inType = local (\ (_,trm,typ) -> (True,trm,typ) )
-    addMap i (Just e) (b,trm,typ) = (b,Map.insert i (Just e) trm, Map.insert i e typ)
-    addMap i Nothing (b,trm,typ) = (b,Map.insert i Nothing trm, typ)
+    addMap i (Just e) (b,trm,typ) = (b,minsert i (Just e) trm, minsert i e typ)
+    addMap i Nothing (b,trm,typ) = (b,minsert i Nothing trm, typ)
     litSMapM (LitCons s es t) = do
         t' <- inType $ f t
         es' <- mapM f es
