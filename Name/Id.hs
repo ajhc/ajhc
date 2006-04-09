@@ -7,6 +7,8 @@ module Name.Id(
     IdSet(),
     IdMap(),
     idSetToIdMap,
+    addBoundNamesIdMap,
+    addBoundNamesIdSet,
     idMapToIdSet
     )where
 
@@ -44,7 +46,7 @@ idToInt = id
 -- IdMap
 
 newtype IdMap a = IdMap (IM.IntMap a)
-    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet (Id,a),MapLike Id a,Functor,FunctorM)
+    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet (Id,a),MapLike Id a,Functor,FunctorM,Show)
 
 
 idSetToIdMap :: (Id -> a) -> IdSet -> IdMap a
@@ -92,5 +94,12 @@ instance Monad m => NameMonad Id (IdNameT m) where
         let genNames i = [st, st + 2 ..]  where
                 st = abs i + 2 + abs i `mod` 2
         fromIdNameT $ newNameFrom  (genNames (size used + size bound))
+
+addBoundNamesIdSet nset = IdNameT $ do
+    modify (\ (used,bound) -> (nset `union` used, nset `union` bound) )
+
+addBoundNamesIdMap nmap = IdNameT $ do
+    modify (\ (used,bound) -> (nset `union` used, nset `union` bound) ) where
+        nset = idMapToIdSet nmap
 
 
