@@ -232,8 +232,6 @@ processDecls stats ho ho' tiData = do
         mangle = mangle' (Just $ fromList inscope) fullDataTable
         namesInscope = fromList inscope
 
-    let initMap' = Map.fromList [ (tvrIdent tvr,EVar tvr) | tvr <- fsts $ Map.elems (hoEs ho)]
-
     -- initial pass over functions to put them into a normalized form
     let procE (ds,usedIds) (n,v,lc) = do
         lc <- atomizeAp False fullDataTable stats (progModule prog) lc -- doopt mangle False stats "FixupLets..." (\stats x -> atomizeAp False fullDataTable stats (progModule prog) x >>= coalesceLets stats)  lc
@@ -260,7 +258,7 @@ processDecls stats ho ho' tiData = do
     rules <- return $ specRules `mappend` rules
     allRules <- return $ allRules `mappend` rules
 
-    let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
+    let initMap = fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
 
     -- initial pass, performs
     -- eta expansion of definitons
@@ -387,7 +385,7 @@ processDecls stats ho ho' tiData = do
         let mangle = mangle' (Just $ namesInscope' `union` fromList (map (tvrIdent . fst) cds')) fullDataTable
         let dd  (ds,used) (v,lc) = do
                 let cm stats e = do
-                    let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = Map.fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `Map.union` smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
+                    let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `union` smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
                     let (stat, e') = SS.simplifyE sopt e
                     Stats.tickStat stats stat
                     return e'
@@ -404,10 +402,9 @@ processDecls stats ho ho' tiData = do
                 | Just n <- fromId (tvrIdent t) = n
                 | otherwise = error $ "toName: " ++ tvrShowName t
         let nvls = [ (t,e)  | (t,e) <- cds ]
-        let uidMap = Map.fromAscList [  (id,Nothing :: Maybe E) | id <- idSetToList usedids ]
 
         wdump FD.Progress $ putErr (if rec then "*" else ".")
-        return (nvls ++ retds, (Map.fromList [ (tvrIdent v,lc) | (v,lc) <- nvls] `Map.union` smap, Map.fromList [ (tvrIdent v,(Just (EVar v))) | (v,_) <- nvls] `Map.union` annmap , idHist' ))
+        return (nvls ++ retds, (fromList [ (tvrIdent v,lc) | (v,lc) <- nvls] `union` smap, fromList [ (tvrIdent v,(Just (EVar v))) | (v,_) <- nvls] `union` annmap , idHist' ))
 
 
 
@@ -415,7 +412,7 @@ processDecls stats ho ho' tiData = do
         fscc (Left n) = (False,[n])
         fscc (Right ns) = (True,ns)
     progress "Optimization pass with workwrapping/CPR"
-    (ds,_) <- foldM f ([],(Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
+    (ds,_) <- foldM f ([],(fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
     progress "!"
     prog <- return $ programSetDs ds prog
     prog <- programPrune prog
@@ -432,7 +429,7 @@ processDecls stats ho ho' tiData = do
         let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> idSetToList $ bindingFreeVars b c))
             fscc (Left n) = (False,[n])
             fscc (Right ns) = (True,ns)
-        (ds,_) <- foldM f ([],(Map.fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
+        (ds,_) <- foldM f ([],(fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
         progress "!"
         return $ programSetDs ds prog
       else return prog
@@ -512,7 +509,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     cmethods <- do
         let es' = concatMap expandPlaceholder (programDs prog)
         --es' <- createMethods dataTable (hoClassHierarchy ho) (programEsMap prog)
-        let initMap = Map.fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- programDs prog, not $ t `Set.member` tmap]
+        let initMap = fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- programDs prog, not $ t `Set.member` tmap]
             tmap = Set.fromList [ t | (t,_) <- es' ]
         let Identity es'' = annotateDs initMap (idann mempty (hoProps ho) ) letann lamann es'
         es' <- return [ (y,floatInward undefined z) |  (y,z) <- es'' ]

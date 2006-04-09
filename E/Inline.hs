@@ -9,29 +9,27 @@ module E.Inline(
     ) where
 
 import Control.Monad.Writer
-import Data.FunctorM
 import Data.Monoid
-import qualified Data.Set as Set
-import qualified Data.Map as Map
 import qualified Data.Graph as G
 
 import Atom
+import E.Annotate
 import E.E
 import E.Program
 import E.Rules
-import E.Annotate
 import E.Subst
 import E.Values
 import GenUtil
-import Info.Info as Info
+import qualified Info.Info as Info
+import Info.Info(Info)
 import Info.Types
+import Name.Id
 import Options
 import qualified FlagOpts as FO
 import Stats
 import Support.FreeVars
 import Util.Graph
-import Util.HasSize
-import Name.Id
+import Util.SetLike
 
 
 
@@ -46,23 +44,20 @@ baseInlinability t e
     | whnfOrBot e = 4
     | otherwise = 0
 
-
-
-
 -- NOINLINE must take precidence because it is sometimes needed for correctness, while INLINE is surely an optimization.
 forceInline x
     | forceNoinline x = False
     | not (fopts FO.InlinePragmas) = False
-    | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_INLINE p  || Set.member prop_WRAPPER p || Set.member prop_SUPERINLINE p
+    | Properties p <- Info.fetch (tvrInfo x) = member prop_INLINE p  || member prop_WRAPPER p || member prop_SUPERINLINE p
 
 forceSuperInline x
     | forceNoinline x = False
     | not (fopts FO.InlinePragmas) = False
-    | Properties p <- Info.fetch (tvrInfo x) =  Set.member prop_SUPERINLINE p
+    | Properties p <- Info.fetch (tvrInfo x) =  member prop_SUPERINLINE p
 
 forceNoinline x
     | Just (_x :: ARules) <- Info.lookup (tvrInfo x) = True
-    | Properties p <- Info.fetch (tvrInfo x) = Set.member prop_NOINLINE p || Set.member prop_PLACEHOLDER p
+    | Properties p <- Info.fetch (tvrInfo x) = member prop_NOINLINE p || member prop_PLACEHOLDER p
 
 app (e,[]) = return e
 app (e,xs) = app' e xs
@@ -99,7 +94,7 @@ app' e as = do
 -- shadows one of the global names.
 
 programMapRecGroups :: Monad m =>
-    Map.Map Id (Maybe E)        -- ^ initial map to apply
+    IdMap (Maybe E)        -- ^ initial map to apply
     -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
     -> (E -> Info -> m Info)    -- ^ annotate letbound bindings
     -> (E -> Info -> m Info)    -- ^ annotate lambdabound bindings
@@ -115,11 +110,11 @@ programMapRecGroups imap idann letann lamann f prog = do
             ds' <- annotateDs imap idann letann lamann ds
             nds <- f (True,ds')
             let imap' = (bm nds imap)
-            let smap = substMap'' $ Map.fromList [ (tvrIdent x,EVar x) | (x,y) <- nds]
+            let smap = substMap'' $ fromList [ (tvrIdent x,EVar x) | (x,y) <- nds]
                 nds' = [ (x,smap y) | (x,y) <- nds]
             g (nds':rs) imap' rds
         g rs _ [] = return $ concat rs
-        bm xs imap = Map.fromList [ (tvrIdent t,Just $ EVar t) | (t,_) <- xs ] `Map.union` imap
+        bm xs imap = fromList [ (tvrIdent t,Just $ EVar t) | (t,_) <- xs ] `union` imap
     ds <- g [] imap $ decomposeDs (programDs prog)
     return $ programSetDs ds prog
 

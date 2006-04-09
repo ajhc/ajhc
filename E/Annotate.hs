@@ -3,19 +3,21 @@ module E.Annotate where
 import Control.Monad.Reader
 import Data.FunctorM
 import Data.Monoid
-import qualified Data.Map as Map
 
 import E.E
 import E.Program
 import E.Rules
 import E.Subst
 import GenUtil
-import Info.Info as Info
 import Info.Types
 import Name.Id
+import qualified Info.Info as Info
+import Info.Info(Info)
+import Util.SetLike
+import Util.HasSize
 
 annotateDs :: Monad m =>
-    (Map.Map Id (Maybe E))
+    (IdMap (Maybe E))
     -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
     -> (E -> Info -> m Info) -- ^ annotate letbound bindings
     -> (E -> Info -> m Info) -- ^ annotate lambdabound bindings
@@ -27,7 +29,7 @@ annotateDs imap idann letann lamann ds = do
     return ds'
 
 annotateProgram :: Monad m =>
-    (Map.Map Id (Maybe E))
+    (IdMap (Maybe E))
     -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
     -> (E -> Info -> m Info)    -- ^ annotate letbound bindings
     -> (E -> Info -> m Info)    -- ^ annotate lambdabound bindings
@@ -39,17 +41,16 @@ annotateProgram imap idann letann lamann prog = do
 
 
 annotate :: Monad m =>
-    (Map.Map Id (Maybe E))
+    (IdMap (Maybe E))
     -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
     -> (E -> Info -> m Info) -- ^ annotate letbound bindings
     -> (E -> Info -> m Info) -- ^ annotate lambdabound bindings
     ->  E            -- ^ term to annotate
     -> m E
 annotate imap idann letann lamann e = runReaderT (f e) imap where
-    -- f :: Monad m => E -> ReaderT (Map.Map Int (Maybe E)) m E
     f eo@(EVar tvr@(TVr { tvrIdent = i, tvrType =  t })) = do
         mp <- ask
-        case Map.lookup i mp of
+        case mlookup i mp of
           Just (Just v) -> return v
           _  -> return eo
     f (ELam tvr e) = lp LambdaBound ELam tvr e
@@ -93,7 +94,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         tvr <- procRules tvr
         nfo <- lift $ lamann e (tvrInfo tvr)
         nfo <- lift $ idann n nfo
-        e' <- local (Map.insert n Nothing) $ f e
+        e' <- local (minsert n Nothing) $ f e
         return $ lam (tvr { tvrIdent =  0, tvrType =  t', tvrInfo =  Info.insert bnd nfo}) e'
     lp bnd lam tvr e = do
         nfo <- lift $ lamann e (tvrInfo tvr)
@@ -106,7 +107,6 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
             (t',r) <- ntvr vs t
             local r $ f ts ((t',r):rs)
         vs = [ tvrIdent x | x <- ts ]
-    -- ntvr :: Monad m => Info -> [Int] -> TVr -> ReaderT (Map.Map Int (Maybe E)) m (TVr, (Map.Map Int (Maybe E)) -> (Map.Map Int (Maybe E)))
     ntvr xs tvr@(TVr { tvrIdent = 0, tvrType =  t}) = do
         t' <- f t
         tvr <- procRules tvr
@@ -121,12 +121,12 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         let i' = mnv xs i ss
         let nvr = (tvr { tvrIdent =  i', tvrType =  t', tvrInfo =  nfo'})
         case i == i' of
-            True -> return (nvr,Map.insert i (Just $ EVar nvr))
-            False -> return (nvr,Map.insert i (Just $ EVar nvr) . Map.insert i' Nothing)
+            True -> return (nvr,minsert i (Just $ EVar nvr))
+            False -> return (nvr,minsert i (Just $ EVar nvr) . minsert i' Nothing)
     mrule r = do
         let g tvr = do
             nfo <- lift $ idann (tvrIdent tvr) (tvrInfo tvr)
-            return (tvr { tvrInfo = nfo },Map.insert (tvrIdent tvr) (Just $ EVar tvr))
+            return (tvr { tvrInfo = nfo },minsert (tvrIdent tvr) (Just $ EVar tvr))
         bs <- mapM g $ ruleBinds r
         local (mconcat $ snds bs) $ do
             args <- mapM f (ruleArgs r)
@@ -139,14 +139,14 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
             return tvr { tvrInfo = Info.insert r' (tvrInfo tvr) }
 
 mnv xs i ss
-    | i <= 0 || i `Map.member` ss = nv (Map.fromList [ (x,undefined) | x <- xs ] `mappend` ss)
+    | i <= 0 || i `mmember` ss = nv (fromList [ (x,undefined) | x <- xs ] `mappend` ss)
     | otherwise = i
 
 
-nv ss = v (2 * (Map.size ss + 1)) where
-    v n | n `Map.member` ss = v (n + 2)
+nv ss = v (2 * (size ss + 1)) where
+    v n | n `mmember` ss = v (n + 2)
     v n = n
 
-nv' ss = v (2 * (Map.size ss + 1)) where
-    v n | (Just Nothing) <- Map.lookup n ss = v (n + 2)
+nv' ss = v (2 * (size ss + 1)) where
+    v n | (Just Nothing) <- mlookup n ss = v (n + 2)
     v n = n
