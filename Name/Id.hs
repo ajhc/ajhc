@@ -4,12 +4,16 @@ module Name.Id(
     runIdNameT',
     runIdNameT,
     IdNameT(),
-    IdSet()
+    IdSet(),
+    IdMap(),
+    idSetToIdMap,
+    idMapToIdSet
     )where
 
 import Control.Monad
 import Control.Monad.State
 import qualified Data.IntSet as IS
+import qualified Data.IntMap  as IM
 import Data.Monoid
 import Data.Typeable
 
@@ -20,22 +24,33 @@ import Util.NameMonad
 -- TODO - make this a newtype
 type Id = Int
 
-newtype IdSet = IdSet IS.IntSet
-    deriving(Typeable,Monoid,HasSize,SetLike)
 
-instance BuildSet IdSet Id where
-    fromList xs = IdSet $ IS.fromList (map idToInt xs)
-    fromDistinctAscList xs = IdSet $ IS.fromDistinctAscList (map idToInt xs)
-    member x (IdSet s) = IS.member (idToInt x) s
-    insert x (IdSet s) = IdSet $ IS.insert (idToInt x) s
-    delete x (IdSet s) = IdSet $ IS.delete (idToInt x) s
-    singleton x = IdSet $ IS.singleton (idToInt x)
+-- IdSet
+
+
+newtype IdSet = IdSet IS.IntSet
+    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet Id,ModifySet Id)
+
 
 idSetToList :: IdSet -> [Id]
 idSetToList (IdSet is) = IS.toList is
 
 idToInt :: Id -> Int
 idToInt = id
+
+
+-- IdMap
+
+newtype IdMap a = IdMap (IM.IntMap a)
+    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet (Id,a),MapLike Id a)
+
+
+idSetToIdMap :: (Id -> a) -> IdSet -> IdMap a
+idSetToIdMap f (IdSet is) = IdMap $ IM.fromDistinctAscList [ (x,f x) |  x <- IS.toAscList is]
+
+idMapToIdSet :: IdMap a -> IdSet
+idMapToIdSet (IdMap im) = IdSet $ IS.fromDistinctAscList (IM.keys im)
+
 
 -- | Name monad transformer.
 newtype IdNameT m a = IdNameT (StateT (IdSet, IdSet) m a)
