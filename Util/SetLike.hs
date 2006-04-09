@@ -134,6 +134,7 @@ class SetLike m => MapLike k v m | m -> k v where
     mdelete :: k -> m -> m
     mmember :: k -> m -> Bool
     mlookup :: Monad g => k -> m -> g v
+    melems :: m -> [v]
 
 instance Ord a => MapLike Int a (IM.IntMap a) where
     mdelete = IM.delete
@@ -141,11 +142,13 @@ instance Ord a => MapLike Int a (IM.IntMap a) where
     mlookup k m = case IM.lookup k m of
         Nothing -> fail $ "IntMap: can't find " ++ show k
         Just x -> return x
+    melems = IM.elems
 
 instance Ord k => MapLike k v (M.Map k v) where
     mdelete = M.delete
     mmember = M.member
     mlookup = M.lookup
+    melems = M.elems
 
 
 -- EnumSet
