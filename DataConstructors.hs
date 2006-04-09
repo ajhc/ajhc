@@ -23,7 +23,7 @@ module DataConstructors(
 
 import Control.Monad.Identity
 import Control.Monad.Writer
-import Data.Map as Map hiding(map)
+import qualified Data.Map as Map hiding(map)
 import qualified Data.Set as Set
 import List(sortBy,(\\))
 
@@ -52,6 +52,7 @@ import Support.CanType
 import Support.Unparse
 import Util.HasSize
 import Util.SameShape
+import Util.SetLike
 import Util.VarName
 
 tipe t = runVarName (tipe' t)
@@ -104,7 +105,7 @@ data Constructor = Constructor {
     {-! derive: GhcBinary !-}
 
 newtype DataTable = DataTable {
-    constructorMap :: (Map Name Constructor)
+    constructorMap :: (Map.Map Name Constructor)
     }
     {-! derive: GhcBinary, Monoid !-}
 
@@ -323,7 +324,7 @@ followAlias dataTable (ELit (LitCons c ts e))
         Identity ccon = getConstructor cn dataTable
         jcon@(~(Just con)) = getConstructor c dataTable
         [sl] = conSlots ccon
-        ans = doSubst False False (Map.fromList $ zip [2..] (map Just ts)) sl
+        ans = doSubst False False (fromList $ zip [2..] (map Just ts)) sl
 followAlias _ e = fail "followAlias: not an alias"
 
 followAliases :: DataTable -> E -> E
@@ -336,7 +337,7 @@ followAliases dataTable l = f l 10 where
 dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tabsurd:tarrow:primitiveTable ] ++ worlds)
 
 {-# NOINLINE toDataTable #-}
-toDataTable :: (Map Name Kind) -> (Map Name Type) -> [HsDecl] -> DataTable
+toDataTable :: (Map.Map Name Kind) -> (Map.Map Name Type) -> [HsDecl] -> DataTable
 toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conName x,x) | x <- ds' ])  where
     fixupMap k _ | Just n <- getConstructor k dataTablePrims = n
     fixupMap _ n = n
@@ -388,7 +389,7 @@ toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conN
                     newName [2,4..] () tv
                 tipe' ty
             existentials = Set.toList $ freeVars (map getType ts') Set.\\ freeVars xs
-            subst = substMap $ Map.fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
+            subst = substMap $ fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
             ts = existentials ++ [ tvr {tvrIdent = x} | tvr <- ts' | x <- drop (5 + length theTypeArgs) [2,4..] ]
             (vs,ty) = case Map.lookup dataConsName cm of
                 Just (TForAll vs (_ :=> ty)) -> (vs,ty)
@@ -415,7 +416,7 @@ constructionExpression dataTable n typ@(ELit (LitCons pn xs _))
     var = tvr { tvrIdent = 2, tvrType = typ }
     Just mc = getConstructor n dataTable
     Just pc = getConstructor (conInhabits mc) dataTable
-    sub = substMap $ Map.fromDistinctAscList [ (i,sl) | sl <- xs | i <- [2,4..] ]
+    sub = substMap $ fromDistinctAscList [ (i,sl) | sl <- xs | i <- [2,4..] ]
 constructionExpression wdt n e | Just fa <- followAlias wdt e  = constructionExpression wdt n fa
 constructionExpression _ n e = error $ "constructionExpression: error in " ++ show n ++ ": " ++ show e
 
@@ -444,7 +445,7 @@ slotTypes wdt n (ELit (LitCons pn xs _))
     where
     Identity mc = getConstructor n wdt
     Identity pc = getConstructor (conInhabits mc) wdt
-    sub = substMap $ Map.fromDistinctAscList [ (i,sl) | sl <- xs | i <- [2,4..] ]
+    sub = substMap $ fromDistinctAscList [ (i,sl) | sl <- xs | i <- [2,4..] ]
 slotTypes wdt n kind
     | sortStarLike kind, (e,ts) <- fromPi kind = drop (length ts) (conSlots mc)
     where Identity mc = getConstructor n wdt

@@ -21,6 +21,7 @@ import Info.Types
 import Name.Name
 import Name.Names
 import Name.VConsts
+import Util.SetLike
 
 
 instance Tuple E where
@@ -115,7 +116,7 @@ eLet :: TVr -> E -> E -> E
 eLet TVr { tvrIdent = 0 } _ e' = e'
 eLet t@(TVr { tvrType =  ty}) e e'
     | sortStarLike ty && isAtomic e = subst t e e'
-    | sortStarLike ty = ELetRec [(t,e)] (typeSubst mempty (Map.singleton (tvrIdent t) e) e')
+    | sortStarLike ty = ELetRec [(t,e)] (typeSubst mempty (msingleton (tvrIdent t) e) e')
     | isUnboxed ty && isAtomic e = subst t e e'
     | isUnboxed ty  = eStrictLet t e e'
 eLet t e e' = ELetRec [(t,e)] e'
@@ -128,7 +129,7 @@ substLet :: [(TVr,E)] -> E -> E
 substLet ds e  = ans where
     (as,nas) = partition (isAtomic . snd) (filter ((/= 0) . tvrIdent . fst) ds)
     tas = filter (sortStarLike . tvrType . fst) nas
-    ans = eLetRec (as ++ nas) (typeSubst' (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- as]) (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas]) e)
+    ans = eLetRec (as ++ nas) (typeSubst' (fromList [ (n,e) | (TVr { tvrIdent = n },e) <- as]) (fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas]) e)
 
 
 substLet' :: [(TVr,E)] -> E -> E
@@ -140,7 +141,7 @@ substLet' ds' e  = ans where
         ([],_) -> hhh hh $ e
         (nas,[]) -> hhh hh $ ELetRec nas e
         _  -> let
-                    f = typeSubst' mempty (Map.fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas])
+                    f = typeSubst' mempty (fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas])
                     nas' = [ (v,f e) | (v,e) <- nas]
                in hhh hh $ ELetRec nas' (f e)
     hhh [] e = e

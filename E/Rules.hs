@@ -26,6 +26,7 @@ module E.Rules(
 
 import Data.Monoid
 import Data.Typeable
+import Data.FunctorM
 import List
 import Monad(liftM)
 import Control.Monad.Trans
@@ -102,8 +103,10 @@ mapBodies g (Rules mp) = do
     let f rule = do
             b <- g (ruleBody rule)
             return rule { ruleBody = b }
-    mp' <- sequence [ do rs' <- mapM f rs; return (k,rs') | (k,rs) <- Map.toAscList mp ]
-    return $ Rules $ Map.fromAscList mp'
+    mp' <- fmapM (mapM f) mp
+    return $ Rules mp'
+    --mp' <- sequence [ do rs' <- mapM f rs; return (k,rs') | (k,rs) <- Map.toAscList mp ]
+    --return $ Rules $ Map.fromAscList mp'
 
 
 ruleAllFreeVars :: Rules -> IdSet
@@ -199,7 +202,7 @@ dropArguments os (ARules rs) = arules (catMaybes $  map f rs) where
             g (i,a) = return (Left a)
         as' <- mapM g $ zip naturals (ruleArgs r)
         let sb = substLet (concat $ rights as')
-            sa = substMap $ Map.fromList [ (tvrIdent t,v) |  Right ds <- as', (t,v) <- ds ]
+            sa = substMap $ fromList [ (tvrIdent t,v) |  Right ds <- as', (t,v) <- ds ]
         return r { ruleArgs = map sa (lefts as'), ruleBody = sb (ruleBody r) }
 
 -- | invarients for ARules
@@ -217,7 +220,7 @@ arules xs = ARules (sortUnder ruleNArgs (map f xs)) where
         ruleArgs = map g (ruleArgs rule)
         } where
         bs = map (setProperty prop_RULEBINDER) (ruleBinds rule)
-        g e = substMap (Map.fromList [ (tvrIdent t, EVar t) | t <- bs ]) e
+        g e = substMap (fromList [ (tvrIdent t, EVar t) | t <- bs ]) e
 
 instance Monoid ARules where
     mempty = ARules []
@@ -231,7 +234,7 @@ joinARules ar@(ARules a) br@(ARules b)
    rs@(r:_) = map ruleHead a ++ map ruleHead b
 
 rsubstMap :: Map.Map Id E -> E -> E
-rsubstMap im e = doSubst False True (Map.map ( (`Map.lookup` im) . tvrIdent) (Map.unions $ (freeVars e :: Map.Map Id TVr):map freeVars (Map.elems im))) e
+rsubstMap im e = doSubst False True (fmap ( (`mlookup` im) . tvrIdent) (unions $ (freeVars e :: IdMap TVr):map freeVars (melems im))) e
 
 applyRules lup (ARules rs) xs = f rs where
     lxs = length xs

@@ -22,7 +22,6 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.FunctorM
 import Data.Monoid
-import qualified Data.Map as Map
 
 import DataConstructors()
 import Util.HasSize
@@ -54,7 +53,7 @@ renameTraverse' e = e' where
     e' = liftM fst $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty mempty  e
 
 runRename :: IdSet -> E -> (E,IdSet)
-runRename set e = runIdentity $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty (Map.fromDistinctAscList [ (v,NotKnown) | v <- idSetToList set])  e
+runRename set e = runIdentity $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty (idSetToIdMap (const NotKnown) set)  e
 
 data  TravOptions m = TravOptions {
     pruneUnreachable :: Maybe [Int],
@@ -62,7 +61,7 @@ data  TravOptions m = TravOptions {
     propagateRecord :: Int -> m (),
     letToCaseRecord :: Int -> m (),
     trav_rules :: Rules,
-    trav_strictness :: Map.Map Int Strict.SA,
+    trav_strictness :: IdMap Strict.SA,
     _hiddenTricky :: m ()    -- ^ This ensures types are not ambiguous if we don't fill in the monadic routines
     }
 
@@ -83,13 +82,14 @@ travOptionsI = TravOptions {
     pruneRecord = \_ -> Identity ()
     }
 -}
-type Subst = Map.Map Int E  -- Map apply anywhere. so should range only over atoms
-type InScope = Map.Map Int Binding
+type Subst = IdMap E  -- Map apply anywhere. so should range only over atoms
+type InScope = IdMap Binding
 data Binding = NotAmong [Name] | IsBoundTo E | NotKnown
+    deriving(Eq,Ord)
 
 --newtype TravM m a = TravM (StateT (Map.Map Int Binding) m a)
 --    deriving(Monad,MonadTrans,Functor,MonadIO)
-newtype TravM m a = TravM (ReaderT (Map.Map Int Binding) (IdNameT m) a)
+newtype TravM m a = TravM (ReaderT (IdMap Binding) (IdNameT m) a)
     deriving(Monad,Functor,MonadIO)
 
 instance MonadTrans TravM where
@@ -107,7 +107,7 @@ newBinding e = do
 lookupBinding :: Monad m => TVr -> TravM m Binding
 lookupBinding (TVr { tvrIdent = n }) = TravM $ do
     x <- ask
-    return (maybe NotKnown id $  Map.lookup n x)
+    return (maybe NotKnown id $  mlookup n x)
 
 {-# INLINE newVarName #-}
 newVarName :: Monad m => TravM m Int
@@ -129,13 +129,13 @@ newVar' _ n = n
 
 -}
 
-traverse :: (MonadFix m,Monad m) => TravOptions m -> (Int -> (E,[E]) -> TravM m E) -> Subst -> (Map.Map Int Binding) -> E -> m (E,IdSet)
+traverse :: (MonadFix m,Monad m) => TravOptions m -> (Int -> (E,[E]) -> TravM m E) -> Subst -> (IdMap Binding) -> E -> m (E,IdSet)
 traverse (tOpt :: TravOptions m) func subst smap e = runIdNameT' $ initNames >> runReaderT (f e) (smap,subst,0::Int)  where
     initNames = do
-        addBoundNames $ freeVars e
-        addBoundNames (Map.keys subst)
-        addBoundNames (Map.keys smap)
-    f :: E -> ReaderT (Map.Map Int Binding, Subst, Int) (IdNameT m) E
+        addBoundNamesIdSet $ freeVars e
+        addBoundNamesIdMap subst
+        addBoundNamesIdMap smap
+    f :: E -> ReaderT (IdMap Binding, Subst, Int) (IdNameT m) E
     f' e = do
         local (\ (a,b,c) -> (a,b,c + 1)) $  f e
     f  e | (x,xs) <- fromAp e = do
@@ -146,7 +146,7 @@ traverse (tOpt :: TravOptions m) func subst smap e = runIdNameT' $ initNames >> 
         return z
     g  e@(EVar (TVr { tvrIdent = n, tvrType =  t})) = do
         (_,im,lvl) <- ask
-        case Map.lookup n im of
+        case mlookup n im of
             Just n'@(EVar t) | tvrIdent t == n -> return $ n'
             Just n' -> do
                 lift $ lift $  propagateRecord tOpt 1
@@ -179,7 +179,7 @@ traverse (tOpt :: TravOptions m) func subst smap e = runIdNameT' $ initNames >> 
             addNames $ map ( tvrIdent . fst ) ds
             z (basicDecompose  (pruneUnreachable tOpt) (trav_rules tOpt) e ds) e  where
         z [] e = f e
-        z (Left (tvr,x):rs) e | worthStricting x, Just (S _) <- Map.lookup (tvrIdent tvr) (trav_strictness tOpt)  = do
+        z (Left (tvr,x):rs) e | worthStricting x, Just (S _) <- mlookup (tvrIdent tvr) (trav_strictness tOpt)  = do
             (n,tvrn) <- ntvr f' tvr
             x' <- f x
             nr <- localSubst [(n,EVar tvrn)]   (z rs e)
@@ -234,15 +234,15 @@ traverse (tOpt :: TravOptions m) func subst smap e = runIdNameT' $ initNames >> 
         (n,tvr@(TVr { tvrIdent = n' })) <- ntvr fg tv
         e' <- localVars [(n',NotKnown)] $ localSubst [(n,EVar tvr)]   (f e)
         return $ elam tvr e'
-    lb n me n' ne (m,im,lvl) = (Map.insert n me m,if n' /= 0 then Map.insert n' ne im else im ,lvl)
+    lb n me n' ne (m,im,lvl) = (minsert n me m,if n' /= 0 then minsert n' ne im else im ,lvl)
     localVars ex x = do
-        let ex' = Map.fromList [ (a,b) |  (a,IsBoundTo b) <- ex, isAtomic b ]
-            z (EVar (TVr { tvrIdent = n })) | Just v <- Map.lookup n ex' = v
+        let ex' = fromList [ (a,b) |  (a,IsBoundTo b) <- ex, isAtomic b ] :: IdMap E
+            z (EVar (TVr { tvrIdent = n })) | Just v <- mlookup n ex' = v
             z e = e
-        r <- local (\ (a,b,c) ->  (Map.fromList ex `mappend` a, fmap z  b ,c)) x
+        r <- local (\ (a,b,c) ->  (fromList ex `mappend` a, fmap z  b ,c)) x
         return r
     localSubst (ex :: [(Int,E)]) x = do
-        r <- local (\ (a,b,c) ->  (a, Map.fromList ex `mappend` b ,c)) x
+        r <- local (\ (a,b,c) ->  (a, fromList ex `mappend` b ,c)) x
         return r
     ntvr fg tvr@(TVr { tvrIdent = 0, tvrType = t}) = do
         t' <- fg t
@@ -258,7 +258,7 @@ traverse (tOpt :: TravOptions m) func subst smap e = runIdNameT' $ initNames >> 
         return $ eLetCoalesce ds e'
     h (((TVr { tvrIdent = n }),x):dds) e ds = do
         (_,tm,_) <- ask
-        let (Just (EVar nt)) = Map.lookup n tm
+        let (Just (EVar nt)) = mlookup n tm
         x' <- f x
         localVars [(tvrIdent nt, IsBoundTo x')] $ h dds e ((nt,x'):ds)
         --case isAtomic x' of
