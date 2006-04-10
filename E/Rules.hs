@@ -11,7 +11,6 @@ module E.Rules(
     fromRules,
     getARules,
     mapRules,
-    hasBuiltinRule,
     makeRule,
     mapABodies,
     mapABodiesArgs,
@@ -19,7 +18,6 @@ module E.Rules(
     printRule,
     printRules,
     ruleAllFreeVars,
-    ruleFreeVars,
     ruleFreeVars',
     rulesFromARules
     )where
@@ -112,10 +110,6 @@ mapBodies g (Rules mp) = do
 ruleAllFreeVars :: Rules -> IdSet
 ruleAllFreeVars (Rules r) = freeVars (concatMap (map ruleBody) (Map.elems r))
 
-ruleFreeVars ::  Rules -> TVr -> IdSet
-ruleFreeVars (Rules r) tvr = case Map.lookup (tvrIdent tvr) r of
-    Nothing -> mempty
-    Just rs -> (freeVars (map ruleBody rs) S.\\ freeVars (map ruleArgs rs))
 
 ruleFreeVars' ::  Rules -> Id -> IdSet
 ruleFreeVars' (Rules r) tvr = case Map.lookup tvr r of
@@ -244,7 +238,6 @@ applyRules lup (ARules rs) xs = f rs where
 preludeError = toId v_error
 ruleError = toAtom "Rule.error/EError"
 
-hasBuiltinRule TVr { tvrIdent = n } = n `Set.member` Set.fromList [preludeError]
 builtinRule TVr { tvrIdent = n } (ty:s:rs)
     | n == preludeError, Just s' <- toString s  = do
         mtick ruleError
