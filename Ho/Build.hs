@@ -326,11 +326,10 @@ getModule initialHo ho name files  = do
                     r <- if hoLibraryDeps ho' ho then f (hohModDepends hh) else return False
                     case r of
                         True -> do
-                            --fixups <- readIORef fixup_ref
-                            --let nfixups = getFixups ho' `mappend` fixups
-                            --writeIORef fixup_ref nfixups
-                            --modifyIORef ho_ref (applyFixups nfixups ho' `mappend`) >> hClose fh
-                            modifyIORef ho_ref ( ho' `mappend`) >> hClose fh
+                            fixups <- readIORef fixup_ref
+                            let nfixups = getFixups ho' `mappend` fixups
+                            writeIORef fixup_ref nfixups
+                            modifyIORef ho_ref (applyFixups nfixups ho' `mappend`) >> hClose fh
                         False -> addNeed name fd fh ho_name
                 Nothing -> addNeed name fd fh ho_name
         checkHoDep :: (Module,FileDep) -> IO Bool
