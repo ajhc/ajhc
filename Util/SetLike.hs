@@ -132,6 +132,7 @@ class SetLike m => MapLike k v m | m -> k v where
     melems :: m -> [v]
     mkeys :: m -> [k]
     mfilter :: (v -> Bool) -> m -> m
+    munionWith :: (v -> v -> v) -> m -> m -> m
 
 instance Ord a => MapLike Int a (IM.IntMap a) where
     mdelete = IM.delete
@@ -142,6 +143,7 @@ instance Ord a => MapLike Int a (IM.IntMap a) where
     melems = IM.elems
     mkeys = IM.keys
     mfilter = IM.filter
+    munionWith = IM.unionWith
 
 instance Ord k => MapLike k v (M.Map k v) where
     mdelete = M.delete
@@ -150,6 +152,7 @@ instance Ord k => MapLike k v (M.Map k v) where
     melems = M.elems
     mkeys = M.keys
     mfilter = M.filter
+    munionWith = M.unionWith
 
 
 -- EnumSet
