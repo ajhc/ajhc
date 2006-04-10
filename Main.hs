@@ -476,7 +476,7 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     let dataTable = progDataTable prog
         rules = hoRules ho
-        prog = hoToProgram ho
+        prog = (hoToProgram ho) { progClosed = True }
 
     -- dump final version of various requested things
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
@@ -554,6 +554,11 @@ compileModEnv' stats (initialHo,finalHo) = do
         let (stat, e') = SS.simplifyE sopt e
         Stats.tickStat stats stat
         return e'
+
+    wdump FD.Lambdacube $ printProgram prog -- printCheckName dataTable (programE prog)
+    prog <- return $ SS.programPruneOccurance prog
+    putStrLn ">>>> after occurance analysis"
+    wdump FD.Lambdacube $ printProgram prog -- printCheckName dataTable (programE prog)
 
     -- run first optimization
     lc <- opt "SuperSimplify" cm lc
@@ -926,9 +931,9 @@ printCheckName'' dataTable tvr e = do
             Right ty -> (ty,pprint ty)
         tmatch = isJust $ match (const Nothing) [] ty (tvrType tvr)
     when (dump FD.EInfo || verbose2) $ putErrLn (show $ tvrInfo tvr)
-    putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
-    when (not tmatch) $
-        putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pprint (tvrType tvr)))
+    putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> (pprint $ tvrType tvr)))
+    when (not tmatch || dump FD.EVerbose) $
+        putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
     putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
 
 
