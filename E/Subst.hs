@@ -67,8 +67,8 @@ substMap :: IdMap E -> E -> E
 substMap im e = doSubst False False (fmap ( (`mlookup` im) . tvrIdent) (unions $ (freeVars e :: IdMap TVr):map freeVars (melems im))) e
 
 -- | doesn't seed with free variables.
-substMap'' :: IdMap E -> E -> E
-substMap'' im = doSubst False False (fmap Just im)
+substMap'' :: IdMap (Maybe E) -> E -> E
+substMap'' im = doSubst False False im -- (fmap Just im)
 
 -- Monadic code is so much nicer
 doSubst :: Bool -> Bool -> IdMap (Maybe E) -> E -> E

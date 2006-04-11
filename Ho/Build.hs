@@ -402,7 +402,7 @@ getFixups ho = fromList [ (tvrIdent x,EVar x) | (x,_) <- melems (hoEs ho)]
 applyFixups :: IdMap E -> Ho -> Ho
 applyFixups mie ho = ho { hoEs = fmap f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) } where
     f (t,e) = (t,sm e)
-    sm = substMap'' mie
+    sm = substMap'' (fmap Just mie)
 
 fixupHo :: Ho -> Ho
 fixupHo ho = applyFixups (getFixups ho) ho

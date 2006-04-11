@@ -272,7 +272,7 @@ specializeProgram doSpecialize usedRules usedValues prog = do
 specializeDef _ (_,unusedVals,_,_) (tvr,e) | tvr `Set.member` unusedVals = return (tvr,EError "Unused" (tvrType tvr))
 specializeDef _ _ (t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
 specializeDef True (_,_,dataTable,_) (tvr,e) = ans where
-    sub = substMap''  $ fromList [ (tvrIdent t,v) | (t,Just v) <- sts ]
+    sub = substMap''  $ fromList [ (tvrIdent t,Just v) | (t,Just v) <- sts ]
     sts = map spec ts
     spec t | Just nt <- Info.lookup (tvrInfo t) >>= getTyp (getType t) dataTable, sortStarLike (getType t) = (t,Just nt)
     spec t = (t,Nothing)
