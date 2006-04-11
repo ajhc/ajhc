@@ -149,7 +149,7 @@ foreach my $d (@ds) {
         push @cmeth, "($c_num, toInstName \"Prelude.fromInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
         push @cmeth, "($c_num, toInstName \"Prelude.toInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
     } else {
-        push @cmeth, "($c_num, toInstName \"Prelude.fromInteger.$d->[0]\", ELam $ivar (create_integralCast_fromInteger $cncons $rtype (EVar $ivar) $t))";
+        push @cmeth, "($c_num, toInstName \"Prelude.fromInteger.$d->[0]\", ELam $ivart (create_integralCast_fromInteger $cncons $rtype (EVar $ivart) $t))";
         push @cmeth, "($c_num, toInstName \"Prelude.toInteger.$d->[0]\", ELam $tvar (create_integralCast_toInteger $cncons $rtype (EVar $tvar)))" if $d->[2] =~ /int/ ;
     }
     #push @cmeth, "(toInstName \"Prelude.abs.$d->[0]\", ELam $tvar (buildAbs $tvar $t))" if $d->[2] =~ /int/ ;
