@@ -172,7 +172,8 @@ class Monad m => MonadStats m where
 {-# INLINE mtick  #-}
 {-# INLINE mticks #-}
 mtick k = mticks' 1 (toAtom k)
-mticks n k = n `seq` mticks' n (toAtom k)
+mticks 0 _ = return ()
+mticks n k = let k' = toAtom k in k' `seq` n `seq` mticks' n k'
 
 --instance (Monad m, Monad (t m), MonadTrans t, MonadReader r m) => MonadReader r (t m) where
 --    ask = lift $ ask
