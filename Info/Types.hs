@@ -23,15 +23,6 @@ data Arity = Arity Int Bool
 data BindType = CaseDefault | CasePattern | LetBound | LambdaBound | PiBound
     deriving(Typeable,Show,Ord,Eq)
 
--- | whether the variable is exported from the current module
-data ExportStatus = Exported
-    deriving(Typeable,Show,Ord,Eq)
-
-instance Binary ExportStatus where
-    put_ _ _ = return ()
-    get _ = return Exported
-
-
 instance Show Properties where
     showsPrec _ (Properties s) = shows (sortBy (\x y -> compare (show x) (show y)) (Set.toList s))
 
