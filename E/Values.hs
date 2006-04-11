@@ -184,7 +184,7 @@ unsafeCoerceOpt (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = f (0::Int) e
     f n (EError err _) t = (n,EError err t,id)
     f n (ELit (LitInt x _)) t = (n,ELit (LitInt x t),id)
     f n (ELit (LitCons x y _)) t = (n,ELit (LitCons x y t),id)
-    f n ec@ECase {} t = (n,nx,id) where
+    f n ec@ECase {} t = (n,nx { eCaseType = t },id) where
         Identity nx = caseBodiesMapM (return . flip prim_unsafeCoerce t) ec
     f n e t | getType e == t = (n,e,id)
     f n e t = (n,e,flip prim_unsafeCoerce t)
