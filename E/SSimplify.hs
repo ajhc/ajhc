@@ -325,6 +325,16 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         let (e',_) = collectOccurance e
         f e' mempty inb
     f :: E -> Subst -> Env -> IdNameT (StatT Identity) E
+    f e sub inb | (ELam t b,(x:xs)) <- fromAp e = do
+        xs' <- mapM (dosub sub inb) xs
+        b' <- f b (minsert (tvrIdent t) (Susp x sub) sub) inb
+        mtick (toAtom "E.Simplify.f-beta-reduce")
+        h b' xs' inb
+    f e sub inb | (EPi t b,(x:xs)) <- fromAp e = do
+        xs' <- mapM (dosub sub inb) xs
+        b' <- f b (minsert (tvrIdent t) (Susp x sub) sub) inb
+        mtick (toAtom "E.Simplify.f-pi-reduce")
+        h b' xs' inb
     f e sub inb | (EVar v,xs) <- fromAp e = do
         xs' <- mapM (dosub sub inb) xs
         case mlookup (tvrIdent v) sub of
@@ -465,6 +475,10 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         mtick "E.Simplify.case-of-bottom'"
         t' <- dosub sub inb t
         return $ prim_unsafeCoerce (EVar v) t'
+    doCase e t b as d sub inb | isBottom e = do
+        mtick "E.Simplify.case-of-bottom"
+        t' <- dosub sub inb t
+        return $ prim_unsafeCoerce e t'
 
     doCase ic@ECase { eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d' sub inb | length (filter (not . isBottom) (caseBodies ic)) <= 1 || all whnfOrBot (caseBodies ic)  || all whnfOrBot (caseBodies emptyCase { eCaseAlts = as', eCaseDefault = d'} )  = do
         mtick (toAtom "E.Simplify.case-of-case")
@@ -475,13 +489,8 @@ simplifyDs sopts dsIn = (stat,dsOut) where
             g x = doCase x t b' as' d' sub (envInScope_u (minsert (tvrIdent b) NotKnown) inb)
         as'' <- mapM f as
         d'' <- fmapM g d
-        t' <- dosub sub t
-        return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
-    doCase e t b as d sub inb | isBottom e = do
-        mtick "E.Simplify.case-of-bottom"
         t' <- dosub sub inb t
-        return $ prim_unsafeCoerce e t'
-
+        return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
     doCase e t b as@(Alt (LitCons n _ _) _:_) (Just d) sub inb | Just ss <- getSiblings (so_dataTable sopts) n, length ss <= length as = do
         mtick "E.Simplify.case-no-default"
         doCase e t b as Nothing sub inb
@@ -617,6 +626,35 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         case me of
             Just e -> return e
             Nothing -> app (EVar v,xs)
+
+    app (e,[]) = return e
+    app (e,xs) = app' e xs
+
+    app' (ELit (LitCons n xs t@EPi {})) (a:as)  = do
+        mtick (toAtom $ "E.Simplify.typecon-reduce.{" ++ show n ++ "}" )
+        app (ELit (LitCons n (xs ++ [a]) (eAp t a)),as)
+    --app' (ELam tvr e) (a:as) = do
+    --    mtick (toAtom "E.Simplify.beta-reduce")
+    --    app (subst tvr a e,as)   -- TODO Fix quadradic substitution
+        --app (eLet tvr a e,as)   -- TODO Fix quadradic substitution
+    --app' (EPi tvr e) (a:as) = do
+    --    mtick (toAtom "E.Simplify.pi-reduce")
+    --    app (subst tvr a e,as)     -- Okay, types are small
+    app' ec@ECase {} xs = do
+        mtick (toAtom "E.Simplify.case-application")
+        let f e = app' e xs
+        ec' <- caseBodiesMapM f ec
+        let t = foldl eAp (eCaseType ec') xs
+        return ec' { eCaseType = t }
+    app' (ELetRec ds e) xs = do
+        mtick (toAtom "E.Simplify.let-application")
+        e' <- app' e xs
+        return $ eLetRec ds e'
+    app' (EError s t) xs = do
+        mtick (toAtom "E.Simplify.error-application")
+        return $ EError s (foldl eAp t xs)
+    app' e as = do
+        return $ foldl EAp e as
 
 
 
