@@ -2,6 +2,7 @@ module E.Show(ePretty,render,prettyE,ePrettyEx) where
 
 import Char
 import Control.Monad.Identity
+import Maybe
 
 import Atom
 import C.Prims
@@ -202,8 +203,11 @@ showE e = do
                     e <- showE e
                     return [unparse db <+> UC.rArrow <+> unparse e]
             let alts' = map (<> bc ';') (alts ++ dcase)
+            ecb <- showTVr (eCaseBind ec)
+            let mbind | dump FD.EVerbose && isNothing (eCaseDefault ec) = unparse ecb <+> text "<-"
+                      | otherwise = empty
             return $ fixitize ((L,(-10))) $ atom $
-                group ( nest 4 ( keyword "case" <+> scrut <+> keyword "of" <$>  (align $ vcat (alts'))) )
+                group ( nest 4 ( keyword "case" <+> mbind <+> scrut <+> keyword "of" <$>  (align $ vcat (alts'))) )
         showAlt (Alt l e) = foldr allocTVr ans (litBinds l) where
             ans = do
                 l <- showLit showTVr l
