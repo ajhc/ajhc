@@ -58,7 +58,8 @@ freeIds ::  E -> IdSet
 freeIds =   fv where
     (<>) = mappend
     fv (EAp e1 e2) = fv e1 <> fv e2
-    fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = insert i (fv t)
+    --fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = insert i (fv t)
+    fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = singleton i
     fv (ELam TVr { tvrIdent = i, tvrType = t} e) = delete i $ fv e <> fv t
     fv (EPi  TVr { tvrIdent = i, tvrType = t} e) = delete i $ fv e <> fv t
     fv (ELetRec dl e) =  ((tl <> bl <> fv e) S.\\ fromList ll)  where
@@ -79,7 +80,8 @@ freeIdMap ::  E -> IdMap TVr
 freeIdMap =   fv where
     (<>) = mappend
     fv (EAp e1 e2) = fv e1 <> fv e2
-    fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = minsert i tvr (fv t)
+    --fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = minsert i tvr (fv t)
+    fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = msingleton i tvr
     fv (ELam TVr { tvrIdent = i, tvrType = t} e) = mdelete i $ fv e <> fv t
     fv (EPi  TVr { tvrIdent = i, tvrType = t} e) = mdelete i $ fv e <> fv t
     fv (ELetRec dl e) =  ((tl <> bl <> fv e) S.\\ fromList ll)  where
