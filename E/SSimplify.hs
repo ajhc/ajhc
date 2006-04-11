@@ -510,14 +510,16 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     -- atomic unboxed values may be substituted or discarded without replicating work or affecting program semantics.
     doCase e _ b [] (Just d) sub inb | isUnboxed (getType e), isAtomic e = do
         mtick "E.Simplify.case-atomic-unboxed"
-        f d (minsert (tvrIdent b) (Susp e sub) sub) inb
+        f d (minsert (tvrIdent b) (Done e) sub) inb
+        --f d (minsert (tvrIdent b) (Susp e sub) sub) inb
     doCase (EVar v) _ b [] (Just d) sub inb | Just (NotAmong _) <-  mlookup (tvrIdent v) (envInScope inb)  = do
         mtick "E.Simplify.case-evaled"
         d' <- f d (minsert (tvrIdent b) (Done (EVar v)) sub) inb
         return d'
     doCase scrut _ v [] (Just sc@ECase { eCaseScrutinee = EVar v'} ) sub inb | v == v', tvrIdent v `notMember` (freeVars (caseBodies sc) :: IdSet)  = do
         mtick "E.Simplify.case-default-case"
-        f sc { eCaseScrutinee = scrut } sub inb
+        doCase scrut (eCaseType sc) (eCaseBind sc) (eCaseAlts sc) (eCaseDefault sc) sub inb
+    --    f sc { eCaseScrutinee = scrut } sub inb
     doCase e t b as d sub inb = do
         b' <- nname b sub inb
         let dd e' = f e' (minsert (tvrIdent b) (Done $ EVar b') sub) (envInScope_u (newinb `union`) inb) where
