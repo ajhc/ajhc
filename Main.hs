@@ -278,48 +278,26 @@ processDecls stats ho ho' tiData = do
         mstats <- Stats.new
         let mprog = programSetDs ns prog { progStats = mempty, progEntryPoints = fsts ns, progExternalNames = progExternalNames prog `mappend` (fromList $ map tvrIdent $ fsts (programDs prog)) }
         mprog <- return $ etaAnnotateProgram mprog
-        let cm stats e = do
-            let sopt = mempty {
+        let sopt = mempty {
                 SS.so_boundVars = fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)],
-                SS.so_rules = allRules,
                 SS.so_exports = map tvrIdent $ progEntryPoints mprog,
                 SS.so_dataTable = fullDataTable
                 }
-            let (e',_) = SS.collectOccurance e
-            let (stat, e'') = SS.simplifyE sopt e'
-            wdump FD.Pass $ printCheckName fullDataTable e''
-            Stats.tickStat mstats stat
-            return e''
-        let mangle = mangle' Nothing fullDataTable
-
-        lintCheckProgram onerrNone mprog
-        mprog <- barendregtProg mprog
-        ns <- flip mapM (programDs mprog) $ \ (v,lc) -> do
-            (v,lc) <- Stats.runStatIO mstats (etaExpandDef' fullDataTable v lc)
-            lc <- doopt mangle False mstats ("SuperSimplify:" ++ pprint v) cm lc
-            return (v,lc)
-        mprog <- return $ programSetDs ns mprog
-        lintCheckProgram onerrNone mprog
+        mprog <- etaExpandProg mprog
+        mprog <- simplifyProgram sopt "SuperSimplify" False mprog
         mprog <- barendregtProg mprog
         mprog <- transformProgram "typeAnalyze" False (dump FD.Pass) (typeAnalyze True) mprog
-        mprog <- transformProgram "floatOutward" False (dump FD.Pass) floatOutward mprog
+        --mprog <- transformProgram "floatOutward" False (dump FD.Pass) floatOutward mprog
         mprog <- barendregtProg mprog
-        ns <- flip mapM (programDs mprog) $ \ (v,lc) -> do
-            (v,lc) <- Stats.runStatIO mstats (etaExpandDef' fullDataTable v lc)
-            lc <- doopt mangle False mstats ("SuperSimplify: "  ++ pprint v) cm lc
-            lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
-            lc <- doopt mangle False mstats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
-            return (v,lc)
+        mprog <- simplifyProgram sopt "SuperSimplify" False mprog
+        mprog <- barendregtProg mprog
+        mprog <- transformProgram "float inward" False (dump FD.Pass) (programMapBodies (return . floatInward allRules)) mprog
+        let ns = programDs mprog
         ns <- E.Strictness.solveDs ns
         mprog <- return $ programSetDs ns mprog
         lintCheckProgram onerrNone mprog
-        ns <- flip mapM (programDs mprog) $ \ (v,lc) -> do
-            lc <- doopt mangle False mstats ("SuperSimplify:" ++ pprint v) cm lc
-            return (v,lc)
-        mprog <- return $ programSetDs ns mprog
-        lintCheckProgram onerrNone mprog
+        mprog <- simplifyProgram sopt "SuperSimplify" False mprog
         mprog <- barendregtProg mprog
-
         Stats.tickStat mstats (progStats mprog)
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
         wdump FD.Pass $
@@ -896,6 +874,8 @@ lintCheckProgram onerr prog | flint = do
         unaccounted = Set.filter (not . (`member` ids) . tvrIdent) fvs
     unless (Set.null unaccounted) $ do
         onerr
+        putErrLn ("\n>>> Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
+        printProgram prog
         putErrLn (">>> Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
         maybeDie
 lintCheckProgram _ _ = return ()
