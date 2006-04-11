@@ -105,7 +105,7 @@ collectOccurance e = (fe,omap)  where
         (b,tfvs) <- grump (f b)
         case mlookup n tfvs of
             Nothing -> tell tfvs >>  return (EPi tvr { tvrIdent =  0, tvrType = a } b)
-            Just occ -> tell (mdelete n tfvs) >> return (EPi (annb occ tvr { tvrType = a }) b)
+            Just occ -> tell (mdelete n tfvs) >> return (EPi (annb' tvr { tvrType = a }) b)
     f (ELit (LitCons n as t)) = arg $ do
         t <- f t
         as <- mapM f as
@@ -124,7 +124,7 @@ collectOccurance e = (fe,omap)  where
         (b',bvs) <- grump (f b)
         (as',asfv) <- grump (arg $ mapM ftvr as)
         let avs = bvs `andOM` asfv
-            as'' = map (annbind avs) as'
+            as'' = map (annbind' avs) as'
         tell $ inLam $ foldr mdelete avs (map tvrIdent as)
         return (foldr ELam b' as'')
     f e | Just (x,t) <- from_unsafeCoerce e  = do x <- f x ; t <- (arg (f t)); return (prim_unsafeCoerce x t)
@@ -144,7 +144,7 @@ collectOccurance e = (fe,omap)  where
         ct <- arg $ f (eCaseType ec)
         b <- arg (ftvr b)
         tell $ mdelete (tvrIdent b) fidm
-        return ec { eCaseScrutinee = scrut', eCaseAlts = as', eCaseBind = annbind fidm b, eCaseType = ct, eCaseDefault = d'}
+        return ec { eCaseScrutinee = scrut', eCaseAlts = as', eCaseBind = annbind' fidm b, eCaseType = ct, eCaseDefault = d'}
     f (ELetRec ds e) = do
         (e',OMap fve) <- grump (f e)
         let (ds''',fids) = collectDs ds fve
@@ -156,7 +156,7 @@ collectOccurance e = (fe,omap)  where
         l <- arg (mapLitBindsM ftvr l)
         l <- arg (fmapM f l)
         let fvs' = foldr mdelete fvs (map tvrIdent $ litBinds l)
-            l' = mapLitBinds (annbind fvs) l
+            l' = mapLitBinds (annbind' fvs) l
         tell fvs'
         return (Alt l' e')
     arg m = do
@@ -166,10 +166,18 @@ collectOccurance e = (fe,omap)  where
         tt <- f (tvrType tvr)
         return tvr { tvrType = tt }
 
-annb x tvr = tvrInfo_u (Info.insert x) tvr
+-- delete any occurance info for non-let-bound vars to be safe
+annb' tvr = tvrInfo_u (Info.delete Many) tvr
+annbind' idm tvr = case mlookup (tvrIdent tvr) idm of
+    Nothing -> annb' tvr { tvrIdent = 0 }
+    Just _ -> annb' tvr
+
+-- add ocucrance info
 annbind idm tvr = case mlookup (tvrIdent tvr) idm of
     Nothing -> annb Unused tvr { tvrIdent = 0 }
     Just x -> annb x tvr
+annb x tvr = tvrInfo_u (Info.insert x) tvr
+
 mapLitBinds f (LitCons n es t) = LitCons n (map f es) t
 mapLitBinds f (LitInt e t) = LitInt e t
 mapLitBindsM f (LitCons n es t) = do
@@ -269,13 +277,15 @@ data Env = Env {
     }
     {-! derive: Monoid, update !-}
 
-applySubst :: Subst -> E -> E
-applySubst s = substMap'' tm where
-    tm = fmap g s
-    g (Done e) = e
-    g (Susp e s') = applySubst s' e
+applySubst :: Subst -> IdMap a -> E -> E
+applySubst s nn = applySubst' s where
+    nn' = fmap (const Nothing) s `mappend` fmap (const Nothing) nn
+    applySubst' s = substMap'' (tm `mappend` nn') where
+        tm = fmap g s
+        g (Done e) = Just e
+        g (Susp e s') = Just $ applySubst' s' e
 
-dosub sub e = coerceOpt return $ applySubst sub e
+dosub sub inb e = coerceOpt return $ applySubst sub (envInScope inb) e
 
 simplifyE :: SimplifyOpts -> E -> (Stat,E)
 simplifyE sopts e = (stat,e') where
@@ -316,7 +326,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         f e' mempty inb
     f :: E -> Subst -> Env -> IdNameT (StatT Identity) E
     f e sub inb | (EVar v,xs) <- fromAp e = do
-        xs' <- mapM (dosub sub) xs
+        xs' <- mapM (dosub sub inb) xs
         case mlookup (tvrIdent v) sub of
             Just (Done e) -> h e xs' inb   -- e is var or trivial
             Just (Susp e s) -> do
@@ -330,28 +340,28 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         case eed of
             Just (_,e) -> f e sub inb -- go e inb
             Nothing -> do
-                xs' <- mapM (dosub sub) xs
+                xs' <- mapM (dosub sub inb) xs
                 x' <- g x sub inb
                 x'' <- coerceOpt return x'
                 x <- primOpt' (so_dataTable sopts) x''
                 h x xs' inb
     g (EPrim a es t) sub inb = do
-        es' <- mapM (dosub sub) es
-        t' <- dosub sub t
+        es' <- mapM (dosub sub inb) es
+        t' <- dosub sub inb t
         return $ EPrim a es' t'
     g (ELit (LitCons n es t)) sub inb = do
-        es' <- mapM (dosub sub) es
-        t' <- dosub sub t
+        es' <- mapM (dosub sub inb) es
+        t' <- dosub sub inb t
         return $ ELit (LitCons n es' t')
     g (ELit (LitInt n t)) sub inb = do
-        t' <- dosub sub t
+        t' <- dosub sub inb t
         return $ ELit (LitInt n t')
     g e@(EPi (TVr { tvrIdent = n }) b) sub inb = do
         addNames [n]
-        e' <- dosub sub e
+        e' <- dosub sub inb e
         return e'
     g (EError s t) sub inb = do
-        t' <- dosub sub t
+        t' <- dosub sub inb t
         return $ EError s t'
     g ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d} sub inb = do
         addNames (map tvrIdent $ caseBinds ec)
@@ -429,8 +439,8 @@ simplifyDs sopts dsIn = (stat,dsOut) where
              | otherwise = "(epheremal)"
 
     nname tvr@(TVr { tvrIdent = n, tvrType =  t}) sub inb  = do
-        t' <- dosub sub t
-        let t'' = substMap'' (fmap (\ IsBoundTo { bindingE = e } -> e) $ mfilter isIsBoundTo (envInScope inb)) t'
+        t' <- dosub sub inb t
+        let t'' = substMap'' (fmap (\ IsBoundTo { bindingE = e } -> Just e) $ mfilter isIsBoundTo (envInScope inb)) t'
         n' <- uniqueName n
         return $ tvr { tvrIdent = n', tvrType =  t'' }
 --        case n `Map.member` inb of
@@ -453,7 +463,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
 
     doCase (EVar v) t b as d sub inb | Just IsBoundTo { bindingE = e } <- mlookup (tvrIdent v) (envInScope inb) , isBottom e = do
         mtick "E.Simplify.case-of-bottom'"
-        t' <- dosub sub t
+        t' <- dosub sub inb t
         return $ prim_unsafeCoerce (EVar v) t'
 
     doCase ic@ECase { eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d' sub inb | length (filter (not . isBottom) (caseBodies ic)) <= 1 || all whnfOrBot (caseBodies ic)  || all whnfOrBot (caseBodies emptyCase { eCaseAlts = as', eCaseDefault = d'} )  = do
@@ -469,7 +479,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
     doCase e t b as d sub inb | isBottom e = do
         mtick "E.Simplify.case-of-bottom"
-        t' <- dosub sub t
+        t' <- dosub sub inb t
         return $ prim_unsafeCoerce e t'
 
     doCase e t b as@(Alt (LitCons n _ _) _:_) (Just d) sub inb | Just ss <- getSiblings (so_dataTable sopts) n, length ss <= length as = do
@@ -514,12 +524,12 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                 na = NotAmong [ n | Alt (LitCons n _ _) _ <- as]
                 newinb = fromList [ (n,na) | EVar (TVr { tvrIdent = n }) <- [e,EVar b']]
             da (Alt (LitInt n t) ae) = do
-                t' <- dosub sub t
+                t' <- dosub sub inb t
                 let p' = LitInt n t'
                 e' <- f ae sub (mins e (patToLitEE p') inb)
                 return $ Alt p' e'
             da (Alt (LitCons n ns t) ae) = do
-                t' <- dosub sub t
+                t' <- dosub sub inb t
                 ns' <- mapM (\v -> nname v sub inb) ns
                 let p' = LitCons n ns' t'
                     nsub = fromList [ (n,Done (EVar t))  | TVr { tvrIdent = n } <- ns | t <- ns' ]
@@ -531,11 +541,11 @@ simplifyDs sopts dsIn = (stat,dsOut) where
 
         d' <- fmapM dd d
         as' <- mapM da as
-        t' <- dosub sub t
+        t' <- dosub sub inb t
         return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind =  b', eCaseAlts = as', eCaseDefault = d'}
 
     doConstCase l t b as d sub inb = do
-        t' <- dosub sub t
+        t' <- dosub sub inb t
         mr <- match l as (b,d)
         case mr of
             Just (bs,e) -> do
@@ -572,26 +582,6 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         case z of
             Nothing | fopts FO.Rules -> applyRules lup (Info.fetch (tvrInfo v)) xs
             x -> return x
-
-{-
-    h v xs' inb  | so_superInline sopts, si@(_:_) <- [ (tvr,fromJust body) | EVar tvr <- xs', forceSuperInline tvr, let body = haveBody tvr, isJust body ] = do
-        mapM_ (\v -> mtick  (toAtom $ "E.Simplify.inline.superforced.{" ++ tvrShowName v  ++ "}")) (fsts si)
-        let siName x = case fromId x of
-                Just y ->  [toId (toName Val ("SI@",'f':show y ++ "$" ++ show i)) | i <- [(1::Int)..] ]
-                Nothing -> [toId (toName Val ("SI@",'f':show x ++ "$" ++ show i)) | i <- [(1::Int)..] ]
-        zs <- flip mapM si $ \ (t,b) -> do
-            nn <- newNameFrom (siName (tvrIdent t))
-            let t' = unsetProperty prop_SUPERINLINE t { tvrIdent = nn }
-            return (t,t',subst t (EVar t') b)
-        let xs'' = map (substLet [ (t,EVar t') | (t,t',_) <- zs]) xs'
-        e <- app (v,xs'')
-        return (eLetRec [ (t',b) | (_,t',b) <- zs] e)
-       where
-            haveBody tvr = case Map.lookup (tvrIdent tvr) (envInScope inb) of
-                Just IsBoundTo { bindingE = e } -> Just e
-                _ -> Nothing
-  -}
-
     h (EVar v) xs' inb = do
         z <- applyRule v xs' inb
         case (z,forceNoinline v) of
