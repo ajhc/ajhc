@@ -153,7 +153,7 @@ barendregtProgram prog = programSetDs ds' prog where
 
 
 barendregtProg prog = do
-    transformProgram "Barendregt" (dump FD.Pass) (return . barendregtProgram) prog
+    transformProgram "Barendregt" False (dump FD.Pass) (return . barendregtProgram) prog
 
 
 lamann _ nfo = return nfo
@@ -285,7 +285,9 @@ processDecls stats ho ho' tiData = do
                 SS.so_exports = map tvrIdent $ progEntryPoints mprog,
                 SS.so_dataTable = fullDataTable
                 }
-            let (stat, e'') = SS.simplifyE sopt e
+            let (e',_) = SS.collectOccurance e
+            let (stat, e'') = SS.simplifyE sopt e'
+            wdump FD.Pass $ printCheckName fullDataTable e''
             Stats.tickStat mstats stat
             return e''
         let mangle = mangle' Nothing fullDataTable
@@ -294,17 +296,17 @@ processDecls stats ho ho' tiData = do
         mprog <- barendregtProg mprog
         ns <- flip mapM (programDs mprog) $ \ (v,lc) -> do
             (v,lc) <- Stats.runStatIO mstats (etaExpandDef' fullDataTable v lc)
-            lc <- doopt mangle False mstats "SuperSimplify" cm lc
+            lc <- doopt mangle False mstats ("SuperSimplify:" ++ pprint v) cm lc
             return (v,lc)
         mprog <- return $ programSetDs ns mprog
         lintCheckProgram onerrNone mprog
         mprog <- barendregtProg mprog
-        mprog <- transformProgram "typeAnalyze" (dump FD.Pass) (typeAnalyze True) mprog
-        mprog <- transformProgram "floatOutward" (dump FD.Pass) floatOutward mprog
+        mprog <- transformProgram "typeAnalyze" False (dump FD.Pass) (typeAnalyze True) mprog
+        mprog <- transformProgram "floatOutward" False (dump FD.Pass) floatOutward mprog
         mprog <- barendregtProg mprog
         ns <- flip mapM (programDs mprog) $ \ (v,lc) -> do
             (v,lc) <- Stats.runStatIO mstats (etaExpandDef' fullDataTable v lc)
-            lc <- doopt mangle False mstats "SuperSimplify" cm lc
+            lc <- doopt mangle False mstats ("SuperSimplify: "  ++ pprint v) cm lc
             lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             lc <- doopt mangle False mstats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             return (v,lc)
@@ -312,7 +314,7 @@ processDecls stats ho ho' tiData = do
         mprog <- return $ programSetDs ns mprog
         lintCheckProgram onerrNone mprog
         ns <- flip mapM (programDs mprog) $ \ (v,lc) -> do
-            lc <- doopt mangle False mstats "SuperSimplify" cm lc
+            lc <- doopt mangle False mstats ("SuperSimplify:" ++ pprint v) cm lc
             return (v,lc)
         mprog <- return $ programSetDs ns mprog
         lintCheckProgram onerrNone mprog
@@ -344,7 +346,9 @@ processDecls stats ho ho' tiData = do
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
         let cm stats e = do
             let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
-            let (stat, e'') = SS.simplifyE sopt e
+            let (e',_) = SS.collectOccurance e
+            let (stat, e'') = SS.simplifyE sopt e'
+            wdump FD.Pass $ printCheckName fullDataTable e''
             Stats.tickStat stats stat
             return e''
         let mangle = mangle' (Just $ namesInscope' `union` fromList (map (tvrIdent . fst) cds)) fullDataTable
@@ -388,9 +392,11 @@ processDecls stats ho ho' tiData = do
         let dd  (ds,used) (v,lc) = do
                 let cm stats e = do
                     let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `union` smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
-                    let (stat, e') = SS.simplifyE sopt e
+                    let (e',_) = SS.collectOccurance e
+                    let (stat, e'') = SS.simplifyE sopt e'
+                    wdump FD.Pass $ printCheckName fullDataTable e''
                     Stats.tickStat stats stat
-                    return e'
+                    return e''
                 let (lc', _) = runRename used lc
                 lc <- doopt mangle False stats "SuperSimplify" cm lc'
                 let (lc', used') = runRename used lc
@@ -421,7 +427,7 @@ processDecls stats ho ho' tiData = do
     Stats.print "Optimization" stats
 
     --prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze True prog else return prog
-    prog <- transformProgram "typeAnalyze" True (typeAnalyze True) prog
+    prog <- transformProgram "typeAnalyze" False True (typeAnalyze True) prog
 
 
     prog <- if True then do
@@ -447,12 +453,12 @@ programPruneUnreachable prog = programSetDs ds' prog where
     ds' = reachable (newGraph (programDs prog) (tvrIdent . fst) (\ (t,e) -> idSetToList $ bindingFreeVars t e)) (map tvrIdent $ progEntryPoints prog)
 
 programPrune :: Program -> IO Program
-programPrune prog = transformProgram "Prune Unreachable" (dump FD.Pass) (return . programPruneUnreachable) prog
+programPrune prog = transformProgram "Prune Unreachable" False (dump FD.Pass) (return . programPruneUnreachable) prog
 
 etaExpandProg :: Program -> IO Program
 etaExpandProg prog = do
     let (prog',stats) = Stats.runStatM $  etaExpandProgram prog
-    transformProgram "eta expansion" (dump FD.Pass) (const $ return prog' { progStats = progStats prog' `mappend` stats }) prog
+    transformProgram "eta expansion" False (dump FD.Pass) (const $ return prog' { progStats = progStats prog' `mappend` stats }) prog
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
 shouldBeExported exports tvr
@@ -496,7 +502,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
     (_,main,mainv) <- getMainFunction dataTable mainFunc (programEsMap prog)
     prog <- return prog { progMainEntry = main, progEntryPoints = [main], progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog] }
-    prog <- programPrune prog
+    prog <- transformProgram "Initial Prune Unreachable" False False (return . programPruneUnreachable) prog
 
     --wdump FD.Lambdacube $ printProgram prog
     prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze False prog else return prog
@@ -528,7 +534,7 @@ compileModEnv' stats (initialHo,finalHo) = do
         prog <- barendregtProg prog
         wdump FD.LambdacubeBeforeLift $ printProgram prog
         finalStats <- Stats.new
-        prog <- transformProgram "lambda lift" (dump FD.Progress) (lambdaLift finalStats) prog
+        prog <- transformProgram "lambda lift" False (dump FD.Progress) (lambdaLift finalStats) prog
         wdump FD.Progress $ Stats.print "PostLifting" finalStats
         wdump FD.Lambdacube $ printProgram prog -- printCheckName dataTable (programE prog)
         compileToGrin prog
@@ -546,37 +552,24 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- return $ runIdentity $ annotateProgram mempty (idann mempty (hoProps ho) ) letann lamann prog
 
 
-    let lc = programE prog
 
-    wdump FD.Progress $ printEStats lc
-    let cm stats e = do
-        let sopt = mempty { SS.so_rules = rules, SS.so_dataTable = dataTable }
-        let (stat, e') = SS.simplifyE sopt e
-        Stats.tickStat stats stat
-        return e'
-
-    wdump FD.Lambdacube $ printProgram prog -- printCheckName dataTable (programE prog)
-    prog <- return $ SS.programPruneOccurance prog
-    putStrLn ">>>> after occurance analysis"
-    wdump FD.Lambdacube $ printProgram prog -- printCheckName dataTable (programE prog)
-
-    -- run first optimization
-    lc <- opt "SuperSimplify" cm lc
-    prog <- return $ programSetE lc prog
+    prog <- simplifyProgram mempty "SuperSimplify" True prog
     prog <- barendregtProg prog
+
 
     st <- Stats.new
-    --prog <- Stats.runStatIO st (etaExpandProgram prog)
-    --Stats.print "eta" st
     prog <- etaExpandProg prog
     prog <- barendregtProg prog
-    prog <- transformProgram "typeAnalyze" True (typeAnalyze True) prog
+    prog <- transformProgram "typeAnalyze" False True (typeAnalyze True) prog
 
     --ne <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) (programE prog)
 
-    lc <- return $ programE prog
-    lc <- opt "SuperSimplify" cm lc
-    prog <- return $ programSetE lc prog
+--    prog <- transformProgram "OccuranceAnalysis" True (return . SS.programPruneOccurance) prog
+--    lc <- return $ programE prog
+--    lc <- opt "SuperSimplify" cm lc
+--    prog <- return $ programSetE lc prog
+
+    prog <- simplifyProgram mempty "SuperSimplify pass 2" True prog
     prog <- barendregtProg prog
 
 
@@ -585,21 +578,25 @@ compileModEnv' stats (initialHo,finalHo) = do
     -- delete rules
     prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ Info.delete (mempty :: ARules) nfo) letann (\_ -> return) prog
 
-    let cm stats e = do
-        let sopt = mempty { SS.so_dataTable = dataTable }
-        let (stat, e') = SS.simplifyE sopt e
-        Stats.tickStat stats stat
-        return e'
-    lc <- return $ programE prog
-    lc <- opt "SuperSimplify no Rules" cm lc
-    prog <- return $ programSetE lc prog
-
+    prog <- simplifyProgram mempty "SuperSimplify no rules" True prog
     prog <- barendregtProg prog
+--
+--    let cm stats e = do
+--        let sopt = mempty { SS.so_dataTable = dataTable }
+--        let (stat, e') = SS.simplifyE sopt e
+--        Stats.tickStat stats stat
+--        return e'
+--    prog <- transformProgram "OccuranceAnalysis" True (return . SS.programPruneOccurance) prog
+--    lc <- return $ programE prog
+--    lc <- opt "SuperSimplify no Rules" cm lc
+--    prog <- return $ programSetE lc prog
+--
+--    prog <- barendregtProg prog
 
     -- perform lambda lifting
     wdump FD.LambdacubeBeforeLift $ printProgram prog
     finalStats <- Stats.new
-    prog <- transformProgram "lambda lift" (dump FD.Progress) (lambdaLift finalStats) prog
+    prog <- transformProgram "lambda lift" False (dump FD.Progress) (lambdaLift finalStats) prog
 
     -- final optimization pass to clean up lambda lifting droppings
     rs' <- flip mapM (progCombinators prog) $ \ (t,ls,e) -> do
@@ -730,17 +727,24 @@ dereferenceItem x = x
 
 buildShowTableLL xs = buildTableLL [ (show x,show y) | (x,y) <- xs ]
 
+simplifyProgram sopt name dodump prog = do
+    let istat = progStats prog
+    let g =  return . SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
+    prog <- transformProgram name True dodump g prog  { progStats = mempty }
+    when ((dodump && dump FD.Progress) || dump FD.Pass) $ Stats.printStat name (progStats prog)
+    return prog { progStats = progStats prog `mappend` istat }
 
 -- all transformation routines assume they are being passed a correct program, and only check the output
 
 transformProgram ::
     String                      -- ^ name of pass
+    -> Bool                     -- ^ wether to iterate
     -> Bool                     -- ^ whether to dump progress
     -> (Program -> IO Program)  -- ^ what to run
     -> Program
     -> IO Program
 
-transformProgram name dodump f prog = do
+transformProgram name iterate dodump f prog = do
     when dodump $ putErrLn $ "-- " ++ name
     when (dodump && dump FD.Steps) $ printProgram prog
     let istat = progStats prog
@@ -759,8 +763,10 @@ transformProgram name dodump f prog = do
             printProgram prog
             Stats.printStat name estat
             putErrLn $ "\n>>> After " ++ name
+    when (dodump && dump FD.Steps) $ Stats.printStat name estat
     lintCheckProgram onerr prog'
-    return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
+    if iterate && estat /= mempty then transformProgram name True dodump f prog' { progStats = istat `mappend` estat } else
+        return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
 
 mangle ::
     DataTable                -- ^ the datatable used for typechecking
@@ -935,6 +941,9 @@ printCheckName'' dataTable tvr e = do
     when (not tmatch || dump FD.EVerbose) $
         putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
     putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
+
+
+
 
 
 

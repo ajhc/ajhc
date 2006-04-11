@@ -2,6 +2,7 @@ module E.SSimplify(
     Occurance(..),
     simplifyE,
     simplifyDs,
+    collectOccurance,
     programPruneOccurance,
     programSSimplify,
     SimplifyOpts(..)
