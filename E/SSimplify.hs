@@ -252,7 +252,7 @@ data SimplifyOpts = SimpOpts {
     {-! derive: Monoid !-}
 
 
-data Range = Done E | Susp E Subst
+data Range = Done E | Susp E Subst E
     deriving(Show,Eq,Ord)
 type Subst = IdMap Range
 
@@ -272,10 +272,38 @@ isBoundTo o e = IsBoundTo {
     }
 
 data Env = Env {
+    envCachedSubst :: IdMap (Maybe E),
+    envSubst :: Subst,
     envInScope :: IdMap Binding,
     envTypeMap :: IdMap E
     }
     {-! derive: Monoid, update !-}
+
+susp:: E -> Subst -> Range
+susp e sub =  Susp e sub (substMap'' (fmap mkSubst sub) e)
+
+insertSuspSubst :: TVr -> E -> Env -> Env
+insertSuspSubst t e env = cacheSubst env { envSubst = minsert (tvrIdent t) (susp e (envSubst env)) (envSubst env) }
+insertSuspSubst' :: Id -> E -> Env -> Env
+insertSuspSubst' t e env = cacheSubst env { envSubst = minsert t (susp e (envSubst env)) (envSubst env) }
+
+insertDoneSubst :: TVr -> E -> Env -> Env
+insertDoneSubst t e env = cacheSubst env { envSubst = minsert (tvrIdent t) (Done e) (envSubst env) }
+insertDoneSubst' :: Id -> E -> Env -> Env
+insertDoneSubst' t e env = cacheSubst env { envSubst = minsert t (Done e) (envSubst env) }
+
+substLookup :: Id -> Env -> Maybe Range
+substLookup id env = mlookup id (envSubst env)
+
+substAddList ls env = env { envSubst = fromList ls `union` envSubst env }
+
+--applySubst :: Subst -> IdMap a -> E -> E
+--applySubst s nn = applySubst' s where
+--    nn' = fmap (const Nothing) s `mappend` fmap (const Nothing) nn
+--    applySubst' s = substMap'' (tm `mappend` nn') where
+--        tm = fmap g s
+--        g (Done e) = Just e
+--        g (Susp e s') = Just $ applySubst' s' e
 
 applySubst :: Subst -> IdMap a -> E -> E
 applySubst s nn = applySubst' s where
@@ -283,9 +311,19 @@ applySubst s nn = applySubst' s where
     applySubst' s = substMap'' (tm `mappend` nn') where
         tm = fmap g s
         g (Done e) = Just e
-        g (Susp e s') = Just $ applySubst' s' e
+        g (Susp _ _ e)  = Just e
+        --g (Susp e s')  = Just $ applySubst' s' e
 
-dosub sub inb e = coerceOpt return $ applySubst sub (envInScope inb) e
+mkSubst :: Range -> Maybe E
+mkSubst (Done e) = Just e
+mkSubst (Susp _ _ e) = Just e
+--mkSubst (Susp e s' e) = Just $ substMap'' (fmap mkSubst s') e
+
+cacheSubst env = env { envCachedSubst = fmap mkSubst (envSubst env) }
+
+dosub inb e = coerceOpt return $ substMap'' (envCachedSubst inb) e
+
+--dosub inb e = coerceOpt return $ applySubst (envSubst inb) (envInScope inb) e
 
 simplifyE :: SimplifyOpts -> E -> (Stat,E)
 simplifyE sopts e = (stat,e') where
@@ -301,13 +339,7 @@ simplifyDs :: SimplifyOpts -> [(TVr,E)] -> (Stat,[(TVr,E)])
 simplifyDs sopts dsIn = (stat,dsOut) where
 
     getType e = infertype (so_dataTable sopts) e
-    collocc dsIn = do
-        --let (dsIn',fvs) = collectDs dsIn (fromList $ map (flip (,) Many) (map (tvrIdent . fst) dsIn))
-        --addNames (mkeys fvs)
-        --addNames (map tvrIdent $ Map.keys occ)
-        --let occ' = Map.mapKeysMonotonic tvrIdent occ
-        --    dsIn'' = runIdentity $ annotateDs mempty (\t nfo -> return $ maybe (Info.delete Many nfo) (flip Info.insert nfo) (mlookup t occ')) (\_ -> return) (\_ -> return) dsIn'
-        return dsIn
+    collocc dsIn = do return dsIn
     initialB = mempty { envInScope =  fmap (\e -> isBoundTo Many e) (so_boundVars sopts) }
     initialB' = mempty { envInScope =  fmap (\e -> NotKnown) (so_boundVars sopts) }
     (dsOut,stat)  = runIdentity $ runStatT (runIdNameT doit)
@@ -316,81 +348,78 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         ds' <- collocc dsIn
         let g (t,e) = do
                 e' <- if forceInline t then
-                        f e mempty initialB'  -- ^ do not inline into functions which themself will be inlined
-                            else f e mempty initialB
+                        f e initialB'  -- ^ do not inline into functions which themself will be inlined
+                            else f e initialB
                 return (t,e')
         mapM g ds'
     go :: E -> Env -> IdNameT (StatT Identity) E
     go e inb = do
         let (e',_) = collectOccurance e
-        f e' mempty inb
-    f :: E -> Subst -> Env -> IdNameT (StatT Identity) E
-    f e sub inb | (ELam t b,(x:xs)) <- fromAp e = do
-        xs' <- mapM (dosub sub inb) xs
-        b' <- f b (minsert (tvrIdent t) (Susp x sub) sub) inb
+        f e' (cacheSubst inb { envSubst = mempty })
+    f :: E -> Env -> IdNameT (StatT Identity) E
+    f e inb | (ELam t b,(x:xs)) <- fromAp e = do
+        xs' <- mapM (dosub inb) xs
+        b' <- f b (insertSuspSubst t x inb) -- minsert (tvrIdent t) (Susp x sub) sub) inb
         mtick (toAtom "E.Simplify.f-beta-reduce")
         h b' xs' inb
-    f e sub inb | (EPi t b,(x:xs)) <- fromAp e = do
-        xs' <- mapM (dosub sub inb) xs
-        b' <- f b (minsert (tvrIdent t) (Susp x sub) sub) inb
+    f e inb | (EPi t b,(x:xs)) <- fromAp e = do
+        xs' <- mapM (dosub inb) xs
+        b' <- f b (insertSuspSubst t x inb) -- (minsert (tvrIdent t) (Susp x sub) sub) inb
         mtick (toAtom "E.Simplify.f-pi-reduce")
         h b' xs' inb
-    f e sub inb | (EVar v,xs) <- fromAp e = do
-        xs' <- mapM (dosub sub inb) xs
-        case mlookup (tvrIdent v) sub of
+    f e inb | (EVar v,xs) <- fromAp e = do
+        xs' <- mapM (dosub inb) xs
+        case substLookup (tvrIdent v) inb of
             Just (Done e) -> h e xs' inb   -- e is var or trivial
-            Just (Susp e s) -> do
-                e' <- f e s inb
+            Just (Susp e s _) -> do
+                e' <- f e (cacheSubst inb { envSubst = s })
                 h e' xs' inb
-                --app (e',xs')
             Nothing -> h (EVar v) xs' inb
-            -- Nothing -> error $ "Var with no subst: " ++ show e ++ "\n" ++  show  sub -- h (EVar v) xs' inb
-    f e sub inb | (x,xs) <- fromAp e = do
+    f e inb | (x,xs) <- fromAp e = do
         eed <- etaExpandDef (so_dataTable sopts) tvr { tvrIdent = 0 } e
         case eed of
-            Just (_,e) -> f e sub inb -- go e inb
+            Just (_,e) -> f e inb -- go e inb
             Nothing -> do
-                xs' <- mapM (dosub sub inb) xs
-                x' <- g x sub inb
+                xs' <- mapM (dosub inb) xs
+                x' <- g x inb
                 x'' <- coerceOpt return x'
                 x <- primOpt' (so_dataTable sopts) x''
                 h x xs' inb
-    g (EPrim a es t) sub inb = do
-        es' <- mapM (dosub sub inb) es
-        t' <- dosub sub inb t
+    g (EPrim a es t) inb = do
+        es' <- mapM (dosub inb) es
+        t' <- dosub inb t
         return $ EPrim a es' t'
-    g (ELit (LitCons n es t)) sub inb = do
-        es' <- mapM (dosub sub inb) es
-        t' <- dosub sub inb t
+    g (ELit (LitCons n es t)) inb = do
+        es' <- mapM (dosub inb) es
+        t' <- dosub inb t
         return $ ELit (LitCons n es' t')
-    g (ELit (LitInt n t)) sub inb = do
-        t' <- dosub sub inb t
+    g (ELit (LitInt n t)) inb = do
+        t' <- dosub inb t
         return $ ELit (LitInt n t')
-    g e@(EPi (TVr { tvrIdent = n }) b) sub inb = do
+    g e@(EPi (TVr { tvrIdent = n }) b) inb = do
         addNames [n]
-        e' <- dosub sub inb e
+        e' <- dosub inb e
         return e'
-    g (EError s t) sub inb = do
-        t' <- dosub sub inb t
+    g (EError s t) inb = do
+        t' <- dosub inb t
         return $ EError s t'
-    g ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d} sub inb = do
+    g ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d} inb = do
         addNames (map tvrIdent $ caseBinds ec)
-        e' <- f e sub inb
-        doCase e' (eCaseType ec) b as d sub inb
-    g (ELam v e) sub inb  = do
+        e' <- f e inb
+        doCase e' (eCaseType ec) b as d inb
+    g (ELam v e) inb  = do
         addNames [tvrIdent v]
-        v' <- nname v sub inb
-        e' <- f e (minsert (tvrIdent v) (Done $ EVar v') sub) (envInScope_u (minsert (tvrIdent v') NotKnown) inb)
+        v' <- nname v inb
+        e' <- f e (insertDoneSubst v (EVar v') . envInScope_u (minsert (tvrIdent v') NotKnown) $ inb) --        minsert (tvrIdent v) (Done $ EVar v') sub)
         return $ ELam v' e'
---    g (ELetRec [] e) sub inb = g e sub inb
-    g (ELetRec ds e) sub inb = do
+    g (ELetRec ds@(_:_) e) inb = do
         addNames $ map (tvrIdent . fst) ds
         let z (t,EVar t') | t == t' = do    -- look for simple loops and replace them with errors.
-                t'' <- nname t sub inb
+                t'' <- nname t inb
                 mtick $ "E.Simplify.<<loop>>.{" ++ showName (tvrIdent t) ++ "}"
                 return (tvrIdent t,Many,t'',EError "<<loop>>" (getType t))
             z (t,e) = do
-                t' <- nname t sub inb
+                t' <- nname t inb
                 case Info.lookup (tvrInfo t) of
                     _ | forceNoinline t -> return (tvrIdent t,LoopBreaker,t',e)
                     Just Once -> return (tvrIdent t,Once,error $ "Once: " ++ show t,e)
@@ -398,24 +427,25 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                     -- We don't want to inline things we don't have occurance info for because they might lead to an infinite loop. hopefully the next pass will fix it.
                     Nothing -> return (tvrIdent t,LoopBreaker,t',e)
                     -- Nothing -> error $ "No Occurance info for " ++ show t
-            w ((t,Once,t',e):rs) sub inb ds = do
+            w ((t,Once,t',e):rs) inb ds = do
                 mtick $ "E.Simplify.inline.Once.{" ++ showName t ++ "}"
-                w rs (minsert t (Susp e sub) sub) inb ds
-            w ((t,n,t',e):rs) sub inb ds = do
-                e' <- f e sub inb
+                w rs (insertSuspSubst' t e inb) ds -- (minsert t (Susp e sub) sub) inb ds
+            w ((t,n,t',e):rs) inb ds = do
+                e' <- f e inb
                 case isAtomic e' && n /= LoopBreaker of
                     True -> do
                         when (n /= Unused) $ mtick $ "E.Simplify.inline.Atomic.{" ++ showName t ++ "}"
-                        w rs (minsert t (Done e') sub) (envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) ((t',e'):ds)
+                        w rs (insertDoneSubst' t e' . envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) $ inb) ((t',e'):ds) -- (minsert t (Done e') sub) (envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) ((t',e'):ds)
                     -- False | worthStricting e', Strict <- Info.lookup (tvrInfo t') -> w rs sub
-                    False -> w rs sub (if n /= LoopBreaker then (envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
-            w [] sub inb ds = return (ds,sub,inb)
+                    False -> w rs (if n /= LoopBreaker then (envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
+            w [] inb ds = return (ds,inb)
         ds <- sequence [ etaExpandDef' (so_dataTable sopts) t e | (t,e) <- ds]
         s' <- mapM z ds
         let
-            sub'' = {- Map.fromList [ (t,Susp e sub'') | (t,Once,_,e) <- s'] `Map.union`-} (fromList [ (t,Done (EVar t'))  | (t,n,t',_) <- s', n /= Once]) `union` sub
-        (ds',sub',inb') <- w s' sub'' (envInScope_u (fromList [ (tvrIdent t',NotKnown) | (_,n,t',_) <- s', n /= Once] `union`) inb) []
-        e' <- f e sub' inb'
+            --sub'' = {- Map.fromList [ (t,Susp e sub'') | (t,Once,_,e) <- s'] `Map.union`-} ([ (t,Done (EVar t'))  | (t,n,t',_) <- s', n /= Once]) `union` sub
+            sub'' = [ (t,Done (EVar t'))  | (t,n,t',_) <- s', n /= Once]
+        (ds',inb') <- w s'  (substAddList sub'' $ envInScope_u (fromList [ (tvrIdent t',NotKnown) | (_,n,t',_) <- s', n /= Once] `union`) inb) []
+        e' <- f e inb'
         case ds' of
             [(t,e)] | worthStricting e, Just (Strict.S _) <- Info.lookup (tvrInfo t), not (getProperty prop_CYCLIC t) -> do
                 mtick "E.Simplify.strictness.let-to-case"
@@ -428,73 +458,51 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                         f [] _ ds True = fn (concat ds) e
                         f [] _ ds False = (concat ds,e)
                 let (ds'',e'') = fn ds' e'
-                --when (hasRepeatUnder fst ds'') $ fail "hasRepeats!"
+                when (flint && hasRepeatUnder fst ds'') $ fail "hasRepeats!"
                 mticks  (length ds'' - length ds') (toAtom $ "E.Simplify.let-coalesce")
                 return $ eLetRec ds'' e''
-                {-
-                let z (v,ELetRec ds e) = (ds,(v,e))
-                    z (v,e) = ([],(v,e))
-                    (ds''',ds'') = unzip (map z ds')
-                    nds = (concat ds''' ++ ds'')
-                --mticks (length (concat ds''')) (toAtom $ "E.Simplify.let-coalesce.{" ++ unwords (sort (map tvrShowName $ map fst (concat ds'''))) ++ "}")
-
-                if hasRepeatUnder fst nds then
-                    return $ eLetRec ds' e'
-                  else do
-                    mticks (length (concat ds''')) (toAtom $ "E.Simplify.let-coalesce")
-                    return $ eLetRec nds  e'
-                  -}
-    g e _ _ = error $ "SSimplify.simplify.g: " ++ show e ++ "\n" ++ pprint e
+    g e _ = error $ "SSimplify.simplify.g: " ++ show e ++ "\n" ++ pprint e
     showName t | odd t = tvrShowName (tVr t Unknown)
              | otherwise = "(epheremal)"
 
-    nname tvr@(TVr { tvrIdent = n, tvrType =  t}) sub inb  = do
-        t' <- dosub sub inb t
+    nname tvr@(TVr { tvrIdent = n, tvrType =  t}) inb  = do
+        t' <- dosub inb t
         let t'' = substMap'' (fmap (\ IsBoundTo { bindingE = e } -> Just e) $ mfilter isIsBoundTo (envInScope inb)) t'
         n' <- uniqueName n
         return $ tvr { tvrIdent = n', tvrType =  t'' }
---        case n `Map.member` inb of
---            True -> do
---                n' <- newName
---                return $ TVr n' t'
---            False -> do
---                n' <- uniqueName n
---                return $ TVr n' t'
-
     -- TODO - case simplification
-
-    doCase (ELetRec ds e) t b as d sub inb = do
+    doCase (ELetRec ds e) t b as d inb = do
         mtick "E.Simplify.let-from-case"
-        e' <- doCase e t b as d sub inb
+        e' <- doCase e t b as d inb
         return $ substLet' ds e'
 
-    doCase (EVar v) t b as d sub inb |  Just IsBoundTo { bindingE = ELit l } <- mlookup (tvrIdent v) (envInScope inb)  = doConstCase l t  b as d sub inb
-    doCase (ELit l) t b as d sub inb  = doConstCase l t b as d sub inb
+    doCase (EVar v) t b as d inb |  Just IsBoundTo { bindingE = ELit l } <- mlookup (tvrIdent v) (envInScope inb)  = doConstCase l t  b as d inb
+    doCase (ELit l) t b as d inb  = doConstCase l t b as d inb
 
-    doCase (EVar v) t b as d sub inb | Just IsBoundTo { bindingE = e } <- mlookup (tvrIdent v) (envInScope inb) , isBottom e = do
+    doCase (EVar v) t b as d inb | Just IsBoundTo { bindingE = e } <- mlookup (tvrIdent v) (envInScope inb) , isBottom e = do
         mtick "E.Simplify.case-of-bottom'"
-        t' <- dosub sub inb t
+        t' <- dosub inb t
         return $ prim_unsafeCoerce (EVar v) t'
-    doCase e t b as d sub inb | isBottom e = do
+    doCase e t b as d inb | isBottom e = do
         mtick "E.Simplify.case-of-bottom"
-        t' <- dosub sub inb t
+        t' <- dosub inb t
         return $ prim_unsafeCoerce e t'
 
-    doCase ic@ECase { eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d' sub inb | length (filter (not . isBottom) (caseBodies ic)) <= 1 || all whnfOrBot (caseBodies ic)  || all whnfOrBot (caseBodies emptyCase { eCaseAlts = as', eCaseDefault = d'} )  = do
+    doCase ic@ECase { eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d' inb | length (filter (not . isBottom) (caseBodies ic)) <= 1 || all whnfOrBot (caseBodies ic)  || all whnfOrBot (caseBodies emptyCase { eCaseAlts = as', eCaseDefault = d'} )  = do
         mtick (toAtom "E.Simplify.case-of-case")
         let f (Alt l e) = do
-                e' <- doCase e t b' as' d' sub (envInScope_u (fromList [ (n,NotKnown) | TVr { tvrIdent = n } <- litBinds l ] `union`) inb)
+                e' <- doCase e t b' as' d' (envInScope_u (fromList [ (n,NotKnown) | TVr { tvrIdent = n } <- litBinds l ] `union`) inb)
                 return (Alt l e')
             --g e >>= return . Alt l
-            g x = doCase x t b' as' d' sub (envInScope_u (minsert (tvrIdent b) NotKnown) inb)
+            g x = doCase x t b' as' d' (envInScope_u (minsert (tvrIdent b) NotKnown) inb)
         as'' <- mapM f as
         d'' <- fmapM g d
-        t' <- dosub sub inb t
+        t' <- dosub inb t
         return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
-    doCase e t b as@(Alt (LitCons n _ _) _:_) (Just d) sub inb | Just ss <- getSiblings (so_dataTable sopts) n, length ss <= length as = do
+    doCase e t b as@(Alt (LitCons n _ _) _:_) (Just d) inb | Just ss <- getSiblings (so_dataTable sopts) n, length ss <= length as = do
         mtick "E.Simplify.case-no-default"
-        doCase e t b as Nothing sub inb
-    doCase e t b as (Just d) sub inb | te /= tWorld__, (ELit (LitCons cn _ _)) <- followAliases dt te, Just Constructor { conChildren = Just cs } <- getConstructor cn dt, length as == length cs - 1 || (False && length as < length cs && isAtomic d)  = do
+        doCase e t b as Nothing inb
+    doCase e t b as (Just d) inb | te /= tWorld__, (ELit (LitCons cn _ _)) <- followAliases dt te, Just Constructor { conChildren = Just cs } <- getConstructor cn dt, length as == length cs - 1 || (False && length as < length cs && isAtomic d)  = do
         let ns = [ n | Alt ~(LitCons n _ _) _ <- as ]
             ls = filter (`notElem` ns) cs
             f n = do
@@ -507,62 +515,62 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                 return $ Alt (LitCons n ts te) (eLet b wtd d)
         mtick $ "E.Simplify.case-improve-default.{" ++ show (sort ls) ++ "}"
         ls' <- mapM f ls
-        doCase e t b (as ++ ls') Nothing sub inb
+        doCase e t b (as ++ ls') Nothing inb
         where
-        te = getType e
+        te = getType b
         dt = (so_dataTable sopts)
-    doCase e _ b [] (Just d) sub inb | not (isLifted e || isUnboxed (getType e)) = do
+    doCase e _ b [] (Just d) inb | not (isLifted e || isUnboxed (getType e)) = do
         mtick "E.Simplify.case-unlifted"
-        b' <- nname b sub inb
-        d' <- f d (minsert (tvrIdent b) (Done (EVar b')) sub) (envInScope_u  (minsert (tvrIdent b') (isBoundTo Many e)) inb)
+        b' <- nname b inb
+        d' <- f d (insertDoneSubst b (EVar b') (envInScope_u  (minsert (tvrIdent b') (isBoundTo Many e)) inb)) -- minsert (tvrIdent b) (Done (EVar b')) sub) (envInScope_u  (minsert (tvrIdent b') (isBoundTo Many e)) inb)
         return $ eLet b' e d'
     -- atomic unboxed values may be substituted or discarded without replicating work or affecting program semantics.
-    doCase e _ b [] (Just d) sub inb | isUnboxed (getType e), isAtomic e = do
+    doCase e _ b [] (Just d) inb | isUnboxed (getType e), isAtomic e = do
         mtick "E.Simplify.case-atomic-unboxed"
-        f d (minsert (tvrIdent b) (Done e) sub) inb
+        f d (insertDoneSubst b e inb) -- minsert (tvrIdent b) (Done e) sub) inb
         --f d (minsert (tvrIdent b) (Susp e sub) sub) inb
-    doCase (EVar v) _ b [] (Just d) sub inb | Just (NotAmong _) <-  mlookup (tvrIdent v) (envInScope inb)  = do
+    doCase (EVar v) _ b [] (Just d) inb | Just (NotAmong _) <-  mlookup (tvrIdent v) (envInScope inb)  = do
         mtick "E.Simplify.case-evaled"
-        d' <- f d (minsert (tvrIdent b) (Done (EVar v)) sub) inb
+        d' <- f d (insertDoneSubst b (EVar v) inb) -- minsert (tvrIdent b) (Done (EVar v)) sub) inb
         return d'
-    doCase scrut _ v [] (Just sc@ECase { eCaseScrutinee = EVar v'} ) sub inb | v == v', tvrIdent v `notMember` (freeVars (caseBodies sc) :: IdSet)  = do
+    doCase scrut _ v [] (Just sc@ECase { eCaseScrutinee = EVar v'} ) inb | v == v', tvrIdent v `notMember` (freeVars (caseBodies sc) :: IdSet)  = do
         mtick "E.Simplify.case-default-case"
-        doCase scrut (eCaseType sc) (eCaseBind sc) (eCaseAlts sc) (eCaseDefault sc) sub inb
+        doCase scrut (eCaseType sc) (eCaseBind sc) (eCaseAlts sc) (eCaseDefault sc) inb
     --    f sc { eCaseScrutinee = scrut } sub inb
-    doCase e t b as d sub inb = do
-        b' <- nname b sub inb
-        let dd e' = f e' (minsert (tvrIdent b) (Done $ EVar b') sub) (envInScope_u (newinb `union`) inb) where
+    doCase e t b as d inb = do
+        b' <- nname b inb
+        let dd e' = f e' (insertDoneSubst b (EVar b') $ envInScope_u (newinb `union`) inb) where
                 na = NotAmong [ n | Alt (LitCons n _ _) _ <- as]
                 newinb = fromList [ (n,na) | EVar (TVr { tvrIdent = n }) <- [e,EVar b']]
             da (Alt (LitInt n t) ae) = do
-                t' <- dosub sub inb t
+                t' <- dosub inb t
                 let p' = LitInt n t'
-                e' <- f ae sub (mins e (patToLitEE p') inb)
+                e' <- f ae (mins e (patToLitEE p') inb)
                 return $ Alt p' e'
             da (Alt (LitCons n ns t) ae) = do
-                t' <- dosub sub inb t
-                ns' <- mapM (\v -> nname v sub inb) ns
+                t' <- dosub inb t
+                ns' <- mapM (\v -> nname v inb) ns
                 let p' = LitCons n ns' t'
-                    nsub = fromList [ (n,Done (EVar t))  | TVr { tvrIdent = n } <- ns | t <- ns' ]
+                    nsub =  [ (n,Done (EVar t))  | TVr { tvrIdent = n } <- ns | t <- ns' ]
                     ninb = fromList [ (n,NotKnown)  | TVr { tvrIdent = n } <- ns' ]
-                e' <- f ae (nsub `union` sub) (envInScope_u (ninb `union`) $ mins e (patToLitEE p') inb)
+                e' <- f ae (substAddList nsub (envInScope_u (ninb `union`) $ mins e (patToLitEE p') inb))
                 return $ Alt p' e'
             mins (EVar v) e = envInScope_u (minsert (tvrIdent v) (isBoundTo Many e))
             mins _ _ = id
 
         d' <- fmapM dd d
         as' <- mapM da as
-        t' <- dosub sub inb t
+        t' <- dosub inb t
         return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind =  b', eCaseAlts = as', eCaseDefault = d'}
 
-    doConstCase l t b as d sub inb = do
-        t' <- dosub sub inb t
+    doConstCase l t b as d inb = do
+        t' <- dosub inb t
         mr <- match l as (b,d)
         case mr of
             Just (bs,e) -> do
                 let bs' = [ x | x@(TVr { tvrIdent = n },_) <- bs, n /= 0]
-                binds <- mapM (\ (v,e) -> nname v sub inb >>= return . (,,) e v) bs'
-                e' <- f e (fromList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] `union` sub)   (envInScope_u (fromList [ (n,isBoundTo Many e) | (e,_,TVr { tvrIdent = n }) <- binds] `union`) inb)
+                binds <- mapM (\ (v,e) -> nname v inb >>= return . (,,) e v) bs'
+                e' <- f e (substAddList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] $ envInScope_u (fromList [ (n,isBoundTo Many e) | (e,_,TVr { tvrIdent = n }) <- binds] `union`) inb)
                 return $ eLetRec [ (v,e) | (e,_,v) <- binds ] e'
             Nothing -> do
                 return $ EError ("match falls off bottom: " ++ pprint l) t'
@@ -633,13 +641,6 @@ simplifyDs sopts dsIn = (stat,dsOut) where
     app' (ELit (LitCons n xs t@EPi {})) (a:as)  = do
         mtick (toAtom $ "E.Simplify.typecon-reduce.{" ++ show n ++ "}" )
         app (ELit (LitCons n (xs ++ [a]) (eAp t a)),as)
-    --app' (ELam tvr e) (a:as) = do
-    --    mtick (toAtom "E.Simplify.beta-reduce")
-    --    app (subst tvr a e,as)   -- TODO Fix quadradic substitution
-        --app (eLet tvr a e,as)   -- TODO Fix quadradic substitution
-    --app' (EPi tvr e) (a:as) = do
-    --    mtick (toAtom "E.Simplify.pi-reduce")
-    --    app (subst tvr a e,as)     -- Okay, types are small
     app' ec@ECase {} xs = do
         mtick (toAtom "E.Simplify.case-application")
         let f e = app' e xs
