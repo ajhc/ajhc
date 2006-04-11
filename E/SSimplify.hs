@@ -48,6 +48,7 @@ import Util.Graph
 import Util.HasSize
 import Util.NameMonad
 import Name.Id
+import Util.ReaderWriter
 import Util.SetLike as S
 
 type Bind = (TVr,E)
@@ -69,7 +70,7 @@ programPruneOccurance prog =
     in (programSetDs dsIn' prog)
 
 
-newtype OM a = OM (Writer OMap a)
+newtype OM a = OM (ReaderWriter () OMap a)
     deriving(Monad,Functor,MonadWriter OMap)
 
 unOM (OM a) = a
@@ -92,7 +93,7 @@ grump m = censor (const mempty) (listen m)
 
 collectOccurance :: E -> (E,IdMap Occurance) -- ^ (annotated expression, free variables mapped to their occurance info)
 collectOccurance e = (fe,omap)  where
-    (fe,OMap omap) = runWriter $ unOM (f e)
+    (fe,OMap omap) = runReaderWriter (unOM (f e)) ()
     f e@ESort {} = return e
     f e@Unknown {} = return e
     f (EPi tvr@TVr { tvrIdent = 0, tvrType =  a} b) = arg $ do
