@@ -133,32 +133,32 @@ inferType dataTable ds e = rfc e where
     fc (EPrim _ ts t) = mapM_ valid ts >> valid t >> ( strong' t)
     fc ec@ECase { eCaseScrutinee = e@ELit {}, eCaseBind = b, eCaseAlts = as, eCaseDefault =  (Just d) } | sortTypeLike e = do   -- TODO - this is a hack to get around case of constants.
         et <- rfc e
-        eq et (getType b)
+        withContext "Checking typelike default binding" $ eq et (getType b)
         dt <- rfc d
         verifyPats (casePats ec)
         -- skip checking alternatives
         ps <- mapM (strong' . getType) $ casePats ec
-        eqAll (et:ps)
+        withContext "Checking typelike pattern equality" $  eqAll (et:ps)
         return dt
     fc ec@ECase {eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseType = dt } | sortTypeLike e  = do   -- TODO - we should substitute the tested for value into the default type.
         et <- rfc e
-        eq et (getType b)
+        withContext "Checking typelike default binding" $ eq et (getType b)
         --dt <- rfc d
         --bs <- mapM rfc (caseBodies ec)  -- these should be specializations of dt
-        mapM_ (calt e) as
+        withContext "Checking typelike alternatives" $ mapM_ (calt e) as
         --eqAll bs
         verifyPats (casePats ec)
         ps <- mapM (strong' . getType) $ casePats ec
-        eqAll (et:ps)
+        withContext "checking typelike pattern equality" $ eqAll (et:ps)
         strong' dt
     fc ec@ECase { eCaseScrutinee =e, eCaseBind = b } = do
         et <- rfc e
-        eq et (getType b)
-        bs <- mapM rfc (caseBodies ec)
-        eqAll bs
+        withContext "Checking default binding" $ eq et (getType b)
+        bs <- withContext "Checking case bodies" $ mapM rfc (caseBodies ec)
+        withContext "Checking case bodies have equal types" $ eqAll bs
         verifyPats (casePats ec)
         ps <- mapM (strong' . getType) $ casePats ec
-        eqAll (et:ps)
+        withContext "checking pattern equality" $ eqAll (et:ps)
         return (head bs)
     fc Unknown = return Unknown
     fc e = failDoc $ text "what's this? " </> (prettyE e)
