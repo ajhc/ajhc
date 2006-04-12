@@ -335,7 +335,7 @@ processDecls stats ho ho' tiData = do
             --lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             lintCheckE onerrNone fullDataTable v lc
             (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable v lc)
-            lc <- doopt mangle False stats "SuperSimplify" cm lc
+            lc <- doopt mangle False stats ("SuperSimplify 1: " ++ pprint v) cm lc
             lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             lintCheckE onerrNone fullDataTable v lc
@@ -345,7 +345,7 @@ processDecls stats ho ho' tiData = do
         cds <- flip mapM cds $ \ (v,lc) -> do
             lintCheckE onerrNone fullDataTable v lc
             (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable v lc)
-            lc <- doopt mangle False stats "SuperSimplify" cm lc
+            lc <- doopt mangle False stats ("SuperSimplify 2: " ++ pprint v) cm lc
             lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             lintCheckE onerrNone fullDataTable v lc
             return (v,lc)
@@ -370,16 +370,16 @@ processDecls stats ho ho' tiData = do
         let mangle = mangle' (Just $ namesInscope' `union` fromList (map (tvrIdent . fst) cds')) fullDataTable
         let dd  (ds,used) (v,lc) = do
                 let cm stats e = do
-                    let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `union` smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
+                    let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `union` smap,  SS.so_dataTable = fullDataTable }
                     let (e',_) = SS.collectOccurance' e
                     let (stat, e'') = SS.simplifyE sopt e'
                     wdump FD.Pass $ printCheckName fullDataTable e''
                     Stats.tickStat stats stat
                     return e''
                 let (lc', _) = runRename used lc
-                lc <- doopt mangle False stats "SuperSimplify" cm lc'
+                lc <- doopt mangle False stats ("SuperSimplify PostPWW: " ++ pprint v) cm lc'
                 let (lc', used') = runRename used lc
-                return ((v,lc):ds,used' `mappend` used)
+                return ((v,lc'):ds,used' `mappend` used)
         (cds,usedids) <- foldM dd ([],fromDistinctAscList $ Set.toList $ hoUsedIds ho) cds
         cds <- E.Strictness.solveDs cds
         cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
