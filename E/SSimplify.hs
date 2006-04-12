@@ -1,8 +1,7 @@
 module E.SSimplify(
     Occurance(..),
     simplifyE,
-    simplifyDs,
-    collectOccurance,
+    collectOccurance',
     programPruneOccurance,
     programSSimplify,
     SimplifyOpts(..)
@@ -66,12 +65,12 @@ data Occurance =
 programPruneOccurance :: Program -> Program
 programPruneOccurance prog =
     let dsIn = programDs prog
-        (dsIn',fvs) = collectDs dsIn $ if progClosed prog then mempty else fromList $ map (flip (,) Many) (map (tvrIdent . fst) dsIn)
-    in (programSetDs dsIn' prog)
+        (dsIn',(OMap fvs,uids)) = runReaderWriter (unOM $ collectDs dsIn $ if progClosed prog then mempty else fromList $ map (flip (,) Many) (map (tvrIdent . fst) dsIn)) ()
+    in (programSetDs dsIn' prog) { progFreeIds = idMapToIdSet fvs, progUsedIds = uids }
 
 
-newtype OM a = OM (ReaderWriter () OMap a)
-    deriving(Monad,Functor,MonadWriter OMap)
+newtype OM a = OM (ReaderWriter () (OMap,IdSet) a)
+    deriving(Monad,Functor,MonadWriter (OMap,IdSet))
 
 unOM (OM a) = a
 
@@ -89,11 +88,14 @@ maybeLetRec ds e = ELetRec ds e
 -- | occurance analysis
 
 grump :: OM a -> OM (a,OMap)
-grump m = censor (const mempty) (listen m)
+grump m = fmap ( \ (x, (y,z)) -> (x,y) ) $ censor (\ (_,y) -> (mempty,y)) (listen m)
 
-collectOccurance :: E -> (E,IdMap Occurance) -- ^ (annotated expression, free variables mapped to their occurance info)
-collectOccurance e = (fe,omap)  where
-    (fe,OMap omap) = runReaderWriter (unOM (f e)) ()
+collectOccurance' :: E -> (E,IdMap Occurance)
+collectOccurance' e = (fe,omap) where
+    (fe,(OMap omap,_)) = runReaderWriter (unOM $ collectOccurance e) ()
+
+collectOccurance :: E -> OM E -- ^ (annotated expression, free variables mapped to their occurance info)
+collectOccurance e = f e  where
     f e@ESort {} = return e
     f e@Unknown {} = return e
     f (EPi tvr@TVr { tvrIdent = 0, tvrType =  a} b) = arg $ do
@@ -104,8 +106,8 @@ collectOccurance e = (fe,omap)  where
         a <- f a
         (b,tfvs) <- grump (f b)
         case mlookup n tfvs of
-            Nothing -> tell tfvs >>  return (EPi tvr { tvrIdent =  0, tvrType = a } b)
-            Just occ -> tell (mdelete n tfvs) >> return (EPi (annb' tvr { tvrType = a }) b)
+            Nothing -> tell (tfvs,mempty) >>  return (EPi tvr { tvrIdent =  0, tvrType = a } b)
+            Just occ -> tell (mdelete n tfvs,singleton n) >> return (EPi (annb' tvr { tvrType = a }) b)
     f (ELit (LitCons n as t)) = arg $ do
         t <- f t
         as <- mapM f as
@@ -125,11 +127,11 @@ collectOccurance e = (fe,omap)  where
         (as',asfv) <- grump (arg $ mapM ftvr as)
         let avs = bvs `andOM` asfv
             as'' = map (annbind' avs) as'
-        tell $ inLam $ foldr mdelete avs (map tvrIdent as)
+        tell $ (inLam $ foldr mdelete avs (map tvrIdent as),fromList $ map tvrIdent as)
         return (foldr ELam b' as'')
     f e | Just (x,t) <- from_unsafeCoerce e  = do x <- f x ; t <- (arg (f t)); return (prim_unsafeCoerce x t)
     f (EVar tvr@TVr { tvrIdent = n, tvrType =  t}) = do
-        tell $ msingleton n Once
+        tell $ (msingleton n Once,mempty)
         t <- arg (f t)
         return $ EVar tvr { tvrType = t }
     f e | (x,xs@(_:_)) <- fromAp e = do
@@ -143,12 +145,11 @@ collectOccurance e = (fe,omap)  where
         let fidm = orMaps (fvb:fvas)
         ct <- arg $ f (eCaseType ec)
         b <- arg (ftvr b)
-        tell $ mdelete (tvrIdent b) fidm
+        tell $ (mdelete (tvrIdent b) fidm,singleton (tvrIdent b))
         return ec { eCaseScrutinee = scrut', eCaseAlts = as', eCaseBind = annbind' fidm b, eCaseType = ct, eCaseDefault = d'}
     f (ELetRec ds e) = do
-        (e',OMap fve) <- grump (f e)
-        let (ds''',fids) = collectDs ds fve
-        tell (OMap fids)
+        (e',fve) <- grump (f e)
+        ds''' <- collectDs ds fve
         return (maybeLetRec ds''' e')
     f e = error $ "SSimplify.collectOcc.f: " ++ show e
     alt (Alt l e) = do
@@ -157,10 +158,10 @@ collectOccurance e = (fe,omap)  where
         l <- arg (fmapM f l)
         let fvs' = foldr mdelete fvs (map tvrIdent $ litBinds l)
             l' = mapLitBinds (annbind' fvs) l
-        tell fvs'
+        tell (fvs',fromList $ map tvrIdent (litBinds l))
         return (Alt l' e')
     arg m = do
-        let mm (OMap mp) = (OMap $ fmap (const Many) mp)
+        let mm (OMap mp,y) = (OMap $ fmap (const Many) mp,y)
         censor mm m
     ftvr tvr = do
         tt <- f (tvrType tvr)
@@ -185,21 +186,23 @@ mapLitBindsM f (LitCons n es t) = do
     return (LitCons n es t)
 mapLitBindsM f (LitInt e t) = return $  LitInt e t
 
-collectBinding :: Bind -> (Bind,IdMap Occurance)
-collectBinding (t,e) = runIdentity $ do
-    let (e',omap) = collectOccurance e
-        rvars = freeVars (Info.fetch (tvrInfo t) :: ARules) :: IdMap TVr
-        rvars' = fmap (const Many) rvars
-    return ((t,e'),omap `andOM` rvars')
+collectBinding :: Bind -> OM Bind
+collectBinding (t,e) = do
+    e' <- collectOccurance e
+    let rvars = freeVars (Info.fetch (tvrInfo t) :: ARules) :: IdMap TVr
+    tell (OMap $ fmap (const Many) rvars, singleton (tvrIdent t))
+    return (t,e')
 
-collectDs :: [Bind] -> (IdMap Occurance) -> ([Bind],IdMap Occurance)
-collectDs ds fve = runIdentity $ do
-    let ds' = map collectBinding ds
+unOMap (OMap x) = x
+
+collectDs :: [Bind] -> OMap -> OM [Bind]
+collectDs ds (OMap fve) = do
+    ds' <- mapM (grump . collectBinding) ds
     let graph = newGraph ds' (\ ((t,_),_) -> tvrIdent t) (\ (_,fv) -> mkeys fv)
         rds = reachable graph (mkeys fve ++ [ tvrIdent t | (t,_) <- ds, getProperty prop_EXPORTED t])
         graph' = newGraph rds (\ ((t,_),_) -> tvrIdent t) (\ (_,fv) -> mkeys fv)
         (lb,ds'') =  findLoopBreakers (\ ((t,e),_) -> loopFunc t e) (const True) graph'
-        fids = foldl andOM mempty (fve:snds ds'')
+        fids = foldl andOM mempty (fve:map unOMap (snds ds''))
         ffids = fromList [ (tvrIdent t,lup t) | ((t,_),_) <- ds'' ]
         cycNodes = (fromList $ [ tvrIdent v | ((v,_),_) <- cyclicNodes graph'] :: IdSet)
         calcStrictInfo :: TVr -> TVr
@@ -213,10 +216,11 @@ collectDs ds fve = runIdentity $ do
                 False | Just r <- mlookup (tvrIdent t) fids -> r
         ds''' = [ (calcStrictInfo $ annbind ffids t ,e) | ((t,e),_) <- ds'']
         froo (t,e) = ((t {tvrType = t' },e),fvs) where
-            (t',fvs) = collectOccurance (tvrType t)
+            (t',fvs) = collectOccurance' (tvrType t)
         (ds'''',nfids) = unzip $ map froo ds'''
         nfid' = fmap (const Many) (mconcat nfids)
-    return (ds'''',(nfid' `andOM` fids) S.\\ ffids)
+    tell $ ((OMap $ nfid' `andOM` fids) S.\\ ffids,fromList (map (tvrIdent . fst) ds''''))
+    return (ds'''')
 
 -- TODO this should use the occurance info
 -- loopFunc t _ | getProperty prop_PLACEHOLDER t = -100  -- we must not choose the placeholder as the loopbreaker
@@ -327,23 +331,25 @@ dosub inb e = coerceOpt return $ substMap'' (envCachedSubst inb) e
 
 simplifyE :: SimplifyOpts -> E -> (Stat,E)
 simplifyE sopts e = (stat,e') where
-    (stat,[(_,e')]) =  simplifyDs sopts [(tvrSilly,e)]
+    (stat,[(_,e')]) =  simplifyDs program sopts [(tvrSilly,e)]
 
 programSSimplify :: SimplifyOpts -> Program -> Program
 programSSimplify sopts prog =
-    let (stats,dsIn) = simplifyDs sopts (programDs prog)
+    let (stats,dsIn) = simplifyDs prog sopts (programDs prog)
     in (programSetDs dsIn prog) { progStats = progStats prog `mappend` stats }
 
 
-simplifyDs :: SimplifyOpts -> [(TVr,E)] -> (Stat,[(TVr,E)])
-simplifyDs sopts dsIn = (stat,dsOut) where
-
+simplifyDs :: Program -> SimplifyOpts -> [(TVr,E)] -> (Stat,[(TVr,E)])
+simplifyDs prog sopts dsIn = (stat,dsOut) where
     getType e = infertype (so_dataTable sopts) e
     collocc dsIn = do return dsIn
     initialB = mempty { envInScope =  fmap (\e -> isBoundTo Many e) (so_boundVars sopts) }
     initialB' = mempty { envInScope =  fmap (\e -> NotKnown) (so_boundVars sopts) }
     (dsOut,stat)  = runIdentity $ runStatT (runIdNameT doit)
     doit = do
+        addNamesIdSet (progUsedIds prog)
+        addBoundNamesIdSet (progFreeIds prog)
+        addBoundNamesIdMap (so_boundVars sopts)
         dsIn <- sequence [etaExpandDef' (so_dataTable sopts) t e | (t,e) <- dsIn ]
         ds' <- collocc dsIn
         let g (t,e) = do
@@ -354,7 +360,7 @@ simplifyDs sopts dsIn = (stat,dsOut) where
         mapM g ds'
     go :: E -> Env -> IdNameT (StatT Identity) E
     go e inb = do
-        let (e',_) = collectOccurance e
+        let (e',_) = collectOccurance' e
         f e' (cacheSubst inb { envSubst = mempty })
     f :: E -> Env -> IdNameT (StatT Identity) E
     f e inb | (ELam t b,(x:xs)) <- fromAp e = do
@@ -515,7 +521,9 @@ simplifyDs sopts dsIn = (stat,dsOut) where
                 return $ Alt (LitCons n ts te) (eLet b wtd d)
         mtick $ "E.Simplify.case-improve-default.{" ++ show (sort ls) ++ "}"
         ls' <- mapM f ls
-        doCase e t b (as ++ ls') Nothing inb
+        ec <- dosub inb emptyCase { eCaseScrutinee = e, eCaseType = t, eCaseBind = b, eCaseAlts = as ++ ls' }
+        return ec { eCaseScrutinee = e }
+        --doCase e t b (as ++ ls') Nothing inb
         where
         te = getType b
         dt = (so_dataTable sopts)

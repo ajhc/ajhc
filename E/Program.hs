@@ -27,6 +27,8 @@ data Program = Program {
     progModule :: Module,
     progClosed :: Bool,           -- ^ whether the universe is closed other than the entry points and external names
     progPasses :: [String],       -- ^ record of passes the program goes through
+    progUsedIds :: IdSet,         -- ^ filled in by occurance info collection
+    progFreeIds :: IdSet,         -- ^ filled in by occurance info collection
     progStats :: Stats.Stat
     }
 
@@ -41,6 +43,8 @@ program = Program {
     progClosed = False,
     progModule = mainModule,
     progPasses = [],
+    progUsedIds = mempty,
+    progFreeIds = mempty,
     progStats = mempty
     }
 

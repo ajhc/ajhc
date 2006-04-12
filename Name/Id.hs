@@ -9,6 +9,7 @@ module Name.Id(
     idSetToIdMap,
     addBoundNamesIdMap,
     addBoundNamesIdSet,
+    addNamesIdSet,
     idMapToIdSet
     )where
 
@@ -95,6 +96,8 @@ instance Monad m => NameMonad Id (IdNameT m) where
                 st = abs i + 2 + abs i `mod` 2
         fromIdNameT $ newNameFrom  (genNames (size used + size bound))
 
+addNamesIdSet nset = IdNameT $ do
+    modify (\ (used,bound) -> (nset `union` used, bound) )
 addBoundNamesIdSet nset = IdNameT $ do
     modify (\ (used,bound) -> (nset `union` used, nset `union` bound) )
 
