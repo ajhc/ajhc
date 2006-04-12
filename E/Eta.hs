@@ -17,8 +17,6 @@ import Control.Monad.State
 import Data.Monoid
 import Data.Typeable
 import Maybe
-import qualified Data.Map as Map
-import qualified Data.Set as Set
 
 import DataConstructors
 import E.Annotate
@@ -108,7 +106,7 @@ fromPi' dataTable e = f [] (followAliases dataTable e) where
 
 -- this annotates, but only expands top-level definitions
 etaExpandProgram :: MonadStats m => Program -> m Program
-etaExpandProgram prog = programMapDs f (etaAnnotateProgram prog) where
+etaExpandProgram prog = runNameMT (programMapDs f (etaAnnotateProgram prog)) where
     f (t,e) = etaExpandDef' (progDataTable prog) t e
 
 -- this annotates a program with its arity information, iterating until a fixpoint is reached.
@@ -152,30 +150,32 @@ etaExpandDef' dataTable t e = etaExpandDef dataTable t e >>= \x -> case x of
 collectIds :: E -> IdSet
 collectIds e = execWriter $ annotate mempty (\id nfo -> tell (singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 -- | eta expand a definition
-etaExpandDef :: MonadStats m => DataTable -> TVr -> E -> m (Maybe (TVr,E))
+etaExpandDef :: (NameMonad Id m,MonadStats m) => DataTable -> TVr -> E -> m (Maybe (TVr,E))
 etaExpandDef _ _ e | isAtomic e = return Nothing -- will be inlined
 etaExpandDef dataTable t e  = ans where
-    fvs = foldr insert (freeVars (b,map getType rs,tvrType t)) (map tvrIdent rs) `mappend` collectIds e
+    fvs = foldr insert (freeVars (b,map getType rs,(tvrType t,e))) (map tvrIdent rs) `mappend` collectIds e
     (b,rs) = fromLam e
     at = arityType e
     zeroName = case fromAp e of
         (EVar v,_) -> "use.{" ++ tvrShowName v
         _ -> "random"
-    nameSupply = [ n |  n <- [2,4 :: Int ..], n `notMember` fvs  ]
+    --nameSupply = [ n |  n <- [2,4 :: Int ..], n `notMember` fvs  ]
+    nameSupply = undefined
     ans = do
         -- note that we can't use the type in the tvr, because it will not have the right free typevars.
         (ne,flag) <- f at e (expandPis dataTable $ infertype dataTable e) nameSupply
         if flag then return (Just (tvrInfo_u (annotateArity' at) t,ne)) else return Nothing
-    f (AFun _ a) (ELam tvr e) (EPi tvr' rt) ns = do
-        (ne,flag) <- f a e (subst tvr' (EVar tvr) rt) ns
+    f (AFun _ a) (ELam tvr e) (EPi tvr' rt) _ns = do
+        (ne,flag) <- f a e (subst tvr' (EVar tvr) rt) _ns
         return (ELam tvr ne,flag)
-    f (AFun _ a) e (EPi tt rt) (n:ns) = do
+    f (AFun _ a) e (EPi tt rt) _nns = do
         if tvrIdent t == 0
          then mtick ("EtaExpand." ++ zeroName)
           else mtick ("EtaExpand.def.{" ++ tvrShowName t)
+        n <- newName
         let nv = tt { tvrIdent = n }
             eb = EAp e (EVar nv)
-        (ne,_) <- f a eb (subst tt (EVar nv) rt) ns
+        (ne,_) <- f a eb (subst tt (EVar nv) rt) _nns
         return (ELam nv ne,True)
     f _ e _ _ = do
         return (e,False)
@@ -183,7 +183,7 @@ etaExpandDef dataTable t e  = ans where
 
 
 -- | eta expand a use of a value
-etaExpandAp :: MonadStats m => DataTable -> TVr -> [E] -> m (Maybe E)
+etaExpandAp :: (NameMonad Id m,MonadStats m) => DataTable -> TVr -> [E] -> m (Maybe E)
 etaExpandAp dataTable tvr xs = do
     r <- etaExpandDef dataTable tvr { tvrIdent = 0} (foldl EAp (EVar tvr) xs)
     return (fmap snd r)

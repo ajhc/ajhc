@@ -64,7 +64,7 @@ data Occurance =
 
 programPruneOccurance :: Program -> Program
 programPruneOccurance prog =
-    let dsIn = programDs prog
+    let dsIn = programDs (runIdentity $ programMapBodies (return . subst (tVr (-1) Unknown) Unknown) prog)
         (dsIn',(OMap fvs,uids)) = runReaderWriter (unOM $ collectDs dsIn $ if progClosed prog then mempty else fromList $ map (flip (,) Many) (map (tvrIdent . fst) dsIn)) ()
     in (programSetDs dsIn' prog) { progFreeIds = idMapToIdSet fvs, progUsedIds = uids }
 
@@ -449,8 +449,8 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
         s' <- mapM z ds
         let
             --sub'' = {- Map.fromList [ (t,Susp e sub'') | (t,Once,_,e) <- s'] `Map.union`-} ([ (t,Done (EVar t'))  | (t,n,t',_) <- s', n /= Once]) `union` sub
-            sub'' = [ (t,Done (EVar t'))  | (t,n,t',_) <- s', n /= Once]
-        (ds',inb') <- w s'  (substAddList sub'' $ envInScope_u (fromList [ (tvrIdent t',NotKnown) | (_,n,t',_) <- s', n /= Once] `union`) inb) []
+            sub'' = fromList [ (t,susp e sub'') | (t,Once,_,e) <- s'] `union` fromList [ (t,Done (EVar t'))  | (t,n,t',_) <- s', n /= Once] `union` envSubst inb
+        (ds',inb') <- w s'  (cacheSubst (envSubst_s sub'' $ envInScope_u (fromList [ (tvrIdent t',NotKnown) | (_,n,t',_) <- s', n /= Once] `union`) inb)) []
         e' <- f e inb'
         case ds' of
             [(t,e)] | worthStricting e, Just (Strict.S _) <- Info.lookup (tvrInfo t), not (getProperty prop_CYCLIC t) -> do

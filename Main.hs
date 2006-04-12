@@ -61,6 +61,7 @@ import Support.FreeVars
 import Support.ShowTable
 import Util.Graph
 import Name.Id
+import Util.NameMonad
 import Util.SetLike as S
 import Version(versionString,versionContext)
 import qualified E.CPR
@@ -333,7 +334,7 @@ processDecls stats ho ho' tiData = do
         cds <- flip mapM cds $ \ (v,lc) -> do
             --lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             lintCheckE onerrNone fullDataTable v lc
-            (v,lc) <- Stats.runStatIO stats (etaExpandDef' fullDataTable v lc)
+            (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable v lc)
             lc <- doopt mangle False stats "SuperSimplify" cm lc
             lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
@@ -343,7 +344,7 @@ processDecls stats ho ho' tiData = do
         cds <- E.Strictness.solveDs cds
         cds <- flip mapM cds $ \ (v,lc) -> do
             lintCheckE onerrNone fullDataTable v lc
-            (v,lc) <- Stats.runStatIO stats (etaExpandDef' fullDataTable v lc)
+            (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable v lc)
             lc <- doopt mangle False stats "SuperSimplify" cm lc
             lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
             lintCheckE onerrNone fullDataTable v lc
