@@ -38,6 +38,7 @@ import Name.VConsts
 import Options
 import qualified E.Strictness as Strict
 import qualified FlagOpts as FO
+import qualified FlagDump as FD
 import qualified Info.Info as Info
 import qualified Util.Seq as Seq
 import Stats hiding(new,print,Stats)
@@ -256,7 +257,7 @@ data SimplifyOpts = SimpOpts {
     {-! derive: Monoid !-}
 
 
-data Range = Done E | Susp E Subst E
+data Range = Done OutE | Susp InE Subst OutE -- cached result
     deriving(Show,Eq,Ord)
 type Subst = IdMap Range
 
@@ -264,7 +265,7 @@ type InScope = IdMap Binding
 
 data Binding =
     NotAmong [Name]
-    | IsBoundTo { bindingOccurance :: Occurance, bindingE :: E, bindingCheap :: Bool }
+    | IsBoundTo { bindingOccurance :: Occurance, bindingE :: OutE, bindingCheap :: Bool }
     | NotKnown
     deriving(Ord,Eq)
     {-! derive: is !-}
@@ -278,28 +279,27 @@ isBoundTo o e = IsBoundTo {
 data Env = Env {
     envCachedSubst :: IdMap (Maybe E),
     envSubst :: Subst,
-    envInScope :: IdMap Binding,
-    envTypeMap :: IdMap E
+    envInScope :: IdMap Binding
     }
     {-! derive: Monoid, update !-}
 
 susp:: E -> Subst -> Range
-susp e sub =  Susp e sub (substMap'' (fmap mkSubst sub) e)
+susp e sub =  Susp e sub undefined -- (substMap'' (fmap mkSubst sub) e)
 
-insertSuspSubst :: TVr -> E -> Env -> Env
+insertSuspSubst :: TVr -> InE -> Env -> Env
 insertSuspSubst t e env = cacheSubst env { envSubst = minsert (tvrIdent t) (susp e (envSubst env)) (envSubst env) }
-insertSuspSubst' :: Id -> E -> Env -> Env
+insertSuspSubst' :: Id -> InE -> Env -> Env
 insertSuspSubst' t e env = cacheSubst env { envSubst = minsert t (susp e (envSubst env)) (envSubst env) }
 
-insertDoneSubst :: TVr -> E -> Env -> Env
+insertDoneSubst :: TVr -> OutE -> Env -> Env
 insertDoneSubst t e env = cacheSubst env { envSubst = minsert (tvrIdent t) (Done e) (envSubst env) }
-insertDoneSubst' :: Id -> E -> Env -> Env
+insertDoneSubst' :: Id -> OutE -> Env -> Env
 insertDoneSubst' t e env = cacheSubst env { envSubst = minsert t (Done e) (envSubst env) }
 
 substLookup :: Id -> Env -> Maybe Range
 substLookup id env = mlookup id (envSubst env)
 
-substAddList ls env = env { envSubst = fromList ls `union` envSubst env }
+substAddList ls env = cacheSubst env { envSubst = fromList ls `union` envSubst env }
 
 --applySubst :: Subst -> IdMap a -> E -> E
 --applySubst s nn = applySubst' s where
@@ -309,6 +309,7 @@ substAddList ls env = env { envSubst = fromList ls `union` envSubst env }
 --        g (Done e) = Just e
 --        g (Susp e s') = Just $ applySubst' s' e
 
+{-
 applySubst :: Subst -> IdMap a -> E -> E
 applySubst s nn = applySubst' s where
     nn' = fmap (const Nothing) s `mappend` fmap (const Nothing) nn
@@ -317,19 +318,29 @@ applySubst s nn = applySubst' s where
         g (Done e) = Just e
         g (Susp _ _ e)  = Just e
         --g (Susp e s')  = Just $ applySubst' s' e
+-}
 
-mkSubst :: Range -> Maybe E
-mkSubst (Done e) = Just e
-mkSubst (Susp _ _ e) = Just e
+applySubst :: Subst -> IdMap a -> IdMap (Maybe OutE)
+applySubst s nn = applySubst' s where
+    nn' = fmap (const Nothing) s `mappend` fmap (const Nothing) nn
+    applySubst' s = (tm `mappend` nn') where
+        tm = fmap g s
+        g (Done e) = Just e
+        g (Susp e s' _) = Just $ substMap'' (applySubst' s') e
+
+--mkSubst :: Range -> Maybe E
+--mkSubst (Done e) = Just e
+--mkSubst (Susp _ _ e) = Just e
 --mkSubst (Susp e s' e) = Just $ substMap'' (fmap mkSubst s') e
 
-cacheSubst env = env { envCachedSubst = fmap mkSubst (envSubst env) }
+--cacheSubst env = env { envCachedSubst = fmap mkSubst (envSubst env) }
+cacheSubst env = env { envCachedSubst = applySubst (envSubst env) (envInScope env) }
 
 dosub inb e = coerceOpt return $ substMap'' (envCachedSubst inb) e
 
 --dosub inb e = coerceOpt return $ applySubst (envSubst inb) (envInScope inb) e
 
-simplifyE :: SimplifyOpts -> E -> (Stat,E)
+simplifyE :: SimplifyOpts -> InE -> (Stat,OutE)
 simplifyE sopts e = (stat,e') where
     (stat,[(_,e')]) =  simplifyDs program sopts [(tvrSilly,e)]
 
@@ -338,6 +349,13 @@ programSSimplify sopts prog =
     let (stats,dsIn) = simplifyDs prog sopts (programDs prog)
     in (programSetDs dsIn prog) { progStats = progStats prog `mappend` stats }
 
+
+type InE = E
+type OutE = E
+type InTVr = TVr
+type OutTVr = TVr
+
+type SM = IdNameT (StatT Identity)
 
 simplifyDs :: Program -> SimplifyOpts -> [(TVr,E)] -> (Stat,[(TVr,E)])
 simplifyDs prog sopts dsIn = (stat,dsOut) where
@@ -362,7 +380,7 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
     go e inb = do
         let (e',_) = collectOccurance' e
         f e' (cacheSubst inb { envSubst = mempty })
-    f :: E -> Env -> IdNameT (StatT Identity) E
+    f :: InE -> Env -> IdNameT (StatT Identity) OutE
     f e inb | (ELam t b,(x:xs)) <- fromAp e = do
         xs' <- mapM (dosub inb) xs
         b' <- f b (insertSuspSubst t x inb) -- minsert (tvrIdent t) (Susp x sub) sub) inb
@@ -441,9 +459,9 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
                 case isAtomic e' && n /= LoopBreaker of
                     True -> do
                         when (n /= Unused) $ mtick $ "E.Simplify.inline.Atomic.{" ++ showName t ++ "}"
-                        w rs (insertDoneSubst' t e' . envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) $ inb) ((t',e'):ds) -- (minsert t (Done e') sub) (envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) ((t',e'):ds)
+                        w rs (insertDoneSubst' t e' . envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) $ inb) ds -- ((t',e'):ds) -- (minsert t (Done e') sub) (envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) ((t',e'):ds)
                     -- False | worthStricting e', Strict <- Info.lookup (tvrInfo t') -> w rs sub
-                    False -> w rs (if n /= LoopBreaker then (envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
+                    False -> w rs (if n /= LoopBreaker then (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
             w [] inb ds = return (ds,inb)
         ds <- sequence [ etaExpandDef' (so_dataTable sopts) t e | (t,e) <- ds]
         s' <- mapM z ds
@@ -468,7 +486,7 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
                 mticks  (length ds'' - length ds') (toAtom $ "E.Simplify.let-coalesce")
                 return $ eLetRec ds'' e''
     g e _ = error $ "SSimplify.simplify.g: " ++ show e ++ "\n" ++ pprint e
-    showName t | odd t = tvrShowName (tVr t Unknown)
+    showName t | odd t || dump FD.EVerbose = tvrShowName (tVr t Unknown)
              | otherwise = "(epheremal)"
 
     nname tvr@(TVr { tvrIdent = n, tvrType =  t}) inb  = do
@@ -477,6 +495,7 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
         n' <- uniqueName n
         return $ tvr { tvrIdent = n', tvrType =  t'' }
     -- TODO - case simplification
+    doCase :: OutE -> InE -> InTVr -> [Alt InE] -> (Maybe InE) -> Env -> SM OutE
     doCase (ELetRec ds e) t b as d inb = do
         mtick "E.Simplify.let-from-case"
         e' <- doCase e t b as d inb
@@ -497,10 +516,10 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
     doCase ic@ECase { eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d' inb | length (filter (not . isBottom) (caseBodies ic)) <= 1 || all whnfOrBot (caseBodies ic)  || all whnfOrBot (caseBodies emptyCase { eCaseAlts = as', eCaseDefault = d'} )  = do
         mtick (toAtom "E.Simplify.case-of-case")
         let f (Alt l e) = do
-                e' <- doCase e t b' as' d' (envInScope_u (fromList [ (n,NotKnown) | TVr { tvrIdent = n } <- litBinds l ] `union`) inb)
+                e' <- doCase e t b' as' d' (cacheSubst $ envInScope_u (fromList [ (n,NotKnown) | TVr { tvrIdent = n } <- litBinds l ] `union`) inb)
                 return (Alt l e')
             --g e >>= return . Alt l
-            g x = doCase x t b' as' d' (envInScope_u (minsert (tvrIdent b) NotKnown) inb)
+            g x = doCase x t b' as' d' (cacheSubst $ envInScope_u (minsert (tvrIdent b) NotKnown) inb)
         as'' <- mapM f as
         d'' <- fmapM g d
         t' <- dosub inb t
@@ -601,6 +620,7 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
     match m as d = error $ "Odd Match: " ++ show ((m,getType m),as,d)
 
 
+    applyRule :: OutTVr -> [OutE] -> Env -> SM (Maybe (OutE,[OutE]))
     applyRule v xs inb  = do
         z <- builtinRule v xs
         let lup x = case mlookup x (envInScope inb) of
@@ -609,6 +629,7 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
         case z of
             Nothing | fopts FO.Rules -> applyRules lup (Info.fetch (tvrInfo v)) xs
             x -> return x
+    h :: OutE -> [OutE] -> Env -> SM OutE
     h (EVar v) xs' inb = do
         z <- applyRule v xs' inb
         case (z,forceNoinline v) of
@@ -634,9 +655,11 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
                 -- Nothing | tvrIdent v `Set.member` exports -> app (EVar v,xs')
                 -- Nothing -> error $ "Var not in scope: " ++ show v
     h e xs' inb = do app (e,xs')
+    didInline :: Env -> OutE -> [OutE] -> SM OutE
     didInline inb z zs = do
         e <- app (z,zs)
-        go e inb
+        return e
+        --go e inb
     appVar v xs = do
         me <- etaExpandAp (so_dataTable sopts) v xs
         case me of
