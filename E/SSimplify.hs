@@ -248,9 +248,8 @@ orMany xs = if all (== Once) xs then ManyBranch else Many
 
 data SimplifyOpts = SimpOpts {
     so_noInlining :: Bool,                 -- ^ this inhibits all inlining inside functions which will always be inlined
-    so_superInline :: Bool,                -- ^ whether to do superinlining
+    so_finalPhase :: Bool,                 -- ^ no rules and don't inhibit inlining
     so_boundVars :: IdMap E,
-    so_rules :: Rules,
     so_dataTable :: DataTable,             -- ^ the data table
     so_exports :: [Int]
     }
@@ -360,7 +359,6 @@ type SM = IdNameT (StatT Identity)
 simplifyDs :: Program -> SimplifyOpts -> [(TVr,E)] -> (Stat,[(TVr,E)])
 simplifyDs prog sopts dsIn = (stat,dsOut) where
     getType e = infertype (so_dataTable sopts) e
-    collocc dsIn = do return dsIn
     initialB = mempty { envInScope =  fmap (\e -> isBoundTo Many e) (so_boundVars sopts) }
     initialB' = mempty { envInScope =  fmap (\e -> NotKnown) (so_boundVars sopts) }
     (dsOut,stat)  = runIdentity $ runStatT (runIdNameT doit)
@@ -368,10 +366,9 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
         addNamesIdSet (progUsedIds prog)
         addBoundNamesIdSet (progFreeIds prog)
         addBoundNamesIdMap (so_boundVars sopts)
-        dsIn <- sequence [etaExpandDef' (so_dataTable sopts) t e | (t,e) <- dsIn ]
-        ds' <- collocc dsIn
+        ds' <- sequence [etaExpandDef' (so_dataTable sopts) t e | (t,e) <- dsIn ]
         let g (t,e) = do
-                e' <- if forceInline t then
+                e' <- if not (so_finalPhase sopts) && forceInline t  then
                         f e initialB'  -- ^ do not inline into functions which themself will be inlined
                             else f e initialB
                 return (t,e')

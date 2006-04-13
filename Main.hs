@@ -324,7 +324,7 @@ processDecls stats ho ho' tiData = do
         --putStrLn "*** After annotate"
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
         let cm stats e = do
-            let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_rules = allRules, SS.so_dataTable = fullDataTable }
+            let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_dataTable = fullDataTable }
             let (e',_) = SS.collectOccurance' e
             let (stat, e'') = SS.simplifyE sopt e'
             wdump FD.Pass $ printCheckName fullDataTable e''
@@ -560,7 +560,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     -- delete rules
     prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ Info.delete (mempty :: ARules) nfo) letann (\_ -> return) prog
 
-    prog <- simplifyProgram mempty "SuperSimplify no rules" True prog
+    prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify no rules" True prog
     prog <- barendregtProg prog
 --
 --    let cm stats e = do
