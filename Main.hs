@@ -482,6 +482,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     (_,main,mainv) <- getMainFunction dataTable mainFunc (programEsMap prog)
     prog <- return prog { progMainEntry = main, progEntryPoints = [main], progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog] }
     prog <- transformProgram "Initial Prune Unreachable" False False (return . programPruneUnreachable) prog
+    prog <- barendregtProg prog
 
     --wdump FD.Lambdacube $ printProgram prog
     prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze False prog else return prog
@@ -548,6 +549,7 @@ compileModEnv' stats (initialHo,finalHo) = do
 --    lc <- opt "SuperSimplify" cm lc
 --    prog <- return $ programSetE lc prog
 
+    prog <- barendregtProg prog
     prog <- simplifyProgram mempty "SuperSimplify pass 2" True prog
     prog <- barendregtProg prog
 
