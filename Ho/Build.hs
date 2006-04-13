@@ -230,6 +230,7 @@ dumpHoFile fn = do
 
 printCheckName'' :: DataTable -> TVr -> E -> IO ()
 printCheckName'' _dataTable tvr e = do
+    when (dump FD.EInfo || verbose2) $ putErrLn (show $ tvrInfo tvr)
     putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pprint (tvrType tvr)))
     putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
 

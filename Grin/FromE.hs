@@ -390,14 +390,14 @@ compile' dataTable cenv (tvr,as,e) = ans where
             as' <- mapM cp'' as
             def <- createDef d (return (toVal b))
             return $
-                e :>>= v :-> Case v (as' ++ def)
+                e :>>= v :-> Return v :>>= toVal b :-> Case v (as' ++ def)
     ce ECase { eCaseScrutinee = scrut, eCaseBind = b, eCaseAlts = as, eCaseDefault = d }  = do
         v <- newNodeVar
         e <- ce scrut
         as <- mapM cp as
         def <- createDef d newNodeVar
         return $ case (def,b,scrut) of
-            ([],_,_) -> e :>>= v :-> Case v as
+            --([],_,_) -> e :>>= v :-> Case v as
             (_,TVr {tvrIdent = 0 },_) -> e :>>= v :-> Case v (as ++ def)
             (_,_,EVar etvr) ->  e :>>= v :-> Return (toVal etvr) :>>= toVal b :-> Case v (as ++ def)
             (_,_,_) -> e :>>= v :-> Store v :>>= toVal b :-> Case v (as ++ def)

@@ -86,7 +86,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
                 l' <- fmapM f l
                 e' <- f e
                 return $ Alt l' e'
-        alts <- (mapM da $ eCaseAlts ec)
+        alts <- local r (mapM da $ eCaseAlts ec)
         t' <- f (eCaseType ec)
         return  ECase { eCaseScrutinee = e', eCaseType = t', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts }
     lp bnd lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == 0  = do

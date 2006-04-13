@@ -108,7 +108,7 @@ doSubst substInVars allShadow bm e  = f e bm where
                 l' <- fmapM f l
                 e' <- f e
                 return $ Alt l' e'
-        alts <- (mapM da $ eCaseAlts ec)
+        alts <- local r (mapM da $ eCaseAlts ec)
         nty <- f (eCaseType ec)
         return  ec { eCaseScrutinee = e', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts, eCaseType = nty }
     lp lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == 0 || (allShadow && n `notElem` freeVars e) = do

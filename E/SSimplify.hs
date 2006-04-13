@@ -566,13 +566,14 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
     --    f sc { eCaseScrutinee = scrut } sub inb
     doCase e t b as d inb = do
         b' <- nname b inb
-        let dd e' = f e' (insertDoneSubst b (EVar b') $ envInScope_u (newinb `union`) inb) where
+        let ids = insertDoneSubst b (EVar b')
+        let dd e' = f e' ( ids $ envInScope_u (newinb `union`) inb) where
                 na = NotAmong [ n | Alt (LitCons n _ _) _ <- as]
                 newinb = fromList [ (n,na) | EVar (TVr { tvrIdent = n }) <- [e,EVar b']]
             da (Alt (LitInt n t) ae) = do
                 t' <- dosub inb t
                 let p' = LitInt n t'
-                e' <- f ae (mins e (patToLitEE p') inb)
+                e' <- f ae (ids $ mins e (patToLitEE p') inb)
                 return $ Alt p' e'
             da (Alt (LitCons n ns t) ae) = do
                 t' <- dosub inb t
@@ -580,7 +581,7 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
                 let p' = LitCons n ns' t'
                     nsub =  [ (n,Done (EVar t))  | TVr { tvrIdent = n } <- ns | t <- ns' ]
                     ninb = fromList [ (n,NotKnown)  | TVr { tvrIdent = n } <- ns' ]
-                e' <- f ae (substAddList nsub (envInScope_u (ninb `union`) $ mins e (patToLitEE p') inb))
+                e' <- f ae (ids $ substAddList nsub (envInScope_u (ninb `union`) $ mins e (patToLitEE p') inb))
                 return $ Alt p' e'
             mins (EVar v) e = envInScope_u (minsert (tvrIdent v) (isBoundTo Many e))
             mins _ _ = id
@@ -590,6 +591,7 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
         t' <- dosub inb t
         return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind =  b', eCaseAlts = as', eCaseDefault = d'}
 
+    doConstCase :: {- Out -} Lit E E -> InE -> InTVr -> [Alt E] -> Maybe InE -> Env -> SM OutE
     doConstCase l t b as d inb = do
         t' <- dosub inb t
         mr <- match l as (b,d)
@@ -602,13 +604,13 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
             Nothing -> do
                 return $ EError ("match falls off bottom: " ++ pprint l) t'
 
-    match m@(LitCons c xs _) ((Alt (LitCons c' bs _) e):rs) d | c == c' = do
+    match m@(LitCons c xs _) ((Alt (LitCons c' bs _) e):rs) d@(b,_) | c == c' = do
         mtick (toAtom $ "E.Simplify.known-case." ++ show c )
-        return $ Just ((zip bs xs),e)
+        return $ Just ((b,ELit m):(zip bs xs),e)
          | otherwise = match m rs d
-    match m@(LitInt a _) ((Alt (LitInt b _) e):rs) d | a == b = do
-        mtick (toAtom $ "E.Simplify.known-case." ++ show a)
-        return $ Just ([],e)
+    match m@(LitInt x _) ((Alt (LitInt y _) e):rs) d@(b,_) | x == y = do
+        mtick (toAtom $ "E.Simplify.known-case." ++ show x)
+        return $ Just ([(b,ELit m)],e)
          | otherwise = match m rs d
     match l [] (b,Just e) = do
         mtick (toAtom "E.Simplify.known-case._")

@@ -492,6 +492,7 @@ compileModEnv' stats (initialHo,finalHo) = do
             ts' = takeWhile (sortStarLike . getType) ts
         when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
     lintCheckProgram onerrNone prog
+    prog <- programPrune prog
     --wdump FD.Lambdacube $ printProgram prog
 
     cmethods <- do

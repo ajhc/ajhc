@@ -324,7 +324,9 @@ expandPlaceholder (tvr,oe) | getProperty prop_PLACEHOLDER tvr = do
     let (oe',as) = fromLam oe
         rule1:_ = rules
         ct = getType $ foldr ELam oe' (drop (length $ ruleArgs rule1) as)
-        as'@(a:ras) = take (length $ ruleArgs rule1) as
+        as'@(a:ras)
+                | (a:ras) <- take (length $ ruleArgs rule1) as = (a:ras)
+                | otherwise = error $ pprint (tvr,(oe,show rule1))
         ne = emptyCase {
             eCaseScrutinee = EVar a,
             eCaseAlts = map calt rules,

@@ -332,13 +332,12 @@ letBindAll  dataTable modName e = f e  where
         e' <- g e
         return $ ELetRec ds' e'
     f ec@ECase {} = do
-        ec' <- caseBodiesMapM g ec
         let mv = case eCaseScrutinee ec of
                 EVar v -> subst (eCaseBind ec) (EVar v)
                 _ -> id
-            nd = fmap mv (eCaseDefault ec')
+        ec' <- caseBodiesMapM (fmap mv . g) ec
         scrut' <- g (eCaseScrutinee ec)
-        return ec' { eCaseScrutinee = scrut', eCaseDefault = nd }
+        return ec' { eCaseScrutinee = scrut' }
     f e@ELam {} = do
         let (b,ts) = fromLam e
         b' <- g b
