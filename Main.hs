@@ -11,6 +11,7 @@ import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified System
+import IO(hFlush,stderr,stdout)
 
 import C.FromGrin
 import CharIO
@@ -79,8 +80,8 @@ import qualified Stats
 -- ∀α∃β . α → β
 ---------------
 
-progress str = wdump FD.Progress (putErrLn str)
-progressM c  = wdump FD.Progress (c >>= putErrLn)
+progress str = wdump FD.Progress $  (putErrLn str) >> hFlush stderr
+progressM c  = wdump FD.Progress $ (c >>= putErrLn) >> hFlush stderr
 
 
 bracketHtml action = do
@@ -211,6 +212,7 @@ processDecls stats ho ho' tiData = do
     let prog = program {
             progClassHierarchy = hoClassHierarchy allHo,
             progDataTable = fullDataTable,
+            progClosed = False,
             progExternalNames = fromList [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ],
             progModule = head (fsts $ tiDataModules tiData)
             }
@@ -272,47 +274,64 @@ processDecls stats ho ho' tiData = do
     -- floating inward
 
     initialPassStats <- Stats.new
+    let sopt = mempty {
+            SS.so_boundVars = fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)],
+            SS.so_dataTable = fullDataTable
+            }
 
     let fint (rec,ns) = do
         let names = [ n | (n,_) <- ns]
         when (dump FD.Lambdacube || dump FD.Pass) $ putErrLn ("----\n" ++ pprint names)
         mstats <- Stats.new
-        let mprog = programSetDs ns prog { progStats = mempty, progEntryPoints = fsts ns, progExternalNames = progExternalNames prog `mappend` (fromList $ map tvrIdent $ fsts (programDs prog)) }
+        let mprog = programSetDs ns prog {
+            progStats = mempty,
+            progClosed = True,
+            progEntryPoints = fsts ns,
+            progExternalNames = progExternalNames prog `mappend` (fromList $ map tvrIdent $ fsts (programDs prog))
+            }
+        progress "eta annotating"
         mprog <- return $ etaAnnotateProgram mprog
-        let sopt = mempty {
-                SS.so_boundVars = fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)],
-                SS.so_exports = map tvrIdent $ progEntryPoints mprog,
-                SS.so_dataTable = fullDataTable
-                }
-        mprog <- etaExpandProg mprog
         mprog <- simplifyProgram sopt "SuperSimplify" False mprog
-        mprog <- barendregtProg mprog
-        mprog <- transformProgram "typeAnalyze" False (dump FD.Pass) (typeAnalyze True) mprog
-        --mprog <- transformProgram "floatOutward" False (dump FD.Pass) floatOutward mprog
-        mprog <- barendregtProg mprog
-        mprog <- simplifyProgram sopt "SuperSimplify" False mprog
+        --mprog <- barendregtProg mprog
+        --mprog <- transformProgram "typeAnalyze" False (dump FD.Pass) (typeAnalyze True) mprog
+        mprog <- transformProgram "floatOutward" False (dump FD.Pass) floatOutward mprog
+        --mprog <- barendregtProg mprog
+        --mprog <- simplifyProgram sopt "SuperSimplify" False mprog
         mprog <- barendregtProg mprog
         mprog <- transformProgram "float inward" False (dump FD.Pass) (programMapBodies (return . floatInward allRules)) mprog
         let ns = programDs mprog
         ns <- E.Strictness.solveDs ns
         mprog <- return $ programSetDs ns mprog
         lintCheckProgram onerrNone mprog
-        mprog <- simplifyProgram sopt "SuperSimplify" False mprog
-        mprog <- barendregtProg mprog
+        --mprog <- simplifyProgram sopt "SuperSimplify" False mprog
+        --mprog <- barendregtProg mprog
         Stats.tickStat mstats (progStats mprog)
-        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
-        wdump FD.Pass $
-            Stats.print ("InitialOptimize:" ++ pprint names) mstats
         Stats.combine initialPassStats mstats
+        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
+        wdump FD.Pass $ Stats.print ("InitialOptimize:" ++ pprint names) mstats
         wdump FD.Progress $ putErr (if rec then "*" else ".")
         return (programDs mprog)
     lintCheckProgram onerrNone prog
     progress "Initial optimization pass"
+
+
     prog <- programMapRecGroups initMap (const return) (const return) (const return) fint prog
     progress "!"
+    hFlush stdout >> hFlush stderr
+
     wdump FD.Progress $
         Stats.print "Initial Pass Stats" initialPassStats
     lintCheckProgram onerrNone prog
+    progress "Big Simplify"
+    prog <- barendregtProg prog
+    prog <- simplifyProgram sopt "SuperSimplify" True prog
+    prog <- barendregtProg prog
+    progress "Big Type Anasysis"
+    prog <- transformProgram "typeAnalyze" False (dump FD.Pass) (typeAnalyze True) prog
+    prog <- barendregtProg prog
+    --prog <- simplifyProgram sopt "SuperSimplify" True prog
+
+    progress "Big Eta Expansion"
     prog <- etaExpandProg prog
 
     -- This is the main function that optimizes the routines before writing them out
@@ -324,7 +343,7 @@ processDecls stats ho ho' tiData = do
         --putStrLn "*** After annotate"
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
         let cm stats e = do
-            let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = smap, SS.so_dataTable = fullDataTable }
+            let sopt = mempty {  SS.so_boundVars = smap, SS.so_dataTable = fullDataTable }
             let (e',_) = SS.collectOccurance' e
             let (stat, e'') = SS.simplifyE sopt e'
             wdump FD.Pass $ printCheckName fullDataTable e''
@@ -370,7 +389,7 @@ processDecls stats ho ho' tiData = do
         let mangle = mangle' (Just $ namesInscope' `union` fromList (map (tvrIdent . fst) cds')) fullDataTable
         let dd  (ds,used) (v,lc) = do
                 let cm stats e = do
-                    let sopt = mempty { SS.so_exports = inscope, SS.so_boundVars = fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `union` smap,  SS.so_dataTable = fullDataTable }
+                    let sopt = mempty {  SS.so_boundVars = fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `union` smap,  SS.so_dataTable = fullDataTable }
                     let (e',_) = SS.collectOccurance' e
                     let (stat, e'') = SS.simplifyE sopt e'
                     wdump FD.Pass $ printCheckName fullDataTable e''
@@ -481,7 +500,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
     (_,main,mainv) <- getMainFunction dataTable mainFunc (programEsMap prog)
     prog <- return prog { progMainEntry = main, progEntryPoints = [main], progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog] }
-    prog <- transformProgram "Initial Prune Unreachable" False False (return . programPruneUnreachable) prog
+    prog <- transformProgram "Initial Prune Unreachable" False True (return . programPruneUnreachable) prog
     prog <- barendregtProg prog
 
     --wdump FD.Lambdacube $ printProgram prog
@@ -530,17 +549,20 @@ compileModEnv' stats (initialHo,finalHo) = do
     --prog <- barendregtProg prog
 
     -- make sure properties and are attached everywhere
+    progress "Annotate After prune"
     prog <- return $ runIdentity $ annotateProgram mempty (idann mempty (hoProps ho) ) letann lamann prog
 
 
 
-    prog <- simplifyProgram mempty "SuperSimplify" True prog
+    prog <- simplifyProgram mempty "SuperSimplify pass 1" True prog
     prog <- barendregtProg prog
 
 
     st <- Stats.new
+    progress "Eta expanding"
     prog <- etaExpandProg prog
     prog <- barendregtProg prog
+    progress "Type Analysis"
     prog <- transformProgram "typeAnalyze" False True (typeAnalyze True) prog
 
     --ne <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) (programE prog)
