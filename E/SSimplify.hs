@@ -342,11 +342,11 @@ dosub inb e = coerceOpt return $ substMap'' (envCachedSubst inb) e
 
 simplifyE :: SimplifyOpts -> InE -> (Stat,OutE)
 simplifyE sopts e = (stat,e') where
-    (stat,[(_,e')]) =  simplifyDs program sopts [(tvrSilly,e)]
+    Identity (stat,[(_,e')]) =  simplifyDs program sopts [(tvrSilly,e)]
 
 programSSimplify :: SimplifyOpts -> Program -> Program
-programSSimplify sopts prog =
-    let (stats,dsIn) = simplifyDs prog sopts (programDs prog)
+programSSimplify sopts prog = let
+    Identity (stats,dsIn) = simplifyDs prog sopts (programDs prog)
     in (programSetDs dsIn prog) { progStats = progStats prog `mappend` stats }
 
 
@@ -355,15 +355,17 @@ type OutE = E
 type InTVr = TVr
 type OutTVr = TVr
 
-type SM = IdNameT (StatT Identity)
+type SM m = IdNameT (StatT m)
 
-simplifyDs :: Program -> SimplifyOpts -> [(TVr,E)] -> (Stat,[(TVr,E)])
-simplifyDs prog sopts dsIn = (stat,dsOut) where
+simplifyDs :: forall m . Monad m => Program -> SimplifyOpts -> [(TVr,E)] -> m (Stat,[(TVr,E)])
+simplifyDs prog sopts dsIn = ans where
+    ans = do
+        ((dsOut,_),stat) <- runStatT (runIdNameT doit)
+        return (stat,dsOut)
     exportedSet = fromList $ map tvrIdent (progEntryPoints prog) :: IdSet
     getType e = infertype (so_dataTable sopts) e
     initialB = mempty { envInScope =  fmap (\e -> isBoundTo Many e) (so_boundVars sopts) }
     initialB' = mempty { envInScope =  fmap (\e -> NotKnown) (so_boundVars sopts) }
-    ((dsOut,_),stat)  = runIdentity $ runStatT (runIdNameT doit)
     doit = do
         addNamesIdSet (progUsedIds prog)
         addBoundNamesIdSet (progFreeIds prog)
@@ -376,11 +378,11 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
 --                            else f e initialB
 --                return (t,e')
 --        mapM g ds'
-    go :: E -> Env -> IdNameT (StatT Identity) E
+    go :: E -> Env -> SM m E
     go e inb = do
         let (e',_) = collectOccurance' e
         f e' (cacheSubst inb { envSubst = mempty })
-    f :: InE -> Env -> IdNameT (StatT Identity) OutE
+    f :: InE -> Env -> SM m OutE
     f e inb | (ELam t b,(x:xs)) <- fromAp e = do
         xs' <- mapM (dosub inb) xs
         b' <- f b (insertSuspSubst t x inb) -- minsert (tvrIdent t) (Susp x sub) sub) inb
@@ -464,7 +466,7 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
         n' <- uniqueName n
         return $ tvr { tvrIdent = n', tvrType =  t'' }
     -- TODO - case simplification
-    doCase :: OutE -> InE -> InTVr -> [Alt InE] -> (Maybe InE) -> Env -> SM OutE
+    doCase :: OutE -> InE -> InTVr -> [Alt InE] -> (Maybe InE) -> Env -> SM m OutE
     doCase (ELetRec ds e) t b as d inb = do
         mtick "E.Simplify.let-from-case"
         e' <- doCase e t b as d inb
@@ -560,7 +562,7 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
         t' <- dosub inb t
         return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind =  b', eCaseAlts = as', eCaseDefault = d'}
 
-    doConstCase :: {- Out -} Lit E E -> InE -> InTVr -> [Alt E] -> Maybe InE -> Env -> SM OutE
+    doConstCase :: {- Out -} Lit E E -> InE -> InTVr -> [Alt E] -> Maybe InE -> Env -> SM m OutE
     doConstCase l t b as d inb = do
         t' <- dosub inb t
         mr <- match l as (b,d)
@@ -591,7 +593,7 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
     match m as d = error $ "Odd Match: " ++ show ((m,getType m),as,d)
 
 
-    applyRule :: OutTVr -> [OutE] -> Env -> SM (Maybe (OutE,[OutE]))
+    applyRule :: OutTVr -> [OutE] -> Env -> SM m (Maybe (OutE,[OutE]))
     applyRule v xs inb  = do
         z <- builtinRule v xs
         let lup x = case mlookup x (envInScope inb) of
@@ -600,7 +602,7 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
         case z of
             Nothing | fopts FO.Rules -> applyRules lup (Info.fetch (tvrInfo v)) xs
             x -> return x
-    h :: OutE -> [OutE] -> Env -> SM OutE
+    h :: OutE -> [OutE] -> Env -> SM m OutE
     h (EVar v) xs' inb = do
         z <- applyRule v xs' inb
         case (z,forceNoinline v) of
@@ -629,7 +631,7 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
                 -- Nothing | tvrIdent v `Set.member` exports -> app (EVar v,xs')
                 -- Nothing -> error $ "Var not in scope: " ++ show v
     h e xs' inb = do app (e,xs')
-    didInline :: Env -> OutE -> [OutE] -> SM OutE
+    didInline :: Env -> OutE -> [OutE] -> SM m OutE
     didInline inb z zs = do
         e <- app (z,zs)
         return e
