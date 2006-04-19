@@ -60,6 +60,12 @@ scc (Graph g ln kv fn) = map decode forest where
     decode other = Right (dec other [])
     dec (Node v ts) vs = ln v:foldr dec vs ts
 
+components :: Graph n k -> [[n]]
+components (Graph g ln kv fn) = map decode forest where
+    forest = Data.Graph.scc g
+    decode n = dec n []
+    dec (Node v ts) vs = ln v:foldr dec vs ts
+
 
 reachable :: Graph n k -> [k] -> [n]
 reachable (Graph g ln kv _) ns = map ln $ snub $  concatMap (Data.Graph.reachable g) gs where
