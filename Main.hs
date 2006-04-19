@@ -289,7 +289,7 @@ processDecls stats ho ho' tiData = do
             progEntryPoints = fsts ns,
             progExternalNames = progExternalNames prog `mappend` (fromList $ map tvrIdent $ fsts (programDs prog))
             }
-        progress "eta annotating"
+        --progress "eta annotating"
         mprog <- return $ etaAnnotateProgram mprog
         mprog <- simplifyProgram sopt "SuperSimplify" False mprog
         --mprog <- barendregtProg mprog
@@ -517,20 +517,20 @@ compileModEnv' stats (initialHo,finalHo) = do
     cmethods <- do
         let es' = concatMap expandPlaceholder (programDs prog)
         --es' <- createMethods dataTable (hoClassHierarchy ho) (programEsMap prog)
-        let initMap = fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- programDs prog, not $ t `Set.member` tmap]
-            tmap = Set.fromList [ t | (t,_) <- es' ]
-        let Identity es'' = annotateDs initMap (idann mempty (hoProps ho) ) letann lamann es'
-        es' <- return [ (y,floatInward undefined z) |  (y,z) <- es'' ]
+        --let initMap = fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- programDs prog, not $ t `Set.member` tmap]
+        --    tmap = Set.fromList [ t | (t,_) <- es' ]
+        --let Identity es'' = annotateDs initMap (idann mempty (hoProps ho) ) letann lamann es'
+        es' <- return [ (y,floatInward undefined z) |  (y,z) <- es' ]
         wdump FD.Class $ do
             sequence_ [ printCheckName' dataTable y z |  (y,z) <- es']
         return es'
 
     prog <- return $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
     prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) letann (\_ nfo -> return nfo) prog
-    prog <- programPrune prog
 
 
     unless (fopts FO.GlobalOptimize) $ do
+        prog <- programPrune prog
         prog <- barendregtProg prog
         wdump FD.LambdacubeBeforeLift $ printProgram prog
         finalStats <- Stats.new
@@ -549,9 +549,11 @@ compileModEnv' stats (initialHo,finalHo) = do
     --prog <- barendregtProg prog
 
     -- make sure properties and are attached everywhere
-    progress "Annotate After prune"
-    prog <- return $ runIdentity $ annotateProgram mempty (idann mempty (hoProps ho) ) letann lamann prog
+    --progress "Annotate After prune"
+    --prog <- return $ runIdentity $ annotateProgram mempty (idann mempty (hoProps ho) ) letann lamann prog
 
+    prog <- transformProgram "typeAnalyze after method" False True (typeAnalyze True) prog
+    prog <- barendregtProg prog
 
 
     prog <- simplifyProgram mempty "SuperSimplify pass 1" True prog
@@ -559,10 +561,8 @@ compileModEnv' stats (initialHo,finalHo) = do
 
 
     st <- Stats.new
-    progress "Eta expanding"
     prog <- etaExpandProg prog
     prog <- barendregtProg prog
-    progress "Type Analysis"
     prog <- transformProgram "typeAnalyze" False True (typeAnalyze True) prog
 
     --ne <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) (programE prog)
@@ -954,6 +954,7 @@ printCheckName'' dataTable tvr e = do
     when (not tmatch || dump FD.EVerbose) $
         putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
     putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
+
 
 
 
