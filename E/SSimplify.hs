@@ -9,6 +9,7 @@ module E.SSimplify(
 
 import Control.Monad.Identity
 import Control.Monad.Writer
+import Control.Monad.Reader
 import Data.FunctorM
 import Data.Generics
 import Data.Monoid
@@ -66,12 +67,12 @@ data Occurance =
 programPruneOccurance :: Program -> Program
 programPruneOccurance prog =
     let dsIn = programDs (runIdentity $ programMapBodies (return . subst (tVr (-1) Unknown) Unknown) prog)
-        (dsIn',(OMap fvs,uids)) = runReaderWriter (unOM $ collectDs dsIn $ if progClosed prog then mempty else fromList $ map (flip (,) Many) (map (tvrIdent . fst) dsIn)) ()
+        (dsIn',(OMap fvs,uids)) = runReaderWriter (unOM $ collectDs dsIn $ if progClosed prog then mempty else fromList $ map (flip (,) Many) (map (tvrIdent . fst) dsIn)) (fromList $ map tvrIdent $ progEntryPoints prog)
     in (programSetDs dsIn' prog) { progFreeIds = idMapToIdSet fvs, progUsedIds = uids }
 
 
-newtype OM a = OM (ReaderWriter () (OMap,IdSet) a)
-    deriving(Monad,Functor,MonadWriter (OMap,IdSet))
+newtype OM a = OM (ReaderWriter IdSet (OMap,IdSet) a)
+    deriving(Monad,Functor,MonadWriter (OMap,IdSet),MonadReader IdSet)
 
 unOM (OM a) = a
 
@@ -93,7 +94,7 @@ grump m = fmap ( \ (x, (y,z)) -> (x,y) ) $ censor (\ (_,y) -> (mempty,y)) (liste
 
 collectOccurance' :: E -> (E,IdMap Occurance)
 collectOccurance' e = (fe,omap) where
-    (fe,(OMap omap,_)) = runReaderWriter (unOM $ collectOccurance e) ()
+    (fe,(OMap omap,_)) = runReaderWriter (unOM $ collectOccurance e) mempty
 
 collectOccurance :: E -> OM E -- ^ (annotated expression, free variables mapped to their occurance info)
 collectOccurance e = f e  where
@@ -199,8 +200,9 @@ unOMap (OMap x) = x
 collectDs :: [Bind] -> OMap -> OM [Bind]
 collectDs ds (OMap fve) = do
     ds' <- mapM (grump . collectBinding) ds
+    exp <- ask
     let graph = newGraph ds' (\ ((t,_),_) -> tvrIdent t) (\ (_,fv) -> mkeys fv)
-        rds = reachable graph (mkeys fve ++ [ tvrIdent t | (t,_) <- ds, getProperty prop_EXPORTED t])
+        rds = reachable graph (mkeys fve ++ [ tvrIdent t | (t,_) <- ds, getProperty prop_EXPORTED t || (tvrIdent t `member` exp)])
         graph' = newGraph rds (\ ((t,_),_) -> tvrIdent t) (\ (_,fv) -> mkeys fv)
         (lb,ds'') =  findLoopBreakers (\ ((t,e),_) -> loopFunc t e) (const True) graph'
         fids = foldl andOM mempty (fve:map unOMap (snds ds''))
@@ -212,7 +214,7 @@ collectDs ds (OMap fve) = do
             | otherwise = t
         lup t = case tvrIdent t `elem` [ tvrIdent t | ((t,_),_) <- lb] of
             True -> LoopBreaker
-            False -> case getProperty prop_EXPORTED t of
+            False -> case getProperty prop_EXPORTED t || (tvrIdent t `member` exp) of
                 True -> Many
                 False | Just r <- mlookup (tvrIdent t) fids -> r
         ds''' = [ (calcStrictInfo $ annbind ffids t ,e) | ((t,e),_) <- ds'']
@@ -250,8 +252,7 @@ data SimplifyOpts = SimpOpts {
     so_noInlining :: Bool,                 -- ^ this inhibits all inlining inside functions which will always be inlined
     so_finalPhase :: Bool,                 -- ^ no rules and don't inhibit inlining
     so_boundVars :: IdMap E,
-    so_dataTable :: DataTable,             -- ^ the data table
-    so_exports :: [Int]
+    so_dataTable :: DataTable              -- ^ the data table
     }
     {-! derive: Monoid !-}
 
@@ -358,21 +359,23 @@ type SM = IdNameT (StatT Identity)
 
 simplifyDs :: Program -> SimplifyOpts -> [(TVr,E)] -> (Stat,[(TVr,E)])
 simplifyDs prog sopts dsIn = (stat,dsOut) where
+    exportedSet = fromList $ map tvrIdent (progEntryPoints prog) :: IdSet
     getType e = infertype (so_dataTable sopts) e
     initialB = mempty { envInScope =  fmap (\e -> isBoundTo Many e) (so_boundVars sopts) }
     initialB' = mempty { envInScope =  fmap (\e -> NotKnown) (so_boundVars sopts) }
-    (dsOut,stat)  = runIdentity $ runStatT (runIdNameT doit)
+    ((dsOut,_),stat)  = runIdentity $ runStatT (runIdNameT doit)
     doit = do
         addNamesIdSet (progUsedIds prog)
         addBoundNamesIdSet (progFreeIds prog)
         addBoundNamesIdMap (so_boundVars sopts)
         ds' <- sequence [etaExpandDef' (so_dataTable sopts) t e | (t,e) <- dsIn ]
-        let g (t,e) = do
-                e' <- if not (so_finalPhase sopts) && forceInline t  then
-                        f e initialB'  -- ^ do not inline into functions which themself will be inlined
-                            else f e initialB
-                return (t,e')
-        mapM g ds'
+        doDs ds' initialB
+--        let g (t,e) = do
+--                e' <- if not (so_finalPhase sopts) && forceInline t  then
+--                        f e initialB'  -- ^ do not inline into functions which themself will be inlined
+--                            else f e initialB
+--                return (t,e')
+--        mapM g ds'
     go :: E -> Env -> IdNameT (StatT Identity) E
     go e inb = do
         let (e',_) = collectOccurance' e
@@ -434,38 +437,7 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
         e' <- f e (insertDoneSubst v (EVar v') . envInScope_u (minsert (tvrIdent v') NotKnown) $ inb) --        minsert (tvrIdent v) (Done $ EVar v') sub)
         return $ ELam v' e'
     g (ELetRec ds@(_:_) e) inb = do
-        addNames $ map (tvrIdent . fst) ds
-        let z (t,EVar t') | t == t' = do    -- look for simple loops and replace them with errors.
-                t'' <- nname t inb
-                mtick $ "E.Simplify.<<loop>>.{" ++ showName (tvrIdent t) ++ "}"
-                return (tvrIdent t,Many,t'',EError "<<loop>>" (getType t))
-            z (t,e) = do
-                t' <- nname t inb
-                case Info.lookup (tvrInfo t) of
-                    _ | forceNoinline t -> return (tvrIdent t,LoopBreaker,t',e)
-                    Just Once -> return (tvrIdent t,Once,error $ "Once: " ++ show t,e)
-                    Just n -> return (tvrIdent t,n,t',e)
-                    -- We don't want to inline things we don't have occurance info for because they might lead to an infinite loop. hopefully the next pass will fix it.
-                    Nothing -> return (tvrIdent t,LoopBreaker,t',e)
-                    -- Nothing -> error $ "No Occurance info for " ++ show t
-            w ((t,Once,t',e):rs) inb ds = do
-                mtick $ "E.Simplify.inline.Once.{" ++ showName t ++ "}"
-                w rs (insertSuspSubst' t e inb) ds -- (minsert t (Susp e sub) sub) inb ds
-            w ((t,n,t',e):rs) inb ds = do
-                e' <- f e inb
-                case isAtomic e' && n /= LoopBreaker of
-                    True -> do
-                        when (n /= Unused) $ mtick $ "E.Simplify.inline.Atomic.{" ++ showName t ++ "}"
-                        w rs (insertDoneSubst' t e' . envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) $ inb) ds -- ((t',e'):ds) -- (minsert t (Done e') sub) (envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) ((t',e'):ds)
-                    -- False | worthStricting e', Strict <- Info.lookup (tvrInfo t') -> w rs sub
-                    False -> w rs (if n /= LoopBreaker then (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
-            w [] inb ds = return (ds,inb)
-        ds <- sequence [ etaExpandDef' (so_dataTable sopts) t e | (t,e) <- ds]
-        s' <- mapM z ds
-        let
-            --sub'' = {- Map.fromList [ (t,Susp e sub'') | (t,Once,_,e) <- s'] `Map.union`-} ([ (t,Done (EVar t'))  | (t,n,t',_) <- s', n /= Once]) `union` sub
-            sub'' = fromList [ (t,susp e sub'') | (t,Once,_,e) <- s'] `union` fromList [ (t,Done (EVar t'))  | (t,n,t',_) <- s', n /= Once] `union` envSubst inb
-        (ds',inb') <- w s'  (cacheSubst (envSubst_s sub'' $ envInScope_u (fromList [ (tvrIdent t',NotKnown) | (_,n,t',_) <- s', n /= Once] `union`) inb)) []
+        (ds',inb') <- doDs ds inb
         e' <- f e inb'
         case ds' of
             [(t,e)] | worthStricting e, Just (Strict.S _) <- Info.lookup (tvrInfo t), not (getProperty prop_CYCLIC t) -> do
@@ -637,7 +609,10 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
             _ -> case mlookup (tvrIdent v) (envInScope inb) of
                 Just IsBoundTo { bindingOccurance = LoopBreaker } -> appVar v xs'
                 Just IsBoundTo { bindingOccurance = Once } -> error "IsBoundTo: Once"
-                Just IsBoundTo { bindingE = e } | forceInline v -> do
+                Just IsBoundTo { bindingE = e } | not (forceNoinline v), isAtomic e  -> do
+                    mtick  (toAtom $ "E.Simplify.inline.atomic.{" ++ tvrShowName v  ++ "}")
+                    didInline inb e xs'
+                Just IsBoundTo { bindingE = e } | not (so_finalPhase sopts), forceInline v, someBenefit v e xs' -> do
                     mtick  (toAtom $ "E.Simplify.inline.forced.{" ++ tvrShowName v  ++ "}")
                     didInline inb e xs'
                 Just IsBoundTo { bindingOccurance = OnceInLam, bindingE = e, bindingCheap = True } | someBenefit v e xs' -> do
@@ -686,11 +661,50 @@ simplifyDs prog sopts dsIn = (stat,dsOut) where
         return $ EError s (foldl eAp t xs)
     app' e as = do
         return $ foldl EAp e as
+    doDs ds inb = do
+        addNames $ map (tvrIdent . fst) ds
+        let z (t,EVar t') | t == t' = do    -- look for simple loops and replace them with errors.
+                t'' <- nname t inb
+                mtick $ "E.Simplify.<<loop>>.{" ++ showName (tvrIdent t) ++ "}"
+                return (tvrIdent t,Many,t'',EError "<<loop>>" (getType t))
+            z (t,e) = do
+                t' <- nname t inb
+                case Info.lookup (tvrInfo t) of
+                    _ | forceNoinline t -> return (tvrIdent t,LoopBreaker,t',e)
+                    Just Once -> return (tvrIdent t,Once,error $ "Once: " ++ show t,e)
+                    Just n -> return (tvrIdent t,n,t',e)
+                    -- We don't want to inline things we don't have occurance info for because they might lead to an infinite loop. hopefully the next pass will fix it.
+                    Nothing -> return (tvrIdent t,LoopBreaker,t',e)
+                    -- Nothing -> error $ "No Occurance info for " ++ show t
+            w ((t,Once,t',e):rs) inb ds = do
+                mtick $ "E.Simplify.inline.Once.{" ++ showName t ++ "}"
+                w rs (insertSuspSubst' t e inb) ds -- (minsert t (Susp e sub) sub) inb ds
+            w ((t,n,t',e):rs) inb ds = do
+                let inb' = if not (so_finalPhase sopts) && forceInline t' then envInScope_u (fmap (const NotKnown)) inb else inb
+                e' <- f e inb'
+--                w rs (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) ((t',e'):ds)
+                w rs (if n /= LoopBreaker then (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
+                case isAtomic e' && n /= LoopBreaker && t `notMember` exportedSet  of
+                    True -> do
+                        when (n /= Unused) $ mtick $ "E.Simplify.inline.Atomic.{" ++ showName t ++ "}"
+                        w rs (insertDoneSubst' t e' . envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) $ inb) ds -- ((t',e'):ds) -- (minsert t (Done e') sub) (envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) ((t',e'):ds)
+                    --False -> w rs (if n /= LoopBreaker then (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
+                    False -> w rs (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb)  ((t',e'):ds)
+            w [] inb ds = return (ds,inb)
+        ds <- sequence [ etaExpandDef' (so_dataTable sopts) t e | (t,e) <- ds]
+        s' <- mapM z ds
+        let sub'' = fromList [ (t,susp e sub'') | (t,Once,_,e) <- s'] `union` fromList [ (t,Done (EVar t'))  | (t,n,t',_) <- s', n /= Once] `union` envSubst inb
+        (ds',inb') <- w s'  (cacheSubst (envSubst_s sub'' $ envInScope_u (fromList [ (tvrIdent t',NotKnown) | (_,n,t',_) <- s', n /= Once] `union`) inb)) []
+        return (ds',inb')
 
 
 
+someBenefit _ e _ | isAtomic e = True
 someBenefit _ ELit {} _ = True
+someBenefit _ EPi {} _ = True
 someBenefit _ EPrim {} _ = True
+someBenefit v (ELetRec ds e) xs | someBenefit v e xs = True
+someBenefit _v ECase {} _ = True
 someBenefit _ e xs | f e xs = True where
     f (ELam _ e) (x:xs) = f e xs
     f ELam {} [] = False
