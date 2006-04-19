@@ -738,6 +738,13 @@ simplifyProgram sopt name dodump prog = do
     when ((dodump && dump FD.Progress) || dump FD.Pass) $ Stats.printStat name (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
+simplifyProgramPStat sopt name dodump prog = do
+    let istat = progStats prog
+    let g =  SS.programSSimplifyPStat sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
+    prog <- transformProgram ("PS:" ++ name) True dodump g prog  { progStats = mempty }
+    when ((dodump && dump FD.Progress) || dump FD.Pass) $ Stats.printStat name (progStats prog)
+    return prog { progStats = progStats prog `mappend` istat }
+
 -- all transformation routines assume they are being passed a correct program, and only check the output
 
 transformProgram ::
