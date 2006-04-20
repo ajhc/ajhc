@@ -719,7 +719,12 @@ buildShowTableLL xs = buildTableLL [ (show x,show y) | (x,y) <- xs ]
 
 simplifyProgram sopt name dodump prog = do
     let istat = progStats prog
-    let g =  return . SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
+    let g prog = do
+            let nprog = SS.programPruneOccurance prog
+            when (corePass && dodump) $ do
+                putStrLn "-- After Occurance Analysis"
+                printProgram nprog
+            return $ SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } nprog
     prog <- transformProgram name IterateDone dodump g prog  { progStats = mempty }
     when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printStat ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
