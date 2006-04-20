@@ -300,6 +300,11 @@ processDecls stats ho ho' tiData = do
         mprog <- simplifyProgram sopt "SuperSimplify" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
         mprog <- transformProgram "floatOutward" DontIterate (dump FD.CoreMini) floatOutward mprog
+        -- perform another supersimplify in order to substitute the once used
+        -- variables back in and replace the variable of case of variables with
+        -- the default binding of the case statement.
+
+        mprog <- simplifyProgram sopt "Simplify FloatOutCleanup" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
         mprog <- transformProgram "float inward" DontIterate (dump FD.CoreMini) (programMapBodies (return . floatInward)) mprog
         let ns = programDs mprog
