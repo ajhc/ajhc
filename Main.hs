@@ -155,7 +155,7 @@ barendregtProgram prog = programSetDs ds' prog where
 
 
 barendregtProg prog = do
-    transformProgram "Barendregt" DontIterate (dump FD.Pass) (return . barendregtProgram) prog
+    transformProgram "Barendregt" DontIterate (dump FD.CorePass) (return . barendregtProgram) prog
 
 
 lamann _ nfo = return nfo
@@ -281,7 +281,7 @@ processDecls stats ho ho' tiData = do
 
     let fint (rec,ns) = do
         let names = [ n | (n,_) <- ns]
-        when (dump FD.Lambdacube || dump FD.Pass) $ putErrLn ("----\n" ++ pprint names)
+        when (dump FD.Lambdacube || dump FD.CorePass) $ putErrLn ("----\n" ++ pprint names)
         mstats <- Stats.new
         let mprog = programSetDs ns prog {
             progStats = mempty,
@@ -293,9 +293,9 @@ processDecls stats ho ho' tiData = do
         mprog <- return $ etaAnnotateProgram mprog
         mprog <- simplifyProgram sopt "SuperSimplify" False mprog
         mprog <- barendregtProg mprog
-        mprog <- transformProgram "floatOutward" DontIterate (dump FD.Pass) floatOutward mprog
+        mprog <- transformProgram "floatOutward" DontIterate (dump FD.CorePass) floatOutward mprog
         mprog <- barendregtProg mprog
-        mprog <- transformProgram "float inward" DontIterate (dump FD.Pass) (programMapBodies (return . floatInward allRules)) mprog
+        mprog <- transformProgram "float inward" DontIterate (dump FD.CorePass) (programMapBodies (return . floatInward allRules)) mprog
         let ns = programDs mprog
         ns <- E.Strictness.solveDs ns
         mprog <- return $ programSetDs ns mprog
@@ -304,8 +304,8 @@ processDecls stats ho ho' tiData = do
         --mprog <- barendregtProg mprog
         Stats.tickStat mstats (progStats mprog)
         Stats.combine initialPassStats mstats
-        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
-        wdump FD.Pass $ Stats.print ("InitialOptimize:" ++ pprint names) mstats
+        when (dump FD.CoreMini && dump FD.CorePass) $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
+        when (dump FD.CoreMini && dump FD.CoreSteps) $ Stats.print ("InitialOptimize:" ++ pprint names) mstats
         wdump FD.Progress $ putErr (if rec then "*" else ".")
         return (programDs mprog)
     lintCheckProgram onerrNone prog
@@ -335,7 +335,7 @@ processDecls stats ho ho' tiData = do
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
         let names = [ n | (n,_) <- ns]
         let namesInscope' = fromDistinctAscList (mkeys smap) `union` namesInscope
-        when (dump FD.Lambdacube || dump FD.Pass) $ putErrLn ("----\n" ++ pprint names)
+        when (dump FD.Lambdacube || dump FD.CorePass) $ putErrLn ("----\n" ++ pprint names)
         cds <- annotateDs annmap (idann allRules mempty) letann lamann [ (t,e) | (t,e) <- ns]
         --putStrLn "*** After annotate"
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
@@ -343,7 +343,7 @@ processDecls stats ho ho' tiData = do
             let sopt = mempty {  SS.so_boundVars = smap, SS.so_dataTable = fullDataTable }
             let (e',_) = SS.collectOccurance' e
             let (stat, e'') = SS.simplifyE sopt e'
-            wdump FD.Pass $ printCheckName fullDataTable e''
+            wdump FD.CorePass $ printCheckName fullDataTable e''
             Stats.tickStat stats stat
             return e''
         let mangle = mangle' (Just $ namesInscope' `union` fromList (map (tvrIdent . fst) cds)) fullDataTable
@@ -388,7 +388,7 @@ processDecls stats ho ho' tiData = do
                     let sopt = mempty {  SS.so_boundVars = fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `union` smap,  SS.so_dataTable = fullDataTable }
                     let (e',_) = SS.collectOccurance' e
                     let (stat, e'') = SS.simplifyE sopt e'
-                    wdump FD.Pass $ printCheckName fullDataTable e''
+                    wdump FD.CorePass $ printCheckName fullDataTable e''
                     Stats.tickStat stats stat
                     return e''
                 let (lc', _) = runRename used lc
@@ -447,12 +447,12 @@ programPruneUnreachable prog = programSetDs ds' prog where
     ds' = reachable (newGraph (programDs prog) (tvrIdent . fst) (\ (t,e) -> idSetToList $ bindingFreeVars t e)) (map tvrIdent $ progEntryPoints prog)
 
 programPrune :: Program -> IO Program
-programPrune prog = transformProgram "Prune Unreachable" DontIterate (dump FD.Pass) (return . programPruneUnreachable) prog
+programPrune prog = transformProgram "Prune Unreachable" DontIterate (dump FD.CorePass) (return . programPruneUnreachable) prog
 
 etaExpandProg :: Program -> IO Program
 etaExpandProg prog = do
     let (prog',stats) = Stats.runStatM $  etaExpandProgram prog
-    transformProgram "eta expansion" DontIterate (dump FD.Pass) (const $ return prog' { progStats = progStats prog' `mappend` stats }) prog
+    transformProgram "eta expansion" DontIterate (dump FD.CorePass) (const $ return prog' { progStats = progStats prog' `mappend` stats }) prog
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
 shouldBeExported exports tvr
@@ -524,11 +524,11 @@ compileModEnv' stats (initialHo,finalHo) = do
     unless (fopts FO.GlobalOptimize) $ do
         prog <- programPrune prog
         prog <- barendregtProg prog
-        wdump FD.LambdacubeBeforeLift $ printProgram prog
+        wdump FD.CoreBeforelift $ printProgram prog
         finalStats <- Stats.new
         prog <- transformProgram "lambda lift" DontIterate (dump FD.Progress) (lambdaLift finalStats) prog
         wdump FD.Progress $ Stats.print "PostLifting" finalStats
-        wdump FD.Lambdacube $ printProgram prog -- printCheckName dataTable (programE prog)
+        wdump FD.CoreAfterlift $ printProgram prog -- printCheckName dataTable (programE prog)
         compileToGrin prog
         exitSuccess
 
@@ -567,7 +567,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- barendregtProg prog
 
     -- perform lambda lifting
-    wdump FD.LambdacubeBeforeLift $ printProgram prog
+    wdump FD.CoreBeforelift $ printProgram prog
     finalStats <- Stats.new
     prog <- transformProgram "lambda lift" DontIterate (dump FD.Progress) (lambdaLift finalStats) prog
 
@@ -586,7 +586,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- return $ prog { progCombinators = rs' }
 
 
-    wdump FD.Lambdacube $ printProgram prog -- printCheckName dataTable (programE prog)
+    wdump FD.CoreAfterlift $ printProgram prog -- printCheckName dataTable (programE prog)
 
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     wdump FD.Progress $ printEStats (programE prog)
@@ -597,7 +597,7 @@ compileToGrin prog = do
     stats <- Stats.new
     progress "Converting to Grin..."
     prog <- Mangle.mangle prog
-    wdump FD.MangledCore $ printUntypedProgram prog -- printCheckName dataTable (programE prog)
+    wdump FD.CoreMangled $ printUntypedProgram prog -- printCheckName dataTable (programE prog)
     x <- Grin.FromE.compile prog
     Stats.print "Grin" Stats.theStats
     wdump FD.GrinInitial $ do
@@ -614,7 +614,7 @@ compileToGrin prog = do
         stats' <- Stats.new
         nf <- mapMsnd (grinPush stats') (grinFunctions x)
         x <- return x { grinFunctions = nf }
-        wdump FD.Steps $ printGrin x
+        wdump FD.GrinPass $ printGrin x
         x <- Grin.Simplify.simplify stats' x
         lintCheckGrin x
         t' <- Stats.getTicks stats'
@@ -710,21 +710,21 @@ simplifyProgram sopt name dodump prog = do
     let istat = progStats prog
     let g =  return . SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
     prog <- transformProgram name IterateDone dodump g prog  { progStats = mempty }
-    when ((dodump && dump FD.Progress) || dump FD.Pass) $ Stats.printStat name (progStats prog)
+    when ((dodump && dump FD.Progress) || dump FD.CorePass) $ Stats.printStat name (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
 simplifyProgramPStat sopt name dodump prog = do
     let istat = progStats prog
     let g =  SS.programSSimplifyPStat sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
     prog <- transformProgram ("PS:" ++ name) IterateDone dodump g prog  { progStats = mempty }
-    when ((dodump && dump FD.Progress) || dump FD.Pass) $ Stats.printStat name (progStats prog)
+    when ((dodump && dump FD.Progress) || dump FD.CorePass) $ Stats.printStat name (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
 simplifyProgram' sopt name dodump iterate prog = do
     let istat = progStats prog
     let g =  return . SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
     prog <- transformProgram name iterate dodump g prog  { progStats = mempty }
-    when ((dodump && dump FD.Progress) || dump FD.Pass) $ Stats.printStat name (progStats prog)
+    when ((dodump && dump FD.Progress) || dump FD.CorePass) $ Stats.printStat name (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
 -- all transformation routines assume they are being passed a correct program, and only check the output
@@ -753,7 +753,7 @@ transformProgram _ (IterateMax n) _ _ prog | n <= 0 = return prog
 transformProgram _ (IterateExactly n) _ _ prog | n <= 0 = return prog
 transformProgram name iterate dodump f prog = do
     when dodump $ putErrLn $ "-- " ++ name
-    when (dodump && dump FD.Steps) $ printProgram prog
+    when (dodump && dump FD.CorePass) $ printProgram prog
     let istat = progStats prog
     let ferr e = do
         putErrLn $ "\n>>> Exception thrown"
@@ -770,7 +770,7 @@ transformProgram name iterate dodump f prog = do
             printProgram prog
             Stats.printStat name estat
             putErrLn $ "\n>>> After " ++ name
-    when (dodump && dump FD.Steps) $ Stats.printStat name estat
+    when (dodump && dump FD.CoreSteps) $ Stats.printStat name estat
     lintCheckProgram onerr prog'
     if doIterate iterate estat then transformProgram name (iterateStep iterate) dodump f prog' { progStats = istat `mappend` estat } else
         return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
@@ -786,7 +786,7 @@ doopt mangle dmp stats name func lc = do
     case t'  of
         0 -> return lc
         _ -> do
-            when ((dmp && dump FD.Progress) || dump FD.Pass) $ Stats.print "Optimization" stats'
+            when ((dmp && dump FD.Progress) || dump FD.CoreSteps) $ Stats.print "Optimization" stats'
             Stats.combine stats stats'
             doopt mangle dmp stats name func lc
 
@@ -801,7 +801,7 @@ mangle' ::
     -> E                -- ^ What to mangle
     -> IO E             -- ^ Out it comes
 mangle'  fv dataTable erraction b  s action e = do
-    when ((b && dump FD.Progress) || dump FD.Pass) $ putErrLn $ "-- " ++ s
+    when ((b && dump FD.Progress) || dump FD.CorePass) $ putErrLn $ "-- " ++ s
     e' <- action e
     if not flint then return e' else do
         let ufreevars e | Just as <- fv = filter ( not . (`member` as) . tvrIdent) (freeVars e)

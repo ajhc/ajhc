@@ -32,18 +32,21 @@ tyvar show original tyvars rather than renaming them.
 
 !Intermediate code
 initial-core show core right after E.FromHs conversion
-lambdacube show intermediate lambda cube code
-lambdacube-before-lift show intermediate lambda cube code just before lambda lifting
-pass show optimization passes over intermediate code
-datatable show data table of constructors
+lambdacube  show intermediate lambda cube code
+datatable   show data table of constructors
 optimization-stats show combined stats of optimization passes
-rules show all rules
+rules       show all rules
 e-info show info tags on all bound variables
-e-verbose print very verbose version of E code always
+e-verbose   print very verbose version of E code always
+core-pass   show each iteration of code while transforming
+core-steps  show what happens in each pass
+core-mini   show details even when optimizing individual functions
+core-beforelift show core before lambdalifting
+core-afterlift  show final core before writing ho file
+core-mangled de-typed core right before it is converted to grin
 
 
 !Grin code
-mangled-core de-typed core right before it is converted to grin
 tags list of all tags and their types
 grin-preeval show grin code just before eval/apply inlining
 grin-posteval show grin code just before eval/apply inlining
@@ -52,6 +55,8 @@ grin-initial grin right after conversion from core
 grin-normalized grin right after first normalization
 steps show interpreter go
 eval show detailed eval inlining info
+grin-pass  show each iteration of code while transforming
+grin-steps show what happens in each transformation
 
 !General
 @verbose progress
