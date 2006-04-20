@@ -507,7 +507,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
     (_,main,mainv) <- getMainFunction dataTable mainFunc (programEsMap prog)
     prog <- return prog { progMainEntry = main, progEntryPoints = [main], progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog] }
-    prog <- transformProgram "Initial Prune Unreachable" DontIterate True (return . programPruneUnreachable) prog
+    prog <- transformProgram "Initial Prune Unreachable" DontIterate False (return . programPruneUnreachable) prog
     prog <- barendregtProg prog
 
     --wdump FD.Lambdacube $ printProgram prog
