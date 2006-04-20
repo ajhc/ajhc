@@ -288,14 +288,23 @@ susp:: E -> Subst -> Range
 susp e sub =  Susp e sub undefined -- (substMap'' (fmap mkSubst sub) e)
 
 insertSuspSubst :: TVr -> InE -> Env -> Env
-insertSuspSubst t e env = cacheSubst env { envSubst = minsert (tvrIdent t) (susp e (envSubst env)) (envSubst env) }
+insertSuspSubst t e env = insertSuspSubst' (tvrIdent t) e env
+
 insertSuspSubst' :: Id -> InE -> Env -> Env
+insertSuspSubst' 0 _e env = env
 insertSuspSubst' t e env = cacheSubst env { envSubst = minsert t (susp e (envSubst env)) (envSubst env) }
 
 insertDoneSubst :: TVr -> OutE -> Env -> Env
-insertDoneSubst t e env = cacheSubst env { envSubst = minsert (tvrIdent t) (Done e) (envSubst env) }
+insertDoneSubst t e env = insertDoneSubst' (tvrIdent t) e env
+
 insertDoneSubst' :: Id -> OutE -> Env -> Env
+insertDoneSubst' 0 _e env = env
 insertDoneSubst' t e env = cacheSubst env { envSubst = minsert t (Done e) (envSubst env) }
+
+
+insertInScope :: Id -> Binding -> Env -> Env
+insertInScope 0 _b env = env
+insertInScope t b env = cacheSubst env { envInScope = minsert t b (envInScope env) }
 
 substLookup :: Id -> Env -> Maybe Range
 substLookup id env = mlookup id (envSubst env)
@@ -443,7 +452,7 @@ simplifyDs prog sopts dsIn = ans where
     g (ELam v e) inb  = do
         addNames [tvrIdent v]
         v' <- nname v inb
-        e' <- f e (insertDoneSubst v (EVar v') . envInScope_u (minsert (tvrIdent v') NotKnown) $ inb) --        minsert (tvrIdent v) (Done $ EVar v') sub)
+        e' <- f e (insertDoneSubst v (EVar v') . insertInScope (tvrIdent v') NotKnown $ inb) --        minsert (tvrIdent v) (Done $ EVar v') sub)
         return $ ELam v' e'
     g (ELetRec ds@(_:_) e) inb = do
         (ds',inb') <- doDs ds inb
@@ -497,7 +506,7 @@ simplifyDs prog sopts dsIn = ans where
                 e' <- doCase e t b' as' d' (cacheSubst $ envInScope_u (fromList [ (n,NotKnown) | TVr { tvrIdent = n } <- litBinds l ] `union`) inb)
                 return (Alt l e')
             --g e >>= return . Alt l
-            g x = doCase x t b' as' d' (cacheSubst $ envInScope_u (minsert (tvrIdent b) NotKnown) inb)
+            g x = doCase x t b' as' d' (insertInScope (tvrIdent b) NotKnown inb)
         as'' <- mapM f as
         d'' <- fmapM g d
         t' <- dosub inb t
@@ -527,7 +536,7 @@ simplifyDs prog sopts dsIn = ans where
     doCase e _ b [] (Just d) inb | not (isLifted e || isUnboxed (getType e)) = do
         mtick "E.Simplify.case-unlifted"
         b' <- nname b inb
-        d' <- f d (insertDoneSubst b (EVar b') (envInScope_u  (minsert (tvrIdent b') (isBoundTo Many e)) inb)) -- minsert (tvrIdent b) (Done (EVar b')) sub) (envInScope_u  (minsert (tvrIdent b') (isBoundTo Many e)) inb)
+        d' <- f d (insertDoneSubst b (EVar b') (insertInScope (tvrIdent b') (isBoundTo Many e) inb))
         return $ eLet b' e d'
     -- atomic unboxed values may be substituted or discarded without replicating work or affecting program semantics.
     doCase e _ b [] (Just d) inb | isUnboxed (getType e), isAtomic e = do
@@ -544,10 +553,12 @@ simplifyDs prog sopts dsIn = ans where
     --    f sc { eCaseScrutinee = scrut } sub inb
     doCase e t b as d inb = do
         b' <- nname b inb
-        let ids = insertDoneSubst b (EVar b')
+        let ids = case e of
+                EVar v -> insertDoneSubst b (EVar b') . insertInScope (tvrIdent v) (isBoundTo Many (EVar b'))
+                _ -> insertDoneSubst b (EVar b')
         let dd e' = f e' ( ids $ envInScope_u (newinb `union`) inb) where
                 na = NotAmong [ n | Alt (LitCons n _ _) _ <- as]
-                newinb = fromList [ (n,na) | EVar (TVr { tvrIdent = n }) <- [e,EVar b']]
+                newinb = fromList [ (n,na) | EVar (TVr { tvrIdent = n }) <- [EVar b']]
             da (Alt (LitInt n t) ae) = do
                 t' <- dosub inb t
                 let p' = LitInt n t'
@@ -561,8 +572,9 @@ simplifyDs prog sopts dsIn = ans where
                     ninb = fromList [ (n,NotKnown)  | TVr { tvrIdent = n } <- ns' ]
                 e' <- f ae (ids $ substAddList nsub (envInScope_u (ninb `union`) $ mins e (patToLitEE p') inb))
                 return $ Alt p' e'
-            mins (EVar v) e = envInScope_u (minsert (tvrIdent v) (isBoundTo Many e))
-            mins _ _ = id
+            --mins (EVar v) e = envInScope_u (minsert (tvrIdent v) (isBoundTo Many e))
+            mins _ e = insertInScope (tvrIdent b') (isBoundTo Many e)
+            --mins _ _ = id
 
         d' <- fmapM dd d
         as' <- mapM da as
@@ -693,7 +705,7 @@ simplifyDs prog sopts dsIn = ans where
             w ((t,n,t',e):rs) inb ds = do
                 let inb' = if not (so_finalPhase sopts) && forceInline t' then (cacheSubst $ envInScope_u (fmap (const NotKnown)) inb) else inb
                 e' <- f e inb'
-                w rs (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb)  ((t',e'):ds)
+                w rs (insertInScope (tvrIdent t') (isBoundTo n e') inb)  ((t',e'):ds)
 --                w rs (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) ((t',e'):ds)
                 --w rs (if n /= LoopBreaker then (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
                 --case isAtomic e' && n /= LoopBreaker && t `notMember` exportedSet  of
