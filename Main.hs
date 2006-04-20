@@ -631,9 +631,15 @@ compileToGrin prog = do
     wdump FD.MangledCore $ printUntypedProgram prog -- printCheckName dataTable (programE prog)
     x <- Grin.FromE.compile prog
     Stats.print "Grin" Stats.theStats
-    wdump FD.GrinInitial $ printGrin x
+    wdump FD.GrinInitial $ do
+        putErrLn "v-- Initial Grin"
+        printGrin x
+        putErrLn "^-- Initial Grin"
     x <- return $ normalizeGrin x
-    wdump FD.GrinNormalized $ printGrin x
+    wdump FD.GrinNormalized $ do
+        putErrLn "v-- Normalized Grin"
+        printGrin x
+        putErrLn "^-- Normalized Grin"
     lintCheckGrin x
     let opt s  x = do
         stats' <- Stats.new
