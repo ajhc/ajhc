@@ -161,7 +161,7 @@ collectOccurance e = f e  where
         l <- arg (fmapM f l)
         let fvs' = foldr mdelete fvs (map tvrIdent $ litBinds l)
             l' = mapLitBinds (annbind' fvs) l
-        tell (fvs',fromList $ map tvrIdent (litBinds l))
+        tell (fvs',fromList $ map tvrIdent (litBinds l'))
         return (Alt l' e')
     arg m = do
         let mm (OMap mp,y) = (OMap $ fmap (const Many) mp,y)
@@ -506,7 +506,7 @@ simplifyDs prog sopts dsIn = ans where
     nname tvr@(TVr { tvrIdent = n, tvrType =  t}) inb  = do
         t' <- dosub inb t
         let t'' = substMap'' (fmap (\ IsBoundTo { bindingE = e } -> Just e) $ mfilter isIsBoundTo (envInScope inb)) t'
-        n' <- uniqueName n
+        n' <- if n == 0 then return 0 else uniqueName n
         return $ tvr { tvrIdent = n', tvrType =  t'' }
     -- TODO - case simplification
     doCase :: OutE -> InE -> InTVr -> [Alt InE] -> (Maybe InE) -> Env -> SM m OutE
