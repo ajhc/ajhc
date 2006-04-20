@@ -580,9 +580,13 @@ simplifyDs prog sopts dsIn = ans where
     --    f sc { eCaseScrutinee = scrut } sub inb
     doCase e t b as d inb = do
         b' <- nname b inb
-        let ids = case e of
-                EVar v -> insertDoneSubst b (EVar b') . insertInScope (tvrIdent v) (isBoundTo Many (EVar b'))
-                _ -> insertDoneSubst b (EVar b')
+        (ids,b') <- case (e,tvrIdent b') of
+            (EVar v,0) -> do
+                nn <- newName
+                b' <- return b' { tvrIdent = nn }
+                return $ (insertInScope (tvrIdent v) (isBoundTo Many (EVar b')),b')
+            (EVar v,_) -> return $ (insertDoneSubst b (EVar b') . insertInScope (tvrIdent v) (isBoundTo Many (EVar b')),b')
+            _ -> return $ (insertDoneSubst b (EVar b'),b')
         let dd e' = f e' ( ids $ envInScope_u (newinb `union`) inb) where
                 na = NotAmong [ n | Alt (LitCons n _ _) _ <- as]
                 newinb = fromList [ (n,na) | EVar (TVr { tvrIdent = n }) <- [EVar b']]
@@ -600,7 +604,8 @@ simplifyDs prog sopts dsIn = ans where
                 e' <- f ae (ids $ substAddList nsub (envInScope_u (ninb `union`) $ mins e (patToLitEE p') inb))
                 return $ Alt p' e'
             --mins (EVar v) e = envInScope_u (minsert (tvrIdent v) (isBoundTo Many e))
-            mins _ e = insertInScope (tvrIdent b') (isBoundTo Many e)
+            mins _ e | 0 `notMember` (freeVars e :: IdSet) = insertInScope (tvrIdent b') (isBoundTo Many e)
+            mins _ _ = id
             --mins _ _ = id
 
         d' <- fmapM dd d
@@ -743,8 +748,8 @@ simplifyDs prog sopts dsIn = ans where
                 let ibt = fixInline finalPhase t' $ isBoundTo n e'
                 case (bindingAtomic ibt,inlineForced ibt) of
                     (True,f) | f /= ForceNoinline -> do
-                        when (n /= Unused) $ mtick $ "E.Simplify.inline.Atomic.{" ++ showName t ++ "}"
-                        w rs (insertDoneSubst' t e' . insertInScope (tvrIdent t') (isBoundTo n e') $ inb) ds
+                        --when (n /= Unused) $ mtick $ "E.Simplify.inline.Atomic.{" ++ showName t ++ "}"
+                        w rs (insertDoneSubst' t e' . insertInScope (tvrIdent t') ibt $ inb) ((t',e'):ds)
                     _ -> w rs (insertInScope (tvrIdent t') ibt inb)  ((t',e'):ds)
 --                w rs (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) ((t',e'):ds)
                 --w rs (if n /= LoopBreaker then (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
@@ -768,7 +773,7 @@ someBenefit _ ELit {} _ = True
 someBenefit _ EPi {} _ = True
 someBenefit _ EPrim {} _ = True
 someBenefit v (ELetRec ds e) xs | someBenefit v e xs = True
-someBenefit _v ECase {} _ = True
+someBenefit _v ECase {} (_:_) = True
 someBenefit _ e xs | f e xs = True where
     f (ELam _ e) (x:xs) = f e xs
     f ELam {} [] = False
