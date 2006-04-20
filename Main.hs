@@ -324,10 +324,10 @@ processDecls stats ho ho' tiData = do
     lintCheckProgram onerrNone prog
     progress "Big Simplify"
     prog <- barendregtProg prog
-    prog <- simplifyProgram sopt "SuperSimplify" True prog
+    prog <- simplifyProgram' sopt "SuperSimplify" True (IterateMax 4) prog
     prog <- barendregtProg prog
     progress "Big Type Anasysis"
-    prog <- transformProgram "typeAnalyze" DontIterate (dump FD.Pass) (typeAnalyze True) prog
+    prog <- transformProgram "typeAnalyze" DontIterate True (typeAnalyze True) prog
     prog <- barendregtProg prog
     --prog <- simplifyProgram sopt "SuperSimplify" True prog
 
@@ -748,6 +748,13 @@ simplifyProgramPStat sopt name dodump prog = do
     let istat = progStats prog
     let g =  SS.programSSimplifyPStat sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
     prog <- transformProgram ("PS:" ++ name) IterateDone dodump g prog  { progStats = mempty }
+    when ((dodump && dump FD.Progress) || dump FD.Pass) $ Stats.printStat name (progStats prog)
+    return prog { progStats = progStats prog `mappend` istat }
+
+simplifyProgram' sopt name dodump iterate prog = do
+    let istat = progStats prog
+    let g =  return . SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
+    prog <- transformProgram name iterate dodump g prog  { progStats = mempty }
     when ((dodump && dump FD.Progress) || dump FD.Pass) $ Stats.printStat name (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
