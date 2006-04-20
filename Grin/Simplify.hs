@@ -277,7 +277,7 @@ optimize1 postEval (n,l) = g l where
     f (Store t :>>= v :-> Fetch v' :>>= lr) | v == v' = do
         mtick "Optimize.optimize.store-fetch"
         f (Store t :>>= v :-> Return t :>>= lr)
-    f (Store t :>>= v :-> Update  v' w :>>= lr) | v == v' = do
+    f (Store t :>>= v@(Var vr _) :-> Update  v' w :>>= lr) | v == v', vr `notElem` freeVars w = do
         mtick "Optimize.optimize.store-update"
         f (Store w :>>= v :-> Return unit :>>= lr)
     f (Update v t :>>= Tup [] :-> Fetch v' :>>= lr) | v == v' = do
