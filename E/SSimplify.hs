@@ -252,7 +252,7 @@ orMany xs = if all (== Once) xs then ManyBranch else Many
 data SimplifyOpts = SimpOpts {
     so_noInlining :: Bool,                 -- ^ this inhibits all inlining inside functions which will always be inlined
     so_finalPhase :: Bool,                 -- ^ no rules and don't inhibit inlining
-    so_boundVars :: IdMap E,
+    so_boundVars :: IdMap (TVr,E),         -- ^ bound variables
     so_dataTable :: DataTable              -- ^ the data table
     }
     {-! derive: Monoid !-}
@@ -413,9 +413,9 @@ simplifyDs prog sopts dsIn = ans where
     exportedSet = fromList $ map tvrIdent (progEntryPoints prog) :: IdSet
     getType e = infertype (so_dataTable sopts) e
     initialB = let
-            bb (t,e) | isFullyConst e = [(t,Done e)]
+            bb (t,(_,e)) | isFullyConst e = [(t,Done e)]
             bb _ = []
-        in cacheSubst mempty { envSubst = fromList $ concatMap bb  (massocs $ so_boundVars sopts),  envInScope =  fmap (\e -> isBoundTo Many e) (so_boundVars sopts) }
+        in cacheSubst mempty { envSubst = fromList $ concatMap bb  (massocs $ so_boundVars sopts),  envInScope =  fmap (\ (t,e) -> fixInline finalPhase t $ isBoundTo Many e) (so_boundVars sopts) }
     doit = do
         addNamesIdSet (progUsedIds prog)
         addBoundNamesIdSet (progFreeIds prog)

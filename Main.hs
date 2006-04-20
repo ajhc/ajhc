@@ -281,7 +281,7 @@ processDecls stats ho ho' tiData = do
 
     initialPassStats <- Stats.new
     let sopt = mempty {
-            SS.so_boundVars = fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)],
+            SS.so_boundVars = fromList [ (tvrIdent v,(v,e)) | (v,e) <- Map.elems (hoEs ho)],
             SS.so_dataTable = fullDataTable
             }
 
@@ -396,7 +396,7 @@ processDecls stats ho ho' tiData = do
         let mangle = mangle' (Just $ namesInscope' `union` fromList (map (tvrIdent . fst) cds')) fullDataTable
         let dd  (ds,used) (v,lc) = do
                 let cm stats e = do
-                    let sopt = mempty {  SS.so_boundVars = fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `union` smap,  SS.so_dataTable = fullDataTable }
+                    let sopt = mempty {  SS.so_boundVars = fromList [ (tvrIdent v,(v,lc)) | (v,lc) <- ds] `union` smap,  SS.so_dataTable = fullDataTable }
                     let (e',_) = SS.collectOccurance' e
                     let (stat, e'') = SS.simplifyE sopt e'
                     when miniCorePass  $ printCheckName fullDataTable e''
@@ -417,7 +417,7 @@ processDecls stats ho ho' tiData = do
         let nvls = [ (t,e)  | (t,e) <- cds ]
 
         wdump FD.Progress $ putErr (if rec then "*" else ".")
-        return (nvls ++ retds, (fromList [ (tvrIdent v,lc) | (v,lc) <- nvls] `union` smap, fromList [ (tvrIdent v,(Just (EVar v))) | (v,_) <- nvls] `union` annmap , idHist' ))
+        return (nvls ++ retds, (fromList [ (tvrIdent v,(v,lc)) | (v,lc) <- nvls] `union` smap, fromList [ (tvrIdent v,(Just (EVar v))) | (v,_) <- nvls] `union` annmap , idHist' ))
 
 
 
@@ -425,7 +425,7 @@ processDecls stats ho ho' tiData = do
         fscc (Left n) = (False,[n])
         fscc (Right ns) = (True,ns)
     progress "Optimization pass with workwrapping/CPR"
-    (ds,_) <- foldM f ([],(fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
+    (ds,_) <- foldM f ([],(fromList [ (tvrIdent v,(v,e)) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
     progress "!"
     prog <- return $ programSetDs ds prog
     prog <- programPrune prog
@@ -442,7 +442,7 @@ processDecls stats ho ho' tiData = do
         let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> idSetToList $ bindingFreeVars b c))
             fscc (Left n) = (False,[n])
             fscc (Right ns) = (True,ns)
-        (ds,_) <- foldM f ([],(fromList [ (tvrIdent v,e) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
+        (ds,_) <- foldM f ([],(fromList [ (tvrIdent v,(v,e)) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
         progress "!"
         return $ programSetDs ds prog
       else return prog
