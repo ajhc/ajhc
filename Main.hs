@@ -292,11 +292,8 @@ processDecls stats ho ho' tiData = do
         --progress "eta annotating"
         mprog <- return $ etaAnnotateProgram mprog
         mprog <- simplifyProgram sopt "SuperSimplify" False mprog
-        --mprog <- barendregtProg mprog
-        --mprog <- transformProgram "typeAnalyze" False (dump FD.Pass) (typeAnalyze True) mprog
+        mprog <- barendregtProg mprog
         mprog <- transformProgram "floatOutward" DontIterate (dump FD.Pass) floatOutward mprog
-        --mprog <- barendregtProg mprog
-        --mprog <- simplifyProgram sopt "SuperSimplify" False mprog
         mprog <- barendregtProg mprog
         mprog <- transformProgram "float inward" DontIterate (dump FD.Pass) (programMapBodies (return . floatInward allRules)) mprog
         let ns = programDs mprog
@@ -351,7 +348,6 @@ processDecls stats ho ho' tiData = do
             return e''
         let mangle = mangle' (Just $ namesInscope' `union` fromList (map (tvrIdent . fst) cds)) fullDataTable
         cds <- flip mapM cds $ \ (v,lc) -> do
-            --lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             lintCheckE onerrNone fullDataTable v lc
             (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable v lc)
             lc <- doopt mangle False stats ("SuperSimplify 1: " ++ pprint v) cm lc
@@ -516,10 +512,6 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     cmethods <- do
         let es' = concatMap expandPlaceholder (programDs prog)
-        --es' <- createMethods dataTable (hoClassHierarchy ho) (programEsMap prog)
-        --let initMap = fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- programDs prog, not $ t `Set.member` tmap]
-        --    tmap = Set.fromList [ t | (t,_) <- es' ]
-        --let Identity es'' = annotateDs initMap (idann mempty (hoProps ho) ) letann lamann es'
         es' <- return [ (y,floatInward undefined z) |  (y,z) <- es' ]
         wdump FD.Class $ do
             sequence_ [ printCheckName' dataTable y z |  (y,z) <- es']
@@ -546,11 +538,6 @@ compileModEnv' stats (initialHo,finalHo) = do
     let opt = doopt (mangle dataTable) True stats
     let showTVr t = prettyE (EVar t) <> show (tvrInfo t)
 
-    --prog <- barendregtProg prog
-
-    -- make sure properties and are attached everywhere
-    --progress "Annotate After prune"
-    --prog <- return $ runIdentity $ annotateProgram mempty (idann mempty (hoProps ho) ) letann lamann prog
 
     prog <- transformProgram "typeAnalyze after method" DontIterate True (typeAnalyze True) prog
     prog <- barendregtProg prog
@@ -565,12 +552,6 @@ compileModEnv' stats (initialHo,finalHo) = do
     prog <- barendregtProg prog
     prog <- transformProgram "typeAnalyze" DontIterate True (typeAnalyze True) prog
 
-    --ne <- mangle dataTable (return ()) True "Barendregt" (return . barendregt) (programE prog)
-
---    prog <- transformProgram "OccuranceAnalysis" True (return . SS.programPruneOccurance) prog
---    lc <- return $ programE prog
---    lc <- opt "SuperSimplify" cm lc
---    prog <- return $ programSetE lc prog
 
     prog <- barendregtProg prog
     prog <- simplifyProgram mempty "SuperSimplify pass 2" True prog
@@ -584,18 +565,6 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify no rules" True prog
     prog <- barendregtProg prog
---
---    let cm stats e = do
---        let sopt = mempty { SS.so_dataTable = dataTable }
---        let (stat, e') = SS.simplifyE sopt e
---        Stats.tickStat stats stat
---        return e'
---    prog <- transformProgram "OccuranceAnalysis" True (return . SS.programPruneOccurance) prog
---    lc <- return $ programE prog
---    lc <- opt "SuperSimplify no Rules" cm lc
---    prog <- return $ programSetE lc prog
---
---    prog <- barendregtProg prog
 
     -- perform lambda lifting
     wdump FD.LambdacubeBeforeLift $ printProgram prog
@@ -807,31 +776,6 @@ transformProgram name iterate dodump f prog = do
         return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
 
 
-
-mangle ::
-    DataTable                -- ^ the datatable used for typechecking
-    -> Maybe IdSet           -- ^ acceptable free variables
-    -> String                -- ^ the name of the pass
-    -> Bool                  -- ^ whether to dump progress
-    -> Int                   -- ^ maximum number of passes to run. -1 for unlimited
-    -> Stats.Stats                 -- ^ the stats to add results to
-    -> (Stats.Stats -> E -> IO E)  -- ^ the modification routine
-    -> E                     -- ^ the input term
-    -> IO E                  -- ^ out it comes
-mangle dataTable fv name dumpProgress count stats action e = do
-    --when ((dumpProgress && dump FD.Progress) || dump FD.Pass) $ putErrLn $ "-- " ++ name
-    let opt 0 e = return e
-        opt n e = do
-            stats' <- Stats.new
-            e' <- mangle' fv dataTable (Stats.print "stats" stats') dumpProgress name (action stats') e
-            t <- Stats.getTicks stats'
-            case t of
-                0 -> return e'
-                _ -> do
-                    when ((dumpProgress && dump FD.Progress) || dump FD.Pass) $ Stats.print "Optimization" stats'
-                    Stats.combine stats stats'
-                    opt (n - 1) e'
-    opt count e
 
 -- these are way to complicated and should be simplified
 
