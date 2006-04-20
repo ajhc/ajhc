@@ -35,7 +35,7 @@ ePrettyEx = ePretty
 showId :: DocLike d => Id -> d
 showId 0 = (char '_')
 showId i | Just x <- intToAtom i  = (text $ show  $ (fromAtom x :: Name))
-showId i = (text $ 'x':show i)
+showId i = (text $ 'v':show i)
 
 instance DocLike d => PPrint d TVr where
     pprint TVr { tvrIdent = i }  = showId i
@@ -194,17 +194,16 @@ showE e = do
         f ec@(ECase { eCaseScrutinee = e, eCaseAlts = alts }) = mt (showE (eCaseType ec)) $  allocTVr (eCaseBind ec) $ do
             scrut <- fmap unparse $ showE e
             alts <- mapM showAlt alts
+            let ecb = eCaseBind ec
+                isUsed = tvrIdent ecb `member` (freeVars (caseBodies ec) :: IdSet)
+            db <- showTVr (if dump FD.EVerbose || isUsed then ecb else ecb { tvrIdent = 0 })
             dcase <- case (eCaseDefault ec) of
                 Nothing -> return []
                 Just e -> do
-                    let ecb = eCaseBind ec
-
-                    db <- showTVr (if dump FD.EVerbose || (tvrIdent ecb `member` (freeVars e :: IdSet)) then ecb else ecb { tvrIdent = 0 })
                     e <- showE e
                     return [unparse db <+> UC.rArrow <+> unparse e]
             let alts' = map (<> bc ';') (alts ++ dcase)
-            ecb <- showTVr (eCaseBind ec)
-            let mbind | dump FD.EVerbose && isNothing (eCaseDefault ec) = unparse ecb <+> text "<-"
+            let mbind | isUsed || dump FD.EVerbose = unparse db <+> text "<-"
                       | otherwise = empty
             return $ fixitize ((L,(-10))) $ atom $
                 group ( nest 4 ( keyword "case" <+> mbind <+> scrut <+> keyword "of" <$>  (align $ vcat (alts'))) )
