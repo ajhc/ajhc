@@ -264,9 +264,18 @@ type Subst = IdMap Range
 
 type InScope = IdMap Binding
 
+data Forced = ForceInline | ForceNoinline | NotForced
+    deriving(Eq,Ord)
+
 data Binding =
     NotAmong [Name]
-    | IsBoundTo { bindingOccurance :: Occurance, bindingE :: OutE, bindingCheap :: Bool }
+    | IsBoundTo {
+        bindingOccurance :: Occurance,
+        bindingE :: OutE,
+        bindingCheap :: Bool,
+        inlineForced :: Forced,
+        bindingAtomic :: Bool
+        }
     | NotKnown
     deriving(Ord,Eq)
     {-! derive: is !-}
@@ -274,8 +283,30 @@ data Binding =
 isBoundTo o e = IsBoundTo {
     bindingOccurance = o,
     bindingE = e,
-    bindingCheap = isCheap e
-    }
+    bindingCheap = isCheap e,
+    inlineForced = if o == LoopBreaker then ForceNoinline else NotForced,
+    bindingAtomic = atomic
+    } where
+    atomic = isAtomic e
+
+
+instance Monoid Forced where
+    mempty = NotForced
+    mappend NotForced x = x
+    mappend x NotForced = x
+    mappend _ ForceNoinline = ForceNoinline
+    mappend ForceNoinline _ = ForceNoinline
+    mappend ForceInline ForceInline = ForceInline
+
+fixInline finalPhase v bt@IsBoundTo {} = bt { inlineForced = inlineForced bt `mappend` calcForced finalPhase v }  where
+
+calcForced finalPhase v =
+    case (forceNoinline v,finalPhase,forceInline v) of
+        (True,_,_) -> ForceNoinline
+        (False,True,_) -> NotForced
+        (False,False,True) -> ForceInline
+        (False,False,False) -> NotForced
+
 
 data Env = Env {
     envCachedSubst :: IdMap (Maybe E),
@@ -375,25 +406,21 @@ type SM m = IdNameT m
 
 simplifyDs :: forall m . MonadStats m => Program -> SimplifyOpts -> [(TVr,E)] -> m [(TVr,E)]
 simplifyDs prog sopts dsIn = ans where
+    finalPhase = so_finalPhase sopts
     ans = do
         (dsOut,_) <- (runIdNameT doit)
         return dsOut
     exportedSet = fromList $ map tvrIdent (progEntryPoints prog) :: IdSet
     getType e = infertype (so_dataTable sopts) e
-    initialB = mempty { envInScope =  fmap (\e -> isBoundTo Many e) (so_boundVars sopts) }
-    initialB' = mempty { envInScope =  fmap (\e -> NotKnown) (so_boundVars sopts) }
+    initialB = let
+            bb (t,e) | isFullyConst e = [(t,Done e)]
+            bb _ = []
+        in cacheSubst mempty { envSubst = fromList $ concatMap bb  (massocs $ so_boundVars sopts),  envInScope =  fmap (\e -> isBoundTo Many e) (so_boundVars sopts) }
     doit = do
         addNamesIdSet (progUsedIds prog)
         addBoundNamesIdSet (progFreeIds prog)
         addBoundNamesIdMap (so_boundVars sopts)
-        --ds' <- sequence [etaExpandDef' (so_dataTable sopts) t e | (t,e) <- dsIn ]
         doDs dsIn initialB
---        let g (t,e) = do
---                e' <- if not (so_finalPhase sopts) && forceInline t  then
---                        f e initialB'  -- ^ do not inline into functions which themself will be inlined
---                            else f e initialB
---                return (t,e')
---        mapM g ds'
     go :: E -> Env -> SM m E
     go e inb = do
         let (e',_) = collectOccurance' e
@@ -536,7 +563,7 @@ simplifyDs prog sopts dsIn = ans where
     doCase e _ b [] (Just d) inb | not (isLifted e || isUnboxed (getType e)) = do
         mtick "E.Simplify.case-unlifted"
         b' <- nname b inb
-        d' <- f d (insertDoneSubst b (EVar b') (insertInScope (tvrIdent b') (isBoundTo Many e) inb))
+        d' <- f d (insertDoneSubst b (EVar b') (insertInScope (tvrIdent b') (fixInline finalPhase b' $ isBoundTo Many e) inb))
         return $ eLet b' e d'
     -- atomic unboxed values may be substituted or discarded without replicating work or affecting program semantics.
     doCase e _ b [] (Just d) inb | isUnboxed (getType e), isAtomic e = do
@@ -624,16 +651,18 @@ simplifyDs prog sopts dsIn = ans where
     h :: OutE -> [OutE] -> Env -> SM m OutE
     h (EVar v) xs' inb = do
         z <- applyRule v xs' inb
-        case (z,forceNoinline v) of
-            (Just (x,xs),_) -> didInline inb x xs  -- h x xs inb
-            (_,True) -> app (EVar v, xs')
+        case z of
+            (Just (x,xs)) -> didInline inb x xs  -- h x xs inb
             _ -> case mlookup (tvrIdent v) (envInScope inb) of
-                Just IsBoundTo { bindingOccurance = LoopBreaker } -> appVar v xs'
+                Just IsBoundTo { inlineForced = ForceNoinline } -> appVar v xs'
                 Just IsBoundTo { bindingOccurance = Once } -> error "IsBoundTo: Once"
-                Just IsBoundTo { bindingE = e } | isAtomic e  -> do
+                Just IsBoundTo { bindingE = e, bindingAtomic = True }  -> do
                     mtick  (toAtom $ "E.Simplify.inline.atomic.{" ++ tvrShowName v  ++ "}")
                     didInline inb e xs'
-                Just IsBoundTo { bindingE = e } | not (so_finalPhase sopts), forceInline v, someBenefit v e xs' -> do
+                Just IsBoundTo { bindingE = e, inlineForced = ForceInline } | someBenefit v e xs' -> do
+                    mtick  (toAtom $ "E.Simplify.inline.Forced.{" ++ tvrShowName v  ++ "}")
+                    didInline inb e xs'
+                Just IsBoundTo { bindingE = e } | forceInline v, someBenefit v e xs' -> do
                     mtick  (toAtom $ "E.Simplify.inline.forced.{" ++ tvrShowName v  ++ "}")
                     didInline inb e xs'
                 Just IsBoundTo { bindingOccurance = OnceInLam, bindingE = e, bindingCheap = True } | someBenefit v e xs' -> do
@@ -703,9 +732,20 @@ simplifyDs prog sopts dsIn = ans where
                 mtick $ "E.Simplify.inline.Once.{" ++ showName t ++ "}"
                 w rs inb ds -- (minsert t (Susp e sub) sub) inb ds
             w ((t,n,t',e):rs) inb ds = do
-                let inb' = if not (so_finalPhase sopts) && forceInline t' then (cacheSubst $ envInScope_u (fmap (const NotKnown)) inb) else inb
+
+                let inb' = case isForced of
+                        ForceInline -> (cacheSubst $ envInScope_u (fmap nogrowth) inb)
+                        _ -> inb
+                    isForced = calcForced finalPhase t'
+                    nogrowth IsBoundTo { bindingAtomic = False } = NotKnown
+                    nogrowth x = x
                 e' <- f e inb'
-                w rs (insertInScope (tvrIdent t') (isBoundTo n e') inb)  ((t',e'):ds)
+                let ibt = fixInline finalPhase t' $ isBoundTo n e'
+                case (bindingAtomic ibt,inlineForced ibt) of
+                    (True,f) | f /= ForceNoinline -> do
+                        when (n /= Unused) $ mtick $ "E.Simplify.inline.Atomic.{" ++ showName t ++ "}"
+                        w rs (insertDoneSubst' t e' . insertInScope (tvrIdent t') (isBoundTo n e') $ inb) ds
+                    _ -> w rs (insertInScope (tvrIdent t') ibt inb)  ((t',e'):ds)
 --                w rs (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) ((t',e'):ds)
                 --w rs (if n /= LoopBreaker then (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb) else inb) ((t',e'):ds)
                 --case isAtomic e' && n /= LoopBreaker && t `notMember` exportedSet  of
