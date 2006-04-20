@@ -130,9 +130,12 @@ class SetLike m => MapLike k v m | m -> k v where
     mmember :: k -> m -> Bool
     mlookup :: Monad g => k -> m -> g v
     melems :: m -> [v]
+    massocs :: m -> [(k,v)]
     mkeys :: m -> [k]
     mfilter :: (v -> Bool) -> m -> m
     munionWith :: (v -> v -> v) -> m -> m -> m
+    mkeys = map fst . massocs
+    melems = map snd . massocs
 
 instance Ord a => MapLike Int a (IM.IntMap a) where
     mdelete = IM.delete
@@ -142,6 +145,7 @@ instance Ord a => MapLike Int a (IM.IntMap a) where
         Just x -> return x
     melems = IM.elems
     mkeys = IM.keys
+    massocs = IM.toList
     mfilter = IM.filter
     munionWith = IM.unionWith
 
@@ -151,6 +155,7 @@ instance Ord k => MapLike k v (M.Map k v) where
     mlookup = M.lookup
     melems = M.elems
     mkeys = M.keys
+    massocs = M.toList
     mfilter = M.filter
     munionWith = M.unionWith
 
