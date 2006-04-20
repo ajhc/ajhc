@@ -35,7 +35,7 @@ ePrettyEx = ePretty
 showId :: DocLike d => Id -> d
 showId 0 = (char '_')
 showId i | Just x <- intToAtom i  = (text $ show  $ (fromAtom x :: Name))
-showId i = (text $ 'v':show i)
+showId i = (text $ 'x':show i)
 
 instance DocLike d => PPrint d TVr where
     pprint TVr { tvrIdent = i }  = showId i
@@ -203,7 +203,7 @@ showE e = do
                     e <- showE e
                     return [unparse db <+> UC.rArrow <+> unparse e]
             let alts' = map (<> bc ';') (alts ++ dcase)
-            let mbind | isUsed || dump FD.EVerbose = unparse db <+> text "<-"
+            let mbind | (isUsed && isNothing (eCaseDefault ec)) || dump FD.EVerbose = unparse db <+> text "<-"
                       | otherwise = empty
             return $ fixitize ((L,(-10))) $ atom $
                 group ( nest 4 ( keyword "case" <+> mbind <+> scrut <+> keyword "of" <$>  (align $ vcat (alts'))) )
