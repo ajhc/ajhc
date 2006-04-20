@@ -250,6 +250,7 @@ combine postEval nty (Return (NodeC t xs)) = Return (tuple xs)
 combine postEval nty (Error s ty) = Error s nty
 combine postEval nty (Case x ls) = Case x (map (combineLam postEval nty) ls)
 combine postEval nty (e1 :>>= p :-> e2) = e1 :>>= p :-> combine postEval nty e2
+combine pe nty e = error $ "combine: " ++ show (pe,nty,e)
 combineLam postEval nty (p :-> e) = p :-> combine postEval nty e
 
 
@@ -259,12 +260,19 @@ isKnown NodeC {} = True
 isKnown Lit {} = True
 isKnown _ = False
 
+mapExp f (b :-> e) = b :-> f e
+
+sizeLam (b :-> exp) = sizeExp exp
+sizeExp (x :>>= y) = sizeExp x + sizeLam y
+sizeExp (Case e as) = 1 + sum (map sizeLam as)
+sizeExp x = 1
+
 optimize1 ::  Bool -> (Atom,Lam) -> StatM Lam
 optimize1 postEval (n,l) = g l where
     g (b :-> e) = f e >>= return . (b :->)
-    --f (e :>>= v1 :-> Return v2 :>>= lr) | (isTup v1 || isVar v1) && v1 == v2 = do
-    --    mtick "Optimize.optimize.unit-unit"
-    --    f (e :>>= lr)
+    f (Case e as :>>= lam)  | (sizeLam lam - 1) * length as <= 3 = do
+        mtick "Optimize.optimize.case-pullin"
+        return (Case e (map (mapExp (:>>= lam)) as))
     f (Return t@NodeC {} :>>= v@Var {} :-> Update w v' :>>= lr) | v == v' = do
         mtick "Optimize.optimize.return-update"
         f (Return t :>>= v :-> Update w t :>>= lr)
@@ -341,20 +349,20 @@ optimize1 postEval (n,l) = g l where
     f (Case x as :>>= v :-> rc@(Case v' as')) | v == v', count (== Nothing ) (Prelude.map (isManifestNode . lamExp) as) <= 1 = do
         ch <- caseHoist x as v as' (getType rc)
         f ch
-    f cs@(Case x as) | Just UnboxTag <- isCombinable postEval cs = do
+    f (cs@(Case x as) :>>= lr) | Just UnboxTag <- isCombinable postEval cs = do
         mtick "Optimize.optimize.case-unbox-tag"
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
             (va:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
-        f (Case x (map (combineLam postEval TyTag) as) :>>= Var va TyTag :-> Return (NodeV va []))
-    f cs@(Case x as) | Just (UnboxTup (t,ts)) <- isCombinable postEval cs = do
+        return ((Case x (map (combineLam postEval TyTag) as) :>>= Var va TyTag :-> Return (NodeV va [])) :>>= lr)
+    f (cs@(Case x as) :>>= lr) | Just (UnboxTup (t,ts)) <- isCombinable postEval cs = do
         mtick $ "Optimize.optimize.case-unbox-node.{" ++ show t
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
             vs = [ v | v <- [v1..], not $ v `Set.member` fv ]
             vars = [ Var v t | v <- vs | t <- ts ]
-        f (Case x (map (combineLam postEval (tuple ts)) as) :>>= tuple vars  :-> Return (NodeC t vars))
-    f cs@(Case x as) | Just (UnboxConst val) <- isCombinable postEval cs = do
+        return ((Case x (map (combineLam postEval (tuple ts)) as) :>>= tuple vars  :-> Return (NodeC t vars)) :>>= lr)
+    f (cs@(Case x as) :>>= lr) | Just (UnboxConst val) <- isCombinable postEval cs = do
         mtick $ "Optimize.optimize.case-unbox-const.{" ++ show val
-        f (Case x (map (combineLam postEval tyUnit) as) :>>= unit :-> Return val)
+        return ((Case x (map (combineLam postEval tyUnit) as) :>>= unit :-> Return val) :>>= lr)
     f cs@(Case x as) | postEval && all isEnum [ p | p :-> _ <- as] = do
         mtick "Optimize.optimize.case-enum"
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
