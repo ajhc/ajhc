@@ -301,7 +301,7 @@ processDecls stats ho ho' tiData = do
         mprog <- barendregtProg mprog
         mprog <- transformProgram "floatOutward" DontIterate (dump FD.CoreMini) floatOutward mprog
         mprog <- barendregtProg mprog
-        mprog <- transformProgram "float inward" DontIterate (dump FD.CoreMini) (programMapBodies (return . floatInward allRules)) mprog
+        mprog <- transformProgram "float inward" DontIterate (dump FD.CoreMini) (programMapBodies (return . floatInward)) mprog
         let ns = programDs mprog
         ns <- E.Strictness.solveDs ns
         mprog <- return $ programSetDs ns mprog
@@ -358,7 +358,7 @@ processDecls stats ho ho' tiData = do
             (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable v lc)
             lc <- doopt mangle coreMini stats ("SuperSimplify 1: " ++ pprint v) cm lc
             lc <- mangle (return ()) coreMini ("Barendregt: " ++ pprint v) (return . barendregt) lc
-            lc <- doopt mangle coreMini stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
+            lc <- doopt mangle coreMini stats "Float Inward..." (\stats x -> return (floatInward x)) lc
             lintCheckE onerrNone fullDataTable v lc
             return (v,lc)
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
@@ -518,7 +518,7 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     cmethods <- do
         let es' = concatMap expandPlaceholder (programDs prog)
-        es' <- return [ (y,floatInward undefined z) |  (y,z) <- es' ]
+        es' <- return [ (y,floatInward z) |  (y,z) <- es' ]
         wdump FD.Class $ do
             sequence_ [ printCheckName' dataTable y z |  (y,z) <- es']
         return es'

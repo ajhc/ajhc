@@ -143,20 +143,22 @@ fvBind (Right xs) = unions (snds xs)
 
 
 floatInward ::
-    Rules -- ^ rules to augment free variables of definitons
-    -> E  -- ^ input term
+    E  -- ^ input term
     -> E  -- ^ output term
-floatInward rules e = f e [] where
-    augment fvs = fvs
+floatInward e = floatInwardE e [] where
+
+
+
+floatInwardE e fvs = f e fvs where
     f ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault =  d } xs = letRec p' $ ec { eCaseScrutinee = (f e pe), eCaseAlts = [ Alt l (f e pn) | Alt l e <- as | pn <- ps ], eCaseDefault = (fmap (flip f pd) d)}  where
         (p',_:pe:pd:ps) = sepByDropPoint (mconcat [freeVars l | Alt l _ <- as ]:freeVars e: tvrIdent b `delete` freeVars d :[freeVars a | a <- as ]) xs
     f (ELetRec ds e) xs = g (G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- ds ] (tvrIdent . fst . fst) (idSetToList . snd) ) xs where
         g [] p' = f e p'
         g ((Left ((v,ev),fv)):xs) p = g xs (p0 ++ [Left ((v,ev'),bindingFreeVars v ev')] ++ p') where
             ev' = f ev pv
-            (p',[p0,pv,_]) = sepByDropPoint [augment (frest xs), bindingFreeVars v ev, freeVars (tvrType v)] p
+            (p',[p0,pv,_]) = sepByDropPoint [(frest xs), bindingFreeVars v ev, freeVars (tvrType v)] p
         g (Right bs:xs) p =  g xs (p0 ++ [Right [ let ev' = f ev pv in ((v,ev'),bindingFreeVars v ev') | ((v,ev),_) <- bs | pv <- ps ]] ++ p') where
-            (p',_:p0:ps) = sepByDropPoint (freeVars (map (tvrType . fst . fst) bs) :augment (frest xs):snds bs) p
+            (p',_:p0:ps) = sepByDropPoint (freeVars (map (tvrType . fst . fst) bs) :(frest xs):snds bs) p
         frest xs = mconcat (freeVars e:map fvBind xs)
     f e@ELam {} xs = letRec unsafe_to_dup (foldr ELam (f b safe_to_dup) ls) where
         (unsafe_to_dup,safe_to_dup) = sepDupableBinds (freeVars ls) xs
@@ -293,7 +295,7 @@ floatOutward prog = do
                     ELetRec ds e -> (e,ds++snds fs)
                     _ -> (e,snds fs)
                 -- we imediatly float inward to clean up cruft and spurious outwards floatings
-                (e'',fs'') = cDefs $ floatInward mempty (ELetRec fs' e')
+                (e'',fs'') = cDefs $ floatInward (ELetRec fs' e')
                 cDefs (ELetRec ds e) = (e',ds ++ ds') where
                     (e',ds') = cDefs e
                 cDefs e = (e,[])
