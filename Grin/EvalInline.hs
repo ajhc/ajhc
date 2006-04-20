@@ -20,7 +20,11 @@ import Support.CanType
 import Util.Once
 import Util.UniqueMonad
 
-data UpdateType = NoUpdate | TrailingUpdate | HoistedUpdate Val | SwitchingUpdate [Atom]
+data UpdateType =
+    NoUpdate                  -- ^ no update is performed
+    | TrailingUpdate          -- ^ an update is placed after the whole evaluation
+    | HoistedUpdate Val
+    | SwitchingUpdate [Atom]
 
 mapExp f (b :-> e) = b :-> f e
 
@@ -30,6 +34,9 @@ createEval shared  te ts'
 
     | null cs = p1 :-> Error "Empty Eval" TyNode
     | all tagIsWHNF [ t | t <- ts , tagIsTag t] = p1 :-> Fetch p1
+    | TrailingUpdate <- shared, [ot] <- ofts = p1 :->
+        Fetch p1 :>>= n2 :->
+        Case n2 (mapExp (:>>= n3 :-> Update p1 n3 :>>= unit :-> Return n3) (f ot):map f whnfts)
     | TrailingUpdate <- shared = p1 :->
         Fetch p1 :>>= n2 :->
         Case n2 cs :>>= n3 :->
@@ -39,10 +46,6 @@ createEval shared  te ts'
         Fetch p1 :>>= n2 :->
         Case n2 cs :>>= v :->
         Return (NodeC t [v])
-    | HoistedUpdate (NodeC t []) <- shared = p1 :->
-        Fetch p1 :>>= n2 :->
-        Case n2 cs :>>= Tup [] :->
-        Return (NodeC t [])
     | HoistedUpdate (NodeC t vs) <- shared = p1 :->
         Fetch p1 :>>= n2 :->
         Case n2 cs :>>= Tup vs :->
@@ -53,7 +56,6 @@ createEval shared  te ts'
     | SwitchingUpdate sts <- shared, [ot] <- ofts = p1 :->
         Fetch p1 :>>= n2 :->
         Case n2 (mapExp (:>>= sup p1 sts) (f ot):map f whnfts)
-
     | SwitchingUpdate sts <- shared = let
             lf = createEval NoUpdate te ts
             cu t | tagIsTag t && tagIsWHNF t = return ans where
@@ -78,9 +80,6 @@ createEval shared  te ts'
     g t vs
         | tagIsWHNF t, HoistedUpdate (NodeC t' [v]) <- shared  = case vs of
             [x] -> Return x
-            _ -> error "createEval: bad thing"
-        | tagIsWHNF t, HoistedUpdate (NodeC t' []) <- shared  = case vs of
-            [] -> Return (Tup [])
             _ -> error "createEval: bad thing"
         | tagIsWHNF t, HoistedUpdate (NodeC t' vars) <- shared  = Return (Tup vs)
         | tagIsWHNF t = Return (NodeC t vs)
