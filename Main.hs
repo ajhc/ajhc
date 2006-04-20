@@ -190,6 +190,12 @@ procSpecs _specMap d = return ([d],[])
 
 -- | this is called on parsed, typechecked haskell code to convert it to the internal representation
 
+coreMini = dump FD.CoreMini
+corePass = dump FD.CorePass
+coreSteps = dump FD.CoreSteps
+miniCorePass = coreMini && corePass
+miniCoreSteps = coreMini && coreSteps
+
 processDecls ::
     Stats.Stats   -- ^ statistics
     -> Ho     -- ^ Collected ho
@@ -281,7 +287,7 @@ processDecls stats ho ho' tiData = do
 
     let fint (rec,ns) = do
         let names = [ n | (n,_) <- ns]
-        when (dump FD.Lambdacube || dump FD.CorePass) $ putErrLn ("----\n" ++ pprint names)
+        when coreMini $ putErrLn ("----\n" ++ pprint names)
         mstats <- Stats.new
         let mprog = programSetDs ns prog {
             progStats = mempty,
@@ -291,11 +297,11 @@ processDecls stats ho ho' tiData = do
             }
         --progress "eta annotating"
         mprog <- return $ etaAnnotateProgram mprog
-        mprog <- simplifyProgram sopt "SuperSimplify" False mprog
+        mprog <- simplifyProgram sopt "SuperSimplify" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
-        mprog <- transformProgram "floatOutward" DontIterate (dump FD.CorePass) floatOutward mprog
+        mprog <- transformProgram "floatOutward" DontIterate (dump FD.CoreMini) floatOutward mprog
         mprog <- barendregtProg mprog
-        mprog <- transformProgram "float inward" DontIterate (dump FD.CorePass) (programMapBodies (return . floatInward allRules)) mprog
+        mprog <- transformProgram "float inward" DontIterate (dump FD.CoreMini) (programMapBodies (return . floatInward allRules)) mprog
         let ns = programDs mprog
         ns <- E.Strictness.solveDs ns
         mprog <- return $ programSetDs ns mprog
@@ -304,8 +310,8 @@ processDecls stats ho ho' tiData = do
         --mprog <- barendregtProg mprog
         Stats.tickStat mstats (progStats mprog)
         Stats.combine initialPassStats mstats
-        when (dump FD.CoreMini && dump FD.CorePass) $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
-        when (dump FD.CoreMini && dump FD.CoreSteps) $ Stats.print ("InitialOptimize:" ++ pprint names) mstats
+        when miniCorePass $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
+        when miniCoreSteps $ Stats.print ("InitialOptimize:" ++ pprint names) mstats
         wdump FD.Progress $ putErr (if rec then "*" else ".")
         return (programDs mprog)
     lintCheckProgram onerrNone prog
@@ -335,24 +341,24 @@ processDecls stats ho ho' tiData = do
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
         let names = [ n | (n,_) <- ns]
         let namesInscope' = fromDistinctAscList (mkeys smap) `union` namesInscope
-        when (dump FD.Lambdacube || dump FD.CorePass) $ putErrLn ("----\n" ++ pprint names)
+        when coreMini $ putErrLn ("----\n" ++ pprint names)
         cds <- annotateDs annmap (idann allRules mempty) letann lamann [ (t,e) | (t,e) <- ns]
         --putStrLn "*** After annotate"
-        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
+        when miniCorePass $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
         let cm stats e = do
             let sopt = mempty {  SS.so_boundVars = smap, SS.so_dataTable = fullDataTable }
             let (e',_) = SS.collectOccurance' e
             let (stat, e'') = SS.simplifyE sopt e'
-            wdump FD.CorePass $ printCheckName fullDataTable e''
+            when miniCorePass  $ printCheckName fullDataTable e''
             Stats.tickStat stats stat
             return e''
         let mangle = mangle' (Just $ namesInscope' `union` fromList (map (tvrIdent . fst) cds)) fullDataTable
         cds <- flip mapM cds $ \ (v,lc) -> do
             lintCheckE onerrNone fullDataTable v lc
             (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable v lc)
-            lc <- doopt mangle False stats ("SuperSimplify 1: " ++ pprint v) cm lc
-            lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
-            lc <- doopt mangle False stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
+            lc <- doopt mangle coreMini stats ("SuperSimplify 1: " ++ pprint v) cm lc
+            lc <- mangle (return ()) coreMini ("Barendregt: " ++ pprint v) (return . barendregt) lc
+            lc <- doopt mangle coreMini stats "Float Inward..." (\stats x -> return (floatInward allRules x)) lc
             lintCheckE onerrNone fullDataTable v lc
             return (v,lc)
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
@@ -360,15 +366,15 @@ processDecls stats ho ho' tiData = do
         cds <- flip mapM cds $ \ (v,lc) -> do
             lintCheckE onerrNone fullDataTable v lc
             (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable v lc)
-            lc <- doopt mangle False stats ("SuperSimplify 2: " ++ pprint v) cm lc
-            lc <- mangle (return ()) False ("Barendregt: " ++ pprint v) (return . barendregt) lc
+            lc <- doopt mangle coreMini stats ("SuperSimplify 2: " ++ pprint v) cm lc
+            lc <- mangle (return ()) coreMini ("Barendregt: " ++ pprint v) (return . barendregt) lc
             lintCheckE onerrNone fullDataTable v lc
             return (v,lc)
 
         -- cds <- E.Strictness.solveDs cds
         cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
         --cds' <- return $ concatMap (uncurry (workWrap fullDataTable)) cds
-        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
+        when miniCorePass  $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
         let (cds',st) = performWorkWrap fullDataTable cds
         Stats.tickStat stats st
         let wws = length cds' - length cds
@@ -388,7 +394,7 @@ processDecls stats ho ho' tiData = do
                     let sopt = mempty {  SS.so_boundVars = fromList [ (tvrIdent v,lc) | (v,lc) <- ds] `union` smap,  SS.so_dataTable = fullDataTable }
                     let (e',_) = SS.collectOccurance' e
                     let (stat, e'') = SS.simplifyE sopt e'
-                    wdump FD.CorePass $ printCheckName fullDataTable e''
+                    when miniCorePass  $ printCheckName fullDataTable e''
                     Stats.tickStat stats stat
                     return e''
                 let (lc', _) = runRename used lc
@@ -447,12 +453,12 @@ programPruneUnreachable prog = programSetDs ds' prog where
     ds' = reachable (newGraph (programDs prog) (tvrIdent . fst) (\ (t,e) -> idSetToList $ bindingFreeVars t e)) (map tvrIdent $ progEntryPoints prog)
 
 programPrune :: Program -> IO Program
-programPrune prog = transformProgram "Prune Unreachable" DontIterate (dump FD.CorePass) (return . programPruneUnreachable) prog
+programPrune prog = transformProgram "Prune Unreachable" DontIterate (dump FD.CorePass || coreMini) (return . programPruneUnreachable) prog
 
 etaExpandProg :: Program -> IO Program
 etaExpandProg prog = do
     let (prog',stats) = Stats.runStatM $  etaExpandProgram prog
-    transformProgram "eta expansion" DontIterate (dump FD.CorePass) (const $ return prog' { progStats = progStats prog' `mappend` stats }) prog
+    transformProgram "eta expansion" DontIterate (dump FD.CorePass || coreMini) (const $ return prog' { progStats = progStats prog' `mappend` stats }) prog
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
 shouldBeExported exports tvr
@@ -710,21 +716,21 @@ simplifyProgram sopt name dodump prog = do
     let istat = progStats prog
     let g =  return . SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
     prog <- transformProgram name IterateDone dodump g prog  { progStats = mempty }
-    when ((dodump && dump FD.Progress) || dump FD.CorePass) $ Stats.printStat name (progStats prog)
+    when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printStat ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
 simplifyProgramPStat sopt name dodump prog = do
     let istat = progStats prog
     let g =  SS.programSSimplifyPStat sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
     prog <- transformProgram ("PS:" ++ name) IterateDone dodump g prog  { progStats = mempty }
-    when ((dodump && dump FD.Progress) || dump FD.CorePass) $ Stats.printStat name (progStats prog)
+    when ((dodump && dump FD.Progress) || dump FD.CoreSteps) $ Stats.printStat ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
 simplifyProgram' sopt name dodump iterate prog = do
     let istat = progStats prog
     let g =  return . SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
     prog <- transformProgram name iterate dodump g prog  { progStats = mempty }
-    when ((dodump && dump FD.Progress) || dump FD.CorePass) $ Stats.printStat name (progStats prog)
+    when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printStat ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
 -- all transformation routines assume they are being passed a correct program, and only check the output
@@ -786,7 +792,7 @@ doopt mangle dmp stats name func lc = do
     case t'  of
         0 -> return lc
         _ -> do
-            when ((dmp && dump FD.Progress) || dump FD.CoreSteps) $ Stats.print "Optimization" stats'
+            when ((dmp && dump FD.Progress) || dmp && coreSteps) $ Stats.print "Optimization" stats'
             Stats.combine stats stats'
             doopt mangle dmp stats name func lc
 
@@ -801,7 +807,7 @@ mangle' ::
     -> E                -- ^ What to mangle
     -> IO E             -- ^ Out it comes
 mangle'  fv dataTable erraction b  s action e = do
-    when ((b && dump FD.Progress) || dump FD.CorePass) $ putErrLn $ "-- " ++ s
+    when ((b && dump FD.Progress) || (b && dump FD.CorePass)) $ putErrLn $ "-- " ++ s
     e' <- action e
     if not flint then return e' else do
         let ufreevars e | Just as <- fv = filter ( not . (`member` as) . tvrIdent) (freeVars e)
