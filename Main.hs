@@ -638,6 +638,8 @@ compileToGrin prog = do
     lintCheckGrin x
     x <- opt "Optimization" x
     lintCheckGrin x
+    x <- grinSpeculate x
+    lintCheckGrin x
     x <- deadCode stats (grinEntryPoints x) x  -- XXX
     lintCheckGrin x
     x <- opt "Optimization" x

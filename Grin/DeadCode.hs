@@ -39,10 +39,10 @@ deadCode stats roots grin = do
     let postInline = phaseEvalInlined (grinPhase grin)
 
     -- using a CAF implies using its function if pre-inlining
-    unless postInline $ flip mapM_ (grinCafs grin) $ \ (var,~(NodeC a [])) -> do
-        x <- supplyValue usedCafs var
-        f <- supplyValue usedFuncs (tagFlipFunction a)
-        addRule $ x `implies` f
+--    unless postInline $ flip mapM_ (grinCafs grin) $ \ (var,~(NodeC a [])) -> do
+--        x <- supplyValue usedCafs var
+--        f <- supplyValue usedFuncs (tagFlipFunction a)
+--        addRule $ x `implies` f
 
     mapM_ (go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline) (grinFunctions grin)
     calcFixpoint "Dead Code" fixer

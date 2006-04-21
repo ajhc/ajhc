@@ -173,7 +173,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry } = 
             grinPhase = PhaseInit,
             grinTypeEnv = newTyEnv,
             grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  discardResult theMain)) : ds',
-            grinCafs = cafs
+            grinCafs = [ (x,NodeC tagHole []) | (x,_) <- cafs]
             }
     --typecheckGrin grin
     return grin

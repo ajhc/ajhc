@@ -1,5 +1,5 @@
 
-module Grin.Optimize(grinPush) where
+module Grin.Optimize(grinPush,grinSpeculate) where
 
 import qualified Data.Set as Set
 import Control.Monad.State
@@ -12,6 +12,9 @@ import C.Prims
 import Support.FreeVars
 import Stats
 import Util.Graph
+import Util.SetLike
+import Atom
+import Support.CanType
 
 
 data PExp = PExp {
@@ -92,3 +95,57 @@ isOmittable Prim { expPrimitive = Primitive { primAPrim = aprim } } = aprimIsChe
 isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
 isOmittable (e1 :>>= _ :-> e2) = isOmittable e1 && isOmittable e2
 isOmittable _ = False
+
+
+grinSpeculate :: Grin -> IO Grin
+grinSpeculate grin = do
+    let ss = findSpeculatable grin
+    putStrLn "Speculatable:"
+    mapM_ Prelude.print ss
+    let (grin',stats) = runStatM (performSpeculate ss grin)
+    Stats.printStat "Speculate" stats
+    return grin'
+
+mapBodyM f (x :-> y) = f y >>= return . (x :->)
+
+mapExpExp f (a :>>= v :-> b) = do
+    a <- f a
+    b <- f b
+    return (a :>>= v :-> b)
+mapExpExp f (Case e as) = do
+    as' <- mapM (mapBodyM f) as
+    return (Case e as')
+mapExpExp _ x = return x
+
+performSpeculate specs grin = do
+    let sset = Set.fromList (map tagFlipFunction specs)
+    let f (a,l) = mapBodyM h l  >>= \l' -> return (a,l')
+        h (Store (NodeC t xs)) | t `member` sset = do
+            let t' = tagFlipFunction t
+            mtick $ "Optimize.speculate.store.{" ++ show t'
+            return (App t' xs TyNode :>>= n1 :-> Store n1)
+        h (Update v (NodeC t xs)) | t `member` sset = do
+            let t' = tagFlipFunction t
+            mtick $ "Optimize.speculate.update.{" ++ show t'
+            return (App t' xs TyNode :>>= n1 :-> Update v n1)
+        h e = mapExpExp h e
+    fs <- mapM f (grinFunctions grin)
+    return grin { grinFunctions = fs }
+
+findSpeculatable :: Grin -> [Atom]
+findSpeculatable grin = ans where
+    ans = [ x | Left (x,_) <- scc graph ]
+    graph = newGraph [ (a,concatMap f (freeVars l)) | (a,_ :-> l) <- grinFunctions grin, isSpeculatable l, getType l == TyNode ] fst snd
+    f t | tagIsSuspFunction t = [tagFlipFunction t]
+        | tagIsFunction t = [t]
+        | otherwise = []
+    isSpeculatable Return {} = True
+    isSpeculatable Store {} = True
+    isSpeculatable (x :>>= _ :-> y) = isSpeculatable x && isSpeculatable y
+    isSpeculatable (Case e as) = all isSpeculatable [ e | _ :-> e <- as]
+    isSpeculatable Prim { expPrimitive = Primitive { primAPrim = APrim p _ } } = primIsConstant p
+    isSpeculatable _ = False
+
+
+
+
