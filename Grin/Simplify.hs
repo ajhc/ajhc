@@ -1,5 +1,6 @@
 module Grin.Simplify(simplify) where
 
+import Char
 import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Trans
@@ -81,7 +82,10 @@ simplify1 stats env (n,l) = do
         gs (Return (Const n))
     gs (App a [n@NodeC {},v] typ) | a == funcApply = do
         lift $ tick stats at_OptSimplifyConstApply
-        gs (doApply n v typ)
+        gs (doApply Return True n v typ)
+    gs (Store (NodeC t [Const x@NodeC {},y])) | Just 1 <- fromBap t = do --  App a [n@NodeC {},v] typ) | a == funcApply = do
+        lift $ tick stats "Optimize.simplify.const-lazy-apply"
+        gs (doApply Store False x y TyNode)
     gs (App a [Const n] typ) | a == funcEval = do
         lift $ tick stats at_OptSimplifyConstEval
         gs (Return n)
@@ -168,16 +172,20 @@ cseStat n = toAtom $ "Optimize.simplify.cse." ++ g n where
     g Store {} = "Store"
     g _ = "Misc"
 
-doApply (NodeC t xs) y typ | Just (n,v) <- tagUnfunction t = case n of
-    1 -> (App v (xs ++ [y]) typ)
-    _ -> Return (NodeC (partialTag v (n - 1)) (xs ++ [y]))
-doApply n y typ = error $ show ("doApply", n,y,typ)
+doApply ret strict (NodeC t xs) y typ | Just (n,v) <- tagUnfunction t = case n of
+    1 | strict -> (App v (xs ++ [y]) typ)
+    _ -> ret (NodeC (partialTag v (n - 1)) (xs ++ [y]))
+doApply _ _ n y typ = error $ show ("doApply", n,y,typ)
 
 doEval n@(NodeC t xs) typ
     | tagIsWHNF t = Return n
     | tagIsSuspFunction t = App (tagFlipFunction t) xs typ
 doEval n typ = error $ show ("doEval", n,typ)
 
+
+fromBap :: Monad m => Atom -> m Int
+fromBap t | 'B':'a':'p':'_':(n:ns) <- toString t, isDigit n = return $ read (n:takeWhile isDigit ns)
+fromBap t = fail "not Bap"
 
 -- This only binds variables to variables
 varBind :: Monad m => Val -> Val -> m (Map.Map Var Val)
@@ -293,10 +301,10 @@ optimize1 postEval (n,l) = g l where
         f (Update v t :>>= Tup [] :-> Return t :>>= lr)
     f (Return t@NodeC {} :>>= v :-> App fa [v',a] typ :>>= lr) | fa == funcApply, v == v' = do
         mtick "Optimize.optimize.return-apply"
-        f (Return t :>>= v :-> doApply t a typ :>>= lr)
+        f (Return t :>>= v :-> doApply Return True t a typ :>>= lr)
     f (Return t@NodeC {} :>>= v :-> App fa [v',a] typ) | fa == funcApply, v == v' = do
         mtick "Optimize.optimize.return-apply"
-        f (Return t :>>= v :-> doApply t a typ)
+        f (Return t :>>= v :-> doApply Return True t a typ)
     f (Store t@NodeC {} :>>= v :-> App fa [v'] typ :>>= lr) | fa == funcEval, v == v' = do
         mtick "Optimize.optimize.store-eval"
         f (Store t :>>= v :-> doEval t typ :>>= lr)
