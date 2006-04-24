@@ -374,9 +374,9 @@ convertFunc (n,Tup as :-> body) = do
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
 compileGrin grin = (hsffi_h ++ jhc_rts_c ++ P.render ans ++ "\n", snub (reqLibraries req))  where
-    ans = vsep $ [vcat includes,enum_tag_t,header,union_node,text "/* CAFS */", vcat $ map ccaf (grinCafs grin), text "/* Constant Data */", buildConstants finalHcHash,text  "/* Functions */",body]
+    ans = vsep $ [vcat includes,enum_tag_t,header,union_node,text "/* CAFS */", vcat $ map ccaf (grinCafs grin), text "/* Constant Data */", jhc_sizeof_data, buildConstants finalHcHash,text  "/* Functions */",jhc_sizeof,body]
     includes =  map include (snub $ reqIncludes req)
-    (header,body) = generateC (jhc_sizeof:functions) structs
+    (header,body) = generateC (functions) structs
 
     -- this is a list of every tag used in the program
     tags = (tagHole,[]):sortUnder (show . fst) [ (t,runIdentity $ findArgs (grinTypeEnv grin) t) | t <- Set.toList $ freeVars (snds $ grinFunctions grin) `mappend` freeVars (snds $ grinCafs grin), tagIsTag t]
@@ -389,8 +389,9 @@ compileGrin grin = (hsffi_h ++ jhc_rts_c ++ P.render ans ++ "\n", snub (reqLibra
 
 
     enum_tag_t = text "typedef enum {" $$ nest 4 (P.fsep (punctuate P.comma (map (tshow . nodeTagName . fst) tags))) $$ text  "} tag_t;"
-    jhc_sizeof =  function (name "jhc_sizeof") size_t [(name "tag",tag_t)] [] ( statementRaw $  "switch(tag) {\n" ++ concatMap cs (fsts tags) ++ "}\n_exit(33);")  where
-        cs t = text "  case " <> tshow (nodeTagName t) <> char ':' <+> text "return sizeof(struct " <> tshow (nodeStructName t) <>  text ");\n"
+    jhc_sizeof_data =  text $ "static const uint8_t JHC_SIZEOF[] = {\n" ++ concatMap sizeof (fsts tags) ++ "};"  where
+        sizeof t = text "  sizeof(struct " <> tshow (nodeStructName t) <>  text "),\n"
+    jhc_sizeof = text "static inline size_t jhc_sizeof(tag_t tag) { return (size_t) JHC_SIZEOF[tag]; }"
     union_node = text $  "union node {\n  struct { tag_t tag; } any;\n" <> mconcat (map cu (fsts tags)) <> text "};" where
         cu t = text "  struct" <+> (tshow $ nodeStructName t) <+> (tshow $ nodeStructName t) <> text ";\n"
 
