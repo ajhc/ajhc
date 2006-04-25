@@ -9,8 +9,8 @@ import qualified Data.Set as Set (map)
 type Rel a b = Set (a,b)
 
 
-domain :: Ord a => Rel a b -> Set a
-domain r = mapMonotonic fst r
+domain :: (Ord a,Ord b) => Rel a b -> Set a
+domain r = Set.map fst r
 
 range :: (Ord a,Ord b) => Rel a b -> Set b
 range r = Set.map snd r
