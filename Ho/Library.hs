@@ -19,8 +19,7 @@ import Options
 import PackedString
 import qualified CharIO
 import qualified FlagDump as FD
-import Util.Gen
-import Util.MD5(md5file)
+import Util.SHA1(sha1file)
 import Version(versionString)
 
 
@@ -56,6 +55,7 @@ loadP mbcs got name = do
 
 loadLibraries :: IO Ho
 loadLibraries = do
+    wdump FD.Progress $ putErrLn $ "Loading libraries: " ++ show (optHls options)
     ps <- foldM (loadP Nothing) Map.empty (optHls options)
     return $ fixupHo $ mconcat (initialHo : map libraryHo (Map.elems ps))
     --return $ mconcat (initialHo : map libraryHo (Map.elems ps))
@@ -115,7 +115,7 @@ condenseWhitespace xs =  reverse $ dropWhile isSpace (reverse (dropWhile isSpace
 
 readDescFile :: FilePath -> IO [(String,String)]
 readDescFile fp = do
-    wdump FD.Progress $ putStrLn $ "Reading: " ++ show fp
+    wdump FD.Progress $ putErrLn $ "Reading: " ++ show fp
     fc <- CharIO.readFile fp
     case parseLibraryDescription fc of
         Left err -> fail $ "Error reading library description file: " ++ show fp ++ " " ++ err
@@ -126,7 +126,8 @@ readDescFile fp = do
 
 readLibraryFile :: LibraryName -> FilePath -> Maybe CheckSum -> IO Library
 readLibraryFile lname fp mbcs = do
-    pkgCS <- md5file fp
+    wdump FD.Progress $ putErrLn $ "Loading library: " ++ show lname ++ " @ " ++ show fp
+    pkgCS <- sha1file fp
     when (maybe False (pkgCS /=) mbcs) $
         putErrDie ("Loading library "++show fp++" failed: Checksum does not match")
     mho <- checkForHoFile fp

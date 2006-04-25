@@ -6,8 +6,7 @@ module Ho.Build (
     initialHo,
     fixupHo,
     recordHoFile,
-    checkForHoFile,
-    checkForHoModule
+    checkForHoFile
     ) where
 
 
@@ -34,7 +33,6 @@ import DataConstructors
 import Directory
 import Doc.DocLike
 import Doc.PPrint
-import Name.Name(Name())
 import Doc.Pretty
 import E.E
 import E.Show
@@ -50,14 +48,11 @@ import FrontEnd.Unlit
 import GenUtil hiding(putErrLn,putErr,putErrDie)
 import Ho.Type
 import HsSyn
-import Info.Types
 import MapBinaryInstance()
 import Options
 import PackedString
-import PrimitiveOperators
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
-import Support.CanType
 import Util.FilterInput
 import Warning
 import Name.Id
@@ -114,8 +109,8 @@ findModule :: Ho                                 -- ^ code loaded from libraries
               -> (Ho -> [HsModule] -> IO Ho)     -- ^ Process set of mutually recursive modules to produce final Ho
               -> IO Ho                           -- ^ Final accumulated ho
 findModule lhave have (Left m) ifunc _
-    | m `Map.member` (hoExports have) = return have
-    | m `Map.member` (hoExports lhave) = return mempty
+    | m `mmember` (hoExports have) = return have
+    | m `mmember` (hoExports lhave) = return have
 findModule lhave have need ifunc func  = do
     let f (Left (Module m)) = (m,searchPaths m)
         f (Right n) = (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
@@ -132,7 +127,7 @@ findModule lhave have need ifunc func  = do
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
                 mods' = [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
                 mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules ho)]
-                ldeps = Map.unions [ Map.singleton ln cs | m <- mods', Right (ln,cs) <- Map.lookup m (hoModules ho)]
+                ldeps = Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules lhave)]
             let hoh = HoHeader { hohGeneration = 0,
                                  hohDepends    = [ x | (_,x,_) <- sc],
                                  hohModDepends = mdeps,
@@ -144,11 +139,13 @@ findModule lhave have need ifunc func  = do
     ho <- ifunc ho
     f ho scc
 
+{-
 checkForHoModule :: Module -> IO (Maybe (HoHeader,Ho))
 checkForHoModule (Module m) = loop $ map snd $ searchPaths m
     where loop []     = return $ fail ("checkForHoModule: Module "++m++" not found.")
           loop (f:fs) = do e <- doesFileExist f
                            if e then checkForHoFile f else loop fs
+-}
 
 checkForHoFile :: String            -- ^ file name to check for
     -> IO (Maybe (HoHeader,Ho))
