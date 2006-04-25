@@ -55,7 +55,7 @@ Conflicts: 10 shift/reduce
 >	STRING   { StringTok $$ }
 >       PRAGMAOPTIONS { PragmaOptions $$ }
 >       PRAGMASTART { PragmaStart $$ }
->       PRAGMARULES { PragmaRules }
+>       PRAGMARULES { PragmaRules $$ }
 >       PRAGMASPECIALIZE { PragmaSpecialize $$ }
 >       PRAGMAEND { PragmaEnd }
 
@@ -296,13 +296,20 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >       | 'foreign' srcloc 'import' mcconv msafety mstring var '::' ctype
 >                       {% parseImport $6 $7 >>= \x ->
 >                          return (HsForeignDecl $2 x $4 $5 $7 $9) }
-
-
->       | srcloc PRAGMARULES STRING mfreevars exp '=' exp PRAGMAEND
->                       { HsPragmaRules { hsDeclSrcLoc = $1, hsDeclString = $3, hsDeclFreeVars = $4, hsDeclLeftExpr = $5, hsDeclRightExpr = $7 } }
+>       | PRAGMARULES layout_on rules close PRAGMAEND
+>               { HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) (reverse $3) }
 >       | srcloc PRAGMASPECIALIZE var '::' type PRAGMAEND
 >                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $3, hsDeclType = $5 } }
 >       | decl		{ $1 }
+
+> rule :: { HsRule }
+>       : srcloc STRING mfreevars exp '=' exp
+>          { HsRule { hsRuleSrcLoc = $1, hsRuleString = $2, hsRuleFreeVars = $3, hsRuleLeftExpr = $4, hsRuleRightExpr = $6 } }
+
+> rules :: { [HsRule] }
+>       : rules optsemi rule  { $3 : $1 }
+>       | rule optsemi           { [$1] }
+
 
 > mfreevars :: { [(HsName,Maybe HsType)] }
 >       : 'forall' vbinds '.' { $2 }

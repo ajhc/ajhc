@@ -257,10 +257,16 @@ ppHsTName (n,Nothing) = ppHsName n
 ppHsTName (n,Just t) = parens (ppHsName n <+> text "::" <+> ppHsType t)
 
 -------------------------  Declarations ------------------------------
+ppHsRule prules@HsRule {} = text (show (hsRuleString prules)) <+> text "forall" <+> vars <+> text "." $$ nest 4 rest  where
+    vars = hsep (map ppHsTName $ hsRuleFreeVars prules)
+    rest = ppHsExp (hsRuleLeftExpr prules) <+> text "=" <+> ppHsExp (hsRuleRightExpr prules)
+
 ppHsDecl :: HsDecl -> Doc
-ppHsDecl prules@HsPragmaRules {} = text ("{-# RULES " ++ show (hsDeclString prules)) <+> text "forall" <+> vars <+> text "." $$ nest 4 rest $$ text "#-}" where
-    vars = hsep (map ppHsTName $ hsDeclFreeVars prules)
-    rest = ppHsExp (hsDeclLeftExpr prules) <+> text "=" <+> ppHsExp (hsDeclRightExpr prules)
+ppHsDecl (HsPragmaRules rs@(HsRule { hsRuleIsMeta = False }:_)) = text "{-# RULES" $$ nest 4 (myVcat (map ppHsRule rs)) $$ text "#-}"
+ppHsDecl (HsPragmaRules rs@(HsRule { hsRuleIsMeta = True }:_)) = text "{-# METARULES" $$ nest 4 (myVcat (map ppHsRule rs)) $$ text "#-}"
+--ppHsDecl prules@HsPragmaRules {} = text ("{-# RULES " ++ show (hsDeclString prules)) <+> text "forall" <+> vars <+> text "." $$ nest 4 rest $$ text "#-}" where
+--    vars = hsep (map ppHsTName $ hsDeclFreeVars prules)
+--    rest = ppHsExp (hsDeclLeftExpr prules) <+> text "=" <+> ppHsExp (hsDeclRightExpr prules)
 ppHsDecl prules@HsPragmaSpecialize {} = text "{-# SPECIALIZE ... #-}" --  ++ show (hsDeclString prules)) <+> text "forall" <+> vars <+> text "." $$ nest 4 rest $$ text "#-}" where
 --    vars = hsep (map ppHsTName $ hsDeclFreeVars prules)
 --    rest = ppHsExp (hsDeclLeftExpr prules) <+> text "=" <+> ppHsExp (hsDeclRightExpr prules)

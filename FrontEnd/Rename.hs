@@ -370,16 +370,9 @@ renameHsDecl (HsPragmaProps srcLoc prop hsNames) subTable = do
     setSrcLoc srcLoc
     hsNames' <- renameHsNames hsNames subTable
     return (HsPragmaProps  srcLoc prop hsNames')
-renameHsDecl prules@HsPragmaRules { hsDeclSrcLoc = srcLoc, hsDeclFreeVars = fvs, hsDeclLeftExpr = e1, hsDeclRightExpr = e2 } subTable = do
-    setSrcLoc srcLoc
-    subTable' <- updateSubTableWithHsNames subTable (fsts fvs)
-    subTable'' <- updateSubTableWithHsTypes subTable (catMaybes $ snds fvs)
-    fvs' <- sequence [ liftM2 (,) (renameAny x subTable') (renameAny y subTable'')| (x,y) <- fvs]
-    e1' <- renameHsExp e1 subTable'
-    e2' <- renameHsExp e2 subTable'
-    m <- getCurrentModule
-    i <- newUniq
-    return prules {  hsDeclUniq = (m,i), hsDeclFreeVars = fvs', hsDeclLeftExpr = e1', hsDeclRightExpr = e2' }
+renameHsDecl (HsPragmaRules rs) subTable = do
+    rs' <- mapM (`renameHsRule` subTable) rs
+    return $ HsPragmaRules rs'
 renameHsDecl prules@HsPragmaSpecialize { hsDeclSrcLoc = srcLoc, hsDeclName = n, hsDeclType = t } subTable = do
     setSrcLoc srcLoc
     n <- renameAny n subTable
@@ -390,6 +383,16 @@ renameHsDecl prules@HsPragmaSpecialize { hsDeclSrcLoc = srcLoc, hsDeclName = n, 
 
 renameHsDecl otherHsDecl _ = return otherHsDecl
 
+renameHsRule prules@HsRule { hsRuleSrcLoc = srcLoc, hsRuleFreeVars = fvs, hsRuleLeftExpr = e1, hsRuleRightExpr = e2 } subTable = do
+    setSrcLoc srcLoc
+    subTable' <- updateSubTableWithHsNames subTable (fsts fvs)
+    subTable'' <- updateSubTableWithHsTypes subTable (catMaybes $ snds fvs)
+    fvs' <- sequence [ liftM2 (,) (renameAny x subTable') (renameAny y subTable'')| (x,y) <- fvs]
+    e1' <- renameHsExp e1 subTable'
+    e2' <- renameHsExp e2 subTable'
+    m <- getCurrentModule
+    i <- newUniq
+    return prules {  hsRuleUniq = (m,i), hsRuleFreeVars = fvs', hsRuleLeftExpr = e1', hsRuleRightExpr = e2' }
 
 doesClassMakeSense :: HsQualType -> ScopeSM ()
 doesClassMakeSense (HsQualType _ type_) =

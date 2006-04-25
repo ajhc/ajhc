@@ -306,17 +306,19 @@ instance GenName String where
    genNames i = map (('x':) . show) [i..]
 
 convertRules :: TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> [HsDecl] -> IO [(String,[TVr],E,E)]
-convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM f hsDecls where
-    f pr@HsPragmaRules {} = do
-        let ce = convertE tiData classHierarchy assumps dataTable (hsDeclSrcLoc pr)
-        e1 <- ce (hsDeclLeftExpr pr)
-        e2 <- ce (hsDeclRightExpr pr)
+convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM g hsDecls where
+    g (HsPragmaRules rs) = mapM f rs
+    g _ = return []
+    f pr = do
+        let ce = convertE tiData classHierarchy assumps dataTable (hsRuleSrcLoc pr)
+        e1 <- ce (hsRuleLeftExpr pr)
+        e2 <- ce (hsRuleRightExpr pr)
         (ts,cs) <- runNameMT $ do
             ts <- flip mapM (filter (sortStarLike . getType) $ freeVars e1) $ \tvr -> do
                 --return (tvrIdent tvr,tvr)
                 nn <- newNameFrom (map (:'\'':[]) ['a' ..])
                 return (tvrIdent tvr,tvr { tvrIdent = toId (toName TypeVal nn) })
-            cs <- flip mapM [toTVr assumps (toName Val v) | (v,_) <- hsDeclFreeVars pr ] $ \tvr -> do
+            cs <- flip mapM [toTVr assumps (toName Val v) | (v,_) <- hsRuleFreeVars pr ] $ \tvr -> do
                 let ur = show $ unRename $ nameName (toUnqualified $ runIdentity $ fromId (tvrIdent tvr))
                 nn <- newNameFrom (ur:map (\v -> ur ++ show v) [1 ::Int ..])
                 return (tvrIdent tvr,tvr { tvrIdent = toId (toName Val nn) })
@@ -326,8 +328,7 @@ convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM f hsDe
             cs' =  [ (x,(tvrType_u smt y))| (x,y) <- cs ]
             e2' = deNewtype dataTable $ smt $ sma e2
         e2 <- atomizeAp False dataTable Stats.theStats mainModule e2'
-        return [(hsDeclString pr,( snds (cs' ++ ts) ),eval $ smt $ sma e1,e2)]
-    f _ = return []
+        return (hsRuleString pr,( snds (cs' ++ ts) ),eval $ smt $ sma e1,e2)
 
 convertE :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> SrcLoc -> HsExp -> m E
 convertE tiData classHierarchy assumps dataTable srcLoc exp = do

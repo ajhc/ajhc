@@ -142,7 +142,7 @@ instance HasLocation HsDecl where
     srcLoc HsInfixDecl   { hsDeclSrcLoc = sl } = sl
     srcLoc HsNewTypeDecl { hsDeclSrcLoc = sl } = sl
     srcLoc HsPragmaSpecialize { hsDeclSrcLoc = sl } = sl
-    srcLoc HsPragmaRules { hsDeclSrcLoc = sl } = sl
+    srcLoc (HsPragmaRules rs) = srcLoc rs
     srcLoc HsForeignDecl { hsDeclSrcLoc = sl } = sl
     srcLoc (HsClassDecl	 sl _ _) = sl
     srcLoc (HsInstDecl	 sl _ _) = sl
@@ -152,6 +152,8 @@ instance HasLocation HsDecl where
     srcLoc (HsPatBind	 sl _ _ _) = sl
     srcLoc (HsPragmaProps sl _ _) = sl
 
+instance HasLocation HsRule where
+    srcLoc HsRule { hsRuleSrcLoc = sl } = sl
 
 data HsDecl
 	 = HsTypeDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclName :: HsName, hsDeclArgs :: [HsName], hsDeclType :: HsType }
@@ -172,10 +174,22 @@ data HsDecl
                            hsDeclQualType :: HsQualType
                          }
          | HsPragmaProps SrcLoc String [HsName]
-	 | HsPragmaRules { hsDeclUniq :: (Module,Int), hsDeclSrcLoc :: SrcLoc, hsDeclString :: String, hsDeclFreeVars :: [(HsName,Maybe HsType)], hsDeclLeftExpr :: HsExp, hsDeclRightExpr :: HsExp }
+	 | HsPragmaRules [HsRule]
          | HsPragmaSpecialize { hsDeclUniq :: (Module,Int), hsDeclSrcLoc :: SrcLoc, hsDeclBool :: Bool, hsDeclName :: HsName, hsDeclType :: HsType }
   deriving(Data,Typeable,Eq,Show)
   {-! derive: is !-}
+
+
+data HsRule = HsRule {
+    hsRuleUniq :: (Module,Int),
+    hsRuleSrcLoc :: SrcLoc,
+    hsRuleIsMeta :: Bool,
+    hsRuleString :: String,
+    hsRuleFreeVars :: [(HsName,Maybe HsType)],
+    hsRuleLeftExpr :: HsExp,
+    hsRuleRightExpr :: HsExp
+    }
+  deriving(Data,Typeable,Eq,Show)
 
 instance HasLocation HsMatch where
     srcLoc (HsMatch sl _ _ _ _) = sl

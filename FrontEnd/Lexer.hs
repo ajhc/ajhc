@@ -40,7 +40,7 @@ data Token
 	| Character Char
         | StringTok String
         | PragmaOptions [String]
-        | PragmaRules
+        | PragmaRules Bool
         | PragmaSpecialize Bool
         | PragmaStart String
         | PragmaEnd
@@ -603,7 +603,8 @@ pragmas_std = [
 
 -- pragmas with a special starting token
 pragmas_parsed = [
-    (["RULES"],PragmaRules),
+    (["RULES"],PragmaRules False),
+    (["METARULES"],PragmaRules True),
     (["SPECIALIZE", "SPECIALISE"],PragmaSpecialize False),
     (["SUPERSPECIALIZE", "SUPERSPECIALISE"],PragmaSpecialize True)
     ]

@@ -550,9 +550,21 @@ tcPragmaDecl spec@HsPragmaSpecialize { hsDeclSrcLoc = sloc, hsDeclName = n, hsDe
         addRule RuleSpec { ruleUniq = hsDeclUniq spec, ruleName = nn, ruleType = t, ruleSuper = hsDeclBool spec }
         return [spec]
 
+tcPragmaDecl (HsPragmaRules rs) = do
+    rs' <- mapM tcRule rs
+    return [HsPragmaRules rs']
 
-tcPragmaDecl prule@HsPragmaRules { hsDeclUniq = uniq, hsDeclFreeVars = vs, hsDeclLeftExpr = e1, hsDeclRightExpr = e2, hsDeclSrcLoc = sloc } =
-    withContext (locMsg sloc "in the RULES pragma" $ hsDeclString prule) ans where
+
+tcPragmaDecl fd@(HsForeignDecl _ _ _ _ n qt) = do
+    kt <- getKindEnv
+    s <- hsQualTypeToSigma kt qt
+    addToCollectedEnv (Map.singleton (toName Val n) s)
+    return [fd]
+
+tcPragmaDecl _ = return []
+
+tcRule prule@HsRule { hsRuleUniq = uniq, hsRuleFreeVars = vs, hsRuleLeftExpr = e1, hsRuleRightExpr = e2, hsRuleSrcLoc = sloc } =
+    withContext (locMsg sloc "in the RULES pragma" $ hsRuleString prule) ans where
         ans = do
             vs' <- mapM dv vs
             tr <- newBox Star
@@ -575,7 +587,7 @@ tcPragmaDecl prule@HsPragmaRules { hsDeclUniq = uniq, hsDeclFreeVars = vs, hsDec
             rs1 <- return $ simplify ch rs1
             rs2 <- return $ simplify ch rs2
             assertEntailment rs1 rs2
-            return [prule { hsDeclLeftExpr = e1, hsDeclRightExpr = e2 }]
+            return prule { hsRuleLeftExpr = e1, hsRuleRightExpr = e2 }
         dv (n,Nothing) = do
             v <- newMetaVar Tau Star
             let env = (Map.singleton (toName Val n) v)
@@ -587,14 +599,6 @@ tcPragmaDecl prule@HsPragmaRules { hsDeclUniq = uniq, hsDeclFreeVars = vs, hsDec
             let env = (Map.singleton (toName Val n) tt)
             addToCollectedEnv env
             return (tt,env)
-
-tcPragmaDecl fd@(HsForeignDecl _ _ _ _ n qt) = do
-    kt <- getKindEnv
-    s <- hsQualTypeToSigma kt qt
-    addToCollectedEnv (Map.singleton (toName Val n) s)
-    return [fd]
-
-tcPragmaDecl _ = return []
 
 tcDecl ::  HsDecl -> Sigma -> Tc (HsDecl,TypeEnv)
 

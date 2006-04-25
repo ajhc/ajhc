@@ -142,16 +142,20 @@ renameHsDecl (HsInstDecl srcLoc hsQualType hsDecls) subTable = withSrcLoc srcLoc
 renameHsDecl (HsInfixDecl srcLoc assoc int hsNames) subTable = withSrcLoc srcLoc $ do
     hsNames' <- renameHsNames hsNames subTable
     return $ HsInfixDecl srcLoc assoc int hsNames'
-renameHsDecl prules@HsPragmaRules { hsDeclSrcLoc = srcLoc, hsDeclFreeVars = fvs, hsDeclLeftExpr = e1, hsDeclRightExpr = e2 } subTable = withSrcLoc srcLoc $ do
-    fvs' <- sequence [ fmapM (`renameHsType` subTable) t  >>= return . (,) n | (n,t) <- fvs]
-    e1' <- renameHsExp e1 subTable
-    e2' <- renameHsExp e2 subTable
-    return prules {  hsDeclFreeVars = fvs', hsDeclLeftExpr = e1', hsDeclRightExpr = e2' }
+renameHsDecl (HsPragmaRules rs) subTable = do
+    rs' <- mapM (`renameHsRule` subTable) rs
+    return $ HsPragmaRules rs'
 renameHsDecl prules@HsPragmaSpecialize { hsDeclSrcLoc = srcLoc, hsDeclName = n, hsDeclType = t } subTable = withSrcLoc srcLoc $ do
     t <- renameHsType t subTable
     return prules {  hsDeclType = t }
 renameHsDecl otherHsDecl _ = return otherHsDecl
 
+
+renameHsRule prules@HsRule { hsRuleSrcLoc = srcLoc, hsRuleFreeVars = fvs, hsRuleLeftExpr = e1, hsRuleRightExpr = e2 } subTable = withSrcLoc srcLoc $ do
+    fvs' <- sequence [ fmapM (`renameHsType` subTable) t  >>= return . (,) n | (n,t) <- fvs]
+    e1' <- renameHsExp e1 subTable
+    e2' <- renameHsExp e2 subTable
+    return prules {  hsRuleFreeVars = fvs', hsRuleLeftExpr = e1', hsRuleRightExpr = e2' }
 
 
 

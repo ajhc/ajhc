@@ -140,11 +140,12 @@ processDecl infixMap decl = case decl of
     HsInstDecl     srcloc qualtype decls   -> HsInstDecl srcloc qualtype $ proc_decls decls
     HsFunBind      matches                 -> HsFunBind $ map (processMatch infixMap) matches
     HsPatBind      srcloc pat rhs decls    -> HsPatBind srcloc (procPat infixMap pat) (processRhs infixMap rhs) $ proc_decls decls
-    prules@HsPragmaRules { hsDeclLeftExpr = e1, hsDeclRightExpr = e2} ->
-        prules { hsDeclLeftExpr = fst $ processExp infixMap e1, hsDeclRightExpr = fst $ processExp infixMap e2 }
+    HsPragmaRules rs -> HsPragmaRules $ map proc_rule rs
     _                                       -> decl
     where
         proc_decls decls = map (processDecl infixMap) decls
+        proc_rule prules@HsRule { hsRuleLeftExpr = e1, hsRuleRightExpr = e2} =
+             prules { hsRuleLeftExpr = fst $ processExp infixMap e1, hsRuleRightExpr = fst $ processExp infixMap e2 }
 
 
 processMatch :: SymbolMap -> HsMatch -> HsMatch
