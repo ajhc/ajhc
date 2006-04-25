@@ -1,0 +1,53 @@
+#!/usr/bin/perl -w
+
+use strict;
+use Data::Dumper;
+
+my @fl;
+my @in;
+
+my @add;
+my %stuff;
+
+
+my @ds;
+open PR, "<data/primitives.txt";
+while(<PR>) {
+    chomp;
+    next unless /\S/;
+    next if /^\s*#/;
+    my @a = split /\s*,\s*/;
+    push @ds, \@a;
+}
+
+
+print "module Name.Prim where\n\n";
+print "import Name.Name\n\n";
+
+
+
+my %rt;
+
+foreach my $d (@ds) {
+    my $ctype = $d->[1];
+    my $hsname = $d->[0];
+    my $sname = $hsname;
+    $rt{$ctype}++;
+    $sname =~ s/(.*)\.([A-Za-z0-9]+)$/$2/ or die "improper name";
+    my $mname = $1;
+
+    print "tc_$sname = toName TypeConstructor (\"$mname\",\"$sname\")\n";
+    print "dc_$sname = toName DataConstructor \"$sname#\"\n";
+}
+
+print "\n";
+
+foreach my $rt (sort keys %rt) {
+    $rt =~ s/ /_/g;
+    print "rt_$rt = toName RawType \"$rt\"\n";
+
+}
+
+print "\n\n";
+
+
