@@ -165,8 +165,9 @@ prim_const s t et@(ELit (LitCons cn' _ _)) =  eStrictLet (tVr 2 st) (EPrim (APri
     st = rawType t
     cn = toName DataConstructor $ nameName cn'
 prim_const _ _ _ = error "prim_const: invalid arg"
--- prim_const s t et = EPrim (APrim (CConst s t) mempty) [] et
 
+prim_sizeof s = (ELit (LitCons dc_Int [rp] tInt)) where
+    rp = (EPrim (APrim (PrimTypeInfo { primArgType = s, primRetType = "int", primTypeInfo = PrimSizeOf }) mempty) [] tIntzh)
 
 v2_Int = tVr 2 tInt
 v2_Integer = tVr 2 tInteger

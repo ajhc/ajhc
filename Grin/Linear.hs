@@ -81,6 +81,7 @@ go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
     omegaize x = fail $ "omegaize: " ++ show x
     farg (_,Const {}) = return ()
     farg (_,Lit {}) = return ()
+    farg (_,ValPrim {}) = return ()
     farg z@(an,Var v _) = do
         eval v
         ea <-  supplyValue argSupply an

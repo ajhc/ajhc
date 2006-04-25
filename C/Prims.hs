@@ -26,6 +26,11 @@ data Prim =
     | Peek { primArgType :: ExtType }                            -- read value from memory
     | Poke { primArgType :: ExtType }                            -- write value to memory
     | CCast { primArgType :: ExtType, primRetType :: ExtType }   -- Cast from one basic type to another, possibly lossy.
+    | PrimTypeInfo { primArgType :: ExtType,  primRetType :: ExtType, primTypeInfo :: PrimTypeInfo }   -- evaluates to sizeof its argument in bytes
+    deriving(Typeable, Data, Eq, Ord, Show)
+    {-! derive: GhcBinary !-}
+
+data PrimTypeInfo = PrimSizeOf | PrimMaxBound | PrimMinBound
     deriving(Typeable, Data, Eq, Ord, Show)
     {-! derive: GhcBinary !-}
 
@@ -38,6 +43,7 @@ primIsCheap AddrOf {} = True
 primIsCheap CCast {} = True
 primIsCheap CConst {} = True
 primIsCheap Operator {} = True
+primIsCheap PrimTypeInfo {} = True
 primIsCheap _ = False
 
 aprimIsCheap (APrim p _) = primIsCheap p
@@ -49,6 +55,7 @@ primIsConstant :: Prim -> Bool
 primIsConstant CConst {} = True
 primIsConstant AddrOf {} = True
 primIsConstant CCast {} = True
+primIsConstant PrimTypeInfo {} = True
 primIsConstant Operator { primOp = op } | op `elem` safeOps = True  where
     safeOps = ["+","-","*","==",">=","<=",">","<","&","|","^","~",">>","<<"]
 primIsConstant _ = False
@@ -84,4 +91,7 @@ instance DocLike d => PPrint d Prim where
     pprint (Peek t) = char '*' <> text t
     pprint (Poke t) = char '=' <> text t
     pprint (CCast _ t) = parens (text t)
+    pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimSizeOf } = text "sizeof" <> parens (text at)
+    pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimMaxBound } = text "max" <> parens (text at)
+    pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimMinBound } = text "min" <> parens (text at)
 

@@ -129,7 +129,8 @@ foreach my $d (@ds) {
     my $c_num = hsname("Prelude.Num");
     push @inst, "[] :=> IsIn $prelude_bounded $tycon";
     push @inst, "[] :=> IsIn $foreign_storable $tycon";
-    push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.sizeOf.$d->[0]\", ELam (v0 $t) \$ " . const("sizeof($d->[1])","tInt") . ")";
+    #push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.sizeOf.$d->[0]\", ELam (v0 $t) \$ " . const("sizeof($d->[1])","tInt") . ")";
+    push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.sizeOf.$d->[0]\", ELam (v0 $t) \$ prim_sizeof \"$d->[1]\")";
     push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.poke.$d->[0]\", buildPoke $cncons $t \"$d->[1]\")";
     push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.peek.$d->[0]\", buildPeek $cncons $t \"$d->[1]\")";
     push @cmeth, "($prelude_bounded, toInstName \"Prelude.maxBound.$d->[0]\", " . const($d->[3],$t,"\"$d->[1]\"") . ")";
