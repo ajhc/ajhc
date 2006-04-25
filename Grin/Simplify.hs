@@ -278,9 +278,9 @@ sizeExp x = 1
 optimize1 ::  Bool -> (Atom,Lam) -> StatM Lam
 optimize1 postEval (n,l) = g l where
     g (b :-> e) = f e >>= return . (b :->)
-    f (Case e as :>>= lam)  | (sizeLam lam - 1) * length as <= 3 = do
-        mtick "Optimize.optimize.case-pullin"
-        return (Case e (map (mapExp (:>>= lam)) as))
+--    f (Case e as :>>= lam)  | (sizeLam lam - 1) * length as <= 3 = do
+--        mtick "Optimize.optimize.case-pullin"
+--        return (Case e (map (mapExp (:>>= lam)) as))
     f (Return t@NodeC {} :>>= v@Var {} :-> Update w v' :>>= lr) | v == v' = do
         mtick "Optimize.optimize.return-update"
         f (Return t :>>= v :-> Update w t :>>= lr)
