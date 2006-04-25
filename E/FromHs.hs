@@ -472,7 +472,14 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         t' = getAssump n'
         (_,rt) = argTypes' (tipe t')
     cExpr (HsLit (HsString s)) = return $ E.Values.toE s
-    cExpr (HsLit (HsInt i)) = return $ intConvert i
+    cExpr (HsAsPat n' (HsLit (HsInt i))) = ans where
+        t' = getAssump n'
+        ty = tipe t'
+        ans = case lookupCType' dataTable ty of
+            Just (cn,st,_it) -> return $ ELit (LitCons cn [ELit (LitInt (fromIntegral i) st)] ty)
+            Nothing -> return $ intConvert' funcs ty i
+            --Just (cn,st,it) ->
+    --cExpr (HsLit (HsInt i)) = return $ intConvert i
     cExpr (HsLit (HsChar ch)) = return $ toE ch
     cExpr (HsLit (HsFrac i))  = return $ toE i
     cExpr (HsLambda sl ps e) | all isHsPVar ps' = do
@@ -626,6 +633,13 @@ integer_cutoff = 500000000
 
 intConvert i | abs i > integer_cutoff  =  ELit (LitCons dc_Integer [ELit $ LitInt (fromInteger i) (rawType "intmax_t")] tInteger)
 intConvert i =  ELit (LitCons dc_Int [ELit $ LitInt (fromInteger i) (rawType "int")] tInt)
+
+intConvert' funcs typ i = EAp (EAp fun typ) (ELit (LitCons con [ELit $ LitInt (fromInteger i) (rawType rawtyp)] ltype))  where
+    (con,ltype,fun,rawtyp) = case abs i > integer_cutoff of
+        True -> (dc_Integer,tInteger,f_fromInteger,"intmax_t")
+        False -> (dc_Int,tInt,f_fromInt,"int")
+    f_fromInt = func_fromInt funcs
+    f_fromInteger = func_fromInteger funcs
 
 litconvert (HsChar i) t | t == tChar =  LitInt (fromIntegral $ ord i) tCharzh
 litconvert e t = error $ "litconvert: shouldn't happen: " ++ show (e,t)

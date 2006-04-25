@@ -647,10 +647,10 @@ renameHsExp (HsCon hsName) subTable = do
     hsName' <- renameHsName hsName subTable
     wrapInAsPat (HsCon hsName')
 
-renameHsExp i@(HsLit (HsInt num)) st = do
-    let fi = if abs num > 500000000 then func_fromInteger else func_fromInt
-    z <- renameHsExp fi st
-    return $ HsParen (HsApp z i)
+renameHsExp i@(HsLit (HsInt _num)) _st = do return i
+    --let fi = if abs num > 500000000 then func_fromInteger else func_fromInt
+    --z <- renameHsExp fi st
+    --return $ HsParen (HsApp z i)
 renameHsExp i@(HsLit (HsFrac _)) st = do
     z <- renameHsExp func_fromRational st
     return $ HsParen (HsApp z i)

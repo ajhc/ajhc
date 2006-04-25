@@ -155,6 +155,13 @@ tiExpr (HsCon conName) typ = do
     sc `subsumes` typ
     return (HsCon conName)
 
+tiExpr (HsLit l@(HsInt _)) typ = do
+    t <- tiLit l
+    t `subsumes` typ
+    (ne,n) <- wrapInAsPat (HsLit l)
+    addToCollectedEnv (Map.singleton n typ)
+    return ne
+
 tiExpr (HsLit l) typ = do
     t <- tiLit l
     t `subsumes` typ
