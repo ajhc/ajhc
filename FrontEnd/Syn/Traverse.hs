@@ -188,7 +188,33 @@ traverseHsPat fn p = f p where
           return (HsPRec hsName hsPatFields')
     fField (HsPFieldPat n p) = fn p >>= return . HsPFieldPat n
 
+traverseHsRhsHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsRhs -> m HsRhs
+traverseHsRhsHsExp fn d = f d where
+    f (HsUnGuardedRhs e) = fn e >>= return . HsUnGuardedRhs
+    f (HsGuardedRhss rs) = return HsGuardedRhss `ap` mapM g rs
+    g (HsGuardedRhs sl e1 e2) = return (HsGuardedRhs sl) `ap` fn e1 `ap` fn e2
 
+traverseHsDeclHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsDecl -> m HsDecl
+traverseHsDeclHsExp fn d = f d where
+    f (HsPatBind srcLoc hsPat hsRhs {-where-} hsDecls) = withSrcLoc srcLoc $ do
+        hsDecls'  <- mapM (traverseHsDeclHsExp fn) hsDecls
+        hsRhs'    <- traverseHsRhsHsExp fn hsRhs
+        return (HsPatBind srcLoc hsPat hsRhs' {-where-} hsDecls')
+--    f (HsFunBind hsMatches)  = do
+--        hsMatches'     <- mapM (traverseHsMatchHsExp fn) hsMatches
+--        return (HsFunBind hsMatches')
+    f (HsClassDecl srcLoc hsQualType hsDecls)  = withSrcLoc srcLoc $ do
+        hsDecls'  <- mapM (traverseHsDeclHsExp fn) hsDecls
+        return (HsClassDecl srcLoc hsQualType hsDecls')
+    f (HsInstDecl srcLoc hsQualType hsDecls)  = withSrcLoc srcLoc $ do
+        hsDecls'  <- mapM (traverseHsDeclHsExp fn) hsDecls
+        return (HsInstDecl srcLoc hsQualType hsDecls')
+--    f prules@HsPragmaRules { hsDeclSrcLoc = srcLoc, hsDeclFreeVars = fvs, hsDeclLeftExpr = e1, hsDeclRightExpr = e2 }  = withSrcLoc srcLoc $ do
+--        fvs' <- sequence [ fmapM (`renameHsType` ) t  >>= return . (,) n | (n,t) <- fvs]
+--        e1' <- renameHsExp e1
+--        e2' <- renameHsExp e2
+--        return prules {  hsDeclFreeVars = fvs', hsDeclLeftExpr = e1', hsDeclRightExpr = e2' }
+    f otherHsDecl = return otherHsDecl
 
 
 
