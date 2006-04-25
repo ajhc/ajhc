@@ -47,7 +47,7 @@ unbox dataTable e vn wtd = eCase e  [Alt (LitCons cna [tvra] te) (wtd tvra)] Unk
 
 intt = rawType "int"
 
-rawMap = Map.fromList [ (rawType w,toAtom t) | (_,w,t) <- allCTypes]
+rawMap = Map.fromList [ (rawType w,toAtom t) | (_,_,_,w,t) <- allCTypes]
 typ_float = toAtom "float"
 
 vars :: [E] -> [TVr]

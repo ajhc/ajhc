@@ -36,7 +36,9 @@ foreach my $d (@ds) {
     $sname =~ s/(.*)\.([A-Za-z0-9]+)$/$2/ or die "improper name";
     my $mname = $1;
 
+    print "{-# NOINLINE tc_$sname #-}\n";
     print "tc_$sname = toName TypeConstructor (\"$mname\",\"$sname\")\n";
+    print "{-# NOINLINE dc_$sname #-}\n";
     print "dc_$sname = toName DataConstructor \"$sname#\"\n";
 }
 
@@ -44,6 +46,7 @@ print "\n";
 
 foreach my $rt (sort keys %rt) {
     $rt =~ s/ /_/g;
+    print "{-# NOINLINE rt_$rt #-}\n";
     print "rt_$rt = toName RawType \"$rt\"\n";
 
 }

@@ -216,7 +216,7 @@ tarrow = Constructor {
         }
 
 
-primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,b,_) -> b) allCTypes) where
+primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,_,_,b,_) -> b) allCTypes) where
     g n = Constructor {
         conName = rn,
         conType = eHash,
@@ -227,7 +227,7 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,b,_) -> b) al
         conInhabits = tHash,
         conChildren = Nothing
        } where rn = toName RawType n
-    f (x,y,z) | z /= "void" = [typeCons,dataCons] where
+    f (dc,tc,rt,y,z) | z /= "void" = [typeCons,dataCons] where
         dataCons = Constructor {
             conName = dc,
             conType = tipe,
@@ -250,9 +250,6 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,b,_) -> b) al
            }
 
         rn = toName RawType y
-        rt = ELit (LitCons rn [] eHash)
-        dc = parseName DataConstructor x
-        tc = parseName TypeConstructor x
         tipe = ELit (LitCons tc [] eStar)
     f _ = []
 
@@ -302,7 +299,11 @@ typesCompatable dataTable a b = go a b where
 
 
 lookupCType dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
-    ELit (LitCons c [] _) | Just pt <- Map.lookup c ctypeMap -> return (c,pt)
+    ELit (LitCons c [] _)
+        | c == tc_Unit -> return (c,"void")
+        | c == tc_World__ -> return (c,"void")
+        | Just pt <- Map.lookup c ctypeMap -> return (c,pt)
+
     e' -> fail $ "lookupCType: " ++ show (e,e')
 
 lookupCType' dataTable e = case followAliases (mappend dataTablePrims dataTable) e of

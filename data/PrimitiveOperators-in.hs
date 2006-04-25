@@ -30,7 +30,7 @@ create_integralCast_toInteger c1 t1 e = create_integralCast c1 t1 dc_Integer tIn
 create_integralCast_fromInt c2 t2 e t = create_integralCast dc_Int tIntzh c2 t2 e t
 create_integralCast_fromInteger c2 t2 e t = create_integralCast dc_Integer tIntegerzh c2 t2 e t
 
-ctypeMap = Map.fromList [ (parseName TypeConstructor n,v) | (n,v,_) <- allCTypes ]
+ctypeMap = Map.fromList [ (tc,v) | (_,tc,_,v,_) <- allCTypes ]
 
 toTypeName x = parseName TypeConstructor x
 toClassName x = parseName ClassName x
@@ -81,7 +81,7 @@ op_aaI op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
     tvrc = tVr 10 intt
     st = rawType ct
     wtd = eStrictLet tvrc (oper_aaI op ct (EVar tvra) (EVar tvrb)) (rebox (EVar tvrc))
-    rebox x = ELit (LitCons d_Prelude_Int [x] t)
+    rebox x = ELit (LitCons dc_Int [x] t)
 
 op_aaB op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
     tvra' = tVr 2 t

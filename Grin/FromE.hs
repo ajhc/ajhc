@@ -215,7 +215,7 @@ primTyEnv = TyEnv . Map.fromList $ [
     (funcApply, ([TyNode, TyPtr TyNode],TyNode)),
     (funcMain, ([],tyUnit)),
     (tagHole, ([],TyNode))
-    ] ++ [ (toAtom ('C':x), ([Ty $ toAtom y],TyNode)) | (x,y,_) <- allCTypes, y /= "void" ]
+    ] ++ [ (toAtom ('C':show dc), ([Ty $ toAtom y],TyNode)) | (dc,tc,_,y,_) <- allCTypes, y /= "void" ]
 
 
 -- | constant CAF analysis

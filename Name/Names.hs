@@ -7,12 +7,13 @@
 -- rt_foo for raw names
 -- class_foo for classes
 
-module Name.Names where
+module Name.Names(module Name.Names,module Name.Prim) where
 
 import Char(isDigit)
 
 import Name.VConsts
 import Name.Name
+import Name.Prim
 
 instance TypeNames Name where
     tInt = tc_Int
@@ -58,13 +59,9 @@ instance FromTupname Name where
 
 -- The constructors
 
-dc_Addr = toName DataConstructor ("Jhc.Addr","Addr")
-dc_Char = toName DataConstructor ("Prelude","Char")
 dc_Cons = toName DataConstructor ("Prelude",":")
 dc_EmptyList = toName DataConstructor ("Prelude","[]")
 dc_False = toName DataConstructor ("Prelude","False")
-dc_Integer = toName DataConstructor ("Prelude","Integer")
-dc_Int = toName DataConstructor ("Prelude","Int")
 dc_JustIO = toName DataConstructor ("Jhc.IO", "JustIO")
 dc_Rational = toName DataConstructor ("Ratio",":%")
 dc_True = toName DataConstructor ("Prelude","True")
@@ -81,21 +78,11 @@ tc_IO = toName TypeConstructor ("Jhc.IO", "IO")
 tc_World__ = toName TypeConstructor ("Jhc.IO","World__")
 
 tc_Bool = toName TypeConstructor ("Prelude","Bool")
-tc_Char = toName TypeConstructor ("Prelude","Char")
-tc_Double = toName TypeConstructor ("Prelude","Double")
-tc_Integer = toName TypeConstructor ("Prelude","Integer")
-tc_Int = toName TypeConstructor ("Prelude","Int")
 tc_List = toName TypeConstructor ("Prelude","[]")
 tc_Ptr = toName TypeConstructor ("Foreign.Ptr","Ptr")
 tc_Ratio = toName TypeConstructor ("Ratio","Ratio")
 tc_Unit = toName TypeConstructor  ("Prelude","()")
 
-rt_int = toName RawType "int"
-rt_uint32_t = toName RawType "uint32_t"
-rt_intmax_t = toName RawType "intmax_t"
-rt_HsChar   = toName RawType "HsChar"
-rt_HsPtr    = toName RawType "HsPtr"
-rt_HsFunPtr = toName RawType "HsFunPtr"
 
 rt_Worldzh = toName RawType "World#"
 rt_tag = toName RawType "tag#"
