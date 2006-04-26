@@ -63,9 +63,9 @@ instance CanType Tyvar Kind where
 instance CanType Type Kind where
   getType (TCon tc) = getType tc
   getType (TVar u)  = getType u
-  getType (TAp t _) = case (getType t) of
+  getType typ@(TAp t _) = case (getType t) of
                      (Kfun _ k) -> k
-                     x -> error $ "Type.getType: Invalid getType in type application for "++show t++": "++show x
+                     x -> error $ "Type.getType: kind error in: " ++ (show typ)
   getType (TArrow _l _r) = Star
   getType (TForAll _ (_ :=> t)) = getType t
   getType (TExists _ (_ :=> t)) = getType t
