@@ -570,10 +570,16 @@ simplifyDs prog sopts dsIn = ans where
         mtick "E.Simplify.case-atomic-unboxed"
         f d (insertDoneSubst b e inb) -- minsert (tvrIdent b) (Done e) sub) inb
         --f d (minsert (tvrIdent b) (Susp e sub) sub) inb
+    doCase e _ TVr { tvrIdent = 0 } [] (Just d) inb | isOmittable inb e = do
+        mtick "E.Simplify.case-omittable"
+        f d inb
     doCase (EVar v) _ b [] (Just d) inb | Just (NotAmong _) <-  mlookup (tvrIdent v) (envInScope inb)  = do
         mtick "E.Simplify.case-evaled"
         d' <- f d (insertDoneSubst b (EVar v) inb) -- minsert (tvrIdent b) (Done (EVar v)) sub) inb
         return d'
+    doCase e _ b [] (Just (EVar v')) inb | b == v' = do
+        mtick "E.Simplify.case-trailing"
+        return e
     doCase scrut _ v [] (Just sc@ECase { eCaseScrutinee = EVar v'} ) inb | v == v', tvrIdent v `notMember` (freeVars (caseBodies sc) :: IdSet)  = do
         mtick "E.Simplify.case-default-case"
         doCase scrut (eCaseType sc) (eCaseBind sc) (eCaseAlts sc) (eCaseDefault sc) inb
@@ -612,6 +618,16 @@ simplifyDs prog sopts dsIn = ans where
         as' <- mapM da as
         t' <- dosub inb t
         return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind =  b', eCaseAlts = as', eCaseDefault = d'}
+
+    isOmittable _ ELit {} = True
+    isOmittable _ EPi {} = True
+    isOmittable _ ELam {} = True
+    isOmittable _ (EPrim (APrim p _) _ _) = primIsConstant p
+    isOmittable inb (EVar v) = case mlookup (tvrIdent v) (envInScope inb) of
+        Just IsBoundTo { bindingE = e } | not (isEVar e) -> isOmittable inb e
+        Just (NotAmong _) -> True
+        _ -> False
+    isOmittable _ _ = False
 
     doConstCase :: {- Out -} Lit E E -> InE -> InTVr -> [Alt E] -> Maybe InE -> Env -> SM m OutE
     doConstCase l t b as d inb = do
