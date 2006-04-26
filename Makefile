@@ -14,7 +14,7 @@ HCI = ghci
 HC_OPTS = $(GHCOPTS)
 
 PROF_OPTS = -P
-JHCOPTS = +RTS -G2 -T8 -S -RTS
+RTSOPTS = +RTS -G2 -T8 -S -RTS
 
 BUILTSOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs Version/Raw.hs Version/Ctx.hs Name/Prim.hs
 
@@ -46,19 +46,19 @@ DP=$(PREFIX)
 
 base-1.0.hl: jhc lib/base/base.cabal
 	-[ -e base.log ] && mv -f base.log base.log.bak
-	./jhc -v $(JHCOPTS) $(JHC_TEST)  -ilib/base --noauto --build-hl lib/base/base.cabal -o $@ 2>&1 | tee base.log
+	./jhc -v $(RTSOPTS) $(JHC_TEST)  -ilib/base --noauto --build-hl lib/base/base.cabal -o $@ 2>&1 | tee base.log
 
 base-1.0.prof.hl: jhc lib/base/base.cabal
 	-[ -e base.prof.log ] && mv -f base.prof.log base.prof.log.bak
-	./jhcp -v $(JHCOPTS) $(JHC_TEST) -ilib/base --noauto --build-hl lib/base/base.cabal -o base-1.0.prof.hl +RTS $(PROF_OPTS)  2>&1 | tee base.log
+	./jhcp -v $(RTSOPTS) $(JHC_TEST) -ilib/base --noauto --build-hl lib/base/base.cabal -o base-1.0.prof.hl +RTS $(PROF_OPTS)  2>&1 | tee base.log
 
 #install: jhc base-1.0.hl
 
 haskell98-1.0.hl: jhc lib/haskell98/haskell98.cabal base-1.0.hl
-	./jhc -v $(JHCOPTS) $(JHC_TEST) -ilib/haskell98 --noauto -L- -L. -p base --build-hl lib/haskell98.cabal -o $@
+	./jhc -v $(RTSOPTS) $(JHC_TEST) -ilib/haskell98 --noauto -L- -L. -p base --build-hl lib/haskell98.cabal -o $@
 
 QuickCheck-1.0.hl: jhc base-1.0.hl
-	./jhc -v $(JHCOPTS) -d progress $(JHC_TEST) -ilib/QuickCheck -L- -L. -f cpp --build-hl lib/QuickCheck/QuickCheck.cabal -o $@
+	./jhc -v $(RTSOPTS) -d progress $(JHC_TEST) -ilib/QuickCheck -L- -L. -f cpp --build-hl lib/QuickCheck/QuickCheck.cabal -o $@
 
 install: jhc $(LIBPACKAGES)
 	install -d "$(DP)/bin"
