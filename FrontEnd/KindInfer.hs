@@ -369,6 +369,8 @@ kiHsQualType :: KindEnv -> HsQualType -> KindEnv
 kiHsQualType inputEnv qualType = newState where
     (_, newState) = unsafePerformIO $ runKI inputEnv $ withContext ("kiHsQualType: " ++ show qualType) $ do
         kiQualType False qualType
+        currentSubst <- getSubst
+        applySubstToEnv currentSubst
         envVarsToStars
 
 {-
