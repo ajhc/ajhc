@@ -679,16 +679,19 @@ cycle xs         =  xs' where xs' = xs ++ xs'
 -- is equivalent to (take n xs, drop n xs).
 
 
-take                   :: Int -> [a] -> [a]
-take n _      | n <= 0 =  []
-take _ []              =  []
-take n (x:xs)          =  x : take (n-1) xs
+take :: Int -> [a] -> [a]
+take n xs = f n xs where
+    f n _      | n <= 0 =  []
+    f _ []              =  []
+    f n (x:xs)          =  x : f (n-1) xs
 
 
-drop                   :: Int -> [a] -> [a]
-drop n xs     | n <= 0 =  xs
-drop _ []              =  []
-drop n (_:xs)          =  drop (n-1) xs
+drop :: Int -> [a] -> [a]
+drop n xs = f n xs where
+    f n xs | n <= 0 =  xs
+    f _ [] = []
+    f n (_:xs) = f (n-1) xs
+
 
 
 splitAt                  :: Int -> [a] -> ([a],[a])
