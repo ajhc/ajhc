@@ -443,6 +443,9 @@ maybe n f m = case m of
 data Either a b = Left a | Right b
     deriving (Eq, Ord, Read, Show)
 
+either :: (a -> c) -> (b -> c) -> Either a b -> c
+either f g (Left x)  =  f x
+either f g (Right y) =  g y
 
 {-# INLINE fst, snd #-}
 fst (a,b) = a
