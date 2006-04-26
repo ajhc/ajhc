@@ -8,6 +8,17 @@ module Prelude(
     -- functions from elsewhere
     putStr,
     putStrLn,
+
+    concatMap,
+    concat,
+    any,
+    all,
+    foldr,
+    and,
+    or,
+    (!!),
+    sequence,
+    sequence_,
     -- submodules
     module Prelude.IO,
     module Prelude.Text
@@ -21,6 +32,7 @@ import Data.Ratio
 import qualified Data.Char as Char(isSpace,ord,chr)
 import Jhc.IO
 import Jhc.Tuples
+import Jhc.List
 
 
 infixr 9  .
@@ -311,11 +323,11 @@ class Monad m  where
     m >> k  =  m >>= \_ -> k
     fail s  = error s
 
-sequence       :: Monad m => [m a] -> m [a]
-sequence       =  foldr mcons (return [])
-                    where mcons p q = p >>= \x -> q >>= \y -> return (x:y)
-sequence_      :: Monad m => [m a] -> m ()
-sequence_      =  foldr (>>) (return ())
+--sequence       :: Monad m => [m a] -> m [a]
+--sequence       =  foldr mcons (return [])
+--                    where mcons p q = p >>= \x -> q >>= \y -> return (x:y)
+--sequence_      :: Monad m => [m a] -> m ()
+--sequence_      =  foldr (>>) (return ())
 
 -- The xxxM functions take list arguments, but lift the function or
 -- list element to a monad type
@@ -512,12 +524,12 @@ filter p (x:xs) | p x       = x : filter p xs
                 | otherwise = filter p xs
 
 
-concat :: [[a]] -> [a]
-concat xss = foldr (++) [] xss
+--concat :: [[a]] -> [a]
+--concat xss = foldr (++) [] xss
 
 
-concatMap :: (a -> [b]) -> [a] -> [b]
-concatMap f = foldr ((++) . f) []
+--concatMap :: (a -> [b]) -> [a] -> [b]
+--concatMap f = foldr ((++) . f) []
 --concatMap f = concat . map f
 
 -- head and tail extract the first element and remaining elements,
@@ -564,19 +576,19 @@ length xs = f xs 0 where
 
 -- List index (subscript) operator, 0-origin
 
-(!!)                :: [a] -> Int -> a
+--(!!)                :: [a] -> Int -> a
 --xs     !! n | n < 0 =  error "Prelude.!!: negative index"
 --[]     !! _         =  error "Prelude.!!: index too large"
 --(x:_)  !! 0         =  x
 --(_:xs) !! n         =  xs !! (n-1)
 
-xs !! n | n < 0   =  error "Prelude.(!!): negative index\n"
-	| otherwise =  sub xs n where
-			    sub :: [a] -> Int -> a
-                            sub []     _ = error "Prelude.(!!): index too large\n"
-                            sub (y:ys) n = if n == 0
-					   then y
-					   else sub ys $! (n - 1)
+--xs !! n | n < 0   =  error "Prelude.(!!): negative index\n"
+--	| otherwise =  sub xs n where
+--			    sub :: [a] -> Int -> a
+--                            sub []     _ = error "Prelude.(!!): index too large\n"
+--                            sub (y:ys) n = if n == 0
+--					   then y
+--					   else sub ys $! (n - 1)
 
 -- foldl, applied to a binary operator, a starting value (typically the
 -- left-identity of the operator), and a list, reduces the list using
@@ -615,9 +627,9 @@ scanl1 _ []      =  []
 -- above functions.
 
 
-foldr :: (a -> b -> b) -> b -> [a] -> b
-foldr k z [] = z
-foldr k z (x:xs) = k x (foldr k z xs)
+--foldr :: (a -> b -> b) -> b -> [a] -> b
+--foldr k z [] = z
+--foldr k z (x:xs) = k x (foldr k z xs)
 
 
 foldr1           :: (a -> a -> a) -> [a] -> a
@@ -760,16 +772,17 @@ reverse l =  rev l [] where
 -- value at a finite index of a finite or infinite list.  or is the
 -- disjunctive dual of and.
 
-and, or          :: [Bool] -> Bool
-and              =  foldr (&&) True
-or               =  foldr (||) False
+-- from Jhc.List
+--and, or          :: [Bool] -> Bool
+--and              =  foldr (&&) True
+--or               =  foldr (||) False
 
 -- Applied to a predicate and a list, any determines if any element
 -- of the list satisfies the predicate.  Similarly, for all.
 
-any, all         :: (a -> Bool) -> [a] -> Bool
-any p            =  or . map p
-all p            =  and . map p
+--any, all         :: (a -> Bool) -> [a] -> Bool
+--any p            =  or . map p
+--all p            =  and . map p
 
 -- elem is the list membership predicate, usually written in infix form,
 -- e.g., x `elem` xs.  notElem is the negation.
@@ -939,30 +952,8 @@ instance Real Int where
     toRational = fromInt
 
 
-filterIterate :: (a -> Bool) -> (a -> a) -> a -> [a]
-filterIterate p f x = fi x where
-    fi x | p x = x : fi (f x)
-    fi x = fi (f x)
 
-mapIterate :: (a -> b) -> (a -> a) -> a -> [b]
-mapIterate f g x = fi x where
-    fi x = f x : fi (g x)
-
-filterMap :: (b -> Bool) -> (a -> b) -> [a] -> [b]
-filterMap p f xs = fm xs where
-    fm (x:xs) = let nx = f x in if p nx then nx:fm xs else fm xs
-    fm [] = []
-
-mapFilter :: (a -> b) -> (a -> Bool) -> [a] -> [b]
-mapFilter f p xs = fm xs where
-    fm (x:xs) = if p x then f x:fm xs else fm xs
-    fm [] = []
-
-{-# RULES "map/filter" forall f p xs . map f (filter p xs) = mapFilter f p xs  #-}
-{-# RULES "filter/map" forall f p xs . filter p (map f xs) = filterMap p f xs  #-}
 {-# RULES "iterate/id" forall . iterate id = repeat #-}
-{-# RULES "map/iterate" forall f g x . map f (iterate g x) = mapIterate f g x  #-}
-{-# RULES "filter/iterate" forall p f x . filter p (iterate f x) = filterIterate p f x  #-}
 {-# RULES "head/iterate"  forall f x . head (iterate f x) = x #-}
 {-# RULES "head/repeat"   forall x . head (repeat x) = x #-}
 {-# RULES "tail/repeat"   forall x . tail (repeat x) = repeat x #-}
@@ -1001,10 +992,6 @@ mapFilter f p xs = fm xs where
 {-# RULES "sequence_/[]"  sequence_ [] = return () #-}
 {-# RULES "mapM/[]"       forall f . mapM f [] = return [] #-}
 {-# RULES "mapM_/[]"      forall f . mapM_ f [] = return () #-}
-{-# RULES "foldr/single"  forall k z x . foldr k z [x] = k x z #-}
-{-# RULES "foldr/double"  forall k z x y . foldr k z [x,y] = k x (k y z) #-}
-{-# RULES "foldr/triple"  forall k z a b c . foldr k z [a,b,c] = k a (k b (k c z)) #-}
-{-# RULES "foldr/id"      foldr (:) [] = \x -> x  #-}
 {-# RULES "concatMap/++"  forall xs ys f . concatMap f (xs ++ ys) = concatMap f xs ++ concatMap f ys #-}
 {-# RULES "map/++"        forall xs ys f . map f (xs ++ ys) = map f xs ++ map f ys #-}
 {-# RULES "sequence_/++"  forall xs ys . sequence_ (xs ++ ys) = sequence_ xs >> sequence_ ys #-}
@@ -1016,7 +1003,6 @@ mapFilter f p xs = fm xs where
 {-# RULES "foldr/++" forall k z xs ys . foldr k z (xs ++ ys) = foldr k (foldr k z ys) xs #-}
 {-# RULES "foldr/concat" forall k z xs . foldr k z (concat xs) = foldr (\x y -> foldr k y x) z xs #-}
 {-# RULES "foldr/repeat" forall k _z x . foldr k _z (repeat x) = let r = k x r in r #-}
-{-# RULES "foldr/[]" forall _k z . foldr _k z [] = z #-}
 -- causes horrible code bloat
 -- {-# RULES "foldr/x:xs" forall k z x xs . foldr k z (x:xs) = k x (foldr k z xs) #-}
 {-# RULES "foldr/zip" forall k z xs ys . foldr k z (zip xs ys) = let zip' (a:as) (b:bs) = k (a,b) (zip' as bs); zip' _ _ = z in zip' xs ys #-}

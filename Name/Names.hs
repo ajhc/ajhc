@@ -96,11 +96,11 @@ v_fromEnum = toName Val ("Prelude","fromEnum")
 v_minBound = toName Val ("Prelude","minBound")
 v_maxBound = toName Val ("Prelude","maxBound")
 v_fail = toName Val ("Prelude","fail")
-v_concatMap = toName Val ("Prelude","concatMap")
+v_concatMap = toName Val ("Jhc.List","concatMap")
 v_map = toName Val ("Prelude","map")
 v_and = toName Val ("Prelude","&&")
 v_filter = toName Val ("Prelude","filter")
-v_foldr = toName Val ("Prelude","foldr")
+v_foldr = toName Val ("Jhc.List","foldr")
 v_undefined = toName Val ("Prelude","undefined")
 v_undefinedIOErrorCont = toName Val ("Jhc.IO","undefinedIOErrorCont")
 v_silly = toName Val ("Jhc@","silly")
@@ -108,7 +108,7 @@ v_silly = toName Val ("Jhc@","silly")
 sFuncNames = FuncNames {
     func_bind = toName Val ("Prelude",">>="),
     func_bind_ = toName Val ("Prelude",">>"),
-    func_concatMap = toName Val ("Prelude","concatMap"),
+    func_concatMap = toName Val ("Jhc.List","concatMap"),
     func_equals = toName Val ("Prelude","=="),
     func_fromInteger = toName Val ("Prelude","fromInteger"),
     func_fromInt = toName Val ("Prelude","fromInt"),
