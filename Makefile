@@ -14,7 +14,6 @@ HCI = ghci
 HC_OPTS = $(GHCOPTS)
 
 PROF_OPTS = -P
-RTSOPTS = +RTS -G2 -T8 -S -RTS
 
 BUILTSOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs Version/Raw.hs Version/Ctx.hs Name/Prim.hs
 
