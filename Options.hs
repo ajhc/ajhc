@@ -6,6 +6,7 @@ module Options(
     Mode(..),
     putVerbose,
     putVerboseLn,
+    getArguments,
     verbose,
     verbose2,
     dump,
@@ -162,10 +163,16 @@ postProcessFO o = case FlagOpts.process (optFOptsSet o) (optFOpts o) of
         (_,xs) -> fail ("Unrecognized flag passed to '-f': "
                         ++ unwords xs ++ "\nValid flags:\n\n" ++ FlagOpts.helpMsg)
 
+getArguments = do
+    x <- lookupEnv "JHCOPTS"
+    let eas = maybe [] words x
+    as <- System.getArgs
+    return (eas ++ as)
+
 {-# NOINLINE processOptions #-}
 -- | Parse commandline options.
 processOptions :: IO Opt
-processOptions = System.getArgs >>= (\argv -> either putErrDie return $ do
+processOptions = getArguments >>= (\argv -> either putErrDie return $ do
     let header = "Usage: jhc [OPTION...] Main.hs"
     let (o,ns,rc) = getOpt Permute theoptions argv
     when (rc /= []) $ fail (concat rc ++ usageInfo header theoptions)

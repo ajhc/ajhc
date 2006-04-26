@@ -84,9 +84,10 @@ progress str = wdump FD.Progress $  (putErrLn str) >> hFlush stderr
 progressM c  = wdump FD.Progress $ (c >>= putErrLn) >> hFlush stderr
 
 
+
 bracketHtml action = do
     pn <- System.getProgName
-    as <- System.getArgs
+    as <- getArguments
     wdump FD.Html $ putStrLn $ "<html><head><title>" ++ (unwords (pn:as)) ++ "</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body style=\"background: black; color: lightgrey\"><pre>"
     action `finally` (wdump FD.Html $ putStrLn "</pre></body></html>")
 
@@ -94,7 +95,7 @@ main = runMain $ bracketHtml $ do
     o <- processOptions
     progressM $ do
         name <- System.getProgName
-        args <- System.getArgs
+        args <- getArguments
         return (simpleQuote (name:args))
     case optMode o of
         BuildHl hl    -> createLibrary hl buildLibrary
@@ -698,7 +699,7 @@ compileGrinToC grin = do
     let cf = (fn ++ "_code.c")
     progress ("Writing " ++ show cf)
     name <- System.getProgName
-    args <- System.getArgs
+    args <- getArguments
     let argstring = simpleQuote (name:args)
         boehmOpts | fopts FO.Boehm = ["-DUSE_BOEHM_GC", "-lgc"]
                   | otherwise = []
