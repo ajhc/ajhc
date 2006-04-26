@@ -35,6 +35,7 @@ module Representation(
     )where
 
 
+import Control.Monad.Identity
 import Control.Monad.Trans
 import Data.Generics
 import Data.IORef
@@ -262,8 +263,18 @@ instance DocLike d => PPrint d HsIdentifier where
 instance DocLike d => PPrint d Type where
     pprint = prettyPrintType
 
+withNewNames ts action = subVarName $ do
+    ts' <- mapM newTyvarName ts
+    action ts'
+
+newTyvarName t = case tyvarKind t of
+    x@Star -> newLookupName (map (:[]) ['a' ..]) x t
+    y@(Star `Kfun` Star) -> newName (map (('f':) . show) [0 ..]) y t
+    z -> newLookupName (map (('t':) . show) [0 ..]) z t
+
+
 prettyPrintType :: DocLike d => Type -> d
-prettyPrintType t  = unparse $ runVarName (f t) where
+prettyPrintType t  = unparse $ runIdentity (runVarNameT (f t)) where
     arr = bop (R,0) (space <> text "->" <> space)
     app = bop (L,100) (text " ")
     fp (IsIn cn t) = do
@@ -271,27 +282,31 @@ prettyPrintType t  = unparse $ runVarName (f t) where
         return (atom (text $ show cn) `app` t')
     f (TForAll [] ([] :=> t)) = f t
     f (TForAll vs (ps :=> t)) = do
-        ts' <- mapM (newLookupName ['a'..] ()) vs
+        --ts' <- mapM (newLookupName ['a'..] ()) vs
+        --ts' <- mapM newTyvarName vs
+        withNewNames vs $ \ts' -> do
         t' <- f t
         ps' <- mapM fp ps
         return $ case ps' of
-            [] ->  fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text ". ")  (atomize t')
-            [p] -> fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text "." <+> unparse p <+> text "=> ")  (atomize t')
-            ps ->  fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text "." <+> tupled (map unparse ps) <+> text "=> ")  (atomize t')
+            [] ->  fixitize (N,-3) $ pop (text "forall" <+> hsep (map text ts') <+> text ". ")  (atomize t')
+            [p] -> fixitize (N,-3) $ pop (text "forall" <+> hsep (map text ts') <+> text "." <+> unparse p <+> text "=> ")  (atomize t')
+            ps ->  fixitize (N,-3) $ pop (text "forall" <+> hsep (map text ts') <+> text "." <+> tupled (map unparse ps) <+> text "=> ")  (atomize t')
     f (TExists [] ([] :=> t)) = f t
     f (TExists vs (ps :=> t)) = do
-        ts' <- mapM (newLookupName ['a'..] ()) vs
+        --ts' <- mapM (newLookupName ['a'..] ()) vs
+        --ts' <- mapM newTyvarName vs
+        withNewNames vs $ \ts' -> do
         t' <- f t
         ps' <- mapM fp ps
         return $ case ps' of
-            [] ->  fixitize (N,-3) $ pop (text "exists" <+> hsep (map char ts') <+> text ". ")  (atomize t')
-            [p] -> fixitize (N,-3) $ pop (text "exists" <+> hsep (map char ts') <+> text "." <+> unparse p <+> text "=> ")  (atomize t')
-            ps ->  fixitize (N,-3) $ pop (text "exists" <+> hsep (map char ts') <+> text "." <+> tupled (map unparse ps) <+> text "=> ")  (atomize t')
+            [] ->  fixitize (N,-3) $ pop (text "exists" <+> hsep (map text ts') <+> text ". ")  (atomize t')
+            [p] -> fixitize (N,-3) $ pop (text "exists" <+> hsep (map text ts') <+> text "." <+> unparse p <+> text "=> ")  (atomize t')
+            ps ->  fixitize (N,-3) $ pop (text "exists" <+> hsep (map text ts') <+> text "." <+> tupled (map unparse ps) <+> text "=> ")  (atomize t')
     f (TCon tycon) = return $ atom (pprint tycon)
     f (TVar tyvar) = do
         vo <- maybeLookupName tyvar
         case vo of
-            Just c  -> return $ atom $ char c
+            Just c  -> return $ atom $ text c
             Nothing -> return $ atom $ tshow (tyvarAtom tyvar)
     f (TAp (TCon (Tycon n _)) x) | n == tc_List = do
         x <- f x
