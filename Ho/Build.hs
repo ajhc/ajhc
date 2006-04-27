@@ -176,8 +176,8 @@ readHoFile fn = do
     bh <- openBinIO fh
     x <- get bh
     when (x /= magic) (putErrDie $ "Bad ho file magic1:" <+> fn)
-    hh <- get bh
-    ho <- get bh
+    hh <- lazyGet bh
+    ho <- lazyGet bh
     x <- get bh
     when (x /= magic2) (putErrDie $ "Bad ho file magic2:" <+> fn)
     --hClose fh
@@ -322,7 +322,7 @@ getModule initialHo ho name files  = do
                             r <- checkHoDep a
                             if r then f as else return False
                         f [] = return True
-                    r <- if hoLibraryDeps ho' ho then f (hohModDepends hh) else return False
+                    r <- if hoLibraryDeps ho' (initialHo `mappend` ho) then f (hohModDepends hh) else return False
                     case r of
                         True -> do
                             fixups <- readIORef fixup_ref
