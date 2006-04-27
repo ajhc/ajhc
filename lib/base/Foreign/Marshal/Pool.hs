@@ -18,7 +18,7 @@
 --
 --------------------------------------------------------------------------------
 
-module Foreign.Marshal.Pool (
+module Foreign.Marshal.Pool () where {- FIXME
    -- * Pool management
    Pool,
    newPool,             -- :: IO Pool
@@ -206,3 +206,4 @@ pooledNewArray0 pool marker vals = do
    ptr <- pooledMallocArray0 pool (length vals)
    pokeArray0 marker ptr vals
    return ptr
+-}
