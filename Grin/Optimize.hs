@@ -89,7 +89,7 @@ grinPush stats lam = ans where
 
 isOmittable (Fetch {}) = True
 isOmittable (Return {}) = True
-isOmittable (Store (NodeC n _)) | n == tagHole = False
+isOmittable (Store (NodeC n _)) | isMutableNodeTag n || n == tagHole = False
 isOmittable (Store {}) = True
 isOmittable Prim { expPrimitive = Primitive { primAPrim = aprim } } = aprimIsCheap aprim
 isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
@@ -120,11 +120,11 @@ mapExpExp _ x = return x
 performSpeculate specs grin = do
     let sset = Set.fromList (map tagFlipFunction specs)
     let f (a,l) = mapBodyM h l  >>= \l' -> return (a,l')
-        h (Store (NodeC t xs)) | t `member` sset = do
+        h (Store (NodeC t xs)) | not (isMutableNodeTag t), t `member` sset = do
             let t' = tagFlipFunction t
             mtick $ "Optimize.speculate.store.{" ++ show t'
             return (App t' xs TyNode :>>= n1 :-> Store n1)
-        h (Update v (NodeC t xs)) | t `member` sset = do
+        h (Update v (NodeC t xs)) | not (isMutableNodeTag t), t `member` sset = do
             let t' = tagFlipFunction t
             mtick $ "Optimize.speculate.update.{" ++ show t'
             return (App t' xs TyNode :>>= n1 :-> Update v n1)

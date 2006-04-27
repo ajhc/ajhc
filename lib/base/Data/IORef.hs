@@ -1,5 +1,5 @@
 module Data.IORef(
-    IORef,	      -- abstract, instance of: Eq
+    IORef(),	      -- abstract, instance of: Eq
     newIORef,	      -- :: a -> IO (IORef a)
     readIORef,	      -- :: IORef a -> IO a
     writeIORef,	      -- :: IORef a -> a -> IO ()
@@ -9,22 +9,40 @@ module Data.IORef(
 
 import Jhc.IO
 
-data Ref s a = Ref a
+data IORef a = IORef a
 
-type IORef = Ref World__
+{-# NOINLINE newIORef #-}
+newIORef :: a -> IO (IORef a)
+newIORef v = do
+    v' <- strictReturn v
+    return (IORef v')
 
-foreign import primitive newRef__ :: forall s . a -> s -> (s,Ref s a)
-foreign import primitive readRef__ :: forall s . Ref s a -> s -> (s,a)
-foreign import primitive writeRef__ :: forall s . Ref s a -> a -> s -> s
+{-# NOINLINE readIORef #-}
+readIORef :: IORef a -> IO a
+readIORef r = do
+    --v <- strictReturn r
+    case r of
+        IORef r -> strictReturn r
 
-foreign import primitive eqRef__ :: forall s . Ref s a -> Ref s a -> Bool
 
-newIORef v = IO $ \_ world -> case newRef__ v world of
-    (world',r) -> JustIO world' r
-readIORef r = IO $ \_ world -> case readRef__ r world of
-    (world',v) -> JustIO world' v
-writeIORef r v = IO $ \_ world -> case writeRef__ r v world of
-    world' -> JustIO world' ()
+--foreign import primitive newRef__ :: forall s . a -> s -> (s,Ref s a)
+--foreign import primitive readRef__ :: forall s . Ref s a -> s -> (s,a)
+foreign import primitive writeRef__ ::  IORef a -> a -> World__ -> World__
+
+{-# NOINLINE writeIORef #-}
+writeIORef :: IORef a -> a -> IO ()
+writeIORef r v = do
+    IO $ \_ world -> case writeRef__ r v world of
+        world' -> JustIO world' ()
+
+--foreign import primitive eqRef__ :: forall s . Ref s a -> Ref s a -> Bool
+
+--newIORef v = IO $ \_ world -> case newRef__ v world of
+--    (world',r) -> JustIO world' r
+--readIORef r = IO $ \_ world -> case readRef__ r world of
+--    (world',v) -> JustIO world' v
+--writeIORef r v = IO $ \_ world -> case writeRef__ r v world of
+--    world' -> JustIO world' ()
 
 --instance Eq (IORef a) where
 --    x == y = eqRef__ x y

@@ -118,11 +118,11 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as
                 addRule $ conditionalRule id fn' $ mconcat [ mconcatMap (implies (sValue usedArgs fn) . varValue) (freeVars a) | (fn,a) <- combineArgs a vs]
                 addRule $ fn' `implies` sValue usedFuncs a
                 addRule (mconcatMap doConst vs)
-            g (Update (Var v _) n@(~(NodeC x vs)))
+            g (Update vv@(Var v _) n@(~(NodeC x vs)))
                 | v < v0 = do
                     v' <- supplyValue usedCafs v
                     addRule $ conditionalRule id v' $ doNode n
-                | otherwise = addRule $ doNode n
+                | otherwise = addRule $ (doNode vv) `mappend` (doNode n)
             g (Store n) = addRule $ doNode n
             g (Fetch x) = addRule $ doNode x
             g Error {} = return ()

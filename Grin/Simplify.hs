@@ -50,6 +50,9 @@ at_OptSimplifyEnumAssignment  = toAtom "Optimize.simplify.enum-assignment"
 -- contains functions that should be inlined
 type SimpEnv = Map.Map Atom (Atom,Lam)
 
+valIsMutable (NodeC t _) = isMutableNodeTag t
+valIsMutable _ = False
+
 simplify1 :: Stats -> SimpEnv -> (Atom,Lam) -> IO (Atom,Lam)
 simplify1 stats env (n,l) = do
     (l,_) <- evalStateT (whiz fn gv f whizState l) mempty
@@ -77,7 +80,7 @@ simplify1 stats env (n,l) = do
     gs (Prim Primitive { primAPrim = APrim CCast {} _, primType = (_,nty) } [Lit i _]) = do
         lift $ tick stats at_OptSimplifyCastLit
         return $ Return (Lit i nty)
-    gs (Store n) | valIsNF n = do
+    gs (Store n) | valIsNF n, not (valIsMutable n) = do
         lift $ tick stats at_OptSimplifyConstStore
         gs (Return (Const n))
     gs (App a [n@NodeC {},v] typ) | a == funcApply = do
@@ -156,10 +159,10 @@ simplify1 stats env (n,l) = do
                 return v
             Nothing -> return x
     getCS (b,app@(App a [vr@Var {}] _)) | a == funcEval = return $ Map.fromList [(app,Return b), (Store b,Return vr)]
-    getCS (b,app@App{})  = return $ Map.singleton app (Return b)
+    --getCS (b,app@App{})  = return $ Map.singleton app (Return b)
     --getCS (b@Var {},Store v@(Var _ _)) = return $ Map.singleton (App funcEval [b] TyNode) (Return v)     -- TODO - only works if node stores have always been evaluated.
-    getCS (b@Var {},Store v@(NodeC t _)) | tagIsWHNF t, t /= tagHole = return $ Map.fromList [(Store v,Return b),(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
-    getCS (b@Var {},Store v@(NodeC t _)) | t /= tagHole = return $ Map.fromList [(Store v,Return b)]
+    getCS (b@Var {},Store v@(NodeC t _)) | not (isMutableNodeTag t), tagIsWHNF t, t /= tagHole = return $ Map.fromList [(Store v,Return b),(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
+    getCS (b@Var {},Store v@(NodeC t _)) | not (isMutableNodeTag t), t /= tagHole = return $ Map.fromList [(Store v,Return b)]
     --getCS (b@Var {},Store v@(NodeC t as)) | Just (0,fn) <- tagUnfunction t = return $ Map.fromList [(Store v,Return b),(App funcEval [b] TyNode, App fn as TyNode :>>= n1 :-> Update b n1 :>>= unit :-> Return n1)]
     getCS (b@Var {},Store v@(NodeC t as)) | Just (0,fn) <- tagUnfunction t = return $ Map.fromList [(Store v,Return b)]
     getCS (b@Var {},Return (Const v)) = return $ Map.fromList [(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
@@ -305,10 +308,10 @@ optimize1 postEval (n,l) = g l where
     f (Return t@NodeC {} :>>= v :-> App fa [v',a] typ) | fa == funcApply, v == v' = do
         mtick "Optimize.optimize.return-apply"
         f (Return t :>>= v :-> doApply Return True t a typ)
-    f (Store t@NodeC {} :>>= v :-> App fa [v'] typ :>>= lr) | fa == funcEval, v == v' = do
+    f (Store t@NodeC {} :>>= v :-> App fa [v'] typ :>>= lr) | not (valIsMutable t), fa == funcEval, v == v' = do
         mtick "Optimize.optimize.store-eval"
         f (Store t :>>= v :-> doEval t typ :>>= lr)
-    f (Store t@NodeC {} :>>= v :-> App fa [v'] typ) | fa == funcEval, v == v' = do
+    f (Store t@NodeC {} :>>= v :-> App fa [v'] typ) | not (valIsMutable t), fa == funcEval, v == v' = do
         mtick "Optimize.optimize.store-eval"
         f (Store t :>>= v :-> doEval t typ)
     f (Update v t@NodeC {} :>>= Tup [] :-> App fa [v'] typ :>>= lr) | fa == funcEval, v == v' = do
@@ -528,6 +531,7 @@ simplify stats grin = do
             nl <- opt env a (0::Int) l
             let iname t = toAtom $ "Optimize.simplify.inline." ++ t ++ ".{" ++ fromAtom a  ++ "}"
                 inline
+                    | a `elem` noInline = Map.empty
                     | a `Set.member` loopBreakers = Map.empty
                     | Hist.find a hist == 1 = Map.singleton a (iname "once",nl)
                     | a `Set.member` indirectFuncs = Map.empty
@@ -538,6 +542,8 @@ simplify stats grin = do
     (nf,_) <- foldM procF ([],mempty) os
     return grin { grinFunctions = nf }
 
+
+noInline = [toAtom "fData.IORef.readIORef", toAtom "fData.IORef.writeIORef"]
 
 
 -- TODO have this collect CAF info ignoring updates.

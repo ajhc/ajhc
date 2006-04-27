@@ -25,6 +25,7 @@ module Grin.Grin(
     funcMain,
     gApply,
     gEval,
+    isMutableNodeTag,
     isHole,
     n0,n1,n2,n3,
     p0,p1,p2,p3,
@@ -637,8 +638,13 @@ modifyTail lam@(_ :-> lb) e = f e where
     f e = e :>>= lam
     g (p :-> e) = p :-> f e
 
+ref_tag =  (toAtom "CData.IORef.IORef")
+
+isMutableNodeTag t = t == ref_tag
+
 valIsConstant :: Val -> Bool
 valIsConstant (Tup xs) = all valIsConstant xs
+valIsConstant (NodeC t _) | isMutableNodeTag t = False
 valIsConstant (NodeC _ xs) = all valIsConstant xs
 valIsConstant Tag {} = True
 valIsConstant Lit {} = True
