@@ -32,9 +32,14 @@ deRefStablePtr (StablePtr x) = do
     v <- deref_ptr x
     return (unsafeCoerce v)
 
+deref_ptr = undefined
+ref_ptr = undefined
+unsafeCoerce = undefined
 
+{-
 
 foreign import primitive deref_ptr :: Ptr () -> IO PlaceHolder
 foreign import primitive ref_ptr   :: PlaceHolder -> IO (Ptr ())
 
 foreign import primitive unsafeCoerce :: a -> b
+-}
