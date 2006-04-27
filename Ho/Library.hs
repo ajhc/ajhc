@@ -142,4 +142,4 @@ readLibraryFile lname fp mbcs = do
 
 writeLibraryFile :: FilePath -> Library -> IO ()
 writeLibraryFile fp pkg = recordHoFile (libraryHo pkg) [fp] hoh >> return ()
-    where hoh = HoHeader 1 [] [] (libraryDesc pkg)
+    where hoh = HoHeader [] [] (libraryDesc pkg)

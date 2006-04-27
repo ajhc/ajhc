@@ -59,7 +59,7 @@ import Name.Id
 import Util.SetLike
 
 version :: Int
-version = 6
+version = 7
 
 magic = (packString "jhc Haskell Object File",version)
 magic2 = packString "John's Haskell Compiler"
@@ -128,8 +128,7 @@ findModule lhave have need ifunc func  = do
                 mods' = [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
                 mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules ho)]
                 ldeps = Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules lhave)]
-            let hoh = HoHeader { hohGeneration = 0,
-                                 hohDepends    = [ x | (_,x,_) <- sc],
+            let hoh = HoHeader { hohDepends    = [ x | (_,x,_) <- sc],
                                  hohModDepends = mdeps,
                                  hohMetaInfo   = []
                                }
@@ -150,14 +149,14 @@ checkForHoModule (Module m) = loop $ map snd $ searchPaths m
 checkForHoFile :: String            -- ^ file name to check for
     -> IO (Maybe (HoHeader,Ho))
 checkForHoFile fn = flip catch (\e -> putErrLn (show e) >> return Nothing) $ do
-    bracket (openGetFileDep fn) (hClose . fst) $ \ (fh,dep) -> do
+    bracket (openGetFileDep fn) (\_ -> return ()) $ \ (fh,dep) -> do
     bh <- openBinIO fh
     x <- get bh
     if x /= magic then (putErrLn $ "Bad ho file:" <+> fn)  >> return Nothing else do
-    hh <- get bh
+    hh <- lazyGet bh
     xs <- mapM checkDep (hohDepends hh)
     if not (and xs) then  return Nothing else do
-        ho <- get bh
+        ho <- lazyGet bh
         x <- get bh
         if x /= magic2 then (putErrLn $ "Bad ho file:" <+> fn)  >>  return Nothing else do
         wdump FD.Progress $ do
@@ -181,7 +180,7 @@ readHoFile fn = do
     ho <- get bh
     x <- get bh
     when (x /= magic2) (putErrDie $ "Bad ho file magic2:" <+> fn)
-    hClose fh
+    --hClose fh
     return (hh,ho)
 
 {-# NOINLINE dumpHoFile #-}
@@ -189,7 +188,6 @@ dumpHoFile :: String -> IO ()
 dumpHoFile fn = do
     (hoh,ho) <- readHoFile fn
     putStrLn fn
-    --putStrLn $ "Generation:" <+> tshow (hohGeneration hoh)
     when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "Dependencies:" <+>  pprint (sortUnder (show . fileName) $ hohDepends hoh)
     when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "ModDependencies:" <+>  pprint (sortUnder fst $ hohModDepends hoh)
     putStrLn $ "MetaInfo:\n" <> vcat (sort [text (' ':' ':unpackPS k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
@@ -249,7 +247,6 @@ recordHoFile ho fs header = do
             putErrLn $ "Skipping Writing Ho Files: " ++ show fs'
         return (ho { hoModules = fmap (const $ Left emptyFileDep) (hoExports ho) })
       else do
-    --let header = HoHeader { hohGeneration = 0, hohDepends = snub (fd ++ concat [ hsdep:ds | (hs,hsdep,honm,ds) <- sc] )}
     let removeLink' fn = catch  (removeLink fn)  (\_ -> return ())
     let g (fn:fs) = do
             fd <- f fn
@@ -276,9 +273,9 @@ recordHoFile ho fs header = do
             let tfn = fn ++ ".tmp"
             fh <- openBinaryFile tfn WriteMode
             bh <- openBinIO fh
-            put bh magic
-            put bh header
-            put bh (mapHoBodies eraseE ho { hoUsedIds = mempty, hoModules = mempty })
+            put_ bh magic
+            lazyPut bh header
+            lazyPut bh (mapHoBodies eraseE ho { hoUsedIds = mempty, hoModules = mempty })
             put bh magic2
             hFlush fh
             (fh,fd) <- hGetFileDep fn fh
