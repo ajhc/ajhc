@@ -53,6 +53,13 @@ base-1.0.prof.hl: jhc lib/base/base.cabal
 
 #install: jhc base-1.0.hl
 
+libs: $(LIBPACKAGES)
+
+publish: $(LIBPACKAGES)
+	cp -f $(LIBPACKAGES) ~/public_html/computer/jhc/libs
+	make -C ~/public_html/computer/jhc
+
+
 haskell98-1.0.hl: jhc lib/haskell98/haskell98.cabal base-1.0.hl
 	./jhc -v $(RTSOPTS) $(JHC_TEST) -ilib/haskell98 --noauto -L- -L. -p base --build-hl lib/haskell98.cabal -o $@
 
@@ -141,5 +148,5 @@ Version/Raw.hs: _darcs/inventory
 	echo '{-# NOINLINE libraryPath #-}'                            >> $@
 	echo 'libraryPath=["$(PREFIX)/lib/jhc-$(JHC_VERSION)"]'        >> $@
 
-.PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs install i printos tests
+.PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs install i printos tests libs publish
 
