@@ -1,4 +1,4 @@
-{-# OPTIONS -fallow-overlapping-instances #-}
+{-# OPTIONS_GHC -funbox-strict-fields -fallow-overlapping-instances #-}
 --
 -- (c) The University of Glasgow 2002
 --
@@ -10,14 +10,14 @@
 -- where you can obtain the original version of the Binary library, namely
 --     http://www.cs.york.ac.uk/fp/nhc98/
 
--- arch-tag: 1418e09a-9a18-4dca-a0fc-9262c9d97beb
+-- with modifications by John Meacham for jhc
 
 module Binary
   ( {-type-}  Bin,
     {-class-} Binary(..),
     {-type-}  BinHandle,
 
-   openBinIO, openBinIO_,
+   openBinIO,
    openBinMem,
 --   closeBin,
 
@@ -61,7 +61,7 @@ import Data.Int
 import Data.Word
 import Data.IORef
 import Data.Char		( ord, chr )
-import Control.Monad	
+import Control.Monad
 import System.IO as IO
 import System.IO.Unsafe		( unsafeInterleaveIO )
 import System.IO.Error		( mkIOError, eofErrorType )
@@ -76,67 +76,26 @@ import Data.Array.IArray
 import Data.Array.Base
 
 
-{-
-#if __GLASGOW_HASKELL__ < 503
-type BinArray = MutableByteArray RealWorld Int
-newArray_ bounds     = stToIO (newCharArray bounds)
-unsafeWrite arr ix e = stToIO (writeWord8Array arr ix e)
-unsafeRead  arr ix   = stToIO (readWord8Array arr ix)
-#if __GLASGOW_HASKELL__ < 411
-newByteArray#        = newCharArray#
-#endif
-hPutArray h arr sz   = hPutBufBAFull h arr sz
-hGetArray h sz       = hGetBufBAFull h sz
-
-mkIOError :: IOErrorType -> String -> Maybe Handle -> Maybe FilePath -> Exception
-mkIOError t location maybe_hdl maybe_filename
-  = IOException (IOError maybe_hdl t location ""
-#if __GLASGOW_HASKELL__ > 411
-		         maybe_filename
-#endif
-  		)
-eofErrorType = EOF
-
-
-#ifndef SIZEOF_HSWORD
-#define SIZEOF_HSWORD WORD_SIZE_IN_BYTES
-#endif
-
-#else
-type BinArray = IOUArray Int Word8
-#endif
--}
-
---  #define SIZEOF_HSINT 4
 
 type BinArray = IOUArray Int Word8
+
 ---------------------------------------------------------------
 --		BinHandle
 ---------------------------------------------------------------
 
-data BinHandle
-  = BinMem {		-- binary data stored in an unboxed array
-     off_r :: !FastMutInt,		-- the current offset
-     sz_r  :: !FastMutInt,		-- size of the array (cached)
-     arr_r :: !(IORef BinArray) 	-- the array (bounds: (0,size-1))
+data BinHandle = BinHandle {
+    off_r :: !FastMutInt,
+    target_r :: !BinTarget
     }
-	-- XXX: should really store a "high water mark" for dumping out
-	-- the binary data to a file.
 
-  | BinIO {		-- binary data stored in a file
-     off_r :: !FastMutInt,		-- the current offset (cached)
-     hdl   :: !IO.Handle		-- the file handle (must be seekable)
-   }
-	-- cache the file ptr in BinIO; using hTell is too expensive
-	-- to call repeatedly.  If anyone else is modifying this Handle
-	-- at the same time, we'll be screwed.
-
---getUserData :: BinHandle -> UserData
---getUserData bh = bh_usr bh
-
---setUserData :: BinHandle -> UserData -> BinHandle
---setUserData bh us = bh { bh_usr = us }
-
+data BinTarget =
+    BinMem {                            -- binary data stored in an unboxed array
+        sz_r  :: !FastMutInt,		-- size of the array (cached)
+        arr_r :: !(IORef BinArray) 	-- the array (bounds: (0,size-1))
+    } |
+    BinIO {		       -- binary data stored in a file
+        hdl   :: !IO.Handle    -- the file handle (must be seekable)
+    }
 
 ---------------------------------------------------------------
 --		Bin
@@ -164,19 +123,19 @@ class Binary a where
     put bh a  = do p <- tellBin bh; put_ bh a; return p
 
 putAt  :: Binary a => BinHandle -> Bin a -> a -> IO ()
-putAt bh p x = do seekBin bh p; put bh x; return ()
+putAt bh p x = do seekBin bh p; put_ bh x; return ()
 
 getAt  :: Binary a => BinHandle -> Bin a -> IO a
 getAt bh p = do seekBin bh p; get bh
 
-openBinIO_ :: IO.Handle -> IO BinHandle
-openBinIO_ h = openBinIO h
 
 openBinIO :: IO.Handle -> IO BinHandle
 openBinIO h = do
   r <- newFastMutInt
   writeFastMutInt r 0
-  return (BinIO  r h)
+  hSetBinaryMode h True
+  hSetBuffering h (BlockBuffering Nothing)
+  return (BinHandle r (BinIO h))
 
 openBinMem :: Int -> IO BinHandle
 openBinMem size
@@ -188,32 +147,30 @@ openBinMem size
    writeFastMutInt ix_r 0
    sz_r <- newFastMutInt
    writeFastMutInt sz_r size
-   return (BinMem ix_r sz_r arr_r)
+   return (BinHandle ix_r (BinMem sz_r arr_r))
 
 tellBin :: BinHandle -> IO (Bin a)
-tellBin (BinIO   r _)   = do ix <- readFastMutInt r; return (BinPtr ix)
-tellBin (BinMem  r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
+tellBin (BinHandle r _)   = do ix <- readFastMutInt r; return (BinPtr ix)
 
 seekBin :: BinHandle -> Bin a -> IO ()
-seekBin (BinIO  ix_r h) (BinPtr p) = do
+seekBin (BinHandle ix_r (BinIO h)) (BinPtr p) = do
   writeFastMutInt ix_r p
   hSeek h AbsoluteSeek (fromIntegral p)
-seekBin h@(BinMem  ix_r sz_r a) (BinPtr p) = do
+seekBin h@(BinHandle ix_r (BinMem sz_r a)) (BinPtr p) = do
   sz <- readFastMutInt sz_r
   if (p >= sz)
 	then do expandBin h p; writeFastMutInt ix_r p
 	else writeFastMutInt ix_r p
 
 isEOFBin :: BinHandle -> IO Bool
-isEOFBin (BinMem  ix_r sz_r a) = do
+isEOFBin (BinHandle ix_r (BinMem sz_r a)) = do
   ix <- readFastMutInt ix_r
   sz <- readFastMutInt sz_r
   return (ix >= sz)
-isEOFBin (BinIO  ix_r h) = hIsEOF h
+isEOFBin (BinHandle _ (BinIO h)) = hIsEOF h
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
-writeBinMem (BinIO  _ _) _ = error "Data.Binary.writeBinMem: not a memory handle"
-writeBinMem (BinMem  ix_r sz_r arr_r) fn = do
+writeBinMem (BinHandle ix_r (BinMem sz_r arr_r)) fn = do
   h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r
@@ -236,11 +193,11 @@ readBinMem filename = do
   writeFastMutInt ix_r 0
   sz_r <- newFastMutInt
   writeFastMutInt sz_r filesize
-  return (BinMem ix_r sz_r arr_r)
+  return (BinHandle ix_r (BinMem sz_r arr_r))
 
 -- expand the size of the array to include a specified offset
 expandBin :: BinHandle -> Int -> IO ()
-expandBin (BinMem  ix_r sz_r arr_r) off = do
+expandBin (BinHandle ix_r (BinMem sz_r arr_r)) off = do
    sz <- readFastMutInt sz_r
    let sz' = head (dropWhile (<= off) (iterate (* 2) sz))
    arr <- readIORef arr_r
@@ -249,14 +206,14 @@ expandBin (BinMem  ix_r sz_r arr_r) off = do
    writeFastMutInt sz_r sz'
    writeIORef arr_r arr'
    return ()
-expandBin (BinIO  _ _) _ = return ()
+expandBin _ _ = return ()
 	-- no need to expand a file, we'll assume they expand by themselves.
 
 -- -----------------------------------------------------------------------------
 -- Low-level reading/writing of bytes
 
 putWord8 :: BinHandle -> Word8 -> IO ()
-putWord8 h@(BinMem  ix_r sz_r arr_r) w = do
+putWord8 h@(BinHandle ix_r (BinMem  sz_r arr_r)) w = do
     ix <- readFastMutInt ix_r
     sz <- readFastMutInt sz_r
 	-- double the size of the array if it overflows
@@ -270,14 +227,14 @@ putWord8 h@(BinMem  ix_r sz_r arr_r) w = do
             writeFastMutInt ix_r (ix+1)
             return ()
 
-putWord8 (BinIO  ix_r h) w = do
-    ix <- readFastMutInt ix_r
+putWord8 (BinHandle ix_r (BinIO h)) w = do
     hPutChar h (chr (fromIntegral w))	-- XXX not really correct
+    ix <- readFastMutInt ix_r
     writeFastMutInt ix_r (ix+1)
     return ()
 
 getWord8 :: BinHandle -> IO Word8
-getWord8 (BinMem  ix_r sz_r arr_r) = do
+getWord8 (BinHandle ix_r (BinMem sz_r arr_r)) = do
     ix <- readFastMutInt ix_r
     sz <- readFastMutInt sz_r
     when (ix >= sz)  $
@@ -286,10 +243,10 @@ getWord8 (BinMem  ix_r sz_r arr_r) = do
     w <- unsafeRead arr ix
     writeFastMutInt ix_r (ix+1)
     return w
-getWord8 (BinIO  ix_r h) = do
+getWord8 (BinHandle ix_r (BinIO h)) = do
     ix <- readFastMutInt ix_r
-    c <- hGetChar h
     writeFastMutInt ix_r (ix+1)
+    c <- hGetChar h
     return $! (fromIntegral (ord c))	-- XXX not really correct
 
 {-# INLINE putByte #-}
@@ -299,6 +256,28 @@ putByte bh w = putWord8 bh w
 {-# INLINE getByte #-}
 getByte :: BinHandle -> IO Word8
 getByte = getWord8
+
+
+-- These do not increment the counter
+
+{-# INLINE putByteIO #-}
+putByteIO :: FastMutInt -> Handle -> Word8 -> IO ()
+putByteIO ix_r h w = do
+    hPutChar h (chr (fromIntegral w))	-- XXX not really correct
+    return ()
+
+{-# INLINE getByteIO #-}
+getByteIO :: FastMutInt -> Handle -> IO Word8
+getByteIO ix_r h = do
+    c <- hGetChar h
+    return $! (fromIntegral (ord c))	-- XXX not really correct
+
+{-# INLINE increment #-}
+increment :: FastMutInt -> Int -> IO ()
+increment ix i = do
+    v <- readFastMutInt ix
+    writeFastMutInt ix (v + i)
+
 
 -- -----------------------------------------------------------------------------
 -- Primitve Word writes
@@ -318,11 +297,27 @@ instance Binary Word16 where
 
 
 instance Binary Word32 where
+  put_ (BinHandle ix (BinIO h)) w = do
+    putByteIO ix h (fromIntegral (w `shiftR` 24))
+    putByteIO ix h (fromIntegral ((w `shiftR` 16) .&. 0xff))
+    putByteIO ix h (fromIntegral ((w `shiftR` 8)  .&. 0xff))
+    putByteIO ix h (fromIntegral (w .&. 0xff))
+    increment ix 4
   put_ h w = do
     putByte h (fromIntegral (w `shiftR` 24))
     putByte h (fromIntegral ((w `shiftR` 16) .&. 0xff))
     putByte h (fromIntegral ((w `shiftR` 8)  .&. 0xff))
     putByte h (fromIntegral (w .&. 0xff))
+  get (BinHandle ix (BinIO h)) = do
+    w1 <- getByteIO ix h
+    w2 <- getByteIO ix h
+    w3 <- getByteIO ix h
+    w4 <- getByteIO ix h
+    increment ix 4
+    return $! ((fromIntegral w1 `shiftL` 24) .|.
+	       (fromIntegral w2 `shiftL` 16) .|.
+	       (fromIntegral w3 `shiftL`  8) .|.
+	       (fromIntegral w4))
   get h = do
     w1 <- getWord8 h
     w2 <- getWord8 h
@@ -399,20 +394,12 @@ instance Binary Char where
     get  bh   = do x <- get bh; return $! (chr (fromIntegral (x :: Word32)))
 --    getF bh p = case getBitsF bh 8 p of (x,b) -> (toEnum x,b)
 
+-- portability demands ints restricted to 32 bits
 instance Binary Int where
---  #if SIZEOF_HSINT == 4
     put_ bh i = put_ bh (fromIntegral i :: Int32)
     get  bh = do
 	x <- get bh
 	return $! (fromIntegral (x :: Int32))
---  #elif SIZEOF_HSINT == 8
---    put_ bh i = put_ bh (fromIntegral i :: Int64)
---    get  bh = do
---	x <- get bh
---	return $! (fromIntegral (x :: Int64))
---  #else
---  #error "unsupported sizeof(HsInt)"
---  #endif
 
 instance Binary ClockTime where
     put_ bh ct = do
@@ -437,16 +424,6 @@ instance Binary PackedString where
     put_ bh (PS a) = put_ bh a
     get bh = fmap PS $ get bh
 
---put_ bh $ (snd $ Data.Array.IArray.bounds a) + 1
---mapM_ (put_ bh) (Data.Array.IArray.elems a)
---sz <- get bh
---x <- sequence $ replicate sz (get bh)
---return $ PS (Data.Array.IArray.listArray (0,sz - 1) x)
-
---put_ bh ps = put_ bh (unpackPS ps)
---get bh = liftM packString $ get bh
---put_ bh ps = putNList_ bh (unpackPS ps)
---get bh = liftM packString $ getNList bh
 
 -- putNList_ bh xs = do
 --     put_ bh (length xs)
@@ -530,7 +507,7 @@ instance (Binary a, Binary b) => Binary (Either a b) where
 
 -- these flatten the start element. hope that's okay!
 instance Binary (UArray Int Word8) where
-    put_ bh@(BinIO ix_r h) ua = do
+    put_ bh@(BinHandle ix_r (BinIO h)) ua = do
         let sz = rangeSize (Data.Array.IO.bounds ua)
         ix <- readFastMutInt ix_r
         put_ bh sz
@@ -542,7 +519,7 @@ instance Binary (UArray Int Word8) where
         put_ bh sz
         case sz of
             I# i -> putByteArray bh ba i
-    get bh@(BinIO ix_r h) = do
+    get bh@(BinHandle ix_r (BinIO h)) = do
         ix <- readFastMutInt ix_r
         sz <- get bh
         ba <- newArray_ (0, sz - 1)
@@ -554,23 +531,6 @@ instance Binary (UArray Int Word8) where
         sz <- get bh
         BA ba <- getByteArray bh sz
         return $ UArray 0 (sz - 1) ba
-
- {-
-
-instance (Ix a, Binary a) => Binary (UArray a Word8) where
-    put_ bh (UArray s e ba) = do
-        put_ bh s
-        put_ bh e
-        case (rangeSize (s,e)) of
-            I# i -> putByteArray bh ba i
-    get  bh = do
-        s <- get bh
-        e <- get bh
-        BA ba <- getByteArray bh (rangeSize (s,e))
-        return $ UArray s e ba
-
--}
---  #ifdef __GLASGOW_HASKELL__
 
 instance Binary Integer where
     put_ bh (S# i#) = do putByte bh 0; put_ bh (I# i#)
