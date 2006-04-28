@@ -45,17 +45,16 @@ my @cmeth;
 my @names;
 my %seen;
 
-sub const($$@) {
-    my ($v,$t,$ct) = @_;
-    $ct ||= "\"int\"";
-    if ($v =~ /^\d/) {
-        return "prim_number $v $ct $t";
+sub const($$$@) {
+    my ($cn,$v,$t,$ct) = @_;
+    $ct ||= "int";
+    my $ctn = $ct;
+    $ctn =~ s/\W/_/g;
 
-        #return "ELit (LitInt $v $t)";
+    if ($v =~ /^\d/) {
+        return "prim_number $cn $v r_$ctn $t";
     } else {
-        #return "EPrim \"prim_const.$v\" [] $t"
-        #return "EPrim (primPrim \"prim_const.$v\") [] $t"
-        return "prim_const \"$v\" $ct $t";
+        return "prim_const $cn \"$v\" r_$ctn \"$ct\" $t";
     }
 }
 
@@ -120,6 +119,7 @@ foreach my $d (@ds) {
     #my @cs = ($d->[2] =~ /int/) ? @in : @fl;
     my @cs = @{$stuff{$d->[2]}};
     my $t = tcon($d->[0]);
+    my $rtype = rtype($d->[1]);
     #my $t =  "(ELit (LitCons (parseName TypeConstructor \"$d->[0]\") [] eStar) )";
     #my $t =  "(ELit (LitCons $nn [] eStar) )";
     my $tycon = tycon($d->[0]);
@@ -133,12 +133,11 @@ foreach my $d (@ds) {
     push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.sizeOf.$d->[0]\", ELam (v0 $t) \$ prim_sizeof \"$d->[1]\")";
     push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.poke.$d->[0]\", buildPoke $cncons $t \"$d->[1]\")";
     push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.peek.$d->[0]\", buildPeek $cncons $t \"$d->[1]\")";
-    push @cmeth, "($prelude_bounded, toInstName \"Prelude.maxBound.$d->[0]\", " . const($d->[3],$t,"\"$d->[1]\"") . ")";
-    push @cmeth, "($prelude_bounded, toInstName \"Prelude.minBound.$d->[0]\", " . const($d->[4],$t,"\"$d->[1]\"") . ")";
+    push @cmeth, "($prelude_bounded, toInstName \"Prelude.maxBound.$d->[0]\", " . const($cncons, $d->[3],$t,"$d->[1]") . ")";
+    push @cmeth, "($prelude_bounded, toInstName \"Prelude.minBound.$d->[0]\", " . const($cncons,$d->[4],$t,"$d->[1]") . ")";
     my $ivar = "v2_Int";
     my $ivart = "v2_Integer";
     my $tvar = "(v2 $t)";
-    my $rtype = rtype($d->[1]);
     if ($d->[0] eq "Prelude.Int") {
         push @cmeth, "($c_num, toInstName \"Prelude.fromInt.$d->[0]\", ELam $ivar (EVar $ivar))";
         push @cmeth, "($c_num, toInstName \"Prelude.toInt.$d->[0]\", ELam $ivar (EVar $ivar))";

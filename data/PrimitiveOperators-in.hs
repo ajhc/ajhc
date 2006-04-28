@@ -156,15 +156,14 @@ createIO_ pv = toIO tUnit (ELam tvrCont $ ELam tvrWorld $  eStrictLet tvrWorld2 
     tvrWorld = tVr 256 tWorld__
 
 
-prim_number v t et@(ELit (LitCons cn' _ _)) = ELit (LitCons cn [ELit (LitInt v (rawType t))] et) where
-    cn = toName DataConstructor $ nameName cn'
-prim_number _ _ _ = error "prim_number: invalid arg"
+prim_number cn v t et = ELit (LitCons cn [ELit (LitInt v t)] et) where
+--    cn = toName DataConstructor $ nameName cn'
+prim_number _ _ _ _ = error "prim_number: invalid arg"
 
 
-prim_const s t et@(ELit (LitCons cn' _ _)) =  eStrictLet (tVr 2 st) (EPrim (APrim (CConst s t) mempty) [] st) (ELit (LitCons cn [EVar $ tVr 2 st] et)) where
-    st = rawType t
-    cn = toName DataConstructor $ nameName cn'
-prim_const _ _ _ = error "prim_const: invalid arg"
+--prim_const cn s st et = eStrictLet (tVr 2 st) (EPrim (APrim (CConst s t) mempty) [] st) (ELit (LitCons cn [EVar $ tVr 2 st] et)) where
+prim_const cn s st t et = ELit (LitCons cn [(EPrim (APrim (CConst s t) mempty) [] st)] et)
+prim_const _ _ _ _ _ = error "prim_const: invalid arg"
 
 prim_sizeof s = (ELit (LitCons dc_Int [rp] tInt)) where
     rp = (EPrim (APrim (PrimTypeInfo { primArgType = s, primRetType = "int", primTypeInfo = PrimSizeOf }) mempty) [] tIntzh)
