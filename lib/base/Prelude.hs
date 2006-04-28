@@ -298,9 +298,17 @@ _ ^ _            = error "Prelude.^: negative exponent"
 x ^^ n           =  if n >= 0 then x^n else recip (x^(-n))
 
 
-{-# INLINE fromIntegral, realToFrac #-}
 fromIntegral     :: (Integral a, Num b) => a -> b
 fromIntegral     =  fromInteger . toInteger
+
+{-# RULES
+  "fromIntegral/Int"          fromIntegral = (id :: Int -> Int)
+  "fromIntegral/Integer"      fromIntegral = (id :: Integer -> Integer)
+  "fromIntegral/toInt"        fromIntegral = toInt
+  "fromIntegral/fromInt"      fromIntegral = fromInt
+  "fromIntegral/toInteger"    fromIntegral = toInteger
+  "fromIntegral/fromInteger"  fromIntegral = fromInteger
+ #-}
 
 
 realToFrac     :: (Real a, Fractional b) => a -> b

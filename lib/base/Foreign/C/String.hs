@@ -184,13 +184,16 @@ charIsRepresentable c = return (ord c < 256)
 
 -- | Convert a C byte, representing a Latin-1 character, to the corresponding
 -- Haskell character.
-castCCharToChar :: CChar -> Char
-castCCharToChar ch = chr (fromIntegral (fromIntegral ch :: Word8))
+--castCCharToChar :: CChar -> Char
+--castCCharToChar ch = chr (fromIntegral (fromIntegral ch :: Word8))
 
 -- | Convert a Haskell character to a C character.
 -- This function is only safe on the first 256 characters.
-castCharToCChar :: Char -> CChar
-castCharToCChar ch = fromIntegral (ord ch)
+--castCharToCChar :: Char -> CChar
+--castCharToCChar ch = fromIntegral (ord ch)
+
+foreign import primitive "integralCast" castCCharToChar :: CChar -> Char
+foreign import primitive "integralCast" castCharToCChar :: Char -> CChar
 
 -- | Marshal a NUL terminated C string into a Haskell string.
 --
@@ -439,9 +442,14 @@ charsToCWchars xs  = map castCharToCWchar xs
 -- These conversions only make sense if __STDC_ISO_10646__ is defined
 -- (meaning that wchar_t is ISO 10646, aka Unicode)
 
-castCWcharToChar :: CWchar -> Char
-castCWcharToChar ch = chr (fromIntegral ch )
+--castCWcharToChar :: CWchar -> Char
+--castCWcharToChar ch = chr (fromIntegral ch )
 
-castCharToCWchar :: Char -> CWchar
-castCharToCWchar ch = fromIntegral (ord ch)
+--castCharToCWchar :: Char -> CWchar
+--castCharToCWchar ch = fromIntegral (ord ch)
+
+foreign import primitive "integralCast" castCWcharToChar :: CWchar -> Char
+foreign import primitive "integralCast" castCharToCWchar :: Char -> CWchar
+
+
 
