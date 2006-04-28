@@ -44,10 +44,11 @@ foreach my $d (@ds) {
 
 print "\n";
 
-foreach my $rt (sort keys %rt) {
+foreach my $ort (sort keys %rt) {
+    my $rt = $ort;
     $rt =~ s/ /_/g;
     print "{-# NOINLINE rt_$rt #-}\n";
-    print "rt_$rt = toName RawType \"$rt\"\n";
+    print "rt_$rt = toName RawType \"$ort\"\n";
 
 }
 
