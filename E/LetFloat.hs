@@ -2,6 +2,7 @@ module E.LetFloat(
     atomizeAp,
     coalesceLets,
     floatOutward,
+    programFloatInward,
     floatInward
   ) where
 
@@ -26,6 +27,7 @@ import E.TypeCheck
 import E.Values
 import GenUtil
 import Name.Name
+import Name.Names
 import Options
 import qualified CharIO as C
 import qualified Util.Graph as G
@@ -35,6 +37,8 @@ import Support.FreeVars
 import Util.UniqueMonad
 import Util.SetLike
 import Name.Id
+import Info.Types
+import qualified CharIO
 
 
 
@@ -141,25 +145,48 @@ fvBind (Left (_,fv)) = fv
 fvBind (Right xs) = unions (snds xs)
 
 
+canFloatPast t | sortStarLike . getType $ t = True
+canFloatPast t | getType t == tWorldzh = True
+canFloatPast t | getType t == ELit (LitCons tc_IOErrorCont [] (ESort EStar)) = True
+canFloatPast _ = False
+
+programFloatInward :: Program -> IO Program
+programFloatInward prog = do
+    let binds = G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- ds, x `notElem` progEntryPoints prog ] (tvrIdent . fst . fst) (idSetToList . snd)
+        binds :: Binds
+        epoints = [ d | d@(x,_) <- ds, x `elem` progEntryPoints prog ]
+        ds,epoints :: [(TVr,E)]
+        ds = programDs prog
+        (oall,pints) = sepByDropPoint (map (\ (x,y) -> bindingFreeVars x y) epoints) binds
+        nprog = programSetDs ([ (k,fi k v y)| ((k,v),y) <- zip epoints pints] ++ [ (x,floatInwardE y []) | (x,y) <- dsBinds oall]) prog
+        fi k = if getProperty prop_ONESHOT k then floatInwardE' else floatInwardE
+    --Prelude.putStrLn "programFloatInward:"
+    --mapM_ (putStrLn . pprint) (map fst $ dsBinds (concat pints))
+    --Prelude.putStrLn "programFloatedInward"
+    nprog <- programMapBodies (return . floatInward) prog
+    return nprog
+
+
 
 floatInward ::
     E  -- ^ input term
     -> E  -- ^ output term
 floatInward e = floatInwardE e [] where
 
-
-
 floatInwardE e fvs = f e fvs where
-    f ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault =  d } xs = letRec p' $ ec { eCaseScrutinee = (f e pe), eCaseAlts = [ Alt l (f e pn) | Alt l e <- as | pn <- ps ], eCaseDefault = (fmap (flip f pd) d)}  where
+    f ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault =  d } xs = ans where
+        ans = letRec p' $ ec { eCaseScrutinee = (f e pe), eCaseAlts = [ Alt l (f e pn) | Alt l e <- as | pn <- ps ], eCaseDefault = (fmap (flip f pd) d)}
         (p',_:pe:pd:ps) = sepByDropPoint (mconcat [freeVars l | Alt l _ <- as ]:freeVars e: tvrIdent b `delete` freeVars d :[freeVars a | a <- as ]) xs
     f (ELetRec ds e) xs = g (G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- ds ] (tvrIdent . fst . fst) (idSetToList . snd) ) xs where
         g [] p' = f e p'
         g ((Left ((v,ev),fv)):xs) p = g xs (p0 ++ [Left ((v,ev'),bindingFreeVars v ev')] ++ p') where
-            ev' = f ev pv
+            ev' = if getProperty prop_ONESHOT v then floatInwardE' ev pv else f ev pv
             (p',[p0,pv,_]) = sepByDropPoint [(frest xs), bindingFreeVars v ev, freeVars (tvrType v)] p
         g (Right bs:xs) p =  g xs (p0 ++ [Right [ let ev' = f ev pv in ((v,ev'),bindingFreeVars v ev') | ((v,ev),_) <- bs | pv <- ps ]] ++ p') where
             (p',_:p0:ps) = sepByDropPoint (freeVars (map (tvrType . fst . fst) bs) :(frest xs):snds bs) p
         frest xs = mconcat (freeVars e:map fvBind xs)
+    f e@ELam {} xs | all canFloatPast  ls = (foldr ELam (f b xs) ls) where
+        (b,ls) = fromLam e
     f e@ELam {} xs = letRec unsafe_to_dup (foldr ELam (f b safe_to_dup) ls) where
         (unsafe_to_dup,safe_to_dup) = sepDupableBinds (freeVars ls) xs
         (b,ls) = fromLam e
@@ -172,8 +199,16 @@ floatInwardE e fvs = f e fvs where
         f (Left (te,_):rs) = eLetRec [te] $ f rs
         f (Right ds:rs) = eLetRec (fsts ds) $ f rs
 
+floatInwardE' e@ELam {} xs  = (foldr ELam (floatInwardE b xs) ls) where
+    (b,ls) = fromLam e
+floatInwardE' e xs = floatInwardE e xs
+
 type FVarSet = IdSet
 type Binds = [Either ((TVr,E),FVarSet) [((TVr,E),FVarSet)]]
+
+dsBinds bs = foldr ($) [] (map f bs) where
+    f (Left (x,_)) = (x:)
+    f (Right ds) = (map fst ds ++)
 
 sepDupableBinds :: [Id] -> Binds -> (Binds,Binds)
 sepDupableBinds fvs xs = partition ind xs where

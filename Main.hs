@@ -219,7 +219,7 @@ processDecls stats ho ho' tiData = do
     let prog = program {
             progClassHierarchy = hoClassHierarchy allHo,
             progDataTable = fullDataTable,
-            progClosed = False,
+            progClosed = True,
             progExternalNames = fromList [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ],
             progModule = head (fsts $ tiDataModules tiData)
             }
@@ -307,7 +307,7 @@ processDecls stats ho ho' tiData = do
 
         mprog <- simplifyProgram sopt "Simplify FloatOutCleanup" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
-        mprog <- transformProgram "float inward" DontIterate (dump FD.CoreMini) (programMapBodies (return . floatInward)) mprog
+        mprog <- transformProgram "float inward" DontIterate (dump FD.CoreMini) programFloatInward mprog
         let ns = programDs mprog
         ns <- E.Strictness.solveDs ns
         mprog <- return $ programSetDs ns mprog
@@ -335,6 +335,7 @@ processDecls stats ho ho' tiData = do
     prog <- barendregtProg prog
     prog <- simplifyProgram' sopt "SuperSimplify" True (IterateMax 4) prog
     prog <- barendregtProg prog
+    --prog <- transformProgram "Big Float Inward" DontIterate True programFloatInward prog
     progress "Big Type Anasysis"
     prog <- transformProgram "typeAnalyze" DontIterate True (typeAnalyze True) prog
     prog <- barendregtProg prog
@@ -574,6 +575,7 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     -- delete rules
     prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ Info.delete (mempty :: ARules) nfo) letann (\_ -> return) prog
+    --prog <- transformProgram "float inward" DontIterate True programFloatInward prog
 
     prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify no rules" True prog
     prog <- barendregtProg prog
