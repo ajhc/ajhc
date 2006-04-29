@@ -11,7 +11,7 @@ import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified System
-import IO(hFlush,stderr,stdout)
+import IO(hFlush,stderr,stdout,openFile,hClose,IOMode(..))
 
 import C.FromGrin
 import CharIO
@@ -690,10 +690,13 @@ compileToGrin prog = do
         when (optMode options == CompileExe) $ compileGrinToC x
 
 dumpFinalGrin grin = do
+    let fn = optOutName options
     wdump FD.GrinGraph $ do
         let dot = graphGrin grin
-            fn = optOutName options
         writeFile (fn ++ "_grin.dot") dot
+    h <- openFile (fn ++ "_grin.txt") WriteMode
+    hPrintGrin h grin
+    hClose h
     wdump FD.Grin $ printGrin grin
 
 

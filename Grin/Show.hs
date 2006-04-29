@@ -3,12 +3,15 @@ module Grin.Show(
     prettyVal,
     prettyExp,
     printGrin,
+    hPrintGrin,
     graphGrin,
     render
     ) where
 
 import Char
 import Monad
+import Data.Maybe
+import IO
 import qualified Data.Set as Set
 import Control.Monad.Writer
 import qualified Data.Map as Map
@@ -26,7 +29,8 @@ import Number
 import Options
 import qualified FlagDump as FD
 import Data.Graph.Inductive.Graph(mkGraph,nmap)
-import Data.Graph.Inductive.Graphviz
+import Data.Graph.Inductive.Basic(elfilter)
+import Util.Graphviz
 import Data.Graph.Inductive.Tree
 import Support.FreeVars
 
@@ -118,12 +122,15 @@ render :: Doc -> String
 render doc =  displayS (renderPretty 0.95 (optColumns options)  doc) ""
 
 printGrin :: Grin -> IO ()
-printGrin Grin { grinFunctions = ds', grinCafs = cafs } = do
+printGrin grin = hPrintGrin stderr grin
+
+hPrintGrin :: Handle -> Grin -> IO ()
+hPrintGrin handle Grin { grinFunctions = ds', grinCafs = cafs } = do
     when (not $ null cafs) $ do
-        putErrLn "-- Cafs"
-        mapM_ (putErrLn) $ map (\(x,y) -> show x ++ " = " ++  render (prettyVal y))  cafs
-    putErrLn "-- Functions"
-    mapM_ (putErrLn . render) $ map prettyFun ds'
+        hPutStrLn handle "-- Cafs"
+        mapM_ (hPutStrLn handle) $ map (\(x,y) -> show x ++ " = " ++  render (prettyVal y))  cafs
+    hPutStrLn handle "-- Functions"
+    mapM_ (hPutStrLn handle . render) $ map prettyFun ds'
 
 showSome xs = f 7 xs [] where
     f 0 _ xs = reverse ("...":xs)
@@ -151,12 +158,23 @@ instance Show HeapType where
     show RecursiveThunk = "Rt"
 
 
+{-# NOINLINE graphGrin #-}
 
 graphGrin :: Grin -> String
-graphGrin grin = graphviz' (gr :: Gr Atom CallType) where
+graphGrin grin = graphviz' gr fnode fedge  where
     nodes = zip [0..] (grinFunctions grin)
     nodeMap = Map.fromList [ (y,x) | (x,(y,_)) <- nodes]
-    gr = nmap fst $ mkGraph nodes [ (n,n2,tc) | (n,(_,_ :-> l)) <- nodes, (tc,fv) <- Set.toList (freeVars l), n2 <- Map.lookup fv nodeMap ]
+    gr :: Gr (Atom,Lam) CallType
+    gr =   mkGraph nodes [ (n,n2,tc) | (n,(_,_ :-> l)) <- nodes, (tc,fv) <- Set.toList (freeVars l), n2 <- Map.lookup fv nodeMap ]
+    fnode :: (Atom,Lam) -> [(String,String)]
+    fnode (x,_ :-> e) = [("label",show x)] ++ if hasError e then [("color","red")] else []
+    fedge :: CallType -> [(String,String)]
+    fedge TailCall = []
+    fedge StandardCall = [("style","dotted")]
+
+hasError x = isNothing (hasError' x)
+hasError' Error {} = Nothing
+hasError' e = mapExpExp hasError' e
 
 
 data CallType = TailCall | StandardCall
