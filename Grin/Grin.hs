@@ -46,6 +46,8 @@ module Grin.Grin(
     tyUnit,
     combineItems,
     unit,
+    mapBodyM,
+    mapExpExp,
     itemTag,
     v0,v1,v2,v3,lamExp,lamBind,
     isVar,isTup,modifyTail,valIsConstant,
@@ -222,6 +224,17 @@ emptyGrin = Grin {
     grinPartFunctions = mempty,
     grinCafs = mempty
 }
+
+mapBodyM f (x :-> y) = f y >>= return . (x :->)
+
+mapExpExp f (a :>>= v :-> b) = do
+    a <- f a
+    b <- f b
+    return (a :>>= v :-> b)
+mapExpExp f (Case e as) = do
+    as' <- mapM (mapBodyM f) as
+    return (Case e as')
+mapExpExp _ x = return x
 
 data Flag = No | Maybe | Yes
     deriving(Eq,Ord,Enum,Show)

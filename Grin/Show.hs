@@ -1,8 +1,17 @@
-module Grin.Show(prettyFun,prettyVal,prettyExp,printGrin,render) where
+module Grin.Show(
+    prettyFun,
+    prettyVal,
+    prettyExp,
+    printGrin,
+    graphGrin,
+    render
+    ) where
 
 import Char
 import Monad
 import qualified Data.Set as Set
+import Control.Monad.Writer
+import qualified Data.Map as Map
 
 import Atom
 import CharIO
@@ -16,6 +25,10 @@ import Name.VConsts
 import Number
 import Options
 import qualified FlagDump as FD
+import Data.Graph.Inductive.Graph(mkGraph,nmap)
+import Data.Graph.Inductive.Graphviz
+import Data.Graph.Inductive.Tree
+import Support.FreeVars
 
 
 
@@ -136,3 +149,22 @@ instance Show HeapType where
     show UnsharedEval = "Eu"
     show Reference = "Ref"
     show RecursiveThunk = "Rt"
+
+
+
+graphGrin :: Grin -> String
+graphGrin grin = graphviz' (gr :: Gr Atom CallType) where
+    nodes = zip [0..] (grinFunctions grin)
+    nodeMap = Map.fromList [ (y,x) | (x,(y,_)) <- nodes]
+    gr = nmap fst $ mkGraph nodes [ (n,n2,tc) | (n,(_,_ :-> l)) <- nodes, (tc,fv) <- Set.toList (freeVars l), n2 <- Map.lookup fv nodeMap ]
+
+
+data CallType = TailCall | StandardCall
+    deriving(Ord,Show,Eq)
+
+instance FreeVars Exp (Set.Set (CallType,Atom)) where
+    freeVars (a :>>= _ :-> b) = freeVars b `Set.union` Set.map (\ (_ :: CallType,y) -> (StandardCall, y)) (freeVars a)
+    freeVars (App a _ _) = Set.singleton (TailCall,a)
+    freeVars e = execWriter $ mapExpExp (\e -> tell (freeVars e) >> return e) e
+
+

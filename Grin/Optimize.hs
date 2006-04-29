@@ -106,16 +106,6 @@ grinSpeculate grin = do
     Stats.printStat "Speculate" stats
     return grin'
 
-mapBodyM f (x :-> y) = f y >>= return . (x :->)
-
-mapExpExp f (a :>>= v :-> b) = do
-    a <- f a
-    b <- f b
-    return (a :>>= v :-> b)
-mapExpExp f (Case e as) = do
-    as' <- mapM (mapBodyM f) as
-    return (Case e as')
-mapExpExp _ x = return x
 
 performSpeculate specs grin = do
     let sset = Set.fromList (map tagFlipFunction specs)

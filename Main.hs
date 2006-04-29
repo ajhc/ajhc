@@ -680,14 +680,22 @@ compileToGrin prog = do
 
         printTable "Return points-to" (grinReturnTags x)
         printTable "Argument points-to" (grinArgTags x)
-        wdump FD.Grin $ printGrin x
+        dumpFinalGrin x
         when (optMode options == CompileExe) $ compileGrinToC x
      else do
         x <- createEvalApply x
         x <- return $ normalizeGrin x
         lintCheckGrin x
-        wdump FD.Grin $ printGrin x
+        dumpFinalGrin x
         when (optMode options == CompileExe) $ compileGrinToC x
+
+dumpFinalGrin grin = do
+    wdump FD.GrinGraph $ do
+        let dot = graphGrin grin
+            fn = optOutName options
+        writeFile (fn ++ "_grin.dot") dot
+    wdump FD.Grin $ printGrin grin
+
 
 compileGrinToC grin = do
     when (optMode options == Interpret) $ do

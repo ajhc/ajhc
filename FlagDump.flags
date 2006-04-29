@@ -57,6 +57,7 @@ steps show interpreter go
 eval show detailed eval inlining info
 grin-pass  show each iteration of code while transforming
 grin-steps show what happens in each transformation
+grin-graph print dot file of final grin code to outputname_grin.dot
 
 !General
 @verbose progress
