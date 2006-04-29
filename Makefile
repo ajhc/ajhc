@@ -51,14 +51,16 @@ base-1.0.prof.hl: jhc lib/base/base.cabal
 	-[ -e base.prof.log ] && mv -f base.prof.log base.prof.log.bak
 	./jhcp -v $(RTSOPTS) $(JHC_TEST) -ilib/base --noauto --build-hl lib/base/base.cabal -o base-1.0.prof.hl +RTS $(PROF_OPTS)  2>&1 | tee base.log
 
-#install: jhc base-1.0.hl
-
 libs: $(LIBPACKAGES)
 
 publish: $(LIBPACKAGES)
 	cp -f $(LIBPACKAGES) ~/public_html/computer/jhc/libs
 	make -C ~/public_html/computer/jhc
 
+fetch-libs:
+	rm -f $(LIBPACKAGES)
+	for f in $(LIBPACKAGES); do wget http://repetae.net/john/computer/jhc/libs/$${f}; done
+	touch $(LIBPACKAGES)
 
 haskell98-1.0.hl: jhc lib/haskell98/haskell98.cabal base-1.0.hl
 	./jhc -v $(RTSOPTS) $(JHC_TEST) -ilib/haskell98 --noauto -L- -L. -p base --build-hl lib/haskell98.cabal -o $@
@@ -66,7 +68,7 @@ haskell98-1.0.hl: jhc lib/haskell98/haskell98.cabal base-1.0.hl
 QuickCheck-1.0.hl: jhc base-1.0.hl
 	./jhc -v $(RTSOPTS) -d progress $(JHC_TEST) -ilib/QuickCheck -L- -L. -f cpp --build-hl lib/QuickCheck/QuickCheck.cabal -o $@
 
-install: jhc $(LIBPACKAGES)
+install:
 	install -d "$(DP)/bin"
 	install jhc "$(DP)/bin"
 	ln -sf "$(DP)/bin/jhc" "$(DP)/bin/jhci"
