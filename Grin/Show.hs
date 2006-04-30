@@ -161,7 +161,7 @@ instance Show HeapType where
 {-# NOINLINE graphGrin #-}
 
 graphGrin :: Grin -> String
-graphGrin grin = graphviz' gr fnode fedge  where
+graphGrin grin = graphviz' gr [] fnode fedge  where
     nodes = zip [0..] (grinFunctions grin)
     nodeMap = Map.fromList [ (y,x) | (x,(y,_)) <- nodes]
     gr :: Gr (Atom,Lam) CallType
