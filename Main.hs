@@ -30,6 +30,7 @@ import E.LambdaLift
 import E.Program
 import E.LetFloat
 import E.Show hiding(render)
+import E.Subst(subst)
 import E.Rules
 import E.Strictness
 import E.Traverse
@@ -197,6 +198,10 @@ coreSteps = dump FD.CoreSteps
 miniCorePass = coreMini && corePass
 miniCoreSteps = coreMini && coreSteps
 
+annotateId mn x = case fromId x of
+    Just y -> toId (toName Val (mn,'f':show y))
+    Nothing -> toId (toName Val (mn,'f':show x))
+
 processDecls ::
     Stats.Stats   -- ^ statistics
     -> Ho     -- ^ Collected ho
@@ -297,6 +302,16 @@ processDecls stats ho ho' tiData = do
             progExternalNames = progExternalNames prog `mappend` (fromList $ map tvrIdent $ fsts (programDs prog))
             }
         --progress "eta annotating"
+        let sRec mprog = case (rec,ns) of
+                (True,[(t,v@ELam {})]) | tvrIdent t `member` (freeVars v :: IdSet) -> do
+                    let nname = annotateId "R@" (tvrIdent t)
+                        tvr' = tvr { tvrIdent = nname, tvrType = tvrType t }
+                        (_,as) = fromLam v
+                        ne' = foldr ELam (ELetRec [(tvr',subst t (EVar tvr') v)]  (foldl EAp (EVar tvr') (map EVar as))) as
+                    putStrLn $ "\nSimple Recursive: " ++ pprint t
+                    return $ programSetDs [(t,ne')] mprog
+                _ -> return mprog
+        mprog <- transformProgram "Simple Recursive" DontIterate (dump FD.CoreMini) sRec mprog
         mprog <- return $ etaAnnotateProgram mprog
         mprog <- simplifyProgram sopt "SuperSimplify" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
