@@ -281,7 +281,7 @@ floatOutward prog = do
             imap' = Map.fromList [ (tvrIdent t,n) | t <- caseBinds ec] `Map.union` imap
         g n (ELetRec ds e) imap = dds (map G.fromScc $ decomposeDs ds) [] e imap where
             dds (ts:rs) nrs e imap = dds rs (ts':nrs) e imap' where
-                n' = maximum (top_level:[ lup t | t <- fvs ])
+                n' = maximum (Level 1:[ lup t | t <- fvs ])
                 lup n = case Map.lookup n imap of
                     Just x -> x
                     Nothing -> error $ "LetFloat: could not find " ++ show tvr { tvrIdent = n }
