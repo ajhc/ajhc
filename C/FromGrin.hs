@@ -170,6 +170,7 @@ nodeType a = return $ structType (nodeStructName a)
 nodeTypePtr a = liftM ptrType (nodeType a)
 
 jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
+jhc_malloc_atomic sz = functionCall (name "jhc_malloc_atomic") [sz]
 tag = name "tag"
 anyTag = name "any.tag"
 arg i = name $ 'a':show i
@@ -188,9 +189,14 @@ newNode (NodeC t as) = do
     as' <- mapM convertVal as
     tmp <- newVar pnode_t
     let tmp' = project' (nodeStructName t) tmp
-        malloc =  tmp `assign` jhc_malloc (sizeof  (if tagIsWHNF t then st else node_t))
+        malloc =  tmp `assign` wmalloc (sizeof  (if tagIsWHNF t then st else node_t))
         tagassign = project tag tmp' `assign` constant (enum $ nodeTagName t)
+        wmalloc = if tagIsWHNF t && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
         ass = [ project (arg i) tmp' `assign` a | a <- as' | i <- [(1 :: Int) ..] ]
+        nonPtr TyPtr {} = False
+        nonPtr TyNode = False
+        nonPtr (TyTup xs) = all nonPtr xs
+        nonPtr _ = True
     return (mconcat $ malloc:tagassign:ass, cast pnode_t tmp)
 
 --convertPrim p vs = return (mempty,err $ show p)
@@ -442,5 +448,6 @@ convertConst x = fail "convertConst"
 
 ccaf :: (Var,Val) -> P.Doc
 ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ render (prettyVal val)) <> text "*/\n" <> text "static node_t _" <> tshow (varName v) <> text ";\n" <> text "#define " <> tshow (varName v) <+>  text "(&_" <> tshow (varName v) <> text ")\n";
+
 
 

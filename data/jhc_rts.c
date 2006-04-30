@@ -14,6 +14,7 @@
 #ifdef USE_BOEHM_GC
 #include <gc/gc.h>
 #define jhc_malloc GC_malloc
+#define jhc_malloc_atomic GC_malloc_atomic
 #define jhc_free GC_free
 #endif
 
@@ -76,6 +77,8 @@ static inline void *jhc_malloc(size_t n) {
         return ret;
 }
 
+#define jhc_malloc_atomic(x) jhc_malloc(x)
+
 #endif
 
 static void
@@ -129,6 +132,8 @@ main(int argc, char *argv[])
 #ifdef _JHC_PROFILE
         prof_memstart = jhc_mem;
 #endif
+#else
+        GC_INIT()
 #endif
 
         jhc_argc = argc - 1;
