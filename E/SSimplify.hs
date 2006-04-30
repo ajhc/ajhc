@@ -189,12 +189,12 @@ mapLitBindsM f (LitCons n es t) = do
     return (LitCons n es t)
 mapLitBindsM f (LitInt e t) = return $  LitInt e t
 
-collectBinding :: Bind -> OM Bind
+collectBinding :: Bind -> OM (Bind,OMap)
 collectBinding (t,e) = do
     e' <- collectOccurance e
     let rvars = freeVars (Info.fetch (tvrInfo t) :: ARules) :: IdMap TVr
-    tell (OMap $ fmap (const Many) rvars, singleton (tvrIdent t))
-    return (t,e')
+        romap = OMap $ fmap (const Many) rvars
+    return ((t,e'),romap)
 
 unOMap (OMap x) = x
 
@@ -202,20 +202,23 @@ collectDs :: [Bind] -> OMap -> OM [Bind]
 collectDs ds (OMap fve) = do
     ds' <- mapM (grump . collectBinding) ds
     exp <- ask
-    let graph = newGraph ds' (\ ((t,_),_) -> tvrIdent t) (\ (_,fv) -> mkeys fv)
-        rds = reachable graph (mkeys fve ++ [ tvrIdent t | (t,_) <- ds, getProperty prop_EXPORTED t || (tvrIdent t `member` exp)])
-        graph' = newGraph rds (\ ((t,_),_) -> tvrIdent t) (\ (_,fv) -> mkeys fv)
-        (lb,ds'') =  findLoopBreakers (\ ((t,e),_) -> loopFunc t e) (const True) graph'
+    let graph = newGraph ds' (\ (((t,_),_),_) -> tvrIdent t) (\ ((_,rv),fv) -> mkeys (fv `mappend` rv))
+        rds = reachable graph (mkeys fve ++ [ tvrIdent t | (t,_) <- ds,  (tvrIdent t `member` exp)])
+        -- ignore rules when calculating loopbreakers
+        -- we must not simplify the expanded body of a rule without recalculating occurance info.
+        graph' = newGraph rds (\ (((t,_),_),_) -> tvrIdent t) (\ (_,fv) -> mkeys fv)
+        (lb,lbds) =  findLoopBreakers (\ (((t,e),_),_) -> loopFunc t e) (const True) graph'
+        ds'' = map ( \ ((t,rv),rv') -> (t,rv `mappend` rv') ) lbds
         fids = foldl andOM mempty (fve:map unOMap (snds ds''))
         ffids = fromList [ (tvrIdent t,lup t) | ((t,_),_) <- ds'' ]
-        cycNodes = (fromList $ [ tvrIdent v | ((v,_),_) <- cyclicNodes graph'] :: IdSet)
+        cycNodes = (fromList $ [ tvrIdent v | (((v,_),_),_) <- cyclicNodes graph'] :: IdSet)
         calcStrictInfo :: TVr -> TVr
         calcStrictInfo t
             | tvrIdent t `member` cycNodes = setProperty prop_CYCLIC t
             | otherwise = t
-        lup t = case tvrIdent t `elem` [ tvrIdent t | ((t,_),_) <- lb] of
+        lup t = case tvrIdent t `elem` [ tvrIdent t | (((t,_),_),_) <- lb] of
             True -> LoopBreaker
-            False -> case getProperty prop_EXPORTED t || (tvrIdent t `member` exp) of
+            False -> case  (tvrIdent t `member` exp) of
                 True -> Many
                 False | Just r <- mlookup (tvrIdent t) fids -> r
         ds''' = [ (calcStrictInfo $ annbind ffids t ,e) | ((t,e),_) <- ds'']
