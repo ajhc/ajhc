@@ -167,7 +167,9 @@ graphGrin grin = graphviz' gr fnode fedge  where
     gr :: Gr (Atom,Lam) CallType
     gr =   mkGraph nodes [ (n,n2,tc) | (n,(_,_ :-> l)) <- nodes, (tc,fv) <- Set.toList (freeVars l), n2 <- Map.lookup fv nodeMap ]
     fnode :: (Atom,Lam) -> [(String,String)]
-    fnode (x,_ :-> e) = [("label",show x)] ++ if hasError e then [("color","red")] else []
+    fnode (x,_ :-> e) = [("label",show x)]
+        ++ (if hasError e then [("color","red")] else [])
+        ++ (if x `elem` grinEntryPoints grin then [("shape","box")] else [])
     fedge :: CallType -> [(String,String)]
     fedge TailCall = []
     fedge StandardCall = [("style","dotted")]
