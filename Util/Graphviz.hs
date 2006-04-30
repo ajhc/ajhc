@@ -70,7 +70,7 @@ graphviz g t headers fnode fedge (w, h) p@(pw', ph') o =
 --	    ++"\tpage = \""++ps++"\"\n"
 --	    ++"\tsize = \""++gs++"\"\n"
             ++ concatMap (\x -> showEq x "\n") headers
-	    ++ o2s o
+--	    ++ o2s o
 --	    ++"\tratio = \"fill\"\n"
 	    ++ns
 	    ++es
