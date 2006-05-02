@@ -27,7 +27,8 @@ cb x = (createTyp x, Binable x)
 binTable = Map.fromList [
     cb (u :: Properties),
     cb (u :: E.CPR.Val),
-    cb (u :: E.Strictness.SA)
+    cb (u :: E.Strictness.SA),
+    cb (u :: [E.Strictness.SA])
     ]
 
 
