@@ -1,14 +1,15 @@
 module Util.UnionFind(
     Element,
     T,
+    find,
+    fromElement,
+    getW,
     new,
     new_,
-    updateW,
-    getW,
-    find,
+    putW,
     union,
     union_,
-    fromElement
+    updateW
     ) where
 
 import Control.Monad.Trans
@@ -50,10 +51,12 @@ getW x = liftIO $ do
 updateW :: MonadIO m => (w -> w) -> Element w a -> m ()
 updateW f x = liftIO $ do
     Element _ _ r <- find x
-    Weight s w <- readIORef  r
-    writeIORef r (Weight s (f w))
+    modifyIORef r (\ (Weight s w) -> Weight s (f w))
 
-
+putW :: MonadIO m => Element w a -> w -> m ()
+putW e w = liftIO $ do
+    Element _ _ r <- find e
+    modifyIORef r (\ (Weight s _) -> Weight s w)
 
 union :: MonadIO m => (w -> w -> w) -> Element w a -> Element w a -> m ()
 union comb e1 e2 = liftIO $ do
