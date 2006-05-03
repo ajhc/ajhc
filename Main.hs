@@ -562,10 +562,6 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     st <- Stats.new
 
-    let mangle = mangle'  (Just mempty)
-    let opt = doopt (mangle dataTable) True stats
-    let showTVr t = prettyE (EVar t) <> show (tvrInfo t)
-
 
     prog <- transformProgram "typeAnalyze after method" DontIterate True (typeAnalyze True) prog
     prog <- barendregtProg prog
