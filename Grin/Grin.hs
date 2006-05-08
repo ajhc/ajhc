@@ -25,6 +25,7 @@ module Grin.Grin(
     funcMain,
     gApply,
     gEval,
+    grinEntryPointNames,
     isMutableNodeTag,
     isHole,
     n0,n1,n2,n3,
@@ -65,6 +66,7 @@ import qualified Data.Set as Set
 
 import Atom
 import Boolean.Algebra
+import C.FFI
 import C.Prims
 import Doc.DocLike
 import Support.FreeVars
@@ -201,7 +203,7 @@ phaseEvalInlined _ = False
 
 
 data Grin = Grin {
-    grinEntryPoints :: [Atom],
+    grinEntryPoints :: Map.Map Atom FfiExport,
     grinPhase :: Phase,
     grinTypeEnv :: TyEnv,
     grinFunctions :: [(Atom,Lam)],
@@ -214,7 +216,7 @@ data Grin = Grin {
 
 
 emptyGrin = Grin {
-    grinEntryPoints = [],
+    grinEntryPoints = mempty,
     grinPhase = PhaseInit,
     grinTypeEnv = mempty,
     grinFunctions = [],
@@ -224,6 +226,8 @@ emptyGrin = Grin {
     grinPartFunctions = mempty,
     grinCafs = mempty
 }
+
+grinEntryPointNames = Map.keys . grinEntryPoints
 
 mapBodyM f (x :-> y) = f y >>= return . (x :->)
 

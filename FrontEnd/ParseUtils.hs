@@ -37,6 +37,7 @@ module FrontEnd.ParseUtils (
         , parseExport
  ) where
 
+import C.FFI
 import HsSyn
 import FrontEnd.SrcLoc
 import FrontEnd.ParseMonad
@@ -364,25 +365,25 @@ sameFun _ _ = False
 
 -- FFI parsing
 
-parseExport :: Monad m => String -> HsName -> m HsForeignT
+parseExport :: Monad m => String -> HsName -> m String
 parseExport cn hn =
     case words cn of
-      [x] | isCName x -> return $ Export x
-      []              -> return $ Export $ show hn
+      [x] | isCName x -> return x
+      []              -> return (show hn)
       _               -> fail ("Invalid cname in export declaration: "++show cn)
 
-parseImport :: Monad m => String -> HsName -> m HsForeignT
+parseImport :: Monad m => String -> HsName -> m FfiType
 parseImport cn hn =
     case words cn of
       ["dynamic"]   -> return Dynamic
       ["wrapper"]   -> return Wrapper
-      []            -> return $ Import (show hn) [] []
+      []            -> return $ Import (show hn) nullRequires
       ("static":xs) -> parseIS [] [] xs
       xs            -> parseIS [] [] xs
 
-parseIS a b ['&':n] | isCName n = return $ AddrOf n a b
-parseIS a b [n]     | isCName n = return $ Import n a b
-parseIS a b ["&",n] | isCName n = return $ AddrOf n a b
+parseIS a b ['&':n] | isCName n = return $ ImportAddr n $ Requires a b
+parseIS a b [n]     | isCName n = return $ Import     n $ Requires a b
+parseIS a b ["&",n] | isCName n = return $ ImportAddr n $ Requires a b
 parseIS a b (('-':'l':l):r)     = parseIS a (l:b) r
 parseIS a b (i:r)               = parseIS (i:a) b r
 parseIS _ _ x                   = fail ("Syntax error parsing foreign import: "++show x)

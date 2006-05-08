@@ -17,6 +17,7 @@ ToDo: Differentiate between record updates and labeled construction.
 > {
 > module FrontEnd.HsParser (parse, parseHsStmt) where
 >
+> import C.FFI
 > import HsSyn
 > import FrontEnd.ParseMonad
 > import FrontEnd.Lexer
@@ -289,13 +290,13 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >			{ HsDefaultDecl $2 $3 }
 >       | 'foreign' srcloc 'export' mcconv mstring var '::' ctype
 >                       {% parseExport $5 $6 >>= \x ->
->                          return (HsForeignDecl $2 x $4 Safe $6 $8) }
+>                          return (HsForeignExport $2 (FfiExport x Safe $4) $6 $8) }
 >       | 'foreign' srcloc 'import' 'primitive' mstring var '::' ctype
->                       { let i = Import (if null $5 then show $6 else $5) [] []
->                         in HsForeignDecl $2 i Primitive Safe $6 $8 }
+>                       { let i = Import (if null $5 then show $6 else $5) nullRequires
+>                         in HsForeignDecl $2 (FfiSpec i Safe Primitive) $6 $8 }
 >       | 'foreign' srcloc 'import' mcconv msafety mstring var '::' ctype
 >                       {% parseImport $6 $7 >>= \x ->
->                          return (HsForeignDecl $2 x $4 $5 $7 $9) }
+>                          return (HsForeignDecl $2 (FfiSpec x $5 $4) $7 $9) }
 >       | PRAGMARULES layout_on rules close PRAGMAEND
 >               { HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) (reverse $3) }
 >       | srcloc PRAGMASPECIALIZE var '::' type PRAGMAEND

@@ -92,7 +92,9 @@ workWrap' dataTable tvr e | isJust res = ans where
         ne | Just cname <- cname, isSingleton = cases $ eStrictLet sv workerCall  (ELit $ LitCons cname [EVar sv] bodyTyp)
            | Just cname <- cname = let ca = Alt (unboxedTuple vars) (ELit $ LitCons cname (map EVar vars) bodyTyp) in  cases $ eCase workerCall [ca] Unknown
            | otherwise = cases $ workerCall
-    vars@(~[sv]) = [  tVr i t | t <- slotTypes dataTable (fromJust cname) bodyTyp | i <- [2,4..] ]
+    getName (Just x) = x
+    getName Nothing  = error ("workWrap': cname = Nothing: tvr = "++show tvr)
+    vars@(~[sv]) = [  tVr i t | t <- slotTypes dataTable (getName cname) bodyTyp | i <- [2,4..] ]
     isSingleton = case vars of
         [v] -> getType (getType v) == eHash
         _ -> False

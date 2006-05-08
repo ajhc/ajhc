@@ -42,7 +42,7 @@
 #define STR(s) #s
 #define XSTR(s) STR(s)
 
-static void _amain(void) A_REGPARM;
+static void _amain(void);
 static int jhc_argc;
 static char **jhc_argv;
 static char *jhc_progname;

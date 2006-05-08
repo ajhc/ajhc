@@ -32,6 +32,7 @@ maybeGetDeclName (HsClassDecl _ qualType _) = case qualType of
             leftMostTyCon (HsTyCon n) = (toName ClassName n)
             leftMostTyCon x = error $ "leftMostTyCon: " ++ show x
 maybeGetDeclName x@HsForeignDecl {} = return $ toName Val $ hsDeclName x
+maybeGetDeclName (HsForeignExport _ e _ _)   = return $ ffiExportName e
 --maybeGetDeclName (HsTypeSig _ [n] _ ) = return n
 maybeGetDeclName d = fail  $ "getDeclName: could not find name for a decl: " ++ show d
 

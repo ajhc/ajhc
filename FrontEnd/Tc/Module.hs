@@ -247,9 +247,13 @@ tiModules' me ms = do
         putStrLn " ---- the coersions of identifiers ---- "
         mapM_ putStrLn [ show n ++  " --> " ++ show s |  (n,s) <- Map.toList coercions]
 
-    let externalEnv = Map.filterWithKey (\ x _ -> isGlobal x && (fromJust (getModule x) `elem` map modInfoName ms)) localVarEnv `Map.union` noDefaultSigs
+    let getMod x = case getModule x of
+                     Just m  -> m
+                     Nothing -> error ("getModule "++show x++" => Nothing")
+        interesting x = isGlobal x && nameType x /= FfiExportName
+    let externalEnv = Map.filterWithKey (\ x _ -> interesting x && (getMod x `elem` map modInfoName ms)) localVarEnv `Map.union` noDefaultSigs
     localVarEnv <- return $  localVarEnv `Map.union` noDefaultSigs
-    let externalKindEnv = restrictKindEnv (\ x  -> isGlobal x && (fromJust (getModule x) `elem` map modInfoName ms)) kindInfo
+    let externalKindEnv = restrictKindEnv (\ x  -> interesting x && (getMod x `elem` map modInfoName ms)) kindInfo
 
     let pragmaProps = Map.fromListWith (\a b -> snub $ a ++ b ) [ (toName Name.Val x,[toAtom w]) |  HsPragmaProps _ w xs <- ds, x <- xs ]
 

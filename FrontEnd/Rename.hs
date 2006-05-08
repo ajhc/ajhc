@@ -283,12 +283,19 @@ renameHsDecl (HsPatBind srcLoc hsPat hsRhs {-where-} hsDecls) subTable = do
     let patbind' = (HsPatBind srcLoc hsPat' hsRhs' {-where-} hsDecls')
     return patbind'
 
-renameHsDecl (HsForeignDecl a b c d n t) subTable = do
+renameHsDecl (HsForeignExport a b n t) subTable = do
     setSrcLoc a
     n <- renameHsName n subTable
     subTable' <- updateSubTableWithHsQualType subTable t
     t <- renameHsQualType t subTable'
-    return (HsForeignDecl a b c d n t)
+    return (HsForeignExport a b n t)
+
+renameHsDecl (HsForeignDecl a b n t) subTable = do
+    setSrcLoc a
+    n <- renameHsName n subTable
+    subTable' <- updateSubTableWithHsQualType subTable t
+    t <- renameHsQualType t subTable'
+    return (HsForeignDecl a b n t)
 
 --renameHsDecl (HsFunBind srcLoc hsMatches) subTable
 renameHsDecl (HsFunBind hsMatches) subTable = do
@@ -1062,7 +1069,7 @@ getHsNamesAndASrcLocsFromHsDecl (HsPatBind sloc _ _ _)
   = error $ "non simple pattern binding found (sloc): " ++ show sloc
 -- getHsNamesAndASrcLocsFromHsDecl (HsFunBind _ hsMatches)
 getHsNamesAndASrcLocsFromHsDecl (HsFunBind hsMatches) = getHsNamesAndASrcLocsFromHsMatches hsMatches
-getHsNamesAndASrcLocsFromHsDecl (HsForeignDecl a _ _ _ n _) = [(n,a)]
+getHsNamesAndASrcLocsFromHsDecl (HsForeignDecl a _ n _) = [(n,a)]
 getHsNamesAndASrcLocsFromHsDecl _otherHsDecl = []
 
 getHsNamesAndASrcLocsFromHsMatches :: [HsMatch] -> [(HsName, SrcLoc)]
@@ -1085,7 +1092,8 @@ collectDefsHsModule m = execWriter (mapM_ f (hsModuleDecls m)) where
     -- f :: HsDecl -> Writer [(Name,SrcLoc,[Name])] ()
     tellF xs = tell (xs,[]) >> return ()
     tellS xs = tell ([],xs) >> return ()
-    f (HsForeignDecl a _ _ _ n _)  = tellF [(toName Val n,a,[])]
+    f (HsForeignDecl a _ n _)  = tellF [(toName Val n,a,[])]
+    f (HsForeignExport a e _ _)  = tellF [(ffiExportName e,a,[])]
     f (HsFunBind [])  = return ()
     f (HsFunBind (HsMatch a n _ _ _:_))  = tellF [(toName Val n,a,[])]
     f (HsPatBind srcLoc p _ _) = tellF [ (toName Val n,srcLoc,[]) | n <- (getHsNamesFromHsPat p) ]
@@ -1142,7 +1150,7 @@ namesHsModule m = mconcatMap namesHsDecl (hsModuleDecls m)
 -}
 
 namesHsDecl :: HsDecl -> ([(HsName, SrcLoc)],[(HsName, SrcLoc)])
-namesHsDecl (HsForeignDecl a _ _ _ n _)  = ([(n,a)],[])
+namesHsDecl (HsForeignDecl a _ n _)  = ([(n,a)],[])
 namesHsDecl (HsFunBind hsMatches)  = (getHsNamesAndASrcLocsFromHsMatches hsMatches, [])
 namesHsDecl (HsPatBind srcLoc p _ _) = (map (rtup srcLoc) (getHsNamesFromHsPat p),[])
 namesHsDecl (HsTypeDecl sl n _ _) = ([],[(n,sl)])

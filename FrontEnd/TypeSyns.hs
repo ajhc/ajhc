@@ -99,10 +99,15 @@ renameHsDecl (HsPatBind srcLoc hsPat hsRhs {-where-} hsDecls) subTable = withSrc
     let patbind' = (HsPatBind srcLoc hsPat' hsRhs' {-where-} hsDecls')
     return patbind'
 
-renameHsDecl (HsForeignDecl a b c d n t) subTable = withSrcLoc a $ do
+renameHsDecl (HsForeignDecl a b n t) subTable = withSrcLoc a $ do
     n <- renameHsName n subTable
     t <- renameHsQualType t subTable
-    return  (HsForeignDecl a b c d n t)
+    return  (HsForeignDecl a b n t)
+
+renameHsDecl (HsForeignExport a b n t) subTable = withSrcLoc a $ do
+    n <- renameHsName n subTable
+    t <- renameHsQualType t subTable
+    return  (HsForeignExport a b n t)
 
 renameHsDecl (HsFunBind hsMatches) subTable = do
     hsMatches' <- renameHsMatches hsMatches subTable
@@ -495,7 +500,7 @@ getHsNamesAndASrcLocsFromHsDecl (HsPatBind sloc _ _ _)
   = error $ "non simple pattern binding found (sloc): " ++ show sloc
 -- getHsNamesAndASrcLocsFromHsDecl (HsFunBind _ hsMatches)
 getHsNamesAndASrcLocsFromHsDecl (HsFunBind hsMatches) = getHsNamesAndASrcLocsFromHsMatches hsMatches
-getHsNamesAndASrcLocsFromHsDecl (HsForeignDecl a _ _ _ n _) = [(n,a)]
+getHsNamesAndASrcLocsFromHsDecl (HsForeignDecl a _ n _) = [(n,a)]
 getHsNamesAndASrcLocsFromHsDecl _otherHsDecl = []
 
 getHsNamesAndASrcLocsFromHsMatches :: [HsMatch] -> [(HsName, SrcLoc)]

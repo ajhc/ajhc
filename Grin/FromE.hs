@@ -13,6 +13,7 @@ import qualified Data.Set as Set
 
 import Atom
 import Control.Monad.Identity
+import qualified C.FFI as FFI
 import C.Prims
 import DataConstructors
 import Doc.DocLike
@@ -120,7 +121,7 @@ toType node = toty where
     toty _ = node
 
 compile :: Program -> IO Grin
-compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry } = do
+compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, progEntryPoints = entries } = do
     prog <- return $ prog { progCombinators  = map stripTheWorld (progCombinators prog) }
     tyEnv <- newIORef initTyEnv
     funcBaps <- newIORef []
@@ -153,8 +154,23 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry } = 
         mapM_ print os
     let tf a = a:tagToFunction a
     ds <- return $ flattenScc $ stronglyConnComp [ (a,x, concatMap tf (freeVars z)) | a@(x,(_ :-> z)) <- ds]
+
+    -- FFI
+    let tvrAtom (TVr i _ _)  = intToAtom i
+    let ef x = do n <- tvrAtom x
+                  return (n, Tup [] :-> discardResult (App (scTag x) [] tyUnit))
+        ep x = do putStrLn ("EP FOR "++show x)
+                  n <- tvrAtom x
+                  l <- Info.lookup (tvrInfo x)
+                  return (n, l)
+    efv <- mapM ef $ tail entries -- FIXME
+    epv <- mapM ep entries
+    enames <- mapM tvrAtom entries
+
+
     TyEnv endTyEnv <- readIORef tyEnv
-    let newTyEnv = TyEnv $ Map.fromList $ concatMap makePartials (Map.toList endTyEnv)
+    -- FIXME correct types.
+    let newTyEnv = TyEnv $ Map.fromList (concatMap makePartials (Map.toList endTyEnv) ++ [(en, ([],tyUnit)) | en <- enames])
     wdump FD.Tags $ do
         dumpTyEnv newTyEnv
     fbaps <- readIORef funcBaps
@@ -162,17 +178,18 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry } = 
     -- let (main,as,rtype) = runIdentity $ Map.lookup (tvrIdent mt) scMap
         -- main' =  if not $ null as then  (Return $ NodeC (partialTag main (length as)) []) else App main [] rtype
         -- tags = Set.toList $ ep $ Set.unions (freeVars (main',initCafs):[ freeVars e | (_,(_ :-> e)) <- ds ])
-    let ep s = Set.fromList $ concatMap partialLadder $ Set.toList s
+    let -- ep s = Set.fromList $ concatMap partialLadder $ Set.toList s
         -- cafs = [ ((V $ - atomIndex tag),NodeC tag []) | (x,(Tup [] :-> _)) <- ds, let tag = partialTag x 0 ] ++ [ (y,z') |(x,y,z) <- cc, y `elem` reqcc, let Const z' = z ]
         cafs = [ (x,y) | (_,x,y) <- rcafs ]
         initCafs = sequenceG_ [ Update (Var v (TyPtr TyNode)) node | (v,node) <- cafs ]
         ic = (funcInitCafs,(Tup [] :-> initCafs) )
         ds' = ic:(ds ++ fbaps)
+
     let grin = emptyGrin {
-            grinEntryPoints = [funcMain],
+            grinEntryPoints = Map.fromList epv,
             grinPhase = PhaseInit,
             grinTypeEnv = newTyEnv,
-            grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  discardResult theMain)) : ds',
+            grinFunctions = (head enames ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  discardResult theMain)) : efv ++ ds',
             grinCafs = [ (x,NodeC tagHole []) | (x,_) <- cafs]
             }
     --typecheckGrin grin
@@ -213,7 +230,6 @@ primTyEnv = TyEnv . Map.fromList $ [
     (funcInitCafs, ([],tyUnit)),
     (funcEval, ([TyPtr TyNode],TyNode)),
     (funcApply, ([TyNode, TyPtr TyNode],TyNode)),
-    (funcMain, ([],tyUnit)),
     (tagHole, ([],TyNode))
     ] ++ [ (toAtom ('C':show dc), ([Ty $ toAtom y],TyNode)) | (dc,tc,_,y,_) <- allCTypes, y /= "void" ]
 

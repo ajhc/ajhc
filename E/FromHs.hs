@@ -24,6 +24,7 @@ import qualified Text.PrettyPrint.HughesPJ as PPrint
 import Atom
 import Boolean.Algebra
 import Class
+import C.FFI
 import C.Prims as CP
 import DataConstructors
 import PrimitiveOperators
@@ -69,7 +70,6 @@ import Util.Gen
 import Util.NameMonad
 import Util.SetLike
 
-theMainName = toName Name.Val "theMain"
 ump sl e = EError (show sl ++ ": Unmatched pattern") e
 
 
@@ -191,31 +191,32 @@ argTypes' e = let (x,y) = fromPi e in (map tvrType y,x)
 
 
 getMainFunction :: Monad m => DataTable -> Name -> (Map.Map Name (TVr,E)) -> m (Name,TVr,E)
-getMainFunction dataTable name ds = ans where
+getMainFunction dataTable name ds = do
+  mt <- Map.lookup name ds
+  funcs <- fmapM (\n -> liftM fst $ Map.lookup n ds) sFuncNames
+  nameToEntryPoint dataTable (fst mt) (toName Name.Val "theMain") (FfiExport "_amain" Safe CCall) funcs
+
+nameToEntryPoint :: Monad m => DataTable -> TVr -> Name -> FfiExport -> FuncNames TVr -> m (Name,TVr,E)
+nameToEntryPoint dataTable main cname ffi ds = ans where
     ans = do
-        main <- findName name
-        runMain <- findName (func_runMain sFuncNames)
-        runExpr <- findName (func_runExpr sFuncNames)
-        runNoWrapper <- findName (func_runNoWrapper sFuncNames)
+        let runMain      = func_runMain ds
+            runExpr      = func_runExpr ds
+            runNoWrapper = func_runNoWrapper ds
         let e = case ioLike (getType maine) of
                 Just x | not (fopts FO.Wrapper) -> EAp (EAp (EVar runNoWrapper) x) maine
                 Just x ->  EAp (EAp (EVar runMain)  x ) maine
                 Nothing ->  EAp (EAp (EVar runExpr) ty) maine
             ne = ELam worldVar (EAp e (EVar worldVar))
             worldVar = tvr { tvrIdent = 2, tvrType = tWorld__ }
-            theMain = (theMainName,setProperty prop_EXPORTED theMainTvr,ne)
-            theMainTvr =  tVr (toId theMainName) (infertype dataTable ne)
+            theMainTvr =  tVr (toId cname) (infertype dataTable ne)
             tvm@(TVr { tvrType =  ty}) =  main
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs, sortStarLike k ]
             (ty',xs) = fromPi ty
-        return theMain
+        return (cname, tvrInfo_u (Info.insert ffi) $ setProperty prop_EXPORTED theMainTvr,ne)
     ioLike ty = case followAliases dataTable ty of
         ELit (LitCons n [x] _) | n ==  tc_IO -> Just x
         (EPi ioc (EPi tvr (ELit (LitCons n [x] _)))) | n == tc_IOResult -> Just x
         _ -> Nothing
-    findName name = case Map.lookup name ds of
-        Nothing -> fail $ "Cannot find: " ++ show name
-        Just (n,_) -> return n
 
 createInstanceRules :: Monad m => ClassHierarchy -> (Map.Map Name (TVr,E)) -> m Rules
 createInstanceRules classHierarchy funcs = return $ fromRules ans where
@@ -386,24 +387,24 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         | "Instance@" `isPrefixOf` show a = (a,setProperty prop_INSTANCE b, deNewtype dataTable c)
         | otherwise = (a,b, deNewtype dataTable c)
     cDecl :: Monad m => HsDecl -> Ce m [(Name,TVr,E)]
-    cDecl (HsForeignDecl _ i@(Import {}) HS.Primitive _ n _) = do
+    cDecl (HsForeignDecl _ (FfiSpec (Import cn req) _ Primitive) n _) = do
         let name      = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         let (ts,rt)   = argTypes' ty
-            toPrim (Import cn is ls) = APrim (PrimPrim cn) (Requires is ls)
+            prim      = APrim (PrimPrim cn) req
         es <- newVars [ t |  t <- ts, not (sortStarLike t) ]
-        let result    = foldr ($) (processPrimPrim dataTable $ EPrim (toPrim i) (map EVar es) rt) (map ELam es)
+        let result    = foldr ($) (processPrimPrim dataTable $ EPrim prim (map EVar es) rt) (map ELam es)
         return [(name,var,lamt result)]
-    cDecl (HsForeignDecl _ i@HS.AddrOf {} _ _ n _) = do
+    cDecl (HsForeignDecl _ (FfiSpec (ImportAddr rcn req) _ _) n _) = do
         let name       = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         let (ts,rt)    = argTypes' ty
         (cn,st,ct) <- lookupCType' dataTable rt
         [uvar] <- newVars [st]
         let expr x     = return [(name,var,lamt x)]
-            prim       = APrim (CP.AddrOf cn) (Requires is ls) where HS.AddrOf cn is ls = i
+            prim       = APrim (AddrOf rcn) req
         expr $ eStrictLet uvar (EPrim prim [] st) (ELit (LitCons cn [EVar uvar] rt))
-    cDecl (HsForeignDecl _ i@Import {} HS.CCall _ n _) = do
+    cDecl (HsForeignDecl _ (FfiSpec (Import rcn req) _ CCall) n _) = do
         let name = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         let (ts,rt) = argTypes' ty
@@ -414,8 +415,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         (_,pt) <- lookupCType dataTable rt'
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
         let cFun = createFunc dataTable (map tvrType es)
-            prim io rs rtt = EPrim (APrim (Func io s (snds rs) rtt) (Requires is ls))
-                where Import s is ls = i
+            prim io rs rtt = EPrim (APrim (Func io rcn (snds rs) rtt) req)
         result <- case (isIO,pt) of
             (True,"void") -> cFun $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
                         eStrictLet tvrWorld2 (prim True rs "void" (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
@@ -432,6 +432,9 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         return [(name,var,lamt result)]
 
     cDecl x@HsForeignDecl {} = fail ("Unsupported foreign declaration: "++ show x)
+    cDecl (HsForeignExport _ ffi@(FfiExport ecn _ CCall) n _) = do
+        return . (:[]) =<< nameToEntryPoint dataTable (tv n) (toName Name.FfiExportName ecn) ffi =<< fmapM (return . toTVr assumps) sFuncNames
+    cDecl x@HsForeignExport {} = fail ("Unsupported foreign export: "++ show x)
 
     cDecl (HsPatBind sl p (HsUnGuardedRhs exp) []) | (HsPVar n) <- simplifyHsPat p, n == sillyName' = do
         e <- cExpr exp

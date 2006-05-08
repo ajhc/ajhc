@@ -4,6 +4,7 @@ module HsSyn where
 
 import Atom
 import Binary
+import C.FFI
 import Data.Generics
 import PackedString
 import FrontEnd.SrcLoc
@@ -30,21 +31,6 @@ instance Show Module where
     showsPrec _ (Module n) = showString n
 
 fromModule (Module s) = s
-
--- Foreign Declarations
-
-data Safety = Safe | Unsafe deriving(Data,Eq,Ord,Show,Typeable)
-data CallConv = CCall | StdCall | Primitive deriving(Data,Eq,Ord,Show,Typeable)
-type Includes = [String]
-type Libs     = [String]
-type CName    = String
-
-data HsForeignT = AddrOf CName Libs Includes
-                | Dynamic
-                | Export CName
-                | Import CName Libs Includes
-                | Wrapper
-                  deriving(Data,Eq,Ord,Show,Typeable)
 
 -- Names
 
@@ -144,6 +130,7 @@ instance HasLocation HsDecl where
     srcLoc HsPragmaSpecialize { hsDeclSrcLoc = sl } = sl
     srcLoc (HsPragmaRules rs) = srcLoc rs
     srcLoc HsForeignDecl { hsDeclSrcLoc = sl } = sl
+    srcLoc (HsForeignExport sl _ _ _) = sl
     srcLoc (HsClassDecl	 sl _ _) = sl
     srcLoc (HsInstDecl	 sl _ _) = sl
     srcLoc (HsDefaultDecl sl _) = sl
@@ -167,18 +154,16 @@ data HsDecl
 	 | HsFunBind     [HsMatch]
 	 | HsPatBind	 SrcLoc HsPat HsRhs {-where-} [HsDecl]
          | HsForeignDecl { hsDeclSrcLoc   :: SrcLoc,
-                           hsDeclForeign  :: HsForeignT,
-                           hsDeclCallConv :: CallConv,
-                           hsDeclSafety   :: Safety,
+                           hsDeclForeign  :: FfiSpec,
                            hsDeclName     :: HsName,
                            hsDeclQualType :: HsQualType
                          }
+         | HsForeignExport SrcLoc FfiExport HsName HsQualType
          | HsPragmaProps SrcLoc String [HsName]
 	 | HsPragmaRules [HsRule]
          | HsPragmaSpecialize { hsDeclUniq :: (Module,Int), hsDeclSrcLoc :: SrcLoc, hsDeclBool :: Bool, hsDeclName :: HsName, hsDeclType :: HsType }
   deriving(Data,Typeable,Eq,Show)
   {-! derive: is !-}
-
 
 data HsRule = HsRule {
     hsRuleUniq :: (Module,Int),

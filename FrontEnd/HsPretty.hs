@@ -270,7 +270,8 @@ ppHsDecl (HsPragmaRules rs@(HsRule { hsRuleIsMeta = True }:_)) = text "{-# METAR
 ppHsDecl prules@HsPragmaSpecialize {} = text "{-# SPECIALIZE ... #-}" --  ++ show (hsDeclString prules)) <+> text "forall" <+> vars <+> text "." $$ nest 4 rest $$ text "#-}" where
 --    vars = hsep (map ppHsTName $ hsDeclFreeVars prules)
 --    rest = ppHsExp (hsDeclLeftExpr prules) <+> text "=" <+> ppHsExp (hsDeclRightExpr prules)
-ppHsDecl fd@(HsForeignDecl _ _ _ _ n qt) = text "ForeignDecl" <+> ppHsName n <+> ppHsQualType qt <+> text (show fd)
+ppHsDecl fd@(HsForeignDecl _ _ n qt) = text "ForeignDecl" <+> ppHsName n <+> ppHsQualType qt <+> text (show fd)
+ppHsDecl fd@(HsForeignExport _ _ n qt) = text "ForeignExport" <+> ppHsName n <+> ppHsQualType qt <+> text (show fd)
 ppHsDecl (HsTypeDecl loc name nameList htype) =
 	   --blankline $
 	   mySep ( [text "type",ppHsName name]

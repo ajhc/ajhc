@@ -523,7 +523,11 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
     (_,main,mainv) <- getMainFunction dataTable mainFunc (programEsMap prog)
-    prog <- return prog { progMainEntry = main, progEntryPoints = [main], progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog] }
+    let ffiExportNames = filter (\t -> (tvrName t >>= return . nameType) == Just FfiExportName) $ map (\(x,_,_) -> x) $ progCombinators prog
+    prog <- return prog { progMainEntry   = main,
+                          progEntryPoints = (main:ffiExportNames),
+                          progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog]
+                        }
     prog <- transformProgram "Initial Prune Unreachable" DontIterate False (return . programPruneUnreachable) prog
     prog <- barendregtProg prog
 
@@ -648,13 +652,13 @@ compileToGrin prog = do
         case t' of
             0 -> return x
             _ -> opt s x
-    x <- deadCode stats (grinEntryPoints x) x  -- XXX
+    x <- deadCode stats (grinEntryPointNames x) x  -- XXX
     lintCheckGrin x
     x <- opt "Optimization" x
     lintCheckGrin x
     x <- grinSpeculate x
     lintCheckGrin x
-    x <- deadCode stats (grinEntryPoints x) x  -- XXX
+    x <- deadCode stats (grinEntryPointNames x) x  -- XXX
     lintCheckGrin x
     x <- opt "Optimization" x
     lintCheckGrin x
@@ -675,14 +679,14 @@ compileToGrin prog = do
         x <- opt "AE Optimization 1" x
         x <- unboxReturnValues x
         lintCheckGrin x
-        x <- deadCode stats (grinEntryPoints x) x
+        x <- deadCode stats (grinEntryPointNames x) x
         lintCheckGrin x
         x <- return $ normalizeGrin x
         lintCheckGrin x
         x <- opt "AE Optimization 2" x
         x <- unboxReturnValues x
         lintCheckGrin x
-        x <- deadCode stats (grinEntryPoints x) x
+        x <- deadCode stats (grinEntryPointNames x) x
         lintCheckGrin x
         x <- opt "AE Optimization 3" x
         wdump FD.OptimizationStats $ Stats.print "AE Optimization" stats

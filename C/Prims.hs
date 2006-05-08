@@ -1,16 +1,12 @@
 module C.Prims where
 
+import C.FFI(Requires(..))
 import Data.Monoid
 import Data.Generics
 import Binary
 import Doc.DocLike
 import Doc.PPrint
 
-data Requires = Requires {
-    reqIncludes :: [String],
-    reqLibraries :: [String]
-    } deriving(Typeable, Data, Eq, Ord, Show)
-    {-! derive: Monoid, GhcBinary !-}
 
 type ExtType = String
 

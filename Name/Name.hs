@@ -10,6 +10,7 @@ module Name.Name(
     fromTypishHsName,
     fromValishHsName,
     parseName,
+    ffiExportName,
     isConstructorLike,
     toId,
     fromId,
@@ -26,6 +27,7 @@ import Monad(liftM)
 
 import Atom
 import Binary
+import C.FFI
 import Doc.DocLike
 import Doc.PPrint
 import GenUtil
@@ -40,6 +42,7 @@ data NameType =
     | SortName
     | FieldLabel
     | RawType
+    | FfiExportName -- Name is the C name of a FFI export
     deriving(Ord,Eq,Enum,Read,Show,Typeable,Data)
 
 
@@ -71,6 +74,7 @@ fromValishHsName name
 createName _ "" i = error $ "createName: empty module "  ++ i
 createName _ m "" = error $ "createName: empty ident "   ++ m
 createName t m i = Name $  toAtom $ (chr $ fromEnum t):m ++ "\NUL" ++ i
+createUName :: NameType -> String -> Name
 createUName _ "" = error $ "createUName: empty ident"
 createUName t i =  Name $ toAtom $ (chr $ fromEnum t):"\NUL" ++ i
 
@@ -172,3 +176,5 @@ mapName (f,g) n = case nameParts n of
 
 mainModule = Module "Main@"
 
+ffiExportName :: FfiExport -> Name
+ffiExportName (FfiExport cn _ _) = toName FfiExportName cn

@@ -7,12 +7,14 @@ import Control.Monad.RWS
 import Control.Monad.State
 import Data.Monoid
 import List(intersperse)
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
 import Text.PrettyPrint.HughesPJ(nest,($$))
 
 import Atom
 import Support.CanType
+import C.FFI
 import C.Generate
 import C.Prims
 import Doc.DocLike
@@ -378,6 +380,22 @@ convertFunc (n,Tup as :-> body) = do
             return (varName v,t')
         return $ function (nodeFuncName n) fr as' ats (profile_function_inc `mappend` s)
 
+
+convertFfiExport :: (Atom,Lam) -> FfiExport -> C Function
+convertFfiExport (n,Tup as :-> body) (FfiExport cn Safe CCall) = do
+        s <- localTodo TodoReturn (convertBody body)
+        let bt = getType body
+            mmalloc (TyPtr _) = [Attribute "A_MALLOC"]
+            mmalloc TyNode = [Attribute "A_MALLOC"]
+            mmalloc _ = []
+            ats = Public : mmalloc bt
+        fr <- convertType bt
+        as' <- flip mapM as $ \ (Var v t) -> do
+            t' <- convertType t
+            return (varName v,t')
+        return $ function (name cn) fr as' ats (profile_function_inc `mappend` s)
+
+
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
 compileGrin grin = (hsffi_h ++ jhc_rts_c ++ P.render ans ++ "\n", snub (reqLibraries req))  where
@@ -388,7 +406,10 @@ compileGrin grin = (hsffi_h ++ jhc_rts_c ++ P.render ans ++ "\n", snub (reqLibra
     -- this is a list of every tag used in the program
     tags = (tagHole,[]):sortUnder (show . fst) [ (t,runIdentity $ findArgs (grinTypeEnv grin) t) | t <- Set.toList $ freeVars (snds $ grinFunctions grin) `mappend` freeVars (snds $ grinCafs grin), tagIsTag t]
     ((functions,structs),finalHcHash,req) = runC $ do
-        funcs <- mapM convertFunc $ grinFunctions grin
+        funcs <- flip mapM (grinFunctions grin) $ \(a,l) -> do
+                   case Map.lookup a (grinEntryPoints grin) of
+                     Nothing -> convertFunc  (a,l)
+                     Just fe -> convertFfiExport (a,l) fe
         sts <- flip mapM tags $ \ (n,ts) -> do
             ts' <- mapM convertType ts
             return (nodeStructName n,zip [ name $ 'a':show i | i <-  [1 ..] ] ts')

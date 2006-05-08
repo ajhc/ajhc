@@ -562,10 +562,16 @@ tcPragmaDecl (HsPragmaRules rs) = do
     return [HsPragmaRules rs']
 
 
-tcPragmaDecl fd@(HsForeignDecl _ _ _ _ n qt) = do
+tcPragmaDecl fd@(HsForeignDecl _ _ n qt) = do
     kt <- getKindEnv
     s <- hsQualTypeToSigma kt qt
     addToCollectedEnv (Map.singleton (toName Val n) s)
+    return [fd]
+
+tcPragmaDecl fd@(HsForeignExport _ e n qt) = do
+    kt <- getKindEnv
+    s <- hsQualTypeToSigma kt qt
+    addToCollectedEnv (Map.singleton (ffiExportName e) s)
     return [fd]
 
 tcPragmaDecl _ = return []
@@ -666,6 +672,7 @@ declDiagnostic decl@(HsFunBind matches) = locMsg (srcLoc decl) "in the function 
 
 tiExpl ::  Expl -> Tc (HsDecl,TypeEnv)
 tiExpl (sc, decl@HsForeignDecl {}) = do return (decl,Map.empty)
+tiExpl (sc, decl@HsForeignExport {}) = do return (decl,Map.empty)
 tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typed " ++  (render $ ppHsDecl decl))) $ do
     when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "** typing expl: " ++ show (getDeclName decl) ++ " " ++ prettyPrintType sc
     (vs,qs,typ) <- skolomize sc

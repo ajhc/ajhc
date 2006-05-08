@@ -393,8 +393,10 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
     return grin { grinPhase = PostInlineEval, grinFunctions = funcs, grinArgTags = convertArgs $ ptFuncArgs pt, grinReturnTags = Map.mapWithKey (funcReturn te pt) $ ptFunc pt }
 
 
-funcReturn te pt fn vs = valueSetToItem te pt ty vs where
-    Just (_,ty) = findArgsType te fn
+funcReturn te pt fn vs =
+  case findArgsType te fn of
+    Just (_,ty) -> valueSetToItem te pt ty vs
+    Nothing     -> error ("funcReturn: "++show fn)
 
 valueSetToItem :: TyEnv -> PointsTo -> Ty -> ValueSet -> Item
 valueSetToItem _ _ ty VsEmpty = itemEmpty ty
