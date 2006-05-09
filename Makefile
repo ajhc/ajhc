@@ -75,8 +75,11 @@ install:
 	install -d $(LIBRARYPATH)
 	install $(LIBPACKAGES) $(LIBRARYPATH)
 
-tags: $(HSFILES)
-	hasktags $(HSFILES)
+tags:
+	hasktags -c `find . -type f -name '*hs' | egrep -v '^\./(_darcs|lib|test)/'`
+	mv tags tags.tmp
+	LC_ALL=C sort tags.tmp > tags
+	rm tags.tmp
 
 
 hsdocs:
@@ -150,5 +153,5 @@ Version/Raw.hs: _darcs/inventory
 	echo '{-# NOINLINE libraryPath #-}'                            >> $@
 	echo 'libraryPath=["$(PREFIX)/lib/jhc-$(JHC_VERSION)"]'        >> $@
 
-.PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs install i printos tests libs publish
+.PHONY: depend clean realclean builtfiles clean-ho  regress hsdocs install i printos tests libs publish tags
 
