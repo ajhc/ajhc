@@ -8,6 +8,7 @@ module Util.BooleanSolver(
     groundConstraints,
     processConstraints,
     C(),
+    Result(..),
     equals,
     implies
 
@@ -19,6 +20,7 @@ import Control.Monad.Trans
 import Util.UnionFind
 import Data.List(intersperse)
 import Data.Monoid
+import Data.Typeable
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Util.UnionFind as UF
@@ -31,8 +33,12 @@ type Seq x = [x] -> [x]
 newtype C v = C (Seq (CL v))
     deriving(Monoid)
 
+
+instance Functor C where
+    fmap f (C v) = C (map (fmap f) (v []) ++)
+
 data CV v = CFalse | CTrue | CJust v
-    deriving(Eq,Ord)
+    deriving(Eq,Ord,Typeable)
 
 
 
@@ -132,8 +138,11 @@ groundConstraints (C cs) = liftIO $ do
 
 
 
-processConstraints :: (Show v,MonadIO m) => C (CA v) -> m ()
-processConstraints (C cs) = mapM_ prule (cs []) where
+processConstraints :: (Show v,MonadIO m)
+    => Bool      -- ^ whether to propagate subset/superset info. if you only care about fixed results you don't need to do this. if you care about residual constraints and equivalance classes after solving then you should set this.
+    -> C (CA v)  -- ^ the input
+    -> m ()
+processConstraints propagateSets (C cs) = mapM_ prule (cs []) where
     prule (CFalse `Cimplies` _) = return ()
     prule (_ `Cimplies` CTrue) = return ()
     prule (CTrue `Cimplies` CFalse) = fail "invalid constraint: T -> F"
@@ -141,6 +150,8 @@ processConstraints (C cs) = mapM_ prule (cs []) where
     prule (CJust (CA x) `Cimplies` CFalse) = find x >>= set Nothing False
     prule (CJust (CA x) `Cimplies` CJust (CA y)) | x == y = return ()
     prule (CJust (CA x) `Cimplies` CJust (CA y)) = do x <- find x; y <- find y; pimp x y
+    pimp' :: (MonadIO m,Show a) => RS a -> RS a -> m ()
+    pimp' x y = do x <- find x; y <- find y; pimp x y
     pimp x y | x == y = return ()
     pimp x y = do
         xv <- getW x
@@ -163,26 +174,38 @@ processConstraints (C cs) = mapM_ prule (cs []) where
             _ -> fail $ "invalid constrant: " ++ show xe ++ " := " ++ show b
         fmapM_ (union const xe) mu
 
-    implies :: RS a -> RS a -> Ri a -> Ri a -> IO ()
+    implies :: (MonadIO m,Show a) => RS a -> RS a -> Ri a -> Ri a -> m ()
     implies xe ye ra rb = do
         ra@(Ri xl xh) <- findRi xe ra
         rb@(Ri yl yh) <- findRi ye rb
-        if xe `Set.member` yh then equals xe ye ra rb else do
+        if xe `Set.member` yh then liftIO $ equals xe ye ra rb else do
         if xe `Set.member` yl then return () else do
-        if ye `Set.member` xl then equals xe ye ra rb else do
+        if ye `Set.member` xl then liftIO $ equals xe ye ra rb else do
         if ye `Set.member` xh then return () else do
         putW xe (CJust $ Ri xl (Set.insert ye xh))
         putW ye (CJust $ Ri (Set.insert xe yl) yh)
+        when propagateSets $ mapM_ (pimp' xe) (Set.toList yh)
+        when propagateSets $ mapM_ (flip pimp' ye) (Set.toList xl)
         return ()
     findRi x (Ri l h) = do
         l <- liftM Set.fromList (mapM find (Set.toList l))
         h <- liftM Set.fromList (mapM find (Set.toList h))
         return (Ri l h)
-    equals :: RS a -> RS a -> Ri a -> Ri a -> IO ()
     equals xe ye (Ri xl xh) (Ri yl yh) = do
         let nl = (xl `mappend` yl)
         let nh = (xh `mappend` yh)
         union (\ _ _ -> CJust (Ri nl nh)) xe ye
+        when propagateSets $ do
+            Ri nl nh <- findRi xe (Ri nl nh)
+            putW xe (CJust $ Ri nl nh)
+            let eq = Set.intersection nl nh
+            flip mapM_ (Set.toList eq) $ \ne -> do
+                ne <- find ne
+                CJust ri <- getW ne
+                ri <- findRi ne ri
+                equals xe ne (Ri nl nh) ri
+            return ()
+        return () :: IO ()
 
 
 
