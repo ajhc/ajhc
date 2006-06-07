@@ -1,5 +1,5 @@
 
---  $Id: GenUtil.hs,v 1.50 2006/04/04 02:15:00 john Exp $
+--  $Id: GenUtil.hs,v 1.51 2006/06/07 00:16:10 john Exp $
 -- arch-tag: 835e46b7-8ffd-40a0-aaf9-326b7e347760
 
 
@@ -105,6 +105,7 @@ module GenUtil(
     doTime,
     getPrefix,
     rspan,
+    rbreak,
     rdropWhile,
     rtakeWhile,
     rbdropWhile,
@@ -185,7 +186,7 @@ rspan fn xs = f xs [] where
     f [] rs = ([],reverse rs)
     f (x:xs) rs
         | fn x = f xs (x:rs)
-        | otherwise = (reverse rs ++ za,zb) where
+        | otherwise = (reverse rs ++ x:za,zb) where
             (za,zb) = f xs []
 
 rbreak :: (a -> Bool) -> [a] -> ([a], [a])
@@ -196,7 +197,7 @@ rdropWhile fn xs = f xs [] where
     f [] _ = []
     f (x:xs) rs
         | fn x = f xs (x:rs)
-        | otherwise = reverse rs ++ (f xs [])
+        | otherwise = reverse rs ++ x:(f xs [])
 
 rtakeWhile :: (a -> Bool) -> [a] -> [a]
 rtakeWhile fn xs = f xs [] where
@@ -780,5 +781,6 @@ getPrefix a b = f a b where
 {-# INLINE naturals #-}
 naturals :: [Int]
 naturals = [0..]
+
 
 
