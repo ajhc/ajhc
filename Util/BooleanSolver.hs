@@ -9,6 +9,7 @@ module Util.BooleanSolver(
     processConstraints,
     C(),
     Result(..),
+    mkCA,
     equals,
     implies
 
@@ -120,7 +121,12 @@ readValue (CA v) = liftIO $ do
 findSet :: Set.Set (Element a b) -> IO (Set.Set (Element a b))
 findSet xs = mapM find (Set.toList xs) >>= return . Set.fromList
 
-groundConstraints :: (MonadIO m,Ord v) => C v -> m (C (CA v), [CA v])
+
+mkCA :: MonadIO m => v -> m (CA v)
+mkCA v = do liftM CA $ new (CJust (Ri mempty mempty)) v
+
+
+groundConstraints :: (MonadIO m,Ord v) => C v -> m (C (CA v), Map.Map v (CA v))
 groundConstraints (C cs) = liftIO $ do
     ref <- newIORef mempty
     let ccs = cs []
@@ -134,7 +140,7 @@ groundConstraints (C cs) = liftIO $ do
                     return e
     v <- fmapM (fmapM nv) ccs
     rr <- readIORef ref
-    return (C (v ++),Map.elems rr)
+    return (C (v ++),rr)
 
 
 
