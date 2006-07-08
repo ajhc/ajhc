@@ -14,26 +14,20 @@ import Doc.PPrint
 import E.Program
 import Util.SetLike
 import Name.Id
-import Util.UnionSolve
+import Util.BooleanSolver
 import E.E
 import Info.Info as Info
 import GenUtil
 
--- simple 2 point lattice for the moment
-data SL = L | S
-    deriving (Eq,Typeable,Show)
+-- our 2 point lattice
+-- True == strict
+-- False == not strict
 
-instance Fixable SL where
-    isTop s = s == S
-    isBottom l = l == L
-    join L L = L
-    join _ _ = S
-    meet S S = S
-    meet _ _ = L
-    eq = (==)
-    lte S L = False
-    lte _ _ = True
+type SL = Bool
 
+
+x `islte` y = x `implies` y
+x `isgte` y = y `implies` x
 
 
 data TAnot l = TAnot l (TTyp l)
@@ -42,7 +36,7 @@ data TAnot l = TAnot l (TTyp l)
 data TTyp l = (TAnot l) `TFun` (TAnot l) | TAtomic | TCPR [TAnot l]
     deriving (Eq,Typeable)
 
-type Typ = TAnot (Either Var SL)
+type Typ = TAnot (CV (CA Var))
 
 instance Functor TAnot where
     fmap f (TAnot l t) = TAnot (f l) (fmap f t)
@@ -51,6 +45,14 @@ instance Functor TTyp where
     fmap _ TAtomic = TAtomic
     fmap f (x `TFun` y) = fmap f x `TFun` fmap f y
     fmap f (TCPR xs) = TCPR $ map (fmap f) xs
+
+instance FunctorM TAnot where
+    fmapM f (TAnot l t) = do l <- f l; t <- fmapM f t; return $ TAnot l t
+
+instance FunctorM TTyp where
+    fmapM _ TAtomic = return TAtomic
+    fmapM f (x `TFun` y) = do x <- fmapM f x; y <- fmapM f y; return $ x `TFun` y
+    fmapM f (TCPR xs) = do xs <- mapM (fmapM f) xs; return $ TCPR xs
 
 instance Show l => Show (TAnot l) where
     showsPrec d (TAnot l typ) = showParen (d > 10) $ showsPrec 11 typ . showString "^" . showsPrec 11 l
@@ -67,14 +69,14 @@ newtype Var = V Int
 instance Show Var where
     showsPrec _ (V x) = ('v':) . shows x
 
-type Constraints = C SL Var
+type Constraints = C (CA Var)
 
 type Environment = Map.Map Id Typ
 
-newtype IM t a = IM (RWST Environment Constraints Int t a)
-    deriving(MonadState Int,MonadReader Environment,MonadWriter Constraints,Monad,Functor)
+newtype IM a = IM (RWST Environment Constraints Int IO a)
+    deriving(MonadState Int,MonadReader Environment,MonadWriter Constraints,Monad,Functor,MonadIO)
 
-newVar :: Monad m => IM m Var
+newVar :: IM Var
 newVar = do
     v <- get
     put (v + 1)
@@ -85,53 +87,95 @@ newtype ShowString = ShowString String
 instance Show ShowString where
     showsPrec _ (ShowString s) = showString s
 
-fn (Left v) = ShowString (show v)
-fn (Right v) = ShowString (show v)
+fn (CJust v) = ShowString (show v)
+fn CTrue = ShowString "S"
+fn CFalse = ShowString "L"
 
+strict,lazy :: CV (CA Var)
+strict = CTrue
+lazy = CFalse
+
+data Variance = Nowhere | Positive | Negative | Both
+    deriving(Eq,Ord,Show)
+
+instance Monoid Variance where
+    mempty = Nowhere
+    mappend x y | x == y = x
+    mappend Positive Negative = Both
+    mappend Negative Positive = Both
+    mappend Nowhere x = x
+    mappend x Nowhere = x
+
+flipVariance Positive = Negative
+flipVariance Negative = Positive
+flipVariance x = x
+
+collect :: Typ -> [(Var,Variance)]
+collect t = execWriter $ f Positive t where
+    f p (TAnot (CJust v) t) = tell [(fromCA v,p)] >> g p t
+    f p (TAnot _ t) = g p t
+    g p TAtomic = return ()
+    g p (x `TFun` y) = f (flipVariance p) x >> f p y
+
+
+{-# NOINLINE analyzeProgram #-}
 analyzeProgram prog = do
     flip mapM_ (programDs prog) $ \ (t,e) -> case (runIM (infer e)) of
         Left err -> putStrLn $ "strictness error :" ++ pprint t ++ "\n" ++ err
         Right (c,(ty,_)) -> do
             putStrLn $ "strictnes " ++ pprint t
             print c
-            let cc (TAnot l TAtomic) = Right S `islte` l
+            let cc (TAnot l TAtomic) = strict `islte` l
                 cc (TAnot _ (_ `TFun` b)) = cc b
             print (fmap fn ty)
             putStrLn "solving:"
-            (mp,rs) <- solve c
-            let fn' (Right v) = ShowString (show v)
-                fn' (Left x)
-                    | Just x <- Map.lookup x mp, Just (ResultJust _ x) <- Map.lookup x rs = ShowString (show x)
-                    | Just x <- Map.lookup x mp = ShowString (show x)
-                    | otherwise = ShowString (show x)
-            print (fmap fn' ty)
-            mapM_ print (Map.elems rs)
-            putStrLn "solving:"
-            (mp,rs) <- solve $ c `mappend` cc ty
-            let fn' (Right v) = ShowString (show v)
-                fn' (Left x)
-                    | Just x <- Map.lookup x mp, Just (ResultJust _ x) <- Map.lookup x rs = ShowString (show x)
-                    | Just x <- Map.lookup x mp = ShowString (show x)
-                    | otherwise = ShowString (show x)
-            print (fmap fn' ty)
-            mapM_ print (Map.elems rs)
+            --(cc,cvs) <- groundConstraints $ c -- `mappend` cc ty
+            processConstraints True c
+--            rs <- flip mapM cvs $ \cv -> do
+--                res <- readValue cv
+--                let rr = case res of
+--                        ResultJust True -> CTrue
+--                        ResultJust False -> CFalse
+--                        ResultBounded a _ _ -> CJust (fromCA a)
+--                return (fromCA cv, rr )
+--            let mp :: Map.Map Var (CV Var)
+--                mp = Map.fromList rs
+--                zz (CJust x) | Just y <- Map.lookup x (Map.fromList rs) = y
+--                zz (CJust y) = CJust y
+--                zz CTrue = CTrue
+--                zz CFalse = CFalse
+--                ty' = fmap zz ty
+--            print (fmap fn ty)
+--            let varmap = (Map.fromListWith mappend $ collect ty')
+--            print varmap
+--            flip mapM_ cvs $ \cv -> do
+--                res <- readValue cv
+--                print (fromCA cv,fmap fromCA res)
+--            --print (fmap (zz . CJust . fromCA) cc)
 
     return ()
 
 
-runIM :: Monad m => IM m a -> m (Constraints,a)
+runIM :: MonadIO m => IM a -> m (Constraints,a)
 runIM (IM s) = do
-    (a,_,c) <- runRWST s mempty 1
+    (a,_,c) <- liftIO $ runRWST s mempty 1
     return (c,a)
 
-atom = TAnot (Right L) TAtomic
+atom = TAnot lazy TAtomic
 
-infer :: Monad m => E -> IM m (TAnot (Either Var SL),E)
+mkVar :: IM (CV (CA Var))
+mkVar = do
+    v <- newVar
+    ca <- mkCA v
+    return (CJust ca)
+
+infer :: E -> IM (Typ,E)
 infer e@(ELit l) = do
-    v <- fmap Left newVar
-    return (TAnot v TAtomic,e)
+    return (TAnot strict TAtomic,e)
+    --return (atom,e)
 infer e@EPi {} = do
-    return (atom,e)
+    return (TAnot strict TAtomic,e)
+    --return (atom,e)
 infer (EVar tvr) = do
     env <- ask
     case mlookup (tvrIdent tvr) env `mplus` Info.lookup (tvrInfo tvr) of
@@ -142,32 +186,37 @@ infer (EVar tvr) = do
         Just t -> return (t,EVar tvr)
 infer (EPrim p xs t) = do
     ts <- mapM infer xs
-    v <- fmap Left newVar
+    v <- mkVar
     mapM_ (\ (TAnot t _) -> tell (v `islte` t)) (map fst ts)
     return (TAnot v TAtomic,EPrim p (map snd ts) t)
 infer (EError s t) = do
-    return (atom,EError s t)
+    v <- mkVar
+    return (TAnot v TAtomic,EError s t)
 infer (ELam x@TVr {tvrType = t1} m) = do
     s1 <- freshAnot t1
     (s2,e) <- local (minsert (tvrIdent x) s1) $
         infer m
-    return (TAnot (Right L) $ s1 `TFun` s2,ELam x e)
+    v <- mkVar
+    return (TAnot strict $ s1 `TFun` s2,ELam x e)
 infer ec@ECase {} = do
+    nv <- mkVar
     (TAnot t _,e') <- infer (eCaseScrutinee ec)
+    tell (nv `implies` t)
     ((ty:tys) ,ec) <- caseBodiesMapM' infer ec
-    rt@(TAnot res _) <- foldM freshGLB ty tys
-    tell (t `isgte` res)
-    return (rt,ec { eCaseScrutinee = e' })
+    (TAnot res rt) <- foldM freshGLB ty tys
+    tell (nv `implies` res)
+    return (TAnot nv rt,ec { eCaseScrutinee = e' })
 infer (EAp a b) = do
-    (TAnot k (s1 `TFun` s2@(TAnot res _)),a) <- infer a
-    (s1',b) <- infer b
-    s1' `subsA` s1
-    res <- fmap Left newVar
+    (TAnot k (s1 `TFun` (TAnot rst s2)),a) <- infer a
+    (s1'@(TAnot zz _),b) <- infer b
+    s1 `subsA` s1'
+    res <- mkVar
     -- the function is strict if we are strict
-    tell (k `isgte` res)
-    return (s2,EAp a b)
+    tell (res `implies` k)
+    tell (res `implies` rst)
+    return (TAnot res s2,EAp a b)
 --infer (ELetRec ds e) = do
-    
+
 
 infer e = fail $ "infer: unsupported\n" ++ show e
 
@@ -185,30 +234,30 @@ caseBodiesMapM' _ _ = error "caseBodiesMapM'"
 guessType (EPi TVr {tvrType = t1 } t2) = do
     TAnot _ t1 <- guessType t1
     t2 <- guessType t2
-    v <- fmap Left newVar
-    return (TAnot v $ TAnot (Right L) t1 `TFun` t2)
+    v <- mkVar
+    return (TAnot v $ TAnot lazy t1 `TFun` t2)
 guessType _ = do
-    v <- newVar
-    return (TAnot (Left v) TAtomic)
+    v <- mkVar
+    return (TAnot v TAtomic)
 
 freshAnot (EPi TVr {tvrType = t1 } t2) = do
     t1 <- freshAnot t1
     t2 <- freshAnot t2
-    v <- fmap Left newVar
+    v <- mkVar
     return (TAnot v $  t1 `TFun` t2)
 freshAnot _ = do
-    v <- newVar
-    return (TAnot (Left v) TAtomic)
+    v <- mkVar
+    return (TAnot v TAtomic)
 
 freshGLB (TAnot k1 TAtomic) (TAnot k2 TAtomic) = do
-    v <- fmap Left newVar
+    v <- mkVar
     tell (v `islte` k1)
     tell (v `islte` k2)
     return (TAnot v TAtomic)
 
 
 freshGLB (TAnot k1 (TFun a1 b1)) (TAnot k2 (TFun a2 b2)) = do
-    v <- fmap Left newVar
+    v <- mkVar
     tell (v `islte` k1)
     tell (v `islte` k2)
     a <- freshLUB a1 a2
@@ -216,13 +265,13 @@ freshGLB (TAnot k1 (TFun a1 b1)) (TAnot k2 (TFun a2 b2)) = do
     return (TAnot v (TFun a b))
 
 freshLUB (TAnot k1 TAtomic) (TAnot k2 TAtomic) = do
-    v <- fmap Left newVar
+    v <- mkVar
     tell (v `isgte` k1)
     tell (v `isgte` k2)
     return (TAnot v TAtomic)
 
 freshLUB (TAnot k1 (TFun a1 b1)) (TAnot k2 (TFun a2 b2)) = do
-    v <- fmap Left newVar
+    v <- mkVar
     tell (v `isgte` k1)
     tell (v `isgte` k2)
     a <- freshLUB a1 a2
