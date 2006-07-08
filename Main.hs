@@ -22,6 +22,7 @@ import Doc.PPrint
 import Doc.Pretty
 import E.Annotate(annotate,annotateDs,annotateProgram)
 import E.Diff
+--import E.SStrictness as SStrict(analyzeProgram)
 import E.E
 import E.Eta
 import E.Inline
@@ -326,9 +327,12 @@ processDecls stats ho ho' tiData = do
         let ns = programDs mprog
         ns <- E.Strictness.solveDs ns
         mprog <- return $ programSetDs ns mprog
+        putStrLn "After strictness"
+        printProgram mprog
+        --SStrict.analyzeProgram mprog
         lintCheckProgram onerrNone mprog
-        --mprog <- simplifyProgram sopt "SuperSimplify" False mprog
-        --mprog <- barendregtProg mprog
+        mprog <- simplifyProgram sopt "Simplify After Strictness" False mprog
+        mprog <- barendregtProg mprog
         Stats.tickStat mstats (progStats mprog)
         Stats.combine initialPassStats mstats
         when miniCorePass $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
