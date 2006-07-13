@@ -23,6 +23,7 @@ import Doc.Pretty
 import E.Annotate(annotate,annotateDs,annotateProgram)
 import E.Diff
 --import E.SStrictness as SStrict(analyzeProgram)
+import E.Demand as Demand(analyzeProgram)
 import E.E
 import E.Eta
 import E.Inline
@@ -327,6 +328,7 @@ processDecls stats ho ho' tiData = do
         let ns = programDs mprog
         ns <- E.Strictness.solveDs ns
         mprog <- return $ programSetDs ns mprog
+        mprog <- Demand.analyzeProgram mprog
         putStrLn "After strictness"
         printProgram mprog
         --SStrict.analyzeProgram mprog
