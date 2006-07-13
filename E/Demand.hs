@@ -30,21 +30,20 @@ import Util.SetLike
 data Demand =
     Bottom    -- hyperstrict
     | L       -- lazy
-    | S       -- strict
-    | Sp [Demand]  -- product or function type
+    | S SubDemand      -- strict
     deriving(Eq,Ord,Typeable)
 
 instance Show Demand where
     showsPrec _ Bottom = ("_|_" ++)
     showsPrec _ L = ('L':)
-    showsPrec _ S = ('S':)
-    showsPrec _ (Sp ds) = showString "S(" . foldr (.) id (map shows ds) . showString ")"
+    showsPrec _ (S None) = ('S':)
+    showsPrec _ (S (Product ds)) = showString "S(" . foldr (.) id (map shows ds) . showString ")"
 
 instance DocLike d => PPrint d Demand where
     pprint demand = tshow demand
 
-data SubDemand = None | Fun Demand | Product [Demand]
-    deriving(Show)
+data SubDemand = None | Product [Demand]
+    deriving(Eq,Ord,Typeable)
 
 data DemandSignature = DemandSignature !Int DemandType
     deriving(Eq,Ord,Typeable)
@@ -80,8 +79,8 @@ class Lattice a where
 -- Sp [.. _|_ ..] = _|_
 
 sp s = sp' True s where
-    sp' True [] = S
-    sp' False [] = Sp s
+    sp' True [] = S None
+    sp' False [] = S (Product s)
     sp' allLazy (L:rs) = sp' allLazy rs
     sp' _ (Bottom:_) = Bottom
     sp' _ (_:rs) = sp' False rs
@@ -96,21 +95,19 @@ instance Lattice Demand where
     lub s Bottom = s
     lub L _  = L
     lub _ L  = L
-    lub S S = S
-    lub (Sp _) S = S
-    lub S (Sp _) = S
-    lub (Sp xs) (Sp ys) | length xs == length ys = sp (zipWith lub xs ys)
+    lub (S (Product xs)) (S (Product ys)) | length xs == length ys = sp (zipWith lub xs ys)
+    lub (S _) (S _) = S None
 
 
     glb Bottom _ = Bottom
     glb _ Bottom = Bottom
     glb L s = s
     glb s L = s
-    glb S S = S
+    glb (S None) (S None) = S None
     glb s1 s2 = sp (zipWith glb (sargs s1) (sargs s2))
 
-sargs S = repeat L
-sargs (Sp xs) = xs
+sargs (S None) = repeat L
+sargs (S (Product xs)) = xs
 
 lenv e (DemandEnv m r) = case Map.lookup e m of
     Nothing -> r
@@ -153,7 +150,7 @@ determineDemandType tvr demand = do
         Nothing -> return absType
         Just (DemandSignature n dt) -> f n demand where
             f 0 _ = return dt
-            f n (Sp [s]) = f (n - 1) s
+            f n (S (Product [s])) = f (n - 1) s
             f _ _ = return absType
 
 splitSigma [] = (L,[])
@@ -165,11 +162,11 @@ analyze (EVar v) s = do
     phi :=> sigma <- determineDemandType v s
     return (EVar v,(phi `glb` (demandEnvSingleton v s)) :=> sigma)
 analyze (EAp e1 e2) s = do
-    (e1',phi1 :=> sigma1') <- analyze e1 (Sp [s])
+    (e1',phi1 :=> sigma1') <- analyze e1 (sp [s])
     let (sa,sigma1) = splitSigma sigma1'
     (e2',phi2 :=> sigma2) <- analyze e2 sa
     return $ (EAp e1' e2',(phi1 `glb` phi2) :=> sigma1)
-analyze el@(ELit LitCons { litName = h, litArgs = ts@(_:_) }) (Sp ss) | length ss == length ts = do
+analyze el@(ELit LitCons { litName = h, litArgs = ts@(_:_) }) (S (Product ss)) | length ss == length ts = do
     dataTable <- getDataTable
     case getSiblings dataTable h of
         Just [_] -> do  -- product type
@@ -179,11 +176,11 @@ analyze el@(ELit LitCons { litName = h, litArgs = ts@(_:_) }) (Sp ss) | length s
             return (el,foldr1 glb envs :=> [])
         _ -> return (el,absType)
 
-analyze (ELam x e) (Sp [s]) = do
+analyze (ELam x e) (S (Product [s])) = do
     (e',phi :=> sigma) <- analyze e s
     let sx = lenv x phi
     return (ELam (tvrInfo_u (Info.insert sx) x) e',demandEnvMinus phi x :=> (sx:sigma))
-analyze (ELam x e) S = analyze (ELam x e) (Sp [L])
+analyze (ELam x e) (S None) = analyze (ELam x e) (S (Product [L]))  -- simply to ensure binder is annotated
 analyze e@EError {} _ = return (e,botType)
 analyze ec@ECase { eCaseAlts = [Alt lc@(LitCons h ts _) alt], eCaseDefault = Nothing } s = do
     dataTable <- getDataTable
@@ -214,18 +211,15 @@ analyze (ELetRec ds b) s = f (decomposeDs ds) [] where
             extEnvs [ (t,ds)| (t,_) <- rg'', let (Just ds) = Info.lookup (tvrInfo t)] $ do
                 f rs (rg'' ++ fs)
           else f (Right rg'':rs) fs
-
-
-
-
 analyze e _ = return (e,absType)
+
 
 analyzeCase ec@ECase {} s = do
     (ec',dts) <- runWriterT $ flip caseBodiesMapM ec $ \e -> do
         (ne,dt) <- lift $ analyze e s
         tell (dt:)
         return ne
-    (ecs,env :=> _) <- analyze (eCaseScrutinee ec') S
+    (ecs,env :=> _) <- analyze (eCaseScrutinee ec') (S None)
     let enva :=> siga =  foldr1 lub (dts [])
     let nenv = foldr denvDelete (glb enva env) (caseBinds ec')
     return (ec' {eCaseScrutinee = ecs},nenv :=> siga)
@@ -235,8 +229,8 @@ denvDelete x (DemandEnv m r) = DemandEnv (Map.delete x m) r
 
 
 topAnalyze :: E -> IM (E,DemandSignature)
-topAnalyze e = clam e S 0 where
-    clam (ELam _ x) s n = clam x (Sp [s]) (n + 1)
+topAnalyze e = clam e (S None) 0 where
+    clam (ELam _ x) s n = clam x (sp [s]) (n + 1)
     clam _ s n = do
         (e,dt) <- analyze e s
         return (e,DemandSignature n dt)
