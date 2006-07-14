@@ -364,6 +364,7 @@ processDecls stats ho ho' tiData = do
 
     progress "Big Eta Expansion"
     prog <- etaExpandProg prog
+    prog <- Demand.analyzeProgram prog
 
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do

@@ -11,6 +11,7 @@ import E.CPR
 import E.E
 import E.Traverse
 import E.Strictness
+import qualified E.Demand as Demand
 import E.TypeCheck()
 import E.Values
 import GenUtil
