@@ -15,56 +15,68 @@ import Data.Maybe
 import Data.Typeable
 import qualified Data.Map as Map
 
-import Doc.PPrint
-import Doc.DocLike
-import E.Inline
-import E.E
-import GenUtil
+import Binary
 import DataConstructors
-import qualified Info.Info as Info
+import Doc.DocLike
+import Doc.PPrint
+import E.E
+import E.Inline
 import E.Program
+import GenUtil
 import Name.Id
+import qualified Info.Info as Info
 import Util.HasSize
 import Util.SetLike
 
 data Demand =
-    Bottom    -- hyperstrict
-    | L       -- lazy
+    Bottom             -- always diverges
+    | L SubDemand      -- lazy
     | S SubDemand      -- strict
+    | Error SubDemand  -- diverges, might use arguments
+    | Absent           -- Not used
     deriving(Eq,Ord,Typeable)
+        {-! derive: GhcBinary !-}
 
 instance Show Demand where
     showsPrec _ Bottom = ("_|_" ++)
-    showsPrec _ L = ('L':)
+    showsPrec _ Absent = ('A':)
+    showsPrec _ (L None) = ('L':)
+    showsPrec _ (L (Product ds)) = showString "L(" . foldr (.) id (map shows ds) . showString ")"
     showsPrec _ (S None) = ('S':)
     showsPrec _ (S (Product ds)) = showString "S(" . foldr (.) id (map shows ds) . showString ")"
+    showsPrec _ (Error None) = showString "Err"
+    showsPrec _ (Error (Product ds)) = showString "Err(" . foldr (.) id (map shows ds) . showString ")"
 
 instance DocLike d => PPrint d Demand where
     pprint demand = tshow demand
 
 data SubDemand = None | Product [Demand]
     deriving(Eq,Ord,Typeable)
+        {-! derive: GhcBinary !-}
 
 data DemandSignature = DemandSignature !Int DemandType
     deriving(Eq,Ord,Typeable)
-data DemandType = DemandEnv :=> [Demand]
+        {-! derive: GhcBinary !-}
+data DemandType = (:=>) DemandEnv [Demand]
     deriving(Eq,Ord,Typeable)
+        {-! derive: GhcBinary !-}
 data DemandEnv = DemandEnv (Map.Map TVr Demand) Demand
     deriving(Eq,Ord,Typeable)
+        {-! derive: GhcBinary !-}
 
 instance Show DemandType where
-    showsPrec _ (DemandEnv e L :=> d) | isEmpty e = shows d
+    showsPrec _ (DemandEnv e Absent :=> d) | isEmpty e = shows d
     showsPrec _ (env :=> ds) = shows env . showString " :=> " .  shows ds
 
 instance Show DemandEnv where
-    showsPrec _ (DemandEnv m L) = pprint m
+    showsPrec _ (DemandEnv m Absent) = pprint m
     showsPrec _ (DemandEnv _ Bottom) = showString "_|_"
 
 
 instance Show DemandSignature where
     showsPrec _ (DemandSignature n dt) = showString "<" . shows n . showString "," . shows dt . showString ">"
 
-idGlb = L
+idGlb = Absent
 
 absType = (DemandEnv mempty idGlb) :=> []
 botType = (DemandEnv mempty Bottom) :=> []
@@ -78,11 +90,12 @@ class Lattice a where
 -- Sp [L .. L] = S
 -- Sp [.. _|_ ..] = _|_
 
+sp [] = S None
 sp s = sp' True s where
     sp' True [] = S None
     sp' False [] = S (Product s)
-    sp' allLazy (L:rs) = sp' allLazy rs
-    sp' _ (Bottom:_) = Bottom
+    sp' allLazy (L _:rs) = sp' allLazy rs
+    sp' _ (Bottom:_) = Error (Product s)
     sp' _ (_:rs) = sp' False rs
 
 
@@ -90,31 +103,67 @@ instance Lattice DemandType where
     lub (env :=> ts) (env' :=> ts') = (env `lub` env') :=> zipWith lub ts ts'
     glb (env :=> ts) (env' :=> ts') = (env `glb` env') :=> zipWith glb ts ts'
 
+lazy = L None
+strict = S None
+err = Error None
+
+comb _ None None = None
+comb f None (Product xs) = Product $ zipWith f (repeat lazy) xs
+comb f (Product xs) None = Product $ zipWith f xs (repeat lazy)
+comb f (Product xs) (Product ys) = Product $ zipWith f xs ys
+
+
 instance Lattice Demand where
     lub Bottom s = s
     lub s Bottom = s
-    lub L _  = L
-    lub _ L  = L
-    lub (S (Product xs)) (S (Product ys)) | length xs == length ys = sp (zipWith lub xs ys)
-    lub (S _) (S _) = S None
+    lub Absent Absent = Absent
+    lub (S x) Absent = L x
+    lub Absent (S x) = L x
+    lub Absent sa = lazy
+    lub sa Absent = lazy
+
+    lub (S x) (S y) = S (comb lub x y)
+    lub (L x) (L y) = L (comb lub x y)
+    lub (Error x) (Error y) = Error (comb lub x y)
+
+    lub (S x) (L y) = L (comb lub x y)
+    lub (L x) (S y) = L (comb lub x y)
+
+    lub (S x) (Error y) = S (comb lub x y)
+    lub (Error x) (S y) = S (comb lub x y)
+
+    lub (L x) (Error y) = lazy
+    lub (Error x) (L y) = lazy
 
 
-    glb Bottom _ = Bottom
-    glb _ Bottom = Bottom
-    glb L s = s
-    glb s L = s
-    glb (S None) (S None) = S None
-    glb s1 s2 = sp (zipWith glb (sargs s1) (sargs s2))
+    glb Bottom Bottom = Bottom
+    glb Absent sa = sa
+    glb sa Absent = sa
 
-sargs (S None) = repeat L
-sargs (S (Product xs)) = xs
+    glb Bottom _ = err
+    glb _ Bottom = err
+
+    glb (S x) (S y) = S (comb glb x y)
+    glb (L x) (L y) = L (comb glb x y)
+    glb (Error x) (Error y) = Error (comb glb x y)
+
+    glb (S _) (Error _) = err
+    glb (Error _) (S _) = err
+
+    glb (S x) (L y) = S (comb glb x y)
+    glb (L x) (S y) = S (comb glb x y)
+
+    glb (L _) (Error _) = err
+    glb (Error _) (L _) = err
+
+
 
 lenv e (DemandEnv m r) = case Map.lookup e m of
     Nothing -> r
     Just x -> x
 
 demandEnvSingleton :: TVr -> Demand -> DemandEnv
-demandEnvSingleton _ L = DemandEnv mempty idGlb
+demandEnvSingleton _ Absent = DemandEnv mempty idGlb
 demandEnvSingleton t d = DemandEnv (Map.singleton t d) idGlb
 
 demandEnvMinus :: DemandEnv -> TVr -> DemandEnv
@@ -153,11 +202,11 @@ determineDemandType tvr demand = do
             f n (S (Product [s])) = f (n - 1) s
             f _ _ = return absType
 
-splitSigma [] = (L,[])
+splitSigma [] = (lazy,[])
 splitSigma (x:xs) = (x,xs)
 
 analyze :: E -> Demand -> IM (E,DemandType)
-analyze e L = return (e,absType)
+analyze e Absent = return (e,absType)
 analyze (EVar v) s = do
     phi :=> sigma <- determineDemandType v s
     return (EVar v,(phi `glb` (demandEnvSingleton v s)) :=> sigma)
@@ -176,11 +225,22 @@ analyze el@(ELit LitCons { litName = h, litArgs = ts@(_:_) }) (S (Product ss)) |
             return (el,foldr1 glb envs :=> [])
         _ -> return (el,absType)
 
+analyze (ELit lc@LitCons { litArgs = ts }) _s = do
+    rts <- mapM (\e -> analyze e lazy) ts
+    return (ELit lc { litArgs = fsts rts }, foldr glb absType (snds rts))
+analyze (EPrim ap ts pt) _s = do
+    rts <- mapM (\e -> analyze e lazy) ts
+    return (EPrim ap (fsts rts) pt, foldr glb absType (snds rts))
+analyze (EPi tvr@TVr { tvrType = t1 } t2)  _s = do
+    (t1',dt1) <- analyze t1 lazy
+    (t2',dt2) <- analyze t2 lazy
+    return (EPi tvr { tvrType = t1' } t2',dt1 `glb` dt2)
+
 analyze (ELam x e) (S (Product [s])) = do
     (e',phi :=> sigma) <- analyze e s
     let sx = lenv x phi
     return (ELam (tvrInfo_u (Info.insert sx) x) e',demandEnvMinus phi x :=> (sx:sigma))
-analyze (ELam x e) (S None) = analyze (ELam x e) (S (Product [L]))  -- simply to ensure binder is annotated
+analyze (ELam x e) (S None) = analyze (ELam x e) (S (Product [lazy]))  -- simply to ensure binder is annotated
 analyze e@EError {} _ = return (e,botType)
 analyze ec@ECase { eCaseAlts = [Alt lc@(LitCons h ts _) alt], eCaseDefault = Nothing } s = do
     dataTable <- getDataTable
