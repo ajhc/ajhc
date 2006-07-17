@@ -5,12 +5,11 @@ import qualified Data.Map as Map
 
 import Atom
 import Binary
+import C.FFI(FfiExport)
+import E.CPR
 import GenUtil
 import Info.Info
 import Info.Types
-import C.FFI(FfiExport)
-import E.CPR
-import E.Strictness
 import qualified E.Demand
 
 
@@ -30,8 +29,6 @@ binTable = Map.fromList [
     cb (u :: Properties),
     cb (u :: E.CPR.Val),
     cb (u :: FfiExport),
-    cb (u :: E.Strictness.SA),
-    cb (u :: [E.Strictness.SA]),
     cb (u :: E.Demand.DemandSignature)
     ]
 

@@ -22,7 +22,6 @@ import Doc.PPrint
 import Doc.Pretty
 import E.Annotate(annotate,annotateDs,annotateProgram)
 import E.Diff
---import E.SStrictness as SStrict(analyzeProgram)
 import E.Demand as Demand(analyzeProgram)
 import E.E
 import E.Eta
@@ -34,7 +33,6 @@ import E.LetFloat
 import E.Show hiding(render)
 import E.Subst(subst)
 import E.Rules
-import E.Strictness
 import E.Traverse
 import E.TypeAnalysis
 import E.TypeCheck
@@ -325,13 +323,7 @@ processDecls stats ho ho' tiData = do
         mprog <- simplifyProgram sopt "Simplify FloatOutCleanup" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
         mprog <- transformProgram "float inward" DontIterate (dump FD.CoreMini) programFloatInward mprog
-        let ns = programDs mprog
-        ns <- E.Strictness.solveDs ns
-        mprog <- return $ programSetDs ns mprog
         mprog <- Demand.analyzeProgram mprog
-        putStrLn "After strictness"
-        printProgram mprog
-        --SStrict.analyzeProgram mprog
         lintCheckProgram onerrNone mprog
         mprog <- simplifyProgram sopt "Simplify After Strictness" False mprog
         mprog <- barendregtProg mprog
@@ -391,7 +383,7 @@ processDecls stats ho ho' tiData = do
             lintCheckE onerrNone fullDataTable v lc
             return (v,lc)
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
-        cds <- E.Strictness.solveDs cds
+        --cds <- E.Strictness.solveDs cds
         cds <- flip mapM cds $ \ (v,lc) -> do
             lintCheckE onerrNone fullDataTable v lc
             (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable v lc)
@@ -431,7 +423,7 @@ processDecls stats ho ho' tiData = do
                 let (lc', used') = runRename used lc
                 return ((v,lc'):ds,used' `mappend` used)
         (cds,usedids) <- foldM dd ([],fromDistinctAscList $ Set.toList $ hoUsedIds ho) cds
-        cds <- E.Strictness.solveDs cds
+        --cds <- E.Strictness.solveDs cds
         cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
         cds <- annotateDs annmap (\_ -> return) letann lamann cds
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds

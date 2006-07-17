@@ -1,8 +1,11 @@
 module E.Demand(
-    analyzeProgram,
     Demand(..),
+    DemandSignature(..),
     DemandType(..),
-    DemandSignature(..)
+    analyzeProgram,
+    lazySig,
+    lazy,
+    lazyType
     ) where
 
 
@@ -80,6 +83,9 @@ idGlb = Absent
 
 absType = (DemandEnv mempty idGlb) :=> []
 botType = (DemandEnv mempty Bottom) :=> []
+
+lazyType = (DemandEnv mempty lazy) :=> []
+lazySig = DemandSignature 0 lazyType
 
 class Lattice a where
     glb :: a -> a -> a

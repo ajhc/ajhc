@@ -5,20 +5,19 @@ import Data.Monoid
 import Maybe
 import Monad
 
-import Support.CanType
 import DataConstructors
 import E.CPR
 import E.E
 import E.Traverse
-import E.Strictness
-import qualified E.Demand as Demand
 import E.TypeCheck()
 import E.Values
 import GenUtil
 import Info.Info as Info
 import Info.Types
 import Name.Name
+import qualified E.Demand as Demand
 import Stats
+import Support.CanType
 
 
 topLike Top = True
@@ -33,9 +32,9 @@ wrappable :: Monad m =>
     -> m (Maybe Name,E,[(Maybe (Constructor,[TVr]),TVr)])  -- ^ (Body,Args)
 wrappable dataTable tvr e@ELam {} = ans where
     cpr = maybe Top id (Info.lookup (tvrInfo tvr))
-    sa = maybe ((repeat L)) id (Info.lookup (tvrInfo tvr))
-    ans = f e ( sa ++ repeat L) cpr []
-    f (ELam t e) (S _:ss) (Fun x) ts
+    Demand.DemandSignature _ (_ Demand.:=> sa) = maybe Demand.lazySig id (Info.lookup (tvrInfo tvr))
+    ans = f e ( sa ++ repeat Demand.lazy) cpr []
+    f (ELam t e) (Demand.S _:ss) (Fun x) ts
        | Just con <- getProduct dataTable tt = f e ss x ((Just (con,as con),t):ts)
          where
             as con = [ tvr { tvrIdent = n, tvrType = st } | st <- slotTypes dataTable (conName con) tt | n <- tmpNames Val (tvrIdent t) ]

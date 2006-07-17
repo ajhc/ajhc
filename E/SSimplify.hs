@@ -38,7 +38,6 @@ import Info.Types
 import Name.Name
 import Name.VConsts
 import Options
-import qualified E.Strictness as Strict
 import qualified E.Demand as Demand
 import qualified FlagOpts as FO
 import qualified FlagDump as FD
@@ -490,9 +489,6 @@ simplifyDs prog sopts dsIn = ans where
         e' <- f e inb'
         case ds' of
             [(t,e)] | worthStricting e, Just (Demand.S _) <- Info.lookup (tvrInfo t), not (getProperty prop_CYCLIC t) -> do
-                mtick "E.Simplify.strictness.let-to-case"
-                return $ eStrictLet t e e'
-            [(t,e)] | worthStricting e, Just (Strict.S _) <- Info.lookup (tvrInfo t), not (getProperty prop_CYCLIC t) -> do
                 mtick "E.Simplify.strictness.let-to-case"
                 return $ eStrictLet t e e'
             _ -> do
