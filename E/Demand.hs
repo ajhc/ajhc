@@ -305,17 +305,14 @@ fixupDemandSignature (DemandSignature n (DemandEnv _ r :=> dt)) = DemandSignatur
 
 {-# NOINLINE analyzeProgram #-}
 analyzeProgram prog = do
-    putStrLn "Beginning Demand analysis"
-    ds' <- flip mapM (programDs prog) $ \ (t,e) -> case (runIM (topAnalyze e) (progDataTable prog)) of
-        Left err -> do
-            putStrLn $ "strictness error :" ++ pprint t ++ "\n" ++ err
-            return (t,e)
-        Right (ne,s) -> do
-            let s' = fixupDemandSignature s
-            putStrLn $ "strictness: " ++ pprint t ++ "\n" ++ show s'
-            return (tvrInfo_u (Info.insert s') t,ne)
-    putStrLn "Ending Demand analysis"
-    return $ programSetDs ds' prog
+    let f (rec,ds) = do
+            flip mapM ds $ \ (t,e) -> case (runIM (topAnalyze e) (progDataTable prog)) of
+                Identity (ne,s) -> do
+                    let s' = fixupDemandSignature s
+                    putStrLn $ "strictness: " ++ pprint t ++ ": " ++ show s'
+                    return (tvrInfo_u (Info.insert s') t,ne)
+    nprog <- programMapRecGroups mempty (\_ -> return) (\_ -> return) (\_ -> return) f prog
+    return nprog
 
 --    flip mapM_ (programDs prog) $ \ (t,e) -> case (runIM (infer e)) of
 --        Left err -> putStrLn $ "strictness error :" ++ pprint t ++ "\n" ++ err
