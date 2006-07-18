@@ -257,7 +257,14 @@ analyze (ELam x e) (S (Product [s])) = do
     (e',phi :=> sigma) <- analyze e s
     let sx = lenv x phi
     return (ELam (tvrInfo_u (Info.insert sx) x) e',demandEnvMinus phi x :=> (sx:sigma))
+
+analyze (ELam x e) (L (Product [s])) = do
+    (e',phi :=> sigma) <- analyze e s
+    let sx = lenv x phi
+    return (ELam (tvrInfo_u (Info.insert sx) x) e',lazify (demandEnvMinus phi x) :=> (sx:sigma))
 analyze (ELam x e) (S None) = analyze (ELam x e) (S (Product [lazy]))  -- simply to ensure binder is annotated
+analyze (ELam x e) (L None) = analyze (ELam x e) (L (Product [lazy]))  -- simply to ensure binder is annotated
+analyze (ELam x e) (Error None) = analyze (ELam x e) (Error (Product [lazy]))  -- simply to ensure binder is annotated
 analyze e@EError {} _ = return (e,botType)
 analyze ec@ECase { eCaseAlts = [Alt lc@(LitCons h ts _) alt], eCaseDefault = Nothing } s = do
     dataTable <- getDataTable
@@ -294,6 +301,7 @@ analyze es@(ELit LitInt {}) _ = return (es,absType)
 analyze e x = fail $ "analyze: " ++ show (e,x)
 
 
+lazify (DemandEnv x r) = DemandEnv (Map.map (const lazy) x) r
 
 analyzeCase ec@ECase {} s = do
     (ec',dts) <- runWriterT $ flip caseBodiesMapM ec $ \e -> do
