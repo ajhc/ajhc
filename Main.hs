@@ -22,7 +22,7 @@ import Doc.PPrint
 import Doc.Pretty
 import E.Annotate(annotate,annotateDs,annotateProgram)
 import E.Diff
-import E.Demand as Demand(analyzeProgram)
+import E.Demand as Demand(analyzeProgram,solveDs)
 import E.E
 import E.Eta
 import E.Inline
@@ -314,8 +314,10 @@ processDecls stats ho ho' tiData = do
         mprog <- transformProgram "Simple Recursive" DontIterate (dump FD.CoreMini) sRec mprog
         mprog <- return $ etaAnnotateProgram mprog
         mprog <- transformProgram "typeAnalyze" DontIterate (dump FD.CoreMini) (typeAnalyze True) mprog
+
         mprog <- simplifyProgram sopt "SuperSimplify" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
+
         mprog <- transformProgram "floatOutward" DontIterate (dump FD.CoreMini) floatOutward mprog
         -- perform another supersimplify in order to substitute the once used
         -- variables back in and replace the variable of case of variables with
@@ -350,14 +352,14 @@ processDecls stats ho ho' tiData = do
     prog <- simplifyProgram' sopt "SuperSimplify" True (IterateMax 4) prog
     prog <- barendregtProg prog
     --prog <- transformProgram "Big Float Inward" DontIterate True programFloatInward prog
-    progress "Big Type Anasysis"
-    prog <- transformProgram "typeAnalyze" DontIterate True (typeAnalyze True) prog
+    --progress "Big Type Anasysis"
+    --prog <- transformProgram "typeAnalyze" DontIterate True (typeAnalyze True) prog
     prog <- barendregtProg prog
+    -- we have to redo strictness after type analysis, as it might have changed the number of arguments to functions
     --prog <- simplifyProgram sopt "SuperSimplify" True prog
 
     progress "Big Eta Expansion"
     prog <- etaExpandProg prog
-    prog <- Demand.analyzeProgram prog
 
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
@@ -385,6 +387,7 @@ processDecls stats ho ho' tiData = do
             return (v,lc)
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
         --cds <- E.Strictness.solveDs cds
+        cds <- Demand.solveDs fullDataTable cds
         cds <- flip mapM cds $ \ (v,lc) -> do
             lintCheckE onerrNone fullDataTable v lc
             (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable v lc)
@@ -394,6 +397,7 @@ processDecls stats ho ho' tiData = do
             return (v,lc)
 
         -- cds <- E.Strictness.solveDs cds
+        cds <- Demand.solveDs fullDataTable cds
         cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
         --cds' <- return $ concatMap (uncurry (workWrap fullDataTable)) cds
         when miniCorePass  $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
@@ -425,6 +429,7 @@ processDecls stats ho ho' tiData = do
                 return ((v,lc'):ds,used' `mappend` used)
         (cds,usedids) <- foldM dd ([],fromDistinctAscList $ Set.toList $ hoUsedIds ho) cds
         --cds <- E.Strictness.solveDs cds
+        cds <- Demand.solveDs fullDataTable cds
         cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
         cds <- annotateDs annmap (\_ -> return) letann lamann cds
         wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
@@ -441,6 +446,10 @@ processDecls stats ho ho' tiData = do
     let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> idSetToList $ bindingFreeVars b c))
         fscc (Left n) = (False,[n])
         fscc (Right ns) = (True,ns)
+
+    -- perform demand analysis
+    prog <- Demand.analyzeProgram prog
+
     progress "Optimization pass with workwrapping/CPR"
     (ds,_) <- foldM f ([],(fromList [ (tvrIdent v,(v,e)) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
     progress "!"
@@ -449,7 +458,7 @@ processDecls stats ho ho' tiData = do
     Stats.print "Optimization" stats
 
     --prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze True prog else return prog
-    prog <- transformProgram "typeAnalyze" DontIterate True (typeAnalyze True) prog
+    --prog <- transformProgram "typeAnalyze" DontIterate True (typeAnalyze True) prog
 
 
     prog <- if True then do
@@ -974,6 +983,7 @@ printCheckName'' dataTable tvr e = do
     when (not tmatch || dump FD.EVerbose) $
         putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
     putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
+
 
 
 
