@@ -103,13 +103,20 @@ class Lattice a where
 -- Sp [.. _|_ ..] = _|_
 
 sp [] = S None
-sp xs = S (Product xs) -- None
+sp xs = S (allLazy xs) -- None
 
 l None = L None
 l (Product xs) = lp xs
 
+s None = S None
+s (Product xs) = sp xs
+
+
+allLazy xs | all (== lazy) xs = None
+allLazy xs = Product xs
+
 lp [] = L None
-lp xs = L (Product (map f xs)) where
+lp xs = L (allLazy (map f xs)) where
     f (S None) = lazy
     f (S (Product ys)) = lp ys
     f Bottom = Absent
@@ -147,18 +154,20 @@ instance Lattice Demand where
     lub Absent Absent = Absent
     lub (S x) Absent = l x
     lub Absent (S x) = l x
+    lub (L x) Absent = l x
+    lub Absent (L x) = l x
     lub Absent sa = lazy
     lub sa Absent = lazy
 
-    lub (S x) (S y) = S (comb lub x y)
+    lub (S x) (S y) = s (comb lub x y)
     lub (L x) (L y) = l (comb lub x y)
     lub (Error x) (Error y) = Error (comb lub x y)
 
     lub (S x) (L y) = l (comb lub x y)
     lub (L x) (S y) = l (comb lub x y)
 
-    lub (S x) (Error y) = S (comb lub x y)
-    lub (Error x) (S y) = S (comb lub x y)
+    lub (S x) (Error y) = s (comb lub x y)
+    lub (Error x) (S y) = s (comb lub x y)
 
     lub (L x) (Error y) = lazy
     lub (Error x) (L y) = lazy
@@ -171,15 +180,15 @@ instance Lattice Demand where
     glb Bottom _ = err
     glb _ Bottom = err
 
-    glb (S x) (S y) = S (comb glb x y)
+    glb (S x) (S y) = s (comb glb x y)
     glb (L x) (L y) = l (comb glb x y)
     glb (Error x) (Error y) = Error (comb glb x y)
 
     glb (S _) (Error _) = err
     glb (Error _) (S _) = err
 
-    glb (S x) (L y) = S (comb glb x y)
-    glb (L x) (S y) = S (comb glb x y)
+    glb (S x) (L y) = s (comb glb x y)
+    glb (L x) (S y) = s (comb glb x y)
 
     glb (L _) (Error _) = err
     glb (Error _) (L _) = err
@@ -324,7 +333,12 @@ analyze es@(ELit LitInt {}) _ = return (es,absType)
 analyze e x = fail $ "analyze: " ++ show (e,x)
 
 
-lazify (DemandEnv x r) = DemandEnv (Map.map (const lazy) x) r
+lazify (DemandEnv x r) = DemandEnv (Map.map f x) Absent where
+    f (S xs) = l xs
+    f Absent = Absent
+    f (L xs) = l xs
+    f Bottom = Absent
+    f (Error xs) = l xs
 
 analyzeCase ec@ECase {} s = do
     (ec',dts) <- runWriterT $ flip caseBodiesMapM ec $ \e -> do
