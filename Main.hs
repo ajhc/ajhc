@@ -301,9 +301,13 @@ processDecls stats ho ho' tiData = do
             progEntryPoints = fsts ns,
             progExternalNames = progExternalNames prog `mappend` (fromList $ map tvrIdent $ fsts (programDs prog))
             }
-        --progress "eta annotating"
+
+        -- This transforms simple recursive routines into non-recursive ones that contain a local
+        -- recursive definition. this makes them easier to inline and optimize.
+        -- TODO - static argument transformation at same time?
+
         let sRec mprog = case (rec,ns) of
-                (True,[(t,v@ELam {})]) | tvrIdent t `member` (freeVars v :: IdSet) -> do
+                (True,[(t,v@ELam {})]) -> do
                     let nname = annotateId "R@" (tvrIdent t)
                         tvr' = tvr { tvrIdent = nname, tvrType = tvrType t }
                         (_,as) = fromLam v
@@ -312,6 +316,7 @@ processDecls stats ho ho' tiData = do
                     return $ programSetDs [(t,ne')] mprog
                 _ -> return mprog
         mprog <- transformProgram "Simple Recursive" DontIterate (dump FD.CoreMini) sRec mprog
+
         mprog <- return $ etaAnnotateProgram mprog
         mprog <- transformProgram "typeAnalyze" DontIterate (dump FD.CoreMini) (typeAnalyze True) mprog
 
