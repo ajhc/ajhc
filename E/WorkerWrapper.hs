@@ -37,7 +37,7 @@ wrappable dataTable tvr e@ELam {} = ans where
     f (ELam t e) (Demand.S _:ss) (Fun x) ts
        | Just con <- getProduct dataTable tt = f e ss x ((Just (con,as con),t):ts)
          where
-            as con = [ tvr { tvrIdent = n, tvrType = st } | st <- slotTypes dataTable (conName con) tt | n <- tmpNames Val (tvrIdent t) ]
+            as con = [ t { tvrIdent = n, tvrType = st } | st <- slotTypes dataTable (conName con) tt | n <- tmpNames Val (tvrIdent t) ]
             tt = getType t
     f (ELam t e) (_:ss) (Fun x) ts = f e ss x ((Nothing,t):ts)
     f e _ (Tup n _) ts | isCPR n = return (Just n,e,reverse ts)
