@@ -45,11 +45,11 @@ putDyn h (ps,d,Binable (_::a)) = do
 
 getDyn h = do
     (ps::Atom) <- get h
-    b <- Map.lookup ps binTable
-    case b of
-        (Binable (_ :: a)) -> do
+    case Map.lookup ps binTable of
+        Just (Binable (_ :: a)) -> do
             x <- get h :: IO a
             return $ newEntry ps x
+        Nothing -> fail $ "getDyn: don't know how to read something of type: " ++ show ps
 
 instance Binary Info where
     put_ h nfo = putInfo h nfo
