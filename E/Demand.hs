@@ -25,6 +25,7 @@ import Doc.PPrint
 import E.E
 import E.Inline
 import E.Program
+import Info.Types
 import GenUtil
 import Name.Id
 import qualified Info.Info as Info
@@ -264,13 +265,13 @@ analyze (ELetRec ds b) s = f (decomposeDs ds) [] where
         let g (t,e) = (tvrInfo_u (Info.insert (lenv t phi)) t,e)
         return (ELetRec (map g ds') b', foldr denvDelete phi (fsts ds) :=> sig)
     f (Left (t,e):rs) fs = do
-        (ne,ds) <- topAnalyze e
+        (ne,ds) <- topAnalyze t e
         extEnv t ds $ do
             f rs ((tvrInfo_u (Info.insert ds) t,ne):fs)
     f (Right rg:rs) fs = do
         rg' <- extEnvs [ (t,ds)| (t,_) <- rg, let il@(~(Just ds)) = Info.lookup (tvrInfo t), isJust il] $ do
             flip mapM rg $ \ (t,e) -> do
-                (ne,ds) <- topAnalyze e
+                (ne,ds) <- topAnalyze t e
                 return ((tvrInfo_u (Info.insert ds) t,ne),Just ds == Info.lookup (tvrInfo t))
         let (rg'',cs) = unzip rg'
         if and cs then
@@ -285,7 +286,7 @@ analyzeCase ec@ECase {} s = do
         (ne,dt) <- lift $ analyze e s
         tell (dt:)
         return ne
-    (ecs,env :=> _) <- analyze (eCaseScrutinee ec') (S None)
+    (ecs,env :=> _) <- analyze (eCaseScrutinee ec') strict
     let enva :=> siga =  foldr1 lub (dts [])
     let nenv = foldr denvDelete (glb enva env) (caseBinds ec')
     return (ec' {eCaseScrutinee = ecs},nenv :=> siga)
@@ -294,8 +295,9 @@ denvDelete x (DemandEnv m r) = DemandEnv (Map.delete x m) r
 
 
 
-topAnalyze :: E -> IM (E,DemandSignature)
-topAnalyze e = clam e (S None) 0 where
+topAnalyze :: TVr -> E -> IM (E,DemandSignature)
+topAnalyze tvr e | getProperty prop_PLACEHOLDER tvr = return (e,lazySig)
+topAnalyze _tvr e = clam e strict 0 where
     clam (ELam _ x) s n = clam x (sp [s]) (n + 1)
     clam _ s n = do
         (e,dt) <- analyze e s
@@ -306,7 +308,7 @@ fixupDemandSignature (DemandSignature n (DemandEnv _ r :=> dt)) = DemandSignatur
 {-# NOINLINE analyzeProgram #-}
 analyzeProgram prog = do
     let f (rec,ds) = do
-            flip mapM ds $ \ (t,e) -> case (runIM (topAnalyze e) (progDataTable prog)) of
+            flip mapM ds $ \ (t,e) -> case (runIM (topAnalyze t e) (progDataTable prog)) of
                 Identity (ne,s) -> do
                     let s' = fixupDemandSignature s
                     putStrLn $ "strictness: " ++ pprint t ++ ": " ++ show s'
