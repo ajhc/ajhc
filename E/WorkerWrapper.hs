@@ -32,7 +32,7 @@ wrappable :: Monad m =>
     -> m (Maybe Name,E,[(Maybe (Constructor,[TVr]),TVr)])  -- ^ (Body,Args)
 wrappable dataTable tvr e@ELam {} = ans where
     cpr = maybe Top id (Info.lookup (tvrInfo tvr))
-    Demand.DemandSignature _ (_ Demand.:=> sa) = maybe Demand.lazySig id (Info.lookup (tvrInfo tvr))
+    Demand.DemandSignature _ (_ Demand.:=> sa) = maybe Demand.absSig id (Info.lookup (tvrInfo tvr))
     ans = f e ( sa ++ repeat Demand.lazy) cpr []
     f (ELam t e) (Demand.S _:ss) (Fun x) ts
        | Just con <- getProduct dataTable tt = f e ss x ((Just (con,as con),t):ts)

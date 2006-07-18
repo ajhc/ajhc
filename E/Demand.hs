@@ -3,6 +3,7 @@ module E.Demand(
     DemandSignature(..),
     DemandType(..),
     analyzeProgram,
+    absSig,
     lazySig,
     lazy,
     lazyType
@@ -87,6 +88,7 @@ botType = (DemandEnv mempty Bottom) :=> []
 
 lazyType = (DemandEnv mempty lazy) :=> []
 lazySig = DemandSignature 0 lazyType
+absSig = DemandSignature 0 absType
 
 class Lattice a where
     glb :: a -> a -> a
@@ -222,7 +224,7 @@ analyze (EAp e1 e2) s = do
     let (sa,sigma1) = splitSigma sigma1'
     (e2',phi2 :=> sigma2) <- analyze e2 sa
     return $ (EAp e1' e2',(phi1 `glb` phi2) :=> sigma1)
-analyze el@(ELit LitCons { litName = h, litArgs = ts@(_:_) }) (S (Product ss)) | length ss == length ts = do
+analyze el@(ELit lc@LitCons { litName = h, litArgs = ts@(_:_) }) (S (Product ss)) | length ss == length ts = do
     dataTable <- getDataTable
     case getSiblings dataTable h of
         Just [_] -> do  -- product type
@@ -230,7 +232,9 @@ analyze el@(ELit LitCons { litName = h, litArgs = ts@(_:_) }) (S (Product ss)) |
                 (_,env :=> _) <- analyze a s
                 return env
             return (el,foldr1 glb envs :=> [])
-        _ -> return (el,absType)
+        _ -> do
+            rts <- mapM (\e -> analyze e lazy) ts
+            return (ELit lc { litArgs = fsts rts }, foldr glb absType (snds rts))
 
 analyze (ELit lc@LitCons { litArgs = ts }) _s = do
     rts <- mapM (\e -> analyze e lazy) ts
@@ -278,7 +282,11 @@ analyze (ELetRec ds b) s = f (decomposeDs ds) [] where
             extEnvs [ (t,ds)| (t,_) <- rg'', let (Just ds) = Info.lookup (tvrInfo t)] $ do
                 f rs (rg'' ++ fs)
           else f (Right rg'':rs) fs
-analyze e _ = return (e,absType)
+analyze Unknown _ = return (Unknown,absType)
+analyze es@ESort {} _ = return (es,absType)
+analyze es@(ELit LitInt {}) _ = return (es,absType)
+analyze e x = fail $ "analyze: " ++ show (e,x)
+
 
 
 analyzeCase ec@ECase {} s = do
@@ -296,7 +304,7 @@ denvDelete x (DemandEnv m r) = DemandEnv (Map.delete x m) r
 
 
 topAnalyze :: TVr -> E -> IM (E,DemandSignature)
-topAnalyze tvr e | getProperty prop_PLACEHOLDER tvr = return (e,lazySig)
+topAnalyze tvr e | getProperty prop_PLACEHOLDER tvr = return (e,DemandSignature 0 absType)
 topAnalyze _tvr e = clam e strict 0 where
     clam (ELam _ x) s n = clam x (sp [s]) (n + 1)
     clam _ s n = do
@@ -307,12 +315,19 @@ fixupDemandSignature (DemandSignature n (DemandEnv _ r :=> dt)) = DemandSignatur
 
 {-# NOINLINE analyzeProgram #-}
 analyzeProgram prog = do
-    let f (rec,ds) = do
-            flip mapM ds $ \ (t,e) -> case (runIM (topAnalyze t e) (progDataTable prog)) of
-                Identity (ne,s) -> do
-                    let s' = fixupDemandSignature s
-                    putStrLn $ "strictness: " ++ pprint t ++ ": " ++ show s'
-                    return (tvrInfo_u (Info.insert s') t,ne)
+    let f (False,[(t,e)]) = do
+            (ne,s) <- runIM (topAnalyze t e) (progDataTable prog)
+            let s' = fixupDemandSignature s
+            putStrLn $ "strictness: " ++ pprint t ++ ": " ++ show s'
+            return [(tvrInfo_u (Info.insert s') t,ne)]
+        f (True,ds) = do
+            let ds' = [ ((t,e),sig) | (t,e) <- ds, let sig = maybe absSig id (Info.lookup (tvrInfo t))]
+                g False [] ds = return [ (tvrInfo_u (Info.insert (fixupDemandSignature sig)) t,e) | ((t,e),sig) <- ds ]
+                g True [] ds = extEnvs [ (t,sig)| ((t,_),sig) <- ds] $ g False ds []
+                g ch (((t,e),sig):rs) fs = do
+                    (ne,sig') <- topAnalyze t e
+                    g (ch || (sig' /= sig)) rs (((t,ne),sig'):fs)
+            runIM (g True [] ds') (progDataTable prog)
     nprog <- programMapRecGroups mempty (\_ -> return) (\_ -> return) (\_ -> return) f prog
     return nprog
 
