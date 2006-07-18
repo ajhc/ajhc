@@ -313,6 +313,7 @@ processDecls stats ho ho' tiData = do
                 _ -> return mprog
         mprog <- transformProgram "Simple Recursive" DontIterate (dump FD.CoreMini) sRec mprog
         mprog <- return $ etaAnnotateProgram mprog
+        mprog <- transformProgram "typeAnalyze" DontIterate (dump FD.CoreMini) (typeAnalyze True) mprog
         mprog <- simplifyProgram sopt "SuperSimplify" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
         mprog <- transformProgram "floatOutward" DontIterate (dump FD.CoreMini) floatOutward mprog
