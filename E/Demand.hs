@@ -202,15 +202,20 @@ instance DataTableMonad IM where
 runIM :: Monad m => IM a -> DataTable ->  m a
 runIM (IM im) dt = return $ runReader im (mempty,dt)
 
-determineDemandType :: TVr -> Demand -> IM DemandType
+-- returns the demand type and whether it was found in the local environment or guessed
+determineDemandType :: TVr -> Demand -> IM (Bool,DemandType)
 determineDemandType tvr demand = do
-    env <- getEnv
-    case mlookup (tvrIdent tvr) env `mplus` Info.lookup (tvrInfo tvr) of
-        Nothing -> return absType
-        Just (DemandSignature n dt) -> f n demand where
-            f 0 _ = return dt
+    let g (DemandSignature n dt) = f n demand where
+            f 0 _ = dt
             f n (S (Product [s])) = f (n - 1) s
-            f _ _ = return absType
+            f _ _ = absType
+    env <- getEnv
+    case mlookup (tvrIdent tvr) env of
+        Just ds -> return (True, g ds)
+        Nothing -> case Info.lookup (tvrInfo tvr) of
+            Nothing -> return (True,absType)
+            Just ds -> return (False,g ds)
+
 
 splitSigma [] = (lazy,[])
 splitSigma (x:xs) = (x,xs)
@@ -218,8 +223,8 @@ splitSigma (x:xs) = (x,xs)
 analyze :: E -> Demand -> IM (E,DemandType)
 analyze e Absent = return (e,absType)
 analyze (EVar v) s = do
-    phi :=> sigma <- determineDemandType v s
-    return (EVar v,(phi `glb` (demandEnvSingleton v s)) :=> sigma)
+    (fl,phi :=> sigma) <- determineDemandType v s
+    return (EVar v,(if fl then phi `glb` (demandEnvSingleton v s) else phi) :=> sigma)
 analyze (EAp e1 e2) s = do
     (e1',phi1 :=> sigma1') <- analyze e1 (sp [s])
     let (sa,sigma1) = splitSigma sigma1'
@@ -274,7 +279,7 @@ analyze (ELetRec ds b) s = f (decomposeDs ds) [] where
         extEnv t ds $ do
             f rs ((tvrInfo_u (Info.insert ds) t,ne):fs)
     f (Right rg:rs) fs = do
-        rg' <- extEnvs [ (t,ds)| (t,_) <- rg, let il@(~(Just ds)) = Info.lookup (tvrInfo t), isJust il] $ do
+        rg' <- extEnvs [ (t,ds)| (t,_) <- rg, let ds = maybe absSig id (Info.lookup (tvrInfo t))] $ do
             flip mapM rg $ \ (t,e) -> do
                 (ne,ds) <- topAnalyze t e
                 return ((tvrInfo_u (Info.insert ds) t,ne),Just ds == Info.lookup (tvrInfo t))
@@ -331,18 +336,6 @@ analyzeProgram prog = do
             runIM (g True [] ds') (progDataTable prog)
     nprog <- programMapRecGroups mempty (\_ -> return) (\_ -> return) (\_ -> return) f prog
     return nprog
-
---    flip mapM_ (programDs prog) $ \ (t,e) -> case (runIM (infer e)) of
---        Left err -> putStrLn $ "strictness error :" ++ pprint t ++ "\n" ++ err
---        Right (c,(ty,_)) -> do
---            putStrLn $ "strictnes " ++ pprint t
---            print c
---            let cc (TAnot l TAtomic) = strict `islte` l
---                cc (TAnot _ (_ `TFun` b)) = cc b
---            print (fmap fn ty)
---            putStrLn "solving:"
---            processConstraints True c
---    return ()
 
 
 
