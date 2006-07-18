@@ -4,6 +4,7 @@ module E.Demand(
     DemandType(..),
     analyzeProgram,
     absSig,
+    solveDs,
     lazySig,
     lazy,
     lazyType
@@ -101,12 +102,28 @@ class Lattice a where
 -- Sp [.. _|_ ..] = _|_
 
 sp [] = S None
+sp xs = S (Product xs) -- None
+
+l None = L None
+l (Product xs) = lp xs
+
+lp [] = L None
+lp xs = L (Product (map f xs)) where
+    f (S None) = lazy
+    f (S (Product ys)) = lp ys
+    f Bottom = Absent
+    f (Error None) = lazy
+    f (Error (Product xs)) = lp xs
+    f x = x
+
+{-
 sp s = sp' True s where
     sp' True [] = S None
     sp' False [] = S (Product s)
     sp' allLazy (L _:rs) = sp' allLazy rs
     sp' _ (Bottom:_) = Error (Product s)
     sp' _ (_:rs) = sp' False rs
+-}
 
 
 instance Lattice DemandType where
@@ -127,17 +144,17 @@ instance Lattice Demand where
     lub Bottom s = s
     lub s Bottom = s
     lub Absent Absent = Absent
-    lub (S x) Absent = L x
-    lub Absent (S x) = L x
+    lub (S x) Absent = l x
+    lub Absent (S x) = l x
     lub Absent sa = lazy
     lub sa Absent = lazy
 
     lub (S x) (S y) = S (comb lub x y)
-    lub (L x) (L y) = L (comb lub x y)
+    lub (L x) (L y) = l (comb lub x y)
     lub (Error x) (Error y) = Error (comb lub x y)
 
-    lub (S x) (L y) = L (comb lub x y)
-    lub (L x) (S y) = L (comb lub x y)
+    lub (S x) (L y) = l (comb lub x y)
+    lub (L x) (S y) = l (comb lub x y)
 
     lub (S x) (Error y) = S (comb lub x y)
     lub (Error x) (S y) = S (comb lub x y)
@@ -154,7 +171,7 @@ instance Lattice Demand where
     glb _ Bottom = err
 
     glb (S x) (S y) = S (comb glb x y)
-    glb (L x) (L y) = L (comb glb x y)
+    glb (L x) (L y) = l (comb glb x y)
     glb (Error x) (Error y) = Error (comb glb x y)
 
     glb (S _) (Error _) = err
@@ -205,16 +222,16 @@ runIM (IM im) dt = return $ runReader im (mempty,dt)
 -- returns the demand type and whether it was found in the local environment or guessed
 determineDemandType :: TVr -> Demand -> IM (Bool,DemandType)
 determineDemandType tvr demand = do
-    let g (DemandSignature n dt) = f n demand where
-            f 0 _ = dt
+    let g (DemandSignature n dt@(DemandEnv phi _ :=> _)) = f n demand where
+            f 0 (S _) = dt
             f n (S (Product [s])) = f (n - 1) s
-            f _ _ = absType
+            f _ _ = lazify (DemandEnv phi Absent) :=> []
     env <- getEnv
     case mlookup (tvrIdent tvr) env of
         Just ds -> return (True, g ds)
         Nothing -> case Info.lookup (tvrInfo tvr) of
             Nothing -> return (True,absType)
-            Just ds -> return (False,g ds)
+            Just ds -> return (True,g ds)
 
 
 splitSigma [] = (lazy,[])
@@ -265,7 +282,8 @@ analyze (ELam x e) (L (Product [s])) = do
 analyze (ELam x e) (S None) = analyze (ELam x e) (S (Product [lazy]))  -- simply to ensure binder is annotated
 analyze (ELam x e) (L None) = analyze (ELam x e) (L (Product [lazy]))  -- simply to ensure binder is annotated
 analyze (ELam x e) (Error None) = analyze (ELam x e) (Error (Product [lazy]))  -- simply to ensure binder is annotated
-analyze e@EError {} _ = return (e,botType)
+analyze e@EError {} (S _) = return (e,botType)
+analyze e@EError {} (L _) = return (e,absType)
 analyze ec@ECase { eCaseAlts = [Alt lc@(LitCons h ts _) alt], eCaseDefault = Nothing } s = do
     dataTable <- getDataTable
     case getSiblings dataTable h of
@@ -326,6 +344,17 @@ topAnalyze _tvr e = clam e strict 0 where
         return (e,DemandSignature n dt)
 
 fixupDemandSignature (DemandSignature n (DemandEnv _ r :=> dt)) = DemandSignature n (DemandEnv mempty r :=> dt)
+
+
+solveDs dataTable ds = do
+    let ds' = [ ((t,e),sig) | (t,e) <- ds, let sig = maybe absSig id (Info.lookup (tvrInfo t))]
+        g False [] ds = return [ (tvrInfo_u (Info.insert (fixupDemandSignature sig)) t,e) | ((t,e),sig) <- ds ]
+        g True [] ds = extEnvs [ (t,sig)| ((t,_),sig) <- ds] $ g False ds []
+        g ch (((t,e),sig):rs) fs = do
+            (ne,sig') <- topAnalyze t e
+            g (ch || (sig' /= sig)) rs (((t,ne),sig'):fs)
+    runIM (g True [] ds') dataTable
+
 
 {-# NOINLINE analyzeProgram #-}
 analyzeProgram prog = do
