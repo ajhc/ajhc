@@ -14,6 +14,7 @@ import Control.Monad
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
+import Data.List
 import Data.Monoid
 import Data.Maybe
 import Data.Typeable
@@ -26,8 +27,8 @@ import Doc.PPrint
 import E.E
 import E.Inline
 import E.Program
-import Info.Types
 import GenUtil
+import Info.Types
 import Name.Id
 import qualified Info.Info as Info
 import Util.HasSize
@@ -74,7 +75,7 @@ instance Show DemandType where
     showsPrec _ (env :=> ds) = shows env . showString " :=> " .  shows ds
 
 instance Show DemandEnv where
-    showsPrec _ (DemandEnv m Absent) = pprint m
+    showsPrec _ (DemandEnv m Absent) = showString "{" . foldr (.) id (intersperse (showString ",") [ showString (pprint t) . showString " -> " . shows v | (t,v) <- Map.toList m]) . showString "}"
     showsPrec _ (DemandEnv _ Bottom) = showString "_|_"
 
 
