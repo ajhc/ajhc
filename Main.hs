@@ -803,6 +803,24 @@ iterateStep (IterateMax n) = IterateMax (n - 1)
 iterateStep (IterateExactly n) = IterateExactly (n - 1)
 iterateStep x = x
 
+data TransformParms = TransformParms {
+    transformIterate :: Iterate,
+    transformDumpProgress :: Bool,
+    transformOperation :: Program -> IO Program,
+    transformCategory :: String,   -- ^ general name of transformation
+    transformPass :: String,       -- ^ what pass we are in
+    transformName :: String        -- ^ name of what we are working on
+    }
+
+transformParms = TransformParms {
+    transformIterate = DontIterate,
+    transformDumpProgress = False,
+    transformCategory = "Unknown",
+    transformPass = "",
+    transformOperation = return,
+    transformName = ""
+    }
+
 transformProgram ::
     String                      -- ^ name of pass
     -> Iterate                     -- ^ wether to iterate
