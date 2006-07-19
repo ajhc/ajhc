@@ -214,14 +214,17 @@ instance Lattice DemandEnv where
         m = Map.fromList [ (x,lenv x d1 `glb` lenv x d2) | x <- Map.keys m1 ++ Map.keys m2]
 
 
-newtype IM a = IM (Reader (IdMap DemandSignature,DataTable) a)
-    deriving(Monad,Functor,MonadReader (IdMap DemandSignature,DataTable))
+newtype IM a = IM (Reader (Env,DataTable) a)
+    deriving(Monad,Functor,MonadReader (Env,DataTable))
 
-getEnv :: IM (IdMap DemandSignature)
+type Env = IdMap (Either DemandSignature E)
+
+getEnv :: IM Env
 getEnv = asks fst
 
-extEnv t e = local (\ (env,dt) -> (minsert (tvrIdent t) e env,dt))
-extEnvs ts = local  (\ (env,dt) -> (mappend (fromList [ (tvrIdent t,s) |  (t,s) <- ts]) env,dt))
+extEnv t e = local (\ (env,dt) -> (minsert (tvrIdent t) (Left e) env,dt))
+extEnvE t e = local (\ (env,dt) -> (minsert (tvrIdent t) (Right e) env,dt))
+extEnvs ts = local  (\ (env,dt) -> (mappend (fromList [ (tvrIdent t,Left s) |  (t,s) <- ts]) env,dt))
 
 
 instance DataTableMonad IM where
@@ -231,7 +234,7 @@ runIM :: Monad m => IM a -> DataTable ->  m a
 runIM (IM im) dt = return $ runReader im (mempty,dt)
 
 -- returns the demand type and whether it was found in the local environment or guessed
-determineDemandType :: TVr -> Demand -> IM (Bool,DemandType)
+determineDemandType :: TVr -> Demand -> IM (Either DemandType E)
 determineDemandType tvr demand = do
     let g (DemandSignature n dt@(DemandEnv phi _ :=> _)) = f n demand where
             f 0 (S _) = dt
@@ -239,10 +242,11 @@ determineDemandType tvr demand = do
             f _ _ = lazify (DemandEnv phi Absent) :=> []
     env <- getEnv
     case mlookup (tvrIdent tvr) env of
-        Just ds -> return (True, g ds)
+        Just (Left ds) -> return (Left $ g ds)
+        Just (Right e) -> return (Right e)
         Nothing -> case Info.lookup (tvrInfo tvr) of
-            Nothing -> return (True,absType)
-            Just ds -> return (True,g ds)
+            Nothing -> return (Left absType)
+            Just ds -> return (Left $ g ds)
 
 
 splitSigma [] = (lazy,[])
@@ -251,8 +255,11 @@ splitSigma (x:xs) = (x,xs)
 analyze :: E -> Demand -> IM (E,DemandType)
 analyze e Absent = return (e,absType)
 analyze (EVar v) s = do
-    (fl,phi :=> sigma) <- determineDemandType v s
-    return (EVar v,(if fl then phi `glb` (demandEnvSingleton v s) else phi) :=> sigma)
+    ddt <- determineDemandType v s
+    (phi :=> sigma) <- case ddt of
+        Left dt -> return dt
+        Right e -> liftM snd $ analyze e s
+    return (EVar v,(phi `glb` (demandEnvSingleton v s)) :=> sigma)
 analyze (EAp e1 e2) s = do
     (e1',phi1 :=> sigma1') <- analyze e1 (sp [s])
     let (sa,sigma1) = splitSigma sigma1'
@@ -299,10 +306,10 @@ analyze (ELam x e) (L None) = analyze (ELam x e) (L (Product [lazy]))  -- simply
 analyze (ELam x e) (Error None) = analyze (ELam x e) (Error (Product [lazy]))  -- simply to ensure binder is annotated
 analyze e@EError {} (S _) = return (e,botType)
 analyze e@EError {} (L _) = return (e,absType)
-analyze ec@ECase { eCaseAlts = [Alt lc@(LitCons h ts _) alt], eCaseDefault = Nothing } s = do
+analyze ec@ECase { eCaseBind = b, eCaseAlts = [Alt lc@(LitCons h ts _) alt], eCaseDefault = Nothing } s = do
     dataTable <- getDataTable
     case getSiblings dataTable h of
-        Just [_] -> do  -- product type
+        Just [_] -> extEnvE b (eCaseScrutinee ec) $  do  -- product type
             (alt',enva :=> siga) <- analyze alt s
             (e',enve :=> []) <- analyze (eCaseScrutinee ec) (sp [ lenv t enva | t <- ts])
             let nenv = foldr denvDelete (glb enva enve) ts
@@ -356,6 +363,7 @@ topAnalyze _tvr e = clam e strict 0 where
 fixupDemandSignature (DemandSignature n (DemandEnv _ r :=> dt)) = DemandSignature n (DemandEnv mempty r :=> dt)
 
 
+{-# NOINLINE solveDs #-}
 solveDs dataTable ds = do
     nds <- runIM (solveDs' Nothing ds fixupDemandSignature return) dataTable
     flip mapM_ nds $ \ (t,_) ->
@@ -365,6 +373,9 @@ solveDs dataTable ds = do
 
 
 solveDs' :: (Maybe Bool) -> [(TVr,E)] -> (DemandSignature -> DemandSignature) -> ([(TVr,E)] -> IM a) -> IM a
+solveDs' (Just False) [(t,e@ELit {})] fixup wdone = do
+    (ne,ds) <- topAnalyze t e
+    extEnvE t e $ wdone [(tvrInfo_u (Info.insert (fixup ds)) t,ne)]
 solveDs' (Just False) [(t,e)] fixup wdone = do
     (ne,ds) <- topAnalyze t e
     extEnv t ds $ wdone [(tvrInfo_u (Info.insert (fixup ds)) t,ne)]
