@@ -10,14 +10,14 @@ import DataConstructors
 import Doc.DocLike
 import E.E
 import E.FreeVars
-import E.Strictness
 import GenUtil
 import Name.Name
 import Name.Names
 import Number
-import qualified Doc.Chars as C
-import qualified Info.Info as Info
 import Util.SameShape
+import qualified Doc.Chars as C
+import qualified E.Demand as Demand
+import qualified Info.Info as Info
 
 newtype Env = Env (Map.Map TVr Val)
     deriving(Monoid)
@@ -97,7 +97,7 @@ cprAnalyze dataTable env e = cprAnalyze' env e where
         (e',val) = cprAnalyze' (env' `mappend` env) e
 
     cprAnalyze' env (ELam t e)
-        | Just (S _) <- Info.lookup (tvrInfo t), Just c <- getProduct dataTable (tvrType t) = let
+        | Just (Demand.S _) <- Info.lookup (tvrInfo t), Just c <- getProduct dataTable (tvrType t) = let
             (e',val) = cprAnalyze' (envInsert t (toVal c) env) e
             in (ELam t e',Fun val)
     cprAnalyze' env (ELam t e) = (ELam t e',Fun val) where

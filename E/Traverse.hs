@@ -27,7 +27,6 @@ import DataConstructors()
 import Util.HasSize
 import E.E
 import E.Rules
-import E.Strictness as Strict
 import E.TypeCheck
 import E.Values
 import Support.FreeVars
@@ -37,6 +36,8 @@ import Util.NameMonad
 import Util.Graph
 import Name.Id
 import Util.SetLike as S
+import qualified E.Demand as Demand
+import qualified Info.Info as Info
 
 -- Generic traversal routines rock.
 
@@ -61,7 +62,6 @@ data  TravOptions m = TravOptions {
     propagateRecord :: Int -> m (),
     letToCaseRecord :: Int -> m (),
     trav_rules :: Rules,
-    trav_strictness :: IdMap Strict.SA,
     _hiddenTricky :: m ()    -- ^ This ensures types are not ambiguous if we don't fill in the monadic routines
     }
 
@@ -72,7 +72,6 @@ travOptions = TravOptions {
     propagateRecord = \_ -> return (),
     letToCaseRecord = \_ -> return (),
     trav_rules = mempty,
-    trav_strictness = mempty,
     _hiddenTricky = return ()
     }
 {-
@@ -179,7 +178,7 @@ traverse (tOpt :: TravOptions m) func subst smap e = runIdNameT' $ initNames >> 
             addNames $ map ( tvrIdent . fst ) ds
             z (basicDecompose  (pruneUnreachable tOpt) (trav_rules tOpt) e ds) e  where
         z [] e = f e
-        z (Left (tvr,x):rs) e | worthStricting x, Just (S _) <- mlookup (tvrIdent tvr) (trav_strictness tOpt)  = do
+        z (Left (tvr,x):rs) e | worthStricting x, Just (Demand.S _) <- Info.lookup (tvrInfo tvr)   = do
             (n,tvrn) <- ntvr f' tvr
             x' <- f x
             nr <- localSubst [(n,EVar tvrn)]   (z rs e)
