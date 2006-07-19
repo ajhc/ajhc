@@ -6,9 +6,7 @@ module E.Demand(
     analyzeProgram,
     absSig,
     solveDs,
-    lazySig,
-    lazy,
-    lazyType
+    lazy
     ) where
 
 
@@ -135,8 +133,10 @@ sp s = sp' True s where
 
 
 instance Lattice DemandType where
-    lub (env :=> ts) (env' :=> ts') = (env `lub` env') :=> zipWith lub ts ts'
-    glb (env :=> ts) (env' :=> ts') = (env `glb` env') :=> zipWith glb ts ts'
+    lub (env :=> ts) (env' :=> ts') | length ts < length ts' = (env `lub` env') :=> zipWith lub (ts ++ repeat lazy) ts'
+                                    | otherwise = (env `lub` env') :=> zipWith lub ts (ts' ++ repeat lazy)
+    glb (env :=> ts) (env' :=> ts') | length ts < length ts' = (env `glb` env') :=> zipWith glb (ts ++ repeat lazy) ts'
+                                    | otherwise = (env `glb` env') :=> zipWith glb ts (ts' ++ repeat lazy)
 
 lazy = L None
 strict = S None
@@ -253,6 +253,7 @@ determineDemandType tvr demand = do
             Nothing -> return (Left absType)
             Just ds -> return (Left $ g ds)
 
+extendSig (DemandSignature n1 t1) (DemandSignature n2 t2)  = DemandSignature (max n1 n2) (glb t1 t2)
 
 splitSigma [] = (lazy,[])
 splitSigma (x:xs) = (x,xs)
@@ -400,7 +401,8 @@ solveDs' (Just True) ds fixup wdone = do
         g True [] ds = extEnvs [ (t,sig)| ((t,_),sig) <- ds] $ g False ds []
         g ch (((t,e),sig):rs) fs = do
             (ne,sig') <- topAnalyze t e
-            g (ch || (sig' /= sig)) rs (((t,ne),sig'):fs)
+            let sig'' = sig `extendSig` sig'
+            g (ch || (sig'' /= sig)) rs (((t,ne),sig''):fs)
     g True [] ds'
 
 {-# NOINLINE analyzeProgram #-}
