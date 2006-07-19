@@ -41,14 +41,14 @@ wrappable :: Monad m =>
     -> TVr      -- ^ function name we want to workwrap
     -> E        -- ^ function body
     -> m (Maybe Name,E,[(Arg,TVr)])  -- ^ (CPR Constructor,Body,Args)
-wrappable dataTable tvr e@ELam {} = ans where
-    cpr = maybe Top id (Info.lookup (tvrInfo tvr))
-    Demand.DemandSignature _ (_ Demand.:=> sa) = maybe Demand.absSig id (Info.lookup (tvrInfo tvr))
+wrappable dataTable mtvr e@ELam {} = ans where
+    cpr = maybe Top id (Info.lookup (tvrInfo mtvr))
+    Demand.DemandSignature _ (_ Demand.:=> sa) = maybe Demand.absSig id (Info.lookup (tvrInfo mtvr))
     ans = f e ( sa ++ repeat Demand.lazy) cpr []
     g t (Demand.S subs)
        | Just con <- getProduct dataTable tt = (Cons con (as con),t)
          where
-            as con = [ g t { tvrIdent = n, tvrType = st } demand  | st <- slotTypes dataTable (conName con) tt | n <- tmpNames Val (tvrIdent t) | demand <- fsubs subs]
+            as con = [ g TVr { tvrIdent = n, tvrType = st, tvrInfo = mempty } demand  | st <- slotTypes dataTable (conName con) tt | n <- tmpNames Val (tvrIdent t) | demand <- fsubs subs]
             tt = getType t
     g t Demand.Absent | isLifted (EVar t) = (Absent,t)
     g t _ = (Plain,t)
