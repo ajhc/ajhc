@@ -156,8 +156,9 @@ barendregtProgram prog = programSetDs ds' prog where
     Identity (ELetRec ds' Unknown) = renameTraverse' (ELetRec (programDs prog) Unknown)
 
 
-barendregtProg prog = do
-    transformProgram "Barendregt" DontIterate (dump FD.CorePass) (return . barendregtProgram) prog
+barendregtProg prog = transformProgram transBarendregt prog
+
+transBarendregt = transformParms { transformCategory = "Barendregt", transformIterate = DontIterate, transformDumpProgress = corePass, transformOperation =  return . barendregtProgram }
 
 
 lamann _ nfo = return nfo
@@ -301,6 +302,7 @@ processDecls stats ho ho' tiData = do
             progEntryPoints = fsts ns,
             progExternalNames = progExternalNames prog `mappend` (fromList $ map tvrIdent $ fsts (programDs prog))
             }
+            tparms = transformParms { transformPass = "Init", transformDumpProgress = coreMini }
 
         -- This transforms simple recursive routines into non-recursive ones that contain a local
         -- recursive definition. this makes them easier to inline and optimize.
@@ -315,22 +317,22 @@ processDecls stats ho ho' tiData = do
                     putStrLn $ "\nSimple Recursive: " ++ pprint t
                     return $ programSetDs [(t,ne')] mprog
                 _ -> return mprog
-        mprog <- transformProgram "Simple Recursive" DontIterate (dump FD.CoreMini) sRec mprog
+        mprog <- transformProgram tparms { transformCategory = "Simple Recursive", transformOperation = sRec } mprog
 
         mprog <- return $ etaAnnotateProgram mprog
-        mprog <- transformProgram "typeAnalyze" DontIterate (dump FD.CoreMini) (typeAnalyze True) mprog
+        mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } mprog
 
         mprog <- simplifyProgram sopt "SuperSimplify" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
 
-        mprog <- transformProgram "floatOutward" DontIterate (dump FD.CoreMini) floatOutward mprog
+        mprog <- transformProgram tparms { transformCategory = "FloatOutward", transformOperation = floatOutward } mprog
         -- perform another supersimplify in order to substitute the once used
         -- variables back in and replace the variable of case of variables with
         -- the default binding of the case statement.
 
         mprog <- simplifyProgram sopt "Simplify FloatOutCleanup" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
-        mprog <- transformProgram "float inward" DontIterate (dump FD.CoreMini) programFloatInward mprog
+        mprog <- transformProgram tparms { transformCategory = "FloatInward", transformOperation = programFloatInward } mprog
         mprog <- Demand.analyzeProgram mprog
         lintCheckProgram onerrNone mprog
         mprog <- simplifyProgram sopt "Simplify After Strictness" False mprog
@@ -490,12 +492,12 @@ programPruneUnreachable prog = programSetDs ds' prog where
     ds' = reachable (newGraph (programDs prog) (tvrIdent . fst) (\ (t,e) -> idSetToList $ bindingFreeVars t e)) (map tvrIdent $ progEntryPoints prog)
 
 programPrune :: Program -> IO Program
-programPrune prog = transformProgram "Prune Unreachable" DontIterate (dump FD.CorePass || coreMini) (return . programPruneUnreachable) prog
+programPrune prog = transformProgram transformParms { transformCategory = "Prune Unreachable", transformDumpProgress  = miniCorePass, transformOperation = return . programPruneUnreachable } prog
 
 etaExpandProg :: Program -> IO Program
 etaExpandProg prog = do
     let (prog',stats) = Stats.runStatM $  etaExpandProgram prog
-    transformProgram "eta expansion" DontIterate (dump FD.CorePass || coreMini) (const $ return prog' { progStats = progStats prog' `mappend` stats }) prog
+    transformProgram transformParms { transformCategory = "EtaExpansion", transformDumpProgress = miniCorePass,  transformOperation = const $ return prog' { progStats = progStats prog' `mappend` stats } } prog
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
 shouldBeExported exports tvr
@@ -513,6 +515,7 @@ isInteractive = do
           || "ichj" `isPrefixOf` reverse pn
           || not (null $ optStmts options)
 
+transTypeAnalyze = transformParms { transformCategory = "TypeAnalyze",  transformOperation = typeAnalyze True }
 
 compileModEnv' stats (initialHo,finalHo) = do
     let ho = initialHo `mappend` finalHo
@@ -543,7 +546,7 @@ compileModEnv' stats (initialHo,finalHo) = do
                           progEntryPoints = (main:ffiExportNames),
                           progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog]
                         }
-    prog <- transformProgram "Initial Prune Unreachable" DontIterate False (return . programPruneUnreachable) prog
+    prog <- transformProgram transformParms { transformCategory = "PruneUnreachable", transformOperation = return . programPruneUnreachable } prog
     prog <- barendregtProg prog
 
     --wdump FD.Lambdacube $ printProgram prog
@@ -573,7 +576,7 @@ compileModEnv' stats (initialHo,finalHo) = do
         prog <- barendregtProg prog
         wdump FD.CoreBeforelift $ printProgram prog
         finalStats <- Stats.new
-        prog <- transformProgram "lambda lift" DontIterate (dump FD.Progress) (lambdaLift finalStats) prog
+        prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift finalStats } prog
         wdump FD.Progress $ Stats.print "PostLifting" finalStats
         wdump FD.CoreAfterlift $ printProgram prog -- printCheckName dataTable (programE prog)
         compileToGrin prog
@@ -582,7 +585,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     st <- Stats.new
 
 
-    prog <- transformProgram "typeAnalyze after method" DontIterate True (typeAnalyze True) prog
+    prog <- transformProgram transTypeAnalyze { transformPass = "AfterMethod", transformDumpProgress = True } prog
     prog <- barendregtProg prog
 
 
@@ -593,7 +596,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     st <- Stats.new
     prog <- etaExpandProg prog
     prog <- barendregtProg prog
-    prog <- transformProgram "typeAnalyze" DontIterate True (typeAnalyze True) prog
+    prog <- transformProgram transTypeAnalyze { transformPass = "AfterSimplify", transformDumpProgress = True } prog
 
 
     prog <- barendregtProg prog
@@ -613,7 +616,7 @@ compileModEnv' stats (initialHo,finalHo) = do
     -- perform lambda lifting
     wdump FD.CoreBeforelift $ printProgram prog
     finalStats <- Stats.new
-    prog <- transformProgram "lambda lift" DontIterate (dump FD.Progress) (lambdaLift finalStats) prog
+    prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift finalStats } prog
 
     -- final optimization pass to clean up lambda lifting droppings
     rs' <- flip mapM (progCombinators prog) $ \ (t,ls,e) -> do
@@ -771,21 +774,22 @@ simplifyProgram sopt name dodump prog = do
                 putStrLn "-- After Occurance Analysis"
                 printProgram nprog
             return $ SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } nprog
-    prog <- transformProgram name IterateDone dodump g prog  { progStats = mempty }
+    prog <- transformProgram transformParms { transformCategory = "Simplify", transformPass = name, transformIterate = IterateDone, transformDumpProgress = dodump, transformOperation = g } prog { progStats = mempty }
     when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printStat ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
+{-
 simplifyProgramPStat sopt name dodump prog = do
     let istat = progStats prog
     let g =  SS.programSSimplifyPStat sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
     prog <- transformProgram ("PS:" ++ name) IterateDone dodump g prog  { progStats = mempty }
     when ((dodump && dump FD.Progress) || dump FD.CoreSteps) $ Stats.printStat ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
-
+-}
 simplifyProgram' sopt name dodump iterate prog = do
     let istat = progStats prog
     let g =  return . SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
-    prog <- transformProgram name iterate dodump g prog  { progStats = mempty }
+    prog <- transformProgram transformParms { transformCategory = "Simplify", transformPass = name, transformIterate = iterate, transformDumpProgress = dodump, transformOperation = g } prog { progStats = mempty }
     when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printStat ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
@@ -821,17 +825,16 @@ transformParms = TransformParms {
     transformName = ""
     }
 
-transformProgram ::
-    String                      -- ^ name of pass
-    -> Iterate                     -- ^ wether to iterate
-    -> Bool                     -- ^ whether to dump progress
-    -> (Program -> IO Program)  -- ^ what to run
-    -> Program
-    -> IO Program
+transformProgram :: TransformParms -> Program -> IO Program
 
-transformProgram _ (IterateMax n) _ _ prog | n <= 0 = return prog
-transformProgram _ (IterateExactly n) _ _ prog | n <= 0 = return prog
-transformProgram name iterate dodump f prog = do
+transformProgram TransformParms { transformIterate = IterateMax n } prog | n <= 0 = return prog
+transformProgram TransformParms { transformIterate = IterateExactly n } prog | n <= 0 = return prog
+transformProgram tp prog = do
+    let dodump = transformDumpProgress tp
+        name = transformCategory tp ++ pname (transformPass tp) ++ pname (transformName tp)
+        pname "" = ""
+        pname xs = '-':xs
+        iterate = transformIterate tp
     when dodump $ putErrLn $ "-- " ++ name
     when (dodump && dump FD.CorePass) $ printProgram prog
     let istat = progStats prog
@@ -843,7 +846,7 @@ transformProgram name iterate dodump f prog = do
         putErrLn (show e)
         maybeDie
         return prog
-    prog' <- Control.Exception.catch (f prog { progStats = mempty }) ferr
+    prog' <- Control.Exception.catch (transformOperation tp prog { progStats = mempty }) ferr
     let estat = progStats prog'
         onerr = do
             putErrLn $ "\n>>> Before " ++ name
@@ -852,7 +855,7 @@ transformProgram name iterate dodump f prog = do
             putErrLn $ "\n>>> After " ++ name
     when (dodump && dump FD.CoreSteps) $ Stats.printStat name estat
     lintCheckProgram onerr prog'
-    if doIterate iterate estat then transformProgram name (iterateStep iterate) dodump f prog' { progStats = istat `mappend` estat } else
+    if doIterate iterate estat then transformProgram tp { transformIterate = iterateStep iterate } prog' { progStats = istat `mappend` estat } else
         return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
 
 
