@@ -385,21 +385,8 @@ solveDs' (Just True) ds fixup wdone = do
 
 {-# NOINLINE analyzeProgram #-}
 analyzeProgram prog = do
-    let f (False,[(t,e)]) = do
-            (ne,s) <- runIM (topAnalyze t e) (progDataTable prog)
-            let s' = fixupDemandSignature s
-            putStrLn $ "strictness: " ++ pprint t ++ ": " ++ show s'
-            return [(tvrInfo_u (Info.insert s') t,ne)]
-        f (True,ds) = do
-            let ds' = [ ((t,e),sig) | (t,e) <- ds, let sig = maybe absSig id (Info.lookup (tvrInfo t))]
-                g False [] ds = return [ (tvrInfo_u (Info.insert (fixupDemandSignature sig)) t,e) | ((t,e),sig) <- ds ]
-                g True [] ds = extEnvs [ (t,sig)| ((t,_),sig) <- ds] $ g False ds []
-                g ch (((t,e),sig):rs) fs = do
-                    (ne,sig') <- topAnalyze t e
-                    g (ch || (sig' /= sig)) rs (((t,ne),sig'):fs)
-            runIM (g True [] ds') (progDataTable prog)
-    nprog <- programMapRecGroups mempty (\_ -> return) (\_ -> return) (\_ -> return) f prog
-    return nprog
+    nds <- solveDs (progDataTable prog) (programDs prog)
+    return $ programSetDs nds prog
 
 
 
