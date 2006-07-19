@@ -2,6 +2,7 @@ module E.Demand(
     Demand(..),
     DemandSignature(..),
     DemandType(..),
+    SubDemand(..),
     analyzeProgram,
     absSig,
     solveDs,

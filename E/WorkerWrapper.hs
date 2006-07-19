@@ -33,6 +33,9 @@ data Arg =
 isPlain Plain = True
 isPlain _ = False
 
+fsubs Demand.None = repeat Demand.lazy
+fsubs (Demand.Product xs) = xs ++ repeat Demand.lazy
+
 wrappable :: Monad m =>
     DataTable   -- ^ data table
     -> TVr      -- ^ function name we want to workwrap
@@ -42,13 +45,14 @@ wrappable dataTable tvr e@ELam {} = ans where
     cpr = maybe Top id (Info.lookup (tvrInfo tvr))
     Demand.DemandSignature _ (_ Demand.:=> sa) = maybe Demand.absSig id (Info.lookup (tvrInfo tvr))
     ans = f e ( sa ++ repeat Demand.lazy) cpr []
-    f (ELam t e) (Demand.S _:ss) (Fun x) ts
-       | Just con <- getProduct dataTable tt = f e ss x ((Cons con (as con),t):ts)
+    g t (Demand.S subs)
+       | Just con <- getProduct dataTable tt = (Cons con (as con),t)
          where
-            as con = [ (Plain,t { tvrIdent = n, tvrType = st }) | st <- slotTypes dataTable (conName con) tt | n <- tmpNames Val (tvrIdent t) ]
+            as con = [ g t { tvrIdent = n, tvrType = st } demand  | st <- slotTypes dataTable (conName con) tt | n <- tmpNames Val (tvrIdent t) | demand <- fsubs subs]
             tt = getType t
-    f (ELam t e) (Demand.Absent:ss) (Fun x) ts | isLifted (EVar t) = f e ss x ((Absent,t):ts)
-    f (ELam t e) (_:ss) (Fun x) ts = f e ss x ((Plain,t):ts)
+    g t Demand.Absent | isLifted (EVar t) = (Absent,t)
+    g t _ = (Plain,t)
+    f (ELam t e) (demand:ss) (Fun x) ts = f e ss x (g t demand:ts)
     f e _ (Tup n _) ts | isCPR n = return (Just n,e,reverse ts)
     f e _ (Tag [n]) ts | isCPR n = return (Just n,e,reverse ts)
     f e _ _ ts | any (not . isPlain . fst) ts = return (Nothing ,e,reverse ts)
@@ -114,11 +118,11 @@ workWrap' dataTable tvr e | isJust res = ans where
             --Just n -> mtick ("E.Workwrap.CPR.{" ++ tvrShowName tvr ++ "." ++ show n ++ "}")
             Just n -> mtick ("E.Workwrap.CPR.{"  ++ show n ++ "}")
             _ -> return ()
-        flip mapM_ sargs $ \ x -> case x of
-            --(Just (n,_),_) ->  mtick ("E.Workwrap.arg.{" ++ tvrShowName tvr ++ "." ++ show (conName n) ++ "}")
-            (Cons n _,_) -> mtick ("E.Workwrap.arg.{"  ++ show (conName n) ++ "}")
-            (Absent,_) -> mtick "E.Workwrap.arg.absent"
-            _ -> return ()
+        let argw cn (Absent,_) = mtick $ cn ++ ".absent"
+            argw cn (Cons n ts,_) = mtick  nname >> mapM_ (argw nname) ts where
+                nname = cn ++ ".{"  ++ show (conName n) ++ "}"
+            argw _ _ = return ()
+        mapM_ (argw "E.Workwrap.arg") sargs
 workWrap' _dataTable tvr e = fail "not workWrapable"
 
 
