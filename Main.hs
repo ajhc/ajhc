@@ -410,6 +410,7 @@ processDecls stats ho ho' tiData = do
         Stats.tickStat stats st
         let wws = length cds' - length cds
         wdump FD.Progress $ putErr (replicate wws 'w')
+        when (miniCorePass && wws > 0) $ putErrLn "After WorkWrap" >> mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds'
 
         let graph = (newGraph cds' (\ (b,_) -> tvrIdent b) (\ (b,c) -> idSetToList $ bindingFreeVars b c))
             (lb,os) = findLoopBreakers (const 1) nogood graph
@@ -988,11 +989,6 @@ printCheckName'' dataTable tvr e = do
     when (not tmatch || dump FD.EVerbose) $
         putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
     putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
-
-
-
-
-
 
 
 
