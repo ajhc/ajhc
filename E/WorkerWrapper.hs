@@ -1,4 +1,4 @@
-module E.WorkerWrapper(workWrap,performWorkWrap) where
+module E.WorkerWrapper(performWorkWrap) where
 
 import Control.Monad.Writer
 import Data.Monoid
@@ -25,36 +25,37 @@ topLike (Fun v) = topLike v
 topLike _ = False
 
 
+data Arg =
+    Absent
+    | Cons Constructor [(Arg,TVr)]
+    | Plain
+
+isPlain Plain = True
+isPlain _ = False
+
 wrappable :: Monad m =>
     DataTable   -- ^ data table
     -> TVr      -- ^ function name we want to workwrap
     -> E        -- ^ function body
-    -> m (Maybe Name,E,[(Maybe (Constructor,[TVr]),TVr)])  -- ^ (Body,Args)
+    -> m (Maybe Name,E,[(Arg,TVr)])  -- ^ (CPR Constructor,Body,Args)
 wrappable dataTable tvr e@ELam {} = ans where
     cpr = maybe Top id (Info.lookup (tvrInfo tvr))
     Demand.DemandSignature _ (_ Demand.:=> sa) = maybe Demand.absSig id (Info.lookup (tvrInfo tvr))
     ans = f e ( sa ++ repeat Demand.lazy) cpr []
     f (ELam t e) (Demand.S _:ss) (Fun x) ts
-       | Just con <- getProduct dataTable tt = f e ss x ((Just (con,as con),t):ts)
+       | Just con <- getProduct dataTable tt = f e ss x ((Cons con (as con),t):ts)
          where
-            as con = [ t { tvrIdent = n, tvrType = st } | st <- slotTypes dataTable (conName con) tt | n <- tmpNames Val (tvrIdent t) ]
+            as con = [ (Plain,t { tvrIdent = n, tvrType = st }) | st <- slotTypes dataTable (conName con) tt | n <- tmpNames Val (tvrIdent t) ]
             tt = getType t
-    f (ELam t e) (_:ss) (Fun x) ts = f e ss x ((Nothing,t):ts)
+    f (ELam t e) (_:ss) (Fun x) ts = f e ss x ((Plain,t):ts)
     f e _ (Tup n _) ts | isCPR n = return (Just n,e,reverse ts)
     f e _ (Tag [n]) ts | isCPR n = return (Just n,e,reverse ts)
-    f e _ _ ts | any (isJust . fst) ts = return (Nothing ,e,reverse ts)
+    f e _ _ ts | any (not . isPlain . fst) ts = return (Nothing ,e,reverse ts)
     f _ _ _ _ = fail "not workwrapable"
     isCPR n | (Just [_]) <- getSiblings dataTable n = True
             | otherwise = False
 wrappable _ _ _ = fail "Only lambdas are wrappable"
 
-workWrap = undefined
-
-{-
-workWrap dataTable tvr e = case workWrap' dataTable tvr e of
-    Nothing -> [(tvr,e)]
-    Just (x,y) -> [x,y]
--}
 workerName x = case fromId x of
     Just y -> toId (toName Val ("W@",'f':show y))
     Nothing -> toId (toName Val ("W@",'f':show x))
@@ -71,15 +72,15 @@ workWrap' dataTable tvr e | isJust res = ans where
     res@(~(Just (cname,body,sargs))) = wrappable dataTable tvr e
     args = snds sargs
     args' = concatMap f sargs where
-        f (Nothing,t) = [t]
-        f (Just (c,ts),_) = ts
+        f (Plain,t) = [t]
+        f (Cons c ts,_) = concatMap f ts
     lets = concatMap f sargs where
-        f (Nothing,_) = []
-        f (Just (c,ts),t) = [(t,ELit (LitCons (conName c) (map EVar ts) (getType t)))]
+        f (Plain,_) = []
+        f (Cons c ts,t) = [(t,ELit (LitCons (conName c) (map EVar (snds ts)) (getType t)))] ++ concatMap f ts
     cases e = f sargs where
         f [] = e
-        f ((Nothing,_):rs) = f rs
-        f ((Just (c,ts),t):rs) = eCase (EVar t) [Alt (LitCons (conName c) ts (getType t)) (f rs)] Unknown
+        f ((Plain,_):rs) = f rs
+        f ((Cons c ts,t):rs) = eCase (EVar t) [Alt (LitCons (conName c) (snds ts) (getType t)) (f (ts ++ rs))] Unknown
     ans = doTicks >> return ((setProperty prop_WRAPPER tvr,wrapper),(setProperty prop_WORKER tvr',worker))
     tvr' = TVr { tvrIdent = workerName (tvrIdent tvr), tvrInfo = mempty, tvrType = wt }
     worker = foldr ELam body' (args' ++ navar) where
@@ -101,7 +102,8 @@ workWrap' dataTable tvr e | isJust res = ans where
     Just wt = typecheck dataTable  worker
     Just bodyTyp = typecheck dataTable body
     -- This is to add a dummy arg so workers arn't turned into updatable CAFs
-    needsArg =  all (isJust . fst) sargs && null (concat [ xs | (Just (_,xs),_) <- sargs])
+    --needsArg =  all (isJust . fst) sargs && null (concat [ xs | (Just (_,xs),_) <- sargs])
+    needsArg = null args'
     (navar,navalue) = if needsArg then ([tvr { tvrType = ltTuple' []}],[eTuple' []]) else ([],[])
     doTicks = do
         case cname of
@@ -110,7 +112,8 @@ workWrap' dataTable tvr e | isJust res = ans where
             _ -> return ()
         flip mapM_ sargs $ \ x -> case x of
             --(Just (n,_),_) ->  mtick ("E.Workwrap.arg.{" ++ tvrShowName tvr ++ "." ++ show (conName n) ++ "}")
-            (Just (n,_),_) ->  mtick ("E.Workwrap.arg.{"  ++ show (conName n) ++ "}")
+            (Cons n _,_) -> mtick ("E.Workwrap.arg.{"  ++ show (conName n) ++ "}")
+            (Absent,_) -> mtick "E.Workwrap.arg.absent"
             _ -> return ()
 workWrap' _dataTable tvr e = fail "not workWrapable"
 
