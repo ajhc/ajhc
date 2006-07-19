@@ -15,9 +15,9 @@ import GenUtil
 import Info.Info as Info
 import Info.Types
 import Name.Name
-import qualified E.Demand as Demand
 import Stats
 import Support.CanType
+import qualified E.Demand as Demand
 
 
 topLike Top = True
@@ -47,6 +47,7 @@ wrappable dataTable tvr e@ELam {} = ans where
          where
             as con = [ (Plain,t { tvrIdent = n, tvrType = st }) | st <- slotTypes dataTable (conName con) tt | n <- tmpNames Val (tvrIdent t) ]
             tt = getType t
+    f (ELam t e) (Demand.Absent:ss) (Fun x) ts | isLifted (EVar t) = f e ss x ((Absent,t):ts)
     f (ELam t e) (_:ss) (Fun x) ts = f e ss x ((Plain,t):ts)
     f e _ (Tup n _) ts | isCPR n = return (Just n,e,reverse ts)
     f e _ (Tag [n]) ts | isCPR n = return (Just n,e,reverse ts)
@@ -72,13 +73,16 @@ workWrap' dataTable tvr e | isJust res = ans where
     res@(~(Just (cname,body,sargs))) = wrappable dataTable tvr e
     args = snds sargs
     args' = concatMap f sargs where
+        f (Absent,_) = []
         f (Plain,t) = [t]
         f (Cons c ts,_) = concatMap f ts
     lets = concatMap f sargs where
+        f (Absent,t) = [(t,EError "WorkWrap.Absent" (getType t))]
         f (Plain,_) = []
         f (Cons c ts,t) = [(t,ELit (LitCons (conName c) (map EVar (snds ts)) (getType t)))] ++ concatMap f ts
     cases e = f sargs where
         f [] = e
+        f ((Absent,_):rs) = f rs
         f ((Plain,_):rs) = f rs
         f ((Cons c ts,t):rs) = eCase (EVar t) [Alt (LitCons (conName c) (snds ts) (getType t)) (f (ts ++ rs))] Unknown
     ans = doTicks >> return ((setProperty prop_WRAPPER tvr,wrapper),(setProperty prop_WORKER tvr',worker))
