@@ -13,7 +13,6 @@ module E.Demand(
 
 
 import Control.Monad
-import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.List
@@ -222,9 +221,15 @@ type Env = IdMap (Either DemandSignature E)
 getEnv :: IM Env
 getEnv = asks fst
 
+isEmptyId 0 = True
+isEmptyId _ = False
+
+extEnv TVr { tvrIdent = i } _ | isEmptyId i = id
 extEnv t e = local (\ (env,dt) -> (minsert (tvrIdent t) (Left e) env,dt))
+
+extEnvE TVr { tvrIdent = i } _ | isEmptyId i = id
 extEnvE t e = local (\ (env,dt) -> (minsert (tvrIdent t) (Right e) env,dt))
-extEnvs ts = local  (\ (env,dt) -> (mappend (fromList [ (tvrIdent t,Left s) |  (t,s) <- ts]) env,dt))
+extEnvs ts = local  (\ (env,dt) -> (mappend (fromList [ (tvrIdent t,Left s) |  (t,s) <- ts, not (isEmptyId (tvrIdent t))]) env,dt))
 
 
 instance DataTableMonad IM where
@@ -309,10 +314,10 @@ analyze e@EError {} (L _) = return (e,absType)
 analyze ec@ECase { eCaseBind = b, eCaseAlts = [Alt lc@(LitCons h ts _) alt], eCaseDefault = Nothing } s = do
     dataTable <- getDataTable
     case getSiblings dataTable h of
-        Just [_] -> extEnvE b (eCaseScrutinee ec) $  do  -- product type
-            (alt',enva :=> siga) <- analyze alt s
+        Just [_] -> do  -- product type
+            (alt',enva :=> siga) <- extEnvE b (eCaseScrutinee ec) $ analyze alt s
             (e',enve :=> []) <- analyze (eCaseScrutinee ec) (sp [ lenv t enva | t <- ts])
-            let nenv = foldr denvDelete (glb enva enve) ts
+            let nenv = enve `glb` foldr denvDelete enva (b:ts)
             return (ec { eCaseScrutinee = e', eCaseAlts = [Alt lc alt'] }, nenv :=> siga)
         _ -> analyzeCase ec s
 analyze ec@ECase {} s = analyzeCase ec s
@@ -339,7 +344,7 @@ lazify (DemandEnv x r) = DemandEnv (Map.map f x) Absent where
     f (Error xs) = l xs
 
 analyzeCase ec@ECase {} s = do
-    (ec',dts) <- runWriterT $ flip caseBodiesMapM ec $ \e -> do
+    (ec',dts) <- extEnvE (eCaseBind ec) (eCaseScrutinee ec) $ runWriterT $ flip caseBodiesMapM ec $ \e -> do
         (ne,dt) <- lift $ analyze e s
         tell (dt:)
         return ne
@@ -371,9 +376,13 @@ solveDs dataTable ds = do
     return nds
 
 
+shouldBind ELit {} = True
+shouldBind EVar {} = True
+shouldBind EPi {} = True
+shouldBind _ = False
 
 solveDs' :: (Maybe Bool) -> [(TVr,E)] -> (DemandSignature -> DemandSignature) -> ([(TVr,E)] -> IM a) -> IM a
-solveDs' (Just False) [(t,e@ELit {})] fixup wdone = do
+solveDs' (Just False) [(t,e)] fixup wdone | shouldBind e = do
     (ne,ds) <- topAnalyze t e
     extEnvE t e $ wdone [(tvrInfo_u (Info.insert (fixup ds)) t,ne)]
 solveDs' (Just False) [(t,e)] fixup wdone = do
