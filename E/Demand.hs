@@ -314,20 +314,10 @@ analyze (ELetRec ds b) s = f (decomposeDs ds) [] where
         (b',phi :=> sig) <- analyze b s
         let g (t,e) = (tvrInfo_u (Info.insert (lenv t phi)) t,e)
         return (ELetRec (map g ds') b', foldr denvDelete phi (fsts ds) :=> sig)
-    f (Left (t,e):rs) fs = do
-        (ne,ds) <- topAnalyze t e
-        extEnv t ds $ do
-            f rs ((tvrInfo_u (Info.insert ds) t,ne):fs)
+    f (Left (t,e):rs) fs =
+        solveDs' (Just False) [(t,e)] id (\nn -> f rs (nn ++ fs))
     f (Right rg:rs) fs = do
-        rg' <- extEnvs [ (t,ds)| (t,_) <- rg, let ds = maybe absSig id (Info.lookup (tvrInfo t))] $ do
-            flip mapM rg $ \ (t,e) -> do
-                (ne,ds) <- topAnalyze t e
-                return ((tvrInfo_u (Info.insert ds) t,ne),Just ds == Info.lookup (tvrInfo t))
-        let (rg'',cs) = unzip rg'
-        if and cs then
-            extEnvs [ (t,ds)| (t,_) <- rg'', let (Just ds) = Info.lookup (tvrInfo t)] $ do
-                f rs (rg'' ++ fs)
-          else f (Right rg'':rs) fs
+        solveDs' (Just True) rg id (\nn -> f rs (nn ++ fs))
 analyze Unknown _ = return (Unknown,absType)
 analyze es@ESort {} _ = return (es,absType)
 analyze es@(ELit LitInt {}) _ = return (es,absType)
@@ -367,14 +357,31 @@ fixupDemandSignature (DemandSignature n (DemandEnv _ r :=> dt)) = DemandSignatur
 
 
 solveDs dataTable ds = do
+    nds <- runIM (solveDs' Nothing ds fixupDemandSignature return) dataTable
+    flip mapM_ nds $ \ (t,_) ->
+        putStrLn $ "strictness: " ++ pprint t ++ ": " ++ show (maybe absSig id $ Info.lookup (tvrInfo t))
+    return nds
+
+
+
+solveDs' :: (Maybe Bool) -> [(TVr,E)] -> (DemandSignature -> DemandSignature) -> ([(TVr,E)] -> IM a) -> IM a
+solveDs' (Just False) [(t,e)] fixup wdone = do
+    (ne,ds) <- topAnalyze t e
+    extEnv t ds $ wdone [(tvrInfo_u (Info.insert (fixup ds)) t,ne)]
+solveDs' (Just False) ds fixup wdone = solveDs' Nothing ds fixup wdone
+solveDs' Nothing ds fixup wdone = do
+    let f (Left d:rs) xs = solveDs' (Just False) [d] fixup (\nds -> f rs (nds ++ xs))
+        f (Right ds:rs) xs = solveDs' (Just True) ds fixup (\nds -> f rs (nds ++ xs))
+        f [] xs = wdone xs
+    f (decomposeDs ds) []
+solveDs' (Just True) ds fixup wdone = do
     let ds' = [ ((t,e),sig) | (t,e) <- ds, let sig = maybe absSig id (Info.lookup (tvrInfo t))]
-        g False [] ds = return [ (tvrInfo_u (Info.insert (fixupDemandSignature sig)) t,e) | ((t,e),sig) <- ds ]
+        g False [] ds = wdone [ (tvrInfo_u (Info.insert (fixup sig)) t,e) | ((t,e),sig) <- ds ]
         g True [] ds = extEnvs [ (t,sig)| ((t,_),sig) <- ds] $ g False ds []
         g ch (((t,e),sig):rs) fs = do
             (ne,sig') <- topAnalyze t e
             g (ch || (sig' /= sig)) rs (((t,ne),sig'):fs)
-    runIM (g True [] ds') dataTable
-
+    g True [] ds'
 
 {-# NOINLINE analyzeProgram #-}
 analyzeProgram prog = do
