@@ -5,13 +5,13 @@ import Control.Exception
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Monoid
+import IO(hFlush,stderr,stdout,openFile,hClose,IOMode(..))
 import List hiding(group,union)
 import Maybe
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified System
-import IO(hFlush,stderr,stdout,openFile,hClose,IOMode(..))
 
 import C.FromGrin
 import CharIO
@@ -22,39 +22,37 @@ import Doc.PPrint
 import Doc.Pretty
 import E.Annotate(annotate,annotateDs,annotateProgram)
 import E.Diff
-import E.Demand as Demand(analyzeProgram,solveDs)
 import E.E
 import E.Eta
-import E.Inline
 import E.FromHs
+import E.Inline
 import E.LambdaLift
-import E.Program
 import E.LetFloat
+import E.Program
+import E.Rules
 import E.Show hiding(render)
 import E.Subst(subst)
-import E.Rules
 import E.Traverse
 import E.TypeAnalysis
 import E.TypeCheck
 import E.WorkerWrapper
 import FrontEnd.FrontEnd
-import qualified FrontEnd.Tc.Type as Type
 import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadCode
 import Grin.EvalInline(createEvalApply)
 import Grin.FromE
 import Grin.Grin
+import Grin.Optimize
 import Grin.Show
 import Grin.Unboxing
-import Grin.Optimize
-import qualified Grin.MangleE as Mangle(mangle)
 import Grin.Whiz
 import Ho.Build
 import Ho.Library
 import Ho.LibraryMap
 import HsSyn
 import Info.Types
+import Name.Id
 import Name.Name
 import Options
 import SelfTest(selfTest)
@@ -62,15 +60,17 @@ import Support.CanType(getType)
 import Support.FreeVars
 import Support.ShowTable
 import Util.Graph
-import Name.Id
 import Util.NameMonad
 import Util.SetLike as S
 import Version(versionString,versionContext)
 import qualified E.CPR
+import qualified E.Demand as Demand(analyzeProgram,solveDs)
 import qualified E.SSimplify as SS
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
+import qualified FrontEnd.Tc.Type as Type
 import qualified Grin.Interpret
+import qualified Grin.MangleE as Mangle(mangle)
 import qualified Grin.PointsToAnalysis
 import qualified Grin.Simplify
 import qualified Info.Info as Info
