@@ -681,22 +681,22 @@ simplifyDs prog sopts dsIn = ans where
                 Just IsBoundTo { inlineForced = ForceNoinline } -> appVar v xs'
                 Just IsBoundTo { bindingOccurance = Once } -> error "IsBoundTo: Once"
                 Just IsBoundTo { bindingE = e, bindingAtomic = True }  -> do
-                    mtick  (toAtom $ "E.Simplify.inline.atomic.{" ++ tvrShowName v  ++ "}")
+                    mtick  (toAtom $ "E.Simplify.inline.atomic/{" ++ tvrShowName v  ++ "}")
                     didInline inb e xs'
                 Just IsBoundTo { bindingE = e, inlineForced = ForceInline } | someBenefit v e xs' -> do
-                    mtick  (toAtom $ "E.Simplify.inline.Forced.{" ++ tvrShowName v  ++ "}")
+                    mtick  (toAtom $ "E.Simplify.inline.Forced/{" ++ tvrShowName v  ++ "}")
                     didInline inb e xs'
                 Just IsBoundTo { bindingE = e } | forceInline v, someBenefit v e xs' -> do
-                    mtick  (toAtom $ "E.Simplify.inline.forced.{" ++ tvrShowName v  ++ "}")
+                    mtick  (toAtom $ "E.Simplify.inline.forced/{" ++ tvrShowName v  ++ "}")
                     didInline inb e xs'
                 Just IsBoundTo { bindingOccurance = OnceInLam, bindingE = e, bindingCheap = True } | someBenefit v e xs' -> do
-                    mtick  (toAtom $ "E.Simplify.inline.OnceInLam.{" ++ showName (tvrIdent v)  ++ "}")
+                    mtick  (toAtom $ "E.Simplify.inline.OnceInLam/{" ++ showName (tvrIdent v)  ++ "}")
                     didInline inb e xs'
                 Just IsBoundTo { bindingOccurance = ManyBranch, bindingE = e } | multiInline v e xs' -> do
-                    mtick  (toAtom $ "E.Simplify.inline.ManyBranch.{" ++ showName (tvrIdent v)  ++ "}")
+                    mtick  (toAtom $ "E.Simplify.inline.ManyBranch/{" ++ showName (tvrIdent v)  ++ "}")
                     didInline inb  e xs'
                 Just IsBoundTo { bindingOccurance = Many, bindingE = e, bindingCheap = True } | multiInline v e xs' -> do
-                    mtick  (toAtom $ "E.Simplify.inline.Many.{" ++ showName (tvrIdent v)  ++ "}")
+                    mtick  (toAtom $ "E.Simplify.inline.Many/{" ++ showName (tvrIdent v)  ++ "}")
                     didInline inb  e xs'
                 Just _ -> appVar v xs'
                 Nothing  -> appVar v xs'
@@ -753,7 +753,7 @@ simplifyDs prog sopts dsIn = ans where
                     -- Nothing -> error $ "No Occurance info for " ++ show t
             w :: [(Id,Occurance,OutTVr,InE)] -> Env -> [(OutTVr,OutE)] -> SM m ([(OutTVr,OutE)],Env)
             w ((t,Once,t',e):rs) inb ds = do
-                mtick $ "E.Simplify.inline.Once.{" ++ showName t ++ "}"
+                mtick $ "E.Simplify.inline.Once/{" ++ showName t ++ "}"
                 w rs inb ds -- (minsert t (Susp e sub) sub) inb ds
             w ((t,n,t',e):rs) inb ds = do
 
