@@ -43,7 +43,7 @@ import qualified FlagOpts as FO
 import qualified FlagDump as FD
 import qualified Info.Info as Info
 import qualified Util.Seq as Seq
-import Stats hiding(new,print,Stats)
+import Stats hiding(new,print,Stats,singleton)
 import Support.CanType
 import Support.FreeVars
 import Util.Graph

@@ -85,6 +85,7 @@ progress str = wdump FD.Progress $  (putErrLn str) >> hFlush stderr
 progressM c  = wdump FD.Progress $ (c >>= putErrLn) >> hFlush stderr
 
 
+collectPassStats = True
 
 bracketHtml action = do
     pn <- System.getProgName
@@ -151,14 +152,17 @@ fileOrModule f = case reverse f of
 
 barendregt e = runIdentity  (renameTraverse' e)
 
-barendregtProgram prog | null $ progCombinators prog = prog
-barendregtProgram prog = programSetDs ds' prog where
-    Identity (ELetRec ds' Unknown) = renameTraverse' (ELetRec (programDs prog) Unknown)
-
-
 barendregtProg prog = transformProgram transBarendregt prog
 
-transBarendregt = transformParms { transformCategory = "Barendregt", transformIterate = DontIterate, transformDumpProgress = corePass, transformOperation =  return . barendregtProgram }
+transBarendregt = transformParms {
+        transformCategory = "Barendregt",
+        transformIterate = DontIterate,
+        transformDumpProgress = corePass,
+        transformOperation =  return . barendregtProgram
+        } where
+    barendregtProgram prog | null $ progCombinators prog = prog
+    barendregtProgram prog = programSetDs ds' prog where
+        Identity (ELetRec ds' Unknown) = renameTraverse' (ELetRec (programDs prog) Unknown)
 
 
 lamann _ nfo = return nfo
@@ -252,7 +256,7 @@ processDecls stats ho ho' tiData = do
 
     -- initial pass over functions to put them into a normalized form
     let procE (ds,usedIds) (n,v,lc) = do
-        lc <- atomizeAp False fullDataTable stats (progModule prog) lc -- doopt mangle False stats "FixupLets..." (\stats x -> atomizeAp False fullDataTable stats (progModule prog) x >>= coalesceLets stats)  lc
+        lc <- atomizeAp False fullDataTable stats (progModule prog) lc
         lc <- coalesceLets stats lc
         nfo <- idann  allRules (hoProps ho') (tvrIdent v) (tvrInfo v)
         v <- return $ v { tvrInfo = Info.insert LetBound nfo }
@@ -264,10 +268,10 @@ processDecls stats ho ho' tiData = do
     Stats.clear stats
 
     prog <- return $ programSetDs [ (t,e) | (_,t,e) <- ds] prog
-    let entries = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t) (tell [t])) prog
-    prog <- return $ prog { progEntryPoints = entries }
-    prog <- programPrune prog
+    let entryPoints = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t) (tell [t])) prog
+    prog <- return $ prog { progEntryPoints = entryPoints }
 
+    -- Create Specializations
     let specMap = Map.fromListWith (++) [ (n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- tiCheckedRules tiData]
     nds <- mapM (procSpecs specMap) (programDs prog)
     prog <- return $ programSetDs (concat (fsts nds)) prog
@@ -276,6 +280,7 @@ processDecls stats ho ho' tiData = do
     rules <- return $ specRules `mappend` rules
     allRules <- return $ allRules `mappend` rules
 
+    prog <- programPrune prog
     let initMap = fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
 
     -- initial pass, performs
@@ -291,6 +296,15 @@ processDecls stats ho ho' tiData = do
             SS.so_boundVars = fromList [ (tvrIdent v,(v,e)) | (v,e) <- Map.elems (hoEs ho)],
             SS.so_dataTable = fullDataTable
             }
+
+    -- quick float inward pass to inline once used functions and prune unused ones
+    prog <- transformProgram transformParms {
+        transformPass = "PreInit",
+        transformDumpProgress = True,
+        transformCategory = "FloatInward",
+        transformOperation = programFloatInward
+        } prog
+    printProgram prog
 
     let fint (rec,ns) = do
         let names = [ n | (n,_) <- ns]
@@ -492,12 +506,17 @@ programPruneUnreachable prog = programSetDs ds' prog where
     ds' = reachable (newGraph (programDs prog) (tvrIdent . fst) (\ (t,e) -> idSetToList $ bindingFreeVars t e)) (map tvrIdent $ progEntryPoints prog)
 
 programPrune :: Program -> IO Program
-programPrune prog = transformProgram transformParms { transformCategory = "Prune Unreachable", transformDumpProgress  = miniCorePass, transformOperation = return . programPruneUnreachable } prog
+programPrune prog = transformProgram transformParms { transformCategory = "PruneUnreachable", transformDumpProgress  = miniCorePass, transformOperation = return . programPruneUnreachable } prog
 
 etaExpandProg :: Program -> IO Program
 etaExpandProg prog = do
     let (prog',stats) = Stats.runStatM $  etaExpandProgram prog
     transformProgram transformParms { transformCategory = "EtaExpansion", transformDumpProgress = miniCorePass,  transformOperation = const $ return prog' { progStats = progStats prog' `mappend` stats } } prog
+
+etaExpandProg' :: Program -> IO Program
+etaExpandProg' prog = do
+    let (prog',stats) = Stats.runStatM $  etaExpandProgram prog
+    transformProgram transformParms { transformCategory = "EtaExpansion", transformDumpProgress = True, transformPass = "PreInit",  transformOperation = const $ return prog' { progStats = progStats prog' `mappend` stats } } prog
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
 shouldBeExported exports tvr
@@ -637,6 +656,11 @@ compileModEnv' stats (initialHo,finalHo) = do
 
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     wdump FD.Progress $ printEStats (programE prog)
+
+    when collectPassStats $ do
+        Stats.print "PassStats" Stats.theStats
+        Stats.clear Stats.theStats
+
     compileToGrin prog
 
 
@@ -775,7 +799,7 @@ simplifyProgram sopt name dodump prog = do
                 printProgram nprog
             return $ SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } nprog
     prog <- transformProgram transformParms { transformCategory = "Simplify", transformPass = name, transformIterate = IterateDone, transformDumpProgress = dodump, transformOperation = g } prog { progStats = mempty }
-    when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printStat ("Total: " ++ name) (progStats prog)
+    when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printLStat (optStatLevel options) ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
 {-
@@ -790,7 +814,7 @@ simplifyProgram' sopt name dodump iterate prog = do
     let istat = progStats prog
     let g =  return . SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
     prog <- transformProgram transformParms { transformCategory = "Simplify", transformPass = name, transformIterate = iterate, transformDumpProgress = dodump, transformOperation = g } prog { progStats = mempty }
-    when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printStat ("Total: " ++ name) (progStats prog)
+    when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printLStat (optStatLevel options) ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
 -- all transformation routines assume they are being passed a correct program, and only check the output
@@ -832,6 +856,7 @@ transformProgram TransformParms { transformIterate = IterateExactly n } prog | n
 transformProgram tp prog = do
     let dodump = transformDumpProgress tp
         name = transformCategory tp ++ pname (transformPass tp) ++ pname (transformName tp)
+        scname = transformCategory tp ++ pname (transformPass tp)
         pname "" = ""
         pname xs = '-':xs
         iterate = transformIterate tp
@@ -853,14 +878,17 @@ transformProgram tp prog = do
             printProgram prog
             Stats.printStat name estat
             putErrLn $ "\n>>> After " ++ name
-    when (dodump && dump FD.CoreSteps) $ Stats.printStat name estat
+    when (dodump && dump FD.CoreSteps) $ Stats.printLStat (optStatLevel options) name estat
+    when collectPassStats $ do
+        Stats.tick Stats.theStats scname
+        Stats.tickStat Stats.theStats (Stats.prependStat scname estat)
     lintCheckProgram onerr prog'
     if doIterate iterate estat then transformProgram tp { transformIterate = iterateStep iterate } prog' { progStats = istat `mappend` estat } else
         return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
 
 
 
--- these are way to complicated and should be simplified
+-- these are way too complicated and should be simplified
 
 doopt mangle dmp stats name func lc = do
     stats' <- Stats.new
@@ -1010,6 +1038,8 @@ printCheckName'' dataTable tvr e = do
     when (not tmatch || dump FD.EVerbose) $
         putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
     putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
+
+
 
 
 

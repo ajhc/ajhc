@@ -30,7 +30,7 @@ import GenUtil hiding(replicateM_)
 import Info.Types
 import Name.Id
 import qualified Info.Info as Info
-import Stats
+import qualified Stats
 import Support.CanType
 import Support.FreeVars
 import Util.NameMonad
@@ -105,7 +105,7 @@ fromPi' dataTable e = f [] (followAliases dataTable e) where
 
 
 -- this annotates, but only expands top-level definitions
-etaExpandProgram :: MonadStats m => Program -> m Program
+etaExpandProgram :: Stats.MonadStats m => Program -> m Program
 etaExpandProgram prog = runNameMT (programMapDs f (etaAnnotateProgram prog)) where
     f (t,e) = etaExpandDef' (progDataTable prog) t e
 
@@ -150,7 +150,7 @@ etaExpandDef' dataTable t e = etaExpandDef dataTable t e >>= \x -> case x of
 collectIds :: E -> IdSet
 collectIds e = execWriter $ annotate mempty (\id nfo -> tell (singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 -- | eta expand a definition
-etaExpandDef :: (NameMonad Id m,MonadStats m) => DataTable -> TVr -> E -> m (Maybe (TVr,E))
+etaExpandDef :: (NameMonad Id m,Stats.MonadStats m) => DataTable -> TVr -> E -> m (Maybe (TVr,E))
 etaExpandDef _ _ e | isAtomic e = return Nothing -- will be inlined
 etaExpandDef dataTable t e  = ans where
     fvs = foldr insert (freeVars (b,map getType rs,(tvrType t,e))) (map tvrIdent rs) `mappend` collectIds e
@@ -170,8 +170,8 @@ etaExpandDef dataTable t e  = ans where
         return (ELam tvr ne,flag)
     f (AFun _ a) e (EPi tt rt) _nns = do
         if tvrIdent t == 0
-         then mtick ("EtaExpand." ++ zeroName)
-          else mtick ("EtaExpand.def.{" ++ tvrShowName t)
+         then Stats.mtick ("EtaExpand." ++ zeroName)
+          else Stats.mtick ("EtaExpand.def.{" ++ tvrShowName t)
         n <- newName
         let nv = tt { tvrIdent = n }
             eb = EAp e (EVar nv)
@@ -183,7 +183,7 @@ etaExpandDef dataTable t e  = ans where
 
 
 -- | eta expand a use of a value
-etaExpandAp :: (NameMonad Id m,MonadStats m) => DataTable -> TVr -> [E] -> m (Maybe E)
+etaExpandAp :: (NameMonad Id m,Stats.MonadStats m) => DataTable -> TVr -> [E] -> m (Maybe E)
 etaExpandAp dataTable tvr xs = do
     r <- etaExpandDef dataTable tvr { tvrIdent = 0} (foldl EAp (EVar tvr) xs)
     return (fmap snd r)

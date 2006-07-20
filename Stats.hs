@@ -14,6 +14,8 @@ module Stats(
     printStat,
     printLStat,
     Stat,
+    singleton,
+    singletons,
     prependStat,
     -- monad
     MonadStats(..),
@@ -159,6 +161,9 @@ printLStat n greets (Stat s) = do
     mapM_ CharIO.putErrLn $ ( draw . fmap p ) (Node (greets,0) fs)  where
         p (x,0) = x
         p (x,n) = x ++ ": " ++ show n
+
+singletons n atom = Stat (Map.singleton (toAtom atom) n)
+singleton atom = singletons 1 atom
 
 instance Monoid Stat where
     mempty = Stat Map.empty
