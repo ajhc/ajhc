@@ -325,7 +325,7 @@ processDecls stats ho ho' tiData = do
         -- TODO - static argument transformation at same time?
 
         let sRec mprog = case (rec,ns) of
-                (True,[(t,v@ELam {})]) -> do
+                (True,[(t,v@ELam {})]) | tvrIdent t `member` (freeVars v :: IdSet) -> do
                     let nname = annotateId "R@" (tvrIdent t)
                         tvr' = tvr { tvrIdent = nname, tvrType = tvrType t }
                         (_,as) = fromLam v
@@ -370,18 +370,20 @@ processDecls stats ho ho' tiData = do
     wdump FD.Progress $
         Stats.print "Initial Pass Stats" initialPassStats
     lintCheckProgram onerrNone prog
-    prog <- barendregtProg prog
-    prog <- simplifyProgram' sopt "Big-One" True (IterateMax 4) prog
-    prog <- barendregtProg prog
-    --prog <- transformProgram "Big Float Inward" DontIterate True programFloatInward prog
-    --progress "Big Type Anasysis"
-    --prog <- transformProgram "typeAnalyze" DontIterate True (typeAnalyze True) prog
-    prog <- barendregtProg prog
-    -- we have to redo strictness after type analysis, as it might have changed the number of arguments to functions
-    --prog <- simplifyProgram sopt "SuperSimplify" True prog
 
-    progress "Big Eta Expansion"
-    prog <- etaExpandProg prog
+    prog <- barendregtProg prog
+    prog <- etaExpandProg "Init-Big-One" prog
+    prog <- transformProgram tparms {
+        transformPass = "Init-Big-One",
+        transformCategory = "FloatInward",
+        transformOperation = programFloatInward
+        } prog
+
+    prog <- Demand.analyzeProgram prog
+    prog <- simplifyProgram' sopt "Init-Big-One" True (IterateMax 4) prog
+
+    prog <- barendregtProg prog
+
 
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
@@ -509,11 +511,11 @@ programPruneUnreachable prog = programSetDs ds' prog where
 programPrune :: Program -> IO Program
 programPrune prog = transformProgram transformParms { transformCategory = "PruneUnreachable", transformDumpProgress  = miniCorePass, transformOperation = return . programPruneUnreachable } prog
 
-etaExpandProg :: Program -> IO Program
-etaExpandProg prog = do
+etaExpandProg :: String -> Program -> IO Program
+etaExpandProg pass prog = do
     let f prog = prog' { progStats = progStats prog `mappend` stats } where
         (prog',stats) = Stats.runStatM $  etaExpandProgram prog
-    transformProgram transformParms { transformCategory = "EtaExpansion", transformDumpProgress = miniCorePass,  transformOperation = return . f } prog
+    transformProgram transformParms { transformPass = pass, transformCategory = "EtaExpansion", transformDumpProgress = miniCorePass,  transformOperation = return . f } prog
 
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
@@ -532,7 +534,7 @@ isInteractive = do
           || "ichj" `isPrefixOf` reverse pn
           || not (null $ optStmts options)
 
-transTypeAnalyze = transformParms { transformCategory = "TypeAnalyze",  transformOperation = typeAnalyze True }
+transTypeAnalyze = transformParms { transformCategory = "typeAnalyze",  transformOperation = typeAnalyze True }
 
 compileModEnv' stats (initialHo,finalHo) = do
     let ho = initialHo `mappend` finalHo
@@ -607,22 +609,22 @@ compileModEnv' stats (initialHo,finalHo) = do
     st <- Stats.new
 
 
-    prog <- transformProgram transTypeAnalyze { transformPass = "AfterMethod", transformDumpProgress = True } prog
+    prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterMethod", transformDumpProgress = True } prog
     prog <- barendregtProg prog
 
 
-    prog <- simplifyProgram mempty "SuperSimplify pass 1" True prog
+    prog <- simplifyProgram mempty "Main-One" True prog
     prog <- barendregtProg prog
 
 
     st <- Stats.new
-    prog <- etaExpandProg prog
+    prog <- etaExpandProg "Main-AfterOne" prog
     prog <- barendregtProg prog
-    prog <- transformProgram transTypeAnalyze { transformPass = "AfterSimplify", transformDumpProgress = True } prog
+    prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterSimp", transformDumpProgress = True } prog
 
 
     prog <- barendregtProg prog
-    prog <- simplifyProgram mempty "SuperSimplify pass 2" True prog
+    prog <- simplifyProgram mempty "Main-Two" True prog
     prog <- barendregtProg prog
 
 
@@ -881,7 +883,7 @@ transformProgram tp prog = do
             printProgram prog
             Stats.printStat name estat
             putErrLn $ "\n>>> After " ++ name
-    when (dodump && dump FD.CoreSteps) $ Stats.printLStat (optStatLevel options) name estat
+    when (dodump && dump FD.CoreSteps && estat /= mempty) $ Stats.printLStat (optStatLevel options) name estat
     when collectPassStats $ do
         Stats.tick Stats.theStats scname
         Stats.tickStat Stats.theStats (Stats.prependStat scname estat)
