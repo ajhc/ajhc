@@ -2,9 +2,11 @@ module Info.Info(
     T,
     Info(..),
     Entry(..),
+    HasInfo(..),
     Info.Info.lookup,
     insertWith,
     insert,
+    limit,
     maybeInsert,
     singleton,
     member,
@@ -20,7 +22,7 @@ import Data.Dynamic
 import Data.Generics
 import Data.Monoid
 import Monad
-import qualified Data.Map as Map
+import qualified Data.List as List
 
 import Atom
 import GenUtil
@@ -33,7 +35,7 @@ type T = Info
 data Entry = Entry {
     entryThing   :: Dynamic,
     entryString  :: String,
-    entryType    :: Atom
+    entryType    :: TypeRep
     }
 
 instance Eq Entry where
@@ -43,13 +45,13 @@ instance Show Entry where
     showsPrec _ x = showString (entryString x)
 
 instance Ord Entry where
-    compare a b = compare (entryType a) (entryType b)
+    compare a b = compare (show $ entryType a) (show $ entryType b)
 
-newtype Info = Info (Map.Map Atom Entry)
+newtype Info = Info [Entry]
     deriving(HasSize,Typeable)
 
 instance Show Info where
-    show (Info ds) = show (sortUnder (show . entryType) (Map.elems ds))
+    show (Info ds) = show (sortUnder (show . entryType) ds)
 
 instance Data Info where
     toConstr = undefined
@@ -57,35 +59,49 @@ instance Data Info where
 
 instance Monoid Info where
     mempty = empty
-    mappend (Info as) (Info bs) = Info (Map.union as bs)
+    mappend (Info as) (Info bs) = Info (List.union as bs)
+
+class HasInfo a where
+    getInfo :: a -> Info
+    modifyInfo :: (Info -> Info) -> a -> a
+
+instance HasInfo Info where
+    getInfo = id
+    modifyInfo f x = f x
 
 
 lookup :: forall a m .  (Monad m,Typeable a) => Info -> m a
 lookup (Info mp) = do
-    let typ = createTyp (undefined :: a)
-    case Map.lookup typ mp of
-        Just Entry { entryThing = x } -> case fromDynamic x of
+    let typ = typeOf (undefined :: a)
+        f [] = fail $ "Info: could not find " ++ show typ
+        f (x:xs) | entryType x == typ = case fromDynamic (entryThing x) of
             Just x -> return x
             Nothing -> error "Info.lookup: this can't happen"
-        Nothing -> fail $ "Info: could not find " ++ show typ
+        f (_:xs) = f xs
+    f mp
 
 
 createTyp :: Typeable a => a -> Atom
 createTyp (_::a) = toAtom (show (typeOf (undefined :: a)))
 
 insertWith :: (Show a,Typeable a) => (a -> a -> a) -> a -> Info -> Info
-insertWith f x (Info mp) = Info (Map.insert typ (newEntry typ nx) mp) where
-    typ = createTyp x
-    nx = case Map.lookup typ mp of
-        Nothing -> x
-        Just Entry { entryThing = d } -> f x (fromDyn d (error "can't happen"))
+insertWith f newx (Info mp) = Info (g mp) where
+    g [] = [newEntry newx]
+    g (x:xs) | entryType x == typ = newEntry (f newx (fromDyn (entryThing x) (error "can't happen"))):xs
+             | otherwise = x:g xs
+    typ = typeOf newx
 
 
-newEntry typ x = Entry { entryThing = toDyn x, entryString = show x, entryType = typ }
+newEntry :: (Typeable a,Show a) => a -> Entry
+newEntry x = Entry { entryThing = toDyn x, entryString = show x, entryType = typeOf x }
 
 
 insert :: (Show a,Typeable a) => a -> Info -> Info
-insert x info = insertWith const x info
+insert newx (Info nfo) = Info $ newEntry newx:f nfo where
+    f [] = []
+    f (x:xs) | entryType x == typ = xs
+             | otherwise = x:f xs
+    typ = typeOf newx
 
 maybeInsert :: (Show a, Typeable a) => Maybe a -> Info -> Info
 maybeInsert Nothing = id
@@ -107,43 +123,33 @@ infoMap f i = case Info.Info.lookup i of
     Nothing -> i
 
 delete :: (Typeable a) => a -> Info -> Info
-delete x = let typ = createTyp x in  \ (Info mp) -> Info (Map.delete typ mp)
+delete x info = deleteTyp (typeOf x) info
+
+deleteTyp :: TypeRep -> Info -> Info
+deleteTyp typ (Info mp) = Info (f mp) where
+    f [] = []
+    f (x:xs) | entryType x == typ = xs
+             | otherwise = x:f xs
+
+limit :: [TypeRep] -> Info -> Info
+limit trs (Info mp) = Info (f mp) where
+    f (x:xs) | entryType x `elem` trs = x:f xs
+             | otherwise = f xs
+    f [] = []
 
 fetch :: (Monoid a, Typeable a) => Info -> a
 fetch info = maybe mempty id  (Info.Info.lookup info)
 
 member :: (Typeable a) => a -> Info -> Bool
-member x (Info s) = Map.member (createTyp x) s
+member x (Info s) = f s where
+    typ = typeOf x
+    f [] = False
+    f (x:xs) | entryType x == typ = True
+             | otherwise = f xs
 
 extend :: (Show a,Monoid a, Typeable a) => a -> Info -> Info
 extend x info = insertWith mappend x info
 
 empty :: Info
-empty = Info Map.empty
+empty = Info []
 
-{-
-
-newtype Info = Info (Map.Map TypeRep Dynamic)
-    deriving(Monoid,HasSize)
-
-
-lookup :: (Monad m,Typeable a) => Info -> m a
-lookup (Info fm) :: m a = case Map.lookup tr fm of
-        Just x -> return (fromDyn x undefined :: a)
-        Nothing -> fail $ "Info: could not find " ++ show tr
-    where tr = typeOf (undefined :: a)
-
-
-fetch :: (Monoid a, Typeable a) => Info -> a
-fetch info = maybe mempty id  (Info.lookup info)
-
-insert :: (Typeable a) => a -> Info -> Info
-insert x (Info fm) = Info (Map.insert (typeOf x) (toDyn x) fm)
-
-insertWith :: (Typeable a) => (a -> a -> a) -> a -> Info -> Info
-insertWith f x (Info fm) = Info (Map.adjust (\y -> toDyn $ f x (fromDyn y undefined)) (typeOf x)  fm)
-
-extend :: (Monoid a, Typeable a) => a -> Info -> Info
-extend x info = insertWith mappend x info
-
--}

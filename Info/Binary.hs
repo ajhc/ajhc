@@ -1,4 +1,4 @@
-module Info.Binary(putInfo, getInfo) where
+module Info.Binary(putInfo, Info.Binary.getInfo) where
 
 import Data.Dynamic
 import qualified Data.Map as Map
@@ -21,7 +21,7 @@ u = u
 
 createTyp :: Typeable a => a -> Atom
 createTyp x = toAtom (show (typeOf x))
-newEntry typ x = Entry { entryThing = toDyn x, entryString = show x, entryType = typ }
+newEntry x = Entry { entryThing = toDyn x, entryString = show x, entryType = typeOf x }
 
 cb x = (createTyp x, Binable x)
 
@@ -48,27 +48,27 @@ getDyn h = do
     case Map.lookup ps binTable of
         Just (Binable (_ :: a)) -> do
             x <- get h :: IO a
-            return $ newEntry ps x
+            return $ newEntry x
         Nothing -> fail $ "getDyn: don't know how to read something of type: " ++ show ps
 
 instance Binary Info where
     put_ h nfo = putInfo h nfo
-    get h = getInfo h
+    get h = Info.Binary.getInfo h
 
 
 putInfo h (Info ds) = do
     let ds' = concatMap (\d -> do
-            let ps = entryType d
+            let ps = toAtom (show $ entryType d)
             x <- Map.lookup ps binTable
             return (ps,entryThing d,x)
-          )  (Map.elems ds)
+          ) ds
     put_ h (length ds')
     mapM_ (putDyn h) ds'
 
 getInfo h = do
     (n::Int) <- get h
     xs <- replicateM n (getDyn h)
-    return (Info $ Map.fromList [ (entryType x, x) | x <- xs])
+    return (Info  [ x | x <- xs])
 
 
 
