@@ -150,23 +150,36 @@ canFloatPast t | getType t == tWorldzh = True
 canFloatPast t | getType t == ELit (LitCons tc_IOErrorCont [] (ESort EStar)) = True
 canFloatPast _ = False
 
+{-# NOINLINE programFloatInward #-}
 programFloatInward :: Program -> IO Program
 programFloatInward prog = do
-    let binds = G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- ds, x `notElem` progEntryPoints prog ] (tvrIdent . fst . fst) (idSetToList . snd)
+    let binds = G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- programDs prog, x `notElem` progEntryPoints prog ] (tvrIdent . fst . fst) (idSetToList . snd)
         binds :: Binds
-        epoints = [ d | d@(x,_) <- ds, x `elem` progEntryPoints prog ]
-        ds,epoints :: [(TVr,E)]
-        ds = programDs prog
-        (oall,pints) = sepByDropPoint (map (\ (x,y) -> bindingFreeVars x y) epoints) binds
+        epoints :: [(TVr,E)]
+        epoints = [ d | d@(x,_) <- programDs prog, x `elem` progEntryPoints prog ]
+        (oall,pints) = sepByDropPoint dpoints  (reverse binds)
+        dpoints = (map (\ (x,y) -> bindingFreeVars x y) epoints)
         nprog = programSetDs ([ (k,fi k v y)| ((k,v),y) <- zip epoints pints] ++ [ (x,floatInwardE y []) | (x,y) <- dsBinds oall]) prog
         fi k = if getProperty prop_ONESHOT k then floatInwardE' else floatInwardE
-    --Prelude.putStrLn "programFloatInward:"
     --mapM_ (putStrLn . pprint) (map fst $ dsBinds (concat pints))
-    --Prelude.putStrLn "programFloatedInward"
-    nprog <- programMapBodies (return . floatInward) prog
-    return nprog
+    --Prelude.print (cupbinds binds)
+    --Prelude.print dpoints
+    --Prelude.putStrLn (pprint $ map fst (dsBinds binds))
+    --Prelude.putStrLn (pprint $ (map fst $ dsBinds oall,map (\binds -> map fst $ dsBinds binds) pints))
+    let mstats = mconcat [ Stats.singleton $ "FloatInward.{" ++ pprint n ++ "}" | n <- map fst $ dsBinds (concat pints)]
+        mstats' = mconcat [ Stats.singleton $ "FloatInward.all.{" ++ pprint n ++ "}" | n <- map fst $ dsBinds oall]
+        nstats = progStats prog `mappend` mstats `mappend` mstats'
+    --nprog <- programMapBodies (return . floatInward) nprog
+    return nprog { progStats = nstats }
 
+instance Show IdSet where
+    showsPrec n is = showsPrec n $ map f (idSetToList is) where
+        f n =  maybe (toAtom ('x':show n)) (toAtom . show . (fromAtom :: Atom -> Name)) (intToAtom n)
 
+cupbinds bs = f bs where
+    f (Left ((t,_),fv):rs) = (tvrShowName t,fv):f rs
+    f (Right ds:rs) = f $ map Left ds ++ rs
+    f [] = []
 
 floatInward ::
     E  -- ^ input term
