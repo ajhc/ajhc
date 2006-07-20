@@ -153,10 +153,10 @@ canFloatPast _ = False
 {-# NOINLINE programFloatInward #-}
 programFloatInward :: Program -> IO Program
 programFloatInward prog = do
-    let binds = G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- programDs prog, x `notElem` progEntryPoints prog ] (tvrIdent . fst . fst) (idSetToList . snd)
+    let binds = G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- programDs prog, x `notElem` fsts epoints ] (tvrIdent . fst . fst) (idSetToList . snd)
         binds :: Binds
         epoints :: [(TVr,E)]
-        epoints = [ d | d@(x,_) <- programDs prog, x `elem` progEntryPoints prog ]
+        epoints = [ d | d@(x,_) <- programDs prog, (x `elem` progEntryPoints prog) || forceNoinline x || getProperty prop_INSTANCE x || getProperty prop_SPECIALIZATION x ]
         (oall,pints) = sepByDropPoint dpoints  (reverse binds)
         dpoints = (map (\ (x,y) -> bindingFreeVars x y) epoints)
         nprog = programSetDs ([ (k,fi k v y)| ((k,v),y) <- zip epoints pints] ++ [ (x,floatInwardE y []) | (x,y) <- dsBinds oall]) prog
