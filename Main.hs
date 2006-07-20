@@ -296,15 +296,17 @@ processDecls stats ho ho' tiData = do
             SS.so_boundVars = fromList [ (tvrIdent v,(v,e)) | (v,e) <- Map.elems (hoEs ho)],
             SS.so_dataTable = fullDataTable
             }
+    let tparms = transformParms {
+            transformPass = "PreInit",
+            transformDumpProgress = True
+            }
 
     -- quick float inward pass to inline once used functions and prune unused ones
-    prog <- transformProgram transformParms {
-        transformPass = "PreInit",
-        transformDumpProgress = True,
+    prog <- transformProgram tparms {
         transformCategory = "FloatInward",
         transformOperation = programFloatInward
         } prog
-    printProgram prog
+    prog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } prog
 
     let fint (rec,ns) = do
         let names = [ n | (n,_) <- ns]
@@ -331,12 +333,12 @@ processDecls stats ho ho' tiData = do
                     putStrLn $ "\nSimple Recursive: " ++ pprint t
                     return $ programSetDs [(t,ne')] mprog
                 _ -> return mprog
-        mprog <- transformProgram tparms { transformCategory = "Simple Recursive", transformOperation = sRec } mprog
+        mprog <- transformProgram tparms { transformCategory = "SimpleRecursive", transformOperation = sRec } mprog
 
         mprog <- return $ etaAnnotateProgram mprog
         mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } mprog
 
-        mprog <- simplifyProgram sopt "SuperSimplify" (dump FD.CoreMini) mprog
+        mprog <- simplifyProgram sopt "Init-One" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
 
         mprog <- transformProgram tparms { transformCategory = "FloatOutward", transformOperation = floatOutward } mprog
@@ -344,12 +346,12 @@ processDecls stats ho ho' tiData = do
         -- variables back in and replace the variable of case of variables with
         -- the default binding of the case statement.
 
-        mprog <- simplifyProgram sopt "Simplify FloatOutCleanup" (dump FD.CoreMini) mprog
+        mprog <- simplifyProgram sopt "Init-Two-FloatOutCleanup" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
         mprog <- transformProgram tparms { transformCategory = "FloatInward", transformOperation = programFloatInward } mprog
         mprog <- Demand.analyzeProgram mprog
         lintCheckProgram onerrNone mprog
-        mprog <- simplifyProgram sopt "Simplify After Strictness" False mprog
+        mprog <- simplifyProgram sopt "Init-Three-AfterDemand" False mprog
         mprog <- barendregtProg mprog
         Stats.tickStat mstats (progStats mprog)
         Stats.combine initialPassStats mstats
@@ -368,9 +370,8 @@ processDecls stats ho ho' tiData = do
     wdump FD.Progress $
         Stats.print "Initial Pass Stats" initialPassStats
     lintCheckProgram onerrNone prog
-    progress "Big Simplify"
     prog <- barendregtProg prog
-    prog <- simplifyProgram' sopt "SuperSimplify" True (IterateMax 4) prog
+    prog <- simplifyProgram' sopt "Big-One" True (IterateMax 4) prog
     prog <- barendregtProg prog
     --prog <- transformProgram "Big Float Inward" DontIterate True programFloatInward prog
     --progress "Big Type Anasysis"
@@ -510,13 +511,10 @@ programPrune prog = transformProgram transformParms { transformCategory = "Prune
 
 etaExpandProg :: Program -> IO Program
 etaExpandProg prog = do
-    let (prog',stats) = Stats.runStatM $  etaExpandProgram prog
-    transformProgram transformParms { transformCategory = "EtaExpansion", transformDumpProgress = miniCorePass,  transformOperation = const $ return prog' { progStats = progStats prog' `mappend` stats } } prog
+    let f prog = prog' { progStats = progStats prog `mappend` stats } where
+        (prog',stats) = Stats.runStatM $  etaExpandProgram prog
+    transformProgram transformParms { transformCategory = "EtaExpansion", transformDumpProgress = miniCorePass,  transformOperation = return . f } prog
 
-etaExpandProg' :: Program -> IO Program
-etaExpandProg' prog = do
-    let (prog',stats) = Stats.runStatM $  etaExpandProgram prog
-    transformProgram transformParms { transformCategory = "EtaExpansion", transformDumpProgress = True, transformPass = "PreInit",  transformOperation = const $ return prog' { progStats = progStats prog' `mappend` stats } } prog
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
 shouldBeExported exports tvr
@@ -556,6 +554,11 @@ compileModEnv' stats (initialHo,finalHo) = do
     -- enter interactive mode
     int <- isInteractive
     if int then Interactive.interact ho else do
+
+    when collectPassStats $ do
+        Stats.print "PassStats" Stats.theStats
+        Stats.clear Stats.theStats
+
     if optMode options == CompileHo then return () else do
 
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
