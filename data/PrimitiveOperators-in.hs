@@ -90,8 +90,8 @@ op_aaB op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
     tvrb = tVr 8 st
     tvrc = tVr 10 intt
     st = rawType ct
-    wtd = eStrictLet tvrc (oper_aaI op ct (EVar tvra) (EVar tvrb)) (caseof (EVar tvrc))
-    caseof x = eCase x [Alt zeroI vFalse]  vTrue
+    wtd = eStrictLet tvrc (oper_aaI op ct (EVar tvra) (EVar tvrb)) (ELit (LitCons dc_Boolzh [EVar tvrc] tBool))  -- (caseof (EVar tvrc))
+--    caseof x = eCase x [Alt zeroI vFalse]  vTrue
 
 build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaI "<" ct (EVar tvra) zero)  [Alt zeroI (rebox $ EVar tvra)] (fs)) where
     te = getType v
