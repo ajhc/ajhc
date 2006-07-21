@@ -178,12 +178,12 @@ traverse (tOpt :: TravOptions m) func subst smap e = runIdNameT' $ initNames >> 
             addNames $ map ( tvrIdent . fst ) ds
             z (basicDecompose  (pruneUnreachable tOpt) (trav_rules tOpt) e ds) e  where
         z [] e = f e
-        z (Left (tvr,x):rs) e | worthStricting x, Just (Demand.S _) <- Info.lookup (tvrInfo tvr)   = do
-            (n,tvrn) <- ntvr f' tvr
-            x' <- f x
-            nr <- localSubst [(n,EVar tvrn)]   (z rs e)
-            lift $ lift $  letToCaseRecord tOpt 1
-            return $ eStrictLet tvrn x' nr
+--        z (Left (tvr,x):rs) e | worthStricting x, Just (Demand.S _) <- Info.lookup (tvrInfo tvr)   = do
+--            (n,tvrn) <- ntvr f' tvr
+--            x' <- f x
+--            nr <- localSubst [(n,EVar tvrn)]   (z rs e)
+--            lift $ lift $  letToCaseRecord tOpt 1
+--            return $ eStrictLet tvrn x' nr
         z (Left (tvr,x):rs) e = do
             (n,tvrn) <- ntvr f' tvr
             x' <- f x

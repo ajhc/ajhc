@@ -571,6 +571,11 @@ simplifyDs prog sopts dsIn = ans where
         b' <- nname b inb
         d' <- f d (insertDoneSubst b (EVar b') (insertInScope (tvrIdent b') (fixInline finalPhase b' $ isBoundTo Many e) inb))
         return $ eLet b' e d'
+    doCase e@ELam {} _ b [] (Just d) inb  = do
+        mtick "E.Simplify.case-lambda"
+        b' <- nname b inb
+        d' <- f d (insertDoneSubst b (EVar b') (insertInScope (tvrIdent b') (fixInline finalPhase b' $ isBoundTo Many e) inb))
+        return $ eLet b' e d'
     -- atomic unboxed values may be substituted or discarded without replicating work or affecting program semantics.
     doCase e _ b [] (Just d) inb | isUnboxed (getType e), isAtomic e = do
         mtick "E.Simplify.case-atomic-unboxed"
