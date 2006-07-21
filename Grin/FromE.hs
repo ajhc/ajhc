@@ -196,12 +196,14 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
     return grin
     where
     scMap = Map.fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- map stripTheWorld $ progCombinators prog]
-    initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ [ (a,(b,c)) | (_,(a,b,c)) <-  Map.toList scMap] ++ [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
-    con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode))
-    con c = (n,(as,TyNode)) where
+    initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ [ (a,(b,c)) | (_,(a,b,c)) <-  Map.toList scMap] ++ concat [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
+    con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = return (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode))
+    con c | keepIt = return (n,(as,TyNode)) where
         n | sortStarLike (conType c) = convertName (conName c)
           | otherwise = convertName (conName c)
-        as = [ toType (TyPtr TyNode) (getType s) |  s <- conSlots c, shouldKeep s]
+        as = [ toType (TyPtr TyNode) s |  s <- conSlots c, shouldKeep s]
+        keepIt = isNothing (conVirtual c) || TypeConstructor == nameType (conName c)
+    con _ = fail "not needed"
 
 discardResult exp = case getType exp of
     TyTup [] -> exp
