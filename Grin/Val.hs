@@ -8,20 +8,20 @@ import Name.Names
 import Name.Name
 import Number
 
-nil      = convertName dc_EmptyList -- (toAtom "CPrelude.[]")
-cons     = convertName dc_Cons -- (toAtom "CPrelude.:")
-cChar    = convertName dc_Char -- toAtom "CPrelude.Char"
-cInt     = convertName dc_Int --toAtom "CPrelude.Int"
+nil      = convertName dc_EmptyList
+cons     = convertName dc_Cons
+cChar    = convertName dc_Char
+cInt     = convertName dc_Int
 tn_2Tup  = convertName $ nameTuple DataConstructor 2
-tn_True  = convertName dc_True  -- toAtom "CPrelude.True"
-tn_False = convertName dc_False -- toAtom "CPrelude.False"
-tn_unit  = convertName dc_Unit -- toAtom "CPrelude.()"
+--tn_True  = convertName dc_True  -- toAtom "CPrelude.True"
+--tn_False = convertName dc_False -- toAtom "CPrelude.False"
+tn_Boolzh = convertName dc_Boolzh
+tn_unit  = convertName dc_Unit
 
 instance ConNames Val where
-    vTrue = NodeC tn_True []
-    vFalse = NodeC tn_False []
-    vUnit =  NodeC tn_unit []
-    vOrdering x = NodeC (toAtom $ "CPrelude." ++ show x) []
+    vTrue  = NodeC tn_Boolzh [toUnVal (1 :: Int)]
+    vFalse = NodeC tn_Boolzh [toUnVal (0 :: Int)]
+    vUnit  = NodeC tn_unit []
 
 world__ = NodeC (toAtom "World#") []
 pworld__ = Const world__
@@ -44,8 +44,6 @@ instance ToVal Bool where
     toVal True = vTrue
     toVal False = vFalse
 
-instance ToVal Ordering where
-    toVal x = vOrdering x
 
 instance ToVal a => ToVal [a] where
     toVal [] = NodeC nil []

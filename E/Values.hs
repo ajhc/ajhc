@@ -30,7 +30,6 @@ instance Tuple E where
     tupleMany es = ELit $ LitCons (nameTuple DataConstructor (length es)) es (ltTuple ts) where
         ts = map getType es
 
-eIf e a b = ECase { eCaseScrutinee = e, eCaseType = getType a, eCaseBind = (tVr 0 tBool),  eCaseAlts =  [Alt vTrue a,Alt vFalse b], eCaseDefault = Nothing }
 
 eTuple :: [E] -> E
 eTuple = tuple

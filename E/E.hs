@@ -221,9 +221,9 @@ instance ConNames E where
     vFalse = ELit vFalse
     vUnit  = ELit vUnit
 
-instance ConNames (Lit x E) where
-    vTrue  = (LitCons vTrue [] tBool)
-    vFalse = (LitCons vFalse [] tBool)
+instance ConNames (Lit E E) where
+    vTrue  = (LitCons dc_Boolzh [ELit (LitInt 1 tIntzh)] tBool)
+    vFalse = (LitCons dc_Boolzh [ELit (LitInt 0 tIntzh)] tBool)
     vUnit  = (LitCons vUnit [] tUnit)
 
 

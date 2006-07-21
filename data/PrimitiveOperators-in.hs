@@ -93,8 +93,6 @@ op_aaB op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
     wtd = eStrictLet tvrc (oper_aaI op ct (EVar tvra) (EVar tvrb)) (caseof (EVar tvrc))
     caseof x = eCase x [Alt zeroI vFalse]  vTrue
 
---buildAbs v t = eIf (EPrim (primPrim "prim_op_aaB.<") [EVar v,(ELit (LitInt 0 t))] tBool) (EPrim (primPrim "prim_op_aa.-") [EVar v] t) (EVar v)
---build_abs ct cn v = unbox' v cn tvra (eCase (EPrim (APrim (Operator "<" [ct,ct] "int") mempty) [EVar tvra, zero] intt) [Alt zeroI (rebox $ EVar tvra)] (fs)) where
 build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaI "<" ct (EVar tvra) zero)  [Alt zeroI (rebox $ EVar tvra)] (fs)) where
     te = getType v
     tvra = tVr 2 st
@@ -105,7 +103,6 @@ build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaI "<" ct (EVar tvra) zero)  
     fs = eStrictLet tvrb (oper_aa "-" ct (EVar tvra)) (rebox (EVar tvrb))
     rebox x = ELit (LitCons cn [x] te)
 
-buildSignum v t = eCase (EVar v) [Alt (LitInt 0 t) (ELit (LitInt 0 t))] (eIf (EPrim (primPrim "prim_op_aaB.<") [EVar v,(ELit (LitInt 0 t))] tBool) (ELit (LitInt (-1) t)) (ELit (LitInt 1  t)))
 build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaI "<" ct (EVar tvra) (ELit zero)) [Alt zeroI (rebox one)] (rebox negativeOne))) where
     tvra = tVr 2 st
     te = getType v

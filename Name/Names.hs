@@ -29,8 +29,8 @@ instance TypeNames Name where
     tWorld__ = rt_Worldzh
 
 instance ConNames Name where
-    vTrue = dc_True
-    vFalse = dc_False
+--    vTrue = dc_True
+--    vFalse = dc_False
     vEmptyList = dc_EmptyList
     vUnit = dc_Unit
     vCons = dc_Cons
@@ -61,11 +61,12 @@ instance FromTupname Name where
 
 dc_Cons = toName DataConstructor ("Prelude",":")
 dc_EmptyList = toName DataConstructor ("Prelude","[]")
-dc_False = toName DataConstructor ("Prelude","False")
+--dc_False = toName DataConstructor ("Prelude","False")
 dc_JustIO = toName DataConstructor ("Jhc.IO", "JustIO")
 dc_Rational = toName DataConstructor ("Ratio",":%")
-dc_True = toName DataConstructor ("Prelude","True")
+--dc_True = toName DataConstructor ("Prelude","True")
 dc_Unit = toName DataConstructor ("Prelude","()")
+dc_Boolzh = toName DataConstructor ("Prelude","Bool#")
 
 tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
 tc_Arrow = toName TypeConstructor ("Jhc@","->")

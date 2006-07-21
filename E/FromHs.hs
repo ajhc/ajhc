@@ -72,6 +72,18 @@ import Util.SetLike
 
 ump sl e = EError (show sl ++ ": Unmatched pattern") e
 
+--eIf e a b = ECase { eCaseScrutinee = e, eCaseType = getType a, eCaseBind = (tVr 0 tBool),  eCaseAlts =  [Alt vTrue a,Alt vFalse b], eCaseDefault = Nothing }
+
+
+createIf e a b = do
+    [tv] <- newVars [Unknown]
+    return $ createIfv tv e a b
+
+createIfv v e a b = res where
+    tv = v { tvrType = tIntzh }
+    ic = eCase (EVar tv) [Alt (LitInt 1 tIntzh) a, Alt (LitInt 0 tIntzh) b] Unknown
+    res = eCase e [Alt (LitCons dc_Boolzh [tv] tBool) ic] Unknown
+
 
 head (x:_) = x
 head _ = error "FromHsHeadError"
@@ -504,7 +516,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
     cExpr (HsExpTypeSig _ e _) = cExpr e
     cExpr (HsNegApp e) = liftM doNegate (cExpr e)
     cExpr (HsLet dl e) = hsLet dl e
-    cExpr (HsIf e a b) = liftM3 eIf (cExpr e) (cExpr a) (cExpr b)
+    cExpr (HsIf e a b) = join $ liftM3 createIf (cExpr e) (cExpr a) (cExpr b)
     cExpr (HsCase _ []) = error "empty case"
     cExpr (HsAsPat n hs@(HsCase e alts)) = do
         let ty = cType n
@@ -548,7 +560,8 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         g <- cExpr g
         e <- cExpr e
         fg <- cGuard (HsGuardedRhss gs)
-        return (\els -> eIf g e (fg els))
+        [nv] <- newVars [Unknown]
+        return (\els -> createIfv nv g e (fg els))
     cGuard (HsGuardedRhss []) = return id
 
     getAssumpCon n  = case Map.lookup (toName Name.DataConstructor n) assumps of
@@ -564,7 +577,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
     cRhs sl (HsUnGuardedRhs e) = cExpr e
     cRhs sl (HsGuardedRhss []) = error "HsGuardedRhss: empty"
     cRhs sl (HsGuardedRhss gs@(HsGuardedRhs _ _ e:_)) = f gs where
-        f (HsGuardedRhs _ g e:gs) = liftM3 eIf (cExpr g) (cExpr e) (f gs)
+        f (HsGuardedRhs _ g e:gs) = join $ liftM3 createIf (cExpr g) (cExpr e) (f gs)
         f [] = do
             e <- cExpr e
             return $ ump sl $ getType e
@@ -681,12 +694,12 @@ convertMatches funcs tv cType bs ms err = match bs ms err where
                         let ip | abs i > integer_cutoff  = (EAp (EAp fromInteger tb) (intConvert i))
                                | otherwise =  (EAp (EAp fromInt tb) (intConvert i))
                         m <- match bs ps err
-                        return $ eIf (EAp (EAp eq (EVar bv)) ip) m els
+                        createIf (EAp (EAp eq (EVar bv)) ip) m els
                     f els (HsPLit (HsFrac i),ps) = do
                         --let ip = (EAp (EAp fromInt tb) (ELit (LitInt (fromIntegral i) tInt)))
                         let ip = (EAp (EAp fromRational tb) (toE i))
                         m <- match bs ps err
-                        return $ eIf (EAp (EAp eq (EVar bv)) ip) m els
+                        createIf (EAp (EAp eq (EVar bv)) ip) m els
                 e <- foldlM f err gps
                 return $ eLetRec [(bv,b)] e
             | all isHsPLit patternHeads = do
