@@ -888,6 +888,7 @@ error s = unsafePerformIO $ do
 foreign import primitive seq :: a -> b -> b
 
 
+
 instance Enum Int where
     succ = (+ 1)
     pred = (+ -1)
@@ -901,14 +902,23 @@ instance Enum Int where
     enumFromThen x y = f x where
         z = y - x
         f x = x:f (x + z)
-    enumFromThenTo x y z = f x where
+    enumFromThenTo x y z | y >= x = f x where
         inc = y - x
-        f x | x <= z = x:f (x + z)
+        f x | x <= z = x:f (x + inc)
+            | otherwise = []
+    enumFromThenTo x y z  = f x where
+        inc = y - x
+        f x | x >= z = x:f (x + inc)
             | otherwise = []
 
 instance Enum Char where
     toEnum = Char.chr
     fromEnum = Char.ord
+    enumFrom c        = map toEnum [fromEnum c .. fromEnum (maxBound::Char)]
+    enumFromThen c c' = map toEnum [fromEnum c, fromEnum c' .. fromEnum lastChar]
+                      where lastChar :: Char
+                            lastChar | c' < c    = minBound
+                                     | otherwise = maxBound
 
 
 instance Enum Integer where
@@ -923,9 +933,13 @@ instance Enum Integer where
     enumFromThen x y = f x where
         z = y - x
         f x = x:f (x + z)
-    enumFromThenTo x y z = f x where
+    enumFromThenTo x y z | y >= x = f x where
         inc = y - x
-        f x | x <= z = x:f (x + z)
+        f x | x <= z = x:f (x + inc)
+            | otherwise = []
+    enumFromThenTo x y z  = f x where
+        inc = y - x
+        f x | x >= z = x:f (x + inc)
             | otherwise = []
 
 
