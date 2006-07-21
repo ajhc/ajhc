@@ -164,16 +164,6 @@ convertVal assumps n = (foldr ePi t vs, flip (foldr eLam) vs) where
 
 
 convertOneVal = tipe
-{-
-convertOneVal (Forall _ (_ :=> t)) = (mp EPi ts (tipe t)) where
-    mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (toId n) (kind k)) (mp fn rs t)
-    mp _ [] t = t
-    ts = ctgen t
-convertOneVal (TForAll _ (_ :=> t)) = (mp EPi ts (tipe t)) where
-    mp fn (((Tyvar _ n k _)):rs) t = fn (tVr (toId n) (kind k)) (mp fn rs t)
-    mp _ [] t = t
-    ts = ctgen t
-    -}
 
 toTVr assumps n = tVr (toId n) (typeOfName n) where
     typeOfName n = fst $ convertVal assumps n
@@ -352,6 +342,9 @@ instance Monad m => UniqueProducer (Ce m) where
         i <- get
         put $! (i + 1)
         return i
+
+instance Monad m => DataTableMonad (Ce m) where
+    getDataTable = asks ceDataTable
 
 applyCoersion :: Monad m => CoerceTerm -> E -> Ce m E
 applyCoersion CTId e = return e
@@ -707,11 +700,12 @@ convertMatches funcs tv cType bs ms err = match bs ms err where
                 return $ unbox dataTable b vr $ \tvr -> eCase (EVar tvr) as err
                 --return $ eCase b as err
             | all isHsPApp patternHeads = do
+                dataTable <- getDataTable
                 let gps =  sortGroupUnderF (hsPatName . (\ (x:_) -> x) . fst) ps
+                    (Just patCons) = getConstructor (toName DataConstructor $ fst $ head gps) dataTable
                     f (name,ps) = do
                         let spats = hsPatPats $ (\ (x:_) -> x) $ fst ((\ (x:_) -> x) ps)
                             nargs = length spats
-                        dataTable <- asks ceDataTable
                         vs <- newVars (slotTypes dataTable (toName DataConstructor name) (getType b))
                         vs' <- newVars (map (const Unknown) vs)
 
@@ -723,7 +717,13 @@ convertMatches funcs tv cType bs ms err = match bs ms err where
                     pp (HsPApp n ps:rps,e)  = do
                         return $ (ps ++ rps , e)
                 as@(_:_) <- mapM f gps
-                return $ eCase b as err
+                case conVirtual patCons of
+                    Nothing -> return $ eCase b as err
+                    Just sibs -> do
+                        let (Just Constructor { conChildren = Just [vCons] }) = getConstructor (conInhabits patCons) dataTable
+                        [z] <- newVars [tIntzh]
+                        let err' = if length sibs <= length as then Unknown else err
+                        return $ eCase b [Alt (LitCons vCons [z] (getType b)) (eCase (EVar z) as err')] Unknown
             | otherwise = error $ "Heterogenious list: " ++ show patternHeads
             where
             patternHeads = map ((\ (x:_) -> x) . fst) ps

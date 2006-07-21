@@ -24,7 +24,7 @@ module DataConstructors(
 import Control.Monad.Identity
 import Control.Monad.Writer
 import qualified Data.Map as Map hiding(map)
-import List(sortBy,(\\))
+import List(sortBy)
 
 import Binary
 import Doc.DocLike
@@ -46,7 +46,6 @@ import Name.VConsts
 import Support.FreeVars
 import PrimitiveOperators
 import qualified Util.Seq as Seq
-import FrontEnd.Tc.Type
 import Representation
 import Support.CanType
 import Support.Unparse
@@ -93,13 +92,14 @@ kind (KVar _) = error "Kind variable still existing."
 -- * is also a data type containing the type constructors, which are unlifted, yet boxed.
 
 data Constructor = Constructor {
-    conName :: Name,             -- name of constructor
-    conType :: E,                -- type of constructor
-    conExpr :: E,                -- expression which constructs this value
-    conSlots :: [E],             -- slots
+    conName     :: Name,         -- name of constructor
+    conType     :: E,            -- type of constructor
+    conExpr     :: E,            -- expression which constructs this value
+    conSlots    :: [E],          -- slots
     conDeriving :: [Name],       -- classes this type derives
-    conAlias :: Bool,            -- whether this is a simple alias and has no tag of its own.
+    conAlias    :: Bool,         -- whether this is a simple alias and has no tag of its own.
     conInhabits :: Name,         -- what constructor it inhabits, similar to conType, but not quite.
+    conVirtual  :: Maybe [Name], -- whether this is a virtual constructor that translates into an enum and its siblings
     conChildren :: Maybe [Name]  -- if nothing, then type is abstract
     } deriving(Show)
     {-! derive: GhcBinary !-}
@@ -137,6 +137,7 @@ tunboxedtuple n = (typeCons,dataCons) where
             conExpr = Unknown, -- error "expr" ELam (tVr 2 rt) (ELit (LitCons dc [EVar (tVr 2 rt)] tipe)),
             conAlias = False,
             conInhabits = tc,
+            conVirtual = Nothing,
             conChildren = Nothing
            }
         typeCons = Constructor {
@@ -146,6 +147,7 @@ tunboxedtuple n = (typeCons,dataCons) where
             conDeriving = [],
             conExpr = tipe,
             conAlias = False,
+            conVirtual = Nothing,
             conInhabits = tHash,
             conChildren = Just [dc]
            }
@@ -162,6 +164,7 @@ tabsurd = Constructor {
             conDeriving = [],
             conExpr = tAbsurd eStar,
             conAlias = False,
+            conVirtual = Nothing,
             conInhabits = tStar,
             conChildren = Nothing
     }
@@ -174,34 +177,10 @@ worlds = [(rt_Worldzh,tWorld__),(tc_World__,tWorld__)] where
                 conDeriving = [],
                 conExpr = ELit (LitCons rt_Worldzh [] eHash),
                 conAlias = False,
+                conVirtual = Nothing,
                 conInhabits = tHash,
                 conChildren = Nothing
         }
-{-
-    tWorld__ = Constructor {
-                conName = tc_World__,
-                conType = eStar,
-                conSlots = [],
-                conDeriving = [],
-                conExpr = ELit (LitCons tc_World__ [] eStar),
-                conAlias = False,
-                conInhabits = tStar,
-                conChildren = Just [conName dWorld__]
-        }
-
-    dWorld__ = Constructor {
-                conName = dc_World__,
-                conType = conExpr tWorld__,
-                conSlots = [conType tWorldzh],
-                conDeriving = [],
-                conExpr = ELam dtvr (ELit (LitCons dc_World__ [EVar dtvr] (conExpr tWorld__))),
-                conAlias = False,
-                conInhabits = tStar,
-                conChildren = Nothing
-        }
-    dtvr = (tVr 10 (conType tWorldzh))
-    -}
-
 
 
 tarrow = Constructor {
@@ -212,6 +191,7 @@ tarrow = Constructor {
             conExpr = ELam (tVr 2 eStar) (ELam (tVr 4 eStar) (EPi (tVr 0 (EVar $ tVr 2 eStar)) (EVar $ tVr 4 eStar))),
             conAlias = False,
             conInhabits = tStar,
+            conVirtual = Nothing,
             conChildren = Nothing
         }
 
@@ -224,6 +204,7 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,_,_,b,_) -> b
         conDeriving = [],
         conExpr = ELit (LitCons rn [] eHash),
         conAlias = False,
+        conVirtual = Nothing,
         conInhabits = tHash,
         conChildren = Nothing
        } where rn = toName RawType n
@@ -235,6 +216,7 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,_,_,b,_) -> b
             conDeriving = [],
             conExpr = ELam (tVr 2 rt) (ELit (LitCons dc [EVar (tVr 2 rt)] tipe)),
             conAlias = False,
+            conVirtual = Nothing,
             conInhabits = tc,
             conChildren = Nothing
            }
@@ -245,6 +227,7 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,_,_,b,_) -> b
             conDeriving = [],
             conExpr = tipe,
             conAlias = False,
+            conVirtual = Nothing,
             conInhabits = tStar,
             conChildren = Just [dc]
            }
@@ -329,7 +312,7 @@ followAlias dataTable (ELit (LitCons c ts e))
 followAlias _ e = fail "followAlias: not an alias"
 
 followAliases :: DataTable -> E -> E
-followAliases dataTable l = f l 10 where
+followAliases dataTable l = f l (10::Int) where
     f l 0 = l
     f l n = case followAlias dataTable l of
         Just e -> f e (n - 1)
@@ -346,11 +329,56 @@ toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conN
     f decl@HsNewTypeDecl {  hsDeclCon = c } = dt decl True  [c]
     f decl@HsDataDecl {  hsDeclCons = cs } = dt decl False  cs
     f _ = return ()
+    dt decl False cs@(_:_:_) | all null (map hsConDeclArgs cs) = do
+        let virtualCons'@(fc:_) = map (makeData False typeInfo) cs
+            typeInfo@(theType,_,_) = makeType decl
+            virt = Just (map conName virtualCons')
+            f (n,vc) = vc { conExpr = ELit (LitCons consName [ELit (LitInt (fromIntegral n) tIntzh)] (conType vc)), conVirtual = virt }
+            virtualCons = map f (zip [(0 :: Int) ..] virtualCons')
+            consName =  mapName (id,(++ "#")) $ toName DataConstructor (nameName (conName theType))
+            dataCons = fc { conName = consName, conType = getType (conExpr dataCons), conSlots = [tIntzh], conExpr = ELam (tVr 12 tIntzh) (ELit (LitCons consName [EVar (tVr 12 tIntzh)] (conExpr theType))) }
+        tell (Seq.fromList virtualCons)
+        tell (Seq.singleton dataCons)
+        tell $ Seq.singleton theType { conChildren = Just [consName], conVirtual = virt }
+        return ()
+
     dt decl alias cs = do
-        let dataCons = map makeData cs
+        let dataCons = map (makeData alias typeInfo) cs
+            typeInfo@(theType,_,_) = makeType decl
         tell (Seq.fromList dataCons)
         tell $ Seq.singleton theType { conChildren = Just (map conName dataCons) }
-        where
+    makeData alias (theType,theTypeArgs,theTypeExpr) x = theData where
+        theData = Constructor {
+            conName = dataConsName,
+            conType =foldr ($) (getType theExpr) (map EPi theTypeArgs),
+            conSlots =  slots,
+            conExpr = theExpr,
+            conInhabits = conName theType,
+            conDeriving = [],
+            conVirtual = Nothing,
+            conAlias = alias,
+            conChildren = Nothing
+            }
+        theExpr =  foldr ($) (strictize $ ELit (LitCons dataConsName (map EVar vars) theTypeExpr)) (map ELam vars)
+        slots = map (subst . tvrType) ts -- XXX TODO fix this mapping
+        vars = [ tvr { tvrType = t } | tvr <- ts | t <- slots ]
+        strictize con = E.Subst.subst tvr { tvrIdent = -1 } Unknown $ f (zip (map isHsBangedTy args) vars) con where
+            f ((False,_):rs) con = f rs con
+            f ((True,var):rs) con = eStrictLet var (EVar var) con
+            f [] con = con
+        dataConsName =  toName Name.DataConstructor (hsConDeclName x)
+        args = hsConDeclArgs x
+        (ELit (LitCons _ xs _) ,ts') = fromPi $ runVarName $ do
+            flip mapM_ vs $ \tv -> do
+                newName [2,4..] () tv
+            tipe' ty
+        existentials = melems $ freeVars (map getType ts') S.\\ (freeVars xs :: IdMap TVr)
+        subst = substMap $ fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
+        ts = existentials ++ [ tvr {tvrIdent = x} | tvr <- ts' | x <- drop (5 + length theTypeArgs) [2,4..] ]
+        (vs,ty) = case Map.lookup dataConsName cm of
+            Just (TForAll vs (_ :=> ty)) -> (vs,ty)
+            Just ty -> ([],ty)
+    makeType decl = (theType,theTypeArgs,theTypeExpr) where
         theTypeName = toName Name.TypeConstructor (hsDeclName decl)
         theKind = kind $ runIdentity (Map.lookup theTypeName km)
         (theTypeFKind,theTypeKArgs') = fromPi theKind
@@ -364,39 +392,9 @@ toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conN
             conDeriving = [ toName ClassName n | n <- hsDeclDerives decl],
             conAlias = False,
             conInhabits = tStar,
+            conVirtual = Nothing,
             conChildren = undefined
-            } where
-        makeData x = Constructor {
-            conName = dataConsName,
-            conType =foldr ($) (getType theExpr) (map EPi theTypeArgs),
-            conSlots =  slots,
-            conExpr = theExpr,
-            conInhabits = theTypeName,
-            conDeriving = [],
-            conAlias = alias,
-            conChildren = Nothing
-            } where
-            theExpr =  foldr ($) (strictize $ ELit (LitCons dataConsName (map EVar vars) theTypeExpr)) (map ELam vars)
-            slots = map (subst . tvrType) ts -- XXX TODO fix this mapping
-            vars = [ tvr { tvrType = t } | tvr <- ts | t <- slots ]
-            strictize con = E.Subst.subst tvr { tvrIdent = -1 } Unknown $ f (zip (map isHsBangedTy args) vars) con where
-                f ((False,_):rs) con = f rs con
-                f ((True,var):rs) con = eStrictLet var (EVar var) con
-                f [] con = con
-            dataConsName =  toName Name.DataConstructor (hsConDeclName x)
-            args = hsConDeclArgs x
-            (ELit (LitCons _ xs _) ,ts') = fromPi $ runVarName $ do
-                flip mapM_ vs $ \tv -> do
-                    newName [2,4..] () tv
-                tipe' ty
-            existentials = melems $ freeVars (map getType ts') S.\\ (freeVars xs :: IdMap TVr)
-            subst = substMap $ fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
-            ts = existentials ++ [ tvr {tvrIdent = x} | tvr <- ts' | x <- drop (5 + length theTypeArgs) [2,4..] ]
-            (vs,ty) = case Map.lookup dataConsName cm of
-                Just (TForAll vs (_ :=> ty)) -> (vs,ty)
-                Just ty -> ([],ty)
-            -- =  Map.lookup dataConsName cm
-            --Just (_,_,ty) = fmap fromType $ Map.lookup dataConsName cm
+            }
 
 isHsBangedTy HsBangedTy {} = True
 isHsBangedTy _ = False
@@ -432,7 +430,9 @@ deconstructionExpression ::
 deconstructionExpression dataTable name typ@(ELit (LitCons pn xs _)) vs _vs' e | pn == conName pc = ans where
     Just mc = getConstructor name dataTable
     Just pc = getConstructor (conInhabits mc) dataTable
-    ans = Alt (LitCons name vs typ) e
+    ans = case conVirtual mc of
+        Nothing -> Alt (LitCons name vs typ) e
+        Just _ -> let ELit (LitCons _ [ELit (LitInt n t)] _) = conExpr mc in Alt (LitInt n t) e
 deconstructionExpression wdt n ty vs vs' e | Just fa <- followAlias wdt ty  = deconstructionExpression wdt n fa vs vs' e
 deconstructionExpression _ n e _ _ _ = error $ "deconstructionExpression: error in " ++ show n ++ ": " ++ show e
 
@@ -454,11 +454,14 @@ slotTypes wdt n e | Just fa <- followAlias wdt e  = slotTypes wdt n fa
 slotTypes _ n e = error $ "slotTypes: error in " ++ show n ++ ": " ++ show e
 
 showDataTable (DataTable mp) = vcat xs where
-    c  const = vcat [t,e,cs,al,ih,ch] where
+    c  const = vcat [t,e,cs,al,vt,ih,ch] where
         t  = text "::" <+> ePretty conType
         e  = text "=" <+> ePretty conExpr
         cs = text "slots:" <+> tupled (map ePretty (conSlots const))
         al = text "alias:" <+> tshow conAlias
+        vt = case conVirtual const of
+            Nothing -> empty
+            Just ss -> text "virtual:" <+> tshow ss
         ih = text "inhabits:" <+> tshow conInhabits
         ch = text "children:" <+> tshow conChildren
         Constructor {
@@ -508,6 +511,7 @@ pprintTypeAsHs e = unparse $ runVarName (f e) where
         ts' <- mapM (newLookupName ['a'..] () . tvrIdent) ts
         r <- f e
         return $ fixitize (N,-3) $ pop (text "forall" <+> hsep (map char ts') <+> text ". ")  (atomize r)
+    f e = error $ "printTypeAsHs: " ++ show e
     arr = bop (R,0) (space <> text "->" <> space)
     app = bop (L,100) (text " ")
 
