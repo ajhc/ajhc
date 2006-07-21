@@ -25,33 +25,34 @@ import DataConstructors
 import Doc.PPrint
 import E.Annotate
 import E.E
-import E.Program
 import E.Eta
 import E.Inline
 import E.PrimOpt
+import E.Program
 import E.Rules
 import E.Subst
+import E.Traverse(runRename)
 import E.TypeCheck
 import E.Values
 import GenUtil
 import Info.Types
+import Name.Id
 import Name.Name
 import Name.VConsts
 import Options
-import qualified E.Demand as Demand
-import qualified FlagOpts as FO
-import qualified FlagDump as FD
-import qualified Info.Info as Info
-import qualified Util.Seq as Seq
 import Stats hiding(new,print,Stats,singleton)
 import Support.CanType
 import Support.FreeVars
 import Util.Graph
 import Util.HasSize
 import Util.NameMonad
-import Name.Id
 import Util.ReaderWriter
 import Util.SetLike as S
+import qualified E.Demand as Demand
+import qualified FlagDump as FD
+import qualified FlagOpts as FO
+import qualified Info.Info as Info
+import qualified Util.Seq as Seq
 
 type Bind = (TVr,E)
 
@@ -430,11 +431,13 @@ simplifyDs prog sopts dsIn = ans where
         f e' (cacheSubst inb { envSubst = mempty })
     f :: InE -> Env -> SM m OutE
     f e inb | (ELam t b,(x:xs)) <- fromAp e = do
+        addBoundNames [tvrIdent t]
         xs' <- mapM (dosub inb) xs
         b' <- f b (insertSuspSubst t x inb) -- minsert (tvrIdent t) (Susp x sub) sub) inb
         mtick (toAtom "E.Simplify.f-beta-reduce")
         h b' xs' inb
     f e inb | (EPi t b,(x:xs)) <- fromAp e = do
+        addBoundNames [tvrIdent t]
         xs' <- mapM (dosub inb) xs
         b' <- f b (insertSuspSubst t x inb) -- (minsert (tvrIdent t) (Susp x sub) sub) inb
         mtick (toAtom "E.Simplify.f-pi-reduce")
@@ -705,8 +708,12 @@ simplifyDs prog sopts dsIn = ans where
     h e xs' inb = do app (e,xs')
     didInline :: Env -> OutE -> [OutE] -> SM m OutE
     didInline inb z zs = do
-        e <- app (z,zs)
-        return e
+        used <- idNameUsedNames
+        let (ne,nn) = runRename used (foldl EAp z zs)
+        addNamesIdSet nn
+        return ne
+        --e <- app (z,zs)
+        --return e
         --go e inb
     appVar v xs = do
         me <- etaExpandAp (so_dataTable sopts) v xs
@@ -719,7 +726,7 @@ simplifyDs prog sopts dsIn = ans where
 
     app' (ELit (LitCons n xs t@EPi {})) (a:as)  = do
         mtick (toAtom $ "E.Simplify.typecon-reduce.{" ++ show n ++ "}" )
-        app (ELit (LitCons n (xs ++ [a]) (eAp t a)),as)
+        app' (ELit (LitCons n (xs ++ [a]) (eAp t a))) as
     app' ec@ECase {} xs = do
         mticks (length xs) (toAtom "E.Simplify.case-application")
         let f e = app' e xs
