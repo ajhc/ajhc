@@ -1,30 +1,32 @@
 module Name.Id(
     Id(),
-    idSetToList,
-    runIdNameT',
-    runIdNameT,
+    IdMap(),
     IdNameT(),
     IdSet(),
-    IdMap(),
-    idSetToIdMap,
     addBoundNamesIdMap,
     addBoundNamesIdSet,
     addNamesIdSet,
-    idMapToIdSet
+    idMapToIdSet,
+    idNameBoundNames,
+    idNameUsedNames,
+    idSetToIdMap,
+    idSetToList,
+    runIdNameT',
+    runIdNameT
     )where
 
 import Control.Monad
 import Control.Monad.State
-import qualified Data.IntSet as IS
-import qualified Data.IntMap  as IM
+import Data.FunctorM
 import Data.Monoid
 import Data.Typeable
-import Data.FunctorM
+import qualified Data.IntMap  as IM
+import qualified Data.IntSet as IS
 
-import Util.SetLike as S
 import Util.HasSize
-import Util.NameMonad
 import Util.Inst()
+import Util.NameMonad
+import Util.SetLike as S
 
 -- TODO - make this a newtype
 type Id = Int
@@ -60,6 +62,16 @@ idMapToIdSet (IdMap im) = IdSet $ IS.fromDistinctAscList (IM.keys im)
 -- | Name monad transformer.
 newtype IdNameT m a = IdNameT (StateT (IdSet, IdSet) m a)
     deriving(Monad, MonadTrans, Functor, MonadFix, MonadPlus, MonadIO)
+
+-- | Get bound and used names
+idNameBoundNames :: Monad m => IdNameT m IdSet
+idNameBoundNames = IdNameT $ do
+    (_used,bound) <- get
+    return bound
+idNameUsedNames :: Monad m => IdNameT m IdSet
+idNameUsedNames = IdNameT $  do
+    (used,_bound) <- get
+    return used
 
 -- | Run the name monad transformer.
 runIdNameT :: (Monad m) => IdNameT m a -> m a
