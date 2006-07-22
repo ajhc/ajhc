@@ -32,10 +32,14 @@ driftDerive hsModule = ans where
     ndcls = hsModuleDecls hsMod
     ss = [ n | Just n <- map driftDerive' $ hsModuleDecls hsModule, any (not . isSpace) n ]
 
+enumDontDerive :: [HsName]
+enumDontDerive = [nameName class_Eq,nameName class_Ord,nameName class_Enum]
+
 driftDerive' :: Monad m => HsDecl -> m String
 driftDerive' (HsDataDecl sloc cntxt name args condecls derives) = do
         let d =  toData  name args condecls derives
-        xs <- return $  map (derive d . show) derives
+            isEnum = length condecls > 1 && null (concatMap hsConDeclArgs condecls)
+        xs <- return $  map (derive d . show) derives -- (if isEnum then derives List.\\ enumDontDerive else derives )
         return $ unlines xs
 driftDerive' (HsNewTypeDecl sloc cntxt name args condecl derives) = do
         let d =  toData  name args [condecl] derives

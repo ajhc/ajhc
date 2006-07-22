@@ -18,6 +18,7 @@ module DataConstructors(
     showDataTable,
     slotTypes,
     toDataTable,
+    deriveClasses,
     typesCompatable
     ) where
 
@@ -322,6 +323,42 @@ followAliases dataTable l = f l (10::Int) where
         Nothing -> l
 
 dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tabsurd:tarrow:primitiveTable ] ++ worlds)
+
+deriveClasses :: DataTable -> [(TVr,E)]
+deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where
+    f c | TypeConstructor == nameType (conName c), Just is <- conVirtual c = concatMap (g is c) (conDeriving c)
+    f _ = []
+    g is c cl = h cl where
+        typ = conExpr c
+        Just [con] = conChildren c
+        v1 = tvr { tvrIdent = 2,  tvrType = typ }
+        v2 = tvr { tvrIdent = 4,  tvrType = typ }
+        i1 = tvr { tvrIdent = 6,  tvrType = tIntzh }
+        i2 = tvr { tvrIdent = 8,  tvrType = tIntzh }
+        i3 = tvr { tvrIdent = 10, tvrType = tIntzh }
+        int1 = tvr { tvrIdent = 12, tvrType = tInt }
+        val1 = tvr { tvrIdent = 14, tvrType = typ }
+        unbox e = ELam v1 (ELam v2 (ec (EVar v1) i1 (ec (EVar v2) i2 e)))  where
+            ec v i e = eCase v [Alt (LitCons con [i] typ) e] Unknown
+        h cl | cl == class_Eq = [mkCmpFunc (func_equals sFuncNames) "=="]
+        h cl | cl == class_Ord = [
+                mkCmpFunc (func_geq sFuncNames) ">=",
+                mkCmpFunc (func_leq sFuncNames) "<=",
+                mkCmpFunc (func_lt sFuncNames) "<",
+                mkCmpFunc (func_gt sFuncNames) ">"]
+        h cl | cl == class_Enum = [{- (iv_te,ib_te), -}(iv_fe,ib_fe)] where
+            iv_te = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName (func_toEnum sFuncNames) (nameName $ conName c), tvrType = getType ib_te }
+            iv_fe = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName (func_fromEnum sFuncNames) (nameName $ conName c), tvrType = getType ib_fe }
+            ib_te = ELam int1 (ec tInt dc_Int (EVar int1) i1 (ELit (LitCons con [EVar i1] typ)))
+            ib_fe = ELam val1 (ec typ con (EVar val1) i1 (ELit (LitCons dc_Int [EVar i1] tInt)))
+            ec typ con v i e = eCase v [Alt (LitCons con [i] typ) e] Unknown
+
+        h _ = []
+        mkCmpFunc fname op = (iv_eq,ib_eq) where
+            ib_eq = unbox (eStrictLet i3 (oper_III op (EVar i1) (EVar i2)) (ELit (LitCons dc_Boolzh [EVar i3] tBool)))
+            iv_eq = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (nameName $ conName c), tvrType = getType ib_eq }
+    oper_III op a b = EPrim (APrim (Operator op ["int","int"] "int") mempty) [a,b] tIntzh
+
 
 {-# NOINLINE toDataTable #-}
 toDataTable :: (Map.Map Name Kind) -> (Map.Map Name Type) -> [HsDecl] -> DataTable

@@ -222,9 +222,12 @@ processDecls stats ho ho' tiData = do
 
     -- build datatables
     let dataTable = toDataTable (getConstructorKinds (hoKinds ho')) (tiAllAssumptions tiData) originalDecls
+        classInstances = deriveClasses dataTable
     let fullDataTable = (dataTable `mappend` hoDataTable ho)
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
 
+    wdump FD.Derived $
+        mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) classInstances
     -- initial program
     let prog = program {
             progClassHierarchy = hoClassHierarchy allHo,
@@ -236,7 +239,8 @@ processDecls stats ho ho' tiData = do
 
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
-    ds <- convertDecls tiData (hoClassHierarchy ho') allAssumps  fullDataTable decls
+    ds' <- convertDecls tiData (hoClassHierarchy ho') allAssumps  fullDataTable decls
+    let ds = [ (runIdentity (fromId (tvrIdent v)),v,e) | (v,e) <- classInstances ] ++  [ (n,v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
     wdump FD.InitialCore $
         mapM_ (\(_,v,lc) -> printCheckName'' fullDataTable v lc) ds
     sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
