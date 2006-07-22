@@ -27,32 +27,35 @@ import qualified Data.Map as Map hiding(map)
 import List(sortBy)
 
 import Binary
+import C.Prims
+import Class(instanceName)
 import Doc.DocLike
-import Doc.Pretty
 import Doc.PPrint
+import Doc.Pretty
 import E.E
-import E.Show
 import E.Shadow
+import E.Show
 import E.Subst
-import E.Values
 import E.TypeCheck
+import E.Values
+import Info.Types
 import GenUtil
 import HsSyn
 import MapBinaryInstance()
+import Name.Id
 import Name.Name as Name
 import Name.Names
-import Name.Id
 import Name.VConsts
-import Support.FreeVars
 import PrimitiveOperators
-import qualified Util.Seq as Seq
 import Representation
 import Support.CanType
+import Support.FreeVars
 import Support.Unparse
 import Util.HasSize
 import Util.SameShape
 import Util.SetLike as S
 import Util.VarName
+import qualified Util.Seq as Seq
 
 tipe t = runVarName (tipe' t)
 tipe' (TAp t1 t2) = liftM2 eAp (tipe' t1) (tipe' t2)

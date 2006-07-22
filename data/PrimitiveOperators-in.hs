@@ -5,15 +5,15 @@ module PrimitiveOperators(primitiveInsts,constantMethods,theMethods,allCTypes,ct
 import Data.Monoid
 import qualified Data.Map as Map
 
-import Support.CanType
 import C.Prims
 import E.E
 import E.TypeCheck()
 import E.Values
 import Name.Name
 import Name.Names
-import Representation
 import Name.VConsts
+import Representation
+import Support.CanType
 
 
 create_integralCast c1 t1 c2 t2 e t = eCase e [Alt (LitCons c1 [tvra] te) cc] Unknown  where
