@@ -38,7 +38,6 @@ module FrontEnd.Desugar ( doToExp, desugarHsModule, desugarHsStmt, desugarHsExp)
 
 import Control.Monad.State
 
-import FrontEnd.Deriving
 import FrontEnd.SrcLoc
 import GenUtil
 import HsSyn
@@ -215,6 +214,8 @@ createSelectors _sloc ds = ans where
     err = nameName $ toUnqualified $ v_error
 
 
+deriveInstances :: Monad m => SrcLoc -> HsName -> [HsName] -> [HsConDecl] -> [HsName] -> m [HsDecl]
+deriveInstances sloc name args cons ds = return []
 
 
 desugarMatch :: (HsMatch) -> PatSM (HsMatch)
