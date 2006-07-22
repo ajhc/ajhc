@@ -85,6 +85,21 @@ data FuncNames a = FuncNames {
     func_negate :: a,
     func_runExpr :: a,
     func_runMain :: a,
+    func_leq :: a,
+    func_geq :: a,
+    func_lt :: a,
+    func_gt :: a,
+    func_compare :: a,
+    func_neq :: a,
+    func_fromEnum :: a,
+    func_toEnum :: a,
+    func_minBound :: a,
+    func_maxBound :: a,
+    func_enumFrom :: a,
+    func_enumFromThen :: a,
+    func_range :: a,
+    func_index :: a,
+    func_inRange :: a,
     func_runNoWrapper :: a
     }
     {-! derive: FunctorM !-}
