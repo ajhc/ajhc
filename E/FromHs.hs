@@ -545,7 +545,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
     hsLetE [] e = return  e
     hsLetE dl e = do
         nds <- mconcatMapM cDecl dl
-        return $ ELetRec [ (b,c) | (_,b,c) <- nds] e
+        return $ eLetRec [ (b,c) | (_,b,c) <- nds] e
     hsLet dl e = do
         e <- cExpr e
         hsLetE dl e
@@ -584,7 +584,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
     processGuards xs = flip mapM xs $ \ (ps,e,wh) -> do
         cg <- cGuard e
         nds <- mconcatMapM cDecl wh
-        let elet = ELetRec [ (b,c) | (_,b,c) <- nds]
+        let elet = eLetRec [ (b,c) | (_,b,c) <- nds]
         return (map simplifyHsPat ps,elet . cg )
     cType (n::HsName) = fst $ convertVal assumps (toName Name.Val n)
 
