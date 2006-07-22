@@ -92,7 +92,6 @@ import Foreign.Storable
 import Foreign.Ptr
 import Foreign.C.Types
 import Foreign.C.String
-import Foreign.Marshal.Error 	( void )
 
 import System.IO.Unsafe		( unsafePerformIO )
 
@@ -302,7 +301,7 @@ throwErrnoIf pred loc f  =
 -- error handling.
 --
 throwErrnoIf_   :: (a -> Bool) -> String -> IO a -> IO ()
-throwErrnoIf_ pred loc f  = void $ throwErrnoIf pred loc f
+throwErrnoIf_ pred loc f  = throwErrnoIf pred loc f >> return ()
 
 -- | as 'throwErrnoIf', but retry the 'IO' action when it yields the
 -- error code 'eINTR' - this amounts to the standard retry loop for
@@ -347,13 +346,13 @@ throwErrnoIfRetryMayBlock pred loc f on_block  =
 -- | as 'throwErrnoIfRetry', but discards the result.
 --
 throwErrnoIfRetry_            :: (a -> Bool) -> String -> IO a -> IO ()
-throwErrnoIfRetry_ pred loc f  = void $ throwErrnoIfRetry pred loc f
+throwErrnoIfRetry_ pred loc f  = throwErrnoIfRetry pred loc f >> return ()
 
 -- | as 'throwErrnoIfRetryMayBlock', but discards the result.
 --
 throwErrnoIfRetryMayBlock_ :: (a -> Bool) -> String -> IO a -> IO b -> IO ()
 throwErrnoIfRetryMayBlock_ pred loc f on_block
-  = void $ throwErrnoIfRetryMayBlock pred loc f on_block
+  = throwErrnoIfRetryMayBlock pred loc f on_block >> return ()
 
 -- | Throw an 'IOError' corresponding to the current value of 'getErrno'
 -- if the 'IO' action returns a result of @-1@.
