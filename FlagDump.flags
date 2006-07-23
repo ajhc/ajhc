@@ -38,6 +38,7 @@ optimization-stats show combined stats of optimization passes
 rules       show all rules
 e-info show info tags on all bound variables
 e-verbose   print very verbose version of E code always
+e-size      print the size of E after each pass
 core-pass   show each iteration of code while transforming
 core-steps  show what happens in each pass
 core-mini   show details even when optimizing individual functions

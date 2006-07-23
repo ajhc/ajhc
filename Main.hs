@@ -382,8 +382,9 @@ processDecls stats ho ho' tiData = do
     lintCheckProgram onerrNone prog
     progress "Initial optimization pass"
 
-
+    printESize "Before programMapRecGroups" prog
     prog <- programMapRecGroups initMap (const return) (const return) (const return) fint prog
+    printESize "After  programMapRecGroups" prog
     progress "!"
     hFlush stdout >> hFlush stderr
 
@@ -891,6 +892,7 @@ transformProgram tp prog = do
         iterate = transformIterate tp
     when dodump $ putErrLn $ "-- " ++ name
     when (dodump && dump FD.CorePass) $ printProgram prog
+    wdump FD.ESize $ printESize ("Before "++name) prog
     let istat = progStats prog
     let ferr e = do
         putErrLn $ "\n>>> Exception thrown"
@@ -911,6 +913,7 @@ transformProgram tp prog = do
     when collectPassStats $ do
         Stats.tick Stats.theStats scname
         Stats.tickStat Stats.theStats (Stats.prependStat scname estat)
+    wdump FD.ESize $ printESize ("After  "++name) prog'
     lintCheckProgram onerr prog'
     if doIterate iterate estat then transformProgram tp { transformIterate = iterateStep iterate } prog' { progStats = istat `mappend` estat } else
         return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
@@ -1068,9 +1071,8 @@ printCheckName'' dataTable tvr e = do
         putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
     putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
 
-
-
-
+printESize :: String -> Program -> IO ()
+printESize str prog = putErrLn $ str ++ " program e-size: " ++ show (eSize (programE prog))
 
 
 

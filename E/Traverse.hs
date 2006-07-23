@@ -7,6 +7,7 @@ module E.Traverse(
     emapE',
     emapE,
     emapE_,
+    eSize,
     lookupBinding,
     newBinding,
     newVarName,
@@ -36,8 +37,6 @@ import Util.NameMonad
 import Util.Graph
 import Name.Id
 import Util.SetLike as S
-import qualified E.Demand as Demand
-import qualified Info.Info as Info
 
 -- Generic traversal routines rock.
 
