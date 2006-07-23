@@ -24,8 +24,12 @@ data FfiType = Import CName Requires
 data Requires = Requires {
     reqIncludes :: [String],
     reqLibraries :: [String]
-    } deriving(Typeable, Data, Eq, Ord, Show)
+    } deriving(Typeable, Data, Eq, Ord)
     {-! derive: Monoid, GhcBinary !-}
+
+instance Show Requires where
+    show (Requires [] []) = "()"
+    show (Requires xs ys) = show (xs,ys)
 
 nullRequires = Requires [] []
 
