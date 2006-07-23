@@ -102,41 +102,39 @@ findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
 
 
 
-findModule :: Ho                                 -- ^ code loaded from libraries
-              -> Ho                              -- ^ Accumulated Ho
+findModule :: Ho                              -- ^ Accumulated Ho
               -> (Either Module String)          -- ^ Either a module or filename to find
-              -> (Ho -> IO Ho)                   -- ^ Process initial ho loaded from file
-              -> (Ho -> [HsModule] -> IO Ho)     -- ^ Process set of mutually recursive modules to produce final Ho
-              -> IO Ho                           -- ^ Final accumulated ho
-findModule lhave have (Left m) ifunc _
-    | m `mmember` (hoExports have) = return have
-    | m `mmember` (hoExports lhave) = return have
-findModule lhave have need ifunc func  = do
+              -> (Ho -> Ho -> IO Ho)             -- ^ Process initial ho loaded from file
+              -> (Ho -> [HsModule] -> IO (Ho,Ho))     -- ^ Process set of mutually recursive modules to produce final Ho
+              -> IO (Ho,Ho)                      -- ^ (Final accumulated ho,just the ho read to satisfy this command)
+findModule have (Left m) ifunc _
+    | m `mmember` (hoExports have) = return (have,mempty)
+findModule have need ifunc func  = do
     let f (Left (Module m)) = (m,searchPaths m)
         f (Right n) = (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
         (name,files) = f need
-    (ho,ms) <- getModule lhave have name files
+    (readHo,ms) <- getModule have name files
     processIOErrors
     let scc = map f $  stronglyConnComp [ (x,fromModule $ hsModuleName hs,hsModuleRequires hs) | x@(hs,fd,honm) <- ms ]
         f (AcyclicSCC x) = [x]
         f (CyclicSCC xs) = xs
     when (dump FD.SccModules) $ CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
-    let f ho [] = return ho
-        f ho (sc:scs) = do
-            ho' <- func (lhave `mappend` ho) [ hs | (hs,_,_) <- sc ]
+    let f ho readHo [] = return (ho,readHo)
+        f ho readHo (sc:scs) = do
+            (ho',newHo) <- func ho [ hs | (hs,_,_) <- sc ]
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
                 mods' = [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
                 mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules ho)]
-                ldeps = Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules lhave)]
+                ldeps = Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules have)]
             let hoh = HoHeader { hohDepends    = [ x | (_,x,_) <- sc],
                                  hohModDepends = mdeps,
                                  hohMetaInfo   = []
                                }
-            ho' <- return (ho' `mappend` mempty { hoLibraries = ldeps })
-            ho' <- recordHoFile ho' [ x | (_,_,x) <- sc ] hoh
-            f (ho `mappend` ho') scs
-    ho <- ifunc ho
-    f ho scc
+            newHo <- return (newHo `mappend` mempty { hoLibraries = ldeps })
+            newHo <- recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
+            f ho' (readHo `mappend` newHo)  scs
+    ho <- ifunc have readHo
+    f ho readHo scc
 
 {-
 checkForHoModule :: Module -> IO (Maybe (HoHeader,Ho))
@@ -296,13 +294,11 @@ hoLibraryDeps newHo oldHo = hoLibraries newHo `Map.isSubmapOf` hoLibraries oldHo
 
 getModule ::
     Ho          -- ^ initialHo
-    -> Ho       -- ^ Current set of modules, we assume anything in here is prefered to what is found on disk.
     -> String   -- ^ Module name for printing error messages
     -> [(String,String)]  -- ^ files to search, and the cooresponding ho file
     -> IO (Ho,[(HsModule,FileDep,String)])
-getModule initialHo ho name files  = do
-    ho_ref <- newIORef ho
-    fixup_ref <- newIORef (getFixups (initialHo `mappend` ho))
+getModule initialHo name files  = do
+    ho_ref <- newIORef mempty
     need_ref <- newIORef []
     let loop name files  = do
             --wdump FD.Progress $ do
@@ -322,13 +318,9 @@ getModule initialHo ho name files  = do
                             r <- checkHoDep a
                             if r then f as else return False
                         f [] = return True
-                    r <- if hoLibraryDeps ho' (initialHo `mappend` ho) then f (hohModDepends hh) else return False
+                    r <- if hoLibraryDeps ho' initialHo then f (hohModDepends hh) else return False
                     case r of
-                        True -> do
-                            fixups <- readIORef fixup_ref
-                            let nfixups = getFixups ho' `mappend` fixups
-                            writeIORef fixup_ref nfixups
-                            modifyIORef ho_ref (applyFixups nfixups ho' `mappend`) >> hClose fh
+                        True -> modifyIORef ho_ref (ho' `mappend`) >> hClose fh
                         False -> addNeed name fd fh ho_name
                 Nothing -> addNeed name fd fh ho_name
         checkHoDep :: (Module,FileDep) -> IO Bool

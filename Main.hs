@@ -13,6 +13,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified System
 
+import Atom
 import C.FromGrin
 import CharIO
 import Class
@@ -181,11 +182,22 @@ collectIdAnn r p id nfo = do
     tell $ singleton id
     idann r p id nfo
 
-processInitialHo :: Ho -> IO Ho
-processInitialHo ho = do
-    let (ds,uids) = runWriter $ annotateDs mempty (collectIdAnn (hoRules ho) (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
+processInitialHo ::
+    Ho       -- ^ current accumulated ho
+    -> Ho    -- ^ new ho, freshly read from file
+    -> IO Ho -- ^ final combined ho data.
+processInitialHo accumho ho = do
+    let (ds,uids) = runWriter $ annotateDs imap (collectIdAnn (hoRules ho) (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
         ds' = programDs $ etaAnnotateProgram (programSetDs ds program)
-    return ho { hoUsedIds = uids, hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds' ] }
+        imap = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho)]
+        accumho' = reprocessHo (hoRules ho) (hoProps ho) accumho
+    return $ accumho' `mappend` ho { hoUsedIds = uids, hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds' ] }
+
+reprocessHo :: Rules -> Map.Map Name [Atom] -> Ho -> Ho
+reprocessHo rules ps ho = ho { hoEs = Map.map f (hoEs ho) } where
+    f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
+    g id = runIdentity . idann rules ps id
+
 
 procSpecs :: Monad m => (Map.Map Name [Type.Rule]) -> (TVr,E) -> m ([(TVr,E)],[Rule])
 procSpecs specMap (t,e) | Just n <- fromId (tvrIdent t), Just rs <- Map.lookup n specMap = do
@@ -208,11 +220,11 @@ annotateId mn x = case fromId x of
     Nothing -> toId (toName Val (mn,'f':show x))
 
 processDecls ::
-    Stats.Stats   -- ^ statistics
-    -> Ho     -- ^ Collected ho
-    -> Ho     -- ^ preliminary haskell object  data
-    -> TiData -- ^ front end output
-    -> IO Ho  -- ^ final haskell object file
+    Stats.Stats    -- ^ statistics
+    -> Ho          -- ^ Collected ho
+    -> Ho          -- ^ preliminary haskell object  data
+    -> TiData      -- ^ front end output
+    -> IO (Ho,Ho)  -- ^ (new accumulated ho, final ho for this modules)
 processDecls stats ho ho' tiData = do
     -- some useful values
     let allHo = ho `mappend` ho'
@@ -272,8 +284,6 @@ processDecls stats ho ho' tiData = do
     Stats.clear stats
 
     prog <- return $ programSetDs [ (t,e) | (_,t,e) <- ds] prog
-    let entryPoints = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t) (tell [t])) prog
-    prog <- return $ prog { progEntryPoints = entryPoints }
 
     -- Create Specializations
     let specMap = Map.fromListWith (++) [ (n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- tiCheckedRules tiData]
@@ -284,7 +294,13 @@ processDecls stats ho ho' tiData = do
     rules <- return $ specRules `mappend` rules
     allRules <- return $ allRules `mappend` rules
 
+    let entryPoints = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || member (tvrIdent t) rfreevars) (tell [t])) prog
+        rfreevars = ruleAllFreeVars rules
+    prog <- return $ prog { progEntryPoints = entryPoints }
+
     prog <- programPrune prog
+    ho <- return $ reprocessHo rules (hoProps ho') ho
+
     let initMap = fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
 
     -- initial pass, performs
@@ -506,7 +522,13 @@ processDecls stats ho ho' tiData = do
     wdump FD.Lambdacube $ printProgram prog
 
     Stats.print "Optimization" stats
-    return ho' { hoDataTable = dataTable, hoEs = programEsMap prog , hoRules = hoRules ho' `mappend` rules, hoUsedIds = collectIds (ELetRec (programDs prog) Unknown) }
+    let newHo = ho' {
+        hoDataTable = dataTable,
+        hoEs = programEsMap prog,
+        hoRules = hoRules ho' `mappend` rules,
+        hoUsedIds = collectIds (ELetRec (programDs prog) Unknown)
+        }
+    return (newHo `mappend` ho,newHo)
 
 programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = programSetDs ds' prog where
@@ -540,9 +562,7 @@ isInteractive = do
 
 transTypeAnalyze = transformParms { transformCategory = "typeAnalyze",  transformOperation = typeAnalyze True }
 
-compileModEnv' stats (initialHo,finalHo) = do
-    let ho = initialHo `mappend` finalHo
-
+compileModEnv' stats (ho,_) = do
     let dataTable = progDataTable prog
         rules = hoRules ho
         prog = (hoToProgram ho) { progClosed = True }
@@ -1047,6 +1067,7 @@ printCheckName'' dataTable tvr e = do
     when (not tmatch || dump FD.EVerbose) $
         putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
     putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
+
 
 
 

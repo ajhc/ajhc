@@ -30,25 +30,25 @@ import Warning
 
 parseFiles :: [String]      -- ^ List of files to read
                -> [Module]  -- ^ List of modules to find
-               -> (Ho -> IO Ho) -- ^ Process initial data loaded from ho files
-               -> (Ho -> Ho -> Tc.TiData -> IO Ho)  -- ^ routine which takes the global ho, the partial local ho and the output of the front end, and returns the completed ho.
-               -> IO (Ho,Ho)     -- ^ (the libraries and predifiend ho,the final combined ho of loaded code)
+               -> (Ho -> Ho -> IO Ho) -- ^ Process initial data loaded from ho files
+               -> (Ho -> Ho -> Tc.TiData -> IO (Ho,Ho))  -- ^ routine which takes the global ho, the partial local ho and the output of the front end, and returns the completed ho.
+               -> IO (Ho,Ho)     -- ^ (the final combined ho,all the loaded ho data)
 parseFiles fs deps ifunc func = do
     wdump FD.Progress $ do
         putErrLn $ "Compiling " ++ show fs
     initialHo <- loadLibraries
-    initialHo <- ifunc initialHo
+    initialHo <- ifunc mempty initialHo
     let xs = snub $ map Right fs ++ map Left deps
-        f ho [] = return ho
-        f ho (x:xs) = do
-            ho' <- findModule initialHo ho x ifunc (doModules func)
-            f ho' xs
-    ho <- f mempty  xs
+        f accumHo ho [] = return (accumHo,ho)
+        f accumHo ho (x:xs) = do
+            (accumHo,ho') <- findModule accumHo x ifunc (doModules func)
+            f accumHo (ho `mappend` ho') xs
+    (initialHo,ho) <- f initialHo mempty  xs
     processIOErrors
     return (initialHo,ho)
 
 -- Process modules found by Ho
-doModules :: (Ho -> Ho -> Tc.TiData -> IO Ho) -> Ho -> [HsModule] -> IO Ho
+doModules :: (Ho -> Ho -> Tc.TiData -> IO (Ho,Ho)) -> Ho -> [HsModule] -> IO (Ho,Ho)
 doModules func ho ms  = do
     ms <- mapM modInfo ms
     --putErrLn $ show (hoExports ho)
@@ -57,9 +57,7 @@ doModules func ho ms  = do
          mapM_ print ( modInfoDefs m)
     ms <- determineExports [ (x,y,z) | (x,(y,z)) <- Map.toList $ hoDefs ho] (Map.toList $ hoExports ho) ms
     (ho',tiData) <- Tc.tiModules' ho ms
-    ho'' <- func ho ho' tiData
-    return ho''
-    --me <- foldM tiModules emptyModEnv mss
+    func ho ho' tiData
 
 modInfo m = do
     opt <- case fileOptions (hsModuleOptions m) of
