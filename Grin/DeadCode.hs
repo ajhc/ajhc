@@ -21,6 +21,7 @@ import Util.Gen
 implies :: Value Bool -> Value Bool -> Rule
 implies x y = y `isSuperSetOf` x
 
+-- | Remove dead code from Grin.
 deadCode ::
     Stats.Stats   -- ^ stats to update with what was done
     -> [Atom]  -- ^ roots

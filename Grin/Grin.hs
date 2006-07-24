@@ -94,7 +94,9 @@ funcFetch = toAtom "@fetch"
 funcInitCafs = toAtom "@initcafs"
 funcMain = toAtom "@main"
 
+gEval :: Val -> Exp
 gEval x = App funcEval [x] TyNode
+gApply :: Val -> Val -> Exp
 gApply x y = App funcApply [x,y] TyNode
 
 
@@ -147,27 +149,27 @@ data Lam = Val :-> Exp
     deriving(Eq,Ord,Show)
 
 data Exp =
-     Exp :>>= Lam
-    | App { expFunction :: Atom, expArgs :: [Val], expType :: Ty }    -- ^ this handles applications of functions and builtins
-    | Prim { expPrimitive :: Primitive, expArgs :: [Val] }
-    | Case { expValue :: Val, expAlts :: [Lam] }
-    | Return { expValue :: Val }
-    | Store { expValue :: Val }
-    | Fetch { expAddress :: Val }
-    | Update { expAddress :: Val, expValue :: Val }
-    | Error { expError :: String, expType :: Ty }      -- ^ abort with an error message, non recoverably.
+     Exp :>>= Lam                                                   -- ^ Sequencing - the same as >>= for monads.
+    | App { expFunction :: Atom, expArgs :: [Val], expType :: Ty }  -- ^ Application of functions and builtins
+    | Prim { expPrimitive :: Primitive, expArgs :: [Val] }          -- ^ Primitive operation
+    | Case { expValue :: Val, expAlts :: [Lam] }                    -- ^ Case statement
+    | Return { expValue :: Val }                                    -- ^ Return a value
+    | Store { expValue :: Val }                                     -- ^ Allocate a new heap node
+    | Fetch { expAddress :: Val }                                   -- ^ Load given heap node
+    | Update { expAddress :: Val, expValue :: Val }                 -- ^ Update given heap node
+    | Error { expError :: String, expType :: Ty }                   -- ^ Abort with an error message, non recoverably.
     deriving(Eq,Show,Ord)
 
 data Val =
-    NodeC !Tag [Val]
-    | NodeV !Var [Val]
-    | Tag !Tag
-    | Const Val         -- ^ pointer to constant data, only Lit, Tag, and NodeC may be children
-    | Lit !Number Ty
-    | Var !Var Ty
-    | Tup [Val]
-    | ValPrim APrim [Val] Ty
-    | Addr {-# UNPACK #-} !(IORef Val)  -- used only in interpreter
+    NodeC !Tag [Val]          -- ^ Complete node with constant tag
+    | NodeV !Var [Val]        -- ^ Complete node with variable tag
+    | Tag !Tag                -- ^ Single tag
+    | Const Val               -- ^ pointer to constant data, only Lit, Tag, and NodeC may be children
+    | Lit !Number Ty          -- ^ Literal
+    | Var !Var Ty             -- ^ Variable
+    | Tup [Val]               -- ^ Unboxed tuple
+    | ValPrim APrim [Val] Ty  -- ^ Primitive value
+    | Addr {-# UNPACK #-} !(IORef Val)  -- ^ Used only in interpreter
     deriving(Eq,Ord)
 
 
@@ -648,6 +650,7 @@ isVar _ = False
 isTup Tup {} = True
 isTup _ = False
 
+modifyTail :: Lam -> Exp -> Exp
 modifyTail lam@(_ :-> lb) e = f e where
     f (Error s ty) = Error s (getType lb)
     f (Case x ls) = Case x (map g ls)
@@ -655,10 +658,11 @@ modifyTail lam@(_ :-> lb) e = f e where
     f e = e :>>= lam
     g (p :-> e) = p :-> f e
 
-ref_tag =  (toAtom "CData.IORef.IORef")
+-- | Is type mutable (currently IORef)
+isMutableNodeTag :: Tag -> Bool
+isMutableNodeTag t = t == ref_tag where ref_tag = toAtom "CData.IORef.IORef"
 
-isMutableNodeTag t = t == ref_tag
-
+-- | Is a Val constant?
 valIsConstant :: Val -> Bool
 valIsConstant (Tup xs) = all valIsConstant xs
 valIsConstant (NodeC t _) | isMutableNodeTag t = False

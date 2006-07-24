@@ -6,17 +6,17 @@ module Grin.EvalInline(
     ) where
 
 
-import Char
 import Control.Monad.Identity
 import List
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 
+
 import Atom
 import Grin.Grin
 import GenUtil
-import Support.FreeVars
-import Support.CanType
+import Support.FreeVars(freeVars)
+import Support.CanType(getType)
 import Util.Once
 import Util.UniqueMonad
 
