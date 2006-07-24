@@ -194,7 +194,9 @@ argTypes' e = let (x,y) = fromPi e in (map tvrType y,x)
 
 getMainFunction :: Monad m => DataTable -> Name -> (Map.Map Name (TVr,E)) -> m (Name,TVr,E)
 getMainFunction dataTable name ds = do
-  mt <- Map.lookup name ds
+  mt <- case Map.lookup name ds of
+    Just x -> return x
+    Nothing -> fail $ "Could not find main function: " ++ show name
   funcs <- fmapM (\n -> liftM fst $ Map.lookup n ds) sFuncNames
   nameToEntryPoint dataTable (fst mt) (toName Name.Val "theMain") (FfiExport "_amain" Safe CCall) funcs
 

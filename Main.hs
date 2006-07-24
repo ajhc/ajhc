@@ -267,13 +267,13 @@ processDecls stats ho ho' tiData = do
 
     -- some more useful values.
     let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (_,n,_) <- ds ]
-        mangle = mangle' (Just $ fromList inscope) fullDataTable
+        mangle = mangle' (Just namesInscope) fullDataTable
         namesInscope = fromList inscope
 
     -- initial pass over functions to put them into a normalized form
     let procE (ds,usedIds) (n,v,lc) = do
         lc <- atomizeAp False fullDataTable stats (progModule prog) lc
-        lc <- coalesceLets stats lc
+        --lc <- coalesceLets stats lc
         nfo <- idann  allRules (hoProps ho') (tvrIdent v) (tvrInfo v)
         v <- return $ v { tvrInfo = Info.insert LetBound nfo }
         let used' = collectIds lc
@@ -356,10 +356,10 @@ processDecls stats ho ho' tiData = do
         mprog <- transformProgram tparms { transformCategory = "SimpleRecursive", transformOperation = sRec } mprog
 
         mprog <- return $ etaAnnotateProgram mprog
-        mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } mprog
 
         mprog <- simplifyProgram sopt "Init-One" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
+        mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } mprog
 
         mprog <- transformProgram tparms { transformCategory = "FloatOutward", transformOperation = floatOutward } mprog
         -- perform another supersimplify in order to substitute the once used
