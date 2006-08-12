@@ -102,11 +102,11 @@ findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
 
 
 
-findModule :: Ho                              -- ^ Accumulated Ho
-              -> (Either Module String)          -- ^ Either a module or filename to find
-              -> (Ho -> Ho -> IO Ho)             -- ^ Process initial ho loaded from file
-              -> (Ho -> [HsModule] -> IO (Ho,Ho))     -- ^ Process set of mutually recursive modules to produce final Ho
-              -> IO (Ho,Ho)                      -- ^ (Final accumulated ho,just the ho read to satisfy this command)
+findModule :: Ho                                  -- ^ Accumulated Ho
+              -> (Either Module String)           -- ^ Either a module or filename to find
+              -> (Ho -> Ho -> IO Ho)              -- ^ Process initial ho loaded from file
+              -> (Ho -> [HsModule] -> IO (Ho,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
+              -> IO (Ho,Ho)                       -- ^ (Final accumulated ho,just the ho read to satisfy this command)
 findModule have (Left m) ifunc _
     | m `mmember` (hoExports have) = return (have,mempty)
 findModule have need ifunc func  = do
