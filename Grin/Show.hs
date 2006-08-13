@@ -84,6 +84,20 @@ prettyExp vl (Prim Primitive { primName = nm } vs)  = vl <> prim (fromAtom nm) <
 prettyExp vl (Update x y) = vl <> keyword "update" <+> prettyVal x <+> prettyVal y
 prettyExp vl (Case v vs) = vl <> keyword "case" <+> prettyVal v <+> keyword "of" <$> indent 2 (vsep (map f vs)) where
     f (v :-> e) = prettyVal v <+> operator "->" <+> keyword "do" <$> indent 2 (prettyExp empty e)
+prettyExp vl NewRegion { expLam = (r :-> body)} = vl <> keyword "region" <+> text "\\" <> prettyVal r <+> text "-> do" <$> indent 2 (prettyExp empty body)
+--prettyExp vl MkCont { expCont = (r :-> body) } = vl <> keyword "continuation" <+> text "\\" <> prettyVal r <+> text "-> do" <$> indent 2 (prettyExp empty body)
+prettyExp vl Alloc { expValue = val, expCount = Lit n _, expRegion = r }| n == 1 = vl <> keyword "alloc" <+> prettyVal val <+> text "at" <+> prettyVal r
+prettyExp vl Alloc { expValue = val, expCount = count, expRegion = r } = vl <> keyword "alloc" <+> prettyVal val <> text "[" <> prettyVal count <> text "]" <+> text "at" <+> prettyVal r
+prettyExp vl Call { expValue = Item t (TyCall fun _ _), expArgs = vs, expJump = jump } | fun `elem` [Function,LocalFunction] =  vl <> f jump  <+> func (fromAtom t) <+> hsep (map prettyVal vs) where
+    f True = text "jump to"
+    f False = text "call"
+prettyExp vl Call { expValue = Var v (TyCall fun _ _), expArgs = vs, expJump = jump}  =  vl <> f jump fun  <+> color "lightgreen" (pprint v) <+> hsep (map prettyVal vs) where
+    f False Continuation = text "cut to"
+    f False Function = text "call"
+    f True Function = text "jump to"
+    f False Closure = text "enter"
+    f True Closure = text "jump into"
+prettyExp vl Call { expValue = ValPrim ap [] (TyCall Primitive' _ _), expArgs = vs } = vl <> prim (tshow ap) <+> hsep (map prettyVal vs)
 
 prettyVal :: DocLike d => Val -> d
 prettyVal s | Just [] <- valToList s = text "[]"
@@ -107,6 +121,8 @@ prettyVal (Lit i _)  = tshow i
 prettyVal (Tup xs)  = tupled $ map prettyVal xs
 prettyVal (Const v) = char '&' <> prettyVal v
 prettyVal (Addr _) = text "<ref>"
+prettyVal (ValUnknown ty) = text "?::" <> tshow ty
+prettyVal (Item a  ty) = tshow a <> text "::" <> tshow ty
 prettyVal (ValPrim aprim xs ty) = pprint aprim <> tupled (map tshow xs)
 
 instance DocLike d => PPrint d Var where

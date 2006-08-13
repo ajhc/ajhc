@@ -1,7 +1,10 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Grin.Grin(
+    Callable(..),
     Exp(..),
+    FuncDef(..),
+    FuncProps(..),
     Grin(..),
     HeapType(..),
     HeapValue(HV),
@@ -15,6 +18,7 @@ module Grin.Grin(
     TyEnv(..),
     Val(..),
     Var(..),
+    combineItems,
     emptyGrin,
     findArgs,
     findArgsType,
@@ -26,8 +30,12 @@ module Grin.Grin(
     gApply,
     gEval,
     grinEntryPointNames,
-    isMutableNodeTag,
     isHole,
+    isMutableNodeTag,
+    isVar,isTup,modifyTail,valIsConstant,
+    itemTag,
+    mapBodyM,
+    mapExpExp,
     n0,n1,n2,n3,
     p0,p1,p2,p3,
     partialTag,
@@ -36,7 +44,6 @@ module Grin.Grin(
     sequenceG_,
     tagFlipFunction,
     tagHole,
-    valToItem,
     tagIsFunction,
     tagIsPartialAp,
     tagIsSuspFunction,
@@ -45,13 +52,9 @@ module Grin.Grin(
     tagToFunction,
     tagUnfunction,
     tyUnit,
-    combineItems,
     unit,
-    mapBodyM,
-    mapExpExp,
-    itemTag,
     v0,v1,v2,v3,lamExp,lamBind,
-    isVar,isTup,modifyTail,valIsConstant,
+    valToItem,
     valIsNF
     ) where
 
@@ -75,6 +78,7 @@ import Number
 import Support.CanType
 import Support.FreeVars
 import Support.Tuple
+import Util.Perhaps
 import qualified Info.Info as Info
 
 -- Extremely simple first order monadic code with basic type system.  similar
@@ -107,27 +111,8 @@ instance TypeNames Ty where
     tStar = Ty (toAtom "*")
 
 data Callable = Continuation | Function | Closure | LocalFunction | Primitive'
-    deriving(Eq,Ord)
+    deriving(Eq,Ord,Show)
 
-data Ty =
-    TyTag                      -- ^ a lone tag
-    | TyPtr Ty                 -- ^ pointer to a heap location which contains its argument
-    | TyNode                   -- ^ a whole tagged node
-    | Ty Atom                  -- ^ a basic type
-    | TyTup [Ty]               -- ^ unboxed list of values
-    | TyCall Callable [Ty] Ty  -- ^ something call,jump, or cut-to-able
-    | TyRegion                 -- ^ a region
-    | TyUnknown                -- ^ an unknown possibly undefined type, All of these must be eliminated by code generation
-    deriving(Eq,Ord)
-
-instance Show Ty where
-    show TyTag = "T"
-    show (Ty a) = fromAtom a
-    show TyNode = "N"
-    show (TyPtr t) = '&':show t
-    show (TyTup []) = "()"
-    show (TyTup ts) =  show ts
-    show TyUnknown = "?"
 
 
 type Tag = Atom
@@ -163,24 +148,29 @@ data Exp =
     | Store     { expValue :: Val }                                       -- ^ Allocate a new heap node
     | Fetch     { expAddress :: Val }                                     -- ^ Load given heap node
     | Update    { expAddress :: Val, expValue :: Val }                    -- ^ Update given heap node
+    | Error     { expError :: String, expType :: Ty }                     -- ^ Abort with an error message, non recoverably.
     | Call      { expValue :: Val,
                   expArgs :: [Val],
                   expType :: Ty,
                   expJump :: Bool,
+                  expFuncProps :: FuncProps,
                   expInfo :: Info.Info }                                  -- ^ Call or jump to a callable
     | NewRegion { expLam :: Lam, expInfo :: Info.Info }                   -- ^ create a new region and pass it to its argument
     | Alloc     { expValue :: Val,
                   expCount :: Val,
                   expRegion :: Val,
                   expInfo :: Info.Info }                                  -- ^ allocate space for a number of values in the given region
-    | Let       { expDefs :: [(Atom,Lam)], expInfo :: Info.Info }         -- ^ A let of local functions
+    | Let       { expDefs :: [(Atom,Lam)],
+                  expBody :: Exp,
+                  expInfo :: Info.Info }                                  -- ^ A let of local functions
     | MkClosure { expValue :: Val,
                   expArgs :: [Val],
                   expRegion :: Val,
                   expType :: Ty,
                   expInfo :: Info.Info }                                  -- ^ create a closure
-    | MkCont    { expLam :: Lam, expInfo :: Info.Info }                   -- ^ Make a continuation, always alloced on smallest enclosing region
-    | Error     { expError :: String, expType :: Ty }                     -- ^ Abort with an error message, non recoverably.
+    | MkCont    { expCont :: Lam,                          -- ^ the continuation routine
+                  expRest :: Lam,                          -- ^ the computation that is passed the newly created computation
+                  expInfo :: Info.Info }                   -- ^ Make a continuation, always allocated on region encompasing expRest
     deriving(Eq,Show,Ord)
 
 data Val =
@@ -197,6 +187,64 @@ data Val =
     | Addr {-# UNPACK #-} !(IORef Val)  -- ^ Used only in interpreter
     deriving(Eq,Ord)
 
+data Ty =
+    TyTag                      -- ^ a lone tag
+    | TyPtr Ty                 -- ^ pointer to a heap location which contains its argument
+    | TyNode                   -- ^ a whole tagged node
+    | Ty Atom                  -- ^ a basic type
+    | TyTup [Ty]               -- ^ unboxed list of values
+    | TyCall Callable [Ty] Ty  -- ^ something call,jump, or cut-to-able
+    | TyRegion                 -- ^ a region
+    | TyUnknown                -- ^ an unknown possibly undefined type, All of these must be eliminated by code generation
+    deriving(Eq,Ord)
+
+
+data FuncDef = FuncDef {
+    funcDefName  :: Atom,
+    funcDefBody  :: Lam,
+    funcDefCall  :: Val,
+    funcDefProps :: FuncProps
+    }
+
+createFuncDef local name body@(args :-> rest)  = FuncDef { funcDefName = name, funcDefBody = body, funcDefCall = call, funcDefProps = props } where
+    call = Item name (TyCall (if local then LocalFunction else Function) (map getType (fromTuple args)) (getType rest))
+    props = funcProps { funcFreeVars = freeVars body, funcTags = freeVars body }
+
+-- cached info
+data FuncProps = FuncProps {
+    funcInfo    :: Info.Info,
+    funcFreeVars :: Set.Set Var,
+    funcTags    :: Set.Set Tag,
+    funcExits   :: Perhaps,      -- ^ function quits the program
+    funcCuts    :: Perhaps,      -- ^ function cuts to a value
+    funcAllocs  :: Perhaps,      -- ^ function allocates memory
+    funcCreates :: Perhaps,      -- ^ function allocates memory and stores or returns it
+    funcLoops   :: Perhaps       -- ^ function may loop
+    }
+    deriving(Eq,Ord,Show)
+
+funcProps = FuncProps {
+    funcInfo = mempty,
+    funcFreeVars = mempty,
+    funcTags = mempty,
+    funcExits = Maybe,
+    funcCuts = Maybe,
+    funcAllocs = Maybe,
+    funcCreates = Maybe,
+    funcLoops = Maybe
+    }
+
+
+instance Show Ty where
+    show TyTag = "T"
+    show (Ty a) = fromAtom a
+    show TyNode = "N"
+    show (TyPtr t) = '&':show t
+    show (TyTup []) = "()"
+    show (TyTup ts) =  tupled (map show ts)
+    show TyRegion = "R"
+    show (TyCall c as rt) = show c <> tupled (map show as) <+> "->" <+> show rt
+    show TyUnknown = "?"
 
 instance Show (IORef a) where
     show _ = "IORef"
@@ -219,6 +267,8 @@ instance Show Val where
     showsPrec _ (Lit i _)  = tshow i
     showsPrec _ (Tup xs)  = tupled $ map shows xs
     showsPrec _ (Const v) = char '&' <> shows v
+    showsPrec _ (Item a  ty) = tshow a <> text "::" <> tshow ty
+    showsPrec _ (ValUnknown ty) = text "?::" <> tshow ty
     showsPrec _ (Addr _) = text "<ref>"
     showsPrec _ (ValPrim aprim xs _) = tshow aprim <> tupled (map tshow xs)
 
@@ -267,21 +317,7 @@ mapExpExp f (Case e as) = do
     return (Case e as')
 mapExpExp _ x = return x
 
-data Flag = No | Maybe | Yes
-    deriving(Eq,Ord,Enum,Show)
 
-
-instance Monoid Flag where
-    mempty = No
-    mappend a b = max a b
-    mconcat xs = maximum xs
-
-
-instance SemiBooleanAlgebra Flag where
-    (&&) = max
-    Yes || Yes = Yes
-    No || No = No
-    _ || _ = Maybe
 
 
 data Primitive = Primitive {
@@ -523,6 +559,11 @@ instance CanType Exp Ty where
     getType (Update w v) = tyUnit
     getType (Case _ []) = error "empty case"
     getType (Case _ ((_ :-> e):_)) = getType e
+    getType NewRegion { expLam = _ :-> body } = getType body
+    getType Alloc { expValue = v } = TyPtr (getType v)
+    getType Let { expBody = body } = getType body
+    getType MkCont { expRest = _ :-> rbody } = getType rbody
+    getType Call { expType = ty } = ty
 
 instance CanType Val Ty where
     getType (Tag _) = TyTag
@@ -534,6 +575,8 @@ instance CanType Val Ty where
     getType (NodeC {}) = TyNode
     getType (Addr _) = TyPtr (error "typecheck: Addr")
     getType (ValPrim _ _ ty) = ty
+    getType (ValUnknown ty) = ty
+    getType (Item _ ty) = ty
 
 instance FreeVars Lam (Set.Set Var) where
     freeVars (x :-> y) = freeVars y Set.\\ freeVars x

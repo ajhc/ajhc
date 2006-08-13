@@ -1,4 +1,4 @@
-module Grin.Val(FromVal(..),ToVal(..),tn_2Tup,world__,pworld__,valToList,convertName) where
+module Grin.Val(FromVal(..),ToVal(..),tn_2Tup,world__,pworld__,valToList,convertName,region_heap) where
 
 import Atom
 import Char
@@ -13,10 +13,10 @@ cons     = convertName dc_Cons
 cChar    = convertName dc_Char
 cInt     = convertName dc_Int
 tn_2Tup  = convertName $ nameTuple DataConstructor 2
---tn_True  = convertName dc_True  -- toAtom "CPrelude.True"
---tn_False = convertName dc_False -- toAtom "CPrelude.False"
 tn_Boolzh = convertName dc_Boolzh
 tn_unit  = convertName dc_Unit
+
+region_heap = Item (toAtom "heap") TyRegion
 
 instance ConNames Val where
     vTrue  = NodeC tn_Boolzh [toUnVal (1 :: Int)]
