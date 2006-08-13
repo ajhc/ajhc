@@ -50,6 +50,13 @@ instance Ord Entry where
 newtype Info = Info [Entry]
     deriving(HasSize,Typeable)
 
+-- the Eq and Ord instances for info make them all seem equivalent.
+instance Eq Info where
+    _ == _ = True
+instance Ord Info where
+    compare _ _ = EQ
+
+
 instance Show Info where
     show (Info ds) = show (sortUnder (show . entryType) ds)
 
