@@ -9,15 +9,18 @@ module Grin.Show(
     ) where
 
 import Char
-import Monad
+import Control.Monad.Writer
 import Data.Maybe
 import IO
-import qualified Data.Set as Set
-import Control.Monad.Writer
+import Monad
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Atom
 import CharIO
+import Data.Graph.Inductive.Basic(elfilter)
+import Data.Graph.Inductive.Graph(mkGraph,nmap)
+import Data.Graph.Inductive.Tree
 import Doc.Attr
 import Doc.DocLike
 import Doc.PPrint
@@ -27,12 +30,9 @@ import Grin.Val
 import Name.VConsts
 import Number
 import Options
-import qualified FlagDump as FD
-import Data.Graph.Inductive.Graph(mkGraph,nmap)
-import Data.Graph.Inductive.Basic(elfilter)
-import Util.Graphviz
-import Data.Graph.Inductive.Tree
 import Support.FreeVars
+import Util.Graphviz
+import qualified FlagDump as FD
 
 
 

@@ -3,25 +3,22 @@ module Grin.FromE(compile,typecheckGrin) where
 import Char
 import Data.Graph(stronglyConnComp, SCC(..))
 import Data.IORef
-import Data.Typeable
-import qualified Data.Map as Map
 import Data.Map(Map)
 import Data.Monoid
+import Data.Typeable
 import List
 import Maybe
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom
-import Control.Monad.Identity
-import qualified C.FFI as FFI
 import C.Prims
+import Control.Monad.Identity
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.E
-import qualified Info.Info as Info
-import Info.Types
 import E.FreeVars
 import E.Program
 import E.TypeCheck
@@ -30,13 +27,12 @@ import GenUtil
 import Grin.Grin
 import Grin.Show
 import Grin.Val
+import Info.Types
 import Name.Name
 import Name.Names
 import Name.VConsts
 import Options
 import PrimitiveOperators
-import qualified FlagDump as FD
-import qualified Stats
 import Stats(mtick)
 import Support.CanType
 import Support.FreeVars
@@ -44,6 +40,10 @@ import Support.Tuple
 import Util.Graph as G
 import Util.Once
 import Util.UniqueMonad()
+import qualified C.FFI as FFI
+import qualified FlagDump as FD
+import qualified Info.Info as Info
+import qualified Stats
 
 
 
