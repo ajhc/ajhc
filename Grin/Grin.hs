@@ -69,12 +69,13 @@ import Boolean.Algebra
 import C.FFI
 import C.Prims
 import Doc.DocLike
-import Support.FreeVars
 import GenUtil
 import Name.VConsts
 import Number
 import Support.CanType
+import Support.FreeVars
 import Support.Tuple
+import qualified Info.Info as Info
 
 -- Extremely simple first order monadic code with basic type system.  similar
 -- to GRIN except for the explicit typing on variables. Note, that certain
@@ -105,13 +106,18 @@ instance TypeNames Ty where
     tCharzh = Ty (toAtom "HsChar")
     tStar = Ty (toAtom "*")
 
+data Callable = Continuation | Function | Closure | LocalFunction | Primitive'
+    deriving(Eq,Ord)
+
 data Ty =
-    TyTag           -- ^ a lone tag
-    | TyPtr Ty      -- ^ pointer to a heap location which contains its argument
-    | TyNode        -- ^ a whole tagged node
-    | Ty Atom       -- ^ a basic type
-    | TyTup [Ty]    -- ^ unboxed list of values
-    | TyUnknown     -- ^ an unknown possibly undefined type, All of these must be eliminated by code generation
+    TyTag                      -- ^ a lone tag
+    | TyPtr Ty                 -- ^ pointer to a heap location which contains its argument
+    | TyNode                   -- ^ a whole tagged node
+    | Ty Atom                  -- ^ a basic type
+    | TyTup [Ty]               -- ^ unboxed list of values
+    | TyCall Callable [Ty] Ty  -- ^ something call,jump, or cut-to-able
+    | TyRegion                 -- ^ a region
+    | TyUnknown                -- ^ an unknown possibly undefined type, All of these must be eliminated by code generation
     deriving(Eq,Ord)
 
 instance Show Ty where
@@ -149,15 +155,32 @@ data Lam = Val :-> Exp
     deriving(Eq,Ord,Show)
 
 data Exp =
-     Exp :>>= Lam                                                   -- ^ Sequencing - the same as >>= for monads.
-    | App { expFunction :: Atom, expArgs :: [Val], expType :: Ty }  -- ^ Application of functions and builtins
-    | Prim { expPrimitive :: Primitive, expArgs :: [Val] }          -- ^ Primitive operation
-    | Case { expValue :: Val, expAlts :: [Lam] }                    -- ^ Case statement
-    | Return { expValue :: Val }                                    -- ^ Return a value
-    | Store { expValue :: Val }                                     -- ^ Allocate a new heap node
-    | Fetch { expAddress :: Val }                                   -- ^ Load given heap node
-    | Update { expAddress :: Val, expValue :: Val }                 -- ^ Update given heap node
-    | Error { expError :: String, expType :: Ty }                   -- ^ Abort with an error message, non recoverably.
+     Exp :>>= Lam                                                         -- ^ Sequencing - the same as >>= for monads.
+    | App       { expFunction  :: Atom, expArgs :: [Val], expType :: Ty } -- ^ Application of functions and builtins
+    | Prim      { expPrimitive :: Primitive, expArgs :: [Val] }           -- ^ Primitive operation
+    | Case      { expValue :: Val, expAlts :: [Lam] }                     -- ^ Case statement
+    | Return    { expValue :: Val }                                       -- ^ Return a value
+    | Store     { expValue :: Val }                                       -- ^ Allocate a new heap node
+    | Fetch     { expAddress :: Val }                                     -- ^ Load given heap node
+    | Update    { expAddress :: Val, expValue :: Val }                    -- ^ Update given heap node
+    | Call      { expValue :: Val,
+                  expArgs :: [Val],
+                  expType :: Ty,
+                  expJump :: Bool,
+                  expInfo :: Info.Info }                                  -- ^ Call or jump to a callable
+    | NewRegion { expLam :: Lam, expInfo :: Info.Info }                   -- ^ create a new region and pass it to its argument
+    | Alloc     { expValue :: Val,
+                  expCount :: Val,
+                  expRegion :: Val,
+                  expInfo :: Info.Info }                                  -- ^ allocate space for a number of values in the given region
+    | Let       { expDefs :: [(Atom,Lam)], expInfo :: Info.Info }         -- ^ A let of local functions
+    | MkClosure { expValue :: Val,
+                  expArgs :: [Val],
+                  expRegion :: Val,
+                  expType :: Ty,
+                  expInfo :: Info.Info }                                  -- ^ create a closure
+    | MkCont    { expLam :: Lam, expInfo :: Info.Info }                   -- ^ Make a continuation, always alloced on smallest enclosing region
+    | Error     { expError :: String, expType :: Ty }                     -- ^ Abort with an error message, non recoverably.
     deriving(Eq,Show,Ord)
 
 data Val =
@@ -169,6 +192,8 @@ data Val =
     | Var !Var Ty             -- ^ Variable
     | Tup [Val]               -- ^ Unboxed tuple
     | ValPrim APrim [Val] Ty  -- ^ Primitive value
+    | Item Atom Ty            -- ^ Specific named thing. function, global, region, etc..
+    | ValUnknown Ty           -- ^ Unknown or empty value
     | Addr {-# UNPACK #-} !(IORef Val)  -- ^ Used only in interpreter
     deriving(Eq,Ord)
 
