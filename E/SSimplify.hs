@@ -515,6 +515,12 @@ simplifyDs prog sopts dsIn = ans where
             [(t,e)] | worthStricting e, Just (Demand.S _) <- Info.lookup (tvrInfo t), not (getProperty prop_CYCLIC t) -> do
                 mtick "E.Simplify.strictness.let-to-case"
                 return $ eStrictLet t e e'
+            [(t,ec@ECase { eCaseScrutinee = sc@(EPrim (APrim p _) _ _), eCaseAlts = [], eCaseDefault = Just def })] | primEagerSafe p && not (getProperty prop_CYCLIC t) -> do
+                mtick "E.Simplify.strictness.cheap-eagerness.def"
+                return $ ec { eCaseDefault = Just $ ELetRec [(t,def)] e' }
+            [(t,ec@ECase { eCaseScrutinee = sc@(EPrim (APrim p _) _ _), eCaseAlts = [Alt c def], eCaseDefault = Nothing })] | primEagerSafe p && not (getProperty prop_CYCLIC t) -> do
+                mtick "E.Simplify.strictness.cheap-eagerness.con"
+                return $ ec { eCaseAlts = [Alt c (ELetRec [(t,def)] e')] }
             _ -> do
                 let fn ds (ELetRec { eDefs = ds', eBody = e}) | not (hasRepeatUnder fst (ds ++ ds')) = fn (ds' ++ ds) e
                     fn ds e = f ds (Set.fromList $ fsts ds) [] False where
@@ -770,7 +776,7 @@ simplifyDs prog sopts dsIn = ans where
         ec' <- caseBodiesMapM f ec
         let t = foldl eAp (eCaseType ec') xs
         return ec' { eCaseType = t }
-    app' (ELetRec ds e) xs = do
+    app' ELetRec { eDefs = ds, eBody = e } xs = do
         mticks (length xs) (toAtom "E.Simplify.let-application")
         e' <- app' e xs
         return $ eLetRec ds e'
@@ -842,7 +848,7 @@ someBenefit _ e _ | isAtomic e = True
 someBenefit _ ELit {} _ = True
 someBenefit _ EPi {} _ = True
 someBenefit _ EPrim {} _ = True
-someBenefit v (ELetRec ds e) xs | someBenefit v e xs = True
+someBenefit v ELetRec { eDefs = ds, eBody = e } xs | someBenefit v e xs = True
 --someBenefit _v ECase {} (_:_) = True
 someBenefit _ e xs | f e xs = True where
     f (ELam _ e) (_:xs) = f e xs

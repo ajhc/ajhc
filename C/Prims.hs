@@ -56,6 +56,17 @@ primIsConstant Operator { primOp = op } | op `elem` safeOps = True  where
     safeOps = ["+","-","*","==",">=","<=",">","<","&","|","^","~",">>","<<"]
 primIsConstant _ = False
 
+-- | whether a primitive can be eagarly evaluated.
+-- TODO needs grin support
+primEagerSafe :: Prim -> Bool
+primEagerSafe CConst {} = True
+primEagerSafe AddrOf {} = True
+primEagerSafe CCast {} = True
+primEagerSafe PrimTypeInfo {} = True
+primEagerSafe Operator { primOp = op } | op `elem` safeOps = True  where
+    safeOps = ["+","-","*","==",">=","<=",">","<","&","|","^","~",">>","<<"]
+primEagerSafe _ = False
+
 
 
 parsePrimString s = do
