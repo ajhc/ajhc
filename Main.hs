@@ -424,7 +424,7 @@ processDecls stats ho ho' tiData = do
         let mangle = mangle' (Just $ namesInscope' `union` fromList (map (tvrIdent . fst) cds)) fullDataTable
         cds <- flip mapM cds $ \ (v,lc) -> do
             lintCheckE onerrNone fullDataTable v lc
-            (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable v lc)
+            (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable 0 v lc)
             lc <- doopt mangle coreMini stats ("SuperSimplify 1: " ++ pprint v) cm lc
             lc <- mangle (return ()) coreMini ("Barendregt: " ++ pprint v) (return . barendregt) lc
             lc <- doopt mangle coreMini stats "Float Inward..." (\stats x -> return (floatInward x)) lc
@@ -435,7 +435,7 @@ processDecls stats ho ho' tiData = do
         cds <- Demand.solveDs fullDataTable cds
         cds <- flip mapM cds $ \ (v,lc) -> do
             lintCheckE onerrNone fullDataTable v lc
-            (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable v lc)
+            (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable 0 v lc)
             lc <- doopt mangle coreMini stats ("SuperSimplify 2: " ++ pprint v) cm lc
             lc <- mangle (return ()) coreMini ("Barendregt: " ++ pprint v) (return . barendregt) lc
             lintCheckE onerrNone fullDataTable v lc

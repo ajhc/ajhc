@@ -472,7 +472,7 @@ simplifyDs prog sopts dsIn = ans where
                 h e' xs' inb
             Nothing -> h (EVar v) xs' inb
     f e inb | (x,xs) <- fromAp e = do
-        eed <- etaExpandDef (so_dataTable sopts) tvr { tvrIdent = 0 } e
+        eed <- etaExpandDef (so_dataTable sopts) 0 tvr { tvrIdent = 0 } e
         case eed of
             Just (_,e) -> f e inb -- go e inb
             Nothing -> do
@@ -826,7 +826,11 @@ simplifyDs prog sopts dsIn = ans where
         s' <- mapM z ds
         let sub'' = fromList [ (t,susp e sub'') | (t, UseInfo { useOccurance = Once },_,e) <- s'] `union` fromList [ (t,Done (EVar t'))  | (t,n,t',_) <- s', useOccurance n /= Once] `union` envSubst inb
         (ds',inb') <- w s'  (cacheSubst (envSubst_s sub'' $ envInScope_u (fromList [ (tvrIdent t',NotKnown) | (_,n,t',_) <- s', useOccurance n /= Once] `union`) inb)) []
-        ds' <- sequence [ etaExpandDef' (so_dataTable sopts) t e | (t,e) <- ds']
+        let minArgs t = case Info.lookup (tvrInfo t) of
+                Just (UseInfo { minimumArgs = min }) -> min
+                Nothing -> 0
+
+        ds' <- sequence [ etaExpandDef' (so_dataTable sopts) (minArgs t) t e | (t,e) <- ds']
         return (ds',inb')
 
 
