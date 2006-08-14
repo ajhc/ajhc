@@ -14,8 +14,9 @@ import E.Subst
 import E.Traverse
 import E.TypeCheck
 import E.Values
+import Fixer.Fixer
+import Fixer.Supply
 import GenUtil
-import Info.Types
 import Name.Id
 import Name.Name
 import Stats
@@ -42,8 +43,60 @@ etaReduce e = case f e 0 of
         f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && not (tvrIdent t `member` (freeVars x :: IdSet)) = f x (n + 1)
         f e n = (e,n)
 
+calculateLiftees :: Program -> IO IdSet
+calculateLiftees prog = do
+    fixer <- newFixer
+    sup <- newSupply fixer
+
+    let f v env ELetRec { eDefs = ds, eBody = e } = do
+            let nenv = fromList [ (tvrIdent t,length (snd (fromLam e))) | (t,e) <- ds ]  `mappend` env
+                nenv :: IdMap Int
+                g (t,e@ELam {}) = do
+                    v <- supplyValue sup (tvrIdent t)
+                    let (a,_as) = fromLam e
+                    f v nenv a
+                g (t,e) = do
+                    f (value True) nenv e
+            mapM_ g ds
+            f v nenv e
+        f v env e@ESort {} = return ()
+        f v env e@Unknown {} = return ()
+        f v env e@EError {} = return ()
+        f v env (EVar TVr { tvrIdent = vv }) = do
+            nv <- supplyValue sup vv
+            assert nv
+        f v env e | (EVar TVr { tvrIdent = vv }, as@(_:_)) <- fromAp e, Just n <- mlookup vv env = do
+            nv <- supplyValue sup vv
+            if length as >= n then v `implies` nv else assert nv
+            mapM_ (f (value True) env) as
+        f v env e | (a, as@(_:_)) <- fromAp e = do
+            mapM_ (f (value True) env) as
+            f v env a
+        f v env (ELit (LitCons _ as _)) = mapM_ (f (value True) env) as
+        f v env ELit {} = return ()
+        f v env (EPi TVr { tvrType = a } b) = f (value True) env a >> f (value True) env b
+        f v env (EPrim _ as _) = mapM_ (f (value True) env) as
+        f v env ec@ECase {} = do
+            f v env (eCaseScrutinee ec)
+            mapM_ (f v env) (caseBodies ec)
+        f v env (ELam _ e) = f (value True) env e
+        f _ _ EAp {} = error "this should not happen"
+    mapM_ (f (value False) mempty) [ fst (fromLam e) | (_,e) <- programDs prog]
+
+    calcFixpoint "Liftees" fixer
+    vs <- supplyReadValues sup
+    mapM_ Prelude.print [ (tvr { tvrIdent = id },"Not Lifted") | (id,False) <- vs ]
+    return (fromList [ x | (x,False) <- vs])
+
+implies :: Value Bool -> Value Bool -> IO ()
+implies x y = addRule $ y `isSuperSetOf` x
+
+assert x = value True `implies` x
+
+
 lambdaLift ::  Program -> IO Program
 lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
+    noLift <- calculateLiftees prog
     let wp =  fromList [ tvrIdent x | (x,_,_) <- cs ]
     fc <- newIORef []
     statRef <- newIORef mempty
@@ -51,6 +104,10 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
             let ((v',cs'),stat) = runReader (runStatT $ execUniqT 1 $ runWriterT (f v)) S { funcName = mkFuncName (tvrIdent n), topVars = wp,isStrict = True, declEnv = [] }
             modifyIORef statRef (mappend stat)
             modifyIORef fc (\xs -> (n,as,v'):cs' ++ xs)
+        shouldLift t _ | tvrIdent t `member` noLift = False
+        shouldLift _ ECase {} = True
+        shouldLift _ ELam {} = True
+        shouldLift _ _ = False
         f e@(ELetRec ds _)  = do
             let (ds',e') = decomposeLet e
             h ds' e' []
@@ -59,7 +116,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
             --    h ds' e' []
         f e = do
             st <- asks isStrict
-            if (isELam e || (shouldLift tvr e && not st)) then do
+            if ((tvrIdent tvr `notMember` noLift && isELam e) || (shouldLift tvr e && not st)) then do
                 (e,fvs'') <- pLift e
                 doBigLift e fvs'' return
              else g e
@@ -79,6 +136,9 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                     return $ Alt l e'
             as' <- mapM z as
             return ec { eCaseAlts = as', eCaseDefault = d'}
+        g (ELam t e) = do
+            e' <- local (isStrict_s True) (g e)
+            return (ELam t e')
         g e = emapE' f e
         pLift e = do
             gs <- asks topVars
@@ -98,6 +158,10 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
             case fvs'' of
                 [] -> doLift t e (h ds rest ds')
                 fs -> doBigLift e fs (\e'' -> h ds rest ((t,e''):ds'))
+        h (Left (t,e@ELam {}):ds) rest ds' = do
+            let (a,as) = fromLam e
+            a' <- local (isStrict_s True) (f a)
+            h ds rest ((t,foldr ELam a' as):ds')
 
         h (Left (t,e):ds) rest ds'  = do
             let fvs =  freeVars e :: [Id]
@@ -117,9 +181,14 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                 fs -> doBigLiftR rs fs (\rs' -> h ds rest (rs' ++ ds'))
         h (Right rs:ds) e' ds'   = do
             local (isStrict_s False) $ do
-                rs' <- flip mapM rs $ \ (t,e) -> do
-                    e'' <- f e
-                    return (t,e'')
+                rs' <- flip mapM rs $ \te -> case te of
+                    (t,e@ELam {}) -> do
+                        let (a,as) = fromLam e
+                        a' <- local (isStrict_s True) (f a)
+                        return (t,foldr ELam a' as)
+                    (t,e) -> do
+                        e'' <- f e
+                        return (t,e'')
                 h ds e' (rs' ++ ds')
         h [] e ds = f e >>= return . eLetRec ds
         doLift t e r = local (topVars_u (insert (tvrIdent t)) ) $ do
@@ -181,11 +250,6 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
     nstat <- readIORef statRef
     return $ prog { progCombinators =  ncs, progStats = progStats prog `mappend` nstat }
 
-shouldLift _ ECase {} = True
-shouldLift t ELam {} | getProperty prop_JOINPOINT t = False
-shouldLift _ ELam {} = True
---shouldLift t ELetRec {eBody = e } = shouldLift t e
-shouldLift _ _ = False
 
 typeLift ECase {} = "Case"
 typeLift ELam {} = "Lambda"
