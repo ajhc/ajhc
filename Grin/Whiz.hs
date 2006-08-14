@@ -192,6 +192,7 @@ applySubstE env x = f x where
     f (Case e as) = do
         e <- g e
         return $ Case e as
+    f lt@Let {} = return lt
     f x = error $ "applySubstE: " ++ show x
 
 applySubst env x = f x where

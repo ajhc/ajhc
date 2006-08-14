@@ -126,6 +126,7 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as
                 | otherwise = addRule $ (doNode vv) `mappend` (doNode n)
             g (Store n) = addRule $ doNode n
             g (Fetch x) = addRule $ doNode x
+            g Let {} = return ()
             g Error {} = return ()
             -- TODO - handle function and case return values smartier.
             g (Return n) = addRule $ doNode n
