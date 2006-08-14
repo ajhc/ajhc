@@ -28,6 +28,7 @@ import Grin.Grin
 import Grin.Show
 import Grin.Val
 import Info.Types
+import Name.Id
 import Name.Name
 import Name.Names
 import Name.VConsts
@@ -40,6 +41,7 @@ import Support.Tuple
 import Util.Graph as G
 import Util.Once
 import Util.UniqueMonad()
+import Util.SetLike
 import qualified C.FFI as FFI
 import qualified FlagDump as FD
 import qualified Info.Info as Info
@@ -71,6 +73,7 @@ data CEnv = CEnv {
     tyEnv :: IORef TyEnv,
     funcBaps :: IORef [(Atom,Lam)],
     constMap :: Map Int Val,
+    localFuncMap :: IORef (IdMap (Atom,Int,Ty)),
     errorOnce :: OnceMap (Ty,String) Atom,
     counter :: IORef Int
 }
@@ -136,12 +139,14 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
         putErrLn "CAFS"
         putDocMLn putStr $ vcat [ pprint v <+> pprint n <+> pprint e | (v,n,e) <- rcafs ]
     errorOnce <- newOnceMap
+    lm <- newIORef mempty
     let doCompile = compile' dataTable CEnv {
             funcBaps = funcBaps,
             tyEnv = tyEnv,
             scMap = scMap,
             counter = counter,
             constMap = mempty,
+            localFuncMap = lm,
             errorOnce = errorOnce,
             ccafMap = Map.fromList $ [(tvrIdent v,e) |(v,_,e) <- cc ]  ++ [ (tvrIdent v,Var vv (TyPtr TyNode)) | (v,vv,_) <- rcafs]
             }
@@ -329,10 +334,14 @@ compile' dataTable cenv (tvr,as,e) = ans where
         return (Fetch (toVal tvr))
     ce e | (EVar tvr,as) <- fromAp e = do
         as <- return $ args as
+        lfunc <- readIORef (localFuncMap cenv)
         let fty = toType TyNode (getType e)
         case Map.lookup (tvrIdent tvr) (ccafMap cenv) of
             Just (Const c) -> app fty (Return c) as
             Just x@Var {} -> app fty (gEval x) as
+            Nothing | Just (v,n,rt) <- mlookup (tvrIdent tvr) lfunc -> do
+                    let (x,y) = splitAt n as
+                    app fty (App v x rt) y
             Nothing -> case Map.lookup (tvrIdent tvr) (scMap cenv) of
                 Just (v,as',es)
                     | length as >= length as' -> do
@@ -527,6 +536,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
 
     doLet ds e = f (decomposeDefns ds) e where
         f [] x = return x
+        f (Left te@(_,ELam {}):ds) x = f (Right [te]:ds) x
         f (Left (t,e):ds) x | not (isLifted (EVar t)) = do
             mtick "Grin.FromE.let-unlifted"
             e <- ce e
@@ -536,6 +546,22 @@ compile' dataTable cenv (tvr,as,e) = ans where
             e <- cc e
             v <- f ds x
             return $ e :>>= toVal t :-> v
+        f (Right bs:ds) x | any (isELam . snd) bs = do
+            let g (t,e@ELam {}) = do
+                    let (a,as) = fromLam e
+                        (nn,_,_) = toEntry (t,[],getType t)
+                    x <- ce a
+                    return $ [createFuncDef True nn (Tup (map toVal (filter (shouldKeep . getType) as)) :-> x)]
+                g' (t,e@ELam {}) = do
+                    let (a,as) = fromLam e
+                        (nn,_,_) = toEntry (t,[],getType t)
+                    modifyIORef (localFuncMap cenv) (minsert (tvrIdent t) (nn,length as,toType TyNode (getType a)))
+            mapM_ g' bs
+            v <- f ds x
+            defs <- mapM g bs
+            return $ Let { expDefs = concat defs , expBody = v, expInfo = mempty }
+
+
         f (Right bs:ds) x = do
             let g (tvr,_) y = (Store (NodeC (toAtom "@hole") []) :>>= toVal tvr :-> y)
                 u (tvr,e) = do

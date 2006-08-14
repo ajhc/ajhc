@@ -126,7 +126,8 @@ doE scombs funArg e = g (value (IsUsed True)) e where
             flip mapM_ (zip naturals as) $ \ (i,ta) -> do
                 v <- supplyValue funArg (tvrIdent tvr,i)
                 g v ta
-        f e | (a,as) <- fromAp e = do
+        f (ELam t e) = f e
+        f e | (a,as@(_:_)) <- fromAp e = do
             f a
             mapM_ f as
 

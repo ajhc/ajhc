@@ -18,6 +18,7 @@ module Grin.Grin(
     TyEnv(..),
     Val(..),
     Var(..),
+    createFuncDef,
     combineItems,
     emptyGrin,
     findArgs,
@@ -603,6 +604,12 @@ instance FreeVars Exp (Set.Set Var) where
     freeVars (Update x y) = freeVars (x,y)
     freeVars (Prim _ x) = freeVars x
     freeVars Error {} = Set.empty
+    freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (funcFreeVars . funcDefProps) fdefs) `mappend` freeVars body
+    freeVars NewRegion { expLam = l } = freeVars l
+    freeVars Alloc { expValue = v, expCount = c, expRegion = r } = freeVars (v,c,r)
+    freeVars Call { expValue = v, expArgs = as } = freeVars (v:as)
+    freeVars MkClosure { expValue = v, expArgs = as, expRegion = r } = freeVars (v,as,r)
+    freeVars MkCont { expCont = v, expRest = as} = freeVars (v,as)
 
 instance FreeVars Exp [Var] where
     freeVars e = Set.toList $ freeVars e
@@ -639,6 +646,12 @@ instance FreeVars Exp (Set.Set Tag) where
     freeVars (Update x y) = freeVars (x,y)
     freeVars (Prim _ x) = freeVars x
     freeVars Error {} = Set.empty
+    freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (funcTags . funcDefProps) fdefs) `mappend` freeVars body
+    freeVars NewRegion { expLam = l } = freeVars l
+    freeVars Alloc { expValue = v, expCount = c, expRegion = r } = freeVars (v,c,r)
+    freeVars Call { expValue = v, expArgs = as } = freeVars (v:as)
+    freeVars MkClosure { expValue = v, expArgs = as, expRegion = r } = freeVars (v,as,r)
+    freeVars MkCont { expCont = v, expRest = as} = freeVars (v,as)
 
 
 -- Points to information
