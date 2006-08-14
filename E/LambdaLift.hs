@@ -180,8 +180,8 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                 [] -> doLiftR rs (h ds rest ds')  -- We always lift CAFS to the top level for now. (GC?)
                 fs -> doBigLiftR rs fs (\rs' -> h ds rest (rs' ++ ds'))
         h (Right rs:ds) e' ds'   = do
-            local (isStrict_s False) $ do
-                rs' <- flip mapM rs $ \te -> case te of
+            rs' <- local (isStrict_s False) $ do
+                flip mapM rs $ \te -> case te of
                     (t,e@ELam {}) -> do
                         let (a,as) = fromLam e
                         a' <- local (isStrict_s True) (f a)
@@ -189,7 +189,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                     (t,e) -> do
                         e'' <- f e
                         return (t,e'')
-                h ds e' (rs' ++ ds')
+            h ds e' (rs' ++ ds')
         h [] e ds = f e >>= return . eLetRec ds
         doLift t e r = local (topVars_u (insert (tvrIdent t)) ) $ do
             --(e,tn) <- return $ etaReduce e
