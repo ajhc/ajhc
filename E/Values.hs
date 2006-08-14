@@ -12,6 +12,7 @@ import E.FreeVars()
 import E.Subst
 import E.TypeCheck
 import Info.Types
+import Info.Info(HasInfo(..))
 import Name.Id
 import Name.Name
 import Name.Names
@@ -194,6 +195,14 @@ instance HasProperties TVr where
     setProperty prop tvr = tvrInfo_u (setProperty prop) tvr
     unsetProperty prop tvr = tvrInfo_u (unsetProperty prop) tvr
     getProperty prop tvr = getProperty prop (tvrInfo tvr)
+
+    getProperties tvr = getProperties (tvrInfo tvr)
+    setProperties [] tvr = tvr
+    setProperties props tvr = tvrInfo_u (setProperties props) tvr
+
+instance HasInfo TVr where
+    getInfo = tvrInfo
+    modifyInfo = tvrInfo_u
 
 
 -- various routines used to classify expressions

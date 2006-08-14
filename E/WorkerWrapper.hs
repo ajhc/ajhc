@@ -4,6 +4,7 @@ import Control.Monad.Writer
 import Data.Monoid
 import Maybe
 import Monad
+import qualified Data.Set as Set
 
 import DataConstructors
 import E.CPR
@@ -89,7 +90,8 @@ workWrap' dataTable tvr e | isJust res = ans where
         f ((Absent,_):rs) = f rs
         f ((Plain,_):rs) = f rs
         f ((Cons c ts,t):rs) = eCase (EVar t) [Alt (LitCons (conName c) (snds ts) (getType t)) (f (ts ++ rs))] Unknown
-    ans = doTicks >> return ((setProperty prop_WRAPPER tvr,wrapper),(setProperty prop_WORKER tvr',worker))
+    nprops = Set.toList $ getProperties tvr `Set.intersection` Set.fromList [prop_JOINPOINT, prop_ONESHOT]
+    ans = doTicks >> return ((setProperty prop_WRAPPER tvr,wrapper),(setProperties (prop_WORKER:nprops) tvr',worker))
     tvr' = TVr { tvrIdent = workerName (tvrIdent tvr), tvrInfo = mempty, tvrType = wt }
     worker = foldr ELam body' (args' ++ navar) where
         body' = eLetRec lets $ case cname of
@@ -141,7 +143,7 @@ performWorkWrap dataTable ds = runWriter (wwDs ds) where
             e' <- wwE e
             return ([(tvr,e')]:: [(TVr,E)])
     --wwE :: E -> Stats.StatT Identity E
-    wwE (ELetRec ds e) = do
+    wwE ELetRec { eDefs = ds, eBody =  e } = do
         ds' <- wwDs ds
         e' <- wwE e
         return (ELetRec ds' e')

@@ -64,11 +64,21 @@ class HasProperties a where
     setProperty :: Atom -> a -> a
     unsetProperty :: Atom -> a -> a
     getProperty :: Atom -> a -> Bool
+    getProperties :: a -> Set.Set Atom
+    setProperties :: [Atom] -> a -> a
+
+    setProperty prop x = setProperties [prop] x
+    setProperties xs x = foldr setProperty x xs
+    getProperty atom x = atom `Set.member` getProperties x
 
 instance HasProperties Properties where
     setProperty prop (Properties x) = Properties (Set.insert prop x)
     unsetProperty prop (Properties x) = Properties (Set.delete prop x)
     getProperty prop (Properties x) = Set.member prop x
+
+    getProperties (Properties x) = x
+    setProperties [] p = p
+    setProperties xs (Properties x) = Properties (x `mappend` Set.fromList xs)
 
 
 instance HasProperties Info where
@@ -82,8 +92,14 @@ instance HasProperties Info where
         Nothing -> info
     getProperty prop info = getProperty prop (Info.fetch info :: Properties)
 
+    getProperties info = getProperties (Info.fetch info :: Properties)
+    setProperties [] info = info
+    setProperties props info = case Info.lookup info of
+        Just p@(Properties _) -> Info.insert (setProperties props p) info
+        Nothing -> Info.insert (Properties $ Set.fromList props) info
 
-setProperties :: HasProperties a => [Atom] -> a -> a
-setProperties [] nfo = nfo
-setProperties (p:ps) nfo = setProperty p (setProperties ps nfo)
+
+--setProperties :: HasProperties a => [Atom] -> a -> a
+--setProperties [] nfo = nfo
+--setProperties (p:ps) nfo = setProperty p (setProperties ps nfo)
 
