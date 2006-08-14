@@ -160,14 +160,14 @@ data Exp =
                   expCount :: Val,
                   expRegion :: Val,
                   expInfo :: Info.Info }                                  -- ^ allocate space for a number of values in the given region
-    | Let       { expDefs :: [(Atom,Lam)],
+    | Let       { expDefs :: [FuncDef],
                   expBody :: Exp,
                   expInfo :: Info.Info }                                  -- ^ A let of local functions
     | MkClosure { expValue :: Val,
                   expArgs :: [Val],
                   expRegion :: Val,
                   expType :: Ty,
-                  expInfo :: Info.Info }                                  -- ^ create a closure
+                  expInfo :: Info.Info }                   -- ^ create a closure
     | MkCont    { expCont :: Lam,                          -- ^ the continuation routine
                   expRest :: Lam,                          -- ^ the computation that is passed the newly created computation
                   expInfo :: Info.Info }                   -- ^ Make a continuation, always allocated on region encompasing expRest
@@ -204,7 +204,7 @@ data FuncDef = FuncDef {
     funcDefBody  :: Lam,
     funcDefCall  :: Val,
     funcDefProps :: FuncProps
-    }
+    } deriving(Eq,Ord,Show)
 
 createFuncDef local name body@(args :-> rest)  = FuncDef { funcDefName = name, funcDefBody = body, funcDefCall = call, funcDefProps = props } where
     call = Item name (TyCall (if local then LocalFunction else Function) (map getType (fromTuple args)) (getType rest))
