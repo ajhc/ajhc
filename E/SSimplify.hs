@@ -39,6 +39,7 @@ import Info.Types
 import Name.Id
 import Name.Name
 import Name.VConsts
+import Number
 import Options
 import Stats hiding(new,print,Stats,singleton)
 import Support.CanType
@@ -703,6 +704,17 @@ simplifyDs prog sopts dsIn = ans where
     h :: OutE -> [OutE] -> Env -> SM m OutE
     h (EVar v) xs' inb = do
         z <- applyRule v xs' inb
+        let txs = map tx xs' where
+                tx (ELit l) = knowLit l
+                tx EPi {} = KnowSomething
+                tx (EVar v) = case mlookup (tvrIdent v) (envInScope inb) of
+                    Just (NotAmong xs) -> KnowNotOneOf xs
+                    Just IsBoundTo { bindingE = ELit l } -> knowLit l
+                    Just IsBoundTo {} -> KnowSomething
+                    _ -> KnowNothing
+                tx _ = KnowNothing
+                knowLit (LitCons c _ _) = KnowIsCon c
+                knowLit (LitInt n _) = KnowIsNum n
         case z of
             (Just (x,xs)) -> didInline inb x xs  -- h x xs inb
             _ -> case mlookup (tvrIdent v) (envInScope inb) of
@@ -711,19 +723,19 @@ simplifyDs prog sopts dsIn = ans where
                 Just IsBoundTo { bindingE = e, bindingAtomic = True }  -> do
                     mtick  (toAtom $ "E.Simplify.inline.atomic/{" ++ tvrShowName v  ++ "}")
                     didInline inb e xs'
-                Just IsBoundTo { bindingE = e, inlineForced = ForceInline } | someBenefit v e xs' -> do
+                Just IsBoundTo { bindingE = e, inlineForced = ForceInline } | someBenefit v e txs -> do
                     mtick  (toAtom $ "E.Simplify.inline.Forced/{" ++ tvrShowName v  ++ "}")
                     didInline inb e xs'
-                Just IsBoundTo { bindingE = e } | forceInline v, someBenefit v e xs' -> do
+                Just IsBoundTo { bindingE = e } | forceInline v, someBenefit v e txs -> do
                     mtick  (toAtom $ "E.Simplify.inline.forced/{" ++ tvrShowName v  ++ "}")
                     didInline inb e xs'
-                Just IsBoundTo { bindingOccurance = OnceInLam, bindingE = e, bindingCheap = True } | someBenefit v e xs' -> do
+                Just IsBoundTo { bindingOccurance = OnceInLam, bindingE = e, bindingCheap = True } | someBenefit v e txs -> do
                     mtick  (toAtom $ "E.Simplify.inline.OnceInLam/{" ++ showName (tvrIdent v)  ++ "}")
                     didInline inb e xs'
-                Just IsBoundTo { bindingOccurance = ManyBranch, bindingE = e } | multiInline v e xs' -> do
+                Just IsBoundTo { bindingOccurance = ManyBranch, bindingE = e } | multiInline v e txs -> do
                     mtick  (toAtom $ "E.Simplify.inline.ManyBranch/{" ++ showName (tvrIdent v)  ++ "}")
                     didInline inb  e xs'
-                Just IsBoundTo { bindingOccurance = Many, bindingE = e, bindingCheap = True } | multiInline v e xs' -> do
+                Just IsBoundTo { bindingOccurance = Many, bindingE = e, bindingCheap = True } | multiInline v e txs -> do
                     mtick  (toAtom $ "E.Simplify.inline.Many/{" ++ showName (tvrIdent v)  ++ "}")
                     didInline inb  e xs'
                 Just _ -> appVar v xs'
@@ -818,38 +830,88 @@ simplifyDs prog sopts dsIn = ans where
         return (ds',inb')
 
 
+data KnowSomething = KnowNothing | KnowNotOneOf [Name] | KnowIsCon Name | KnowIsNum Number | KnowSomething
+    deriving(Eq)
+
 
 someBenefit _ e _ | isAtomic e = True
 someBenefit _ ELit {} _ = True
 someBenefit _ EPi {} _ = True
 someBenefit _ EPrim {} _ = True
 someBenefit v (ELetRec ds e) xs | someBenefit v e xs = True
-someBenefit _v ECase {} (_:_) = True
+--someBenefit _v ECase {} (_:_) = True
 someBenefit _ e xs | f e xs = True where
-    f (ELam _ e) (x:xs) = f e xs
-    f ELam {} [] = False
-    f _ _ = True
-someBenefit v e xs = False
-
-multiInline _ e xs | isSmall (f e xs) = True  where -- should be noSizeIncrease
-    f e [] = e
     f (ELam _ e) (_:xs) = f e xs
-    f e xs = foldl EAp e xs
+    f ELam {} [] = any (/= KnowNothing) xs
+    f _ _ = not (null xs)
+someBenefit v e xs = any (/= KnowNothing) xs
+
+exprSize ::
+    Int            -- ^ maximum size before bailing out
+    -> E           -- ^ expression
+    -> Int         -- ^ discount for case of something known
+    -> [(Id,KnowSomething)]        -- ^ things that are known
+    -> Maybe Int
+exprSize max e discount known = f max e >>= \n -> return (max - n) where
+    f n _ | n <= 0 = fail "exprSize: expression too big"
+    f n EVar {} = return $! n - 1
+    f n (EAp x@(EVar v) y) | Just _ <- lookup (tvrIdent v) known = do
+        v <- f (n + discount) x
+        f v x
+    f n (EAp x y) = do
+        v <- f n x
+        f v x
+    f n (ELam t x) = f (n - 1) x
+    f n EPi {} = return $! n - 1
+    f n ELit {} = return $! n - 1
+    f n ESort {} = return $! n - 1
+    f n EPrim {} = return $! n - 1
+    f n EError {} = return $! n - 1
+    f n ec@ECase { eCaseScrutinee = EVar tv } | Just l <- lookup (tvrIdent tv) known = do
+        n <- f (n + discount) (EVar tv)
+        let g n []  | Just d <- eCaseDefault ec = f n d
+                    | otherwise  = return n
+            g n (Alt (LitCons c' _ _) e:rs) | KnowIsCon c <- l = if c == c' then f n e else g n rs
+            g n (Alt (LitInt c' _) e:rs) | KnowIsNum c <- l = if c == c' then f n e else g n rs
+            g n (Alt (LitCons c _ _) e:rs) | KnowNotOneOf na <- l = if c `elem` na then g n rs else f n e >>= \n' -> g n' rs
+            g n (Alt _ e:rs) = f n e >>= \n' -> g n' rs
+        g n (eCaseAlts ec)
+    f n ec@ECase {} = do
+        n <- f n (eCaseScrutinee ec)
+        foldM f n (caseBodies ec)
+    f n ELetRec {eDefs = ds, eBody = e } = do
+        n <- foldM f n (snds ds)
+        f n e
+
+
+noSizeIncrease e xs = f e xs where
+    currentSize = 1 + length xs
+    f (ELam t e) (x:xs) = f e xs
+    f ELam {} [] = False -- ^ abort if we will create a lambda
+    f e [] = isJust $ exprSize currentSize  e 3 []
+    f e xs = isJust $ exprSize (currentSize - length xs) e 3 []
+
+
+--multiInline _ e xs | isSmall (f e xs) = True  where -- should be noSizeIncrease
+--    f e [] = e
+--    f (ELam _ e) (_:xs) = f e xs
+--    f e xs = foldl EAp e xs
+--
+--
+
+scrutineeDiscount = 4
+extraArgDiscount = 1
+knowSomethingDiscount = 2
+
+multiInline _ e xs | noSizeIncrease e xs = True
 multiInline v e xs | not (someBenefit v e xs) = False
-multiInline _ e xs = length xs + 2 >= (nsize + if safeToDup b then negate 4 else 0)  where
-    (b,as) = fromLam e
-    nsize = size b + abs (length as - length xs)
-    size e | (x,xs) <- fromAp e = size' x + length xs
-    size' (EVar _) = 1
-    size' (ELit _) = 1
-    size' (EPi _ _) = 1
-    size' (ESort _) = 1
-    size' (EPrim _ _ _) = 1
-    size' (EError _ _) = -1
-    size' ec@ECase {} | EVar v <- eCaseScrutinee ec, v `elem` as = sum (map size (caseBodies ec)) - 3
-    size' ec@ECase {} = size (eCaseScrutinee ec) + sum (map size (caseBodies ec))
-    size' (ELetRec ds e) = size e + sum (map (size . snd) ds)
-    size' _ = 2
+multiInline v e xs = f e xs [] where
+    currentSize = 1 + length xs
+    f (ELam t e) (KnowNothing:xs) rs = f e xs rs
+    f (ELam t e) (x:xs) rs = f e xs ((tvrIdent t,x):rs)
+    f e xs rs = isJust $ exprSize (knowSomethingDiscount*(length rs) + discount + currentSize + (if null xs then 0 else extraArgDiscount)) e scrutineeDiscount rs where
+           discount = if safeToDup e then 4 else 0
+
 
 
 worthStricting EError {} = True
