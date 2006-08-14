@@ -674,15 +674,18 @@ convertMatches funcs tv cType bs ms err = match bs ms err where
         f _ = error "FromHs.convertMatches.match"
     match _ [] err = return err
     match (b:bs) ps err = f patternGroups err where
+        isJoinPoint (EAp (EVar x) _) | getProperty prop_JOINPOINT x = True
+        isJoinPoint _ = False
         f  [] err = return err
         f (ps:pss) err = do
             err' <- f pss err
-            if isEVar err' || isEError err' then
+            if isEVar err' || isEError err' || isJoinPoint err' then
                g ps err'
                else do
-                [ev] <- newVars [getType err']
-                nm <- g ps (EVar ev)
-                return $ eLetRec [(ev,err')] nm
+                [ev] <- newVars [EPi tvr { tvrType = unboxedTyUnit } $ getType err']
+                let ev' = setProperties [prop_ONESHOT, prop_JOINPOINT] ev
+                nm <- g ps (EAp (EVar ev') unboxedUnit)
+                return $ eLetRec [(ev',ELam (setProperty prop_ONESHOT tvr { tvrType = unboxedTyUnit }) err')] nm
         g ps err
             | all (not . isStrictPat) patternHeads = match bs [(ps',eLetRec (toBinding p) . e)  | (p:ps',e) <- ps] err
             | any (isHsPAsPat || isHsPNeg || isHsPIrrPat) patternHeads = g (map (procAs b) ps) err

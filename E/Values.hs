@@ -32,14 +32,16 @@ instance Tuple E where
 eTuple :: [E] -> E
 eTuple = tuple
 
-eTuple' es = ELit $ LitCons (unboxedNameTuple DataConstructor (length es)) es (ltTuple' ts) where
-    ts = map getType es
-
-
+eTuple' es = ELit $ unboxedTuple es
 
 unboxedTuple es =  LitCons (unboxedNameTuple DataConstructor (length es)) es (ltTuple' ts) where
     ts = map getType es
 
+unboxedUnit :: E
+unboxedUnit =  ELit $ unboxedTuple []
+
+unboxedTyUnit :: E
+unboxedTyUnit = ltTuple' []
 
 class ToE a where
     toE :: a -> E
