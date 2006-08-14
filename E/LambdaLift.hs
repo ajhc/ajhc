@@ -9,19 +9,20 @@ import List hiding(insert)
 import Atom
 import E.E
 import E.FreeVars
-import E.Subst
 import E.Program
+import E.Subst
 import E.Traverse
 import E.TypeCheck
 import E.Values
-import Support.FreeVars
 import GenUtil
+import Info.Types
+import Name.Id
 import Name.Name
 import Stats
-import Util.UniqueMonad
+import Support.FreeVars
 import Util.Graph as G
 import Util.SetLike
-import Name.Id
+import Util.UniqueMonad
 
 
 
@@ -58,7 +59,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
             --    h ds' e' []
         f e = do
             st <- asks isStrict
-            if (isELam e || (shouldLift e && not st)) then do
+            if (isELam e || (shouldLift tvr e && not st)) then do
                 (e,fvs'') <- pLift e
                 doBigLift e fvs'' return
              else g e
@@ -92,7 +93,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                     | otherwise = f ss e x
                 fvs'' = reverse $ topSort $ newGraph fvs' tvrIdent freeVars
             f ss e False
-        h (Left (t,e):ds) rest ds' | shouldLift e = do
+        h (Left (t,e):ds) rest ds' | shouldLift t e = do
             (e,fvs'') <- pLift e
             case fvs'' of
                 [] -> doLift t e (h ds rest ds')
@@ -106,7 +107,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                 [] -> doLift t e (h ds rest ds')  -- We always lift CAFS to the top level for now. (GC?)
                 _ ->  local (isStrict_s False) (f e) >>= \e'' -> h ds rest ((t,e''):ds')
         --h (Left (t,e):ds) e' ds' = local (isStrict_s False) (f e) >>= \e'' -> h ds e' ((t,e''):ds')
-        h (Right rs:ds) rest ds' | any shouldLift (snds rs)  = do
+        h (Right rs:ds) rest ds' | any (uncurry shouldLift) rs  = do
             gs <- asks topVars
             let fvs =  freeVars (snds rs)--   (Set.fromList (map tvrIdent $ fsts rs) `Set.union` gs)
             let fvs' = filter (not . (`member` (fromList (map tvrIdent $ fsts rs) `mappend` gs) ) . tvrIdent) fvs
@@ -155,7 +156,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
         doBigLiftR rs fs dr = do
             ds <- asks declEnv
             rst <- flip mapM rs $ \ (t,e) -> do
-                case shouldLift e of
+                case shouldLift t e of
                     True -> do
                         mtick (toAtom $ "E.LambdaLift.doBigLiftR." ++ typeLift e ++ "." ++ show (length fs))
                         let tt = typeInfer' dataTable ds (foldr ELam e fs)
@@ -180,10 +181,11 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
     nstat <- readIORef statRef
     return $ prog { progCombinators =  ncs, progStats = progStats prog `mappend` nstat }
 
-shouldLift ECase {} = True
-shouldLift ELam {} = True
-shouldLift ELetRec {eBody = e } = shouldLift e
-shouldLift _ = False
+shouldLift _ ECase {} = True
+shouldLift t ELam {} | getProperty prop_JOINPOINT t = False
+shouldLift _ ELam {} = True
+--shouldLift t ELetRec {eBody = e } = shouldLift t e
+shouldLift _ _ = False
 
 typeLift ECase {} = "Case"
 typeLift ELam {} = "Lambda"
