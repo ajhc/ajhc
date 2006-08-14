@@ -63,13 +63,21 @@ data Occurance =
     | ManyBranch  -- ^ used once in several branches
     | Many        -- ^ used many or an unknown number of times
     | LoopBreaker -- ^ chosen as a loopbreaker, never inline
+    deriving(Show,Eq,Ord)
+
+data UseInfo = UseInfo {
+    useOccurance :: !Occurance,   -- ^ occurance Info
+    minimumArgs  :: !Int          -- ^ minimum number of args that are ever passed to this function (if used)
+    }
     deriving(Show,Eq,Ord,Typeable)
 
+noUseInfo = UseInfo { useOccurance = Many, minimumArgs = 0 }
+notUsedInfo = UseInfo { useOccurance = Unused, minimumArgs = maxBound }
 
 programPruneOccurance :: Program -> Program
 programPruneOccurance prog =
     let dsIn = programDs (runIdentity $ programMapBodies (return . subst (tVr (-1) Unknown) Unknown) prog)
-        (dsIn',(OMap fvs,uids)) = runReaderWriter (unOM $ collectDs dsIn $ if progClosed prog then mempty else fromList $ map (flip (,) Many) (map (tvrIdent . fst) dsIn)) (fromList $ map tvrIdent $ progEntryPoints prog)
+        (dsIn',(OMap fvs,uids)) = runReaderWriter (unOM $ collectDs dsIn $ if progClosed prog then mempty else fromList $ map (flip (,) noUseInfo) (map (tvrIdent . fst) dsIn)) (fromList $ map tvrIdent $ progEntryPoints prog)
     in (programSetDs dsIn' prog) { progFreeIds = idMapToIdSet fvs, progUsedIds = uids }
 
 
@@ -78,8 +86,8 @@ newtype OM a = OM (ReaderWriter IdSet (OMap,IdSet) a)
 
 unOM (OM a) = a
 
-newtype OMap = OMap (IdMap Occurance)
-   deriving(HasSize,SetLike,BuildSet (Id,Occurance),MapLike Id Occurance,Show,IsEmpty,Eq,Ord)
+newtype OMap = OMap (IdMap UseInfo)
+   deriving(HasSize,SetLike,BuildSet (Id,UseInfo),MapLike Id UseInfo,Show,IsEmpty,Eq,Ord)
 
 instance Monoid OMap where
     mempty = OMap mempty
@@ -94,7 +102,7 @@ maybeLetRec ds e = ELetRec ds e
 grump :: OM a -> OM (a,OMap)
 grump m = fmap ( \ (x, (y,z)) -> (x,y) ) $ censor (\ (_,y) -> (mempty,y)) (listen m)
 
-collectOccurance' :: E -> (E,IdMap Occurance)
+collectOccurance' :: E -> (E,IdMap UseInfo)
 collectOccurance' e = (fe,omap) where
     (fe,(OMap omap,_)) = runReaderWriter (unOM $ collectOccurance e) mempty
 
@@ -135,9 +143,14 @@ collectOccurance e = f e  where
         return (foldr ELam b' as'')
     f e | Just (x,t) <- from_unsafeCoerce e  = do x <- f x ; t <- (arg (f t)); return (prim_unsafeCoerce x t)
     f (EVar tvr@TVr { tvrIdent = n, tvrType =  t}) = do
-        tell $ (msingleton n Once,mempty)
+        tell $ (msingleton n UseInfo { useOccurance = Once, minimumArgs = 0 },mempty)
         t <- arg (f t)
         return $ EVar tvr { tvrType = t }
+    f e | (EVar tvr@TVr { tvrIdent = n, tvrType = t},xs@(_:_)) <- fromAp e = do
+        tell $ (msingleton n UseInfo { useOccurance = Once, minimumArgs = length xs },mempty)
+        t <- arg (f t)
+        xs <- arg (mapM f xs)
+        return (foldl EAp (EVar tvr { tvrType = t}) xs)
     f e | (x,xs@(_:_)) <- fromAp e = do
         x <- f x
         xs <- arg (mapM f xs)
@@ -151,7 +164,7 @@ collectOccurance e = f e  where
         b <- arg (ftvr b)
         tell $ (mdelete (tvrIdent b) fidm,singleton (tvrIdent b))
         return ec { eCaseScrutinee = scrut', eCaseAlts = as', eCaseBind = annbind' fidm b, eCaseType = ct, eCaseDefault = d'}
-    f (ELetRec ds e) = do
+    f ELetRec { eDefs = ds, eBody = e } = do
         (e',fve) <- grump (f e)
         ds''' <- collectDs ds fve
         return (maybeLetRec ds''' e')
@@ -165,21 +178,21 @@ collectOccurance e = f e  where
         tell (fvs',fromList $ map tvrIdent (litBinds l'))
         return (Alt l' e')
     arg m = do
-        let mm (OMap mp,y) = (OMap $ fmap (const Many) mp,y)
+        let mm (OMap mp,y) = (OMap $ fmap (const noUseInfo) mp,y)
         censor mm m
     ftvr tvr = do
         tt <- f (tvrType tvr)
         return tvr { tvrType = tt }
 
 -- delete any occurance info for non-let-bound vars to be safe
-annb' tvr = tvrInfo_u (Info.delete Many) tvr
+annb' tvr = tvrInfo_u (Info.delete noUseInfo) tvr
 annbind' idm tvr = case mlookup (tvrIdent tvr) idm of
     Nothing -> annb' tvr { tvrIdent = 0 }
     Just _ -> annb' tvr
 
 -- add ocucrance info
 annbind idm tvr = case mlookup (tvrIdent tvr) idm of
-    Nothing -> annb Unused tvr { tvrIdent = 0 }
+    Nothing -> annb notUsedInfo tvr { tvrIdent = 0 }
     Just x -> annb x tvr
 annb x tvr = tvrInfo_u (Info.insert x) tvr
 
@@ -194,7 +207,7 @@ collectBinding :: Bind -> OM (Bind,OMap)
 collectBinding (t,e) = do
     e' <- collectOccurance e
     let rvars = freeVars (Info.fetch (tvrInfo t) :: ARules) :: IdMap TVr
-        romap = OMap $ fmap (const Many) rvars
+        romap = OMap $ fmap (const noUseInfo) rvars
     return ((t,e'),romap)
 
 unOMap (OMap x) = x
@@ -218,15 +231,15 @@ collectDs ds (OMap fve) = do
             | tvrIdent t `member` cycNodes = setProperty prop_CYCLIC t
             | otherwise = t
         lup t = case tvrIdent t `elem` [ tvrIdent t | (((t,_),_),_) <- lb] of
-            True -> LoopBreaker
+            True -> noUseInfo { useOccurance = LoopBreaker }
             False -> case  (tvrIdent t `member` exp) of
-                True -> Many
+                True -> noUseInfo
                 False | Just r <- mlookup (tvrIdent t) fids -> r
         ds''' = [ (calcStrictInfo $ annbind ffids t ,e) | ((t,e),_) <- ds'']
         froo (t,e) = ((t {tvrType = t' },e),fvs) where
             (t',fvs) = collectOccurance' (tvrType t)
         (ds'''',nfids) = unzip $ map froo ds'''
-        nfid' = fmap (const Many) (mconcat nfids)
+        nfid' = fmap (const noUseInfo) (mconcat nfids)
     tell $ ((OMap $ nfid' `andOM` fids) S.\\ ffids,fromList (map (tvrIdent . fst) ds''''))
     return (ds'''')
 
@@ -236,20 +249,27 @@ loopFunc t e = negate (baseInlinability t e)
 
 
 inLam (OMap om) = OMap (fmap il om) where
-    il Once = OnceInLam
-    il _ = Many
+    il ui@UseInfo { useOccurance = Once } = ui { useOccurance = OnceInLam }
+    il ui = ui { useOccurance = Many }
 
+--andOM :: IdMap UseInfo -> IdMap UseInfo -> IdMap UseInfo
 andOM x y = munionWith andOcc x y
-andOcc Unused x = x
-andOcc x Unused = x
-andOcc _ _ = Many
+andOcc UseInfo { useOccurance = Unused } x = x
+andOcc x UseInfo { useOccurance = Unused } = x
+andOcc x y = UseInfo { useOccurance = Many, minimumArgs = min (minimumArgs x) (minimumArgs y) }
 
 orMaps ms = OMap $ fmap orMany $ foldl (munionWith (++)) mempty (map (fmap (:[])) (map unOMap ms)) where
     unOMap (OMap m) = m
 
 orMany [] = error "empty orMany"
-orMany [x] = x
-orMany xs = if all (== Once) xs then ManyBranch else Many
+orMany xs = f (filter ((/= Unused) . useOccurance) xs) where
+    f [] = notUsedInfo
+    f [x] = x
+    f xs = if all good (map useOccurance xs) then ui ManyBranch else ui Many where
+        good Once = True
+        good ManyBranch = True
+        good _ = False
+        ui x = UseInfo { minimumArgs =  minimum (map minimumArgs xs), useOccurance = x }
 
 
 
@@ -285,10 +305,10 @@ data Binding =
     {-! derive: is !-}
 
 isBoundTo o e = IsBoundTo {
-    bindingOccurance = o,
+    bindingOccurance = useOccurance o,
     bindingE = e,
     bindingCheap = isCheap e,
-    inlineForced = if o == LoopBreaker then ForceNoinline else NotForced,
+    inlineForced = if useOccurance o == LoopBreaker then ForceNoinline else NotForced,
     bindingAtomic = atomic
     } where
     atomic = isAtomic e
@@ -419,7 +439,7 @@ simplifyDs prog sopts dsIn = ans where
     initialB = let
             bb (t,(_,e)) | isFullyConst e = [(t,Done e)]
             bb _ = []
-        in cacheSubst mempty { envSubst = fromList $ concatMap bb  (massocs $ so_boundVars sopts),  envInScope =  fmap (\ (t,e) -> fixInline finalPhase t $ isBoundTo Many e) (so_boundVars sopts) }
+        in cacheSubst mempty { envSubst = fromList $ concatMap bb  (massocs $ so_boundVars sopts),  envInScope =  fmap (\ (t,e) -> fixInline finalPhase t $ isBoundTo noUseInfo e) (so_boundVars sopts) }
     doit = do
         addNamesIdSet (progUsedIds prog)
         addBoundNamesIdSet (progFreeIds prog)
@@ -487,7 +507,7 @@ simplifyDs prog sopts dsIn = ans where
         v' <- nname v inb
         e' <- f e (insertDoneSubst v (EVar v') . insertInScope (tvrIdent v') NotKnown $ inb) --        minsert (tvrIdent v) (Done $ EVar v') sub)
         return $ ELam v' e'
-    g (ELetRec ds@(_:_) e) inb = do
+    g ELetRec { eDefs = ds@(_:_), eBody =  e } inb = do
         (ds',inb') <- doDs ds inb
         e' <- f e inb'
         case ds' of
@@ -495,9 +515,9 @@ simplifyDs prog sopts dsIn = ans where
                 mtick "E.Simplify.strictness.let-to-case"
                 return $ eStrictLet t e e'
             _ -> do
-                let fn ds (ELetRec ds' e) | not (hasRepeatUnder fst (ds ++ ds')) = fn (ds' ++ ds) e
+                let fn ds (ELetRec { eDefs = ds', eBody = e}) | not (hasRepeatUnder fst (ds ++ ds')) = fn (ds' ++ ds) e
                     fn ds e = f ds (Set.fromList $ fsts ds) [] False where
-                        f ((t,ELetRec ds' e):rs) us ds b | all (not . (`Set.member` us)) (fsts ds') = f ((t,e):rs) (Set.fromList (fsts ds') `Set.union` us) (ds':ds) True
+                        f ((t,ELetRec { eDefs = ds', eBody = e}):rs) us ds b | all (not . (`Set.member` us)) (fsts ds') = f ((t,e):rs) (Set.fromList (fsts ds') `Set.union` us) (ds':ds) True
                         f (te:rs) us ds b = f rs us ([te]:ds) b
                         f [] _ ds True = fn (concat ds) e
                         f [] _ ds False = (concat ds,e)
@@ -516,7 +536,7 @@ simplifyDs prog sopts dsIn = ans where
         return $ tvr { tvrIdent = n', tvrType =  t'' }
     -- TODO - case simplification
     doCase :: OutE -> InE -> InTVr -> [Alt InE] -> (Maybe InE) -> Env -> SM m OutE
-    doCase (ELetRec ds e) t b as d inb = do
+    doCase ELetRec { eDefs = ds, eBody = e} t b as d inb = do
         mtick "E.Simplify.let-from-case"
         e' <- doCase e t b as d inb
         return $ substLet' ds e'
@@ -569,12 +589,12 @@ simplifyDs prog sopts dsIn = ans where
     doCase e _ b [] (Just d) inb | not (isLifted e || isUnboxed (getType e)) = do
         mtick "E.Simplify.case-unlifted"
         b' <- nname b inb
-        d' <- f d (insertDoneSubst b (EVar b') (insertInScope (tvrIdent b') (fixInline finalPhase b' $ isBoundTo Many e) inb))
+        d' <- f d (insertDoneSubst b (EVar b') (insertInScope (tvrIdent b') (fixInline finalPhase b' $ isBoundTo noUseInfo e) inb))
         return $ eLet b' e d'
     doCase e@ELam {} _ b [] (Just d) inb  = do
         mtick "E.Simplify.case-lambda"
         b' <- nname b inb
-        d' <- f d (insertDoneSubst b (EVar b') (insertInScope (tvrIdent b') (fixInline finalPhase b' $ isBoundTo Many e) inb))
+        d' <- f d (insertDoneSubst b (EVar b') (insertInScope (tvrIdent b') (fixInline finalPhase b' $ isBoundTo noUseInfo e) inb))
         return $ eLet b' e d'
     -- atomic unboxed values may be substituted or discarded without replicating work or affecting program semantics.
     doCase e _ b [] (Just d) inb | isUnboxed (getType e), isAtomic e = do
@@ -601,8 +621,8 @@ simplifyDs prog sopts dsIn = ans where
             (EVar v,0) -> do
                 nn <- newName
                 b' <- return b' { tvrIdent = nn }
-                return $ (insertInScope (tvrIdent v) (isBoundTo Many (EVar b')),b')
-            (EVar v,_) -> return $ (insertDoneSubst b (EVar b') . insertInScope (tvrIdent v) (isBoundTo Many (EVar b')),b')
+                return $ (insertInScope (tvrIdent v) (isBoundTo noUseInfo (EVar b')),b')
+            (EVar v,_) -> return $ (insertDoneSubst b (EVar b') . insertInScope (tvrIdent v) (isBoundTo noUseInfo (EVar b')),b')
             _ -> return $ (insertDoneSubst b (EVar b'),b')
         let dd e' = f e' ( ids $ envInScope_u (newinb `union`) inb) where
                 na = NotAmong [ n | Alt (LitCons n _ _) _ <- as]
@@ -621,7 +641,7 @@ simplifyDs prog sopts dsIn = ans where
                 e' <- f ae (ids $ substAddList nsub (envInScope_u (ninb `union`) $ mins e (patToLitEE p') inb))
                 return $ Alt p' e'
             --mins (EVar v) e = envInScope_u (minsert (tvrIdent v) (isBoundTo Many e))
-            mins _ e | 0 `notMember` (freeVars e :: IdSet) = insertInScope (tvrIdent b') (isBoundTo Many e)
+            mins _ e | 0 `notMember` (freeVars e :: IdSet) = insertInScope (tvrIdent b') (isBoundTo noUseInfo e)
             mins _ _ = id
             --mins _ _ = id
 
@@ -648,7 +668,7 @@ simplifyDs prog sopts dsIn = ans where
             Just (bs,e) -> do
                 let bs' = [ x | x@(TVr { tvrIdent = n },_) <- bs, n /= 0]
                 binds <- mapM (\ (v,e) -> nname v inb >>= return . (,,) e v) bs'
-                e' <- f e (substAddList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] $ envInScope_u (fromList [ (n,isBoundTo Many e) | (e,_,TVr { tvrIdent = n }) <- binds] `union`) inb)
+                e' <- f e (substAddList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] $ envInScope_u (fromList [ (n,isBoundTo noUseInfo e) | (e,_,TVr { tvrIdent = n }) <- binds] `union`) inb)
                 return $ eLetRec [ (v,e) | (e,_,v) <- binds ] e'
             Nothing -> do
                 return $ EError ("match falls off bottom: " ++ pprint l) t'
@@ -749,22 +769,22 @@ simplifyDs prog sopts dsIn = ans where
         return $ foldl EAp e as
     doDs ds inb = do
         addNames $ map (tvrIdent . fst) ds
-        let z :: (InTVr,InE) -> SM m (Id,Occurance,OutTVr,InE)
+        let z :: (InTVr,InE) -> SM m (Id,UseInfo,OutTVr,InE)
             z (t,EVar t') | t == t' = do    -- look for simple loops and replace them with errors.
                 t'' <- nname t inb
                 mtick $ "E.Simplify.<<loop>>.{" ++ showName (tvrIdent t) ++ "}"
-                return (tvrIdent t,Many,t'',EError "<<loop>>" (getType t))
+                return (tvrIdent t,noUseInfo,t'',EError "<<loop>>" (getType t))
             z (t,e) = do
                 t' <- nname t inb
                 case Info.lookup (tvrInfo t) of
-                    _ | forceNoinline t -> return (tvrIdent t,LoopBreaker,t',e)
-                    Just Once -> return (tvrIdent t,Once,error $ "Once: " ++ show t,e)
+                    _ | forceNoinline t -> return (tvrIdent t,noUseInfo { useOccurance = LoopBreaker },t',e)
+                    Just ui@UseInfo { useOccurance = Once } -> return (tvrIdent t,ui,error $ "Once: " ++ show t,e)
                     Just n -> return (tvrIdent t,n,t',e)
                     -- We don't want to inline things we don't have occurance info for because they might lead to an infinite loop. hopefully the next pass will fix it.
-                    Nothing -> return (tvrIdent t,LoopBreaker,t',e)
+                    Nothing -> return (tvrIdent t,noUseInfo { useOccurance = LoopBreaker },t',e)
                     -- Nothing -> error $ "No Occurance info for " ++ show t
-            w :: [(Id,Occurance,OutTVr,InE)] -> Env -> [(OutTVr,OutE)] -> SM m ([(OutTVr,OutE)],Env)
-            w ((t,Once,t',e):rs) inb ds = do
+            w :: [(Id,UseInfo,OutTVr,InE)] -> Env -> [(OutTVr,OutE)] -> SM m ([(OutTVr,OutE)],Env)
+            w ((t,UseInfo { useOccurance = Once },t',e):rs) inb ds = do
                 mtick $ "E.Simplify.inline.Once/{" ++ showName t ++ "}"
                 w rs inb ds -- (minsert t (Susp e sub) sub) inb ds
             w ((t,n,t',e):rs) inb ds = do
@@ -792,8 +812,8 @@ simplifyDs prog sopts dsIn = ans where
                 --    _ -> w rs (cacheSubst $ envInScope_u (minsert (tvrIdent t') (isBoundTo n e')) inb)  ((t',e'):ds)
             w [] inb ds = return (ds,inb)
         s' <- mapM z ds
-        let sub'' = fromList [ (t,susp e sub'') | (t,Once,_,e) <- s'] `union` fromList [ (t,Done (EVar t'))  | (t,n,t',_) <- s', n /= Once] `union` envSubst inb
-        (ds',inb') <- w s'  (cacheSubst (envSubst_s sub'' $ envInScope_u (fromList [ (tvrIdent t',NotKnown) | (_,n,t',_) <- s', n /= Once] `union`) inb)) []
+        let sub'' = fromList [ (t,susp e sub'') | (t, UseInfo { useOccurance = Once },_,e) <- s'] `union` fromList [ (t,Done (EVar t'))  | (t,n,t',_) <- s', useOccurance n /= Once] `union` envSubst inb
+        (ds',inb') <- w s'  (cacheSubst (envSubst_s sub'' $ envInScope_u (fromList [ (tvrIdent t',NotKnown) | (_,n,t',_) <- s', useOccurance n /= Once] `union`) inb)) []
         ds' <- sequence [ etaExpandDef' (so_dataTable sopts) t e | (t,e) <- ds']
         return (ds',inb')
 
