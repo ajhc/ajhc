@@ -4,25 +4,23 @@ import Char
 import Control.Monad.Identity
 import Data.Monoid
 import List
-import qualified Data.Map as Map
-import qualified Data.Set as Set
 import Ratio
 
-import Support.CanType
-import Support.Tuple
 import C.Prims
 import E.E
 import E.FreeVars()
 import E.Subst
 import E.TypeCheck
-import qualified Info.Info as Info
-import Support.FreeVars
 import Info.Types
+import Name.Id
 import Name.Name
 import Name.Names
 import Name.VConsts
-import Name.Id
+import Support.CanType
+import Support.FreeVars
+import Support.Tuple
 import Util.SetLike
+import qualified Info.Info as Info
 
 
 instance Tuple E where

@@ -17,28 +17,26 @@ import Atom
 import DataConstructors
 import Doc.PPrint
 import E.E
-import E.Subst
-import E.Program
 import E.Inline
-import Info.Info as Info hiding(member,delete)
+import E.Program
 import E.Rules
+import E.Subst
 import E.Traverse
 import E.TypeCheck
 import E.Values
 import GenUtil
+import Info.Info as Info hiding(member,delete)
+import Info.Types
+import Name.Id
 import Name.Name
 import Name.Names
 import Options
-import qualified CharIO as C
-import qualified Util.Graph as G
 import Stats
 import Support.CanType
 import Support.FreeVars
-import Util.UniqueMonad
 import Util.SetLike
-import Name.Id
-import Info.Types
-import qualified CharIO
+import Util.UniqueMonad
+import qualified Util.Graph as G
 
 
 
@@ -65,7 +63,7 @@ atomizeAp atomizeTypes dataTable stats modName e = f e  where
         ds' <- sequence [  f y >>= return . (,) x | (x,y) <- ds ]
         doLetRec stats ds' x
     g,h :: E -> IO (E,[(TVr,E)])
-    g (ELetRec ds e) = do
+    g ELetRec { eDefs = ds, eBody = e } = do
         e' <- f e
         return (e',ds)
     g (ELam tvr e) = do
@@ -95,7 +93,7 @@ atomizeAp atomizeTypes dataTable stats modName e = f e  where
             (xs',dss) <- fmap unzip (mapM h xs)
             return (foldl EAp x' xs', concat (ds:dss))
     h e | isAtomic e = return (e,[])
-    h (ELetRec ds e) = do
+    h ELetRec { eDefs = ds, eBody = e } = do
         (e',ds') <- h e
         return (e',ds' ++ ds)
     h e = do
@@ -115,19 +113,19 @@ doCoalesce stats (x,xs) = ans where
     ans = do
         (xs',dss) <- fmap unzip (mapM at xs)
         case x of
-            ELetRec ds' (ELetRec ds'' x') -> do
+            ELetRec { eDefs = ds', eBody = ELetRec { eDefs = ds'', eBody = x' } } -> do
                 liftIO $ tick stats (toAtom "E.LetFloat.coalesce.fromLet")
                 fromLet2 (concat $ ds'':ds':dss) (foldl EAp x' xs')
             ec@ECase { eCaseScrutinee = (ELetRec ds' x') }  -> do
                 liftIO $ tick stats (toAtom "E.LetFloat.coalesce.fromCase")
                 fromLet2 (concat $ ds':dss) (foldl EAp (ec { eCaseScrutinee = x' } ) xs')
-            ELetRec ds' x' | not (List.null xs) -> do
+            ELetRec { eDefs = ds', eBody = x' } | not (List.null xs) -> do
                 liftIO $ tick stats (toAtom "E.LetFloat.coalesce.fromAp")
                 fromLet2 (concat $ ds':dss) (foldl EAp x' xs')
-            ELetRec ds x' -> do
+            ELetRec { eDefs = ds, eBody = x' } -> do
                 fromLet2 (concat $ ds:dss) (foldl EAp x' xs')
             x -> fromLet2 (concat dss) (foldl EAp x xs')
-    at (ELetRec ds e) = do
+    at ELetRec { eDefs = ds, eBody = e } = do
         liftIO $ tick stats (toAtom "E.LetFloat.coalesce.fromArg")
         return (e,ds)
     at e = return (e,[])
@@ -190,7 +188,7 @@ floatInwardE e fvs = f e fvs where
     f ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault =  d } xs = ans where
         ans = letRec p' $ ec { eCaseScrutinee = (f e pe), eCaseAlts = [ Alt l (f e pn) | Alt l e <- as | pn <- ps ], eCaseDefault = (fmap (flip f pd) d)}
         (p',_:pe:pd:ps) = sepByDropPoint (mconcat [freeVars l | Alt l _ <- as ]:freeVars e: tvrIdent b `delete` freeVars d :[freeVars a | a <- as ]) xs
-    f (ELetRec ds e) xs = g (G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- ds ] (tvrIdent . fst . fst) (idSetToList . snd) ) xs where
+    f ELetRec { eDefs = ds, eBody = e } xs = g (G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- ds ] (tvrIdent . fst . fst) (idSetToList . snd) ) xs where
         g [] p' = f e p'
         g ((Left ((v,ev),fv)):xs) p = g xs (p0 ++ [Left ((v,ev'),bindingFreeVars v ev')] ++ p') where
             ev' = if getProperty prop_ONESHOT v then floatInwardE' ev pv else f ev pv
@@ -292,7 +290,7 @@ floatOutward prog = do
             ma (Alt (LitCons n xs t)  b) = Alt (LitCons n (map m xs) t) b
             ma a = a
             imap' = Map.fromList [ (tvrIdent t,n) | t <- caseBinds ec] `Map.union` imap
-        g n (ELetRec ds e) imap = dds (map G.fromScc $ decomposeDs ds) [] e imap where
+        g n ELetRec { eDefs = ds, eBody = e } imap = dds (map G.fromScc $ decomposeDs ds) [] e imap where
             dds (ts:rs) nrs e imap = dds rs (ts':nrs) e imap' where
                 n' = maximum (Level 1:[ lup t | t <- fvs ])
                 lup n = case Map.lookup n imap of
@@ -311,7 +309,7 @@ floatOutward prog = do
         return $ tl (t,e') imap)
 
 
-    let dofloat (ELetRec ds e) = do
+    let dofloat ELetRec { eDefs = ds, eBody = e } = do
             e' <- dofloat e
             ds' <- mapM df ds
             return (ELetRec (concat ds') e')
@@ -340,7 +338,7 @@ floatOutward prog = do
         dtl (t,e) = do
             (e,fs) <- runWriterT (dofloat e)
             let (e',fs') = case e of
-                    ELetRec ds e -> (e,ds++snds fs)
+                    ELetRec { eDefs = ds, eBody = e } -> (e,ds++snds fs)
                     _ -> (e,snds fs)
                 -- we imediatly float inward to clean up cruft and spurious outwards floatings
                 (e'',fs'') = cDefs $ floatInward (ELetRec fs' e')
@@ -377,7 +375,7 @@ letBindAll ::
     -> IO E
 letBindAll  dataTable modName e = f e  where
     f :: E -> IO E
-    f (ELetRec ds e) = do
+    f ELetRec { eDefs = ds, eBody = e } = do
         ds' <- mapMSnd f ds
         e' <- g e
         return $ ELetRec ds' e'

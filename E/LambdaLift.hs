@@ -25,18 +25,12 @@ import Name.Id
 
 
 
-{-
--- | pull lets from just in definitions to top level, as they can obscure lambdas.
-flattenSC :: SC -> SC
-flattenSC (SC v cs) = SC v (concatMap f cs) where
-    f (t,[],ELetRec ds e) = fd (t,e):map fd ds
-    f (t,as,e) = [(t,as,e)]
-    fd (t,e) =  let (c,b) = fromLam e in (t,b,c)
-
-lambdaLiftE stats dt e = fmap scToE (lambdaLift stats dt (eToSC dt e))
--}
-
-data S = S { funcName :: Name, topVars :: IdSet, isStrict :: Bool, declEnv :: [(TVr,E)] }
+data S = S {
+    funcName :: Name,
+    topVars :: IdSet,
+    isStrict :: Bool,
+    declEnv :: [(TVr,E)]
+    }
     {-! derive: update !-}
 
 etaReduce :: E -> (E,Int)
@@ -47,13 +41,14 @@ etaReduce e = case f e 0 of
         f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && not (tvrIdent t `member` (freeVars x :: IdSet)) = f x (n + 1)
         f e n = (e,n)
 
-lambdaLift :: Stats -> Program -> IO Program
-lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs } = do
+lambdaLift ::  Program -> IO Program
+lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
     let wp =  fromList [ tvrIdent x | (x,_,_) <- cs ]
     fc <- newIORef []
+    statRef <- newIORef mempty
     let z (n,as,v) = do
             let ((v',cs'),stat) = runReader (runStatT $ execUniqT 1 $ runWriterT (f v)) S { funcName = mkFuncName (tvrIdent n), topVars = wp,isStrict = True, declEnv = [] }
-            tickStat stats stat
+            modifyIORef statRef (mappend stat)
             modifyIORef fc (\xs -> (n,as,v'):cs' ++ xs)
         f e@(ELetRec ds _)  = do
             let (ds',e') = decomposeLet e
@@ -182,10 +177,12 @@ lambdaLift stats prog@Program { progDataTable = dataTable, progCombinators = cs 
             Nothing -> toName Val ("LL@",'f':show x)
     mapM_ z cs
     ncs <- readIORef fc
-    return $ prog { progCombinators =  ncs }
+    nstat <- readIORef statRef
+    return $ prog { progCombinators =  ncs, progStats = progStats prog `mappend` nstat }
 
 shouldLift ECase {} = True
 shouldLift ELam {} = True
+shouldLift ELetRec {eBody = e } = shouldLift e
 shouldLift _ = False
 
 typeLift ECase {} = "Case"
@@ -201,25 +198,4 @@ removeType t v e = ans where
 -}
 
 
-
-
---        h ((t,e):ds) rest ds' | shouldLift e = do
---            let fvs =  freeVars e
---            gs <- asks topVars
---            let fvs' = filter (not . (`Set.member` gs) . tvrIdent) fvs
---                fvs'' = reverse $ topSort $ newGraph fvs' tvrIdent freeVars
---            case fvs'' of
---                [] -> doLift t e (h ds rest ds')
---                fs -> doBigLift e fs (\e'' -> h ds rest ((t,e''):ds'))
-
-
---        f e = do
---            st <- asks isStrict
---            if (isELam e || (shouldLift e && not st)) then do
---                let (fvs :: [TVr]) = freeVars e
---                (gs :: Set.Set Int) <- asks topVars
---                let fvs' = filter (not . (`Set.member` gs) . tvrIdent) fvs
---                    fvs'' = reverse $ topSort $ newGraph fvs' tvrIdent freeVars
---                doBigLift e fvs'' return
---             else emapE' f e
 

@@ -624,9 +624,7 @@ compileModEnv' stats (ho,_) = do
         prog <- programPrune prog
         prog <- barendregtProg prog
         wdump FD.CoreBeforelift $ printProgram prog
-        finalStats <- Stats.new
-        prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift finalStats } prog
-        wdump FD.Progress $ Stats.print "PostLifting" finalStats
+        prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift } prog
         wdump FD.CoreAfterlift $ printProgram prog -- printCheckName dataTable (programE prog)
         compileToGrin prog
         exitSuccess
@@ -662,11 +660,18 @@ compileModEnv' stats (ho,_) = do
     prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify no rules" True prog
     prog <- barendregtProg prog
 
+
+    -- We should float inward right before lambda lifting so that when a case statement is lifted out, it takes any local definitions with it.
+--    prog <- transformProgram transformParms {
+--        transformCategory = "FloatInward",
+--        transformDumpProgress = dump FD.Progress,
+--        transformOperation = programFloatInward
+--        } prog
     -- perform lambda lifting
     wdump FD.CoreBeforelift $ printProgram prog
-    finalStats <- Stats.new
-    prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift finalStats } prog
+    prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift } prog
 
+    finalStats <- Stats.new
     -- final optimization pass to clean up lambda lifting droppings
     rs' <- flip mapM (progCombinators prog) $ \ (t,ls,e) -> do
         let cm stats e = do
@@ -1073,6 +1078,7 @@ printCheckName'' dataTable tvr e = do
 
 printESize :: String -> Program -> IO ()
 printESize str prog = putErrLn $ str ++ " program e-size: " ++ show (eSize (programE prog))
+
 
 
 

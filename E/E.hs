@@ -66,7 +66,7 @@ data E = EAp E E
     | Unknown
     | ESort ESort
     | ELit !(Lit E E)
-    | ELetRec [(TVr, E)] E
+    | ELetRec { eDefs :: [(TVr, E)], eBody :: E }
     | EPrim APrim [E] E
     | EError String E
     | ECase {
