@@ -46,6 +46,7 @@ prop_METHOD = toAtom "_METHOD"
 -- | whether a function is exported
 prop_EXPORTED = toAtom "_EXPORTED"
 
+prop_JOINPOINT = toAtom "_JOINPOINT"
 prop_WORKER = toAtom "_WORKER"
 prop_WRAPPER = toAtom "_WRAPPER"
 prop_CYCLIC = toAtom "_CYCLIC"
