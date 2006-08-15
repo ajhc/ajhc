@@ -75,10 +75,10 @@ constantItem _ = fail "not constant item"
 {-# NOINLINE unboxReturnValues #-}
 unboxReturnValues :: Grin -> IO Grin
 unboxReturnValues grin = do
-    let tcgraph = newGraph [ (n, Set.toList $ tailcalls body) | (n,body) <- grinFunctions grin] fst snd
+    let tcgraph = newGraph [ (n, Set.toList $ tailcalls body) | (n,body) <- grinFuncs  grin] fst snd
         ubc a | Just v <- Map.lookup a (grinReturnTags grin) = unboxingCandidate v
         ubc _ = False
-        cfns = filter ubc (fsts $ grinFunctions grin)
+        cfns = filter ubc (fsts $ grinFuncs grin)
         pf fn | Just item <- Map.lookup fn (grinReturnTags grin) =
             do x <- unboxFunction fn item ; return $ Map.singleton fn x
         fns = Map.unions $ concatMap pf cfns
@@ -95,10 +95,9 @@ unboxReturnValues grin = do
     putStrLn "Unboxed return values"
     mapM_ putStrLn [ "  " ++ show fn ++ " - " ++  show nt | (fn,(_,_,nt,_)) <- Map.toList fns]
 
-    let newgrin = grin {
+    let newgrin = setGrinFunctions (map doFunc (grinFuncs grin)) grin {
         grinReturnTags = Map.mapWithKey retTag (grinReturnTags grin),
-        grinTypeEnv = mtenv (grinTypeEnv grin),
-        grinFunctions = map doFunc (grinFunctions grin)
+        grinTypeEnv = mtenv (grinTypeEnv grin)
         }
     if Map.null fns then return newgrin else unboxReturnValues newgrin
 

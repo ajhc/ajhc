@@ -231,7 +231,7 @@ bind (Tup vs) p | sameLength vs vs' = tell mempty { varEq = vs'  }  where
 bind x y = error $ unwords ["bind:",show x,show y]
 
 analyze :: Grin -> IO PointsTo
-analyze grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinCafs = cafs }) = do
+analyze grin@(Grin { grinTypeEnv = typeEnv, grinCafs = cafs }) = do
     wdump FD.Progress $ CharIO.putErrLn "Linear nodes analysis..."
     lr <- Grin.Linear.grinLinear grin
     flip mapM_ lr $ \ (x,y) -> CharIO.putStrLn $ show x ++ " - " ++ show y
@@ -250,7 +250,7 @@ analyze grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinC
             heapEq = heapEq', -- [ (h,toHEq node) | (v,node) <- cafs | h <- [1..] ],
             varEq =  [ (v,Ptr h) | (v,_) <- cafs | h <- [1..] ]
             }
-        (neq,hc) = mapFst flattenPointsToEq $ foldl f  (eq,hc') grinFunctions
+        (neq,hc) = mapFst flattenPointsToEq $ foldl f  (eq,hc') (grinFuncs grin)
         func ('B':xs) = Func $ toAtom $ 'b':xs
         func ('F':xs) = Func $ toAtom $ 'f':xs
         func x = error $ "func:" ++ x
@@ -292,7 +292,7 @@ createStore  te ts
 
 {-# NOINLINE grinInlineEvalApply #-}
 grinInlineEvalApply :: Stats -> Grin -> IO Grin
-grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinCafs = cafs }) = do
+grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv,  grinCafs = cafs }) = do
     pt <- analyze grin
     wdump FD.Progress $ do
         CharIO.putStrLn (pointsToStats pt)
@@ -395,11 +395,10 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
                 ts = case findArgsType te atom of
                     Just (ts,_) -> ts
                     _ -> []
-    let (sts,funcs) = unzip [ (stat,(a,l')) | (a,l) <- grinFunctions, let (l',stat) = runStatM (f l) ]
+    let (sts,funcs) = unzip [ (stat,(a,l')) | (a,l) <- grinFuncs grin, let (l',stat) = runStatM (f l) ]
     tickStat stats (mconcat sts)
-    return grin {
+    return $ setGrinFunctions funcs grin {
         grinPhase = PostInlineEval,
-        grinFunctions = funcs,
         grinArgTags = convertArgs $ ptFuncArgs pt,
         grinReturnTags = Map.mapWithKey (funcReturn te pt) $ ptFunc pt
         }
@@ -782,7 +781,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
 
 
     let makeEntry v i n ty | Just x <- Map.lookup v ptVars = ((n,i),(ty,x))
-        ptFuncArgs = [ makeEntry v i n ty | (n,~(Tup xs) :-> _) <- grinFunctions grin, (i,~(Var v ty)) <- zip naturals xs]
+        ptFuncArgs = [ makeEntry v i n ty | (n,~(Tup xs) :-> _) <- grinFuncs grin, (i,~(Var v ty)) <- zip naturals xs]
 
 
     wdump FD.Eval $ do

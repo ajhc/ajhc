@@ -70,7 +70,6 @@ import qualified E.SSimplify as SS
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified FrontEnd.Tc.Type as Type
-import qualified Grin.Interpret
 import qualified Grin.MangleE as Mangle(mangle)
 import qualified Grin.PointsToAnalysis
 import qualified Grin.Simplify
@@ -718,8 +717,8 @@ compileToGrin prog = do
     lintCheckGrin x
     let opt s  x = do
         stats' <- Stats.new
-        nf <- mapMsnd (grinPush stats') (grinFunctions x)
-        x <- return x { grinFunctions = nf }
+        nf <- mapMsnd (grinPush stats') (grinFuncs x)
+        x <- return $ setGrinFunctions nf x
         wdump FD.GrinPass $ printGrin x
         x <- Grin.Simplify.simplify stats' x
         lintCheckGrin x
@@ -794,10 +793,11 @@ dumpFinalGrin grin = do
 
 compileGrinToC grin = do
     when (optMode options == Interpret) $ do
-        progress "Interpreting..."
-        (v,stats) <- Grin.Interpret.evaluate grin
-        CharIO.putStrLn $ render $ Grin.Show.prettyVal v
-        wdump FD.Stats $  Stats.print "Stats" stats
+        putErrLn "Interpreting not supported."
+        --progress "Interpreting..."
+        --(v,stats) <- Grin.Interpret.evaluate grin
+        --CharIO.putStrLn $ render $ Grin.Show.prettyVal v
+        --wdump FD.Stats $  Stats.print "Stats" stats
         return ()
     let (cg,rls) = compileGrin grin
     let fn = optOutName options

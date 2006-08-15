@@ -499,7 +499,7 @@ simplify ::
     -> IO Grin
 simplify stats grin = do
     let postEval = phaseEvalInlined (grinPhase grin)
-        fs = grinFunctions grin
+        fs = grinFuncs grin
         uf = [ ((a,l),collectUsedFuncs l) | (a,l) <- fs ]
         graph = newGraph uf (\ ((a,_),_) -> a) (\ (_,(fi,fd)) -> (if postEval then [] else fi) ++ fd)
         rf = reachable graph (grinEntryPointNames grin)
@@ -547,7 +547,7 @@ simplify stats grin = do
             return ((a,nl):out , inline `Map.union` env)
 
     (nf,_) <- foldM procF ([],mempty) os
-    return grin { grinFunctions = nf }
+    return $ setGrinFunctions nf grin
 
 
 noInline = [toAtom "fData.IORef.readIORef", toAtom "fData.IORef.writeIORef"]

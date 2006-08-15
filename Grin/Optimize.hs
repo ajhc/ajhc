@@ -69,7 +69,7 @@ grinPush stats lam = ans where
         return (exp'::Exp)
     fixupLet lt@Let { expDefs = defs, expBody = b } = do
         let def = (Set.fromList $ map funcDefName defs)
-            f (e :>>= l :-> r) | Set.null (freeVars e `Set.intersect` def) = do
+            f (e :>>= l :-> r) | Set.null (freeVars e `Set.intersection` def) = do
                 exp <- f r
                 return (e :>>= l :-> exp)
             f r = return lt {  expBody = r }
@@ -139,13 +139,13 @@ performSpeculate specs grin = do
             mtick $ "Optimize.speculate.update.{" ++ show t'
             return (App t' xs TyNode :>>= n1 :-> Update v n1)
         h e = mapExpExp h e
-    fs <- mapM f (grinFunctions grin)
-    return grin { grinFunctions = fs }
+    fs <- mapM f (grinFuncs grin)
+    return $ setGrinFunctions fs grin
 
 findSpeculatable :: Grin -> [Atom]
 findSpeculatable grin = ans where
     ans = [ x | Left (x,_) <- scc graph ]
-    graph = newGraph [ (a,concatMap f (freeVars l)) | (a,_ :-> l) <- grinFunctions grin, isSpeculatable l, getType l == TyNode ] fst snd
+    graph = newGraph [ (a,concatMap f (freeVars l)) | (a,_ :-> l) <- grinFuncs grin, isSpeculatable l, getType l == TyNode ] fst snd
     f t | tagIsSuspFunction t = [tagFlipFunction t]
         | tagIsFunction t = [t]
         | otherwise = []

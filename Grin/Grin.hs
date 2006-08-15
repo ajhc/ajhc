@@ -20,7 +20,9 @@ module Grin.Grin(
     Var(..),
     extendTyEnv,
     createFuncDef,
+    setGrinFunctions,
     combineItems,
+    grinFuncs,
     emptyGrin,
     findArgs,
     findArgsType,
@@ -212,6 +214,9 @@ createFuncDef local name body@(args :-> rest)  = FuncDef { funcDefName = name, f
     call = Item name (TyCall (if local then LocalFunction else Function) (map getType (fromTuple args)) (getType rest))
     props = funcProps { funcFreeVars = freeVars body, funcTags = freeVars body, funcType = (map getType (fromTuple args),getType rest) }
 
+grinFuncs grin = map (\x -> (funcDefName x, funcDefBody x)) (grinFunctions grin)
+setGrinFunctions xs grin = grin { grinFunctions = map (uncurry (createFuncDef False)) xs }
+
 
 extendTyEnv ds (TyEnv env) = TyEnv (Map.fromList xs `mappend` env) where
     xs = [ (funcDefName d,funcType $ funcDefProps d) |  d <- ds]
@@ -290,7 +295,7 @@ data Grin = Grin {
     grinEntryPoints :: Map.Map Atom FfiExport,
     grinPhase :: Phase,
     grinTypeEnv :: TyEnv,
-    grinFunctions :: [(Atom,Lam)],
+    grinFunctions :: [FuncDef],
     grinReturnTags :: Map.Map Atom Item,
     grinArgTags :: Map.Map Atom [Item],
     grinSuspFunctions :: Set.Set Atom,

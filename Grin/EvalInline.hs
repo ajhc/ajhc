@@ -129,7 +129,7 @@ createEvalApply grin = do
     let eval = (funcEval,Tup [earg] :-> ebody) where
             earg :-> ebody  =  createEval TrailingUpdate (grinTypeEnv grin) tags
         tags = Set.toList $ ftags `Set.union` plads
-        ftags = freeVars (map (lamExp . snd) $ grinFunctions grin)
+        ftags = freeVars (map (lamExp . snd) $ grinFuncs grin)
         plads = Set.fromList $ concatMap mplad (Set.toList ftags)
         mplad t | Just (n,tag) <- tagUnfunction t, n > 1 = t:mplad (partialTag tag (n - 1))
         mplad t = [t]
@@ -150,14 +150,14 @@ createEvalApply grin = do
                 return (toAtom $ "@apply_" ++ show u)
             return (App fn' [fun,arg] ty)
         g x = return x
-    funcs <- mapMsnd f (grinFunctions grin)
+    funcs <- mapMsnd f (grinFuncs grin)
     as <- onceMapToList appMap
     let (apps,ntyenv) = unzip $ map cf as
         cf ((targ,tret),name) = ((name,appBody),(name,([TyNode,targ],tret))) where
             appBody = createApply targ tret (grinTypeEnv grin) tags
         TyEnv tyEnv = grinTypeEnv grin
         appTyEnv = Map.fromList ntyenv
-    return $ grin { grinTypeEnv = TyEnv (tyEnv `Map.union` appTyEnv), grinFunctions = apps ++ eval:funcs}
+    return $ setGrinFunctions (apps ++ eval:funcs) grin { grinTypeEnv = TyEnv (tyEnv `Map.union` appTyEnv) }
 
 
 

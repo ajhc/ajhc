@@ -152,12 +152,12 @@ printGrin :: Grin -> IO ()
 printGrin grin = hPrintGrin stderr grin
 
 hPrintGrin :: Handle -> Grin -> IO ()
-hPrintGrin handle Grin { grinFunctions = ds', grinCafs = cafs } = do
+hPrintGrin handle grin@Grin { grinCafs = cafs } = do
     when (not $ null cafs) $ do
         hPutStrLn handle "-- Cafs"
         mapM_ (hPutStrLn handle) $ map (\(x,y) -> show x ++ " = " ++  render (prettyVal y))  cafs
     hPutStrLn handle "-- Functions"
-    mapM_ (hPutStrLn handle . render) $ map prettyFun ds'
+    mapM_ (hPutStrLn handle . render) $ map prettyFun (grinFuncs grin)
 
 showSome xs = f 7 xs [] where
     f 0 _ xs = reverse ("...":xs)
@@ -189,7 +189,7 @@ instance Show HeapType where
 
 graphGrin :: Grin -> String
 graphGrin grin = graphviz' gr [] fnode fedge  where
-    nodes = zip [0..] (grinFunctions grin)
+    nodes = zip [0..] (grinFuncs grin)
     nodeMap = Map.fromList [ (y,x) | (x,(y,_)) <- nodes]
     gr :: Gr (Atom,Lam) CallType
     gr =   mkGraph nodes [ (n,n2,tc) | (n,(_,_ :-> l)) <- nodes, (tc,fv) <- Set.toList (freeVars l), n2 <- Map.lookup fv nodeMap ]

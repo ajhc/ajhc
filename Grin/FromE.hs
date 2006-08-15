@@ -102,7 +102,7 @@ partialLadder t
     | otherwise = [t]
 
 typecheckGrin grin = do
-    let errs = [  (err ++ "\n" ++ render (prettyFun a) ) | (a,Left err) <-  [ (a,typecheck (grinTypeEnv grin) c:: Either String Ty)   | a@(_,(_ :-> c)) <-  grinFunctions grin ]]
+    let errs = [  (err ++ "\n" ++ render (prettyFun a) ) | (a,Left err) <-  [ (a,typecheck (grinTypeEnv grin) c:: Either String Ty)   | a@(_,(_ :-> c)) <-  grinFuncs grin ]]
     mapM_ putErrLn  errs
     unless (null errs || optKeepGoing options) $ fail "There were type errors!"
 
@@ -193,14 +193,13 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
         initCafs = sequenceG_ [ Update (Var v (TyPtr TyNode)) node | (v,node) <- cafs ]
         ic = (funcInitCafs,(Tup [] :-> initCafs) )
         ds' = ic:(ds ++ fbaps)
-
-    let grin = emptyGrin {
+    let grin = setGrinFunctions theFuncs emptyGrin {
             grinEntryPoints = Map.insert funcMain (FfiExport "_amain" Safe CCall) $ Map.fromList epv,
             grinPhase = PhaseInit,
             grinTypeEnv = newTyEnv,
-            grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  discardResult theMain)) : efv ++ ds',
             grinCafs = [ (x,NodeC tagHole []) | (x,_) <- cafs]
             }
+        theFuncs = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  discardResult theMain)) : efv ++ ds'
     --typecheckGrin grin
     return grin
     where

@@ -25,11 +25,11 @@ instance Fixable W where
 
 {-# NOINLINE grinLinear #-}
 grinLinear :: Grin -> IO [(Var,W)]
-grinLinear  grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = grinFunctions, grinCafs = cafs }) = do
+grinLinear  grin@(Grin { grinTypeEnv = typeEnv, grinCafs = cafs }) = do
     fixer <- newFixer
     argSupply <- newSupply fixer
     varSupply <- newSupply fixer
-    mapM_ (go argSupply varSupply) grinFunctions
+    mapM_ (go argSupply varSupply) (grinFuncs grin)
     calcFixpoint "linear nodes" fixer
     as <- supplyReadValues argSupply
     mapM_ print $ sortGroupUnderFG fst (snd . snd)  [ (n,(a,v)) | ((n,a),v) <- as ]

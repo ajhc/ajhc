@@ -40,7 +40,7 @@ deadCode stats roots grin = do
     let postInline = phaseEvalInlined (grinPhase grin)
 
 
-    mapM_ (go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline) (grinFunctions grin)
+    mapM_ (go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline) (grinFuncs grin)
     calcFixpoint "Dead Code" fixer
     ua <- supplyReadValues usedArgs
     uc <- supplyReadValues usedCafs
@@ -64,7 +64,7 @@ deadCode stats roots grin = do
         directFuncs =  funSet Set.\\ suspFuncs Set.\\ pappFuncs
         fg xs = Set.fromList [ x | (x,True) <- xs ]
     newCafs <- flip mconcatMapM (grinCafs grin) $ \ (x,y) -> if x `Set.member` cafSet then return [(x,y)] else tick stats "Optimize.dead-code.caf" >> return []
-    newFuncs <- flip mconcatMapM (grinFunctions grin) $ \ (x,y) -> do
+    newFuncs <- flip mconcatMapM (grinFuncs grin) $ \ (x,y) -> do
         if not $ x `Set.member` funSet then tick stats "Optimize.dead-code.func" >> return [] else do
         r <- runStatIO stats $ removeDeadArgs postInline funSet directFuncs cafSet argSet (x,y)
         return [r]
@@ -85,9 +85,8 @@ deadCode stats roots grin = do
                      | otherwise =  []
         foo (fn,ts) = [(fn,ts)]
 
-    return grin {
+    return $ setGrinFunctions newFuncs grin {
         grinCafs = newCafs,
-        grinFunctions = newFuncs,
         grinPartFunctions = pappFuncs,
         grinTypeEnv = TyEnv $ Map.fromList mp',
         grinArgTags = Map.fromList newArgTags,

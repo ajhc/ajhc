@@ -426,9 +426,9 @@ compileGrin grin = (hsffi_h ++ jhc_rts_c ++ P.render ans ++ "\n", snub (reqLibra
     (header,body) = generateC (functions) structs
 
     -- this is a list of every tag used in the program
-    tags = (tagHole,[]):sortUnder (show . fst) [ (t,runIdentity $ findArgs (grinTypeEnv grin) t) | t <- Set.toList $ freeVars (snds $ grinFunctions grin) `mappend` freeVars (snds $ grinCafs grin), tagIsTag t]
+    tags = (tagHole,[]):sortUnder (show . fst) [ (t,runIdentity $ findArgs (grinTypeEnv grin) t) | t <- Set.toList $ freeVars (snds $ grinFuncs grin) `mappend` freeVars (snds $ grinCafs grin), tagIsTag t]
     ((functions,structs),finalHcHash,req) = runC $ do
-        funcs <- flip mapM (grinFunctions grin) $ \(a,l) -> do
+        funcs <- flip mapM (grinFuncs grin) $ \(a,l) -> do
                    case Map.lookup a (grinEntryPoints grin) of
                      Nothing -> convertFunc  (a,l)
                      Just fe -> convertFfiExport (a,l) fe

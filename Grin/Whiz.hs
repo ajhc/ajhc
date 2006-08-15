@@ -22,13 +22,13 @@ whizState = Left mempty
 --    f ((a,(Tup vs,fn)):xs) ys set = f xs ((a,(Tup vs',fn')):ys) set' where
 --        (Identity ((NodeC _ vs',fn'),set')) = whiz return return set (NodeC tagHole vs , fn)
 normalizeGrin :: Grin -> Grin
-normalizeGrin grin@Grin { grinFunctions = fs } = grin { grinFunctions = f fs [] (Right 1) } where
+normalizeGrin grin = setGrinFunctions (f (grinFuncs grin) [] (Right 1)) grin  where
     f [] xs _ = reverse xs
     f ((a,lm):xs) ys set = f xs ((a,lm'):ys) set' where
         (Identity (lm',set')) = fizz  (\_ x -> x) (return . Just) return set lm
 
 normalizeGrin' :: Grin -> Grin
-normalizeGrin' grin@Grin { grinFunctions = fs } = grin { grinFunctions = f fs [] } where
+normalizeGrin' grin = setGrinFunctions (f (grinFuncs grin) []) grin  where
     f [] xs  = reverse xs
     f ((a,lm):xs) ys  = f xs ((a,lm'):ys) where
         (Identity (lm',_)) = whiz (\_ x -> x) (return . Just) return (Right 1) lm
