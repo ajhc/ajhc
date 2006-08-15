@@ -609,6 +609,8 @@ instance CanType Val Ty where
 
 instance FreeVars Lam (Set.Set Var) where
     freeVars (x :-> y) = freeVars y Set.\\ freeVars x
+instance FreeVars Lam (Set.Set (Var,Ty)) where
+    freeVars (x :-> y) = freeVars y Set.\\ freeVars x
 
 instance  FreeVars Exp (Set.Set Var,Set.Set Tag) where
     freeVars x = (freeVars x, freeVars x)
@@ -618,6 +620,14 @@ instance FreeVars Val (Set.Set Var) where
     freeVars (NodeV v xs) = Set.insert v $ freeVars xs
     freeVars (Const v) = freeVars v
     freeVars (Var v _) = Set.singleton v
+    freeVars (Tup vs) = freeVars vs
+    freeVars _ = Set.empty
+
+instance FreeVars Val (Set.Set (Var,Ty)) where
+    freeVars (NodeC t xs) = freeVars xs
+    freeVars (NodeV v xs) = Set.insert (v,TyTag) $ freeVars xs
+    freeVars (Const v) = freeVars v
+    freeVars (Var v t) = Set.singleton (v,t)
     freeVars (Tup vs) = freeVars vs
     freeVars _ = Set.empty
 
@@ -641,6 +651,23 @@ instance FreeVars Exp (Set.Set Var) where
     freeVars (Prim _ x) = freeVars x
     freeVars Error {} = Set.empty
     freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (funcFreeVars . funcDefProps) fdefs) `mappend` freeVars body
+    freeVars NewRegion { expLam = l } = freeVars l
+    freeVars Alloc { expValue = v, expCount = c, expRegion = r } = freeVars (v,c,r)
+    freeVars Call { expValue = v, expArgs = as } = freeVars (v:as)
+    freeVars MkClosure { expValue = v, expArgs = as, expRegion = r } = freeVars (v,as,r)
+    freeVars MkCont { expCont = v, expLam = as} = freeVars (v,as)
+
+instance FreeVars Exp (Set.Set (Var,Ty)) where
+    freeVars (a :>>= b) = freeVars (a,b)
+    freeVars (App a vs _) =  freeVars vs
+    freeVars (Case x xs) = freeVars (x,xs)
+    freeVars (Return v) = freeVars v
+    freeVars (Store v) = freeVars v
+    freeVars (Fetch v) = freeVars v
+    freeVars (Update x y) = freeVars (x,y)
+    freeVars (Prim _ x) = freeVars x
+    freeVars Error {} = Set.empty
+    freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (freeVars . funcDefBody) fdefs) `mappend` freeVars body
     freeVars NewRegion { expLam = l } = freeVars l
     freeVars Alloc { expValue = v, expCount = c, expRegion = r } = freeVars (v,c,r)
     freeVars Call { expValue = v, expArgs = as } = freeVars (v:as)
