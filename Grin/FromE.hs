@@ -325,7 +325,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
     cr x = ce x
 
     -- | ce evaluates something in strict context returning the evaluated result of its argument.
-    ce (ELetRec ds e) = ce e >>= \e -> doLet ds e
+    ce (ELetRec ds e) = doLet ds (ce e)
     ce (EError s e) = return (Error s (toType TyNode e))
     ce (EVar tvr) | isUnboxed (getType tvr) = do
         return (Return (toVal tvr))
@@ -505,7 +505,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
             addNewFunction (tl,Tup [] :-> Error s ty)
             return t
         return $ Return (Const (NodeC a []))
-    cc (ELetRec ds e) = cc e >>= \e -> doLet ds e
+    cc (ELetRec ds e) = doLet ds (cc e)
     cc e | (EVar v,as@(_:_)) <- fromAp e = do
         as <- return $ args as
         case Map.lookup (tvrIdent v) (scMap cenv) of
@@ -535,7 +535,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
 
 
     doLet ds e = f (decomposeDefns ds) e where
-        f [] x = return x
+        f [] x = x
         f (Left te@(_,ELam {}):ds) x = f (Right [te]:ds) x
         f (Left (t,e):ds) x | not (isLifted (EVar t)) = do
             mtick "Grin.FromE.let-unlifted"
