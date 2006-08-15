@@ -3,6 +3,7 @@ module Grin.PointsToAnalysis(grinInlineEvalApply) where
 import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Writer
+import Control.Monad.RWS
 import Data.IORef
 import Data.Monoid
 import List(sort,intersperse)
@@ -428,12 +429,36 @@ itemEmpty ty  = BasicValue ty
 getTags (VsNodes _ s) = Set.toList s
 getTags _ = []
 
+newtype CM a = CM (RWS (Map.Map Var W) PointsToEq (Int,HcHash) a)
+    deriving(Monad,MonadWriter PointsToEq,Functor,MonadReader (Map.Map Var W))
+
+instance MonadState HcHash CM where
+    get = CM $ gets snd
+    put n = CM $ modify (\ (x,y) -> (x,n))
+
+
+instance UniqueProducer CM where
+    newUniq = CM $ do
+        modify (\ (x,y) -> (x + 1,y))
+        gets fst
+
+
+
 collect :: Map.Map Var W -> HcHash -> Int -> Atom -> Lam -> (PointsToEq,HcHash)
-collect lmap hc st fname (Tup vs :-> exp')
-    | sameLength avs vs = (eq { funcEq = (fname,v):funcEq eq, varEq = varEq eq ++ avs },hc')   where
-    avs = [ (v,Arg fname n) |  Var v _ <- vs | n <- [0..] ]
+collect lmap hc st fname lam = (eq,hc')  where
+    CM cm = collectM fname lam
+    ((_,hc'),eq) = execRWS cm lmap (st,hc)
+
+collectM :: Atom -> Lam -> CM ()
+collectM  fname (~(Tup vs) :-> exp') = ans where
+    ans = do
+        v <- f exp'
+        tell mempty { funcEq = [(fname,v)], varEq = avs }
+    avs = [ (v,Arg fname n) |  ~(Var v _) <- vs | n <- [0..] ]
+
+ --   ans = (eq { funcEq = (fname,v):funcEq eq, varEq = varEq eq ++ avs },hc')   where
     --((v,eq),hc') = execUniq st $ (runStateT ((runWriterT (f exp'))) hc)
-    ((v,hc'),eq) = execUniq st $ (runWriterT (runStateT (f exp') hc))
+ --   ((v,hc'),eq) = execUniq st $ (runWriterT (runStateT (f exp') hc))
     --((v,hc'),eq) = runWriter $ execUniqT st $ (runStateT  (f exp') hc)
     --tell x = lift $ Control.Monad.Writer.tell x
     isHole (Con t _) | t == tagHole = True
@@ -441,6 +466,7 @@ collect lmap hc st fname (Tup vs :-> exp')
 
     f (Store { expValue = val } :>>= var@(Var v _) :-> exp2) = do
         p <- toPos val
+        lmap <- ask
         p' <- if Map.lookup v lmap == Just One then newHeap UnsharedEval p else newHeap SharedEval p
         bind var p'
         f exp2
@@ -516,8 +542,7 @@ collect lmap hc st fname (Tup vs :-> exp')
         v <- toPos v
         tell mempty { updateEq = [(p,v)] }
         return Basic
-    g x = error $ unwords ["g",show x]
-collect _ _ _ _ _ = error "collect: bad argument"
+    g x = error $ unwords ["Grin.PointsToAnalysis.collect.g",show x]
 
 toPos (NodeC tag vs) = do
     vs' <- mapM toPos vs
