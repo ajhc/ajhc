@@ -39,11 +39,6 @@ deadCode stats roots grin = do
         addRule $ value True `implies` sValue usedFuncs r
     let postInline = phaseEvalInlined (grinPhase grin)
 
-    -- using a CAF implies using its function if pre-inlining
---    unless postInline $ flip mapM_ (grinCafs grin) $ \ (var,~(NodeC a [])) -> do
---        x <- supplyValue usedCafs var
---        f <- supplyValue usedFuncs (tagFlipFunction a)
---        addRule $ x `implies` f
 
     mapM_ (go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline) (grinFunctions grin)
     calcFixpoint "Dead Code" fixer
@@ -52,6 +47,17 @@ deadCode stats roots grin = do
     uf <- supplyReadValues usedFuncs
     pappFuncs <- readValue pappFuncs
     suspFuncs <- readValue suspFuncs
+    when True $ do
+        putStrLn "usedArgs"
+        mapM_ print ua
+        putStrLn "usedCafs"
+        mapM_ print uc
+        putStrLn "usedFuncs"
+        mapM_ print uf
+        putStrLn "pappFuncs"
+        print pappFuncs
+        putStrLn "suspFuncs"
+        print suspFuncs
     let cafSet = fg uc
         argSet = fg ua
         funSet = fg uf
@@ -79,14 +85,6 @@ deadCode stats roots grin = do
                      | otherwise =  []
         foo (fn,ts) = [(fn,ts)]
 
-
-
-    --putStrLn "partialapplied:"
-    --mapM_ print $ Set.toList pappFuncs
-    --putStrLn "suspended:"
-    --mapM_ print $ Set.toList suspFuncs
-    --putStrLn "none:"
-    --mapM_ print $ Set.toList $ funSet Set.\\ suspFuncs Set.\\ pappFuncs
     return grin {
         grinCafs = newCafs,
         grinFunctions = newFuncs,
@@ -99,6 +97,7 @@ deadCode stats roots grin = do
 combineArgs fn as = [ ((fn,n),a) | (n,a) <- zip [0 :: Int ..] as]
 
 go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as) :-> body) = ans where
+    goAgain = go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline
     ans = do
         usedVars <- newSupply fixer
 
@@ -126,7 +125,9 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as
                 | otherwise = addRule $ (doNode vv) `mappend` (doNode n)
             g (Store n) = addRule $ doNode n
             g (Fetch x) = addRule $ doNode x
-            g Let {} = return ()
+            g Let { expDefs = defs, expBody = body } = do
+                mapM_ goAgain [ (name,bod) | FuncDef { funcDefBody = bod, funcDefName = name } <- defs]
+                -- g body
             g Error {} = return ()
             -- TODO - handle function and case return values smartier.
             g (Return n) = addRule $ doNode n
@@ -155,9 +156,9 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as
 
 
 removeDeadArgs :: MonadStats m => Bool -> Set.Set Atom -> Set.Set Atom -> (Set.Set Var) -> (Set.Set (Atom,Int)) -> (Atom,Lam) -> m (Atom,Lam)
-removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps f (margs l) >>= return . (,) a where
-    margs (Tup as :-> e) | a `Set.member` directFuncs = (Tup (removeArgs a as) :-> e)
-    margs x = x
+removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps f (margs a l) >>= return . (,) a where
+    margs fn (Tup as :-> e) | a `Set.member` directFuncs = (Tup (removeArgs fn as) :-> e)
+    margs _ x = x
     f (App fn as ty) | fn `notElem` [funcApply, funcEval] = do
         as <- dff fn as
         as <- mapM clearCaf as
@@ -177,6 +178,7 @@ removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps
         as <- dff' fn' as
         as <- mapM clearCaf as
         return $ Update p (NodeC fn as)
+    f lt@Let { expDefs = defs }  = return lt { expDefs = [ df { funcDefBody = margs name body } | df@FuncDef { funcDefName = name, funcDefBody = body } <- defs ] }
     f x = return x
     dff' fn as | fn `Set.member` directFuncs = return as
     dff' fn as = dff'' fn as
