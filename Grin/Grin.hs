@@ -593,6 +593,14 @@ instance FreeVars Val (Set.Set Var) where
     freeVars (Tup vs) = freeVars vs
     freeVars _ = Set.empty
 
+instance FreeVars FuncProps (Set.Set Var) where
+    freeVars FuncProps { funcFreeVars = fv } = fv
+
+instance FreeVars FuncProps (Set.Set Tag) where
+    freeVars FuncProps { funcTags = fv } = fv
+
+instance FreeVars FuncProps a => FreeVars FuncDef a where
+    freeVars fd = freeVars (funcDefProps fd)
 
 instance FreeVars Exp (Set.Set Var) where
     freeVars (a :>>= b) = freeVars (a,b)
