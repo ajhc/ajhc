@@ -271,7 +271,7 @@ assign :: Expression -> Expression -> Statement
 assign a b = expr $ operator "=" a b
 
 label :: Name -> Statement
-label n@(Name s) = SD (StatementLabel n) $ text s <> char ':'
+label n@(Name s) = SD (StatementLabel n) $ text s <> char ':' <+> text "0;"
 
 goto :: Name -> Statement
 goto n@(Name s) = SD (StatementGoto n) $ text "goto" <+> text s <> char ';'
