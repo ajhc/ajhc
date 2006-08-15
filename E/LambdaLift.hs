@@ -43,6 +43,18 @@ etaReduce e = case f e 0 of
         f (ELam t (EAp x (EVar t'))) n | n `seq` True, t == t' && not (tvrIdent t `member` (freeVars x :: IdSet)) = f x (n + 1)
         f e n = (e,n)
 
+-- | we do not lift functions that only appear in saturated strict contexts,
+-- as these functions will never have an escaping thunk or partial app
+-- built and can be turned into local functions in grin.
+--
+-- Although grin is only able to take advantage of groups of possibily
+-- mutually recursive local functions that only tail-call each other, we leave
+-- all candidate functions local, as further grin transformations can expose
+-- tail-calls that arn't evident in core.
+--
+-- A final lambda-lifting needs to be done in grin to get rid of these local
+-- functions that cannot be turned into loops
+
 calculateLiftees :: Program -> IO IdSet
 calculateLiftees prog = do
     fixer <- newFixer
@@ -97,6 +109,7 @@ assert x = value True `implies` x
 lambdaLift ::  Program -> IO Program
 lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
     noLift <- calculateLiftees prog
+--    noLift <- return $ mempty `asTypeOf` noLift
     let wp =  fromList [ tvrIdent x | (x,_,_) <- cs ]
     fc <- newIORef []
     statRef <- newIORef mempty
