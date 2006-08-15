@@ -276,6 +276,8 @@ mapExp f (b :-> e) = b :-> f e
 sizeLam (b :-> exp) = sizeExp exp
 sizeExp (x :>>= y) = sizeExp x + sizeLam y
 sizeExp (Case e as) = 1 + sum (map sizeLam as)
+sizeExp Let { expDefs = defs, expBody = body } = sizeExp body + sum (map (sizeLam . funcDefBody) defs)
+sizeExp MkCont { expCont = l1, expLam = l2 } = 1 + sizeLam l1 + sizeLam l2
 sizeExp x = 1
 
 optimize1 ::  Bool -> (Atom,Lam) -> StatM Lam
