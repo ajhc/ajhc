@@ -202,6 +202,9 @@ flattenPointsToEq eq = varEq_u f . funcEq_u f . heapEq_u h . appEq_u g $ eq  whe
     h xs = [ (x, (t,mconcat $ snds $ snds xs))  | xs@((x,(t,_)):_) <- sortGroupUnder fst xs]
 
 
+collectFuncDefs e = execWriter (f e) where
+    f e@Let { expDefs = defs } = tell defs >> mapExpExp f e >> return e
+    f e = mapExpExp f e >> return e
 
 
 --newHeap ht p@(Con a ps)
@@ -389,12 +392,14 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv,  grinCafs = cafs 
             mticks (length xs - length xs') "Grin.eval.case-elim"
             return $ if null xs' then  Error "No Valid alternatives. This Should Not be reachable." (getType (Case v xs)) else (Case v xs')
         vsToItem = valueSetToItem (grinTypeEnv grin) pt
-        te = grinTypeEnv grin
+        te = extendTyEnv fds typeEnv
+        fds = concatMap (collectFuncDefs . lamExp) (snds $ grinFuncs grin)
         convertArgs fa = Map.fromList $ map f (Map.keys $ ptFunc pt) where
             f atom = (atom,[ uncurry vsToItem $ Map.findWithDefault (t,VsEmpty) (atom,i) fa  |  t <- ts | i <- naturals]) where
-                ts = case findArgsType te atom of
-                    Just (ts,_) -> ts
-                    _ -> []
+                Just (ts,_) = findArgsType te atom
+                --ts = case findArgsType te atom of
+                --    Just (ts,_) -> ts
+                --    _ -> []
     let (sts,funcs) = unzip [ (stat,(a,l')) | (a,l) <- grinFuncs grin, let (l',stat) = runStatM (f l) ]
     tickStat stats (mconcat sts)
     return $ setGrinFunctions funcs grin {
@@ -407,24 +412,26 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv,  grinCafs = cafs 
 funcReturn te pt fn vs =
   case findArgsType te fn of
     Just (_,ty) -> valueSetToItem te pt ty vs
-    Nothing     -> valueSetToItem te pt TyUnknown vs -- error ("funcReturn: "++show fn)
+    Nothing     -> error ("funcReturn: "++show fn)
+    --Nothing     -> valueSetToItem te pt TyUnknown vs -- error ("funcReturn: "++show fn)
 
 valueSetToItem :: TyEnv -> PointsTo -> Ty -> ValueSet -> Item
 valueSetToItem _ _ ty VsEmpty = itemEmpty ty
 valueSetToItem _ _ ty (VsBas "()") = TupledValue []
 valueSetToItem _ _ ty VsBas {} = BasicValue ty
-valueSetToItem te pt ~TyNode (VsNodes as n) = NodeValue (Set.mapMonotonic f n) where  -- depends on tag being first value in NodeValue
+valueSetToItem te pt TyNode (VsNodes as n) = NodeValue (Set.mapMonotonic f n) where  -- depends on tag being first value in NodeValue
     f n = NV n [ valueSetToItem te pt ty (Map.findWithDefault VsEmpty (n,i) as)  | ty <- ts | i <- naturals ] where
-        ts = case findArgsType te n of
-            Just (ts,_) -> ts
-            _ -> []
-valueSetToItem te pt ~(TyPtr _) (VsHeaps ss) = HeapValue (Set.mapMonotonic f ss) where -- depends on int being first value in HeapValue
+        Just (ts,_) = findArgsType te n
+      --  ts = case findArgsType te n of
+    --     Just (ts,_) -> ts
+      --      _ -> []
+valueSetToItem te pt (TyPtr _) (VsHeaps ss) = HeapValue (Set.mapMonotonic f ss) where -- depends on int being first value in HeapValue
     f n | n < 0 = HV n (Right val) where
         Just val = Map.lookup n (ptConstMap pt)
     f n = HV n (Left (hType,(valueSetToItem te pt TyNode vs))) where   -- TODO heap locations of different types
         Just hType = Map.lookup n (ptHeapType pt)
         Just vs = Map.lookup n (ptHeap pt)
-valueSetToItem te pt ~(TyTup xs) (VsNodes as n)
+valueSetToItem te pt (TyTup xs) (VsNodes as n)
     | tupleName `Set.member` n = TupledValue [ valueSetToItem te pt t (Map.findWithDefault VsEmpty (tupleName,i) as) | i <- naturals | t <- xs]
     | otherwise = itemEmpty (TyTup xs)
 valueSetToItem _ _ ty v = error $ "valueSetToItem " ++ show (ty,v)

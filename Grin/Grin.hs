@@ -13,7 +13,9 @@ module Grin.Grin(
     NodeValue(NV),
     Phase(..),
     Primitive(..),
+    mapFBodies,
     Tag,
+    updateFuncDefProps,
     Ty(..),
     TyEnv(..),
     Val(..),
@@ -210,9 +212,12 @@ data FuncDef = FuncDef {
     funcDefProps :: FuncProps
     } deriving(Eq,Ord,Show)
 
-createFuncDef local name body@(args :-> rest)  = FuncDef { funcDefName = name, funcDefBody = body, funcDefCall = call, funcDefProps = props } where
+createFuncDef local name body@(args :-> rest)  = updateFuncDefProps FuncDef { funcDefName = name, funcDefBody = body, funcDefCall = call, funcDefProps = funcProps } where
     call = Item name (TyCall (if local then LocalFunction else Function) (map getType (fromTuple args)) (getType rest))
-    props = funcProps { funcFreeVars = freeVars body, funcTags = freeVars body, funcType = (map getType (fromTuple args),getType rest) }
+
+
+updateFuncDefProps fd@FuncDef { funcDefBody = body@(args :-> rest) } =  fd { funcDefProps = props } where
+    props = (funcDefProps fd) { funcFreeVars = freeVars body, funcTags = freeVars body, funcType = (map getType (fromTuple args),getType rest) }
 
 grinFuncs grin = map (\x -> (funcDefName x, funcDefBody x)) (grinFunctions grin)
 setGrinFunctions xs grin = grin { grinFunctions = map (uncurry (createFuncDef False)) xs }
@@ -327,7 +332,16 @@ mapExpExp f (a :>>= v :-> b) = do
 mapExpExp f (Case e as) = do
     as' <- mapM (mapBodyM f) as
     return (Case e as')
+mapExpExp f l@Let { expBody = b, expDefs = defs } = do
+    b <- f b
+    defs' <- mapFBodies f defs
+    return l { expBody = b, expDefs = defs' }
 mapExpExp _ x = return x
+
+mapFBodies f xs = mapM f' xs where
+    f' fd@FuncDef { funcDefBody = l :-> r } = do
+        r' <- f r
+        return $  updateFuncDefProps fd { funcDefBody = l :-> r' }
 
 
 

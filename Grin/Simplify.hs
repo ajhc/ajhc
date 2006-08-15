@@ -217,6 +217,8 @@ isSimple (fn,x) = f (2::Int) x where
     f n _ | n <= 0 = False
     f n (p :-> a :>>= b ) = (f (n - 1) (p :-> a)) &&  (f (n - 1) b)
     f _ (_ :-> Case {}) = False
+    f _ (_ :-> Let {}) = False
+    f _ (_ :-> MkCont {}) = False
     f _ _ = True
 
 isManifestNode :: Monad m => Exp -> m [Atom]
@@ -358,6 +360,9 @@ optimize1 postEval (n,l) = g l where
     f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars r `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-tail"
         f (lt { expDefs = defs, expBody = e } :>>= l :-> r)
+    f lt@(Let { expDefs = defs, expBody = e :>>= l :-> r } :>>= lr) | Set.null (freeVars r `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
+        mtick "Optimize.optimize.let-shrink-tail"
+        f ((lt { expDefs = defs, expBody = e } :>>= l :-> r) :>>= lr)
     f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars e `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-head"
         f (e :>>= l :-> lt { expDefs = defs, expBody = r })
@@ -397,6 +402,7 @@ optimize1 postEval (n,l) = g l where
     f (Case x as) = do
        as' <- sequence [ f e >>= return . (b :->)| b :-> e <- as ]
        return $ Case x as'
+    f e@Let {} = mapExpExp f e
     f e = return e
     caseHoist x as v as' ty = do
         mtick $ "Optimize.optimize.case-hoist" -- .{" ++ show (Prelude.map (isManifestNode . lamExp) as :: [Maybe [Atom]])
