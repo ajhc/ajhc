@@ -60,11 +60,21 @@ grinPush stats lam = ans where
         put (nn+1,npexp:cv)
         return Nothing
     doexp (v, exp) = do
+        exp <- fixupLet exp
         exp' <- dropAny exp
         return $ Just (v,exp')
     finalExp (exp::Exp) = do
+        exp <- fixupLet exp
         exp' <- dropAny exp
         return (exp'::Exp)
+    fixupLet lt@Let { expDefs = defs, expBody = b } = do
+        let def = (Set.fromList $ map funcDefName defs)
+            f (e :>>= l :-> r) | Set.null (freeVars e `Set.intersect` def) = do
+                exp <- f r
+                return (e :>>= l :-> exp)
+            f r = return lt {  expBody = r }
+        f b
+    fixupLet exp = return exp
     dropAny (exp::Exp) = do
         (nn,xs) <- get
         let graph = newGraph xs pexpUniq pexpDeps
@@ -73,6 +83,15 @@ grinPush stats lam = ans where
             dropped = case prefered reached exp of
                 Just (x:_) | [] <- [ r | r <- reached, pexpUniq x `elem` pexpDeps r ] -> (reverse $ topSort $ newGraph (filter (/= x) reached) pexpUniq pexpDeps) ++ [x]
                 _ -> reverse $ topSort $ newGraph reached pexpUniq pexpDeps
+            ff pexp exp = pexpExp pexp :>>= pexpBind pexp :-> exp
+        put (nn,[ x | x <- xs, pexpUniq x `notElem` (map pexpUniq reached) ])
+        return (foldr ff exp dropped :: Exp)
+    dropAll exp fvs = do
+        (nn,xs) <- get
+        let graph = newGraph xs pexpUniq pexpDeps
+            deps = justDeps xs fvs
+            reached = reachable graph deps
+            dropped =  reverse $ topSort $ newGraph reached pexpUniq pexpDeps
             ff pexp exp = pexpExp pexp :>>= pexpBind pexp :-> exp
         put (nn,[ x | x <- xs, pexpUniq x `notElem` (map pexpUniq reached) ])
         return (foldr ff exp dropped :: Exp)
@@ -93,6 +112,7 @@ isOmittable (Store (NodeC n _)) | isMutableNodeTag n || n == tagHole = False
 isOmittable (Store {}) = True
 isOmittable Prim { expPrimitive = Primitive { primAPrim = aprim } } = aprimIsCheap aprim
 isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
+isOmittable Let { expBody = x } = isOmittable x
 isOmittable (e1 :>>= _ :-> e2) = isOmittable e1 && isOmittable e2
 isOmittable _ = False
 

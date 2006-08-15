@@ -18,6 +18,7 @@ module Grin.Grin(
     TyEnv(..),
     Val(..),
     Var(..),
+    extendTyEnv,
     createFuncDef,
     combineItems,
     emptyGrin,
@@ -209,13 +210,18 @@ data FuncDef = FuncDef {
 
 createFuncDef local name body@(args :-> rest)  = FuncDef { funcDefName = name, funcDefBody = body, funcDefCall = call, funcDefProps = props } where
     call = Item name (TyCall (if local then LocalFunction else Function) (map getType (fromTuple args)) (getType rest))
-    props = funcProps { funcFreeVars = freeVars body, funcTags = freeVars body }
+    props = funcProps { funcFreeVars = freeVars body, funcTags = freeVars body, funcType = (map getType (fromTuple args),getType rest) }
+
+
+extendTyEnv ds (TyEnv env) = TyEnv (Map.fromList xs `mappend` env) where
+    xs = [ (funcDefName d,funcType $ funcDefProps d) |  d <- ds]
 
 -- cached info
 data FuncProps = FuncProps {
     funcInfo    :: Info.Info,
     funcFreeVars :: Set.Set Var,
     funcTags    :: Set.Set Tag,
+    funcType    :: ([Ty],Ty),
     funcExits   :: Perhaps,      -- ^ function quits the program
     funcCuts    :: Perhaps,      -- ^ function cuts to a value
     funcAllocs  :: Perhaps,      -- ^ function allocates memory
