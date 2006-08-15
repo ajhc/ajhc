@@ -41,6 +41,7 @@ import FrontEnd.FrontEnd
 import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadCode
+import Grin.Devolve(devolveGrin)
 import Grin.EvalInline(createEvalApply)
 import Grin.FromE
 import Grin.Grin
@@ -771,12 +772,14 @@ compileToGrin prog = do
 
         printTable "Return points-to" (grinReturnTags x)
         printTable "Argument points-to" (grinArgTags x)
+        x <- devolveGrin x
         dumpFinalGrin x
         when (optMode options == CompileExe) $ compileGrinToC x
      else do
         x <- createEvalApply x
         x <- return $ normalizeGrin x
         lintCheckGrin x
+        x <- devolveGrin x
         dumpFinalGrin x
         when (optMode options == CompileExe) $ compileGrinToC x
 
