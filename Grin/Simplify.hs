@@ -531,9 +531,9 @@ simplify stats grin = do
                     -- tick stats $ "Optimize.repeat.{" ++ show a ++ "}"
                     opt env a (n + 1 :: Int) nl
                     -}
-        procF (out,env) ((a,_),_) | False <- a `Set.member` reached = do
-            tick stats (toAtom "Optimize.dead.function")
-            return (out,env)
+        --procF (out,env) ((a,_),_) | False <- a `Set.member` reached = do
+        --    tick stats (toAtom "Optimize.dead.function")
+        --    return (out,env)
         procF (out,env) ((a,l),_) = do
             nl <- opt env a (0::Int) l
             let iname t = toAtom $ "Optimize.simplify.inline." ++ t ++ ".{" ++ fromAtom a  ++ "}"

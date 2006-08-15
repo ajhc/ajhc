@@ -414,16 +414,16 @@ valueSetToItem :: TyEnv -> PointsTo -> Ty -> ValueSet -> Item
 valueSetToItem _ _ ty VsEmpty = itemEmpty ty
 valueSetToItem _ _ ty (VsBas "()") = TupledValue []
 valueSetToItem _ _ ty VsBas {} = BasicValue ty
-valueSetToItem te pt TyNode (VsNodes as n) = NodeValue (Set.mapMonotonic f n) where  -- depends on tag being first value in NodeValue
+valueSetToItem te pt ~TyNode (VsNodes as n) = NodeValue (Set.mapMonotonic f n) where  -- depends on tag being first value in NodeValue
     f n = NV n [ valueSetToItem te pt ty (Map.findWithDefault VsEmpty (n,i) as)  | ty <- ts | i <- naturals ] where
         Just (ts,_) = findArgsType te n
-valueSetToItem te pt (TyPtr _) (VsHeaps ss) = HeapValue (Set.mapMonotonic f ss) where -- depends on int being first value in HeapValue
+valueSetToItem te pt ~(TyPtr _) (VsHeaps ss) = HeapValue (Set.mapMonotonic f ss) where -- depends on int being first value in HeapValue
     f n | n < 0 = HV n (Right val) where
         Just val = Map.lookup n (ptConstMap pt)
     f n = HV n (Left (hType,(valueSetToItem te pt TyNode vs))) where   -- TODO heap locations of different types
         Just hType = Map.lookup n (ptHeapType pt)
         Just vs = Map.lookup n (ptHeap pt)
-valueSetToItem te pt (TyTup xs) (VsNodes as n)
+valueSetToItem te pt ~(TyTup xs) (VsNodes as n)
     | tupleName `Set.member` n = TupledValue [ valueSetToItem te pt t (Map.findWithDefault VsEmpty (tupleName,i) as) | i <- naturals | t <- xs]
     | otherwise = itemEmpty (TyTup xs)
 valueSetToItem _ _ ty v = error $ "valueSetToItem " ++ show (ty,v)

@@ -127,7 +127,9 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as
             g (Fetch x) = addRule $ doNode x
             g Let { expDefs = defs, expBody = body } = do
                 mapM_ goAgain [ (name,bod) | FuncDef { funcDefBody = bod, funcDefName = name } <- defs]
-                -- g body
+                flip mapM_ (map funcDefName defs) $ \n -> do
+                    n' <- supplyValue usedFuncs n
+                    addRule $ fn' `implies` n'
             g Error {} = return ()
             -- TODO - handle function and case return values smartier.
             g (Return n) = addRule $ doNode n

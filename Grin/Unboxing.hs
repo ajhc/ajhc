@@ -107,11 +107,15 @@ convertReturns unboxReturn lam = g lam where
     g (l :-> e) = l :-> f e
     f (e :>>= l) = e :>>= g l
     f e@Case { expAlts = as } = e { expAlts = map g as }
+    f e@Let { expBody = b } = e { expBody = f b }
+    f e@MkCont { expCont = c , expLam = b } = e { expCont = g c, expLam = g b }
     f e = unboxReturn e
 
 convertApps doApp lam = g lam where
     g (l :-> e) = l :-> f e
     f (e :>>= l) = f e :>>= g l
     f e@Case { expAlts = as } = e { expAlts = map g as }
+    f e@Let { expDefs = defs, expBody = b } = e { expBody = f b, expDefs = [ createFuncDef True (funcDefName d) (g $ funcDefBody d) | d <- defs ] }
+    f e@MkCont { expCont = c , expLam = b } = e { expCont = g c, expLam = g b }
     f e = doApp e
 
