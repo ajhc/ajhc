@@ -45,6 +45,8 @@ module C.Generate(
     structAnon,
     structType,
     assign,
+    label,
+    goto,
     renderG,
     generateC,
     expressionRaw,
@@ -254,6 +256,12 @@ creturn e = SD $ text "return " <> draw e <> char ';'
 
 assign :: Expression -> Expression -> Statement
 assign a b = expr $ operator "=" a b
+
+label :: Name -> Statement
+label (Name s) = SD $ text s <> char ':'
+
+goto :: Name -> Statement
+goto (Name s) = SD $ text "goto" <+> text s <> char ';'
 
 withVars xs act = undefined
 --SD $ do
