@@ -198,9 +198,9 @@ getMainFunction dataTable name ds = do
     Just x -> return x
     Nothing -> fail $ "Could not find main function: " ++ show name
   funcs <- fmapM (\n -> liftM fst $ Map.lookup n ds) sFuncNames
-  nameToEntryPoint dataTable (fst mt) (toName Name.Val "theMain") (FfiExport "_amain" Safe CCall) funcs
+  nameToEntryPoint dataTable (fst mt) (toName Name.Val "theMain") Nothing funcs
 
-nameToEntryPoint :: Monad m => DataTable -> TVr -> Name -> FfiExport -> FuncNames TVr -> m (Name,TVr,E)
+nameToEntryPoint :: Monad m => DataTable -> TVr -> Name -> Maybe FfiExport -> FuncNames TVr -> m (Name,TVr,E)
 nameToEntryPoint dataTable main cname ffi ds = ans where
     ans = do
         let runMain      = func_runMain ds
@@ -216,7 +216,7 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
             tvm@(TVr { tvrType =  ty}) =  main
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs, sortStarLike k ]
             (ty',xs) = fromPi ty
-        return (cname, tvrInfo_u (Info.insert ffi) $ setProperty prop_EXPORTED theMainTvr,ne)
+        return (cname, tvrInfo_u (case ffi of Just ffi -> Info.insert ffi; Nothing -> id) $ setProperty prop_EXPORTED theMainTvr,ne)
     ioLike ty = case followAliases dataTable ty of
         ELit (LitCons n [x] _) | n ==  tc_IO -> Just x
         (EPi ioc (EPi tvr (ELit (LitCons n [x] _)))) | n == tc_IOResult -> Just x
@@ -440,7 +440,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
 
     cDecl x@HsForeignDecl {} = fail ("Unsupported foreign declaration: "++ show x)
     cDecl (HsForeignExport _ ffi@(FfiExport ecn _ CCall) n _) = do
-        return . (:[]) =<< nameToEntryPoint dataTable (tv n) (toName Name.FfiExportName ecn) ffi =<< fmapM (return . toTVr assumps) sFuncNames
+        return . (:[]) =<< nameToEntryPoint dataTable (tv n) (toName Name.FfiExportName ecn) (Just ffi) =<< fmapM (return . toTVr assumps) sFuncNames
     cDecl x@HsForeignExport {} = fail ("Unsupported foreign export: "++ show x)
 
     cDecl (HsPatBind sl p (HsUnGuardedRhs exp) []) | (HsPVar n) <- simplifyHsPat p, n == sillyName' = do

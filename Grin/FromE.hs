@@ -1,6 +1,7 @@
 module Grin.FromE(compile,typecheckGrin) where
 
 import Char
+import Control.Monad
 import Data.Graph(stronglyConnComp, SCC(..))
 import Data.IORef
 import Data.Map(Map)
@@ -12,6 +13,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom
+import C.FFI hiding(Primitive)
 import C.Prims
 import Control.Monad.Identity
 import DataConstructors
@@ -112,7 +114,7 @@ cafNum n = V $ - atomIndex (partialTag t 0)
 
 
 toEntry (n,as,e)
-    | Just nm <- intToAtom (tvrIdent n)  = f (toAtom ('f':show (fromAtom nm :: Name)))
+    | Just nm <- fromId (tvrIdent n)  = f (toAtom ('f':show nm))
     | otherwise = f (toAtom ('f':show (tvrIdent n))) where
         f x = (x,map (toType (TyPtr TyNode) . tvrType ) $ filter (shouldKeep . getType )as,toType TyNode (getType (e::E) :: E))
 
@@ -161,21 +163,23 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
     ds <- return $ flattenScc $ stronglyConnComp [ (a,x, concatMap tf (freeVars z)) | a@(x,(_ :-> z)) <- ds]
 
     -- FFI
-    let tvrAtom (TVr i _ _)  = intToAtom i
+    let tvrAtom t  = liftM convertName (fromId $ tvrIdent t)
     let ef x = do n <- tvrAtom x
                   return (n, Tup [] :-> discardResult (App (scTag x) [] tyUnit))
         ep x = do putStrLn ("EP FOR "++show x)
                   n <- tvrAtom x
-                  l <- Info.lookup (tvrInfo x)
-                  return (n, l)
-    efv <- mapM ef $ tail entries -- FIXME
-    epv <- mapM ep entries
+                  case Info.lookup (tvrInfo x) of
+                    Just l -> return [(n, l)]
+                    Nothing -> return []
+    -- efv <- mapM ef entries -- FIXME
+    efv <- return []
+    epv <- liftM concat $ mapM ep entries
     enames <- mapM tvrAtom entries
 
 
     TyEnv endTyEnv <- readIORef tyEnv
     -- FIXME correct types.
-    let newTyEnv = TyEnv $ Map.fromList (concatMap makePartials (Map.toList endTyEnv) ++ [(en, ([],tyUnit)) | en <- enames])
+    let newTyEnv = TyEnv $ Map.fromList (concatMap makePartials (Map.toList endTyEnv) ++ [(funcMain, ([],tyUnit))] ++ [(en, ([],tyUnit)) | en <- enames])
     wdump FD.Tags $ do
         dumpTyEnv newTyEnv
     fbaps <- readIORef funcBaps
@@ -191,10 +195,10 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
         ds' = ic:(ds ++ fbaps)
 
     let grin = emptyGrin {
-            grinEntryPoints = Map.fromList epv,
+            grinEntryPoints = Map.insert funcMain (FfiExport "_amain" Safe CCall) $ Map.fromList epv,
             grinPhase = PhaseInit,
             grinTypeEnv = newTyEnv,
-            grinFunctions = (head enames ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  discardResult theMain)) : efv ++ ds',
+            grinFunctions = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  discardResult theMain)) : efv ++ ds',
             grinCafs = [ (x,NodeC tagHole []) | (x,_) <- cafs]
             }
     --typecheckGrin grin
@@ -319,7 +323,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
         --putStrLn $ "Compiling: " ++ show nn
         x <- cr e
         return (nn,(Tup (map toVal (filter (shouldKeep . getType) as)) :-> x))
-    funcName = maybe (show $ tvrIdent tvr) show (fmap fromAtom ( intToAtom $ tvrIdent tvr) :: Maybe Name)
+    funcName = maybe (show $ tvrIdent tvr) show (fromId (tvrIdent tvr))
     cc, ce, cr :: E -> IO Exp
     (nn,_,_) = runIdentity $ Map.lookup (tvrIdent tvr) (scMap cenv)
     cr x = ce x

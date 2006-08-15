@@ -153,7 +153,7 @@ data Exp =
     | Call      { expValue :: Val,
                   expArgs :: [Val],
                   expType :: Ty,
-                  expJump :: Bool,
+                  expJump :: Bool,                                        -- ^ Jump is equivalent to a call except it deallocates the region it resides in before transfering control
                   expFuncProps :: FuncProps,
                   expInfo :: Info.Info }                                  -- ^ Call or jump to a callable
     | NewRegion { expLam :: Lam, expInfo :: Info.Info }                   -- ^ create a new region and pass it to its argument
@@ -170,8 +170,8 @@ data Exp =
                   expType :: Ty,
                   expInfo :: Info.Info }                   -- ^ create a closure
     | MkCont    { expCont :: Lam,                          -- ^ the continuation routine
-                  expRest :: Lam,                          -- ^ the computation that is passed the newly created computation
-                  expInfo :: Info.Info }                   -- ^ Make a continuation, always allocated on region encompasing expRest
+                  expLam :: Lam,                           -- ^ the computation that is passed the newly created computation
+                  expInfo :: Info.Info }                   -- ^ Make a continuation, always allocated on region encompasing expLam
     deriving(Eq,Show,Ord)
 
 data Val =
@@ -527,6 +527,9 @@ instance CanTypeCheck TyEnv Exp Ty where
         (ps,es) <- liftM unzip $ mapM (typLam te) as
         foldl1M_ (same "case pat") (tv:ps)
         foldl1M (same $ "case exp: " ++ show (map head $ sortGroupUnder fst (zip es as)) ) (es)
+    typecheck te (Let { expDefs = defs, expBody = body }) = do
+        mapM_ (typecheck te) [ b | FuncDef { funcDefBody = _ :-> b } <- defs ]
+        typecheck te body
 
 instance CanTypeCheck TyEnv Val Ty where
     typecheck _ (Tag _) = return TyTag
@@ -563,7 +566,7 @@ instance CanType Exp Ty where
     getType NewRegion { expLam = _ :-> body } = getType body
     getType Alloc { expValue = v } = TyPtr (getType v)
     getType Let { expBody = body } = getType body
-    getType MkCont { expRest = _ :-> rbody } = getType rbody
+    getType MkCont { expLam = _ :-> rbody } = getType rbody
     getType Call { expType = ty } = ty
 
 instance CanType Val Ty where
@@ -617,7 +620,7 @@ instance FreeVars Exp (Set.Set Var) where
     freeVars Alloc { expValue = v, expCount = c, expRegion = r } = freeVars (v,c,r)
     freeVars Call { expValue = v, expArgs = as } = freeVars (v:as)
     freeVars MkClosure { expValue = v, expArgs = as, expRegion = r } = freeVars (v,as,r)
-    freeVars MkCont { expCont = v, expRest = as} = freeVars (v,as)
+    freeVars MkCont { expCont = v, expLam = as} = freeVars (v,as)
 
 instance FreeVars Exp [Var] where
     freeVars e = Set.toList $ freeVars e
@@ -659,7 +662,7 @@ instance FreeVars Exp (Set.Set Tag) where
     freeVars Alloc { expValue = v, expCount = c, expRegion = r } = freeVars (v,c,r)
     freeVars Call { expValue = v, expArgs = as } = freeVars (v:as)
     freeVars MkClosure { expValue = v, expArgs = as, expRegion = r } = freeVars (v,as,r)
-    freeVars MkCont { expCont = v, expRest = as} = freeVars (v,as)
+    freeVars MkCont { expCont = v, expLam = as} = freeVars (v,as)
 
 
 -- Points to information
