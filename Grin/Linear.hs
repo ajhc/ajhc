@@ -1,12 +1,15 @@
 module Grin.Linear(grinLinear,W(..)) where
 
-import qualified Data.Map as Map
 import Control.Monad.State
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Fixer.Fixer
 import Fixer.Supply
-import Grin.Grin
 import GenUtil
+import Grin.Grin
+import Support.FreeVars
+import Util.SetLike
 
 data W = Zero | One | Omega
     deriving(Ord,Eq,Show)
@@ -51,6 +54,9 @@ go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
         ms <- sequence [ f e mp |  _ :-> e <- ls ]
         let z (x,y) (x',y') = (max x x',y)
         return (Map.unionsWith z ms)
+    g Let { expDefs = defs, expBody = body } mp = do
+        mp' <- execStateT (mapM_ omegaize (map (\v -> Var v undefined) $ Set.toList $ freeVars defs)) mp
+        f body mp'
     g e mp = execStateT (h e) mp
     h (App a [_,b] _) | a == funcApply = omegaize b
     h (App a [Var v _] _) | a == funcEval = eval v
@@ -68,6 +74,7 @@ go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
     h Return { } = return ()
     h Store {} = return ()
     h Update {} = return ()
+
     h e = fail ("Grin.Linear.h: " ++ show e)
     fuse a vs = mapM_ farg $ zip (zip (repeat a) [0..]) vs
     omegaize Const {} = return ()
@@ -75,7 +82,7 @@ go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
     omegaize ValPrim {} = return ()
     omegaize (Var v _) = do
         mp <- get
-        case Map.lookup v mp of
+        case mlookup v mp of
             Nothing -> return ()
             Just (_,v) -> toOmega v
     omegaize x = fail $ "omegaize: " ++ show x
@@ -86,13 +93,13 @@ go argSupply varSupply (fn,~(Tup vs) :-> fb) = ans where
         eval v
         ea <-  supplyValue argSupply an
         mp <- get
-        case Map.lookup v mp of
+        case mlookup v mp of
             Just (_,ev) -> addRule $ ev `isSuperSetOf` ea
             Nothing -> return ()
     farg x = fail ("Grin.Linear.farg: " ++ show x)
     eval v = do
         mp <- get
-        case Map.lookup v mp of
+        case mlookup v mp of
             Just (0,e) -> do
                 addRule $ e `isSuperSetOf` value One
                 modify (Map.insert v (1,e))
