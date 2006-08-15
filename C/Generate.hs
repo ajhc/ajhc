@@ -1,57 +1,58 @@
 module C.Generate(
     Annotate(..),
-    Function(),
-    Type(),
-    Name(),
-    Expression(),
-    Statement(),
-    FunctionOpts(..),
-    sizeof,
+    anonStructType,
+    assign,
+    basicType,
     cast,
+    character,
     cif,
     commaExpression,
-    functionCall,
-    function,
+    constant,
+    creturn,
     dereference,
-    reference,
-    projectAnon,
+    Draw(err),
+    drawG,
+    emptyExpression,
+    enum,
+    expr,
+    Expression(),
+    expressionRaw,
+    function,
+    Function(),
+    functionCall,
+    FunctionOpts(..),
+    generateC,
+    goto,
+    indentBlock,
+    isEmptyExpression,
+    label,
+    localVariable,
+    name,
+    Name(),
+    newVar,
+    nullPtr,
+    number,
+    operator,
     project,
     project',
-    operator,
-    uoperator,
-    anonStructType,
-    constant,
-    string,
-    enum,
-    switch',
-    number,
-    character,
-    isEmptyExpression,
-    newVar,
-    emptyExpression,
-    drawG,
-    toName,
-    nullPtr,
-    expr,
-    name,
-    variable,
-    localVariable,
-    creturn,
-    Draw(err),
-    basicType,
-    withVars,
+    projectAnon,
     ptrType,
-    voidStarType,
+    reference,
+    renderG,
+    sizeof,
+    Statement(),
+    statementRaw,
+    string,
     structAnon,
     structType,
-    assign,
-    label,
-    goto,
-    renderG,
-    generateC,
-    expressionRaw,
-    statementRaw,
+    switch',
+    toName,
+    Type(),
+    uoperator,
+    variable,
+    voidStarType,
     voidType,
+    withVars,
     test
     ) where
 
@@ -79,10 +80,14 @@ newtype Name = Name String
 instance Show Name where
     show (Name n) = n
 
+data StatementInfo = StatementGoto Name | StatementLabel Name | StatementNoInfo | StatementEmpty
+
 data TypeHint = ThNone | ThConst | ThPtr
 data Expression = Exp TypeHint E
-newtype Statement = SD (G Doc)
+data Statement = SD StatementInfo (G Doc)
 newtype Constant = C (G Doc)
+
+sd = SD StatementNoInfo
 
 data Type = TB String | TPtr Type | TAnon [Type] | TNStruct Name
     deriving(Eq,Ord)
@@ -99,8 +104,8 @@ class Draw d where
     err s = error s
 
 instance Draw Statement where
-    draw (SD g) = g
-    err s = SD $ terr s
+    draw (SD _ g) = g
+    err s = sd $ terr s
 
 instance Draw E where
     draw (ED g) = g
@@ -180,7 +185,7 @@ localVariable t n = expD $ do
 emptyExpression = Exp ThNone EE
 
 expressionRaw s = expD $ text s
-statementRaw s = SD (text s)
+statementRaw s = sd (text s)
 
 isEmptyExpression (Exp _ EE) = True
 isEmptyExpression _ = False
@@ -239,29 +244,37 @@ character c = C (tshow c)
 -- statements
 expr :: Expression -> Statement
 expr e | isEmptyExpression e = mempty
-expr e = SD $ draw e <> char ';'
+expr e = sd $ draw e <> char ';'
 
 instance Monoid Statement where
-    mempty = SD empty
-    mconcat = statements
-    mappend a b = mconcat [a,b]
+    mempty = SD StatementEmpty empty
+    mappend (SD StatementEmpty _) x = x
+    mappend x (SD StatementEmpty _) = x
+    mappend x@(SD (StatementGoto _) _) (SD (StatementGoto _) _) = x
+    mappend (SD (StatementGoto l) _) y@(SD (StatementLabel l') _) | l == l' = y
+--    mappend x y@(SD l@StatementGoto {} _) = combine l x y
+--    mappend x@(SD l@StatementLabel {} _) y  = combine l x y
+    mappend a b = combine StatementNoInfo a b
+
+combine l a b = SD l $ do
+    a <- draw a
+    b <- draw b
+    return $ vcat [a,b]
 
 statements :: [Statement] -> Statement
-statements ss = SD $ do
-    ss <- mapM draw ss
-    return $ vcat ss -- foldl ($+$) empty ss
+statements = mconcat
 
 creturn :: Expression -> Statement
-creturn e = SD $ text "return " <> draw e <> char ';'
+creturn e = SD (StatementGoto (Name "")) $ text "return " <> draw e <> char ';'
 
 assign :: Expression -> Expression -> Statement
 assign a b = expr $ operator "=" a b
 
 label :: Name -> Statement
-label (Name s) = SD $ text s <> char ':'
+label n@(Name s) = SD (StatementLabel n) $ text s <> char ':'
 
 goto :: Name -> Statement
-goto (Name s) = SD $ text "goto" <+> text s <> char ';'
+goto n@(Name s) = SD (StatementGoto n) $ text "goto" <+> text s <> char ';'
 
 withVars xs act = undefined
 --SD $ do
@@ -279,19 +292,22 @@ newVar t = do
 
 switch' :: Expression -> [(Maybe Constant,Statement)]  -> Statement
 
-switch' e ts = SD $ text "switch" <+> parens (draw e) <+> char '{' <$> vcat (map sc ts) <$> md <$>  char '}' where
+switch' e ts = sd $ text "switch" <+> parens (draw e) <+> char '{' <$> vcat (map sc ts) <$> md <$>  char '}' where
     sc (Just x,ss) = do ss <- draw ss ; x <- draw x; return $ text "case" <+> x <> char ':' $$ nest 4 (ss $$ text "break;")
     sc (Nothing,ss) = do ss <- draw ss; return $ text "default:"  $$  ( nest 4 ss $$ text "break;")
     md = if any isNothing (fsts ts) then empty else text "default: jhc_case_fell_off(__LINE__);"
 
 
 cif :: Expression -> Statement -> Statement -> Statement
-cif exp thn els = SD $ do
+cif exp thn els = sd $ do
     thn <- draw thn
     els <- draw els
     exp <- draw exp
     return $ text "if" <+> parens exp <+> lbrace <$> nest 4 thn <$> rbrace <+> text "else" <+> lbrace <$> nest 4 els <$> rbrace
 
+indentBlock sd@(SD si _) = SD si $ do
+    x <- draw sd
+    return $ nest 4 x
 {-
 creturn_ :: Statement
 withVars :: [Type] -> ([Expression] -> Statement) -> Statement
@@ -371,7 +387,7 @@ class Annotate e where
     annotate :: String -> e -> e
 
 instance Annotate Statement where
-    annotate c s = SD ((text "/* " <> text c <> text " */") <$> draw s)
+    annotate c s@(SD si _) = SD si ((text "/* " <> text c <> text " */") <$> draw s)
 
 
 mangleIdent xs =  concatMap f xs where

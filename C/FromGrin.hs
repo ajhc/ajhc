@@ -28,13 +28,13 @@ import RawFiles
 import Util.UniqueMonad
 
 
-newtype C a = C (RWST Todo Requires HcHash Uniq a)
+newtype C a = C (RWST (Todo,Map.Map Atom (Name,[Expression])) Requires HcHash Uniq a)
     deriving(Monad,UniqueProducer,MonadState HcHash)
 
 data Todo = TodoReturn | TodoExp Expression | TodoNothing
 
 runC :: C a -> (a,HcHash,Requires)
-runC (C m) =  execUniq1 (runRWST m TodoNothing emptyHcHash)
+runC (C m) =  execUniq1 (runRWST m (TodoNothing,mempty) emptyHcHash)
 
 
 fetchVar :: Var -> Ty -> C Expression
@@ -103,8 +103,13 @@ convertExp (Error s t) = do
       then return (expr $ functionCall (name "jhc_exit") [constant $ number 255],ev)
        else return (expr $ functionCall (name "jhc_error") [string s],ev)
 convertExp (App a vs _) = do
+    lm <- C $ asks snd
     vs' <- mapM convertVal vs
-    return $ (mempty, functionCall (toName (toString a)) vs')
+    case a `Map.lookup` lm of
+        Just (nm,as) -> do
+            let ss = [ a `assign` v | a <- as | v <- vs' ]
+            return (mconcat ss `mappend` goto nm, emptyExpression)
+        Nothing -> return $ (mempty, functionCall (toName (toString a)) vs')
 convertExp (Fetch v) = do
     v <- convertVal v
     return (mempty,v)
@@ -229,6 +234,8 @@ convertPrim p vs
         return $ expressionRaw ('&':t)
 
 
+localJumps xs (C action) = C $ local (\ (x,y) -> (x,Map.fromList xs `mappend` y)) action
+
 convertBody :: Exp -> C Statement
 convertBody (Prim p [a,b] :>>= Tup [q,r] :-> e') | primName p == toAtom "@primQuotRem" = do
     a' <- convertVal a
@@ -237,6 +244,20 @@ convertBody (Prim p [a,b] :>>= Tup [q,r] :-> e') | primName p == toAtom "@primQu
     q' <- convertVal q
     ss' <- convertBody e'
     return $ mconcat [ assign q' (operator "/" a' b'), assign r' (operator "%" a' b'), ss' ]
+
+convertBody Let { expDefs = defs, expBody = body } = do
+    u <- newUniq
+    nn <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = Tup as :-> _ } -> do
+        vs' <- mapM convertVal as
+        let nm = (toName (show name ++ show u))
+        return (name,(nm,vs'))
+    localJumps nn $ do
+    let done = (toName $ "done" ++ show u)
+    ss <- (convertBody body)
+    rs <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = Tup as :-> b } -> do
+       ss <- convertBody b
+       return (annotate (show as) (label (toName (show name ++ show u))) `mappend` indentBlock ss)
+    return (ss `mappend` goto done `mappend` mconcat (intersperse (goto done) rs) `mappend` label done);
 
 
 convertBody (Return v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
@@ -336,10 +357,11 @@ convertBody (Case v@(Var _ t) ls) = do
 
 
 convertBody e = do
-    x <- C ask
+    (x,_) <- C ask
     (ss,er) <- convertExp e -- lift $  runSubCGen $ cexp e
     case x of
         TodoReturn -> return (ss `mappend` creturn er)
+        TodoExp v | isEmptyExpression er -> return ss
         TodoExp v -> return (ss `mappend` (v `assign` er))
         TodoNothing | isEmptyExpression er -> return ss
         TodoNothing -> return (ss `mappend` expr er)
@@ -363,7 +385,7 @@ nodeAssignV v t e' = do
 
 
 localTodo :: Todo -> C a -> C a
-localTodo todo (C act) = C $ local (const todo) act
+localTodo todo (C act) = C $ local (\ (_,y) -> (todo,y)) act
 
 
 convertFunc :: (Atom,Lam) -> C Function
