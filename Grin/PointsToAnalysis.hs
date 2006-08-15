@@ -334,6 +334,10 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
                         update <- getNeedUpdate (SwitchingUpdate stags) v
                         return $ (Return vr :>>= createEval update typeEnv (tagsp v)) :>>= vb :-> e'
         g (e1 :>>= l) = do e1' <- g e1; l' <- f l; return $ e1' :>>= l'
+        g lt@Let { expDefs = defs, expBody = body } = do
+            body' <- g body
+            ds <- sequence [ f l >>= return . (,) n | FuncDef { funcDefName = n, funcDefBody = l } <- defs ]
+            return lt { expDefs = map (uncurry $ createFuncDef True) ds, expBody = body' }
         g (App a [vr@(Var v _)] _) | a == funcEval = do
             mtick "Grin.eval.trailing"
             return $ Return vr :>>= createEval TrailingUpdate typeEnv (tagsp v)
@@ -388,16 +392,23 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv, grinFunctions = g
         te = grinTypeEnv grin
         convertArgs fa = Map.fromList $ map f (Map.keys $ ptFunc pt) where
             f atom = (atom,[ uncurry vsToItem $ Map.findWithDefault (t,VsEmpty) (atom,i) fa  |  t <- ts | i <- naturals]) where
-                Just (ts,_) = findArgsType te atom
+                ts = case findArgsType te atom of
+                    Just (ts,_) -> ts
+                    _ -> []
     let (sts,funcs) = unzip [ (stat,(a,l')) | (a,l) <- grinFunctions, let (l',stat) = runStatM (f l) ]
     tickStat stats (mconcat sts)
-    return grin { grinPhase = PostInlineEval, grinFunctions = funcs, grinArgTags = convertArgs $ ptFuncArgs pt, grinReturnTags = Map.mapWithKey (funcReturn te pt) $ ptFunc pt }
+    return grin {
+        grinPhase = PostInlineEval,
+        grinFunctions = funcs,
+        grinArgTags = convertArgs $ ptFuncArgs pt,
+        grinReturnTags = Map.mapWithKey (funcReturn te pt) $ ptFunc pt
+        }
 
 
 funcReturn te pt fn vs =
   case findArgsType te fn of
     Just (_,ty) -> valueSetToItem te pt ty vs
-    Nothing     -> error ("funcReturn: "++show fn)
+    Nothing     -> valueSetToItem te pt TyUnknown vs -- error ("funcReturn: "++show fn)
 
 valueSetToItem :: TyEnv -> PointsTo -> Ty -> ValueSet -> Item
 valueSetToItem _ _ ty VsEmpty = itemEmpty ty
@@ -477,6 +488,9 @@ collectM  fname (~(Tup vs) :-> exp') = ans where
         f exp2
     f exp = g exp
 
+    g Let { expDefs = defs, expBody = body } = do
+        mapM_ (uncurry collectM) [ (funcDefName d, funcDefBody d) | d <- defs]
+        f body
     g (App fe [v] _) | fe == funcEval = do
         x <- toPos v
         tell mempty { appEq = [(funcEval,[x])] }
