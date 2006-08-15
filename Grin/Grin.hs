@@ -746,6 +746,8 @@ modifyTail :: Lam -> Exp -> Exp
 modifyTail lam@(_ :-> lb) e = f e where
     f (Error s ty) = Error s (getType lb)
     f (Case x ls) = Case x (map g ls)
+    f lt@Let {expBody = body } = lt { expBody = f body }
+    f lt@MkCont {expLam = lam, expCont = cont } = lt { expLam = g lam, expCont = g cont }
     f (e1 :>>= p :-> e2) = e1 :>>= p :-> f e2
     f e = e :>>= lam
     g (p :-> e) = p :-> f e
