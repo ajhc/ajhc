@@ -7,6 +7,7 @@ import Control.Monad.Writer
 import Data.Monoid
 import IO(hFlush,stderr,stdout,openFile,hClose,IOMode(..))
 import List hiding(group,union)
+import qualified List(group)
 import Maybe
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
@@ -192,6 +193,8 @@ processInitialHo accumho ho = do
         prog = etaAnnotateProgram (programSetDs ds program)
         imap = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho `mappend` hoEs ho)]
         accumho' = reprocessHo rules' (hoProps ho) accumho
+
+    --lintCheckProgram (putStrLn "processInitialHo") prog
     return $ accumho' `mappend` ho { hoUsedIds = uids, hoEs = programEsMap prog }
 
 reprocessHo :: Rules -> Map.Map Name [Atom] -> Ho -> Ho
@@ -1028,6 +1031,13 @@ lintCheckE onerr dataTable tvr e | flint = case inferType dataTable [] e of
 lintCheckE _ _ _ _ = return ()
 
 lintCheckProgram onerr prog | flint = do
+    when (hasRepeatUnder fst (programDs prog)) $ do
+        onerr
+        let repeats = [ x | x@(_:_:_) <- List.group $ sort (map fst (programDs prog))]
+        putErrLn $ ">>> Repeated top level decls: " ++ pprint repeats
+        printProgram prog
+        putErrLn $ ">>> program has repeated toplevel definitions" ++ pprint repeats
+        maybeDie
     let f (tvr@TVr { tvrIdent = n },e) | even n = do
             onerr
             putErrLn $ ">>> non-unique name at top level: " ++ pprint tvr
@@ -1035,12 +1045,6 @@ lintCheckProgram onerr prog | flint = do
             putErrLn $ ">>> non-unique name at top level: " ++ pprint tvr
             maybeDie
         f (tvr,e) = lintCheckE onerr (progDataTable prog) tvr e
-    when (hasRepeatUnder fst (programDs prog)) $ do
-        onerr
-        putErrLn ">>> Repeated top level decls"
-        printProgram prog
-        putErrLn ">>> program has repeated toplevel definitions"
-        maybeDie
     mapM_ f (programDs prog)
     let ids = progExternalNames prog `mappend` fromList (map tvrIdent $ fsts (programDs prog))
         fvs = Set.fromList $ melems (freeVars $ snds $ programDs prog :: IdMap TVr)
