@@ -143,6 +143,7 @@ fvBind (Right xs) = unions (snds xs)
 
 canFloatPast t | sortStarLike . getType $ t = True
 canFloatPast t | getType t == tWorldzh = True
+canFloatPast t | getProperty prop_ONESHOT t = True
 canFloatPast t | getType t == ELit (LitCons tc_IOErrorCont [] (ESort EStar)) = True
 canFloatPast _ = False
 

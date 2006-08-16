@@ -140,7 +140,9 @@ collectOccurance e = f e  where
         (as',asfv) <- grump (arg $ mapM ftvr as)
         let avs = bvs `andOM` asfv
             as'' = map (annbind' avs) as'
-        tell $ (inLam $ foldr mdelete avs (map tvrIdent as),fromList $ map tvrIdent as)
+        case all (getProperty prop_ONESHOT) as of
+            True ->  tell $ (foldr mdelete avs (map tvrIdent as),fromList $ map tvrIdent as)
+            False -> tell $ (inLam $ foldr mdelete avs (map tvrIdent as),fromList $ map tvrIdent as)
         return (foldr ELam b' as'')
     f e | Just (x,t) <- from_unsafeCoerce e  = do x <- f x ; t <- (arg (f t)); return (prim_unsafeCoerce x t)
     f (EVar tvr@TVr { tvrIdent = n, tvrType =  t}) = do
