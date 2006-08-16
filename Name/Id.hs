@@ -15,8 +15,8 @@ module Name.Id(
     runIdNameT
     )where
 
-import Control.Monad
 import Control.Monad.State
+import Control.Monad.Reader
 import Data.FunctorM
 import Data.Monoid
 import Data.Typeable
@@ -62,6 +62,10 @@ idMapToIdSet (IdMap im) = IdSet $ IS.fromDistinctAscList (IM.keys im)
 -- | Name monad transformer.
 newtype IdNameT m a = IdNameT (StateT (IdSet, IdSet) m a)
     deriving(Monad, MonadTrans, Functor, MonadFix, MonadPlus, MonadIO)
+
+instance (MonadReader r m) => MonadReader r (IdNameT m) where
+	ask       = lift ask
+	local f (IdNameT m) = IdNameT $ local f m
 
 -- | Get bound and used names
 idNameBoundNames :: Monad m => IdNameT m IdSet

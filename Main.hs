@@ -7,11 +7,11 @@ import Control.Monad.Writer
 import Data.Monoid
 import IO(hFlush,stderr,stdout,openFile,hClose,IOMode(..))
 import List hiding(group,union)
-import qualified List(group)
 import Maybe
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified List(group)
 import qualified System
 
 import Atom
@@ -152,7 +152,7 @@ fileOrModule f = case reverse f of
                    _                   -> Left $ Module f
 
 
-barendregt e = runIdentity  (renameTraverse' e)
+barendregt e = fst $ renameE mempty mempty e -- runIdentity  (renameTraverse' e)
 
 barendregtProg prog = transformProgram transBarendregt prog
 
@@ -164,7 +164,7 @@ transBarendregt = transformParms {
         } where
     barendregtProgram prog | null $ progCombinators prog = prog
     barendregtProgram prog = programSetDs ds' prog where
-        Identity (ELetRec ds' Unknown) = renameTraverse' (ELetRec (programDs prog) Unknown)
+        (ELetRec ds' Unknown,_) = renameE mempty mempty (ELetRec (programDs prog) Unknown)
 
 
 lamann _ nfo = return nfo
@@ -1101,6 +1101,7 @@ printCheckName'' dataTable tvr e = do
 
 printESize :: String -> Program -> IO ()
 printESize str prog = putErrLn $ str ++ " program e-size: " ++ show (eSize (programE prog))
+
 
 
 

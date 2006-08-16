@@ -1,24 +1,24 @@
 
 module E.Traverse(
-    Binding(..),
-    TravM,
-    TravOptions(..),
     basicDecompose,
-    emapE',
-    emapE,
+    Binding(..),
     emapE_,
+    emapE,
+    emapE',
     eSize,
     lookupBinding,
     newBinding,
     newVarName,
-    renameTraverse',
+    renameE,
     renameTraverse,
+    renameTraverse',
     runRename,
+    traverse,
     travOptions,
-    traverse
+    TravOptions(..),
+    TravM
     ) where
 
-import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.FunctorM
@@ -53,7 +53,8 @@ renameTraverse' e = e' where
     e' = liftM fst $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty mempty  e
 
 runRename :: IdSet -> E -> (E,IdSet)
-runRename set e = runIdentity $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty (idSetToIdMap (const NotKnown) set)  e
+runRename set e = renameE set mempty e
+--runRename set e = runIdentity $ traverse travOptions { pruneUnreachable = Nothing } (\_ (x,xs) -> (return $ foldl EAp x xs)) mempty (idSetToIdMap (const NotKnown) set)  e
 
 data  TravOptions m = TravOptions {
     pruneUnreachable :: Maybe [Int],
@@ -370,3 +371,74 @@ basicDecompose prune rules body ds = ans where
     mapScc f = map g where
         g (Left x) = Left (f x)
         g (Right xs) = Right (map f xs)
+
+renameE :: IdSet -> IdMap E -> E -> (E,IdSet)
+renameE initSet initMap e = runReader (runIdNameT' $ addBoundNamesIdMap initMap >> addBoundNamesIdSet initSet >> f e) initMap  where
+    f,f' :: E -> IdNameT (Reader (IdMap E)) E
+    f' e = f e
+    f  (EAp a b) = return EAp `ap` f a `ap` f b
+    f  (ELit (LitCons n xs t)) = do
+        xs' <- mapM f xs
+        t' <- f' t
+        return $ ELit (LitCons n xs' t')
+    f (ELit (LitInt n t)) = do
+        t' <- f' t
+        return (ELit (LitInt n t'))
+    f (EError x t) = return (EError x) `ap` f' t
+    f (EPrim n es t) = do
+        es' <- mapM f es
+        t' <- f' t
+        return $ EPrim n es' t'
+    f (ELam tvr e) = lp f' ELam tvr e
+    f (EPi tvr e) = lp f EPi tvr e
+    f  e@(EVar TVr { tvrIdent = n }) = do
+        im <- lift ask
+        case mlookup n im of
+            Just n' -> do return n'
+            Nothing -> return e
+    f x@(ESort {}) = return x
+    f Unknown = return Unknown
+    f ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d } = do
+        e' <- f e
+        t' <- f' (eCaseType ec)
+        addNames $ map tvrIdent (caseBinds ec)
+        (ob,b') <- ntvr f' b
+        localSubst ob $ do
+            as' <- mapM da as
+            d' <- fmapM f d
+            return $ ec { eCaseScrutinee = e', eCaseType = t', eCaseBind = b', eCaseAlts = as', eCaseDefault = d' }
+    f (ELetRec ds e) = do
+        addNames (map (tvrIdent . fst) ds)
+        ds' <- mapM ( ntvr f' . fst) ds
+        localSubst (mconcat $ fsts ds') $ do
+            es <- mapM f (snds ds)
+            e' <- f e
+            return (ELetRec (zip (snds ds') es) e')
+    --f e = error $ "renameE.f: " ++ show e
+    da :: Alt E -> IdNameT (Reader (IdMap E)) (Alt E)
+    da (Alt (LitCons n xs t) l) = do
+        t' <- f' t
+        xs' <-  mapM (ntvr f') xs
+        localSubst (mconcat [ x | (x,_) <- xs']) $ do
+            l' <- f l
+            return (Alt (LitCons n (snds xs') t') l')
+    da (Alt (LitInt n t) l) = do
+        t' <- f' t
+        l' <- f l
+        return (Alt (LitInt n t') l')
+    localSubst :: (IdMap E) -> IdNameT (Reader (IdMap E)) a  -> IdNameT (Reader (IdMap E)) a
+    localSubst ex action = do local (ex `mappend`) action
+    ntvr fg tv@TVr { tvrIdent = 0, tvrType = t} = do
+        t' <- fg t
+        return (mempty,tv { tvrType = t'})
+    ntvr fg tv@(TVr { tvrIdent = n, tvrType = t}) = do
+        n' <- if n > 0 then uniqueName  n else newName
+        t' <- fg t
+        let tv' = tv { tvrIdent = n', tvrType = t' }
+        return (msingleton n (EVar tv'),tv')
+    lp fg elam tv e = do
+        (n,tv') <- ntvr fg tv
+        e' <- localSubst n (f e)
+        return $ elam tv' e'
+
+
