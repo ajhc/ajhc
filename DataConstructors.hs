@@ -306,13 +306,13 @@ followAlias :: Monad m => DataTable -> E -> m E
 followAlias dataTable (EAp a b) = do
     a' <- followAlias dataTable a
     return (eAp a' b)
-followAlias dataTable (ELit (LitCons c ts e))
-    | Just _ <- jcon, sameLength (conSlots con) ts, Just [_] <- jcn, conAlias ccon  = return ans where
-        jcn@(~(Just [cn])) = conChildren con
-        Identity ccon = getConstructor cn dataTable
-        jcon@(~(Just con)) = getConstructor c dataTable
-        [sl] = conSlots ccon
-        ans = doSubst False False (fromList $ zip [2..] (map Just ts)) sl
+followAlias dataTable (ELit (LitCons c ts e)) = do
+    con <- getConstructor c dataTable
+    Just [cn] <- return $ conChildren con
+    ccon <- getConstructor cn dataTable
+    [sl] <- return $ conSlots ccon
+    True <- return $ sameLength (conSlots con) ts && conAlias ccon
+    return $ doSubst False False (fromList $ zip [2..] (map Just ts)) sl
 followAlias _ e = fail "followAlias: not an alias"
 
 followAliases :: DataTable -> E -> E
