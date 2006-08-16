@@ -172,7 +172,7 @@ programFloatInward prog = do
 
 instance Show IdSet where
     showsPrec n is = showsPrec n $ map f (idSetToList is) where
-        f n =  maybe (toAtom ('x':show n)) (toAtom . show . (fromAtom :: Atom -> Name)) (intToAtom n)
+        f n =  maybe (toAtom ('x':show n)) (toAtom . show) (fromId n)
 
 cupbinds bs = f bs where
     f (Left ((t,_),fv):rs) = (tvrShowName t,fv):f rs

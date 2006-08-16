@@ -34,7 +34,7 @@ ePrettyEx = ePretty
 
 showId :: DocLike d => Id -> d
 showId 0 = (char '_')
-showId i | Just x <- intToAtom i  = (text $ show  $ (fromAtom x :: Name))
+showId i | Just x <- fromId i  = (text $ show x)
 showId i = (text $ 'x':show i)
 
 instance DocLike d => PPrint d TVr where

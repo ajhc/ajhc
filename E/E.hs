@@ -142,7 +142,7 @@ instance Binary TVr where
 
 instance Show a => Show (TVr' a) where
     show TVr { tvrIdent = 0, tvrType = e} = "(_::" ++ show e ++ ")"
-    show TVr { tvrIdent = (x), tvrType =  e} | Just n <- intToAtom x  = "(v" ++ show (fromAtom n::Name) ++ "::" ++ show e ++ ")"
+    show TVr { tvrIdent = (x), tvrType =  e} | Just n <- fromId x  = "(v" ++ show n ++ "::" ++ show e ++ ")"
     show TVr { tvrIdent = (x), tvrType = e}  = "(v" ++ show x ++ "::" ++ show e ++ ")"
 
 
@@ -268,7 +268,7 @@ discardArgs _ _ = error "discardArgs"
 
 
 tvrName :: Monad m => TVr  -> m Name
-tvrName (TVr {tvrIdent =  n }) | Just a <- intToAtom n = return $ fromAtom a
+tvrName (TVr {tvrIdent =  n }) | Just a <- fromId n = return a
 tvrName tvr = fail $ "TVr is not Name: " ++ show tvr
 
 tvrShowName :: TVr -> String

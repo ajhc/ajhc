@@ -188,10 +188,10 @@ processInitialHo ::
     -> IO Ho -- ^ final combined ho data.
 processInitialHo accumho ho = do
     let (ds,uids) = runWriter $ annotateDs imap (collectIdAnn (hoRules ho) (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
-        ds' = programDs $ etaAnnotateProgram (programSetDs ds program)
+        prog = etaAnnotateProgram (programSetDs ds program)
         imap = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho)]
         accumho' = reprocessHo (hoRules ho) (hoProps ho) accumho
-    return $ accumho' `mappend` ho { hoUsedIds = uids, hoEs = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) |  d@(v,_) <- ds' ] }
+    return $ accumho' `mappend` ho { hoUsedIds = uids, hoEs = programEsMap prog }
 
 reprocessHo :: Rules -> Map.Map Name [Atom] -> Ho -> Ho
 reprocessHo rules ps ho = ho { hoEs = Map.map f (hoEs ho) } where

@@ -167,7 +167,9 @@ toId :: Name -> Int
 toId x = atomIndex (toAtom x)
 
 fromId :: Monad m => Int -> m Name
-fromId i = liftM Name (intToAtom i)
+fromId i = case intToAtom i of
+    Just a -> return $ Name a
+    Nothing -> fail $ "Name.fromId: not a name " ++ show i
 
 mapName :: (String -> String,String -> String) -> Name -> Name
 mapName (f,g) n = case nameParts n of

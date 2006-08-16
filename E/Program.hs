@@ -4,17 +4,14 @@ import Control.Monad.Identity
 import Data.Monoid
 import List
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 
 import Class
 import DataConstructors
 import E.E
-import E.FreeVars
 import E.TypeCheck
+import Name.Id
 import Name.Name
 import qualified Stats
-import Util.Graph
-import Name.Id
 
 
 data Program = Program {
@@ -69,7 +66,12 @@ programE :: Program -> E
 programE prog = ELetRec (programDs prog) (EVar (progMainEntry prog))
 
 programEsMap :: Program -> Map.Map Name (TVr,E)
-programEsMap prog = Map.fromList [ (runIdentity $ fromId (tvrIdent v),d) | d@(v,_) <- programDs prog ]
+programEsMap prog = runIdentity $ do
+    let f d@(v,_) = case fromId (tvrIdent v) of
+            Just n -> return (n,d)
+            Nothing -> fail $ "Program.programEsMap: top level var with temporary name " ++ show v
+    xs <- mapM f (programDs prog)
+    return (Map.fromList xs)
 
 -- | note, this will reset your entry points
 programSetE :: E -> Program -> Program
