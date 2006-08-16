@@ -45,7 +45,7 @@ DP=$(PREFIX)
 
 base-1.0.hl: jhc lib/base/base.cabal
 	-[ -e base.log ] && mv -f base.log base.log.bak
-	./jhc -v $(RTSOPTS) $(JHC_TEST)  -ilib/base --noauto --build-hl lib/base/base.cabal -o $@ 2>&1 | tee base.log
+	set -o pipefail; ./jhc -v $(RTSOPTS) $(JHC_TEST)  -ilib/base --noauto --build-hl lib/base/base.cabal -o $@ 2>&1 | tee base.log
 
 base-1.0.prof.hl: jhc lib/base/base.cabal
 	-[ -e base.prof.log ] && mv -f base.prof.log base.prof.log.bak
