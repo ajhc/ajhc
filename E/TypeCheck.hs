@@ -107,7 +107,8 @@ inferType dataTable ds e = rfc e where
     fc (EAp a b) = do
         withContextDoc (text "EAp:" </> parens (prettyE a) </> parens (prettyE b)) $ do
             a' <- rfc a
-            return $ eAp (followAliases dataTable a') b
+            --b <- strong' b
+            strong' $ eAp (followAliases dataTable a') b
         {-
         case followAliases dataTable a' of
             (EPi tvr@(TVr { tvrType =  t}) v) -> do
@@ -120,7 +121,8 @@ inferType dataTable ds e = rfc e where
             x -> fail $ "App: " ++ render (tupled [ePretty x,ePretty a, ePretty a', ePretty b])
             -}
     fc (ELetRec vs e) = do
-        let ck (tv@(TVr { tvrType =  t}),e) = withContextDoc (hsep [text "Checking Let: ", parens (pprint tv),text  " = ", parens $ prettyE e ])  $ do
+        let ck (TVr { tvrIdent = 0 },_) = fail "binding of empty var"
+            ck (tv@(TVr { tvrType =  t}),e) = withContextDoc (hsep [text "Checking Let: ", parens (pprint tv),text  " = ", parens $ prettyE e ])  $ do
                 when (getType t == eHash && not (isEPi t)) $ fail $ "Let binding unboxed value: " ++ show (tv,e)
                 valid' nds t
                 fceq nds e t

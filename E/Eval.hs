@@ -81,6 +81,7 @@ strong dsMap' term = eval' dsMap term [] where
     eval' ds (ELam v body) (t:rest) = eval' ds (subst v t body) rest
     eval' ds (EPi v body) (t:rest) = eval' ds (subst v t body) rest   -- fudge
     eval' ds (EAp t1 t2) stack = eval' ds t1 (t2:stack)
+    eval' _ds (EVar TVr { tvrIdent = 0 }) _stack = fail "empty ident in term"
     eval' ds t@(EVar v) stack
         | Just x <- Map.lookup v ds = eval' ds x stack
         | otherwise = do
