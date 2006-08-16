@@ -9,8 +9,10 @@ import Class
 import DataConstructors
 import E.E
 import E.TypeCheck
+import GenUtil
 import Name.Id
 import Name.Name
+import Options
 import qualified Stats
 
 
@@ -50,6 +52,8 @@ programDs :: Program -> [(TVr,E)]
 programDs prog = [ (t,foldr ELam e as)  | (t,as,e) <- progCombinators prog]
 
 programSetDs :: [(TVr,E)] -> Program -> Program
+programSetDs ds prog | flint && hasRepeatUnder (tvrIdent . fst) ds = error $ "programSetDs: program has redundant definitions: " ++ show (map (tvrShowName . fst) ds)
+programSetDs ds prog | flint && any even (map (tvrIdent . fst) ds) = error $ "programSetDs: trying to set non unique top sevel name: " ++ show (map (tvrShowName . fst) ds)
 programSetDs ds prog = prog {
     progMainEntry = f (progMainEntry prog),
     progEntryPoints = map f (progEntryPoints prog),
