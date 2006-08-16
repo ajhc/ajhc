@@ -21,7 +21,7 @@ funAddrToWordPtr :: FunAddr -> WordPtr
 funAddrToWordPtr = integralCast
 -}
 {-# INLINE plusAddr #-}
-plusAddr addr off = wordPtrToAddr $ addrToWordPtr addr + fromInt off
+plusAddr addr off = wordPtrToAddr (addrToWordPtr addr + fromInt off)
 
 --foreign import primitive unsafeCoerce :: a -> b
 --foreign import primitive integralCast :: a -> b

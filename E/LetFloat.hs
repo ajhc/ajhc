@@ -1,6 +1,5 @@
 module E.LetFloat(
     atomizeAp,
-    coalesceLets,
     floatOutward,
     programFloatInward,
     floatInward
@@ -37,7 +36,6 @@ import Support.FreeVars
 import Util.SetLike
 import Util.UniqueMonad
 import qualified Util.Graph as G
-
 
 
 doLetRec stats [] e = return e
@@ -256,13 +254,6 @@ sepByDropPoint ds fs' = (r,xs) where
     fvDecls (Right ts) = [tvrIdent t | ((t,_),_) <- ts ]
     comb (a,b) (c,d) = (a ++ c, zipWith (++) b d)
 
-
-
-coalesceLets :: Stats -> E -> IO E
-coalesceLets stats e = liftM fst $ traverse travOptions { pruneRecord = varElim stats } f mempty mempty e where
-    f n (x,xs) = do
-        (x',xs') <- lift $ doCoalesce stats (x,xs)
-        return $ foldl EAp x' xs'
 
 newtype Level = Level Int
     deriving(Eq,Ord,Enum,Show,Typeable)
