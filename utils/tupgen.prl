@@ -1,0 +1,71 @@
+#!/usr/bin/perl
+
+
+use strict;
+use warnings;
+use Data::Dumper;
+use Getopt::Long;
+
+my @text;
+my $in = undef;
+
+my $start = 2;
+my $end = 15;
+
+GetOptions ("s=i" => \$start, "e=i" => \$end );
+
+sub proctext  {
+    local $_ = $_[0];
+    if (/^(\s+)\#Do\s+(.*)/) {
+        push @text, ["","$1$2\n"];
+    } elsif (/(.*?)\(\#Tup (.*?)\)(.*)/) {
+        push @text, $1 if $1;
+        push @text, "(";
+        push @text, [",","$2"];
+        push @text, ")";
+        proctext("$3\n");
+    } elsif (/(.*?)\[\#List (.*?)\](.*)/) {
+        push @text, $1 if $1;
+        push @text, "[";
+        push @text, [",","$2"];
+        push @text, "]";
+        proctext("$3\n");
+    } else {
+        push @text, $_;
+    }
+}
+
+while (<>) {
+    if (/^\{\- TUPGEN\!\s*$/) {
+        while (<>) {
+            last if /^\-\}\s*$/;
+            proctext($_);
+        }
+    }
+}
+
+#print Dumper(\@text);
+
+sub filltup ($@) {
+    local $_;
+    my ($t,@l) = @_;
+    my @r = map {
+       my $nt = $t;
+       $nt =~ s/\#([a-z])/$1$_/g;
+       $nt;
+    } @l;
+    return @r;
+}
+
+foreach  ($start .. $end) {
+    my @l = ( 1 .. $_);
+    print "-- tupgen $_\n";
+    foreach (@text) {
+        if (ref $_) {
+            print join($_->[0],filltup($_->[1],@l));
+        } else {
+            print $_;
+        }
+    }
+
+}
