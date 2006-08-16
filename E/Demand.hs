@@ -298,6 +298,10 @@ analyze (EPi tvr@TVr { tvrType = t1 } t2)  _s = do
     (t2',dt2) <- analyze t2 lazy
     return (EPi tvr { tvrType = t1' } t2',dt1 `glb` dt2)
 
+analyze (ELam x@TVr { tvrIdent = 0 } e) (S (Product [s])) = do
+    (e',phi :=> sigma) <- analyze e s
+    let sx = Absent
+    return (ELam (tvrInfo_u (Info.insert sx) x) e',demandEnvMinus phi x :=> (sx:sigma))
 analyze (ELam x e) (S (Product [s])) = do
     (e',phi :=> sigma) <- analyze e s
     let sx = lenv x phi

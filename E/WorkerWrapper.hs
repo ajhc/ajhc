@@ -46,6 +46,7 @@ wrappable dataTable mtvr e@ELam {} = ans where
     cpr = maybe Top id (Info.lookup (tvrInfo mtvr))
     Demand.DemandSignature _ (_ Demand.:=> sa) = maybe Demand.absSig id (Info.lookup (tvrInfo mtvr))
     ans = f e ( sa ++ repeat Demand.lazy) cpr []
+    g t@TVr { tvrIdent = 0 } _ = (Absent,t)
     g t (Demand.S subs)
        | Just con <- getProduct dataTable tt = (Cons con (as con),t)
          where
