@@ -24,17 +24,16 @@ import E.E
 import E.Inline
 import E.Program
 import E.Subst
-import E.Traverse(emapE')
 import E.Values
 import GenUtil hiding(replicateM_)
 import Info.Types
 import Name.Id
-import qualified Info.Info as Info
-import qualified Stats
 import Support.CanType
 import Support.FreeVars
 import Util.NameMonad
 import Util.SetLike
+import qualified Info.Info as Info
+import qualified Stats
 
 
 data ArityType = AFun Bool ArityType | ABottom | ATop
