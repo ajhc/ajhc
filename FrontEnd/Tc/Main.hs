@@ -562,17 +562,18 @@ tcPragmaDecl (HsPragmaRules rs) = do
     return [HsPragmaRules rs']
 
 
+-- foreign decls are accumulated by tiExpl
 tcPragmaDecl fd@(HsForeignDecl _ _ n qt) = do
     kt <- getKindEnv
     s <- hsQualTypeToSigma kt qt
     addToCollectedEnv (Map.singleton (toName Val n) s)
-    return [fd]
+    return []
 
 tcPragmaDecl fd@(HsForeignExport _ e n qt) = do
     kt <- getKindEnv
     s <- hsQualTypeToSigma kt qt
     addToCollectedEnv (Map.singleton (ffiExportName e) s)
-    return [fd]
+    return []
 
 tcPragmaDecl _ = return []
 
