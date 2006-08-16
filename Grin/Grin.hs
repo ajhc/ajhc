@@ -212,12 +212,12 @@ data FuncDef = FuncDef {
     funcDefProps :: FuncProps
     } deriving(Eq,Ord,Show)
 
-createFuncDef local name body@(args :-> rest)  = updateFuncDefProps FuncDef { funcDefName = name, funcDefBody = body, funcDefCall = call, funcDefProps = funcProps } where
-    call = Item name (TyCall (if local then LocalFunction else Function) (map getType (fromTuple args)) (getType rest))
+createFuncDef local name body@(Tup args :-> rest)  = updateFuncDefProps FuncDef { funcDefName = name, funcDefBody = body, funcDefCall = call, funcDefProps = funcProps } where
+    call = Item name (TyCall (if local then LocalFunction else Function) (map getType args) (getType rest))
 
 
-updateFuncDefProps fd@FuncDef { funcDefBody = body@(args :-> rest) } =  fd { funcDefProps = props } where
-    props = (funcDefProps fd) { funcFreeVars = freeVars body, funcTags = freeVars body, funcType = (map getType (fromTuple args),getType rest) }
+updateFuncDefProps fd@FuncDef { funcDefBody = body@(Tup args :-> rest) } =  fd { funcDefProps = props } where
+    props = (funcDefProps fd) { funcFreeVars = freeVars body, funcTags = freeVars body, funcType = (map getType args,getType rest) }
 
 grinFuncs grin = map (\x -> (funcDefName x, funcDefBody x)) (grinFunctions grin)
 setGrinFunctions xs grin = grin { grinFunctions = map (uncurry (createFuncDef False)) xs }
@@ -553,8 +553,9 @@ instance CanTypeCheck TyEnv Exp Ty where
         foldl1M_ (same "case pat") (tv:ps)
         foldl1M (same $ "case exp: " ++ show (map head $ sortGroupUnder fst (zip es as)) ) (es)
     typecheck te (Let { expDefs = defs, expBody = body }) = do
-        mapM_ (typecheck te) [ b | FuncDef { funcDefBody = _ :-> b } <- defs ]
-        typecheck te body
+        let nte = extendTyEnv defs te
+        mapM_ (typecheck nte) [ b | FuncDef { funcDefBody = _ :-> b } <- defs ]
+        typecheck nte body
 
 instance CanTypeCheck TyEnv Val Ty where
     typecheck _ (Tag _) = return TyTag

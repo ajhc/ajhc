@@ -179,7 +179,7 @@ removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps
         as <- dff' fn' as
         as <- mapM clearCaf as
         return $ Update p (NodeC fn as)
-    f lt@Let { expDefs = defs }  = return lt { expDefs = [ df { funcDefBody = margs name body } | df@FuncDef { funcDefName = name, funcDefBody = body } <- defs ] }
+    f lt@Let { expDefs = defs }  = return lt { expDefs = [ updateFuncDefProps df { funcDefBody = margs name body } | df@FuncDef { funcDefName = name, funcDefBody = body } <- defs ] }
     f x = return x
     dff' fn as | fn `Set.member` directFuncs = return as
     dff' fn as = dff'' fn as

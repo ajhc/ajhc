@@ -119,6 +119,12 @@ jhc_case_fell_off(int n) {
 #define jhc_setjmp(jb) sigsetjmp(*(jmp_buf *)jb,0)
 #define jhc_longjmp(jb) siglongjmp(*(jmp_buf *)jb,1)
 
+struct jhc_continuation {
+    void *argument;
+    jmp_buf jump_buf;
+};
+
+
 
 int
 main(int argc, char *argv[])

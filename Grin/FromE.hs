@@ -226,6 +226,7 @@ stripTheWorld (t,as,e) = (tvrInfo_u (Info.insert (IsCAF caf)) t,filter (shouldKe
 
 
 shouldKeep :: E -> Bool
+shouldKeep e | e == unboxedTyUnit = False
 shouldKeep e = e /= tWorld__
 
 
