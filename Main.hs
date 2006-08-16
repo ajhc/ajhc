@@ -284,6 +284,7 @@ processDecls stats ho ho' tiData = do
     Stats.clear stats
 
     prog <- return $ programSetDs [ (t,e) | (_,t,e) <- ds] prog
+    lintCheckProgram (putErrLn "LintPostProcess") prog
 
     -- Create Specializations
     let specMap = Map.fromListWith (++) [ (n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- tiCheckedRules tiData]
@@ -297,6 +298,8 @@ processDecls stats ho ho' tiData = do
     let entryPoints = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || member (tvrIdent t) rfreevars) (tell [t])) prog
         rfreevars = ruleAllFreeVars rules
     prog <- return $ prog { progEntryPoints = entryPoints }
+
+    lintCheckProgram (putErrLn "InitialLint") prog
 
     prog <- programPrune prog
     ho <- return $ reprocessHo rules (hoProps ho') ho
@@ -1002,7 +1005,9 @@ maybeDie = case optKeepGoing options of
     True -> return ()
     False -> putErrDie "Internal Error"
 
+onerrNone :: IO ()
 onerrNone = return ()
+
 onerrProg prog = putErrLn ">>> Before" >> printProgram prog
 
 lintCheckGrin grin = when flint $ typecheckGrin grin
@@ -1018,7 +1023,13 @@ lintCheckE onerr dataTable tvr e | flint = case inferType dataTable [] e of
 lintCheckE _ _ _ _ = return ()
 
 lintCheckProgram onerr prog | flint = do
-    let f (tvr,e) = lintCheckE onerr (progDataTable prog) tvr e
+    let f (tvr@TVr { tvrIdent = n },e) | even n = do
+            onerr
+            putErrLn $ ">>> non-unique name at top level: " ++ pprint tvr
+            printProgram prog
+            putErrLn $ ">>> non-unique name at top level: " ++ pprint tvr
+            maybeDie
+        f (tvr,e) = lintCheckE onerr (progDataTable prog) tvr e
     when (hasRepeatUnder fst (programDs prog)) $ do
         onerr
         putErrLn ">>> Repeated top level decls"
@@ -1081,6 +1092,7 @@ printCheckName'' dataTable tvr e = do
 
 printESize :: String -> Program -> IO ()
 printESize str prog = putErrLn $ str ++ " program e-size: " ++ show (eSize (programE prog))
+
 
 
 
