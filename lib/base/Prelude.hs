@@ -53,7 +53,7 @@ data Bool = False | True
     deriving (Eq, Ord, Bounded, Enum, Read, Show)
 
 data () = ()
-    deriving (Eq, Ord, Bounded, Enum, Show)  -- Read declared in Prelude.Text
+    deriving (Eq, Ord, Bounded, Enum)  -- Read declared in Prelude.Text
 
 data [] a =  a : ([] a) | []
     -- odd syntax, so we write instances manually
