@@ -51,6 +51,10 @@ base-1.0.prof.hl: jhc lib/base/base.cabal
 	-[ -e base.prof.log ] && mv -f base.prof.log base.prof.log.bak
 	./jhcp -v $(RTSOPTS) $(JHC_TEST) -ilib/base --noauto --build-hl lib/base/base.cabal -o base-1.0.prof.hl +RTS $(PROF_OPTS)  2>&1 | tee base.log
 
+jhc-1.0.hl: jhc lib/jhc/jhc.cabal
+	-[ -e jhc.log ] && mv -f jhc.log jhc.log.bak
+	set -o pipefail; ./jhc -v $(RTSOPTS) $(JHC_TEST)  -ilib/base --noauto --build-hl lib/jhc/jhc.cabal -o $@ 2>&1 | tee jhc.log
+
 libs: $(LIBPACKAGES)
 
 publish: $(LIBPACKAGES)

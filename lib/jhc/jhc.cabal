@@ -1,0 +1,26 @@
+Name: jhc
+Version: 1.0
+Extensions: ForeignFunctionInterface
+Exposed-Modules:
+        Data.Char,
+        Data.Ratio,
+        Data.Word,
+        Foreign.C.String,
+        Foreign.C.Types,
+        Foreign.Marshal.Alloc,
+        Foreign.Marshal.Array,
+        Foreign.Marshal.Utils,
+        Foreign.Ptr,
+        Foreign.Storable,
+        Jhc.Addr,
+        Jhc.Hole,
+        Jhc.IO,
+        Jhc.JumpPoint,
+        Jhc.List,
+        Jhc.Tuples,
+        Numeric,
+        Prelude,
+        Prelude.Float,
+        Prelude.IO,
+        Prelude.IOError,
+        Prelude.Text
