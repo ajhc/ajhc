@@ -187,10 +187,11 @@ processInitialHo ::
     -> Ho    -- ^ new ho, freshly read from file
     -> IO Ho -- ^ final combined ho data.
 processInitialHo accumho ho = do
-    let (ds,uids) = runWriter $ annotateDs imap (collectIdAnn (hoRules ho) (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
+    let (ds,uids) = runWriter $ annotateDs imap (collectIdAnn rules' (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
+        rules' = runIdentity $ mapBodies (annotate imap (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
         prog = etaAnnotateProgram (programSetDs ds program)
-        imap = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho)]
-        accumho' = reprocessHo (hoRules ho) (hoProps ho) accumho
+        imap = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho `mappend` hoEs ho)]
+        accumho' = reprocessHo rules' (hoProps ho) accumho
     return $ accumho' `mappend` ho { hoUsedIds = uids, hoEs = programEsMap prog }
 
 reprocessHo :: Rules -> Map.Map Name [Atom] -> Ho -> Ho
@@ -503,6 +504,9 @@ processDecls stats ho ho' tiData = do
     (ds,_) <- foldM f ([],(fromList [ (tvrIdent v,(v,e)) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
     progress "!"
     prog <- return $ programSetDs ds prog
+
+    lintCheckProgram (putErrLn "After the workwrap/CPR") prog
+
     prog <- programPrune prog
     Stats.print "Optimization" stats
 
@@ -523,6 +527,7 @@ processDecls stats ho ho' tiData = do
       else return prog
     prog <- programPrune prog
 
+    lintCheckProgram (putErrLn "After the Opimization") prog
     wdump FD.Lambdacube $ printProgram prog
 
     Stats.print "Optimization" stats
