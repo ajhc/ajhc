@@ -189,11 +189,11 @@ processInitialHo ::
     -> IO Ho -- ^ final combined ho data.
 processInitialHo accumho ho = do
     let (ds,uids) = runWriter $ annotateDs imap (collectIdAnn rules' (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
-        rules' = runIdentity $ mapBodies (annotate imap (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
+        rules' = runIdentity $ mapBodies (annotate imapRules (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
         prog = etaAnnotateProgram (programSetDs ds program)
-        imap = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho `mappend` hoEs ho)]
+        imap = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho)]
+        imapRules = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho `mappend` hoEs ho)]
         accumho' = reprocessHo rules' (hoProps ho) accumho
-
     --lintCheckProgram (putStrLn "processInitialHo") prog
     return $ accumho' `mappend` ho { hoUsedIds = uids, hoEs = programEsMap prog }
 
@@ -275,19 +275,18 @@ processDecls stats ho ho' tiData = do
         namesInscope = fromList inscope
 
     -- initial pass over functions to put them into a normalized form
-    let procE (ds,usedIds) (n,v,lc) = do
+    let procE (ds,usedIds) (v,lc) = do
         lc <- atomizeAp False fullDataTable stats (progModule prog) lc
-        --lc <- coalesceLets stats lc
         nfo <- idann  allRules (hoProps ho') (tvrIdent v) (tvrInfo v)
         v <- return $ v { tvrInfo = Info.insert LetBound nfo }
         let used' = collectIds lc
-        return ((n, shouldBeExported (getExports ho') v,lc):ds,usedIds `mappend` used')
+        return ((shouldBeExported (getExports ho') v,lc):ds,usedIds `mappend` used')
     Stats.clear stats
-    (ds,_allIds) <- foldM procE ([],hoUsedIds ho) ds
+    (ds,_allIds) <- foldM procE ([],hoUsedIds ho) [ (v,e) | (_,v,e) <- ds]
     Stats.print "PostProcess" stats
     Stats.clear stats
 
-    prog <- return $ programSetDs [ (t,e) | (_,t,e) <- ds] prog
+    prog <- return $ programSetDs ds prog
     lintCheckProgram (putErrLn "LintPostProcess") prog
 
     -- Create Specializations
@@ -1101,6 +1100,7 @@ printCheckName'' dataTable tvr e = do
 
 printESize :: String -> Program -> IO ()
 printESize str prog = putErrLn $ str ++ " program e-size: " ++ show (eSize (programE prog))
+
 
 
 

@@ -376,8 +376,8 @@ fixupDemandSignature (DemandSignature n (DemandEnv _ r :=> dt)) = DemandSignatur
 {-# NOINLINE solveDs #-}
 solveDs dataTable ds = do
     nds <- runIM (solveDs' Nothing ds fixupDemandSignature return) dataTable
-    flip mapM_ nds $ \ (t,_) ->
-        putStrLn $ "strictness: " ++ pprint t ++ ": " ++ show (maybe absSig id $ Info.lookup (tvrInfo t))
+    --flip mapM_ nds $ \ (t,_) ->
+    --    putStrLn $ "strictness: " ++ pprint t ++ ": " ++ show (maybe absSig id $ Info.lookup (tvrInfo t))
     return nds
 
 
