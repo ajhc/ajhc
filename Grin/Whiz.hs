@@ -1,13 +1,15 @@
 module Grin.Whiz(whiz, fizz, whizState, normalizeGrin,normalizeGrin', applySubstE, applySubst, whizExps) where
 
-import Grin.Grin
-import qualified Data.Set as Set
-import qualified Data.Map as Map
-import Control.Monad.State
-import Control.Monad.Writer
-import Control.Monad.Trans
-import Data.Monoid
 import Control.Monad.Identity
+import Control.Monad.State
+import Control.Monad.Trans
+import Control.Monad.Writer
+import Data.Monoid
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+
+import Grin.Grin
+import Grin.Noodle
 import Support.CanType
 
 type WhizState = Either (Set.Set Int) Int
@@ -89,7 +91,7 @@ whiz sub te tf inState start = res where
                 b <- dc env b
                 return $ createFuncDef True n b
         defs <- mapM f defs
-        return lt { expBody = body, expDefs = defs }
+        return $ updateLetProps lt { expBody = body, expDefs = defs }
     g env x = applySubstE env x
     dc env (p :-> e) = do
         (p,env') <- renamePattern p
@@ -157,7 +159,7 @@ fizz sub te tf inState start = res where
                 b <- dc env b
                 return $ createFuncDef True n b
         defs <- mapM f defs
-        return lt { expBody = body, expDefs = defs }
+        return $ updateLetProps lt { expBody = body, expDefs = defs }
     g env x = applySubstE env x
     dc env (p :-> e) = do
         (p,env') <- renamePattern p

@@ -25,7 +25,7 @@ modifyTail lam@(_ :-> lb) te = trace "modifyTail: returning" (f mempty te) where
         defs' = [ updateFuncDefProps d { funcDefBody = g nlf (funcDefBody d) } | d <- defs ]
     f lf lt@MkCont {expLam = lam, expCont = cont } = lt { expLam = g lf lam, expCont = g lf cont }
     f lf (e1 :>>= p :-> e2) = e1 :>>= p :-> f lf e2
-    f lf e@(App a _ _) | a `Set.member` lf = e
+    f lf e@(App a as t) | a `Set.member` lf = App a as (getType lb)
     f lf e = e :>>= lam
     g lf (p :-> e) = p :-> f lf e
 

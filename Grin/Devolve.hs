@@ -29,7 +29,7 @@ devolveGrin grin = do
                 proc' e = mapExpExp proc' e
             mapM_ print (Map.toList pmap)
             modifyIORef col (++ fsts nmaps)
-            return $ if null rmaps then proc body else lt { expDefs = rmaps, expBody = proc body }
+            return $  updateLetProps lt { expDefs = rmaps, expBody = proc body }
         f e = mapExpExp f e
     nf <- mapM g (grinFuncs grin)
     lf <- readIORef col

@@ -341,7 +341,7 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv,  grinCafs = cafs 
         g lt@Let { expDefs = defs, expBody = body } = do
             body' <- g body
             ds <- sequence [ f l >>= return . (,) n | FuncDef { funcDefName = n, funcDefBody = l } <- defs ]
-            return lt { expDefs = map (uncurry $ createFuncDef True) ds, expBody = body' }
+            return $ updateLetProps lt { expDefs = map (uncurry $ createFuncDef True) ds, expBody = body' }
         g (App a [vr@(Var v _)] _) | a == funcEval = do
             mtick "Grin.eval.trailing"
             return $ Return vr :>>= createEval TrailingUpdate typeEnv (tagsp v)
@@ -435,7 +435,7 @@ valueSetToItem te pt (TyPtr _) (VsHeaps ss) = HeapValue (Set.mapMonotonic f ss) 
 valueSetToItem te pt (TyTup xs) (VsNodes as n)
     | tupleName `Set.member` n = TupledValue [ valueSetToItem te pt t (Map.findWithDefault VsEmpty (tupleName,i) as) | i <- naturals | t <- xs]
     | otherwise = itemEmpty (TyTup xs)
-valueSetToItem _ _ ty v = error $ "valueSetToItem " ++ show (ty,v)
+valueSetToItem _ pt ty v = error $ "valueSetToItem " ++ show (pt,ty,v)
 
 
 

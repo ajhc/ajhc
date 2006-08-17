@@ -732,10 +732,10 @@ compileToGrin prog = do
         x <- return $ setGrinFunctions nf x
         wdump FD.GrinPass $ printGrin x
         x <- Grin.Simplify.simplify stats' x
-        lintCheckGrin x
         t' <- Stats.getTicks stats'
         wdump FD.Progress $ Stats.print s stats'
         Stats.combine stats stats'
+        lintCheckGrin x
         case t' of
             0 -> return x
             _ -> opt s x
