@@ -783,6 +783,8 @@ compileToGrin prog = do
         printTable "Return points-to" (grinReturnTags x)
         printTable "Argument points-to" (grinArgTags x)
         x <- devolveGrin x
+        x <- opt "After Devolve Optimization" x
+        x <- return $ normalizeGrin x
         dumpFinalGrin x
         when (optMode options == CompileExe) $ compileGrinToC x
      else do
@@ -790,6 +792,8 @@ compileToGrin prog = do
         x <- return $ normalizeGrin x
         lintCheckGrin x
         x <- devolveGrin x
+        x <- opt "After Devolve Optimization" x
+        x <- return $ normalizeGrin x
         dumpFinalGrin x
         when (optMode options == CompileExe) $ compileGrinToC x
 

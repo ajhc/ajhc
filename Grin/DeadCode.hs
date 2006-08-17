@@ -127,8 +127,9 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as
             g Let { expDefs = defs, expBody = body } = do
                 mapM_ goAgain [ (name,bod) | FuncDef { funcDefBody = bod, funcDefName = name } <- defs]
                 flip mapM_ (map funcDefName defs) $ \n -> do
-                    n' <- supplyValue usedFuncs n
-                    addRule $ fn' `implies` n'
+                    --n' <- supplyValue usedFuncs n
+                    --addRule $ fn' `implies` n'
+                    return ()
             g Error {} = return ()
             -- TODO - handle function and case return values smartier.
             g (Return n) = addRule $ doNode n
@@ -179,7 +180,8 @@ removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps
         as <- dff' fn' as
         as <- mapM clearCaf as
         return $ Update p (NodeC fn as)
-    f lt@Let { expDefs = defs }  = return lt { expDefs = [ updateFuncDefProps df { funcDefBody = margs name body } | df@FuncDef { funcDefName = name, funcDefBody = body } <- defs ] }
+    f lt@Let { expDefs = defs }  = if null defs' then return (expBody lt) else return lt { expDefs = defs' } where
+        defs' = [ updateFuncDefProps df { funcDefBody = margs name body } | df@FuncDef { funcDefName = name, funcDefBody = body } <- defs, name `Set.member` funSet ]
     f x = return x
     dff' fn as | fn `Set.member` directFuncs = return as
     dff' fn as = dff'' fn as

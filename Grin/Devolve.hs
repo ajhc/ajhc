@@ -28,7 +28,7 @@ devolveGrin grin = do
                 proc' e = mapExpExp proc' e
             mapM_ print (Map.toList pmap)
             modifyIORef col (++ fsts nmaps)
-            return lt { expDefs = rmaps, expBody = proc body }
+            return $ if null rmaps then proc body else lt { expDefs = rmaps, expBody = proc body }
         f e = mapExpExp f e
         clfunc (l :-> r) = cfunc r
         cfunc (e :>>= y) = do
