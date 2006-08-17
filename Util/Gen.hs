@@ -1,11 +1,13 @@
 
 -- | similar to GenUtil but can rely on non-haskell 98 features
-module Util.Gen where
+module Util.Gen(module Util.Gen, module GenUtil) where
 
 import Control.Monad.Writer
 import Control.Monad.Identity
 import Data.Monoid
 import List
+
+import GenUtil hiding(replicateM)
 
 mconcatMap f xs = mconcat (map f xs)
 mconcatInter x xs = mconcat (intersperse x xs)
