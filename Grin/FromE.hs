@@ -27,6 +27,7 @@ import E.TypeCheck
 import E.Values
 import GenUtil
 import Grin.Grin
+import Grin.Noodle
 import Grin.Show
 import Grin.Val
 import Info.Types
@@ -42,8 +43,8 @@ import Support.FreeVars
 import Support.Tuple
 import Util.Graph as G
 import Util.Once
-import Util.UniqueMonad()
 import Util.SetLike
+import Util.UniqueMonad()
 import qualified C.FFI as FFI
 import qualified FlagDump as FD
 import qualified Info.Info as Info
@@ -193,6 +194,9 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
         initCafs = sequenceG_ [ Update (Var v (TyPtr TyNode)) node | (v,node) <- cafs ]
         ic = (funcInitCafs,(Tup [] :-> initCafs) )
         ds' = ic:(ds ++ fbaps)
+        a @>> b = a :>>= (unit :-> b)
+        sequenceG_ [] = Return unit
+        sequenceG_ (x:xs) = foldl (@>>) x xs
     let grin = setGrinFunctions theFuncs emptyGrin {
             grinEntryPoints = Map.insert funcMain (FfiExport "_amain" Safe CCall) $ Map.fromList epv,
             grinPhase = PhaseInit,

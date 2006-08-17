@@ -13,7 +13,6 @@ module Grin.Grin(
     NodeValue(NV),
     Phase(..),
     Primitive(..),
-    mapFBodies,
     Tag,
     updateFuncDefProps,
     Ty(..),
@@ -37,17 +36,13 @@ module Grin.Grin(
     gEval,
     grinEntryPointNames,
     isHole,
-    isMutableNodeTag,
-    isVar,isTup,modifyTail,valIsConstant,
+    isVar,isTup,
     itemTag,
-    mapBodyM,
-    mapExpExp,
     n0,n1,n2,n3,
     p0,p1,p2,p3,
     partialTag,
     phaseEvalInlined,
     properHole,
-    sequenceG_,
     tagFlipFunction,
     tagHole,
     tagIsFunction,
@@ -120,7 +115,6 @@ data Callable = Continuation | Function | Closure | LocalFunction | Primitive'
     deriving(Eq,Ord,Show)
 
 
-
 type Tag = Atom
 
 newtype Var = V Int
@@ -128,11 +122,6 @@ newtype Var = V Int
 
 instance Show Var where
     showsPrec _ (V n) xs = 'v':shows n xs
-
-a @>> b = a :>>= (unit :-> b)
-sequenceG_ [] = Return unit
-sequenceG_ (x:xs) = foldl (@>>) x xs
-
 
 
 
@@ -322,26 +311,6 @@ emptyGrin = Grin {
 }
 
 grinEntryPointNames = Map.keys . grinEntryPoints
-
-mapBodyM f (x :-> y) = f y >>= return . (x :->)
-
-mapExpExp f (a :>>= v :-> b) = do
-    a <- f a
-    b <- f b
-    return (a :>>= v :-> b)
-mapExpExp f (Case e as) = do
-    as' <- mapM (mapBodyM f) as
-    return (Case e as')
-mapExpExp f l@Let { expBody = b, expDefs = defs } = do
-    b <- f b
-    defs' <- mapFBodies f defs
-    return l { expBody = b, expDefs = defs' }
-mapExpExp _ x = return x
-
-mapFBodies f xs = mapM f' xs where
-    f' fd@FuncDef { funcDefBody = l :-> r } = do
-        r' <- f r
-        return $  updateFuncDefProps fd { funcDefBody = l :-> r' }
 
 
 
@@ -795,28 +764,5 @@ isVar _ = False
 isTup Tup {} = True
 isTup _ = False
 
-modifyTail :: Lam -> Exp -> Exp
-modifyTail lam@(_ :-> lb) e = f e where
-    f (Error s ty) = Error s (getType lb)
-    f (Case x ls) = Case x (map g ls)
-    f lt@Let {expBody = body } = lt { expBody = f body }
-    f lt@MkCont {expLam = lam, expCont = cont } = lt { expLam = g lam, expCont = g cont }
-    f (e1 :>>= p :-> e2) = e1 :>>= p :-> f e2
-    f e = e :>>= lam
-    g (p :-> e) = p :-> f e
 
--- | Is type mutable (currently IORef)
-isMutableNodeTag :: Tag -> Bool
-isMutableNodeTag t = t == ref_tag where ref_tag = toAtom "CData.IORef.IORef"
 
--- | Is a Val constant?
-valIsConstant :: Val -> Bool
-valIsConstant (Tup xs) = all valIsConstant xs
-valIsConstant (NodeC t _) | isMutableNodeTag t = False
-valIsConstant (NodeC _ xs) = all valIsConstant xs
-valIsConstant Tag {} = True
-valIsConstant Lit {} = True
-valIsConstant Const {} = True
-valIsConstant (Var v _) | v < v0 = True
-valIsConstant ValPrim {} = True
-valIsConstant _ = False

@@ -12,13 +12,14 @@ import qualified Data.Set as Set
 
 import Atom
 import C.Prims
-import Support.FreeVars
 import GenUtil hiding(putErrLn,replicateM_)
 import Grin.Grin
+import Grin.Noodle
 import Grin.Whiz
 import qualified Util.Histogram as Hist
 import Stats hiding(combine)
 import Support.CanType
+import Support.FreeVars
 import Support.Tuple
 import Util.Graph
 import Util.Inst()
@@ -50,8 +51,6 @@ at_OptSimplifyEnumAssignment  = toAtom "Optimize.simplify.enum-assignment"
 -- contains functions that should be inlined
 type SimpEnv = Map.Map Atom (Atom,Lam)
 
-valIsMutable (NodeC t _) = isMutableNodeTag t
-valIsMutable _ = False
 
 simplify1 :: Stats -> SimpEnv -> (Atom,Lam) -> IO (Atom,Lam)
 simplify1 stats env (n,l) = do
@@ -221,15 +220,6 @@ isSimple (fn,x) = f (2::Int) x where
     f _ (_ :-> MkCont {}) = False
     f _ _ = True
 
-isManifestNode :: Monad m => Exp -> m [Atom]
-isManifestNode (Return (Tag t)) = return [t]
-isManifestNode (Return (NodeC t _)) = return [t]
-isManifestNode Error {} = return []
-isManifestNode (Case _ ls) = do
-    cs <- Prelude.mapM isManifestNode [ e | _ :-> e <- ls ]
-    return $ concat cs
-isManifestNode (_ :>>= _ :-> e) = isManifestNode e
-isManifestNode _ = fail "not manifest node"
 
 manifestNodes as = Prelude.map (isManifestNode . lamExp) as
 
@@ -484,18 +474,6 @@ deadVars stats (n,l) = do
     gv w@(_,e) = f e >> return (Just w)
 
 
-isOmittable (Fetch {}) = True
-isOmittable (Return {}) = True
-isOmittable (Store {}) = True
-isOmittable Prim { expPrimitive = Primitive { primAPrim = aprim } } = aprimIsCheap aprim
-isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
-isOmittable (e1 :>>= _ :-> e2) = isOmittable e1 && isOmittable e2
-isOmittable _ = False
-
-isErrOmittable Update {} = True
-isErrOmittable (e1 :>>= _ :-> e2) = isErrOmittable e1 && isErrOmittable e2
-isErrOmittable (Case x ds) = all isErrOmittable [ e | _ :-> e <- ds ]
-isErrOmittable x = isOmittable x
 
 {-# NOINLINE simplify #-}
 

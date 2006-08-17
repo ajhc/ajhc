@@ -26,6 +26,7 @@ import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import Grin.Grin
+import Grin.Noodle
 import Grin.Val
 import Name.VConsts
 import Number

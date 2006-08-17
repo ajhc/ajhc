@@ -8,6 +8,7 @@ import qualified Data.Set as Set
 
 import GenUtil
 import Grin.Grin
+import Grin.Noodle
 import Support.FreeVars
 
 

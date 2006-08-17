@@ -13,7 +13,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom
-import Support.CanType
 import CharIO
 import Doc.DocLike
 import Fixer.Fixer
@@ -22,16 +21,18 @@ import GenUtil
 import Grin.EvalInline
 import Grin.Grin
 import Grin.HashConst
-import Grin.Show()
 import Grin.Linear
+import Grin.Noodle
+import Grin.Show()
 import Options
+import Stats
+import Support.CanType
+import Util.Gen
+import Util.Once
+import Util.SameShape
+import Util.UniqueMonad
 import qualified Doc.Chars as U
 import qualified FlagDump as FD
-import Util.UniqueMonad
-import Util.Once
-import Stats
-import Util.SameShape
-import Util.Gen
 
 
 
