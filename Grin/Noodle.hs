@@ -8,6 +8,7 @@ import qualified Data.Set as Set
 
 import Atom(Atom(),toAtom)
 import C.Prims
+import Util.Gen
 import Grin.Grin
 import Support.CanType
 
@@ -110,10 +111,9 @@ collectFuncs exp = runWriter (cfunc exp) where
         cfunc (Case _ as) = do
             rs <- mapM clfunc as
             return (mconcat rs)
-        cfunc Let { expDefs = defs, expBody = body } = do
-            b <- cfunc body
-            rs <- mapM (clfunc . funcDefBody) defs
-            return $ mconcat (b:rs)
+        cfunc Let { expFuncCalls = (tail,nonTail) } = do
+            tell nonTail
+            return tail
         cfunc Fetch {} = return mempty
         cfunc Error {} = return mempty
         cfunc Prim {} = return mempty
@@ -127,10 +127,18 @@ collectFuncs exp = runWriter (cfunc exp) where
             b <- clfunc l2
             return (a `mappend` b)
 
-grinLet defs body = updateLetProps Let { expDefs = defs, expBody = body, expInfo = mempty }
+grinLet defs body = updateLetProps Let {
+    expDefs = defs,
+    expBody = body,
+    expInfo = mempty,
+    expIsNormal = False,
+    expFuncCalls = undefined }
 
 updateLetProps Let { expDefs = [], expBody = body } = body
-updateLetProps lt@Let {} = lt
+updateLetProps lt@Let { expBody = body, expDefs = defs } = lt { expFuncCalls = (tail Set.\\ myDefs, nonTail Set.\\ myDefs), expIsNormal = not isNotNormal } where
+    (tail,nonTail) = mconcatMap collectFuncs (body : map (lamExp . funcDefBody) defs)
+    isNotNormal = any ((`Set.member` nonTail) . funcDefName) defs
+    myDefs = Set.fromList (map funcDefName defs)
 updateLetProps e = e
 
 

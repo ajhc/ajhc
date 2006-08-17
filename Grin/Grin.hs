@@ -157,6 +157,8 @@ data Exp =
                   expInfo :: Info.Info }                                  -- ^ allocate space for a number of values in the given region
     | Let       { expDefs :: [FuncDef],
                   expBody :: Exp,
+                  expFuncCalls :: (Set.Set Atom,Set.Set Atom),            -- ^ cache
+                  expIsNormal :: Bool,                                    -- ^ cache, True = definitely normal, False = maybe normal
                   expInfo :: Info.Info }                                  -- ^ A let of local functions
     | MkClosure { expValue :: Val,
                   expArgs :: [Val],
