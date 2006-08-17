@@ -2,6 +2,10 @@ module Grin.Noodle where
 
 -- various routines for manipulating and exploring grin code.
 
+import Control.Monad.Writer
+import Data.Monoid
+import qualified Data.Set as Set
+
 import Atom(Atom(),toAtom)
 import C.Prims
 import Grin.Grin
@@ -90,5 +94,43 @@ isErrOmittable Update {} = True
 isErrOmittable (e1 :>>= _ :-> e2) = isErrOmittable e1 && isErrOmittable e2
 isErrOmittable (Case x ds) = all isErrOmittable [ e | _ :-> e <- ds ]
 isErrOmittable x = isOmittable x
+
+
+
+-- collect tail called, and normally called functions
+
+collectFuncs :: Exp -> (Set.Set Atom,Set.Set Atom)
+collectFuncs exp = runWriter (cfunc exp) where
+        clfunc (l :-> r) = cfunc r
+        cfunc (e :>>= y) = do
+            xs <- cfunc e
+            tell xs
+            clfunc y
+        cfunc (App a _ _) = return (Set.singleton a)
+        cfunc (Case _ as) = do
+            rs <- mapM clfunc as
+            return (mconcat rs)
+        cfunc Let { expDefs = defs, expBody = body } = do
+            b <- cfunc body
+            rs <- mapM (clfunc . funcDefBody) defs
+            return $ mconcat (b:rs)
+        cfunc Fetch {} = return mempty
+        cfunc Error {} = return mempty
+        cfunc Prim {} = return mempty
+        cfunc Return {} = return mempty
+        cfunc Store {} = return mempty
+        cfunc Update {} = return mempty
+        cfunc Alloc {} = return mempty
+        cfunc NewRegion { expLam = l } = clfunc l
+        cfunc MkCont { expCont = l1, expLam = l2 } = do
+            a <- clfunc l1
+            b <- clfunc l2
+            return (a `mappend` b)
+
+grinLet defs body = updateLetProps Let { expDefs = defs, expBody = body, expInfo = mempty }
+
+updateLetProps Let { expDefs = [], expBody = body } = body
+updateLetProps lt@Let {} = lt
+updateLetProps e = e
 
 

@@ -349,13 +349,13 @@ optimize1 postEval (n,l) = g l where
 
     f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars r `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-tail"
-        f (lt { expDefs = defs, expBody = e } :>>= l :-> r)
+        f (updateLetProps lt { expBody = e } :>>= l :-> r)
     f lt@(Let { expDefs = defs, expBody = e :>>= l :-> r } :>>= lr) | Set.null (freeVars r `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-tail"
-        f ((lt { expDefs = defs, expBody = e } :>>= l :-> r) :>>= lr)
+        f ((updateLetProps lt { expBody = e } :>>= l :-> r) :>>= lr)
     f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars e `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-head"
-        f (e :>>= l :-> lt { expDefs = defs, expBody = r })
+        f (e :>>= l :-> updateLetProps lt { expBody = r })
     f (Case x as :>>= v@(Var vnum _) :-> rc@(Case v' as') :>>= lr) | v == v', count (== Nothing ) (Prelude.map (isManifestNode . lamExp) as) <= 1, not (vnum `Set.member` freeVars lr) = do
         c <- caseHoist x as v as' (getType rc)
         f (c :>>= lr)

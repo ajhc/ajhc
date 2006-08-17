@@ -9,12 +9,12 @@ import qualified Data.Map as Map
 import Atom
 import Fixer.Fixer
 import Fixer.Supply
-import Support.FreeVars
-import GenUtil
 import Grin.Grin
+import Grin.Noodle
 import Grin.Whiz
 import Stats hiding(print)
 import Support.CanType
+import Support.FreeVars
 import Util.Gen
 
 
@@ -180,7 +180,7 @@ removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps
         as <- dff' fn' as
         as <- mapM clearCaf as
         return $ Update p (NodeC fn as)
-    f lt@Let { expDefs = defs }  = if null defs' then return (expBody lt) else return lt { expDefs = defs' } where
+    f lt@Let { expDefs = defs }  = return $ updateLetProps lt { expDefs = defs' } where
         defs' = [ updateFuncDefProps df { funcDefBody = margs name body } | df@FuncDef { funcDefName = name, funcDefBody = body } <- defs, name `Set.member` funSet ]
     f x = return x
     dff' fn as | fn `Set.member` directFuncs = return as

@@ -567,7 +567,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
             mapM_ g' bs
             v <- f ds x
             defs <- mapM g bs
-            return $ Let { expDefs = concat defs , expBody = v, expInfo = mempty }
+            return $ grinLet (concat defs) v
 
 
         f (Right bs:ds) x = do
