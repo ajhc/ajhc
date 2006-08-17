@@ -339,20 +339,27 @@ optimize1 postEval (n,l) = g l where
         mtick "Optimize.optimize.case-pullin"
         f $ Case x [ x :-> (e :>>= b :-> m) |  x :-> e <- as ]
         -}
-    f (Case x alts :>>= v :-> Return v' :>>= NodeC t as :-> lr ) | v == v' = do
+    f (cc@Case {} :>>= v :-> Return v' :>>= NodeC t as :-> lr ) | v == v' = do
         mtick "Optimize.optimize.case-hoist-return"
         let (va:_) = [ v | v <- [v1..], not $ v `Set.member` fv ]
             var = Var va TyNode
             fv = freeVars as
             mc = modifyTail ( var :-> Return var :>>=  NodeC t as :-> Return (tuple as))
-        f (mc (Case x alts) :>>= tuple as :-> Return (NodeC t as) :>>= v :-> lr)
+        f (mc cc :>>= tuple as :-> Return (NodeC t as) :>>= v :-> lr)
+    f (lt@Let { expIsNormal = True } :>>= v :-> Return v' :>>= NodeC t as :-> lr ) | v == v' = do
+        mtick "Optimize.optimize.let-hoist-return"
+        let (va:_) = [ v | v <- [v1..], not $ v `Set.member` fv ]
+            var = Var va TyNode
+            fv = freeVars as
+            mc = modifyTail ( var :-> Return var :>>=  NodeC t as :-> Return (tuple as))
+        f (mc lt :>>= tuple as :-> Return (NodeC t as) :>>= v :-> lr)
 
     f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars r `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-tail"
         f (updateLetProps lt { expBody = e } :>>= l :-> r)
-    f lt@(Let { expDefs = defs, expBody = e :>>= l :-> r } :>>= lr) | Set.null (freeVars r `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
-        mtick "Optimize.optimize.let-shrink-tail"
-        f ((updateLetProps lt { expBody = e } :>>= l :-> r) :>>= lr)
+--    f lt@(Let { expDefs = defs, expBody = e :>>= l :-> r } :>>= lr) | Set.null (freeVars r `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
+--        mtick "Optimize.optimize.let-shrink-tail"
+--        f ((updateLetProps lt { expBody = e } :>>= l :-> r) :>>= lr)
     f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars e `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-head"
         f (e :>>= l :-> updateLetProps lt { expBody = r })

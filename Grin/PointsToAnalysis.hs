@@ -392,7 +392,7 @@ grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv,  grinCafs = cafs 
                 xs' = if sameShape1 ns ts  then  ns else (ns ++ vs)
             mticks (length xs - length xs') "Grin.eval.case-elim"
             return $ if null xs' then  Error "No Valid alternatives. This Should Not be reachable." (getType (Case v xs)) else (Case v xs')
-        vsToItem = valueSetToItem (grinTypeEnv grin) pt
+        vsToItem = valueSetToItem te pt
         te = extendTyEnv fds typeEnv
         fds = concatMap (collectFuncDefs . lamExp) (snds $ grinFuncs grin)
         convertArgs fa = Map.fromList $ map f (Map.keys $ ptFunc pt) where

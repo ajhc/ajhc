@@ -11,17 +11,23 @@ import C.Prims
 import Util.Gen
 import Grin.Grin
 import Support.CanType
+import Debug.Trace
 
 
 modifyTail :: Lam -> Exp -> Exp
-modifyTail lam@(_ :-> lb) e = f e where
-    f (Error s ty) = Error s (getType lb)
-    f (Case x ls) = Case x (map g ls)
-    f lt@Let {expBody = body } = lt { expBody = f body }
-    f lt@MkCont {expLam = lam, expCont = cont } = lt { expLam = g lam, expCont = g cont }
-    f (e1 :>>= p :-> e2) = e1 :>>= p :-> f e2
-    f e = e :>>= lam
-    g (p :-> e) = p :-> f e
+modifyTail lam@(_ :-> lb) te = trace "modifyTail: returning" (f mempty te) where
+    f lf e | False && trace ("modifyTail: " ++ show (lf,e)) False = undefined
+    f _ (Error s ty) = Error s (getType lb)
+    f lf (Case x ls) = Case x (map (g lf) ls)
+    f _ lt@Let {expIsNormal = False } = lt :>>= lam
+    f lf lt@Let {expDefs = defs, expBody = body, expIsNormal = True } = updateLetProps lt { expBody = f nlf body, expDefs = defs' } where
+        nlf = lf `Set.union` Set.fromList (map funcDefName defs)
+        defs' = [ updateFuncDefProps d { funcDefBody = g nlf (funcDefBody d) } | d <- defs ]
+    f lf lt@MkCont {expLam = lam, expCont = cont } = lt { expLam = g lf lam, expCont = g lf cont }
+    f lf (e1 :>>= p :-> e2) = e1 :>>= p :-> f lf e2
+    f lf e@(App a _ _) | a `Set.member` lf = e
+    f lf e = e :>>= lam
+    g lf (p :-> e) = p :-> f lf e
 
 
 mapBodyM f (x :-> y) = f y >>= return . (x :->)
@@ -36,7 +42,7 @@ mapExpExp f (Case e as) = do
 mapExpExp f l@Let { expBody = b, expDefs = defs } = do
     b <- f b
     defs' <- mapFBodies f defs
-    return l { expBody = b, expDefs = defs' }
+    return $ updateLetProps l { expBody = b, expDefs = defs' }
 mapExpExp _ x = return x
 
 mapFBodies f xs = mapM f' xs where
@@ -50,14 +56,24 @@ mapFBodies f xs = mapM f' xs where
 --------------------------
 
 isManifestNode :: Monad m => Exp -> m [Atom]
-isManifestNode (Return (Tag t)) = return [t]
-isManifestNode (Return (NodeC t _)) = return [t]
-isManifestNode Error {} = return []
-isManifestNode (Case _ ls) = do
-    cs <- Prelude.mapM isManifestNode [ e | _ :-> e <- ls ]
-    return $ concat cs
-isManifestNode (_ :>>= _ :-> e) = isManifestNode e
-isManifestNode _ = fail "not manifest node"
+isManifestNode e = f mempty e where
+    f lf _ | False && trace ("isManifestNode: " ++ show lf) False = undefined
+    f lf (Return (Tag t)) = return [t]
+    f lf (Return (NodeC t _)) = return [t]
+    f lf Error {} = return []
+    f lf (App a _ _) | a `Set.member` lf = return []
+    f lf Let { expBody = body, expIsNormal = False } = f lf body
+    f lf Let { expBody = body, expDefs = defs, expIsNormal = True } = ans where
+        nlf = lf `Set.union` Set.fromList (map funcDefName defs)
+        ans = do
+            xs <- mapM (f nlf . lamExp . funcDefBody) defs
+            b <- f nlf body
+            return (concat (b:xs))
+    f lf (Case _ ls) = do
+        cs <- Prelude.mapM (f lf) [ e | _ :-> e <- ls ]
+        return $ concat cs
+    f lf (_ :>>= _ :-> e) = isManifestNode e
+    f lf _ = fail "not manifest node"
 
 
 -- | Is a Val constant?
@@ -103,6 +119,7 @@ isErrOmittable x = isOmittable x
 collectFuncs :: Exp -> (Set.Set Atom,Set.Set Atom)
 collectFuncs exp = runWriter (cfunc exp) where
         clfunc (l :-> r) = cfunc r
+        cfunc e | False && trace ("isManifestNode: " ++ show e) False = undefined
         cfunc (e :>>= y) = do
             xs <- cfunc e
             tell xs
@@ -131,7 +148,7 @@ grinLet defs body = updateLetProps Let {
     expDefs = defs,
     expBody = body,
     expInfo = mempty,
-    expIsNormal = False,
+    expIsNormal = undefined,
     expFuncCalls = undefined }
 
 updateLetProps Let { expDefs = [], expBody = body } = body

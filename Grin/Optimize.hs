@@ -73,7 +73,7 @@ grinPush stats lam = ans where
             f (e :>>= l :-> r) | Set.null (freeVars e `Set.intersection` def) = do
                 exp <- f r
                 return (e :>>= l :-> exp)
-            f r = return lt {  expBody = r }
+            f r = return $ updateLetProps lt {  expBody = r }
         f b
     fixupLet exp = return exp
     dropAny (exp::Exp) = do
