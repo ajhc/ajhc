@@ -400,15 +400,18 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
         mtick "Optimize.optimize.case-unbox-tag"
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
             (va:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
+        lr <- g lr
         return ((Case x (map (combineLam postEval TyTag) as) :>>= Var va TyTag :-> Return (NodeV va [])) :>>= lr)
     f (cs@(Case x as) :>>= lr) | Just (UnboxTup (t,ts)) <- isCombinable postEval cs = do
         mtick $ "Optimize.optimize.case-unbox-node.{" ++ show t
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
             vs = [ v | v <- [v1..], not $ v `Set.member` fv ]
             vars = [ Var v t | v <- vs | t <- ts ]
+        lr <- g lr
         return ((Case x (map (combineLam postEval (tuple ts)) as) :>>= tuple vars  :-> Return (NodeC t vars)) :>>= lr)
     f (cs@(Case x as) :>>= lr) | Just (UnboxConst val) <- isCombinable postEval cs = do
         mtick $ "Optimize.optimize.case-unbox-const.{" ++ show val
+        lr <- g lr
         return ((Case x (map (combineLam postEval tyUnit) as) :>>= unit :-> Return val) :>>= lr)
 
 
@@ -436,19 +439,21 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
         caseHoist x as v as' (getType rc)
 
     -- let unboxing
-    f (cs@Let {} :>>= lr) | Just comb <- isCombinable postEval cs = case comb of
-        UnboxTag -> do
-            mtick "Optimize.optimize.let-unbox-tag"
-            let (va:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
-            return ((combine postEval TyTag cs :>>= Var va TyTag :-> Return (NodeV va [])) :>>= lr)
-        UnboxTup (t,ts) -> do
-            mtick $ "Optimize.optimize.let-unbox-node.{" ++ show t
-            let vs = [ v | v <- [v1..], not $ v `Set.member` fv ]
-                vars = [ Var v t | v <- vs | t <- ts ]
-            return ((combine postEval (tuple ts) cs :>>= tuple vars  :-> Return (NodeC t vars)) :>>= lr)
-        UnboxConst val -> do
-            mtick $ "Optimize.optimize.let-unbox-const.{" ++ show val
-            return ((combine postEval tyUnit cs :>>= unit :-> Return val) :>>= lr)
+    f (cs@Let {} :>>= lr) | Just comb <- isCombinable postEval cs = do
+        lr <- g lr
+        case comb of
+            UnboxTag -> do
+                mtick "Optimize.optimize.let-unbox-tag"
+                let (va:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
+                return ((combine postEval TyTag cs :>>= Var va TyTag :-> Return (NodeV va [])) :>>= lr)
+            UnboxTup (t,ts) -> do
+                mtick $ "Optimize.optimize.let-unbox-node.{" ++ show t
+                let vs = [ v | v <- [v1..], not $ v `Set.member` fv ]
+                    vars = [ Var v t | v <- vs | t <- ts ]
+                return ((combine postEval (tuple ts) cs :>>= tuple vars  :-> Return (NodeC t vars)) :>>= lr)
+            UnboxConst val -> do
+                mtick $ "Optimize.optimize.let-unbox-const.{" ++ show val
+                return ((combine postEval tyUnit cs :>>= unit :-> Return val) :>>= lr)
        where fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- map funcDefBody (expDefs cs) ]
 
 

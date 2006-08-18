@@ -14,6 +14,7 @@ import Text.PrettyPrint.HughesPJ(nest,($$))
 
 import Atom
 import Support.CanType
+import Grin.Noodle
 import C.FFI
 import C.Generate
 import C.Prims
@@ -59,6 +60,9 @@ convertVal :: Val -> C Expression
 convertVal (Var v ty) = fetchVar v ty
 convertVal (Const (NodeC h _)) | h == tagHole = return nullPtr
 convertVal (Const h) = do
+    (_,i) <- newConst h
+    return $ variable (name $  'c':show i )
+convertVal h@NodeC {} | valIsConstant h = do
     (_,i) <- newConst h
     return $ variable (name $  'c':show i )
 convertVal (Lit i _) = return (constant $ number (fromIntegral i))
@@ -491,6 +495,7 @@ convertConst x = fail "convertConst"
 
 ccaf :: (Var,Val) -> P.Doc
 ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ render (prettyVal val)) <> text "*/\n" <> text "static node_t _" <> tshow (varName v) <> text ";\n" <> text "#define " <> tshow (varName v) <+>  text "(&_" <> tshow (varName v) <> text ")\n";
+
 
 
 

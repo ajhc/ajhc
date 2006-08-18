@@ -33,5 +33,5 @@ devolveGrin grin = do
         f e = mapExpExp f e
     nf <- mapM g (grinFuncs grin)
     lf <- readIORef col
-    return $ setGrinFunctions (lf ++ nf) grin
+    return $ setGrinFunctions (lf ++ nf) grin { grinPhase = PostDevolve }
 
