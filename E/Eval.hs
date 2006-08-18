@@ -89,6 +89,10 @@ strong dsMap' term = eval' dsMap term [] where
             unwind ds (EVar tvr) stack
     eval' ds (ELetRec ds' e) stack = eval' (Map.fromList ds'  `mappend` ds) e  stack
     eval' ds e@(ELit LitCons {}) stack = unwind ds e stack
+    eval' ds (EError s ty) (t:rest) = do
+        nt <- eval' ds (EAp ty t) rest
+        return (EError s nt)
+    eval' ds e@EError {} [] = do return e
 
     eval' ds e stack= fail $ "Cannot strong: \n" ++ render (pprint (e,stack))
 
