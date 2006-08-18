@@ -21,6 +21,7 @@ import Stats hiding(combine)
 import Support.CanType
 import Support.FreeVars
 import Support.Tuple
+import Util.HasSize
 import Util.Graph
 import Util.Inst()
 import Util.Seq as Seq
@@ -226,7 +227,6 @@ manifestNodes as = Prelude.map (isManifestNode . lamExp) as
 data UnboxingResult = UnboxTag | UnboxTup (Atom,[Ty]) | UnboxConst Val
     deriving(Eq,Ord)
 
--- returns nothing if can return a tag, or just atom if can return an atom
 isCombinable :: Monad m => Bool -> Exp -> m UnboxingResult
 isCombinable postEval e = ans where
     ans = do
@@ -391,6 +391,8 @@ optimize1 postEval (n,l) = g l where
     f (Case x as :>>= v :-> rc@(Case v' as')) | v == v', count (== Nothing ) (Prelude.map (isManifestNode . lamExp) as) <= 1 = do
         ch <- caseHoist x as v as' (getType rc)
         f ch
+
+    -- case unboxing
     f (cs@(Case x as) :>>= lr) | Just UnboxTag <- isCombinable postEval cs = do
         mtick "Optimize.optimize.case-unbox-tag"
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
@@ -406,7 +408,18 @@ optimize1 postEval (n,l) = g l where
         mtick $ "Optimize.optimize.case-unbox-const.{" ++ show val
         return ((Case x (map (combineLam postEval tyUnit) as) :>>= unit :-> Return val) :>>= lr)
 
-    -- let combining
+
+    -- let pullin
+    f (cs@Let { expIsNormal = True } :>>= lr) |  sizeLTE 1 (filter (/= ReturnError) (getReturnInfo cs)) = do
+            mtick "Optimize.optimize.let-pullin"
+            return $ modifyTail lr cs
+    -- case pullin
+    f (cs@Case {} :>>= lr) |  sizeLTE 1 (filter (/= ReturnError) (getReturnInfo cs)) = do
+            mtick "Optimize.optimize.case-pullin"
+            return $ modifyTail lr cs
+
+
+    -- let unboxing
     f (cs@Let {} :>>= lr) | Just comb <- isCombinable postEval cs = case comb of
         UnboxTag -> do
             mtick "Optimize.optimize.let-unbox-tag"

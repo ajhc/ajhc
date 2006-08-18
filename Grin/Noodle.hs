@@ -6,7 +6,9 @@ import Control.Monad.Writer
 import Data.Monoid
 import qualified Data.Set as Set
 
+import Support.FreeVars
 import Atom(Atom(),toAtom)
+import Options(flint)
 import C.Prims
 import Util.Gen
 import Grin.Grin
@@ -15,7 +17,8 @@ import Debug.Trace
 
 
 modifyTail :: Lam -> Exp -> Exp
-modifyTail lam@(_ :-> lb) te = trace "modifyTail: returning" (f mempty te) where
+modifyTail lam@(_ :-> lb) te = f mempty te where
+    lamFV = freeVars lam :: Set.Set Var
     f lf e | False && trace ("modifyTail: " ++ show (lf,e)) False = undefined
     f _ (Error s ty) = Error s (getType lb)
     f lf (Case x ls) = Case x (map (g lf) ls)
@@ -27,6 +30,7 @@ modifyTail lam@(_ :-> lb) te = trace "modifyTail: returning" (f mempty te) where
     f lf (e1 :>>= p :-> e2) = e1 :>>= p :-> f lf e2
     f lf e@(App a as t) | a `Set.member` lf = App a as (getType lb)
     f lf e = e :>>= lam
+    g lf (p :-> e) | flint && not (Set.null $ Set.intersect (freeVars p) lamFV) = error "modifyTail: lam floated inside bad scope"
     g lf (p :-> e) = p :-> f lf e
 
 
@@ -155,7 +159,32 @@ updateLetProps Let { expDefs = [], expBody = body } = body
 updateLetProps lt@Let { expBody = body, expDefs = defs } = lt { expFuncCalls = (tail Set.\\ myDefs, nonTail Set.\\ myDefs), expIsNormal = not isNotNormal } where
     (tail,nonTail) = mconcatMap collectFuncs (body : map (lamExp . funcDefBody) defs)
     isNotNormal = any ((`Set.member` nonTail) . funcDefName) defs
-    myDefs = Set.fromList (map funcDefName defs)
+    myDefs = Set.fromList $ map funcDefName defs
+--    retInfo = filter (`notElem` [myDefs]) concatMap (getReturnInfo . lamExp . funcDefBody) (body:defs)
 updateLetProps e = e
+
+
+data ReturnInfo = ReturnNode (Maybe Atom,[Ty]) | ReturnConst Val | ReturnCalls Atom | ReturnOther | ReturnError
+    deriving(Eq,Ord)
+
+getReturnInfo :: Exp -> [ReturnInfo]
+getReturnInfo  e = ans where
+    ans = execWriter (f mempty e)
+    tells x = tell [x]
+    f lf (Return (NodeV t as)) = tells (ReturnNode (Nothing,map getType as))
+    f lf (Return (NodeC t as)) = tells (ReturnNode (Just t,map getType as))
+    f lf (Return z) | valIsConstant z = tell [ReturnConst z]
+    f lf Error {} = tells ReturnError
+    f lf (Case _ ls) = do Prelude.mapM_ (f lf) [ e | _ :-> e <- ls ]
+    f lf (_ :>>= _ :-> e) = f lf e
+    f lf Let { expBody = body, expIsNormal = False } = f lf body
+    f lf (App a _ _) | a `Set.member` lf = return ()
+    f lf Let { expBody = body, expDefs = defs, expIsNormal = True } = ans where
+        nlf = lf `Set.union` Set.fromList (map funcDefName defs)
+        ans = do
+            mapM_ (f nlf . lamExp . funcDefBody) defs
+            f nlf body
+    f _ (App a _ _) = tells $ ReturnCalls a
+    f _ e = tells ReturnOther
 
 
