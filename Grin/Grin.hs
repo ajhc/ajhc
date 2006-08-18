@@ -280,11 +280,10 @@ instance Show Val where
     showsPrec _ (Addr _) = text "<ref>"
     showsPrec _ (ValPrim aprim xs _) = tshow aprim <> tupled (map tshow xs)
 
-data Phase = PhaseInit | PostInlineEval
+data Phase = PhaseInit | PostInlineEval | PostAeOptimize | PostDevolve
     deriving(Show,Eq,Ord,Enum)
 
-phaseEvalInlined PostInlineEval = True
-phaseEvalInlined _ = False
+phaseEvalInlined e = e >= PostInlineEval
 
 
 data Grin = Grin {

@@ -16,15 +16,16 @@ import GenUtil hiding(putErrLn,replicateM_)
 import Grin.Grin
 import Grin.Noodle
 import Grin.Whiz
-import qualified Util.Histogram as Hist
 import Stats hiding(combine)
 import Support.CanType
 import Support.FreeVars
 import Support.Tuple
-import Util.HasSize
 import Util.Graph
+import Util.HasSize
 import Util.Inst()
 import Util.Seq as Seq
+import Util.UniqueMonad
+import qualified Util.Histogram as Hist
 
 -- perform a number of simple simplifications.
 -- inline very small and builtin-wrapper functions
@@ -294,8 +295,8 @@ sizeExp Let { expDefs = defs, expBody = body } = sizeExp body + sum (map (sizeLa
 sizeExp MkCont { expCont = l1, expLam = l2 } = 1 + sizeLam l1 + sizeLam l2
 sizeExp x = 1
 
-optimize1 ::  Bool -> (Atom,Lam) -> StatM Lam
-optimize1 postEval (n,l) = g l where
+optimize1 ::  Grin -> Bool -> (Atom,Lam) -> StatM Lam
+optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
     g (b :-> e) = f e >>= return . (b :->)
 --    f (Case e as :>>= lam)  | (sizeLam lam - 1) * length as <= 3 = do
 --        mtick "Optimize.optimize.case-pullin"
@@ -367,14 +368,14 @@ optimize1 postEval (n,l) = g l where
             var = Var va TyNode
             fv = freeVars as
             mc = modifyTail ( var :-> Return var :>>=  NodeC t as :-> Return (tuple as))
-        f (mc cc :>>= tuple as :-> Return (NodeC t as) :>>= v :-> lr)
+        return (mc cc :>>= tuple as :-> Return (NodeC t as) :>>= v :-> lr)
     f (lt@Let { expIsNormal = True } :>>= v :-> Return v' :>>= NodeC t as :-> lr ) | v == v' = do
         mtick "Optimize.optimize.let-hoist-return"
         let (va:_) = [ v | v <- [v1..], not $ v `Set.member` fv ]
             var = Var va TyNode
             fv = freeVars as
             mc = modifyTail ( var :-> Return var :>>=  NodeC t as :-> Return (tuple as))
-        f (mc lt :>>= tuple as :-> Return (NodeC t as) :>>= v :-> lr)
+        return (mc lt :>>= tuple as :-> Return (NodeC t as) :>>= v :-> lr)
 
     f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars r `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-tail"
@@ -385,13 +386,15 @@ optimize1 postEval (n,l) = g l where
     f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars e `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-head"
         f (e :>>= l :-> updateLetProps lt { expBody = r })
+
+{-
     f (Case x as :>>= v@(Var vnum _) :-> rc@(Case v' as') :>>= lr) | v == v', count (== Nothing ) (Prelude.map (isManifestNode . lamExp) as) <= 1, not (vnum `Set.member` freeVars lr) = do
         c <- caseHoist x as v as' (getType rc)
         f (c :>>= lr)
     f (Case x as :>>= v :-> rc@(Case v' as')) | v == v', count (== Nothing ) (Prelude.map (isManifestNode . lamExp) as) <= 1 = do
         ch <- caseHoist x as v as' (getType rc)
         f ch
-
+  -}
     -- case unboxing
     f (cs@(Case x as) :>>= lr) | Just UnboxTag <- isCombinable postEval cs = do
         mtick "Optimize.optimize.case-unbox-tag"
@@ -418,6 +421,19 @@ optimize1 postEval (n,l) = g l where
             mtick "Optimize.optimize.case-pullin"
             return $ modifyTail lr cs
 
+    f cs@(Case x as) | postEval && all isEnum [ p | p :-> _ <- as] = do
+        mtick "Optimize.optimize.case-enum"
+        let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
+            (va:vb:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
+        return (Return x :>>= NodeV va [] :-> Case (Var va TyTag) (Prelude.map (untagPat vb) as))
+
+    -- hoisting must come last
+    f (Case x as :>>= v@(Var vnum _) :-> rc@(Case v' as') :>>= lr) | v == v', not (vnum `Set.member` freeVars lr) = do
+        c <- caseHoist x as v as' (getType rc)
+        lr <- g lr
+        return $ c :>>= lr
+    f (Case x as :>>= v@Var {} :-> rc@(Case v' as')) | v == v'  = do
+        caseHoist x as v as' (getType rc)
 
     -- let unboxing
     f (cs@Let {} :>>= lr) | Just comb <- isCombinable postEval cs = case comb of
@@ -435,11 +451,6 @@ optimize1 postEval (n,l) = g l where
             return ((combine postEval tyUnit cs :>>= unit :-> Return val) :>>= lr)
        where fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- map funcDefBody (expDefs cs) ]
 
-    f cs@(Case x as) | postEval && all isEnum [ p | p :-> _ <- as] = do
-        mtick "Optimize.optimize.case-enum"
-        let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
-            (va:vb:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
-        f (Return x :>>= NodeV va [] :-> Case (Var va TyTag) (Prelude.map (untagPat vb) as))
 
     f (e1 :>>= _ :-> err@Error {}) | isErrOmittable e1 = do
         mtick "Optimize.optimize.del-error"
@@ -453,13 +464,26 @@ optimize1 postEval (n,l) = g l where
        return $ Case x as'
     f e@Let {} = mapExpExp f e
     f e = return e
-    caseHoist x as v as' ty = do
+    notReturnNode (ReturnNode (Just _,_)) = False
+    notReturnNode _ = True
+    --caseHoist x as v as' ty | sizeLTE 1 (filter (\x -> x /= ReturnError && notReturnNode x ) (getReturnInfo (Case undefined as)))= do
+    caseHoist x as v as' ty | sizeLTE 1 (filter (== Nothing ) (Prelude.map (isManifestNode . lamExp) as))  = do
         mtick $ "Optimize.optimize.case-hoist" -- .{" ++ show (Prelude.map (isManifestNode . lamExp) as :: [Maybe [Atom]])
-        let nc = Case x [ b :-> e :>>= v :-> Case v as' | b :-> e <- as ]
-            z (Error s _) = Error s ty
-            z (e1 :>>= b :-> e2) = e1 :>>= b :-> z e2
-            z e = e :>>= v :-> Case v as'
-        return nc
+        nic <- f (Case v as')
+        True <- return $ Set.null $ Set.intersection (freeVars nic) (freeVars (map lamBind as) :: Set.Set Var)
+        return $ modifyTail (v :-> nic) (Case x as) -- Case x [ b :-> e :>>= v :-> Case v as' | b :-> e <- as ]
+    caseHoist x as v as' ty | grinPhase grin >= PostDevolve  = do
+        mtick $ "Optimize.optimize.case-hoist-jumppoint" -- .{" ++ show (Prelude.map (isManifestNode . lamExp) as :: [Maybe [Atom]])
+        uniq <- newUniq
+        let fname = toAtom $ "fjumppoint-" ++ show n ++ "-" ++ show uniq
+            nbody = modifyTail (v :-> App fname [v] (getType $ Case v as')) (Case x as)
+            fbody = Tup [v] :-> Case v as'
+        return $ grinLet [createFuncDef True fname fbody] nbody
+    caseHoist x as v as' ty = do
+       ras <- sequence [ f e >>= return . (b :->)| b :-> e <- as ]
+       mfc <- f (Case x as)
+       fc <- f (Case v as')
+       return $ mfc :>>= v :-> fc
     knownCase n@(NodeC t vs) as = do
         mtick $ "Optimize.optimize.known-case-node.{" ++ show t
         --let f [] = error $ "no known case:" ++ show (n,as)
@@ -557,7 +581,7 @@ simplify stats grin = do
                 (_,nl) <- simplify1 stats env (a,nl)
                 let Identity nl'' = whizExps return nl
                 -- putDocM CharIO.putErr (prettyFun (a,nl''))
-                let (nl',stat) = runStatM (optimize1 postEval (a,nl''))
+                let (nl',stat) = runStatM (optimize1 grin postEval (a,nl''))
                 tickStat stats stat
                 return nl'
                 {-

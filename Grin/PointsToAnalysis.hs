@@ -757,7 +757,7 @@ findFixpoint' grin (HcHash _ mp) eq = do
         simplePos (Func v) = return $ sValue funcSupply v
         simplePos _ = fail "this pos is not simple"
         getArg a i = do
-            when (not $ tagIsFunction a) $ fail "getArg: tag not function"
+            when (not $ tagIsFunction a) $ fail $ "getArg: tag not function" ++ show (a,i)
             am <- readIORef argMap
             case Map.lookup (a,i) am of
                 Just e -> return e
