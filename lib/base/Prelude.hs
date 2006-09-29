@@ -20,9 +20,18 @@ module Prelude(
     sequence,
     sequence_,
     -- submodules
+    module Jhc.Basics,
+    module Jhc.Float,
+    Int(),
+
     module Prelude.IO,
     module Prelude.Text
     ) where
+
+
+import Jhc.Basics
+import Jhc.Float
+import Data.Int(Int())
 
 import Prelude.IO
 import Prelude.IOError
@@ -55,28 +64,11 @@ data Bool = False | True
 data () = ()
     deriving (Eq, Ord, Bounded, Enum)  -- Read declared in Prelude.Text
 
-data [] a =  a : ([] a) | []
-    -- odd syntax, so we write instances manually
 
 data  Ordering    =  LT | EQ | GT
     deriving (Eq, Ord, Bounded, Enum, Read, Show)
 
 
-data (,) a b = (,) a b
-data (,,) a b c = (,,) a b c
-data (,,,) a b c d = (,,,) a b c d
-data (,,,,) a b c d e = (,,,,) a b c d e
-data (,,,,,) a b c d e f = (,,,,,) a b c d e f
-data (,,,,,,) a b c d e f g = (,,,,,,) a b c d e f g
-data (,,,,,,,) a b c d e f g h = (,,,,,,,) a b c d e f g h
-data (,,,,,,,,) a b c d e f g h i = (,,,,,,,,) a b c d e f g h i
-
-type String = [Char]
-data Integer
-data Int
-data Char
-data Float
-data Double
 
 -- Enumeration and Bounded classes
 
@@ -425,14 +417,6 @@ undefined = error "Prelude.undefined"
 
 -- Basic combinators
 
-{-# SUPERINLINE id, const, (.), ($), ($!), flip #-}
-
-id x = x
-const x _ = x
-f . g = \x -> f (g x)
-f $ x = f x
-f $! x = x `seq` f x
-flip f x y = f y x
 
 {-# INLINE (&&), (||), not, otherwise #-}
 (&&), (||)       :: Bool -> Bool -> Bool
@@ -467,27 +451,12 @@ either :: (a -> c) -> (b -> c) -> Either a b -> c
 either f g (Left x)  =  f x
 either f g (Right y) =  g y
 
-{-# INLINE fst, snd #-}
-fst (a,b) = a
-snd (a,b) = b
-
-
-
-
 
 
 until            :: (a -> Bool) -> (a -> a) -> a -> a
 until p f x
      | p x       =  x
      | otherwise =  until p f (f x)
-
--- asTypeOf is a type-restricted version of const.  It is usually used
--- as an infix operator, and its typing forces its first argument
--- (which is usually overloaded) to have the same type as the second.
-
-{-# SUPERINLINE asTypeOf #-}
-asTypeOf         :: a -> a -> a
-asTypeOf         =  const
 
 
 
@@ -507,23 +476,8 @@ asTypeOf         =  const
 
 
 infixl 9  !!
-infixr 5  ++
 infix  4  `elem`, `notElem`
 
--- Map and append
-
-map :: (a -> b) -> [a] -> [b]
-map f xs = go xs where
-    go [] = []
-    go (x:xs) = f x : go xs
-
---map f []     = []
---map f (x:xs) = f x : map f xs
-
-
-(++) :: [a] -> [a] -> [a]
-[]     ++ ys = ys
-(x:xs) ++ ys = x : (xs ++ ys)
 
 
 filter :: (a -> Bool) -> [a] -> [a]
@@ -611,20 +565,12 @@ length xs = f xs 0 where
 --      scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
 
 
-foldl            :: (a -> b -> a) -> a -> [b] -> a
-foldl f z []     =  z
-foldl f z (x:xs) =  foldl f (f z x) xs
 
 
 foldl1           :: (a -> a -> a) -> [a] -> a
 foldl1 f (x:xs)  =  foldl f x xs
 foldl1 _ []      =  error "Prelude.foldl1: empty list"
 
-
-scanl            :: (a -> b -> a) -> a -> [b] -> [a]
-scanl f q xs     =  q : (case xs of
-                            []   -> []
-                            x:xs -> scanl f (f q x) xs)
 
 
 scanl1           :: (a -> a -> a) -> [a] -> [a]
@@ -656,16 +602,6 @@ scanr1 f []     =  []
 scanr1 f [x]    =  [x]
 scanr1 f (x:xs) =  f x q : qs where qs@(q:_) = scanr1 f xs
 
--- iterate f x returns an infinite list of repeated applications of f to x:
--- iterate f x == [x, f x, f (f x), ...]
-
-iterate          :: (a -> a) -> a -> [a]
-iterate f x      =  x : iterate f (f x)
-
--- repeat x is an infinite list, with x the value of every element.
-
-repeat           :: a -> [a]
-repeat x         =  xs where xs = x:xs
 
 -- replicate n x is a list of length n with x the value of every element
 
@@ -772,11 +708,6 @@ unwords (w:ws)		= w ++ ' ' : unwords ws
 
 -- reverse xs returns the elements of xs in reverse order.  xs must be finite.
 
-reverse          :: [a] -> [a]
---reverse          =  foldl (flip (:)) []
-reverse l =  rev l [] where
-    rev []     a = a
-    rev (x:xs) a = rev xs (x:a)
 
 -- and returns the conjunction of a Boolean list.  For the result to be
 -- True, the list must be finite; False, however, results from a False
@@ -832,29 +763,10 @@ maximum xs       =  foldl1 max xs
 minimum []       =  error "Prelude.minimum: empty list"
 minimum xs       =  foldl1 min xs
 
--- zip takes two lists and returns a list of corresponding pairs.  If one
--- input list is short, excess elements of the longer list are discarded.
--- zip3 takes three lists and returns a list of triples.  Zips for larger
--- tuples are in the List library
-
-
-zip              :: [a] -> [b] -> [(a,b)]
-zip              =  zipWith (\a b -> (a,b))
-
 
 zip3             :: [a] -> [b] -> [c] -> [(a,b,c)]
 zip3             =  zipWith3 (\a b c -> (a,b,c))
 
--- The zipWith family generalises the zip family by zipping with the
--- function given as the first argument, instead of a tupling function.
--- For example, zipWith (+) is applied to two lists to produce the list
--- of corresponding sums.
-
-
-zipWith          :: (a->b->c) -> [a]->[b]->[c]
-zipWith z (a:as) (b:bs)
-                 =  z a b : zipWith z as bs
-zipWith _ _ _    =  []
 
 
 zipWith3         :: (a->b->c->d) -> [a]->[b]->[c]->[d]
@@ -883,9 +795,6 @@ error s = unsafePerformIO $ do
     exitFailure
 
 
-{-# INLINE seq #-}
-
-foreign import primitive seq :: a -> b -> b
 
 
 
@@ -963,8 +872,6 @@ instance Eq a => Eq [a] where
     (x:xs) == (y:ys) | x == y = xs == ys
     _ == _ = False
 
-uncurry f (x,y) = f x y
-curry f x y = f (x,y)
 
 {-
 instance (Eq a, Eq b) => Eq (a,b) where

@@ -1,3 +1,4 @@
+{-# OPTIONS_JHC -N #-}
 module System.Info where
 
 

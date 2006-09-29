@@ -346,7 +346,8 @@ main_mod	      = Module "Main"
 
 --unit_con_name	      = Qual prelude_mod (HsSpecial "()")
 unit_con_name	      = UnQual (HsIdent "()")
-tuple_con_name i      = Qual prelude_mod (HsIdent ("("++replicate i ','++")"))
+--tuple_con_name i      = Qual prelude_mod (HsIdent ("("++replicate i ','++")"))
+tuple_con_name i      = Qual (Module "Jhc.Basics") (HsIdent ("("++replicate i ','++")"))
 
 unit_con	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = unit_con_name }
 tuple_con i	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = (tuple_con_name i) }

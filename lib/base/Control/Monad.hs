@@ -10,6 +10,8 @@ module Control.Monad(
     mapM, mapM_, sequence, sequence_, (=<<)
 )where
 
+import Jhc.Basics
+
 class Monad m => MonadPlus m where
     mzero :: m a
     mplus :: m a -> m a -> m a

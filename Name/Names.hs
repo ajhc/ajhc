@@ -59,12 +59,10 @@ instance FromTupname Name where
 
 -- The constructors
 
-dc_Cons = toName DataConstructor ("Prelude",":")
-dc_EmptyList = toName DataConstructor ("Prelude","[]")
---dc_False = toName DataConstructor ("Prelude","False")
+dc_Cons = toName DataConstructor ("Jhc.Basics",":")
+dc_EmptyList = toName DataConstructor ("Jhc.Basics","[]")
 dc_JustIO = toName DataConstructor ("Jhc.IO", "JustIO")
 dc_Rational = toName DataConstructor ("Ratio",":%")
---dc_True = toName DataConstructor ("Prelude","True")
 dc_Unit = toName DataConstructor ("Prelude","()")
 dc_Boolzh = toName DataConstructor ("Prelude","Bool#")
 
@@ -79,7 +77,7 @@ tc_IO = toName TypeConstructor ("Jhc.IO", "IO")
 tc_World__ = toName TypeConstructor ("Jhc.IO","World__")
 
 tc_Bool = toName TypeConstructor ("Prelude","Bool")
-tc_List = toName TypeConstructor ("Prelude","[]")
+tc_List = toName TypeConstructor ("Jhc.Basics","[]")
 tc_Ptr = toName TypeConstructor ("Foreign.Ptr","Ptr")
 tc_Ratio = toName TypeConstructor ("Ratio","Ratio")
 tc_Unit = toName TypeConstructor  ("Prelude","()")
@@ -97,11 +95,11 @@ v_fromEnum = toName Val ("Prelude","fromEnum")
 v_minBound = toName Val ("Prelude","minBound")
 v_maxBound = toName Val ("Prelude","maxBound")
 v_fail = toName Val ("Prelude","fail")
-v_concatMap = toName Val ("Jhc.List","concatMap")
-v_map = toName Val ("Prelude","map")
+v_concatMap = toName Val ("Jhc.Basics","concatMap")
+v_map = toName Val ("Jhc.Basics","map")
 v_and = toName Val ("Prelude","&&")
 v_filter = toName Val ("Prelude","filter")
-v_foldr = toName Val ("Jhc.List","foldr")
+v_foldr = toName Val ("Jhc.Basics","foldr")
 v_undefined = toName Val ("Prelude","undefined")
 v_undefinedIOErrorCont = toName Val ("Jhc.IO","undefinedIOErrorCont")
 v_silly = toName Val ("Jhc@","silly")
@@ -109,7 +107,7 @@ v_silly = toName Val ("Jhc@","silly")
 sFuncNames = FuncNames {
     func_bind = toName Val ("Prelude",">>="),
     func_bind_ = toName Val ("Prelude",">>"),
-    func_concatMap = toName Val ("Jhc.List","concatMap"),
+    func_concatMap = toName Val ("Jhc.Basics","concatMap"),
     func_equals = toName Val ("Prelude","=="),
     func_fromInteger = toName Val ("Prelude","fromInteger"),
     func_fromInt = toName Val ("Prelude","fromInt"),

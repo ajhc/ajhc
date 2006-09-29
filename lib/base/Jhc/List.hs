@@ -1,13 +1,12 @@
 module Jhc.List where
 
+import Jhc.Basics
+
 -- | our fusion routines
 
 build :: (forall b . (a -> b -> b) -> b -> b) -> [a]
 build g = g (:) []
 
-foldr :: (a -> b -> b) -> b -> [a] -> b
-foldr k z [] = z
-foldr k z (x:xs) = k x (foldr k z xs)
 
 augment :: forall a. (forall b. (a->b->b) -> b -> b) -> [a] -> [a]
 augment g xs = g (:) xs
@@ -89,17 +88,6 @@ xs !! n | n < 0   =  error "Prelude.(!!): negative index\n"
                                else sub ys $! (n - 1)
 
 
-concat :: [[a]] -> [a]
-concat [] = []
-concat (x:xs) = case x of
-    [] -> concat xs
-    (y:ys) -> y:concat (ys:xs)
-
-
-concatMap :: (a -> [b]) -> [a] -> [b]
-concatMap f xs = g xs where
-    g [] = []
-    g (x:xs) = f x ++ g xs
 
 {- SPECIALIZE sequence :: forall a . [IO a] -> IO [a] #-}
 {- SPECIALIZE sequence_ :: forall a . [IO a] -> IO () #-}

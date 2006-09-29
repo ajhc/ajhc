@@ -35,6 +35,8 @@ Exposed-Modules: Control.Exception,
                  Foreign.StablePtr,
                  Foreign.Storable,
                  Jhc.Addr,
+                 Jhc.Basics,
+                 Jhc.Float
 --                 Jhc.Array,
                  Jhc.Handle,
                  Jhc.Hole,

@@ -57,8 +57,6 @@ defaultFixity = (9, HsAssocLeft)
 terminalFixity :: (Int, HsAssoc)    -- Fixity given to variables, etc. Used to terminate descent.
 terminalFixity = (10, HsAssocLeft)
 
-unqualModule :: Module              -- The module which unqualified operators are associated with.
-unqualModule = Module "Prelude"
 
 ----------------------------------------------------------------------------
 
