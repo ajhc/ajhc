@@ -3,12 +3,12 @@ module Ho.Library(
     createLibrary
     ) where
 
+import Char
 import Control.Monad(when,foldM)
 import Data.List(sort)
 import Data.Monoid
-import qualified Data.Map as Map
 import System.IO
-import Char
+import qualified Data.Map as Map
 
 import GenUtil
 import Ho.Build
@@ -17,10 +17,11 @@ import Ho.Type
 import HsSyn
 import Options
 import PackedString
+import Util.SHA1(sha1file)
+import Util.SetLike
+import Version(versionString)
 import qualified CharIO
 import qualified FlagDump as FD
-import Util.SHA1(sha1file)
-import Version(versionString)
 
 
 
@@ -77,10 +78,12 @@ createLibrary fp wtd = do
     let mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ field x
     let name  = jfield "name"
         vers  = jfield "version"
-        hmods = mfield "hidden-modules"
-        emods = mfield "exposed-modules"
+        hmods = snub $ mfield "hidden-modules"
+        emods = snub $ mfield "exposed-modules"
     let allmods  = sort $ map Module (emods ++ hmods)
     ho <- wtd (map Module emods)
+    let unknownMods = [ m | m <- allmods , m `mnotMember` (hoExports ho)]
+    mapM_ ((putStrLn . ("*** Module included in library that is not in export list: " ++)) . show) unknownMods
     let outName = case optOutName options of
             "hs.out" -> name ++ "-" ++ vers ++ ".hl"
             fn -> fn
