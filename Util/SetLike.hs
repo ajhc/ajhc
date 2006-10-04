@@ -2,6 +2,7 @@ module Util.SetLike(
     EnumSet(),
     (\\),
     notMember,
+    mnotMember,
     union,
     unions,
     minsert,
@@ -13,12 +14,12 @@ module Util.SetLike(
     ) where
 
 
-import qualified Data.Set as S
-import qualified Data.IntMap as IM
-import qualified Data.Map as M
-import qualified Data.IntSet as IS
 import Data.Monoid
 import Data.Typeable
+import qualified Data.IntMap as IM
+import qualified Data.IntSet as IS
+import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Util.HasSize
 
@@ -53,6 +54,7 @@ class BuildSet t s => ModifySet t s | s -> t where
     member :: t -> s -> Bool
 
 notMember x t = not $ member x t
+mnotMember x t = not $ mmember x t
 
 union :: SetLike a => a -> a -> a
 union = mappend
