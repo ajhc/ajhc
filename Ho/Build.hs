@@ -121,7 +121,7 @@ findModule have need ifunc func  = do
         f ho readHo (sc:scs) = do
             (ho',newHo) <- func ho [ hs | (hs,_,_) <- sc ]
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
-                mods' = [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
+                mods' = snub [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
                 mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules ho')]
                 ldeps = Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules have)]
             let hoh = HoHeader { hohDepends    = [ x | (_,x,_) <- sc],
@@ -146,7 +146,7 @@ checkForHoModule (Module m) = loop $ map snd $ searchPaths m
 
 checkForHoFile :: String            -- ^ file name to check for
     -> IO (Maybe (HoHeader,Ho))
-checkForHoFile fn = flip catch (\e -> putErrLn (show e) >> return Nothing) $ do
+checkForHoFile fn = flip catch (\e -> return Nothing) $ do
     bracket (openGetFileDep fn) (\_ -> return ()) $ \ (fh,dep) -> do
     bh <- openBinIO fh
     x <- get bh
@@ -287,6 +287,59 @@ recordHoFile ho fs header = do
 -- | Check that ho library dependencies are right
 hoLibraryDeps newHo oldHo = hoLibraries newHo `Map.isSubmapOf` hoLibraries oldHo
 
+
+nextModule ::
+    Map.Map Module (Maybe (Either FileDep (LibraryName,CheckSum))) -- ^ modules we got, and don't need to worry about
+    -> [(HsModule,FileDep,String)]  -- ^ todo list
+    -> Ho -- ^ what we have read so far
+    -> [Either Module (String,[(String,String)])] -- ^ either a module name or some files to search
+    -> IO (Ho,[(HsModule,FileDep,String)]) -- ^ (everything read,what still needs to be done)
+
+
+
+nextModule ms tl ho [] = return (ho,tl)
+nextModule ms tl ho (Left m:rest) | m `mmember` ms = nextModule ms tl ho rest
+nextModule ms tl ho (Left m:rest) = nextModule ms tl ho (Right (fromModule m,searchPaths (fromModule m)):rest)
+nextModule ms tl ho (Right (name,files):rest) = result where
+    result = do
+        res@(_,fd,ho_name) <- findFirstFile name files
+        when (fd == emptyFileDep) $ processIOErrors >> fail "Could not find file"
+        if optIgnoreHo options then addNeed [] res else do
+        mho <- checkForHoFile ho_name
+        cho [] res mempty mho
+    cho drest res zho mho = case mho of
+            Nothing -> addNeed [] res
+            Just (hoh,ho) -> cdeps (ho `mappend` zho:: Ho) res (drest ++ hohModDepends hoh)
+    cdeps nho res ((m,fd):drest) = case mlookup m ms of
+        Nothing | Just (Left fd') <- mlookup m (hoModules nho), fd' == fd -> cdeps nho res drest
+        Nothing -> do
+            r <- checkDep fd
+            case r of
+                True -> checkForHoFile (fromAtom $ fileName fd) >>= cho drest res nho
+                False -> addNeed [] res
+        Just Nothing -> cdeps nho res drest
+        Just (Just (Left fd')) | fd == fd' -> cdeps nho res drest
+        Just (Just (Left fd')) | fd /= emptyFileDep -> do
+            wdump FD.Progress $ do
+                putErrLn $ "Found newer dependency:" <+> fromModule m <+> "at" <+> pprint (fd,fd')
+            addNeed [] res
+        Just (Just _) -> addNeed [] res
+    cdeps nho (fh,_,_) [] = hClose fh >> nextModule (ms `mappend` fmap Just (hoModules nho)) tl (nho `mappend` ho) rest
+    addNeed additional (fh,fd,ho_name) = do
+        cs <- if fopts FO.Cpp then filterInput "cpp" ["-D__JHC__","-traditional","-P"] fh
+                              else CharIO.hGetContents fh
+        hs <- parseHsSource (fromAtom $ fileName fd) cs
+        case (hsModuleName hs `mmember` ms) of
+            True -> do putStrLn $ "Found module name that we alread gots: " ++ show (hsModuleName hs); nextModule ms tl ho (map Left additional ++ rest)
+            False -> do
+                wdump FD.Progress $ do
+                    sp <- shortenPath $ fromAtom (fileName fd)
+                    putErrLn $ "Found dependency:" <+> name <+> "at" <+> sp -- fromAtom (fileName fd) --  <+> show (hsModuleRequires hs)
+                nextModule (minsert (hsModuleName hs) Nothing ms) ((hs,fd,ho_name):tl) ho (rest ++ [ Left (Module m) | m <- hsModuleRequires hs] ++ map Left additional)
+
+
+
+
 -- | Find a module, returning just the read Ho file and the parsed
 -- contents of files that still need to be processed, This chases dependencies so
 -- you could end up getting parsed source for several files back.
@@ -297,67 +350,8 @@ getModule ::
     -> String   -- ^ Module name for printing error messages
     -> [(String,String)]  -- ^ files to search, and the cooresponding ho file
     -> IO (Ho,[(HsModule,FileDep,String)])
-getModule initialHo name files  = do
-    ho_ref <- newIORef mempty
-    need_ref <- newIORef []
-    let loop name files  = do
-            --wdump FD.Progress $ do
-            --    putErrLn $ "Looking for :" <+> name <+> "at" <+> show files
-            -- First find the haskell source file.
-            (fh,fd,ho_name) <- findFirstFile name files
-            --if fd == emptyFileDep then return mempty else do
-            when (fd == emptyFileDep) $ processIOErrors >> fail "Couldn't find file" -- then return mempty else do
-            mho <- if optIgnoreHo options then do
-                    wdump FD.Progress $ do
-                        putErrLn $ "Skipping haskell object file:" <+> ho_name
-                    return Nothing
-                   else checkForHoFile ho_name
-            case mho of
-                Just (hh,ho') -> do
-                    let f (a:as) = do
-                            r <- checkHoDep a
-                            if r then f as else return False
-                        f [] = return True
-                    r <- if hoLibraryDeps ho' initialHo then f (hohModDepends hh) else return False
-                    case r of
-                        True -> modifyIORef ho_ref (ho' `mappend`) >> hClose fh
-                        False -> addNeed name fd fh ho_name
-                Nothing -> addNeed name fd fh ho_name
-        checkHoDep :: (Module,FileDep) -> IO Bool
-        checkHoDep (m,fd) = do
-            --wdump FD.Progress $ do
-            --    putErrLn $ "checking dependency:" <+> show m <+> "at" <+> fromAtom (fileName fd)
-            ho <- readIORef ho_ref
-            case mlookup m (hoModules (initialHo `mappend` ho)) of
-                Just (Left fd') | fd == fd' -> return True
-                Just (Left fd') | fd /= emptyFileDep -> do
-                    wdump FD.Progress $ do
-                        putErrLn $ "Found newer dependency:" <+> fromModule m <+> "at" <+> pprint (fd,fd')
-                    return False
-                Just (Left _) -> return False
-                Just (Right (cl,cs)) -> do
-                    putVerboseLn  (show m ++ " found in " ++ show cl)
-                    writeIORef ho_ref $ ho { hoLibraries = Map.insert cl cs $ hoLibraries ho }
-                    return True
-                Nothing -> do
-                    xs <- readIORef need_ref
-                    case lookup m xs of
-                        Just _ -> return False
-                        Nothing -> loop (fromModule m) (searchPaths (fromModule m)) >> checkHoDep (m,fd)
-        addNeed :: String -> FileDep -> Handle -> String ->  IO ()
-        addNeed name fd fh ho_name = do
-            cs <- if fopts FO.Cpp then filterInput "cpp" ["-D__JHC__","-traditional","-P"] fh
-                                  else CharIO.hGetContents fh
-            hs <- parseHsSource (fromAtom $ fileName fd) cs
-            wdump FD.Progress $ do
-                sp <- shortenPath $ fromAtom (fileName fd)
-                putErrLn $ "Found dependency:" <+> name <+> "at" <+> sp -- fromAtom (fileName fd) --  <+> show (hsModuleRequires hs)
-            modifyIORef need_ref $ ((hsModuleName hs,(hs,fd,ho_name)):)
-            mapM_ (checkHoDep . (flip (,) emptyFileDep) . Module) $ hsModuleRequires hs
-    loop name files
-    ho   <- readIORef ho_ref
-    need <- readIORef need_ref
-    return (ho,snds need)
+
+getModule initialHo name files = nextModule (fmap Just $ hoModules initialHo) [] mempty [Right (name,files)]
 
 hsModuleRequires x = ans where
     noPrelude =   or $ not (optPrelude options):[ opt == c | opt <- hsModuleOptions x, c <- ["-N","--noprelude"]]
