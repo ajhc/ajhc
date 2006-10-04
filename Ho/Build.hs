@@ -11,7 +11,6 @@ module Ho.Build (
 
 
 import Control.Monad.Identity
-import Data.Graph(stronglyConnComp,SCC(..))
 import Data.IORef
 import Data.Monoid
 import IO(bracket)
@@ -19,11 +18,11 @@ import List
 import Maybe
 import Monad
 import Prelude hiding(print,putStrLn)
-import qualified Data.Map as Map
-import qualified Text.PrettyPrint.HughesPJ as PPrint
 import System.IO hiding(print,putStrLn)
 import System.Posix.Files
 import System.Posix.IO
+import qualified Data.Map as Map
+import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import Atom
 import Binary
@@ -35,11 +34,11 @@ import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.E
-import E.Show
-import E.Traverse(emapE)
 import E.Program
 import E.Rules
+import E.Show
 import E.Subst(substMap'')
+import E.Traverse(emapE)
 import E.TypeCheck()
 import FrontEnd.HsParser
 import FrontEnd.Infix
@@ -49,14 +48,15 @@ import GenUtil hiding(putErrLn,putErr,putErrDie)
 import Ho.Type
 import HsSyn
 import MapBinaryInstance()
+import Name.Id
 import Options
 import PackedString
+import Util.FilterInput
+import Util.SetLike
+import Warning
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
-import Util.FilterInput
-import Warning
-import Name.Id
-import Util.SetLike
+import qualified Util.Graph as G
 
 version :: Int
 version = 7
@@ -115,16 +115,14 @@ findModule have need ifunc func  = do
         (name,files) = f need
     (readHo,ms) <- getModule have name files
     processIOErrors
-    let scc = map f $  stronglyConnComp [ (x,fromModule $ hsModuleName hs,hsModuleRequires hs) | x@(hs,fd,honm) <- ms ]
-        f (AcyclicSCC x) = [x]
-        f (CyclicSCC xs) = xs
+    let scc = G.sccGroups (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires . fst3) )
     when (dump FD.SccModules) $ CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
     let f ho readHo [] = return (ho,readHo)
         f ho readHo (sc:scs) = do
             (ho',newHo) <- func ho [ hs | (hs,_,_) <- sc ]
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
                 mods' = [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
-                mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules ho)]
+                mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules ho')]
                 ldeps = Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules have)]
             let hoh = HoHeader { hohDepends    = [ x | (_,x,_) <- sc],
                                  hohModDepends = mdeps,
@@ -135,6 +133,8 @@ findModule have need ifunc func  = do
             f ho' (readHo `mappend` newHo)  scs
     ho <- ifunc have readHo
     f ho readHo scc
+
+fst3 (x,_,_) = x
 
 {-
 checkForHoModule :: Module -> IO (Maybe (HoHeader,Ho))
@@ -287,7 +287,7 @@ recordHoFile ho fs header = do
 -- | Check that ho library dependencies are right
 hoLibraryDeps newHo oldHo = hoLibraries newHo `Map.isSubmapOf` hoLibraries oldHo
 
--- | Find a module, returning the combined up to date Ho files and the parsed
+-- | Find a module, returning just the read Ho file and the parsed
 -- contents of files that still need to be processed, This chases dependencies so
 -- you could end up getting parsed source for several files back.
 -- We only look for ho files where there is a cooresponding haskell source file.
@@ -424,9 +424,5 @@ hoToProgram ho = programSetDs (melems $ hoEs ho) program {
     progDataTable = hoDataTable ho
     }
 
-
-
-initialHo = mempty { hoEs = mempty , hoClassHierarchy = mempty, hoDataTable = dataTablePrims  }  where
-    --ch = foldl addOneInstanceToHierarchy mempty (map ((,) False) primitiveInsts)
-    --es = Map.fromList [  (n,(setProperties [prop_INSTANCE] $ tVr (atomIndex $ toAtom n) (getType v),v)) |  (n,v) <- constantMethods ]
+initialHo = mempty { hoDataTable = dataTablePrims  }
 
