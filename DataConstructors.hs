@@ -173,6 +173,21 @@ tabsurd = Constructor {
             conChildren = Nothing
     }
 
+-- | Jhc@.Box can hold any boxed value (something whose type inhabits *, or is a function)
+-- so, there is a bit of subtyping that goes on.
+
+tbox = Constructor {
+            conName = tc_Box,
+            conType = eStar,
+            conSlots = [],
+            conDeriving = [],
+            conExpr = tBox,
+            conAlias = False,
+            conVirtual = Nothing,
+            conInhabits = tStar,
+            conChildren = Nothing
+    }
+
 worlds = [(rt_Worldzh,tWorld__),(tc_World__,tWorld__)] where
     tWorld__ = Constructor {
                 conName = rt_Worldzh,
@@ -246,6 +261,8 @@ isAbsurd _ = False
 
 -- | determine if types are the same expanding newtypes and
 typesCompatable :: Monad m => DataTable -> E -> E -> m ()
+typesCompatable _ box b | box == tBox, canBeBox b = return ()
+typesCompatable _ a box | box == tBox, canBeBox a = return ()
 typesCompatable dataTable a b = go a b where
     go :: Monad m => E -> E -> m ()
     go a b = g' [] [] a b
@@ -322,7 +339,7 @@ followAliases dataTable l = f l (10::Int) where
         Just e -> f e (n - 1)
         Nothing -> l
 
-dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tabsurd:tarrow:primitiveTable ] ++ worlds)
+dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tbox:tabsurd:tarrow:primitiveTable ] ++ worlds)
 
 deriveClasses :: DataTable -> [(TVr,E)]
 deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where

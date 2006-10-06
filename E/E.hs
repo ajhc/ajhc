@@ -227,6 +227,7 @@ instance ConNames (Lit E E) where
     vUnit  = (LitCons vUnit [] tUnit)
 
 
+tBox = ELit (LitCons tc_Box [] eStar)
 
 tFunc a b = ePi (tVr 0 a) b
 

@@ -1,4 +1,14 @@
-module E.TypeCheck(eAp, sortStarLike, sortTypeLike,  sortTermLike, inferType, typeInfer, typeInfer', match) where
+module E.TypeCheck(
+    canBeBox,
+    eAp,
+    inferType,
+    match,
+    sortStarLike,
+    sortTermLike,
+    sortTypeLike,
+    typeInfer',
+    typeInfer
+    ) where
 
 import Monad(when,liftM)
 import Control.Monad.Writer
@@ -20,6 +30,9 @@ import Util.SetLike
 import Name.Id
 
 
+canBeBox EPi {} = True
+canBeBox x | getType x == eStar = True
+canBeBox _ = False
 
 -- Fast (and lazy, and perhaps unsafe) typeof
 typ ::  E -> E
@@ -183,6 +196,8 @@ inferType dataTable ds e = rfc e where
         | s == eBox = return ()
         | Unknown <- s = return ()
         | otherwise =  withContextDoc (text "valid:" <+> prettyE s) (do t <- inferType' nds s;  valid' nds t)
+    eq box t2 | box == tBox, canBeBox t2 = return t2
+    eq t1 box | box == tBox, canBeBox t1 = return t1
     eq Unknown t2 = return t2
     eq t1 Unknown = return t1
     eq t1 t2 = eq' ds t1 t2
