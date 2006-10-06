@@ -18,11 +18,12 @@ import Ho.Build
 import Ho.Library(loadLibraries)
 import HsSyn
 import Options
+import Util.SetLike
+import Warning
 import qualified Doc.PPrint as PPrint
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified FrontEnd.Tc.Module as Tc
-import Warning
 
 
 
@@ -36,8 +37,8 @@ parseFiles :: [String]      -- ^ List of files to read
 parseFiles fs deps ifunc func = do
     wdump FD.Progress $ do
         putErrLn $ "Compiling " ++ show fs
-    initialHo <- loadLibraries
-    initialHo <- ifunc mempty initialHo
+    libraries <- loadLibraries
+    initialHo <- ifunc mempty (initialHo `mappend` libraries)
     let xs = snub $ map Right fs ++ map Left deps
         f accumHo ho [] = return (accumHo,ho)
         f accumHo ho (x:xs) = do

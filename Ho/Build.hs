@@ -4,7 +4,6 @@ module Ho.Build (
     findModule,
     hoToProgram,
     initialHo,
-    fixupHo,
     recordHoFile,
     checkForHoFile
     ) where
@@ -392,8 +391,6 @@ applyFixups mie ho = ho { hoEs = fmap f (hoEs ho) , hoRules =  runIdentity (E.Ru
     f (t,e) = (t,sm e)
     sm = substMap'' (fmap Just mie)
 
-fixupHo :: Ho -> Ho
-fixupHo ho = applyFixups (getFixups ho) ho
 
 hGetFileDep fn fh = do
     fd <- handleToFd fh
