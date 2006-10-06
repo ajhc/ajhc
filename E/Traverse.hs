@@ -5,6 +5,7 @@ module E.Traverse(
     emapE_,
     emapE,
     emapE',
+    emapEG,
     eSize,
     lookupBinding,
     newBinding,
@@ -308,7 +309,7 @@ emapEG f g e = z e where
     z (EAp aa ab) = do aa <- f aa;ab <- f ab; return $ EAp aa ab
     z (ELam aa ab) = do aa <- mapmTvr g aa; ab <- f ab; return $ ELam aa ab
     z (EPi aa ab) = do aa <- mapmTvr f aa; ab <- f ab; return $ EPi aa ab
-    z (EVar aa) = do aa <- mapmTvr f aa; return $ EVar aa
+    z (EVar aa) = do aa <- mapmTvr g aa; return $ EVar aa
     z (Unknown) = do return $ Unknown
     z (ESort aa) = do return $ ESort aa
     z (ELit (LitCons n es t)) = do t' <- g t; es' <- mapM f es; return $ ELit (LitCons n es' t')
@@ -322,8 +323,8 @@ emapEG f g e = z e where
         t' <- g (eCaseType ec)
         return ECase { eCaseScrutinee =e', eCaseBind = b', eCaseAlts = as', eCaseDefault = d', eCaseType = t'}
     --    aa ab) = do aa <- f aa;ab <- mapM (\(x,y) -> do x <- fmapM f x; y <- f y; return (x,y)) ab; return $ ECase aa ab
-    z (EPrim aa ab ac) = do ab <- mapM f ab;ac <- f ac; return $ EPrim aa ab ac
-    z (EError aa ab) = do ab <- f ab; return $ EError aa ab
+    z (EPrim aa ab ac) = do ab <- mapM f ab;ac <- g ac; return $ EPrim aa ab ac
+    z (EError aa ab) = do ab <- g ab; return $ EError aa ab
     mapmTvr = fmapM
     mapmAlt (Alt (LitCons n xs t) e) = do
         e' <- f e
