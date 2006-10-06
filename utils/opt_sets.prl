@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 
+use warnings;
 use strict;
 
 use Getopt::Std;
@@ -13,7 +14,7 @@ my $name = $h{n};
 $name =~ s/\.[a-z]+$//;
 
 my @l;
-my %h;
+undef %h;
 
 # this is fun
 my $cat;
@@ -51,7 +52,7 @@ foreach (@l) {
 }
 @ds = sort @ds;
 
-print "module $name(Flag(..),process,helpMsg) where\n\n";
+print "module $name(Flag(..),process,helpMsg,helpFlags) where\n\n";
 print "import qualified Data.Set as Set\n";
 print "\n";
 print "-- | Flags\n";
@@ -96,6 +97,7 @@ foreach (@cat) {
 print "\n{-# NOINLINE helpMsg #-}\n";
 print "helpMsg = \"$help\"\n";
 
+print "helpFlags = [" . join(", ",map { "\"$_\"" } sort keys %h) . "]\n\n";
 
 
 

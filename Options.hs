@@ -111,11 +111,11 @@ idu d ds = ds ++ [d]
 theoptions :: [OptDescr (Opt -> Opt)]
 theoptions =
     [ Option ['V'] ["version"]   (NoArg  (optMode_s Version))          "print version info and exit"
-    , Option []    ["version-context"] (NoArg  (optMode_s VersionCtx)) "print version context (darcs changes) info and exit"
+    , Option []    ["version-context"] (NoArg  (optMode_s VersionCtx)) "print version context info and exit"
     , Option ['v'] ["verbose"]   (NoArg  (optVerbose_u (+1)))          "chatty output on stderr"
     , Option ['z'] []            (NoArg  (optStatLevel_u (+1)))        "Increase verbosity of statistics"
-    , Option ['d'] []            (ReqArg (\d -> optDump_u (d:)) "dump-flag")  "dump specified data to stdout"
-    , Option ['f'] []            (ReqArg (\d -> optFOpts_u (d:)) "flag")      "set compilation options"
+    , Option ['d'] []            (ReqArg (\d -> optDump_u (d:)) "[no-]flag")  "dump specified data during compilation"
+    , Option ['f'] []            (ReqArg (\d -> optFOpts_u (d:)) "[no-]flag") "set or clear compilation options"
     , Option ['o'] ["output"]    (ReqArg (optOutName_s) "FILE")        "output to FILE"
     , Option ['i'] ["include"]   (ReqArg (optIncdirs_u . idu) "DIR")   "library directory"
     , Option []    ["optc"]      (ReqArg (optCCargs_u . idu) "option") "extra options to pass to c compiler"
@@ -172,13 +172,28 @@ getArguments = do
     as <- System.getArgs
     return (eas ++ as)
 
+pfill ::
+    Int            -- ^ maximum width
+    -> (a -> Int)  -- ^ find width of any element
+    -> [a]         -- ^ input elements
+    -> [[a]]       -- ^ output element
+pfill maxn length xs = f maxn xs [] [] where
+    f n (x:xs) ws ls | lx < n = f (n - lx) xs (x:ws) ls where
+        lx = length x
+    f _ (x:xs) [] ls = f (maxn - length x) xs [x] ls
+    f _ (x:xs) ws ls = f (maxn - length x) xs [x] (ws:ls)
+    f _ [] [] ls = reverse (map reverse ls)
+    f _ [] ws ls = reverse (map reverse (ws:ls))
+
 {-# NOINLINE processOptions #-}
 -- | Parse commandline options.
 processOptions :: IO Opt
 processOptions = getArguments >>= (\argv -> either putErrDie return $ do
     let header = "Usage: jhc [OPTION...] Main.hs"
+    let mkoptlist d os = "valid " ++ d ++ " arguments: 'help' for more info\n    " ++ concatInter "\n    " (map (concatInter ", ") $ pfill 100 ((2 +) . length) os) ++ "\n"
+    let trailer = "\n" ++ mkoptlist "-d" FlagDump.helpFlags ++ "\n" ++ mkoptlist "-f" FlagOpts.helpFlags
     let (o,ns,rc) = getOpt Permute theoptions argv
-    when (rc /= []) $ fail (concat rc ++ usageInfo header theoptions)
+    when (rc /= []) $ fail (concat rc ++ usageInfo header theoptions ++ trailer)
     o1 <- postProcessFD (foldl (flip ($)) opt o)
     o2 <- postProcessFO o1
     case optNoAuto o2 of
