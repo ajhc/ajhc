@@ -261,8 +261,6 @@ isAbsurd _ = False
 
 -- | determine if types are the same expanding newtypes and
 typesCompatable :: Monad m => DataTable -> E -> E -> m ()
-typesCompatable _ box b | box == tBox, canBeBox b = return ()
-typesCompatable _ a box | box == tBox, canBeBox a = return ()
 typesCompatable dataTable a b = go a b where
     go :: Monad m => E -> E -> m ()
     go a b = g' [] [] a b
@@ -299,6 +297,8 @@ typesCompatable dataTable a b = go a b where
     f :: Monad m => [Name] -> [Name] -> E -> E -> m ()
     f xs ys (ELit (LitCons n _ _)) _ | n `elem` xs = fail "Loop detected"
     f xs ys a@(ELit (LitCons n _ _)) b | Just x <- followAlias dataTable a = g' (n:xs) ys x b
+    f _ _ box b | box == tBox, canBeBox b = return ()
+    f _ _ a box | box == tBox, canBeBox a = return ()
     f _ _ a b = fail $ "Types don't match: " ++ pprint (a,b)
 
 

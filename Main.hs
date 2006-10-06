@@ -679,6 +679,10 @@ compileModEnv' stats (ho,_) = do
 --        transformOperation = programFloatInward
 --        } prog
     -- perform lambda lifting
+    prog <- transformProgram transformParms { transformCategory = "BoxifyProgram", transformOperation = boxifyProgram } prog
+    prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify after boxify" True prog
+    prog <- barendregtProg prog
+
     wdump FD.CoreBeforelift $ printProgram prog
     prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift } prog
 
@@ -708,6 +712,32 @@ compileModEnv' stats (ho,_) = do
         Stats.clear Stats.theStats
 
     compileToGrin prog
+
+
+-- | this gets rid of all type variables, replacing them with boxes that can hold any type
+-- the program is still type-safe, but all polymorphism has been removed in favor of
+-- implicit coercion to a universal type.
+
+boxifyProgram :: Program -> IO Program
+boxifyProgram prog = ans where
+    ans = do
+        prog' <- programMapDs f prog
+        return $ runIdentity $ annotateProgram mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo)  (\_ nfo -> return nfo) prog'
+    f (t,e) = do
+--        putStrLn $ ">>> " ++ pprint t
+        e <- g e
+        return (tv t,e)
+    tv t = t { tvrType = boxify (tvrType t) }
+    g e = do
+  --      putStrLn $ "g: " ++ pprint e
+        emapEG g (return . boxify) e -- (\e -> do putStrLn ("box: " ++ pprint e) ; return $ boxify e) e
+    boxify (EPi t e) = EPi t { tvrType = boxify (tvrType t) } (boxify e)
+    boxify v@EVar {} | canBeBox v = tBox
+    boxify (ELit lc) = ELit lc { litArgs = map boxify (litArgs lc) }
+    boxify v@(EAp _ _) | canBeBox v = tBox
+    boxify (EAp a b) = EAp (boxify a) b -- TODO there should be no applications at the type level by now (boxify b)
+    boxify s@ESort {} = s
+    boxify x = error $ "boxify: " ++ show x
 
 
 compileToGrin prog = do
@@ -1110,6 +1140,7 @@ printCheckName'' dataTable tvr e = do
 
 printESize :: String -> Program -> IO ()
 printESize str prog = putErrLn $ str ++ " program e-size: " ++ show (eSize (programE prog))
+
 
 
 
