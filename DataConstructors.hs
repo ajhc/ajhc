@@ -486,7 +486,7 @@ slotTypes wdt n (ELit (LitCons pn xs _))
     where
     Identity mc = getConstructor n wdt
     Identity pc = getConstructor (conInhabits mc) wdt
-    sub = substMap'' $ fromDistinctAscList [ (i,Just sl) | sl <- xs | i <- [2,4..] ]
+    sub = substMap $ fromDistinctAscList [ (i,sl) | sl <- xs | i <- [2,4..] ]
 slotTypes wdt n kind
     | sortStarLike kind, (e,ts) <- fromPi kind = drop (length ts) (conSlots mc)
     where Identity mc = getConstructor n wdt
