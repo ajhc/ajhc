@@ -11,41 +11,40 @@ defs Show all defined names in a module
 
 
 !Type Checker
-kind    show results of kind inference for each module
-dcons   data constructors
+kind        show results of kind inference for each module
+dcons       data constructors
 class-summary summary of all classes
-class detailed information on each class
-instance show instances
-bindgroups show bindgroups
-types display unified type table containing all defined names
-all-kind show unified kind table after everything has been typechecked
-all-dcons show unified data constructor table
-all-types show unified type table, after everything has been typechecked
-sigenv initial signature environment
-srcsigs processed signatures from source code
-program impl expls, the whole shebang.
-decls processed declarations
-boxy-steps show step by step what the type inferencer is doing
-aspats show as patterns
-tyvar show original tyvars rather than renaming them.
+class       detailed information on each class
+instance    show instances
+bindgroups  show bindgroups
+types       display unified type table containing all defined names
+all-kind    show unified kind table after everything has been typechecked
+all-dcons   show unified data constructor table
+all-types   show unified type table, after everything has been typechecked
+sigenv      initial signature environment
+srcsigs     processed signatures from source code
+program     impl expls, the whole shebang.
+decls       processed declarations
+boxy-steps  show step by step what the type inferencer is doing
+aspats      show as patterns
+tyvar       show original tyvars rather than renaming them.
 
 
 !Intermediate code
-initial-core show core right after E.FromHs conversion
-lambdacube  show intermediate lambda cube code
-datatable   show data table of constructors
-optimization-stats show combined stats of optimization passes
-rules       show all rules
-e-info show info tags on all bound variables
-e-verbose   print very verbose version of E code always
-e-size      print the size of E after each pass
-core-pass   show each iteration of code while transforming
-core-steps  show what happens in each pass
-core-mini   show details even when optimizing individual functions
+core-pass    show each iteration of code while transforming
+core-steps   show what happens in each pass
+core-mini    show details even when optimizing individual functions
+core-initial show core right after E.FromHs conversion
 core-beforelift show core before lambdalifting
 core-afterlift  show final core before writing ho file
+core         show intermediate core code
 core-mangled de-typed core right before it is converted to grin
-
+datatable    show data table of constructors
+optimization-stats show combined stats of optimization passes
+rules        show all rules
+e-info       show info tags on all bound variables
+e-verbose    print very verbose version of E code always
+e-size       print the size of E after each pass
 
 !Grin code
 tags list of all tags and their types

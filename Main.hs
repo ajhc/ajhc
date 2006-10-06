@@ -257,7 +257,7 @@ processDecls stats ho ho' tiData = do
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
     ds' <- convertDecls tiData (hoClassHierarchy ho') allAssumps  fullDataTable decls
     let ds = [ (runIdentity (fromId (tvrIdent v)),v,e) | (v,e) <- classInstances ] ++  [ (n,v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
-    wdump FD.InitialCore $
+    wdump FD.CoreInitial $
         mapM_ (\(_,v,lc) -> printCheckName'' fullDataTable v lc) ds
     sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 
@@ -436,7 +436,7 @@ processDecls stats ho ho' tiData = do
             lc <- doopt mangle coreMini stats "Float Inward..." (\stats x -> return (floatInward x)) lc
             lintCheckE onerrNone fullDataTable v lc
             return (v,lc)
-        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
+        wdump FD.Core $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
         --cds <- E.Strictness.solveDs cds
         cds <- Demand.solveDs fullDataTable cds
         cds <- flip mapM cds $ \ (v,lc) -> do
@@ -484,7 +484,7 @@ processDecls stats ho ho' tiData = do
         cds <- Demand.solveDs fullDataTable cds
         cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
         cds <- annotateDs annmap (\_ -> return) letann lamann cds
-        wdump FD.Lambdacube $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
+        wdump FD.Core $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
         let toName t
                 | Just n <- fromId (tvrIdent t) = n
                 | otherwise = error $ "toName: " ++ tvrShowName t
@@ -530,7 +530,7 @@ processDecls stats ho ho' tiData = do
     prog <- programPrune prog
 
     lintCheckProgram (putErrLn "After the Opimization") prog
-    wdump FD.Lambdacube $ printProgram prog
+    wdump FD.Core $ printProgram prog
 
     Stats.print "Optimization" stats
     let newHo = ho' {
@@ -608,7 +608,7 @@ compileModEnv' stats (ho,_) = do
     prog <- transformProgram transformParms { transformCategory = "PruneUnreachable", transformOperation = return . programPruneUnreachable } prog
     prog <- barendregtProg prog
 
-    --wdump FD.Lambdacube $ printProgram prog
+    --wdump FD.Core $ printProgram prog
     prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze False prog else return prog
     putStrLn "Type analyzed methods"
     flip mapM_ (programDs prog) $ \ (t,e) -> do
@@ -617,7 +617,7 @@ compileModEnv' stats (ho,_) = do
         when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
     lintCheckProgram onerrNone prog
     prog <- programPrune prog
-    --wdump FD.Lambdacube $ printProgram prog
+    --wdump FD.Core $ printProgram prog
 
     cmethods <- do
         let es' = concatMap expandPlaceholder (programDs prog)

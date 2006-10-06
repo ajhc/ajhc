@@ -220,7 +220,7 @@ dumpHoFile fn = do
     wdump FD.Types $ do
         putStrLn " ---- the types of identifiers ---- "
         putStrLn $ PPrint.render $ pprint (hoAssumps ho)
-    wdump FD.Lambdacube $ do
+    wdump FD.Core $ do
         putStrLn " ---- lambdacube  ---- "
         mapM_ (\ (v,lc) -> printCheckName'' (hoDataTable ho) v lc) (melems $ hoEs ho)
 
