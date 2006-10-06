@@ -130,7 +130,7 @@ findModule have need ifunc func  = do
                                }
             newHo <- return (newHo `mappend` mempty { hoLibraries = ldeps })
             newHo <- recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
-            f ho' (readHo `mappend` newHo)  scs
+            f (ho' `mappend` mempty { hoModules = hoModules newHo }) (readHo `mappend` newHo)  scs
     ho <- ifunc have readHo
     f ho readHo scc
 
