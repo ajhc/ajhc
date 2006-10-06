@@ -9,6 +9,7 @@ import qualified Data.Set as Set
 import DataConstructors
 import E.CPR
 import E.E
+import E.FreeVars
 import E.Traverse
 import E.TypeCheck()
 import E.Values
@@ -18,6 +19,7 @@ import Info.Types
 import Name.Name
 import Stats
 import Support.CanType
+import Util.SetLike
 import qualified E.Demand as Demand
 
 
@@ -106,7 +108,8 @@ workWrap' dataTable tvr e | isJust res = ans where
            | otherwise = cases $ workerCall
     getName (Just x) = x
     getName Nothing  = error ("workWrap': cname = Nothing: tvr = "++show tvr)
-    vars@(~[sv]) = [  tVr i t | t <- slotTypes dataTable (getName cname) bodyTyp | i <- [2,4..] ]
+    vars@(~[sv]) = [  tVr i t | t <- slotTypes dataTable (getName cname) bodyTyp | i <- [2,4..], i `notMember` dontUseThese ]
+    dontUseThese = freeIds (getType tvr) `mappend` freeIds bodyTyp --`mappend` freeIds (EAp (getType tvr) $ EAp (EVar tvr) e)
     isSingleton = case vars of
         [v] -> getType (getType v) == eHash
         _ -> False

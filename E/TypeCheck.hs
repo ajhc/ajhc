@@ -84,6 +84,7 @@ inferType dataTable ds e = rfc e where
     strong' e = withContextDoc (text "Strong:" </> prettyE e) $ strong ds (followAliases dataTable e)
     fc s@(ESort _) = return $ typ s
     fc (ELit LitCons { litName = n, litArgs = es, litType =  t}) = do
+        withContext ("Checking Constructor: " ++ show n) $ do
         valid t
         es' <- mapM rfc es
         t' <- strong' t

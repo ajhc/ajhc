@@ -452,6 +452,7 @@ processDecls stats ho ho' tiData = do
         cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
         --cds' <- return $ concatMap (uncurry (workWrap fullDataTable)) cds
         when miniCorePass  $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
+        sequence_ [lintCheckE onerrNone fullDataTable v e | (v,e) <- cds ]
         let (cds',st) = performWorkWrap fullDataTable cds
         Stats.tickStat stats st
         let wws = length cds' - length cds
