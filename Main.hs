@@ -288,6 +288,8 @@ processDecls stats ho ho' tiData = do
 
     prog <- return $ programSetDs ds prog
     lintCheckProgram (putErrLn "LintPostProcess") prog
+    let ELetRec ds _ = removeNewtypes fullDataTable (programE prog)
+    prog <- return $ programSetDs ds prog
 
     -- Create Specializations
     let specMap = Map.fromListWith (++) [ (n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- tiCheckedRules tiData]
@@ -609,6 +611,7 @@ compileModEnv' stats (ho,_) = do
     prog <- transformProgram transformParms { transformCategory = "PruneUnreachable", transformOperation = return . programPruneUnreachable } prog
     prog <- barendregtProg prog
 
+
     --wdump FD.Core $ printProgram prog
     prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze False prog else return prog
     putStrLn "Type analyzed methods"
@@ -628,6 +631,10 @@ compileModEnv' stats (ho,_) = do
         return es'
 
     prog <- return $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
+
+    let ELetRec ds _ = removeNewtypes dataTable (programE prog)
+    prog <- return $ programSetDs ds prog
+
     prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) letann (\_ nfo -> return nfo) prog
 
 

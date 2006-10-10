@@ -3,20 +3,20 @@ module E.TypeCheck(
     eAp,
     inferType,
     match,
+    removeNewtypes,
     sortStarLike,
     sortTermLike,
     sortTypeLike,
-    typeInfer',
-    typeInfer
+    typeInfer,
+    typeInfer'
     ) where
 
-import Monad(when,liftM)
-import Control.Monad.Writer
+import Control.Monad.Identity
 import Control.Monad.Reader
+import Control.Monad.Writer
+import Monad(when,liftM)
 import qualified Data.Map as Map
 
-import Support.CanType
-import {-# SOURCE #-} DataConstructors
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
@@ -24,11 +24,14 @@ import E.E
 import E.Eval(strong)
 import E.Show
 import E.Subst
+import E.Traverse
 import GenUtil
-import Util.ContextMonad
-import qualified Util.Seq as Seq
-import Util.SetLike
 import Name.Id
+import Support.CanType
+import Util.ContextMonad
+import Util.SetLike
+import qualified Util.Seq as Seq
+import {-# SOURCE #-} DataConstructors
 
 
 -- PTS type checker
@@ -129,6 +132,13 @@ simplifyAp dataTable a@ELit {} b = case followAliases dataTable a  of
         (EPi tvr e) -> do
                 return (subst tvr b e)
 simplifyAp _ a b = fail $ "simplifyAp: " ++ render (tupled [ePretty a, ePretty b])
+
+
+removeNewtypes :: DataTable -> E -> E
+removeNewtypes dataTable e = runIdentity (f e) where
+    f e = emapEGH f f' return e
+    f' el@ELit {} = emapEGH f' return return (followAliases dataTable el)
+    f' t = emapEGH f' return return t
 
 
 withContextDoc s a = withContext (render s) a

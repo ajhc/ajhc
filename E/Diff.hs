@@ -6,6 +6,7 @@ module E.Diff where
 
 import E.E
 import E.Traverse
+import E.FreeVars()
 import Support.FreeVars
 import Stats
 

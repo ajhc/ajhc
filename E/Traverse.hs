@@ -15,7 +15,6 @@ import Control.Monad.Writer
 import Data.FunctorM
 import Data.Monoid
 
-import DataConstructors()
 import E.E
 import Name.Id
 import Name.Name
