@@ -13,6 +13,7 @@ module E.TypeCheck(
 import Monad(when,liftM)
 import Control.Monad.Writer
 import Control.Monad.Reader
+import qualified Data.Map as Map
 
 import Support.CanType
 import {-# SOURCE #-} DataConstructors
@@ -30,15 +31,46 @@ import Util.SetLike
 import Name.Id
 
 
+-- PTS type checker
+-- core is the following PTS
+-- S = (*,#,Box)
+-- A = (*::Box,#::Box)
+-- R = (*,*,*) (*,#,*) (#,#,*) (#,*,*) (Box,*,*) (Box,#,*) (Box,Box,Box)
+--
+-- * is the sort of boxed values
+-- # is the sort of unboxed values
+-- notice that functions are always boxed
+--
+-- this PTS is functional but not injective
+
+
+ptsAxioms = [
+    (EStar,EBox),
+    (EHash,EBox)
+    ]
+
+ptsRules = [
+    (EStar,EStar,EStar),  -- Int -> Int :: *
+    (EStar,EHash,EStar),  -- Int -> Int# :: *
+    (EHash,EStar,EStar),  -- Int# -> Int :: *
+    (EHash,EHash,EStar),  -- Int# -> Int# :: *
+    (EBox,EStar,EStar),   -- forall x . Foo x :: *
+    (EBox,EHash,EStar),   -- forall x . Int# :: *
+    (EBox,EBox,EBox)      -- * -> * :: Box
+    ]
+
+ptsRulesMap = Map.fromList [ ((a,b),c) | (a,b,c) <- ptsRules ]
+
+
 canBeBox EPi {} = True
 canBeBox x | getType x == eStar = True
 canBeBox _ = False
 
 -- Fast (and lazy, and perhaps unsafe) typeof
 typ ::  E -> E
-typ (ESort EStar) =  eBox
-typ (ESort EHash) =  eBox
-typ (ESort EBox) = error "Box inhabits nowhere."
+typ (ESort s) = case lookup s ptsAxioms of
+    Just r -> ESort r
+    Nothing -> error "Box inhabits nowhere"
 typ (ELit l) = getType l
 typ (EVar v) =  getType v
 typ (EPi _ b) = typ b
@@ -53,6 +85,21 @@ typ ECase {eCaseType = ty} = ty
 typ (EError _ e) = e
 typ (EPrim _ _ t) = t
 typ Unknown = Unknown
+
+
+-- * -> Int#
+
+-- * -> *
+
+sortOf e = f e where
+    f (ESort s) = lookup s ptsAxioms
+    f (EVar TVr { tvrType = ESort t }) = return t
+    f (EPi TVr { tvrType = a } b) = do
+        a' <- f a
+        b' <- f b
+        Map.lookup (a',b') ptsRulesMap
+--    f (EAp x y) = Map.lookup
+--        EPi _ b = getType x
 
 
 instance CanType E E where

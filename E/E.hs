@@ -26,6 +26,10 @@ import Util.SetLike as S
 
 --------------------------------------
 -- Lambda Cube (it's just fun to say.)
+-- We are now based on a PTS, which is
+-- a generalization of the lambda cube
+-- see E.TypeCheck for a description
+-- of the type system.
 --------------------------------------
 
 
