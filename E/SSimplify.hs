@@ -519,10 +519,10 @@ simplifyDs prog sopts dsIn = ans where
                 return $ eStrictLet t e e'
             [(t,ec@ECase { eCaseScrutinee = sc@(EPrim (APrim p _) _ _), eCaseAlts = [], eCaseDefault = Just def })] | primEagerSafe p && not (getProperty prop_CYCLIC t) -> do
                 mtick "E.Simplify.strictness.cheap-eagerness.def"
-                return $ ec { eCaseDefault = Just $ ELetRec [(t,def)] e' }
+                return $ ec { eCaseDefault = Just $ ELetRec [(t,def)] e', eCaseType = getType e' }
             [(t,ec@ECase { eCaseScrutinee = sc@(EPrim (APrim p _) _ _), eCaseAlts = [Alt c def], eCaseDefault = Nothing })] | primEagerSafe p && not (getProperty prop_CYCLIC t) -> do
                 mtick "E.Simplify.strictness.cheap-eagerness.con"
-                return $ ec { eCaseAlts = [Alt c (ELetRec [(t,def)] e')] }
+                return $ ec { eCaseAlts = [Alt c (ELetRec [(t,def)] e')], eCaseType = getType e' }
             _ -> do
                 let fn ds (ELetRec { eDefs = ds', eBody = e}) | not (hasRepeatUnder fst (ds ++ ds')) = fn (ds' ++ ds) e
                     fn ds e = f ds (Set.fromList $ fsts ds) [] False where
