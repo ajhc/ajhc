@@ -686,6 +686,10 @@ compileModEnv' stats (ho,_) = do
 --        transformOperation = programFloatInward
 --        } prog
     -- perform lambda lifting
+    let ELetRec ds _ = removeNewtypes dataTable (programE prog)
+    prog <- return $ programSetDs ds prog
+    prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo)  (\_ nfo -> return nfo) prog
+
     prog <- transformProgram transformParms { transformCategory = "BoxifyProgram", transformOperation = boxifyProgram } prog
     prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify after boxify" True prog
     prog <- barendregtProg prog

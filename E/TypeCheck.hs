@@ -137,6 +137,10 @@ simplifyAp _ a b = fail $ "simplifyAp: " ++ render (tupled [ePretty a, ePretty b
 removeNewtypes :: DataTable -> E -> E
 removeNewtypes dataTable e = runIdentity (f e) where
     f e = emapEGH f f' return e
+    f' (EAp a b) = do
+        a' <- f' a
+        b' <- f' b
+        return (eAp a' b')
     f' el@ELit {} = emapEGH f' return return (followAliases dataTable el)
     f' t = emapEGH f' return return t
 
