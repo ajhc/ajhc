@@ -158,11 +158,12 @@ inferType dataTable ds e = rfc e where
         et <- rfc e
         withContext "Checking default binding" $ eq et (getType b)
         bs <- withContext "Checking case bodies" $ mapM rfc (caseBodies ec)
-        withContext "Checking case bodies have equal types" $ eqAll bs
+        ect <- strong' (eCaseType ec)
+        withContext "Checking case bodies have equal types" $ eqAll (ect:bs)
         verifyPats (casePats ec)
         ps <- mapM (strong' . getType) $ casePats ec
         withContext "checking pattern equality" $ eqAll (et:ps)
-        return (head bs)
+        return ect
     fc Unknown = return Unknown
     fc e = failDoc $ text "what's this? " </> (prettyE e)
     calt (EVar v) (Alt l e) = do
