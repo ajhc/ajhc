@@ -284,7 +284,7 @@ constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans wh
 getName' :: (Show a,Monad m) => DataTable -> Lit a E -> m Atom
 getName' dataTable v@(LitCons n es _)
     | Just _ <- fromUnboxedNameTuple n = fail $ "unboxed tuples don't have names silly"
-    | conAlias cons = error $ "Alias still exists: " ++ show v
+    | conAlias cons /= NotAlias = error $ "Alias still exists: " ++ show v
     | length es == nargs  = do
         return cn
     | nameType n == TypeConstructor && length es < nargs = do
@@ -617,7 +617,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
     con (EPi (TVr {tvrIdent =  0, tvrType = x}) y) = do
         return $  NodeC tagArrow (args [x,y])
     con v@(ELit (LitCons n es _))
-        | conAlias cons = error $ "Alias still exists: " ++ show v
+        | conAlias cons /= NotAlias = error $ "Alias still exists: " ++ show v
         | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = do
             return (tuple (args (filter (shouldKeep . getType) es)))
         | length es == nargs  = do
