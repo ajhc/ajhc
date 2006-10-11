@@ -15,6 +15,7 @@ import E.Traverse
 import E.TypeCheck
 import E.Values
 import Fixer.Fixer
+import E.Annotate
 import Fixer.Supply
 import GenUtil
 import Name.Id
@@ -112,11 +113,13 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
 --    noLift <- return $ mempty `asTypeOf` noLift
     let wp =  fromList [ tvrIdent x | (x,_,_) <- cs ]
     fc <- newIORef []
+    fm <- newIORef mempty
     statRef <- newIORef mempty
     let z (n,as,v) = do
-            let ((v',cs'),stat) = runReader (runStatT $ execUniqT 1 $ runWriterT (f v)) S { funcName = mkFuncName (tvrIdent n), topVars = wp,isStrict = True, declEnv = [] }
+            let ((v',(cs',rm)),stat) = runReader (runStatT $ execUniqT 1 $ runWriterT (f v)) S { funcName = mkFuncName (tvrIdent n), topVars = wp,isStrict = True, declEnv = [] }
             modifyIORef statRef (mappend stat)
             modifyIORef fc (\xs -> (n,as,v'):cs' ++ xs)
+            modifyIORef fm (rm `mappend`)
         shouldLift t _ | tvrIdent t `member` noLift = False
         shouldLift _ ECase {} = True
         shouldLift _ ELam {} = True
@@ -204,13 +207,16 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                         return (t,e'')
             h ds e' (rs' ++ ds')
         h [] e ds = f e >>= return . eLetRec ds
+        tellCombinator c = tell ([c],mempty)
+        tellCombinators c = tell (c,mempty)
         doLift t e r = local (topVars_u (insert (tvrIdent t)) ) $ do
             --(e,tn) <- return $ etaReduce e
             let (e',ls) = fromLam e
             mtick (toAtom $ "E.LambdaLift.doLift." ++ typeLift e ++ "." ++ show (length ls))
             --mticks tn (toAtom $ "E.LambdaLift.doLift.etaReduce")
             e'' <- local (isStrict_s True) $ f e'
-            tell [(t,ls,e'')]
+            t <- globalName t
+            tellCombinator (t,ls,e'')
             r
         doLiftR rs r = local (topVars_u (mappend (fromList (map (tvrIdent . fst) rs)) )) $ do
             flip mapM_ rs $ \ (t,e) -> do
@@ -219,8 +225,15 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                 mtick (toAtom $ "E.LambdaLift.doLiftR." ++ typeLift e ++ "." ++ show (length ls))
                 --mticks tn (toAtom $ "E.LambdaLift.doLift.etaReduce")
                 e'' <- local (isStrict_s True) $ f e'
-                tell [(t,ls,e'')]
+                t <- globalName t
+                tellCombinator (t,ls,e'')
             r
+        globalName tvr | even (tvrIdent tvr) = do
+            TVr { tvrIdent = t } <- newName Unknown
+            let ntvr = tvr { tvrIdent = t }
+            tell ([],msingleton (tvrIdent tvr) (Just $ EVar ntvr))
+            return ntvr
+        globalName tvr = return tvr
         newName tt = do
             un <-  newUniq
             n <- asks funcName
@@ -232,7 +245,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
             tvr <- newName tt
             let (e',ls) = fromLam e
             e'' <- local (isStrict_s True) $ f e'
-            tell [(tvr,fs ++ ls,e'')]
+            tellCombinator (tvr,fs ++ ls,e'')
             let e'' = foldl EAp (EVar tvr) (map EVar fs)
             dr e''
         doBigLiftR rs fs dr = do
@@ -252,7 +265,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                         mtick (toAtom $ "E.LambdaLift.skipBigLiftR." ++ show (length fs))
                         return ((t,e),[])
             let (rs',ts) = unzip rst
-            tell [ (t,ls,substLet rs' e) | (t,ls,e) <- concat ts]
+            tellCombinators [ (t,ls,substLet rs' e) | (t,ls,e) <- concat ts]
             dr rs'
 
         mkFuncName x = case fromId x of
@@ -261,7 +274,8 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
     mapM_ z cs
     ncs <- readIORef fc
     nstat <- readIORef statRef
-    return $ prog { progCombinators =  ncs, progStats = progStats prog `mappend` nstat }
+    nz <- readIORef fm
+    annotateProgram nz (\_ nfo -> return nfo) (\_ nfo -> return nfo) (\_ nfo -> return nfo) prog { progCombinators =  ncs, progStats = progStats prog `mappend` nstat }
 
 
 typeLift ECase {} = "Case"
