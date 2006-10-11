@@ -166,6 +166,17 @@ transBarendregt = transformParms {
     barendregtProgram prog = programSetDs ds' prog where
         (ELetRec ds' Unknown,_) = renameE mempty mempty (ELetRec (programDs prog) Unknown)
 
+denewtypeProgram prog = transformProgram transDenewtype prog
+transDenewtype = transformParms {
+        transformCategory = "DeNewtype",
+        transformIterate = DontIterate,
+        transformDumpProgress = corePass,
+        transformOperation =  return . denewtype
+        } where
+    denewtype prog | null $ progCombinators prog = prog
+    denewtype prog = prog' where
+        ELetRec ds _ = removeNewtypes (progDataTable prog) (programE prog)
+        Identity prog' = annotateProgram mempty (\_ nfo -> return nfo)  (\_ nfo -> return nfo) (\_ nfo -> return nfo) (programSetDs ds prog)
 
 lamann _ nfo = return nfo
 letann e nfo = return (annotateArity e nfo)
@@ -288,8 +299,7 @@ processDecls stats ho ho' tiData = do
 
     prog <- return $ programSetDs ds prog
     lintCheckProgram (putErrLn "LintPostProcess") prog
-    let ELetRec ds _ = removeNewtypes fullDataTable (programE prog)
-    prog <- return $ programSetDs ds prog
+    prog <- denewtypeProgram prog
 
     -- Create Specializations
     let specMap = Map.fromListWith (++) [ (n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- tiCheckedRules tiData]
@@ -632,8 +642,7 @@ compileModEnv' stats (ho,_) = do
 
     prog <- return $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
 
-    let ELetRec ds _ = removeNewtypes dataTable (programE prog)
-    prog <- return $ programSetDs ds prog
+    prog <- denewtypeProgram prog
 
     prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) letann (\_ nfo -> return nfo) prog
 
@@ -653,6 +662,7 @@ compileModEnv' stats (ho,_) = do
     prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterMethod", transformDumpProgress = True } prog
     prog <- barendregtProg prog
 
+    prog <- denewtypeProgram prog
 
     prog <- simplifyProgram mempty "Main-One" True prog
     prog <- barendregtProg prog
@@ -686,9 +696,7 @@ compileModEnv' stats (ho,_) = do
 --        transformOperation = programFloatInward
 --        } prog
     -- perform lambda lifting
-    let ELetRec ds _ = removeNewtypes dataTable (programE prog)
-    prog <- return $ programSetDs ds prog
-    prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo)  (\_ nfo -> return nfo) prog
+    prog <- denewtypeProgram prog
 
     prog <- transformProgram transformParms { transformCategory = "BoxifyProgram", transformOperation = boxifyProgram } prog
     prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify after boxify" True prog
