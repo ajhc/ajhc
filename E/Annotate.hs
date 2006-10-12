@@ -63,7 +63,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
             nfo <- lift $ letann e (tvrInfo t)
             return (tvrInfo_u (Info.insert LetBound) t { tvrInfo = nfo })
         (as,rs) <- liftM unzip $ mapMntvr dl'
-        local (mconcat rs) $ do
+        local (foldr (.) id rs) $ do
             as <- mapM procRules as
             ds <- mapM f (snds dl)
             e' <- f e
@@ -80,7 +80,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         let da (Alt lc@LitCons { litName = s, litArgs = vs, litType = t } e) = do
                 t' <- f t
                 (as,rs) <- liftM unzip $ mapMntvr (map (tvrInfo_u (Info.insert CasePattern)) vs)
-                e' <- local (mconcat rs) $ f e
+                e' <- local (foldr (.) id rs) $ f e
                 return $ Alt lc { litArgs = as, litType = t' } e'
             da (Alt l e) = do
                 l' <- fmapM f l
@@ -128,7 +128,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
             nfo <- lift $ idann (tvrIdent tvr) (tvrInfo tvr)
             return (tvr { tvrInfo = nfo },minsert (tvrIdent tvr) (Just $ EVar tvr))
         bs <- mapM g $ ruleBinds r
-        local (mconcat $ snds bs) $ do
+        local (foldr (.) id $ snds bs) $ do
             args <- mapM f (ruleArgs r)
             body <- f (ruleBody r)
             return r { ruleBinds = fsts bs, ruleBody = body, ruleArgs = args }

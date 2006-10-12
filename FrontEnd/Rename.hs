@@ -1171,10 +1171,10 @@ namesHsConDecl c = (hsConDeclName c,hsConDeclSrcLoc c) : case c of
 -- _hsNames that are constructors can be ignored.
 
 getHsNamesFromHsPat :: HsPat -> [HsName]
-getHsNamesFromHsPat p = execWriter (getNamesFromPat p)  []
-getNamesFromPat (HsPVar hsName) = tell (hsName:)
+getHsNamesFromHsPat p = execWriter (getNamesFromPat p)
+getNamesFromPat (HsPVar hsName) = tell [hsName]
 getNamesFromPat (HsPAsPat hsName hsPat) = do
-    tell (hsName:)
+    tell [hsName]
     getNamesFromPat hsPat
 getNamesFromPat p = traverseHsPat_ getNamesFromPat p
 
@@ -1211,8 +1211,8 @@ getHsNamesFromHsQualType :: HsQualType -> [HsName]
 getHsNamesFromHsQualType (HsQualType _hsContext hsType) = getHsNamesFromHsType hsType
 
 getHsNamesFromHsType :: HsType -> [HsName]
-getHsNamesFromHsType t = execWriter (getNamesFromType t) []
-getNamesFromType (HsTyVar hsName) = tell (hsName:)
+getHsNamesFromHsType t = execWriter (getNamesFromType t)
+getNamesFromType (HsTyVar hsName) = tell [hsName]
 getNamesFromType t = traverseHsType_ getNamesFromType t
 -- XXX getHsNamesFromHsType (HsTyForall _bs t) = getHsNamesFromHsQualType t -- TODO, scoping?
 -- XXX getHsNamesFromHsType (HsTyExists _bs t) = getHsNamesFromHsQualType t -- TODO, scoping?

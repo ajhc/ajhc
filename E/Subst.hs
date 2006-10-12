@@ -88,7 +88,7 @@ doSubst substInVars allShadow bm e  = f e bm where
     f (EPrim x es e) = liftM2 (EPrim x) (mapM f es) (f e)
     f (ELetRec dl e) = do
         (as,rs) <- liftM unzip $ mapMntvr (fsts dl)
-        local (mconcat rs) $ do
+        local (foldr (.) id rs) $ do
             ds <- mapM f (snds dl)
             e' <- f e
             return $ ELetRec (zip as ds) e'
@@ -102,7 +102,7 @@ doSubst substInVars allShadow bm e  = f e bm where
         let da (Alt lc@LitCons { litName = s, litArgs = vs, litType = t } e) = do
                 t' <- f t
                 (as,rs) <- liftM unzip $ mapMntvr vs
-                e' <- local (mconcat rs) $ f e
+                e' <- local (foldr (.) id rs) $ f e
                 return $ Alt lc { litArgs = as, litType = t' } e'
             da (Alt l e) = do
                 l' <- fmapM f l
@@ -206,7 +206,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
     f (EPrim x es e) = liftM2 (EPrim x) (mapM f es) (inType $ f e)
     f (ELetRec dl e) = do
         (as,rs) <- liftM unzip $ mapMntvr (fsts dl)
-        local (mconcat rs) $ do
+        local (foldr (.) id rs) $ do
             ds <- mapM f (snds dl)
             e' <- f e
             return $ ELetRec (zip as ds) e'
@@ -220,7 +220,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
         let da (Alt lc@LitCons { litName = s, litArgs = vs, litType = t } e) = do
                 t' <- inType $ f t
                 (as,rs) <- liftM unzip $ mapMntvr vs
-                e' <- local (mconcat rs) $ f e
+                e' <- local (foldr (.) id rs) $ f e
                 return $ Alt lc { litArgs = as, litType = t' } e'
             da (Alt (LitInt n t) e) = do
                 t' <- inType (f t)

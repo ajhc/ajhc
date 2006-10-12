@@ -49,7 +49,7 @@ s <> t
 --------------------------------------------------------------------}
 -- | Sequences of values @a@.
 newtype Seq a = Seq ([a] -> [a])
-    deriving(Monoid)
+
 
 {--------------------------------------------------------------------
   Construction
@@ -118,5 +118,7 @@ instance MonadPlus Util.Seq.Seq where
     mzero = Util.Seq.empty
 
 
-
+instance Monoid (Seq a) where
+    mempty = empty
+    mappend = append
 

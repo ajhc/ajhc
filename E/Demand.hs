@@ -351,10 +351,10 @@ lazify (DemandEnv x r) = DemandEnv (Map.map f x) Absent where
 analyzeCase ec@ECase {} s = do
     (ec',dts) <- extEnvE (eCaseBind ec) (eCaseScrutinee ec) $ runWriterT $ flip caseBodiesMapM ec $ \e -> do
         (ne,dt) <- lift $ analyze e s
-        tell (dt:)
+        tell [dt]
         return ne
     (ecs,env :=> _) <- analyze (eCaseScrutinee ec') strict
-    let enva :=> siga =  foldr1 lub (dts [])
+    let enva :=> siga =  foldr1 lub dts
     let nenv = foldr denvDelete (glb enva env) (caseBinds ec')
     return (ec' {eCaseScrutinee = ecs},nenv :=> siga)
 
