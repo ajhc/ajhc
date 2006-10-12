@@ -379,13 +379,13 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
             mc = modifyTail ( var :-> Return var :>>=  NodeC t as :-> Return (tuple as))
         return (mc lt :>>= tuple as :-> Return (NodeC t as) :>>= v :-> lr)
 
-    f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars r `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
+    f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars r `Set.intersection` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-tail"
         f (updateLetProps lt { expBody = e } :>>= l :-> r)
 --    f lt@(Let { expDefs = defs, expBody = e :>>= l :-> r } :>>= lr) | Set.null (freeVars r `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
 --        mtick "Optimize.optimize.let-shrink-tail"
 --        f ((updateLetProps lt { expBody = e } :>>= l :-> r) :>>= lr)
-    f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars e `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
+    f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars e `Set.intersection` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-head"
         f (e :>>= l :-> updateLetProps lt { expBody = r })
 

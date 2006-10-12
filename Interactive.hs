@@ -3,6 +3,7 @@ module Interactive(Interactive.interact) where
 import Control.Monad.Reader
 import Control.Monad.Identity
 import Control.Monad.Trans
+import Control.Exception as CE
 import Data.Monoid
 import IO(stdout,ioeGetErrorString)
 import List(sort)
@@ -11,7 +12,7 @@ import Monad
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as P
 import Text.Regex
-import Text.Regex.Posix(regcomp,regExtended)
+--import Text.Regex.Posix(regcomp,regExtended)
 
 
 import DataConstructors
@@ -135,7 +136,7 @@ interact ho = mre where
             f opt [x] = (opt,x)
             f opt ~(x:xs) = f (x ++ opt) xs
             f _ _ = undefined
-        rx <- catch ( Just `fmap` regcomp reg regExtended) (\_ -> return Nothing)
+        rx <- CE.catch ( Just `fmap` evaluate (mkRegex reg)) (\_ -> return Nothing)
         case rx of
             Nothing -> putStrLn $ "Invalid regex: " ++ arg
             --Just rx -> mapM_ putStrLn $ sort [ nameTag (nameType v):' ':show v <+> "::" <+> ptype v  | v <- Map.keys (hoDefs ho), isJust (matchRegex rx (show v)), nameTag (nameType v) `elem` opt ]
@@ -150,7 +151,7 @@ interact ho = mre where
     do_expr act s = case parseStmt (s ++ "\n") of
         Left m -> putStrLn m >> return act
         Right e -> do
-            catch (runIn isStart { stateInteract = act } $ executeStatement e) $ (\e -> putStrLn $ ioeGetErrorString e)
+            CE.catch (runIn isStart { stateInteract = act } $ executeStatement e) $ (\e -> putStrLn $ show e)
             return act
     pshow _opt v
         | Just d <- showSynonym (show . (pprint :: HsType -> PP.Doc) ) v (hoTypeSynonyms ho) = nameTag (nameType v):' ':d

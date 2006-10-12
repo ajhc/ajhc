@@ -283,21 +283,6 @@ tvrShowName :: TVr -> String
 tvrShowName t = maybe ('x':(show $ tvrIdent t)) show (tvrName t)
 
 
----------------------------
--- | compatable approximation
----------------------------
-
-eCompat :: E -> E -> Bool
-eCompat x y | x == y = True
-eCompat (EAp e1 e2) (EAp ea eb) = eCompat e1 ea && eCompat e2 eb
-eCompat (ELam (TVr { tvrType =  e1 }) e2) (ELam (TVr { tvrType =  ea }) eb) = eCompat e1 ea && eCompat e2 eb
-eCompat (EPi (TVr { tvrType = e1 }) e2) (EPi (TVr { tvrType = ea }) eb) = eCompat e1 ea && eCompat e2 eb
-eCompat (EVar _) _ = True
-eCompat _ (EVar _) = True
-eCompat (ELetRec _ e1) (ELetRec _ e2) = eCompat e1 e2
-eCompat (ELit LitCons { litName = n, litArgs = es, litType = t }) (ELit LitCons { litName = n', litArgs = es', litType = t' }) = n == n' && all (uncurry eCompat) (zip es es') && eCompat t t'
-eCompat x y = x == y
-
 
 
 

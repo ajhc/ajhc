@@ -12,9 +12,9 @@ module E.Demand(
 
 import Control.Monad
 import Control.Monad.Reader
-import Control.Monad.Writer
+import Control.Monad.Writer hiding(Product(..))
 import Data.List
-import Data.Monoid
+import Data.Monoid hiding(Product(..))
 import Data.Maybe
 import Data.Typeable
 import qualified Data.Map as Map

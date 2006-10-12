@@ -1,7 +1,7 @@
 module E.WorkerWrapper(performWorkWrap) where
 
-import Control.Monad.Writer
-import Data.Monoid
+import Control.Monad.Writer hiding(Product(..))
+import Data.Monoid hiding(Product(..))
 import Maybe
 import Monad
 import qualified Data.Set as Set

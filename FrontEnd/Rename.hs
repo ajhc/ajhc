@@ -68,7 +68,6 @@ import Control.Monad.State
 import Control.Monad.Writer
 import Control.Monad.Identity
 import Data.FunctorM
-import Data.FiniteMap
 import Data.Monoid
 import List
 import Maybe
@@ -103,7 +102,7 @@ type FieldMap =  (Map.Map Name Int,Map.Map Name [(Name,Int)])
 -- a 'Substitution Table' which is a map from old names to new names
 -- All names in the current scope are stored in here, with their renamings
 
-type SubTable = FiniteMap HsName HsName
+type SubTable = Map.Map HsName HsName
 
 -- an Identifier Table is a map from renamed names to that identifier's source
 -- location and binding type
@@ -114,9 +113,9 @@ type SubTable = FiniteMap HsName HsName
 data ScopeState = ScopeState {
     currentModule  :: Module,
     unique         :: !Int,
-    globalSubTable :: FiniteMap HsName HsName,  -- Current substition
-    typeSubTable   :: FiniteMap HsName HsName,  -- type substition table
-    errorTable     :: FiniteMap HsName String,  -- special error message. else it's just unknown.
+    globalSubTable :: Map.Map HsName HsName,  -- Current substition
+    typeSubTable   :: Map.Map HsName HsName,  -- type substition table
+    errorTable     :: Map.Map HsName String,  -- special error message. else it's just unknown.
     nameMap        :: Map.Map Name (Either String Name),
     fieldLabels    :: FieldMap,
     errors         :: [Warning],
@@ -165,8 +164,8 @@ addTopLevels  []  = return ()
 addTopLevels  hsDecls = do
     mod <- getCurrentModule
     let (ns,ts) = mconcat (map namesHsDecl hsDecls)
-        nm = listToFM $ foldl f [] (fsts ns)
-        tm = listToFM $ foldl f [] (fsts ts)
+        nm = Map.fromList $ foldl f [] (fsts ns)
+        tm = Map.fromList $ foldl f [] (fsts ts)
         f r hsName@Qual {}
             | Just _ <- V.fromTupname hsName, Module "Jhc.Basics" <- mod
                 = let nn = hsName in (nn,nn):r
@@ -175,8 +174,8 @@ addTopLevels  hsDecls = do
         z ns = mapM mult (filter (\x -> length x > 1) $ groupBy (\a b -> fst a == fst b) (sort ns))
         mult xs@((n,sl):_) = warn sl "multiply-defined" (show n ++ " is defined multiple times: " ++ show xs )
     z ns >> z ts
-    modify (\s -> s { globalSubTable = nm `plusFM` globalSubTable s })
-    modify (\s -> s { typeSubTable = tm `plusFM` typeSubTable s })
+    modify (\s -> s { globalSubTable = nm `Map.union` globalSubTable s })
+    modify (\s -> s { typeSubTable = tm `Map.union` typeSubTable s })
     return ()
 
 
@@ -187,12 +186,12 @@ ambig x ys = "Ambiguous Name: " ++ show x ++ "\nCould refer to: " ++ tupled (map
 {-# NOINLINE renameModule #-}
 renameModule :: MonadWarn m => FieldMap -> [(Name,[Name])] -> HsModule -> m HsModule
 renameModule fls ns m = mapM_ addWarning (errors finalState) >> return renamedMod where
-    initialGlobalSubTable = listToFM [ (x,y) | ((typ,x),[y]) <- ns', typ == Val || typ == DataConstructor ]
-    initialTypeSubTable = listToFM [ (x,y) | ((typ,x),[y]) <- ns', typ == TypeConstructor || typ == ClassName ]
+    initialGlobalSubTable = Map.fromList [ (x,y) | ((typ,x),[y]) <- ns', typ == Val || typ == DataConstructor ]
+    initialTypeSubTable = Map.fromList [ (x,y) | ((typ,x),[y]) <- ns', typ == TypeConstructor || typ == ClassName ]
     ns' = map fn ns
     fn (n,ns) = (fromName n, map nameName ns)
 
-    errorTab =  listToFM [ (x,ambig x ys) | ((typ,x),ys@(_:_:_)) <- ns' ]
+    errorTab =  Map.fromList [ (x,ambig x ys) | ((typ,x),ys@(_:_:_)) <- ns' ]
 
     startState = ScopeState {
         typeSubTable   = initialTypeSubTable,
@@ -211,12 +210,12 @@ renameModule fls ns m = mapM_ addWarning (errors finalState) >> return renamedMo
 {-# NOINLINE renameStatement #-}
 renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] -> Module -> HsStmt -> m HsStmt
 renameStatement fls ns modName stmt = mapM_ addWarning (errors finalState) >> return renamedStmt where
-    initialGlobalSubTable = listToFM [ (x,y) | ((typ,x),[y]) <- ns', typ == Val || typ == DataConstructor ]
-    initialTypeSubTable = listToFM [ (x,y) | ((typ,x),[y]) <- ns', typ == TypeConstructor || typ == ClassName ]
+    initialGlobalSubTable = Map.fromList [ (x,y) | ((typ,x),[y]) <- ns', typ == Val || typ == DataConstructor ]
+    initialTypeSubTable = Map.fromList [ (x,y) | ((typ,x),[y]) <- ns', typ == TypeConstructor || typ == ClassName ]
     ns' = map fn ns
     fn (n,ns) = (fromName n, map nameName ns)
 
-    errorTab =  listToFM [ (x,ambig x ys) | ((typ,x),ys@(_:_:_)) <- ns' ]
+    errorTab =  Map.fromList [ (x,ambig x ys) | ((typ,x),ys@(_:_:_)) <- ns' ]
 
     startState = ScopeState {
         typeSubTable   = initialTypeSubTable,
@@ -244,7 +243,7 @@ renameDecls :: HsModule -> SubTable -> ScopeSM HsModule
 renameDecls tidy subTable = do
         addTopLevels $ hsModuleDecls tidy
         subTable'a <- gets globalSubTable
-        let subTable' = subTable `plusFM` subTable'a
+        let subTable' = subTable `Map.union` subTable'a
         --addError (show $ fmToList subTable')
         decls' <-  renameHsDecls (hsModuleDecls tidy) subTable' ; return decls'
         --addDiag (show syns)
@@ -867,7 +866,7 @@ renameHsNames = mapRename renameHsName
 renameHsName :: HsName -> SubTable -> ScopeSM (HsName)
 renameHsName hsName subTable
     | Qual (Module ('@':m)) (HsIdent i) <- hsName = return $ Qual (Module m) (HsIdent i)
-renameHsName hsName subTable = case lookupFM subTable  hsName of
+renameHsName hsName subTable = case Map.lookup hsName subTable of
     Just name@(Qual _ _) -> return name
     Just _ -> error "renameHsName"
     Nothing
@@ -875,7 +874,7 @@ renameHsName hsName subTable = case lookupFM subTable  hsName of
         | otherwise -> do
             sl <- gets srcLoc
             et <- gets errorTable
-            let err = case lookupFM et hsName of {
+            let err = case Map.lookup hsName et of {
                 Just s -> s;
                 Nothing -> "Unknown name: " ++ show hsName }
             warn sl "undefined-name" err
@@ -891,7 +890,7 @@ renameHsName hsName subTable = case lookupFM subTable  hsName of
 --    _ -> renameHsName hsName subTable
 
 
-renameTypeHsName hsName subTable  =  gets typeSubTable  >>= \t -> case lookupFM t hsName of
+renameTypeHsName hsName subTable  =  gets typeSubTable  >>= \t -> case Map.lookup hsName t of
     Just _ -> renameHsName hsName t
     Nothing -> renameHsName hsName subTable
 
@@ -942,7 +941,7 @@ clobberHsName hsName subTable = do
       unique     <- newUniq
       currModule <- getCurrentModule
       let hsName'     = renameAndQualify hsName unique currModule
-          subTable'   = addToFM subTable hsName hsName'
+          subTable'   = Map.insert hsName hsName' subTable
       return (subTable')
 
 
@@ -1203,7 +1202,7 @@ getNewHsNamesFromHsType subTable (HsTyTuple hsTypes)
 getNewHsNamesFromHsType subTable (HsTyApp hsType1 hsType2)
   = (getNewHsNamesFromHsType subTable hsType1) ++ (getNewHsNamesFromHsType subTable hsType2)
 getNewHsNamesFromHsType subTable (HsTyVar hsName)
-  | lookupFM subTable hsName == Nothing = [hsName]
+  | Map.lookup hsName subTable == Nothing = [hsName]
   | otherwise                           = []
 getNewHsNamesFromHsType _subTable (HsTyCon _hsName)
   = [] -- don't rename the Constructors

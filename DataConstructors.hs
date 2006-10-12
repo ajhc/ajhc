@@ -24,7 +24,8 @@ module DataConstructors(
     ) where
 
 import Control.Monad.Identity
-import Control.Monad.Writer
+import Control.Monad.Writer(tell,execWriter)
+import Data.Monoid hiding(getProduct)
 import List(sortBy)
 import qualified Data.Map as Map hiding(map)
 

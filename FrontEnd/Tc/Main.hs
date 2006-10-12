@@ -521,7 +521,7 @@ tiImpls bs = withContext (locSimple (srcLoc bs) ("in the recursive implicitly ty
     fs <- freeMetaVarsEnv
     let vss = map (Set.fromList . freeVars) ts'
         gs = (Set.unions vss) Set.\\ fs
-    (mvs,ds,rs) <- splitReduce (Set.toList fs) (Set.toList $ foldr1 Set.intersect vss) ps'
+    (mvs,ds,rs) <- splitReduce (Set.toList fs) (Set.toList $ foldr1 Set.intersection vss) ps'
     addPreds ds
     scs' <- if restricted bs then do
         let gs' = gs Set.\\ Set.fromList (freeVars rs)

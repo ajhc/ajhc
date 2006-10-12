@@ -30,7 +30,7 @@ modifyTail lam@(_ :-> lb) te = f mempty te where
     f lf (e1 :>>= p :-> e2) = e1 :>>= p :-> f lf e2
     f lf e@(App a as t) | a `Set.member` lf = App a as (getType lb)
     f lf e = e :>>= lam
-    g lf (p :-> e) | flint && not (Set.null $ Set.intersect (freeVars p) lamFV) = error "modifyTail: lam floated inside bad scope"
+    g lf (p :-> e) | flint && not (Set.null $ Set.intersection (freeVars p) lamFV) = error "modifyTail: lam floated inside bad scope"
     g lf (p :-> e) = p :-> f lf e
 
 

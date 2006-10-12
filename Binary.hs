@@ -56,6 +56,7 @@ module Binary
 import FastMutInt
 
 import Data.Array.IO
+import Data.Array.Base
 import Data.Bits
 import Data.Int
 import Data.Word
@@ -508,7 +509,7 @@ instance (Binary a, Binary b) => Binary (Either a b) where
 -- these flatten the start element. hope that's okay!
 instance Binary (UArray Int Word8) where
     put_ bh@(BinHandle ix_r (BinIO h)) ua = do
-        let sz = rangeSize (Data.Array.IO.bounds ua)
+        let sz = rangeSize (Data.Array.Base.bounds ua)
         ix <- readFastMutInt ix_r
         put_ bh sz
         ua <- unsafeThaw ua

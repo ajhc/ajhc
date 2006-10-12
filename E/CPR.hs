@@ -1,6 +1,6 @@
 module E.CPR(Val(..), cprAnalyzeDs) where
 
-import Control.Monad.Writer
+import Control.Monad.Writer hiding(Product(..))
 import Data.Generics
 import Data.Monoid()
 import qualified Data.Map as Map
