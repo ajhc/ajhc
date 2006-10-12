@@ -39,6 +39,7 @@ data Lit e t = LitInt { litNumber :: Number, litType :: t }
     deriving(Data,Eq,Ord,Typeable)
         {-!derive: is, GhcBinary !-}
 
+litCons = LitCons { litName = error "litName: name not set", litArgs = [], litType = error "litCons: type not set" }
 
 instance (Show e,Show t) => Show (Lit e t) where
     showsPrec _ (LitInt x t) = parens $  shows x <> showString "::" <> shows t
@@ -173,7 +174,7 @@ litHead LitCons { litName = s } = LitCons s [] ()
 litBinds (LitCons { litArgs = xs } ) = xs
 litBinds _ = []
 
-patToLitEE (LitCons n [a,b] t) | t == eStar, n == tc_Arrow = EPi (tVr 0 (EVar a)) (EVar b)
+patToLitEE LitCons { litName = n, litArgs = [a,b], litType = t } | t == eStar, n == tc_Arrow = EPi (tVr 0 (EVar a)) (EVar b)
 patToLitEE LitCons { litName = n, litArgs = xs, litType = t } = ELit $ LitCons n (map EVar xs) t
 patToLitEE (LitInt x t) = ELit $ LitInt x t
 
@@ -210,17 +211,17 @@ isWHNF _ = False
 
 instance TypeNames E where
     tStar = eStar
-    tInt = ELit (LitCons tInt [] eStar)
-    tRational = ELit (LitCons tc_Ratio [tInteger] eStar)
-    tChar = ELit (LitCons tChar [] eStar)
-    tBool = ELit (LitCons tBool [] eStar)
-    tUnit = ELit (LitCons tUnit [] eStar)
-    tString =  (ELit (LitCons tc_List [tChar] eStar))
-    tInteger = ELit (LitCons tInteger [] eStar)
-    tWorld__ = ELit (LitCons tWorld__ [] eHash)
-    tIntzh = ELit (LitCons tIntzh [] eHash)
-    tIntegerzh = ELit (LitCons tIntegerzh [] eHash)
-    tCharzh = ELit (LitCons tCharzh [] eHash)
+    tInt = ELit (litCons { litName = tInt, litArgs = [], litType = eStar })
+    tRational = ELit (litCons { litName = tc_Ratio, litArgs = [tInteger], litType = eStar })
+    tChar = ELit (litCons { litName = tChar, litArgs = [], litType = eStar })
+    tBool = ELit (litCons { litName = tBool, litArgs = [], litType = eStar })
+    tUnit = ELit (litCons { litName = tUnit, litArgs = [], litType = eStar })
+    tString =  (ELit (litCons { litName = tc_List, litArgs = [tChar], litType = eStar }))
+    tInteger = ELit (litCons { litName = tInteger, litArgs = [], litType = eStar })
+    tWorld__ = ELit (litCons { litName = tWorld__, litArgs = [], litType = eHash })
+    tIntzh = ELit (litCons { litName = tIntzh, litArgs = [], litType = eHash })
+    tIntegerzh = ELit (litCons { litName = tIntegerzh, litArgs = [], litType = eHash })
+    tCharzh = ELit (litCons { litName = tCharzh, litArgs = [], litType = eHash })
 
 instance ConNames E where
     vTrue = ELit vTrue
@@ -228,12 +229,12 @@ instance ConNames E where
     vUnit  = ELit vUnit
 
 instance ConNames (Lit E E) where
-    vTrue  = (LitCons dc_Boolzh [ELit (LitInt 1 tIntzh)] tBool)
-    vFalse = (LitCons dc_Boolzh [ELit (LitInt 0 tIntzh)] tBool)
-    vUnit  = (LitCons vUnit [] tUnit)
+    vTrue  = (litCons { litName = dc_Boolzh, litArgs = [ELit (LitInt 1 tIntzh)], litType = tBool })
+    vFalse = (litCons { litName = dc_Boolzh, litArgs = [ELit (LitInt 0 tIntzh)], litType = tBool })
+    vUnit  = (litCons { litName = vUnit, litArgs = [], litType = tUnit })
 
 
-tBox = ELit (LitCons tc_Box [] eStar)
+tBox = ELit (litCons { litName = tc_Box, litArgs = [], litType = eStar })
 
 tFunc a b = ePi (tVr 0 a) b
 
@@ -314,20 +315,20 @@ caseBodiesMapM f ec@ECase { eCaseAlts = as, eCaseDefault = d } = do
 caseBodiesMapM _ _ = error "caseBodiesMapM"
 
 toList :: Monad m => E -> m  [E]
-toList (ELit (LitCons n [e,b] _)) | vCons == n = toList b >>= \x -> return (e:x)
+toList (ELit LitCons { litName = n, litArgs = [e,b] }) | vCons == n = toList b >>= \x -> return (e:x)
 toList (ELit LitCons { litName = n, litArgs = [] }) | vEmptyList == n = return []
 toList _ = fail "toList: not list"
 
 toString x = toList x >>= mapM fromChar where
-    fromChar (ELit (LitCons dc [ELit (LitInt ch t)] _ot)) | dc == dc_Char && t == tCharzh = return (chr $ fromIntegral ch)
+    fromChar (ELit (LitCons { litName = dc, litArgs = [ELit (LitInt ch t)], litType = _ot })) | dc == dc_Char && t == tCharzh = return (chr $ fromIntegral ch)
     fromChar _ = fail "fromChar: not char"
 
 
-tAbsurd k = ELit (LitCons tc_Absurd [] k)
-tPtr t = ELit (LitCons tc_Ptr [t] eStar)
+tAbsurd k = ELit (litCons { litName = tc_Absurd, litArgs = [], litType = k })
+tPtr t = ELit (litCons { litName = tc_Ptr, litArgs = [t], litType = eStar })
 
 -- the IOErrorCont type from Jhc.IO
-tCont = ELit (LitCons tc_IOErrorCont [] eStar)
+tCont = ELit (litCons { litName = tc_IOErrorCont, litArgs = [], litType = eStar })
 tvrCont = tvr { tvrIdent = 0, tvrType = tCont }
 
 ltTuple ts = ELit $ LitCons (nameTuple TypeConstructor (length ts)) ts eStar

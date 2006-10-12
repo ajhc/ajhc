@@ -73,7 +73,7 @@ strong dsMap' term = eval' dsMap term [] where
     eval' ds (ELit LitCons { litName = n, litArgs = es, litType = t }) [] = do
         es' <- mapM (\e -> eval' ds e []) es
         t' <-  (eval' ds t [])
-        return $ ELit $ LitCons n es' t'
+        return $ ELit $ litCons { litName = n, litArgs = es', litType = t' }
     eval' ds e@ELit {} [] = return e
     eval' ds (ELit (LitCons n es ty@EPi {})) (t:rest) = do
         t' <- (eval' ds (EAp ty t) [])

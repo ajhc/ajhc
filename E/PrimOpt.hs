@@ -29,18 +29,18 @@ import Util.SetLike
 
 
 
-create_integralCast dataTable e t = eCase e [Alt (LitCons cna [tvra] te) cc] Unknown  where
+create_integralCast dataTable e t = eCase e [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) cc] Unknown  where
     te = getType e
     (vara:varb:_) = freeNames (freeVars (e,t))
     tvra =  tVr vara sta
     tvrb =  tVr varb stb
     Just (cna,sta,ta) = lookupCType' dataTable te
     Just (cnb,stb,tb) = lookupCType' dataTable t
-    cc = if ta == tb then ELit (LitCons cnb [EVar tvra] t) else
-        eStrictLet  tvrb (EPrim (APrim (CCast ta tb) mempty) [EVar tvra] stb)  (ELit (LitCons cnb [EVar tvrb] t))
+    cc = if ta == tb then ELit (litCons { litName = cnb, litArgs = [EVar tvra], litType = t }) else
+        eStrictLet  tvrb (EPrim (APrim (CCast ta tb) mempty) [EVar tvra] stb)  (ELit (litCons { litName = cnb, litArgs = [EVar tvrb], litType = t }))
 
 unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
-unbox dataTable e vn wtd = eCase e  [Alt (LitCons cna [tvra] te) (wtd tvra)] Unknown where
+unbox dataTable e vn wtd = eCase e  [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd tvra)] Unknown where
     te = getType e
     tvra = tVr vn sta
     Just (cna,sta,ta) = lookupCType' dataTable te
@@ -147,14 +147,14 @@ processPrimPrim dataTable o@(EPrim (APrim prim _) es t) = case primopt prim es t
                 unless (ta == tb && tb == tr) $ fail "bad divide"
                 return $ unbox dataTable a vara $ \tvra ->
                     unbox dataTable b varb $ \tvrb ->
-                        eStrictLet (tVr varc sta) (EPrim (APrim (Operator "/" [ta,ta] ta) mempty) [EVar tvra, EVar tvrb] sta) (ELit (LitCons cna [EVar (tVr varc sta)] t))
+                        eStrictLet (tVr varc sta) (EPrim (APrim (Operator "/" [ta,ta] ta) mempty) [EVar tvra, EVar tvrb] sta) (ELit (litCons { litName = cna, litArgs = [EVar (tVr varc sta)], litType = t }))
 
         primopt (PrimPrim pn) [] t | Just c <-  getPrefix "const." pn = do
             (cn,st,ct) <- case lookupCType' dataTable t of
                 Right x -> return x
                 Left x -> error x
             let (var:_) = freeNames (freeVars t)
-            return $ eStrictLet (tVr var st) (EPrim (APrim (CConst c ct) mempty) [] st) (ELit (LitCons cn [EVar $ tVr var st] t))
+            return $ eStrictLet (tVr var st) (EPrim (APrim (CConst c ct) mempty) [] st) (ELit (litCons { litName = cn, litArgs = [EVar $ tVr var st], litType = t }))
         primopt (PrimPrim "integralCast") [e] t = return $ create_integralCast dataTable e t
         primopt (PrimPrim "integralCast") es t = error $ "Invalid integralCast " ++ show (es,t)
         primopt _ _ _ = fail "not a primopt we care about"

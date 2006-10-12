@@ -69,7 +69,7 @@ atomizeAp atomizeTypes dataTable stats modName e = f e  where
         return (ELam tvr e',[])
     g (ELit LitCons { litName = n, litArgs = xs, litType = t }) = do
         (xs',dss) <- fmap unzip (mapM h xs)
-        return (ELit (LitCons n xs' t), concat dss)
+        return (ELit (litCons { litName = n, litArgs = xs', litType = t }), concat dss)
     g e@ELit {} = return (e,[])
     g e@EError {} = return (e,[])
     g ep@(EPi tvr@TVr {tvrIdent = i, tvrType = t} b) | i == 0 || i `notElem` freeVars b  = do

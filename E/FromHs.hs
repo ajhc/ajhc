@@ -82,7 +82,7 @@ createIf e a b = do
 createIfv v e a b = res where
     tv = v { tvrType = tIntzh }
     ic = eCase (EVar tv) [Alt (LitInt 1 tIntzh) a, Alt (LitInt 0 tIntzh) b] Unknown
-    res = eCase e [Alt (LitCons dc_Boolzh [tv] tBool) ic] Unknown
+    res = eCase e [Alt (litCons { litName = dc_Boolzh, litArgs = [tv], litType = tBool }) ic] Unknown
 
 
 head (x:_) = x
@@ -99,7 +99,7 @@ newVars xs = f xs [] where
 tipe t = f t where
     f (TAp t1 t2) = eAp (f t1) (f t2)
     f (TArrow t1 t2) =  EPi (tVr 0 (f t1)) (f t2)
-    f (TCon (Tycon n k)) | n == tc_World__ =  ELit (LitCons rt_Worldzh [] eHash)
+    f (TCon (Tycon n k)) | n == tc_World__ =  ELit (litCons { litName = rt_Worldzh, litArgs = [], litType = eHash })
     f (TCon (Tycon n k)) =  ELit (LitCons n [] (kind k))
     f (TVar tv) = EVar (cvar [] tv)
     f (TMetaVar mv) = cmvar mv
@@ -230,8 +230,8 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
         methodVar = tVr (toId methodName) ty
         _methodName@(~(Just (TVr {tvrType = ty},_))) = findName methodName
         defaultName =  (defaultInstanceName methodName)
-        valToPat' (ELit LitCons { litName = x, litArgs = ts, litType = t }) = ELit $ LitCons x [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..], j `notElem` map tvrIdent args]  t
-        valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ LitCons tc_Arrow [ EVar (tVr j (getType z)) | z <- [a,b] | j <- [2,4 ..], j `notElem` map tvrIdent args]  eStar
+        valToPat' (ELit LitCons { litName = x, litArgs = ts, litType = t }) = ELit $ litCons { litName = x, litArgs = [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..], j `notElem` map tvrIdent args], litType = t }
+        valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ litCons { litName = tc_Arrow, litArgs = [ EVar (tVr j (getType z)) | z <- [a,b] | j <- [2,4 ..], j `notElem` map tvrIdent args], litType = eStar }
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
         as = [ rule  t | (_ :=> IsIn _ t ) <- snub (classInsts classRecord) ]
         (_ft,_:args') = fromPi ty
@@ -271,7 +271,7 @@ createMethods dataTable classHierarchy funcs = return ans where
                 | otherwise  = return $ calt $  EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) errType
             where
             name = (instanceName methodName (getTypeCons t))
-            calt e =  Alt (LitCons x [ case e of EVar tvr -> tvr; _ -> error $ "createMethods: "++ show e | e <- vs ]  ct)  e
+            calt e =  Alt (litCons { litName = x, litArgs = [ case e of EVar tvr -> tvr; _ -> error $ "createMethods: "++ show e | e <- vs ], litType = ct })  e
             errType = subst tvr (tipe t) finalType
             (x,vs,ct) = case tipe t of
                 (ELit LitCons { litName = x', litArgs = vs', litType = ct' }) -> (x',vs',ct')
@@ -288,7 +288,7 @@ methodNames  classHierarchy =  ans where
     cClass classRecord =  [ setProperty prop_METHOD $ tVr (toId n) (convertOneVal t) | (n,t) <- classAssumps classRecord ]
 
 unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
-unbox dataTable e vn wtd = eCase e [Alt (LitCons cna [tvra] te) (wtd tvra)] Unknown where
+unbox dataTable e vn wtd = eCase e [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd tvra)] Unknown where
     te = getType e
     tvra = tVr vn sta
     Just (cna,sta,ta) = lookupCType' dataTable te
@@ -303,7 +303,7 @@ createFunc dataTable es ee = do
         tvrs = [ t | (t,_,_) <- xs]
         (me,innerE) = ee tvrs'
         eee = me $ foldr esr innerE xs
-        esr (tvr,(tvr',_),(cn,_,_)) e = eCase (EVar tvr) [Alt (LitCons cn [tvr'] te) e] Unknown  where
+        esr (tvr,(tvr',_),(cn,_,_)) e = eCase (EVar tvr) [Alt (litCons { litName = cn, litArgs = [tvr'], litType = te }) e] Unknown  where
             te = getType $ EVar tvr
     return $ foldr ELam eee tvrs
 
@@ -410,13 +410,13 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         [uvar] <- newVars [st]
         let expr x     = return [(name,var,lamt x)]
             prim       = APrim (AddrOf rcn) req
-        expr $ eStrictLet uvar (EPrim prim [] st) (ELit (LitCons cn [EVar uvar] rt))
+        expr $ eStrictLet uvar (EPrim prim [] st) (ELit (litCons { litName = cn, litArgs = [EVar uvar], litType = rt }))
     cDecl (HsForeignDecl _ (FfiSpec (Import rcn req) _ CCall) n _) = do
         let name = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         let (ts,rt) = argTypes' ty
             (isIO,rt') = case  rt of
-                ELit (LitCons c [x] _) | c == tc_IO -> (True,x)
+                ELit (litCons { litName = c, litArgs = [x], litType = _ }) | c == tc_IO -> (True,x)
                 _ -> (False,rt)
         es <- newVars [ t |  t <- ts, not (sortStarLike t) ]
         (_,pt) <- lookupCType dataTable rt'
@@ -433,9 +433,9 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
                 let rttIO = ltTuple [tWorld__, rt']
                     rttIO' = ltTuple' [tWorld__, rtt']
                 case isIO of
-                    False -> cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim False rs rtt [ EVar t | (t,_) <- rs ] rtt') (ELit $ LitCons cn [EVar rtVar'] rt')
+                    False -> cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim False rs rtt [ EVar t | (t,_) <- rs ] rtt') (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
                     True -> cFun $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
-                                eCaseTup' (prim True rs rtt (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ LitCons cn [EVar rtVar'] rt') (eJustIO (EVar tvrWorld2) (EVar rtVar)))
+                                eCaseTup' (prim True rs rtt (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' }) (eJustIO (EVar tvrWorld2) (EVar rtVar)))
         return [(name,var,lamt result)]
 
     cDecl x@HsForeignDecl {} = fail ("Unsupported foreign declaration: "++ show x)
@@ -486,7 +486,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         t' = getAssump n'
         ty = tipe t'
         ans = case lookupCType' dataTable ty of
-            Just (cn,st,_it) -> return $ ELit (LitCons cn [ELit (LitInt (fromIntegral i) st)] ty)
+            Just (cn,st,_it) -> return $ ELit (litCons { litName = cn, litArgs = [ELit (LitInt (fromIntegral i) st)], litType = ty })
             Nothing -> return $ intConvert' funcs ty i
             --Just (cn,st,it) ->
     --cExpr (HsLit (HsInt i)) = return $ intConvert i
@@ -642,10 +642,10 @@ ctgen t = map snd $ snubFst $ Seq.toList $ everything (Seq.<>) (mkQ Seq.empty gg
 
 integer_cutoff = 500000000
 
-intConvert i | abs i > integer_cutoff  =  ELit (LitCons dc_Integer [ELit $ LitInt (fromInteger i) (rawType "intmax_t")] tInteger)
-intConvert i =  ELit (LitCons dc_Int [ELit $ LitInt (fromInteger i) (rawType "int")] tInt)
+intConvert i | abs i > integer_cutoff  =  ELit (litCons { litName = dc_Integer, litArgs = [ELit $ LitInt (fromInteger i) (rawType "intmax_t")], litType = tInteger })
+intConvert i =  ELit (litCons { litName = dc_Int, litArgs = [ELit $ LitInt (fromInteger i) (rawType "int")], litType = tInt })
 
-intConvert' funcs typ i = EAp (EAp fun typ) (ELit (LitCons con [ELit $ LitInt (fromInteger i) (rawType rawtyp)] ltype))  where
+intConvert' funcs typ i = EAp (EAp fun typ) (ELit (litCons { litName = con, litArgs = [ELit $ LitInt (fromInteger i) (rawType rawtyp)], litType = ltype }))  where
     (con,ltype,fun,rawtyp) = case abs i > integer_cutoff of
         True -> (dc_Integer,tInteger,f_fromInteger,"intmax_t")
         False -> (dc_Int,tInt,f_fromInt,"int")
@@ -741,7 +741,7 @@ convertMatches funcs tv cType bs ms err = match bs ms err where
                         let (Just Constructor { conChildren = Just [vCons] }) = getConstructor (conInhabits patCons) dataTable
                         [z] <- newVars [tIntzh]
                         let err' = if length sibs <= length as then Unknown else err
-                        return $ eCase b [Alt (LitCons vCons [z] (getType b)) (eCase (EVar z) as err')] Unknown
+                        return $ eCase b [Alt (litCons { litName = vCons, litArgs = [z] (getType b)) (eCase (EVar z) as err')], litType = Unknown }
             | otherwise = error $ "Heterogenious list: " ++ show patternHeads
             where
             patternHeads = map ((\ (x:_) -> x) . fst) ps
@@ -796,9 +796,9 @@ makeSpec (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (Module m,ui), T.ruleS
 
 deNewtype :: DataTable -> E -> E
 deNewtype dataTable e = f e where
-    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons n [v] t) z):_) } | alias == ErasedAlias = eLet v (f e)  (f z) where
+    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (litCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == ErasedAlias = eLet v (f e)  (f z) where
         Identity Constructor { conAlias = alias } = getConstructor n dataTable
-    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons n [v] t) z):_) } | alias == RecursiveAlias = eLet v (prim_unsafeCoerce (f e) (getType v)) (f z) where
+    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (litCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == RecursiveAlias = eLet v (prim_unsafeCoerce (f e) (getType v)) (f z) where
         Identity Constructor { conAlias = alias } = getConstructor n dataTable
     f e = runIdentity $ emapE (return . f) e
 
