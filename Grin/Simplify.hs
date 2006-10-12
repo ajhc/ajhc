@@ -499,7 +499,7 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
         nic <- f (Case v as')
         --True <- return $ Set.null $ Set.intersection (freeVars nic) (freeVars (map lamBind as) :: Set.Set Var)
         return $ modifyTail (v :-> nic) hexp -- Case x [ b :-> e :>>= v :-> Case v as' | b :-> e <- as ]
-    caseHoist hexp v as' ty | grinPhase grin >= PostDevolve  = do
+    caseHoist hexp v as' ty | False && grinPhase grin >= PostDevolve  = do
         let ufuncs = freeVars fbody
             fbody = Tup [v] :-> Case v as'
             cfname = do
