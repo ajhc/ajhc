@@ -40,9 +40,10 @@ import E.Show
 import E.Subst
 import E.TypeCheck
 import E.Values
-import Info.Types
+import FrontEnd.Syn.Traverse
 import GenUtil
 import HsSyn
+import Info.Types
 import MapBinaryInstance()
 import Name.Id
 import Name.Name as Name
@@ -390,11 +391,16 @@ toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conN
     fixupMap k _ | Just n <- getConstructor k dataTablePrims = n
     fixupMap _ n = n
     ds' = Seq.toList $ execWriter (mapM_ f ds)
-    f decl@HsNewTypeDecl {  hsDeclCon = c } = dt decl True  [c]
-    f decl@HsDataDecl {  hsDeclCons = cs } = dt decl False  cs
+    newtypeLoopBreakers = map fst $ fst $  G.findLoopBreakers (const 0) (const True) (G.newGraph newtypeDeps fst snd) where
+        newtypeDeps = [ (n,concatMap (fm . hsBangType) $ hsConDeclArgs c) | HsNewTypeDecl { hsDeclName = n, hsDeclCon = c } <- ds  ]
+        fm t = execWriter $ f t
+        f HsTyCon { hsTypeName = n } = tell [n]
+        f t = traverseHsType_ f t
+    f decl@HsNewTypeDecl {  hsDeclName = nn, hsDeclCon = c } = dt decl (if nn `elem` newtypeLoopBreakers then RecursiveAlias else ErasedAlias)  [c]
+    f decl@HsDataDecl {  hsDeclCons = cs } = dt decl NotAlias  cs
     f _ = return ()
-    dt decl False cs@(_:_:_) | all null (map hsConDeclArgs cs) = do
-        let virtualCons'@(fc:_) = map (makeData False typeInfo) cs
+    dt decl NotAlias cs@(_:_:_) | all null (map hsConDeclArgs cs) = do
+        let virtualCons'@(fc:_) = map (makeData NotAlias typeInfo) cs
             typeInfo@(theType,_,_) = makeType decl
             virt = Just (map conName virtualCons')
             f (n,vc) = vc { conExpr = ELit (LitCons consName [ELit (LitInt (fromIntegral n) tIntzh)] (conType vc)), conVirtual = virt }
@@ -420,7 +426,7 @@ toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conN
             conInhabits = conName theType,
             conDeriving = [],
             conVirtual = Nothing,
-            conAlias = if alias then ErasedAlias else NotAlias,
+            conAlias = alias,
             conChildren = Nothing
             }
         theExpr =  foldr ($) (strictize $ ELit (LitCons dataConsName (map EVar vars) theTypeExpr)) (map ELam vars)
@@ -475,7 +481,9 @@ constructionExpression ::
     -> E      -- ^ saturated lambda calculus term
 constructionExpression dataTable n typ@(ELit (LitCons pn xs _))
     | ErasedAlias <- conAlias mc = ELam var (EVar var)
+    | RecursiveAlias <- conAlias mc = let var' = var { tvrType = st } in ELam var' (prim_unsafeCoerce (EVar var') typ)
     | pn == conName pc = sub (conExpr mc) where
+    ~[st] = slotTypes dataTable n typ
     var = tvr { tvrIdent = 2, tvrType = typ }
     Just mc = getConstructor n dataTable
     Just pc = getConstructor (conInhabits mc) dataTable

@@ -798,6 +798,8 @@ deNewtype :: DataTable -> E -> E
 deNewtype dataTable e = f e where
     f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons n [v] t) z):_) } | alias == ErasedAlias = eLet v (f e)  (f z) where
         Identity Constructor { conAlias = alias } = getConstructor n dataTable
+    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons n [v] t) z):_) } | alias == RecursiveAlias = eLet v (prim_unsafeCoerce (f e) (getType v)) (f z) where
+        Identity Constructor { conAlias = alias } = getConstructor n dataTable
     f e = runIdentity $ emapE (return . f) e
 
 
