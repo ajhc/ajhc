@@ -23,19 +23,18 @@ import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import Atom
 import Boolean.Algebra
-import Class
 import C.FFI
 import C.Prims as CP
+import Class
 import DataConstructors
-import PrimitiveOperators
 import Doc.DocLike
 import Doc.PPrint
 import E.E
-import E.Eval(eval)
 import E.Eta
+import E.Eval(eval)
 import E.LetFloat(atomizeAp)
-import E.Program
 import E.PrimOpt
+import E.Program
 import E.Rules
 import E.Subst
 import E.Traverse
@@ -46,8 +45,8 @@ import Fixer.VMap
 import FrontEnd.KindInfer(hoistType)
 import FrontEnd.Rename(unRename)
 import FrontEnd.SrcLoc
-import FrontEnd.Tc.Type hiding(Rule(..), unbox)
 import FrontEnd.Tc.Module(TiData(..))
+import FrontEnd.Tc.Type hiding(Rule(..), unbox)
 import FrontEnd.Tc.Type(prettyPrintType)
 import FrontEnd.Utils
 import GenUtil
@@ -57,18 +56,19 @@ import Name.Name as Name
 import Name.Names
 import Name.VConsts
 import Options
-import qualified FlagOpts as FO
-import qualified FrontEnd.Tc.Monad as TM
-import qualified FrontEnd.Tc.Type as T(Rule(..))
-import qualified Info.Info as Info
-import qualified Stats
-import qualified Util.Seq as Seq
+import PrimitiveOperators
 import Representation
 import Support.CanType
 import Support.FreeVars
 import Util.Gen
 import Util.NameMonad
 import Util.SetLike
+import qualified FlagOpts as FO
+import qualified FrontEnd.Tc.Monad as TM
+import qualified FrontEnd.Tc.Type as T(Rule(..))
+import qualified Info.Info as Info
+import qualified Stats
+import qualified Util.Seq as Seq
 
 ump sl e = EError (show sl ++ ": Unmatched pattern") e
 
@@ -100,13 +100,13 @@ tipe t = f t where
     f (TAp t1 t2) = eAp (f t1) (f t2)
     f (TArrow t1 t2) =  EPi (tVr 0 (f t1)) (f t2)
     f (TCon (Tycon n k)) | n == tc_World__ =  ELit (litCons { litName = rt_Worldzh, litArgs = [], litType = eHash })
-    f (TCon (Tycon n k)) =  ELit (LitCons n [] (kind k))
+    f (TCon (Tycon n k)) =  ELit litCons { litName = n, litType = kind k }
     f (TVar tv) = EVar (cvar [] tv)
     f (TMetaVar mv) = cmvar mv
     f (TForAll vs (ps :=> t)) = foldr EPi (f t) (map (cvar $ freeVars ps) vs)
     f (TExists xs (_ :=> t)) = let
         xs' = map (kind . tyvarKind) xs
-        in ELit (LitCons (unboxedNameTuple TypeConstructor (length xs' + 1)) (f t:xs') eHash)
+        in ELit litCons { litName = unboxedNameTuple TypeConstructor (length xs' + 1), litArgs = f t:xs', litType = eHash }
     cvar fvs tv@Tyvar { tyvarName = n, tyvarKind = k }
         | tv `elem` fvs = setProperty prop_SCRUTINIZED (tVr (lt n) (kind k))
         | otherwise = tVr (lt n) (kind k)
@@ -218,8 +218,8 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
             (ty',xs) = fromPi ty
         return (cname, tvrInfo_u (case ffi of Just ffi -> Info.insert ffi; Nothing -> id) $ setProperty prop_EXPORTED theMainTvr,ne)
     ioLike ty = case followAliases dataTable ty of
-        ELit (LitCons n [x] _) | n ==  tc_IO -> Just x
-        (EPi ioc (EPi tvr (ELit (LitCons n [x] _)))) | n == tc_IOResult -> Just x
+        ELit LitCons { litName = n, litArgs = [x] } | n ==  tc_IO -> Just x
+        (EPi ioc (EPi tvr (ELit LitCons { litName = n, litArgs = [x] }))) | n == tc_IOResult -> Just x
         _ -> Nothing
 
 createInstanceRules :: Monad m => ClassHierarchy -> (Map.Map Name (TVr,E)) -> m Rules
@@ -416,7 +416,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         (var,ty,lamt) <- convertValue name
         let (ts,rt) = argTypes' ty
             (isIO,rt') = case  rt of
-                ELit (litCons { litName = c, litArgs = [x], litType = _ }) | c == tc_IO -> (True,x)
+                ELit (LitCons { litName = c, litArgs = [x] }) | c == tc_IO -> (True,x)
                 _ -> (False,rt)
         es <- newVars [ t |  t <- ts, not (sortStarLike t) ]
         (_,pt) <- lookupCType dataTable rt'
@@ -741,7 +741,7 @@ convertMatches funcs tv cType bs ms err = match bs ms err where
                         let (Just Constructor { conChildren = Just [vCons] }) = getConstructor (conInhabits patCons) dataTable
                         [z] <- newVars [tIntzh]
                         let err' = if length sibs <= length as then Unknown else err
-                        return $ eCase b [Alt (litCons { litName = vCons, litArgs = [z] (getType b)) (eCase (EVar z) as err')], litType = Unknown }
+                        return $ eCase b [Alt litCons { litName = vCons, litArgs = [z], litType = getType b } (eCase (EVar z) as err')] Unknown
             | otherwise = error $ "Heterogenious list: " ++ show patternHeads
             where
             patternHeads = map ((\ (x:_) -> x) . fst) ps
@@ -796,9 +796,9 @@ makeSpec (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (Module m,ui), T.ruleS
 
 deNewtype :: DataTable -> E -> E
 deNewtype dataTable e = f e where
-    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (litCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == ErasedAlias = eLet v (f e)  (f z) where
+    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == ErasedAlias = eLet v (f e)  (f z) where
         Identity Constructor { conAlias = alias } = getConstructor n dataTable
-    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (litCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == RecursiveAlias = eLet v (prim_unsafeCoerce (f e) (getType v)) (f z) where
+    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == RecursiveAlias = eLet v (prim_unsafeCoerce (f e) (getType v)) (f z) where
         Identity Constructor { conAlias = alias } = getConstructor n dataTable
     f e = runIdentity $ emapE (return . f) e
 

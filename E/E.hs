@@ -34,12 +34,12 @@ import Util.SetLike as S
 
 
 data Lit e t = LitInt { litNumber :: Number, litType :: t }
-    | LitCons  { litName :: Name, litArgs :: [e], litType :: t }
+    | LitCons  { litName :: Name, litArgs :: [e], litType :: t, litAliasFor :: Maybe E }
 --    | LitAlias { litName :: Name, litArgs :: [e], litType :: t, litAliasFor :: Maybe E }
     deriving(Data,Eq,Ord,Typeable)
         {-!derive: is, GhcBinary !-}
 
-litCons = LitCons { litName = error "litName: name not set", litArgs = [], litType = error "litCons: type not set" }
+litCons = LitCons { litName = error "litName: name not set", litArgs = [], litType = error "litCons: type not set", litAliasFor = Nothing }
 
 instance (Show e,Show t) => Show (Lit e t) where
     showsPrec _ (LitInt x t) = parens $  shows x <> showString "::" <> shows t
@@ -50,7 +50,7 @@ instance Functor (Lit e) where
 
 instance FunctorM (Lit e) where
     fmapM f x = case x of
-        LitCons { litName = a, litArgs = es, litType = e } -> do  e <- f e; return LitCons { litName = a, litArgs = es, litType = e }
+        LitCons { litName = a, litArgs = es, litType = e, litAliasFor = af } -> do  e <- f e; return LitCons { litName = a, litArgs = es, litType = e, litAliasFor = af }
         LitInt i t -> do t <- f t; return $ LitInt i t
 
 
@@ -169,20 +169,20 @@ altHead :: Alt E -> Lit () ()
 altHead (Alt l _) = litHead  l
 litHead :: Lit a b -> Lit () ()
 litHead (LitInt x _) = LitInt x ()
-litHead LitCons { litName = s } = LitCons s [] ()
+litHead LitCons { litName = s } = litCons { litName = s, litType = () }
 
 litBinds (LitCons { litArgs = xs } ) = xs
 litBinds _ = []
 
 patToLitEE LitCons { litName = n, litArgs = [a,b], litType = t } | t == eStar, n == tc_Arrow = EPi (tVr 0 (EVar a)) (EVar b)
-patToLitEE LitCons { litName = n, litArgs = xs, litType = t } = ELit $ LitCons n (map EVar xs) t
+patToLitEE LitCons { litName = n, litArgs = xs, litType = t, litAliasFor = af } = ELit $ LitCons { litName = n, litArgs = (map EVar xs), litType = t, litAliasFor = af }
 patToLitEE (LitInt x t) = ELit $ LitInt x t
 
 
 caseBodies :: E -> [E]
 caseBodies ec = [ b | Alt _ b <- eCaseAlts ec] ++ maybeToMonad (eCaseDefault ec)
 casePats ec =  [ p | Alt p _ <- eCaseAlts ec]
-caseBinds ec = eCaseBind ec : concat [ xs  | LitCons _ xs _ <- casePats ec]
+caseBinds ec = eCaseBind ec : concat [ xs  | LitCons { litArgs = xs } <- casePats ec]
 
 
 instance Eq TVr where
@@ -331,8 +331,8 @@ tPtr t = ELit (litCons { litName = tc_Ptr, litArgs = [t], litType = eStar })
 tCont = ELit (litCons { litName = tc_IOErrorCont, litArgs = [], litType = eStar })
 tvrCont = tvr { tvrIdent = 0, tvrType = tCont }
 
-ltTuple ts = ELit $ LitCons (nameTuple TypeConstructor (length ts)) ts eStar
-ltTuple' ts = ELit $ LitCons (unboxedNameTuple TypeConstructor (length ts)) ts eHash
+ltTuple ts = ELit $ litCons { litName = nameTuple TypeConstructor (length ts), litArgs = ts, litType = eStar }
+ltTuple' ts = ELit $ litCons { litName = unboxedNameTuple TypeConstructor (length ts), litArgs = ts, litType = eHash }
 
 p_unsafeCoerce = primPrim "unsafeCoerce"
 p_toTag = primPrim "toTag"

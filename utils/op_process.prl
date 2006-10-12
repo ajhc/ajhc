@@ -68,7 +68,7 @@ sub tcon($) {
     $n = "t_" . $n;
     my $x = $_[0];
     $x =~ s/^.*\.//;
-    my $v = "$n = ELit (LitCons tc_$x [] eStar)";
+    my $v = "$n = ELit litCons { litName = tc_$x, litType = eStar}";
     $tcon{$_[0]} = [$n,$v];
     return $n;
 }
@@ -79,7 +79,7 @@ sub rtype($) {
     my $c = $_[0];
     $c =~ s/\W/_/g;
     my $n = "r_" . $c;
-    my $v = "$n " . " "x(14-length $n) . "= ELit (LitCons rt_$c  [] eHash)";
+    my $v = "$n " . " "x(14-length $n) . "= ELit litCons { litName = rt_$c, litType = eHash }";
     $rtype{$_[0]} = [$n,$v];
     return $n;
 }

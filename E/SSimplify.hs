@@ -121,10 +121,10 @@ collectOccurance e = f e  where
         case mlookup n tfvs of
             Nothing -> tell (tfvs,mempty) >>  return (EPi tvr { tvrIdent =  0, tvrType = a } b)
             Just occ -> tell (mdelete n tfvs,singleton n) >> return (EPi (annb' tvr { tvrType = a }) b)
-    f (ELit LitCons { litName = n, litArgs = as, litType = t }) = arg $ do
+    f (ELit lc@LitCons { litName = n, litArgs = as, litType = t }) = arg $ do
         t <- f t
         as <- mapM f as
-        return (ELit (LitCons n as t))
+        return (ELit lc { litArgs = as, litType = t })
     f (ELit (LitInt i t)) = do
         t <- arg (f t)
         return $ ELit (LitInt i t)
@@ -199,11 +199,11 @@ annbind idm tvr = case mlookup (tvrIdent tvr) idm of
     Just x -> annb x tvr
 annb x tvr = tvrInfo_u (Info.insert x) tvr
 
-mapLitBinds f LitCons { litName = n, litArgs = es, litType = t } = LitCons n (map f es) t
+mapLitBinds f lc@LitCons { litArgs = es } = lc { litArgs = map f es }
 mapLitBinds f (LitInt e t) = LitInt e t
-mapLitBindsM f LitCons { litName = n, litArgs = es, litType = t } = do
+mapLitBindsM f lc@LitCons { litArgs = es } = do
     es <- mapM f es
-    return (LitCons n es t)
+    return lc { litArgs = es }
 mapLitBindsM f (LitInt e t) = return $  LitInt e t
 
 collectBinding :: Bind -> OM (Bind,OMap)
@@ -487,10 +487,10 @@ simplifyDs prog sopts dsIn = ans where
         es' <- mapM (dosub inb) es
         t' <- dosub inb t
         return $ EPrim a es' t'
-    g (ELit LitCons { litName = n, litArgs = es, litType = t }) inb = do
+    g (ELit lc@LitCons { litName = n, litArgs = es, litType = t }) inb = do
         es' <- mapM (dosub inb) es
         t' <- dosub inb t
-        return $ ELit (LitCons n es' t')
+        return $ ELit lc { litArgs = es', litType = t' }
     g (ELit (LitInt n t)) inb = do
         t' <- dosub inb t
         return $ ELit (LitInt n t')
@@ -585,8 +585,8 @@ simplifyDs prog sopts dsIn = ans where
                         n <- newName
                         return $ tVr n t
                 ts <- mapM g (slotTypes (so_dataTable sopts) n te)
-                let wtd = ELit $ LitCons n (map EVar ts) te
-                return $ Alt (LitCons n ts te) (eLet b wtd d)
+                let wtd = ELit $ litCons { litName = n, litArgs = map EVar ts, litType = te }
+                return $ Alt litCons { litName = n, litArgs = ts, litType = te } (eLet b wtd d)
         mtick $ "E.Simplify.case-improve-default.{" ++ show (sort ls) ++ "}"
         ls' <- mapM f ls
         ec <- dosub inb emptyCase { eCaseScrutinee = e, eCaseType = t, eCaseBind = b, eCaseAlts = as ++ ls' }
@@ -641,10 +641,10 @@ simplifyDs prog sopts dsIn = ans where
                 let p' = LitInt n t'
                 e' <- f ae (ids $ mins e (patToLitEE p') inb)
                 return $ Alt p' e'
-            da (Alt LitCons { litName = n, litArgs = ns, litType = t } ae) = do
+            da (Alt lc@LitCons { litName = n, litArgs = ns, litType = t } ae) = do
                 t' <- dosub inb t
                 ns' <- mapM (\v -> nname v inb) ns
-                let p' = LitCons n ns' t'
+                let p' = lc { litArgs = ns', litType = t' }
                     nsub =  [ (n,Done (EVar t))  | TVr { tvrIdent = n } <- ns | t <- ns' ]
                     ninb = fromList [ (n,NotKnown)  | TVr { tvrIdent = n } <- ns' ]
                 e' <- f ae (ids $ substAddList nsub (envInScope_u (ninb `union`) $ mins e (patToLitEE p') inb))
@@ -769,9 +769,12 @@ simplifyDs prog sopts dsIn = ans where
     app (e,[]) = return e
     app (e,xs) = app' e xs
 
-    app' (ELit (LitCons n xs t@EPi {})) (a:as)  = do
+    app' (ELit lc@LitCons { litName = n, litArgs = xs, litType = EPi ta tt }) (a:as)  = do
         mtick (toAtom $ "E.Simplify.typecon-reduce.{" ++ show n ++ "}" )
-        app' (ELit (LitCons n (xs ++ [a]) (eAp t a))) as
+        app' (ELit lc { litArgs = xs ++ [a], litType = subst ta a tt }) as
+--    app' (ELit (LitCons n xs t@EPi {})) (a:as)  = do
+--        mtick (toAtom $ "E.Simplify.typecon-reduce.{" ++ show n ++ "}" )
+--        app' (ELit (LitCons n (xs ++ [a]) (eAp t a))) as
     app' ec@ECase {} xs = do
         mticks (length xs) (toAtom "E.Simplify.case-application")
         let f e = app' e xs

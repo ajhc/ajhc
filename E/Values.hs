@@ -26,7 +26,7 @@ import qualified Info.Info as Info
 
 instance Tuple E where
     tupleNil = vUnit
-    tupleMany es = ELit $ LitCons (nameTuple DataConstructor (length es)) es (ltTuple ts) where
+    tupleMany es = ELit litCons { litName = nameTuple DataConstructor (length es), litArgs = es, litType = ltTuple ts } where
         ts = map getType es
 
 
@@ -35,7 +35,7 @@ eTuple = tuple
 
 eTuple' es = ELit $ unboxedTuple es
 
-unboxedTuple es =  LitCons (unboxedNameTuple DataConstructor (length es)) es (ltTuple' ts) where
+unboxedTuple es =  litCons { litName = unboxedNameTuple DataConstructor (length es), litArgs = es, litType = ltTuple' ts } where
     ts = map getType es
 
 unboxedUnit :: E
@@ -75,39 +75,39 @@ instance ToE Bool where
 
 
 instance ToE Char where
-    toE ch = ELit (LitCons dc_Char [toEzh ch] tChar)
+    toE ch = ELit (litCons { litName = dc_Char, litArgs = [toEzh ch], litType = tChar })
     typeE _ = tChar
 
 instance ToE Rational where
-    toE rat = ELit (LitCons dc_Rational [toE (numerator rat), toE (denominator rat)] tRational)
+    toE rat = ELit (litCons { litName = dc_Rational, litArgs = [toE (numerator rat), toE (denominator rat)], litType = tRational })
     typeE _ = tRational
 
 instance ToE Integer where
-    toE ch = ELit (LitCons dc_Integer [toEzh ch] tInteger)
+    toE ch = ELit (litCons { litName = dc_Integer, litArgs = [toEzh ch], litType = tInteger })
     typeE _ = tInteger
 
 instance ToE Int where
-    toE ch = ELit (LitCons dc_Int [toEzh ch] tInt)
+    toE ch = ELit (litCons { litName = dc_Int, litArgs = [toEzh ch], litType = tInt })
     typeE _ = tInt
 
 instance ToE a => ToE [a] where
     toE xs@[] = eNil (typeE xs)
     toE (x:xs) = eCons (toE x) (toE xs)
-    typeE (_::[a]) = ELit (LitCons tc_List [typeE (undefined::a)] eStar)
+    typeE (_::[a]) = ELit (litCons { litName = tc_List, litArgs = [typeE (undefined::a)], litType = eStar })
 
 
 --eInt x = ELit $ LitInt x tInt
 
-eCons x xs = ELit $ LitCons vCons [x,xs] (getType xs)
-eNil t = ELit $ LitCons vEmptyList [] t
+eCons x xs = ELit $ litCons { litName = vCons, litArgs = [x,xs], litType = getType xs }
+eNil t = ELit $ litCons { litName = vEmptyList, litArgs = [], litType = t }
 
 emptyCase = ECase { eCaseDefault = Nothing, eCaseAlts = [], eCaseBind = error "emptyCase: bind", eCaseType = error "emptyCase: type", eCaseScrutinee = error "emptyCase: scrutinee" }
 
-eCaseTup e vs w = emptyCase { eCaseScrutinee = e, eCaseBind =  (tVr 0 (getType e)), eCaseType = getType w, eCaseAlts =  [Alt (LitCons (nameTuple DataConstructor (length vs)) vs (getType e)) w] }
-eCaseTup' e vs w = emptyCase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseType = getType w, eCaseAlts =  [Alt (LitCons (unboxedNameTuple DataConstructor (length vs)) vs (getType e)) w] }
+eCaseTup e vs w = emptyCase { eCaseScrutinee = e, eCaseBind =  (tVr 0 (getType e)), eCaseType = getType w, eCaseAlts =  [Alt litCons { litName = nameTuple DataConstructor (length vs), litArgs = vs, litType = getType e } w] }
+eCaseTup' e vs w = emptyCase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseType = getType w, eCaseAlts =  [Alt litCons { litName = unboxedNameTuple DataConstructor (length vs), litArgs = vs, litType = getType e} w] }
 
-eJustIO w x = ELit (LitCons dc_JustIO [w,x] (ELit (LitCons tc_IOResult [getType x] eStar)))
-tIO t = ELit (LitCons tc_IO [t] eStar)
+eJustIO w x = ELit litCons { litName = dc_JustIO, litArgs = [w,x], litType = ELit litCons { litName = tc_IOResult, litArgs = [getType x], litType = eStar } }
+tIO t = ELit (litCons { litName = tc_IO, litArgs = [t], litType = eStar })
 
 eCase e alts@(alt:_) Unknown = emptyCase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseType = getType alt,  eCaseAlts =  alts }
 eCase e alts els = emptyCase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseDefault = Just els, eCaseAlts =  alts, eCaseType = getType els }
@@ -151,7 +151,7 @@ substLet' ds' e  = ans where
 eLetRec = substLet'
 
 
-vTag n = ELit $ LitCons n [] tTag
+vTag n = ELit $ litCons { litName = n, litArgs = [], litType = tTag }
 
 prim_seq a b | isWHNF a = b
 prim_seq a b = emptyCase { eCaseScrutinee = a, eCaseBind =  (tVr 0 (getType a)), eCaseDefault = Just b, eCaseType = getType b }
@@ -172,10 +172,10 @@ prim_unsafeCoerce e t = p e' where
 from_unsafeCoerce (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = return (e,t)
 from_unsafeCoerce _ = fail "Not unsafeCoerce primitive"
 
-rawType s = ELit (LitCons (toName RawType s) [] eHash)
+rawType s = ELit litCons { litName = toName RawType s, litType = eHash }
 
-tWorldzh = ELit (LitCons rt_Worldzh [] eHash)
-tTag = ELit (LitCons rt_tag [] eHash)
+tWorldzh = ELit litCons { litName = rt_Worldzh, litArgs = [], litType = eHash }
+tTag = ELit litCons { litName = rt_tag, litArgs = [], litType = eHash }
 
 unsafeCoerceOpt (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = f (0::Int) e t where
     f n e t | Just (e',_) <- from_unsafeCoerce e = f (n + 1) e' t
@@ -183,7 +183,7 @@ unsafeCoerceOpt (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = f (0::Int) e
         (n,e',p) = f n e t
     f n (EError err _) t = (n,EError err t,id)
     f n (ELit (LitInt x _)) t = (n,ELit (LitInt x t),id)
-    f n (ELit LitCons { litName = x, litArgs = y }) t = (n,ELit (LitCons x y t),id)
+    f n (ELit lc@LitCons {}) t = (n,ELit lc { litType = t },id)
     f n ec@ECase {} t = (n,nx { eCaseType = t },id) where
         Identity nx = caseBodiesMapM (return . flip prim_unsafeCoerce t) ec
     f n e t | getType e == t = (n,e,id)

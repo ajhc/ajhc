@@ -87,24 +87,24 @@ workWrap' dataTable tvr e | isJust res = ans where
     lets = concatMap f sargs where
         f (Absent,t) = [(t,EError "WorkWrap.Absent" (getType t))]
         f (Plain,_) = []
-        f (Cons c ts,t) = [(t,ELit (LitCons (conName c) (map EVar (snds ts)) (getType t)))] ++ concatMap f ts
+        f (Cons c ts,t) = [(t,ELit (litCons { litName = conName c, litArgs = map EVar (snds ts), litType = getType t }))] ++ concatMap f ts
     cases e = f sargs where
         f [] = e
         f ((Absent,_):rs) = f rs
         f ((Plain,_):rs) = f rs
-        f ((Cons c ts,t):rs) = eCase (EVar t) [Alt (LitCons (conName c) (snds ts) (getType t)) (f (ts ++ rs))] Unknown
+        f ((Cons c ts,t):rs) = eCase (EVar t) [Alt (litCons { litName = conName c, litArgs = snds ts, litType = getType t }) (f (ts ++ rs))] Unknown
     nprops = Set.toList $ getProperties tvr `Set.intersection` Set.fromList [prop_JOINPOINT, prop_ONESHOT]
     ans = doTicks >> return ((setProperty prop_WRAPPER tvr,wrapper),(setProperties (prop_WORKER:nprops) tvr',worker))
     tvr' = TVr { tvrIdent = workerName (tvrIdent tvr), tvrInfo = mempty, tvrType = wt }
     worker = foldr ELam body' (args' ++ navar) where
         body' = eLetRec lets $ case cname of
             Just cname -> eCase body [cb] Unknown where
-                cb = Alt (LitCons cname vars bodyTyp) (if isSingleton then EVar sv else (ELit $ unboxedTuple (map EVar vars)))
+                cb = Alt (litCons { litName = cname, litArgs = vars, litType = bodyTyp }) (if isSingleton then EVar sv else (ELit $ unboxedTuple (map EVar vars)))
             Nothing -> body
     wrapper = foldr ELam ne args where
         workerCall = (foldl EAp (EVar tvr') (map EVar args' ++ navalue))
-        ne | Just cname <- cname, isSingleton = cases $ eStrictLet sv workerCall  (ELit $ LitCons cname [EVar sv] bodyTyp)
-           | Just cname <- cname = let ca = Alt (unboxedTuple vars) (ELit $ LitCons cname (map EVar vars) bodyTyp) in  cases $ eCase workerCall [ca] Unknown
+        ne | Just cname <- cname, isSingleton = cases $ eStrictLet sv workerCall  (ELit $ litCons { litName = cname, litArgs = [EVar sv], litType = bodyTyp })
+           | Just cname <- cname = let ca = Alt (unboxedTuple vars) (ELit $ litCons { litName = cname, litArgs = (map EVar vars), litType = bodyTyp }) in  cases $ eCase workerCall [ca] Unknown
            | otherwise = cases $ workerCall
     getName (Just x) = x
     getName Nothing  = error ("workWrap': cname = Nothing: tvr = "++show tvr)

@@ -62,9 +62,9 @@ forceNoinline x
 app (e,[]) = return e
 app (e,xs) = app' e xs
 
-app' (ELit (LitCons n xs t@EPi {})) (a:as)  = do
+app' (ELit lc@LitCons { litName = n, litArgs = xs, litType = EPi ta tt }) (a:as)  = do
     mtick (toAtom $ "E.Simplify.typecon-reduce.{" ++ show n ++ "}" )
-    app (ELit (LitCons n (xs ++ [a]) (eAp t a)),as)
+    app (ELit (lc { litArgs = xs ++ [a], litType = subst ta a tt }),as)
 app' (ELam tvr e) (a:as) = do
     mtick (toAtom "E.Simplify.beta-reduce")
     app (subst tvr a e,as)   -- TODO Fix quadradic substitution

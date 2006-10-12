@@ -23,11 +23,11 @@ eval term = eval' term []  where
     eval' (EPi v body) [] = check_eta $ EPi v (eval body)
     eval' e@Unknown [] = e
     eval' e@ESort {} [] = e
-    eval' (ELit LitCons { litName = n, litArgs = es, litType = t }) [] = ELit $ LitCons n (map eval es) t
+    eval' (ELit lc@LitCons { litName = n, litArgs = es, litType = t }) [] = ELit lc { litArgs = map eval es }
     eval' e@ELit {} [] = e
 
     -- argument applications
-    eval' (ELit (LitCons n es ty@EPi {})) (t:rest) = eval' (ELit $ LitCons n (es ++ [t]) (eval $ EAp ty t)) rest
+    eval' (ELit lc@LitCons { litArgs = es, litType = EPi tb tt }) (t:rest) = eval' (ELit lc { litArgs = es ++ [t], litType = subst tb t tt }) rest
 
     eval' (ELam v body) (t:rest) = eval' (subst v t body) rest
     eval' (EPi v body) (t:rest) = eval' (subst v t body) rest   -- fudge
@@ -70,14 +70,12 @@ strong dsMap' term = eval' dsMap term [] where
         check_eta $ EPi v' body'
     eval' ds e@Unknown [] = return e
     eval' ds e@ESort {} [] = return e
-    eval' ds (ELit LitCons { litName = n, litArgs = es, litType = t }) [] = do
+    eval' ds (ELit lc@LitCons { litArgs = es, litType = t }) [] = do
         es' <- mapM (\e -> eval' ds e []) es
         t' <-  (eval' ds t [])
-        return $ ELit $ litCons { litName = n, litArgs = es', litType = t' }
+        return $ ELit $ lc { litArgs = es', litType = t' }
     eval' ds e@ELit {} [] = return e
-    eval' ds (ELit (LitCons n es ty@EPi {})) (t:rest) = do
-        t' <- (eval' ds (EAp ty t) [])
-        eval' ds (ELit $ LitCons n (es ++ [t]) t') rest
+    eval' ds (ELit lc@LitCons { litArgs = es, litType = EPi tb tt }) (t:rest) = eval' ds (ELit lc { litArgs = es ++ [t], litType = subst tb t tt }) rest
     eval' ds (ELam v body) (t:rest) = eval' ds (subst v t body) rest
     eval' ds (EPi v body) (t:rest) = eval' ds (subst v t body) rest   -- fudge
     eval' ds (EAp t1 t2) stack = eval' ds t1 (t2:stack)

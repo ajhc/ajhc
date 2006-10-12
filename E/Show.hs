@@ -69,15 +69,15 @@ showLit showBind l = do
         f LitCons { litName = s, litArgs = es } | Just n <- fromUnboxedNameTuple s, n == length es = do
             es' <- mapM (fmap unparse . showBind) es
             return $ atom $ encloseSep (text "(# ") (text " #)") (text ", ") es'
-        f (LitCons n [a,b] _) | dc_Cons == n  = do
+        f LitCons { litName = n, litArgs = [a,b] } | dc_Cons == n  = do
             a' <- showBind a
             b' <- showBind b
             return $ a' `cons` b'
-        f (LitCons n [e] _) | tc_List == n = do
+        f LitCons { litName = n, litArgs = [e] } | tc_List == n = do
             e <- showBind e
             return $  atom   (char '[' <> unparse e  <> char ']')
         f LitCons { litName = n, litArgs = [] } | dc_EmptyList == n = return $ atom $ text "[]"
-        f (LitCons n [v] _)
+        f LitCons { litName = n, litArgs = [v] }
             | n == dc_Integer = go "Integer#"
             | n == dc_Int     = go "Int#"
             | n == dc_Char    = go "Char#"
@@ -167,12 +167,12 @@ showE e = do
         f (ESort EBox) = return $ symbol UC.box
         f (ESort EHash) = return $ symbol (text "#")
         f (ELit l) = showLit showE l
-        f (EError s t) = do
-            ty <- showE t
-            return $ atom $ angles ( UC.bottom <> char ':' <> text s <>  UC.coloncolon <> unparse ty)
         f (EError "" t) = do
             ty <- showE t
             return $ atom $ angles (text "exitFailure"  <>  UC.coloncolon <> unparse ty)
+        f (EError s t) = do
+            ty <- showE t
+            return $ atom $ angles ( UC.bottom <> char ':' <> text s <>  UC.coloncolon <> unparse ty)
         f (EPrim (APrim Operator { primOp = op } _) [x,y] t) = do
             x <- showE x
             y <- showE y
@@ -246,5 +246,5 @@ ePretty e = unparse pe where
     Identity pe = runVarNameT pe'
 
 tTag = rawType "tag#"
-rawType s  = ELit (LitCons (toName RawType s) [] eHash)
+rawType s  = ELit litCons { litName = toName RawType s, litType = eHash }
 

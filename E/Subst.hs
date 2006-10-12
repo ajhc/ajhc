@@ -53,10 +53,10 @@ subst' (TVr { tvrIdent = (i) }) w e = doSubst True False (minsert i (Just w) $ (
 
 
 
-litSMapM f LitCons { litName = s, litArgs = es, litType = t } = do
+litSMapM f LitCons { litName = s, litArgs = es, litType = t, litAliasFor = af } = do
     t' <- f t
     es' <- mapM f es
-    return $ LitCons s es' t'
+    return $ LitCons s es' t' af
 litSMapM f (LitInt n t) = do
     t' <- f t
     return $ LitInt n t'
@@ -99,11 +99,11 @@ doSubst substInVars allShadow bm e  = f e bm where
         e' <- f $ eCaseScrutinee ec
         (b',r) <- ntvr [] $ eCaseBind ec
         d <- local r $ fmapM f $ eCaseDefault ec
-        let da (Alt LitCons { litName = s, litArgs = vs, litType = t } e) = do
+        let da (Alt lc@LitCons { litName = s, litArgs = vs, litType = t } e) = do
                 t' <- f t
                 (as,rs) <- liftM unzip $ mapMntvr vs
                 e' <- local (mconcat rs) $ f e
-                return $ Alt (LitCons s as t') e'
+                return $ Alt lc { litArgs = as, litType = t' } e'
             da (Alt l e) = do
                 l' <- fmapM f l
                 e' <- f e
@@ -165,7 +165,7 @@ nv' ss = v (2 * (size ss + 1)) where
 eAp (EPi (TVr { tvrIdent =  0 }) b) _ = b
 eAp (EPi t b) e = subst t e b
 --eAp (EPrim n es t@(EPi _ _)) b = EPrim n (es ++ [b]) (eAp t b)  -- only apply if type is pi-like
-eAp (ELit (LitCons n es (EPi t r))) b = ELit (LitCons n (es ++ [b]) (subst t b r))
+eAp (ELit lc@LitCons { litArgs = es, litType = (EPi t r) }) b = ELit lc { litArgs = es ++ [b], litType = subst t b r }
 eAp (EError s t) b = EError s (eAp t b)
 eAp a b = EAp a b
 
@@ -217,11 +217,11 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
         e' <- f $ eCaseScrutinee ec
         (b',r) <- ntvr [] $ eCaseBind ec
         d <- local r $ fmapM f $ eCaseDefault ec
-        let da (Alt LitCons { litName = s, litArgs = vs, litType = t } e) = do
+        let da (Alt lc@LitCons { litName = s, litArgs = vs, litType = t } e) = do
                 t' <- inType $ f t
                 (as,rs) <- liftM unzip $ mapMntvr vs
                 e' <- local (mconcat rs) $ f e
-                return $ Alt (LitCons s as t') e'
+                return $ Alt lc { litArgs = as, litType = t' } e'
             da (Alt (LitInt n t) e) = do
                 t' <- inType (f t)
                 e' <- f e
@@ -246,10 +246,10 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
     inType = local (\ (_,trm,typ) -> (True,trm,typ) )
     addMap i (Just e) (b,trm,typ) = (b,minsert i (Just e) trm, minsert i e typ)
     addMap i Nothing (b,trm,typ) = (b,minsert i Nothing trm, typ)
-    litSMapM LitCons { litName = s, litArgs = es, litType = t } = do
+    litSMapM lc@LitCons { litName = s, litArgs = es, litType = t } = do
         t' <- inType $ f t
         es' <- mapM f es
-        return $ LitCons s es' t'
+        return $ lc { litArgs = es', litType = t' }
     litSMapM (LitInt n t) = do
         t' <- inType $ f t
         return $ LitInt n t'

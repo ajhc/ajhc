@@ -90,6 +90,7 @@ atomizeAp atomizeTypes dataTable stats modName e = f e  where
             (x',ds) <- g x
             (xs',dss) <- fmap unzip (mapM h xs)
             return (foldl EAp x' xs', concat (ds:dss))
+        _ -> error "E.LetFloat.g: bad"
     h e | isAtomic e = return (e,[])
     h ELetRec { eDefs = ds, eBody = e } = do
         (e',ds') <- h e
@@ -144,7 +145,7 @@ fvBind (Right xs) = unions (snds xs)
 canFloatPast t | sortStarLike . getType $ t = True
 canFloatPast t | getType t == tWorldzh = True
 canFloatPast t | getProperty prop_ONESHOT t = True
-canFloatPast t | getType t == ELit (LitCons tc_IOErrorCont [] (ESort EStar)) = True
+canFloatPast t | ELit LitCons { litName = n } <- getType t, n == tc_IOErrorCont = True -- getType t == ELit (litCons tc_IOErrorCont [] (ESort EStar)) = True
 canFloatPast _ = False
 
 {-# NOINLINE programFloatInward #-}
@@ -279,7 +280,7 @@ floatOutward prog = do
             imap' = Map.fromList [ (tvrIdent t,n') | t <- ts] `Map.union` imap
         g n ec@ECase {} imap = runIdentity $ caseBodiesMapM (\e -> g' n e imap') ec { eCaseBind = m (eCaseBind ec), eCaseAlts = map ma (eCaseAlts ec) } where
             m t = tvrInfo_u (Info.insert n) t
-            ma (Alt LitCons { litName = n, litArgs = xs, litType = t }  b) = Alt (LitCons n (map m xs) t) b
+            ma (Alt lc@LitCons { litName = n, litArgs = xs, litType = t }  b) = Alt lc { litArgs = map m xs } b
             ma a = a
             imap' = Map.fromList [ (tvrIdent t,n) | t <- caseBinds ec] `Map.union` imap
         g n ELetRec { eDefs = ds, eBody = e } imap = dds (map G.fromScc $ decomposeDs ds) [] e imap where

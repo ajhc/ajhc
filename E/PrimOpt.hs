@@ -129,11 +129,11 @@ processPrimPrim dataTable o@(EPrim (APrim prim _) es t) = case primopt prim es t
         primopt (PrimPrim "exitFailure__") [w] rt  = return $ EError "" rt
         primopt (PrimPrim "newRef__") [x,y] rt  = return $ EAp (EAp (ELam x' $ ELam y' $ eCaseTup' (EPrim (primPrim "newRef_") [EVar x',EVar y'] (ltTuple' [a,b])) [a',b'] (eTuple [EVar a',EVar b']) ) x) y where
             [x',y',a',b'] = vars [getType x,getType y,a,b]
-            ELit (LitCons _ [a,b] (ESort EStar)) = rt
+            ELit LitCons { litArgs = [a,b], litType = ESort EStar } = rt
         primopt (PrimPrim "readRef__") [x,y] rt  = return $ EAp (EAp (ELam x' $ ELam y' $ eCaseTup' (EPrim (primPrim "readRef_") [EVar x',EVar y'] (ltTuple' [a,b])) [a',b'] (eTuple [EVar a',EVar b']) ) x) y where
             [x',y',a',b'] = vars [getType x,getType y,a,b]
-            ELit (LitCons _ [a,b] (ESort EStar)) = rt
-        primopt (PrimPrim "newHole__") [y] (ELit (LitCons name [b] (ESort EStar))) | name == tc_IOResult =
+            ELit LitCons { litArgs = [a,b], litType = ESort EStar } = rt
+        primopt (PrimPrim "newHole__") [y] (ELit LitCons { litName = name, litArgs = [b], litType = ESort EStar }) | name == tc_IOResult =
             return $ eCaseTup' (EPrim (primPrim "newHole_") [y] (ltTuple' [tWorld__,b])) [a',b'] (eJustIO (EVar a') (EVar b')) where
                 (a':b':_) = vars [tWorld__,b,y]
 

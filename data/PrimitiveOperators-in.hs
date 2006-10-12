@@ -16,14 +16,14 @@ import Representation
 import Support.CanType
 
 
-create_integralCast c1 t1 c2 t2 e t = eCase e [Alt (LitCons c1 [tvra] te) cc] Unknown  where
+create_integralCast c1 t1 c2 t2 e t = eCase e [Alt (litCons { litName = c1, litArgs = [tvra], litType = te }) cc] Unknown  where
     te = getType e
     ELit LitCons { litName = n1, litArgs = [] } = t1
     ELit LitCons { litName = n2, litArgs = [] } = t2
     tvra =  tVr 4 t1
     tvrb =  tVr 6 t2
-    cc = if n1 == n2 then ELit (LitCons c2 [EVar tvra] t) else
-        eStrictLet  tvrb (EPrim (APrim (CCast (show n1) (show n2)) mempty) [EVar tvra] t2)  (ELit (LitCons c2 [EVar tvrb] t))
+    cc = if n1 == n2 then ELit (litCons { litName = c2, litArgs = [EVar tvra], litType = t }) else
+        eStrictLet  tvrb (EPrim (APrim (CCast (show n1) (show n2)) mempty) [EVar tvra] t2)  (ELit (litCons { litName = c2, litArgs = [EVar tvrb], litType = t }))
 
 create_integralCast_toInt c1 t1 e = create_integralCast c1 t1 dc_Int tIntzh e tInt
 create_integralCast_toInteger c1 t1 e = create_integralCast c1 t1 dc_Integer tIntegerzh e tInteger
@@ -37,7 +37,7 @@ toClassName x = parseName ClassName x
 
 toInstName x = toName Val ("Instance@",'i':x)
 
-unbox' e cn tvr wtd = eCase e [Alt (LitCons cn [tvr] te) wtd] Unknown where
+unbox' e cn tvr wtd = eCase e [Alt (litCons { litName = cn, litArgs = [tvr], litType = te }) wtd] Unknown where
     te = getType e
 
 oper_aa op ct e = EPrim (APrim (Operator op [ct] ct) mempty) [e] (rawType ct)
@@ -56,7 +56,7 @@ op_aIa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
     tvrc = tVr 10 st
     st = rawType ct
     wtd = eStrictLet tvrc (oper_aIa op ct (EVar tvra) (EVar tvrb)) (rebox (EVar tvrc))
-    rebox x = ELit (LitCons cn [x] t)
+    rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = t })
 op_aaa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
     tvra' = tVr 2 t
     tvrb' = tVr 4 t
@@ -65,14 +65,14 @@ op_aaa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
     tvrc = tVr 10 st
     st = rawType ct
     wtd = eStrictLet tvrc (oper_aaa op ct (EVar tvra) (EVar tvrb)) (rebox (EVar tvrc))
-    rebox x = ELit (LitCons cn [x] t)
+    rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = t })
 op_aa op ct cn t = ELam tvra' (unbox' (EVar tvra') cn tvra wtd) where
     tvra' = tVr 2 t
     tvra = tVr 6 st
     tvrc = tVr 10 st
     st = rawType ct
     wtd = eStrictLet tvrc (oper_aa op ct (EVar tvra)) (rebox (EVar tvrc))
-    rebox x = ELit (LitCons cn [x] t)
+    rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = t })
 op_aaI op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
     tvra' = tVr 2 t
     tvrb' = tVr 4 t
@@ -81,7 +81,7 @@ op_aaI op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
     tvrc = tVr 10 intt
     st = rawType ct
     wtd = eStrictLet tvrc (oper_aaI op ct (EVar tvra) (EVar tvrb)) (rebox (EVar tvrc))
-    rebox x = ELit (LitCons dc_Int [x] t)
+    rebox x = ELit (litCons { litName = dc_Int, litArgs = [x], litType = t })
 
 op_aaB op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
     tvra' = tVr 2 t
@@ -90,7 +90,7 @@ op_aaB op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
     tvrb = tVr 8 st
     tvrc = tVr 10 intt
     st = rawType ct
-    wtd = eStrictLet tvrc (oper_aaI op ct (EVar tvra) (EVar tvrb)) (ELit (LitCons dc_Boolzh [EVar tvrc] tBool))  -- (caseof (EVar tvrc))
+    wtd = eStrictLet tvrc (oper_aaI op ct (EVar tvra) (EVar tvrb)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar tvrc], litType = tBool }))  -- (caseof (EVar tvrc))
 --    caseof x = eCase x [Alt zeroI vFalse]  vTrue
 
 build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaI "<" ct (EVar tvra) zero)  [Alt zeroI (rebox $ EVar tvra)] (fs)) where
@@ -101,7 +101,7 @@ build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaI "<" ct (EVar tvra) zero)  
     st = rawType ct
     intt =  rawType "int"
     fs = eStrictLet tvrb (oper_aa "-" ct (EVar tvra)) (rebox (EVar tvrb))
-    rebox x = ELit (LitCons cn [x] te)
+    rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
 
 build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaI "<" ct (EVar tvra) (ELit zero)) [Alt zeroI (rebox one)] (rebox negativeOne))) where
     tvra = tVr 2 st
@@ -111,7 +111,7 @@ build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELi
     zero = LitInt 0 st
     one = ELit $ LitInt 1 st
     negativeOne = ELit $ LitInt (-1) st
-    rebox x = ELit (LitCons cn [x] te)
+    rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
 
 
 
@@ -123,7 +123,7 @@ buildPeek cn t p = ELam tvr $ ELam tvrCont $ ELam tvrWorld (unbox' (EVar tvr) dc
     tvrWorld = tVr 256 tWorld__
     rtVar = tVr 260 (rawType p)
     rtVar' = tVr 262 t
-    rest = eCaseTup' (EPrim (APrim (Peek p) mempty) [EVar tvrWorld, EVar tvr'] (ltTuple' [tWorld__,rawType p])) [tvrWorld2,rtVar] (eLet rtVar' (ELit $ LitCons cn [EVar rtVar] t) $ eJustIO (EVar tvrWorld2) (EVar rtVar') )
+    rest = eCaseTup' (EPrim (APrim (Peek p) mempty) [EVar tvrWorld, EVar tvr'] (ltTuple' [tWorld__,rawType p])) [tvrWorld2,rtVar] (eLet rtVar' (ELit $ litCons { litName = cn, litArgs = [EVar rtVar], litType = t }) $ eJustIO (EVar tvrWorld2) (EVar rtVar') )
 
 
 buildPoke cn t p = ELam ptr_tvr $ ELam v_tvr $ createIO_ $ (\tw -> unbox' (EVar ptr_tvr) dc_Addr ptr_tvr' $ unbox' (EVar v_tvr) cn v_tvr' $ EPrim (APrim (Poke p) mempty) [EVar tw, EVar ptr_tvr', EVar v_tvr'] tWorld__) where
@@ -153,16 +153,16 @@ createIO_ pv = toIO tUnit (ELam tvrCont $ ELam tvrWorld $  eStrictLet tvrWorld2 
     tvrWorld = tVr 256 tWorld__
 
 
-prim_number cn v t et = ELit (LitCons cn [ELit (LitInt v t)] et) where
+prim_number cn v t et = ELit litCons { litName = cn, litArgs = [ELit (LitInt v t)], litType = et }
 --    cn = toName DataConstructor $ nameName cn'
-prim_number _ _ _ _ = error "prim_number: invalid arg"
+--prim_number _ _ _ _ = error "prim_number: invalid arg"
 
 
---prim_const cn s st et = eStrictLet (tVr 2 st) (EPrim (APrim (CConst s t) mempty) [] st) (ELit (LitCons cn [EVar $ tVr 2 st] et)) where
-prim_const cn s st t et = ELit (LitCons cn [(EPrim (APrim (CConst s t) mempty) [] st)] et)
-prim_const _ _ _ _ _ = error "prim_const: invalid arg"
+--prim_const cn s st et = eStrictLet (tVr 2 st) (EPrim (APrim (CConst s t) mempty) [] st) (ELit (litCons { litName = cn, litArgs = [EVar $ tVr 2 st], litType = et })) where
+prim_const cn s st t et = ELit litCons { litName = cn, litArgs = [EPrim (APrim (CConst s t) mempty) [] st], litType = et }
+--prim_const _ _ _ _ _ = error "prim_const: invalid arg"
 
-prim_sizeof s = (ELit (LitCons dc_Int [rp] tInt)) where
+prim_sizeof s = (ELit (litCons { litName = dc_Int, litArgs = [rp], litType = tInt })) where
     rp = (EPrim (APrim (PrimTypeInfo { primArgType = s, primRetType = "int", primTypeInfo = PrimSizeOf }) mempty) [] tIntzh)
 
 v2_Int = tVr 2 tInt

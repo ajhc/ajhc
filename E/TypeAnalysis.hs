@@ -240,7 +240,7 @@ pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
     cd Nothing = Nothing
     -- The reason we do this is because for a typecase, we need a valid default in order to get the most general type
     cd (Just d) = Just $ EError "pruneCase: default pruned" (getType d)
-    as = [ n | LitCons n _ _ <- casePats ec ]
+    as = [ n | LitCons { litName = n } <- casePats ec ]
 
 
 
@@ -255,7 +255,7 @@ getTyp kind dataTable vm = f 10 kind vm where
         let ss = slotTypes dataTable h kind
             as = [ (s,vmapArg h i vm) | (s,i) <- zip ss [0..]]
         as' <- mapM (uncurry (f (n - 1))) as
-        return $ ELit (LitCons h as' kind)
+        return $ ELit (litCons { litName = h, litArgs = as', litType = kind })
     f _ _ _  = fail "getTyp: not constant type"
 
 specializeProgram :: (MonadStats m) =>
@@ -269,7 +269,7 @@ specializeProgram doSpecialize usedRules usedValues prog = do
     return $ programSetDs nds prog
 
 
-repi (ELit (LitCons n [a,b] _)) | n == tc_Arrow = EPi tvr { tvrIdent = 0, tvrType = a } b
+repi (ELit LitCons { litName = n, litArgs = [a,b] }) | n == tc_Arrow = EPi tvr { tvrIdent = 0, tvrType = a } b
 repi e = e
 
 specializeDef _ (_,unusedVals,_,_) (tvr,e) | tvr `Set.member` unusedVals = return (tvr,EError "Unused" (tvrType tvr))
@@ -338,8 +338,8 @@ expandPlaceholder (tvr,oe) | getProperty prop_PLACEHOLDER tvr = do
             }
         calt rule@Rule { ruleArgs = (arg:rs) } = Alt (valToPat' arg) (substMap (fromList [ (tvrIdent v,EVar r) | ~(EVar v) <- rs | r <- ras ]) $ ruleBody rule)
 
-        valToPat' (ELit LitCons { litName = x, litArgs = ts, litType = t }) = LitCons x [ z | ~(EVar z) <- ts ] t
-        valToPat' (EPi (TVr { tvrType =  EVar a}) (EVar b))  = LitCons tc_Arrow [a,b] eStar
+        valToPat' (ELit LitCons { litName = x, litArgs = ts, litType = t }) = LitCons { litName = x, litArgs = [ z | ~(EVar z) <- ts ], litType = t }
+        valToPat' (EPi (TVr { tvrType =  EVar a}) (EVar b))  = litCons { litName = tc_Arrow, litArgs = [a,b], litType = eStar }
         valToPat' x = error $ "expandPlaceholder.valToPat': " ++ show x
 
     return (unsetProperty prop_PLACEHOLDER tvr,foldr ELam ne as')
