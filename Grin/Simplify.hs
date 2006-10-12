@@ -26,6 +26,7 @@ import Util.HasSize
 import Util.Inst()
 import Util.Seq as Seq
 import Util.UniqueMonad
+import Util.SetLike
 import qualified Util.Histogram as Hist
 
 -- perform a number of simple simplifications.
@@ -247,7 +248,7 @@ isCombinable postEval e = ans where
         return $ concat cs
     f lf (_ :>>= _ :-> e) = f lf e
     f lf Let { expBody = body, expIsNormal = False } = f lf body
-    f lf (App a _ _) | a `Set.member` lf = return []
+    f lf (App a _ _) | a `member` lf = return []
     f lf Let { expBody = body, expDefs = defs, expIsNormal = True } = ans where
         nlf = lf `Set.union` Set.fromList (map funcDefName defs)
         ans = do
@@ -277,7 +278,7 @@ editTail nty mt te = f mempty te where
         defs' = [ updateFuncDefProps d { funcDefBody = g nlf (funcDefBody d) } | d <- defs ]
     f lf lt@MkCont {expLam = lam, expCont = cont } = lt { expLam = g lf lam, expCont = g lf cont }
     f lf (e1 :>>= p :-> e2) = e1 :>>= p :-> f lf e2
-    f lf e@(App a as t) | a `Set.member` lf = App a as nty
+    f lf e@(App a as t) | a `member` lf = App a as nty
     f lf e = mt e
     g lf (p :-> e) = p :-> f lf e
 
@@ -499,14 +500,18 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
         --True <- return $ Set.null $ Set.intersection (freeVars nic) (freeVars (map lamBind as) :: Set.Set Var)
         return $ modifyTail (v :-> nic) hexp -- Case x [ b :-> e :>>= v :-> Case v as' | b :-> e <- as ]
     caseHoist hexp v as' ty | grinPhase grin >= PostDevolve  = do
-        mtick $ "Optimize.optimize.case-hoist-jumppoint" -- .{" ++ show (Prelude.map (isManifestNode . lamExp) as :: [Maybe [Atom]])
-        uniq <- newUniq
-        let fname = toAtom $ "fjumppoint-" ++ show n ++ "-" ++ show uniq
-            f e@(Return NodeC {}) = e :>>= v :-> Case v as'
+        let ufuncs = freeVars fbody
+            fbody = Tup [v] :-> Case v as'
+            cfname = do
+                uniq <- newUniq
+                let fname = toAtom $ "fjumppoint-" ++ show n ++ "-" ++ show uniq
+                if fname `member` (ufuncs :: Set.Set Atom) then cfname else return fname
+        fname <- cfname
+        let f e@(Return NodeC {}) = e :>>= v :-> Case v as'
             f e@(Return Lit {}) = e :>>= v :-> Case v as'
             f e = e :>>= v :-> App fname [v] ty
             nbody = editTail ty f hexp -- (v :-> App fname [v] (getType $ Case v as')) (Case x as)
-            fbody = Tup [v] :-> Case v as'
+        mtick $ "Optimize.optimize.case-hoist-jumppoint.{" ++ show fname -- .{" ++ show (Prelude.map (isManifestNode . lamExp) as :: [Maybe [Atom]])
         return $ grinLet [createFuncDef True fname fbody] nbody
     caseHoist hexp v as' ty = do
        mfc <- f hexp
