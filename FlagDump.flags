@@ -44,6 +44,7 @@ optimization-stats show combined stats of optimization passes
 rules        show all rules
 e-info       show info tags on all bound variables
 e-verbose    print very verbose version of E code always
+e-alias      show expanded aliases
 e-size       print the size of E after each pass
 
 !Grin code

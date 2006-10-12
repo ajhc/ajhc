@@ -84,6 +84,10 @@ showLit showBind l = do
           where go n = do
                     se <- showBind v
                     return $ atom (text n) `app` se
+        f LitCons { litName = s, litArgs = es, litType = t, litAliasFor = Just af } | dump FD.EAlias = do
+            es' <- mapM showBind es
+            se <- showE af
+            return $ foldl appCon (atom (tshow s <> char '@' <> parens (unparse se))) es' -- `inhabit` prettye t
         f LitCons { litName = s, litArgs = es, litType = t } = do
             es' <- mapM showBind es
             return $ foldl appCon (atom (tshow s)) es' -- `inhabit` prettye t
