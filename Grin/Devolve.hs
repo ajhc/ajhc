@@ -33,5 +33,6 @@ devolveGrin grin = do
         f e = mapExpExp f e
     nf <- mapM g (grinFuncs grin)
     lf <- readIORef col
-    return $ setGrinFunctions (lf ++ nf) grin { grinPhase = PostDevolve }
+    let ntenv = extendTyEnv [ createFuncDef False x y | (x,y) <- lf ] (grinTypeEnv grin)
+    return $ setGrinFunctions (lf ++ nf) grin { grinPhase = PostDevolve, grinTypeEnv = ntenv }
 
