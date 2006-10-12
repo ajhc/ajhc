@@ -67,7 +67,7 @@ atomizeAp atomizeTypes dataTable stats modName e = f e  where
     g (ELam tvr e) = do
         e' <- f e
         return (ELam tvr e',[])
-    g (ELit (LitCons n xs t)) = do
+    g (ELit LitCons { litName = n, litArgs = xs, litType = t }) = do
         (xs',dss) <- fmap unzip (mapM h xs)
         return (ELit (LitCons n xs' t), concat dss)
     g e@ELit {} = return (e,[])
@@ -279,7 +279,7 @@ floatOutward prog = do
             imap' = Map.fromList [ (tvrIdent t,n') | t <- ts] `Map.union` imap
         g n ec@ECase {} imap = runIdentity $ caseBodiesMapM (\e -> g' n e imap') ec { eCaseBind = m (eCaseBind ec), eCaseAlts = map ma (eCaseAlts ec) } where
             m t = tvrInfo_u (Info.insert n) t
-            ma (Alt (LitCons n xs t)  b) = Alt (LitCons n (map m xs) t) b
+            ma (Alt LitCons { litName = n, litArgs = xs, litType = t }  b) = Alt (LitCons n (map m xs) t) b
             ma a = a
             imap' = Map.fromList [ (tvrIdent t,n) | t <- caseBinds ec] `Map.union` imap
         g n ELetRec { eDefs = ds, eBody = e } imap = dds (map G.fromScc $ decomposeDs ds) [] e imap where

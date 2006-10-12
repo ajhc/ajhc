@@ -121,7 +121,7 @@ collectOccurance e = f e  where
         case mlookup n tfvs of
             Nothing -> tell (tfvs,mempty) >>  return (EPi tvr { tvrIdent =  0, tvrType = a } b)
             Just occ -> tell (mdelete n tfvs,singleton n) >> return (EPi (annb' tvr { tvrType = a }) b)
-    f (ELit (LitCons n as t)) = arg $ do
+    f (ELit LitCons { litName = n, litArgs = as, litType = t }) = arg $ do
         t <- f t
         as <- mapM f as
         return (ELit (LitCons n as t))
@@ -199,9 +199,9 @@ annbind idm tvr = case mlookup (tvrIdent tvr) idm of
     Just x -> annb x tvr
 annb x tvr = tvrInfo_u (Info.insert x) tvr
 
-mapLitBinds f (LitCons n es t) = LitCons n (map f es) t
+mapLitBinds f LitCons { litName = n, litArgs = es, litType = t } = LitCons n (map f es) t
 mapLitBinds f (LitInt e t) = LitInt e t
-mapLitBindsM f (LitCons n es t) = do
+mapLitBindsM f LitCons { litName = n, litArgs = es, litType = t } = do
     es <- mapM f es
     return (LitCons n es t)
 mapLitBindsM f (LitInt e t) = return $  LitInt e t
@@ -487,7 +487,7 @@ simplifyDs prog sopts dsIn = ans where
         es' <- mapM (dosub inb) es
         t' <- dosub inb t
         return $ EPrim a es' t'
-    g (ELit (LitCons n es t)) inb = do
+    g (ELit LitCons { litName = n, litArgs = es, litType = t }) inb = do
         es' <- mapM (dosub inb) es
         t' <- dosub inb t
         return $ ELit (LitCons n es' t')
@@ -573,11 +573,11 @@ simplifyDs prog sopts dsIn = ans where
         d'' <- fmapM g d
         t' <- dosub inb t
         return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
-    doCase e t b as@(Alt (LitCons n _ _) _:_) (Just d) inb | Just ss <- getSiblings (so_dataTable sopts) n, length ss <= length as = do
+    doCase e t b as@(Alt LitCons { litName = n } _:_) (Just d) inb | Just ss <- getSiblings (so_dataTable sopts) n, length ss <= length as = do
         mtick "E.Simplify.case-no-default"
         doCase e t b as Nothing inb
-    doCase e t b as (Just d) inb | te /= tWorld__, (ELit (LitCons cn _ _)) <- followAliases dt te, Just Constructor { conChildren = Just cs } <- getConstructor cn dt, length as == length cs - 1 || (False && length as < length cs && isAtomic d)  = do
-        let ns = [ n | Alt ~(LitCons n _ _) _ <- as ]
+    doCase e t b as (Just d) inb | te /= tWorld__, (ELit LitCons { litName = cn }) <- followAliases dt te, Just Constructor { conChildren = Just cs } <- getConstructor cn dt, length as == length cs - 1 || (False && length as < length cs && isAtomic d)  = do
+        let ns = [ n | Alt ~LitCons { litName = n } _ <- as ]
             ls = filter (`notElem` ns) cs
             f n = do
                 con <- getConstructor n dt
@@ -634,14 +634,14 @@ simplifyDs prog sopts dsIn = ans where
             (EVar v,_) -> return $ (insertDoneSubst b (EVar b') . insertInScope (tvrIdent v) (isBoundTo noUseInfo (EVar b')),b')
             _ -> return $ (insertDoneSubst b (EVar b'),b')
         let dd e' = f e' ( ids $ envInScope_u (newinb `union`) inb) where
-                na = NotAmong [ n | Alt (LitCons n _ _) _ <- as]
+                na = NotAmong [ n | Alt LitCons { litName = n } _ <- as]
                 newinb = fromList [ (n,na) | EVar (TVr { tvrIdent = n }) <- [EVar b']]
             da (Alt (LitInt n t) ae) = do
                 t' <- dosub inb t
                 let p' = LitInt n t'
                 e' <- f ae (ids $ mins e (patToLitEE p') inb)
                 return $ Alt p' e'
-            da (Alt (LitCons n ns t) ae) = do
+            da (Alt LitCons { litName = n, litArgs = ns, litType = t } ae) = do
                 t' <- dosub inb t
                 ns' <- mapM (\v -> nname v inb) ns
                 let p' = LitCons n ns' t'
@@ -682,7 +682,7 @@ simplifyDs prog sopts dsIn = ans where
             Nothing -> do
                 return $ EError ("match falls off bottom: " ++ pprint l) t'
 
-    match m@(LitCons c xs _) ((Alt (LitCons c' bs _) e):rs) d@(b,_) | c == c' = do
+    match m@LitCons { litName = c, litArgs = xs } ((Alt LitCons { litName = c', litArgs = bs } e):rs) d@(b,_) | c == c' = do
         mtick (toAtom $ "E.Simplify.known-case." ++ show c )
         return $ Just ((b,ELit m):(zip bs xs),e)
          | otherwise = match m rs d
@@ -721,7 +721,7 @@ simplifyDs prog sopts dsIn = ans where
                     Just IsBoundTo {} -> KnowSomething
                     _ -> KnowNothing
                 tx _ = KnowNothing
-                knowLit (LitCons c _ _) = KnowIsCon c
+                knowLit LitCons { litName = c } = KnowIsCon c
                 knowLit (LitInt n _) = KnowIsNum n
         case z of
             (Just (x,xs)) -> didInline inb x xs  -- h x xs inb
@@ -883,9 +883,9 @@ exprSize max e discount known = f max e >>= \n -> return (max - n) where
         n <- f (n + discount) (EVar tv)
         let g n []  | Just d <- eCaseDefault ec = f n d
                     | otherwise  = return n
-            g n (Alt (LitCons c' _ _) e:rs) | KnowIsCon c <- l = if c == c' then f n e else g n rs
+            g n (Alt LitCons { litName = c' } e:rs) | KnowIsCon c <- l = if c == c' then f n e else g n rs
             g n (Alt (LitInt c' _) e:rs) | KnowIsNum c <- l = if c == c' then f n e else g n rs
-            g n (Alt (LitCons c _ _) e:rs) | KnowNotOneOf na <- l = if c `elem` na then g n rs else f n e >>= \n' -> g n' rs
+            g n (Alt LitCons { litName = c } e:rs) | KnowNotOneOf na <- l = if c `elem` na then g n rs else f n e >>= \n' -> g n' rs
             g n (Alt _ e:rs) = f n e >>= \n' -> g n' rs
         g n (eCaseAlts ec)
     f n ec@ECase {} = do

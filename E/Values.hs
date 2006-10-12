@@ -157,7 +157,7 @@ prim_seq a b | isWHNF a = b
 prim_seq a b = emptyCase { eCaseScrutinee = a, eCaseBind =  (tVr 0 (getType a)), eCaseDefault = Just b, eCaseType = getType b }
 
 prim_toTag e = f e where
-    f (ELit (LitCons n _ _)) = vTag n
+    f (ELit LitCons { litName = n }) = vTag n
     f (ELit (LitInt {})) = error "toTag applied to integer"
     f (ELetRec ds e) = ELetRec ds (prim_toTag e)
     f (EError err _) = EError err tTag
@@ -183,7 +183,7 @@ unsafeCoerceOpt (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = f (0::Int) e
         (n,e',p) = f n e t
     f n (EError err _) t = (n,EError err t,id)
     f n (ELit (LitInt x _)) t = (n,ELit (LitInt x t),id)
-    f n (ELit (LitCons x y _)) t = (n,ELit (LitCons x y t),id)
+    f n (ELit LitCons { litName = x, litArgs = y }) t = (n,ELit (LitCons x y t),id)
     f n ec@ECase {} t = (n,nx { eCaseType = t },id) where
         Identity nx = caseBodiesMapM (return . flip prim_unsafeCoerce t) ec
     f n e t | getType e == t = (n,e,id)
@@ -210,8 +210,8 @@ instance HasInfo TVr where
 
 -- | whether a value is a compile time constant
 isFullyConst :: E -> Bool
-isFullyConst (ELit (LitCons _ [] _)) = True
-isFullyConst (ELit (LitCons _ xs _)) = all isFullyConst xs
+isFullyConst (ELit LitCons { litArgs = [] }) = True
+isFullyConst (ELit LitCons { litArgs = xs }) = all isFullyConst xs
 isFullyConst ELit {} = True
 isFullyConst (EPi (TVr { tvrType = t }) x) =  isFullyConst t && isFullyConst x
 isFullyConst (EPrim (APrim p _) as _) = primIsConstant p && all isFullyConst as
@@ -258,7 +258,7 @@ isLifted x = sortTermLike x && not (isUnboxed (getType x))
 -- Note: This does not treat lambdas as whnf
 whnfOrBot :: E -> Bool
 whnfOrBot (EError {}) = True
-whnfOrBot (ELit (LitCons _ xs _)) = all isAtomic xs
+whnfOrBot (ELit LitCons { litArgs = xs }) = all isAtomic xs
 whnfOrBot (EPi (TVr { tvrIdent =  j, tvrType =  x }) y) | not (j `member` (freeVars y :: IdSet)) = isAtomic x && isAtomic y
 whnfOrBot ELam {} = True
 whnfOrBot e | isAtomic e = True

@@ -14,7 +14,7 @@ import Util.SetLike as S
 -------------------------
 
 getLitTyp (LitInt _ t) = t
-getLitTyp (LitCons _ _ t) = t
+getLitTyp LitCons { litType = t } = t
 
 instance FreeVars E [TVr] where
     freeVars x = melems $ (freeVars x :: IdMap TVr)
@@ -71,7 +71,7 @@ freeIds =   fv where
     fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = mconcat ( fv e:freeVars (tvrType  b):freeVars ty:(delete (tvrIdent b) $ mconcat (freeVars d:map freeVars as)  ):[])
     fv Unknown = mempty
     fv ESort {} = mempty
-    fvLit (LitCons _ es e) = mconcat $ fv e:map fv es
+    fvLit LitCons { litArgs = es, litType = e } = mconcat $ fv e:map fv es
     fvLit l = fv (getLitTyp l)
 
 
@@ -93,7 +93,7 @@ freeIdMap =   fv where
     fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = mconcat ( fv e:freeVars (tvrType  b):freeVars ty:(mdelete (tvrIdent b) $ mconcat (freeVars d:map freeVars as)  ):[])
     fv Unknown = mempty
     fv ESort {} = mempty
-    fvLit (LitCons _ es e) = mconcat $ fv e:map fv es
+    fvLit LitCons { litArgs = es, litType = e } = mconcat $ fv e:map fv es
     fvLit l = fv (getLitTyp l)
 
 

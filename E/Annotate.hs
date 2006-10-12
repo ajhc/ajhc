@@ -77,11 +77,11 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         caseBind <- procRules caseBind
         (b',r) <- ntvr [] $ caseBind { tvrInfo = Info.insert CaseDefault (tvrInfo caseBind) }
         d <- local r $ fmapM f $ eCaseDefault ec
-        let da (Alt (LitCons s vs t) e) = do
+        let da (Alt lc@LitCons { litName = s, litArgs = vs, litType = t } e) = do
                 t' <- f t
                 (as,rs) <- liftM unzip $ mapMntvr (map (tvrInfo_u (Info.insert CasePattern)) vs)
                 e' <- local (mconcat rs) $ f e
-                return $ Alt (LitCons s as t') e'
+                return $ Alt lc { litArgs = as, litType = t' } e'
             da (Alt l e) = do
                 l' <- fmapM f l
                 e' <- f e

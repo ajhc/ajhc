@@ -62,11 +62,11 @@ showLit showBind l = do
     let f (LitInt c t) | t == tCharzh = return $ atom $ (const_color (tshow $ chr i)) where
             i = fromIntegral c
         f (LitInt i _) = return $ atom $ (const_color (text $ show i))
-        f (LitCons n [] t) | t == tTag = return $  atom $ (const_color (text $ show n))
-        f (LitCons s es _) | Just n <- fromTupname s , n == length es = do
+        f LitCons { litName = n, litArgs = [], litType = t } | t == tTag = return $  atom $ (const_color (text $ show n))
+        f LitCons { litName = s, litArgs = es } | Just n <- fromTupname s , n == length es = do
             es' <- mapM (fmap unparse . showBind) es
             return $ atom $ tupled es'
-        f (LitCons s es _) | Just n <- fromUnboxedNameTuple s, n == length es = do
+        f LitCons { litName = s, litArgs = es } | Just n <- fromUnboxedNameTuple s, n == length es = do
             es' <- mapM (fmap unparse . showBind) es
             return $ atom $ encloseSep (text "(# ") (text " #)") (text ", ") es'
         f (LitCons n [a,b] _) | dc_Cons == n  = do
@@ -76,7 +76,7 @@ showLit showBind l = do
         f (LitCons n [e] _) | tc_List == n = do
             e <- showBind e
             return $  atom   (char '[' <> unparse e  <> char ']')
-        f (LitCons n [] _) | dc_EmptyList == n = return $ atom $ text "[]"
+        f LitCons { litName = n, litArgs = [] } | dc_EmptyList == n = return $ atom $ text "[]"
         f (LitCons n [v] _)
             | n == dc_Integer = go "Integer#"
             | n == dc_Int     = go "Int#"
@@ -84,7 +84,7 @@ showLit showBind l = do
           where go n = do
                     se <- showBind v
                     return $ atom (text n) `app` se
-        f (LitCons s es t) = do
+        f LitCons { litName = s, litArgs = es, litType = t } = do
             es' <- mapM showBind es
             return $ foldl appCon (atom (tshow s)) es' -- `inhabit` prettye t
         cons = bop (R,5) (text ":")

@@ -122,8 +122,8 @@ toEntry (n,as,e)
 toType :: Ty -> E -> Ty
 toType node = toty where
     toty e | e == tWorld__ = TyTup []
-    toty (ELit (LitCons n es ty)) |  ty == eHash, TypeConstructor <- nameType n, Just _ <- fromUnboxedNameTuple n = (tuple (map (toType (TyPtr TyNode) ) (filter shouldKeep es)))
-    toty (ELit (LitCons n [] es)) |  es == eHash, RawType <- nameType n = (Ty $ toAtom (show n))
+    toty (ELit LitCons { litName = n, litArgs = es, litType = ty }) |  ty == eHash, TypeConstructor <- nameType n, Just _ <- fromUnboxedNameTuple n = (tuple (map (toType (TyPtr TyNode) ) (filter shouldKeep es)))
+    toty (ELit LitCons { litName = n, litArgs = [], litType = es }) |  es == eHash, RawType <- nameType n = (Ty $ toAtom (show n))
     toty _ = node
 
 compile :: Program -> IO Grin
@@ -270,7 +270,7 @@ constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans wh
     coMap = Map.fromList [  (v,ce)| (v,_,ce) <- fst3 ans]
     conv :: E -> Val
     conv e | Just v <- literal e = v
-    conv (ELit lc@(LitCons n es _)) | Just nn <- getName lc = (Const (NodeC nn (map conv es)))
+    conv (ELit lc@LitCons { litName = n, litArgs = es }) | Just nn <- getName lc = (Const (NodeC nn (map conv es)))
     conv (EPi (TVr { tvrIdent = 0, tvrType =  a}) b)  =  Const $ NodeC tagArrow [conv a,conv b]
     conv (EVar v) | v `Set.member` lbs = Var (cafNum v) (TyPtr TyNode)
     conv e | (EVar x,as) <- fromAp e, Just vs <- Map.lookup x res, vs > length (ff as) = Const (NodeC (partialTag (scTag x) (vs - length (ff as))) (map conv (ff as)))
@@ -282,7 +282,7 @@ constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans wh
     fst3 (x,_,_) = x
 
 getName' :: (Show a,Monad m) => DataTable -> Lit a E -> m Atom
-getName' dataTable v@(LitCons n es _)
+getName' dataTable v@LitCons { litName = n, litArgs = es }
     | Just _ <- fromUnboxedNameTuple n = fail $ "unboxed tuples don't have names silly"
     | conAlias cons /= NotAlias = error $ "Alias still exists: " ++ show v
     | length es == nargs  = do
@@ -297,7 +297,7 @@ getName' dataTable v@(LitCons n es _)
 
 instance ToVal TVr where
     toVal (TVr { tvrIdent = num, tvrType = w}) | w == tWorld__ = Tup []-- Var v0 tyUnit -- es == eHash, RawType <- nameType n  = Var (V num) (Ty $ toAtom (show n))
-    toVal (TVr { tvrIdent = num, tvrType = (ELit (LitCons n [] es))}) | es == eHash, RawType <- nameType n  = Var (V num) (Ty $ toAtom (show n))
+    toVal (TVr { tvrIdent = num, tvrType = (ELit LitCons { litName = n, litArgs = [], litType = es })}) | es == eHash, RawType <- nameType n  = Var (V num) (Ty $ toAtom (show n))
     toVal tvr = Var  (V (tvrIdent tvr)) (TyPtr TyNode) -- (toTy $ tvrType tvr)
 
 -- constraints during compilation:
@@ -414,7 +414,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
             let p = prim { primType = ((map (Ty . toAtom) as),Ty (toAtom r)) }
             return $ Prim p (args xs)
         other -> fail $ "ce unknown primitive: " ++ show other
-    ce ECase { eCaseScrutinee = e, eCaseAlts = [Alt (LitCons n xs _) wh] } | Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n  = do
+    ce ECase { eCaseScrutinee = e, eCaseAlts = [Alt LitCons { litName = n, litArgs = xs } wh] } | Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n  = do
         e <- ce e
         wh <- ce wh
         return $ e :>>= tuple (map toVal (filter (shouldKeep . getType) xs)) :-> wh
@@ -422,7 +422,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
         e <- ce e
         r <- ce r
         return $ e :>>= unit :-> r
-    ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d } | (ELit (LitCons n [] _)) <- getType e, RawType <- nameType n = do
+    ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d } | (ELit LitCons { litName = n, litArgs = [] }) <- getType e, RawType <- nameType n = do
             let ty = Ty $ toAtom (show n)
             v <- newPrimVar ty
             e <- ce e
@@ -448,12 +448,12 @@ compile' dataTable cenv (tvr,as,e) = ans where
         nv <- nnv
         x <- ce e
         return [nv :-> x]
-    cp (Alt lc@(LitCons n es _) e) = do
+    cp (Alt lc@LitCons { litName = n, litArgs = es } e) = do
         x <- ce e
         nn <- getName lc
         return (NodeC nn (map toVal (filter (shouldKeep . getType) es)) :-> x)
     cp x = error $ "cp: " ++ show (funcName,x)
-    cp'' (Alt (LitInt i (ELit (LitCons nn [] _))) e) = do
+    cp'' (Alt (LitInt i (ELit LitCons { litName = nn, litArgs = [] })) e) = do
         x <- ce e
         return (Lit i (Ty $ toAtom (show nn)) :-> x)
 
@@ -608,7 +608,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
                          , t <- partialTag v (length as), tagIsWHNF t = return $ Const $ NodeC t []
     --                        False -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
     constant e | Just l <- literal e = return l
-    constant (ELit lc@(LitCons n es _)) | Just es <- mapM constant (filter (shouldKeep . getType) es), Just nn <- getName lc = (return $ Const (NodeC nn es))
+    constant (ELit lc@LitCons { litName = n, litArgs = es }) | Just es <- mapM constant (filter (shouldKeep . getType) es), Just nn <- getName lc = (return $ Const (NodeC nn es))
     constant (EPi (TVr { tvrIdent = 0, tvrType = a}) b) | Just a <- constant a, Just b <- constant b = return $ Const $ NodeC tagArrow [a,b]
     constant _ = fail "not a constant term"
 
@@ -616,7 +616,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
     con :: Monad m => E -> m Val
     con (EPi (TVr {tvrIdent =  0, tvrType = x}) y) = do
         return $  NodeC tagArrow (args [x,y])
-    con v@(ELit (LitCons n es _))
+    con v@(ELit LitCons { litName = n, litArgs = es })
         | conAlias cons /= NotAlias = error $ "Alias still exists: " ++ show v
         | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = do
             return (tuple (args (filter (shouldKeep . getType) es)))
@@ -642,7 +642,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
         writeIORef (counter cenv) $! (i + 2)
         return $! V i
 
-fromRawType (ELit (LitCons tname [] _))
+fromRawType (ELit LitCons { litName = tname, litArgs = [] })
     | RawType <- nameType tname = return (Ty $ toAtom (show tname))
 fromRawType _ = fail "not a raw type"
 

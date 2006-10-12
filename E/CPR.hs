@@ -116,8 +116,8 @@ cprAnalyze dataTable env e = cprAnalyze' env e where
             v -> error $ "cprAnalyze'.res_res: " ++ show v
     cprAnalyze' env  e = (e,f e) where
         f (ELit (LitInt n _)) = VInt n
-        f (ELit (LitCons n [] _)) = Tag [n]
-        f (ELit (LitCons n xs  _)) = Tup n (map g xs)
+        f (ELit LitCons { litName = n, litArgs = [], litType = _ }) = Tag [n]
+        f (ELit LitCons { litName = n, litArgs = xs, litType = _ }) = Tup n (map g xs)
         f (EPi t e) = Tup tc_Arrow [g $ tvrType t, g e]
         f (EPrim {}) = Top -- TODO fix primitives
         f (EError {}) = Bot

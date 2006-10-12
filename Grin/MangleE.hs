@@ -105,7 +105,7 @@ doComb scombs funArg (tvr,as,e) = do
 doE :: Set.Set TVr -> Supply (Int,Int) IsUsed -> E -> IO ()
 doE scombs funArg e = g (value (IsUsed True)) e where
     g eUsed e = f e where
-        f (ELit (LitCons _ xs _)) = mapM_ f xs
+        f (ELit LitCons { litArgs = xs }) = mapM_ f xs
         f ELit {} = return ()
         f (EPrim _ xs _) = mapM_ f xs
         f EError {} = return ()

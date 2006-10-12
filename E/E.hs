@@ -33,21 +33,23 @@ import Util.SetLike as S
 --------------------------------------
 
 
-data Lit e t = LitInt { litNumber :: Number, litType :: t } |  LitCons { litName :: Name, litArgs :: [e], litType :: t }
+data Lit e t = LitInt { litNumber :: Number, litType :: t }
+    | LitCons  { litName :: Name, litArgs :: [e], litType :: t }
+--    | LitAlias { litName :: Name, litArgs :: [e], litType :: t, litAliasFor :: Maybe E }
     deriving(Data,Eq,Ord,Typeable)
         {-!derive: is, GhcBinary !-}
 
 
 instance (Show e,Show t) => Show (Lit e t) where
     showsPrec _ (LitInt x t) = parens $  shows x <> showString "::" <> shows t
-    showsPrec _ (LitCons n es t) = parens $  hsep (shows n:map shows es) <> showString "::" <> shows t
+    showsPrec _ LitCons { litName = n, litArgs = es, litType = t } = parens $  hsep (shows n:map shows es) <> showString "::" <> shows t
 
 instance Functor (Lit e) where
     fmap f x = runIdentity $ fmapM (return . f) x
 
 instance FunctorM (Lit e) where
     fmapM f x = case x of
-        (LitCons a es e) -> do  e <- f e; return (LitCons a es e)
+        LitCons { litName = a, litArgs = es, litType = e } -> do  e <- f e; return LitCons { litName = a, litArgs = es, litType = e }
         LitInt i t -> do t <- f t; return $ LitInt i t
 
 
@@ -166,13 +168,13 @@ altHead :: Alt E -> Lit () ()
 altHead (Alt l _) = litHead  l
 litHead :: Lit a b -> Lit () ()
 litHead (LitInt x _) = LitInt x ()
-litHead (LitCons s _ _) = LitCons s [] ()
+litHead LitCons { litName = s } = LitCons s [] ()
 
-litBinds ((LitCons _ xs _) ) = xs
+litBinds (LitCons { litArgs = xs } ) = xs
 litBinds _ = []
 
 patToLitEE (LitCons n [a,b] t) | t == eStar, n == tc_Arrow = EPi (tVr 0 (EVar a)) (EVar b)
-patToLitEE (LitCons n xs t) = ELit $ LitCons n (map EVar xs) t
+patToLitEE LitCons { litName = n, litArgs = xs, litType = t } = ELit $ LitCons n (map EVar xs) t
 patToLitEE (LitInt x t) = ELit $ LitInt x t
 
 
@@ -292,7 +294,7 @@ eCompat (EPi (TVr { tvrType = e1 }) e2) (EPi (TVr { tvrType = ea }) eb) = eCompa
 eCompat (EVar _) _ = True
 eCompat _ (EVar _) = True
 eCompat (ELetRec _ e1) (ELetRec _ e2) = eCompat e1 e2
-eCompat (ELit (LitCons n es t)) (ELit (LitCons n' es' t')) = n == n' && all (uncurry eCompat) (zip es es') && eCompat t t'
+eCompat (ELit LitCons { litName = n, litArgs = es, litType = t }) (ELit LitCons { litName = n', litArgs = es', litType = t' }) = n == n' && all (uncurry eCompat) (zip es es') && eCompat t t'
 eCompat x y = x == y
 
 
@@ -313,7 +315,7 @@ caseBodiesMapM _ _ = error "caseBodiesMapM"
 
 toList :: Monad m => E -> m  [E]
 toList (ELit (LitCons n [e,b] _)) | vCons == n = toList b >>= \x -> return (e:x)
-toList (ELit (LitCons n [] _)) | vEmptyList == n = return []
+toList (ELit LitCons { litName = n, litArgs = [] }) | vEmptyList == n = return []
 toList _ = fail "toList: not list"
 
 toString x = toList x >>= mapM fromChar where

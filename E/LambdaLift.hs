@@ -85,7 +85,7 @@ calculateLiftees prog = do
         f v env e | (a, as@(_:_)) <- fromAp e = do
             mapM_ (f (value True) env) as
             f v env a
-        f v env (ELit (LitCons _ as _)) = mapM_ (f (value True) env) as
+        f v env (ELit LitCons { litArgs = as }) = mapM_ (f (value True) env) as
         f v env ELit {} = return ()
         f v env (EPi TVr { tvrType = a } b) = f (value True) env a >> f (value True) env b
         f v env (EPrim _ as _) = mapM_ (f (value True) env) as

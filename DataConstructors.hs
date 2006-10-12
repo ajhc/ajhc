@@ -134,7 +134,7 @@ getConstructor n (DataTable map) = case Map.lookup n map of
 -- | return the single constructor of product types
 
 getProduct :: Monad m => DataTable -> E -> m Constructor
-getProduct dataTable e | (ELit (LitCons cn _ _)) <- followAliases dataTable e, Just c <- getConstructor cn dataTable = f c where
+getProduct dataTable e | (ELit LitCons { litName = cn, litArgs = _, litType = _ }) <- followAliases dataTable e, Just c <- getConstructor cn dataTable = f c where
     f c | Just [x] <- conChildren c = getConstructor x dataTable
         | otherwise = fail "Not Product type"
 getProduct _ _ = fail "Not Product type"
@@ -263,7 +263,7 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,_,_,b,_) -> b
         tipe = ELit (LitCons tc [] eStar)
     f _ = []
 
-isAbsurd (ELit (LitCons n [] _)) | n == tc_Absurd = True
+isAbsurd (ELit LitCons { litName = n, litArgs = [], litType = _ }) | n == tc_Absurd = True
 isAbsurd (ELit (LitCons _ xs@(_:_) _)) = all isAbsurd xs
 isAbsurd _ = False
 
@@ -273,7 +273,7 @@ typesCompatable dataTable a b = go a b where
     go :: Monad m => E -> E -> m ()
     go a b = g' [] [] a b
     g' xs ys a b = g a b where
-        g (ELit (LitCons n xs t)) (ELit (LitCons n' xs' t')) | n == n' = do
+        g (ELit LitCons { litName = n, litArgs = xs, litType = t }) (ELit LitCons { litName = n', litArgs = xs', litType = t' }) | n == n' = do
             go t t'
             when (not $ sameShape1 xs xs') $ fail "Arg lists don't match"
             zipWithM_ go xs xs'
@@ -303,15 +303,15 @@ typesCompatable dataTable a b = go a b where
                 Right () -> return ()
                 Left s -> fail (s ++ "\n" ++ s' ++ "\n")
     f :: Monad m => [Name] -> [Name] -> E -> E -> m ()
-    f xs ys (ELit (LitCons n _ _)) _ | n `elem` xs = fail "Loop detected"
-    f xs ys a@(ELit (LitCons n _ _)) b | Just x <- followAlias dataTable a = g' (n:xs) ys x b
+    f xs ys (ELit LitCons { litName = n, litArgs = _, litType = _ }) _ | n `elem` xs = fail "Loop detected"
+    f xs ys a@(ELit LitCons { litName = n, litArgs = _, litType = _ }) b | Just x <- followAlias dataTable a = g' (n:xs) ys x b
     f _ _ box b | box == tBox, canBeBox b = return ()
     f _ _ a box | box == tBox, canBeBox a = return ()
     f _ _ a b = fail $ "Types don't match: " ++ pprint (a,b)
 
 
 lookupCType dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
-    ELit (LitCons c [] _)
+    ELit LitCons { litName = c, litArgs = [], litType = _ }
         | c == tc_Unit -> return (c,"void")
         | c == tc_World__ -> return (c,"void")
         | Just pt <- Map.lookup c ctypeMap -> return (c,pt)
@@ -319,11 +319,11 @@ lookupCType dataTable e = case followAliases (mappend dataTablePrims dataTable) 
     e' -> fail $ "lookupCType: " ++ show (e,e')
 
 lookupCType' dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
-    ELit (LitCons c [] _)
+    ELit LitCons { litName = c, litArgs = [], litType = _ }
         | Just Constructor { conChildren = Just [cn] }  <- getConstructor c dataTable,
-          Just Constructor { conSlots = [st@(ELit (LitCons n [] _))] } <- getConstructor cn dataTable
+          Just Constructor { conSlots = [st@(ELit LitCons { litName = n, litArgs = [], litType = _ })] } <- getConstructor cn dataTable
             -> return (cn,st,show n)
-    ELit (LitCons c [] _) | Just cn  <- getConstructor c dataTable -> fail $ "lookupCType: " ++ show cn
+    ELit LitCons { litName = c, litArgs = [], litType = _ } | Just cn  <- getConstructor c dataTable -> fail $ "lookupCType: " ++ show cn
     e' -> fail $ "lookupCType': " ++ show (e,e')
 
 followAlias :: Monad m => DataTable -> E -> m E
@@ -331,7 +331,7 @@ followAlias :: Monad m => DataTable -> E -> m E
 followAlias dataTable (EAp a b) = do
     a' <- followAlias dataTable a
     return (eAp a' b)
-followAlias dataTable (ELit (LitCons c ts e)) = do
+followAlias dataTable (ELit LitCons { litName = c, litArgs = ts, litType = e }) = do
     con <- getConstructor c dataTable
     Just [cn] <- return $ conChildren con
     ccon <- getConstructor cn dataTable
@@ -438,7 +438,7 @@ toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conN
             f [] con = con
         dataConsName =  toName Name.DataConstructor (hsConDeclName x)
         args = hsConDeclArgs x
-        (ELit (LitCons _ xs _) ,ts') = fromPi $ runVarName $ do
+        (ELit LitCons { litName = _, litArgs = xs, litType = _ } ,ts') = fromPi $ runVarName $ do
             flip mapM_ vs $ \tv -> do
                 newName [2,4..] () tv
             tipe' ty
@@ -479,7 +479,7 @@ constructionExpression ::
     -> Name   -- ^ name of said constructor
     -> E      -- ^ type of eventual constructor
     -> E      -- ^ saturated lambda calculus term
-constructionExpression dataTable n typ@(ELit (LitCons pn xs _))
+constructionExpression dataTable n typ@(ELit LitCons { litName = pn, litArgs = xs, litType = _ })
     | ErasedAlias <- conAlias mc = ELam var (EVar var)
     | RecursiveAlias <- conAlias mc = let var' = var { tvrType = st } in ELam var' (prim_unsafeCoerce (EVar var') typ)
     | pn == conName pc = sub (conExpr mc) where
@@ -499,7 +499,7 @@ deconstructionExpression ::
     -> [TVr]  -- ^ name supply, types ignored, must be at least as many as bound variables exist
     -> E      -- ^ body of alt
     -> Alt E  -- ^ resulting alternative
-deconstructionExpression dataTable name typ@(ELit (LitCons pn xs _)) vs _vs' e | pn == conName pc = ans where
+deconstructionExpression dataTable name typ@(ELit LitCons { litName = pn, litArgs = xs, litType = _ }) vs _vs' e | pn == conName pc = ans where
     Just mc = getConstructor name dataTable
     Just pc = getConstructor (conInhabits mc) dataTable
     ans = case conVirtual mc of
@@ -513,7 +513,7 @@ slotTypes ::
     -> Name   -- ^ name of constructor
     -> E      -- ^ type of value
     -> [E]    -- ^ type of each slot
-slotTypes wdt n (ELit (LitCons pn xs _))
+slotTypes wdt n (ELit LitCons { litName = pn, litArgs = xs, litType = _ })
     | pn == conName pc = [sub x | x <- conSlots mc ]
     where
     Identity mc = getConstructor n wdt
@@ -570,8 +570,8 @@ pprintTypeAsHs e = unparse $ runVarName (f e) where
         t1 <- f t1
         t2 <- f t2
         return $ t1 `arr` t2
-    f (ELit (LitCons n as _)) | (a:as') <- reverse as = f $ EAp (ELit (LitCons n (reverse as') undefined)) a
-    f (ELit (LitCons n [] _)) = return $ atom $ text $ show n
+    f (ELit LitCons { litName = n, litArgs = as, litType = _ }) | (a:as') <- reverse as = f $ EAp (ELit (LitCons n (reverse as') undefined)) a
+    f (ELit LitCons { litName = n, litArgs = [], litType = _ }) = return $ atom $ text $ show n
     f (EAp a b) = do
         a <- f a
         b <- f b

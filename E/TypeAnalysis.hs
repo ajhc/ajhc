@@ -86,7 +86,7 @@ sillyEntry env t = mapM_ (addRule . (`isSuperSetOf` value (vmapPlaceholder ())))
 lookupArgs t (_,_,tm) = maybe [] id (mlookup (tvrIdent t) tm)
 
 toLit (EPi TVr { tvrType = a } b) = return (tc_Arrow,[a,b])
-toLit (ELit (LitCons n ts _)) = return (n,ts)
+toLit (ELit LitCons { litName = n, litArgs = ts }) = return (n,ts)
 toLit _ = fail "not convertable to literal"
 
 assert :: Value Bool -> Fixer.Fixer.Rule
@@ -151,7 +151,7 @@ calcDs env@(ur,uv,_) ds = do
     d (t,e) = fail $ "calcDs: " ++ show (t,e)
 
 -- TODO - make default case conditional
-calcAlt env v (Alt (LitCons n xs _) e) = do
+calcAlt env v (Alt LitCons { litName = n, litArgs = xs } e) = do
     addRule $ conditionalRule (n `vmapMember`) v $ ioToRule $ do
         calcE env e
         flip mapM_ (zip [0..] xs) $ \ (i,t) -> do
@@ -212,7 +212,7 @@ typConstant :: Monad m => E -> m Typ
 typConstant (EPi TVr { tvrType = a} b) = do
     ab <- mapM typConstant [a,b]
     return $ vmapValue tc_Arrow ab
-typConstant (ELit (LitCons n xs _)) = do
+typConstant (ELit LitCons { litName = n, litArgs = xs }) = do
     xs' <- mapM typConstant xs
     return $ vmapValue n xs'
 typConstant e = fail $ "typConstant: " ++ show e
@@ -233,7 +233,7 @@ pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
     err = EError "pruneCase: all alternatives pruned" (getType ec)
     nec = ec { eCaseAlts = f [] $ eCaseAlts ec, eCaseDefault = cd (eCaseDefault ec)}
     f xs [] = reverse xs
-    f xs (alt@(Alt (LitCons n _ _) _):rs) | not (n `vmapMember` ns) = f xs rs
+    f xs (alt@(Alt LitCons { litName = n } _):rs) | not (n `vmapMember` ns) = f xs rs
     f xs (alt:rs) = f (alt:xs) rs
     cd (Just d) | Just nns <- vmapHeads ns, or [ n `notElem` as | n <- nns ] = Just d
                 | Nothing <- vmapHeads ns = Just d
@@ -338,7 +338,7 @@ expandPlaceholder (tvr,oe) | getProperty prop_PLACEHOLDER tvr = do
             }
         calt rule@Rule { ruleArgs = (arg:rs) } = Alt (valToPat' arg) (substMap (fromList [ (tvrIdent v,EVar r) | ~(EVar v) <- rs | r <- ras ]) $ ruleBody rule)
 
-        valToPat' (ELit (LitCons x ts t)) = LitCons x [ z | ~(EVar z) <- ts ] t
+        valToPat' (ELit LitCons { litName = x, litArgs = ts, litType = t }) = LitCons x [ z | ~(EVar z) <- ts ] t
         valToPat' (EPi (TVr { tvrType =  EVar a}) (EVar b))  = LitCons tc_Arrow [a,b] eStar
         valToPat' x = error $ "expandPlaceholder.valToPat': " ++ show x
 

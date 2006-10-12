@@ -53,7 +53,7 @@ emapEGH f g h e = z e where
     z (EVar aa) = do aa <- mapmTvr h aa; return $ EVar aa
     z (Unknown) = do return $ Unknown
     z (ESort aa) = do return $ ESort aa
-    z (ELit (LitCons n es t)) = do t' <- g t; es' <- mapM f es; return $ ELit (LitCons n es' t')
+    z (ELit LitCons { litName = n, litArgs = es, litType = t }) = do t' <- g t; es' <- mapM f es; return $ ELit (LitCons n es' t')
     z (ELit aa) = do aa <- fmapM g aa; return $ ELit aa
     z (ELetRec aa ab) = do aa <- mapM (\x -> do x <- (do (aa,ab) <- return x; aa <- mapmTvr g aa;ab <- f ab;return (aa,ab)); return x) aa;ab <- f ab; return $ ELetRec aa ab
     z ec@ECase {} = do
@@ -67,7 +67,7 @@ emapEGH f g h e = z e where
     z (EPrim aa ab ac) = do ab <- mapM f ab;ac <- g ac; return $ EPrim aa ab ac
     z (EError aa ab) = do ab <- g ab; return $ EError aa ab
     mapmTvr = fmapM
-    mapmAlt (Alt (LitCons n xs t) e) = do
+    mapmAlt (Alt LitCons { litName = n, litArgs = xs, litType = t } e) = do
         e' <- f e
         xs' <- mapM (fmapM g) xs
         t' <- g t
@@ -96,7 +96,7 @@ renameE initSet initMap e = runReader (runIdNameT' $ addBoundNamesIdMap initMap 
     f,f' :: E -> IdNameT (Reader (IdMap E)) E
     f' e = f e
     f  (EAp a b) = return EAp `ap` f a `ap` f b
-    f  (ELit (LitCons n xs t)) = do
+    f  (ELit LitCons { litName = n, litArgs = xs, litType = t }) = do
         xs' <- mapM f xs
         t' <- f' t
         return $ ELit (LitCons n xs' t')
@@ -135,7 +135,7 @@ renameE initSet initMap e = runReader (runIdNameT' $ addBoundNamesIdMap initMap 
             return (ELetRec (zip (snds ds') es) e')
     --f e = error $ "renameE.f: " ++ show e
     da :: Alt E -> IdNameT (Reader (IdMap E)) (Alt E)
-    da (Alt (LitCons n xs t) l) = do
+    da (Alt LitCons { litName = n, litArgs = xs, litType = t } l) = do
         t' <- f' t
         xs' <-  mapM (ntvr f') xs
         localSubst (mconcat [ x | (x,_) <- xs']) $ do

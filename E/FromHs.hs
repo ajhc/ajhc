@@ -230,7 +230,7 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
         methodVar = tVr (toId methodName) ty
         _methodName@(~(Just (TVr {tvrType = ty},_))) = findName methodName
         defaultName =  (defaultInstanceName methodName)
-        valToPat' (ELit (LitCons x ts t)) = ELit $ LitCons x [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..], j `notElem` map tvrIdent args]  t
+        valToPat' (ELit LitCons { litName = x, litArgs = ts, litType = t }) = ELit $ LitCons x [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..], j `notElem` map tvrIdent args]  t
         valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ LitCons tc_Arrow [ EVar (tVr j (getType z)) | z <- [a,b] | j <- [2,4 ..], j `notElem` map tvrIdent args]  eStar
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
         as = [ rule  t | (_ :=> IsIn _ t ) <- snub (classInsts classRecord) ]
@@ -274,7 +274,7 @@ createMethods dataTable classHierarchy funcs = return ans where
             calt e =  Alt (LitCons x [ case e of EVar tvr -> tvr; _ -> error $ "createMethods: "++ show e | e <- vs ]  ct)  e
             errType = subst tvr (tipe t) finalType
             (x,vs,ct) = case tipe t of
-                (ELit (LitCons x' vs' ct')) -> (x',vs',ct')
+                (ELit LitCons { litName = x', litArgs = vs', litType = ct' }) -> (x',vs',ct')
                 (EPi (TVr { tvrType = a}) b) -> (tc_Arrow,[a,b],eStar)
                 e -> error $ "FromHs.createMethods: " ++ show e
     method _ _ = []

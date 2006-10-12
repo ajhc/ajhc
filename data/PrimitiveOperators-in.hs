@@ -18,8 +18,8 @@ import Support.CanType
 
 create_integralCast c1 t1 c2 t2 e t = eCase e [Alt (LitCons c1 [tvra] te) cc] Unknown  where
     te = getType e
-    ELit (LitCons n1 [] _) = t1
-    ELit (LitCons n2 [] _) = t2
+    ELit LitCons { litName = n1, litArgs = [] } = t1
+    ELit LitCons { litName = n2, litArgs = [] } = t2
     tvra =  tVr 4 t1
     tvrb =  tVr 6 t2
     cc = if n1 == n2 then ELit (LitCons c2 [EVar tvra] t) else

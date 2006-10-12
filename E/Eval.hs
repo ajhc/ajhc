@@ -23,7 +23,7 @@ eval term = eval' term []  where
     eval' (EPi v body) [] = check_eta $ EPi v (eval body)
     eval' e@Unknown [] = e
     eval' e@ESort {} [] = e
-    eval' (ELit (LitCons n es t)) [] = ELit $ LitCons n (map eval es) t
+    eval' (ELit LitCons { litName = n, litArgs = es, litType = t }) [] = ELit $ LitCons n (map eval es) t
     eval' e@ELit {} [] = e
 
     -- argument applications
@@ -70,7 +70,7 @@ strong dsMap' term = eval' dsMap term [] where
         check_eta $ EPi v' body'
     eval' ds e@Unknown [] = return e
     eval' ds e@ESort {} [] = return e
-    eval' ds (ELit (LitCons n es t)) [] = do
+    eval' ds (ELit LitCons { litName = n, litArgs = es, litType = t }) [] = do
         es' <- mapM (\e -> eval' ds e []) es
         t' <-  (eval' ds t [])
         return $ ELit $ LitCons n es' t'

@@ -53,7 +53,7 @@ subst' (TVr { tvrIdent = (i) }) w e = doSubst True False (minsert i (Just w) $ (
 
 
 
-litSMapM f (LitCons s es t) = do
+litSMapM f LitCons { litName = s, litArgs = es, litType = t } = do
     t' <- f t
     es' <- mapM f es
     return $ LitCons s es' t'
@@ -99,7 +99,7 @@ doSubst substInVars allShadow bm e  = f e bm where
         e' <- f $ eCaseScrutinee ec
         (b',r) <- ntvr [] $ eCaseBind ec
         d <- local r $ fmapM f $ eCaseDefault ec
-        let da (Alt (LitCons s vs t) e) = do
+        let da (Alt LitCons { litName = s, litArgs = vs, litType = t } e) = do
                 t' <- f t
                 (as,rs) <- liftM unzip $ mapMntvr vs
                 e' <- local (mconcat rs) $ f e
@@ -217,7 +217,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
         e' <- f $ eCaseScrutinee ec
         (b',r) <- ntvr [] $ eCaseBind ec
         d <- local r $ fmapM f $ eCaseDefault ec
-        let da (Alt (LitCons s vs t) e) = do
+        let da (Alt LitCons { litName = s, litArgs = vs, litType = t } e) = do
                 t' <- inType $ f t
                 (as,rs) <- liftM unzip $ mapMntvr vs
                 e' <- local (mconcat rs) $ f e
@@ -246,7 +246,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
     inType = local (\ (_,trm,typ) -> (True,trm,typ) )
     addMap i (Just e) (b,trm,typ) = (b,minsert i (Just e) trm, minsert i e typ)
     addMap i Nothing (b,trm,typ) = (b,minsert i Nothing trm, typ)
-    litSMapM (LitCons s es t) = do
+    litSMapM LitCons { litName = s, litArgs = es, litType = t } = do
         t' <- inType $ f t
         es' <- mapM f es
         return $ LitCons s es' t'
