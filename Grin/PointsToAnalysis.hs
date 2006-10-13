@@ -19,6 +19,7 @@ import Fixer.Fixer
 import Fixer.Supply
 import GenUtil
 import Grin.EvalInline
+import Grin.Simplify
 import Grin.Grin
 import Grin.HashConst
 import Grin.Linear
@@ -297,6 +298,7 @@ createStore  te ts
 {-# NOINLINE grinInlineEvalApply #-}
 grinInlineEvalApply :: Stats -> Grin -> IO Grin
 grinInlineEvalApply  stats grin@(Grin { grinTypeEnv = typeEnv,  grinCafs = cafs }) = do
+    grin <- return $ renameUniqueGrin grin
     pt <- analyze grin
     wdump FD.Progress $ do
         CharIO.putStrLn (pointsToStats pt)

@@ -1,12 +1,13 @@
-module Grin.Simplify(simplify) where
+module Grin.Simplify(simplify,renameUniqueGrin) where
 
 import Char
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Control.Monad.State
 import Control.Monad.Trans
+import Control.Monad.RWS
 import Data.Monoid
-import List
+import List hiding (insert)
 import Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -24,9 +25,9 @@ import Support.Tuple
 import Util.Graph
 import Util.HasSize
 import Util.Inst()
-import Util.Seq as Seq
 import Util.UniqueMonad
 import Util.SetLike
+import qualified Util.Seq as Seq
 import qualified Util.Histogram as Hist
 
 -- perform a number of simple simplifications.
@@ -664,7 +665,44 @@ collectUsedFuncs (Tup as :-> exp) = (snub $ concatMap tagToFunction (Seq.toList 
     f e = (Seq.fromList [ v | v <- freeVars e ],Seq.empty)
 
 
+-- renames all functions to unique names, grin-wide
 
+renameUniqueGrin :: Grin -> Grin
+renameUniqueGrin grin = res where
+    (res,()) = evalRWS (execUniqT 1 ans) ( mempty :: Map.Map Atom Atom) (fromList [ x | (x,_) <- grinFuncs grin ] :: Set.Set Atom)
+    ans = do mapGrinFuncsM f grin
+    f (l :-> b) = g b >>= return . (l :->)
+    g a@App  { expFunction = fn } = do
+        m <- lift ask
+        case mlookup fn m of
+            Just fn' -> return a { expFunction = fn' }
+            _ -> return a
+    g a@Call { expValue = Item fn t } = do
+        m <- lift ask
+        case mlookup fn m of
+            Just fn' -> return a { expValue = Item fn' t }
+            _ -> return a
+    g (e@Let { expDefs = defs }) = do
+        (defs',rs) <- liftM unzip $ flip mapM defs $ \d -> do
+            (nn,rs) <- newName (funcDefName d)
+            return (d { funcDefName = nn },rs)
+        local (fromList rs `mappend`) $  mapExpExp g e { expDefs = defs' }
+    g b = mapExpExp g b
+    newName a = do
+        m <- lift get
+        case member a m of
+            False -> do lift $ modify (insert a); return (a,(a,a))
+            True -> do
+            let cfname = do
+                uniq <- newUniq
+                let fname = toAtom $ show a  ++ "-" ++ show uniq
+                if fname `member` (m :: Set.Set Atom) then cfname else return fname
+            nn <- cfname
+            lift $ modify (insert nn)
+            return (nn,(a,nn))
+
+mapGrinFuncsM :: Monad m => (Lam -> m Lam) -> Grin -> m Grin
+mapGrinFuncsM f grin = liftM (`setGrinFunctions` grin) $ mapM  (\x -> do nb <- f (funcDefBody x); return (funcDefName x, nb)) (grinFunctions grin)
 
 
 

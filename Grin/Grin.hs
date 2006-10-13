@@ -76,6 +76,7 @@ import Doc.DocLike
 import GenUtil
 import Name.VConsts
 import Number
+import Options
 import Support.CanType
 import Support.FreeVars
 import Support.Tuple
@@ -211,6 +212,7 @@ updateFuncDefProps fd@FuncDef { funcDefBody = body@(Tup args :-> rest) } =  fd {
     props = (funcDefProps fd) { funcFreeVars = freeVars body, funcTags = freeVars body, funcType = (map getType args,getType rest) }
 
 grinFuncs grin = map (\x -> (funcDefName x, funcDefBody x)) (grinFunctions grin)
+setGrinFunctions xs _grin | flint && hasRepeatUnder fst xs = error $ "setGrinFunctions: grin has redundent defeninitions" ++ show (fsts xs)
 setGrinFunctions xs grin = grin { grinFunctions = map (uncurry (createFuncDef False)) xs }
 
 
