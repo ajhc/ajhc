@@ -7,6 +7,7 @@ module DataConstructors(
     constructionExpression,
     deconstructionExpression,
     followAliases,
+    removeNewtypes,
     followAlias,
     expandAliases,
     getConstructor,
@@ -19,6 +20,7 @@ module DataConstructors(
     showDataTable,
     slotTypes,
     toDataTable,
+    updateLit,
     deriveClasses,
     typesCompatable
     ) where
@@ -40,6 +42,7 @@ import E.Shadow
 import E.Show
 import E.Subst
 import E.TypeCheck
+import E.Traverse
 import E.Values
 import FrontEnd.Syn.Traverse
 import GenUtil
@@ -386,9 +389,29 @@ deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where
     oper_III op a b = EPrim (APrim (Operator op ["int","int"] "int") mempty) [a,b] tIntzh
 
 
+
+updateLit :: DataTable -> Lit e t -> Lit e t
+updateLit _ l@LitInt {} = l
+updateLit dataTable lc@LitCons { litName = n } =  lc { litAliasFor = af } where
+    af = do
+        Constructor { conChildren = Just [x], conSlots = cs } <- getConstructor n dataTable
+        Constructor { conAlias = ErasedAlias, conSlots = [sl] } <- getConstructor x dataTable
+        return (foldr ELam sl [ tVr i s | s <- cs | i <- [2,4..]])
+
+removeNewtypes :: DataTable -> E -> E
+removeNewtypes dataTable e = runIdentity (f e) where
+    f ec@ECase {} = emapEGH f f return ec { eCaseAlts = map g (eCaseAlts ec) } where
+        g (Alt l e) = Alt (updateLit dataTable l) e
+    f (ELit l) = emapEGH f f return (ELit (updateLit dataTable l))
+    f e = emapEGH f f return e
+
+
 {-# NOINLINE toDataTable #-}
-toDataTable :: (Map.Map Name Kind) -> (Map.Map Name Type) -> [HsDecl] -> DataTable
-toDataTable km cm ds = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conName x,x) | x <- ds' ])  where
+toDataTable :: (Map.Map Name Kind) -> (Map.Map Name Type) -> [HsDecl] -> DataTable -> DataTable
+toDataTable km cm ds currentDataTable = newDataTable  where
+    newDataTable = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conName x,procNewTypes x) | x <- ds' ])
+    procNewTypes c = c { conExpr = f (conExpr c), conType = f (conType c), conSlots = map f (conSlots c) } where
+        f = removeNewtypes (newDataTable `mappend` currentDataTable)
     fixupMap k _ | Just n <- getConstructor k dataTablePrims = n
     fixupMap _ n = n
     ds' = Seq.toList $ execWriter (mapM_ f ds)

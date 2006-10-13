@@ -3,7 +3,6 @@ module E.TypeCheck(
     eAp,
     inferType,
     match,
-    removeNewtypes,
     sortStarLike,
     sortTermLike,
     sortTypeLike,
@@ -78,7 +77,8 @@ typ (ELit l) = getType l
 typ (EVar v) =  getType v
 typ (EPi _ b) = typ b
 typ (EAp (ELit LitCons { litType = EPi tvr a }) b) = getType (subst tvr b a)
-typ e@(EAp (ELit LitCons { litType = ty }) b) | ty == eStar = eStar -- XXX functions might have unboxed return types in the future
+-- typ e@(EAp (ELit LitCons { litType = ty }) b) | ty == eStar = eStar -- XXX functions might have unboxed return types in the future
+typ (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = getType (foldl EAp af (litArgs lc ++ [b]))
 typ e@(EAp (ELit LitCons {}) b) = error $ "getType: application of type alias " ++ (render $ ePretty e)
 typ (EAp (EPi tvr a) b) = getType (subst tvr b a)
 typ (EAp a b) = eAp (typ a) b
@@ -134,15 +134,6 @@ simplifyAp dataTable a@ELit {} b = case followAliases dataTable a  of
 simplifyAp _ a b = fail $ "simplifyAp: " ++ render (tupled [ePretty a, ePretty b])
 
 
-removeNewtypes :: DataTable -> E -> E
-removeNewtypes dataTable e = runIdentity (f e) where
-    f e = emapEGH f f' return e
-    f' (EAp a b) = do
-        a' <- f' a
-        b' <- f' b
-        return (eAp a' b')
-    f' el@ELit {} = emapEGH f' return return (followAliases dataTable el)
-    f' t = emapEGH f' return return t
 
 
 withContextDoc s a = withContext (render s) a
@@ -157,6 +148,7 @@ inferType dataTable ds e = rfc e where
     rfc' nds e = withContextDoc (text "fullCheck:" </> prettyE e) (inferType' nds (followAliases dataTable e) >>=  strong')
     strong' e = withContextDoc (text "Strong:" </> prettyE e) $ strong ds (followAliases dataTable e)
     fc s@(ESort _) = return $ typ s
+    fc (ELit lc@LitCons {}) | let lc' = updateLit dataTable lc, litAliasFor lc /= litAliasFor lc' = fail $ "Alias not correct: " ++ show (lc, litAliasFor lc')
     fc (ELit LitCons { litName = n, litArgs = es, litType =  t}) = do
         withContext ("Checking Constructor: " ++ show n) $ do
         valid t

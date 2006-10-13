@@ -255,7 +255,7 @@ getTyp kind dataTable vm = f 10 kind vm where
         let ss = slotTypes dataTable h kind
             as = [ (s,vmapArg h i vm) | (s,i) <- zip ss [0..]]
         as' <- mapM (uncurry (f (n - 1))) as
-        return $ ELit (litCons { litName = h, litArgs = as', litType = kind })
+        return $ ELit (updateLit dataTable litCons { litName = h, litArgs = as', litType = kind })
     f _ _ _  = fail "getTyp: not constant type"
 
 specializeProgram :: (MonadStats m) =>
@@ -338,7 +338,7 @@ expandPlaceholder (tvr,oe) | getProperty prop_PLACEHOLDER tvr = do
             }
         calt rule@Rule { ruleArgs = (arg:rs) } = Alt (valToPat' arg) (substMap (fromList [ (tvrIdent v,EVar r) | ~(EVar v) <- rs | r <- ras ]) $ ruleBody rule)
 
-        valToPat' (ELit LitCons { litName = x, litArgs = ts, litType = t }) = LitCons { litName = x, litArgs = [ z | ~(EVar z) <- ts ], litType = t }
+        valToPat' (ELit LitCons { litName = x, litArgs = ts, litType = t, litAliasFor = af }) = LitCons { litName = x, litArgs = [ z | ~(EVar z) <- ts ], litType = t, litAliasFor = af }
         valToPat' (EPi (TVr { tvrType =  EVar a}) (EVar b))  = litCons { litName = tc_Arrow, litArgs = [a,b], litType = eStar }
         valToPat' x = error $ "expandPlaceholder.valToPat': " ++ show x
 
