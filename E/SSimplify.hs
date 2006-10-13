@@ -772,6 +772,9 @@ simplifyDs prog sopts dsIn = ans where
     app' (ELit lc@LitCons { litName = n, litArgs = xs, litType = EPi ta tt }) (a:as)  = do
         mtick (toAtom $ "E.Simplify.typecon-reduce.{" ++ show n ++ "}" )
         app' (ELit lc { litArgs = xs ++ [a], litType = subst ta a tt }) as
+    app' (ELit LitCons { litName = n, litArgs = es, litAliasFor = Just af }) bs@(_:_) = do
+        mtick (toAtom $ "E.Simplify.newtype-reduce.{" ++ show n ++ "}" )
+        app' (foldl eAp af (es ++ bs)) []
 --    app' (ELit (LitCons n xs t@EPi {})) (a:as)  = do
 --        mtick (toAtom $ "E.Simplify.typecon-reduce.{" ++ show n ++ "}" )
 --        app' (ELit (LitCons n (xs ++ [a]) (eAp t a))) as

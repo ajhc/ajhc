@@ -162,9 +162,8 @@ nv' ss = v (2 * (size ss + 1)) where
 
 
 
-eAp (EPi (TVr { tvrIdent =  0 }) b) _ = b
-eAp (EPi t b) e = subst t e b
-eAp (ELam t b) e = subst t e b
+eAp (EPi t b) e = if tvrIdent t == 0 then b else subst t e b
+eAp (ELam t b) e = if tvrIdent t == 0 then b else subst t e b
 --eAp (EPrim n es t@(EPi _ _)) b = EPrim n (es ++ [b]) (eAp t b)  -- only apply if type is pi-like
 eAp (ELit lc@LitCons { litArgs = es, litType = (EPi t r) }) b = ELit lc { litArgs = es ++ [b], litType = subst t b r }
 eAp (ELit LitCons { litArgs = es, litAliasFor = Just af }) b = foldl eAp af (es ++ [b])

@@ -316,7 +316,7 @@ analyze (ELam x e) (L None) = analyze (ELam x e) (L (Product [lazy]))  -- simply
 analyze (ELam x e) (Error None) = analyze (ELam x e) (Error (Product [lazy]))  -- simply to ensure binder is annotated
 analyze e@EError {} (S _) = return (e,botType)
 analyze e@EError {} (L _) = return (e,absType)
-analyze ec@ECase { eCaseBind = b, eCaseAlts = [Alt lc@LitCons { litName = h, litArgs = ts, litType = _ } alt], eCaseDefault = Nothing } s = do
+analyze ec@ECase { eCaseBind = b, eCaseAlts = [Alt lc@LitCons { litName = h, litArgs = ts } alt], eCaseDefault = Nothing } s = do
     dataTable <- getDataTable
     case getSiblings dataTable h of
         Just [_] -> do  -- product type

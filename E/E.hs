@@ -169,7 +169,7 @@ altHead :: Alt E -> Lit () ()
 altHead (Alt l _) = litHead  l
 litHead :: Lit a b -> Lit () ()
 litHead (LitInt x _) = LitInt x ()
-litHead LitCons { litName = s } = litCons { litName = s, litType = () }
+litHead LitCons { litName = s, litAliasFor = af } = litCons { litName = s, litType = (), litAliasFor = af }
 
 litBinds (LitCons { litArgs = xs } ) = xs
 litBinds _ = []

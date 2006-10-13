@@ -23,11 +23,12 @@ eval term = eval' term []  where
     eval' (EPi v body) [] = check_eta $ EPi v (eval body)
     eval' e@Unknown [] = e
     eval' e@ESort {} [] = e
-    eval' (ELit lc@LitCons { litName = n, litArgs = es, litType = t }) [] = ELit lc { litArgs = map eval es }
+    eval' (ELit lc@LitCons { litArgs = es }) [] = ELit lc { litArgs = map eval es }
     eval' e@ELit {} [] = e
 
     -- argument applications
     eval' (ELit lc@LitCons { litArgs = es, litType = EPi tb tt }) (t:rest) = eval' (ELit lc { litArgs = es ++ [t], litType = subst tb t tt }) rest
+    eval' (ELit LitCons { litArgs = es, litAliasFor = Just af }) (t:rest) = eval' af (es ++ t:rest)
 
     eval' (ELam v body) (t:rest) = eval' (subst v t body) rest
     eval' (EPi v body) (t:rest) = eval' (subst v t body) rest   -- fudge
@@ -76,6 +77,7 @@ strong dsMap' term = eval' dsMap term [] where
         return $ ELit $ lc { litArgs = es', litType = t' }
     eval' ds e@ELit {} [] = return e
     eval' ds (ELit lc@LitCons { litArgs = es, litType = EPi tb tt }) (t:rest) = eval' ds (ELit lc { litArgs = es ++ [t], litType = subst tb t tt }) rest
+    eval' ds (ELit LitCons { litArgs = es, litAliasFor = Just af }) (t:rest) = eval' ds af (es ++ t:rest)
     eval' ds (ELam v body) (t:rest) = eval' ds (subst v t body) rest
     eval' ds (EPi v body) (t:rest) = eval' ds (subst v t body) rest   -- fudge
     eval' ds (EAp t1 t2) stack = eval' ds t1 (t2:stack)

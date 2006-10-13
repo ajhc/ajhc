@@ -122,19 +122,6 @@ sortTermLike e = e /= eBox && not (sortStarLike e) && not (sortTypeLike e) && so
 
 
 
-simplifyAp :: Monad m => DataTable -> E -> E -> m E
-simplifyAp dataTable (EAp a b) c = do
-    na <- simplifyAp dataTable a b
-    simplifyAp dataTable na c
-simplifyAp _ (ELit lc@LitCons { litArgs = xs, litType = EPi tvr r }) b = do
-        return (ELit lc { litArgs = (xs ++ [b]), litType = subst tvr b r })
-simplifyAp dataTable a@ELit {} b = case followAliases dataTable a  of
-        ELit {} -> fail $ "simplifyAp: " ++ render (tupled [ePretty a, ePretty b])
-        (EPi tvr e) -> do
-                return (subst tvr b e)
-simplifyAp _ a b = fail $ "simplifyAp: " ++ render (tupled [ePretty a, ePretty b])
-
-
 
 
 withContextDoc s a = withContext (render s) a
@@ -145,9 +132,9 @@ inferType :: ContextMonad String m => DataTable -> [(TVr,E)] -> E -> m E
 inferType dataTable ds e = rfc e where
     inferType' ds e = inferType dataTable ds e
     prettyE = ePrettyEx
-    rfc e =  withContextDoc (text "fullCheck:" </> prettyE e) (fc (followAliases dataTable e) >>=  strong')
-    rfc' nds e = withContextDoc (text "fullCheck:" </> prettyE e) (inferType' nds (followAliases dataTable e) >>=  strong')
-    strong' e = withContextDoc (text "Strong:" </> prettyE e) $ strong ds (followAliases dataTable e)
+    rfc e =  withContextDoc (text "fullCheck:" </> prettyE e) (fc e >>=  strong')
+    rfc' nds e = withContextDoc (text "fullCheck:" </> prettyE e) (inferType' nds e >>=  strong')
+    strong' e = withContextDoc (text "Strong:" </> prettyE e) $ strong ds e
     fc s@(ESort _) = return $ typ s
     fc (ELit lc@LitCons {}) | let lc' = updateLit dataTable lc, litAliasFor lc /= litAliasFor lc' = fail $ "Alias not correct: " ++ show (lc, litAliasFor lc')
     fc (ELit LitCons { litName = n, litArgs = es, litType =  t}) = do
@@ -172,11 +159,12 @@ inferType dataTable ds e = rfc e where
         b' <- rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
         strong' $ EPi tvr b'
     fc (EAp (EPi tvr e) b) = rfc (subst tvr b e)
+    fc (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = fc (EAp (foldl eAp af (litArgs lc)) b)
     fc (EAp a b) = do
         withContextDoc (text "EAp:" </> parens (prettyE a) </> parens (prettyE b)) $ do
             a' <- rfc a
             --b <- strong' b
-            strong' $ eAp (followAliases dataTable a') b
+            strong' $ eAp a' b
         {-
         case followAliases dataTable a' of
             (EPi tvr@(TVr { tvrType =  t}) v) -> do
@@ -319,9 +307,9 @@ typeInfer'' :: ContextMonad String m => DataTable -> [(TVr,E)] -> E -> m E
 typeInfer'' dataTable ds e = rfc e where
     inferType' ds e = typeInfer'' dataTable ds e
     prettyE = ePrettyEx
-    rfc e =  withContextDoc (text "fullCheck':" </> prettyE e) (fc (followAliases dataTable e) >>=  strong')
-    rfc' nds e =  withContextDoc (text "fullCheck':" </> prettyE e) (inferType' nds  (followAliases dataTable e) >>=  strong')
-    strong' e = withContextDoc (text "Strong':" </> prettyE e) $ strong ds (followAliases dataTable e)
+    rfc e =  withContextDoc (text "fullCheck':" </> prettyE e) (fc e >>=  strong')
+    rfc' nds e =  withContextDoc (text "fullCheck':" </> prettyE e) (inferType' nds  e >>=  strong')
+    strong' e = withContextDoc (text "Strong':" </> prettyE e) $ strong ds e
     fc s@ESort {} = return $ getType s
     fc (ELit LitCons { litType = t }) = strong' t
     fc e@ELit {} = strong' (getType e)
@@ -335,9 +323,10 @@ typeInfer'' dataTable ds e = rfc e where
     fc (EAp (EPi tvr e) b) = do
         b <- strong' b
         rfc (subst tvr b e)
+    fc (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = fc (EAp (foldl eAp af (litArgs lc)) b)
     fc (EAp a b) = do
         a' <- rfc a
-        strong' (eAp (followAliases dataTable a') b)
+        strong' (eAp a' b)
     fc (ELetRec vs e) = do
         let nds = vs ++ ds
         et <- inferType' nds e
