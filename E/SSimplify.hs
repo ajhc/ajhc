@@ -121,7 +121,7 @@ collectOccurance e = f e  where
         case mlookup n tfvs of
             Nothing -> tell (tfvs,mempty) >>  return (EPi tvr { tvrIdent =  0, tvrType = a } b)
             Just occ -> tell (mdelete n tfvs,singleton n) >> return (EPi (annb' tvr { tvrType = a }) b)
-    f (ELit lc@LitCons { litName = n, litArgs = as, litType = t }) = arg $ do
+    f (ELit lc@LitCons { litArgs = as, litType = t }) = arg $ do
         t <- f t
         as <- mapM f as
         return (ELit lc { litArgs = as, litType = t })
@@ -585,8 +585,8 @@ simplifyDs prog sopts dsIn = ans where
                         n <- newName
                         return $ tVr n t
                 ts <- mapM g (slotTypes (so_dataTable sopts) n te)
-                let wtd = ELit $ litCons { litName = n, litArgs = map EVar ts, litType = te }
-                return $ Alt litCons { litName = n, litArgs = ts, litType = te } (eLet b wtd d)
+                let wtd = ELit $ updateLit (so_dataTable sopts) litCons { litName = n, litArgs = map EVar ts, litType = te }
+                return $ Alt (updateLit (so_dataTable sopts) litCons { litName = n, litArgs = ts, litType = te }) (eLet b wtd d)
         mtick $ "E.Simplify.case-improve-default.{" ++ show (sort ls) ++ "}"
         ls' <- mapM f ls
         ec <- dosub inb emptyCase { eCaseScrutinee = e, eCaseType = t, eCaseBind = b, eCaseAlts = as ++ ls' }

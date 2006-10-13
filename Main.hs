@@ -165,8 +165,7 @@ transBarendregt = transformParms {
     barendregtProgram prog | null $ progCombinators prog = prog
     barendregtProgram prog = programSetDs ds' prog where
         (ELetRec ds' Unknown,_) = renameE mempty mempty (ELetRec (programDs prog) Unknown)
-
-{-
+          {-
 denewtypeProgram prog = transformProgram transDenewtype prog
 transDenewtype = transformParms {
         transformCategory = "DeNewtype",
@@ -174,11 +173,12 @@ transDenewtype = transformParms {
         transformDumpProgress = corePass,
         transformOperation =  return . denewtype
         } where
-    denewtype prog | null $ progCombinators prog = prog
-    denewtype prog = prog' where
-        ELetRec ds _ = removeNewtypes (progDataTable prog) (programE prog)
-        Identity prog' = annotateProgram mempty (\_ nfo -> return nfo)  (\_ nfo -> return nfo) (\_ nfo -> return nfo) (programSetDs ds prog)
--}
+        -}
+denewtype prog | null $ progCombinators prog = prog
+denewtype prog = prog' where
+    ELetRec ds _ = removeNewtypes (progDataTable prog) (programE prog)
+    prog' = programSetDs ds prog
+--    Identity prog' = annotateProgram mempty (\_ nfo -> return nfo)  (\_ nfo -> return nfo) (\_ nfo -> return nfo) (programSetDs ds prog)
 
 lamann _ nfo = return nfo
 letann e nfo = return (annotateArity e nfo)
@@ -203,10 +203,11 @@ processInitialHo ::
 processInitialHo accumho ho = do
     let (ds,uids) = runWriter $ annotateDs imap (collectIdAnn rules' (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
         rules' = runIdentity $ mapBodies (annotate imapRules (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
-        prog = etaAnnotateProgram (programSetDs ds program)
+        prog = etaAnnotateProgram (denewtype $ programSetDs ds program { progDataTable = hoDataTable accumho `mappend` hoDataTable ho })
         imap = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho)]
         imapRules = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho `mappend` hoEs ho)]
         accumho' = reprocessHo rules' (hoProps ho) accumho
+
     --lintCheckProgram (putStrLn "processInitialHo") prog
     return $ accumho' `mappend` ho { hoUsedIds = uids, hoEs = programEsMap prog }
 
@@ -756,6 +757,7 @@ boxifyProgram prog = ans where
     boxify v@EVar {} | canBeBox v = tBox
     boxify (ELit lc) = ELit lc { litArgs = map boxify (litArgs lc) }
     boxify v@(EAp _ _) | canBeBox v = tBox
+    boxify (EAp (ELam t b) e) = boxify (subst t e b)
     boxify (EAp a b) = EAp (boxify a) b -- TODO there should be no applications at the type level by now (boxify b)
     boxify s@ESort {} = s
     boxify x = error $ "boxify: " ++ show x

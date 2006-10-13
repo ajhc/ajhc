@@ -78,7 +78,8 @@ typ (EVar v) =  getType v
 typ (EPi _ b) = typ b
 typ (EAp (ELit LitCons { litType = EPi tvr a }) b) = getType (subst tvr b a)
 -- typ e@(EAp (ELit LitCons { litType = ty }) b) | ty == eStar = eStar -- XXX functions might have unboxed return types in the future
-typ (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = getType (foldl EAp af (litArgs lc ++ [b]))
+-- XXX the following should never occur
+typ (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = getType (foldl eAp af (litArgs lc ++ [b]))
 typ e@(EAp (ELit LitCons {}) b) = error $ "getType: application of type alias " ++ (render $ ePretty e)
 typ (EAp (EPi tvr a) b) = getType (subst tvr b a)
 typ (EAp a b) = eAp (typ a) b
