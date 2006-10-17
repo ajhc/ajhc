@@ -1120,6 +1120,7 @@ namesHsConDecl' toName c = ans where
         _ -> []
 
 namesHsDeclTS' toName (HsTypeSig sl ns _) = ((map (rtup sl . toName Val) ns),[])
+namesHsDeclTS' toName (HsTypeDecl sl n _ _) = ([(toName TypeConstructor n,sl)],[])
 namesHsDeclTS' _ _ = ([],[])
 
 {-

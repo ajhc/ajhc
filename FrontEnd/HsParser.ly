@@ -271,9 +271,7 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >	| topdecl			{ [$1] }
 
 > topdecl :: { HsDecl }
->	: 'type' simpletype srcloc '=' type
->			{ HsTypeDecl $3 (fst $2) (snd $2) $5 }
->       | 'data' ctype srcloc deriving
+>       : 'data' ctype srcloc deriving
 >           {% checkDataHeader $2 `thenP` \(cs,c,t) ->
 >              returnP (HsDataDecl $3 cs c t [] $4) }
 >	| 'data' ctype srcloc '=' constrs deriving
@@ -554,7 +552,9 @@ Recycling...
 Value definitions
 
 > valdef :: { HsDecl }
->	: infixexp srcloc rhs			{% checkValDef $2 $1 $3 []}
+>	: 'type' simpletype srcloc '=' type
+>			{ HsTypeDecl $3 (fst $2) (snd $2) $5 }
+>	| infixexp srcloc rhs			{% checkValDef $2 $1 $3 []}
 >	| infixexp srcloc rhs 'where' decllist	{% checkValDef $2 $1 $3 $5}
 
 > rhs	:: { HsRhs }
