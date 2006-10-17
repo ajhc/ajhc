@@ -428,6 +428,12 @@ type KindGroup = ([(HsName,[HsName])], [DataDeclHead], HsContext, [HsType], [HsQ
 --     kgQualTypes ::[HsQualType]
 --     }
 
+
+--declsToKindGroup ds = ans where
+--    ans = execWriter (mapM_ f ds)
+--    f (HsDataDecl _sloc context tyconName tyconArgs condecls _derives) = do
+--        declsToKindGroup
+
 declsToKindGroup :: [HsDecl] -> KindGroup
 declsToKindGroup [] = ([], [], [], [], [])
 
@@ -455,22 +461,29 @@ declsToKindGroup ((HsNewTypeDecl _sloc context tyconName tyconArgs condecl _deri
    newHead = (tyconName, tyconArgs)
    newBodies = conDeclToTypes condecl
 
+declsToKindGroup (HsTypeDecl _sloc name names t: decls)
+   = (restClassDecls,
+      (name,names):restDataHeads,
+      restContext,
+      restDataBodies,
+      restClassBodies)
+   where
+   (restClassDecls, restDataHeads, restContext, restDataBodies, restClassBodies)
+      = declsToKindGroup decls
 
 declsToKindGroup (HsClassDecl _sloc qualType sigsAndDefaults : decls)
    = (newClassDecl:restClassDecls,
-      restDataHeads,
+      foos ++ restDataHeads,
       newContext++restContext,
       restDataBodies,
       newClassBodies++restClassBodies)
    where
    (restClassDecls, restDataHeads, restContext, restDataBodies, restClassBodies) = declsToKindGroup decls
    newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
-   --rn = runIdentity $ applyTU (full_tdTU $ adhocTU (constTU ([])) f) newClassBodies
-   --f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = return [n']
-   --f _ = return []
    rn = Seq.toList $ everything (Seq.<>) (mkQ Seq.empty f) newClassBodies
    f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = Seq.single n'
    f _ = Seq.empty
+   foos = [ (name,names) | HsTypeDecl _sloc name names _ <- sigsAndDefaults ]
    (newClassDecl, newContext) = ((className, classArg:rn), contxt)
    HsQualType contxt (HsTyApp (HsTyCon className) (HsTyVar classArg)) =  qualType
 

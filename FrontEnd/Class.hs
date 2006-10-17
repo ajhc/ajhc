@@ -642,6 +642,7 @@ nameOfTyCon _ t = error $ "nameOfTyCon: " ++ show t
 
 groupEquations :: [HsDecl] -> [(Name, HsDecl)]
 groupEquations [] = []
+groupEquations (HsTypeDecl {}:ds) = groupEquations ds
 groupEquations (d:ds) = (getDeclName d, d) : groupEquations ds
 
 
