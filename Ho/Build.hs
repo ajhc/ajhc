@@ -26,7 +26,7 @@ import qualified Text.PrettyPrint.HughesPJ as PPrint
 import Atom
 import Binary
 import CharIO
-import Class
+import FrontEnd.Class
 import DataConstructors
 import Directory
 import Doc.DocLike

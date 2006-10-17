@@ -29,16 +29,13 @@
 
 -- TODO this, of everything desperatly needs to be rewritten the most.
 
-module Class(
+module FrontEnd.Class(
     addClassToHierarchy,
     addInstancesToHierarchy,
     printClassHierarchy,
     instanceToTopDecls,
-    entails,
     ClassHierarchy,
     ClassRecord(..),
-    reduce,
-    split,
     instanceName,
     defaultInstanceName,
     printClassSummary,
@@ -47,12 +44,9 @@ module Class(
     asksClassRecord,
     classRecords,
     makeClassHierarchy,
-    splitReduce,
-    toHnfs,
-    topDefaults,
     derivableClasses,
     stdClasses,
-    simplify,
+    Inst(..),
     numClasses
     ) where
 
@@ -61,13 +55,14 @@ import Control.Monad.Writer
 import Data.Generics
 import Data.Monoid
 import List((\\), partition)
-import qualified Data.Map as Map
 import Text.PrettyPrint.HughesPJ as PPrint
+import qualified Data.Map as Map
 
 import Binary
 import Doc.PPrint
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc
+import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import GenUtil(snub,snubFst,concatInter)
 import HsSyn
@@ -78,54 +73,24 @@ import Name.Name
 import Name.Names
 import Name.VConsts
 import Options
-import qualified FlagOpts as FO
+import PrimitiveOperators(primitiveInsts)
 import Representation
 import Type
 import Util.HasSize
 import Util.Inst()
-import PrimitiveOperators(primitiveInsts)
-import FrontEnd.Tc.Type
+import qualified FlagOpts as FO
 
 --------------------------------------------------------------------------------
 
--- Instance
-type Inst  = Qual Pred
 type Assump = (Name,Sigma)
 
-bySuper :: ClassHierarchy -> Pred -> [Pred]
-bySuper h p@(IsIn c t)
- = p : concat (map (bySuper h) supers)
-   where supers = [ IsIn c' t | c' <- supersOf h c ]
 
-byInst             :: Monad m => Pred -> Inst -> m [Pred]
-byInst p (ps :=> h) = do u <- matchPred h p
-                         return (map (apply u) ps)
+newtype Inst = Inst {
+    instHead :: Qual Pred
+    } deriving(Typeable,Data,Eq,Ord,PPrint Doc,Show)
+    {-! derive: GhcBinary !-}
 
-matchPred :: Monad m => Pred -> Pred -> m Subst
-matchPred x@(IsIn c t) y@(IsIn c' t')
-      | c == c'   = match t t'
-      | otherwise = fail $ "Classes do not match: " ++ show (x,y)
-
-reducePred :: Monad m => ClassHierarchy -> Pred -> m [Pred]
-reducePred h p@(IsIn c t)
-    | Just x <- foldr mplus Nothing poss = return x
-    | otherwise = fail "reducePred"
- where poss = map (byInst p) (instsOf h c)
-
------------------------------------------------------------------------------
-
-entails :: ClassHierarchy -> [Pred] -> Pred -> Bool
-entails h ps p = any (p `elem`) (map (bySuper h) ps) ||
-           case reducePred h p of
-             Nothing -> False
-             Just qs -> all (entails h ps) qs
-
------------------------------------------------------------------------------
-
--- the new class hierarchy
-
-
--- classname (superclasses, instances, properly qualified type-sigs of methods)
+emptyInstance = Inst { instHead = error "emptyInstance" }
 
 data ClassRecord = ClassRecord {
     className :: Class,
@@ -174,49 +139,12 @@ asksClassRecord (ClassHierarchy ch) cn f = case Map.lookup cn ch of
     Nothing -> error $ "asksClassRecord: " ++ show cn
     Just n -> f n
 
-supersOf :: ClassHierarchy -> Class -> [Class]
-supersOf ch c = asksClassRecord ch c classSupers
-
-instsOf :: ClassHierarchy -> Class -> [Inst]
-instsOf ch c = asksClassRecord ch c classInsts
-
-
 showInst :: Inst -> String
 showInst = PPrint.render . pprint
 
 showPred :: Pred -> String
 showPred (IsIn c t) = show c ++ " " ++ (pretty t)
 
-
---makeDeriveInstances :: [Pred] -> Type -> [Class] -> [Inst]
---makeDeriveInstances context t [] = []
---makeDeriveInstances context t (c:cs)
---   | c `elem` derivableClasses
---        = (context :=> IsIn c t) : makeDeriveInstances context t cs
---   | otherwise
---        = error $ "makeDeriveInstances: attempt to make type " ++ pretty t ++
---                  "\nan instance of a non-derivable class " ++ show c
-
-{-
-toHsName (x,y) = Qual (Module x) (HsIdent y)
-instance ClassNames HsName where
-    classEq = toHsName classEq
-    classOrd = toHsName classOrd
-    classEnum = toHsName classEnum
-    classBounded = toHsName classBounded
-    classShow = toHsName classShow
-    classRead = toHsName classRead
-    classIx = toHsName classIx
-    classFunctor = toHsName classFunctor
-    classMonad = toHsName classMonad
-    classNum = toHsName classNum
-    classReal = toHsName classReal
-    classIntegral = toHsName classIntegral
-    classFractional = toHsName classFractional
-    classFloating = toHsName classFloating
-    classRealFrac = toHsName classRealFrac
-    classRealFloat = toHsName classRealFloat
--}
 
 
 toHsQualType qt = qt
@@ -315,7 +243,7 @@ modifyClassRecord f c (ClassHierarchy h) = case Map.lookup c h of
            Just r -> ClassHierarchy $ Map.insert c (f r) h
 
 addOneInstanceToHierarchy :: ClassHierarchy -> (Bool,Inst) -> ClassHierarchy
-addOneInstanceToHierarchy ch (x,inst@(cntxt :=> IsIn className _)) = modifyClassRecord f className ch where
+addOneInstanceToHierarchy ch (x,inst@Inst { instHead = cntxt :=> IsIn className _ }) = modifyClassRecord f className ch where
     f c
         | x = c { classInsts = inst:classInsts c, classDerives = inst:classDerives c }
         | otherwise = c { classInsts = inst:classInsts c  }
@@ -355,7 +283,7 @@ instance (Eq a, Functor a) => Eq (Tree a) where ...
 hsInstDeclToInst :: Monad m => KindEnv -> (HsDecl) -> m [(Bool,Inst)]
 hsInstDeclToInst kt (HsInstDecl _sloc qType _decls)
    | classKind == argTypeKind
-        = return [(False,cntxt :=> IsIn className convertedArgType)]
+        = return [(False,emptyInstance { instHead = cntxt :=> IsIn className convertedArgType })]
    | otherwise
         = failSl _sloc $ "hsInstDeclToInst: kind error, attempt to make\n" ++
                   show argType ++ " (with kind " ++
@@ -633,133 +561,6 @@ classMethodAssumps hierarchy = concatMap classAssumps $ classRecords hierarchy
 
 --------------------------------------------------------------------------------
 
-splitReduce :: OptionMonad m => ClassHierarchy -> [Tyvar] -> [Tyvar] -> [Pred] -> m ([Pred], [Pred], [(Tyvar,Type)])
-
-splitReduce h fs gs ps = do
-    (ds, rs) <- split h fs ps
-    (rs',sub) <- genDefaults h (fs++gs) rs
-    return (ds,rs',sub)
-
--- context reduction
--- This is the 'split' from THIH
-
-
-reduce :: OptionMonad m => ClassHierarchy -> [Tyvar] -> [Tyvar] -> [Pred] -> m ([Pred], [Pred])
-
-reduce h fs gs ps = do
-    (ds, rs) <- split h fs ps
-    rs' <-   useDefaults h (fs++gs) rs
-    return (ds,rs')
-
---------------------------------------------------------------------------------
-
--- context splitting
--- This is equivalant to a 'reduce' then a 'partition' in THIH
-
-split       :: Monad m => ClassHierarchy -> [Tyvar] -> [Pred] -> m ([Pred], [Pred])
-split h fs ps  = do
-    ps' <- (toHnfs h ps)
-    return $ partition (all (`elem` fs) . tv) $ simplify h  $ ps'
-
-toHnfs      :: Monad m => ClassHierarchy -> [Pred] -> m [Pred]
-toHnfs h ps =  mapM (toHnf h) ps >>= return . concat
-
-toHnf :: Monad m => ClassHierarchy -> Pred -> m [Pred]
-toHnf h p
-    | inHnf p = return [p]
-    | otherwise =  case reducePred h p of
-         Nothing -> fail $ "context reduction, no instance for: "  ++ render (pprint  p)
-         Just ps -> toHnfs h ps
-
-inHnf       :: Pred -> Bool
-inHnf (IsIn c t) = hnf t
- where hnf (TVar v)  = True
-       hnf (TCon tc) = False
-       hnf (TAp t _) = hnf t
-       hnf (TArrow _t1 _t2) = False
-       hnf TForAll {} = False
-
---simplify          :: ClassHierarchy -> [Pred] -> [Pred] -> [Pred]
---simplify h rs []     = rs
---simplify h rs (p:ps) = simplify h (p:(rs\\qs)) (ps\\qs)
--- where qs       = bySuper h p
---       rs \\ qs = [ r | r<-rs, r `notElem` qs ]
-
-simplify :: ClassHierarchy -> [Pred] -> [Pred]
-simplify h ps = loop [] ps where
-    loop rs []     = rs
-    loop rs (p:ps)
-        | entails h (rs ++ ps) p = loop rs ps
-        | otherwise = loop (p:rs) ps
---     where qs       = bySuper h p
---           rs \\ qs = [ r | r<-rs, r `notElem` qs ]
------------------------------------------------------------------------------
-
--- defaulting ambiguous constraints
-
-
--- ambiguities from THIH + call to candidates
-ambig :: ClassHierarchy -> [Tyvar] -> [Pred] -> [(Tyvar,[Pred],[Type])]
-
-ambig h vs ps
-  = [ (v, qs, defs h v qs) |
-         v <- tv ps \\ vs,
-         let qs = [ p | p<-ps, v `elem` tv p ] ]
-
--- 'candidates' from THIH
-defs     :: ClassHierarchy -> Tyvar -> [Pred] -> [Type]
-defs h v qs = [ t | all ((TVar v)==) ts,
-                  all (`elem` stdClasses) cs, -- XXX needs fixing
-                  any (`elem` numClasses) cs, -- XXX needs fixing
-                  -- False, -- XXX
-                  t <- defaults, -- XXX needs fixing
-                  and [ entails h [] (IsIn c t) | c <- cs ]]
- where cs = [ c | (IsIn c t) <- qs ]
-       ts = [ t | (IsIn c t) <- qs ]
-
-withDefaults     :: Monad m => ClassHierarchy ->  [Tyvar] -> [Pred] -> m [(Tyvar, [Pred], Type)]
-withDefaults h vs ps
-  | any null tss = fail $ "withDefaults.ambiguity: " ++ (render $ pprint ps) ++ show vs ++ show ps
---  | otherwise = fail $ "Zambiguity: " ++ (render $ pprint ps) ++  show (ps,ps',ams)
-  | otherwise    = return $ [ (v,qs,head ts) | (v,qs,ts) <- ams ]
-    where ams = ambig h vs ps
-          tss = [ ts | (v,qs,ts) <- ams ]
-
--- Return retained predicates and a defaulting substitution
-genDefaults :: Monad m => ClassHierarchy ->  [Tyvar] -> [Pred] -> m ([Pred],[(Tyvar,Type)])
-genDefaults h vs ps = do
-    ams <- withDefaults h vs ps
-    let ps' = [ p | (v,qs,ts) <- ams, p<-qs ]
-        vs  = [ (v,t)  | (v,qs,t) <- ams ]
-    return (ps \\ ps',  vs)
-
-useDefaults     :: OptionMonad m => ClassHierarchy -> [Tyvar] -> [Pred] -> m [Pred]
-useDefaults h vs ps = flagOpt FO.Defaulting >>= \b -> case b of
- --   False -> return ps
-    _
-      | any null tss -> fail $ "useDefaults.ambiguity: " ++ (render $ pprint ps) ++  show ps
-      | otherwise -> fail $ "Zambiguity: " ++ (render $ pprint ps) ++  show (ps,ps',ams)
---      | otherwise    = return $ ps \\ ps'
-        where ams = ambig h vs ps
-              tss = [ ts | (v,qs,ts) <- ams ]
-              ps' = [ p | (v,qs,ts) <- ams, p<-qs ]
-
-topDefaults     :: OptionMonad m => ClassHierarchy -> [Pred] -> m Subst
-topDefaults h ps  =  flagOpt FO.Defaulting >>= \b -> case b of
---    False -> return mempty
-    _
-      | any null tss -> fail $ " ambiguity " ++ (render $ pprint ps)
-      | otherwise    -> return $ Map.fromList (zip vs (map head tss))
-        where ams = ambig h [] ps
-              tss = [ ts | (v,qs,ts) <- ams ]
-              vs  = [ v  | (v,qs,ts) <- ams ]
-
-defaults    :: [Type]
-defaults
-    | not $ fopts FO.Defaulting = []
-    | otherwise = map (\name -> TCon (Tycon name Star)) [tc_Integer, tc_Double]
-
-
 
 failSl sl m = fail $ show sl ++ ": " ++ m
 
@@ -773,13 +574,13 @@ makeClassHierarchy (ClassHierarchy ch) kt ds = return (ClassHierarchy ans) where
         | HsTyApp (HsTyCon className) (HsTyVar argName)  <- tbody = do
             let qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
                 newClassContext = hsContextToContext [(className, argName)]
-            tell [ClassRecord { className = toName ClassName className, classSrcLoc = sl, classSupers = map fst $ hsContextToContext cntxt, classInsts = [ i | i@(_ :=> IsIn n _) <- primitiveInsts, nameName n == className], classDerives = [], classAssumps = qualifiedMethodAssumps }]
+            tell [ClassRecord { className = toName ClassName className, classSrcLoc = sl, classSupers = map fst $ hsContextToContext cntxt, classInsts = [ emptyInstance { instHead = i } | i@(_ :=> IsIn n _) <- primitiveInsts, nameName n == className], classDerives = [], classAssumps = qualifiedMethodAssumps }]
 
         | otherwise = failSl sl "Invalid Class declaration."
         where
         HsQualType cntxt tbody = toHsQualType t
     f decl = hsInstDeclToInst kt decl >>= \insts -> do
-        crs <- flip mapM [ (cn,i) | (_,i@(_ :=> IsIn cn _)) <- insts] $ \ (x,inst) -> case Map.lookup x ch of
+        crs <- flip mapM [ (cn,i) | (_,i@Inst { instHead = _ :=> IsIn cn _}) <- insts] $ \ (x,inst) -> case Map.lookup x ch of
             Just cr -> ensureNotDup (srcLoc decl) inst (classInsts cr) >> return [cr { classInsts = mempty }]
             Nothing -> return [] -- case Map.lookup x ans of
                 -- Just _ -> return []

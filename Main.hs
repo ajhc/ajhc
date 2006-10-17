@@ -17,7 +17,7 @@ import qualified System
 import Atom
 import C.FromGrin
 import CharIO
-import Class
+import FrontEnd.Class
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint

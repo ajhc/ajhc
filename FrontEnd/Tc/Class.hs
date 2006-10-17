@@ -10,7 +10,6 @@ module FrontEnd.Tc.Class(
     assertEntailment,
     assertEquivalant,
     Preds
-
     )where
 
 import Control.Monad.Trans
@@ -27,14 +26,13 @@ import Doc.DocLike
 import Support.CanType
 import qualified FlagOpts as FO
 import qualified FlagDump as FD
-import Class hiding(split,simplify,toHnfs,entails,splitReduce,topDefaults)
+import FrontEnd.Class
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Monad
 import Doc.PPrint
 import Warning
 
 
-type Inst = Qual Pred
 
 generalize :: [Pred] -> Rho -> Tc Sigma
 generalize ps r = do
@@ -107,8 +105,9 @@ bySuper h p@(IsIn c t)
    where supers = [ IsIn c' t | c' <- supersOf h c ]
 
 byInst             :: Monad m => Pred -> Inst -> m [Pred]
-byInst p (ps :=> h) = do u <- matchPred h p
-                         return (map (inst mempty (Map.fromList [ (tyvarAtom mv,t) | (mv,t) <- u ])) ps)
+byInst p Inst { instHead = ps :=> h } = do
+    u <- matchPred h p
+    return (map (inst mempty (Map.fromList [ (tyvarAtom mv,t) | (mv,t) <- u ])) ps)
 
 matchPred :: Monad m => Pred -> Pred -> m [(Tyvar,Type)]
 matchPred x@(IsIn c t) y@(IsIn c' t')

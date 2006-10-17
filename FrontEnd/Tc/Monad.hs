@@ -58,7 +58,7 @@ import Text.PrettyPrint.HughesPJ(Doc)
 
 
 import Atom
-import Class(ClassHierarchy,simplify)
+import {-# SOURCE #-} FrontEnd.Tc.Class(ClassHierarchy,simplify)
 import Diagnostic
 import Doc.DocLike
 import Support.FreeVars
@@ -367,7 +367,7 @@ quantify vs ps r | not $ any isBoxyMetaVar vs = do
     sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- vs ]
     (ps :=> r) <- flattenType (ps :=> r)
     ch <- getClassHierarchy
-    return $ TForAll nvs (Class.simplify ch ps :=> r)
+    return $ TForAll nvs (FrontEnd.Tc.Class.simplify ch ps :=> r)
 
 
 -- this removes all boxes, replacing them with tau vars

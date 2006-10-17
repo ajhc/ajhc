@@ -3,7 +3,7 @@ module Ho.Type where
 import Binary
 
 import Atom(Atom)
-import Class(ClassHierarchy)
+import FrontEnd.Class(ClassHierarchy)
 import DataConstructors(DataTable)
 import E.E(TVr,E)
 import E.Rules(Rules)

@@ -30,7 +30,7 @@ import FrontEnd.Tc.Type
 import FrontEnd.Tc.Class
 import FrontEnd.Desugar(desugarHsStmt)
 import GenUtil
-import Class
+import FrontEnd.Class
 import Ho.Type
 import HsPretty()
 import HsSyn
@@ -233,7 +233,7 @@ tcStatementTc (HsQualifier e) = do
     box <- newBox Star
     (_,ps') <- listenPreds $ tiExpr e box
     ps' <- flattenType ps'
-    let ps = Class.simplify (hoClassHierarchy ho) ps'
+    let ps = FrontEnd.Tc.Class.simplify (hoClassHierarchy ho) ps'
     (ps :=> vv) <- flattenType (ps :=> box)
     TForAll vs (ps :=> t) <- generalize ps vv -- quantify (tv vv) qt
     --liftIO $ putStrLn $ show (text "::" <+> pprint vv' :: P.Doc)

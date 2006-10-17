@@ -4,7 +4,7 @@
 
 module FrontEnd.HsErrors where
 
-import Class
+import FrontEnd.Class
 import HsSyn
 import Monad
 import Name.Name

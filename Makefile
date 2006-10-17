@@ -5,7 +5,7 @@ all: jhc
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches -fno-warn-unused-binds    # -O2 -ddump-simpl-stats -ddump-rules
 GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
-GHCINC=  -iFrontEnd
+GHCINC=  -i. -iFrontEnd
 PACKAGES= -package mtl  -package unix -package QuickCheck
 GHCOPTS=   -O -ignore-package lang  -pgmF drift-ghc  -F $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) -fwarn-type-defaults   -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
 

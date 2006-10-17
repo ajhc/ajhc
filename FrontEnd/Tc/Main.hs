@@ -8,7 +8,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Graph(stronglyConnComp, SCC(..))
 
-import Class(ClassHierarchy)
 import Control.Monad.Reader
 import DeclsDepends(getDeclDeps)
 import Diagnostic

@@ -33,7 +33,7 @@ import qualified Data.Map as Map hiding(map)
 
 import Binary
 import C.Prims
-import Class(instanceName)
+import FrontEnd.Class(instanceName)
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty

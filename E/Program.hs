@@ -5,7 +5,7 @@ import Data.Monoid
 import List
 import qualified Data.Map as Map
 
-import Class
+import FrontEnd.Class
 import DataConstructors
 import E.E
 import E.TypeCheck

@@ -10,7 +10,7 @@ import qualified Data.Map as Map
 import Text.PrettyPrint.HughesPJ as PPrint
 
 import Atom
-import Class
+import FrontEnd.Class
 import DataConsAssump     (dataConsEnv)
 import DataConstructors
 import DeclsDepends       (getDeclDeps, debugDeclBindGroups)

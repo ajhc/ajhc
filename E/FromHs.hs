@@ -25,7 +25,7 @@ import Atom
 import Boolean.Algebra
 import C.FFI
 import C.Prims as CP
-import Class
+import FrontEnd.Class
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
@@ -234,7 +234,7 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
         valToPat' (ELit LitCons { litName = x, litArgs = ts, litType = t }) = ELit $ litCons { litName = x, litArgs = [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..], j `notElem` map tvrIdent args], litType = t }
         valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ litCons { litName = tc_Arrow, litArgs = [ EVar (tVr j (getType z)) | z <- [a,b] | j <- [2,4 ..], j `notElem` map tvrIdent args], litType = eStar }
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
-        as = [ rule  t | (_ :=> IsIn _ t ) <- snub (classInsts classRecord) ]
+        as = [ rule  t | Inst { instHead = _ :=> IsIn _ t }  <- snub (classInsts classRecord) ]
         (_ft,_:args') = fromPi ty
         (args,_rargs) = span (sortStarLike . getType)  args'
         rule t = emptyRule { ruleHead = methodVar, ruleArgs = valToPat' (tipe t):map EVar args, ruleBinds = [ t | ~(EVar t) <- vs] ++ args, ruleBody = body, ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
@@ -262,7 +262,7 @@ createMethods dataTable classHierarchy funcs = return ans where
         Just (vmap::Typ) = Info.lookup nfo
         (EPi tvr finalType) = ty
         v = eLam tvr (foldr ELam emptyCase { eCaseScrutinee = EVar tvr, eCaseAlts = as, eCaseBind = tvr { tvrIdent = 0 }, eCaseType = foldr EPi ft rargs } args)
-        as = concatMap cinst [ t | (_ :=> IsIn _ t ) <- classInsts classRecord]
+        as = concatMap cinst [ t | Inst { instHead = _ :=> IsIn _ t } <- classInsts classRecord]
         (ft,args') = fromPi finalType
         (args,rargs) = span (sortStarLike . getType)  args'
         cinst t | Nothing <- getConstructor x dataTable = fail "skip un-imported primitives"
