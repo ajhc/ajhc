@@ -62,6 +62,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import HsSyn
+import Util.SetLike
 import MapBinaryInstance()
 import Maybe
 import Monad
@@ -71,7 +72,7 @@ import Name.VConsts
 import Options
 import PrimitiveOperators(primitiveInsts)
 import Representation
-import Type
+import Type as T
 import Util.HasSize
 import Util.Gen
 import Util.Inst()
@@ -143,8 +144,6 @@ asksClassRecord (ClassHierarchy ch) cn f = case Map.lookup cn ch of
 showInst :: Inst -> String
 showInst = PPrint.render . pprint
 
-showPred :: Pred -> String
-showPred (IsIn c t) = show c ++ " " ++ (pretty t)
 
 
 
@@ -216,37 +215,6 @@ addOneInstanceToHierarchy ch (x,inst@Inst { instHead = cntxt :=> IsIn className 
         | x = c { classInsts = inst:classInsts c, classDerives = inst:classDerives c }
         | otherwise = c { classInsts = inst:classInsts c  }
 
-{-
-   = newHierarchy
-   where
-   newHierarchy
-      -- check to make sure the class exists
-      -- = case lookupFM ch className of
-      = case lookupEnv className ch of
-           Nothing
-              -> error $ "addInstanceToHierarchy: attempt to add instance decl: " ++ showInst inst ++
-                         ", to non-existent class: " ++ show className
-           Just _ -> addToCombFM nodeCombiner className newElement ch
-   newElement = ([], [inst], [])
-   nodeCombiner :: ([HsName], [Inst], [Assump]) -> ([HsName], [Inst], [Assump]) -> ([HsName], [Inst], [Assump])
-   nodeCombiner (_, [newInst], _) (supers, oldInsts, oldMethodSigs) = (supers, newInst:oldInsts, oldMethodSigs)
-
-
-from section 4.3.2 of the Haskell 98 report
-
-instance decls look like:
-   instance cx' => C (T u1 ... uk) where { d }
-
-where u_i are simple variables and are distinct
-
-XXX
-currently hsInstDeclToInst does not check whether the context of
-an instance declaration is legal, for example it allows:
-
-instance (Eq a, Functor a) => Eq (Tree a) where ...
- the kind of Functor, and Eq are different (the Functor is wrong here)
-
--}
 
 hsInstDeclToInst :: Monad m => KindEnv -> (HsDecl) -> m [(Bool,Inst)]
 hsInstDeclToInst kt (HsInstDecl _sloc qType _decls)
@@ -327,8 +295,7 @@ hsInstDeclToInst _ _ = return []
 -- the types will only ever be constructors or vars
 
 convType :: [(HsType, Kind)] -> Type
-convType tsks
-   = foldl1 TAp (map toType tsks)
+convType tsks = foldl1 TAp (map toType tsks)
 
 toType :: (HsType, Kind) -> Type
 toType (HsTyCon n, k) = TCon $ Tycon (toName TypeConstructor n) k
@@ -337,51 +304,10 @@ toType (HsTyFun x y, Star) = TArrow (toType (x,Star)) (toType (y,Star))
 toType x = error $ "toType: " ++ show x
 
 flattenLeftTypeApplication :: HsType -> [HsType]
-flattenLeftTypeApplication t
-   = flatTypeAcc t []
-   where
-   flatTypeAcc (HsTyApp t1 t2) acc
-      = flatTypeAcc t1 (t2:acc)
-   flatTypeAcc nonTypApp acc
-      = nonTypApp:acc
+flattenLeftTypeApplication t = flatTypeAcc t [] where
+   flatTypeAcc (HsTyApp t1 t2) acc = flatTypeAcc t1 (t2:acc)
+   flatTypeAcc nonTypApp acc = nonTypApp:acc
 
-{-
-makeDeriveInstances :: [Pred] -> Type -> [Class] -> [Inst]
-makeDeriveInstances context t [] = []
-makeDeriveInstances context t (c:cs)
-   | c `elem` deriveableClasses
-        = (context :=> IsIn c t) : makeDeriveInstances context t cs
-   | otherwise
-        = error $ "makeDeriveInstances: attempt to make type " ++ pretty t ++
-                  "\nan instance of a non-deriveable class " ++ c
--}
-
--- as defined by section 4.3.3 of the haskell report
-{-
-deriveableClasses :: [Class]
-deriveableClasses = ["Eq", "Ord", "Enum", "Bounded", "Show", "Read"]
--}
-
-{-
-
-   converts leftmost type applications into lists
-
-   (((TC v1) v2) v3) => [TC, v1, v2, v3]
-
--}
-
-
---------------------------------------------------------------------------------
-
--- code for making instance methods into top level decls
--- by adding a (instantiated) type signature from the corresponding class
--- decl
---   className
---      = case qualType of
---           HsQualType _cntxt (HsTyApp (HsTyCon className) _argType) -> className
---           HsUnQualType (HsTyApp (HsTyCon className) _argType) -> className
-
--- {-
 
 
 
@@ -411,12 +337,14 @@ instanceToTopDecls :: KindEnv -> ClassHierarchy -> HsDecl -> (([HsDecl],[Assump]
 instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsInstDecl _ qualType methods)
     = unzip $ map (methodToTopDecls kt cacntxt crecord methodSigs qualType) $ methodGroups where
     methodGroups = groupEquations methods
-    cacntxt = [ IsEq (TAp (TCon (Tycon n k)) th) v | ((n,k),[_],~(Just v)) <- createClassAssocs kt methods]
-    (_,(className,[th])) = qtToClassHead kt qualType
+    cacntxt = [ IsEq (TAp (TCon (Tycon n k)) th) (tsubst (uncurry tyvar na) cvar v) | ((n,k),[na],~(Just v)) <- createClassAssocs kt methods]
+    (_,(className,[th@(TAp _ cvar)])) = qtToClassHead kt qualType
     crecord = case Map.lookup className classHierarchy  of
         Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
         Just crecord -> crecord
     methodSigs = classAssumps crecord
+    tsubst na vv v = T.apply (msingleton na vv) v
+
 instanceToTopDecls kt classHierarchy decl@HsDataDecl {} =
      (makeDerivation kt classHierarchy (hsDeclName decl) (hsDeclArgs decl) (hsDeclCons decl)) (map (toName ClassName) $ hsDeclDerives decl)
 instanceToTopDecls kt classHierarchy decl@HsNewTypeDecl {} =

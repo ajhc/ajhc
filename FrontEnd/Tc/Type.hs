@@ -20,6 +20,7 @@ module FrontEnd.Tc.Type(
     tyvar
     ) where
 
+import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.IORef
 import List
@@ -32,6 +33,7 @@ import Name.VConsts
 import Representation
 import Support.CanType
 import Support.FreeVars
+import Support.Tickle
 
 type Sigma' = Sigma
 type Tau' = Tau
@@ -125,6 +127,7 @@ instance UnVar t => UnVar [t] where
 
 instance UnVar Pred where
     unVar' opt (IsIn c t) = IsIn c `liftM` unVar' opt t
+    unVar' opt (IsEq t1 t2) = liftM2 IsEq (unVar' opt t1) (unVar' opt t2)
 
 instance (UnVar a,UnVar b) => UnVar (a,b) where
     unVar' opt (a,b) = do
@@ -214,6 +217,13 @@ instance (FreeVars t b,FreeVars Pred b) => FreeVars (Qual t) b where
 
 instance FreeVars Type b =>  FreeVars Pred b where
     freeVars (IsIn _c t)  = freeVars t
+    freeVars (IsEq t1 t2)  = freeVars (t1,t2)
+
+
+instance Tickleable Type Pred where
+    tickleM f (IsIn c t) = liftM (IsIn c) (f t)
+    tickleM f (IsEq t1 t2) = return IsEq `ap` f t1 `ap` f t2
+
 
 -- returns (new type, any open boxes, any open tauvars)
 unbox :: MonadIO m => Type -> m (Type,Bool,Bool)
@@ -222,11 +232,12 @@ unbox tv = do
         ft (TArrow x y) = liftM2 TArrow (ft' x) (ft' y)
         ft t@TCon {} = return t
         ft (TForAll vs (ps :=> t)) = do
-            ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
+            ps' <- sequence (map (tickleM ft') ps) --[  ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
             t' <- ft' t
             return $ TForAll vs (ps' :=> t')
         ft (TExists vs (ps :=> t)) = do
-            ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
+            ps' <- sequence (map (tickleM ft') ps) --[  ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
+            --ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
             t' <- ft' t
             return $ TExists vs (ps' :=> t')
         ft t@(TMetaVar mv)

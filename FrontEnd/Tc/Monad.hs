@@ -62,6 +62,7 @@ import {-# SOURCE #-} FrontEnd.Tc.Class(ClassHierarchy,simplify)
 import Diagnostic
 import Doc.DocLike
 import Support.FreeVars
+import Support.Tickle
 import Doc.PPrint
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc(bogusASrcLoc,MonadSrcLoc(..))
@@ -271,7 +272,7 @@ instance Instantiate t => Instantiate (Qual t) where
   inst mm ts (ps :=> t) = inst mm ts ps :=> inst mm ts t
 
 instance Instantiate Pred where
-  inst mm ts (IsIn c t) = IsIn c (inst mm ts t)
+  inst mm ts is = tickle (inst mm ts :: Type -> Type) is -- (IsIn c t) = IsIn c (inst mm ts t)
 
 
 freshInstance :: MetaVarType -> Sigma -> Tc ([Type],Rho)
@@ -377,11 +378,12 @@ unBox tv = ft' tv where
     ft (TArrow x y) = liftM2 TArrow (ft' x) (ft' y)
     ft t@TCon {} = return t
     ft (TForAll vs (ps :=> t)) = do
-        ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
+        ps' <- sequence (map (tickleM ft') ps) -- [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
         t' <- ft' t
         return $ TForAll vs (ps' :=> t')
     ft (TExists vs (ps :=> t)) = do
-        ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
+        ps' <- sequence (map (tickleM ft') ps) -- [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
+        --ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
         t' <- ft' t
         return $ TExists vs (ps' :=> t')
     ft t@(TMetaVar mv)

@@ -77,7 +77,9 @@ instance Types t => Types (Qual t) where
 
 instance Types Pred where
   apply s (IsIn c t) = IsIn c (apply s t)
+  apply s (IsEq t1 t2) = IsEq (apply s t1) (apply s t2)
   tv (IsIn c t)      = tv t
+  tv (IsEq t1 t2)      = tv t1 ++ tv t2
 
 --------------------------------------------------------------------------------
 
