@@ -56,6 +56,7 @@ splitTyConApp t0 = split t0 []
 	split (HsTyApp t u) ts = split t (u:ts)
 	split (HsTyCon t) ts = return (t,ts)
 	split _ _ = fail "Illegal data/newtype declaration"
+--	split a b = fail $ "Illegal data/newtype declaration: " ++ show (a,b)
 
 -----------------------------------------------------------------------------
 -- Various Syntactic Checks
@@ -99,6 +100,7 @@ checkSimple :: String -> HsType -> [HsName] -> P ((HsName,[HsName]))
 checkSimple kw (HsTyApp l (HsTyVar a)) xs = checkSimple kw l (a:xs)
 checkSimple _kw (HsTyCon t)   xs = return (t,xs)
 checkSimple kw _ _ = fail ("Illegal " ++ kw ++ " declaration")
+--checkSimple kw t ts = fail ("Illegal " ++ kw ++ " declaration: " ++ show (t,ts))
 
 checkInstHeader :: HsQualType -> P (HsContext,HsQName,[HsType])
 checkInstHeader (HsQualType cs t) = do

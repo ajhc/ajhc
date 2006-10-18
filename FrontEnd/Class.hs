@@ -30,8 +30,6 @@
 -- TODO this, of everything desperatly needs to be rewritten the most.
 
 module FrontEnd.Class(
-    addClassToHierarchy,
-    addInstancesToHierarchy,
     printClassHierarchy,
     instanceToTopDecls,
     ClassHierarchy,
@@ -39,7 +37,6 @@ module FrontEnd.Class(
     instanceName,
     defaultInstanceName,
     printClassSummary,
-    addOneInstanceToHierarchy,
     findClassRecord,
     asksClassRecord,
     classRecords,
@@ -64,7 +61,6 @@ import FrontEnd.KindInfer
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
-import GenUtil(snub,snubFst,concatInter)
 import HsSyn
 import MapBinaryInstance()
 import Maybe
@@ -77,6 +73,7 @@ import PrimitiveOperators(primitiveInsts)
 import Representation
 import Type
 import Util.HasSize
+import Util.Gen
 import Util.Inst()
 import qualified FlagOpts as FO
 
@@ -97,6 +94,7 @@ data ClassRecord = ClassRecord {
     classSupers :: [Class],
     classInsts :: [Inst],
     classAssumps :: [(Name,Sigma)],
+    classAssocs :: [((Name,Kind),[(Name,Kind)],Maybe Sigma)],
     classDerives :: [Inst]
     } deriving(Typeable,Data)
     {-! derive: GhcBinary !-}
@@ -107,6 +105,7 @@ newClassRecord c = ClassRecord {
     classSupers = [],
     classInsts = [],
     classAssumps = [],
+    classAssocs = [],
     classDerives = []
     }
 
@@ -116,8 +115,11 @@ combineClassRecords cra crb | className cra == className crb = ClassRecord {
     classSupers = snub $ classSupers cra ++ classSupers crb,
     classInsts = snub $ classInsts cra ++ classInsts crb,
     classAssumps = snubFst $ classAssumps cra ++ classAssumps crb,
+    classAssocs = snubUnder fst3 $ classAssocs cra ++ classAssocs crb,
     classDerives = snub $ classDerives cra ++ classDerives crb
     }
+
+fst3 (x,_,_) = x
 
 --([Class], [Inst], [Assump])
 
@@ -152,27 +154,6 @@ aHsTypeSigToAssumps :: KindEnv -> HsDecl -> [(Name,Type)]
 aHsTypeSigToAssumps kt sig@(HsTypeSig _ names qualType) = [ (toName Val n,typ) | n <- names] where
     Identity typ = hsQualTypeToSigma kt qualType
 
-addClassToHierarchy :: Monad m =>  KindEnv -> HsDecl -> ClassHierarchy -> m ClassHierarchy
-addClassToHierarchy  kt (HsClassDecl _ t decls) (ClassHierarchy h) |   (HsQualType cntxt (HsTyApp (HsTyCon className') (HsTyVar argName')))  <- toHsQualType t = let
-   qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
-   newClassContext = [HsAsst (nameName className) [nameName argName]] -- [(className, argName)]
-   className,argName :: Name
-   className = toName ClassName className'
-   argName = toName TypeVal argName'
-   in return $ ClassHierarchy $ Map.insertWith combineClassRecords  className ClassRecord { classSrcLoc = bogusASrcLoc, className = className, classSupers = [ toName ClassName x | HsAsst x _ <- cntxt], classInsts = [], classDerives = [], classAssumps = qualifiedMethodAssumps } h
-
-
-addClassToHierarchy  _ _ ch = return ch
-
---addClassToHierarchy mod kt (HsClassDecl _sloc (HsUnQualType (HsTyApp (HsTyCon className) (HsTyVar argName))) decls) h
---   = addToEnv (className, ([], [], qualifiedMethodAssumps)) h
---   where
---   qualifiedMethodAssumps
---      = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isSigDecl decls)
---   newClassContext
---      = [(className, argName)]
---qualifyMethod cntxt (HsTypeSig sloc names (HsUnQualType t))
---   = HsTypeSig sloc names (HsQualType cntxt t)
 
 qualifyMethod :: [HsAsst] -> HsDecl -> HsDecl
 qualifyMethod [HsAsst c [n]] (HsTypeSig sloc names (HsQualType oc t))
@@ -195,41 +176,32 @@ printClassSummary (ClassHierarchy h) = mapM_ f $  h' where
 
 
 printClassHierarchy :: ClassHierarchy -> IO ()
-printClassHierarchy (ClassHierarchy h)
-   = mapM_ printClassDetails $  Map.toList h
-   where
-   printClassDetails :: (Name, ClassRecord) -> IO ()
-   printClassDetails (cname, (ClassRecord { classSupers = supers, classInsts = insts, classAssumps = methodAssumps}))
-      = do
-            putStrLn "..........."
-            putStrLn $ "class: " ++ show cname
-            putStr $ "super classes:"
-            case supers of
-               [] -> putStrLn $ " none"
-               _  -> putStrLn $ " " ++ (showListAndSep id " " (map show supers))
-            putStr $ "instances:"
-            case insts of
-               [] -> putStrLn $ " none"
-               _  -> putStrLn $ "\n" ++ (showListAndSepInWidth showInst 80 ", " insts)
-            putStr $ "method signatures:"
-            case methodAssumps of
+printClassHierarchy (ClassHierarchy h) = mapM_ printClassDetails $  Map.toList h where
+    printClassDetails :: (Name, ClassRecord) -> IO ()
+    printClassDetails (cname, (ClassRecord { classSupers = supers, classInsts = insts, classAssumps = methodAssumps, classAssocs = classAssocs})) = do
+        putStrLn "..........."
+        putStrLn $ "class: " ++ show cname
+        putStr $ "super classes:"
+        pnone supers $ do putStrLn $ " " ++ (concatInter " " (map show supers))
+        putStr $ "instances:"
+        pnone insts $  putStr $ "\n" ++ (showListAndSepInWidth showInst 80 ", " insts)
+        putStr $ "method signatures:"
+        pnone methodAssumps $ putStr $ "\n" ++ (unlines $ map pretty methodAssumps)
+        putStr $ "associated types:"
+        pnone classAssocs $  putStrLn $ "\n" ++ (unlines $ map (render . passoc) classAssocs)
+        putStr "\n"
+    pnone [] f = putStrLn " none"
+    pnone xs f = f
+    passoc (nk,as,mt) = text "type" <+> pb nk <+> hsep (map pb as) <> case mt of
+        Nothing -> empty
+        Just s -> text " = " <> pprint s
+    pb (n,Star) = pprint n
+    pb (n,k) = parens (pprint n <+> text "::" <+> pprint k)
 
-               [] -> putStrLn $ " none"
-               _  -> putStrLn $ "\n" ++
-                        (unlines $ map pretty methodAssumps)
-
-
-            putStr "\n"
 
 
 --------------------------------------------------------------------------------
 
-addInstancesToHierarchy :: Monad m => KindEnv -> ClassHierarchy -> [HsDecl] -> m ClassHierarchy
-addInstancesToHierarchy kt ch decls = do
-    insts <- mapM (hsInstDeclToInst kt) decls
-    return $ foldl addOneInstanceToHierarchy ch (concat insts)
-   --where
-   --instances = concatMap (hsInstDeclToInst kt) decls
 
 
 modifyClassRecord ::  (ClassRecord -> ClassRecord) -> Class -> ClassHierarchy -> ClassHierarchy
@@ -570,11 +542,15 @@ makeClassHierarchy (ClassHierarchy ch) kt ds = return (ClassHierarchy ans) where
         | HsTyApp (HsTyCon className) (HsTyVar argName)  <- tbody = do
             let qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
                 newClassContext = [HsAsst className [argName]] -- hsContextToContext [(className, argName)]
-            tell [ClassRecord { className = toName ClassName className, classSrcLoc = sl, classSupers = [ toName ClassName x | HsAsst x _ <- cntxt], classInsts = [ emptyInstance { instHead = i } | i@(_ :=> IsIn n _) <- primitiveInsts, nameName n == className], classDerives = [], classAssumps = qualifiedMethodAssumps }]
+            tell [ClassRecord { classAssocs = classAssocs, className = toName ClassName className, classSrcLoc = sl, classSupers = [ toName ClassName x | HsAsst x _ <- cntxt], classInsts = [ emptyInstance { instHead = i } | i@(_ :=> IsIn n _) <- primitiveInsts, nameName n == className], classDerives = [], classAssumps = qualifiedMethodAssumps }]
 
         | otherwise = failSl sl "Invalid Class declaration."
         where
         HsQualType cntxt tbody = toHsQualType t
+        classAssocs = [ (ct TypeConstructor n,map (ct TypeVal) as,ctype t)| HsTypeDecl { hsDeclName = n, hsDeclArgs = as, hsDeclType = t } <- decls ] where
+            ct nameType n = let nn = toName nameType n in (nn,kindOf nn kt)
+            ctype HsTyAssoc = Nothing
+            ctype t = Just $ runIdentity $ hsTypeToType kt t
     f decl = hsInstDeclToInst kt decl >>= \insts -> do
         crs <- flip mapM [ (cn,i) | (_,i@Inst { instHead = _ :=> IsIn cn _}) <- insts] $ \ (x,inst) -> case Map.lookup x ch of
             Just cr -> ensureNotDup (srcLoc decl) inst (classInsts cr) >> return [cr { classInsts = mempty }]
@@ -590,20 +566,10 @@ ensureNotDup :: Monad m => SrcLoc -> Inst -> [Inst] -> m ()
 ensureNotDup sl i is | i `elem` is = failSl sl $ "Duplicate Instance: " ++ show i
                      | otherwise = return ()
 
--- takes a list of things and puts a seperator string after each elem
--- except the last, first arg is a function to convert the things into
--- strings
-showListAndSep :: (a -> String) -> String -> [a] -> String
-showListAndSep f sep [] = []
-showListAndSep f sep [s] = f s
-showListAndSep f sep (s:ss) = f s ++ sep ++ showListAndSep f sep ss
 
 accLen :: Int -> [[a]] -> [(Int, [a])]
 accLen width [] = []
-accLen width (x:xs)
-   = let newWidth
-           = length x + width
-     in (newWidth, x) : accLen newWidth xs
+accLen width (x:xs) = let newWidth = length x + width in (newWidth, x) : accLen newWidth xs
 
 groupStringsToWidth :: Int -> [String] -> [String]
 groupStringsToWidth width ss
@@ -622,9 +588,7 @@ groupStringsToWidth width ss
 
 showListAndSepInWidth :: (a -> String) -> Int -> String -> [a] -> String
 showListAndSepInWidth _ _ _ [] = []
-showListAndSepInWidth f width sep things
-   = unlines $ groupStringsToWidth width newThings
-   where
+showListAndSepInWidth f width sep things = unlines $ groupStringsToWidth width newThings where
    newThings = (map ((\t -> t ++ sep).f) (init things)) ++ [f (last things)]
 
 pretty  :: PPrint Doc a => a -> String
