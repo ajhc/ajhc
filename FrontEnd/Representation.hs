@@ -195,7 +195,7 @@ unfoldKind (Kfun k1 k2) = k1 : unfoldKind k2
 --------------------------------------------------------------------------------
 
 -- Predicates
-data Pred   = IsIn Class Type
+data Pred   = IsIn Class Type | IsEq Type Type
               deriving(Data,Typeable, Show, Eq,Ord)
     {-! derive: GhcBinary !-}
 

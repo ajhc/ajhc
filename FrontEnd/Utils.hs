@@ -58,7 +58,4 @@ lJustify n s = take n $ s ++ repeat ' '
 
 pprintEnvMap m = vcat [ pprint x <+> text "::" <+> pprint y | (x,y) <- Map.toList m ]
 
-type Context = [(Name,Name)]
-hsContextToContext :: HsContext -> [(Name,Name)]
-hsContextToContext xs = [ (toName ClassName c, toName TypeVal t) | (c,t) <- xs]
 

@@ -18,6 +18,7 @@ module FrontEnd.KindInfer (
     ) where
 
 import Control.Monad
+import Control.Monad.Identity
 import Data.Generics
 import Data.IORef
 import Data.Monoid
@@ -265,7 +266,7 @@ kiClassDecl (className, argNames) = do
 -- here we expext the classname to be already defined and should be in the
 -- environment, we do not require that the variables will be defined
 kiAsst :: HsAsst -> KI Kind
-kiAsst x@(className, argName) = withContext ("kiAsst: " ++ show x) $ do
+kiAsst x@(HsAsst className [argName]) = withContext ("kiAsst: " ++ show x) $ do
     classKind <- lookupKindEnv (toName ClassName className)
     case classKind of
            Nothing -> fail $ "kiAsst: could not find kind information for class: " ++ show className
@@ -412,7 +413,9 @@ namesFromType (HsTyExists _vs qt) = namesFromQualType qt -- map (toName TypeVal 
 --namesFromType HsTyExists { hsTypeVars = vs } = map (toName TypeVal . hsTyVarBindName) vs
 
 namesFromContext :: HsContext -> [Name]
-namesFromContext cntxt = map fst (hsContextToContext cntxt)
+namesFromContext cntxt = concatMap f cntxt where
+    f (HsAsst x xs) = toName ClassName x:map (toName TypeVal) xs
+    f (HsAsstEq a b) = namesFromType a ++ namesFromType b
 
 --------------------------------------------------------------------------------
 
@@ -558,10 +561,11 @@ aHsQualTypeToQualType kt (HsQualType cntxt t) = map (hsAsstToPred kt) cntxt :=> 
 
 
 hsAsstToPred :: KindEnv -> HsAsst -> Pred
-hsAsstToPred kt (className, varName)
+hsAsstToPred kt (HsAsst className [varName])
    -- = IsIn className (TVar $ Tyvar varName (kindOf varName kt))
    | isConstructorLike (hsIdentString . hsNameIdent $ varName) = IsIn  (toName ClassName className) (TCon (Tycon (toName TypeConstructor varName) (head $ kindOfClass (toName ClassName className) kt)))
    | otherwise = IsIn (toName ClassName className) (TVar $ tyvar (toName TypeVal varName) (head $ kindOfClass (toName ClassName className) kt))
+hsAsstToPred kt (HsAsstEq t1 t2) = IsEq (runIdentity $ hsTypeToType kt t1) (runIdentity $ hsTypeToType kt t2)
 
 
 

@@ -31,6 +31,8 @@ import FlagDump as FD
 import FrontEnd.Rename(unRename)
 import HsSyn
 import Name.VConsts
+import Name.Names
+import Name.Name
 import Options
 import qualified Doc.DocLike as DL
 import qualified Doc.PPrint as P
@@ -407,15 +409,16 @@ ppHsTypePrec :: Int -> HsType -> Doc
 ppHsTypePrec p (HsTyFun a b) =
 	parensIf (p > 0) $
 		myFsep [ppHsTypePrec 1 a, text "->", ppHsType b]
+ppHsTypePrec p (HsTyAssoc) = text "<assoc>"
+ppHsTypePrec p (HsTyEq a b) =
+	parensIf (p > 0) $ myFsep [ppHsType a, text "=", ppHsType b]
 ppHsTypePrec p (HsTyTuple l) = parenList . map ppHsType $ l
 -- special case
-ppHsTypePrec p (HsTyApp (HsTyCon (Qual (Module "Prelude") (HsIdent "[]"))) b ) =
-	brackets $ ppHsType b
+ppHsTypePrec p (HsTyApp (HsTyCon lcons) b ) | lcons == nameName tc_List = brackets $ ppHsType b
 ppHsTypePrec p (HsTyApp a b) =
 	parensIf (p > 1) $ myFsep[ppHsType a, ppHsTypeArg b]
 ppHsTypePrec p (HsTyVar name) = ppHsName name
 -- special case
---ppHsTypePrec p (HsTyCon (Qual (Module "Prelude") n)) = ppHsNameParen (UnQual n)
 ppHsTypePrec p (HsTyCon name) = ppHsQName name
 ppHsTypePrec p HsTyForall { hsTypeVars = vs, hsTypeType = qt } = parensIf (p > 1) $ do
     pp <- ppHsQualType qt
@@ -630,7 +633,8 @@ ppHsContext context = parenList (map ppHsAsst context)
 
 ppHsAsst :: HsAsst -> Doc
 --ppHsAsst (a,ts) = myFsep(ppHsQName a : map ppHsTypeArg ts)
-ppHsAsst (a,ts) = myFsep(ppHsQName a : [ppHsName ts])
+ppHsAsst (HsAsst a ts) = myFsep(ppHsQName a : map ppHsName ts)
+ppHsAsst (HsAsstEq a b) = ppHsType a <+> char '=' <+> ppHsType b
 
 ------------------------- pp utils -------------------------
 maybePP :: (a -> Doc) -> Maybe a -> Doc

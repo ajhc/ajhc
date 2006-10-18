@@ -417,11 +417,15 @@ renameHsQualType (HsQualType hsContext hsType) subTable = do
 renameHsContext :: HsContext -> SubTable -> ScopeSM (HsContext)
 renameHsContext = mapRename renameHsAsst
 
-renameHsAsst :: HsAsst -> SubTable -> ScopeSM (HsAsst)
-renameHsAsst (hsName1, hsName2) subTable = do
+renameHsAsst :: HsAsst -> SubTable -> ScopeSM HsAsst
+renameHsAsst (HsAsst hsName1  hsName2s) subTable = do
       hsName1' <- renameTypeHsName hsName1 subTable  -- for class names
-      hsName2' <- renameTypeHsName hsName2 subTable
-      return (hsName1', hsName2')
+      hsName2s' <- mapRename renameTypeHsName hsName2s subTable
+      return (HsAsst hsName1' hsName2s')
+renameHsAsst (HsAsstEq t1 t2) subTable = do
+      t1' <- renameHsType t1 subTable  -- for class names
+      t2' <- renameHsType t2 subTable  -- for class names
+      return (HsAsstEq t1' t2')
 
 renameHsConDecls :: [HsConDecl] -> SubTable -> ScopeSM ([HsConDecl])
 renameHsConDecls = mapRename renameHsConDecl
@@ -490,6 +494,8 @@ renameHsType' dovar t st = pp (rt t st) where
         ts' <- renameAny ts subTable'
         v' <- renameHsQualType v subTable'
         return $ HsTyExists ts' v'
+    rt (HsTyAssoc) subTable = return HsTyAssoc
+    rt (HsTyEq a b) subTable = return HsTyEq `ap` (flip renameAny subTable a) `ap` (flip renameAny subTable b)
     pp t | not dovar = t
     pp t = t
 
@@ -1260,6 +1266,9 @@ instance Renameable HsExportSpec where
             HsEModuleContents mod	 ->
                 HsEModuleContents mod
 
+instance Renameable HsAsst where
+    replaceName f (HsAsst x xs) = HsAsst (replaceName f x) (replaceName f xs)
+    replaceName f (HsAsstEq x y) = HsAsstEq (replaceName f x) (replaceName f y)
 
 instance Renameable HsImportDecl where
     replaceName f object

@@ -128,25 +128,24 @@ traverseHsExp fn e = f e where
 
 traverseHsType_ fn p = traverseHsType (traverse_ fn) p >> return ()
 
-traverseHsType f (HsTyFun a b) = do
-    a <- f a
-    b <- f b
-    return $ HsTyFun a b
+traverseHsType f (HsTyFun a b) = return HsTyFun `ap` f a `ap` f b
 traverseHsType f (HsTyTuple xs) = do
     xs <- mapM f xs
     return $ HsTyTuple xs
-traverseHsType f (HsTyApp a b) = do
-    a <- f a
-    b <- f b
-    return $ HsTyApp a b
-traverseHsType f (HsTyForall vs qt) = do
-    x <- f $ hsQualTypeType qt
-    return $ HsTyForall vs qt { hsQualTypeType = x }
-traverseHsType f (HsTyExists vs qt) = do
-    x <- f $ hsQualTypeType qt
-    return $ HsTyExists vs qt { hsQualTypeType = x }
+traverseHsType f (HsTyApp a b) = return HsTyApp `ap` f a `ap` f b
+traverseHsType f (HsTyForall vs qt) = doQual HsTyForall f vs qt
+traverseHsType f (HsTyExists vs qt) = doQual HsTyExists f vs qt
 traverseHsType _ x@HsTyVar {} = return x
 traverseHsType _ x@HsTyCon {} = return x
+traverseHsType _ HsTyAssoc = return HsTyAssoc
+traverseHsType f (HsTyEq a b) = return HsTyEq `ap` f a `ap` f b
+
+doQual hsTyForall f vs qt = do
+    x <- f $ hsQualTypeType qt
+    cntx <- flip mapM (hsQualTypeContext qt) $ \v -> case v of
+        x@HsAsst {} -> return x
+        HsAsstEq a b -> return HsAsstEq `ap` f a `ap` f b
+    return $ hsTyForall vs qt { hsQualTypeContext = cntx, hsQualTypeType = x }
 
 traverseHsPat_ fn p = traverseHsPat (traverse_ fn) p >> return ()
 

@@ -412,6 +412,7 @@ Types
 >	| '(' types ')'			{ HsTyTuple (reverse $2) }
 >	| '[' type ']'			{ HsTyApp list_tycon $2 }
 >	| '(' type ')'			{ $2 }
+>	| '(' type '=' type ')'         { HsTyEq $2 $4 }
 
 > gtycon :: { HsName }
 >	: qconid			{ $1 }
@@ -554,6 +555,8 @@ Value definitions
 > valdef :: { HsDecl }
 >	: 'type' simpletype srcloc '=' type
 >			{ HsTypeDecl $3 (fst $2) (snd $2) $5 }
+>	| 'type' simpletype srcloc
+>			{ HsTypeDecl $3 (fst $2) (snd $2) HsTyAssoc }
 >	| infixexp srcloc rhs			{% checkValDef $2 $1 $3 []}
 >	| infixexp srcloc rhs 'where' decllist	{% checkValDef $2 $1 $3 $5}
 

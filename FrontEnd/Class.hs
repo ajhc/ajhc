@@ -84,7 +84,6 @@ import qualified FlagOpts as FO
 
 type Assump = (Name,Sigma)
 
-
 newtype Inst = Inst {
     instHead :: Qual Pred
     } deriving(Typeable,Data,Eq,Ord,PPrint Doc,Show)
@@ -156,10 +155,11 @@ aHsTypeSigToAssumps kt sig@(HsTypeSig _ names qualType) = [ (toName Val n,typ) |
 addClassToHierarchy :: Monad m =>  KindEnv -> HsDecl -> ClassHierarchy -> m ClassHierarchy
 addClassToHierarchy  kt (HsClassDecl _ t decls) (ClassHierarchy h) |   (HsQualType cntxt (HsTyApp (HsTyCon className') (HsTyVar argName')))  <- toHsQualType t = let
    qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
-   newClassContext = [(className, argName)]
+   newClassContext = [HsAsst (nameName className) [nameName argName]] -- [(className, argName)]
+   className,argName :: Name
    className = toName ClassName className'
    argName = toName TypeVal argName'
-   in return $ ClassHierarchy $ Map.insertWith combineClassRecords  className ClassRecord { classSrcLoc = bogusASrcLoc, className = className, classSupers = map fst (hsContextToContext cntxt), classInsts = [], classDerives = [], classAssumps = qualifiedMethodAssumps } h
+   in return $ ClassHierarchy $ Map.insertWith combineClassRecords  className ClassRecord { classSrcLoc = bogusASrcLoc, className = className, classSupers = [ toName ClassName x | HsAsst x _ <- cntxt], classInsts = [], classDerives = [], classAssumps = qualifiedMethodAssumps } h
 
 
 addClassToHierarchy  _ _ ch = return ch
@@ -174,15 +174,11 @@ addClassToHierarchy  _ _ ch = return ch
 --qualifyMethod cntxt (HsTypeSig sloc names (HsUnQualType t))
 --   = HsTypeSig sloc names (HsQualType cntxt t)
 
-qualifyMethod :: Context -> (HsDecl) -> (HsDecl)
-qualifyMethod [(c,n)] (HsTypeSig sloc names (HsQualType oc t))
-    = HsTypeSig sloc names (HsQualType ((nameName c,n'):oc) t) where
-        --n' = fromJust $ applyTU (once_tdTU $ adhocTU failTU f) t
-        --f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig n = return n'
-        --f (HsTyVar n')  = return n'
-        --f _ = mzero
+qualifyMethod :: [HsAsst] -> HsDecl -> HsDecl
+qualifyMethod [HsAsst c [n]] (HsTypeSig sloc names (HsQualType oc t))
+    = HsTypeSig sloc names (HsQualType (HsAsst c [n']:oc) t) where
         Just n' = (something (mkQ mzero f)) t
-        f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig (nameName n) = return n'
+        f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig n = return n'
         f _ = mzero
 
 
@@ -573,8 +569,8 @@ makeClassHierarchy (ClassHierarchy ch) kt ds = return (ClassHierarchy ans) where
     f (HsClassDecl sl t decls)
         | HsTyApp (HsTyCon className) (HsTyVar argName)  <- tbody = do
             let qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
-                newClassContext = hsContextToContext [(className, argName)]
-            tell [ClassRecord { className = toName ClassName className, classSrcLoc = sl, classSupers = map fst $ hsContextToContext cntxt, classInsts = [ emptyInstance { instHead = i } | i@(_ :=> IsIn n _) <- primitiveInsts, nameName n == className], classDerives = [], classAssumps = qualifiedMethodAssumps }]
+                newClassContext = [HsAsst className [argName]] -- hsContextToContext [(className, argName)]
+            tell [ClassRecord { className = toName ClassName className, classSrcLoc = sl, classSupers = [ toName ClassName x | HsAsst x _ <- cntxt], classInsts = [ emptyInstance { instHead = i } | i@(_ :=> IsIn n _) <- primitiveInsts, nameName n == className], classDerives = [], classAssumps = qualifiedMethodAssumps }]
 
         | otherwise = failSl sl "Invalid Class declaration."
         where

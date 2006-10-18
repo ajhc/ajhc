@@ -225,6 +225,9 @@ data HsType
          | HsTyExists {
             hsTypeVars :: [HsTyVarBind],
             hsTypeType :: HsQualType }
+         -- the following are used internally
+         | HsTyAssoc
+         | HsTyEq HsType HsType
   deriving(Data,Typeable,Eq,Ord,Show)
   {-! derive: GhcBinary, is !-}
 
@@ -242,7 +245,11 @@ instance HasLocation HsTyVarBind where
 
 type HsContext = [HsAsst]
 --type HsAsst    = (HsName,[HsType])	-- for multi-parameter type classes
-type HsAsst    = (HsName,HsName)	-- clobber
+--type HsAsst    = (HsName,HsName)	-- clobber
+
+data HsAsst = HsAsst HsName [HsName] | HsAsstEq HsType HsType
+  deriving(Data,Typeable,Eq,Ord, Show)
+    {-! derive: GhcBinary !-}
 
 data HsLiteral
 	= HsInt		!Integer

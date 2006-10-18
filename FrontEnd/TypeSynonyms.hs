@@ -37,7 +37,9 @@ showSynonym pprint n (TypeSynonyms m) = do
 -- expansion
 
 declsToTypeSynonyms :: [HsDecl] -> TypeSynonyms
-declsToTypeSynonyms ts = TypeSynonyms $ Map.fromList [ (toName TypeConstructor name,( args , quantifyHsType args (HsQualType [] t) , sl)) | (HsTypeDecl sl name args t) <- ts]
+declsToTypeSynonyms ts = TypeSynonyms $ Map.fromList $
+    [ (toName TypeConstructor name,( args , quantifyHsType args (HsQualType [] t) , sl)) | (HsTypeDecl sl name args t) <- ts]
+    ++  [ (toName TypeConstructor name,( args , HsTyAssoc, sl)) | (HsClassDecl _ _ ds) <- ts,(HsTypeDecl sl name args _) <- ds]
 
 removeSynonymsFromType :: MonadWarn m => TypeSynonyms -> HsType -> m HsType
 removeSynonymsFromType syns t = evalTypeSyms  syns t
@@ -61,9 +63,11 @@ evalTypeSyms (TypeSynonyms tmap) t = execUniqT 1 (eval [] t) where
         if (excess < 0) then do
             lift $ warn sl "type-synonym-partialap" ("Partially applied typesym:" <+> show n <+> "need" <+> show (- excess) <+> "more arguments.")
             unwind x stack
-          else do
-            st <- subst (Map.fromList [(a,s) | a <- args | s <- stack]) t
-            eval (drop (length args) stack) st
+          else case t of
+            HsTyAssoc -> unwind x stack
+            _ -> do
+                st <- subst (Map.fromList [(a,s) | a <- args | s <- stack]) t
+                eval (drop (length args) stack) st
     eval stack (HsTyApp t1 t2) = eval (t2:stack) t1
     eval stack x = do
         t <- traverseHsType (eval []) x
@@ -88,7 +92,14 @@ evalTypeSyms (TypeSynonyms tmap) t = execUniqT 1 (eval [] t) where
     subst sm t = traverseHsType (subst sm) t
     substqt sm qt@HsQualType { hsQualTypeContext = ps, hsQualTypeType = t } = do
         t' <- subst sm t
-        let ps' = [ case Map.lookup n sm of Just (HsTyVar n') -> (c,n') ; _ -> (c,n) | (c,n) <- ps ]
+        let f (HsAsst c xs) = return (HsAsst c (map g xs))
+            f (HsAsstEq a b) = do
+                a' <- subst sm a
+                b' <- subst sm b
+                return (HsAsstEq a' b')
+            g n =  case Map.lookup n sm of Just (HsTyVar n') -> n' ; _ -> n
+        ps' <- mapM f ps -- = [ case Map.lookup n sm of Just (HsTyVar n') -> (c,n') ; _ -> (c,n) | (c,n) <- ps ]
+
         return qt { hsQualTypeType = t', hsQualTypeContext = ps' }
 
 

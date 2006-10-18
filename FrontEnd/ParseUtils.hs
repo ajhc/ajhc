@@ -23,7 +23,7 @@ module FrontEnd.ParseUtils (
 	, checkClassHeader	-- HsQualType -> P (HsContext,HsName,[HsName])
 	, checkInstHeader	-- HsQualType -> P (HsContext,HsQName,[HsType])
 	, checkPattern		-- HsExp -> P HsPat
-	, checkPatterns	
+	, checkPatterns
 	, checkExpr		-- HsExp -> P HsExp
 	, checkValDef		-- SrcLoc -> HsExp -> HsRhs -> [HsDecl] -> P HsDecl
 	, checkClassBody	-- [HsDecl] -> P [HsDecl]
@@ -74,8 +74,8 @@ checkAssertion t =  checkAssertion' [] t
 	where	checkAssertion' ts (HsTyCon c) =  tast (c,ts)
 		checkAssertion' ts (HsTyApp a t) = checkAssertion' (t:ts) a
 		checkAssertion' _ _ = fail "Illegal class assertion"
-                tast (a,[HsTyVar n]) = return (a,n)
-                tast _ = fail "Invalid Class. multiparameter?"
+                tast (a,[HsTyVar n]) = return (HsAsst a [n]) -- (a,n)
+                tast _ = fail "Invalid Class. multiparameter classes not yet supported"
                 tast _ = error "tast!"
 --checkAssertion = checkAssertion' []
 --	where	checkAssertion' ts (HsTyCon c) = return (c,ts)
