@@ -13,6 +13,8 @@ module FrontEnd.Class(
     derivableClasses,
     makeInstanceEnvironment,
     stdClasses,
+    makeInstanceEnv,
+    InstanceEnv(..),
     Inst(..),
     numClasses
     ) where
@@ -103,6 +105,15 @@ combineClassRecords cra crb | className cra == className crb = ClassRecord {
     }
 
 fst3 (x,_,_) = x
+
+
+newtype InstanceEnv = InstanceEnv { instanceEnv :: Map.Map (Name,Name) (Tyvar,[Tyvar],Type) }
+
+makeInstanceEnv :: ClassHierarchy -> InstanceEnv
+makeInstanceEnv (ClassHierarchy ch) = InstanceEnv $ Map.fromList (concatMap f (Map.elems ch)) where
+    f cr = concatMap (g cr) (classInsts cr)
+    g cr Inst { instHead = _ :=> IsIn _cname (TAp (TCon ca) (TVar vv)), instAssocs = as } | _cname == className cr = ans where
+        ans = [ ((tyconName tc,tyconName ca),(vv,rs,e)) | (tc,rs,e) <- as]
 
 
 makeInstanceEnvironment :: ClassHierarchy -> [Qual Pred]

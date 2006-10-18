@@ -67,6 +67,7 @@ import Doc.PPrint
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc(bogusASrcLoc,MonadSrcLoc(..))
 import FrontEnd.Tc.Type
+import FrontEnd.Class
 import GenUtil
 import Name.Name
 import Options
@@ -91,6 +92,7 @@ data TcEnv = TcEnv {
     tcCurrentEnv        :: Map.Map Name Sigma,
     tcCurrentScope      :: Set.Set MetaVar,
     tcRecursiveCalls    :: Set.Set Name,
+    tcInstanceEnv   :: InstanceEnv,
     tcOptions           :: Opt  -- module specific options
     }
    {-! derive: update !-}
@@ -169,6 +171,7 @@ runTc tcInfo  (Tc tim) = do
         tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ tcInfoModName tcInfo],
         tcInfo = tcInfo,
         tcRecursiveCalls = mempty,
+        tcInstanceEnv = makeInstanceEnv (tcInfoClassHierarchy tcInfo),
         tcCurrentScope = mempty,
         tcOptions = opt
         }

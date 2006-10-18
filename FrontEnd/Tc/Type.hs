@@ -60,25 +60,19 @@ fromType s = case s of
 
 isTau :: Type -> Bool
 isTau TForAll {} = False
-isTau (TAp a b) = isTau a && isTau b
-isTau (TArrow a b) = isTau a && isTau b
 isTau (TMetaVar MetaVar { metaType = t })
     | t == Tau = True
     | otherwise = False
-isTau _ = True
+isTau t = and $ tickleCollect ((:[]) . isTau) t
 
 isTau' :: Type -> Bool
 isTau' TForAll {} = False
-isTau' (TAp a b) = isTau a && isTau b
-isTau' (TArrow a b) = isTau a && isTau b
-isTau' _ = True
+isTau' t = and $ tickleCollect ((:[]) . isTau') t
 
 isBoxy :: Type -> Bool
 isBoxy (TMetaVar MetaVar { metaType = t }) | t > Tau = True
-isBoxy (TForAll _ (_ :=> t)) = isBoxy t
-isBoxy (TAp a b) = isBoxy a || isBoxy b
-isBoxy (TArrow a b) = isBoxy a || isBoxy b
-isBoxy _ = False
+isBoxy t = or $ tickleCollect ((:[]) . isBoxy) t
+
 
 isRho' :: Type -> Bool
 isRho' TForAll {} = False
@@ -150,8 +144,10 @@ instance UnVar Type where
                 qt' <- unVar' opt qt
                 return $ TExists vs qt'
             ft t@(TMetaVar _) = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return t
+            ft t = tickleM (unVar' opt . (id :: Type -> Type)) t
             --ft t | Just tv <- extractMetaTV t = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return (TVar tv)
-            ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
+            --ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
+            --ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
         tv' <- findType tv
         ft tv'
 
@@ -192,22 +188,25 @@ readMetaVar MetaVar { metaRef = r }  = liftIO $ do
 
 
 freeMetaVars :: Type -> [MetaVar]
-freeMetaVars (TVar u)      = []
-freeMetaVars (TAp l r)     = freeMetaVars l `union` freeMetaVars r
-freeMetaVars (TArrow l r)  = freeMetaVars l `union` freeMetaVars r
-freeMetaVars TCon {}       = []
 freeMetaVars (TMetaVar mv) = [mv]
-freeMetaVars (TForAll vs qt) = freeVars qt
-freeMetaVars (TExists vs qt) = freeVars qt
+freeMetaVars t = foldr union [] $ tickleCollect ((:[]) . freeMetaVars) t
+--freeMetaVars (TVar u)      = []
+--freeMetaVars (TAp l r)     = freeMetaVars l `union` freeMetaVars r
+--freeMetaVars (TArrow l r)  = freeMetaVars l `union` freeMetaVars r
+--freeMetaVars TCon {}       = []
+--freeMetaVars (TMetaVar mv) = [mv]
+--freeMetaVars (TForAll vs qt) = freeVars qt
+--freeMetaVars (TExists vs qt) = freeVars qt
 
 instance FreeVars Type [Tyvar] where
     freeVars (TVar u)      = [u]
-    freeVars (TAp l r)     = freeVars l `union` freeVars r
-    freeVars (TArrow l r)  = freeVars l `union` freeVars r
-    freeVars TCon {}       = []
-    freeVars TMetaVar {}   = []
     freeVars (TForAll vs qt) = freeVars qt List.\\ vs
     freeVars (TExists vs qt) = freeVars qt List.\\ vs
+    freeVars t = foldr union [] $ tickleCollect ((:[]) . (freeVars :: Type -> [Tyvar])) t
+--    freeVars (TAp l r)     = freeVars l `union` freeVars r
+--    freeVars (TArrow l r)  = freeVars l `union` freeVars r
+--    freeVars TCon {}       = []
+--    freeVars TMetaVar {}   = []
 
 instance FreeVars Type [MetaVar] where
     freeVars t = freeMetaVars t
@@ -223,6 +222,14 @@ instance FreeVars Type b =>  FreeVars Pred b where
 instance Tickleable Type Pred where
     tickleM f (IsIn c t) = liftM (IsIn c) (f t)
     tickleM f (IsEq t1 t2) = return IsEq `ap` f t1 `ap` f t2
+
+instance Tickleable Type Type where
+    tickleM f (TAp l r) = return TAp `ap` f l `ap` f r
+    tickleM f (TArrow l r) = return TArrow `ap` f l `ap` f r
+    tickleM f (TAssoc c cas eas) = return (TAssoc c) `ap` mapM f cas `ap` mapM f eas
+    tickleM f (TForAll ta (ps :=> t)) = return (TForAll ta . (ps :=>)) `ap` f t
+    tickleM f (TExists ta (ps :=> t)) = return (TExists ta . (ps :=>)) `ap` f t
+    tickleM _ t = return t
 
 
 -- returns (new type, any open boxes, any open tauvars)
@@ -243,7 +250,8 @@ unbox tv = do
         ft t@(TMetaVar mv)
             | isBoxyMetaVar mv = tell ([True],[]) >> return t
             | otherwise =  tell ([],[True]) >> return t
-        ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
+        ft t = tickleM ft' t
+        --ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
         ft' t = findType t >>= ft
     (tv,(eb,et)) <- runWriterT (ft' tv)
     return (tv,or eb, or et)

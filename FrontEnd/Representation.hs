@@ -30,7 +30,9 @@ module Representation(
     prettyPrintType,
     fromTAp,
     fromTArrow,
+    tassocToAp,
     MetaVar(..),
+    tTTuple,
     tList
     )where
 
@@ -49,6 +51,7 @@ import Doc.PPrint(pprint,PPrint)
 import HsSyn
 import Name.Name
 import Name.Names
+import Support.CanType
 import Name.VConsts
 import Options
 import qualified Doc.DocLike as D
@@ -72,6 +75,7 @@ data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
            | TForAll { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
            | TExists { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
            | TMetaVar { metaVar :: MetaVar }
+           | TAssoc   { typeCon :: !Tycon, typeClassArgs :: [Type], typeExtraArgs :: [Type] }
              deriving(Data,Typeable,Ord,Show)
     {-! derive: GhcBinary !-}
 
@@ -104,6 +108,7 @@ instance Eq Type where
     (TArrow a' a) == (TArrow b' b) = a' == b' && b == a
     _ == _ = False
 
+tassocToAp TAssoc { typeCon = con, typeClassArgs = cas, typeExtraArgs = eas } = foldl TAp (TCon con) (cas ++ eas)
 
 -- Unquantified type variables
 
@@ -143,7 +148,7 @@ instance Ord Tyvar where
 
 -- Type constructors
 
-data Tycon = Tycon Name Kind
+data Tycon = Tycon { tyconName :: Name, tyconKind :: Kind }
     deriving(Data,Typeable, Eq, Show,Ord)
     {-! derive: GhcBinary !-}
 
@@ -315,6 +320,10 @@ prettyPrintType t  = unparse $ runIdentity (runVarNameT (f t)) where
     f (TAp (TCon (Tycon n _)) x) | n == tc_List = do
         x <- f x
         return $ atom (char '[' <> unparse x <> char ']')
+    f TAssoc { typeCon = con, typeClassArgs = cas, typeExtraArgs = eas } = do
+        let x = atom (pprint con)
+        xs <- mapM f (cas ++ eas)
+        return $ foldl app x xs
     f ta@(TAp {}) | (TCon (Tycon c _),xs) <- fromTAp ta, Just _ <- fromTupname c = do
         xs <- mapM f xs
         return $ atom (tupled (map unparse xs))
@@ -354,3 +363,28 @@ fromTAp t = f t [] where
 fromTArrow t = f t [] where
     f (TArrow a b) rs = f b (a:rs)
     f t rs = (reverse rs,t)
+
+
+instance CanType MetaVar Kind where
+    getType mv = metaKind mv
+
+instance CanType Tycon Kind where
+    getType (Tycon _ k) = k
+
+instance CanType Tyvar Kind where
+    getType = tyvarKind
+
+instance CanType Type Kind where
+  getType (TCon tc) = getType tc
+  getType (TVar u)  = getType u
+  getType typ@(TAp t _) = case (getType t) of
+                     (Kfun _ k) -> k
+                     x -> error $ "Type.getType: kind error in: " ++ (show typ)
+  getType (TArrow _l _r) = Star
+  getType (TForAll _ (_ :=> t)) = getType t
+  getType (TExists _ (_ :=> t)) = getType t
+  getType (TMetaVar mv) = getType mv
+  getType ta@TAssoc {} = getType (tassocToAp ta)
+
+tTTuple ts | length ts < 2 = error "tTTuple"
+tTTuple ts = foldl TAp (toTuple (length ts)) ts

@@ -24,10 +24,7 @@
 -------------------------------------------------------------------------------}
 
 module Type (
-    Types (..),
-    match,
-    Subst,
-    tTTuple
+    Types (..)
     ) where
 
 import Control.Monad.Error
@@ -51,25 +48,6 @@ class Types t where
 
 -----------------------------------------------------------------------------
 
-instance CanType MetaVar Kind where
-    getType mv = metaKind mv
-
-instance CanType Tycon Kind where
-    getType (Tycon _ k) = k
-
-instance CanType Tyvar Kind where
-    getType = tyvarKind
-
-instance CanType Type Kind where
-  getType (TCon tc) = getType tc
-  getType (TVar u)  = getType u
-  getType typ@(TAp t _) = case (getType t) of
-                     (Kfun _ k) -> k
-                     x -> error $ "Type.getType: kind error in: " ++ (show typ)
-  getType (TArrow _l _r) = Star
-  getType (TForAll _ (_ :=> t)) = getType t
-  getType (TExists _ (_ :=> t)) = getType t
-  getType (TMetaVar mv) = getType mv
 
 instance Types t => Types (Qual t) where
   apply s (ps :=> t) = apply s ps :=> apply s t
@@ -99,11 +77,13 @@ instance Types Type where
           Nothing -> x
   apply s (TAp l r)     = TAp (apply s l) (apply s r)
   apply s (TArrow l r)  = TArrow (apply s l) (apply s r)
+  apply s (TAssoc c cas eas)  = TAssoc c (map (apply s) cas) (map (apply s) cas)
   apply _ t         = t
 
   tv (TVar u)      = [u]
   tv (TAp l r)     = tv l `union` tv r
   tv (TArrow l r)  = tv l `union` tv r
+  tv (TAssoc _ cas eas) = tv cas `union` tv eas
   tv _             = []
 
 instance Types a => Types [a] where
@@ -151,7 +131,5 @@ match' (TCon tc1) (TCon tc2)
 
 match' t1 t2           = fail $ "match: " ++ show (t1,t2)
 
-tTTuple ts | length ts < 2 = error "tTTuple"
-tTTuple ts = foldl TAp (toTuple (length ts)) ts
 
 
