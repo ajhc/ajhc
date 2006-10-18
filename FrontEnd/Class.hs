@@ -1,34 +1,3 @@
-{-------------------------------------------------------------------------------
-
-        Copyright:              Mark Jones and The Hatchet Team
-                                (see file Contributors)
-
-        Module:                 Class
-
-        Description:            Code for manipulating the class hierarchy and
-                                qualified types.
-
-                                The main tasks implemented by this module are:
-                                        - context reduction
-                                        - context spliting
-                                        - defaulting
-                                        - entailment of class constraints
-                                        - class hierarchy representation and
-                                          manipulation
-
-        Primary Authors:        Mark Jones, Bernie Pope
-
-        Notes:                  See the files License and License.thih
-                                for license information.
-
-                                Large parts of this module were derived from
-                                the work of Mark Jones' "Typing Haskell in
-                                Haskell", (http://www.cse.ogi.edu/~mpj/thih/)
-
--------------------------------------------------------------------------------}
-
--- TODO this, of everything desperatly needs to be rewritten the most.
-
 module FrontEnd.Class(
     printClassHierarchy,
     instanceToTopDecls,
@@ -42,6 +11,7 @@ module FrontEnd.Class(
     classRecords,
     makeClassHierarchy,
     derivableClasses,
+    makeInstanceEnvironment,
     stdClasses,
     Inst(..),
     numClasses
@@ -52,17 +22,18 @@ import Control.Monad.Writer
 import Data.Generics
 import Data.Monoid
 import List((\\), partition)
-import Text.PrettyPrint.HughesPJ as PPrint
+import Text.PrettyPrint.HughesPJ(render,Doc())
 import qualified Data.Map as Map
+import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import Binary
+import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import HsSyn
-import Util.SetLike
 import MapBinaryInstance()
 import Maybe
 import Monad
@@ -70,32 +41,41 @@ import Name.Name
 import Name.Names
 import Name.VConsts
 import Options
+import Support.CanType
 import PrimitiveOperators(primitiveInsts)
 import Representation
 import Type as T
-import Util.HasSize
 import Util.Gen
+import Util.HasSize
 import Util.Inst()
+import Util.SetLike
 import qualified FlagOpts as FO
 
 --------------------------------------------------------------------------------
 
 type Assump = (Name,Sigma)
 
-newtype Inst = Inst {
-    instHead :: Qual Pred
-    } deriving(Typeable,Data,Eq,Ord,PPrint Doc,Show)
+data Inst = Inst {
+    instHead :: Qual Pred,
+    instAssocs :: [(Tycon,[Tyvar],Sigma)]  -- only has extra arguments, after first one
+    } deriving(Typeable,Data,Eq,Ord,Show)
     {-! derive: GhcBinary !-}
 
-emptyInstance = Inst { instHead = error "emptyInstance" }
+instance PPrint a (Qual Pred) => PPrint a Inst where
+    pprint Inst { instHead = h, instAssocs = [] } = pprint h
+    pprint Inst { instHead = h, instAssocs = as } = pprint h <+> text "where" <$> vcat [ text "    type" <+> pprint n <+> text "_" <+> hsep (map pprint ts) <+> text "=" <+> pprint sigma  | (n,ts,sigma) <- as]
+
+
+emptyInstance = Inst { instHead = error "emptyInstance", instAssocs = [] }
 
 data ClassRecord = ClassRecord {
     className :: Class,
     classSrcLoc :: SrcLoc,
+    classArgs :: [Tyvar],
     classSupers :: [Class],
     classInsts :: [Inst],
     classAssumps :: [(Name,Sigma)],
-    classAssocs :: [((Name,Kind),[(Name,Kind)],Maybe Sigma)],
+    classAssocs :: [(Tycon,[Tyvar],Maybe Sigma)],
     classDerives :: [Inst]
     } deriving(Typeable,Data)
     {-! derive: GhcBinary !-}
@@ -104,6 +84,7 @@ newClassRecord c = ClassRecord {
     className = c,
     classSrcLoc = bogusASrcLoc,
     classSupers = [],
+    classArgs = [],
     classInsts = [],
     classAssumps = [],
     classAssocs = [],
@@ -117,10 +98,20 @@ combineClassRecords cra crb | className cra == className crb = ClassRecord {
     classInsts = snub $ classInsts cra ++ classInsts crb,
     classAssumps = snubFst $ classAssumps cra ++ classAssumps crb,
     classAssocs = snubUnder fst3 $ classAssocs cra ++ classAssocs crb,
-    classDerives = snub $ classDerives cra ++ classDerives crb
+    classDerives = snub $ classDerives cra ++ classDerives crb,
+    classArgs = if null (classArgs cra) then classArgs crb else classArgs cra
     }
 
 fst3 (x,_,_) = x
+
+
+makeInstanceEnvironment :: ClassHierarchy -> [Qual Pred]
+makeInstanceEnvironment (ClassHierarchy ch) = concatMap f (Map.elems ch) where
+    f cr@ClassRecord { classSupers = supers, className = cname } = concatMap (g cr) (classInsts cr) ++ [ [IsIn cname var] :=> IsIn s var | s <- supers ] where
+        var = let [v] = classArgs cr in TVar v
+    g cr Inst { instHead = ih@(_ :=> (IsIn _cname what)), instAssocs = as } | _cname == className cr = ans where
+        ans = ih:[ [] :=> IsEq (foldl TAp (TAp (TCon tc) what) (map TVar rs)) e | (tc,rs,e) <- as]
+
 
 --([Class], [Inst], [Assump])
 
@@ -177,9 +168,9 @@ printClassSummary (ClassHierarchy h) = mapM_ f $  h' where
 printClassHierarchy :: ClassHierarchy -> IO ()
 printClassHierarchy (ClassHierarchy h) = mapM_ printClassDetails $  Map.toList h where
     printClassDetails :: (Name, ClassRecord) -> IO ()
-    printClassDetails (cname, (ClassRecord { classSupers = supers, classInsts = insts, classAssumps = methodAssumps, classAssocs = classAssocs})) = do
+    printClassDetails (cname, (ClassRecord { classArgs = classArgs, classSupers = supers, classInsts = insts, classAssumps = methodAssumps, classAssocs = classAssocs})) = do
         putStrLn "..........."
-        putStrLn $ "class: " ++ show cname
+        putStrLn $ "class: " ++ hsep (pprint cname:map pprint classArgs)
         putStr $ "super classes:"
         pnone supers $ do putStrLn $ " " ++ (concatInter " " (map show supers))
         putStr $ "instances:"
@@ -191,11 +182,11 @@ printClassHierarchy (ClassHierarchy h) = mapM_ printClassDetails $  Map.toList h
         putStr "\n"
     pnone [] f = putStrLn " none"
     pnone xs f = f
-    passoc (nk,as,mt) = text "type" <+> pb nk <+> hsep (map pb as) <> case mt of
+    passoc (nk,as,mt) = text "type" <+> pprint nk <+> hsep (map pprint as) <> case mt of
         Nothing -> empty
         Just s -> text " = " <> pprint s
-    pb (n,Star) = pprint n
-    pb (n,k) = parens (pprint n <+> text "::" <+> pprint k)
+--    pb (n,Star) = pprint n
+--    pb (n,k) = parens (pprint n <+> text "::" <+> pprint k)
 
 
 
@@ -217,20 +208,23 @@ addOneInstanceToHierarchy ch (x,inst@Inst { instHead = cntxt :=> IsIn className 
 
 
 hsInstDeclToInst :: Monad m => KindEnv -> (HsDecl) -> m [(Bool,Inst)]
-hsInstDeclToInst kt (HsInstDecl _sloc qType _decls)
+hsInstDeclToInst kt (HsInstDecl _sloc qType decls)
    | classKind == argTypeKind
-        = return [(False,emptyInstance { instHead = cntxt :=> IsIn className convertedArgType })]
-   | otherwise
-        = failSl _sloc $ "hsInstDeclToInst: kind error, attempt to make\n" ++
-                  show argType ++ " (with kind " ++
-                  show argTypeKind ++ ")\n" ++
-                  "an instance of class " ++ show className ++
-                  " (with kind " ++ show classKind ++ ")"
+        = return [(False,emptyInstance { instHead = cntxt :=> IsIn className convertedArgType, instAssocs = assocs })]
+   | otherwise = failSl _sloc $ "hsInstDeclToInst: kind error, attempt to make\n" ++
+                      show convertedArgType ++ " (with kind " ++ show argTypeKind ++ ")\n" ++
+                      "an instance of class " ++ show className ++
+                      " (with kind " ++ show classKind ++ ")"
    where
-   (cntxt, classType, argType)
-      = case toHsQualType qType of
-           HsQualType context (HsTyApp cType@(HsTyCon _) aType)
-              -> (map (hsAsstToPred kt) context, cType, aType)
+   (cntxt, (className, cargs@[convertedArgType])) = qtToClassHead kt qType
+   classKind = kindOfClass className kt
+   argTypeKind = map getType cargs
+   assocs = [ (tc,rs,s) | (tc,~(_:rs),~(Just s)) <- createClassAssocs kt decls ]
+
+--   (cntxt, classType, argType)
+--      = case toHsQualType qType of
+--           HsQualType context (HsTyApp cType@(HsTyCon _) aType)
+--              -> (map (hsAsstToPred kt) context, cType, aType)
    {-
       Note:
       kind (Either) = *->*->*
@@ -240,7 +234,6 @@ hsInstDeclToInst kt (HsInstDecl _sloc qType _decls)
       the kind of the argument type (argTypeKind) is the remaining
       kind after droping the kinds of the supplied arguments from
       the kind of the type constructor
-   -}
    argTypeKind :: Kind
    convertedArgType :: Type
    (argTypeKind, convertedArgType)
@@ -256,8 +249,9 @@ hsInstDeclToInst kt (HsInstDecl _sloc qType _decls)
                      typeKindPairs = (tyCon, tyConKind) : (zip (tail flatType) flatTyConKind)
                      in (foldr1 Kfun $ drop numArgs flatTyConKind,
                          convType typeKindPairs)
-   className = nameOfTyCon ClassName classType
-   [classKind] = kindOfClass className kt
+--   className = nameOfTyCon ClassName classType
+--   [classKind] = kindOfClass className kt
+   -}
 
 -- derive statements
 hsInstDeclToInst kt (HsDataDecl _sloc _cntxt tyConName argNames _condecls derives@(_:_))
@@ -328,8 +322,9 @@ makeDerivation kt ch name args cs ds = ([],concatMap f ds) where
 qtToClassHead :: KindEnv -> HsQualType -> ([Pred],(Name,[Type]))
 qtToClassHead kt (HsQualType cntx (HsTyApp (HsTyCon className) ty)) = (map (hsAsstToPred kt) cntx,(toName ClassName className,[runIdentity $ hsTypeToType kt ty]))
 
-createClassAssocs kt decls = [ (ct TypeConstructor n,map (ct TypeVal) as,ctype t)| HsTypeDecl { hsDeclName = n, hsDeclArgs = as, hsDeclType = t } <- decls ] where
-    ct nameType n = let nn = toName nameType n in (nn,kindOf nn kt)
+createClassAssocs kt decls = [ (ctc n,map ct as,ctype t)| HsTypeDecl { hsDeclName = n, hsDeclArgs = as, hsDeclType = t } <- decls ] where
+    ctc n = let nn = toName TypeConstructor n in Tycon nn (kindOf nn kt)
+    ct n = let nn = toName TypeVal n in tyvar nn (kindOf nn kt)
     ctype HsTyAssoc = Nothing
     ctype t = Just $ runIdentity $ hsTypeToType kt t
 
@@ -337,7 +332,7 @@ instanceToTopDecls :: KindEnv -> ClassHierarchy -> HsDecl -> (([HsDecl],[Assump]
 instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsInstDecl _ qualType methods)
     = unzip $ map (methodToTopDecls kt cacntxt crecord methodSigs qualType) $ methodGroups where
     methodGroups = groupEquations methods
-    cacntxt = [ IsEq (TAp (TCon (Tycon n k)) th) (tsubst (uncurry tyvar na) cvar v) | ((n,k),[na],~(Just v)) <- createClassAssocs kt methods]
+    cacntxt = [ IsEq (TAp (TCon tcon) th) (tsubst na cvar v) | (tcon,[na],~(Just v)) <- createClassAssocs kt methods]
     (_,(className,[th@(TAp _ cvar)])) = qtToClassHead kt qualType
     crecord = case Map.lookup className classHierarchy  of
         Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
@@ -356,8 +351,6 @@ instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsClassDecl _ qualType me
    methodSigs = case Map.lookup (toName ClassName className) classHierarchy  of
            Nothing -> error $ "defaultInstanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
            Just sigs -> classAssumps sigs
-
-
 instanceToTopDecls _ _ _ = mempty
 
 
@@ -427,12 +420,6 @@ newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
    -- the class hierarchy should ensure this
    --((className, classArg):restContxt) = cntxt
    foo = "_" ++ (show methodName ++ show (getHsTypeCons instanceType)) ++ "@@"
-
-   --newQualType = runIdentity $ (applyTP $ full_tdTP (adhocTP idTP at)) $ quantify (tv qt) qt
-   --at (Tyvar n k) = return $ Tyvar (hsNameIdent_u (hsIdentString_u (++ foo)) n) k
-   --qt = (map (aHsAsstToPred kt) newCntxt ++ restContext) :=> (runIdentity $ applyTP (full_tdTP $ adhocTP idTP ct) t)
-   --ct n | n == classArg = return $ aHsTypeToType kt instanceType
-   --ct n = return n
    newQualType = everywhere (mkT at) $ tForAll (tv qt) qt
    at (Tyvar _ n k) =  tyvar (updateName (++ foo) n) k
    updateName f n = toName nt (md,f nm) where
@@ -441,23 +428,6 @@ newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
    ct n | n == classArg =  runIdentity $ hsTypeToType kt instanceType
    ct n =  n
 
-{-
-newMethodSig :: HsContext -> HsName -> HsDecl -> HsType -> HsDecl
-newMethodSig newCntxt newName (HsTypeSig _sloc methodName (HsQualType cntxt t)) instanceType
-   = HsTypeSig bogusASrcLoc [newName] newQualType
-   where
-   -- the assumption is that the context is non-empty and that
-   -- the class and variable that we are interested in are at the
-   -- front of the old context - the method of inserting instance types into
-   -- the class hierarchy should ensure this
-   ((className, classArg):restContxt) = cntxt
-   newT = oneTypeReplace (HsTyVar classArg, instanceType) t
-   newQualType
-      = let finalCntxt = newCntxt++restContxt
-           in case finalCntxt of
-                 []    -> HsUnQualType newT
-                 (_:_) -> HsQualType finalCntxt newT
--- -}
 
 -- collect assumptions of all class methods
 
@@ -479,15 +449,13 @@ makeClassHierarchy (ClassHierarchy ch) kt ds = return (ClassHierarchy ans) where
         | HsTyApp (HsTyCon className) (HsTyVar argName)  <- tbody = do
             let qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
                 newClassContext = [HsAsst className [argName]] -- hsContextToContext [(className, argName)]
-            tell [ClassRecord { classAssocs = classAssocs, className = toName ClassName className, classSrcLoc = sl, classSupers = [ toName ClassName x | HsAsst x _ <- cntxt], classInsts = [ emptyInstance { instHead = i } | i@(_ :=> IsIn n _) <- primitiveInsts, nameName n == className], classDerives = [], classAssumps = qualifiedMethodAssumps }]
-
+            tell [ClassRecord { classArgs = classArgs, classAssocs = classAssocs, className = toName ClassName className, classSrcLoc = sl, classSupers = [ toName ClassName x | HsAsst x _ <- cntxt], classInsts = [ emptyInstance { instHead = i } | i@(_ :=> IsIn n _) <- primitiveInsts, nameName n == className], classDerives = [], classAssumps = qualifiedMethodAssumps }]
         | otherwise = failSl sl "Invalid Class declaration."
         where
         HsQualType cntxt tbody = toHsQualType t
-        classAssocs = [ (ct TypeConstructor n,map (ct TypeVal) as,ctype t)| HsTypeDecl { hsDeclName = n, hsDeclArgs = as, hsDeclType = t } <- decls ] where
-            ct nameType n = let nn = toName nameType n in (nn,kindOf nn kt)
-            ctype HsTyAssoc = Nothing
-            ctype t = Just $ runIdentity $ hsTypeToType kt t
+        classAssocs = createClassAssocs kt decls
+        (_,(_,classArgs')) = qtToClassHead kt t
+        classArgs = [ v | ~(TVar v) <- classArgs' ]
     f decl = hsInstDeclToInst kt decl >>= \insts -> do
         crs <- flip mapM [ (cn,i) | (_,i@Inst { instHead = _ :=> IsIn cn _}) <- insts] $ \ (x,inst) -> case Map.lookup x ch of
             Just cr -> ensureNotDup (srcLoc decl) inst (classInsts cr) >> return [cr { classInsts = mempty }]

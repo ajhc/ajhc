@@ -16,21 +16,21 @@ import Control.Monad.Trans
 import Data.Monoid
 import List
 import Monad
+import Representation(Class)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Representation(Class)
 
+import Doc.DocLike
+import Doc.PPrint
+import FrontEnd.Class
+import FrontEnd.Tc.Monad
+import FrontEnd.Tc.Type
 import Name.Names
 import Options
-import Doc.DocLike
 import Support.CanType
-import qualified FlagOpts as FO
-import qualified FlagDump as FD
-import FrontEnd.Class
-import FrontEnd.Tc.Type
-import FrontEnd.Tc.Monad
-import Doc.PPrint
 import Warning
+import qualified FlagDump as FD
+import qualified FlagOpts as FO
 
 
 
