@@ -280,6 +280,10 @@ prettyPrintType t  = unparse $ runIdentity (runVarNameT (f t)) where
     fp (IsIn cn t) = do
         t' <- f t
         return (atom (text $ show cn) `app` t')
+    fp (IsEq t1 t2) = do
+        t1' <- f t1
+        t2' <- f t2
+        return (atom (parens $ unparse t1' <+> text "=" <+> unparse t2'))
     f (TForAll [] ([] :=> t)) = f t
     f (TForAll vs (ps :=> t)) = do
         --ts' <- mapM (newLookupName ['a'..] ()) vs
@@ -336,6 +340,7 @@ instance DocLike d => PPrint d MetaVarType where
 
 instance DocLike d => PPrint d Pred where
     pprint (IsIn c t) = text (show c) <+> prettyPrintType t
+    pprint (IsEq t1 t2) = parens $ prettyPrintType t1 <+> text "=" <+> prettyPrintType t2
 
 instance DocLike d => PPrint d MetaVar where
     pprint MetaVar { metaUniq = u, metaKind = k, metaType = t }

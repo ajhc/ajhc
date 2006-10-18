@@ -399,14 +399,24 @@ makeDerivation kt ch name args cs ds = ([],concatMap f ds) where
 
 
 
+qtToClassHead :: KindEnv -> HsQualType -> ([Pred],(Name,[Type]))
+qtToClassHead kt (HsQualType cntx (HsTyApp (HsTyCon className) ty)) = (map (hsAsstToPred kt) cntx,(toName ClassName className,[runIdentity $ hsTypeToType kt ty]))
+
+createClassAssocs kt decls = [ (ct TypeConstructor n,map (ct TypeVal) as,ctype t)| HsTypeDecl { hsDeclName = n, hsDeclArgs = as, hsDeclType = t } <- decls ] where
+    ct nameType n = let nn = toName nameType n in (nn,kindOf nn kt)
+    ctype HsTyAssoc = Nothing
+    ctype t = Just $ runIdentity $ hsTypeToType kt t
+
 instanceToTopDecls :: KindEnv -> ClassHierarchy -> HsDecl -> (([HsDecl],[Assump]))
 instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsInstDecl _ qualType methods)
-   = unzip $ map (methodToTopDecls kt methodSigs qualType) $ methodGroups where
-   HsQualType _ (HsTyApp (HsTyCon className) _) = qualType
-   methodGroups = groupEquations methods
-   methodSigs = case Map.lookup (toName ClassName className) classHierarchy  of
-           Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
-           Just sigs -> classAssumps sigs
+    = unzip $ map (methodToTopDecls kt cacntxt crecord methodSigs qualType) $ methodGroups where
+    methodGroups = groupEquations methods
+    cacntxt = [ IsEq (TAp (TCon (Tycon n k)) th) v | ((n,k),[_],~(Just v)) <- createClassAssocs kt methods]
+    (_,(className,[th])) = qtToClassHead kt qualType
+    crecord = case Map.lookup className classHierarchy  of
+        Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
+        Just crecord -> crecord
+    methodSigs = classAssumps crecord
 instanceToTopDecls kt classHierarchy decl@HsDataDecl {} =
      (makeDerivation kt classHierarchy (hsDeclName decl) (hsDeclArgs decl) (hsDeclCons decl)) (map (toName ClassName) $ hsDeclDerives decl)
 instanceToTopDecls kt classHierarchy decl@HsNewTypeDecl {} =
@@ -439,20 +449,19 @@ createInstanceAssump kt methodSigs cntxt className argType methodName
    = (newMethodName,instantiatedSig) where
     newMethodName = instanceName methodName (getHsTypeCons argType)
     [sigFromClass] = [ s | (n,s) <- methodSigs, n == methodName]
-    instantiatedSig = newMethodSig' kt methodName cntxt sigFromClass argType
+    instantiatedSig = newMethodSig' kt methodName (map (hsAsstToPred kt) cntxt) sigFromClass argType
 
-methodToTopDecls :: KindEnv -> [Assump] -> HsQualType -> (Name, HsDecl) -> (HsDecl,Assump)
+methodToTopDecls :: KindEnv -> [Pred] -> ClassRecord -> [Assump] -> HsQualType -> (Name, HsDecl) -> (HsDecl,Assump)
 
-methodToTopDecls kt methodSigs (HsQualType cntxt classApp) (methodName, methodDecls)
+methodToTopDecls kt preds crecord methodSigs qt@(HsQualType cntxt classApp) (methodName, methodDecls)
    = (renamedMethodDecls,(newMethodName, instantiatedSig)) where
     (HsTyApp (HsTyCon className) argType) = classApp
+--    (cntxt,(className,[argType])) = qtToClassHead qt
     newMethodName = instanceName methodName (getHsTypeCons argType)
     sigFromClass = case [ s | (n, s) <- methodSigs, n == methodName] of
         [x] -> x
         _ -> error $ "sigFromClass: " ++ pprint methodSigs ++ " " ++ show  methodName
-    --instantiatedSig = newMethodSig' (kiHsQualTypePredPred kt qt) cntxt sigFromClass argType
-    instantiatedSig = newMethodSig' kt methodName cntxt sigFromClass argType
-     --  = newMethodSig cntxt newMethodName sigFromClass argType
+    instantiatedSig = newMethodSig' kt methodName (preds ++ map (hsAsstToPred kt) cntxt) sigFromClass argType
     renamedMethodDecls = renameOneDecl newMethodName methodDecls
 
 defaultMethodToTopDecls :: KindEnv -> [Assump] -> HsQualType -> (Name, HsDecl) -> (HsDecl,Assump)
@@ -481,7 +490,7 @@ renameOneMatch newName (HsMatch sloc oldName pats rhs wheres)
 
 
 
-newMethodSig' :: KindEnv -> Name -> HsContext -> Sigma -> HsType -> Sigma
+newMethodSig' :: KindEnv -> Name -> [Pred] -> Sigma -> HsType -> Sigma
 newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
    TForAll _ ((IsIn _ classArg:restContext) :=> t) = qt'
    -- the assumption is that the context is non-empty and that
@@ -500,7 +509,7 @@ newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
    at (Tyvar _ n k) =  tyvar (updateName (++ foo) n) k
    updateName f n = toName nt (md,f nm) where
         (nt,(md::String,nm)) = fromName n
-   qt = (map (hsAsstToPred kt) newCntxt ++ restContext) :=> (everywhere (mkT ct) t)
+   qt = (newCntxt ++ restContext) :=> (everywhere (mkT ct) t)
    ct n | n == classArg =  runIdentity $ hsTypeToType kt instanceType
    ct n =  n
 
