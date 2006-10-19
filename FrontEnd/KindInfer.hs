@@ -43,8 +43,12 @@ import Util.ContextMonad
 import Util.HasSize
 
 
-newtype KindEnv = KindEnv (Map.Map Name Kind)
-    deriving(Binary,Typeable,Show,HasSize,Monoid)
+data KindEnv = KindEnv (Map.Map Name Kind) (Map.Map Name (Int,Int))
+    deriving(Typeable,Show)
+        {-!derive: Monoid, GhcBinary !-}
+
+instance HasSize KindEnv where
+    size (KindEnv env _) = size env
 
 type Subst = [(Kindvar, Kind)]
 
@@ -77,12 +81,12 @@ instance Kinds a => Kinds (b, a) where
    vars (x, y) = vars y
 
 instance Kinds KindEnv where
-   apply s (KindEnv m) = KindEnv $ Map.map (\el -> apply s el) m
-   vars (KindEnv env) = vars $ map snd $ Map.toList env
+   apply s (KindEnv m x) = KindEnv (Map.map (\el -> apply s el) m) x
+   vars (KindEnv env x) = vars $ map snd $ Map.toList env
 
 
 instance DocLike d =>  PPrint d KindEnv where
-    pprint (KindEnv m) = vcat [ pprint x <+> text "=>" <+> pprint y | (x,y) <- Map.toList m]
+    pprint (KindEnv m _) = vcat [ pprint x <+> text "=>" <+> pprint y | (x,y) <- Map.toList m]
 --------------------------------------------------------------------------------
 
 -- unification
@@ -136,7 +140,7 @@ instance Monad KI where
 
 
 restrictKindEnv :: (Name -> Bool) -> KindEnv -> KindEnv
-restrictKindEnv f (KindEnv m) = KindEnv $ Map.filterWithKey (\k _ -> f k) m
+restrictKindEnv f (KindEnv m x) = KindEnv (Map.filterWithKey (\k _ -> f k) m) x
 
 --------------------------------------------------------------------------------
 
@@ -201,13 +205,13 @@ newKindVar
         return (KVar (Kindvar n))
 
 lookupKindEnv :: Name -> KI (Maybe Kind)
-lookupKindEnv name
-   = do KindEnv env <- getEnv
-        return $ Map.lookup name env
+lookupKindEnv name = do
+    KindEnv env _ <- getEnv
+    return $ Map.lookup name env
 
 extendEnv :: KindEnv -> KI ()
-extendEnv (KindEnv newEnv) = KI $ \e ->
-    modifyIORef (kiEnv e) (\ (KindEnv env) -> KindEnv $ env `Map.union` newEnv)
+extendEnv (KindEnv newEnv nx) = KI $ \e ->
+    modifyIORef (kiEnv e) (\ (KindEnv env x) -> KindEnv (env `Map.union` newEnv) (nx `mappend` x))
 
 applySubstToEnv :: Subst -> KI ()
 applySubstToEnv subst = KI $ \e ->
@@ -221,7 +225,7 @@ envVarsToStars
 
 
 getConstructorKinds :: KindEnv -> Map.Map Name Kind
-getConstructorKinds (KindEnv m) = m -- Map.fromList [ (toName TypeConstructor x,y) | (x,y)<- Map.toList m]
+getConstructorKinds (KindEnv m _) = m -- Map.fromList [ (toName TypeConstructor x,y) | (x,y)<- Map.toList m]
 
 --------------------------------------------------------------------------------
 
@@ -252,14 +256,14 @@ kiTyConDecl :: DataDeclHead -> KI ()
 kiTyConDecl (tyconName, args) = do
         argKindVars <- mapM newNameVar args
         let tyConKind = foldr Kfun Star $ map snd argKindVars
-        let newEnv = KindEnv $ Map.fromList $ [(toName TypeConstructor tyconName, tyConKind)] ++ argKindVars
+        let newEnv = KindEnv (Map.fromList $ [(toName TypeConstructor tyconName, tyConKind)] ++ argKindVars) mempty
         extendEnv newEnv
 
 kiClassDecl :: (HsName,[HsName]) -> KI ()
 --kiClassDecl nn | trace ("kiClassDecl: " ++ show nn) False = undefined
 kiClassDecl (className, argNames) = do
         varKind <- newKindVar
-        let newEnv = KindEnv $ Map.fromList $ (toName ClassName className, varKind): [(toName TypeVal argName, varKind) | argName <- argNames]
+        let newEnv = KindEnv (Map.fromList $ (toName ClassName className, varKind): [(toName TypeVal argName, varKind) | argName <- argNames]) mempty
         extendEnv newEnv
 
 -- here we expext the classname to be already defined and should be in the
@@ -273,7 +277,7 @@ kiAsst x@(HsAsst className [argName]) = withContext ("kiAsst: " ++ show x) $ do
                          case argKind of
                             --Nothing -> error  $ "kiAsst: could not find kind information for class/arg: " ++ show className ++ "/" ++ show argName
                             Nothing -> do varKind <- newKindVar
-					  extendEnv $ KindEnv $ Map.singleton (toName TypeVal argName) varKind
+					  extendEnv $ KindEnv (Map.singleton (toName TypeVal argName) varKind) mempty
                                           unify ck varKind
                                           return ck
                             Just ak -> do unify ck ak
@@ -309,7 +313,7 @@ kiType varExist tap@(HsTyVar name) = do
                     True
                        -> fail $ "kiType: could not find kind for this type variable: " ++ show name
                     False -> do varKind <- newKindVar
-				extendEnv $ KindEnv $ Map.singleton (toName TypeVal name) varKind
+				extendEnv $ KindEnv (Map.singleton (toName TypeVal name) varKind) mempty
                                 return varKind
            Just k -> return k
 
@@ -346,12 +350,12 @@ kiType varExist tap@(HsTyTuple ts) = do
 
 kiType varExist tap@(HsTyForall { hsTypeVars = vs, hsTypeType = qt }) = do
     argKindVars <- mapM (newNameVar . hsTyVarBindName) vs
-    let newEnv = KindEnv $ Map.fromList $ argKindVars
+    let newEnv = KindEnv (Map.fromList argKindVars) mempty
     extendEnv newEnv
     kiQualType varExist qt
 kiType varExist tap@(HsTyExists { hsTypeVars = vs, hsTypeType = qt }) = do
     argKindVars <- mapM (newNameVar . hsTyVarBindName) vs
-    let newEnv = KindEnv $ Map.fromList $ argKindVars
+    let newEnv = KindEnv (Map.fromList argKindVars) mempty
     extendEnv newEnv
     kiQualType varExist qt
 
@@ -509,13 +513,13 @@ typeFromSig (HsTypeSig _sloc _names qualType) = qualType
 --------------------------------------------------------------------------------
 
 kindOf :: Name -> KindEnv -> Kind
-kindOf name (KindEnv env) = case Map.lookup name env of
+kindOf name (KindEnv env _) = case Map.lookup name env of
             Nothing | nameType name `elem` [TypeConstructor,TypeVal] -> Star
             Just k -> k
             _ -> error $ "kindOf: could not find kind of : " ++ show (nameType name,name)
 
 kindOfClass :: Name -> KindEnv -> [Kind]
-kindOfClass name (KindEnv env) = case Map.lookup name env of
+kindOfClass name (KindEnv env _) = case Map.lookup name env of
         --Nothing -> Star
         Nothing -> error $ "kindOf: could not find kind of class : " ++ show (nameType name,name)
         Just k -> [k]
