@@ -499,12 +499,17 @@ kindOfClass name (KindEnv env _) = case Map.lookup name env of
 -- Conversion of Types
 ----------------------
 
--- note that the types are generated without generalised type
--- variables, ie there will be no TGens in the output
--- to get the generalised variables a second phase
--- of generalisation must be applied
+fromTyApp t = f t [] where
+    f (HsTyApp a b) rs = f a (b:rs)
+    f t rs = (t,rs)
 
 aHsTypeToType :: KindEnv -> HsType -> Type
+aHsTypeToType kt@(KindEnv _ at) t | (HsTyCon con,xs) <- fromTyApp t, let nn = toName TypeConstructor con, Just (n1,n2) <- Map.lookup nn at =
+    TAssoc {
+        typeCon = Tycon nn (kindOf nn kt),
+        typeClassArgs = map (aHsTypeToType kt) (take n1 xs),
+        typeExtraArgs = map (aHsTypeToType kt) (take n2 $ drop n1 xs)
+    }
 aHsTypeToType kt (HsTyFun t1 t2) = aHsTypeToType kt t1 `fn` aHsTypeToType kt t2
 aHsTypeToType kt tuple@(HsTyTuple types) = tTTuple $ map (aHsTypeToType kt) types
 aHsTypeToType kt (HsTyApp t1 t2) = TAp (aHsTypeToType kt t1) (aHsTypeToType kt t2)
@@ -568,6 +573,7 @@ hoistType t = f t where
     f t@TVar {} = t
     f t@TCon {} = t
     f t@TMetaVar {} = t
+    f t@TAssoc {} = t { typeClassArgs = map f (typeClassArgs t), typeExtraArgs = map f (typeExtraArgs t) }
     f (TAp a b) = TAp (f a) (f b)
     f (TForAll vs (ps :=> t))
         | (TForAll vs' (ps' :=> t')) <- nt = f $ TForAll (vs ++ vs') ((ps ++ ps') :=> t')

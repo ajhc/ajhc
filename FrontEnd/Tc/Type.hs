@@ -227,8 +227,12 @@ instance Tickleable Type Type where
     tickleM f (TAp l r) = return TAp `ap` f l `ap` f r
     tickleM f (TArrow l r) = return TArrow `ap` f l `ap` f r
     tickleM f (TAssoc c cas eas) = return (TAssoc c) `ap` mapM f cas `ap` mapM f eas
-    tickleM f (TForAll ta (ps :=> t)) = return (TForAll ta . (ps :=>)) `ap` f t
-    tickleM f (TExists ta (ps :=> t)) = return (TExists ta . (ps :=>)) `ap` f t
+    tickleM f (TForAll ta (ps :=> t)) = do
+        ps <- mapM (tickleM f) ps
+        return (TForAll ta . (ps :=>)) `ap` f t
+    tickleM f (TExists ta (ps :=> t)) = do
+        ps <- mapM (tickleM f) ps
+        return (TExists ta . (ps :=>)) `ap` f t
     tickleM _ t = return t
 
 

@@ -92,7 +92,7 @@ data TcEnv = TcEnv {
     tcCurrentEnv        :: Map.Map Name Sigma,
     tcCurrentScope      :: Set.Set MetaVar,
     tcRecursiveCalls    :: Set.Set Name,
-    tcInstanceEnv   :: InstanceEnv,
+    tcInstanceEnv       :: InstanceEnv,
     tcOptions           :: Opt  -- module specific options
     }
    {-! derive: update !-}
@@ -265,6 +265,7 @@ instance Instantiate Type where
     inst mm ts (TExists as qt) = TExists as (inst mm (foldr Map.delete ts (map tyvarAtom as)) qt)
     inst mm ts (TMetaVar mv) | Just t <- Map.lookup (metaUniq mv) mm  = t
     inst mm ts (TMetaVar mv) = TMetaVar mv
+    inst mm ts (TAssoc tc as bs) = TAssoc tc (map (inst mm ts) as) (map (inst mm ts) bs)
     inst mm _ t = error $ "inst: " ++ show t
 
 
@@ -377,9 +378,6 @@ quantify vs ps r | not $ any isBoxyMetaVar vs = do
 -- this removes all boxes, replacing them with tau vars
 unBox ::  Type -> Tc Type
 unBox tv = ft' tv where
-    ft (TAp x y) = liftM2 TAp (ft' x) (ft' y)
-    ft (TArrow x y) = liftM2 TArrow (ft' x) (ft' y)
-    ft t@TCon {} = return t
     ft (TForAll vs (ps :=> t)) = do
         ps' <- sequence (map (tickleM ft') ps) -- [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
         t' <- ft' t
@@ -395,7 +393,7 @@ unBox tv = ft' tv where
             varBind mv tmv
             return tmv
         | otherwise =  return t
-    ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
+    ft t = tickleM ft' t
     ft' t = findType t >>= ft
 
 
