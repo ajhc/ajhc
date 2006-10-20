@@ -19,6 +19,7 @@ module FrontEnd.KindInfer (
 
 import Control.Monad
 import Control.Monad.Identity
+import Control.Monad.Writer
 import Data.Generics
 import Data.IORef
 import Data.Monoid
@@ -86,7 +87,7 @@ instance Kinds KindEnv where
 
 
 instance DocLike d =>  PPrint d KindEnv where
-    pprint (KindEnv m _) = vcat [ pprint x <+> text "=>" <+> pprint y | (x,y) <- Map.toList m]
+    pprint (KindEnv m ev) = vcat $ [ pprint x <+> text "=>" <+> pprint y | (x,y) <- Map.toList m] ++ [ text "associated type" <+> pprint n <+> pprint ab  | (n,ab) <- Map.toList ev] ++ [empty]
 --------------------------------------------------------------------------------
 
 -- unification
@@ -232,13 +233,16 @@ getConstructorKinds (KindEnv m _) = m -- Map.fromList [ (toName TypeConstructor 
 -- kind inference proper
 -- this is what gets called from outside of this module
 kiDecls :: KindEnv -> [HsDecl] -> IO KindEnv
-kiDecls inputEnv classAndDataDecls = run >>= return . snd where
-   run = runKI inputEnv $ withContext ("kiDecls: " ++ show (map getDeclName classAndDataDecls)) $ mapM_ kiKindGroup kindGroups
-   kindGroups = map declsToKindGroup depGroups
-   depGroups = getDataAndClassBg classAndDataDecls
+kiDecls inputEnv classAndDataDecls = ans where
+    ans = do
+        (_,KindEnv env as) <- run
+        return (KindEnv env (Map.fromList (concatMap kgAssocs kindGroups) `mappend` as))
+    run = runKI inputEnv $ withContext ("kiDecls: " ++ show (map getDeclName classAndDataDecls)) $ mapM_ kiKindGroup kindGroups
+    kindGroups = map declsToKindGroup depGroups
+    depGroups = getDataAndClassBg classAndDataDecls
 
 kiKindGroup :: KindGroup -> KI ()
-kiKindGroup tap@(classDecls, heads, context, dataBodies, classBodies) = do
+kiKindGroup tap@KindGroup { kgClassDecls = classDecls, kgDataDecls = heads, kgContexts = context, kgTypes = dataBodies, kgQualTypes = classBodies } = do
         withContext ("kiKindGroup: " ++ show tap) $ do
         mapM_ kiClassDecl classDecls
         mapM_ kiTyConDecl heads
@@ -425,73 +429,40 @@ namesFromContext cntxt = concatMap f cntxt where
 -- (type constructor name, arguments to constructor)
 type DataDeclHead = (HsName, [HsName])
 -- (class decls, data decl heads, class and data contexts, types in body of data decl, types in body of class)
-type KindGroup = ([(HsName,[HsName])], [DataDeclHead], HsContext, [HsType], [HsQualType])
--- data KindGroup = KindGroup {
---     kgClassDecls :: [(HsName,[HsName])],
---     kgDataDecls ::[DataDeclHead],
---     kgContexts ::HsContext,
---     kgTypes ::[HsType],
---     kgQualTypes ::[HsQualType]
---     }
+--type KindGroup = ([(HsName,[HsName])], [DataDeclHead], HsContext, [HsType], [HsQualType])
+
+data KindGroup = KindGroup {
+     kgClassDecls :: [(HsName,[HsName])],
+     kgDataDecls ::[DataDeclHead],
+     kgContexts ::HsContext,
+     kgTypes ::[HsType],
+     kgAssocs :: [(Name,(Int,Int))],
+     kgQualTypes ::[HsQualType]
+     }
+     deriving(Show)
+    {-!derive: Monoid !-}
 
 
---declsToKindGroup ds = ans where
---    ans = execWriter (mapM_ f ds)
---    f (HsDataDecl _sloc context tyconName tyconArgs condecls _derives) = do
---        declsToKindGroup
-
-declsToKindGroup :: [HsDecl] -> KindGroup
-declsToKindGroup [] = ([], [], [], [], [])
-
-declsToKindGroup ((HsDataDecl _sloc context tyconName tyconArgs condecls _derives):decls)
-   = (restClassDecls,
-      newHead:restDataHeads,
-      context++restContext,
-      newBodies ++ restDataBodies,
-      restClassBodies)
-   where
-   (restClassDecls, restDataHeads, restContext, restDataBodies, restClassBodies)
-      = declsToKindGroup decls
-   newHead = (tyconName, tyconArgs)
-   newBodies = concatMap conDeclToTypes condecls
-
-declsToKindGroup ((HsNewTypeDecl _sloc context tyconName tyconArgs condecl _derives):decls)
-   = (restClassDecls,
-      newHead:restDataHeads,
-      context++restContext,
-      newBodies ++ restDataBodies,
-      restClassBodies)
-   where
-   (restClassDecls, restDataHeads, restContext, restDataBodies, restClassBodies)
-      = declsToKindGroup decls
-   newHead = (tyconName, tyconArgs)
-   newBodies = conDeclToTypes condecl
-
-declsToKindGroup (HsTypeDecl _sloc name names t: decls)
-   = (restClassDecls,
-      (name,names):restDataHeads,
-      restContext,
-      restDataBodies,
-      restClassBodies)
-   where
-   (restClassDecls, restDataHeads, restContext, restDataBodies, restClassBodies)
-      = declsToKindGroup decls
-
-declsToKindGroup (HsClassDecl _sloc qualType sigsAndDefaults : decls)
-   = (newClassDecl:restClassDecls,
-      foos ++ restDataHeads,
-      newContext++restContext,
-      restDataBodies,
-      newClassBodies++restClassBodies)
-   where
-   (restClassDecls, restDataHeads, restContext, restDataBodies, restClassBodies) = declsToKindGroup decls
-   newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
-   rn = Seq.toList $ everything (Seq.<>) (mkQ Seq.empty f) newClassBodies
-   f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = Seq.single n'
-   f _ = Seq.empty
-   foos = [ (name,names) | HsTypeDecl _sloc name names _ <- sigsAndDefaults ]
-   (newClassDecl, newContext) = ((className, classArg:rn), contxt)
-   HsQualType contxt (HsTyApp (HsTyCon className) (HsTyVar classArg)) =  qualType
+declsToKindGroup ds = ans where
+    ans = execWriter (mapM_ f ds)
+    f (HsDataDecl _sloc context tyconName tyconArgs condecls _derives) = do
+        tell mempty { kgDataDecls = [(tyconName, tyconArgs)], kgContexts = context, kgTypes = concatMap conDeclToTypes condecls }
+    f (HsNewTypeDecl _sloc context tyconName tyconArgs condecl _derives) = do
+        tell mempty { kgDataDecls = [(tyconName, tyconArgs)], kgContexts = context, kgTypes = conDeclToTypes condecl }
+    f (HsTypeDecl _sloc name names t) = do
+        tell mempty { kgDataDecls = [(name,names)] }
+    f (HsClassDecl _sloc qualType sigsAndDefaults) = do
+        let newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
+            newAssocs = [ (name,names,t,map HsTyVar names) | HsTypeDecl _sloc name names t <- sigsAndDefaults ]
+            assocs = [ (toName TypeConstructor n,(numClassArgs,length names - numClassArgs)) | (n,names,_,_) <- newAssocs ]
+            numClassArgs = 1
+            rn = Seq.toList $ everything (Seq.<>) (mkQ Seq.empty f) (newClassBodies,newAssocs)
+            f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = Seq.single n'
+            f _ = Seq.empty
+            foos = [ (name,names) | (name,names,_,_) <- newAssocs ]
+            (newClassDecl, newContext) = ((className, classArg:rn), contxt)
+            HsQualType contxt (HsTyApp (HsTyCon className) (HsTyVar classArg)) =  qualType
+        tell mempty { kgClassDecls = [newClassDecl], kgDataDecls = foos, kgContexts = newContext, kgQualTypes = newClassBodies, kgAssocs = assocs }
 
 
 conDeclToTypes :: HsConDecl -> [HsType]
