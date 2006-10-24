@@ -11,7 +11,7 @@ module FrontEnd.Class(
     classRecords,
     makeClassHierarchy,
     derivableClasses,
-    makeInstanceEnvironment,
+    --makeInstanceEnvironment,
     stdClasses,
     makeInstanceEnv,
     InstanceEnv(..),
@@ -59,13 +59,13 @@ type Assump = (Name,Sigma)
 
 data Inst = Inst {
     instHead :: Qual Pred,
-    instAssocs :: [(Tycon,[Tyvar],Sigma)]  -- only has extra arguments, after first one
+    instAssocs :: [(Tycon,[Tyvar],[Tyvar],Sigma)]
     } deriving(Typeable,Data,Eq,Ord,Show)
     {-! derive: GhcBinary !-}
 
 instance PPrint a (Qual Pred) => PPrint a Inst where
     pprint Inst { instHead = h, instAssocs = [] } = pprint h
-    pprint Inst { instHead = h, instAssocs = as } = pprint h <+> text "where" <$> vcat [ text "    type" <+> pprint n <+> text "_" <+> hsep (map pprint ts) <+> text "=" <+> pprint sigma  | (n,ts,sigma) <- as]
+    pprint Inst { instHead = h, instAssocs = as } = pprint h <+> text "where" <$> vcat [ text "    type" <+> pprint n <+> text "_" <+> hsep (map pprint ts) <+> text "=" <+> pprint sigma  | (n,_,ts,sigma) <- as]
 
 
 emptyInstance = Inst { instHead = error "emptyInstance", instAssocs = [] }
@@ -107,21 +107,23 @@ combineClassRecords cra crb | className cra == className crb = ClassRecord {
 fst3 (x,_,_) = x
 
 
-newtype InstanceEnv = InstanceEnv { instanceEnv :: Map.Map (Name,Name) (Tyvar,[Tyvar],Type) }
+newtype InstanceEnv = InstanceEnv { instanceEnv :: Map.Map (Name,Name) ([Tyvar],[Tyvar],Type) }
 
 makeInstanceEnv :: ClassHierarchy -> InstanceEnv
 makeInstanceEnv (ClassHierarchy ch) = InstanceEnv $ Map.fromList (concatMap f (Map.elems ch)) where
     f cr = concatMap (g cr) (classInsts cr)
     g cr Inst { instHead = _ :=> IsIn _cname (TAp (TCon ca) (TVar vv)), instAssocs = as } | _cname == className cr = ans where
-        ans = [ ((tyconName tc,tyconName ca),(vv,rs,e)) | (tc,rs,e) <- as]
+        ans = [ ((tyconName tc,tyconName ca),(is,rs,e)) | (tc,is,rs,e) <- as]
 
 
+{-
 makeInstanceEnvironment :: ClassHierarchy -> [Qual Pred]
 makeInstanceEnvironment (ClassHierarchy ch) = concatMap f (Map.elems ch) where
     f cr@ClassRecord { classSupers = supers, className = cname } = concatMap (g cr) (classInsts cr) ++ [ [IsIn cname var] :=> IsIn s var | s <- supers ] where
         var = let [v] = classArgs cr in TVar v
     g cr Inst { instHead = ih@(_ :=> (IsIn _cname what)), instAssocs = as } | _cname == className cr = ans where
         ans = ih:[ [] :=> IsEq (foldl TAp (TAp (TCon tc) what) (map TVar rs)) e | (tc,rs,e) <- as]
+-}
 
 
 --([Class], [Inst], [Assump])
@@ -230,7 +232,7 @@ hsInstDeclToInst kt (HsInstDecl _sloc qType decls)
    (cntxt, (className, cargs@[convertedArgType])) = qtToClassHead kt qType
    classKind = kindOfClass className kt
    argTypeKind = map getType cargs
-   assocs = [ (tc,rs,s) | (tc,~(_:rs),~(Just s)) <- createClassAssocs kt decls ]
+   assocs = [ (tc,[r],rs,s) | (tc,~(r:rs),~(Just s)) <- createClassAssocs kt decls ]
 
 --   (cntxt, classType, argType)
 --      = case toHsQualType qType of
@@ -333,9 +335,9 @@ makeDerivation kt ch name args cs ds = ([],concatMap f ds) where
 qtToClassHead :: KindEnv -> HsQualType -> ([Pred],(Name,[Type]))
 qtToClassHead kt (HsQualType cntx (HsTyApp (HsTyCon className) ty)) = (map (hsAsstToPred kt) cntx,(toName ClassName className,[runIdentity $ hsTypeToType kt ty]))
 
-createClassAssocs kt decls = [ (ctc n,map ct as,ctype t)| HsTypeDecl { hsDeclName = n, hsDeclArgs = as, hsDeclType = t } <- decls ] where
+createClassAssocs kt decls = [ (ctc n,map ct as,ctype t)| HsTypeDecl { hsDeclName = n, hsDeclTArgs = as, hsDeclType = t } <- decls ] where
     ctc n = let nn = toName TypeConstructor n in Tycon nn (kindOf nn kt)
-    ct n = let nn = toName TypeVal n in tyvar nn (kindOf nn kt)
+    ct (HsTyVar n) = let nn = toName TypeVal n in tyvar nn (kindOf nn kt)
     ctype HsTyAssoc = Nothing
     ctype t = Just $ runIdentity $ hsTypeToType kt t
 

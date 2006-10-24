@@ -72,8 +72,17 @@ processErrors' doDie ws = mapM_ s ws' >> when (die && doDie) exitFailure >> retu
         putErrLn (fn ++ ":" ++ pad 3 (show l) ++  " - "  ++ msg t m)
     die = (not $ null $ intersect (map warnType ws') fatal) && not (optKeepGoing options)
 
-fatal = ["undefined-name", "ambiguous-name", "multiply-defined",
-    "ambiguous-export", "unknown-import", "parse-error", "missing-dep", "type-synonym-partialap" ]
+fatal = [
+    "undefined-name",
+    "ambiguous-name",
+    "multiply-defined",
+    "ambiguous-export",
+    "unknown-import",
+    "parse-error",
+    "missing-dep",
+    "invalid-decl",
+    "type-synonym-partialap" ]
+
 ignore = ["h98-emptydata"]
 
 instance Show Warning where

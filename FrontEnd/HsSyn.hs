@@ -143,7 +143,7 @@ instance HasLocation HsRule where
     srcLoc HsRule { hsRuleSrcLoc = sl } = sl
 
 data HsDecl
-	 = HsTypeDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclName :: HsName, hsDeclArgs :: [HsName], hsDeclType :: HsType }
+	 = HsTypeDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclName :: HsName, hsDeclTArgs :: [HsType], hsDeclType :: HsType }
 	 | HsDataDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclContext :: HsContext, hsDeclName :: HsName, hsDeclArgs :: [HsName], hsDeclCons :: [HsConDecl], {- deriving -} hsDeclDerives :: [HsName] }
 	 | HsInfixDecl   { hsDeclSrcLoc :: SrcLoc, hsDeclAssoc :: HsAssoc, hsDeclInt :: !Int, hsDeclNames :: [HsName]  }
 	 | HsNewTypeDecl { hsDeclSrcLoc :: SrcLoc, hsDeclContext :: HsContext, hsDeclName :: HsName, hsDeclArgs :: [HsName], hsDeclCon :: HsConDecl, {- deriving -} hsDeclDerives :: [HsName] }

@@ -277,7 +277,7 @@ ppHsDecl fd@(HsForeignExport _ _ n qt) = text "ForeignExport" <+> ppHsName n <+>
 ppHsDecl (HsTypeDecl loc name nameList htype) =
 	   --blankline $
 	   mySep ( [text "type",ppHsName name]
-		   ++ map ppHsName nameList
+		   ++ map ppHsType nameList
 		   ++ [equals, ppHsType htype])
 
 ppHsDecl (HsDataDecl loc context name nameList constrList derives) =

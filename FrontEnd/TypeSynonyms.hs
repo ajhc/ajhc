@@ -38,8 +38,8 @@ showSynonym pprint n (TypeSynonyms m) = do
 
 declsToTypeSynonyms :: [HsDecl] -> TypeSynonyms
 declsToTypeSynonyms ts = TypeSynonyms $ Map.fromList $
-    [ (toName TypeConstructor name,( args , quantifyHsType args (HsQualType [] t) , sl)) | (HsTypeDecl sl name args t) <- ts]
-    ++  [ (toName TypeConstructor name,( args , HsTyAssoc, sl)) | (HsClassDecl _ _ ds) <- ts,(HsTypeDecl sl name args _) <- ds]
+    [ (toName TypeConstructor name,( args , quantifyHsType args (HsQualType [] t) , sl)) | (HsTypeDecl sl name args' t) <- ts, let args = [ n | ~(HsTyVar n) <- args'] ]
+     ++ [ (toName TypeConstructor name,( args , HsTyAssoc, sl)) | (HsClassDecl _ _ ds) <- ts,(HsTypeDecl sl name args' _) <- ds, let args = [ n | ~(HsTyVar n) <- args'] ]
 
 removeSynonymsFromType :: MonadWarn m => TypeSynonyms -> HsType -> m HsType
 removeSynonymsFromType syns t = evalTypeSyms  syns t

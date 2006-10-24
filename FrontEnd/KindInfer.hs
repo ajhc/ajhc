@@ -256,7 +256,7 @@ kiKindGroup tap@KindGroup { kgClassDecls = classDecls, kgDataDecls = heads, kgCo
         envVarsToStars
 
 
-kiTyConDecl :: DataDeclHead -> KI ()
+kiTyConDecl :: (HsName,[HsName]) -> KI ()
 kiTyConDecl (tyconName, args) = do
         argKindVars <- mapM newNameVar args
         let tyConKind = foldr Kfun Star $ map snd argKindVars
@@ -427,13 +427,13 @@ namesFromContext cntxt = concatMap f cntxt where
 --------------------------------------------------------------------------------
 
 -- (type constructor name, arguments to constructor)
-type DataDeclHead = (HsName, [HsName])
+--type DataDeclHead = (HsName, [HsName])
 -- (class decls, data decl heads, class and data contexts, types in body of data decl, types in body of class)
 --type KindGroup = ([(HsName,[HsName])], [DataDeclHead], HsContext, [HsType], [HsQualType])
 
 data KindGroup = KindGroup {
      kgClassDecls :: [(HsName,[HsName])],
-     kgDataDecls ::[DataDeclHead],
+     kgDataDecls ::[(HsName, [HsName])],
      kgContexts ::HsContext,
      kgTypes ::[HsType],
      kgAssocs :: [(Name,(Int,Int))],
@@ -450,10 +450,10 @@ declsToKindGroup ds = ans where
     f (HsNewTypeDecl _sloc context tyconName tyconArgs condecl _derives) = do
         tell mempty { kgDataDecls = [(tyconName, tyconArgs)], kgContexts = context, kgTypes = conDeclToTypes condecl }
     f (HsTypeDecl _sloc name names t) = do
-        tell mempty { kgDataDecls = [(name,names)] }
+        tell mempty { kgDataDecls = [(name,[ n | ~(HsTyVar n) <- names])] }
     f (HsClassDecl _sloc qualType sigsAndDefaults) = do
         let newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
-            newAssocs = [ (name,names,t,map HsTyVar names) | HsTypeDecl _sloc name names t <- sigsAndDefaults ]
+            newAssocs = [ (name,[ n | ~(HsTyVar n) <- names],t,names) | HsTypeDecl _sloc name names t <- sigsAndDefaults ]
             assocs = [ (toName TypeConstructor n,(numClassArgs,length names - numClassArgs)) | (n,names,_,_) <- newAssocs ]
             numClassArgs = 1
             rn = Seq.toList $ everything (Seq.<>) (mkQ Seq.empty f) (newClassBodies,newAssocs)

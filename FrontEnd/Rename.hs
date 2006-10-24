@@ -72,24 +72,26 @@ import Data.Monoid
 import List
 import Maybe
 import qualified Data.Map as Map
+import qualified Data.Set as Set
+
 
 import Doc.DocLike(tupled)
 import FrontEnd.Desugar (doToExp)
+import FrontEnd.HsErrors as HsErrors
 import FrontEnd.SrcLoc hiding(srcLoc)
+import FrontEnd.Syn.Traverse
 import FrontEnd.Utils
 import GenUtil hiding(replicateM)
-import FrontEnd.HsErrors as HsErrors
 import HsSyn
 import Name.Name as Name hiding(qualifyName)
 import Name.Names
-import qualified Name.VConsts as V
+import Support.FreeVars
 import Util.ContextMonad
 import Util.Gen
-import Util.UniqueMonad
 import Util.Inst()
-import FrontEnd.Syn.Traverse
+import Util.UniqueMonad
 import Warning
-
+import qualified Name.VConsts as V
 
 type FieldMap =  (Map.Map Name Int,Map.Map Name [(Name,Int)])
 
@@ -321,9 +323,9 @@ renameHsDecl (HsDataDecl srcLoc hsContext hsName hsNames1 hsConDecls hsNames2) s
 renameHsDecl (HsTypeDecl srcLoc name hsNames t) subTable = do
     setSrcLoc srcLoc
     hsName' <- renameTypeHsName name subTable
-    subTable' <- updateSubTableWithHsNames subTable hsNames
+    subTable' <- updateSubTableWithHsNames subTable (Set.toList $ freeVars hsNames)
     --subTable' <- updateSubTableWithHsNames subTable hsNames
-    hsNames' <- renameHsNames hsNames subTable'
+    hsNames' <- renameAny hsNames subTable'
     t' <- renameHsType t subTable'
     return (HsTypeDecl srcLoc  hsName' hsNames' t')
 

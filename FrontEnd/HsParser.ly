@@ -441,11 +441,11 @@ C a, or (C1 a, C2 b, ... Cn z) and convert it into a context.  Blaach!
 >	: types ',' type		{ $3 : $1 }
 >	| type  ',' type		{ [$3, $1] }
 
-> simpletype :: { (HsName, [HsName]) }
->	: tycon tyvars			{ ($1,reverse $2) }
+> simpletype :: { (HsName, [HsType]) }
+>	: tycon atypes			{ ($1,reverse $2) }
 
-> tyvars :: { [HsName] }
->	: tyvars tyvar			{ $2 : $1 }
+> atypes :: { [HsType] }
+>	: atypes atype			{ $2 : $1 }
 >	| {- empty -}			{ [] }
 
 -----------------------------------------------------------------------------

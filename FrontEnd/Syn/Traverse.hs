@@ -1,8 +1,18 @@
 module FrontEnd.Syn.Traverse where
 
+import qualified Data.Set as Set
+import Control.Monad.Writer
+
 import HsSyn
 import Control.Monad.Identity
 import FrontEnd.SrcLoc
+import Support.FreeVars
+
+
+instance FreeVars HsType (Set.Set HsName) where
+    freeVars t = execWriter (f t) where
+        f (HsTyVar v) = tell (Set.singleton v)
+        f t = traverseHsType_ f t
 
 traverse_ :: Monad m => (a -> m b) -> a -> m a
 traverse_ fn x = fn x >> return x
