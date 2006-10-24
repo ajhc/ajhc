@@ -271,9 +271,10 @@ processDecls stats ho ho' tiData = do
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
     ds' <- convertDecls tiData (hoClassHierarchy ho') allAssumps  fullDataTable decls
     let ds = [ (runIdentity (fromId (tvrIdent v)),v,e) | (v,e) <- classInstances ] ++  [ (n,v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
+--    ds <- annotateDs mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo) (\_ nfo -> return nfo) ds
     wdump FD.CoreInitial $
         mapM_ (\(_,v,lc) -> printCheckName'' fullDataTable v lc) ds
-    sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
+ --   sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 
     -- Build rules
     rules' <- createInstanceRules (hoClassHierarchy ho')   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
@@ -301,6 +302,7 @@ processDecls stats ho ho' tiData = do
     Stats.clear stats
 
     prog <- return $ programSetDs ds prog
+    prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo)  (\_ nfo -> return nfo) prog
     lintCheckProgram (putErrLn "LintPostProcess") prog
 --    prog <- denewtypeProgram prog
 

@@ -150,8 +150,9 @@ fromSigma t = ([], tipe t)
 
 convertValue n = do
     assumps <- asks ceAssumps
+    dataTable <- asks ceDataTable
     t <- Map.lookup n assumps
-    let ty = tipe t
+    let ty = removeNewtypes dataTable (tipe t)
     cc <- asks ceCoerce
     lm <- case Map.lookup n cc of
         Nothing -> do
@@ -572,7 +573,8 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
     getAssump n  = case Map.lookup (toName Name.Val n) assumps of
         Just z -> z
         Nothing -> error $ "Lookup failed: " ++ (show n)
-    tv n = toTVr assumps (toName Name.Val n)
+    tv n = tvr { tvrType = removeNewtypes dataTable (tvrType tvr) } where
+        tvr = toTVr assumps (toName Name.Val n)
     lp  [] e = e
     lp  (HsPVar n:ps) e = eLam (tv n) $ lp  ps e
     lp  p e  =  error $ "unsupported pattern:" <+> tshow p  <+> tshow e

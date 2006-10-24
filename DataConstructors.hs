@@ -401,9 +401,11 @@ updateLit dataTable lc@LitCons { litName = n } =  lc { litAliasFor = af } where
 removeNewtypes :: DataTable -> E -> E
 removeNewtypes dataTable e = runIdentity (f e) where
     f ec@ECase {} = emapEGH f f return ec { eCaseAlts = map g (eCaseAlts ec) } where
-        g (Alt l e) = Alt (updateLit dataTable l) e
-    f (ELit l) = emapEGH f f return (ELit (updateLit dataTable l))
+        g (Alt l e) = Alt (gl $ updateLit dataTable l) e
+    f (ELit l) = emapEGH f f return (ELit (gl $ updateLit dataTable l))
     f e = emapEGH f f return e
+    gl lc@LitCons { litAliasFor = Just e }  = lc { litAliasFor = Just $ removeNewtypes dataTable e }
+    gl l = l
 
 
 {-# NOINLINE toDataTable #-}
