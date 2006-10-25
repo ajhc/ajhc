@@ -232,39 +232,8 @@ hsInstDeclToInst kt (HsInstDecl _sloc qType decls)
    (cntxt, (className, cargs@[convertedArgType])) = qtToClassHead kt qType
    classKind = kindOfClass className kt
    argTypeKind = map getType cargs
-   assocs = [ (tc,[r],rs,s) | (tc,~(r:rs),~(Just s)) <- createClassAssocs kt decls ]
+   assocs = [ (tc,as,bs,s) | (tc,as,bs,~(Just s)) <- createInstAssocs kt decls ]
 
---   (cntxt, classType, argType)
---      = case toHsQualType qType of
---           HsQualType context (HsTyApp cType@(HsTyCon _) aType)
---              -> (map (hsAsstToPred kt) context, cType, aType)
-   {-
-      Note:
-      kind (Either) = *->*->*
-      kind (Either a) = *->*
-      kind (Either a b) = *
-
-      the kind of the argument type (argTypeKind) is the remaining
-      kind after droping the kinds of the supplied arguments from
-      the kind of the type constructor
-   argTypeKind :: Kind
-   convertedArgType :: Type
-   (argTypeKind, convertedArgType)
-      = case argType of
-           HsTyTuple args -> (Star, tTTuple $ map toType $ zip args $ repeat Star)
-           _anythingElse
-              -> let tyConName = nameOfTyCon TypeConstructor tyCon
-                     numArgs = (length flatType) - 1
-                     flatType = flattenLeftTypeApplication argType
-                     flatTyConKind = unfoldKind tyConKind
-                     tyConKind = kindOf tyConName kt
-                     tyCon = head flatType
-                     typeKindPairs = (tyCon, tyConKind) : (zip (tail flatType) flatTyConKind)
-                     in (foldr1 Kfun $ drop numArgs flatTyConKind,
-                         convType typeKindPairs)
---   className = nameOfTyCon ClassName classType
---   [classKind] = kindOfClass className kt
-   -}
 
 -- derive statements
 hsInstDeclToInst kt (HsDataDecl _sloc _cntxt tyConName argNames _condecls derives@(_:_))
@@ -341,11 +310,23 @@ createClassAssocs kt decls = [ (ctc n,map ct as,ctype t)| HsTypeDecl { hsDeclNam
     ctype HsTyAssoc = Nothing
     ctype t = Just $ runIdentity $ hsTypeToType kt t
 
+createInstAssocs kt decls = [ (ctc n,map ct (czas ca),map ct as,ctype t)| HsTypeDecl { hsDeclName = n, hsDeclTArgs = (ca:as), hsDeclType = t } <- decls ] where
+    ctc n = let nn = toName TypeConstructor n in Tycon nn (kindOf nn kt)
+    ct (HsTyVar n) = let nn = toName TypeVal n in tyvar nn (kindOf nn kt)
+    czas ca = let (HsTyCon {},zas) = fromHsTypeApp ca in zas
+    ctype HsTyAssoc = Nothing
+    ctype t = Just $ runIdentity $ hsTypeToType kt t
+
+fromHsTypeApp t = f t [] where
+    f (HsTyApp a b) rs = f a (b:rs)
+    f t rs = (t,rs)
+
 instanceToTopDecls :: KindEnv -> ClassHierarchy -> HsDecl -> (([HsDecl],[Assump]))
 instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsInstDecl _ qualType methods)
     = unzip $ map (methodToTopDecls kt cacntxt crecord methodSigs qualType) $ methodGroups where
     methodGroups = groupEquations methods
-    cacntxt = [ IsEq (TAp (TCon tcon) th) (tsubst na cvar v) | (tcon,[na],~(Just v)) <- createClassAssocs kt methods]
+    cacntxt = []
+    --cacntxt = [ IsEq (TAp (TCon tcon) th) (tsubst na cvar v) | (tcon,[na],~(Just v)) <- createClassAssocs kt methods]
     (_,(className,[th@(~(TAp _ cvar))])) = qtToClassHead kt qualType
     crecord = case Map.lookup className classHierarchy  of
         Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
