@@ -147,8 +147,8 @@ data HsDecl
 	 | HsDataDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclContext :: HsContext, hsDeclName :: HsName, hsDeclArgs :: [HsName], hsDeclCons :: [HsConDecl], {- deriving -} hsDeclDerives :: [HsName] }
 	 | HsInfixDecl   { hsDeclSrcLoc :: SrcLoc, hsDeclAssoc :: HsAssoc, hsDeclInt :: !Int, hsDeclNames :: [HsName]  }
 	 | HsNewTypeDecl { hsDeclSrcLoc :: SrcLoc, hsDeclContext :: HsContext, hsDeclName :: HsName, hsDeclArgs :: [HsName], hsDeclCon :: HsConDecl, {- deriving -} hsDeclDerives :: [HsName] }
-	 | HsClassDecl	 SrcLoc HsQualType [HsDecl]
-	 | HsInstDecl	 SrcLoc HsQualType [HsDecl]
+	 | HsClassDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType, hsDeclDecls :: [HsDecl] }
+	 | HsInstDecl    { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType, hsDeclDecls :: [HsDecl] }
 	 | HsDefaultDecl SrcLoc HsType
 	 | HsTypeSig	 SrcLoc [HsName] HsQualType
 	 | HsFunBind     [HsMatch]

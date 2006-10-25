@@ -346,7 +346,7 @@ instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsInstDecl _ qualType met
     = unzip $ map (methodToTopDecls kt cacntxt crecord methodSigs qualType) $ methodGroups where
     methodGroups = groupEquations methods
     cacntxt = [ IsEq (TAp (TCon tcon) th) (tsubst na cvar v) | (tcon,[na],~(Just v)) <- createClassAssocs kt methods]
-    (_,(className,[th@(TAp _ cvar)])) = qtToClassHead kt qualType
+    (_,(className,[th@(~(TAp _ cvar))])) = qtToClassHead kt qualType
     crecord = case Map.lookup className classHierarchy  of
         Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
         Just crecord -> crecord

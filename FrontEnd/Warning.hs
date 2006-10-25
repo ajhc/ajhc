@@ -81,6 +81,7 @@ fatal = [
     "parse-error",
     "missing-dep",
     "invalid-decl",
+    "invalid-assoc",
     "type-synonym-partialap" ]
 
 ignore = ["h98-emptydata"]

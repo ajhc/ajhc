@@ -77,7 +77,6 @@ import qualified Data.Set as Set
 
 import Doc.DocLike(tupled)
 import FrontEnd.Desugar (doToExp)
-import FrontEnd.HsErrors as HsErrors
 import FrontEnd.SrcLoc hiding(srcLoc)
 import FrontEnd.Syn.Traverse
 import FrontEnd.Utils
@@ -91,6 +90,7 @@ import Util.Gen
 import Util.Inst()
 import Util.UniqueMonad
 import Warning
+import qualified FrontEnd.HsErrors as HsErrors
 import qualified Name.VConsts as V
 
 type FieldMap =  (Map.Map Name Int,Map.Map Name [(Name,Int)])
@@ -247,7 +247,7 @@ renameDecls tidy subTable = do
         subTable'a <- gets globalSubTable
         let subTable' = subTable `Map.union` subTable'a
         --addError (show $ fmToList subTable')
-        decls' <-  renameHsDecls (hsModuleDecls tidy) subTable' ; return decls'
+        decls' <-  renameHsDeclsTL (hsModuleDecls tidy) subTable' ; return decls'
         --addDiag (show syns)
         --sta <- gets globalSubTable
         --stb <- gets typeSubTable
@@ -263,9 +263,20 @@ renameDecls tidy subTable = do
 -- new table down to its children on the syntax tree.
 
 renameHsDecls :: [HsDecl] -> SubTable -> ScopeSM ([HsDecl])
-renameHsDecls decls subtable = do
+renameHsDecls  decls subtable = do
     ans <- mapRename renameHsDecl (expandTypeSigs decls) subtable
-    mapM_ HsErrors.hsDecl ans
+    mapM_ HsErrors.hsDeclLocal ans
+    return ans
+
+renameHsDeclsTL :: [HsDecl] -> SubTable -> ScopeSM ([HsDecl])
+renameHsDeclsTL  decls subtable = do
+    ans <- mapRename renameHsDecl (expandTypeSigs decls) subtable
+    mapM_ HsErrors.hsDeclTopLevel ans
+    return ans
+
+renameHsDeclsN :: [HsDecl] -> SubTable -> ScopeSM ([HsDecl])
+renameHsDeclsN  decls subtable = do
+    ans <- mapRename renameHsDecl (expandTypeSigs decls) subtable
     return ans
 
 
@@ -362,13 +373,13 @@ renameHsDecl (HsClassDecl srcLoc hsQualType hsDecls) subTable = do
     typeSigSubTable <- updateSubTableWithHsQualType startingSubTable hsQualType
     hsQualType' <- renameHsQualType hsQualType typeSigSubTable
     doesClassMakeSense hsQualType'
-    hsDecls' <- renameHsDecls hsDecls subTable
+    hsDecls' <- renameHsDeclsN hsDecls subTable
     return (HsClassDecl srcLoc hsQualType' hsDecls')
 renameHsDecl (HsInstDecl srcLoc hsQualType hsDecls) subTable = do
     setSrcLoc srcLoc
     subTable' <- updateSubTableWithHsQualType subTable hsQualType
     hsQualType' <- renameHsQualType hsQualType subTable'
-    hsDecls' <- renameHsDecls hsDecls subTable'
+    hsDecls' <- renameHsDeclsN hsDecls subTable'
     return (HsInstDecl srcLoc hsQualType' hsDecls')
 renameHsDecl (HsInfixDecl srcLoc assoc int hsNames) subTable = do
     setSrcLoc srcLoc
