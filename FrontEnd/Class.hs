@@ -45,8 +45,8 @@ import Name.VConsts
 import Options
 import Support.CanType
 import PrimitiveOperators(primitiveInsts)
+import Support.FreeVars
 import Representation
-import Type as T
 import Util.Gen
 import Util.HasSize
 import Util.Inst()
@@ -112,8 +112,10 @@ newtype InstanceEnv = InstanceEnv { instanceEnv :: Map.Map (Name,Name) ([Tyvar],
 makeInstanceEnv :: ClassHierarchy -> InstanceEnv
 makeInstanceEnv (ClassHierarchy ch) = InstanceEnv $ Map.fromList (concatMap f (Map.elems ch)) where
     f cr = concatMap (g cr) (classInsts cr)
-    g cr Inst { instHead = _ :=> IsIn _cname (TAp (TCon ca) (TVar vv)), instAssocs = as } | _cname == className cr = ans where
+    g cr Inst { instHead = _ :=> IsIn _cname tt, instAssocs = as } | _cname == className cr = ans where
         ans = [ ((tyconName tc,tyconName ca),(is,rs,e)) | (tc,is,rs,e) <- as]
+        (TCon ca,_) = fromTAp tt
+    g cr x = error $  "makeInstanceEnv: " ++ show (className cr,x)
 
 
 {-
@@ -332,7 +334,7 @@ instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsInstDecl _ qualType met
         Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
         Just crecord -> crecord
     methodSigs = classAssumps crecord
-    tsubst na vv v = T.apply (msingleton na vv) v
+    tsubst na vv v = applyTyvarMap (msingleton na vv) v
 
 instanceToTopDecls kt classHierarchy decl@HsDataDecl {} =
      (makeDerivation kt classHierarchy (hsDeclName decl) (hsDeclArgs decl) (hsDeclCons decl)) (map (toName ClassName) $ hsDeclDerives decl)
@@ -414,7 +416,7 @@ newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
    -- the class hierarchy should ensure this
    --((className, classArg):restContxt) = cntxt
    foo = "_" ++ (show methodName ++ show (getHsTypeCons instanceType)) ++ "@@"
-   newQualType = everywhere (mkT at) $ tForAll (tv qt) qt
+   newQualType = everywhere (mkT at) $ tForAll (freeVars qt) qt
    at (Tyvar _ n k) =  tyvar (updateName (++ foo) n) k
    updateName f n = toName nt (md,f nm) where
         (nt,(md::String,nm)) = fromName n

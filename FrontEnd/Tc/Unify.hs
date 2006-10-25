@@ -2,6 +2,7 @@
 module FrontEnd.Tc.Unify(subsumes,boxyMatch) where
 
 import Control.Monad.Writer
+import Control.Monad.Reader
 import qualified Data.Map as Map
 
 import Doc.DocLike
@@ -9,10 +10,12 @@ import Doc.PPrint
 import FrontEnd.Tc.Class
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
+import FrontEnd.Class
 import GenUtil
 import Options
-import qualified FlagDump as FD
 import Support.CanType
+import Util.SetLike
+import qualified FlagDump as FD
 
 
 
@@ -227,7 +230,9 @@ var_meets_var tv1 tv2 = do
 unify      :: Tau -> Tau -> Tc ()
 unify t1 t2 = do
     t1' <- findType t1
+    t1' <- evalTAssoc t1'
     t2' <- findType t2
+    t2' <- evalTAssoc t2'
     printRule $ "unify: " <> ppretty t1 <+> ppretty t2
     mgu t1' t2'
 
@@ -254,6 +259,12 @@ unifyList :: [Type] -> Tc ()
 unifyList (t1:t2:ts) = unify t1 t2 >> unifyList (t2:ts)
 unifyList _ = return ()
 
+evalTAssoc TAssoc { typeCon = Tycon { tyconName = n1 }, typeClassArgs = [carg], typeExtraArgs = eas }  | (TCon Tycon { tyconName = n2 }, as) <- fromTAp carg = do
+    InstanceEnv ie <- asks tcInstanceEnv
+    case Map.lookup (n1,n2) ie of
+        Just (aa,bb,tt) -> return (applyTyvarMap (fromList $ zip aa as ++ zip bb eas) tt)
+        _ -> fail "no instance for associated type"
+evalTAssoc t = return t
 
 -- This is used in pattern matching because it might be polymorphic, but also needs to match exactly
 --subsumesPattern a b | isTau b = a `boxyMatch` b

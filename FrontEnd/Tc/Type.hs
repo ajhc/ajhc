@@ -17,6 +17,7 @@ module FrontEnd.Tc.Type(
     readMetaVar,
     tForAll,
     tList,
+    applyTyvarMap,
     tyvar
     ) where
 
@@ -24,6 +25,7 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.IORef
 import List
+import qualified Data.Map as Map
 
 import Doc.DocLike
 import Doc.PPrint
@@ -34,6 +36,7 @@ import Representation
 import Support.CanType
 import Support.FreeVars
 import Support.Tickle
+import qualified Type as T
 
 type Sigma' = Sigma
 type Tau' = Tau
@@ -47,6 +50,8 @@ type BoundTV = Tyvar
 
 type Preds = [Pred]
 
+applyTyvarMap :: Map.Map Tyvar Type -> Type -> Type
+applyTyvarMap = T.apply
 
 typeOfType :: Type -> (MetaVarType,Bool)
 typeOfType TForAll { typeArgs = as, typeBody = _ :=> t } = (Sigma,isBoxy t)
