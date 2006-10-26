@@ -364,8 +364,13 @@ lexToken = do
 
 lexDecimalOrFloat :: Lex a Token
 lexDecimalOrFloat = do
-	ds <- lexWhile isDigit
-	rest <- getInput
+        let ld ds' = do
+                ds <- lexWhile isDigit
+                rest <- getInput
+                case rest of
+                    ('_':_) -> discard 1 >> ld (ds' ++ ds)
+                    rest -> return (ds' ++ ds,rest)
+        (ds,rest) <- ld []
 	case rest of
 	    ('.':d:_) | isDigit d -> do
 		discard 1
