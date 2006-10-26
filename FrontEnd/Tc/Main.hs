@@ -51,7 +51,7 @@ tcKnownApp e coerce vname as typ = do
     --addCoerce nname (ctAp ts)
     let f (TArrow x y) (a:as) = do
             a <- tcExprPoly a x
-            y <- findType y
+            y <- evalType y
             (as,fc) <- f y as
             return (a:as,fc)
         f lt [] = do
@@ -94,7 +94,7 @@ tcApp e1 e2 typ = do
 tiExprPoly,tcExprPoly ::  HsExp -> Type ->  Tc HsExp
 
 tcExprPoly e t = do
-    t <- findType t
+    t <- evalType t
     tiExprPoly e t
 
 tiExprPoly e t@TMetaVar {} = tcExpr e t   -- GEN2
@@ -124,7 +124,7 @@ newHsVar ns = do
 tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp
 
 tcExpr e t = do
-    t <- findType t
+    t <- evalType t
     e <- tiExpr e t
     --(_,False,_) <- unbox t
     return e
@@ -235,7 +235,7 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
             --s1' `boxyMatch` box
             (p',env) <- tcPat p s1'
             localEnv env $ do
-                s2' <- findType s2'
+                s2' <- evalType s2'
                 lamPoly ps e s2' (p':rs)  -- TODO poly
         lam [] e typ rs = do
             e' <- tcExpr e typ
@@ -325,7 +325,7 @@ tcWheres decls = do
 tcAlt ::  Sigma -> Sigma -> HsAlt -> Tc HsAlt
 
 tcAlt scrutinee typ alt@(HsAlt sloc pat gAlts wheres)  = withContext (locMsg sloc "in the alternative" $ render $ ppHsAlt alt) $ do
-    scrutinee <- findType scrutinee
+    scrutinee <- evalType scrutinee
     (pat',env) <- tcPat pat scrutinee
     localEnv env $ do
     (wheres', env) <- tcWheres wheres
@@ -338,13 +338,13 @@ tcAlt scrutinee typ alt@(HsAlt sloc pat gAlts wheres)  = withContext (locMsg slo
             return (HsAlt sloc pat' (HsGuardedRhss gas) wheres')
 
 tcGuardedAlt typ gAlt@(HsGuardedRhs sloc eGuard e) = withContext (locMsg sloc "in the guarded alternative" $ render $ ppGAlt gAlt) $ do
-    typ <- findType typ
+    typ <- evalType typ
     g' <- tcExpr eGuard tBool
     e' <- tcExpr e typ
     return  (HsGuardedRhs sloc g' e')
 
 tcGuardedRhs typ gAlt@(HsGuardedRhs sloc eGuard e) = withContext (locMsg sloc "in the guarded alternative" $ render $ ppHsGuardedRhs gAlt) $ do
-    typ <- findType typ
+    typ <- evalType typ
     g' <- tcExpr eGuard tBool
     e' <- tcExpr e typ
     return  (HsGuardedRhs sloc g' e')
@@ -354,7 +354,7 @@ tcGuardedRhs typ gAlt@(HsGuardedRhs sloc eGuard e) = withContext (locMsg sloc "i
 tiPat,tcPat :: HsPat -> Type -> Tc (HsPat, Map.Map Name Sigma)
 
 tcPat p typ = withContext (makeMsg "in the pattern: " $ render $ ppHsPat p) $ do
-    typ <- findType typ
+    typ <- evalType typ
     tiPat p typ
 
 tiPat (HsPVar i) typ = do
@@ -624,7 +624,7 @@ tcDecl d@(HsForeignDecl _ _ _ n _) typ = do
 
 
 tcDecl decl@(HsPatBind sloc (HsPVar v) rhs wheres) typ = withContext (declDiagnostic decl) $ do
-    typ <- findType typ
+    typ <- evalType typ
     (wheres', env) <- tcWheres wheres
     localEnv env $ do
     case rhs of
@@ -637,7 +637,7 @@ tcDecl decl@(HsPatBind sloc (HsPVar v) rhs wheres) typ = withContext (declDiagno
 
 
 tcDecl decl@(HsFunBind matches) typ = withContext (declDiagnostic decl) $ do
-    typ <- findType typ
+    typ <- evalType typ
     matches' <- mapM (`tcMatch` typ) matches
     return (HsFunBind matches', Map.singleton (getDeclName decl) typ)
 
@@ -648,7 +648,7 @@ tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "i
         lam (p:ps) ty@(TArrow s1' s2') rs = do -- ABS1
             (p',env) <- tcPat p s1'
             localEnv env $ do
-                s2' <- findType s2'
+                s2' <- evalType s2'
                 lamPoly ps s2' (p':rs)
         lam [] typ rs = do
             (wheres', env) <- tcWheres wheres
@@ -661,7 +661,7 @@ tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "i
         lamPoly ps s rs = do
             (_,_,s) <- skolomize s
             lam ps s rs
-    typ <- findType typ
+    typ <- evalType typ
     res <- lam pats typ []
     return res
 

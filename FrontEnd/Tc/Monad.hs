@@ -37,6 +37,7 @@ module FrontEnd.Tc.Monad(
     tcInfoEmpty,
     toSigma,
     unBox,
+    evalType,
     unificationError,
     varBind,
     withContext,
@@ -58,25 +59,26 @@ import Text.PrettyPrint.HughesPJ(Doc)
 
 
 import Atom
-import {-# SOURCE #-} FrontEnd.Tc.Class(ClassHierarchy,simplify)
 import Diagnostic
 import Doc.DocLike
-import Support.FreeVars
-import Support.Tickle
 import Doc.PPrint
+import FrontEnd.Class
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc(bogusASrcLoc,MonadSrcLoc(..))
 import FrontEnd.Tc.Type
-import FrontEnd.Class
 import GenUtil
 import Name.Name
 import Options
 import Options
-import qualified FlagDump as FD
 import Support.CanType
-import Util.Inst
-import Warning
+import Support.FreeVars
+import Support.Tickle
 import Type()
+import Util.Inst
+import Util.SetLike
+import Warning
+import qualified FlagDump as FD
+import {-# SOURCE #-} FrontEnd.Tc.Class(ClassHierarchy,simplify)
 
 
 data BindingType = RecursiveInfered | Supplied
@@ -394,8 +396,16 @@ unBox tv = ft' tv where
             return tmv
         | otherwise =  return t
     ft t = tickleM ft' t
-    ft' t = findType t >>= ft
+    ft' t = evalType t >>= ft
 
+evalType t = findType t >>= evalTAssoc
+
+evalTAssoc TAssoc { typeCon = Tycon { tyconName = n1 }, typeClassArgs = [carg], typeExtraArgs = eas }  | (TCon Tycon { tyconName = n2 }, as) <- fromTAp carg = do
+    InstanceEnv ie <- asks tcInstanceEnv
+    case Map.lookup (n1,n2) ie of
+        Just (aa,bb,tt) -> return (applyTyvarMap (fromList $ zip aa as ++ zip bb eas) tt)
+        _ -> fail "no instance for associated type"
+evalTAssoc t = return t
 
 -- Bind mv to type, first filling in any boxes in type with tau vars
 varBind :: MetaVar -> Type -> Tc ()

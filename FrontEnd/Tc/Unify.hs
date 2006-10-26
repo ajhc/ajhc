@@ -34,8 +34,8 @@ subsumes s1 s2 = do
         (s2,_,_) <- unbox s2
         return (s1,s2)
       else do
-        s1 <- findType s1
-        s2 <- findType s2
+        s1 <- evalType s1
+        s2 <- evalType s2
         return (s1,s2)
     printRule $ "subsumes: " <> ppretty s1 <+> ppretty s2
     sub s1 s2
@@ -111,8 +111,8 @@ boxyMatch s1 s2 = do
         (s2,_,_) <- unbox s2
         return (s1,s2)
       else do
-        s1 <- findType s1
-        s2 <- findType s2
+        s1 <- evalType s1
+        s2 <- evalType s2
         return (s1,s2)
     printRule $ "boxyMatch: " <> ppretty s1 <+> ppretty s2
     b <- bm s1 s2
@@ -229,10 +229,8 @@ var_meets_var tv1 tv2 = do
 
 unify      :: Tau -> Tau -> Tc ()
 unify t1 t2 = do
-    t1' <- findType t1
-    t1' <- evalTAssoc t1'
-    t2' <- findType t2
-    t2' <- evalTAssoc t2'
+    t1' <- evalType t1
+    t2' <- evalType t2
     printRule $ "unify: " <> ppretty t1 <+> ppretty t2
     mgu t1' t2'
 
@@ -259,12 +257,6 @@ unifyList :: [Type] -> Tc ()
 unifyList (t1:t2:ts) = unify t1 t2 >> unifyList (t2:ts)
 unifyList _ = return ()
 
-evalTAssoc TAssoc { typeCon = Tycon { tyconName = n1 }, typeClassArgs = [carg], typeExtraArgs = eas }  | (TCon Tycon { tyconName = n2 }, as) <- fromTAp carg = do
-    InstanceEnv ie <- asks tcInstanceEnv
-    case Map.lookup (n1,n2) ie of
-        Just (aa,bb,tt) -> return (applyTyvarMap (fromList $ zip aa as ++ zip bb eas) tt)
-        _ -> fail "no instance for associated type"
-evalTAssoc t = return t
 
 -- This is used in pattern matching because it might be polymorphic, but also needs to match exactly
 --subsumesPattern a b | isTau b = a `boxyMatch` b
