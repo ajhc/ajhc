@@ -1,5 +1,9 @@
 
-module FrontEnd.Tc.Unify(subsumes,boxyMatch) where
+module FrontEnd.Tc.Unify(
+    subsumes,
+    boxyMatch,
+    listenSolvePreds
+    ) where
 
 import Control.Monad.Writer
 import Control.Monad.Reader
@@ -11,6 +15,7 @@ import FrontEnd.Tc.Class
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 import FrontEnd.Class
+import FrontEnd.SrcLoc
 import GenUtil
 import Options
 import Support.CanType
@@ -80,6 +85,14 @@ subsumes s1 s2 = do
         printRule "F2"
         withMetaVars mv [getType s1, getType s2] (\ [a,b] -> TArrow a b) $ \ [a,b] -> do
         subsumes t (a `fn` b)
+
+
+
+    -- ASSOC
+    sub s1@TAssoc {} s2 = do
+        printRule "ASSOC"
+        s1 `boxyMatch` s2
+        return ctId
 
     -- BMONO
     sub a (TMetaVar mv) | isTau a  = varBind mv a >> return ctId
@@ -198,11 +211,45 @@ boxyMatch s1 s2 = do
         b `boxyMatch` d
         return False
 
+    -- Associated type
+    bm ta@TAssoc {} (TMetaVar mv) = do
+        printRule "ASSOC-BIND"
+        -- are associated types tau?
+        varBind mv ta
+        return False
+
+    bm ta@TAssoc {} tb@TAssoc {} = do
+        ta' <- evalFullType ta
+        tb' <- evalFullType tb
+        when (ta' /= tb') $ do
+            printRule "ASSOC-EQ"
+            addPreds [IsEq ta' tb']
+        return False
+
+    bm ta@TAssoc {} t = do
+        printRule "ASSOC-EQ"
+        -- are associated types tau?
+        addPreds [IsEq ta t]
+        return False
+
     -- MEQ1 MEQ2  SYM
     bm a b
         | isTau a, TMetaVar mv <- b = printRule "MEQ1" >> varBind mv a >> return False
         | isTau a && isTau b = printRule "MEQ2" >> unify a b >> return False
     bm _ _ = return True
+
+
+solveConstraints :: [Constraint] -> Tc ()
+solveConstraints cs = mapM_ f cs where
+    f Equality { constraintSrcLoc = _sl, constraintType1 = t1, constraintType2 = t2 } = {- withSrcLoc sl $ -} boxyMatch t1 t2
+
+listenSolvePreds :: Tc a -> Tc (a,[Pred])
+listenSolvePreds tc = do
+    (x,(ps,cs)) <- listenCPreds tc
+    ((),(ps',cs')) <- listenCPreds (solveConstraints cs)
+    ch <- getClassHierarchy
+    return (x,simplify ch (ps ++ ps') ++ [ IsEq a b | Equality _ a b <- cs' ])
+
 
 var_meets_var :: MetaVar -> MetaVar -> Tc ()
 var_meets_var tv1 tv2 = do
@@ -253,14 +300,12 @@ mgu TForAll {} _ = error "attempt to unify TForall"
 mgu _ TForAll {} = error "attempt to unify TForall"
 mgu t1 t2  = unificationError t1 t2
 
-unifyList :: [Type] -> Tc ()
-unifyList (t1:t2:ts) = unify t1 t2 >> unifyList (t2:ts)
-unifyList _ = return ()
 
 
 -- This is used in pattern matching because it might be polymorphic, but also needs to match exactly
 --subsumesPattern a b | isTau b = a `boxyMatch` b
 --subsumes
+
 
 
 

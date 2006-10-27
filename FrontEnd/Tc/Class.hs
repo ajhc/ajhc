@@ -69,6 +69,7 @@ toHnf h p
          Just ps -> toHnfs h ps
 
 inHnf       :: Pred -> Bool
+inHnf (IsEq t1 t2) = True
 inHnf (IsIn c t) = hnf t
  where hnf (TVar v)  = True
        hnf TMetaVar {} = True
@@ -79,6 +80,7 @@ inHnf (IsIn c t) = hnf t
        hnf TExists {} = False
 
 reducePred :: Monad m => ClassHierarchy -> Pred -> m [Pred]
+reducePred h p@(IsEq t1 t2) = fail "reducePred" -- return [p]
 reducePred h p@(IsIn c t)
     | Just x <- foldr mplus Nothing poss = return x
     | otherwise = fail "reducePred"
@@ -95,12 +97,14 @@ simplify h ps = loop [] ps where
 
 -- | returns true when set of predicates implies some other predicate is satisfied.
 entails :: ClassHierarchy -> [Pred] -> Pred -> Bool
+--entails h ps e@(IsEq {}) = error $ pprint (ps,e)
 entails h ps p = (p `elem` concatMap (bySuper h) ps) ||
            case reducePred h p of
              Nothing -> False
              Just qs -> all (entails h ps) qs
 
 bySuper :: ClassHierarchy -> Pred -> [Pred]
+bySuper h p@IsEq {} = [p]
 bySuper h p@(IsIn c t)
  = p : concatMap (bySuper h) supers
    where supers = [ IsIn c' t | c' <- supersOf h c ]
@@ -176,9 +180,23 @@ ambig h vs ps
          v <- nub (freeMetaVarsPreds ps) \\ vs,
          let qs = [ p | p<-ps, v `elem` freeMetaVarsPred p ] ]
 
+{-
+contextReduce :: Pred -> Tc [Pred]
+conetxtReduce (IsIn c t) = ans where
+    ans = do
+        t' <- evalType t
+        case fromTAp t' of
+            (TCon tycon,as) -> ...
+            t' -> return [IsIn c t']
+contextReduce (IsEq t1 t2) = do
+    t1 <- evalType t1
+    t2 <- evalType t2
+    -}
+
 
 assertEntailment :: Preds -> Preds -> Tc ()
 assertEntailment qs ps = do
+    liftIO $ putStrLn $ "Asserting entailment: " ++ pprint (qs,ps)
     ch <- getClassHierarchy
     let ns = [ p  | p <- ps, not $ entails ch qs p ]
     if null ns then return () else

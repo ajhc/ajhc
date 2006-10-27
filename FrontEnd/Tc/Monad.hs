@@ -23,9 +23,11 @@ module FrontEnd.Tc.Monad(
     getKindEnv,
     getModName,
     getSigEnv,
+    evalFullType,
     inst,
     listenCheckedRules,
     listenPreds,
+    listenCPreds,
     localEnv,
     lookupName,
     newBox,
@@ -102,6 +104,7 @@ data TcEnv = TcEnv {
 data Output = Output {
     collectedPreds   :: Preds,
     existentialPreds :: Preds,
+    constraints      :: [Constraint],
     checkedRules     :: [Rule],
     existentialVars  :: [Tyvar],
     outKnots         :: [(Name,Name)]
@@ -290,11 +293,19 @@ freshInstance typ (TForAll as qt) = do
 freshInstance _ x = return ([],x)
 
 addPreds :: Preds -> Tc ()
-addPreds ps = Tc $ tell mempty { collectedPreds = ps }
+addPreds ps = do
+    sl <- getSrcLoc
+    Tc $ tell mempty { collectedPreds = [ p | p@IsIn {} <- ps ], constraints = [ Equality { constraintSrcLoc = sl, constraintType1 = a, constraintType2 = b } | IsEq a b <- ps ] }
 
+addConstraints :: [Constraint] -> Tc ()
+addConstraints ps = Tc $ tell mempty { constraints = ps }
 
 listenPreds :: Tc a -> Tc (a,Preds)
 listenPreds action = censor (\x -> x { collectedPreds = mempty }) $ listens collectedPreds action
+
+listenCPreds :: Tc a -> Tc (a,(Preds,[Constraint]))
+listenCPreds action = censor (\x -> x { constraints = mempty, collectedPreds = mempty }) $ listens (\x -> (collectedPreds x,constraints x)) action
+
 listenCheckedRules :: Tc a -> Tc (a,[Rule])
 listenCheckedRules action = censor (\x -> x { checkedRules = mempty }) $ listens checkedRules action
 
@@ -399,12 +410,19 @@ unBox tv = ft' tv where
     ft' t = evalType t >>= ft
 
 evalType t = findType t >>= evalTAssoc
+evalFullType t = f' t where
+    f t = tickleM f' t
+    f' t =  evalType t >>= f
 
-evalTAssoc TAssoc { typeCon = Tycon { tyconName = n1 }, typeClassArgs = [carg], typeExtraArgs = eas }  | (TCon Tycon { tyconName = n2 }, as) <- fromTAp carg = do
-    InstanceEnv ie <- asks tcInstanceEnv
-    case Map.lookup (n1,n2) ie of
-        Just (aa,bb,tt) -> return (applyTyvarMap (fromList $ zip aa as ++ zip bb eas) tt)
-        _ -> fail "no instance for associated type"
+evalTAssoc ta@TAssoc { typeCon = Tycon { tyconName = n1 }, typeClassArgs = ~[carg], typeExtraArgs = eas }  = do
+    carg' <- evalType carg
+    case fromTAp carg' of
+        (TCon Tycon { tyconName = n2 }, as) -> do
+            InstanceEnv ie <- asks tcInstanceEnv
+            case Map.lookup (n1,n2) ie of
+                Just (aa,bb,tt) -> return (applyTyvarMap (fromList $ zip aa as ++ zip bb eas) tt)
+                _ -> fail "no instance for associated type"
+        _ -> return ta { typeClassArgs = [carg'] }
 evalTAssoc t = return t
 
 -- Bind mv to type, first filling in any boxes in type with tau vars

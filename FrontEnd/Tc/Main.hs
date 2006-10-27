@@ -1,12 +1,12 @@
 module FrontEnd.Tc.Main (tiExpr, tiProgram, makeProgram ) where
 
 import Control.Monad.Writer
-import List
+import Data.Graph(stronglyConnComp, SCC(..))
 import IO(hFlush,stdout)
-import qualified Text.PrettyPrint.HughesPJ as P
+import List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Data.Graph(stronglyConnComp, SCC(..))
+import qualified Text.PrettyPrint.HughesPJ as P
 
 import Control.Monad.Reader
 import DeclsDepends(getDeclDeps)
@@ -15,15 +15,11 @@ import Doc.DocLike
 import Doc.PPrint as PPrint
 import FrontEnd.Desugar(doToExp)
 import FrontEnd.KindInfer
-import FrontEnd.Tc.Monad
-import FrontEnd.Tc.Type
-import FrontEnd.Tc.Unify
-import Options
-import qualified FlagOpts as FO
-import qualified FlagDump as FD
-import Support.FreeVars
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Class
+import FrontEnd.Tc.Monad hiding(listenPreds)
+import FrontEnd.Tc.Type
+import FrontEnd.Tc.Unify
 import FrontEnd.Utils(getDeclName)
 import GenUtil
 import HsPretty
@@ -31,8 +27,13 @@ import HsSyn
 import Name.Name
 import Name.Names
 import Name.VConsts
+import Options
+import Support.FreeVars
+import qualified FlagDump as FD
+import qualified FlagOpts as FO
 
 
+listenPreds = listenSolvePreds
 
 type Expl = (Sigma, HsDecl)
 -- TODO: this is different than the "Typing Haskell in Haskell" paper
@@ -675,6 +676,7 @@ tiExpl (sc, decl@HsForeignDecl {}) = do return (decl,Map.empty)
 tiExpl (sc, decl@HsForeignExport {}) = do return (decl,Map.empty)
 tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typed " ++  (render $ ppHsDecl decl))) $ do
     when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "** typing expl: " ++ show (getDeclName decl) ++ " " ++ prettyPrintType sc
+    sc <- evalFullType sc
     (vs,qs,typ) <- skolomize sc
     let sc' = (tForAll vs (qs :=> typ))
         mp = (Map.singleton (getDeclName decl) sc')

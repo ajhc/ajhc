@@ -17,6 +17,7 @@ module FrontEnd.Tc.Type(
     readMetaVar,
     tForAll,
     tList,
+    Constraint(..),
     applyTyvarMap,
     tyvar
     ) where
@@ -30,6 +31,7 @@ import qualified Data.Map as Map
 import Doc.DocLike
 import Doc.PPrint
 import Name.Name
+import FrontEnd.SrcLoc
 import Name.Names
 import Name.VConsts
 import Representation
@@ -49,6 +51,15 @@ type SkolemTV = Tyvar
 type BoundTV = Tyvar
 
 type Preds = [Pred]
+
+data Constraint = Equality {
+    constraintSrcLoc :: SrcLoc,
+    constraintType1 :: Type,
+    constraintType2 ::Type
+    }
+
+instance HasLocation Constraint where
+    srcLoc Equality { constraintSrcLoc = sl } = sl
 
 applyTyvarMap :: Map.Map Tyvar Type -> Type -> Type
 applyTyvarMap = T.apply
