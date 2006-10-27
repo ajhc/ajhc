@@ -11,14 +11,15 @@ import qualified Data.Map as Map
 
 import Doc.DocLike
 import Doc.PPrint
+import FrontEnd.Class
+import FrontEnd.SrcLoc
 import FrontEnd.Tc.Class
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
-import FrontEnd.Class
-import FrontEnd.SrcLoc
-import GenUtil
 import Options
 import Support.CanType
+import Support.FreeVars
+import Util.Gen
 import Util.SetLike
 import qualified FlagDump as FD
 
@@ -35,8 +36,8 @@ ppretty vv = parens (pretty vv)
 subsumes :: Sigma' -> Sigma' -> Tc CoerceTerm
 subsumes s1 s2 = do
     (s1,s2) <- if dump FD.BoxySteps then do
-        (s1,_,_) <- unbox s1
-        (s2,_,_) <- unbox s2
+        s1 <- evalFullType s1
+        s2 <- evalFullType s2
         return (s1,s2)
       else do
         s1 <- evalType s1
@@ -90,7 +91,12 @@ subsumes s1 s2 = do
 
     -- ASSOC
     sub s1@TAssoc {} s2 = do
-        printRule "ASSOC"
+        printRule "ASSOC-L"
+        s1 `boxyMatch` s2
+        return ctId
+    -- ASSOC
+    sub s1 s2@TAssoc {} = do
+        printRule "ASSOC-R"
         s1 `boxyMatch` s2
         return ctId
 
@@ -120,8 +126,8 @@ printRule s
 boxyMatch :: Sigma' -> Sigma' -> Tc ()
 boxyMatch s1 s2 = do
     (s1,s2) <- if dump FD.BoxySteps then do
-        (s1,_,_) <- unbox s1
-        (s2,_,_) <- unbox s2
+        s1 <- evalFullType s1
+        s2 <- evalFullType s2
         return (s1,s2)
       else do
         s1 <- evalType s1
@@ -213,9 +219,13 @@ boxyMatch s1 s2 = do
 
     -- Associated type
     bm ta@TAssoc {} (TMetaVar mv) = do
-        printRule "ASSOC-BIND"
-        -- are associated types tau?
-        varBind mv ta
+        ta' <- evalFullType ta
+        if mv `elem` freeVars ta' then do
+            printRule "ASSOC-OCCURS"
+            addPreds [IsEq ta' (TMetaVar mv)]
+         else do
+            printRule "ASSOC-BIND"
+            varBind mv ta'
         return False
 
     bm ta@TAssoc {} tb@TAssoc {} = do
@@ -278,7 +288,7 @@ unify      :: Tau -> Tau -> Tc ()
 unify t1 t2 = do
     t1' <- evalType t1
     t2' <- evalType t2
-    printRule $ "unify: " <> ppretty t1 <+> ppretty t2
+    printRule $ "unify: " <> ppretty t1' <+> ppretty t2'
     mgu t1' t2'
 
 mgu (TAp l r) (TAp l' r')

@@ -233,6 +233,8 @@ newBox k = newMetaVar Sigma k
 
 
 unificationError t1 t2 = do
+    t1 <- evalFullType t1
+    t2 <- evalFullType t2
     diagnosis <- getErrorContext
     let Left msg = typeError (Unification $ "attempted to unify " ++ prettyPrintType t1 ++ " with " ++ prettyPrintType t2) diagnosis
     liftIO $ processIOErrors
@@ -391,15 +393,15 @@ quantify vs ps r | not $ any isBoxyMetaVar vs = do
 -- this removes all boxes, replacing them with tau vars
 unBox ::  Type -> Tc Type
 unBox tv = ft' tv where
-    ft (TForAll vs (ps :=> t)) = do
-        ps' <- sequence (map (tickleM ft') ps) -- [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
-        t' <- ft' t
-        return $ TForAll vs (ps' :=> t')
-    ft (TExists vs (ps :=> t)) = do
-        ps' <- sequence (map (tickleM ft') ps) -- [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
-        --ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
-        t' <- ft' t
-        return $ TExists vs (ps' :=> t')
+--    ft (TForAll vs (ps :=> t)) = do
+--        ps' <- sequence (map (tickleM ft') ps) -- [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
+--        t' <- ft' t
+--        return $ TForAll vs (ps' :=> t')
+--    ft (TExists vs (ps :=> t)) = do
+--        ps' <- sequence (map (tickleM ft') ps) -- [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
+--        --ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
+--        t' <- ft' t
+--        return $ TExists vs (ps' :=> t')
     ft t@(TMetaVar mv)
         | isBoxyMetaVar mv = do
             tmv <- newMetaVar Tau (getType mv)
@@ -420,7 +422,7 @@ evalTAssoc ta@TAssoc { typeCon = Tycon { tyconName = n1 }, typeClassArgs = ~[car
         (TCon Tycon { tyconName = n2 }, as) -> do
             InstanceEnv ie <- asks tcInstanceEnv
             case Map.lookup (n1,n2) ie of
-                Just (aa,bb,tt) -> return (applyTyvarMap (fromList $ zip aa as ++ zip bb eas) tt)
+                Just (aa,bb,tt) -> evalType (applyTyvarMap (fromList $ zip aa as ++ zip bb eas) tt)
                 _ -> fail "no instance for associated type"
         _ -> return ta { typeClassArgs = [carg'] }
 evalTAssoc t = return t
