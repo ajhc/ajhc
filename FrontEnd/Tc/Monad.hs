@@ -393,15 +393,6 @@ quantify vs ps r | not $ any isBoxyMetaVar vs = do
 -- this removes all boxes, replacing them with tau vars
 unBox ::  Type -> Tc Type
 unBox tv = ft' tv where
---    ft (TForAll vs (ps :=> t)) = do
---        ps' <- sequence (map (tickleM ft') ps) -- [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
---        t' <- ft' t
---        return $ TForAll vs (ps' :=> t')
---    ft (TExists vs (ps :=> t)) = do
---        ps' <- sequence (map (tickleM ft') ps) -- [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
---        --ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
---        t' <- ft' t
---        return $ TExists vs (ps' :=> t')
     ft t@(TMetaVar mv)
         | isBoxyMetaVar mv = do
             tmv <- newMetaVar Tau (getType mv)

@@ -120,10 +120,8 @@ data UnVarOpt = UnVarOpt {
     failEmptyMetaVar :: Bool
     }
 
---flattenMetaVars t = unVar UnVarOpt { openBoxes = False, failEmptyMetaVar = False } t
 flattenType t =  unVar UnVarOpt { openBoxes = True, failEmptyMetaVar = False } t
 
--- flattenType t = do (t,_,_) <- unbox t ; return t
 
 
 class UnVar t where
@@ -150,10 +148,7 @@ instance UnVar t => UnVar (Qual t) where
 
 instance UnVar Type where
     unVar' opt tv =  do
-        let ft (TAp x y) = liftM2 TAp (unVar' opt x) (unVar' opt y)
-            ft (TArrow x y) = liftM2 TArrow (unVar' opt x) (unVar' opt y)
-            ft t@TCon {} = return t
-            ft (TForAll vs qt) = do
+        let ft (TForAll vs qt) = do
                 qt' <- unVar' opt qt
                 return $ TForAll vs qt'
             ft (TExists vs qt) = do
@@ -161,9 +156,6 @@ instance UnVar Type where
                 return $ TExists vs qt'
             ft t@(TMetaVar _) = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return t
             ft t = tickleM (unVar' opt . (id :: Type -> Type)) t
-            --ft t | Just tv <- extractMetaTV t = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return (TVar tv)
-            --ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
-            --ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
         tv' <- findType tv
         ft tv'
 
@@ -206,23 +198,12 @@ readMetaVar MetaVar { metaRef = r }  = liftIO $ do
 freeMetaVars :: Type -> [MetaVar]
 freeMetaVars (TMetaVar mv) = [mv]
 freeMetaVars t = foldr union [] $ tickleCollect ((:[]) . freeMetaVars) t
---freeMetaVars (TVar u)      = []
---freeMetaVars (TAp l r)     = freeMetaVars l `union` freeMetaVars r
---freeMetaVars (TArrow l r)  = freeMetaVars l `union` freeMetaVars r
---freeMetaVars TCon {}       = []
---freeMetaVars (TMetaVar mv) = [mv]
---freeMetaVars (TForAll vs qt) = freeVars qt
---freeMetaVars (TExists vs qt) = freeVars qt
 
 instance FreeVars Type [Tyvar] where
     freeVars (TVar u)      = [u]
     freeVars (TForAll vs qt) = freeVars qt List.\\ vs
     freeVars (TExists vs qt) = freeVars qt List.\\ vs
     freeVars t = foldr union [] $ tickleCollect ((:[]) . (freeVars :: Type -> [Tyvar])) t
---    freeVars (TAp l r)     = freeVars l `union` freeVars r
---    freeVars (TArrow l r)  = freeVars l `union` freeVars r
---    freeVars TCon {}       = []
---    freeVars TMetaVar {}   = []
 
 instance FreeVars Type [MetaVar] where
     freeVars t = freeMetaVars t
@@ -250,32 +231,6 @@ instance Tickleable Type Type where
         ps <- mapM (tickleM f) ps
         return (TExists ta . (ps :=>)) `ap` f t
     tickleM _ t = return t
-
-
--- returns (new type, any open boxes, any open tauvars)
-unbox :: MonadIO m => Type -> m (Type,Bool,Bool)
-unbox tv = do
-    let ft (TAp x y) = liftM2 TAp (ft' x) (ft' y)
-        ft (TArrow x y) = liftM2 TArrow (ft' x) (ft' y)
-        ft t@TCon {} = return t
-        ft (TForAll vs (ps :=> t)) = do
-            ps' <- sequence (map (tickleM ft') ps) --[  ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
-            t' <- ft' t
-            return $ TForAll vs (ps' :=> t')
-        ft (TExists vs (ps :=> t)) = do
-            ps' <- sequence (map (tickleM ft') ps) --[  ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
-            --ps' <- sequence [ ft' t >>= return . IsIn c | ~(IsIn c t) <- ps ]
-            t' <- ft' t
-            return $ TExists vs (ps' :=> t')
-        ft t@(TMetaVar mv)
-            | isBoxyMetaVar mv = tell ([True],[]) >> return t
-            | otherwise =  tell ([],[True]) >> return t
-        ft t = tickleM ft' t
-        --ft t | ~(Just tv) <- extractTyVar t  = return (TVar tv)
-        ft' t = findType t >>= ft
-    (tv,(eb,et)) <- runWriterT (ft' tv)
-    return (tv,or eb, or et)
-
 
 
 
