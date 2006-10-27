@@ -39,7 +39,6 @@ import Options
 import qualified FrontEnd.Infix
 import qualified HsPretty
 import qualified Text.PrettyPrint.HughesPJ as PP
-import Representation
 import TypeSynonyms(showSynonym)
 import TypeSyns
 import TypeSigs

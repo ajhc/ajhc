@@ -11,7 +11,6 @@ import HsSyn
 import Name.Name
 import Name.Names
 import Name.VConsts
-import Representation()
 
 
 

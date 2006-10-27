@@ -30,12 +30,11 @@ module DataConsAssump (dataConsEnv) where
 import Control.Monad.Identity
 import qualified Data.Map as Map
 
-import HsSyn
-import Representation
-import FrontEnd.Tc.Type
-import Name.Name
-import Type                     (Types (..))
 import FrontEnd.KindInfer
+import FrontEnd.Tc.Type
+import HsSyn
+import Name.Name
+import Support.FreeVars
 
 --------------------------------------------------------------------------------
 
@@ -87,12 +86,12 @@ hsContextToPreds kt assts = map (hsAsstToPred kt) assts
 
 conDeclType :: Module -> KindEnv -> [Pred] -> Type -> HsConDecl -> Map.Map Name Sigma
 conDeclType modName kt preds tResult (HsConDecl { hsConDeclName = conName, hsConDeclConArg = bangTypes })
-   = Map.singleton (toName DataConstructor conName) $ tForAll (tv qualConType) qualConType
+   = Map.singleton (toName DataConstructor conName) $ tForAll (freeVars qualConType) qualConType
    where
    conType = foldr fn tResult (map (bangTypeToType kt) bangTypes)
    qualConType = preds :=> conType
 conDeclType modName kt preds tResult rd@HsRecDecl { hsConDeclName = conName }
-   = Map.singleton (toName DataConstructor conName) $ tForAll (tv qualConType) qualConType
+   = Map.singleton (toName DataConstructor conName) $ tForAll (freeVars qualConType) qualConType
    where
    conType = foldr fn tResult (map (bangTypeToType kt) (hsConDeclArgs rd))
    qualConType = preds :=> conType

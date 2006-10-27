@@ -34,11 +34,9 @@ import Name.Name as Name
 import Options
 import qualified FlagDump as FD
 import qualified HsPretty
-import Representation
 import TypeSigs           (collectSigs, listSigsToSigEnv)
 import TypeSynonyms
 import TypeSyns
-import Type
 import Util.Gen
 import Util.Inst()
 import Warning

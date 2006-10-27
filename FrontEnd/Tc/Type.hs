@@ -8,6 +8,7 @@ module FrontEnd.Tc.Type(
     Tycon(..),
     Type(..),
     Tyvar(..),
+    unfoldKind,
     fn,
     followTaus,
     fromTAp,
@@ -19,6 +20,9 @@ module FrontEnd.Tc.Type(
     tList,
     Constraint(..),
     applyTyvarMap,
+    Class(),
+    Kindvar(..),
+    tTTuple,
     tyvar
     ) where
 
@@ -38,7 +42,6 @@ import Representation
 import Support.CanType
 import Support.FreeVars
 import Support.Tickle
-import qualified Type as T
 
 type Sigma' = Sigma
 type Tau' = Tau
@@ -61,8 +64,21 @@ data Constraint = Equality {
 instance HasLocation Constraint where
     srcLoc Equality { constraintSrcLoc = sl } = sl
 
-applyTyvarMap :: Map.Map Tyvar Type -> Type -> Type
-applyTyvarMap = T.apply
+applyTyvarMap :: [(Tyvar,Type)] -> Type -> Type
+applyTyvarMap ts t = f initMp t where
+    initMp = Map.fromList [ (tyvarAtom v,t) | (v,t) <- ts ]
+    -- XXX name capture!
+    f mp (TForAll as qt) = TForAll as (fq (foldr Map.delete mp (map tyvarAtom as)) qt)
+    f mp (TExists as qt) = TExists as (fq (foldr Map.delete mp (map tyvarAtom as)) qt)
+    f mp (TVar tv) = case Map.lookup (tyvarAtom tv) mp of
+            Just t'  -> t'
+            Nothing -> (TVar tv)
+    f mp t = tickle (f mp) t
+    fq mp (ps :=> t) = map (tickle (f mp)) ps :=> f mp t
+
+applyTyvarMapQT :: [(Tyvar,Type)] -> Qual Type -> Qual Type
+applyTyvarMapQT ts qt = qt' where
+    (TForAll [] qt') = applyTyvarMap ts (TForAll [] qt)
 
 typeOfType :: Type -> (MetaVarType,Bool)
 typeOfType TForAll { typeArgs = as, typeBody = _ :=> t } = (Sigma,isBoxy t)

@@ -75,7 +75,6 @@ import Options
 import Support.CanType
 import Support.FreeVars
 import Support.Tickle
-import Type()
 import Util.Inst
 import Util.SetLike
 import Warning
@@ -289,7 +288,7 @@ instance Instantiate Pred where
 freshInstance :: MetaVarType -> Sigma -> Tc ([Type],Rho)
 freshInstance typ (TForAll as qt) = do
     ts <- mapM (newMetaVar typ) (map tyvarKind as)
-    let (ps :=> t) = (inst mempty (Map.fromList $ zip (map tyvarAtom as) ts) qt)
+    let (ps :=> t) = (applyTyvarMapQT (zip as ts) qt)
     addPreds ps
     return (ts,t)
 freshInstance _ x = return ([],x)
@@ -324,7 +323,7 @@ freshSigma :: Sigma -> Tc Sigma
 freshSigma (TForAll [] ([] :=> t)) = return t
 freshSigma (TForAll vs qt) = do
     nvs <- mapM (newVar . tyvarKind) vs
-    return (TForAll nvs $ inst mempty (Map.fromList $ zip (map tyvarAtom vs) (map TVar nvs)) qt)
+    return (TForAll nvs $ applyTyvarMapQT (zip vs (map TVar nvs)) qt)
 freshSigma x = return x
 
 toSigma :: Sigma -> Sigma
@@ -413,7 +412,7 @@ evalTAssoc ta@TAssoc { typeCon = Tycon { tyconName = n1 }, typeClassArgs = ~[car
         (TCon Tycon { tyconName = n2 }, as) -> do
             InstanceEnv ie <- asks tcInstanceEnv
             case Map.lookup (n1,n2) ie of
-                Just (aa,bb,tt) -> evalType (applyTyvarMap (fromList $ zip aa as ++ zip bb eas) tt)
+                Just (aa,bb,tt) -> evalType (applyTyvarMap (zip aa as ++ zip bb eas) tt)
                 _ -> fail "no instance for associated type"
         _ -> return ta { typeClassArgs = [carg'] }
 evalTAssoc t = return t

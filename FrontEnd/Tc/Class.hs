@@ -16,7 +16,6 @@ import Control.Monad.Trans
 import Data.Monoid
 import List
 import Monad
-import Representation(Class)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -181,23 +180,10 @@ ambig h vs ps
          v <- nub (freeMetaVarsPreds ps) \\ vs,
          let qs = [ p | p<-ps, v `elem` freeMetaVarsPred p ] ]
 
-{-
-contextReduce :: Pred -> Tc [Pred]
-conetxtReduce (IsIn c t) = ans where
-    ans = do
-        t' <- evalType t
-        case fromTAp t' of
-            (TCon tycon,as) -> ...
-            t' -> return [IsIn c t']
-contextReduce (IsEq t1 t2) = do
-    t1 <- evalType t1
-    t2 <- evalType t2
-    -}
-
 
 assertEntailment :: Preds -> Preds -> Tc ()
 assertEntailment qs ps = do
-    liftIO $ putStrLn $ "Asserting entailment: " ++ pprint (qs,ps)
+--    liftIO $ putStrLn $ "Asserting entailment: " ++ pprint (qs,ps)
     ch <- getClassHierarchy
     let ns = [ p  | p <- ps, not $ entails ch qs p ]
     if null ns then return () else

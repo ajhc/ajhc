@@ -31,7 +31,7 @@ import Binary
 import DependAnalysis
 import Doc.DocLike
 import Doc.PPrint
-import FrontEnd.Tc.Type(Sigma())
+import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import GenUtil
 import Support.FreeVars
@@ -39,7 +39,6 @@ import HsSyn
 import MapBinaryInstance()
 import Name.Name
 import qualified Util.Seq as Seq
-import Representation
 import Util.ContextMonad
 import Util.HasSize
 

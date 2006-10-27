@@ -46,7 +46,6 @@ import Options
 import Support.CanType
 import PrimitiveOperators(primitiveInsts)
 import Support.FreeVars
-import Representation
 import Util.Gen
 import Util.HasSize
 import Util.Inst()
@@ -334,7 +333,7 @@ instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsInstDecl _ qualType met
         Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
         Just crecord -> crecord
     methodSigs = classAssumps crecord
-    tsubst na vv v = applyTyvarMap (msingleton na vv) v
+    tsubst na vv v = applyTyvarMap [(na,vv)] v
 
 instanceToTopDecls kt classHierarchy decl@HsDataDecl {} =
      (makeDerivation kt classHierarchy (hsDeclName decl) (hsDeclArgs decl) (hsDeclCons decl)) (map (toName ClassName) $ hsDeclDerives decl)

@@ -12,7 +12,7 @@ import E.Values
 import Name.Name
 import Name.Names
 import Name.VConsts
-import Representation
+import FrontEnd.Tc.Type
 import Support.CanType
 
 

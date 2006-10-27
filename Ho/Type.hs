@@ -3,21 +3,21 @@ module Ho.Type where
 import Binary
 
 import Atom(Atom)
-import FrontEnd.Class(ClassHierarchy)
 import DataConstructors(DataTable)
 import E.E(TVr,E)
 import E.Rules(Rules)
 import E.TypeCheck()
-import FrontEnd.SrcLoc(SrcLoc)
+import FrontEnd.Class(ClassHierarchy)
 import FrontEnd.Infix(FixityMap)
-import HsSyn(Module)
 import FrontEnd.KindInfer(KindEnv)
+import FrontEnd.SrcLoc(SrcLoc)
+import FrontEnd.Tc.Type(Type())
+import HsSyn(Module)
 import MapBinaryInstance()
+import Name.Id
 import Name.Name(Name)
 import PackedString(PackedString)
-import Representation(Type())
 import TypeSynonyms(TypeSynonyms)
-import Name.Id
 
 
 import Data.Monoid
