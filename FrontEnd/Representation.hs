@@ -23,7 +23,6 @@ module Representation(
     Pred(..),
     Qual(..),
     Class,
-    getTypeCons,
     tForAll,
     tExists,
     MetaVarType(..),
@@ -38,10 +37,8 @@ module Representation(
 
 
 import Control.Monad.Identity
-import Control.Monad.Trans
 import Data.Generics
 import Data.IORef
-import qualified Data.Map as Map
 import Text.PrettyPrint.HughesPJ(Doc)
 
 import Atom
@@ -53,9 +50,7 @@ import Name.Name
 import Name.Names
 import Support.CanType
 import Name.VConsts
-import Options
 import qualified Doc.DocLike as D
-import qualified FlagDump as FD
 import Support.Unparse
 import Util.VarName
 
@@ -216,10 +211,6 @@ instance (DocLike d,PPrint d t) => PPrint d (Qual t) where
     pprint (xs :=> r) = tupled (map pprint xs) <+> text "=>" <+> pprint r
 
 
-getTypeCons (TCon (Tycon n _)) = n
-getTypeCons (TAp a _) = getTypeCons a
-getTypeCons (TArrow {}) = tc_Arrow
-getTypeCons x = error $ "getTypeCons: " ++ show x
 
 
 type Class = Name
@@ -232,14 +223,14 @@ instance  DocLike d => PPrint d Tyvar where
 
 instance Binary Tyvar where
     put_ bh (Tyvar aa ab ac) = do
-            put_ bh aa
-            put_ bh ab
-            put_ bh ac
+        put_ bh aa
+        put_ bh ab
+        put_ bh ac
     get bh = do
-    aa <- get bh
-    ab <- get bh
-    ac <- get bh
-    return (Tyvar aa ab ac)
+        aa <- get bh
+        ab <- get bh
+        ac <- get bh
+        return (Tyvar aa ab ac)
 
 
 instance FromTupname HsName where
@@ -274,8 +265,8 @@ withNewNames ts action = subVarName $ do
 
 newTyvarName t = case tyvarKind t of
     x@Star -> newLookupName (map (:[]) ['a' ..]) x t
-    y@(Star `Kfun` Star) -> newName (map (('f':) . show) [0 ..]) y t
-    z -> newLookupName (map (('t':) . show) [0 ..]) z t
+    y@(Star `Kfun` Star) -> newName (map (('f':) . show) [0 :: Int ..]) y t
+    z -> newLookupName (map (('t':) . show) [0 :: Int ..]) z t
 
 
 prettyPrintType :: DocLike d => Type -> d

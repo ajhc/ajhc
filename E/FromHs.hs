@@ -9,16 +9,13 @@ module E.FromHs(
 
 import Char
 import Control.Monad.Identity
-import Control.Monad.State
 import Control.Monad.RWS
 import Data.FunctorM
-import Data.Generics
 import Data.Monoid
 import List(isPrefixOf)
 import Maybe
 import Prelude hiding((&&),(||),not,and,or,any,all,head)
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import Atom
@@ -34,7 +31,6 @@ import E.Eta
 import E.Eval(eval)
 import E.LetFloat(atomizeAp)
 import E.PrimOpt
-import E.Program
 import E.Rules
 import E.Subst
 import E.Traverse
@@ -42,14 +38,11 @@ import E.TypeAnalysis
 import E.TypeCheck
 import E.Values
 import Fixer.VMap
-import FrontEnd.KindInfer(hoistType)
 import FrontEnd.Rename(unRename)
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Module(TiData(..))
 import FrontEnd.Tc.Type hiding(Rule(..))
-import FrontEnd.Tc.Type(prettyPrintType)
 import FrontEnd.Utils
-import GenUtil
 import HsSyn as HS
 import Info.Types
 import Name.Name as Name
@@ -57,7 +50,6 @@ import Name.Names
 import Name.VConsts
 import Options
 import PrimitiveOperators
-import Representation
 import Support.CanType
 import Support.FreeVars
 import Util.Gen
@@ -68,11 +60,8 @@ import qualified FrontEnd.Tc.Monad as TM
 import qualified FrontEnd.Tc.Type as T(Rule(..))
 import qualified Info.Info as Info
 import qualified Stats
-import qualified Util.Seq as Seq
 
 ump sl e = EError (show sl ++ ": Unmatched pattern") e
-
---eIf e a b = ECase { eCaseScrutinee = e, eCaseType = getType a, eCaseBind = (tVr 0 tBool),  eCaseAlts =  [Alt vTrue a,Alt vFalse b], eCaseDefault = Nothing }
 
 
 createIf e a b = do
@@ -162,24 +151,14 @@ convertValue n = do
         Just (CTAbs ts) -> do return $ \e -> foldr eLam e (map fromTyvar ts)
     return (tVr (toId n) ty,ty,lm)
 
-lookupCoercion n = do
-    assumps <- asks ceAssumps
-    cs <- asks ceCoerce
-    case Map.lookup n assumps of
-        Just x -> return (Left x)
-        Nothing -> Right `liftM` Map.lookup n cs
 
 
-convertVal assumps n = (foldr ePi t vs, flip (foldr eLam) vs) where
-    (vs,t) = case Map.lookup n assumps of
-        Just z -> fromSigma  z
-        Nothing -> error $ "convertVal.Lookup failed: " ++ (show n)
 
 
-convertOneVal = tipe
+--convertType t = do
+--    dataTable <- asks ceDataTable
+--    return $ removeNewtypes dataTable (tipe t)
 
-toTVr assumps n = tVr (toId n) (typeOfName n) where
-    typeOfName n = fst $ convertVal assumps n
 
 matchesConv ms = map v ms where
     v (HsMatch _ _ ps rhs wh) = (map simplifyHsPat ps,rhs,wh)
@@ -216,7 +195,7 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
             theMainTvr =  tVr (toId cname) (infertype dataTable ne)
             tvm@(TVr { tvrType =  ty}) =  main
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs, sortStarLike k ]
-            (ty',xs) = fromPi ty
+            (_,xs) = fromPi ty
         return (cname, tvrInfo_u (case ffi of Just ffi -> Info.insert ffi; Nothing -> id) $ setProperty prop_EXPORTED theMainTvr,ne)
     ioLike ty = case followAliases dataTable ty of
         ELit LitCons { litName = n, litArgs = [x] } | n ==  tc_IO -> Just x
@@ -252,6 +231,11 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
         Nothing -> fail $ "Cannot find: " ++ show name
         Just n -> return n
 
+getTypeCons (TCon (Tycon n _)) = n
+getTypeCons (TAp a _) = getTypeCons a
+getTypeCons (TArrow {}) = tc_Arrow
+getTypeCons x = error $ "getTypeCons: " ++ show x
+
 createMethods :: Monad m => DataTable -> ClassHierarchy -> (Map.Map Name (TVr,E))  -> m [(Name,TVr,E)]
 createMethods dataTable classHierarchy funcs = return ans where
     ans = concatMap cClass (classRecords classHierarchy)
@@ -283,10 +267,6 @@ createMethods dataTable classHierarchy funcs = return ans where
         Nothing -> fail $ "Cannot find: " ++ show name
         Just n -> return n
 
-methodNames ::  ClassHierarchy ->  [TVr]
-methodNames  classHierarchy =  ans where
-    ans = concatMap cClass (classRecords classHierarchy)
-    cClass classRecord =  [ setProperty prop_METHOD $ tVr (toId n) (convertOneVal t) | (n,t) <- classAssumps classRecord ]
 
 unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
 unbox dataTable e vn wtd = eCase e [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd tvra)] Unknown where
@@ -532,12 +512,6 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         cl xs
     cExpr (HsVar n) = do
         return (EVar (tv n))
-    cExpr (HsAsPat n' (HsVar n)) = do
-        cv <- lookupCoercion (toName Val n')
-        let t = getAssump n
-        case cv of
-            -- Left t' -> return $ foldl eAp (EVar (tv n)) (map tipe $ specialize t t')
-            Right c -> applyCoersion c $ EVar (tv n)
     cExpr (HsAsPat n' e) = do
         e <- cExpr e
         cc <- asks ceCoerce
@@ -567,9 +541,6 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         return (\els -> createIfv nv g e (fg els))
     cGuard (HsGuardedRhss []) = return id
 
-    getAssumpCon n  = case Map.lookup (toName Name.DataConstructor n) assumps of
-        Just z -> z
-        Nothing -> error $ "Lookup failed: " ++ (show n)
     getAssump n  = case Map.lookup (toName Name.Val n) assumps of
         Just z -> z
         Nothing -> error $ "Lookup failed: " ++ (show n)
@@ -596,51 +567,21 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         let ds = map simplifyDecl decls
             cr = findClassRecord classHierarchy className
             className = (toName ClassName name)
-            method n = do
-                let defaultName = defaultInstanceName n
-                    (TVr { tvrType = ty}) = tv (nameName n)
-                tels <- case [ d | d <- ds, maybeGetDeclName d == Just n] of
-                    [] -> return []
-                    (d:_) -> cDecl d >>= \ [(_,_,v)] -> return [v]
-                return [(defaultName,tVr (toId defaultName) ty,els) | els <- tels ]
-            cClass classRecord =  [ f n (toId n) (convertOneVal t) | (n,t) <- classAssumps classRecord ] where
+            cClass classRecord =  [ f n (toId n) (removeNewtypes dataTable $ tipe t) | (n,t) <- classAssumps classRecord ] where
                 f n i t = (n,setProperties [prop_METHOD,prop_PLACEHOLDER] $ tVr i t, foldr ELam (EPrim (primPrim ("Placeholder: " ++ show n)) [] ft) args)  where
                     (ft',as) = fromPi t
                     (args,rargs) = span (sortStarLike . getType) as
                     ft = foldr EPi ft' rargs
-        --mthds <- mconcatMapM method  [  n | n :>: _ <- classAssumps cr]
-        let mthds = []
-        return (cClass cr ++ mthds ++ primitiveInstances className)
+        return (cClass cr ++ primitiveInstances className)
     cClassDecl _ = error "cClassDecl"
 
-{-
--- | determine what arguments must be passed to something of the first type, to transform it into something of the second type.
-specialize :: Type -> Type -> [Type]
-specialize (TForAll vs _) (TForAll vs' _) | sameLength vs vs'= []  -- we assume program is typesafe
-specialize (TForAll vs (ps :=> t)) b@(TForAll vs' _) | length vs' < length vs = specialize' (TForAll rs (ps :=> TForAll ls ([] :=> t))) b where
-    nd = length vs - length vs'
-    (rs,ls) = splitAt nd vs
-specialize x y = specialize' x y
+toTVr assumps n = tVr (toId n) (typeOfName n) where
+    typeOfName n = fst $ convertVal assumps n
+convertVal assumps n = (foldr ePi t vs, flip (foldr eLam) vs) where
+    (vs,t) = case Map.lookup n assumps of
+        Just z -> fromSigma  z
+        Nothing -> error $ "convertVal.Lookup failed: " ++ (show n)
 
-specialize' g@(TForAll vs (_ :=> t)) s = snds (gg t s)  where
-    ps = zip vs [0 :: Int ..]
-    gg a b = snubFst $ gg' a b
-    gg' (TAp t1 t2) (TAp ta tb) = gg' t1 ta ++ gg' t2 tb
-    gg' (TArrow t1 t2) (TArrow ta tb) = gg' t1 ta ++ gg' t2 tb
-    gg' (TCon a) (TCon b) = if a /= b then error "constructors don't match." else []
-    gg' (TVar a) t | Just n <- lookup a ps = [(n,t)]
-    gg' (TVar a) (TVar b) | a == b = []
-    gg' (TMetaVar a) (TMetaVar b) | a == b = []
-    gg' (TForAll as1 (_ :=> r1)) (TForAll as2 (_ :=> r2)) | sameLength as1 as2 = do
-      let r2' = TM.inst mempty (Map.fromList [ (tyvarAtom a2,TVar a1) | a1 <- as1 | a2 <- as2 ]) r2
-      gg' r1 r2' -- assume names are unique
-    gg' a b = error $ "specialization: " <> parens  (prettyPrintType a) <+> parens (prettyPrintType b) <+> "\nin spec\n" <+> vcat (map parens [prettyPrintType g, prettyPrintType s])
-specialize' _g _s = []
-
-ctgen t = map snd $ snubFst $ Seq.toList $ everything (Seq.<>) (mkQ Seq.empty gg) t where
-    gg (TGen n g) = Seq.single (n,g)
-    gg _ =  Seq.empty
--}
 
 integer_cutoff = 500000000
 
@@ -798,9 +739,9 @@ makeSpec (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (Module m,ui), T.ruleS
 
 deNewtype :: DataTable -> E -> E
 deNewtype dataTable e = removeNewtypes dataTable (f e) where
-    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == ErasedAlias = eLet v (f e)  (f z) where
+    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == ErasedAlias = f (eLet v e z) where
         Identity Constructor { conAlias = alias } = getConstructor n dataTable
-    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == RecursiveAlias = eLet v (prim_unsafeCoerce (f e) (getType v)) (f z) where
+    f ECase { eCaseScrutinee = e, eCaseAlts =  ((Alt (LitCons { litName = n, litArgs = [v], litType = t }) z):_) } | alias == RecursiveAlias = f $ eLet v (prim_unsafeCoerce e (getType v)) z where
         Identity Constructor { conAlias = alias } = getConstructor n dataTable
     f e = runIdentity $ emapE (return . f) e
 

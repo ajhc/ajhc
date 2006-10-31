@@ -65,7 +65,6 @@ import Util.VarName
 import qualified Util.Graph as G
 import qualified Util.Seq as Seq
 
-tipe t = runVarName (tipe' t)
 tipe' (TAp t1 t2) = liftM2 eAp (tipe' t1) (tipe' t2)
 tipe' (TArrow t1 t2) =  do
     t1' <- tipe' t1
@@ -92,7 +91,6 @@ tipe' (TExists xs (_ :=> t)) = do
     t' <- tipe' t
     return $ ELit litCons { litName = unboxedNameTuple TypeConstructor (length xs' + 1), litArgs = (t':xs'), litType = eHash }
 
---tipe (TForAll (Forall xs (_ :=> t))) = foldr EPi (tipe t) [ tVr n (kind k) | n <- [2,4..] | k <- xs ]
 
 
 kind Star = eStar
@@ -263,7 +261,6 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,_,_,b,_) -> b
             conChildren = Just [dc]
            }
 
-        rn = toName RawType y
         tipe = ELit (litCons { litName = tc, litArgs = [], litType = eStar })
     f _ = []
 
@@ -505,7 +502,7 @@ constructionExpression ::
     -> Name   -- ^ name of said constructor
     -> E      -- ^ type of eventual constructor
     -> E      -- ^ saturated lambda calculus term
-constructionExpression dataTable n typ@(ELit LitCons { litName = pn, litArgs = xs, litType = _ })
+constructionExpression dataTable n typ@(ELit LitCons { litName = pn, litArgs = xs })
     | ErasedAlias <- conAlias mc = ELam var (EVar var)
     | RecursiveAlias <- conAlias mc = let var' = var { tvrType = st } in ELam var' (prim_unsafeCoerce (EVar var') typ)
     | pn == conName pc = sub (conExpr mc) where
@@ -563,7 +560,6 @@ showDataTable (DataTable mp) = vcat xs where
         ih = text "inhabits:" <+> tshow conInhabits
         ch = text "children:" <+> tshow conChildren
         Constructor {
-            conName = conName,
             conType = conType,
             conExpr = conExpr,
             conAlias = conAlias,

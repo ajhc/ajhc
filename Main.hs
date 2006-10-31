@@ -286,7 +286,6 @@ processDecls stats ho ho' tiData = do
 
     -- some more useful values.
     let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (_,n,_) <- ds ]
-        mangle = mangle' (Just namesInscope) fullDataTable
         namesInscope = fromList inscope
 
     -- initial pass over functions to put them into a normalized form
@@ -503,9 +502,6 @@ processDecls stats ho ho' tiData = do
         cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
         cds <- annotateDs annmap (\_ -> return) letann lamann cds
         wdump FD.Core $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
-        let toName t
-                | Just n <- fromId (tvrIdent t) = n
-                | otherwise = error $ "toName: " ++ tvrShowName t
         let nvls = [ (t,e)  | (t,e) <- cds ]
 
         wdump FD.Progress $ putErr (if rec then "*" else ".")
@@ -1080,7 +1076,6 @@ maybeDie = case optKeepGoing options of
 onerrNone :: IO ()
 onerrNone = return ()
 
-onerrProg prog = putErrLn ">>> Before" >> printProgram prog
 
 lintCheckGrin grin = when flint $ typecheckGrin grin
 

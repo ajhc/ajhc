@@ -34,7 +34,7 @@ import Stats
 import Support.CanType
 import Support.FreeVars
 import Util.SetLike
-import Util.UniqueMonad
+import Util.UniqueMonad()
 import qualified Util.Graph as G
 
 
@@ -42,9 +42,6 @@ doLetRec stats [] e = return e
 doLetRec stats ds _ | flint && hasRepeatUnder fst ds = error "doLetRec: repeated variables!"
 doLetRec stats ds e = return $ ELetRec ds e
 
-varElim :: Stats -> Int -> IO ()
-varElim stats n = do
-    ticks stats n (toAtom "E.Simplify.var-elimination")
 
 
 atomizeAp ::
@@ -67,9 +64,9 @@ atomizeAp atomizeTypes dataTable stats modName e = f e  where
     g (ELam tvr e) = do
         e' <- f e
         return (ELam tvr e',[])
-    g (ELit LitCons { litName = n, litArgs = xs, litType = t }) = do
+    g (ELit lc@LitCons { litArgs = xs }) = do
         (xs',dss) <- fmap unzip (mapM h xs)
-        return (ELit (litCons { litName = n, litArgs = xs', litType = t }), concat dss)
+        return (ELit lc { litArgs = xs'}, concat dss)
     g e@ELit {} = return (e,[])
     g e@EError {} = return (e,[])
     g ep@(EPi tvr@TVr {tvrIdent = i, tvrType = t} b) | i == 0 || i `notElem` freeVars b  = do
@@ -107,36 +104,6 @@ atomizeAp atomizeTypes dataTable stats modName e = f e  where
     isAtomic e | not atomizeTypes && sortTypeLike e = True
     isAtomic e = isFullyConst e
 
-doCoalesce :: Stats -> (E,[E]) -> IO (E,[E])
-doCoalesce stats (x,xs) = ans where
-    ans = do
-        (xs',dss) <- fmap unzip (mapM at xs)
-        case x of
-            ELetRec { eDefs = ds', eBody = ELetRec { eDefs = ds'', eBody = x' } } -> do
-                liftIO $ tick stats (toAtom "E.LetFloat.coalesce.fromLet")
-                fromLet2 (concat $ ds'':ds':dss) (foldl EAp x' xs')
-            ec@ECase { eCaseScrutinee = (ELetRec ds' x') }  -> do
-                liftIO $ tick stats (toAtom "E.LetFloat.coalesce.fromCase")
-                fromLet2 (concat $ ds':dss) (foldl EAp (ec { eCaseScrutinee = x' } ) xs')
-            ELetRec { eDefs = ds', eBody = x' } | not (List.null xs) -> do
-                liftIO $ tick stats (toAtom "E.LetFloat.coalesce.fromAp")
-                fromLet2 (concat $ ds':dss) (foldl EAp x' xs')
-            ELetRec { eDefs = ds, eBody = x' } -> do
-                fromLet2 (concat $ ds:dss) (foldl EAp x' xs')
-            x -> fromLet2 (concat dss) (foldl EAp x xs')
-    at ELetRec { eDefs = ds, eBody = e } = do
-        liftIO $ tick stats (toAtom "E.LetFloat.coalesce.fromArg")
-        return (e,ds)
-    at e = return (e,[])
-    --at' (t,(ELetRec ds e)) = do
-    --    liftIO $ tick stats (toAtom "E.LetFloat.coalesce.fromLet2")
-    --    return ((t,e),ds)
-    at' e = return (e,[])
-    fromLet2 ds e = do
-        (ds',dss) <- fmap unzip (mapM at' ds)
-        let ds'' = (concat $ ds':dss)
-        r <- doLetRec stats ds''  e
-        return $ fromAp r
 
 fvBind (Left (_,fv)) = fv
 fvBind (Right xs) = unions (snds xs)
@@ -254,7 +221,6 @@ sepByDropPoint ds fs' = (r,xs) where
         nu = length (filter snd ds')
     fvDecls (Left ((t,_),_)) = [tvrIdent t]
     fvDecls (Right ts) = [tvrIdent t | ((t,_),_) <- ts ]
-    comb (a,b) (c,d) = (a ++ c, zipWith (++) b d)
 
 
 newtype Level = Level Int

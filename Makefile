@@ -3,7 +3,7 @@ PREFIX=/usr/local
 
 all: jhc
 
-GHCDEBUGOPTS= -W -fno-warn-unused-matches -fno-warn-unused-binds    # -O2 -ddump-simpl-stats -ddump-rules
+GHCDEBUGOPTS= -W -fno-warn-unused-matches # -fno-warn-unused-binds    # -O2 -ddump-simpl-stats -ddump-rules
 GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
 GHCINC=  -i. -iFrontEnd
 PACKAGES= -package mtl  -package unix -package QuickCheck
