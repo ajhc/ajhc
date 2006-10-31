@@ -270,14 +270,14 @@ processDecls stats ho ho' tiData = do
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
     ds' <- convertDecls tiData (hoClassHierarchy ho') allAssumps  fullDataTable decls
-    let ds = [ (runIdentity (fromId (tvrIdent v)),v,e) | (v,e) <- classInstances ] ++  [ (n,v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
---    ds <- annotateDs mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo) (\_ nfo -> return nfo) ds
+    let ds = [ (v,e) | (v,e) <- classInstances ] ++  [ (v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
+    ds <- annotateDs mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo) (\_ nfo -> return nfo) ds
     wdump FD.CoreInitial $
-        mapM_ (\(_,v,lc) -> printCheckName'' fullDataTable v lc) ds
+        mapM_ (\(v,lc) -> printCheckName'' fullDataTable v lc) ds
  --   sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 
     -- Build rules
-    rules' <- createInstanceRules (hoClassHierarchy ho')   (Map.fromList [ (x,(y,z)) | (x,y,z) <- ds] `mappend` hoEs ho)
+    rules' <- createInstanceRules (hoClassHierarchy ho')   (Map.fromList [ (runIdentity $ fromId (tvrIdent y),(y,z)) | (y,z) <- ds] `mappend` hoEs ho)
     rawRules <- convertRules tiData (hoClassHierarchy ho') allAssumps fullDataTable decls
     let nrules = fromRules [ makeRule n (progModule prog,i) vs head args e2 | (n,vs,e1,e2) <- rawRules, let (EVar head,args) = fromAp e1 | i <- [1..] ]
     let rules = rules' `mappend` nrules
@@ -285,7 +285,7 @@ processDecls stats ho ho' tiData = do
     let allRules = hoRules allHo `mappend` rules
 
     -- some more useful values.
-    let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (_,n,_) <- ds ]
+    let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (n,_) <- ds ]
         namesInscope = fromList inscope
 
     -- initial pass over functions to put them into a normalized form
@@ -296,7 +296,8 @@ processDecls stats ho ho' tiData = do
         let used' = collectIds lc
         return ((shouldBeExported (getExports ho') v,lc):ds,usedIds `mappend` used')
     Stats.clear stats
-    (ds,_allIds) <- foldM procE ([],hoUsedIds ho) [ (v,e) | (_,v,e) <- ds]
+--    ds <- return $ runIdentity $ annotateDs mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo)  (\_ nfo -> return nfo) ds
+    (ds,_allIds) <- foldM procE ([],hoUsedIds ho) ds
     Stats.print "PostProcess" stats
     Stats.clear stats
 

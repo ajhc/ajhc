@@ -179,7 +179,7 @@ calcE _ Unknown = return ()
 calcE env e | (EVar v,as@(_:_)) <- fromAp e = do
     let ts = lookupArgs v env
     tagE env e
-    when (length as < length ts) $ fail "calcE: unsaturated call to function"
+    when (length as < length ts) $ fail ("calcE: unsaturated call to function: " ++ pprint e)
     flip mapM_ (zip as ts) $ \ (a,t) -> do
         when (sortStarLike (getType a)) $ do
             a' <- getValue a
