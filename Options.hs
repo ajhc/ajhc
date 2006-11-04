@@ -46,7 +46,8 @@ data Mode = BuildHl String -- ^ Build the specified hl-file given a description 
           | CompileExe     -- ^ Compile executable
           | ShowHo String  -- ^ Show ho-file.
           | ListLibraries  -- ^ List libraries
-            deriving(Eq,Show)
+            deriving(Eq)
+
 
 data Opt = Opt {
     optMode        :: Mode,       -- ^ Mode of interaction
@@ -74,7 +75,7 @@ data Opt = Opt {
     optStatLevel   :: !Int,                    -- ^ Level to print statistics
     optDumpSet     ::  S.Set FlagDump.Flag,    -- ^ Dump flags.
     optFOptsSet    ::  S.Set FlagOpts.Flag     -- ^ Flag options (-f\<opt\>).
-  } deriving(Show) {-!derive: update !-}
+  } {-!derive: update !-}
 
 
 opt = Opt {
