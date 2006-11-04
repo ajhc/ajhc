@@ -149,7 +149,7 @@ nameName :: Name -> HsName
 nameName (Name a) = f $ tail (toString a) where
     f ('\NUL':xs) = UnQual $ HsIdent xs
     f xs | (a,_:b) <- span (/= '\NUL') xs  = Qual (Module a) (HsIdent b)
-    f _ = error "invalid Name"
+    f _ = error $ "invalid Name: " ++ (show $ toString a)
 
 nameParts :: Name -> (NameType,Maybe String,String)
 nameParts n@(Name a) = f $ tail (toString a) where
