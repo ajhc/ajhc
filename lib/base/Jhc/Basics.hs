@@ -7,6 +7,8 @@ data Integer
 data Char
 
 
+infixr 5  :
+
 data [] a =  a : ([] a) | []
     -- odd syntax, so we write instances manually
 
@@ -26,6 +28,9 @@ data (,,,,,,,,) a b c d e f g h i = (,,,,,,,,) a b c d e f g h i
 ------------------------
 
 {-# SUPERINLINE id, const, (.), ($), ($!), flip #-}
+
+infixr 9  .
+infixr 0  $, $!, `seq`
 
 id x = x
 const x _ = x

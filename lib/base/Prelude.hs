@@ -44,17 +44,17 @@ import Jhc.Tuples
 import Jhc.List
 
 
-infixr 9  .
+-- infixr 9  .
 infixr 8  ^, ^^, **
 infixl 7  *  , /, `quot`, `rem`, `div`, `mod`
 infixl 6  +, -
-infixr 5  :
+--infixr 5  :
 infix  4  ==, /=, <, <=, >=, >
 infixr 3  &&
 infixr 2  ||
 infixl 1  >>, >>=
 infixr 1  =<<
-infixr 0  $, $!, `seq`
+-- infixr 0  $, $!, `seq`
 
 
 
