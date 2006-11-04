@@ -177,7 +177,7 @@ getMainFunction dataTable name ds = do
   mt <- case Map.lookup name ds of
     Just x -> return x
     Nothing -> fail $ "Could not find main function: " ++ show name
-  funcs <- fmapM (\n -> liftM fst $ Map.lookup n ds) sFuncNames
+  let funcs = runIdentity $ fmapM (\n -> return . fst $ runEither (show n) $ Map.lookup n ds) sFuncNames
   nameToEntryPoint dataTable (fst mt) (toName Name.Val "theMain") Nothing funcs
 
 nameToEntryPoint :: Monad m => DataTable -> TVr -> Name -> Maybe FfiExport -> FuncNames TVr -> m (Name,TVr,E)
@@ -189,6 +189,7 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
         let e = case ioLike (getType maine) of
                 Just x | not (fopts FO.Wrapper) -> EAp (EAp (EVar runNoWrapper) x) maine
                 Just x ->  EAp (EAp (EVar runMain)  x ) maine
+                Nothing | fopts FO.Raw -> EAp (EAp (EVar runRaw) ty) maine
                 Nothing ->  EAp (EAp (EVar runExpr) ty) maine
             ne = ELam worldVar (EAp e (EVar worldVar))
             worldVar = tvr { tvrIdent = 2, tvrType = tWorld__ }
