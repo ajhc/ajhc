@@ -63,8 +63,8 @@ dc_Cons = toName DataConstructor ("Jhc.Basics",":")
 dc_EmptyList = toName DataConstructor ("Jhc.Basics","[]")
 dc_JustIO = toName DataConstructor ("Jhc.IO", "JustIO")
 dc_Rational = toName DataConstructor ("Ratio",":%")
-dc_Unit = toName DataConstructor ("Prelude","()")
-dc_Boolzh = toName DataConstructor ("Prelude","Bool#")
+dc_Unit = toName DataConstructor ("Jhc.Basics","()")
+dc_Boolzh = toName DataConstructor ("Jhc.Order","Bool#")
 
 tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
 tc_Box = toName TypeConstructor    ("Jhc@","Box")
@@ -77,11 +77,11 @@ tc_IOResult = toName TypeConstructor ("Jhc.IO","IOResult")
 tc_IO = toName TypeConstructor ("Jhc.IO", "IO")
 tc_World__ = toName TypeConstructor ("Jhc.Prim","World__")
 
-tc_Bool = toName TypeConstructor ("Prelude","Bool")
+tc_Bool = toName TypeConstructor ("Jhc.Order","Bool")
 tc_List = toName TypeConstructor ("Jhc.Basics","[]")
 tc_Ptr = toName TypeConstructor ("Foreign.Ptr","Ptr")
 tc_Ratio = toName TypeConstructor ("Ratio","Ratio")
-tc_Unit = toName TypeConstructor  ("Prelude","()")
+tc_Unit = toName TypeConstructor  ("Jhc.Basics","()")
 
 
 rt_Worldzh = toName RawType "World#"
@@ -91,17 +91,17 @@ s_Star = toName SortName ("Jhc@","*")
 s_Hash = toName SortName ("Jhc@","#")
 
 v_error = toName Val ("Prelude","error")
-v_toEnum = toName Val ("Prelude","toEnum")
-v_fromEnum = toName Val ("Prelude","fromEnum")
-v_minBound = toName Val ("Prelude","minBound")
-v_maxBound = toName Val ("Prelude","maxBound")
+v_toEnum = toName Val ("Jhc.Enum","toEnum")
+v_fromEnum = toName Val ("Jhc.Enum","fromEnum")
+v_minBound = toName Val ("Jhc.Enum","minBound")
+v_maxBound = toName Val ("Jhc.Enum","maxBound")
 v_fail = toName Val ("Prelude","fail")
 v_concatMap = toName Val ("Jhc.Basics","concatMap")
 v_map = toName Val ("Jhc.Basics","map")
-v_and = toName Val ("Prelude","&&")
+v_and = toName Val ("Jhc.Order","&&")
 v_filter = toName Val ("Prelude","filter")
 v_foldr = toName Val ("Jhc.Basics","foldr")
-v_undefined = toName Val ("Prelude","undefined")
+v_undefined = toName Val ("Jhc.Basics","undefined")
 v_undefinedIOErrorCont = toName Val ("Jhc.IO","undefinedIOErrorCont")
 v_silly = toName Val ("Jhc@","silly")
 
@@ -109,23 +109,23 @@ sFuncNames = FuncNames {
     func_bind = toName Val ("Prelude",">>="),
     func_bind_ = toName Val ("Prelude",">>"),
     func_concatMap = toName Val ("Jhc.Basics","concatMap"),
-    func_equals = toName Val ("Prelude","=="),
     func_fromInteger = toName Val ("Prelude","fromInteger"),
     func_fromInt = toName Val ("Prelude","fromInt"),
     func_fromRational = toName Val ("Prelude","fromRational"),
     func_negate = toName Val ("Prelude","negate"),
-    func_leq = toName Val ("Prelude","<="),
-    func_geq = toName Val ("Prelude",">="),
-    func_lt = toName Val ("Prelude","<"),
-    func_gt = toName Val ("Prelude",">"),
-    func_compare = toName Val ("Prelude","compare"),
-    func_neq = toName Val ("Prelude","/="),
-    func_fromEnum = toName Val ("Prelude","fromEnum"),
-    func_toEnum = toName Val ("Prelude","toEnum"),
-    func_minBound = toName Val ("Prelude","minBound"),
-    func_maxBound = toName Val ("Prelude","maxBound"),
-    func_enumFrom = toName Val ("Prelude","enumFrom"),
-    func_enumFromThen = toName Val ("Prelude","enumFromThen"),
+    func_leq = toName Val ("Jhc.Order","<="),
+    func_geq = toName Val ("Jhc.Order",">="),
+    func_lt = toName Val ("Jhc.Order","<"),
+    func_gt = toName Val ("Jhc.Order",">"),
+    func_compare = toName Val ("Jhc.Order","compare"),
+    func_equals = toName Val ("Jhc.Order","=="),
+    func_neq = toName Val ("Jhc.Order","/="),
+    func_fromEnum = toName Val ("Jhc.Enum","fromEnum"),
+    func_toEnum = toName Val ("Jhc.Enum","toEnum"),
+    func_minBound = toName Val ("Jhc.Enum","minBound"),
+    func_maxBound = toName Val ("Jhc.Enum","maxBound"),
+    func_enumFrom = toName Val ("Jhc.Enum","enumFrom"),
+    func_enumFromThen = toName Val ("Jhc.Enum","enumFromThen"),
     func_range = toName Val ("Data.Ix","range"),
     func_index = toName Val ("Data.Ix","index"),
     func_inRange = toName Val ("Data.Ix","inRange"),
@@ -137,10 +137,10 @@ sFuncNames = FuncNames {
 
 
 
-class_Eq = toName ClassName ("Prelude","Eq")
-class_Ord = toName ClassName ("Prelude","Ord")
-class_Enum = toName ClassName ("Prelude","Enum")
-class_Bounded = toName ClassName ("Prelude","Bounded")
+class_Eq = toName ClassName ("Jhc.Order","Eq")
+class_Ord = toName ClassName ("Jhc.Order","Ord")
+class_Enum = toName ClassName ("Jhc.Enum","Enum")
+class_Bounded = toName ClassName ("Jhc.Enum","Bounded")
 class_Show = toName ClassName ("Prelude.Text","Show")
 class_Read = toName ClassName ("Prelude.Text","Read")
 class_Ix = toName ClassName ("Ix","Ix")

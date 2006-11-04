@@ -1,6 +1,7 @@
 {-# OPTIONS_JHC -N #-}
 module Jhc.Basics where
 
+import Data.Int(Int())
 
 type String = [Char]
 data Integer
@@ -12,6 +13,7 @@ infixr 5  :
 data [] a =  a : ([] a) | []
     -- odd syntax, so we write instances manually
 
+data () = ()
 data (,) a b = (,) a b
 data (,,) a b c = (,,) a b c
 data (,,,) a b c d = (,,,) a b c d
@@ -157,3 +159,5 @@ foldr k z (x:xs) = k x (foldr k z xs)
 
 foreign import primitive "error.Prelude.undefined" undefined :: a
 
+foreign import primitive "integralCast" ord :: Char -> Int
+foreign import primitive "integralCast" chr :: Int -> Char

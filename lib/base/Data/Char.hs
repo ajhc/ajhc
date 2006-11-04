@@ -13,6 +13,7 @@ module Data.Char (
 --import Array         -- Used for character name table.
 import Numeric (readDec, readOct, lexDigits, readHex)
 import Prelude.Text
+import Jhc.Basics
 
 -- Character-testing operations
 isAscii, isLatin1, isControl, isPrint, isSpace, isUpper, isLower,
@@ -68,15 +69,6 @@ toLower :: Char -> Char
 toLower c | isUpper c = chr $ ord c + 32
           | otherwise = c
 
--- Character code functions
---foreign import primitive ord :: Char -> Int
---ord  =  fromEnum
-
---foreign import primitive chr :: Int  -> Char
---chr  =  toEnum
-
-foreign import primitive "integralCast" ord :: Char -> Int
-foreign import primitive "integralCast" chr :: Int -> Char
 
 -- Text functions
 readLitChar          :: ReadS Char

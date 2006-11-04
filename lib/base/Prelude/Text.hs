@@ -193,6 +193,32 @@ instance  (Read a) => Read [a]  where
     readsPrec p      = readList
 
 
+
+instance Read Bool where
+    readsPrec d input =
+              (\ inp -> [((False) , rest) | ("False" , rest) <- lex inp]) input
+              ++
+              (\ inp -> [((True) , rest) | ("True" , rest) <- lex inp]) input
+
+instance Show Bool where
+    showsPrec d (False) = showString "False"
+    showsPrec d (True) = showString "True"
+
+instance Read Ordering where
+    readsPrec d input =
+              (\ inp -> [((LT) , rest) | ("LT" , rest) <- lex inp]) input
+              ++
+              (\ inp -> [((EQ) , rest) | ("EQ" , rest) <- lex inp]) input
+              ++
+              (\ inp -> [((GT) , rest) | ("GT" , rest) <- lex inp]) input
+
+instance Show Ordering where
+    showsPrec d (LT) = showString "LT"
+    showsPrec d (EQ) = showString "EQ"
+    showsPrec d (GT) = showString "GT"
+
+
+
     {-
 instance Show a => Show (Maybe a) where
     showsPrec _p Nothing s = showString "Nothing" s

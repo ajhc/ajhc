@@ -2,12 +2,12 @@
 
 
 [int,float,char,ptr]
-aaB, ==, Prelude.Eq, ==
-# aaB, /=, Prelude.Eq, !=
-aaB, >=, Prelude.Ord, >=
-aaB, <=, Prelude.Ord, <=
-aaB, >, Prelude.Ord, >
-aaB, <, Prelude.Ord, <
+aaB, ==, Jhc.Order.Eq, ==
+# aaB, /=, Jhc.Order.Eq, !=
+aaB, >=, Jhc.Order.Ord, >=
+aaB, <=, Jhc.Order.Ord, <=
+aaB, >, Jhc.Order.Ord, >
+aaB, <, Jhc.Order.Ord, <
 
 
 [int,float]

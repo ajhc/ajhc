@@ -124,7 +124,7 @@ foreach my $d (@ds) {
     #my $t =  "(ELit (LitCons $nn [] eStar) )";
     my $tycon = tycon($d->[0]);
     my $cncons = dcon($d->[0]);
-    my $prelude_bounded = hsname("Prelude.Bounded");
+    my $prelude_bounded = hsname("Jhc.Enum.Bounded");
     my $foreign_storable = hsname("Foreign.Storable.Storable");
     my $c_num = hsname("Prelude.Num");
     push @inst, "[] :=> IsIn $prelude_bounded $tycon";
@@ -133,8 +133,8 @@ foreach my $d (@ds) {
     push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.sizeOf.$d->[0]\", ELam (v0 $t) \$ prim_sizeof \"$d->[1]\")";
     push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.poke.$d->[0]\", buildPoke $cncons $t \"$d->[1]\")";
     push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.peek.$d->[0]\", buildPeek $cncons $t \"$d->[1]\")";
-    push @cmeth, "($prelude_bounded, toInstName \"Prelude.maxBound.$d->[0]\", " . const($cncons, $d->[3],$t,"$d->[1]") . ")";
-    push @cmeth, "($prelude_bounded, toInstName \"Prelude.minBound.$d->[0]\", " . const($cncons,$d->[4],$t,"$d->[1]") . ")";
+    push @cmeth, "($prelude_bounded, toInstName \"Jhc.Enum.maxBound.$d->[0]\", " . const($cncons, $d->[3],$t,"$d->[1]") . ")";
+    push @cmeth, "($prelude_bounded, toInstName \"Jhc.Enum.minBound.$d->[0]\", " . const($cncons,$d->[4],$t,"$d->[1]") . ")";
     my $ivar = "v2_Int";
     my $ivart = "v2_Integer";
     my $tvar = "(v2 $t)";

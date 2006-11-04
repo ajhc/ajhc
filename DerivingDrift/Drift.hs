@@ -2,6 +2,8 @@ module DerivingDrift.Drift(driftDerive) where
 
 import Char
 import List
+import Control.Monad.Identity
+import Data.FunctorM
 
 import CharIO
 import DerivingDrift.DataP
@@ -11,6 +13,7 @@ import FrontEnd.ParseMonad
 import HsSyn
 import Name.Name
 import Name.Names
+import Name.VConsts
 import Options
 import Text.PrettyPrint.HughesPJ(render)
 import qualified Data.Map as Map
@@ -32,18 +35,26 @@ driftDerive hsModule = ans where
     ndcls = hsModuleDecls hsMod
     ss = [ n | Just n <- map driftDerive' $ hsModuleDecls hsModule, any (not . isSpace) n ]
 
-enumDontDerive :: [HsName]
-enumDontDerive = [nameName class_Eq,nameName class_Ord,nameName class_Enum]
+enumDontDerive :: [(HsName,[HsName])]
+enumDontDerive = [
+    (f class_Eq, [func_equals fns]),
+    (f class_Ord, [func_geq fns, func_leq fns, func_lt fns, func_gt fns]),
+    (f class_Enum, [func_toEnum fns,func_fromEnum fns])
+    ]  where
+        Identity fns = fmapM (return . f) sFuncNames
+        f n = nameName (toUnqualified n)
+
+
 
 driftDerive' :: Monad m => HsDecl -> m String
 driftDerive' (HsDataDecl sloc cntxt name args condecls derives) = do
         let d =  toData  name args condecls derives
             isEnum = length condecls > 1 && null (concatMap hsConDeclArgs condecls)
-        xs <- return $  map (derive d . show) derives -- (if isEnum then derives List.\\ enumDontDerive else derives )
+        xs <- return $  map (derive isEnum d) derives -- (if isEnum then derives List.\\ enumDontDerive else derives )
         return $ unlines xs
 driftDerive' (HsNewTypeDecl sloc cntxt name args condecl derives) = do
         let d =  toData  name args [condecl] derives
-        xs <- return $ map (derive d . show) derives
+        xs <- return $ map (derive False d) derives
         return $ unlines xs
 
 driftDerive' _ = fail "Nothing to derive"
@@ -59,7 +70,13 @@ toData name args cons derives = ans where
 
 rulesMap = Map.fromList [ (t,f) | (t,f,_,_,_) <- standardRules]
 
-derive d wh | Just fn <- Map.lookup wh rulesMap = render $ fn d
-            | otherwise                         =
-  error ("derive: Tried to use non-existing rule "++wh++" for "++name d)
+derive True d wh | Just fns <- lookup wh enumDontDerive = inst fns where
+    dummy = "{- This is a dummy instance, it will be rewritten internally -}\n"
+    inst fns = dummy ++ "instance " ++ show wh ++ " " ++ name d ++ " where\n" ++ concat (intersperse "\n" (map f fns))
+    f n = "    " ++ g (show n) ++ " = " ++ g (show n)
+    g (c:cs) | c == '_' || c == '\'' || isAlpha c = c:cs
+    g x = "(" ++ x ++ ")"
+
+derive _ d wh | Just fn <- Map.lookup (show wh) rulesMap = render $ fn d
+              | otherwise  = error ("derive: Tried to use non-existing rule "++show wh++" for "++name d)
 

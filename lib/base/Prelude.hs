@@ -22,6 +22,8 @@ module Prelude(
     -- submodules
     module Jhc.Basics,
     module Jhc.Float,
+    module Jhc.Enum,
+    module Jhc.Order,
     Int(),
 
     module Prelude.IO,
@@ -42,6 +44,8 @@ import qualified Data.Char as Char(isSpace,ord,chr)
 import Jhc.IO
 import Jhc.Tuples
 import Jhc.List
+import Jhc.Enum
+import Jhc.Order
 
 
 -- infixr 9  .
@@ -49,56 +53,18 @@ infixr 8  ^, ^^, **
 infixl 7  *  , /, `quot`, `rem`, `div`, `mod`
 infixl 6  +, -
 --infixr 5  :
-infix  4  ==, /=, <, <=, >=, >
-infixr 3  &&
-infixr 2  ||
+--infix  4  ==, /=, <, <=, >=, >
+--infixr 3  &&
+--infixr 2  ||
 infixl 1  >>, >>=
 infixr 1  =<<
 -- infixr 0  $, $!, `seq`
 
 
 
-data Bool = False | True
-    deriving (Eq, Ord, Bounded, Enum, Read, Show)
-
-data () = ()
-    deriving (Eq, Ord, Bounded, Enum)  -- Read declared in Prelude.Text
-
-
-data  Ordering    =  LT | EQ | GT
-    deriving (Eq, Ord, Bounded, Enum, Read, Show)
 
 
 
--- Enumeration and Bounded classes
-
-class  Enum a  where
-    succ, pred       :: a -> a
-    toEnum           :: Int -> a
-    fromEnum         :: a -> Int
-    enumFrom         :: a -> [a]             -- [n..]
-    enumFromThen     :: a -> a -> [a]        -- [n,n'..]
-    enumFromTo       :: a -> a -> [a]        -- [n..m]
-    enumFromThenTo   :: a -> a -> a -> [a]   -- [n,n'..m]
-
-        -- Minimal complete definition:
-        --      toEnum, fromEnum
---
--- NOTE: these default methods only make sense for types
---   that map injectively into Int using fromEnum
---  and toEnum.
-    succ             =  toEnum . (+1) . fromEnum
-    pred             =  toEnum . (subtract 1) . fromEnum
-    enumFrom x       =  map toEnum [fromEnum x ..]
-    enumFromTo x y   =  map toEnum [fromEnum x .. fromEnum y]
-    enumFromThen x y =  map toEnum [fromEnum x, fromEnum y ..]
-    enumFromThenTo x y z =
-                        map toEnum [fromEnum x, fromEnum y .. fromEnum z]
-
-
-class Bounded a  where
-    minBound         :: a
-    maxBound         :: a
 
 -- Numeric classes
 
@@ -246,6 +212,18 @@ class  (RealFrac a, Floating a) => RealFloat a  where
       | x==0 && y==0  =  y     -- must be after the other double zero tests
       | otherwise     =  x + y -- x or y is a NaN, return a NaN (via +)
 
+instance Enum () where
+    succ _      = error "Prelude.Enum.().succ: bad argument"
+    pred _      = error "Prelude.Enum.().pred: bad argument"
+
+    toEnum x | x == 0 = ()
+             | otherwise    = error "Prelude.Enum.().toEnum: bad argument"
+
+    fromEnum () = 0
+    enumFrom () 	= [()]
+    enumFromThen () () 	= let many = ():many in many
+    enumFromTo () () 	= [()]
+    enumFromThenTo () () () = let many = ():many in many
 
 -- Numeric functions
 
@@ -369,37 +347,6 @@ instance Monad [] where
 
 
 
-class Eq a where
-    (==) :: a -> a -> Bool
-    (/=) :: a -> a -> Bool
-    x == y = case x /= y of
-        True -> False
-        False -> True
-    x /= y = case x == y of
-        True -> False
-        False -> True
-
-class  (Eq a) => Ord a  where
-    compare              :: a -> a -> Ordering
-    (<), (<=), (>=), (>) :: a -> a -> Bool
-    max, min             :: a -> a -> a
-
-    compare x y | x == y    = EQ
-                | x <= y    = LT
-                | otherwise = GT
-
-    x <= y  = compare x y /= GT
-    x <  y  = compare x y == LT
-    x >= y  = compare x y /= LT
-    x >  y  = compare x y == GT
-
-    -- Note that (min x y, max x y) = (x,y) or (y,x)
-    max x y | x <= y    =  y
-            | otherwise =  x
-    min x y | x <= y    =  x
-            | otherwise =  y
-
-
 instance Functor [] where
     fmap f (x:xs) = f x : fmap f xs
     fmap f [] = []
@@ -408,20 +355,6 @@ instance Functor [] where
 -- Basic combinators
 
 
-{-# INLINE (&&), (||), not, otherwise #-}
-(&&), (||)       :: Bool -> Bool -> Bool
-True  && x       =  x
-False && _       =  False
-True  || _       =  True
-False || x       =  x
-
-
-not              :: Bool -> Bool
-not x = if x then False else True
-
-
-otherwise        :: Bool
-otherwise        =  True
 
 -- Maybe
 
@@ -788,38 +721,6 @@ error s = unsafePerformIO $ do
 
 
 
-instance Enum Int where
-    succ = (+ 1)
-    pred = (+ -1)
-    toEnum x = x
-    fromEnum x = x
-
-    enumFrom x       =  x:enumFrom (x + 1)
-    enumFromTo x y = f x where
-        f x | x > y = []
-            | otherwise = x:f (x + 1)
-    enumFromThen x y = f x where
-        z = y - x
-        f x = x:f (x + z)
-    enumFromThenTo x y z | y >= x = f x where
-        inc = y - x
-        f x | x <= z = x:f (x + inc)
-            | otherwise = []
-    enumFromThenTo x y z  = f x where
-        inc = y - x
-        f x | x >= z = x:f (x + inc)
-            | otherwise = []
-
-instance Enum Char where
-    toEnum = Char.chr
-    fromEnum = Char.ord
-    enumFrom c        = map toEnum [fromEnum c .. fromEnum (maxBound::Char)]
-    enumFromThen c c' = map toEnum [fromEnum c, fromEnum c' .. fromEnum lastChar]
-                      where lastChar :: Char
-                            lastChar | c' < c    = minBound
-                                     | otherwise = maxBound
-
-
 instance Enum Integer where
     toEnum = fromInt
     fromEnum = toInt
@@ -849,18 +750,7 @@ instance (Ord a, Ord b) => Ord (a,b) where
         z -> z
     -}
 
-instance Ord a => Ord [a] where
-    compare (x:xs) (y:ys) = case compare x y of
-        EQ -> compare xs ys
-        z -> z
-    compare [] [] = EQ
-    compare [] _ = LT
-    compare _ [] = GT
 
-instance Eq a => Eq [a] where
-    [] == [] = True
-    (x:xs) == (y:ys) | x == y = xs == ys
-    _ == _ = False
 
 
 {-
