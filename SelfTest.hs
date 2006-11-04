@@ -34,6 +34,7 @@ selfTest _ = do
     putStrLn "Testing Atom"
     quickCheck prop_atomid
     quickCheck prop_atomeq
+    quickCheck prop_atomIndex
     quickCheck prop_atomneq
     quickCheck prop_atomneq'
 
@@ -50,6 +51,8 @@ prop_atomeq xs = (toAtom xs) == toAtom (xs::String)
 prop_atomneq xs ys = (xs /= ys) == (a1 /= a2) where
     a1 = toAtom xs
     a2 = toAtom (ys :: String)
+prop_atomIndex (xs :: String) = intToAtom (atomIndex a) == Just a where
+    a = toAtom xs
 prop_atomneq' xs ys = (xs `compare` ys) == (toPackedString a1 `compare` toPackedString a2) where
     a1 = toAtom xs
     a2 = toAtom (ys :: String)
