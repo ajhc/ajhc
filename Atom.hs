@@ -17,8 +17,10 @@ import Data.Generics
 import Data.Monoid
 import Foreign
 import List(sort)
-import qualified Data.HashTable as HT
 import System.IO.Unsafe
+import Data.IORef
+import qualified Data.HashTable as HT
+import qualified Data.IntMap as IM
 
 import PackedString
 
@@ -33,8 +35,8 @@ table :: HT.HashTable PackedString Atom
 table = unsafePerformIO (HT.new (==) (fromIntegral . hashPS))
 
 {-# NOINLINE reverseTable #-}
-reverseTable :: HT.HashTable Int PackedString
-reverseTable = unsafePerformIO (HT.new (==) (fromIntegral))
+reverseTable :: IORef (IM.IntMap PackedString)
+reverseTable = unsafePerformIO (newIORef IM.empty)
 
 {-# NOINLINE intPtr #-}
 intPtr :: Ptr Int
@@ -51,7 +53,6 @@ instance Read Atom where
     readsPrec _ s = [ (fromString s,"") ]
     --readsPrec p s = [ (fromString x,y) |  (x,y) <- readsPrec p s]
 
-toPackedString atom = atomToPS atom
 toString atom = unpackPS $ toPackedString atom
 atomIndex (Atom x) = x
 
@@ -88,6 +89,7 @@ fromString xs = unsafePerformIO $ fromStringIO xs
 fromStringIO :: String -> IO Atom
 fromStringIO cs = fromPackedStringIO (packString cs)
 
+{-# NOINLINE fromPackedStringIO #-}
 fromPackedStringIO :: PackedString -> IO Atom
 fromPackedStringIO ps = HT.lookup table ps >>= \x -> case x of
     Just z -> return z
@@ -96,7 +98,7 @@ fromPackedStringIO ps = HT.lookup table ps >>= \x -> case x of
         poke intPtr (i + 2)
         let a = Atom i
         HT.insert table ps a
-        HT.insert reverseTable i ps
+        modifyIORef reverseTable (IM.insert ((i - 1) `div` 2) ps)
         return a
 
 
@@ -107,13 +109,18 @@ dumpAtomTable = do
     mapM_ putStrLn [ show i ++ " " ++ show ps  | (ps,Atom i) <- sort x]
 
 
+{-# NOINLINE intToAtom #-}
 intToAtom :: Monad m => Int -> m Atom
-intToAtom i = unsafePerformIO $  HT.lookup reverseTable i >>= \x -> case x of
-    Just _ -> return (return $ Atom i)
-    Nothing -> return $ fail $ "intToAtom: " ++ show i
+intToAtom i | odd i && i > 0 = unsafePerformIO $ readIORef (i `seq` reverseTable) >>= \x -> case IM.member ((i-1) `div` 2) x of
+    True -> return $ return $ Atom i
+    False -> return $ fail $ "intToAtom: " ++ show i
+intToAtom i = fail $ "intToAtom: " ++ show i
 
-atomToPS :: Atom -> PackedString
-atomToPS (Atom i) = unsafePerformIO $  HT.lookup reverseTable i >>= \x -> case x of
+{-# NOINLINE toPackedString #-}
+toPackedString :: Atom -> PackedString
+toPackedString (Atom i) = unsafePerformIO $ readIORef (i `seq` reverseTable) >>= \x -> case IM.lookup ((i-1) `div` 2) x of
     Just ps -> return ps
-    Nothing -> return $ error $ "atomToPS: " ++ show i
+    Nothing -> do
+        x' <- readIORef reverseTable
+        return $ error $ "toPackedString: " ++ show i ++ " " ++ (show (x,x'))
 
