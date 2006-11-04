@@ -19,11 +19,10 @@ module Jhc.IO(
 
 import Jhc.Hole
 import Jhc.JumpPoint
+import Jhc.Prim
 import Prelude.IOError
 
 
--- this is treated very specially by the compiler. it is unboxed.
-data World__
 data IOErrorCont = IOErrorCont JumpPoint (Hole IOError)
 
 --data IOResult a = FailIO World__ IOError | JustIO World__ a
@@ -97,12 +96,6 @@ catch (IO x) fn = do
 -- | this creates a new world object that artificially depends on its argument to avoid CSE.
 foreign import primitive newWorld__ :: a -> World__
 
--- throws away first argument. but causes second argument to artificially depend on it.
-foreign import primitive drop__ :: forall a b. a -> b -> b
-
--- like 'const' but creates an artificial dependency on its second argument to guide optimization.
-dependingOn :: b -> a -> b
-dependingOn = flip drop__
 
 -- throws away first argument. but causes second argument to artificially depend on it.
 foreign import primitive "drop__" worldDep__ :: forall b. World__ -> b -> b
@@ -125,7 +118,8 @@ runMain main w = case run undefinedIOErrorCont w of
 
 -- | this is wrapped around arbitrary showable expressions when used as the main entry point
 runExpr :: Show a => a -> World__ -> World__
-runExpr x w = runMain (print x) w
+runExpr x w = runNoWrapper (print x) w
+
 
 -- | when no exception wrapper is wanted
 runNoWrapper :: IO a -> World__ -> World__

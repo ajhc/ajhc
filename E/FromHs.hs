@@ -186,6 +186,7 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
         let runMain      = func_runMain ds
             runExpr      = func_runExpr ds
             runNoWrapper = func_runNoWrapper ds
+            runRaw       = func_runRaw ds
         let e = case ioLike (getType maine) of
                 Just x | not (fopts FO.Wrapper) -> EAp (EAp (EVar runNoWrapper) x) maine
                 Just x ->  EAp (EAp (EVar runMain)  x ) maine

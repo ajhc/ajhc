@@ -84,6 +84,7 @@ data FuncNames a = FuncNames {
     func_fromRational :: a,
     func_negate :: a,
     func_runExpr :: a,
+    func_runRaw :: a,
     func_runMain :: a,
     func_leq :: a,
     func_geq :: a,

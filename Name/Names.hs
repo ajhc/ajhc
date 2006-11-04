@@ -75,7 +75,7 @@ tc_IOError = toName TypeConstructor     ("Prelude.IOError","IOError")
 
 tc_IOResult = toName TypeConstructor ("Jhc.IO","IOResult")
 tc_IO = toName TypeConstructor ("Jhc.IO", "IO")
-tc_World__ = toName TypeConstructor ("Jhc.IO","World__")
+tc_World__ = toName TypeConstructor ("Jhc.Prim","World__")
 
 tc_Bool = toName TypeConstructor ("Prelude","Bool")
 tc_List = toName TypeConstructor ("Jhc.Basics","[]")
@@ -130,6 +130,7 @@ sFuncNames = FuncNames {
     func_index = toName Val ("Data.Ix","index"),
     func_inRange = toName Val ("Data.Ix","inRange"),
     func_runExpr = toName Val ("Jhc.IO","runExpr"),
+    func_runRaw = toName Val ("Jhc.Prim","runRaw"),
     func_runMain = toName Val ("Jhc.IO","runMain"),
     func_runNoWrapper = toName Val ("Jhc.IO","runNoWrapper")
     }
