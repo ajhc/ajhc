@@ -405,16 +405,6 @@ instance Functor [] where
     fmap f [] = []
 
 
-{-
-instance Eq Bool where
-    True == True = True
-    False == False = True
-    _ == _ = False
--}
-
-undefined :: a
-undefined = error "Prelude.undefined"
-
 -- Basic combinators
 
 

@@ -154,3 +154,6 @@ concatMap f xs = g xs where
 foldr :: (a -> b -> b) -> b -> [a] -> b
 foldr k z [] = z
 foldr k z (x:xs) = k x (foldr k z xs)
+
+foreign import primitive "error.Prelude.undefined" undefined :: a
+
