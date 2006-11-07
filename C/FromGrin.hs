@@ -25,7 +25,7 @@ import GenUtil
 import Grin.Grin
 import Grin.HashConst
 import Grin.Show
-import RawFiles
+import RawFiles(hsffi_h,jhc_rts_c)
 import Util.UniqueMonad
 
 

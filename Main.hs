@@ -29,6 +29,7 @@ import E.Eta
 import E.FromHs
 import E.Inline
 import E.LambdaLift
+import E.ToHs
 import E.LetFloat
 import E.Program
 import E.Rules
@@ -703,6 +704,11 @@ compileModEnv' stats (ho,_) = do
     prog <- transformProgram transformParms { transformCategory = "BoxifyProgram", transformOperation = boxifyProgram } prog
     prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify after boxify" True prog
     prog <- barendregtProg prog
+
+    when (fopts FO.ViaGhc) $ do
+        wdump FD.Core $ printProgram prog
+        compileToHs prog
+        exitSuccess
 
     wdump FD.CoreBeforelift $ printProgram prog
     prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift } prog

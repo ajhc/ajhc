@@ -20,6 +20,7 @@ eval-optimize perform eval-apply analysis and optimization
 global-optimize perform whole program E optimization
 
 !Code Generation
+via-ghc compile via ghc
 wrapper wrap main in exception handler
 boehm use Boehm garbage collector
 profile enable profiling code in generated executable
