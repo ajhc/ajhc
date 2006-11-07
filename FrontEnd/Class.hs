@@ -66,7 +66,7 @@ instance PPrint a (Qual Pred) => PPrint a Inst where
     pprint Inst { instHead = h, instAssocs = as } = pprint h <+> text "where" <$> vcat [ text "    type" <+> pprint n <+> text "_" <+> hsep (map pprint ts) <+> text "=" <+> pprint sigma  | (n,_,ts,sigma) <- as]
 
 
-emptyInstance = Inst { instSrcLoc = bogusASrcLoc, instHead = error "emptyInstance", instAssocs = [] }
+emptyInstance = Inst { instDerived = False, instSrcLoc = bogusASrcLoc, instHead = error "emptyInstance", instAssocs = [] }
 
 -- | a class record is either a class along with instances, or just instances.
 -- you can tell the difference by the presence of the classArgs field
