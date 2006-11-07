@@ -25,6 +25,7 @@ import FrontEnd.Class
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 import Name.Names
+import Name.Name
 import Options
 import Support.CanType
 import Warning
@@ -231,3 +232,34 @@ topDefaults ps  = do
 --        where ams = ambig h [] ps
 --              tss = [ ts | (v,qs,ts) <- ams ]
 --              vs  = [ v  | (v,qs,ts) <- ams ]
+
+numClasses,stdClasses :: [Name]
+
+stdClasses = [
+    class_Eq,
+    class_Ord,
+    class_Enum,
+    class_Bounded,
+    class_Show,
+    class_Read,
+    class_Ix,
+    class_Functor,
+    class_Monad,
+    class_Num ,
+    class_Real,
+    class_Integral,
+    class_Fractional,
+    class_Floating,
+    class_RealFrac,
+    class_RealFloat
+    ]
+
+numClasses = [
+    class_Num ,
+    class_Real,
+    class_Integral,
+    class_Fractional,
+    class_Floating,
+    class_RealFrac,
+    class_RealFloat
+    ]

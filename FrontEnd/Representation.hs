@@ -265,7 +265,7 @@ withNewNames ts action = subVarName $ do
 
 newTyvarName t = case tyvarKind t of
     x@Star -> newLookupName (map (:[]) ['a' ..]) x t
-    y@(Star `Kfun` Star) -> newName (map (('f':) . show) [0 :: Int ..]) y t
+    y@(Star `Kfun` Star) -> newLookupName (map (('f':) . show) [0 :: Int ..]) y t
     z -> newLookupName (map (('t':) . show) [0 :: Int ..]) z t
 
 
@@ -282,8 +282,6 @@ prettyPrintType t  = unparse $ runIdentity (runVarNameT (f t)) where
         return (atom (parens $ unparse t1' <+> text "=" <+> unparse t2'))
     f (TForAll [] ([] :=> t)) = f t
     f (TForAll vs (ps :=> t)) = do
-        --ts' <- mapM (newLookupName ['a'..] ()) vs
-        --ts' <- mapM newTyvarName vs
         withNewNames vs $ \ts' -> do
         t' <- f t
         ps' <- mapM fp ps
@@ -293,8 +291,6 @@ prettyPrintType t  = unparse $ runIdentity (runVarNameT (f t)) where
             ps ->  fixitize (N,-3) $ pop (text "forall" <+> hsep (map text ts') <+> text "." <+> tupled (map unparse ps) <+> text "=> ")  (atomize t')
     f (TExists [] ([] :=> t)) = f t
     f (TExists vs (ps :=> t)) = do
-        --ts' <- mapM (newLookupName ['a'..] ()) vs
-        --ts' <- mapM newTyvarName vs
         withNewNames vs $ \ts' -> do
         t' <- f t
         ps' <- mapM fp ps
