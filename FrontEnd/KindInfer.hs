@@ -31,6 +31,7 @@ import Binary
 import DependAnalysis
 import Doc.DocLike
 import Doc.PPrint
+import Name.Names
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import GenUtil
@@ -502,6 +503,7 @@ fromTyApp t = f t [] where
     f (HsTyApp a b) rs = f a (b:rs)
     f t rs = (t,rs)
 
+
 aHsTypeToType :: KindEnv -> HsType -> Type
 aHsTypeToType kt@(KindEnv _ at) t | (HsTyCon con,xs) <- fromTyApp t, let nn = toName TypeConstructor con, Just (n1,n2) <- Map.lookup nn at =
     TAssoc {
@@ -511,7 +513,9 @@ aHsTypeToType kt@(KindEnv _ at) t | (HsTyCon con,xs) <- fromTyApp t, let nn = to
     }
 aHsTypeToType kt (HsTyFun t1 t2) = aHsTypeToType kt t1 `fn` aHsTypeToType kt t2
 aHsTypeToType kt tuple@(HsTyTuple types) = tTTuple $ map (aHsTypeToType kt) types
+aHsTypeToType kt tuple@(HsTyUnboxedTuple types) = tTTuple' $ map (aHsTypeToType kt) types
 aHsTypeToType kt (HsTyApp t1 t2) = TAp (aHsTypeToType kt t1) (aHsTypeToType kt t2)
+
 
 -- variables, we must know the kind of the variable here!
 -- they are assumed to already exist in the kindInfoTable

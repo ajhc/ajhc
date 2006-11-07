@@ -1,5 +1,8 @@
 # -f code options
 
+!Code options
+unboxed-tuples allow unboxed tuple syntax to be recognized
+
 !Typechecking
 boxy use the new boxy typechecker
 monomorphism-restriction enforce monomorphism restriction

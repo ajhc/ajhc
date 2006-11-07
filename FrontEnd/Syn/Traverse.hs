@@ -54,6 +54,9 @@ traverseHsExp fn e = f e where
     f (HsTuple hsExps)  = do
         hsExps' <- fns hsExps
         return (HsTuple hsExps')
+    f (HsUnboxedTuple hsExps)  = do
+        hsExps' <- fns hsExps
+        return (HsUnboxedTuple hsExps')
     f (HsList hsExps)  = do
         hsExps' <- fns hsExps
         return (HsList hsExps')
@@ -142,6 +145,9 @@ traverseHsType f (HsTyFun a b) = return HsTyFun `ap` f a `ap` f b
 traverseHsType f (HsTyTuple xs) = do
     xs <- mapM f xs
     return $ HsTyTuple xs
+traverseHsType f (HsTyUnboxedTuple xs) = do
+    xs <- mapM f xs
+    return $ HsTyUnboxedTuple xs
 traverseHsType f (HsTyApp a b) = return HsTyApp `ap` f a `ap` f b
 traverseHsType f (HsTyForall vs qt) = doQual HsTyForall f vs qt
 traverseHsType f (HsTyExists vs qt) = doQual HsTyExists f vs qt
@@ -176,6 +182,9 @@ traverseHsPat fn p = f p where
     f (HsPTuple hsPats)  = do
           hsPats' <- mapM fn hsPats
           return (HsPTuple hsPats')
+    f (HsPUnboxedTuple hsPats)  = do
+          hsPats' <- mapM fn hsPats
+          return (HsPUnboxedTuple hsPats')
     f (HsPList hsPats)  = do
           hsPats' <- mapM fn hsPats
           return (HsPList hsPats')

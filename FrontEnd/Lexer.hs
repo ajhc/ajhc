@@ -49,6 +49,8 @@ data Token
 
 	| LeftParen
 	| RightParen
+	| LeftUParen
+	| RightUParen
 	| SemiColon
         | LeftCurly
         | RightCurly
@@ -294,8 +296,15 @@ lexBOL = do
 lexToken :: Lex a Token
 lexToken = do
     s <- getInput
+    ParseMode { parseUnboxedTuples = utup } <- lexParseMode
     case s of
         [] -> return EOF
+        '(':'#':_ | utup -> do
+            discard 2
+            return LeftUParen
+        '#':')':_ | utup -> do
+            discard 2
+            return RightUParen
         '{':'-':'#':s' -> do
             discard 3
             lexWhile isSpace

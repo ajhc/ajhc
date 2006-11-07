@@ -93,6 +93,7 @@ tipe' (TExists xs (_ :=> t)) = do
 
 
 
+kind KUTuple = eHash
 kind Star = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."

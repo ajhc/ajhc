@@ -29,6 +29,7 @@ module Representation(
     tassocToAp,
     MetaVar(..),
     tTTuple,
+    tTTuple',
     tList
     )where
 
@@ -341,3 +342,6 @@ instance CanType Type Kind where
 
 tTTuple ts | length ts < 2 = error "tTTuple"
 tTTuple ts = foldl TAp (toTuple (length ts)) ts
+
+tTTuple' ts = foldl TAp (TCon $ Tycon (unboxedNameTuple TypeConstructor  n) (foldr Kfun KUTuple $ replicate n Star)) ts where
+    n = length ts

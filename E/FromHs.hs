@@ -102,6 +102,7 @@ tipe t = f t where
     cmvar MetaVar { metaKind = k } = tAbsurd (kind k)
     lt n | nameType n == TypeVal = toId n  -- verifies namespace
 
+kind KUTuple = eHash
 kind Star = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."
@@ -113,6 +114,7 @@ simplifyDecl x = x
 simplifyHsPat (HsPInfixApp p1 n p2) = HsPApp n [simplifyHsPat p1, simplifyHsPat p2]
 simplifyHsPat (HsPParen p) = simplifyHsPat p
 simplifyHsPat (HsPTuple ps) = HsPApp (toTuple (length ps)) (map simplifyHsPat ps)
+simplifyHsPat (HsPUnboxedTuple ps) = HsPApp (nameName $ unboxedNameTuple DataConstructor (length ps)) (map simplifyHsPat ps)
 simplifyHsPat (HsPNeg p)
     | HsPLit (HsInt i) <- p' = HsPLit $ HsInt (negate i)
     | HsPLit (HsFrac i) <- p' = HsPLit $ HsFrac (negate i)
@@ -508,6 +510,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         scrut <- cExpr e
         cMatchs [scrut] (altConv alts) (EError ("No Match in Case expression at " ++ show (srcLoc hs))  ty)
     cExpr (HsTuple es) = liftM eTuple (mapM cExpr es)
+    cExpr (HsUnboxedTuple es) = liftM eTuple' (mapM cExpr es)
     cExpr (HsAsPat n (HsList xs)) = do
         let cl (x:xs) = liftM2 eCons (cExpr x) (cl xs)
             cl [] = return $ eNil (cType n)

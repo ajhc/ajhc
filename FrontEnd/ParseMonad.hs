@@ -16,17 +16,21 @@
 module FrontEnd.ParseMonad(
 		-- * Parsing
 		P, ParseResult(..), atSrcLoc, LexContext(..),
-		ParseMode(..), defaultParseMode,
+		ParseMode(..),
+                parseModeOptions,
 		runParserWithMode, runParser,
 		getSrcLoc, pushCurrentContext, popContext,thenP,returnP,
 		-- * Lexing
 		Lex(runL), getInput, discard, lexNewline, lexTab, lexWhile,
 		alternative, checkBOL, setBOL, startToken, getOffside,
-		pushContextL, popContextL
+		pushContextL, popContextL, lexParseMode
 	) where
 
 import FrontEnd.SrcLoc
+import qualified Data.Set as Set
 import Warning
+import Options
+import qualified FlagOpts as FO
 
 -- | The result of a parse.
 data ParseResult a
@@ -58,7 +62,8 @@ emptyParseState = ParseState { psLexContext = [], psWarnings = [] }
 
 data ParseMode = ParseMode {
                 -- | original name of the file being parsed
-		parseFilename :: String
+		parseFilename :: String,
+                parseUnboxedTuples :: Bool
 		}
 
 -- | Default parameters for a parse,
@@ -66,8 +71,11 @@ data ParseMode = ParseMode {
 
 defaultParseMode :: ParseMode
 defaultParseMode = ParseMode {
-		parseFilename = "<unknown>"
+		parseFilename = "<unknown>",
+                parseUnboxedTuples = False
 		}
+
+parseModeOptions options = defaultParseMode { parseUnboxedTuples = FO.UnboxedTuples `Set.member` optFOptsSet options }
 
 -- | Monad for parsing
 
@@ -186,6 +194,9 @@ nextTab x = x + (tAB_LENGTH - (x-1) `mod` tAB_LENGTH)
 
 tAB_LENGTH :: Int
 tAB_LENGTH = 8
+
+lexParseMode :: Lex a ParseMode
+lexParseMode = Lex $ \cont -> P $ \r x y z s m -> runP (cont m) r x y z s m
 
 -- Consume and return the largest string of characters satisfying p
 

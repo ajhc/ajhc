@@ -12,6 +12,7 @@ import Doc.PPrint(pprint,PPrint)
 
 data Kind  = Star
            | Kfun Kind Kind
+           | KUTuple                    -- ^ kind of unboxed tuples
            | KVar Kindvar               -- variables aren't really allowed in haskell in kinds
              deriving(Data,Typeable, Eq, Ord)   -- but we need them for kind inference
     {-! derive: GhcBinary !-}
@@ -24,8 +25,11 @@ instance Show Kind where
 
 instance DocLike d => PPrint d Kind where
    pprint Star = text "*"
+   pprint KUTuple = text "(#)"
    pprint (Kfun Star k2)   = text "* -> " <> pprint k2
+   pprint (Kfun KUTuple k2)   = text "(#) -> " <> pprint k2  -- ^ this is invalid
    pprint (Kfun k1   Star) = text "(" <> pprint k1 <> text ")" <> text " -> *"
+   pprint (Kfun k1   KUTuple) = text "(" <> pprint k1 <> text ")" <> text " -> (#)"
    pprint (Kfun k1   k2)   = text "(" <> pprint k1 <> text ") -> (" <> pprint k2 <> text ")"
    pprint (KVar kindVar)   = pprint kindVar
 
@@ -35,7 +39,6 @@ instance DocLike d =>  PPrint d Kindvar where
 --  * -> * == [*,*]
 --  (*->*->*) -> * -> * == [(*->*->*), *, *]
 unfoldKind :: Kind -> [Kind]
-unfoldKind Star = [Star]
-unfoldKind (KVar v) = [KVar v]
 unfoldKind (Kfun k1 k2) = k1 : unfoldKind k2
+unfoldKind v = [v]
 

@@ -364,7 +364,7 @@ searchPaths m = ans where
 
 
 parseHsSource :: String -> String -> IO HsModule
-parseHsSource fn s = case runParserWithMode ParseMode { parseFilename = fn } parse  s'  of
+parseHsSource fn s = case runParserWithMode (parseModeOptions options) { parseFilename = fn } parse  s'  of
                       ParseOk ws e -> processErrors ws >> return e
                       ParseFailed sl err -> putErrDie $ show sl ++ ": " ++ err
     where

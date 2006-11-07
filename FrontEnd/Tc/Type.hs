@@ -23,6 +23,7 @@ module FrontEnd.Tc.Type(
     Class(),
     Kindvar(..),
     tTTuple,
+    tTTuple',
     tyvar
     ) where
 

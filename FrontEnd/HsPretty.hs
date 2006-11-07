@@ -142,6 +142,8 @@ rational = return . P.rational
 
 parens, brackets, braces,quotes,doubleQuotes :: Doc -> Doc
 parens d = d >>= return . P.parens
+parenszh d = d >>= \d' -> return $ P.text "(# " P.<> d' P.<> P.text " #)"
+
 brackets d = d >>= return . P.brackets
 braces d = d >>= return . P.braces
 quotes d = d >>= return . P.quotes
@@ -489,6 +491,7 @@ ppHsExp (HsDo stmtList) = text "do" $$$ body doIndent (map ppHsStmt stmtList)
 ppHsExp (HsVar name ) = ppHsQNameParen name
 ppHsExp (HsCon name) = ppHsQNameParen name
 ppHsExp (HsTuple expList) = parenList . map ppHsExp $ expList
+ppHsExp (HsUnboxedTuple expList) = parenListzh . map ppHsExp $ expList
 -- weird stuff
 ppHsExp (HsParen exp) = parens . ppHsExp $ exp
 ppHsExp (HsLeftSection v exp)   | (HsVar name) <- dropAs v =
@@ -643,6 +646,8 @@ maybePP pp (Just a) = pp a
 
 parenList :: [Doc] -> Doc
 parenList = parens . myFsepSimple . punctuate comma
+parenListzh :: [Doc] -> Doc
+parenListzh = parenszh . myFsepSimple . punctuate comma
 
 braceList :: [Doc] -> Doc
 braceList = braces . myFsepSimple . punctuate comma

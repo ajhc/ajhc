@@ -64,6 +64,8 @@ Symbols
 
 >	'('	{ LeftParen }
 >	')'	{ RightParen }
+>	'(#'	{ LeftUParen }
+>	'#)'	{ RightUParen }
 >	';'	{ SemiColon }
 >	'{'	{ LeftCurly }
 >	'}'	{ RightCurly }
@@ -410,6 +412,9 @@ Types
 >	: gtycon			{ HsTyCon $1 }
 >	| tyvar				{ HsTyVar $1 }
 >	| '(' types ')'			{ HsTyTuple (reverse $2) }
+>	| '(#' '#)'	                { HsTyUnboxedTuple [] }
+>	| '(#' type '#)'	        { HsTyUnboxedTuple [$2] }
+>	| '(#' types '#)'		{ HsTyUnboxedTuple (reverse $2) }
 >	| '[' type ']'			{ HsTyApp list_tycon $2 }
 >	| '(' type ')'			{ $2 }
 >	| '(' type '=' type ')'         { HsTyEq $2 $4 }
@@ -625,6 +630,9 @@ qvar here to avoid a shift/reduce conflict, and then check it ourselves
 >  	| literal			{ $1 }
 >	| '(' exp ')'			{ HsParen $2 }
 >	| '(' texps ')'			{ HsTuple (reverse $2) }
+>	| '(#' '#)'		        { HsUnboxedTuple [] }
+>	| '(#' exp '#)'		        { HsUnboxedTuple [$2] }
+>	| '(#' texps '#)'		{ HsUnboxedTuple (reverse $2) }
 >	| '[' list ']'                  { $2 }
 >	| '(' infixexp qop ')'		{ HsLeftSection $3 $2  }
 >	| '(' qopm infixexp ')'		{ HsRightSection $3 $2 }

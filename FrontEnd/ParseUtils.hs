@@ -138,6 +138,9 @@ checkPat e [] = case e of
 	HsTuple es         -> do
 			      ps <- mapM (\e -> checkPat e []) es
 			      return (HsPTuple ps)
+	HsUnboxedTuple es  -> do
+			      ps <- mapM (\e -> checkPat e []) es
+			      return (HsPUnboxedTuple ps)
 	HsList es	   -> do
 			      ps <- mapM (\e -> checkPat e []) es
 			      return (HsPList ps)
@@ -192,6 +195,7 @@ checkExpr e = case e of
 				     stmts <- mapM checkStmt stmts
 				     return (HsDo stmts)
 	HsTuple es		  -> checkManyExprs es HsTuple
+	HsUnboxedTuple es	  -> checkManyExprs es HsUnboxedTuple
 	HsList es		  -> checkManyExprs es HsList
 	HsParen e		  -> check1Expr e HsParen
 	HsLeftSection e op	  -> check1Expr e (flip HsLeftSection op)

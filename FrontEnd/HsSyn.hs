@@ -216,6 +216,7 @@ hsQualTypeHsContext HsQualType { hsQualTypeContext = c } = c
 data HsType
 	 = HsTyFun   HsType HsType
 	 | HsTyTuple [HsType]
+	 | HsTyUnboxedTuple [HsType]
 	 | HsTyApp   HsType HsType
 	 | HsTyVar   { hsTypeName :: HsName }
 	 | HsTyCon   { hsTypeName :: HsName }
@@ -272,6 +273,7 @@ hsParen x@HsCon {} = x
 hsParen x@HsParen {} = x
 hsParen x@HsLit {} = x
 hsParen x@HsTuple {} = x
+hsParen x@HsUnboxedTuple {} = x
 hsParen x = HsParen x
 
 data HsExp
@@ -287,6 +289,7 @@ data HsExp
 	| HsCase HsExp [HsAlt]
 	| HsDo { hsExpStatements :: [HsStmt] }
 	| HsTuple [HsExp]
+	| HsUnboxedTuple [HsExp]
 	| HsList [HsExp]
 	| HsParen HsExp
 	| HsLeftSection HsExp HsExp
@@ -312,6 +315,7 @@ data HsPat
 	| HsPInfixApp HsPat HsName HsPat
 	| HsPApp { hsPatName :: HsName, hsPatPats :: [HsPat] }
 	| HsPTuple [HsPat]
+	| HsPUnboxedTuple [HsPat]
 	| HsPList [HsPat]
 	| HsPParen HsPat
 	| HsPRec HsName [HsPatField]

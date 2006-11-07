@@ -261,6 +261,10 @@ tiExpr tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ re
     (_,exps') <- tcApps (HsCon (toTuple (length exps))) exps typ
     return (HsTuple exps')
 
+tiExpr tuple@(HsUnboxedTuple exps) typ = withContext (makeMsg "in the unboxed tuple" $ render $ ppHsExp tuple) $ do
+    (_,exps') <- tcApps (HsCon (nameName $ unboxedNameTuple DataConstructor (length exps))) exps typ
+    return (HsUnboxedTuple exps')
+
 
 -- special case for the empty list
 tiExpr (HsList []) (TAp c v) | c == tList = do
@@ -455,6 +459,7 @@ tiPat (HsPAsPat i pat) typ = do
 
 tiPat (HsPInfixApp pLeft conName pRight) typ =  tiPat (HsPApp conName [pLeft,pRight]) typ
 
+tiPat (HsPUnboxedTuple ps) typ = tiPat (HsPApp (nameName $ unboxedNameTuple DataConstructor (length ps)) ps) typ
 tiPat tuple@(HsPTuple pats) typ = tiPat (HsPApp (toTuple (length pats)) pats) typ
 
 tiPat p _ = error $ "tiPat: " ++ show p

@@ -70,6 +70,7 @@ import FrontEnd.SrcLoc(bogusASrcLoc,MonadSrcLoc(..))
 import FrontEnd.Tc.Type
 import GenUtil
 import Name.Name
+import Name.Names
 import Options
 import Options
 import Support.CanType
@@ -246,6 +247,12 @@ lookupName n = do
     env <- asks tcCurrentEnv
     case Map.lookup n env of
         Just x -> freshSigma x
+        Nothing | Just 0 <- fromUnboxedNameTuple n  -> do
+            return (tTTuple' [])
+        Nothing | Just num <- fromUnboxedNameTuple n -> do
+            nvs <- mapM newVar  (replicate num Star)
+            let nvs' = map TVar nvs
+            return (TForAll nvs $ [] :=> foldr TArrow  (tTTuple' nvs') nvs')
         Nothing -> fail $ "Could not find var in tcEnv:" ++ show (nameType n,n)
 
 
