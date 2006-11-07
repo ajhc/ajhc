@@ -36,6 +36,7 @@ import Doc.DocLike
 import Doc.PPrint
 import Name.Name
 import FrontEnd.SrcLoc
+import FrontEnd.Tc.Kind
 import Name.Names
 import Name.VConsts
 import Representation

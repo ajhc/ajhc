@@ -54,7 +54,7 @@ import Name.Name as Name
 import Name.Names
 import Name.VConsts
 import PrimitiveOperators
-import Representation
+import FrontEnd.Tc.Type
 import Support.CanType
 import Support.FreeVars
 import Support.Unparse
