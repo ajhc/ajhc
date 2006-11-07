@@ -115,6 +115,7 @@ makeInstanceEnv (ClassHierarchy ch) = InstanceEnv $ Map.fromList (concatMap f (M
     g cr x = error $  "makeInstanceEnv: " ++ show (className cr,x)
 
 getTypeHead th = case fromTAp th of
+    (TArrow {},_) -> tc_Arrow
     (TCon c,_) -> tyconName c
     _ -> error $ "getTypeHead: " ++ show th
 
