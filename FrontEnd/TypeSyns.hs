@@ -218,6 +218,9 @@ renameHsType' dovar t st = pp (rt t st) where
     rt (HsTyTuple hsTypes) subTable = do
         hsTypes' <- mapRename rt hsTypes subTable
         return (HsTyTuple hsTypes')
+    rt (HsTyUnboxedTuple hsTypes) subTable = do
+        hsTypes' <- mapRename rt hsTypes subTable
+        return (HsTyUnboxedTuple hsTypes')
     rt (HsTyApp hsType1 hsType2) subTable = do
         hsType1' <- rt hsType1 subTable
         hsType2' <- rt hsType2 subTable
@@ -528,6 +531,7 @@ getHsNamesFromHsPat (HsPNeg hsPat) = getHsNamesFromHsPat hsPat
 getHsNamesFromHsPat (HsPInfixApp hsPat1 _hsName hsPat2) = getHsNamesFromHsPat hsPat1 ++ getHsNamesFromHsPat hsPat2
 getHsNamesFromHsPat (HsPApp _hsName hsPats) = concat (map getHsNamesFromHsPat hsPats)
 getHsNamesFromHsPat (HsPTuple hsPats) = concat (map getHsNamesFromHsPat hsPats)
+getHsNamesFromHsPat (HsPUnboxedTuple hsPats) = concat (map getHsNamesFromHsPat hsPats)
 getHsNamesFromHsPat (HsPList hsPats) = concat (map getHsNamesFromHsPat hsPats)
 getHsNamesFromHsPat (HsPParen hsPat) = getHsNamesFromHsPat hsPat
 getHsNamesFromHsPat (HsPRec _hsName hsPatFields) = concat $ map getHsNamesFromHsPatField hsPatFields -- hsName can be ignored as it is a Constructor
@@ -559,6 +563,7 @@ getHsNamesFromHsQualType (HsQualType _hsContext hsType) = getHsNamesFromHsType h
 getHsNamesFromHsType :: HsType -> [HsName]
 getHsNamesFromHsType (HsTyFun hsType1 hsType2) = (getHsNamesFromHsType hsType1) ++ (getHsNamesFromHsType hsType2)
 getHsNamesFromHsType (HsTyTuple hsTypes) = concat $ map getHsNamesFromHsType hsTypes
+getHsNamesFromHsType (HsTyUnboxedTuple hsTypes) = concat $ map getHsNamesFromHsType hsTypes
 getHsNamesFromHsType (HsTyApp hsType1 hsType2) = (getHsNamesFromHsType hsType1) ++ (getHsNamesFromHsType hsType2)
 getHsNamesFromHsType (HsTyVar hsName) = [hsName]
 getHsNamesFromHsType (HsTyForall vs qt) = getHsNamesFromHsQualType qt List.\\ map hsTyVarBindName vs
@@ -734,6 +739,8 @@ instance Renameable HsType where
                 HsTyFun  # typ # typ'
             HsTyTuple  typs ->
                 HsTyTuple  # typs
+            HsTyUnboxedTuple  typs ->
+                HsTyUnboxedTuple  # typs
             HsTyApp    typ typ' ->
                 HsTyApp  # typ # typ'
             HsTyVar    name ->
@@ -772,6 +779,8 @@ instance Renameable (HsExp) where
                 HsDo  # stmts
             HsTuple  exps ->
                 HsTuple  # exps
+            HsUnboxedTuple  exps ->
+                HsUnboxedTuple  # exps
             HsList  exps ->
                 HsList  # exps
             HsParen  exp ->
@@ -819,6 +828,8 @@ instance Renameable HsPat where
                 HsPApp  # name # pats
             HsPTuple  pats ->
                 HsPTuple  # pats
+            HsPUnboxedTuple  pats ->
+                HsPUnboxedTuple  # pats
             HsPList  pats ->
                 HsPList  # pats
             HsPParen  pat ->

@@ -16,6 +16,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Class
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
+import FrontEnd.Tc.Kind
 import Options
 import Support.CanType
 import Support.FreeVars
@@ -111,7 +112,7 @@ subsumes s1 s2 = do
 -- might as well return flattened type
 -- we can skip the occurs check for boxy types
 occursCheck u@MetaVar { metaType = Tau } t = do
-    tt <- flattenType t
+    tt <- evalFullType t
     when (u `elem` freeMetaVars tt) $ unificationError (TMetaVar u) tt -- occurs check
     return tt
 occursCheck u t = return t
@@ -263,24 +264,31 @@ listenSolvePreds tc = do
 
 var_meets_var :: MetaVar -> MetaVar -> Tc ()
 var_meets_var tv1 tv2 = do
-    when (getType tv1 /= getType tv2) $ error "BBEQ boxyMatch kinds"
-    f tv1 tv2
+--    when (getType tv1 /= getType tv2) $ error "BBEQ boxyMatch kinds"
+    k <- kindCombine (getType tv1) (getType tv2)
+    f k tv1 tv2
     where
-    f tv1 tv2 | tv1 == tv2 = return ()
-    f tv1 tv2 | isBoxyMetaVar tv1 && isBoxyMetaVar tv2 = do
+    f k tv1 tv2 | tv1 == tv2 = zonkKind k tv1 >> return ()
+    f k tv1 tv2 | isBoxyMetaVar tv1 && isBoxyMetaVar tv2 = do
             printRule "BBEQ"
-            tt <- newMetaVar Tau (getType tv1)
+            tt <- newMetaVar Tau k
             varBind tv1 tt
             varBind tv2 tt
-    f tv1 tv2 | isBoxyMetaVar tv1  = do
+    f k tv1 tv2 | isBoxyMetaVar tv1  = do
             printRule "BBEQ-L"
             varBind tv1 (TMetaVar tv2)
-    f tv1 tv2 | isBoxyMetaVar tv2  = do
+            zonkKind k tv2
+            return ()
+    f k tv1 tv2 | isBoxyMetaVar tv2  = do
             printRule "BBEQ-R"
             varBind tv2 (TMetaVar tv1)
-    f tv1 tv2  = do
+            zonkKind k tv1
+            return ()
+    f k tv1 tv2  = do
             printRule "BBEQ-Tau"
             varBind tv2 (TMetaVar tv1)
+            zonkKind k tv1
+            return ()
 
 
 

@@ -484,6 +484,9 @@ renameHsType' dovar t st = pp (rt t st) where
     rt (HsTyTuple hsTypes) subTable = do
         hsTypes' <- mapRename rt hsTypes subTable
         return (HsTyTuple hsTypes')
+    rt (HsTyUnboxedTuple hsTypes) subTable = do
+        hsTypes' <- mapRename rt hsTypes subTable
+        return (HsTyUnboxedTuple hsTypes')
     rt (HsTyApp hsType1 hsType2) subTable = do
         hsType1' <- rt hsType1 subTable
         hsType2' <- rt hsType2 subTable
@@ -1427,6 +1430,8 @@ instance Renameable HsType where
                 HsTyFun  # typ # typ'
             HsTyTuple  typs ->
                 HsTyTuple  # typs
+            HsTyUnboxedTuple  typs ->
+                HsTyUnboxedTuple  # typs
             HsTyApp    typ typ' ->
                 HsTyApp  # typ # typ'
             HsTyVar    name ->
@@ -1465,6 +1470,8 @@ instance Renameable (HsExp) where
                 HsDo  # stmts
             HsTuple  exps ->
                 HsTuple  # exps
+            HsUnboxedTuple  exps ->
+                HsUnboxedTuple  # exps
             HsList  exps ->
                 HsList  # exps
             HsParen  exp ->
@@ -1512,6 +1519,8 @@ instance Renameable HsPat where
                 HsPApp  # name # pats
             HsPTuple  pats ->
                 HsPTuple  # pats
+            HsPUnboxedTuple  pats ->
+                HsPUnboxedTuple  # pats
             HsPList  pats ->
                 HsPList  # pats
             HsPParen  pat ->

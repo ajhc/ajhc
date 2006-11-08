@@ -142,7 +142,7 @@ tiExpr (HsVar v) typ = do
         doCoerce f (HsVar v)
 
 tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n   case " ++ show e ++ " of ...") $ do
-    scrutinee <- newBox Star
+    scrutinee <- newBox KFunRet
     e' <- tcExpr e scrutinee
     alts' <- mapM (tcAlt scrutinee typ) alts
     (ne,ap) <- wrapInAsPat (HsCase e' alts')
@@ -230,7 +230,7 @@ tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression"
 -- ABS1
 tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show (pprint ps:: P.Doc) ++ " -> ...") $ do
     let lam (p:ps) e (TMetaVar mv) rs = do -- ABS2
-            withMetaVars mv [Star,Star] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) e (a `fn` b) rs
+            withMetaVars mv [Star,KFunRet] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) e (a `fn` b) rs
         lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
             --box <- newBox Star
             --s1' `boxyMatch` box
@@ -650,7 +650,7 @@ tcDecl decl@(HsFunBind matches) typ = withContext (declDiagnostic decl) $ do
 tcMatch ::  HsMatch -> Sigma -> Tc HsMatch
 tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "in" $ show funName) $ do
     let lam (p:ps) (TMetaVar mv) rs = do -- ABS2
-            withMetaVars mv [Star,Star] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) (a `fn` b) rs
+            withMetaVars mv [Star,KFunRet] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) (a `fn` b) rs
         lam (p:ps) ty@(TArrow s1' s2') rs = do -- ABS1
             (p',env) <- tcPat p s1'
             localEnv env $ do

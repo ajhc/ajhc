@@ -17,6 +17,7 @@ module FrontEnd.KindInfer (
     getConstructorKinds
     ) where
 
+import Data.Maybe
 import Control.Monad
 import Control.Monad.Identity
 import Control.Monad.Writer
@@ -33,6 +34,7 @@ import Doc.DocLike
 import Doc.PPrint
 import Name.Names
 import FrontEnd.Tc.Type
+import FrontEnd.Tc.Kind
 import FrontEnd.Utils
 import GenUtil
 import Support.FreeVars
@@ -107,6 +109,7 @@ mgu (k1 `Kfun` k2) (k3 `Kfun` k4) = do
     return (s2 `composeSubst` s1)
 mgu (KVar u) k = varBind u k
 mgu k (KVar u) = varBind u k
+mgu k1 k2 | isJust $ kindCombine k1 k2 = return nullSubst
 mgu k1 k2 = fail $ "attempt to unify these two kinds: " ++ show k1 ++ ", " ++ show k2
 
 {-# SPECIALIZE varBind :: Kindvar -> Kind -> KI Subst #-}
@@ -351,6 +354,11 @@ kiType varExist tap@(HsTyTuple ts) = do
         tsKs <- mapM (kiType varExist) ts
         mapM_ (\k -> unify k Star) tsKs
         return Star
+kiType varExist tap@(HsTyUnboxedTuple ts) = do
+        withContext ("kiType: " ++ show tap) $ do
+        tsKs <- mapM (kiType varExist) ts
+        mapM_ (\k -> unify k Star) tsKs
+        return KUTuple
 
 kiType varExist tap@(HsTyForall { hsTypeVars = vs, hsTypeType = qt }) = do
     argKindVars <- mapM (newNameVar . hsTyVarBindName) vs
@@ -412,6 +420,7 @@ namesFromQualType (HsQualType cntxt t) = namesFromContext cntxt ++ namesFromType
 namesFromType :: HsType -> [Name]
 namesFromType (HsTyFun t1 t2) = namesFromType t1 ++ namesFromType t2
 namesFromType (HsTyTuple ts) = concatMap namesFromType ts
+namesFromType (HsTyUnboxedTuple ts) = concatMap namesFromType ts
 namesFromType (HsTyApp t1 t2) = namesFromType t1 ++ namesFromType t2
 namesFromType (HsTyVar _) = []
 namesFromType (HsTyCon n) = [toName TypeConstructor n]

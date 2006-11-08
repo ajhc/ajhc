@@ -233,6 +233,8 @@ withNewNames ts action = subVarName $ do
 newTyvarName t = case tyvarKind t of
     x@Star -> newLookupName (map (:[]) ['a' ..]) x t
     y@(Star `Kfun` Star) -> newLookupName (map (('f':) . show) [0 :: Int ..]) y t
+    z@KUTuple -> newLookupName (map (('u':) . show) [0 :: Int ..]) z t
+    z@KFunRet -> newLookupName (map (('r':) . show) [0 :: Int ..]) z t
     z -> newLookupName (map (('t':) . show) [0 :: Int ..]) z t
 
 

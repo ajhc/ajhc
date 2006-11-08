@@ -42,6 +42,7 @@ module FrontEnd.Tc.Monad(
     evalType,
     unificationError,
     varBind,
+    zonkKind,
     withContext,
     withMetaVars
     ) where
@@ -68,6 +69,7 @@ import FrontEnd.Class
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc(bogusASrcLoc,MonadSrcLoc(..))
 import FrontEnd.Tc.Type
+import FrontEnd.Tc.Kind
 import GenUtil
 import Name.Name
 import Name.Names
@@ -389,11 +391,17 @@ freeMetaVarsEnv = do
 quantify :: [MetaVar] -> [Pred] -> Rho -> Tc Sigma
 quantify vs ps r | not $ any isBoxyMetaVar vs = do
     r <- flattenType r
-    nvs <- mapM (newVar . metaKind) vs
+    nvs <- mapM (newVar . id . metaKind) vs
     sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- vs ]
     (ps :=> r) <- flattenType (ps :=> r)
     ch <- getClassHierarchy
     return $ TForAll nvs (FrontEnd.Tc.Class.simplify ch ps :=> r)
+
+-- turn all ?? into * types, as we can't abstract over unboxed types
+fixKind :: Kind -> Kind
+fixKind KFunRet = Star
+fixKind (a `Kfun` b) = fixKind a `Kfun` fixKind b
+fixKind x = x
 
 
 -- this removes all boxes, replacing them with tau vars
@@ -427,20 +435,33 @@ evalTAssoc t = return t
 -- Bind mv to type, first filling in any boxes in type with tau vars
 varBind :: MetaVar -> Type -> Tc ()
 varBind u t
-    | getType u /= getType t = error $ "varBind: kinds do not match:" ++ show (u,t)
+--    | getType u /= getType t = error $ "varBind: kinds do not match:" ++ show (u,t)
     | otherwise = do
+        kindCombine (getType u) (getType t)
         tt <- unBox t
         --(t,be,_) <- unbox t
         --when be $ error $ "binding boxy: " ++ tupled [pprint u,prettyPrintType t]
-        tt <- flattenType tt
-        when (u `elem` freeMetaVars tt) $ unificationError (TMetaVar u) tt -- occurs check
+        tt <- evalFullType tt
+        when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "varBind: " ++ pprint u <+> text ":=" <+> prettyPrintType tt
+        when (u `elem` freeMetaVars tt) $ do
+            unificationError (TMetaVar u) tt -- occurs check
         let r = metaRef u
         x <- liftIO $ readIORef r
         case x of
             Just r -> fail $ "varBind: binding unfree: " ++ tupled [pprint u,prettyPrintType tt,prettyPrintType r]
             Nothing -> liftIO $ do
-                when (dump FD.BoxySteps) $ putStrLn $ "varBind: " ++ pprint u <+> text ":=" <+> prettyPrintType t
+                --when (dump FD.BoxySteps) $ putStrLn $ "varBind: " ++ pprint u <+> text ":=" <+> prettyPrintType t
                 writeIORef r (Just tt)
+
+
+zonkKind :: Kind -> MetaVar -> Tc MetaVar
+zonkKind nk mv = do
+    fk <- kindCombine nk (metaKind mv)
+    if fk == metaKind mv then return mv else do
+        nref <- liftIO $ newIORef Nothing
+        let nmv = mv { metaKind = fk, metaRef = nref }
+        liftIO $ modifyIORef (metaRef mv) (\Nothing -> Just $ TMetaVar nmv)
+        return nmv
 
 
 
