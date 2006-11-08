@@ -252,7 +252,7 @@ lookupName n = do
         Nothing | Just 0 <- fromUnboxedNameTuple n  -> do
             return (tTTuple' [])
         Nothing | Just num <- fromUnboxedNameTuple n -> do
-            nvs <- mapM newVar  (replicate num Star)
+            nvs <- mapM newVar  (replicate num kindStar)
             let nvs' = map TVar nvs
             return (TForAll nvs $ [] :=> foldr TArrow  (tTTuple' nvs') nvs')
         Nothing -> fail $ "Could not find var in tcEnv:" ++ show (nameType n,n)
@@ -391,7 +391,7 @@ freeMetaVarsEnv = do
 quantify :: [MetaVar] -> [Pred] -> Rho -> Tc Sigma
 quantify vs ps r | not $ any isBoxyMetaVar vs = do
     r <- flattenType r
-    nvs <- mapM (newVar . id . metaKind) vs
+    nvs <- mapM (newVar . fixKind . metaKind) vs
     sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- vs ]
     (ps :=> r) <- flattenType (ps :=> r)
     ch <- getClassHierarchy
@@ -399,7 +399,7 @@ quantify vs ps r | not $ any isBoxyMetaVar vs = do
 
 -- turn all ?? into * types, as we can't abstract over unboxed types
 fixKind :: Kind -> Kind
-fixKind KFunRet = Star
+fixKind (KBase KFunRet) = KBase Star
 fixKind (a `Kfun` b) = fixKind a `Kfun` fixKind b
 fixKind x = x
 

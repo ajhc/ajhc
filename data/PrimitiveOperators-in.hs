@@ -13,6 +13,7 @@ import Name.Name
 import Name.Names
 import Name.VConsts
 import FrontEnd.Tc.Type
+import FrontEnd.Tc.Kind
 import Support.CanType
 
 

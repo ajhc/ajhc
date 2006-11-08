@@ -84,15 +84,15 @@ instance Ord MetaVar where
     compare a b = compare (metaUniq a) (metaUniq b)
 
 instance TypeNames Type where
-    tBool = TCon (Tycon tc_Bool Star)
+    tBool = TCon (Tycon tc_Bool kindStar)
     tString = TAp tList tChar
-    tChar      = TCon (Tycon tc_Char Star)
-    tUnit = TCon (Tycon tc_Unit Star)
+    tChar      = TCon (Tycon tc_Char kindStar)
+    tUnit = TCon (Tycon tc_Unit kindStar)
 
 instance Ord (IORef a)
 instance Binary (IORef a)
 
-tList = TCon (Tycon tc_List (Kfun Star Star))
+tList = TCon (Tycon tc_List (Kfun kindStar kindStar))
 
 instance Eq Type where
     (TVar a) == (TVar b) = a == b
@@ -147,7 +147,7 @@ data Tycon = Tycon { tyconName :: Name, tyconKind :: Kind }
     {-! derive: GhcBinary !-}
 
 instance ToTuple Tycon where
-    toTuple n = Tycon (nameTuple TypeConstructor n) (foldr Kfun Star $ replicate n Star)
+    toTuple n = Tycon (nameTuple TypeConstructor n) (foldr Kfun kindStar $ replicate n kindStar)
 instance ToTuple Type where
     toTuple n = TCon $ toTuple n
 
@@ -231,10 +231,10 @@ withNewNames ts action = subVarName $ do
     action ts'
 
 newTyvarName t = case tyvarKind t of
-    x@Star -> newLookupName (map (:[]) ['a' ..]) x t
-    y@(Star `Kfun` Star) -> newLookupName (map (('f':) . show) [0 :: Int ..]) y t
-    z@KUTuple -> newLookupName (map (('u':) . show) [0 :: Int ..]) z t
-    z@KFunRet -> newLookupName (map (('r':) . show) [0 :: Int ..]) z t
+    x@(KBase Star) -> newLookupName (map (:[]) ['a' ..]) x t
+    y@(KBase Star `Kfun` KBase Star) -> newLookupName (map (('f':) . show) [0 :: Int ..]) y t
+    z@(KBase KUTuple) -> newLookupName (map (('u':) . show) [0 :: Int ..]) z t
+    z@(KBase KFunRet) -> newLookupName (map (('r':) . show) [0 :: Int ..]) z t
     z -> newLookupName (map (('t':) . show) [0 :: Int ..]) z t
 
 
@@ -309,7 +309,7 @@ instance DocLike d => PPrint d Pred where
 
 instance DocLike d => PPrint d MetaVar where
     pprint MetaVar { metaUniq = u, metaKind = k, metaType = t }
-        | Star <- k =  pprint t <> tshow u
+        | KBase Star <- k =  pprint t <> tshow u
         | otherwise = parens $ pprint t <> tshow u <> text " :: " <> pprint k
 
 fromTAp t = f t [] where
@@ -336,7 +336,7 @@ instance CanType Type Kind where
   getType typ@(TAp t _) = case (getType t) of
                      (Kfun _ k) -> k
                      x -> error $ "Type.getType: kind error in: " ++ (show typ)
-  getType (TArrow _l _r) = Star
+  getType (TArrow _l _r) = kindStar
   getType (TForAll _ (_ :=> t)) = getType t
   getType (TExists _ (_ :=> t)) = getType t
   getType (TMetaVar mv) = getType mv
@@ -345,5 +345,5 @@ instance CanType Type Kind where
 tTTuple ts | length ts < 2 = error "tTTuple"
 tTTuple ts = foldl TAp (toTuple (length ts)) ts
 
-tTTuple' ts = foldl TAp (TCon $ Tycon (unboxedNameTuple TypeConstructor  n) (foldr Kfun KUTuple $ replicate n Star)) ts where
+tTTuple' ts = foldl TAp (TCon $ Tycon (unboxedNameTuple TypeConstructor  n) (foldr Kfun kindUTuple $ replicate n kindStar)) ts where
     n = length ts

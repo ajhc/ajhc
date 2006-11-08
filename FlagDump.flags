@@ -12,6 +12,7 @@ defs Show all defined names in a module
 
 !Type Checker
 kind        show results of kind inference for each module
+kind-steps  show steps of kind inference
 dcons       data constructors
 class-summary summary of all classes
 class       detailed information on each class

@@ -24,6 +24,7 @@ import Doc.PPrint
 import FrontEnd.Class
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
+import FrontEnd.Tc.Kind
 import Name.Names
 import Name.Name
 import Options
@@ -218,7 +219,7 @@ defs h v qs = [ t | all ((TMetaVar v)==) ts,
 defaults    :: [Type]
 defaults
     | not $ fopts FO.Defaulting = []
-    | otherwise = map (\name -> TCon (Tycon name Star)) [tc_Integer, tc_Double]
+    | otherwise = map (\name -> TCon (Tycon name kindStar)) [tc_Integer, tc_Double]
 
 topDefaults     :: [Pred] -> Tc ()
 topDefaults ps  = do

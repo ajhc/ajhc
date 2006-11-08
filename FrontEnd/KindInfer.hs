@@ -17,6 +17,10 @@ module FrontEnd.KindInfer (
     getConstructorKinds
     ) where
 
+import Control.Monad.Reader
+import Data.List
+import Data.FunctorM
+import Util.Inst
 import Data.Maybe
 import Control.Monad
 import Control.Monad.Identity
@@ -24,7 +28,6 @@ import Control.Monad.Writer
 import Data.Generics
 import Data.IORef
 import Data.Monoid
-import List (nub)
 import qualified Data.Map as Map
 import System.IO.Unsafe
 
@@ -42,199 +45,193 @@ import HsSyn
 import MapBinaryInstance()
 import Name.Name
 import qualified Util.Seq as Seq
+import qualified FlagDump as FD
+import Options
 import Util.ContextMonad
 import Util.HasSize
 
 
-data KindEnv = KindEnv (Map.Map Name Kind) (Map.Map Name (Int,Int))
-    deriving(Typeable,Show)
+data KindEnv = KindEnv {
+    kindEnv :: Map.Map Name Kind,
+    kindEnvAssocs :: Map.Map Name (Int,Int),
+    kindEnvClasses :: Map.Map Name [Kind]
+    } deriving(Typeable,Show)
         {-!derive: Monoid, GhcBinary !-}
 
 instance HasSize KindEnv where
-    size (KindEnv env _) = size env
+    size KindEnv { kindEnv = env } = size env
 
-type Subst = [(Kindvar, Kind)]
+instance FreeVars Kind [Kindvar] where
+   freeVars (KVar kindvar) = [kindvar]
+   freeVars (kind1 `Kfun` kind2) = freeVars kind1 `union` freeVars kind2
+   freeVars KBase {} = []
 
-nullSubst :: Subst
-nullSubst = []
-
-class Kinds a where
-   vars :: a -> [Kindvar]
-   apply :: Subst -> a -> a
-
-instance Kinds Kind where
-   vars Star = []
-   vars (KVar kindvar) = [kindvar]
-   vars (kind1 `Kfun` kind2) = vars kind1 ++ vars kind2
-
-   apply s Star = Star
-   apply s (KVar kindvar)
-      = case lookup kindvar s of
-           Just k -> k
-           Nothing -> KVar kindvar
-   apply s (kind1 `Kfun` kind2)
-      = (apply s kind1) `Kfun` (apply s kind2)
-
-instance Kinds a => Kinds [a] where
-   vars = nub . concatMap vars
-   apply s = map (apply s)
-
-instance Kinds a => Kinds (b, a) where
-   apply s (x, y) = (x, apply s y)
-   vars (x, y) = vars y
-
-instance Kinds KindEnv where
-   apply s (KindEnv m x) = KindEnv (Map.map (\el -> apply s el) m) x
-   vars (KindEnv env x) = vars $ map snd $ Map.toList env
 
 
 instance DocLike d =>  PPrint d KindEnv where
-    pprint (KindEnv m ev) = vcat $ [ pprint x <+> text "=>" <+> pprint y | (x,y) <- Map.toList m] ++ [ text "associated type" <+> pprint n <+> pprint ab  | (n,ab) <- Map.toList ev] ++ [empty]
---------------------------------------------------------------------------------
-
--- unification
-
-composeSubst :: Subst -> Subst -> Subst
-composeSubst s1 s2 = [(u, apply s1 k) | (u, k) <- s2] ++ s1
-
-
-{-# SPECIALIZE mgu :: Kind -> Kind -> KI Subst #-}
-
--- can return either a substitution or a string
-mgu :: Monad m => Kind -> Kind -> m Subst
-mgu Star Star = return nullSubst
-mgu (k1 `Kfun` k2) (k3 `Kfun` k4) = do
-    s1 <- mgu k1 k3
-    s2 <- mgu (apply s1 k2) (apply s1 k4)
-    return (s2 `composeSubst` s1)
-mgu (KVar u) k = varBind u k
-mgu k (KVar u) = varBind u k
-mgu k1 k2 | isJust $ kindCombine k1 k2 = return nullSubst
-mgu k1 k2 = fail $ "attempt to unify these two kinds: " ++ show k1 ++ ", " ++ show k2
-
-{-# SPECIALIZE varBind :: Kindvar -> Kind -> KI Subst #-}
-
-varBind :: Monad m => Kindvar -> Kind -> m Subst
-varBind u k
-   | k == KVar u = return nullSubst
-   | u `elem` vars k = fail $ "occurs check failed in kind inference: " ++
-                               show u ++ ", " ++ show k
-   | otherwise = return [(u, k)]
-
+    pprint KindEnv { kindEnv = m, kindEnvAssocs = ev, kindEnvClasses = cs } = vcat $
+        [ pprint x <+> text "=>" <+> pprint y | (x,y) <- Map.toList m] ++
+        [ text "associated type" <+> pprint n <+> pprint ab  | (n,ab) <- Map.toList ev] ++
+        [ text "class" <+> pprint n <+> pprint ab  | (n,ab) <- Map.toList cs] ++
+        [empty]
 
 --------------------------------------------------------------------------------
+
 
 -- The kind inference monad
+
+data KiWhere = InClass | InInstance | Other
+    deriving(Eq)
 
 data KiEnv  = KiEnv {
     kiContext :: [String],
     kiEnv :: IORef KindEnv,
-    kiSubst :: IORef Subst,
+    kiWhere :: KiWhere,
     kiVarnum :: IORef Int
     }
 
-newtype KI a = KI (KiEnv -> IO a)-- -> (a, State))
-
-
-instance Monad KI where
-    return a = KI (\_ -> return a)
-    KI comp >>= fun
-        = KI (\v  -> comp v >>= \r -> case fun r   of KI x -> x v)
-    fail x = KI (\s -> fail (unlines $ reverse (x:kiContext s)))
+newtype Ki a = Ki (ReaderT KiEnv IO a)
+    deriving(Monad,MonadReader KiEnv,MonadIO,Functor)
 
 
 restrictKindEnv :: (Name -> Bool) -> KindEnv -> KindEnv
-restrictKindEnv f (KindEnv m x) = KindEnv (Map.filterWithKey (\k _ -> f k) m) x
+restrictKindEnv f ke = ke { kindEnv = Map.filterWithKey (\k _ -> f k) (kindEnv ke) }
 
 --------------------------------------------------------------------------------
 
+findKind :: MonadIO m => Kind -> m Kind
+findKind tv@(KVar Kindvar {kvarRef = r, kvarConstraint = con }) = liftIO $ do
+    rt <- readIORef r
+    case rt of
+        Nothing
+            | con == KindStar -> writeIORef r (Just kindStar) >> return kindStar
+            | otherwise -> return tv
+        Just t -> do
+            t' <- findKind t
+            writeIORef r (Just t')
+            return t'
+findKind tv = return tv
+
 -- useful operations in the inference monad
 
-runKI :: KindEnv -> KI a -> IO (a, KindEnv)
-runKI env (KI ki) = (kienv >>= ki') where
+runKI :: KindEnv -> Ki a -> IO a
+runKI env (Ki ki) = (kienv >>= ki') where
     kienv = do
         env <- newIORef env
-        subst <- newIORef nullSubst
         varnum <- newIORef 0
-        return KiEnv { kiContext = [], kiEnv = env, kiSubst = subst, kiVarnum = varnum }
-    ki' e = do
-        x <- ki e
-        env <- readIORef (kiEnv e)
-        return (x,env)
+        return KiEnv { kiContext = [], kiEnv = env, kiVarnum = varnum, kiWhere = Other }
+    ki' e = runReaderT ki e
 
 
-instance ContextMonad String KI where
-    withContext nc (KI x)= KI (\s -> x s { kiContext = nc :kiContext s })
-
-getSubst :: KI Subst
-getSubst = KI $ \e -> do
-    readIORef (kiSubst e)
-
-getVarNum :: KI Int
-getVarNum = KI $ \e -> do
-    readIORef (kiVarnum e)
-
-getEnv :: KI KindEnv
-getEnv = KI $ \e -> readIORef (kiEnv e)
+instance ContextMonad String Ki where
+    withContext nc x = local (\s -> s { kiContext = nc :kiContext s }) x
 
 
-getEnvVars :: KI [Kindvar]
-getEnvVars
-   = do e <- getEnv
-        return $ vars e
+getEnv :: Ki KindEnv
+getEnv = do asks kiEnv >>= liftIO . readIORef
 
-incVarNum :: KI ()
-incVarNum = KI $ \e -> do
-    n <- readIORef (kiVarnum e)
-    writeIORef (kiVarnum e ) $! (n + 1)
 
-unify :: Kind -> Kind -> KI ()
+unify :: Kind -> Kind -> Ki ()
 unify k1 k2 = do
-    s <- getSubst
-    newSubst <- mgu (apply s k1) (apply s k2)
-    extendSubst newSubst
-    --case mgu (apply s k1) (apply s k2) of
-    --       Right newSubst  -> extendSubst newSubst
-    --       Left errorMsg -> error $ unlines (reverse c ++ [errorMsg])
+    k1 <- flattenKind k1
+    k2 <- flattenKind k2
+    printRule $ "unify:" <+> pprint k1 <+> text "<->" <+> pprint k2
+    mgu k1 k2
+
+mgu :: Kind -> Kind -> Ki ()
+mgu (KBase a) (KBase b) | a == b = return ()
+mgu (Kfun a b) (Kfun a' b') = do
+    unify a a'
+    unify b b'
+mgu (KVar u) k = varBind u k
+mgu k (KVar u) = varBind u k
+mgu k1 k2 = fail $ "attempt to unify these two kinds: " ++ show k1 ++ " <-> " ++ show k2
+
+varBind :: Kindvar -> Kind -> Ki ()
+varBind u k = do
+    k <- flattenKind k
+    printRule $ "varBind:" <+> pprint u <+> text ":=" <+> pprint k
+    if k == KVar u then return () else do
+    when (u `elem` freeVars k) $ fail $ "occurs check failed in kind inference: " ++ show u ++ " := " ++ show k
+    v <- liftIO $ readIORef (kvarRef u)
+    case v of
+        Just v -> fail $ "varBind unfree"
+        Nothing -> do
+            liftIO $ writeIORef (kvarRef u) (Just k)
+            constrain (kvarConstraint u) k
+
+zonkConstraint :: KindConstraint -> Kindvar -> Ki ()
+zonkConstraint nk mv = do
+    let fk = mappend nk (kvarConstraint mv)
+    if fk == kvarConstraint mv then return () else do
+        nref <- liftIO $ newIORef Nothing
+        let nmv = mv { kvarConstraint = fk, kvarRef = nref }
+        liftIO $ modifyIORef (kvarRef mv) (\Nothing -> Just $ KVar nmv)
+
+constrain KindAny k = return ()
+constrain KindStar (KBase Star) = return ()
+constrain KindFunRet (KBase _) = return ()
+constrain KindSimple (KBase Star) = return ()
+constrain KindSimple (a `Kfun` b) = do
+    a <- findKind a
+    b <- findKind b
+    constrain KindSimple a
+    constrain KindSimple b
+constrain con (KVar v) = zonkConstraint con v
+constrain con k = fail $ "constraining kind: " ++ show (con,k)
 
 
-extendSubst :: Subst -> KI ()
-extendSubst s = KI $ \e -> do
-    modifyIORef (kiSubst e) (s `composeSubst`)
+flattenKind :: Kind -> Ki Kind
+flattenKind k = f' k where
+    f (a `Kfun` b) = return Kfun `ap` f' a `ap` f' b
+    f k = return k
+    f' k = findKind k >>= f
 
-newKindVar :: KI Kind
-newKindVar
-   = do n <- getVarNum
-        incVarNum
-        return (KVar (Kindvar n))
 
-lookupKindEnv :: Name -> KI (Maybe Kind)
+newKindVar :: KindConstraint -> Ki Kindvar
+newKindVar con = do
+    KiEnv { kiVarnum = vr } <- ask
+    liftIO $ do
+    n <- readIORef vr
+    writeIORef vr $! (n + 1)
+    nr <- newIORef Nothing
+    return Kindvar { kvarUniq = n, kvarRef = nr, kvarConstraint = con }
+
+lookupKindEnv :: Name -> Ki (Maybe Kind)
 lookupKindEnv name = do
-    KindEnv env _ <- getEnv
+    KindEnv { kindEnv = env } <- getEnv
     return $ Map.lookup name env
 
-extendEnv :: KindEnv -> KI ()
-extendEnv (KindEnv newEnv nx) = KI $ \e ->
-    modifyIORef (kiEnv e) (\ (KindEnv env x) -> KindEnv (env `Map.union` newEnv) (nx `mappend` x))
+lookupKind :: KindConstraint -> Name -> Ki Kind
+lookupKind con name = do
+    KindEnv { kindEnv = env } <- getEnv
+    case Map.lookup name env of
+        Just k -> do
+            k <- findKind k
+            constrain con k
+            findKind k
+        Nothing -> do
+            kv <- newKindVar con
+            extendEnv mempty { kindEnv = Map.singleton name (KVar kv) }
+            return (KVar kv)
 
-applySubstToEnv :: Subst -> KI ()
-applySubstToEnv subst = KI $ \e ->
-    modifyIORef (kiEnv e) (apply subst)
-
-envVarsToStars :: KI ()
-envVarsToStars
-   = do vars <- getEnvVars
-        let varsToStarSubst = map (\v -> (v, Star)) vars   -- clobber all remaining variables to stars
-        applySubstToEnv varsToStarSubst
+extendEnv :: KindEnv -> Ki ()
+extendEnv newEnv = do
+    ref <- asks kiEnv
+    liftIO $ modifyIORef ref (mappend newEnv) -- (\ (KindEnv env x) -> KindEnv (env `Map.union` newEnv) (nx `mappend` x))
 
 
 getConstructorKinds :: KindEnv -> Map.Map Name Kind
-getConstructorKinds (KindEnv m _) = m -- Map.fromList [ (toName TypeConstructor x,y) | (x,y)<- Map.toList m]
+getConstructorKinds ke = kindEnv ke -- Map.fromList [ (toName TypeConstructor x,y) | (x,y)<- Map.toList m]
 
 --------------------------------------------------------------------------------
 
 -- kind inference proper
 -- this is what gets called from outside of this module
+
+
+
+{-
 kiDecls :: KindEnv -> [HsDecl] -> IO KindEnv
 kiDecls inputEnv classAndDataDecls = ans where
     ans = do
@@ -243,6 +240,198 @@ kiDecls inputEnv classAndDataDecls = ans where
     run = runKI inputEnv $ withContext ("kiDecls: " ++ show (map getDeclName classAndDataDecls)) $ mapM_ kiKindGroup kindGroups
     kindGroups = map declsToKindGroup depGroups
     depGroups = getDataAndClassBg classAndDataDecls
+-}
+
+printRule :: String -> Ki ()
+printRule s
+    | dump FD.KindSteps = liftIO $ putStrLn s
+    | otherwise = return ()
+
+kiDecls :: KindEnv -> [HsDecl] -> IO KindEnv
+kiDecls inputEnv classAndDataDecls = ans where
+    ans = do
+        ke <- run
+        return ke -- TODO (Map.fromList (concatMap kgAssocs kindGroups) `mappend` as))
+    run = runKI inputEnv $ withContext ("kiDecls: " ++ show (map getDeclName classAndDataDecls)) $ do
+        kiInitClasses classAndDataDecls
+        mapM_ kiDecl classAndDataDecls
+        getEnv >>= postProcess
+
+postProcess ke = do
+    kindEnv <- fmapM flattenKind (kindEnv ke)
+    kindEnvClasses <- fmapM (mapM flattenKind) (kindEnvClasses ke)
+    let defs = snub (freeVars (Map.elems kindEnv,Map.elems kindEnvClasses))
+    printRule $ "defaulting the following kinds: " ++ pprint defs
+    mapM_ (flip varBind kindStar) defs
+    kindEnv <- fmapM flattenKind kindEnv
+    kindEnvClasses <- fmapM (mapM flattenKind) kindEnvClasses
+    return ke { kindEnvClasses = kindEnvClasses, kindEnv = kindEnv }
+
+
+kiType,kiType' :: Kind -> HsType -> Ki ()
+kiType' k t = do
+    k <- findKind k
+    kiType k t
+
+kiType k (HsTyTuple ts) = do
+    unify kindStar k
+    mapM_ (kiType kindStar) ts
+kiType k (HsTyUnboxedTuple ts) = do
+    unify kindUTuple k
+    mapM_ (kiType kindStar) ts
+kiType k (HsTyFun a b) = do
+    unify kindStar k
+    kiType kindStar a
+    kv <- newKindVar KindFunRet
+    kiType (KVar kv) b
+kiType k (HsTyApp a b) = do
+    kv <- newKindVar KindAny
+    kiType  (KVar kv `Kfun` k) a
+    kiType' (KVar kv) b
+kiType k (HsTyVar v) = do
+    kv <- lookupKind KindSimple (toName TypeVal v)
+    unify k kv
+kiType k (HsTyCon v) = do
+    kv <- lookupKind KindAny (toName TypeConstructor v)
+    unify k kv
+kiType k (HsTyCon v) = do
+    kv <- lookupKind KindAny (toName TypeConstructor v)
+    unify k kv
+kiType k HsTyAssoc = do
+    constrain KindSimple k
+kiType _ HsTyEq {} = error "kiType.HsTyEq"
+kiType k HsTyForall { hsTypeVars = vs, hsTypeType = HsQualType con t } = do
+    mapM initTyVarBind vs
+    mapM_ kiPred con
+    kiType' k t
+kiType k HsTyExists { hsTypeVars = vs, hsTypeType = HsQualType con t } = do
+    mapM initTyVarBind vs
+    mapM_ kiPred con
+    kiType' k t
+
+initTyVarBind HsTyVarBind { hsTyVarBindName = name, hsTyVarBindKind = kk } = do
+    nk <- lookupKind KindSimple (toName TypeVal name)
+    case kk of
+        Nothing -> return ()
+        Just kk -> unify nk (hsKindToKind kk)
+
+
+
+hsKindToKind (HsKindFn a b) = hsKindToKind a `Kfun` hsKindToKind b
+hsKindToKind a | a == hsKindStar = kindStar
+
+kiApps :: Kind -> [HsType] -> Kind -> Ki ()
+kiApps ca args fk = f ca args fk where
+    f ca [] fk = unify ca fk
+    f (x `Kfun` y) (a:as) fk = do
+        kiType' x a
+        y <- findKind y
+        f y as fk
+    f (KVar var) as fk = do
+        x <- newKindVar KindAny
+        y <- newKindVar KindAny
+        let nv = (KVar x `Kfun` KVar y)
+        varBind var nv
+        f nv as fk
+
+kiApps' :: Kind -> [Kind] -> Kind -> Ki ()
+kiApps' ca args fk = f ca args fk where
+    f ca [] fk = unify ca fk
+    f (x `Kfun` y) (a:as) fk = do
+        unify a x
+        y <- findKind y
+        f y as fk
+    f (KVar var) as fk = do
+        x <- newKindVar KindAny
+        y <- newKindVar KindAny
+        let nv = (KVar x `Kfun` KVar y)
+        varBind var nv
+        f nv as fk
+
+kiPred :: HsAsst -> Ki ()
+kiPred asst@(HsAsst n ns) = do
+    env <- getEnv
+    let f k n = do
+            k' <- lookupKind KindSimple (toName TypeVal n)
+            unify k k'
+    case Map.lookup (toName ClassName n) (kindEnvClasses env) of
+        Nothing -> fail $ "unknown class: " ++ show asst
+        Just ks -> zipWithM_ f ks ns
+kiPred (HsAsstEq a b) = do
+    mv <- newKindVar KindSimple
+    kiType  (KVar mv) a
+    kiType' (KVar mv) b
+
+kiInitClasses :: [HsDecl] -> Ki ()
+kiInitClasses ds =  sequence_ [ f className [classArg] |  HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon className) (HsTyVar classArg))) _ <- ds] where
+    f className args = do
+        args <- mapM (lookupKind KindSimple . toName TypeVal) args
+        extendEnv mempty { kindEnvClasses = Map.singleton (toName ClassName className) args }
+
+
+
+kiDecl :: HsDecl -> Ki ()
+kiDecl HsDataDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs = args, hsDeclCons = condecls } = kiData context tyconName args condecls
+kiDecl HsNewTypeDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs = args, hsDeclCon = condecl } = kiData context tyconName args [condecl]
+kiDecl HsTypeDecl { hsDeclName = name, hsDeclTArgs = args, hsDeclType = ty } = do
+    wh <- asks kiWhere
+    let theconstraint = if wh == Other then KindAny else KindSimple
+    kc <- lookupKind theconstraint (toName TypeConstructor name)
+    mv <- newKindVar theconstraint
+    kiApps kc args (KVar mv)
+    kiType' (KVar mv) ty
+kiDecl (HsTypeSig _ _ (HsQualType ps t)) = do
+    mapM_ kiPred ps
+    kiType kindStar t
+kiDecl (HsClassDecl _sloc qualType sigsAndDefaults) = ans where
+    HsQualType contxt (HsTyApp (HsTyCon className) (HsTyVar classArg)) =  qualType
+    ans = do
+        carg <- lookupKind KindSimple (toName TypeVal classArg)
+        mapM_ kiPred contxt
+        extendEnv mempty { kindEnvAssocs = Map.fromList assocs }
+        mapM_ (\n -> lookupKind KindSimple n >>= unify carg ) rn
+        local (\e -> e { kiWhere = InClass }) $ mapM_ kiDecl sigsAndDefaults
+
+    numClassArgs = 1
+    newAssocs = [ (name,[ n | ~(HsTyVar n) <- names],t,names) | HsTypeDecl _sloc name names t <- sigsAndDefaults ]
+    assocs = [ (toName TypeConstructor n,(numClassArgs,length names - numClassArgs)) | (n,names,_,_) <- newAssocs ]
+    rn = Seq.toList $ everything (Seq.<>) (mkQ Seq.empty f) (newClassBodies,newAssocs)
+    newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
+    f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = Seq.single (toName TypeVal n')
+    f _ = Seq.empty
+    typeFromSig :: HsDecl -> HsQualType
+    typeFromSig (HsTypeSig _sloc _names qualType) = qualType
+kiDecl _ = return ()
+
+kiData context tyconName args condecls = do
+    args <- mapM (lookupKind KindSimple . toName TypeVal) args
+    kc <- lookupKind KindSimple (toName TypeConstructor tyconName)
+    kiApps' kc args kindStar
+    mapM_ kiPred context
+    mapM_ (kiType kindStar) (concatMap (map hsBangType . hsConDeclArgs) condecls)
+
+kiHsQualType :: KindEnv -> HsQualType -> KindEnv
+kiHsQualType inputEnv qualType@(HsQualType ps t) = newState where
+    newState = unsafePerformIO $ runKI inputEnv $ withContext ("kiHsQualType: " ++ show qualType) $ do
+        kiType kindStar t
+        mapM_ kiPred ps
+        getEnv >>= postProcess
+
+{-
+kiDecl (HsClassDecl _sloc qualType sigsAndDefaults) = do
+        let newClassBodies = map typeFromSig $ filter isHsTypeSig sigsAndDefaults
+            newAssocs = [ (name,[ n | ~(HsTyVar n) <- names],t,names) | HsTypeDecl _sloc name names t <- sigsAndDefaults ]
+            assocs = [ (toName TypeConstructor n,(numClassArgs,length names - numClassArgs)) | (n,names,_,_) <- newAssocs ]
+            numClassArgs = 1
+            rn = Seq.toList $ everything (Seq.<>) (mkQ Seq.empty f) (newClassBodies,newAssocs)
+            f (HsTyVar n') | hsNameToOrig n' == hsNameToOrig classArg = Seq.single n'
+            f _ = Seq.empty
+            foos = [ (name,names) | (name,names,_,_) <- newAssocs ]
+            (newClassDecl, newContext) = ((className, classArg:rn), contxt)
+            HsQualType contxt (HsTyApp (HsTyCon className) (HsTyVar classArg)) =  qualType
+        tell mempty { kgClassDecls = [newClassDecl], kgDataDecls = foos, kgContexts = newContext, kgQualTypes = newClassBodies, kgAssocs = assocs }
+
+
 
 kiKindGroup :: KindGroup -> KI ()
 kiKindGroup tap@KindGroup { kgClassDecls = classDecls, kgDataDecls = heads, kgContexts = context, kgTypes = dataBodies, kgQualTypes = classBodies } = do
@@ -343,7 +532,7 @@ kiType varExist tap@(HsTyFun t1 t2) = do
         k1 <- kiType varExist t1
         k2 <- kiType varExist t2
         unify k1 Star
-        unify k2 Star
+        unify k2 KFunRet
         return Star
 
 -- kind (t1, t2, ..., tn) = *
@@ -381,13 +570,6 @@ newNameVar n = do
 
 -- code for getting the kinds of variables in type sigs
 
-kiHsQualType :: KindEnv -> HsQualType -> KindEnv
-kiHsQualType inputEnv qualType = newState where
-    (_, newState) = unsafePerformIO $ runKI inputEnv $ withContext ("kiHsQualType: " ++ show qualType) $ do
-        kiQualType False qualType
-        currentSubst <- getSubst
-        applySubstToEnv currentSubst
-        envVarsToStars
 
 {-
 kiHsQualTypePredPred :: KindEnv -> HsQualType -> KindEnv
@@ -487,22 +669,22 @@ bangTypeToType :: HsBangType -> HsType
 bangTypeToType (HsBangedTy t) = t
 bangTypeToType (HsUnBangedTy t) = t
 
-typeFromSig :: HsDecl -> HsQualType
-typeFromSig (HsTypeSig _sloc _names qualType) = qualType
+
+-}
 
 --------------------------------------------------------------------------------
 
 kindOf :: Name -> KindEnv -> Kind
-kindOf name (KindEnv env _) = case Map.lookup name env of
-            Nothing | nameType name `elem` [TypeConstructor,TypeVal] -> Star
+kindOf name KindEnv { kindEnv = env } = case Map.lookup name env of
+            Nothing | nameType name `elem` [TypeConstructor,TypeVal] -> kindStar
             Just k -> k
             _ -> error $ "kindOf: could not find kind of : " ++ show (nameType name,name)
 
 kindOfClass :: Name -> KindEnv -> [Kind]
-kindOfClass name (KindEnv env _) = case Map.lookup name env of
+kindOfClass name KindEnv { kindEnvClasses = cs } = case Map.lookup name cs of
         --Nothing -> Star
         Nothing -> error $ "kindOf: could not find kind of class : " ++ show (nameType name,name)
-        Just k -> [k]
+        Just k -> k
 
 ----------------------
 -- Conversion of Types
@@ -514,7 +696,7 @@ fromTyApp t = f t [] where
 
 
 aHsTypeToType :: KindEnv -> HsType -> Type
-aHsTypeToType kt@(KindEnv _ at) t | (HsTyCon con,xs) <- fromTyApp t, let nn = toName TypeConstructor con, Just (n1,n2) <- Map.lookup nn at =
+aHsTypeToType kt@KindEnv { kindEnvAssocs = at } t | (HsTyCon con,xs) <- fromTyApp t, let nn = toName TypeConstructor con, Just (n1,n2) <- Map.lookup nn at =
     TAssoc {
         typeCon = Tycon nn (kindOf nn kt),
         typeClassArgs = map (aHsTypeToType kt) (take n1 xs),
@@ -572,6 +754,7 @@ hsQualTypeToType :: Monad m =>
     -> m Sigma
 hsQualTypeToType kindEnv qs qualType = return $ hoistType $ tForAll quantOver ( ps' :=> t') where
    newEnv = kiHsQualType kindEnv qualType
+   --newEnv = kindEnv
    Just t' = hsTypeToType newEnv (hsQualTypeType qualType)
    ps = hsQualTypeHsContext qualType
    ps' = map (hsAsstToPred newEnv) ps

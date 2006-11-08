@@ -156,7 +156,7 @@ interact ho = mre where
         | Just d <- showSynonym (show . (pprint :: HsType -> PP.Doc) ) v (hoTypeSynonyms ho) = nameTag (nameType v):' ':d
         | otherwise = nameTag (nameType v):' ':show v <+> "::" <+> ptype v
 
-kindShow Star = "*"
+kindShow (KBase b) = pprint b
 kindShow x = parens (pprint x)
 
 parseStmt ::  Monad m => String -> m HsStmt
@@ -229,7 +229,7 @@ tcStatementTc (HsQualifier e) = do
 
         }
     runTc tcInfo $ do
-    box <- newBox Star
+    box <- newBox kindFunRet
     (_,ps') <- listenPreds $ tiExpr e box
     ps' <- flattenType ps'
     let ps = FrontEnd.Tc.Class.simplify (hoClassHierarchy ho) ps'

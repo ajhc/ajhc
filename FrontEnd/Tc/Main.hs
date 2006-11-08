@@ -19,6 +19,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Class
 import FrontEnd.Tc.Monad hiding(listenPreds)
 import FrontEnd.Tc.Type
+import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Unify
 import FrontEnd.Utils(getDeclName)
 import GenUtil
@@ -81,7 +82,7 @@ tcApps e as typ = tcApps' e as typ
 
 -- the fall through case
 tcApps' e as typ = do
-    bs <- sequence [ newBox Star | _ <- as ]
+    bs <- sequence [ newBox kindStar | _ <- as ]
     e' <- tcExpr e (foldr fn typ bs)
     as' <- sequence [ tcExprPoly a r | r <- bs | a <- as ]
     return (e',as')
@@ -142,7 +143,7 @@ tiExpr (HsVar v) typ = do
         doCoerce f (HsVar v)
 
 tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n   case " ++ show e ++ " of ...") $ do
-    scrutinee <- newBox KFunRet
+    scrutinee <- newBox kindFunRet
     e' <- tcExpr e scrutinee
     alts' <- mapM (tcAlt scrutinee typ) alts
     (ne,ap) <- wrapInAsPat (HsCase e' alts')
@@ -193,9 +194,9 @@ tiExpr (HsLeftSection e1 e2) typ = do
 -- (: [])  \x -> x : []   `fn`
 
 tiExpr (HsRightSection e1 e2) typ = do
-    arg <- newBox Star
-    arg2 <- newBox Star
-    ret <- newBox Star
+    arg <- newBox kindStar
+    arg2 <- newBox kindStar
+    ret <- newBox kindStar
     e1 <- tcExpr e1 arg2
     e2 <- tcExpr e2 (arg `fn` (arg2 `fn` ret))
     (arg `fn` ret) `subsumes` typ
@@ -230,7 +231,7 @@ tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression"
 -- ABS1
 tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show (pprint ps:: P.Doc) ++ " -> ...") $ do
     let lam (p:ps) e (TMetaVar mv) rs = do -- ABS2
-            withMetaVars mv [Star,KFunRet] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) e (a `fn` b) rs
+            withMetaVars mv [kindStar,kindFunRet] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) e (a `fn` b) rs
         lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
             --box <- newBox Star
             --s1' `boxyMatch` box
@@ -273,7 +274,7 @@ tiExpr (HsList []) (TAp c v) | c == tList = do
 
 -- special case for the empty list
 tiExpr (HsList []) typ = do
-    v <- newVar Star
+    v <- newVar kindStar
     let lt = TForAll [v] ([] :=> TAp tList (TVar v))
     lt `subsumes` typ
     return (HsList [])
@@ -285,7 +286,7 @@ tiExpr expr@(HsList exps@(_:_)) (TAp tList' v) | tList == tList' = withContext (
 
 -- non empty list
 tiExpr expr@(HsList exps@(_:_)) typ = withContext (makeMsg "in the list " $ render $ ppHsExp expr) $ do
-        v <- newBox Star
+        v <- newBox kindStar
         exps' <- mapM (`tcExpr` v) exps
         (TAp tList v) `subsumes` typ
         return (HsList exps')
@@ -425,20 +426,20 @@ tiPat pl@(HsPList []) (TAp t v) | t == tList = do
     return (pl,mempty)
 
 tiPat pl@(HsPList []) typ = do
-    v <- newBox Star
+    v <- newBox kindStar
     --typ `subsumes` TAp tList v
     typ `boxyMatch` TAp tList v
     return (pl,mempty)
 
 tiPat (HsPList pats@(_:_)) (TAp t v) | t == tList = do
-    --v <- newBox Star
+    --v <- newBox kindStar
     --TAp tList v `boxyMatch` typ
     --typ `subsumes` TAp tList v
     ps <- mapM (`tcPat` v) pats
     return (HsPList (fsts ps), mconcat (snds ps))
 
 tiPat (HsPList pats@(_:_)) typ = do
-    v <- newBox Star
+    v <- newBox kindStar
     --TAp tList v `boxyMatch` typ
     ps <- mapM (`tcPat` v) pats
     typ `boxyMatch` TAp tList v
@@ -487,7 +488,7 @@ tiImplGroups (Right x:xs) = do
 tiNonRecImpl :: HsDecl -> Tc (HsDecl, TypeEnv)
 tiNonRecImpl decl = withContext (locSimple (srcLoc decl) ("in the implicitly typed: " ++ show (getDeclName decl))) $ do
     when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tiimpls " ++ show (getDeclName decl)
-    mv <- newMetaVar Sigma Star
+    mv <- newMetaVar Sigma kindStar
     (res,ps) <- listenPreds $ tcDecl decl mv
     ps' <- flattenType ps
     mv' <- flattenType mv
@@ -516,7 +517,7 @@ tiImpls [] = return ([],Map.empty)
 tiImpls bs = withContext (locSimple (srcLoc bs) ("in the recursive implicitly typed: " ++ (show (map getDeclName bs)))) $ do
     let names = map getDeclName bs
     when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tiimpls " ++ show names
-    ts <- sequence [newMetaVar Tau Star | _ <- bs]
+    ts <- sequence [newMetaVar Tau kindStar | _ <- bs]
     (res,ps) <- listenPreds $
         local (tcRecursiveCalls_u (Set.union $ Set.fromList names)) $
             localEnv (Map.fromList [  (d,s) | d <- names | s <- ts]) $
@@ -586,7 +587,7 @@ tcRule prule@HsRule { hsRuleUniq = uniq, hsRuleFreeVars = vs, hsRuleLeftExpr = e
     withContext (locMsg sloc "in the RULES pragma" $ hsRuleString prule) ans where
         ans = do
             vs' <- mapM dv vs
-            tr <- newBox Star
+            tr <- newBox kindStar
             let (vs,envs) = unzip vs'
             ch <- getClassHierarchy
             ((e1,rs1),(e2,rs2)) <- localEnv (mconcat envs) $ do
@@ -608,7 +609,7 @@ tcRule prule@HsRule { hsRuleUniq = uniq, hsRuleFreeVars = vs, hsRuleLeftExpr = e
             assertEntailment rs1 rs2
             return prule { hsRuleLeftExpr = e1, hsRuleRightExpr = e2 }
         dv (n,Nothing) = do
-            v <- newMetaVar Tau Star
+            v <- newMetaVar Tau kindStar
             let env = (Map.singleton (toName Val n) v)
             addToCollectedEnv env
             return (v,env)
@@ -650,7 +651,7 @@ tcDecl decl@(HsFunBind matches) typ = withContext (declDiagnostic decl) $ do
 tcMatch ::  HsMatch -> Sigma -> Tc HsMatch
 tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "in" $ show funName) $ do
     let lam (p:ps) (TMetaVar mv) rs = do -- ABS2
-            withMetaVars mv [Star,KFunRet] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) (a `fn` b) rs
+            withMetaVars mv [kindStar,kindFunRet] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) (a `fn` b) rs
         lam (p:ps) ty@(TArrow s1' s2') rs = do -- ABS1
             (p',env) <- tcPat p s1'
             localEnv env $ do
@@ -793,14 +794,14 @@ tiProgram bgs es = ans where
 tiLit :: HsLiteral -> Tc Tau
 tiLit (HsChar _) = return tChar
 tiLit (HsInt _) = do
-    v <- newVar Star
+    v <- newVar kindStar
     return $ TForAll [v] ([IsIn class_Num (TVar v)] :=> TVar v)
     --(v) <- newBox Star
     --addPreds [IsIn class_Num v]
     --return v
 
 tiLit (HsFrac _) = do
-    v <- newVar Star
+    v <- newVar kindStar
     return $ TForAll [v] ([IsIn class_Fractional (TVar v)] :=> TVar v)
     --    (v) <- newBox Star
     --    addPreds [IsIn class_Fractional v]

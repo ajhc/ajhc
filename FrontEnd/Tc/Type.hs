@@ -1,5 +1,6 @@
 module FrontEnd.Tc.Type(
     Kind(..),
+    KBase(..),
     MetaVar(..),
     MetaVarType(..),
     Pred(..),
@@ -8,6 +9,9 @@ module FrontEnd.Tc.Type(
     Tycon(..),
     Type(..),
     Tyvar(..),
+    kindStar,
+    kindFunRet,
+    kindUTuple,
     unfoldKind,
     fn,
     followTaus,

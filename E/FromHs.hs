@@ -102,8 +102,8 @@ tipe t = f t where
     cmvar MetaVar { metaKind = k } = tAbsurd (kind k)
     lt n | nameType n == TypeVal = toId n  -- verifies namespace
 
-kind KUTuple = eHash
-kind Star = eStar
+kind (KBase KUTuple) = eHash
+kind (KBase Star) = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."
 

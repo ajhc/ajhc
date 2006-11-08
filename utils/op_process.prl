@@ -110,7 +110,7 @@ sub tycon($) {
     $n = "tc_" . $n;
     my $x = $_[0];
     $x =~ s/^.*\.//;
-    my $v = "$n = TCon (Tycon tc_$x Star)";
+    my $v = "$n = TCon (Tycon tc_$x kindStar)";
     $tycon{$_[0]} = [$n,$v];
     return $n;
 }

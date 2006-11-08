@@ -55,6 +55,7 @@ import Name.Names
 import Name.VConsts
 import PrimitiveOperators
 import FrontEnd.Tc.Type
+import FrontEnd.Tc.Kind
 import Support.CanType
 import Support.FreeVars
 import Support.Unparse
@@ -93,8 +94,8 @@ tipe' (TExists xs (_ :=> t)) = do
 
 
 
-kind KUTuple = eHash
-kind Star = eStar
+kind (KBase KUTuple) = eHash
+kind (KBase Star) = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."
 

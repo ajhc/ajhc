@@ -138,7 +138,7 @@ tiModules' me ms = do
 
     when (dump FD.Kind) $
          do {putStrLn " \n ---- kind information ---- \n";
-             putStr $ PPrint.render $ pprint kindInfo}
+             putStrLn $ PPrint.render $ pprint kindInfo}
 
     -- collect types for data constructors
 
