@@ -698,7 +698,7 @@ renameHsExp (HsCase hsExp hsAlts) subTable = do
     hsAlts' <- renameHsAlts hsAlts subTable
     return (HsCase hsExp' hsAlts')
 renameHsExp (HsDo hsStmts) subTable = do
-    let e = doToExp hsStmts
+    e <- doToExp hsStmts
     renameHsExp e subTable
 renameHsExp (HsList hsExps) subTable = do
     unique <- newUniq

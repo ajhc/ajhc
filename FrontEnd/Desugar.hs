@@ -256,6 +256,8 @@ patVarNames (HsPApp conName pats)
    = concatMap patVarNames pats
 patVarNames (HsPTuple pats)
    = concatMap patVarNames pats
+patVarNames (HsPUnboxedTuple pats)
+   = concatMap patVarNames pats
 patVarNames (HsPList pats)
    = concatMap patVarNames pats
 patVarNames (HsPParen pat)
@@ -285,6 +287,8 @@ replaceVarNamesInPat name (HsPApp conName pats)
    = HsPApp conName (map (replaceVarNamesInPat name) pats)
 replaceVarNamesInPat name (HsPTuple pats)
    = HsPTuple (map (replaceVarNamesInPat name) pats)
+replaceVarNamesInPat name (HsPUnboxedTuple pats)
+   = HsPUnboxedTuple (map (replaceVarNamesInPat name) pats)
 replaceVarNamesInPat name (HsPList pats)
    = HsPList (map (replaceVarNamesInPat name) pats)
 replaceVarNamesInPat name (HsPParen pat)
@@ -318,9 +322,11 @@ desugarGRhs (HsGuardedRhs sloc e1 e2)
         newE2 <- desugarExp e2
         return (HsGuardedRhs sloc newE1 newE2)
 
+
+
 desugarExp :: (HsExp) -> PatSM (HsExp)
 desugarExp (HsLambda sloc pats e)
-    | all isHsPVar pats = do
+    | all isLazyPat pats = do
         newE <- desugarExp e
         return (HsLambda sloc pats newE)
 desugarExp (HsLambda sloc pats e) = z where
@@ -352,7 +358,8 @@ desugarExp (HsCase e alts) = do
         return (HsCase newE newAlts)
 desugarExp (HsDo stmts) = do
         newStmts <- mapM desugarStmt stmts
-        return (doToExp newStmts)
+        ss <- doToExp newStmts
+        return ss
 desugarExp (HsListComp e stmts) = do
         newE <- desugarExp e
         newStmts <- mapM desugarStmt stmts
@@ -420,7 +427,6 @@ remSynsQualType qualtype
 -- TODO -  THIS IS BROKEN
 
 
-doToExp :: [HsStmt] -> HsExp
 
 f_bind = nameName $ toUnqualified (func_bind sFuncNames)
 f_bind_ = nameName $ toUnqualified (func_bind_ sFuncNames)
@@ -432,22 +438,26 @@ f_filter = nameName $ toUnqualified v_filter
 f_and = nameName $ toUnqualified v_and
 con_cons = nameName $ toUnqualified dc_Cons
 
-doToExp [] = error "doToExp: empty statements in do notation"
-doToExp [HsQualifier e] = e
-doToExp [gen@(HsGenerator srcLoc _pat _e)]
-   = error $ "doToExp: last expression n do notation is a generator (srcLoc):" ++ show srcLoc
-doToExp [letst@(HsLetStmt _decls)]
-   = error $ "doToExp: last expression n do notation is a let statement"
-doToExp ((HsQualifier e):ss)
-   = HsInfixApp (hsParen e) (HsVar f_bind_) (hsParen $ doToExp ss)
-doToExp ((HsGenerator _srcLoc pat@(HsPVar {}) e):ss)
-   = HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda _srcLoc [pat] (doToExp ss))
-doToExp ((HsGenerator srcLoc pat e):ss) = HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda srcLoc [HsPVar newPatVarName] kase)  where
-   kase = HsCase (HsVar newPatVarName) [a1, a2 ]
-   a1 =  HsAlt srcLoc pat (HsUnGuardedRhs (doToExp ss)) []
-   a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar f_fail) (HsLit $ HsString $ show srcLoc ++ " failed pattern match in do"))) []
-doToExp ((HsLetStmt decls):ss)
-   = HsLet decls (doToExp ss)
+doToExp :: Monad m => [HsStmt] -> m HsExp
+doToExp [] = fail "doToExp: empty statements in do notation"
+doToExp [HsQualifier e] = return e
+doToExp [gen@(HsGenerator srcLoc _pat _e)] = fail $ "doToExp: last expression n do notation is a generator (srcLoc):" ++ show srcLoc
+doToExp [letst@(HsLetStmt _decls)] = fail $ "doToExp: last expression n do notation is a let statement"
+doToExp ((HsQualifier e):ss) = do
+    ss <- doToExp ss
+    return $ HsInfixApp (hsParen e) (HsVar f_bind_) (hsParen ss)
+doToExp ((HsGenerator _srcLoc pat e):ss) | isLazyPat pat = do
+    ss <- doToExp ss
+    return $ HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda _srcLoc [pat] ss)
+doToExp ((HsGenerator srcLoc pat e):ss) = do
+    ss <- doToExp ss
+    let kase = HsCase patVar [a1, a2 ]
+        a1 =  HsAlt srcLoc pat (HsUnGuardedRhs ss) []
+        a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar f_fail) (HsLit $ HsString $ show srcLoc ++ " failed pattern match in do"))) []
+    return $ HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda srcLoc [HsPVar newPatVarName] kase)  where
+doToExp (HsLetStmt decls:ss) = do
+    ss <- doToExp ss
+    return $ HsLet decls ss
 
 hsApp e es = hsParen $ foldl HsApp (hsParen e) (map hsParen es)
 hsIf e a b = hsParen $ HsIf e a b
@@ -459,10 +469,10 @@ listCompToExp exp ss = hsParen (f ss) where
     f (gen:HsQualifier q1:HsQualifier q2:ss)  = f (gen:HsQualifier (hsApp (HsVar f_and) [q1,q2]):ss)
     f ((HsLetStmt ds):ss) = hsParen (HsLet ds (f ss))
     f (HsQualifier e:ss) = hsParen (HsIf e (f ss) (HsList []))
-    f ((HsGenerator srcLoc pat e):ss) | isHsPVar pat, Just exp' <- g ss = hsParen $ HsApp (HsApp (HsVar f_map)  (hsParen $ HsLambda srcLoc [pat] exp')) e
+    f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat, Just exp' <- g ss = hsParen $ HsApp (HsApp (HsVar f_map)  (hsParen $ HsLambda srcLoc [pat] exp')) e
     --f ((HsGenerator srcLoc pat e):[HsQualifier q]) | isHsPVar pat = hsParen $ HsApp (HsApp (HsVar f_filter)  (hsParen $ HsLambda srcLoc [pat] q) ) e
-    f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isHsPVar pat, Just exp' <- g ss =  hsApp (HsVar f_foldr)  [HsLambda srcLoc [pat,HsPVar newPatVarName] $ hsIf q (hsApp (HsCon con_cons) [exp',patVar]) (HsVar newPatVarName), HsList [],e]
-    f ((HsGenerator srcLoc pat e):ss) | isHsPVar pat = hsParen $ HsApp (HsApp (HsVar f_concatMap)  (hsParen $ HsLambda srcLoc [pat] (f ss))) e
+    f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isLazyPat pat, Just exp' <- g ss =  hsApp (HsVar f_foldr)  [HsLambda srcLoc [pat,HsPVar newPatVarName] $ hsIf q (hsApp (HsCon con_cons) [exp',patVar]) (HsVar newPatVarName), HsList [],e]
+    f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat = hsParen $ HsApp (HsApp (HsVar f_concatMap)  (hsParen $ HsLambda srcLoc [pat] (f ss))) e
     f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isFailablePat pat || Nothing == (g ss) = hsParen $ HsApp (HsApp (HsVar f_concatMap)  (hsParen $ HsLambda srcLoc [HsPVar newPatVarName] kase)) e where
         kase = HsCase (HsVar newPatVarName) [a1, a2 ]
         a1 =  HsAlt srcLoc pat (HsGuardedRhss [HsGuardedRhs srcLoc q (f ss)]) []
@@ -483,16 +493,18 @@ listCompToExp exp ss = hsParen (f ss) where
 
 -- patterns are
 -- failable - may fail to match
--- refutable - may bottom out
--- irrefutable - match no matter what
+-- refutable or strict - may bottom out
+-- irrefutable or lazy - match no matter what
 -- failable is a subset of refutable
 
 
 isFailablePat p | isStrictPat p = f (openPat p) where
     f (HsPTuple ps) = any isFailablePat ps
+    f (HsPUnboxedTuple ps) = any isFailablePat ps
     f _ = True
 isFailablePat _ = False
 
+isLazyPat pat = not (isStrictPat pat)
 isStrictPat p = f (openPat p) where
     f HsPVar {} = False
     f HsPWildCard = False

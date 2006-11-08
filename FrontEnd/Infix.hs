@@ -238,6 +238,7 @@ processPat infixMap exp = case exp of
     HsPIrrPat p -> tf $ HsPIrrPat (pp p)
     HsPApp n xs -> tf $ HsPApp n (map pp xs)
     HsPTuple xs -> tf $ HsPTuple (map pp xs)
+    HsPUnboxedTuple xs -> tf $ HsPUnboxedTuple (map pp xs)
     HsPList xs ->  tf $ HsPList (map pp xs)
     HsPParen xs -> tf $ HsPParen (pp xs)
     HsPRec n xs -> tf $ HsPRec n [ HsPFieldPat n (pp p) | HsPFieldPat n p <- xs ]
@@ -296,6 +297,7 @@ processExp infixMap exp = case exp of
     HsCase e1 alts     -> (HsCase (processExp' e1) (map (processAlt infixMap) alts), terminalFixity)
     HsDo stmts         -> (HsDo (map (processStmt infixMap) stmts), terminalFixity)
     HsTuple exps       -> (HsTuple (map processExp' exps), terminalFixity)
+    HsUnboxedTuple exps -> (HsUnboxedTuple (map processExp' exps), terminalFixity)
     HsList exps        -> (HsList (map processExp' exps), terminalFixity)
     HsParen e1         -> (HsParen (processExp' e1), terminalFixity)
     HsEnumFrom e1      -> (HsEnumFrom (processExp' e1), terminalFixity)

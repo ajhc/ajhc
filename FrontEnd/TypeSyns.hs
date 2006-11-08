@@ -297,7 +297,7 @@ renameHsExp (HsCase hsExp hsAlts) subTable = do
     hsAlts' <- renameHsAlts hsAlts subTable
     return (HsCase hsExp' hsAlts')
 renameHsExp (HsDo hsStmts) subTable = do
-    let e = doToExp hsStmts
+    e <- doToExp hsStmts
     renameHsExp e subTable
 renameHsExp (HsRecConstr hsName hsFieldUpdates) subTable = do
     hsName' <- renameHsName hsName subTable  -- do I need to change this name?
