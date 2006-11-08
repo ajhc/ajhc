@@ -472,6 +472,7 @@ ppHsExp (HsInfixApp a op b) = myFsep[ppHsExp a, ppInfix op, ppHsExp b]
 	ppInfix n = error $ "illegal infix expression: " ++ show n
 ppHsExp (HsNegApp e) = myFsep [char '-', ppHsExp e]
 ppHsExp (HsApp a b) = myFsep [ppHsExp a, ppHsExp b]
+ppHsExp HsError { hsExpString = msg } = text $ "<error:" ++ msg ++ ">"
 -- ppHsExp (HsLambda expList body) = myFsep $
 ppHsExp (HsLambda _srcLoc expList body) = myFsep $              -- srcLoc added by Bernie
 	(((char '\\' ):) . map ppHsPat $ expList)

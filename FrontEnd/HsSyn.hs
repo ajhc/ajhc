@@ -276,6 +276,9 @@ hsParen x@HsTuple {} = x
 hsParen x@HsUnboxedTuple {} = x
 hsParen x = HsParen x
 
+data HsErrorType = HsErrorPatternFailure | HsErrorSource | HsErrorFieldSelect | HsErrorUnderscore | HsErrorUninitializedField | HsErrorRecordUpdate
+ deriving(Data,Typeable,Eq,Show)
+
 data HsExp
 	= HsVar { {- hsExpSrcSpan :: SrcSpan,-} hsExpName :: HsName }
 	| HsCon { {-hsExpSrcSpan :: SrcSpan,-} hsExpName :: HsName }
@@ -303,6 +306,7 @@ data HsExp
 	| HsListComp HsExp [HsStmt]
 	| HsExpTypeSig SrcLoc HsExp HsQualType
 	| HsAsPat { hsExpName :: HsName, hsExpExp :: HsExp }  -- pattern only
+        | HsError { hsExpSrcLoc :: SrcLoc, hsExpErrorType :: HsErrorType, hsExpString :: String }
 	| HsWildCard SrcLoc			-- ditto
 	| HsIrrPat HsExp		-- ditto
  deriving(Data,Typeable,Eq,Show)

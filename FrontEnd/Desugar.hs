@@ -208,10 +208,9 @@ createSelectors _sloc ds = ans where
     g (n,cs) = HsFunBind (map f cs ++ [els]) where
         f (_,(c,i,l)) = HsMatch _sloc n [pat c i l] (HsUnGuardedRhs (HsVar var)) []
         pat c i l = HsPApp c [ if p == i then HsPVar var else HsPWildCard | p <- [0 .. l - 1]]
-        els = HsMatch _sloc n [HsPWildCard] (HsUnGuardedRhs (HsApp (HsVar err) (HsLit (HsString (show n))))) []
+        els = HsMatch _sloc n [HsPWildCard] (HsUnGuardedRhs HsError { hsExpSrcLoc = _sloc, hsExpString = show n, hsExpErrorType = HsErrorFieldSelect } ) []
 
     var = nameName $ toName Val "x"
-    err = nameName $ toUnqualified $ v_error
 
 
 deriveInstances :: Monad m => SrcLoc -> HsName -> [HsName] -> [HsConDecl] -> [HsName] -> m [HsDecl]
@@ -339,7 +338,7 @@ desugarExp (HsLambda sloc pats e) = z where
     ne e ((n,p):zs) =  do
         e' <- ne e zs
         let a1 =  HsAlt sloc p (HsUnGuardedRhs e') []
-            a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar (nameName $ toUnqualified v_error)) (HsLit $ HsString $ show sloc ++ " failed pattern match in lambda"))) []
+            a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsError { hsExpSrcLoc = sloc, hsExpErrorType = HsErrorPatternFailure, hsExpString = show sloc ++ " failed pattern match in lambda" })) []
         return $ HsCase (HsVar n) [a1, a2 ]
 
     f (HsPVar x) = return (x,[])

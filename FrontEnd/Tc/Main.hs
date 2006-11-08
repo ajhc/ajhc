@@ -163,6 +163,12 @@ tiExpr (HsLit l@(HsInt _)) typ = do
     addToCollectedEnv (Map.singleton n typ)
     return ne
 
+tiExpr err@HsError {} typ = do
+    unBox typ
+    (ne,n) <- wrapInAsPat err
+    addToCollectedEnv (Map.singleton n typ)
+    return ne
+
 tiExpr (HsLit l) typ = do
     t <- tiLit l
     t `subsumes` typ

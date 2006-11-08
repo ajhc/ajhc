@@ -748,17 +748,16 @@ renameHsExp (HsAsPat hsName hsExp) subTable = do
     return (HsAsPat hsName' hsExp')
 renameHsExp (HsWildCard sl) _ = do
     setSrcLoc sl
-    e <- createError ("_")
+    e <- createError HsErrorUnderscore ("_")
     return e
 renameHsExp p subTable = traverseHsExp (flip renameHsExp subTable) p
 
 desugarEnum s as = foldl HsApp (HsVar (nameName $ toName Val s)) as
 
 
-createError s = do
+createError et s = do
     sl <- gets srcLoc
-    let pe = (HsVar (nameName v_error))
-    return $ HsParen $ HsApp pe (HsLit (HsString (show sl ++ ": " ++ s)))
+    return $ HsError { hsExpSrcLoc = sl, hsExpErrorType = et, hsExpString = (show sl ++ ": " ++ s) }
 
 failRename s = do
     sl <- gets srcLoc
@@ -767,7 +766,7 @@ failRename s = do
 
 buildRecConstr ::  FieldMap -> HsName -> [HsFieldUpdate] -> ScopeSM HsExp
 buildRecConstr (amp,fls) n us = do
-    undef <- createError "Uninitialized Field"
+    undef <- createError HsErrorUninitializedField "Uninitialized Field"
     case Map.lookup (toName DataConstructor n) amp of
         Nothing -> failRename $ "Unknown Constructor: " ++ show n
         Just t -> do
@@ -801,9 +800,8 @@ buildRecUpdate (amp,fls) n us = do
                     let x = foldl HsApp con [ maybe v id (lookup i zs) | v <- vars' | i <- [ 0 .. t - 1] ]
                     return $ HsAlt sl (HsPApp c' (map HsPVar vars))  (HsUnGuardedRhs x) []
         as <- mapM g fm'
-        pe <- createError "Record Update Error"
-        v <- newVar
-        return $ HsCase n (as ++ [HsAlt sl (HsPVar v) (HsUnGuardedRhs pe) []])
+        pe <- createError HsErrorRecordUpdate "Record Update Error"
+        return $ HsCase n (as ++ [HsAlt sl HsPWildCard (HsUnGuardedRhs pe) []])
 --    undef <- createError "Uninitialized Field"
 --    case Map.lookup (toName DataConstructor n) amp of
 --        Nothing -> failRename $ "Unknown Constructor: " ++ show n

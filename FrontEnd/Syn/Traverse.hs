@@ -31,6 +31,7 @@ traverseHsExp fn e = f e where
     f e@HsVar {} = return e
     f e@HsCon {} = return e
     f e@HsLit {} = return e
+    f e@HsError {} = return e
     f (HsInfixApp hsExp1 hsExp2 hsExp3) = do
         hsExp1' <- fn hsExp1
         hsExp2' <- fn hsExp2

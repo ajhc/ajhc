@@ -505,6 +505,9 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
     cExpr (HsLet dl e) = hsLet dl e
     cExpr (HsIf e a b) = join $ liftM3 createIf (cExpr e) (cExpr a) (cExpr b)
     cExpr (HsCase _ []) = error "empty case"
+    cExpr (HsAsPat n HsError { hsExpString = msg }) = do
+        let ty = cType n
+        return $ EError msg ty
     cExpr (HsAsPat n hs@(HsCase e alts)) = do
         let ty = cType n
         scrut <- cExpr e
