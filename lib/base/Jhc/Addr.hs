@@ -1,29 +1,30 @@
-module Jhc.Addr where
+{-# OPTIONS_JHC -N #-}
+
+module Jhc.Addr(
+    Addr(),
+    FunAddr(),
+    nullAddr,
+    nullFunAddr,
+    plusAddr,
+    addrToWordPtr,
+    wordPtrToAddr,
+    wordPtrToFunAddr,
+    funAddrToWordPtr
+    ) where
 
 import Data.Word
+import Data.Int
 
 data Addr
 data FunAddr
 
-nullAddr = wordPtrToAddr 0
-nullFunAddr = wordPtrToFunAddr 0
+nullAddr = wordPtrToAddr zeroWordPtr
+nullFunAddr = wordPtrToFunAddr zeroWordPtr
 
-{-
-addrToWordPtr :: Addr -> WordPtr
-addrToWordPtr = integralCast
-wordPtrToAddr :: WordPtr -> Addr
-wordPtrToAddr = integralCast
-
-
-wordPtrToFunAddr :: WordPtr -> FunAddr
-wordPtrToFunAddr = integralCast
-funAddrToWordPtr :: FunAddr -> WordPtr
-funAddrToWordPtr = integralCast
--}
 
 {-# INLINE plusAddr #-}
 plusAddr :: Addr -> Int -> Addr
-plusAddr addr off = wordPtrToAddr (addrToWordPtr addr + fromInt off)
+plusAddr addr off = wordPtrToAddr (addrToWordPtr addr `plusWordPtr` intToWordPtr off)
 
 --foreign import primitive unsafeCoerce :: a -> b
 --foreign import primitive integralCast :: a -> b
@@ -31,3 +32,10 @@ foreign import primitive "integralCast" addrToWordPtr :: Addr -> WordPtr
 foreign import primitive "integralCast" wordPtrToAddr :: WordPtr -> Addr
 foreign import primitive "integralCast" wordPtrToFunAddr :: WordPtr -> FunAddr
 foreign import primitive "integralCast" funAddrToWordPtr :: FunAddr -> WordPtr
+
+foreign import primitive "integralCast" intToWordPtr :: Int -> WordPtr
+
+foreign import primitive "zero" zeroWordPtr :: WordPtr
+foreign import primitive "plus" plusWordPtr :: WordPtr -> WordPtr -> WordPtr
+
+
