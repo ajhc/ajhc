@@ -204,10 +204,10 @@ addOneInstanceToHierarchy ch inst@Inst { instHead = cntxt :=> IsIn className _ }
 
 
 hsInstDeclToInst :: Monad m => KindEnv -> HsDecl -> m [Inst]
-hsInstDeclToInst kt (HsInstDecl _sloc qType decls)
+hsInstDeclToInst kt (HsInstDecl sloc qType decls)
    | classKind == argTypeKind
-        = return [emptyInstance { instDerived = False, instHead = cntxt :=> IsIn className convertedArgType, instAssocs = assocs }]
-   | otherwise = failSl _sloc $ "hsInstDeclToInst: kind error, attempt to make\n" ++
+        = return [emptyInstance { instSrcLoc = sloc, instDerived = False, instHead = cntxt :=> IsIn className convertedArgType, instAssocs = assocs }]
+   | otherwise = failSl sloc $ "hsInstDeclToInst: kind error, attempt to make\n" ++
                       show convertedArgType ++ " (with kind " ++ show argTypeKind ++ ")\n" ++
                       "an instance of class " ++ show className ++
                       " (with kind " ++ show classKind ++ ")"
