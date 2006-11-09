@@ -206,8 +206,8 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
         (EPi ioc (EPi tvr (ELit LitCons { litName = n, litArgs = [x] }))) | n == tc_IOResult -> Just x
         _ -> Nothing
 
-createInstanceRules :: Monad m => ClassHierarchy -> (Map.Map Name (TVr,E)) -> m Rules
-createInstanceRules classHierarchy funcs = return $ fromRules ans where
+createInstanceRules :: Monad m => DataTable -> ClassHierarchy -> (Map.Map Name (TVr,E)) -> m Rules
+createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans where
     ans = concatMap cClass (classRecords classHierarchy)
     cClass classRecord =  concat [ method classRecord n | (n,TForAll _ (_ :=> t)) <- classAssumps classRecord ]
     method classRecord methodName | isJust _methodName = as where
@@ -220,7 +220,7 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
         as = [ rule  t | Inst { instHead = _ :=> IsIn _ t }  <- snub (classInsts classRecord) ]
         (_ft,_:args') = fromPi ty
         (args,_rargs) = span (sortStarLike . getType)  args'
-        rule t = emptyRule { ruleHead = methodVar, ruleArgs = valToPat' (tipe t):map EVar args, ruleBinds = [ t | ~(EVar t) <- vs] ++ args, ruleBody = body, ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
+        rule t = emptyRule { ruleHead = methodVar, ruleArgs = valToPat' (tipe t):map EVar args, ruleBinds = [ t | ~(EVar t) <- vs] ++ args, ruleBody = removeNewtypes dataTable body, ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
             name = (instanceName methodName (getTypeCons t))
             vp@(ELit LitCons { litArgs =  vs }) = valToPat' (tipe t)
             body = case findName name of
@@ -244,7 +244,7 @@ createMethods :: Monad m => DataTable -> ClassHierarchy -> (Map.Map Name (TVr,E)
 createMethods dataTable classHierarchy funcs = return ans where
     ans = concatMap cClass (classRecords classHierarchy)
     cClass classRecord =  concat [ method classRecord n | (n,_) <- classAssumps classRecord ]
-    method classRecord methodName | isJust _methodTVr = [(methodName ,setProperty prop_METHOD (tVr (toId methodName) ty),v)] where
+    method classRecord methodName | isJust _methodTVr = [(methodName ,setProperty prop_METHOD (tVr (toId methodName) (removeNewtypes dataTable ty)),removeNewtypes dataTable v)] where
         theDefault = findName (defaultInstanceName methodName)
         _methodTVr@(~(Just (TVr {tvrType = ty},ELam TVr { tvrInfo = nfo } _))) = findName methodName
         Just (vmap::Typ) = Info.lookup nfo

@@ -278,7 +278,7 @@ processDecls stats ho ho' tiData = do
  --   sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 
     -- Build rules
-    rules' <- createInstanceRules (hoClassHierarchy ho')   (Map.fromList [ (runIdentity $ fromId (tvrIdent y),(y,z)) | (y,z) <- ds] `mappend` hoEs ho)
+    rules' <- createInstanceRules fullDataTable (hoClassHierarchy ho')   (Map.fromList [ (runIdentity $ fromId (tvrIdent y),(y,z)) | (y,z) <- ds] `mappend` hoEs ho)
     rawRules <- convertRules tiData (hoClassHierarchy ho') allAssumps fullDataTable decls
     let nrules = fromRules [ makeRule n (progModule prog,i) vs head args e2 | (n,vs,e1,e2) <- rawRules, let (EVar head,args) = fromAp e1 | i <- [1..] ]
     let rules = rules' `mappend` nrules
