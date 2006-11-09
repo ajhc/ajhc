@@ -1,6 +1,8 @@
+{-# OPTIONS_JHC -funboxed-tuples #-}
+
 module Jhc.IO(
     IO(..),
-    IOResult(..),
+--    IOResult(..),
     World__(),
     IOErrorCont(),
     catch,
@@ -26,8 +28,9 @@ import Prelude.IOError
 data IOErrorCont = IOErrorCont JumpPoint (Hole IOError)
 
 --data IOResult a = FailIO World__ IOError | JustIO World__ a
-data IOResult a = JustIO World__ a
-newtype IO a = IO (IOErrorCont -> World__ -> IOResult a)
+-- data IOResult a = JustIO World__ a
+
+newtype IO a = IO (IOErrorCont -> World__ -> (# World__, a #))
 
 
 undefinedIOErrorCont :: IOErrorCont
@@ -45,38 +48,39 @@ unsafePerformIO :: IO a -> a
 unsafePerformIO x = case newWorld__ x of
     world -> case errorContinuation x of
         IO y -> case y undefinedIOErrorCont world of
-            JustIO _ a -> a
+            (# _, a #) -> a
 
 -- we have to replace the error handler because the context might have quit by the time the value is evaluated.
 unsafeInterleaveIO :: IO a -> IO a
-unsafeInterleaveIO action = IO $ \c w -> JustIO w $ case action' c w of
-    JustIO _ a -> a
-    where
-    IO action' = errorContinuation action
+unsafeInterleaveIO action = IO $ \c w -> (# w , case action' c w of (# _,  a #) -> a #)
+    where IO action' = errorContinuation action
 
 instance Monad IO where
-    return x = IO $ \_ w -> JustIO w x
+    return x = IO $ \_ w -> (# w,  x #)
     IO x >>= f = IO $ \c w -> case x c w of
-        JustIO w v -> case f v of
+        (# w, v #) -> case f v of
             IO g -> g c w
     IO x >> IO y = IO $ \c w -> case x c w of
-        JustIO w _ -> y c w
+        (# w,  _ #) -> y c w
     fail s = ioError $ userError s
 
 instance Functor IO where
     fmap f a = a >>= \x -> return (f x)
 
+data FixIO a = FixIO World__ a
 
 fixIO :: (a -> IO a) -> IO a
 fixIO k = IO $ \c w -> let
             r = case k ans of
-                    IO z -> z c w
+                    IO z -> case z c w of
+                        (# w, r #) -> FixIO w r
             ans = case r of
-                JustIO _ z  -> z
-               in r
+                FixIO _ z -> z
+               in case r of
+                FixIO w z -> (# w, z #)
 
 getJumpPoint :: IO IOErrorCont
-getJumpPoint = IO $ \ ioe w -> JustIO w ioe
+getJumpPoint = IO $ \ ioe w -> (# w, ioe #)
 
 ioError    ::  IOError -> IO a
 ioError e   =  do
@@ -102,13 +106,13 @@ foreign import primitive "drop__" worldDep__ :: forall b. World__ -> b -> b
 
 -- | this will return a value making it artificially depend on the state of the world. any uses of this value are guarenteed not to float before this point in the IO monad.
 strictReturn :: a -> IO a
-strictReturn a = IO $ \_ w -> JustIO w (worldDep__ w a)
+strictReturn a = IO $ \_ w -> (# w, worldDep__ w a #)
 
 {-# INLINE runMain, runExpr #-}
 -- | this is wrapped around 'main' when compiling programs. it catches any exceptions and prints them to the screen and dies appropriatly.
 runMain :: IO a -> World__ -> World__
 runMain main w = case run undefinedIOErrorCont w of
-        JustIO w _ -> w
+        (# w,  _ #) -> w
     where
     IO run = catch main $ \e -> do
             putStrLn "\nUncaught Exception:"
@@ -125,12 +129,12 @@ runExpr x w = runNoWrapper (print x) w
 runNoWrapper :: IO a -> World__ -> World__
 runNoWrapper (IO run) w =
     case run undefinedIOErrorCont w of
-        JustIO w _ -> w
+        (# w, _ #) -> w
 
 exitFailure :: IO a
 exitFailure = IO $ \_ w -> exitFailure__ w
 
-foreign import primitive exitFailure__ :: World__ -> IOResult a
+foreign import primitive exitFailure__ :: World__ -> (# World__, a #)
 
 
 

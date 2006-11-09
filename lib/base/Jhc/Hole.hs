@@ -28,8 +28,8 @@ errorHole = Hole undefined
 -- | it is an unchecked error to fill in the same hole more than once.
 fillHole :: Hole a -> a -> IO ()
 fillHole r v = IO $ \_ world -> case fillHole__ r v world of
-    world' -> JustIO world' ()
+    world' -> (# world', () #)
 
-foreign import primitive newHole__  :: World__ -> IOResult (Hole a)
-foreign import primitive fillHole__ :: Hole a -> a -> World__ ->World__
+foreign import primitive newHole__  :: World__ -> (# World__, Hole a #)
+foreign import primitive fillHole__ :: Hole a -> a -> World__ -> World__
 

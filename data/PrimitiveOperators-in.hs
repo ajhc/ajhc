@@ -17,6 +17,8 @@ import FrontEnd.Tc.Kind
 import Support.CanType
 
 
+tPtr t = ELit (litCons { litName = tc_Ptr, litArgs = [t], litType = eStar, litAliasFor = Just (ELam tvr { tvrIdent = 2, tvrType = eStar} (ELit litCons { litName = tc_Addr, litType = eStar })) })
+
 create_integralCast c1 t1 c2 t2 e t = eCase e [Alt (litCons { litName = c1, litArgs = [tvra], litType = te }) cc] Unknown  where
     te = getType e
     ELit LitCons { litName = n1, litArgs = [] } = t1

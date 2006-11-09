@@ -304,7 +304,6 @@ toString x = toList x >>= mapM fromChar where
 
 
 tAbsurd k = ELit (litCons { litName = tc_Absurd, litArgs = [], litType = k })
-tPtr t = ELit (litCons { litName = tc_Ptr, litArgs = [t], litType = eStar })
 
 -- the IOErrorCont type from Jhc.IO
 tCont = ELit (litCons { litName = tc_IOErrorCont, litArgs = [], litType = eStar })

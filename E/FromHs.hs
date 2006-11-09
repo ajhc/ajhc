@@ -201,9 +201,9 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs, sortStarLike k ]
             (_,xs) = fromPi ty
         return (cname, tvrInfo_u (case ffi of Just ffi -> Info.insert ffi; Nothing -> id) $ setProperty prop_EXPORTED theMainTvr,ne)
-    ioLike ty = case followAliases dataTable ty of
+    ioLike ty = case ty of
         ELit LitCons { litName = n, litArgs = [x] } | n ==  tc_IO -> Just x
-        (EPi ioc (EPi tvr (ELit LitCons { litName = n, litArgs = [x] }))) | n == tc_IOResult -> Just x
+--        (EPi ioc (EPi tvr (ELit LitCons { litName = n, litArgs = [x] }))) | n == tc_IOResult -> Just x
         _ -> Nothing
 
 createInstanceRules :: Monad m => DataTable -> ClassHierarchy -> (Map.Map Name (TVr,E)) -> m Rules

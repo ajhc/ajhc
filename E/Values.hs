@@ -106,7 +106,7 @@ emptyCase = ECase { eCaseDefault = Nothing, eCaseAlts = [], eCaseBind = error "e
 eCaseTup e vs w = emptyCase { eCaseScrutinee = e, eCaseBind =  (tVr 0 (getType e)), eCaseType = getType w, eCaseAlts =  [Alt litCons { litName = nameTuple DataConstructor (length vs), litArgs = vs, litType = getType e } w] }
 eCaseTup' e vs w = emptyCase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseType = getType w, eCaseAlts =  [Alt litCons { litName = unboxedNameTuple DataConstructor (length vs), litArgs = vs, litType = getType e} w] }
 
-eJustIO w x = ELit litCons { litName = dc_JustIO, litArgs = [w,x], litType = ELit litCons { litName = tc_IOResult, litArgs = [getType x], litType = eStar } }
+eJustIO w x = eTuple' [w,x] -- ELit litCons { litName = dc_JustIO, litArgs = [w,x], litType = ELit litCons { litName = tc_IOResult, litArgs = [getType x], litType = eStar } }
 tIO t = ELit (litCons { litName = tc_IO, litArgs = [t], litType = eStar })
 
 eCase e alts@(alt:_) Unknown = emptyCase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseType = getType alt,  eCaseAlts =  alts }
