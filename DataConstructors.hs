@@ -8,8 +8,6 @@ module DataConstructors(
     deconstructionExpression,
     followAliases,
     removeNewtypes,
-    followAlias,
-    expandAliases,
     getConstructor,
     getConstructorArities,
     getProduct,
@@ -137,7 +135,7 @@ getConstructor n (DataTable map) = case Map.lookup n map of
 -- | return the single constructor of product types
 
 getProduct :: Monad m => DataTable -> E -> m Constructor
-getProduct dataTable e | (ELit LitCons { litName = cn, litArgs = _, litType = _ }) <- followAliases dataTable e, Just c <- getConstructor cn dataTable = f c where
+getProduct dataTable e | (ELit LitCons { litName = cn }) <- followAliases dataTable e, Just c <- getConstructor cn dataTable = f c where
     f c | Just [x] <- conChildren c = getConstructor x dataTable
         | otherwise = fail "Not Product type"
 getProduct _ _ = fail "Not Product type"
@@ -367,6 +365,8 @@ lookupCType' dataTable e = case followAliases (mappend dataTablePrims dataTable)
     ELit LitCons { litName = c, litArgs = [], litType = _ } | Just cn  <- getConstructor c dataTable -> fail $ "lookupCType: " ++ show cn
     e' -> fail $ "lookupCType': " ++ show (e,e')
 
+    {-
+
 followAlias :: Monad m => DataTable -> E -> m E
 --followAlias _ e | not (sortTypeLike e) = fail "followAlias: not a type"
 followAlias dataTable (EAp a b) = do
@@ -387,6 +387,17 @@ followAliases dataTable l = f l (10::Int) where
     f l n = case followAlias dataTable l of
         Just e -> f e (n - 1)
         Nothing -> l
+
+    -}
+
+followAlias :: Monad m => DataTable -> E -> m E
+followAlias _ (ELit LitCons { litAliasFor = Just af, litArgs = as }) = return (foldl eAp af as)
+followAlias _  _ = fail "followAlias: not alias"
+
+followAliases :: DataTable -> E -> E
+followAliases _dataTable e = f e where
+    f (ELit LitCons { litAliasFor = Just af, litArgs = as }) = f (foldl eAp af as)
+    f e = e
 
 dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tbox:tabsurd:tarrow:primitiveTable ] ++ worlds)
 
@@ -657,9 +668,5 @@ class Monad m => DataTableMonad m where
 
 instance DataTableMonad Identity
 
-expandAliases :: DataTableMonad m => E -> m E
-expandAliases e = do
-    dt <- getDataTable
-    return (followAliases dt e)
 
 

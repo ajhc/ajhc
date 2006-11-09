@@ -214,7 +214,7 @@ createInstanceRules classHierarchy funcs = return $ fromRules ans where
         methodVar = tVr (toId methodName) ty
         _methodName@(~(Just (TVr {tvrType = ty},_))) = findName methodName
         defaultName =  (defaultInstanceName methodName)
-        valToPat' (ELit LitCons { litName = x, litArgs = ts, litType = t }) = ELit $ litCons { litName = x, litArgs = [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..], j `notElem` map tvrIdent args], litType = t }
+        valToPat' (ELit LitCons { litAliasFor = af,  litName = x, litArgs = ts, litType = t }) = ELit $ litCons { litAliasFor = af, litName = x, litArgs = [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..], j `notElem` map tvrIdent args], litType = t }
         valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ litCons { litName = tc_Arrow, litArgs = [ EVar (tVr j (getType z)) | z <- [a,b] | j <- [2,4 ..], j `notElem` map tvrIdent args], litType = eStar }
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
         as = [ rule  t | Inst { instHead = _ :=> IsIn _ t }  <- snub (classInsts classRecord) ]
