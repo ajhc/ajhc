@@ -38,7 +38,6 @@ import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.E
-import E.Shadow
 import E.Show
 import E.Subst
 import E.TypeCheck
@@ -144,13 +143,14 @@ getProduct dataTable e | (ELit LitCons { litName = cn, litArgs = _, litType = _ 
 getProduct _ _ = fail "Not Product type"
 
 
+tunboxedtuple :: Int -> (Constructor,Constructor)
 tunboxedtuple n = (typeCons,dataCons) where
         dataCons = Constructor {
             conName = dc,
-            conType = tipe,
-            conSlots = replicate n Unknown,
+            conType = dtipe,
+            conSlots = map EVar typeVars,
             conDeriving = [],
-            conExpr = Unknown, -- error "expr" ELam (tVr 2 rt) (ELit (LitCons dc [EVar (tVr 2 rt)] tipe)),
+            conExpr =  foldr ($) (ELit litCons { litName = dc, litArgs = map EVar vars, litType = ftipe }) (map ELam vars),
             conAlias = NotAlias,
             conInhabits = tc,
             conVirtual = Nothing,
@@ -158,8 +158,8 @@ tunboxedtuple n = (typeCons,dataCons) where
            }
         typeCons = Constructor {
             conName = tc,
-            conType = eHash,
-            conSlots = replicate n Unknown,
+            conType = foldr EPi eHash (replicate n tvr { tvrType = eStar }),
+            conSlots = replicate n eStar,
             conDeriving = [],
             conExpr = tipe,
             conAlias = NotAlias,
@@ -170,8 +170,11 @@ tunboxedtuple n = (typeCons,dataCons) where
 
         dc = unboxedNameTuple DataConstructor n
         tc = unboxedNameTuple TypeConstructor n
-        tipe = ELit (litCons { litName = tc, litArgs = [], litType = eHash })
-
+        tipe = foldr ELam ftipe typeVars
+        typeVars = take n [ tvr { tvrType = eStar, tvrIdent = v } | v <- [ 2,4 ..]]
+        vars =  [ tvr { tvrType = EVar t, tvrIdent = v } | v <- [ 2*n + 16, 2*n + 18 ..] | t <- typeVars ]
+        ftipe = ELit (litCons { litName = tc, litArgs = map EVar typeVars, litType = eHash })
+        dtipe = foldr EPi (foldr EPi ftipe [ v { tvrIdent = 0 } | v <- vars]) typeVars
 
 tabsurd = Constructor {
             conName = tc_Absurd,
@@ -270,6 +273,40 @@ isAbsurd (ELit LitCons { litName = n, litArgs = [], litType = _ }) | n == tc_Abs
 isAbsurd (ELit LitCons { litArgs = xs@(_:_) }) = all isAbsurd xs
 isAbsurd _ = False
 
+
+typesCompatable :: forall m . Monad m => DataTable -> E -> E -> m ()
+typesCompatable dataTable a b = f (-2 :: Id) a b where
+        f :: Id -> E -> E -> m ()
+        f _ (ESort a) (ESort b) = when (a /= b) $ fail $ "Sorts don't match: " ++ pprint (ESort a,ESort b)
+        f _ (EVar a) (EVar b) = when (a /= b) $ fail $ "Vars don't match: " ++ pprint (a,b)
+        f c (ELit LitCons { litName = n, litArgs = xs, litType = t }) (ELit LitCons { litName = n', litArgs = xs', litType = t' }) | n == n' = do
+            f c t t'
+            when (not $ sameShape1 xs xs') $ fail "Arg lists don't match"
+            zipWithM_ (f c) xs xs'
+        f c (EAp a b) (EAp a' b') = do
+            f c a a'
+            f c b b'
+        f c (ELam va ea) (ELam vb eb) = lam va ea vb eb c
+        f c (EPi va ea) (EPi vb eb)   = lam va ea vb eb c
+        f c (EPi (TVr { tvrIdent = 0, tvrType =  a}) b) (ELit (LitCons { litName = n, litArgs = [a',b'], litType = t })) | conName tarrow == n, t == eStar = do
+            f c a a'
+            f c b b'
+        f c (ELit (LitCons { litName = n, litArgs = [a',b'], litType = t })) (EPi (TVr { tvrIdent = 0, tvrType =  a}) b)  | conName tarrow == n, t == eStar = do
+            f c a a'
+            f c b b'
+        f c (ELit (LitCons {  litAliasFor = Just af, litArgs = as })) b = do
+            f c (foldl eAp af as) b
+        f c a (ELit (LitCons {  litAliasFor = Just af, litArgs = as })) = do
+            f c a (foldl eAp af as)
+        f _ a b = fail $ "Types don't match:" ++ pprint (a,b)
+
+        lam :: TVr -> E -> TVr -> E -> Id -> m ()
+        lam va ea vb eb c = do
+            f c (tvrType va) (tvrType vb)
+            f (c - 2) (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb)
+
+
+{-
 -- | determine if types are the same expanding newtypes and
 typesCompatable :: Monad m => DataTable -> E -> E -> m ()
 typesCompatable dataTable a b = go a b where
@@ -311,6 +348,7 @@ typesCompatable dataTable a b = go a b where
     f _ _ box b | box == tBox, canBeBox b = return ()
     f _ _ a box | box == tBox, canBeBox a = return ()
     f _ _ a b = fail $ "Types don't match: " ++ pprint (a,b)
+-}
 
 
 lookupCType dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
@@ -556,20 +594,20 @@ showDataTable (DataTable mp) = vcat xs where
         e  = text "=" <+> ePretty conExpr
         cs = text "slots:" <+> tupled (map ePretty (conSlots const))
         al = text "alias:" <+> tshow conAlias
-        vt = case conVirtual const of
-            Nothing -> empty
-            Just ss -> text "virtual:" <+> tshow ss
+        vt = text "virtual:" <+> tshow conVirtual
         ih = text "inhabits:" <+> tshow conInhabits
         ch = text "children:" <+> tshow conChildren
         Constructor {
             conType = conType,
             conExpr = conExpr,
             conAlias = conAlias,
+            conVirtual = conVirtual,
             conInhabits = conInhabits,
             conChildren = conChildren
             } = const
-    xs = [text x <+> hang 0 (c y) | (x,y) <- ds]
-    ds = sortBy (\(x,_) (y,_) -> compare x y) [ (show x,y)  | (x,y) <-  Map.toList mp]
+    xs = [text x <+> hang 0 (c y) | (x,y) <- ds ]
+    (ubt,ubd) = tunboxedtuple 3
+    ds = sortBy (\(x,_) (y,_) -> compare x y) [ (show x,y)  | (x,y) <-  Map.toList mp ++ [(conName ubt,ubt),(conName ubd,ubd)]]
 
 
 getSiblings :: DataTable -> Name -> Maybe [Name]

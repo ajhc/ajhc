@@ -244,10 +244,10 @@ inferType dataTable ds e = rfc e where
     eq t1 Unknown = return t1
     eq t1 t2 = eq' ds t1 t2
     eq' nds t1 t2 = do
-        e1 <- strong nds (followAliases dataTable t1)
-        e2 <- strong nds (followAliases dataTable t2)
+        e1 <- strong nds (t1)
+        e2 <- strong nds (t2)
         case typesCompatable dataTable e1 e2 of
-            Right () -> return (followAliases dataTable e1)
+            Right () -> return (e1)
             Left s -> failDoc $ hsep [text "eq:",text s, align $ vcat [ prettyE (e1),prettyE (e2) ]  ]
     fceq nds e1 t2 = do
         withContextDoc (hsep [text "fceq:", align $ vcat [parens $ prettyE e1,  parens $ prettyE t2]]) $ do
