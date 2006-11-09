@@ -91,6 +91,7 @@ import FrontEnd.SrcLoc
       '-'     { Minus }
       '!'     { Exclamation }
       '*'     { Star }
+      '#'     { Hash }
       '.'     { Dot }
 
 -- Reserved Ids
@@ -275,10 +276,13 @@ topdecls :: { [HsDecl] }
 topdecl :: { HsDecl }
       : 'data' ctype srcloc deriving
           {% checkDataHeader $2 `thenP` \(cs,c,t) ->
-             returnP (HsDataDecl $3 cs c t [] $4) }
+             returnP hsDataDecl { hsDeclSrcLoc = $3, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $4 } }
+      | 'data' ctype '::' kind srcloc deriving
+          {% checkDataHeader $2 `thenP` \(cs,c,t) ->
+             returnP hsDataDecl { hsDeclSrcLoc = $5, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $6, hsDeclHasKind = Just $4 } }
       | 'data' ctype srcloc '=' constrs deriving
                       {% checkDataHeader $2 `thenP` \(cs,c,t) ->
-                         returnP (HsDataDecl $3 cs c t (reverse $5) $6) }
+                         returnP hsDataDecl { hsDeclSrcLoc = $3, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $6, hsDeclCons = reverse $5 } }
       | 'newtype' ctype srcloc '=' constr deriving
                       {% checkDataHeader $2 `thenP` \(cs,c,t) ->
                          returnP (HsNewTypeDecl $3 cs c t $5 $6) }
@@ -403,6 +407,8 @@ kind :: { HsKind }
 bkind :: { HsKind }
        : '(' kind ')'           { $2 }
        |  '*'                   { hsKindStar }
+       |  '#'                   { hsKindHash }
+       |  qconid                { HsKind $1 }
 
 btype :: { HsType }
       : btype atype                   { HsTyApp $1 $2 }
@@ -416,8 +422,12 @@ atype :: { HsType }
       | '(#' type '#)'                { HsTyUnboxedTuple [$2] }
       | '(#' types '#)'               { HsTyUnboxedTuple (reverse $2) }
       | '[' type ']'                  { HsTyApp list_tycon $2 }
-      | '(' type ')'                  { $2 }
+      | '(' ktype ')'                 { $2 }
       | '(' type '=' type ')'         { HsTyEq $2 $4 }
+
+ktype :: { HsType }
+    : srcloc atype '::' kind { HsTyExpKind { hsTySrcLoc = $1, hsTyType = $2, hsTyKind = $4 } }
+    | type                  { $1 }
 
 gtycon :: { HsName }
       : qconid                        { $1 }
@@ -830,12 +840,14 @@ varsym :: { HsName }
       | '-'                   { minus_name }
       | '!'                   { pling_name }
       | '*'                   { star_name }
+      | '#'                   { hash_name }
       | '.'                   { dot_name }
 
 varsymm :: { HsName } -- varsym not including '-'
       : VARSYM                { UnQual (hsSymbol $1) }
       | '!'                   { pling_name }
       | '*'                   { star_name }
+      | '#'                   { hash_name }
       | '.'                   { dot_name }
 
 qvarsym1 :: { HsName }

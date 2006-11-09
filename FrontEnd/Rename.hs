@@ -321,7 +321,7 @@ renameHsDecl (HsTypeSig srcLoc hsNames hsQualType) subTable = do
     subTable' <- updateSubTableWithHsQualType subTable hsQualType
     hsQualType' <- renameHsQualType hsQualType subTable'
     return (HsTypeSig srcLoc hsNames' hsQualType')
-renameHsDecl (HsDataDecl srcLoc hsContext hsName hsNames1 hsConDecls hsNames2) subTable = do
+renameHsDecl dl@HsDataDecl { hsDeclSrcLoc = srcLoc, hsDeclContext = hsContext, hsDeclName = hsName, hsDeclArgs = hsNames1, hsDeclCons = hsConDecls, hsDeclDerives = hsNames2 } subTable = do
     setSrcLoc srcLoc
     hsName' <- renameTypeHsName hsName subTable
     subTable' <- updateSubTableWithHsNames subTable hsNames1
@@ -330,7 +330,7 @@ renameHsDecl (HsDataDecl srcLoc hsContext hsName hsNames1 hsConDecls hsNames2) s
     hsConDecls' <- renameHsConDecls hsConDecls subTable'
     -- don't need to rename the hsNames2 as it is just a list of TypeClasses
     hsNames2' <- mapM (`renameTypeHsName` subTable') hsNames2
-    return (HsDataDecl srcLoc hsContext' hsName' hsNames1' hsConDecls' hsNames2')
+    return dl { hsDeclContext = hsContext', hsDeclName = hsName', hsDeclArgs = hsNames1', hsDeclCons = hsConDecls', hsDeclDerives = hsNames2' }
 renameHsDecl (HsTypeDecl srcLoc name hsNames t) subTable = do
     setSrcLoc srcLoc
     hsName' <- renameTypeHsName name subTable
@@ -1117,7 +1117,7 @@ collectDefsHsModule m = execWriter (mapM_ f (hsModuleDecls m)) where
     f (HsFunBind (HsMatch a n _ _ _:_))  = tellF [(toName Val n,a,[])]
     f (HsPatBind srcLoc p _ _) = tellF [ (toName Val n,srcLoc,[]) | n <- (getHsNamesFromHsPat p) ]
     f (HsTypeDecl sl n _ _) = tellF [(toName TypeConstructor n,sl,[])]
-    f (HsDataDecl sl _ n _ cs _) = do tellF $ (toName TypeConstructor n,sl,snub [ x |(x,_,_) <- cs']): cs' ; zup cs where
+    f HsDataDecl { hsDeclSrcLoc =sl, hsDeclName = n, hsDeclCons = cs } = do tellF $ (toName TypeConstructor n,sl,snub [ x |(x,_,_) <- cs']): cs' ; zup cs where
         cs' = concatMap (namesHsConDecl' toName) cs
     f (HsNewTypeDecl sl _ n _ c _) = do tellF $ (toName TypeConstructor n,sl,snub [ x |(x,_,_) <- cs']): cs' ; zup [c] where
         cs' = namesHsConDecl' toName c
@@ -1174,7 +1174,7 @@ namesHsDecl (HsForeignDecl a _ n _)  = ([(n,a)],[])
 namesHsDecl (HsFunBind hsMatches)  = (getHsNamesAndASrcLocsFromHsMatches hsMatches, [])
 namesHsDecl (HsPatBind srcLoc p _ _) = (map (rtup srcLoc) (getHsNamesFromHsPat p),[])
 namesHsDecl (HsTypeDecl sl n _ _) = ([],[(n,sl)])
-namesHsDecl (HsDataDecl sl _ n _ cs _) = ( (concatMap namesHsConDecl cs) ,[(n,sl)])
+namesHsDecl HsDataDecl { hsDeclSrcLoc = sl, hsDeclName = n, hsDeclCons = cs } = ( (concatMap namesHsConDecl cs) ,[(n,sl)])
 namesHsDecl (HsNewTypeDecl sl _ n _ c _) = ( (namesHsConDecl c),[(n,sl)])
 namesHsDecl cd@(HsClassDecl sl _ ds) = (mconcatMap namesHsDeclTS ds) `mappend` ([],[(nameName z,sl)]) where
     z = case maybeGetDeclName cd of
@@ -1254,343 +1254,9 @@ getHsNamesFromTypeSigs [] = []
 
 --------------------------------------------------------------------------------
 
--- the Renameable class
-
-
--- stores the instance Renameable for all of HsSyn
-
-class Renameable a where
-    replaceName :: (HsName -> HsName) -> a -> a
-
-instance Renameable SrcLoc where
-    replaceName f = id
-
-instance Renameable HsExportSpec where
-    replaceName f hsexportspec
-      = let a # b = a $ (replaceName f b)
-        in case hsexportspec of
-            HsEVar  name               ->
-                HsEVar  # name
-            HsEAbs  name               ->
-                HsEAbs  # name
-            HsEThingAll  name		 ->
-                HsEThingAll  # name
-            HsEThingWith  name names	 ->
-                HsEThingWith  # name # names
-            HsEModuleContents mod	 ->
-                HsEModuleContents mod
-
-instance Renameable HsAsst where
-    replaceName f (HsAsst x xs) = HsAsst (replaceName f x) (replaceName f xs)
-    replaceName f (HsAsstEq x y) = HsAsstEq (replaceName f x) (replaceName f y)
-
-instance Renameable HsImportDecl where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-            a $$ b = a b
-            infixl 0 $$
-        in case object of
-            HsImportDecl  srcloc mod bool maybe1 maybe2 ->
-                HsImportDecl # srcloc $$ mod $$ bool $$ maybe1 $$ maybe2'
-                where maybe2' = fmap (\(b,importSpec) -> (b, replaceName f importSpec)) maybe2
-
-
-instance Renameable HsImportSpec where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsIVar  name			 ->
-                HsIVar  # name
-            HsIAbs  name			 ->
-                HsIAbs  # name
-            HsIThingAll  name		 ->
-                HsIThingAll  # name
-            HsIThingWith  name names	 ->
-                HsIThingWith  # name # names
-
-
-{-
-instance Renameable HsInfixDecl where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsInfixDecl  srcloc fixity names ->
-                HsInfixDecl  # srcloc # fixity # names
--}
-
-
-{-
-instance Renameable HsFixity where
-    replaceName f = id
--}
-
-instance Renameable HsAssoc where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsAssocNone  ->
-                HsAssocNone
-            HsAssocLeft  ->
-                HsAssocLeft
-            HsAssocRight  ->
-                HsAssocRight
-
-
-instance Renameable (HsDecl) where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsTypeDecl 	srcloc name names typ ->
-                HsTypeDecl 	srcloc # name # names # typ
-            HsDataDecl 	srcloc context name names condecls names' ->
-                HsDataDecl 	srcloc # context # name # names # condecls # names'
-            HsNewTypeDecl 	srcloc context name names condecl names' ->
-                HsNewTypeDecl 	srcloc # context # name # names # condecl # names'
-            HsClassDecl 	srcloc qualtyp objects ->
-                HsClassDecl 	srcloc # qualtyp # objects
-            HsInstDecl 	srcloc qualtyp objects ->
-                HsInstDecl 	srcloc # qualtyp # objects
-            HsDefaultDecl 	srcloc typ ->
-                HsDefaultDecl 	srcloc # typ
-            HsTypeSig 	srcloc names qualtyp ->
-                HsTypeSig 	srcloc # names # qualtyp
-            -- HsFunBind       srcloc matc ->
-            HsFunBind          matc ->
-                -- HsFunBind  # srcloc # matc
-                HsFunBind  # matc
-            HsPatBind 	srcloc pat r {-where-} objects ->
-                HsPatBind 	srcloc # pat # r # objects
-            od -> od
-
-
-instance Renameable (HsMatch) where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsMatch  srcloc name pats r {-where-} objects ->
-                HsMatch  # srcloc # name # pats # r # objects
-
-
-instance Renameable HsConDecl where
-    replaceName f = hsConDeclExists_u (replaceName f) . hsConDeclName_u (replaceName f) . hsConDeclRecArg_u (replaceName f) . hsConDeclConArg_u (replaceName f)
---    replaceName f object
---      = let a # b = a $ (replaceName f b)
---        in case object of
---            HsConDecl  srcloc name bangtyps ->
---                HsConDecl  # srcloc # name # bangtyps
---            HsRecDecl  srcloc name names_and_bangtyp ->
---                HsRecDecl  # srcloc # name # names_and_bangtyp
-
-
-
-
-instance Renameable HsBangType where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsBangedTy    typ ->
-                HsBangedTy  # typ
-            HsUnBangedTy  typ ->
-                HsUnBangedTy  # typ
-
-
-instance Renameable (HsRhs) where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsUnGuardedRhs  exp ->
-                HsUnGuardedRhs  # exp
-            HsGuardedRhss   guardedrs ->
-                HsGuardedRhss  # guardedrs
-
-
-instance Renameable (HsGuardedRhs) where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsGuardedRhs  srcloc exp exp' ->
-                HsGuardedRhs  # srcloc # exp # exp'
-
-
-instance Renameable HsQualType where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsQualType    context typ ->
-                HsQualType  # context # typ
-
-
-instance Renameable HsType where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsTyFun    typ typ' ->
-                HsTyFun  # typ # typ'
-            HsTyTuple  typs ->
-                HsTyTuple  # typs
-            HsTyUnboxedTuple  typs ->
-                HsTyUnboxedTuple  # typs
-            HsTyApp    typ typ' ->
-                HsTyApp  # typ # typ'
-            HsTyVar    name ->
-                HsTyVar  # name
-            HsTyCon    name ->
-                HsTyCon  # name
-
-instance Renameable HsLiteral where
-    replaceName f = id
-
-instance Renameable (HsExp) where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            -- HsVar  name ann -> HsVar (replaceName f name) ann
-            HsVar  name -> HsVar (replaceName f name)
-            HsCon  name ->
-                HsCon  # name
-            HsLit  literal ->
-                HsLit  # literal
-            HsInfixApp  exp exp' exp'' ->
-                HsInfixApp  # exp # exp' # exp''
-            HsApp  exp exp' ->
-                HsApp  # exp # exp'
-            HsNegApp  exp ->
-                HsNegApp  # exp
-            HsLambda  srcloc pats exp ->
-                HsLambda  # srcloc # pats # exp
-            HsLet  objects exp ->
-                HsLet  # objects # exp
-            HsIf  exp exp' exp'' ->
-                HsIf  # exp # exp' # exp''
-            HsCase  exp alts ->
-                HsCase  # exp # alts
-            HsDo  stmts ->
-                HsDo  # stmts
-            HsTuple  exps ->
-                HsTuple  # exps
-            HsUnboxedTuple  exps ->
-                HsUnboxedTuple  # exps
-            HsList  exps ->
-                HsList  # exps
-            HsParen  exp ->
-                HsParen  # exp
-            HsLeftSection  exp exp' ->
-                HsLeftSection  # exp # exp'
-            HsRightSection  exp exp' ->
-                HsRightSection  # exp # exp'
-            HsRecConstr  name fieldupdates ->
-                HsRecConstr  # name # fieldupdates
-            HsRecUpdate  exp fieldupdates ->
-                HsRecUpdate  # exp # fieldupdates
-            HsEnumFrom  exp ->
-                HsEnumFrom  # exp
-            HsEnumFromTo  exp exp' ->
-                HsEnumFromTo  # exp # exp'
-            HsEnumFromThen  exp exp' ->
-                HsEnumFromThen  # exp # exp'
-            HsEnumFromThenTo  exp exp' exp'' ->
-                HsEnumFromThenTo  # exp # exp' # exp''
-            HsListComp  exp stmts ->
-                HsListComp  # exp # stmts
-            HsExpTypeSig  srcloc exp qualtyp ->
-                HsExpTypeSig  # srcloc # exp # qualtyp
-            HsAsPat  name exp		 ->
-                HsAsPat  # name # exp
-            HsWildCard sl 			 ->
-                HsWildCard sl
-            HsIrrPat  exp		 ->
-                HsIrrPat  # exp
-
-instance Renameable HsPat where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsPVar  name ->
-                HsPVar  # name
-            HsPLit  literal ->
-                HsPLit  # literal
-            HsPNeg  pat ->
-                HsPNeg  # pat
-            HsPInfixApp  pat name pat' ->
-                HsPInfixApp  # pat # name # pat'
-            HsPApp  name pats ->
-                HsPApp  # name # pats
-            HsPTuple  pats ->
-                HsPTuple  # pats
-            HsPUnboxedTuple  pats ->
-                HsPUnboxedTuple  # pats
-            HsPList  pats ->
-                HsPList  # pats
-            HsPParen  pat ->
-                HsPParen  # pat
-            HsPRec  name patfields ->
-                HsPRec  # name # patfields
-            HsPAsPat  name pat ->
-                HsPAsPat  # name # pat
-            HsPWildCard  ->
-                HsPWildCard
-            HsPIrrPat  pat ->
-                HsPIrrPat  # pat
-
-
-instance Renameable HsPatField where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-{-
-            HsPFieldPun  name ->
-                HsPFieldPun  # name
--}
-            HsPFieldPat  name pat ->
-                HsPFieldPat  # name # pat
-
-
-instance Renameable (HsStmt) where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsGenerator  srcloc pat exp ->
-                HsGenerator  # srcloc # pat # exp
-            HsQualifier  exp ->
-                HsQualifier  # exp
-            HsLetStmt  objects ->
-                HsLetStmt  # objects
-
-
-instance Renameable (HsFieldUpdate) where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-{-
-            HsFieldBind  name ->
-                HsFieldBind  # name
--}
-            HsFieldUpdate  name exp ->
-                HsFieldUpdate  # name # exp
-
-instance Renameable HsTyVarBind where
-    replaceName f = hsTyVarBindName_u (replaceName f)
-
-instance Renameable (HsAlt) where
-    replaceName f object
-      = let a # b = a $ (replaceName f b)
-        in case object of
-            HsAlt  srcloc pat guardedalts objects ->
-                HsAlt  # srcloc # pat # guardedalts # objects
-
-
-
-instance Renameable HsName where
-    replaceName f name = f name
-
-instance (Renameable a, Renameable b) => Renameable (a,b) where
-    replaceName f (x,y) = (replaceName f x, replaceName f y)
-instance Renameable a => Renameable [a] where
-    replaceName f xs = map (replaceName f) xs
-
-
-type Binding = ()
 
 qualifyName :: Module -> HsName -> HsName
 qualifyName _ name@(Qual {}) = name
 qualifyName mod (UnQual name) = Qual mod name
+
+

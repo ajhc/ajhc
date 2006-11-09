@@ -77,6 +77,7 @@ data Token
 	| Minus
 	| Exclamation
 	| Star
+	| Hash
 	| Dot
 
 -- Reserved Ids
@@ -143,7 +144,8 @@ special_varops = [
  ( "-",  Minus ),	--ToDo: shouldn't be here
  ( "!",  Exclamation ),	--ditto
  ( ".",  Dot ),		--ditto
- ( "*",  Star )		--ditto
+ ( "*",  Star ),	--ditto
+ ( "#",  Hash )		--ditto
  ]
 
 reserved_ids :: [(String,Token)]

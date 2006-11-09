@@ -34,6 +34,7 @@ import Name.VConsts
 import Name.Names
 import Name.Name
 import Options
+import Doc.DocLike(TextLike(..),DocLike(..))
 import qualified Doc.DocLike as DL
 import qualified Doc.PPrint as P
 
@@ -105,8 +106,6 @@ type Doc = DocM PPHsMode P.Doc
 
 -- The pretty printing combinators
 
-empty :: Doc
-empty = return P.empty
 
 nest :: Int -> Doc -> Doc
 nest i m = m >>= return . P.nest i
@@ -115,13 +114,12 @@ dropAs (HsAsPat _ e) = e
 dropAs e = e
 
 -- Literals
+instance DL.TextLike Doc where
+    empty = return P.empty
+    text = return . P.text
+    char = return . P.char
 
-text, ptext :: String -> Doc
-text = return . P.text
-ptext = return . P.text
 
-char :: Char -> Doc
-char = return . P.char
 
 int :: Int -> Doc
 int = return . P.int
@@ -167,17 +165,21 @@ lbrace = return  P.lbrace
 rbrace = return  P.rbrace
 
 -- Combinators
+--
+instance DocLike Doc where
+    aM <> bM = do{a<-aM;b<-bM;return (a P.<> b)}
+    aM <+> bM = do{a<-aM;b<-bM;return (a P.<+> b)}
+    aM <$> bM = do{a<-aM;b<-bM;return (a P.$$ b)}
+    hcat dl = sequence dl >>= return . P.hcat
+    hsep dl = sequence dl >>= return . P.hsep
+    vcat dl = sequence dl >>= return . P.vcat
 
-(<>),(<+>),($$),($+$) :: Doc -> Doc -> Doc
-aM <> bM = do{a<-aM;b<-bM;return (a P.<> b)}
-aM <+> bM = do{a<-aM;b<-bM;return (a P.<+> b)}
+($$),($+$) :: Doc -> Doc -> Doc
 aM $$ bM = do{a<-aM;b<-bM;return (a P.$$ b)}
 aM $+$ bM = do{a<-aM;b<-bM;return (a P.$+$ b)}
 
-hcat,hsep,vcat,sep,cat,fsep,fcat :: [Doc] -> Doc
-hcat dl = sequence dl >>= return . P.hcat
-hsep dl = sequence dl >>= return . P.hsep
-vcat dl = sequence dl >>= return . P.vcat
+
+sep,cat,fsep,fcat :: [Doc] -> Doc
 sep dl = sequence dl >>= return . P.sep
 cat dl = sequence dl >>= return . P.cat
 fsep dl = sequence dl >>= return . P.fsep
@@ -282,7 +284,7 @@ ppHsDecl (HsTypeDecl loc name nameList htype) =
 		   ++ map ppHsType nameList
 		   ++ [equals, ppHsType htype])
 
-ppHsDecl (HsDataDecl loc context name nameList constrList derives) =
+ppHsDecl HsDataDecl { hsDeclContext = context, hsDeclName = name, hsDeclArgs = nameList, hsDeclCons = constrList, hsDeclDerives = derives } =
 	   --blankline $
            mySep ([text "data", ppHsContext context, ppHsName name]
                   ++ map ppHsName nameList)
@@ -428,6 +430,14 @@ ppHsTypePrec p HsTyForall { hsTypeVars = vs, hsTypeType = qt } = parensIf (p > 1
 ppHsTypePrec p HsTyExists { hsTypeVars = vs, hsTypeType = qt } = parensIf (p > 1) $ do
     pp <- ppHsQualType qt
     return $ DL.text "exists" DL.<+> DL.hsep (map pprint vs) DL.<+> DL.char '.' DL.<+> pp
+ppHsTypePrec _ HsTyExpKind { hsTyType = t, hsTyKind = k } = do
+    t <- ppHsType t
+    return $ DL.parens ( t DL.<+> DL.text "::" DL.<+> pprint k)
+
+instance DL.DocLike d => P.PPrint d HsKind where
+    pprint (HsKind k) = pprint k
+    pprint (HsKindFn (HsKind k) t) = pprint k DL.<+> DL.text "->" DL.<+> pprint t
+    pprint (HsKindFn a b) = DL.parens (pprint a) DL.<+> DL.text "->" DL.<+> pprint b
 
 ------------------------- Expressions -------------------------
 ppHsRhs :: HsRhs -> Doc
@@ -589,17 +599,16 @@ ppHsFieldUpdate (HsFieldUpdate name exp) =
 ppHsQName :: HsName -> Doc
 ppHsQName (UnQual name)			= ppHsIdentifier name
 ppHsQName z@(Qual m@(Module mod) name)
-	 | m == prelude_mod && isSpecialName z = ppHsIdentifier name
 	 | otherwise = text mod <> char '.' <> ppHsIdentifier name
 
 ppHsName = ppHsQName
 
 ppHsQNameParen :: HsName -> Doc
-ppHsQNameParen name = parensIf (isSymbolName (getName name)) (ppHsQName name)
+ppHsQNameParen name = parensIf (isSymbolName name) (ppHsQName name)
 
 ppHsQNameInfix :: HsName -> Doc
 ppHsQNameInfix name
-	| isSymbolName (getName name) = ppHsQName name
+	| isSymbolName name = ppHsQName name
 	| otherwise = char '`' <> ppHsQName name <> char '`'
 
 ppHsIdentifier :: HsIdentifier -> Doc
@@ -619,15 +628,6 @@ isSymbolName :: HsName -> Bool
 isSymbolName x | (c:_) <- hsIdentString (hsNameIdent (unRename x)), isAlpha c || c `elem` "'_" = False
 isSymbolName _ = True
 
-isSpecialName :: HsName -> Bool
---isSpecialName (Qual _ (HsSpecial _)) = True
---isSpecialName (UnQual (HsSpecial _)) = True
-isSpecialName _ = False
-
-getName :: HsName -> HsName
---getName (UnQual s) = s
---getName (Qual _ s) = s
-getName = id
 
 ppHsContext :: HsContext -> Doc
 ppHsContext []      = empty

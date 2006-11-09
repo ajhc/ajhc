@@ -47,7 +47,7 @@ dataConsEnv modName kt decls
 -- howver the fall through case is just there for completeness
 
 dataDeclEnv :: Module -> KindEnv -> (HsDecl) -> Map.Map Name Sigma
-dataDeclEnv modName kt (HsDataDecl _sloc context typeName args condecls _)
+dataDeclEnv modName kt HsDataDecl { hsDeclContext = context, hsDeclName = typeName, hsDeclArgs = args, hsDeclCons = condecls }
    = Map.unions $ map (conDeclType modName kt preds resultType) $ condecls
    where
    typeName' = toName TypeConstructor typeName

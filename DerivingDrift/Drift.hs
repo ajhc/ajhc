@@ -47,7 +47,7 @@ enumDontDerive = [
 
 
 driftDerive' :: Monad m => HsDecl -> m String
-driftDerive' (HsDataDecl sloc cntxt name args condecls derives) = do
+driftDerive' HsDataDecl { hsDeclName = name, hsDeclArgs = args, hsDeclCons = condecls, hsDeclDerives = derives } = do
         let d =  toData  name args condecls derives
             isEnum = length condecls > 1 && null (concatMap hsConDeclArgs condecls)
         xs <- return $  map (derive isEnum d) derives -- (if isEnum then derives List.\\ enumDontDerive else derives )

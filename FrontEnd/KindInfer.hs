@@ -288,6 +288,9 @@ kiType k HsTyForall { hsTypeVars = vs, hsTypeType = HsQualType con t } = do
     mapM initTyVarBind vs
     mapM_ kiPred con
     kiType' k t
+kiType k HsTyExpKind { hsTyType = t, hsTyKind = ek } = do
+    unify (hsKindToKind ek) k
+    kiType' k t
 kiType k HsTyExists { hsTypeVars = vs, hsTypeType = HsQualType con t } = do
     mapM initTyVarBind vs
     mapM_ kiPred con
@@ -303,6 +306,7 @@ initTyVarBind HsTyVarBind { hsTyVarBindName = name, hsTyVarBindKind = kk } = do
 
 hsKindToKind (HsKindFn a b) = hsKindToKind a `Kfun` hsKindToKind b
 hsKindToKind a | a == hsKindStar = kindStar
+-- hsKindToKind (HsKind n) = toName SortName n
 
 kiApps :: Kind -> [HsType] -> Kind -> Ki ()
 kiApps ca args fk = f ca args fk where
@@ -433,6 +437,7 @@ aHsTypeToType kt@KindEnv { kindEnvAssocs = at } t | (HsTyCon con,xs) <- fromTyAp
         typeExtraArgs = map (aHsTypeToType kt) (take n2 $ drop n1 xs)
     }
 aHsTypeToType kt (HsTyFun t1 t2) = aHsTypeToType kt t1 `fn` aHsTypeToType kt t2
+aHsTypeToType kt HsTyExpKind { hsTyType = t } = aHsTypeToType kt t
 aHsTypeToType kt tuple@(HsTyTuple types) = tTTuple $ map (aHsTypeToType kt) types
 aHsTypeToType kt tuple@(HsTyUnboxedTuple types) = tTTuple' $ map (aHsTypeToType kt) types
 aHsTypeToType kt (HsTyApp t1 t2) = TAp (aHsTypeToType kt t1) (aHsTypeToType kt t2)

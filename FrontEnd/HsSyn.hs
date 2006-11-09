@@ -20,6 +20,7 @@ instance HasLocation HsExp where
     srcLoc (HsCase _ xs) = srcLoc xs
     srcLoc (HsExpTypeSig sl _ _) = sl
     srcLoc (HsLambda sl _ _) = sl
+    srcLoc HsError { hsExpSrcLoc = sl } = sl
     srcLoc _ = bogusASrcLoc
 
 
@@ -141,11 +142,45 @@ instance HasLocation HsDecl where
 instance HasLocation HsRule where
     srcLoc HsRule { hsRuleSrcLoc = sl } = sl
 
+hsDataDecl = HsDataDecl {
+    hsDeclSrcLoc = bogusASrcLoc,
+    hsDeclContext = [],
+    hsDeclName = error "hsDataDecl.hsDeclName",
+    hsDeclArgs = [],
+    hsDeclCons = [],
+    hsDeclHasKind = Nothing,
+    hsDeclDerives = []
+    }
+
+hsNewTypeDecl = HsNewTypeDecl {
+    hsDeclSrcLoc = bogusASrcLoc,
+    hsDeclContext = [],
+    hsDeclName = error "hsNewTypeDecl.hsDeclName",
+    hsDeclArgs = [],
+    hsDeclCon = error "hsNewTypeDecl.hsDeclCon",
+    hsDeclDerives = []
+    }
+
 data HsDecl
 	 = HsTypeDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclName :: HsName, hsDeclTArgs :: [HsType], hsDeclType :: HsType }
-	 | HsDataDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclContext :: HsContext, hsDeclName :: HsName, hsDeclArgs :: [HsName], hsDeclCons :: [HsConDecl], {- deriving -} hsDeclDerives :: [HsName] }
+	 | HsDataDecl	 {
+            hsDeclSrcLoc :: SrcLoc,
+            hsDeclContext :: HsContext,
+            hsDeclName :: HsName,
+            hsDeclArgs :: [HsName],
+            hsDeclCons :: [HsConDecl],
+            hsDeclHasKind :: Maybe HsKind,
+            {- deriving -} hsDeclDerives :: [HsName]
+            }
+	 | HsNewTypeDecl {
+            hsDeclSrcLoc :: SrcLoc,
+            hsDeclContext :: HsContext,
+            hsDeclName :: HsName,
+            hsDeclArgs :: [HsName],
+            hsDeclCon :: HsConDecl,
+            {- deriving -} hsDeclDerives :: [HsName]
+            }
 	 | HsInfixDecl   { hsDeclSrcLoc :: SrcLoc, hsDeclAssoc :: HsAssoc, hsDeclInt :: !Int, hsDeclNames :: [HsName]  }
-	 | HsNewTypeDecl { hsDeclSrcLoc :: SrcLoc, hsDeclContext :: HsContext, hsDeclName :: HsName, hsDeclArgs :: [HsName], hsDeclCon :: HsConDecl, {- deriving -} hsDeclDerives :: [HsName] }
 	 | HsClassDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType, hsDeclDecls :: [HsDecl] }
 	 | HsInstDecl    { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType, hsDeclDecls :: [HsDecl] }
 	 | HsDefaultDecl SrcLoc HsType
@@ -161,6 +196,7 @@ data HsDecl
          | HsPragmaProps SrcLoc String [HsName]
 	 | HsPragmaRules [HsRule]
          | HsPragmaSpecialize { hsDeclUniq :: (Module,Int), hsDeclSrcLoc :: SrcLoc, hsDeclBool :: Bool, hsDeclName :: HsName, hsDeclType :: HsType }
+         | HsDeclDeriving { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType }
   deriving(Eq,Show)
   {-! derive: is !-}
 
@@ -225,6 +261,7 @@ data HsType
          | HsTyExists {
             hsTypeVars :: [HsTyVarBind],
             hsTypeType :: HsQualType }
+         | HsTyExpKind { hsTySrcLoc :: SrcLoc, hsTyType :: HsType, hsTyKind :: HsKind }
          -- the following are used internally
          | HsTyAssoc
          | HsTyEq HsType HsType
@@ -346,11 +383,12 @@ data HsFieldUpdate
 data HsAlt = HsAlt SrcLoc HsPat HsRhs [HsDecl]
   deriving(Eq,Show)
 
-data HsKind = HsKind {-# UNPACK #-} !Atom | HsKindFn HsKind HsKind
+data HsKind = HsKind HsName | HsKindFn HsKind HsKind
   deriving(Data,Typeable,Eq,Ord,Show)
   {-! derive: GhcBinary !-}
 
-hsKindStar = HsKind (fromString "*")
+hsKindStar = HsKind (Qual (Module "Jhc@") (HsIdent "*"))
+hsKindHash = HsKind (Qual (Module "Jhc@") (HsIdent "#"))
 
 -----------------------------------------------------------------------------
 -- Builtin names.
@@ -358,9 +396,7 @@ hsKindStar = HsKind (fromString "*")
 prelude_mod	      = Module "Prelude"
 main_mod	      = Module "Main"
 
---unit_con_name	      = Qual prelude_mod (HsSpecial "()")
 unit_con_name	      = UnQual (HsIdent "()")
---tuple_con_name i      = Qual prelude_mod (HsIdent ("("++replicate i ','++")"))
 tuple_con_name i      = Qual (Module "Jhc.Basics") (HsIdent ("("++replicate i ','++")"))
 
 unit_con	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = unit_con_name }
@@ -372,12 +408,12 @@ hiding_name	      = UnQual $ HsIdent "hiding"
 minus_name	      = UnQual $ HsIdent "-"
 pling_name	      = UnQual $ HsIdent "!"
 star_name	      = UnQual $ HsIdent "*"
+hash_name	      = UnQual $ HsIdent "#"
 dot_name	      = UnQual $ HsIdent "."
 
 unit_tycon_name       = unit_con_name
 fun_tycon_name        = Qual prelude_mod (HsIdent "->")
 list_tycon_name       = UnQual (HsIdent "[]")
---list_tycon_name       = Qual prelude_mod (HsIdent "[]")
 tuple_tycon_name i    = tuple_con_name i
 
 unit_tycon	      = HsTyCon unit_tycon_name

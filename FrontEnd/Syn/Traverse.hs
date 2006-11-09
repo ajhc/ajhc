@@ -155,6 +155,7 @@ traverseHsType f (HsTyExists vs qt) = doQual HsTyExists f vs qt
 traverseHsType _ x@HsTyVar {} = return x
 traverseHsType _ x@HsTyCon {} = return x
 traverseHsType _ HsTyAssoc = return HsTyAssoc
+traverseHsType f x@HsTyExpKind { hsTyType = t } = f t >>= \t' -> return x { hsTyType = t' }
 traverseHsType f (HsTyEq a b) = return HsTyEq `ap` f a `ap` f b
 
 doQual hsTyForall f vs qt = do

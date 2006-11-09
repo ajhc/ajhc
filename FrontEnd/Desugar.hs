@@ -180,19 +180,19 @@ desugarDecl sig@(HsTypeSig _sloc _names _qualType) = do
     return [newSig]
 
 
-desugarDecl (HsDataDecl sloc cntxt name args condecls derives) = do
+desugarDecl dl@HsDataDecl { hsDeclSrcLoc = sloc, hsDeclName =  name, hsDeclArgs = args, hsDeclCons = condecls, hsDeclDerives = derives } = do
         --newConDecls <- mapM remSynsFromCondecl condecls
         newConDecls <- return condecls
         ds <- deriveInstances sloc name args newConDecls derives
         ss <- createSelectors sloc newConDecls
-        return $ (HsDataDecl sloc cntxt name args newConDecls derives):(ds ++ ss)
+        return $ dl:(ds ++ ss)
 
-desugarDecl (HsNewTypeDecl sloc cntxt name args condecl derives) = do
+desugarDecl dl@(HsNewTypeDecl sloc cntxt name args condecl derives) = do
         --newConDecl <- remSynsFromCondecl condecl
         newConDecl <- return condecl
         ds <- deriveInstances sloc name args [newConDecl] derives
         ss <- createSelectors sloc [newConDecl]
-        return $ (HsNewTypeDecl sloc cntxt name args newConDecl derives):(ds ++ ss)
+        return $ dl:(ds ++ ss)
 
 desugarDecl anyOtherDecl = return [anyOtherDecl]
 
