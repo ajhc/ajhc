@@ -26,6 +26,8 @@ import E.Subst
 import E.Traverse
 import GenUtil
 import Name.Id
+import Name.Name
+import Name.Names
 import Support.CanType
 import Util.ContextMonad
 import Util.SetLike
@@ -137,6 +139,12 @@ inferType dataTable ds e = rfc e where
     strong' e = withContextDoc (text "Strong:" </> prettyE e) $ strong ds e
     fc s@(ESort _) = return $ typ s
     fc (ELit lc@LitCons {}) | let lc' = updateLit dataTable lc, litAliasFor lc /= litAliasFor lc' = fail $ "Alias not correct: " ++ show (lc, litAliasFor lc')
+    fc (ELit LitCons { litName = n, litArgs = es, litType =  t}) | nameType n == TypeConstructor, Just _ <- fromUnboxedNameTuple n = do
+        withContext ("Checking Unboxed Tuple: " ++ show n) $ do
+        -- we omit kind checking for unboxed tuples
+        valid t
+        es' <- mapM rfc es
+        strong' t
     fc (ELit LitCons { litName = n, litArgs = es, litType =  t}) = do
         withContext ("Checking Constructor: " ++ show n) $ do
         valid t
