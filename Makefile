@@ -136,8 +136,8 @@ Name/Prim.hs: utils/op_names.prl data/primitives.txt
 RawFiles.hs:  data/HsFFI.h data/jhc_rts.c  data/ViaGhc.hs
 	perl ./utils/op_raw.prl $(basename $@)  $^ > $@
 
-FrontEnd/HsParser.hs: FrontEnd/HsParser.ly
-	happy -a -g -c FrontEnd/HsParser.ly
+FrontEnd/HsParser.hs: FrontEnd/HsParser.y
+	happy -a -g -c FrontEnd/HsParser.y
 
 Version/Ctx.hs: _darcs/inventory
 	rm -f $@
