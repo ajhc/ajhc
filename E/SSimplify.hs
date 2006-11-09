@@ -12,7 +12,7 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Control.Monad.Reader
 import Data.FunctorM
-import Data.Generics
+import Data.Typeable
 import Data.Monoid
 import List hiding(delete,union)
 import Maybe

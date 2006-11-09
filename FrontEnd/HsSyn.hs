@@ -25,7 +25,7 @@ instance HasLocation HsExp where
 
 
 newtype Module = Module String
-  deriving(Data,Typeable,Eq,Ord,ToAtom,FromAtom)
+  deriving(Eq,Data,Typeable,Ord,ToAtom,FromAtom)
 
 instance Show Module where
     showsPrec _ (Module n) = showString n
@@ -85,7 +85,6 @@ data HsModule = HsModule {
     hsModuleDecls :: [HsDecl],
     hsModuleOptions :: [String]
     }
-  deriving(Data,Typeable, Show)
   {-! derive: update !-}
 
 -- Export/Import Specifications
@@ -96,7 +95,7 @@ data HsExportSpec
 	 | HsEThingAll HsName		-- T(..)
 	 | HsEThingWith HsName [HsName]	-- T(C_1,...,C_n)
 	 | HsEModuleContents Module	-- module M   (not for imports)
-  deriving(Data,Typeable,Eq,Show)
+  deriving(Eq,Show)
 
 instance HasLocation HsImportDecl where
     srcLoc x = hsImportDeclSrcLoc x
@@ -109,17 +108,17 @@ data HsImportDecl = HsImportDecl {
     hsImportDeclAs :: (Maybe Module),
     hsImportDeclSpec :: (Maybe (Bool,[HsImportSpec]))
     }
-  deriving(Data,Typeable,Eq,Show)
+  deriving(Eq,Show)
 
 data HsImportSpec
 	 = HsIVar HsName		-- variable
 	 | HsIAbs HsName		-- T
 	 | HsIThingAll HsName		-- T(..)
 	 | HsIThingWith HsName [HsName]	-- T(C_1,...,C_n)
-  deriving(Data,Typeable,Eq,Show)
+  deriving(Eq,Show)
 
 data HsAssoc = HsAssocNone | HsAssocLeft | HsAssocRight
-  deriving(Data,Typeable,Eq,Show)
+  deriving(Eq,Show)
   {-! derive: GhcBinary !-}
 
 instance HasLocation HsDecl where
@@ -162,7 +161,7 @@ data HsDecl
          | HsPragmaProps SrcLoc String [HsName]
 	 | HsPragmaRules [HsRule]
          | HsPragmaSpecialize { hsDeclUniq :: (Module,Int), hsDeclSrcLoc :: SrcLoc, hsDeclBool :: Bool, hsDeclName :: HsName, hsDeclType :: HsType }
-  deriving(Data,Typeable,Eq,Show)
+  deriving(Eq,Show)
   {-! derive: is !-}
 
 data HsRule = HsRule {
@@ -174,19 +173,19 @@ data HsRule = HsRule {
     hsRuleLeftExpr :: HsExp,
     hsRuleRightExpr :: HsExp
     }
-  deriving(Data,Typeable,Eq,Show)
+  deriving(Eq,Show)
 
 instance HasLocation HsMatch where
     srcLoc (HsMatch sl _ _ _ _) = sl
 
 data HsMatch
 	 = HsMatch SrcLoc HsName [HsPat] HsRhs {-where-} [HsDecl]
-  deriving(Data,Typeable,Eq,Show)
+  deriving(Eq,Show)
 
 data HsConDecl
 	 = HsConDecl { hsConDeclSrcLoc :: SrcLoc, hsConDeclExists :: [HsTyVarBind], hsConDeclName :: HsName, hsConDeclConArg :: [HsBangType] }
 	 | HsRecDecl { hsConDeclSrcLoc :: SrcLoc, hsConDeclExists :: [HsTyVarBind], hsConDeclName :: HsName, hsConDeclRecArg :: [([HsName],HsBangType)] }
-  deriving(Data,Typeable,Eq,Show)
+  deriving(Eq,Show)
   {-! derive: is, update !-}
 
 hsConDeclArgs HsConDecl { hsConDeclConArg = as } = as
@@ -195,16 +194,16 @@ hsConDeclArgs HsRecDecl { hsConDeclRecArg = as } = concat [ replicate (length ns
 data HsBangType
 	 = HsBangedTy   { hsBangType :: HsType }
 	 | HsUnBangedTy { hsBangType :: HsType }
-  deriving(Data,Typeable,Eq,Show)
+  deriving(Eq,Show)
 
 data HsRhs
 	 = HsUnGuardedRhs HsExp
 	 | HsGuardedRhss  [HsGuardedRhs]
-  deriving(Data,Typeable,Eq,Show)
+  deriving(Eq,Show)
 
 data HsGuardedRhs
 	 = HsGuardedRhs SrcLoc HsExp HsExp
-  deriving(Data,Typeable,Eq,Show)
+  deriving(Eq,Show)
 
 data HsQualType
 	 = HsQualType   { hsQualTypeContext :: HsContext, hsQualTypeType :: HsType }
@@ -265,7 +264,7 @@ data HsLiteral
 	| HsDoublePrim	Rational
 	-- GHC extension:
 	| HsLitLit	String
-  deriving(Data,Typeable,Eq,Ord, Show)
+  deriving(Eq,Ord, Show)
     {-! derive: is !-}
 
 hsParen x@HsVar {} = x
@@ -277,7 +276,7 @@ hsParen x@HsUnboxedTuple {} = x
 hsParen x = HsParen x
 
 data HsErrorType = HsErrorPatternFailure | HsErrorSource | HsErrorFieldSelect | HsErrorUnderscore | HsErrorUninitializedField | HsErrorRecordUpdate
- deriving(Data,Typeable,Eq,Show)
+ deriving(Eq,Show)
 
 data HsExp
 	= HsVar { {- hsExpSrcSpan :: SrcSpan,-} hsExpName :: HsName }
@@ -309,7 +308,7 @@ data HsExp
         | HsError { hsExpSrcLoc :: SrcLoc, hsExpErrorType :: HsErrorType, hsExpString :: String }
 	| HsWildCard SrcLoc			-- ditto
 	| HsIrrPat HsExp		-- ditto
- deriving(Data,Typeable,Eq,Show)
+ deriving(Eq,Show)
     {-! derive: is, update !-}
 
 data HsPat
@@ -327,25 +326,25 @@ data HsPat
 	| HsPWildCard
 	| HsPIrrPat HsPat
 	| HsPTypeSig SrcLoc HsPat HsQualType  -- scoped type variable extension
- deriving(Data,Typeable,Eq,Ord,Show)
+ deriving(Eq,Ord,Show)
  {-! derive: is !-}
 
 data HsPatField
 	= HsPFieldPat HsName HsPat
- deriving(Data,Typeable,Eq,Ord,Show)
+ deriving(Eq,Ord,Show)
 
 data HsStmt
 	= HsGenerator SrcLoc HsPat HsExp       -- srcloc added by bernie
 	| HsQualifier HsExp
 	| HsLetStmt [HsDecl]
- deriving(Data,Typeable,Eq,Show)
+ deriving(Eq,Show)
 
 data HsFieldUpdate
 	= HsFieldUpdate HsName HsExp
-  deriving(Data,Typeable,Eq,Show)
+  deriving(Eq,Show)
 
 data HsAlt = HsAlt SrcLoc HsPat HsRhs [HsDecl]
-  deriving(Data,Typeable,Eq,Show)
+  deriving(Eq,Show)
 
 data HsKind = HsKind {-# UNPACK #-} !Atom | HsKindFn HsKind HsKind
   deriving(Data,Typeable,Eq,Ord,Show)

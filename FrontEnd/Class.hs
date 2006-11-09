@@ -18,8 +18,8 @@ module FrontEnd.Class(
 
 import Control.Monad.Identity
 import Control.Monad.Writer
-import Data.Generics
 import Data.Monoid
+import Data.Generics
 import Data.List((\\),partition,nub)
 import Text.PrettyPrint.HughesPJ(render,Doc())
 import qualified Data.Map as Map
@@ -48,6 +48,7 @@ import Util.HasSize
 import Util.Inst()
 import Util.SetLike
 import qualified FlagOpts as FO
+import Support.Tickle
 
 --------------------------------------------------------------------------------
 
@@ -58,7 +59,7 @@ data Inst = Inst {
     instDerived :: Bool,   -- ^ whether this instance was derived
     instHead :: Qual Pred,
     instAssocs :: [(Tycon,[Tyvar],[Tyvar],Sigma)]
-    } deriving(Typeable,Data,Eq,Ord,Show)
+    } deriving(Eq,Ord,Show)
     {-! derive: GhcBinary !-}
 
 instance PPrint a (Qual Pred) => PPrint a Inst where
@@ -79,7 +80,7 @@ data ClassRecord = ClassRecord {
     classInsts :: [Inst],
     classAssumps :: [(Name,Sigma)],
     classAssocs :: [(Tycon,[Tyvar],Maybe Sigma)]
-    } deriving(Typeable,Data)
+    }
     {-! derive: GhcBinary !-}
 
 newClassRecord c = ClassRecord {
@@ -366,20 +367,33 @@ renameOneMatch newName (HsMatch sloc oldName pats rhs wheres)
 
 newMethodSig' :: KindEnv -> Name -> [Pred] -> Sigma -> Type -> Sigma
 newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
-   TForAll _ ((IsIn _ classArg:restContext) :=> t) = qt'
-   -- the assumption is that the context is non-empty and that
-   -- the class and variable that we are interested in are at the
-   -- front of the old context - the method of inserting instance types into
-   -- the class hierarchy should ensure this
-   --((className, classArg):restContxt) = cntxt
-   foo = "_" ++ (show methodName ++ show (getTypeHead instanceType)) ++ "@@"
-   newQualType = everywhere (mkT at) $ tForAll (nub $ freeVars qt) qt
-   at (Tyvar _ n k) =  tyvar (updateName (++ foo) n) k
-   updateName f n = toName nt (md,f nm) where
-        (nt,(md::String,nm)) = fromName n
-   qt = (newCntxt ++ restContext) :=> (everywhere (mkT ct) t)
-   ct n | n == classArg = instanceType
-   ct n =  n
+    TForAll _ ((IsIn _ classArg:restContext) :=> t) = qt'
+    -- the assumption is that the context is non-empty and that
+    -- the class and variable that we are interested in are at the
+    -- front of the old context - the method of inserting instance types into
+    -- the class hierarchy should ensure this
+    --((className, classArg):restContxt) = cntxt
+    foo = "_" ++ (show methodName ++ show (getTypeHead instanceType)) ++ "@@"
+--    newQualType = everywhere (mkT at) $ tForAll (nub $ freeVars qt) qt
+
+    newQualType = tForAll vs nqt where
+        vs = nub $ freeVars nqt
+        nqt = map (tickle f) (newCntxt ++ restContext) :=> f t
+        f t | t == classArg = f instanceType
+        f (TVar t) = TVar (at t)
+        f (TForAll ta (ps :=> t)) = tickle f (TForAll (map at ta) (ps :=> t))
+        f (TExists ta (ps :=> t)) = tickle f (TExists (map at ta) (ps :=> t))
+        f t = tickle f t
+
+    at (Tyvar _ n k) =  tyvar (updateName (++ foo) n) k
+    updateName f n = toName nt (md,f nm) where
+         (nt,(md::String,nm)) = fromName n
+--    qt = (newCntxt ++ restContext) :=> t
+    {-
+    qt = (newCntxt ++ restContext) :=> (everywhere (mkT ct) t)
+    ct n | n == classArg = instanceType
+    ct n =  n
+    -}
 
 
 -- collect assumptions of all class methods

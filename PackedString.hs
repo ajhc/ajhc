@@ -88,7 +88,6 @@ import GHC.Exts
 import Data.Array.Base
 import Word
 import Data.Monoid
-import Data.Generics(Data(..))
 import Foreign.C.Types
 
 instance Monoid PackedString where
@@ -104,11 +103,6 @@ instance Monoid PackedString where
 newtype PackedString = PS (UArray Int Word8)
     deriving(Typeable)
 
-instance Data PackedString where
-    toConstr _   = error "toConstr"
-    --fromConstr _   = error "fromConstr"
-    --gfoldl f g x  = g x
-    --dataTypeOf _ = mkDataType []
 
 
 instance Eq PackedString where

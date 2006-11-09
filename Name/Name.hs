@@ -22,8 +22,8 @@ module Name.Name(
     ) where
 
 import Char
-import Data.Generics
 import Monad(liftM)
+import Data.Typeable
 
 import Atom
 import Binary
@@ -43,11 +43,11 @@ data NameType =
     | FieldLabel
     | RawType
     | FfiExportName -- Name is the C name of a FFI export
-    deriving(Ord,Eq,Enum,Read,Show,Typeable,Data)
+    deriving(Ord,Eq,Enum,Read,Show)
 
 
 newtype Name = Name Atom
-    deriving(Ord,Eq,Typeable,Data,Binary,ToAtom,FromAtom)
+    deriving(Ord,Eq,Typeable,Binary,ToAtom,FromAtom)
 
 isTypeNamespace TypeConstructor = True
 isTypeNamespace ClassName = True

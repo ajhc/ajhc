@@ -4,7 +4,6 @@ module E.E where
 import GenUtil
 import Control.Monad.Identity
 import Monad
-import Data.Generics
 import Data.FunctorM
 import Maybe
 import List
@@ -36,7 +35,7 @@ import Util.SetLike as S
 data Lit e t = LitInt { litNumber :: Number, litType :: t }
     | LitCons  { litName :: Name, litArgs :: [e], litType :: t, litAliasFor :: Maybe E }
 --    | LitAlias { litName :: Name, litArgs :: [e], litType :: t, litAliasFor :: Maybe E }
-    deriving(Data,Eq,Ord,Typeable)
+    deriving(Eq,Ord)
         {-!derive: is, GhcBinary !-}
 
 litCons = LitCons { litName = error "litName: name not set", litArgs = [], litType = error "litCons: type not set", litAliasFor = Nothing }
@@ -58,7 +57,7 @@ data ESort =
     EStar     -- ^ the sort of types
     | EHash   -- ^ the sort of unboxed types
     | EBox    -- ^ the sort of types of types
-    deriving(Data,Eq, Ord, Typeable)
+    deriving(Eq, Ord)
     {-! derive: is, GhcBinary !-}
 
 instance Show ESort where
@@ -83,13 +82,9 @@ data E = EAp E E
        eCaseAlts :: [Alt E],
        eCaseDefault :: (Maybe E)
        }
-	deriving(Data,Eq, Ord, Typeable, Show)
+	deriving(Eq, Ord, Show)
     {-! derive: is, from, GhcBinary !-}
 
-
-data EBind = EBind [TVr] E
-    deriving(Data,Eq,Typeable,Show)
-    {-! derive: GhcBinary !-}
 
 
 -- | extract out EAp nodes a value and the arguments it is applied to.
@@ -114,7 +109,6 @@ fromLam e = f [] e where
 
 type TVr = TVr' E
 data TVr' e = TVr { tvrIdent :: !Id, tvrType :: e, tvrInfo :: Info.Info }
-    deriving(Data,Typeable)
     {-! derive: update !-}
 
 tVr x y = tvr { tvrIdent = x, tvrType = y }
@@ -162,7 +156,7 @@ instance Functor TVr' where
 
 
 data Alt e = Alt (Lit TVr e) e
-    deriving(Data,Show,Eq,Ord,Typeable)
+    deriving(Show,Eq,Ord)
        {-!derive: GhcBinary !-}
 
 altHead :: Alt E -> Lit () ()

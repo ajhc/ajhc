@@ -2,7 +2,6 @@ module Number(Number(..),TypeInfo,toIntegral) where
 
 import Ratio
 import Binary
-import Data.Generics
 
 data NumType = Signed | Unsigned | Floating | Pointer
 data Value a = Known a | Unknown | AtLeast a | GreatestOfAll
@@ -43,7 +42,7 @@ typeTable = [
  -}
 
 newtype Number = Number Rational
-    deriving(Num,Eq,Ord,Binary,Real,Fractional,RealFrac,Enum,Typeable,Data)
+    deriving(Num,Eq,Ord,Binary,Real,Fractional,RealFrac,Enum)
 
 instance Integral Number where
     toInteger (Number x) = case denominator x of

@@ -11,7 +11,6 @@ module FrontEnd.Tc.Kind(
     ) where
 
 import Data.Monoid
-import Data.Generics
 import Control.Monad
 import Data.IORef
 
@@ -36,7 +35,7 @@ import Doc.PPrint(pprint,PPrint)
 -}
 
 data KBase = Star | KUTuple | KFunRet
-    deriving(Data,Typeable, Eq, Ord)   -- but we need them for kind inference
+    deriving(Eq, Ord)   -- but we need them for kind inference
     {-! derive: GhcBinary !-}
 
 kindStar = KBase Star
@@ -46,7 +45,7 @@ kindFunRet = KBase KFunRet
 data Kind  = KBase KBase
            | Kfun Kind Kind
            | KVar Kindvar               -- variables aren't really allowed in haskell in kinds
-             deriving(Data,Typeable, Eq, Ord)   -- but we need them for kind inference
+             deriving(Eq, Ord)   -- but we need them for kind inference
     {-! derive: GhcBinary !-}
 
 
@@ -70,7 +69,7 @@ data KindConstraint
     | KindFunRet  -- ^ ??, so * or (#) or ??
     | KindStar    -- ^ must be *
     | KindAny     -- ^ no constraints
-    deriving(Eq,Ord,Typeable,Data,Show)
+    deriving(Eq,Ord,Show)
 
 instance Monoid KindConstraint where
     mempty = KindAny
@@ -84,8 +83,7 @@ data Kindvar = Kindvar {
     kvarUniq :: !Int,
     kvarRef :: IORef (Maybe Kind),
     kvarConstraint :: KindConstraint
-    } deriving
-    (Data,Typeable)
+    }
 
 instance Binary Kindvar where
     put_ _ _ = return ()

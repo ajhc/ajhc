@@ -35,7 +35,6 @@ module Representation(
 
 
 import Control.Monad.Identity
-import Data.Generics
 import Data.IORef
 import Text.PrettyPrint.HughesPJ(Doc)
 
@@ -59,7 +58,7 @@ import FrontEnd.Tc.Kind
 -- Types
 
 data MetaVarType = Tau | Rho | Sigma
-             deriving(Data,Typeable,Eq,Ord,Show)
+             deriving(Eq,Ord,Show)
     {-! derive: GhcBinary !-}
 
 data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
@@ -70,11 +69,11 @@ data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
            | TExists { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
            | TMetaVar { metaVar :: MetaVar }
            | TAssoc   { typeCon :: !Tycon, typeClassArgs :: [Type], typeExtraArgs :: [Type] }
-             deriving(Data,Typeable,Ord,Show)
+             deriving(Ord,Show)
     {-! derive: GhcBinary !-}
 
 data MetaVar = MetaVar { metaUniq :: !Int, metaKind :: Kind, metaRef :: (IORef (Maybe Type)), metaType :: MetaVarType } -- ^ used only in typechecker
-             deriving(Data,Typeable,Show)
+             deriving(Show)
     {-! derive: GhcBinary !-}
 
 instance Eq MetaVar where
@@ -107,7 +106,6 @@ tassocToAp TAssoc { typeCon = con, typeClassArgs = cas, typeExtraArgs = eas } = 
 -- Unquantified type variables
 
 data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !Name, tyvarKind :: Kind }
-    deriving(Data,Typeable)
     {-  derive: GhcBinary -}
 
 instance Show Tyvar where
@@ -143,7 +141,7 @@ instance Ord Tyvar where
 -- Type constructors
 
 data Tycon = Tycon { tyconName :: Name, tyconKind :: Kind }
-    deriving(Data,Typeable, Eq, Show,Ord)
+    deriving(Eq, Show,Ord)
     {-! derive: GhcBinary !-}
 
 instance ToTuple Tycon where
@@ -163,12 +161,12 @@ a `fn` b    = TArrow a b
 
 -- Predicates
 data Pred   = IsIn Class Type | IsEq Type Type
-              deriving(Data,Typeable, Show, Eq,Ord)
+              deriving(Show, Eq,Ord)
     {-! derive: GhcBinary !-}
 
 -- Qualified entities
 data Qual t =  [Pred] :=> t
-              deriving(Data,Typeable, Show, Eq,Ord)
+              deriving(Show, Eq,Ord)
     {-! derive: GhcBinary !-}
 
 
