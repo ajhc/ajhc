@@ -8,6 +8,8 @@ import qualified Data.Set as Set
 
 import Support.FreeVars
 import Atom(Atom(),toAtom)
+import Grin.Val
+import Name.Names
 import Options(flint)
 import C.Prims
 import Util.Gen
@@ -94,7 +96,7 @@ valIsConstant _ = False
 
 -- | Is type mutable (currently IORef)
 isMutableNodeTag :: Tag -> Bool
-isMutableNodeTag t = t == ref_tag where ref_tag = toAtom "CData.IORef.IORef"
+isMutableNodeTag t = t ==  convertName dc_Ref
 
 valIsMutable (NodeC t _) = isMutableNodeTag t
 valIsMutable _ = False

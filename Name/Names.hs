@@ -65,6 +65,8 @@ dc_JustIO = toName DataConstructor ("Jhc.IO", "JustIO")
 dc_Rational = toName DataConstructor ("Ratio",":%")
 dc_Unit = toName DataConstructor ("Jhc.Basics","()")
 dc_Boolzh = toName DataConstructor ("Jhc.Order","Bool#")
+dc_IORef = toName DataConstructor ("Data.IORef","IORef")
+dc_Ref = toName DataConstructor ("Data.IORef","Ref")
 
 tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
 tc_Box = toName TypeConstructor    ("Jhc@","Box")

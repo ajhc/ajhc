@@ -507,6 +507,9 @@ instance CanTypeCheck TyEnv Exp Ty where
     typecheck te (Store v) = do
         t <- typecheck te v
         return (TyPtr t)
+    typecheck te Alloc { expValue = v } = do
+        t <- typecheck te v
+        return (TyPtr t)
     typecheck te (Return v) = do
         typecheck te v
     typecheck te (Fetch v) = do

@@ -184,6 +184,10 @@ applySubstE env x = f x where
     f (Store v) = do
         v <- g v
         return $ Store v
+    f e@Alloc { expValue = v, expCount = c } = do
+        v <- g v
+        c <- g c
+        return e { expValue = v, expCount = c }
     f (Fetch v) = do
         v <- g v
         return $ Fetch v

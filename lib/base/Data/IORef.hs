@@ -11,22 +11,25 @@ module Data.IORef(
 import Jhc.Basics
 import Jhc.Order
 import Jhc.IO
-import Jhc.Addr
 
-newtype IORef a = IORef Addr
+data IORef a = IORef (Ref a)
+data Ref a = Ref a
 
 
 foreign import primitive newRef__   :: a -> World__ -> (# World__, IORef a #)
 foreign import primitive readRef__  :: IORef a -> World__ -> (# World__, a #)
 foreign import primitive writeRef__ :: IORef a -> a -> World__ -> World__
 
+{-# NOINLINE newIORef #-}
 newIORef :: a -> IO (IORef a)
 newIORef v = IO $ \_ w -> newRef__ v w
 
 
+{-# NOINLINE readIORef #-}
 readIORef :: IORef a -> IO a
 readIORef r = IO $ \_ w -> readRef__ r w
 
+{-# NOINLINE writeIORef #-}
 writeIORef :: IORef a -> a -> IO ()
 writeIORef r v = IO $ \_ w -> case writeRef__ r v w of w' -> (# w', () #)
 
@@ -37,11 +40,13 @@ instance Eq (IORef a) where
     x /= y = not (eqRef__ x y)
 
 
+{-# NOINLINE modifyIORef #-}
 modifyIORef :: IORef a -> (a -> a) -> IO ()
 modifyIORef ref f = IO $ \_ w -> case readRef__ ref w of
     (# w', a #) -> case writeRef__ ref (f a) w' of
         w'' -> (# w'', () #)
 
+{-# NOINLINE atomicModifyIORef #-}
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
 atomicModifyIORef r f = IO $ \_ w -> case readRef__ r w of
     (# w', a #) -> case f a of

@@ -375,13 +375,23 @@ compile' dataTable cenv (tvr,as,e) = ans where
         let var = Var v2 TyNode
             [r',v'] = args [r,v]
         return $ gEval v' :>>= n1 :-> Update r' n1
-    ce (EPrim ap@(APrim (PrimPrim "writeRef__") _) [r,v,_] _) = do
-        let var = Var v2 TyNode
-            [r',v'] = args [r,v]
-        return $ Update r' (NodeC (toAtom "CData.IORef.IORef") [v'])
     ce (EPrim ap@(APrim (PrimPrim "newWorld__") _) [_] _) = do
         return $ Return unit
     ce (EPrim ap@(APrim (PrimPrim "drop__") _) [_,e] _) = ce e
+    ce (EPrim ap@(APrim (PrimPrim "newRef__") _) [v,_] _) = do
+        let [v'] = args [v]
+            var = Var v2 (TyPtr TyNode)
+        return $ Store (NodeC (convertName dc_Ref) [v']) :>>= var :-> Store (NodeC (convertName dc_IORef) [var])
+        --return $ Alloc { expValue = NodeC (convertName dc_Ref) [v'], expCount = toUnVal (1 :: Int), expRegion = region_heap, expInfo = mempty } :>>= var :-> Store (NodeC (convertName dc_IORef) [var])
+    ce (EPrim ap@(APrim (PrimPrim "readRef__") _) [r,_] _) = do
+        let [r'] = args [r]
+            var = Var v2 (TyPtr TyNode)
+            var' = Var v3 (TyPtr TyNode)
+        return $ gEval r' :>>= NodeC (convertName dc_IORef) [var] :-> Fetch var :>>= NodeC (convertName dc_Ref) [var'] :-> Return var'
+    ce (EPrim ap@(APrim (PrimPrim "writeRef__") _) [r,v,_] _) = do
+        let var = Var v2 (TyPtr TyNode)
+            [r',v'] = args [r,v]
+        return $ gEval r' :>>= NodeC (convertName dc_IORef) [var] :-> Update var (NodeC (convertName dc_Ref) [v'])
     ce (EPrim ap@(APrim p _) xs ty) = let
       prim = Primitive { primName = Atom.fromString (pprint ap), primAPrim = ap, primRets = Nothing, primType = ([],tyUnit) }
       in case p of
