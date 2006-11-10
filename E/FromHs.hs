@@ -409,7 +409,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         let cFun = createFunc dataTable (map tvrType es)
             prim io rs rtt = EPrim (APrim (Func io rcn (snds rs) rtt) req)
         result <- case (isIO,pt) of
-            (True,"void") -> cFun $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
+            (True,"void") -> cFun $ \rs -> (,) (ELam tvrWorld) $
                         eStrictLet tvrWorld2 (prim True rs "void" (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
             (False,"void") -> fail "pure foreign function must return a valid value"
             _ -> do
@@ -419,7 +419,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
                     rttIO' = ltTuple' [tWorld__, rtt']
                 case isIO of
                     False -> cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim False rs rtt [ EVar t | (t,_) <- rs ] rtt') (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
-                    True -> cFun $ \rs -> (,) (ELam tvrCont . ELam tvrWorld) $
+                    True -> cFun $ \rs -> (,) (ELam tvrWorld) $
                                 eCaseTup' (prim True rs rtt (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' }) (eJustIO (EVar tvrWorld2) (EVar rtVar)))
         return [(name,var,lamt result)]
 

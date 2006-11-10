@@ -1,13 +1,13 @@
-module Prelude.IOError where
+module Prelude.IOError(IOError(),showIOError,userError) where
 
+import Jhc.IO
 
-newtype IOError = IOError String
-    deriving(Show,Eq)
-
-showIOError :: IOError -> String
-showIOError (IOError x) = x
+instance Show IOError where
+    showsPrec _ s = showString (showIOError s)
 
 {-
+
+
 data IOError = IOError {
      ioe_handle   :: Maybe Handle,   -- the handle used by the action flagging
 				     -- the error.
@@ -59,5 +59,3 @@ instance Show IOException where
 
 -}
 
-userError       :: String  -> IOError
-userError str	=  IOError  str

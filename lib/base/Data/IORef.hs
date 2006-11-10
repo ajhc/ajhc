@@ -22,16 +22,16 @@ foreign import primitive writeRef__ :: IORef a -> a -> World__ -> World__
 
 {-# NOINLINE newIORef #-}
 newIORef :: a -> IO (IORef a)
-newIORef v = IO $ \_ w -> newRef__ v w
+newIORef v = IO $ \w -> newRef__ v w
 
 
 {-# NOINLINE readIORef #-}
 readIORef :: IORef a -> IO a
-readIORef r = IO $ \_ w -> readRef__ r w
+readIORef r = IO $ \w -> readRef__ r w
 
 {-# NOINLINE writeIORef #-}
 writeIORef :: IORef a -> a -> IO ()
-writeIORef r v = IO $ \_ w -> case writeRef__ r v w of w' -> (# w', () #)
+writeIORef r v = IO $ \w -> case writeRef__ r v w of w' -> (# w', () #)
 
 foreign import primitive eqRef__ :: IORef a -> IORef a -> Bool
 
@@ -42,13 +42,13 @@ instance Eq (IORef a) where
 
 {-# NOINLINE modifyIORef #-}
 modifyIORef :: IORef a -> (a -> a) -> IO ()
-modifyIORef ref f = IO $ \_ w -> case readRef__ ref w of
+modifyIORef ref f = IO $ \w -> case readRef__ ref w of
     (# w', a #) -> case writeRef__ ref (f a) w' of
         w'' -> (# w'', () #)
 
 {-# NOINLINE atomicModifyIORef #-}
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
-atomicModifyIORef r f = IO $ \_ w -> case readRef__ r w of
+atomicModifyIORef r f = IO $ \w -> case readRef__ r w of
     (# w', a #) -> case f a of
         (a',b) -> case writeRef__ r a' w' of
             w'' -> (# w'', b #)

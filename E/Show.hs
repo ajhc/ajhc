@@ -140,7 +140,6 @@ showE e = do
         f e | e == tChar     = return $ atom $ text "Char"
         f e | e == tInt      = return $ atom $ text "Int"
         f e | e == tInteger  = return $ atom $ text "Integer"
-        f e | e == tCont     = return $ atom $ text "IOErrorCont"
         f e | e == tRational = return $ atom $ text "Rational"
         f e | e == tString   = return $ atom $ text "String"
         f e | e == tUnit     = return $ atom $ text "()"

@@ -2,6 +2,7 @@ module Prelude.IO(
     IO(),
     ioError,
     catch,
+    runExpr,
     module Prelude.IO,
     userError) where
 
@@ -108,6 +109,10 @@ readLn =  do l <- getLine
 
 putChar :: Char -> IO ()
 putChar c = c_putwchar (charToCWchar c)
+
+-- | this is wrapped around arbitrary showable expressions when used as the main entry point
+runExpr :: Show a => a -> World__ -> World__
+runExpr x w = runNoWrapper (print x) w
 
 --TODO EOF == -1
 getChar :: IO Char

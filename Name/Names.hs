@@ -61,27 +61,26 @@ instance FromTupname Name where
 
 dc_Cons = toName DataConstructor ("Jhc.Basics",":")
 dc_EmptyList = toName DataConstructor ("Jhc.Basics","[]")
-dc_JustIO = toName DataConstructor ("Jhc.IO", "JustIO")
 dc_Rational = toName DataConstructor ("Ratio",":%")
 dc_Unit = toName DataConstructor ("Jhc.Basics","()")
 dc_Boolzh = toName DataConstructor ("Jhc.Order","Bool#")
 dc_IORef = toName DataConstructor ("Data.IORef","IORef")
 dc_Ref = toName DataConstructor ("Data.IORef","Ref")
+dc_Target = toName DataConstructor  ("Jhc.Options","Target#")
 
 tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
 tc_Box = toName TypeConstructor    ("Jhc@","Box")
 tc_Arrow = toName TypeConstructor  ("Jhc@","->")
-tc_IOErrorCont = toName TypeConstructor ("Jhc.IO","IOErrorCont")
 tc_JumpPoint = toName TypeConstructor   ("Jhc.JumpPoint","JumpPoint")
-tc_IOError = toName TypeConstructor     ("Prelude.IOError","IOError")
 
 tc_IOResult = toName TypeConstructor ("Jhc.IO","IOResult")
-tc_IO = toName TypeConstructor ("Jhc.IO", "IO")
-tc_World__ = toName TypeConstructor ("Jhc.Prim","World__")
+tc_IO = toName TypeConstructor       ("Jhc.IO", "IO")
+tc_World__ = toName TypeConstructor  ("Jhc.Prim","World__")
 
-tc_Bool = toName TypeConstructor ("Jhc.Order","Bool")
-tc_List = toName TypeConstructor ("Jhc.Basics","[]")
-tc_Ptr = toName TypeConstructor ("Foreign.Ptr","Ptr")
+tc_Bool = toName TypeConstructor  ("Jhc.Order","Bool")
+tc_Target = toName TypeConstructor  ("Jhc.Options","Target")
+tc_List = toName TypeConstructor  ("Jhc.Basics","[]")
+tc_Ptr = toName TypeConstructor   ("Foreign.Ptr","Ptr")
 tc_Ratio = toName TypeConstructor ("Ratio","Ratio")
 tc_Unit = toName TypeConstructor  ("Jhc.Basics","()")
 
@@ -91,7 +90,8 @@ rt_tag = toName RawType "tag#"
 s_Star = toName SortName ("Jhc@","*")
 s_Hash = toName SortName ("Jhc@","#")
 
-v_error = toName Val ("Prelude","error")
+v_target = toName Val  ("Jhc.Options","target")
+v_error = toName Val ("Jhc.IO","error")
 v_toEnum = toName Val ("Jhc.Enum","toEnum")
 v_fromEnum = toName Val ("Jhc.Enum","fromEnum")
 v_minBound = toName Val ("Jhc.Enum","minBound")
@@ -100,15 +100,14 @@ v_fail = toName Val ("Prelude","fail")
 v_concatMap = toName Val ("Jhc.Basics","concatMap")
 v_map = toName Val ("Jhc.Basics","map")
 v_and = toName Val ("Jhc.Order","&&")
-v_filter = toName Val ("Prelude","filter")
+v_filter = toName Val ("Jhc.List","filter")
 v_foldr = toName Val ("Jhc.Basics","foldr")
 v_undefined = toName Val ("Jhc.Basics","undefined")
-v_undefinedIOErrorCont = toName Val ("Jhc.IO","undefinedIOErrorCont")
 v_silly = toName Val ("Jhc@","silly")
 
 sFuncNames = FuncNames {
-    func_bind = toName Val ("Prelude",">>="),
-    func_bind_ = toName Val ("Prelude",">>"),
+    func_bind = toName Val ("Jhc.Monad",">>="),
+    func_bind_ = toName Val ("Jhc.Monad",">>"),
     func_concatMap = toName Val ("Jhc.Basics","concatMap"),
     func_fromInteger = toName Val ("Prelude","fromInteger"),
     func_fromInt = toName Val ("Prelude","fromInt"),
@@ -130,7 +129,7 @@ sFuncNames = FuncNames {
     func_range = toName Val ("Data.Ix","range"),
     func_index = toName Val ("Data.Ix","index"),
     func_inRange = toName Val ("Data.Ix","inRange"),
-    func_runExpr = toName Val ("Jhc.IO","runExpr"),
+    func_runExpr = toName Val ("Prelude.IO","runExpr"),
     func_runRaw = toName Val ("Jhc.Prim","runRaw"),
     func_runMain = toName Val ("Jhc.IO","runMain"),
     func_runNoWrapper = toName Val ("Jhc.IO","runNoWrapper")
@@ -145,8 +144,8 @@ class_Bounded = toName ClassName ("Jhc.Enum","Bounded")
 class_Show = toName ClassName ("Prelude.Text","Show")
 class_Read = toName ClassName ("Prelude.Text","Read")
 class_Ix = toName ClassName ("Ix","Ix")
-class_Functor = toName ClassName ("Prelude","Functor")
-class_Monad = toName ClassName ("Prelude","Monad")
+class_Functor = toName ClassName ("Jhc.Monad","Functor")
+class_Monad = toName ClassName ("Jhc.Monad","Monad")
 class_Num = toName ClassName ("Prelude","Num")
 class_Real = toName ClassName ("Prelude","Real")
 class_Integral = toName ClassName ("Prelude","Integral")

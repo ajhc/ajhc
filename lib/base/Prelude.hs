@@ -8,7 +8,7 @@ module Prelude(
     -- functions from elsewhere
     putStr,
     putStrLn,
-
+    error,
     concatMap,
     concat,
     any,
@@ -24,6 +24,7 @@ module Prelude(
     module Jhc.Float,
     module Jhc.Enum,
     module Jhc.Order,
+    module Jhc.Monad,
     Int(),
 
     module Prelude.IO,
@@ -45,6 +46,7 @@ import Jhc.IO
 import Jhc.Tuples
 import Jhc.List
 import Jhc.Enum
+import Jhc.Monad
 import Jhc.Order
 
 
@@ -56,8 +58,8 @@ infixl 6  +, -
 --infix  4  ==, /=, <, <=, >=, >
 --infixr 3  &&
 --infixr 2  ||
-infixl 1  >>, >>=
-infixr 1  =<<
+--infixl 1  >>, >>=
+--infixr 1  =<<
 -- infixr 0  $, $!, `seq`
 
 
@@ -284,52 +286,6 @@ fromIntegral     =  fromInteger . toInteger
 realToFrac     :: (Real a, Fractional b) => a -> b
 realToFrac      =  fromRational . toRational
 
- -- Monadic classes
-
-class Functor f  where
-    fmap              :: (a -> b) -> f a -> f b
-
-{- INLINE return, fail, (>>=), (>>) -}
-class Monad m  where
-    (>>=)  :: m a -> (a -> m b) -> m b
-    (>>)   :: m a -> m b -> m b
-    return :: a -> m a
-    fail   :: String -> m a
-
-        -- Minimal complete definition:
-        --      (>>=), return
-    m >> k  =  m >>= \_ -> k
-    fail s  = error s
-
---sequence       :: Monad m => [m a] -> m [a]
---sequence       =  foldr mcons (return [])
---                    where mcons p q = p >>= \x -> q >>= \y -> return (x:y)
---sequence_      :: Monad m => [m a] -> m ()
---sequence_      =  foldr (>>) (return ())
-
--- The xxxM functions take list arguments, but lift the function or
--- list element to a monad type
-
--- manually deforested for now
-
-mapM             :: Monad m => (a -> m b) -> [a] -> m [b]
---mapM f as        =  sequence (map f as)
-mapM f as = go as where
-    go [] = return []
-    go (a:as) = do
-        a' <- f a
-        as' <- go as
-        return (a':as')
-
-mapM_            :: Monad m => (a -> m b) -> [a] -> m ()
---mapM_ f as       =  sequence_ (map f as)
-mapM_ f as = go as where
-    go [] = return ()
-    go (a:as) = f a >> go as
-
-(=<<)            :: Monad m => (a -> m b) -> m a -> m b
-f =<< x          =  x >>= f
-
 
 
 
@@ -339,20 +295,11 @@ instance Monad Maybe where
     Just x >>= y = y x
     fail _ = Nothing
 
-instance Monad [] where
-    return x = [x]
-    xs >>= f = concatMap f xs
-    fail _ = []
 
 
-
-
-instance Functor [] where
-    fmap f (x:xs) = f x : fmap f xs
-    fmap f [] = []
-
-
--- Basic combinators
+instance Functor Maybe where
+    fmap _ Nothing = Nothing
+    fmap f (Just x) = Just (f x)
 
 
 
@@ -383,44 +330,6 @@ until p f x
 
 
 
-
-
--- module PreludeList (
---    map, (++), filter, concat, concatMap,
---    head, last, tail, init, null, length, (!!),
---    foldl, foldl1, scanl, scanl1, foldr, foldr1, scanr, scanr1,
---    iterate, repeat, replicate, cycle,
---    take, drop, splitAt, takeWhile, dropWhile, span, break,
---    lines, words, unlines, unwords, reverse, and, or,
---    any, all, elem, notElem, lookup,
---    sum, product, maximum, minimum,
---    zip, zip3, zipWith, zipWith3, unzip, unzip3)
---  where
-
-
-infixl 9  !!
-infix  4  `elem`, `notElem`
-
-
-
-filter :: (a -> Bool) -> [a] -> [a]
-filter p []                 = []
-filter p (x:xs) | p x       = x : filter p xs
-                | otherwise = filter p xs
-
-
---concat :: [[a]] -> [a]
---concat xss = foldr (++) [] xss
-
-
---concatMap :: (a -> [b]) -> [a] -> [b]
---concatMap f = foldr ((++) . f) []
---concatMap f = concat . map f
-
--- head and tail extract the first element and remaining elements,
--- respectively, of a list, which must be non-empty.  last and init
--- are the dual functions working from the end of a finite list,
--- rather than the beginning.
 
 
 {-# SUPERINLINE head, tail, null #-}
@@ -626,31 +535,11 @@ unwords          :: [String] -> String
 unwords []		=  ""
 unwords [w]		= w
 unwords (w:ws)		= w ++ ' ' : unwords ws
---unwords []       =  ""
---unwords ws       =  foldr1 (\w s -> w ++ ' ':s) ws
-
--- reverse xs returns the elements of xs in reverse order.  xs must be finite.
-
-
--- and returns the conjunction of a Boolean list.  For the result to be
--- True, the list must be finite; False, however, results from a False
--- value at a finite index of a finite or infinite list.  or is the
--- disjunctive dual of and.
-
--- from Jhc.List
---and, or          :: [Bool] -> Bool
---and              =  foldr (&&) True
---or               =  foldr (||) False
-
--- Applied to a predicate and a list, any determines if any element
--- of the list satisfies the predicate.  Similarly, for all.
-
---any, all         :: (a -> Bool) -> [a] -> Bool
---any p            =  or . map p
---all p            =  and . map p
 
 -- elem is the list membership predicate, usually written in infix form,
 -- e.g., x `elem` xs.  notElem is the negation.
+
+infix  4  `elem`, `notElem`
 
 elem, notElem    :: (Eq a) => a -> [a] -> Bool
 elem x           =  any (== x)
@@ -708,16 +597,6 @@ unzip            =  foldr (\(a,b) ~(as,bs) -> (a:as,b:bs)) ([],[])
 unzip3           :: [(a,b,c)] -> ([a],[b],[c])
 unzip3           =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
                           ([],[],[])
-
--- We don't inline this so there is a better chance calls to it will be recognized as bottom
-
-{-# NOINLINE error #-}
-error s = unsafePerformIO $ do
-    putStrLn "error:"
-    putStrLn s
-    exitFailure
-
-
 
 
 

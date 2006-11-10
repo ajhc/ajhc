@@ -1,6 +1,12 @@
+{-# OPTIONS_JHC -N #-}
 module Jhc.List where
 
 import Jhc.Basics
+import Jhc.IO(error)
+import Jhc.Int
+import Jhc.Order
+import Jhc.Monad
+
 
 -- | our fusion routines
 
@@ -76,16 +82,22 @@ all p xs = f xs where
     f (x:xs) | not (p x) = False
              | otherwise = f xs
 
+filter :: (a -> Bool) -> [a] -> [a]
+filter p []                 = []
+filter p (x:xs) | p x       = x : filter p xs
+                | otherwise = filter p xs
+
+infixl 9  !!
 
 (!!)                :: [a] -> Int -> a
-xs !! n | n < 0   =  error "Prelude.(!!): negative index\n"
+xs !! n | n < zero  =  error "Prelude.(!!): negative index\n"
 	| otherwise =  sub xs n where
                 sub :: [a] -> Int -> a
                 sub _ n | n `seq` False = undefined
                 sub []     _ = error "Prelude.(!!): index too large\n"
-                sub (y:ys) n = if n == 0
+                sub (y:ys) n = if n == zero
                                then y
-                               else sub ys $! (n - 1)
+                               else sub ys $! (n `minus` one)
 
 
 

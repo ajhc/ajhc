@@ -5,6 +5,7 @@ module Jhc.Enum(Enum(..),Bounded(..)) where
 import Data.Int
 import Jhc.Basics
 import Jhc.Order
+import Jhc.Int
 
 class  Enum a  where
     succ, pred       :: a -> a
@@ -56,7 +57,3 @@ instance Enum Int where
         f x | x >= z = x:f (x `plus` inc)
             | otherwise = []
 
-foreign import primitive increment :: Int -> Int
-foreign import primitive decrement :: Int -> Int
-foreign import primitive plus :: Int -> Int -> Int
-foreign import primitive minus :: Int -> Int -> Int

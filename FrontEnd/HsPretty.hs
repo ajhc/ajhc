@@ -556,6 +556,7 @@ ppHsPat (HsPNeg p) = myFsep [char '-', ppHsPat p]
 ppHsPat (HsPInfixApp a op b) = myFsep[ppHsPat a, ppHsQNameInfix op, ppHsPat b]
 ppHsPat (HsPApp n ps) = myFsep (ppHsQName n : map ppHsPat ps)
 ppHsPat (HsPTuple ps) = parenList . map ppHsPat $ ps
+ppHsPat (HsPUnboxedTuple ps) = parenListzh . map ppHsPat $ ps
 ppHsPat (HsPList ps) = bracketList . punctuate comma . map ppHsPat $ ps
 ppHsPat (HsPParen p) = parens . ppHsPat $ p
 ppHsPat (HsPRec c fields)

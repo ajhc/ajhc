@@ -58,6 +58,8 @@ import HsSyn
 import Info.Types
 import Name.Id
 import Name.Name
+import Name.Names
+import Name.VConsts
 import Options
 import SelfTest(selfTest)
 import Support.CanType(getType)
@@ -624,6 +626,10 @@ compileModEnv' stats (ho,_) = do
     prog <- transformProgram transformParms { transformCategory = "PruneUnreachable", transformOperation = return . programPruneUnreachable } prog
     prog <- barendregtProg prog
 
+
+    let theTarget = ELit litCons { litName = dc_Target, litArgs = [ELit (LitInt targetIndex tIntzh)], litType = ELit litCons { litName = tc_Target, litArgs = [], litType = eStar } }
+        targetIndex = if fopts FO.ViaGhc then 1 else 0
+    prog <- return $ runIdentity $ flip programMapDs prog $ \(t,e) -> return $ if tvrIdent t == toId v_target then (t { tvrInfo = setProperty prop_INLINE mempty },theTarget) else (t,e)
 
     --wdump FD.Core $ printProgram prog
     prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze False prog else return prog

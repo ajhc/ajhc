@@ -18,7 +18,7 @@ readHole (Hole x) = strictReturn x
 
 -- | create a new hole containing a garbage value. must not be read until it has been filled.
 newHole :: IO (Hole a)
-newHole = IO $ \_ world -> newHole__ world
+newHole = IO $ \world -> newHole__ world
 
 -- | hole that can be written to and results discarded. never read this.
 errorHole :: Hole a
@@ -27,7 +27,7 @@ errorHole = Hole undefined
 
 -- | it is an unchecked error to fill in the same hole more than once.
 fillHole :: Hole a -> a -> IO ()
-fillHole r v = IO $ \_ world -> case fillHole__ r v world of
+fillHole r v = IO $ \world -> case fillHole__ r v world of
     world' -> (# world', () #)
 
 foreign import primitive newHole__  :: World__ -> (# World__, Hole a #)

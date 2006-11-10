@@ -119,7 +119,7 @@ build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELi
 
 
 
-buildPeek cn t p = ELam tvr $ ELam tvrCont $ ELam tvrWorld (unbox' (EVar tvr) dc_Addr tvr' rest)  where
+buildPeek cn t p = ELam tvr $ ELam tvrWorld (unbox' (EVar tvr) dc_Addr tvr' rest)  where
     tvr = (tVr 2 (tPtr t))
     tvr' = tVr 4 (rawType "HsPtr")
     tvrWorld2 = tVr 258 tWorld__
@@ -147,11 +147,11 @@ buildPoke t p = ELam ptr_tvr $ ELam v_tvr $ createIO_ $ (\tw -> EPrim (APrim (Po
 --toIO t x = prim_unsafeCoerce x (tIO t)
 -}
 
-createIO t pv = toIO t (ELam tvrCont $ ELam tvrWorld $  eCaseTup  (pv tvrWorld) [tvrWorld2,rtVar] (eJustIO (EVar tvrWorld2) (EVar rtVar))) where
+createIO t pv = toIO t (ELam tvrWorld $  eCaseTup  (pv tvrWorld) [tvrWorld2,rtVar] (eJustIO (EVar tvrWorld2) (EVar rtVar))) where
     tvrWorld2 = tVr 258 tWorld__
     tvrWorld = tVr 256 tWorld__
     rtVar = tVr 260 t
-createIO_ pv = toIO tUnit (ELam tvrCont $ ELam tvrWorld $  eStrictLet tvrWorld2 (pv tvrWorld)  (eJustIO (EVar tvrWorld2) vUnit)) where
+createIO_ pv = toIO tUnit (ELam tvrWorld $  eStrictLet tvrWorld2 (pv tvrWorld)  (eJustIO (EVar tvrWorld2) vUnit)) where
     tvrWorld2 = tVr 258 tWorld__
     tvrWorld = tVr 256 tWorld__
 

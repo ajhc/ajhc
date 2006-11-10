@@ -305,9 +305,6 @@ toString x = toList x >>= mapM fromChar where
 
 tAbsurd k = ELit (litCons { litName = tc_Absurd, litArgs = [], litType = k })
 
--- the IOErrorCont type from Jhc.IO
-tCont = ELit (litCons { litName = tc_IOErrorCont, litArgs = [], litType = eStar })
-tvrCont = tvr { tvrIdent = 0, tvrType = tCont }
 
 ltTuple ts = ELit $ litCons { litName = nameTuple TypeConstructor (length ts), litArgs = ts, litType = eStar }
 ltTuple' ts = ELit $ litCons { litName = unboxedNameTuple TypeConstructor (length ts), litArgs = ts, litType = eHash }
