@@ -88,7 +88,6 @@ newVars xs = f xs [] where
 tipe t = f t where
     f (TAp t1 t2) = eAp (f t1) (f t2)
     f (TArrow t1 t2) =  EPi (tVr 0 (f t1)) (f t2)
-    f (TCon (Tycon n k)) | n == tc_World__ =  ELit (litCons { litName = rt_Worldzh, litArgs = [], litType = eHash })
     f (TCon (Tycon n k)) =  ELit litCons { litName = n, litType = kind k }
     f (TVar tv) = EVar (cvar [] tv)
     f (TMetaVar mv) = cmvar mv

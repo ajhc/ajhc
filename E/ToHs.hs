@@ -87,7 +87,7 @@ transDataTable dataTable ns = vcat (map g $ Set.toList (mconcatMap f (Set.toList
     showSlot (ELit LitCons { litArgs = es, litAliasFor = Just af }) = showSlot (foldl eAp af es)
     showSlot (EPi TVr { tvrType = a } b) = parens $ showSlot a <+> text "->" <+> showSlot b
     showSlot (ELit (LitCons { litName = c, litArgs = as })) = showCon c (map showSlot as)
-    builtIns = [tc_Int,tc_Char,dc_Int,dc_Char,rt_int,rt_HsChar,rt_Worldzh,rt_HsPtr]
+    builtIns = [tc_Int,tc_Char,dc_Int,dc_Char,rt_int,rt_HsChar,tc_World__,rt_HsPtr]
 
 data Environment = Env { envParen :: Bool, envType :: Bool }
 emptyEnvironment = Env { envParen = False, envType = False }
@@ -112,7 +112,7 @@ tshow x = text (show x)
 
 showCon c ts | Just _ <- fromUnboxedNameTuple c = text "(# " <> hsep (punctuate comma ts) <> text " #)"
 showCon c ts | Just _ <- fromTupname c = text "(" <> hsep (punctuate comma ts) <> text ")"
-showCon c [] | c == rt_Worldzh = text "World__"
+showCon c [] | c == tc_World__ = text "World__"
 showCon c [] | c == rt_int = text "Int#"
 showCon c [] | c == rt_HsChar = text "Char#"
 showCon c [] | c == rt_HsPtr = text "Addr#"

@@ -8,13 +8,12 @@ module Jhc.Prim(
 
 
 -- | this is treated very specially by the compiler. it is unboxed.
-data World__
+data World__ :: #
 
 -- | this is wrapped around arbitrary expressions and just evaluates them to whnf
-runRaw :: a -> World__ -> World__
-runRaw x w = x `seq` w
+foreign import primitive "seq" runRaw :: a -> World__ -> World__
 
-foreign import primitive seq :: a -> b -> b
+
 foreign import primitive "unsafeCoerce" unsafeCoerce__ :: a -> b
 
 -- throws away first argument. but causes second argument to artificially depend on it.

@@ -68,7 +68,6 @@ tipe' (TArrow t1 t2) =  do
     t1' <- tipe' t1
     t2' <- tipe' t2
     return $ EPi (tVr 0 (t1')) t2'
-tipe' (TCon (Tycon n k)) | n == tc_World__ = return $ ELit (litCons { litName = rt_Worldzh, litArgs = [], litType = eHash })
 tipe' (TCon (Tycon n k)) =  return $ ELit litCons { litName = n, litType = kind k }
 tipe' (TVar tv@Tyvar { tyvarKind = k}) = do
     v <- lookupName tv
@@ -202,18 +201,7 @@ tbox = Constructor {
             conChildren = Nothing
     }
 
-worlds = [(rt_Worldzh,tWorld__),(tc_World__,tWorld__)] where
-    tWorld__ = Constructor {
-                conName = rt_Worldzh,
-                conType = eHash,
-                conSlots = [],
-                conDeriving = [],
-                conExpr = ELit (litCons { litName = rt_Worldzh, litArgs = [], litType = eHash }),
-                conAlias = NotAlias,
-                conVirtual = Nothing,
-                conInhabits = tHash,
-                conChildren = Nothing
-        }
+worlds = []
 
 
 tarrow = Constructor {
@@ -305,49 +293,6 @@ typesCompatable dataTable a b = f (-2 :: Id) a b where
             f (c - 2) (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb)
 
 
-{-
--- | determine if types are the same expanding newtypes and
-typesCompatable :: Monad m => DataTable -> E -> E -> m ()
-typesCompatable dataTable a b = go a b where
-    go :: Monad m => E -> E -> m ()
-    go a b = g' [] [] a b
-    g' xs ys a b = g a b where
-        g (ELit LitCons { litName = n, litArgs = xs, litType = t }) (ELit LitCons { litName = n', litArgs = xs', litType = t' }) | n == n' = do
-            go t t'
-            when (not $ sameShape1 xs xs') $ fail "Arg lists don't match"
-            zipWithM_ go xs xs'
-        g a b | isAbsurd a && isAbsurd b = do
-            go (getType a) (getType b)
-            return ()
-        g (ESort a) (ESort b) = when (a /= b) $ fail $ "Sorts don't match: " ++ pprint (ESort a,ESort b)
-        g (EVar a) (EVar b) = when (a /= b) $ fail $ "Vars don't match: " ++ pprint (a,b)
-        g (EAp a b) (EAp a' b') = do
-            go a a'
-            go b b'
-        g x@(EPi {}) y@(EPi {}) = do
-            let EPi (TVr { tvrType =  a}) b = allShadow x
-                EPi (TVr { tvrType =  a'}) b' = allShadow y
-            go a a'
-            go b b'
-        g (EPi (TVr { tvrIdent = 0, tvrType =  a}) b) (ELit (LitCons { litName = n, litArgs = [a',b'], litType = t })) | conName tarrow == n, t == eStar = do go a a'; go b b'
-        g (ELit (LitCons { litName = n, litArgs = [a',b'], litType = t })) (EPi (TVr { tvrIdent = 0, tvrType =  a}) b) | conName tarrow == n, t == eStar = do go a a'; go b b'
-        g x@(ELam {}) y@(ELam {}) = do
-            let ELam (TVr { tvrType = a}) b = allShadow x
-                ELam (TVr { tvrType =  a'}) b' = allShadow y
-            go a a'
-            go b b'
-        g a b = case f xs ys a b of
-            Right () -> return ()
-            Left s' -> case f ys xs b a of
-                Right () -> return ()
-                Left s -> fail (s ++ "\n" ++ s' ++ "\n")
-    f :: Monad m => [Name] -> [Name] -> E -> E -> m ()
-    f xs ys (ELit LitCons { litName = n }) _ | n `elem` xs = fail "Loop detected"
-    f xs ys a@(ELit LitCons { litName = n }) b | Just x <- followAlias dataTable a = g' (n:xs) ys x b
-    f _ _ box b | box == tBox, canBeBox b = return ()
-    f _ _ a box | box == tBox, canBeBox a = return ()
-    f _ _ a b = fail $ "Types don't match: " ++ pprint (a,b)
--}
 
 
 lookupCType dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
@@ -366,30 +311,6 @@ lookupCType' dataTable e = case followAliases (mappend dataTablePrims dataTable)
     ELit LitCons { litName = c, litArgs = [], litType = _ } | Just cn  <- getConstructor c dataTable -> fail $ "lookupCType: " ++ show cn
     e' -> fail $ "lookupCType': " ++ show (e,e')
 
-    {-
-
-followAlias :: Monad m => DataTable -> E -> m E
---followAlias _ e | not (sortTypeLike e) = fail "followAlias: not a type"
-followAlias dataTable (EAp a b) = do
-    a' <- followAlias dataTable a
-    return (eAp a' b)
-followAlias dataTable (ELit LitCons { litName = c, litArgs = ts, litType = e }) = do
-    con <- getConstructor c dataTable
-    Just [cn] <- return $ conChildren con
-    ccon <- getConstructor cn dataTable
-    [sl] <- return $ conSlots ccon
-    True <- return $ sameLength (conSlots con) ts && (conAlias ccon == ErasedAlias)
-    return $ doSubst False False (fromList $ zip [2..] (map Just ts)) sl
-followAlias _ e = fail "followAlias: not an alias"
-
-followAliases :: DataTable -> E -> E
-followAliases dataTable l = f l (10::Int) where
-    f l 0 = l
-    f l n = case followAlias dataTable l of
-        Just e -> f e (n - 1)
-        Nothing -> l
-
-    -}
 
 followAlias :: Monad m => DataTable -> E -> m E
 followAlias _ (ELit LitCons { litAliasFor = Just af, litArgs = as }) = return (foldl eAp af as)
@@ -536,7 +457,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             conExpr = foldr ($) theTypeExpr (map ELam theTypeArgs),
             conDeriving = [ toName ClassName n | n <- hsDeclDerives decl],
             conAlias = NotAlias,
-            conInhabits = tStar,
+            conInhabits = if theTypeFKind == eStar then tStar else tHash,
             conVirtual = Nothing,
             conChildren = undefined
             }

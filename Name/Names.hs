@@ -26,7 +26,7 @@ instance TypeNames Name where
     tIntzh = rt_int
     tCharzh = rt_HsChar
     tIntegerzh = rt_intmax_t
-    tWorld__ = rt_Worldzh
+    tWorld__ = tc_World__
 
 instance ConNames Name where
 --    vTrue = dc_True
@@ -86,7 +86,6 @@ tc_Ratio = toName TypeConstructor ("Ratio","Ratio")
 tc_Unit = toName TypeConstructor  ("Jhc.Basics","()")
 
 
-rt_Worldzh = toName RawType "World#"
 rt_tag = toName RawType "tag#"
 
 s_Star = toName SortName ("Jhc@","*")
