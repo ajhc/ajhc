@@ -7,6 +7,8 @@ module FrontEnd.Tc.Kind(
     kindStar,
     kindUTuple,
     kindFunRet,
+    kindHash,
+    kindArg,
     unfoldKind
     ) where
 
@@ -17,30 +19,46 @@ import Data.IORef
 import Binary
 import Doc.DocLike
 import Doc.PPrint(pprint,PPrint)
+import Name.Name
 
 {-
 
- KFunRet = ?
- KUTuple = (#)
- Star    = *
+ KQuest = ?        star or hash or unboxed tuple
+ KQuestQuest = ??  star or hash
+ KUTuple = (#)     unboxed tuple
+ Star    = *       boxed value
+ KHash   = #       unboxed value
  Kfun    = (->)
+ KNamed Foo = Foo  named kind
 
  we have the following subkinding going on
 
-   ?
-  / \
- *  (#)
+       ?
+      / \
+     ?? (#)
+     /\
+    *  #
 
+in addition, user defined named kinds are allowed. these can only occur via
+kind annotations, and only unify with themselves
 
 -}
 
-data KBase = Star | KUTuple | KFunRet
+data KBase =
+        Star
+        | KHash
+        | KUTuple
+        | KQuestQuest
+        | KQuest
+        | KNamed Name
     deriving(Eq, Ord)   -- but we need them for kind inference
     {-! derive: GhcBinary !-}
 
-kindStar = KBase Star
+kindStar   = KBase Star
+kindHash   = KBase KHash
 kindUTuple = KBase KUTuple
-kindFunRet = KBase KFunRet
+kindFunRet = KBase KQuest
+kindArg    = KBase KQuestQuest
 
 data Kind  = KBase KBase
            | Kfun Kind Kind
@@ -51,32 +69,42 @@ data Kind  = KBase KBase
 
 kindCombine :: Monad m => Kind -> Kind -> m Kind
 kindCombine x y = g x y where
-    f Star Star = return Star
-    f KUTuple KUTuple = return KUTuple
-    f KFunRet KFunRet = return KFunRet
+    f x y | x == y = return x
 
-    f KFunRet Star = return Star
-    f Star KFunRet = return Star
-    f KFunRet KUTuple = return KUTuple
-    f KUTuple KFunRet = return KUTuple
+    f KQuest x = fquest x
+    f x  KQuest = fquest x
+    f KQuestQuest x = fquest2 x
+    f x  KQuestQuest = fquest2 x
     f x y = fail $ "kindCombine: " ++ show (x,y)
+    fquest (KNamed n) = fail $ "Attempt to unify named kind" <+> tshow n <+> "with ?"
+    fquest x = return x
+    fquest2 (KNamed n) = fail $ "Attempt to unify named kind" <+> tshow n <+> "with ??"
+    fquest2 KUTuple = fail $ "Attempt to unify unboxed tuple with ??"
+    fquest2 KQuest = return KQuestQuest
+    fquest2 x = return x
     g (KBase x) (KBase y) = f x y >>= return . KBase
     g (Kfun a b) (Kfun a' b') = return Kfun `ap` g a a' `ap` g b b'
     g x y = fail $ "kindCombine: " ++ show (x,y)
 
 data KindConstraint
-    = KindSimple  -- ^ * | kindSimple -> kindSimple
-    | KindFunRet  -- ^ ??, so * or (#) or ??
-    | KindStar    -- ^ must be *
-    | KindAny     -- ^ no constraints
+    = KindSimple     -- ^ * | kindSimple -> kindSimple
+    | KindQuest      -- ^ ?, so * or (#) or #
+    | KindQuestQuest -- ^ ??, * or #
+    | KindStar       -- ^ must be *
+    | KindAny        -- ^ may be anything
     deriving(Eq,Ord,Show)
+
+-- note that named kinds are never infered, so we don't need constraints
+-- mentioning them.
 
 instance Monoid KindConstraint where
     mempty = KindAny
     mappend a b | a == b = a
     mappend KindAny k = k
     mappend KindStar _ = KindStar
-    mappend KindSimple KindFunRet = KindStar
+    mappend KindSimple KindQuest = KindStar
+    mappend KindSimple KindQuestQuest = KindStar
+    mappend KindQuest KindQuestQuest = KindQuestQuest
     mappend k1 k2 = mappend k2 k1
 
 data Kindvar = Kindvar {
@@ -102,9 +130,12 @@ instance Show Kindvar where
 
 
 instance Show KBase where
-    showsPrec _ Star = showString "*"
+    showsPrec _ Star    = showString "*"
     showsPrec _ KUTuple = showString "(#)"
-    showsPrec _ KFunRet = showString "?"
+    showsPrec _ KHash   = showString "#"
+    showsPrec _ KQuest  = showString "?"
+    showsPrec _ KQuestQuest = showString "??"
+    showsPrec _ (KNamed n) = shows n
 
 instance DocLike d => PPrint d KBase where
     pprint kb = text (show kb)

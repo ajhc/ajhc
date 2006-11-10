@@ -232,7 +232,8 @@ newTyvarName t = case tyvarKind t of
     x@(KBase Star) -> newLookupName (map (:[]) ['a' ..]) x t
     y@(KBase Star `Kfun` KBase Star) -> newLookupName (map (('f':) . show) [0 :: Int ..]) y t
     z@(KBase KUTuple) -> newLookupName (map (('u':) . show) [0 :: Int ..]) z t
-    z@(KBase KFunRet) -> newLookupName (map (('r':) . show) [0 :: Int ..]) z t
+    z@(KBase KQuest) -> newLookupName (map (('q':) . show) [0 :: Int ..]) z t
+    z@(KBase KQuestQuest) -> newLookupName (map (('q':) . ('q':) . show) [0 :: Int ..]) z t
     z -> newLookupName (map (('t':) . show) [0 :: Int ..]) z t
 
 

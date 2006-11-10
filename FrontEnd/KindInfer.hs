@@ -169,8 +169,10 @@ zonkConstraint nk mv = do
         liftIO $ modifyIORef (kvarRef mv) (\Nothing -> Just $ KVar nmv)
 
 constrain KindAny k = return ()
-constrain KindStar (KBase Star) = return ()
-constrain KindFunRet (KBase _) = return ()
+constrain KindStar        (KBase Star) = return ()
+constrain KindQuest       k@KBase {}  = kindCombine kindFunRet k >> return ()
+constrain KindQuestQuest  (KBase KQuest) = fail "cannot constraint ? to be ??"
+constrain KindQuestQuest  k@KBase {}  = kindCombine kindArg k >> return ()
 constrain KindSimple (KBase Star) = return ()
 constrain KindSimple (a `Kfun` b) = do
     a <- findKind a
@@ -259,21 +261,24 @@ kiType' k t = do
 
 kiType k (HsTyTuple ts) = do
     unify kindStar k
-    mapM_ (kiType kindStar) ts
+    mapM_ (kiType' kindStar) ts
 kiType k (HsTyUnboxedTuple ts) = do
     unify kindUTuple k
-    mapM_ (kiType kindStar) ts
+    flip mapM_ ts $ \t -> do
+        kt <- newKindVar KindQuestQuest
+        kiType (KVar kt) t
 kiType k (HsTyFun a b) = do
     unify kindStar k
-    kiType kindStar a
-    kv <- newKindVar KindFunRet
-    kiType (KVar kv) b
+    ka <- newKindVar KindQuestQuest
+    kb <- newKindVar KindQuest
+    kiType (KVar ka) a
+    kiType (KVar kb) b
 kiType k (HsTyApp a b) = do
     kv <- newKindVar KindAny
     kiType  (KVar kv `Kfun` k) a
     kiType' (KVar kv) b
 kiType k (HsTyVar v) = do
-    kv <- lookupKind KindSimple (toName TypeVal v)
+    kv <- lookupKind KindAny (toName TypeVal v)
     unify k kv
 kiType k (HsTyCon v) = do
     kv <- lookupKind KindAny (toName TypeConstructor v)
@@ -285,14 +290,14 @@ kiType k HsTyAssoc = do
     constrain KindSimple k
 kiType _ HsTyEq {} = error "kiType.HsTyEq"
 kiType k HsTyForall { hsTypeVars = vs, hsTypeType = HsQualType con t } = do
-    mapM initTyVarBind vs
+    mapM_ initTyVarBind vs
     mapM_ kiPred con
     kiType' k t
 kiType k HsTyExpKind { hsTyType = t, hsTyKind = ek } = do
     unify (hsKindToKind ek) k
     kiType' k t
 kiType k HsTyExists { hsTypeVars = vs, hsTypeType = HsQualType con t } = do
-    mapM initTyVarBind vs
+    mapM_ initTyVarBind vs
     mapM_ kiPred con
     kiType' k t
 
@@ -306,6 +311,8 @@ initTyVarBind HsTyVarBind { hsTyVarBindName = name, hsTyVarBindKind = kk } = do
 
 hsKindToKind (HsKindFn a b) = hsKindToKind a `Kfun` hsKindToKind b
 hsKindToKind a | a == hsKindStar = kindStar
+hsKindToKind a | a == hsKindHash = kindHash
+hsKindToKind (HsKind n) = KBase (KNamed (toName SortName n))
 -- hsKindToKind (HsKind n) = toName SortName n
 
 kiApps :: Kind -> [HsType] -> Kind -> Ki ()
@@ -340,7 +347,7 @@ kiPred :: HsAsst -> Ki ()
 kiPred asst@(HsAsst n ns) = do
     env <- getEnv
     let f k n = do
-            k' <- lookupKind KindSimple (toName TypeVal n)
+            k' <- lookupKind KindAny (toName TypeVal n)
             unify k k'
     case Map.lookup (toName ClassName n) (kindEnvClasses env) of
         Nothing -> fail $ "unknown class: " ++ show asst
@@ -359,6 +366,11 @@ kiInitClasses ds =  sequence_ [ f className [classArg] |  HsClassDecl _ (HsQualT
 
 
 kiDecl :: HsDecl -> Ki ()
+kiDecl HsDataDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs = args, hsDeclCons = [], hsDeclHasKind = Just kk } = do
+    args <- mapM (lookupKind KindSimple . toName TypeVal) args
+    kc <- lookupKind KindAny (toName TypeConstructor tyconName)
+    kiApps' kc args (hsKindToKind kk)
+    mapM_ kiPred context
 kiDecl HsDataDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs = args, hsDeclCons = condecls } = kiData context tyconName args condecls
 kiDecl HsNewTypeDecl { hsDeclContext = context, hsDeclName = tyconName, hsDeclArgs = args, hsDeclCon = condecl } = kiData context tyconName args [condecl]
 kiDecl HsTypeDecl { hsDeclName = name, hsDeclTArgs = args, hsDeclType = ty } = do
@@ -396,7 +408,9 @@ kiData context tyconName args condecls = do
     kc <- lookupKind KindSimple (toName TypeConstructor tyconName)
     kiApps' kc args kindStar
     mapM_ kiPred context
-    mapM_ (kiType kindStar) (concatMap (map hsBangType . hsConDeclArgs) condecls)
+    flip mapM_  (concatMap (map hsBangType . hsConDeclArgs) condecls) $ \t -> do
+        v <- newKindVar KindQuestQuest
+        kiType (KVar v) t
 
 kiHsQualType :: KindEnv -> HsQualType -> KindEnv
 kiHsQualType inputEnv qualType@(HsQualType ps t) = newState where

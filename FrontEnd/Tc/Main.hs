@@ -82,7 +82,7 @@ tcApps e as typ = tcApps' e as typ
 
 -- the fall through case
 tcApps' e as typ = do
-    bs <- sequence [ newBox kindStar | _ <- as ]
+    bs <- sequence [ newBox kindArg | _ <- as ]
     e' <- tcExpr e (foldr fn typ bs)
     as' <- sequence [ tcExprPoly a r | r <- bs | a <- as ]
     return (e',as')
@@ -200,9 +200,9 @@ tiExpr (HsLeftSection e1 e2) typ = do
 -- (: [])  \x -> x : []   `fn`
 
 tiExpr (HsRightSection e1 e2) typ = do
-    arg <- newBox kindStar
-    arg2 <- newBox kindStar
-    ret <- newBox kindStar
+    arg <- newBox kindArg
+    arg2 <- newBox kindArg
+    ret <- newBox kindFunRet
     e1 <- tcExpr e1 arg2
     e2 <- tcExpr e2 (arg `fn` (arg2 `fn` ret))
     (arg `fn` ret) `subsumes` typ
@@ -237,7 +237,7 @@ tiExpr expr@(HsNegApp e) typ = withContext (makeMsg "in the negative expression"
 -- ABS1
 tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lambda expression\n   \\" ++ show (pprint ps:: P.Doc) ++ " -> ...") $ do
     let lam (p:ps) e (TMetaVar mv) rs = do -- ABS2
-            withMetaVars mv [kindStar,kindFunRet] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) e (a `fn` b) rs
+            withMetaVars mv [kindArg,kindFunRet] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) e (a `fn` b) rs
         lam (p:ps) e (TArrow s1' s2') rs = do -- ABS1
             --box <- newBox Star
             --s1' `boxyMatch` box

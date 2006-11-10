@@ -103,6 +103,7 @@ tipe t = f t where
     lt n | nameType n == TypeVal = toId n  -- verifies namespace
 
 kind (KBase KUTuple) = eHash
+kind (KBase KHash) = eHash
 kind (KBase Star) = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."

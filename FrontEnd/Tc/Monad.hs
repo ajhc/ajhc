@@ -252,7 +252,7 @@ lookupName n = do
         Nothing | Just 0 <- fromUnboxedNameTuple n  -> do
             return (tTTuple' [])
         Nothing | Just num <- fromUnboxedNameTuple n -> do
-            nvs <- mapM newVar  (replicate num kindStar)
+            nvs <- mapM newVar  (replicate num kindArg)
             let nvs' = map TVar nvs
             return (TForAll nvs $ [] :=> foldr TArrow  (tTTuple' nvs') nvs')
         Nothing -> fail $ "Could not find var in tcEnv:" ++ show (nameType n,n)
@@ -399,7 +399,8 @@ quantify vs ps r | not $ any isBoxyMetaVar vs = do
 
 -- turn all ?? into * types, as we can't abstract over unboxed types
 fixKind :: Kind -> Kind
-fixKind (KBase KFunRet) = KBase Star
+fixKind (KBase KQuestQuest) = KBase Star
+fixKind (KBase KQuest) = KBase Star
 fixKind (a `Kfun` b) = fixKind a `Kfun` fixKind b
 fixKind x = x
 
