@@ -184,6 +184,28 @@ processPrimPrim dataTable o@(EPrim (APrim prim _) es t) = case primopt prim es t
                 return $ unbox dataTable a vara $ \tvra ->
                     unbox dataTable b varb $ \tvrb ->
                         eStrictLet (tVr varc sta) (EPrim (APrim (Operator "-" [ta,ta] ta) mempty) [EVar tvra, EVar tvrb] sta) (ELit (litCons { litName = cna, litArgs = [EVar (tVr varc sta)], litType = t }))
+        primopt (PrimPrim "times") [a,b] t = ans where
+            (vara:varb:varc:_) = freeNames (freeVars (a,b,t))
+            Just (cna,sta,ta) = lookupCType' dataTable t
+            ans = do
+                (_,ta) <- lookupCType dataTable (getType a)
+                (_,tb) <- lookupCType dataTable (getType b)
+                (_,tr) <- lookupCType dataTable t
+                unless (ta == tb && tb == tr) $ fail "bad minus"
+                return $ unbox dataTable a vara $ \tvra ->
+                    unbox dataTable b varb $ \tvrb ->
+                        eStrictLet (tVr varc sta) (EPrim (APrim (Operator "*" [ta,ta] ta) mempty) [EVar tvra, EVar tvrb] sta) (ELit (litCons { litName = cna, litArgs = [EVar (tVr varc sta)], litType = t }))
+        primopt (PrimPrim "modulus") [a,b] t = ans where
+            (vara:varb:varc:_) = freeNames (freeVars (a,b,t))
+            Just (cna,sta,ta) = lookupCType' dataTable t
+            ans = do
+                (_,ta) <- lookupCType dataTable (getType a)
+                (_,tb) <- lookupCType dataTable (getType b)
+                (_,tr) <- lookupCType dataTable t
+                unless (ta == tb && tb == tr) $ fail "bad minus"
+                return $ unbox dataTable a vara $ \tvra ->
+                    unbox dataTable b varb $ \tvrb ->
+                        eStrictLet (tVr varc sta) (EPrim (APrim (Operator "%" [ta,ta] ta) mempty) [EVar tvra, EVar tvrb] sta) (ELit (litCons { litName = cna, litArgs = [EVar (tVr varc sta)], litType = t }))
 
         primopt (PrimPrim "increment") [a] t = ans where
             (vara:varc:_) = freeNames (freeVars (a,t))
