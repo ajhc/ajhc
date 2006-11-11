@@ -7,6 +7,7 @@ data Target = Grin | GhcHs | DotNet | Java
 
 {-# NOINLINE target #-}
 target :: Target
-target = error_target
+target = unknown_target
 
-foreign import primitive "error.Jhc.Options.Target" error_target :: Target
+foreign import primitive unknown_target :: Target
+

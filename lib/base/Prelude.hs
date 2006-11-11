@@ -15,6 +15,7 @@ module Prelude(
     all,
     foldr,
     and,
+    filter,
     or,
     (!!),
     sequence,
