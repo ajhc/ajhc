@@ -417,6 +417,7 @@ ppHsTypePrec p (HsTyAssoc) = text "<assoc>"
 ppHsTypePrec p (HsTyEq a b) =
 	parensIf (p > 0) $ myFsep [ppHsType a, text "=", ppHsType b]
 ppHsTypePrec p (HsTyTuple l) = parenList . map ppHsType $ l
+ppHsTypePrec p (HsTyUnboxedTuple l) = parenListzh . map ppHsType $ l
 -- special case
 ppHsTypePrec p (HsTyApp (HsTyCon lcons) b ) | lcons == nameName tc_List = brackets $ ppHsType b
 ppHsTypePrec p (HsTyApp a b) =

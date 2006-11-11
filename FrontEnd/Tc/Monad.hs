@@ -390,6 +390,7 @@ freeMetaVarsEnv = do
 
 quantify :: [MetaVar] -> [Pred] -> Rho -> Tc Sigma
 quantify vs ps r | not $ any isBoxyMetaVar vs = do
+    vs <- mapM groundKind vs
     r <- flattenType r
     nvs <- mapM (newVar . fixKind . metaKind) vs
     sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- vs ]
@@ -404,6 +405,7 @@ fixKind (KBase KQuest) = KBase Star
 fixKind (a `Kfun` b) = fixKind a `Kfun` fixKind b
 fixKind x = x
 
+groundKind mv = zonkKind (fixKind $ metaKind mv) mv
 
 -- this removes all boxes, replacing them with tau vars
 unBox ::  Type -> Tc Type

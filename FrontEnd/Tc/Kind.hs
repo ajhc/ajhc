@@ -37,8 +37,9 @@ import Name.Name
       / \
      ?? (#)
      /\
-    *  #
-
+    *?  #
+   /  \
+  *    !
 in addition, user defined named kinds are allowed. these can only occur via
 kind annotations, and only unify with themselves
 

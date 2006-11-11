@@ -104,6 +104,8 @@ tipe t = f t where
 kind (KBase KUTuple) = eHash
 kind (KBase KHash) = eHash
 kind (KBase Star) = eStar
+kind (KBase KQuest) = eStar      -- XXX why do these still exist?
+kind (KBase KQuestQuest) = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."
 
