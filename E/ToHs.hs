@@ -77,9 +77,10 @@ transDataTable dataTable ns = vcat (map g $ Set.toList (mconcatMap f (Set.toList
     g n = ans where
         ans = text "data" <+> hsep (showCName n:[ text ('x':show i) | _ <- conSlots con | i <- [2::Int,4 ..] ]) <+> dchildren
         Just con = getConstructor n dataTable
-        Just childs = conChildren con
-        dchildren | null childs = empty
-                  | otherwise =  text "=" <+> hcat (punctuate (text " | ") (map dc childs))
+        childs = conChildren con
+        dchildren | Just [] <- childs = empty
+                  | Nothing <- childs = empty
+                  | Just childs <- childs  =  text "=" <+> hcat (punctuate (text " | ") (map dc childs))
     dc cn = ans where
         ans = hsep (showCName cn: map showSlot (conSlots con))
         Just con = getConstructor cn dataTable
@@ -110,9 +111,12 @@ noParens x = local (\e -> e { envParen = False }) x
 
 tshow x = text (show x)
 
+showCon c ts | Just 0 <- fromUnboxedNameTuple c, nameType c == TypeConstructor = text "Nothing"
+showCon c ts | Just 0 <- fromUnboxedNameTuple c, nameType c == DataConstructor = text "theNothing"
 showCon c ts | Just _ <- fromUnboxedNameTuple c = text "(# " <> hsep (punctuate comma ts) <> text " #)"
 showCon c ts | Just _ <- fromTupname c = text "(" <> hsep (punctuate comma ts) <> text ")"
 showCon c [] | c == tc_World__ = text "World__"
+showCon c [] | (RawType,v) <- fromName c = text $ showCType v
 showCon c [] | c == rt_int = text "Int#"
 showCon c [] | c == rt_HsChar = text "Char#"
 showCon c [] | c == rt_HsPtr = text "Addr#"
@@ -142,6 +146,7 @@ transType (ELit LitCons { litName = c, litArgs =  ts }) = nparen $ do
     tell mempty { collNames = Set.singleton (c,length ts,inType) }
     ts <- mapM transType ts
     return $ showCon c ts
+transType e = return $ text "{- ERROR " <> tshow e <> text " -} Type"
 
 transE :: E -> TM Doc
 transE (EError s _) = mparen $ return (text "error" <+> tshow s)
@@ -193,10 +198,17 @@ transE ECase { eCaseBind = bind, eCaseScrutinee = scrut, eCaseDefault = md, eCas
 transE e | Just (e',_) <- from_unsafeCoerce e = mparen $ do
     e' <- transE e'
     return (text "unsafeCoerce#" <+> e')
+transE e@(EPrim (APrim (PrimPrim prim) _) args _) = case (prim,args) of
+    ("drop__",[_x,y]) -> transE y  -- XXX
+    _ -> return $ parens $ text "error" <+> tshow (show e)
 transE (EPrim (APrim Operator { primOp = op, primRetType = rt } _) [x,y] _) | Just z <- op2Table (op,rt) = mparen $ do
     x <- transE x
     y <- transE y
     return (hsep [text z,x,y])
+transE (EPrim (APrim Operator { primOp = op, primArgTypes = [at,_] } _) [x,y] _) | Just z <- op2TableCmp (op,showCType at) = mparen $ do
+    x <- transE x
+    y <- transE y
+    return $ text "fromBool" <+> (parens $ hsep [text z,x,y])
 transE (EPrim (APrim (AddrOf addr) _) [] _) = mparen $ do
     tell mempty { collPrims = Set.singleton (AddrOf addr) }
     return (text $ "unPtr addr_" ++ mangleIdent addr)
@@ -214,7 +226,7 @@ transE (EPrim (APrim cast@CCast { primArgType = at, primRetType = rt } _) [x] _)
     ("Word#","Int#") -> return (text "addr2Int#" <+> x)
     ("Int#","Word#") -> return (text "int2Word#" <+> x)
 
-transE e = return $ text "{- ERROR " <> tshow e <> text " -} undefined"
+transE e = return $ parens $ text "error" <+> tshow (show e)
 
 cfuncname Func { funcName = fn, funcIOLike = iol, primArgTypes = as, primRetType = r  } =  ("func_" ++ (if iol then "io" else "pure") ++ "_" ++ fn ++ concatInter "_" (r:as))
 
@@ -223,7 +235,26 @@ op2Table (op,rt) = lookup rt table >>= lookup op where
     intTable = [
         ("+","(+#)"),
         ("-","(-#)"),
-        ("*","(*#)")
+        ("*","(*#)"),
+        ("%","remInt#"),
+        ("/","quotInt#")
+        ]
+
+op2TableCmp (op,rt) = lookup rt table >>= lookup op where
+    table = [ ("Int#",intTable), ("Char#",charTable)]
+    intTable = [
+        (">","(>#)"),
+        ("==","(==#)"),
+        ("<","(<#)"),
+        (">=","(>=#)"),
+        ("<=","(<=#)")
+        ]
+    charTable = [
+        (">","gtChar#"),
+        ("==","eqChar#"),
+        ("<","ltChar#"),
+        (">=","gteChar#"),
+        ("<=","lteChar#")
         ]
 
 transAlt :: Bool -> Doc -> Alt E -> TM Doc
@@ -239,6 +270,7 @@ transAlt dobind b (Alt LitCons { litName = c, litArgs = ts } e) = do
 
 
 transTVr :: TVr -> TM Doc
+transTVr TVr { tvrIdent = 0 } = return $ char '_'
 transTVr tvr = return (text $ 'v':mangleIdent (pprint tvr))
 
 mangleIdent xs =  concatMap f xs where
