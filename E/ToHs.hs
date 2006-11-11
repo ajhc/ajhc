@@ -63,19 +63,26 @@ transForeign ps = vcat (map f ps) where
     f furc@Func { funcName = fn, funcIOLike = False, primArgTypes = as, primRetType = rt } = ans where
         ans = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ cfuncname furc ++ " :: " ++ concatInter " -> " (map showCType (as ++ [rt]))
 
-transDataTable dataTable ns = vcat (map g $ Set.toList (mconcatMap f (Set.toList ns))) where
+transDataTable dataTable ns = vcat (theType:map g (lefts wtd)) where
+    wtd =  Set.toList (mconcatMap f (Set.toList ns))
     f (n,_,_) | n `elem` builtIns = Set.empty
     f (n,_,_) | Just _ <- fromUnboxedNameTuple n = Set.empty
     f (n,_,_) | Just _ <- fromTupname n = Set.empty
-    f w@(n,_,tl) = case (nameType n,tl) of
+    f w@(n,nn,tl) = case (nameType n,tl) of
         (DataConstructor,False) -> Set.fromList $ do
             c <- getConstructor n dataTable
-            return (conInhabits c)
-        (TypeConstructor,True) -> Set.singleton n
-        (_RawType,_) -> Set.empty
+            return (Left $ conInhabits c)
+        (TypeConstructor,True) -> Set.singleton (Left n)
+        (TypeConstructor,False) -> Set.singleton (Right (n,nn))
+        (RawType,_) -> Set.empty
         (nt,_) -> error (show (w,nt))
+    theType = text "data Type = Char | Int" <+> case rights wtd of
+        [] -> empty
+        as -> text "|" <+> hcat (punctuate (text " | ") (map tt as))
+    tt (n,nn) = hsep (showTCName nn n:replicate nn (text "Type"))
+
     g n = ans where
-        ans = text "data" <+> hsep (showCName n:[ text ('x':show i) | _ <- conSlots con | i <- [2::Int,4 ..] ]) <+> dchildren
+        ans = text "data" <+> hsep (showTCName (length $ conSlots con) n:[ text ('x':show i) | _ <- conSlots con | i <- [2::Int,4 ..] ]) <+> dchildren
         Just con = getConstructor n dataTable
         childs = conChildren con
         dchildren | Just [] <- childs = empty
@@ -125,8 +132,12 @@ showCon c [] | c == tc_Char = text "Char"
 --showCon c [x,xs] | c == dc_Cons = parens $ x <> text ":" <> xs
 --showCon c [] | c == dc_EmptyList = text "[]"
 
-showCon c [] = showCName c
-showCon c ts = parens $ hsep (showCName c:ts)
+showCon c [] = showTCName 0 c
+showCon c ts = parens $ hsep (showTCName (length ts) c:ts)
+
+showTCName n c | nameType c == TypeConstructor = showCName c <> text "_" <> tshow n
+showTCName _ c = showCName c
+
 
 showCName c  | c == dc_Char = text "C#"
 showCName c  | c == dc_Int = text "I#"
@@ -146,6 +157,7 @@ transType (ELit LitCons { litName = c, litArgs =  ts }) = nparen $ do
     tell mempty { collNames = Set.singleton (c,length ts,inType) }
     ts <- mapM transType ts
     return $ showCon c ts
+transType (ESort EStar) = return $ text "Type"
 transType e = return $ text "{- ERROR " <> tshow e <> text " -} Type"
 
 transE :: E -> TM Doc
@@ -258,6 +270,9 @@ op2TableCmp (op,rt) = lookup rt table >>= lookup op where
         ]
 
 transAlt :: Bool -> Doc -> Alt E -> TM Doc
+transAlt dobind b (Alt (LitInt num t) e) | t == tCharzh || t == rawType "wchar_t" = do
+    e <- noParens $ transE e
+    return ( (if dobind then b <> char '@' else empty) <> text (show $ chr $ fromIntegral num) <> text "#" <+> text "->" <+> e)
 transAlt dobind b (Alt LitInt { litNumber = i } e) = do
     e <- noParens $ transE e
     return ( (if dobind then b <> char '@' else empty) <> tshow i <> text "#" <+> text "->" <+> e)
