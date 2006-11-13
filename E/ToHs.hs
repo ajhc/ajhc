@@ -228,7 +228,12 @@ transE e | Just (e',_) <- from_unsafeCoerce e = mparen $ do
     return (text "unsafeCoerce#" <+> e')
 transE e@(EPrim (APrim (PrimPrim prim) _) args _) = case (prim,args) of
     ("drop__",[_x,y]) -> transE y  -- XXX
-    _ -> return $ parens $ text "error" <+> tshow (show e)
+    ("catch__",args) -> mapM transE args >>= \args' -> mparen (return $ hsep (text "catch#":args'))
+    ("raiseIO__",args) -> mapM transE args >>= \args' -> mparen (return $ hsep (text "raiseIO#":args'))
+    ("newRef__",args) -> mapM transE args >>= \args' -> mparen (return $ hsep (text "newMVar#":args'))
+    ("readRef__",args) -> mapM transE args >>= \args' -> mparen (return $ hsep (text "readMutVar#":args'))
+    ("writeRef__",args) -> mapM transE args >>= \args' -> mparen (return $ hsep (text "writeMutVar#":args'))
+    _ -> return $ parens $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
 transE (EPrim (APrim Operator { primOp = op, primRetType = rt } _) [x,y] _) | Just z <- op2Table (op,rt) = mparen $ do
     x <- transE x
     y <- transE y
@@ -254,7 +259,7 @@ transE (EPrim (APrim cast@CCast { primArgType = at, primRetType = rt } _) [x] _)
     ("Word#","Int#") -> return (text "addr2Int#" <+> x)
     ("Int#","Word#") -> return (text "int2Word#" <+> x)
 
-transE e = return $ parens $ text "error" <+> tshow (show e)
+transE e = return $ parens $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
 
 cfuncname Func { funcName = fn, funcIOLike = iol, primArgTypes = as, primRetType = r  } =  ("func_" ++ (if iol then "io" else "pure") ++ "_" ++ fn ++ concatInter "_" (r:as))
 
