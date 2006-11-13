@@ -17,7 +17,8 @@ module Jhc.IO(
     IOError(),
     showIOError,
     userError,
-    unsafePerformIO
+    unsafePerformIO,
+    unsafePerformIO'
     ) where
 
 import Jhc.Prim
@@ -41,6 +42,12 @@ unsafePerformIO :: IO a -> a
 unsafePerformIO x = case newWorld__ x of
     world -> case errorContinuation x of
         IO y -> case y world of
+            (# _, a #) -> a
+
+-- | same as unsafePerformIO, but doesn't set up error handler
+unsafePerformIO' :: IO a -> a
+unsafePerformIO' x = case newWorld__ x of
+    world -> case (unIO x) world of
             (# _, a #) -> a
 
 -- we have to replace the error handler because the context might have quit by the time the value is evaluated.
@@ -135,7 +142,7 @@ IO a `thenIO` b = IO $ \w -> case a w of
     (# w', v #) -> unIO (b v) w'
 
 {-# NOINLINE error #-}
-error s = unsafePerformIO $
+error s = unsafePerformIO' $
     putErrLn "error:"  `thenIO_`
     putErrLn s         `thenIO_`
     exitFailure
