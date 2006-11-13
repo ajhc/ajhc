@@ -43,6 +43,7 @@ import FrontEnd.HsParser
 import FrontEnd.Infix
 import FrontEnd.ParseMonad
 import FrontEnd.Unlit
+import FrontEnd.Syn.Options
 import GenUtil hiding(putErrLn,putErr,putErrDie)
 import Ho.Type
 import HsSyn
@@ -364,11 +365,15 @@ searchPaths m = ans where
 
 
 parseHsSource :: String -> String -> IO HsModule
-parseHsSource fn s = case runParserWithMode (parseModeOptions options) { parseFilename = fn } parse  s'  of
+parseHsSource fn s = do
+    let opts = concat [ words as | (x,as) <- parseOptions s', x `elem` ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"]]
+        s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
+    opt <- case fileOptions opts of
+        Just o -> return o
+        Nothing -> return options
+    case runParserWithMode (parseModeOptions opt) { parseFilename = fn } parse  s'  of
                       ParseOk ws e -> processErrors ws >> return e
                       ParseFailed sl err -> putErrDie $ show sl ++ ": " ++ err
-    where
-    s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
 
 
 mapHoBodies  :: (E -> E) -> Ho -> Ho

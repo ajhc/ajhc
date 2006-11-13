@@ -204,7 +204,7 @@ processOptions = getArguments >>= (\argv -> either putErrDie return $ do
 {-# NOINLINE fileOptions #-}
 fileOptions :: Monad m => [String] -> m Opt
 fileOptions xs = case getOpt Permute theoptions xs of
-    (os,[],[]) -> postProcessFD (foldl (flip ($)) options os)
+    (os,[],[]) -> postProcessFD (foldl (flip ($)) options os) >>= postProcessFO
     (_,_,errs) -> fail (concat errs)
 
 {-# NOINLINE options #-}
