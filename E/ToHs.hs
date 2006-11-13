@@ -47,7 +47,7 @@ compileToHs prog = do
     args <- getArguments
     let argstring = simpleQuote (name:args)
         comm = shellQuote $ ["ghc", cf, "-o", fn ]
-    writeFile cf $ unlines ["-- " ++ argstring,"-- " ++ comm,"",viaghc_hs,data_decls,rv,"",foreign_decls]
+    writeFile cf $ unlines ["-- " ++ argstring,"-- " ++ comm,"",viaghc_hs,render restate,data_decls,rv,"",foreign_decls]
     progress ("Running: " ++ comm)
     r <- System.system comm
     when (r /= System.ExitSuccess) $ fail "Hs code did not compile."
@@ -59,12 +59,27 @@ showCType "HsPtr" =  "Addr#"
 showCType "HsFunPtr" =  "Addr#"
 showCType _ =  "Int#"
 
+restate = vcat $ map f restated where
+    f (n,nn,v) = g (nameType n) <> text v <+> text "=" <+> showTCName nn n
+    g DataConstructor = empty
+    g TypeConstructor = text "type "
+    restated = [
+        (dc_Cons,0,"jhc_Cons"),
+        (dc_EmptyList,0,"jhc_EmptyList"),
+        (tc_List,1,"ListTCon")
+        ]
+
+
+
 transForeign ps = vcat (map f ps) where
     f (AddrOf s) = text $ "foreign import ccall \"&" ++ s ++ "\" addr_" ++ mangleIdent s ++ " :: Ptr ()"
     f furc@Func { funcName = fn, funcIOLike = True, primArgTypes = as, primRetType = "void" } = ans where
         ans = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ cfuncname furc ++ " :: " ++ concatInter " -> " ("World__":map showCType as ++ ["World__"])
     f furc@Func { funcName = fn, funcIOLike = False, primArgTypes = as, primRetType = rt } = ans where
         ans = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ cfuncname furc ++ " :: " ++ concatInter " -> " (map showCType (as ++ [rt]))
+    f furc@Func { funcName = fn, funcIOLike = True, primArgTypes = as, primRetType = rt } = ans where
+        ans = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ cfuncname furc ++ " :: " ++ concatInter " -> " ("World__":(map showCType as ++ ["(# World__, " ++ showCType rt ++ " #)"]))
+    f n = text "{- Foreign.Error " <+> tshow n <+> text "-}"
 
 transDataTable dataTable ns = vcat (theType:map g (lefts wtd)) where
     wtd =  Set.toList (mconcatMap f (Set.toList ns))

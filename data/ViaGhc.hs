@@ -32,4 +32,8 @@ fromBool b = case b of
 gteChar# a b = gtChar# a b || eqChar# a b
 lteChar# a b = ltChar# a b || eqChar# a b
 
+convertString :: [Char] -> ListTCon Char
+convertString [] = jhc_EmptyList
+convertString (x:xs) = jhc_Cons x (convertString xs)
+
 theRealMain :: World__ -> World__
