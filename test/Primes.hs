@@ -20,5 +20,5 @@ primes :: [Int]
 primes = map head (iterate the_filter (iterate suCC 2))
 
 main = do
-	[arg] <- getArgs
-	print $ primes !! (read arg)
+	--[arg] <- getArgs
+	print $ primes !! 2000 -- (read arg)

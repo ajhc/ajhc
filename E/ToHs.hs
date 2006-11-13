@@ -8,14 +8,15 @@ import Text.PrettyPrint.HughesPJ
 import qualified System
 import qualified Data.Set as Set
 
+import C.Prims
+import DataConstructors
 import Doc.PPrint
 import E.E
-import DataConstructors
-import C.Prims
-import E.Subst
 import E.Program
+import E.Subst
+import E.Traverse
 import E.Values
-import Support.CanType
+import Name.Id
 import Name.Name
 import Name.Names
 import Name.Prim
@@ -23,7 +24,9 @@ import Name.VConsts
 import Numeric
 import Options
 import RawFiles(viaghc_hs)
+import Support.CanType
 import Util.Gen
+import Util.SetLike
 import qualified FlagDump as FD
 
 progress str = wdump FD.Progress $  (putErrLn str) >> hFlush stderr
@@ -97,8 +100,17 @@ transDataTable dataTable ns = vcat (theType:map g (lefts wtd)) where
     showSlot (ELit (LitCons { litName = c, litArgs = as })) = showCon c (map showSlot as)
     builtIns = [tc_Int,tc_Char,dc_Int,dc_Char,rt_int,rt_HsChar,tc_World__,rt_HsPtr]
 
-data Environment = Env { envParen :: Bool, envType :: Bool }
-emptyEnvironment = Env { envParen = False, envType = False }
+data Environment = Env {
+    envParen  :: Bool,
+    envType   :: Bool,
+    envCoerce :: IdSet
+    }
+
+emptyEnvironment = Env {
+    envParen  = False,
+    envType   = False,
+    envCoerce = mempty
+    }
 
 data Collect = Coll { collNames :: Set.Set (Name,Int,Bool), collPrims :: Set.Set Prim }
     {-! derive: Monoid !-}
@@ -147,6 +159,7 @@ showCName c = text $ case nameType c of
     n -> 'U':mangleIdent (show n ++ "_" ++ show c)
 
 transType :: E -> TM Doc
+transType e | typeLike e = return $ text "Type"
 transType (EPi TVr {tvrType = a } b) = local (\e -> e { envType = True }) $ mparen $ do
     a <- transType a
     b <- transType b
@@ -157,8 +170,11 @@ transType (ELit LitCons { litName = c, litArgs =  ts }) = nparen $ do
     tell mempty { collNames = Set.singleton (c,length ts,inType) }
     ts <- mapM transType ts
     return $ showCon c ts
-transType (ESort EStar) = return $ text "Type"
 transType e = return $ text "{- ERROR " <> tshow e <> text " -} Type"
+
+typeLike (ESort EStar) = True
+typeLike (EPi TVr { tvrType = a } b) = typeLike a && typeLike b
+typeLike _ = False
 
 transE :: E -> TM Doc
 transE (EError s _) = mparen $ return (text "error" <+> tshow s)
@@ -173,18 +189,18 @@ transE ee | (e,ts@(_:_)) <- fromLam ee  = mparen $ do
     ts' <- mapM transTVr ts
     e <- noParens $ transE e
     return $ text "\\" <> hsep ts' <+> text "->" <+> e
-transE (EVar tvr) = transTVr tvr
+transE (EVar tvr) = do
+    env <- asks envCoerce
+    t <- transTVr tvr
+    case tvrIdent tvr `member` env of
+        False -> return t
+        True -> mparen $ return $ text "unsafeCoerce#" <+> t
 transE ee | (e,es@(_:_)) <- fromAp ee = mparen $ do
     e <- transE e
     es <- mapM transE es
     return (hsep (e:es))
---transE ELetRec { eDefs = [(t,d)], eBody = e } | (d,bs) <- fromLam d = mparen $ noParens $ do
---    t <- transTVr t
---    bs <- mapM transTVr bs
---    d <- transE d
---    e <- transE e
---    return (text "let {" <+> hsep (t:bs) <+> text "=" <+> d <+> text " } in" <+> e)
 transE ELetRec { eDefs = ds, eBody = e } = mparen $ do
+    local (\e -> e { envCoerce = envCoerce e `mappend` fromList [ tvrIdent t | (t,_) <- ds, hasBoxes (tvrType t)] }) $ do
     ds' <- flip mapM ds $ \ (t,e) -> do
         let (b,bs) = fromLam e
         tt <- noParens $ transType (tvrType t)
@@ -242,8 +258,12 @@ transE e = return $ parens $ text "error" <+> tshow (show e)
 
 cfuncname Func { funcName = fn, funcIOLike = iol, primArgTypes = as, primRetType = r  } =  ("func_" ++ (if iol then "io" else "pure") ++ "_" ++ fn ++ concatInter "_" (r:as))
 
-op2Table (op,rt) = lookup rt table >>= lookup op where
-    table = [ ("int",intTable)]
+hasBoxes e = or $ execWriter (f e) where
+    f e | e == tBox = tell [True] >> return e
+    f e = emapEGH f f f e
+
+op2Table (op,rt) = lookup (showCType rt) table >>= lookup op where
+    table = [ ("Int#",intTable)]
     intTable = [
         ("+","(+#)"),
         ("-","(-#)"),
