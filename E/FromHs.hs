@@ -2,7 +2,6 @@ module E.FromHs(
     convertDecls,
     convertRules,
     createInstanceRules,
-    createMethods,
     makeSpec,
     getMainFunction
     ) where
@@ -222,9 +221,10 @@ createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans wher
         as = [ rule  t | Inst { instHead = _ :=> IsIn _ t }  <- snub (classInsts classRecord) ]
         (_ft,_:args') = fromPi ty
         (args,_rargs) = span (sortStarLike . getType)  args'
-        rule t = emptyRule { ruleHead = methodVar, ruleArgs = valToPat' (tipe t):map EVar args, ruleBinds = [ t | ~(EVar t) <- vs] ++ args, ruleBody = removeNewtypes dataTable body, ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
+        rule t = emptyRule { ruleHead = methodVar, ruleArgs = tpat:map EVar args, ruleBinds = [ t | ~(EVar t) <- vs] ++ args, ruleBody = removeNewtypes dataTable body, ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
+            tpat = valToPat' (removeNewtypes dataTable $ tipe t)
             name = (instanceName methodName (getTypeCons t))
-            vp@(ELit LitCons { litArgs =  vs }) = valToPat' (tipe t)
+            vp@(ELit LitCons { litArgs =  vs }) = tpat
             body = case findName name of
                 Just (n,_) -> foldl EAp (EVar n) (vs ++ map EVar args)
                 Nothing -> case findName defaultName of
@@ -242,36 +242,6 @@ getTypeCons (TAp a _) = getTypeCons a
 getTypeCons (TArrow {}) = tc_Arrow
 getTypeCons x = error $ "getTypeCons: " ++ show x
 
-createMethods :: Monad m => DataTable -> ClassHierarchy -> (Map.Map Name (TVr,E))  -> m [(Name,TVr,E)]
-createMethods dataTable classHierarchy funcs = return ans where
-    ans = concatMap cClass (classRecords classHierarchy)
-    cClass classRecord =  concat [ method classRecord n | (n,_) <- classAssumps classRecord ]
-    method classRecord methodName | isJust _methodTVr = [(methodName ,setProperty prop_METHOD (tVr (toId methodName) (removeNewtypes dataTable ty)),removeNewtypes dataTable v)] where
-        theDefault = findName (defaultInstanceName methodName)
-        _methodTVr@(~(Just (TVr {tvrType = ty},ELam TVr { tvrInfo = nfo } _))) = findName methodName
-        Just (vmap::Typ) = Info.lookup nfo
-        (EPi tvr finalType) = ty
-        v = eLam tvr (foldr ELam emptyCase { eCaseScrutinee = EVar tvr, eCaseAlts = as, eCaseBind = tvr { tvrIdent = 0 }, eCaseType = foldr EPi ft rargs } args)
-        as = concatMap cinst [ t | Inst { instHead = _ :=> IsIn _ t } <- classInsts classRecord]
-        (ft,args') = fromPi finalType
-        (args,rargs) = span (sortStarLike . getType)  args'
-        cinst t | Nothing <- getConstructor x dataTable = fail "skip un-imported primitives"
-                | not $ x `vmapMember` vmap = fail "unused instance"
-                | Just (tvr,_) <- findName name  = return $ calt (foldl EAp (EVar tvr) (vs ++ map EVar args))
-                | Just (deftvr,defe) <- theDefault = return $ calt $ eLet tvr (tipe t) (foldl EAp (EVar deftvr) (EVar tvr:map EVar args))
-                | otherwise  = return $ calt $  EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) errType
-            where
-            name = (instanceName methodName (getTypeCons t))
-            calt e =  Alt (litCons { litName = x, litArgs = [ case e of EVar tvr -> tvr; _ -> error $ "createMethods: "++ show e | e <- vs ], litType = ct })  e
-            errType = subst tvr (tipe t) finalType
-            (x,vs,ct) = case tipe t of
-                (ELit LitCons { litName = x', litArgs = vs', litType = ct' }) -> (x',vs',ct')
-                (EPi (TVr { tvrType = a}) b) -> (tc_Arrow,[a,b],eStar)
-                e -> error $ "FromHs.createMethods: " ++ show e
-    method _ _ = []
-    findName name = case Map.lookup name funcs of
-        Nothing -> fail $ "Cannot find: " ++ show name
-        Just n -> return n
 
 
 unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
