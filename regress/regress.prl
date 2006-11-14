@@ -85,7 +85,7 @@ sub do_it {
             my $name = "$name.$ln";
             rlog "-- $name";
             system "rm -f -- $cwd/$ln.ho";
-            my @cmd = ("$jhc_dir/jhc", "-v", "--noauto", "-i$jhc_dir/lib/base", "-flint", "-o", "$fbase", @flags, @opts, "$cwd/$fn");
+            my @cmd = ("$jhc_dir/jhc", "-v", "--noauto", "-i$jhc_dir/lib/base", "-i$jhc_dir/lib/haskell98", "-flint", "-o", "$fbase", @flags, @opts, "$cwd/$fn");
             my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
             rlog "; ", $res;
             my $r = system $res;
@@ -133,7 +133,7 @@ sub done {
     }
     rlog "\n--------------------------------------------------------------------";
 
-    my $fmt = "%30s %5s %5s %5s\n";
+    my $fmt = "%50s %5s %5s %5s\n";
     rlog sprintf $fmt, "Name", "Compile", "Run", "Out";
     foreach my $r (@res) {
         rlog sprintf $fmt, $r->{name}, statf($r->{compile_status}),statf($r->{run_status}),statf($r->{stdout_diff});
