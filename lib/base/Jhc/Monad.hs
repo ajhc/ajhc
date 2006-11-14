@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -N -funboxed-tuples #-}
 
 module Jhc.Monad where
 
