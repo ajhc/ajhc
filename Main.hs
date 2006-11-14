@@ -764,6 +764,7 @@ boxifyProgram prog = ans where
     g e = do
   --      putStrLn $ "g: " ++ pprint e
         emapEG g (return . boxify) e -- (\e -> do putStrLn ("box: " ++ pprint e) ; return $ boxify e) e
+    boxify t | Just e <- followAlias (progDataTable prog) t = boxify e
     boxify (EPi t e) = EPi t { tvrType = boxify (tvrType t) } (boxify e)
     boxify v@EVar {} | canBeBox v = tBox
     boxify (ELit lc) = ELit lc { litArgs = map boxify (litArgs lc) }

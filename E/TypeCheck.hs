@@ -230,7 +230,7 @@ inferType dataTable ds e = rfc e where
     fc Unknown = return Unknown
     fc e = failDoc $ text "what's this? " </> (prettyE e)
     calt (EVar v) (Alt l e) = do
-        let nv =  patToLitEE l
+        let nv =  followAliases undefined (patToLitEE l)
         rfc (subst' v nv e)
     calt _ (Alt _ e) = rfc e
     verifyPats xs = do

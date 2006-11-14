@@ -7,6 +7,7 @@ import Data.IORef
 import List hiding(insert)
 
 import Atom
+import DataConstructors
 import E.E
 import E.FreeVars
 import E.Program
@@ -148,7 +149,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
             True <- asks isStrict
             d' <- fmapM f d
             let z (Alt l e) = do
-                    e' <- local (declEnv_u ((v,patToLitEE l):)) $ f e
+                    e' <- local (declEnv_u ((v,followAliases dataTable $ patToLitEE l):)) $ f e
                     return $ Alt l e'
             as' <- mapM z as
             return ec { eCaseAlts = as', eCaseDefault = d'}

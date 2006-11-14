@@ -7,6 +7,7 @@ module DataConstructors(
     constructionExpression,
     deconstructionExpression,
     followAliases,
+    followAlias,
     removeNewtypes,
     getConstructor,
     getConstructorArities,
@@ -285,6 +286,8 @@ typesCompatable dataTable a b = f (-2 :: Id) a b where
             f c (foldl eAp af as) b
         f c a (ELit (LitCons {  litAliasFor = Just af, litArgs = as })) = do
             f c a (foldl eAp af as)
+        f c a b | a == tBox && canBeBox b = return ()
+        f c a b | b == tBox && canBeBox a = return ()
         f _ a b = fail $ "Types don't match:" ++ pprint (a,b)
 
         lam :: TVr -> E -> TVr -> E -> Id -> m ()
