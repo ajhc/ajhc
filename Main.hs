@@ -30,6 +30,7 @@ import E.FromHs
 import E.Inline
 import E.LambdaLift
 import E.ToHs
+import E.FreeVars
 import E.LetFloat
 import E.Program
 import E.Rules
@@ -710,6 +711,7 @@ compileModEnv' stats (ho,_) = do
     prog <- transformProgram transformParms { transformCategory = "BoxifyProgram", transformOperation = boxifyProgram } prog
     prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify after boxify" True prog
     prog <- barendregtProg prog
+    prog <- return $ runIdentity $ programMapBodies (return . cleanupE) prog
 
     when (fopts FO.ViaGhc) $ do
         wdump FD.Core $ printProgram prog
@@ -774,6 +776,13 @@ boxifyProgram prog = ans where
     boxify s@ESort {} = s
     boxify x = error $ "boxify: " ++ show x
 
+-- | get rid of unused bindings
+cleanupE :: E -> E
+cleanupE e = runIdentity (f e) where
+    f (ELam t@TVr { tvrIdent = v } e) | v /= 0, v `notMember` freeIds e = f (ELam t { tvrIdent = 0 } e)
+    f (EPi t@TVr { tvrIdent = v } e) | v /= 0, v `notMember` freeIds e = f (EPi t { tvrIdent = 0 } e)
+    f ec@ECase { eCaseBind = t@TVr { tvrIdent = v } } | v /= 0, v `notMember` (freeVars (caseBodies ec)::IdSet) = f ec { eCaseBind = t { tvrIdent = 0 } }
+    f e = emapEG f f e
 
 compileToGrin prog = do
     stats <- Stats.new

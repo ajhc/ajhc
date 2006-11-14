@@ -35,18 +35,11 @@ import qualified FlagDump as FD
 progress str = wdump FD.Progress $  (putErrLn str) >> hFlush stderr
 
 
--- | get rid of unused bindings
-cleanupE :: E -> E
-cleanupE e = runIdentity (f e) where
-    f (ELam t@TVr { tvrIdent = v } e) | v /= 0, v `notMember` freeIds e = f (ELam t { tvrIdent = 0 } e)
-    f (EPi t@TVr { tvrIdent = v } e) | v /= 0, v `notMember` freeIds e = f (EPi t { tvrIdent = 0 } e)
-    f ec@ECase { eCaseBind = t@TVr { tvrIdent = v } } | v /= 0, v `notMember` (freeVars (caseBodies ec)::IdSet) = f ec { eCaseBind = t { tvrIdent = 0 } }
-    f e = emapEG f f e
 
 {-# NOINLINE compileToHs #-}
 compileToHs :: Program -> IO ()
 compileToHs prog = do
-    (v,_,Coll { collNames = ns, collPrims = prims }) <- runRWST (fromTM $ transE (cleanupE $ programE prog)) emptyEnvironment 1
+    (v,_,Coll { collNames = ns, collPrims = prims }) <- runRWST (fromTM $ transE (programE prog)) emptyEnvironment 1
 
 
     let rv = render (text "theRealMain = " <> v)
@@ -261,13 +254,13 @@ transE e | Just (e',_) <- from_unsafeCoerce e = mparen $ do
     e' <- transE e'
     return (text "unsafeCoerce#" <+> e')
 transE e@(EPrim (APrim (PrimPrim prim) _) args _) = case (prim,args) of
-    ("drop__",[_x,y]) -> transE y  -- XXX
-    ("catch__",args) -> mapM transE args >>= \args' -> mparen (return $ hsep (text "catch#":args'))
-    ("raiseIO__",args) -> mapM transE args >>= \args' -> mparen (return $ hsep (text "raiseIO#":args'))
-    ("newRef__",args) -> mapM transE args >>= \args' -> mparen (return $ hsep (text "newMVar#":args'))
-    ("readRef__",args) -> mapM transE args >>= \args' -> mparen (return $ hsep (text "readMutVar#":args'))
-    ("writeRef__",args) -> mapM transE args >>= \args' -> mparen (return $ hsep (text "writeMutVar#":args'))
-    _ -> return $ parens $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
+    ("drop__",[_x,y])   -> transE y  -- XXX
+    ("catch__",args)    -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "catch#":args')
+    ("raiseIO__",args)  -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "raiseIO#":args')
+    ("newRef__",args)   -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "newMVar#":args')
+    ("readRef__",args)  -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "readMutVar#":args')
+    ("writeRef__",args) -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "writeMutVar#":args')
+    _ -> mparen $ return $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
 transE (EPrim (APrim Operator { primOp = op, primRetType = rt } _) [x,y] _) | Just z <- op2Table (op,rt) = mparen $ do
     x <- transE x
     y <- transE y
@@ -293,7 +286,7 @@ transE (EPrim (APrim cast@CCast { primArgType = at, primRetType = rt } _) [x] _)
     ("Word#","Int#") -> return (text "addr2Int#" <+> x)
     ("Int#","Word#") -> return (text "int2Word#" <+> x)
 
-transE e = return $ parens $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
+transE e = mparen $ return $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
 
 cfuncname Func { funcName = fn, funcIOLike = iol, primArgTypes = as, primRetType = r  } =  ("func_" ++ (if iol then "io" else "pure") ++ "_" ++ fn ++ concatInter "_" (r:as))
 
