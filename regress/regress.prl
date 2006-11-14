@@ -1,0 +1,158 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+use Data::Dumper;
+use POSIX qw(strftime);
+
+my @opts;
+GetOptions( 'o=s' => \@opts  ) or die "Invalid options";
+
+my $now_string = strftime "%a %b %e %H:%M:%S %Y", localtime;
+
+my $pwd = `pwd`;
+chomp $pwd;
+
+# figure out where we are
+
+my ($regress_dir,$jhc_dir);
+
+
+
+if (-d "tests" && -d "results") {
+    $regress_dir = ".";
+    $jhc_dir = "..";
+} elsif (-d "regress" && -f "Makefile") {
+    $regress_dir = "regress";
+    $jhc_dir = "."
+} else { die "could not figure out where I am" }
+
+my $test_dir = "$regress_dir/tests";
+my $results_dir = "$regress_dir/results";
+
+my $time = `date +%Y%m%d%H%M%S`;
+chomp $time;
+
+my $rd = "$results_dir/$time";
+mkdir $rd or die "$!: could not make $rd";
+
+unlink "$results_dir/current";
+system "ln -sf $time $results_dir/current";
+
+open RLOG, ">$rd/log.txt" or die "$!: Could not open log";
+
+print RLOG "$now_string\n";
+
+
+
+-d $test_dir or die "could not find $test_dir";
+
+sub maybe_read {
+    my ($fn) = @_;
+    open my $fh, "<$fn" or return ();
+    my @lines = <$fh>;
+    map { chomp } @lines;
+    close $fh;
+    return @lines;
+}
+
+my $error;
+my @res;
+
+sub rlog {
+    my $msg = join "",@_;
+    chomp $msg;
+    print RLOG $msg, "\n";
+    print $msg, "\n";
+}
+
+sub do_it {
+    my ($cwd,$name) = @_;
+    #print "Entering $cwd\n";
+    my $no_run = -f "$cwd/norun";
+    my @flags = maybe_read "$cwd/flags.txt";
+    foreach my $fn (sort(split /\n/,`ls $cwd`)) {
+        my $n = "$cwd/$fn";
+        if (-d $n && $n ne "results") {
+            my $fnn = $fn;
+            $fnn =~ s/^\d+_//;
+            do_it($n,"$name.$fnn");
+        } elsif ($fn =~ /^([^_].*)\.l?hs$/) {
+            my $ln = $1;
+            my $fbase = "$cwd/$ln";
+            my $name = "$name.$ln";
+            rlog "-- $name";
+            system "rm -f -- $cwd/$ln.ho";
+            my @cmd = ("$jhc_dir/jhc", "-v", "--noauto", "-i$jhc_dir/lib/base", "-flint", "-o", "$fbase", @flags, @opts, "$cwd/$fn");
+            my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
+            rlog "; ", $res;
+            my $r = system $res;
+            my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out" };
+            push @res, $result;
+            unless($r == 0) {
+                rlog "Compilation Failed: $r";
+                my $msg = `tail $result->{compile_results}`;
+                rlog $msg;
+                $error++;
+                if($r > 64000) {done()};
+                next;
+            }
+            next if $no_run;
+            my @args = maybe_read("$fbase.args");
+            $result->{run_stdout} = "$rd/$name.stdout";
+            my $run_cmd = "$fbase " . join(" ",@args) . " > $result->{run_stdout}";
+            rlog "; ", $run_cmd;
+            $result->{run_cmd} = $run_cmd;
+            $r = system $run_cmd;
+            $result->{run_status} = $r;
+            unless($r == 0) {
+                rlog "-- Run Failed: $r";
+                $error++;
+                if($r > 64000) {done()};
+            }
+
+            if(-f "$fbase.expected.stdout" ) {
+                $result->{expected_stdout} = "$fbase.expected.stdout";
+                my $r = system "diff $result->{run_stdout} $result->{expected_stdout}";
+                $result->{stdout_diff} = $r;
+                $error++ if $r ne 0;
+            }
+        }
+    }
+}
+
+do_it($test_dir,"tests");
+done();
+
+
+sub done {
+    sub statf {
+        return defined $_[0] ? ($_[0] > 64000 ? "Int" : $_[0]) : "-";
+    }
+    rlog "\n--------------------------------------------------------------------";
+
+    my $fmt = "%30s %5s %5s %5s\n";
+    rlog sprintf $fmt, "Name", "Compile", "Run", "Out";
+    foreach my $r (@res) {
+        rlog sprintf $fmt, $r->{name}, statf($r->{compile_status}),statf($r->{run_status}),statf($r->{stdout_diff});
+
+    }
+    exit 0;
+}
+
+
+
+END {
+    close RLOG;
+    unlink "$results_dir/last";
+    system "mv $results_dir/latest $results_dir/last";
+    unlink "$results_dir/latest";
+    system "ln -sf $time $results_dir/latest";
+    unless ($error) {
+        unlink "$results_dir/latest_success";
+        system "ln -sf $time $results_dir/latest_success";
+    }
+}
+
