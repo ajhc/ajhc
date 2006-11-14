@@ -29,6 +29,9 @@ fromBool b = case b of
     False -> 0#
     True -> 1#
 
+scrutAddr :: Addr# -> Int#
+scrutAddr addr = if eqAddr# addr nullAddr# then 0# else 1#
+
 gteChar# a b = gtChar# a b || eqChar# a b
 lteChar# a b = ltChar# a b || eqChar# a b
 

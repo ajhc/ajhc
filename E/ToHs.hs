@@ -1,6 +1,7 @@
 module E.ToHs(compileToHs) where
 
 import Char
+import Control.Monad.Identity
 import Control.Monad.RWS
 import Data.FunctorM
 import System.IO
@@ -12,6 +13,7 @@ import C.Prims
 import DataConstructors
 import Doc.PPrint
 import E.E
+import E.FreeVars
 import E.Program
 import E.Subst
 import E.Traverse
@@ -25,16 +27,26 @@ import Numeric
 import Options
 import RawFiles(viaghc_hs)
 import Support.CanType
+import Support.FreeVars
 import Util.Gen
 import Util.SetLike
 import qualified FlagDump as FD
 
 progress str = wdump FD.Progress $  (putErrLn str) >> hFlush stderr
 
+
+-- | get rid of unused bindings
+cleanupE :: E -> E
+cleanupE e = runIdentity (f e) where
+    f (ELam t@TVr { tvrIdent = v } e) | v /= 0, v `notMember` freeIds e = f (ELam t { tvrIdent = 0 } e)
+    f (EPi t@TVr { tvrIdent = v } e) | v /= 0, v `notMember` freeIds e = f (EPi t { tvrIdent = 0 } e)
+    f ec@ECase { eCaseBind = t@TVr { tvrIdent = v } } | v /= 0, v `notMember` (freeVars (caseBodies ec)::IdSet) = f ec { eCaseBind = t { tvrIdent = 0 } }
+    f e = emapEG f f e
+
 {-# NOINLINE compileToHs #-}
 compileToHs :: Program -> IO ()
 compileToHs prog = do
-    (v,_,Coll { collNames = ns, collPrims = prims }) <- runRWST (fromTM $ transE (programE prog)) emptyEnvironment 1
+    (v,_,Coll { collNames = ns, collPrims = prims }) <- runRWST (fromTM $ transE (cleanupE $ programE prog)) emptyEnvironment 1
 
 
     let rv = render (text "theRealMain = " <> v)
@@ -229,6 +241,13 @@ transE ECase { eCaseBind = TVr { tvrIdent = 0, tvrType = tt }, eCaseScrutinee = 
     scrut <- transE scrut
     body <- transE body
     return (scrut <+> text "`seq`" <+> body)
+transE ECase { eCaseBind = TVr { tvrIdent = 0 }, eCaseScrutinee = scrut, eCaseDefault = Just md, eCaseAlts = as@[Alt (LitInt 0 (ELit LitCons { litName = n })) _] } | n == rt_HsPtr = mparen $ do
+    scrut <- transE scrut
+    md <- noParens $ transE md
+    let md' =  text "_" <+> text "->" <+> md
+    as <- mapM (transAlt False undefined) as
+    let alts = as ++ [md']
+    return (text "case" <+> text "scrutAddr" <+> scrut <+> text "of {" $$ nest 4  (vcat (punctuate semi alts)) $$ text "}")
 transE ECase { eCaseBind = bind, eCaseScrutinee = scrut, eCaseDefault = md, eCaseAlts = as } = mparen $ do
     scrut <- noParens $ transE scrut
     let dobind = 0 /= tvrIdent bind
