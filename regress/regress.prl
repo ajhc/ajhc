@@ -113,7 +113,7 @@ sub do_it {
                 my $msg = `tail $result->{compile_results}`;
                 rlog $msg;
                 $error++;
-                if($r > 64000) {done()};
+                if($r == 64512) {done()};
                 next;
             }
             next if $no_run;
@@ -127,7 +127,8 @@ sub do_it {
             unless($r == 0) {
                 rlog "-- Run Failed: $r";
                 $error++;
-                if($r > 64000) {done()};
+                if($r == 64512) {done()};
+                next;
             }
 
             if(-f "$fbase.expected.stdout" ) {
@@ -146,7 +147,7 @@ done();
 
 sub done {
     sub statf {
-        return defined $_[0] ? ($_[0] > 64000 ? "Int" : $_[0]) : "-";
+        return defined $_[0] ? ($_[0] == 64512 ? "Int" : $_[0]) : "-";
     }
     rlog "\n--------------------------------------------------------------------";
 
