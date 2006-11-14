@@ -8,7 +8,14 @@ use Data::Dumper;
 use POSIX qw(strftime);
 
 my @opts;
-GetOptions( 'o=s' => \@opts  ) or die "Invalid options";
+my @fopts;
+
+my @saved_args = @ARGV;
+
+Getopt::Long::Configure ("bundling");
+GetOptions( 'f=s' => \@fopts, 'o=s' => \@opts  ) or die "Invalid options";
+
+@opts = (@opts, map { "-f$_" } @fopts);
 
 my $now_string = strftime "%a %b %e %H:%M:%S %Y", localtime;
 
@@ -35,6 +42,10 @@ my $results_dir = "$regress_dir/results";
 my $time = `date +%Y%m%d%H%M%S`;
 chomp $time;
 
+
+my $jhc_version = `$jhc_dir/jhc --version`;
+$? == 0 or die "Could not run $jhc_dir/jhc --version";
+
 my $rd = "$results_dir/$time";
 mkdir $rd or die "$!: could not make $rd";
 
@@ -43,7 +54,10 @@ system "ln -sf $time $results_dir/current";
 
 open RLOG, ">$rd/log.txt" or die "$!: Could not open log";
 
-print RLOG "$now_string\n";
+rlog("$now_string");
+rlog("$jhc_version");
+rlog("regress ", join " ", @saved_args) if @saved_args;
+rlog("-----------------------------------");
 
 
 
@@ -81,10 +95,13 @@ sub do_it {
             do_it($n,"$name.$fnn");
         } elsif ($fn =~ /^([^_].*)\.l?hs$/) {
             my $ln = $1;
+            next if $ln =~ /_code$/;
             my $fbase = "$cwd/$ln";
             my $name = "$name.$ln";
             rlog "-- $name";
             system "rm -f -- $cwd/$ln.ho";
+            system "rm -f -- $cwd/${ln}_code.hs";
+            system "rm -f -- $cwd/${ln}_code.c";
             my @cmd = ("$jhc_dir/jhc", "-v", "--noauto", "-i$jhc_dir/lib/base", "-i$jhc_dir/lib/haskell98", "-flint", "-o", "$fbase", @flags, @opts, "$cwd/$fn");
             my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
             rlog "; ", $res;
@@ -139,12 +156,6 @@ sub done {
         rlog sprintf $fmt, $r->{name}, statf($r->{compile_status}),statf($r->{run_status}),statf($r->{stdout_diff});
 
     }
-    exit 0;
-}
-
-
-
-END {
     close RLOG;
     unlink "$results_dir/last";
     system "mv $results_dir/latest $results_dir/last";
@@ -154,5 +165,9 @@ END {
         unlink "$results_dir/latest_success";
         system "ln -sf $time $results_dir/latest_success";
     }
+    exit 0;
 }
+
+
+
 
