@@ -497,6 +497,10 @@ instance CanTypeCheck TyEnv Exp Ty where
         [v',a'] <- mapM (typecheck te) [v,a]
         if v' == TyNode then return t
          else fail $ "App apply arg doesn't match: " ++ show ap
+    typecheck te ap@(App fn [v] t) | fn == funcEval = do
+        v' <- typecheck te v
+        if v' == TyPtr TyNode then return t
+         else fail $ "App eval arg doesn't match: " ++ show ap
     typecheck te a@(App fn as t) = do
         (as',t') <- findArgsType te fn
         as'' <- mapM (typecheck te) as

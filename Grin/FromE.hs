@@ -313,13 +313,14 @@ instance ToVal TVr where
 --
 
 
-evalVar tvr | Just CaseDefault <- Info.lookup (tvrInfo tvr)  = do
+evalVar _ tvr | Just CaseDefault <- Info.lookup (tvrInfo tvr)  = do
         mtick "Grin.FromE.strict-casedefault"
         return (Fetch (toVal tvr))
-evalVar tvr | getProperty prop_WHNF tvr = do
+evalVar _ tvr | getProperty prop_WHNF tvr = do
         mtick "Grin.FromE.strict-propevaled"
         return (Fetch (toVal tvr))
-evalVar tvr = return $ gEval (toVal tvr)
+--evalVar fty tvr = return $ gEval (toVal tvr)
+evalVar fty tvr = return $ App funcEval [toVal tvr] fty
 
 compile' ::  DataTable -> CEnv -> (TVr,[TVr],E) -> IO (Atom,Lam)
 compile' dataTable cenv (tvr,as,e) = ans where
@@ -362,8 +363,11 @@ compile' dataTable cenv (tvr,as,e) = ans where
                     mtick "Grin.FromE.app-unlifted"
                     app fty (Fetch $ toVal tvr) as
                 Nothing -> do
-                    ee <- evalVar tvr
-                    app fty ee as
+                    case as of
+                        [] -> evalVar fty tvr
+                        _ -> do
+                            ee <- evalVar TyNode tvr
+                            app fty ee as
     ce e | Just z <- literal e = return (Return z)
     ce e | Just (Const z) <- constant e = return (Return z)
     ce e | Just z <- constant e = return (gEval z)
