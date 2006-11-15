@@ -1,6 +1,8 @@
 {-# OPTIONS_JHC -N #-}
 module Jhc.Prim(
     World__(),
+    Int__(),
+    Addr__(),
     runRaw,
     unsafeCoerce__,
     dependingOn
@@ -9,6 +11,9 @@ module Jhc.Prim(
 
 -- | this is treated very specially by the compiler. it is unboxed.
 data World__ :: #
+
+data Int__ :: #
+data Addr__ :: #
 
 -- | this is wrapped around arbitrary expressions and just evaluates them to whnf
 foreign import primitive "seq" runRaw :: a -> World__ -> World__

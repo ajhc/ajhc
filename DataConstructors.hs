@@ -3,6 +3,7 @@ module DataConstructors(
     DataTable(..),
     DataTableMonad(..),
     AliasType(..),
+    primitiveAliases,
     dataTablePrims,
     constructionExpression,
     deconstructionExpression,
@@ -69,6 +70,7 @@ tipe' (TArrow t1 t2) =  do
     t1' <- tipe' t1
     t2' <- tipe' t2
     return $ EPi (tVr 0 (t1')) t2'
+tipe' (TCon (Tycon n k)) | Just n' <- lookup n primitiveAliases = return $ ELit litCons { litName = n', litType = kind k }
 tipe' (TCon (Tycon n k)) =  return $ ELit litCons { litName = n, litType = kind k }
 tipe' (TVar tv@Tyvar { tyvarKind = k}) = do
     v <- lookupName tv
@@ -384,7 +386,7 @@ removeNewtypes dataTable e = runIdentity (f e) where
 {-# NOINLINE toDataTable #-}
 toDataTable :: (Map.Map Name Kind) -> (Map.Map Name Type) -> [HsDecl] -> DataTable -> DataTable
 toDataTable km cm ds currentDataTable = newDataTable  where
-    newDataTable = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conName x,procNewTypes x) | x <- ds' ])
+    newDataTable = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conName x,procNewTypes x) | x <- ds', conName x `notElem` map fst primitiveAliases ])
     procNewTypes c = c { conExpr = f (conExpr c), conType = f (conType c), conSlots = map f (conSlots c) } where
         f = removeNewtypes (newDataTable `mappend` currentDataTable)
     fixupMap k _ | Just n <- getConstructor k dataTablePrims = n
@@ -593,5 +595,6 @@ class Monad m => DataTableMonad m where
 
 instance DataTableMonad Identity
 
+primitiveAliases = [(tc_Int__,rt_int),(tc_Addr__,rt_HsPtr)]
 
 

@@ -76,6 +76,9 @@ tc_JumpPoint = toName TypeConstructor   ("Jhc.JumpPoint","JumpPoint")
 tc_IOResult = toName TypeConstructor ("Jhc.IO","IOResult")
 tc_IO = toName TypeConstructor       ("Jhc.IO", "IO")
 tc_World__ = toName TypeConstructor  ("Jhc.Prim","World__")
+tc_Int__ = toName TypeConstructor  ("Jhc.Prim","Int__")
+tc_Addr__ = toName TypeConstructor  ("Jhc.Prim","Addr__")
+
 
 tc_Bool = toName TypeConstructor  ("Jhc.Order","Bool")
 tc_Target = toName TypeConstructor  ("Jhc.Options","Target")
