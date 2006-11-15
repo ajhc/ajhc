@@ -78,6 +78,8 @@ tc_IO = toName TypeConstructor       ("Jhc.IO", "IO")
 tc_World__ = toName TypeConstructor  ("Jhc.Prim","World__")
 tc_Int__ = toName TypeConstructor  ("Jhc.Prim","Int__")
 tc_Addr__ = toName TypeConstructor  ("Jhc.Prim","Addr__")
+tc_Array__ = toName TypeConstructor  ("Jhc.Array","Array__")
+tc_MutArray__ = toName TypeConstructor  ("Jhc.Array","MutArray__")
 
 
 tc_Bool = toName TypeConstructor  ("Jhc.Order","Bool")

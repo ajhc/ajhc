@@ -7,6 +7,8 @@ import GHC.Base
 import GHC.Ptr
 
 type World__ = State# RealWorld
+type Array__ a = Array# a
+type MutArray__ a = MutableArray# RealWorld a
 
 type Nothing = ()
 
@@ -50,4 +52,10 @@ convertString :: [Char] -> ListTCon Char
 convertString [] = jhc_EmptyList
 convertString (x:xs) = jhc_Cons x (convertString xs)
 
+{-# NOINLINE newWorld__ #-}
+newWorld__ :: a -> World__
+newWorld__ a = case lazy a of
+    _ -> realWorld#
+
 theRealMain :: World__ -> World__
+

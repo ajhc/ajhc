@@ -118,7 +118,7 @@ transDataTable dataTable ns = vcat (theType:map g (lefts wtd)) where
     showSlot (ELit LitCons { litArgs = es, litAliasFor = Just af }) = showSlot (foldl eAp af es)
     showSlot (EPi TVr { tvrType = a } b) = parens $ showSlot a <+> text "->" <+> showSlot b
     showSlot (ELit (LitCons { litName = c, litArgs = as })) = showCon c (map showSlot as)
-    builtIns = [tc_Int,tc_Char,dc_Int,dc_Char,rt_int,rt_HsChar,tc_World__,rt_HsPtr]
+    builtIns = [tc_Int,tc_Char,dc_Int,dc_Char,rt_int,rt_HsChar,tc_World__,tc_Array__,tc_MutArray__,rt_HsPtr]
 
 data Environment = Env {
     envParen  :: Bool,
@@ -155,6 +155,8 @@ showCon c ts | Just 0 <- fromUnboxedNameTuple c, nameType c == DataConstructor =
 showCon c ts | Just _ <- fromUnboxedNameTuple c = text "(# " <> hsep (punctuate comma ts) <> text " #)"
 showCon c ts | Just _ <- fromTupname c = text "(" <> hsep (punctuate comma ts) <> text ")"
 showCon c [] | c == tc_World__ = text "World__"
+showCon c [a] | c == tc_Array__ = parens $ text "Array__" <+> a
+showCon c [a] | c == tc_MutArray__ = parens $ text "MutArray__" <+> a
 showCon c [] | (RawType,v) <- fromName c = text $ showCType v
 showCon c [] | c == tc_Int = text "Int"
 showCon c [] | c == tc_Char = text "Char"
@@ -255,12 +257,7 @@ transE e | Just (e',_) <- from_unsafeCoerce e = mparen $ do
     return (text "unsafeCoerce#" <+> e')
 transE e@(EPrim (APrim (PrimPrim prim) _) args _) = case (prim,args) of
     ("drop__",[_x,y])   -> transE y  -- XXX
-    ("catch__",args)    -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "catch#":args')
-    ("raiseIO__",args)  -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "raiseIO#":args')
-    ("newRef__",args)   -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "newMVar#":args')
-    ("readRef__",args)  -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "readMutVar#":args')
-    ("writeRef__",args) -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "writeMutVar#":args')
-    ("alloca__",args)   -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "alloca__":args')
+    (fs,args) | Just ghcprim <- lookup fs ghcPrimTable -> mparen $ mapM transE args >>= \args' -> return $ hsep (text ghcprim:args')
     _ -> mparen $ return $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
 transE (EPrim (APrim Operator { primOp = op, primRetType = rt } _) [x,y] _) | Just z <- op2Table (op,rt) = mparen $ do
     x <- transE x
@@ -288,6 +285,22 @@ transE (EPrim (APrim cast@CCast { primArgType = at, primRetType = rt } _) [x] _)
     ("Int#","Word#") -> return (text "int2Word#" <+> x)
 
 transE e = mparen $ return $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
+
+ghcPrimTable = [
+    ("newWorld__","newWorld__"),
+    ("catch__","catch#"),
+    ("raiseIO__","raiseIO#"),
+    ("newRef__","newMVar#"),
+    ("readRef__","readMutVar#"),
+    ("writeRef__","writeMutVar#"),
+    ("newMutArray__","newArray#"),
+    ("readArray__","readArray#"),
+    ("writeArray__","writeArray#"),
+    ("indexArray__","indexArray#"),
+    ("unsafeFreezeArray__","unsafeFreezeArray#"),
+    ("alloca__","alloca__")
+    ]
+
 
 cfuncname Func { funcName = fn, funcIOLike = iol, primArgTypes = as, primRetType = r  } =  ("func_" ++ (if iol then "io" else "pure") ++ "_" ++ fn ++ concatInter "_" (r:as))
 
