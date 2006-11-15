@@ -156,14 +156,8 @@ showCon c ts | Just _ <- fromUnboxedNameTuple c = text "(# " <> hsep (punctuate 
 showCon c ts | Just _ <- fromTupname c = text "(" <> hsep (punctuate comma ts) <> text ")"
 showCon c [] | c == tc_World__ = text "World__"
 showCon c [] | (RawType,v) <- fromName c = text $ showCType v
-showCon c [] | c == rt_int = text "Int#"
-showCon c [] | c == rt_HsChar = text "Char#"
-showCon c [] | c == rt_HsPtr = text "Addr#"
 showCon c [] | c == tc_Int = text "Int"
 showCon c [] | c == tc_Char = text "Char"
---showCon c [x,xs] | c == dc_Cons = parens $ x <> text ":" <> xs
---showCon c [] | c == dc_EmptyList = text "[]"
-
 showCon c [] = showTCName 0 c
 showCon c ts = parens $ hsep (showTCName (length ts) c:ts)
 
@@ -199,6 +193,7 @@ typeLike _ = False
 transE :: E -> TM Doc
 transE (EError s _) = mparen $ return (text "error" <+> tshow s)
 transE (ELit (LitInt num t)) | t == tCharzh || t == rawType "wchar_t" = return $ text (show $ chr $ fromIntegral num) <> text "#"
+transE (ELit (LitInt num _)) | num < 0 = mparen $ return $ text (show num) <> text "#"
 transE (ELit (LitInt num _)) = return $ text (show num) <> text "#"
 transE (ELit LitCons { litName = c, litArgs =  ts }) = nparen $ do
     Env { envType = inType } <- ask
@@ -210,9 +205,10 @@ transE ee | (e,ts@(_:_)) <- fromLam ee  = mparen $ do
     e <- noParens $ transE e
     return $ text "\\" <> hsep ts' <+> text "->" <+> e
 transE (EVar tvr) = do
-    env <- asks envCoerce
+    --env <- asks envCoerce
     t <- transTVr tvr
-    case tvrIdent tvr `member` env of
+    --case tvrIdent tvr `member` env of
+    case hasBoxes (tvrType tvr) of
         False -> return t
         True -> mparen $ return $ text "unsafeCoerce#" <+> t
 transE ee | (e,es@(_:_)) <- fromAp ee = mparen $ do
@@ -220,13 +216,17 @@ transE ee | (e,es@(_:_)) <- fromAp ee = mparen $ do
     es <- mapM transE es
     return (hsep (e:es))
 transE ELetRec { eDefs = ds, eBody = e } = mparen $ do
-    local (\e -> e { envCoerce = envCoerce e `mappend` fromList [ tvrIdent t | (t,_) <- ds, hasBoxes (tvrType t)] }) $ do
-    ds' <- flip mapM ds $ \ (t,e) -> do
+    --local (\e -> e { envCoerce = envCoerce e `mappend` fromList [ tvrIdent t | (t,_) <- ds, hasBoxes (tvrType t)] }) $ do
+    ds' <- flip mapM ds $ \ (tvr,e) -> do
         let (b,bs) = fromLam e
-        tt <- noParens $ transType (tvrType t)
-        t <- transTVr t
+        tt <- noParens $ transType (tvrType tvr)
+        t <- transTVr tvr
         bs <- mapM transTVr bs
-        e <- noParens $ transE b
+        e <- case hasBoxes (tvrType tvr) of
+            False -> noParens $ transE b
+            True -> do
+                t <- transE b
+                return $ text "unsafeCoerce#" <+> t
         return (t <+> text "::" <+> tt <> semi $$ hsep (t:bs) <+> text "=" <+> e)
     e <- noParens $ transE e
     return (text "let {" $$ nest 4 (vcat (punctuate (text ";") ds')) $$ text "} in" <+> e)
@@ -330,6 +330,7 @@ transAlt dobind b (Alt LitInt { litNumber = i } e) = do
     e <- noParens $ transE e
     return ( (if dobind then b <> char '@' else empty) <> tshow i <> text "#" <+> text "->" <+> e)
 transAlt dobind b (Alt LitCons { litName = c, litArgs = ts } e) = do
+    tell mempty { collNames = Set.singleton (c,length ts,False) }  -- XXX this shouldn't be needed
     ts <- mapM transTVr ts
     e <- noParens $ transE e
     return ( (if dobind then b <> char '@' else empty) <> showCon c ts <+> text "->" <+> e)
