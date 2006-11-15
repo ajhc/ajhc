@@ -260,6 +260,7 @@ transE e@(EPrim (APrim (PrimPrim prim) _) args _) = case (prim,args) of
     ("newRef__",args)   -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "newMVar#":args')
     ("readRef__",args)  -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "readMutVar#":args')
     ("writeRef__",args) -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "writeMutVar#":args')
+    ("alloca__",args)   -> mparen $ mapM transE args >>= \args' -> return $ hsep (text "alloca__":args')
     _ -> mparen $ return $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
 transE (EPrim (APrim Operator { primOp = op, primRetType = rt } _) [x,y] _) | Just z <- op2Table (op,rt) = mparen $ do
     x <- transE x

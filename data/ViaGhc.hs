@@ -13,6 +13,8 @@ type Nothing = ()
 theNothing :: Nothing
 theNothing = ()
 
+type JIO a = World__ -> (# World__, a #)
+
 main :: IO ()
 main = IO $ \rw -> case theRealMain rw of rw' -> (# rw', () #)
 
@@ -34,6 +36,15 @@ scrutAddr addr = if eqAddr# addr nullAddr# then 0# else 1#
 
 gteChar# a b = gtChar# a b || eqChar# a b
 lteChar# a b = ltChar# a b || eqChar# a b
+
+
+alloca__ :: Int# -> (Addr# -> JIO a) -> JIO a
+alloca__ size action s =
+     case newPinnedByteArray# size s      of { (# s, mbarr# #) ->
+     case unsafeFreezeByteArray# mbarr# s of { (# s, barr#  #) ->
+     case action (byteArrayContents# barr#) s of { (# s, r #) ->
+     case touch# barr# s of { s -> (# s, r #) }
+     }}}
 
 convertString :: [Char] -> ListTCon Char
 convertString [] = jhc_EmptyList

@@ -21,17 +21,28 @@ import Prelude.IO
 import Foreign.C.Types
 import Foreign.Marshal.Utils
 import Prelude.IOError
+import Jhc.Prim
+import Jhc.Int(unboxInt)
+import Jhc.Addr
+import qualified Jhc.Options as JO
 
 
 
 -- TODO handle exceptions
-allocaBytes :: Int -> (Ptr a -> IO b) -> IO b
-allocaBytes b f = do
+allocaBytes' :: Int -> (Ptr a -> IO b) -> IO b
+allocaBytes' b f = do
     p <- mallocBytes b
     r <- f p
     free p
     return r
 
+allocaBytes :: Int -> (Ptr a -> IO b) -> IO b
+allocaBytes num fn = case JO.target of
+    JO.GhcHs -> case unboxInt num of n -> alloca__ n (\addr -> fn (boxAddr addr))
+    _ -> allocaBytes' num fn
+
+foreign import primitive alloca__ :: Int__ -> (Addr__ -> IO b) -> IO b
+foreign import primitive "box" boxAddr :: Addr__ -> Ptr a
 
 -- exported functions
 -- ------------------
