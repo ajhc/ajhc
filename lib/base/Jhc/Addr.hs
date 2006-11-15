@@ -3,6 +3,8 @@
 module Jhc.Addr(
     Addr(),
     FunAddr(),
+    Ptr(..),
+    FunPtr(..),
     nullAddr,
     nullFunAddr,
     plusAddr,
@@ -17,6 +19,9 @@ import Data.Int
 
 data Addr
 data FunAddr
+
+newtype Ptr a = Ptr Addr
+newtype FunPtr a = FunPtr FunAddr
 
 nullAddr = wordPtrToAddr zeroWordPtr
 nullFunAddr = wordPtrToFunAddr zeroWordPtr

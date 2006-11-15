@@ -83,7 +83,7 @@ tc_Addr__ = toName TypeConstructor  ("Jhc.Prim","Addr__")
 tc_Bool = toName TypeConstructor  ("Jhc.Order","Bool")
 tc_Target = toName TypeConstructor  ("Jhc.Options","Target")
 tc_List = toName TypeConstructor  ("Jhc.Basics","[]")
-tc_Ptr = toName TypeConstructor   ("Foreign.Ptr","Ptr")
+tc_Ptr = toName TypeConstructor   ("Jhc.Addr","Ptr")
 tc_Ratio = toName TypeConstructor ("Ratio","Ratio")
 tc_Unit = toName TypeConstructor  ("Jhc.Basics","()")
 

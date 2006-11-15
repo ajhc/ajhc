@@ -1,11 +1,11 @@
 module Foreign.Ptr(
-    Ptr,
+    Ptr(),
     nullPtr,
     castPtr,
     plusPtr,
     alignPtr,
     minusPtr,
-    FunPtr,
+    FunPtr(),
     nullFunPtr,
     castFunPtr,
     castFunPtrToPtr,
@@ -18,8 +18,6 @@ import Jhc.Addr
 import Foreign.Storable
 
 
-newtype Ptr a = Ptr Addr
-newtype FunPtr a = FunPtr FunAddr
 
 instance Storable (Ptr a) where
     sizeOf (Ptr a) = sizeOf a
