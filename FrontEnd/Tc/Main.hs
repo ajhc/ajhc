@@ -656,7 +656,7 @@ tcDecl decl@(HsFunBind matches) typ = withContext (declDiagnostic decl) $ do
 tcMatch ::  HsMatch -> Sigma -> Tc HsMatch
 tcMatch (HsMatch sloc funName pats rhs wheres) typ = withContext (locMsg sloc "in" $ show funName) $ do
     let lam (p:ps) (TMetaVar mv) rs = do -- ABS2
-            withMetaVars mv [kindStar,kindFunRet] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) (a `fn` b) rs
+            withMetaVars mv [kindArg,kindFunRet] (\ [a,b] -> a `fn` b) $ \ [a,b] -> lam (p:ps) (a `fn` b) rs
         lam (p:ps) ty@(TArrow s1' s2') rs = do -- ABS1
             (p',env) <- tcPat p s1'
             localEnv env $ do
