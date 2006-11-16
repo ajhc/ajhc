@@ -128,7 +128,6 @@ toEntry (n,as,e)
 
 toType :: Ty -> E -> Ty
 toType node = toty where
-    --toty e | e == tWorld__ = TyTup []
     toty (ELit LitCons { litName = n, litArgs = es, litType = ty }) |  ty == eHash, TypeConstructor <- nameType n, Just _ <- fromUnboxedNameTuple n = (tuple (map (toType (TyPtr TyNode) ) (filter shouldKeep es)))
     toty (ELit LitCons { litName = n, litArgs = [], litType = ty }) |  ty == eHash, RawType <- nameType n = (Ty $ toAtom (show n))
     toty e@(ELit LitCons { litName = n, litType = ty }) |  ty == eHash = case lookup n unboxedMap of
@@ -242,8 +241,6 @@ stripTheWorld (t,as,e) = (tvrInfo_u (Info.insert (IsCAF caf)) t,filter (shouldKe
 
 shouldKeep :: E -> Bool
 shouldKeep e = tyUnit /= toType TyNode e
---shouldKeep e | e == unboxedTyUnit = False
---shouldKeep e = e /= tWorld__
 
 
 makePartials (fn,(ts,rt)) | tagIsFunction fn, head (show fn) /= '@'  = (fn,(ts,rt)):[(partialTag fn i,(reverse $ drop i $ reverse ts ,TyNode)) |  i <- [0.. end] ]  where
@@ -311,21 +308,7 @@ instance ToVal TVr where
     toVal TVr { tvrType = ty, tvrIdent = num } = case toType (TyPtr TyNode) ty of
         TyTup [] -> Tup []
         ty -> Var (V num) ty
---    toVal (TVr { tvrIdent = num, tvrType = w}) | w == tWorld__ = Tup []-- Var v0 tyUnit -- es == eHash, RawType <- nameType n  = Var (V num) (Ty $ toAtom (show n))
---    toVal (TVr { tvrIdent = num, tvrType = (ELit LitCons { litName = n, litArgs = [], litType = es })}) | es == eHash, RawType <- nameType n  = Var (V num) (Ty $ toAtom (show n))
---    toVal tvr = Var  (V (tvrIdent tvr)) (TyPtr TyNode) -- (toTy $ tvrType tvr)
 
--- constraints during compilation:
---
--- ce always produces something of type TyNode
--- cc always produces something of type (TyPtr TyNode)
--- all functions are assumed to return a TyNode
--- This is no longer true.
---
--- right after compilation, everything has type TyNode or (TyPtr TyNode) since
--- Haskell does not natively support anything other than boxed types.
--- This also isn't true.
---
 
 
 evalVar _ tvr | Just CaseDefault <- Info.lookup (tvrInfo tvr)  = do
@@ -387,6 +370,8 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce e | Just (Const z) <- constant e = return (Return z)
     ce e | Just z <- constant e = return (gEval z)
     ce e | Just z <- con e = return (Return z)
+
+    -- holes - are these still useful?
     ce (EPrim ap@(APrim (PrimPrim "newHole__") _) [_] _) = do
         let var = Var v2 (TyPtr TyNode)
         return $ Store (NodeC (toAtom "@hole") []) :>>= var :-> Return (tuple [var])
@@ -394,35 +379,26 @@ compile' dataTable cenv (tvr,as,e) = ans where
         let var = Var v2 TyNode
             [r',v'] = args [r,v]
         return $ gEval v' :>>= n1 :-> Update r' n1
+
+    -- artificial dependencies
     ce (EPrim ap@(APrim (PrimPrim "newWorld__") _) [_] _) = do
         return $ Return unit
     ce (EPrim ap@(APrim (PrimPrim "drop__") _) [_,e] _) = ce e
+
+
+    -- references
     ce (EPrim ap@(APrim (PrimPrim "newRef__") _) [v,_] _) = do
         let [v'] = args [v]
-        --    var = Var v2 (TyPtr TyNode)
-        return $ Store v' -- (NodeC (convertName dc_Ref) [v']) :>>= var :-> Store (NodeC (convertName dc_IORef) [var])
+        return $ Store v'
     ce (EPrim ap@(APrim (PrimPrim "readRef__") _) [r,_] _) = do
         let [r'] = args [r]
-        return $ Fetch r' -- gEval r' :>>= NodeC (convertName dc_IORef) [var] :-> Fetch var :>>= NodeC (convertName dc_Ref) [var'] :-> Return var'
+        return $ Fetch r'
     ce (EPrim ap@(APrim (PrimPrim "writeRef__") _) [r,v,_] _) = do
         let [r',v'] = args [r,v]
-        return $ Update r' v' -- gEval r' :>>= NodeC (convertName dc_IORef) [var] :-> Update var (NodeC (convertName dc_Ref) [v'])
-    {-
-    ce (EPrim ap@(APrim (PrimPrim "newRef__") _) [v,_] _) = do
-        let [v'] = args [v]
-            var = Var v2 (TyPtr TyNode)
-        return $ Store (NodeC (convertName dc_Ref) [v']) :>>= var :-> Store (NodeC (convertName dc_IORef) [var])
-        --return $ Alloc { expValue = NodeC (convertName dc_Ref) [v'], expCount = toUnVal (1 :: Int), expRegion = region_heap, expInfo = mempty } :>>= var :-> Store (NodeC (convertName dc_IORef) [var])
-    ce (EPrim ap@(APrim (PrimPrim "readRef__") _) [r,_] _) = do
-        let [r'] = args [r]
-            var = Var v2 (TyPtr TyNode)
-            var' = Var v3 (TyPtr TyNode)
-        return $ gEval r' :>>= NodeC (convertName dc_IORef) [var] :-> Fetch var :>>= NodeC (convertName dc_Ref) [var'] :-> Return var'
-    ce (EPrim ap@(APrim (PrimPrim "writeRef__") _) [r,v,_] _) = do
-        let var = Var v2 (TyPtr TyNode)
-            [r',v'] = args [r,v]
-        return $ gEval r' :>>= NodeC (convertName dc_IORef) [var] :-> Update var (NodeC (convertName dc_Ref) [v'])
-        -}
+        return $ Update r' v'
+
+
+    -- other primitives
     ce (EPrim ap@(APrim p _) xs ty) = let
       prim = Primitive { primName = Atom.fromString (pprint ap), primAPrim = ap, primRets = Nothing, primType = ([],tyUnit) }
       in case p of
@@ -455,6 +431,8 @@ compile' dataTable cenv (tvr,as,e) = ans where
             let p = prim { primType = ((map (Ty . toAtom) as),Ty (toAtom r)) }
             return $ Prim p (args xs)
         other -> fail $ "ce unknown primitive: " ++ show other
+
+    -- case statements
     ce ECase { eCaseScrutinee = e, eCaseAlts = [Alt LitCons { litName = n, litArgs = xs } wh] } | Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n  = do
         e <- ce e
         wh <- ce wh
