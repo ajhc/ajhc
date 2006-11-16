@@ -117,13 +117,17 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as
                 addRule $ conditionalRule id fn' $ mconcat [ mconcatMap (implies (sValue usedArgs fn) . varValue) (freeVars a) | (fn,a) <- combineArgs a vs]
                 addRule $ fn' `implies` sValue usedFuncs a
                 addRule (mconcatMap doConst vs)
-            g (Update vv@(Var v _) n@(~(NodeC x vs)))
-                | v < v0 = do
-                    v' <- supplyValue usedCafs v
-                    addRule $ conditionalRule id v' $ doNode n
-                | otherwise = addRule $ (doNode vv) `mappend` (doNode n)
+            g (Update (Var v _) n) | v < v0 = do
+                v' <- supplyValue usedCafs v
+                addRule $ conditionalRule id v' $ doNode n
+            g (Update vv@(Index (Var v _) r) n) | v < v0 = do
+                v' <- supplyValue usedCafs v
+                addRule (doNode r)
+                addRule $ conditionalRule id v' $ doNode n
+            g (Update vv n) = addRule $ (doNode vv) `mappend` (doNode n)
             g (Store n) = addRule $ doNode n
             g (Fetch x) = addRule $ doNode x
+            g Alloc { expValue = v, expCount = c, expRegion = r } = addRule $ doNode v `mappend` doNode c `mappend` doNode r
             g Let { expDefs = defs, expBody = body } = do
                 mapM_ goAgain [ (name,bod) | FuncDef { funcDefBody = bod, funcDefName = name } <- defs]
                 flip mapM_ (map funcDefName defs) $ \n -> do
@@ -136,6 +140,7 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as
             g x = error $ "deadcode.g: " ++ show x
             h' (p,e) = h (p,e) >> return (Just (p,e))
             h (p,Store v) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
+            h (p,Alloc { expValue = v, expCount = c, expRegion = r }) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v `mappend` doNode c `mappend` doNode r) | pv <- freeVars p]
             h (p,Return v) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
             h (p,Fetch v) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
             h (p,e) = g e
@@ -205,9 +210,8 @@ removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps
     clearCaf (NodeV a xs) = do
         xs <- mapM clearCaf xs
         return $ NodeV a xs
-    clearCaf (Const a) = do
-        a <- clearCaf a
-        return $ Const a
+    clearCaf (Index a b) = return Index `ap` clearCaf a `ap` clearCaf b
+    clearCaf (Const a) = Const `liftM` clearCaf a
     clearCaf x = return x
     deadCaf v = v < v0 && not (v `Set.member` usedCafs)
     deadVal (Lit 0 _) = True

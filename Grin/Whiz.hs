@@ -208,6 +208,7 @@ applySubst env x = f x where
     f (NodeC t vs) = do
         vs' <- mapM f vs
         return $ NodeC t vs'
+    f (Index a b) = return Index `ap` f a `ap` f b
     f (Tup vs) = do
         vs' <- mapM f vs
         return $ Tup vs'
@@ -231,6 +232,7 @@ renamePattern x = runWriterT (f x) where
     f (NodeC t vs) = do
         vs' <- mapM f vs
         return $ NodeC t vs'
+    f (Index a b) = return Index `ap` f a `ap` f b
     f (Tup vs) = do
         vs' <- mapM f vs
         return $ Tup vs'

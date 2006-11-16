@@ -397,6 +397,27 @@ compile' dataTable cenv (tvr,as,e) = ans where
         let [r',v'] = args [r,v]
         return $ Update r' v'
 
+    -- arrays
+    ce (EPrim ap@(APrim (PrimPrim "newMutArray__") _) [v,def,_] _) = do
+        let [v',def'] = args [v,def]
+        return $ Alloc { expValue = def', expCount = v', expRegion = region_heap, expInfo = mempty }
+    ce (EPrim ap@(APrim (PrimPrim "newBlankMutArray__") _) [v,_] _) = do
+        let [v'] = args [v]
+        return $ Alloc { expValue = ValUnknown (TyPtr TyNode), expCount = v', expRegion = region_heap, expInfo = mempty }
+    ce (EPrim ap@(APrim (PrimPrim "readArray__") _) [r,o,_] _) = do
+        let [r',o'] = args [r,o]
+        return $ Fetch (Index r' o')
+    ce (EPrim ap@(APrim (PrimPrim "indexArray__") _) [r,o] _) = do
+        let [r',o'] = args [r,o]
+        return $ Fetch (Index r' o')
+    ce (EPrim ap@(APrim (PrimPrim "writeArray__") _) [r,o,v,_] _) = do
+        let [r',o',v'] = args [r,o,v]
+        return $ Update (Index r' o') v'
+
+    ce (EPrim ap@(APrim (PrimPrim ft) _) [v,_] _) | ft `elem` ["unsafeFreezeArray__", "unsafeThawArray__"] = do
+        let [v'] = args [v]
+        return $ Return v'
+
 
     -- other primitives
     ce (EPrim ap@(APrim p _) xs ty) = let

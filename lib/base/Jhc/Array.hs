@@ -29,8 +29,8 @@ newArray init n xs = case unboxInt n of
     n' -> case newWorld__ (init,n,xs) of
      w -> case newMutArray__ n' init w of
       (# w, arr #) -> let
-        f :: MutArray__ a -> World__ -> [(Int,a)] -> Array__ a
-        f arr w [] = case unsafeFreezeArray__ arr w  of (# _, r #) -> r
+        f :: MutArray__ a -> World__ -> [(Int,a)] -> World__
+        f arr w [] = w
         f arr w ((i,v):xs) = case unboxInt i of i' -> case writeArray__ arr i' v w of w -> f arr w xs
-            in f arr w xs
+            in case f arr w xs of w -> case unsafeFreezeArray__ arr w  of (# _, r #) -> r
 

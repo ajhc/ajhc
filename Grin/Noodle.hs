@@ -91,6 +91,7 @@ valIsConstant Tag {} = True
 valIsConstant Lit {} = True
 valIsConstant Const {} = True
 valIsConstant (Var v _) | v < v0 = True
+valIsConstant (Index v t) = valIsConstant v && valIsConstant t
 valIsConstant ValPrim {} = True
 valIsConstant _ = False
 

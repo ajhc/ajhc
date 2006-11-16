@@ -180,6 +180,7 @@ data Val =
     | Var !Var Ty             -- ^ Variable
     | Tup [Val]               -- ^ Unboxed tuple
     | ValPrim APrim [Val] Ty  -- ^ Primitive value
+    | Index Val Val           -- ^ A pointer incremented some number of values (Index v 0) == v
     | Item Atom Ty            -- ^ Specific named thing. function, global, region, etc..
     | ValUnknown Ty           -- ^ Unknown or empty value
     | Addr {-# UNPACK #-} !(IORef Val)  -- ^ Used only in interpreter
@@ -267,6 +268,7 @@ instance Show Val where
     showsPrec _ (NodeC t vs) = parens $ (fromAtom t) <+> hsep (map shows vs)
     showsPrec _ (NodeV (V i) vs) = parens $ char 't' <> tshow i <+> hsep (map shows vs)
     showsPrec _ (Tag t) = (fromAtom t)
+    showsPrec _ (Index v o) = shows v <> char '[' <> shows o <> char ']'
     showsPrec _ (Var (V i) t)
         | TyPtr _ <- t = char 'p' <> tshow i
         | TyNode <- t = char 'n' <> tshow i
@@ -547,6 +549,10 @@ instance CanTypeCheck TyEnv Val Ty where
     typecheck x (Const t) = do
         v <- typecheck x t
         return (TyPtr v)
+    typecheck te (Index v offset) = do
+        t <- typecheck te v
+        Ty _ <- typecheck te offset
+        return t
     typecheck _ (Addr _) = return $ TyPtr (error "typecheck: Addr")
     typecheck _ (ValPrim _ _ ty) = return ty
     typecheck te n@(NodeC tg as) = do
@@ -578,6 +584,7 @@ instance CanType Val Ty where
     getType (Tag _) = TyTag
     getType (Var _ t) = t
     getType (Lit _ t) = t
+    getType (Index v _) = getType v
     getType (NodeV {}) = TyNode
     getType (Tup xs) = TyTup (map getType xs)
     getType (Const t) = TyPtr (getType t)
@@ -599,6 +606,7 @@ instance FreeVars Val (Set.Set Var) where
     freeVars (NodeC t xs) = freeVars xs
     freeVars (NodeV v xs) = Set.insert v $ freeVars xs
     freeVars (Const v) = freeVars v
+    freeVars (Index a b) = freeVars (a,b)
     freeVars (Var v _) = Set.singleton v
     freeVars (Tup vs) = freeVars vs
     freeVars _ = Set.empty
@@ -607,6 +615,7 @@ instance FreeVars Val (Set.Set (Var,Ty)) where
     freeVars (NodeC t xs) = freeVars xs
     freeVars (NodeV v xs) = Set.insert (v,TyTag) $ freeVars xs
     freeVars (Const v) = freeVars v
+    freeVars (Index a b) = freeVars (a,b)
     freeVars (Var v t) = Set.singleton (v,t)
     freeVars (Tup vs) = freeVars vs
     freeVars _ = Set.empty
@@ -665,6 +674,7 @@ instance FreeVars Val (Set.Set Tag) where
     freeVars (NodeC t xs) = Set.singleton t `Set.union` freeVars xs
     freeVars (NodeV _ xs) = freeVars xs
     freeVars (Tup xs) = freeVars xs
+    freeVars (Index a b) = freeVars (a,b)
     freeVars (Tag t) = Set.singleton t
     freeVars (Const v) = freeVars v
     freeVars _ = Set.empty
@@ -709,6 +719,7 @@ data HeapValue = HV Int (Either (HeapType,Item) Val)  -- either a heap location 
 data NodeValue = NV Tag [Item]
     deriving(Ord,Eq)
 
+valToItem (Index v _) = valToItem v
 valToItem (Const v) = HeapValue (Set.singleton (HV (-1) (Right v)))
 valToItem (NodeC t as) = NodeValue (Set.singleton (NV t (map valToItem as)))
 valToItem (Lit _ ty) = BasicValue ty

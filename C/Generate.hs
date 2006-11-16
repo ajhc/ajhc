@@ -17,6 +17,7 @@ module C.Generate(
     expr,
     Expression(),
     expressionRaw,
+    indexArray,
     function,
     Function(),
     functionCall,
@@ -30,6 +31,7 @@ module C.Generate(
     name,
     Name(),
     newVar,
+    forLoop,
     nullPtr,
     number,
     operator,
@@ -164,6 +166,9 @@ dereference x = expDC $ char '*' <> pdraw x
 
 reference :: Expression -> Expression
 reference x = expDC $ char '&' <> pdraw x
+
+indexArray :: Expression -> Expression -> Expression
+indexArray w i = expD (pdraw w <> char '[' <> pdraw i <> char ']')
 
 project :: Name -> Expression -> Expression
 project n e = expD (pdraw e <> char '.' <> draw n)
@@ -308,6 +313,16 @@ cif exp thn els = sd $ do
 indentBlock sd@(SD si _) = SD si $ do
     x <- draw sd
     return $ nest 4 x
+
+forLoop :: Expression -> Expression -> Expression -> Statement -> Statement
+forLoop i from to body = sd $ do
+    i <- draw i
+    from <- draw from
+    to <- draw to
+    body <- draw body
+    return $ text "for" <> parens (i <+> equals <+> from <> semi <+> i <> text "++" <> semi <+> i <+> text "<" <+> to) <+> lbrace <$> nest 4 body <$> rbrace
+
+
 {-
 creturn_ :: Statement
 withVars :: [Type] -> ([Expression] -> Statement) -> Statement

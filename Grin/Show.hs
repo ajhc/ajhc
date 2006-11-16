@@ -119,6 +119,7 @@ prettyVal s | Just vs <- valToList s = list $ map prettyVal vs
 prettyVal (NodeC t []) = parens $ tag (fromAtom t)
 prettyVal (NodeC t vs) = parens $ tag (fromAtom t) <+> hsep (map prettyVal vs)
 prettyVal (NodeV (V i) vs) = parens $ char 't' <> tshow i <+> hsep (map prettyVal vs)
+prettyVal (Index p off) = prettyVal p <> char '[' <> prettyVal off <> char ']'
 prettyVal (Tag t) = tag (fromAtom t)
 prettyVal (Var (V i) t)
     | TyPtr t <- t = char 'p' <> prettyVal (Var (V i) t)

@@ -1,4 +1,4 @@
-module Grin.Val(FromVal(..),ToVal(..),tn_2Tup,world__,pworld__,valToList,convertName,region_heap) where
+module Grin.Val(FromVal(..),ToVal(..),tn_2Tup,valToList,convertName,region_heap) where
 
 import Atom
 import Char
@@ -22,9 +22,6 @@ instance ConNames Val where
     vTrue  = NodeC tn_Boolzh [toUnVal (1 :: Int)]
     vFalse = NodeC tn_Boolzh [toUnVal (0 :: Int)]
     vUnit  = NodeC tn_unit []
-
-world__ = NodeC (toAtom "World#") []
-pworld__ = Const world__
 
 class ToVal a where
     toVal :: a -> Val

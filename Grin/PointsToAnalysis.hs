@@ -492,6 +492,12 @@ collectM  fname (~(Tup vs) :-> exp') = ans where
         p' <- if Map.lookup v lmap == Just One then newHeap UnsharedEval p else newHeap SharedEval p
         bind var p'
         f exp2
+    f (Alloc { expValue = val } :>>= var@(Var v _) :-> exp2) = do
+        p <- toPos val
+        lmap <- ask
+        p' <- if Map.lookup v lmap == Just One then newHeap UnsharedEval p else newHeap SharedEval p
+        bind var p'
+        f exp2
 
     f (exp :>>= v :-> exp2) = do
         p <- g exp
@@ -533,6 +539,9 @@ collectM  fname (~(Tup vs) :-> exp') = ans where
         --    _ -> return ()
         newHeap SharedEval p
     g (Store { expValue = val }) = do
+        v <- toPos val
+        newHeap SharedEval v
+    g (Alloc { expValue = val }) = do
         v <- toPos val
         newHeap SharedEval v
     g Fetch { expAddress = val } = do
@@ -585,6 +594,7 @@ toPos (Lit {}) = return Basic
 toPos (ValPrim {}) = return Basic
 toPos Tag {} = return Basic
 toPos (Var v _)  = return $ Variable v
+toPos (Index v _) = toPos v
 toPos x  = error $ unwords ["toPos:",show x]
 
 
