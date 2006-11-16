@@ -96,15 +96,18 @@ valIsConstant _ = False
 
 -- | Is type mutable (currently IORef)
 isMutableNodeTag :: Tag -> Bool
-isMutableNodeTag t = t ==  convertName dc_Ref
+isMutableNodeTag _ = False
+--isMutableNodeTag t = t ==  convertName dc_Ref
 
-valIsMutable (NodeC t _) = isMutableNodeTag t
-valIsMutable _ = False
+valIsMutable (NodeC t _) = isMutableNodeTag t || t == tagHole
+valIsMutable NodeC {} = False
+valIsMutable _ = True
 
 
 
 isOmittable (Fetch {}) = True
 isOmittable (Return {}) = True
+isOmittable (Store x) | getType x /= TyNode = False
 isOmittable (Store (NodeC n _)) | isMutableNodeTag n || n == tagHole = False
 isOmittable (Store {}) = True
 isOmittable Prim { expPrimitive = Primitive { primAPrim = aprim } } = aprimIsCheap aprim

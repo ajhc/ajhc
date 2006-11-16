@@ -9,6 +9,7 @@ import GHC.Ptr
 type World__ = State# RealWorld
 type Array__ a = Array# a
 type MutArray__ a = MutableArray# RealWorld a
+type Ref__ a = MutVar# RealWorld a
 
 type Nothing = ()
 

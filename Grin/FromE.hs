@@ -69,6 +69,14 @@ import qualified Stats
 -------------------
 
 
+unboxedMap :: [(Name,Maybe Ty)]
+unboxedMap = [
+    (tc_World__,Nothing),
+    (tc_Ref__,Just $ TyPtr (TyPtr TyNode)),
+    (tc_Array__,Just $ TyPtr (TyPtr TyNode)),
+    (tc_MutArray__,Just $ TyPtr (TyPtr TyNode))
+    ]
+
 
 data CEnv = CEnv {
     scMap :: Map Int (Atom,[Ty],Ty),
@@ -88,7 +96,6 @@ newtype IsCAF = IsCAF Bool
 dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ fromAtom n <+> hsep (map show as) <+> "::" <+> show t |  (n,(as,t)) <- Map.toList tt]
 
 tagArrow = convertName tc_Arrow
-tagRef = toAtom "CData.IORef.Ref"
 
 
 flattenScc xs = concatMap f xs where
@@ -121,9 +128,13 @@ toEntry (n,as,e)
 
 toType :: Ty -> E -> Ty
 toType node = toty where
-    toty e | e == tWorld__ = TyTup []
+    --toty e | e == tWorld__ = TyTup []
     toty (ELit LitCons { litName = n, litArgs = es, litType = ty }) |  ty == eHash, TypeConstructor <- nameType n, Just _ <- fromUnboxedNameTuple n = (tuple (map (toType (TyPtr TyNode) ) (filter shouldKeep es)))
-    toty (ELit LitCons { litName = n, litArgs = [], litType = es }) |  es == eHash, RawType <- nameType n = (Ty $ toAtom (show n))
+    toty (ELit LitCons { litName = n, litArgs = [], litType = ty }) |  ty == eHash, RawType <- nameType n = (Ty $ toAtom (show n))
+    toty e@(ELit LitCons { litName = n, litType = ty }) |  ty == eHash = case lookup n unboxedMap of
+        Just Nothing -> TyTup []
+        Just (Just x) -> x
+        Nothing -> error $ "Grin.FromE.toType: " ++ show e
     toty _ = node
 
 compile :: Program -> IO Grin
@@ -230,8 +241,9 @@ stripTheWorld (t,as,e) = (tvrInfo_u (Info.insert (IsCAF caf)) t,filter (shouldKe
 
 
 shouldKeep :: E -> Bool
-shouldKeep e | e == unboxedTyUnit = False
-shouldKeep e = e /= tWorld__
+shouldKeep e = tyUnit /= toType TyNode e
+--shouldKeep e | e == unboxedTyUnit = False
+--shouldKeep e = e /= tWorld__
 
 
 makePartials (fn,(ts,rt)) | tagIsFunction fn, head (show fn) /= '@'  = (fn,(ts,rt)):[(partialTag fn i,(reverse $ drop i $ reverse ts ,TyNode)) |  i <- [0.. end] ]  where
@@ -296,9 +308,12 @@ getName' dataTable v@LitCons { litName = n, litArgs = es }
     nargs = length (conSlots cons)
 
 instance ToVal TVr where
-    toVal (TVr { tvrIdent = num, tvrType = w}) | w == tWorld__ = Tup []-- Var v0 tyUnit -- es == eHash, RawType <- nameType n  = Var (V num) (Ty $ toAtom (show n))
-    toVal (TVr { tvrIdent = num, tvrType = (ELit LitCons { litName = n, litArgs = [], litType = es })}) | es == eHash, RawType <- nameType n  = Var (V num) (Ty $ toAtom (show n))
-    toVal tvr = Var  (V (tvrIdent tvr)) (TyPtr TyNode) -- (toTy $ tvrType tvr)
+    toVal TVr { tvrType = ty, tvrIdent = num } = case toType (TyPtr TyNode) ty of
+        TyTup [] -> Tup []
+        ty -> Var (V num) ty
+--    toVal (TVr { tvrIdent = num, tvrType = w}) | w == tWorld__ = Tup []-- Var v0 tyUnit -- es == eHash, RawType <- nameType n  = Var (V num) (Ty $ toAtom (show n))
+--    toVal (TVr { tvrIdent = num, tvrType = (ELit LitCons { litName = n, litArgs = [], litType = es })}) | es == eHash, RawType <- nameType n  = Var (V num) (Ty $ toAtom (show n))
+--    toVal tvr = Var  (V (tvrIdent tvr)) (TyPtr TyNode) -- (toTy $ tvrType tvr)
 
 -- constraints during compilation:
 --
@@ -384,6 +399,17 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce (EPrim ap@(APrim (PrimPrim "drop__") _) [_,e] _) = ce e
     ce (EPrim ap@(APrim (PrimPrim "newRef__") _) [v,_] _) = do
         let [v'] = args [v]
+        --    var = Var v2 (TyPtr TyNode)
+        return $ Store v' -- (NodeC (convertName dc_Ref) [v']) :>>= var :-> Store (NodeC (convertName dc_IORef) [var])
+    ce (EPrim ap@(APrim (PrimPrim "readRef__") _) [r,_] _) = do
+        let [r'] = args [r]
+        return $ Fetch r' -- gEval r' :>>= NodeC (convertName dc_IORef) [var] :-> Fetch var :>>= NodeC (convertName dc_Ref) [var'] :-> Return var'
+    ce (EPrim ap@(APrim (PrimPrim "writeRef__") _) [r,v,_] _) = do
+        let [r',v'] = args [r,v]
+        return $ Update r' v' -- gEval r' :>>= NodeC (convertName dc_IORef) [var] :-> Update var (NodeC (convertName dc_Ref) [v'])
+    {-
+    ce (EPrim ap@(APrim (PrimPrim "newRef__") _) [v,_] _) = do
+        let [v'] = args [v]
             var = Var v2 (TyPtr TyNode)
         return $ Store (NodeC (convertName dc_Ref) [v']) :>>= var :-> Store (NodeC (convertName dc_IORef) [var])
         --return $ Alloc { expValue = NodeC (convertName dc_Ref) [v'], expCount = toUnVal (1 :: Int), expRegion = region_heap, expInfo = mempty } :>>= var :-> Store (NodeC (convertName dc_IORef) [var])
@@ -396,6 +422,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
         let var = Var v2 (TyPtr TyNode)
             [r',v'] = args [r,v]
         return $ gEval r' :>>= NodeC (convertName dc_IORef) [var] :-> Update var (NodeC (convertName dc_Ref) [v'])
+        -}
     ce (EPrim ap@(APrim p _) xs ty) = let
       prim = Primitive { primName = Atom.fromString (pprint ap), primAPrim = ap, primRets = Nothing, primType = ([],tyUnit) }
       in case p of
@@ -432,7 +459,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
         e <- ce e
         wh <- ce wh
         return $ e :>>= tuple (map toVal (filter (shouldKeep . getType) xs)) :-> wh
-    ce ECase { eCaseScrutinee = e, eCaseAlts = [], eCaseDefault = (Just r)} | getType e == tWorld__ = do
+    ce ECase { eCaseScrutinee = e, eCaseAlts = [], eCaseDefault = (Just r)} | not (shouldKeep (getType e)) = do
         e <- ce e
         r <- ce r
         return $ e :>>= unit :-> r

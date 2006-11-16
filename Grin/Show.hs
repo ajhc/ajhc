@@ -111,6 +111,7 @@ prettyExp vl Call { expValue = Var v (TyCall fun _ _), expArgs = vs, expJump = j
     f True Closure = text "jump into"
 prettyExp vl Call { expValue = ValPrim ap [] (TyCall Primitive' _ _), expArgs = vs } = vl <> prim (tshow ap) <+> hsep (map prettyVal vs)
 
+{-# NOINLINE prettyVal #-}
 prettyVal :: DocLike d => Val -> d
 prettyVal s | Just [] <- valToList s = text "[]"
 prettyVal s | Just st <- fromVal s = text $ show (st::String)
@@ -120,7 +121,7 @@ prettyVal (NodeC t vs) = parens $ tag (fromAtom t) <+> hsep (map prettyVal vs)
 prettyVal (NodeV (V i) vs) = parens $ char 't' <> tshow i <+> hsep (map prettyVal vs)
 prettyVal (Tag t) = tag (fromAtom t)
 prettyVal (Var (V i) t)
-    | TyPtr _ <- t = char 'p' <> tshow i
+    | TyPtr t <- t = char 'p' <> prettyVal (Var (V i) t)
     | TyNode <- t = char 'n' <> tshow i
     | t == tCharzh = char 'c' <> tshow i
     | t == tIntzh  = char 'i' <> tshow i

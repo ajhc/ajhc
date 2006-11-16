@@ -49,6 +49,7 @@ varName (V n) = name $ 'v':show n
 
 node_t = basicType "node_t"
 pnode_t = ptrType node_t
+ppnode_t = ptrType (ptrType node_t)
 size_t = basicType "size_t"
 tag_t = basicType "tag_t"
 
@@ -114,20 +115,28 @@ convertExp (App a vs _) = do
             let ss = [ a `assign` v | a <- as | v <- vs' ]
             return (mconcat ss `mappend` goto nm, emptyExpression)
         Nothing -> return $ (mempty, functionCall (toName (toString a)) vs')
-convertExp (Fetch v) = do
+convertExp (Fetch v) | getType v == TyPtr TyNode = do
     v <- convertVal v
     return (mempty,v)
+convertExp (Fetch v) | getType v == TyPtr (TyPtr TyNode) = do
+    v <- convertVal v
+    return (mempty,dereference v)
 convertExp (Store n@NodeV {}) = newNode n
 convertExp (Return n@NodeV {}) = newNode n
 convertExp (Store n@NodeC {}) = newNode n
 convertExp (Return n@NodeC {}) = newNode n
-convertExp (Store n@Var {}) = do
+
+convertExp (Store n@Var {}) | getType n == TyNode = do
     (ss,nn) <- newNode (NodeC tagHole [])
     tmp <- newVar pnode_t
     n <- convertVal n
     let tag = project' anyTag n
         update = expr (functionCall (name "memcpy") [tmp,n,functionCall  (name "jhc_sizeof") [tag]])
     return (ss `mappend` (tmp `assign` nn) `mappend` update, tmp)
+convertExp (Store v) | TyPtr TyNode == getType v = do
+    v <- convertVal v
+    tmp <- newVar ppnode_t
+    return ((tmp `assign` jhc_malloc (sizeof pnode_t)) `mappend` (dereference tmp `assign` v),tmp)
 convertExp (Return v) = do
     v <- convertVal v
     return (mempty,v)
@@ -135,7 +144,9 @@ convertExp (Prim p vs) | APrim _ req <- primAPrim p  =  do
     addRequires req
     e <- convertPrim p vs
     return (mempty,e)
-convertExp (Update v@Var {} (NodeC t as)) = do
+convertExp e@(Update v z) | getType v /= TyPtr (getType z) = do
+    return (err (show e),err "nothing")
+convertExp (Update v@Var {} (NodeC t as)) | getType v == TyPtr TyNode = do
     v' <- convertVal v
     as' <- mapM convertVal as
     nt <- nodeTypePtr t
@@ -143,13 +154,17 @@ convertExp (Update v@Var {} (NodeC t as)) = do
         s = project' tag tmp' `assign` constant (enum (nodeTagName t))
         ass = [project' (arg i) tmp' `assign` a | a <- as' | i <- [(1 :: Int) ..] ]
     return (mconcat $ profile_update_inc:s:ass,emptyExpression)
-convertExp (Update v@Var {} (NodeV t [])) = do
+convertExp (Update v@Var {} (NodeV t [])) | getType v == TyPtr TyNode = do
     v' <- convertVal v
     t' <- convertVal (Var t TyTag)
     let tag = project' anyTag v'
     return (tag `assign` t',emptyExpression)
-
-convertExp (Update v z) = do  -- TODO eliminate unknown updates
+convertExp (Update v z) | getType z == TyPtr TyNode = do
+    v' <- convertVal v
+    z' <- convertVal z
+    let tag = project' anyTag z'
+    return $ (dereference v' `assign` z',emptyExpression)
+convertExp (Update v z) | getType z == TyNode = do  -- TODO eliminate unknown updates
     v' <- convertVal v
     z' <- convertVal z
     let tag = project' anyTag z'
@@ -159,6 +174,7 @@ convertExp e = return (err (show e),err "nothing")
 convertType TyTag = return tag_t
 convertType TyNode = return pnode_t
 convertType (TyPtr TyNode) = return pnode_t
+convertType (TyPtr (TyPtr TyNode)) = return ppnode_t
 convertType (Ty t) = return (basicType (toString t))
 convertType (TyTup []) = return voidType
 convertType (TyTup [x]) = convertType x
@@ -262,6 +278,7 @@ convertBody Let { expDefs = defs, expBody = body } = do
        ss <- convertBody b
        return (annotate (show as) (label (toName (show name ++ show u))) `mappend` indentBlock ss)
     return (ss `mappend` goto done `mappend` mconcat (intersperse (goto done) rs) `mappend` label done);
+
 
 
 convertBody (Return v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'

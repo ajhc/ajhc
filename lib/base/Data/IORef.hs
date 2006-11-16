@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -N -funboxed-tuples #-}
 module Data.IORef(
     IORef(),	      -- abstract, instance of: Eq
     newIORef,	      -- :: a -> IO (IORef a)
@@ -11,44 +11,44 @@ module Data.IORef(
 import Jhc.Basics
 import Jhc.Order
 import Jhc.IO
+import Jhc.Int
 
-data IORef a = IORef (Ref a)
-data Ref a = Ref a
+data IORef a = IORef (Ref__ a)
+data Ref__ a :: #
 
 
-foreign import primitive newRef__   :: a -> World__ -> (# World__, IORef a #)
-foreign import primitive readRef__  :: IORef a -> World__ -> (# World__, a #)
-foreign import primitive writeRef__ :: IORef a -> a -> World__ -> World__
+foreign import primitive newRef__   :: a -> UIO (Ref__ a)
+foreign import primitive readRef__  :: Ref__ a -> UIO a
+foreign import primitive writeRef__ :: Ref__ a -> a -> UIO_
 
-{-# NOINLINE newIORef #-}
+-- {-# NOINLINE newIORef #-}
 newIORef :: a -> IO (IORef a)
-newIORef v = IO $ \w -> newRef__ v w
+newIORef v = IO $ \w -> case newRef__ v w of (# w', r #) -> (# w', IORef r #)
 
 
-{-# NOINLINE readIORef #-}
+-- {-# NOINLINE readIORef #-}
 readIORef :: IORef a -> IO a
-readIORef r = IO $ \w -> readRef__ r w
+readIORef (IORef r) = IO $ \w -> readRef__ r w
 
-{-# NOINLINE writeIORef #-}
+-- {-# NOINLINE writeIORef #-}
 writeIORef :: IORef a -> a -> IO ()
-writeIORef r v = IO $ \w -> case writeRef__ r v w of w' -> (# w', () #)
+writeIORef (IORef r) v = IO $ \w -> case writeRef__ r v w of w' -> (# w', () #)
 
-foreign import primitive eqRef__ :: IORef a -> IORef a -> Bool
+foreign import primitive eqRef__ :: Ref__ a -> Ref__ a -> Bool
 
 instance Eq (IORef a) where
-    x == y = eqRef__ x y
-    x /= y = not (eqRef__ x y)
+    (IORef x) == (IORef y) = eqRef__ x y
 
 
-{-# NOINLINE modifyIORef #-}
+--{-# NOINLINE modifyIORef #-}
 modifyIORef :: IORef a -> (a -> a) -> IO ()
-modifyIORef ref f = IO $ \w -> case readRef__ ref w of
+modifyIORef (IORef ref) f = IO $ \w -> case readRef__ ref w of
     (# w', a #) -> case writeRef__ ref (f a) w' of
         w'' -> (# w'', () #)
 
-{-# NOINLINE atomicModifyIORef #-}
+--{-# NOINLINE atomicModifyIORef #-}
 atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
-atomicModifyIORef r f = IO $ \w -> case readRef__ r w of
+atomicModifyIORef (IORef r) f = IO $ \w -> case readRef__ r w of
     (# w', a #) -> case f a of
         (a',b) -> case writeRef__ r a' w' of
             w'' -> (# w'', b #)

@@ -64,8 +64,6 @@ dc_EmptyList = toName DataConstructor ("Jhc.Basics","[]")
 dc_Rational = toName DataConstructor ("Ratio",":%")
 dc_Unit = toName DataConstructor ("Jhc.Basics","()")
 dc_Boolzh = toName DataConstructor ("Jhc.Order","Bool#")
-dc_IORef = toName DataConstructor ("Data.IORef","IORef")
-dc_Ref = toName DataConstructor ("Data.IORef","Ref")
 dc_Target = toName DataConstructor  ("Jhc.Options","Target#")
 
 tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
@@ -80,6 +78,7 @@ tc_Int__ = toName TypeConstructor  ("Jhc.Prim","Int__")
 tc_Addr__ = toName TypeConstructor  ("Jhc.Prim","Addr__")
 tc_Array__ = toName TypeConstructor  ("Jhc.Array","Array__")
 tc_MutArray__ = toName TypeConstructor  ("Jhc.Array","MutArray__")
+tc_Ref__ = toName TypeConstructor ("Data.IORef","Ref__")
 
 
 tc_Bool = toName TypeConstructor  ("Jhc.Order","Bool")

@@ -118,7 +118,7 @@ transDataTable dataTable ns = vcat (theType:map g (lefts wtd)) where
     showSlot (ELit LitCons { litArgs = es, litAliasFor = Just af }) = showSlot (foldl eAp af es)
     showSlot (EPi TVr { tvrType = a } b) = parens $ showSlot a <+> text "->" <+> showSlot b
     showSlot (ELit (LitCons { litName = c, litArgs = as })) = showCon c (map showSlot as)
-    builtIns = [tc_Int,tc_Char,dc_Int,dc_Char,rt_int,rt_HsChar,tc_World__,tc_Array__,tc_MutArray__,rt_HsPtr]
+    builtIns = [tc_Int,tc_Char,dc_Int,dc_Char,rt_int,rt_HsChar,tc_World__,tc_Array__,tc_MutArray__,tc_Ref__,rt_HsPtr]
 
 data Environment = Env {
     envParen  :: Bool,
@@ -157,6 +157,7 @@ showCon c ts | Just _ <- fromTupname c = text "(" <> hsep (punctuate comma ts) <
 showCon c [] | c == tc_World__ = text "World__"
 showCon c [a] | c == tc_Array__ = parens $ text "Array__" <+> a
 showCon c [a] | c == tc_MutArray__ = parens $ text "MutArray__" <+> a
+showCon c [a] | c == tc_Ref__ = parens $ text "Ref__" <+> a
 showCon c [] | (RawType,v) <- fromName c = text $ showCType v
 showCon c [] | c == tc_Int = text "Int"
 showCon c [] | c == tc_Char = text "Char"
@@ -290,7 +291,7 @@ ghcPrimTable = [
     ("newWorld__","newWorld__"),
     ("catch__","catch#"),
     ("raiseIO__","raiseIO#"),
-    ("newRef__","newMVar#"),
+    ("newRef__","newMutVar#"),
     ("readRef__","readMutVar#"),
     ("writeRef__","writeMutVar#"),
     ("newMutArray__","newArray#"),
