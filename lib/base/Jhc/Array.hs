@@ -5,8 +5,6 @@ import Jhc.Basics
 import Jhc.IO
 import Jhc.Int
 
-type UIO a = World__ -> (# World__, a #)
-type UIO_ = World__ -> World__
 
 
 data MutArray__ :: * -> #

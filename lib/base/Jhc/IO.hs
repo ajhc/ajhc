@@ -2,6 +2,8 @@
 
 module Jhc.IO(
     IO(..),
+    UIO(),
+    UIO_(),
     World__(),
     catch,
     dependingOn,
@@ -35,6 +37,8 @@ newtype IO a = IO (World__ -> (# World__, a #))
 unIO :: IO a -> World__ -> (# World__, a #)
 unIO (IO x) = x
 
+type UIO a = World__ -> (# World__, a #)
+type UIO_ = World__ -> World__
 
 -- unsafe operations
 
