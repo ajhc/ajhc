@@ -1,36 +1,41 @@
+{-# OPTIONS_JHC -funboxed-tuples #-}
 module  Data.Array (
     module Ix,  -- export all of Ix
-    Array, array, listArray, (!), bounds, indices, elems, assocs,
-    accumArray, (//), accum, ixmap ) where
+    Array(),
+    array,
+    listArray,
+    (!),
+    bounds,
+    indices,
+    elems,
+    assocs,
+    accumArray,
+    (//),
+    accum,
+    ixmap
+    ) where
 
 import Data.Ix
-import Data.List( (\\) )
---import Prelude.Text
+import Jhc.Array
+import Jhc.Int
 
 infixl 9  !, //
 
-data (Ix a) => Array a b = MkArray (a,a) (a -> b) deriving ()
+
+data Array a b = MkArray !a !a (Array__ b)
 
 array       :: (Ix a) => (a,a) -> [(a,b)] -> Array a b
-array b ivs =
-    if and [inRange b i | (i,_) <- ivs]
-        then MkArray b
-                     (\j -> case [v | (i,v) <- ivs, i == j] of
-                            [v]   -> v
-                            []    -> error "Array.!: \
-                                           \undefined array element"
-                            _     -> error "Array.!: \
-                                           \multiply defined array element")
-        else error "Array.array: out-of-range array association"
+array b@(s,e) ivs = case newArray (error "array: missing element") (rangeSize b) [(index b x,y) | (x,y) <- ivs] of
+        arr -> MkArray s e arr
 
 listArray             :: (Ix a) => (a,a) -> [b] -> Array a b
 listArray b vs        =  array b (zipWith (\ a b -> (a,b)) (range b) vs)
 
 (!)                   :: (Ix a) => Array a b -> a -> b
-(!) (MkArray _ f)     =  f
+(!) (MkArray s e arr) i =  case unboxInt (index (s,e) i) of i' -> case indexArray__ arr i' of (# r #) -> r
 
 bounds                :: (Ix a) => Array a b -> (a,a)
-bounds (MkArray b _)  =  b
+bounds (MkArray s e _)  =  (s,e)
 
 indices               :: (Ix a) => Array a b -> [a]
 indices               =  range . bounds
@@ -42,26 +47,24 @@ assocs                :: (Ix a) => Array a b -> [(a,b)]
 assocs a              =  [(i, a!i) | i <- indices a]
 
 (//)                  :: (Ix a) => Array a b -> [(a,b)] -> Array a b
+a // []               = a
 a // new_ivs          = array (bounds a) (old_ivs ++ new_ivs)
                       where
                   	old_ivs = [(i,a!i) | i <- indices a,
                                              i `notElem` new_is]
                   	new_is  = [i | (i,_) <- new_ivs]
 
-accum                 :: (Ix a) => (b -> c -> b) -> Array a b -> [(a,c)]
-                                   -> Array a b
+accum                 :: (Ix a) => (b -> c -> b) -> Array a b -> [(a,c)] -> Array a b
 accum f               =  foldl (\a (i,v) -> a // [(i,f (a!i) v)])
 
-accumArray            :: (Ix a) => (b -> c -> b) -> b -> (a,a) -> [(a,c)]
-                                   -> Array a b
+accumArray            :: (Ix a) => (b -> c -> b) -> b -> (a,a) -> [(a,c)] -> Array a b
 accumArray f z b      =  accum f (array b [(i,z) | i <- range b])
 
-ixmap                 :: (Ix a, Ix b) => (a,a) -> (a -> b) -> Array b c
-                                         -> Array a c
+ixmap                 :: (Ix a, Ix b) => (a,a) -> (a -> b) -> Array b c -> Array a c
 ixmap b f a           = array b [(i, a ! f i) | i <- range b]
 
 instance  (Ix a)          => Functor (Array a) where
-    fmap fn (MkArray b f) =  MkArray b (fn . f)
+    fmap fn a = array (bounds a) [ (a,fn b) | (a,b) <- assocs a ]
 
 instance  (Ix a, Eq b)  => Eq (Array a b)  where
     a == a' =  assocs a == assocs a'
@@ -74,7 +77,6 @@ instance  (Ix a, Show a, Show b) => Show (Array a b)  where
                     showString "array " .
                     showsPrec (arrPrec+1) (bounds a) . showChar ' ' .
                     showsPrec (arrPrec+1) (assocs a)                  )
-
 instance  (Ix a, Read a, Read b) => Read (Array a b)  where
     readsPrec p = readParen (p > arrPrec)
            (\r -> [ (array b as, u)
@@ -85,3 +87,4 @@ instance  (Ix a, Read a, Read b) => Read (Array a b)  where
 -- Precedence of the 'array' function is that of application itself
 arrPrec :: Int
 arrPrec = 10
+
