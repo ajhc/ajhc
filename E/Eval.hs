@@ -34,7 +34,7 @@ eval term = eval' term []  where
     eval' (EPi v body) (t:rest) = eval' (subst v t body) rest   -- fudge
     eval' (EAp t1 t2) stack = eval' t1 (t2:stack)
     eval' t@EVar {} stack = unwind t stack
-    eval' (ELetRec ds e) stack = eval' (f (decomposeDefns ds) e) stack where
+    eval' ELetRec { eDefs = ds, eBody = e } stack = eval' (f (decomposeDefns ds) e) stack where
         f [] e = e
         f (Left (x,y):ds) e =  subst x y (f ds e)
         f (Right _:_) _ = error $ "cannot eval recursive let"
@@ -87,7 +87,7 @@ strong dsMap' term = eval' dsMap term [] where
         | otherwise = do
             tvr <- etvr ds v
             unwind ds (EVar tvr) stack
-    eval' ds (ELetRec ds' e) stack = eval' (Map.fromList ds'  `mappend` ds) e  stack
+    eval' ds ELetRec { eDefs = ds', eBody = e } stack = eval' (Map.fromList ds'  `mappend` ds) e  stack
     eval' ds e@(ELit LitCons {}) stack = unwind ds e stack
     eval' ds (EError s ty) (t:rest) = do
         nt <- eval' ds (EAp ty t) rest

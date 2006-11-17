@@ -50,7 +50,7 @@ decomposeDefns bs = map f mp where
 
 -- | pull apart an ELet and separate out recursive strongly connected components from an ELet.
 decomposeLet :: E ->  ([Either (TVr, E) [(TVr,E)]],E)
-decomposeLet (ELetRec ds e) = (decomposeDefns ds,e)
+decomposeLet ELetRec { eDefs = ds, eBody = e } = (decomposeDefns ds,e)
 decomposeLet e = ([],e)
 
 -- we export this to get a concrete type for free id sets.
@@ -62,7 +62,7 @@ freeIds =   fv where
     fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = singleton i
     fv (ELam TVr { tvrIdent = i, tvrType = t} e) = delete i $ fv e <> fv t
     fv (EPi  TVr { tvrIdent = i, tvrType = t} e) = delete i $ fv e <> fv t
-    fv (ELetRec dl e) =  ((tl <> bl <> fv e) S.\\ fromList ll)  where
+    fv ELetRec { eDefs = dl, eBody = e } =  ((tl <> bl <> fv e) S.\\ fromList ll)  where
         (ll,tl,bl) = liftT3 (id,mconcat,mconcat) $ unzip3 $
             map (\(tvr@(TVr { tvrIdent = j, tvrType =  t}),y) -> (j, fv t, fv y)) dl
     fv (EError _ e) = fv e
@@ -84,7 +84,7 @@ freeIdMap =   fv where
     fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = msingleton i tvr
     fv (ELam TVr { tvrIdent = i, tvrType = t} e) = mdelete i $ fv e <> fv t
     fv (EPi  TVr { tvrIdent = i, tvrType = t} e) = mdelete i $ fv e <> fv t
-    fv (ELetRec dl e) =  ((tl <> bl <> fv e) S.\\ fromList ll)  where
+    fv ELetRec { eDefs = dl, eBody = e } =  ((tl <> bl <> fv e) S.\\ fromList ll)  where
         (ll,tl,bl) = liftT3 (id,mconcat,mconcat) $ unzip3 $
             map (\(tvr@(TVr { tvrIdent = j, tvrType =  t}),y) -> ((j,tvr), fv t, fv y)) dl
     fv (EError _ e) = fv e

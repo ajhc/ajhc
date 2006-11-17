@@ -189,7 +189,7 @@ showE e = do
             es' <- mapM showE es
             t <- showE t
             return $ atom $ angles $ unparse $ foldl app (atom (pprint s)) es' `inhabit` t
-        f (ELetRec ds e) = do
+        f ELetRec { eDefs = ds, eBody = e } = do
             e <- fmap unparse $ showE e
             ds <- mapM (fmap unparse . showDecl) ds
             return $ fixitize (L,(-10)) $ atom $ group (nest 4  ( keyword "let" </> (align $ sep (map (<> bc ';') ds) </> (keyword "in" <+> e))))

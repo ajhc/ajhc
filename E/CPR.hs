@@ -92,7 +92,7 @@ cprAnalyze dataTable env e = cprAnalyze' env e where
         | Just t <- Map.lookup v mp = (EVar v,t)
         | Just t <- Info.lookup (tvrInfo v)  = (EVar v,t)
         | otherwise = (EVar v,Top)
-    cprAnalyze' env (ELetRec ds e) = (ELetRec ds' e',val) where
+    cprAnalyze' env ELetRec { eDefs = ds, eBody = e } = (ELetRec ds' e',val) where
         (ds',env') = cprAnalyzeBinds dataTable env ds
         (e',val) = cprAnalyze' (env' `mappend` env) e
 

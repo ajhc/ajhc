@@ -326,7 +326,7 @@ analyze ec@ECase { eCaseBind = b, eCaseAlts = [Alt lc@LitCons { litName = h, lit
             return (ec { eCaseScrutinee = e', eCaseAlts = [Alt lc alt'] }, nenv :=> siga)
         _ -> analyzeCase ec s
 analyze ec@ECase {} s = analyzeCase ec s
-analyze (ELetRec ds b) s = f (decomposeDs ds) [] where
+analyze ELetRec { eDefs = ds, eBody = b } s = f (decomposeDs ds) [] where
     f [] ds' = do
         (b',phi :=> sig) <- analyze b s
         let g (t,e) = (tvrInfo_u (Info.insert (lenv t phi)) t,e)

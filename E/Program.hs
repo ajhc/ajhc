@@ -79,8 +79,8 @@ programEsMap prog = runIdentity $ do
 
 -- | note, this will reset your entry points
 programSetE :: E -> Program -> Program
-programSetE (ELetRec ds (EVar v)) prog = programSetDs ds prog { progMainEntry = v }
-programSetE (ELetRec ds mainBody) prog = programSetDs ((main,mainBody):ds) prog { progEntryPoints = [main], progMainEntry = main } where
+programSetE ELetRec { eDefs = ds, eBody = EVar v } prog = programSetDs ds prog { progMainEntry = v }
+programSetE ELetRec { eDefs = ds, eBody = mainBody } prog = programSetDs ((main,mainBody):ds) prog { progEntryPoints = [main], progMainEntry = main } where
     main = (tVr num (typeInfer (progDataTable prog) mainBody))
     Just num = List.find (`notElem` [ n  | (TVr { tvrIdent = n },_) <- ds ]) [toId $ toName Val (show $ progModule prog,"main" ++ show n) |  n <- [1 :: Int ..] ]
 programSetE e prog = prog { progCombinators = [(main,as,mainBody)], progEntryPoints = [main], progMainEntry = main } where

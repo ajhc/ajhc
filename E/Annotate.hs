@@ -25,7 +25,7 @@ annotateDs :: Monad m =>
     -> m [(TVr,E)]
 
 annotateDs imap idann letann lamann ds = do
-    ELetRec ds' Unknown <- annotate imap idann letann lamann (ELetRec ds Unknown)
+    ELetRec { eDefs = ds', eBody = Unknown } <- annotate imap idann letann lamann (ELetRec ds Unknown)
     return ds'
 
 annotateProgram :: Monad m =>
@@ -58,7 +58,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
     f (EAp a b) = liftM2 EAp (f a) (f b)
     f (EError x e) = liftM (EError x) (f e)
     f (EPrim x es e) = liftM2 (EPrim x) (mapM f es) (f e)
-    f (ELetRec dl e) = do
+    f ELetRec { eDefs = dl, eBody = e } = do
         dl' <- flip mapM dl $ \ (t,e) -> do
             nfo <- lift $ letann e (tvrInfo t)
             return (tvrInfo_u (Info.insert LetBound) t { tvrInfo = nfo })

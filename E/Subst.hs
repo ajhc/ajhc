@@ -87,7 +87,7 @@ doSubst substInVars allShadow bm e  = f e bm where
     f (EAp a b) = liftM2 eAp (f a) (f b)
     f (EError x e) = liftM (EError x) (f e)
     f (EPrim x es e) = liftM2 (EPrim x) (mapM f es) (f e)
-    f (ELetRec dl e) = do
+    f ELetRec { eDefs = dl, eBody = e } = do
         (as,rs) <- liftM unzip $ mapMntvr (fsts dl)
         local (foldr (.) id rs) $ do
             ds <- mapM f (snds dl)
@@ -207,7 +207,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
     f (EAp a b) = liftM2 eAp (f a) (f b)
     f (EError x e) = liftM (EError x) (inType $ f e)
     f (EPrim x es e) = liftM2 (EPrim x) (mapM f es) (inType $ f e)
-    f (ELetRec dl e) = do
+    f ELetRec { eDefs = dl, eBody = e } = do
         (as,rs) <- liftM unzip $ mapMntvr (fsts dl)
         local (foldr (.) id rs) $ do
             ds <- mapM f (snds dl)

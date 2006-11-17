@@ -55,7 +55,7 @@ emapEGH f g h e = z e where
     z (ESort aa) = do return $ ESort aa
     z (ELit lc@LitCons { litArgs = es, litType = t }) = do t' <- g t; es' <- mapM f es; return $ ELit lc { litArgs = es', litType = t' }
     z (ELit aa) = do aa <- fmapM g aa; return $ ELit aa
-    z (ELetRec aa ab) = do aa <- mapM (\x -> do x <- (do (aa,ab) <- return x; aa <- mapmTvr g aa;ab <- f ab;return (aa,ab)); return x) aa;ab <- f ab; return $ ELetRec aa ab
+    z ELetRec { eDefs = aa, eBody = ab } = do aa <- mapM (\x -> do x <- (do (aa,ab) <- return x; aa <- mapmTvr g aa;ab <- f ab;return (aa,ab)); return x) aa;ab <- f ab; return $ ELetRec aa ab
     z ec@ECase {} = do
         e' <- f $ eCaseScrutinee ec
         b' <- fmapM g (eCaseBind ec)
@@ -126,7 +126,7 @@ renameE initSet initMap e = runReader (runIdNameT' $ addBoundNamesIdMap initMap 
             as' <- mapM da as
             d' <- fmapM f d
             return $ ec { eCaseScrutinee = e', eCaseType = t', eCaseBind = b', eCaseAlts = as', eCaseDefault = d' }
-    f (ELetRec ds e) = do
+    f ELetRec { eDefs = ds, eBody = e } = do
         addNames (map (tvrIdent . fst) ds)
         ds' <- mapM ( ntvr f' . fst) ds
         localSubst (mconcat $ fsts ds') $ do
