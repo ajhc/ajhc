@@ -41,8 +41,8 @@ data Lit e t = LitInt { litNumber :: Number, litType :: t }
 litCons = LitCons { litName = error "litName: name not set", litArgs = [], litType = error "litCons: type not set", litAliasFor = Nothing }
 
 instance (Show e,Show t) => Show (Lit e t) where
-    showsPrec _ (LitInt x t) = parens $  shows x <> showString "::" <> shows t
-    showsPrec _ LitCons { litName = n, litArgs = es, litType = t } = parens $  hsep (shows n:map shows es) <> showString "::" <> shows t
+    showsPrec p (LitInt x t) = showParen (p > 10) $  shows x <> showString "::" <> shows t
+    showsPrec p LitCons { litName = n, litArgs = es, litType = t } = showParen (p > 10) $ hsep (shows n:map (showsPrec 11) es) <> showString "::" <> shows t
 
 instance Functor (Lit e) where
     fmap f x = runIdentity $ fmapM (return . f) x
@@ -142,9 +142,10 @@ instance Binary TVr where
 
 
 instance Show a => Show (TVr' a) where
-    show TVr { tvrIdent = 0, tvrType = e} = "(_::" ++ show e ++ ")"
-    show TVr { tvrIdent = (x), tvrType =  e} | Just n <- fromId x  = "(v" ++ show n ++ "::" ++ show e ++ ")"
-    show TVr { tvrIdent = (x), tvrType = e}  = "(v" ++ show x ++ "::" ++ show e ++ ")"
+    showsPrec n TVr { tvrIdent = 0, tvrType = e} = showParen (n > 10) $ showString "_::" . shows e
+    showsPrec n TVr { tvrIdent = x, tvrType = e} = showParen (n > 10) $ case fromId x of
+        Just n -> shows n . showString "::" . shows e
+        Nothing  -> shows x . showString "::" . shows e
 
 
 
@@ -153,10 +154,12 @@ instance FunctorM TVr' where
 instance Functor TVr' where
     fmap f t = runIdentity (fmapM (return . f) t)
 
+instance Show e => Show (Alt e) where
+    showsPrec n (Alt l e) = showParen (n > 10) $ shows l . showString " -> " . shows e
 
 
 data Alt e = Alt (Lit TVr e) e
-    deriving(Show,Eq,Ord)
+    deriving(Eq,Ord)
        {-!derive: GhcBinary !-}
 
 altHead :: Alt E -> Lit () ()
