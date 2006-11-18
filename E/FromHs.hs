@@ -290,7 +290,8 @@ convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM g hsDe
             sma = substMap $ fromList [ (x,EVar y)| (x,y) <- cs' ]
             cs' =  [ (x,(tvrType_u smt y))| (x,y) <- cs ]
             e2' = deNewtype dataTable $ smt $ sma e2
-        e2 <- atomizeAp False dataTable Stats.theStats mainModule e2'
+        --e2 <- atomizeAp False dataTable Stats.theStats mainModule e2'
+        let e2 = atomizeAp mempty False dataTable e2'
         return (hsRuleString pr,( snds (cs' ++ ts) ),eval $ smt $ sma e1,e2)
 
 convertE :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> SrcLoc -> HsExp -> m E

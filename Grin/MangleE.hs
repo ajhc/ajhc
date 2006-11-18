@@ -22,7 +22,7 @@ import qualified Data.Set as Set
 import Doc.PPrint
 import E.Annotate
 import E.E
-import E.LetFloat(atomizeAp)
+import E.LetFloat(atomizeApps)
 import E.Program
 import E.Traverse
 import E.TypeCheck(sortStarLike)
@@ -56,7 +56,7 @@ mangle prog = do
     prog <- pruneTypes prog
 
     stats <- Stats.new
-    prog <- programMapBodies (atomizeAp True (progDataTable prog) stats (progModule prog)) prog
+    prog <- return $ atomizeApps True prog -- programMapBodies (atomizeAp True (progDataTable prog) stats (progModule prog)) prog
     prog <- programMapBodies dropCoercions prog
     Stats.print "Mangle" stats
 

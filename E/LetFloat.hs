@@ -1,4 +1,5 @@
 module E.LetFloat(
+    atomizeApps,
     atomizeAp,
     floatOutward,
     programFloatInward,
@@ -6,6 +7,7 @@ module E.LetFloat(
   ) where
 
 import Control.Monad.Identity
+import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.Monoid
 import Data.Typeable
@@ -16,6 +18,7 @@ import Atom
 import DataConstructors
 import Doc.PPrint
 import E.E
+import E.FreeVars
 import E.Inline
 import E.Program
 import E.Rules
@@ -24,7 +27,7 @@ import E.Traverse
 import E.TypeCheck
 import E.Values
 import GenUtil
-import Info.Info as Info hiding(member,delete)
+import qualified Info.Info as Info
 import Info.Types
 import Name.Id
 import Name.Name
@@ -44,65 +47,51 @@ doLetRec stats ds e = return $ ELetRec ds e
 
 
 
-atomizeAp ::
+atomizeApps ::
     Bool          -- ^ whether to atomize type arguments
-    -> DataTable  -- ^ the data table for expanding newtypes
-    -> Stats      -- ^ statistics
-    -> Module     -- ^ current module name
-    -> E          -- ^ input term
-    -> IO E
-atomizeAp atomizeTypes dataTable stats modName e = f e  where
-    f :: E -> IO E
-    f e = do
-        (x,ds) <- g e
-        ds' <- sequence [  f y >>= return . (,) x | (x,y) <- ds ]
-        doLetRec stats ds' x
-    g,h :: E -> IO (E,[(TVr,E)])
-    g ELetRec { eDefs = ds, eBody = e } = do
-        e' <- f e
-        return (e',ds)
-    g (ELam tvr e) = do
-        e' <- f e
-        return (ELam tvr e',[])
-    g (ELit lc@LitCons { litArgs = xs }) = do
-        (xs',dss) <- fmap unzip (mapM h xs)
-        return (ELit lc { litArgs = xs'}, concat dss)
-    g e@ELit {} = return (e,[])
-    g e@EError {} = return (e,[])
-    g ep@(EPi tvr@TVr {tvrIdent = i, tvrType = t} b) | i == 0 || i `notElem` freeVars b  = do
-        ([t',b'],dss) <- fmap unzip (mapM h [t,b])
-        return (EPi tvr { tvrIdent = 0, tvrType = t' } b', concat dss)
-    g (EPrim n xs t) = do
-        (xs',dss) <- fmap unzip (mapM h xs)
-        return (EPrim n xs' t, concat dss)
-    g ec@ECase { eCaseScrutinee = e } = do
-        ec' <- caseBodiesMapM f ec
-        e' <- f e
-        return (ec' { eCaseScrutinee = e' },[])
-    g e = case fromAp e of
-        (EVar x,xs) -> do
-            (xs',dss) <- fmap unzip (mapM h xs)
-            return (foldl EAp (EVar x) xs', concat dss)
-        (x,xs@(_:_)) -> do
-            (x',ds) <- g x
-            (xs',dss) <- fmap unzip (mapM h xs)
-            return (foldl EAp x' xs', concat (ds:dss))
-        _ -> error "E.LetFloat.g: bad"
-    h e | isAtomic e = return (e,[])
-    h ELetRec { eDefs = ds, eBody = e } = do
-        (e',ds') <- h e
-        return (e',ds' ++ ds)
-    h e = do
-        tick stats (toAtom "E.LetFloat.atomizeAp")
-        u <- newUniq
-        let n = toName Val (show modName,"a@" ++ show u)
-            tv = tvr { tvrIdent = toId n, tvrType = infertype dataTable e }
-        --C.putStrLn $ show n ++ " = " ++ pprint e
-        return (EVar tv,[(tv,e)])
+    -> Program
+    -> Program
+atomizeApps atomizeTypes prog = ans where
+    Identity ans = programMapBodies (return . atomizeAp mempty atomizeTypes (progDataTable prog)) prog
+
+atomizeAp :: IdSet -> Bool -> DataTable -> E -> E
+atomizeAp inscope atomizeTypes dataTable e = runReader (f e) inscope where
+    f ELetRec { eDefs = [], eBody = e } = f e
+    f ep@(ELam TVr { tvrIdent = i } _) = local (insert i) $ emapEG f return ep
+    f el@ELetRec { eDefs = ds } = local (`mappend` fromList (map (tvrIdent . fst) ds)) $ emapEG f return el
+    f ec@ECase {} = local (`mappend` fromList (map tvrIdent (caseBinds ec))) $ emapEG f return ec
+    f (ELit lc@LitCons { litArgs = xs }) = mapM f xs >>= dl (\xs -> ELit lc { litArgs = xs })
+    f ep@(EPi tvr@TVr {tvrIdent = i, tvrType = t} b) | i == 0 || i `notMember` freeIds b  = do
+        t <- f t
+        b <- f b
+        dl (\ [t,b] -> EPi tvr { tvrIdent = 0, tvrType = t } b) [t,b]
+    f ep@(EPi  TVr { tvrIdent = i } _) = local (insert i) $ emapEG f return ep
+    f (EPrim n xs t) = mapM f xs >>= dl (\xs -> EPrim n xs t)
+    f e = case fromAp e of
+        (x,xs) -> do
+            x <- emapEG f return x
+            mapM f xs >>= dl (\xs -> foldl EAp x xs)
+    dl build xs = do
+        (fn,xs') <- h xs
+        return $ fn (build xs')
+    h :: [E] -> Reader IdSet (E -> E,[E])
+    h (e:es) | isAtomic e = h es >>= \ (fn,es') -> return (fn,e:es')
+    h (e:es) = do
+        fvs <- ask
+        let (var:_) = [ i | i <- [2, 4 .. ], i `notMember` fvs]
+            tvt = infertype dataTable e
+            tv = tvr { tvrIdent = var, tvrType = tvt }
+            fn = if getType tvt == eHash then eStrictLet tv e else eLetRec [(tv,e)]
+        (fn',es') <- local (insert var) (h es)
+        return (fn . fn',EVar tv:es')
+    h [] = return (id,[])
     isAtomic :: E -> Bool
     isAtomic EVar {}  = True
+--    isAtomic (EAp e v) | not atomizeTypes && isAtomic e && sortTypeLike v = True
     isAtomic e | not atomizeTypes && sortTypeLike e = True
     isAtomic e = isFullyConst e
+
+
 
 
 fvBind (Left (_,fv)) = fv

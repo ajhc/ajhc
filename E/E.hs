@@ -195,7 +195,7 @@ isWHNF ELit {} = True
 isWHNF ELam {} = True
 isWHNF EPi {} = True
 isWHNF ESort {} = True
-isWHNF (ELetRec _ e) = isWHNF e
+isWHNF ELetRec { eBody = e } = isWHNF e
 isWHNF _ = False
 
 

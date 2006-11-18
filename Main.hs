@@ -292,23 +292,11 @@ processDecls stats ho ho' tiData = do
     let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (n,_) <- ds ]
         namesInscope = fromList inscope
 
-    -- initial pass over functions to put them into a normalized form
-    let procE (ds,usedIds) (v,lc) = do
-        lc <- atomizeAp False fullDataTable stats (progModule prog) lc
-        nfo <- idann  allRules (hoProps ho') (tvrIdent v) (tvrInfo v)
-        v <- return $ v { tvrInfo = Info.insert LetBound nfo }
-        let used' = collectIds lc
-        return ((shouldBeExported (getExports ho') v,lc):ds,usedIds `mappend` used')
-    Stats.clear stats
---    ds <- return $ runIdentity $ annotateDs mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo)  (\_ nfo -> return nfo) ds
-    (ds,_allIds) <- foldM procE ([],hoUsedIds ho) ds
-    Stats.print "PostProcess" stats
-    Stats.clear stats
-
-    prog <- return $ programSetDs ds prog
-    prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo)  (\_ nfo -> return nfo) prog
+    let prog' = programSetDs ds prog
+    let Identity prog = programMapDs (\ (t,e) -> return (shouldBeExported (getExports ho') t,e)) $ atomizeApps False prog'
+    prog <- barendregtProg prog
+    prog <- return $ runIdentity $ annotateProgram mempty (idann allRules (hoProps ho')) letann lamann prog
     lintCheckProgram (putErrLn "LintPostProcess") prog
---    prog <- denewtypeProgram prog
 
     -- Create Specializations
     let specMap = Map.fromListWith (++) [ (n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- tiCheckedRules tiData]
