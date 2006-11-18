@@ -145,7 +145,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
         -- easily proven so, so we avoid the whole mess by subtituting known
         -- type variables within lifted expressions. This can not duplicate work
         -- since types are unpointed, but might change space usage slightly.
-        g ec@ECase { eCaseScrutinee = (EVar v), eCaseAlts = as, eCaseDefault = d} | sortStarLike (tvrType v) = do
+        g ec@ECase { eCaseScrutinee = (EVar v), eCaseAlts = as, eCaseDefault = d} | sortKindLike (tvrType v) = do
             True <- asks isStrict
             d' <- fmapM f d
             let z (Alt l e) = do
@@ -162,7 +162,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
             ds <- asks declEnv
             let fvs = freeVars e
                 fvs' = filter (not . (`member` gs) . tvrIdent) fvs
-                ss = filter (sortStarLike . tvrType) fvs'
+                ss = filter (sortKindLike . tvrType) fvs'
                 f [] e False = return (e,fvs'')
                 f [] e True = pLift e
                 f (s:ss) e x

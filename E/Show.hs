@@ -166,9 +166,7 @@ showE e = do
             return $ (pop (retOp UC.lambda) tvr) `dot` e
         f (EVar tvr) = if dump FD.EVerbose then showTVr tvr else showTVr' tvr
         f Unknown = return $ symbol (char  '?')
-        f (ESort EStar) = return $ symbol (text "*")
-        f (ESort EBox) = return $ symbol UC.box
-        f (ESort EHash) = return $ symbol (text "#")
+        f (ESort s) = return $ symbol (tshow s)
         f (ELit l) = showLit showE l
         f (EError "" t) = do
             ty <- showE t

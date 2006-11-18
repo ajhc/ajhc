@@ -116,20 +116,20 @@ eCase e alts els = emptyCase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e
 eLet :: TVr -> E -> E -> E
 eLet TVr { tvrIdent = 0 } _ e' = e'
 eLet t@(TVr { tvrType =  ty}) e e'
-    | sortStarLike ty && isAtomic e = subst t e e'
-    | sortStarLike ty = ELetRec [(t,e)] (typeSubst mempty (msingleton (tvrIdent t) e) e')
+    | sortKindLike ty && isAtomic e = subst t e e'
+    | sortKindLike ty = ELetRec [(t,e)] (typeSubst mempty (msingleton (tvrIdent t) e) e')
     | isUnboxed ty && isAtomic e = subst t e e'
     | isUnboxed ty  = eStrictLet t e e'
 eLet t e e' = ELetRec [(t,e)] e'
 
 -- | strict version of let, evaluates argument before assigning it.
-eStrictLet t@(TVr { tvrType =  ty }) v e | sortStarLike ty  = eLet t v e
+eStrictLet t@(TVr { tvrType =  ty }) v e | sortKindLike ty  = eLet t v e
 eStrictLet t v e = emptyCase { eCaseScrutinee = v, eCaseBind = t, eCaseDefault = Just e, eCaseType = getType e }
 
 substLet :: [(TVr,E)] -> E -> E
 substLet ds e  = ans where
     (as,nas) = partition (isAtomic . snd) (filter ((/= 0) . tvrIdent . fst) ds)
-    tas = filter (sortStarLike . tvrType . fst) nas
+    tas = filter (sortKindLike . tvrType . fst) nas
     ans = eLetRec (as ++ nas) (typeSubst' (fromList [ (n,e) | (TVr { tvrIdent = n },e) <- as]) (fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas]) e)
 
 
@@ -137,7 +137,7 @@ substLet' :: [(TVr,E)] -> E -> E
 substLet' ds' e  = ans where
     (hh,ds) = partition (isUnboxed . tvrType . fst) ds'
     nas = filter ((/= 0) . tvrIdent . fst) ds
-    tas = filter (sortStarLike . tvrType . fst) nas
+    tas = filter (sortKindLike . tvrType . fst) nas
     ans = case (nas,tas) of
         ([],_) -> hhh hh $ e
         (nas,[]) -> hhh hh $ ELetRec nas e

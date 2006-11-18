@@ -3,7 +3,8 @@ module E.TypeCheck(
     eAp,
     inferType,
     match,
-    sortStarLike,
+    sortSortLike,
+    sortKindLike,
     sortTermLike,
     sortTypeLike,
     typeInfer,
@@ -37,54 +38,84 @@ import {-# SOURCE #-} DataConstructors
 
 -- PTS type checker
 -- core is the following PTS
--- S = (*,#,Box)
--- A = (*::Box,#::Box)
--- R = (*,*,*) (*,#,*) (#,#,*) (#,*,*) (Box,*,*) (Box,#,*) (Box,Box,Box)
+-- S = (*,!,**,#,(#),##)
+-- A = (*::**,#::##,(#)::##,!::**)
+--
 --
 -- * is the sort of boxed values
+-- ! is the sort of boxed strict values
+-- ** is the supersort of all boxed value
 -- # is the sort of unboxed values
--- notice that functions are always boxed
+-- (#) is the sort of unboxed tuples
+-- ## is the supersort of all unboxed values
+-- we also have user defined kinds, which are always of supersort ##
+--
+-- notice that functions are always boxed, but may be strict if they take an unboxed tuple as an argument
+
+--  -- these rules apply to lambda abstractions, data constructors can be _defined_ to have types that would be invalid otherwise
+-- as a shortcut we will use *# to mean either * or # and so forth
+--
+-- so (*#,*#,*) means (*,*,*) (#,*,*) (*,#,*) (#,#,*)
+--
+-- R =
+--    (*#!,*#!,*)
+--    (*#!,(#),*)
+--    ((#),*#!,!)
+--    ((#),(#),!)
+--    (**,*,*)  -- may have a function from an unboxed type to a value
+--    (**,#,*)
+--    (**,!,*)
+--    (**,**,**)  -- we have functions from types to types
+--    (**,##,##)  -- Array__ a :: #
+--
+-- _|_ :: t iff t::*
 --
 -- this PTS is functional but not injective
 
 
-ptsAxioms = [
-    (EStar,EBox),
-    (EHash,EBox)
+
+ptsAxioms :: Map.Map ESort ESort
+ptsAxioms = Map.fromList [
+    (EStar,EStarStar),
+    (EBang,EStarStar),
+    (EHash,EHashHash),
+    (ETuple,EHashHash)
     ]
 
-ptsRules = [
-    (EStar,EStar,EStar),  -- Int -> Int :: *
-    (EStar,EHash,EStar),  -- Int -> Int# :: *
-    (EHash,EStar,EStar),  -- Int# -> Int :: *
-    (EHash,EHash,EStar),  -- Int# -> Int# :: *
-    (EBox,EStar,EStar),   -- forall x . Foo x :: *
-    (EBox,EHash,EStar),   -- forall x . Int# :: *
-    (EBox,EBox,EBox)      -- * -> * :: Box
-    ]
+ptsRulesMap :: Map.Map (ESort,ESort) ESort
+ptsRulesMap = Map.fromList [ ((a,b),c) | (as,bs,c) <- ptsRules, a <- as, b <- bs  ] where
+    starHashBang = [EStar,EHash,EBang]
+    ptsRules = [
+        (starHashBang,ETuple:starHashBang,EStar),
+        ([ETuple],ETuple:starHashBang,EBang),
+        ([EStarStar],starHashBang,EStar),
+        ([EStarStar],[EStarStar],EStarStar),
+        ([EStarStar],[EHashHash],EHashHash)
+        ]
 
-ptsRulesMap = Map.fromList [ ((a,b),c) | (a,b,c) <- ptsRules ]
 
-
-canBeBox EPi {} = True
 canBeBox x | getType x == eStar = True
 canBeBox _ = False
 
 -- Fast (and lazy, and perhaps unsafe) typeof
 typ ::  E -> E
-typ (ESort s) = case lookup s ptsAxioms of
+typ (ESort s) = case Map.lookup s ptsAxioms of
     Just r -> ESort r
-    Nothing -> error "Box inhabits nowhere"
+    Nothing -> error ("TypeOf: " ++ show s)
 typ (ELit l) = getType l
 typ (EVar v) =  getType v
-typ (EPi _ b) = typ b
+typ e@(EPi TVr { tvrType = a } b)
+    | typa == Unknown || typb == Unknown = Unknown
+    | otherwise = maybe (error $ "getType: " ++ show e) ESort $ do
+        ESort s1 <- return $ typ a
+        ESort s2 <- return $ typ b
+        Map.lookup (s1,s2) ptsRulesMap
+    where typa = typ a; typb = typ b
 typ (EAp (ELit LitCons { litType = EPi tvr a }) b) = getType (subst tvr b a)
--- typ e@(EAp (ELit LitCons { litType = ty }) b) | ty == eStar = eStar -- XXX functions might have unboxed return types in the future
--- XXX the following should never occur
 typ (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = getType (foldl eAp af (litArgs lc ++ [b]))
 typ e@(EAp (ELit LitCons {}) b) = error $ "getType: application of type alias " ++ (render $ ePretty e)
 typ (EAp (EPi tvr a) b) = getType (subst tvr b a)
-typ (EAp a b) = eAp (typ a) b
+typ (EAp a b) = if typa == Unknown then Unknown else eAp typa b where typa = typ a
 typ (ELam (TVr { tvrIdent = x, tvrType =  a}) b) = EPi (tVr x a) (typ b)
 typ (ELetRec _ e) = typ e
 typ ECase {eCaseType = ty} = ty
@@ -93,21 +124,10 @@ typ (EPrim _ _ t) = t
 typ Unknown = Unknown
 
 
--- * -> Int#
-
--- * -> *
-
-sortOf e = f e where
-    f (ESort s) = lookup s ptsAxioms
-    f (EVar TVr { tvrType = ESort t }) = return t
-    f (EPi TVr { tvrType = a } b) = do
-        a' <- f a
-        b' <- f b
-        Map.lookup (a',b') ptsRulesMap
---    f (EAp x y) = Map.lookup
---        EPi _ b = getType x
-
-
+instance CanType ESort ESort where
+    getType s = case Map.lookup s ptsAxioms of
+        Just s -> s
+        Nothing -> error $ "getType: " ++ show s
 instance CanType E E where
     getType = typ
 instance CanType TVr E where
@@ -118,9 +138,10 @@ instance CanType e t => CanType (Alt e) t where
     getType (Alt _ e) = getType e
 
 
-sortStarLike e = e /= eBox && getType e == eBox
-sortTypeLike e = e /= eBox && not (sortStarLike e) && sortStarLike (getType e)
-sortTermLike e = e /= eBox && not (sortStarLike e) && not (sortTypeLike e) && sortTypeLike (getType e)
+sortSortLike e = e == ESort EHashHash || e == ESort EStarStar
+sortKindLike e = not (sortSortLike e) && sortSortLike (getType e)
+sortTypeLike e = not (sortSortLike e) && not (sortKindLike e) && sortKindLike (getType e)
+sortTermLike e = not (sortSortLike e) && not (sortKindLike e) && not (sortTypeLike e) && sortTypeLike (getType e)
 
 
 
@@ -160,7 +181,11 @@ inferType dataTable ds e = rfc e where
     fc e@(ELit _) = let t = typ e in valid t >> return t
     fc (EVar (TVr { tvrIdent = 0 })) = fail "variable with nothing!"
     fc (EVar (TVr { tvrType =  t})) = valid t >> strong' t
-    fc (EPi (TVr { tvrIdent = n, tvrType =  at}) b) = valid at >> rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
+    fc (EPi (TVr { tvrIdent = n, tvrType =  at}) b) = do
+        ESort a <- rfc at
+        ESort b <- rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
+        liftM ESort $ Map.lookup (a,b) ptsRulesMap
+        --valid at >> rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
     --fc (ELam tvr@(TVr n at) b) = valid at >> rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b >>= \b' -> (strong' $ EPi tvr b')
     fc (ELam tvr@(TVr { tvrIdent = n, tvrType =  at}) b) = do
         valid at
@@ -171,19 +196,7 @@ inferType dataTable ds e = rfc e where
     fc (EAp a b) = do
         withContextDoc (text "EAp:" </> parens (prettyE a) </> parens (prettyE b)) $ do
             a' <- rfc a
-            --b <- strong' b
             strong' $ eAp a' b
-        {-
-        case followAliases dataTable a' of
-            (EPi tvr@(TVr { tvrType =  t}) v) -> do
-                valid t
-                withContextDoc (hsep [text "Application: ", parens $ prettyE a <> text "::" <> prettyE a', parens $ prettyE b]) $ fceq ds b t
-                b' <- if sortStarLike t then strong' b else return b
-                nt <- return (subst tvr b' v)
-                valid nt
-                return nt
-            x -> fail $ "App: " ++ render (tupled [ePretty x,ePretty a, ePretty a', ePretty b])
-            -}
     fc (ELetRec vs e) = do
         let ck (TVr { tvrIdent = 0 },_) = fail "binding of empty var"
             ck (tv@(TVr { tvrType =  t}),e) = withContextDoc (hsep [text "Checking Let: ", parens (pprint tv),text  " = ", parens $ prettyE e ])  $ do
@@ -242,8 +255,8 @@ inferType dataTable ds e = rfc e where
 
     eqAll ts = withContextDoc (text "eqAll" </> list (map prettyE ts)) $ foldl1M_ eq ts
     valid s = valid' ds s
+    valid' nds ESort {} = return ()
     valid' nds s
-        | s == eBox = return ()
         | Unknown <- s = return ()
         | otherwise =  withContextDoc (text "valid:" <+> prettyE s) (do t <- inferType' nds s;  valid' nds t)
     eq box t2 | box == tBox, canBeBox t2 = return t2
@@ -269,14 +282,17 @@ instance CanTypeCheck DataTable E E where
         Right v -> return v
 
 instance CanTypeCheck DataTable TVr E where
-    typecheck _ tvr = return $ getType tvr
+    typecheck dt tvr = do
+        typecheck dt (getType tvr)
+        return $ getType tvr
 
 instance CanTypeCheck DataTable (Lit a E) E where
-    typecheck _ l = return $ getType l
+    typecheck  dt LitCons { litType = t } = typecheck dt t >> return t
+    typecheck  dt LitInt  { litType = t } = typecheck dt t >> return t
 
 -- TODO, types might be bound in scrutinization
 instance CanTypeCheck DataTable (Alt E) E where
-    typecheck dt (Alt _ e) = typecheck dt e
+    typecheck dt (Alt l e) = typecheck dt l >> typecheck dt e
 
 instance CanTypeCheck DataTable [(TVr,E)] [E] where
     typecheck dataTable ds = do mapM (typecheck dataTable) (snds ds)
@@ -314,16 +330,18 @@ instance ContextMonad String Tc where
 typeInfer'' :: ContextMonad String m => DataTable -> [(TVr,E)] -> E -> m E
 typeInfer'' dataTable ds e = rfc e where
     inferType' ds e = typeInfer'' dataTable ds e
-    prettyE = ePrettyEx
-    rfc e =  withContextDoc (text "fullCheck':" </> prettyE e) (fc e >>=  strong')
-    rfc' nds e =  withContextDoc (text "fullCheck':" </> prettyE e) (inferType' nds  e >>=  strong')
-    strong' e = withContextDoc (text "Strong':" </> prettyE e) $ strong ds e
+    rfc e =  withContextDoc (text "fullCheck':" </> ePrettyEx e) (fc e >>=  strong')
+    rfc' nds e =  withContextDoc (text "fullCheck':" </> ePrettyEx e) (inferType' nds  e >>=  strong')
+    strong' e = withContextDoc (text "Strong':" </> ePrettyEx e) $ strong ds e
     fc s@ESort {} = return $ getType s
     fc (ELit LitCons { litType = t }) = strong' t
     fc e@ELit {} = strong' (getType e)
     fc (EVar TVr { tvrIdent = 0 }) = fail "variable with nothing!"
     fc (EVar TVr { tvrType =  t}) =  strong' t
-    fc (EPi TVr { tvrIdent = n, tvrType = at} b) =  rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
+    fc (EPi TVr { tvrIdent = n, tvrType = at} b) =  do
+        ESort a <- rfc at
+        ESort b <- rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
+        liftM ESort $ Map.lookup (a,b) ptsRulesMap
     fc (ELam tvr@TVr { tvrIdent = n, tvrType =  at} b) = do
         at' <- strong' at
         b' <- rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
@@ -344,7 +362,7 @@ typeInfer'' dataTable ds e = rfc e where
     fc ECase { eCaseType = ty } = do
         strong' ty
     fc Unknown = return Unknown
-    fc e = failDoc $ text "what's this? " </> (prettyE e)
+    fc e = failDoc $ text "what's this? " </> (ePrettyEx e)
 
 
 

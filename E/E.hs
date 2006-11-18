@@ -54,16 +54,24 @@ instance FunctorM (Lit e) where
 
 
 data ESort =
-    EStar     -- ^ the sort of types
-    | EHash   -- ^ the sort of unboxed types
-    | EBox    -- ^ the sort of types of types
+    EStar         -- ^ the sort of boxed lazy types
+    | EBang       -- ^ the sort of boxed strict types
+    | EHash       -- ^ the sort of unboxed types
+    | ETuple      -- ^ the sort of unboxed tuples
+    | EHashHash   -- ^ the supersort of unboxed types
+    | EStarStar   -- ^ the supersort of boxed types
+    | ESortNamed Name -- ^ user defined sorts
     deriving(Eq, Ord)
     {-! derive: is, GhcBinary !-}
 
 instance Show ESort where
     showsPrec _ EStar = showString "*"
     showsPrec _ EHash = showString "#"
-    showsPrec _ EBox = showString "BOX"
+    showsPrec _ EStarStar = showString "**"
+    showsPrec _ EHashHash = showString "##"
+    showsPrec _ ETuple = showString "(#)"
+    showsPrec _ EBang = showString "!"
+
 
 data E = EAp E E
     | ELam TVr E
@@ -245,9 +253,6 @@ tvrSilly = tVr ((-1)) Unknown
 -- E constructors
 -----------------
 
-
-eBox :: E
-eBox = ESort EBox
 
 eStar :: E
 eStar = ESort EStar

@@ -170,7 +170,7 @@ matchesConv ms = map v ms where
 altConv as = map v as where
     v (HsAlt _ p rhs wh) = ([simplifyHsPat p],rhs,wh)
 
-argTypes e = span ((== eBox) . getType) (map tvrType xs) where
+argTypes e = span (sortSortLike . getType) (map tvrType xs) where
     (_,xs) = fromPi e
 argTypes' :: E -> ([E],E)
 argTypes' e = let (x,y) = fromPi e in (map tvrType y,x)
@@ -200,7 +200,7 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
             worldVar = tvr { tvrIdent = 2, tvrType = tWorld__ }
             theMainTvr =  tVr (toId cname) (infertype dataTable ne)
             tvm@(TVr { tvrType =  ty}) =  main
-            maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs, sortStarLike k ]
+            maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs, sortKindLike k ]
             (_,xs) = fromPi ty
         return (cname, tvrInfo_u (case ffi of Just ffi -> Info.insert ffi; Nothing -> id) $ setProperty prop_EXPORTED theMainTvr,ne)
     ioLike ty = case ty of
@@ -221,7 +221,7 @@ createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans wher
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
         as = [ rule  t | Inst { instHead = _ :=> IsIn _ t }  <- snub (classInsts classRecord) ]
         (_ft,_:args') = fromPi ty
-        (args,_rargs) = span (sortStarLike . getType)  args'
+        (args,_rargs) = span (sortKindLike . getType)  args'
         rule t = emptyRule { ruleHead = methodVar, ruleArgs = tpat:map EVar args, ruleBinds = [ t | ~(EVar t) <- vs] ++ args, ruleBody = removeNewtypes dataTable body, ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
             tpat = valToPat' (removeNewtypes dataTable $ tipe t)
             name = (instanceName methodName (getTypeCons t))
@@ -277,7 +277,7 @@ convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM g hsDe
         e1 <- ce (hsRuleLeftExpr pr)
         e2 <- ce (hsRuleRightExpr pr)
         (ts,cs) <- runNameMT $ do
-            ts <- flip mapM (filter (sortStarLike . getType) $ freeVars e1) $ \tvr -> do
+            ts <- flip mapM (filter (sortKindLike . getType) $ freeVars e1) $ \tvr -> do
                 --return (tvrIdent tvr,tvr)
                 nn <- newNameFrom (map (:'\'':[]) ['a' ..])
                 return (tvrIdent tvr,tvr { tvrIdent = toId (toName TypeVal nn) })
@@ -358,7 +358,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         (var,ty,lamt) <- convertValue name
         let (ts,rt)   = argTypes' ty
             prim      = APrim (PrimPrim cn) req
-        es <- newVars [ t |  t <- ts, not (sortStarLike t) ]
+        es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
         let result    = foldr ($) (processPrimPrim dataTable $ EPrim prim (map EVar es) rt) (map ELam es)
         return [(name,var,lamt result)]
     cDecl (HsForeignDecl _ (FfiSpec (ImportAddr rcn req) _ _) n _) = do
@@ -377,7 +377,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
             (isIO,rt') = case  rt of
                 ELit (LitCons { litName = c, litArgs = [x] }) | c == tc_IO -> (True,x)
                 _ -> (False,rt)
-        es <- newVars [ t |  t <- ts, not (sortStarLike t) ]
+        es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
         (_,pt) <- lookupCType dataTable rt'
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
         let cFun = createFunc dataTable (map tvrType es)
@@ -552,7 +552,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
             cClass classRecord =  [ f n (toId n) (removeNewtypes dataTable $ tipe t) | (n,t) <- classAssumps classRecord ] where
                 f n i t = (n,setProperties [prop_METHOD,prop_PLACEHOLDER] $ tVr i t, foldr ELam (EPrim (primPrim ("Placeholder: " ++ show n)) [] ft) args)  where
                     (ft',as) = fromPi t
-                    (args,rargs) = span (sortStarLike . getType) as
+                    (args,rargs) = span (sortKindLike . getType) as
                     ft = foldr EPi ft' rargs
         return (cClass cr ++ primitiveInstances className)
     cClassDecl _ = error "cClassDecl"

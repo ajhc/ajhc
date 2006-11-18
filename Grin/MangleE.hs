@@ -25,7 +25,7 @@ import E.E
 import E.LetFloat(atomizeApps)
 import E.Program
 import E.Traverse
-import E.TypeCheck(sortStarLike)
+import E.TypeCheck(sortKindLike)
 import E.Values
 import Fixer.Fixer
 import Fixer.Supply
@@ -89,7 +89,7 @@ typeAnalyze prog = do
         when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.lookup (tvrInfo t) :: Maybe IsUsed) ++ ")" | t <- ts' ]
     return prog
 
-good tvr = sortStarLike (tvrType tvr)
+good tvr = sortKindLike (tvrType tvr)
 
 doComb :: Set.Set TVr -> Supply (Int,Int) IsUsed -> (TVr,[TVr],E) -> IO ()
 doComb scombs funArg (tvr,as,e) = do

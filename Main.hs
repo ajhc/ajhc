@@ -625,7 +625,7 @@ compileModEnv' stats (ho,_) = do
     putStrLn "Type analyzed methods"
     flip mapM_ (programDs prog) $ \ (t,e) -> do
         let (_,ts) = fromLam e
-            ts' = takeWhile (sortStarLike . getType) ts
+            ts' = takeWhile (sortKindLike . getType) ts
         when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
     lintCheckProgram onerrNone prog
     prog <- programPrune prog

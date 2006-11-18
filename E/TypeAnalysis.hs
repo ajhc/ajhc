@@ -44,7 +44,7 @@ type Env = (Supply (Module,Int) Bool,Supply TVr Bool,Map.Map Id [Value Typ])
 
 extractValMap :: [(TVr,E)] -> Map.Map Id [Value Typ]
 extractValMap ds = fromList [ (tvrIdent t,f e []) | (t,e) <- ds] where
-    f (ELam tvr e) rs | sortStarLike (getType tvr) = f e (runIdentity (Info.lookup $ tvrInfo tvr):rs)
+    f (ELam tvr e) rs | sortKindLike (getType tvr) = f e (runIdentity (Info.lookup $ tvrInfo tvr):rs)
     f _ rs = reverse rs
 
 -- all variables _must_ be unique before running this
@@ -95,7 +95,7 @@ assert v = v `isSuperSetOf` value True
 calcDef :: Env -> (TVr,E) -> IO ()
 calcDef env@(ur,uv,_) (t,e) = do
     let (_,ls) = fromLam e
-        tls = takeWhile (sortStarLike . getType) ls
+        tls = takeWhile (sortKindLike . getType) ls
         rs = rulesFromARules (Info.fetch (tvrInfo t))
         hr r = do
             ruleUsed <- supplyValue ur (ruleUniq r)
@@ -130,7 +130,7 @@ calcDs env@(ur,uv,_) ds = do
     flip mapM_ ds $ \ (v,e) -> do calcDef env (v,e)
       --  addRule $ conditionalRule id nv (ioToRule $ calcDef env (v,e))
      where
-    d (t,e) | not (sortStarLike (getType t)) = return ()
+    d (t,e) | not (sortKindLike (getType t)) = return ()
     d (t,e) | Just v <- getValue e = do
         let Just t' = Info.lookup (tvrInfo t)
         addRule $ t' `isSuperSetOf` v
@@ -163,7 +163,7 @@ calcE :: Env -> E -> IO ()
 calcE (ur,uv,env) (ELetRec ds e) = calcDs nenv ds >> calcE nenv e where
     nenv = (ur,uv,extractValMap ds `union` env)
 calcE env e | (e',(_:_)) <- fromLam e = calcE env e'
---calcE env ec@ECase {} | sortStarLike (getType $ eCaseScrutinee ec) = do
+--calcE env ec@ECase {} | sortKindLike (getType $ eCaseScrutinee ec) = do
 --    calcE env (eCaseScrutinee ec)
 --    fmapM_ (calcE env) (eCaseDefault ec)
 --    v <- getValue (eCaseScrutinee ec)
@@ -181,7 +181,7 @@ calcE env e | (EVar v,as@(_:_)) <- fromAp e = do
     tagE env e
     when (length as < length ts) $ fail ("calcE: unsaturated call to function: " ++ pprint e)
     flip mapM_ (zip as ts) $ \ (a,t) -> do
-        when (sortStarLike (getType a)) $ do
+        when (sortKindLike (getType a)) $ do
             a' <- getValue a
             addRule $ t `isSuperSetOf` a'
 calcE env e@EVar {} = tagE env e
@@ -223,7 +223,7 @@ typConstant e = fail $ "typConstant: " ++ show e
 
 pruneE :: E -> IO E
 pruneE e = return $ runIdentity (prune e)  where
-    prune ec@ECase { eCaseScrutinee = EVar v } | sortStarLike (getType v), Just vm <- Info.lookup (tvrInfo v) = do
+    prune ec@ECase { eCaseScrutinee = EVar v } | sortKindLike (getType v), Just vm <- Info.lookup (tvrInfo v) = do
         ec' <- pruneCase ec vm
         emapE' prune ec'
     prune e = emapE' prune e
@@ -277,7 +277,7 @@ specializeDef _ _ (t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
 specializeDef True (_,_,dataTable,_) (tvr,e) = ans where
     sub = substMap''  $ fromList [ (tvrIdent t,Just v) | (t,Just v) <- sts ]
     sts = map spec ts
-    spec t | Just nt <- Info.lookup (tvrInfo t) >>= getTyp (getType t) dataTable, sortStarLike (getType t) = (t,Just (repi nt))
+    spec t | Just nt <- Info.lookup (tvrInfo t) >>= getTyp (getType t) dataTable, sortKindLike (getType t) = (t,Just (repi nt))
     spec t = (t,Nothing)
     (fe,ts) = fromLam e
     ne = sub $ foldr ELam fe [ t | (t,Nothing) <- sts]
