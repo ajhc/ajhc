@@ -90,6 +90,8 @@ import FrontEnd.SrcLoc
       '=>'    { DoubleArrow }
       '-'     { Minus }
       '!'     { Exclamation }
+      '??'    { QuestQuest }
+      '*!'    { StarBang }
       '*'     { Star }
       '#'     { Hash }
       '.'     { Dot }
@@ -104,7 +106,6 @@ import FrontEnd.SrcLoc
       'deriving'      { KW_Deriving }
       'do'            { KW_Do }
       'else'          { KW_Else }
-      'export'        { KW_Export }
       'hiding'        { KW_Hiding }
       'if'            { KW_If }
       'import'        { KW_Import }
@@ -122,13 +123,9 @@ import FrontEnd.SrcLoc
       'where'         { KW_Where }
       'qualified'     { KW_Qualified }
       'foreign'       { KW_Foreign }
-      'safe'          { KW_Safe }
-      'unsafe'        { KW_Unsafe }
-      'ccall'         { KW_CCall }
-      'stdcall'       { KW_Stdcall }
-      'primitive'     { KW_Primitive }
       'forall'        { KW_Forall }
       'exists'        { KW_Exists }
+      'kind'          { KW_Kind }
 
 %monad { P } { thenP } { returnP }
 %lexer { lexer } { EOF }
@@ -292,15 +289,21 @@ topdecl :: { HsDecl }
                       { HsInstDecl $2 $3 $4 }
       | 'default' srcloc type
                       { HsDefaultDecl $2 $3 }
-      | 'foreign' srcloc 'export' mcconv mstring var '::' ctype
-                      {% parseExport $5 $6 >>= \x ->
-                         return (HsForeignExport $2 (FfiExport x Safe $4) $6 $8) }
-      | 'foreign' srcloc 'import' 'primitive' mstring var '::' ctype
-                      { let i = Import (if null $5 then show $6 else $5) nullRequires
-                        in HsForeignDecl $2 (FfiSpec i Safe Primitive) $6 $8 }
-      | 'foreign' srcloc 'import' mcconv msafety mstring var '::' ctype
-                      {% parseImport $6 $7 >>= \x ->
-                         return (HsForeignDecl $2 (FfiSpec x $5 $4) $7 $9) }
+      | 'foreign' srcloc 'import' varids mstring '::' ctype
+                      {% doForeign $2 (UnQual (HsIdent "import"):reverse $4) $5 $7  }
+      | 'foreign' srcloc varids mstring '::' ctype
+                      {% doForeign $2 (reverse $3) $4 $6  }
+      | 'foreign' srcloc varids mstring '::' ctype '=' exp
+                      {% doForeignEq $2 (reverse $3) $4 $6 $8 }
+--      | 'foreign' srcloc 'export' mcconv mstring var '::' ctype
+--                      {% parseExport $5 $6 >>= \x ->
+--                         return (HsForeignExport $2 (FfiExport x Safe $4) $6 $8) }
+--      | 'foreign' srcloc 'import' 'primitive' mstring var '::' ctype
+--                      { let i = Import (if null $5 then show $6 else $5) nullRequires
+--                        in HsForeignDecl $2 (FfiSpec i Safe Primitive) $6 $8 }
+--      | 'foreign' srcloc 'import' mcconv msafety mstring var '::' ctype
+--                      {% parseImport $6 $7 >>= \x ->
+--                         return (HsForeignDecl $2 (FfiSpec x $5 $4) $7 $9) }
       | PRAGMARULES layout_on rules close PRAGMAEND
               { HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) (reverse $3) }
       | srcloc PRAGMASPECIALIZE var '::' type PRAGMAEND
@@ -368,7 +371,7 @@ vars  :: { [HsName] }
                                          returnP [n] }
 
 -- FFI parts
-
+{-
 mcconv :: { CallConv }
 mcconv : 'ccall'        { CCall }
        | 'stdcall'      { StdCall }
@@ -378,10 +381,10 @@ msafety :: { Safety }
 msafety : 'safe'        { Safe }
         | 'unsafe'      { Unsafe }
         | {- empty -}   { Safe }
-
-mstring :: { String }
-mstring : STRING         { $1 }
-        | {- empty -}    { "" }
+-}
+mstring :: { Maybe (String,HsName) }
+mstring : STRING var        { Just ($1,$2) }
+        | {- empty -}    { Nothing }
 
 -- -----------------------------------------------------------------------------
 -- Types
@@ -408,6 +411,9 @@ bkind :: { HsKind }
        : '(' kind ')'           { $2 }
        |  '*'                   { hsKindStar }
        |  '#'                   { hsKindHash }
+       |  '!'                   { hsKindBang }
+       |  '*!'                  { hsKindStarBang }
+       |  '??'                  { hsKindQuestQuest }
        |  qconid                { HsKind $1 }
 
 btype :: { HsType }
@@ -548,7 +554,7 @@ fundep    :: { ([HsName],[HsName]) }
 
 varids    :: { [HsName] }
       : {- empty -}                           { [] }
-      | varids tyvar                          { ($2:$1) }
+      | varids varid                          { ($2:$1) }
 
 -- -----------------------------------------------------------------------------
 -- Instance declarations
@@ -810,6 +816,7 @@ qvarid :: { HsName }
 varid :: { HsName }
       : VARID                 { UnQual (HsIdent $1) }
       | 'as'                  { as_name }
+      | 'kind'                { UnQual (HsIdent "kind") }
       | 'qualified'           { qualified_name }
       | 'hiding'              { hiding_name }
 
@@ -839,6 +846,8 @@ varsym :: { HsName }
       : VARSYM                { UnQual (hsSymbol $1) }
       | '-'                   { minus_name }
       | '!'                   { pling_name }
+      | '??'                  { UnQual (hsSymbol "??") }
+      | '*!'                  { UnQual (hsSymbol "*!") }
       | '*'                   { star_name }
       | '#'                   { hash_name }
       | '.'                   { dot_name }

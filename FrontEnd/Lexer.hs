@@ -75,6 +75,8 @@ data Token
 	| Tilde
 	| DoubleArrow
 	| Minus
+	| QuestQuest
+	| StarBang
 	| Exclamation
 	| Star
 	| Hash
@@ -90,7 +92,6 @@ data Token
 	| KW_Deriving
 	| KW_Do
 	| KW_Else
-        | KW_Export
         | KW_Hiding
 	| KW_If
 	| KW_Import
@@ -108,13 +109,9 @@ data Token
 	| KW_Where
 	| KW_Qualified
 	| KW_Foreign
-        | KW_Safe
-        | KW_Unsafe
-        | KW_CCall
-        | KW_Stdcall
-        | KW_Primitive
 	| KW_Forall
         | KW_Exists
+        | KW_Kind
 
         | EOF
         deriving (Eq,Show)
@@ -142,6 +139,8 @@ reserved_ops = [
 special_varops :: [(String,Token)]
 special_varops = [
  ( "-",  Minus ),	--ToDo: shouldn't be here
+ ( "??",  QuestQuest ),--ditto
+ ( "*!",  StarBang ),--ditto
  ( "!",  Exclamation ),	--ditto
  ( ".",  Dot ),		--ditto
  ( "*",  Star ),	--ditto
@@ -158,7 +157,6 @@ reserved_ids = [
  ( "deriving",  KW_Deriving ),
  ( "do",        KW_Do ),
  ( "else",      KW_Else ),
- ( "export",    KW_Export ),
  ( "if",    	KW_If ),
  ( "import",    KW_Import ),
  ( "in", 	KW_In ),
@@ -173,11 +171,6 @@ reserved_ids = [
  ( "then", 	KW_Then ),
  ( "type", 	KW_Type ),
  ( "foreign",   KW_Foreign ),
- ( "safe",      KW_Safe ),
- ( "unsafe",    KW_Unsafe ),
- ( "ccall",     KW_CCall ),
- ( "stdcall",   KW_Stdcall ),
- ( "primitive", KW_Primitive ),
  ( "forall",    KW_Forall ),
  ( "exists",    KW_Exists ),
  ( "where", 	KW_Where )
@@ -186,6 +179,7 @@ reserved_ids = [
 special_varids :: [(String,Token)]
 special_varids = [
  ( "as", 	KW_As ),
+ ( "kind", 	KW_Kind ),
  ( "qualified", KW_Qualified ),
  ( "hiding", 	KW_Hiding )
  ]
@@ -298,7 +292,7 @@ lexBOL = do
 lexToken :: Lex a Token
 lexToken = do
     s <- getInput
-    ParseMode { parseUnboxedTuples = utup } <- lexParseMode
+    ParseMode { parseUnboxedTuples = utup, parseFFI = doFFI } <- lexParseMode
     case s of
         [] -> return EOF
         '(':'#':_ | utup -> do
@@ -334,6 +328,9 @@ lexToken = do
 	    | isLower c || c == '_' -> do
 		ident <- lexWhile isIdent
 		return $ case lookup ident (reserved_ids ++ special_varids) of
+                        Just KW_Foreign
+                            | doFFI -> KW_Foreign
+                            | otherwise -> VarId ident
 			Just keyword -> keyword
 			Nothing -> VarId ident
 

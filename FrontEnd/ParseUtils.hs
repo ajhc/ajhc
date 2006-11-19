@@ -35,6 +35,8 @@ module FrontEnd.ParseUtils (
         , parseError
         , parseImport
         , parseExport
+        , doForeign
+        , doForeignEq
  ) where
 
 import C.FFI
@@ -369,6 +371,36 @@ sameFun :: HsName -> HsDecl -> Bool
 sameFun name (HsFunBind matches@(_:_)) = name == (matchName $ head matches)
 sameFun _ _ = False
 
+doForeign :: Monad m => SrcLoc -> [HsName] -> Maybe (String,HsName) -> HsQualType -> m HsDecl
+doForeign srcLoc names ms qt = ans where
+    ans = do
+        (mstring,vname@(UnQual (HsIdent cname)),names') <- case ms of
+            Just (s,n) -> return (Just s,n,names)
+            Nothing -> do
+                (n:ns) <- return $ reverse names
+                return (Nothing,n,reverse ns)
+        let f ["import","primitive"] cname = return $ HsForeignDecl srcLoc (FfiSpec (Import cname nullRequires) Safe Primitive) vname qt
+            f ("import":rs) cname = do
+                let (safe,conv) = pconv rs
+                im <- parseImport mstring vname
+                return $ HsForeignDecl srcLoc (FfiSpec im safe conv) vname qt
+            f ("export":rs) cname = do
+                let (safe,conv) = pconv rs
+                return $ HsForeignExport srcLoc (FfiExport cname safe conv) vname qt
+        f (map show names') (maybe cname id mstring) where
+    pconv rs = case rs of
+                ("safe":rs) -> g Safe rs
+                ("unsafe":rs) -> g Unsafe rs
+                rs -> g Safe rs
+            where
+            g safe [] = (safe,CCall)
+            g safe ["ccall"] = (safe,CCall)
+            g safe ["stdcall"] = (safe,StdCall)
+
+
+doForeignEq :: Monad m => SrcLoc -> [HsName] -> Maybe (String,HsName) -> HsQualType -> HsExp -> m HsDecl
+doForeignEq = undefined
+
 -- FFI parsing
 
 parseExport :: Monad m => String -> HsName -> m String
@@ -378,8 +410,9 @@ parseExport cn hn =
       []              -> return (show hn)
       _               -> fail ("Invalid cname in export declaration: "++show cn)
 
-parseImport :: Monad m => String -> HsName -> m FfiType
-parseImport cn hn =
+parseImport :: Monad m => Maybe String -> HsName -> m FfiType
+parseImport Nothing hn = return $ Import (show hn) nullRequires
+parseImport (Just cn) hn =
     case words cn of
       ["dynamic"]   -> return Dynamic
       ["wrapper"]   -> return Wrapper

@@ -2,6 +2,7 @@
 
 !Code options
 unboxed-tuples allow unboxed tuple syntax to be recognized
+ffi support foreign function declarations
 
 !Typechecking
 boxy use the new boxy typechecker
