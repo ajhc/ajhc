@@ -1,3 +1,4 @@
+{-# OPTIONS_JHC -fffi #-}
 module Data.Unicode(
     CType(),
     ctype,

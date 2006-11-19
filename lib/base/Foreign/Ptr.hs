@@ -1,3 +1,4 @@
+{-# OPTIONS_JHC -fffi #-}
 module Foreign.Ptr(
     Ptr(),
     nullPtr,

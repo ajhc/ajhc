@@ -1,3 +1,4 @@
+{-# OPTIONS_JHC -fffi #-}
 module Prelude.IO(
     IO(),
     ioError,

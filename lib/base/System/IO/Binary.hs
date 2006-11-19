@@ -1,3 +1,4 @@
+{-# OPTIONS_JHC -fffi #-}
 module System.IO.Binary(readBinaryFile) where
 
 import Data.Word

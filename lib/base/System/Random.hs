@@ -1,3 +1,4 @@
+{-# OPTIONS_JHC -fffi #-}
 {-
 The June 1988 (v31 #6) issue of the Communications of the ACM has an
 article by Pierre L'Ecuyer called, "Efficient and Portable Combined

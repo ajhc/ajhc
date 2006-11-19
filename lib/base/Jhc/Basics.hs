@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -N -fffi #-}
 module Jhc.Basics where
 
 import Data.Int(Int())

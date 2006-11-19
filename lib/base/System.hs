@@ -1,3 +1,4 @@
+{-# OPTIONS_JHC -fffi #-}
 module System (
     ExitCode(ExitSuccess,ExitFailure),
     getArgs, getProgName, getEnv, system, exitWith, exitFailure

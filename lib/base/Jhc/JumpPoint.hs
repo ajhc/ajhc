@@ -1,3 +1,4 @@
+{-# OPTIONS_JHC -fffi #-}
 module Jhc.JumpPoint(JumpPoint(), withJumpPoint__, jumpJumpPoint__, errorJumpPoint) where
 
 import Jhc.IO

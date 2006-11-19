@@ -1,3 +1,5 @@
+{-# OPTIONS_JHC -fffi #-}
+
 module Prelude.Float() where
 
 import Data.Ratio

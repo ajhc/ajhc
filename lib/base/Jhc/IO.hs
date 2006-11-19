@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -funboxed-tuples #-}
+{-# OPTIONS_JHC -N -funboxed-tuples -fffi #-}
 
 module Jhc.IO(
     IO(..),

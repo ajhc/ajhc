@@ -1,3 +1,4 @@
+{-# OPTIONS_JHC -fffi #-}
 module Foreign.Marshal.Alloc (
   -- * Memory allocation
   -- ** Local allocation

@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-implicit-prelude #-}
+{-# OPTIONS_JHC -fffi #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.Marshal.Utils

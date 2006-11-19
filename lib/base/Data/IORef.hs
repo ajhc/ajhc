@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -funboxed-tuples #-}
+{-# OPTIONS_JHC -N -funboxed-tuples -fffi #-}
 module Data.IORef(
     IORef(),	      -- abstract, instance of: Eq
     newIORef,	      -- :: a -> IO (IORef a)
