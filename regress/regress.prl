@@ -12,10 +12,19 @@ my @fopts;
 
 my @saved_args = @ARGV;
 
+my $opt_l;
+
 Getopt::Long::Configure ("bundling");
-GetOptions( 'f=s' => \@fopts, 'o=s' => \@opts  ) or die "Invalid options";
+GetOptions( 'f=s' => \@fopts, 'o=s' => \@opts, l => \$opt_l  ) or die "Invalid options";
 
 @opts = (@opts, map { "-f$_" } @fopts);
+
+my @cond;
+my @ncond;
+
+foreach (@ARGV) {
+    /^\!(.*)/ ? push @ncond, $1 : push @cond, $_;
+}
 
 my $now_string = strftime "%a %b %e %H:%M:%S %Y", localtime;
 
@@ -87,7 +96,11 @@ sub do_it {
     #print "Entering $cwd\n";
     my $no_run = -f "$cwd/norun";
     my @flags = maybe_read "$cwd/flags.txt";
-    foreach my $fn (sort(split /\n/,`ls $cwd`)) {
+    if(-f "Main.hs") {
+        system "rm -f -- $cwd/*.ho $cwd/*_code.hs $cwd/*_code.c";
+
+    }
+    test: foreach my $fn (sort(split /\n/,`ls $cwd`)) {
         my $n = "$cwd/$fn";
         if (-d $n && $n ne "results") {
             my $fnn = $fn;
@@ -98,15 +111,34 @@ sub do_it {
             next if $ln =~ /_code$/;
             my $fbase = "$cwd/$ln";
             my $name = "$name.$ln";
+            if(@cond) {
+                my $keep = 0;
+                foreach (@cond) {
+                $keep = 1 if $name  =~ /$_/;
+                }
+                unless($keep) {
+                    rlog "Skipping $name";
+                    next;
+                }
+            }
+            foreach (@ncond) {
+                if($name =~ /$_/) {
+                    rlog "Skipping $name";
+                    next test;
+                }
+            }
             rlog "-- $name";
             system "rm -f -- $cwd/$ln.ho";
             system "rm -f -- $cwd/${ln}_code.hs";
             system "rm -f -- $cwd/${ln}_code.c";
-            my @cmd = ("$jhc_dir/jhc", "-v", "--noauto", "-i$jhc_dir/lib/base", "-i$jhc_dir/lib/haskell98", "-flint", "-o", "$fbase", @flags, @opts, "$cwd/$fn");
+            my @libs = $opt_l ? () : ("--noauto", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
+            my @cmd = ("$jhc_dir/jhc", "-v", @libs , "-flint", "-o", "$fbase", @flags, @opts, "$cwd/$fn");
             my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
             rlog "; ", $res;
+            my $time_start = time();
             my $r = system $res;
-            my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out" };
+            my $time_end = time();
+            my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out", compile_time => $time_end - $time_start };
             push @res, $result;
             unless($r == 0) {
                 rlog "Compilation Failed: $r";
@@ -122,8 +154,11 @@ sub do_it {
             my $run_cmd = "$fbase " . join(" ",@args) . " > $result->{run_stdout}";
             rlog "; ", $run_cmd;
             $result->{run_cmd} = $run_cmd;
+            $time_start = time();
             $r = system $run_cmd;
+            $time_end = time();
             $result->{run_status} = $r;
+            $result->{run_time} = $time_end - $time_start;
             unless($r == 0) {
                 rlog "-- Run Failed: $r";
                 $error++;
@@ -149,12 +184,19 @@ sub done {
     sub statf {
         return defined $_[0] ? ($_[0] == 64512 ? "Int" : $_[0]) : "-";
     }
+    sub timef {
+        return defined $_[0] ? "$_[0]s" : "-";
+    }
+    rlog("-----------------------------------");
+    rlog("$now_string");
+    rlog("$jhc_version");
+    rlog("regress ", join " ", @saved_args) if @saved_args;
     rlog "\n--------------------------------------------------------------------";
 
-    my $fmt = "%50s %5s %5s %5s\n";
-    rlog sprintf $fmt, "Name", "Compile", "Run", "Out";
+    my $fmt = "%50s %5s %5s %5s %7s %7s\n";
+    rlog sprintf $fmt, "Name", "Compile", "Run", "Out", "CTime", "RTime";
     foreach my $r (@res) {
-        rlog sprintf $fmt, $r->{name}, statf($r->{compile_status}),statf($r->{run_status}),statf($r->{stdout_diff});
+        rlog sprintf $fmt, $r->{name}, statf($r->{compile_status}),statf($r->{run_status}),statf($r->{stdout_diff}), timef($r->{compile_time}), timef($r->{run_time}) ;
 
     }
     close RLOG;
