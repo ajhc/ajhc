@@ -396,6 +396,7 @@ doForeign srcLoc names ms qt = ans where
             g safe [] = (safe,CCall)
             g safe ["ccall"] = (safe,CCall)
             g safe ["stdcall"] = (safe,StdCall)
+            g x y = error $ "FrontEnd.ParseUtils: " ++ show (x,y)
 
 
 doForeignEq :: Monad m => SrcLoc -> [HsName] -> Maybe (String,HsName) -> HsQualType -> HsExp -> m HsDecl

@@ -228,5 +228,5 @@ show2' x = if x < 10 then [ ' ', intToDigit x] else show2 x
 show3 x = intToDigit (x `quot` 100) : show2 (x `rem` 100)
 
 
-foreign import ccall unsafe "time.h time" c_time :: Ptr CTime -> IO CTime
+foreign import unsafe ccall "time.h time" c_time :: Ptr CTime -> IO CTime
 
