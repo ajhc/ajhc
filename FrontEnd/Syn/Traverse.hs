@@ -220,6 +220,9 @@ traverseHsDeclHsExp fn d = f d where
         hsDecls'  <- mapM (traverseHsDeclHsExp fn) hsDecls
         hsRhs'    <- traverseHsRhsHsExp fn hsRhs
         return (HsPatBind srcLoc hsPat hsRhs' {-where-} hsDecls')
+    f (HsActionDecl sl p e) = withSrcLoc sl $ do
+        e <- fn e
+        return $ HsActionDecl sl p e
 --    f (HsFunBind hsMatches)  = do
 --        hsMatches'     <- mapM (traverseHsMatchHsExp fn) hsMatches
 --        return (HsFunBind hsMatches')

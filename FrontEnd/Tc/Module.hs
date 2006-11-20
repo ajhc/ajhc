@@ -179,7 +179,7 @@ tiModules' me ms = do
         putStrLn $ PPrint.render $ pprintEnvMap instanceEnv
 
 
-    let funPatBinds =  [ d | d <- ds, or' [isHsFunBind, isHsPatBind, isHsForeignDecl] d]
+    let funPatBinds =  [ d | d <- ds, or' [isHsFunBind, isHsPatBind, isHsForeignDecl, isHsActionDecl] d]
     let rTySigs =  [ d | d <- ds, or' [isHsTypeSig] d]
 
     -- build an environment of assumptions for all the type signatures

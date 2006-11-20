@@ -37,6 +37,7 @@ debugDeclBindGroups groups
 getDeclDeps :: HsDecl -> [HsName]
 
 getDeclDeps (HsPatBind _pat _ rhs wheres) = getRhsDeps rhs ++ foldr (++) [] (map getLocalDeclDeps wheres)
+getDeclDeps (HsActionDecl _ _ e) = getExpDeps e
 getDeclDeps (HsFunBind matches) = foldr (++) [] (map getMatchDeps matches)
 getDeclDeps _ = []
 
@@ -50,6 +51,7 @@ getLocalDeclDeps :: HsDecl -> [HsName]
 getLocalDeclDeps (HsFunBind matches) = foldr (++) [] (map getMatchDeps matches)
 
 getLocalDeclDeps (HsPatBind _sloc _hspat rhs wheres) = getRhsDeps rhs ++ foldr (++) [] (map getLocalDeclDeps wheres)
+getLocalDeclDeps (HsActionDecl _sloc _ e) = getExpDeps e
 
 getLocalDeclDeps _ = []
 

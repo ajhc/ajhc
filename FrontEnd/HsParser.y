@@ -280,6 +280,9 @@ topdecl :: { HsDecl }
       | 'data' ctype srcloc '=' constrs deriving
                       {% checkDataHeader $2 `thenP` \(cs,c,t) ->
                          returnP hsDataDecl { hsDeclSrcLoc = $3, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $6, hsDeclCons = reverse $5 } }
+      | 'data' 'kind' ctype srcloc '=' constrs deriving
+                      {% checkDataHeader $3 `thenP` \(cs,c,t) ->
+                         returnP hsDataDecl { hsDeclKindDecl = True, hsDeclSrcLoc = $4, hsDeclContext = cs, hsDeclName = c, hsDeclArgs = t, hsDeclDerives = $7, hsDeclCons = reverse $6 } }
       | 'newtype' ctype srcloc '=' constr deriving
                       {% checkDataHeader $2 `thenP` \(cs,c,t) ->
                          returnP (HsNewTypeDecl $3 cs c t $5 $6) }
@@ -289,21 +292,14 @@ topdecl :: { HsDecl }
                       { HsInstDecl $2 $3 $4 }
       | 'default' srcloc type
                       { HsDefaultDecl $2 $3 }
+      | infixexp srcloc '<-' exp      {% checkPattern $1 `thenP` \p ->
+                                         returnP (HsActionDecl $2 p $4) }
       | 'foreign' srcloc 'import' varids mstring '::' ctype
                       {% doForeign $2 (UnQual (HsIdent "import"):reverse $4) $5 $7  }
       | 'foreign' srcloc varids mstring '::' ctype
                       {% doForeign $2 (reverse $3) $4 $6  }
       | 'foreign' srcloc varids mstring '::' ctype '=' exp
                       {% doForeignEq $2 (reverse $3) $4 $6 $8 }
---      | 'foreign' srcloc 'export' mcconv mstring var '::' ctype
---                      {% parseExport $5 $6 >>= \x ->
---                         return (HsForeignExport $2 (FfiExport x Safe $4) $6 $8) }
---      | 'foreign' srcloc 'import' 'primitive' mstring var '::' ctype
---                      { let i = Import (if null $5 then show $6 else $5) nullRequires
---                        in HsForeignDecl $2 (FfiSpec i Safe Primitive) $6 $8 }
---      | 'foreign' srcloc 'import' mcconv msafety mstring var '::' ctype
---                      {% parseImport $6 $7 >>= \x ->
---                         return (HsForeignDecl $2 (FfiSpec x $5 $4) $7 $9) }
       | PRAGMARULES layout_on rules close PRAGMAEND
               { HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) (reverse $3) }
       | srcloc PRAGMASPECIALIZE var '::' type PRAGMAEND

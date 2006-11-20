@@ -399,7 +399,7 @@ doForeign srcLoc names ms qt = ans where
 
 
 doForeignEq :: Monad m => SrcLoc -> [HsName] -> Maybe (String,HsName) -> HsQualType -> HsExp -> m HsDecl
-doForeignEq = undefined
+doForeignEq srcLoc names ms qt e = undefined
 
 -- FFI parsing
 

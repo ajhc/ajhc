@@ -130,6 +130,7 @@ instance HasLocation HsDecl where
     srcLoc HsPragmaSpecialize { hsDeclSrcLoc = sl } = sl
     srcLoc (HsPragmaRules rs) = srcLoc rs
     srcLoc HsForeignDecl { hsDeclSrcLoc = sl } = sl
+    srcLoc HsActionDecl { hsDeclSrcLoc = sl } = sl
     srcLoc (HsForeignExport sl _ _ _) = sl
     srcLoc (HsClassDecl	 sl _ _) = sl
     srcLoc (HsInstDecl	 sl _ _) = sl
@@ -143,6 +144,7 @@ instance HasLocation HsRule where
     srcLoc HsRule { hsRuleSrcLoc = sl } = sl
 
 hsDataDecl = HsDataDecl {
+    hsDeclKindDecl = False,
     hsDeclSrcLoc = bogusASrcLoc,
     hsDeclContext = [],
     hsDeclName = error "hsDataDecl.hsDeclName",
@@ -162,41 +164,61 @@ hsNewTypeDecl = HsNewTypeDecl {
     }
 
 data HsDecl
-	 = HsTypeDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclName :: HsName, hsDeclTArgs :: [HsType], hsDeclType :: HsType }
-	 | HsDataDecl	 {
-            hsDeclSrcLoc :: SrcLoc,
-            hsDeclContext :: HsContext,
-            hsDeclName :: HsName,
-            hsDeclArgs :: [HsName],
-            hsDeclCons :: [HsConDecl],
-            hsDeclHasKind :: Maybe HsKind,
-            {- deriving -} hsDeclDerives :: [HsName]
-            }
-	 | HsNewTypeDecl {
-            hsDeclSrcLoc :: SrcLoc,
-            hsDeclContext :: HsContext,
-            hsDeclName :: HsName,
-            hsDeclArgs :: [HsName],
-            hsDeclCon :: HsConDecl,
-            {- deriving -} hsDeclDerives :: [HsName]
-            }
-	 | HsInfixDecl   { hsDeclSrcLoc :: SrcLoc, hsDeclAssoc :: HsAssoc, hsDeclInt :: !Int, hsDeclNames :: [HsName]  }
-	 | HsClassDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType, hsDeclDecls :: [HsDecl] }
-	 | HsInstDecl    { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType, hsDeclDecls :: [HsDecl] }
-	 | HsDefaultDecl SrcLoc HsType
-	 | HsTypeSig	 SrcLoc [HsName] HsQualType
-	 | HsFunBind     [HsMatch]
-	 | HsPatBind	 SrcLoc HsPat HsRhs {-where-} [HsDecl]
-         | HsForeignDecl { hsDeclSrcLoc   :: SrcLoc,
-                           hsDeclForeign  :: FfiSpec,
-                           hsDeclName     :: HsName,
-                           hsDeclQualType :: HsQualType
-                         }
-         | HsForeignExport SrcLoc FfiExport HsName HsQualType
-         | HsPragmaProps SrcLoc String [HsName]
-	 | HsPragmaRules [HsRule]
-         | HsPragmaSpecialize { hsDeclUniq :: (Module,Int), hsDeclSrcLoc :: SrcLoc, hsDeclBool :: Bool, hsDeclName :: HsName, hsDeclType :: HsType }
-         | HsDeclDeriving { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType }
+    = HsTypeDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclName :: HsName, hsDeclTArgs :: [HsType], hsDeclType :: HsType }
+    | HsDataDecl	 {
+        hsDeclKindDecl :: Bool,
+        hsDeclSrcLoc :: SrcLoc,
+        hsDeclContext :: HsContext,
+        hsDeclName :: HsName,
+        hsDeclArgs :: [HsName],
+        hsDeclCons :: [HsConDecl],
+        hsDeclHasKind :: Maybe HsKind,
+        {- deriving -} hsDeclDerives :: [HsName]
+        }
+    | HsNewTypeDecl {
+        hsDeclSrcLoc :: SrcLoc,
+        hsDeclContext :: HsContext,
+        hsDeclName :: HsName,
+        hsDeclArgs :: [HsName],
+        hsDeclCon :: HsConDecl,
+        {- deriving -} hsDeclDerives :: [HsName]
+        }
+    | HsInfixDecl   { hsDeclSrcLoc :: SrcLoc, hsDeclAssoc :: HsAssoc, hsDeclInt :: !Int, hsDeclNames :: [HsName]  }
+    | HsClassDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType, hsDeclDecls :: [HsDecl] }
+    | HsInstDecl    { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType, hsDeclDecls :: [HsDecl] }
+    | HsDefaultDecl SrcLoc HsType
+    | HsTypeSig	 SrcLoc [HsName] HsQualType
+    | HsFunBind     [HsMatch]
+    | HsPatBind	 SrcLoc HsPat HsRhs {-where-} [HsDecl]
+    | HsActionDecl {
+        hsDeclSrcLoc   :: SrcLoc,
+        hsDeclPat      :: HsPat,
+        hsDeclExp      :: HsExp
+        }
+    | HsSpaceDecl {
+        hsDeclSrcLoc   :: SrcLoc,
+        hsDeclName     :: HsName,
+        hsDeclExp      :: HsExp,
+        hsDeclCName    :: Maybe String,
+        hsDeclCount    :: Int,
+        hsDeclQualType :: HsQualType
+        }
+    | HsForeignDecl {
+        hsDeclSrcLoc   :: SrcLoc,
+        hsDeclForeign  :: FfiSpec,
+        hsDeclName     :: HsName,
+        hsDeclQualType :: HsQualType
+        }
+    | HsForeignExport {
+        hsDeclSrcLoc :: SrcLoc,
+        hsDeclFFIExport :: FfiExport,
+        hsDeclName :: HsName,
+        hsDeclQualType ::HsQualType
+        }
+    | HsPragmaProps SrcLoc String [HsName]
+    | HsPragmaRules [HsRule]
+    | HsPragmaSpecialize { hsDeclUniq :: (Module,Int), hsDeclSrcLoc :: SrcLoc, hsDeclBool :: Bool, hsDeclName :: HsName, hsDeclType :: HsType }
+    | HsDeclDeriving { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType }
   deriving(Eq,Show)
   {-! derive: is !-}
 

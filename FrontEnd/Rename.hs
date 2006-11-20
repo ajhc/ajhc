@@ -385,6 +385,11 @@ renameHsDecl (HsInfixDecl srcLoc assoc int hsNames) subTable = do
     setSrcLoc srcLoc
     hsNames' <- renameHsNames hsNames subTable
     return $ HsInfixDecl srcLoc assoc int hsNames'
+renameHsDecl (HsActionDecl srcLoc pat e) subTable = do
+    setSrcLoc srcLoc
+    pat <- renameAny pat subTable
+    e <- renameAny e subTable
+    return (HsActionDecl srcLoc pat e)
 renameHsDecl (HsPragmaProps srcLoc prop hsNames) subTable = do
     setSrcLoc srcLoc
     hsNames' <- renameHsNames hsNames subTable
@@ -537,6 +542,8 @@ instance RenameAny HsTyVarBind where
         n' <- renameTypeHsName n t
         return tvb { hsTyVarBindName = n' }
 
+instance RenameAny HsExp where
+    renameAny = renameHsExp
 
 instance RenameAny HsMatch where
     renameAny = renameHsMatch
@@ -1116,6 +1123,7 @@ collectDefsHsModule m = execWriter (mapM_ f (hsModuleDecls m)) where
     f (HsFunBind [])  = return ()
     f (HsFunBind (HsMatch a n _ _ _:_))  = tellF [(toName Val n,a,[])]
     f (HsPatBind srcLoc p _ _) = tellF [ (toName Val n,srcLoc,[]) | n <- (getHsNamesFromHsPat p) ]
+    f (HsActionDecl srcLoc p _) = tellF [ (toName Val n,srcLoc,[]) | n <- (getHsNamesFromHsPat p) ]
     f (HsTypeDecl sl n _ _) = tellF [(toName TypeConstructor n,sl,[])]
     f HsDataDecl { hsDeclSrcLoc =sl, hsDeclName = n, hsDeclCons = cs } = do tellF $ (toName TypeConstructor n,sl,snub [ x |(x,_,_) <- cs']): cs' ; zup cs where
         cs' = concatMap (namesHsConDecl' toName) cs

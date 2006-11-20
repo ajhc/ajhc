@@ -627,13 +627,12 @@ tcRule prule@HsRule { hsRuleUniq = uniq, hsRuleFreeVars = vs, hsRuleLeftExpr = e
 
 tcDecl ::  HsDecl -> Sigma -> Tc (HsDecl,TypeEnv)
 
-{-
-tcDecl d@(HsForeignDecl _ _ _ n _) typ = do
-    s <- lookupName (toName Val n)
-    s `subsumes` typ
-    return (d,mempty)
--}
-
+tcDecl decl@(HsActionDecl srcLoc pat@(HsPVar v) exp) typ = withContext (declDiagnostic decl) $ do
+    typ <- evalType typ
+    (pat',env) <- tcPat pat typ
+    let tio = TCon (Tycon tc_IO (Kfun kindStar kindStar))
+    e' <- tcExpr exp (TAp tio typ)
+    return (decl { hsDeclPat = pat', hsDeclExp = e' }, Map.singleton (toName Val v) typ)
 
 tcDecl decl@(HsPatBind sloc (HsPVar v) rhs wheres) typ = withContext (declDiagnostic decl) $ do
     typ <- evalType typ
@@ -702,7 +701,7 @@ tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typ
     return ret
 
 restricted   :: [HsDecl] -> Bool
-restricted bs = fopts FO.MonomorphismRestriction && any isSimpleDecl bs where
+restricted bs = any isHsActionDecl bs || (fopts FO.MonomorphismRestriction && any isSimpleDecl bs) where
    isSimpleDecl :: (HsDecl) -> Bool
    isSimpleDecl (HsPatBind _sloc _pat _rhs _wheres) = True
    isSimpleDecl _ = False
@@ -869,6 +868,7 @@ makeBindGroup' sigEnv (d:ds) = case Map.lookup funName sigEnv of
 collectBindDecls :: [HsDecl] ->  [HsDecl]
 collectBindDecls = filter isBindDecl where
     isBindDecl :: HsDecl -> Bool
+    isBindDecl HsActionDecl {} = True
     isBindDecl HsPatBind {} = True
     isBindDecl HsFunBind {} = True
     isBindDecl _ = False

@@ -135,7 +135,9 @@ renameHsDecl (HsNewTypeDecl srcLoc hsContext hsName hsNames1 hsConDecl hsNames2)
     hsNames1' <- renameHsNames hsNames1 subTable
     hsConDecl' <- renameHsConDecl hsConDecl subTable
     return (HsNewTypeDecl srcLoc hsContext' hsName hsNames1' hsConDecl' hsNames2)
-
+renameHsDecl decl@HsActionDecl { hsDeclSrcLoc = srcLoc, hsDeclExp = e }  subTable = withSrcLoc srcLoc $ do
+    e <- renameHsExp e subTable
+    return decl { hsDeclExp = e }
 renameHsDecl (HsClassDecl srcLoc hsQualType hsDecls) subTable = withSrcLoc srcLoc $ do
     hsQualType' <- renameHsQualType hsQualType undefined
     hsDecls' <- renameHsDecls hsDecls subTable
