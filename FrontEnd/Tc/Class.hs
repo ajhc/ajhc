@@ -153,8 +153,9 @@ splitReduce fs gs ps = do
     (rs',sub) <- genDefaults h (fs++gs) rs
     --liftIO $ putStrLn $ pprint (rs')
     flip mapM_ sub $ \ (x,y) ->  do
-        wdump FD.BoxySteps $ liftIO $ putStrLn $ "defaulting: " <+> pprint x <+> "=>" <+> prettyPrintType y
-        addWarn "type-defaults" ("defaulting: " <+> pprint x <+> "=>" <+> prettyPrintType y)
+        let msg = "defaulting: " <+> pprint x <+> "=>" <+> prettyPrintType y
+        wdump FD.BoxySteps $ liftIO $ putStrLn msg
+        addWarn "type-defaults" msg
     sequence_ [ varBind x y | (x,y) <- nub sub]
     return (nub gs List.\\ map fst sub, ds,rs')
 
