@@ -52,6 +52,7 @@ import Foreign.Storable
 import Foreign.Marshal.Alloc
 import Prelude.IOError
 import Foreign.Marshal.Utils
+import Jhc.IO
 
 -- allocation
 -- ----------
@@ -74,9 +75,9 @@ mallocArray0 size  = mallocArray (size + 1)
 -- (like 'Foreign.Marshal.Alloc.alloca', but for multiple elements).
 --
 allocaArray :: Storable a => Int -> (Ptr a -> IO b) -> IO b
-allocaArray  = doAlloca undefined
-doAlloca            :: Storable a' => a' -> Int -> (Ptr a' -> IO b') -> IO b'
-doAlloca dummy size  = allocaBytes (size * sizeOf dummy)
+allocaArray  size fn = etaIO $ doAlloca undefined fn where
+    doAlloca            :: Storable a' => a' ->  (Ptr a' -> IO b') -> IO b'
+    doAlloca dummy fn = allocaBytes (size * sizeOf dummy) fn
 
 -- |Like 'allocaArray', but add an extra position to hold a special
 -- termination element.
@@ -104,8 +105,8 @@ reallocArray0 ptr size  = reallocArray ptr (size + 1)
 -- needed linear stack space.
 --
 peekArray          :: Storable a => Int -> Ptr a -> IO [a]
-peekArray size ptr | size <= 0 = return []
-                 | otherwise = f (size-1) []
+peekArray size ptr | ptr `seq` (size <= 0) = return []
+                   | otherwise = f (size-1) []
   where
     f 0 acc = do e <- peekElemOff ptr 0; return (e:acc)
     f n acc = do e <- peekElemOff ptr n; f (n-1) (e:acc)
@@ -123,18 +124,27 @@ peekArray0 marker ptr  = do
 
 -- |Write the list elements consecutive into memory
 --
+--pokeArray :: Storable a => Ptr a -> [a] -> IO ()
+--pokeArray ptr vals =  zipWithM_ (pokeElemOff ptr) [0..] vals where
+--    zipWithM_         :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
+--    zipWithM_ f xs ys =  sequence_ (zipWith f xs ys)
+
 pokeArray :: Storable a => Ptr a -> [a] -> IO ()
-pokeArray ptr vals =  zipWithM_ (pokeElemOff ptr) [0..] vals where
-    zipWithM_         :: (Monad m) => (a -> b -> m c) -> [a] -> [b] -> m ()
-    zipWithM_ f xs ys =  sequence_ (zipWith f xs ys)
+pokeArray ptr vals = pokeArray' ptr vals >> return ()
+
+pokeArray' :: Storable a => Ptr a -> [a] -> IO Int
+pokeArray' ptr vals =  etaIO $ f 0 vals where
+    f n [] | n `seq` True = return n
+    f n (x:xs) = pokeElemOff ptr n x >> f (n + 1) xs
+
 
 -- |Write the list elements consecutive into memory and terminate them with the
 -- given marker element
 --
 pokeArray0 :: Storable a => a -> Ptr a -> [a] -> IO ()
 pokeArray0 marker ptr vals  = do
-  pokeArray ptr vals
-  pokeElemOff ptr (length vals) marker
+  lv <- pokeArray' ptr vals
+  pokeElemOff ptr lv marker
 
 -- combined allocation and marshalling
 -- -----------------------------------
@@ -168,8 +178,8 @@ withArray vals = withArrayLen vals . const
 -- as an additional parameter
 --
 withArrayLen :: Storable a => [a] -> (Int -> Ptr a -> IO b) -> IO b
-withArrayLen vals f  =
-  allocaArray len $ \ptr -> do
+withArrayLen vals f  = etaIO $
+  len `seq` allocaArray len $ \ptr -> do
       pokeArray ptr vals
       res <- f len ptr
       return res
@@ -184,8 +194,8 @@ withArray0 marker vals = withArrayLen0 marker vals . const
 -- |Like 'withArrayLen', but a terminator indicates where the array ends
 --
 withArrayLen0 :: Storable a => a -> [a] -> (Int -> Ptr a -> IO b) -> IO b
-withArrayLen0 marker vals f  =
-  allocaArray0 len $ \ptr -> do
+withArrayLen0 marker vals f  = etaIO $
+  len `seq` allocaArray0 len $ \ptr -> do
       pokeArray0 marker ptr vals
       res <- f len ptr
       return res
@@ -221,9 +231,9 @@ moveArray  = doMove undefined
 -- |Return the number of elements in an array, excluding the terminator
 --
 lengthArray0            :: (Storable a, Eq a) => a -> Ptr a -> IO Int
-lengthArray0 marker ptr  = loop 0
+lengthArray0 marker ptr | ptr `seq` True  = etaIO $ loop 0
   where
-    loop i = do
+    loop i | i `seq` True = do
         val <- peekElemOff ptr i
         if val == marker then return i else loop (i+1)
 

@@ -606,11 +606,11 @@ instance Enum Integer where
     fromEnum = toInt
     succ = (+ 1)
     pred = (+ -1)
-    enumFrom x  =  x:enumFrom (x + 1)
+    enumFrom x | x `seq` True =  x:enumFrom (x + 1)
     enumFromTo x y = f x where
         f x | x > y = []
             | otherwise = x:f (x + 1)
-    enumFromThen x y = f x where
+    enumFromThen x y | x `seq` y `seq` True = f x where
         z = y - x
         f x = x:f (x + z)
     enumFromThenTo x y z | y >= x = f x where

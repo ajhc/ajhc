@@ -23,6 +23,7 @@ import Foreign.C.Types
 import Foreign.Marshal.Utils
 import Prelude.IOError
 import Jhc.Prim
+import Jhc.IO
 import Jhc.Int(unboxInt)
 import Jhc.Addr
 import qualified Jhc.Options as JO
@@ -38,7 +39,7 @@ allocaBytes' b f = do
     return r
 
 allocaBytes :: Int -> (Ptr a -> IO b) -> IO b
-allocaBytes num fn = case JO.target of
+allocaBytes num fn = etaIO $ case JO.target of
     JO.GhcHs -> case unboxInt num of n -> alloca__ n (\addr -> fn (boxAddr addr))
     _ -> allocaBytes' num fn
 
@@ -69,9 +70,9 @@ doMalloc dummy  = mallocBytes (sizeOf dummy)
 -- exception), so the pointer passed to @f@ must /not/ be used after this.
 --
 alloca :: Storable a => (Ptr a -> IO b) -> IO b
-alloca  = doAlloca undefined
-doAlloca       :: Storable a' => a' -> (Ptr a' -> IO b') -> IO b'
-doAlloca dummy  = allocaBytes (sizeOf dummy)
+alloca fn  = etaIO $ doAlloca undefined fn where
+    doAlloca       :: Storable a' => a' -> (Ptr a' -> IO b') -> IO b'
+    doAlloca dummy fn = allocaBytes (sizeOf dummy) fn
 
 failWhenNULL :: String -> IO (Ptr a) -> IO (Ptr a)
 failWhenNULL name f = do
@@ -122,6 +123,7 @@ doRealloc dummy ptr  = let
 -- behaves like 'free'.
 --
 reallocBytes          :: Ptr a -> Int -> IO (Ptr a)
+reallocBytes ptr i | ptr `seq` i `seq` False = undefined
 reallocBytes ptr 0     = do free ptr; return nullPtr
 reallocBytes ptr size  =
   failWhenNULL "realloc" (_realloc ptr (fromIntegral size))

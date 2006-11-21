@@ -41,11 +41,11 @@ instance Enum Int where
     toEnum x = x
     fromEnum x = x
 
-    enumFrom x       =  x:enumFrom (increment x)
+    enumFrom x  | x `seq` True     =  x:enumFrom (increment x)
     enumFromTo x y = f x where
         f x | x > y = []
             | otherwise = x:f (increment x)
-    enumFromThen x y = f x where
+    enumFromThen x y | x `seq` y `seq` True = f x where
         z = y `minus` x
         f x = x:f (x `plus` z)
     enumFromThenTo x y z | y >= x = f x where

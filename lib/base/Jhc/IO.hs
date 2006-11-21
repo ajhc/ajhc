@@ -7,6 +7,7 @@ module Jhc.IO(
     World__(),
     catch,
     unIO,
+    etaIO,
     dependingOn,
     fixIO,
     ioError,
@@ -40,6 +41,11 @@ unIO (IO x) = x
 
 type UIO a = World__ -> (# World__, a #)
 type UIO_ = World__ -> World__
+
+-- | this ensures the world parameter is eta expanded out
+{-# INLINE etaIO #-}
+etaIO :: IO a -> IO a
+etaIO x = IO $ \w -> unIO x w
 
 -- unsafe operations
 
