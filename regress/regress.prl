@@ -14,9 +14,11 @@ my @saved_args = @ARGV;
 
 my $opt_l;
 my $opt_n;
+my $opt_p;
+my @opt_rts;
 
 Getopt::Long::Configure ("bundling");
-GetOptions( 'f=s' => \@fopts, 'o=s' => \@opts, l => \$opt_l, n => \$opt_n  ) or die "Invalid options";
+GetOptions( 'f=s' => \@fopts, 'o=s' => \@opts, l => \$opt_l, n => \$opt_n, p => \$opt_p, 'rts=s' =>\@opt_rts  ) or die "Invalid options";
 
 @opts = (@opts, map { "-f$_" } @fopts);
 
@@ -92,6 +94,15 @@ sub rlog {
     print $msg, "\n";
 }
 
+sub my_system {
+    my $time_start = time();
+    rlog "; ", join " ",@_;
+    my $r = system @_;
+    my $time_end = time();
+    return ($r,$time_end - $time_start);
+}
+
+
 sub do_it {
     my ($cwd,$name) = @_;
     #print "Entering $cwd\n";
@@ -134,13 +145,11 @@ sub do_it {
             system "rm -f -- $cwd/${ln}_code.c";
             my @libs = $opt_l ? () : ("--noauto", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
             my @fast = $opt_n ? () : ("-flint");
-            my @cmd = ("$jhc_dir/jhc", "-v", @libs , @fast, "-o", "$fbase", @flags, @opts, "$cwd/$fn");
+            my @jhc  = $opt_p ? ("$jhc_dir/jhcp","+RTS", "-S$rd/$name.jhcp_prof",@opt_rts,"-RTS")  :  ("$jhc_dir/jhc");
+            my @cmd = (@jhc, "-v", @libs , @fast, "-o", "$fbase", @flags, @opts, "$cwd/$fn");
             my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
-            rlog "; ", $res;
-            my $time_start = time();
-            my $r = system $res;
-            my $time_end = time();
-            my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out", compile_time => $time_end - $time_start };
+            my ($r,$time) = my_system $res;
+            my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out", compile_time => $time };
             push @res, $result;
             unless($r == 0) {
                 rlog "Compilation Failed: $r";
@@ -154,13 +163,10 @@ sub do_it {
             my @args = maybe_read("$fbase.args");
             $result->{run_stdout} = "$rd/$name.stdout";
             my $run_cmd = "$fbase " . join(" ",@args) . " > $result->{run_stdout}";
-            rlog "; ", $run_cmd;
             $result->{run_cmd} = $run_cmd;
-            $time_start = time();
-            $r = system $run_cmd;
-            $time_end = time();
+            ($r,$time) = my_system $run_cmd;
             $result->{run_status} = $r;
-            $result->{run_time} = $time_end - $time_start;
+            $result->{run_time} = $time;
             unless($r == 0) {
                 rlog "-- Run Failed: $r";
                 $error++;
