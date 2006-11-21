@@ -98,12 +98,12 @@ instance Ord a => ModifySet a (S.Set a) where
 
 -- maps
 
-instance Ord a => SetLike (IM.IntMap a) where    -- SIC
+instance SetLike (IM.IntMap a) where    -- SIC
     difference = IM.difference
     intersection = IM.intersection
 
 
-instance Ord a => BuildSet (Int,a) (IM.IntMap a) where
+instance BuildSet (Int,a) (IM.IntMap a) where
     fromList xs = IM.fromList xs
     fromDistinctAscList xs = IM.fromDistinctAscList xs
     insert (k,v) s = IM.insert k v s
@@ -139,7 +139,7 @@ class SetLike m => MapLike k v m | m -> k v where
     mkeys = map fst . massocs
     melems = map snd . massocs
 
-instance Ord a => MapLike Int a (IM.IntMap a) where
+instance MapLike Int a (IM.IntMap a) where
     mdelete = IM.delete
     mmember = IM.member
     mlookup k m = case IM.lookup k m of
