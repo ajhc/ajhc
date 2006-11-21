@@ -6,6 +6,7 @@ module Jhc.IO(
     UIO_(),
     World__(),
     catch,
+    unIO,
     dependingOn,
     fixIO,
     ioError,

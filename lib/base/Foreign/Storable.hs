@@ -20,10 +20,10 @@ class Storable a where
     poke :: Ptr a -> a -> IO ()
 
     alignment x = sizeOf x
-    peekElemOff addr idx = peek (addr `plusPtr` (idx `times` sizeOf (_f addr)))
-    pokeElemOff addr idx x = poke (addr `plusPtr` (idx `times` sizeOf x)) x
-    peekByteOff addr off = peek (addr `plusPtr` off)
-    pokeByteOff addr off x = poke (addr `plusPtr` off) x
+    peekElemOff addr idx = IO $ \w -> unIO (peek $! (addr `plusPtr` (idx `times` sizeOf (_f addr)))) w
+    pokeElemOff addr idx x = IO $ \w -> unIO (let adr = (addr `plusPtr` (idx `times` sizeOf x)) in adr `seq` poke adr x) w
+    peekByteOff addr off = IO $ \w -> unIO (peek $! (addr `plusPtr` off)) w
+    pokeByteOff addr off x = IO $ \w -> unIO (let adr = (addr `plusPtr` off) in adr `seq` poke adr x) w
 
 _f :: Ptr a -> a
 _f _ = undefined
