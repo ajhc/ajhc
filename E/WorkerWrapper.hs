@@ -17,6 +17,7 @@ import GenUtil
 import qualified Info.Info as Info
 import Info.Types
 import Name.Name
+import Name.Names
 import Stats
 import Support.CanType
 import Util.SetLike
@@ -61,8 +62,13 @@ wrappable dataTable mtvr e@ELam {} = ans where
     f e _ (Tag [n]) ts | isCPR n = return (Just n,e,reverse ts)
     f e _ _ ts | any (not . isPlain . fst) ts = return (Nothing ,e,reverse ts)
     f _ _ _ _ = fail "not workwrapable"
-    isCPR n | (Just [_]) <- getSiblings dataTable n = True
+    isCPR n | isBoxed n, (Just [_]) <- getSiblings dataTable n = True
             | otherwise = False
+    isBoxed n = isJust $ do
+        Constructor { conInhabits = c } <- getConstructor n dataTable
+        if c == s_Star then return () else do
+        Constructor { conInhabits = c } <- getConstructor c dataTable
+        if c == s_Star then return () else Nothing
 wrappable _ _ _ = fail "Only lambdas are wrappable"
 
 workerName x = case fromId x of
