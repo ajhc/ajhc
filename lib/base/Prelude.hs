@@ -1,3 +1,4 @@
+{-# OPTIONS_JHC -funboxed-tuples #-}
 module Prelude(
     -- export everything here
     module Prelude,
@@ -345,15 +346,17 @@ tail []          =  error "Prelude.tail: empty list"
 
 
 last             :: [a] -> a
-last [x]         =  x
-last (_:xs)      =  last xs
 last []          =  error "Prelude.last: empty list"
+last (x:xs)      = last' x xs where
+    last' x []     = x
+    last' _ (y:ys) = last' y xs
 
 
 init             :: [a] -> [a]
-init [x]         =  []
-init (x:xs)      =  x : init xs
 init []          =  error "Prelude.init: empty list"
+init (x:xs)      =  init' x xs where
+    init' _ [] = []
+    init' y (z:zs) = y:init' z zs
 
 
 null             :: [a] -> Bool
@@ -366,24 +369,7 @@ length           :: [a] -> Int
 length xs = f xs 0 where
     f [] n = n
     f (_:xs) n = f xs $! n + 1
---length []        =  0
---length (_:l)     =  1 + length l
 
--- List index (subscript) operator, 0-origin
-
---(!!)                :: [a] -> Int -> a
---xs     !! n | n < 0 =  error "Prelude.!!: negative index"
---[]     !! _         =  error "Prelude.!!: index too large"
---(x:_)  !! 0         =  x
---(_:xs) !! n         =  xs !! (n-1)
-
---xs !! n | n < 0   =  error "Prelude.(!!): negative index\n"
---	| otherwise =  sub xs n where
---			    sub :: [a] -> Int -> a
---                            sub []     _ = error "Prelude.(!!): index too large\n"
---                            sub (y:ys) n = if n == 0
---					   then y
---					   else sub ys $! (n - 1)
 
 -- foldl, applied to a binary operator, a starting value (typically the
 -- left-identity of the operator), and a list, reduces the list using
@@ -439,7 +425,9 @@ scanr1 f (x:xs) =  f x q : qs where qs@(q:_) = scanr1 f xs
 -- replicate n x is a list of length n with x the value of every element
 
 replicate        :: Int -> a -> [a]
-replicate n x    =  take n (repeat x)
+replicate n x    = f n where
+    f n | n <= 0 = []
+    f n = let n' = n - 1 in n' `seq` (x:f n')
 
 -- cycle ties a finite list into a circular one, or equivalently,
 -- the infinite repetition of the original list.  It is the identity
@@ -472,7 +460,14 @@ drop n xs = f n xs where
 
 
 splitAt                  :: Int -> [a] -> ([a],[a])
-splitAt n xs             =  (take n xs, drop n xs)
+--splitAt n xs             =  (take n xs, drop n xs)
+splitAt n ls | n < 0	= ([], ls)
+splitAt n ls = splitAt' n ls where
+    splitAt' :: Int -> [a] -> ([a], [a])
+    splitAt' 0  xs  = ([], xs)
+    splitAt' _  []  = ([], [])
+    splitAt' m (x:xs) = case splitAt' (m - 1) xs of
+        (xs', xs'') -> (x:xs', xs'')
 
 -- takeWhile, applied to a predicate p and a list xs, returns the longest
 -- prefix (possibly empty) of xs of elements that satisfy p.  dropWhile p xs
@@ -543,8 +538,13 @@ unwords (w:ws)		= w ++ ' ' : unwords ws
 infix  4  `elem`, `notElem`
 
 elem, notElem    :: (Eq a) => a -> [a] -> Bool
-elem x           =  any (== x)
-notElem x        =  all (/= x)
+--elem x           =  any (== x)
+--notElem x        =  all (/= x)
+elem _ []	= False
+elem x (y:ys)	= x==y || elem x ys
+
+notElem	_ []	=  True
+notElem x (y:ys)=  x /= y && notElem x ys
 
 -- lookup key assocs looks up a key in an association list.
 

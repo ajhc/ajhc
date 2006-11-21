@@ -126,8 +126,9 @@ reverse l =  rev l [] where
 -- tuples are in the List library
 
 
-zip              :: [a] -> [b] -> [(a,b)]
-zip              =  zipWith (\a b -> (a,b))
+zip :: [a] -> [b] -> [(a,b)]
+zip (a:as) (b:bs) = (a,b) : zip as bs
+zip _      _      = []
 
 -- The zipWith family generalises the zip family by zipping with the
 -- function given as the first argument, instead of a tupling function.
@@ -135,8 +136,7 @@ zip              =  zipWith (\a b -> (a,b))
 -- of corresponding sums.
 
 zipWith          :: (a->b->c) -> [a]->[b]->[c]
-zipWith z (a:as) (b:bs)
-                 =  z a b : zipWith z as bs
+zipWith z (a:as) (b:bs) =  z a b : zipWith z as bs
 zipWith _ _ _    =  []
 
 
