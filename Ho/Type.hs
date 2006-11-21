@@ -1,8 +1,11 @@
 module Ho.Type where
 
-import Binary
+import Data.Monoid
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Atom(Atom)
+import Binary
 import DataConstructors(DataTable)
 import E.E(TVr,E)
 import E.Rules(Rules)
@@ -14,15 +17,13 @@ import FrontEnd.SrcLoc(SrcLoc)
 import FrontEnd.Tc.Type(Type())
 import HsSyn(Module)
 import MapBinaryInstance()
+import Name.Binary
 import Name.Id
 import Name.Name(Name)
 import PackedString(PackedString)
 import TypeSynonyms(TypeSynonyms)
 
 
-import Data.Monoid
-import qualified Data.Map as Map
-import qualified Data.Set as Set
 
 type CheckSum = String
 type LibraryName= String
@@ -36,6 +37,20 @@ data HoHeader = HoHeader {
     -- * metainformation, filled for hl-files, empty for normal objects.
     hohMetaInfo   :: [(PackedString,PackedString)]
     }
+
+data Def = Def {
+    defTVr :: TVr,
+    defE :: E
+    }
+
+instance Binary Def where
+    put_ bh def = do
+        put_ bh (defTVr def)
+        lazyPut bh (defE def)
+    get bh = do
+        tvr <- get bh
+        e <- lazyGet bh
+        return Def { defTVr = tvr, defE = e }
 
 data Ho = Ho {
     -- filled in by front end
@@ -54,7 +69,7 @@ data Ho = Ho {
     hoDataTable :: DataTable,
     hoEs :: Map.Map Name (TVr,E),
     hoRules :: Rules,
-    hoUsedIds :: Set.Set Id
+    hoUsedIds :: IdSet
     }
     {-! derive: Monoid !-}
 

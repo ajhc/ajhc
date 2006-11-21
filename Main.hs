@@ -489,7 +489,7 @@ processDecls stats ho ho' tiData = do
                 lc <- doopt mangle False stats ("SuperSimplify PostPWW: " ++ pprint v) cm lc'
                 let (lc', used') = runRename used lc
                 return ((v,lc'):ds,used' `mappend` used)
-        (cds,usedids) <- foldM dd ([],fromDistinctAscList $ Set.toList $ hoUsedIds ho) cds
+        (cds,usedids) <- foldM dd ([],hoUsedIds ho) cds
         --cds <- E.Strictness.solveDs cds
         cds <- Demand.solveDs fullDataTable cds
         cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
@@ -568,7 +568,7 @@ shouldBeExported exports tvr
     | otherwise = tvr
 
 
-collectIds e = execWriter $ annotate mempty (\id nfo -> tell (Set.singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
+collectIds e = execWriter $ annotate mempty (\id nfo -> tell (singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 --idHistogram e = execWriter $ annotate mempty (\id nfo -> tell (Histogram.singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 
 isInteractive :: IO Bool

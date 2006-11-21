@@ -10,7 +10,12 @@ module Name.Id(
     idNameBoundNames,
     idNameUsedNames,
     idSetToIdMap,
+    idSetFromList,
+    idSetFromDistinctAscList,
+    idMapFromList,
+    idMapFromDistinctAscList,
     idSetToList,
+    idMapToList,
     runIdNameT',
     runIdNameT
     )where
@@ -41,6 +46,9 @@ newtype IdSet = IdSet IS.IntSet
 
 idSetToList :: IdSet -> [Id]
 idSetToList (IdSet is) = IS.toList is
+
+idMapToList :: IdMap a -> [(Id,a)]
+idMapToList (IdMap is) = IM.toList is
 
 idToInt :: Id -> Int
 idToInt = id
@@ -120,5 +128,17 @@ addBoundNamesIdSet nset = IdNameT $ do
 addBoundNamesIdMap nmap = IdNameT $ do
     modify (\ (used,bound) -> (nset `union` used, nset `union` bound) ) where
         nset = idMapToIdSet nmap
+
+idSetFromDistinctAscList :: [Id] -> IdSet
+idSetFromDistinctAscList ids = IdSet (IS.fromDistinctAscList ids)
+
+idSetFromList :: [Id] -> IdSet
+idSetFromList ids = IdSet (IS.fromList ids)
+
+idMapFromList :: [(Id,a)] -> IdMap a
+idMapFromList ids = IdMap (IM.fromList ids)
+
+idMapFromDistinctAscList :: [(Id,a)] -> IdMap a
+idMapFromDistinctAscList ids = IdMap (IM.fromDistinctAscList ids)
 
 
