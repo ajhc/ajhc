@@ -50,6 +50,7 @@ class SetLike s => BuildSet t s | s -> t where
     fromDistinctAscList = fromList
 
 class BuildSet t s => ModifySet t s | s -> t where
+    toList :: s -> [t]
     delete :: t -> s -> s
     member :: t -> s -> Bool
 
@@ -76,6 +77,7 @@ instance BuildSet Int IS.IntSet where
     singleton x = IS.singleton x
 
 instance ModifySet Int IS.IntSet where
+    toList s = IS.toList s
     delete x s = IS.delete x s
     member x s = IS.member x s
 
@@ -93,6 +95,7 @@ instance Ord a => BuildSet a (S.Set a) where
     singleton x = S.singleton x
 
 instance Ord a => ModifySet a (S.Set a) where
+    toList s = S.toList s
     member x s = S.member x s
     delete x s = S.delete x s
 
@@ -174,6 +177,7 @@ instance Enum a => BuildSet a (EnumSet a) where
     singleton x = EnumSet $ IS.singleton (fromEnum x)
 
 instance Enum a => ModifySet a (EnumSet a) where
+    toList (EnumSet s) = map toEnum $ toList s
     member x (EnumSet s) = IS.member (fromEnum x) s
     delete x (EnumSet s) = EnumSet $ IS.delete (fromEnum x) s
 
