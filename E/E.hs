@@ -301,12 +301,12 @@ caseBodiesMapM f ec@ECase { eCaseAlts = as, eCaseDefault = d } = do
     return $ ec { eCaseAlts = as', eCaseDefault = d' }
 caseBodiesMapM _ _ = error "caseBodiesMapM"
 
-toList :: Monad m => E -> m  [E]
-toList (ELit LitCons { litName = n, litArgs = [e,b] }) | vCons == n = toList b >>= \x -> return (e:x)
-toList (ELit LitCons { litName = n, litArgs = [] }) | vEmptyList == n = return []
-toList _ = fail "toList: not list"
+eToList :: Monad m => E -> m  [E]
+eToList (ELit LitCons { litName = n, litArgs = [e,b] }) | vCons == n = eToList b >>= \x -> return (e:x)
+eToList (ELit LitCons { litName = n, litArgs = [] }) | vEmptyList == n = return []
+eToList _ = fail "eToList: not list"
 
-toString x = toList x >>= mapM fromChar where
+toString x = eToList x >>= mapM fromChar where
     fromChar (ELit (LitCons { litName = dc, litArgs = [ELit (LitInt ch t)], litType = _ot })) | dc == dc_Char && t == tCharzh = return (chr $ fromIntegral ch)
     fromChar _ = fail "fromChar: not char"
 

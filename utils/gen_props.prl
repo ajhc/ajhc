@@ -1,0 +1,47 @@
+#!/usr/bin/perl
+
+use warnings;
+use strict;
+
+my @props;
+
+while(<>) {
+    s/\#.*$//;
+    next unless /\S/;
+    s/^\s*(\S*)\s*$/$1/;
+    push @props, $_;
+}
+
+print "module Info.Properties where\n\n";
+
+my @props_ = @props;
+
+map { s/^_// } @props_;
+
+print "data Property = " . join " | ",  map { "PROP_$_" } @props_; 
+    print "\n    deriving(Eq,Ord,Enum,Bounded)\n\n";
+
+print "instance Show Property where\n";
+foreach (@props) {
+    my $r = $_;
+    $r =~ s/^_//;
+    print "   show PROP_$r = \"$_\"\n";
+}
+
+print "\n\n";
+
+
+print "{-# NOINLINE readProp #-}\n";
+foreach (@props) {
+    next if /^_/;
+    print "readProp \"$_\" = return PROP_$_\n";
+}
+
+print "readProp p = fail \$ \"Invalid Property: \" ++ p\n\n";
+
+foreach (@props_) {
+    print "prop_$_ = PROP_$_\n";
+}
+
+
+

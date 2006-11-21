@@ -2,6 +2,7 @@ module SelfTest(selfTest) where
 
 import Data.Monoid
 import List(sort)
+import qualified List
 import Monad
 import qualified Data.Set as Set
 import System.IO
@@ -15,16 +16,19 @@ import E.E
 import GenUtil
 import HsSyn
 import Info.Binary()
-import Info.Info as Info
+import qualified Info.Info as Info
 import Info.Types
 import Name.Name
 import Name.Names
 import PackedString
 import Util.ArbitraryInstances()
 import Util.HasSize
+import Util.SetLike
 import qualified C.Generate
 
 
+
+type Prop = Info.Types.Property
 
 {-# NOINLINE selfTest #-}
 selfTest :: [String] -> IO ()
@@ -37,6 +41,8 @@ selfTest _ = do
     quickCheck prop_atomIndex
     quickCheck prop_atomneq
     quickCheck prop_atomneq'
+
+    testProperties
 
     testPackedString
     testHasSize
@@ -100,6 +106,14 @@ testName = do
     quickCheck prop_acc
     quickCheck prop_tup
 
+testProperties = do
+    putStrLn "Testing Properties"
+    let prop_list x xs = List.delete x xs == toList p where
+            p = unsetProperty x ((fromList xs) :: Properties)
+        prop_enum :: Prop -> Prop -> Bool
+        prop_enum x y = (fromEnum x `compare` fromEnum y) == (x `compare` y)
+    quickCheck prop_list
+    quickCheck prop_enum
 
 testBoolean = do
     quickCheck (\(x::Bool) -> prop_notnot x)
@@ -131,9 +145,9 @@ testInfo = do
     putStrLn "Testing Info"
     i <- return mempty
     unless (Info.lookup i == (Nothing :: Maybe Int)) $ fail "test failed..."
-    i <- return $ insert (3 :: Int) i
+    i <- return $ Info.insert (3 :: Int) i
     unless (Info.lookup i == (Just 3 :: Maybe Int)) $ fail "test failed..."
-    unless (Info.fetch (insert (5 :: Int) i) == ([] :: [Int])) $ fail "test failed..."
+    unless (Info.fetch (Info.insert (5 :: Int) i) == ([] :: [Int])) $ fail "test failed..."
 
     let x = Properties mempty
         x' = setProperty prop_METHOD $ setProperty prop_INLINE x
@@ -146,6 +160,7 @@ testInfo = do
     print (x',getProperty prop_METHOD x', getProperty prop_INSTANCE x')
     let x'' = setProperty prop_INSTANCE $ unsetProperty prop_METHOD x'
     print (x'',getProperty prop_METHOD x'', getProperty prop_INSTANCE x'')
+    print (getProperties x')
 
 putFile fn a = do
     h <- openBinaryFile fn WriteMode
@@ -169,7 +184,8 @@ testBinary = do
     x <- getFile fn
     if (x /= test) then fail "Test Failed" else return ()
     let fn = "/tmp/jhc.info.bin"
-        t = Properties (Set.singleton prop_INLINE)
+        t = (singleton prop_INLINE) `mappend` fromList [prop_WORKER,prop_SPECIALIZATION]
+        t :: Properties
         nfo = (Info.insert "food" $ Info.insert t mempty)
         nf = (nfo, "Hello, this is a test", Set.fromList ['a' .. 'f'])
     print nf
@@ -187,5 +203,10 @@ testBinary = do
 
 
 instance Arbitrary NameType where
-    arbitrary = oneof $ map return [ TypeConstructor .. ] -- ,  DataConstructor, ClassName, TypeVal, Val, SortName, FieldLabel, RawType]
+    arbitrary = oneof $ map return [ TypeConstructor .. ]
 
+instance Arbitrary Info.Types.Property where
+    arbitrary = oneof $ map return [ minBound .. ]
+
+instance Arbitrary Properties where
+    arbitrary = fromList `fmap` arbitrary

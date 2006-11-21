@@ -15,7 +15,7 @@ HC_OPTS = $(GHCOPTS)
 
 PROF_OPTS = -P
 
-BUILTSOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs Version/Raw.hs Version/Ctx.hs Name/Prim.hs
+BUILTSOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs Version/Raw.hs Version/Ctx.hs Name/Prim.hs Info/Properties.hs
 
 # HSFILES is defined here, it can be updated with 'make depend' whenever a new source file is added
 -include depend.make
@@ -126,6 +126,10 @@ clean-ho:
 
 %.hs: %.flags  ./utils/opt_sets.prl
 	perl ./utils/opt_sets.prl -n $< $<  > $@
+
+Info/Properties.hs: data/props.txt utils/gen_props.prl
+	perl ./utils/gen_props.prl $< > $@ || rm -f $@
+
 
 PrimitiveOperators.hs: utils/op_process.prl data/operators.txt data/primitives.txt data/PrimitiveOperators-in.hs
 	perl ./utils/op_process.prl > $@ || rm -f $@

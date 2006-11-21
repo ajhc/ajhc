@@ -1,19 +1,17 @@
 -- | some useful types to use in Info's that don't really fit anywhere else
-module Info.Types where
+module Info.Types(module Info.Types, module Info.Properties) where
 
+import Info.Properties
 import Data.Dynamic
 import Data.Monoid
-import List
+import List hiding(insert,delete)
 import qualified Data.Set as Set
 
 import Atom
-import Binary
-import Info.Info as Info
-import MapBinaryInstance()
+import Util.HasSize
+import Util.SetLike
+import qualified Info.Info as Info
 
--- | list of properties of a function, such as specified by use pragmas or options
-newtype Properties = Properties (Set.Set Atom)
-    deriving(Typeable,Eq,Binary,Monoid)
 
 -- | how many arguments a function my be applied to before it performs work and whether it bottoms out after that many arguments
 data Arity = Arity Int Bool
@@ -24,82 +22,43 @@ data BindType = CaseDefault | CasePattern | LetBound | LambdaBound | PiBound
     deriving(Typeable,Show,Ord,Eq)
 
 instance Show Properties where
-    showsPrec _ (Properties s) = shows (sortBy (\x y -> compare (show x) (show y)) (Set.toList s))
+    showsPrec _ props = shows (toList props)
 
 
--- These are set by user pragmas
-prop_INLINE = toAtom "INLINE"
-prop_SUPERINLINE = toAtom "SUPERINLINE"
-prop_NOINLINE = toAtom "NOINLINE"
-prop_SRCLOC_ANNOTATE = toAtom "SRCLOC_ANNOTATE"
-prop_MULTISPECIALIZE = toAtom "MULTISPECIALIZE"
+-- | list of properties of a function, such as specified by use pragmas or options
+newtype Properties = Properties (EnumSet Property)
+    deriving(Typeable,Eq,HasSize,Monoid,SetLike,BuildSet Property,ModifySet Property,IsEmpty)
 
--- | this is set on functions which are the target of an error annotated function
-prop_SRCLOC_ANNOTATE_FUN = toAtom "_SRCLOC_ANNOTATE_FUN"
-
--- | this is an internal flag set on instance functions
-prop_INSTANCE = toAtom "_INSTANCE"
-
--- | this is an internal flag set on class methods to eventually be filled in
-prop_METHOD = toAtom "_METHOD"
-
--- | whether a function is exported
-prop_EXPORTED = toAtom "_EXPORTED"
-
-prop_JOINPOINT = toAtom "_JOINPOINT"
-prop_WORKER = toAtom "_WORKER"
-prop_WRAPPER = toAtom "_WRAPPER"
-prop_CYCLIC = toAtom "_CYCLIC"
-prop_PLACEHOLDER = toAtom "_PLACEHOLDER"
-prop_RULEBINDER = toAtom "_RULEBINDER"
-prop_SCRUTINIZED = toAtom "_SCRUTINIZED"
-prop_SPECIALIZATION = toAtom "_SPECIALIZATION"
-prop_SUPERSPECIALIZE = toAtom "_SUPERSPECIALIZE"
-prop_UNSHARED = toAtom "_UNSHARED"
-prop_ONESHOT = toAtom "_ONESHOT"
-prop_WHNF = toAtom "_WHNF"
 
 
 class HasProperties a where
-    setProperty :: Atom -> a -> a
-    unsetProperty :: Atom -> a -> a
-    getProperty :: Atom -> a -> Bool
-    getProperties :: a -> Set.Set Atom
-    setProperties :: [Atom] -> a -> a
+    modifyProperties :: (Properties -> Properties) -> a -> a
+    getProperties :: a -> Properties
+    putProperties :: Properties -> a -> a
 
-    setProperty prop x = setProperties [prop] x
-    setProperties xs x = foldr setProperty x xs
-    getProperty atom x = atom `Set.member` getProperties x
+    setProperty :: Property -> a -> a
+    unsetProperty :: Property -> a -> a
+    getProperty :: Property -> a -> Bool
+    setProperties :: [Property] -> a -> a
+
+    unsetProperty prop = modifyProperties (delete prop)
+    setProperty prop = modifyProperties (insert prop)
+    setProperties xs = modifyProperties (`mappend` fromList xs)
+    getProperty atom = member atom . getProperties
 
 instance HasProperties Properties where
-    setProperty prop (Properties x) = Properties (Set.insert prop x)
-    unsetProperty prop (Properties x) = Properties (Set.delete prop x)
-    getProperty prop (Properties x) = Set.member prop x
-
-    getProperties (Properties x) = x
-    setProperties [] p = p
-    setProperties xs (Properties x) = Properties (x `mappend` Set.fromList xs)
+    getProperties prop = prop
+    putProperties prop _ = prop
+    modifyProperties f = f
 
 
-instance HasProperties Info where
-    setProperty prop info = case Info.lookup info of
-        Just (Properties x) -> Info.insert (Properties $ Set.insert prop x) info
-        Nothing -> Info.insert (Properties $ Set.singleton prop) info
-    unsetProperty prop info = case Info.lookup info of
-        Just pr@(Properties x) -> case Set.delete prop x of
-                p | Set.null p -> Info.delete pr info
-                  | otherwise -> Info.insert (Properties p) info
-        Nothing -> info
-    getProperty prop info = getProperty prop (Info.fetch info :: Properties)
+instance HasProperties Info.Info where
+    modifyProperties f info = case Info.lookup info of
+        Just x -> Info.insert (f x) info
+        Nothing -> Info.insert (f mempty) info
+    getProperties info = case Info.lookup info of
+        Just p -> p
+        Nothing -> mempty
+    putProperties prop info = Info.insert prop info
 
-    getProperties info = getProperties (Info.fetch info :: Properties)
-    setProperties [] info = info
-    setProperties props info = case Info.lookup info of
-        Just p@(Properties _) -> Info.insert (setProperties props p) info
-        Nothing -> Info.insert (Properties $ Set.fromList props) info
-
-
---setProperties :: HasProperties a => [Atom] -> a -> a
---setProperties [] nfo = nfo
---setProperties (p:ps) nfo = setProperty p (setProperties ps nfo)
 

@@ -7,6 +7,7 @@ import Atom
 import Binary
 import C.FFI(FfiExport)
 import E.CPR
+import Util.SetLike(toList,fromDistinctAscList)
 import GenUtil
 import Info.Info
 import Info.Types
@@ -50,6 +51,14 @@ getDyn h = do
             x <- get h :: IO a
             return $ newEntry x
         Nothing -> fail $ "getDyn: don't know how to read something of type: " ++ show ps
+
+instance Binary Properties where
+    put_ bh props = putN8List bh (toList props)
+    get bh = fromDistinctAscList `fmap` getN8List bh
+
+instance Binary Property where
+    put_ bh prop = putByte bh $ fromIntegral $ fromEnum prop
+    get bh = (toEnum . fromIntegral) `fmap` getByte bh
 
 instance Binary Info where
     put_ h nfo = putInfo h nfo

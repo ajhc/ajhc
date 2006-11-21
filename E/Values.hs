@@ -192,13 +192,9 @@ unsafeCoerceOpt e = (0,e,id)
 
 
 instance HasProperties TVr where
-    setProperty prop tvr = tvrInfo_u (setProperty prop) tvr
-    unsetProperty prop tvr = tvrInfo_u (unsetProperty prop) tvr
-    getProperty prop tvr = getProperty prop (tvrInfo tvr)
-
-    getProperties tvr = getProperties (tvrInfo tvr)
-    setProperties [] tvr = tvr
-    setProperties props tvr = tvrInfo_u (setProperties props) tvr
+    modifyProperties f = tvrInfo_u (modifyProperties f)
+    getProperties = getProperties . tvrInfo
+    putProperties prop =  tvrInfo_u (putProperties prop)
 
 instance HasInfo TVr where
     getInfo = tvrInfo

@@ -133,7 +133,7 @@ showE :: E -> SEM (Unparse Doc)
 showE e = do
     let const_color = col "blue"
     let f e | Just s <- E.E.toString e = return $ atom $ const_color (text $ show s)
-        f e | Just xs <- toList e = do
+        f e | Just xs <- eToList e = do
             xs <- mapM (fmap unparse . showE) xs
             return $ atom $ list xs
         f e | e == tBool     = return $ atom $ text "Bool"

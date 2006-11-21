@@ -28,12 +28,14 @@ import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import FrontEnd.Exports
 import GenUtil
+import Info.Properties
 import Ho.Type
 import HsSyn
 import Name.Name as Name
 import Options
 import qualified FlagDump as FD
 import qualified HsPretty
+import Util.SetLike
 import TypeSigs           (collectSigs, listSigsToSigEnv)
 import TypeSynonyms
 import TypeSyns
@@ -253,7 +255,7 @@ tiModules' me ms = do
     localVarEnv <- return $  localVarEnv `Map.union` noDefaultSigs
     let externalKindEnv = restrictKindEnv (\ x  -> interesting x && (getMod x `elem` map modInfoName ms)) kindInfo
 
-    let pragmaProps = Map.fromListWith (\a b -> snub $ a ++ b ) [ (toName Name.Val x,[toAtom w]) |  HsPragmaProps _ w xs <- ds, x <- xs ]
+    let pragmaProps = Map.fromListWith mappend [ (toName Name.Val x,fromList $ readProp w) |  HsPragmaProps _ w xs <- ds, x <- xs ]
 
     let allAssumps = localDConsEnv `Map.union` localVarEnv
         expAssumps = localDConsEnv `Map.union` externalEnv

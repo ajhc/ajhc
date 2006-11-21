@@ -17,6 +17,7 @@ import FrontEnd.SrcLoc(SrcLoc)
 import FrontEnd.Tc.Type(Type())
 import HsSyn(Module)
 import MapBinaryInstance()
+import Info.Types
 import Name.Binary
 import Name.Id
 import Name.Name(Name)
@@ -64,7 +65,7 @@ data Ho = Ho {
     hoKinds :: KindEnv,                      -- used for typechecking
     hoClassHierarchy :: ClassHierarchy,
     hoTypeSynonyms :: TypeSynonyms,
-    hoProps :: Map.Map Name [Atom],
+    hoProps :: Map.Map Name Properties,
     -- Filled in by E generation
     hoDataTable :: DataTable,
     hoEs :: Map.Map Name (TVr,E),

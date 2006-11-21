@@ -37,6 +37,9 @@ module Binary
    getNList,
    putNList,
 
+   getN8List,
+   putN8List,
+
    -- lazy Bin I/O
    lazyGet,
    lazyPut,
@@ -453,6 +456,20 @@ getNList :: Binary a => BinHandle -> IO [a]
 getNList bh = do
     n <- get bh
     sequence $ replicate n (get bh)
+
+-- | put length prefixed list.
+putN8List :: Binary a => BinHandle -> [a] -> IO ()
+putN8List bh xs = do
+    let len = length xs
+    when (length xs > 255) $ fail "putN8List, list is too long"
+    putWord8 bh (fromIntegral len)
+    mapM_ (put_ bh) xs
+
+-- | get length prefixed list.
+getN8List :: Binary a => BinHandle -> IO [a]
+getN8List bh = do
+    n <- getWord8 bh
+    sequence $ replicate (fromIntegral n) (get bh)
 
 instance Binary a => Binary [a] where
     put_ bh []     = putByte bh 0

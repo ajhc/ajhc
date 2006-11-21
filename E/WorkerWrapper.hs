@@ -14,7 +14,7 @@ import E.Traverse
 import E.TypeCheck()
 import E.Values
 import GenUtil
-import Info.Info as Info
+import qualified Info.Info as Info
 import Info.Types
 import Name.Name
 import Stats
@@ -74,9 +74,11 @@ tmpNames ns x = case fromId x of
     Nothing -> [toId (toName ns ("X@",'f':show x ++ "@" ++ show i)) | i <- [(1::Int)..] ]
 
 workWrap' :: MonadStats m => DataTable -> TVr -> E -> m ((TVr,E),(TVr,E))
-workWrap' _dataTable tvr _e | getProperty prop_WORKER tvr || getProperty prop_WRAPPER tvr = fail "already workwrapped"
-workWrap' _dataTable tvr _e | getProperty prop_INLINE tvr || getProperty prop_SUPERINLINE tvr = fail "going to be inlined"
-workWrap' _dataTable tvr _e | getProperty prop_NOINLINE tvr  = fail "not going to be inlined"
+workWrap' _dataTable tvr _e
+    | member prop_WORKER props || member prop_WRAPPER props = fail "already workwrapped"
+    | member prop_INLINE props || member prop_SUPERINLINE props = fail "going to be inlined"
+    | member prop_NOINLINE props  = fail "not going to be inlined"
+    where props = getProperties tvr
 workWrap' dataTable tvr e | isJust res = ans where
     res@(~(Just (cname,body,sargs))) = wrappable dataTable tvr e
     args = snds sargs
@@ -93,7 +95,7 @@ workWrap' dataTable tvr e | isJust res = ans where
         f ((Absent,_):rs) = f rs
         f ((Plain,_):rs) = f rs
         f ((Cons c ts,t):rs) = eCase (EVar t) [Alt (updateLit dataTable litCons { litName = conName c, litArgs = snds ts, litType = getType t }) (f (ts ++ rs))] Unknown
-    nprops = Set.toList $ getProperties tvr `Set.intersection` Set.fromList [prop_JOINPOINT, prop_ONESHOT]
+    nprops = toList $ getProperties tvr `intersection` fromList [prop_JOINPOINT, prop_ONESHOT]
     ans = doTicks >> return ((setProperty prop_WRAPPER tvr,wrapper),(setProperties (prop_WORKER:nprops) tvr',worker))
     tvr' = TVr { tvrIdent = workerName (tvrIdent tvr), tvrInfo = mempty, tvrType = wt }
     worker = foldr ELam body' (args' ++ navar) where

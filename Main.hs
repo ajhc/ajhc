@@ -187,9 +187,10 @@ denewtype prog = prog' where
 lamann _ nfo = return nfo
 letann e nfo = return (annotateArity e nfo)
 idann rs ps i nfo = return (rules rs i (props ps i nfo)) where
+    props :: Map.Map Name Properties -> Id -> Info.Info -> Info.Info
     props ps i = case tvrName (tvr { tvrIdent = i }) of
-        Just n -> case Map.lookup n ps of
-            Just ps ->  setProperties ps
+        Just n -> case mlookup n ps of
+            Just ps ->  modifyProperties (mappend ps)
             Nothing ->  id
         Nothing -> id
     rules rs i = case getARules rs i of
@@ -215,7 +216,7 @@ processInitialHo accumho ho = do
     --lintCheckProgram (putStrLn "processInitialHo") prog
     return $ accumho' `mappend` ho { hoUsedIds = uids, hoEs = programEsMap prog }
 
-reprocessHo :: Rules -> Map.Map Name [Atom] -> Ho -> Ho
+reprocessHo :: Rules -> Map.Map Name Properties -> Ho -> Ho
 reprocessHo rules ps ho = ho { hoEs = Map.map f (hoEs ho) } where
     f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
     g id = runIdentity . idann rules ps id
@@ -467,6 +468,7 @@ processDecls stats ho ho' tiData = do
         let wws = length cds' - length cds
         wdump FD.Progress $ putErr (replicate wws 'w')
         when (miniCorePass && wws > 0) $ putErrLn "After WorkWrap" >> mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds'
+        when (miniCorePass && wws > 0) $ putErrLn "^^^ After WorkWrap"
 
         let graph = (newGraph cds' (\ (b,_) -> tvrIdent b) (\ (b,c) -> idSetToList $ bindingFreeVars b c))
             (lb,os) = findLoopBreakers (const 1) nogood graph
@@ -482,7 +484,7 @@ processDecls stats ho ho' tiData = do
                     let sopt = mempty {  SS.so_boundVars = fromList [ (tvrIdent v,(v,lc)) | (v,lc) <- ds] `union` smap,  SS.so_dataTable = fullDataTable }
                     let (e',_) = SS.collectOccurance' e
                     let (stat, e'') = SS.simplifyE sopt e'
-                    when miniCorePass  $ printCheckName fullDataTable e''
+                    when miniCorePass  $ printCheckName' fullDataTable v e''
                     Stats.tickStat stats stat
                     return e''
                 let (lc', _) = runRename used lc
