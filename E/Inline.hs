@@ -46,18 +46,24 @@ baseInlinability t e
 
 -- NOINLINE must take precidence because it is sometimes needed for correctness, while INLINE is surely an optimization.
 forceInline x
-    | forceNoinline x = False
+    | forceNoinline' props x = False
     | not (fopts FO.InlinePragmas) = False
-    | Properties p <- Info.fetch (tvrInfo x) = member prop_INLINE p  || member prop_WRAPPER p || member prop_SUPERINLINE p
+    | otherwise  = member prop_INLINE props  || member prop_WRAPPER props || member prop_SUPERINLINE props
+    where props = Info.fetch (tvrInfo x)
 
 forceSuperInline x
-    | forceNoinline x = False
+    | forceNoinline' props x = False
     | not (fopts FO.InlinePragmas) = False
-    | Properties p <- Info.fetch (tvrInfo x) =  member prop_SUPERINLINE p
+    | otherwise = member prop_SUPERINLINE props
+    where props = Info.fetch (tvrInfo x)
 
-forceNoinline x
+forceNoinline x = forceNoinline' (Info.fetch (tvrInfo x)) x
+
+forceNoinline' :: Properties -> TVr -> Bool
+forceNoinline' props x
+    | member prop_NOINLINE props || member prop_PLACEHOLDER props = True
     | Just (_x :: ARules) <- Info.lookup (tvrInfo x) = True
-    | Properties p <- Info.fetch (tvrInfo x) = member prop_NOINLINE p || member prop_PLACEHOLDER p
+    | otherwise = False
 
 app (e,[]) = return e
 app (e,xs) = app' e xs

@@ -274,7 +274,7 @@ recordHoFile ho fs header = do
             put_ bh magic
             lazyPut bh header
             lazyPut bh (mapHoBodies eraseE ho { hoUsedIds = mempty, hoModules = mempty })
-            put bh magic2
+            put_ bh magic2
             hFlush fh
             (fh,fd) <- hGetFileDep fn fh
             hClose fh
