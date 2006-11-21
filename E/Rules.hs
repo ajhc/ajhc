@@ -29,8 +29,6 @@ import List
 import Monad(liftM)
 import Control.Monad.Trans
 import Maybe
-import qualified Data.Map as Map
-import qualified Data.Set as Set
 
 import Atom(toAtom,fromAtom,Atom)
 import Binary
@@ -86,12 +84,12 @@ emptyRule = Rule {
     ruleUniq = error "ruleUniq undefined"
     }
 
-newtype Rules = Rules (Map.Map Id [Rule])
+newtype Rules = Rules (IdMap [Rule])
     deriving(HasSize)
 
 
 instance Binary Rules where
-    put_ h (Rules mp) = putNList h (concat $ Map.elems mp)
+    put_ h (Rules mp) = putNList h (concat $ melems mp)
     get h = do
         rs <- getNList h
         return $ fromRules rs
@@ -108,11 +106,11 @@ mapBodies g (Rules mp) = do
 
 
 ruleAllFreeVars :: Rules -> IdSet
-ruleAllFreeVars (Rules r) = freeVars (concatMap (map ruleBody) (Map.elems r))
+ruleAllFreeVars (Rules r) = freeVars (concatMap (map ruleBody) (melems r))
 
 
 ruleFreeVars' ::  Rules -> Id -> IdSet
-ruleFreeVars' (Rules r) tvr = case Map.lookup tvr r of
+ruleFreeVars' (Rules r) tvr = case mlookup tvr r of
     Nothing -> mempty
     Just rs -> (freeVars (map ruleBody rs) S.\\ freeVars (map ruleArgs rs))
 
@@ -128,7 +126,7 @@ instance FreeVars Rule (IdMap TVr) where
 instance FreeVars Rule [Id] where
     freeVars rule = idSetToList $ freeVars rule
 
-printRules (Rules rules) = mapM_ printRule (concat $ Map.elems rules)
+printRules (Rules rules) = mapM_ printRule (concat $ melems rules)
 
 printRule Rule {ruleName = n, ruleBinds = vs, ruleBody = e2, ruleHead = head, ruleArgs = args } = do
     let e1 = foldl EAp (EVar head) args
@@ -146,14 +144,14 @@ combineRules as bs = map head $ sortGroupUnder ruleUniq (as ++ bs)
 
 instance Monoid Rules where
     mempty = Rules mempty
-    mappend (Rules x) (Rules y) = Rules $ Map.unionWith (combineRules) x y
+    mappend (Rules x) (Rules y) = Rules $ munionWith (combineRules) x y
 
 
 fromRules :: [Rule] -> Rules
-fromRules rs = Rules $ Map.map snds $ Map.fromList $ sortGroupUnderF fst [ (tvrIdent $ ruleHead r,r) | r <- rs ]
+fromRules rs = Rules $ fmap snds $ fromList $ sortGroupUnderF fst [ (tvrIdent $ ruleHead r,r) | r <- rs ]
 
 getARules :: Monad m => Rules -> Id -> m ARules
-getARules (Rules mp) tvr = liftM arules (Map.lookup tvr mp)
+getARules (Rules mp) tvr = liftM arules (mlookup tvr mp)
 
 mapABodies :: Monad m => (E -> m E) -> ARules -> m ARules
 mapABodies g (ARules rs) = do
