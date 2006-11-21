@@ -13,9 +13,10 @@ my @fopts;
 my @saved_args = @ARGV;
 
 my $opt_l;
+my $opt_n;
 
 Getopt::Long::Configure ("bundling");
-GetOptions( 'f=s' => \@fopts, 'o=s' => \@opts, l => \$opt_l  ) or die "Invalid options";
+GetOptions( 'f=s' => \@fopts, 'o=s' => \@opts, l => \$opt_l, n => \$opt_n  ) or die "Invalid options";
 
 @opts = (@opts, map { "-f$_" } @fopts);
 
@@ -132,7 +133,8 @@ sub do_it {
             system "rm -f -- $cwd/${ln}_code.hs";
             system "rm -f -- $cwd/${ln}_code.c";
             my @libs = $opt_l ? () : ("--noauto", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
-            my @cmd = ("$jhc_dir/jhc", "-v", @libs , "-flint", "-o", "$fbase", @flags, @opts, "$cwd/$fn");
+            my @fast = $opt_n ? () : ("-flint");
+            my @cmd = ("$jhc_dir/jhc", "-v", @libs , @fast, "-o", "$fbase", @flags, @opts, "$cwd/$fn");
             my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
             rlog "; ", $res;
             my $time_start = time();
