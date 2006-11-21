@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -N -fffi #-}
 
 module Jhc.Order where
 
@@ -43,14 +43,6 @@ class  (Eq a) => Ord a  where
     min x y | x <= y    =  x
             | otherwise =  y
 
-instance Enum Char where
-    toEnum = chr
-    fromEnum = ord
-    enumFrom c        = map toEnum [fromEnum c .. fromEnum (maxBound::Char)]
-    enumFromThen c c' = map toEnum [fromEnum c, fromEnum c' .. fromEnum lastChar]
-                      where lastChar :: Char
-                            lastChar | c' < c    = minBound
-                                     | otherwise = maxBound
 
 instance Eq () where
     () == () = True

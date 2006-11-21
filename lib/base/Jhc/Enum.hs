@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -N -fffi #-}
 module Jhc.Enum(Enum(..),Bounded(..)) where
 -- Enumeration and Bounded classes
 
@@ -57,3 +57,24 @@ instance Enum Int where
         f x | x >= z = x:f (x `plus` inc)
             | otherwise = []
 
+
+instance Enum Char where
+    toEnum = chr
+    fromEnum = ord
+    enumFrom c        = [c .. maxBound::Char]
+    enumFromThen c c' = [c, c' .. lastChar]
+                      where lastChar :: Char
+                            lastChar | c' < c    = minBound
+                                     | otherwise = maxBound
+    enumFromTo x y = f x where
+        f x | x > y = []
+            | otherwise = x:f (incrementChar x)
+    enumFromThenTo x y z  = f x where
+        inc = y `minusChar` x
+        f x | x >= z = x:f (x `plusChar` inc)
+            | otherwise = []
+
+
+foreign import primitive "increment" incrementChar :: Char -> Char
+foreign import primitive "plus"      plusChar      :: Char -> Char -> Char
+foreign import primitive "minus"     minusChar     :: Char -> Char -> Char
