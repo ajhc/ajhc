@@ -27,6 +27,7 @@ import List
 import Monad(liftM)
 import Control.Monad.Trans
 import Maybe
+import Control.Monad.Writer
 
 import Atom(toAtom,fromAtom,Atom)
 import Binary
@@ -38,7 +39,7 @@ import E.Eval
 import E.Show
 import E.Values
 import E.Subst
-import E.TypeCheck
+import E.TypeCheck hiding(match)
 import GenUtil
 import MapBinaryInstance()
 import Name.Name
@@ -53,6 +54,8 @@ import Util.HasSize
 import Name.Id
 import Options
 import Util.SetLike as S
+import qualified Util.Seq as Seq
+
 
 
 
@@ -244,6 +247,7 @@ joinARules ar@(ARules fvsa a) br@(ARules fvsb b)
 rsubstMap :: IdMap E -> E -> E
 rsubstMap im e = doSubst False True (fmap ( (`mlookup` im) . tvrIdent) (unions $ (freeVars e :: IdMap TVr):map freeVars (melems im))) e
 
+applyRules :: MonadStats m => (Id -> Maybe E) -> ARules -> [E] -> m (Maybe (E,[E]))
 applyRules lup (ARules _ rs) xs = f rs where
     lxs = length xs
     f [] = return Nothing
@@ -289,4 +293,44 @@ makeRule name uniq ruleType fvs head args body = rule where
 -- | this determines all free variables of a definition taking rules into account
 bindingFreeVars :: TVr -> E -> IdSet
 bindingFreeVars t e = freeVars (tvrType t) `mappend` freeVars e `mappend` freeVars (Info.fetch (tvrInfo t) :: ARules)
+
+-- | find substitution that will transform the left term into the right one,
+-- only substituting for the vars in the list
+
+match :: Monad m =>
+    (Id -> Maybe E)      -- ^ function to look up values in the environment
+    -> [TVr]              -- ^ vars which may be substituted
+    -> E                  -- ^ pattern to match
+    -> E                  -- ^ input expression
+    -> m [(TVr,E)]
+match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () (-2::Int)) where
+    bvs :: IdSet
+    bvs = fromList (map tvrIdent vs)
+
+    un _ _ _ c | c `seq` False = undefined
+    un (EAp a b) (EAp a' b') mm c = do
+        un a a' mm c
+        un b b' mm c
+    un (ELam va ea) (ELam vb eb) mm c = lam va ea vb eb mm c
+    un (EPi va ea) (EPi vb eb) mm c = lam va ea vb eb mm c
+    un (EPrim s xs t) (EPrim s' ys t') mm c | length xs == length ys = do
+        sequence_ [ un x y mm c | x <- xs | y <- ys]
+        un t t' mm c
+    un (ESort x) (ESort y) mm c | x == y = return ()
+    un (ELit (LitInt x t1))  (ELit (LitInt y t2)) mm c | x == y = un t1 t2 mm c
+    un (ELit LitCons { litName = n, litArgs = xs, litType = t })  (ELit LitCons { litName = n', litArgs = ys, litType =  t'}) mm c | n == n' && length xs == length ys = do
+        sequence_ [ un x y mm c | x <- xs | y <- ys]
+        un t t' mm c
+
+    un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | i == j = un t u mm c
+    un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | i < 0 || j < 0  = fail "Expressions don't match"
+    un (EVar tvr@TVr { tvrIdent = i, tvrType = t}) b mm c
+        | i `member` bvs = tell (Seq.single (tvr,b))
+        | otherwise = fail $ "Expressions do not unify: " ++ show tvr ++ show b
+    un a (EVar tvr) mm c | Just b <- lup (tvrIdent tvr), not $ isEVar b = un a b mm c
+
+    un a b _ _ = fail $ "Expressions do not unify: " ++ show a ++ show b
+    lam va ea vb eb mm c = do
+        un (tvrType va) (tvrType vb) mm c
+        un (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb) mm (c - 2)
 
