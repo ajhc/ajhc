@@ -30,6 +30,7 @@ foreach (@ARGV) {
     foreach (keys %nub) {
         next if /^(import|data|type|module|class)$/;
         print "--- $_\n";
+        next if /\'/;
         my @lines = `grep -l '\\<$_\\>' $files | grep -v '^./$fn\$'`;
         map { s/^\s*\.\///; chomp } @lines;
         print "$_\n" foreach @lines;

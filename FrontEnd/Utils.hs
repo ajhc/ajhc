@@ -48,11 +48,6 @@ hsNameToOrig n = hsNameIdent_u (hsIdentString_u dn) n where
         ('_':xs) -> xs
         _ -> error $ "hsNameToOrig: " ++ show n
 
-rJustify :: Int -> String -> String
-rJustify n s = replicate (n - length s) ' ' ++ s
-
-lJustify :: Int -> String -> String
-lJustify n s = take n $ s ++ repeat ' '
 
 
 

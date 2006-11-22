@@ -18,8 +18,6 @@ module Binary
 
    openBinIO,
 
-   isEOFBin,
-
    -- for writing instances:
    putByte,
    getByte,
@@ -34,13 +32,6 @@ module Binary
    lazyGet,
    lazyPut,
 
-   -- GHC only:
-   ByteArray(..),
-   getByteArray,
-   putByteArray
-
-   --getBinFileWithDict,	-- :: Binary a => FilePath -> IO a
-   --putBinFileWithDict,	-- :: Binary a => FilePath -> ModuleName -> a -> IO ()
 
   ) where
 

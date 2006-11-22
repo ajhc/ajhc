@@ -14,8 +14,7 @@ module Stats(
     printStat,
     printLStat,
     Stat,
-    singleton,
-    singletons,
+    Stats.singleton,
     prependStat,
     -- monad
     MonadStats(..),
@@ -162,8 +161,6 @@ printLStat n greets (Stat s) = do
         p (x,0) = x
         p (x,n) = x ++ ": " ++ show n
 
-singletons n atom = Stat (Map.singleton (toAtom atom) n)
-singleton atom = singletons 1 atom
 
 instance Monoid Stat where
     mempty = Stat Map.empty
@@ -233,6 +230,7 @@ instance (Monad m, Monad (t m), MonadTrans t, MonadStats m) => MonadStats (t m) 
 instance Monad m => MonadStats (StatT m) where
     mticks' n k = StatT $ tell (Stat $ Map.singleton k n)
 
+singleton n = Stat $ Map.singleton (toAtom n) 1
 
 instance MonadStats IO where
     mticks' 0 _ = return ()

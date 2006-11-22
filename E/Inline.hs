@@ -2,7 +2,6 @@ module E.Inline(
     app,
     programMapRecGroups,
     forceInline,
-    forceSuperInline,
     programDecomposedDs,
     forceNoinline,
     baseInlinability,

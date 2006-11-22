@@ -14,7 +14,7 @@
 -------------------------------------------------------------------------------}
 
 module Diagnostic (
-       Diagnostic(..), dumpDiagnostic, withASrcLoc,
+       Diagnostic(..), dumpDiagnostic,
        makeMsg,
        locMsg,
        locSimple,

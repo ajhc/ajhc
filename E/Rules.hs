@@ -12,7 +12,6 @@ module E.Rules(
     getARules,
     mapRules,
     makeRule,
-    mapABodies,
     mapABodiesArgs,
     mapBodies,
     printRules,

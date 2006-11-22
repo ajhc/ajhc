@@ -151,21 +151,10 @@ substLet' ds' e  = ans where
 eLetRec = substLet'
 
 
-vTag n = ELit $ litCons { litName = n, litArgs = [], litType = tTag }
 
 prim_seq a b | isWHNF a = b
 prim_seq a b = emptyCase { eCaseScrutinee = a, eCaseBind =  (tVr 0 (getType a)), eCaseDefault = Just b, eCaseType = getType b }
 
-prim_toTag e = f e where
-    f (ELit LitCons { litName = n }) = vTag n
-    f (ELit (LitInt {})) = error "toTag applied to integer"
-    f (ELetRec ds e) = ELetRec ds (prim_toTag e)
-    f (EError err _) = EError err tTag
-    f ec@ECase {} = nx where
-        Identity nx = caseBodiesMapM (return . prim_toTag) ec
-    f e = EPrim p_toTag [e] tTag
-
--- prim_fromTag e t = EPrim (primPrim "fromTag") [e] t
 
 prim_unsafeCoerce e t = p e' where
     (_,e',p) = unsafeCoerceOpt $ EPrim p_unsafeCoerce [e] t

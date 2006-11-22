@@ -18,22 +18,16 @@ module FrontEnd.ParseUtils (
 	, mkRecConstrOrUpdate	-- HsExp -> [HsFieldUpdate] -> P HsExp
 	, checkPrec		-- Integer -> P Int
 	, checkContext		-- HsType -> P HsContext
-	, checkAssertion	-- HsType -> P HsAsst
 	, checkDataHeader	-- HsQualType -> P (HsContext,HsName,[HsName])
-	, checkClassHeader	-- HsQualType -> P (HsContext,HsName,[HsName])
-	, checkInstHeader	-- HsQualType -> P (HsContext,HsQName,[HsType])
 	, checkPattern		-- HsExp -> P HsPat
 	, checkPatterns
 	, checkExpr		-- HsExp -> P HsExp
 	, checkValDef		-- SrcLoc -> HsExp -> HsRhs -> [HsDecl] -> P HsDecl
-	, checkClassBody	-- [HsDecl] -> P [HsDecl]
 	, checkUnQual		-- HsQName -> P HsName
-	, checkRevDecls		-- [HsDecl] -> P [HsDecl]
         , readInteger
         , readRational
         , fixupHsDecls
         , parseError
-        , parseImport
         , parseExport
         , doForeign
         , doForeignEq

@@ -7,21 +7,18 @@
 --
 -----------------------------------------------------------------------------
 
-module HsPretty (PPLayout(..),PPHsMode(..),defaultMode,
-		render, renderWithMode,
-		ppHsModule,ppHsModuleHeader,
+module HsPretty (PPLayout(..),PPHsMode(..),
+		render,
+		ppHsModule,
 		ppHsDecl,
 		ppHsDecls,
-		ppHsQualType, ppHsType,
 		ppHsExp,
-                ppMatch,
                 ppHsStmt,
                 ppHsPat,
                 ppHsAlt,
                 ppGAlt,
-                ppHsGuardedRhs,
-                ppHsName,
-		ppHsQName) where
+                ppHsGuardedRhs
+		) where
 
 import Char
 import qualified Text.PrettyPrint.HughesPJ as P

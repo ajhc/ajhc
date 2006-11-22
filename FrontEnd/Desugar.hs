@@ -34,7 +34,7 @@
 -- Type synonyms are no longer handled here. only 'local' desugaring is done.
 -- Does this module need to exist?
 
-module FrontEnd.Desugar ( doToExp, desugarHsModule, desugarHsStmt, desugarHsExp) where
+module FrontEnd.Desugar ( doToExp, desugarHsModule, desugarHsStmt) where
 
 import Control.Monad.State
 
