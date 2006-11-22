@@ -222,7 +222,8 @@ createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans wher
         as = [ rule  t | Inst { instHead = _ :=> IsIn _ t }  <- snub (classInsts classRecord) ]
         (_ft,_:args') = fromPi ty
         (args,_rargs) = span (sortKindLike . getType)  args'
-        rule t = emptyRule { ruleHead = methodVar, ruleArgs = tpat:map EVar args, ruleBinds = [ t | ~(EVar t) <- vs] ++ args, ruleBody = removeNewtypes dataTable body, ruleUniq = (Module (show name),0), ruleName = toAtom $ "Rule.{" ++ show name ++ "}"}  where
+        rule t = makeRule ("Rule.{" ++ show name ++ "}") (Module (show name),0) RuleSpecialization ruleFvs methodVar (tpat:map EVar args) (removeNewtypes dataTable body)  where
+            ruleFvs = [ t | ~(EVar t) <- vs] ++ args
             tpat = valToPat' (removeNewtypes dataTable $ tipe t)
             name = (instanceName methodName (getTypeCons t))
             vp@(ELit LitCons { litArgs =  vs }) = tpat
@@ -715,7 +716,7 @@ makeSpec (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (Module m,ui), T.ruleS
         (ntype,Just m,q) = nameParts nn
         newName = toName ntype (Just $ "Spec@." ++ m ++ "." ++ show ui,'f':m ++ "." ++ q)
         sspec = if ss then [prop_SUPERSPECIALIZE] else []
-        ar = makeRule ("Specialize.{" ++ show newName) (Module m,ui) [] t as (EVar ntvr)
+        ar = makeRule ("Specialize.{" ++ show newName) (Module m,ui) RuleSpecialization [] t as (EVar ntvr)
     return ((ntvr,foldl EAp e as),ar)
 
 

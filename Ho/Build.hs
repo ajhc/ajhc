@@ -210,9 +210,10 @@ dumpHoFile fn = do
     when (dump FD.Class) $
          do {putStrLn "  ---- class hierarchy ---- ";
              printClassHierarchy (hoClassHierarchy ho)}
-    when (dump FD.Rules) $ do
-        putStrLn "  ---- rules ---- "
-        printRules (hoRules ho)
+    let rules = hoRules ho
+    wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
+    wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
+    wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
     wdump FD.Datatable $ do
          putStrLn "  ---- data table ---- "
          putDocM CharIO.putStr (showDataTable (hoDataTable ho))

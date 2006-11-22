@@ -616,8 +616,8 @@ pragmas_std = [
 
 -- pragmas with a special starting token
 pragmas_parsed = [
-    (["RULES"],PragmaRules False),
-    (["METARULES"],PragmaRules True),
+    (["RULES","RULE"],PragmaRules False),
+    (["CATALYST","CATALYSTS"],PragmaRules True),
     (["SPECIALIZE", "SPECIALISE"],PragmaSpecialize False),
     (["SUPERSPECIALIZE", "SUPERSPECIALISE"],PragmaSpecialize True)
     ]

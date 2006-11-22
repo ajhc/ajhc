@@ -284,9 +284,13 @@ processDecls stats ho ho' tiData = do
     -- Build rules
     rules' <- createInstanceRules fullDataTable (hoClassHierarchy ho')   (Map.fromList [ (runIdentity $ fromId (tvrIdent y),(y,z)) | (y,z) <- ds] `mappend` hoEs ho)
     rawRules <- convertRules tiData (hoClassHierarchy ho') allAssumps fullDataTable decls
-    let nrules = fromRules [ makeRule n (progModule prog,i) vs head args e2 | (n,vs,e1,e2) <- rawRules, let (EVar head,args) = fromAp e1 | i <- [1..] ]
+    let nrules = fromRules [ makeRule n (progModule prog,i) RuleUser vs head args e2 | (n,vs,e1,e2) <- rawRules, let (EVar head,args) = fromAp e1 | i <- [1..] ]
     let rules = rules' `mappend` nrules
-    wdump FD.Rules $ printRules rules
+
+    wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
+    wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
+    wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
+
     let allRules = hoRules allHo `mappend` rules
 
     -- some more useful values.
@@ -304,7 +308,7 @@ processDecls stats ho ho' tiData = do
     nds <- mapM (procSpecs specMap) (programDs prog)
     prog <- return $ programSetDs (concat (fsts nds)) prog
     let specRules = fromRules $ concat $ snds nds
-    wdump FD.Rules $ printRules specRules
+    wdump FD.RulesSpec $ printRules RuleSpecialization specRules
     rules <- return $ specRules `mappend` rules
     allRules <- return $ allRules `mappend` rules
 
@@ -583,6 +587,8 @@ isInteractive = do
 transTypeAnalyze = transformParms { transformCategory = "typeAnalyze",  transformOperation = typeAnalyze True }
 
 compileModEnv' stats (ho,_) = do
+    if optMode options == CompileHo then return () else do
+
     let dataTable = progDataTable prog
         rules = hoRules ho
         prog = (hoToProgram ho) { progClosed = True }
@@ -595,7 +601,9 @@ compileModEnv' stats (ho,_) = do
     when (dump FD.Class) $ do
         putStrLn "  ---- class hierarchy ---- "
         printClassHierarchy (hoClassHierarchy ho)
-    wdump FD.Rules $ printRules rules
+    wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
+    wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
+    wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
 
     -- enter interactive mode
     int <- isInteractive
@@ -605,7 +613,6 @@ compileModEnv' stats (ho,_) = do
         Stats.print "PassStats" Stats.theStats
         Stats.clear Stats.theStats
 
-    if optMode options == CompileHo then return () else do
 
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
     (_,main,mainv) <- getMainFunction dataTable mainFunc (programEsMap prog)

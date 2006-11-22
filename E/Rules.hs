@@ -1,13 +1,13 @@
 module E.Rules(
     ARules,
     Rule(Rule,ruleHead,ruleBinds,ruleArgs,ruleBody,ruleUniq,ruleName),
+    RuleType(..),
     Rules,
     applyRules,
     arules,
     bindingFreeVars,
     builtinRule,
     dropArguments,
-    emptyRule,
     fromRules,
     getARules,
     mapRules,
@@ -15,10 +15,8 @@ module E.Rules(
     mapABodies,
     mapABodiesArgs,
     mapBodies,
-    printRule,
     printRules,
     ruleAllFreeVars,
-    ruleFreeVars',
     rulesFromARules
     )where
 
@@ -53,10 +51,14 @@ import Support.CanType
 import Support.FreeVars
 import Util.HasSize
 import Name.Id
+import Options
 import Util.SetLike as S
 
 
 
+data RuleType = RuleSpecialization | RuleUser | RuleCatalyst
+    deriving(Eq)
+ {-! derive: GhcBinary !-}
 
 data Rule = Rule {
     ruleHead :: TVr,
@@ -64,6 +66,7 @@ data Rule = Rule {
     ruleArgs :: [E],
     ruleNArgs :: {-# UNPACK #-} !Int,
     ruleBody :: E,
+    ruleType :: RuleType,
     ruleUniq :: (Module,Int),
     ruleName :: Atom
     }
@@ -79,6 +82,7 @@ emptyRule = Rule {
     ruleArgs = [],
     ruleNArgs = 0,
     ruleBinds = [],
+    ruleType = RuleUser,
     ruleBody = error "ruleBody undefined",
     ruleName = error "ruleName undefined",
     ruleUniq = error "ruleUniq undefined"
@@ -109,11 +113,6 @@ ruleAllFreeVars :: Rules -> IdSet
 ruleAllFreeVars (Rules r) = freeVars (concatMap (map ruleBody) (melems r))
 
 
-ruleFreeVars' ::  Rules -> Id -> IdSet
-ruleFreeVars' (Rules r) tvr = case mlookup tvr r of
-    Nothing -> mempty
-    Just rs -> (freeVars (map ruleBody rs) S.\\ freeVars (map ruleArgs rs))
-
 
 instance FreeVars Rule b => FreeVars ARules b where
     freeVars (ARules rs) = freeVars rs
@@ -126,18 +125,21 @@ instance FreeVars Rule (IdMap TVr) where
 instance FreeVars Rule [Id] where
     freeVars rule = idSetToList $ freeVars rule
 
-printRules (Rules rules) = mapM_ printRule (concat $ melems rules)
+{-# NOINLINE printRules #-}
+printRules ty (Rules rules) = mapM_ (\r -> printRule r >> putChar '\n') [ r | r <- concat $ melems rules, ruleType r == ty ]
+
+putDocMLn' :: Monad m => (String -> m ()) -> Doc -> m ()
+putDocMLn' putStr d = displayM putStr (renderPretty 0.80 (optColumns options) d) >> putStr "\n"
 
 printRule Rule {ruleName = n, ruleBinds = vs, ruleBody = e2, ruleHead = head, ruleArgs = args } = do
     let e1 = foldl EAp (EVar head) args
     let p v = parens $ pprint v <> text "::" <> pprint (getType v)
-    putDocMLn CharIO.putStr $  (tshow n) <+> text "forall" <+> hsep (map p vs) <+> text "."
+    putDocMLn' CharIO.putStr $  (tshow n) <+> text "forall" <+> hsep (map p vs) <+> text "."
     let ty = pprint $ getType e1 -- case inferType dataTable [] e1 of
     --    ty2 = pprint $ getType e2
-    putDocMLn CharIO.putStr (indent 2 (pprint e1))
-    putDocMLn CharIO.putStr $ text " ====>"
-    putDocMLn CharIO.putStr (indent 2 (pprint e2))
-    putDocMLn CharIO.putStr (indent 2 (text "::" <+> ty))
+    putDocMLn' CharIO.putStr (indent 2 (pprint e1) <+> text "::" <+> ty )
+    putDocMLn' CharIO.putStr $ text " ==>" <+> pprint e2
+    --putDocMLn CharIO.putStr (indent 2 (pprint e2))
     --putDocMLn CharIO.putStr (indent 2 (text "::" <+> ty2))
 
 combineRules as bs = map head $ sortGroupUnder ruleUniq (as ++ bs)
@@ -246,16 +248,18 @@ builtinRule _ _ = return Nothing
 makeRule ::
     String      -- ^ the rule name
     -> (Module,Int)  -- ^ a unique name for this rule
+    -> RuleType -- ^ type of rule
     -> [TVr]    -- ^ the free variables
     -> TVr      -- ^ the head
     -> [E]      -- ^ the args
     -> E        -- ^ the body
     -> Rule
-makeRule name uniq fvs head args body = rule where
+makeRule name uniq ruleType fvs head args body = rule where
     rule = emptyRule {
         ruleHead = head,
         ruleBinds = fvs,
         ruleArgs = args,
+        ruleType = ruleType,
         ruleNArgs = length args,
         ruleBody = body,
         ruleUniq = uniq,
