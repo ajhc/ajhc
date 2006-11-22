@@ -25,5 +25,5 @@ instance Binary a => Binary (IdMap a) where
     get bh = do
         idl <- getNList bh
         ndl <- getNList bh
-        return (idMapFromDistinctAscList idl `mappend` idMapFromList ndl)
+        return (idMapFromDistinctAscList idl `mappend` idMapFromList [ (toId n,v) | (n,v) <- ndl ])
 
