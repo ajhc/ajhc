@@ -1,4 +1,4 @@
-module E.LambdaLift(lambdaLift)  where
+module E.LambdaLift(lambdaLift,staticArgumentTransform)  where
 
 import Control.Monad.Reader
 import Control.Monad.Writer
@@ -9,6 +9,7 @@ import List hiding(insert)
 import Atom
 import DataConstructors
 import E.E
+import E.Inline
 import E.FreeVars
 import E.Program
 import E.Subst
@@ -24,9 +25,46 @@ import Name.Name
 import Stats
 import Support.FreeVars
 import Util.Graph as G
+import Support.CanType
 import Util.SetLike
+import Doc.PPrint
 import Util.UniqueMonad
 
+annotateId mn x = case fromId x of
+    Just y -> toId (toName Val (mn,'f':show y))
+    Nothing -> toId (toName Val (mn,'f':show x))
+
+
+-- | transform simple recursive functions into non-recursive variants
+-- this is exactly the opposite of lambda lifting, but is a big win if the function ends up inlined
+-- and is conducive to other optimizations
+--
+-- in particular, the type arguments can almost always be transformed away from the recursive inner function
+
+staticArgumentTransform :: Program -> Program
+staticArgumentTransform prog = ans where
+    ans = programSetDs (concat ds') prog { progStats = progStats prog `mappend` nstat }
+    (ds',nstat) = runStatM $ mapM f (programDecomposedDs prog)
+    f (Left t) = return [t]
+    f (Right [(t,v@ELam {})]) | tvrIdent t `member` (freeVars v :: IdSet) = do
+        let nname = annotateId "R@" (tvrIdent t)
+            dropArgs = minimum [ countCommon args aps | aps <- collectApps ] where
+                args = map EVar $ snd $ fromLam v
+                countCommon (x:xs) (y:ys) | x == y = 1 + countCommon xs ys
+                countCommon _ _ = 0
+            collectApps = execWriter (ca v) where
+                ca e | (EVar v,as) <- fromAp e, tvrIdent v == tvrIdent t = tell [as] >> mapM_ ca as >> return e
+                ca e = emapE ca e
+            (body,args) = fromLam v
+            (droppedAs,keptAs) = splitAt dropArgs args
+            rbody = foldr ELam (subst t newV body)  keptAs
+            newV = foldr ELam (EVar tvr') [ t { tvrIdent = 0 } | t <- droppedAs ]
+            tvr' = tvr { tvrIdent = nname, tvrType = getType rbody }
+            ne' = foldr ELam (ELetRec [(tvr',rbody)]  (foldl EAp (EVar tvr') (map EVar keptAs))) args
+            --ne' = foldr ELam (ELetRec [(tvr',subst t (EVar tvr') v)]  (foldl EAp (EVar tvr') (map EVar as))) args
+        mtick $ "SimpleRecursive.{" ++ pprint t
+        return [(t,ne')]
+    f (Right ts) = return ts
 
 
 data S = S {

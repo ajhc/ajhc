@@ -238,9 +238,6 @@ coreSteps = dump FD.CoreSteps
 miniCorePass = coreMini && corePass
 miniCoreSteps = coreMini && coreSteps
 
-annotateId mn x = case fromId x of
-    Just y -> toId (toName Val (mn,'f':show y))
-    Nothing -> toId (toName Val (mn,'f':show x))
 
 processDecls ::
     Stats.Stats    -- ^ statistics
@@ -360,25 +357,14 @@ processDecls stats ho ho' tiData = do
             }
             tparms = transformParms { transformPass = "Init", transformDumpProgress = coreMini }
 
-        -- This transforms simple recursive routines into non-recursive ones that contain a local
-        -- recursive definition. this makes them easier to inline and optimize.
-        -- TODO - static argument transformation at same time?
-
-        let sRec mprog = case (rec,ns) of
-                (True,[(t,v@ELam {})]) | tvrIdent t `member` (freeVars v :: IdSet) -> do
-                    let nname = annotateId "R@" (tvrIdent t)
-                        tvr' = tvr { tvrIdent = nname, tvrType = tvrType t }
-                        (_,as) = fromLam v
-                        ne' = foldr ELam (ELetRec [(tvr',subst t (EVar tvr') v)]  (foldl EAp (EVar tvr') (map EVar as))) as
-                    putStrLn $ "\nSimple Recursive: " ++ pprint t
-                    return $ programSetDs [(t,ne')] mprog
-                _ -> return mprog
-        mprog <- transformProgram tparms { transformCategory = "SimpleRecursive", transformOperation = sRec } mprog
-
         mprog <- return $ etaAnnotateProgram mprog
 
         mprog <- simplifyProgram sopt "Init-One" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
+
+        -- | this catches more static arguments if we wait until after the initial normalizing simplification pass
+        mprog <- transformProgram tparms { transformCategory = "SimpleRecursive", transformOperation = return . staticArgumentTransform } mprog
+
         mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } mprog
 
         mprog <- transformProgram tparms { transformCategory = "FloatOutward", transformOperation = floatOutward } mprog

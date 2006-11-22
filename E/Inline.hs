@@ -3,6 +3,7 @@ module E.Inline(
     programMapRecGroups,
     forceInline,
     forceSuperInline,
+    programDecomposedDs,
     forceNoinline,
     baseInlinability,
     decomposeDs
@@ -135,5 +136,7 @@ decomposeDs bs = map f mp where
 
 
 
+programDecomposedDs :: Program -> [Either (TVr, E) [(TVr,E)]]
+programDecomposedDs prog = decomposeDs $ programDs prog 
 
 
