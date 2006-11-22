@@ -209,8 +209,8 @@ mapLitBindsM f (LitInt e t) = return $  LitInt e t
 collectBinding :: Bind -> OM (Bind,OMap)
 collectBinding (t,e) = do
     e' <- collectOccurance e
-    let rvars = freeVars (Info.fetch (tvrInfo t) :: ARules) :: IdMap TVr
-        romap = OMap $ fmap (const noUseInfo) rvars
+    let rvars = freeVars (Info.fetch (tvrInfo t) :: ARules) :: IdSet
+        romap = OMap (idSetToIdMap (const noUseInfo) rvars)
     return ((t,e'),romap)
 
 unOMap (OMap x) = x
