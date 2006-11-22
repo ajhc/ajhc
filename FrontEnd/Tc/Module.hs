@@ -255,7 +255,7 @@ tiModules' me ms = do
     localVarEnv <- return $  localVarEnv `Map.union` noDefaultSigs
     let externalKindEnv = restrictKindEnv (\ x  -> interesting x && (getMod x `elem` map modInfoName ms)) kindInfo
 
-    let pragmaProps = Map.fromListWith mappend [ (toName Name.Val x,fromList $ readProp w) |  HsPragmaProps _ w xs <- ds, x <- xs ]
+    let pragmaProps = fromList $ Map.toList $ Map.fromListWith mappend [ (toId $ toName Name.Val x,fromList $ readProp w) |  HsPragmaProps _ w xs <- ds, x <- xs ]
 
     let allAssumps = localDConsEnv `Map.union` localVarEnv
         expAssumps = localDConsEnv `Map.union` externalEnv

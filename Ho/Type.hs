@@ -65,7 +65,7 @@ data Ho = Ho {
     hoKinds :: KindEnv,                      -- used for typechecking
     hoClassHierarchy :: ClassHierarchy,
     hoTypeSynonyms :: TypeSynonyms,
-    hoProps :: Map.Map Name Properties,
+    hoProps :: IdMap Properties,
     -- Filled in by E generation
     hoDataTable :: DataTable,
     hoEs :: Map.Map Name (TVr,E),

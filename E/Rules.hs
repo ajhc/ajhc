@@ -13,6 +13,7 @@ module E.Rules(
     mapRules,
     makeRule,
     mapABodiesArgs,
+    ruleHeadFreeVars,
     mapBodies,
     printRules,
     ruleAllFreeVars,

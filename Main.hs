@@ -187,12 +187,10 @@ denewtype prog = prog' where
 lamann _ nfo = return nfo
 letann e nfo = return (annotateArity e nfo)
 idann rs ps i nfo = return (rules rs i (props ps i nfo)) where
-    props :: Map.Map Name Properties -> Id -> Info.Info -> Info.Info
-    props ps i = case tvrName (tvr { tvrIdent = i }) of
-        Just n -> case mlookup n ps of
-            Just ps ->  modifyProperties (mappend ps)
-            Nothing ->  id
-        Nothing -> id
+    props :: IdMap Properties -> Id -> Info.Info -> Info.Info
+    props ps i = case mlookup i ps of
+        Just ps ->  modifyProperties (mappend ps)
+        Nothing ->  id
     rules rs i = case getARules rs i of
         Nothing -> id
         Just x -> \nfo -> Info.insert (x `mappend` Info.fetch nfo) nfo
@@ -216,7 +214,7 @@ processInitialHo accumho ho = do
     --lintCheckProgram (putStrLn "processInitialHo") prog
     return $ accumho' `mappend` ho { hoUsedIds = uids, hoEs = programEsMap prog }
 
-reprocessHo :: Rules -> Map.Map Name Properties -> Ho -> Ho
+reprocessHo :: Rules -> IdMap Properties -> Ho -> Ho
 reprocessHo rules ps ho = ho { hoEs = Map.map f (hoEs ho) } where
     f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
     g id = runIdentity . idann rules ps id
@@ -292,7 +290,8 @@ processDecls stats ho ho' tiData = do
     let prog' = programSetDs ds prog
     let Identity prog = programMapDs (\ (t,e) -> return (shouldBeExported (getExports ho') t,e)) $ atomizeApps False prog'
     prog <- barendregtProg prog
-    prog <- return $ runIdentity $ annotateProgram mempty (idann allRules (hoProps ho')) letann lamann prog
+    let allProps = munionWith mappend (hoProps ho')  (idSetToIdMap (const (singleton prop_HASRULE)) (ruleHeadFreeVars allRules))
+    prog <- return $ runIdentity $ annotateProgram mempty (idann allRules allProps) letann lamann prog
     lintCheckProgram (putErrLn "LintPostProcess") prog
 
 
@@ -303,7 +302,7 @@ processDecls stats ho ho' tiData = do
     lintCheckProgram (putErrLn "InitialLint") prog
 
     prog <- programPrune prog
-    ho <- return $ reprocessHo rules (hoProps ho') ho
+    ho <- return $ reprocessHo rules allProps ho
 
     let initMap = fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
 

@@ -61,8 +61,7 @@ forceNoinline x = forceNoinline' (Info.fetch (tvrInfo x)) x
 
 forceNoinline' :: Properties -> TVr -> Bool
 forceNoinline' props x
-    | member prop_NOINLINE props || member prop_PLACEHOLDER props = True
-    | Just (_x :: ARules) <- Info.lookup (tvrInfo x) = True
+    | member prop_HASRULE props || member prop_NOINLINE props || member prop_PLACEHOLDER props = True
     | otherwise = False
 
 app (e,[]) = return e
