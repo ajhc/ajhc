@@ -1,0 +1,41 @@
+#!/usr/bin/perl
+
+use warnings;
+use strict;
+
+my @files = `find . -name \\*.hs | grep -v _darcs | grep -v '^./lib' | grep -v '^./test'`;
+map { chomp } @files;
+my $files = join " ", @files;
+
+print "$files\n";
+
+
+my @cand;
+foreach (@ARGV) {
+    my $fn = $_;
+    print "---- $fn\n";
+    open my $fh, "<$fn";
+    my $data = join "",<$fh>;
+    close $fh;
+    $data =~ /module\s+[\w.]+\s*\((.*?)\)\s*where/s;
+    my @matches;
+    if (defined $1) {
+        @matches = $1 =~ /[\w']+/g;
+    } else {
+        @matches = $data =~ /^[\w']+/gm;
+    }
+    next unless @matches;
+    my %nub;
+    $nub{$_}++ foreach @matches;
+    foreach (keys %nub) {
+        next if /^(import|data|type|module|class)$/;
+        print "--- $_\n";
+        my @lines = `grep -l '\\<$_\\>' $files | grep -v '^./$fn\$'`;
+        map { s/^\s*\.\///; chomp } @lines;
+        print "$_\n" foreach @lines;
+        push @cand,"$fn $_" unless @lines;
+    }
+}
+
+print "\n\n--- candidates ---\n";
+print "$_\n" foreach @cand;
