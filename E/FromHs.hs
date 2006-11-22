@@ -208,6 +208,7 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
 --        (EPi ioc (EPi tvr (ELit LitCons { litName = n, litArgs = [x] }))) | n == tc_IOResult -> Just x
         _ -> Nothing
 
+{-# NOINLINE createInstanceRules #-}
 createInstanceRules :: Monad m => DataTable -> ClassHierarchy -> (Map.Map Name (TVr,E)) -> m Rules
 createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans where
     ans = concatMap cClass (classRecords classHierarchy)
@@ -269,8 +270,12 @@ createFunc dataTable es ee = do
 instance GenName String where
    genNames i = map (('x':) . show) [i..]
 
-convertRules :: TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> [HsDecl] -> IO [(String,[TVr],E,E)]
-convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM g hsDecls where
+{-# NOINLINE convertRules #-}
+convertRules :: Module -> TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> [HsDecl] -> IO Rules
+convertRules mod tiData classHierarchy assumps dataTable hsDecls = ans where
+    ans = do
+        rawRules <- concatMapM g hsDecls
+        return $ fromRules [ makeRule n (mod,i) (if catalyst then RuleCatalyst else RuleUser) vs head args e2 | (catalyst,n,vs,e1,e2) <- rawRules, let (EVar head,args) = fromAp e1 | i <- [1..] ]
     g (HsPragmaRules rs) = mapM f rs
     g _ = return []
     f pr = do
@@ -293,7 +298,7 @@ convertRules tiData classHierarchy assumps dataTable hsDecls = concatMapM g hsDe
             e2' = deNewtype dataTable $ smt $ sma e2
         --e2 <- atomizeAp False dataTable Stats.theStats mainModule e2'
         let e2 = atomizeAp mempty False dataTable e2'
-        return (hsRuleString pr,( snds (cs' ++ ts) ),eval $ smt $ sma e1,e2)
+        return (hsRuleIsMeta pr,hsRuleString pr,( snds (cs' ++ ts) ),eval $ smt $ sma e1,e2)
 
 convertE :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> SrcLoc -> HsExp -> m E
 convertE tiData classHierarchy assumps dataTable srcLoc exp = do
@@ -338,6 +343,7 @@ applyCoersion ct e = etaReduce `liftM` f ct e where
 primitiveInstances :: Name -> [(Name,TVr,E)]
 primitiveInstances name = [(n,setProperties [prop_INSTANCE,prop_INLINE] $ tVr (toId n) (getType v),v) | (cn,n,v) <- constantMethods, cn == name]
 
+{-# NOINLINE convertDecls #-}
 convertDecls :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
 convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalRWST ans ceEnv 2 where
     ceEnv = CeEnv {

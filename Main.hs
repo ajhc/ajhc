@@ -280,8 +280,8 @@ processDecls stats ho ho' tiData = do
 
     -- Build rules
     rules' <- createInstanceRules fullDataTable (hoClassHierarchy ho')   (Map.fromList [ (runIdentity $ fromId (tvrIdent y),(y,z)) | (y,z) <- ds] `mappend` hoEs ho)
-    rawRules <- convertRules tiData (hoClassHierarchy ho') allAssumps fullDataTable decls
-    let nrules = fromRules [ makeRule n (progModule prog,i) RuleUser vs head args e2 | (n,vs,e1,e2) <- rawRules, let (EVar head,args) = fromAp e1 | i <- [1..] ]
+    nrules <- convertRules (progModule prog) tiData (hoClassHierarchy ho') allAssumps fullDataTable decls
+    --let nrules = fromRules [ makeRule n (progModule prog,i) RuleUser vs head args e2 | (n,vs,e1,e2) <- rawRules, let (EVar head,args) = fromAp e1 | i <- [1..] ]
     let rules = rules' `mappend` nrules
 
     wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
