@@ -222,13 +222,6 @@ reprocessHo rules ps ho = ho { hoEs = Map.map f (hoEs ho) } where
     g id = runIdentity . idann rules ps id
 
 
-procSpecs :: Monad m => (Map.Map Name [Type.Rule]) -> (TVr,E) -> m ([(TVr,E)],[Rule])
-procSpecs specMap (t,e) | Just n <- fromId (tvrIdent t), Just rs <- Map.lookup n specMap = do
-    hs <- mapM (makeSpec (t,e)) rs
-    let (defs,rls) = unzip hs
-        crules = Info.fetch (tvrInfo t)
-    return $ ((t { tvrInfo = Info.insert (mappend crules (arules rls)) $ tvrInfo t},e):defs,rls)
-procSpecs _specMap d = return ([d],[])
 
 -- | this is called on parsed, typechecked haskell code to convert it to the internal representation
 
@@ -278,11 +271,14 @@ processDecls stats ho ho' tiData = do
         mapM_ (\(v,lc) -> printCheckName'' fullDataTable v lc) ds
  --   sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 
-    -- Build rules
+    -- Build rules from instances, specializations, and user specified rules and catalysts
     rules' <- createInstanceRules fullDataTable (hoClassHierarchy ho')   (Map.fromList [ (runIdentity $ fromId (tvrIdent y),(y,z)) | (y,z) <- ds] `mappend` hoEs ho)
     nrules <- convertRules (progModule prog) tiData (hoClassHierarchy ho') allAssumps fullDataTable decls
-    --let nrules = fromRules [ makeRule n (progModule prog,i) RuleUser vs head args e2 | (n,vs,e1,e2) <- rawRules, let (EVar head,args) = fromAp e1 | i <- [1..] ]
-    let rules = rules' `mappend` nrules
+    (nds,srules) <- procAllSpecs (tiCheckedRules tiData) ds
+
+    ds <- return $ ds ++ nds
+
+    let rules = rules' `mappend` nrules `mappend` srules
 
     wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
     wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
@@ -291,8 +287,7 @@ processDecls stats ho ho' tiData = do
     let allRules = hoRules allHo `mappend` rules
 
     -- some more useful values.
-    let inscope =  [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (n,_) <- ds ]
-        namesInscope = fromList inscope
+    let  namesInscope = fromList $ [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (n,_) <- ds ]
 
     let prog' = programSetDs ds prog
     let Identity prog = programMapDs (\ (t,e) -> return (shouldBeExported (getExports ho') t,e)) $ atomizeApps False prog'
@@ -300,14 +295,6 @@ processDecls stats ho ho' tiData = do
     prog <- return $ runIdentity $ annotateProgram mempty (idann allRules (hoProps ho')) letann lamann prog
     lintCheckProgram (putErrLn "LintPostProcess") prog
 
-    -- Create Specializations
-    let specMap = Map.fromListWith (++) [ (n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- tiCheckedRules tiData]
-    nds <- mapM (procSpecs specMap) (programDs prog)
-    prog <- return $ programSetDs (concat (fsts nds)) prog
-    let specRules = fromRules $ concat $ snds nds
-    wdump FD.RulesSpec $ printRules RuleSpecialization specRules
-    rules <- return $ specRules `mappend` rules
-    allRules <- return $ allRules `mappend` rules
 
     let entryPoints = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || member (tvrIdent t) rfreevars) (tell [t])) prog
         rfreevars = ruleAllFreeVars rules

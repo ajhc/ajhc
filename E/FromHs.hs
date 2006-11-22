@@ -2,7 +2,7 @@ module E.FromHs(
     convertDecls,
     convertRules,
     createInstanceRules,
-    makeSpec,
+    procAllSpecs,
     getMainFunction
     ) where
 
@@ -41,6 +41,7 @@ import FrontEnd.Rename(unRename)
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Module(TiData(..))
 import FrontEnd.Tc.Type hiding(Rule(..))
+import qualified FrontEnd.Tc.Type as Type
 import FrontEnd.Utils
 import HsSyn as HS
 import Info.Types
@@ -711,6 +712,16 @@ specializeE gt st = do
         f _ _ = fail "specializeE: attempt to specialize types that do not unify"
     f [] gt
 
+
+procAllSpecs :: Monad m => [Type.Rule] -> [(TVr,E)] -> m ([(TVr,E)],Rules)
+procAllSpecs rs ds = do
+    let specMap = Map.fromListWith (++) [ (toId n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- rs]
+        f (t,e) | Just rs <- Map.lookup (tvrIdent t) specMap = do
+            hs <- mapM (makeSpec (t,e)) rs
+            return (unzip hs)
+        f _ = return mempty
+    (nds,rules) <- mconcat `liftM` mapM f ds
+    return $ (nds,fromRules rules)
 
 
 makeSpec :: Monad m => (TVr,E) -> T.Rule -> m ((TVr,E),Rule)
