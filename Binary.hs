@@ -172,7 +172,7 @@ instance Binary Word8 where
 instance Binary Word16 where
   put_ h w = do -- XXX too slow.. inline putWord8?
     w <- return $ fromIntegral w
-    putByte h (fromIntegral (w `unsafeShiftR` 8))
+    putByte h (fromIntegral ((w `unsafeShiftR` 8) .&. 0xff))
     putByte h (fromIntegral (w .&. 0xff))
   get h = do
     w1 <- getWord8 h
@@ -185,7 +185,7 @@ unsafeShiftR (W# a) (I# b) = (W# (a `uncheckedShiftRL#` b))
 instance Binary Word32 where
   put_ (BinHandle ix (h)) w = do
     w <- return $ fromIntegral w
-    putByteIO ix h (fromIntegral (w `unsafeShiftR` 24))
+    putByteIO ix h (fromIntegral ((w `unsafeShiftR` 24) .&. 0xff))
     putByteIO ix h (fromIntegral ((w `unsafeShiftR` 16) .&. 0xff))
     putByteIO ix h (fromIntegral ((w `unsafeShiftR` 8)  .&. 0xff))
     putByteIO ix h (fromIntegral (w .&. 0xff))
