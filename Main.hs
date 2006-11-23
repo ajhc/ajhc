@@ -660,7 +660,7 @@ compileModEnv' stats (ho,_) = do
     -- run optimization again with no rules enabled
 
     -- delete rules
-    prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ Info.delete (mempty :: ARules) nfo) letann (\_ -> return) prog
+    prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_HASRULE nfo) letann (\_ -> return) prog
     --prog <- transformProgram "float inward" DontIterate True programFloatInward prog
 
     prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify no rules" True prog
