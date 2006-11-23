@@ -76,7 +76,6 @@ import qualified E.SSimplify as SS
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified FrontEnd.Tc.Type as Type
-import qualified Grin.MangleE as Mangle(mangle)
 import qualified Grin.PointsToAnalysis
 import qualified Grin.Simplify
 import qualified Info.Info as Info
@@ -678,6 +677,7 @@ compileModEnv' stats (ho,_) = do
 --    prog <- denewtypeProgram prog
 
     prog <- transformProgram transformParms { transformCategory = "BoxifyProgram", transformOperation = boxifyProgram } prog
+    prog <- programPrune prog
     prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify after boxify" True prog
     prog <- barendregtProg prog
     prog <- return $ runIdentity $ programMapBodies (return . cleanupE) prog
@@ -721,12 +721,14 @@ compileModEnv' stats (ho,_) = do
 -- | this gets rid of all type variables, replacing them with boxes that can hold any type
 -- the program is still type-safe, but all polymorphism has been removed in favor of
 -- implicit coercion to a universal type.
+--
+-- also, all rules are deleted.
 
 boxifyProgram :: Program -> IO Program
 boxifyProgram prog = ans where
     ans = do
         prog' <- programMapDs f prog
-        return $ runIdentity $ annotateProgram mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo)  (\_ nfo -> return nfo) prog'
+        return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_HASRULE $ Info.delete (undefined :: ARules) nfo) (\_ nfo -> return nfo)  (\_ nfo -> return nfo) prog'
     f (t,e) = do
 --        putStrLn $ ">>> " ++ pprint t
         e <- g e
@@ -756,8 +758,8 @@ cleanupE e = runIdentity (f e) where
 compileToGrin prog = do
     stats <- Stats.new
     progress "Converting to Grin..."
-    prog <- Mangle.mangle prog
-    wdump FD.CoreMangled $ printUntypedProgram prog -- printCheckName dataTable (programE prog)
+    prog <- return $ atomizeApps True prog
+    wdump FD.CoreMangled $ printProgram prog
     x <- Grin.FromE.compile prog
     Stats.print "Grin" Stats.theStats
     wdump FD.GrinInitial $ do
@@ -1130,13 +1132,6 @@ printProgram prog@Program {progCombinators = cs, progDataTable = dataTable } = d
     when (progEntryPoints prog /= [progMainEntry prog]) $
         putErrLn $ "EntryPoints: " ++ hsep (map pprint (progEntryPoints prog))
 
-printUntypedProgram prog@Program {progCombinators = cs, progDataTable = dataTable } = do
-    let pp tvr e = putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
-    sequence_ $ intersperse (putErrLn "") [ pp v (foldr ELam e as) | (v,as,e) <- cs]
-    when (progMainEntry prog /= tvr) $
-        putErrLn $ "MainEntry: " ++ pprint (progMainEntry prog)
-    when (progEntryPoints prog /= [progMainEntry prog]) $
-        putErrLn $ "EntryPoints: " ++ hsep (map pprint (progEntryPoints prog))
 
 printCheckName'' :: DataTable -> TVr -> E -> IO ()
 printCheckName'' dataTable tvr e = do
