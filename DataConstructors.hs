@@ -269,6 +269,11 @@ typesCompatable dataTable a b = f (-2 :: Id) a b where
         f :: Id -> E -> E -> m ()
         f _ (ESort a) (ESort b) = when (a /= b) $ fail $ "Sorts don't match: " ++ pprint (ESort a,ESort b)
         f _ (EVar a) (EVar b) = when (a /= b) $ fail $ "Vars don't match: " ++ pprint (a,b)
+        -- we expand aliases first, because the newtype might have phantom types as arguments
+        f c (ELit (LitCons {  litAliasFor = Just af, litArgs = as })) b = do
+            f c (foldl eAp af as) b
+        f c a (ELit (LitCons {  litAliasFor = Just af, litArgs = as })) = do
+            f c a (foldl eAp af as)
         f c (ELit LitCons { litName = n, litArgs = xs, litType = t }) (ELit LitCons { litName = n', litArgs = xs', litType = t' }) | n == n' = do
             f c t t'
             when (not $ sameShape1 xs xs') $ fail "Arg lists don't match"
@@ -284,10 +289,6 @@ typesCompatable dataTable a b = f (-2 :: Id) a b where
         f c (ELit (LitCons { litName = n, litArgs = [a',b'], litType = t })) (EPi (TVr { tvrIdent = 0, tvrType =  a}) b)  | conName tarrow == n, t == eStar = do
             f c a a'
             f c b b'
-        f c (ELit (LitCons {  litAliasFor = Just af, litArgs = as })) b = do
-            f c (foldl eAp af as) b
-        f c a (ELit (LitCons {  litAliasFor = Just af, litArgs = as })) = do
-            f c a (foldl eAp af as)
         f c a b | a == tBox && canBeBox b = return ()
         f c a b | b == tBox && canBeBox a = return ()
         f _ a b = fail $ "Types don't match:" ++ pprint (a,b)
