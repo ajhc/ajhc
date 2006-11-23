@@ -46,6 +46,7 @@ import FrontEnd.Unlit
 import FrontEnd.Syn.Options
 import GenUtil hiding(putErrLn,putErr,putErrDie)
 import Ho.Type
+import Ho.LibraryMap
 import HsSyn
 import MapBinaryInstance()
 import Name.Id
@@ -160,7 +161,12 @@ checkForHoFile fn = flip catch (\e -> return Nothing) $ do
         wdump FD.Progress $ do
             fn' <- shortenPath fn
             putErrLn $ "Found object file:" <+> fn'
-        return $ Just (hh,ho { hoModules = fmap (const (Left dep)) (hoExports ho) })
+        if (all (`elem` loadedLibraries) (Map.keys $ hoLibraries ho)) then do
+            return $ Just (hh,ho { hoModules = fmap (const (Left dep)) (hoExports ho) })
+         else do
+            putErrLn $ "No library dep for ho file:" <+> fn
+            return Nothing
+
 
 checkDep fd = do
     fs <- getFileStatus (fromAtom $ fileName fd)
