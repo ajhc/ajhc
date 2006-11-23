@@ -109,9 +109,9 @@ or' fs x = or [ f x | f <- fs ]
 
 tiModules' ::  Ho -> [ModInfo] -> IO (Ho,TiData)
 tiModules' me ms = do
-    let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
-        importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
-        importClassHierarchy = hoClassHierarchy me
+--    let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
+--        importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
+    let importClassHierarchy = hoClassHierarchy me
         importKindEnv = hoKinds me
     wdump FD.Progress $ do
         putErrLn $ "Typing: " ++ show ([ m | Module m <- map modInfoName ms])
@@ -151,7 +151,7 @@ tiModules' me ms = do
         mapM_ putStrLn [ show n ++  " :: " ++ prettyPrintType s |  (n,s) <- Map.toList localDConsEnv]
 
 
-    let globalDConsEnv = localDConsEnv `Map.union` importDConsEnv
+    --let globalDConsEnv = localDConsEnv `Map.union` importDConsEnv
 
 
     smallClassHierarchy <- makeClassHierarchy importClassHierarchy kindInfo ds
@@ -214,12 +214,16 @@ tiModules' me ms = do
 
     -- type inference/checking for all variables
 
+    when (dump FD.AllTypes) $ do
+        putStrLn "  ---- all types ---- "
+        putStrLn $ PPrint.render $ pprintEnvMap (sigEnv `mappend` localDConsEnv `mappend` hoAssumps me)
+
     wdump FD.Progress $ do
         putErrLn $ "Type inference"
     let moduleName = modInfoName tms
         (tms:_) = ms
     let tcInfo = tcInfoEmpty {
-        tcInfoEnv = (importVarEnv `mappend` globalDConsEnv),
+        tcInfoEnv = hoAssumps me `mappend` localDConsEnv, -- (importVarEnv `mappend` globalDConsEnv),
         tcInfoSigEnv = sigEnv,
         tcInfoModName =  show moduleName,
         tcInfoKindInfo = kindInfo,
