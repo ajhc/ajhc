@@ -1098,6 +1098,7 @@ lintCheckProgram onerr prog | flint = do
         putErrLn ("\n>>> Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
         printProgram prog
         putErrLn (">>> Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
+        putErrLn (show ids)
         maybeDie
 lintCheckProgram _ _ = return ()
 

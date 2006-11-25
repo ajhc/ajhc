@@ -1,5 +1,6 @@
 module E.Program where
 
+import Prelude hiding(putStrLn, putStr,print)
 import Control.Monad.Identity
 import Data.Monoid
 import List
@@ -9,12 +10,13 @@ import qualified Data.Map as Map
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
+import CharIO
 import Doc.Pretty
 import E.E
 import E.Show
 import E.TypeCheck
 import FrontEnd.Class
-import GenUtil
+import Util.Gen hiding(putErrLn)
 import Name.Id
 import Name.Name
 import Options

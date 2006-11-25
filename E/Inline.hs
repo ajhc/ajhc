@@ -166,4 +166,4 @@ programMapProgGroups imap f prog = do
         prog' = prog { progStats = mempty }
         unames ds prog = prog { progExternalNames = progExternalNames prog `mappend` fromList [ tvrIdent t | (t,_) <- ds ] }
     (ds,prog'') <- g prog' [] imap $ programDecomposedDs prog
-    return $ programSetDs ds prog'' { progStats = progStats prog `mappend` progStats prog'' }
+    return $ programSetDs ds prog { progStats = progStats prog `mappend` progStats prog'' }
