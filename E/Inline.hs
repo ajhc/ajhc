@@ -45,24 +45,25 @@ baseInlinability t e
     | otherwise = 0
 
 -- NOINLINE must take precidence because it is sometimes needed for correctness, while INLINE is surely an optimization.
+forceInline :: HasProperties a => a -> Bool
 forceInline x
-    | forceNoinline' props x = False
+    | forceNoinline props = False
     | not (fopts FO.InlinePragmas) = False
     | otherwise  = member prop_INLINE props  || member prop_WRAPPER props || member prop_SUPERINLINE props
-    where props = Info.fetch (tvrInfo x)
+    where props = getProperties x
 
+forceSuperInline :: HasProperties a => a -> Bool
 forceSuperInline x
-    | forceNoinline' props x = False
+    | forceNoinline props = False
     | not (fopts FO.InlinePragmas) = False
     | otherwise = member prop_SUPERINLINE props
-    where props = Info.fetch (tvrInfo x)
+    where props = getProperties x
 
-forceNoinline x = forceNoinline' (Info.fetch (tvrInfo x)) x
-
-forceNoinline' :: Properties -> TVr -> Bool
-forceNoinline' props x
+forceNoinline :: HasProperties a => a -> Bool
+forceNoinline x
     | member prop_HASRULE props || member prop_NOINLINE props || member prop_PLACEHOLDER props = True
     | otherwise = False
+    where props = getProperties x
 
 app (e,[]) = return e
 app (e,xs) = app' e xs
@@ -135,6 +136,6 @@ decomposeDs bs = map f mp where
 
 
 programDecomposedDs :: Program -> [Either (TVr, E) [(TVr,E)]]
-programDecomposedDs prog = decomposeDs $ programDs prog 
+programDecomposedDs prog = decomposeDs $ programDs prog
 
 
