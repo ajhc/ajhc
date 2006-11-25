@@ -62,7 +62,7 @@ scc (Graph g ln kv fn) = map decode forest where
 
 components :: Graph n k -> [[n]]
 components (Graph g ln kv fn) = map decode forest where
-    forest = Data.Graph.scc g
+    forest = Data.Graph.components g
     decode n = dec n []
     dec (Node v ts) vs = ln v:foldr dec vs ts
 
