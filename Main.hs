@@ -330,16 +330,11 @@ processDecls stats ho ho' tiData = do
         } prog
     prog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } prog
 
-    let fint (rec,ns) = do
-        let names = [ n | (n,_) <- ns]
+    let fint mprog' = do
+        let names = [ n | (n,_) <- programDs mprog']
         when coreMini $ putErrLn ("----\n" ++ pprint names)
         mstats <- Stats.new
-        let mprog = programSetDs ns prog {
-            progStats = mempty,
-            progClosed = True,
-            progEntryPoints = fsts ns,
-            progExternalNames = progExternalNames prog `mappend` (fromList $ map tvrIdent $ fsts (programDs prog))
-            }
+        let mprog = mprog' { progClosed = True }
             tparms = transformParms { transformPass = "Init", transformDumpProgress = coreMini }
 
         mprog <- return $ etaAnnotateProgram mprog
@@ -368,13 +363,13 @@ processDecls stats ho ho' tiData = do
         Stats.combine initialPassStats mstats
         when miniCorePass $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
         when miniCoreSteps $ Stats.print ("InitialOptimize:" ++ pprint names) mstats
-        wdump FD.Progress $ putErr (if rec then "*" else ".")
-        return (programDs mprog)
+        wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
+        return mprog
     lintCheckProgram onerrNone prog
     progress "Initial optimization pass"
 
     printESize "Before programMapRecGroups" prog
-    prog <- programMapRecGroups initMap (const return) (const return) (const return) fint prog
+    prog <- programMapProgGroups initMap  fint prog
     printESize "After  programMapRecGroups" prog
     progress "!"
     hFlush stdout >> hFlush stderr
@@ -422,7 +417,6 @@ processDecls stats ho ho' tiData = do
             lintCheckE onerrNone fullDataTable v lc
             return (v,lc)
         wdump FD.Core $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
-        --cds <- E.Strictness.solveDs cds
         cds <- Demand.solveDs fullDataTable cds
         cds <- flip mapM cds $ \ (v,lc) -> do
             lintCheckE onerrNone fullDataTable v lc
@@ -432,10 +426,8 @@ processDecls stats ho ho' tiData = do
             lintCheckE onerrNone fullDataTable v lc
             return (v,lc)
 
-        -- cds <- E.Strictness.solveDs cds
         cds <- Demand.solveDs fullDataTable cds
         cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
-        --cds' <- return $ concatMap (uncurry (workWrap fullDataTable)) cds
         when miniCorePass  $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
         sequence_ [lintCheckE onerrNone fullDataTable v e | (v,e) <- cds ]
         let (cds',st) = performWorkWrap fullDataTable cds

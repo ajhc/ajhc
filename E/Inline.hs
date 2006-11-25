@@ -3,6 +3,7 @@ module E.Inline(
     programMapRecGroups,
     forceInline,
     programDecomposedDs,
+    programMapProgGroups,
     forceNoinline,
     baseInlinability,
     decomposeDs
@@ -20,16 +21,16 @@ import E.Rules
 import E.Subst
 import E.Values
 import GenUtil
-import qualified Info.Info as Info
 import Info.Info(Info)
 import Info.Types
 import Name.Id
 import Options
-import qualified FlagOpts as FO
 import Stats
 import Support.FreeVars
 import Util.Graph
 import Util.SetLike
+import qualified FlagOpts as FO
+import qualified Info.Info as Info
 
 
 
@@ -138,4 +139,31 @@ decomposeDs bs = map f mp where
 programDecomposedDs :: Program -> [Either (TVr, E) [(TVr,E)]]
 programDecomposedDs prog = decomposeDs $ programDs prog
 
+programSubProgram prog rec ds = programSetDs ds prog { progType = SubProgram rec, progEntryPoints = map fst ds }
 
+programMapProgGroups :: Monad m =>
+    IdMap (Maybe E)        -- ^ initial map to apply
+    -> (Program -> m Program)  -- ^ bool is true if group is recursive.
+    -> Program
+    -> m Program
+programMapProgGroups imap f prog = do
+    let g prog' rs imap (Left d:rds) = do
+            [d'] <- annotateDs imap nann nann nann [d]
+            nprog <- f (programSubProgram prog' False [d'])
+            let nds = programDs nprog
+            g (unames nds nprog) (nds:rs) (bm nds imap) rds
+        g prog' rs imap (Right ds:rds) = do
+            ds' <- annotateDs imap nann nann nann ds
+            nprog <- f (programSubProgram prog' True ds')
+            let imap' = bm nds imap
+                smap = substMap'' $ fromList [ (tvrIdent x,Just $ EVar x) | (x,y) <- nds]
+                nds = programDs nprog
+                nds' = [ (x,smap y) | (x,y) <- nds]
+            g (unames nds' nprog) (nds':rs) imap' rds
+        g prog' rs _ [] = return $ (concat rs,prog')
+        bm xs imap = fromList [ (tvrIdent t,Just $ EVar t) | (t,_) <- xs ] `union` imap
+        nann _ = return
+        prog' = prog { progStats = mempty }
+        unames ds prog = prog { progExternalNames = progExternalNames prog `mappend` fromList [ tvrIdent t | (t,_) <- ds ] }
+    (ds,prog'') <- g prog' [] imap $ programDecomposedDs prog
+    return $ programSetDs ds prog'' { progStats = progStats prog `mappend` progStats prog'' }
