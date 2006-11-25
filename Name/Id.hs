@@ -28,10 +28,12 @@ import Data.Typeable
 import qualified Data.IntMap  as IM
 import qualified Data.IntSet as IS
 
+import Atom
 import Util.HasSize
 import Util.Inst()
 import Util.NameMonad
 import Util.SetLike as S
+import Name.Name
 
 -- TODO - make this a newtype
 type Id = Int
@@ -57,7 +59,7 @@ idToInt = id
 -- IdMap
 
 newtype IdMap a = IdMap (IM.IntMap a)
-    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet (Id,a),MapLike Id a,Functor,FunctorM,Show,IsEmpty,Eq,Ord)
+    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet (Id,a),MapLike Id a,Functor,FunctorM,IsEmpty,Eq,Ord)
 
 
 idSetToIdMap :: (Id -> a) -> IdSet -> IdMap a
@@ -141,4 +143,12 @@ idMapFromList ids = IdMap (IM.fromList ids)
 idMapFromDistinctAscList :: [(Id,a)] -> IdMap a
 idMapFromDistinctAscList ids = IdMap (IM.fromDistinctAscList ids)
 
+
+instance Show IdSet where
+    showsPrec n is = showsPrec n $ map f (idSetToList is) where
+        f n =  maybe (toAtom ('x':show n)) (toAtom . show) (fromId n)
+
+instance Show v => Show (IdMap v) where
+    showsPrec n is = showsPrec n $ map f (idMapToList is) where
+        f (n,v) =  (maybe (toAtom ('x':show n)) (toAtom . show) (fromId n),v)
 
