@@ -254,7 +254,6 @@ processDecls stats ho ho' tiData = do
     let prog = program {
             progClassHierarchy = hoClassHierarchy allHo,
             progDataTable = fullDataTable,
-            progClosed = True,
             progExternalNames = fromList [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ],
             progModule = head (fsts $ tiDataModules tiData)
             }
@@ -329,12 +328,11 @@ processDecls stats ho ho' tiData = do
         } prog
     prog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } prog
 
-    let fint mprog' = do
-        let names = pprint [ n | (n,_) <- programDs mprog']
+    let fint mprog = do
+        let names = pprint [ n | (n,_) <- programDs mprog]
         when coreMini $ putErrLn ("----\n" ++ names)
         mstats <- Stats.new
-        let mprog = mprog' { progClosed = True }
-            tparms = transformParms { transformPass = "Init", transformDumpProgress = coreMini }
+        let tparms = transformParms { transformPass = "Init", transformDumpProgress = coreMini }
 
         mprog <- return $ etaAnnotateProgram mprog
 
@@ -549,7 +547,7 @@ compileModEnv' stats (ho,_) = do
 
     let dataTable = progDataTable prog
         rules = hoRules ho
-        prog = (hoToProgram ho) { progClosed = True }
+        prog = hoToProgram ho
 
     -- dump final version of various requested things
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
@@ -1098,7 +1096,7 @@ lintCheckProgram onerr prog | flint = do
         putErrLn ("\n>>> Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
         printProgram prog
         putErrLn (">>> Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
-        putErrLn (show ids)
+        --putErrLn (show ids)
         maybeDie
 lintCheckProgram _ _ = return ()
 

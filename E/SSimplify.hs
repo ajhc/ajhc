@@ -78,7 +78,7 @@ notUsedInfo = UseInfo { useOccurance = Unused, minimumArgs = maxBound }
 programPruneOccurance :: Program -> Program
 programPruneOccurance prog =
     let dsIn = programDs (runIdentity $ programMapBodies (return . subst (tVr (-1) Unknown) Unknown) prog)
-        (dsIn',(OMap fvs,uids)) = runReaderWriter (unOM $ collectDs dsIn $ if progClosed prog then mempty else fromList $ map (flip (,) noUseInfo) (map (tvrIdent . fst) dsIn)) (fromList $ map tvrIdent $ progEntryPoints prog)
+        (dsIn',(OMap fvs,uids)) = runReaderWriter (unOM $ collectDs dsIn mempty) (fromList $ map tvrIdent $ progEntryPoints prog)
     in (programSetDs dsIn' prog) { progFreeIds = idMapToIdSet fvs, progUsedIds = uids }
 
 

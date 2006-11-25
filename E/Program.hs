@@ -24,7 +24,7 @@ import qualified FlagDump as FD
 import qualified Stats
 
 
-data ProgramType = SubProgram Bool | MainProgram
+data ProgramType = SubProgram Bool | MainProgram | MainComponent
 
 data Program = Program {
     progExternalNames :: IdSet,
@@ -34,7 +34,6 @@ data Program = Program {
     progEntryPoints :: [TVr],
     progMainEntry :: TVr,
     progModule :: Module,
-    progClosed :: Bool,           -- ^ whether the universe is closed other than the entry points and external names
     progPasses :: [String],       -- ^ record of passes the program goes through
     progUsedIds :: IdSet,         -- ^ filled in by occurance info collection
     progFreeIds :: IdSet,         -- ^ filled in by occurance info collection
@@ -50,7 +49,6 @@ program = Program {
     progDataTable = mempty,
     progEntryPoints = mempty,
     progMainEntry = tvr,
-    progClosed = False,
     progModule = mainModule,
     progPasses = [],
     progUsedIds = mempty,

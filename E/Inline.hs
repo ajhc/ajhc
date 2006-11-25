@@ -4,6 +4,7 @@ module E.Inline(
     forceInline,
     programDecomposedDs,
     programMapProgGroups,
+    programMapProgComponents,
     forceNoinline,
     baseInlinability,
     decomposeDs
@@ -11,7 +12,6 @@ module E.Inline(
 
 import Control.Monad.Writer
 import Data.Monoid
-import qualified Data.Graph as G
 
 import Atom
 import E.Annotate
@@ -125,25 +125,30 @@ programMapRecGroups imap idann letann lamann f prog = do
             g (nds':rs) imap' rds
         g rs _ [] = return $ concat rs
         bm xs imap = fromList [ (tvrIdent t,Just $ EVar t) | (t,_) <- xs ] `union` imap
-    ds <- g [] imap $ decomposeDs (programDs prog)
+    ds <- g [] imap $ programDecomposedDs prog
     return $ programSetDs ds prog
 
 decomposeDs :: [(TVr, E)] -> [Either (TVr, E) [(TVr,E)]]
-decomposeDs bs = map f mp where
-    mp = G.stronglyConnComp [ (v,i, idSetToList $ bindingFreeVars t e) | v@(t@TVr { tvrIdent = i },e) <- bs]
-    f (G.AcyclicSCC v) = Left v
-    f (G.CyclicSCC vs) = Right vs
+decomposeDs bs = scc g where
+    g = newGraph bs (tvrIdent . fst ) (toList . uncurry bindingFreeVars)
+    --mp = G.stronglyConnComp [ (v,i, idSetToList $ bindingFreeVars t e) | v@(t@TVr { tvrIdent = i },e) <- bs]
+    --f (G.AcyclicSCC v) = Left v
+    --f (G.CyclicSCC vs) = Right vs
+
 
 
 
 programDecomposedDs :: Program -> [Either (TVr, E) [(TVr,E)]]
 programDecomposedDs prog = decomposeDs $ programDs prog
 
+programComponents :: Program -> [[(TVr,E)]]
+programComponents prog = components $ newGraph (programDs prog) (tvrIdent . fst) (toList . uncurry bindingFreeVars)
+
 programSubProgram prog rec ds = programSetDs ds prog { progType = SubProgram rec, progEntryPoints = map fst ds }
 
 programMapProgGroups :: Monad m =>
     IdMap (Maybe E)        -- ^ initial map to apply
-    -> (Program -> m Program)  -- ^ bool is true if group is recursive.
+    -> (Program -> m Program)
     -> Program
     -> m Program
 programMapProgGroups imap f prog = do
@@ -167,3 +172,16 @@ programMapProgGroups imap f prog = do
         unames ds prog = prog { progExternalNames = progExternalNames prog `mappend` fromList [ tvrIdent t | (t,_) <- ds ] }
     (ds,prog'') <- g prog' [] imap $ programDecomposedDs prog
     return $ programSetDs ds prog { progStats = progStats prog `mappend` progStats prog'' }
+
+
+programMapProgComponents :: Monad m =>
+    (Program -> m Program)
+    -> Program
+    -> m Program
+programMapProgComponents f prog = do
+    let cs = programComponents prog
+        prog' = prog { progStats = mempty, progType = MainComponent }
+        g ds = f (programSetDs ds prog')
+    ps <- mapM g (programComponents prog)
+    return $ programSetDs (concatMap programDs ps) prog { progStats = progStats prog `mappend` (mconcat $ map progStats ps) }
+
