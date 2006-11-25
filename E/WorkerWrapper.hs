@@ -82,9 +82,9 @@ tmpNames ns x = case fromId x of
 
 workWrap' :: MonadStats m => DataTable -> TVr -> E -> m ((TVr,E),(TVr,E))
 workWrap' _dataTable tvr _e
-    | member prop_WORKER props || member prop_WRAPPER props = fail "already workwrapped"
+    | member prop_WRAPPER props = fail "already a wrapper"
     | member prop_INLINE props || member prop_SUPERINLINE props = fail "going to be inlined"
-    | member prop_NOINLINE props  = fail "not going to be inlined"
+    | member prop_NOINLINE props || member prop_PLACEHOLDER props = fail "not going to be inlined"
     where props = getProperties tvr
 workWrap' dataTable tvr e | isJust res = ans where
     res@(~(Just (cname,body,sargs))) = wrappable dataTable tvr e
