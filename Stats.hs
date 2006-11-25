@@ -156,7 +156,7 @@ printStat greets (Stat s) = do
         p (x,n) = x ++ ": " ++ show n
 
 printLStat n greets (Stat s) = do
-    let fs = createForest 0 $ sort [(splitUp n $ fromAtom x,y) | (x,y) <- Map.toList s]
+    let fs = createForest 0 $ Map.toList $ Map.fromListWith (+) [(splitUp n $ fromAtom x,y) | (x,y) <- Map.toList s]
     mapM_ CharIO.putErrLn $ ( draw . fmap p ) (Node (greets,0) fs)  where
         p (x,0) = x
         p (x,n) = x ++ ": " ++ show n
