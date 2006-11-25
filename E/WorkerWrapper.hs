@@ -1,4 +1,4 @@
-module E.WorkerWrapper(performWorkWrap) where
+module E.WorkerWrapper(performWorkWrap,workWrapProgram) where
 
 import Control.Monad.Writer hiding(Product(..))
 import Data.Monoid hiding(Product(..))
@@ -13,6 +13,7 @@ import E.FreeVars
 import E.Traverse
 import E.TypeCheck()
 import E.Values
+import E.Program
 import GenUtil
 import qualified Info.Info as Info
 import Info.Types
@@ -92,10 +93,10 @@ workWrap' dataTable tvr e | isJust res = ans where
         f (Absent,_) = []
         f (Plain,t) = [t]
         f (Cons c ts,_) = concatMap f ts
-    lets = concatMap f sargs where
-        f (Absent,t) = [(t,EError "WorkWrap.Absent" (getType t))]
-        f (Plain,_) = []
-        f (Cons c ts,t) = [(t,ELit (updateLit dataTable litCons { litName = conName c, litArgs = map EVar (snds ts), litType = getType t }))] ++ concatMap f ts
+    lets = concatMap f (zip sargs (map show naturals)) where
+        f ((Absent,t),n) = [(t,EError ("WorkWrap.Absent." ++ tvrShowName tvr ++ "." ++ n) (getType t))]
+        f ((Plain,_),_) = []
+        f ((Cons c ts,t),n) = [(t,ELit (updateLit dataTable litCons { litName = conName c, litArgs = map EVar (snds ts), litType = getType t }))] ++ concatMap f (zip ts [ n ++ "." ++ show i | i <- naturals])
     cases e = f sargs where
         f [] = e
         f ((Absent,_):rs) = f rs
@@ -140,6 +141,13 @@ workWrap' dataTable tvr e | isJust res = ans where
 workWrap' _dataTable tvr e = fail "not workWrapable"
 
 
+{-# NOINLINE workWrapProgram #-}
+workWrapProgram :: Program -> Program
+workWrapProgram prog = ans where
+    (nds,stats) = performWorkWrap (progDataTable prog) (programDs prog)
+    ans = programSetDs nds prog { progStats = progStats prog `mappend` stats }
+
+{-# NOINLINE performWorkWrap #-}
 performWorkWrap :: DataTable -> [(TVr,E)] -> ([(TVr,E)],Stats.Stat)
 performWorkWrap dataTable ds = runWriter (wwDs ds) where
     --wwDs :: [(TVr,E)] -> Stats.StatT Identity [(TVr,E)]

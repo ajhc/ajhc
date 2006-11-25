@@ -6,7 +6,7 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Monoid
 import IO(hFlush,stderr,stdout,openFile,hClose,IOMode(..))
-import List hiding(group,union)
+import List hiding(group,union,delete)
 import Maybe
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
@@ -660,7 +660,7 @@ compileModEnv' stats (ho,_) = do
     -- run optimization again with no rules enabled
 
     -- delete rules
-    prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_HASRULE nfo) letann (\_ -> return) prog
+    prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ modifyProperties (flip (foldr delete) [prop_HASRULE,prop_WORKER,prop_WRAPPER]) nfo) letann (\_ -> return) prog
     --prog <- transformProgram "float inward" DontIterate True programFloatInward prog
 
     prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify no rules" True prog
@@ -676,9 +676,13 @@ compileModEnv' stats (ho,_) = do
     -- perform lambda lifting
 --    prog <- denewtypeProgram prog
 
-    prog <- transformProgram transformParms { transformCategory = "BoxifyProgram", transformOperation = boxifyProgram } prog
+    prog <- transformProgram transformParms { transformCategory = "BoxifyProgram", transformDumpProgress = dump FD.Progress, transformOperation = boxifyProgram } prog
     prog <- programPrune prog
-    prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify after boxify" True prog
+
+    prog <- Demand.analyzeProgram prog
+    prog <- return $ E.CPR.cprAnalyzeProgram prog
+    prog <- transformProgram transformParms { transformCategory = "Boxy WorkWrap", transformDumpProgress = dump FD.Progress, transformOperation = return . workWrapProgram } prog
+    prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify after Boxy WorkWrap" True prog
     prog <- barendregtProg prog
     prog <- return $ runIdentity $ programMapBodies (return . cleanupE) prog
 

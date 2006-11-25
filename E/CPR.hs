@@ -1,4 +1,4 @@
-module E.CPR(Val(..), cprAnalyzeDs) where
+module E.CPR(Val(..), cprAnalyzeDs, cprAnalyzeProgram) where
 
 import Control.Monad.Writer hiding(Product(..))
 import Data.Typeable
@@ -11,6 +11,7 @@ import Doc.DocLike
 import E.E
 import E.FreeVars
 import GenUtil
+import E.Program
 import Name.Name
 import Name.Names
 import Number
@@ -66,6 +67,13 @@ lub _ _ = Top
 instance Monoid Val where
     mempty = Bot
     mappend = lub
+
+
+{-# NOINLINE cprAnalyzeProgram #-}
+cprAnalyzeProgram :: Program -> Program
+cprAnalyzeProgram prog = ans where
+    nds = cprAnalyzeDs (progDataTable prog) (programDs prog)
+    ans = programSetDs nds prog -- { progStats = progStats prog `mappend` stats }
 
 cprAnalyzeDs :: DataTable -> [(TVr,E)] -> [(TVr,E)]
 cprAnalyzeDs dataTable ds = fst $ cprAnalyzeBinds dataTable mempty ds
