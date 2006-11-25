@@ -328,11 +328,12 @@ instance Monoid Forced where
 fixInline finalPhase v bt@IsBoundTo {} = bt { inlineForced = inlineForced bt `mappend` calcForced finalPhase v }  where
 
 calcForced finalPhase v =
-    case (forceNoinline v,finalPhase,forceInline v) of
-        (True,_,_) -> ForceNoinline
-        (False,True,_) -> NotForced
-        (False,False,True) -> ForceInline
-        (False,False,False) -> NotForced
+    let props = getProperties v in
+        case (forceNoinline props,finalPhase,forceInline props) of
+            (True,_,_) -> ForceNoinline
+            (False,True,_) -> NotForced
+            (False,False,True) -> ForceInline
+            (False,False,False) -> NotForced
 
 
 data Env = Env {
@@ -733,9 +734,6 @@ simplifyDs prog sopts dsIn = ans where
                     didInline inb e xs'
                 Just IsBoundTo { bindingE = e, inlineForced = ForceInline } | someBenefit v e txs -> do
                     mtick  (toAtom $ "E.Simplify.inline.Forced/{" ++ tvrShowName v  ++ "}")
-                    didInline inb e xs'
-                Just IsBoundTo { bindingE = e } | forceInline v, someBenefit v e txs -> do
-                    mtick  (toAtom $ "E.Simplify.inline.forced/{" ++ tvrShowName v  ++ "}")
                     didInline inb e xs'
                 Just IsBoundTo { bindingOccurance = OnceInLam, bindingE = e, bindingCheap = True } | someBenefit v e txs -> do
                     mtick  (toAtom $ "E.Simplify.inline.OnceInLam/{" ++ showName (tvrIdent v)  ++ "}")
