@@ -230,13 +230,12 @@ dumpHoFile fn = do
     wdump FD.Core $ do
         putStrLn " ---- lambdacube  ---- "
         mapM_ (\ (v,lc) -> printCheckName'' (hoDataTable ho) v lc) (melems $ hoEs ho)
-
-
-printCheckName'' :: DataTable -> TVr -> E -> IO ()
-printCheckName'' _dataTable tvr e = do
-    when (dump FD.EInfo || verbose2) $ putErrLn (show $ tvrInfo tvr)
-    putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pprint (tvrType tvr)))
-    putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
+    where
+    printCheckName'' :: DataTable -> TVr -> E -> IO ()
+    printCheckName'' _dataTable tvr e = do
+        when (dump FD.EInfo || verbose2) $ putErrLn (show $ tvrInfo tvr)
+        putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pprint (tvrType tvr)))
+        putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
 
 --recordHoFile :: Ho -> [(HsModule,FileDep,String,[FileDep])] -> [FileDep] -> IO [FileDep]
 

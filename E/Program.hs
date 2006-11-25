@@ -3,16 +3,22 @@ module E.Program where
 import Control.Monad.Identity
 import Data.Monoid
 import List
+import Maybe
 import qualified Data.Map as Map
 
-import FrontEnd.Class
 import DataConstructors
+import Doc.DocLike
+import Doc.PPrint
+import Doc.Pretty
 import E.E
+import E.Show
 import E.TypeCheck
+import FrontEnd.Class
 import GenUtil
 import Name.Id
 import Name.Name
 import Options
+import qualified FlagDump as FD
 import qualified Stats
 
 
@@ -103,3 +109,21 @@ programMapDs f prog = do
 programMapDs_ f prog = mapM_ f (programDs prog)
 
 
+printProgram prog@Program {progCombinators = cs, progDataTable = dataTable } = do
+    sequence_ $ intersperse (putErrLn "") [ printCheckName'' dataTable v (foldr ELam e as) | (v,as,e) <- cs]
+    when (progMainEntry prog /= tvr) $
+        putErrLn $ "MainEntry: " ++ pprint (progMainEntry prog)
+    when (progEntryPoints prog /= [progMainEntry prog]) $
+        putErrLn $ "EntryPoints: " ++ hsep (map pprint (progEntryPoints prog))
+
+printCheckName'' :: DataTable -> TVr -> E -> IO ()
+printCheckName'' dataTable tvr e = do
+    let (ty,pty) = case inferType dataTable [] e of
+            Left err -> (Unknown,vcat $ map text (intersperse "---" $ tail err))
+            Right ty -> (ty,pprint ty)
+        tmatch = isJust $ match (const Nothing) [] ty (tvrType tvr)
+    when (dump FD.EInfo || verbose2) $ putErrLn (show $ tvrInfo tvr)
+    putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> (pprint $ tvrType tvr)))
+    when (not tmatch || dump FD.EVerbose) $
+        putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
+    putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))

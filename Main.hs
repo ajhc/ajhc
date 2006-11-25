@@ -313,7 +313,6 @@ processDecls stats ho ho' tiData = do
     -- simplify
     -- floating inward
 
-    initialPassStats <- Stats.new
     let sopt = mempty {
             SS.so_boundVars = fromList [ (tvrIdent v,(v,e)) | (v,e) <- Map.elems (hoEs ho)],
             SS.so_dataTable = fullDataTable
@@ -331,8 +330,8 @@ processDecls stats ho ho' tiData = do
     prog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } prog
 
     let fint mprog' = do
-        let names = [ n | (n,_) <- programDs mprog']
-        when coreMini $ putErrLn ("----\n" ++ pprint names)
+        let names = pprint [ n | (n,_) <- programDs mprog']
+        when coreMini $ putErrLn ("----\n" ++ names)
         mstats <- Stats.new
         let mprog = mprog' { progClosed = True }
             tparms = transformParms { transformPass = "Init", transformDumpProgress = coreMini }
@@ -359,23 +358,19 @@ processDecls stats ho ho' tiData = do
         lintCheckProgram onerrNone mprog
         mprog <- simplifyProgram sopt "Init-Three-AfterDemand" False mprog
         mprog <- barendregtProg mprog
-        Stats.tickStat mstats (progStats mprog)
-        Stats.combine initialPassStats mstats
-        when miniCorePass $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
-        when miniCoreSteps $ Stats.print ("InitialOptimize:" ++ pprint names) mstats
+        when miniCorePass $ printProgram mprog -- mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
+        when miniCoreSteps $ Stats.printLStat (optStatLevel options) ("InitialOptimize:" ++ names) (progStats mprog)
         wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
         return mprog
     lintCheckProgram onerrNone prog
     progress "Initial optimization pass"
 
-    printESize "Before programMapRecGroups" prog
     prog <- programMapProgGroups initMap  fint prog
-    printESize "After  programMapRecGroups" prog
     progress "!"
     hFlush stdout >> hFlush stderr
 
     wdump FD.Progress $
-        Stats.print "Initial Pass Stats" initialPassStats
+        Stats.printLStat (optStatLevel options) "Initial Pass Stats" (progStats prog)
     lintCheckProgram onerrNone prog
 
     prog <- barendregtProg prog
@@ -1121,25 +1116,8 @@ printCheckName' dataTable tvr e = do
     ty <- typecheck dataTable e
     putErrLn  ( render $ indent 4 (pprint ty))
 
-printProgram prog@Program {progCombinators = cs, progDataTable = dataTable } = do
-    sequence_ $ intersperse (putErrLn "") [ printCheckName'' dataTable v (foldr ELam e as) | (v,as,e) <- cs]
-    when (progMainEntry prog /= tvr) $
-        putErrLn $ "MainEntry: " ++ pprint (progMainEntry prog)
-    when (progEntryPoints prog /= [progMainEntry prog]) $
-        putErrLn $ "EntryPoints: " ++ hsep (map pprint (progEntryPoints prog))
 
 
-printCheckName'' :: DataTable -> TVr -> E -> IO ()
-printCheckName'' dataTable tvr e = do
-    let (ty,pty) = case inferType dataTable [] e of
-            Left err -> (Unknown,vcat $ map text (intersperse "---" $ tail err))
-            Right ty -> (ty,pprint ty)
-        tmatch = isJust $ match (const Nothing) [] ty (tvrType tvr)
-    when (dump FD.EInfo || verbose2) $ putErrLn (show $ tvrInfo tvr)
-    putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> (pprint $ tvrType tvr)))
-    when (not tmatch || dump FD.EVerbose) $
-        putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
-    putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
 
 printESize :: String -> Program -> IO ()
 printESize str prog = putErrLn $ str ++ " program e-size: " ++ show (eSize (programE prog))
