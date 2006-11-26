@@ -37,45 +37,26 @@ import Doc.Pretty
 import E.E
 import E.Eval
 import E.Show
-import E.Values
 import E.Subst
 import E.TypeCheck hiding(match)
+import E.Values
 import GenUtil
+import Info.Types
 import MapBinaryInstance()
+import Name.Id
 import Name.Name
 import Name.Names
-import qualified CharIO
-import qualified Info.Info as Info
-import Info.Types
+import Options
 import Stats
 import Support.CanType
 import Support.FreeVars
 import Util.HasSize
-import Name.Id
-import Options
 import Util.SetLike as S
+import qualified CharIO
+import qualified Info.Info as Info
 import qualified Util.Seq as Seq
 
 
-
-
-data RuleType = RuleSpecialization | RuleUser | RuleCatalyst
-    deriving(Eq)
- {-! derive: GhcBinary !-}
-
--- a rule in its user visible form
-
-data Rule = Rule {
-    ruleHead :: TVr,
-    ruleBinds :: [TVr],
-    ruleArgs :: [E],
-    ruleNArgs :: {-# UNPACK #-} !Int,
-    ruleBody :: E,
-    ruleType :: RuleType,
-    ruleUniq :: (Module,Int),
-    ruleName :: Atom
-    }
- {-! derive: GhcBinary !-}
 
 
 instance Show Rule where
@@ -212,12 +193,6 @@ dropArguments os ARules { aruleRules = rs } = arules (catMaybes $  map f rs) whe
 -- free variables are up to date
 
 
-
-data ARules = ARules {
-    aruleFreeVars :: IdSet,
-    aruleRules :: [Rule]
-    }
-    deriving(Typeable)
 
 instance Show ARules where
     showsPrec n a = showsPrec n (aruleRules a)

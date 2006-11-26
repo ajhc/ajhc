@@ -1,97 +1,30 @@
 {-# OPTIONS -fglasgow-exts #-}
-module E.E where
+module E.E(module E.Type, module E.E) where
 
-import GenUtil
-import Control.Monad.Identity
-import Monad
+import Char(chr)
 import Data.FunctorM
-import Maybe
+import Data.Monoid
 import List
-import Doc.DocLike
-import Name.VConsts
-import Name.Name
-import Name.Names
-import Binary
+import Maybe
+import Monad
+
 import Atom
 import C.Prims
-import Char(chr)
-import Data.Monoid
-import Number
-import {-# SOURCE #-} Info.Binary(putInfo,getInfo)
-import qualified Info.Info as Info
+import Control.Monad.Identity
+import E.Type
+import GenUtil
 import Name.Id
+import Name.Name
+import Name.Names
+import Name.VConsts
+import Number
 import Util.SetLike as S
 
 
---------------------------------------
--- Lambda Cube (it's just fun to say.)
--- We are now based on a PTS, which is
--- a generalization of the lambda cube
--- see E.TypeCheck for a description
--- of the type system.
---------------------------------------
 
 
-data Lit e t = LitInt { litNumber :: Number, litType :: t }
-    | LitCons  { litName :: Name, litArgs :: [e], litType :: t, litAliasFor :: Maybe E }
---    | LitAlias { litName :: Name, litArgs :: [e], litType :: t, litAliasFor :: Maybe E }
-    deriving(Eq,Ord)
-        {-!derive: is, GhcBinary !-}
 
 litCons = LitCons { litName = error "litName: name not set", litArgs = [], litType = error "litCons: type not set", litAliasFor = Nothing }
-
-instance (Show e,Show t) => Show (Lit e t) where
-    showsPrec p (LitInt x t) = showParen (p > 10) $  shows x <> showString "::" <> shows t
-    showsPrec p LitCons { litName = n, litArgs = es, litType = t } = showParen (p > 10) $ hsep (shows n:map (showsPrec 11) es) <> showString "::" <> shows t
-
-instance Functor (Lit e) where
-    fmap f x = runIdentity $ fmapM (return . f) x
-
-instance FunctorM (Lit e) where
-    fmapM f x = case x of
-        LitCons { litName = a, litArgs = es, litType = e, litAliasFor = af } -> do  e <- f e; return LitCons { litName = a, litArgs = es, litType = e, litAliasFor = af }
-        LitInt i t -> do t <- f t; return $ LitInt i t
-
-
-data ESort =
-    EStar         -- ^ the sort of boxed lazy types
-    | EBang       -- ^ the sort of boxed strict types
-    | EHash       -- ^ the sort of unboxed types
-    | ETuple      -- ^ the sort of unboxed tuples
-    | EHashHash   -- ^ the supersort of unboxed types
-    | EStarStar   -- ^ the supersort of boxed types
-    | ESortNamed Name -- ^ user defined sorts
-    deriving(Eq, Ord)
-    {-! derive: is, GhcBinary !-}
-
-instance Show ESort where
-    showsPrec _ EStar = showString "*"
-    showsPrec _ EHash = showString "#"
-    showsPrec _ EStarStar = showString "**"
-    showsPrec _ EHashHash = showString "##"
-    showsPrec _ ETuple = showString "(#)"
-    showsPrec _ EBang = showString "!"
-
-
-data E = EAp E E
-    | ELam TVr E
-    | EPi TVr E
-    | EVar TVr
-    | Unknown
-    | ESort ESort
-    | ELit !(Lit E E)
-    | ELetRec { eDefs :: [(TVr, E)], eBody :: E }
-    | EPrim APrim [E] E
-    | EError String E
-    | ECase {
-       eCaseScrutinee :: E,
-       eCaseType :: E, -- due to GADTs and typecases, the final type of the expression might not be so obvious, so we include it here.
-       eCaseBind :: TVr,
-       eCaseAlts :: [Alt E],
-       eCaseDefault :: (Maybe E)
-       }
-	deriving(Eq, Ord, Show)
-    {-! derive: is, from, GhcBinary !-}
 
 
 
@@ -115,60 +48,11 @@ fromLam e = f [] e where
     f as (ELam v e) = f (v:as) e
     f as e  =  (e,reverse as)
 
-type TVr = TVr' E
-data TVr' e = TVr { tvrIdent :: !Id, tvrType :: e, tvrInfo :: Info.Info }
-    {-! derive: update !-}
 
 tVr x y = tvr { tvrIdent = x, tvrType = y }
 tvr = TVr { tvrIdent = 0, tvrType = Unknown, tvrInfo = mempty }
 
-data TvrBinary = TvrBinaryNone | TvrBinaryAtom Atom | TvrBinaryInt Int
-    {-! derive: GhcBinary !-}
 
-instance Binary TVr where
-    put_ bh (TVr { tvrIdent = 0, tvrType =  e, tvrInfo = nf} ) = do
-        put_ bh (TvrBinaryNone)
-        put_ bh e
-        putInfo bh nf
-    put_ bh (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) | Just x <- intToAtom i = do
-        put_ bh (TvrBinaryAtom x)
-        put_ bh e
-        putInfo bh nf
-    put_ bh (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) = do
-        unless (even i) $ fail "number not even"
-        put_ bh (TvrBinaryInt i)
-        put_ bh e
-        putInfo bh nf
-    get bh = do
-        (x ) <- get bh
-        e <- get bh
-        nf <- getInfo bh
-        case x of
-            TvrBinaryNone -> return $ TVr 0 e nf
-            TvrBinaryAtom a -> return $ TVr (atomIndex a) e nf
-            TvrBinaryInt i -> return $ TVr (i) e nf
-
-
-instance Show a => Show (TVr' a) where
-    showsPrec n TVr { tvrIdent = 0, tvrType = e} = showParen (n > 10) $ showString "_::" . shows e
-    showsPrec n TVr { tvrIdent = x, tvrType = e} = showParen (n > 10) $ case fromId x of
-        Just n -> shows n . showString "::" . shows e
-        Nothing  -> shows x . showString "::" . shows e
-
-
-
-instance FunctorM TVr' where
-    fmapM f t = do e <- f (tvrType t); return t { tvrType = e }
-instance Functor TVr' where
-    fmap f t = runIdentity (fmapM (return . f) t)
-
-instance Show e => Show (Alt e) where
-    showsPrec n (Alt l e) = showParen (n > 10) $ shows l . showString " -> " . shows e
-
-
-data Alt e = Alt (Lit TVr e) e
-    deriving(Eq,Ord)
-       {-!derive: GhcBinary !-}
 
 altHead :: Alt E -> Lit () ()
 altHead (Alt l _) = litHead  l
@@ -190,16 +74,6 @@ casePats ec =  [ p | Alt p _ <- eCaseAlts ec]
 caseBinds ec = eCaseBind ec : concat [ xs  | LitCons { litArgs = xs } <- casePats ec]
 
 
-instance Eq TVr where
-    (==) (TVr { tvrIdent = i }) (TVr { tvrIdent = i' }) = i == i'
-    (/=) (TVr { tvrIdent = i }) (TVr { tvrIdent = i' }) = i /= i'
-
-instance Ord TVr where
-    compare (TVr { tvrIdent = x }) (TVr { tvrIdent = y }) = compare x y
-    x < y = tvrIdent x < tvrIdent y
-    x > y = tvrIdent x > tvrIdent y
-    x >= y = tvrIdent x >= tvrIdent y
-    x <= y = tvrIdent x <= tvrIdent y
 
 
 isWHNF ELit {} = True
@@ -280,8 +154,6 @@ tvrName tvr = fail $ "TVr is not Name: " ++ show tvr
 
 tvrShowName :: TVr -> String
 tvrShowName t = maybe ('x':(show $ tvrIdent t)) show (tvrName t)
-
-
 
 
 

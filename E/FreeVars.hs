@@ -1,12 +1,12 @@
 {-# OPTIONS -fglasgow-exts #-}
 module E.FreeVars(decomposeLet, decomposeDefns, freeIds) where
 
-import Support.FreeVars
-import E.E
-import Data.Monoid
-import GenUtil
 import Data.Graph as G
+import Data.Monoid
+import E.E
+import GenUtil
 import Name.Id
+import Support.FreeVars
 import Util.SetLike as S
 
 -------------------------
@@ -95,5 +95,6 @@ freeIdMap =   fv where
     fv ESort {} = mempty
     fvLit LitCons { litArgs = es, litType = e } = mconcat $ fv e:map fv es
     fvLit l = fv (getLitTyp l)
+
 
 
