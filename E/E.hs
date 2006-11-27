@@ -1,5 +1,5 @@
 {-# OPTIONS -fglasgow-exts #-}
-module E.E(module E.Type, module E.E) where
+module E.E(module E.Type, module E.E, module E.FreeVars) where
 
 import Char(chr)
 import Data.FunctorM
@@ -8,6 +8,7 @@ import List
 import Maybe
 import Monad
 
+import E.FreeVars
 import Atom
 import C.Prims
 import Control.Monad.Identity
@@ -19,60 +20,6 @@ import Name.Names
 import Name.VConsts
 import Number
 import Util.SetLike as S
-
-
-
-
-
-litCons = LitCons { litName = error "litName: name not set", litArgs = [], litType = error "litCons: type not set", litAliasFor = Nothing }
-
-
-
--- | extract out EAp nodes a value and the arguments it is applied to.
-fromAp :: E -> (E,[E])
-fromAp e = f [] e where
-    f as (EAp e a) = f (a:as) e
-    f as e  =  (e,as)
-
--- | deconstruct EPi terms, getting function argument types.
-
-fromPi :: E -> (E,[TVr])
-fromPi e = f [] e where
-    f as (EPi v e) = f (v:as) e
-    f as e  =  (e,reverse as)
-
--- | deconstruct ELam term.
-
-fromLam :: E -> (E,[TVr])
-fromLam e = f [] e where
-    f as (ELam v e) = f (v:as) e
-    f as e  =  (e,reverse as)
-
-
-tVr x y = tvr { tvrIdent = x, tvrType = y }
-tvr = TVr { tvrIdent = 0, tvrType = Unknown, tvrInfo = mempty }
-
-
-
-altHead :: Alt E -> Lit () ()
-altHead (Alt l _) = litHead  l
-litHead :: Lit a b -> Lit () ()
-litHead (LitInt x _) = LitInt x ()
-litHead LitCons { litName = s, litAliasFor = af } = litCons { litName = s, litType = (), litAliasFor = af }
-
-litBinds (LitCons { litArgs = xs } ) = xs
-litBinds _ = []
-
-patToLitEE LitCons { litName = n, litArgs = [a,b], litType = t } | t == eStar, n == tc_Arrow = EPi (tVr 0 (EVar a)) (EVar b)
-patToLitEE LitCons { litName = n, litArgs = xs, litType = t, litAliasFor = af } = ELit $ LitCons { litName = n, litArgs = (map EVar xs), litType = t, litAliasFor = af }
-patToLitEE (LitInt x t) = ELit $ LitInt x t
-
-
-caseBodies :: E -> [E]
-caseBodies ec = [ b | Alt _ b <- eCaseAlts ec] ++ maybeToMonad (eCaseDefault ec)
-casePats ec =  [ p | Alt p _ <- eCaseAlts ec]
-caseBinds ec = eCaseBind ec : concat [ xs  | LitCons { litArgs = xs } <- casePats ec]
-
 
 
 
@@ -128,12 +75,6 @@ tvrSilly = tVr ((-1)) Unknown
 -----------------
 
 
-eStar :: E
-eStar = ESort EStar
-
-eHash :: E
-eHash = ESort EHash
-
 
 ePi a b = EPi a b
 
@@ -176,7 +117,7 @@ eToList (ELit LitCons { litName = n, litArgs = [] }) | vEmptyList == n = return 
 eToList _ = fail "eToList: not list"
 
 toString x = eToList x >>= mapM fromChar where
-    fromChar (ELit (LitCons { litName = dc, litArgs = [ELit (LitInt ch t)], litType = _ot })) | dc == dc_Char && t == tCharzh = return (chr $ fromIntegral ch)
+    fromChar (ELit LitCons { litName = dc, litArgs = [ELit (LitInt ch t)] }) | dc == dc_Char && t == tCharzh = return (chr $ fromIntegral ch)
     fromChar _ = fail "fromChar: not char"
 
 

@@ -1,13 +1,20 @@
 {-# OPTIONS -fglasgow-exts #-}
-module E.FreeVars(decomposeLet, decomposeDefns, freeIds) where
+module E.FreeVars(
+    decomposeLet,
+    decomposeDs,
+    bindingFreeVars,
+    freeIds
+    ) where
 
-import Data.Graph as G
 import Data.Monoid
-import E.E
+
+import E.Type
 import GenUtil
 import Name.Id
 import Support.FreeVars
 import Util.SetLike as S
+import Util.Graph
+import qualified Info.Info as Info
 
 -------------------------
 -- finding free variables
@@ -42,15 +49,13 @@ instance FreeVars E (IdMap (Maybe E)) where
 
 -- | separate out recursive strongly connected components from a declaration list
 
-decomposeDefns :: [(TVr, E)] -> [Either (TVr, E) [(TVr,E)]]
-decomposeDefns bs = map f mp where
-    mp = G.stronglyConnComp [ (v,i,freeVars t `mappend` freeVars e) | v@(TVr i t _ ,e) <- bs]
-    f (AcyclicSCC v) = Left v
-    f (CyclicSCC vs) = Right vs
+decomposeDs :: [(TVr, E)] -> [Either (TVr, E) [(TVr,E)]]
+decomposeDs bs = scc g where
+    g = newGraph bs (tvrIdent . fst ) (toList . uncurry bindingFreeVars)
 
 -- | pull apart an ELet and separate out recursive strongly connected components from an ELet.
 decomposeLet :: E ->  ([Either (TVr, E) [(TVr,E)]],E)
-decomposeLet ELetRec { eDefs = ds, eBody = e } = (decomposeDefns ds,e)
+decomposeLet ELetRec { eDefs = ds, eBody = e } = (decomposeDs ds,e)
 decomposeLet e = ([],e)
 
 -- we export this to get a concrete type for free id sets.
@@ -58,13 +63,12 @@ freeIds ::  E -> IdSet
 freeIds =   fv where
     (<>) = mappend
     fv (EAp e1 e2) = fv e1 <> fv e2
-    --fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = insert i (fv t)
-    fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = singleton i
+    fv (EVar tvr@TVr { tvrIdent = i }) = singleton i <> freeVarsInfo (tvrInfo tvr)
     fv (ELam TVr { tvrIdent = i, tvrType = t} e) = delete i $ fv e <> fv t
     fv (EPi  TVr { tvrIdent = i, tvrType = t} e) = delete i $ fv e <> fv t
     fv ELetRec { eDefs = dl, eBody = e } =  ((tl <> bl <> fv e) S.\\ fromList ll)  where
         (ll,tl,bl) = liftT3 (id,mconcat,mconcat) $ unzip3 $
-            map (\(tvr@(TVr { tvrIdent = j, tvrType =  t}),y) -> (j, fv t, fv y)) dl
+            map (\(tvr@(TVr { tvrIdent = j }),y) -> (j, freeVars tvr, fv y)) dl
     fv (EError _ e) = fv e
     fv (ELit l) = fvLit l
     fv (EPrim _ es e) = mconcat $ fv e : map fv es
@@ -80,8 +84,7 @@ freeIdMap ::  E -> IdMap TVr
 freeIdMap =   fv where
     (<>) = mappend
     fv (EAp e1 e2) = fv e1 <> fv e2
-    --fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = minsert i tvr (fv t)
-    fv (EVar tvr@TVr { tvrIdent = i, tvrType = t }) = msingleton i tvr
+    fv (EVar tvr@TVr { tvrIdent = i }) = msingleton i tvr
     fv (ELam TVr { tvrIdent = i, tvrType = t} e) = mdelete i $ fv e <> fv t
     fv (EPi  TVr { tvrIdent = i, tvrType = t} e) = mdelete i $ fv e <> fv t
     fv ELetRec { eDefs = dl, eBody = e } =  ((tl <> bl <> fv e) S.\\ fromList ll)  where
@@ -96,5 +99,23 @@ freeIdMap =   fv where
     fvLit LitCons { litArgs = es, litType = e } = mconcat $ fv e:map fv es
     fvLit l = fv (getLitTyp l)
 
+-- | determine free variables of a binding site
+instance FreeVars TVr IdSet where
+    freeVars t = freeVars (tvrType t) `mappend` freeVarsInfo (tvrInfo t)
+
+-- | this determines all free variables of a definition taking rules into account
+bindingFreeVars :: TVr -> E -> IdSet
+bindingFreeVars t e = freeVars t `mappend` freeVars e
+
+freeVarsInfo nfo = maybe mempty freeVars (Info.lookup (Info.getInfo nfo) :: Maybe ARules)
+--instance FreeVars TVr (IdMap TVr) where
+--    freeVars t = freeVars (tvrType t) `mappend` freeVars (Info.fetch (tvrInfo t) :: ARules)
 
 
+instance FreeVars ARules IdSet where
+    freeVars a = aruleFreeVars a
+
+instance FreeVars Rule IdSet where
+    freeVars rule = freeVars (ruleBody rule) S.\\ fromList (map tvrIdent $ ruleBinds rule)
+instance FreeVars Rule (IdMap TVr) where
+    freeVars rule = freeVars (ruleBody rule) S.\\ fromList [ (tvrIdent t,t) | t <- ruleBinds rule]

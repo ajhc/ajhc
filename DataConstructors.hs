@@ -37,6 +37,7 @@ import FrontEnd.Class(instanceName)
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
+import E.Binary()
 import E.E
 import E.Show
 import E.Subst

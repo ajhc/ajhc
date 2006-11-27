@@ -1,23 +1,24 @@
 module E.Type where
 
 import Data.FunctorM
+import Maybe
 import Control.Monad.Identity
 
 
 import Atom
-import Binary
 import C.Prims
 import Data.Typeable
 import Doc.DocLike
 import Name.Id
+import Util.Gen
 import Name.Name
+import Name.Names
 import Number
 import qualified Info.Info as Info
 import {-# SOURCE #-} Info.Binary(putInfo,getInfo)
 
 data RuleType = RuleSpecialization | RuleUser | RuleCatalyst
     deriving(Eq)
- {-! derive: GhcBinary !-}
 
 -- a rule in its user visible form
 
@@ -31,7 +32,6 @@ data Rule = Rule {
     ruleUniq :: (Module,Int),
     ruleName :: Atom
     }
- {-! derive: GhcBinary !-}
 
 data ARules = ARules {
     aruleFreeVars :: IdSet,
@@ -42,7 +42,7 @@ data ARules = ARules {
 data Lit e t = LitInt { litNumber :: Number, litType :: t }
     | LitCons  { litName :: Name, litArgs :: [e], litType :: t, litAliasFor :: Maybe E }
     deriving(Eq,Ord)
-        {-!derive: is, GhcBinary !-}
+        {-!derive: is !-}
 
 
 --------------------------------------
@@ -62,7 +62,7 @@ data ESort =
     | EStarStar   -- ^ the supersort of boxed types
     | ESortNamed Name -- ^ user defined sorts
     deriving(Eq, Ord)
-    {-! derive: is, GhcBinary !-}
+    {-! derive: is !-}
 
 
 data E = EAp E E
@@ -83,7 +83,7 @@ data E = EAp E E
        eCaseDefault :: (Maybe E)
        }
 	deriving(Eq, Ord, Show)
-    {-! derive: is, from, GhcBinary !-}
+    {-! derive: is, from !-}
 
 
 
@@ -120,7 +120,6 @@ data TVr' e = TVr { tvrIdent :: !Id, tvrType :: e, tvrInfo :: Info.Info }
 
 data Alt e = Alt (Lit TVr e) e
     deriving(Eq,Ord)
-       {-!derive: GhcBinary !-}
 
 instance FunctorM TVr' where
     fmapM f t = do e <- f (tvrType t); return t { tvrType = e }
@@ -142,30 +141,61 @@ instance Ord TVr where
     x >= y = tvrIdent x >= tvrIdent y
     x <= y = tvrIdent x <= tvrIdent y
 
--- Binary instance
-data TvrBinary = TvrBinaryNone | TvrBinaryAtom Atom | TvrBinaryInt Int
-    {-! derive: GhcBinary !-}
 
-instance Binary TVr where
-    put_ bh (TVr { tvrIdent = 0, tvrType =  e, tvrInfo = nf} ) = do
-        put_ bh (TvrBinaryNone)
-        put_ bh e
-        putInfo bh nf
-    put_ bh (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) | Just x <- intToAtom i = do
-        put_ bh (TvrBinaryAtom x)
-        put_ bh e
-        putInfo bh nf
-    put_ bh (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) = do
-        unless (even i) $ fail "number not even"
-        put_ bh (TvrBinaryInt i)
-        put_ bh e
-        putInfo bh nf
-    get bh = do
-        (x ) <- get bh
-        e <- get bh
-        nf <- getInfo bh
-        case x of
-            TvrBinaryNone -> return $ TVr 0 e nf
-            TvrBinaryAtom a -> return $ TVr (atomIndex a) e nf
-            TvrBinaryInt i -> return $ TVr (i) e nf
+-- simple querying routines
+altHead :: Alt E -> Lit () ()
+altHead (Alt l _) = litHead  l
+
+litHead :: Lit a b -> Lit () ()
+litHead (LitInt x _) = LitInt x ()
+litHead LitCons { litName = s, litAliasFor = af } = litCons { litName = s, litType = (), litAliasFor = af }
+
+litBinds (LitCons { litArgs = xs } ) = xs
+litBinds _ = []
+
+patToLitEE LitCons { litName = n, litArgs = [a,b], litType = t } | t == eStar, n == tc_Arrow = EPi (tVr 0 (EVar a)) (EVar b)
+patToLitEE LitCons { litName = n, litArgs = xs, litType = t, litAliasFor = af } = ELit $ LitCons { litName = n, litArgs = (map EVar xs), litType = t, litAliasFor = af }
+patToLitEE (LitInt x t) = ELit $ LitInt x t
+
+caseBodies :: E -> [E]
+caseBodies ec = [ b | Alt _ b <- eCaseAlts ec] ++ maybeToMonad (eCaseDefault ec)
+casePats ec =  [ p | Alt p _ <- eCaseAlts ec]
+caseBinds ec = eCaseBind ec : concat [ xs  | LitCons { litArgs = xs } <- casePats ec]
+
+
+-- | extract out EAp nodes a value and the arguments it is applied to.
+fromAp :: E -> (E,[E])
+fromAp e = f [] e where
+    f as (EAp e a) = f (a:as) e
+    f as e  =  (e,as)
+
+-- | deconstruct EPi terms, getting function argument types.
+
+fromPi :: E -> (E,[TVr])
+fromPi e = f [] e where
+    f as (EPi v e) = f (v:as) e
+    f as e  =  (e,reverse as)
+
+-- | deconstruct ELam term.
+
+fromLam :: E -> (E,[TVr])
+fromLam e = f [] e where
+    f as (ELam v e) = f (v:as) e
+    f as e  =  (e,reverse as)
+
+
+litCons = LitCons { litName = error "litName: name not set", litArgs = [], litType = error "litCons: type not set", litAliasFor = Nothing }
+
+-----------------
+-- E constructors
+-----------------
+
+eStar :: E
+eStar = ESort EStar
+
+eHash :: E
+eHash = ESort EHash
+
+tVr x y = tvr { tvrIdent = x, tvrType = y }
+tvr = TVr { tvrIdent = 0, tvrType = Unknown, tvrInfo = Info.empty }
 

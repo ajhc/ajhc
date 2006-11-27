@@ -5,7 +5,6 @@ module E.Rules(
     Rules,
     applyRules,
     arules,
-    bindingFreeVars,
     builtinRule,
     dropArguments,
     fromRules,
@@ -35,6 +34,7 @@ import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.E
+import E.Binary()
 import E.Eval
 import E.Show
 import E.Subst
@@ -106,13 +106,6 @@ ruleHeadFreeVars (Rules rs) = unions $ map f (concat $ melems rs) where
     f r = (S.insert (tvrIdent $ ruleHead r) $ freeVars (ruleArgs r)) S.\\ fromList (map tvrIdent $ ruleBinds r)
 
 
-instance FreeVars ARules IdSet where
-    freeVars a = aruleFreeVars a
-
-instance FreeVars Rule IdSet where
-    freeVars rule = freeVars (ruleBody rule) S.\\ fromList (map tvrIdent $ ruleBinds rule)
-instance FreeVars Rule (IdMap TVr) where
-    freeVars rule = freeVars (ruleBody rule) S.\\ fromList [ (tvrIdent t,t) | t <- ruleBinds rule]
 
 instance FreeVars Rule [Id] where
     freeVars rule = idSetToList $ freeVars rule
@@ -265,9 +258,6 @@ makeRule name uniq ruleType fvs head args body = rule where
         ruleName = toAtom $ "Rule.User." ++ name
         }
 
--- | this determines all free variables of a definition taking rules into account
-bindingFreeVars :: TVr -> E -> IdSet
-bindingFreeVars t e = freeVars (tvrType t) `mappend` freeVars e `mappend` freeVars (Info.fetch (tvrInfo t) :: ARules)
 
 -- | find substitution that will transform the left term into the right one,
 -- only substituting for the vars in the list

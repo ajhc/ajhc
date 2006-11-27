@@ -34,7 +34,7 @@ eval term = eval' term []  where
     eval' (EPi v body) (t:rest) = eval' (subst v t body) rest   -- fudge
     eval' (EAp t1 t2) stack = eval' t1 (t2:stack)
     eval' t@EVar {} stack = unwind t stack
-    eval' ELetRec { eDefs = ds, eBody = e } stack = eval' (f (decomposeDefns ds) e) stack where
+    eval' ELetRec { eDefs = ds, eBody = e } stack = eval' (f (decomposeDs ds) e) stack where
         f [] e = e
         f (Left (x,y):ds) e =  subst x y (f ds e)
         f (Right _:_) _ = error $ "cannot eval recursive let"

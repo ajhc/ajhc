@@ -582,7 +582,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
     cc e = return $ error ("cc: " ++ show e)
 
 
-    doLet ds e = f (decomposeDefns ds) e where
+    doLet ds e = f (decomposeDs ds) e where
         f [] x = x
         f (Left te@(_,ELam {}):ds) x = f (Right [te]:ds) x
         f (Left (t,e):ds) x | not (isLifted (EVar t)) = do

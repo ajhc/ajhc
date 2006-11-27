@@ -6,8 +6,7 @@ module E.Inline(
     programMapProgGroups,
     programMapProgComponents,
     forceNoinline,
-    baseInlinability,
-    decomposeDs
+    baseInlinability
     ) where
 
 import Control.Monad.Writer
@@ -128,12 +127,6 @@ programMapRecGroups imap idann letann lamann f prog = do
     ds <- g [] imap $ programDecomposedDs prog
     return $ programSetDs ds prog
 
-decomposeDs :: [(TVr, E)] -> [Either (TVr, E) [(TVr,E)]]
-decomposeDs bs = scc g where
-    g = newGraph bs (tvrIdent . fst ) (toList . uncurry bindingFreeVars)
-    --mp = G.stronglyConnComp [ (v,i, idSetToList $ bindingFreeVars t e) | v@(t@TVr { tvrIdent = i },e) <- bs]
-    --f (G.AcyclicSCC v) = Left v
-    --f (G.CyclicSCC vs) = Right vs
 
 
 

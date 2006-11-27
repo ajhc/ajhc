@@ -80,7 +80,7 @@ cprAnalyzeDs dataTable ds = fst $ cprAnalyzeBinds dataTable mempty ds
 
 
 cprAnalyzeBinds :: DataTable -> Env -> [(TVr,E)] -> ([(TVr,E)],Env)
-cprAnalyzeBinds dataTable env bs = f env  (decomposeDefns bs) [] where
+cprAnalyzeBinds dataTable env bs = f env  (decomposeDs bs) [] where
     f env (Left (t,e):rs) zs = case cprAnalyze dataTable env e of
         (e',v) -> f (envInsert t v env) rs ((tvrInfo_u (Info.insert v) t,e'):zs)
     f env (Right xs:rs) zs = g (length xs + 2) ([ (t,(e,Bot)) | (t,e) <- xs]) where

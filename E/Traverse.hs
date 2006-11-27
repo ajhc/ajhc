@@ -15,7 +15,7 @@ import Control.Monad.Writer
 import Data.FunctorM
 import Data.Monoid
 
-import E.E
+import E.Type
 import Name.Id
 import Name.Name
 import Support.FreeVars
