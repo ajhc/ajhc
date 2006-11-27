@@ -46,24 +46,25 @@ staticArgumentTransform prog = ans where
     ans = programSetDs (concat ds') prog { progStats = progStats prog `mappend` nstat }
     (ds',nstat) = runStatM $ mapM f (programDecomposedDs prog)
     f (Left t) = return [t]
-    f (Right [(t,v@ELam {})]) | tvrIdent t `member` (freeVars v :: IdSet) = do
-        let nname = annotateId "R@" (tvrIdent t)
-            dropArgs = minimum [ countCommon args aps | aps <- collectApps ] where
-                args = map EVar $ snd $ fromLam v
-                countCommon (x:xs) (y:ys) | x == y = 1 + countCommon xs ys
-                countCommon _ _ = 0
-            collectApps = execWriter (ca v) where
-                ca e | (EVar v,as) <- fromAp e, tvrIdent v == tvrIdent t = tell [as] >> mapM_ ca as >> return e
-                ca e = emapE ca e
-            (body,args) = fromLam v
-            (droppedAs,keptAs) = splitAt dropArgs args
-            rbody = foldr ELam (subst t newV body)  keptAs
-            newV = foldr ELam (EVar tvr') [ t { tvrIdent = 0 } | t <- droppedAs ]
-            tvr' = tvr { tvrIdent = nname, tvrType = getType rbody }
-            ne' = foldr ELam (ELetRec [(tvr',rbody)]  (foldl EAp (EVar tvr') (map EVar keptAs))) args
-            --ne' = foldr ELam (ELetRec [(tvr',subst t (EVar tvr') v)]  (foldl EAp (EVar tvr') (map EVar as))) args
-        mtick $ "SimpleRecursive.{" ++ pprint t
-        return [(t,ne')]
+    f (Right [(t,v@ELam {})]) | not (null collectApps) = ans where
+        nname = annotateId "R@" (tvrIdent t)
+        dropArgs = minimum [ countCommon args aps | aps <- collectApps ] where
+            args = map EVar $ snd $ fromLam v
+            countCommon (x:xs) (y:ys) | x == y = 1 + countCommon xs ys
+            countCommon _ _ = 0
+        collectApps = execWriter (ca v) where
+            ca e | (EVar v,as) <- fromAp e, tvrIdent v == tvrIdent t = tell [as] >> mapM_ ca as >> return e
+            ca e = emapE ca e
+        (body,args) = fromLam v
+        (droppedAs,keptAs) = splitAt dropArgs args
+        rbody = foldr ELam (subst t newV body)  keptAs
+        newV = foldr ELam (EVar tvr') [ t { tvrIdent = 0 } | t <- droppedAs ]
+        tvr' = tvr { tvrIdent = nname, tvrType = getType rbody }
+        ne' = foldr ELam (ELetRec [(tvr',rbody)]  (foldl EAp (EVar tvr') (map EVar keptAs))) args
+        --ne' = foldr ELam (ELetRec [(tvr',subst t (EVar tvr') v)]  (foldl EAp (EVar tvr') (map EVar as))) args
+        ans = do
+            mtick $ "SimpleRecursive.{" ++ pprint t
+            return [(t,ne')]
     f (Right ts) = return ts
 
 
