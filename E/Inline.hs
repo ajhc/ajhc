@@ -161,9 +161,8 @@ programMapProgGroups imap f prog = do
         g prog' rs _ [] = return $ (concat rs,prog')
         bm xs imap = fromList [ (tvrIdent t,Just $ EVar t) | (t,_) <- xs ] `union` imap
         nann _ = return
-        prog' = prog { progStats = mempty }
         unames ds prog = prog { progExternalNames = progExternalNames prog `mappend` fromList [ tvrIdent t | (t,_) <- ds ] }
-    (ds,prog'') <- g prog' [] imap $ programDecomposedDs prog
+    (ds,prog'') <- g prog { progStats = mempty } [] imap $ programDecomposedDs prog
     return $ programSetDs ds prog { progStats = progStats prog `mappend` progStats prog'' }
 
 

@@ -21,6 +21,7 @@ import Info.Types
 import Name.Binary
 import Name.Id
 import Name.Name(Name)
+import Util.SetLike
 import PackedString(PackedString)
 import TypeSynonyms(TypeSynonyms)
 
@@ -72,7 +73,26 @@ data Ho = Ho {
     hoRules :: Rules,
     hoUsedIds :: IdSet
     }
-    {-! derive: Monoid !-}
+
+instance Monoid Ho where
+    mempty = Ho mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
+    mappend a b = Ho {
+        hoModules = hoModules a `mappend` hoModules b,
+        hoLibraries = hoLibraries a `mappend` hoLibraries b,
+        hoExports = hoExports a `mappend` hoExports b,
+        hoDefs = hoDefs a `mappend` hoDefs b,
+        hoAssumps = hoAssumps a `mappend` hoAssumps b,
+        hoFixities = hoFixities a `mappend` hoFixities b,
+        hoKinds = hoKinds a `mappend` hoKinds b,
+        hoClassHierarchy = hoClassHierarchy a `mappend` hoClassHierarchy b,
+        hoTypeSynonyms = hoTypeSynonyms a `mappend` hoTypeSynonyms b,
+        hoProps = munionWith mappend (hoProps a) (hoProps b),
+        hoDataTable = hoDataTable a `mappend` hoDataTable b,
+        hoEs = hoEs a `mappend` hoEs b,
+        hoRules = hoRules a `mappend` hoRules b,
+        hoUsedIds = hoUsedIds a `mappend` hoUsedIds b
+    }
+
 
 
 -- | Contains hopefully enough meta-info to uniquely identify a file

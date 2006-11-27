@@ -107,7 +107,7 @@ instance FreeVars TVr IdSet where
 bindingFreeVars :: TVr -> E -> IdSet
 bindingFreeVars t e = freeVars t `mappend` freeVars e
 
-freeVarsInfo nfo = maybe mempty freeVars (Info.lookup (Info.getInfo nfo) :: Maybe ARules)
+freeVarsInfo nfo = maybe mempty freeVars (Info.lookup nfo :: Maybe ARules)
 --instance FreeVars TVr (IdMap TVr) where
 --    freeVars t = freeVars (tvrType t) `mappend` freeVars (Info.fetch (tvrInfo t) :: ARules)
 
@@ -119,3 +119,4 @@ instance FreeVars Rule IdSet where
     freeVars rule = freeVars (ruleBody rule) S.\\ fromList (map tvrIdent $ ruleBinds rule)
 instance FreeVars Rule (IdMap TVr) where
     freeVars rule = freeVars (ruleBody rule) S.\\ fromList [ (tvrIdent t,t) | t <- ruleBinds rule]
+

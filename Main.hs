@@ -207,7 +207,7 @@ processInitialHo accumho ho = do
         rules' = runIdentity $ mapBodies (annotate imapRules (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
         prog = etaAnnotateProgram (denewtype $ programSetDs ds program { progDataTable = hoDataTable accumho `mappend` hoDataTable ho })
         imap = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho)]
-        imapRules = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho `mappend` hoEs ho)]
+        imapRules = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho' `mappend` hoEs ho)]
         accumho' = reprocessHo rules' (hoProps ho) accumho
 
     --lintCheckProgram (putStrLn "processInitialHo") prog
@@ -262,9 +262,6 @@ processDecls stats ho ho' tiData = do
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
     ds' <- convertDecls tiData (hoClassHierarchy ho') allAssumps  fullDataTable decls
     let ds = [ (v,e) | (v,e) <- classInstances ] ++  [ (v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
-    ds <- annotateDs mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo) (\_ nfo -> return nfo) ds
-    wdump FD.CoreInitial $
-        mapM_ (\(v,lc) -> printCheckName'' fullDataTable v lc) ds
  --   sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 
     -- Build rules from instances, specializations, and user specified rules and catalysts
@@ -273,6 +270,9 @@ processDecls stats ho ho' tiData = do
     (nds,srules) <- procAllSpecs (tiCheckedRules tiData) ds
 
     ds <- return $ ds ++ nds
+    ds <- annotateDs mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo) (\_ nfo -> return nfo) ds
+    wdump FD.CoreInitial $
+        mapM_ (\(v,lc) -> printCheckName'' fullDataTable v lc) ds
 
     let rules = rules' `mappend` nrules `mappend` srules
 
@@ -280,7 +280,7 @@ processDecls stats ho ho' tiData = do
     wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
     wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
 
-    let allRules = hoRules allHo `mappend` rules
+    let allRules = hoRules ho `mappend` rules
 
     -- some more useful values.
     let  namesInscope = fromList $ [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (n,_) <- ds ]
@@ -289,18 +289,24 @@ processDecls stats ho ho' tiData = do
     let Identity prog = programMapDs (\ (t,e) -> return (shouldBeExported (getExports ho') t,e)) $ atomizeApps False prog'
     prog <- barendregtProg prog
     let allProps = munionWith mappend (hoProps ho')  (idSetToIdMap (const (singleton prop_HASRULE)) (ruleHeadFreeVars allRules))
-    prog <- return $ runIdentity $ annotateProgram mempty (idann allRules allProps) letann lamann prog
+
+    ho <- return $ reprocessHo rules allProps ho
+
+    let brum = fromList [ (tvrIdent n,Just (EVar n)) | (n,_) <- Map.elems $ hoEs ho ] where
+    -- Here we substitute in all the original types, with rules and properties defined in the current module included
+    prog <- return $ runIdentity $ annotateProgram brum (idann allRules allProps) letann lamann prog
+
     lintCheckProgram (putErrLn "LintPostProcess") prog
 
 
-    let entryPoints = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || member (tvrIdent t) rfreevars) (tell [t])) prog
-        rfreevars = ruleAllFreeVars rules
+    --let entryPoints = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || member (tvrIdent t) rfreevars) (tell [t])) prog
+    --    rfreevars = ruleAllFreeVars rules
+    let entryPoints = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || getProperty prop_INSTANCE t)  (tell [t])) prog
     prog <- return $ prog { progEntryPoints = entryPoints }
 
     lintCheckProgram (putErrLn "InitialLint") prog
 
     prog <- programPrune prog
-    ho <- return $ reprocessHo rules allProps ho
 
     let initMap = fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
 
