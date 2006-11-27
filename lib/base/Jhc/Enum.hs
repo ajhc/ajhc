@@ -69,7 +69,7 @@ instance Enum Char where
     enumFromTo x y = f x where
         f x | x > y = []
             | otherwise = x:f (incrementChar x)
-    enumFromThenTo x y z  = f x where
+    enumFromThenTo x y z | y `seq` True = f x where
         inc = y `minusChar` x
         f x | x >= z = x:f (x `plusChar` inc)
             | otherwise = []
