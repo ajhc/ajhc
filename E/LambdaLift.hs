@@ -44,9 +44,9 @@ annotateId mn x = case fromId x of
 staticArgumentTransform :: Program -> Program
 staticArgumentTransform prog = ans where
     ans = programSetDs (concat ds') prog { progStats = progStats prog `mappend` nstat }
-    (ds',nstat) = runStatM $ mapM f (programDecomposedDs prog)
-    f (Left t) = return [t]
-    f (Right [(t,v@ELam {})]) | not (null collectApps) = ans where
+    (ds',nstat) = runStatM $ mapM (f True) (programDecomposedDs prog)
+    f _ (Left (t,e)) = gds [(t,e)]
+    f always (Right [(t,v@ELam {})]) | not (null collectApps), always || dropArgs > 0 = ans where
         nname = annotateId "R@" (tvrIdent t)
         dropArgs = minimum [ countCommon args aps | aps <- collectApps ] where
             args = map EVar $ snd $ fromLam v
@@ -65,7 +65,13 @@ staticArgumentTransform prog = ans where
         ans = do
             mtick $ "SimpleRecursive.{" ++ pprint t
             return [(t,ne')]
-    f (Right ts) = return ts
+    f _ (Right ts) = gds ts
+    gds ts = mapM g' ts >>= return where
+        g' (t,e) = g e >>= return . (,) t
+    g elet@ELetRec { eDefs = ds }  = do
+        ds' <- mapM (f False) (decomposeDs ds)
+        emapE g elet { eDefs = concat ds' }
+    g e = emapE g e
 
 
 data S = S {
