@@ -4,6 +4,7 @@ module Main(main) where
 import Control.Exception
 import Control.Monad.Identity
 import Control.Monad.Writer
+import Control.Monad.State
 import Data.Monoid
 import IO(hFlush,stderr,stdout,openFile,hClose,IOMode(..))
 import List hiding(group,union,delete)
@@ -283,7 +284,7 @@ processDecls stats ho ho' tiData = do
     let allRules = hoRules ho `mappend` rules
 
     -- some more useful values.
-    let  namesInscope = fromList $ [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (n,_) <- ds ]
+    --let  namesInscope = fromList $ [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (n,_) <- ds ]
 
     let prog' = programSetDs ds prog
     let Identity prog = programMapDs (\ (t,e) -> return (shouldBeExported (getExports ho') t,e)) $ atomizeApps False prog'
@@ -337,7 +338,6 @@ processDecls stats ho ho' tiData = do
     let fint mprog = do
         let names = pprint [ n | (n,_) <- programDs mprog]
         when coreMini $ putErrLn ("----\n" ++ names)
-        mstats <- Stats.new
         let tparms = transformParms { transformPass = "Init", transformDumpProgress = coreMini }
 
         mprog <- return $ etaAnnotateProgram mprog
@@ -348,7 +348,6 @@ processDecls stats ho ho' tiData = do
         -- | this catches more static arguments if we wait until after the initial normalizing simplification pass
         mprog <- transformProgram tparms { transformCategory = "SimpleRecursive", transformOperation = return . staticArgumentTransform } mprog
 
-        mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } mprog
 
         mprog <- transformProgram tparms { transformCategory = "FloatOutward", transformOperation = floatOutward } mprog
         -- perform another supersimplify in order to substitute the once used
@@ -357,6 +356,8 @@ processDecls stats ho ho' tiData = do
 
         mprog <- simplifyProgram sopt "Init-Two-FloatOutCleanup" (dump FD.CoreMini) mprog
         mprog <- barendregtProg mprog
+        mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } mprog
+
         mprog <- transformProgram tparms { transformCategory = "FloatInward", transformOperation = programFloatInward } mprog
         mprog <- Demand.analyzeProgram mprog
         lintCheckProgram onerrNone mprog
@@ -377,7 +378,7 @@ processDecls stats ho ho' tiData = do
         Stats.printLStat (optStatLevel options) "Initial Pass Stats" (progStats prog)
     lintCheckProgram onerrNone prog
 
-    prog <- barendregtProg prog
+    prog <- barendregtProg prog { progStats = mempty }
     prog <- etaExpandProg "Init-Big-One" prog
     prog <- transformProgram tparms {
         transformPass = "Init-Big-One",
@@ -388,8 +389,53 @@ processDecls stats ho ho' tiData = do
     prog <- Demand.analyzeProgram prog
     prog <- simplifyProgram' sopt "Init-Big-One" True (IterateMax 4) prog
 
-    prog <- barendregtProg prog
+    wdump FD.Progress $
+        Stats.printLStat (optStatLevel options) "Init-Big-One Stats" (progStats prog)
 
+    -- This is the main function that optimizes the routines before writing them out
+    let optWW mprog = do
+        let names = pprint [ n | (n,_) <- programDs mprog]
+        liftIO $ when coreMini $ putErrLn ("----\n" ++ names)
+        smap <- get
+        let tparms = transformParms { transformPass = "OptWW", transformDumpProgress = coreMini }
+            sopt = mempty {  SS.so_boundVars = smap, SS.so_dataTable = progDataTable mprog }
+
+        mprog <- simplifyProgram sopt "Simplify-One" coreMini mprog
+        mprog <- barendregtProg mprog
+        mprog <- transformProgram tparms { transformCategory = "FloatInward", transformOperation = programFloatInward } mprog
+        mprog <- Demand.analyzeProgram mprog
+        mprog <- simplifyProgram sopt "Simplify-Two" coreMini mprog
+        mprog <- transformProgram tparms { transformCategory = "FloatInward", transformOperation = programFloatInward } mprog
+        mprog <- Demand.analyzeProgram mprog
+        mprog <- return $ E.CPR.cprAnalyzeProgram mprog
+        mprog' <- transformProgram tparms { transformCategory = "WorkWrap", transformOperation = return . workWrapProgram } mprog
+        let wws = length (programDs mprog') - length (programDs mprog)
+        liftIO $ wdump FD.Progress $ putErr (replicate wws 'w')
+        mprog <- return mprog'
+
+        --smap <- return $ fromList [ (tvrIdent v,(v,lc)) | (v,lc) <- programDs mprog] `union` smap
+        --sopt <- return $ sopt { SS.so_boundVars = smap }
+
+        mprog <- simplifyProgram sopt "Simplify-Three" coreMini mprog
+
+
+        -- annotate our bindings for further passes
+        mprog <- return $ etaAnnotateProgram mprog
+        mprog <- Demand.analyzeProgram mprog
+        mprog <- return $ E.CPR.cprAnalyzeProgram mprog
+
+        put $ fromList [ (tvrIdent v,(v,lc)) | (v,lc) <- programDs mprog] `union` smap
+
+        liftIO $ wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
+        return mprog
+
+    prog <- barendregtProg prog { progStats = mempty }
+    prog <- evalStateT (programMapProgGroups mempty optWW prog) (SS.so_boundVars sopt)
+    progress "!"
+    hFlush stdout >> hFlush stderr
+    wdump FD.Progress $
+        Stats.printLStat (optStatLevel options) "MainPass Stats" (progStats prog)
+    {-
 
     -- This is the main function that optimizes the routines before writing them out
     let f (retds,(smap,annmap,idHist')) (rec,ns) = do
@@ -481,16 +527,17 @@ processDecls stats ho ho' tiData = do
     (ds,_) <- foldM f ([],(fromList [ (tvrIdent v,(v,e)) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
     progress "!"
     prog <- return $ programSetDs ds prog
+    -}
 
     lintCheckProgram (putErrLn "After the workwrap/CPR") prog
 
     prog <- programPrune prog
-    Stats.print "Optimization" stats
 
     --prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze True prog else return prog
     --prog <- transformProgram "typeAnalyze" DontIterate True (typeAnalyze True) prog
 
 
+{-
     prog <- if True then do
         prog <- barendregtProg prog
         prog <- return $ etaAnnotateProgram prog
@@ -503,11 +550,11 @@ processDecls stats ho ho' tiData = do
         return $ programSetDs ds prog
       else return prog
     prog <- programPrune prog
+    -}
 
     lintCheckProgram (putErrLn "After the Opimization") prog
     wdump FD.Core $ printProgram prog
 
-    Stats.print "Optimization" stats
     let newHo = ho' {
         hoDataTable = dataTable,
         hoEs = programEsMap prog,
@@ -888,7 +935,7 @@ dereferenceItem x = x
 
 buildShowTableLL xs = buildTableLL [ (show x,show y) | (x,y) <- xs ]
 
-simplifyProgram sopt name dodump prog = do
+simplifyProgram sopt name dodump prog = liftIO $ do
     let istat = progStats prog
     let g prog = do
             let nprog = SS.programPruneOccurance prog
@@ -947,11 +994,11 @@ transformParms = TransformParms {
     transformName = ""
     }
 
-transformProgram :: TransformParms -> Program -> IO Program
+transformProgram :: MonadIO m => TransformParms -> Program -> m Program
 
 transformProgram TransformParms { transformIterate = IterateMax n } prog | n <= 0 = return prog
 transformProgram TransformParms { transformIterate = IterateExactly n } prog | n <= 0 = return prog
-transformProgram tp prog = do
+transformProgram tp prog = liftIO $ do
     let dodump = transformDumpProgress tp
         name = transformCategory tp ++ pname (transformPass tp) ++ pname (transformName tp)
         scname = transformCategory tp ++ pname (transformPass tp)
