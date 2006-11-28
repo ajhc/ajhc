@@ -122,8 +122,16 @@ freeVarsInfo nfo = maybe mempty freeVars (Info.lookup nfo :: Maybe ARules)
 instance FreeVars ARules IdSet where
     freeVars a = aruleFreeVars a
 
+-- | we delete the free variables of the heads of a rule from the rule's free
+-- variables. the reason for doing this is that the rule cannot fire if all its
+-- heads are in scope, and if it were not done then many functions seem
+-- recursive when they arn't actually.
+
 instance FreeVars Rule IdSet where
-    freeVars rule = freeVars (ruleBody rule) S.\\ fromList (map tvrIdent $ ruleBinds rule)
-instance FreeVars Rule (IdMap TVr) where
-    freeVars rule = freeVars (ruleBody rule) S.\\ fromList [ (tvrIdent t,t) | t <- ruleBinds rule]
+    freeVars rule = freeVars (ruleBody rule) S.\\ (fromList (map tvrIdent $ ruleBinds rule) `mappend` ruleHeadFV rule)
+--instance FreeVars Rule (IdMap TVr) where
+--    freeVars rule = freeVars (ruleBody rule) S.\\ fromList [ (tvrIdent t,t) | t <- ruleBinds rule]
+
+
+ruleHeadFV r = (S.insert (tvrIdent $ ruleHead r) $ freeVars (ruleArgs r)) S.\\ fromList (map tvrIdent $ ruleBinds r)
 
