@@ -138,7 +138,7 @@ floatInward e = floatInwardE e [] where
 
 floatInwardE e fvs = f e fvs where
     f ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault =  d } xs = ans where
-        ans = letRec p' $ ec { eCaseScrutinee = (f e pe), eCaseAlts = [ Alt l (f e pn) | Alt l e <- as | pn <- ps ], eCaseDefault = (fmap (flip f pd) d)}
+        ans = letRec p' $ caseUpdate ec { eCaseScrutinee = (f e pe), eCaseAlts = [ Alt l (f e pn) | Alt l e <- as | pn <- ps ], eCaseDefault = (fmap (flip f pd) d)}
         (p',_:pe:pd:ps) = sepByDropPoint (mconcat [freeVars l | Alt l _ <- as ]:freeVars e: tvrIdent b `delete` freeVars d :[freeVars a | a <- as ]) xs
     f ELetRec { eDefs = ds, eBody = e } xs = g (G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- ds ] (tvrIdent . fst . fst) (idSetToList . snd) ) xs where
         g [] p' = f e p'
@@ -329,7 +329,7 @@ letBindAll  dataTable modName e = f e  where
                 _ -> id
         ec' <- caseBodiesMapM (fmap mv . g) ec
         scrut' <- g (eCaseScrutinee ec)
-        return ec' { eCaseScrutinee = scrut' }
+        return $ caseUpdate ec' { eCaseScrutinee = scrut' }
     f e@ELam {} = do
         let (b,ts) = fromLam e
         b' <- g b

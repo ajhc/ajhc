@@ -197,7 +197,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                     e' <- local (declEnv_u ((v,followAliases dataTable $ patToLitEE l):)) $ f e
                     return $ Alt l e'
             as' <- mapM z as
-            return ec { eCaseAlts = as', eCaseDefault = d'}
+            return $ caseUpdate ec { eCaseAlts = as', eCaseDefault = d'}
         g (ELam t e) = do
             e' <- local (isStrict_s True) (g e)
             return (ELam t e')

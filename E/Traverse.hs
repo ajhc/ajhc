@@ -16,6 +16,7 @@ import Data.FunctorM
 import Data.Monoid
 
 import E.Type
+import E.FreeVars(caseUpdate)
 import Name.Id
 import Name.Name
 import Support.FreeVars
@@ -62,7 +63,7 @@ emapEGH f g h e = z e where
         as' <- mapM mapmAlt (eCaseAlts ec)
         d' <- fmapM f (eCaseDefault ec)
         t' <- g (eCaseType ec)
-        return ECase { eCaseScrutinee =e', eCaseBind = b', eCaseAlts = as', eCaseDefault = d', eCaseType = t'}
+        return $ caseUpdate ECase { eCaseScrutinee =e', eCaseBind = b', eCaseAlts = as', eCaseDefault = d', eCaseType = t'}
     --    aa ab) = do aa <- f aa;ab <- mapM (\(x,y) -> do x <- fmapM f x; y <- f y; return (x,y)) ab; return $ ECase aa ab
     z (EPrim aa ab ac) = do ab <- mapM f ab;ac <- g ac; return $ EPrim aa ab ac
     z (EError aa ab) = do ab <- g ab; return $ EError aa ab
@@ -125,7 +126,7 @@ renameE initSet initMap e = runReader (runIdNameT' $ addBoundNamesIdMap initMap 
         localSubst ob $ do
             as' <- mapM da as
             d' <- fmapM f d
-            return $ ec { eCaseScrutinee = e', eCaseType = t', eCaseBind = b', eCaseAlts = as', eCaseDefault = d' }
+            return $ caseUpdate ec { eCaseScrutinee = e', eCaseType = t', eCaseBind = b', eCaseAlts = as', eCaseDefault = d' }
     f ELetRec { eDefs = ds, eBody = e } = do
         addNames (map (tvrIdent . fst) ds)
         ds' <- mapM ( ntvr f' . fst) ds

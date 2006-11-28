@@ -1,6 +1,7 @@
 module E.Binary() where
 
 import E.Type
+import E.FreeVars(caseUpdate)
 import {-# SOURCE #-} Info.Binary(putInfo,getInfo)
 import Binary
 import Atom
@@ -175,7 +176,7 @@ instance Binary E where
 	    putByte bh 9
 	    put_ bh ao
 	    put_ bh ap
-    put_ bh (ECase aq ar as at au) = do
+    put_ bh (ECase aq ar as at au fv) = do
 	    putByte bh 10
 	    put_ bh aq
 	    put_ bh ar
@@ -227,7 +228,7 @@ instance Binary E where
 		    as <- get bh
 		    at <- get bh
 		    au <- get bh
-		    return (ECase aq ar as at au)
+		    return (caseUpdate $ ECase aq ar as at au undefined)
 	      _ -> fail "invalid binary data found"
 
 

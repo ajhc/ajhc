@@ -323,7 +323,7 @@ analyze ec@ECase { eCaseBind = b, eCaseAlts = [Alt lc@LitCons { litName = h, lit
             (alt',enva :=> siga) <- extEnvE b (eCaseScrutinee ec) $ analyze alt s
             (e',enve :=> []) <- analyze (eCaseScrutinee ec) (sp [ lenv t enva | t <- ts])
             let nenv = enve `glb` foldr denvDelete enva (b:ts)
-            return (ec { eCaseScrutinee = e', eCaseAlts = [Alt lc alt'] }, nenv :=> siga)
+            return (caseUpdate $ ec { eCaseScrutinee = e', eCaseAlts = [Alt lc alt'] }, nenv :=> siga)
         _ -> analyzeCase ec s
 analyze ec@ECase {} s = analyzeCase ec s
 analyze ELetRec { eDefs = ds, eBody = b } s = f (decomposeDs ds) [] where
@@ -356,7 +356,7 @@ analyzeCase ec@ECase {} s = do
     (ecs,env :=> _) <- analyze (eCaseScrutinee ec') strict
     let enva :=> siga =  foldr1 lub dts
     let nenv = foldr denvDelete (glb enva env) (caseBinds ec')
-    return (ec' {eCaseScrutinee = ecs},nenv :=> siga)
+    return (caseUpdate $ ec' {eCaseScrutinee = ecs},nenv :=> siga)
 
 denvDelete x (DemandEnv m r) = DemandEnv (Map.delete x m) r
 

@@ -108,7 +108,7 @@ caseBodiesMapM f ec@ECase { eCaseAlts = as, eCaseDefault = d } = do
     let g (Alt l e) = f e >>= return . Alt l
     as' <- mapM g as
     d' <- fmapM f d
-    return $ ec { eCaseAlts = as', eCaseDefault = d' }
+    return $ caseUpdate ec { eCaseAlts = as', eCaseDefault = d' }
 caseBodiesMapM _ _ = error "caseBodiesMapM"
 
 eToList :: Monad m => E -> m  [E]

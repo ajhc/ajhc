@@ -86,7 +86,7 @@ app' ec@ECase {} xs = do
     let f e = app' e xs
     ec' <- caseBodiesMapM f ec
     let t = foldl eAp (eCaseType ec') xs
-    return ec' { eCaseType = t }
+    return $ caseUpdate ec' { eCaseType = t }
 app' (ELetRec ds e) xs = do
     mtick (toAtom "E.Simplify.let-application")
     e' <- app' e xs

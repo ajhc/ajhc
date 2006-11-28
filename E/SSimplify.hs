@@ -166,7 +166,7 @@ collectOccurance e = f e  where
         ct <- arg $ f (eCaseType ec)
         b <- arg (ftvr b)
         tell $ (mdelete (tvrIdent b) fidm,singleton (tvrIdent b))
-        return ec { eCaseScrutinee = scrut', eCaseAlts = as', eCaseBind = annbind' fidm b, eCaseType = ct, eCaseDefault = d'}
+        return $ caseUpdate ec { eCaseScrutinee = scrut', eCaseAlts = as', eCaseBind = annbind' fidm b, eCaseType = ct, eCaseDefault = d'}
     f ELetRec { eDefs = ds, eBody = e } = do
         (e',fve) <- grump (f e)
         ds''' <- collectDs ds fve
@@ -520,10 +520,10 @@ simplifyDs prog sopts dsIn = ans where
                 return $ eStrictLet t e e'
             [(t,ec@ECase { eCaseScrutinee = sc@(EPrim (APrim p _) _ _), eCaseAlts = [], eCaseDefault = Just def })] | primEagerSafe p && not (getProperty prop_CYCLIC t) -> do
                 mtick "E.Simplify.strictness.cheap-eagerness.def"
-                return $ ec { eCaseDefault = Just $ ELetRec [(t,def)] e', eCaseType = getType e' }
+                return $ caseUpdate ec { eCaseDefault = Just $ ELetRec [(t,def)] e', eCaseType = getType e' }
             [(t,ec@ECase { eCaseScrutinee = sc@(EPrim (APrim p _) _ _), eCaseAlts = [Alt c def], eCaseDefault = Nothing })] | primEagerSafe p && not (getProperty prop_CYCLIC t) -> do
                 mtick "E.Simplify.strictness.cheap-eagerness.con"
-                return $ ec { eCaseAlts = [Alt c (ELetRec [(t,def)] e')], eCaseType = getType e' }
+                return $ caseUpdate ec { eCaseAlts = [Alt c (ELetRec [(t,def)] e')], eCaseType = getType e' }
             _ -> do
                 let fn ds (ELetRec { eDefs = ds', eBody = e}) | not (hasRepeatUnder fst (ds ++ ds')) = fn (ds' ++ ds) e
                     fn ds e = f ds (Set.fromList $ fsts ds) [] False where
@@ -573,7 +573,7 @@ simplifyDs prog sopts dsIn = ans where
         as'' <- mapM f as
         d'' <- fmapM g d
         t' <- dosub inb t
-        return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
+        return $ caseUpdate ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
     doCase e t b as@(Alt LitCons { litName = n } _:_) (Just d) inb | Just ss <- getSiblings (so_dataTable sopts) n, length ss <= length as = do
         mtick "E.Simplify.case-no-default"
         doCase e t b as Nothing inb
@@ -590,8 +590,8 @@ simplifyDs prog sopts dsIn = ans where
                 return $ Alt (updateLit (so_dataTable sopts) litCons { litName = n, litArgs = ts, litType = te }) (eLet b wtd d)
         mtick $ "E.Simplify.case-improve-default.{" ++ show (sort ls) ++ "}"
         ls' <- mapM f ls
-        ec <- dosub inb emptyCase { eCaseScrutinee = e, eCaseType = t, eCaseBind = b, eCaseAlts = as ++ ls' }
-        return ec { eCaseScrutinee = e }
+        ec <- dosub inb $ caseUpdate emptyCase { eCaseScrutinee = e, eCaseType = t, eCaseBind = b, eCaseAlts = as ++ ls' }
+        return $ caseUpdate ec { eCaseScrutinee = e }
         --doCase e t b (as ++ ls') Nothing inb
         where
         te = getType b
@@ -658,7 +658,7 @@ simplifyDs prog sopts dsIn = ans where
         d' <- fmapM dd d
         as' <- mapM da as
         t' <- dosub inb t
-        return ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind =  b', eCaseAlts = as', eCaseDefault = d'}
+        return $ caseUpdate ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind =  b', eCaseAlts = as', eCaseDefault = d'}
 
     isOmittable _ ELit {} = True
     isOmittable _ EPi {} = True
@@ -781,7 +781,7 @@ simplifyDs prog sopts dsIn = ans where
         let f e = app' e xs
         ec' <- caseBodiesMapM f ec
         let t = foldl eAp (eCaseType ec') xs
-        return ec' { eCaseType = t }
+        return $ caseUpdate ec' { eCaseType = t }
     app' ELetRec { eDefs = ds, eBody = e } xs = do
         mticks (length xs) (toAtom "E.Simplify.let-application")
         e' <- app' e xs

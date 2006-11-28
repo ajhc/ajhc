@@ -3,6 +3,7 @@ module E.FreeVars(
     decomposeLet,
     decomposeDs,
     bindingFreeVars,
+    caseUpdate,
     freeIds
     ) where
 
@@ -58,6 +59,11 @@ decomposeLet :: E ->  ([Either (TVr, E) [(TVr,E)]],E)
 decomposeLet ELetRec { eDefs = ds, eBody = e } = (decomposeDs ds,e)
 decomposeLet e = ([],e)
 
+caseUpdate :: E -> E
+caseUpdate ec@ECase {} = ec { eCaseAllFV = fv ec } where
+    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = mconcat (freeIds e:freeIds (tvrType  b):freeIds ty:(delete (tvrIdent b) $ mconcat (freeVars d:map freeVars as)  ):[])
+caseUpdate e = e
+
 -- we export this to get a concrete type for free id sets.
 freeIds ::  E -> IdSet
 freeIds =   fv where
@@ -72,7 +78,8 @@ freeIds =   fv where
     fv (EError _ e) = fv e
     fv (ELit l) = fvLit l
     fv (EPrim _ es e) = mconcat $ fv e : map fv es
-    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = mconcat ( fv e:freeVars (tvrType  b):freeVars ty:(delete (tvrIdent b) $ mconcat (freeVars d:map freeVars as)  ):[])
+    --fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = mconcat ( fv e:freeVars (tvrType  b):freeVars ty:(delete (tvrIdent b) $ mconcat (freeVars d:map freeVars as)  ):[])
+    fv ECase { eCaseAllFV = cfv } = cfv
     fv Unknown = mempty
     fv ESort {} = mempty
     fvLit LitCons { litArgs = es, litType = e } = mconcat $ fv e:map fv es

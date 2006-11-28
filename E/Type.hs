@@ -80,7 +80,8 @@ data E = EAp E E
        eCaseType :: E, -- due to GADTs and typecases, the final type of the expression might not be so obvious, so we include it here.
        eCaseBind :: TVr,
        eCaseAlts :: [Alt E],
-       eCaseDefault :: (Maybe E)
+       eCaseDefault :: (Maybe E),
+       eCaseAllFV  :: IdSet
        }
 	deriving(Eq, Ord, Show)
     {-! derive: is, from !-}

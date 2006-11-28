@@ -231,7 +231,7 @@ pruneE e = return $ runIdentity (prune e)  where
 pruneCase :: (Monad m) => E -> VMap () Name -> m E
 pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
     err = EError "pruneCase: all alternatives pruned" (getType ec)
-    nec = ec { eCaseAlts = f [] $ eCaseAlts ec, eCaseDefault = cd (eCaseDefault ec)}
+    nec = caseUpdate ec { eCaseAlts = f [] $ eCaseAlts ec, eCaseDefault = cd (eCaseDefault ec)}
     f xs [] = reverse xs
     f xs (alt@(Alt LitCons { litName = n } _):rs) | not (n `vmapMember` ns) = f xs rs
     f xs (alt:rs) = f (alt:xs) rs
