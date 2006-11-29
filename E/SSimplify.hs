@@ -422,6 +422,7 @@ data Cont =
     | LazyContext TVr  -- the RHS of a let statement
     | StartContext
     | ArgContext
+    | Coerce Range Cont
     | Scrutinee {
         contExamined :: Bool  -- ^ whether the result is actually examined, or just bound to a variable
         }
@@ -453,12 +454,15 @@ simplifyDs prog sopts dsIn = ans where
         let (e',_) = collectOccurance' e
         localEnv (envSubst_s mempty) $ f StartContext e'
     --mtick a = Stats.mtick $ trace (show a) a
+    makeRange b = do
+        sub <- asks envSubst
+        return $ susp b sub
     f :: Cont -> InE -> SM OutE
     --f cont e | trace (take 20 (show cont) ++ " - " ++ take 40 (show e)) False = undefined
     f ArgContext e = dosub e
     f c (EAp a b) = do
-        sub <- asks envSubst
-        f ApplyTo { contArg = susp b sub, contNext = c } a
+        b' <- makeRange b
+        f ApplyTo { contArg = b', contNext = c } a
     f (ApplyTo rng cont) (ELam t b) = do
         addBoundNames [tvrIdent t]
         mtick (toAtom "E.Simplify.f-beta-reduce")
@@ -473,43 +477,34 @@ simplifyDs prog sopts dsIn = ans where
             Just (Done e) -> done cont e
             Just (Susp e s _) -> localEnv (envSubst_s s)  $ f cont e
             Nothing -> done cont (EVar v)
-
-    f cont e | isApplyTo cont = els
-             | otherwise = tryEta
-            where
-            els = do
-                x' <- g e
-                x'' <- coerceOpt return x'
-                x <- primOpt' (so_dataTable sopts) x''
-                done cont x
-            tryEta = do
-                eed <- etaExpandDef (so_dataTable sopts) 0 tvr { tvrIdent = 0 } e
-                case eed of
-                    Just (_,e) -> f cont e
-                    Nothing -> els
-
-    g :: InE -> SM OutE
-    --g e | trace ("g: " ++ take 20 (show e)) False = undefined
-    g (EPrim a es t) = return (EPrim a) `ap` mapM dosub es `ap` dosub t
-    g e@ELit {} = dosub e
-    g e@(EPi (TVr { tvrIdent = n }) _) = do
-        addNames [n]
-        e' <- dosub e
-        return e'
-    g (EError s t) = do EError s `fmap` dosub t
-    g ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d} = do
-        addNames (map tvrIdent $ caseBinds ec)
-        e' <- f (Scrutinee False) e
-        doCase e' (eCaseType ec) b as d
-    g (ELam v e)  = do
+    f (Coerce t cont) (EError s _) = evalRange t >>= \t' -> done cont (EError s t')
+    f (Coerce t cont) (ELit (LitInt n _)) = evalRange t >>= \t' -> done cont (ELit (LitInt n t'))
+    f cont v | Just (e,t) <- from_unsafeCoerce v =
+        makeRange t >>= \t' -> f (g t' cont) e where g t' (Coerce _ cont) = Coerce t' cont
+    f cont ep@EPrim {} = do
+        ep' <- primOpt' (so_dataTable sopts) ep
+        ep'' <- dosub ep'
+        done cont ep''
+    f cont e@ELit {} = dosub e >>= done cont
+    f cont (ELam v e)  = do
         addNames [tvrIdent v]
         v' <- nname v
         e' <- localEnv (insertDoneSubst v (EVar v') . insertInScope (tvrIdent v') NotKnown) $ f StartContext e
-        return $ ELam v' e'
-    g ELetRec { eDefs = ds@(_:_), eBody =  e } = do
+        done cont $ ELam v' e'
+    f cont e@(EPi (TVr { tvrIdent = n }) _) = do
+        addNames [n]
+        e' <- dosub e
+        done cont e'
+    f cont (EError s t) = (EError s `fmap` dosub t) >>= done cont
+    f cont ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d} = do
+        addNames (map tvrIdent $ caseBinds ec)
+        e' <- f (Scrutinee (not $ null as)) e
+        ec' <- doCase e' (eCaseType ec) b as d
+        done cont ec'
+    f cont ELetRec { eDefs = ds@(_:_), eBody =  e } = do
         (ds',inb') <- doDs ds
-        e' <- localEnv (const inb') $ f StartContext e
-        case ds' of
+        e' <- localEnv (const inb') $ f cont e
+        res <- case ds' of
             [(t,e)] | worthStricting e, Just (Demand.S _) <- Info.lookup (tvrInfo t), not (getProperty prop_CYCLIC t) -> do
                 mtick "E.Simplify.strictness.let-to-case"
                 return $ eStrictLet t e e'
@@ -530,6 +525,22 @@ simplifyDs prog sopts dsIn = ans where
                 when (flint && hasRepeatUnder fst ds'') $ fail "hasRepeats!"
                 mticks  (length ds'' - length ds') (toAtom $ "E.Simplify.let-coalesce")
                 return $ eLetRec ds'' e''
+        done StartContext res
+    f cont e = dosub e >>= done cont
+--    f cont e | isApplyTo cont = els
+--             | otherwise = tryEta
+--            where
+--            els = do
+--                x' <- dosub e
+--                done cont x'
+--            tryEta = do
+--                eed <- etaExpandDef (so_dataTable sopts) 0 tvr { tvrIdent = 0 } e
+--                case eed of
+--                    Just (_,e) -> f cont e
+--                    Nothing -> els
+
+    g :: InE -> SM OutE
+    --g e | trace ("g: " ++ take 20 (show e)) False = undefined
     g e = error $ "SSimplify.simplify.g: " ++ show e ++ "\n" ++ pprint e
     showName t | odd t || dump FD.EVerbose = tvrShowName (tVr t Unknown)
              | otherwise = "(epheremal)"
@@ -576,7 +587,7 @@ simplifyDs prog sopts dsIn = ans where
     doCase e t b as (Just d) | te /= tWorld__, (ELit LitCons { litName = cn }) <- followAliases dt te, Just Constructor { conChildren = Just cs } <- getConstructor cn dt, length as == length cs - 1 || (False && length as < length cs && isAtomic d)  = do
         let ns = [ n | Alt ~LitCons { litName = n } _ <- as ]
             ls = filter (`notElem` ns) cs
-            f n = do
+            ff n = do
                 con <- getConstructor n dt
                 let g t = do
                         n <- newName
@@ -585,10 +596,10 @@ simplifyDs prog sopts dsIn = ans where
                 let wtd = ELit $ updateLit (so_dataTable sopts) litCons { litName = n, litArgs = map EVar ts, litType = te }
                 return $ Alt (updateLit (so_dataTable sopts) litCons { litName = n, litArgs = ts, litType = te }) (eLet b wtd d)
         mtick $ "E.Simplify.case-improve-default.{" ++ show (sort ls) ++ "}"
-        ls' <- mapM f ls
-        ec <- dosub $ caseUpdate emptyCase { eCaseScrutinee = e, eCaseType = t, eCaseBind = b, eCaseAlts = as ++ ls' }
-        return $ caseUpdate ec { eCaseScrutinee = e }
-        --doCase e t b (as ++ ls') Nothing inb
+        ls' <- mapM ff ls
+        --ec <- dosub $ caseUpdate emptyCase { eCaseScrutinee = e, eCaseType = t, eCaseBind = b, eCaseAlts = as ++ ls' }
+        --localEnv (envSubst_s mempty) $ f StartContext (caseUpdate ec { eCaseScrutinee = e })
+        doCase e t b (as ++ ls') Nothing
         where
         te = getType b
         dt = (so_dataTable sopts)
@@ -710,6 +721,10 @@ simplifyDs prog sopts dsIn = ans where
             x -> return x
     done cont e = z cont [] where
         z (ApplyTo r cont') rs = evalRange r >>= \a -> z cont' (a:rs)
+        z (Coerce t cont) rs = do
+            t' <- evalRange t
+            z <- h e (reverse rs)
+            done cont (prim_unsafeCoerce z t')
         z _ rs = h e (reverse rs)
     h :: OutE -> [OutE] -> SM OutE
     h (EVar v) xs' = do
