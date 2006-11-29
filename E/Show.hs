@@ -204,10 +204,11 @@ showE e = do
                     e <- showE e
                     return [unparse db <+> UC.rArrow <+> unparse e]
             let alts' = map (<> bc ';') (alts ++ dcase)
-            let mbind | (isUsed && isNothing (eCaseDefault ec)) || dump FD.EVerbose = unparse db <+> text "<-"
+            let mbind | isJust (eCaseDefault ec) = empty
+                      | (isUsed && isNothing (eCaseDefault ec)) || dump FD.EVerbose = text " " <> (if isUsed then id else (char '_' <>)) (unparse db) <+> text "<-"
                       | otherwise = empty
             return $ fixitize ((L,(-10))) $ atom $
-                group ( nest 4 ( keyword "case" <+> mbind <+> scrut <+> keyword "of" <$>  (align $ vcat (alts'))) )
+                group ( nest 4 ( keyword "case" <> mbind <+> scrut <+> keyword "of" <$>  (align $ vcat (alts'))) )
         showAlt (Alt l e) = foldr allocTVr ans (litBinds l) where
             ans = do
                 l <- showLit showTVr l
