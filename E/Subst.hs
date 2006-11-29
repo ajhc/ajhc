@@ -168,7 +168,7 @@ eAp (ELam t b) e = if tvrIdent t == 0 then b else subst t e b
 --eAp (EPrim n es t@(EPi _ _)) b = EPrim n (es ++ [b]) (eAp t b)  -- only apply if type is pi-like
 eAp (ELit lc@LitCons { litArgs = es, litType = (EPi t r) }) b = ELit lc { litArgs = es ++ [b], litType = subst t b r }
 eAp (ELit LitCons { litArgs = es, litAliasFor = Just af }) b = foldl eAp af (es ++ [b])
-eAp a@ELit {} b = error $ "very strange application: (" ++ prettyE a ++ ") (" ++ prettyE b ++ ")"
+--eAp a@ELit {} b = error $ "very strange application: (" ++ prettyE a ++ ") (" ++ prettyE b ++ ")"
 eAp (EError s t) b = EError s (eAp t b)
 eAp a b = EAp a b
 
