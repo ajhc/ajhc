@@ -8,13 +8,14 @@ module E.SSimplify(
     SimplifyOpts(..)
     ) where
 
+import Control.Monad.RWS
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Control.Monad.Reader
 import Data.FunctorM
 import Data.Typeable
 import Data.Monoid
-import List hiding(delete,union)
+import List hiding(delete,union,insert)
 import Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -430,13 +431,14 @@ type OutE = E
 type InTVr = TVr
 type OutTVr = TVr
 
-type SM m = IdNameT m
+
 
 simplifyDs :: forall m . MonadStats m => Program -> SimplifyOpts -> [(TVr,E)] -> m [(TVr,E)]
 simplifyDs prog sopts dsIn = ans where
     finalPhase = so_finalPhase sopts
     ans = do
-        (dsOut,_) <- (runIdNameT doit)
+        let ((dsOut,_),stats) = runSM initialB doit
+        mtickStat stats
         return dsOut
     exportedSet = fromList $ map tvrIdent (progEntryPoints prog) :: IdSet
     getType e = infertype (so_dataTable sopts) e
@@ -445,15 +447,15 @@ simplifyDs prog sopts dsIn = ans where
             bb _ = []
         in cacheSubst mempty { envSubst = fromList $ concatMap bb  (massocs $ so_boundVars sopts),  envInScope =  fmap (\ (t,e) -> fixInline finalPhase t $ isBoundTo noUseInfo e) (so_boundVars sopts) }
     doit = do
-        addNamesIdSet (progUsedIds prog)
-        addBoundNamesIdSet (progFreeIds prog)
-        addBoundNamesIdMap (so_boundVars sopts)
+        smAddNamesIdSet (progUsedIds prog)
+        smAddBoundNamesIdSet (progFreeIds prog)
+        smAddBoundNamesIdMap (so_boundVars sopts)
         doDs dsIn initialB
-    go :: E -> Env -> SM m E
+    go :: E -> Env -> SM E
     go e inb = do
         let (e',_) = collectOccurance' e
         f e' (cacheSubst inb { envSubst = mempty })
-    f :: InE -> Env -> SM m OutE
+    f :: InE -> Env -> SM OutE
     f e inb | (ELam t b,(x:xs)) <- fromAp e = do
         addBoundNames [tvrIdent t]
         xs' <- mapM (dosub inb) xs
@@ -545,7 +547,7 @@ simplifyDs prog sopts dsIn = ans where
         n' <- if n == 0 then return 0 else uniqueName n
         return $ tvr { tvrIdent = n', tvrType =  t'' }
     -- TODO - case simplification
-    doCase :: OutE -> InE -> InTVr -> [Alt InE] -> (Maybe InE) -> Env -> SM m OutE
+    doCase :: OutE -> InE -> InTVr -> [Alt InE] -> (Maybe InE) -> Env -> SM OutE
     doCase ELetRec { eDefs = ds, eBody = e} t b as d inb = do
         mtick "E.Simplify.let-from-case"
         e' <- doCase e t b as d inb
@@ -670,7 +672,7 @@ simplifyDs prog sopts dsIn = ans where
         _ -> False
     isOmittable _ _ = False
 
-    doConstCase :: {- Out -} Lit E E -> InE -> InTVr -> [Alt E] -> Maybe InE -> Env -> SM m OutE
+    doConstCase :: {- Out -} Lit E E -> InE -> InTVr -> [Alt E] -> Maybe InE -> Env -> SM OutE
     doConstCase l t b as d inb = do
         t' <- dosub inb t
         mr <- match l as (b,d)
@@ -701,7 +703,7 @@ simplifyDs prog sopts dsIn = ans where
     match m as d = error $ "Odd Match: " ++ show ((m,getType m),as,d)
 
 
-    applyRule :: OutTVr -> [OutE] -> Env -> SM m (Maybe (OutE,[OutE]))
+    applyRule :: OutTVr -> [OutE] -> Env -> SM (Maybe (OutE,[OutE]))
     applyRule v xs inb  = do
         z <- builtinRule v xs
         let lup x = case mlookup x (envInScope inb) of
@@ -710,7 +712,7 @@ simplifyDs prog sopts dsIn = ans where
         case z of
             Nothing | fopts FO.Rules -> applyRules lup (Info.fetch (tvrInfo v)) xs
             x -> return x
-    h :: OutE -> [OutE] -> Env -> SM m OutE
+    h :: OutE -> [OutE] -> Env -> SM OutE
     h (EVar v) xs' inb = do
         z <- applyRule v xs' inb
         let txs = map tx xs' where
@@ -749,11 +751,11 @@ simplifyDs prog sopts dsIn = ans where
                 -- Nothing | tvrIdent v `Set.member` exports -> app (EVar v,xs')
                 -- Nothing -> error $ "Var not in scope: " ++ show v
     h e xs' inb = do app (e,xs')
-    didInline :: Env -> OutE -> [OutE] -> SM m OutE
+    didInline :: Env -> OutE -> [OutE] -> SM OutE
     didInline inb z zs = do
-        used <- idNameUsedNames
+        used <- smUsedNames
         let (ne,nn) = runRename used (foldl EAp z zs)
-        addNamesIdSet nn
+        smAddNamesIdSet nn
         return ne
         --e <- app (z,zs)
         --return e
@@ -793,7 +795,7 @@ simplifyDs prog sopts dsIn = ans where
         return $ foldl EAp e as
     doDs ds inb = do
         addNames $ map (tvrIdent . fst) ds
-        let z :: (InTVr,InE) -> SM m (Id,UseInfo,OutTVr,InE)
+        let z :: (InTVr,InE) -> SM (Id,UseInfo,OutTVr,InE)
             z (t,EVar t') | t == t' = do    -- look for simple loops and replace them with errors.
                 t'' <- nname t inb
                 mtick $ "E.Simplify.<<loop>>.{" ++ showName (tvrIdent t) ++ "}"
@@ -807,7 +809,7 @@ simplifyDs prog sopts dsIn = ans where
                     -- We don't want to inline things we don't have occurance info for because they might lead to an infinite loop. hopefully the next pass will fix it.
                     Nothing -> return (tvrIdent t,noUseInfo { useOccurance = LoopBreaker },t',e)
                     -- Nothing -> error $ "No Occurance info for " ++ show t
-            w :: [(Id,UseInfo,OutTVr,InE)] -> Env -> [(OutTVr,OutE)] -> SM m ([(OutTVr,OutE)],Env)
+            w :: [(Id,UseInfo,OutTVr,InE)] -> Env -> [(OutTVr,OutE)] -> SM ([(OutTVr,OutE)],Env)
             w ((t,UseInfo { useOccurance = Once },t',e):rs) inb ds = do
                 mtick $ "E.Simplify.inline.Once/{" ++ showName t ++ "}"
                 w rs inb ds -- (minsert t (Susp e sub) sub) inb ds
@@ -944,4 +946,74 @@ coerceOpt fn e = do
     return (p e'')
 
 stat_unsafeCoerce = toAtom "E.Simplify.unsafeCoerce"
+
+
+-----------------------
+-- simplification Monad
+-----------------------
+
+data SmState = SmState {
+    idsUsed :: !IdSet,
+    idsBound :: !IdSet
+    }
+
+smState = SmState { idsUsed = mempty, idsBound = mempty }
+
+newtype SM a = SM (RWS Env Stats.Stat SmState a)
+    deriving(Monad,Functor,MonadReader Env)
+
+localEnv f (SM action) = SM $ local (cacheSubst . f) action
+
+
+runSM :: Env -> SM a -> (a,Stat)
+runSM env (SM x) = (r,s) where
+    (r,_,s) = runRWS x (cacheSubst env) smState
+
+instance MonadStats SM where
+   mticks' n k = SM $ tell (Stats.singleStat n k) >> return ()
+
+modifyIds fn = SM $ modify f where
+    f s@SmState { idsUsed = used, idsBound = bound } = case fn (used,bound) of (used',bound') -> s { idsUsed = used', idsBound = bound' }
+getIds = SM $ liftM f get where
+    f s@SmState { idsUsed = used, idsBound = bound } = (used,bound)
+putIds x = SM $ modify (f x) where
+    f (used,bound) = \s -> s { idsUsed = used, idsBound = bound }
+
+instance NameMonad Id SM where
+    addNames ns = do
+        modifyIds (\ (used,bound) -> (fromList ns `union` used, bound) )
+    addBoundNames ns = do
+        let nset = fromList ns
+        modifyIds (\ (used,bound) -> (nset `union` used, nset `union` bound) )
+    uniqueName n = do
+        (used,bound) <- getIds
+        if n `member` bound then newName else putIds (insert n used,insert n bound) >> return n
+    newNameFrom vs = do
+        (used,bound) <- getIds
+        let f (x:xs)
+                | x `member` used = f xs
+                | otherwise = x
+            f [] = error "newNameFrom: finite list!"
+            nn = f vs
+        putIds (insert nn used, insert nn bound)
+        return nn
+    newName  = do
+        (used,bound) <- getIds
+        let genNames i = [st, st + 2 ..]  where
+                st = abs i + 2 + abs i `mod` 2
+        newNameFrom  (genNames (size used + size bound))
+
+
+smUsedNames = SM $ gets idsUsed
+smBoundNames = SM $ gets idsBound
+
+
+
+smAddNamesIdSet nset = do modifyIds (\ (used,bound) -> (nset `union` used, bound) )
+smAddBoundNamesIdSet nset = do modifyIds (\ (used,bound) -> (nset `union` used, nset `union` bound) )
+
+smAddBoundNamesIdMap nmap = do
+    modifyIds (\ (used,bound) -> (nset `union` used, nset `union` bound) ) where
+        nset = idMapToIdSet nmap
+
 
