@@ -346,7 +346,7 @@ processDecls stats ho ho' tiData = do
         mprog <- barendregtProg mprog
 
         -- | this catches more static arguments if we wait until after the initial normalizing simplification pass
-        mprog <- transformProgram tparms { transformCategory = "SimpleRecursive", transformOperation = return . staticArgumentTransform } mprog
+        mprog <- transformProgram tparms { transformSkipNoStats = True, transformCategory = "SimpleRecursive", transformOperation = return . staticArgumentTransform } mprog
 
 
         mprog <- transformProgram tparms { transformCategory = "FloatOutward", transformOperation = floatOutward } mprog
@@ -408,7 +408,7 @@ processDecls stats ho ho' tiData = do
         mprog <- transformProgram tparms { transformCategory = "FloatInward", transformOperation = programFloatInward } mprog
         mprog <- Demand.analyzeProgram mprog
         mprog <- return $ E.CPR.cprAnalyzeProgram mprog
-        mprog' <- transformProgram tparms { transformCategory = "WorkWrap", transformOperation = return . workWrapProgram } mprog
+        mprog' <- transformProgram tparms { transformSkipNoStats = True, transformCategory = "WorkWrap", transformOperation = return . workWrapProgram } mprog
         let wws = length (programDs mprog') - length (programDs mprog)
         liftIO $ wdump FD.Progress $ putErr (replicate wws 'w')
         mprog <- return mprog'
@@ -979,6 +979,7 @@ iterateStep x = x
 data TransformParms = TransformParms {
     transformIterate :: Iterate,
     transformDumpProgress :: Bool,
+    transformSkipNoStats  :: Bool,
     transformOperation :: Program -> IO Program,
     transformCategory :: String,   -- ^ general name of transformation
     transformPass :: String,       -- ^ what pass we are in
@@ -988,6 +989,7 @@ data TransformParms = TransformParms {
 transformParms = TransformParms {
     transformIterate = DontIterate,
     transformDumpProgress = False,
+    transformSkipNoStats = False,
     transformCategory = "Unknown",
     transformPass = "",
     transformOperation = return,
@@ -1024,6 +1026,10 @@ transformProgram tp prog = liftIO $ do
             printProgram prog
             Stats.printStat name estat
             putErrLn $ "\n>>> After " ++ name
+    if transformSkipNoStats tp && estat == mempty then do
+        when dodump $ putErrLn "program not changed"
+        return prog
+     else do
     when (dodump && dump FD.CoreSteps && estat /= mempty) $ Stats.printLStat (optStatLevel options) name estat
     when collectPassStats $ do
         Stats.tick Stats.theStats scname
