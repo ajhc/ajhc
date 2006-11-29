@@ -195,7 +195,7 @@ dumpHoFile fn = do
     when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "Dependencies:" <+>  pprint (sortUnder (show . fileName) $ hohDepends hoh)
     when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "ModDependencies:" <+>  pprint (sortUnder fst $ hohModDepends hoh)
     putStrLn $ "MetaInfo:\n" <> vcat (sort [text (' ':' ':unpackPS k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
-    putStrLn $ "Libraries depended on:" <+> pprint (sort $ mkeys $ hoLibraries ho)
+    putStrLn $ "Libraries depended on:" <+> pprint (sort $ Map.toList $ hoLibraries ho)
     putStrLn $ "Modules contained:" <+> tshow (mkeys $ hoExports ho)
     putStrLn $ "number of definitions:" <+> tshow (size $ hoDefs ho)
     putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps ho)
