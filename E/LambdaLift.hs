@@ -40,6 +40,8 @@ annotateId mn x = case fromId x of
 -- and is conducive to other optimizations
 --
 -- in particular, the type arguments can almost always be transformed away from the recursive inner function
+--
+-- this has potentially exponential behavior. beware
 
 staticArgumentTransform :: Program -> Program
 staticArgumentTransform prog = ans where
@@ -61,16 +63,17 @@ staticArgumentTransform prog = ans where
         newV = foldr ELam (EVar tvr') [ t { tvrIdent = 0 } | t <- droppedAs ]
         tvr' = tvr { tvrIdent = nname, tvrType = getType rbody }
         ne' = foldr ELam (ELetRec [(tvr',rbody)]  (foldl EAp (EVar tvr') (map EVar keptAs))) args
-        --ne' = foldr ELam (ELetRec [(tvr',subst t (EVar tvr') v)]  (foldl EAp (EVar tvr') (map EVar as))) args
         ans = do
             mtick $ "SimpleRecursive.{" ++ pprint t
+            ne' <- g ne'
             return [(t,ne')]
-    f _ (Right ts) = gds ts
+    f _ (Right ts) =  gds ts
     gds ts = mapM g' ts >>= return where
         g' (t,e) = g e >>= return . (,) t
-    g elet@ELetRec { eDefs = ds }  = do
-        ds' <- mapM (f False) (decomposeDs ds)
-        emapE g elet { eDefs = concat ds' }
+    g elet@ELetRec { eDefs = ds } =  do
+        ds'' <- mapM (f False) (decomposeDs ds)
+        e' <- g $ eBody elet
+        return elet { eDefs = concat ds'', eBody = e' }
     g e = emapE g e
 
 
