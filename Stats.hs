@@ -15,6 +15,7 @@ module Stats(
     printLStat,
     Stat,
     Stats.singleton,
+    Stats.singleStat,
     prependStat,
     -- monad
     MonadStats(..),
@@ -25,6 +26,7 @@ module Stats(
     runStatT,
     runStatIO,
     runStatM,
+    mtickStat,
     -- combined
     tickStat
     ) where
@@ -176,6 +178,9 @@ instance Monoid Stat where
 tickStat ::  Stats -> Stat -> IO ()
 tickStat stats (Stat stat) = sequence_  [ ticks stats n a | (a,n) <- Map.toList stat]
 
+mtickStat :: MonadStats m =>  Stat -> m ()
+mtickStat (Stat stats)  = sequence_  [ mticks n a | (a,n) <- Map.toList stats]
+
 runStatIO :: MonadIO m =>  Stats -> StatT m a -> m a
 runStatIO stats action = do
     (a,s) <- runStatT action
@@ -198,15 +203,29 @@ class Monad m => MonadStats m where
 newtype StatT m a = StatT (WriterT Stat m a)
     deriving(MonadIO, Functor, MonadFix, MonadTrans, Monad)
 
-newtype StatM a = StatM (StatT Identity a)
-    deriving(Functor, MonadFix, Monad, MonadStats)
-
 
 runStatT :: Monad m => StatT m a -> m (a,Stat)
 runStatT (StatT m) =  runWriterT m
 
+
+data StatM a = StatM a !Stat
+
+instance Functor StatM where
+    fmap f (StatM a s) = StatM (f a) s
+
+instance Monad StatM where
+    StatM _ s1 >> StatM y s2 = StatM y (s1 `mappend` s2)
+    return x = StatM x mempty
+    StatM x s1 >>= y = case y x of StatM z s2 -> StatM z (s1 `mappend` s2)
+
+instance Stats.MonadStats StatM where
+   mticks' 0 k = StatM () mempty
+   mticks' n k = StatM () $ Stats.singleStat n k
+
+
+
 runStatM ::  StatM a -> (a,Stat)
-runStatM (StatM (StatT m)) = runIdentity $ runWriterT m
+runStatM (StatM a s) = (a,s)
 
 
 -- These are inlined so the 'toAtom' can become a caf and be shared
@@ -231,6 +250,8 @@ instance Monad m => MonadStats (StatT m) where
     mticks' n k = StatT $ tell (Stat $ Map.singleton k n)
 
 singleton n = Stat $ Map.singleton (toAtom n) 1
+singleStat 0 _ = mempty
+singleStat n k = Stat $ Map.singleton (toAtom k) n
 
 instance MonadStats IO where
     mticks' 0 _ = return ()
