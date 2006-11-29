@@ -127,8 +127,7 @@ buildLibrary [] = do
     return mempty
 buildLibrary mods = do
     putVerboseLn $ "Building library containing: " ++ show mods
-    s <- Stats.new
-    (_,ho) <- parseFiles [] mods processInitialHo (processDecls s)
+    (_,ho) <- parseFiles [] mods processInitialHo processDecls
     -- TODO optimize, leaving out hidden module exports
     return ho
 
@@ -147,8 +146,7 @@ processFiles cs = do
     processFilesModules fs ms
 
 processFilesModules fs ms = do
-    s <- Stats.new
-    compileModEnv' s =<< parseFiles fs ms processInitialHo (processDecls s)
+    compileModEnv' =<< parseFiles fs ms processInitialHo processDecls
 
 fileOrModule f = case reverse f of
                    ('s':'h':'.':_)     -> Right f
@@ -200,10 +198,10 @@ collectIdAnn r p id nfo = do
     idann r p id nfo
 
 processInitialHo ::
-    Ho       -- ^ current accumulated ho
+    CollectedHo       -- ^ current accumulated ho
     -> Ho    -- ^ new ho, freshly read from file
-    -> IO Ho -- ^ final combined ho data.
-processInitialHo accumho ho = do
+    -> IO CollectedHo -- ^ final combined ho data.
+processInitialHo (CollectedHo accumho) ho = do
     let (ds,uids) = runWriter $ annotateDs imap (collectIdAnn rules' (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
         rules' = runIdentity $ mapBodies (annotate imapRules (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
         prog = etaAnnotateProgram (denewtype $ programSetDs ds program { progDataTable = hoDataTable accumho `mappend` hoDataTable ho })
@@ -212,7 +210,7 @@ processInitialHo accumho ho = do
         accumho' = reprocessHo rules' (hoProps ho) accumho
 
     --lintCheckProgram (putStrLn "processInitialHo") prog
-    return $ accumho' `mappend` ho { hoUsedIds = uids, hoEs = programEsMap prog }
+    return $ CollectedHo $ accumho' `mappend` ho { hoUsedIds = uids, hoEs = programEsMap prog }
 
 reprocessHo :: Rules -> IdMap Properties -> Ho -> Ho
 reprocessHo rules ps ho = ho { hoEs = Map.map f (hoEs ho) } where
@@ -231,12 +229,11 @@ miniCoreSteps = coreMini && coreSteps
 
 
 processDecls ::
-    Stats.Stats    -- ^ statistics
-    -> Ho          -- ^ Collected ho
-    -> Ho          -- ^ preliminary haskell object  data
-    -> TiData      -- ^ front end output
-    -> IO (Ho,Ho)  -- ^ (new accumulated ho, final ho for this modules)
-processDecls stats ho ho' tiData = do
+    CollectedHo          -- ^ Collected ho
+    -> Ho                   -- ^ preliminary haskell object  data
+    -> TiData               -- ^ front end output
+    -> IO (CollectedHo,Ho)  -- ^ (new accumulated ho, final ho for this modules)
+processDecls (CollectedHo ho) ho' tiData = do
     -- some useful values
     let allHo = ho `mappend` ho'
         decls | fopts FO.Boxy = tiDataDecls tiData
@@ -435,122 +432,11 @@ processDecls stats ho ho' tiData = do
     hFlush stdout >> hFlush stderr
     wdump FD.Progress $
         Stats.printLStat (optStatLevel options) "MainPass Stats" (progStats prog)
-    {-
-
-    -- This is the main function that optimizes the routines before writing them out
-    let f (retds,(smap,annmap,idHist')) (rec,ns) = do
-        let names = [ n | (n,_) <- ns]
-        let namesInscope' = fromDistinctAscList (mkeys smap) `union` namesInscope
-        when coreMini $ putErrLn ("----\n" ++ pprint names)
-        cds <- annotateDs annmap (idann allRules mempty) letann lamann [ (t,e) | (t,e) <- ns]
-        --putStrLn "*** After annotate"
-        when miniCorePass $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
-        let cm stats e = do
-            let sopt = mempty {  SS.so_boundVars = smap, SS.so_dataTable = fullDataTable }
-            let (e',_) = SS.collectOccurance' e
-            let (stat, e'') = SS.simplifyE sopt e'
-            when miniCorePass  $ printCheckName fullDataTable e''
-            Stats.tickStat stats stat
-            return e''
-        let mangle = mangle' (Just $ namesInscope' `union` fromList (map (tvrIdent . fst) cds)) fullDataTable
-        cds <- flip mapM cds $ \ (v,lc) -> do
-            lintCheckE onerrNone fullDataTable v lc
-            (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable 0 v lc)
-            lc <- doopt mangle coreMini stats ("SuperSimplify 1: " ++ pprint v) cm lc
-            lc <- mangle (return ()) coreMini ("Barendregt: " ++ pprint v) (return . barendregt) lc
-            lc <- doopt mangle coreMini stats "Float Inward..." (\stats x -> return (floatInward x)) lc
-            lintCheckE onerrNone fullDataTable v lc
-            return (v,lc)
-        wdump FD.Core $ mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) cds
-        cds <- Demand.solveDs fullDataTable cds
-        cds <- flip mapM cds $ \ (v,lc) -> do
-            lintCheckE onerrNone fullDataTable v lc
-            (v,lc) <- Stats.runStatIO stats (runNameMT $ etaExpandDef' fullDataTable 0 v lc)
-            lc <- doopt mangle coreMini stats ("SuperSimplify 2: " ++ pprint v) cm lc
-            lc <- mangle (return ()) coreMini ("Barendregt: " ++ pprint v) (return . barendregt) lc
-            lintCheckE onerrNone fullDataTable v lc
-            return (v,lc)
-
-        cds <- Demand.solveDs fullDataTable cds
-        cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
-        when miniCorePass  $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
-        sequence_ [lintCheckE onerrNone fullDataTable v e | (v,e) <- cds ]
-        let (cds',st) = performWorkWrap fullDataTable cds
-        Stats.tickStat stats st
-        let wws = length cds' - length cds
-        wdump FD.Progress $ putErr (replicate wws 'w')
-        when (miniCorePass && wws > 0) $ putErrLn "After WorkWrap" >> mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds'
-        when (miniCorePass && wws > 0) $ putErrLn "^^^ After WorkWrap"
-
-        let graph = (newGraph cds' (\ (b,_) -> tvrIdent b) (\ (b,c) -> idSetToList $ bindingFreeVars b c))
-            (lb,os) = findLoopBreakers (const 1) nogood graph
-            nogood (b,_) = not $ getProperty prop_PLACEHOLDER b || getProperty prop_WRAPPER b
-            cds = [ if x `elem` fsts lb then (setProperty prop_NOINLINE x,y) else (x,y) | (x,y) <- os  ]
-        sequence_ [lintCheckE onerrNone fullDataTable v e | (v,e) <- cds ]
-        cds <- annotateDs annmap (\_ -> return) letann lamann cds
-        sequence_ [lintCheckE onerrNone fullDataTable v e | (v,e) <- cds ]
-
-        let mangle = mangle' (Just $ namesInscope' `union` fromList (map (tvrIdent . fst) cds')) fullDataTable
-        let dd  (ds,used) (v,lc) = do
-                let cm stats e = do
-                    let sopt = mempty {  SS.so_boundVars = fromList [ (tvrIdent v,(v,lc)) | (v,lc) <- ds] `union` smap,  SS.so_dataTable = fullDataTable }
-                    let (e',_) = SS.collectOccurance' e
-                    let (stat, e'') = SS.simplifyE sopt e'
-                    when miniCorePass  $ printCheckName' fullDataTable v e''
-                    Stats.tickStat stats stat
-                    return e''
-                let (lc', _) = runRename used lc
-                lc <- doopt mangle False stats ("SuperSimplify PostPWW: " ++ pprint v) cm lc'
-                let (lc', used') = runRename used lc
-                return ((v,lc'):ds,used' `mappend` used)
-        (cds,usedids) <- foldM dd ([],hoUsedIds ho) cds
-        --cds <- E.Strictness.solveDs cds
-        cds <- Demand.solveDs fullDataTable cds
-        cds <- return (E.CPR.cprAnalyzeDs fullDataTable cds)
-        cds <- annotateDs annmap (\_ -> return) letann lamann cds
-        wdump FD.Core $ mapM_ (\ (v,lc) -> printCheckName' fullDataTable v lc) cds
-        let nvls = [ (t,e)  | (t,e) <- cds ]
-
-        wdump FD.Progress $ putErr (if rec then "*" else ".")
-        return (nvls ++ retds, (fromList [ (tvrIdent v,(v,lc)) | (v,lc) <- nvls] `union` smap, fromList [ (tvrIdent v,(Just (EVar v))) | (v,_) <- nvls] `union` annmap , idHist' ))
-
-
-
-    let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> idSetToList $ bindingFreeVars b c))
-        fscc (Left n) = (False,[n])
-        fscc (Right ns) = (True,ns)
-
-    -- perform demand analysis
-    prog <- Demand.analyzeProgram prog
-
-    progress "Optimization pass with workwrapping/CPR"
-    (ds,_) <- foldM f ([],(fromList [ (tvrIdent v,(v,e)) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
-    progress "!"
-    prog <- return $ programSetDs ds prog
-    -}
 
     lintCheckProgram (putErrLn "After the workwrap/CPR") prog
 
     prog <- programPrune prog
 
-    --prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze True prog else return prog
-    --prog <- transformProgram "typeAnalyze" DontIterate True (typeAnalyze True) prog
-
-
-{-
-    prog <- if True then do
-        prog <- barendregtProg prog
-        prog <- return $ etaAnnotateProgram prog
-        progress "Post typeanalyis/etaexpansion pass"
-        let graph =  (newGraph (programDs prog) (\ (b,_) -> tvrIdent b) (\ (b,c) -> idSetToList $ bindingFreeVars b c))
-            fscc (Left n) = (False,[n])
-            fscc (Right ns) = (True,ns)
-        (ds,_) <- foldM f ([],(fromList [ (tvrIdent v,(v,e)) | (v,e) <- Map.elems (hoEs ho)], initMap, Set.empty)) (map fscc $ scc graph)
-        progress "!"
-        return $ programSetDs ds prog
-      else return prog
-    prog <- programPrune prog
-    -}
 
     lintCheckProgram (putErrLn "After the Opimization") prog
     wdump FD.Core $ printProgram prog
@@ -561,7 +447,7 @@ processDecls stats ho ho' tiData = do
         hoRules = hoRules ho' `mappend` rules,
         hoUsedIds = collectIds (ELetRec (programDs prog) Unknown)
         }
-    return (newHo `mappend` ho,newHo)
+    return (CollectedHo (newHo `mappend` ho),newHo)
 
 programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = programSetDs ds' prog where
@@ -595,7 +481,7 @@ isInteractive = do
 
 transTypeAnalyze = transformParms { transformCategory = "typeAnalyze",  transformOperation = typeAnalyze True }
 
-compileModEnv' stats (ho,_) = do
+compileModEnv' (CollectedHo ho,_) = do
     if optMode options == CompileHo then return () else do
 
     let dataTable = progDataTable prog
@@ -672,8 +558,6 @@ compileModEnv' stats (ho,_) = do
         compileToGrin prog
         exitSuccess
 
-    st <- Stats.new
-
 
     prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterMethod", transformDumpProgress = True } prog
     prog <- barendregtProg prog
@@ -684,7 +568,6 @@ compileModEnv' stats (ho,_) = do
     prog <- barendregtProg prog
 
 
-    st <- Stats.new
     prog <- etaExpandProg "Main-AfterOne" prog
     prog <- barendregtProg prog
     prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterSimp", transformDumpProgress = True } prog
@@ -750,7 +633,6 @@ compileModEnv' stats (ho,_) = do
 
     wdump FD.CoreAfterlift $ printProgram prog -- printCheckName dataTable (programE prog)
 
-    wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     wdump FD.Progress $ printEStats (programE prog)
 
     when collectPassStats $ do

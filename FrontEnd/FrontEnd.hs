@@ -31,9 +31,9 @@ import qualified FrontEnd.Tc.Module as Tc
 
 parseFiles :: [String]      -- ^ List of files to read
                -> [Module]  -- ^ List of modules to find
-               -> (Ho -> Ho -> IO Ho) -- ^ Process initial data loaded from ho files
-               -> (Ho -> Ho -> Tc.TiData -> IO (Ho,Ho))  -- ^ routine which takes the global ho, the partial local ho and the output of the front end, and returns the completed ho.
-               -> IO (Ho,Ho)     -- ^ (the final combined ho,all the loaded ho data)
+               -> (CollectedHo -> Ho -> IO CollectedHo) -- ^ Process initial data loaded from ho files
+               -> (CollectedHo -> Ho -> Tc.TiData -> IO (CollectedHo,Ho))  -- ^ routine which takes the global ho, the partial local ho and the output of the front end, and returns the completed ho.
+               -> IO (CollectedHo,Ho)     -- ^ (the final combined ho,all the loaded ho data)
 parseFiles fs deps ifunc func = do
     wdump FD.Progress $ do
         putErrLn $ "Compiling " ++ show fs
@@ -49,14 +49,14 @@ parseFiles fs deps ifunc func = do
     return (initialHo,ho)
 
 -- Process modules found by Ho
-doModules :: (Ho -> Ho -> Tc.TiData -> IO (Ho,Ho)) -> Ho -> [HsModule] -> IO (Ho,Ho)
+doModules :: (CollectedHo -> Ho -> Tc.TiData -> IO (CollectedHo,Ho)) -> CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)
 doModules func ho ms  = do
     ms <- mapM modInfo ms
     --putErrLn $ show (hoExports ho)
     when (dump FD.Defs) $ flip mapM_ ms $ \m -> do
          putStrLn $ " ---- Definitions for" <+> show (modInfoName m) <+> "----";
          mapM_ print ( modInfoDefs m)
-    ms <- determineExports [ (x,y,z) | (x,(y,z)) <- Map.toList $ hoDefs ho] (Map.toList $ hoExports ho) ms
+    ms <- determineExports [ (x,y,z) | (x,(y,z)) <- Map.toList $ hoDefs $ choHo ho] (Map.toList $ hoExports $ choHo ho) ms
     (ho',tiData) <- Tc.tiModules' ho ms
     func ho ho' tiData
 

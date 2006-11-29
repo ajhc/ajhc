@@ -18,7 +18,6 @@ import FrontEnd.Tc.Type(Type())
 import HsSyn(Module)
 import MapBinaryInstance()
 import Info.Types
-import Name.Binary
 import Name.Id
 import Name.Name(Name)
 import Util.SetLike
@@ -28,32 +27,13 @@ import TypeSynonyms(TypeSynonyms)
 
 
 type CheckSum = String
-type LibraryName= String
+type LibraryName = String
 
+-- the collected information that is passed around
+newtype CollectedHo = CollectedHo { choHo :: Ho }
+    deriving(Monoid)
 
-data HoHeader = HoHeader {
-    -- * Haskell Source files depended on
-    hohDepends    :: [FileDep],
-    -- * Other objects depended on
-    hohModDepends :: [(Module,FileDep)],
-    -- * metainformation, filled for hl-files, empty for normal objects.
-    hohMetaInfo   :: [(PackedString,PackedString)]
-    }
-
-data Def = Def {
-    defTVr :: TVr,
-    defE :: E
-    }
-
-instance Binary Def where
-    put_ bh def = do
-        put_ bh (defTVr def)
-        lazyPut bh (defE def)
-    get bh = do
-        tvr <- get bh
-        e <- lazyGet bh
-        return Def { defTVr = tvr, defE = e }
-
+-- The raw data as ut appears on disk
 data Ho = Ho {
     -- filled in by front end
     hoModules :: Map.Map Module (Either FileDep (LibraryName,CheckSum)),     -- ^ Map of module to ho file, This never actually ends up in the binary file on disk, but is filled in when the file is read, libraries have no non-library dependencies.
@@ -105,53 +85,9 @@ data FileDep = FileDep {
     fileFileID :: Int,
     fileFileSize :: Int
     } deriving(Show)
-    {-! derive: GhcBinary !-}
 
 
 
-instance Binary HoHeader where
-    put_ bh (HoHeader ab ac ad) = do
-	    put_ bh ab
-	    lazyPut bh ac
-	    lazyPut bh ad
-    get bh = do
-    ab <- get bh
-    ac <- lazyGet bh
-    ad <- lazyGet bh
-    return (HoHeader ab ac ad)
-
-instance Binary Ho where
-    put_ bh (Ho aa ab ac ad ae af ag ah ai aj ak al am an) = do
-	    lazyPut bh aa
-	    lazyPut bh ab
-	    lazyPut bh ac
-	    lazyPut bh ad
-	    lazyPut bh ae
-	    lazyPut bh af
-	    lazyPut bh ag
-	    lazyPut bh ah
-	    lazyPut bh ai
-	    lazyPut bh aj
-	    lazyPut bh ak
-	    lazyPut bh al
-	    lazyPut bh am
-	    lazyPut bh an
-    get bh = do
-    aa <- lazyGet bh
-    ab <- lazyGet bh
-    ac <- lazyGet bh
-    ad <- lazyGet bh
-    ae <- lazyGet bh
-    af <- lazyGet bh
-    ag <- lazyGet bh
-    ah <- lazyGet bh
-    ai <- lazyGet bh
-    aj <- lazyGet bh
-    ak <- lazyGet bh
-    al <- lazyGet bh
-    am <- lazyGet bh
-    an <- lazyGet bh
-    return (Ho aa ab ac ad ae af ag ah ai aj ak al am an)
 
 
 --  Imported from other files :-

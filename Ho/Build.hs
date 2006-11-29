@@ -46,6 +46,7 @@ import FrontEnd.Unlit
 import FrontEnd.Syn.Options
 import GenUtil hiding(putErrLn,putErr,putErrDie)
 import Ho.Type
+import Ho.Binary
 import Ho.LibraryMap
 import HsSyn
 import MapBinaryInstance()
@@ -103,14 +104,14 @@ findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
 
 
 
-findModule :: Ho                                  -- ^ Accumulated Ho
+findModule :: CollectedHo                                  -- ^ Accumulated Ho
               -> (Either Module String)           -- ^ Either a module or filename to find
-              -> (Ho -> Ho -> IO Ho)              -- ^ Process initial ho loaded from file
-              -> (Ho -> [HsModule] -> IO (Ho,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
-              -> IO (Ho,Ho)                       -- ^ (Final accumulated ho,just the ho read to satisfy this command)
-findModule have (Left m) ifunc _
-    | m `mmember` (hoExports have) = return (have,mempty)
-findModule have need ifunc func  = do
+              -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
+              -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
+              -> IO (CollectedHo,Ho)                       -- ^ (Final accumulated ho,just the ho read to satisfy this command)
+findModule cho@(CollectedHo have) (Left m) ifunc _
+    | m `mmember` (hoExports have) = return (cho,mempty)
+findModule cho@(CollectedHo have) need ifunc func  = do
     let f (Left (Module m)) = (m,searchPaths m)
         f (Right n) = (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
         (name,files) = f need
@@ -120,10 +121,10 @@ findModule have need ifunc func  = do
     when (dump FD.SccModules) $ CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
     let f ho readHo [] = return (ho,readHo)
         f ho readHo (sc:scs) = do
-            (ho',newHo) <- func ho [ hs | (hs,_,_) <- sc ]
+            (ho'@(CollectedHo ho''),newHo) <- func ho [ hs | (hs,_,_) <- sc ]
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
                 mods' = snub [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
-                mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules ho')]
+                mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules ho'')]
                 ldeps = Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules have)]
             let hoh = HoHeader { hohDepends    = [ x | (_,x,_) <- sc],
                                  hohModDepends = mdeps,
@@ -131,8 +132,8 @@ findModule have need ifunc func  = do
                                }
             newHo <- return (newHo `mappend` mempty { hoLibraries = ldeps })
             newHo <- recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
-            f (ho' `mappend` mempty { hoModules = hoModules newHo }) (readHo `mappend` newHo)  scs
-    ho <- ifunc have readHo
+            f (ho' `mappend` CollectedHo mempty { hoModules = hoModules newHo }) (readHo `mappend` newHo)  scs
+    ho <- ifunc cho readHo
     f ho readHo scc
 
 fst3 (x,_,_) = x

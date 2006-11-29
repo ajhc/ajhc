@@ -107,8 +107,8 @@ processModule defs m = do
 or' :: [(a -> Bool)] -> a -> Bool
 or' fs x = or [ f x | f <- fs ]
 
-tiModules' ::  Ho -> [ModInfo] -> IO (Ho,TiData)
-tiModules' me ms = do
+tiModules' ::  CollectedHo -> [ModInfo] -> IO (Ho,TiData)
+tiModules' (CollectedHo me) ms = do
 --    let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
 --        importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
     let importClassHierarchy = hoClassHierarchy me

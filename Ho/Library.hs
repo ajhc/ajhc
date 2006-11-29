@@ -12,6 +12,7 @@ import qualified Data.Map as Map
 
 import GenUtil
 import Ho.Build
+import Ho.Binary
 import Ho.LibraryMap
 import Ho.Type
 import HsSyn
