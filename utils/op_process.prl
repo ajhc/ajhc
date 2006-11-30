@@ -138,14 +138,14 @@ foreach my $d (@ds) {
     my $ivar = "v2_Int";
     my $ivart = "v2_Integer";
     my $tvar = "(v2 $t)";
-    if ($d->[0] eq "Prelude.Int") {
+    if ($d->[0] eq "Jhc.Prim.Int") {
         push @cmeth, "($c_num, toInstName \"Prelude.fromInt.$d->[0]\", ELam $ivar (EVar $ivar))";
         push @cmeth, "($c_num, toInstName \"Prelude.toInt.$d->[0]\", ELam $ivar (EVar $ivar))";
     } else {
         push @cmeth, "($c_num, toInstName \"Prelude.fromInt.$d->[0]\", ELam $ivar (create_integralCast_fromInt $cncons $rtype (EVar $ivar) $t))";
         push @cmeth, "($c_num, toInstName \"Prelude.toInt.$d->[0]\", ELam $tvar (create_integralCast_toInt $cncons $rtype (EVar $tvar)))" if $d->[2] =~ /int/ ;
     }
-    if ($d->[0] eq "Prelude.Integer") {
+    if ($d->[0] eq "Jhc.Basics.Integer") {
         push @cmeth, "($c_num, toInstName \"Prelude.fromInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
         push @cmeth, "($c_num, toInstName \"Prelude.toInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
     } else {

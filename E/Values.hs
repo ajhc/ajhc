@@ -216,7 +216,7 @@ isFullyConst _ = False
 isAtomic :: E -> Bool
 isAtomic EVar {}  = True
 isAtomic e | sortTypeLike e = True
-isAtomic (EPrim (APrim (PrimPrim "drop__") _) [x,y] _) = isAtomic y
+isAtomic (EPrim (APrim (PrimPrim "dependingOn") _) [x,y] _) = isAtomic x
 isAtomic e = isFullyConst e
 
 

@@ -286,10 +286,10 @@ analyze el@(ELit lc@LitCons { litName = h, litArgs = ts@(_:_) }) (S (Product ss)
 analyze (ELit lc@LitCons { litArgs = ts }) _s = do
     rts <- mapM (\e -> analyze e lazy) ts
     return (ELit lc { litArgs = fsts rts }, foldr glb absType (snds rts))
-analyze (EPrim (APrim (PrimPrim "drop__") pc) [t1,t2] pt) s = do
-    (t1',dt1) <- analyze t1 lazy
-    (t2',dt2) <- analyze t2 s
-    return (EPrim (APrim (PrimPrim "drop__") pc) [t1',t2'] pt,dt1 `glb` dt2)
+analyze (EPrim (APrim (PrimPrim "dependingOn") pc) [t1,t2] pt) s = do
+    (t1',dt1) <- analyze t1 s
+    (t2',dt2) <- analyze t2 lazy
+    return (EPrim (APrim (PrimPrim "dependingOn") pc) [t1',t2'] pt,dt1 `glb` dt2)
 analyze (EPrim ap ts pt) _s = do
     rts <- mapM (\e -> analyze e lazy) ts
     return (EPrim ap (fsts rts) pt, foldr glb absType (snds rts))

@@ -34,7 +34,6 @@ import qualified Jhc.Options
 
 -- basic types
 
-newtype IO a = IO (World__ -> (# World__, a #))
 
 unIO :: IO a -> World__ -> (# World__, a #)
 unIO (IO x) = x
@@ -116,11 +115,11 @@ fixIO k = IO $ \w -> let
 
 -- | this creates a new world object that artificially depends on its argument to avoid CSE.
 foreign import primitive newWorld__ :: a -> World__
-foreign import primitive "drop__" worldDep__ :: forall b. World__ -> b -> b
+foreign import primitive "dependingOn" worldDep__ :: forall b. b -> World__ -> b
 
 -- | this will return a value making it artificially depend on the state of the world. any uses of this value are guarenteed not to float before this point in the IO monad.
 strictReturn :: a -> IO a
-strictReturn a = IO $ \w -> (# w, worldDep__ w a #)
+strictReturn a = IO $ \w -> (# w, worldDep__ a w #)
 
 {-# INLINE runMain #-}
 -- | this is wrapped around 'main' when compiling programs. it catches any exceptions and prints them to the screen and dies appropriatly.

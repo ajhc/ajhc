@@ -597,6 +597,6 @@ class Monad m => DataTableMonad m where
 
 instance DataTableMonad Identity
 
-primitiveAliases = [(tc_Int__,rt_int),(tc_Addr__,rt_HsPtr)]
+primitiveAliases = [(tc_Int__,rt_int),(tc_Addr__,rt_HsPtr),(tc_Char__,rt_HsChar),(tc_Bool__,rt_int)]
 
 

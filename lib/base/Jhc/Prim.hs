@@ -1,19 +1,22 @@
-{-# OPTIONS_JHC -N -fffi #-}
-module Jhc.Prim(
-    World__(),
-    Int__(),
-    Addr__(),
-    runRaw,
-    unsafeCoerce__,
-    dependingOn
-    ) where
+{-# OPTIONS_JHC -N -fffi -funboxed-tuples #-}
+module Jhc.Prim where
 
+-- this module is always included in all programs compiled by jhc. it defines some things that are needed to make jhc work at all.
 
--- | this is treated very specially by the compiler. it is unboxed.
+infixr 5  :
+data [] a =  a : ([] a) | []
+
+newtype IO a = IO (World__ -> (# World__, a #))
+
 data World__ :: #
 
+data Int
+data Char
+
+data Bool__ :: #
 data Int__ :: #
 data Addr__ :: #
+data Char__ :: #
 
 -- | this is wrapped around arbitrary expressions and just evaluates them to whnf
 foreign import primitive "seq" runRaw :: a -> World__ -> World__
@@ -21,9 +24,5 @@ foreign import primitive "seq" runRaw :: a -> World__ -> World__
 
 foreign import primitive "unsafeCoerce" unsafeCoerce__ :: a -> b
 
--- throws away first argument. but causes second argument to artificially depend on it.
-foreign import primitive drop__ :: forall a b. a -> b -> b
-
 -- like 'const' but creates an artificial dependency on its second argument to guide optimization.
-dependingOn :: b -> a -> b
-dependingOn a b = drop__ b a
+foreign import primitive dependingOn :: forall a b. a -> b -> a

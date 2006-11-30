@@ -257,7 +257,7 @@ transE e | Just (e',_) <- from_unsafeCoerce e = mparen $ do
     e' <- transE e'
     return (text "unsafeCoerce#" <+> e')
 transE e@(EPrim (APrim (PrimPrim prim) _) args _) = case (prim,args) of
-    ("drop__",[_x,y])   -> transE y  -- XXX
+    ("dependingOn",[x,_y])   -> transE x  -- XXX
     (fs,args) | Just ghcprim <- lookup fs ghcPrimTable -> mparen $ mapM transE args >>= \args' -> return $ hsep (text ghcprim:args')
     _ -> mparen $ return $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
 transE (EPrim (APrim Operator { primOp = op, primRetType = rt } _) [x,y] _) | Just z <- op2Table (op,rt) = mparen $ do

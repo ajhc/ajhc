@@ -2,9 +2,8 @@
 
 # limits.h, float.h, inttypes.h
 
-Jhc.Basics.Char, HsChar, char, UINT32_MAX, 0
-Data.Int.Int, int, int, INT_MAX, INT_MIN
-# Prelude.Integer, int, int, INT_MAX, INT_MIN
+Jhc.Prim.Char, HsChar, char, UINT32_MAX, 0
+Jhc.Prim.Int, int, int, INT_MAX, INT_MIN
 Jhc.Basics.Integer, intmax_t, int, INTMAX_MAX, INTMAX_MIN
 
 Data.Int.Int8, int8_t, int, INT8_MAX, INT8_MIN

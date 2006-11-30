@@ -383,7 +383,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
     -- artificial dependencies
     ce (EPrim ap@(APrim (PrimPrim "newWorld__") _) [_] _) = do
         return $ Return unit
-    ce (EPrim ap@(APrim (PrimPrim "drop__") _) [_,e] _) = ce e
+    ce (EPrim ap@(APrim (PrimPrim "dependingOn") _) [e,_] _) = ce e
 
 
     -- references
@@ -540,7 +540,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
 
     -- | cc evaluates something in lazy context, returning a pointer to a node which when evaluated will produce the strict result.
     -- it is an invarient that evaling (cc e) produces the same value as (ce e)
-    cc (EPrim (APrim (PrimPrim "drop__") _) [_,e] _) = cc e
+    cc (EPrim (APrim (PrimPrim "dependingOn") _) [e,_] _) = cc e
     cc e | Just _ <- literal e = error "unboxed literal in lazy context"
     cc e | Just z <- constant e = return (Return z)
     cc e | Just z <- con e = return (Store z)

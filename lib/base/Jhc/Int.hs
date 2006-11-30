@@ -3,8 +3,7 @@
 -- just a few basic operations on integers to jumpstart things
 module Jhc.Int(Int(),Int__(),increment,decrement,plus,minus,times,divide,modulus,zero,one,boxInt,unboxInt) where
 
-import Data.Int(Int())
-import Jhc.Prim(Int__())
+import Jhc.Prim(Int(),Int__())
 
 foreign import primitive increment :: Int -> Int
 foreign import primitive decrement :: Int -> Int

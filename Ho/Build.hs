@@ -344,7 +344,7 @@ nextModule ms tl ho (Right (name,files):rest) = result where
 
 
 
-hsModuleRequires x = ans where
+hsModuleRequires x = "Jhc.Prim":ans where
     noPrelude =   or $ not (optPrelude options):[ opt == c | opt <- hsModuleOptions x, c <- ["-N","--noprelude"]]
     ans = snub $ (if noPrelude then id else  ("Prelude":)) [ fromModule $ hsImportDeclModule y | y <- hsModuleImports x]
 

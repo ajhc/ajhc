@@ -1,17 +1,11 @@
 {-# OPTIONS_JHC -N -fffi #-}
-module Jhc.Basics where
+module Jhc.Basics(module Jhc.Basics, module Jhc.Prim) where
 
-import Data.Int(Int())
+import Jhc.Prim
+
+data Integer
 
 type String = [Char]
-data Integer
-data Char
-
-
-infixr 5  :
-
-data [] a =  a : ([] a) | []
-    -- odd syntax, so we write instances manually
 
 data () = ()
 data (,) a b = (,) a b

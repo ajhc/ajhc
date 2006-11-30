@@ -59,8 +59,8 @@ instance FromTupname Name where
 
 -- The constructors
 
-dc_Cons = toName DataConstructor ("Jhc.Basics",":")
-dc_EmptyList = toName DataConstructor ("Jhc.Basics","[]")
+dc_Cons = toName DataConstructor ("Jhc.Prim",":")
+dc_EmptyList = toName DataConstructor ("Jhc.Prim","[]")
 dc_Rational = toName DataConstructor ("Ratio",":%")
 dc_Unit = toName DataConstructor ("Jhc.Basics","()")
 dc_Boolzh = toName DataConstructor ("Jhc.Order","Bool#")
@@ -71,19 +71,21 @@ tc_Box = toName TypeConstructor    ("Jhc@","Box")
 tc_Arrow = toName TypeConstructor  ("Jhc@","->")
 tc_JumpPoint = toName TypeConstructor   ("Jhc.JumpPoint","JumpPoint")
 
-tc_IOResult = toName TypeConstructor ("Jhc.IO","IOResult")
-tc_IO = toName TypeConstructor       ("Jhc.IO", "IO")
+tc_IO = toName TypeConstructor       ("Jhc.Prim", "IO")
 tc_World__ = toName TypeConstructor  ("Jhc.Prim","World__")
 tc_Int__ = toName TypeConstructor  ("Jhc.Prim","Int__")
 tc_Addr__ = toName TypeConstructor  ("Jhc.Prim","Addr__")
+tc_Char__ = toName TypeConstructor  ("Jhc.Prim","Char__")
+tc_Bool__ = toName TypeConstructor  ("Jhc.Prim","Bool__")
 tc_Array__ = toName TypeConstructor  ("Jhc.Array","Array__")
 tc_MutArray__ = toName TypeConstructor  ("Jhc.Array","MutArray__")
 tc_Ref__ = toName TypeConstructor ("Data.IORef","Ref__")
 
 
-tc_Bool = toName TypeConstructor  ("Jhc.Order","Bool")
-tc_Target = toName TypeConstructor  ("Jhc.Options","Target")
-tc_List = toName TypeConstructor  ("Jhc.Basics","[]")
+tc_Bool = toName TypeConstructor   ("Jhc.Order","Bool")
+tc_Boolzh = toName TypeConstructor ("Jhc.Order","Bool#")
+tc_Target = toName TypeConstructor ("Jhc.Options","Target")
+tc_List = toName TypeConstructor  ("Jhc.Prim","[]")
 tc_Ptr = toName TypeConstructor   ("Jhc.Addr","Ptr")
 tc_Ratio = toName TypeConstructor ("Ratio","Ratio")
 tc_Unit = toName TypeConstructor  ("Jhc.Basics","()")
