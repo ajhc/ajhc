@@ -109,42 +109,35 @@ findModule :: CollectedHo                                  -- ^ Accumulated Ho
               -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
               -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
               -> IO (CollectedHo,Ho)                       -- ^ (Final accumulated ho,just the ho read to satisfy this command)
-findModule cho@(CollectedHo have) (Left m) ifunc _
-    | m `mmember` (hoExports have) = return (cho,mempty)
-findModule cho@(CollectedHo have) need ifunc func  = do
+findModule cho (Left m) ifunc _
+    | m `mmember` (hoExports . choHo $ cho) = return (cho,mempty)
+findModule cho need ifunc func  = do
     let f (Left (Module m)) = (m,searchPaths m)
         f (Right n) = (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
         (name,files) = f need
-    (readHo,ms) <- getModule have name files
+    (readHo,ms) <- nextModule (fmap Just . hoModules . choHo $ cho) [] mempty [Right (name,files)]
     processIOErrors
     let scc = G.sccGroups (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires . fst3) )
     when (dump FD.SccModules) $ CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
     let f ho readHo [] = return (ho,readHo)
         f ho readHo (sc:scs) = do
-            (ho'@(CollectedHo ho''),newHo) <- func ho [ hs | (hs,_,_) <- sc ]
+            (cho',newHo) <- func ho [ hs | (hs,_,_) <- sc ]
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
                 mods' = snub [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
-                mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules ho'')]
-                ldeps = Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules have)]
+                mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules . choHo $ cho')]
+                ldeps = Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules . choHo $ cho)]
             let hoh = HoHeader { hohDepends    = [ x | (_,x,_) <- sc],
                                  hohModDepends = mdeps,
                                  hohMetaInfo   = []
                                }
             newHo <- return (newHo `mappend` mempty { hoLibraries = ldeps })
             newHo <- recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
-            f (ho' `mappend` CollectedHo mempty { hoModules = hoModules newHo }) (readHo `mappend` newHo)  scs
+            f (cho' `mappend` collectedHo { choHo = mempty { hoModules = hoModules newHo }}) (readHo `mappend` newHo)  scs
     ho <- ifunc cho readHo
     f ho readHo scc
 
 fst3 (x,_,_) = x
 
-{-
-checkForHoModule :: Module -> IO (Maybe (HoHeader,Ho))
-checkForHoModule (Module m) = loop $ map snd $ searchPaths m
-    where loop []     = return $ fail ("checkForHoModule: Module "++m++" not found.")
-          loop (f:fs) = do e <- doesFileExist f
-                           if e then checkForHoFile f else loop fs
--}
 
 checkForHoFile :: String            -- ^ file name to check for
     -> IO (Maybe (HoHeader,Ho))
@@ -294,6 +287,10 @@ recordHoFile ho fs header = do
 -- | Check that ho library dependencies are right
 hoLibraryDeps newHo oldHo = hoLibraries newHo `Map.isSubmapOf` hoLibraries oldHo
 
+-- | Find a module, returning just the read Ho file and the parsed
+-- contents of files that still need to be processed, This chases dependencies so
+-- you could end up getting parsed source for several files back.
+-- We only look for ho files where there is a cooresponding haskell source file.
 
 nextModule ::
     Map.Map Module (Maybe (Either FileDep (LibraryName,CheckSum))) -- ^ modules we got, and don't need to worry about
@@ -301,8 +298,6 @@ nextModule ::
     -> Ho -- ^ what we have read so far
     -> [Either Module (String,[(String,String)])] -- ^ either a module name or some files to search
     -> IO (Ho,[(HsModule,FileDep,String)]) -- ^ (everything read,what still needs to be done)
-
-
 
 nextModule ms tl ho [] = return (ho,tl)
 nextModule ms tl ho (Left m:rest) | m `mmember` ms = nextModule ms tl ho rest
@@ -347,18 +342,7 @@ nextModule ms tl ho (Right (name,files):rest) = result where
 
 
 
--- | Find a module, returning just the read Ho file and the parsed
--- contents of files that still need to be processed, This chases dependencies so
--- you could end up getting parsed source for several files back.
--- We only look for ho files where there is a cooresponding haskell source file.
 
-getModule ::
-    Ho          -- ^ initialHo
-    -> String   -- ^ Module name for printing error messages
-    -> [(String,String)]  -- ^ files to search, and the cooresponding ho file
-    -> IO (Ho,[(HsModule,FileDep,String)])
-
-getModule initialHo name files = nextModule (fmap Just $ hoModules initialHo) [] mempty [Right (name,files)]
 
 hsModuleRequires x = ans where
     noPrelude =   or $ not (optPrelude options):[ opt == c | opt <- hsModuleOptions x, c <- ["-N","--noprelude"]]
@@ -388,20 +372,11 @@ mapHoBodies sm ho = ho { hoEs = fmap f (hoEs ho) , hoRules =  runIdentity (E.Rul
     f (t,e) = (t,sm e)
 
 
-
-
 eraseE :: E -> E
 eraseE e = runIdentity $ f e where
     f (EVar tv) = return $ EVar  tvr { tvrIdent = tvrIdent tv }
     f e = emapE f e
 
-getFixups :: Ho -> IdMap E
-getFixups ho = fromList [ (tvrIdent x,EVar x) | (x,_) <- melems (hoEs ho)]
-
-applyFixups :: IdMap E -> Ho -> Ho
-applyFixups mie ho = ho { hoEs = fmap f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) } where
-    f (t,e) = (t,sm e)
-    sm = substMap'' (fmap Just mie)
 
 
 hGetFileDep fn fh = do

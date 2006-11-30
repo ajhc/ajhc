@@ -30,8 +30,24 @@ type CheckSum = String
 type LibraryName = String
 
 -- the collected information that is passed around
-newtype CollectedHo = CollectedHo { choHo :: Ho }
-    deriving(Monoid)
+data CollectedHo = CollectedHo {
+    choExternalNames :: IdSet,
+    choVarMap :: IdMap (Maybe E),
+    choHo :: Ho
+    }
+
+instance Monoid CollectedHo where
+    mempty = collectedHo
+    a `mappend` b = CollectedHo {
+        choExternalNames = choExternalNames a `mappend` choExternalNames b,
+        choVarMap = choVarMap a `mappend` choVarMap b,
+        choHo = choHo a `mappend` choHo b
+        }
+
+choDataTable cho = hoDataTable $ choHo cho
+
+collectedHo :: CollectedHo
+collectedHo = CollectedHo { choExternalNames = mempty, choHo = mempty, choVarMap = mempty }
 
 -- The raw data as ut appears on disk
 data Ho = Ho {

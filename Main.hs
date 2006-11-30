@@ -154,8 +154,6 @@ fileOrModule f = case reverse f of
                    _                   -> Left $ Module f
 
 
-barendregt e = fst $ renameE mempty mempty e -- runIdentity  (renameTraverse' e)
-
 barendregtProg prog = transformProgram transBarendregt prog
 
 transBarendregt = transformParms {
@@ -167,20 +165,11 @@ transBarendregt = transformParms {
     barendregtProgram prog | null $ progCombinators prog = prog
     barendregtProgram prog = programSetDs ds' prog where
         (ELetRec ds' Unknown,_) = renameE mempty mempty (ELetRec (programDs prog) Unknown)
-          {-
-denewtypeProgram prog = transformProgram transDenewtype prog
-transDenewtype = transformParms {
-        transformCategory = "DeNewtype",
-        transformIterate = DontIterate,
-        transformDumpProgress = corePass,
-        transformOperation =  return . denewtype
-        } where
-        -}
+
 denewtype prog | null $ progCombinators prog = prog
 denewtype prog = prog' where
     ELetRec ds _ = removeNewtypes (progDataTable prog) (programE prog)
     prog' = programSetDs ds prog
---    Identity prog' = annotateProgram mempty (\_ nfo -> return nfo)  (\_ nfo -> return nfo) (\_ nfo -> return nfo) (programSetDs ds prog)
 
 lamann _ nfo = return nfo
 letann e nfo = return (annotateArity e nfo)
@@ -201,21 +190,32 @@ processInitialHo ::
     CollectedHo       -- ^ current accumulated ho
     -> Ho    -- ^ new ho, freshly read from file
     -> IO CollectedHo -- ^ final combined ho data.
-processInitialHo (CollectedHo accumho) ho = do
-    let (ds,uids) = runWriter $ annotateDs imap (collectIdAnn rules' (hoProps ho) ) letann lamann (Map.elems $ hoEs ho)
+processInitialHo accumho ho = do
+    let ho' = reprocessHo (hoRules ho) (hoProps ho) ho
+
+        (ds,uids) = runWriter $ annotateDs (choVarMap accumho') (\_ -> return) letann lamann (Map.elems $ hoEs ho')
+        prog = etaAnnotateProgram (programSetDs ds program { progDataTable = choDataTable accumho `mappend` hoDataTable ho })
+
         rules' = runIdentity $ mapBodies (annotate imapRules (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
-        prog = etaAnnotateProgram (denewtype $ programSetDs ds program { progDataTable = hoDataTable accumho `mappend` hoDataTable ho })
-        imap = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho)]
-        imapRules = fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho' `mappend` hoEs ho)]
-        accumho' = reprocessHo rules' (hoProps ho) accumho
+        accumho' = reprocessCho rules' (hoProps ho) accumho
+
+        imapRules = choVarMap accumho'  `mappend` newVarMap -- fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho' `mappend` hoEs ho)]
+        newVarMap = fromList [ (tvrIdent t,Just (EVar t)) | (t,_) <- programDs prog ]
 
     --lintCheckProgram (putStrLn "processInitialHo") prog
-    return $ CollectedHo $ accumho' `mappend` ho { hoUsedIds = uids, hoEs = programEsMap prog }
+    return $ accumho' `mappend` mempty { choVarMap = newVarMap, choExternalNames = idMapToIdSet newVarMap, choHo = ho { hoUsedIds = uids, hoEs = programEsMap prog } }
 
+-- reprocess an old ho to include new rules and properties
 reprocessHo :: Rules -> IdMap Properties -> Ho -> Ho
 reprocessHo rules ps ho = ho { hoEs = Map.map f (hoEs ho) } where
     f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
     g id = runIdentity . idann rules ps id
+
+reprocessCho :: Rules -> IdMap Properties -> CollectedHo -> CollectedHo
+reprocessCho rules ps cho = cho { choVarMap = fmap h (choVarMap cho) , choHo = (choHo cho) { hoEs = Map.map f (hoEs $ choHo cho) }} where
+    f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
+    g id = runIdentity . idann rules ps id
+    h (Just (EVar t)) = Just (EVar (tvrInfo_u (g (tvrIdent t)) t))
 
 
 
@@ -233,9 +233,10 @@ processDecls ::
     -> Ho                   -- ^ preliminary haskell object  data
     -> TiData               -- ^ front end output
     -> IO (CollectedHo,Ho)  -- ^ (new accumulated ho, final ho for this modules)
-processDecls (CollectedHo ho) ho' tiData = do
+processDecls cho ho' tiData = do
     -- some useful values
     let allHo = ho `mappend` ho'
+        ho = choHo cho
         decls | fopts FO.Boxy = tiDataDecls tiData
               | otherwise = concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ] ++ Map.elems (tiDataLiftedInstances tiData)
         originalDecls =  concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ]
@@ -252,7 +253,7 @@ processDecls (CollectedHo ho) ho' tiData = do
     let prog = program {
             progClassHierarchy = hoClassHierarchy allHo,
             progDataTable = fullDataTable,
-            progExternalNames = fromList [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ],
+            progExternalNames = choExternalNames cho,
             progModule = head (fsts $ tiDataModules tiData)
             }
 
@@ -263,7 +264,7 @@ processDecls (CollectedHo ho) ho' tiData = do
  --   sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 
     -- Build rules from instances, specializations, and user specified rules and catalysts
-    rules' <- createInstanceRules fullDataTable (hoClassHierarchy ho')   (Map.fromList [ (runIdentity $ fromId (tvrIdent y),(y,z)) | (y,z) <- ds] `mappend` hoEs ho)
+    rules' <- createInstanceRules fullDataTable (hoClassHierarchy ho')  (Map.fromList [ (runIdentity $ fromId (tvrIdent y),(y,z)) | (y,z) <- ds] `mappend` hoEs ho)
     nrules <- convertRules (progModule prog) tiData (hoClassHierarchy ho') allAssumps fullDataTable decls
     (nds,srules) <- procAllSpecs (tiCheckedRules tiData) ds
 
@@ -288,17 +289,15 @@ processDecls (CollectedHo ho) ho' tiData = do
     prog <- barendregtProg prog
     let allProps = munionWith mappend (hoProps ho')  (idSetToIdMap (const (singleton prop_HASRULE)) (ruleHeadFreeVars allRules))
 
-    ho <- return $ reprocessHo rules allProps ho
+    cho <- return $ reprocessCho rules allProps cho
 
-    let brum = fromList [ (tvrIdent n,Just (EVar n)) | (n,_) <- Map.elems $ hoEs ho ] where
     -- Here we substitute in all the original types, with rules and properties defined in the current module included
-    prog <- return $ runIdentity $ annotateProgram brum (idann allRules allProps) letann lamann prog
+    prog <- return $ runIdentity $ annotateProgram (choVarMap cho) (idann allRules allProps) letann lamann prog
 
     lintCheckProgram (putErrLn "LintPostProcess") prog
 
 
-    --let entryPoints = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || member (tvrIdent t) rfreevars) (tell [t])) prog
-    --    rfreevars = ruleAllFreeVars rules
+
     let entryPoints = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || getProperty prop_INSTANCE t)  (tell [t])) prog
     prog <- return $ prog { progEntryPoints = entryPoints }
 
@@ -306,7 +305,6 @@ processDecls (CollectedHo ho) ho' tiData = do
 
     prog <- programPrune prog
 
-    let initMap = fromList [ (tvrIdent t, Just (EVar t)) | (t,_) <- (Map.elems (hoEs ho))]
 
     -- initial pass, performs
     -- eta expansion of definitons
@@ -367,7 +365,7 @@ processDecls (CollectedHo ho) ho' tiData = do
     lintCheckProgram onerrNone prog
     progress "Initial optimization pass"
 
-    prog <- programMapProgGroups initMap  fint prog
+    prog <- programMapProgGroups mempty  fint prog
     progress "!"
     hFlush stdout >> hFlush stderr
 
@@ -410,9 +408,6 @@ processDecls (CollectedHo ho) ho' tiData = do
         liftIO $ wdump FD.Progress $ putErr (replicate wws 'w')
         mprog <- return mprog'
 
-        --smap <- return $ fromList [ (tvrIdent v,(v,lc)) | (v,lc) <- programDs mprog] `union` smap
-        --sopt <- return $ sopt { SS.so_boundVars = smap }
-
         mprog <- simplifyProgram sopt "Simplify-Three" coreMini mprog
 
 
@@ -447,7 +442,8 @@ processDecls (CollectedHo ho) ho' tiData = do
         hoRules = hoRules ho' `mappend` rules,
         hoUsedIds = collectIds (ELetRec (programDs prog) Unknown)
         }
-    return (CollectedHo (newHo `mappend` ho),newHo)
+        newMap = fromList [ (tvrIdent n,Just (EVar n)) | (n,_) <- Map.elems $ hoEs newHo ]
+    return (mempty { choHo = newHo, choExternalNames = idMapToIdSet newMap, choVarMap = newMap  } `mappend` cho,newHo)
 
 programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = programSetDs ds' prog where
@@ -481,7 +477,8 @@ isInteractive = do
 
 transTypeAnalyze = transformParms { transformCategory = "typeAnalyze",  transformOperation = typeAnalyze True }
 
-compileModEnv' (CollectedHo ho,_) = do
+compileModEnv' (cho,_) = do
+    let ho = choHo cho
     if optMode options == CompileHo then return () else do
 
     let dataTable = progDataTable prog
