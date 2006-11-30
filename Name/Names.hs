@@ -96,6 +96,7 @@ rt_tag = toName RawType "tag#"
 s_Star = toName SortName ("Jhc@","*")
 s_Hash = toName SortName ("Jhc@","#")
 
+v_eqString = toName Val  ("Jhc.String","eqString")
 v_target = toName Val  ("Jhc.Options","target")
 v_error = toName Val ("Jhc.IO","error")
 v_toEnum = toName Val ("Jhc.Enum","toEnum")

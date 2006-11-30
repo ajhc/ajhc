@@ -73,6 +73,7 @@ createIfv v e a b = res where
     ic = eCase (EVar tv) [Alt (LitInt 1 tIntzh) a, Alt (LitInt 0 tIntzh) b] Unknown
     res = eCase e [Alt (litCons { litName = dc_Boolzh, litArgs = [tv], litType = tBool }) ic] Unknown
 
+ifzh e a b = eCase e [Alt (LitInt 1 tIntzh) a, Alt (LitInt 0 tIntzh) b] Unknown
 
 head (x:_) = x
 head _ = error "FromHsHeadError"
@@ -123,8 +124,8 @@ simplifyHsPat (HsPNeg p)
     | HsPLit (HsFrac i) <- p' = HsPLit $ HsFrac (negate i)
     | otherwise = HsPNeg p'
     where p' = (simplifyHsPat p)
-simplifyHsPat (HsPLit (HsString s)) = simplifyHsPat (HsPList (map f s)) where
-    f c = HsPLit (HsChar c)
+--simplifyHsPat (HsPLit (HsString s)) | True || length s <= 3 = simplifyHsPat (HsPList (map f s)) where
+--    f c = HsPLit (HsChar c)
 simplifyHsPat (HsPAsPat n p) = HsPAsPat n (simplifyHsPat p)
 simplifyHsPat (HsPTypeSig _ p _) = simplifyHsPat p
 simplifyHsPat (HsPList ps) = pl ps where
@@ -646,6 +647,17 @@ convertMatches funcs tv cType bs ms err = match bs ms err where
                         createIf (EAp (EAp eq (EVar bv)) ip) m els
                 e <- foldlM f err gps
                 return $ eLetRec [(bv,b)] e
+            | all isHsPString patternHeads = do
+                let tb = getType b
+                [bv] <- newVars [tb]
+                (eqString,_,_) <- convertValue v_eqString
+                let gps = [ (p,[ (ps,e) |  (_:ps,e) <- xs ]) | (p,xs) <- sortGroupUnderF ((\ (x:_) -> x) . fst) ps]
+                    eq = EAp (func_equals funcs) tb
+                    f els (HsPLit (HsString s),ps) = do
+                        m <- match bs ps err
+                        return $ ifzh (EAp (EAp (EVar eqString) (EVar bv)) (toE s)) m els
+                e <- foldlM f err gps
+                return $ eLetRec [(bv,b)] e
             | all isHsPLit patternHeads = do
                 let gps = [ (p,[ (ps,e) |  (_:ps,e) <- xs ]) | (p,xs) <- sortGroupUnderF ((\ (x:_) -> x) . fst) ps]
                     f (HsPLit l,ps) = do
@@ -656,9 +668,12 @@ convertMatches funcs tv cType bs ms err = match bs ms err where
                 dataTable <- asks ceDataTable
                 return $ unbox dataTable b vr $ \tvr -> eCase tvr as err
                 --return $ eCase b as err
-            | all isHsPApp patternHeads = do
+            | all (\c -> isHsPApp c || isHsPString c) patternHeads = do
                 dataTable <- getDataTable
-                let gps =  sortGroupUnderF (hsPatName . (\ (x:_) -> x) . fst) ps
+                let gps =  sortGroupUnderF (hsPPatName . (\ (x:_) -> x) . fst) (map ff ps)
+                    ff ((HsPLit (HsString ""):ps),b) = ((HsPApp (nameName $ dc_EmptyList) []):ps,b)
+                    ff ((HsPLit (HsString (c:cs)):ps),b) = ((HsPApp (nameName $ dc_Cons) [HsPLit (HsChar c),HsPLit (HsString cs)]):ps,b)
+                    ff x = x
                     (Just patCons) = getConstructor (toName DataConstructor $ fst $ head gps) dataTable
                     f (name,ps) = do
                         let spats = hsPatPats $ (\ (x:_) -> x) $ fst ((\ (x:_) -> x) ps)
@@ -696,6 +711,12 @@ convertMatches funcs tv cType bs ms err = match bs ms err where
         toBinding p = error $ "toBinding: " ++ show p
 
 
+hsPPatName p@HsPApp {} = hsPatName p
+hsPPatName (HsPLit (HsString "")) = nameName dc_EmptyList
+hsPPatName (HsPLit (HsString {})) = nameName dc_Cons
+
+isHsPString (HsPLit HsString {}) = True
+isHsPString _ = False
 
 isStrictPat HsPVar {} = False
 isStrictPat (HsPNeg p) = isStrictPat p

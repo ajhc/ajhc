@@ -3,6 +3,8 @@ module Jhc.Prim where
 
 -- this module is always included in all programs compiled by jhc. it defines some things that are needed to make jhc work at all.
 
+import Jhc.String
+
 infixr 5  :
 data [] a =  a : ([] a) | []
 

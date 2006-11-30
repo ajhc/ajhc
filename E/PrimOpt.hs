@@ -153,6 +153,7 @@ processPrimPrim dataTable o@(EPrim (APrim prim _) es orig_t) = maybe o id (primo
             return $ unbox dataTable a vara $ \tvra ->
                 unbox dataTable b varb $ \tvrb ->
                     eStrictLet (tVr varc sta) (EPrim (APrim (Operator cop [ta,ta] ta) mempty) [EVar tvra, EVar tvrb] sta) (ELit (litCons { litName = cna, litArgs = [EVar (tVr varc sta)], litType = orig_t }))
+    primopt (PrimPrim "equalsChar") [a,b] t = return (EPrim (APrim (Operator "==" ["HsChar","HsChar"] "int") mempty) [a,b] t)
     primopt (PrimPrim "box") [a] t = return ans where
         Just (cna,sta,ta) = lookupCType' dataTable t
         ans = ELit litCons { litName = cna, litArgs = [a], litType = orig_t }
