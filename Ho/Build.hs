@@ -16,6 +16,7 @@ import IO(bracket)
 import List
 import Maybe
 import Monad
+import Data.Tree
 import Prelude hiding(print,putStrLn)
 import System.IO hiding(print,putStrLn)
 import System.Posix.Files
@@ -117,8 +118,13 @@ findModule cho need ifunc func  = do
         (name,files) = f need
     (readHo,ms) <- nextModule (fmap Just . hoModules . choHo $ cho) [] mempty [Right (name,files)]
     processIOErrors
-    let scc = G.sccGroups (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires . fst3) )
-    when (dump FD.SccModules) $ CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
+    let mgraph =  (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires . fst3) )
+        scc = G.sccGroups mgraph
+        mgraph' =  (G.newGraph scc (fromModule . hsModuleName . fst3 . head) (concatMap ff . concatMap (hsModuleRequires . fst3)) )
+        ff n = [ fromModule . hsModuleName $ ms | gs@((ms,_,_):_) <- scc, n `elem` map (fromModule . hsModuleName . fst3) gs]
+    when (dump FD.SccModules) $ do
+        CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
+        putErrLn $ drawForest (map (fmap (show . map (hsModuleName . fst3))) (G.dff mgraph'))
     let f ho readHo [] = return (ho,readHo)
         f ho readHo (sc:scs) = do
             (cho',newHo) <- func ho [ hs | (hs,_,_) <- sc ]
