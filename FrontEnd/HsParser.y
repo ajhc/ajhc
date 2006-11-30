@@ -51,9 +51,12 @@ import FrontEnd.SrcLoc
       QVARSYM  { QVarSym $$ }
       QCONSYM  { QConSym $$ }
       INT      { IntTok $$ }
+      UINT     { UIntTok $$ }
       RATIONAL { FloatTok $$ }
       CHAR     { Character $$ }
+      UCHAR    { UCharacter $$ }
       STRING   { StringTok $$ }
+      USTRING  { UStringTok $$ }
       PRAGMAOPTIONS { PragmaOptions $$ }
       PRAGMASTART { PragmaStart $$ }
       PRAGMARULES { PragmaRules $$ }
@@ -860,9 +863,12 @@ qvarsym1 :: { HsName }
 
 literal :: { HsExp }
       : INT                   { HsLit (HsInt (readInteger $1)) }
+      | UINT                  { HsLit (HsIntPrim (readInteger $1)) }
       | CHAR                  { HsLit (HsChar $1) }
+      | UCHAR                 { HsLit (HsCharPrim $1) }
       | RATIONAL              { HsLit (HsFrac (readRational $1)) }
       | STRING                { HsLit (HsString $1) }
+      | USTRING               { HsLit (HsStringPrim $1) }
 
  srcloc :: { SrcLoc } :       {% getSrcLoc }
 

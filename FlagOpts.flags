@@ -2,6 +2,7 @@
 
 !Code options
 unboxed-tuples allow unboxed tuple syntax to be recognized
+unboxed-values allow unboxed value syntax
 ffi support foreign function declarations
 
 !Typechecking

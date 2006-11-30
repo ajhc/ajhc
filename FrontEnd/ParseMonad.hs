@@ -62,8 +62,9 @@ emptyParseState = ParseState { psLexContext = [], psWarnings = [] }
 
 data ParseMode = ParseMode {
                 -- | original name of the file being parsed
-		parseFilename :: String,
-                parseFFI :: Bool,
+		parseFilename      :: String,
+                parseFFI           :: Bool,
+                parseUnboxedValues :: Bool,
                 parseUnboxedTuples :: Bool
 		}
 
@@ -74,11 +75,13 @@ defaultParseMode :: ParseMode
 defaultParseMode = ParseMode {
 		parseFilename = "<unknown>",
                 parseFFI = False,
+                parseUnboxedValues = False,
                 parseUnboxedTuples = False
 		}
 
 parseModeOptions options = defaultParseMode {
-    parseUnboxedTuples = FO.UnboxedTuples `Set.member` optFOptsSet options,
+    parseUnboxedTuples = FO.UnboxedTuples `Set.member` optFOptsSet options || FO.UnboxedValues `Set.member` optFOptsSet options,
+    parseUnboxedValues = FO.UnboxedValues `Set.member` optFOptsSet options,
     parseFFI = FO.Ffi `Set.member` optFOptsSet options
     }
 

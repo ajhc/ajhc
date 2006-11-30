@@ -35,10 +35,13 @@ data Token
         | ConSym String
         | QVarSym (String,String)
         | QConSym (String,String)
-	| IntTok Integer
+	| IntTok  Integer
+	| UIntTok Integer
 	| FloatTok Rational
 	| Character Char
+	| UCharacter Char
         | StringTok String
+        | UStringTok String
         | PragmaOptions [String]
         | PragmaRules Bool
         | PragmaSpecialize Bool
@@ -372,30 +375,32 @@ lexToken = do
 
 lexDecimalOrFloat :: Lex a Token
 lexDecimalOrFloat = do
-        let ld ds' = do
-                ds <- lexWhile isDigit
-                rest <- getInput
-                case rest of
-                    ('_':_) -> discard 1 >> ld (ds' ++ ds)
-                    rest -> return (ds' ++ ds,rest)
-        (ds,rest) <- ld []
-	case rest of
-	    ('.':d:_) | isDigit d -> do
-		discard 1
-		frac <- lexWhile isDigit
-		let num = parseInteger 10 (ds ++ frac)
-		    decimals = toInteger (length frac)
-		exponent <- do
-			rest2 <- getInput
-			case rest2 of
-			    'e':_ -> lexExponent
-			    'E':_ -> lexExponent
-			    _     -> return 0
-		return (FloatTok ((num%1) * 10^^(exponent - decimals)))
-	    e:_ | toLower e == 'e' -> do
-		exponent <- lexExponent
-		return (FloatTok ((parseInteger 10 ds%1) * 10^^exponent))
-	    _ -> return (IntTok (parseInteger 10 ds))
+    ParseMode { parseUnboxedValues = uval } <- lexParseMode
+    let ld ds' = do
+            ds <- lexWhile isDigit
+            rest <- getInput
+            case rest of
+                ('_':_) -> discard 1 >> ld (ds' ++ ds)
+                rest -> return (ds' ++ ds,rest)
+    (ds,rest) <- ld []
+    case rest of
+        ('.':d:_) | isDigit d -> do
+            discard 1
+            frac <- lexWhile isDigit
+            let num = parseInteger 10 (ds ++ frac)
+                decimals = toInteger (length frac)
+            exponent <- do
+                    rest2 <- getInput
+                    case rest2 of
+                        'e':_ -> lexExponent
+                        'E':_ -> lexExponent
+                        _     -> return 0
+            return (FloatTok ((num%1) * 10^^(exponent - decimals)))
+        e:_ | toLower e == 'e' -> do
+            exponent <- lexExponent
+            return (FloatTok ((parseInteger 10 ds%1) * 10^^exponent))
+        '#':_ | uval -> discard 1 >> return (UIntTok (parseInteger 10 ds))
+        _ -> return (IntTok (parseInteger 10 ds))
 
     where
 	lexExponent :: Lex a Integer
@@ -457,9 +462,9 @@ lexChar = do
 		[]	-> fail "Incomplete character constant"
 
 lexString :: Lex a Token
-lexString = loop ""
-    where
-	loop s = do
+lexString = do
+    ParseMode { parseUnboxedValues = uval } <- lexParseMode
+    let loop s = do
 		r <- getInput
 		case r of
 		    '\\':'&':_ -> do
@@ -473,6 +478,9 @@ lexString = loop ""
 			     | otherwise -> do
 				ce <- lexEscape
 				loop (ce:s)
+		    '"':'#':_ | uval -> do
+				discard 2
+				return (UStringTok (reverse s))
 		    '"':_ -> do
 				discard 1
 				return (StringTok (reverse s))
@@ -495,6 +503,7 @@ lexString = loop ""
 			discard 1
 			lexWhiteChars
 		    _ -> return ()
+    loop ""
 
 lexEscape :: Lex a Char
 lexEscape = do

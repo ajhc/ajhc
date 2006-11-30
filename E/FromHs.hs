@@ -248,8 +248,9 @@ getTypeCons x = error $ "getTypeCons: " ++ show x
 
 
 
-unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
-unbox dataTable e vn wtd = eCase e [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd tvra)] Unknown where
+unbox :: DataTable -> E -> Int -> (E -> E) -> E
+unbox dataTable e _vn wtd | getType (getType e) == eHash = wtd e
+unbox dataTable e vn wtd = eCase e [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd (EVar tvra))] Unknown where
     te = getType e
     tvra = tVr vn sta
     Just (cna,sta,ta) = lookupCType' dataTable te
@@ -449,6 +450,9 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         t' = getAssump n'
         (_,rt) = argTypes' (tipe t')
     cExpr (HsLit (HsString s)) = return $ E.Values.toE s
+    cExpr (HsAsPat n' (HsLit (HsIntPrim i))) = ans where
+        t' = getAssump n'
+        ans = return $ ELit (LitInt (fromIntegral i) (tipe t'))
     cExpr (HsAsPat n' (HsLit (HsInt i))) = ans where
         t' = getAssump n'
         ty = tipe t'
@@ -586,6 +590,8 @@ intConvert' funcs typ i = EAp (EAp fun typ) (ELit (litCons { litName = con, litA
     f_fromInteger = func_fromInteger funcs
 
 litconvert (HsChar i) t | t == tChar =  LitInt (fromIntegral $ ord i) tCharzh
+litconvert (HsCharPrim i) t | t == tCharzh =  LitInt (fromIntegral $ ord i) tCharzh
+litconvert (HsIntPrim i) t  =  LitInt (fromIntegral $  i) t
 litconvert e t = error $ "litconvert: shouldn't happen: " ++ show (e,t)
 
 
@@ -648,7 +654,7 @@ convertMatches funcs tv cType bs ms err = match bs ms err where
                 as@(_:_) <- mapM f gps
                 [TVr { tvrIdent = vr }] <- newVars [Unknown]
                 dataTable <- asks ceDataTable
-                return $ unbox dataTable b vr $ \tvr -> eCase (EVar tvr) as err
+                return $ unbox dataTable b vr $ \tvr -> eCase tvr as err
                 --return $ eCase b as err
             | all isHsPApp patternHeads = do
                 dataTable <- getDataTable

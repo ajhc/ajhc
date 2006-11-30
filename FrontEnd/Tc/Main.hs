@@ -156,6 +156,16 @@ tiExpr (HsCon conName) typ = do
     sc `subsumes` typ
     return (HsCon conName)
 
+tiExpr (HsLit l@(HsIntPrim _)) typ = do
+    unBox typ
+    ty <- evalType typ
+    case ty of
+        TCon (Tycon n kh) | kh == kindHash -> return ()
+        _ -> ty `boxyMatch` (TCon (Tycon tc_Int__ kindHash))
+    (ne,n) <- wrapInAsPat (HsLit l)
+    addToCollectedEnv (Map.singleton n ty)
+    return ne
+
 tiExpr (HsLit l@(HsInt _)) typ = do
     t <- tiLit l
     t `subsumes` typ
@@ -381,6 +391,13 @@ tiPat pl@(HsPLit HsString {}) typ = boxyMatch tString typ >> return (pl,mempty)
 tiPat pl@(HsPLit HsInt {}) typ = do
     unBox typ
     addPreds [IsIn class_Num typ]
+    return (pl,mempty)
+tiPat pl@(HsPLit HsIntPrim {}) typ = do
+    unBox typ
+    ty <- evalType typ
+    case ty of
+        TCon (Tycon n kh) | kh == kindHash -> return ()
+        _ -> ty `boxyMatch` (TCon (Tycon tc_Int__ kindHash))
     return (pl,mempty)
 tiPat pl@(HsPLit HsFrac {}) typ = do
     unBox typ
