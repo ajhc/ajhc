@@ -60,6 +60,18 @@ scc (Graph g ln kv fn) = map decode forest where
     decode other = Right (dec other [])
     dec (Node v ts) vs = ln v:foldr dec vs ts
 
+sccForest :: Graph n k -> Forest n
+sccForest (Graph g ln kv fn) = map (fmap ln) forest where
+    forest = Data.Graph.scc g
+
+dff :: Graph n k -> Forest n
+dff (Graph g ln kv fn) = map (fmap ln) forest where
+    forest = Data.Graph.dff g
+
+dfs :: Graph n k -> [k] -> Forest n
+dfs (Graph g ln kv fn) ks = map (fmap ln) forest where
+    forest = Data.Graph.dfs g [ v | Just v <- map kv ks]
+
 components :: Graph n k -> [[n]]
 components (Graph g ln kv fn) = map decode forest where
     forest = Data.Graph.components g
