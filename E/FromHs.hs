@@ -700,6 +700,7 @@ convertMatches funcs tv cType bs ms err = match bs ms err where
             where
             patternHeads = map ((\ (x:_) -> x) . fst) ps
         patternGroups = groupUnder (isStrictPat . (\ (x:_) -> x) . fst) ps
+        procAs b (HsPNeg (HsPLit (HsInt i)):ps, ef) =  procAs b (HsPLit (HsInt (negate i)):ps,ef)
         procAs b (HsPNeg p:ps, ef) =  (p:ps,ef)  -- TODO, negative patterns
         procAs b (HsPAsPat n p:ps, ef) =  (p:ps,eLetRec [((tv n),b)] . ef)
         procAs b (HsPIrrPat p:ps, ef) =  (p:ps, ef) -- TODO, irrefutable patterns
