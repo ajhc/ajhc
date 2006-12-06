@@ -119,9 +119,7 @@ runExpr x w = runNoWrapper (print x) w
 getChar :: IO Char
 getChar = do
     ch <- c_getwchar
-    case ch of
-        -1 -> fail "End of file."
-        _ -> return (cwintToChar ch)
+    if ch == -1 then fail "End of file." else return (cwintToChar ch)
 
 foreign import primitive "const.\"r\"" read_str :: Ptr CChar
 
@@ -130,4 +128,6 @@ foreign import primitive "integralCast" charToCWchar :: Char -> CWchar
 
 foreign import ccall "stdio.h putwchar" c_putwchar :: CWchar -> IO ()
 foreign import ccall "wchar.h getwchar" c_getwchar :: IO CWint
+
+foreign import primitive "const.WEOF" c_WEOF :: CWint
 
