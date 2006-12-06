@@ -63,8 +63,8 @@ cTypeInfoT (ELit LitCons { litName = n }) | (RawType,t) <- fromName n = cTypeInf
 
 cTypeInfo "wchar_t" = ("Char#","C#","Char")
 cTypeInfo "HsChar" = ("Char#","C#","Char")
-cTypeInfo "HsPtr" =  ("Addr#","Ptr","Ptr ()")
-cTypeInfo "HsFunPtr" =  ("Addr#","Ptr","Ptr ()")
+cTypeInfo "HsPtr" =  ("Addr#","Ptr","(Ptr ())")
+cTypeInfo "HsFunPtr" =  ("Addr#","Ptr","(Ptr ())")
 cTypeInfo n = (if primTypeIsSigned pi then "Int#" else "Word#",v,i) where
         (v,i) = if primTypeIsSigned pi then ('I':nn ++ "#","Int" ++ nn) else ('W':nn ++ "#","Word" ++ nn)
         nn = show $ primTypeSizeOf pi * 8
@@ -262,13 +262,6 @@ transE ECase { eCaseBind = TVr { tvrIdent = 0, tvrType = tt }, eCaseScrutinee = 
     scrut <- transE scrut
     body <- transE body
     return (scrut <+> text "`seq`" <+> body)
-transE ECase { eCaseBind = TVr { tvrIdent = 0 }, eCaseScrutinee = scrut, eCaseDefault = Just md, eCaseAlts = as@[Alt (LitInt 0 (ELit LitCons { litName = n })) _] } | n == rt_HsPtr = mparen $ do
-    scrut <- transE scrut
-    md <- noParens $ transE md
-    let md' =  text "_" <+> text "->" <+> md
-    as <- mapM (transAlt False undefined) as
-    let alts = as ++ [md']
-    return (text "case" <+> text "scrutAddr" <+> scrut <+> text "of {" $$ nest 4  (vcat (punctuate semi alts)) $$ text "}")
 transE ECase { eCaseBind = bind, eCaseScrutinee = scrut, eCaseDefault = md, eCaseAlts = as } = mparen $ do
     scrut <- noParens $ transE scrut
     let dobind = 0 /= tvrIdent bind
@@ -293,6 +286,41 @@ transE (EPrim (APrim Operator { primOp = op, primArgTypes = [at,_] } _) [x,y] _)
     x <- transE x
     y <- transE y
     return $ text "fromBool" <+> (parens $ hsep [text z,x,y])
+transE (EPrim (APrim CConst { primConst = ('"':rs) } _) [] _) = return (text ('"':rs) <> text "#")
+transE (EPrim (APrim PrimTypeInfo { primArgType = at, primTypeInfo = c }  _) [] _) = ans where
+    Just pi = primitiveInfo at
+    ans = case c of
+        PrimSizeOf -> return $ tshow (primTypeSizeOf pi) <> char '#'
+
+transE (EPrim (APrim Peek { primArgType = at } _) [w,x] _) = mparen ans where
+    ans = do
+        w <- transE w
+        x <- transE x
+        return (text func <+> x <+> text "0#" <+> w)
+    (tt,_,_) = cTypeInfo at
+    Just pi = primitiveInfo at
+    size = primTypeSizeOf pi * 8
+    sign = primTypeIsSigned pi
+    func = case tt of
+        "Char#" -> "readWideCharOffAddr#"
+        "Addr#" -> "readAddrOffAddr#"
+        "Int#" -> "readInt" ++ show size ++ "OffAddr#"
+        "Word#" -> "readWord" ++ show size ++ "OffAddr#"
+transE (EPrim (APrim Poke { primArgType = at } _) [w,ptr,v] _) = mparen ans where
+    ans = do
+        w <- transE w
+        ptr <- transE ptr
+        v <- transE v
+        return (text func <+> ptr <+> text "0#" <+> v <+> w)
+    Just pi = primitiveInfo at
+    size = primTypeSizeOf pi * 8
+    sign = primTypeIsSigned pi
+    (tt,_,_) = cTypeInfo at
+    func = case tt of
+        "Char#" -> "writeWideCharOffAddr#"
+        "Addr#" -> "writeAddrOffAddr#"
+        "Int#" -> "writeInt" ++ show size ++ "OffAddr#"
+        "Word#" -> "writeWord" ++ show size ++ "OffAddr#"
 transE (EPrim (APrim (AddrOf addr) _) [] _) = mparen $ do
     tell mempty { collPrims = Set.singleton (AddrOf addr) }
     return (text $ "unPtr addr_" ++ mangleIdent addr)
@@ -311,6 +339,8 @@ transE (EPrim (APrim cast@CCast { primArgType = at, primRetType = rt } _) [x] _)
     ("Int#","Word#") -> return (text "int2Word#" <+> x)
     ("Char#","Word#") -> return (text "char2Word__" <+> x)
     ("Word#","Char#") -> return (text "word2Char__" <+> x)
+    ("Addr#","Word#") -> return (text "int2Word#" <+> parens (text "addr2Int#" <+> x))
+    ("Word#","Addr#") -> return (text "int2Addr#" <+> parens (text "word2Int#" <+> x))
     xs -> fail $ "unknown coercion: " ++ show xs
 
 transE e = mparen $ return $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
@@ -386,19 +416,17 @@ op2TableCmp (op,rt) = lookup rt table >>= lookup op where
         ]
 
 transAlt :: Bool -> Doc -> Alt E -> TM Doc
-transAlt dobind b (Alt (LitInt num t) e) | t == tCharzh || t == rawType "wchar_t" = do
-    e <- noParens $ transE e
-    return ( (if dobind then b <> char '@' else empty) <> text (show $ chr $ fromIntegral num) <> text "#" <+> text "->" <+> e)
 transAlt dobind b (Alt LitInt { litNumber = i, litType = tt } e) = do
     let (t,_,_) = cTypeInfoT tt
     e <- noParens $ transE e
-    if t == "Int#" then
-        return ( (if dobind then b <> char '@' else empty) <> tshow i <> text "#" <+> text "->" <+> e)
-     else do
-        let bvar = if dobind then b else text "_bvar"
-            Just eq = op2TableCmp ("==",t)
-        v <- transE (ELit (LitInt i tt))
-        return ( bvar <+> text "|" <+> text eq <+> bvar <+> v <+> text "->" <+> e)
+    case t of
+        "Int#" -> return $ (if dobind then b <> char '@' else empty) <> tshow i <> text "#" <+> text "->" <+> e
+        "Char#" -> return $ (if dobind then b <> char '@' else empty) <> text (show $ chr $ fromIntegral i) <> text "#" <+> text "->" <+> e
+        _ -> do
+            let bvar = if dobind then b else text "_bvar"
+                Just eq = op2TableCmp ("==",t)
+            v <- transE (ELit (LitInt i tt))
+            return (bvar <+> text "|" <+> text eq <+> bvar <+> v <+> text "->" <+> e)
 transAlt dobind b (Alt LitCons { litName = c, litArgs = ts } e) = do
     tell mempty { collNames = Set.singleton (c,length ts,False) }  -- XXX this shouldn't be needed
     ts <- mapM transTVr ts
