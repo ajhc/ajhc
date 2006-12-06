@@ -46,11 +46,9 @@ getContents :: IO String
 getContents = unsafeInterleaveIO getContents' where
     getContents' = do
         ch <- c_getwchar
-        case ch of
-            -1 -> return []
-            _ -> do
-                xs <- unsafeInterleaveIO getContents'
-                return (cwintToChar ch:xs)
+        if ch == -1 then return [] else  do
+            xs <- unsafeInterleaveIO getContents'
+            return (cwintToChar ch:xs)
 
 
 readFile :: FilePath -> IO String
@@ -59,9 +57,7 @@ readFile fn = do
     if  (file == nullPtr) then (fail "Could not open file.") else do
         let gc = do
                 ch <- c_fgetwc file
-                case ch of
-                    -1 -> c_fclose file >> return []
-                    _ -> do
+                if ch == -1 then c_fclose file >> return [] else do
                         xs <- unsafeInterleaveIO gc
                         return (cwintToChar ch:xs)
         unsafeInterleaveIO gc
