@@ -8,6 +8,17 @@ import Doc.DocLike
 import Doc.PPrint
 
 
+data PrimTypeType = PrimTypeIntegral | PrimTypeFloating | PrimTypePointer | PrimTypeVoid
+    deriving(Show,Eq,Ord)
+
+data PrimType = PrimType {
+    primTypeName :: ExtType,
+    primTypeType :: PrimTypeType,
+    primTypeAlignmentOf :: Int,
+    primTypeIsSigned :: Bool,
+    primTypeSizeOf :: Int
+    } deriving(Show)
+
 type ExtType = String
 
 emptyExtType = ""
@@ -22,11 +33,11 @@ data Prim =
     | Peek { primArgType :: ExtType }                            -- read value from memory
     | Poke { primArgType :: ExtType }                            -- write value to memory
     | CCast { primArgType :: ExtType, primRetType :: ExtType }   -- Cast from one basic type to another, possibly lossy.
-    | PrimTypeInfo { primArgType :: ExtType,  primRetType :: ExtType, primTypeInfo :: PrimTypeInfo }   -- evaluates to sizeof its argument in bytes
+    | PrimTypeInfo { primArgType :: ExtType,  primRetType :: ExtType, primTypeInfo :: PrimTypeInfo }
     deriving(Typeable, Data, Eq, Ord, Show)
     {-! derive: GhcBinary !-}
 
-data PrimTypeInfo = PrimSizeOf | PrimMaxBound | PrimMinBound
+data PrimTypeInfo = PrimSizeOf | PrimMaxBound | PrimMinBound | PrimAlignmentOf | PrimTypeIsSigned
     deriving(Typeable, Data, Eq, Ord, Show)
     {-! derive: GhcBinary !-}
 

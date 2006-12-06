@@ -1,14 +1,69 @@
-
 arch_generic = [
-  ("uint32_t", 4),
-  ("int8_t", 1),
-  ("int16_t", 2),
-  ("int32_t", 4),
-  ("int64_t", 8),
-  ("uint8_t", 1),
-  ("uint16_t", 2),
-  ("uint32_t", 4),
-  ("uint64_t", 8),
-  ("char", 1),
-  ("void",0)
- ]
+  PrimType {
+    primTypeName = "uint32_t",
+    primTypeIsSigned = False,
+    primTypeType = PrimTypeIntegral,
+    primTypeAlignmentOf = 4,
+    primTypeSizeOf = 4 },
+  PrimType {
+    primTypeName = "int8_t",
+    primTypeIsSigned = True,
+    primTypeType = PrimTypeIntegral,
+    primTypeAlignmentOf = 1,
+    primTypeSizeOf = 1 },
+  PrimType {
+    primTypeName = "int16_t",
+    primTypeIsSigned = True,
+    primTypeType = PrimTypeIntegral,
+    primTypeAlignmentOf = 2,
+    primTypeSizeOf = 2 },
+  PrimType {
+    primTypeName = "int32_t",
+    primTypeIsSigned = True,
+    primTypeType = PrimTypeIntegral,
+    primTypeAlignmentOf = 4,
+    primTypeSizeOf = 4 },
+  PrimType {
+    primTypeName = "int64_t",
+    primTypeIsSigned = True,
+    primTypeType = PrimTypeIntegral,
+    primTypeAlignmentOf = 8,
+    primTypeSizeOf = 8 },
+  PrimType {
+    primTypeName = "uint8_t",
+    primTypeIsSigned = False,
+    primTypeType = PrimTypeIntegral,
+    primTypeAlignmentOf = 1,
+    primTypeSizeOf = 1 },
+  PrimType {
+    primTypeName = "uint16_t",
+    primTypeIsSigned = False,
+    primTypeType = PrimTypeIntegral,
+    primTypeAlignmentOf = 2,
+    primTypeSizeOf = 2 },
+  PrimType {
+    primTypeName = "uint32_t",
+    primTypeIsSigned = False,
+    primTypeType = PrimTypeIntegral,
+    primTypeAlignmentOf = 4,
+    primTypeSizeOf = 4 },
+  PrimType {
+    primTypeName = "uint64_t",
+    primTypeIsSigned = False,
+    primTypeType = PrimTypeIntegral,
+    primTypeAlignmentOf = 8,
+    primTypeSizeOf = 8 },
+  PrimType {
+    primTypeName = "char",
+    primTypeIsSigned = True,
+    primTypeType = PrimTypeIntegral,
+    primTypeAlignmentOf = 1,
+    primTypeSizeOf = 1 },
+  PrimType {
+    primTypeName = "void",
+    primTypeIsSigned = False,
+    primTypeType = PrimTypeVoid,
+    primTypeAlignmentOf = 0,
+    primTypeSizeOf = 0 }
+  ]
+

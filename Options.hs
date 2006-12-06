@@ -65,6 +65,7 @@ data Opt = Opt {
     optArgs        ::  [String],
     optKeepGoing   :: !Bool,      -- ^ Keep going when encountering errors.
     optMainFunc    ::  Maybe (Bool,String),    -- ^ Entry point name for the main function.
+    optArch        ::  Maybe String,           -- ^ target architecture
     optOutName     ::  String,                 -- ^ Name of output file.
     optPrelude     :: !Bool,                   -- ^ No implicit Prelude.
     optIgnoreHo    :: !Bool,                   -- ^ Ignore ho-files.
@@ -96,6 +97,7 @@ opt = Opt {
     optNoWriteHo   = False,
     optKeepGoing   = False,
     optMainFunc    = Nothing,
+    optArch        = Nothing,
     optOutName     = "hs.out",
     optPrelude     = True,
     optFollowDeps  = True,
@@ -128,7 +130,8 @@ theoptions =
     , Option ['I'] ["interpret"] (NoArg  (optMode_s Interpret))        "interpret."
     , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))        "keep going on errors."
     , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output."
-    , Option ['m'] ["main"]      (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point."
+    , Option []    ["main"]      (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point."
+    , Option ['m'] ["arch"]      (ReqArg (optArch_s . Just ) "arch")            "target architecture."
     , Option []    ["entry"]     (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression."
     , Option ['e'] []            (ReqArg (\d -> optStmts_u (d:)) "<statement>")  "run given statement as if on jhci prompt"
     , Option []    ["debug"]     (NoArg  (optDebug_s True))            "debugging"
