@@ -17,6 +17,7 @@ import qualified System
 
 import Atom
 import C.FromGrin
+import C.Arch
 import CharIO
 import FrontEnd.Class
 import DataConstructors
@@ -516,9 +517,11 @@ compileModEnv' (cho,_) = do
     prog <- transformProgram transformParms { transformCategory = "PruneUnreachable", transformOperation = return . programPruneUnreachable } prog
     prog <- barendregtProg prog
 
+    (viaGhc,fn,_,_) <- determineArch
+    wdump FD.Progress $ putStrLn $ "Arch: " ++ fn
 
     let theTarget = ELit litCons { litName = dc_Target, litArgs = [ELit (LitInt targetIndex tIntzh)], litType = ELit litCons { litName = tc_Target, litArgs = [], litType = eStar } }
-        targetIndex = if fopts FO.ViaGhc then 1 else 0
+        targetIndex = if viaGhc then 1 else 0
     prog <- return $ runIdentity $ flip programMapDs prog $ \(t,e) -> return $ if tvrIdent t == toId v_target then (t { tvrInfo = setProperty prop_INLINE mempty },theTarget) else (t,e)
 
     --wdump FD.Core $ printProgram prog
@@ -604,7 +607,7 @@ compileModEnv' (cho,_) = do
     prog <- barendregtProg prog
     prog <- return $ runIdentity $ programMapBodies (return . cleanupE) prog
 
-    when (fopts FO.ViaGhc) $ do
+    when viaGhc $ do
         wdump FD.Core $ printProgram prog
         compileToHs prog
         exitSuccess

@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -fglasgow-exts -fno-implicit-prelude #-}
 module Main(main) where
 
+import GHC.Int
+import GHC.Word
 import GHC.IOBase
 import GHC.Prim
 import GHC.Base
@@ -48,6 +50,9 @@ alloca__ size action s =
      case action (byteArrayContents# barr#) s of { (# s, r #) ->
      case touch# barr# s of { s -> (# s, r #) }
      }}}
+
+word2Char__ x = chr# (word2Int# x)
+char2Word__ x = int2Word# (ord# x)
 
 convertString :: [Char] -> ListTCon Char
 convertString [] = jhc_EmptyList

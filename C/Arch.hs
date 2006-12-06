@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -cpp -fbang-patterns #-}
-module C.Arch(determineArch) where
+module C.Arch(determineArch,primitiveInfo) where
 
 
 
@@ -21,6 +21,8 @@ module C.Arch(determineArch) where
 
 import Char
 import System.Info
+import qualified Data.Map as Map
+import System.IO.Unsafe
 
 import C.Prims
 import Options
@@ -52,6 +54,15 @@ arch_map = [
 
 available_archs = snub $ "ghc":"ghc-64":"ghc-32":[ n | (n,_,_,_) <- arch_map ]  ++ [ n ++ "-" ++ show b |  (n,Just b,_,_) <- arch_map]
 
+primitiveInfo :: Monad m => ExtType -> m PrimType
+primitiveInfo et = Map.lookup et primMap
+
+
+
+primMap :: Map.Map ExtType PrimType
+primMap = Map.fromList [ (primTypeName a,a) | a <- as ] where
+    (_,_,as,_) = unsafePerformIO determineArch
+
 determineArch = do
     let specs = maybe [] (split (== '-')) (optArch options)
         (backendGhc,specs') | ("ghc":rs) <- specs = (True,rs)
@@ -74,8 +85,7 @@ determineArch = do
             (_,"x86_64",64) -> ("x86_64",arch_x86_64,[])
             _ -> arch_error
 
-    print available_archs
-    print (fn,mp,opt)
+    return (backendGhc,fn,mp,opt)
 
 arch_error =  error $ "\nunknown architecture, supported architectures are:\n" ++ show available_archs
 

@@ -5,13 +5,15 @@ import Control.Monad.Identity
 import Control.Monad.RWS
 import Data.FunctorM
 import System.IO
-import Text.PrettyPrint.HughesPJ
+import Text.PrettyPrint.HughesPJ(render,($$),nest,Doc())
 import qualified System
 import qualified Data.Set as Set
 
 import C.Prims
+import C.Arch
 import DataConstructors
 import Doc.PPrint
+import Doc.DocLike
 import E.E
 import E.FreeVars
 import E.Program
@@ -33,7 +35,6 @@ import Util.SetLike
 import qualified FlagDump as FD
 
 progress str = wdump FD.Progress $  (putErrLn str) >> hFlush stderr
-
 
 
 {-# NOINLINE compileToHs #-}
@@ -58,11 +59,18 @@ compileToHs prog = do
     when (r /= System.ExitSuccess) $ fail "Hs code did not compile."
     return ()
 
-showCType "wchar_t" = "Char#"
-showCType "HsChar" = "Char#"
-showCType "HsPtr" =  "Addr#"
-showCType "HsFunPtr" =  "Addr#"
-showCType _ =  "Int#"
+cTypeInfoT (ELit LitCons { litName = n }) | (RawType,t) <- fromName n = cTypeInfo t
+
+cTypeInfo "wchar_t" = ("Char#","C#","Char")
+cTypeInfo "HsChar" = ("Char#","C#","Char")
+cTypeInfo "HsPtr" =  ("Addr#","Ptr","Ptr ()")
+cTypeInfo "HsFunPtr" =  ("Addr#","Ptr","Ptr ()")
+cTypeInfo n = (if primTypeIsSigned pi then "Int#" else "Word#",v,i) where
+        (v,i) = if primTypeIsSigned pi then ('I':nn ++ "#","Int" ++ nn) else ('W':nn ++ "#","Word" ++ nn)
+        nn = show $ primTypeSizeOf pi * 8
+        Just pi = primitiveInfo n
+
+showCType n = fst3 $ cTypeInfo n
 
 restate = vcat $ map f restated where
     f (n,nn,v) = g (nameType n) <> text v <+> text "=" <+> showTCName nn n
@@ -74,17 +82,33 @@ restate = vcat $ map f restated where
         (tc_List,1,"ListTCon")
         ]
 
+fst3 (x,_,_) = x
+
 
 
 transForeign ps = vcat (map f ps) where
     f (AddrOf s) = text $ "foreign import ccall \"&" ++ s ++ "\" addr_" ++ mangleIdent s ++ " :: Ptr ()"
-    f furc@Func { funcName = fn, funcIOLike = True, primArgTypes = as, primRetType = "void" } = ans where
-        ans = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ cfuncname furc ++ " :: " ++ concatInter " -> " ("World__":map showCType as ++ ["World__"])
-    f furc@Func { funcName = fn, funcIOLike = False, primArgTypes = as, primRetType = rt } = ans where
-        ans = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ cfuncname furc ++ " :: " ++ concatInter " -> " (map showCType (as ++ [rt]))
-    f furc@Func { funcName = fn, funcIOLike = True, primArgTypes = as, primRetType = rt } = ans where
-        ans = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ cfuncname furc ++ " :: " ++ concatInter " -> " ("World__":(map showCType as ++ ["(# World__, " ++ showCType rt ++ " #)"]))
+    f furc@Func { funcName = fn, funcIOLike = True, primArgTypes = as, primRetType = "void" } = ans <$> ans' where
+        ans  = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ concatInter " -> " (map (snd . snd) vals ++ ["IO ()"])
+        ans' = text $ cfuncname furc <+> "w" <+> unwords (fsts vals) <+> " = case _" ++ cfuncname furc <+> concatInter " " [ parens (c <+> a) | (a,(c,_)) <- vals ] <+> "of IO f -> case f w of (# w, _ #) -> w"
+        vals = [ ('a':show n,ioInfo a) | a <- as | n <- naturals ]
+    f furc@Func { funcName = fn, funcIOLike = True, primArgTypes = as, primRetType = rt' } = ans <$> ans' where
+        ans  = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ concatInter " -> " (map (snd . snd) vals ++ ["IO " ++ rt])
+        ans' = text $ cfuncname furc <+> "w" <+> unwords (fsts vals) <+> " = case _" ++ cfuncname furc <+> concatInter " " [ parens (c <+> a) | (a,(c,_)) <- vals ] <+> "of IO f -> case f w of (# w, " ++ rc ++ " r #) -> (# w, r #)"
+        vals = [ ('a':show n,ioInfo a) | a <- as | n <- naturals ]
+        (rc,rt) = ioInfo rt'
+    f furc@Func { funcName = fn, funcIOLike = False, primArgTypes = as, primRetType = rt' } = ans <$> ans' where
+        ans  = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ concatInter " -> " (map (snd . snd) vals ++ [rt])
+        ans' = text $ cfuncname furc <+> unwords (fsts vals) <+> " = case _" ++ cfuncname furc <+> concatInter " " [ parens (c <+> a) | (a,(c,_)) <- vals ] <+> "of " ++ rc ++ " r -> r"
+        vals = [ ('a':show n,ioInfo a) | a <- as | n <- naturals ]
+        (rc,rt) = ioInfo rt'
+--    f furc@Func { funcName = fn, funcIOLike = False, primArgTypes = as, primRetType = rt } = ans where
+--       ans = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ cfuncname furc ++ " :: " ++ concatInter " -> " (map showCType (as ++ [rt]))
+--    f furc@Func { funcName = fn, funcIOLike = True, primArgTypes = as, primRetType = rt } = ans where
+--        ans = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ cfuncname furc ++ " :: " ++ concatInter " -> " ("World__":(map showCType as ++ ["(# World__, " ++ showCType rt ++ " #)"]))
     f n = text "{- Foreign.Error " <+> tshow n <+> text "-}"
+    ioInfo n = (x,y) where
+        (_,x,y) = cTypeInfo n
 
 transDataTable dataTable ns = vcat (theType:map g (lefts wtd)) where
     wtd =  Set.toList (mconcatMap f (Set.toList ns))
@@ -148,8 +172,6 @@ nparen xs = do local (\e -> e { envParen = True }) xs
 
 noParens x = local (\e -> e { envParen = False }) x
 
-tshow x = text (show x)
-
 showCon c ts | Just 0 <- fromUnboxedNameTuple c, nameType c == TypeConstructor = text "Nothing"
 showCon c ts | Just 0 <- fromUnboxedNameTuple c, nameType c == DataConstructor = text "theNothing"
 showCon c ts | Just _ <- fromUnboxedNameTuple c = text "(# " <> hsep (punctuate comma ts) <> text " #)"
@@ -195,9 +217,12 @@ typeLike _ = False
 
 transE :: E -> TM Doc
 transE (EError s _) = mparen $ return (text "error" <+> tshow s)
-transE (ELit (LitInt num t)) | t == tCharzh || t == rawType "wchar_t" = return $ text (show $ chr $ fromIntegral num) <> text "#"
-transE (ELit (LitInt num _)) | num < 0 = mparen $ return $ text (show num) <> text "#"
-transE (ELit (LitInt num _)) = return $ text (show num) <> text "#"
+transE (ELit (LitInt num t)) = case cTypeInfoT t of
+    ("Char#",_,_) -> return $ text (show $ chr $ fromIntegral num) <> text "#"
+    ("Int#",_,_)  | num < 0 -> mparen $ return $ text (show num) <> text "#"
+                  | otherwise -> return $ text (show num) <> text "#"
+    ("Addr#",_,_) | num == 0 -> return $ text "nullAddr#"
+    ("Word#",_,_) -> mparen $ text "int2Word# (" <> tshow num <> text "# )"
 transE (ELit LitCons { litName = c, litArgs =  ts }) = nparen $ do
     Env { envType = inType } <- ask
     tell mempty { collNames = Set.singleton (c,length ts,inType) }
@@ -282,8 +307,11 @@ transE (EPrim (APrim cast@CCast { primArgType = at, primRetType = rt } _) [x] _)
     ("Char#","Int#") -> return (text "ord#" <+> x)
     ("Addr#","Int#") -> return (text "addr2Int#" <+> x)
     ("Int#","Addr#") -> return (text "int2Addr#" <+> x)
-    ("Word#","Int#") -> return (text "addr2Int#" <+> x)
+    ("Word#","Int#") -> return (text "word2Int#" <+> x)
     ("Int#","Word#") -> return (text "int2Word#" <+> x)
+    ("Char#","Word#") -> return (text "char2Word__" <+> x)
+    ("Word#","Char#") -> return (text "word2Char__" <+> x)
+    xs -> fail $ "unknown coercion: " ++ show xs
 
 transE e = mparen $ return $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
 
@@ -303,14 +331,14 @@ ghcPrimTable = [
     ]
 
 
-cfuncname Func { funcName = fn, funcIOLike = iol, primArgTypes = as, primRetType = r  } =  ("func_" ++ (if iol then "io" else "pure") ++ "_" ++ fn ++ concatInter "_" (r:as))
+cfuncname Func { funcName = fn, funcIOLike = iol, primArgTypes = as, primRetType = r  } =  text $ ("func_" ++ (if iol then "io" else "pure") ++ "_" ++ fn ++ concatInter "_" (r:as))
 
 hasBoxes e = or $ execWriter (f e) where
     f e | e == tBox = tell [True] >> return e
     f e = emapEGH f f f e
 
 op2Table (op,rt) = lookup (showCType rt) table >>= lookup op where
-    table = [ ("Int#",intTable)]
+    table = [ ("Int#",intTable),("Word#",wordTable)]
     intTable = [
         ("+","(+#)"),
         ("-","(-#)"),
@@ -318,9 +346,16 @@ op2Table (op,rt) = lookup (showCType rt) table >>= lookup op where
         ("%","remInt#"),
         ("/","quotInt#")
         ]
+    wordTable = [
+        ("+","plusWord#"),
+        ("-","minusWord#"),
+        ("*","timesWord#"),
+        ("%","remWord#"),
+        ("/","quotWord#")
+        ]
 
 op2TableCmp (op,rt) = lookup rt table >>= lookup op where
-    table = [ ("Int#",intTable), ("Char#",charTable)]
+    table = [ ("Int#",intTable), ("Char#",charTable), ("Addr#",addrTable),("Word#",wordTable)]
     intTable = [
         (">","(>#)"),
         ("==","(==#)"),
@@ -335,14 +370,35 @@ op2TableCmp (op,rt) = lookup rt table >>= lookup op where
         (">=","gteChar#"),
         ("<=","lteChar#")
         ]
+    addrTable = [
+        (">","gtAddr#"),
+        ("==","eqAddr#"),
+        ("<","ltAddr#"),
+        (">=","gteAddr#"),
+        ("<=","lteAddr#")
+        ]
+    wordTable = [
+        (">","gtWord#"),
+        ("==","eqWord#"),
+        ("<","ltWord#"),
+        (">=","gteWord#"),
+        ("<=","lteWord#")
+        ]
 
 transAlt :: Bool -> Doc -> Alt E -> TM Doc
 transAlt dobind b (Alt (LitInt num t) e) | t == tCharzh || t == rawType "wchar_t" = do
     e <- noParens $ transE e
     return ( (if dobind then b <> char '@' else empty) <> text (show $ chr $ fromIntegral num) <> text "#" <+> text "->" <+> e)
-transAlt dobind b (Alt LitInt { litNumber = i } e) = do
+transAlt dobind b (Alt LitInt { litNumber = i, litType = tt } e) = do
+    let (t,_,_) = cTypeInfoT tt
     e <- noParens $ transE e
-    return ( (if dobind then b <> char '@' else empty) <> tshow i <> text "#" <+> text "->" <+> e)
+    if t == "Int#" then
+        return ( (if dobind then b <> char '@' else empty) <> tshow i <> text "#" <+> text "->" <+> e)
+     else do
+        let bvar = if dobind then b else text "_bvar"
+            Just eq = op2TableCmp ("==",t)
+        v <- transE (ELit (LitInt i tt))
+        return ( bvar <+> text "|" <+> text eq <+> bvar <+> v <+> text "->" <+> e)
 transAlt dobind b (Alt LitCons { litName = c, litArgs = ts } e) = do
     tell mempty { collNames = Set.singleton (c,length ts,False) }  -- XXX this shouldn't be needed
     ts <- mapM transTVr ts
