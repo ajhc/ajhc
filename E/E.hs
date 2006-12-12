@@ -1,5 +1,13 @@
 {-# OPTIONS -fglasgow-exts #-}
-module E.E(module E.Type, module E.E, module E.FreeVars) where
+module E.E(
+    Id(),
+    IdMap(),
+    IdSet(),
+    newIds,
+    module E.Type,
+    module E.E,
+    module E.FreeVars
+    ) where
 
 import Char(chr)
 import Data.FunctorM

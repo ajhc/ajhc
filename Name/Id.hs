@@ -16,6 +16,7 @@ module Name.Id(
     idMapFromDistinctAscList,
     idSetToList,
     idMapToList,
+    newIds,
     runIdNameT',
     runIdNameT
     )where
@@ -151,4 +152,13 @@ instance Show IdSet where
 instance Show v => Show (IdMap v) where
     showsPrec n is = showsPrec n $ map f (idMapToList is) where
         f (n,v) =  (maybe (toAtom ('x':show n)) (toAtom . show) (fromId n),v)
+
+
+-- | find some temporary ids that are not members of the set,
+-- useful for generating a small number of local unique names.
+
+newIds :: IdSet -> [Id]
+newIds ids = [ i | i <- [s, s + 2 ..] , i `notMember` ids ] where
+    s = 2 + (2 * size ids)
+
 
