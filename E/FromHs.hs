@@ -608,11 +608,71 @@ fromHsPLitInt (HsPLit l@(HsInt _)) = return l
 fromHsPLitInt (HsPLit l@(HsFrac _)) = return l
 fromHsPLitInt x = fail $ "fromHsPLitInt: " ++ show x
 
+tidyPat ::
+    Monad m
+    => HsPat
+    -> E
+    -> Ce m (HsPat,E -> E)
+tidyPat p b = f p where
+    f (HsPInfixApp p1 n p2) = f $ HsPApp n [p1,p2]
+    f (HsPParen p) = f p
+    f (HsPTuple ps) = f (HsPApp (toTuple (length ps)) ps)
+    f (HsPUnboxedTuple ps) = f $ HsPApp (nameName $ unboxedNameTuple DataConstructor (length ps)) ps
+    f HsPWildCard = return (HsPWildCard,id)
+    f HsPNeg {} = error "E.FromHs: HsPNeg exists"
+    f HsPRec {} = error "E.FromHs: HsPRec exists"
+    f (HsPTypeSig _ p _) = f p
+    f (HsPList ps) = f (pl ps) where
+        pl [] = HsPApp (nameName $ dc_EmptyList) []
+        pl (p:xs) = HsPApp (nameName $ dc_Cons) [p, pl xs]
+    f p@HsPLit {} = return (p,id)
+    f (HsPVar n) = do
+        v <- convertVar (toName Name.Val n)
+        return (HsPWildCard,eLet v b)
+    f (HsPAsPat n p) = do
+        (p',g') <- f p
+        v <- convertVar (toName Name.Val n)
+        return (p',eLet v b . g')
+    -- translate something like 'True' -> 'Bool# 1#'
+
+    f p@HsPApp {} = return (p,id)
+
+    f (HsPIrrPat p) = f p -- TODO irrefutable patterns!
+--    f p@(HsPApp n []) = do
+--        dataTable <- getDataTable
+--        patCons <- getConstructor (toName DataConstructor n) dataTable
+--        case conVirtual patCons of
+--            Nothing -> return (p,id)
+--            Just sibs -> do
+--                let (Just Constructor { conChildren = Just [vCons] }) = getConstructor (conInhabits patCons) dataTable
+--                f (HsPApp (nameName vCons) []
+--                --[z] <- newVars [tIntzh]
+--                --let err' = if length sibs <= length as then Unknown else err
+--                --return $ eCase b [Alt litCons { litName = vCons, litArgs = [z], litType = getType b } (eCase (EVar z) as err')] Unknown
+
+--            f (([],e):ps) = do
+--                r <- f ps
+--                return (e r)
+--            f [] = return err
+--            f _ = error "FromHs.convertMatches.match"
+
+tidyHeads ::
+    Monad m
+    => E
+    -> [([HsPat],E->E)]  -- [(pats,else -> value)]
+    -> Ce m [(HsPat,[HsPat],E->E)]  -- pulls the head off of each pattern, tidying it up perhaps
+tidyHeads b ps = mapM f ps where
+    f ((p:ps),fe) = do
+        (p',fe') <- tidyPat p b
+        return (p',ps,fe' . fe)
+
+fst3 (x,_,_) = x
+
 convertMatches ::
     Monad m
-    => [E]
-    -> [([HsPat],E->E)]
-    -> E
+    => [E]               -- input expressions we are matching against.
+    -> [([HsPat],E->E)]  -- [(pats,else -> value)]
+    -> E                 -- else, what to do if nothing matches
     -> Ce m E
 convertMatches bs ms err = do
     assumps <- asks ceAssumps
@@ -624,14 +684,92 @@ convertMatches bs ms err = do
         fromInt = func_fromInt funcs
         fromInteger = func_fromInteger funcs
         fromRational = func_fromRational funcs
+        isJoinPoint (EAp (EVar x) _) | getProperty prop_JOINPOINT x = True
+        isJoinPoint _ = False
         match :: Monad m => [E] -> [([HsPat],E->E)] -> E -> Ce m E
-        match  [] ps err = f ps where
-            f (([],e):ps) = do
-                r <- f ps
-                return (e r)
-            f [] = return err
-            f _ = error "FromHs.convertMatches.match"
+        -- when we run out of arguments, we should run out of patterns. simply fold the transformers.
+        match  [] ps err = return $ foldr f err ps where
+            f ([],fe) err = fe err
+        -- when we are out of patterns, return the error term
         match _ [] err = return err
+        match (b:bs) ps err = do
+            pps <- tidyHeads b ps
+            let patternGroups = groupUnder (isStrictPat . fst3) pps
+                f [] err = return err
+                f (ps:pss) err = do
+                    err' <- f pss err
+                    if isEVar err' || isEError err' || isJoinPoint err' then matchGroup b bs ps err' else do
+                        [ev] <- newVars [EPi tvr { tvrType = unboxedTyUnit } $ getType err']
+                        let ev' = setProperties [prop_ONESHOT, prop_JOINPOINT] ev
+                        nm <- matchGroup b bs ps (EAp (EVar ev') unboxedUnit)
+                        return $ eLetRec [(ev',ELam (setProperty prop_ONESHOT tvr { tvrType = unboxedTyUnit }) err')] nm
+            f patternGroups err
+        matchGroup b bs ps err
+            | all (isHsPWildCard . fst3) ps = match bs [ (ps,e) | (_,ps,e) <- ps] err
+            | Just () <- mapM_ (fromHsPLitInt . fst3) ps = do
+                    let tb = getType b
+                    [bv] <- newVars [tb]
+                    let gps = [ (p,[ (ps,e) |  (_,ps,e) <- xs ]) | (p,xs) <- sortGroupUnderF fst3 ps]
+                        eq = EAp (func_equals funcs) tb
+                        f els (HsPLit (HsInt i),ps) = do
+                            let ip | abs i > integer_cutoff  = (EAp (EAp fromInteger tb) (intConvert i))
+                                   | otherwise =  (EAp (EAp fromInt tb) (intConvert i))
+                            m <- match bs ps err
+                            createIf (EAp (EAp eq (EVar bv)) ip) m els
+                        f els (HsPLit (HsFrac i),ps) = do
+                            let ip = (EAp (EAp fromRational tb) (toE i))
+                            m <- match bs ps err
+                            createIf (EAp (EAp eq (EVar bv)) ip) m els
+                    e <- foldlM f err gps
+                    return $ eLet bv b e
+            | all (isHsPString . fst3) ps = do
+                    [bv] <- newVars [getType b]
+                    (eqString,_,_) <- convertValue v_eqString
+                    let gps = [ (p,[ (ps,fe) |  (_,ps,fe) <- xs ]) | (p,xs) <- sortGroupUnderF fst3 ps]
+                        f els (HsPLit (HsString s),ps) = do
+                            m <- match bs ps err
+                            return $ ifzh (EAp (EAp (EVar eqString) (EVar bv)) (toE s)) m els
+                    e <- foldlM f err gps
+                    return $ eLet bv b e
+            | all (isHsPLit . fst3) ps = do
+                let gps = [ (p,[ (ps,fe) |  (_,ps,fe) <- xs ]) | (p,xs) <- sortGroupUnderF fst3 ps]
+                    f (HsPLit l,ps) = do
+                        m <- match bs ps err
+                        return (Alt (litconvert l (getType b)) m)
+                as@(_:_) <- mapM f gps
+                [TVr { tvrIdent = vr }] <- newVars [Unknown]
+                return $ unbox dataTable b vr $ \tvr -> eCase tvr as err
+            | all (\ (c,_,_) -> isHsPApp c || isHsPString c) ps = do
+                let gps =  sortGroupUnderF (hsPPatName . fst3) (map ff ps)
+                    ff (HsPLit (HsString ""),ps,b) = ((HsPApp (nameName $ dc_EmptyList) []),ps,b)
+                    ff (HsPLit (HsString (c:cs)),ps,b) = ((HsPApp (nameName $ dc_Cons) [HsPLit (HsChar c),HsPLit (HsString cs)]),ps,b)
+                    ff x = x
+                    (Just patCons) = getConstructor (toName DataConstructor $ fst $ head gps) dataTable
+                    f (name,ps) = do
+                        let spats = hsPatPats $ fst3 (head ps)
+                            nargs = length spats
+                        vs <- newVars (slotTypes dataTable (toName DataConstructor name) (getType b))
+                        vs' <- newVars (map (const Unknown) vs)
+
+                        ps' <- mapM pp ps
+                        m <- match (map EVar vs ++ bs) ps' err
+                        return $ deconstructionExpression dataTable (toName DataConstructor name) (getType b) vs vs' m
+                    pp (HsPApp n ps,rps,e)  = do
+                        return $ (ps ++ rps , e)
+                as@(_:_) <- mapM f gps
+                case conVirtual patCons of
+                    Nothing -> return $ eCase b as err
+                    Just sibs -> do
+                        let (Just Constructor { conChildren = Just [vCons] }) = getConstructor (conInhabits patCons) dataTable
+                        [z] <- newVars [tIntzh]
+                        let err' = if length sibs <= length as then Unknown else err
+                        return $ eCase b [Alt litCons { litName = vCons, litArgs = [z], litType = getType b } (eCase (EVar z) as err')] Unknown
+            | otherwise = error $ "Heterogenious list: " ++ show (map fst3 ps)
+    match bs ms err
+
+
+{-
+
         match (b:bs) ps err = f patternGroups err where
             isJoinPoint (EAp (EVar x) _) | getProperty prop_JOINPOINT x = True
             isJoinPoint _ = False
@@ -726,8 +864,7 @@ convertMatches bs ms err = do
             toBinding (HsPIrrPat p) = toBinding p
             toBinding (HsPAsPat n p) = (tv n,b):toBinding p
             toBinding p = error $ "toBinding: " ++ show p
-    match bs ms err
-
+-}
 
 hsPPatName p@HsPApp {} = hsPatName p
 hsPPatName (HsPLit (HsString "")) = nameName dc_EmptyList
@@ -737,6 +874,7 @@ isHsPString (HsPLit HsString {}) = True
 isHsPString _ = False
 
 isStrictPat HsPVar {} = False
+isStrictPat HsPWildCard = False
 isStrictPat (HsPAsPat _ p) = isStrictPat p
 isStrictPat (HsPIrrPat p) = isStrictPat p  -- TODO irrefutable patterns
 isStrictPat _ = True
