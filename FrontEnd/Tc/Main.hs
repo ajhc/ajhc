@@ -415,6 +415,12 @@ tiPat (HsPLit l) typ = do
 -- it is safe not to make any predicates about
 -- the pat, since the type checking of the literal
 -- will do this for us
+tiPat (HsPNeg (HsPLit (HsInt i))) typ = tiPat (HsPLit $ HsInt (negate i)) typ
+tiPat (HsPNeg (HsPLit (HsFrac i))) typ = tiPat (HsPLit $ HsFrac (negate i)) typ
+tiPat (HsPNeg (HsPLit (HsIntPrim i))) typ = tiPat (HsPLit $ HsIntPrim (negate i)) typ
+tiPat (HsPNeg (HsPLit (HsFloatPrim i))) typ = tiPat (HsPLit $ HsFloatPrim (negate i)) typ
+tiPat (HsPNeg (HsPLit (HsDoublePrim i))) typ = tiPat (HsPLit $ HsDoublePrim (negate i)) typ
+tiPat (HsPNeg pat) typ = fail $ "non-literal negative patterns are not allowed"
 tiPat (HsPNeg pat) typ = tiPat pat typ
 
 tiPat (HsPIrrPat p) typ = tiPat p typ
