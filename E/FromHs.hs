@@ -38,6 +38,7 @@ import E.TypeCheck
 import E.Values
 import Fixer.VMap
 import FrontEnd.Rename(unRename)
+import FrontEnd.Desugar(patVarNames)
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Module(TiData(..))
 import FrontEnd.Tc.Type hiding(Rule(..))
@@ -78,7 +79,7 @@ ifzh e a b = eCase e [Alt (LitInt 1 tIntzh) a, Alt (LitInt 0 tIntzh) b] Unknown
 head (x:_) = x
 head _ = error "FromHsHeadError"
 
---newVars :: MonadState Int m => [E] -> m [TVr]
+newVars :: UniqueProducer m => [E] -> m [TVr]
 newVars xs = f xs [] where
     f [] xs = return $ reverse xs
     f (x:xs) ys = do
@@ -128,7 +129,7 @@ simplifyHsPat (HsPList ps) = pl ps where
     pl [] = HsPApp (nameName $ dc_EmptyList) []
     pl (p:xs) = HsPApp (nameName $ dc_Cons) [simplifyHsPat p, pl xs]
 simplifyHsPat (HsPApp n xs) = HsPApp n (map simplifyHsPat xs)
-simplifyHsPat (HsPIrrPat p) = simplifyHsPat p -- TODO irrefutable patterns!
+simplifyHsPat (HsPIrrPat p) = HsPIrrPat $ simplifyHsPat p -- TODO irrefutable patterns!
 simplifyHsPat p@HsPVar {} = p
 simplifyHsPat p@HsPLit {} = p
 simplifyHsPat p = error $ "simplifyHsPat: " ++ show p
@@ -162,10 +163,12 @@ convertValue n = do
 
 
 matchesConv ms = map v ms where
-    v (HsMatch _ _ ps rhs wh) = (map simplifyHsPat ps,rhs,wh)
+    v (HsMatch _ _ ps rhs wh) = (ps,rhs,wh)
+    --v (HsMatch _ _ ps rhs wh) = (map simplifyHsPat ps,rhs,wh)
 
 altConv as = map v as where
-    v (HsAlt _ p rhs wh) = ([simplifyHsPat p],rhs,wh)
+    v (HsAlt _ p rhs wh) = ([p],rhs,wh)
+--    v (HsAlt _ p rhs wh) = ([simplifyHsPat p],rhs,wh)
 
 argTypes e = span (sortSortLike . getType) (map tvrType xs) where
     (_,xs) = fromPi e
@@ -637,7 +640,18 @@ tidyPat p b = f p where
 
     f p@HsPApp {} = return (p,id)
 
-    f (HsPIrrPat p) = f p -- TODO irrefutable patterns!
+    -- remove some redundant irrefutable markings
+    f (HsPIrrPat p@HsPVar {}) = f p
+    f (HsPIrrPat p@HsPWildCard) = f p
+    f (HsPIrrPat p@HsPIrrPat {}) = f p
+    f (HsPIrrPat p) = do
+        [bv] <- newVars [getType b]
+        let f n = do
+            v <- convertVar (toName Name.Val n)
+            fe <- convertMatches [EVar bv] [([p],const (EVar v))] (EError "Irrefutable pattern match failed" (getType v))
+            return (v,fe)
+        zs <- mapM f (patVarNames p)
+        return (HsPWildCard,eLet bv b . eLetRec zs)
 --    f p@(HsPApp n []) = do
 --        dataTable <- getDataTable
 --        patCons <- getConstructor (toName DataConstructor n) dataTable
@@ -694,7 +708,7 @@ convertMatches bs ms err = do
         match _ [] err = return err
         match (b:bs) ps err = do
             pps <- tidyHeads b ps
-            let patternGroups = groupUnder (isStrictPat . fst3) pps
+            let patternGroups = groupUnder (isHsPWildCard . fst3) pps
                 f [] err = return err
                 f (ps:pss) err = do
                     err' <- f pss err
@@ -873,11 +887,6 @@ hsPPatName (HsPLit (HsString {})) = nameName dc_Cons
 isHsPString (HsPLit HsString {}) = True
 isHsPString _ = False
 
-isStrictPat HsPVar {} = False
-isStrictPat HsPWildCard = False
-isStrictPat (HsPAsPat _ p) = isStrictPat p
-isStrictPat (HsPIrrPat p) = isStrictPat p  -- TODO irrefutable patterns
-isStrictPat _ = True
 
 
 

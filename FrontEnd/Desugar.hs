@@ -34,7 +34,7 @@
 -- Type synonyms are no longer handled here. only 'local' desugaring is done.
 -- Does this module need to exist?
 
-module FrontEnd.Desugar ( doToExp, desugarHsModule, desugarHsStmt) where
+module FrontEnd.Desugar (doToExp, desugarHsModule, desugarHsStmt, patVarNames) where
 
 import Control.Monad.State
 
@@ -249,24 +249,16 @@ patVarNames :: HsPat -> [HsName]
 patVarNames (HsPVar name) = [name]
 patVarNames (HsPLit _) = []
 patVarNames (HsPNeg pat) = patVarNames pat
-patVarNames (HsPInfixApp pat1 conName pat2)
-   = patVarNames pat1 ++ patVarNames pat2
-patVarNames (HsPApp conName pats)
-   = concatMap patVarNames pats
-patVarNames (HsPTuple pats)
-   = concatMap patVarNames pats
-patVarNames (HsPUnboxedTuple pats)
-   = concatMap patVarNames pats
-patVarNames (HsPList pats)
-   = concatMap patVarNames pats
-patVarNames (HsPParen pat)
-   = patVarNames pat
+patVarNames (HsPInfixApp pat1 conName pat2) = patVarNames pat1 ++ patVarNames pat2
+patVarNames (HsPApp conName pats) = concatMap patVarNames pats
+patVarNames (HsPTuple pats) = concatMap patVarNames pats
+patVarNames (HsPUnboxedTuple pats) = concatMap patVarNames pats
+patVarNames (HsPList pats) = concatMap patVarNames pats
+patVarNames (HsPParen pat) = patVarNames pat
 patVarNames (HsPRec _ _) = error "patVarNames (HsPRec _ _): not implemented "
-patVarNames (HsPAsPat asName pat)
-   = asName : patVarNames pat
+patVarNames (HsPAsPat asName pat) = asName : patVarNames pat
 patVarNames HsPWildCard = []
-patVarNames (HsPIrrPat pat)
-   = patVarNames pat
+patVarNames (HsPIrrPat pat) = patVarNames pat
 patVarNames e = error $ "patVarNames: " ++ show e
 
 -- replaces all occurrences of a name with a new variable
