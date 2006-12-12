@@ -117,7 +117,7 @@ workWrap' dataTable tvr e | isJust res = ans where
            | otherwise = cases $ workerCall
     getName (Just x) = x
     getName Nothing  = error ("workWrap': cname = Nothing: tvr = "++show tvr)
-    vars@(~[sv]) = [  tVr i t | t <- slotTypes dataTable (getName cname) bodyTyp | i <- [2,4..], i `notMember` dontUseThese ]
+    vars@(~[sv]) = [  tVr i t | t <- slotTypes dataTable (getName cname) bodyTyp | i <- newIds dontUseThese ]
     dontUseThese = freeIds (getType tvr) `mappend` freeIds bodyTyp --`mappend` freeIds (EAp (getType tvr) $ EAp (EVar tvr) e)
     isSingleton = case vars of
         [v] -> getType (getType v) == eHash

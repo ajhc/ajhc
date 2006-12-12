@@ -487,7 +487,8 @@ constructionExpression dataTable n typ@(ELit LitCons { litName = pn, litArgs = x
     | RecursiveAlias <- conAlias mc = let var' = var { tvrType = st } in ELam var' (prim_unsafeCoerce (EVar var') typ)
     | pn == conName pc = sub (conExpr mc) where
     ~[st] = slotTypes dataTable n typ
-    var = tvr { tvrIdent = 2, tvrType = typ }
+    var = tvr { tvrIdent = vid, tvrType = typ }
+    (vid:_) = newIds (freeVars typ)
     Just mc = getConstructor n dataTable
     Just pc = getConstructor (conInhabits mc) dataTable
     sub = substMap $ fromDistinctAscList [ (i,sl) | sl <- xs | i <- [2,4..] ]

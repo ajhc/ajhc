@@ -78,7 +78,7 @@ atomizeAp inscope atomizeTypes dataTable e = runReader (f e) inscope where
     h (e:es) | isAtomic e = h es >>= \ (fn,es') -> return (fn,e:es')
     h (e:es) = do
         fvs <- ask
-        let (var:_) = [ i | i <- [2, 4 .. ], i `notMember` fvs]
+        let (var:_) = [ i | i <- newIds fvs]
             tvt = infertype dataTable e
             tv = tvr { tvrIdent = var, tvrType = tvt }
             fn = if getType tvt == eHash then eStrictLet tv e else eLetRec [(tv,e)]

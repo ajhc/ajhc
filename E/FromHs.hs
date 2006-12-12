@@ -235,7 +235,7 @@ createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans wher
                 Nothing -> case findName defaultName of
                     Just (deftvr,_) | null vs -> foldl EAp (EAp (EVar deftvr) vp) (map EVar args)
                     Just (deftvr,_) -> eLet tv vp $ foldl EAp (EAp (EVar deftvr) (EVar tv)) (map EVar args) where
-                        tv = tvr { tvrIdent = head [ n | n <- [2,4..], n `notElem` freeVars vp], tvrType = getType vp }
+                        tv = tvr { tvrIdent = head [ n | n <- newIds (freeVars vp)], tvrType = getType vp }
                     Nothing -> foldl EAp (EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) (eAp ty (valToPat' (tipe t)))) (map EVar args)
     method _ _ = []
     findName name = case Map.lookup name funcs of
