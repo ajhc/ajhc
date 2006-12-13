@@ -34,7 +34,7 @@
 -- Type synonyms are no longer handled here. only 'local' desugaring is done.
 -- Does this module need to exist?
 
-module FrontEnd.Desugar (doToExp, desugarHsModule, desugarHsStmt, patVarNames) where
+module FrontEnd.Desugar (doToExp, desugarHsModule, desugarHsStmt) where
 
 import Control.Monad.State
 
@@ -236,63 +236,35 @@ genBindsForPat pat sloc rhsName
 -- are bound in a pattern
 
 getPatSelFuns :: SrcLoc -> HsPat -> [(HsName, (HsExp))]
-getPatSelFuns sloc pat = [(varName, HsParen (HsLambda sloc [HsPVar newPatVarName] (kase (replaceVarNamesInPat varName pat)))) | varName <- patVarNames pat] where
+getPatSelFuns sloc pat = [(varName, HsParen (HsLambda sloc [HsPVar newPatVarName] (kase (replaceVarNamesInPat varName pat)))) | varName <- getNamesFromHsPat pat] where
     kase p =  HsCase (HsVar newPatVarName) [a1, a2 ] where
        a1 =  HsAlt sloc p (HsUnGuardedRhs (HsVar newPatVarName)) []
        a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar (UnQual $ HsIdent "error")) (HsLit $ HsString $ show sloc ++ " failed pattern match"))) []
 
 
---getPatSelFuns sloc pat = [(varName, HsParen (HsLambda sloc [replaceVarNamesInPat varName pat] (HsVar newPatVarName))) | varName <- patVarNames pat]
--- returns the names of variables bound in a pattern
--- XXX bjpop: do as patterns work properly?
-patVarNames :: HsPat -> [HsName]
-patVarNames (HsPVar name) = [name]
-patVarNames (HsPLit _) = []
-patVarNames (HsPNeg pat) = patVarNames pat
-patVarNames (HsPInfixApp pat1 conName pat2) = patVarNames pat1 ++ patVarNames pat2
-patVarNames (HsPApp conName pats) = concatMap patVarNames pats
-patVarNames (HsPTuple pats) = concatMap patVarNames pats
-patVarNames (HsPUnboxedTuple pats) = concatMap patVarNames pats
-patVarNames (HsPList pats) = concatMap patVarNames pats
-patVarNames (HsPParen pat) = patVarNames pat
-patVarNames (HsPRec _ _) = error "patVarNames (HsPRec _ _): not implemented "
-patVarNames (HsPAsPat asName pat) = asName : patVarNames pat
-patVarNames HsPWildCard = []
-patVarNames (HsPIrrPat pat) = patVarNames pat
-patVarNames e = error $ "patVarNames: " ++ show e
-
 -- replaces all occurrences of a name with a new variable
 -- and every other name with underscore
 
 replaceVarNamesInPat :: HsName -> HsPat -> HsPat
-
-replaceVarNamesInPat name1 (HsPVar name2)
-   | name1 == name2 = HsPVar $ newPatVarName
-   | otherwise = HsPWildCard
-replaceVarNamesInPat _ p@(HsPLit _) = p
-replaceVarNamesInPat name (HsPNeg pat)
-   = HsPNeg $ replaceVarNamesInPat name pat
-replaceVarNamesInPat name (HsPInfixApp pat1 conName pat2)
-   = HsPInfixApp (replaceVarNamesInPat name pat1) conName (replaceVarNamesInPat name pat2)
-replaceVarNamesInPat name (HsPApp conName pats)
-   = HsPApp conName (map (replaceVarNamesInPat name) pats)
-replaceVarNamesInPat name (HsPTuple pats)
-   = HsPTuple (map (replaceVarNamesInPat name) pats)
-replaceVarNamesInPat name (HsPUnboxedTuple pats)
-   = HsPUnboxedTuple (map (replaceVarNamesInPat name) pats)
-replaceVarNamesInPat name (HsPList pats)
-   = HsPList (map (replaceVarNamesInPat name) pats)
-replaceVarNamesInPat name (HsPParen pat)
-   = HsPParen (replaceVarNamesInPat name pat)
-replaceVarNamesInPat name (HsPRec _ _)
-   = error  "replaceVarNamesInPat name (HsPRec _ _): not implemented"
-replaceVarNamesInPat name (HsPAsPat asName pat)
-   | name == asName = HsPAsPat newPatVarName (replaceVarNamesInPat name pat)
-   | otherwise = replaceVarNamesInPat name pat
-replaceVarNamesInPat name HsPWildCard = HsPWildCard
-replaceVarNamesInPat name (HsPIrrPat pat)
-   = HsPIrrPat $ replaceVarNamesInPat name pat
-replaceVarNamesInPat name p = error $ "replaceVarNamesInPat: " ++ show (name,p)
+replaceVarNamesInPat name p = f name p where
+    f name1 (HsPVar name2)
+       | name1 == name2 = HsPVar $ newPatVarName
+       | otherwise = HsPWildCard
+    f _ p@(HsPLit _) = p
+    f name (HsPNeg pat) = HsPNeg $ f name pat
+    f name (HsPInfixApp pat1 conName pat2) = HsPInfixApp (f name pat1) conName (f name pat2)
+    f name (HsPApp conName pats) = HsPApp conName (map (f name) pats)
+    f name (HsPTuple pats) = HsPTuple (map (f name) pats)
+    f name (HsPUnboxedTuple pats) = HsPUnboxedTuple (map (f name) pats)
+    f name (HsPList pats) = HsPList (map (f name) pats)
+    f name (HsPParen pat) = HsPParen (f name pat)
+    f name (HsPRec _ _) = error  "f name (HsPRec _ _): not implemented"
+    f name (HsPAsPat asName pat)
+       | name == asName = HsPAsPat newPatVarName (f name pat)
+       | otherwise = f name pat
+    f name HsPWildCard = HsPWildCard
+    f name (HsPIrrPat pat) = HsPIrrPat $ fmap (f name) pat
+    f name p = error $ "f: " ++ show (name,p)
 
 
 desugarRhs :: (HsRhs) -> PatSM (HsRhs)

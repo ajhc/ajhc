@@ -26,6 +26,7 @@ import qualified Text.PrettyPrint.HughesPJ as P
 import Doc.PPrint(pprint)
 import FlagDump as FD
 import FrontEnd.Rename(unRename)
+import FrontEnd.SrcLoc(Located(..))
 import HsSyn
 import Name.VConsts
 import Name.Names
@@ -523,11 +524,11 @@ ppHsExp (HsRecUpdate exp fieldList) =
 -- patterns
 -- special case that would otherwise be buggy
 ppHsExp (HsAsPat _ p) | not (dump FD.Aspats) = ppHsExp p
-ppHsExp (HsAsPat name (HsIrrPat exp)) =
+ppHsExp (HsAsPat name (HsIrrPat (Located _ exp))) =
 	myFsep[ppHsName name <> char '@', char '~' <> ppHsExp exp]
 ppHsExp (HsAsPat name exp) = hcat[ppHsName name,char '@',ppHsExp exp]
 ppHsExp (HsWildCard _) = char '_'
-ppHsExp (HsIrrPat exp) = char '~' <> ppHsExp exp
+ppHsExp (HsIrrPat (Located _ exp)) = char '~' <> ppHsExp exp
 -- Lists
 ppHsExp (HsList list) =
 	bracketList . punctuate comma . map ppHsExp $ list
@@ -562,11 +563,11 @@ ppHsPat (HsPRec c fields)
     =  ppHsQName c
     <> (braceList . map ppHsPatField $ fields)
 -- special case that would otherwise be buggy
-ppHsPat (HsPAsPat name (HsPIrrPat pat)) =
+ppHsPat (HsPAsPat name (HsPIrrPat (Located _ pat))) =
 	myFsep[ppHsName name <> char '@', char '~' <> ppHsPat pat]
 ppHsPat	(HsPAsPat name pat) = hcat[ppHsName name,char '@',ppHsPat pat]
 ppHsPat	HsPWildCard = char '_'
-ppHsPat	(HsPIrrPat pat) = char '~' <> ppHsPat pat
+ppHsPat	(HsPIrrPat (Located _ pat)) = char '~' <> ppHsPat pat
 
 ppHsPatField (HsPFieldPat name pat) = myFsep[ppHsQName name, equals, ppHsPat pat]
 

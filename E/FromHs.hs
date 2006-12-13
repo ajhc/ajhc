@@ -38,7 +38,7 @@ import E.TypeCheck
 import E.Values
 import Fixer.VMap
 import FrontEnd.Rename(unRename)
-import FrontEnd.Desugar(patVarNames)
+import FrontEnd.Syn.Traverse(getNamesFromHsPat)
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Module(TiData(..))
 import FrontEnd.Tc.Type hiding(Rule(..))
@@ -644,15 +644,15 @@ tidyPat p b = f p where
             ErasedAlias -> f p
             _ -> return (pa,id)
     f p@HsPApp {} = return (p,id)
-    f (HsPIrrPat p) = f p >>= \ (p',fe) -> case p' of
+    f (HsPIrrPat (Located ss p)) = f p >>= \ (p',fe) -> case p' of
         HsPWildCard -> return (p',fe)
         _ -> do
             (lbv,bv) <- varify b
             let f n = do
                 v <- convertVar (toName Name.Val n)
-                fe <- convertMatches [bv] [([p],const (EVar v))] (EError "Irrefutable pattern match failed" (getType v))
+                fe <- convertMatches [bv] [([p],const (EVar v))] (EError (show ss ++ ": Irrefutable pattern match failed") (getType v))
                 return (v,fe)
-            zs <- mapM f (patVarNames p)
+            zs <- mapM f (getNamesFromHsPat p)
             return (HsPWildCard,lbv . eLetRec zs)
 
 -- converts a value to an updatable closure if it isn't one already.

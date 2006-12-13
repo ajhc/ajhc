@@ -256,9 +256,9 @@ renameHsMatches = mapRename renameHsMatch
 renameHsMatch :: HsMatch -> SubTable -> ScopeSM HsMatch
 renameHsMatch (HsMatch srcLoc hsName hsPats hsRhs {-where-} hsDecls) subTable = withSrcLoc srcLoc $ do
     hsName' <- renameHsName hsName subTable
-    subTable' <- updateSubTableWithHsPats subTable hsPats srcLoc FunPat
+    subTable' <- updateSubTableWithHsPats subTable hsPats srcLoc
     hsPats' <- renameHsPats hsPats subTable'
-    subTable'' <- updateSubTableWithHsDecls subTable' hsDecls WhereFun
+    subTable'' <- updateSubTableWithHsDecls subTable' hsDecls
     hsDecls' <- renameHsDecls hsDecls subTable''
     hsRhs' <- renameHsRhs hsRhs subTable''
     return (HsMatch srcLoc hsName' hsPats' hsRhs' {-where-} hsDecls')
@@ -285,12 +285,12 @@ renameHsRhs (HsGuardedRhss hsGuardedRhss) subTable = do
 
 renameHsExp :: HsExp -> SubTable -> ScopeSM HsExp
 renameHsExp (HsLambda srcLoc hsPats hsExp) subTable = withSrcLoc srcLoc $ do
-    subTable' <- updateSubTableWithHsPats subTable hsPats srcLoc LamPat
+    subTable' <- updateSubTableWithHsPats subTable hsPats srcLoc
     hsPats' <- renameHsPats hsPats subTable'
     hsExp' <- renameHsExp hsExp subTable'
     return (HsLambda srcLoc hsPats' hsExp')
 renameHsExp (HsLet hsDecls hsExp) subTable = do
-    subTable' <- updateSubTableWithHsDecls subTable hsDecls LetFun
+    subTable' <- updateSubTableWithHsDecls subTable hsDecls
     hsDecls' <- renameHsDecls hsDecls subTable'
     hsExp' <- renameHsExp hsExp subTable'
     return (HsLet hsDecls' hsExp')
@@ -327,9 +327,9 @@ renameHsAlts = mapRename renameHsAlt
 
 renameHsAlt :: HsAlt -> SubTable -> ScopeSM (HsAlt)
 renameHsAlt (HsAlt srcLoc hsPat hsGuardedAlts {-where-} hsDecls) subTable = withSrcLoc srcLoc $ do
-    subTable' <- updateSubTableWithHsPats subTable [hsPat] srcLoc CasePat
+    subTable' <- updateSubTableWithHsPats subTable [hsPat] srcLoc
     hsPat' <- renameHsPat hsPat subTable'
-    subTable'' <- updateSubTableWithHsDecls subTable' hsDecls WhereFun
+    subTable'' <- updateSubTableWithHsDecls subTable' hsDecls
     hsDecls' <- renameHsDecls hsDecls subTable''
     hsGuardedAlts' <- renameHsRhs hsGuardedAlts subTable''
     return (HsAlt srcLoc hsPat' hsGuardedAlts' hsDecls')
@@ -422,12 +422,12 @@ renameTypeHsName hsName subTable  =  return hsName
 -- clobberHsNamesAndUpdateIdentTable also adds a mapping from this
 -- renamed name to its source location and binding type
 
-clobberHsNamesAndUpdateIdentTable :: [(HsName,SrcLoc)] -> SubTable -> Binding -> ScopeSM (SubTable)
-clobberHsNamesAndUpdateIdentTable ((hsName,srcLoc):hsNamesAndASrcLocs) subTable binding = do
+clobberHsNamesAndUpdateIdentTable :: [(HsName,SrcLoc)] -> SubTable ->  ScopeSM (SubTable)
+clobberHsNamesAndUpdateIdentTable ((hsName,srcLoc):hsNamesAndASrcLocs) subTable  = do
       subTable'  <- clobberHsName hsName subTable
-      subTable'' <- clobberHsNamesAndUpdateIdentTable hsNamesAndASrcLocs subTable' binding
+      subTable'' <- clobberHsNamesAndUpdateIdentTable hsNamesAndASrcLocs subTable'
       return (subTable'')
-clobberHsNamesAndUpdateIdentTable [] subTable _binding = return (subTable)
+clobberHsNamesAndUpdateIdentTable [] subTable  = return (subTable)
 
 {-
 clobberHsNameAndUpdateIdentTable :: HsName -> SrcLoc -> SubTable -> Binding -> ScopeSM (SubTable)
@@ -462,21 +462,21 @@ clobberHsName hsName subTable = return subTable
 ----This section of code updates the current SubTable to reflect the present scope
 
 
-updateSubTableWithHsDecls :: SubTable -> [HsDecl] -> Binding -> ScopeSM (SubTable)
-updateSubTableWithHsDecls subTable [] _binding = return subTable
-updateSubTableWithHsDecls subTable (hsDecl:hsDecls) binding = do
+updateSubTableWithHsDecls :: SubTable -> [HsDecl] ->  ScopeSM (SubTable)
+updateSubTableWithHsDecls subTable []  = return subTable
+updateSubTableWithHsDecls subTable (hsDecl:hsDecls) = do
     let hsNamesAndASrcLocs = getHsNamesAndASrcLocsFromHsDecl hsDecl
-    subTable'  <- clobberHsNamesAndUpdateIdentTable hsNamesAndASrcLocs subTable binding
-    subTable'' <- updateSubTableWithHsDecls subTable' hsDecls binding
+    subTable'  <- clobberHsNamesAndUpdateIdentTable hsNamesAndASrcLocs subTable
+    subTable'' <- updateSubTableWithHsDecls subTable' hsDecls
     return (subTable'')
 
-updateSubTableWithHsPats :: SubTable -> [HsPat] -> SrcLoc -> Binding -> ScopeSM (SubTable)
-updateSubTableWithHsPats subTable (hsPat:hsPats) srcLoc binding = do
-    let hsNamesAndASrcLocs = zip (getHsNamesFromHsPat hsPat) (repeat srcLoc)
-    subTable'  <- clobberHsNamesAndUpdateIdentTable hsNamesAndASrcLocs subTable binding
-    subTable'' <- updateSubTableWithHsPats subTable' hsPats srcLoc binding
+updateSubTableWithHsPats :: SubTable -> [HsPat] -> SrcLoc -> ScopeSM (SubTable)
+updateSubTableWithHsPats subTable (hsPat:hsPats) srcLoc  = do
+    let hsNamesAndASrcLocs = zip (getNamesFromHsPat hsPat) (repeat srcLoc)
+    subTable'  <- clobberHsNamesAndUpdateIdentTable hsNamesAndASrcLocs subTable
+    subTable'' <- updateSubTableWithHsPats subTable' hsPats srcLoc
     return subTable''
-updateSubTableWithHsPats subTable [] _srcLoc _binding = do return (subTable)
+updateSubTableWithHsPats subTable [] _srcLoc = do return (subTable)
 
 -- Only one HsStmt should be added at a time because each new identifier is only valid
 -- below the point at which it is defined
@@ -484,7 +484,7 @@ updateSubTableWithHsPats subTable [] _srcLoc _binding = do return (subTable)
 updateSubTableWithHsStmt :: SubTable -> HsStmt -> ScopeSM (SubTable)
 updateSubTableWithHsStmt subTable hsStmt = do
     let hsNamesAndASrcLocs = getHsNamesAndASrcLocsFromHsStmt hsStmt
-    subTable' <- clobberHsNamesAndUpdateIdentTable hsNamesAndASrcLocs subTable GenPat
+    subTable' <- clobberHsNamesAndUpdateIdentTable hsNamesAndASrcLocs subTable
     return (subTable')
 
 ----------------------------------------------------------
@@ -524,33 +524,8 @@ getHsNamesAndASrcLocsFromHsMatch (HsMatch srcLoc hsName _ _ _)
 
 
 
-
-getHsNamesFromHsPat :: HsPat -> [HsName]
-getHsNamesFromHsPat (HsPVar hsName) = [hsName]
-getHsNamesFromHsPat (HsPLit _hsName) = []
-getHsNamesFromHsPat (HsPNeg hsPat) = getHsNamesFromHsPat hsPat
--- _hsName can be ignored as it is a Constructor (e.g. in (x:xs) we only want to know what's in scope; that is x and xs)
-getHsNamesFromHsPat (HsPInfixApp hsPat1 _hsName hsPat2) = getHsNamesFromHsPat hsPat1 ++ getHsNamesFromHsPat hsPat2
-getHsNamesFromHsPat (HsPApp _hsName hsPats) = concat (map getHsNamesFromHsPat hsPats)
-getHsNamesFromHsPat (HsPTuple hsPats) = concat (map getHsNamesFromHsPat hsPats)
-getHsNamesFromHsPat (HsPUnboxedTuple hsPats) = concat (map getHsNamesFromHsPat hsPats)
-getHsNamesFromHsPat (HsPList hsPats) = concat (map getHsNamesFromHsPat hsPats)
-getHsNamesFromHsPat (HsPParen hsPat) = getHsNamesFromHsPat hsPat
-getHsNamesFromHsPat (HsPRec _hsName hsPatFields) = concat $ map getHsNamesFromHsPatField hsPatFields -- hsName can be ignored as it is a Constructor
-getHsNamesFromHsPat (HsPAsPat hsName hsPat) = hsName:(getHsNamesFromHsPat hsPat)
-getHsNamesFromHsPat (HsPWildCard) = []
-getHsNamesFromHsPat (HsPIrrPat hsPat) = getHsNamesFromHsPat hsPat
-
--- the hsName can be ignored as it is the field name and must already be in scope
-getHsNamesFromHsPatField :: HsPatField -> [HsName]
-{-
-getHsNamesFromHsPatField (HsPFieldPun _hsName)
-  = []
-  -}
-getHsNamesFromHsPatField (HsPFieldPat _hsName hsPat) = getHsNamesFromHsPat hsPat
-
 getHsNamesAndASrcLocsFromHsStmt :: HsStmt -> [(HsName, SrcLoc)]
-getHsNamesAndASrcLocsFromHsStmt (HsGenerator srcLoc hsPat _hsExp) = zip (getHsNamesFromHsPat hsPat) (repeat srcLoc)
+getHsNamesAndASrcLocsFromHsStmt (HsGenerator srcLoc hsPat _hsExp) = zip (getNamesFromHsPat hsPat) (repeat srcLoc)
 getHsNamesAndASrcLocsFromHsStmt (HsQualifier _hsExp) = []
 getHsNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls) = concat $ map getHsNamesAndASrcLocsFromHsDecl hsDecls
 
@@ -573,11 +548,4 @@ getHsNamesFromHsType (HsTyExists vs qt) = getHsNamesFromHsQualType qt List.\\ ma
 getHsNamesFromHsType (HsTyCon _hsName) = [] -- don't rename the Constructors
 
 
-data Binding
-   = WhereFun           -- function binding in a where clause
-   | LetFun             -- function binding in a let expression (used to include topbinds too)
-   | LamPat             -- pattern binding in a lambda expression
-   | CasePat            -- pattern binding in a case expression
-   | GenPat             -- pattern binding in a generator statement
-   | FunPat             -- pattern binding in a function declaration
 

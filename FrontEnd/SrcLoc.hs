@@ -2,6 +2,8 @@ module FrontEnd.SrcLoc where
 
 import Control.Monad.Writer
 import Control.Monad.Identity
+import Control.Monad
+import Data.FunctorM
 
 import Data.Monoid
 import Data.Generics
@@ -44,11 +46,25 @@ instance HasLocation SrcLoc where
 instance HasLocation SrcSpan where
     srcSpan x = x
 
-data Located x = Located SrcSpan x
-    deriving(Ord,Show,Data,Typeable,Eq)
+instance HasLocation (SrcLoc,SrcLoc) where
+    srcSpan (x,y) = SrcSpan x y
 
 instance HasLocation (Located a) where
     srcSpan (Located x _) = x
+
+data Located x = Located SrcSpan x
+    deriving(Ord,Show,Data,Typeable,Eq)
+
+fromLocated :: Located x -> x
+fromLocated (Located _ x) = x
+
+instance Functor Located where
+    fmap f (Located l x) = Located l (f x)
+instance FunctorM Located where
+    fmapM f (Located l x) = Located l `liftM` f x
+
+
+located ss x = Located (srcSpan ss) x
 
 
 -----------------------

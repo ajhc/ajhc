@@ -350,22 +350,6 @@ renameHsDecl (HsNewTypeDecl srcLoc hsContext hsName hsNames1 hsConDecl hsNames2)
     -- don't need to rename the hsNames2 as it is just a list of TypeClasses
     hsNames2' <- mapM (`renameTypeHsName` subTable') hsNames2
     return (HsNewTypeDecl srcLoc hsContext' hsName' hsNames1' hsConDecl' hsNames2')
---renameHsDecl (HsNewTypeDecl srcLoc hsContext hsName hsNames1 hsConDecl hsNames2) subTable = do
---    setSrcLoc srcLoc
---    subTable' <- updateSubTableWithHsNames subTable hsNames1
---    hsContext' <- renameHsContext hsContext subTable'
---    -- don't need to rename the hsName (it is a constructor)
---    hsNames1' <- renameHsNames hsNames1 subTable'
---    hsConDecl' <- renameHsConDecl hsConDecl subTable'
---    -- don't need to rename the hsNames2 as it is just a list of TypeClasses
---    hsNames2' <- mapM (`renameTypeHsName` subTable') hsNames2
---    return (HsNewTypeDecl srcLoc hsContext' hsName hsNames1' hsConDecl' hsNames2')
--- here, we have to create a separate subTable (called the typeSigSubTable) to be passed down
--- because the part that renames the hsQualType in the type signatures needs a subTable with
--- _only_ the class's QualType in it.
--- Yes this is complicated and nasty. It is due mainly to the fact that some (but not all of
--- the type variables in the type sigs of the class's member functions must be renamed and
--- the new variables are used on the fly and not declared in an orderly manner.
 renameHsDecl (HsClassDecl srcLoc hsQualType hsDecls) subTable = do
     setSrcLoc srcLoc
     startingSubTable <- return subTable
@@ -870,13 +854,6 @@ renameHsFieldUpdates :: [HsFieldUpdate] -> SubTable -> ScopeSM ([HsFieldUpdate])
 renameHsFieldUpdates = mapRename renameHsFieldUpdate
 
 renameHsFieldUpdate :: HsFieldUpdate -> SubTable -> ScopeSM (HsFieldUpdate)
--- XXX I'm not 100% sure that this works
-{-
-renameHsFieldUpdate (HsFieldBind hsName) subTable
-  = do
-      hsName' <- renameHsName hsName subTable  -- do i need to rename this name?
-      return (HsFieldBind hsName')
--}
 renameHsFieldUpdate (HsFieldUpdate hsName hsExp) subTable = do
     gt <- gets globalSubTable     -- field names are global and not shadowed
     hsName' <- renameHsName hsName gt      -- TODO field names should have own namespace
@@ -909,12 +886,6 @@ renameHsName hsName subTable = case Map.lookup hsName subTable of
             return $ hsName
             --return (Qual modName name)
 
-
---renameTypeHsName hsName subTable  = case hsIdentString (hsNameIdent hsName) of
---    xs@(x:_) | isUpper x -> do
---        t <- gets typeSubTable
---        renameHsName hsName t
---    _ -> renameHsName hsName subTable
 
 
 renameTypeHsName hsName subTable  =  gets typeSubTable  >>= \t -> case Map.lookup hsName t of
@@ -1030,7 +1001,7 @@ updateSubTableWithHsDecls subTable (hsDecl:hsDecls) = do
 
 updateSubTableWithHsPats :: SubTable -> [HsPat] -> SrcLoc -> ScopeSM (SubTable)
 updateSubTableWithHsPats subTable (hsPat:hsPats) srcLoc = do
-    let hsNamesAndASrcLocs = zip (getHsNamesFromHsPat hsPat) (repeat srcLoc)
+    let hsNamesAndASrcLocs = zip (getNamesFromHsPat hsPat) (repeat srcLoc)
     subTable'  <- clobberHsNamesAndUpdateIdentTable hsNamesAndASrcLocs subTable
     subTable'' <- updateSubTableWithHsPats subTable' hsPats srcLoc
     return subTable''
@@ -1122,8 +1093,8 @@ collectDefsHsModule m = execWriter (mapM_ f (hsModuleDecls m)) where
     f (HsForeignExport a e _ _)  = tellF [(ffiExportName e,a,[])]
     f (HsFunBind [])  = return ()
     f (HsFunBind (HsMatch a n _ _ _:_))  = tellF [(toName Val n,a,[])]
-    f (HsPatBind srcLoc p _ _) = tellF [ (toName Val n,srcLoc,[]) | n <- (getHsNamesFromHsPat p) ]
-    f (HsActionDecl srcLoc p _) = tellF [ (toName Val n,srcLoc,[]) | n <- (getHsNamesFromHsPat p) ]
+    f (HsPatBind srcLoc p _ _) = tellF [ (toName Val n,srcLoc,[]) | n <- (getNamesFromHsPat p) ]
+    f (HsActionDecl srcLoc p _) = tellF [ (toName Val n,srcLoc,[]) | n <- (getNamesFromHsPat p) ]
     f (HsTypeDecl sl n _ _) = tellF [(toName TypeConstructor n,sl,[])]
     f HsDataDecl { hsDeclSrcLoc =sl, hsDeclName = n, hsDeclCons = cs } = do tellF $ (toName TypeConstructor n,sl,snub [ x |(x,_,_) <- cs']): cs' ; zup cs where
         cs' = concatMap (namesHsConDecl' toName) cs
@@ -1151,36 +1122,11 @@ namesHsDeclTS' toName (HsTypeSig sl ns _) = ((map (rtup sl . toName Val) ns),[])
 namesHsDeclTS' toName (HsTypeDecl sl n _ _) = ([(toName TypeConstructor n,sl)],[])
 namesHsDeclTS' _ _ = ([],[])
 
-{-
-collectDefsHsModule :: HsModule -> [(Bool,HsName,SrcLoc,[HsName])]
-collectDefsHsModule m = map g $ snd $ runWriter (mapM_ f (hsModuleDecls m)) where
-    g (b,n,sl,ns) = (b,mod n, sl, map mod ns)
-    mod = qualifyName (hsModuleName m)
-    f (HsForeignDecl a _ _ n _)  = tell [(False,n,a,[])]
-    f (HsFunBind [])  = return ()
-    f (HsFunBind (HsMatch a n _ _ _:_))  = tell [(False,n,a,[])]
-    f (HsPatBind srcLoc p _ _) = tell [ (False,n,srcLoc,[]) | n <- (getHsNamesFromHsPat p) ]
-    f (HsTypeDecl sl n _ _) = tell [(True,n,sl,[])]
-    f (HsDataDecl sl _ n _ cs _) = tell $ (True,n,sl,fsts cs'):[ (False,n,sl,[]) | (n,sl) <- cs'] where
-        cs' = concatMap namesHsConDecl cs
-    f (HsNewTypeDecl sl _ n _ c _) =  tell $ (True,n,sl,fsts cs'):[ (False,n,sl,[]) | (n,sl) <- cs'] where
-        cs' = namesHsConDecl c
-    f cd@(HsClassDecl sl _ ds) = tell $ (True,z,sl,fsts cs):[ (False,n,a,[]) | (n,a) <- cs]  where
-        Just z = maybeGetDeclName cd
-        cs = fst (mconcatMap namesHsDeclTS ds)
-    f _ = return ()
-
--- | Collect all names which are defined in a given module.
-namesHsModule ::
-    HsModule   -- ^ Module to collect names from.
-    -> ([(HsName, SrcLoc)],[(HsName, SrcLoc)])  -- ^ (value-like names,type-like names)
-namesHsModule m = mconcatMap namesHsDecl (hsModuleDecls m)
--}
 
 namesHsDecl :: HsDecl -> ([(HsName, SrcLoc)],[(HsName, SrcLoc)])
 namesHsDecl (HsForeignDecl a _ n _)  = ([(n,a)],[])
 namesHsDecl (HsFunBind hsMatches)  = (getHsNamesAndASrcLocsFromHsMatches hsMatches, [])
-namesHsDecl (HsPatBind srcLoc p _ _) = (map (rtup srcLoc) (getHsNamesFromHsPat p),[])
+namesHsDecl (HsPatBind srcLoc p _ _) = (map (rtup srcLoc) (getNamesFromHsPat p),[])
 namesHsDecl (HsTypeDecl sl n _ _) = ([],[(n,sl)])
 namesHsDecl HsDataDecl { hsDeclSrcLoc = sl, hsDeclName = n, hsDeclCons = cs } = ( (concatMap namesHsConDecl cs) ,[(n,sl)])
 namesHsDecl (HsNewTypeDecl sl _ n _ c _) = ( (namesHsConDecl c),[(n,sl)])
@@ -1199,17 +1145,10 @@ namesHsConDecl c = (hsConDeclName c,hsConDeclSrcLoc c) : case c of
 
 -- _hsNames that are constructors can be ignored.
 
-getHsNamesFromHsPat :: HsPat -> [HsName]
-getHsNamesFromHsPat p = execWriter (getNamesFromPat p)
-getNamesFromPat (HsPVar hsName) = tell [hsName]
-getNamesFromPat (HsPAsPat hsName hsPat) = do
-    tell [hsName]
-    getNamesFromPat hsPat
-getNamesFromPat p = traverseHsPat_ getNamesFromPat p
 
 getHsNamesAndASrcLocsFromHsStmt :: HsStmt -> [(HsName, SrcLoc)]
 getHsNamesAndASrcLocsFromHsStmt (HsGenerator srcLoc hsPat _hsExp)
-  = zip (getHsNamesFromHsPat hsPat) (repeat srcLoc)
+  = zip (getNamesFromHsPat hsPat) (repeat srcLoc)
 getHsNamesAndASrcLocsFromHsStmt (HsQualifier _hsExp)
   = []
 getHsNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls)

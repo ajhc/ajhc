@@ -337,6 +337,8 @@ hsParen x = HsParen x
 data HsErrorType = HsErrorPatternFailure | HsErrorSource | HsErrorFieldSelect | HsErrorUnderscore | HsErrorUninitializedField | HsErrorRecordUpdate
  deriving(Eq,Show)
 
+type LHsExp = Located HsExp
+
 data HsExp
 	= HsVar { {- hsExpSrcSpan :: SrcSpan,-} hsExpName :: HsName }
 	| HsCon { {-hsExpSrcSpan :: SrcSpan,-} hsExpName :: HsName }
@@ -366,9 +368,11 @@ data HsExp
 	| HsAsPat { hsExpName :: HsName, hsExpExp :: HsExp }  -- pattern only
         | HsError { hsExpSrcLoc :: SrcLoc, hsExpErrorType :: HsErrorType, hsExpString :: String }
 	| HsWildCard SrcLoc			-- ditto
-	| HsIrrPat HsExp		-- ditto
+	| HsIrrPat { hsExpLExp :: LHsExp }
  deriving(Eq,Show)
     {-! derive: is, update !-}
+
+type LHsPat = Located HsPat
 
 data HsPat
 	= HsPVar { hsPatName :: HsName }
@@ -383,7 +387,7 @@ data HsPat
 	| HsPRec HsName [HsPatField]
 	| HsPAsPat { hsPatName :: HsName, hsPatPat :: HsPat }
 	| HsPWildCard
-	| HsPIrrPat HsPat
+	| HsPIrrPat { hsPatLPat :: LHsPat }
 	| HsPTypeSig SrcLoc HsPat HsQualType  -- scoped type variable extension
  deriving(Eq,Ord,Show)
  {-! derive: is !-}

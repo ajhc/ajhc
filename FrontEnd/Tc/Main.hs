@@ -427,9 +427,9 @@ tiPat (HsPNeg (HsPLit (HsDoublePrim i))) typ = tiPat (HsPLit $ HsDoublePrim (neg
 tiPat (HsPNeg pat) typ = fail $ "non-literal negative patterns are not allowed"
 tiPat (HsPNeg pat) typ = tiPat pat typ
 
-tiPat (HsPIrrPat p) typ = do
+tiPat (HsPIrrPat (Located l p)) typ = do
     (p,ns) <- tiPat p typ
-    return (HsPIrrPat p,ns)
+    return (HsPIrrPat (Located l p),ns)
 tiPat (HsPParen p) typ = tiPat p typ
 
 

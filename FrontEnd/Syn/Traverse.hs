@@ -96,7 +96,7 @@ traverseHsExp fn e = f e where
         return (HsAsPat hsName hsExp')
     f (HsWildCard x) = do return (HsWildCard x)
     f (HsIrrPat hsExp)  = do
-        hsExp' <- fn hsExp
+        hsExp' <- fnl hsExp
         return (HsIrrPat hsExp')
     f (HsRecConstr n fus) = do
         fus' <- mapM fFieldUpdate fus
@@ -108,6 +108,7 @@ traverseHsExp fn e = f e where
     fFieldUpdate (HsFieldUpdate n e) = do
         e' <- fn e
         return $ HsFieldUpdate n e'
+    fnl (Located l e) = Located l `liftM` fn e
 
     {-
 -- not done
@@ -198,7 +199,7 @@ traverseHsPat fn p = f p where
           return (HsPAsPat hsName hsPat')
     f HsPWildCard  = do return HsPWildCard
     f (HsPIrrPat hsPat)  = do
-          hsPat' <- fn hsPat
+          hsPat' <- fnl hsPat
           return (HsPIrrPat hsPat')
     f (HsPTypeSig srcLoc hsPat qt) = withSrcLoc srcLoc $ do
           hsPat' <- fn hsPat
@@ -207,6 +208,7 @@ traverseHsPat fn p = f p where
           hsPatFields' <- mapM fField hsPatFields
           return (HsPRec hsName hsPatFields')
     fField (HsPFieldPat n p) = fn p >>= return . HsPFieldPat n
+    fnl (Located l e) = Located l `liftM` fn e
 
 traverseHsRhsHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsRhs -> m HsRhs
 traverseHsRhsHsExp fn d = f d where
@@ -239,5 +241,12 @@ traverseHsDeclHsExp fn d = f d where
 --        return prules {  hsDeclFreeVars = fvs', hsDeclLeftExpr = e1', hsDeclRightExpr = e2' }
     f otherHsDecl = return otherHsDecl
 
+getNamesFromHsPat :: HsPat -> [HsName]
+getNamesFromHsPat p = execWriter (getNamesFromPat p) where
+    getNamesFromPat (HsPVar hsName) = tell [hsName]
+    getNamesFromPat (HsPAsPat hsName hsPat) = do
+        tell [hsName]
+        getNamesFromPat hsPat
+    getNamesFromPat p = traverseHsPat_ getNamesFromPat p
 
 

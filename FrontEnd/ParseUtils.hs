@@ -39,6 +39,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.ParseMonad
 import Char
 import Ratio
+import Data.FunctorM
 
 type HsQName = HsName
 
@@ -117,6 +118,7 @@ checkInsts _ _ = fail "Illegal instance declaration"
 checkPattern :: HsExp -> P HsPat
 checkPattern e = checkPat e []
 
+
 checkPat :: HsExp -> [HsPat] -> P HsPat
 checkPat (HsCon c) args = return (HsPApp c args)
 checkPat (HsApp f x) args = do
@@ -147,8 +149,8 @@ checkPat e [] = case e of
 			      p <- checkPat e []
 			      return (HsPAsPat n p)
 	HsWildCard _	   -> return HsPWildCard
-	HsIrrPat e	   -> do
-			      p <- checkPat e []
+	HsIrrPat e         -> do
+			      p <- fmapM checkPattern e
 			      return (HsPIrrPat p)
 	HsRecConstr c fs   -> do
 			      fs <- mapM checkPatField fs

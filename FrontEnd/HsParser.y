@@ -654,7 +654,7 @@ aexp1 :: { HsExp }
       | qvar '@' aexp1                {% checkUnQual $1 `thenP` \n ->
                                          returnP (HsAsPat n $3) }
       | srcloc '_'                    { HsWildCard $1 }
-      | '~' aexp1                     { HsIrrPat $2 }
+      | '~' srcloc aexp1 srcloc       { HsIrrPat $ located ($2,$4) $3 }
 
 commas :: { Int }
       : commas ','                    { $1 + 1 }

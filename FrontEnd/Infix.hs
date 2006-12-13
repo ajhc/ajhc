@@ -235,7 +235,7 @@ processPat infixMap exp = case exp of
     x@HsPLit {} -> (x,terminalFixity)
     x@HsPWildCard  -> (x,terminalFixity)
     HsPNeg p ->    tf $ HsPNeg (pp p)
-    HsPIrrPat p -> tf $ HsPIrrPat (pp p)
+    HsPIrrPat p -> tf $ HsPIrrPat (fmap pp p)
     HsPApp n xs -> tf $ HsPApp n (map pp xs)
     HsPTuple xs -> tf $ HsPTuple (map pp xs)
     HsPUnboxedTuple xs -> tf $ HsPUnboxedTuple (map pp xs)
@@ -305,7 +305,7 @@ processExp infixMap exp = case exp of
     HsListComp e1 stmts    ->
                            (HsListComp (processExp' e1) (map (processStmt infixMap) stmts), terminalFixity)
     HsAsPat name e1        -> (HsAsPat name (processExp' e1), terminalFixity)
-    HsIrrPat e1            -> (HsIrrPat (processExp' e1), terminalFixity)
+    HsIrrPat e1            -> (HsIrrPat (fmap processExp' e1), terminalFixity)
     HsLeftSection e1 e2    -> (HsLeftSection e1 (processExp' e2), terminalFixity)
     HsRightSection e1 e2       -> (HsRightSection (processExp' e1) e2, terminalFixity)
     HsLambda srcloc pats e1    -> (HsLambda srcloc (map (procPat infixMap) pats) (processExp' e1), terminalFixity)
