@@ -1,4 +1,4 @@
-module FrontEnd.Tc.Main (tiExpr, tiProgram, makeProgram ) where
+module FrontEnd.Tc.Main (tiExpr, tiProgram, makeProgram, isTypePlaceholder ) where
 
 import Control.Monad.Writer
 import Data.Graph(stronglyConnComp, SCC(..))
@@ -122,6 +122,10 @@ newHsVar ns = do
     return $ toName Val (ns ++ "@",show nn)
 
 
+isTypePlaceholder :: HsName -> Bool
+isTypePlaceholder (Qual (Module "Wild@") _) = True
+isTypePlaceholder (Qual (Module "As@") _) = True
+isTypePlaceholder _ = False
 
 tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp
 
@@ -453,29 +457,28 @@ tiPat (HsPApp conName pats) typ = do
 
 tiPat pl@(HsPList []) (TAp t v) | t == tList = do
     unBox v
-    return (pl,mempty)
+    return (delistPats [],mempty)
 
 tiPat pl@(HsPList []) typ = do
     v <- newBox kindStar
     --typ `subsumes` TAp tList v
     typ `boxyMatch` TAp tList v
-    return (pl,mempty)
+    return (delistPats [],mempty)
 
 tiPat (HsPList pats@(_:_)) (TAp t v) | t == tList = do
     --v <- newBox kindStar
     --TAp tList v `boxyMatch` typ
     --typ `subsumes` TAp tList v
     ps <- mapM (`tcPat` v) pats
-    return (HsPList (fsts ps), mconcat (snds ps))
+    return (delistPats (fsts ps), mconcat (snds ps))
 
 tiPat (HsPList pats@(_:_)) typ = do
     v <- newBox kindStar
     --TAp tList v `boxyMatch` typ
     ps <- mapM (`tcPat` v) pats
     typ `boxyMatch` TAp tList v
-    return (HsPList (fsts ps), mconcat (snds ps))
+    return (delistPats (fsts ps), mconcat (snds ps))
 
---tiPat HsPWildCard typ = unBox typ >> return (HsPWildCard, mempty)
 tiPat HsPWildCard typ = do
     n <- newHsVar "Wild"
     typ' <- unBox typ
@@ -494,6 +497,10 @@ tiPat (HsPUnboxedTuple ps) typ = tiPat (HsPApp (nameName $ unboxedNameTuple Data
 tiPat tuple@(HsPTuple pats) typ = tiPat (HsPApp (toTuple (length pats)) pats) typ
 
 tiPat p _ = error $ "tiPat: " ++ show p
+
+delistPats ps = pl ps where
+    pl [] = HsPApp (nameName $ dc_EmptyList) []
+    pl (p:xs) = HsPApp (nameName $ dc_Cons) [p, pl xs]
 
 tcBindGroup :: BindGroup -> Tc ([HsDecl], TypeEnv)
 tcBindGroup (es, is) = do

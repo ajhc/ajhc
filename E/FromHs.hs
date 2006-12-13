@@ -42,6 +42,7 @@ import FrontEnd.Desugar(patVarNames)
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Module(TiData(..))
 import FrontEnd.Tc.Type hiding(Rule(..))
+import FrontEnd.Tc.Main(isTypePlaceholder)
 import qualified FrontEnd.Tc.Type as Type
 import FrontEnd.Utils
 import HsSyn as HS
@@ -116,23 +117,6 @@ kind (KVar _) = error "Kind variable still existing."
 simplifyDecl (HsPatBind sl (HsPVar n)  rhs wh) = HsFunBind [HsMatch sl n [] rhs wh]
 simplifyDecl x = x
 
-simplifyHsPat (HsPInfixApp p1 n p2) = HsPApp n [simplifyHsPat p1, simplifyHsPat p2]
-simplifyHsPat (HsPParen p) = simplifyHsPat p
-simplifyHsPat (HsPTuple ps) = HsPApp (toTuple (length ps)) (map simplifyHsPat ps)
-simplifyHsPat (HsPUnboxedTuple ps) = HsPApp (nameName $ unboxedNameTuple DataConstructor (length ps)) (map simplifyHsPat ps)
-simplifyHsPat HsPNeg {} = error "E.FromHs: HsPNeg exists"
---simplifyHsPat (HsPLit (HsString s)) | True || length s <= 3 = simplifyHsPat (HsPList (map f s)) where
---    f c = HsPLit (HsChar c)
-simplifyHsPat (HsPAsPat n p) = HsPAsPat n (simplifyHsPat p)
-simplifyHsPat (HsPTypeSig _ p _) = simplifyHsPat p
-simplifyHsPat (HsPList ps) = pl ps where
-    pl [] = HsPApp (nameName $ dc_EmptyList) []
-    pl (p:xs) = HsPApp (nameName $ dc_Cons) [simplifyHsPat p, pl xs]
-simplifyHsPat (HsPApp n xs) = HsPApp n (map simplifyHsPat xs)
-simplifyHsPat (HsPIrrPat p) = HsPIrrPat $ simplifyHsPat p -- TODO irrefutable patterns!
-simplifyHsPat p@HsPVar {} = p
-simplifyHsPat p@HsPLit {} = p
-simplifyHsPat p = error $ "simplifyHsPat: " ++ show p
 
 
 fromTyvar (Tyvar _ n k) = tVr (toId n) (kind k)
@@ -164,11 +148,9 @@ convertValue n = do
 
 matchesConv ms = map v ms where
     v (HsMatch _ _ ps rhs wh) = (ps,rhs,wh)
-    --v (HsMatch _ _ ps rhs wh) = (map simplifyHsPat ps,rhs,wh)
 
 altConv as = map v as where
     v (HsAlt _ p rhs wh) = ([p],rhs,wh)
---    v (HsAlt _ p rhs wh) = ([simplifyHsPat p],rhs,wh)
 
 argTypes e = span (sortSortLike . getType) (map tvrType xs) where
     (_,xs) = fromPi e
@@ -414,22 +396,34 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         (:[]) `liftM` nameToEntryPoint dataTable tn (toName Name.FfiExportName ecn) (Just ffi) funcs
     cDecl x@HsForeignExport {} = fail ("Unsupported foreign export: "++ show x)
 
-    cDecl (HsPatBind sl p (HsUnGuardedRhs exp) []) | (HsPVar n) <- simplifyHsPat p, n == sillyName' = do
+    cDecl (HsPatBind sl (HsPVar n) (HsUnGuardedRhs exp) []) | n == sillyName' = do
         e <- cExpr exp
         return [(v_silly,tvr,e)]
-
-    cDecl (HsPatBind sl p rhs wh) | (HsPVar n) <- simplifyHsPat p = do
+    cDecl (HsPatBind sl p rhs wh) | (HsPVar n) <- p = do
         let name = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         rhs <- cRhs sl rhs
         lv <- hsLetE wh rhs
         return [(name,var,lamt lv)]
-    cDecl (HsFunBind [(HsMatch sl n ps rhs wh)]) | ps' <- map simplifyHsPat ps, all isHsPVar ps' = do
+    cDecl (HsPatBind sl p rhs wh) | (HsPVar n) <- p = do
         let name = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         rhs <- cRhs sl rhs
         lv <- hsLetE wh rhs
-        lps <- lp  ps' lv
+        return [(name,var,lamt lv)]
+
+    cDecl (HsPatBind sl p rhs wh) | (HsPVar n) <- p = do
+        let name = toName Name.Val n
+        (var,ty,lamt) <- convertValue name
+        rhs <- cRhs sl rhs
+        lv <- hsLetE wh rhs
+        return [(name,var,lamt lv)]
+    cDecl (HsFunBind [(HsMatch sl n ps rhs wh)]) | all isHsPVar ps = do
+        let name = toName Name.Val n
+        (var,ty,lamt) <- convertValue name
+        rhs <- cRhs sl rhs
+        lv <- hsLetE wh rhs
+        lps <- lp ps lv
         return [(name,var,lamt lps )]
     cDecl (HsFunBind ms@((HsMatch sl n ps _ _):_)) = do
         let name = toName Name.Val n
@@ -467,10 +461,9 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
     --cExpr (HsLit (HsInt i)) = return $ intConvert i
     cExpr (HsLit (HsChar ch)) = return $ toE ch
     cExpr (HsLit (HsFrac i))  = return $ toE i
-    cExpr (HsLambda sl ps e) | all isHsPVar ps' = do
+    cExpr (HsLambda sl ps e) | all isHsPVar ps = do
         e <- cExpr e
-        lp ps' e
-      where ps' = map simplifyHsPat ps
+        lp ps e
     cExpr (HsInfixApp e1 v e2) = do
         v <- cExpr v
         e1 <- cExpr e1
@@ -560,7 +553,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         cg <- cGuard e
         nds <- mconcatMapM cDecl wh
         let elet = eLetRec [ (b,c) | (_,b,c) <- nds]
-        return (map simplifyHsPat ps,elet . cg )
+        return (ps,elet . cg )
 
     cClassDecl (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon name) _)) decls) = do
         let ds = map simplifyDecl decls
@@ -610,31 +603,40 @@ fromHsPLitInt (HsPLit l@(HsInt _)) = return l
 fromHsPLitInt (HsPLit l@(HsFrac _)) = return l
 fromHsPLitInt x = fail $ "fromHsPLitInt: " ++ show x
 
+patVar ::
+    Monad m
+    => HsPat -- ^ the pattern
+    -> E     -- ^ the type of the expression
+    -> Ce m (HsPat,TVr)  -- ^ a new pattern and a binding variable
+patVar HsPWildCard t = return (HsPWildCard,tvr { tvrType = t })
+patVar (HsPVar n) t | isTypePlaceholder n = return (HsPWildCard,tvr { tvrType = t })
+patVar (HsPAsPat n p) t | not (isTypePlaceholder n) = do
+    nn <- convertVar (toName Name.Val n)
+    return (p,nn)
+patVar (HsPAsPat n p) t | isTypePlaceholder n = patVar p t
+patVar p t = do
+    [nv] <- newVars [t]
+    return (p,nv)
+
+
 tidyPat ::
     Monad m
     => HsPat
     -> E
     -> Ce m (HsPat,E -> E)
 tidyPat p b = f p where
-    f (HsPInfixApp p1 n p2) = f $ HsPApp n [p1,p2]
-    f (HsPParen p) = f p
-    f (HsPTuple ps) = f (HsPApp (toTuple (length ps)) ps)
-    f (HsPUnboxedTuple ps) = f $ HsPApp (nameName $ unboxedNameTuple DataConstructor (length ps)) ps
     f HsPWildCard = return (HsPWildCard,id)
-    f HsPNeg {} = error "E.FromHs: HsPNeg exists"
-    f HsPRec {} = error "E.FromHs: HsPRec exists"
+    f (HsPVar n) | isTypePlaceholder n = return (HsPWildCard,id)
+    f (HsPAsPat n p) | isTypePlaceholder n = f p
     f (HsPTypeSig _ p _) = f p
-    f (HsPList ps) = f (pl ps) where
-        pl [] = HsPApp (nameName $ dc_EmptyList) []
-        pl (p:xs) = HsPApp (nameName $ dc_Cons) [p, pl xs]
     f p@HsPLit {} = return (p,id)
     f (HsPVar n) = do
         v <- convertVar (toName Name.Val n)
-        return (HsPWildCard,eLet v b)
+        return (HsPWildCard,if EVar v /=  b then eLet v b else id)
     f (HsPAsPat n p) = do
         (p',g') <- f p
         v <- convertVar (toName Name.Val n)
-        return (p',eLet v b . g')
+        return (p',(if EVar v /= b then eLet v b else id) . g')
     f pa@(HsPApp n [p]) = do
         dataTable <- getDataTable
         patCons <- getConstructor (toName DataConstructor n) dataTable
@@ -642,19 +644,16 @@ tidyPat p b = f p where
             ErasedAlias -> f p
             _ -> return (pa,id)
     f p@HsPApp {} = return (p,id)
-
-    -- remove some redundant irrefutable markings
-    f (HsPIrrPat p@HsPVar {}) = f p
-    f (HsPIrrPat p@HsPWildCard) = f p
-    f (HsPIrrPat p@HsPIrrPat {}) = f p
-    f (HsPIrrPat p) = do
-        (lbv,bv) <- varify b
-        let f n = do
-            v <- convertVar (toName Name.Val n)
-            fe <- convertMatches [bv] [([p],const (EVar v))] (EError "Irrefutable pattern match failed" (getType v))
-            return (v,fe)
-        zs <- mapM f (patVarNames p)
-        return (HsPWildCard,lbv . eLetRec zs)
+    f (HsPIrrPat p) = f p >>= \ (p',fe) -> case p' of
+        HsPWildCard -> return (p',fe)
+        _ -> do
+            (lbv,bv) <- varify b
+            let f n = do
+                v <- convertVar (toName Name.Val n)
+                fe <- convertMatches [bv] [([p],const (EVar v))] (EError "Irrefutable pattern match failed" (getType v))
+                return (v,fe)
+            zs <- mapM f (patVarNames p)
+            return (HsPWildCard,lbv . eLetRec zs)
 
 -- converts a value to an updatable closure if it isn't one already.
 varify b@EVar {} = return (id,b)
@@ -742,11 +741,8 @@ convertMatches bs ms err = do
                 as@(_:_) <- mapM f gps
                 [TVr { tvrIdent = vr }] <- newVars [Unknown]
                 return $ unbox dataTable b vr $ \tvr -> eCase tvr as err
-            | all (\ (c,_,_) -> isHsPApp c || isHsPString c) ps = do
-                let gps =  sortGroupUnderF (hsPPatName . fst3) (map ff ps)
-                    ff (HsPLit (HsString ""),ps,b) = ((HsPApp (nameName $ dc_EmptyList) []),ps,b)
-                    ff (HsPLit (HsString (c:cs)),ps,b) = ((HsPApp (nameName $ dc_Cons) [HsPLit (HsChar c),HsPLit (HsString cs)]),ps,b)
-                    ff x = x
+            | Just ps <- mapM pappConvert ps = do
+                let gps =  sortGroupUnderF (hsPatName . fst3) ps
                     (Just patCons) = getConstructor (toName DataConstructor $ fst $ head gps) dataTable
                     f (name,ps) = do
                         let spats = hsPatPats $ fst3 (head ps)
@@ -768,14 +764,14 @@ convertMatches bs ms err = do
                         let err' = if length sibs <= length as then Unknown else err
                         return $ eCase b [Alt litCons { litName = vCons, litArgs = [z], litType = getType b } (eCase (EVar z) as err')] Unknown
             | otherwise = error $ "Heterogenious list: " ++ show (map fst3 ps)
+        pappConvert (p@HsPApp {},x,y) = return (p,x,y)
+        pappConvert (HsPLit (HsString ""),ps,b) = return (HsPApp (nameName $ dc_EmptyList) [],ps,b)
+        pappConvert (HsPLit (HsString (c:cs)),ps,b) = return (HsPApp (nameName $ dc_Cons) [HsPLit (HsChar c),HsPLit (HsString cs)],ps,b)
+        pappConvert _ = fail "pappConvert"
+        isHsPString (HsPLit HsString {}) = True
+        isHsPString _ = False
     match bs ms err
 
-hsPPatName p@HsPApp {} = hsPatName p
-hsPPatName (HsPLit (HsString "")) = nameName dc_EmptyList
-hsPPatName (HsPLit (HsString {})) = nameName dc_Cons
-
-isHsPString (HsPLit HsString {}) = True
-isHsPString _ = False
 
 
 
