@@ -181,10 +181,10 @@ getMainFunction dataTable name ds = do
   mt <- case Map.lookup name ds of
     Just x -> return x
     Nothing -> fail $ "Could not find main function: " ++ show name
-  let funcs = runIdentity $ fmapM (\n -> return . fst $ runEither (show n) $ Map.lookup n ds) sFuncNames
+  let funcs = runIdentity $ fmapM (\n -> return . EVar . fst $ runEither (show n) $ Map.lookup n ds) sFuncNames
   nameToEntryPoint dataTable (fst mt) (toName Name.Val "theMain") Nothing funcs
 
-nameToEntryPoint :: Monad m => DataTable -> TVr -> Name -> Maybe FfiExport -> FuncNames TVr -> m (Name,TVr,E)
+nameToEntryPoint :: Monad m => DataTable -> TVr -> Name -> Maybe FfiExport -> FuncNames E -> m (Name,TVr,E)
 nameToEntryPoint dataTable main cname ffi ds = ans where
     ans = do
         let runMain      = func_runMain ds
@@ -192,10 +192,10 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
             runNoWrapper = func_runNoWrapper ds
             runRaw       = func_runRaw ds
         let e = case ioLike (getType maine) of
-                Just x | not (fopts FO.Wrapper) -> EAp (EAp (EVar runNoWrapper) x) maine
-                Just x ->  EAp (EAp (EVar runMain)  x ) maine
-                Nothing | fopts FO.Raw -> EAp (EAp (EVar runRaw) ty) maine
-                Nothing ->  EAp (EAp (EVar runExpr) ty) maine
+                Just x | not (fopts FO.Wrapper) -> EAp (EAp runNoWrapper x) maine
+                Just x ->  EAp (EAp runMain  x ) maine
+                Nothing | fopts FO.Raw -> EAp (EAp runRaw ty) maine
+                Nothing ->  EAp (EAp runExpr ty) maine
             ne = ELam worldVar (EAp e (EVar worldVar))
             worldVar = tvr { tvrIdent = 2, tvrType = tWorld__ }
             theMainTvr =  tVr (toId cname) (infertype dataTable ne)
@@ -288,7 +288,7 @@ convertRules mod tiData classHierarchy assumps dataTable hsDecls = ans where
                 --return (tvrIdent tvr,tvr)
                 nn <- newNameFrom (map (:'\'':[]) ['a' ..])
                 return (tvrIdent tvr,tvr { tvrIdent = toId (toName TypeVal nn) })
-            cs <- flip mapM [toTVr assumps (toName Val v) | (v,_) <- hsRuleFreeVars pr ] $ \tvr -> do
+            cs <- flip mapM [toTVr assumps dataTable (toName Val v) | (v,_) <- hsRuleFreeVars pr ] $ \tvr -> do
                 let ur = show $ unRename $ nameName (toUnqualified $ runIdentity $ fromId (tvrIdent tvr))
                 nn <- newNameFrom (ur:map (\v -> ur ++ show v) [1 ::Int ..])
                 return (tvrIdent tvr,tvr { tvrIdent = toId (toName Val nn) })
@@ -354,7 +354,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         ceFuncs = funcs,
         ceDataTable = dataTable
         }
-    Identity funcs = fmapM (return . EVar . toTVr assumps) sFuncNames
+    Identity funcs = fmapM (return . EVar . toTVr assumps dataTable) sFuncNames
     Ce ans = do
         nds <- mapM cDecl hsDecls
         return (map anninst $ concat nds)
@@ -410,7 +410,8 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
     cDecl x@HsForeignDecl {} = fail ("Unsupported foreign declaration: "++ show x)
     cDecl (HsForeignExport _ ffi@(FfiExport ecn _ CCall) n _) = do
         tn <- convertVar (toName Name.Val n)
-        return . (:[]) =<< nameToEntryPoint dataTable tn (toName Name.FfiExportName ecn) (Just ffi) =<< fmapM (return . toTVr assumps) sFuncNames
+        funcs <- asks ceFuncs
+        (:[]) `liftM` nameToEntryPoint dataTable tn (toName Name.FfiExportName ecn) (Just ffi) funcs
     cDecl x@HsForeignExport {} = fail ("Unsupported foreign export: "++ show x)
 
     cDecl (HsPatBind sl p (HsUnGuardedRhs exp) []) | (HsPVar n) <- simplifyHsPat p, n == sillyName' = do
@@ -581,11 +582,9 @@ convertTyp n = do
     return t
 
 
-toTVr assumps n = tVr (toId n) (typeOfName n) where
-    typeOfName n = fst $ convertVal assumps n
-convertVal assumps n = (foldr ePi t vs, flip (foldr eLam) vs) where
-    (vs,t) = case Map.lookup n assumps of
-        Just z -> fromSigma  z
+toTVr assumps dataTable n = tVr (toId n) typeOfName where
+    typeOfName = case Map.lookup n assumps of
+        Just z -> removeNewtypes dataTable (tipe z)
         Nothing -> error $ "convertVal.Lookup failed: " ++ (show n)
 
 
@@ -649,13 +648,19 @@ tidyPat p b = f p where
     f (HsPIrrPat p@HsPWildCard) = f p
     f (HsPIrrPat p@HsPIrrPat {}) = f p
     f (HsPIrrPat p) = do
-        [bv] <- newVars [getType b]
+        (lbv,bv) <- varify b
         let f n = do
             v <- convertVar (toName Name.Val n)
-            fe <- convertMatches [EVar bv] [([p],const (EVar v))] (EError "Irrefutable pattern match failed" (getType v))
+            fe <- convertMatches [bv] [([p],const (EVar v))] (EError "Irrefutable pattern match failed" (getType v))
             return (v,fe)
         zs <- mapM f (patVarNames p)
-        return (HsPWildCard,eLet bv b . eLetRec zs)
+        return (HsPWildCard,lbv . eLetRec zs)
+
+-- converts a value to an updatable closure if it isn't one already.
+varify b@EVar {} = return (id,b)
+varify b = do
+    [bv] <- newVars [getType b]
+    return (eLet bv b,EVar bv)
 
 tidyHeads ::
     Monad m
@@ -679,18 +684,15 @@ convertMatches bs ms err = do
     assumps <- asks ceAssumps
     dataTable <- getDataTable
     funcs <- asks ceFuncs
-    let tv n = tvr { tvrType = removeNewtypes dataTable (tvrType tvr) } where
-            tvr = toTVr assumps (toName Name.Val n)
-    let doNegate e = eAp (eAp (func_negate funcs) (getType e)) e
-        fromInt = func_fromInt funcs
+    let fromInt = func_fromInt funcs
         fromInteger = func_fromInteger funcs
         fromRational = func_fromRational funcs
         isJoinPoint (EAp (EVar x) _) | getProperty prop_JOINPOINT x = True
         isJoinPoint _ = False
+
         match :: Monad m => [E] -> [([HsPat],E->E)] -> E -> Ce m E
         -- when we run out of arguments, we should run out of patterns. simply fold the transformers.
-        match  [] ps err = return $ foldr f err ps where
-            f ([],fe) err = fe err
+        match  [] ps err = return $ foldr f err ps where f ([],fe) err = fe err
         -- when we are out of patterns, return the error term
         match _ [] err = return err
         match (b:bs) ps err = do
@@ -708,30 +710,30 @@ convertMatches bs ms err = do
         matchGroup b bs ps err
             | all (isHsPWildCard . fst3) ps = match bs [ (ps,e) | (_,ps,e) <- ps] err
             | Just () <- mapM_ (fromHsPLitInt . fst3) ps = do
-                    let tb = getType b
-                    [bv] <- newVars [tb]
-                    let gps = [ (p,[ (ps,e) |  (_,ps,e) <- xs ]) | (p,xs) <- sortGroupUnderF fst3 ps]
-                        eq = EAp (func_equals funcs) tb
-                        f els (HsPLit (HsInt i),ps) = do
-                            let ip | abs i > integer_cutoff  = (EAp (EAp fromInteger tb) (intConvert i))
-                                   | otherwise =  (EAp (EAp fromInt tb) (intConvert i))
-                            m <- match bs ps err
-                            createIf (EAp (EAp eq (EVar bv)) ip) m els
-                        f els (HsPLit (HsFrac i),ps) = do
-                            let ip = (EAp (EAp fromRational tb) (toE i))
-                            m <- match bs ps err
-                            createIf (EAp (EAp eq (EVar bv)) ip) m els
-                    e <- foldlM f err gps
-                    return $ eLet bv b e
+                let tb = getType b
+                (lbv,bv) <- varify b
+                let gps = [ (p,[ (ps,e) |  (_,ps,e) <- xs ]) | (p,xs) <- sortGroupUnderF fst3 ps]
+                    eq = EAp (func_equals funcs) tb
+                    f els (HsPLit (HsInt i),ps) = do
+                        let ip | abs i > integer_cutoff  = (EAp (EAp fromInteger tb) (intConvert i))
+                               | otherwise =  (EAp (EAp fromInt tb) (intConvert i))
+                        m <- match bs ps err
+                        createIf (EAp (EAp eq bv) ip) m els
+                    f els (HsPLit (HsFrac i),ps) = do
+                        let ip = (EAp (EAp fromRational tb) (toE i))
+                        m <- match bs ps err
+                        createIf (EAp (EAp eq bv) ip) m els
+                e <- foldlM f err gps
+                return $ lbv e
             | all (isHsPString . fst3) ps = do
-                    [bv] <- newVars [getType b]
-                    (eqString,_,_) <- convertValue v_eqString
-                    let gps = [ (p,[ (ps,fe) |  (_,ps,fe) <- xs ]) | (p,xs) <- sortGroupUnderF fst3 ps]
-                        f els (HsPLit (HsString s),ps) = do
-                            m <- match bs ps err
-                            return $ ifzh (EAp (EAp (EVar eqString) (EVar bv)) (toE s)) m els
-                    e <- foldlM f err gps
-                    return $ eLet bv b e
+                (lbv,bv) <- varify b
+                (eqString,_,_) <- convertValue v_eqString
+                let gps = [ (p,[ (ps,fe) |  (_,ps,fe) <- xs ]) | (p,xs) <- sortGroupUnderF fst3 ps]
+                    f els (HsPLit (HsString s),ps) = do
+                        m <- match bs ps err
+                        return $ ifzh (EAp (EAp (EVar eqString) bv) (toE s)) m els
+                e <- foldlM f err gps
+                return $ lbv e
             | all (isHsPLit . fst3) ps = do
                 let gps = [ (p,[ (ps,fe) |  (_,ps,fe) <- xs ]) | (p,xs) <- sortGroupUnderF fst3 ps]
                     f (HsPLit l,ps) = do
