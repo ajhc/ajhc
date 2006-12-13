@@ -21,7 +21,6 @@ import Atom
 import Boolean.Algebra
 import C.FFI
 import C.Prims as CP
-import FrontEnd.Class
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
@@ -37,13 +36,13 @@ import E.TypeAnalysis
 import E.TypeCheck
 import E.Values
 import Fixer.VMap
+import FrontEnd.Class
 import FrontEnd.Rename(unRename)
-import FrontEnd.Syn.Traverse(getNamesFromHsPat)
 import FrontEnd.SrcLoc
+import FrontEnd.Syn.Traverse(getNamesFromHsPat)
+import FrontEnd.Tc.Main(isTypePlaceholder)
 import FrontEnd.Tc.Module(TiData(..))
 import FrontEnd.Tc.Type hiding(Rule(..))
-import FrontEnd.Tc.Main(isTypePlaceholder)
-import qualified FrontEnd.Tc.Type as Type
 import FrontEnd.Utils
 import HsSyn as HS
 import Info.Types
@@ -51,6 +50,7 @@ import Name.Name as Name
 import Name.Names
 import Name.VConsts
 import Options
+import PackedString
 import PrimitiveOperators
 import Support.CanType
 import Support.FreeVars
@@ -60,6 +60,7 @@ import Util.SetLike
 import qualified FlagOpts as FO
 import qualified FrontEnd.Tc.Monad as TM
 import qualified FrontEnd.Tc.Type as T(Rule(..))
+import qualified FrontEnd.Tc.Type as Type
 import qualified Info.Info as Info
 import qualified Stats
 
@@ -447,6 +448,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
     cExpr (HsAsPat n' (HsCon n)) = return $ constructionExpression dataTable (toName DataConstructor n) rt where
         t' = getAssump n'
         (_,rt) = argTypes' (tipe t')
+    cExpr (HsLit (HsStringPrim s)) = return $ EPrim (APrim (PrimString (packString s)) mempty) [] (rawType "HsPtr")
     cExpr (HsLit (HsString s)) = return $ E.Values.toE s
     cExpr (HsAsPat n' (HsLit (HsIntPrim i))) = ans where
         t' = getAssump n'

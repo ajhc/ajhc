@@ -83,6 +83,7 @@ convertVal (ValPrim (APrim p _) [] _) = case p of
     CConst s _ -> return $ expressionRaw s
     AddrOf t -> return $ expressionRaw ('&':t)
     PrimTypeInfo { primArgType = arg, primTypeInfo = PrimSizeOf } -> return $ expressionRaw ("sizeof(" ++ arg ++ ")")
+    PrimString s -> return $ expressionRaw (show s)
     x -> return $ err ("convertVal: " ++ show x)
 convertVal (ValPrim (APrim p _) [x] _) = do
     x' <- convertVal x

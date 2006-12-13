@@ -1,12 +1,13 @@
 module C.Prims where
 
-import C.FFI(Requires(..))
-import Data.Monoid
 import Data.Generics
+import Data.Monoid
+
 import Binary
+import C.FFI(Requires(..))
 import Doc.DocLike
 import Doc.PPrint
-
+import PackedString
 
 data PrimTypeType = PrimTypeIntegral | PrimTypeFloating | PrimTypePointer | PrimTypeVoid
     deriving(Show,Eq,Ord)
@@ -34,12 +35,15 @@ data Prim =
     | Poke { primArgType :: ExtType }                            -- write value to memory
     | CCast { primArgType :: ExtType, primRetType :: ExtType }   -- Cast from one basic type to another, possibly lossy.
     | PrimTypeInfo { primArgType :: ExtType,  primRetType :: ExtType, primTypeInfo :: PrimTypeInfo }
+    | PrimString PackedString                                 -- address of a raw string. encoded in utf8.
     deriving(Typeable, Data, Eq, Ord, Show)
     {-! derive: GhcBinary !-}
 
 data PrimTypeInfo = PrimSizeOf | PrimMaxBound | PrimMinBound | PrimAlignmentOf | PrimTypeIsSigned
     deriving(Typeable, Data, Eq, Ord, Show)
     {-! derive: GhcBinary !-}
+
+instance Data PackedString where
 
 -- | These primitives may safely be duplicated without affecting performance or
 -- correctness too adversly. either because they are cheap to begin with, or
@@ -61,6 +65,7 @@ aprimIsCheap (APrim p _) = primIsCheap p
 primIsConstant :: Prim -> Bool
 primIsConstant CConst {} = True
 primIsConstant AddrOf {} = True
+primIsConstant PrimString {} = True
 primIsConstant CCast {} = True
 primIsConstant PrimTypeInfo {} = True
 primIsConstant Operator { primOp = op } | op `elem` safeOps = True  where
@@ -72,6 +77,7 @@ primIsConstant _ = False
 primEagerSafe :: Prim -> Bool
 primEagerSafe CConst {} = True
 primEagerSafe AddrOf {} = True
+primEagerSafe PrimString {} = True
 primEagerSafe CCast {} = True
 primEagerSafe PrimTypeInfo {} = True
 primEagerSafe Operator { primOp = op } | op `elem` safeOps = True  where
@@ -106,6 +112,7 @@ instance DocLike d => PPrint d Prim where
     pprint (Func _ s xs r) = parens (text r) <> text s <> tupled (map text xs)
     pprint (IFunc xs r) = parens (text r) <> parens (char '*') <> tupled (map text xs)
     pprint (AddrOf s) = char '&' <> text s
+    pprint (PrimString s) = tshow s <> char '#'
     pprint (Peek t) = char '*' <> text t
     pprint (Poke t) = char '=' <> text t
     pprint (CCast _ t) = parens (text t)

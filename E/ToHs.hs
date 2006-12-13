@@ -287,6 +287,7 @@ transE (EPrim (APrim Operator { primOp = op, primArgTypes = [at,_] } _) [x,y] _)
     y <- transE y
     return $ text "fromBool" <+> (parens $ hsep [text z,x,y])
 transE (EPrim (APrim CConst { primConst = ('"':rs) } _) [] _) = return (text ('"':rs) <> text "#")
+transE (EPrim (APrim (PrimString ss)  _) [] _) = return (tshow ss <> text "#")
 transE (EPrim (APrim PrimTypeInfo { primArgType = at, primTypeInfo = c }  _) [] _) = ans where
     Just pi = primitiveInfo at
     ans = case c of

@@ -170,6 +170,7 @@ tiExpr (HsLit l@(HsIntPrim _)) typ = do
     addToCollectedEnv (Map.singleton n ty)
     return ne
 
+
 tiExpr (HsLit l@(HsInt _)) typ = do
     t <- tiLit l
     t `subsumes` typ
@@ -843,6 +844,7 @@ tiLit (HsFrac _) = do
     --    addPreds [IsIn class_Fractional v]
     --    return v
 
+tiLit (HsStringPrim _)  = return (TCon (Tycon tc_Addr__ kindHash))
 tiLit (HsString _)  = return tString
 
 
