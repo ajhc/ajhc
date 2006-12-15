@@ -14,6 +14,8 @@ module DataConstructors(
     getConstructorArities,
     getProduct,
     getSiblings,
+    extractPrimitive,
+    boxPrimitive,
     lookupCType',
     lookupCType,
     pprintTypeOfCons,
@@ -298,6 +300,39 @@ typesCompatable dataTable a b = f (-2 :: Id) a b where
         lam va ea vb eb c = do
             f c (tvrType va) (tvrType vb)
             f (c - 2) (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb)
+
+
+extractPrimitive :: Monad m => DataTable -> E -> m (E,(ExtType,E))
+extractPrimitive dataTable e = case followAliases dataTable (getType e) of
+    st@(ELit LitCons { litName = c, litArgs = [], litType = t })
+        | t == eHash -> return (e,(show c,st))
+        | otherwise -> do
+            Constructor { conChildren = Just [cn] }  <- getConstructor c dataTable
+            Constructor { conSlots = [st@(ELit LitCons { litName = n, litArgs = []})] } <- getConstructor cn dataTable
+            let tvra = tVr vn st
+                (vn:_) = newIds (freeIds e)
+            return (eCase e  [Alt (litCons { litName = cn, litArgs = [tvra], litType = (getType e) }) (EVar tvra)] Unknown,(show n,st))
+    e' -> fail $ "extractPrimitive: " ++ show (e,e')
+
+boxPrimitive ::
+    Monad m
+    => DataTable
+    -> E         -- primitive to box
+    -> E         -- what type we want it to have
+    -> m (E,(ExtType,E))
+boxPrimitive dataTable e et = case followAliases dataTable et of
+    st@(ELit LitCons { litName = c, litArgs = [], litType = t })
+        | t == eHash -> return (e,(show c,st))
+        | otherwise -> do
+            Constructor { conChildren = Just [cn] }  <- getConstructor c dataTable
+            Constructor { conSlots = [st@(ELit LitCons { litName = n, litArgs = []})] } <- getConstructor cn dataTable
+            let tvra = tVr vn st
+                (vn:_) = newIds (freeVars (e,et))
+            if isManifestAtomic e then
+                return $ (ELit litCons { litName = cn, litArgs = [e], litType = et },(show n,st))
+             else
+                return $ (eStrictLet tvra e $ ELit litCons { litName = cn, litArgs = [EVar tvra], litType = et },(show n,st))
+    e' -> fail $ "extractPrimitive: " ++ show (e,e')
 
 
 
@@ -598,6 +633,6 @@ class Monad m => DataTableMonad m where
 
 instance DataTableMonad Identity
 
-primitiveAliases = [(tc_Int__,rt_int),(tc_Addr__,rt_HsPtr),(tc_Char__,rt_HsChar),(tc_Bool__,rt_int)]
+primitiveAliases = [(tc_Int__,rt_int),(tc_Addr__,rt_HsPtr),(tc_Word8__,rt_uint8_t),(tc_Char__,rt_HsChar),(tc_Bool__,rt_int)]
 
 

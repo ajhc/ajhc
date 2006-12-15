@@ -219,6 +219,15 @@ isAtomic e | sortTypeLike e = True
 isAtomic (EPrim (APrim (PrimPrim "dependingOn") _) [x,y] _) = isAtomic x
 isAtomic e = isFullyConst e
 
+-- | whether a type is "obviously" atomic. fast and lazy, doesn't recurse
+-- True -> definitely atomic
+-- False -> maybe atomic
+isManifestAtomic :: E -> Bool
+isManifestAtomic EVar {}  = True
+isManifestAtomic (ELit LitInt {})  = True
+isManifestAtomic (ELit LitCons { litArgs = []})  = True
+isManifestAtomic _ = False
+
 
 -- | whether an expression is small enough that it can be duplicated without code size growing too much. (work may be repeated)
 isSmall e | isAtomic e = True

@@ -5,6 +5,7 @@ module E.PrimOpt(
 
 import List
 import Monad
+import Control.Monad.Fix
 import Maybe
 import qualified Data.Map as Map
 
@@ -46,7 +47,7 @@ increment/decrement - increment or decrement a primitive numeric type by 1
 
 create_integralCast dataTable e t = eCase e [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) cc] Unknown  where
     te = getType e
-    (vara:varb:_) = freeNames (freeVars (e,t))
+    (vara:varb:_) = newIds (freeVars (e,t))
     tvra =  tVr vara sta
     tvrb =  tVr varb stb
     Just (cna,sta,ta) = lookupCType' dataTable te
@@ -136,65 +137,42 @@ primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
 primOpt' _  x = return x
 
 
+processPrimPrim :: DataTable -> E -> E
 processPrimPrim dataTable o@(EPrim (APrim prim _) es orig_t) = maybe o id (primopt prim es (followAliases dataTable orig_t)) where
     binOps = [("divide","/"),("plus","+"),("minus","-"),("times","*"),("modulus","%")]
 
     primopt (PrimPrim "seq") [x,y] _  = return $ prim_seq x y
     primopt (PrimPrim "exitFailure__") [w] rt  = return $ EError "" rt
-    primopt (PrimPrim op) [a,b] t | isJust zz = ans where
-        zz@(~(Just cop)) = lookup op binOps
-        (vara:varb:varc:_) = freeNames (freeVars (a,b,(t,orig_t)))
-        Just (cna,sta,ta) = lookupCType' dataTable t
-        ans = do
-            (_,ta) <- lookupCType dataTable (getType a)
-            (_,tb) <- lookupCType dataTable (getType b)
-            (_,tr) <- lookupCType dataTable t
-            unless (ta == tb && tb == tr) $ fail $ "bad " ++ op
-            return $ unbox dataTable a vara $ \tvra ->
-                unbox dataTable b varb $ \tvrb ->
-                    eStrictLet (tVr varc sta) (EPrim (APrim (Operator cop [ta,ta] ta) mempty) [EVar tvra, EVar tvrb] sta) (ELit (litCons { litName = cna, litArgs = [EVar (tVr varc sta)], litType = orig_t }))
+    primopt (PrimPrim op) [a,b] t | Just cop <- lookup op binOps = mdo
+        (pa,(ta,sta)) <- extractPrimitive dataTable a
+        (pb,(tb,stb)) <- extractPrimitive dataTable b
+        (bp,(tr,str)) <- boxPrimitive dataTable
+                (EPrim (APrim (Operator cop [ta,ta] tr) mempty) [pa, pb] str) t
+        return bp
     primopt (PrimPrim "equalsChar") [a,b] t = return (EPrim (APrim (Operator "==" ["HsChar","HsChar"] "int") mempty) [a,b] t)
+    primopt (PrimPrim "constPeekByte") [a] t = return (EPrim (APrim (Peek "uint8_t") mempty) [a] t)
     primopt (PrimPrim "box") [a] t = return ans where
         Just (cna,sta,ta) = lookupCType' dataTable t
         ans = ELit litCons { litName = cna, litArgs = [a], litType = orig_t }
     primopt (PrimPrim "unbox") [a] t = return ans where
-        (vara:_) = freeNames (freeVars (a,t,orig_t))
+        (vara:_) = newIds (freeVars (a,t,orig_t))
         ans = unbox dataTable a vara $ \tvra -> EVar tvra
-    primopt (PrimPrim op) [a] t | op `elem` ["increment","decrement"] = ans where
-        (vara:varc:_) = freeNames (freeVars (a,t,orig_t))
-        Just (cna,sta,ta) = lookupCType' dataTable t
-        ans = do
-            (_,ta) <- lookupCType dataTable (getType a)
-            (_,tr) <- lookupCType dataTable t
-            unless (ta == tr) $ fail $ "bad " ++ op
-            return $ unbox dataTable a vara $ \tvra ->
-                    eStrictLet (tVr varc sta) (EPrim (APrim (Operator (if op == "increment" then "+" else "-") [ta,ta] ta) mempty) [EVar tvra, ELit (LitInt 1 $ rawType ta)] sta) (ELit (litCons { litName = cna, litArgs = [EVar (tVr varc sta)], litType = orig_t }))
-
-    primopt (PrimPrim n) [] t@(ELit LitCons { litType = h })
-        | good, h == eHash = return $ ELit (LitInt num $ rawType ta)
-        | good = boxedNumber
-        where
-        vs = [("zero",0),("one",1)]
-        good = n `elem` map fst vs
-        Just num = lookup n vs
-        (varc:_) = freeNames (freeVars t)
-        Just (cna,sta,ta) = lookupCType' dataTable t
-        boxedNumber = return (ELit (litCons { litName = cna, litArgs = [ELit (LitInt num $ rawType ta)], litType = t }))
-
-    primopt (PrimPrim pn) [] t | Just c <-  getPrefix "const." pn = do
-        (cn,st,ct) <- case lookupCType' dataTable t of
-            Right x -> return x
-            Left x -> error x
-        let (var:_) = freeNames (freeVars t)
-        return $ eStrictLet (tVr var st) (EPrim (APrim (CConst c ct) mempty) [] st) (ELit (litCons { litName = cn, litArgs = [EVar $ tVr var st], litType = orig_t }))
+    primopt (PrimPrim op) [a] t | Just o <- lookup op unop = do
+        (pa,(ta,sta)) <- extractPrimitive dataTable a
+        let tvra = tVr vn sta; (vn:_) = newIds (freeVars (a,t))
+        (bp,(tr,str)) <- boxPrimitive dataTable (EVar tvra) t
+        let res = EPrim (APrim (Operator o [ta,ta] tr) mempty) [pa, ELit (LitInt 1 sta)] str
+        return $ eStrictLet tvra res bp
+        where unop = [("increment","+"),("decrement","-")]
+    primopt (PrimPrim n) [] t | Just num <- lookup n vs = mdo
+        (res,(_,sta)) <- boxPrimitive dataTable (ELit (LitInt num sta)) t; return res
+        where vs = [("zero",0),("one",1)]
+    primopt (PrimPrim pn) [] t | Just c <-  getPrefix "const." pn = mdo
+        (res,(ta,sta)) <- boxPrimitive dataTable (EPrim (APrim (CConst c ta) mempty) [] sta) t; return res
     primopt (PrimPrim pn) [] _ | Just c <-  getPrefix "error." pn = return (EError c orig_t)
     primopt (PrimPrim "integralCast") [e] t = return $ create_integralCast dataTable e t
     primopt (PrimPrim "integralCast") es t = error $ "Invalid integralCast " ++ show (es,t)
     primopt _ _ _ = fail "not a primopt we care about"
 
-
--- | Generate an infinite list of names not present in the given set.
-freeNames :: IdSet -> [Id]
-freeNames s  = filter (not . (`member` s)) (genNames (size s))
 
 
