@@ -19,9 +19,14 @@ data Bool__ :: #
 data Int__ :: #
 data Addr__ :: #
 data Char__ :: #
+data Word8__ :: #
 
 -- | this is wrapped around arbitrary expressions and just evaluates them to whnf
 foreign import primitive "seq" runRaw :: a -> World__ -> World__
+
+-- | when no exception wrapper is wanted
+runNoWrapper :: IO a -> World__ -> World__
+runNoWrapper (IO run) w = case run w of (# w, _ #) -> w
 
 
 foreign import primitive "unsafeCoerce" unsafeCoerce__ :: a -> b

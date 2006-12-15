@@ -75,6 +75,7 @@ tc_IO = toName TypeConstructor       ("Jhc.Prim", "IO")
 tc_World__ = toName TypeConstructor  ("Jhc.Prim","World__")
 tc_Int__ = toName TypeConstructor  ("Jhc.Prim","Int__")
 tc_Addr__ = toName TypeConstructor  ("Jhc.Prim","Addr__")
+tc_Word8__ = toName TypeConstructor  ("Jhc.Prim","Word8__")
 tc_Char__ = toName TypeConstructor  ("Jhc.Prim","Char__")
 tc_Bool__ = toName TypeConstructor  ("Jhc.Prim","Bool__")
 tc_Array__ = toName TypeConstructor  ("Jhc.Array","Array__")
@@ -97,6 +98,8 @@ s_Star = toName SortName ("Jhc@","*")
 s_Hash = toName SortName ("Jhc@","#")
 
 v_eqString = toName Val  ("Jhc.String","eqString")
+v_eqUnpacked = toName Val  ("Jhc.String","eqUnpacked")
+v_unpackASCII = toName Val  ("Jhc.String","unpackASCII")
 v_target = toName Val  ("Jhc.Options","target")
 v_error = toName Val ("Jhc.IO","error")
 v_toEnum = toName Val ("Jhc.Enum","toEnum")
@@ -139,7 +142,7 @@ sFuncNames = FuncNames {
     func_runExpr = toName Val ("Prelude.IO","runExpr"),
     func_runRaw = toName Val ("Jhc.Prim","runRaw"),
     func_runMain = toName Val ("Jhc.IO","runMain"),
-    func_runNoWrapper = toName Val ("Jhc.IO","runNoWrapper")
+    func_runNoWrapper = toName Val ("Jhc.Prim","runNoWrapper")
     }
 
 

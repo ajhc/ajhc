@@ -426,16 +426,18 @@ compile' dataTable cenv (tvr,as,e) = ans where
         Func True fn as "void" -> return $ Prim prim { primType = ((map (Ty . toAtom) as),tyUnit) } (args $ tail xs)
         Func True fn as r -> do
             let p = prim { primType = ((map (Ty . toAtom) as),Ty (toAtom r)) }
-                ptv = Var v2 pt
                 pt = Ty (toAtom r)
             return $ Prim p (args $ tail xs)
         Func False _ as r | Just _ <- fromRawType ty ->  do
             let p = prim { primType = ((map (Ty . toAtom) as),Ty (toAtom r)) }
             return $ Prim p (args xs)
+        Peek pt' | [addr] <- xs -> do
+            let p = prim { primType = ([Ty $ toAtom (show rt_HsPtr)],pt) }
+                pt = toType (Ty $ toAtom pt') ty
+            return $ Prim p (args [addr])
         Peek pt' -> do
             let p = prim { primType = ([Ty $ toAtom (show rt_HsPtr)],pt) }
                 [_,addr] = xs
-                ptv = Var v2 pt
                 pt = Ty (toAtom pt')
             return $ Prim p (args [addr])
         Poke pt' ->  do

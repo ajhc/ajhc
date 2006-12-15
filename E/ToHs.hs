@@ -222,6 +222,7 @@ transE (ELit (LitInt num t)) = case cTypeInfoT t of
     ("Int#",_,_)  | num < 0 -> mparen $ return $ text (show num) <> text "#"
                   | otherwise -> return $ text (show num) <> text "#"
     ("Addr#",_,_) | num == 0 -> return $ text "nullAddr#"
+                  | otherwise -> mparen $ return $ text "int2Addr#" <+> text (show num) <> text "#"
     ("Word#",_,_) -> mparen $ text "int2Word# (" <> tshow num <> text "# )"
 transE (ELit LitCons { litName = c, litArgs =  ts }) = nparen $ do
     Env { envType = inType } <- ask
@@ -307,6 +308,20 @@ transE (EPrim (APrim Peek { primArgType = at } _) [w,x] _) = mparen ans where
         "Addr#" -> "readAddrOffAddr#"
         "Int#" -> "readInt" ++ show size ++ "OffAddr#"
         "Word#" -> "readWord" ++ show size ++ "OffAddr#"
+transE (EPrim (APrim Peek { primArgType = at } _) [x] (ELit LitCons { litName = n })) = mparen $ ans where
+    ans = do x <- ans'; castVal at (show n) x
+    ans' = mparen $ do
+        x <- transE x
+        return (text func <+> x <+> text "0#")
+    (tt,_,_) = cTypeInfo at
+    Just pi = primitiveInfo at
+    size = primTypeSizeOf pi * 8
+    sign = primTypeIsSigned pi
+    func = case tt of
+        "Char#" -> "indexWideCharOffAddr#"
+        "Addr#" -> "indexAddrOffAddr#"
+        "Int#" -> "indexInt" ++ show size ++ "OffAddr#"
+        "Word#" -> "indexWord" ++ show size ++ "OffAddr#"
 transE (EPrim (APrim Poke { primArgType = at } _) [w,ptr,v] _) = mparen ans where
     ans = do
         w <- transE w
@@ -330,19 +345,7 @@ transE (EPrim (APrim func@Func {} _) xs _) = mparen $ do
     tell mempty { collPrims = Set.singleton func }
     xs <- mapM transE xs
     return (hsep (text (cfuncname func):xs))
-transE (EPrim (APrim cast@CCast { primArgType = at, primRetType = rt } _) [x] _) = mparen $ transE x >>= \x ->  case (showCType at,showCType rt) of
-    (a,b) | a == b -> return x
-    ("Int#","Char#") -> return (text "chr#" <+> x)
-    ("Char#","Int#") -> return (text "ord#" <+> x)
-    ("Addr#","Int#") -> return (text "addr2Int#" <+> x)
-    ("Int#","Addr#") -> return (text "int2Addr#" <+> x)
-    ("Word#","Int#") -> return (text "word2Int#" <+> x)
-    ("Int#","Word#") -> return (text "int2Word#" <+> x)
-    ("Char#","Word#") -> return (text "char2Word__" <+> x)
-    ("Word#","Char#") -> return (text "word2Char__" <+> x)
-    ("Addr#","Word#") -> return (text "int2Word#" <+> parens (text "addr2Int#" <+> x))
-    ("Word#","Addr#") -> return (text "int2Addr#" <+> parens (text "word2Int#" <+> x))
-    xs -> fail $ "unknown coercion: " ++ show xs
+transE (EPrim (APrim cast@CCast { primArgType = at, primRetType = rt } _) [x] _) = mparen $ transE x >>= \x ->  castVal at rt x
 
 transE e = mparen $ return $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
 
@@ -361,6 +364,24 @@ ghcPrimTable = [
     ("alloca__","alloca__")
     ]
 
+castVal :: ExtType -> ExtType -> Doc -> TM Doc
+castVal at rt x = case (showCType at,showCType rt) of
+        (a,b) | a == b -> return x
+        z | Just co <- lookup z coercions -> mparen $ return (text co <+> x)
+        xs -> fail $ "unknown coercion: " ++ show xs
+    where
+    coercions = [
+        (("Int#","Char#"),"chr#"),
+        (("Char#","Int#"),"ord#"),
+        (("Addr#","Int#"),"addr2Int#"),
+        (("Int#","Addr#"),"int2Addr#"),
+        (("Word#","Int#"),"word2Int#"),
+        (("Int#","Word#"),"int2Word#"),
+        (("Char#","Word#"),"char2Word__"),
+        (("Word#","Char#"),"word2Char__"),
+        (("Addr#","Word#"),"int2Word#"),
+        (("Word#","Addr#"),"int2Addr#")
+        ]
 
 cfuncname Func { funcName = fn, funcIOLike = iol, primArgTypes = as, primRetType = r  } =  text $ ("func_" ++ (if iol then "io" else "pure") ++ "_" ++ fn ++ concatInter "_" (r:as))
 
@@ -369,7 +390,7 @@ hasBoxes e = or $ execWriter (f e) where
     f e = emapEGH f f f e
 
 op2Table (op,rt) = lookup (showCType rt) table >>= lookup op where
-    table = [ ("Int#",intTable),("Word#",wordTable)]
+    table = [ ("Int#",intTable),("Word#",wordTable),("Addr#",addrTable)]
     intTable = [
         ("+","(+#)"),
         ("-","(-#)"),
@@ -384,6 +405,7 @@ op2Table (op,rt) = lookup (showCType rt) table >>= lookup op where
         ("%","remWord#"),
         ("/","quotWord#")
         ]
+    addrTable = [ ("+","plusAddr__") ]
 
 op2TableCmp (op,rt) = lookup rt table >>= lookup op where
     table = [ ("Int#",intTable), ("Char#",charTable), ("Addr#",addrTable),("Word#",wordTable)]

@@ -39,6 +39,8 @@ fromBool b = case b of
 gteChar# a b = gtChar# a b || eqChar# a b
 lteChar# a b = ltChar# a b || eqChar# a b
 
+plusAddr__ :: Addr# -> Addr# -> Addr#
+plusAddr__ a1 a2 = plusAddr# a1 (addr2Int# a2)
 
 alloca__ :: Int# -> (Addr# -> JIO a) -> JIO a
 alloca__ size action s =

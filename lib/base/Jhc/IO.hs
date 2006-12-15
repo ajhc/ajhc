@@ -134,9 +134,6 @@ runMain main w = case run w of
 
 
 
--- | when no exception wrapper is wanted
-runNoWrapper :: IO a -> World__ -> World__
-runNoWrapper (IO run) w = case run w of (# w, _ #) -> w
 
 exitFailure :: IO a
 exitFailure = IO $ \w -> exitFailure__ w
