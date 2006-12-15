@@ -7,6 +7,8 @@ import Jhc.Int
 import Jhc.Order
 import Jhc.Monad
 
+import Jhc.String
+
 
 -- | our fusion routines
 
@@ -32,6 +34,7 @@ augment g xs = g (:) xs
 		       augment g (build h) = build (\c n -> g c (h c n)) #-}
 {-# RULES "augment/nil"   forall (g::forall b. (a->b->b) -> b -> b) .  augment g [] = build g #-}
 
+{-# RULES "foldr/unpackString"  forall k z (addr::Addr__) . foldr k z (unpackString addr) = unpackStringFoldr addr k z  #-}
 
 -- a few pre-fusioned routines
 

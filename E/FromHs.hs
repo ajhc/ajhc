@@ -729,10 +729,14 @@ convertMatches bs ms err = do
             | all (isHsPString . fst3) ps = do
                 (lbv,bv) <- varify b
                 (eqString,_,_) <- convertValue v_eqString
+                (eqUnpackedString,_,_) <- convertValue v_eqUnpackedString
                 let gps = [ (p,[ (ps,fe) |  (_,ps,fe) <- xs ]) | (p,xs) <- sortGroupUnderF fst3 ps]
                     f els (HsPLit (HsString s),ps) = do
                         m <- match bs ps err
-                        return $ ifzh (EAp (EAp (EVar eqString) bv) (toE s)) m els
+                        let (s',packed) = packupString s
+                        if packed
+                            then return $ ifzh (EAp (EAp (EVar eqUnpackedString) s') bv) m els
+                            else return $ ifzh (EAp (EAp (EVar eqString) s') bv) m els
                 e <- foldlM f err gps
                 return $ lbv e
             | all (isHsPLit . fst3) ps = do
@@ -774,7 +778,9 @@ convertMatches bs ms err = do
         isHsPString _ = False
     match bs ms err
 
-
+packupString :: String -> (E,Bool)
+packupString s | all (\c -> c > '\NUL' && c <= '\xff') s = (EPrim (APrim (PrimString (packString s)) mempty) [] (rawType "HsPtr"),True)
+packupString s = (toE s,False)
 
 
 
