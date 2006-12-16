@@ -52,7 +52,7 @@ compileToHs prog = do
     name <- System.getProgName
     args <- getArguments
     let argstring = simpleQuote (name:args)
-        comm = shellQuote $ ["ghc", cf, "-o", fn ]
+        comm = shellQuote $ ["ghc", "-O", cf, "-o", fn ]
     writeFile cf $ unlines ["-- " ++ argstring,"-- " ++ comm,"",viaghc_hs,render restate,data_decls,rv,"",foreign_decls]
     progress ("Running: " ++ comm)
     r <- System.system comm
