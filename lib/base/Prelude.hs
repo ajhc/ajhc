@@ -543,8 +543,14 @@ elem, notElem    :: (Eq a) => a -> [a] -> Bool
 elem _ []	= False
 elem x (y:ys)	= x==y || elem x ys
 
+{-# RULES "elem/[]" forall c . elem c [] = False #-}
+{-# RULES "elem/[_]" forall c v . elem c [v] = c == v #-}
+
 notElem	_ []	=  True
 notElem x (y:ys)=  x /= y && notElem x ys
+
+{-# RULES "notElem/[]" forall c . notElem c [] = True #-}
+{-# RULES "notElem/[_]" forall c v . notElem c [v] = c /= v #-}
 
 -- lookup key assocs looks up a key in an association list.
 
@@ -674,6 +680,9 @@ instance Real Int where
 --{-# RULES "++/tick2"      forall x y xs ys . (x:y:xs) ++ ys = x:y:(xs ++ ys) #-}
 --{-# RULES "++/tick1"      forall x xs ys . (x:xs) ++ ys = x:(xs ++ ys) #-}
 {-# RULES "++/tick0"      forall xs . [] ++ xs = xs #-}
+{-# RULES "++/tick1"      forall x xs . [x] ++ xs = x:xs #-}
+{-# RULES "++/tick2"      forall x y xs . [x,y] ++ xs = x:y:xs #-}
+{-# RULES "++/tick3"      forall x y z xs . [x,y,z] ++ xs = x:y:z:xs #-}
 {-# RULES "map/map"       forall f g xs . map f (map g xs) = map (\x -> f (g x)) xs #-}
 {-# RULES "concatMap/map" forall f g xs . concatMap f (map g xs) = concatMap (\x -> f (g x)) xs #-}
 {---# RULES "concat/tick"   forall x xs . concat (x:xs) = x ++ concat xs #-}

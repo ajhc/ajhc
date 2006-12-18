@@ -12,7 +12,7 @@ import Foreign.C.Types
 import Jhc.IO(exitFailure)
 import qualified Jhc.Options
 
-data ExitCode = ExitSuccess | ExitFailure Int
+data ExitCode = ExitSuccess | ExitFailure !Int
             deriving (Eq, Ord, Read, Show)
 
 getArgs     :: IO [String]

@@ -5,6 +5,7 @@ module Jhc.Addr(
     FunAddr(),
     Ptr(..),
     FunPtr(..),
+    ptrFromAddr__,
     nullAddr,
     nullFunAddr,
     plusAddr,
@@ -16,6 +17,7 @@ module Jhc.Addr(
 
 import Data.Word
 import Data.Int
+import Jhc.Prim
 
 data Addr
 data FunAddr
@@ -43,4 +45,8 @@ foreign import primitive "integralCast" intToWordPtr :: Int -> WordPtr
 foreign import primitive "zero" zeroWordPtr :: WordPtr
 foreign import primitive "plus" plusWordPtr :: WordPtr -> WordPtr -> WordPtr
 
+foreign import primitive "box" boxAddr :: Addr__ -> Addr
+
+ptrFromAddr__ :: Addr__ -> Ptr a
+ptrFromAddr__ addr = Ptr (boxAddr addr)
 

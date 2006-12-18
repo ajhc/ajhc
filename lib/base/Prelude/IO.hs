@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi #-}
+{-# OPTIONS_JHC -fffi -funboxed-values #-}
 module Prelude.IO(
     IO(),
     ioError,
@@ -10,6 +10,7 @@ module Prelude.IO(
 import Prelude
 import Prelude.Text
 import Prelude.IOError
+import Jhc.Addr
 import Jhc.IO
 import Data.Char
 import Foreign.C.Types
@@ -53,7 +54,7 @@ getContents = unsafeInterleaveIO getContents' where
 
 readFile :: FilePath -> IO String
 readFile fn = do
-    file <- withCString fn $ \fnc -> c_fopen fnc read_str
+    file <- withCString fn $ \fnc -> c_fopen fnc (ptrFromAddr__ "r"#)
     if  (file == nullPtr) then (fail "Could not open file.") else do
         let gc = do
                 ch <- c_fgetwc file
@@ -117,13 +118,10 @@ getChar = do
     ch <- c_getwchar
     if ch == -1 then fail "End of file." else return (cwintToChar ch)
 
-foreign import primitive "const.\"r\"" read_str :: Ptr CChar
-
 foreign import primitive "integralCast" cwintToChar :: CWint -> Char
 foreign import primitive "integralCast" charToCWchar :: Char -> CWchar
 
-foreign import ccall "stdio.h putwchar" c_putwchar :: CWchar -> IO ()
-foreign import ccall "wchar.h getwchar" c_getwchar :: IO CWint
+foreign import ccall "stdio.h putwchar_unlocked" c_putwchar :: CWchar -> IO ()
+foreign import ccall "wchar.h getwchar_unlocked" c_getwchar :: IO CWint
 
-foreign import primitive "const.WEOF" c_WEOF :: CWint
 

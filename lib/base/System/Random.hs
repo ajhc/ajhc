@@ -40,7 +40,7 @@ class RandomGen g where
     genRange :: g -> (Int,Int)
     genRange g = (minBound,maxBound)
 
-data StdGen = StdGen Int Int
+data StdGen = StdGen !Int !Int
 
 instance RandomGen StdGen where
   next  = stdNext

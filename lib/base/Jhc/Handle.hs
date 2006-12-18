@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi #-}
+{-# OPTIONS_JHC -fffi -funboxed-values #-}
 module Jhc.Handle(
     Handle(..),
     IOMode(..),
@@ -15,6 +15,7 @@ import Foreign.Ptr
 import Foreign.Storable
 import Foreign.C.Types
 import Jhc.IO
+import Jhc.Addr
 import Foreign.C.String
 import Foreign.Marshal.Utils
 import Foreign.C.Error
@@ -79,15 +80,10 @@ openFile fp m = do
         pptr <- new ptr
         return Handle { handleName = fp, handleIOMode = m, handleFile = pptr }
 
-toStr ReadMode = read_str
-toStr WriteMode = write_str
-toStr AppendMode = append_str
-toStr ReadWriteMode = readwrite_str
-
-foreign import primitive "const.\"r\"" read_str :: Ptr CChar
-foreign import primitive "const.\"w\"" write_str  :: Ptr CChar
-foreign import primitive "const.\"a\"" append_str  :: Ptr CChar
-foreign import primitive "const.\"r+\"" readwrite_str  :: Ptr CChar
+toStr ReadMode = ptrFromAddr__ "r"#
+toStr WriteMode = ptrFromAddr__ "w"#
+toStr AppendMode = ptrFromAddr__ "a"#
+toStr ReadWriteMode = ptrFromAddr__ "r+"#
 
 foreign import ccall "stdio.h fclose" c_fclose :: Ptr Handle -> IO CInt
 foreign import ccall "stdio.h fopen" c_fopen :: Ptr CChar -> Ptr CChar ->  IO (Ptr Handle)
