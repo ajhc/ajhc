@@ -6,6 +6,7 @@ import Data.Monoid
 import List
 import Ratio
 
+import PackedString
 import C.Prims
 import E.E
 import E.FreeVars()
@@ -166,7 +167,7 @@ prim_seq a b = caseUpdate emptyCase { eCaseScrutinee = a, eCaseBind =  (tVr 0 (g
 
 prim_unsafeCoerce e t = p e' where
     (_,e',p) = unsafeCoerceOpt $ EPrim p_unsafeCoerce [e] t
-from_unsafeCoerce (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = return (e,t)
+from_unsafeCoerce (EPrim (APrim (PrimPrim unsafeCoerce) _) [e] t) | unsafeCoerce == packString "unsafeCoerce" = return (e,t)
 from_unsafeCoerce _ = fail "Not unsafeCoerce primitive"
 
 rawType s = ELit litCons { litName = toName RawType s, litType = eHash }
@@ -174,7 +175,7 @@ rawType s = ELit litCons { litName = toName RawType s, litType = eHash }
 tWorldzh = ELit litCons { litName = tc_World__, litArgs = [], litType = eHash }
 tTag = ELit litCons { litName = rt_tag, litArgs = [], litType = eHash }
 
-unsafeCoerceOpt (EPrim (APrim (PrimPrim "unsafeCoerce") _) [e] t) = f (0::Int) e t where
+unsafeCoerceOpt (EPrim (APrim (PrimPrim uc) _) [e] t) | uc == packString "unsafeCoerce" = f (0::Int) e t where
     f n e t | Just (e',_) <- from_unsafeCoerce e = f (n + 1) e' t
     f n (ELetRec ds e) t = (n + 1, ELetRec ds (p e'),id) where
         (n,e',p) = f n e t
@@ -216,7 +217,7 @@ isFullyConst _ = False
 isAtomic :: E -> Bool
 isAtomic EVar {}  = True
 isAtomic e | sortTypeLike e = True
-isAtomic (EPrim (APrim (PrimPrim "dependingOn") _) [x,y] _) = isAtomic x
+isAtomic (EPrim (APrim (PrimPrim don) _) [x,y] _) | don == packString "dependingOn" = isAtomic x
 isAtomic e = isFullyConst e
 
 -- | whether a type is "obviously" atomic. fast and lazy, doesn't recurse

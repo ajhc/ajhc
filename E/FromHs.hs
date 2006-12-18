@@ -350,7 +350,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         let name      = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         let (ts,rt)   = argTypes' ty
-            prim      = APrim (PrimPrim cn) req
+            prim      = APrim (PrimPrim $ packString cn) req
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
         let result    = foldr ($) (processPrimPrim dataTable $ EPrim prim (map EVar es) rt) (map ELam es)
         return [(name,var,lamt result)]
@@ -374,7 +374,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         (_,pt) <- lookupCType dataTable rt'
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
         let cFun = createFunc dataTable (map tvrType es)
-            prim io rs rtt = EPrim (APrim (Func io rcn (snds rs) rtt) req)
+            prim io rs rtt = EPrim (APrim (Func io (packString rcn) (snds rs) rtt) req)
         result <- case (isIO,pt) of
             (True,"void") -> cFun $ \rs -> (,) (ELam tvrWorld) $
                         eStrictLet tvrWorld2 (prim True rs "void" (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)

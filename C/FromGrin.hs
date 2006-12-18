@@ -13,6 +13,7 @@ import qualified Text.PrettyPrint.HughesPJ as P
 import Text.PrettyPrint.HughesPJ(nest,($$))
 
 import Atom
+import PackedString
 import Support.CanType
 import Grin.Noodle
 import C.FFI
@@ -267,7 +268,7 @@ convertPrim p vs
         return $ cast (basicType r) (operator n a' b')
     | APrim (Func _ n as r) _ <- primAPrim p = do
         vs' <- mapM convertVal vs
-        return $ cast (basicType r) (functionCall (name n) [ cast (basicType t) v | v <- vs' | t <- as ])
+        return $ cast (basicType r) (functionCall (name $ unpackPS n) [ cast (basicType t) v | v <- vs' | t <- as ])
     | APrim (Peek t) _ <- primAPrim p, [v] <- vs = do
         v' <- convertVal v
         return $ expressionRaw ("*((" <> t <+> "*)" <> (parens $ renderG v') <> char ')')

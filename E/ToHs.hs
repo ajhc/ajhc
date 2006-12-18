@@ -9,6 +9,7 @@ import Text.PrettyPrint.HughesPJ(render,($$),nest,Doc())
 import qualified System
 import qualified Data.Set as Set
 
+import PackedString
 import C.Prims
 import C.Arch
 import DataConstructors
@@ -89,16 +90,16 @@ fst3 (x,_,_) = x
 transForeign ps = vcat (map f ps) where
     f (AddrOf s) = text $ "foreign import ccall \"&" ++ s ++ "\" addr_" ++ mangleIdent s ++ " :: Ptr ()"
     f furc@Func { funcName = fn, funcIOLike = True, primArgTypes = as, primRetType = "void" } = ans <$> ans' where
-        ans  = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ concatInter " -> " (map (snd . snd) vals ++ ["IO ()"])
+        ans  = text $ "foreign import ccall unsafe \"" ++ unpackPS fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ concatInter " -> " (map (snd . snd) vals ++ ["IO ()"])
         ans' = text $ cfuncname furc <+> "w" <+> unwords (fsts vals) <+> " = case _" ++ cfuncname furc <+> concatInter " " [ parens (c <+> a) | (a,(c,_)) <- vals ] <+> "of IO f -> case f w of (# w, _ #) -> w"
         vals = [ ('a':show n,ioInfo a) | a <- as | n <- naturals ]
     f furc@Func { funcName = fn, funcIOLike = True, primArgTypes = as, primRetType = rt' } = ans <$> ans' where
-        ans  = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ concatInter " -> " (map (snd . snd) vals ++ ["IO " ++ rt])
+        ans  = text $ "foreign import ccall unsafe \"" ++ unpackPS fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ concatInter " -> " (map (snd . snd) vals ++ ["IO " ++ rt])
         ans' = text $ cfuncname furc <+> "w" <+> unwords (fsts vals) <+> " = case _" ++ cfuncname furc <+> concatInter " " [ parens (c <+> a) | (a,(c,_)) <- vals ] <+> "of IO f -> case f w of (# w, " ++ rc ++ " r #) -> (# w, r #)"
         vals = [ ('a':show n,ioInfo a) | a <- as | n <- naturals ]
         (rc,rt) = ioInfo rt'
     f furc@Func { funcName = fn, funcIOLike = False, primArgTypes = as, primRetType = rt' } = ans <$> ans' where
-        ans  = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ concatInter " -> " (map (snd . snd) vals ++ [rt])
+        ans  = text $ "foreign import ccall unsafe \"" ++ unpackPS fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ concatInter " -> " (map (snd . snd) vals ++ [rt])
         ans' = text $ cfuncname furc <+> unwords (fsts vals) <+> " = case _" ++ cfuncname furc <+> concatInter " " [ parens (c <+> a) | (a,(c,_)) <- vals ] <+> "of " ++ rc ++ " r -> r"
         vals = [ ('a':show n,ioInfo a) | a <- as | n <- naturals ]
         (rc,rt) = ioInfo rt'
@@ -275,7 +276,7 @@ transE ECase { eCaseBind = bind, eCaseScrutinee = scrut, eCaseDefault = md, eCas
 transE e | Just (e',_) <- from_unsafeCoerce e = mparen $ do
     e' <- transE e'
     return (text "unsafeCoerce#" <+> e')
-transE e@(EPrim (APrim (PrimPrim prim) _) args _) = case (prim,args) of
+transE e@(EPrim (APrim (PrimPrim prim) _) args _) = case (unpackPS prim,args) of
     ("dependingOn",[x,_y])   -> transE x  -- XXX
     (fs,args) | Just ghcprim <- lookup fs ghcPrimTable -> mparen $ mapM transE args >>= \args' -> return $ hsep (text ghcprim:args')
     _ -> mparen $ return $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
@@ -383,7 +384,7 @@ castVal at rt x = case (showCType at,showCType rt) of
         (("Word#","Addr#"),"int2Addr#")
         ]
 
-cfuncname Func { funcName = fn, funcIOLike = iol, primArgTypes = as, primRetType = r  } =  text $ ("func_" ++ (if iol then "io" else "pure") ++ "_" ++ fn ++ concatInter "_" (r:as))
+cfuncname Func { funcName = fn, funcIOLike = iol, primArgTypes = as, primRetType = r  } =  text $ ("func_" ++ (if iol then "io" else "pure") ++ "_" ++ unpackPS fn ++ concatInter "_" (r:as))
 
 hasBoxes e = or $ execWriter (f e) where
     f e | e == tBox = tell [True] >> return e

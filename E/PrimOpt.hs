@@ -10,6 +10,7 @@ import Maybe
 import qualified Data.Map as Map
 
 import Atom
+import PackedString
 import C.Prims
 import DataConstructors
 import Data.Monoid
@@ -138,41 +139,42 @@ primOpt' _  x = return x
 
 
 processPrimPrim :: DataTable -> E -> E
-processPrimPrim dataTable o@(EPrim (APrim prim _) es orig_t) = maybe o id (primopt prim es (followAliases dataTable orig_t)) where
+processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o id (primopt (unpackPS s) es (followAliases dataTable orig_t)) where
     binOps = [("divide","/"),("plus","+"),("minus","-"),("times","*"),("modulus","%")]
 
-    primopt (PrimPrim "seq") [x,y] _  = return $ prim_seq x y
-    primopt (PrimPrim "exitFailure__") [w] rt  = return $ EError "" rt
-    primopt (PrimPrim op) [a,b] t | Just cop <- lookup op binOps = mdo
+    primopt "seq" [x,y] _  = return $ prim_seq x y
+    primopt "exitFailure__" [w] rt  = return $ EError "" rt
+    primopt op [a,b] t | Just cop <- lookup op binOps = mdo
         (pa,(ta,sta)) <- extractPrimitive dataTable a
         (pb,(tb,stb)) <- extractPrimitive dataTable b
         (bp,(tr,str)) <- boxPrimitive dataTable
                 (EPrim (APrim (Operator cop [ta,ta] tr) mempty) [pa, pb] str) t
         return bp
-    primopt (PrimPrim "equalsChar") [a,b] t = return (EPrim (APrim (Operator "==" ["HsChar","HsChar"] "int") mempty) [a,b] t)
-    primopt (PrimPrim "constPeekByte") [a] t = return (EPrim (APrim (Peek "uint8_t") mempty) [a] t)
-    primopt (PrimPrim "box") [a] t = return ans where
+    primopt "equalsChar" [a,b] t = return (EPrim (APrim (Operator "==" ["HsChar","HsChar"] "int") mempty) [a,b] t)
+    primopt "constPeekByte" [a] t = return (EPrim (APrim (Peek "uint8_t") mempty) [a] t)
+    primopt "box" [a] t = return ans where
         Just (cna,sta,ta) = lookupCType' dataTable t
         ans = ELit litCons { litName = cna, litArgs = [a], litType = orig_t }
-    primopt (PrimPrim "unbox") [a] t = return ans where
+    primopt "unbox" [a] t = return ans where
         (vara:_) = newIds (freeVars (a,t,orig_t))
         ans = unbox dataTable a vara $ \tvra -> EVar tvra
-    primopt (PrimPrim op) [a] t | Just o <- lookup op unop = do
+    primopt op [a] t | Just o <- lookup op unop = do
         (pa,(ta,sta)) <- extractPrimitive dataTable a
         let tvra = tVr vn sta; (vn:_) = newIds (freeVars (a,t))
         (bp,(tr,str)) <- boxPrimitive dataTable (EVar tvra) t
         let res = EPrim (APrim (Operator o [ta,ta] tr) mempty) [pa, ELit (LitInt 1 sta)] str
         return $ eStrictLet tvra res bp
         where unop = [("increment","+"),("decrement","-")]
-    primopt (PrimPrim n) [] t | Just num <- lookup n vs = mdo
+    primopt n [] t | Just num <- lookup n vs = mdo
         (res,(_,sta)) <- boxPrimitive dataTable (ELit (LitInt num sta)) t; return res
         where vs = [("zero",0),("one",1)]
-    primopt (PrimPrim pn) [] t | Just c <-  getPrefix "const." pn = mdo
+    primopt pn [] t | Just c <-  getPrefix "const." pn = mdo
         (res,(ta,sta)) <- boxPrimitive dataTable (EPrim (APrim (CConst c ta) mempty) [] sta) t; return res
-    primopt (PrimPrim pn) [] _ | Just c <-  getPrefix "error." pn = return (EError c orig_t)
-    primopt (PrimPrim "integralCast") [e] t = return $ create_integralCast dataTable e t
-    primopt (PrimPrim "integralCast") es t = error $ "Invalid integralCast " ++ show (es,t)
+    primopt pn [] _ | Just c <-  getPrefix "error." pn = return (EError c orig_t)
+    primopt "integralCast" [e] t = return $ create_integralCast dataTable e t
+    primopt "integralCast" es t = error $ "Invalid integralCast " ++ show (es,t)
     primopt _ _ _ = fail "not a primopt we care about"
+processPrimPrim _ e = e
 
 
 

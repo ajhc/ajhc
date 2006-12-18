@@ -13,6 +13,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom
+import PackedString
 import C.FFI hiding(Primitive)
 import C.Prims
 import Control.Monad.Identity
@@ -371,52 +372,55 @@ compile' dataTable cenv (tvr,as,e) = ans where
     ce e | Just z <- constant e = return (gEval z)
     ce e | Just z <- con e = return (Return z)
 
-    -- holes - are these still useful?
-    ce (EPrim ap@(APrim (PrimPrim "newHole__") _) [_] _) = do
-        let var = Var v2 (TyPtr TyNode)
-        return $ Store (NodeC (toAtom "@hole") []) :>>= var :-> Return (tuple [var])
-    ce (EPrim ap@(APrim (PrimPrim "fillHole__") _) [r,v,_] _) = do
-        let var = Var v2 TyNode
-            [r',v'] = args [r,v]
-        return $ gEval v' :>>= n1 :-> Update r' n1
 
-    -- artificial dependencies
-    ce (EPrim ap@(APrim (PrimPrim "newWorld__") _) [_] _) = do
-        return $ Return unit
-    ce (EPrim ap@(APrim (PrimPrim "dependingOn") _) [e,_] _) = ce e
+    ce (EPrim ap@(APrim (PrimPrim prim) _) as _) = f (unpackPS prim) as where
+
+        -- holes - are these still useful?
+        f "newHole__" [_] = do
+            let var = Var v2 (TyPtr TyNode)
+            return $ Store (NodeC (toAtom "@hole") []) :>>= var :-> Return (tuple [var])
+        f "fillHole__" [r,v,_] = do
+            let var = Var v2 TyNode
+                [r',v'] = args [r,v]
+            return $ gEval v' :>>= n1 :-> Update r' n1
+
+        -- artificial dependencies
+        f "newWorld__" [_] = do
+            return $ Return unit
+        f "dependingOn" [e,_] = ce e
 
 
-    -- references
-    ce (EPrim ap@(APrim (PrimPrim "newRef__") _) [v,_] _) = do
-        let [v'] = args [v]
-        return $ Store v'
-    ce (EPrim ap@(APrim (PrimPrim "readRef__") _) [r,_] _) = do
-        let [r'] = args [r]
-        return $ Fetch r'
-    ce (EPrim ap@(APrim (PrimPrim "writeRef__") _) [r,v,_] _) = do
-        let [r',v'] = args [r,v]
-        return $ Update r' v'
+        -- references
+        f "newRef__" [v,_] = do
+            let [v'] = args [v]
+            return $ Store v'
+        f "readRef__" [r,_] = do
+            let [r'] = args [r]
+            return $ Fetch r'
+        f "writeRef__" [r,v,_] = do
+            let [r',v'] = args [r,v]
+            return $ Update r' v'
 
-    -- arrays
-    ce (EPrim ap@(APrim (PrimPrim "newMutArray__") _) [v,def,_] _) = do
-        let [v',def'] = args [v,def]
-        return $ Alloc { expValue = def', expCount = v', expRegion = region_heap, expInfo = mempty }
-    ce (EPrim ap@(APrim (PrimPrim "newBlankMutArray__") _) [v,_] _) = do
-        let [v'] = args [v]
-        return $ Alloc { expValue = ValUnknown (TyPtr TyNode), expCount = v', expRegion = region_heap, expInfo = mempty }
-    ce (EPrim ap@(APrim (PrimPrim "readArray__") _) [r,o,_] _) = do
-        let [r',o'] = args [r,o]
-        return $ Fetch (Index r' o')
-    ce (EPrim ap@(APrim (PrimPrim "indexArray__") _) [r,o] _) = do
-        let [r',o'] = args [r,o]
-        return $ Fetch (Index r' o')
-    ce (EPrim ap@(APrim (PrimPrim "writeArray__") _) [r,o,v,_] _) = do
-        let [r',o',v'] = args [r,o,v]
-        return $ Update (Index r' o') v'
+        -- arrays
+        f "newMutArray__" [v,def,_] = do
+            let [v',def'] = args [v,def]
+            return $ Alloc { expValue = def', expCount = v', expRegion = region_heap, expInfo = mempty }
+        f "newBlankMutArray__" [v,_] = do
+            let [v'] = args [v]
+            return $ Alloc { expValue = ValUnknown (TyPtr TyNode), expCount = v', expRegion = region_heap, expInfo = mempty }
+        f "readArray__" [r,o,_] = do
+            let [r',o'] = args [r,o]
+            return $ Fetch (Index r' o')
+        f "indexArray__" [r,o] = do
+            let [r',o'] = args [r,o]
+            return $ Fetch (Index r' o')
+        f "writeArray__" [r,o,v,_] = do
+            let [r',o',v'] = args [r,o,v]
+            return $ Update (Index r' o') v'
 
-    ce (EPrim ap@(APrim (PrimPrim ft) _) [v,_] _) | ft `elem` ["unsafeFreezeArray__", "unsafeThawArray__"] = do
-        let [v'] = args [v]
-        return $ Return v'
+        f ft [v,_]  | ft `elem` ["unsafeFreezeArray__", "unsafeThawArray__"] = do
+            let [v'] = args [v]
+            return $ Return v'
 
 
     -- other primitives
@@ -542,7 +546,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
 
     -- | cc evaluates something in lazy context, returning a pointer to a node which when evaluated will produce the strict result.
     -- it is an invarient that evaling (cc e) produces the same value as (ce e)
-    cc (EPrim (APrim (PrimPrim "dependingOn") _) [e,_] _) = cc e
+    cc (EPrim (APrim (PrimPrim don) _) [e,_] _) | don == packString "dependingOn" = cc e
     cc e | Just _ <- literal e = error "unboxed literal in lazy context"
     cc e | Just z <- constant e = return (Return z)
     cc e | Just z <- con e = return (Store z)

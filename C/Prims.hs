@@ -29,10 +29,10 @@ data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
     {-! derive: GhcBinary !-}
 
 data Prim =
-    PrimPrim String          -- Special primitive implemented in the compiler somehow.
+    PrimPrim PackedString          -- Special primitive implemented in the compiler somehow.
     | CConst { primConst :: String, primRetType :: ExtType }  -- C code which evaluates to a constant
     | Operator { primOp :: String, primArgTypes ::  [ExtType], primRetType :: ExtType }   -- C operator
-    | Func { funcIOLike :: Bool, funcName :: String, primArgTypes :: [ExtType], primRetType :: ExtType }   -- function call with C calling convention
+    | Func { funcIOLike :: Bool, funcName :: PackedString, primArgTypes :: [ExtType], primRetType :: ExtType }   -- function call with C calling convention
     | IFunc { primArgTypes :: [ExtType], primRetType :: ExtType }-- indirect function call
     | AddrOf String                                              -- address of linker name
     | Peek { primArgType :: ExtType }                            -- read value from memory
@@ -64,6 +64,7 @@ primIsCheap :: Prim -> Bool
 primIsCheap AddrOf {} = True
 primIsCheap CCast {} = True
 primIsCheap CConst {} = True
+primIsCheap PrimString {} = True
 primIsCheap Operator {} = True
 primIsCheap PrimTypeInfo {} = True
 primIsCheap _ = False
@@ -78,6 +79,7 @@ primIsConstant CConst {} = True
 primIsConstant AddrOf {} = True
 primIsConstant PrimString {} = True
 primIsConstant CCast {} = True
+primIsConstant PrimString {} = True
 primIsConstant PrimTypeInfo {} = True
 primIsConstant Operator { primOp = op } | op `elem` safeOps = True  where
     safeOps = ["+","-","*","==",">=","<=",">","<","&","|","^","~",">>","<<"]
@@ -87,6 +89,7 @@ primIsConstant _ = False
 -- TODO needs grin support
 primEagerSafe :: Prim -> Bool
 primEagerSafe CConst {} = True
+primEagerSafe PrimString {} = True
 primEagerSafe AddrOf {} = True
 primEagerSafe PrimString {} = True
 primEagerSafe CCast {} = True
@@ -101,13 +104,13 @@ parsePrimString s = do
     ws@(_:_) <- return $ words s
     let v = case last ws of
             '&':s -> AddrOf s
-            s -> Func False s [] emptyExtType
+            s -> Func False (packString s) [] emptyExtType
     let f opt@('-':'l':_) = Requires [] [opt]
         f s = Requires [s] []
     return (APrim v (mconcat (map f (init ws))))
 
 
-primPrim s = APrim (PrimPrim s) mempty
+primPrim s = APrim (PrimPrim $ packString s) mempty
 
 data APrim = APrim Prim Requires
     deriving(Typeable, Data, Eq, Ord, Show)
@@ -117,10 +120,10 @@ instance PPrint d Prim  => PPrint d APrim where
     pprint (APrim p _) = pprint p
 
 instance DocLike d => PPrint d Prim where
-    pprint (PrimPrim t) = text t
+    pprint (PrimPrim t) = text (unpackPS t)
     pprint (CConst s t) = parens (text t) <> parens (text s)
     pprint (Operator s xs r) = parens (text r) <> text s <> tupled (map text xs)
-    pprint (Func _ s xs r) = parens (text r) <> text s <> tupled (map text xs)
+    pprint (Func _ s xs r) = parens (text r) <> text (unpackPS s) <> tupled (map text xs)
     pprint (IFunc xs r) = parens (text r) <> parens (char '*') <> tupled (map text xs)
     pprint (AddrOf s) = char '&' <> text s
     pprint (PrimString s) = tshow s <> char '#'
@@ -134,7 +137,7 @@ instance DocLike d => PPrint d Prim where
 
 parseDotNetFFI :: Monad m => String -> m Prim
 parseDotNetFFI s = ans where
-    init = PrimDotNet { primStatic = False, primDotNet = DotNetField, primAssembly = packString "", primDotNetName = packString "" }
+    init = PrimDotNet { primIOLike = False, primStatic = False, primDotNet = DotNetField, primAssembly = packString "", primDotNetName = packString "" }
     ans = case words s of
         ("static":rs) -> f rs init { primStatic = True }
         rs -> f rs init
