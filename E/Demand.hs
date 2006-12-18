@@ -274,8 +274,8 @@ analyze (EAp e1 e2) s = do
     return $ (EAp e1' e2',(phi1 `glb` phi2) :=> sigma1)
 analyze el@(ELit lc@LitCons { litName = h, litArgs = ts@(_:_) }) (S (Product ss)) | length ss == length ts = do
     dataTable <- getDataTable
-    case getSiblings dataTable h of
-        Just [_] -> do  -- product type
+    case onlyChild dataTable h of
+        True -> do  -- product type
             envs <- flip mapM (zip ts ss) $ \(a,s) -> do
                 (_,env :=> _) <- analyze a s
                 return env
@@ -319,8 +319,8 @@ analyze e@EError {} (S _) = return (e,botType)
 analyze e@EError {} (L _) = return (e,absType)
 analyze ec@ECase { eCaseBind = b, eCaseAlts = [Alt lc@LitCons { litName = h, litArgs = ts } alt], eCaseDefault = Nothing } s = do
     dataTable <- getDataTable
-    case getSiblings dataTable h of
-        Just [_] -> do  -- product type
+    case onlyChild dataTable h of
+        True -> do  -- product type
             (alt',enva :=> siga) <- extEnvE b (eCaseScrutinee ec) $ analyze alt s
             (e',enve :=> []) <- analyze (eCaseScrutinee ec) (sp [ lenv t enva | t <- ts])
             let nenv = enve `glb` foldr denvDelete enva (b:ts)

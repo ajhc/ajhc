@@ -587,10 +587,10 @@ simplifyDs prog sopts dsIn = ans where
                 d'' <- fmapM g d
                 t' <- dosub t
                 done cont $ caseUpdate ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
-            doCase e t b as@(Alt LitCons { litName = n } _:_) (Just d) | Just ss <- getSiblings (so_dataTable sopts) n, length ss <= length as = do
+            doCase e t b as@(Alt LitCons { litName = n } _:_) (Just d) | Just nsib <- numberSiblings (so_dataTable sopts) n, nsib <= length as = do
                 mtick "E.Simplify.case-no-default"
                 doCase e t b as Nothing
-            doCase e t b as (Just d) | te /= tWorld__, (ELit LitCons { litName = cn }) <- followAliases dt te, Just Constructor { conChildren = Just cs } <- getConstructor cn dt, length as == length cs - 1 || (False && length as < length cs && isAtomic d)  = do
+            doCase e t b as (Just d) | te /= tWorld__, (ELit LitCons { litName = cn }) <- followAliases dt te, Just Constructor { conChildren = DataNormal cs } <- getConstructor cn dt, length as == length cs - 1 || (False && length as < length cs && isAtomic d)  = do
                 let ns = [ n | Alt ~LitCons { litName = n } _ <- as ]
                     ls = filter (`notElem` ns) cs
                     ff n = do

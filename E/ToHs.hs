@@ -133,9 +133,9 @@ transDataTable dataTable ns = vcat (theType:map g (lefts wtd)) where
         ans = text "data" <+> hsep (showTCName (length $ conSlots con) n:[ text ('x':show i) | _ <- conSlots con | i <- [2::Int,4 ..] ]) <+> dchildren
         Just con = getConstructor n dataTable
         childs = conChildren con
-        dchildren | Just [] <- childs = empty
-                  | Nothing <- childs = empty
-                  | Just childs <- childs  =  text "=" <+> hcat (punctuate (text " | ") (map dc childs))
+        dchildren | DataNormal [] <- childs = empty
+                  | DataNormal childs <- childs  =  text "=" <+> hcat (punctuate (text " | ") (map dc childs))
+                  | otherwise = empty
     dc cn = ans where
         ans = hsep (showCName cn: map showSlot (conSlots con))
         Just con = getConstructor cn dataTable

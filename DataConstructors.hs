@@ -3,6 +3,7 @@ module DataConstructors(
     DataTable(..),
     DataTableMonad(..),
     AliasType(..),
+    DataFamily(..),
     primitiveAliases,
     dataTablePrims,
     constructionExpression,
@@ -14,6 +15,7 @@ module DataConstructors(
     getConstructorArities,
     getProduct,
     getSiblings,
+    numberSiblings,
     extractPrimitive,
     boxPrimitive,
     lookupCType',
@@ -24,12 +26,14 @@ module DataConstructors(
     toDataTable,
     updateLit,
     deriveClasses,
+    onlyChild,
     typesCompatable
     ) where
 
 import Control.Monad.Identity
 import Control.Monad.Writer(tell,execWriter)
 import Data.Monoid hiding(getProduct)
+import Data.Maybe
 import List(sortBy)
 import qualified Data.Map as Map hiding(map)
 
@@ -107,6 +111,16 @@ data AliasType = NotAlias | ErasedAlias | RecursiveAlias
     deriving(Eq,Ord,Show)
     {-! derive: GhcBinary !-}
 
+-- these apply to types
+data DataFamily =
+    DataAbstract        -- abstract internal type, has children of representation unknown and irrelevant.
+    | DataNone          -- children don't apply. data constructor for instance
+    | DataPrimitive     -- primitive type, children are all numbers.
+    | DataEnum !Int     -- bounded integral type, argument is maximum number
+    | DataNormal [Name] -- child constructors
+    deriving(Eq,Ord,Show)
+    {-! derive: GhcBinary !-}
+
 -- | Record describing a data type.
 -- * is also a data type containing the type constructors, which are unlifted, yet boxed.
 
@@ -116,10 +130,10 @@ data Constructor = Constructor {
     conExpr     :: E,            -- expression which constructs this value
     conSlots    :: [E],          -- slots
     conDeriving :: [Name],       -- classes this type derives
-    conAlias    :: AliasType,         -- whether this is a simple alias and has no tag of its own.
+    conAlias    :: AliasType,    -- whether this is a simple alias and has no tag of its own.
     conInhabits :: Name,         -- what constructor it inhabits, similar to conType, but not quite.
     conVirtual  :: Maybe [Name], -- whether this is a virtual constructor that translates into an enum and its siblings
-    conChildren :: Maybe [Name]  -- if nothing, then type is abstract
+    conChildren :: DataFamily
     } deriving(Show)
     {-! derive: GhcBinary !-}
 
@@ -142,7 +156,7 @@ getConstructor n (DataTable map) = case Map.lookup n map of
 
 getProduct :: Monad m => DataTable -> E -> m Constructor
 getProduct dataTable e | (ELit LitCons { litName = cn }) <- followAliases dataTable e, Just c <- getConstructor cn dataTable = f c where
-    f c | Just [x] <- conChildren c = getConstructor x dataTable
+    f c | DataNormal [x] <- conChildren c = getConstructor x dataTable
         | otherwise = fail "Not Product type"
 getProduct _ _ = fail "Not Product type"
 
@@ -158,7 +172,7 @@ tunboxedtuple n = (typeCons,dataCons) where
             conAlias = NotAlias,
             conInhabits = tc,
             conVirtual = Nothing,
-            conChildren = Nothing
+            conChildren = DataNone
            }
         typeCons = Constructor {
             conName = tc,
@@ -169,7 +183,7 @@ tunboxedtuple n = (typeCons,dataCons) where
             conAlias = NotAlias,
             conVirtual = Nothing,
             conInhabits = tHash,
-            conChildren = Just [dc]
+            conChildren = DataNormal [dc]
            }
 
         dc = unboxedNameTuple DataConstructor n
@@ -189,7 +203,7 @@ tabsurd = Constructor {
             conAlias = NotAlias,
             conVirtual = Nothing,
             conInhabits = tStar,
-            conChildren = Nothing
+            conChildren = DataNone
     }
 
 -- | Jhc@.Box can hold any boxed value (something whose type inhabits *, or is a function)
@@ -204,7 +218,7 @@ tbox = Constructor {
             conAlias = NotAlias,
             conVirtual = Nothing,
             conInhabits = tStar,
-            conChildren = Nothing
+            conChildren = DataAbstract
     }
 
 worlds = []
@@ -219,7 +233,7 @@ tarrow = Constructor {
             conAlias = NotAlias,
             conInhabits = tStar,
             conVirtual = Nothing,
-            conChildren = Nothing
+            conChildren = DataAbstract
         }
 
 
@@ -233,7 +247,7 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,_,_,b,_) -> b
         conAlias = NotAlias,
         conVirtual = Nothing,
         conInhabits = tHash,
-        conChildren = Nothing
+        conChildren = DataPrimitive
        } where rn = toName RawType n
     f (dc,tc,rt,y,z) | z /= "void" = [typeCons,dataCons] where
         dataCons = Constructor {
@@ -245,7 +259,7 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,_,_,b,_) -> b
             conAlias = NotAlias,
             conVirtual = Nothing,
             conInhabits = tc,
-            conChildren = Nothing
+            conChildren = DataNone
            }
         typeCons = Constructor {
             conName = tc,
@@ -256,7 +270,7 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,_,_,b,_) -> b
             conAlias = NotAlias,
             conVirtual = Nothing,
             conInhabits = tStar,
-            conChildren = Just [dc]
+            conChildren = DataNormal [dc]
            }
 
         tipe = ELit (litCons { litName = tc, litArgs = [], litType = eStar })
@@ -307,7 +321,7 @@ extractPrimitive dataTable e = case followAliases dataTable (getType e) of
     st@(ELit LitCons { litName = c, litArgs = [], litType = t })
         | t == eHash -> return (e,(show c,st))
         | otherwise -> do
-            Constructor { conChildren = Just [cn] }  <- getConstructor c dataTable
+            Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable
             Constructor { conSlots = [st@(ELit LitCons { litName = n, litArgs = []})] } <- getConstructor cn dataTable
             let tvra = tVr vn st
                 (vn:_) = newIds (freeIds e)
@@ -324,7 +338,7 @@ boxPrimitive dataTable e et = case followAliases dataTable et of
     st@(ELit LitCons { litName = c, litArgs = [], litType = t })
         | t == eHash -> return (e,(show c,st))
         | otherwise -> do
-            Constructor { conChildren = Just [cn] }  <- getConstructor c dataTable
+            Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable
             Constructor { conSlots = [st@(ELit LitCons { litName = n, litArgs = []})] } <- getConstructor cn dataTable
             let tvra = tVr vn st
                 (vn:_) = newIds (freeVars (e,et))
@@ -347,7 +361,7 @@ lookupCType dataTable e = case followAliases (mappend dataTablePrims dataTable) 
 
 lookupCType' dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
     ELit LitCons { litName = c, litArgs = [], litType = _ }
-        | Just Constructor { conChildren = Just [cn] }  <- getConstructor c dataTable,
+        | Just Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable,
           Just Constructor { conSlots = [st@(ELit LitCons { litName = n, litArgs = [], litType = _ })] } <- getConstructor cn dataTable
             -> return (cn,st,show n)
     ELit LitCons { litName = c, litArgs = [], litType = _ } | Just cn  <- getConstructor c dataTable -> fail $ "lookupCType: " ++ show cn
@@ -371,7 +385,7 @@ deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where
     f _ = []
     g is c cl = h cl where
         typ = conExpr c
-        Just [con] = conChildren c
+        DataNormal [con] = conChildren c
         v1 = tvr { tvrIdent = 2,  tvrType = typ }
         v2 = tvr { tvrIdent = 4,  tvrType = typ }
         i1 = tvr { tvrIdent = 6,  tvrType = tIntzh }
@@ -406,7 +420,7 @@ updateLit :: DataTable -> Lit e t -> Lit e t
 updateLit _ l@LitInt {} = l
 updateLit dataTable lc@LitCons { litName = n } =  lc { litAliasFor = af } where
     af = do
-        Constructor { conChildren = Just [x], conSlots = cs } <- getConstructor n dataTable
+        Constructor { conChildren = DataNormal [x], conSlots = cs } <- getConstructor n dataTable
         Constructor { conAlias = ErasedAlias, conSlots = [sl] } <- getConstructor x dataTable
         return (foldr ELam sl [ tVr i s | s <- cs | i <- [2,4..]])
 
@@ -444,17 +458,18 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             f (n,vc) = vc { conExpr = ELit (litCons { litName = consName, litArgs = [ELit (LitInt (fromIntegral n) tIntzh)], litType = conType vc }), conVirtual = virt }
             virtualCons = map f (zip [(0 :: Int) ..] virtualCons')
             consName =  mapName (id,(++ "#")) $ toName DataConstructor (nameName (conName theType))
+            rtypeName =  mapName (id,(++ "#")) $ toName TypeConstructor (nameName (conName theType))
             dataCons = fc { conName = consName, conType = getType (conExpr dataCons), conSlots = [tIntzh], conExpr = ELam (tVr 12 tIntzh) (ELit (litCons { litName = consName, litArgs = [EVar (tVr 12 tIntzh)], litType =  conExpr theType })) }
         tell (Seq.fromList virtualCons)
         tell (Seq.singleton dataCons)
-        tell $ Seq.singleton theType { conChildren = Just [consName], conVirtual = virt }
+        tell $ Seq.singleton theType { conChildren = DataNormal [consName], conVirtual = virt }
         return ()
 
     dt decl alias cs = do
         let dataCons = map (makeData alias typeInfo) cs
             typeInfo@(theType,_,_) = makeType decl
         tell (Seq.fromList dataCons)
-        tell $ Seq.singleton theType { conChildren = Just (map conName dataCons) }
+        tell $ Seq.singleton theType { conChildren = DataNormal (map conName dataCons) }
     makeData alias (theType,theTypeArgs,theTypeExpr) x = theData where
         theData = Constructor {
             conName = dataConsName,
@@ -465,7 +480,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             conDeriving = [],
             conVirtual = Nothing,
             conAlias = alias,
-            conChildren = Nothing
+            conChildren = DataNone
             }
         theExpr =  foldr ($) (strictize $ ELit litCons { litName = dataConsName, litArgs = map EVar vars, litType = theTypeExpr }) (map ELam vars)
         slots = map (subst . tvrType) ts -- XXX TODO fix this mapping
@@ -588,8 +603,29 @@ showDataTable (DataTable mp) = vcat xs where
 
 getSiblings :: DataTable -> Name -> Maybe [Name]
 getSiblings dt n
-    | Just c <- getConstructor n dt, Just s <- getConstructor (conInhabits c) dt = conChildren s
+    | Just c <- getConstructor n dt, Just Constructor { conChildren = DataNormal cs } <- getConstructor (conInhabits c) dt = Just cs
     | otherwise =  Nothing
+
+numberSiblings :: DataTable -> Name -> Maybe Int
+numberSiblings dt n
+    | Just c <- getConstructor n dt, Just Constructor { conChildren = cc } <- getConstructor (conInhabits c) dt = case cc of
+        DataNormal ds -> Just $ length ds
+        DataEnum n -> Just n
+        _ -> Nothing
+    | otherwise =  Nothing
+
+-- whether the type has a single slot
+onlyChild :: DataTable -> Name -> Bool
+onlyChild dt n = isJust ans where
+    ans = do
+        c <- getConstructor n dt
+        case conChildren c of
+            DataNormal [_] -> return ()
+            _ -> do
+                c <- getConstructor (conInhabits c) dt
+                case conChildren c of
+                    DataNormal [_] -> return ()
+                    _ -> fail "not cpr"
 
 
 pprintTypeOfCons :: (Monad m,DocLike a) => DataTable -> Name -> m a

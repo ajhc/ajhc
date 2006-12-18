@@ -791,7 +791,7 @@ convertMatches bs ms err = do
                 case conVirtual patCons of
                     Nothing -> return $ eCase b as err
                     Just sibs -> do
-                        let (Just Constructor { conChildren = Just [vCons] }) = getConstructor (conInhabits patCons) dataTable
+                        let (Just Constructor { conChildren = DataNormal [vCons] }) = getConstructor (conInhabits patCons) dataTable
                         [z] <- newVars [tIntzh]
                         let err' = if length sibs <= length as then Unknown else err
                         return $ eCase b [Alt litCons { litName = vCons, litArgs = [z], litType = getType b } (eCase (EVar z) as err')] Unknown
