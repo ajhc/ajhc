@@ -52,6 +52,8 @@ alloca__ size action s =
 
 word2Char__ x = chr# (word2Int# x)
 char2Word__ x = int2Word# (ord# x)
+addr2Word__ x = int2Word# (addr2Int# x)
+word2Addr__ x = int2Addr# (word2Int# x)
 
 convertString :: [Char] -> ListTCon Char
 convertString [] = jhc_EmptyList

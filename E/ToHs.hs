@@ -380,8 +380,8 @@ castVal at rt x = case (showCType at,showCType rt) of
         (("Int#","Word#"),"int2Word#"),
         (("Char#","Word#"),"char2Word__"),
         (("Word#","Char#"),"word2Char__"),
-        (("Addr#","Word#"),"int2Word#"),
-        (("Word#","Addr#"),"int2Addr#")
+        (("Addr#","Word#"),"addr2Word__"),
+        (("Word#","Addr#"),"word2Addr__")
         ]
 
 cfuncname Func { funcName = fn, funcIOLike = iol, primArgTypes = as, primRetType = r  } =  text $ ("func_" ++ (if iol then "io" else "pure") ++ "_" ++ unpackPS fn ++ concatInter "_" (r:as))
