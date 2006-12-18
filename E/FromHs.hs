@@ -389,6 +389,32 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
                     True -> cFun $ \rs -> (,) (ELam tvrWorld) $
                                 eCaseTup' (prim True rs rtt (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' }) (eJustIO (EVar tvrWorld2) (EVar rtVar)))
         return [(name,var,lamt result)]
+    cDecl (HsForeignDecl _ (FfiSpec (Import rcn _) _ DotNet) n _) = do
+        (var,ty,lamt) <- convertValue (toName Name.Val n)
+        let (ts,rt) = argTypes' ty
+            (isIO,rt') = case  rt of
+                ELit (LitCons { litName = c, litArgs = [x] }) | c == tc_IO -> (True,x)
+                _ -> (False,rt)
+        es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
+        (_,pt) <- lookupCType dataTable rt'
+        [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
+        dnet <- parseDotNetFFI rcn
+        let cFun = createFunc dataTable (map tvrType es)
+            prim rs rtt = EPrim (APrim dnet { primIOLike = isIO } mempty)
+        result <- case (isIO,pt) of
+            (True,"void") -> cFun $ \rs -> (,) (ELam tvrWorld) $
+                        eStrictLet tvrWorld2 (prim rs "void" (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
+            (False,"void") -> fail "pure foreign function must return a valid value"
+            _ -> do
+                (cn,rtt',rtt) <- lookupCType' dataTable rt'
+                [rtVar,rtVar'] <- newVars [rt',rtt']
+                let rttIO = ltTuple [tWorld__, rt']
+                    rttIO' = ltTuple' [tWorld__, rtt']
+                case isIO of
+                    False -> cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim rs rtt [ EVar t | (t,_) <- rs ] rtt') (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
+                    True -> cFun $ \rs -> (,) (ELam tvrWorld) $
+                                eCaseTup' (prim rs rtt (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' }) (eJustIO (EVar tvrWorld2) (EVar rtVar)))
+        return [(toName Name.Val n,var,lamt result)]
 
     cDecl x@HsForeignDecl {} = fail ("Unsupported foreign declaration: "++ show x)
     cDecl (HsForeignExport _ ffi@(FfiExport ecn _ CCall) n _) = do

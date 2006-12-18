@@ -24,6 +24,10 @@ type ExtType = String
 
 emptyExtType = ""
 
+data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
+    deriving(Typeable, Data, Eq, Ord, Show)
+    {-! derive: GhcBinary !-}
+
 data Prim =
     PrimPrim String          -- Special primitive implemented in the compiler somehow.
     | CConst { primConst :: String, primRetType :: ExtType }  -- C code which evaluates to a constant
@@ -36,6 +40,13 @@ data Prim =
     | CCast { primArgType :: ExtType, primRetType :: ExtType }   -- Cast from one basic type to another, possibly lossy.
     | PrimTypeInfo { primArgType :: ExtType,  primRetType :: ExtType, primTypeInfo :: PrimTypeInfo }
     | PrimString PackedString                                 -- address of a raw string. encoded in utf8.
+    | PrimDotNet {
+        primStatic :: Bool,
+        primDotNet :: DotNetPrim,
+        primIOLike :: Bool,
+        primAssembly :: PackedString,
+        primDotNetName :: PackedString
+        }
     deriving(Typeable, Data, Eq, Ord, Show)
     {-! derive: GhcBinary !-}
 
@@ -116,7 +127,23 @@ instance DocLike d => PPrint d Prim where
     pprint (Peek t) = char '*' <> text t
     pprint (Poke t) = char '=' <> text t
     pprint (CCast _ t) = parens (text t)
+    pprint PrimDotNet { primDotNet = dn,  primDotNetName = n} = parens (text (unpackPS n))
     pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimSizeOf } = text "sizeof" <> parens (text at)
     pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimMaxBound } = text "max" <> parens (text at)
     pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimMinBound } = text "min" <> parens (text at)
+
+parseDotNetFFI :: Monad m => String -> m Prim
+parseDotNetFFI s = ans where
+    init = PrimDotNet { primStatic = False, primDotNet = DotNetField, primAssembly = packString "", primDotNetName = packString "" }
+    ans = case words s of
+        ("static":rs) -> f rs init { primStatic = True }
+        rs -> f rs init
+    f ("field":rs) dn = g dn { primDotNet = DotNetField } rs
+    f ("ctor":rs) dn = g dn { primDotNet = DotNetCtor } rs
+    f ("method":rs) dn = g dn { primDotNet = DotNetMethod } rs
+    f _ _ = fail "invalid .NET ffi specification"
+    g dn ['[':rs] | (as,']':nm) <- span (/= ']') rs = return dn { primAssembly = packString as, primDotNetName = packString nm }
+    g dn [n] = return dn { primDotNetName = packString n }
+    g _ _ = fail "invalid .NET ffi specification"
+
 

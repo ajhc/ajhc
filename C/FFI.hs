@@ -8,7 +8,7 @@ import Data.Monoid
 
 type CName    = String
 
-data CallConv = CCall | StdCall | Primitive deriving(Eq,Ord,Show,Data,Typeable)
+data CallConv = CCall | StdCall | Primitive | DotNet deriving(Eq,Ord,Show,Data,Typeable)
     {-! derive: GhcBinary !-}
 
 data Safety = Safe | Unsafe deriving(Eq,Ord,Show,Data,Typeable)

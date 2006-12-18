@@ -63,7 +63,7 @@ emapEGH f g h e = z e where
         as' <- mapM mapmAlt (eCaseAlts ec)
         d' <- fmapM f (eCaseDefault ec)
         t' <- g (eCaseType ec)
-        return $ caseUpdate ECase { eCaseScrutinee =e', eCaseBind = b', eCaseAlts = as', eCaseDefault = d', eCaseType = t'}
+        return $ caseUpdate ec { eCaseScrutinee =e', eCaseBind = b', eCaseAlts = as', eCaseDefault = d', eCaseType = t'}
     --    aa ab) = do aa <- f aa;ab <- mapM (\(x,y) -> do x <- fmapM f x; y <- f y; return (x,y)) ab; return $ ECase aa ab
     z (EPrim aa ab ac) = do ab <- mapM f ab;ac <- g ac; return $ EPrim aa ab ac
     z (EError aa ab) = do ab <- g ab; return $ EError aa ab

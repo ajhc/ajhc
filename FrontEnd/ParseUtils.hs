@@ -376,6 +376,7 @@ doForeign srcLoc names ms qt = ans where
                 (n:ns) <- return $ reverse names
                 return (Nothing,n,reverse ns)
         let f ["import","primitive"] cname = return $ HsForeignDecl srcLoc (FfiSpec (Import cname nullRequires) Safe Primitive) vname qt
+            f ["import","dotnet"] cname = return $ HsForeignDecl srcLoc (FfiSpec (Import cname nullRequires) Safe DotNet) vname qt
             f ("import":rs) cname = do
                 let (safe,conv) = pconv rs
                 im <- parseImport mstring vname
