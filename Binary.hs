@@ -277,6 +277,12 @@ instance Binary Int where
 	x <- get bh
 	return $! (fromIntegral (x :: Int32))
 
+instance Binary Word where
+    put_ bh i = put_ bh (fromIntegral i :: Word32)
+    get  bh = do
+	x <- get bh
+	return $! (fromIntegral (x :: Word32))
+
 instance Binary ClockTime where
     put_ bh (TOD x y) = put_ bh x >> put_ bh y
     get bh = do
