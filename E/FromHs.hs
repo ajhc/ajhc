@@ -361,7 +361,7 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         (cn,st,ct) <- lookupCType' dataTable rt
         [uvar] <- newVars [st]
         let expr x     = return [(name,var,lamt x)]
-            prim       = APrim (AddrOf rcn) req
+            prim       = APrim (AddrOf $ packString rcn) req
         expr $ eStrictLet uvar (EPrim prim [] st) (ELit (litCons { litName = cn, litArgs = [EVar uvar], litType = rt }))
     cDecl (HsForeignDecl _ (FfiSpec (Import rcn req) _ CCall) n _) = do
         let name = toName Name.Val n

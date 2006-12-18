@@ -82,7 +82,7 @@ convertVal (Tup xs) = do
 convertVal (Tag t) = return $ constant (enum $ nodeTagName t)
 convertVal (ValPrim (APrim p _) [] _) = case p of
     CConst s _ -> return $ expressionRaw s
-    AddrOf t -> return $ expressionRaw ('&':t)
+    AddrOf t -> return $ expressionRaw ('&':unpackPS t)
     PrimTypeInfo { primArgType = arg, primTypeInfo = PrimSizeOf } -> return $ expressionRaw ("sizeof(" ++ arg ++ ")")
     PrimString s -> return $ expressionRaw (show s)
     x -> return $ err ("convertVal: " ++ show x)
@@ -277,7 +277,7 @@ convertPrim p vs
         x' <- convertVal x
         return $ expressionRaw ("*((" <> t <+> "*)" <> (parens $ renderG v') <> text ") = " <> renderG x')
     | APrim (AddrOf t) _ <- primAPrim p, [] <- vs = do
-        return $ expressionRaw ('&':t)
+        return $ expressionRaw ('&':unpackPS t)
 
 
 localJumps xs (C action) = C $ local (\ (x,y) -> (x,Map.fromList xs `mappend` y)) action
@@ -517,7 +517,7 @@ convertConst (Tup []) = return emptyExpression
 convertConst (Tag t) = return $ constant (enum $ nodeTagName t)
 convertConst (ValPrim (APrim p _) [] _) = case p of
     CConst s _ -> return $ expressionRaw s
-    AddrOf t -> return $ expressionRaw ('&':t)
+    AddrOf t -> return $ expressionRaw ('&':unpackPS t)
     x -> return $ err (show x)
 convertConst (ValPrim (APrim p _) [x] _) = do
     x' <- convertConst x

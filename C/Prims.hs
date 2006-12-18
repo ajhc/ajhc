@@ -22,7 +22,6 @@ data PrimType = PrimType {
 
 type ExtType = String
 
-emptyExtType = ""
 
 data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
     deriving(Typeable, Data, Eq, Ord, Show)
@@ -31,14 +30,33 @@ data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
 data Prim =
     PrimPrim PackedString          -- Special primitive implemented in the compiler somehow.
     | CConst { primConst :: String, primRetType :: ExtType }  -- C code which evaluates to a constant
-    | Operator { primOp :: String, primArgTypes ::  [ExtType], primRetType :: ExtType }   -- C operator
-    | Func { funcIOLike :: Bool, funcName :: PackedString, primArgTypes :: [ExtType], primRetType :: ExtType }   -- function call with C calling convention
-    | IFunc { primArgTypes :: [ExtType], primRetType :: ExtType }-- indirect function call
-    | AddrOf String                                              -- address of linker name
-    | Peek { primArgType :: ExtType }                            -- read value from memory
-    | Poke { primArgType :: ExtType }                            -- write value to memory
-    | CCast { primArgType :: ExtType, primRetType :: ExtType }   -- Cast from one basic type to another, possibly lossy.
-    | PrimTypeInfo { primArgType :: ExtType,  primRetType :: ExtType, primTypeInfo :: PrimTypeInfo }
+    | Operator {
+        primOp :: String,
+        primArgTypes ::  [ExtType],
+        primRetType :: ExtType
+        }   -- C operator
+    | Func {
+        funcIOLike :: Bool,
+        funcName :: PackedString,
+        primArgTypes :: [ExtType],
+        primRetType :: ExtType
+        }   -- function call with C calling convention
+    | IFunc {
+        primArgTypes :: [ExtType],
+        primRetType :: ExtType
+        } -- indirect function call
+    | AddrOf PackedString              -- address of linker name
+    | Peek { primArgType :: ExtType }  -- read value from memory
+    | Poke { primArgType :: ExtType }  -- write value to memory
+    | CCast {
+        primArgType :: ExtType,
+        primRetType :: ExtType
+        }   -- Cast from one basic type to another, possibly lossy.
+    | PrimTypeInfo {
+        primArgType :: ExtType,
+        primRetType :: ExtType,
+        primTypeInfo :: PrimTypeInfo
+        }
     | PrimString PackedString                                 -- address of a raw string. encoded in utf8.
     | PrimDotNet {
         primStatic :: Bool,
@@ -103,8 +121,8 @@ primEagerSafe _ = False
 parsePrimString s = do
     ws@(_:_) <- return $ words s
     let v = case last ws of
-            '&':s -> AddrOf s
-            s -> Func False (packString s) [] emptyExtType
+            '&':s -> AddrOf (packString s)
+            s -> Func False (packString s) [] ""
     let f opt@('-':'l':_) = Requires [] [opt]
         f s = Requires [s] []
     return (APrim v (mconcat (map f (init ws))))
@@ -125,7 +143,7 @@ instance DocLike d => PPrint d Prim where
     pprint (Operator s xs r) = parens (text r) <> text s <> tupled (map text xs)
     pprint (Func _ s xs r) = parens (text r) <> text (unpackPS s) <> tupled (map text xs)
     pprint (IFunc xs r) = parens (text r) <> parens (char '*') <> tupled (map text xs)
-    pprint (AddrOf s) = char '&' <> text s
+    pprint (AddrOf s) = char '&' <> text (unpackPS s)
     pprint (PrimString s) = tshow s <> char '#'
     pprint (Peek t) = char '*' <> text t
     pprint (Poke t) = char '=' <> text t

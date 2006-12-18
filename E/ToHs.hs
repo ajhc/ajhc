@@ -88,7 +88,7 @@ fst3 (x,_,_) = x
 
 
 transForeign ps = vcat (map f ps) where
-    f (AddrOf s) = text $ "foreign import ccall \"&" ++ s ++ "\" addr_" ++ mangleIdent s ++ " :: Ptr ()"
+    f (AddrOf s) = text $ "foreign import ccall \"&" ++ unpackPS s ++ "\" addr_" ++ mangleIdent (unpackPS s) ++ " :: Ptr ()"
     f furc@Func { funcName = fn, funcIOLike = True, primArgTypes = as, primRetType = "void" } = ans <$> ans' where
         ans  = text $ "foreign import ccall unsafe \"" ++ unpackPS fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ concatInter " -> " (map (snd . snd) vals ++ ["IO ()"])
         ans' = text $ cfuncname furc <+> "w" <+> unwords (fsts vals) <+> " = case _" ++ cfuncname furc <+> concatInter " " [ parens (c <+> a) | (a,(c,_)) <- vals ] <+> "of IO f -> case f w of (# w, _ #) -> w"
@@ -340,7 +340,7 @@ transE (EPrim (APrim Poke { primArgType = at } _) [w,ptr,v] _) = mparen ans wher
         "Word#" -> "writeWord" ++ show size ++ "OffAddr#"
 transE (EPrim (APrim (AddrOf addr) _) [] _) = mparen $ do
     tell mempty { collPrims = Set.singleton (AddrOf addr) }
-    return (text $ "unPtr addr_" ++ mangleIdent addr)
+    return (text $ "unPtr addr_" ++ mangleIdent (unpackPS addr))
 
 transE (EPrim (APrim func@Func {} _) xs _) = mparen $ do
     tell mempty { collPrims = Set.singleton func }
