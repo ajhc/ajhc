@@ -10,6 +10,7 @@ import qualified Data.Set as Set
 import Atom
 import Util.HasSize
 import Util.SetLike
+import Util.BitSet
 import qualified Info.Info as Info
 
 
@@ -26,7 +27,7 @@ instance Show Properties where
 
 
 -- | list of properties of a function, such as specified by use pragmas or options
-newtype Properties = Properties (EnumSet Property)
+newtype Properties = Properties (EnumBitSet Property)
     deriving(Typeable,Eq,HasSize,Monoid,SetLike,BuildSet Property,ModifySet Property,IsEmpty)
 
 
