@@ -472,7 +472,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
         vars = [ tvr { tvrType = t } | tvr <- ts | t <- slots ]
         strictize con = E.Subst.subst tvr { tvrIdent = -1 } Unknown $ f (zip (map isHsBangedTy args) vars) con where
             f ((False,_):rs) con = f rs con
-            f ((True,var):rs) con = eStrictLet var (EVar var) con
+            f ((True,var):rs) con = eStrictLet var (EVar var) (f rs con)
             f [] con = con
         dataConsName =  toName Name.DataConstructor (hsConDeclName x)
         args = hsConDeclArgs x
