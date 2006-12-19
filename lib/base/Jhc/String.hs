@@ -4,6 +4,7 @@ module Jhc.String(
     eqString,
     eqUnpackedString,
     unpackStringFoldr,
+    eqSingleChar,
     unpackString
     )where
 
@@ -62,6 +63,13 @@ eqUnpackedString addr cs = f addr cs where
         uc -> case equalsChar uc (unbox c) of
             0# -> 0#
             1# -> f (increment offset) cs
+
+eqSingleChar :: Char__ -> [Char] -> Bool__
+eqSingleChar ch (c:cs) = case equalsChar ch (unbox c) of
+    0# -> 0#
+    1# -> case cs of
+        [] -> 1#
+        _ -> 0#
 
 
 {-# NOINLINE eqUnpacked #-}
