@@ -142,6 +142,18 @@ newtype DataTable = DataTable {
     }
     {-! derive: GhcBinary, Monoid !-}
 
+emptyConstructor = Constructor {
+                conName = error "emptyConstructor.conName",
+                conType = Unknown,
+                conSlots = [],
+                conExpr = Unknown,
+                conInhabits = error "emptyConstructor.conInhabits",
+                conDeriving = [],
+                conAlias = NotAlias,
+                conVirtual = Nothing,
+                conChildren = DataNone
+                }
+
 instance HasSize DataTable where
     size (DataTable d) = Map.size d
 
@@ -390,7 +402,7 @@ deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where
         v2 = tvr { tvrIdent = 4,  tvrType = typ }
         i1 = tvr { tvrIdent = 6,  tvrType = tIntzh }
         i2 = tvr { tvrIdent = 8,  tvrType = tIntzh }
-        i3 = tvr { tvrIdent = 10, tvrType = tIntzh }
+        b3 = tvr { tvrIdent = 10, tvrType = tBoolzh }
         int1 = tvr { tvrIdent = 12, tvrType = tInt }
         val1 = tvr { tvrIdent = 14, tvrType = typ }
         unbox e = ELam v1 (ELam v2 (ec (EVar v1) i1 (ec (EVar v2) i2 e)))  where
@@ -410,14 +422,15 @@ deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where
 
         h _ = []
         mkCmpFunc fname op = (iv_eq,ib_eq) where
-            ib_eq = unbox (eStrictLet i3 (oper_III op (EVar i1) (EVar i2)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar i3], litType = tBool })))
+            ib_eq = unbox (eStrictLet b3 (oper_IIB op (EVar i1) (EVar i2)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar b3], litType = tBool })))
             iv_eq = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (nameName $ conName c), tvrType = getType ib_eq }
-    oper_III op a b = EPrim (APrim (Operator op ["int","int"] "int") mempty) [a,b] tIntzh
+    oper_IIB op a b = EPrim (APrim (Operator op ["int","int"] "int") mempty) [a,b] tBoolzh
 
 
 
 updateLit :: DataTable -> Lit e t -> Lit e t
 updateLit _ l@LitInt {} = l
+updateLit dataTable lc@LitCons { litAliasFor = Just {} } = lc
 updateLit dataTable lc@LitCons { litName = n } =  lc { litAliasFor = af } where
     af = do
         Constructor { conChildren = DataNormal [x], conSlots = cs } <- getConstructor n dataTable
@@ -455,13 +468,22 @@ toDataTable km cm ds currentDataTable = newDataTable  where
         let virtualCons'@(fc:_) = map (makeData NotAlias typeInfo) cs
             typeInfo@(theType,_,_) = makeType decl
             virt = Just (map conName virtualCons')
-            f (n,vc) = vc { conExpr = ELit (litCons { litName = consName, litArgs = [ELit (LitInt (fromIntegral n) tIntzh)], litType = conType vc }), conVirtual = virt }
+            f (n,vc) = vc { conExpr = ELit (litCons { litName = consName, litArgs = [ELit (LitInt (fromIntegral n) rtype)], litType = conType vc }), conVirtual = virt }
             virtualCons = map f (zip [(0 :: Int) ..] virtualCons')
             consName =  mapName (id,(++ "#")) $ toName DataConstructor (nameName (conName theType))
             rtypeName =  mapName (id,(++ "#")) $ toName TypeConstructor (nameName (conName theType))
-            dataCons = fc { conName = consName, conType = getType (conExpr dataCons), conSlots = [tIntzh], conExpr = ELam (tVr 12 tIntzh) (ELit (litCons { litName = consName, litArgs = [EVar (tVr 12 tIntzh)], litType =  conExpr theType })) }
+            rtype = ELit litCons { litName = rtypeName, litType = eHash, litAliasFor = Just tIntzh }
+            dataCons = fc { conName = consName, conType = getType (conExpr dataCons), conSlots = [rtype], conExpr = ELam (tVr 12 rtype) (ELit (litCons { litName = consName, litArgs = [EVar (tVr 12 rtype)], litType =  conExpr theType })) }
+            rtypeCons = emptyConstructor {
+                conName = rtypeName,
+                conType = eHash,
+                conExpr = rtype,
+                conInhabits = tHash,
+                conChildren = DataEnum (length virtualCons)
+                }
         tell (Seq.fromList virtualCons)
         tell (Seq.singleton dataCons)
+        tell (Seq.singleton rtypeCons)
         tell $ Seq.singleton theType { conChildren = DataNormal [consName], conVirtual = virt }
         return ()
 
@@ -471,14 +493,12 @@ toDataTable km cm ds currentDataTable = newDataTable  where
         tell (Seq.fromList dataCons)
         tell $ Seq.singleton theType { conChildren = DataNormal (map conName dataCons) }
     makeData alias (theType,theTypeArgs,theTypeExpr) x = theData where
-        theData = Constructor {
+        theData = emptyConstructor {
             conName = dataConsName,
             conType =foldr ($) (getType theExpr) (map EPi theTypeArgs),
             conSlots =  slots,
             conExpr = theExpr,
             conInhabits = conName theType,
-            conDeriving = [],
-            conVirtual = Nothing,
             conAlias = alias,
             conChildren = DataNone
             }
@@ -507,13 +527,12 @@ toDataTable km cm ds currentDataTable = newDataTable  where
         (theTypeFKind,theTypeKArgs') = fromPi theKind
         theTypeArgs = [ tvr { tvrIdent = x } | tvr  <- theTypeKArgs' | x <- [2,4..] ]
         theTypeExpr = ELit litCons { litName = theTypeName, litArgs = map EVar theTypeArgs, litType = theTypeFKind }
-        theType = Constructor {
+        theType = emptyConstructor {
             conName = theTypeName,
             conType = theKind,
             conSlots = map tvrType theTypeArgs,
             conExpr = foldr ($) theTypeExpr (map ELam theTypeArgs),
             conDeriving = [ toName ClassName n | n <- hsDeclDerives decl],
-            conAlias = NotAlias,
             conInhabits = if theTypeFKind == eStar then tStar else tHash,
             conVirtual = Nothing,
             conChildren = undefined
@@ -669,6 +688,11 @@ class Monad m => DataTableMonad m where
 
 instance DataTableMonad Identity
 
-primitiveAliases = [(tc_Int__,rt_int),(tc_Addr__,rt_HsPtr),(tc_Word8__,rt_uint8_t),(tc_Char__,rt_HsChar),(tc_Bool__,rt_int)]
+primitiveAliases = [
+    (tc_Int__,rt_int),
+    (tc_Addr__,rt_HsPtr),
+    (tc_Word8__,rt_uint8_t),
+    (tc_Char__,rt_HsChar),
+    (tc_Bool__,rt_int)]
 
 

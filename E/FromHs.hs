@@ -72,11 +72,11 @@ createIf e a b = do
     return $ createIfv tv e a b
 
 createIfv v e a b = res where
-    tv = v { tvrType = tIntzh }
-    ic = eCase (EVar tv) [Alt (LitInt 1 tIntzh) a, Alt (LitInt 0 tIntzh) b] Unknown
+    tv = v { tvrType = tBoolzh }
+    ic = eCase (EVar tv) [Alt lTruezh a, Alt lFalsezh b] Unknown
     res = eCase e [Alt (litCons { litName = dc_Boolzh, litArgs = [tv], litType = tBool }) ic] Unknown
 
-ifzh e a b = eCase e [Alt (LitInt 1 tIntzh) a, Alt (LitInt 0 tIntzh) b] Unknown
+ifzh e a b = eCase e [Alt lTruezh a, Alt lFalsezh b] Unknown
 
 head (x:_) = x
 head _ = error "FromHsHeadError"
@@ -792,7 +792,8 @@ convertMatches bs ms err = do
                     Nothing -> return $ eCase b as err
                     Just sibs -> do
                         let (Just Constructor { conChildren = DataNormal [vCons] }) = getConstructor (conInhabits patCons) dataTable
-                        [z] <- newVars [tIntzh]
+                            (Just Constructor { conSlots = [rtype] }) = getConstructor vCons dataTable
+                        [z] <- newVars [rtype]
                         let err' = if length sibs <= length as then Unknown else err
                         return $ eCase b [Alt litCons { litName = vCons, litArgs = [z], litType = getType b } (eCase (EVar z) as err')] Unknown
             | otherwise = error $ "Heterogenious list: " ++ show (map fst3 ps)

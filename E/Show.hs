@@ -52,6 +52,10 @@ instance PPrint String (Lit E E) where
 newtype SEM a = SEM { unSEM :: VarNameT E Id String Identity a }
     deriving(Monad,Functor)
 
+enumList = [
+    (tc_Boolzh,["False#","True#"]),
+    (toName TypeConstructor ("Jhc.Order","Ordering#"),["LT#","EQ#","GT#"])
+    ]
 
 showLit ::
     (a -> SEM (Unparse Doc))   -- ^ routine for showing the contents of constructor literals
@@ -61,6 +65,8 @@ showLit showBind l = do
     let const_color = col "blue"
     let f (LitInt c t) | t == tCharzh = return $ atom $ (const_color (tshow $ chr i)) where
             i = fromIntegral c
+        f (LitInt i (ELit LitCons { litName = n })) | Just l <- lookup n enumList, i >= 0 && fromIntegral i < length l =
+            return $ atom $ (const_color (text $ l !! (fromIntegral i)))
         f (LitInt i _) = return $ atom $ (const_color (text $ show i))
         f LitCons { litName = n, litArgs = [], litType = t } | t == tTag = return $  atom $ (const_color (text $ show n))
         f LitCons { litName = s, litArgs = es } | Just n <- fromTupname s , n == length es = do
@@ -128,6 +134,7 @@ allocTVr tvr (SEM action) | even (tvrIdent tvr) = do
     SEM $ subVarName $ newName (map (('v':) . show) [1::Int ..]) Unknown (tvrIdent tvr) >> action
 allocTVr _ action = action
 
+tBoolzh = ELit litCons { litName = tc_Boolzh, litType = eHash, litAliasFor = Just tIntzh }
 
 showE :: E -> SEM (Unparse Doc)
 showE e = do
@@ -137,6 +144,7 @@ showE e = do
             xs <- mapM (fmap unparse . showE) xs
             return $ atom $ list xs
         f e | e == tBool     = return $ atom $ text "Bool"
+        f e | e == tBoolzh   = return $ atom $ text "Bool#"
         f e | e == tChar     = return $ atom $ text "Char"
         f e | e == tInt      = return $ atom $ text "Int"
         f e | e == tInteger  = return $ atom $ text "Integer"

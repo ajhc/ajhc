@@ -45,6 +45,7 @@ unbox' e cn tvr wtd = eCase e [Alt (litCons { litName = cn, litArgs = [tvr], lit
 
 oper_aa op ct e = EPrim (APrim (Operator op [ct] ct) mempty) [e] (rawType ct)
 oper_aaI op ct a b = EPrim (APrim (Operator op [ct,ct] "int") mempty) [a,b] intt
+oper_aaB op ct a b = EPrim (APrim (Operator op [ct,ct] "int") mempty) [a,b] tBoolzh
 oper_aaa op ct a b = EPrim (APrim (Operator op [ct,ct] ct) mempty) [a,b] (rawType ct)
 oper_aIa op ct a b = EPrim (APrim (Operator op [ct,"int"] ct) mempty) [a,b] (rawType ct)
 
@@ -91,12 +92,12 @@ op_aaB op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
     tvrb' = tVr 4 t
     tvra = tVr 6 st
     tvrb = tVr 8 st
-    tvrc = tVr 10 intt
+    tvrc = tVr 10 tBoolzh
     st = rawType ct
-    wtd = eStrictLet tvrc (oper_aaI op ct (EVar tvra) (EVar tvrb)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar tvrc], litType = tBool }))  -- (caseof (EVar tvrc))
+    wtd = eStrictLet tvrc (oper_aaB op ct (EVar tvra) (EVar tvrb)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar tvrc], litType = tBool }))  -- (caseof (EVar tvrc))
 --    caseof x = eCase x [Alt zeroI vFalse]  vTrue
 
-build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaI "<" ct (EVar tvra) zero)  [Alt zeroI (rebox $ EVar tvra)] (fs)) where
+build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaB "<" ct (EVar tvra) zero)  [Alt lFalsezh (rebox $ EVar tvra)] (fs)) where
     te = getType v
     tvra = tVr 2 st
     tvrb = tVr 4 st
@@ -106,7 +107,7 @@ build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaI "<" ct (EVar tvra) zero)  
     fs = eStrictLet tvrb (oper_aa "-" ct (EVar tvra)) (rebox (EVar tvrb))
     rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
 
-build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaI "<" ct (EVar tvra) (ELit zero)) [Alt zeroI (rebox one)] (rebox negativeOne))) where
+build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaB "<" ct (EVar tvra) (ELit zero)) [Alt lFalsezh (rebox one)] (rebox negativeOne))) where
     tvra = tVr 2 st
     te = getType v
     st = rawType ct

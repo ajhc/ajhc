@@ -60,6 +60,7 @@ compileToHs prog = do
     when (r /= System.ExitSuccess) $ fail "Hs code did not compile."
     return ()
 
+cTypeInfoT (ELit LitCons { litAliasFor = Just af }) = cTypeInfoT af
 cTypeInfoT (ELit LitCons { litName = n }) | (RawType,t) <- fromName n = cTypeInfo t
 
 cTypeInfo "wchar_t" = ("Char#","C#","Char")

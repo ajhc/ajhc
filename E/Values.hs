@@ -279,3 +279,9 @@ safeToDup ec@ECase {}
 safeToDup (EPrim p _ _) = aprimIsCheap p
 safeToDup e = whnfOrBot e || isELam e || isEPi e
 
+tBoolzh = ELit litCons { litName = tc_Boolzh, litType = eHash, litAliasFor = Just tIntzh }
+
+lFalsezh = (LitInt 0 tBoolzh)
+lTruezh = (LitInt 1 tBoolzh)
+
+
