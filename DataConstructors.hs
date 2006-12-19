@@ -175,25 +175,19 @@ getProduct _ _ = fail "Not Product type"
 
 tunboxedtuple :: Int -> (Constructor,Constructor)
 tunboxedtuple n = (typeCons,dataCons) where
-        dataCons = Constructor {
+        dataCons = emptyConstructor {
             conName = dc,
             conType = dtipe,
             conSlots = map EVar typeVars,
-            conDeriving = [],
             conExpr =  foldr ($) (ELit litCons { litName = dc, litArgs = map EVar vars, litType = ftipe }) (map ELam vars),
-            conAlias = NotAlias,
             conInhabits = tc,
-            conVirtual = Nothing,
             conChildren = DataNone
            }
-        typeCons = Constructor {
+        typeCons = emptyConstructor {
             conName = tc,
             conType = foldr EPi eHash (replicate n tvr { tvrType = eStar }),
             conSlots = replicate n eStar,
-            conDeriving = [],
             conExpr = tipe,
-            conAlias = NotAlias,
-            conVirtual = Nothing,
             conInhabits = tHash,
             conChildren = DataNormal [dc]
            }
@@ -206,14 +200,10 @@ tunboxedtuple n = (typeCons,dataCons) where
         ftipe = ELit (litCons { litName = tc, litArgs = map EVar typeVars, litType = eHash })
         dtipe = foldr EPi (foldr EPi ftipe [ v { tvrIdent = 0 } | v <- vars]) typeVars
 
-tabsurd = Constructor {
+tabsurd = emptyConstructor {
             conName = tc_Absurd,
             conType = eStar,
-            conSlots = [],
-            conDeriving = [],
             conExpr = tAbsurd eStar,
-            conAlias = NotAlias,
-            conVirtual = Nothing,
             conInhabits = tStar,
             conChildren = DataNone
     }
@@ -221,14 +211,10 @@ tabsurd = Constructor {
 -- | Jhc@.Box can hold any boxed value (something whose type inhabits *, or is a function)
 -- so, there is a bit of subtyping that goes on.
 
-tbox = Constructor {
+tbox = emptyConstructor {
             conName = tc_Box,
             conType = eStar,
-            conSlots = [],
-            conDeriving = [],
             conExpr = tBox,
-            conAlias = NotAlias,
-            conVirtual = Nothing,
             conInhabits = tStar,
             conChildren = DataAbstract
     }
@@ -236,51 +222,38 @@ tbox = Constructor {
 worlds = []
 
 
-tarrow = Constructor {
+tarrow = emptyConstructor {
             conName = tc_Arrow,
             conType = EPi (tVr 0 eStar) (EPi (tVr 0 eStar) eStar),
             conSlots = [eStar,eStar],
-            conDeriving = [],
             conExpr = ELam (tVr 2 eStar) (ELam (tVr 4 eStar) (EPi (tVr 0 (EVar $ tVr 2 eStar)) (EVar $ tVr 4 eStar))),
-            conAlias = NotAlias,
             conInhabits = tStar,
-            conVirtual = Nothing,
             conChildren = DataAbstract
         }
 
 
 primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,_,_,b,_) -> b) allCTypes) where
-    g n = Constructor {
+    g n = emptyConstructor {
         conName = rn,
         conType = eHash,
-        conSlots = [],
         conDeriving = [],
         conExpr = ELit (litCons { litName = rn, litArgs = [], litType = eHash }),
-        conAlias = NotAlias,
-        conVirtual = Nothing,
         conInhabits = tHash,
         conChildren = DataPrimitive
        } where rn = toName RawType n
     f (dc,tc,rt,y,z) | z /= "void" = [typeCons,dataCons] where
-        dataCons = Constructor {
+        dataCons = emptyConstructor {
             conName = dc,
             conType = tipe,
             conSlots = [rt],
-            conDeriving = [],
             conExpr = ELam (tVr 2 rt) (ELit (litCons { litName = dc, litArgs = [EVar (tVr 2 rt)], litType = tipe })),
-            conAlias = NotAlias,
-            conVirtual = Nothing,
             conInhabits = tc,
             conChildren = DataNone
            }
-        typeCons = Constructor {
+        typeCons = emptyConstructor {
             conName = tc,
             conType = eStar,
-            conSlots = [],
-            conDeriving = [],
             conExpr = tipe,
-            conAlias = NotAlias,
-            conVirtual = Nothing,
             conInhabits = tStar,
             conChildren = DataNormal [dc]
            }
