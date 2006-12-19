@@ -4,6 +4,7 @@ module DataConstructors(
     DataTableMonad(..),
     AliasType(..),
     DataFamily(..),
+    Slot(..),
     primitiveAliases,
     dataTablePrims,
     constructionExpression,
@@ -23,10 +24,12 @@ module DataConstructors(
     pprintTypeOfCons,
     showDataTable,
     slotTypes,
+    slotTypesHs,
     toDataTable,
     updateLit,
     deriveClasses,
     onlyChild,
+    conSlots,
     typesCompatable
     ) where
 
@@ -125,17 +128,42 @@ data DataFamily =
 -- * is also a data type containing the type constructors, which are unlifted, yet boxed.
 
 data Constructor = Constructor {
-    conName     :: Name,         -- name of constructor
-    conType     :: E,            -- type of constructor
-    conExpr     :: E,            -- expression which constructs this value
-    conSlots    :: [E],          -- slots
-    conDeriving :: [Name],       -- classes this type derives
-    conAlias    :: AliasType,    -- whether this is a simple alias and has no tag of its own.
-    conInhabits :: Name,         -- what constructor it inhabits, similar to conType, but not quite.
-    conVirtual  :: Maybe [Name], -- whether this is a virtual constructor that translates into an enum and its siblings
-    conChildren :: DataFamily
+    conName      :: Name,        -- name of constructor
+    conType      :: E,            -- type of constructor
+    conExpr      :: E,            -- expression which constructs this value
+    conOrigSlots :: [Slot],      -- original slots
+    conDeriving  :: [Name],       -- classes this type derives
+    conAlias     :: AliasType,    -- whether this is a simple alias and has no tag of its own.
+    conInhabits  :: Name,        -- what constructor it inhabits, similar to conType, but not quite.
+    conVirtual   :: Maybe [Name], -- whether this is a virtual constructor that translates into an enum and its siblings
+    conChildren  :: DataFamily
     } deriving(Show)
     {-! derive: GhcBinary !-}
+
+data Slot =
+    SlotNormal E
+    | SlotUnpacked E !Name [E]
+    | SlotExistential TVr
+    deriving(Eq,Ord,Show)
+    {-! derive: GhcBinary !-}
+
+mapESlot f (SlotExistential t) = SlotExistential t { tvrType = f (tvrType t) }
+mapESlot f (SlotNormal e) = SlotNormal $ f e
+mapESlot f (SlotUnpacked e n es) = SlotUnpacked (f e) n (map f es)
+
+conSlots s = getSlots $ conOrigSlots s
+
+getSlots ss = concatMap f ss where
+    f (SlotNormal e) = [e]
+    f (SlotUnpacked _ _ es) = es
+    f (SlotExistential e) = [tvrType e]
+
+getHsSlots ss = map f ss where
+    f (SlotNormal e) = e
+    f (SlotUnpacked e _ es) = e
+    f (SlotExistential e) = tvrType e
+
+origSlots = map SlotNormal
 
 newtype DataTable = DataTable {
     constructorMap :: (Map.Map Name Constructor)
@@ -145,7 +173,7 @@ newtype DataTable = DataTable {
 emptyConstructor = Constructor {
                 conName = error "emptyConstructor.conName",
                 conType = Unknown,
-                conSlots = [],
+                conOrigSlots = [],
                 conExpr = Unknown,
                 conInhabits = error "emptyConstructor.conInhabits",
                 conDeriving = [],
@@ -178,15 +206,14 @@ tunboxedtuple n = (typeCons,dataCons) where
         dataCons = emptyConstructor {
             conName = dc,
             conType = dtipe,
-            conSlots = map EVar typeVars,
+            conOrigSlots = map (SlotNormal . EVar) typeVars,
             conExpr =  foldr ($) (ELit litCons { litName = dc, litArgs = map EVar vars, litType = ftipe }) (map ELam vars),
-            conInhabits = tc,
-            conChildren = DataNone
+            conInhabits = tc
            }
         typeCons = emptyConstructor {
             conName = tc,
             conType = foldr EPi eHash (replicate n tvr { tvrType = eStar }),
-            conSlots = replicate n eStar,
+            conOrigSlots = replicate n (SlotNormal eStar),
             conExpr = tipe,
             conInhabits = tHash,
             conChildren = DataNormal [dc]
@@ -204,8 +231,7 @@ tabsurd = emptyConstructor {
             conName = tc_Absurd,
             conType = eStar,
             conExpr = tAbsurd eStar,
-            conInhabits = tStar,
-            conChildren = DataNone
+            conInhabits = tStar
     }
 
 -- | Jhc@.Box can hold any boxed value (something whose type inhabits *, or is a function)
@@ -225,7 +251,7 @@ worlds = []
 tarrow = emptyConstructor {
             conName = tc_Arrow,
             conType = EPi (tVr 0 eStar) (EPi (tVr 0 eStar) eStar),
-            conSlots = [eStar,eStar],
+            conOrigSlots = [SlotNormal eStar,SlotNormal eStar],
             conExpr = ELam (tVr 2 eStar) (ELam (tVr 4 eStar) (EPi (tVr 0 (EVar $ tVr 2 eStar)) (EVar $ tVr 4 eStar))),
             conInhabits = tStar,
             conChildren = DataAbstract
@@ -245,10 +271,9 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,_,_,b,_) -> b
         dataCons = emptyConstructor {
             conName = dc,
             conType = tipe,
-            conSlots = [rt],
+            conOrigSlots = [SlotNormal rt],
             conExpr = ELam (tVr 2 rt) (ELit (litCons { litName = dc, litArgs = [EVar (tVr 2 rt)], litType = tipe })),
-            conInhabits = tc,
-            conChildren = DataNone
+            conInhabits = tc
            }
         typeCons = emptyConstructor {
             conName = tc,
@@ -307,7 +332,7 @@ extractPrimitive dataTable e = case followAliases dataTable (getType e) of
         | t == eHash -> return (e,(show c,st))
         | otherwise -> do
             Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable
-            Constructor { conSlots = [st@(ELit LitCons { litName = n, litArgs = []})] } <- getConstructor cn dataTable
+            Constructor { conOrigSlots = [SlotNormal st@(ELit LitCons { litName = n, litArgs = []})] } <- getConstructor cn dataTable
             let tvra = tVr vn st
                 (vn:_) = newIds (freeIds e)
             return (eCase e  [Alt (litCons { litName = cn, litArgs = [tvra], litType = (getType e) }) (EVar tvra)] Unknown,(show n,st))
@@ -324,7 +349,7 @@ boxPrimitive dataTable e et = case followAliases dataTable et of
         | t == eHash -> return (e,(show c,st))
         | otherwise -> do
             Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable
-            Constructor { conSlots = [st@(ELit LitCons { litName = n, litArgs = []})] } <- getConstructor cn dataTable
+            Constructor { conOrigSlots = [SlotNormal st@(ELit LitCons { litName = n, litArgs = []})] } <- getConstructor cn dataTable
             let tvra = tVr vn st
                 (vn:_) = newIds (freeVars (e,et))
             if isManifestAtomic e then
@@ -347,7 +372,7 @@ lookupCType dataTable e = case followAliases (mappend dataTablePrims dataTable) 
 lookupCType' dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
     ELit LitCons { litName = c, litArgs = [], litType = _ }
         | Just Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable,
-          Just Constructor { conSlots = [st@(ELit LitCons { litName = n, litArgs = [], litType = _ })] } <- getConstructor cn dataTable
+          Just Constructor { conOrigSlots = [SlotNormal st@(ELit LitCons { litName = n, litArgs = [], litType = _ })] } <- getConstructor cn dataTable
             -> return (cn,st,show n)
     ELit LitCons { litName = c, litArgs = [], litType = _ } | Just cn  <- getConstructor c dataTable -> fail $ "lookupCType: " ++ show cn
     e' -> fail $ "lookupCType': " ++ show (e,e')
@@ -406,9 +431,9 @@ updateLit _ l@LitInt {} = l
 updateLit dataTable lc@LitCons { litAliasFor = Just {} } = lc
 updateLit dataTable lc@LitCons { litName = n } =  lc { litAliasFor = af } where
     af = do
-        Constructor { conChildren = DataNormal [x], conSlots = cs } <- getConstructor n dataTable
-        Constructor { conAlias = ErasedAlias, conSlots = [sl] } <- getConstructor x dataTable
-        return (foldr ELam sl [ tVr i s | s <- cs | i <- [2,4..]])
+        Constructor { conChildren = DataNormal [x], conOrigSlots = cs } <- getConstructor n dataTable
+        Constructor { conAlias = ErasedAlias, conOrigSlots = [SlotNormal sl] } <- getConstructor x dataTable
+        return (foldr ELam sl [ tVr i s | s <- getSlots cs | i <- [2,4..]])
 
 removeNewtypes :: DataTable -> E -> E
 removeNewtypes dataTable e = runIdentity (f e) where
@@ -424,8 +449,9 @@ removeNewtypes dataTable e = runIdentity (f e) where
 toDataTable :: (Map.Map Name Kind) -> (Map.Map Name Type) -> [HsDecl] -> DataTable -> DataTable
 toDataTable km cm ds currentDataTable = newDataTable  where
     newDataTable = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conName x,procNewTypes x) | x <- ds', conName x `notElem` map fst primitiveAliases ])
-    procNewTypes c = c { conExpr = f (conExpr c), conType = f (conType c), conSlots = map f (conSlots c) } where
-        f = removeNewtypes (newDataTable `mappend` currentDataTable)
+    fullDataTable = (newDataTable `mappend` currentDataTable)
+    procNewTypes c = c { conExpr = f (conExpr c), conType = f (conType c), conOrigSlots = map (mapESlot f) (conOrigSlots c) } where
+        f = removeNewtypes fullDataTable
     fixupMap k _ | Just n <- getConstructor k dataTablePrims = n
     fixupMap _ n = n
     ds' = Seq.toList $ execWriter (mapM_ f ds)
@@ -446,7 +472,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             consName =  mapName (id,(++ "#")) $ toName DataConstructor (nameName (conName theType))
             rtypeName =  mapName (id,(++ "#")) $ toName TypeConstructor (nameName (conName theType))
             rtype = ELit litCons { litName = rtypeName, litType = eHash, litAliasFor = Just tIntzh }
-            dataCons = fc { conName = consName, conType = getType (conExpr dataCons), conSlots = [rtype], conExpr = ELam (tVr 12 rtype) (ELit (litCons { litName = consName, litArgs = [EVar (tVr 12 rtype)], litType =  conExpr theType })) }
+            dataCons = fc { conName = consName, conType = getType (conExpr dataCons), conOrigSlots = [SlotNormal rtype], conExpr = ELam (tVr 12 rtype) (ELit (litCons { litName = consName, litArgs = [EVar (tVr 12 rtype)], litType =  conExpr theType })) }
             rtypeCons = emptyConstructor {
                 conName = rtypeName,
                 conType = eHash,
@@ -465,35 +491,62 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             typeInfo@(theType,_,_) = makeType decl
         tell (Seq.fromList dataCons)
         tell $ Seq.singleton theType { conChildren = DataNormal (map conName dataCons) }
+
     makeData alias (theType,theTypeArgs,theTypeExpr) x = theData where
         theData = emptyConstructor {
             conName = dataConsName,
             conType =foldr ($) (getType theExpr) (map EPi theTypeArgs),
-            conSlots =  slots,
+            conOrigSlots = origSlots,
             conExpr = theExpr,
             conInhabits = conName theType,
-            conAlias = alias,
-            conChildren = DataNone
+            conAlias = alias
             }
-        theExpr =  foldr ($) (strictize $ ELit litCons { litName = dataConsName, litArgs = map EVar vars, litType = theTypeExpr }) (map ELam vars)
-        slots = map (subst . tvrType) ts -- XXX TODO fix this mapping
-        vars = [ tvr { tvrType = t } | tvr <- ts | t <- slots ]
-        strictize con = E.Subst.subst tvr { tvrIdent = -1 } Unknown $ f (zip (map isHsBangedTy args) vars) con where
-            f ((False,_):rs) con = f rs con
-            f ((True,var):rs) con = eStrictLet var (EVar var) (f rs con)
-            f [] con = con
         dataConsName =  toName Name.DataConstructor (hsConDeclName x)
-        args = hsConDeclArgs x
-        (ELit LitCons { litName = _, litArgs = xs, litType = _ } ,ts') = fromPi $ runVarName $ do
-            flip mapM_ vs $ \tv -> do
-                newName [2,4..] () tv
+
+        theExpr =  foldr ELam (strictize tslots $ ELit litCons { litName = dataConsName, litArgs = map EVar dvars, litType = theTypeExpr }) hsvars
+
+        strictize tslots con = E.Subst.subst tvr { tvrIdent = -1 } Unknown $ f tslots con where
+            f (Left (v,False):rs) con = f rs con
+            f (Left (v,True):rs) con = eStrictLet v (EVar v) (f rs con)
+            f (Right (v,dc,rcs):rs) con = eCase (EVar v) [Alt pat (f rs con)] Unknown where
+                pat = litCons { litName = dc, litArgs = rcs, litType = (getType v) }
+            f [] con = con
+
+        -- substitution is only about substituting type variables
+        (ELit LitCons { litArgs = thisTypeArgs }, origArgs) = fromPi $ runVarName $ do
+            let (vs,ty) = case Map.lookup dataConsName cm of Just (TForAll vs (_ :=> ty)) -> (vs,ty); Just ty -> ([],ty)
+            mapM_ (newName [2,4..] ()) vs
             tipe' ty
-        existentials = melems $ freeVars (map getType ts') S.\\ (freeVars xs :: IdMap TVr)
-        subst = substMap $ fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- xs | p <- [2,4..] ]
-        ts = existentials ++ [ tvr {tvrIdent = x} | tvr <- ts' | x <- drop (5 + length theTypeArgs) [2,4..] ]
-        (vs,ty) = case Map.lookup dataConsName cm of
-            Just (TForAll vs (_ :=> ty)) -> (vs,ty)
-            Just ty -> ([],ty)
+        subst = substMap $ fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- thisTypeArgs | p <- [2,4..] ]
+
+        origSlots = map SlotExistential existentials ++ map f tslots where
+            f (Left (e,_)) = SlotNormal (getType e)
+            f (Right (e,n,es)) = SlotUnpacked (getType e) n (map getType es)
+        hsvars = existentials ++ map f tslots where
+            f (Left (e,_)) = e
+            f (Right (e,_,_)) = e
+        dvars = existentials ++ concatMap f tslots where
+            f (Left (e,_)) = [e]
+            f (Right (_,_,es)) = es
+        tslots = f (newIds fvset) (map isHsBangedTy (hsConDeclArgs x)) origArgs where
+            f (i:is) (False:bs) (e:es) = Left (e { tvrIdent = i, tvrType = subst (tvrType e) },False):f is bs es
+            f (i:j:is) (True:bs) (e:es) = maybe  (Left (e { tvrIdent = i, tvrType = subst (tvrType e) },True):f is bs es) id $ do
+                ELit LitCons { litName = n } <- return $ followAliases fullDataTable (getType e)
+                Constructor { conChildren = DataNormal [dc] } <- getConstructor n fullDataTable
+                [st] <- return $ slotTypes fullDataTable dc (tvrType e)
+                let nv = tvr { tvrIdent = j, tvrType = st }
+                return $ Right (e { tvrIdent = i, tvrType = subst (tvrType e)},dc,[nv]):f is bs es
+            f _ [] [] = []
+            fvset = freeVars (thisTypeArgs,origArgs) `mappend` fromList [2,4 .. 2 * (length theTypeArgs + 2)]
+
+        -- existentials are free variables in the arguments, that arn't bound in the type
+        existentials = melems $ freeVars (map getType origArgs) S.\\ (freeVars thisTypeArgs :: IdMap TVr)
+
+        -- arguments that the front end passes or pulls out of this constructor
+        hsArgs = existentials ++ [ tvr {tvrIdent = x} | tvr <- origArgs | x <- drop (5 + length theTypeArgs) [2,4..] ]
+
+
+
     makeType decl = (theType,theTypeArgs,theTypeExpr) where
         theTypeName = toName Name.TypeConstructor (hsDeclName decl)
         theKind = kind $ runIdentity (Map.lookup theTypeName km)
@@ -503,7 +556,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
         theType = emptyConstructor {
             conName = theTypeName,
             conType = theKind,
-            conSlots = map tvrType theTypeArgs,
+            conOrigSlots = map (SlotNormal . tvrType) theTypeArgs,
             conExpr = foldr ($) theTypeExpr (map ELam theTypeArgs),
             conDeriving = [ toName ClassName n | n <- hsDeclDerives decl],
             conInhabits = if theTypeFKind == eStar then tStar else tHash,
@@ -538,21 +591,31 @@ constructionExpression wdt n e | Just fa <- followAlias wdt e  = constructionExp
 constructionExpression _ n e = error $ "constructionExpression: error in " ++ show n ++ ": " ++ show e
 
 deconstructionExpression ::
-    DataTable -- ^ table of data constructors
+    UniqueProducer m
+    => DataTable -- ^ table of data constructors
     -> Name   -- ^ name of said constructor
     -> E      -- ^ type of pattern
     -> [TVr]  -- ^ variables to be bound
-    -> [TVr]  -- ^ name supply, types ignored, must be at least as many as bound variables exist
     -> E      -- ^ body of alt
-    -> Alt E  -- ^ resulting alternative
-deconstructionExpression dataTable name typ@(ELit LitCons { litName = pn, litArgs = xs, litType = _ }) vs _vs' e | pn == conName pc = ans where
+    -> m (Alt E)  -- ^ resulting alternative
+deconstructionExpression dataTable name typ@(ELit LitCons { litName = pn, litArgs = xs }) vs  e | pn == conName pc = ans where
     Just mc = getConstructor name dataTable
     Just pc = getConstructor (conInhabits mc) dataTable
     ans = case conVirtual mc of
-        Nothing -> Alt (litCons { litName = name, litArgs = vs, litType = typ }) e
-        Just _ -> let ELit LitCons {  litArgs = [ELit (LitInt n t)] } = conExpr mc in Alt (LitInt n t) e
-deconstructionExpression wdt n ty vs vs' e | Just fa <- followAlias wdt ty  = deconstructionExpression wdt n fa vs vs' e
-deconstructionExpression _ n e _ _ _ = error $ "deconstructionExpression: error in " ++ show n ++ ": " ++ show e
+        Just _ -> return $ let ELit LitCons {  litArgs = [ELit (LitInt n t)] } = conExpr mc in Alt (LitInt n t) e
+        Nothing -> do
+            let f vs (SlotExistential t:ss) rs ls = f vs ss (t:rs) ls
+                f (v:vs) (SlotNormal e:ss) rs ls = f vs ss (v:rs) ls
+                f (v:vs) (SlotUnpacked e n es:ss) rs ls = do
+                    let g t = do
+                            s <- newUniq
+                            return $ tVr (2*s) t
+                    as <- mapM g es
+                    f vs ss (reverse as ++ rs) ((v,ELit litCons { litName = n, litArgs = map EVar as, litType = e }):ls)
+                f [] [] rs ls = return $ Alt (litCons { litName = name, litArgs = reverse rs, litType = typ }) (eLetRec ls e)
+            f vs (conOrigSlots mc) [] []
+deconstructionExpression wdt n ty vs e | Just fa <- followAlias wdt ty  = deconstructionExpression wdt n fa vs e
+deconstructionExpression _ n e _ _ = error $ "deconstructionExpression: error in " ++ show n ++ ": " ++ show e
 
 slotTypes ::
     DataTable -- ^ table of data constructors
@@ -570,6 +633,23 @@ slotTypes wdt n kind
     where Identity mc = getConstructor n wdt
 slotTypes wdt n e | Just fa <- followAlias wdt e  = slotTypes wdt n fa
 slotTypes _ n e = error $ "slotTypes: error in " ++ show n ++ ": " ++ show e
+
+slotTypesHs ::
+    DataTable -- ^ table of data constructors
+    -> Name   -- ^ name of constructor
+    -> E      -- ^ type of value
+    -> [E]    -- ^ type of each slot
+slotTypesHs wdt n (ELit LitCons { litName = pn, litArgs = xs, litType = _ })
+    | pn == conName pc = [sub x | x <- getHsSlots $ conOrigSlots mc ]
+    where
+    Identity mc = getConstructor n wdt
+    Identity pc = getConstructor (conInhabits mc) wdt
+    sub = substMap $ fromDistinctAscList [ (i,sl) | sl <- xs | i <- [2,4..] ]
+slotTypesHs wdt n kind
+    | sortKindLike kind, (e,ts) <- fromPi kind = drop (length ts) (conSlots mc)
+    where Identity mc = getConstructor n wdt
+slotTypesHs wdt n e | Just fa <- followAlias wdt e  = slotTypes wdt n fa
+slotTypesHs _ n e = error $ "slotTypes: error in " ++ show n ++ ": " ++ show e
 
 showDataTable (DataTable mp) = vcat xs where
     c  const = vcat [t,e,cs,al,vt,ih,ch] where

@@ -782,12 +782,10 @@ convertMatches bs ms err = do
                     f (name,ps) = do
                         let spats = hsPatPats $ fst3 (head ps)
                             nargs = length spats
-                        vs <- newVars (slotTypes dataTable (toName DataConstructor name) (getType b))
-                        vs' <- newVars (map (const Unknown) vs)
-
+                        vs <- newVars (slotTypesHs dataTable (toName DataConstructor name) (getType b))
                         ps' <- mapM pp ps
                         m <- match (map EVar vs ++ bs) ps' err
-                        return $ deconstructionExpression dataTable (toName DataConstructor name) (getType b) vs vs' m
+                        deconstructionExpression dataTable (toName DataConstructor name) (getType b) vs m
                     pp (HsPApp n ps,rps,e)  = do
                         return $ (ps ++ rps , e)
                 as@(_:_) <- mapM f gps
@@ -795,7 +793,7 @@ convertMatches bs ms err = do
                     Nothing -> return $ eCase b as err
                     Just sibs -> do
                         let (Just Constructor { conChildren = DataNormal [vCons] }) = getConstructor (conInhabits patCons) dataTable
-                            (Just Constructor { conSlots = [rtype] }) = getConstructor vCons dataTable
+                            (Just Constructor { conOrigSlots = [SlotNormal rtype] }) = getConstructor vCons dataTable
                         [z] <- newVars [rtype]
                         let err' = if length sibs <= length as then Unknown else err
                         return $ eCase b [Alt litCons { litName = vCons, litArgs = [z], litType = getType b } (eCase (EVar z) as err')] Unknown
