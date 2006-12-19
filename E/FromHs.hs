@@ -757,6 +757,9 @@ convertMatches bs ms err = do
                 (eqString,_,_) <- convertValue v_eqString
                 (eqUnpackedString,_,_) <- convertValue v_eqUnpackedString
                 let gps = [ (p,[ (ps,fe) |  (_,ps,fe) <- xs ]) | (p,xs) <- sortGroupUnderF fst3 ps]
+                    f els (HsPLit (HsString ""),ps) = do
+                        m <- match bs ps err
+                        return $ eCase bv [Alt (litCons { litName = dc_EmptyList, litType = tString }) m] els
                     f els (HsPLit (HsString s),ps) = do
                         m <- match bs ps err
                         let (s',packed) = packupString s
