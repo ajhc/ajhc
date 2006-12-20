@@ -122,14 +122,14 @@ renameE initSet initMap e = runReader (runIdNameT' $ addBoundNamesIdMap initMap 
         e' <- f e
         t' <- f' (eCaseType ec)
         addNames $ map tvrIdent (caseBinds ec)
-        (ob,b') <- ntvr f' b
+        (ob,b') <- ntvr False f' b
         localSubst ob $ do
             as' <- mapM da as
             d' <- fmapM f d
             return $ caseUpdate ec { eCaseScrutinee = e', eCaseType = t', eCaseBind = b', eCaseAlts = as', eCaseDefault = d' }
     f ELetRec { eDefs = ds, eBody = e } = do
         addNames (map (tvrIdent . fst) ds)
-        ds' <- mapM ( ntvr f' . fst) ds
+        ds' <- mapM ( ntvr False f' . fst) ds
         localSubst (mconcat $ fsts ds') $ do
             es <- mapM f (snds ds)
             e' <- f e
@@ -138,7 +138,7 @@ renameE initSet initMap e = runReader (runIdNameT' $ addBoundNamesIdMap initMap 
     da :: Alt E -> IdNameT (Reader (IdMap E)) (Alt E)
     da (Alt lc@LitCons { litName = n, litArgs = xs, litType = t } l) = do
         t' <- f' t
-        xs' <-  mapM (ntvr f') xs
+        xs' <-  mapM (ntvr False f') xs
         localSubst (mconcat [ x | (x,_) <- xs']) $ do
             l' <- f l
             return (Alt lc { litArgs = snds xs', litType = t' } l')
@@ -148,16 +148,16 @@ renameE initSet initMap e = runReader (runIdNameT' $ addBoundNamesIdMap initMap 
         return (Alt (LitInt n t') l')
     localSubst :: (IdMap E) -> IdNameT (Reader (IdMap E)) a  -> IdNameT (Reader (IdMap E)) a
     localSubst ex action = do local (ex `mappend`) action
-    ntvr fg tv@TVr { tvrIdent = 0, tvrType = t} = do
+    ntvr _ fg tv@TVr { tvrIdent = 0, tvrType = t} = do
         t' <- fg t
         return (mempty,tv { tvrType = t'})
-    ntvr fg tv@(TVr { tvrIdent = n, tvrType = t}) = do
-        n' <- if n > 0 then uniqueName  n else newName
+    ntvr ralways fg tv@(TVr { tvrIdent = n, tvrType = t}) = do
+        n' <- if n > 0 && (not ralways || odd n) then uniqueName  n else newName
         t' <- fg t
         let tv' = tv { tvrIdent = n', tvrType = t' }
         return (msingleton n (EVar tv'),tv')
     lp fg elam tv e = do
-        (n,tv') <- ntvr fg tv
+        (n,tv') <- ntvr True fg tv
         e' <- localSubst n (f e)
         return $ elam tv' e'
 
