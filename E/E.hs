@@ -124,6 +124,7 @@ eToList (ELit LitCons { litName = n, litArgs = [e,b] }) | vCons == n = eToList b
 eToList (ELit LitCons { litName = n, litArgs = [] }) | vEmptyList == n = return []
 eToList _ = fail "eToList: not list"
 
+toString (ELit LitCons { litName = n, litArgs = [], litType = t }) = if vEmptyList == n && t == tString then return "" else fail "not a string"
 toString x = eToList x >>= mapM fromChar where
     fromChar (ELit LitCons { litName = dc, litArgs = [ELit (LitInt ch t)] }) | dc == dc_Char && t == tCharzh = return (chr $ fromIntegral ch)
     fromChar _ = fail "fromChar: not char"
