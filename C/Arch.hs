@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -cpp -fbang-patterns #-}
-module C.Arch(determineArch,primitiveInfo) where
+module C.Arch(determineArch,primitiveInfo,genericPrimitiveInfo) where
 
 
 
@@ -57,6 +57,8 @@ available_archs = snub $ "ghc":"ghc-64":"ghc-32":[ n | (n,_,_,_) <- arch_map ]  
 primitiveInfo :: Monad m => ExtType -> m PrimType
 primitiveInfo et = Map.lookup et primMap
 
+genericPrimitiveInfo :: Monad m => ExtType -> m PrimType
+genericPrimitiveInfo et = Map.lookup et primMap
 
 
 primMap :: Map.Map ExtType PrimType

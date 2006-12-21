@@ -6,6 +6,7 @@ import Data.Monoid
 import qualified Data.Map as Map
 
 import C.Prims
+import C.Arch
 import E.E
 import E.TypeCheck()
 import E.Values
@@ -166,8 +167,43 @@ prim_number cn v t et = ELit litCons { litName = cn, litArgs = [ELit (LitInt v t
 prim_const cn s st t et = ELit litCons { litName = cn, litArgs = [EPrim (APrim (CConst s t) mempty) [] st], litType = et }
 --prim_const _ _ _ _ _ = error "prim_const: invalid arg"
 
+prim_minbound, prim_maxbound :: Name -> E -> ExtType -> E -> E
+prim_minbound dc dt s e = f s where
+    f "HsChar" = boxup $ ELit $ LitInt 0 (rawType "HsChar")
+    f s | Just pt <- genericPrimitiveInfo s = boxup $ case primTypeIsSigned pt of
+        False -> ELit $ LitInt 0 (rawType s)
+        True -> ELit $ LitInt (negate $ 2 ^ (8 * primTypeSizeOf pt - 1)) (rawType s)
+    f _ = e
+    boxup a =  ELit litCons { litName = dc, litArgs = [a], litType = dt }
+prim_maxbound dc dt s e = f s where
+    f "HsChar" = boxup $ ELit $ LitInt 0x10ffff (rawType "HsChar")
+    f s | Just pt <- genericPrimitiveInfo s = boxup $ case primTypeIsSigned pt of
+        False -> ELit $ LitInt (2 ^ (8 * primTypeSizeOf pt)) (rawType s)
+        True -> ELit $ LitInt (2 ^ (8 * primTypeSizeOf pt - 1) - 1) (rawType s)
+    f _ = e
+    boxup a =  ELit litCons { litName = dc, litArgs = [a], litType = dt }
+    {-
+prim_maxbound "HsChar" e = ELit $ LitInt 0x10ffff (rawType "HsChar")
+prim_maxbound s e | Just pt <- genericPrimitiveInfo s = case primTypeIsSigned pt of
+    False -> ELit $ LitInt (2 ^ (8 * primTypeSizeOf pt)) (rawType s)
+    True -> ELit $ LitInt (2 ^ (8 * primTypeSizeOf pt - 1) - 1) (rawType s)
+prim_maxbound s e = e
+-}
+
+prim_bitsize s | Just pt <- genericPrimitiveInfo s = let
+    rp = ELit $ LitInt (fromIntegral (primTypeSizeOf pt) * 8) tIntzh
+    in (ELit (litCons { litName = dc_Int, litArgs = [rp], litType = tInt }))
+prim_bitsize s = (ELit (litCons { litName = dc_Int, litArgs = [rp'], litType = tInt })) where
+    rp = EPrim (APrim (PrimTypeInfo { primArgType = s, primRetType = "int", primTypeInfo = PrimSizeOf }) mempty) [] tIntzh
+    rp' = EPrim (APrim (Operator "*" ["int","int"] "int") mempty) [rp,(ELit (LitInt 8 tIntzh))] tIntzh
+
+
+prim_sizeof s | Just pt <- genericPrimitiveInfo s = let
+    rp = ELit $ LitInt (fromIntegral (primTypeSizeOf pt)) tIntzh
+    in (ELit (litCons { litName = dc_Int, litArgs = [rp], litType = tInt }))
 prim_sizeof s = (ELit (litCons { litName = dc_Int, litArgs = [rp], litType = tInt })) where
-    rp = (EPrim (APrim (PrimTypeInfo { primArgType = s, primRetType = "int", primTypeInfo = PrimSizeOf }) mempty) [] tIntzh)
+    rp = EPrim (APrim (PrimTypeInfo { primArgType = s, primRetType = "int", primTypeInfo = PrimSizeOf }) mempty) [] tIntzh
+
 
 v2_Int = tVr 2 tInt
 v2_Integer = tVr 2 tInteger

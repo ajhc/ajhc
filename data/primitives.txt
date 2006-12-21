@@ -32,8 +32,8 @@ Foreign.C.Types.CShort, short, int, SHORT_MAX, SHORT_MIN
 Foreign.C.Types.CInt, int, int, INT_MAX, INT_MIN
 Foreign.C.Types.CUInt, unsigned int, int, UINT_MAX, 0
 Foreign.C.Types.CSize, size_t, int, UINTPTR_MAX, 0
-Foreign.C.Types.CWchar, wchar_t, int, 0x10FFF, 0
-Foreign.C.Types.CWint, wint_t, int, 0x10FFF, 0
+Foreign.C.Types.CWchar, wchar_t, int, 0x10FFFF, 0
+Foreign.C.Types.CWint, wint_t, int, 0x10FFFF, 0
 # not really right, need to find out actual minimum/maximum somehow
 Foreign.C.Types.CTime, time_t, float, 0xffffffffff, 0
 

@@ -6,6 +6,12 @@ arch_generic = [
     primTypeAlignmentOf = 4,
     primTypeSizeOf = 4 },
   PrimType {
+    primTypeName = "HsChar",
+    primTypeIsSigned = True,
+    primTypeType = PrimTypeIntegral,
+    primTypeAlignmentOf = 4,
+    primTypeSizeOf = 4 },
+  PrimType {
     primTypeName = "int8_t",
     primTypeIsSigned = True,
     primTypeType = PrimTypeIntegral,
