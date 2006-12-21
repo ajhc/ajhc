@@ -281,6 +281,9 @@ transE e@(EPrim (APrim (PrimPrim prim) _) args _) = case (unpackPS prim,args) of
     ("dependingOn",[x,_y])   -> transE x  -- XXX
     (fs,args) | Just ghcprim <- lookup fs ghcPrimTable -> mparen $ mapM transE args >>= \args' -> return $ hsep (text ghcprim:args')
     _ -> mparen $ return $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
+transE (EPrim (APrim Operator { primOp = "-", primRetType = rt } _) [x] _) = mparen $ do
+    x <- transE x
+    return (hsep [text "negateInt#",x])
 transE (EPrim (APrim Operator { primOp = op, primRetType = rt } _) [x,y] _) | Just z <- op2Table (op,rt) = mparen $ do
     x <- transE x
     y <- transE y
