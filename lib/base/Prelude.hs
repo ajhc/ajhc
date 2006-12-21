@@ -232,9 +232,15 @@ instance Enum () where
 -- Numeric functions
 
 
+{-# INLINE subtract #-}
 subtract         :: (Num a) => a -> a -> a
 subtract         =  flip (-)
 
+
+{-# SPECIALIZE even :: Int -> Bool #-}
+{-# SPECIALIZE odd :: Int -> Bool #-}
+{-# SPECIALIZE even :: Integer -> Bool #-}
+{-# SPECIALIZE odd :: Integer -> Bool #-}
 
 even, odd        :: (Integral a) => a -> Bool
 even n           =  n `rem` 2 == 0
@@ -488,7 +494,6 @@ dropWhile p xs@(x:xs')
             | p x       =  dropWhile p xs'
             | otherwise =  xs
 
-
 span, break             :: (a -> Bool) -> [a] -> ([a],[a])
 span p []            = ([],[])
 span p xs@(x:xs')
@@ -496,6 +501,7 @@ span p xs@(x:xs')
             | otherwise =  ([],xs)
                            where (ys,zs) = span p xs'
 
+{-# INLINE break #-}
 break p                 =  span (not . p)
 
 -- lines breaks a string up into a list of strings at newline characters.
@@ -537,28 +543,53 @@ unwords (w:ws)		= w ++ ' ' : unwords ws
 
 infix  4  `elem`, `notElem`
 
-elem, notElem    :: (Eq a) => a -> [a] -> Bool
---elem x           =  any (== x)
---notElem x        =  all (/= x)
-elem _ []	= False
-elem x (y:ys)	= x==y || elem x ys
 
+-- the implementation looks a little funny, but the reason for the
+-- inner loop is so that both the == function and the unboxing of the
+-- argument may occur right away outside the inner loop when the list isn't
+-- empty.
+
+
+elem, notElem    :: (Eq a) => a -> [a] -> Bool
+elem _ []	= False
+elem x (y:ys)
+    | x == y = True
+    | otherwise = f y ys where
+        f y _ | x == y = True
+        f _ (y:ys) = f y ys
+        f _ [] = False
+
+{-# SPECIALIZE elem :: Char -> String -> Bool #-}
+{-# SPECIALIZE elem :: Int -> [Int] -> Bool #-}
 {-# RULES "elem/[]" forall c . elem c [] = False #-}
 {-# RULES "elem/[_]" forall c v . elem c [v] = c == v #-}
 
 notElem	_ []	=  True
-notElem x (y:ys)=  x /= y && notElem x ys
+notElem x (y:ys)
+    | x == y = False
+    | otherwise = f y ys where
+        f y ys | x == y = False
+        f _ (y:ys) = f y ys
+        f _ [] = True
 
+{-# SPECIALIZE notElem :: Char -> String -> Bool #-}
+{-# SPECIALIZE notElem :: Int -> [Int] -> Bool #-}
 {-# RULES "notElem/[]" forall c . notElem c [] = True #-}
 {-# RULES "notElem/[_]" forall c v . notElem c [v] = c /= v #-}
 
 -- lookup key assocs looks up a key in an association list.
 
+{- SPECIALIZE lookup :: forall b . Char -> (Char,b) -> Maybe b #-}
+{- SPECIALIZE lookup :: forall b . Int -> (Int,b) -> Maybe b #-}
+
 lookup           :: (Eq a) => a -> [(a,b)] -> Maybe b
 lookup key []    =  Nothing
 lookup key ((x,y):xys)
     | key == x   =  Just y
-    | otherwise  =  lookup key xys
+    | otherwise  =  f x y xys where
+        f x y _ | key == x = Just y
+        f _ _ ((x,y):xys)  = f x y xys
+        f _ _ []           = Nothing
 
 -- sum and product compute the sum or product of a finite list of numbers.
 

@@ -231,7 +231,7 @@ formatRealFloat fmt decs x
 
 
 roundTo :: Int -> Int -> [Int] -> (Int, [Int])
-roundTo base d is = case f d is of
+roundTo base d is | base `seq` d `seq` True = case f d is of
                 (0, is) -> (0, is)
                 (1, is) -> (1, 1 : is)
   where b2 = base `div` 2
