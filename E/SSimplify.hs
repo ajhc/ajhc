@@ -587,6 +587,16 @@ simplifyDs prog sopts dsIn = ans where
                 d'' <- fmapM g d
                 t' <- dosub t
                 done cont $ caseUpdate ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
+            doCase ic@ECase { eCaseType = it, eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d' = do
+                mtick (toAtom "E.Simplify.case-of-case-join")
+                n1 <- newName
+                n2 <- newName
+                let cvar = setProperty prop_ONESHOT $ tVr n1 it
+                rcc <- doCaseCont StartContext (EVar cvar) t b' as' d'
+                let fbody = ELam cvar rcc
+                    zvar = setProperties [prop_JOINPOINT,prop_ONESHOT] $ tVr n2 (EPi tvr { tvrType = it } (getType rcc))
+                nic <- flip caseBodiesMapM ic $ \body -> return $ eLet cvar body (eAp (EVar zvar) (EVar cvar))
+                done cont $ eLet zvar fbody nic { eCaseType = getType rcc }
             doCase e t b as@(Alt LitCons { litName = n } _:_) (Just d) | Just nsib <- numberSiblings (so_dataTable sopts) n, nsib <= length as = do
                 mtick "E.Simplify.case-no-default"
                 doCase e t b as Nothing
