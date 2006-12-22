@@ -98,7 +98,7 @@ op_aaB op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
     wtd = eStrictLet tvrc (oper_aaB op ct (EVar tvra) (EVar tvrb)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar tvrc], litType = tBool }))  -- (caseof (EVar tvrc))
 --    caseof x = eCase x [Alt zeroI vFalse]  vTrue
 
-build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaB "<" ct (EVar tvra) zero)  [Alt lFalsezh (rebox $ EVar tvra)] (fs)) where
+build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaB "<" ct (EVar tvra) zero)  [Alt lFalsezh (rebox $ EVar tvra), Alt lTruezh fs] Unknown) where
     te = getType v
     tvra = tVr 2 st
     tvrb = tVr 4 st
@@ -108,7 +108,7 @@ build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaB "<" ct (EVar tvra) zero)  
     fs = eStrictLet tvrb (oper_aa "-" ct (EVar tvra)) (rebox (EVar tvrb))
     rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
 
-build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaB "<" ct (EVar tvra) (ELit zero)) [Alt lFalsezh (rebox one)] (rebox negativeOne))) where
+build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaB "<" ct (EVar tvra) (ELit zero)) [Alt lFalsezh (rebox one),Alt lTruezh (rebox negativeOne)] Unknown)) where
     tvra = tVr 2 st
     te = getType v
     st = rawType ct
