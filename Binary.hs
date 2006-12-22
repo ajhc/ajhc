@@ -328,7 +328,7 @@ instance Binary a => Binary [a] where
     get bh         = do h <- getWord8 bh
                         case h of
                           0 -> return []
-                          _ -> do x  <- get bh
+                          1 -> do x  <- get bh
                                   xs <- get bh
                                   return (x:xs)
 
@@ -360,7 +360,7 @@ instance Binary a => Binary (Maybe a) where
         h <- getWord8 bh
         case h of
             0 -> return Nothing
-            _ -> do
+            1 -> do
                 x <- get bh
                 return (Just x)
 
@@ -370,7 +370,7 @@ instance (Binary a, Binary b) => Binary (Either a b) where
     get bh            = do h <- getWord8 bh
                            case h of
                              0 -> do a <- get bh ; return (Left a)
-                             _ -> do b <- get bh ; return (Right b)
+                             1 -> do b <- get bh ; return (Right b)
 
 
 
@@ -392,24 +392,30 @@ instance Binary (UArray Int Word8) where
         ba <- unsafeFreeze ba
         return ba
 
-instance Binary Integer where
-    put_ bh (S# i#) = do putByte bh 0; put_ bh (I# i#)
-    put_ bh (J# s# a#) = do
- 	p <- putByte bh 1;
-	put_ bh (I# s#)
-	let sz# = sizeofByteArray# a#  -- in *bytes*
-	put_ bh (I# sz#)  -- in *bytes*
-	putByteArray bh a# sz#
+toInts :: Integer -> [Int32]
+toInts n
+    | n == 0 = []
+    | otherwise = mkInt (n `mod` numInts):toInts (n `div` numInts)
+  where mkInt n | n > toInteger(maxBound::Int32) = fromInteger (n-numInts)
+		| otherwise = fromInteger n
 
+fromInts :: [Int32] -> Integer
+fromInts = foldr catInt 0
+    where catInt d n = (if d<0 then n+1 else n)*numInts + toInteger d
+
+numInts = toInteger (maxBound::Int32) - toInteger (minBound::Int32) + 1
+
+instance Binary Integer where
+    put_ bh i = do
+        if i < 0
+         then putByte bh 1 >> putNList bh (toInts $ negate i)
+         else putByte bh 0 >> putNList bh (toInts i)
     get bh = do
-	b <- getByte bh
-	case b of
-	  0 -> do (I# i#) <- get bh
-		  return (S# i#)
-	  _ -> do (I# s#) <- get bh
-		  sz <- get bh
-		  (BA a#) <- getByteArray bh sz
-		  return (J# s# a#)
+        b <- getByte bh
+        is <- getNList bh
+        case b of
+            1 -> return $ negate $ fromInts is
+            0 -> return $ fromInts is
 
 putByteArray :: BinHandle -> ByteArray# -> Int# -> IO ()
 putByteArray bh a s# = loop 0#
