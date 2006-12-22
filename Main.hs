@@ -260,7 +260,7 @@ processDecls cho ho' tiData = do
 
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
-    ds' <- convertDecls tiData (hoClassHierarchy ho') allAssumps  fullDataTable decls
+    ds' <- convertDecls tiData (hoProps allHo) (hoClassHierarchy ho') allAssumps  fullDataTable decls
     let ds = [ (v,e) | (v,e) <- classInstances ] ++  [ (v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
  --   sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 

@@ -4,6 +4,7 @@ MULTISPECIALIZE
 NOINLINE
 SRCLOC_ANNOTATE
 SUPERINLINE
+NOETA
 
 # these are used internaly by the compiler
 _CYCLIC

@@ -286,7 +286,7 @@ convertRules mod tiData classHierarchy assumps dataTable hsDecls = ans where
 
 convertE :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> SrcLoc -> HsExp -> m E
 convertE tiData classHierarchy assumps dataTable srcLoc exp = do
-    [(_,_,e)] <- convertDecls tiData classHierarchy assumps dataTable [HsPatBind srcLoc (HsPVar sillyName') (HsUnGuardedRhs exp) []]
+    [(_,_,e)] <- convertDecls tiData mempty classHierarchy assumps dataTable [HsPatBind srcLoc (HsPVar sillyName') (HsUnGuardedRhs exp) []]
     return e
 
 sillyName' = nameName v_silly
@@ -295,6 +295,7 @@ data CeEnv = CeEnv {
     ceAssumps :: Map.Map Name Type,
     ceCoerce :: Map.Map Name CoerceTerm,
     ceFuncs  :: FuncNames E,
+    ceProps  :: IdMap Properties,
     ceDataTable :: DataTable
     }
 
@@ -329,12 +330,13 @@ primitiveInstances :: Name -> [(Name,TVr,E)]
 primitiveInstances name = [(n,setProperties [prop_INSTANCE,prop_INLINE] $ tVr (toId n) (getType v),v) | (cn,n,v) <- constantMethods, cn == name]
 
 {-# NOINLINE convertDecls #-}
-convertDecls :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
-convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalRWST ans ceEnv 2 where
+convertDecls :: Monad m => TiData -> IdMap Properties -> ClassHierarchy -> Map.Map Name Type -> DataTable -> [HsDecl] -> m [(Name,TVr,E)]
+convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $ evalRWST ans ceEnv 2 where
     ceEnv = CeEnv {
         ceCoerce = tiCoerce tiData,
         ceAssumps = assumps,
         ceFuncs = funcs,
+        ceProps = props,
         ceDataTable = dataTable
         }
     Identity funcs = fmapM (return . EVar . toTVr assumps dataTable) sFuncNames
@@ -584,13 +586,16 @@ convertDecls tiData classHierarchy assumps dataTable hsDecls = liftM fst $ evalR
         return (ps,elet . cg )
 
     cClassDecl (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon name) _)) decls) = do
+        props <- asks ceProps
         let ds = map simplifyDecl decls
             cr = findClassRecord classHierarchy className
             className = (toName ClassName name)
             cClass classRecord =  [ f n (toId n) (removeNewtypes dataTable $ tipe t) | (n,t) <- classAssumps classRecord ] where
                 f n i t = (n,setProperties [prop_METHOD,prop_PLACEHOLDER] $ tVr i t, foldr ELam (EPrim (primPrim ("Placeholder: " ++ show n)) [] ft) args)  where
                     (ft',as) = fromPi t
-                    (args,rargs) = span (sortKindLike . getType) as
+                    (args,rargs) = case mlookup i props of
+                        Just p | getProperty prop_NOETA p -> span (sortKindLike . getType) as
+                        _ -> (as,[])
                     ft = foldr EPi ft' rargs
         return (cClass cr ++ primitiveInstances className)
     cClassDecl _ = error "cClassDecl"

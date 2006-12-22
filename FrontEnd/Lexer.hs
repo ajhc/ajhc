@@ -617,6 +617,7 @@ pragmas_raw = [["OPTIONS", "JHC_OPTIONS", "OPTIONS_JHC" ]]
 -- pragmas which just have a simple string based start rule.
 pragmas_std = [
     ["INLINE"],
+    ["NOETA"],
     ["SUPERINLINE"],
     ["NOINLINE","NOTINLINE"],
     ["MULTISPECIALIZE", "MULTISPECIALISE"],
