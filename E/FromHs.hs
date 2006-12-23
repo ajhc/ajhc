@@ -728,17 +728,20 @@ convertMatches bs ms err = do
         -- when we are out of patterns, return the error term
         match _ [] err = return err
         match (b:bs) ps err = do
-            pps <- tidyHeads b ps
+            (b',mf) <- if isEVar b   then return (b,id) else do
+                [ev] <- newVars [getType b]
+                return $ (EVar ev, eLet ev b)
+            pps <- tidyHeads b' ps
             let patternGroups = groupUnder (isHsPWildCard . fst3) pps
                 f [] err = return err
                 f (ps:pss) err = do
                     err' <- f pss err
-                    if isEVar err' || isEError err' || isJoinPoint err' then matchGroup b bs ps err' else do
+                    if isEVar err' || isEError err' || isJoinPoint err' then matchGroup b' bs ps err' else do
                         [ev] <- newVars [EPi tvr { tvrType = unboxedTyUnit } $ getType err']
                         let ev' = setProperties [prop_ONESHOT, prop_JOINPOINT] ev
-                        nm <- matchGroup b bs ps (EAp (EVar ev') unboxedUnit)
+                        nm <- matchGroup b' bs ps (EAp (EVar ev') unboxedUnit)
                         return $ eLetRec [(ev',ELam (setProperty prop_ONESHOT tvr { tvrType = unboxedTyUnit }) err')] nm
-            f patternGroups err
+            liftM mf $ f patternGroups err
         matchGroup b bs ps err
             | all (isHsPWildCard . fst3) ps = match bs [ (ps,e) | (_,ps,e) <- ps] err
             | Just () <- mapM_ (fromHsPLitInt . fst3) ps = do
