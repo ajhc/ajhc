@@ -496,6 +496,13 @@ tiPat (HsPInfixApp pLeft conName pRight) typ =  tiPat (HsPApp conName [pLeft,pRi
 
 tiPat (HsPUnboxedTuple ps) typ = tiPat (HsPApp (nameName $ unboxedNameTuple DataConstructor (length ps)) ps) typ
 tiPat tuple@(HsPTuple pats) typ = tiPat (HsPApp (toTuple (length pats)) pats) typ
+tiPat (HsPTypeSig _ pat qt)  typ = do
+    kt <- getKindEnv
+    s <- hsQualTypeToSigma kt qt
+    s `boxyMatch` typ
+    p <- tcPat pat typ
+    return p
+
 
 tiPat p _ = error $ "tiPat: " ++ show p
 
