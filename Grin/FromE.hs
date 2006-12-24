@@ -128,7 +128,7 @@ toEntry (n,as,e)
         f x = (x,map (toType (TyPtr TyNode) . tvrType ) $ filter (shouldKeep . getType )as,toType TyNode (getType (e::E) :: E))
 
 toType :: Ty -> E -> Ty
-toType node = toty where
+toType node = toty . followAliases mempty where
     toty (ELit LitCons { litName = n, litArgs = es, litType = ty }) |  ty == eHash, TypeConstructor <- nameType n, Just _ <- fromUnboxedNameTuple n = (tuple (map (toType (TyPtr TyNode) ) (filter shouldKeep es)))
     toty (ELit LitCons { litName = n, litArgs = [], litType = ty }) |  ty == eHash, RawType <- nameType n = (Ty $ toAtom (show n))
     toty e@(ELit LitCons { litName = n, litType = ty }) |  ty == eHash = case lookup n unboxedMap of
@@ -468,7 +468,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
         e <- ce e
         r <- ce r
         return $ e :>>= unit :-> r
-    ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d } | (ELit LitCons { litName = n, litArgs = [] }) <- getType e, RawType <- nameType n = do
+    ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d } | (ELit LitCons { litName = n, litArgs = [] }) <- followAliases dataTable (getType e), RawType <- nameType n = do
             let ty = Ty $ toAtom (show n)
             v <- newPrimVar ty
             e <- ce e
