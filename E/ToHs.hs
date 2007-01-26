@@ -219,6 +219,7 @@ typeLike _ = False
 
 transE :: E -> TM Doc
 transE (EError s _) = mparen $ return (text "error" <+> tshow s)
+transE (EError s _) = mparen $ return (text "error__" <+> tshow s <> text "#" <+> text "`seq`" <+> text "undefined")
 transE (ELit (LitInt num t)) = case cTypeInfoT t of
     ("Char#",_,_) -> return $ text (show $ chr $ fromIntegral num) <> text "#"
     ("Int#",_,_)  | num < 0 -> mparen $ return $ text (show num) <> text "#"

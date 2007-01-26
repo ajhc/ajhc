@@ -411,6 +411,12 @@ processDecls cho ho' tiData = do
 
         mprog <- simplifyProgram sopt "Simplify-Three" coreMini mprog
 
+        --mprog <- transformProgram tparms { transformCategory = "FloatInward", transformOperation = programFloatInward } mprog
+        --mprog <- Demand.analyzeProgram mprog
+        --mprog <- return $ E.CPR.cprAnalyzeProgram mprog
+        --mprog <- transformProgram tparms { transformSkipNoStats = True, transformCategory = "WorkWrap2", transformOperation = return . workWrapProgram } mprog
+        --mprog <- simplifyProgram sopt "Simplify-Four" coreMini mprog
+
 
         -- annotate our bindings for further passes
         mprog <- return $ etaAnnotateProgram mprog

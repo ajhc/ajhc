@@ -7,6 +7,7 @@ import GHC.IOBase
 import GHC.Prim
 import GHC.Base
 import GHC.Ptr
+import GHC.Err
 
 type World__ = State# RealWorld
 type Array__ a = Array# a
@@ -58,6 +59,30 @@ word2Addr__ x = int2Addr# (word2Int# x)
 convertString :: [Char] -> ListTCon Char
 convertString [] = jhc_EmptyList
 convertString (x:xs) = jhc_Cons x (convertString xs)
+
+{-
+error__ :: Addr# -> a
+error__ s = unsafePerformIO $ do
+    error_show s
+    error_exit (I# 255#)
+
+errorInt__ :: Addr# -> Int#
+errorInt__ s = seq (unsafePerformIO $ do
+    error_show s
+    error_exit (I# 255#)) 0#
+
+errorWord__ :: Addr# -> Word#
+errorWord__ s = seq (unsafePerformIO $ do
+    error_show s
+    error_exit (I# 255#)) (int2Word# 0#)
+
+errorAddr__ :: Addr# -> Addr#
+errorAddr__ s = seq (unsafePerformIO $ do
+    error_show s
+    error_exit (I# 255#)) (int2Addr# 0#)
+foreign import ccall unsafe "puts" error_show :: Ptr a -> IO ()
+foreign import ccall unsafe "exit" error_exit :: Int -> IO a
+ -}
 
 {-# NOINLINE newWorld__ #-}
 newWorld__ :: a -> World__
