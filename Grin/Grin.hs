@@ -64,12 +64,11 @@ import Control.Monad.Identity
 import Data.IORef
 import Data.Monoid
 import List(isPrefixOf)
-import Prelude hiding((&&),(||),not,and,or,any,all)
+import Prelude
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom
-import Boolean.Algebra
 import C.FFI
 import C.Prims
 import Doc.DocLike

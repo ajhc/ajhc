@@ -13,12 +13,11 @@ import Data.FunctorM
 import Data.Monoid
 import List(isPrefixOf)
 import Maybe
-import Prelude hiding((&&),(||),not,and,or,any,all,head)
+import Prelude
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import Atom
-import Boolean.Algebra
 import C.FFI
 import C.Prims as CP
 import DataConstructors
@@ -77,9 +76,6 @@ createIfv v e a b = res where
     res = eCase e [Alt (litCons { litName = dc_Boolzh, litArgs = [tv], litType = tBool }) ic] Unknown
 
 ifzh e a b = eCase e [Alt lTruezh a, Alt lFalsezh b] Unknown
-
-head (x:_) = x
-head _ = error "FromHsHeadError"
 
 newVars :: UniqueProducer m => [E] -> m [TVr]
 newVars xs = f xs [] where

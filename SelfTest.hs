@@ -10,7 +10,6 @@ import Test.QuickCheck
 
 import Atom
 import Data.Binary
-import Boolean.TestCases
 import E.Arbitrary
 import E.E
 import GenUtil
@@ -33,8 +32,6 @@ type Prop = Info.Types.Property
 {-# NOINLINE selfTest #-}
 selfTest :: [String] -> IO ()
 selfTest _ = do
-    putStrLn "Testing Boolean Library"
-    testBoolean
     putStrLn "Testing Atom"
     quickCheck prop_atomid
     quickCheck prop_atomeq
@@ -115,20 +112,6 @@ testProperties = do
     quickCheck prop_list
     quickCheck prop_enum
 
-testBoolean = do
-    quickCheck (\(x::Bool) -> prop_notnot x)
-    quickCheck (\(x::Int) -> prop_notnot x)
-    quickCheck (\(x::Int) -> prop_true x)
-    quickCheck (\(x::Int) -> prop_false x)
-    quickCheck (\(x::(Int,(Bool,Int))) -> prop_notnot x)
-    quickCheck (\(x::(Int,(Bool,Int))) -> prop_true x)
-    quickCheck (\(x::(Int,(Bool,Int))) -> prop_false x)
-    quickCheck (\(x::(Int,(Bool,Int))) -> prop_false' x)
-    quickCheck (\(x::[(Int,(Bool,Int))]) -> null x `trivial` prop_demorgan x)
-    quickCheck (\(x::[(Int,(Bool,Int))]) -> null x `trivial` prop_demorgan' x)
-    quickCheck $ prop_truefalse [3::Int] []
-    quickCheck $ prop_truefalse (Just True) Nothing
-    quickCheck $ prop_truefalse ((Right True),[3::Int]) (Left (), [])
 
 
 testHasSize = do
