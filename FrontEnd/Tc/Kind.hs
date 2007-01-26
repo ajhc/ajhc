@@ -16,7 +16,7 @@ import Data.Monoid
 import Control.Monad
 import Data.IORef
 
-import Binary
+import Data.Binary
 import Doc.DocLike
 import Doc.PPrint(pprint,PPrint)
 import Name.Name
@@ -53,7 +53,7 @@ data KBase =
         | KQuest
         | KNamed Name
     deriving(Eq, Ord)   -- but we need them for kind inference
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 kindStar   = KBase Star
 kindHash   = KBase KHash
@@ -65,7 +65,7 @@ data Kind  = KBase KBase
            | Kfun Kind Kind
            | KVar Kindvar               -- variables aren't really allowed in haskell in kinds
              deriving(Eq, Ord)   -- but we need them for kind inference
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 
 kindCombine :: Monad m => Kind -> Kind -> m Kind
@@ -115,8 +115,8 @@ data Kindvar = Kindvar {
     }
 
 instance Binary Kindvar where
-    put_ _ _ = return ()
-    get _ = return (error "Binary.Kindvar.get")
+    put _ = return ()
+    get = return (error "Binary.Kindvar.get")
 
 instance Eq Kindvar where
     a == b = kvarUniq a == kvarUniq b

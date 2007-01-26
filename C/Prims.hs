@@ -3,7 +3,7 @@ module C.Prims where
 import Data.Generics
 import Data.Monoid
 
-import Binary
+import Data.Binary
 import C.FFI(Requires(..))
 import Doc.DocLike
 import Doc.PPrint
@@ -25,7 +25,7 @@ type ExtType = String
 
 data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
     deriving(Typeable, Data, Eq, Ord, Show)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 data Prim =
     PrimPrim PackedString          -- Special primitive implemented in the compiler somehow.
@@ -66,11 +66,11 @@ data Prim =
         primDotNetName :: PackedString
         }
     deriving(Typeable, Data, Eq, Ord, Show)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 data PrimTypeInfo = PrimSizeOf | PrimMaxBound | PrimMinBound | PrimAlignmentOf | PrimTypeIsSigned
     deriving(Typeable, Data, Eq, Ord, Show)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 instance Data PackedString where
 
@@ -132,7 +132,7 @@ primPrim s = APrim (PrimPrim $ packString s) mempty
 
 data APrim = APrim Prim Requires
     deriving(Typeable, Data, Eq, Ord, Show)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 instance PPrint d Prim  => PPrint d APrim where
     pprint (APrim p _) = pprint p

@@ -29,7 +29,7 @@ import Maybe
 import Control.Monad.Writer
 
 import Atom(toAtom,fromAtom,Atom)
-import Binary
+import Data.Binary
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
@@ -81,9 +81,9 @@ newtype Rules = Rules (IdMap [Rule])
 
 
 instance Binary Rules where
-    put_ h (Rules mp) = putNList h (concat $ melems mp)
-    get h = do
-        rs <- getNList h
+    put (Rules mp) = put (concat $ melems mp)
+    get = do
+        rs <- get
         return $ fromRules rs
 
 mapBodies :: Monad m => (E -> m E) -> Rules -> m Rules

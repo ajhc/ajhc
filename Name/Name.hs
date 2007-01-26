@@ -26,7 +26,7 @@ import Monad(liftM)
 import Data.Typeable
 
 import Atom
-import Binary
+import Data.Binary
 import C.FFI
 import Doc.DocLike
 import Doc.PPrint

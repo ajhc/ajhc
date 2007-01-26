@@ -1,34 +1,29 @@
-module MapBinaryInstance() where
+module MapBinaryInstance where
 
 
-import Binary
---import Data.FiniteMap
+import Data.Binary
 import Data.Map as Map
 import Data.Set as Set
 import Control.Monad
 
-instance (Ord a,Binary a, Binary b) => Binary (Map a b) where
-    put_ bh x = do
-        put_ bh (Map.size x)
-        mapM_ (put_ bh) (Map.toList x)
-    get bh = do
-        (sz::Int) <- get bh
-        ls <- replicateM sz (get bh)
+putMap :: (Binary k,Ord k,Binary v) => Map.Map k v -> Put
+putMap x = do
+        put (Map.size x)
+        mapM_ put (Map.toList x)
+getMap :: (Binary k,Ord k,Binary v) => Get (Map.Map k v)
+getMap = do
+        (sz::Int) <- get
+        ls <- replicateM sz get
         return (Map.fromList ls)
-        --get bh >>= return . Map.fromList
 
-{-
-instance (Ord a,Binary a, Binary b) => Binary (FiniteMap a b) where
-   put_ bh x = put_ bh (fmToList x)
-   get bh = get bh >>= return . listToFM
--}
 
-instance (Ord a,Binary a) => Binary (Set a) where
-    put_ bh x = do
-        put_ bh (Set.size x)
-        mapM_ (put_ bh) (Set.toList x)
-    get bh = do
-        (sz::Int) <- get bh
-        ls <- replicateM sz (get bh)
+putSet :: (Binary a,Ord a) => Set.Set a -> Put
+putSet x = do
+        put (Set.size x)
+        mapM_ put (Set.toList x)
+
+getSet :: (Binary a,Ord a) => Get (Set.Set a)
+getSet = do
+        (sz::Int) <- get
+        ls <- replicateM sz get
         return (Set.fromList ls)
-        --get bh >>= return . Map.fromList

@@ -23,9 +23,11 @@ import System.Posix.Files
 import System.Posix.IO
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
+import Data.Binary
+import qualified Data.ByteString.Lazy as L
+import Codec.Compression.GZip
 
 import Atom
-import Binary
 import CharIO
 import FrontEnd.Class
 import DataConstructors
@@ -149,15 +151,12 @@ checkForHoFile :: String            -- ^ file name to check for
     -> IO (Maybe (HoHeader,Ho))
 checkForHoFile fn = flip catch (\e -> return Nothing) $ do
     bracket (openGetFileDep fn) (\_ -> return ()) $ \ (fh,dep) -> do
-    bh <- openBinIO fh
-    x <- get bh
+    lbs <- L.hGetContents fh
+    let (x,hh,ho,m2) = decode (decompress lbs)
     if x /= magic then (putErrLn $ "Bad ho file:" <+> fn)  >> return Nothing else do
-    hh <- lazyGet bh
     xs <- mapM checkDep (hohDepends hh)
     if not (and xs) then  return Nothing else do
-        ho <- lazyGet bh
-        x <- get bh
-        if x /= magic2 then (putErrLn $ "Bad ho file:" <+> fn)  >>  return Nothing else do
+        if m2 /= magic2 then (putErrLn $ "Bad ho file:" <+> fn)  >>  return Nothing else do
         wdump FD.Progress $ do
             fn' <- shortenPath fn
             putErrLn $ "Found object file:" <+> fn'
@@ -177,14 +176,10 @@ checkDep fd = do
 readHoFile :: String -> IO (HoHeader,Ho)
 readHoFile fn = do
     fh <- openBinaryFile fn ReadMode
-    bh <- openBinIO fh
-    x <- get bh
-    when (x /= magic) (putErrDie $ "Bad ho file magic1:" <+> fn)
-    hh <- lazyGet bh
-    ho <- lazyGet bh
-    x <- get bh
-    when (x /= magic2) (putErrDie $ "Bad ho file magic2:" <+> fn)
-    --hClose fh
+    c <- L.hGetContents fh
+    let (m1,hh,ho,m2) = decode (decompress c)
+    when (m1 /= magic) (putErrDie $ "Bad ho file magic1:" <+> fn)
+    when (m2 /= magic2) (putErrDie $ "Bad ho file magic2:" <+> fn)
     return (hh,ho)
 
 {-# NOINLINE dumpHoFile #-}
@@ -276,11 +271,8 @@ recordHoFile ho fs header = do
             if optNoWriteHo options then return emptyFileDep else do
             let tfn = fn ++ ".tmp"
             fh <- openBinaryFile tfn WriteMode
-            bh <- openBinIO fh
-            put_ bh magic
-            lazyPut bh header
-            lazyPut bh (mapHoBodies eraseE ho { hoUsedIds = mempty, hoModules = mempty })
-            put_ bh magic2
+            let theho =  mapHoBodies eraseE ho { hoUsedIds = mempty, hoModules = mempty }
+            L.hPut fh (compress $ encode (magic,header,theho,magic2))
             hFlush fh
             (fh,fd) <- hGetFileDep fn fh
             hClose fh

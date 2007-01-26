@@ -39,7 +39,7 @@ import Data.IORef
 import Text.PrettyPrint.HughesPJ(Doc)
 
 import Atom
-import Binary
+import Data.Binary
 import Doc.DocLike
 import Doc.PPrint(pprint,PPrint)
 import HsSyn
@@ -59,7 +59,7 @@ import FrontEnd.Tc.Kind
 
 data MetaVarType = Tau | Rho | Sigma
              deriving(Eq,Ord,Show)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
            | TCon { typeCon :: !Tycon }
@@ -70,11 +70,11 @@ data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
            | TMetaVar { metaVar :: MetaVar }
            | TAssoc   { typeCon :: !Tycon, typeClassArgs :: [Type], typeExtraArgs :: [Type] }
              deriving(Ord,Show)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 data MetaVar = MetaVar { metaUniq :: !Int, metaKind :: Kind, metaRef :: (IORef (Maybe Type)), metaType :: MetaVarType } -- ^ used only in typechecker
              deriving(Show)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 instance Eq MetaVar where
     a == b = metaUniq a == metaUniq b
@@ -106,7 +106,7 @@ tassocToAp TAssoc { typeCon = con, typeClassArgs = cas, typeExtraArgs = eas } = 
 -- Unquantified type variables
 
 data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !Name, tyvarKind :: Kind }
-    {-  derive: GhcBinary -}
+    {-  derive: Binary -}
 
 instance Show Tyvar where
     showsPrec _ Tyvar { tyvarName = hn, tyvarKind = k } = shows hn . ("::" ++) . shows k
@@ -142,7 +142,7 @@ instance Ord Tyvar where
 
 data Tycon = Tycon { tyconName :: Name, tyconKind :: Kind }
     deriving(Eq, Show,Ord)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 instance ToTuple Tycon where
     toTuple n = Tycon (nameTuple TypeConstructor n) (foldr Kfun kindStar $ replicate n kindStar)
@@ -162,12 +162,12 @@ a `fn` b    = TArrow a b
 -- Predicates
 data Pred   = IsIn Class Type | IsEq Type Type
               deriving(Show, Eq,Ord)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 -- Qualified entities
 data Qual t =  [Pred] :=> t
               deriving(Show, Eq,Ord)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 
 instance (DocLike d,PPrint d t) => PPrint d (Qual t) where
@@ -187,14 +187,14 @@ instance  DocLike d => PPrint d Tyvar where
   pprint tv = tshow (tyvarName tv)
 
 instance Binary Tyvar where
-    put_ bh (Tyvar aa ab ac) = do
-        put_ bh aa
-        put_ bh ab
-        put_ bh ac
-    get bh = do
-        aa <- get bh
-        ab <- get bh
-        ac <- get bh
+    put (Tyvar aa ab ac) = do
+        put aa
+        put ab
+        put ac
+    get = do
+        aa <- get
+        ab <- get
+        ac <- get
         return (Tyvar aa ab ac)
 
 

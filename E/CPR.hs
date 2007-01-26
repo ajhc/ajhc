@@ -1,11 +1,11 @@
 module E.CPR(Val(..), cprAnalyzeDs, cprAnalyzeProgram) where
 
 import Control.Monad.Writer hiding(Product(..))
+import Data.Binary
 import Data.Typeable
 import Data.Monoid()
 import qualified Data.Map as Map
 
-import Binary
 import DataConstructors
 import Doc.DocLike
 import E.E
@@ -31,7 +31,7 @@ data Val =
     | Tag [Name]      -- A nullary constructor, like True, False
     | Bot             -- the bottom
     deriving(Eq,Ord,Typeable)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 toVal c = case conSlots c of
     [] -> Tag [conName c]

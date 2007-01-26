@@ -3,7 +3,7 @@ module HsSyn where
 
 
 import Atom
-import Binary
+import Data.Binary
 import C.FFI
 import Data.Generics
 import PackedString
@@ -39,7 +39,7 @@ data HsName
 	= Qual { hsNameModule :: Module, hsNameIdent ::  HsIdentifier}
 	| UnQual { hsNameIdent :: HsIdentifier}
   deriving(Data,Typeable,Eq,Ord)
-  {-! derive: is, update, GhcBinary !-}
+  {-! derive: is, update, Binary !-}
 
 
 instance ToAtom HsName where
@@ -54,16 +54,16 @@ newtype HsIdentifier = HsIdent { hsIdentString :: String }
   deriving(Data,Typeable,Eq,Ord)
 
 instance Binary Module where
-    get bh = do
-        ps <- get bh
+    get = do
+        ps <- get
         return (Module $ unpackPS ps)
-    put_ bh (Module n) = put_ bh (packString n)
+    put (Module n) = put (packString n)
 
 instance Binary HsIdentifier where
-    get bh = do
-        ps <- get bh
+    get = do
+        ps <- get
         return (HsIdent $ unpackPS ps)
-    put_ bh (HsIdent n) = put_ bh (packString n)
+    put (HsIdent n) = put (packString n)
 
 hsIdentString_u f x = x { hsIdentString = f $ hsIdentString x }
 
@@ -120,7 +120,7 @@ data HsImportSpec
 
 data HsAssoc = HsAssocNone | HsAssocLeft | HsAssocRight
   deriving(Eq,Show)
-  {-! derive: GhcBinary !-}
+  {-! derive: Binary !-}
 
 instance HasLocation HsDecl where
     srcLoc HsTypeDecl	 { hsDeclSrcLoc  = sl } = sl
@@ -266,7 +266,7 @@ data HsGuardedRhs
 data HsQualType
 	 = HsQualType   { hsQualTypeContext :: HsContext, hsQualTypeType :: HsType }
   deriving(Data,Typeable,Eq,Ord,Show)
-  {-! derive: GhcBinary !-}
+  {-! derive: Binary !-}
 
 hsQualTypeHsContext HsQualType { hsQualTypeContext = c } = c
 
@@ -288,14 +288,14 @@ data HsType
          | HsTyAssoc
          | HsTyEq HsType HsType
   deriving(Data,Typeable,Eq,Ord,Show)
-  {-! derive: GhcBinary, is !-}
+  {-! derive: Binary, is !-}
 
 data HsTyVarBind = HsTyVarBind {
     hsTyVarBindSrcLoc :: SrcLoc,
     hsTyVarBindName :: HsName,
     hsTyVarBindKind :: Maybe HsKind }
   deriving(Data,Typeable,Eq,Ord,Show)
-  {-! derive: GhcBinary, update !-}
+  {-! derive: Binary, update !-}
 
 hsTyVarBind = HsTyVarBind { hsTyVarBindSrcLoc = bogusASrcLoc, hsTyVarBindName = undefined, hsTyVarBindKind = Nothing }
 
@@ -308,7 +308,7 @@ type HsContext = [HsAsst]
 
 data HsAsst = HsAsst HsName [HsName] | HsAsstEq HsType HsType
   deriving(Data,Typeable,Eq,Ord, Show)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 data HsLiteral
 	= HsInt		!Integer
@@ -411,7 +411,7 @@ data HsAlt = HsAlt SrcLoc HsPat HsRhs [HsDecl]
 
 data HsKind = HsKind HsName | HsKindFn HsKind HsKind
   deriving(Data,Typeable,Eq,Ord,Show)
-  {-! derive: GhcBinary !-}
+  {-! derive: Binary !-}
 
 hsKindStar = HsKind (Qual (Module "Jhc@") (HsIdent "*"))
 hsKindHash = HsKind (Qual (Module "Jhc@") (HsIdent "#"))

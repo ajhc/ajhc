@@ -13,6 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
+
 -- Original GHC implementation by Bryan O\'Sullivan,
 -- rewritten to use UArray by Simon Marlow.
 -- modified by John Meacham for use in ginsu
@@ -28,8 +29,8 @@ module PackedString (
         showsPS,
         -- toString,
         toUTF8,
-        lengthPS,
-        utfLengthPS,
+--        lengthPS,
+--        utfLengthPS,
 
 	joinPS,      -- :: PackedString -> [PackedString] -> PackedString
 	-- * List-like manipulation functions
@@ -37,44 +38,13 @@ module PackedString (
 	consPS,      -- :: Char -> PackedString -> PackedString
 	nullPS,      -- :: PackedString -> Bool
 	appendPS,    -- :: PackedString -> PackedString -> PackedString
-        foldrPS,
+--        foldrPS,
         hashPS,
         filterPS,
-        foldlPS,
-        headPS,
+--        foldlPS,
+--        headPS,
 	concatPS    -- :: [PackedString] -> PackedString
 
-{-
-	headPS,      -- :: PackedString -> Char
-	tailPS,      -- :: PackedString -> PackedString
-	lengthPS,    -- :: PackedString -> Int
-	indexPS,     -- :: PackedString -> Int -> Char
-	mapPS,       -- :: (Char -> Char) -> PackedString -> PackedString
-	filterPS,    -- :: (Char -> Bool) -> PackedString -> PackedString
-	reversePS,   -- :: PackedString -> PackedString
-	elemPS,      -- :: Char -> PackedString -> Bool
-	substrPS,    -- :: PackedString -> Int -> Int -> PackedString
-	takePS,      -- :: Int -> PackedString -> PackedString
-	dropPS,      -- :: Int -> PackedString -> PackedString
-	splitAtPS,   -- :: Int -> PackedString -> (PackedString, PackedString)
-
-	foldlPS,     -- :: (a -> Char -> a) -> a -> PackedString -> a
-	foldrPS,     -- :: (Char -> a -> a) -> a -> PackedString -> a
-	takeWhilePS, -- :: (Char -> Bool) -> PackedString -> PackedString
-	dropWhilePS, -- :: (Char -> Bool) -> PackedString -> PackedString
-	spanPS,      -- :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
-	breakPS,     -- :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
-	linesPS,     -- :: PackedString -> [PackedString]
-	unlinesPS,   -- :: [PackedString] -> PackedString
-	wordsPS,     -- :: PackedString -> [PackedString]
-	unwordsPS,   -- :: [PackedString] -> PackedString
-	splitPS,     -- :: Char -> PackedString -> [PackedString]
-	splitWithPS, -- :: (Char -> Bool) -> PackedString -> [PackedString]
-
-	-- * I\/O with @PackedString@s
-	hPutPS,      -- :: Handle -> PackedString -> IO ()
-	hGetPS,      -- :: Handle -> Int -> IO PackedString
-    -}
 
 
     ) where
@@ -82,6 +52,9 @@ module PackedString (
 import Data.Array.IO
 import Data.Typeable
 import Data.Char
+import Data.Int
+import Data.Binary
+import qualified Data.ByteString as BS
 
 import Bits
 import GHC.Exts
@@ -100,46 +73,27 @@ instance Monoid PackedString where
 
 -- | A space-efficient representation of a 'String', which supports various
 -- efficient operations.  A 'PackedString' contains full Unicode 'Char's.
-newtype PackedString = PS (UArray Int Word8)
-    deriving(Typeable)
-
+newtype PackedString = PS BS.ByteString
+    deriving(Typeable,Binary)
 
 
 instance Eq PackedString where
     (==) (PS x) (PS y) =  x == y
     (/=) (PS x) (PS y) =  x /= y
-    {-
-   (PS (UArray _ (I# e) ba)) == (PS (UArray _ (I# e') ba'))
-    | e ==# e' = c_memcmp ba ba' (e +# 1#) ==# 0#
-    | otherwise = False
-    -}
 
 instance Ord PackedString where
     compare (PS x) (PS y) = compare x y
-    {-
-    compare (PS (UArray _ (I# e) ba)) (PS (UArray _ (I# e') ba'))
-        | e <# e' =  f LT (c_memcmp ba ba' (e +# 1#))
-        | e ># e' =  f GT (c_memcmp ba ba' (e' +# 1#))
-        | e ==# e' = f EQ (c_memcmp ba ba' (e +# 1#))
-            where
-            f eq 0# = eq
-            f _ x | x ># 0# = GT
-            f _ _ = LT
-     -}
 
 instance Show PackedString where
     showsPrec p ps r = showsPrec p (unpackPS ps) r
---instance Read PackedString: ToDo
 
--- this is effectivly pure.
---foreign import ccall unsafe "memcmp" c_memcmp :: ByteArray# -> ByteArray# -> Int# -> Int#
 
 -- -----------------------------------------------------------------------------
 -- Constructor functions
 
 -- | The 'nilPS' value is the empty string.
 nilPS :: PackedString
-nilPS = PS (array (0,-1) [])
+nilPS = PS BS.empty
 
 -- | The 'consPS' function prepends the given character to the
 -- given string.
@@ -148,7 +102,7 @@ consPS c cs = packString (c : (unpackPS cs)) -- ToDo:better
 
 -- | Convert a 'String' into a 'PackedString'
 packString :: String -> PackedString
-packString str = PS $ listArray (0, I# (utfCount str -# 1#)) (toUTF str)
+packString str = PS $ (BS.pack $ toUTF str)
 
 
 -- -----------------------------------------------------------------------------
@@ -156,27 +110,29 @@ packString str = PS $ listArray (0, I# (utfCount str -# 1#)) (toUTF str)
 
 
 unpackPS :: PackedString -> String
-unpackPS (PS (UArray _ (I# e) ba)) = unpackFoldrUtf8# (ba) (e +# 1#) f [] where
-    f ch r = C# ch : r
+unpackPS (PS bs) = fromUTF (BS.unpack bs)
+--unpackPS (PS (UArray _ (I# e) ba)) = unpackFoldrUtf8# (ba) (e +# 1#) f [] where
+--    f ch r = C# ch : r
 
 showsPS :: PackedString -> String -> String
-showsPS  (PS (UArray _ (I# e) ba)) xs = unpackFoldrUtf8# (ba) (e +# 1#) f xs where
-    f ch r = C# ch : r
+showsPS ps = (unpackPS ps ++)
+--showsPS  (PS (UArray _ (I# e) ba)) xs = unpackFoldrUtf8# (ba) (e +# 1#) f xs where
+--    f ch r = C# ch : r
 
 
 toUTF8 :: PackedString -> [Word8]
-toUTF8 (PS ba) = elems ba
+toUTF8 (PS ba) = BS.unpack ba
 
-lengthPS :: PackedString -> Int
-lengthPS (PS (UArray _ (I# e) ba)) =  unpackFoldlUtf8#  (\x _ -> x + 1) 0 ba (e +# 1#)
+--lengthPS :: PackedString -> Int
+--lengthPS (PS (UArray _ (I# e) ba)) =  unpackFoldlUtf8#  (\x _ -> x + 1) 0 ba (e +# 1#)
 
-utfLengthPS :: PackedString -> Int
-utfLengthPS (PS (UArray _ e _)) = e + 1
+--utfLengthPS :: PackedString -> Int
+--utfLengthPS (PS (UArray _ e _)) = e + 1
 
-headPS :: PackedString -> Char
-headPS ps = case unpackPS ps of
-    (x:_) -> x
-    [] -> error "headPS: empty PackedString"
+--headPS :: PackedString -> Char
+--headPS ps = case unpackPS ps of
+--    (x:_) -> x
+--    [] -> error "headPS: empty PackedString"
 
 -- | The 'indexPS' function returns the character in the string at the given position.
 --indexPS :: PackedString -> Int -> Char
@@ -201,18 +157,12 @@ headPS ps = case unpackPS ps of
 
 -- | The 'nullPS' function returns True iff the argument is null.
 nullPS :: PackedString -> Bool
-nullPS (PS ps) = rangeSize (bounds ps) == 0
+nullPS (PS ps) = BS.null ps
 
 -- | The 'appendPS' function appends the second string onto the first.
 appendPS :: PackedString -> PackedString -> PackedString
-appendPS xs ys
-  | nullPS xs = ys
-  | nullPS ys = xs
-  | otherwise  = concatPS [xs,ys]
+appendPS (PS xs) (PS ys) = PS (BS.append xs ys)
 
--- | The 'mapPS' function applies a function to each character in the string.
---mapPS :: (Char -> Char) -> PackedString -> PackedString
---mapPS f (PS ps) = PS (amap f ps)
 
 -- | The 'filterPS' function filters out the appropriate substring.
 filterPS :: (Char -> Bool) -> PackedString -> PackedString {-or String?-}
@@ -220,31 +170,31 @@ filterPS pred ps = packString (filter pred (unpackPS ps))
 
 -- | The 'foldlPS' function behaves like 'foldl' on 'PackedString's.
 -- note, this version is strict. (behaves like foldl' )
-foldlPS :: (a -> Char -> a) -> a -> PackedString -> a
-foldlPS f b (PS (UArray _ (I# e) ba)) = unpackFoldlUtf8# (\x y -> f x (C# y)) b ba (e +# 1#)
+--foldlPS :: (a -> Char -> a) -> a -> PackedString -> a
+--foldlPS f b (PS (UArray _ (I# e) ba)) = unpackFoldlUtf8# (\x y -> f x (C# y)) b ba (e +# 1#)
 
 -- | The 'foldrPS' function behaves like 'foldr' on 'PackedString's.
-foldrPS :: (Char -> a -> a) -> a -> PackedString -> a
-foldrPS f b (PS (UArray _ (I# e) ba)) = unpackFoldrUtf8# ba (e +# 1#) (\x y -> f (C# x)  y) b
+--foldrPS :: (Char -> a -> a) -> a -> PackedString -> a
+--foldrPS f b (PS (UArray _ (I# e) ba)) = unpackFoldrUtf8# ba (e +# 1#) (\x y -> f (C# x)  y) b
 --foldrPS f v ps = foldr f v (unpackPS ps)
 
-{-
 hashPS :: PackedString -> Int32
-hashPS (PS arr) = f 5381 (elems arr) where
+hashPS (PS arr) = f 5381 (BS.unpack arr) where
     f x [] = x
     f m (c:cs) = n `seq` f n cs where
         n = ((m `shiftL` 5) + m ) `xor` fromIntegral c
+{-
 
 hashPS' :: PackedString -> Int32
 hashPS' (PS (UArray 0 (I# e) ba)) = fromIntegral $ unpackFoldlUtf8# f 5381 ba (e +# 1#) where
     f m c = ((m `shiftL` 5) + m ) `xor` I# (ord# c)
--}
 
 hashPS :: PackedString -> Word
 hashPS (PS (UArray 0 (I# e) ba)) =  W# (f (unsafeCoerce# 5381#) 0#) where
     f m c
         | c >=# (e +# 1#) = m
         | otherwise = f (((m `uncheckedShiftL#` 5#) `plusWord#` m ) `xor#`  (((indexWord8Array# ba c)))) (c +# 1#)
+-}
 
 
 
@@ -429,6 +379,25 @@ toUTF (x:xs) | ord x<=0x007F = (fromIntegral $ ord x):toUTF xs
 			       toUTF xs
 
 
+fromUTF :: [Word8] -> String
+fromUTF xs = fromUTF' (map fromIntegral xs) where
+    fromUTF' [] = []
+    fromUTF' (all@(x:xs))
+	| x<=0x7F = (chr (x)):fromUTF' xs
+	| x<=0xBF = err
+	| x<=0xDF = twoBytes all
+	| x<=0xEF = threeBytes all
+	| otherwise   = err
+    twoBytes (x1:x2:xs) = chr  ((((x1 .&. 0x1F) `shift` 6) .|.
+			       (x2 .&. 0x3F))):fromUTF' xs
+    twoBytes _ = error "fromUTF: illegal two byte sequence"
+
+    threeBytes (x1:x2:x3:xs) = chr ((((x1 .&. 0x0F) `shift` 12) .|.
+				    ((x2 .&. 0x3F) `shift` 6) .|.
+				    (x3 .&. 0x3F))):fromUTF' xs
+    threeBytes _ = error "fromUTF: illegal three byte sequence"
+
+    err = error "fromUTF: illegal UTF-8 character"
 
 
 

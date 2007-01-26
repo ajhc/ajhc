@@ -1,7 +1,7 @@
 module Number(Number(..),TypeInfo,toIntegral) where
 
 import Ratio
-import Binary
+import Data.Binary
 
 data NumType = Signed | Unsigned | Floating | Pointer
 data Value a = Known a | Unknown | AtLeast a | GreatestOfAll

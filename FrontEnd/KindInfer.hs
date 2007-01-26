@@ -30,7 +30,7 @@ import Data.Monoid
 import qualified Data.Map as Map
 import System.IO.Unsafe
 
-import Binary
+import Data.Binary
 import DependAnalysis
 import Doc.DocLike
 import Doc.PPrint
@@ -41,7 +41,7 @@ import FrontEnd.Utils
 import GenUtil
 import Support.FreeVars
 import HsSyn
-import MapBinaryInstance()
+import MapBinaryInstance
 import Name.Name
 import qualified Util.Seq as Seq
 import qualified FlagDump as FD
@@ -55,7 +55,15 @@ data KindEnv = KindEnv {
     kindEnvAssocs :: Map.Map Name (Int,Int),
     kindEnvClasses :: Map.Map Name [Kind]
     } deriving(Typeable,Show)
-        {-!derive: Monoid, GhcBinary !-}
+        {-!derive: Monoid !-}
+
+instance Binary KindEnv where
+    put KindEnv { kindEnv = a, kindEnvAssocs = b, kindEnvClasses = c } = putMap a >> putMap b >> putMap c
+    get = do
+        a <- getMap
+        b <- getMap
+        c <- getMap
+        return KindEnv { kindEnv = a, kindEnvAssocs = b, kindEnvClasses = c }
 
 instance HasSize KindEnv where
     size KindEnv { kindEnv = env } = size env

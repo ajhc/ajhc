@@ -25,7 +25,7 @@ import Text.PrettyPrint.HughesPJ(render,Doc())
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
-import Binary
+import Data.Binary
 import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.KindInfer
@@ -33,7 +33,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import HsSyn
-import MapBinaryInstance()
+import MapBinaryInstance
 import Maybe
 import Monad
 import Name.Name
@@ -60,7 +60,7 @@ data Inst = Inst {
     instHead :: Qual Pred,
     instAssocs :: [(Tycon,[Tyvar],[Tyvar],Sigma)]
     } deriving(Eq,Ord,Show)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 instance PPrint a (Qual Pred) => PPrint a Inst where
     pprint Inst { instHead = h, instAssocs = [] } = pprint h
@@ -81,7 +81,7 @@ data ClassRecord = ClassRecord {
     classAssumps :: [(Name,Sigma)],
     classAssocs :: [(Tycon,[Tyvar],Maybe Sigma)]
     }
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 newClassRecord c = ClassRecord {
     className = c,
@@ -121,7 +121,11 @@ getTypeHead th = case fromTAp th of
     _ -> error $ "getTypeHead: " ++ show th
 
 newtype ClassHierarchy = ClassHierarchy (Map.Map Class ClassRecord)
-    deriving (Binary,HasSize)
+    deriving (HasSize)
+
+instance Binary ClassHierarchy where
+    get = fmap ClassHierarchy getMap
+    put (ClassHierarchy ch) = putMap ch
 
 instance Monoid ClassHierarchy where
     mempty = ClassHierarchy mempty

@@ -5,7 +5,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom(Atom)
-import Binary
+import Data.Binary
 import DataConstructors(DataTable)
 import E.E(TVr,E)
 import E.Rules(Rules)

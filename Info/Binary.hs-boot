@@ -1,7 +1,7 @@
 module Info.Binary where
 
 import Info.Info
-import Binary
+import Data.Binary
 
-putInfo :: Binary.BinHandle -> Info.Info.Info -> IO ()
-getInfo :: Binary.BinHandle -> IO Info.Info.Info
+putInfo :: Info.Info.Info -> Put
+getInfo :: Get Info.Info.Info

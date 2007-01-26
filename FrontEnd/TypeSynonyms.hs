@@ -9,10 +9,10 @@ module TypeSynonyms (
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Monoid
+import Data.Binary
 import List
 import qualified Data.Map as Map
 
-import Binary
 import Doc.DocLike
 import FrontEnd.SrcLoc
 import GenUtil
@@ -26,7 +26,11 @@ import MapBinaryInstance
 
 
 newtype TypeSynonyms = TypeSynonyms (Map.Map Name ([HsName], HsType, SrcLoc))
-    deriving(Monoid,Binary,HasSize)
+    deriving(Monoid,HasSize)
+
+instance Binary TypeSynonyms where
+    put (TypeSynonyms ts) = putMap ts
+    get = fmap TypeSynonyms getMap
 
 showSynonym :: (DocLike d,Monad m) => (HsType -> d) -> Name -> TypeSynonyms -> m d
 showSynonym pprint n (TypeSynonyms m) = do

@@ -7,12 +7,12 @@ import Data.FunctorM
 
 import Data.Monoid
 import Data.Generics
-import Binary
+import Data.Binary
 
 
 data SrcLoc = SrcLoc { srcLocFileName :: String, srcLocLine :: !Int, srcLocColumn :: !Int}
     deriving(Data,Typeable,Eq,Ord)
-    {-! derive: update, GhcBinary !-}
+    {-! derive: update, Binary !-}
 
 data SrcSpan = SrcSpan { srcSpanBegin :: !SrcLoc, srcSpanEnd :: !SrcLoc }
     deriving(Data,Typeable,Eq,Ord)

@@ -19,6 +19,7 @@ import Foreign
 import List(sort)
 import System.IO.Unsafe
 import Data.IORef
+import Data.Binary
 import qualified Data.HashTable as HT
 import qualified Data.IntMap as IM
 
@@ -123,4 +124,8 @@ toPackedString (Atom i) = unsafePerformIO $ readIORef (i `seq` reverseTable) >>=
     Nothing -> do
         x' <- readIORef reverseTable
         return $ error $ "toPackedString: " ++ show i ++ " " ++ (show (x,x'))
+
+instance Binary Atom where
+    get = do fmap (unsafePerformIO . fromPackedStringIO) get
+    put a = put (toPackedString a)
 

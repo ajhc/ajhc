@@ -4,7 +4,7 @@ import Data.Dynamic
 import qualified Data.Map as Map
 
 import Atom
-import Binary
+import Data.Binary
 import C.FFI(FfiExport)
 import E.CPR
 import Util.SetLike(toList,fromDistinctAscList)
@@ -35,46 +35,48 @@ binTable = Map.fromList [
     ]
 
 
-putDyn :: BinHandle -> (Atom,Dynamic,Binable) -> IO ()
-putDyn h (ps,d,Binable (_::a)) = do
-    put_ h ps
-    put_ h (fromDyn d (error (show d)) :: a)
+putDyn :: (Atom,Dynamic,Binable) -> Put
+putDyn (ps,d,Binable (_::a)) = do
+    put ps
+    put (fromDyn d (error (show d)) :: a)
 
 -- = case Map.lookup (packString (show d)) of
 --    Just (Binable (x::a)) -> put_ h (case fromDynamic d of Just x -> x :: a)
 --    Nothing -> return ()
 
 
-getDyn h = do
-    (ps::Atom) <- get h
+getDyn = do
+    (ps::Atom) <- get
     case Map.lookup ps binTable of
         Just (Binable (_ :: a)) -> do
-            x <- get h :: IO a
+            x <- get :: Get a
             return $ newEntry x
         Nothing -> fail $ "getDyn: don't know how to read something of type: " ++ show ps
 
 instance Binary Properties where
-    put_ bh (Properties (EnumBitSet props)) = put_ bh (BS.toWord props)
-    get bh = get bh >>= return . Properties . EnumBitSet . BS.fromWord
+    put (Properties (EnumBitSet props)) = put (BS.toWord props)
+    get = get >>= return . Properties . EnumBitSet . BS.fromWord
 
 
 instance Binary Info where
-    put_ h nfo = putInfo h nfo
-    get h = Info.Binary.getInfo h
+    put nfo = putInfo nfo
+    get = Info.Binary.getInfo
 
 
-putInfo h (Info ds) = do
+putInfo :: Info.Info.Info -> Put
+putInfo (Info ds) = do
     let ds' = concatMap (\d -> do
             let ps = toAtom (show $ entryType d)
             x <- Map.lookup ps binTable
             return (ps,entryThing d,x)
           ) ds
-    put_ h (length ds')
-    mapM_ (putDyn h) ds'
+    put (length ds')
+    mapM_ putDyn ds'
 
-getInfo h = do
-    (n::Int) <- get h
-    xs <- replicateM n (getDyn h)
+getInfo :: Get Info.Info.Info
+getInfo = do
+    (n::Int) <- get
+    xs <- replicateM n getDyn
     return (Info  [ x | x <- xs])
 
 

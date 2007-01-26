@@ -13,6 +13,7 @@ module E.Demand(
 import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.Writer hiding(Product(..))
+import Data.Binary
 import Data.List
 import Data.Monoid hiding(Product(..))
 import Data.Maybe
@@ -20,7 +21,6 @@ import Data.Typeable
 import qualified Data.Map as Map
 
 import PackedString
-import Binary
 import C.Prims
 import DataConstructors
 import Doc.DocLike
@@ -42,7 +42,7 @@ data Demand =
     | Error SubDemand  -- diverges, might use arguments
     | Absent           -- Not used
     deriving(Eq,Ord,Typeable)
-        {-! derive: GhcBinary !-}
+        {-! derive: Binary !-}
 
 instance Show Demand where
     showsPrec _ Bottom = ("_|_" ++)
@@ -59,17 +59,17 @@ instance DocLike d => PPrint d Demand where
 
 data SubDemand = None | Product [Demand]
     deriving(Eq,Ord,Typeable)
-        {-! derive: GhcBinary !-}
+        {-! derive: Binary !-}
 
 data DemandSignature = DemandSignature !Int DemandType
     deriving(Eq,Ord,Typeable)
-        {-! derive: GhcBinary !-}
+        {-! derive: Binary !-}
 data DemandType = (:=>) DemandEnv [Demand]
     deriving(Eq,Ord,Typeable)
-        {-! derive: GhcBinary !-}
+        {-! derive: Binary !-}
 data DemandEnv = DemandEnv (Map.Map TVr Demand) Demand
     deriving(Eq,Ord,Typeable)
-        {-! derive: GhcBinary !-}
+        {-! derive: Binary !-}
 
 instance Show DemandType where
     showsPrec _ (DemandEnv e Absent :=> d) | isEmpty e = shows d

@@ -18,13 +18,14 @@
 
 module FrontEnd.Infix (buildFixityMap, infixHsModule, FixityMap,size, infixStatement) where
 
-import Binary
+import Data.Binary
 import Data.Monoid
+import qualified Data.Map as Map
+
 import Util.HasSize
 import HsSyn
-import MapBinaryInstance()
+import MapBinaryInstance
 import Name.Name
-import qualified Data.Map as Map
 
 ----------------------------------------------------------------------------
 
@@ -34,8 +35,11 @@ type FixityInfo = (Int, HsAssoc)
 type SymbolMap = Map.Map Name FixityInfo
 
 newtype FixityMap = FixityMap SymbolMap
-    deriving(Monoid,Binary,HasSize)
+    deriving(Monoid,HasSize)
 
+instance Binary FixityMap where
+    put (FixityMap ts) = putMap ts
+    get = fmap FixityMap getMap
 
 ----------------------------------------------------------------------------
 

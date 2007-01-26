@@ -9,7 +9,7 @@ import System.IO
 import Test.QuickCheck
 
 import Atom
-import Binary
+import Data.Binary
 import Boolean.TestCases
 import E.Arbitrary
 import E.E
@@ -70,12 +70,12 @@ strings =  ["h","n\206^um\198(","\186","yOw\246$\187x#",";\221x<n","\201\209\236
 testPackedString = do
     putStrLn "Testing PackedString"
     let prop_psid xs = unpackPS (packString xs) == (xs::String)
-        prop_pslen xs = lengthPS (packString xs) == length (xs::String)
+--        prop_pslen xs = lengthPS (packString xs) == length (xs::String)
         prop_psappend (xs,ys) = (packString xs `appendPS` packString ys) == packString ((xs::String) ++ ys)
         prop_psappend' (xs,ys) = unpackPS (packString xs `appendPS` packString ys) == ((xs::String) ++ ys)
         prop_sort xs = sort (map packString xs) == map packString (sort xs)
     quickCheck prop_psid
-    quickCheck prop_pslen
+--    quickCheck prop_pslen
     doTime "prop_sort" $ quickCheck prop_sort
     quickCheck prop_psappend
     quickCheck prop_psappend'
@@ -162,26 +162,14 @@ testInfo = do
     print (x'',getProperty prop_METHOD x'', getProperty prop_INSTANCE x'')
     print (getProperties x')
 
-putFile fn a = do
-    h <- openBinaryFile fn WriteMode
-    bh <- openBinIO h
-    put_ bh a
-    hClose h
-
-getFile fn = do
-    h <- openBinaryFile fn ReadMode
-    bh <- openBinIO h
-    b <- get bh
-    hClose h
-    return b
 
 
 testBinary = do
     let test = ("hello",3::Int)
         fn = "/tmp/jhc.test.bin"
     putStrLn "Testing Binary"
-    putFile fn test
-    x <- getFile fn
+    encodeFile fn test
+    x <- decodeFile fn
     if (x /= test) then fail "Test Failed" else return ()
     let fn = "/tmp/jhc.info.bin"
         t = (singleton prop_INLINE) `mappend` fromList [prop_WORKER,prop_SPECIALIZATION]
@@ -189,8 +177,8 @@ testBinary = do
         nfo = (Info.insert "food" $ Info.insert t mempty)
         nf = (nfo, "Hello, this is a test", Set.fromList ['a' .. 'f'])
     print nf
-    putFile fn nf
-    x@(nfo,_,_) <- getFile fn
+    encodeFile fn nf
+    x@(nfo,_,_) <- decodeFile fn
     print $ x `asTypeOf` nf
     z <- Info.lookup nfo
     if (z /= t) then fail "Info Test Failed" else return ()

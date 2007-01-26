@@ -40,7 +40,7 @@ import Data.Maybe
 import List(sortBy)
 import qualified Data.Map as Map hiding(map)
 
-import Binary
+import Data.Binary
 import C.Prims
 import FrontEnd.Class(instanceName)
 import Doc.DocLike
@@ -57,7 +57,7 @@ import FrontEnd.Syn.Traverse
 import GenUtil
 import HsSyn
 import Info.Types
-import MapBinaryInstance()
+import MapBinaryInstance
 import Name.Id
 import Name.Name as Name
 import Name.Names
@@ -112,7 +112,7 @@ kind (KVar _) = error "Kind variable still existing."
 
 data AliasType = NotAlias | ErasedAlias | RecursiveAlias
     deriving(Eq,Ord,Show)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 -- these apply to types
 data DataFamily =
@@ -122,7 +122,7 @@ data DataFamily =
     | DataEnum !Int     -- bounded integral type, argument is maximum number
     | DataNormal [Name] -- child constructors
     deriving(Eq,Ord,Show)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 -- | Record describing a data type.
 -- * is also a data type containing the type constructors, which are unlifted, yet boxed.
@@ -138,14 +138,14 @@ data Constructor = Constructor {
     conVirtual   :: Maybe [Name], -- whether this is a virtual constructor that translates into an enum and its siblings
     conChildren  :: DataFamily
     } deriving(Show)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 data Slot =
     SlotNormal E
     | SlotUnpacked E !Name [E]
     | SlotExistential TVr
     deriving(Eq,Ord,Show)
-    {-! derive: GhcBinary !-}
+    {-! derive: Binary !-}
 
 mapESlot f (SlotExistential t) = SlotExistential t { tvrType = f (tvrType t) }
 mapESlot f (SlotNormal e) = SlotNormal $ f e
@@ -168,7 +168,11 @@ origSlots = map SlotNormal
 newtype DataTable = DataTable {
     constructorMap :: (Map.Map Name Constructor)
     }
-    {-! derive: GhcBinary, Monoid !-}
+    {-! derive: Monoid !-}
+
+instance Binary DataTable where
+    put (DataTable dt) = putMap dt
+    get = fmap DataTable getMap
 
 emptyConstructor = Constructor {
                 conName = error "emptyConstructor.conName",
