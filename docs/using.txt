@@ -5,9 +5,10 @@ can execute it and putting the libraries somewhere.
 
 === Building jhc ===
 
-building jhc requires the most recent version of DrIFT which can be gotten at
-http://repetae.net/john/computer/haskell/DrIFT/, GHC 6.4, happy, Perl, and having
-darcs will help keep updated with the newest version and submit patches.
+building jhc requires the most recent version of DrIFT 2.2.1 or better, which
+can be gotten at http://repetae.net/john/computer/haskell/DrIFT/, GHC 6.6,
+happy, Perl, and having darcs will help keep updated with the newest version
+and submit patches.
 
 ==== Getting the source ====
 
@@ -16,15 +17,19 @@ pull everything needed to build jhc.
 
   darcs get http://repetae.net/john/repos/jhc
   cd jhc
-  darcs get http://repetae.net/john/repos/Boolean
   darcs get http://repetae.net/john/repos/Doc
   cd lib
   darcs get http://darcs.haskell.org/packages/haskell98/
   darcs get http://darcs.haskell.org/packages/QuickCheck/
 
+The binary and zlib packages also need to be installed.
+
+  http://hackage.haskell.org/cgi-bin/hackage-scripts/package/binary/
+  http://hackage.haskell.org/cgi-bin/hackage-scripts/package/zlib/
+
 ==== making it ====
 
-Assuming you have ghc 6.4, happy, and DrIFT installed, you may now run GNU
+Assuming you have ghc 6.6, happy, and DrIFT installed, you may now run GNU
 make by typing 'gmake' or just 'make' depending on your system and get a
 binary 'jhc' out if nothing went wrong.
 
