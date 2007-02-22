@@ -34,6 +34,7 @@ import Name.Id
 import qualified Info.Info as Info
 import Util.HasSize
 import Util.SetLike
+import MapBinaryInstance
 
 data Demand =
     Bottom             -- always diverges
@@ -67,9 +68,19 @@ data DemandSignature = DemandSignature !Int DemandType
 data DemandType = (:=>) DemandEnv [Demand]
     deriving(Eq,Ord,Typeable)
         {-! derive: Binary !-}
+
 data DemandEnv = DemandEnv (Map.Map TVr Demand) Demand
     deriving(Eq,Ord,Typeable)
-        {-! derive: Binary !-}
+
+instance Binary DemandEnv where
+    put (DemandEnv dt d) = do
+        putMap dt
+        put d
+    get = do
+        m <- getMap
+        d <- get
+        return $ DemandEnv m d
+
 
 instance Show DemandType where
     showsPrec _ (DemandEnv e Absent :=> d) | isEmpty e = shows d
