@@ -106,18 +106,15 @@ findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
 
 
 
-findModule :: CollectedHo                                  -- ^ Accumulated Ho
-              -> (Either Module String)           -- ^ Either a module or filename to find
+findModule :: CollectedHo                                           -- ^ Accumulated Ho
+              -> [Either Module String]                             -- ^ Either a module or filename to find
               -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
               -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
-              -> IO (CollectedHo,Ho)                       -- ^ (Final accumulated ho,just the ho read to satisfy this command)
-findModule cho (Left m) ifunc _
-    | m `mmember` (hoExports . choHo $ cho) = return (cho,mempty)
+              -> IO (CollectedHo,Ho)                                -- ^ (Final accumulated ho,just the ho read to satisfy this command)
 findModule cho need ifunc func  = do
-    let f (Left (Module m)) = (m,searchPaths m)
-        f (Right n) = (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
-        (name,files) = f need
-    (readHo,ms) <- nextModule (fmap Just . hoModules . choHo $ cho) [] mempty [Right (name,files)]
+    let f (Left (Module m)) = Left (Module m)
+        f (Right n) = Right (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
+    (readHo,ms) <- nextModule (fmap Just . hoModules . choHo $ cho) [] mempty (map f (snub need))
     processIOErrors
     let mgraph =  (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires . fst3) )
         scc = G.sccGroups mgraph

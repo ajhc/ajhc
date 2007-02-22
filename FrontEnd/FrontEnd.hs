@@ -29,22 +29,16 @@ import qualified FrontEnd.Tc.Module as Tc
 
 -- | Main entry point to front end
 
-parseFiles :: [String]      -- ^ List of files to read
-               -> [Module]  -- ^ List of modules to find
+parseFiles :: [Either Module String]      -- ^ List of files or modules to read
                -> (CollectedHo -> Ho -> IO CollectedHo) -- ^ Process initial data loaded from ho files
                -> (CollectedHo -> Ho -> Tc.TiData -> IO (CollectedHo,Ho))  -- ^ routine which takes the global ho, the partial local ho and the output of the front end, and returns the completed ho.
                -> IO (CollectedHo,Ho)     -- ^ (the final combined ho,all the loaded ho data)
-parseFiles fs deps ifunc func = do
+parseFiles fs ifunc func = do
     wdump FD.Progress $ do
         putErrLn $ "Compiling " ++ show fs
     libraries <- loadLibraries
     initialHo <- ifunc mempty (initialHo `mappend` libraries)
-    let xs = snub $ map Right fs ++ map Left deps
-        f accumHo ho [] = return (accumHo,ho)
-        f accumHo ho (x:xs) = do
-            (accumHo,ho') <- findModule accumHo x ifunc (doModules func)
-            f accumHo (ho `mappend` ho') xs
-    (initialHo,ho) <- f initialHo mempty  xs
+    (initialHo,ho) <- findModule initialHo fs ifunc (doModules func)
     processIOErrors
     return (initialHo,ho)
 

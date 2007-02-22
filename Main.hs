@@ -128,7 +128,7 @@ buildLibrary [] = do
     return mempty
 buildLibrary mods = do
     putVerboseLn $ "Building library containing: " ++ show mods
-    (_,ho) <- parseFiles [] mods processInitialHo processDecls
+    (_,ho) <- parseFiles (map Left mods) processInitialHo processDecls
     -- TODO optimize, leaving out hidden module exports
     return ho
 
@@ -137,17 +137,15 @@ buildLibrary mods = do
 processFiles [] | Nothing <- optMainFunc options = do
     int <- isInteractive
     when (not int) $ putErrDie "jhc: no input files"
-    processFilesModules [] [Module "Prelude"]
+    processFilesModules [Left (Module "Prelude")]
 processFiles [] | Just (b,m) <- optMainFunc options = do
     m <- return $ parseName Val m
-    Module m <- getModule m
-    processFilesModules [] [Module m]
-processFiles cs = do
-    (ms,fs) <- return $ splitEither $ map fileOrModule cs
-    processFilesModules fs ms
+    m <- getModule m
+    processFilesModules [Left m]
+processFiles cs = do processFilesModules (map fileOrModule cs)
 
-processFilesModules fs ms = do
-    compileModEnv' =<< parseFiles fs ms processInitialHo processDecls
+processFilesModules fs = do
+    compileModEnv' =<< parseFiles fs processInitialHo processDecls
 
 fileOrModule f = case reverse f of
                    ('s':'h':'.':_)     -> Right f
