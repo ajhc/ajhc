@@ -82,7 +82,7 @@ createLibrary fp wtd = do
         emods = snub $ mfield "exposed-modules"
     let allmods  = sort $ map Module (emods ++ hmods)
     ho <- wtd (map Module emods)
-    let unknownMods = [ m | m <- allmods , m `mnotMember` (hoExports ho)]
+    let unknownMods = [ m | m <- mkeys (hoExports ho), m `notElem` allmods  ]
     mapM_ ((putStrLn . ("*** Module included in library that is not in export list: " ++)) . show) unknownMods
     let outName = case optOutName options of
             "hs.out" -> name ++ "-" ++ vers ++ ".hl"

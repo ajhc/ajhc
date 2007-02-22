@@ -52,7 +52,6 @@ import Ho.Type
 import Ho.Binary
 import Ho.LibraryMap
 import HsSyn
-import MapBinaryInstance()
 import Name.Id
 import Options
 import PackedString
