@@ -6,7 +6,7 @@ data TimeLocale = TimeLocale {
         amPm   :: (String, String),     -- AM/PM symbols
         dateTimeFmt, dateFmt,           -- formatting strings
           timeFmt, time12Fmt :: String
-        } deriving (Eq, Ord, Show)
+        } deriving (Eq, Ord)
 
 defaultTimeLocale :: TimeLocale
 defaultTimeLocale =  TimeLocale {
