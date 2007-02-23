@@ -4,9 +4,7 @@ module C.Generate(
     assign,
     basicType,
     cast,
-    character,
     cif,
-    commaExpression,
     constant,
     creturn,
     dereference,
@@ -39,11 +37,9 @@ module C.Generate(
     project',
     projectAnon,
     ptrType,
-    reference,
     renderG,
     sizeof,
     Statement(),
-    statementRaw,
     string,
     structAnon,
     structType,
@@ -52,10 +48,8 @@ module C.Generate(
     Type(),
     uoperator,
     variable,
-    voidStarType,
-    voidType,
-    withVars,
-    test
+    test,
+    voidType
     ) where
 
 import Char
@@ -190,7 +184,6 @@ localVariable t n = expD $ do
 emptyExpression = Exp ThNone EE
 
 expressionRaw s = expD $ text s
-statementRaw s = sd (text s)
 
 isEmptyExpression (Exp _ EE) = True
 isEmptyExpression _ = False
@@ -266,8 +259,6 @@ combine l a b = SD l $ do
     b <- draw b
     return $ vcat [a,b]
 
-statements :: [Statement] -> Statement
-statements = mconcat
 
 creturn :: Expression -> Statement
 creturn e = SD (StatementGoto (Name "")) $ text "return " <> draw e <> char ';'
@@ -281,7 +272,6 @@ label n@(Name s) = SD (StatementLabel n) $ text s <> char ':' <+> text "0;"
 goto :: Name -> Statement
 goto n@(Name s) = SD (StatementGoto n) $ text "goto" <+> text s <> char ';'
 
-withVars xs act = undefined
 --SD $ do
 --    us <- mapM (const newUniq) xs
 --    let ss = act [ variable (name $ 'v':show u) | u <- us]
@@ -394,8 +384,6 @@ voidStarType = ptrType voidType
 voidType :: Type
 voidType = basicType "void"
 
-typeChar = basicType "char"
-typeCharStar = ptrType typeChar
 
 
 class Annotate e where
@@ -439,7 +427,7 @@ generateC fs ss = ans where
         let shead = vcat $ map (text . (++ ";") . ("struct " ++) . show . fst) ss
         shead2 <- declStructs True ss
         return (shead $$ line $$ shead2, vcat protos $$ line $$  vsep bodys)
-    ((hd,fns),(_,ass),written) = runRWS ga () (1,Map.empty)
+    ((hd,fns),(_,ass),_written) = runRWS ga () (1,Map.empty)
 
     anons = [ (n, fields ts ) | (ts,n) <- Map.toList ass ] where
         fields :: [Type] -> [(Name,Type)]
@@ -460,7 +448,7 @@ vsep xs = vcat $ intersperse line xs
 test1 = constant (number 3)
 test2 = operator "-" (operator "+" test1 test1) test1
 test3 = expr $ functionCall (toName "foo") [test1,test2]
-test4 = statements [test3,expr test2,test3]
+test4 = mconcat [test3,expr test2,test3]
 
 showIt x = putStrLn (render $ drawG x)
 
