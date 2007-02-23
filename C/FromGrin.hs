@@ -467,7 +467,7 @@ convertFfiExport (n,Tup as :-> body) (FfiExport cn Safe CCall) = do
 
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
-compileGrin grin = (hsffi_h ++ jhc_rts_c ++ P.render ans ++ "\n", snub (reqLibraries req))  where
+compileGrin grin = (hsffi_h ++ jhc_rts_c ++ "\ntypedef union node node_t;\n" ++ P.render ans ++ "\n", snub (reqLibraries req))  where
     ans = vsep $ [vcat includes,enum_tag_t,header,union_node,text "/* CAFS */", vcat $ map ccaf (grinCafs grin), text "/* Constant Data */", jhc_sizeof_data, buildConstants finalHcHash,text  "/* Functions */",jhc_sizeof,body]
     includes =  map include (snub $ reqIncludes req)
     (header,body) = generateC (functions) structs

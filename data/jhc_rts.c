@@ -152,5 +152,6 @@ main(int argc, char *argv[])
         return 0;
 }
 
-typedef union node node_t;
+
+
 
