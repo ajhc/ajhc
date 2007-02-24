@@ -1,9 +1,7 @@
 #include <stdlib.h>
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#define _GNU_SOURCE
 #include <wchar.h>
 #include <limits.h>
 #include <locale.h>
