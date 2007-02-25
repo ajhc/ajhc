@@ -83,7 +83,7 @@ compileGrin grin = (hsffi_h ++ jhc_rts_c ++ jhc_rts2_c ++ P.render ans ++ "\n", 
     (header,body) = generateC (Map.elems fm) (Map.assocs sm)
     ((),finalHcHash,Written { wRequires = req, wFunctions = fm, wStructures = sm, wTags = ts }) = runC grin go
     enum_tag_t = text "enum {" $$ nest 4 (P.vcat (punctuate P.comma (zipWith f [0 ..] (tagHole:Set.toList ts)))) $$ text "};" where
-        f n t = tshow (nodeTagName t) <> text " = " <> tshow (n * 4 + 2 :: Int)
+        f n t = tshow (nodeTagName t) <> text " = " <> tshow (n :: Int) -- (n * 4 + 2 :: Int)
     cafs = text "/* CAFS */" $$ (vcat $ map ccaf (grinCafs grin))
     tags = (tagHole,[]):sortUnder (show . fst) [ (t,runIdentity $ findArgs (grinTypeEnv grin) t) | t <- Set.toList ts, tagIsTag t]
     go = do
@@ -524,7 +524,8 @@ newNode (NodeC t as) | tagIsSuspFunction t = do
         nonPtr TyNode = False
         nonPtr (TyTup xs) = all nonPtr xs
         nonPtr _ = True
-    return (mconcat $ malloc:tagassign:ass, cast pnode_t tmp)
+        tmp'' = functionCall (name "EVALTAG") [tmp]
+    return (mconcat $ malloc:tagassign:ass, cast pnode_t tmp'')
 newNode (NodeC t as) | tagIsWHNF t = do -- && not (tagIsPartialAp t) = do
     st <- nodeType t
     tell mempty { wTags = Set.singleton t }
