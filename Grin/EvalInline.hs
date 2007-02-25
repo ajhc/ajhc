@@ -17,6 +17,7 @@ import Grin.Grin
 import GenUtil
 import Support.FreeVars(freeVars)
 import Support.CanType(getType)
+import C.Arch
 import Util.Once
 import Util.UniqueMonad
 
@@ -31,9 +32,9 @@ mapExp f (b :-> e) = b :-> f e
 -- create an eval suitable for inlining.
 createEval :: UpdateType -> TyEnv -> [Tag] -> Lam
 createEval shared  te ts'
-
     | null cs = p1 :-> Error "Empty Eval" TyNode
     | all tagIsWHNF [ t | t <- ts , tagIsTag t] = p1 :-> Fetch p1
+    | NoUpdate <- shared, [t] <- ts = p1 :-> Fetch p1 :>>= f t
     | TrailingUpdate <- shared, [ot] <- ofts = p1 :->
         Fetch p1 :>>= n2 :->
         Case n2 (mapExp (:>>= n3 :-> Update p1 n3 :>>= unit :-> Return n3) (f ot):map f whnfts)
@@ -157,7 +158,8 @@ createEvalApply grin = do
             appBody = createApply targ tret (grinTypeEnv grin) tags
         TyEnv tyEnv = grinTypeEnv grin
         appTyEnv = Map.fromList ntyenv
-    return $ setGrinFunctions (apps ++ eval:funcs) grin { grinTypeEnv = TyEnv (tyEnv `Map.union` appTyEnv) }
+        teval = if isFGrin then [] else [eval]
+    return $ setGrinFunctions (apps ++ teval ++ funcs) grin { grinTypeEnv = TyEnv (tyEnv `Map.union` appTyEnv) }
 
 
 

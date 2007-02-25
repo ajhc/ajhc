@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -cpp -fbang-patterns #-}
-module C.Arch(determineArch,primitiveInfo,genericPrimitiveInfo) where
+module C.Arch(determineArch,primitiveInfo,genericPrimitiveInfo,isFGrin) where
 
 
 
@@ -20,9 +20,10 @@ module C.Arch(determineArch,primitiveInfo,genericPrimitiveInfo) where
 -}
 
 import Char
+import Data.List
+import System.IO.Unsafe
 import System.Info
 import qualified Data.Map as Map
-import System.IO.Unsafe
 
 import C.Prims
 import Options
@@ -65,10 +66,16 @@ primMap :: Map.Map ExtType PrimType
 primMap = Map.fromList [ (primTypeName a,a) | a <- as ] where
     (_,_,as,_) = unsafePerformIO determineArch
 
+isFGrin :: Bool
+isFGrin = case optArch options of
+    Nothing -> False
+    Just o -> "fgrin" `isPrefixOf` o
+
 determineArch = do
     let specs = maybe [] (split (== '-')) (optArch options)
         (backendGhc,specs') | ("ghc":rs) <- specs = (True,rs)
                             | ("grin":rs) <- specs = (False,rs)
+                            | ("fgrin":rs) <- specs = (False,rs)
                             | otherwise = (fopts FO.ViaGhc,specs)
         (cpu,bits) = case specs' of
             ["32"] -> (cpu_alias arch,32)

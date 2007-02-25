@@ -17,6 +17,7 @@ import qualified System
 
 import Atom
 import C.FromGrin
+import qualified C.FromGrin2 as FG2
 import C.Arch
 import CharIO
 import FrontEnd.Class
@@ -727,7 +728,7 @@ compileToGrin prog = do
 
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
 
-    if fopts FO.EvalOptimize then do
+    if fopts FO.EvalOptimize && not isFGrin then do
         lintCheckGrin x
         wdump FD.GrinPreeval $ printGrin x
         progress "Points-to analysis..."
@@ -765,7 +766,7 @@ compileToGrin prog = do
         x <- devolveGrin x
         x <- return $ normalizeGrin x
         dumpFinalGrin x
-        when (optMode options == CompileExe) $ compileGrinToC x
+        compileGrinToC x
      else do
         x <- createEvalApply x
         x <- return $ normalizeGrin x
@@ -774,7 +775,7 @@ compileToGrin prog = do
         x <- opt "After Devolve Optimization" x
         x <- return $ normalizeGrin x
         dumpFinalGrin x
-        when (optMode options == CompileExe) $ compileGrinToC x
+        compileGrinToC x
 
 dumpFinalGrin grin = do
     let fn = optOutName options
@@ -787,15 +788,10 @@ dumpFinalGrin grin = do
     wdump FD.Grin $ printGrin grin
 
 
+compileGrinToC grin | optMode options == Interpret = fail "Interpretation currently not supported."
+compileGrinToC grin | optMode options /= CompileExe = return ()
 compileGrinToC grin = do
-    when (optMode options == Interpret) $ do
-        putErrLn "Interpreting not supported."
-        --progress "Interpreting..."
-        --(v,stats) <- Grin.Interpret.evaluate grin
-        --CharIO.putStrLn $ render $ Grin.Show.prettyVal v
-        --wdump FD.Stats $  Stats.print "Stats" stats
-        return ()
-    let (cg,rls) = compileGrin grin
+    let (cg,rls) = if isFGrin then FG2.compileGrin grin else compileGrin grin
     let fn = optOutName options
     let cf = (fn ++ "_code.c")
     progress ("Writing " ++ show cf)
@@ -806,8 +802,8 @@ compileGrinToC grin = do
                   | otherwise = []
         profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE"]
                   | otherwise = []
-        comm = shellQuote $ [optCC options, "-std=gnu99", "-D_GNU_SOURCE", "-ffast-math", "-foptimize-sibling-calls", "-O2", {- "-funit-at-a-time", -} "-Wall", "-o", fn, cf ] ++ (map ("-l" ++) rls) ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
-        debug = if fopts FO.Debug then ["-g"] else ["-DNDEBUG"]
+        comm = shellQuote $ [optCC options, "-std=gnu99", "-D_GNU_SOURCE", "-fno-strict-aliasing", "-ffast-math", "-foptimize-sibling-calls", {- "-funit-at-a-time", -} "-Wall", "-o", fn, cf ] ++ (map ("-l" ++) rls) ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
+        debug = if fopts FO.Debug then ["-g"] else ["-DNDEBUG", "-O2"]
         globalvar n c = "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" (head $ lines versionString),"",cg]
     progress ("Running: " ++ comm)

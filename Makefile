@@ -137,7 +137,7 @@ PrimitiveOperators.hs: utils/op_process.prl data/operators.txt data/primitives.t
 Name/Prim.hs: utils/op_names.prl data/primitives.txt
 	perl ./utils/op_names.prl > $@ || rm -f $@
 
-RawFiles.hs:  data/HsFFI.h data/jhc_rts.c  data/ViaGhc.hs
+RawFiles.hs:  data/HsFFI.h data/jhc_rts.c data/jhc_rts2.c data/ViaGhc.hs
 	perl ./utils/op_raw.prl $(basename $@)  $^ > $@
 
 FrontEnd/HsParser.hs: FrontEnd/HsParser.y
