@@ -377,18 +377,6 @@ convertExp (Update v@(Var vv _) (NodeC t as)) | getType v == TyPtr TyNode = do
         return $ getTag tmp' =* constant (enum (nodeTagName t))
     let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
     return (mconcat $ profile_update_inc:s:ass,emptyExpression)
-{-
-convertExp (Update v@(Var vv _) (NodeC t as)) | getType v == TyPtr TyNode = do
-    v' <- convertVal v
-    as' <- mapM convertVal as
-    nt <- nodeTypePtr t
-    declareStruct t
-    tell mempty { wTags = Set.singleton t }
-    let tmp' = cast nt (if vv < v0 then f_DETAG v' else v')
-        s = getTag tmp' =* constant (enum (nodeTagName t))
-        ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
-    return (mconcat $ profile_update_inc:s:ass,emptyExpression)
--}
 convertExp e = return (err (show e),err "nothing")
 
 ccaf :: (Var,Val) -> P.Doc

@@ -150,6 +150,7 @@ toType node = toty . followAliases mempty where
         Nothing -> error $ "Grin.FromE.toType: " ++ show e
     toty _ = node
 
+{-# NOINLINE compile #-}
 compile :: Program -> IO Grin
 compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, progEntryPoints = entries } = do
     prog <- return $ prog { progCombinators  = map stripTheWorld (progCombinators prog) }
@@ -330,14 +331,19 @@ instance ToVal TVr where
 
 
 
-evalVar _ tvr | not isFGrin, Just CaseDefault <- Info.lookup (tvrInfo tvr)  = do
-        mtick "Grin.FromE.strict-casedefault"
-        return (Fetch (toVal tvr))
-evalVar _ tvr | getProperty prop_WHNF tvr = do
-        mtick "Grin.FromE.strict-propevaled"
-        return (Fetch (toVal tvr))
---evalVar fty tvr = return $ gEval (toVal tvr)
-evalVar fty tvr = return $ App funcEval [toVal tvr] fty
+evalVar fty tvr  = do
+    em <- asks evaledMap
+    case Map.lookup (tvrIdent tvr) em of
+        Just v -> do
+            mtick "Grin.FromE.strict-evaled"
+            return (Return v)
+        Nothing | not isFGrin, Just CaseDefault <- Info.lookup (tvrInfo tvr) -> do
+            mtick "Grin.FromE.strict-casedefault"
+            return (Fetch (toVal tvr))
+        Nothing | getProperty prop_WHNF tvr -> do
+            mtick "Grin.FromE.strict-propevaled"
+            return (Fetch (toVal tvr))
+        Nothing -> return $ App funcEval [toVal tvr] fty
 
 compile' ::  CEnv -> (TVr,[TVr],E) -> C (Atom,Lam)
 compile' cenv (tvr,as,e) = ans where
@@ -497,15 +503,23 @@ compile' cenv (tvr,as,e) = ans where
     ce ECase { eCaseScrutinee = scrut, eCaseBind = b, eCaseAlts = as, eCaseDefault = d }  = do
         v <- newNodeVar
         e <- ce scrut
-        as <- mapM cp as
-        def <- createDef d newNodeVar
-        return $ case (def,b,scrut) of
-            --([],_,_) -> e :>>= v :-> Case v as
-            (_,TVr {tvrIdent = 0 },_) -> e :>>= v :-> Case v (as ++ def)
-            (_,_,EVar etvr) ->  e :>>= v :-> Return (toVal etvr) :>>= toVal b :-> Case v (as ++ def)
-            (_,_,_) -> e :>>= v :-> Store v :>>= toVal b :-> Case v (as ++ def)
+        case (b,scrut) of
+            (_,EVar etvr) -> localEvaled [etvr,b] v $ do
+                    as <- mapM cp as
+                    def <- createDef d newNodeVar
+                    return $ e :>>= v :-> Return (toVal etvr) :>>= toVal b :-> Case v (as ++ def)
+            (TVr { tvrIdent = 0 },_) -> do
+                as <- mapM cp as
+                def <- createDef d newNodeVar
+                return $ e :>>= v :-> Case v (as ++ def)
+            (_,_) -> localEvaled [b] v $ do
+                    as <- mapM cp as
+                    def <- createDef d newNodeVar
+                    return $ e :>>= v :-> Store v :>>= toVal b :-> Case v (as ++ def)
     ce e = error $ "ce: " ++ render (pprint (funcName,e))
 
+    localEvaled vs v action = local (\lenv -> lenv { evaledMap = nm `mappend` evaledMap lenv }) action where
+        nm = Map.fromList [ (tvrIdent x, v) | x <- vs, tvrIdent x /= 0 ]
 
     createDef Nothing _ = return []
     createDef (Just e) nnv = do
