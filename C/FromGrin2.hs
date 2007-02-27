@@ -1,23 +1,22 @@
 
 module C.FromGrin2(compileGrin) where
 
-import qualified Text.PrettyPrint.HughesPJ as P
-import Text.PrettyPrint.HughesPJ(nest,($$))
-import Control.Monad.RWS
 import Control.Monad.Identity
+import Control.Monad.RWS
 import Data.List
 import Data.Maybe
 import Data.Monoid
+import Text.PrettyPrint.HughesPJ(nest,($$))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Text.PrettyPrint.HughesPJ as P
 
 
 import Atom
+import C.Arch
 import C.FFI
-import Support.FreeVars
 import C.Generate
 import C.Prims
-import C.Arch
 import Doc.DocLike
 import Doc.PPrint
 import Grin.Grin
@@ -28,6 +27,7 @@ import Grin.Val
 import PackedString
 import RawFiles
 import Support.CanType
+import Support.FreeVars
 import Util.Gen
 import Util.UniqueMonad
 
@@ -49,7 +49,7 @@ data Written = Written {
     }
     {-! derive: Monoid !-}
 
-data Red = Red {
+data Env = Env {
     rTodo :: Todo,
     rEMap :: Map.Map Atom (Name,[Expression]),
     rGrin :: Grin
@@ -57,12 +57,12 @@ data Red = Red {
     {-! derive: update !-}
 
 
-newtype C a = C (RWST Red Written HcHash Uniq a)
-    deriving(Monad,UniqueProducer,MonadState HcHash,MonadWriter Written,MonadReader Red)
+newtype C a = C (RWST Env Written HcHash Uniq a)
+    deriving(Monad,UniqueProducer,MonadState HcHash,MonadWriter Written,MonadReader Env)
 
 
 runC :: Grin -> C a -> (a,HcHash,Written)
-runC grin (C m) =  execUniq1 (runRWST m Red { rGrin = grin, rTodo = TodoNothing, rEMap = mempty } emptyHcHash)
+runC grin (C m) =  execUniq1 (runRWST m Env { rGrin = grin, rTodo = TodoNothing, rEMap = mempty } emptyHcHash)
 
 tellFunctions :: [Function] -> C ()
 tellFunctions fs = tell mempty { wFunctions = Map.fromList $ map (\x -> (functionName x,x)) fs }
