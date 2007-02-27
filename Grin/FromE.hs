@@ -219,13 +219,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
     wdump FD.Tags $ do
         dumpTyEnv newTyEnv
     fbaps <- readIORef funcBaps
-    --sequence_ [ typecheck te c >>= when False . print . (,) a  | (a,_,c) <-  ds ]
-    -- let (main,as,rtype) = runIdentity $ Map.lookup (tvrIdent mt) scMap
-        -- main' =  if not $ null as then  (Return $ NodeC (partialTag main (length as)) []) else App main [] rtype
-        -- tags = Set.toList $ ep $ Set.unions (freeVars (main',initCafs):[ freeVars e | (_,(_ :-> e)) <- ds ])
-    let -- ep s = Set.fromList $ concatMap partialLadder $ Set.toList s
-        -- cafs = [ ((V $ - atomIndex tag),NodeC tag []) | (x,(Tup [] :-> _)) <- ds, let tag = partialTag x 0 ] ++ [ (y,z') |(x,y,z) <- cc, y `elem` reqcc, let Const z' = z ]
-        cafs = [ (x,y) | (_,x,y) <- rcafs ]
+    let cafs = [ (x,y) | (_,x,y) <- rcafs ]
         initCafs = sequenceG_ [ Update (Var v (TyPtr TyNode)) node | (v,node) <- cafs ]
         ic = (funcInitCafs,(Tup [] :-> initCafs) )
         ds' = ic:(ds ++ fbaps)
@@ -239,17 +233,17 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
             grinCafs = [ (x,NodeC tagHole []) | (x,_) <- cafs]
             }
         theFuncs = (funcMain ,(Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  discardResult theMain)) : efv ++ ds'
-    --typecheckGrin grin
     return grin
     where
     scMap = Map.fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- map stripTheWorld $ progCombinators prog]
     initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ [ (a,toTyTy (b,c)) | (_,(a,b,c)) <-  Map.toList scMap] ++ concat [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = return $ (tagArrow,toTyTy ([TyPtr TyNode, TyPtr TyNode],TyNode))
-    con c | keepIt = return $ (n,toTyTy (as,TyNode)) where
+    con c | keepIt = return $ (n,TyTy { tySlots = as, tyReturn = TyNode, tySiblings = fmap (map convertName) sibs}) where
         n | sortKindLike (conType c) = convertName (conName c)
           | otherwise = convertName (conName c)
         as = [ toType (TyPtr TyNode) s |  s <- conSlots c, shouldKeep s]
         keepIt = isNothing (conVirtual c) || TypeConstructor == nameType (conName c)
+        sibs = getSiblings dataTable (conName c)
     con _ = fail "not needed"
 
 discardResult exp = case getType exp of
