@@ -154,7 +154,7 @@ createEvalApply grin = do
     funcs <- mapMsnd f (grinFuncs grin)
     as <- onceMapToList appMap
     let (apps,ntyenv) = unzip $ map cf as
-        cf ((targ,tret),name) = ((name,appBody),(name,([TyNode,targ],tret))) where
+        cf ((targ,tret),name) = ((name,appBody),(name,tyTy { tySlots = [TyNode,targ],tyReturn = tret })) where
             appBody = createApply targ tret (grinTypeEnv grin) tags
         TyEnv tyEnv = grinTypeEnv grin
         appTyEnv = Map.fromList ntyenv

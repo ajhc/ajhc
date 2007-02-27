@@ -44,7 +44,6 @@ data Written = Written {
     wRequires :: Requires,
     wStructures :: Map.Map Name [(Name,Type)],
     wTags :: Set.Set Atom,
---    wCAFS :: [Doc],
     wFunctions :: Map.Map Name Function
     }
     {-! derive: Monoid !-}
@@ -79,7 +78,6 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 compileGrin :: Grin -> (String,[String])
 compileGrin grin = (hsffi_h ++ jhc_rts_c ++ jhc_rts2_c ++ P.render ans ++ "\n", snub (reqLibraries req))  where
     ans = vcat $ includes ++ [text "", enum_tag_t, header, cafs,buildConstants finalHcHash, body]
-    --ans = vcat $ includes ++ [text "", enum_tag_t, header, text "/* CAFS */", vcat cafs,buildConstants finalHcHash, body]
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
     (header,body) = generateC (Map.elems fm) (Map.assocs sm)
@@ -88,8 +86,6 @@ compileGrin grin = (hsffi_h ++ jhc_rts_c ++ jhc_rts2_c ++ P.render ans ++ "\n", 
         f n t = tshow (nodeTagName t) <> text " = " <> tshow (n :: Int) -- (n * 4 + 2 :: Int)
     tags = (tagHole,[]):sortUnder (show . fst) [ (t,runIdentity $ findArgs (grinTypeEnv grin) t) | t <- Set.toList ts, tagIsTag t]
     go = do
-        --cs <- mapM doCAF (grinCafs grin)
-        --tell mempty { wCAFS = cs }
         funcs <- flip mapM (grinFuncs grin) $ \(a,l) -> do
                     convertFunc (Map.lookup a (grinEntryPoints grin)) (a,l)
         tellFunctions funcs
@@ -97,18 +93,16 @@ compileGrin grin = (hsffi_h ++ jhc_rts_c ++ jhc_rts2_c ++ P.render ans ++ "\n", 
         let tset = Set.fromList [ n | (HcNode n _,_) <- Grin.HashConst.toList h]
         mapM_ declareStruct  (Set.toList tset)
         tell mempty { wTags = tset }
-
-
     cafs = text "/* CAFS */" $$ (vcat $ map ccaf (grinCafs grin))
 
 convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C Function
 convertFunc ffie (n,Tup as :-> body) = do
         s <- localTodo TodoReturn (convertBody body)
         let bt = getType body
-            mmalloc (TyPtr _) = [Attribute "A_MALLOC"]
-            mmalloc TyNode = [Attribute "A_MALLOC"]
+            mmalloc (TyPtr _) = [a_MALLOC]
+            mmalloc TyNode = [a_MALLOC]
             mmalloc _ = []
-            ats = (if isNothing ffie then Attribute "A_STD" else Public):mmalloc bt
+            ats = (if isNothing ffie then a_STD else Public):mmalloc bt
             fnname = case ffie of
                 Nothing -> nodeFuncName n
                 Just (FfiExport cn Safe CCall) -> name cn
@@ -246,7 +240,7 @@ convertBody (Case v@Var {} [v1, v2@(Lit n _ :-> _)]) | n == 0 = convertBody (Cas
 convertBody (Case v@(Var _ t) [p1 :-> e1, p2 :-> e2]) | Set.null ((freeVars p2 :: Set.Set Var) `Set.intersection` freeVars e2) = do
     scrut <- convertVal v
     let ptrs = [Ty $ toAtom "HsPtr", Ty $ toAtom "HsFunPtr"]
-        scrut' = (if t `elem` ptrs then cast (basicType "uintptr_t") scrut else scrut)
+        scrut' = (if t `elem` ptrs then cast uintptr_t scrut else scrut)
         cp (Lit i _) = constant (number $ fromIntegral i)
         cp (Tag t) = constant (enum (nodeTagName t))
         am e | isVar p2 = e
@@ -279,7 +273,7 @@ convertBody (Case v@(Var _ t) ls) | t == TyNode = do
 convertBody (Case v@(Var _ t) ls) = do
     scrut <- convertVal v
     let ptrs = [Ty $ toAtom "HsPtr", Ty $ toAtom "HsFunPtr"]
-        scrut' = (if t `elem` ptrs then cast (basicType "uintptr_t") scrut else scrut)
+        scrut' = (if t `elem` ptrs then cast uintptr_t scrut else scrut)
         da (v@(Var {}) :-> e) = do
             v'' <- convertVal v
             e' <- convertBody e
@@ -297,7 +291,7 @@ convertBody (Case v@(Var _ t) ls) = do
 
 convertBody e = do
     x <- asks rTodo
-    (ss,er) <- convertExp e -- lift $  runSubCGen $ cexp e
+    (ss,er) <- convertExp e
     case x of
         TodoReturn -> return (ss & creturn er)
         TodoExp v | isEmptyExpression er -> return ss
@@ -340,7 +334,7 @@ convertExp (Fetch v) | getType v == TyPtr (TyPtr TyNode) = do
     return (mempty,dereference v)
 convertExp (Fetch v) | getType v == TyPtr TyNode = do
     v <- convertVal v
-    return (mempty,(functionCall (name "fetch") [v]))
+    return (mempty,f_fetch v)
 convertExp (Update v z) | getType z == TyPtr TyNode = do
     v' <- convertVal v
     z' <- convertVal z
@@ -351,7 +345,7 @@ convertExp (Update v z) | getType z == TyPtr TyNode = do
 --    return (mempty,(functionCall (name "eval") [v']))
 convertExp (App a [v] _) | a == funcEval = do
     v' <- convertVal v
-    return (mempty,(functionCall (name "eval") [v']))
+    return (mempty,f_eval v')
 convertExp (Store n@NodeC {}) = newNode n
 convertExp (Return n@NodeC {}) = newNode n
 convertExp (Store n@Var {}) | getType n == TyNode = do
@@ -517,7 +511,7 @@ declareEvalFunc n = do
         atype = ptrType nt
         body = rvar =* functionCall (toName (show $ fn)) [ project' (arg i) (variable aname) | _ <- ts | i <- [1 .. ] ]
         update =  f_update (cast wptr_t (variable aname)) rvar
-    tellFunctions [function fname wptr_t [(aname,atype)] [Attribute "A_STD"] (body & update & creturn rvar )]
+    tellFunctions [function fname wptr_t [(aname,atype)] [a_STD] (body & update & creturn rvar )]
     return fname
 
 
@@ -558,14 +552,16 @@ instance Show Shapes where
 ----------------------------
 
 jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
-f_assert e = expr $ functionCall (name "assert") [e]
-f_DETAG e = functionCall (name "DETAG") [e]
-f_NODEP e = functionCall (name "NODEP") [e]
-f_EVALTAG e = functionCall (name "EVALTAG") [e]
-f_update x y = functionCall (name "update") [x,y]
+f_assert e    = functionCall (name "assert") [e]
+f_DETAG e     = functionCall (name "DETAG") [e]
+f_NODEP e     = functionCall (name "NODEP") [e]
+f_EVALTAG e   = functionCall (name "EVALTAG") [e]
+f_eval e      = functionCall (name "eval") [e]
+f_fetch e     = functionCall (name "fetch") [e]
+f_update x y  = functionCall (name "update") [x,y]
 jhc_malloc_atomic sz = functionCall (name "jhc_malloc_atomic") [sz]
-profile_update_inc = expr $ functionCall (name "update_inc") []
-profile_case_inc = expr $ functionCall (name "case_inc") []
+profile_update_inc   = expr $ functionCall (name "update_inc") []
+profile_case_inc     = expr $ functionCall (name "case_inc") []
 profile_function_inc = expr $ functionCall (name "function_inc") []
 
 arg i = name $ 'a':show i
@@ -579,10 +575,14 @@ nodeTagName a = toName (toString a)
 nodeFuncName :: Atom -> Name
 nodeFuncName a = toName (toString a)
 
-sptr_t = basicType "sptr_t"
-wptr_t = basicType "wptr_t"
-size_t = basicType "size_t"
-tag_t = basicType "tag_t"
+sptr_t    = basicType "sptr_t"
+wptr_t    = basicType "wptr_t"
+size_t    = basicType "size_t"
+tag_t     = basicType "tag_t"
+uintptr_t = basicType "uintptr_t"
+
+a_STD = Attribute "A_STD"
+a_MALLOC = Attribute "A_MALLOC"
 
 concrete :: Atom -> Expression -> Expression
 concrete t e = cast (ptrType $ structType (nodeStructName t)) e

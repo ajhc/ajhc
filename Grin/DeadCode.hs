@@ -69,15 +69,15 @@ deadCode stats roots grin = do
         r <- runStatIO stats $ removeDeadArgs postInline funSet directFuncs cafSet argSet (x,y)
         return [r]
     let (TyEnv mp) = grinTypeEnv grin
-    mp' <- flip mconcatMapM (Map.toList mp) $ \ (x,(ts,rt)) -> case Just x  of
+    mp' <- flip mconcatMapM (Map.toList mp) $ \ (x,tyty@TyTy { tySlots = ts }) -> case Just x  of
         Just _ | tagIsFunction x, not $ x `Set.member` funSet -> return []
         Just fn | fn `Set.member` directFuncs -> do
             let da (t,i)
                     | Set.member (fn,i) argSet = return [t]
                     | otherwise = tick stats ("Optimize.dead-code.arg-func.{" ++ show x ++ "-" ++ show i) >> return []
             ts' <- mconcatMapM da (zip ts naturals)
-            return [(x,(ts',rt))]
-        _ -> return [(x,(ts,rt))]
+            return [(x,tyty { tySlots = ts' })]
+        _ -> return [(x,tyty)]
     let newArgTags = concatMap foo (Map.toList $ grinArgTags grin)
         foo (fn,ts) | not $ fn `Set.member` funSet = []
         foo (fn,ts) | fn `Set.member` directFuncs = [(fn,concatMap da (zip ts naturals))] where

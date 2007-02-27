@@ -84,7 +84,7 @@ unboxReturnValues grin = do
         fns = Map.unions $ concatMap pf cfns
         retTag fn _ | Just (_,_,_,ret) <- Map.lookup fn fns = ret
         retTag _ x = x
-        retTe fn (ts,_) | Just (_,_,ret,_) <- Map.lookup fn fns = (ts,ret)
+        retTe fn tyty | Just (_,_,ret,_) <- Map.lookup fn fns = tyty { tyReturn = ret }
         retTe _ x = x
         mtenv (TyEnv mp) = TyEnv $ Map.mapWithKey retTe mp
         doFunc (fn,lam) | Just (unboxReturn,_,_,_) <- Map.lookup fn fns = doFunc' (fn,convertReturns unboxReturn lam)

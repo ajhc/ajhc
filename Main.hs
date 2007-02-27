@@ -1044,7 +1044,7 @@ lintCheckProgram _ _ = return ()
 
 
 
-dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ show n <+> hsep (map show as) <+> "::" <+> show t |  (n,(as,t)) <- Map.toList tt]
+dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ show n <+> hsep (map show as) <+> "::" <+> show t |  (n,TyTy { tySlots = as, tyReturn = t }) <- Map.toList tt]
 
 printCheckName dataTable e = do
     putErrLn  ( render $ hang 4 (pprint e <+> text "::") )

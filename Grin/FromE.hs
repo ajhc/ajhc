@@ -107,7 +107,9 @@ data CEnv = CEnv {
 newtype IsCAF = IsCAF Bool
     deriving(Typeable,Show,Eq)
 
-dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ fromAtom n <+> hsep (map show as) <+> "::" <+> show t |  (n,(as,t)) <- Map.toList tt]
+dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ fromAtom n <+> hsep (map show as) <+> "::" <+> show t <> f z |  (n,TyTy { tySlots = as, tyReturn = t, tySiblings = z }) <- Map.toList tt] where
+    f Nothing = mempty
+    f (Just v) = text " " <> tshow v
 
 tagArrow = convertName tc_Arrow
 
@@ -149,6 +151,9 @@ toType node = toty . followAliases mempty where
         Just (Just x) -> x
         Nothing -> error $ "Grin.FromE.toType: " ++ show e
     toty _ = node
+
+toTyTy (as,r) = tyTy { tySlots = as, tyReturn = r }
+
 
 {-# NOINLINE compile #-}
 compile :: Program -> IO Grin
@@ -210,7 +215,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
 
     TyEnv endTyEnv <- readIORef tyEnv
     -- FIXME correct types.
-    let newTyEnv = TyEnv $ Map.fromList (concatMap makePartials (Map.toList endTyEnv) ++ [(funcMain, ([],tyUnit))] ++ [(en, ([],tyUnit)) | en <- enames])
+    let newTyEnv = TyEnv $ Map.fromList (concatMap makePartials (Map.toList endTyEnv) ++ [(funcMain, toTyTy ([],tyUnit))] ++ [(en, toTyTy ([],tyUnit)) | en <- enames])
     wdump FD.Tags $ do
         dumpTyEnv newTyEnv
     fbaps <- readIORef funcBaps
@@ -238,9 +243,9 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
     return grin
     where
     scMap = Map.fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- map stripTheWorld $ progCombinators prog]
-    initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ [ (a,(b,c)) | (_,(a,b,c)) <-  Map.toList scMap] ++ concat [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
-    con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = return (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode))
-    con c | keepIt = return (n,(as,TyNode)) where
+    initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ [ (a,toTyTy (b,c)) | (_,(a,b,c)) <-  Map.toList scMap] ++ concat [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
+    con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = return $ (tagArrow,toTyTy ([TyPtr TyNode, TyPtr TyNode],TyNode))
+    con c | keepIt = return $ (n,toTyTy (as,TyNode)) where
         n | sortKindLike (conType c) = convertName (conName c)
           | otherwise = convertName (conName c)
         as = [ toType (TyPtr TyNode) s |  s <- conSlots c, shouldKeep s]
@@ -263,19 +268,19 @@ shouldKeep :: E -> Bool
 shouldKeep e = tyUnit /= toType TyNode e
 
 
-makePartials (fn,(ts,rt)) | tagIsFunction fn, head (show fn) /= '@'  = (fn,(ts,rt)):[(partialTag fn i,(reverse $ drop i $ reverse ts ,TyNode)) |  i <- [0.. end] ]  where
+makePartials (fn,TyTy { tySlots = ts, tyReturn = rt }) | tagIsFunction fn, head (show fn) /= '@'  = (fn,toTyTy (ts,rt)):[(partialTag fn i,toTyTy (reverse $ drop i $ reverse ts ,TyNode)) |  i <- [0.. end] ]  where
     end | 'b':_ <- show fn = 0
         | otherwise = length ts
 makePartials x = [x]
 
-primTyEnv = TyEnv . Map.fromList $ [
+primTyEnv = TyEnv . Map.map toTyTy $ Map.fromList $ [
     (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode)),
     (convertName tc_Absurd, ([],TyNode)),
     (funcInitCafs, ([],tyUnit)),
     (funcEval, ([TyPtr TyNode],TyNode)),
     (funcApply, ([TyNode, TyPtr TyNode],TyNode)),
     (tagHole, ([],TyNode))
-    ] ++ [ (toAtom ('C':show dc), ([Ty $ toAtom y],TyNode)) | (dc,tc,_,y,_) <- allCTypes, y /= "void" ]
+    ]
 
 
 -- | constant CAF analysis
@@ -574,7 +579,7 @@ compile' cenv (tvr,as,e) = ans where
         return s
     addNewFunction cenv tl@(n,Tup args :-> body) = do
         liftIO $ modifyIORef (funcBaps cenv) (tl:)
-        let addt (TyEnv mp) =  TyEnv $ Map.insert n (map getType args,getType body) mp
+        let addt (TyEnv mp) =  TyEnv $ Map.insert n (toTyTy (map getType args,getType body)) mp
         liftIO $ modifyIORef (tyEnv cenv) addt
 
     -- | cc evaluates something in lazy context, returning a pointer to a node which when evaluated will produce the strict result.

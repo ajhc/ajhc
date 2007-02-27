@@ -128,13 +128,13 @@ data DataFamily =
 -- * is also a data type containing the type constructors, which are unlifted, yet boxed.
 
 data Constructor = Constructor {
-    conName      :: Name,        -- name of constructor
+    conName      :: Name,         -- name of constructor
     conType      :: E,            -- type of constructor
     conExpr      :: E,            -- expression which constructs this value
-    conOrigSlots :: [Slot],      -- original slots
+    conOrigSlots :: [Slot],       -- original slots
     conDeriving  :: [Name],       -- classes this type derives
     conAlias     :: AliasType,    -- whether this is a simple alias and has no tag of its own.
-    conInhabits  :: Name,        -- what constructor it inhabits, similar to conType, but not quite.
+    conInhabits  :: Name,         -- what constructor it inhabits, similar to conType, but not quite.
     conVirtual   :: Maybe [Name], -- whether this is a virtual constructor that translates into an enum and its siblings
     conChildren  :: DataFamily
     } deriving(Show)
