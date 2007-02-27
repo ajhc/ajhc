@@ -14,7 +14,7 @@ foreign import primitive newMutArray__      :: Int__ -> a -> UIO (MutArray__ a)
 foreign import primitive newBlankMutArray__ :: Int__ -> UIO (MutArray__ a)
 foreign import primitive copyArray__        :: Int__ -> Int__ -> Int__ -> Array__ a -> MutArray__ a -> UIO_
 foreign import primitive copyMutArray__     :: Int__ -> Int__ -> Int__ -> MutArray__ a -> MutArray__ a -> UIO_
-foreign import primitive readArray__        :: MutArray__ a -> Int__ -> IO a
+foreign import primitive readArray__        :: MutArray__ a -> Int__ -> UIO a
 foreign import primitive writeArray__       :: MutArray__ a -> Int__ -> a -> UIO_
 foreign import primitive indexArray__       :: Array__ a -> Int__ -> (# a #)
 
