@@ -159,11 +159,9 @@ convertVal (ValPrim (APrim p _) [x,y] _) = do
 convertVal x = return $ err ("convertVal: " ++ show x)
 
 convertType TyTag = return tag_t
---convertType TyNode = return pnode_t
---convertType (TyPtr TyNode) = return pnode_t
-convertType TyNode = return sptr_t
+convertType TyNode = return wptr_t
 convertType (TyPtr TyNode) = return sptr_t
-convertType (TyPtr (TyPtr TyNode)) = return $ ptrType sptr_t -- ppnode_t
+convertType (TyPtr (TyPtr TyNode)) = return $ ptrType sptr_t
 convertType (Ty t) = return (basicType (toString t))
 convertType (TyTup []) = return voidType
 convertType (TyTup [x]) = convertType x
@@ -329,8 +327,8 @@ convertExp (Prim p vs) | APrim _ req <- primAPrim p  =  do
     return (mempty,e)
 convertExp (Store v) | TyPtr TyNode == getType v = do
     v <- convertVal v
-    tmp <- newVar ppnode_t
-    return ((tmp =* jhc_malloc (sizeof pnode_t)) & (dereference tmp =* v),tmp)
+    tmp <- newVar (ptrType sptr_t)
+    return ((tmp =* jhc_malloc (sizeof sptr_t)) & (dereference tmp =* v),tmp)
 convertExp (Fetch v) | getType v == TyPtr (TyPtr TyNode) = do
     v <- convertVal v
     return (mempty,dereference v)
@@ -365,29 +363,36 @@ convertExp (App a vs _) = do
             let ss = [ a =* v | a <- as | v <- vs' ]
             return (mconcat ss & goto nm, emptyExpression)
         Nothing -> return $ (mempty, functionCall (toName (toString a)) vs')
-convertExp (Update v@Var {} (NodeC t as)) | tagIsSuspFunction t, getType v == TyPtr TyNode = do
-    en <- declareEvalFunc t
+convertExp (Update v@(Var vv _) (NodeC t as)) | getType v == TyPtr TyNode = do
     v' <- convertVal v
     as' <- mapM convertVal as
     nt <- nodeTypePtr t
-    let tmp' = cast nt v'
-        s = getTag tmp' =* functionCall (name "EVALTAG") [reference (variable en)]
-        ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
+    let tmp' = cast nt (if vv < v0 then f_DETAG v' else v')
+    s <- if tagIsSuspFunction t then do
+        en <- declareEvalFunc t
+        return $ getTag tmp' =* f_EVALTAG (reference (variable en))
+     else do
+        declareStruct t
+        tell mempty { wTags = Set.singleton t }
+        return $ getTag tmp' =* constant (enum (nodeTagName t))
+    let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
     return (mconcat $ profile_update_inc:s:ass,emptyExpression)
-convertExp (Update v@Var {} (NodeC t as)) | getType v == TyPtr TyNode = do
+{-
+convertExp (Update v@(Var vv _) (NodeC t as)) | getType v == TyPtr TyNode = do
     v' <- convertVal v
     as' <- mapM convertVal as
     nt <- nodeTypePtr t
     declareStruct t
     tell mempty { wTags = Set.singleton t }
-    let tmp' = cast nt v'
+    let tmp' = cast nt (if vv < v0 then f_DETAG v' else v')
         s = getTag tmp' =* constant (enum (nodeTagName t))
         ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
     return (mconcat $ profile_update_inc:s:ass,emptyExpression)
+-}
 convertExp e = return (err (show e),err "nothing")
 
 ccaf :: (Var,Val) -> P.Doc
-ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ P.render (pprint val)) <> text "*/\n" <> text "static node_t _" <> tshow (varName v) <> text ";\n" <> text "#define " <> tshow (varName v) <+>  text "(&_" <> tshow (varName v) <> text ")\n";
+ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ P.render (pprint val)) <> text "*/\n" <> text "static node_t _" <> tshow (varName v) <> text ";\n" <> text "#define " <> tshow (varName v) <+>  text "(EVALTAG(&_" <> tshow (varName v) <> text "))\n";
 
 
 buildConstants fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
@@ -456,30 +461,30 @@ isValUnknown ValUnknown {} = True
 isValUnknown _ = False
 
 newNode (NodeC t _) | t == tagHole = do
-    return $  (mempty,jhc_malloc (sizeof node_t))
+    fail "newNode.tagHole"
 newNode (NodeC t as) | tagIsSuspFunction t = do
     en <- declareEvalFunc t
     st <- nodeType t
     as' <- mapM convertVal as
-    tmp <- newVar pnode_t
+    tmp <- newVar sptr_t
     let tmp' = concrete t tmp
         malloc =  tmp =* jhc_malloc (sizeof st)
-        tagassign = getTag tmp' =* functionCall (name "EVALTAG") [reference (variable en)]
+        tagassign = getTag tmp' =* f_EVALTAG (reference (variable en))
         ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
         nonPtr TyPtr {} = False
         nonPtr TyNode = False
         nonPtr (TyTup xs) = all nonPtr xs
         nonPtr _ = True
-        tmp'' = functionCall (name "EVALTAG") [tmp]
-    return (mconcat $ malloc:tagassign:ass, cast pnode_t tmp'')
+        tmp'' = f_EVALTAG tmp
+    return (mconcat $ malloc:tagassign:ass, cast sptr_t tmp'')
 newNode (NodeC t as) | tagIsWHNF t = do -- && not (tagIsPartialAp t) = do
     st <- nodeType t
     tell mempty { wTags = Set.singleton t }
     declareStruct t
     as' <- mapM convertVal as
-    tmp <- newVar pnode_t
+    tmp <- newVar wptr_t
     let tmp' = concrete t tmp
-        malloc =  tmp =* wmalloc (sizeof  (if tagIsWHNF t then st else node_t))
+        malloc =  tmp =* wmalloc (sizeof st)
         tagassign = getTag tmp' =* constant (enum $ nodeTagName t)
         wmalloc = if tagIsWHNF t && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
         ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
@@ -487,7 +492,7 @@ newNode (NodeC t as) | tagIsWHNF t = do -- && not (tagIsPartialAp t) = do
         nonPtr TyNode = False
         nonPtr (TyTup xs) = all nonPtr xs
         nonPtr _ = True
-    return (mconcat $ malloc:tagassign:ass, cast pnode_t tmp)
+    return (mconcat $ malloc:tagassign:ass, tmp)
 newNode e = return (err (show e),err "newNode")
 
 ------------------
@@ -508,11 +513,11 @@ declareEvalFunc n = do
     let ts = runIdentity $ findArgs (grinTypeEnv grin) n
         fname = toName $ "jhc_eval_" ++ show fn
         aname = name "arg";
-        rvar = localVariable sptr_t (name "r");
+        rvar = localVariable wptr_t (name "r");
         atype = ptrType nt
         body = rvar =* functionCall (toName (show $ fn)) [ project' (arg i) (variable aname) | _ <- ts | i <- [1 .. ] ]
-        update =  functionCall (toName "update") [cast sptr_t (variable aname),rvar]
-    tellFunctions [function fname sptr_t [(aname,atype)] [] (body & update & creturn rvar )]
+        update =  functionCall (toName "update") [cast wptr_t (variable aname),rvar]
+    tellFunctions [function fname wptr_t [(aname,atype)] [] (body & update & creturn rvar )]
     return fname
 
 
@@ -554,6 +559,8 @@ instance Show Shapes where
 
 jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
 f_assert e = expr $ functionCall (name "assert") [e]
+f_DETAG e = functionCall (name "DETAG") [e]
+f_EVALTAG e = functionCall (name "EVALTAG") [e]
 jhc_malloc_atomic sz = functionCall (name "jhc_malloc_atomic") [sz]
 profile_update_inc = expr $ functionCall (name "update_inc") []
 profile_case_inc = expr $ functionCall (name "case_inc") []
@@ -570,10 +577,8 @@ nodeTagName a = toName (toString a)
 nodeFuncName :: Atom -> Name
 nodeFuncName a = toName (toString a)
 
-node_t = basicType "node_t"
 sptr_t = basicType "sptr_t"
-pnode_t = ptrType node_t
-ppnode_t = ptrType (ptrType node_t)
+wptr_t = basicType "wptr_t"
 size_t = basicType "size_t"
 tag_t = basicType "tag_t"
 
