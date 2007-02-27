@@ -87,7 +87,7 @@ typedef struct node {
 } node_t;
 
 
-typedef sptr_t (*eval_fn)(node_t *node);
+typedef sptr_t (*eval_fn)(node_t *node) A_STD;
 
 // fetch is like a cast, an 'eval' where you know the target is in WHNF
 static wptr_t A_STD A_UNUSED

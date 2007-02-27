@@ -517,7 +517,7 @@ declareEvalFunc n = do
         atype = ptrType nt
         body = rvar =* functionCall (toName (show $ fn)) [ project' (arg i) (variable aname) | _ <- ts | i <- [1 .. ] ]
         update =  f_update (cast wptr_t (variable aname)) rvar
-    tellFunctions [function fname wptr_t [(aname,atype)] [] (body & update & creturn rvar )]
+    tellFunctions [function fname wptr_t [(aname,atype)] [Attribute "A_STD"] (body & update & creturn rvar )]
     return fname
 
 
