@@ -70,6 +70,7 @@
  * type names
  *
  * sptr_t - a tagged smart pointer, may be a value, may be a pointer to a whnf or lazy location
+ * wptr_t - a value guarenteed to be in whnf
  * node_t - definitely a pointer to a lazy location
  * tag_t - the first value in a lazy location, has a tag indicating what it is
  *
@@ -77,6 +78,7 @@
 
 typedef struct node enode_t;
 typedef struct node * sptr_t;
+typedef struct node * wptr_t;
 typedef uintptr_t tag_t;
 
 typedef struct node {
@@ -88,14 +90,14 @@ typedef struct node {
 typedef sptr_t (*eval_fn)(node_t *node);
 
 // fetch is like a cast, an 'eval' where you know the target is in WHNF
-static sptr_t A_UNUSED
+static wptr_t A_STD A_UNUSED
 fetch(sptr_t s)
 {
         assert(!ISLAZY(s));
         return s;
 }
 
-static sptr_t A_UNUSED
+static wptr_t A_STD A_UNUSED
 eval(sptr_t s)
 {
         if(ISLAZY(s)) {
@@ -107,7 +109,7 @@ eval(sptr_t s)
 #ifndef NDEBUG
                         GETHEAD(ds) = BLACK_HOLE;
 #endif
-                        sptr_t r = (*fn)(NODEP(ds));
+                        wptr_t r = (*fn)(NODEP(ds));
 #ifndef NDEBUG
                         assert(GETHEAD(ds) != BLACK_HOLE);
 #endif
@@ -119,8 +121,8 @@ eval(sptr_t s)
 }
 
 
-static void A_UNUSED
-update(sptr_t thunk, sptr_t new)
+static void A_STD A_UNUSED
+update(sptr_t thunk, wptr_t new)
 {
         update_inc();
         assert(GETHEAD(thunk) == BLACK_HOLE);

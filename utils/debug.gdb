@@ -14,6 +14,7 @@ define pnode
         printf "tag: %p\n", ((node_t *)((uintptr_t)$arg0 & ~0x3))->tag
         printf "a1: %p\n", ((node_t *)((uintptr_t)$arg0 & ~0x3))->rest[0]
         printf "a2: %p\n", ((node_t *)((uintptr_t)$arg0 & ~0x3))->rest[1]
+        printf "--- line %u\n", *(uintptr_t *)(((uintptr_t)$arg0 & ~0x3) - sizeof(uintptr_t))
 
         else
         printf "--- WHNF node %p\n", $arg0
@@ -21,6 +22,9 @@ define pnode
         printf "a1:  %p %u\n", ((node_t *)$arg0)->rest[0], ((node_t *)$arg0)->rest[0]
         printf "a2:  %p %u\n", ((node_t *)$arg0)->rest[1], ((node_t *)$arg0)->rest[1]
         printf "a3:  %p %u\n", ((node_t *)$arg0)->rest[2], ((node_t *)$arg0)->rest[2]
+        printf "--- line %u\n", *(uintptr_t *)((uintptr_t)$arg0 - sizeof(uintptr_t))
         end
 
 end
+
+

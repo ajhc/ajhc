@@ -72,15 +72,32 @@ static void *prof_memstart;
 #ifndef USE_BOEHM_GC
 static void *jhc_mem = NULL;
 
-static inline void *jhc_malloc(size_t n) {
+#ifndef NDEBUG
+
+#define jhc_malloc(n) jhc_malloc_debug(n,__LINE__)
+
+static inline void * A_MALLOC
+jhc_malloc_debug(size_t n,int line)
+{
+        void *ret = jhc_mem;
+        jhc_mem += ALIGN(__alignof__(void *),sizeof(uintptr_t) + n);
+        *((uintptr_t *)ret) = line;
+//        memset(ret,7,(char *)jhc_mem - (char *)ret);
+//        memset(jhc_mem,8,2*sizeof(void *));
+        return ret + sizeof(uintptr_t);
+}
+
+#else
+
+static inline void * A_MALLOC
+jhc_malloc(size_t n)
+{
         void *ret = jhc_mem;
         jhc_mem += ALIGN(__alignof__(void *),n);
-#ifndef NDEBUG
-        memset(ret,7,(char *)jhc_mem - (char *)ret);
-        memset(jhc_mem,8,2*sizeof(void *));
-#endif
         return ret;
 }
+
+#endif
 
 #define jhc_malloc_atomic(x) jhc_malloc(x)
 
