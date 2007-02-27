@@ -323,10 +323,20 @@ convertExp (Prim p vs) | APrim _ req <- primAPrim p  =  do
     tell mempty { wRequires = req }
     e <- convertPrim p vs
     return (mempty,e)
+convertExp (Store v) | TyPtr TyNode == getType v = do
+    v <- convertVal v
+    tmp <- newVar ppnode_t
+    return ((tmp =* jhc_malloc (sizeof pnode_t)) & (dereference tmp =* v),tmp)
+convertExp (Fetch v) | getType v == TyPtr (TyPtr TyNode) = do
+    v <- convertVal v
+    return (mempty,dereference v)
+convertExp (Update v z) | getType z == TyPtr TyNode = do
+    v' <- convertVal v
+    z' <- convertVal z
+    return $ (dereference v' =* z',emptyExpression)
 --convertExp (App a [fn,x] _) | a == funcApply = do
 --    fn' <- convertVal fn
 --    x' <- convertVal x
-
 --    return (mempty,(functionCall (name "eval") [v']))
 convertExp (App a [v] _) | a == funcEval = do
     v' <- convertVal v
@@ -601,9 +611,6 @@ convertExp (Fetch (Index base off)) | getType base == TyPtr (TyPtr TyNode) = do
     base <- convertVal base
     off <- convertVal off
     ure.eturn (mempty,indexArray base off)
-convertExp (Fetch v) | getType v == TyPtr (TyPtr TyNode) = do
-    v <- convertVal v
-    return (mempty,dereference v)
 convertExp (Store n@NodeV {}) = newNode n
 convertExp (Return n@NodeV {}) = newNode n
 convertExp (Store n@NodeC {}) = newNode n
@@ -616,10 +623,6 @@ convertExp (Store n@Var {}) | getType n == TyNode = do
     let tag = project' anyTag n
         update = expr (functionCall (name "memcpy") [tmp,n,functionCall  (name "jhc_sizeof") [tag]])
     return (ss `mappend` (tmp `assign` nn) `mappend` update, tmp)
-convertExp (Store v) | TyPtr TyNode == getType v = do
-    v <- convertVal v
-    tmp <- newVar ppnode_t
-    return ((tmp `assign` jhc_malloc (sizeof pnode_t)) `mappend` (dereference tmp `assign` v),tmp)
 convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_heap, TyPtr TyNode == getType v  = do
     v' <- convertVal v
     c' <- convertVal c
@@ -633,20 +636,11 @@ convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_hea
     return (malloc `mappend` fill, tmp)
 convertExp e@(Update v z) | getType v /= TyPtr (getType z) = do
     return (err (show e),err "nothing")
-convertExp (Update v@Var {} (NodeV t [])) | getType v == TyPtr TyNode = do
-    v' <- convertVal v
-    t' <- convertVal (Var t TyTag)
-    let tag = project' anyTag v'
-    return (tag `assign` t',emptyExpression)
 convertExp (Update (Index base off) z) | getType z == TyPtr TyNode = do
     base <- convertVal base
     off <- convertVal off
     z' <- convertVal z
     return $ (indexArray base off `assign` z',emptyExpression)
-convertExp (Update v z) | getType z == TyPtr TyNode = do
-    v' <- convertVal v
-    z' <- convertVal z
-    return $ (dereference v' `assign` z',emptyExpression)
 convertExp (Update v z) | getType z == TyNode = do  -- TODO eliminate unknown updates
     v' <- convertVal v
     z' <- convertVal z
