@@ -6,7 +6,7 @@
 
 #define GETHEAD(x)  (NODEP(x)->tag)
 #define NODEP(x)    ((node_t *)(x))
-#define EVALTAG(fn) ((tag_t)((uintptr_t)(fn) | P_LAZY))
+#define EVALTAG(fn) (assert(((uintptr_t)(fn) & 0x3) == 0),(tag_t)((uintptr_t)(fn) | P_LAZY))
 
 #define P_VALUE 0x2
 #define P_WHNF  0x0
