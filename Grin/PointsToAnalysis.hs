@@ -483,8 +483,8 @@ collectM  fname (~(Tup vs) :-> exp') = ans where
  --   ((v,hc'),eq) = execUniq st $ (runWriterT (runStateT (f exp') hc))
     --((v,hc'),eq) = runWriter $ execUniqT st $ (runStateT  (f exp') hc)
     --tell x = lift $ Control.Monad.Writer.tell x
-    isHole (Con t _) | t == tagHole = True
-    isHole _ = False
+    --isHole (Con t _) | t == tagHole = True
+    --isHole _ = False
 
     f (Store { expValue = val } :>>= var@(Var v _) :-> exp2) = do
         p <- toPos val
@@ -530,6 +530,8 @@ collectM  fname (~(Tup vs) :-> exp') = ans where
         return p
     g (Return { expValue = val }) = toPos val
     g Store { expValue = NodeC t _ } | t == tagHole = do
+        newHeap RecursiveThunk mempty
+    g Store { expValue = NodeC t vs } | any isValUnknown vs = do
         newHeap RecursiveThunk mempty
     g Store { expValue = n@(NodeC _ (_:_)) } = do
         p@(Con a ts) <- toPos n
@@ -578,6 +580,9 @@ collectM  fname (~(Tup vs) :-> exp') = ans where
         return Basic
     g x = error $ unwords ["Grin.PointsToAnalysis.collect.g",show x]
 
+isValUnknown ValUnknown {} = True
+isValUnknown _ = False
+
 toPos (NodeC tag vs) = do
     vs' <- mapM toPos vs
     return $ Con tag vs'
@@ -593,6 +598,7 @@ toPos (Tup xs) = do
 toPos (Lit {}) = return Basic
 toPos (ValPrim {}) = return Basic
 toPos Tag {} = return Basic
+toPos ValUnknown {} = return mempty
 toPos (Var v _)  = return $ Variable v
 toPos (Index v _) = toPos v
 toPos x  = error $ unwords ["toPos:",show x]

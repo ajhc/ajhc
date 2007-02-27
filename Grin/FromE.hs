@@ -617,20 +617,20 @@ compile' dataTable cenv (tvr,as,e) = ans where
 
 
         f (Right bs:ds) x = do
-            let g (tvr,_) y = (Store (NodeC (toAtom "@hole") []) :>>= toVal tvr :-> y)
-                u (tvr,e) = do
+            let u [] ss dus = return (\y -> ss (dus y))
+                u ((tvr,e):rs) ss dus = do
                     v <- newNodePtrVar
                     v' <- newNodeVar
                     e <- cc e
-                    return $ doUpdate (toVal tvr) e
-            xs <- mapM u bs
+                    let (du,t,ts) = doUpdate (toVal tvr) e
+                    u rs (\y -> Store (NodeC t (map ValUnknown ts)) :>>= toVal tvr :-> ss y) (\y -> du :>>= unit :-> dus y)
+            rr <- u bs id id
             v <- f ds x
-            let r = (foldr (\a b -> a :>>= unit :-> b) v xs)
-            return $ foldr g r bs
+            return (rr v)
 
     -- This avoids a blind update on recursive thunks
-    doUpdate vr (Store n) = Update vr n
-    doUpdate vr (x :>>= v :-> e) = x :>>= v :-> doUpdate vr e
+    doUpdate vr (Store n@(NodeC t ts)) = (Update vr n,t,map getType ts)
+    doUpdate vr (x :>>= v :-> e) = let (du,t,ts) = doUpdate vr e in (x :>>= v :-> du,t,ts)
     doUpdate vr x = error $ "doUpdate: " ++ show x
     args es = map f (filter (shouldKeep . getType) es) where
         f x | Just z <- literal x = z

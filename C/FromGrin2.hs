@@ -434,13 +434,9 @@ convertPrim p vs
     | APrim (AddrOf t) _ <- primAPrim p, [] <- vs = do
         return $ expressionRaw ('&':unpackPS t)
 
-newNode (NodeV t []) = do
-    tmp <- newVar pnode_t
-    var <- fetchVar t TyTag
-    let tmp' = getTag tmp
-        malloc =  tmp =* jhc_malloc (sizeof  node_t)
-        tagassign = tmp' =* var
-    return (mappend malloc tagassign, tmp)
+isValUnknown ValUnknown {} = True
+isValUnknown _ = False
+
 newNode (NodeC t _) | t == tagHole = do
     return $  (mempty,jhc_malloc (sizeof node_t))
 newNode (NodeC t as) | tagIsSuspFunction t = do
@@ -451,7 +447,7 @@ newNode (NodeC t as) | tagIsSuspFunction t = do
     let tmp' = concrete t tmp
         malloc =  tmp =* jhc_malloc (sizeof st)
         tagassign = getTag tmp' =* functionCall (name "EVALTAG") [reference (variable en)]
-        ass = [ project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
+        ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
         nonPtr TyPtr {} = False
         nonPtr TyNode = False
         nonPtr (TyTup xs) = all nonPtr xs
@@ -468,7 +464,7 @@ newNode (NodeC t as) | tagIsWHNF t = do -- && not (tagIsPartialAp t) = do
         malloc =  tmp =* wmalloc (sizeof  (if tagIsWHNF t then st else node_t))
         tagassign = getTag tmp' =* constant (enum $ nodeTagName t)
         wmalloc = if tagIsWHNF t && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
-        ass = [ project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
+        ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
         nonPtr TyPtr {} = False
         nonPtr TyNode = False
         nonPtr (TyTup xs) = all nonPtr xs
@@ -647,6 +643,13 @@ convertExp (Update v z) | getType z == TyNode = do  -- TODO eliminate unknown up
     let tag = project' anyTag z'
     return $ (profile_update_inc,functionCall (name "memcpy") [v',z',functionCall  (name "jhc_sizeof") [tag]])
 convertExp e = return (err (show e),err "nothing")
+newNode (NodeV t []) = do
+    tmp <- newVar pnode_t
+    var <- fetchVar t TyTag
+    let tmp' = getTag tmp
+        malloc =  tmp =* jhc_malloc (sizeof  node_t)
+        tagassign = tmp' =* var
+    return (mappend malloc tagassign, tmp)
 
 -}
 {-

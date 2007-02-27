@@ -245,12 +245,15 @@ newNode (NodeC t as) = do
         malloc =  tmp `assign` wmalloc (sizeof  (if tagIsWHNF t then st else node_t))
         tagassign = project tag tmp' `assign` constant (enum $ nodeTagName t)
         wmalloc = if tagIsWHNF t && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
-        ass = [ project (arg i) tmp' `assign` a | a <- as' | i <- [(1 :: Int) ..] ]
+        ass = [ if isValUnknown aa then mempty else project (arg i) tmp' `assign` a | a <- as' | aa <- as | i <- [(1 :: Int) ..] ]
         nonPtr TyPtr {} = False
         nonPtr TyNode = False
         nonPtr (TyTup xs) = all nonPtr xs
         nonPtr _ = True
     return (mconcat $ malloc:tagassign:ass, cast pnode_t tmp)
+
+isValUnknown ValUnknown {} = True
+isValUnknown _ = False
 
 --convertPrim p vs = return (mempty,err $ show p)
 convertPrim p vs

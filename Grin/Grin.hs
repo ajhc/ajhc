@@ -552,6 +552,7 @@ instance CanTypeCheck TyEnv Val Ty where
         t <- typecheck te v
         Ty _ <- typecheck te offset
         return t
+    typecheck _ (ValUnknown ty) = return ty
     typecheck _ (Addr _) = return $ TyPtr (error "typecheck: Addr")
     typecheck _ (ValPrim _ _ ty) = return ty
     typecheck te n@(NodeC tg as) = do
