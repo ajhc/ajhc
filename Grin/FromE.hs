@@ -2,6 +2,8 @@ module Grin.FromE(compile,typecheckGrin) where
 
 import Char
 import Control.Monad
+import Control.Monad.Reader
+import Control.Monad.Trans
 import Data.Graph(stronglyConnComp, SCC(..))
 import Data.IORef
 import Data.Map(Map)
@@ -14,6 +16,7 @@ import qualified Data.Set as Set
 
 import Atom
 import PackedString
+import C.Arch
 import C.FFI hiding(Primitive)
 import C.Prims
 import Control.Monad.Identity
@@ -78,6 +81,15 @@ unboxedMap = [
     (tc_MutArray__,Just $ TyPtr (TyPtr TyNode))
     ]
 
+newtype C a = C (ReaderT LEnv IO a)
+    deriving(Monad,MonadReader LEnv,UniqueProducer,Functor,MonadIO,Stats.MonadStats)
+
+runC :: LEnv -> C a -> IO a
+runC lenv (C x) = runReaderT x lenv
+
+newtype LEnv = LEnv {
+    evaledMap :: Map Id Val
+}
 
 data CEnv = CEnv {
     scMap :: Map Int (Atom,[Ty],Ty),
@@ -87,6 +99,7 @@ data CEnv = CEnv {
     constMap :: Map Int Val,
     localFuncMap :: IORef (IdMap (Atom,Int,Ty)),
     errorOnce :: OnceMap (Ty,String) Atom,
+    dataTable :: DataTable,
     counter :: IORef Int
 }
 
@@ -140,9 +153,9 @@ toType node = toty . followAliases mempty where
 compile :: Program -> IO Grin
 compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, progEntryPoints = entries } = do
     prog <- return $ prog { progCombinators  = map stripTheWorld (progCombinators prog) }
-    tyEnv <- newIORef initTyEnv
-    funcBaps <- newIORef []
-    counter <- newIORef 100000  -- TODO real number
+    tyEnv <- liftIO $ newIORef initTyEnv
+    funcBaps <- liftIO $ newIORef []
+    counter <- liftIO $ newIORef 100000  -- TODO real number
     let (cc,reqcc,rcafs) = constantCaf prog
     wdump FD.Progress $ do
         putErrLn $ "Found" <+> tshow (length cc) <+> "CAFs to convert to constants," <+> tshow (length reqcc) <+> "of which are recursive."
@@ -154,17 +167,22 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
         putDocMLn putStr $ vcat [ pprint v <+> pprint n <+> pprint e | (v,n,e) <- rcafs ]
     errorOnce <- newOnceMap
     lm <- newIORef mempty
-    let doCompile = compile' dataTable CEnv {
+    let doCompile = compile' cenv
+        lenv = LEnv {
+            evaledMap = mempty
+        }
+        cenv = CEnv {
             funcBaps = funcBaps,
             tyEnv = tyEnv,
             scMap = scMap,
             counter = counter,
             constMap = mempty,
             localFuncMap = lm,
+            dataTable = dataTable,
             errorOnce = errorOnce,
             ccafMap = Map.fromList $ [(tvrIdent v,e) |(v,_,e) <- cc ]  ++ [ (tvrIdent v,Var vv (TyPtr TyNode)) | (v,vv,_) <- rcafs]
             }
-    ds <- mapM doCompile [ c | c@(v,_,_) <- progCombinators prog, v `notElem` [x | (x,_,_) <- cc]]
+    ds <- runC lenv $ mapM doCompile [ c | c@(v,_,_) <- progCombinators prog, v `notElem` [x | (x,_,_) <- cc]]
     --(_,(Tup [] :-> theMain)) <- doCompile ((mainEntry,[],EVar mainEntry))
     let theMain = App (scTag mainEntry) [] tyUnit
 
@@ -312,7 +330,7 @@ instance ToVal TVr where
 
 
 
-evalVar _ tvr | Just CaseDefault <- Info.lookup (tvrInfo tvr)  = do
+evalVar _ tvr | not isFGrin, Just CaseDefault <- Info.lookup (tvrInfo tvr)  = do
         mtick "Grin.FromE.strict-casedefault"
         return (Fetch (toVal tvr))
 evalVar _ tvr | getProperty prop_WHNF tvr = do
@@ -321,15 +339,15 @@ evalVar _ tvr | getProperty prop_WHNF tvr = do
 --evalVar fty tvr = return $ gEval (toVal tvr)
 evalVar fty tvr = return $ App funcEval [toVal tvr] fty
 
-compile' ::  DataTable -> CEnv -> (TVr,[TVr],E) -> IO (Atom,Lam)
-compile' dataTable cenv (tvr,as,e) = ans where
+compile' ::  CEnv -> (TVr,[TVr],E) -> C (Atom,Lam)
+compile' cenv (tvr,as,e) = ans where
     ans = do
         --putStrLn $ "Compiling: " ++ show nn
         x <- cr e
+        let (nn,_,_) = runIdentity $ Map.lookup (tvrIdent tvr) (scMap cenv)
         return (nn,(Tup (map toVal (filter (shouldKeep . getType) as)) :-> x))
     funcName = maybe (show $ tvrIdent tvr) show (fromId (tvrIdent tvr))
-    cc, ce, cr :: E -> IO Exp
-    (nn,_,_) = runIdentity $ Map.lookup (tvrIdent tvr) (scMap cenv)
+    cc, ce, cr :: E -> C Exp
     cr x = ce x
 
     -- | ce evaluates something in strict context returning the evaluated result of its argument.
@@ -342,7 +360,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
         return (Fetch (toVal tvr))
     ce e | (EVar tvr,as) <- fromAp e = do
         as <- return $ args as
-        lfunc <- readIORef (localFuncMap cenv)
+        lfunc <- liftIO $ readIORef (localFuncMap cenv)
         let fty = toType TyNode (getType e)
         case Map.lookup (tvrIdent tvr) (ccafMap cenv) of
             Just (Const c) -> app fty (Return c) as
@@ -468,14 +486,14 @@ compile' dataTable cenv (tvr,as,e) = ans where
         e <- ce e
         r <- ce r
         return $ e :>>= unit :-> r
-    ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d } | (ELit LitCons { litName = n, litArgs = [] }) <- followAliases dataTable (getType e), RawType <- nameType n = do
+    ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d } | (ELit LitCons { litName = n, litArgs = [] }) <- followAliases (dataTable cenv) (getType e), RawType <- nameType n = do
             let ty = Ty $ toAtom (show n)
-            v <- newPrimVar ty
+            v <- if tvrIdent b == 0 then newPrimVar ty else return $ toVal b
             e <- ce e
             as' <- mapM cp'' as
             def <- createDef d (return (toVal b))
             return $
-                e :>>= v :-> Return v :>>= toVal b :-> Case v (as' ++ def)
+                e :>>= v :-> Case v (as' ++ def)
     ce ECase { eCaseScrutinee = scrut, eCaseBind = b, eCaseAlts = as, eCaseDefault = d }  = do
         v <- newNodeVar
         e <- ce scrut
@@ -503,8 +521,9 @@ compile' dataTable cenv (tvr,as,e) = ans where
         x <- ce e
         return (Lit i (Ty $ toAtom (show nn)) :-> x)
 
-    getName x = getName' dataTable x
+    getName x = getName' (dataTable cenv) x
 
+    app :: Ty -> Exp -> [Val] -> C Exp
     app _ e [] = return e
     app ty e [a] = do
         v <- newNodeVar
@@ -537,12 +556,12 @@ compile' dataTable cenv (tvr,as,e) = ans where
             args = [Var v ty | v <- [v1..] | ty <- (TyPtr TyNode:map getType as)]
             s = Store (NodeC t (e:as))
         d <- app TyNode (gEval p1) (tail args) --TODO
-        addNewFunction (tl,Tup (args) :-> d)
+        liftIO $ addNewFunction cenv (tl,Tup (args) :-> d)
         return s
-    addNewFunction tl@(n,Tup args :-> body) = do
-        modifyIORef (funcBaps cenv) (tl:)
+    addNewFunction cenv tl@(n,Tup args :-> body) = do
+        liftIO $ modifyIORef (funcBaps cenv) (tl:)
         let addt (TyEnv mp) =  TyEnv $ Map.insert n (map getType args,getType body) mp
-        modifyIORef (tyEnv cenv) addt
+        liftIO $ modifyIORef (tyEnv cenv) addt
 
     -- | cc evaluates something in lazy context, returning a pointer to a node which when evaluated will produce the strict result.
     -- it is an invarient that evaling (cc e) produces the same value as (ce e)
@@ -552,11 +571,11 @@ compile' dataTable cenv (tvr,as,e) = ans where
     cc e | Just z <- con e = return (Store z)
     cc (EError s e) = do
         let ty = toType TyNode e
-        a <- runOnceMap (errorOnce cenv) (ty,s) $ do
+        a <- liftIO $ runOnceMap (errorOnce cenv) (ty,s) $ do
             u <- newUniq
             let t  = toAtom $ "Berr_" ++ show u
                 tl = toAtom $ "berr_" ++ show u
-            addNewFunction (tl,Tup [] :-> Error s ty)
+            addNewFunction cenv (tl,Tup [] :-> Error s ty)
             return t
         return $ Return (Const (NodeC a []))
     cc (ELetRec ds e) = doLet ds (cc e)
@@ -609,7 +628,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
                 g' (t,e@ELam {}) = do
                     let (a,as) = fromLam e
                         (nn,_,_) = toEntry (t,[],getType t)
-                    modifyIORef (localFuncMap cenv) (minsert (tvrIdent t) (nn,length as,toType TyNode (getType a)))
+                    liftIO $ modifyIORef (localFuncMap cenv) (minsert (tvrIdent t) (nn,length as,toType TyNode (getType a)))
             mapM_ g' bs
             v <- f ds x
             defs <- mapM g bs
@@ -672,7 +691,7 @@ compile' dataTable cenv (tvr,as,e) = ans where
             return (NodeC (partialTag cn (nargs - length es)) $ args es)
         where
         cn = convertName n
-        cons = runIdentity $ getConstructor n dataTable
+        cons = runIdentity $ getConstructor n (dataTable cenv)
         nargs = length (conSlots cons)
 
     con _ = fail "not constructor"
@@ -684,8 +703,8 @@ compile' dataTable cenv (tvr,as,e) = ans where
     newPrimVar ty =  fmap (\x -> Var x ty) newVar
     newNodePtrVar =  fmap (\x -> Var x (TyPtr TyNode)) newVar
     newVar = do
-        i <- readIORef (counter cenv)
-        writeIORef (counter cenv) $! (i + 2)
+        i <- liftIO $ readIORef (counter cenv)
+        liftIO $ (writeIORef (counter cenv) $! (i + 2))
         return $! V i
 
 fromRawType (ELit LitCons { litName = tname, litArgs = [] })

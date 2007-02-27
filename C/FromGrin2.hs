@@ -215,6 +215,7 @@ convertBody (Return v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
 convertBody (Fetch v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
 convertBody (Case v@(Var _ ty) [p1@(NodeC t _) :-> e1,p2 :-> e2]) | ty == TyNode = do
     scrut <- convertVal v
+    tell mempty { wTags = Set.singleton t }
     let tag = getTag scrut
         da v@Var {} e = do
             v'' <- convertVal v
@@ -222,6 +223,7 @@ convertBody (Case v@(Var _ ty) [p1@(NodeC t _) :-> e1,p2 :-> e2]) | ty == TyNode
             return $ v'' =* scrut & e'
         da n1@(NodeC t _) (Return n2@NodeC {}) | n1 == n2 = convertBody (Return v)
         da (NodeC t as) e = do
+            tell mempty { wTags = Set.singleton t }
             as' <- mapM convertVal as
             let tmp = concrete t  scrut
                 ass = mconcat [if needed a then a' =* (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
@@ -256,9 +258,11 @@ convertBody (Case v@(Var _ t) ls) | t == TyNode = do
             e' <- convertBody e
             return $ (Nothing,v'' =* scrut & e')
         da (n1@(NodeC t _) :-> Return n2@NodeC {}) | n1 == n2 = do
+            tell mempty { wTags = Set.singleton t }
             e' <- convertBody (Return v)
             return (Just (enum (nodeTagName t)),e')
         da ((NodeC t as) :-> e) = do
+            tell mempty { wTags = Set.singleton t }
             as' <- mapM convertVal as
             e' <- convertBody e
             let tmp = concrete t scrut
@@ -330,6 +334,9 @@ convertExp (Store v) | TyPtr TyNode == getType v = do
 convertExp (Fetch v) | getType v == TyPtr (TyPtr TyNode) = do
     v <- convertVal v
     return (mempty,dereference v)
+convertExp (Fetch v) | getType v == TyPtr TyNode = do
+    v <- convertVal v
+    return (mempty,(functionCall (name "fetch") [v]))
 convertExp (Update v z) | getType z == TyPtr TyNode = do
     v' <- convertVal v
     z' <- convertVal z
@@ -358,10 +365,21 @@ convertExp (App a vs _) = do
             let ss = [ a =* v | a <- as | v <- vs' ]
             return (mconcat ss & goto nm, emptyExpression)
         Nothing -> return $ (mempty, functionCall (toName (toString a)) vs')
+convertExp (Update v@Var {} (NodeC t as)) | tagIsSuspFunction t, getType v == TyPtr TyNode = do
+    en <- declareEvalFunc t
+    v' <- convertVal v
+    as' <- mapM convertVal as
+    nt <- nodeTypePtr t
+    let tmp' = cast nt v'
+        s = getTag tmp' =* functionCall (name "EVALTAG") [reference (variable en)]
+        ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
+    return (mconcat $ profile_update_inc:s:ass,emptyExpression)
 convertExp (Update v@Var {} (NodeC t as)) | getType v == TyPtr TyNode = do
     v' <- convertVal v
     as' <- mapM convertVal as
     nt <- nodeTypePtr t
+    declareStruct t
+    tell mempty { wTags = Set.singleton t }
     let tmp' = cast nt v'
         s = getTag tmp' =* constant (enum (nodeTagName t))
         ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
@@ -600,9 +618,6 @@ x & y = toStatement x `mappend` toStatement y
 
 
 {-
-convertExp (Fetch v) | getType v == TyPtr TyNode = do
-    v <- convertVal v
-    return (mempty,v)
 convertExp (Fetch (Index base off)) | getType base == TyPtr (TyPtr TyNode) = do
     base <- convertVal base
     off <- convertVal off
@@ -656,3 +671,4 @@ newNode (NodeV t []) = do
 convertBody (Return v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
 convertBody (Fetch v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
 -}
+
