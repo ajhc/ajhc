@@ -23,22 +23,25 @@
 #define A_CONST __attribute__ ((const))
 #define A_UNUSED __attribute__ ((unused))
 #define A_MALLOC __attribute__ ((malloc))
+#ifdef __i386__
+#define A_REGPARM __attribute__ ((fastcall))
+#else
+#define A_REGPARM
+#endif
+#define A_STD    A_REGPARM __attribute__ ((nothrow))
 #else
 #define A_NORETURN
 #define A_PURE
 #define A_CONST
 #define A_UNUSED
 #define A_MALLOC
+#define A_STD
 #endif
 
-#if defined(__GNUC__) && defined(__i386__)
-#define A_REGPARM __attribute__ ((regparm(2)))
-#else
-#define A_REGPARM
-#endif
 
 #define STR(s) #s
 #define XSTR(s) STR(s)
+#define ALIGN(a,n) ((n) - 1 + ((a) - ((n) - 1) % (a)))
 
 static void _amain(void);
 static int jhc_argc;
@@ -71,7 +74,11 @@ static void *jhc_mem = NULL;
 
 static inline void *jhc_malloc(size_t n) {
         void *ret = jhc_mem;
-        jhc_mem += n;
+        jhc_mem += ALIGN(__alignof__(void *),n);
+#ifndef NDEBUG
+        memset(ret,7,(char *)jhc_mem - (char *)ret);
+        memset(jhc_mem,8,2*sizeof(void *));
+#endif
         return ret;
 }
 

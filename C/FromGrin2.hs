@@ -94,14 +94,6 @@ compileGrin grin = (hsffi_h ++ jhc_rts_c ++ jhc_rts2_c ++ P.render ans ++ "\n", 
         let tset = Set.fromList [ n | (HcNode n _,_) <- Grin.HashConst.toList h]
         mapM_ declareStruct  (Set.toList tset)
         tell mempty { wTags = tset }
-  --      flip mapM_ tags $ \ (n,ts) -> do
-  --          ts' <- mapM convertType ts
-  --          tell Written { wStructures = Map.singleton (nodeStructName n) (zip [ name $ 'a':show i | i <-  [1 ..] ] ts') }
-
-
-
-
-
 
 convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C Function
 convertFunc ffie (n,Tup as :-> body) = do
@@ -110,7 +102,7 @@ convertFunc ffie (n,Tup as :-> body) = do
             mmalloc (TyPtr _) = [Attribute "A_MALLOC"]
             mmalloc TyNode = [Attribute "A_MALLOC"]
             mmalloc _ = []
-            ats = (if isNothing ffie then Attribute "A_REGPARM" else Public):mmalloc bt
+            ats = (if isNothing ffie then Attribute "A_STD" else Public):mmalloc bt
             fnname = case ffie of
                 Nothing -> nodeFuncName n
                 Just (FfiExport cn Safe CCall) -> name cn
@@ -118,7 +110,7 @@ convertFunc ffie (n,Tup as :-> body) = do
         as' <- flip mapM as $ \ (Var v t) -> do
             t' <- convertType t
             return (varName v,t')
-        return $ function fnname fr as' ats (profile_function_inc `mappend` s)
+        return $ function fnname fr as' ats (profile_function_inc & s)
 
 
 fetchVar :: Var -> Ty -> C Expression
@@ -187,7 +179,7 @@ convertBody (Prim p [a,b] :>>= Tup [q,r] :-> e') | primName p == toAtom "@primQu
     r' <- convertVal r
     q' <- convertVal q
     ss' <- convertBody e'
-    return $ mconcat [ assign q' (operator "/" a' b'), assign r' (operator "%" a' b'), ss' ]
+    return $ mconcat [ q' =* (operator "/" a' b'), r' =* (operator "%" a' b'), ss' ]
 convertBody Let { expDefs = defs, expBody = body } = do
     u <- newUniq
     nn <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = Tup as :-> _ } -> do
@@ -200,48 +192,49 @@ convertBody Let { expDefs = defs, expBody = body } = do
     ss <- (convertBody body)
     rs <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = Tup as :-> b } -> do
        ss <- convertBody b
-       return (annotate (show as) (label (toName (show name ++ show u))) `mappend` indentBlock ss)
-    return (ss `mappend` goto done `mappend` mconcat (intersperse (goto done) rs) `mappend` label done);
+       return (annotate (show as) (label (toName (show name ++ show u))) & indentBlock ss)
+    return (ss & goto done & mconcat (intersperse (goto done) rs) & label done);
 convertBody (e :>>= v@(Var _ _) :-> e') = do
     v' <- convertVal v
     ss <- localTodo (TodoExp v')  (convertBody e)
     ss' <- convertBody e'
-    return (ss `mappend` ss')
+    return (ss & ss')
 convertBody (e :>>= Tup [x] :-> e') = convertBody (e :>>= x :-> e')
 convertBody (e :>>= Tup [] :-> e') = do
     ss <- localTodo TodoNothing (convertBody e)
     ss' <- convertBody e'
-    return (ss `mappend` ss')
+    return (ss & ss')
 convertBody (e :>>= Tup xs :-> e') = do
     ts <- mapM ( convertType . getType) xs
     st <- newVar (anonStructType ts)
     ss <- localTodo (TodoExp st) (convertBody e)
     ss' <- convertBody e'
     vs <- mapM convertVal xs
-    return $  ss `mappend` mconcat [ v `assign` projectAnon i st | v <- vs | i <- [0..] ] `mappend` ss'
+    return $  ss & mconcat [ v =* projectAnon i st | v <- vs | i <- [0..] ] & ss'
 convertBody (Return v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
 convertBody (Fetch v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
 convertBody (Case v@(Var _ ty) [p1@(NodeC t _) :-> e1,p2 :-> e2]) | ty == TyNode = do
     scrut <- convertVal v
     let tag = getTag scrut
-        da v@Var {} _ = do
+        da v@Var {} e = do
             v'' <- convertVal v
-            return $ assign v'' scrut
+            e' <- convertBody e
+            return $ v'' =* scrut & e'
         da n1@(NodeC t _) (Return n2@NodeC {}) | n1 == n2 = convertBody (Return v)
         da (NodeC t as) e = do
             as' <- mapM convertVal as
             let tmp = concrete t  scrut
-                ass = mconcat [if needed a then assign  a' (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
+                ass = mconcat [if needed a then a' =* (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
                 fve = freeVars e
                 needed (Var v _) = v `Set.member` fve
-            return ass
-        am | isVar p2 = id
-           | otherwise = annotate (show p2)
-    e1' <- convertBody e1
-    e2' <- convertBody e2
+            e' <- convertBody e
+            return (ass & e')
+        am Var {} e = e
+        am (NodeC t2 _) e = annotate (show p2) (f_assert ((constant $ enum (nodeTagName t2)) `eq` tag) & e)
     p1' <- da p1 e1
-    p2' <- liftM am $ da p2 e2
-    return $ profile_case_inc `mappend` cif (operator "==" (constant $ enum (nodeTagName t)) tag) (p1' `mappend` e1') (p2' `mappend` e2')
+    p2' <- liftM (am p2) $ da p2 e2
+    return $ profile_case_inc & cif ((constant $ enum (nodeTagName t)) `eq` tag) p1' p2'
+
 -- zero is usually faster to test for than other values, so flip them if zero is being tested for.
 convertBody (Case v@Var {} [v1, v2@(Lit n _ :-> _)]) | n == 0 = convertBody (Case v [v2,v1])
 convertBody (Case v@(Var _ t) [p1 :-> e1, p2 :-> e2]) | Set.null ((freeVars p2 :: Set.Set Var) `Set.intersection` freeVars e2) = do
@@ -250,18 +243,18 @@ convertBody (Case v@(Var _ t) [p1 :-> e1, p2 :-> e2]) | Set.null ((freeVars p2 :
         scrut' = (if t `elem` ptrs then cast (basicType "uintptr_t") scrut else scrut)
         cp (Lit i _) = constant (number $ fromIntegral i)
         cp (Tag t) = constant (enum (nodeTagName t))
-        am | isVar p2 = id
-           | otherwise = annotate (show p2)
+        am e | isVar p2 = e
+             | otherwise = annotate (show p2) (f_assert ((cp p2) `eq` scrut') & e)
     e1' <- convertBody e1
     e2' <- convertBody e2
-    return $ profile_case_inc `mappend` cif (operator "==" (cp p1) scrut') e1' (am e2')
+    return $ profile_case_inc & cif (cp p1 `eq` scrut') e1' (am e2')
 convertBody (Case v@(Var _ t) ls) | t == TyNode = do
     scrut <- convertVal v
     let tag = getTag scrut
         da (v@(Var {}) :-> e) = do
             v'' <- convertVal v
             e' <- convertBody e
-            return $ (Nothing,assign v'' scrut `mappend` e')
+            return $ (Nothing,v'' =* scrut & e')
         da (n1@(NodeC t _) :-> Return n2@NodeC {}) | n1 == n2 = do
             e' <- convertBody (Return v)
             return (Just (enum (nodeTagName t)),e')
@@ -269,12 +262,12 @@ convertBody (Case v@(Var _ t) ls) | t == TyNode = do
             as' <- mapM convertVal as
             e' <- convertBody e
             let tmp = concrete t scrut
-                ass = mconcat [if needed a then assign  a' (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
+                ass = mconcat [if needed a then a' =* (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
                 fve = freeVars e
                 needed (Var v _) = v `Set.member` fve
-            return $ (Just (enum (nodeTagName t)), ass `mappend` e')
+            return $ (Just (enum (nodeTagName t)), ass & e')
     ls' <- mapM da ls
-    return $ profile_case_inc `mappend` switch' tag ls'
+    return $ profile_case_inc & switch' tag ls'
 convertBody (Case v@(Var _ t) ls) = do
     scrut <- convertVal v
     let ptrs = [Ty $ toAtom "HsPtr", Ty $ toAtom "HsFunPtr"]
@@ -282,7 +275,7 @@ convertBody (Case v@(Var _ t) ls) = do
         da (v@(Var {}) :-> e) = do
             v'' <- convertVal v
             e' <- convertBody e
-            return (Nothing,assign v'' scrut `mappend` e')
+            return (Nothing,v'' =* scrut & e')
         da ((Lit i _) :-> e) = do
             e' <- convertBody e
             return $ (Just (number $ fromIntegral i), e')
@@ -291,35 +284,27 @@ convertBody (Case v@(Var _ t) ls) = do
             return $ (Just (enum (nodeTagName t)), e')
         da (Tup [x] :-> e) = da ( x :-> e )
     ls' <- mapM da ls
-    return $ profile_case_inc `mappend` switch' scrut' ls'
+    return $ profile_case_inc & switch' scrut' ls'
 
 
 convertBody e = do
     x <- asks rTodo
     (ss,er) <- convertExp e -- lift $  runSubCGen $ cexp e
     case x of
-        TodoReturn -> return (ss `mappend` creturn er)
+        TodoReturn -> return (ss & creturn er)
         TodoExp v | isEmptyExpression er -> return ss
-        TodoExp v -> return (ss `mappend` (v `assign` er))
+        TodoExp v -> return (ss & (v =* er))
         TodoNothing | isEmptyExpression er -> return ss
-        TodoNothing -> return (ss `mappend` expr er)
+        TodoNothing -> return (ss & er)
 
 nodeAssign v t as e' = do
     v' <- convertVal v
     as' <- mapM convertVal as
-    let ass = concat [perhapsM (a `Set.member` fve) $ assign  a' (project' (arg i) (concrete t v')) | a' <- as' | Var a _ <- as |  i <- [( 1 :: Int) ..] ]
+    let ass = concat [perhapsM (a `Set.member` fve) $ a' =* (project' (arg i) (concrete t v')) | a' <- as' | Var a _ <- as |  i <- [( 1 :: Int) ..] ]
         fve = freeVars e'
     ss' <- convertBody e'
-    return $  mconcat ass `mappend` ss'
+    return $  mconcat ass & ss'
 
-{-
-
-convertBody (Return v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
-convertBody (Fetch v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
-
-
-
--}
 
 convertExp :: Exp -> C (Statement,Expression)
 convertExp (Error s t) = do
@@ -360,16 +345,16 @@ convertExp (App a vs _) = do
     vs' <- mapM convertVal vs
     case a `Map.lookup` lm of
         Just (nm,as) -> do
-            let ss = [ a `assign` v | a <- as | v <- vs' ]
-            return (mconcat ss `mappend` goto nm, emptyExpression)
+            let ss = [ a =* v | a <- as | v <- vs' ]
+            return (mconcat ss & goto nm, emptyExpression)
         Nothing -> return $ (mempty, functionCall (toName (toString a)) vs')
 convertExp (Update v@Var {} (NodeC t as)) | getType v == TyPtr TyNode = do
     v' <- convertVal v
     as' <- mapM convertVal as
     nt <- nodeTypePtr t
     let tmp' = cast nt v'
-        s = getTag tmp' `assign` constant (enum (nodeTagName t))
-        ass = [project' (arg i) tmp' `assign` a | a <- as' | i <- [(1 :: Int) ..] ]
+        s = getTag tmp' =* constant (enum (nodeTagName t))
+        ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
     return (mconcat $ profile_update_inc:s:ass,emptyExpression)
 convertExp e = return (err (show e),err "nothing")
 
@@ -409,8 +394,204 @@ convertConst (ValPrim (APrim p _) [x,y] _) = do
     case p of
         Operator n [_,_] r -> return $ cast (basicType r) (operator n x' y')
         x -> return $ err (show x)
-
 convertConst x = fail "convertConst"
+
+
+--convertPrim p vs = return (mempty,err $ show p)
+convertPrim p vs
+    | APrim (CConst s _) _ <- primAPrim p = do
+        return $ expressionRaw s
+    | APrim (CCast _ to) _ <- primAPrim p, [a] <- vs = do
+        a' <- convertVal a
+        return $ cast (basicType to) a'
+    | APrim (Operator n [ta] r) _ <- primAPrim p, [a] <- vs = do
+        a' <- convertVal a
+        return $ cast (basicType r) (uoperator n a')
+    | APrim (Operator n [ta,tb] r) _ <- primAPrim p, [a,b] <- vs = do
+        a' <- convertVal a
+        b' <- convertVal b
+        return $ cast (basicType r) (operator n a' b')
+    | APrim (Func _ n as r) _ <- primAPrim p = do
+        vs' <- mapM convertVal vs
+        return $ cast (basicType r) (functionCall (name $ unpackPS n) [ cast (basicType t) v | v <- vs' | t <- as ])
+    | APrim (Peek t) _ <- primAPrim p, [v] <- vs = do
+        v' <- convertVal v
+        return $ expressionRaw ("*((" <> t <+> "*)" <> (parens $ renderG v') <> char ')')
+    | APrim (Poke t) _ <- primAPrim p, [v,x] <- vs = do
+        v' <- convertVal v
+        x' <- convertVal x
+        return $ expressionRaw ("*((" <> t <+> "*)" <> (parens $ renderG v') <> text ") = " <> renderG x')
+    | APrim (AddrOf t) _ <- primAPrim p, [] <- vs = do
+        return $ expressionRaw ('&':unpackPS t)
+
+newNode (NodeV t []) = do
+    tmp <- newVar pnode_t
+    var <- fetchVar t TyTag
+    let tmp' = getTag tmp
+        malloc =  tmp =* jhc_malloc (sizeof  node_t)
+        tagassign = tmp' =* var
+    return (mappend malloc tagassign, tmp)
+newNode (NodeC t _) | t == tagHole = do
+    return $  (mempty,jhc_malloc (sizeof node_t))
+newNode (NodeC t as) | tagIsSuspFunction t = do
+    en <- declareEvalFunc t
+    st <- nodeType t
+    as' <- mapM convertVal as
+    tmp <- newVar pnode_t
+    let tmp' = concrete t tmp
+        malloc =  tmp =* jhc_malloc (sizeof st)
+        tagassign = getTag tmp' =* functionCall (name "EVALTAG") [reference (variable en)]
+        ass = [ project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
+        nonPtr TyPtr {} = False
+        nonPtr TyNode = False
+        nonPtr (TyTup xs) = all nonPtr xs
+        nonPtr _ = True
+        tmp'' = functionCall (name "EVALTAG") [tmp]
+    return (mconcat $ malloc:tagassign:ass, cast pnode_t tmp'')
+newNode (NodeC t as) | tagIsWHNF t = do -- && not (tagIsPartialAp t) = do
+    st <- nodeType t
+    tell mempty { wTags = Set.singleton t }
+    declareStruct t
+    as' <- mapM convertVal as
+    tmp <- newVar pnode_t
+    let tmp' = concrete t tmp
+        malloc =  tmp =* wmalloc (sizeof  (if tagIsWHNF t then st else node_t))
+        tagassign = getTag tmp' =* constant (enum $ nodeTagName t)
+        wmalloc = if tagIsWHNF t && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
+        ass = [ project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
+        nonPtr TyPtr {} = False
+        nonPtr TyNode = False
+        nonPtr (TyTup xs) = all nonPtr xs
+        nonPtr _ = True
+    return (mconcat $ malloc:tagassign:ass, cast pnode_t tmp)
+newNode e = return (err (show e),err "newNode")
+
+------------------
+-- declaring stuff
+------------------
+
+declareStruct n = do
+    grin <- asks rGrin
+    let ts = runIdentity $ findArgs (grinTypeEnv grin) n
+    ts' <- mapM convertType ts
+    tell mempty { wStructures = Map.singleton (nodeStructName n) (zip [ name $ 'a':show i | i <-  [1 ..] ] ts') }
+
+declareEvalFunc n = do
+    fn <- tagToFunction n
+    grin <- asks rGrin
+    declareStruct n
+    nt <- nodeType n
+    let ts = runIdentity $ findArgs (grinTypeEnv grin) n
+        fname = toName $ "jhc_eval_" ++ show fn
+        aname = name "arg";
+        rvar = localVariable sptr_t (name "r");
+        atype = ptrType nt
+        body = rvar =* functionCall (toName (show $ fn)) [ project' (arg i) (variable aname) | _ <- ts | i <- [1 .. ] ]
+        update =  functionCall (toName "update") [cast sptr_t (variable aname),rvar]
+    tellFunctions [function fname sptr_t [(aname,atype)] [] (body & update & creturn rvar )]
+    return fname
+
+
+--------
+-- shape
+--------
+
+
+toShape TyPtr {} = ShapeNativePtr
+toShape TyNode = ShapeNativePtr
+toShape (Ty bt)
+    | show bt == "int" = ShapeNativeInt
+    | show bt == "HsPtr" = ShapeNativePtr
+    | show bt == "HsFunPtr" = ShapeNativePtr
+toShape (Ty bt) = case genericPrimitiveInfo (show bt) of
+    Just v -> ShapeBits $ primTypeSizeOf v
+    Nothing -> error $ "toShape: " ++ show bt
+toShape t = error $ "toShape: " ++ show t
+
+newtype Shapes = Shapes [Shape]
+    deriving(Eq,Ord)
+
+data Shape = ShapeNativePtr | ShapeNativeInt | ShapeBits !Int
+    deriving(Eq,Ord)
+
+instance Show Shape where
+    showsPrec _ ShapeNativeInt = ('i':)
+    showsPrec _ ShapeNativePtr = ('p':)
+    showsPrec _ (ShapeBits n) = ('b':) . shows n
+
+instance Show Shapes where
+    showsPrec _ (Shapes s) = foldr (.) id (map shows s)
+
+
+
+----------------------------
+-- c constants and utilities
+----------------------------
+
+jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
+f_assert e = expr $ functionCall (name "assert") [e]
+jhc_malloc_atomic sz = functionCall (name "jhc_malloc_atomic") [sz]
+profile_update_inc = expr $ functionCall (name "update_inc") []
+profile_case_inc = expr $ functionCall (name "case_inc") []
+profile_function_inc = expr $ functionCall (name "function_inc") []
+
+arg i = name $ 'a':show i
+
+
+varName (V n) | n < 0 = name $ 'g':show (- n)
+varName (V n) = name $ 'v':show n
+
+nodeTagName :: Atom -> Name
+nodeTagName a = toName (toString a)
+nodeFuncName :: Atom -> Name
+nodeFuncName a = toName (toString a)
+
+node_t = basicType "node_t"
+sptr_t = basicType "sptr_t"
+pnode_t = ptrType node_t
+ppnode_t = ptrType (ptrType node_t)
+size_t = basicType "size_t"
+tag_t = basicType "tag_t"
+
+concrete :: Atom -> Expression -> Expression
+concrete t e = cast (ptrType $ structType (nodeStructName t)) e
+
+getTag :: Expression -> Expression
+getTag e = project' (name "tag") e
+
+nodeTypePtr a = liftM ptrType (nodeType a)
+nodeType a = return $ structType (nodeStructName a)
+nodeStructName :: Atom -> Name
+nodeStructName a = toName ('s':toString a)
+
+------------
+-- C helpers
+------------
+
+infix 3 `eq`
+
+eq :: Expression -> Expression -> Expression
+eq = operator "=="
+
+infix 2 =*
+
+(=*) :: Expression -> Expression -> Statement
+x =* y = x `assign` y
+
+class ToStatement a  where
+    toStatement :: a -> Statement
+
+instance ToStatement Statement where
+    toStatement x = x
+
+instance ToStatement Expression where
+    toStatement e = expr e
+
+infixl 1 &
+
+(&) :: (ToStatement a,ToStatement b) => a -> b -> Statement
+x & y = toStatement x `mappend` toStatement y
+
 
 {-
 convertExp (Fetch v) | getType v == TyPtr TyNode = do
@@ -474,171 +655,7 @@ convertExp (Update v z) | getType z == TyNode = do  -- TODO eliminate unknown up
 convertExp e = return (err (show e),err "nothing")
 
 -}
-
---convertPrim p vs = return (mempty,err $ show p)
-convertPrim p vs
-    | APrim (CConst s _) _ <- primAPrim p = do
-        return $ expressionRaw s
-    | APrim (CCast _ to) _ <- primAPrim p, [a] <- vs = do
-        a' <- convertVal a
-        return $ cast (basicType to) a'
-    | APrim (Operator n [ta] r) _ <- primAPrim p, [a] <- vs = do
-        a' <- convertVal a
-        return $ cast (basicType r) (uoperator n a')
-    | APrim (Operator n [ta,tb] r) _ <- primAPrim p, [a,b] <- vs = do
-        a' <- convertVal a
-        b' <- convertVal b
-        return $ cast (basicType r) (operator n a' b')
-    | APrim (Func _ n as r) _ <- primAPrim p = do
-        vs' <- mapM convertVal vs
-        return $ cast (basicType r) (functionCall (name $ unpackPS n) [ cast (basicType t) v | v <- vs' | t <- as ])
-    | APrim (Peek t) _ <- primAPrim p, [v] <- vs = do
-        v' <- convertVal v
-        return $ expressionRaw ("*((" <> t <+> "*)" <> (parens $ renderG v') <> char ')')
-    | APrim (Poke t) _ <- primAPrim p, [v,x] <- vs = do
-        v' <- convertVal v
-        x' <- convertVal x
-        return $ expressionRaw ("*((" <> t <+> "*)" <> (parens $ renderG v') <> text ") = " <> renderG x')
-    | APrim (AddrOf t) _ <- primAPrim p, [] <- vs = do
-        return $ expressionRaw ('&':unpackPS t)
-
-newNode (NodeV t []) = do
-    tmp <- newVar pnode_t
-    var <- fetchVar t TyTag
-    let tmp' = getTag tmp
-        malloc =  tmp `assign` jhc_malloc (sizeof  node_t)
-        tagassign = tmp' `assign` var
-    return (mappend malloc tagassign, tmp)
-newNode (NodeC t _) | t == tagHole = do
-    return $  (mempty,jhc_malloc (sizeof node_t))
-newNode (NodeC t as) | tagIsSuspFunction t = do
-    en <- declareEvalFunc t
-    st <- nodeType t
-    as' <- mapM convertVal as
-    tmp <- newVar pnode_t
-    let tmp' = concrete t tmp
-        malloc =  tmp `assign` jhc_malloc (sizeof st)
-        tagassign = getTag tmp' `assign` functionCall (name "EVALTAG") [reference (variable en)]
-        ass = [ project' (arg i) tmp' `assign` a | a <- as' | i <- [(1 :: Int) ..] ]
-        nonPtr TyPtr {} = False
-        nonPtr TyNode = False
-        nonPtr (TyTup xs) = all nonPtr xs
-        nonPtr _ = True
-        tmp'' = functionCall (name "EVALTAG") [tmp]
-    return (mconcat $ malloc:tagassign:ass, cast pnode_t tmp'')
-newNode (NodeC t as) | tagIsWHNF t = do -- && not (tagIsPartialAp t) = do
-    st <- nodeType t
-    tell mempty { wTags = Set.singleton t }
-    declareStruct t
-    as' <- mapM convertVal as
-    tmp <- newVar pnode_t
-    let tmp' = concrete t tmp
-        malloc =  tmp `assign` wmalloc (sizeof  (if tagIsWHNF t then st else node_t))
-        tagassign = getTag tmp' `assign` constant (enum $ nodeTagName t)
-        wmalloc = if tagIsWHNF t && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
-        ass = [ project' (arg i) tmp' `assign` a | a <- as' | i <- [(1 :: Int) ..] ]
-        nonPtr TyPtr {} = False
-        nonPtr TyNode = False
-        nonPtr (TyTup xs) = all nonPtr xs
-        nonPtr _ = True
-    return (mconcat $ malloc:tagassign:ass, cast pnode_t tmp)
-newNode e = return (err (show e),err "newNode")
-
-------------------
--- declaring stuff
-------------------
-
-declareStruct n = do
-    grin <- asks rGrin
-    let ts = runIdentity $ findArgs (grinTypeEnv grin) n
-    ts' <- mapM convertType ts
-    tell mempty { wStructures = Map.singleton (nodeStructName n) (zip [ name $ 'a':show i | i <-  [1 ..] ] ts') }
-
-declareEvalFunc n = do
-    fn <- tagToFunction n
-    grin <- asks rGrin
-    declareStruct n
-    nt <- nodeType n
-    let ts = runIdentity $ findArgs (grinTypeEnv grin) n
-        fname = toName $ "jhc_eval_" ++ show fn
-        aname = name "arg";
-        rvar = localVariable sptr_t (name "r");
-        atype = ptrType nt
-        body = rvar `assign` functionCall (toName (show $ fn)) [ project' (arg i) (variable aname) | _ <- ts | i <- [1 .. ] ]
-        update =  expr $ functionCall (toName "update") [cast sptr_t (variable aname),rvar]
-    tellFunctions [function fname sptr_t [(aname,atype)] [] (body `mappend` update `mappend` creturn rvar )]
-    return fname
-
-
---------
--- shape
---------
-
-
-toShape TyPtr {} = ShapeNativePtr
-toShape TyNode = ShapeNativePtr
-toShape (Ty bt)
-    | show bt == "int" = ShapeNativeInt
-    | show bt == "HsPtr" = ShapeNativePtr
-    | show bt == "HsFunPtr" = ShapeNativePtr
-toShape (Ty bt) = case genericPrimitiveInfo (show bt) of
-    Just v -> ShapeBits $ primTypeSizeOf v
-    Nothing -> error $ "toShape: " ++ show bt
-toShape t = error $ "toShape: " ++ show t
-
-newtype Shapes = Shapes [Shape]
-    deriving(Eq,Ord)
-
-data Shape = ShapeNativePtr | ShapeNativeInt | ShapeBits !Int
-    deriving(Eq,Ord)
-
-instance Show Shape where
-    showsPrec _ ShapeNativeInt = ('i':)
-    showsPrec _ ShapeNativePtr = ('p':)
-    showsPrec _ (ShapeBits n) = ('b':) . shows n
-
-instance Show Shapes where
-    showsPrec _ (Shapes s) = foldr (.) id (map shows s)
-
-
-
-----------------------------
--- c constants and utilities
-----------------------------
-
-jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
-jhc_malloc_atomic sz = functionCall (name "jhc_malloc_atomic") [sz]
-profile_update_inc = expr $ functionCall (name "update_inc") []
-profile_case_inc = expr $ functionCall (name "case_inc") []
-profile_function_inc = expr $ functionCall (name "function_inc") []
-
-arg i = name $ 'a':show i
-
-
-varName (V n) | n < 0 = name $ 'g':show (- n)
-varName (V n) = name $ 'v':show n
-
-nodeTagName :: Atom -> Name
-nodeTagName a = toName (toString a)
-nodeFuncName :: Atom -> Name
-nodeFuncName a = toName (toString a)
-
-node_t = basicType "node_t"
-sptr_t = basicType "sptr_t"
-pnode_t = ptrType node_t
-ppnode_t = ptrType (ptrType node_t)
-size_t = basicType "size_t"
-tag_t = basicType "tag_t"
-
-concrete :: Atom -> Expression -> Expression
-concrete t e = cast (ptrType $ structType (nodeStructName t)) e
-
-getTag :: Expression -> Expression
-getTag e = project' (name "tag") e
-
-nodeTypePtr a = liftM ptrType (nodeType a)
-nodeType a = return $ structType (nodeStructName a)
-nodeStructName :: Atom -> Name
-nodeStructName a = toName ('s':toString a)
-
-
+{-
+convertBody (Return v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
+convertBody (Fetch v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
+-}

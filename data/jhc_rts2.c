@@ -12,6 +12,7 @@
 #define P_WHNF  0x0
 #define P_LAZY  0x1
 
+#define BLACK_HOLE 0xDEADBEEF
 
 
 /* a value may be one of the following and is represented by a sptr_t
@@ -100,8 +101,17 @@ eval(sptr_t s)
         if(ISLAZY(s)) {
                 void *ds = (void *)DETAG(s);
                 sptr_t h = (sptr_t)(GETHEAD(ds));
+                assert(h != BLACK_HOLE);
                 if(ISLAZY(h)) {
-                        return ((eval_fn)DETAG(h))(NODEP(ds));
+                        eval_fn fn = (eval_fn)DETAG(h);
+#ifndef NDEBUG
+                        GETHEAD(ds) = BLACK_HOLE;
+#endif
+                        sptr_t r = (*fn)(NODEP(ds));
+#ifndef NDEBUG
+                        assert(GETHEAD(ds) != BLACK_HOLE);
+#endif
+                        return r;
                 }
                 return h;
         }
@@ -113,7 +123,7 @@ static void A_UNUSED
 update(sptr_t thunk, sptr_t new)
 {
         update_inc();
-        assert(ISLAZY(GETHEAD(thunk)));
+        assert(GETHEAD(thunk) == BLACK_HOLE);
         assert(!ISLAZY(new));
         GETHEAD(thunk) = (tag_t)new;
 }
