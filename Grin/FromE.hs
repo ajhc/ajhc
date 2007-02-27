@@ -627,8 +627,9 @@ compile' cenv (tvr,as,e) = ans where
         f (Left (t,e):ds) x | not (isLifted (EVar t)) = do
             mtick "Grin.FromE.let-unlifted"
             e <- ce e
-            v <- f ds x
-            return $ (e :>>= n1 :-> Store n1) :>>= toVal t :-> v
+            z <- newNodeVar
+            v <- localEvaled [t] z $ f ds x
+            return $ (e :>>= z :-> Store z) :>>= toVal t :-> v
         f (Left (t,e):ds) x = do
             e <- cc e
             v <- f ds x

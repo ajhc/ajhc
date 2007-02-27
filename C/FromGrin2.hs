@@ -44,6 +44,7 @@ data Written = Written {
     wRequires :: Requires,
     wStructures :: Map.Map Name [(Name,Type)],
     wTags :: Set.Set Atom,
+--    wCAFS :: [Doc],
     wFunctions :: Map.Map Name Function
     }
     {-! derive: Monoid !-}
@@ -78,15 +79,17 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 compileGrin :: Grin -> (String,[String])
 compileGrin grin = (hsffi_h ++ jhc_rts_c ++ jhc_rts2_c ++ P.render ans ++ "\n", snub (reqLibraries req))  where
     ans = vcat $ includes ++ [text "", enum_tag_t, header, cafs,buildConstants finalHcHash, body]
+    --ans = vcat $ includes ++ [text "", enum_tag_t, header, text "/* CAFS */", vcat cafs,buildConstants finalHcHash, body]
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
     (header,body) = generateC (Map.elems fm) (Map.assocs sm)
     ((),finalHcHash,Written { wRequires = req, wFunctions = fm, wStructures = sm, wTags = ts }) = runC grin go
     enum_tag_t = text "enum {" $$ nest 4 (P.vcat (punctuate P.comma (zipWith f [0 ..] (tagHole:Set.toList ts)))) $$ text "};" where
         f n t = tshow (nodeTagName t) <> text " = " <> tshow (n :: Int) -- (n * 4 + 2 :: Int)
-    cafs = text "/* CAFS */" $$ (vcat $ map ccaf (grinCafs grin))
     tags = (tagHole,[]):sortUnder (show . fst) [ (t,runIdentity $ findArgs (grinTypeEnv grin) t) | t <- Set.toList ts, tagIsTag t]
     go = do
+        --cs <- mapM doCAF (grinCafs grin)
+        --tell mempty { wCAFS = cs }
         funcs <- flip mapM (grinFuncs grin) $ \(a,l) -> do
                     convertFunc (Map.lookup a (grinEntryPoints grin)) (a,l)
         tellFunctions funcs
@@ -94,6 +97,9 @@ compileGrin grin = (hsffi_h ++ jhc_rts_c ++ jhc_rts2_c ++ P.render ans ++ "\n", 
         let tset = Set.fromList [ n | (HcNode n _,_) <- Grin.HashConst.toList h]
         mapM_ declareStruct  (Set.toList tset)
         tell mempty { wTags = tset }
+
+
+    cafs = text "/* CAFS */" $$ (vcat $ map ccaf (grinCafs grin))
 
 convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C Function
 convertFunc ffie (n,Tup as :-> body) = do
@@ -363,24 +369,30 @@ convertExp (App a vs _) = do
             let ss = [ a =* v | a <- as | v <- vs' ]
             return (mconcat ss & goto nm, emptyExpression)
         Nothing -> return $ (mempty, functionCall (toName (toString a)) vs')
-convertExp (Update v@(Var vv _) (NodeC t as)) | getType v == TyPtr TyNode = do
+convertExp (Update v@(Var vv _) tn@(NodeC t as)) | getType v == TyPtr TyNode = do
     v' <- convertVal v
     as' <- mapM convertVal as
     nt <- nodeTypePtr t
     let tmp' = cast nt (if vv < v0 then f_DETAG v' else v')
-    s <- if tagIsSuspFunction t then do
-        en <- declareEvalFunc t
-        return $ getTag tmp' =* f_EVALTAG (reference (variable en))
+    if not (tagIsSuspFunction t) && vv < v0 then do
+        (nns, nn) <- newNode tn
+        return (nns & getTag (f_NODEP(f_DETAG v')) =* nn,emptyExpression)
      else do
-        declareStruct t
-        tell mempty { wTags = Set.singleton t }
-        return $ getTag tmp' =* constant (enum (nodeTagName t))
-    let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
-    return (mconcat $ profile_update_inc:s:ass,emptyExpression)
+        s <- if tagIsSuspFunction t then do
+            en <- declareEvalFunc t
+            return $ getTag tmp' =* f_EVALTAG (reference (variable en))
+         else do
+            declareStruct t
+            tell mempty { wTags = Set.singleton t }
+            return $ getTag tmp' =* constant (enum (nodeTagName t))
+        let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
+        return (mconcat $ profile_update_inc:s:ass,emptyExpression)
 convertExp e = return (err (show e),err "nothing")
 
 ccaf :: (Var,Val) -> P.Doc
-ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ P.render (pprint val)) <> text "*/\n" <> text "static node_t _" <> tshow (varName v) <> text ";\n" <> text "#define " <> tshow (varName v) <+>  text "(EVALTAG(&_" <> tshow (varName v) <> text "))\n";
+ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ P.render (pprint val)) <> text "*/\n" <>
+     text "static node_t _" <> tshow (varName v) <> text ";\n" <>
+     text "#define " <> tshow (varName v) <+>  text "(EVALTAG(&_" <> tshow (varName v) <> text "))\n";
 
 
 buildConstants fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
@@ -504,7 +516,7 @@ declareEvalFunc n = do
         rvar = localVariable wptr_t (name "r");
         atype = ptrType nt
         body = rvar =* functionCall (toName (show $ fn)) [ project' (arg i) (variable aname) | _ <- ts | i <- [1 .. ] ]
-        update =  functionCall (toName "update") [cast wptr_t (variable aname),rvar]
+        update =  f_update (cast wptr_t (variable aname)) rvar
     tellFunctions [function fname wptr_t [(aname,atype)] [] (body & update & creturn rvar )]
     return fname
 
@@ -548,7 +560,9 @@ instance Show Shapes where
 jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
 f_assert e = expr $ functionCall (name "assert") [e]
 f_DETAG e = functionCall (name "DETAG") [e]
+f_NODEP e = functionCall (name "NODEP") [e]
 f_EVALTAG e = functionCall (name "EVALTAG") [e]
+f_update x y = functionCall (name "update") [x,y]
 jhc_malloc_atomic sz = functionCall (name "jhc_malloc_atomic") [sz]
 profile_update_inc = expr $ functionCall (name "update_inc") []
 profile_case_inc = expr $ functionCall (name "case_inc") []
@@ -664,4 +678,6 @@ newNode (NodeV t []) = do
 convertBody (Return v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
 convertBody (Fetch v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
 -}
+
+
 
