@@ -9,6 +9,7 @@ use POSIX qw(strftime);
 
 my @opts;
 my @fopts;
+my @mopts;
 
 my @saved_args = @ARGV;
 
@@ -18,9 +19,9 @@ my $opt_p;
 my @opt_rts;
 
 Getopt::Long::Configure ("bundling");
-GetOptions( 'f=s' => \@fopts, 'o=s' => \@opts, l => \$opt_l, n => \$opt_n, p => \$opt_p, 'rts=s' =>\@opt_rts  ) or die "Invalid options";
+GetOptions( 'm=s' => \@mopts, 'f=s' => \@fopts, 'o=s' => \@opts, l => \$opt_l, n => \$opt_n, p => \$opt_p, 'rts=s' =>\@opt_rts  ) or die "Invalid options";
 
-@opts = (@opts, map { "-f$_" } @fopts);
+@opts = (@opts, (map { "-f$_" } @fopts), (map { "-m$_" } @mopts));
 
 my @cond;
 my @ncond;
