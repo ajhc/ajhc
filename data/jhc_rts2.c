@@ -107,6 +107,18 @@ fetch(sptr_t s)
         return (wptr_t)s;
 }
 
+// like eval but you know the target is in WHNF or is a already evaluated indirection
+static inline wptr_t A_STD A_UNUSED
+follow(sptr_t s)
+{
+        if(ISLAZY(s)) {
+                sptr_t h = (sptr_t)(GETHEAD(DETAG(s)));
+                assert(!ISLAZY(h));
+                return (wptr_t)h;
+        }
+        return (wptr_t)s;
+}
+
 static inline wptr_t A_STD A_UNUSED
 eval(sptr_t s)
 {
