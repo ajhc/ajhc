@@ -29,6 +29,7 @@ module Grin.Grin(
     emptyGrin,
     findArgs,
     findArgsType,
+    findTyTy,
     funcApply,
     funcEval,
     funcFetch,
@@ -444,16 +445,18 @@ isHole x = x `elem` map properHole [TyPtr TyNode, TyNode, TyTag]
 -- Look up stuff in the typing environment.
 ---------
 
-findArgsType (TyEnv m) a | Just TyTy { tySlots = ss, tyReturn = r } <-  Map.lookup a m = return (ss,r)
-findArgsType (TyEnv m) a | ('Y':rs) <- fromAtom a, (ns,'_':rs) <- span isDigit rs  = case Map.lookup (toAtom ('T':rs)) m of
-    Just TyTy { tySlots = ts, tyReturn = n } -> return (take (length ts - read ns) ts,n)
+findTyTy (TyEnv m) a | Just tyty <-  Map.lookup a m = return tyty
+findTyTy (TyEnv m) a | ('Y':rs) <- fromAtom a, (ns,'_':rs) <- span isDigit rs  = case Map.lookup (toAtom ('T':rs)) m of
+    Just TyTy { tySlots = ts, tyReturn = n } -> return tyTy { tySlots = take (length ts - read ns) ts, tyReturn = n }
     Nothing -> fail $ "findArgsType: " ++ show a
-findArgsType _ a | "@hole" `isPrefixOf` fromAtom a  = return ([],TyNode)
-findArgsType _ a =  fail $ "findArgsType: " ++ show a
+findTyTy _ a | "@hole" `isPrefixOf` fromAtom a  = return tyTy { tySlots = [], tyReturn = TyNode }
+findTyTy _ a =  fail $ "findArgsType: " ++ show a
 
-findType (TyEnv m) a = case Map.lookup a m of
+findArgsType m a = liftM (\tyty -> (tySlots tyty,tyReturn tyty)) (findTyTy m a)
+
+findType m a = case findArgsType m a of
     Nothing -> fail $ "findType: " ++ show a
-    Just TyTy { tyReturn = x }-> return x
+    Just (_,x) -> return x
 findArgs m a = case findArgsType m a of
     Nothing -> fail $ "findArgs: " ++ show a
     Just (as,_) -> return as

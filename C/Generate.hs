@@ -417,16 +417,16 @@ mangleIdent xs =  concatMap f xs where
 
 toName s = Name (mangleIdent s)
 
-
-generateC :: [Function]        -- ^ functions
+generateC :: Bool              -- ^ whether to add tag nodes
+    -> [Function]              -- ^ functions
     -> [(Name,[(Name,Type)])]  -- ^ extra structures
     -> (Doc,Doc)               -- ^ final result
-generateC fs ss = ans where
+generateC genTag fs ss = ans where
     G ga = do
         fs <- mapM drawFunction fs
         let (protos,bodys) = unzip fs
         let shead = vcat $ map (text . (++ ";") . ("struct " ++) . show . fst) ss
-        shead2 <- declStructs True ss
+        shead2 <- declStructs genTag ss
         return (shead $$ line $$ shead2, vcat protos $$ line $$  vsep bodys)
     ((hd,fns),(_,ass),_written) = runRWS ga () (1,Map.empty)
 
@@ -442,6 +442,7 @@ generateC fs ss = ans where
                 return $ t <+> tshow n <> semi
             return $ text "struct" <+> tshow n <+> lbrace $$ nest 4 (vcat $ (if ht then text "tag_t tag;" else empty):ts') $$ rbrace <> semi
     ans = (hd $$ anons'',fns)
+
 
 line = text ""
 vsep xs = vcat $ intersperse line xs

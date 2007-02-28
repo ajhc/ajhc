@@ -2,17 +2,19 @@
 #include <assert.h>
 
 #define ISLAZY(x)   (((uintptr_t)(x)) & 0x1)
-#define DETAG(x)    ((uintptr_t)(x) & ~0x3)
+#define DETAG(x)    ((uintptr_t)(x) & ~0x1)
 
-#define GETHEAD(x)  (NODEP(x)->tag)
+#define GETHEAD(x)  (NODEP(x)->head)
+#define GETWHAT(x)  (DNODEP(x)->what)
 #define NODEP(x)    ((node_t *)(x))
-#define EVALTAG(fn) (assert(((uintptr_t)(fn) & 0x3) == 0),(tag_t)((uintptr_t)(fn) | P_LAZY))
+#define DNODEP(x)   ((dnode_t *)(x))
+#define EVALTAG(fn) (assert(((uintptr_t)(fn) & 0x3) == 0),(sptr_t)((uintptr_t)(fn) | P_LAZY))
 
 #define P_VALUE 0x2
 #define P_WHNF  0x0
 #define P_LAZY  0x1
 
-#define BLACK_HOLE 0xDEADBEEF
+#define BLACK_HOLE ((fptr_t)0xDEADBEEF)
 
 
 /* a value may be one of the following and is represented by a sptr_t
@@ -26,7 +28,7 @@
  * -------------------------
  *
  * -------------------------
- * |   lazy location   | u1|
+ * |   lazy location   | 01|
  * -------------------------
  *
  * whnf and raw value field formats are completly determined by the data type
@@ -46,7 +48,7 @@
  *  which are interpreted exactly as above or
  *
  * -------------------------
- * |    code pointer   | u1|
+ * |    code pointer   | 01|
  * -------------------------
  * |     data ...          |
  *
@@ -71,30 +73,36 @@
  *
  * sptr_t - a tagged smart pointer, may be a value, may be a pointer to a whnf or lazy location
  * wptr_t - a value guarenteed to be in whnf
- * node_t - definitely a pointer to a lazy location
- * tag_t - the first value in a lazy location, has a tag indicating what it is
+ * fptr_t - a pointer to a whnf or a function pointer to something to evaluate, first value in a lazy location.
+ * what_t  - the discriminator of a discriminated union
  *
  */
 
-typedef struct node enode_t;
-typedef struct node * sptr_t;
-typedef struct node * wptr_t;
-typedef uintptr_t tag_t;
+typedef struct node *  sptr_t;
+typedef struct dnode * wptr_t;
+typedef void *         fptr_t;
+typedef unsigned       what_t;
+
 
 typedef struct node {
-        tag_t tag;
+        fptr_t head;
         sptr_t rest[];
 } node_t;
 
+typedef struct dnode {
+        what_t what;
+        sptr_t rest[];
+} dnode_t;
 
-typedef sptr_t (*eval_fn)(node_t *node) A_STD;
+
+typedef wptr_t (*eval_fn)(node_t *node) A_STD;
 
 // fetch is like a cast, an 'eval' where you know the target is in WHNF
 static wptr_t A_STD A_UNUSED
 fetch(sptr_t s)
 {
         assert(!ISLAZY(s));
-        return s;
+        return (wptr_t)s;
 }
 
 static wptr_t A_STD A_UNUSED
@@ -115,9 +123,9 @@ eval(sptr_t s)
 #endif
                         return r;
                 }
-                return h;
+                return (wptr_t)h;
         }
-        return s;
+        return (wptr_t)s;
 }
 
 
@@ -127,7 +135,7 @@ update(sptr_t thunk, wptr_t new)
         update_inc();
         assert(GETHEAD(thunk) == BLACK_HOLE);
         assert(!ISLAZY(new));
-        GETHEAD(thunk) = (tag_t)new;
+        GETHEAD(thunk) = (fptr_t)new;
 }
 
 

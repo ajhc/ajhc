@@ -44,6 +44,7 @@ data Written = Written {
     wRequires :: Requires,
     wStructures :: Map.Map Name [(Name,Type)],
     wTags :: Set.Set Atom,
+    wEnums :: Map.Map Name Int,
     wFunctions :: Map.Map Name Function
     }
     {-! derive: Monoid !-}
@@ -77,14 +78,14 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
 compileGrin grin = (hsffi_h ++ jhc_rts_c ++ jhc_rts2_c ++ P.render ans ++ "\n", snub (reqLibraries req))  where
-    ans = vcat $ includes ++ [text "", enum_tag_t, header, cafs,buildConstants finalHcHash, body]
+    ans = vcat $ includes ++ [text "", enum_tag_t, header, cafs,buildConstants (grinTypeEnv grin) finalHcHash, body]
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
-    (header,body) = generateC (Map.elems fm) (Map.assocs sm)
-    ((),finalHcHash,Written { wRequires = req, wFunctions = fm, wStructures = sm, wTags = ts }) = runC grin go
-    enum_tag_t = text "enum {" $$ nest 4 (P.vcat (punctuate P.comma (zipWith f [0 ..] (tagHole:Set.toList ts)))) $$ text "};" where
-        f n t = tshow (nodeTagName t) <> text " = " <> tshow (n :: Int) -- (n * 4 + 2 :: Int)
-    tags = (tagHole,[]):sortUnder (show . fst) [ (t,runIdentity $ findArgs (grinTypeEnv grin) t) | t <- Set.toList ts, tagIsTag t]
+    (header,body) = generateC False (Map.elems fm) (Map.assocs sm)
+    ((),finalHcHash,Written { wRequires = req, wFunctions = fm, wEnums = wenum, wStructures = sm, wTags = ts }) = runC grin go
+    enum_tag_t = text "enum {" $$ nest 4 (P.vcat (punctuate P.comma $ map (uncurry g) (Map.toList wenum) ++ (zipWith f (Set.toList ts) [0 ..]))) $$ text "};" where
+        f t n = tshow (nodeTagName t) <> text " = " <> tshow (n :: Int)
+        g t n = tshow t <> text " = " <> tshow (n :: Int)
     go = do
         funcs <- flip mapM (grinFuncs grin) $ \(a,l) -> do
                     convertFunc (Map.lookup a (grinEntryPoints grin)) (a,l)
@@ -92,7 +93,7 @@ compileGrin grin = (hsffi_h ++ jhc_rts_c ++ jhc_rts2_c ++ P.render ans ++ "\n", 
         h <- get
         let tset = Set.fromList [ n | (HcNode n _,_) <- Grin.HashConst.toList h]
         mapM_ declareStruct  (Set.toList tset)
-        tell mempty { wTags = tset }
+        mapM_ tellTags (Set.toList tset)
     cafs = text "/* CAFS */" $$ (vcat $ map ccaf (grinCafs grin))
 
 convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C Function
@@ -136,7 +137,7 @@ convertVal (Tup xs) = do
     ts <- mapM convertType (map getType xs)
     xs <- mapM convertVal xs
     return (structAnon (zip xs ts))
-convertVal (Tag t) = do tell mempty { wTags = Set.singleton t } ; return $ constant (enum $ nodeTagName t)
+convertVal (Tag t) = do tellTags t ; return $ constant (enum $ nodeTagName t)
 convertVal (ValPrim (APrim p _) [] _) = case p of
     CConst s _ -> return $ expressionRaw s
     AddrOf t -> return $ expressionRaw ('&':unpackPS t)
@@ -213,15 +214,15 @@ convertBody (Return v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
 convertBody (Fetch v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
 convertBody (Case v@(Var _ ty) [p1@(NodeC t _) :-> e1,p2 :-> e2]) | ty == TyNode = do
     scrut <- convertVal v
-    tell mempty { wTags = Set.singleton t }
-    let tag = getTag scrut
+    tellTags t
+    let tag = getWhat scrut
         da v@Var {} e = do
             v'' <- convertVal v
             e' <- convertBody e
             return $ v'' =* scrut & e'
         da n1@(NodeC t _) (Return n2@NodeC {}) | n1 == n2 = convertBody (Return v)
         da (NodeC t as) e = do
-            tell mempty { wTags = Set.singleton t }
+            tellTags t
             as' <- mapM convertVal as
             let tmp = concrete t  scrut
                 ass = mconcat [if needed a then a' =* (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
@@ -250,17 +251,17 @@ convertBody (Case v@(Var _ t) [p1 :-> e1, p2 :-> e2]) | Set.null ((freeVars p2 :
     return $ profile_case_inc & cif (cp p1 `eq` scrut') e1' (am e2')
 convertBody (Case v@(Var _ t) ls) | t == TyNode = do
     scrut <- convertVal v
-    let tag = getTag scrut
+    let tag = getWhat scrut
         da (v@(Var {}) :-> e) = do
             v'' <- convertVal v
             e' <- convertBody e
             return $ (Nothing,v'' =* scrut & e')
         da (n1@(NodeC t _) :-> Return n2@NodeC {}) | n1 == n2 = do
-            tell mempty { wTags = Set.singleton t }
+            tellTags t
             e' <- convertBody (Return v)
             return (Just (enum (nodeTagName t)),e')
         da ((NodeC t as) :-> e) = do
-            tell mempty { wTags = Set.singleton t }
+            tellTags t
             as' <- mapM convertVal as
             e' <- convertBody e
             let tmp = concrete t scrut
@@ -346,11 +347,11 @@ convertExp (Update v z) | getType z == TyPtr TyNode = do
 convertExp (App a [v] _) | a == funcEval = do
     v' <- convertVal v
     return (mempty,f_eval v')
-convertExp (Store n@NodeC {}) = newNode n
-convertExp (Return n@NodeC {}) = newNode n
+convertExp (Store n@NodeC {})  = newNode n >>= \(x,y) -> return (x,cast sptr_t y)
+convertExp (Return n@NodeC {}) = newNode n >>= \(x,y) -> return (x,cast wptr_t y)
 convertExp (Store n@Var {}) | getType n == TyNode = do
     n' <- convertVal n
-    return (mempty,n')
+    return (mempty,cast sptr_t n')
 convertExp (Return v) = do
     v <- convertVal v
     return (mempty,v)
@@ -370,15 +371,9 @@ convertExp (Update v@(Var vv _) tn@(NodeC t as)) | getType v == TyPtr TyNode = d
     let tmp' = cast nt (if vv < v0 then f_DETAG v' else v')
     if not (tagIsSuspFunction t) && vv < v0 then do
         (nns, nn) <- newNode tn
-        return (nns & getTag (f_NODEP(f_DETAG v')) =* nn,emptyExpression)
+        return (nns & getHead (f_NODEP(f_DETAG v')) =* cast fptr_t nn,emptyExpression)
      else do
-        s <- if tagIsSuspFunction t then do
-            en <- declareEvalFunc t
-            return $ getTag tmp' =* f_EVALTAG (reference (variable en))
-         else do
-            declareStruct t
-            tell mempty { wTags = Set.singleton t }
-            return $ getTag tmp' =* constant (enum (nodeTagName t))
+        s <- tagAssign tmp' t
         let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
         return (mconcat $ profile_update_inc:s:ass,emptyExpression)
 convertExp e = return (err (show e),err "nothing")
@@ -389,10 +384,14 @@ ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ P.render (pp
      text "#define " <> tshow (varName v) <+>  text "(EVALTAG(&_" <> tshow (varName v) <> text "))\n";
 
 
-buildConstants fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
+buildConstants tyenv fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
     cc nn@(HcNode a zs,i) = comm $$ cd $$ def where
         comm = text "/* " <> tshow (nn) <> text " */"
-        cd = text "const static struct " <> tshow (nodeStructName a) <+> text "_c" <> tshow i <+> text "= {" <> hsep (punctuate P.comma (tshow (nodeTagName a):rs)) <> text "};"
+        cd = text "const static struct " <> tshow (nodeStructName a) <+> text "_c" <> tshow i <+> text "= {" <> hsep (punctuate P.comma (ntag ++ rs)) <> text "};"
+        Just TyTy { tySiblings = sibs } = findTyTy tyenv a
+        ntag = case sibs of
+            Just [a'] | a' == a -> []
+            _ -> [tshow (nodeTagName a)]
         def = text "#define c" <> tshow i <+> text "((sptr_t)&_c" <> tshow i <> text ")"
         rs = [ f z undefined |  z <- zs ]
         f (Right i) = text $ 'c':show i
@@ -454,8 +453,54 @@ convertPrim p vs
 isValUnknown ValUnknown {} = True
 isValUnknown _ = False
 
+
+tagAssign :: Expression -> Atom -> C Statement
+tagAssign e t | tagIsSuspFunction t = do
+    en <- declareEvalFunc t
+    return $ getHead e =* f_EVALTAG (reference (variable en))
+tagAssign e t = do
+    declareStruct t
+    tyenv <- asks (grinTypeEnv . rGrin)
+    TyTy { tySiblings = sib } <- findTyTy tyenv t
+    tellTags t
+    case sib of
+        Just [n'] | n' == t -> return mempty
+        _ -> do return $ getWhat e =* constant (enum $ nodeTagName t)
+
+tellTags :: Atom -> C ()
+tellTags t | tagIsSuspFunction t = return ()
+tellTags t = do
+    tyenv <- asks (grinTypeEnv . rGrin)
+    TyTy { tySiblings = sib } <- findTyTy tyenv t
+    case sib of
+        Just [n'] | n' == t -> return ()
+        Just rs -> tell mempty { wEnums = Map.fromList (zip (map nodeTagName rs) [0..]) }
+        Nothing -> tell mempty { wTags = Set.singleton t }
+
+
+
 newNode (NodeC t _) | t == tagHole = do
     fail "newNode.tagHole"
+newNode (NodeC t as) = do
+    let sf = tagIsSuspFunction t
+    st <- nodeType t
+    as' <- mapM convertVal as
+    tmp <- newVar (if sf then sptr_t else wptr_t)
+    let tmp' = concrete t tmp
+        wmalloc = if not sf && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
+        malloc =  tmp =* wmalloc (sizeof st)
+        ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
+        nonPtr TyPtr {} = False
+        nonPtr TyNode = False
+        nonPtr (TyTup xs) = all nonPtr xs
+        nonPtr _ = True
+    tagassign <- tagAssign tmp' t
+    let res = if sf then (f_EVALTAG tmp) else tmp
+    return (mconcat $ malloc:tagassign:ass,res)
+
+
+{-
+
 newNode (NodeC t as) | tagIsSuspFunction t = do
     en <- declareEvalFunc t
     st <- nodeType t
@@ -478,6 +523,7 @@ newNode (NodeC t as) | tagIsWHNF t = do -- && not (tagIsPartialAp t) = do
     as' <- mapM convertVal as
     tmp <- newVar wptr_t
     let tmp' = concrete t tmp
+        wmalloc = if all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
         malloc =  tmp =* wmalloc (sizeof st)
         tagassign = getTag tmp' =* constant (enum $ nodeTagName t)
         wmalloc = if tagIsWHNF t && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
@@ -489,15 +535,20 @@ newNode (NodeC t as) | tagIsWHNF t = do -- && not (tagIsPartialAp t) = do
     return (mconcat $ malloc:tagassign:ass, tmp)
 newNode e = return (err (show e),err "newNode")
 
+-}
+
 ------------------
 -- declaring stuff
 ------------------
 
 declareStruct n = do
     grin <- asks rGrin
-    let ts = runIdentity $ findArgs (grinTypeEnv grin) n
+    let TyTy { tySlots = ts, tySiblings = ss } = runIdentity $ findTyTy (grinTypeEnv grin) n
     ts' <- mapM convertType ts
-    tell mempty { wStructures = Map.singleton (nodeStructName n) (zip [ name $ 'a':show i | i <-  [1 ..] ] ts') }
+    let tag | tagIsSuspFunction n = [(name "head",fptr_t)]
+            | Just [n'] <- ss, n == n' = []
+            | otherwise = [(name "what",what_t)]
+    tell mempty { wStructures = Map.singleton (nodeStructName n) (tag ++ zip [ name $ 'a':show i | i <-  [1 ..] ] ts') }
 
 declareEvalFunc n = do
     fn <- tagToFunction n
@@ -510,7 +561,7 @@ declareEvalFunc n = do
         rvar = localVariable wptr_t (name "r");
         atype = ptrType nt
         body = rvar =* functionCall (toName (show $ fn)) [ project' (arg i) (variable aname) | _ <- ts | i <- [1 .. ] ]
-        update =  f_update (cast wptr_t (variable aname)) rvar
+        update =  f_update (cast sptr_t (variable aname)) rvar
     tellFunctions [function fname wptr_t [(aname,atype)] [a_STD] (body & update & creturn rvar )]
     return fname
 
@@ -576,6 +627,8 @@ nodeFuncName :: Atom -> Name
 nodeFuncName a = toName (toString a)
 
 sptr_t    = basicType "sptr_t"
+fptr_t    = basicType "fptr_t"
+what_t    = basicType "what_t"
 wptr_t    = basicType "wptr_t"
 size_t    = basicType "size_t"
 tag_t     = basicType "tag_t"
@@ -587,8 +640,12 @@ a_MALLOC = Attribute "A_MALLOC"
 concrete :: Atom -> Expression -> Expression
 concrete t e = cast (ptrType $ structType (nodeStructName t)) e
 
-getTag :: Expression -> Expression
-getTag e = project' (name "tag") e
+
+getHead :: Expression -> Expression
+getHead e = project' (name "head") e
+
+getWhat :: Expression -> Expression
+getWhat e = project' (name "what") e
 
 nodeTypePtr a = liftM ptrType (nodeType a)
 nodeType a = return $ structType (nodeStructName a)
