@@ -802,7 +802,7 @@ compileGrinToC grin = do
                   | otherwise = []
         profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE"]
                   | otherwise = []
-        comm = shellQuote $ [optCC options, "-std=gnu99", "-D_GNU_SOURCE", "-falign-functions=4", "-fno-strict-aliasing", "-ffast-math", "-Wall", "-o", fn, cf ] ++ (map ("-l" ++) rls) ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
+        comm = shellQuote $ [optCC options, "-std=gnu99", "-D_GNU_SOURCE", "-falign-functions=4", "-ffast-math", "-Wall", "-o", fn, cf ] ++ (map ("-l" ++) rls) ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
         debug = if fopts FO.Debug then ["-g"] else ["-DNDEBUG", "-O2", "-fomit-frame-pointer"]
         globalvar n c = "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" (head $ lines versionString),"",cg]

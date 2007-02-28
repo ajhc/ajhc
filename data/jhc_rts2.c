@@ -89,12 +89,12 @@ typedef unsigned       what_t;
 typedef struct node {
         fptr_t head;
         sptr_t rest[];
-} node_t;
+} A_MAYALIAS node_t;
 
 typedef struct dnode {
         what_t what;
         sptr_t rest[];
-} dnode_t;
+} A_MAYALIAS dnode_t;
 
 
 typedef wptr_t (*eval_fn)(node_t *node) A_STD;
@@ -139,6 +139,7 @@ update(sptr_t thunk, wptr_t new)
         assert(!ISLAZY(new));
         GETHEAD(thunk) = (fptr_t)new;
 }
+
 
 
 

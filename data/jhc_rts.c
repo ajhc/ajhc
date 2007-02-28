@@ -23,13 +23,17 @@
 #define A_CONST __attribute__ ((const))
 #define A_UNUSED __attribute__ ((unused))
 #define A_MALLOC __attribute__ ((malloc))
+#define A_MAYALIAS __attribute__ ((__may_alias__))
 #ifdef __i386__
 #define A_REGPARM __attribute__ ((fastcall))
 #else
 #define A_REGPARM
 #endif
-#define A_STD    A_REGPARM __attribute__ ((nothrow))
+#define A_STD    A_REGPARM
+
+
 #else
+#define A_MAYALIAS
 #define A_NORETURN
 #define A_PURE
 #define A_CONST
