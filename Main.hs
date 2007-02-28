@@ -72,7 +72,7 @@ import Support.ShowTable
 import Util.Graph
 import Util.NameMonad
 import Util.SetLike as S
-import Version(versionString,versionContext)
+import Version(versionString,versionContext,versionSimple)
 import qualified E.CPR
 import qualified E.Demand as Demand(analyzeProgram,solveDs)
 import qualified E.SSimplify as SS
@@ -106,7 +106,7 @@ main = runMain $ bracketHtml $ do
     progressM $ do
         name <- System.getProgName
         args <- getArguments
-        return (simpleQuote (name:args))
+        return (simpleQuote (name:args) ++ "\n" ++ versionSimple)
     case optMode o of
         BuildHl hl    -> createLibrary hl buildLibrary
         ListLibraries -> do
@@ -120,7 +120,7 @@ main = runMain $ bracketHtml $ do
             SelfTest.selfTest (optArgs o)
         ShowHo ho     -> dumpHoFile ho
         Version       -> putStrLn versionString
-        VersionCtx    -> putStrLn versionContext
+        VersionCtx    -> putStrLn (versionString ++ versionContext)
         _             -> processFiles  (optArgs o)
 
 
