@@ -100,14 +100,14 @@ typedef struct dnode {
 typedef wptr_t (*eval_fn)(node_t *node) A_STD;
 
 // fetch is like a cast, an 'eval' where you know the target is in WHNF
-static wptr_t A_STD A_UNUSED
+static inline wptr_t A_STD A_UNUSED
 fetch(sptr_t s)
 {
         assert(!ISLAZY(s));
         return (wptr_t)s;
 }
 
-static wptr_t A_STD A_UNUSED
+static inline wptr_t A_STD A_UNUSED
 eval(sptr_t s)
 {
         if(ISLAZY(s)) {
@@ -131,7 +131,7 @@ eval(sptr_t s)
 }
 
 
-static void A_STD A_UNUSED
+static inline void A_STD A_UNUSED
 update(sptr_t thunk, wptr_t new)
 {
         update_inc();
