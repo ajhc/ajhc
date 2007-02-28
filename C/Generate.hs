@@ -15,6 +15,7 @@ module C.Generate(
     enum,
     expr,
     Expression(),
+    Constant(),
     expressionRaw,
     indexArray,
     function,

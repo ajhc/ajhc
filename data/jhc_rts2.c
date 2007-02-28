@@ -9,6 +9,8 @@
 #define NODEP(x)    ((node_t *)(x))
 #define DNODEP(x)   ((dnode_t *)(x))
 #define EVALTAG(fn) (assert(((uintptr_t)(fn) & 0x3) == 0),(sptr_t)((uintptr_t)(fn) | P_LAZY))
+#define VALUE(n)    ((wptr_t)(((uintptr_t)(n) << 2) | P_VALUE))
+#define ISVALUE(n)  (assert(!ISLAZY(n)), ((uintptr_t)(n) & 0x2))
 
 #define P_VALUE 0x2
 #define P_WHNF  0x0

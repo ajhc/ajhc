@@ -123,13 +123,21 @@ fetchVar v ty = do
 
 convertVal :: Val -> C Expression
 convertVal (Var v ty) = fetchVar v ty
-convertVal (Const (NodeC h _)) | h == tagHole = return nullPtr
+convertVal (Const (NodeC h _)) | h == tagHole = return (cast sptr_t (f_VALUE (constant $ number 0)))
 convertVal (Const h) = do
-    (_,i) <- newConst h
-    return $ variable (name $  'c':show i )
-convertVal h@NodeC {} | valIsConstant h = do
-    (_,i) <- newConst h
-    return $ variable (name $  'c':show i )
+    tyenv <- asks (grinTypeEnv . rGrin)
+    case h of
+        NodeC a ts | Just bn <- basicNode tyenv a ts -> return (cast sptr_t bn)
+        _ -> do
+            (_,i) <- newConst h
+            return $ variable (name $  'c':show i )
+convertVal h@(NodeC a ts) | valIsConstant h = do
+    tyenv <- asks (grinTypeEnv . rGrin)
+    case basicNode tyenv a ts of
+        Just bn -> return bn
+        _ -> do
+            (_,i) <- newConst h
+            return $ variable (name $  'c':show i )
 convertVal (Lit i _) = return (constant $ number (fromIntegral i))
 convertVal (Tup [x]) = convertVal x
 convertVal (Tup []) = return emptyExpression
@@ -482,21 +490,25 @@ tellTags t = do
 newNode (NodeC t _) | t == tagHole = do
     fail "newNode.tagHole"
 newNode (NodeC t as) = do
+    tyenv <- asks (grinTypeEnv . rGrin)
     let sf = tagIsSuspFunction t
-    st <- nodeType t
-    as' <- mapM convertVal as
-    tmp <- newVar (if sf then sptr_t else wptr_t)
-    let tmp' = concrete t tmp
-        wmalloc = if not sf && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
-        malloc =  tmp =* wmalloc (sizeof st)
-        ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
-        nonPtr TyPtr {} = False
-        nonPtr TyNode = False
-        nonPtr (TyTup xs) = all nonPtr xs
-        nonPtr _ = True
-    tagassign <- tagAssign tmp' t
-    let res = if sf then (f_EVALTAG tmp) else tmp
-    return (mconcat $ malloc:tagassign:ass,res)
+    case basicNode tyenv t as of
+      Just e -> return (mempty,e)
+      Nothing -> do
+        st <- nodeType t
+        as' <- mapM convertVal as
+        tmp <- newVar (if sf then sptr_t else wptr_t)
+        let tmp' = concrete t tmp
+            wmalloc = if not sf && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
+            malloc =  tmp =* wmalloc (sizeof st)
+            ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
+            nonPtr TyPtr {} = False
+            nonPtr TyNode = False
+            nonPtr (TyTup xs) = all nonPtr xs
+            nonPtr _ = True
+        tagassign <- tagAssign tmp' t
+        let res = if sf then (f_EVALTAG tmp) else tmp
+        return (mconcat $ malloc:tagassign:ass,res)
 
 
 {-
@@ -548,7 +560,18 @@ declareStruct n = do
     let tag | tagIsSuspFunction n = [(name "head",fptr_t)]
             | Just [n'] <- ss, n == n' = []
             | otherwise = [(name "what",what_t)]
-    tell mempty { wStructures = Map.singleton (nodeStructName n) (tag ++ zip [ name $ 'a':show i | i <-  [1 ..] ] ts') }
+        fields = (tag ++ zip [ name $ 'a':show i | i <-  [1 ..] ] ts')
+    unless (null fields) $ tell mempty { wStructures = Map.singleton (nodeStructName n) fields }
+
+
+basicNode :: TyEnv -> Atom -> [Val] -> (Maybe Expression)
+basicNode tyenv a [] | isJust s = ans where
+    Just TyTy { tySiblings = s@(~(Just ss)) } = findTyTy tyenv a
+    ans = case ss of
+        [n'] | n' == a -> Just (f_VALUE (constant $ number 0))
+        _ -> Nothing
+basicNode _ _ _ = Nothing
+
 
 declareEvalFunc n = do
     fn <- tagToFunction n
@@ -607,6 +630,8 @@ f_assert e    = functionCall (name "assert") [e]
 f_DETAG e     = functionCall (name "DETAG") [e]
 f_NODEP e     = functionCall (name "NODEP") [e]
 f_EVALTAG e   = functionCall (name "EVALTAG") [e]
+f_VALUE e     = functionCall (name "VALUE") [e]
+f_ISVALUE e   = functionCall (name "ISVALUE") [e]
 f_eval e      = functionCall (name "eval") [e]
 f_fetch e     = functionCall (name "fetch") [e]
 f_update x y  = functionCall (name "update") [x,y]
@@ -673,7 +698,20 @@ instance ToStatement Statement where
     toStatement x = x
 
 instance ToStatement Expression where
-    toStatement e = expr e
+    toStatement x = expr x
+
+class ToExpression a where
+    toExpression :: a -> Expression
+
+instance ToExpression Expression where
+    toExpression e = e
+
+instance ToExpression Constant where
+    toExpression c = constant c
+
+instance ToExpression Name where
+    toExpression c = variable c
+
 
 infixl 1 &
 
