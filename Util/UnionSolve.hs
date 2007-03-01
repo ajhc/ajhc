@@ -34,9 +34,6 @@ class Fixable a where
     isTop _ = False
 
 
-
-
-
 -- arguments are the lattice and the variable type
 newtype C l v = C ([CL l v] -> [CL l v])
 
@@ -164,31 +161,15 @@ solve putLog (C csp) = do
                 R c | c `eq` v -> return ()
                     | otherwise -> fail $ "UnionSolve: equality constraints don't match " ++ show (c,v)
                 Ri ml lb mu ub | testBoundLT ml v && testBoundGT mu v -> do
+                    mapM_ (v `greaterThen`) (Set.toList lb)
+                    mapM_ (v `lessThen`)    (Set.toList ub)
                     updateW (const (R v)) xe
-                    case (isBottom v,isTop v) of
-                        (True,_) -> do
-                            mapM_ (unifyTo Lower xe) (Set.toList lb)
-                        (_,True) -> do
-                            mapM_ (unifyTo Upper xe) (Set.toList ub)
-                        _ -> do
-                            mapM_ (\lb -> v `greaterThen` lb) (Set.toList lb)
-                            mapM_ (\ub -> v `lessThen` ub) (Set.toList ub)
-                            --when (Just v `nem` mu) $ mapM_ (\lb -> v `greaterThen` lb) (Set.toList lb)
-                            --when (Just v `nem` ml) $ mapM_ (\ub -> v `lessThen` ub) (Set.toList ub)
         nem Nothing Nothing = False
         nem (Just x) (Just y) = not (x `eq` y)
         nem _ _ = True
         getBounds Lower (Ri _ lb _ _) = lb
         getBounds Upper (Ri _ _ _ ub) = ub
         getBounds _ _ = Set.empty
-        unifyTo d xe ye = do
-            xe <- find xe
-            ye <- find ye
-            putLog $ "unifying to " ++ show (xe,ye)
-            when (xe /= ye) $ do
-                yw <- UF.getW ye
-                UF.union const xe ye
-                mapM_ (unifyTo d xe) (Set.toList (getBounds d yw))
         testBoundLT Nothing _ = True
         testBoundLT (Just x) y = x `lte` y
         testBoundGT Nothing _ = True
@@ -201,18 +182,18 @@ solve putLog (C csp) = do
                     | otherwise -> fail $ "UnionSolve: greaterThen " ++ show (v,c)
                 Ri _ _ (Just n) _ | n `lte` v -> return ()
                 Ri ml lb mu ub | testBoundLT ml v -> do
-                    doUpdate (Ri ml lb (mjoin (Just v) mu) ub) xe
+                    doUpdate (Ri ml lb (mmeet (Just v) mu) ub) xe
                     mapM_ (greaterThen v) (Set.toList lb)
                                | otherwise -> fail $ "UnionSolve: testBoundLT " ++ show (ml,v)
         v `lessThen` xe = do
             putLog $ "make sure " ++ show (fromElement xe) ++ " is greater than " ++ show v
             xw <- getW xe
             case xw of
-                R c | v `lte` c -> do putLog "already set and is lower"; return ()
+                R c | v `lte` c -> do return ()
                     | otherwise -> fail $ "UnionSolve: lessThen " ++ show (v,c)
-                Ri (Just n) _ _ _ |  v `lte` n -> do putLog "already less than lower bound";  return ()
+                Ri (Just n) _ _ _ |  v `lte` n -> do return ()
                 Ri ml lb mu ub | testBoundGT mu v -> do
-                    doUpdate (Ri (mmeet (Just v) ml) lb mu ub) xe
+                    doUpdate (Ri (mjoin (Just v) ml) lb mu ub) xe
                     mapM_ (lessThen v) (Set.toList ub)
                                | otherwise -> fail $ "UnionSolve: testBoundGT " ++ show (mu,v)
         --checkRS :: R l a -> RS l a -> IO ()
@@ -245,8 +226,8 @@ solve putLog (C csp) = do
                             if xe `Set.member` ylb then return () else do
                             xub <- finds xub
                             if xe `Set.member` yub then equal xe ye  else do
-                            updateW (const (Ri xml xlb (mjoin ymu xmu) (Set.delete xe $ Set.insert ye xub))) xe
-                            updateW (const (Ri (mmeet yml xml) (Set.delete ye $ Set.insert xe ylb) ymu yub)) ye
+                            updateW (const (Ri xml xlb (mmeet ymu xmu) (Set.delete xe $ Set.insert ye xub))) xe
+                            updateW (const (Ri (mjoin yml xml) (Set.delete ye $ Set.insert xe ylb) ymu yub)) ye
                             w <- getW xe
                             checkRS w xe
                             w <- getW ye
@@ -262,20 +243,11 @@ solve putLog (C csp) = do
             xe <- find xe
             case (xw,yw) of
                 (Ri xml xlb xmu xub,Ri yml ylb ymu yub) -> do
-                    let nml = xml `mmeet` yml
-                        nmu = xmu `mjoin` ymu
+                    let nml = xml `mjoin` yml
+                        nmu = xmu `mmeet` ymu
                     nlb <- finds (xlb `mappend` ylb)
                     nub <- finds (yub `mappend` xub)
                     doUpdate (Ri nml (Set.delete xe nlb) nmu (Set.delete xe nub)) xe
---                    updateW (\_ -> Ri nml (Set.delete xe nlb) nmu (Set.delete xe nub)) xe
---                    case (nml,nmu) of
---                        (Just x,Just y) | x `eq` y -> xe `setValue` x
---                                        | y `lte` x -> fail "equal not equal"
---                        _ -> return ()
---                (Ri xml xlb xmu xub,R c) -> do xe `setValue` c
---                (R c,Ri xml xlb xmu xub) -> do xe `setValue` c
---                (R c1,R c2) | c1 `eq` c2 -> return ()
---                _ -> fail $ "error: " ++ show (xw,yw)
         mjoin Nothing b = b
         mjoin x Nothing = x
         mjoin (Just x) (Just y) = Just (join x y)
@@ -298,7 +270,6 @@ solve putLog (C csp) = do
         return ((a,aa),(aa,rr))
     let (ma,mb) = unzip rs
     return (Map.fromList ma,Map.fromList mb)
-    --mapM rr cs
 
 
 
