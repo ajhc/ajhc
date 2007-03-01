@@ -96,6 +96,15 @@ typedef struct dnode {
         sptr_t rest[];
 } A_MAYALIAS dnode_t;
 
+#ifndef NDEBUG
+// these ensure the type synonyms are available to the debugger
+uintptr_t _dummy1;
+node_t *_dummy2;
+dnode_t *_dummy3;
+sptr_t *_dummy4;
+fptr_t *_dummy5;
+wptr_t *_dummy6;
+#endif
 
 typedef wptr_t (*eval_fn)(node_t *node) A_STD;
 
