@@ -63,7 +63,9 @@ islte,isgte,equals :: Either v l -> Either v l -> C l v
 
 islte x y = C ((x `Clte` y):)
 isgte x y = islte y x
-equals x y = (x `islte` y) `mappend` (y `islte` x)
+--equals x y = (x `islte` y) `mappend` (y `islte` x)
+
+equals x y = is x y
 
 is :: Either v l -> Either v l -> C l v
 is x y = C ((x `Cset` y):)
@@ -71,6 +73,7 @@ is x y = C ((x `Cset` y):)
 
 -- a variable is either set to a value or bounded by other values
 data R l a = R l |  Ri (Maybe l) (Set.Set (RS l a))  (Maybe l) (Set.Set (RS l a))
+    deriving(Show)
 
 type RS l a =  Element (R l a) a
 
@@ -110,7 +113,8 @@ data Direction = Lower | Upper
 --
 
 
-solve :: (Fixable l, Show l, Show v, Ord v,Eq l) =>  C l v -> IO (Map.Map v v,Map.Map v (Result l v))
+{-# NOINLINE solve #-}
+solve :: (Fixable l, Show l, Show v, Ord v) =>  C l v -> IO (Map.Map v v,Map.Map v (Result l v))
 solve (C csp) = do
     let vars = Set.fromList [ x | Left x <- collectVars cs]
         cs = csp []
@@ -134,15 +138,8 @@ solve (C csp) = do
             ans = do
                 xe <- UF.find xe
                 y `greaterThen` xe
-        prule (Right x `Clte` Right y)
-            | x `lte` y = return ()
-            | otherwise = fail $ "invalid constraint: " ++ show x ++ " <= " ++ show y
+        prule (Right v `Cset` Left x) = prule (Left x `Cset` Right v)
         prule (Left x `Cset` Right v) = ans where
-            Just xe = Map.lookup x umap
-            ans = do
-                xe <- UF.find xe
-                xe `setValue` v
-        prule (Right v `Cset` Left x) = ans where
             Just xe = Map.lookup x umap
             ans = do
                 xe <- UF.find xe
@@ -154,9 +151,13 @@ solve (C csp) = do
                 xe <- UF.find xe
                 ye <- UF.find ye
                 xe `equal` ye
+        -- handle constant cases, just check if valid, and perhaps report error
         prule (Right x `Cset` Right y)
             | x `eq` y = return ()
             | otherwise = fail $ "equality of two different values" ++ show (x,y)
+        prule (Right x `Clte` Right y)
+            | x `lte` y = return ()
+            | otherwise = fail $ "invalid constraint: " ++ show x ++ " <= " ++ show y
         setValue xe v = do
             putStrLn $ "Setting value of " ++ show (fromElement xe) ++ " to " ++ show v
             xw <- getW xe
@@ -171,8 +172,11 @@ solve (C csp) = do
                         (_,True) -> do
                             mapM_ (unifyTo Upper xe) (Set.toList ub)
                         _ -> do
-                            when (Just v /= mu) $ mapM_ (\lb -> v `greaterThen` lb) (Set.toList lb)
-                            when (Just v /= ml) $ mapM_ (\ub -> v `lessThen` ub) (Set.toList ub)
+                            when (Just v `nem` mu) $ mapM_ (\lb -> v `greaterThen` lb) (Set.toList lb)
+                            when (Just v `nem` ml) $ mapM_ (\ub -> v `lessThen` ub) (Set.toList ub)
+        nem Nothing Nothing = False
+        nem (Just x) (Just y) = not (x `eq` y)
+        nem _ _ = True
         getBounds Lower (Ri _ lb _ _) = lb
         getBounds Upper (Ri _ _ _ ub) = ub
         getBounds _ _ = Set.empty
@@ -244,7 +248,13 @@ solve (C csp) = do
             xe <- find xe
             case (xw,yw) of
                 (Ri xml xlb xmu xub,Ri yml ylb ymu yub) -> do
-                    updateW (\_ -> Ri (xml `mmeet` yml) (Set.delete xe $ xlb `mappend` ylb) (xmu `mjoin` ymu) (Set.delete xe $ yub `mappend` xub)) xe
+                    nlb <- finds (xlb `mappend` ylb)
+                    nub <- finds (yub `mappend` xub)
+                    updateW (\_ -> Ri (xml `mmeet` yml) (Set.delete xe nlb) (xmu `mjoin` ymu) (Set.delete xe nub)) xe
+                (Ri xml xlb xmu xub,R c) -> do xe `setValue` c
+                (R c,Ri xml xlb xmu xub) -> do xe `setValue` c
+                (R c1,R c2) | c1 `eq` c2 -> return ()
+                _ -> fail $ "error: " ++ show (xw,yw)
         mjoin Nothing b = b
         mjoin x Nothing = x
         mjoin (Just x) (Just y) = Just (join x y)
