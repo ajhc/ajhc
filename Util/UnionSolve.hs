@@ -4,7 +4,7 @@ module Util.UnionSolve(
     Fixable(..),
     Topped(..),
     Result(..),
-    islte,isgte,equals,is
+    islte,isgte,equals
     ) where
 
 import Control.Monad(when)
@@ -60,16 +60,9 @@ instance (Show e,Show l) => Show (CL l e) where
 
 -- basic constraints
 islte,isgte,equals :: Either v l -> Either v l -> C l v
-
-islte x y = C ((x `Clte` y):)
-isgte x y = islte y x
---equals x y = (x `islte` y) `mappend` (y `islte` x)
-
-equals x y = is x y
-
-is :: Either v l -> Either v l -> C l v
-is x y = C ((x `Cset` y):)
-
+islte  x y = C ((x `Clte` y):)
+isgte  x y = islte y x
+equals x y = C ((x `Cset` y):)
 
 -- a variable is either set to a value or bounded by other values
 data R l a = R l |  Ri (Maybe l) (Set.Set (RS l a))  (Maybe l) (Set.Set (RS l a))
@@ -114,8 +107,11 @@ data Direction = Lower | Upper
 
 
 {-# NOINLINE solve #-}
-solve :: (Fixable l, Show l, Show v, Ord v) =>  C l v -> IO (Map.Map v v,Map.Map v (Result l v))
-solve (C csp) = do
+solve :: (Fixable l, Show l, Show v, Ord v)
+    => (String -> IO ())
+    -> C l v
+    -> IO (Map.Map v v,Map.Map v (Result l v))
+solve putLog (C csp) = do
     let vars = Set.fromList [ x | Left x <- collectVars cs]
         cs = csp []
     ufs <- flip mapM (Set.toList vars) $ \a -> do
@@ -159,7 +155,7 @@ solve (C csp) = do
             | x `lte` y = return ()
             | otherwise = fail $ "invalid constraint: " ++ show x ++ " <= " ++ show y
         setValue xe v = do
-            putStrLn $ "Setting value of " ++ show (fromElement xe) ++ " to " ++ show v
+            putLog $ "Setting value of " ++ show (fromElement xe) ++ " to " ++ show v
             xw <- getW xe
             case xw of
                 R c | c `eq` v -> return ()
@@ -183,7 +179,7 @@ solve (C csp) = do
         unifyTo d xe ye = do
             xe <- find xe
             ye <- find ye
-            putStrLn $ "unifying to " ++ show (xe,ye)
+            putLog $ "unifying to " ++ show (xe,ye)
             when (xe /= ye) $ do
                 yw <- UF.getW ye
                 UF.union const xe ye
@@ -193,7 +189,7 @@ solve (C csp) = do
         testBoundGT Nothing _ = True
         testBoundGT (Just x) y = y `lte` x
         v `greaterThen` xe = do
-            putStrLn $ "make sure " ++ show (fromElement xe) ++ " is less than " ++ show v
+            putLog $ "make sure " ++ show (fromElement xe) ++ " is less than " ++ show v
             xw <- UF.getW xe
             case xw of
                 R c | c `lte` v -> return ()
@@ -204,7 +200,7 @@ solve (C csp) = do
                     mapM_ (greaterThen v) (Set.toList lb)
                                | otherwise -> fail $ "UnionSolve: testBoundLT " ++ show (ml,v)
         v `lessThen` xe = do
-            putStrLn $ "make sure " ++ show (fromElement xe) ++ " is greater than " ++ show v
+            putLog $ "make sure " ++ show (fromElement xe) ++ " is greater than " ++ show v
             xw <- getW xe
             case xw of
                 R c | v `lte` c -> return ()
@@ -248,9 +244,15 @@ solve (C csp) = do
             xe <- find xe
             case (xw,yw) of
                 (Ri xml xlb xmu xub,Ri yml ylb ymu yub) -> do
-                    nlb <- finds (xlb `mappend` ylb)
-                    nub <- finds (yub `mappend` xub)
-                    updateW (\_ -> Ri (xml `mmeet` yml) (Set.delete xe nlb) (xmu `mjoin` ymu) (Set.delete xe nub)) xe
+                    let nml = xml `mmeet` yml
+                        nmu = xmu `mjoin` ymu
+                    case (nml,nmu) of
+                        (Just x,Just y) | x `eq` y -> xe `setValue` x
+                                        | y `lte` x -> fail "equal not equal"
+                        _ -> do
+                            nlb <- finds (xlb `mappend` ylb)
+                            nub <- finds (yub `mappend` xub)
+                            updateW (\_ -> Ri nml (Set.delete xe nlb) nmu (Set.delete xe nub)) xe
                 (Ri xml xlb xmu xub,R c) -> do xe `setValue` c
                 (R c,Ri xml xlb xmu xub) -> do xe `setValue` c
                 (R c1,R c2) | c1 `eq` c2 -> return ()
@@ -335,6 +337,7 @@ instance Fixable a => Fixable (Maybe a) where
     lte (Just x) (Just y) = x `lte` y
 
 -- the topped instance creates a new top of everything.
+-- this is the opposite of the 'Maybe' instance
 data Topped a = Top | Only a
     deriving(Eq,Ord,Show)
 
