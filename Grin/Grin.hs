@@ -280,8 +280,10 @@ instance Show Val where
     showsPrec _ (Tag t) = (fromAtom t)
     showsPrec _ (Index v o) = shows v <> char '[' <> shows o <> char ']'
     showsPrec _ (Var (V i) t)
-        | TyPtr _ <- t = char 'p' <> tshow i
+        | TyPtr t <- t = char 'p' <> shows (Var (V i) t)
         | TyNode <- t = char 'n' <> tshow i
+        | t == tCharzh = char 'c' <> tshow i
+        | t == tIntzh  = char 'i' <> tshow i
         | Ty _ <- t  = char 'l' <> tshow i
         | TyTag <- t  = char 't' <> tshow i
         | otherwise = char 'v' <> tshow i
