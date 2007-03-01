@@ -146,7 +146,10 @@ solve putLog (C csp) = do
             ans = do
                 xe <- UF.find xe
                 ye <- UF.find ye
-                xe `equal` ye
+                xe `lessThenOrEqual` ye
+                xe <- UF.find xe
+                ye <- UF.find ye
+                ye `lessThenOrEqual` xe
         -- handle constant cases, just check if valid, and perhaps report error
         prule (Right x `Cset` Right y)
             | x `eq` y = return ()
@@ -168,8 +171,10 @@ solve putLog (C csp) = do
                         (_,True) -> do
                             mapM_ (unifyTo Upper xe) (Set.toList ub)
                         _ -> do
-                            when (Just v `nem` mu) $ mapM_ (\lb -> v `greaterThen` lb) (Set.toList lb)
-                            when (Just v `nem` ml) $ mapM_ (\ub -> v `lessThen` ub) (Set.toList ub)
+                            mapM_ (\lb -> v `greaterThen` lb) (Set.toList lb)
+                            mapM_ (\ub -> v `lessThen` ub) (Set.toList ub)
+                            --when (Just v `nem` mu) $ mapM_ (\lb -> v `greaterThen` lb) (Set.toList lb)
+                            --when (Just v `nem` ml) $ mapM_ (\ub -> v `lessThen` ub) (Set.toList ub)
         nem Nothing Nothing = False
         nem (Just x) (Just y) = not (x `eq` y)
         nem _ _ = True
@@ -196,26 +201,32 @@ solve putLog (C csp) = do
                     | otherwise -> fail $ "UnionSolve: greaterThen " ++ show (v,c)
                 Ri _ _ (Just n) _ | n `lte` v -> return ()
                 Ri ml lb mu ub | testBoundLT ml v -> do
-                    checkRS ((Ri ml lb (mjoin (Just v) mu) ub)) xe
+                    doUpdate (Ri ml lb (mjoin (Just v) mu) ub) xe
                     mapM_ (greaterThen v) (Set.toList lb)
                                | otherwise -> fail $ "UnionSolve: testBoundLT " ++ show (ml,v)
         v `lessThen` xe = do
             putLog $ "make sure " ++ show (fromElement xe) ++ " is greater than " ++ show v
             xw <- getW xe
             case xw of
-                R c | v `lte` c -> return ()
+                R c | v `lte` c -> do putLog "already set and is lower"; return ()
                     | otherwise -> fail $ "UnionSolve: lessThen " ++ show (v,c)
-                Ri (Just n) _ _ _ | v `lte` n -> return ()
+                Ri (Just n) _ _ _ |  v `lte` n -> do putLog "already less than lower bound";  return ()
                 Ri ml lb mu ub | testBoundGT mu v -> do
-                    checkRS ((Ri (mmeet (Just v) ml) lb mu ub)) xe
+                    doUpdate (Ri (mmeet (Just v) ml) lb mu ub) xe
                     mapM_ (lessThen v) (Set.toList ub)
                                | otherwise -> fail $ "UnionSolve: testBoundGT " ++ show (mu,v)
         --checkRS :: R l a -> RS l a -> IO ()
-        checkRS (Ri (Just l) _ (Just u) _) xe | l `eq` u = setValue xe l
-        checkRS (Ri (Just l) _ (Just u) _) xe | u `lte` l = error "you crossed the streams"
-        checkRS (Ri (Just l) _ _ _) xe  | isTop l = setValue xe l
-        checkRS (Ri  _ _ (Just u) _) xe | isBottom u = setValue xe u
-        checkRS r xe = updateW (const r) xe
+        checkRS (Ri (Just l) _ (Just u) _) xe | l `eq` u = do
+            putLog $ "Boxed in value of " ++ show (fromElement xe) ++ " being set to " ++ show l
+            setValue xe l
+        checkRS (Ri (Just l) _ (Just u) _) xe | u `lte` l = fail "checkRS: you crossed the streams"
+        checkRS (Ri (Just l) _ _ _) xe  | isTop l = do
+            putLog $ "Going up:   " ++ show (fromElement xe)
+            setValue xe l
+        checkRS (Ri  _ _ (Just u) _) xe | isBottom u = do
+            putLog $ "Going down: " ++ show (fromElement xe)
+            setValue xe u
+        checkRS r xe = return ()
         xe `lessThenOrEqual` ye | xe == ye = return ()
         xe `lessThenOrEqual` ye = do
             xw <- UF.getW xe
@@ -236,6 +247,13 @@ solve putLog (C csp) = do
                             if xe `Set.member` yub then equal xe ye  else do
                             updateW (const (Ri xml xlb (mjoin ymu xmu) (Set.delete xe $ Set.insert ye xub))) xe
                             updateW (const (Ri (mmeet yml xml) (Set.delete ye $ Set.insert xe ylb) ymu yub)) ye
+                            w <- getW xe
+                            checkRS w xe
+                            w <- getW ye
+                            checkRS w ye
+        doUpdate r xe = do
+            updateW (const r) xe
+            checkRS r xe
         equal xe ye | xe == ye = return ()
         equal xe ye = do
             xw <- getW xe
@@ -246,17 +264,18 @@ solve putLog (C csp) = do
                 (Ri xml xlb xmu xub,Ri yml ylb ymu yub) -> do
                     let nml = xml `mmeet` yml
                         nmu = xmu `mjoin` ymu
-                    case (nml,nmu) of
-                        (Just x,Just y) | x `eq` y -> xe `setValue` x
-                                        | y `lte` x -> fail "equal not equal"
-                        _ -> do
-                            nlb <- finds (xlb `mappend` ylb)
-                            nub <- finds (yub `mappend` xub)
-                            updateW (\_ -> Ri nml (Set.delete xe nlb) nmu (Set.delete xe nub)) xe
-                (Ri xml xlb xmu xub,R c) -> do xe `setValue` c
-                (R c,Ri xml xlb xmu xub) -> do xe `setValue` c
-                (R c1,R c2) | c1 `eq` c2 -> return ()
-                _ -> fail $ "error: " ++ show (xw,yw)
+                    nlb <- finds (xlb `mappend` ylb)
+                    nub <- finds (yub `mappend` xub)
+                    doUpdate (Ri nml (Set.delete xe nlb) nmu (Set.delete xe nub)) xe
+--                    updateW (\_ -> Ri nml (Set.delete xe nlb) nmu (Set.delete xe nub)) xe
+--                    case (nml,nmu) of
+--                        (Just x,Just y) | x `eq` y -> xe `setValue` x
+--                                        | y `lte` x -> fail "equal not equal"
+--                        _ -> return ()
+--                (Ri xml xlb xmu xub,R c) -> do xe `setValue` c
+--                (R c,Ri xml xlb xmu xub) -> do xe `setValue` c
+--                (R c1,R c2) | c1 `eq` c2 -> return ()
+--                _ -> fail $ "error: " ++ show (xw,yw)
         mjoin Nothing b = b
         mjoin x Nothing = x
         mjoin (Just x) (Just y) = Just (join x y)
