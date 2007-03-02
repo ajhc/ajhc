@@ -39,6 +39,7 @@ module Grin.Grin(
     gEval,
     grinEntryPointNames,
     isHole,
+    isValUnknown,
     isVar,isTup,
     itemTag,
     n0,n1,n2,n3,
@@ -442,6 +443,10 @@ properHole x = case x of
     TyNode -> (NodeC tagHole [])
 
 isHole x = x `elem` map properHole [TyPtr TyNode, TyNode, TyTag]
+
+isValUnknown ValUnknown {} = True
+isValUnknown _ = False
+
 
 ---------
 -- Look up stuff in the typing environment.

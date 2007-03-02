@@ -6,7 +6,7 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Control.Monad.State
 import Data.Monoid
-import IO(hFlush,stderr,stdout,openFile,hClose,IOMode(..))
+import IO(hFlush,stderr,stdout,openFile,hClose,IOMode(..),hPutStrLn)
 import List hiding(group,union,delete)
 import Maybe
 import Prelude hiding(putStrLn, putStr,print)
@@ -97,17 +97,15 @@ progressM c  = wdump FD.Progress $ (c >>= putErrLn) >> hFlush stderr
 collectPassStats = True
 
 bracketHtml action = do
-    pn <- System.getProgName
-    as <- getArguments
-    wdump FD.Html $ putStrLn $ "<html><head><title>" ++ (unwords (pn:as)) ++ "</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body style=\"background: black; color: lightgrey\"><pre>"
+    (argstring,_) <- getArgString
+    wdump FD.Html $ putStrLn $ "<html><head><title>" ++ argstring ++ "</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body style=\"background: black; color: lightgrey\"><pre>"
     action `finally` (wdump FD.Html $ putStrLn "</pre></body></html>")
 
 main = runMain $ bracketHtml $ do
     o <- processOptions
     progressM $ do
-        name <- System.getProgName
-        args <- getArguments
-        return (simpleQuote (name:args) ++ "\n" ++ versionSimple)
+        (argstring,_) <- getArgString
+        return (argstring ++ "\n" ++ versionSimple)
     case optMode o of
         BuildHl hl    -> createLibrary hl buildLibrary
         ListLibraries -> do
@@ -785,9 +783,16 @@ dumpFinalGrin grin = do
         let dot = graphGrin grin
         writeFile (fn ++ "_grin.dot") dot
     h <- openFile (fn ++ "_final.grin") WriteMode
+    (argstring,sversion) <- getArgString
+    hPutStrLn h $ unlines [ "-- " ++ argstring,"-- " ++ sversion,""]
     hPrintGrin h grin
     hClose h
     wdump FD.Grin $ printGrin grin
+
+getArgString = do
+    name <- System.getProgName
+    args <- getArguments
+    return (simpleQuote (name:args),head $ lines versionString)
 
 
 compileGrinToC grin | optMode options == Interpret = fail "Interpretation currently not supported."
@@ -797,9 +802,8 @@ compileGrinToC grin = do
     let fn = optOutName options
     let cf = (fn ++ "_code.c")
     progress ("Writing " ++ show cf)
-    name <- System.getProgName
-    args <- getArguments
-    let argstring = simpleQuote (name:args)
+    (argstring,sversion) <- getArgString
+    let
         boehmOpts | fopts FO.Boehm = ["-D_JHC_BOEHM_GC=1", "-lgc"]
                   | otherwise = []
         profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE=1"]
@@ -807,7 +811,7 @@ compileGrinToC grin = do
         comm = shellQuote $ [optCC options, "-std=gnu99", "-D_GNU_SOURCE", "-falign-functions=4", "-ffast-math", "-Wall", "-o", fn, cf ] ++ (map ("-l" ++) rls) ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
         debug = if fopts FO.Debug then ["-g"] else ["-DNDEBUG", "-O3", "-fomit-frame-pointer"]
         globalvar n c = "char " ++ n ++ "[] = \"" ++ c ++ "\";"
-    writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" (head $ lines versionString),"",cg]
+    writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" sversion,"",cg]
     progress ("Running: " ++ comm)
     r <- System.system comm
     when (r /= System.ExitSuccess) $ fail "C code did not compile."

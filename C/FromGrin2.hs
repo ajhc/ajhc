@@ -457,9 +457,6 @@ convertPrim p vs
     | APrim (AddrOf t) _ <- primAPrim p, [] <- vs = do
         return $ expressionRaw ('&':unpackPS t)
 
-isValUnknown ValUnknown {} = True
-isValUnknown _ = False
-
 
 tagAssign :: Expression -> Atom -> C Statement
 tagAssign e t | tagIsSuspFunction t = do

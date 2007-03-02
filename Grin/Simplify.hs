@@ -112,9 +112,9 @@ simplify1 stats env (n,l) = do
     gv (NodeC t xs,Return (NodeC t' xs')) | t == t' = do
             lift $ tick stats at_OptSimplifyNodeReduction
             gv (Tup xs,Return (Tup xs'))
-    gv (NodeC t xs,Return (NodeC t' [])) |  t' == tagHole = do
-            lift $ tick stats at_OptSimplifyHoleAssignment
-            gv (Tup xs, Return $ Tup $ Prelude.map (properHole . getType) xs)
+--    gv (NodeC t xs,Return (NodeC t' [])) |  t' == tagHole = do
+--            lift $ tick stats at_OptSimplifyHoleAssignment
+--            gv (Tup xs, Return $ Tup $ Prelude.map (properHole . getType) xs)
     gv (NodeC t xs,Return (NodeC t' xs')) | t /= t' = do
             lift $ tick stats at_OptSimplifyBadAssignment
             gv (NodeC t xs,Error ("Bad Assignment: " ++ show (t,t')) TyNode)
@@ -165,13 +165,16 @@ simplify1 stats env (n,l) = do
     getCS (b,app@(App a [vr@Var {}] _)) | a == funcEval = return $ Map.fromList [(app,Return b), (Store b,Return vr)]
     --getCS (b,app@App{})  = return $ Map.singleton app (Return b)
     --getCS (b@Var {},Store v@(Var _ _)) = return $ Map.singleton (App funcEval [b] TyNode) (Return v)     -- TODO - only works if node stores have always been evaluated.
-    getCS (b@Var {},Store v@(NodeC t _)) | not (isMutableNodeTag t), tagIsWHNF t, t /= tagHole = return $ Map.fromList [(Store v,Return b),(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
-    getCS (b@Var {},Store v@(NodeC t _)) | not (isMutableNodeTag t), t /= tagHole = return $ Map.fromList [(Store v,Return b)]
+    getCS (b@Var {},Store v@(NodeC t _)) | not (isMutableNodeTag t), tagIsWHNF t, not (isHoly v) = return $ Map.fromList [(Store v,Return b),(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
+    getCS (b@Var {},Store v@(NodeC t _)) | not (isMutableNodeTag t), not (isHoly v) = return $ Map.fromList [(Store v,Return b)]
     --getCS (b@Var {},Store v@(NodeC t as)) | Just (0,fn) <- tagUnfunction t = return $ Map.fromList [(Store v,Return b),(App funcEval [b] TyNode, App fn as TyNode :>>= n1 :-> Update b n1 :>>= unit :-> Return n1)]
     getCS (b@Var {},Store v@(NodeC t as)) | Just (0,fn) <- tagUnfunction t = return $ Map.fromList [(Store v,Return b)]
     getCS (b@Var {},Return (Const v)) = return $ Map.fromList [(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
     getCS (b@Var {},Return v) = return $ Map.fromList [(Return b,Return v), (Store b, Store v), (Fetch b, Fetch v)]
     getCS _ = return mempty
+    isHoly (NodeC _ as) | any isValUnknown as = True
+    isHoly n = isHole n
+
 
 cseStat n = toAtom $ "Optimize.simplify.cse." ++ g n where
     g App { expFunction = n } = fromAtom n

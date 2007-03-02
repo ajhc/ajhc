@@ -580,9 +580,6 @@ collectM  fname (~(Tup vs) :-> exp') = ans where
         return Basic
     g x = error $ unwords ["Grin.PointsToAnalysis.collect.g",show x]
 
-isValUnknown ValUnknown {} = True
-isValUnknown _ = False
-
 toPos (NodeC tag vs) = do
     vs' <- mapM toPos vs
     return $ Con tag vs'

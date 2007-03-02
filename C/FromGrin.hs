@@ -252,9 +252,6 @@ newNode (NodeC t as) = do
         nonPtr _ = True
     return (mconcat $ malloc:tagassign:ass, cast pnode_t tmp)
 
-isValUnknown ValUnknown {} = True
-isValUnknown _ = False
-
 --convertPrim p vs = return (mempty,err $ show p)
 convertPrim p vs
     | APrim (CConst s _) _ <- primAPrim p = do
