@@ -52,6 +52,7 @@ import Grin.EvalInline(createEvalApply)
 import Grin.FromE
 import Grin.Grin
 import Grin.Optimize
+import Grin.NodeAnalyze
 import Grin.Show
 import Grin.Unboxing
 import Grin.Whiz
@@ -620,7 +621,10 @@ compileModEnv' (cho,_) = do
     wdump FD.CoreBeforelift $ printProgram prog
     prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift } prog
 
+    wdump FD.CoreAfterlift $ printProgram prog
+
     finalStats <- Stats.new
+
     -- final optimization pass to clean up lambda lifting droppings
     prog <- flip programMapBodies prog $ \ e -> do
         let cm stats e = do
@@ -631,7 +635,6 @@ compileModEnv' (cho,_) = do
         doopt (mangle' Nothing dataTable) False finalStats "PostLambdaLift"  cm e
     wdump FD.Progress $ Stats.print "PostLifting" finalStats
 
-    wdump FD.CoreAfterlift $ printProgram prog -- printCheckName dataTable (programE prog)
     lintCheckProgram (putErrLn "LintPostLifting") prog
 
     wdump FD.Progress $ printEStats (programE prog)
@@ -764,7 +767,10 @@ compileToGrin prog = do
         dumpFinalGrin x
         compileGrinToC x
      else do
+        x <- nodeAnalyze x
+        lintCheckGrin x
         x <- createEvalApply x
+        lintCheckGrin x
         x <- return $ normalizeGrin x
         lintCheckGrin x
         x <- devolveGrin x
