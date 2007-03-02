@@ -1024,7 +1024,16 @@ lintCheckProgram onerr prog | flint = do
             printProgram prog
             putErrLn $ ">>> non-unique name at top level: " ++ pprint tvr
             maybeDie
-        f (tvr,e) = lintCheckE onerr (progDataTable prog) tvr e
+        f (tvr,e) = do
+            case scopeCheck False mempty e of
+                Left s -> do
+                    onerr
+                    putErrLn $ ">>> scopecheck failed in " ++ pprint tvr ++ " " ++ s
+                    printProgram prog
+                    putErrLn $ ">>> scopecheck failed in " ++ pprint tvr ++ " " ++ s
+                    maybeDie
+                Right () -> return ()
+            lintCheckE onerr (progDataTable prog) tvr e
     mapM_ f (programDs prog)
     let ids = progExternalNames prog `mappend` fromList (map tvrIdent $ fsts (programDs prog))
         fvs = Set.fromList $ melems (freeVars $ snds $ programDs prog :: IdMap TVr)

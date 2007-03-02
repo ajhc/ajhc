@@ -172,7 +172,7 @@ scopeCheck checkFvs initMap e = runReaderT (f e) initMap  where
             Just t' | tvrType t /= tvrType t' -> fail $ "scopeCheck: found variable whose type does not match " ++ tvrShowName t
             _ -> return ()
     f ec@ECase { eCaseBind = b } = do
-        f (eCaseScrutinee e)
+        f (eCaseScrutinee ec)
         f (eCaseType ec)
         f (tvrType b)
         local (minsert (tvrIdent b) b) $ mapM_ doAlt (eCaseAlts ec)
