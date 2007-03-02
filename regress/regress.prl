@@ -6,6 +6,7 @@ use warnings;
 use Getopt::Long;
 use Data::Dumper;
 use POSIX qw(strftime);
+use Cwd;
 
 my @opts;
 my @fopts;
@@ -17,9 +18,19 @@ my $opt_l;
 my $opt_n;
 my $opt_p;
 my @opt_rts;
+my $opt_clean;
 
 Getopt::Long::Configure ("bundling");
-GetOptions( 'm=s' => \@mopts, 'f=s' => \@fopts, 'o=s' => \@opts, l => \$opt_l, n => \$opt_n, p => \$opt_p, 'rts=s' =>\@opt_rts  ) or die "Invalid options";
+GetOptions(
+    'm=s' => \@mopts,
+    'f=s' => \@fopts,
+    'o=s' => \@opts,
+    l => \$opt_l,
+    n => \$opt_n,
+    p => \$opt_p,
+    'rts=s' =>\@opt_rts,
+    clean => \$opt_clean
+    ) or die "Invalid options";
 
 @opts = (@opts, (map { "-f$_" } @fopts), (map { "-m$_" } @mopts));
 
@@ -32,8 +43,7 @@ foreach (@ARGV) {
 
 my $now_string = strftime "%a %b %e %H:%M:%S %Y", localtime;
 
-my $pwd = `pwd`;
-chomp $pwd;
+my $pwd = cwd();
 
 # figure out where we are
 
@@ -163,7 +173,8 @@ sub do_it {
             next if $no_run;
             my @args = maybe_read("$fbase.args");
             $result->{run_stdout} = "$rd/$name.stdout";
-            my $run_cmd = "$fbase " . join(" ",@args) . " > $result->{run_stdout}";
+            my $stdin = " < $fbase.stdin" if -f "$fbase.stdin";
+            my $run_cmd = "$fbase " . join(" ",@args) . " > $result->{run_stdout}" . $stdin;
             $result->{run_cmd} = $run_cmd;
             ($r,$time) = my_system $run_cmd;
             $result->{run_status} = $r;
