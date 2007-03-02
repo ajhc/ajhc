@@ -32,6 +32,7 @@ import Name.VConsts
 import Number
 import Options
 import Support.FreeVars
+import Support.CanType
 import Support.Tuple
 import Util.Graphviz
 import qualified FlagDump as FD
@@ -158,9 +159,12 @@ hPrintGrin :: Handle -> Grin -> IO ()
 hPrintGrin handle grin@Grin { grinCafs = cafs } = do
     when (not $ null cafs) $ do
         hPutStrLn handle "-- Cafs"
-        mapM_ (hPutStrLn handle) $ map (\(x,y) -> show x ++ " = " ++  render (prettyVal y))  cafs
+        mapM_ (hPutStrLn handle) $ map (\(x,y) -> show x ++ " := " ++  render (prettyVal y))  cafs
     hPutStrLn handle "-- Functions"
-    mapM_ (hPutStrLn handle . render) $ map prettyFun (grinFuncs grin)
+    forM_ (grinFuncs grin) $ \ f@(n,l :-> e) -> do
+        hPutStrLn handle . render $ func (fromAtom n) <+> operator "::" <+> hsep (map (tshow . getType) (fromTuple l))  <+> operator "->" <+> tshow (getType e)
+        hPutStrLn handle (render $ prettyFun f)
+        hPutStrLn handle ""
 
 showSome xs = f 7 xs [] where
     f 0 _ xs = reverse ("...":xs)

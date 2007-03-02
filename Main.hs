@@ -778,7 +778,7 @@ dumpFinalGrin grin = do
     wdump FD.GrinGraph $ do
         let dot = graphGrin grin
         writeFile (fn ++ "_grin.dot") dot
-    h <- openFile (fn ++ "_grin.txt") WriteMode
+    h <- openFile (fn ++ "_final.grin") WriteMode
     hPrintGrin h grin
     hClose h
     wdump FD.Grin $ printGrin grin
