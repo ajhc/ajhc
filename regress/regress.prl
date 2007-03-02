@@ -19,12 +19,14 @@ my $opt_n;
 my $opt_p;
 my @opt_rts;
 my $opt_clean;
+my $opt_timeout=60*3;
 
 Getopt::Long::Configure ("bundling");
 GetOptions(
     'm=s' => \@mopts,
     'f=s' => \@fopts,
     'o=s' => \@opts,
+    't=i' => \$opt_timeout,
     l => \$opt_l,
     n => \$opt_n,
     p => \$opt_p,
@@ -108,7 +110,7 @@ sub rlog {
 sub my_system {
     my $time_start = time();
     rlog "; ", join " ",@_;
-    my $r = system @_;
+    my $r = $opt_timeout ? system ("ulimit -t $opt_timeout ; ". join " ",@_) : system @_;
     my $time_end = time();
     return ($r,$time_end - $time_start);
 }
@@ -202,7 +204,7 @@ done();
 
 sub done {
     sub statf {
-        return defined $_[0] ? ($_[0] == 64512 ? "Int" : $_[0]) : "-";
+        return defined $_[0] ? ($_[0] == 64512 ? "INT" : $_[0] == 35072 ? "TIME" : $_[0]) : "-";
     }
     sub timef {
         return defined $_[0] ? "$_[0]s" : "-";
