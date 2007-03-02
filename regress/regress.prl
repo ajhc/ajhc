@@ -20,6 +20,7 @@ my $opt_p;
 my @opt_rts;
 my $opt_clean;
 my $opt_timeout=60*3;
+my $opt_ho;
 
 Getopt::Long::Configure ("bundling");
 GetOptions(
@@ -30,6 +31,7 @@ GetOptions(
     l => \$opt_l,
     n => \$opt_n,
     p => \$opt_p,
+    ho => \$opt_ho,
     'rts=s' =>\@opt_rts,
     clean => \$opt_clean
     ) or die "Invalid options";
@@ -122,7 +124,8 @@ sub do_it {
     my $no_run = -f "$cwd/norun";
     my @flags = maybe_read "$cwd/flags.txt";
     if(-f "Main.hs") {
-        system "rm -f -- $cwd/*.ho $cwd/*_code.hs $cwd/*_code.c";
+        my $dh = $opt_ho ? "" : "$cwd/*.ho";
+        system "rm -f -- $dh $cwd/*_code.hs $cwd/*_code.c";
 
     }
     test: foreach my $fn (sort(split /\n/,`ls $cwd`)) {
@@ -153,7 +156,7 @@ sub do_it {
                 }
             }
             rlog "-- $name";
-            system "rm -f -- $cwd/$ln.ho";
+            system "rm -f -- $cwd/$ln.ho" unless $opt_ho;
             system "rm -f -- $cwd/${ln}_code.hs";
             system "rm -f -- $cwd/${ln}_code.c";
             my @libs = $opt_l ? () : ("--noauto", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
