@@ -1,5 +1,8 @@
 /* HsFFI.h for jhc */
 
+#ifndef _JHC_HSFFI_H
+#define _JHC_HSFFI_H
+
 #include <inttypes.h>
 
 typedef int HsInt;
@@ -29,4 +32,4 @@ void hs_perform_gc(void);
 void hs_free_stable_ptr(HsStablePtr sp);
 void hs_free_fun_ptr(HsFunPtr fp);
 
-
+#endif

@@ -1,51 +1,3 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <wchar.h>
-#include <limits.h>
-#include <locale.h>
-#include <math.h>
-#include <float.h>
-#include <setjmp.h>
-
-#ifdef USE_BOEHM_GC
-#include <gc/gc.h>
-#define jhc_malloc GC_malloc
-#define jhc_malloc_atomic GC_malloc_atomic
-#define jhc_free GC_free
-#endif
-
-
-#ifdef __GNUC__
-#define A_NORETURN __attribute__ ((noreturn))
-#define A_PURE __attribute__ ((pure))
-#define A_CONST __attribute__ ((const))
-#define A_UNUSED __attribute__ ((unused))
-#define A_MALLOC __attribute__ ((malloc))
-#define A_MAYALIAS __attribute__ ((__may_alias__))
-#ifdef __i386__
-#define A_REGPARM __attribute__ ((fastcall))
-#else
-#define A_REGPARM
-#endif
-#define A_STD    A_REGPARM
-
-
-#else
-#define A_MAYALIAS
-#define A_NORETURN
-#define A_PURE
-#define A_CONST
-#define A_UNUSED
-#define A_MALLOC
-#define A_STD
-#endif
-
-
-#define STR(s) #s
-#define XSTR(s) STR(s)
-#define ALIGN(a,n) ((n) - 1 + ((a) - ((n) - 1) % (a)))
 
 static void _amain(void);
 static int jhc_argc;
@@ -55,69 +7,49 @@ static jmp_buf jhc_uncaught;
 
 static int jhc_stdrnd[2] A_UNUSED = { 1 , 1 };
 
-#ifdef _JHC_PROFILE
-static uintmax_t prof_function_calls;
-static uintmax_t prof_case_statements;
-static uintmax_t prof_updates;
-#ifndef USE_BOEHM_GC
-static void *prof_memstart;
-#endif
+#if _JHC_PROFILE
 
-#define update_inc() prof_updates++
-#define function_inc() prof_function_calls++
-#define case_inc() prof_case_statements++
-#else
-#define update_inc()  do { } while(0)
-#define function_inc()  do { } while(0)
-#define case_inc()  do { } while(0)
-#endif
+static uintmax_t jhc_prof_function_calls;
+static uintmax_t jhc_prof_case_statements;
+static uintmax_t jhc_prof_updates;
 
-
-#ifndef USE_BOEHM_GC
-static void *jhc_mem = NULL;
-
-#ifndef NDEBUG
-
-#define jhc_malloc(n) jhc_malloc_debug(n,__LINE__)
-
-static inline void * A_MALLOC
-jhc_malloc_debug(size_t n,int line)
-{
-        void *ret = jhc_mem;
-        jhc_mem += ALIGN(__alignof__(void *),sizeof(uintptr_t) + n);
-        *((uintptr_t *)ret) = line;
-//        memset(ret,7,(char *)jhc_mem - (char *)ret);
-//        memset(jhc_mem,8,2*sizeof(void *));
-        return ret + sizeof(uintptr_t);
-}
+#define jhc_update_inc()   jhc_prof_updates++
+#define jhc_function_inc() jhc_prof_function_calls++
+#define jhc_case_inc()     jhc_prof_case_statements++
 
 #else
 
-static inline void * A_MALLOC
-jhc_malloc(size_t n)
-{
-        void *ret = jhc_mem;
-        jhc_mem += ALIGN(__alignof__(void *),n);
-        return ret;
-}
-
-#endif
-
-#define jhc_malloc_atomic(x) jhc_malloc(x)
+#define jhc_update_inc()    do { } while(0)
+#define jhc_function_inc()  do { } while(0)
+#define jhc_case_inc()      do { } while(0)
 
 #endif
 
 static void
 jhc_print_profile(void) {
-#ifdef _JHC_PROFILE
-        wprintf(L"Command: %s\n", jhc_command);
-#ifndef USE_BOEHM_GC
-        wprintf(L"Memory Allocated: %llu\n", (long long)(jhc_mem - prof_memstart));
+        struct tms tm;
+        times(&tm);
+        if(!(_JHC_PROFILE || getenv("JHC_RTS_PROFILE"))) return;
+
+        fwprintf(stderr, L"\n-----------------\n");
+        fwprintf(stderr, L"Profiling: %s\n", jhc_progname);
+        fwprintf(stderr, L"Command: %s\n", jhc_command);
+        fwprintf(stderr, L"Complie: %s\n", jhc_c_compile);
+        fwprintf(stderr, L"Version: %s\n\n", jhc_version);
+#if !_JHC_BOEHM_GC
+        fwprintf(stderr, L"Memory Allocated: %llu bytes\n", (unsigned long long)(jhc_mem - jhc_memstart));
 #endif
-        wprintf(L"Function Calls:   %llu\n", (long long)prof_function_calls);
-        wprintf(L"Case Statements:  %llu\n", (long long)prof_case_statements);
-        wprintf(L"Updates:          %llu\n", (long long)prof_updates);
+        float cpt = (float)sysconf(_SC_CLK_TCK);
+        fwprintf(stderr, L"User Time:   %.2fs\n", (float)tm.tms_utime/cpt);
+        fwprintf(stderr, L"System Time: %.2fs\n", (float)tm.tms_stime/cpt);
+        fwprintf(stderr, L"Total Time:  %.2fs\n", (float)(tm.tms_stime + tm.tms_utime)/cpt);
+
+#if _JHC_PROFILE
+        fwprintf(stderr, L"\nFunction Calls:   %llu\n", (unsigned long long)jhc_prof_function_calls);
+        fwprintf(stderr, L"Case Statements:  %llu\n", (unsigned long long)jhc_prof_case_statements);
+        fwprintf(stderr, L"Updates:          %llu\n", (unsigned long long)jhc_prof_updates);
 #endif
+        fwprintf(stderr, L"-----------------\n");
 }
 
 
@@ -135,12 +67,18 @@ jhc_error(char *s) {
         exit(255);
 }
 
+#if _JHC_DEBUG
 static void  A_NORETURN A_UNUSED
 jhc_case_fell_off(int n) {
         fflush(stdout);
         fprintf(stderr, "\n%s:%i: case fell off\n", __FILE__, n);
         abort();
 }
+#else
+
+#define jhc_case_fell_off(x) do {} while(0)
+
+#endif
 
 #define jhc_setjmp(jb) sigsetjmp(*(jmp_buf *)jb,0)
 #define jhc_longjmp(jb) siglongjmp(*(jmp_buf *)jb,1)
@@ -151,23 +89,10 @@ struct jhc_continuation {
 };
 
 
-
 int
 main(int argc, char *argv[])
 {
-#ifndef USE_BOEHM_GC
-        size_t mem_size = 1000000000;
-        while(!jhc_mem) {
-                jhc_mem = malloc(mem_size);
-                mem_size *= 0.80;
-        }
-#ifdef _JHC_PROFILE
-        prof_memstart = jhc_mem;
-#endif
-#else
-        GC_INIT()
-#endif
-
+        jhc_malloc_init();
         jhc_argc = argc - 1;
         jhc_argv = argv + 1;
         jhc_progname = argv[0];
@@ -179,7 +104,6 @@ main(int argc, char *argv[])
         jhc_print_profile();
         return 0;
 }
-
 
 
 

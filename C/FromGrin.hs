@@ -27,7 +27,7 @@ import Grin.Grin
 import Grin.Val
 import Grin.HashConst
 import Grin.Show
-import RawFiles(hsffi_h,jhc_rts_c)
+import RawFiles(hsffi_h,jhc_rts_header_h,jhc_rts_alloc_c,jhc_rts_c)
 import Util.UniqueMonad
 
 
@@ -55,9 +55,9 @@ ppnode_t = ptrType (ptrType node_t)
 size_t = basicType "size_t"
 tag_t = basicType "tag_t"
 
-profile_update_inc = expr $ functionCall (name "update_inc") []
-profile_case_inc = expr $ functionCall (name "case_inc") []
-profile_function_inc = expr $ functionCall (name "function_inc") []
+profile_update_inc = expr $ functionCall (name "jhc_update_inc") []
+profile_case_inc = expr $ functionCall (name "jhc_case_inc") []
+profile_function_inc = expr $ functionCall (name "jhc_function_inc") []
 
 convertVal :: Val -> C Expression
 convertVal (Var v ty) = fetchVar v ty
@@ -470,7 +470,7 @@ convertFfiExport (n,Tup as :-> body) (FfiExport cn Safe CCall) = do
 
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
-compileGrin grin = (hsffi_h ++ jhc_rts_c ++ "\ntypedef union node node_t;\n" ++ P.render ans ++ "\n", snub (reqLibraries req))  where
+compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c ++ "\ntypedef union node node_t;\n" ++ P.render ans ++ "\n", snub (reqLibraries req))  where
     ans = vsep $ [vcat includes,enum_tag_t,header,union_node,text "/* CAFS */", vcat $ map ccaf (grinCafs grin), text "/* Constant Data */", jhc_sizeof_data, buildConstants finalHcHash,text  "/* Functions */",jhc_sizeof,body]
     includes =  map include (snub $ reqIncludes req)
     (header,body) = generateC True functions structs

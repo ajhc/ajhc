@@ -77,7 +77,7 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
-compileGrin grin = (hsffi_h ++ jhc_rts_c ++ jhc_rts2_c ++ P.render ans ++ "\n", snub (reqLibraries req))  where
+compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c ++ jhc_rts2_c ++ P.render ans ++ "\n", snub (reqLibraries req))  where
     ans = vcat $ includes ++ [text "", enum_tag_t, header, cafs,buildConstants (grinTypeEnv grin) finalHcHash, body]
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
@@ -635,9 +635,9 @@ f_eval e      = functionCall (name "eval") [e]
 f_fetch e     = functionCall (name "fetch") [e]
 f_update x y  = functionCall (name "update") [x,y]
 jhc_malloc_atomic sz = functionCall (name "jhc_malloc_atomic") [sz]
-profile_update_inc   = expr $ functionCall (name "update_inc") []
-profile_case_inc     = expr $ functionCall (name "case_inc") []
-profile_function_inc = expr $ functionCall (name "function_inc") []
+profile_update_inc   = expr $ functionCall (name "jhc_update_inc") []
+profile_case_inc     = expr $ functionCall (name "jhc_case_inc") []
+profile_function_inc = expr $ functionCall (name "jhc_function_inc") []
 
 arg i = name $ 'a':show i
 

@@ -798,9 +798,9 @@ compileGrinToC grin = do
     name <- System.getProgName
     args <- getArguments
     let argstring = simpleQuote (name:args)
-        boehmOpts | fopts FO.Boehm = ["-DUSE_BOEHM_GC", "-lgc"]
+        boehmOpts | fopts FO.Boehm = ["-D_JHC_BOEHM_GC=1", "-lgc"]
                   | otherwise = []
-        profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE"]
+        profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE=1"]
                   | otherwise = []
         comm = shellQuote $ [optCC options, "-std=gnu99", "-D_GNU_SOURCE", "-falign-functions=4", "-ffast-math", "-Wall", "-o", fn, cf ] ++ (map ("-l" ++) rls) ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
         debug = if fopts FO.Debug then ["-g"] else ["-DNDEBUG", "-O3", "-fomit-frame-pointer"]

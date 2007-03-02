@@ -96,7 +96,7 @@ typedef struct dnode {
         sptr_t rest[];
 } A_MAYALIAS dnode_t;
 
-#ifndef NDEBUG
+#if _JHC_DEBUG
 // these ensure the type synonyms are available to the debugger
 uintptr_t _dummy1;
 node_t *_dummy2;
@@ -137,11 +137,11 @@ eval(sptr_t s)
                 assert(h != BLACK_HOLE);
                 if(ISLAZY(h)) {
                         eval_fn fn = (eval_fn)DETAG(h);
-#ifndef NDEBUG
+#if _JHC_DEBUG
                         GETHEAD(ds) = BLACK_HOLE;
 #endif
                         wptr_t r = (*fn)(NODEP(ds));
-#ifndef NDEBUG
+#if _JHC_DEBUG
                         assert(GETHEAD(ds) != BLACK_HOLE);
 #endif
                         return r;
@@ -155,7 +155,7 @@ eval(sptr_t s)
 static inline void A_STD A_UNUSED
 update(sptr_t thunk, wptr_t new)
 {
-        update_inc();
+        jhc_update_inc();
         assert(GETHEAD(thunk) == BLACK_HOLE);
         assert(!ISLAZY(new));
         GETHEAD(thunk) = (fptr_t)new;
