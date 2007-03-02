@@ -7,6 +7,7 @@ module E.Traverse(
     emapEGH,
     eSize,
     renameE,
+    scopeCheck,
     runRename
     ) where
 
@@ -15,13 +16,11 @@ import Control.Monad.Writer
 import Data.FunctorM
 import Data.Monoid
 
-import E.Type
+import E.E
 import E.FreeVars(caseUpdate)
+import E.Type
 import Name.Id
-import Name.Name
-import Support.FreeVars
 import Util.Gen
-import Util.Graph
 import Util.HasSize
 import Util.NameMonad
 import Util.SetLike as S
@@ -160,5 +159,30 @@ renameE initSet initMap e = runReader (runIdNameT' $ addBoundNamesIdMap initMap 
         (n,tv') <- ntvr True fg tv
         e' <- localSubst n (f e)
         return $ elam tv' e'
+
+
+scopeCheck :: Monad m => Bool -> IdMap TVr -> E -> m ()
+scopeCheck checkFvs initMap e = runReaderT (f e) initMap  where
+    f (ELam tvr e) = f (tvrType tvr) >> local (minsert (tvrIdent tvr) tvr) (f e)
+    f (EPi tvr e) = f (tvrType tvr) >> local (minsert (tvrIdent tvr) tvr) (f e)
+    f (EVar t) = do
+        m <- ask
+        case mlookup (tvrIdent t) m of
+            Nothing | checkFvs -> fail $ "scopeCheck: found variable not in scope " ++ tvrShowName t
+            Just t' | tvrType t /= tvrType t' -> fail $ "scopeCheck: found variable whose type does not match " ++ tvrShowName t
+            _ -> return ()
+    f ec@ECase { eCaseBind = b } = do
+        f (eCaseScrutinee e)
+        f (eCaseType ec)
+        f (tvrType b)
+        local (minsert (tvrIdent b) b) $ mapM_ doAlt (eCaseAlts ec)
+    f ELetRec { eDefs = ds, eBody = e } = do
+        mapM_ (f . tvrType . fst) ds
+        local (fromList [ (tvrIdent t,t) | (t,_) <- ds ] `mappend`) (f e)
+    f e = emapE_ f e
+    doAlt (Alt LitCons { litArgs = xs, litType = t } e) = do
+        f t >> local (fromList [ (tvrIdent t,t) | t <- xs] `mappend`) (f e)
+    doAlt (Alt (LitInt _ t) e) = f t >> f e
+
 
 
