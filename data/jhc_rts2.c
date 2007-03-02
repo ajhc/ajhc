@@ -1,8 +1,7 @@
 
-#include <assert.h>
-
 #define ISLAZY(x)   (((uintptr_t)(x)) & 0x1)
 #define DETAG(x)    ((uintptr_t)(x) & ~0x1)
+#define GETTAG(x)   ((uintptr_t)(x) & 0x3)
 
 #define GETHEAD(x)  (NODEP(x)->head)
 #define GETWHAT(x)  (DNODEP(x)->what)
@@ -11,6 +10,7 @@
 #define EVALTAG(fn) (assert(((uintptr_t)(fn) & 0x3) == 0),(sptr_t)((uintptr_t)(fn) | P_LAZY))
 #define VALUE(n)    ((wptr_t)(((uintptr_t)(n) << 2) | P_VALUE))
 #define ISVALUE(n)  (assert(!ISLAZY(n)), ((uintptr_t)(n) & 0x2))
+
 
 #define P_VALUE 0x2
 #define P_WHNF  0x0
@@ -97,6 +97,7 @@ typedef struct dnode {
 } A_MAYALIAS dnode_t;
 
 #if _JHC_DEBUG
+
 // these ensure the type synonyms are available to the debugger
 uintptr_t _dummy1;
 node_t *_dummy2;
@@ -104,7 +105,38 @@ dnode_t *_dummy3;
 sptr_t *_dummy4;
 fptr_t *_dummy5;
 wptr_t *_dummy6;
+
+
+static int A_UNUSED
+jhc_valid_whnf(wptr_t s)
+{
+        return ((GETTAG(s) == P_VALUE) || ((GETTAG(s) == P_WHNF) && jhc_malloc_sanity(s,P_WHNF)));
+}
+
+static int A_UNUSED
+jhc_valid_lazy(sptr_t s)
+{
+        if(jhc_valid_whnf((wptr_t)s))
+                return 1;
+        assert(GETTAG(s) == P_LAZY);
+        assert(jhc_malloc_sanity(s,P_LAZY));
+        if(ISLAZY(s->head)) {
+                if(s->head == BLACK_HOLE) return 1;
+                assert(GETTAG(s->head) == P_LAZY);
+                fptr_t dhead = DETAG(s->head);
+                assert(dhead >= &_start && dhead < &_end);
+                return 1;
+        } else
+                return jhc_valid_whnf((wptr_t)s->head);
+}
+
+#else
+
+#define jhc_valid_whnf(x) 1
+#define jhc_valid_lazy(x) 1
+
 #endif
+
 
 typedef wptr_t (*eval_fn)(node_t *node) A_STD;
 
@@ -113,6 +145,7 @@ static inline wptr_t A_STD A_UNUSED
 fetch(sptr_t s)
 {
         assert(!ISLAZY(s));
+        assert(jhc_valid_whnf((wptr_t)s));
         return (wptr_t)s;
 }
 
@@ -120,6 +153,7 @@ fetch(sptr_t s)
 static inline wptr_t A_STD A_UNUSED
 follow(sptr_t s)
 {
+        assert(jhc_valid_lazy(s));
         if(ISLAZY(s)) {
                 sptr_t h = (sptr_t)(GETHEAD(DETAG(s)));
                 assert(!ISLAZY(h));
@@ -131,7 +165,9 @@ follow(sptr_t s)
 static inline wptr_t A_STD A_UNUSED
 eval(sptr_t s)
 {
+        assert(jhc_valid_lazy(s));
         if(ISLAZY(s)) {
+                assert(GETTAG(s) == P_LAZY);
                 void *ds = (void *)DETAG(s);
                 sptr_t h = (sptr_t)(GETHEAD(ds));
                 assert(h != BLACK_HOLE);
@@ -148,6 +184,7 @@ eval(sptr_t s)
                 }
                 return (wptr_t)h;
         }
+        assert(jhc_valid_whnf((wptr_t)s));
         return (wptr_t)s;
 }
 

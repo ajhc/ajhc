@@ -39,9 +39,21 @@ struct jhcm_header {
         unsigned short line_number;
 };
 
+
+extern void _start;
+extern void _end;
+
+static int
+jhc_malloc_sanity(void *p,int tag)
+{
+        assert((p >= jhc_memstart && p < jhc_mem) || (p >= &_start && p < &_end));
+        return 1;
+}
+
+
 #define jhc_malloc(n) jhc_malloc_debug(n,__LINE__)
 
-static inline void * A_MALLOC
+static void * A_MALLOC
 jhc_malloc_debug(size_t n,int line)
 {
         void *ret = jhc_mem;
@@ -59,6 +71,8 @@ jhc_malloc(size_t n)
         jhc_mem += ALIGN(__alignof__(void *),n);
         return ret;
 }
+
+#define jhc_malloc_sanity(p,t) do {} while(0)
 
 #endif
 

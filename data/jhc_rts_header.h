@@ -9,6 +9,7 @@
 #include <limits.h>
 #include <locale.h>
 #include <math.h>
+#include <assert.h>
 #include <float.h>
 #include <sys/times.h>
 #include <setjmp.h>
