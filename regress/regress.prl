@@ -19,7 +19,7 @@ my $opt_n;
 my $opt_p;
 my @opt_rts;
 my $opt_clean;
-my $opt_timeout=60*3;
+my $opt_timeout=60*5;
 my $opt_ho;
 
 Getopt::Long::Configure ("bundling");
@@ -179,7 +179,7 @@ sub do_it {
             my @args = maybe_read("$fbase.args");
             $result->{run_stdout} = "$rd/$name.stdout";
             my $stdin = " < $fbase.stdin" if -f "$fbase.stdin";
-            my $run_cmd = "$fbase " . join(" ",@args) . " > $result->{run_stdout}" . $stdin;
+            my $run_cmd = "$fbase " . join(" ",@args) . " > $result->{run_stdout}" . ($stdin || "");
             $result->{run_cmd} = $run_cmd;
             ($r,$time) = my_system $run_cmd;
             $result->{run_status} = $r;
