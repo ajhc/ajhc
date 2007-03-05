@@ -119,10 +119,7 @@ flattenScc xs = concatMap f xs where
     f (CyclicSCC xs) = xs
 
 partialLadder t
-    | 'P':cs <- fromAtom t = let
-        (n','_':rs) = span isDigit cs
-        n = (read n' :: Int)
-        in [ toAtom $ 'P':show x ++ "_" ++ rs | x <- [1 .. n]]
+    | Just (n,frs) <- tagUnfunction t = [ partialTag frs x | x <- [1 .. n]]
     | otherwise = [t]
 
 typecheckGrin grin = do
@@ -174,9 +171,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
     errorOnce <- newOnceMap
     lm <- newIORef mempty
     let doCompile = compile' cenv
-        lenv = LEnv {
-            evaledMap = mempty
-        }
+        lenv = LEnv { evaledMap = mempty }
         cenv = CEnv {
             funcBaps = funcBaps,
             tyEnv = tyEnv,
@@ -468,7 +463,7 @@ compile' cenv (tvr,as,e) = ans where
                 pt = Ty (toAtom pt')
             return $ Prim p (args [addr])
         Poke pt' ->  do
-            let p = prim { primType = ([Ty $ toAtom (show rt_HsPtr)],tyUnit) }
+            let p = prim { primType = ([Ty $ toAtom (show rt_HsPtr),pt],tyUnit) }
                 [_,addr,val] = xs
                 pt = Ty (toAtom pt')
             return $  Prim p (args [addr,val])
@@ -546,12 +541,10 @@ compile' cenv (tvr,as,e) = ans where
         app ty (e :>>= v :-> gApply v a) as
     app' e [] = return $ Return e
     app' (Const (NodeC t cs)) (a:as) | tagIsPartialAp t = do
-        let ('P':rs') = fromAtom t
-            (n','_':rs) = span isDigit rs'
-            n = (read n' :: Int)
+        let Just (n,frs) = tagUnfunction t
             lazy = do
                 mtick "Grin.FromE.lazy-app-const"
-                app' (Const (NodeC (partialTag (toAtom $ 'f':rs) (n - 1)) (cs ++ [a]))) as
+                app' (Const (NodeC (partialTag frs (n - 1)) (cs ++ [a]))) as
         case a of
             Const {} -> lazy
             Lit {} -> lazy
@@ -560,7 +553,7 @@ compile' cenv (tvr,as,e) = ans where
                 mtick "Grin.FromE.lazy-app-store"
                 tpv <- newNodePtrVar
                 x <- app' tpv as
-                return $ Store  (NodeC (partialTag (toAtom $ 'f':rs) (n - 1)) (cs ++ [a])) :>>= tpv :-> x
+                return $ Store  (NodeC (partialTag frs (n - 1)) (cs ++ [a])) :>>= tpv :-> x
     app' e as = do
         mtick "Grin.FromE.lazy-app-bap"
         V vn <- newVar
