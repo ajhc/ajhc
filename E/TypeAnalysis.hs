@@ -16,7 +16,7 @@ import Doc.PPrint
 import E.Annotate
 import E.E hiding(isBottom)
 import E.Subst
-import E.Traverse(emapE',emapE_)
+import E.Traverse(emapE',emapE_,emapE)
 import E.Program
 import E.Eta
 import Support.FreeVars
@@ -270,8 +270,8 @@ specializeProgram doSpecialize usedRules usedValues prog = do
     return $ programSetDs nds prog
 
 
-repi (ELit LitCons { litName = n, litArgs = [a,b] }) | n == tc_Arrow = EPi tvr { tvrIdent = 0, tvrType = a } b
-repi e = e
+repi (ELit LitCons { litName = n, litArgs = [a,b] }) | n == tc_Arrow = EPi tvr { tvrIdent = 0, tvrType = repi a } (repi b)
+repi e = runIdentity $ emapE (return . repi ) e
 
 specializeDef _ (_,unusedVals,_,_) (tvr,e) | tvr `Set.member` unusedVals = return (tvr,EError "Unused" (tvrType tvr))
 specializeDef _ _ (t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
