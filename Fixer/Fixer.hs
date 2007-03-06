@@ -82,8 +82,8 @@ instance Fixable a => Monoid (Value a) where
 data Value a = IOValue (IO (Value a)) | UnionValue (Value a) (Value a) | ConstValue a | IV (RvValue a)
     deriving(Typeable)
 
-instance Show a => Show (Value a) where
-    showsPrec _ (ConstValue a) = showString "<<" . shows a . showString ">>"
+instance Fixable a => Show (Value a) where
+    showsPrec _ (ConstValue a) = showString "<<" . showString (showFixable a) . showString ">>"
     showsPrec _ (UnionValue a b) = showString "<<" . shows a . shows b . showString ">>"
     showsPrec _ (IOValue _) = showString "<<IO>>"
     showsPrec _ (IV a) = showString "<<" . shows (hashUnique $ ident a) . showString ">>"
@@ -150,14 +150,16 @@ modifiedSuperSetOf :: (Fixable a, Fixable b) =>  Value b -> Value a -> (a -> b) 
 modifiedSuperSetOf (IV rv) (ConstValue cv) r = Rule $ propagateValue (r cv) rv
 modifiedSuperSetOf (IV rv) v2 r = Rule $ addAction v2 (\x -> propagateValue (r x) rv)
 modifiedSuperSetOf (IOValue iov) v2 r = Rule $ iov >>= \v1 -> unRule $ modifiedSuperSetOf v1 v2 r
-modifiedSuperSetOf ConstValue {} _ _ =  Rule $ fail "Fixer: You cannot modify a constant value"
+modifiedSuperSetOf (ConstValue vb) (ConstValue va)  f | f va `lte` vb =  Rule $ return ()
+modifiedSuperSetOf ca@ConstValue {}  cb _ =  Rule $ fail ("Fixer.modifedSuperSetOf: You cannot modify a constant value:" ++ show(ca,cb))
 modifiedSuperSetOf UnionValue {} _ _ =  Rule $ fail "Fixer: You cannot modify a union value"
 
 isSuperSetOf :: Fixable a => Value a -> Value a -> Rule
 (IV rv) `isSuperSetOf` (ConstValue v2) = Rule $ propagateValue v2 rv
 (IV rv) `isSuperSetOf` v2 = Rule $ addAction v2 (\x -> propagateValue x rv)
 (IOValue iov) `isSuperSetOf` v2 = Rule $ iov >>= unRule . (`isSuperSetOf` v2)
-ConstValue {} `isSuperSetOf` _ = Rule $  fail "Fixer: You cannot modify a constant value"
+ConstValue v1 `isSuperSetOf` ConstValue v2 | v2 `lte` v1 =  Rule $ return ()
+ConstValue {} `isSuperSetOf` _ = Rule $  fail "Fixer.isSuperSetOf: You cannot modify a constant value"
 UnionValue {} `isSuperSetOf` _ = Rule $  fail "Fixer: You cannot modify a union value"
 
 -- | the function must satisfy the rule that if a >= b then f(a) implies f(b)
