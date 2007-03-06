@@ -1,5 +1,10 @@
+{-# OPTIONS_JHC -N #-}
 module Data.Bits where
 
+
+import Jhc.Num
+import Jhc.Order
+import Jhc.Int
 
 
 infixl 8 `shift`, `rotate`, `shiftL`, `shiftR`, `rotateL`, `rotateR`

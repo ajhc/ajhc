@@ -126,7 +126,7 @@ foreach my $d (@ds) {
     my $cncons = dcon($d->[0]);
     my $prelude_bounded = hsname("Jhc.Enum.Bounded");
     my $foreign_storable = hsname("Foreign.Storable.Storable");
-    my $c_num = hsname("Prelude.Num");
+    my $c_num = hsname("Jhc.Num.Num");
     push @inst, "[] :=> IsIn $prelude_bounded $tycon";
     push @inst, "[] :=> IsIn $foreign_storable $tycon";
     #push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.sizeOf.$d->[0]\", ELam (v0 $t) \$ " . const("sizeof($d->[1])","tInt") . ")";
@@ -139,23 +139,23 @@ foreach my $d (@ds) {
     my $ivart = "v2_Integer";
     my $tvar = "(v2 $t)";
     if ($d->[0] eq "Jhc.Prim.Int") {
-        push @cmeth, "($c_num, toInstName \"Prelude.fromInt.$d->[0]\", ELam $ivar (EVar $ivar))";
-        push @cmeth, "($c_num, toInstName \"Prelude.toInt.$d->[0]\", ELam $ivar (EVar $ivar))";
+        push @cmeth, "($c_num, toInstName \"Jhc.Num.fromInt.$d->[0]\", ELam $ivar (EVar $ivar))";
+        push @cmeth, "($c_num, toInstName \"Jhc.Num.toInt.$d->[0]\", ELam $ivar (EVar $ivar))";
     } else {
-        push @cmeth, "($c_num, toInstName \"Prelude.fromInt.$d->[0]\", ELam $ivar (create_integralCast_fromInt $cncons $rtype (EVar $ivar) $t))";
-        push @cmeth, "($c_num, toInstName \"Prelude.toInt.$d->[0]\", ELam $tvar (create_integralCast_toInt $cncons $rtype (EVar $tvar)))" if $d->[2] =~ /int/ ;
+        push @cmeth, "($c_num, toInstName \"Jhc.Num.fromInt.$d->[0]\", ELam $ivar (create_integralCast_fromInt $cncons $rtype (EVar $ivar) $t))";
+        push @cmeth, "($c_num, toInstName \"Jhc.Num.toInt.$d->[0]\", ELam $tvar (create_integralCast_toInt $cncons $rtype (EVar $tvar)))" if $d->[2] =~ /int/ ;
     }
     if ($d->[0] eq "Jhc.Basics.Integer") {
-        push @cmeth, "($c_num, toInstName \"Prelude.fromInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
-        push @cmeth, "($c_num, toInstName \"Prelude.toInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
+        push @cmeth, "($c_num, toInstName \"Jhc.Num.fromInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
+        push @cmeth, "($c_num, toInstName \"Jhc.Num.toInteger.$d->[0]\", ELam $ivart (EVar $ivart))";
     } else {
-        push @cmeth, "($c_num, toInstName \"Prelude.fromInteger.$d->[0]\", ELam $ivart (create_integralCast_fromInteger $cncons $rtype (EVar $ivart) $t))";
-        push @cmeth, "($c_num, toInstName \"Prelude.toInteger.$d->[0]\", ELam $tvar (create_integralCast_toInteger $cncons $rtype (EVar $tvar)))" if $d->[2] =~ /int/ ;
+        push @cmeth, "($c_num, toInstName \"Jhc.Num.fromInteger.$d->[0]\", ELam $ivart (create_integralCast_fromInteger $cncons $rtype (EVar $ivart) $t))";
+        push @cmeth, "($c_num, toInstName \"Jhc.Num.toInteger.$d->[0]\", ELam $tvar (create_integralCast_toInteger $cncons $rtype (EVar $tvar)))" if $d->[2] =~ /int/ ;
     }
     #push @cmeth, "(toInstName \"Prelude.abs.$d->[0]\", ELam $tvar (buildAbs $tvar $t))" if $d->[2] =~ /int/ ;
-    push @cmeth, "($c_num, toInstName \"Prelude.abs.$d->[0]\", ELam $tvar (build_abs \"$d->[1]\" $cncons (EVar $tvar)  ))" if $d->[2] =~ /int/ ;
+    push @cmeth, "($c_num, toInstName \"Jhc.Num.abs.$d->[0]\", ELam $tvar (build_abs \"$d->[1]\" $cncons (EVar $tvar)  ))" if $d->[2] =~ /int/ ;
     #push @cmeth, "(toInstName \"Prelude.signum.$d->[0]\", ELam $tvar (buildSignum $tvar $t))" if $d->[2] =~ /int/ ;
-    push @cmeth, "($c_num, toInstName \"Prelude.signum.$d->[0]\", ELam $tvar (build_signum \"$d->[1]\" $cncons (EVar $tvar) ))" if $d->[2] =~ /int/ ;
+    push @cmeth, "($c_num, toInstName \"Jhc.Num.signum.$d->[0]\", ELam $tvar (build_signum \"$d->[1]\" $cncons (EVar $tvar) ))" if $d->[2] =~ /int/ ;
     #push @names, "(\"$d->[0]\", \"$d->[1]\", \"$d->[2]\")\n";
     my $sname = $d->[0];
     $sname =~ s/^.*\.//;

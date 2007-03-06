@@ -34,16 +34,7 @@ instance  (Read a, Read b) => Read (a,b)  where
                                                  (y,v)   <- reads u,
                                                  (")",w) <- lex v ] )
 
-instance  (Show a, Show b) => Show (a,b)  where
-    showsPrec _ (x,y) s = (showChar '(' . shows x . showChar ',' .
-                                          shows y . showChar ')')
-			  s
 
-instance (Show a, Show b, Show c) => Show (a, b, c) where
-    showsPrec _ (x,y,z) s = (showChar '(' . shows x . showChar ',' .
-					    shows y . showChar ',' .
-					    shows z . showChar ')')
-			    s
 
 instance (Show a, Show b, Show c, Show d) => Show (a, b, c, d) where
     showsPrec _ (w,x,y,z) s = (showChar '(' . shows w . showChar ',' .

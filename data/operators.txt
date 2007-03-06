@@ -11,26 +11,26 @@ aaB, <, Jhc.Order.Ord, <
 
 
 [int,float]
-aaa, +, Prelude.Num, +
-aaa, -, Prelude.Num, -
-aaa, *, Prelude.Num, *
-aa, negate, Prelude.Num, -
-# 1, abs, Prelude.Num, abs
-# 1, signum, Prelude.Num, abs
+aaa, +, Jhc.Num.Num, +
+aaa, -, Jhc.Num.Num, -
+aaa, *, Jhc.Num.Num, *
+aa, negate, Jhc.Num.Num, -
+# 1, abs, Jhc.Num.Num, abs
+# 1, signum, Jhc.Num.Num, abs
 
 [int]
 aaa, .&., Data.Bits.Bits, &
 aaa, .|., Data.Bits.Bits, |
 aaa, xor, Data.Bits.Bits, ^
 aa, complement, Data.Bits.Bits, ~
-aaa, quot, Prelude.Integral, /
-aaa, rem, Prelude.Integral, %
-aaa, div, Prelude.Integral, /
-aaa, mod, Prelude.Integral, %
+aaa, quot, Jhc.Num.Integral, /
+aaa, rem, Jhc.Num.Integral, %
+aaa, div, Jhc.Num.Integral, /
+aaa, mod, Jhc.Num.Integral, %
 aIa, shiftL, Data.Bits.Bits, <<
 aIa, shiftR, Data.Bits.Bits, >>
 
 
 # [float]
-# aaa, /, Prelude.Fractional, /
+# aaa, /, Jhc.Num.Fractional, /
 

@@ -9,6 +9,7 @@ module Prelude.Text (
 --      Bool, Maybe, Either, Ordering
 -- are done via "deriving" clauses in Prelude.hs
 import Prelude
+import Jhc.Show
 
 
 import Data.Char(isSpace, isAlpha, isDigit, isAlphaNum,
@@ -18,7 +19,6 @@ import Numeric(showSigned, showInt, readSigned, readDec, showFloat,
                readFloat, lexDigits)
 
 type  ReadS a  = String -> [(a,String)]
-type  ShowS    = String -> String
 
 class  Read a  where
     readsPrec        :: Int -> ReadS a
@@ -36,44 +36,15 @@ class  Read a  where
                                                     (x,u)    <- reads t,
                                                     (xs,v)   <- readl' u]
 
-class  Show a  where
-    showsPrec        :: Int -> a -> ShowS
-    show             :: a -> String
-    showList         :: [a] -> ShowS
-
-        -- Mimimal complete definition:
-        --      show or showsPrec
-    showsPrec _ x s   = show x ++ s
-
-    show x            = showsPrec 0 x ""
-
-    showList []       = showString "[]"
-    showList (x:xs)   = showChar '[' . shows x . showl xs
-                        where showl []     = showChar ']'
-                              showl (x:xs) = showChar ',' . shows x .
-                                             showl xs
 
 reads            :: (Read a) => ReadS a
 reads            =  readsPrec 0
-
-shows            :: (Show a) => a -> ShowS
-shows            =  showsPrec 0
 
 read             :: (Read a) => String -> a
 read s           =  case [x | (x,t) <- reads s, ("","") <- lex t] of
                          [x] -> x
                          []  -> error "Prelude.read: no parse"
                          _   -> error "Prelude.read: ambiguous parse"
-
-{-# INLINE showChar, showString #-}
-showChar         :: Char -> ShowS
-showChar         =  (:)
-
-showString       :: String -> ShowS
-showString       =  (++)
-
-showParen        :: Bool -> ShowS -> ShowS
-showParen b p    =  if b then showChar '(' . p . showChar ')' else p
 
 readParen        :: Bool -> ReadS a -> ReadS a
 readParen b g    =  if b then mandatory else optional
@@ -158,9 +129,6 @@ instance  Show Double  where
 instance  Read Double  where
     readsPrec p         = readSigned readFloat
 
-instance  Show ()  where
-    showsPrec p () = showString "()"
-
 instance Read () where
     readsPrec p    = readParen False
                             (\r -> [((),t) | ("(",s) <- lex r,
@@ -186,8 +154,6 @@ instance  Read Char  where
               readl s            = [(c:cs,u) | (c ,t) <- readLitChar s,
                                                (cs,u) <- readl t       ]
 
-instance  (Show a) => Show [a]  where
-    showsPrec p      = showList
 
 instance  (Read a) => Read [a]  where
     readsPrec p      = readList
@@ -200,9 +166,6 @@ instance Read Bool where
               ++
               (\ inp -> [((True) , rest) | ("True" , rest) <- lex inp]) input
 
-instance Show Bool where
-    showsPrec d (False) = showString "False"
-    showsPrec d (True) = showString "True"
 
 instance Read Ordering where
     readsPrec d input =
@@ -211,11 +174,6 @@ instance Read Ordering where
               (\ inp -> [((EQ) , rest) | ("EQ" , rest) <- lex inp]) input
               ++
               (\ inp -> [((GT) , rest) | ("GT" , rest) <- lex inp]) input
-
-instance Show Ordering where
-    showsPrec d (LT) = showString "LT"
-    showsPrec d (EQ) = showString "EQ"
-    showsPrec d (GT) = showString "GT"
 
 
 

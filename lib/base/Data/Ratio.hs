@@ -4,13 +4,15 @@ module  Data.Ratio (
     Ratio, Rational, (%), numerator, denominator, approxRational ) where
 
 import Prelude.Text
+import Jhc.Num
 
 infixl 7  %
 
 ratPrec = 7 :: Int
 
-data  (Integral a)      => Ratio a = !a :% !a
-type  Rational          =  Ratio Integer
+numerator (x :% _)      =  x
+denominator (_ :% y)    =  y
+
 
 (%)                     :: (Integral a) => a -> a -> Ratio a
 numerator, denominator  :: (Integral a) => Ratio a -> a
@@ -19,10 +21,6 @@ approxRational          :: (RealFrac a) => a -> a -> Rational
 
 
 x % y                   =  reduce (x * signum y) (abs y)
-
-numerator (x :% _)      =  x
-
-denominator (_ :% y)    =  y
 
 
 
