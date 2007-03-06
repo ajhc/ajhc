@@ -587,7 +587,7 @@ simplifyDs prog sopts dsIn = ans where
                 d'' <- fmapM g d
                 t' <- dosub t
                 done cont $ caseUpdate ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
-            doCase ic@ECase { eCaseType = it, eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d' = do
+            doCase ic@ECase { eCaseType = it, eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d' | not (isUnboxedTuple it) = do
                 mtick (toAtom "E.Simplify.case-of-case-join")
                 n1 <- newName
                 n2 <- newName

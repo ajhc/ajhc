@@ -140,4 +140,9 @@ p_unsafeCoerce = primPrim "unsafeCoerce"
 p_toTag = primPrim "toTag"
 p_fromTag = primPrim "fromTag"
 
+fromUnboxedTuple :: Monad m => E -> m [E]
+fromUnboxedTuple (ELit LitCons { litName = n, litArgs = as }) | Just _ <- fromUnboxedNameTuple n = return as
+fromUnboxedTuple _ = fail "fromUnboxedTuple: not a tuple"
+
+isUnboxedTuple m = isJust (fromUnboxedTuple m)
 
