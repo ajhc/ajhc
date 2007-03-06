@@ -110,7 +110,8 @@ calcDef env@(ur,uv,_) (t,e) = do
                     as' <- mapM getValue as
                     addRule $ conditionalRule id ruleUsed $ ioToRule $ do
                         flip mapM_ (zip [0..] as') $ \ (i,t') -> do
-                            addRule $ modifiedSuperSetOf t' vv (vmapArg n i)
+                            addRule $ modifiedSuperSetOf vv t' (vmapArg n i)
+                            --addRule $ modifiedSuperSetOf t' vv (vmapArg n i)
 --                    addRule $ conditionalRule id ruleUsed $ ioToRule $ do
 --                        flip mapM_ (zip as' naturals)  $ \ (v,i) -> do
 --                            addRule $ modifiedSuperSetOf vv v (vmapArgSingleton n i)
