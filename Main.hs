@@ -159,7 +159,7 @@ transBarendregt = transformParms {
         transformCategory = "Barendregt",
         transformIterate = DontIterate,
         transformDumpProgress = corePass,
-        transformOperation =  return . barendregtProgram
+        transformOperation =  evaluate . barendregtProgram
         } where
     barendregtProgram prog | null $ progCombinators prog = prog
     barendregtProgram prog = programSetDs ds' prog where
@@ -243,7 +243,7 @@ processDecls cho ho' tiData = do
     -- build datatables
     let dataTable = toDataTable (getConstructorKinds (hoKinds ho')) (tiAllAssumptions tiData) originalDecls (hoDataTable ho)
         classInstances = deriveClasses dataTable
-    let fullDataTable = (dataTable `mappend` hoDataTable ho)
+        fullDataTable = dataTable `mappend` hoDataTable ho
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
 
     wdump FD.Derived $
@@ -288,7 +288,7 @@ processDecls cho ho' tiData = do
     prog <- barendregtProg prog
     let allProps = munionWith mappend (hoProps ho')  (idSetToIdMap (const (singleton prop_HASRULE)) (ruleHeadFreeVars allRules))
 
-    cho <- return $ reprocessCho rules allProps cho
+    cho <- evaluate $ reprocessCho rules allProps cho
 
     -- Here we substitute in all the original types, with rules and properties defined in the current module included
     prog <- return $ runIdentity $ annotateProgram (choVarMap cho) (idann allRules allProps) letann lamann prog
@@ -455,13 +455,13 @@ programPruneUnreachable prog = programSetDs ds' prog where
     ds' = reachable (newGraph (programDs prog) (tvrIdent . fst) (\ (t,e) -> idSetToList $ bindingFreeVars t e)) (map tvrIdent $ progEntryPoints prog)
 
 programPrune :: Program -> IO Program
-programPrune prog = transformProgram transformParms { transformCategory = "PruneUnreachable", transformDumpProgress  = miniCorePass, transformOperation = return . programPruneUnreachable } prog
+programPrune prog = transformProgram transformParms { transformCategory = "PruneUnreachable", transformDumpProgress  = miniCorePass, transformOperation = evaluate . programPruneUnreachable } prog
 
 etaExpandProg :: String -> Program -> IO Program
 etaExpandProg pass prog = do
     let f prog = prog' { progStats = progStats prog `mappend` stats } where
         (prog',stats) = Stats.runStatM $  etaExpandProgram prog
-    transformProgram transformParms { transformPass = pass, transformCategory = "EtaExpansion", transformDumpProgress = miniCorePass,  transformOperation = return . f } prog
+    transformProgram transformParms { transformPass = pass, transformCategory = "EtaExpansion", transformDumpProgress = miniCorePass,  transformOperation = evaluate . f } prog
 
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
@@ -518,7 +518,7 @@ compileModEnv' (cho,_) = do
                           progEntryPoints = (main:ffiExportNames),
                           progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog]
                         }
-    prog <- transformProgram transformParms { transformCategory = "PruneUnreachable", transformOperation = return . programPruneUnreachable } prog
+    prog <- transformProgram transformParms { transformCategory = "PruneUnreachable", transformOperation = evaluate . programPruneUnreachable } prog
     prog <- barendregtProg prog
 
     (viaGhc,fn,_,_) <- determineArch
@@ -546,7 +546,7 @@ compileModEnv' (cho,_) = do
             sequence_ [ printCheckName' dataTable y z |  (y,z) <- es']
         return es'
 
-    prog <- return $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
+    prog <- evaluate $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
 
 --    prog <- denewtypeProgram prog
 
@@ -606,7 +606,7 @@ compileModEnv' (cho,_) = do
 
     prog <- Demand.analyzeProgram prog
     prog <- return $ E.CPR.cprAnalyzeProgram prog
-    prog <- transformProgram transformParms { transformCategory = "Boxy WorkWrap", transformDumpProgress = dump FD.Progress, transformOperation = return . workWrapProgram } prog
+    prog <- transformProgram transformParms { transformCategory = "Boxy WorkWrap", transformDumpProgress = dump FD.Progress, transformOperation = evaluate . workWrapProgram } prog
     prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify after Boxy WorkWrap" True prog
     prog <- barendregtProg prog
     prog <- return $ runIdentity $ programMapBodies (return . cleanupE) prog
