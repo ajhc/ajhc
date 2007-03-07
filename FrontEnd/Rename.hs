@@ -578,6 +578,10 @@ renameHsPat (HsPAsPat hsName hsPat) subTable = do
       hsName' <- renameHsName hsName subTable
       hsPat' <- renameHsPat hsPat subTable
       return (HsPAsPat hsName' hsPat')
+renameHsPat (HsPTypeSig sl hsPat qt) subTable = do
+      hsPat' <- renameHsPat hsPat subTable
+      qt' <- renameHsQualType qt subTable
+      return (HsPTypeSig sl hsPat' qt')
 renameHsPat p subTable = traverseHsPat (flip renameHsPat subTable) p
 
 buildRecPat :: FieldMap -> HsName -> [HsPatField] -> ScopeSM HsPat
