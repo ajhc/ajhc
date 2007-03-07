@@ -40,6 +40,7 @@ import GenUtil
 import Info.Types
 import Name.Id
 import Name.Name
+import Name.Names
 import Name.VConsts
 import Number
 import Options
@@ -566,6 +567,7 @@ simplifyDs prog sopts dsIn = ans where
                 done StartContext (substLet' ds e')
 
             doCase _ t b as d |  Just IsBoundTo { bindingE = ELit l } <- varval  = doConstCase cont l t  b as d
+            doCase (EPi TVr { tvrType = x} y) t b as d = doConstCase cont litCons { litName = tc_Arrow, litArgs = [x,y], litType = eStar} t b as d
             doCase (ELit l) t b as d  = doConstCase cont l t b as d
             doCase (EVar v) t b as d | Just IsBoundTo { bindingE = e } <- varval , isBottom e = do
                 mtick "E.Simplify.case-of-bottom'"
