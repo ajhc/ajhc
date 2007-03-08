@@ -51,7 +51,7 @@ fromUnboxedNameTuple n = case show n of
     _ -> fail $ "Not unboxed tuple: " ++ show n
 
 instance FromTupname Name where
-    fromTupname name | m == "Prelude" = fromTupname (nn::String) where
+    fromTupname name | m == "Jhc.Basics" = fromTupname (nn::String) where
         (_,(m,nn)) = fromName name
     fromTupname _ = fail "not a tuple"
 
