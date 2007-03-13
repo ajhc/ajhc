@@ -119,16 +119,18 @@ jhc_valid_lazy(sptr_t s)
         if(jhc_valid_whnf((wptr_t)s))
                 return 1;
         assert(GETTAG(s) == P_LAZY);
-        assert(jhc_malloc_sanity(s,P_LAZY));
-        if(ISLAZY(s->head)) {
-                if(s->head == BLACK_HOLE) return 1;
-                assert(GETTAG(s->head) == P_LAZY);
-                fptr_t dhead = DETAG(s->head);
+        node_t *ds = (sptr_t)DETAG(s);
+        assert(jhc_malloc_sanity(ds,P_LAZY));
+        if(ISLAZY(ds->head)) {
+                if(ds->head == BLACK_HOLE) return 1;
+                assert(GETTAG(ds->head) == P_LAZY);
+                fptr_t dhead = (fptr_t)DETAG(ds->head);
                 assert(dhead >= &_start && dhead < &_end);
                 return 1;
         } else
-                return jhc_valid_whnf((wptr_t)s->head);
+                return jhc_valid_whnf((wptr_t)ds->head);
 }
+
 
 #else
 
