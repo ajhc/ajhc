@@ -105,8 +105,9 @@ fromPi' dataTable e = f [] (followAliases dataTable e) where
 
 -- this annotates, but only expands top-level definitions
 etaExpandProgram :: Stats.MonadStats m => Program -> m Program
-etaExpandProgram prog = runNameMT (programMapDs f (etaAnnotateProgram prog)) where
-    f (t,e) = etaExpandDef' (progDataTable prog) 0 t e
+--etaExpandProgram prog = runNameMT (programMapDs f (etaAnnotateProgram prog)) where
+etaExpandProgram prog = runNameMT (programMapDs f prog) where
+    f (t,e) = do etaExpandDef' (progDataTable prog) 0 t e
 
 -- this annotates a program with its arity information, iterating until a fixpoint is reached.
 etaAnnotateProgram :: Program -> Program
