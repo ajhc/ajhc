@@ -68,8 +68,8 @@ primMap = Map.fromList [ (primTypeName a,a) | a <- as ] where
 
 isFGrin :: Bool
 isFGrin = case optArch options of
-    Nothing -> False
-    Just o -> "fgrin" `isPrefixOf` o
+    Nothing -> True
+    Just o -> "grin" `isPrefixOf` o
 
 determineArch = do
     let specs = maybe [] (split (== '-')) (optArch options)
