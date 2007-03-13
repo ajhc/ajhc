@@ -73,12 +73,12 @@ import qualified Stats
 -------------------
 
 
-unboxedMap :: [(Name,Maybe Ty)]
+unboxedMap :: [(Name,Ty)]
 unboxedMap = [
-    (tc_World__,Nothing),
-    (tc_Ref__,Just $ TyPtr (TyPtr TyNode)),
-    (tc_Array__,Just $ TyPtr (TyPtr TyNode)),
-    (tc_MutArray__,Just $ TyPtr (TyPtr TyNode))
+    (tc_World__,tyUnit),
+    (tc_Ref__,TyPtr (TyPtr TyNode)),
+    (tc_Array__,TyPtr (TyPtr TyNode)),
+    (tc_MutArray__,TyPtr (TyPtr TyNode))
     ]
 
 newtype C a = C (ReaderT LEnv IO a)
@@ -118,25 +118,18 @@ flattenScc xs = concatMap f xs where
     f (AcyclicSCC x) = [x]
     f (CyclicSCC xs) = xs
 
-partialLadder t
-    | Just (n,frs) <- tagUnfunction t = [ partialTag frs x | x <- [1 .. n]]
-    | otherwise = [t]
 
 typecheckGrin grin = do
     let errs = [  (err ++ "\n" ++ render (prettyFun a) ) | (a,Left err) <-  [ (a,typecheck (grinTypeEnv grin) c:: Either String Ty)   | a@(_,(_ :-> c)) <-  grinFuncs grin ]]
     mapM_ putErrLn  errs
     unless (null errs || optKeepGoing options) $ fail "There were type errors!"
 
-scTag n = t where (t,_,_) = toEntry (n,undefined,undefined)
+scTag n
+    | Just nm <- fromId (tvrIdent n) = toAtom ('f':show nm)
+    | otherwise = toAtom ('f':show (tvrIdent n))
+cafNum n = V $ - atomIndex (partialTag (scTag n) 0)
 
-cafNum n = V $ - atomIndex (partialTag t 0)
-    where
-    (t,_,_) = toEntry (n,undefined,undefined)
-
-
-toEntry (n,as,e)
-    | Just nm <- fromId (tvrIdent n)  = f (toAtom ('f':show nm))
-    | otherwise = f (toAtom ('f':show (tvrIdent n))) where
+toEntry (n,as,e) = f (scTag n) where
         f x = (x,map (toType (TyPtr TyNode) . tvrType ) $ filter (shouldKeep . getType )as,toType TyNode (getType (e::E) :: E))
 
 toType :: Ty -> E -> Ty
@@ -144,8 +137,7 @@ toType node = toty . followAliases mempty where
     toty (ELit LitCons { litName = n, litArgs = es, litType = ty }) |  ty == eHash, TypeConstructor <- nameType n, Just _ <- fromUnboxedNameTuple n = (tuple (map (toType (TyPtr TyNode) ) (filter shouldKeep es)))
     toty (ELit LitCons { litName = n, litArgs = [], litType = ty }) |  ty == eHash, RawType <- nameType n = (Ty $ toAtom (show n))
     toty e@(ELit LitCons { litName = n, litType = ty }) |  ty == eHash = case lookup n unboxedMap of
-        Just Nothing -> TyTup []
-        Just (Just x) -> x
+        Just x -> x
         Nothing -> error $ "Grin.FromE.toType: " ++ show e
     toty _ = node
 
@@ -267,7 +259,6 @@ primTyEnv = TyEnv . Map.map toTyTy $ Map.fromList $ [
     (convertName tc_Absurd, ([],TyNode)),
     (funcInitCafs, ([],tyUnit)),
     (funcEval, ([TyPtr TyNode],TyNode)),
-    (funcApply, ([TyNode, TyPtr TyNode],TyNode)),
     (tagHole, ([],TyNode))
     ]
 
