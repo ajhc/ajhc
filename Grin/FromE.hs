@@ -315,6 +315,8 @@ instance ToVal TVr where
         ty -> Var (V num) ty
 
 
+--doApply x y ty | getType y == tyUnit = App funcApply [x] ty
+doApply x y ty = App funcApply [x,y] ty
 
 evalVar fty tvr  = do
     em <- asks evaledMap
@@ -526,10 +528,10 @@ compile' cenv (tvr,as,e) = ans where
     app _ e [] = return e
     app ty e [a] = do
         v <- newNodeVar
-        return (e :>>= v :-> App funcApply [v,a] ty)
+        return (e :>>= v :-> doApply v a ty)
     app ty e (a:as) = do
         v <- newNodeVar
-        app ty (e :>>= v :-> gApply v a) as
+        app ty (e :>>= v :-> doApply v a TyNode) as
     app' e [] = return $ Return e
     app' (Const (NodeC t cs)) (a:as) | tagIsPartialAp t = do
         let Just (n,frs) = tagUnfunction t

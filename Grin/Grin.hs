@@ -35,7 +35,6 @@ module Grin.Grin(
     funcFetch,
     funcInitCafs,
     funcMain,
-    gApply,
     gEval,
     grinEntryPointNames,
     isHole,
@@ -114,8 +113,6 @@ funcMain = toAtom "@main"
 
 gEval :: Val -> Exp
 gEval x = App funcEval [x] TyNode
-gApply :: Val -> Val -> Exp
-gApply x y = App funcApply [x,y] TyNode
 
 
 instance TypeNames Ty where
@@ -516,6 +513,10 @@ instance CanTypeCheck TyEnv Exp Ty where
             fail $ "Prim: arguments do not match " ++ show n
     typecheck te ap@(App fn [v,a] t) | fn == funcApply = do
         [v',a'] <- mapM (typecheck te) [v,a]
+        if v' == TyNode then return t
+         else fail $ "App apply arg doesn't match: " ++ show ap
+    typecheck te ap@(App fn [v] t) | fn == funcApply = do
+        [v'] <- mapM (typecheck te) [v]
         if v' == TyNode then return t
          else fail $ "App apply arg doesn't match: " ++ show ap
     typecheck te ap@(App fn [v] t) | fn == funcEval = do
