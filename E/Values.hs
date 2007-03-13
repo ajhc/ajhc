@@ -285,3 +285,24 @@ lFalsezh = (LitInt 0 tBoolzh)
 lTruezh = (LitInt 1 tBoolzh)
 
 
+eToPat e = f e where
+    f (ELit LitCons { litAliasFor = af,  litName = x, litArgs = ts, litType = t }) = do
+        ts <- mapM cv ts
+        return litCons { litAliasFor = af, litName = x, litArgs = ts, litType = t }
+    f (ELit (LitInt e t)) = return (LitInt e t)
+    f (EPi (TVr { tvrType =  a}) b)  = do
+        a <- cv a
+        b <- cv b
+        return litCons { litName = tc_Arrow, litArgs = [a,b], litType = eStar }
+    f x = fail $ "E.Values.eToPat: " ++ show x
+    cv (EVar v) = return v
+    cv e = fail $ "E.Value.eToPat.cv: " ++ show e
+
+patToE p = f p where
+    f LitCons { litName = arr, litArgs = [a,b], litType = t} | t == eStar = return $ EPi tvr { tvrType = EVar a } (EVar b)
+    f (LitCons { litAliasFor = af,  litName = x, litArgs = ts, litType = t }) = do
+       return $  ELit litCons { litAliasFor = af, litName = x, litArgs = map EVar ts, litType = t }
+    f (LitInt e t) = return $ ELit (LitInt e t)
+    f x = fail $ "E.Values.patToE: " ++ show x
+
+
