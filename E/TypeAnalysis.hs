@@ -197,7 +197,8 @@ tagE env e  = emapE_ (tagE env) e
 
 getValue (EVar v)
     | Just x <- Info.lookup (tvrInfo v) = return x
-    | otherwise = fail $ "getValue: no varinfo: " ++ show v
+    | otherwise = return $ value (vmapPlaceholder ())
+    -- | otherwise = fail $ "getValue: no varinfo: " ++ show v
 getValue e | Just c <- typConstant e = return $ value c
 getValue e = value `liftM` fuzzyConstant e  -- TODO - make more accurate
 getValue e = fail $ "getValue: " ++ show e
@@ -255,8 +256,10 @@ getTyp kind dataTable vm = f 10 kind vm where
     f n kind vm | Just [h] <- vmapHeads vm = do
         let ss = slotTypes dataTable h kind
             as = [ (s,vmapArg h i vm) | (s,i) <- zip ss [0..]]
-        as' <- mapM (uncurry (f (n - 1))) as
-        return $ ELit (updateLit dataTable litCons { litName = h, litArgs = as', litType = kind })
+        as'@(~[fa,fb]) <- mapM (uncurry (f (n - 1))) as
+        if h == tc_Arrow
+         then return $ EPi tvr { tvrType = fa } fb
+         else return $ ELit (updateLit dataTable litCons { litName = h, litArgs = as', litType = kind })
     f _ _ _  = fail "getTyp: not constant type"
 
 specializeProgram :: (MonadStats m) =>
@@ -337,12 +340,8 @@ expandPlaceholder (tvr,oe) | getProperty prop_PLACEHOLDER tvr = do
             eCaseBind = a { tvrIdent = 0 },
             eCaseType = ct
             }
-        calt rule@Rule { ruleArgs = (arg:rs) } = Alt (valToPat' arg) (substMap (fromList [ (tvrIdent v,EVar r) | ~(EVar v) <- rs | r <- ras ]) $ ruleBody rule)
-
-        valToPat' (ELit LitCons { litName = x, litArgs = ts, litType = t, litAliasFor = af }) = LitCons { litName = x, litArgs = [ z | ~(EVar z) <- ts ], litType = t, litAliasFor = af }
-        valToPat' (EPi (TVr { tvrType =  EVar a}) (EVar b))  = litCons { litName = tc_Arrow, litArgs = [a,b], litType = eStar }
-        valToPat' x = error $ "expandPlaceholder.valToPat': " ++ show x
-
+        calt rule@Rule { ruleArgs = (arg:rs) } = Alt vp (substMap (fromList [ (tvrIdent v,EVar r) | ~(EVar v) <- rs | r <- ras ]) $ ruleBody rule) where
+            Just vp = eToPat arg
     return (unsetProperty prop_PLACEHOLDER tvr,foldr ELam ne as')
 
 expandPlaceholder _x = fail "not placeholder"

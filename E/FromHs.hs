@@ -196,24 +196,29 @@ createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans wher
         methodVar = tVr (toId methodName) ty
         _methodName@(~(Just (TVr {tvrType = ty},_))) = findName methodName
         defaultName =  (defaultInstanceName methodName)
-        valToPat' (ELit LitCons { litAliasFor = af,  litName = x, litArgs = ts, litType = t }) = ELit $ litCons { litAliasFor = af, litName = x, litArgs = [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..], j `notElem` map tvrIdent args], litType = t }
-        valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ litCons { litName = tc_Arrow, litArgs = [ EVar (tVr j (getType z)) | z <- [a,b] | j <- [2,4 ..], j `notElem` map tvrIdent args], litType = eStar }
+        valToPat' (ELit LitCons { litAliasFor = af,  litName = x, litArgs = ts, litType = t }) = (ELit litCons { litAliasFor = af, litName = x, litArgs = ts', litType = t },ts') where
+            ts' = [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..], j `notElem` map tvrIdent args]
+        --valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ litCons { litName = tc_Arrow, litArgs = [ EVar (tVr j (getType z)) | z <- [a,b] | j <- [2,4 ..], j `notElem` map tvrIdent args], litType = eStar }
+        valToPat' (EPi tv@TVr { tvrType =  a} b)  = (EPi tvr { tvrType =  a'} b',[a',b']) where
+            a' = EVar (tVr ja (getType a))
+            b' = EVar (tVr jb (getType b))
+            (ja:jb:_) = [ j |  j <- [2,4 ..], j `notElem` map tvrIdent args]
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
         as = [ rule  t | Inst { instHead = _ :=> IsIn _ t }  <- snub (classInsts classRecord) ]
         (_ft,_:args') = fromPi ty
         (args,_rargs) = span (sortKindLike . getType)  args'
-        rule t = makeRule ("Rule.{" ++ show name ++ "}") (Module (show name),0) RuleSpecialization ruleFvs methodVar (tpat:map EVar args) (removeNewtypes dataTable body)  where
+        rule t = makeRule ("Rule.{" ++ show name ++ "}") (Module (show name),0) RuleSpecialization ruleFvs methodVar (vp:map EVar args) (removeNewtypes dataTable body)  where
             ruleFvs = [ t | ~(EVar t) <- vs] ++ args
-            tpat = valToPat' (removeNewtypes dataTable $ tipe t)
+            (vp,vs) = valToPat' (removeNewtypes dataTable $ tipe t)
             name = (instanceName methodName (getTypeCons t))
-            vp@(ELit LitCons { litArgs =  vs }) = tpat
+            --vp@(ELit LitCons { litArgs =  vs }) = tpat
             body = case findName name of
                 Just (n,_) -> foldl EAp (EVar n) (vs ++ map EVar args)
                 Nothing -> case findName defaultName of
                     Just (deftvr,_) | null vs -> foldl EAp (EAp (EVar deftvr) vp) (map EVar args)
                     Just (deftvr,_) -> eLet tv vp $ foldl EAp (EAp (EVar deftvr) (EVar tv)) (map EVar args) where
                         tv = tvr { tvrIdent = head [ n | n <- newIds (freeVars vp)], tvrType = getType vp }
-                    Nothing -> foldl EAp (EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) (eAp ty (valToPat' (tipe t)))) (map EVar args)
+                    Nothing -> foldl EAp (EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) (eAp ty (fst $ valToPat' (tipe t)))) (map EVar args)
     method _ _ = []
     findName name = case Map.lookup name funcs of
         Nothing -> fail $ "Cannot find: " ++ show name
