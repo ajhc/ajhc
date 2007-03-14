@@ -137,9 +137,15 @@ instance CanType e t => CanType (Alt e) t where
 
 sortSortLike (ESort s) = s ==  EHashHash || s == EStarStar
 sortSortLike _ = False
-sortKindLike e = not (sortSortLike e) && sortSortLike (getType e)
-sortTypeLike e = not (sortSortLike e) && not (sortKindLike e) && sortKindLike (getType e)
-sortTermLike e = not (sortSortLike e) && not (sortKindLike e) && not (sortTypeLike e) && sortTypeLike (getType e)
+
+sortKindLike (ESort s) =  s /=  EHashHash && s /= EStarStar
+sortKindLike e = sortSortLike (getType e)
+
+sortTypeLike ESort {} = False
+sortTypeLike e = sortKindLike (getType e)
+
+sortTermLike ESort {} = False
+sortTermLike e = sortTypeLike (getType e)
 
 
 
@@ -208,15 +214,14 @@ inferType dataTable ds e = rfc e where
         strong nds et
     fc (EError _ e) = valid e >> (strong'  e)
     fc (EPrim _ ts t) = mapM_ valid ts >> valid t >> ( strong' t)
-    fc ec@ECase { eCaseScrutinee = e@ELit {}, eCaseBind = b, eCaseAlts = as, eCaseDefault =  (Just d) } | sortTypeLike e = do   -- TODO - this is a hack to get around case of constants.
+    fc ec@ECase { eCaseScrutinee = e@ELit {}, eCaseBind = b, eCaseAlts = as, eCaseType = dt } | sortTypeLike e = do   -- TODO - this is a hack to get around case of constants.
         et <- rfc e
         withContext "Checking typelike default binding" $ eq et (getType b)
-        dt <- rfc d
         verifyPats (casePats ec)
         -- skip checking alternatives
         ps <- mapM (strong' . getType) $ casePats ec
         withContext "Checking typelike pattern equality" $  eqAll (et:ps)
-        return dt
+        strong' dt
     fc ec@ECase {eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseType = dt } | sortTypeLike e  = do   -- TODO - we should substitute the tested for value into the default type.
         et <- rfc e
         withContext "Checking typelike default binding" $ eq et (getType b)
