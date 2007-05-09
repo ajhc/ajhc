@@ -88,6 +88,7 @@ prettyExp vl (Fetch v) = vl <> keyword "fetch" <+> prettyVal v
 prettyExp vl (Error "" _) = vl <> prim "exitFailure"
 prettyExp vl (Error s _) = vl <> keyword "error" <+> tshow s
 prettyExp vl (App t [v] _) | t == funcEval = vl <> keyword "eval" <+> prettyVal v
+prettyExp vl (App t [a] _) | t == funcApply = vl <> keyword "apply" <+> prettyVal a
 prettyExp vl (App t [a,b] _) | t == funcApply = vl <> keyword "apply" <+> prettyVal a <+> prettyVal b
 prettyExp vl (App a vs _)  = vl <> func (fromAtom a) <+> hsep (map prettyVal vs)
 prettyExp vl (Prim Primitive { primName = nm } vs)  = vl <> prim (fromAtom nm) <+> hsep (map prettyVal vs)

@@ -690,11 +690,13 @@ compileToGrin prog = do
     Stats.print "Grin" Stats.theStats
     wdump FD.GrinInitial $ do
         putErrLn "v-- Initial Grin"
+        dumpGrin (optOutName options) "initial" x
         printGrin x
         putErrLn "^-- Initial Grin"
     x <- return $ normalizeGrin x
     wdump FD.GrinNormalized $ do
         putErrLn "v-- Normalized Grin"
+        dumpGrin (optOutName options) "normalized" x
         printGrin x
         putErrLn "^-- Normalized Grin"
     lintCheckGrin x
@@ -776,6 +778,14 @@ compileToGrin prog = do
         x <- return $ normalizeGrin x
         dumpFinalGrin x
         compileGrinToC x
+
+dumpGrin fname pname grin = do
+    h <- openFile (fname ++ "_" ++ pname ++ ".grin") WriteMode
+    (argstring,sversion) <- getArgString
+    hPutStrLn h $ unlines [ "-- " ++ argstring,"-- " ++ sversion,""]
+    hPrintGrin h grin
+    hClose h
+
 
 dumpFinalGrin grin = do
     let fn = optOutName options

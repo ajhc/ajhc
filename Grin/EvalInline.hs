@@ -102,7 +102,9 @@ createEval shared  te ts'
 
 createApply :: Ty -> Ty -> TyEnv -> [Tag] -> Lam
 createApply argType retType te ts'
+    | null cs && argType == tyUnit = Tup [n1] :-> Error ("Empty Apply:" ++ show ts)  retType
     | null cs = Tup [n1,a2] :-> Error ("Empty Apply:" ++ show ts)  retType
+    | argType == tyUnit = Tup [n1] :-> Case n1 cs
     | otherwise = Tup [n1,a2] :-> Case n1 cs
     where
     ts = sortUnder toPackedString ts'
@@ -145,6 +147,11 @@ createEvalApply grin = do
         g (Case v ls) = do
             ls' <- mapM f ls
             return $ Case v ls'
+        g (App fn [fun] ty) | fn == funcApply = do
+            fn' <- runOnceMap appMap (tyUnit,ty) $ do
+                u <- newUniq
+                return (toAtom $ "@apply_" ++ show u)
+            return (App fn' [fun] ty)
         g (App fn [fun,arg] ty) | fn == funcApply = do
             fn' <- runOnceMap appMap (getType arg,ty) $ do
                 u <- newUniq
@@ -154,6 +161,8 @@ createEvalApply grin = do
     funcs <- mapMsnd f (grinFuncs grin)
     as <- onceMapToList appMap
     let (apps,ntyenv) = unzip $ map cf as
+        cf ((targ,tret),name) | targ == tyUnit = ((name,appBody),(name,tyTy { tySlots = [TyNode],tyReturn = tret })) where
+            appBody = createApply targ tret (grinTypeEnv grin) tags
         cf ((targ,tret),name) = ((name,appBody),(name,tyTy { tySlots = [TyNode,targ],tyReturn = tret })) where
             appBody = createApply targ tret (grinTypeEnv grin) tags
         TyEnv tyEnv = grinTypeEnv grin
