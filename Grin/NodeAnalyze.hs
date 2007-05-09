@@ -27,7 +27,12 @@ import Util.Gen
 
 atomUnknown = toAtom "(unknown)"
 
-data NodeType = WHNF | LazyWHNF | Lazy
+
+
+data NodeType =
+    WHNF         -- ^ guarenteed to be a WHNF
+    | LazyWHNF   -- ^ WHNF or an indirection to a WHNF
+    | Lazy       -- ^ a suspension, a WHNF, or an indirection to a WHNF
     deriving(Eq,Ord,Show)
 
 
@@ -191,6 +196,9 @@ doFunc (name,arg :-> body) = ans where
             | TodoNothing <- ret = mapM_ (fl TodoNothing) as
         f (App { expFunction = fn, expArgs = [x] }) | fn == funcEval = do
             dres [Right (N WHNF Top)]
+        f (App { expFunction = fn, expArgs = [x], expType = ty }) | fn == funcApply = do
+            convertVal x
+            dunno ty
         f (App { expFunction = fn, expArgs = [x,y], expType = ty }) | fn == funcApply = do
             convertVal x
             convertVal y
@@ -239,6 +247,7 @@ doFunc (name,arg :-> body) = ans where
 --        f _ = dres []
 
 
+    convertVal (Const (NodeC t _)) = return $ Right (N WHNF (Only $ Set.singleton t))
     convertVal (Const _) = return $ Right (N WHNF Top)
     convertVal (NodeC t vs) = case tagUnfunction t of
         Nothing -> return $ Right (N WHNF (Only $ Set.singleton t))
@@ -278,10 +287,5 @@ fixupFunc cmap (name,l :-> body) = fmap (\b -> (name, l :-> b)) (f body) where
                 putStrLn $ "NA-EVAL-WHNF-" ++ show fn
                 return (Fetch arg)
         _ -> return a
---    f a@App { expFunction = fn, expArgs = [afunc,what] } | fn == funcApply, Just n <- lupVar afunc = case n of
---        N WHNF set | [x] <- Set.toList set, Just (1,fn) <- tagUnfunction x -> do
---            putStrLn "NA-APPLY-KNOWN"
---            return (a { expFunction = fn, expArgs =
---        _ -> return a
     f e = mapExpExp f e
 

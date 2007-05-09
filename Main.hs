@@ -724,6 +724,11 @@ compileToGrin prog = do
 
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
 
+    wdump FD.GrinPreeval $ do
+        putErrLn "v-- Preeval Grin"
+        dumpGrin (optOutName options) "preeval" x
+        printGrin x
+        putErrLn "^-- Preeval Grin"
     x <- nodeAnalyze x
     lintCheckGrin x
     x <- createEvalApply x

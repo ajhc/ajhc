@@ -109,8 +109,9 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,~(Tup as
         let varValue v | v < v0 = sValue usedCafs v
                        | otherwise = sValue usedVars v
             f e = g e >> return e
-            g (App a [e] _) | a == funcEval =  addRule (doNode e)
+            g (App a [e] _)   | a == funcEval =  addRule (doNode e)
             g (App a [x,y] _) | a == funcApply =  addRule (doNode x `mappend` doNode y)
+            g (App a [x] _)   | a == funcApply =  addRule (doNode x)
             g (Case e _) =  addRule (doNode e)
             g Prim { expArgs = as } = addRule (mconcatMap doNode as)
             g (App a vs _) = do

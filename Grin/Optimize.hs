@@ -99,7 +99,8 @@ grinPush stats lam = ans where
     -- | preferentially pull definitons of the variable this returns right next to it as it admits a peephole optimization
     prefer (Store v@Var {}) = return v
     prefer (App fn [v@Var {}] _)  | fn == funcEval = return v
-    prefer (App fn [v@Var {},_] _)  | fn == funcApply = return v
+    prefer (App fn [v@Var {},_] _)| fn == funcApply = return v
+    prefer (App fn [v@Var {}] _)  | fn == funcApply = return v
     prefer (Update _ v@Var {}) = return v
     prefer (Update v@Var {} _) = return v
     prefer _ = fail "no preference"

@@ -110,18 +110,21 @@ createApply argType retType te ts'
     ts = sortUnder toPackedString ts'
     a2 = Var v2 argType
     cs = [ f t | t <- ts, tagGood t]
-    tagGood t | Just (n,fn) <- tagUnfunction t, n > 0 = let
-        ptag = argType == ts !! (length ts - n)
-        rtag = retType == TyNode || (n == 1 && rt == retType)
-        (ts,rt) = runIdentity $ findArgsType te fn
-        in rtag && ptag
+    tagGood t | Just TyTy { tyThunk = TyPApp mt w } <- findTyTy te t =
+         (Just argType == mt || (argType == tyUnit && Nothing == mt)) && (fmap snd $ findArgsType te w) == Just retType
     tagGood _ = False
+--    tagGood t | Just (n,fn) <- tagUnfunction t, n > 0 = let
+--        ptag = argType == ts !! (length ts - n)
+--        rtag = retType == TyNode || (n == 1 && rt == retType)
+--        (ts,rt) = runIdentity $ findArgsType te fn
+--        in rtag && ptag
     f t = (NodeC t vs :-> g ) where
         (ts,_) = runIdentity $ findArgsType te t
         vs = [ Var v ty |  v <- [v3 .. ] | ty <- ts]
         Just (n,fn) = tagUnfunction t
-        g | n == 1 =  App fn (vs ++ [a2]) ty
-          | n > 1 = Return $ NodeC (partialTag fn (n - 1)) (vs ++ [a2])
+        a2s = if argType == tyUnit then [] else [a2]
+        g | n == 1 =  App fn (vs ++ a2s) ty
+          | n > 1 = Return $ NodeC (partialTag fn (n - 1)) (vs ++ a2s)
           | otherwise = error "createApply"
          where
             Just (_,ty) = findArgsType te fn
@@ -150,12 +153,12 @@ createEvalApply grin = do
         g (App fn [fun] ty) | fn == funcApply = do
             fn' <- runOnceMap appMap (tyUnit,ty) $ do
                 u <- newUniq
-                return (toAtom $ "@apply_" ++ show u)
+                return (toAtom $ "bapply_" ++ show u)
             return (App fn' [fun] ty)
         g (App fn [fun,arg] ty) | fn == funcApply = do
             fn' <- runOnceMap appMap (getType arg,ty) $ do
                 u <- newUniq
-                return (toAtom $ "@apply_" ++ show u)
+                return (toAtom $ "bapply_" ++ show u)
             return (App fn' [fun,arg] ty)
         g x = return x
     funcs <- mapMsnd f (grinFuncs grin)

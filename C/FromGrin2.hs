@@ -308,6 +308,7 @@ convertBody e = do
         TodoNothing -> return (ss & er)
 
 nodeAssign v t as e' = do
+    declareStruct t
     v' <- convertVal v
     as' <- mapM convertVal as
     let ass = concat [perhapsM (a `Set.member` fve) $ a' =* (project' (arg i) (concrete t v')) | a' <- as' | Var a _ <- as |  i <- [( 1 :: Int) ..] ]
