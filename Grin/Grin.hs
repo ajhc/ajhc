@@ -7,6 +7,7 @@ module Grin.Grin(
     FuncProps(..),
     Grin(..),
     HeapType(..),
+    TyThunk(..),
     HeapValue(HV),
     Item(..),
     Lam(..),
@@ -91,14 +92,20 @@ import qualified Info.Info as Info
 -- than examining them. (types may not be constructed at run-time) ( do we need
 -- this for polymorphic recursion? )
 
+data TyThunk =
+    TyNotThunk                 -- ^ not the thunk
+    | TyPApp (Maybe Ty) Atom   -- ^ can be applied to (possibly) an argument, and what results
+    | TySusp Atom              -- ^ can be evaluated and calls what function
+    deriving(Eq,Show)
 
 data TyTy = TyTy {
     tySlots :: [Ty],
     tyReturn :: Ty,
+    tyThunk :: TyThunk,
     tySiblings :: Maybe [Atom]
 }
 
-tyTy = TyTy { tySlots = [], tyReturn = TyUnknown, tySiblings = Nothing }
+tyTy = TyTy { tySlots = [], tyReturn = TyUnknown, tySiblings = Nothing, tyThunk = TyNotThunk }
 
 newtype TyEnv = TyEnv (Map.Map Atom TyTy)
     deriving(Monoid)

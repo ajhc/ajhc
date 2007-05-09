@@ -103,9 +103,11 @@ data CEnv = CEnv {
     counter :: IORef Int
 }
 
-dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ fromAtom n <+> hsep (map show as) <+> "::" <+> show t <> f z |  (n,TyTy { tySlots = as, tyReturn = t, tySiblings = z }) <- Map.toList tt] where
+dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ fromAtom n <+> hsep (map show as) <+> "::" <+> show t <> f z <> g th|  (n,TyTy { tySlots = as, tyReturn = t, tySiblings = z, tyThunk = th}) <- Map.toList tt] where
     f Nothing = mempty
     f (Just v) = text " " <> tshow v
+    g TyNotThunk = mempty
+    g x = text " " <> tshow x
 
 tagArrow = convertName tc_Arrow
 
@@ -218,7 +220,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
     scMap = Map.fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- progCombinators prog]
     initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ concat [ makePartials (a,b,c) | (_,(a,b,c)) <-  Map.toList scMap] ++ concat [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = return $ (tagArrow,toTyTy ([TyPtr TyNode, TyPtr TyNode],TyNode))
-    con c | keepCon = return $ (n,TyTy { tySlots = keepIts as, tyReturn = TyNode, tySiblings = fmap (map convertName) sibs}) where
+    con c | keepCon = return $ (n,TyTy { tyThunk = TyNotThunk, tySlots = keepIts as, tyReturn = TyNode, tySiblings = fmap (map convertName) sibs}) where
         n | sortKindLike (conType c) = convertName (conName c)
           | otherwise = convertName (conName c)
         as = [ toType (TyPtr TyNode) s |  s <- conSlots c]
@@ -249,8 +251,14 @@ instance Keepable Val where
 
 keepIts xs = filter keepIt xs
 
-makePartials (fn,ts,rt) | 'f':_ <- show fn = ans where
-    ans = (fn,toTyTy (keepIts ts,rt)):[(partialTag fn i,toTyTy (keepIts $ reverse $ drop i $ reverse ts ,TyNode)) |  i <- [0.. length ts] ]
+tySusp fn ts = (partialTag fn 0,(toTyTy (keepIts ts,TyNode)) { tyThunk = TySusp fn })
+
+makePartials (fn,ts,rt) | 'f':_ <- show fn = (fn,toTyTy (keepIts ts,rt)):f undefined 0 (reverse ts) where
+    f _ 0 ts = tySusp fn (reverse ts):f fn 1 ts
+    f nfn n (t:ts) = (mfn,(toTyTy (reverse $ keepIts ts,TyNode)) { tyThunk = TyPApp (if keepIt t then Just t else Nothing) nfn }):f mfn (n + 1) ts  where
+        mfn = partialTag fn n
+    f _ _ [] = []
+--    ans = (fn,toTyTy (keepIts ts,rt)):[(partialTag fn i,toTyTy (keepIts $ reverse $ drop i $ reverse ts ,TyNode)) |  i <- [0.. length ts] ]
 makePartials x = error "makePartials"
 
 primTyEnv = TyEnv . Map.map toTyTy $ Map.fromList $ [
@@ -568,7 +576,8 @@ compile' cenv (tvr,as,e) = ans where
         return s
     addNewFunction cenv tl@(n,Tup args :-> body) = do
         liftIO $ modifyIORef (funcBaps cenv) (tl:)
-        let addt (TyEnv mp) =  TyEnv $ Map.insert (partialTag n 0) (toTyTy (args',TyNode))  (Map.insert n (toTyTy (args',getType body)) mp)
+        let addt (TyEnv mp) =  TyEnv $ Map.insert sfn sft (Map.insert n (toTyTy (args',getType body)) mp)
+            (sfn,sft) = tySusp n args'
             args' = map getType args
         liftIO $ modifyIORef (tyEnv cenv) addt
 
