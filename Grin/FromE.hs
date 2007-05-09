@@ -334,9 +334,9 @@ evalVar fty tvr  = do
         Just v -> do
             mtick "Grin.FromE.strict-evaled"
             return (Return v)
-        Nothing | not isFGrin, Just CaseDefault <- Info.lookup (tvrInfo tvr) -> do
-            mtick "Grin.FromE.strict-casedefault"
-            return (Fetch (toVal tvr))
+--        Nothing | not isFGrin, Just CaseDefault <- Info.lookup (tvrInfo tvr) -> do
+--            mtick "Grin.FromE.strict-casedefault"
+--            return (Fetch (toVal tvr))
         Nothing | getProperty prop_WHNF tvr -> do
             mtick "Grin.FromE.strict-propevaled"
             return (Fetch (toVal tvr))

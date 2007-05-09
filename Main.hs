@@ -16,7 +16,6 @@ import qualified List(group)
 import qualified System
 
 import Atom
-import C.FromGrin
 import qualified C.FromGrin2 as FG2
 import C.Arch
 import CharIO
@@ -54,7 +53,6 @@ import Grin.Grin
 import Grin.Optimize
 import Grin.NodeAnalyze
 import Grin.Show
-import Grin.Unboxing
 import Grin.Whiz
 import Ho.Build
 import Ho.Library
@@ -80,7 +78,6 @@ import qualified E.SSimplify as SS
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified FrontEnd.Tc.Type as Type
-import qualified Grin.PointsToAnalysis
 import qualified Grin.Simplify
 import qualified Info.Info as Info
 import qualified Interactive
@@ -727,57 +724,18 @@ compileToGrin prog = do
 
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
 
-    if fopts FO.EvalOptimize && not isFGrin then do
-        lintCheckGrin x
-        wdump FD.GrinPreeval $ printGrin x
-        progress "Points-to analysis..."
-        stats <- Stats.new
-        x <- Grin.PointsToAnalysis.grinInlineEvalApply stats x
-        wdump FD.Progress $ Stats.print "EvalInline" stats
-        lintCheckGrin x
-        wdump FD.GrinPosteval $ printGrin x
-        stats <- Stats.new
-        x <- opt "AE Optimization 1" x
-        x <- unboxReturnValues x
-        lintCheckGrin x
-        x <- deadCode stats (grinEntryPointNames x) x
-        lintCheckGrin x
-        x <- return $ normalizeGrin x
-        lintCheckGrin x
-        x <- opt "AE Optimization 2" x
-        x <- unboxReturnValues x
-        lintCheckGrin x
-        x <- deadCode stats (grinEntryPointNames x) x
-        lintCheckGrin x
-        x <- opt "AE Optimization 3" x
-        wdump FD.OptimizationStats $ Stats.print "AE Optimization" stats
-        x <- return $ normalizeGrin x
-        lintCheckGrin x
-
-        printTable "Return points-to" (grinReturnTags x)
-        printTable "Argument points-to" (grinArgTags x)
-        x <- devolveGrin x
-        x <- opt "After Devolve Optimization" x
-        x <- return $ normalizeGrin x
-        x <- devolveGrin x
-        x <- opt "After Devolve Optimization 2" x
-        x <- return $ normalizeGrin x
-        x <- devolveGrin x
-        x <- return $ normalizeGrin x
-        dumpFinalGrin x
-        compileGrinToC x
-     else do
-        x <- nodeAnalyze x
-        lintCheckGrin x
-        x <- createEvalApply x
-        lintCheckGrin x
-        x <- return $ normalizeGrin x
-        lintCheckGrin x
-        x <- devolveGrin x
-        x <- opt "After Devolve Optimization" x
-        x <- return $ normalizeGrin x
-        dumpFinalGrin x
-        compileGrinToC x
+    x <- nodeAnalyze x
+    lintCheckGrin x
+    x <- createEvalApply x
+    lintCheckGrin x
+    x <- return $ normalizeGrin x
+    --x <- unboxReturnValues x
+    lintCheckGrin x
+    x <- devolveGrin x
+    x <- opt "After Devolve Optimization" x
+    x <- return $ normalizeGrin x
+    dumpFinalGrin x
+    compileGrinToC x
 
 dumpGrin fname pname grin = do
     h <- openFile (fname ++ "_" ++ pname ++ ".grin") WriteMode
@@ -804,7 +762,7 @@ getArgString = do
 compileGrinToC grin | optMode options == Interpret = fail "Interpretation currently not supported."
 compileGrinToC grin | optMode options /= CompileExe = return ()
 compileGrinToC grin = do
-    let (cg,rls) = if isFGrin then FG2.compileGrin grin else compileGrin grin
+    let (cg,rls) = FG2.compileGrin grin
     let fn = optOutName options
     let cf = (fn ++ "_code.c")
     progress ("Writing " ++ show cf)

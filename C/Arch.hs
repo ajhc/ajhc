@@ -1,5 +1,5 @@
 {-# OPTIONS_GHC -cpp -fbang-patterns #-}
-module C.Arch(determineArch,primitiveInfo,genericPrimitiveInfo,isFGrin) where
+module C.Arch(determineArch,primitiveInfo,genericPrimitiveInfo) where
 
 
 
@@ -66,10 +66,6 @@ primMap :: Map.Map ExtType PrimType
 primMap = Map.fromList [ (primTypeName a,a) | a <- as ] where
     (_,_,as,_) = unsafePerformIO determineArch
 
-isFGrin :: Bool
-isFGrin = case optArch options of
-    Nothing -> True
-    Just o -> "grin" `isPrefixOf` o
 
 determineArch = do
     let specs = maybe [] (split (== '-')) (optArch options)

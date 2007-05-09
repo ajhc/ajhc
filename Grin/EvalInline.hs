@@ -167,8 +167,7 @@ createEvalApply grin = do
             appBody = createApply targ tret (grinTypeEnv grin) tags
         TyEnv tyEnv = grinTypeEnv grin
         appTyEnv = Map.fromList ntyenv
-        teval = if isFGrin then [] else [eval]
-    return $ setGrinFunctions (apps ++ teval ++ funcs) grin { grinTypeEnv = TyEnv (tyEnv `Map.union` appTyEnv) }
+    return $ setGrinFunctions (apps ++ funcs) grin { grinTypeEnv = TyEnv (tyEnv `Map.union` appTyEnv) }
 
 
 
