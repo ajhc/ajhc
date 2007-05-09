@@ -195,7 +195,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
 
     TyEnv endTyEnv <- readIORef tyEnv
     -- FIXME correct types.
-    let newTyEnv = TyEnv $ Map.fromList (concatMap makePartials (Map.toList endTyEnv) ++ [(funcMain, toTyTy ([],tyUnit))] ++ [(en, toTyTy ([],tyUnit)) | en <- enames])
+    let newTyEnv = TyEnv $ Map.fromList (Map.toList endTyEnv ++ [(funcMain, toTyTy ([],tyUnit))] ++ [(en, toTyTy ([],tyUnit)) | en <- enames])
     wdump FD.Tags $ do
         dumpTyEnv newTyEnv
     fbaps <- readIORef funcBaps
@@ -216,9 +216,9 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
     return grin
     where
     scMap = Map.fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- progCombinators prog]
-    initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ [ (a,toTyTy (b,c)) | (_,(a,b,c)) <-  Map.toList scMap] ++ concat [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
+    initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ concat [ makePartials (a,b,c) | (_,(a,b,c)) <-  Map.toList scMap] ++ concat [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = return $ (tagArrow,toTyTy ([TyPtr TyNode, TyPtr TyNode],TyNode))
-    con c | keepCon = return $ (n,TyTy { tySlots = filter keepIt as, tyReturn = TyNode, tySiblings = fmap (map convertName) sibs}) where
+    con c | keepCon = return $ (n,TyTy { tySlots = keepIts as, tyReturn = TyNode, tySiblings = fmap (map convertName) sibs}) where
         n | sortKindLike (conType c) = convertName (conName c)
           | otherwise = convertName (conName c)
         as = [ toType (TyPtr TyNode) s |  s <- conSlots c]
@@ -249,11 +249,9 @@ instance Keepable Val where
 
 keepIts xs = filter keepIt xs
 
-makePartials (fn,TyTy { tySlots = ts, tyReturn = rt }) | tagIsFunction fn, head (show fn) /= '@' = ans where
-    ans = (fn,toTyTy (ts,rt)):[(partialTag fn i,toTyTy (reverse $ drop i $ reverse ts ,TyNode)) |  i <- [0.. end] ]
-    end | 'b':_ <- show fn = 0
-        | otherwise = length ts
-makePartials x = [x]
+makePartials (fn,ts,rt) | 'f':_ <- show fn = ans where
+    ans = (fn,toTyTy (keepIts ts,rt)):[(partialTag fn i,toTyTy (keepIts $ reverse $ drop i $ reverse ts ,TyNode)) |  i <- [0.. length ts] ]
+makePartials x = error "makePartials"
 
 primTyEnv = TyEnv . Map.map toTyTy $ Map.fromList $ [
     (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode)),
@@ -342,7 +340,7 @@ compile' cenv (tvr,as,e) = ans where
         --putStrLn $ "Compiling: " ++ show nn
         x <- cr e
         let (nn,_,_) = runIdentity $ Map.lookup (tvrIdent tvr) (scMap cenv)
-        return (nn,(Tup (filter keepIt $ map toVal as) :-> x))
+        return (nn,(Tup (keepIts $ map toVal as) :-> x))
     funcName = maybe (show $ tvrIdent tvr) show (fromId (tvrIdent tvr))
     cc, ce, cr :: E -> C Exp
     cr x = ce x
@@ -364,15 +362,15 @@ compile' cenv (tvr,as,e) = ans where
             Just x@Var {} -> app fty (gEval x) as
             Nothing | Just (v,n,rt) <- mlookup (tvrIdent tvr) lfunc -> do
                     let (x,y) = splitAt n as
-                    app fty (App v (filter keepIt x) rt) y
+                    app fty (App v (keepIts x) rt) y
             Nothing -> case Map.lookup (tvrIdent tvr) (scMap cenv) of
                 Just (v,as',es)
                     | length as >= length as' -> do
                         let (x,y) = splitAt (length as') as
-                        app fty (App v (filter keepIt x) es) y
+                        app fty (App v (keepIts x) es) y
                     | otherwise -> do
                         let pt = partialTag v (length as' - length as)
-                        return $ Return (NodeC pt (filter keepIt as))
+                        return $ Return (NodeC pt (keepIts as))
                 Nothing | not (isLifted $ EVar tvr) -> do
                     mtick "Grin.FromE.app-unlifted"
                     app fty (Fetch $ toVal tvr) as
@@ -446,10 +444,10 @@ compile' cenv (tvr,as,e) = ans where
         Func True fn as r -> do
             let p = prim { primType = (keepIts (map (Ty . toAtom) as),Ty (toAtom r)) }
                 pt = Ty (toAtom r)
-            return $ Prim p (filter keepIt $ args $ tail xs)
+            return $ Prim p (keepIts $ args $ tail xs)
         Func False _ as r | Just _ <- fromRawType ty ->  do
             let p = prim { primType = (keepIts (map (Ty . toAtom) as),Ty (toAtom r)) }
-            return $ Prim p (filter keepIt $ args xs)
+            return $ Prim p (keepIts $ args xs)
         Peek pt' | [addr] <- xs -> do
             let p = prim { primType = ([Ty $ toAtom (show rt_HsPtr)],pt) }
                 pt = toType (Ty $ toAtom pt') ty
@@ -478,7 +476,7 @@ compile' cenv (tvr,as,e) = ans where
     ce ECase { eCaseScrutinee = e, eCaseAlts = [Alt LitCons { litName = n, litArgs = xs } wh] } | Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n  = do
         e <- ce e
         wh <- ce wh
-        return $ e :>>= tuple (filter keepIt $ map toVal xs) :-> wh
+        return $ e :>>= tuple (keepIts $ map toVal xs) :-> wh
     ce ECase { eCaseScrutinee = e, eCaseAlts = [], eCaseDefault = (Just r)} | not (shouldKeep (getType e)) = do
         e <- ce e
         r <- ce r
@@ -520,7 +518,7 @@ compile' cenv (tvr,as,e) = ans where
     cp (Alt lc@LitCons { litName = n, litArgs = es } e) = do
         x <- ce e
         nn <- getName lc
-        return (NodeC nn (filter keepIt $ map toVal es) :-> x)
+        return (NodeC nn (keepIts $ map toVal es) :-> x)
     cp x = error $ "cp: " ++ show (funcName,x)
     cp'' (Alt (LitInt i (ELit LitCons { litName = nn, litArgs = [] })) e) = do
         x <- ce e
@@ -564,13 +562,14 @@ compile' cenv (tvr,as,e) = ans where
         let t  = toAtom $ "Bap_" ++ show (length as) ++ "_" ++ funcName ++ "_" ++ show vn
             tl = toAtom $ "bap_" ++ show (length as) ++ "_" ++  funcName ++ "_" ++ show vn
             targs = [Var v ty | v <- [v1..] | ty <- (TyPtr TyNode:map getType as)]
-            s = Store (NodeC t (filter keepIt $ e:as))
+            s = Store (NodeC t (keepIts $ e:as))
         d <- app TyNode (gEval p1) (tail targs)
-        liftIO $ addNewFunction cenv (tl,Tup (filter keepIt targs) :-> d)
+        liftIO $ addNewFunction cenv (tl,Tup (keepIts targs) :-> d)
         return s
     addNewFunction cenv tl@(n,Tup args :-> body) = do
         liftIO $ modifyIORef (funcBaps cenv) (tl:)
-        let addt (TyEnv mp) =  TyEnv $ Map.insert n (toTyTy (map getType args,getType body)) mp
+        let addt (TyEnv mp) =  TyEnv $ Map.insert (partialTag n 0) (toTyTy (args',TyNode))  (Map.insert n (toTyTy (args',getType body)) mp)
+            args' = map getType args
         liftIO $ modifyIORef (tyEnv cenv) addt
 
     -- | cc evaluates something in lazy context, returning a pointer to a node which when evaluated will produce the strict result.
@@ -596,7 +595,7 @@ compile' cenv (tvr,as,e) = ans where
             Just (v,as',es)
                 | length as > length as' -> do
                     let (x,y) = splitAt (length as') as
-                    let s = Store (NodeC (partialTag v 0) (filter keepIt x))
+                    let s = Store (NodeC (partialTag v 0) (keepIts x))
                     nv <- newNodePtrVar
                     z <- app' nv y
                     return $ s :>>= nv :-> z
@@ -606,12 +605,12 @@ compile' cenv (tvr,as,e) = ans where
 --                    return $ Return (Const (NodeC pt as))
                 | length as < length as' -> do
                     let pt = partialTag v (length as' - length as)
-                    as <- return $ filter keepIt as
+                    as <- return $ keepIts as
                     return $ if all valIsConstant as
                       then Return (Const (NodeC pt as))
                       else Store (NodeC pt as)
                 | otherwise -> do -- length as == length as'
-                    return $ Store (NodeC (tagFlipFunction v) (filter keepIt as))
+                    return $ Store (NodeC (tagFlipFunction v) (keepIts as))
             Nothing -> app' (toVal v) as
     cc (EVar v) = do
         return $ Return (toVal v)
@@ -636,7 +635,7 @@ compile' cenv (tvr,as,e) = ans where
                     let (a,as) = fromLam e
                         (nn,_,_) = toEntry (t,[],getType t)
                     x <- ce a
-                    return $ [createFuncDef True nn (Tup (filter keepIt $ map toVal as) :-> x)]
+                    return $ [createFuncDef True nn (Tup (keepIts $ map toVal as) :-> x)]
                 g' (t,e@ELam {}) = do
                     let (a,as) = fromLam e
                         (nn,_,_) = toEntry (t,[],getType t)
@@ -685,7 +684,7 @@ compile' cenv (tvr,as,e) = ans where
                          , t <- partialTag v (length as), tagIsWHNF t = return $ Const $ NodeC t []
     --                        False -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
     constant e | Just l <- literal e = return l
-    constant (ELit lc@LitCons { litName = n, litArgs = es }) | Just es <- mapM constant es, Just nn <- getName lc = (return $ Const (NodeC nn (filter keepIt es)))
+    constant (ELit lc@LitCons { litName = n, litArgs = es }) | Just es <- mapM constant es, Just nn <- getName lc = (return $ Const (NodeC nn (keepIts es)))
     constant (EPi (TVr { tvrIdent = 0, tvrType = a}) b) | Just a <- constant a, Just b <- constant b = return $ Const $ NodeC tagArrow [a,b]
     constant _ = fail "not a constant term"
 

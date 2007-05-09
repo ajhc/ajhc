@@ -792,11 +792,7 @@ dumpFinalGrin grin = do
     wdump FD.GrinGraph $ do
         let dot = graphGrin grin
         writeFile (fn ++ "_grin.dot") dot
-    h <- openFile (fn ++ "_final.grin") WriteMode
-    (argstring,sversion) <- getArgString
-    hPutStrLn h $ unlines [ "-- " ++ argstring,"-- " ++ sversion,""]
-    hPrintGrin h grin
-    hClose h
+    dumpGrin (optOutName options) "final" grin
     wdump FD.Grin $ printGrin grin
 
 getArgString = do
