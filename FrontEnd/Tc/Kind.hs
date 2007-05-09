@@ -18,7 +18,7 @@ import Data.IORef
 
 import Data.Binary
 import Doc.DocLike
-import Doc.PPrint(pprint,PPrint)
+import Doc.PPrint(pprint,pprintPrec,PPrint)
 import Name.Name
 
 {-
@@ -120,14 +120,15 @@ instance Binary Kindvar where
 
 instance Eq Kindvar where
     a == b = kvarUniq a == kvarUniq b
+
 instance Ord Kindvar where
     a `compare` b = kvarUniq a `compare` kvarUniq b
 
 instance Show Kind where
-    showsPrec _ k = pprint k
+    showsPrec n k = pprintPrec n k
 
 instance Show Kindvar where
-    showsPrec _ k = pprint k
+    showsPrec n k = pprintPrec n k
 
 
 instance Show KBase where
@@ -142,13 +143,12 @@ instance DocLike d => PPrint d KBase where
     pprint kb = text (show kb)
 
 instance DocLike d => PPrint d Kind where
-   pprint (KBase b) = pprint b
-   pprint (KVar kindVar)   = pprint kindVar
-   pprint (Kfun (KBase b) k2)   = pprint b <+> text "->" <+> pprint k2
-   pprint (Kfun (KVar b)  k2)   = pprint b <+> text "->" <+> pprint k2
-   pprint (Kfun k1   b) = text "(" <> pprint k1 <> text ")" <+> text "->" <+> pprint b
---   pprint (Kfun k1   (KVar b)) = text "(" <> pprint k1 <> text ")" <+> text "->" <+> pprint b
---   pprint (Kfun k1   k2)   = text "(" <> pprint k1 <> text ") -> (" <> pprint k2 <> text ")"
+   pprintPrec _ (KBase b) = pprint b
+   pprintPrec _ (KVar kindVar)   = pprint kindVar
+   pprintPrec p k | p > 9 = parens $ pprint k
+   pprintPrec _ (Kfun k1 k2) = pprintPrec 10 k1 <+> text "->" <+> pprint k2
+
+
 
 instance DocLike d =>  PPrint d Kindvar where
    pprint Kindvar { kvarUniq = s } = text $ 'k':show s

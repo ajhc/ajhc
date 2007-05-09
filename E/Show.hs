@@ -47,7 +47,8 @@ instance PPrint String E where
     pprint x = prettyE x
 
 instance PPrint String (Lit E E) where
-    pprint x = prettyE (ELit x)
+    pprintPrec n x | n <= 9    = prettyE (ELit x)
+                   | otherwise = parens (prettyE (ELit x))
 
 newtype SEM a = SEM { unSEM :: VarNameT E Id String Identity a }
     deriving(Monad,Functor)
