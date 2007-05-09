@@ -58,11 +58,11 @@ import {-# SOURCE #-} DataConstructors
 -- so (*#,*#,*) means (*,*,*) (#,*,*) (*,#,*) (#,#,*)
 --
 -- R =
---    (*#!,*#!,*)
---    (*#!,(#),*)
---    ((#),*#!,!)
---    ((#),(#),!)
---    (**,*,*)  -- may have a function from an unboxed type to a value
+--    (*#!,*#!,*)  -- functions from values to values are boxed and lazy
+--    (*#!,(#),*)  -- functions from values to unboxed tuples are boxed and lazy
+--    ((#),*#!,!)  -- functions from unboxed tuples to values are boxed and strict
+--    ((#),(#),!)  -- functions from unboxed tuples to unboxed tuples are boxed and strict
+--    (**,*,*)     -- may have a function from an unboxed type to a value
 --    (**,#,*)
 --    (**,!,*)
 --    (**,**,**)  -- we have functions from types to types
