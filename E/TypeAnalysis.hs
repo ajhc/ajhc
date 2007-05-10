@@ -15,34 +15,38 @@ import DataConstructors
 import Doc.PPrint
 import E.Annotate
 import E.E hiding(isBottom)
+import E.Eta
+import E.Program
+import E.Rules
 import E.Subst
 import E.Traverse(emapE',emapE_,emapE)
-import E.Program
-import E.Eta
-import Support.FreeVars
-import E.Rules
 import E.TypeCheck
 import E.Values
 import Fixer.Fixer
 import Fixer.Supply
 import Fixer.VMap
 import GenUtil
-import Util.Gen
 import Info.Info(infoMapM,infoMap)
 import Info.Types
+import Name.Id
 import Name.Name
 import Name.Names
-import qualified Info.Info as Info
 import Stats
 import Support.CanType
-import Name.Id
+import Support.FreeVars
+import Util.Gen
 import Util.SetLike
+import qualified Info.Info as Info
 
 
 type Typ = VMap () Name
-type Env = (Supply (Module,Int) Bool,Supply TVr Bool,Map.Map Id [Value Typ])
+data Env = Env {
+    envRuleSupply :: Supply (Module,Int) Bool,
+    envValSupply :: Supply TVr Bool,
+    envEnv :: IdMap [Value Typ]
+    }
 
-extractValMap :: [(TVr,E)] -> Map.Map Id [Value Typ]
+extractValMap :: [(TVr,E)] -> IdMap [Value Typ]
 extractValMap ds = fromList [ (tvrIdent t,f e []) | (t,e) <- ds] where
     f (ELam tvr e) rs | sortKindLike (getType tvr) = f e (runIdentity (Info.lookup $ tvrInfo tvr):rs)
     f _ rs = reverse rs
@@ -64,14 +68,15 @@ typeAnalyze doSpecialize prog = do
         lamdel _ nfo = return (Info.delete (undefined :: Value Typ) nfo)
     prog <- annotateProgram mempty lambind (\_ -> return . deleteArity) (\_ -> return) prog
     let ds = programDs prog
-        env = (ur,uv,extractValMap ds)
+        env = Env { envRuleSupply = ur, envValSupply = uv, envEnv = extractValMap ds }
         entries = progEntryPoints prog
     calcDs env ds
     flip mapM_ entries $ \tvr ->  do
         vv <- supplyValue uv tvr
         addRule $ assert vv
     mapM_ (sillyEntry env) entries
-    findFixpoint Nothing fixer
+    --findFixpoint Nothing fixer
+    calcFixpoint "TypeAnalysis" fixer
     prog <- annotateProgram mempty (\_ -> return) (\_ -> return) lamread prog
     unusedRules <- supplyReadValues ur >>= return . fsts . filter (not . snd)
     unusedValues <- supplyReadValues uv >>= return . fsts . filter (not . snd)
@@ -83,7 +88,7 @@ sillyEntry :: Env -> TVr -> IO ()
 sillyEntry env t = mapM_ (addRule . (`isSuperSetOf` value (vmapPlaceholder ()))) args where
     args = lookupArgs t env
 
-lookupArgs t (_,_,tm) = maybe [] id (mlookup (tvrIdent t) tm)
+lookupArgs t Env { envEnv = tm }  = maybe [] id (mlookup (tvrIdent t) tm)
 
 toLit (EPi TVr { tvrType = a } b) = return (tc_Arrow,[a,b])
 toLit (ELit LitCons { litName = n, litArgs = ts }) = return (n,ts)
@@ -93,7 +98,7 @@ assert :: Value Bool -> Fixer.Fixer.Rule
 assert v = v `isSuperSetOf` value True
 
 calcDef :: Env -> (TVr,E) -> IO ()
-calcDef env@(ur,uv,_) (t,e) = do
+calcDef env@Env { envRuleSupply = ur, envValSupply = uv } (t,e) = do
     let (_,ls) = fromLam e
         tls = takeWhile (sortKindLike . getType) ls
         rs = rulesFromARules (Info.fetch (tvrInfo t))
@@ -103,20 +108,21 @@ calcDef env@(ur,uv,_) (t,e) = do
             let hrg r (t,EVar a) | a `elem` ruleBinds r = do
                     let (t'::Value Typ) = Info.fetch (tvrInfo t)
                     let (a'::Value Typ) = Info.fetch (tvrInfo a)
-                    addRule $ a' `isSuperSetOf` t'
+                    addRule $ conditionalRule id ruleUsed $ ioToRule $ do
+                        addRule $ a' `isSuperSetOf` t'
                     return True
                 hrg r (t,e) | Just (n,as) <- toLit e = do
-                    let (vv::Value Typ) = Info.fetch (tvrInfo t)
+                    let (t'::Value Typ) = Info.fetch (tvrInfo t)
                     as' <- mapM getValue as
                     addRule $ conditionalRule id ruleUsed $ ioToRule $ do
-                        flip mapM_ (zip [0..] as') $ \ (i,t') -> do
-                            addRule $ modifiedSuperSetOf vv t' (vmapArg n i)
+                        flip mapM_ (zip naturals as') $ \ (i,a'') -> do
+                            addRule $ modifiedSuperSetOf a'' t' (vmapArg n i)
                             --addRule $ modifiedSuperSetOf t' vv (vmapArg n i)
 --                    addRule $ conditionalRule id ruleUsed $ ioToRule $ do
 --                        flip mapM_ (zip as' naturals)  $ \ (v,i) -> do
 --                            addRule $ modifiedSuperSetOf vv v (vmapArgSingleton n i)
                     --addRule $ dynamicRule v $ \v' -> (mconcat [ t `isSuperSetOf` value (vmapArg n i v') | (t,i) <-  zip ts' naturals ])
-                    addRule $ conditionalRule (n `vmapMember`) vv (assert ruleUsed)
+                    addRule $ conditionalRule (n `vmapMember`) t' (assert ruleUsed)
                     return False
             rr <- mapM (hrg r) (zip tls (ruleArgs r))
             when (and rr) $ addRule (assert ruleUsed)
@@ -126,7 +132,7 @@ calcDef env@(ur,uv,_) (t,e) = do
         calcE env e
 
 calcDs ::  Env -> [(TVr,E)] -> IO ()
-calcDs env@(ur,uv,_) ds = do
+calcDs env@Env { envRuleSupply = ur, envValSupply = uv } ds = do
     mapM_ d ds
     flip mapM_ ds $ \ (v,e) -> do calcDef env (v,e)
       --  addRule $ conditionalRule id nv (ioToRule $ calcDef env (v,e))
@@ -161,8 +167,8 @@ calcAlt env v (Alt LitCons { litName = n, litArgs = xs } e) = do
 
 
 calcE :: Env -> E -> IO ()
-calcE (ur,uv,env) (ELetRec ds e) = calcDs nenv ds >> calcE nenv e where
-    nenv = (ur,uv,extractValMap ds `union` env)
+calcE env (ELetRec ds e) = calcDs nenv ds >> calcE nenv e where
+    nenv = env { envEnv = extractValMap ds `union` envEnv env }
 calcE env e | (e',(_:_)) <- fromLam e = calcE env e'
 --calcE env ec@ECase {} | sortKindLike (getType $ eCaseScrutinee ec) = do
 --    calcE env (eCaseScrutinee ec)
@@ -190,7 +196,7 @@ calcE env e@EAp {} = tagE env e
 calcE env e@EPi {} = tagE env e
 calcE _ e = fail $ "odd calcE: " ++ show e
 
-tagE (ur,uv,_) (EVar v) | not $ getProperty prop_RULEBINDER v = do
+tagE Env { envValSupply = uv }  (EVar v) | not $ getProperty prop_RULEBINDER v = do
     v <- supplyValue uv v
     addRule $ assert v
 tagE env e  = emapE_ (tagE env) e
@@ -327,7 +333,7 @@ expandPlaceholder (tvr,oe) | getProperty prop_PLACEHOLDER tvr = do
     let rules = filter isBodyRule $  rulesFromARules $ Info.fetch (tvrInfo tvr)
         isBodyRule Rule { ruleBody = e } | (EVar vv,_) <- fromAp e, getProperty prop_INSTANCE vv = True
         isBodyRule _ = False
-    if null rules then return (unsetProperty prop_PLACEHOLDER tvr, EError "placeholder, no bodies" (getType tvr)) else do
+    if null rules then return (unsetProperty prop_PLACEHOLDER tvr, EError ("Placeholder, no bodies: " ++ tvrShowName tvr) (getType tvr)) else do
     let (oe',as) = fromLam oe
         rule1:_ = rules
         ct = getType $ foldr ELam oe' (drop (length $ ruleArgs rule1) as)
