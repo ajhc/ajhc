@@ -83,8 +83,11 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
     include fn = text "#include <" <> text fn <> text ">"
     (header,body) = generateC False (Map.elems fm) (Map.assocs sm)
     ((),finalHcHash,Written { wRequires = req, wFunctions = fm, wEnums = wenum, wStructures = sm, wTags = ts }) = runC grin go
-    enum_tag_t = text "enum {" $$ nest 4 (P.vcat (punctuate P.comma $ map (uncurry f) (Map.toList wenum) ++ (zipWith f (Set.toList (Set.map nodeTagName ts)) [0 ..]))) $$ text "};" where
-        f t n = tshow t <> text " = " <> tshow (n :: Int)
+    enum_tag_t | null enums = mempty
+               | otherwise  = text "enum {" $$ nest 4 (P.vcat (punctuate P.comma $ enums)) $$ text "};"
+        where
+            f t n = tshow t <> text " = " <> tshow (n :: Int)
+            enums =  map (uncurry f) (Map.toList wenum) ++ (zipWith f (Set.toList (Set.map nodeTagName ts)) [0 ..])
     go = do
         funcs <- flip mapM (grinFuncs grin) $ \(a,l) -> do
                     convertFunc (Map.lookup a (grinEntryPoints grin)) (a,l)
