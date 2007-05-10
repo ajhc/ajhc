@@ -340,6 +340,15 @@ convertExp (Prim p vs) | APrim _ req <- primAPrim p  =  do
     tell mempty { wRequires = req }
     e <- convertPrim p vs
     return (mempty,e)
+convertExp (Fetch (Index base off)) | getType base == TyPtr (TyPtr TyNode) = do
+    base <- convertVal base
+    off <- convertVal off
+    return (mempty,indexArray base off)
+convertExp (Update (Index base off) z) | getType z == TyPtr TyNode = do
+    base <- convertVal base
+    off <- convertVal off
+    z' <- convertVal z
+    return $ (indexArray base off `assign` z',emptyExpression)
 convertExp (Store v) | TyPtr TyNode == getType v = do
     v <- convertVal v
     tmp <- newVar (ptrType sptr_t)
@@ -390,6 +399,19 @@ convertExp (Update v@(Var vv _) tn@(NodeC t as)) | getType v == TyPtr TyNode = d
         s <- tagAssign tmp' t
         let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
         return (mconcat $ profile_update_inc:s:ass,emptyExpression)
+
+convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_heap, TyPtr TyNode == getType v  = do
+    v' <- convertVal v
+    c' <- convertVal c
+    tmp <- newVar (ptrType sptr_t)
+    let malloc = tmp `assign` jhc_malloc (operator "*" (sizeof sptr_t) c')
+    fill <- case v of
+        ValUnknown _ -> return mempty
+        _ -> do
+            i <- newVar (basicType "int")
+            return $ forLoop i (expressionRaw "0") c' $ indexArray tmp i `assign` v'
+    return (malloc `mappend` fill, tmp)
+
 convertExp e = return (err (show e),err "nothing")
 
 ccaf :: (Var,Val) -> P.Doc
@@ -723,10 +745,6 @@ x & y = toStatement x `mappend` toStatement y
 
 
 {-
-convertExp (Fetch (Index base off)) | getType base == TyPtr (TyPtr TyNode) = do
-    base <- convertVal base
-    off <- convertVal off
-    ure.eturn (mempty,indexArray base off)
 convertExp (Store n@NodeV {}) = newNode n
 convertExp (Return n@NodeV {}) = newNode n
 convertExp (Store n@NodeC {}) = newNode n
@@ -752,11 +770,6 @@ convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_hea
     return (malloc `mappend` fill, tmp)
 convertExp e@(Update v z) | getType v /= TyPtr (getType z) = do
     return (err (show e),err "nothing")
-convertExp (Update (Index base off) z) | getType z == TyPtr TyNode = do
-    base <- convertVal base
-    off <- convertVal off
-    z' <- convertVal z
-    return $ (indexArray base off `assign` z',emptyExpression)
 convertExp (Update v z) | getType z == TyNode = do  -- TODO eliminate unknown updates
     v' <- convertVal v
     z' <- convertVal z
