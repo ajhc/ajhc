@@ -87,17 +87,16 @@ newtype C a = C (ReaderT LEnv IO a)
 runC :: LEnv -> C a -> IO a
 runC lenv (C x) = runReaderT x lenv
 
-newtype LEnv = LEnv {
-    evaledMap :: Map Id Val
+data LEnv = LEnv {
+    evaledMap :: IdMap Val,
+    lfuncMap  :: IdMap (Atom,Int,Ty)
 }
 
 data CEnv = CEnv {
-    scMap :: Map Id (Atom,[Ty],Ty),
-    ccafMap :: Map Id Val,
+    scMap :: IdMap (Atom,[Ty],Ty),
+    ccafMap :: IdMap Val,
     tyEnv :: IORef TyEnv,
     funcBaps :: IORef [(Atom,Lam)],
-    constMap :: Map Int Val,
-    localFuncMap :: IORef (IdMap (Atom,Int,Ty)),
     errorOnce :: OnceMap (Ty,String) Atom,
     dataTable :: DataTable,
     counter :: IORef Int
@@ -155,19 +154,16 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
         putErrLn "CAFS"
         putDocMLn putStr $ vcat [ pprint v <+> pprint n <+> pprint e | (v,n,e) <- rcafs ]
     errorOnce <- newOnceMap
-    lm <- newIORef mempty
     let doCompile = compile' cenv
-        lenv = LEnv { evaledMap = mempty }
+        lenv = LEnv { evaledMap = mempty, lfuncMap = mempty }
         cenv = CEnv {
             funcBaps = funcBaps,
             tyEnv = tyEnv,
             scMap = scMap,
             counter = counter,
-            constMap = mempty,
-            localFuncMap = lm,
             dataTable = dataTable,
             errorOnce = errorOnce,
-            ccafMap = Map.fromList $ [(tvrIdent v,e) |(v,_,e) <- cc ]  ++ [ (tvrIdent v,Var vv (TyPtr TyNode)) | (v,vv,_) <- rcafs]
+            ccafMap = fromList $ [(tvrIdent v,e) |(v,_,e) <- cc ]  ++ [ (tvrIdent v,Var vv (TyPtr TyNode)) | (v,vv,_) <- rcafs]
             }
     ds <- runC lenv $ mapM doCompile [ c | c@(v,_,_) <- progCombinators prog, v `notElem` [x | (x,_,_) <- cc]]
     wdump FD.Progress $ do
@@ -213,8 +209,8 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
         theFuncs = (funcMain ,Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  discardResult (App (scTag mainEntry) [] tyUnit)) : efv ++ ds'
     return grin
     where
-    scMap = Map.fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- progCombinators prog]
-    initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ concat [ makePartials (a,b,c) | (_,(a,b,c)) <-  Map.toList scMap] ++ concat [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
+    scMap = fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- progCombinators prog]
+    initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ concat [ makePartials (a,b,c) | (_,(a,b,c)) <-  massocs scMap] ++ concat [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = return $ (tagArrow,toTyTy ([TyPtr TyNode, TyPtr TyNode],TyNode))
     con c | keepCon = return $ (n,TyTy { tyThunk = TyNotThunk, tySlots = keepIts as, tyReturn = TyNode, tySiblings = fmap (map convertName) sibs}) where
         n | sortKindLike (conType c) = convertName (conName c)
@@ -281,7 +277,7 @@ constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans wh
     lbs = Set.fromList $ fsts lbs'
     canidate (ELit _) = True
     canidate (EPi _ _) = True
-    canidate e | (EVar x,as) <- fromAp e, Just vs <- Map.lookup x res, vs > length (ff as) = True
+    canidate e | (EVar x,as) <- fromAp e, Just vs <- mlookup x res, vs > length (ff as) = True
     canidate _ = False
     ans = ([ (v,cafNum v,conv e) | (v,e) <- cafs ],[ cafNum v | (v,_) <- cafs, v `Set.member` lbs ], [(v,cafNum v, NodeC (partialTag n 0) []) | (v,e) <- ecafs, not (canidate e), let n = scTag v ])
     res = Map.fromList [ (v,length $ ff vs) | (v,vs,_) <- ds]
@@ -291,8 +287,8 @@ constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans wh
     conv (ELit lc@LitCons { litName = n, litArgs = es }) | Just nn <- getName lc = (Const (NodeC nn (keepIts $ map conv es)))
     conv (EPi (TVr { tvrIdent = 0, tvrType =  a}) b)  =  Const $ NodeC tagArrow [conv a,conv b]
     conv (EVar v) | v `Set.member` lbs = Var (cafNum v) (TyPtr TyNode)
-    conv e | (EVar x,as) <- fromAp e, Just vs <- Map.lookup x res, vs > length (ff as) = Const (NodeC (partialTag (scTag x) (vs - length (ff as))) (keepIts $ map conv (ff as)))
-    conv (EVar v) | Just ce <- Map.lookup v coMap = ce
+    conv e | (EVar x,as) <- fromAp e, Just vs <- mlookup x res, vs > length (ff as) = Const (NodeC (partialTag (scTag x) (vs - length (ff as))) (keepIts $ map conv (ff as)))
+    conv (EVar v) | Just ce <- mlookup v coMap = ce
     conv (EVar v) = Var (cafNum v) (TyPtr TyNode)
     conv x = error $ "conv: " ++ show x
     getName = getName' dataTable
@@ -326,7 +322,7 @@ doApply x y ty = App funcApply [x,y] ty
 
 evalVar fty tvr  = do
     em <- asks evaledMap
-    case Map.lookup (tvrIdent tvr) em of
+    case mlookup (tvrIdent tvr) em of
         Just v -> do
             mtick "Grin.FromE.strict-evaled"
             return (Return v)
@@ -343,7 +339,7 @@ compile' cenv (tvr,as,e) = ans where
     ans = do
         --putStrLn $ "Compiling: " ++ show nn
         x <- cr e
-        let (nn,_,_) = runIdentity $ Map.lookup (tvrIdent tvr) (scMap cenv)
+        let (nn,_,_) = runIdentity $ mlookup (tvrIdent tvr) (scMap cenv)
         return (nn,(Tup (keepIts $ map toVal as) :-> x))
     funcName = maybe (show $ tvrIdent tvr) show (fromId (tvrIdent tvr))
     cc, ce, cr :: E -> C Exp
@@ -359,15 +355,15 @@ compile' cenv (tvr,as,e) = ans where
         return (Fetch (toVal tvr))
     ce e | (EVar tvr,as) <- fromAp e = do
         as <- return $ args as
-        lfunc <- liftIO $ readIORef (localFuncMap cenv)
+        lfunc <- asks lfuncMap
         let fty = toType TyNode (getType e)
-        case Map.lookup (tvrIdent tvr) (ccafMap cenv) of
+        case mlookup (tvrIdent tvr) (ccafMap cenv) of
             Just (Const c) -> app fty (Return c) as
             Just x@Var {} -> app fty (gEval x) as
             Nothing | Just (v,n,rt) <- mlookup (tvrIdent tvr) lfunc -> do
                     let (x,y) = splitAt n as
                     app fty (App v (keepIts x) rt) y
-            Nothing -> case Map.lookup (tvrIdent tvr) (scMap cenv) of
+            Nothing -> case mlookup (tvrIdent tvr) (scMap cenv) of
                 Just (v,as',es)
                     | length as >= length as' -> do
                         let (x,y) = splitAt (length as') as
@@ -512,7 +508,9 @@ compile' cenv (tvr,as,e) = ans where
     ce e = error $ "ce: " ++ render (pprint (funcName,e))
 
     localEvaled vs v action = local (\lenv -> lenv { evaledMap = nm `mappend` evaledMap lenv }) action where
-        nm = Map.fromList [ (tvrIdent x, v) | x <- vs, tvrIdent x /= 0 ]
+        nm = fromList [ (tvrIdent x, v) | x <- vs, tvrIdent x /= 0 ]
+
+    localFuncs vs action = local (\lenv -> lenv { lfuncMap = fromList vs `mappend` lfuncMap lenv }) action
 
     createDef Nothing _ = return []
     createDef (Just e) nnv = do
@@ -595,7 +593,7 @@ compile' cenv (tvr,as,e) = ans where
     cc (ELetRec ds e) = doLet ds (cc e)
     cc e | (EVar v,as@(_:_)) <- fromAp e = do
         as <- return $ args as
-        case Map.lookup (tvrIdent v) (scMap cenv) of
+        case mlookup (tvrIdent v) (scMap cenv) of
             Just (_,[],_) | Just x <- constant (EVar v) -> app' x as
             Just (v,as',es)
                 | length as > length as' -> do
@@ -641,14 +639,14 @@ compile' cenv (tvr,as,e) = ans where
                         (nn,_,_) = toEntry (t,[],getType t)
                     x <- ce a
                     return $ [createFuncDef True nn (Tup (keepIts $ map toVal as) :-> x)]
-                g' (t,e@ELam {}) = do
+                g' (t,e@ELam {}) =
                     let (a,as) = fromLam e
                         (nn,_,_) = toEntry (t,[],getType t)
-                    liftIO $ modifyIORef (localFuncMap cenv) (minsert (tvrIdent t) (nn,length as,toType TyNode (getType a)))
-            mapM_ g' bs
-            v <- f ds x
-            defs <- mapM g bs
-            return $ grinLet (concat defs) v
+                    in (tvrIdent t,(nn,length as,toType TyNode (getType a)))
+            localFuncs (map g' bs) $ do
+                v <- f ds x
+                defs <- mapM g bs
+                return $ grinLet (concat defs) v
 
 
         f (Right bs:ds) x = do
@@ -684,8 +682,8 @@ compile' cenv (tvr,as,e) = ans where
     -- CAFs may be updated with evaluated values.
 
     constant :: Monad m =>  E -> m Val
-    constant (EVar tvr) | Just c <- Map.lookup (tvrIdent tvr) (ccafMap cenv) = return c
-                        | Just (v,as,_) <- Map.lookup (tvrIdent tvr) (scMap cenv)
+    constant (EVar tvr) | Just c <- mlookup (tvrIdent tvr) (ccafMap cenv) = return c
+                        | Just (v,as,_) <- mlookup (tvrIdent tvr) (scMap cenv)
                          , t <- partialTag v (length as), tagIsWHNF t = return $ Const $ NodeC t []
     --                        False -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
     constant e | Just l <- literal e = return l
@@ -713,7 +711,7 @@ compile' cenv (tvr,as,e) = ans where
     con _ = fail "not constructor"
 
 
-    scInfo tvr | Just n <- Map.lookup (tvrIdent tvr) (scMap cenv) = return n
+    scInfo tvr | Just n <- mlookup (tvrIdent tvr) (scMap cenv) = return n
     scInfo tvr = fail $ "not a supercombinator:" <+> show tvr
     newNodeVar =  fmap (\x -> Var x TyNode) newVar
     newPrimVar ty =  fmap (\x -> Var x ty) newVar
