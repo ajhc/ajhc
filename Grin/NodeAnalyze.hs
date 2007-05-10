@@ -222,19 +222,20 @@ doFunc (name,arg :-> body) = ans where
         f (Store w) = do
             ww <- convertVal w
             dunno (TyPtr (getType w))
-        f (Fetch w) | TyPtr TyNode == getType w = do
+        f (Fetch w) | tyINode == getType w = do
             ww <- convertVal w
-            dres [ww]
-        f (Fetch w) | TyPtr (TyPtr TyNode) == getType w = do
+            --dres [ww]
+            dres [Right (N WHNF Top)]
+        f (Fetch w) | TyPtr tyINode == getType w = do
             dres [Right top]
         f Error {} = dres []
         f Prim { expArgs = as } = mapM_ convertVal as
         f Alloc { expValue = v } | getType v == TyNode = do
             v' <- convertVal v
             dres [v']
-        f Alloc { expValue = v } | getType v == TyPtr TyNode = do
+        f Alloc { expValue = v } | getType v == tyINode = do
             convertVal v
-            dunno (TyPtr $ TyPtr TyNode)
+            dunno (TyPtr tyINode)
 --            dres [v']
         f NewRegion { expLam = _ :-> body } = fn ret body
         f (Update (Var vname ty) v) | ty == TyPtr TyNode  = do
