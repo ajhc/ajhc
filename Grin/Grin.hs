@@ -28,14 +28,13 @@ module Grin.Grin(
     combineItems,
     grinFuncs,
     emptyGrin,
+    tyINode,
+    tyDNode,
     findArgs,
     findArgsType,
     findTyTy,
     funcApply,
     funcEval,
-    funcFetch,
-    funcInitCafs,
-    funcMain,
     gEval,
     grinEntryPointNames,
     isHole,
@@ -114,12 +113,14 @@ newtype TyEnv = TyEnv (Map.Map Atom TyTy)
 tagHole = toAtom "@hole"
 funcApply = toAtom "@apply"
 funcEval = toAtom "@eval"
-funcFetch = toAtom "@fetch"
-funcInitCafs = toAtom "@initcafs"
-funcMain = toAtom "@main"
 
 gEval :: Val -> Exp
 gEval x = App funcEval [x] TyNode
+
+-- lazy node sptr_t
+tyINode = TyPtr TyNode
+-- strict node wptr_t
+tyDNode = TyNode
 
 
 instance TypeNames Ty where
@@ -211,6 +212,7 @@ data Ty =
     | TyRegion                 -- ^ a region
     | TyUnknown                -- ^ an unknown possibly undefined type, All of these must be eliminated by code generation
     deriving(Eq,Ord)
+
 
 
 data FuncDef = FuncDef {
@@ -392,8 +394,6 @@ tagIsSuspFunction t
     where t' = fromAtom t
 
 tagToFunction t
-    | t == funcMain = return t
-    | t == funcInitCafs = return t
     | 'F':xs <- t' = return $ toAtom $ 'f':xs
     | 'B':xs <- t' = return $ toAtom $ 'b':xs
     | 'f':_ <- t' = return t
@@ -403,8 +403,6 @@ tagToFunction t
     where t' = fromAtom t
 
 tagIsFunction t
-    | t == funcMain = True
-    | t == funcInitCafs = True
     | 'f':_ <- t' = True
     | 'b':_ <- t' = True
     | otherwise = False
@@ -465,9 +463,6 @@ findTyTy _ a =  fail $ "findArgsType: " ++ show a
 
 findArgsType m a = liftM (\tyty -> (tySlots tyty,tyReturn tyty)) (findTyTy m a)
 
-findType m a = case findArgsType m a of
-    Nothing -> fail $ "findType: " ++ show a
-    Just (_,x) -> return x
 findArgs m a = case findArgsType m a of
     Nothing -> fail $ "findArgs: " ++ show a
     Just (as,_) -> return as

@@ -76,9 +76,9 @@ import qualified Stats
 unboxedMap :: [(Name,Ty)]
 unboxedMap = [
     (tc_World__,tyUnit),
-    (tc_Ref__,TyPtr (TyPtr TyNode)),
-    (tc_Array__,TyPtr (TyPtr TyNode)),
-    (tc_MutArray__,TyPtr (TyPtr TyNode))
+    (tc_Ref__,TyPtr tyINode),
+    (tc_Array__,TyPtr tyINode),
+    (tc_MutArray__,TyPtr tyINode)
     ]
 
 newtype C a = C (ReaderT LEnv IO a)
@@ -140,11 +140,11 @@ toTyTy (as,r) = tyTy { tySlots = as, tyReturn = r }
 {-# NOINLINE compile #-}
 compile :: Program -> IO Grin
 compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, progEntryPoints = entries } = do
---    prog <- return $ prog { progCombinators  = map stripTheWorld (progCombinators prog) }
     tyEnv <- liftIO $ newIORef initTyEnv
     funcBaps <- liftIO $ newIORef []
     counter <- liftIO $ newIORef 100000  -- TODO real number
     let (cc,reqcc,rcafs) = constantCaf prog
+        funcMain = toAtom "b_main"
     wdump FD.Progress $ do
         putErrLn $ "Found" <+> tshow (length cc) <+> "CAFs to convert to constants," <+> tshow (length reqcc) <+> "of which are recursive."
         putErrLn "Recursive"
@@ -195,8 +195,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
     fbaps <- readIORef funcBaps
     let cafs = [ (x,y) | (_,x,y) <- rcafs ]
         initCafs = sequenceG_ [ Update (Var v (TyPtr TyNode)) node | (v,node) <- cafs ]
-        ic = (funcInitCafs,(Tup [] :-> initCafs) )
-        ds' = ic:(ds ++ fbaps)
+        ds' = ds ++ fbaps
         a @>> b = a :>>= (unit :-> b)
         sequenceG_ [] = Return unit
         sequenceG_ (x:xs) = foldl (@>>) x xs
@@ -206,7 +205,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
             grinTypeEnv = newTyEnv,
             grinCafs = [ (x,NodeC tagHole []) | (x,_) <- cafs]
             }
-        theFuncs = (funcMain ,Tup [] :-> App funcInitCafs [] tyUnit :>>= unit :->  discardResult (App (scTag mainEntry) [] tyUnit)) : efv ++ ds'
+        theFuncs = (funcMain ,Tup [] :-> initCafs :>>= unit :->  discardResult (App (scTag mainEntry) [] tyUnit)) : efv ++ ds'
     return grin
     where
     scMap = fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- progCombinators prog]
@@ -255,7 +254,6 @@ makePartials x = error "makePartials"
 
 primTyEnv = TyEnv . Map.map toTyTy $ Map.fromList $ [
     (tagArrow,([TyPtr TyNode, TyPtr TyNode],TyNode)),
-    (funcInitCafs, ([],tyUnit)),
     (funcEval, ([TyPtr TyNode],TyNode)),
     (tagHole, ([],TyNode))
     ]
@@ -277,24 +275,22 @@ constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans wh
     lbs = Set.fromList $ fsts lbs'
     canidate (ELit _) = True
     canidate (EPi _ _) = True
-    canidate e | (EVar x,as) <- fromAp e, Just vs <- mlookup x res, vs > length (ff as) = True
+    canidate e | (EVar x,as) <- fromAp e, Just vs <- mlookup x res, vs > length as = True
     canidate _ = False
     ans = ([ (v,cafNum v,conv e) | (v,e) <- cafs ],[ cafNum v | (v,_) <- cafs, v `Set.member` lbs ], [(v,cafNum v, NodeC (partialTag n 0) []) | (v,e) <- ecafs, not (canidate e), let n = scTag v ])
-    res = Map.fromList [ (v,length $ ff vs) | (v,vs,_) <- ds]
+    res = Map.fromList [ (v,length vs) | (v,vs,_) <- ds]
     coMap = Map.fromList [  (v,ce)| (v,_,ce) <- fst3 ans]
     conv :: E -> Val
     conv e | Just v <- literal e = v
     conv (ELit lc@LitCons { litName = n, litArgs = es }) | Just nn <- getName lc = (Const (NodeC nn (keepIts $ map conv es)))
     conv (EPi (TVr { tvrIdent = 0, tvrType =  a}) b)  =  Const $ NodeC tagArrow [conv a,conv b]
     conv (EVar v) | v `Set.member` lbs = Var (cafNum v) (TyPtr TyNode)
-    conv e | (EVar x,as) <- fromAp e, Just vs <- mlookup x res, vs > length (ff as) = Const (NodeC (partialTag (scTag x) (vs - length (ff as))) (keepIts $ map conv (ff as)))
+    conv e | (EVar x,as) <- fromAp e, Just vs <- mlookup x res, vs > length as = Const (NodeC (partialTag (scTag x) (vs - length as)) (keepIts $ map conv as))
     conv (EVar v) | Just ce <- mlookup v coMap = ce
     conv (EVar v) = Var (cafNum v) (TyPtr TyNode)
     conv x = error $ "conv: " ++ show x
     getName = getName' dataTable
 
-    ff x = x
-    --ff x = filter (shouldKeep . getType) x
     fst3 (x,_,_) = x
 
 getName' :: (Show a,Monad m) => DataTable -> Lit a E -> m Atom
