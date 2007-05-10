@@ -89,7 +89,7 @@ simplify1 stats env (n,l) = do
         gs (Return (Const n))
 --    gs (App a [n@NodeC {},v] typ) | a == funcApply = do
 --        lift $ tick stats at_OptSimplifyConstApply
---        gs (doApply Return True n v typ)
+--        gs (doApply Return True n [v] typ)
 --    gs (Store (NodeC t [Const x@NodeC {},y])) | Just 1 <- fromBap t = do --  App a [n@NodeC {},v] typ) | a == funcApply = do
 --        lift $ tick stats "Optimize.simplify.const-lazy-apply"
 --        gs (doApply Store False x y TyNode)
@@ -182,9 +182,9 @@ cseStat n = toAtom $ "Optimize.simplify.cse." ++ g n where
     g Store {} = "Store"
     g _ = "Misc"
 
-doApply ret strict (NodeC t xs) y typ | Just (n,v) <- tagUnfunction t = case n of
-    1 | strict -> (App v (xs ++ [y]) typ)
-    _ -> ret (NodeC (partialTag v (n - 1)) (xs ++ [y]))
+doApply ret strict (NodeC t xs) ys typ | Just (n,v) <- tagUnfunction t = case n of
+    1 | strict -> (App v (xs ++ ys) typ)
+    _ -> ret (NodeC (partialTag v (n - 1)) (xs ++ ys))
 doApply _ _ n y typ = error $ show ("doApply", n,y,typ)
 
 doEval n@(NodeC t xs) typ
@@ -325,13 +325,21 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
     f (Update v t :>>= Tup [] :-> Fetch v' :>>= lr) | v == v' = do
         mtick "Optimize.optimize.update-fetch"
         f (Update v t :>>= Tup [] :-> Return t :>>= lr)
---    f (Return t@NodeC {} :>>= v :-> App fa [v',a] typ :>>= lr) | fa == funcApply, v == v' = do
---        mtick "Optimize.optimize.return-apply"
---        f (Return t :>>= v :-> doApply Return True t a typ :>>= lr)
---    f (Return t@NodeC {} :>>= v :-> App fa [v',a] typ) | fa == funcApply, v == v' = do
---        mtick "Optimize.optimize.return-apply"
---        f (Return t :>>= v :-> doApply Return True t a typ)
+    f (Return t@NodeC {} :>>= v :-> App fa [v',a] typ :>>= lr) | fa == funcApply, v == v' = do
+        mtick "Optimize.optimize.return-apply"
+        f (Return t :>>= v :-> doApply Return True t [a] typ :>>= lr)
+    f (Return t@NodeC {} :>>= v :-> App fa [v',a] typ) | fa == funcApply, v == v' = do
+        mtick "Optimize.optimize.return-apply"
+        f (Return t :>>= v :-> doApply Return True t [a] typ)
+    f (Return t@NodeC {} :>>= v :-> App fa [v'] typ :>>= lr) | fa == funcApply, v == v' = do
+
+        mtick "Optimize.optimize.return-apply0"
+        f (Return t :>>= v :-> doApply Return True t [] typ :>>= lr)
+    f (Return t@NodeC {} :>>= v :-> App fa [v'] typ) | fa == funcApply, v == v' = do
+        mtick "Optimize.optimize.return-apply0"
+        f (Return t :>>= v :-> doApply Return True t [] typ)
     f (Store t@NodeC {} :>>= v :-> App fa [v'] typ :>>= lr) | not (valIsMutable t), fa == funcEval, v == v' = do
+
         mtick "Optimize.optimize.store-eval"
         f (Store t :>>= v :-> doEval t typ :>>= lr)
     f (Store t@NodeC {} :>>= v :-> App fa [v'] typ) | not (valIsMutable t), fa == funcEval, v == v' = do

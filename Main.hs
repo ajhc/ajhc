@@ -46,6 +46,7 @@ import FrontEnd.FrontEnd
 import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadCode
+import Grin.Lint
 import Grin.Devolve(devolveGrin)
 import Grin.EvalInline(createEvalApply)
 import Grin.FromE
@@ -68,6 +69,7 @@ import SelfTest(selfTest)
 import Support.CanType(getType)
 import Support.FreeVars
 import Support.ShowTable
+import Support.Transform
 import Util.Graph
 import Util.NameMonad
 import Util.SetLike as S
@@ -685,17 +687,9 @@ compileToGrin prog = do
     wdump FD.CoreMangled $ printProgram prog
     x <- Grin.FromE.compile prog
     Stats.print "Grin" Stats.theStats
-    wdump FD.GrinInitial $ do
-        putErrLn "v-- Initial Grin"
-        dumpGrin (optOutName options) "initial" x
-        printGrin x
-        putErrLn "^-- Initial Grin"
+    wdump FD.GrinInitial $ do dumpGrin "initial" x
     x <- return $ normalizeGrin x
-    wdump FD.GrinNormalized $ do
-        putErrLn "v-- Normalized Grin"
-        dumpGrin (optOutName options) "normalized" x
-        printGrin x
-        putErrLn "^-- Normalized Grin"
+    wdump FD.GrinNormalized $ do dumpGrin "normalized" x
     lintCheckGrin x
     let opt s  x = do
         stats' <- Stats.new
@@ -724,11 +718,7 @@ compileToGrin prog = do
 
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
 
-    wdump FD.GrinPreeval $ do
-        putErrLn "v-- Preeval Grin"
-        dumpGrin (optOutName options) "preeval" x
-        printGrin x
-        putErrLn "^-- Preeval Grin"
+    wdump FD.GrinPreeval $ dumpGrin "preeval" x
     x <- nodeAnalyze x
     lintCheckGrin x
     x <- createEvalApply x
@@ -742,26 +732,14 @@ compileToGrin prog = do
     dumpFinalGrin x
     compileGrinToC x
 
-dumpGrin fname pname grin = do
-    h <- openFile (fname ++ "_" ++ pname ++ ".grin") WriteMode
-    (argstring,sversion) <- getArgString
-    hPutStrLn h $ unlines [ "-- " ++ argstring,"-- " ++ sversion,""]
-    hPrintGrin h grin
-    hClose h
-
 
 dumpFinalGrin grin = do
-    let fn = optOutName options
     wdump FD.GrinGraph $ do
         let dot = graphGrin grin
+            fn = optOutName options
         writeFile (fn ++ "_grin.dot") dot
-    dumpGrin (optOutName options) "final" grin
-    wdump FD.Grin $ printGrin grin
+    dumpGrin "final" grin
 
-getArgString = do
-    name <- System.getProgName
-    args <- getArguments
-    return (simpleQuote (name:args),head $ lines versionString)
 
 
 compileGrinToC grin | optMode options == Interpret = fail "Interpretation currently not supported."
@@ -822,39 +800,11 @@ simplifyProgram' sopt name dodump iterate prog = do
 
 -- all transformation routines assume they are being passed a correct program, and only check the output
 
-data Iterate = DontIterate | IterateMax !Int | IterateExactly !Int | IterateDone
-    deriving(Eq)
 
-doIterate (IterateMax _) stat | stat /= mempty = True
-doIterate IterateDone stat | stat /= mempty = True
-doIterate IterateExactly {} _ = True
-doIterate _ _ = False
 
-iterateStep (IterateMax n) = IterateMax (n - 1)
-iterateStep (IterateExactly n) = IterateExactly (n - 1)
-iterateStep x = x
 
-data TransformParms = TransformParms {
-    transformIterate :: Iterate,
-    transformDumpProgress :: Bool,
-    transformSkipNoStats  :: Bool,
-    transformOperation :: Program -> IO Program,
-    transformCategory :: String,   -- ^ general name of transformation
-    transformPass :: String,       -- ^ what pass we are in
-    transformName :: String        -- ^ name of what we are working on
-    }
 
-transformParms = TransformParms {
-    transformIterate = DontIterate,
-    transformDumpProgress = False,
-    transformSkipNoStats = False,
-    transformCategory = "Unknown",
-    transformPass = "",
-    transformOperation = return,
-    transformName = ""
-    }
-
-transformProgram :: MonadIO m => TransformParms -> Program -> m Program
+transformProgram :: MonadIO m => TransformParms Program -> Program -> m Program
 
 transformProgram TransformParms { transformIterate = IterateMax n } prog | n <= 0 = return prog
 transformProgram TransformParms { transformIterate = IterateExactly n } prog | n <= 0 = return prog
@@ -894,7 +844,7 @@ transformProgram tp prog = liftIO $ do
         Stats.tickStat Stats.theStats (Stats.prependStat scname estat)
     wdump FD.ESize $ printESize ("After  "++name) prog'
     lintCheckProgram onerr prog'
-    if doIterate iterate estat then transformProgram tp { transformIterate = iterateStep iterate } prog' { progStats = istat `mappend` estat } else
+    if doIterate iterate (estat /= mempty) then transformProgram tp { transformIterate = iterateStep iterate } prog' { progStats = istat `mappend` estat } else
         return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
 
 
@@ -977,7 +927,6 @@ onerrNone :: IO ()
 onerrNone = return ()
 
 
-lintCheckGrin grin = when flint $ typecheckGrin grin
 
 lintCheckE onerr dataTable tvr e | flint = case inferType dataTable [] e of
     Left ss -> do

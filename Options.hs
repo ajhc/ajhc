@@ -16,6 +16,7 @@ module Options(
     fileOptions,
     withOptions,
     withOptionsT,
+    getArgString,
     OptM(),
     OptT(),
     OptionMonad(..),
@@ -34,6 +35,7 @@ import GenUtil
 import qualified FlagDump
 import qualified FlagOpts
 import Version.Raw(libraryPath)
+import Version(versionString)
 
 data Mode = BuildHl String -- ^ Build the specified hl-file given a description file.
           | Interactive    -- ^ Run interactively.
@@ -289,3 +291,7 @@ flagOpt flag = do
     opt <- getOptions
     return (flag `S.member` optFOptsSet opt)
 
+getArgString = do
+    name <- System.getProgName
+    args <- getArguments
+    return (simpleQuote (name:args),head $ lines versionString)

@@ -1,4 +1,4 @@
-module Grin.FromE(compile,typecheckGrin) where
+module Grin.FromE(compile) where
 
 import Char
 import Control.Monad
@@ -117,10 +117,6 @@ flattenScc xs = concatMap f xs where
     f (CyclicSCC xs) = xs
 
 
-typecheckGrin grin = do
-    let errs = [  (err ++ "\n" ++ render (prettyFun a) ) | (a,Left err) <-  [ (a,typecheck (grinTypeEnv grin) c:: Either String Ty)   | a@(_,(_ :-> c)) <-  grinFuncs grin ]]
-    mapM_ putErrLn  errs
-    unless (null errs || optKeepGoing options) $ fail "There were type errors!"
 
 scTag n
     | Just nm <- fromId (tvrIdent n) = toAtom ('f':show nm)
