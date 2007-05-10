@@ -232,6 +232,10 @@ doFunc (name,arg :-> body) = ans where
         f Alloc { expValue = v } | getType v == TyNode = do
             v' <- convertVal v
             dres [v']
+        f Alloc { expValue = v } | getType v == TyPtr TyNode = do
+            convertVal v
+            dunno (TyPtr $ TyPtr TyNode)
+--            dres [v']
         f NewRegion { expLam = _ :-> body } = fn ret body
         f (Update (Var vname ty) v) | ty == TyPtr TyNode  = do
             v' <- convertVal v
@@ -239,6 +243,10 @@ doFunc (name,arg :-> body) = ans where
             dres []
         f (Update (Var vname ty) v) | ty == TyPtr (TyPtr TyNode)  = do
             v' <- convertVal v
+            dres []
+        f (Update v1 v)  = do
+            v' <- convertVal v
+            v' <- convertVal v1
             dres []
         f Let { expDefs = ds, expBody = e } = do
             mapM_ doFunc (map (\x -> (funcDefName x, funcDefBody x)) ds)

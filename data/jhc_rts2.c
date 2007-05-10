@@ -1,15 +1,16 @@
 
-#define ISLAZY(x)   (((uintptr_t)(x)) & 0x1)
-#define DETAG(x)    ((uintptr_t)(x) & ~0x1)
-#define GETTAG(x)   ((uintptr_t)(x) & 0x3)
+#define ISLAZY(x)    (((uintptr_t)(x)) & 0x1)
+#define DETAG(x)     ((uintptr_t)(x) & ~0x1)
+#define GETTAG(x)    ((uintptr_t)(x) & 0x3)
 
-#define GETHEAD(x)  (NODEP(x)->head)
-#define GETWHAT(x)  (DNODEP(x)->what)
-#define NODEP(x)    ((node_t *)(x))
-#define DNODEP(x)   ((dnode_t *)(x))
-#define EVALTAG(fn) (assert(((uintptr_t)(fn) & 0x3) == 0),(sptr_t)((uintptr_t)(fn) | P_LAZY))
-#define VALUE(n)    ((wptr_t)(((uintptr_t)(n) << 2) | P_VALUE))
-#define ISVALUE(n)  (assert(!ISLAZY(n)), ((uintptr_t)(n) & 0x2))
+#define GETHEAD(x)   (NODEP(x)->head)
+#define GETWHAT(x)   (DNODEP(x)->what)
+#define NODEP(x)     ((node_t *)(x))
+#define DNODEP(x)    ((dnode_t *)(x))
+#define EVALTAG(fn)  (assert(((uintptr_t)(fn) & 0x3) == 0),(sptr_t)((uintptr_t)(fn) | P_LAZY))
+#define EVALTAGC(fn) ((sptr_t)((void *)(fn) + P_LAZY))
+#define VALUE(n)     ((wptr_t)(((uintptr_t)(n) << 2) | P_VALUE))
+#define ISVALUE(n)   (assert(!ISLAZY(n)), ((uintptr_t)(n) & 0x2))
 
 
 #define P_VALUE 0x2

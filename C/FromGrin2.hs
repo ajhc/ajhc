@@ -218,6 +218,10 @@ convertBody (e :>>= Tup xs :-> e') = do
     vs <- mapM convertVal xs
     return $  ss & mconcat [ v =* projectAnon i st | v <- vs | i <- [0..] ] & ss'
 convertBody (Return v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
+convertBody (Return v :>>= (NodeV t []) :-> e') = do
+    v' <- convertVal v
+    t' <- convertVal (Var t TyTag)
+    return $ t' =* getWhat v'
 convertBody (Fetch v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
 convertBody (Case v@(Var _ ty) [p1@(NodeC t _) :-> e1,p2 :-> e2]) | ty == TyNode = do
     scrut <- convertVal v
@@ -230,6 +234,7 @@ convertBody (Case v@(Var _ ty) [p1@(NodeC t _) :-> e1,p2 :-> e2]) | ty == TyNode
         da n1@(NodeC t _) (Return n2@NodeC {}) | n1 == n2 = convertBody (Return v)
         da (NodeC t as) e = do
             tellTags t
+            declareStruct t
             as' <- mapM convertVal as
             let tmp = concrete t  scrut
                 ass = mconcat [if needed a then a' =* (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
@@ -269,6 +274,7 @@ convertBody (Case v@(Var _ t) ls) | t == TyNode = do
             return (Just (enum (nodeTagName t)),e')
         da ((NodeC t as) :-> e) = do
             tellTags t
+            declareStruct t
             as' <- mapM convertVal as
             e' <- convertBody e
             let tmp = concrete t scrut
@@ -389,7 +395,7 @@ convertExp e = return (err (show e),err "nothing")
 ccaf :: (Var,Val) -> P.Doc
 ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ P.render (pprint val)) <> text "*/\n" <>
      text "static node_t _" <> tshow (varName v) <> text ";\n" <>
-     text "#define " <> tshow (varName v) <+>  text "(EVALTAG(&_" <> tshow (varName v) <> text "))\n";
+     text "#define " <> tshow (varName v) <+>  text "(EVALTAGC(&_" <> tshow (varName v) <> text "))\n";
 
 
 buildConstants tyenv fh = P.vcat (map cc (Grin.HashConst.toList fh)) where

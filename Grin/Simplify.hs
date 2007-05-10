@@ -242,8 +242,8 @@ isCombinable postEval e = ans where
     equal [] = fail "empty isCombinable"
     equal [x] = return x
     equal (x:y:rs) = if x == y then equal (y:rs) else fail "not equal"
-    f lf (Return (NodeV t [])) | postEval = return [UnboxTag]
-    f lf (Return (NodeC t [])) | postEval = return [UnboxTag]
+--    f lf (Return (NodeV t [])) | postEval = return [UnboxTag]
+--    f lf (Return (NodeC t [])) | postEval = return [UnboxTag]
     f lf (Return z) | z /= unit && valIsConstant z = return [UnboxConst z]
     f lf (Return (NodeC t xs)) = return [UnboxTup (t,map getType xs)]
     f lf Error {} = return []
@@ -408,7 +408,6 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
     f (Case x as :>>= v :-> rc@(Case v' as')) | v == v', count (== Nothing ) (Prelude.map (isManifestNode . lamExp) as) <= 1 = do
         ch <- caseHoist x as v as' (getType rc)
         f ch
-  -}
     -- case unboxing
     f (cs@(Case x as) :>>= lr) | Just UnboxTag <- isCombinable postEval cs = do
         mtick "Optimize.optimize.case-unbox-tag"
@@ -416,6 +415,7 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
             (va:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
         lr <- g lr
         return ((Case x (map (combineLam postEval TyTag) as) :>>= Var va TyTag :-> Return (NodeV va [])) :>>= lr)
+  -}
     f (cs@(Case x as) :>>= lr) | Just (UnboxTup (t,ts)) <- isCombinable postEval cs = do
         mtick $ "Optimize.optimize.case-unbox-node.{" ++ show t
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
@@ -438,11 +438,13 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
             mtick "Optimize.optimize.case-pullin"
             return $ modifyTail lr cs
 
+{-
     f cs@(Case x as) | postEval && all isEnum [ p | p :-> _ <- as] = do
         mtick "Optimize.optimize.case-enum"
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
             (va:vb:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
         return (Return x :>>= NodeV va [] :-> Case (Var va TyTag) (Prelude.map (untagPat vb) as))
+        -}
 
     -- hoisting must come last
     f (hexp@Case {} :>>= v@(Var vnum _) :-> rc@(Case v' as') :>>= lr) | v == v', not (vnum `Set.member` freeVars lr) = do
