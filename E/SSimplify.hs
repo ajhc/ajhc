@@ -193,8 +193,8 @@ collectOccurance e = f e  where
 -- delete any occurance info for non-let-bound vars to be safe
 annb' tvr = tvrInfo_u (Info.delete noUseInfo) tvr
 annbind' idm tvr = case mlookup (tvrIdent tvr) idm of
-    Nothing -> annb' tvr { tvrIdent = 0 }
-    Just _ -> annb' tvr
+    Nothing | sortTermLike (getType tvr) -> annb' tvr { tvrIdent = 0 }
+    _ -> annb' tvr
 
 -- add ocucrance info
 annbind idm tvr = case mlookup (tvrIdent tvr) idm of
