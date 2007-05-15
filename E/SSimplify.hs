@@ -602,6 +602,9 @@ simplifyDs prog sopts dsIn = ans where
             doCase e t b as@(Alt LitCons { litName = n } _:_) (Just d) | Just nsib <- numberSiblings (so_dataTable sopts) n, nsib <= length as = do
                 mtick "E.Simplify.case-no-default"
                 doCase e t b as Nothing
+            doCase e t b (a@(Alt LitCons { litName = n } _):_) (Just d) | Just _ <- fromUnboxedNameTuple n = do
+                mtick "E.Simplify.case-unboxed-no-default"
+                doCase e t b [a] Nothing
             doCase e t b as (Just d) | te /= tWorld__, (ELit LitCons { litName = cn }) <- followAliases dt te, Just Constructor { conChildren = DataNormal cs } <- getConstructor cn dt, length as == length cs - 1 || (False && length as < length cs && isAtomic d)  = do
                 let ns = [ n | Alt ~LitCons { litName = n } _ <- as ]
                     ls = filter (`notElem` ns) cs
@@ -718,6 +721,9 @@ simplifyDs prog sopts dsIn = ans where
         mtick (toAtom $ "E.Simplify.known-case." ++ show x)
         return $ Just ([(b,ELit m)],e)
          | otherwise = match m rs d
+    match m@LitCons { litName = c } [] (_,Just e) | Just _ <- fromUnboxedNameTuple c  = do
+        mtick (toAtom $ "E.Simplify.known-case._#" ++ show c )
+        return (Just ([],e))
     match l [] (b,Just e) = do
         mtick (toAtom "E.Simplify.known-case._")
         return $ Just ([(b,ELit l)],e)
