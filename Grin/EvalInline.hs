@@ -1,9 +1,4 @@
-module Grin.EvalInline(
-    createEval,
-    createApply,
-    createEvalApply,
-    UpdateType(..)
-    ) where
+module Grin.EvalInline(createEvalApply) where
 
 
 import Control.Monad.Identity
@@ -14,6 +9,7 @@ import qualified Data.Map as Map
 
 import Atom
 import Grin.Grin
+import Grin.Noodle
 import GenUtil
 import Support.FreeVars(freeVars)
 import Support.CanType(getType)
@@ -143,13 +139,6 @@ createEvalApply grin = do
     let f (ls :-> exp) = do
             exp' <- g exp
             return $ ls :-> exp'
-        g (exp :>>= lam) = do
-            exp' <- g exp
-            lam' <- f lam
-            return (exp' :>>= lam')
-        g (Case v ls) = do
-            ls' <- mapM f ls
-            return $ Case v ls'
         g (App fn [fun] ty) | fn == funcApply = do
             fn' <- runOnceMap appMap (tyUnit,ty) $ do
                 u <- newUniq
@@ -160,7 +149,7 @@ createEvalApply grin = do
                 u <- newUniq
                 return (toAtom $ "bapply_" ++ show u)
             return (App fn' [fun,arg] ty)
-        g x = return x
+        g x = mapExpExp g x
     funcs <- mapMsnd f (grinFuncs grin)
     as <- onceMapToList appMap
     let (apps,ntyenv) = unzip $ map cf as
