@@ -326,12 +326,13 @@ processDecls cho ho' tiData = do
         transformCategory = "FloatInward",
         transformOperation = programFloatInward
         } prog
-    prog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } prog
 
     let fint mprog = do
         let names = pprint [ n | (n,_) <- programDs mprog]
         when coreMini $ putErrLn ("----\n" ++ names)
         let tparms = transformParms { transformPass = "Init", transformDumpProgress = coreMini }
+
+        mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformPass = "PreInit", transformOperation = typeAnalyze True } mprog
 
         mprog <- return $ etaAnnotateProgram mprog
 

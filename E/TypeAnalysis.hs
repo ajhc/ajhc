@@ -75,8 +75,7 @@ typeAnalyze doSpecialize prog = do
         vv <- supplyValue uv tvr
         addRule $ assert vv
     mapM_ (sillyEntry env) entries
-    --findFixpoint Nothing fixer
-    calcFixpoint "TypeAnalysis" fixer
+    findFixpoint Nothing fixer
     prog <- annotateProgram mempty (\_ -> return) (\_ -> return) lamread prog
     unusedRules <- supplyReadValues ur >>= return . fsts . filter (not . snd)
     unusedValues <- supplyReadValues uv >>= return . fsts . filter (not . snd)
