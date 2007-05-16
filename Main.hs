@@ -624,14 +624,14 @@ compileModEnv' (cho,_) = do
     finalStats <- Stats.new
 
     -- final optimization pass to clean up lambda lifting droppings
-    prog <- flip programMapBodies prog $ \ e -> do
-        let cm stats e = do
-            let sopt = mempty {  SS.so_dataTable = dataTable }
-            let (stat, e') = SS.simplifyE sopt e
-            Stats.tickStat stats stat
-            return e'
-        doopt (mangle' Nothing dataTable) False finalStats "PostLambdaLift"  cm e
-    wdump FD.Progress $ Stats.print "PostLifting" finalStats
+--    prog <- flip programMapBodies prog $ \ e -> do
+--        let cm stats e = do
+--            let sopt = mempty {  SS.so_dataTable = dataTable }
+--            let (stat, e') = SS.simplifyE sopt e
+--            Stats.tickStat stats stat
+--            return e'
+--        doopt (mangle' Nothing dataTable) False finalStats "PostLambdaLift"  cm e
+--    wdump FD.Progress $ Stats.print "PostLifting" finalStats
 
     lintCheckProgram (putErrLn "LintPostLifting") prog
 
