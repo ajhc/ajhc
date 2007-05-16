@@ -71,7 +71,7 @@ typeAnalyze doSpecialize prog = do
         env = Env { envRuleSupply = ur, envValSupply = uv, envEnv = extractValMap ds }
         entries = progEntryPoints prog
     calcDs env ds
-    flip mapM_ entries $ \tvr ->  do
+    forM_ entries $ \tvr ->  do
         vv <- supplyValue uv tvr
         addRule $ assert vv
     mapM_ (sillyEntry env) entries
@@ -114,7 +114,7 @@ calcDef env@Env { envRuleSupply = ur, envValSupply = uv } (t,e) = do
                     let (t'::Value Typ) = Info.fetch (tvrInfo t)
                     as' <- mapM getValue as
                     addRule $ conditionalRule id ruleUsed $ ioToRule $ do
-                        flip mapM_ (zip naturals (zip as as')) $ \ (i,(a',a'')) -> do
+                        forMn_ ((zip as as')) $ \ ((a',a''),i) -> do
                             when (isEVar a') $ addRule $ modifiedSuperSetOf a'' t' (vmapArg n i)
                             --addRule $ modifiedSuperSetOf t' vv (vmapArg n i)
 --                    addRule $ conditionalRule id ruleUsed $ ioToRule $ do
@@ -133,7 +133,7 @@ calcDef env@Env { envRuleSupply = ur, envValSupply = uv } (t,e) = do
 calcDs ::  Env -> [(TVr,E)] -> IO ()
 calcDs env@Env { envRuleSupply = ur, envValSupply = uv } ds = do
     mapM_ d ds
-    flip mapM_ ds $ \ (v,e) -> do calcDef env (v,e)
+    forM_ ds $ \ (v,e) -> do calcDef env (v,e)
       --  addRule $ conditionalRule id nv (ioToRule $ calcDef env (v,e))
      where
     d (t,e) | not (sortKindLike (getType t)) = return ()
@@ -145,7 +145,7 @@ calcDs env@Env { envRuleSupply = ur, envValSupply = uv } ds = do
             v = vmapSingleton n
         addRule $ t' `isSuperSetOf` (value v)
         xs' <- mapM getValue xs
-        flip mapM_ (zip xs' [0.. ])  $ \ (v,i) -> do
+        forMn_ xs' $ \ (v,i) -> do
             addRule $ modifiedSuperSetOf t' v (vmapArgSingleton n i)
     d (t,e) | (EVar v,as) <- fromAp e = do
         let Just t' = Info.lookup (tvrInfo t)
@@ -160,7 +160,7 @@ calcDs env@Env { envRuleSupply = ur, envValSupply = uv } ds = do
 calcAlt env v (Alt LitCons { litName = n, litArgs = xs } e) = do
     addRule $ conditionalRule (n `vmapMember`) v $ ioToRule $ do
         calcE env e
-        flip mapM_ (zip [0..] xs) $ \ (i,t) -> do
+        forMn_ xs $ \ (t,i) -> do
             let Just t' = Info.lookup (tvrInfo t)
             addRule $ modifiedSuperSetOf t' v (vmapArg n i)
 
@@ -169,11 +169,11 @@ calcE :: Env -> E -> IO ()
 calcE env (ELetRec ds e) = calcDs nenv ds >> calcE nenv e where
     nenv = env { envEnv = extractValMap ds `union` envEnv env }
 calcE env e | (e',(_:_)) <- fromLam e = calcE env e'
---calcE env ec@ECase {} | sortKindLike (getType $ eCaseScrutinee ec) = do
---    calcE env (eCaseScrutinee ec)
---    fmapM_ (calcE env) (eCaseDefault ec)
---    v <- getValue (eCaseScrutinee ec)
---    mapM_ (calcAlt env v) (eCaseAlts ec)
+calcE env ec@ECase {} | sortKindLike (getType $ eCaseScrutinee ec) = do
+    calcE env (eCaseScrutinee ec)
+    fmapM_ (calcE env) (eCaseDefault ec)
+    v <- getValue (eCaseScrutinee ec)
+    mapM_ (calcAlt env v) (eCaseAlts ec)
 calcE env ec@ECase {} = do
     calcE env (eCaseScrutinee ec)
     mapM_ (calcE env) (caseBodies ec)
@@ -186,7 +186,7 @@ calcE env e | (EVar v,as@(_:_)) <- fromAp e = do
     let ts = lookupArgs v env
     tagE env e
     when (length as < length ts) $ fail ("calcE: unsaturated call to function: " ++ pprint e)
-    flip mapM_ (zip as ts) $ \ (a,t) -> do
+    forM_ (zip as ts) $ \ (a,t) -> do
         when (sortKindLike (getType a)) $ do
             a' <- getValue a
             addRule $ t `isSuperSetOf` a'
@@ -250,8 +250,13 @@ pruneCase ec ns = return $ if null (caseBodies nec) then err else nec where
     as = [ n | LitCons { litName = n } <- casePats ec ]
 
 
+data SpecEnv = SpecEnv {
+    senvUnusedRules :: Set.Set (Module,Int),
+    senvUnusedVars  :: Set.Set TVr,
+    senvDataTable :: DataTable,
+    senvArgs      :: Map.Map TVr [Int]
+    }
 
-type SpecEnv = (Set.Set (Module,Int),Set.Set TVr,DataTable,Map.Map TVr [Int])
 
 
 getTyp :: Monad m => E -> DataTable -> Typ -> m E
@@ -269,21 +274,21 @@ getTyp kind dataTable vm = f 10 kind vm where
 
 specializeProgram :: (MonadStats m) =>
     Bool                       -- ^ do specialization
-    -> (Set.Set (Module,Int))  -- ^ used rules
-    -> (Set.Set TVr)           -- ^ used values
+    -> (Set.Set (Module,Int))  -- ^ unused rules
+    -> (Set.Set TVr)           -- ^ unused values
     -> Program
     -> m Program
-specializeProgram doSpecialize usedRules usedValues prog = do
-    (nds,_) <- specializeDs doSpecialize (usedRules,usedValues,progDataTable prog,mempty) (programDs prog)
+specializeProgram doSpecialize unusedRules unusedValues prog = do
+    (nds,_) <- specializeDs doSpecialize SpecEnv { senvUnusedRules = unusedRules, senvUnusedVars = unusedValues, senvDataTable = progDataTable prog, senvArgs = mempty } (programDs prog)
     return $ programSetDs nds prog
 
 
 repi (ELit LitCons { litName = n, litArgs = [a,b] }) | n == tc_Arrow = EPi tvr { tvrIdent = 0, tvrType = repi a } (repi b)
 repi e = runIdentity $ emapE (return . repi ) e
 
-specializeDef _ (_,unusedVals,_,_) (tvr,e) | tvr `Set.member` unusedVals = return (tvr,EError "Unused" (tvrType tvr))
+specializeDef _ SpecEnv { senvUnusedVars = unusedVals }  (tvr,e) | tvr `Set.member` unusedVals = return (tvr,EError "Unused" (tvrType tvr))
 specializeDef _ _ (t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
-specializeDef True (_,_,dataTable,_) (tvr,e) = ans where
+specializeDef True SpecEnv { senvDataTable = dataTable }  (tvr,e) = ans where
     sub = substMap''  $ fromList [ (tvrIdent t,Just v) | (t,Just v) <- sts ]
     sts = map spec ts
     spec t | Just nt <- Info.lookup (tvrInfo t) >>= getTyp (getType t) dataTable, sortKindLike (getType t) = (t,Just (repi nt))
@@ -300,12 +305,14 @@ specializeDef _ _ (t,e) = return (t,e)
 
 
 specBody :: MonadStats m => Bool -> SpecEnv -> E -> m E
-specBody _ env@(_,unusedVars,dataTable,_) e | (EVar h,as) <- fromAp e, h `Set.member` unusedVars = do
+specBody _ env@SpecEnv { senvUnusedVars = unusedVars, senvDataTable = dataTable } e | (EVar h,as) <- fromAp e, h `Set.member` unusedVars = do
     mtick $ "Specialize.delete.{" ++ pprint h ++ "}"
     return $ foldl EAp (EError ("Unused: " ++ pprint h) (getType h)) as
-specBody True (_,_,_,dmap) e | (EVar h,as) <- fromAp e, Just os <- mlookup h dmap = do
+specBody True SpecEnv { senvArgs = dmap } e | (EVar h,as) <- fromAp e, Just os <- mlookup h dmap = do
     mtick $ "Specialize.use.{" ++ pprint h ++ "}"
     return $ foldl EAp (EVar h) [ a | (a,i) <- zip as naturals, i `notElem` os ]
+--specBody True env e@ECase { eCaseScrutinee = EVar v } | sortKindLike (getType v)scrut = do
+--    k
 specBody doSpecialize env (ELetRec ds e) = do
     (nds,nenv) <- specializeDs doSpecialize env ds
     e <- specBody doSpecialize nenv e
@@ -313,7 +320,7 @@ specBody doSpecialize env (ELetRec ds e) = do
 specBody doSpecialize env e = emapE' (specBody doSpecialize env) e
 
 --specializeDs :: MonadStats m => DataTable -> Map.Map TVr [Int] -> [(TVr,E)] -> m ([(TVr,E)]
-specializeDs doSpecialize env@(unusedRules,_,dataTable,_) ds = do
+specializeDs doSpecialize env@SpecEnv { senvUnusedRules = unusedRules, senvDataTable = dataTable }  ds = do
     (ds,nenv) <- runWriterT $ mapM (specializeDef doSpecialize env) ds
     -- ds <- sequence [ specBody dataTable (nenv `mappend` env) e >>= return . (,) t | (t,e) <- ds]
     let f (t,e) = do
@@ -321,7 +328,7 @@ specializeDs doSpecialize env@(unusedRules,_,dataTable,_) ds = do
             nfo <- infoMapM (mapABodiesArgs sb) (tvrInfo t)
             nfo <- infoMapM (return . arules . filter ( not . (`Set.member` unusedRules) . ruleUniq) . rulesFromARules) nfo
             return (t { tvrInfo = nfo }, e)
-        tenv = ((\ (a,b,c,d) -> (a,b,c,nenv `mappend` d)) env)
+        tenv = env { senvArgs = nenv `mappend` senvArgs env }
         sb = specBody doSpecialize tenv
     ds <- mapM f ds
     return (ds,tenv)
