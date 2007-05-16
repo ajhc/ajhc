@@ -4,30 +4,32 @@ import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.FunctorM
 import Data.IORef
+import Text.Printf
 import List hiding(insert)
 
 import Atom
 import DataConstructors
+import Doc.PPrint
+import E.Annotate
 import E.E
-import E.Inline
 import E.FreeVars
+import E.Inline
 import E.Program
 import E.Subst
 import E.Traverse
 import E.TypeCheck
 import E.Values
 import Fixer.Fixer
-import E.Annotate
 import Fixer.Supply
 import GenUtil
 import Name.Id
 import Name.Name
 import Stats
+import Support.CanType
 import Support.FreeVars
 import Util.Graph as G
-import Support.CanType
+import Util.HasSize
 import Util.SetLike
-import Doc.PPrint
 import Util.UniqueMonad
 
 annotateId mn x = case fromId x of
@@ -147,8 +149,9 @@ calculateLiftees prog = do
 
     calcFixpoint "Liftees" fixer
     vs <- supplyReadValues sup
-    mapM_ Prelude.print [ (tvr { tvrIdent = id },"Not Lifted") | (id,False) <- vs ]
-    return (fromList [ x | (x,False) <- vs])
+    let nlset =  (fromList [ x | (x,False) <- vs])
+    printf "%i lambdas not lifted\n" (size nlset)
+    return nlset
 
 implies :: Value Bool -> Value Bool -> IO ()
 implies x y = addRule $ y `isSuperSetOf` x
@@ -159,9 +162,6 @@ assert x = value True `implies` x
 lambdaLift ::  Program -> IO Program
 lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
     noLift <- calculateLiftees prog
-    noLift <- return $ mempty `asTypeOf` noLift
-    putStrLn "noLift"
-    Prelude.print noLift
     let wp =  fromList [ tvrIdent x | (x,_,_) <- cs ]
     fc <- newIORef []
     fm <- newIORef mempty
