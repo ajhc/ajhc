@@ -106,7 +106,6 @@ runM :: Grin -> M a -> C N V
 runM grin (M w) = case runRWS w (grinTypeEnv grin) 1 of
     (_,_,w) -> w
 
-forMn_ xs = forM_ (zip xs [0 :: Int .. ])
 
 {-# NOINLINE nodeAnalyze #-}
 nodeAnalyze :: Grin -> IO Grin
