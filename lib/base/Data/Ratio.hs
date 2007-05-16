@@ -5,17 +5,15 @@ module  Data.Ratio (
 
 import Prelude.Text
 import Jhc.Num
+import Jhc.Float
 
 infixl 7  %
 
 ratPrec = 7 :: Int
 
-numerator (x :% _)      =  x
-denominator (_ :% y)    =  y
 
 
 (%)                     :: (Integral a) => a -> a -> Ratio a
-numerator, denominator  :: (Integral a) => Ratio a -> a
 approxRational          :: (RealFrac a) => a -> a -> Rational
 
 
@@ -57,14 +55,18 @@ instance  (Integral a)  => Num (Ratio a)  where
     abs (x:%y)          =  abs x :% y
     signum (x:%y)       =  signum x :% 1
     fromInteger x       =  fromInteger x :% 1
+    fromInt     x       =  fromInt x :% 1
 
 instance  (Integral a)  => Real (Ratio a)  where
     toRational (x:%y)   =  toInteger x :% toInteger y
+
+    toDouble  x         = rationalToDouble (toRational x)
 
 instance  (Integral a)  => Fractional (Ratio a)  where
     (x:%y) / (x':%y')   =  (x*y') % (y*x')
     recip (x:%y)        =  y % x
     fromRational (x:%y) =  fromInteger x :% fromInteger y
+    fromDouble   x      = fromRational (doubleToRational x)
 
 instance  (Integral a)  => RealFrac (Ratio a)  where
     properFraction (x:%y) = (fromIntegral q, r:%y)

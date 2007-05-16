@@ -6,12 +6,18 @@ import Jhc.Order
 import Jhc.Show
 import Jhc.IO(error)
 import Jhc.Enum
+import Jhc.Float
 
+infixl 7 :%
 infixl 7  *  , /, `quot`, `rem`, `div`, `mod`
 infixl 6  +, -
 
 data  Ratio a  = !a :% !a
 type  Rational = Ratio Integer
+
+numerator, denominator  :: Ratio a -> a
+numerator (x :% _)      =  x
+denominator (_ :% y)    =  y
 
 
 class  (Eq a, Show a) => Num a  where
@@ -30,6 +36,8 @@ class  (Eq a, Show a) => Num a  where
 
 class  (Num a, Ord a) => Real a  where
     toRational       ::  a -> Rational
+    toDouble         ::  a -> Double
+    toDouble x = rationalToDouble (toRational x)
 
 class  (Real a, Enum a) => Integral a  where
     quot, rem        :: a -> a -> a
@@ -54,22 +62,27 @@ class  (Num a) => Fractional a  where
     (/)              :: a -> a -> a
     recip            :: a -> a
     fromRational     :: Rational -> a
+    fromDouble       :: Double   -> a
 
         -- Minimal complete definition:
         --      fromRational and (recip or (/))
     recip x          =  1 / x
     x / y            =  x * recip y
 
+    fromDouble x = fromRational (doubleToRational x)
 
-fromIntegral     :: (Integral a, Num b) => a -> b
-fromIntegral     =  fromInteger . toInteger
+
+fromIntegral   :: (Integral a, Num b) => a -> b
+fromIntegral x =  fromInteger (toInteger x)
 
 realToFrac     :: (Real a, Fractional b) => a -> b
-realToFrac      =  fromRational . toRational
+realToFrac x   =  fromRational (toRational x)
 
 {-# RULES
   "realToFrac/toRational"     realToFrac = toRational
-  "realToFrac/fromRational"   realToFrac = fromRational
+--  "realToFrac/fromRational"   realToFrac = fromRational
+--  "realToFrac/toDouble"       realToFrac = toDouble
+--  "realToFrac/fromDouble"     realToFrac = fromDouble
  #-}
 
 {-# RULES
@@ -80,3 +93,4 @@ realToFrac      =  fromRational . toRational
   "fromIntegral/toInteger"    fromIntegral = toInteger
   "fromIntegral/fromInteger"  fromIntegral = fromInteger
  #-}
+

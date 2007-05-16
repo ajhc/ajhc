@@ -2,20 +2,24 @@
 
 module Prelude.Float() where
 
-import Data.Ratio
+import Jhc.Order
+import Jhc.Basics
+import Jhc.Monad
+import Jhc.IO
+import Jhc.Float
+import Jhc.Num
+import Foreign.Storable
 import Foreign.C.Types
 import Foreign.Ptr
 import Foreign.Marshal.Alloc
-import Jhc.IO
-import Foreign.Storable
 
 
 {-  template
 
 
-instance Fractional @type@ where
-    (/) = divide@type@
-    fromRational x = numerator x / denominator x
+--instance Fractional @type@ where
+--    (/) = divide@type@
+--    fromRational x = numerator x / denominator x
 
 instance Floating @type@ where
     pi = atan 1 * 4
@@ -37,6 +41,24 @@ instance Floating @type@ where
     tanh = c_tanh@x@
 
 
+instance RealFrac Float where
+    properFraction x
+      = case (decodeFloat x)      of { (m,n) ->
+    	let  b = floatRadix x     in
+    	if n >= 0 then
+	    (fromInteger m * fromInteger b ^ n, 0.0)
+    	else
+	    case (quotRem m (b^(negate n))) of { (w,r) ->
+	    (fromInteger w, encodeFloat r n)
+	    }
+        }
+
+    truncatef x = c_trunc@x@ x
+    roundf x = c_nearbyint@x@ x
+    ceilingf x = c_ceil@x@ x
+    floorf x = c_floor@x@ x
+
+
 foreign import ccall "-lm math.h sqrt@x@" c_sqrt@x@ :: @type@ -> @type@
 foreign import ccall "-lm math.h exp@x@" c_exp@x@ :: @type@ -> @type@
 foreign import ccall "-lm math.h log@x@" c_log@x@ :: @type@ -> @type@
@@ -53,6 +75,10 @@ foreign import ccall "-lm math.h sinh@x@" c_sinh@x@ :: @type@ -> @type@
 foreign import ccall "-lm math.h cosh@x@" c_cosh@x@ :: @type@ -> @type@
 foreign import ccall "-lm math.h tanh@x@" c_tanh@x@ :: @type@ -> @type@
 foreign import ccall "-lm math.h pow@x@" exponent@type@ ::  @type@ -> @type@ -> @type@
+foreign import ccall "-lm math.h trunc@x@" c_trunc@x@ :: @type@ -> @type@
+foreign import ccall "-lm math.h ceil@x@" c_ceil@x@ :: @type@ -> @type@
+foreign import ccall "-lm math.h floor@x@" c_floor@x@ :: @type@ -> @type@
+foreign import ccall "-lm math.h nearbyint@x@" c_nearbyint@x@ :: @type@ -> @type@
 
 foreign import primitive "divide" divide@type@ ::  @type@ -> @type@ -> @type@
 
@@ -64,6 +90,7 @@ foreign import primitive "divide" divide@type@ ::  @type@ -> @type@ -> @type@
 instance Fractional Float where
     a / b = divideFloat a b
     fromRational x = fromInteger (numerator x) / fromInteger (denominator x)
+    fromDouble x = doubleToFloat x
 
 instance Floating Float where
     pi = c_pif
@@ -101,6 +128,12 @@ foreign import ccall "-lm math.h sinhf" c_sinhf :: Float -> Float
 foreign import ccall "-lm math.h coshf" c_coshf :: Float -> Float
 foreign import ccall "-lm math.h tanhf" c_tanhf :: Float -> Float
 foreign import ccall "-lm math.h powf" exponentFloat ::  Float -> Float -> Float
+foreign import ccall "-lm math.h truncf" c_truncf :: Float -> Float
+foreign import ccall "-lm math.h ceilf" c_ceilf :: Float -> Float
+foreign import ccall "-lm math.h floorf" c_floorf :: Float -> Float
+foreign import ccall "-lm math.h nearbyintf" c_nearbyintf :: Float -> Float
+
+
 
 foreign import primitive "divide" divideFloat ::  Float -> Float -> Float
 
@@ -111,6 +144,7 @@ foreign import primitive "divide" divideFloat ::  Float -> Float -> Float
 instance Fractional Double where
     (/) = divideDouble
     fromRational x = fromInteger (numerator x) / fromInteger (denominator x)
+    fromDouble x = x
 
 instance Floating Double where
     pi = c_pi
@@ -148,18 +182,27 @@ foreign import ccall "-lm math.h sinh" c_sinh :: Double -> Double
 foreign import ccall "-lm math.h cosh" c_cosh :: Double -> Double
 foreign import ccall "-lm math.h tanh" c_tanh :: Double -> Double
 foreign import ccall "-lm math.h pow" exponentDouble ::  Double -> Double -> Double
+foreign import ccall "-lm math.h trunc" c_trunc :: Double -> Double
+foreign import ccall "-lm math.h ceil" c_ceil :: Double -> Double
+foreign import ccall "-lm math.h floor" c_floor :: Double -> Double
+foreign import ccall "-lm math.h nearbyint" c_nearbyint :: Double -> Double
+
+
 
 foreign import primitive "divide" divideDouble ::  Double -> Double -> Double
 
 
 instance Real Float where
-    toRational x	=  (m%1)*(b%1)^^n
+    toRational x	=  (m:%1)*(b:%1)^^n
 			   where (m,n) = decodeFloat x
 				 b     = floatRadix  x
+    toDouble x = floatToDouble x
+
 instance Real Double where
-    toRational x	=  (m%1)*(b%1)^^n
+    toRational x	=  (m:%1)*(b:%1)^^n
 			   where (m,n) = decodeFloat x
 				 b     = floatRadix  x
+    toDouble x = x
 
 
 instance RealFrac Float where
@@ -173,6 +216,11 @@ instance RealFrac Float where
 	    (fromInteger w, encodeFloat r n)
 	    }
         }
+    truncatef x = c_truncf x
+    roundf x = c_nearbyintf x
+    ceilingf x = c_ceilf x
+    floorf x = c_floorf x
+
 
 instance RealFrac Double where
     properFraction x
@@ -185,42 +233,50 @@ instance RealFrac Double where
 	    (fromInteger w, encodeFloat r n)
 	    }
         }
+    truncatef x = c_trunc x
+    roundf x = c_nearbyint x
+    ceilingf x = c_ceil x
+    floorf x = c_floor x
+
 
 instance RealFloat Float where
     floatRadix _ = c_flt_radix
     floatDigits _ = c_flt_mant_dig
     floatRange _ = (c_flt_min_exp,c_flt_max_exp)
 
-    exponent x		= case decodeFloat x of
-			    (m,n) -> if m == 0 then 0 else n + floatDigits x
+    exponent x		= case decodeFloatf x of (_,n) -> n
+    significand x	= case decodeFloatf x of (m,_) -> m
 
-    significand x	= case decodeFloat x of
-			    (m,_) -> encodeFloat m (negate (floatDigits x))
-
-    scaleFloat k x	= case decodeFloat x of
-			    (m,n) -> encodeFloat m (n+k)
     isNaN x = c_isnanf x /= 0
     isInfinite x = c_isinfinitef x /= 0
     isDenormalized _ = False
     isNegativeZero x = x == 0 && c_signbitf x /= 0
     isIEEE _ = True
-    encodeFloat i e = double2float $ c_ldexp (integer2double i) (fromInt e)
+
+    scaleFloat k x = c_ldexpf x (fromInt k)
+    decodeFloatf x = unsafePerformIO $ alloca $ \ptr -> do
+        x' <- c_frexpf x ptr
+        exp <- peek ptr
+        return (x', fromIntegral exp)
+
+    encodeFloat i e = c_ldexpf (fromInteger i) (fromInt e)
     decodeFloat x = unsafePerformIO $ alloca $ \ptr -> do
-        x' <- c_frexp (float2double x) ptr
+        x' <- c_frexp (floatToDouble x) ptr
         exp <- peek ptr
         let x'' =  c_ldexp x' (fromInt $ floatDigits x)
         return (double2integer x'', fromIntegral exp  - floatDigits x)
 
 
 
-
 foreign import ccall "math.h isnan" c_isnanf :: Float -> CInt
 foreign import ccall "math.h isinf" c_isinfinitef :: Float -> CInt
-foreign import ccall "math.h ldexp" c_ldexp :: Double -> CInt -> Double
 foreign import ccall "math.h signbit" c_signbit :: Double -> CInt
 foreign import ccall "math.h signbit" c_signbitf :: Float -> CInt
 
-foreign import ccall "math.h frexp" c_frexp :: Double -> Ptr CInt -> IO Double
+foreign import ccall "math.h ldexp"  c_ldexp :: Double -> CInt -> Double
+foreign import ccall "math.h ldexpf" c_ldexpf :: Float -> CInt -> Float
+foreign import ccall "math.h frexp"  c_frexp :: Double -> Ptr CInt -> IO Double
+foreign import ccall "math.h frexpf" c_frexpf :: Float -> Ptr CInt -> IO Float
 
 foreign import primitive "const.FLT_RADIX" c_flt_radix :: Integer
 foreign import primitive "const.FLT_MANT_DIG" c_flt_mant_dig :: Int
@@ -234,27 +290,26 @@ instance RealFloat Double where
     floatDigits _ = c_dbl_mant_dig
     floatRange _ = (c_dbl_min_exp,c_dbl_max_exp)
 
-    exponent x		= case decodeFloat x of
-			    (m,n) -> if m == 0 then 0 else n + floatDigits x
+    exponent x		= case decodeFloatf x of (_,n) -> n
+    significand x	= case decodeFloatf x of (m,_) -> m
 
-    significand x	= case decodeFloat x of
-			    (m,_) -> encodeFloat m (negate (floatDigits x))
-
-    --scaleFloat k x	= case decodeFloat x of
-    --    		    (m,n) -> encodeFloat m (n+k)
     isNaN x = c_isnan x /= 0
     isInfinite x = c_isinfinite x /= 0
     isDenormalized _ = False
     isNegativeZero x = x == 0 && c_signbit x /= 0
     isIEEE _ = True
-    encodeFloat i e =  c_ldexp (integer2double i) (fromInt e)
     scaleFloat k x = c_ldexp x (fromInt k)
+    decodeFloatf x = unsafePerformIO $ alloca $ \ptr -> do
+        x' <- c_frexp x ptr
+        exp <- peek ptr
+        return (x', fromIntegral exp)
+
+    encodeFloat i e =  c_ldexp (integer2double i) (fromInt e)
     decodeFloat x = unsafePerformIO $ alloca $ \ptr -> do
         x' <- c_frexp x ptr
         exp <- peek ptr
         let x'' = c_ldexp x' (fromInt $ floatDigits x)
         return (double2integer x'', fromIntegral exp  - floatDigits x)
-
 
 
 
@@ -267,7 +322,5 @@ foreign import primitive "const.DBL_MAX_EXP" c_dbl_max_exp :: Int
 
 foreign import primitive "integralCast" integer2float :: Integer -> Float
 foreign import primitive "integralCast" integer2double :: Integer -> Double
-foreign import primitive "integralCast" double2float :: Double -> Float
 foreign import primitive "integralCast" double2integer :: Double -> Integer
-foreign import primitive "integralCast" float2double :: Float -> Double
 

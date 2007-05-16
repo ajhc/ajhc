@@ -9,7 +9,7 @@ module Numeric(fromRat,
 
 import Data.Char   ( isDigit, isOctDigit, isHexDigit
                    , digitToInt, intToDigit )
---import Ratio  ( (%), numerator, denominator )
+import Data.Ratio  ( (%), numerator, denominator )
 --import Array  ( (!), Array, array )
 import Prelude.Text
 
@@ -30,8 +30,11 @@ fromRat x =
 -- that we got from the scaling.
 -- To speed up the scaling process we compute the log2 of the number to get
 -- a first guess of the exponent.
-fromRat' :: (RealFloat a) => Rational -> a
-fromRat' x = r
+fromRat' :: (RealFloat a) => Rational ->  a
+fromRat' x = fromRat'' x undefined
+
+fromRat'' :: (RealFloat a) => Rational -> a -> a
+fromRat'' x _x = r
   where b = floatRadix r
         p = floatDigits r
         (minExp0, _) = floatRange r
@@ -42,7 +45,7 @@ fromRat' x = r
               integerLogBase b (denominator x) - p) `max` minExp
         f = if p0 < 0 then 1 % expt b (-p0) else expt b p0 % 1
         (x', p') = scaleRat (toRational b) minExp xMin xMax p0 (x / f)
-        r = encodeFloat (round x') p'
+        r = encodeFloat (round x') p' `asTypeOf` _x
 
 -- Scale x until xMin <= x < xMax, or p (the exponent) <= minExp.
 scaleRat :: Rational -> Int -> Rational -> Rational ->
@@ -56,7 +59,7 @@ scaleRat b minExp xMin xMax p x =
         scaleRat b minExp xMin xMax (p-1) (x*b)
     else
         (x, p)
--}
+        -}
 -- Exponentiation with a cache for the most common numbers.
 minExpt = 0::Int
 maxExpt = 1100::Int
@@ -327,7 +330,7 @@ floatToDigits base x =
 -- point than the Haskell lexer.  The `.' is optional.
 
 readFloat     :: (RealFrac a) => ReadS a
-readFloat r = error "readFloat"
+readFloat = error "readFloat"
 {-
 readFloat r    = [(fromRational ((n%1)*10^^(k-d)),t) | (n,d,s) <- readFix r,
                                                        (k,t)   <- readExp s] ++
@@ -347,7 +350,9 @@ readFloat r    = [(fromRational ((n%1)*10^^(k-d)),t) | (n,d,s) <- readFix r,
                  readExp' ('-':s) = [(-k,t) | (k,t) <- readDec s]
                  readExp' ('+':s) = readDec s
                  readExp' s       = readDec s
+
 -}
+
 lexDigits        :: ReadS String
 lexDigits        =  nonnull isDigit
 
