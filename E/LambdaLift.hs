@@ -159,7 +159,9 @@ assert x = value True `implies` x
 lambdaLift ::  Program -> IO Program
 lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
     noLift <- calculateLiftees prog
---    noLift <- return $ mempty `asTypeOf` noLift
+    noLift <- return $ mempty `asTypeOf` noLift
+    putStrLn "noLift"
+    Prelude.print noLift
     let wp =  fromList [ tvrIdent x | (x,_,_) <- cs ]
     fc <- newIORef []
     fm <- newIORef mempty
@@ -176,9 +178,6 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
         f e@(ELetRec ds _)  = do
             let (ds',e') = decomposeLet e
             h ds' e' []
-            --local (declEnv_u (ds ++)) $ do
-            --    let (ds',e') = decomposeLet e
-            --    h ds' e' []
         f e = do
             st <- asks isStrict
             if ((tvrIdent tvr `notMember` noLift && isELam e) || (shouldLift tvr e && not st)) then do
@@ -193,14 +192,14 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
         -- easily proven so, so we avoid the whole mess by subtituting known
         -- type variables within lifted expressions. This can not duplicate work
         -- since types are unpointed, but might change space usage slightly.
-        g ec@ECase { eCaseScrutinee = (EVar v), eCaseAlts = as, eCaseDefault = d} | sortKindLike (tvrType v) = do
-            True <- asks isStrict
-            d' <- fmapM f d
-            let z (Alt l e) = do
-                    e' <- local (declEnv_u ((v,followAliases dataTable $ patToLitEE l):)) $ f e
-                    return $ Alt l e'
-            as' <- mapM z as
-            return $ caseUpdate ec { eCaseAlts = as', eCaseDefault = d'}
+--        g ec@ECase { eCaseScrutinee = (EVar v), eCaseAlts = as, eCaseDefault = d} | sortKindLike (tvrType v) = do
+--            True <- asks isStrict
+--            d' <- fmapM f d
+--            let z (Alt l e) = do
+--                    e' <- local (declEnv_u ((v,followAliases dataTable $ patToLitEE l):)) $ f e
+--                    return $ Alt l e'
+--            as' <- mapM z as
+--            return $ caseUpdate ec { eCaseAlts = as', eCaseDefault = d'}
         g (ELam t e) = do
             e' <- local (isStrict_s True) (g e)
             return (ELam t e')
@@ -210,7 +209,8 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
             ds <- asks declEnv
             let fvs = freeVars e
                 fvs' = filter (not . (`member` gs) . tvrIdent) fvs
-                ss = filter (sortKindLike . tvrType) fvs'
+                --ss = filter (sortKindLike . tvrType) fvs'
+                ss = []
                 f [] e False = return (e,fvs'')
                 f [] e True = pLift e
                 f (s:ss) e x
