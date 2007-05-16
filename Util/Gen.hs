@@ -5,7 +5,7 @@ module Util.Gen(module Util.Gen, module GenUtil) where
 import Control.Monad.Writer
 import Control.Monad.Identity
 import Data.Monoid
-import List
+import Data.List
 
 import GenUtil hiding(replicateM)
 
@@ -23,3 +23,5 @@ runEither _ (Right a) = a
 travCollect :: Monoid w => (forall m . Monad m => (a -> m a) -> a -> m a) -> (a -> w) -> a -> w
 travCollect fn col x = execWriter (fn (\x -> tell (col x) >> return x) x)
 
+forMn_ xs = forM_ (zip xs [0 :: Int .. ])
+forMn xs = forM (zip xs [0 :: Int .. ])
