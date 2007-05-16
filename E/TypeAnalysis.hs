@@ -114,8 +114,8 @@ calcDef env@Env { envRuleSupply = ur, envValSupply = uv } (t,e) = do
                     let (t'::Value Typ) = Info.fetch (tvrInfo t)
                     as' <- mapM getValue as
                     addRule $ conditionalRule id ruleUsed $ ioToRule $ do
-                        flip mapM_ (zip naturals as') $ \ (i,a'') -> do
-                            addRule $ modifiedSuperSetOf a'' t' (vmapArg n i)
+                        flip mapM_ (zip naturals (zip as as')) $ \ (i,(a',a'')) -> do
+                            when (isEVar a') $ addRule $ modifiedSuperSetOf a'' t' (vmapArg n i)
                             --addRule $ modifiedSuperSetOf t' vv (vmapArg n i)
 --                    addRule $ conditionalRule id ruleUsed $ ioToRule $ do
 --                        flip mapM_ (zip as' naturals)  $ \ (v,i) -> do
