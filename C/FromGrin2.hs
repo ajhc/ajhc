@@ -140,7 +140,10 @@ convertVal h@(NodeC a ts) | valIsConstant h = do
         _ -> do
             (_,i) <- newConst h
             return $ variable (name $  'c':show i )
-convertVal (Lit i _) = return (constant $ number (fromIntegral i))
+convertVal (Lit i ty)
+    | ty == Ty (toAtom "float") || ty == Ty (toAtom "double") = return (constant $ floating (fromIntegral i))
+    | otherwise = return (constant $ number (fromIntegral i))
+
 convertVal (Tup [x]) = convertVal x
 convertVal (Tup []) = return emptyExpression
 convertVal (Tup xs) = do

@@ -34,6 +34,7 @@ module C.Generate(
     forLoop,
     nullPtr,
     number,
+    floating,
     operator,
     project,
     project',
@@ -237,6 +238,9 @@ enum n = C (draw n)
 
 number :: Int -> Constant
 number i = C (tshow i)
+
+floating :: Double -> Constant
+floating i = C (tshow i)
 
 character :: Char -> Constant
 character c = C (tshow c)
