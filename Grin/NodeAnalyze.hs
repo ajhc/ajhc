@@ -116,19 +116,19 @@ nodeAnalyze grin' = do
         grin = renameUniqueGrin grin'
         docaf (v,tt) | True = tell $ Right top `equals` Left (V (Vr v) (TyPtr TyNode))
                      | otherwise = return ()
-    putStrLn "----------------------------"
-    print cs
-    putStrLn "----------------------------"
+    --putStrLn "----------------------------"
+    --print cs
+    --putStrLn "----------------------------"
     putStrLn "-- NodeAnayze"
-    --(rm,res) <- solve (const (return ())) cs
-    (rm,res) <- solve putStrLn cs
+    (rm,res) <- solve (const (return ())) cs
+    --(rm,res) <- solve putStrLn cs
     let cmap = Map.map (runIdentity . flip Map.lookup res) rm
-    putStrLn "----------------------------"
-    mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList rm)
-    putStrLn "----------------------------"
-    mapM_ print (Map.elems res)
-    putStrLn "----------------------------"
-    hFlush stdout
+    --putStrLn "----------------------------"
+    --mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList rm)
+    --putStrLn "----------------------------"
+    --mapM_ print (Map.elems res)
+    --putStrLn "----------------------------"
+    --hFlush stdout
     --exitWith ExitSuccess
     nfs <- mapM (fixupFunc cmap) (grinFuncs grin)
     return $ setGrinFunctions nfs grin
