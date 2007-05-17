@@ -397,7 +397,7 @@ convertExp (Update v@(Var vv _) tn@(NodeC t as)) | getType v == TyPtr TyNode = d
     v' <- convertVal v
     as' <- mapM convertVal as
     nt <- nodeTypePtr t
-    let tmp' = cast nt (if vv < v0 then f_DETAG v' else v')
+    let tmp' = cast nt (f_DETAG v') -- (if vv < v0 then f_DETAG v' else v')
     if not (tagIsSuspFunction t) && vv < v0 then do
         (nns, nn) <- newNode tn
         return (nns & getHead (f_NODEP(f_DETAG v')) =* cast fptr_t nn,emptyExpression)
