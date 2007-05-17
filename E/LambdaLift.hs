@@ -150,7 +150,7 @@ calculateLiftees prog = do
     calcFixpoint "Liftees" fixer
     vs <- supplyReadValues sup
     let nlset =  (fromList [ x | (x,False) <- vs])
-    printf "%i lambdas not lifted\n" (size nlset)
+    printf "%d lambdas not lifted\n" (size nlset)
     return nlset
 
 implies :: Value Bool -> Value Bool -> IO ()
