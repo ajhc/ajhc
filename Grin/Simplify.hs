@@ -118,12 +118,12 @@ simplify1 stats env (n,l) = do
     gv (NodeC t xs,Return (NodeC t' xs')) | t /= t' = do
             lift $ tick stats at_OptSimplifyBadAssignment
             gv (NodeC t xs,Error ("Bad Assignment: " ++ show (t,t')) TyNode)
-    gv (NodeV v [],Return (NodeC t' [])) = do
-            lift $ tick stats at_OptSimplifyEnumAssignment
-            gv (Var v TyTag, Return (Tag t'))
-    gv (NodeV v [],Return (NodeV v' [])) = do
-            lift $ tick stats at_OptSimplifyEnumAssignment
-            gv (Var v TyTag, Return (Var v' TyTag))
+--    gv (NodeV v [],Return (NodeC t' [])) = do
+--            lift $ tick stats at_OptSimplifyEnumAssignment
+--            gv (Var v TyTag, Return (Tag t'))
+--    gv (NodeV v [],Return (NodeV v' [])) = do
+--            lift $ tick stats at_OptSimplifyEnumAssignment
+--            gv (Var v TyTag, Return (Var v' TyTag))
     gv (p,e) = do
         (env,_) <- get
         e <- (applySubstE env e)
@@ -265,8 +265,8 @@ isCombinable postEval e = ans where
 
 combineLam postEval nty (p :-> e) = p :-> combine postEval nty e where
 combine postEval nty exp = editTail nty f exp where
-    f (Return (NodeV t [])) = Return (Var t TyTag)
-    f (Return (NodeC t [])) | postEval  = Return (Tag t)
+--    f (Return (NodeV t [])) = Return (Var t TyTag)
+--    f (Return (NodeC t [])) | postEval  = Return (Tag t)
     f (Return v) | valIsConstant v  = Return unit
     f (Return (NodeC t xs)) = Return (tuple xs)
     f lt@Let { expBody = body } = updateLetProps lt { expBody = combine postEval nty body }
