@@ -204,7 +204,7 @@ convertBody Let { expDefs = defs, expBody = body } = do
     ss <- (convertBody body)
     rs <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = Tup as :-> b } -> do
        ss <- convertBody b
-       return (annotate (show as) (label (toName (show name ++ show u))) & indentBlock ss)
+       return (annotate (show as) (label (toName (show name ++ show u))) & subBlock ss)
     return (ss & goto done & mconcat (intersperse (goto done) rs) & label done);
 convertBody (e :>>= v@(Var _ _) :-> e') = do
     v' <- convertVal v
@@ -307,17 +307,62 @@ convertBody (Case v@(Var _ t) ls) = do
         da (Tup [x] :-> e) = da ( x :-> e )
     ls' <- mapM da ls
     return $ profile_case_inc & switch' scrut' ls'
+convertBody (Error s t) = do
+    x <- asks rTodo
+    let jerr | null s    = expr $ functionCall (name "jhc_exit") [constant $ number 255]
+             | otherwise = expr $ functionCall (name "jhc_error") [string s]
+    let f (TyPtr _) = return nullPtr
+        f TyNode = return nullPtr
+        f (TyTup []) = return emptyExpression
+        f (TyTup xs) = do ts <- mapM convertType xs; xs <- mapM f xs ; return $ structAnon (zip xs ts)
+        f (Ty x) = return $ cast (basicType (show x)) (constant $ number 0)
+        f TyTag  = return $ constant (enum $ nodeTagName tagHole)
+        f x = return $ err ("error-type " ++ show x)
+    case x of
+        TodoNothing -> return jerr
+        TodoExp _ -> return jerr
+        TodoReturn -> do
+            v <- f t
+            return (jerr & creturn v)
+
+convertBody (Store  n@NodeC {})  = newNode n >>= \(x,y) -> simpleRet (cast sptr_t y) >>= \v -> return (x & v)
+convertBody (Return n@NodeC {})  = newNode n >>= \(x,y) -> simpleRet (cast wptr_t y) >>= \v -> return (x & v)
+
+-- IORef's do this
+convertBody (Store v) | tyINode == getType v = do
+    v <- convertVal v
+    tmp <- newVar (ptrType sptr_t)
+    r <- simpleRet tmp
+    return ((tmp =* jhc_malloc (sizeof sptr_t)) & (dereference tmp =* v) & r)
+convertBody (Fetch v) | getType v == TyPtr tyINode  = do
+    v <- convertVal v
+    simpleRet $ dereference v
+convertBody (Update v z) | getType z == tyINode = do
+    v' <- convertVal v
+    z' <- convertVal z
+    r <- simpleRet emptyExpression
+    return (dereference v' =* z' & r)
+
+-- return, promote and demote
+convertBody (Fetch v)        | getType v == tyINode = simpleRet =<< f_promote `liftM` convertVal v
+convertBody (Store n@Var {}) | getType n == tyDNode = simpleRet =<< f_demote `liftM` convertVal n
+convertBody (Return v) = simpleRet =<< convertVal v
 
 
 convertBody e = do
     x <- asks rTodo
     (ss,er) <- convertExp e
+    r <- simpleRet er
+    return (ss & r)
+
+
+simpleRet er = do
+    x <- asks rTodo
     case x of
-        TodoReturn -> return (ss & creturn er)
-        TodoExp v | isEmptyExpression er -> return ss
-        TodoExp v -> return (ss & (v =* er))
-        TodoNothing | isEmptyExpression er -> return ss
-        TodoNothing -> return (ss & er)
+        TodoReturn -> return (creturn er)
+        _ | isEmptyExpression er -> return mempty
+        TodoExp v -> return (v =* er)
+        TodoNothing -> return $ expr er
 
 nodeAssign v t as e' = do
     declareStruct t
@@ -330,18 +375,6 @@ nodeAssign v t as e' = do
 
 
 convertExp :: Exp -> C (Statement,Expression)
-convertExp (Error s t) = do
-    let f (TyPtr _) = return nullPtr
-        f TyNode = return nullPtr
-        f (TyTup []) = return emptyExpression
-        f (TyTup xs) = do ts <- mapM convertType xs; xs <- mapM f xs ; return $ structAnon (zip xs ts)
-        f (Ty x) = return $ cast (basicType (show x)) (constant $ number 0)
-        f TyTag  = return $ constant (enum $ nodeTagName tagHole)
-        f x = return $ err $ "error-type " ++ show x
-    ev <- f t
-    if null s
-      then return (expr $ functionCall (name "jhc_exit") [constant $ number 255],ev)
-       else return (expr $ functionCall (name "jhc_error") [string s],ev)
 convertExp (Prim p vs) | APrim _ req <- primAPrim p  =  do
     tell mempty { wRequires = req }
     e <- convertPrim p vs
@@ -355,20 +388,8 @@ convertExp (Update (Index base off) z) | getType z == TyPtr TyNode = do
     off <- convertVal off
     z' <- convertVal z
     return $ (indexArray base off `assign` z',emptyExpression)
-convertExp (Store v) | TyPtr TyNode == getType v = do
-    v <- convertVal v
-    tmp <- newVar (ptrType sptr_t)
-    return ((tmp =* jhc_malloc (sizeof sptr_t)) & (dereference tmp =* v),tmp)
-convertExp (Fetch v) | getType v == TyPtr (TyPtr TyNode) = do
-    v <- convertVal v
-    return (mempty,dereference v)
-convertExp (Fetch v) | getType v == TyPtr TyNode = do
-    v <- convertVal v
-    return (mempty,f_fetch v)
-convertExp (Update v z) | getType z == TyPtr TyNode = do
-    v' <- convertVal v
-    z' <- convertVal z
-    return $ (dereference v' =* z',emptyExpression)
+
+
 --convertExp (App a [fn,x] _) | a == funcApply = do
 --    fn' <- convertVal fn
 --    x' <- convertVal x
@@ -376,15 +397,6 @@ convertExp (Update v z) | getType z == TyPtr TyNode = do
 convertExp (App a [v] _) | a == funcEval = do
     v' <- convertVal v
     return (mempty,f_eval v')
-convertExp (Store n@NodeC {})  = newNode n >>= \(x,y) -> return (x,cast sptr_t y)
-convertExp (Return n@NodeC {}) = newNode n >>= \(x,y) -> return (x,cast wptr_t y)
-convertExp (Store n@Var {}) | getType n == TyNode = do
-    n' <- convertVal n
-    return (mempty,cast sptr_t n')
-convertExp (Return v) = do
-    v <- convertVal v
-    return (mempty,v)
---convertExp (App a vs _) | a `notElem` [funcApply,funcEval] = do
 convertExp (App a vs _) = do
     lm <- asks rEMap
     vs' <- mapM convertVal vs
@@ -664,7 +676,9 @@ f_EVALTAG e   = functionCall (name "EVALTAG") [e]
 f_VALUE e     = functionCall (name "VALUE") [e]
 f_ISVALUE e   = functionCall (name "ISVALUE") [e]
 f_eval e      = functionCall (name "eval") [e]
-f_fetch e     = functionCall (name "fetch") [e]
+f_promote e   = functionCall (name "promote") [e]
+f_demote e    = functionCall (name "demote") [e]
+f_follow e    = functionCall (name "follow") [e]
 f_update x y  = functionCall (name "update") [x,y]
 jhc_malloc_atomic sz = functionCall (name "jhc_malloc_atomic") [sz]
 profile_update_inc   = expr $ functionCall (name "jhc_update_inc") []
@@ -795,6 +809,7 @@ newNode (NodeV t []) = do
 convertBody (Return v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
 convertBody (Fetch v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
 -}
+
 
 
 

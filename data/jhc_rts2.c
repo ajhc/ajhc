@@ -143,13 +143,23 @@ jhc_valid_lazy(sptr_t s)
 
 typedef wptr_t (*eval_fn)(node_t *node) A_STD;
 
-// fetch is like a cast, an 'eval' where you know the target is in WHNF
+// both promote and demote evaluate to nothing when debugging is not enabled
+// otherwise, they check that their arguments are in the correct form.
+
 static inline wptr_t A_STD A_UNUSED
-fetch(sptr_t s)
+promote(sptr_t s)
 {
         assert(!ISLAZY(s));
         assert(jhc_valid_whnf((wptr_t)s));
         return (wptr_t)s;
+}
+
+static inline sptr_t A_STD A_UNUSED
+demote(wptr_t s)
+{
+        assert(!ISLAZY(s));
+        assert(jhc_valid_whnf(s));
+        return (sptr_t)s;
 }
 
 // like eval but you know the target is in WHNF or is a already evaluated indirection

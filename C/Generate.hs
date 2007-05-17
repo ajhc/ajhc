@@ -24,7 +24,7 @@ module C.Generate(
     FunctionOpts(..),
     generateC,
     goto,
-    indentBlock,
+    subBlock,
     isEmptyExpression,
     label,
     localVariable,
@@ -57,19 +57,30 @@ module C.Generate(
 
 import Char
 import Control.Monad.RWS
+import Data.List(intersperse)
+import Data.Maybe(isNothing)
 import Data.Monoid
-import List(intersperse)
-import Maybe(isNothing)
 import Numeric
-import qualified Data.Map as Map
 import Text.PrettyPrint.HughesPJ(Doc,render,nest,($$),($+$))
+import qualified Data.Foldable as Seq
+import qualified Data.Map as Map
+import qualified Data.Sequence as Seq
+import qualified Data.Traversable as Seq
+import qualified Data.Set as Set
 
 import Doc.DocLike
-import GenUtil
+import Util.Gen
+import Util.SetLike
 
+data Env = Env {
+    envUsedLabels :: Set.Set Name,
+    envInScope    :: Set.Set Name
+    }
 
-newtype G a = G (RWS () [(Name,Type)] (Int,Map.Map [Type] Name) a)
-    deriving(Monad,MonadWriter [(Name,Type)],MonadState (Int,Map.Map [Type] Name))
+emptyEnv = Env { envUsedLabels = mempty, envInScope = mempty }
+
+newtype G a = G (RWS Env [(Name,Type)] (Int,Map.Map [Type] Name) a)
+    deriving(Monad,MonadWriter [(Name,Type)],MonadState (Int,Map.Map [Type] Name),MonadReader Env)
 
 
 newtype Name = Name String
@@ -79,14 +90,38 @@ newtype Name = Name String
 instance Show Name where
     show (Name n) = n
 
-data StatementInfo = StatementGoto Name | StatementLabel Name | StatementNoInfo | StatementEmpty
 
 data TypeHint = ThNone | ThConst | ThPtr
 data Expression = Exp TypeHint E
-data Statement = SD StatementInfo (G Doc)
+
+newtype Statement = St (Seq.Seq Stmt)
+
+data Stmt =
+    SD (G Doc)
+    | SGoto Name
+    | SLabel Name
+    | SReturn Expression
+    | SBlock Statement
+    | SIf Expression Statement Statement
+    | SSwitch Expression [(Maybe Constant,Statement)]
+
 newtype Constant = C (G Doc)
 
-sd = SD StatementNoInfo
+sd x = stmt (SD x)
+stmt s = St (Seq.singleton s)
+
+stmtMapStmt :: Monad m => (Stmt -> m Stmt) -> Stmt -> m Stmt
+stmtMapStmt f s = g s where
+    g (SBlock sb) = return SBlock `ap` h sb
+    g (SIf e s1 s2) = return (SIf e) `ap` h s1 `ap` h s2
+    g (SSwitch e ss) = do
+        ss <- forM ss $ \ (x,y) -> do
+            y <- h y
+            return (x,y)
+        return $ SSwitch e ss
+    g s = return s
+    h (St sms) = return St `ap` Seq.mapM f sms
+
 
 data Type = TB String | TPtr Type | TAnon [Type] | TNStruct Name
     deriving(Eq,Ord)
@@ -103,8 +138,33 @@ class Draw d where
     err s = error s
 
 instance Draw Statement where
-    draw (SD _ g) = g
+    draw (St ss) = vcat (map draw $ Seq.toList ss)
     err s = sd $ terr s
+
+instance Draw Stmt where
+    err s = SD (terr s)
+
+    draw (SD g) = g
+    draw (SReturn e) | isEmptyExpression e = text "return;"
+    draw (SReturn e) = text "return " <> draw e <> char ';'
+    draw (SLabel n@(Name s)) = do
+        ls <- asks envUsedLabels
+        if n `member` ls then  text s <> char ':' else return mempty
+    draw (SGoto (Name s)) = text "goto" <+> text s <> char ';'
+    draw (SBlock s) = do
+        s <- subBlockBody s
+        return $ vcat [char '{', nest 4 s, char '}']
+    draw (SIf exp thn els) = do
+        exp <- draw exp
+        thn <- subBlockBody thn
+        els <- subBlockBody els
+        return $ text "if" <+> parens exp <+> lbrace <$> nest 4 thn <$> rbrace <+> text "else" <+> lbrace <$> nest 4 els <$> rbrace
+    draw (SSwitch e ts) = text "switch" <+> parens (draw e) <+> char '{' <$> vcat (map sc ts) <$> md <$>  char '}' where
+        sc (Just x,ss) = do ss <- draw ss ; x <- draw x; return $ text "case" <+> x <> char ':' $$ nest 4 (ss $$ text "break;")
+        sc (Nothing,ss) = do ss <- draw ss; return $ text "default:"  $$  ( nest 4 ss $$ text "break;")
+        md = if any isNothing (fsts ts) then empty else text "default: jhc_case_fell_off(__LINE__);"
+
+subBlockBody s = draw s
 
 instance Draw E where
     draw (ED g) = g
@@ -184,6 +244,27 @@ localVariable t n = expD $ do
     tell [(n,t)]
     draw n
 
+instance Monoid Statement where
+    mempty = St mempty
+    mappend (St as) (St bs) = St $ pairOpt stmtPairOpt as bs
+
+stmtPairOpt a b = f a b where
+    f (SGoto l) y@(SLabel l') | l == l' = Just y
+    f SReturn {} SLabel {} = Nothing
+    f x@SGoto {} _  = Just x
+    f x@SReturn {} _  = Just x
+    f _ _ = Nothing
+
+-- combine two sequences, attempting pairwise peephole optimizations
+
+pairOpt :: (s -> s -> Maybe s) -> Seq.Seq s -> Seq.Seq s -> Seq.Seq s
+pairOpt peep as bs = f as bs where
+    f as bs | as' Seq.:> a <- Seq.viewr as, b Seq.:< bs' <- Seq.viewl bs = case peep a b of
+        Just ab -> as' `f` Seq.singleton ab `f` bs'
+        Nothing -> as Seq.>< bs
+    f as bs =  as Seq.>< bs
+
+
 emptyExpression = Exp ThNone EE
 
 expressionRaw s = expD $ text s
@@ -250,65 +331,38 @@ expr :: Expression -> Statement
 expr e | isEmptyExpression e = mempty
 expr e = sd $ draw e <> char ';'
 
-instance Monoid Statement where
-    mempty = SD StatementEmpty empty
-    mappend (SD StatementEmpty _) x = x
-    mappend x (SD StatementEmpty _) = x
-    mappend x@(SD (StatementGoto _) _) (SD (StatementGoto _) _) = x
-    mappend (SD (StatementGoto l) _) y@(SD (StatementLabel l') _) | l == l' = y
---    mappend x y@(SD l@StatementGoto {} _) = combine l x y
---    mappend x@(SD l@StatementLabel {} _) y  = combine l x y
-    mappend a b = combine StatementNoInfo a b
-
-combine l a b = SD l $ do
-    a <- draw a
-    b <- draw b
-    return $ vcat [a,b]
-
 
 creturn :: Expression -> Statement
-creturn e = SD (StatementGoto (Name "")) $ text "return " <> draw e <> char ';'
+creturn e = stmt $ SReturn e
 
 assign :: Expression -> Expression -> Statement
 assign a b = expr $ operator "=" a b
 
 label :: Name -> Statement
-label n@(Name s) = SD (StatementLabel n) $ text s <> char ':' <+> text "0;"
+label n = stmt $ SLabel n
 
 goto :: Name -> Statement
-goto n@(Name s) = SD (StatementGoto n) $ text "goto" <+> text s <> char ';'
+goto n = stmt $ SGoto n
 
---SD $ do
---    us <- mapM (const newUniq) xs
---    let ss = act [ variable (name $ 'v':show u) | u <- us]
---    draw ss
 
-newVar t = do
+newVar t = snd `liftM` newDeclVar t
+
+newDeclVar t = do
     u <- newUniq
-    return (localVariable t (name $ 'x':show u))
+    let n = name $ 'x':show u
+    return (sd (tell [(n,t)] >> return mempty),localVariable t n)
 
 
---switch :: Expression -> [(Constant,Statement)] -> Maybe Statement -> Statement
 
 
 switch' :: Expression -> [(Maybe Constant,Statement)]  -> Statement
-
-switch' e ts = sd $ text "switch" <+> parens (draw e) <+> char '{' <$> vcat (map sc ts) <$> md <$>  char '}' where
-    sc (Just x,ss) = do ss <- draw ss ; x <- draw x; return $ text "case" <+> x <> char ':' $$ nest 4 (ss $$ text "break;")
-    sc (Nothing,ss) = do ss <- draw ss; return $ text "default:"  $$  ( nest 4 ss $$ text "break;")
-    md = if any isNothing (fsts ts) then empty else text "default: jhc_case_fell_off(__LINE__);"
+switch' e es = stmt $ SSwitch e es
 
 
 cif :: Expression -> Statement -> Statement -> Statement
-cif exp thn els = sd $ do
-    thn <- draw thn
-    els <- draw els
-    exp <- draw exp
-    return $ text "if" <+> parens exp <+> lbrace <$> nest 4 thn <$> rbrace <+> text "else" <+> lbrace <$> nest 4 els <$> rbrace
+cif exp thn els = stmt $ SIf exp thn els
 
-indentBlock sd@(SD si _) = SD si $ do
-    x <- draw sd
-    return $ nest 4 x
+subBlock st = stmt (SBlock st)
 
 forLoop :: Expression -> Expression -> Expression -> Statement -> Statement
 forLoop i from to body = sd $ do
@@ -319,18 +373,6 @@ forLoop i from to body = sd $ do
     return $ text "for" <> parens (i <+> equals <+> from <> semi <+> i <> text "++" <> semi <+> i <+> text "<" <+> to) <+> lbrace <$> nest 4 body <$> rbrace
 
 
-{-
-creturn_ :: Statement
-withVars :: [Type] -> ([Expression] -> Statement) -> Statement
-
-
-
-
--- functions
-
--- bfunction :: Name -> Type -> [Type] (\[Expression] -> Statement ) -> Function
-
--}
 
 data Function = F {
     functionAnnotations :: String,
@@ -347,15 +389,24 @@ data FunctionOpts = Public | Attribute String
 function :: Name -> Type -> [(Name,Type)] -> [FunctionOpts] -> Statement -> Function
 function n t as o s = F "" n t as o s
 
+travCollect' :: Monoid w => ((a -> Writer w a) -> a -> Writer w a) -> (a -> w) -> a -> w
+travCollect' fn col x = execWriter (f x) where
+    f x = tell (col x) >> fn f x
 
 drawFunction f = do
     frt <- draw (functionReturnType f)
-    (body,uv) <- listen (draw (functionBody f))
-    uv' <- flip mapM [ (x,t) | (x,t) <- snubUnder fst uv, x `notElem` fsts (functionArgs f)] $ \ (n,t) -> do
+    cenv <- ask
+    let env = cenv { envUsedLabels = ul } where
+        ul = Set.fromList $ Seq.toList $ Seq.foldMap (travCollect' stmtMapStmt g) stseq
+        St stseq = functionBody f
+        g (SGoto n) = Seq.singleton n
+        g s = mempty
+    (body,uv) <- local (const env) $ listen (draw (functionBody f))
+    uv' <- forM [ (x,t) | (x,t) <- snubUnder fst uv, x `notElem` fsts (functionArgs f)] $ \ (n,t) -> do
         t <- draw t
         return $ t <+> tshow n <> semi
     name <- draw (functionName f)
-    fas <- flip mapM (functionArgs f) $ \ (n,t) -> do
+    fas <- forM (functionArgs f) $ \ (n,t) -> do
         n <- draw n
         t <- draw t
         return $ t <+> n
@@ -396,7 +447,8 @@ class Annotate e where
     annotate :: String -> e -> e
 
 instance Annotate Statement where
-    annotate c s@(SD si _) = SD si ((text "/* " <> text c <> text " */") <$> draw s)
+    --annotate c s@(SD si _) = SD si ((text "/* " <> text c <> text " */") <$> draw s)
+    annotate c s = sd (text "/* " <> text c <> text " */") `mappend` s
 
 
 mangleIdent xs =  concatMap f xs where
@@ -433,16 +485,16 @@ generateC genTag fs ss = ans where
         let shead = vcat $ map (text . (++ ";") . ("struct " ++) . show . fst) ss
         shead2 <- declStructs genTag ss
         return (shead $$ line $$ shead2, vcat protos $$ line $$  vsep bodys)
-    ((hd,fns),(_,ass),_written) = runRWS ga () (1,Map.empty)
+    ((hd,fns),(_,ass),_written) = runRWS ga emptyEnv (1,Map.empty)
 
     anons = [ (n, fields ts ) | (ts,n) <- Map.toList ass ] where
         fields :: [Type] -> [(Name,Type)]
         fields ts = [ (name ('t':show tn),t) | t <- ts | tn <- [0::Int .. ]]
     G anons' = declStructs False anons
-    (anons'',_,_) = runRWS anons' () (1,Map.empty)
+    (anons'',_,_) = runRWS anons' emptyEnv (1,Map.empty)
 
-    declStructs ht ss = liftM vsep $ flip mapM ss $ \ (n,ts) -> do
-            ts' <- flip mapM ts $ \ (n,t) -> do
+    declStructs ht ss = liftM vsep $ forM ss $ \ (n,ts) -> do
+            ts' <- forM ts $ \ (n,t) -> do
                 t <- draw t
                 return $ t <+> tshow n <> semi
             return $ text "struct" <+> tshow n <+> lbrace $$ nest 4 (vcat $ (if ht then text "tag_t tag;" else empty):ts') $$ rbrace <> semi
@@ -471,6 +523,6 @@ renderG x = render $ drawG x
 drawG :: Draw d => d -> Doc
 drawG x = fns where
     G ga = draw x
-    (fns,_,_) = runRWS ga () (1,Map.empty)
+    (fns,_,_) = runRWS ga emptyEnv (1,Map.empty)
 
 
