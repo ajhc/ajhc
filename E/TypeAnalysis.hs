@@ -3,9 +3,11 @@
 
 module E.TypeAnalysis(typeAnalyze, Typ(),expandPlaceholder) where
 
+import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.Identity
+import Control.Monad.State
 import Data.Monoid
 import Data.FunctorM
 import qualified Data.Set as Set
@@ -76,7 +78,7 @@ typeAnalyze doSpecialize prog = do
         addRule $ assert vv
     mapM_ (sillyEntry env) entries
     findFixpoint Nothing fixer
-    prog <- annotateProgram mempty (\_ -> return) (\_ -> return) lamread prog
+    prog <- annotateProgram mempty lamread (\_ -> return) (\_ -> return) prog
     unusedRules <- supplyReadValues ur >>= return . fsts . filter (not . snd)
     unusedValues <- supplyReadValues uv >>= return . fsts . filter (not . snd)
     let (prog',stats) = runStatM $ specializeProgram doSpecialize (Set.fromList unusedRules) (Set.fromList unusedValues) prog
@@ -116,11 +118,6 @@ calcDef env@Env { envRuleSupply = ur, envValSupply = uv } (t,e) = do
                     addRule $ conditionalRule id ruleUsed $ ioToRule $ do
                         forMn_ ((zip as as')) $ \ ((a',a''),i) -> do
                             when (isEVar a') $ addRule $ modifiedSuperSetOf a'' t' (vmapArg n i)
-                            --addRule $ modifiedSuperSetOf t' vv (vmapArg n i)
---                    addRule $ conditionalRule id ruleUsed $ ioToRule $ do
---                        flip mapM_ (zip as' naturals)  $ \ (v,i) -> do
---                            addRule $ modifiedSuperSetOf vv v (vmapArgSingleton n i)
-                    --addRule $ dynamicRule v $ \v' -> (mconcat [ t `isSuperSetOf` value (vmapArg n i v') | (t,i) <-  zip ts' naturals ])
                     addRule $ conditionalRule (n `vmapMember`) t' (assert ruleUsed)
                     return False
             rr <- mapM (hrg r) (zip tls (ruleArgs r))
@@ -168,12 +165,12 @@ calcAlt env v (Alt LitCons { litName = n, litArgs = xs } e) = do
 calcE :: Env -> E -> IO ()
 calcE env (ELetRec ds e) = calcDs nenv ds >> calcE nenv e where
     nenv = env { envEnv = extractValMap ds `union` envEnv env }
-calcE env e | (e',(_:_)) <- fromLam e = calcE env e'
 calcE env ec@ECase {} | sortKindLike (getType $ eCaseScrutinee ec) = do
     calcE env (eCaseScrutinee ec)
     fmapM_ (calcE env) (eCaseDefault ec)
     v <- getValue (eCaseScrutinee ec)
     mapM_ (calcAlt env v) (eCaseAlts ec)
+calcE env e | (e',(_:_)) <- fromLam e = calcE env e'
 calcE env ec@ECase {} = do
     calcE env (eCaseScrutinee ec)
     mapM_ (calcE env) (caseBodies ec)
@@ -303,6 +300,58 @@ specializeDef True SpecEnv { senvDataTable = dataTable }  (tvr,e) = ans where
         return (if sd then tvr { tvrType = infertype dataTable ne, tvrInfo = infoMap (dropArguments vs) (tvrInfo tvr) } else tvr,ne)
 specializeDef _ _ (t,e) = return (t,e)
 
+instance Error () where
+    noMsg = ()
+    strMsg _ = ()
+
+
+evalErrorT :: Monad m => a -> ErrorT () m a -> m a
+evalErrorT err action = liftM f (runErrorT action) where
+    f (Left _) = err
+    f (Right x) = x
+
+eToPatM :: Monad m => (E -> m TVr) -> E -> m (Lit TVr E)
+eToPatM cv e = f e where
+    f (ELit LitCons { litAliasFor = af,  litName = x, litArgs = ts, litType = t }) = do
+        ts <- mapM cv ts
+        return litCons { litAliasFor = af, litName = x, litArgs = ts, litType = t }
+    f (ELit (LitInt e t)) = return (LitInt e t)
+    f (EPi (TVr { tvrType =  a}) b)  = do
+        a <- cv a
+        b <- cv b
+        return litCons { litName = tc_Arrow, litArgs = [a,b], litType = eStar }
+    f x = fail $ "E.Values.eToPatM: " ++ show x
+
+
+caseCast :: TVr -> E -> E -> E
+caseCast t ty e = evalState  (f t ty e) (newIds (freeIds e),[]) where
+    f t ty e = do
+        p <- eToPatM cv ty
+        (ns,es) <- get
+        put (ns,[])
+        let rs = map (uncurry caseCast) es
+        return (eCase (EVar t) [Alt p (foldr (.) id rs e)] Unknown)
+    cv (EVar v) = return v
+    cv e = do
+        ((n:ns),es) <- get
+        let t = tvr { tvrIdent = n, tvrType = getType e }
+        put (ns,(t,e):es)
+        return t
+caseCast t _ty e = e
+
+specAlt :: MonadStats m => SpecEnv -> Alt E -> m (Alt E)
+specAlt SpecEnv { senvDataTable = dataTable, senvUnusedVars = unusedVals } (Alt lc@LitCons { litArgs = ts } e) = ans where
+    f xs = do
+        ws <- forM xs $ \t -> evalErrorT id $ do
+            False <- return $ t `member` unusedVals
+            Just nt <- return $ Info.lookup (tvrInfo t)
+            Just tt <- return $ getTyp (getType t) dataTable nt
+            mtick $ "Specialize.alt.{" ++ pprint (show nt,tt) ++ "}"
+            return $ caseCast t tt
+        return $ foldr (.) id ws
+    ans = do
+        ws <- f ts
+        return (Alt lc (ws e))
 
 specBody :: MonadStats m => Bool -> SpecEnv -> E -> m E
 specBody _ env@SpecEnv { senvUnusedVars = unusedVars, senvDataTable = dataTable } e | (EVar h,as) <- fromAp e, h `Set.member` unusedVars = do
@@ -311,8 +360,9 @@ specBody _ env@SpecEnv { senvUnusedVars = unusedVars, senvDataTable = dataTable 
 specBody True SpecEnv { senvArgs = dmap } e | (EVar h,as) <- fromAp e, Just os <- mlookup h dmap = do
     mtick $ "Specialize.use.{" ++ pprint h ++ "}"
     return $ foldl EAp (EVar h) [ a | (a,i) <- zip as naturals, i `notElem` os ]
---specBody True env e@ECase { eCaseScrutinee = EVar v } | sortKindLike (getType v)scrut = do
---    k
+specBody True env ec@ECase { eCaseScrutinee = EVar v } | sortKindLike (getType v) = do
+    alts <- mapM (specAlt env) (eCaseAlts ec)
+    emapE' (specBody True env) ec { eCaseAlts = alts }
 specBody doSpecialize env (ELetRec ds e) = do
     (nds,nenv) <- specializeDs doSpecialize env ds
     e <- specBody doSpecialize nenv e
@@ -322,7 +372,6 @@ specBody doSpecialize env e = emapE' (specBody doSpecialize env) e
 --specializeDs :: MonadStats m => DataTable -> Map.Map TVr [Int] -> [(TVr,E)] -> m ([(TVr,E)]
 specializeDs doSpecialize env@SpecEnv { senvUnusedRules = unusedRules, senvDataTable = dataTable }  ds = do
     (ds,nenv) <- runWriterT $ mapM (specializeDef doSpecialize env) ds
-    -- ds <- sequence [ specBody dataTable (nenv `mappend` env) e >>= return . (,) t | (t,e) <- ds]
     let f (t,e) = do
             e <- sb e
             nfo <- infoMapM (mapABodiesArgs sb) (tvrInfo t)
