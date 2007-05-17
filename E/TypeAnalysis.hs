@@ -9,6 +9,7 @@ import Control.Monad.Writer
 import Control.Monad.Identity
 import Control.Monad.State
 import Data.Monoid
+import Data.Maybe
 import Data.FunctorM
 import qualified Data.Set as Set
 import qualified Data.Map as Map
@@ -283,7 +284,7 @@ specializeProgram doSpecialize unusedRules unusedValues prog = do
 repi (ELit LitCons { litName = n, litArgs = [a,b] }) | n == tc_Arrow = EPi tvr { tvrIdent = 0, tvrType = repi a } (repi b)
 repi e = runIdentity $ emapE (return . repi ) e
 
-specializeDef _ SpecEnv { senvUnusedVars = unusedVals }  (tvr,e) | tvr `Set.member` unusedVals = return (tvr,EError "Unused" (tvrType tvr))
+specializeDef _ env  (tvr,e) | isUnused env tvr = return (tvr,EError ("Unused Def: " ++ tvrShowName tvr) (tvrType tvr))
 specializeDef _ _ (t,e) | getProperty prop_PLACEHOLDER t = return (t,e)
 specializeDef True SpecEnv { senvDataTable = dataTable }  (tvr,e) = ans where
     sub = substMap''  $ fromList [ (tvrIdent t,Just v) | (t,Just v) <- sts ]
@@ -340,10 +341,10 @@ caseCast t ty e = evalState  (f t ty e) (newIds (freeIds e),[]) where
 caseCast t _ty e = e
 
 specAlt :: MonadStats m => SpecEnv -> Alt E -> m (Alt E)
-specAlt SpecEnv { senvDataTable = dataTable, senvUnusedVars = unusedVals } (Alt lc@LitCons { litArgs = ts } e) = ans where
+specAlt env@SpecEnv { senvDataTable = dataTable } (Alt lc@LitCons { litArgs = ts } e) = ans where
     f xs = do
         ws <- forM xs $ \t -> evalErrorT id $ do
-            False <- return $ t `member` unusedVals
+            False <- return $ isUnused env t
             Just nt <- return $ Info.lookup (tvrInfo t)
             Just tt <- return $ getTyp (getType t) dataTable nt
             mtick $ "Specialize.alt.{" ++ pprint (show nt,tt) ++ "}"
@@ -353,8 +354,10 @@ specAlt SpecEnv { senvDataTable = dataTable, senvUnusedVars = unusedVals } (Alt 
         ws <- f ts
         return (Alt lc (ws e))
 
+isUnused SpecEnv { senvUnusedVars = unusedVars } v = v `Set.member` unusedVars && isJust (Info.lookup $ tvrInfo v :: Maybe Typ)
+
 specBody :: MonadStats m => Bool -> SpecEnv -> E -> m E
-specBody _ env@SpecEnv { senvUnusedVars = unusedVars, senvDataTable = dataTable } e | (EVar h,as) <- fromAp e, h `Set.member` unusedVars = do
+specBody _ env e | (EVar h,as) <- fromAp e, isUnused env h  = do
     mtick $ "Specialize.delete.{" ++ pprint h ++ "}"
     return $ foldl EAp (EError ("Unused: " ++ pprint h) (getType h)) as
 specBody True SpecEnv { senvArgs = dmap } e | (EVar h,as) <- fromAp e, Just os <- mlookup h dmap = do
