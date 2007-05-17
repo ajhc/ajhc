@@ -331,9 +331,9 @@ convertBody (Return n@NodeC {})  = newNode n >>= \(x,y) -> simpleRet (cast wptr_
 -- IORef's do this
 convertBody (Store v) | tyINode == getType v = do
     v <- convertVal v
-    tmp <- newVar (ptrType sptr_t)
+    (d,tmp) <- (ptrType sptr_t) `newTmpVar`  jhc_malloc (sizeof sptr_t)
     r <- simpleRet tmp
-    return ((tmp =* jhc_malloc (sizeof sptr_t)) & (dereference tmp =* v) & r)
+    return (d & (dereference tmp =* v) & r)
 convertBody (Fetch v) | getType v == TyPtr tyINode  = do
     v <- convertVal v
     simpleRet $ dereference v
@@ -540,18 +540,19 @@ newNode (NodeC t as) = do
       Nothing -> do
         st <- nodeType t
         as' <- mapM convertVal as
-        tmp <- newVar (if sf then sptr_t else wptr_t)
-        let tmp' = concrete t tmp
-            wmalloc = if not sf && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
-            malloc =  tmp =* wmalloc (sizeof st)
-            ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
+        --tmp <- newVar (if sf then sptr_t else wptr_t)
+        let wmalloc = if not sf && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
+            malloc =  wmalloc (sizeof st)
             nonPtr TyPtr {} = False
             nonPtr TyNode = False
             nonPtr (TyTup xs) = all nonPtr xs
             nonPtr _ = True
+        (dtmp,tmp) <- (if sf then sptr_t else wptr_t) `newTmpVar` malloc
+        let tmp' = concrete t tmp
+            ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
         tagassign <- tagAssign tmp' t
         let res = if sf then (f_EVALTAG tmp) else tmp
-        return (mconcat $ malloc:tagassign:ass,res)
+        return (mconcat $ dtmp:tagassign:ass,res)
 
 
 {-

@@ -31,6 +31,7 @@ module C.Generate(
     name,
     Name(),
     newVar,
+    newTmpVar,
     forLoop,
     nullPtr,
     number,
@@ -244,6 +245,7 @@ localVariable t n = expD $ do
     tell [(n,t)]
     draw n
 
+
 instance Monoid Statement where
     mempty = St mempty
     mappend (St as) (St bs) = St $ pairOpt stmtPairOpt as bs
@@ -343,6 +345,15 @@ label n = stmt $ SLabel n
 
 goto :: Name -> Statement
 goto n = stmt $ SGoto n
+
+newTmpVar t e = do
+    u <- newUniq
+    let n = name $ 'x':show u
+        d = sd $ do
+            va <- draw (variable n `assign` e)
+            t <- draw t
+            return $ t <+> va
+    return (d,variable n)
 
 
 newVar t = snd `liftM` newDeclVar t
