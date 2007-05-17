@@ -28,7 +28,8 @@ import qualified FlagDump as FD
 lintCheckGrin grin = when flint $ typecheckGrin grin
 
 lintCheckGrin' onerr grin | flint = do
-    let errs = [  (err ++ "\n" ++ render (prettyFun a) ) | (a,Left err) <-  [ (a,typecheck (grinTypeEnv grin) c:: Either String Ty)   | a@(_,(_ :-> c)) <-  grinFuncs grin ]]
+    let env = TcEnv { envTyEnv = grinTypeEnv grin, envInScope = fromList (fsts $ grinCafs grin) }
+    let errs = [  (err ++ "\n" ++ render (prettyFun a) ) | (a,Left err) <-  [ (a,runTc env (tcLam Nothing c))  | a@(_,c) <-  grinFuncs grin ]]
     if null errs then return () else do
     onerr
     putErrLn ">>> Type Errors"
@@ -85,7 +86,7 @@ transformGrin tp prog = do
             dumpGrin ("lint-before-" ++ name) prog
 --            Stats.printStat name estat
             putErrLn $ "\n>>> After " ++ name
-            dumpGrin ("lint-after-" ++ name) prog
+            dumpGrin ("lint-after-" ++ name) grin'
 --    if transformSkipNoStats tp && estat == mempty then do
 --        when dodump $ putErrLn "program not changed"
 --        return prog

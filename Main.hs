@@ -530,11 +530,11 @@ compileModEnv' (cho,_) = do
 
     --wdump FD.Core $ printProgram prog
     prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze False prog else return prog
-    putStrLn "Type analyzed methods"
-    flip mapM_ (programDs prog) $ \ (t,e) -> do
-        let (_,ts) = fromLam e
-            ts' = takeWhile (sortKindLike . getType) ts
-        when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
+--    putStrLn "Type analyzed methods"
+--    flip mapM_ (programDs prog) $ \ (t,e) -> do
+--        let (_,ts) = fromLam e
+--            ts' = takeWhile (sortKindLike . getType) ts
+--        when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
     lintCheckProgram onerrNone prog
     prog <- programPrune prog
     --wdump FD.Core $ printProgram prog
@@ -692,21 +692,43 @@ compileToGrin prog = do
     x <- return $ normalizeGrin x
     wdump FD.GrinNormalized $ do dumpGrin "normalized" x
     lintCheckGrin x
-    let opt s  x = do
-        stats' <- Stats.new
-        nf <- mapMsnd (grinPush stats') (grinFuncs x)
-        x <- return $ setGrinFunctions nf x
-        wdump FD.GrinPass $ printGrin x
-        x <- Grin.Simplify.simplify stats' x
-        t' <- Stats.getTicks stats'
-        wdump FD.Progress $ Stats.print s stats'
-        Stats.combine stats stats'
-        lintCheckGrin x
-        case t' of
-            0 -> return x
-            _ -> opt s x
+    let opt' s  x = do
+            stats' <- Stats.new
+            nf <- mapMsnd (grinPush stats') (grinFuncs x)
+            x <- return $ setGrinFunctions nf x
+            wdump FD.GrinPass $ printGrin x
+            x <- Grin.Simplify.simplify stats' x
+            t' <- Stats.getTicks stats'
+            wdump FD.Progress $ Stats.print s stats'
+            Stats.combine stats stats'
+            lintCheckGrin x
+            case t' of
+                0 -> return x
+                _ -> opt s x
+        pushGrin grin = do
+            grin <- return $ normalizeGrin grin
+            nf   <- mapMsnd (grinPush undefined) (grinFuncs grin)
+            return $ setGrinFunctions nf grin
+
+        opt s grin = do
+            stats' <- Stats.new
+            let fop grin = do Grin.Simplify.simplify stats' grin
+                tparms = transformParms {
+                    transformDumpProgress = True,
+                    transformCategory = s,
+                    transformPass = "Grin",
+                    transformOperation = fop
+                    }
+            grin <- transformGrin tparms grin
+            t' <- Stats.getTicks stats'
+            wdump FD.Progress $ Stats.print s stats'
+            Stats.combine stats stats'
+            case t' of
+                0 -> return grin
+                _ -> opt s grin
     x <- deadCode stats (grinEntryPointNames x) x  -- XXX
     lintCheckGrin x
+    x <- pushGrin x
     x <- opt "Optimization" x
     lintCheckGrin x
     x <- grinSpeculate x

@@ -13,6 +13,7 @@ import Grin.Noodle
 import Grin.Whiz
 import Stats
 import Support.CanType
+import Support.Tuple
 import Support.FreeVars
 import Util.Graph
 import Util.SetLike
@@ -44,30 +45,26 @@ justDeps cs fs = deps where
 -- peephole optimizations.
 
 grinPush :: Stats -> Lam -> IO Lam
-grinPush stats lam = ans where
+grinPush stats (l :-> e) = ans where
     ans = do
-        (ans,_) <- evalStateT (whiz subBlock doexp finalExp whizState lam) (1,[])
-        return ans
-    subBlock _ action = do
-        (nn,x) <- get
-        put (nn,mempty)
-        r <- action
-        (nn,_) <- get
-        put (nn,x)
-        return r
-    doexp (v, exp) | isOmittable exp = do
+--        putStrLn "@@@ grinPush"
+        e' <- evalStateT (f e) (1,[])
+        return (l :-> e')
+    f (exp :>>= v :-> e2) | isOmittable exp = do
         (nn,cv) <- get
         let npexp = makeDeps cv PExp { pexpUniq = nn, pexpBind = v, pexpExp = exp, pexpDeps = undefined, pexpProvides = undefined }
         put (nn+1,npexp:cv)
-        return Nothing
-    doexp (v, exp) = do
+        f e2
+    f (exp :>>= v :-> e2) = do
         exp <- fixupLet exp
-        exp' <- dropAny exp
-        return $ Just (v,exp')
-    finalExp (exp::Exp) = do
+        (v',exp') <- dropAny (Just v) exp
+        e2' <- f e2
+        return $ exp' :>>= v' :-> e2'
+    f exp = do
         exp <- fixupLet exp
-        exp' <- dropAny exp
-        return (exp'::Exp)
+        (_,exp') <- dropAny Nothing exp
+        return exp'
+
     fixupLet lt@Let { expDefs = defs, expBody = b } = do
         let def = (Set.fromList $ map funcDefName defs)
             f (e :>>= l :-> r) | Set.null (freeVars e `Set.intersection` def) = do
@@ -76,26 +73,24 @@ grinPush stats lam = ans where
             f r = return $ updateLetProps lt {  expBody = r }
         f b
     fixupLet exp = return exp
-    dropAny (exp::Exp) = do
+    dropAny mv (exp::Exp) = do
         (nn,xs) <- get
         let graph = newGraph xs pexpUniq pexpDeps
             deps = justDeps xs (freeVars exp)
             reached = reachable graph deps
-            dropped = case prefered reached exp of
-                Just (x:_) | [] <- [ r | r <- reached, pexpUniq x `elem` pexpDeps r ] -> (reverse $ topSort $ newGraph (filter (/= x) reached) pexpUniq pexpDeps) ++ [x]
-                _ -> reverse $ topSort $ newGraph reached pexpUniq pexpDeps
-            ff pexp exp = pexpExp pexp :>>= pexpBind pexp :-> exp
-        put (nn,[ x | x <- xs, pexpUniq x `notElem` (map pexpUniq reached) ])
-        return (foldr ff exp dropped :: Exp)
-    dropAll exp fvs = do
-        (nn,xs) <- get
-        let graph = newGraph xs pexpUniq pexpDeps
-            deps = justDeps xs fvs
-            reached = reachable graph deps
+            --dropped = case prefered reached exp of
+            --    Just (x:_) | [] <- [ r | r <- reached, pexpUniq x `elem` pexpDeps r ] -> (reverse $ topSort $ newGraph (filter (/= x) reached) pexpUniq pexpDeps) ++ [x]
+            --    _ -> reverse $ topSort $ newGraph reached pexpUniq pexpDeps
             dropped =  reverse $ topSort $ newGraph reached pexpUniq pexpDeps
             ff pexp exp = pexpExp pexp :>>= pexpBind pexp :-> exp
+            ebinds = [ Var v t | (v,t) <- Set.toList $ freeVars (map pexpBind dropped) ]
+            (exp',mv') | Just vv <- mv = let mv' = tuple $ fromTuple vv ++ ebinds in (exp :>>= vv :-> Return mv',mv')
+                       | otherwise = (exp,unit)
         put (nn,[ x | x <- xs, pexpUniq x `notElem` (map pexpUniq reached) ])
-        return (foldr ff exp dropped :: Exp)
+--        when (not $ null dropped) $ lift $ do
+--            putStrLn "@@@ dropped"
+--            mapM_ Prelude.print dropped
+        return (mv',foldr ff exp' dropped :: Exp)
     -- | preferentially pull definitons of the variable this returns right next to it as it admits a peephole optimization
     prefer (Store v@Var {}) = return v
     prefer (App fn [v@Var {}] _)  | fn == funcEval = return v
@@ -107,6 +102,70 @@ grinPush stats lam = ans where
     prefered pexps exp = do
         v <- prefer exp
         return [ p | p <- pexps, v == pexpBind p]
+
+--grinPush :: Stats -> Lam -> IO Lam
+--grinPush stats lam = ans where
+--    ans = do
+--        putStrLn "@@@ grinPush"
+--        (ans,_) <- evalStateT (whiz subBlock doexp finalExp whizState lam) (1,[])
+--        return ans
+--    subBlock _ action = do
+--        (nn,x) <- get
+--        put (nn,mempty)
+--        r <- action
+--        (nn,_) <- get
+--        put (nn,x)
+--        return r
+--    doexp (v, exp) | isOmittable exp = do
+--        (nn,cv) <- get
+--        let npexp = makeDeps cv PExp { pexpUniq = nn, pexpBind = v, pexpExp = exp, pexpDeps = undefined, pexpProvides = undefined }
+--        put (nn+1,npexp:cv)
+--        return Nothing
+--    doexp (v, exp) = do
+--        exp <- fixupLet exp
+--        (v',exp') <- dropAny (Just v) exp
+--        return $ Just (v',exp')
+--    finalExp (exp::Exp) = do
+--        exp <- fixupLet exp
+--        (_,exp') <- dropAny Nothing exp
+--        return (exp'::Exp)
+--    fixupLet lt@Let { expDefs = defs, expBody = b } = do
+--        let def = (Set.fromList $ map funcDefName defs)
+--            f (e :>>= l :-> r) | Set.null (freeVars e `Set.intersection` def) = do
+--                exp <- f r
+--                return (e :>>= l :-> exp)
+--            f r = return $ updateLetProps lt {  expBody = r }
+--        f b
+--    fixupLet exp = return exp
+--    dropAny mv (exp::Exp) = do
+--        (nn,xs) <- get
+--        let graph = newGraph xs pexpUniq pexpDeps
+--            deps = justDeps xs (freeVars exp)
+--            reached = reachable graph deps
+--            --dropped = case prefered reached exp of
+--            --    Just (x:_) | [] <- [ r | r <- reached, pexpUniq x `elem` pexpDeps r ] -> (reverse $ topSort $ newGraph (filter (/= x) reached) pexpUniq pexpDeps) ++ [x]
+--            --    _ -> reverse $ topSort $ newGraph reached pexpUniq pexpDeps
+--            dropped =  reverse $ topSort $ newGraph reached pexpUniq pexpDeps
+--            ff pexp exp = pexpExp pexp :>>= pexpBind pexp :-> exp
+--            ebinds = [ Var v t | (v,t) <- Set.toList $ freeVars (map pexpBind dropped) ]
+--            (exp',mv') | Just vv <- mv = let mv' = tuple $ fromTuple vv ++ ebinds in (exp :>>= vv :-> Return mv',mv')
+--                       | otherwise = (exp,unit)
+--        put (nn,[ x | x <- xs, pexpUniq x `notElem` (map pexpUniq reached) ])
+--        when (not $ null dropped) $ lift $ do
+--            putStrLn "@@@ dropped"
+--            mapM_ Prelude.print dropped
+--        return (mv',foldr ff exp' dropped :: Exp)
+--    -- | preferentially pull definitons of the variable this returns right next to it as it admits a peephole optimization
+--    prefer (Store v@Var {}) = return v
+--    prefer (App fn [v@Var {}] _)  | fn == funcEval = return v
+--    prefer (App fn [v@Var {},_] _)| fn == funcApply = return v
+--    prefer (App fn [v@Var {}] _)  | fn == funcApply = return v
+--    prefer (Update _ v@Var {}) = return v
+--    prefer (Update v@Var {} _) = return v
+--    prefer _ = fail "no preference"
+--    prefered pexps exp = do
+--        v <- prefer exp
+--        return [ p | p <- pexps, v == pexpBind p]
 
 
 
