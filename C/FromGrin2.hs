@@ -29,6 +29,7 @@ import RawFiles
 import Support.CanType
 import Support.FreeVars
 import Util.Gen
+import Util.SetLike
 import Util.UniqueMonad
 
 
@@ -37,7 +38,7 @@ import Util.UniqueMonad
 ---------------
 
 type Structure = (Name,[(Name,Type)])
-data Todo = TodoReturn | TodoExp Expression | TodoNothing
+data Todo = TodoReturn | TodoExp Expression | TodoNothing  | TodoDecl Name Type
 
 
 data Written = Written {
@@ -51,6 +52,7 @@ data Written = Written {
 
 data Env = Env {
     rTodo :: Todo,
+    rInscope :: Set.Set Name,
     rEMap :: Map.Map Atom (Name,[Expression]),
     rGrin :: Grin
     }
@@ -62,7 +64,7 @@ newtype C a = C (RWST Env Written HcHash Uniq a)
 
 
 runC :: Grin -> C a -> (a,HcHash,Written)
-runC grin (C m) =  execUniq1 (runRWST m Env { rGrin = grin, rTodo = TodoNothing, rEMap = mempty } emptyHcHash)
+runC grin (C m) =  execUniq1 (runRWST m Env { rGrin = grin, rTodo = TodoNothing, rEMap = mempty, rInscope = mempty } emptyHcHash)
 
 tellFunctions :: [Function] -> C ()
 tellFunctions fs = tell mempty { wFunctions = Map.fromList $ map (\x -> (functionName x,x)) fs }
@@ -120,8 +122,15 @@ fetchVar :: Var -> Ty -> C Expression
 fetchVar v@(V n) _ | n < 0 = return $ (variable  $ varName v)
 fetchVar v ty = do
     t <- convertType ty
-    return $ (localVariable t (varName v))
+    is <- asks rInscope
+    let n = varName v
+    return $ if n `member` is then variable n else localVariable t n
 
+fetchVar' :: Var -> Ty -> C (Name,Type)
+fetchVar' (V n) _ | n < 0 = error "fetchVar': CAF"
+fetchVar' v ty = do
+    t <- convertType ty
+    return $ (varName v,t)
 
 convertVal :: Val -> C Expression
 convertVal (Var v ty) = fetchVar v ty
@@ -139,7 +148,7 @@ convertVal h@(NodeC a ts) | valIsConstant h = do
         Just bn -> return bn
         _ -> do
             (_,i) <- newConst h
-            return $ variable (name $  'c':show i )
+            return $ f_PROMOTE (variable (name $  'c':show i ))
 convertVal (Lit i ty)
     | ty == Ty (toAtom "float") || ty == Ty (toAtom "double") = return (constant $ floating (fromIntegral i))
     | otherwise = return (constant $ number (fromIntegral i))
@@ -196,7 +205,7 @@ convertBody Let { expDefs = defs, expBody = body } = do
     u <- newUniq
     nn <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = Tup as :-> _ } -> do
         vs' <- mapM convertVal as
-        let nm = (toName (show name ++ show u))
+        let nm = (toName (show name ++ "_" ++ show u))
         return (name,(nm,vs'))
     let done = (toName $ "done" ++ show u)
         localJumps xs = local (rEMap_u (Map.fromList xs `mappend`))
@@ -204,13 +213,8 @@ convertBody Let { expDefs = defs, expBody = body } = do
     ss <- (convertBody body)
     rs <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = Tup as :-> b } -> do
        ss <- convertBody b
-       return (annotate (show as) (label (toName (show name ++ show u))) & subBlock ss)
+       return (annotate (show as) (label (toName (show name ++ "_" ++ show u))) & subBlock ss)
     return (ss & goto done & mconcat (intersperse (goto done) rs) & label done);
-convertBody (e :>>= v@(Var _ _) :-> e') = do
-    v' <- convertVal v
-    ss <- localTodo (TodoExp v')  (convertBody e)
-    ss' <- convertBody e'
-    return (ss & ss')
 convertBody (e :>>= Tup [x] :-> e') = convertBody (e :>>= x :-> e')
 convertBody (e :>>= Tup [] :-> e') = do
     ss <- localTodo TodoNothing (convertBody e)
@@ -321,12 +325,32 @@ convertBody (Error s t) = do
     case x of
         TodoNothing -> return jerr
         TodoExp _ -> return jerr
+        TodoDecl {} -> return jerr
         TodoReturn -> do
             v <- f t
             return (jerr & creturn v)
 
-convertBody (Store  n@NodeC {})  = newNode n >>= \(x,y) -> simpleRet (cast sptr_t y) >>= \v -> return (x & v)
-convertBody (Return n@NodeC {})  = newNode n >>= \(x,y) -> simpleRet (cast wptr_t y) >>= \v -> return (x & v)
+convertBody (Store  n@NodeC {})  = newNode sptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
+convertBody (Return n@NodeC {})  = newNode wptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
+
+--convertBody (Store  n@NodeC {} :>>= (Var vn vt) :-> e') = do
+--    (x,y) <- newNode sptr_t n
+--    (vn,vt) <- fetchVar' vn vt
+--    d <- newAssignVar vt vn y
+--    e'' <- convertBody e'
+--    return (x & d & e'')
+
+convertBody (e :>>= (Var vn vt) :-> e') | not $ isCompound e = do
+    (vn,vt) <- fetchVar' vn vt
+    ss <- localTodo (TodoDecl vn vt) (convertBody e)
+    ss' <- local (rInscope_u (Set.insert vn)) $ convertBody e'
+    return (ss & ss')
+
+convertBody (e :>>= v@(Var _ _) :-> e') = do
+    v' <- convertVal v
+    ss <- localTodo (TodoExp v')  (convertBody e)
+    ss' <- convertBody e'
+    return (ss & ss')
 
 -- IORef's do this
 convertBody (Store v) | tyINode == getType v = do
@@ -362,6 +386,7 @@ simpleRet er = do
         TodoReturn -> return (creturn er)
         _ | isEmptyExpression er -> return mempty
         TodoExp v -> return (v =* er)
+        TodoDecl n t -> do newAssignVar t n er
         TodoNothing -> return $ expr er
 
 nodeAssign v t as e' = do
@@ -372,6 +397,14 @@ nodeAssign v t as e' = do
         fve = freeVars e'
     ss' <- convertBody e'
     return $  mconcat ass & ss'
+
+isCompound Fetch {} = False
+isCompound Return {} = False
+isCompound Store {} = False
+isCompound Prim {} = False
+--isCompound App {} = False
+--isCompound Call {} = False
+isCompound _ = True
 
 
 convertExp :: Exp -> C (Statement,Expression)
@@ -411,8 +444,8 @@ convertExp (Update v@(Var vv _) tn@(NodeC t as)) | getType v == TyPtr TyNode = d
     nt <- nodeTypePtr t
     let tmp' = cast nt (f_DETAG v') -- (if vv < v0 then f_DETAG v' else v')
     if not (tagIsSuspFunction t) && vv < v0 then do
-        (nns, nn) <- newNode tn
-        return (nns & getHead (f_NODEP(f_DETAG v')) =* cast fptr_t nn,emptyExpression)
+        (nns, nn) <- newNode fptr_t tn
+        return (nns & getHead (f_NODEP(f_DETAG v')) =* nn,emptyExpression)
      else do
         s <- tagAssign tmp' t
         let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
@@ -529,10 +562,15 @@ tellTags t = do
         Nothing -> tell mempty { wTags = Set.singleton t }
 
 
+{-
+newNode ty node = do
+    u <- newUniq
+    let n = name $ 'x':show u
+    d <- newVarNode ty n node
+    return (d,localVariable ty n)
+-}
 
-newNode (NodeC t _) | t == tagHole = do
-    fail "newNode.tagHole"
-newNode (NodeC t as) = do
+newNode ty (NodeC t as) = do
     tyenv <- asks (grinTypeEnv . rGrin)
     let sf = tagIsSuspFunction t
     case basicNode tyenv t as of
@@ -540,14 +578,13 @@ newNode (NodeC t as) = do
       Nothing -> do
         st <- nodeType t
         as' <- mapM convertVal as
-        --tmp <- newVar (if sf then sptr_t else wptr_t)
         let wmalloc = if not sf && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
             malloc =  wmalloc (sizeof st)
             nonPtr TyPtr {} = False
             nonPtr TyNode = False
             nonPtr (TyTup xs) = all nonPtr xs
             nonPtr _ = True
-        (dtmp,tmp) <- (if sf then sptr_t else wptr_t) `newTmpVar` malloc
+        (dtmp,tmp) <- ty `newTmpVar` malloc
         let tmp' = concrete t tmp
             ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
         tagassign <- tagAssign tmp' t
@@ -555,43 +592,6 @@ newNode (NodeC t as) = do
         return (mconcat $ dtmp:tagassign:ass,res)
 
 
-{-
-
-newNode (NodeC t as) | tagIsSuspFunction t = do
-    en <- declareEvalFunc t
-    st <- nodeType t
-    as' <- mapM convertVal as
-    tmp <- newVar sptr_t
-    let tmp' = concrete t tmp
-        malloc =  tmp =* jhc_malloc (sizeof st)
-        tagassign = getTag tmp' =* f_EVALTAG (reference (variable en))
-        ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
-        nonPtr TyPtr {} = False
-        nonPtr TyNode = False
-        nonPtr (TyTup xs) = all nonPtr xs
-        nonPtr _ = True
-        tmp'' = f_EVALTAG tmp
-    return (mconcat $ malloc:tagassign:ass, cast sptr_t tmp'')
-newNode (NodeC t as) | tagIsWHNF t = do -- && not (tagIsPartialAp t) = do
-    st <- nodeType t
-    tell mempty { wTags = Set.singleton t }
-    declareStruct t
-    as' <- mapM convertVal as
-    tmp <- newVar wptr_t
-    let tmp' = concrete t tmp
-        wmalloc = if all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
-        malloc =  tmp =* wmalloc (sizeof st)
-        tagassign = getTag tmp' =* constant (enum $ nodeTagName t)
-        wmalloc = if tagIsWHNF t && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
-        ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
-        nonPtr TyPtr {} = False
-        nonPtr TyNode = False
-        nonPtr (TyTup xs) = all nonPtr xs
-        nonPtr _ = True
-    return (mconcat $ malloc:tagassign:ass, tmp)
-newNode e = return (err (show e),err "newNode")
-
--}
 
 ------------------
 -- declaring stuff
@@ -678,6 +678,7 @@ f_VALUE e     = functionCall (name "VALUE") [e]
 f_ISVALUE e   = functionCall (name "ISVALUE") [e]
 f_eval e      = functionCall (name "eval") [e]
 f_promote e   = functionCall (name "promote") [e]
+f_PROMOTE e   = functionCall (name "PROMOTE") [e]
 f_demote e    = functionCall (name "demote") [e]
 f_follow e    = functionCall (name "follow") [e]
 f_update x y  = functionCall (name "update") [x,y]
@@ -764,52 +765,6 @@ infixl 1 &
 (&) :: (ToStatement a,ToStatement b) => a -> b -> Statement
 x & y = toStatement x `mappend` toStatement y
 
-
-{-
-convertExp (Store n@NodeV {}) = newNode n
-convertExp (Return n@NodeV {}) = newNode n
-convertExp (Store n@NodeC {}) = newNode n
-convertExp (Return n@NodeC {}) = newNode n
-
-convertExp (Store n@Var {}) | getType n == TyNode = do
-    (ss,nn) <- newNode (NodeC tagHole [])
-    tmp <- newVar pnode_t
-    n <- convertVal n
-    let tag = project' anyTag n
-        update = expr (functionCall (name "memcpy") [tmp,n,functionCall  (name "jhc_sizeof") [tag]])
-    return (ss `mappend` (tmp `assign` nn) `mappend` update, tmp)
-convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_heap, TyPtr TyNode == getType v  = do
-    v' <- convertVal v
-    c' <- convertVal c
-    tmp <- newVar ppnode_t
-    let malloc = tmp `assign` jhc_malloc (operator "*" (sizeof pnode_t) c')
-    fill <- case v of
-        ValUnknown _ -> return mempty
-        _ -> do
-            i <- newVar (basicType "int")
-            return $ forLoop i (expressionRaw "0") c' $ indexArray tmp i `assign` v'
-    return (malloc `mappend` fill, tmp)
-convertExp e@(Update v z) | getType v /= TyPtr (getType z) = do
-    return (err (show e),err "nothing")
-convertExp (Update v z) | getType z == TyNode = do  -- TODO eliminate unknown updates
-    v' <- convertVal v
-    z' <- convertVal z
-    let tag = project' anyTag z'
-    return $ (profile_update_inc,functionCall (name "memcpy") [v',z',functionCall  (name "jhc_sizeof") [tag]])
-convertExp e = return (err (show e),err "nothing")
-newNode (NodeV t []) = do
-    tmp <- newVar pnode_t
-    var <- fetchVar t TyTag
-    let tmp' = getTag tmp
-        malloc =  tmp =* jhc_malloc (sizeof  node_t)
-        tagassign = tmp' =* var
-    return (mappend malloc tagassign, tmp)
-
--}
-{-
-convertBody (Return v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
-convertBody (Fetch v :>>= (NodeV t []) :-> e') = nodeAssignV v t e'
--}
 
 
 

@@ -11,6 +11,8 @@
 #define EVALTAGC(fn) ((sptr_t)((void *)(fn) + P_LAZY))
 #define VALUE(n)     ((wptr_t)(((uintptr_t)(n) << 2) | P_VALUE))
 #define ISVALUE(n)   (assert(!ISLAZY(n)), ((uintptr_t)(n) & 0x2))
+#define PROMOTE(n)   ((wptr_t)(n))
+#define DEMOTE(n)    ((sptr_t)(n))
 
 
 #define P_VALUE 0x2

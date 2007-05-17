@@ -31,6 +31,7 @@ module C.Generate(
     name,
     Name(),
     newVar,
+    newAssignVar,
     newTmpVar,
     forLoop,
     nullPtr,
@@ -161,8 +162,8 @@ instance Draw Stmt where
         els <- subBlockBody els
         return $ text "if" <+> parens exp <+> lbrace <$> nest 4 thn <$> rbrace <+> text "else" <+> lbrace <$> nest 4 els <$> rbrace
     draw (SSwitch e ts) = text "switch" <+> parens (draw e) <+> char '{' <$> vcat (map sc ts) <$> md <$>  char '}' where
-        sc (Just x,ss) = do ss <- draw ss ; x <- draw x; return $ text "case" <+> x <> char ':' $$ nest 4 (ss $$ text "break;")
-        sc (Nothing,ss) = do ss <- draw ss; return $ text "default:"  $$  ( nest 4 ss $$ text "break;")
+        sc (Just x,ss) = do ss <- draw (SBlock ss); x <- draw x; return $ text "case" <+> x <> char ':' $$ nest 4 (ss $$ text "break;")
+        sc (Nothing,ss) = do ss <- draw (SBlock ss); return $ text "default:"  $$  ( nest 4 ss $$ text "break;")
         md = if any isNothing (fsts ts) then empty else text "default: jhc_case_fell_off(__LINE__);"
 
 subBlockBody s = draw s
@@ -251,7 +252,9 @@ instance Monoid Statement where
     mappend (St as) (St bs) = St $ pairOpt stmtPairOpt as bs
 
 stmtPairOpt a b = f a b where
-    f (SGoto l) y@(SLabel l') | l == l' = Just y
+    f (SGoto l) y@(SLabel l')
+        | l == l' = Just y
+        | otherwise = Nothing
     f SReturn {} SLabel {} = Nothing
     f x@SGoto {} _  = Just x
     f x@SReturn {} _  = Just x
@@ -346,6 +349,7 @@ label n = stmt $ SLabel n
 goto :: Name -> Statement
 goto n = stmt $ SGoto n
 
+
 newTmpVar t e = do
     u <- newUniq
     let n = name $ 'x':show u
@@ -355,6 +359,12 @@ newTmpVar t e = do
             return $ t <+> va
     return (d,variable n)
 
+newAssignVar t n e = do
+    let d = sd $ do
+            va <- draw (variable n `assign` e)
+            t <- draw t
+            return $ t <+> va
+    return d
 
 newVar t = snd `liftM` newDeclVar t
 
