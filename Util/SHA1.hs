@@ -1,7 +1,11 @@
+{-
 Copyright (C) 2001, 2004 Ian Lynagh <igloo@earth.li>
 
 Modified by Einar Karttunen to remove dependency on packed strings
 and autoconf.
+
+Modified by John Meacham for code cleanups.
+
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -17,15 +21,12 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software Foundation,
 Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
-\begin{code}
-{-# OPTIONS -fglasgow-exts -fno-warn-name-shadowing -O2 #-}
--- -fglasgow-exts needed for nasty hack below
--- name shadowing disabled because a,b,c,d,e are shadowed loads in step 4
-module Util.SHA1 (sha1file) where
+-}
 
--- import Autoconf (big_endian)
---import PackedString (PackedString, unsafeWithInternals,
---                     concatLenPS, packWords, lengthPS)
+{-# OPTIONS -funbox-strict-fields -fglasgow-exts -fno-warn-name-shadowing -O2 #-}
+
+module Util.SHA1 (sha1file,ABCDE(..),Hash) where
+
 
 import Control.Monad (unless)
 import Data.Char (intToDigit)
@@ -36,10 +37,14 @@ import Foreign.C
 import System.IO
 import System.IO.Unsafe (unsafePerformIO)
 
+type Hash = ABCDE
 data ABCDE = ABCDE !Word32 !Word32 !Word32 !Word32 !Word32
+    deriving(Eq,Ord)
+
 data XYZ = XYZ !Word32 !Word32 !Word32
 
-sha1file :: FilePath -> IO String
+{-# NOINLINE sha1file #-}
+sha1file :: FilePath -> IO Hash
 sha1file fp = do
     h   <- openBinaryFile fp ReadMode
     len <- hFileSize h
@@ -54,7 +59,7 @@ sha1file fp = do
     let ptr' = castPtr ptr
     unless big_endian $ fiddle_endianness ptr' plen
     res <- sha1_step_4_main abcde ptr' plen
-    return $ sha1_step_5_display res
+    return res
 
 big_endian = unsafePerformIO $ do
     let x :: Word32
@@ -65,18 +70,6 @@ big_endian = unsafePerformIO $ do
       "\x78\x56\x34\x12" -> return False
       _                  -> error "Testing endianess failed"
 
-{-
-sha1PS :: PackedString -> String
-sha1PS s = s5
- where s1_2 = sha1_step_1_2_pad_length s
-       abcde = sha1_step_3_init
-       abcde' = unsafePerformIO
-              $ unsafeWithInternals s1_2 (\ptr len ->
-                    do let ptr' = castPtr ptr
-                       unless big_endian $ fiddle_endianness ptr' len
-                       sha1_step_4_main abcde ptr' len)
-       s5 = sha1_step_5_display abcde'
--}
 fiddle_endianness :: Ptr Word32 -> Int -> IO ()
 fiddle_endianness p 0 = p `seq` return ()
 fiddle_endianness p n
@@ -86,23 +79,22 @@ fiddle_endianness p n
            .|. (shiftR x 8 .&. 0xff00)
            .|. shiftR x 24
       fiddle_endianness (p `advancePtr` 1) (n - 4)
-\end{code}
 
-sha1_step_1_2_pad_length assumes the length is at most 2^61.
-This seems reasonable as the Int used to represent it is normally 32bit,
-but obviously could go wrong with large inputs on 64bit machines.
-The PackedString library should probably move to Word64s if this is an
-issue, though.
+-- sha1_step_1_2_pad_length assumes the length is at most 2^61.
+-- This seems reasonable as the Int used to represent it is normally 32bit,
+-- but obviously could go wrong with large inputs on 64bit machines.
+-- The PackedString library should probably move to Word64s if this is an
+-- issue, though.
+--
+-- sha1_step_1_2_pad_length :: PackedString -> PackedString
+-- sha1_step_1_2_pad_length s
+--  = let len = lengthPS s
+--        num_nuls = (55 - len) `mod` 64
+--        padding = 128:replicate num_nuls 0
+--        len_w8s = reverse $ size_split 8 (fromIntegral len*8)
+--    in concatLenPS (len + 1 + num_nuls + 8)
+--                   [s, packWords padding, packWords len_w8s]
 
-sha1_step_1_2_pad_length :: PackedString -> PackedString
-sha1_step_1_2_pad_length s
- = let len = lengthPS s
-       num_nuls = (55 - len) `mod` 64
-       padding = 128:replicate num_nuls 0
-       len_w8s = reverse $ size_split 8 (fromIntegral len*8)
-   in concatLenPS (len + 1 + num_nuls + 8)
-                  [s, packWords padding, packWords len_w8s]
-\begin{code}
 sha1_step_1_2_plength :: Int -> Int
 sha1_step_1_2_plength len = (len + 1 + num_nuls + 8) where num_nuls = (55 - len) `mod` 64
 
@@ -114,9 +106,7 @@ size_split p n = fromIntegral d:size_split (p-1) n'
 
 sha1_step_3_init :: ABCDE
 sha1_step_3_init = ABCDE 0x67452301 0xefcdab89 0x98badcfe 0x10325476 0xc3d2e1f0
-\end{code}
 
-\begin{code}
 sha1_step_4_main :: ABCDE -> Ptr Word32 -> Int -> IO ABCDE
 sha1_step_4_main abcde _ 0 = return $! abcde
 sha1_step_4_main (ABCDE a0@a b0@b c0@c d0@d e0@e) s len
@@ -226,17 +216,15 @@ sha1_step_4_main (ABCDE a0@a b0@b c0@c d0@d e0@e) s len
               return (rotateL a 5 + f (XYZ b c d) + e + i' + k,
                       rotateL b 30)
 
-sha1_step_5_display :: ABCDE -> String
-sha1_step_5_display (ABCDE a b c d e)
- = concatMap showAsHex [a, b, c, d, e]
+instance Show ABCDE where
+    showsPrec _ (ABCDE a b c d e) = showAsHex a . showAsHex b . showAsHex c . showAsHex d . showAsHex e
 
-showAsHex :: Word32 -> String
-showAsHex n = showIt 8 n ""
+showAsHex :: Word32 -> ShowS
+showAsHex n = showIt 8 n
    where
     showIt :: Int -> Word32 -> String -> String
     showIt 0 _ r = r
     showIt i x r = case quotRem x 16 of
                        (y, z) -> let c = intToDigit (fromIntegral z)
                                  in c `seq` showIt (i-1) y (c:r)
-\end{code}
 
