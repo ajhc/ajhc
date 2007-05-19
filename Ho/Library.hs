@@ -130,7 +130,7 @@ readDescFile fp = do
 readLibraryFile :: LibraryName -> FilePath -> Maybe CheckSum -> IO Library
 readLibraryFile lname fp mbcs = do
     wdump FD.Progress $ putErrLn $ "Loading library: " ++ show lname ++ " @ " ++ show fp
-    pkgCS <- sha1file fp
+    pkgCS <- liftM show $ sha1file fp
     when (maybe False (pkgCS /=) mbcs) $
         putErrDie ("Loading library "++show fp++" failed: Checksum does not match")
     mho <- checkForHoFile fp
