@@ -489,6 +489,10 @@ compile' cenv (tvr,as,e) = ans where
         v <- newNodeVar
         e <- ce scrut
         case (b,scrut) of
+            (TVr { tvrIdent = 0 },EVar etvr) -> localEvaled [etvr] v $ do
+                    as <- mapM cp as
+                    def <- createDef d newNodeVar
+                    return $ e :>>= v :-> Case v (as ++ def)
             (_,EVar etvr) -> localEvaled [etvr,b] v $ do
                     as <- mapM cp as
                     def <- createDef d newNodeVar
