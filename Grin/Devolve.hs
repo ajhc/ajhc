@@ -1,4 +1,4 @@
-module Grin.Devolve(devolveGrin) where
+module Grin.Devolve(devolveTransform,devolveGrin) where
 
 import Control.Monad.Identity
 import Control.Monad.Writer
@@ -7,10 +7,21 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Util.Gen
+import Support.Transform
 import Grin.Grin
 import Grin.Noodle
 import Support.FreeVars
 
+devolveTransform = transformParms {
+    transformDumpProgress = True,
+    transformCategory = "Devolve",
+    transformPass = "Grin",
+    transformOperation = devolveGrin
+    }
+
+-- devolve grin into a form in which it can be readily converted into C code
+-- This lifts any local functions which are ever called in a non-tail-calllike form
+-- to the top level.
 
 devolveGrin :: Grin -> IO Grin
 devolveGrin grin = do

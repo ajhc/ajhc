@@ -47,7 +47,7 @@ import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadCode
 import Grin.Lint
-import Grin.Devolve(devolveGrin)
+import Grin.Devolve(devolveTransform)
 import Grin.EvalInline(createEvalApply)
 import Grin.FromE
 import Grin.Grin
@@ -749,7 +749,7 @@ compileToGrin prog = do
     x <- return $ normalizeGrin x
     --x <- unboxReturnValues x
     lintCheckGrin x
-    x <- devolveGrin x
+    x <- transformGrin devolveTransform x
     x <- opt "After Devolve Optimization" x
     x <- return $ normalizeGrin x
     dumpFinalGrin x
