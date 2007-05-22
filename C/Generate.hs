@@ -376,16 +376,26 @@ newDeclVar t = do
     return (sd (tell [(n,t)] >> return mempty),localVariable t n)
 
 
+labelPull :: Statement -> (Statement,Statement)
+labelPull (St ss) = f ss mempty where
+    f ss rr | ss' Seq.:> l@SLabel {} <- Seq.viewr ss = f ss' (Seq.singleton l `mappend` rr)
+            | otherwise = (St ss,St rr)
+
 
 
 switch' :: Expression -> [(Maybe Constant,Statement)]  -> Statement
-switch' e es = stmt $ SSwitch e es
+switch' e es = (stmt $ SSwitch e es') `mappend` ls where
+     (es',ls) = runWriter $ mapM f es
+     f (c,s) = tell l >> return (c,s') where (s',l) = labelPull s
 
 
 cif :: Expression -> Statement -> Statement -> Statement
-cif exp thn els = stmt $ SIf exp thn els
+cif exp thn els = (stmt $ SIf exp thn' els') `mappend` la `mappend` lb where
+    (thn',la) = labelPull thn
+    (els',lb) = labelPull els
 
-subBlock st = stmt (SBlock st)
+subBlock st = stmt (SBlock st') `mappend` la  where
+    (st',la) = labelPull st
 
 forLoop :: Expression -> Expression -> Expression -> Statement -> Statement
 forLoop i from to body = sd $ do
