@@ -2,8 +2,12 @@ module E.ToHs(compileToHs) where
 
 import Char
 import Control.Monad.Identity
+import Control.Monad
 import Control.Monad.RWS
+import Control.Monad.Trans
+import Control.Monad.Writer
 import Data.FunctorM
+import Data.Monoid
 import System.IO
 import Text.PrettyPrint.HughesPJ(render,($$),nest,Doc())
 import qualified System

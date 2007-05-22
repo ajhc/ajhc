@@ -4,6 +4,7 @@ module Ho.Library(
     ) where
 
 import Char
+import Control.Monad
 import Control.Monad(when,foldM)
 import Data.List(sort)
 import Data.Monoid

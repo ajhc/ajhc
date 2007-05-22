@@ -6,7 +6,7 @@
 
 module Grin.NodeAnalyze(nodeAnalyze) where
 
-import Control.Monad.RWS hiding(join)
+import Control.Monad.RWS
 import Control.Monad.Identity hiding(join)
 import Data.Monoid
 import System

@@ -59,6 +59,8 @@ module C.Generate(
 
 import Char
 import Control.Monad.RWS
+import Control.Monad.Writer
+import Control.Monad
 import Data.List(intersperse)
 import Data.Maybe(isNothing)
 import Data.Monoid
