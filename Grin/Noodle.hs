@@ -158,13 +158,14 @@ grinLet defs body = updateLetProps Let {
     expDefs = defs,
     expBody = body,
     expInfo = mempty,
+    expNonNormal = undefined,
     expIsNormal = undefined,
     expFuncCalls = undefined }
 
 updateLetProps Let { expDefs = [], expBody = body } = body
-updateLetProps lt@Let { expBody = body, expDefs = defs } = lt { expFuncCalls = (tail Set.\\ myDefs, nonTail Set.\\ myDefs), expIsNormal = not isNotNormal } where
+updateLetProps lt@Let { expBody = body, expDefs = defs } = lt { expFuncCalls = (tail Set.\\ myDefs, nonTail Set.\\ myDefs), expNonNormal = notNormal, expIsNormal = Set.null notNormal } where
     (tail,nonTail) = mconcatMap collectFuncs (body : map (lamExp . funcDefBody) defs)
-    isNotNormal = any ((`Set.member` nonTail) . funcDefName) defs
+    notNormal =  nonTail `Set.intersection` (Set.fromList $ map funcDefName defs)
     myDefs = Set.fromList $ map funcDefName defs
 --    retInfo = filter (`notElem` [myDefs]) concatMap (getReturnInfo . lamExp . funcDefBody) (body:defs)
 updateLetProps e = e

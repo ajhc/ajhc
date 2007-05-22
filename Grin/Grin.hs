@@ -176,6 +176,7 @@ data Exp =
                   expBody :: Exp,
                   expFuncCalls :: (Set.Set Atom,Set.Set Atom),            -- ^ cache
                   expIsNormal :: Bool,                                    -- ^ cache, True = definitely normal, False = maybe normal
+                  expNonNormal :: Set.Set Atom,                           -- ^ cache, a superset of functions called in non-tail call position.
                   expInfo :: Info.Info }                                  -- ^ A let of local functions
     | MkClosure { expValue :: Val,
                   expArgs :: [Val],
