@@ -38,7 +38,7 @@ import Util.UniqueMonad
 ---------------
 
 type Structure = (Name,[(Name,Type)])
-data Todo = TodoReturn | TodoExp Expression | TodoNothing  | TodoDecl Name Type
+data Todo = TodoReturn | TodoExp [Expression] | TodoDecl Name Type
 
 
 data Written = Written {
@@ -64,7 +64,7 @@ newtype C a = C (RWST Env Written HcHash Uniq a)
 
 
 runC :: Grin -> C a -> (a,HcHash,Written)
-runC grin (C m) =  execUniq1 (runRWST m Env { rGrin = grin, rTodo = TodoNothing, rEMap = mempty, rInscope = mempty } emptyHcHash)
+runC grin (C m) =  execUniq1 (runRWST m Env { rGrin = grin, rTodo = TodoExp [], rEMap = mempty, rInscope = mempty } emptyHcHash)
 
 tellFunctions :: [Function] -> C ()
 tellFunctions fs = tell mempty { wFunctions = Map.fromList $ map (\x -> (functionName x,x)) fs }
@@ -217,13 +217,13 @@ convertBody Let { expDefs = defs, expBody = body } = do
     return (ss & goto done & mconcat (intersperse (goto done) rs) & label done);
 convertBody (e :>>= Tup [x] :-> e') = convertBody (e :>>= x :-> e')
 convertBody (e :>>= Tup [] :-> e') = do
-    ss <- localTodo TodoNothing (convertBody e)
+    ss <- localTodo (TodoExp []) (convertBody e)
     ss' <- convertBody e'
     return (ss & ss')
 convertBody (e :>>= Tup xs :-> e') = do
     ts <- mapM ( convertType . getType) xs
     st <- newVar (anonStructType ts)
-    ss <- localTodo (TodoExp st) (convertBody e)
+    ss <- localTodo (TodoExp [st]) (convertBody e)
     ss' <- convertBody e'
     vs <- mapM convertVal xs
     return $  ss & mconcat [ v =* projectAnon i st | v <- vs | i <- [0..] ] & ss'
@@ -323,7 +323,6 @@ convertBody (Error s t) = do
         f TyTag  = return $ constant (enum $ nodeTagName tagHole)
         f x = return $ err ("error-type " ++ show x)
     case x of
-        TodoNothing -> return jerr
         TodoExp _ -> return jerr
         TodoDecl {} -> return jerr
         TodoReturn -> do
@@ -333,12 +332,6 @@ convertBody (Error s t) = do
 convertBody (Store  n@NodeC {})  = newNode sptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
 convertBody (Return n@NodeC {})  = newNode wptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
 
---convertBody (Store  n@NodeC {} :>>= (Var vn vt) :-> e') = do
---    (x,y) <- newNode sptr_t n
---    (vn,vt) <- fetchVar' vn vt
---    d <- newAssignVar vt vn y
---    e'' <- convertBody e'
---    return (x & d & e'')
 
 convertBody (e :>>= (Var vn vt) :-> e') | not $ isCompound e = do
     (vn,vt) <- fetchVar' vn vt
@@ -348,7 +341,7 @@ convertBody (e :>>= (Var vn vt) :-> e') | not $ isCompound e = do
 
 convertBody (e :>>= v@(Var _ _) :-> e') = do
     v' <- convertVal v
-    ss <- localTodo (TodoExp v')  (convertBody e)
+    ss <- localTodo (TodoExp [v'])  (convertBody e)
     ss' <- convertBody e'
     return (ss & ss')
 
@@ -385,9 +378,9 @@ simpleRet er = do
     case x of
         TodoReturn -> return (creturn er)
         _ | isEmptyExpression er -> return mempty
-        TodoExp v -> return (v =* er)
+        TodoExp [v] -> return (v =* er)
         TodoDecl n t -> do newAssignVar t n er
-        TodoNothing -> return $ expr er
+        TodoExp [] -> return $ expr er
 
 nodeAssign v t as e' = do
     declareStruct t
