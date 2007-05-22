@@ -28,9 +28,9 @@ devolveGrin grin = do
     col <- newIORef []
     let g (n,l :-> r) = f r >>= \r -> return (n,l :-> r)
         f lt@Let { expDefs = defs, expBody = body } = do
-            let nonTail = snd $ mconcatMap collectFuncs (body : map (lamExp . funcDefBody) defs)
+            let nonTail = expNonNormal lt
                 (nmaps,rmaps) = splitEither (map z defs)
-                z fd@FuncDef { funcDefName = name, funcDefBody = Tup as :-> r }
+                z fd@FuncDef { funcDefName = name, funcDefBody = ~(Tup as) :-> r }
                     | name `Set.member` nonTail = Left ((name,Tup (as ++ xs) :-> proc r),xs)
                     | otherwise = Right fd { funcDefBody = Tup as :-> proc r }
                   where xs = [ Var v t |  (v,t) <- Set.toList $ freeVars (Tup as :-> r)]
@@ -40,7 +40,7 @@ devolveGrin grin = do
                 proc' e = mapExpExp proc' e
             mapM_ print (Map.toList pmap)
             modifyIORef col (++ fsts nmaps)
-            return $  updateLetProps lt { expDefs = rmaps, expBody = proc body }
+            mapExpExp f $  updateLetProps lt { expDefs = rmaps, expBody = proc body }
         f e = mapExpExp f e
     nf <- mapM g (grinFuncs grin)
     lf <- readIORef col
