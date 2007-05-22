@@ -27,6 +27,7 @@ import Grin.Val
 import PackedString
 import RawFiles
 import Support.CanType
+import Support.Tuple
 import Support.FreeVars
 import Util.Gen
 import Util.SetLike
@@ -208,7 +209,7 @@ convertBody Let { expDefs = defs, expBody = body } = do
         let nm = (toName (show name ++ "_" ++ show u))
         return (name,(nm,vs'))
     let done = (toName $ "done" ++ show u)
-        localJumps xs = local (rEMap_u (Map.fromList xs `mappend`))
+    let localJumps xs = local (rEMap_u (Map.fromList xs `mappend`))
     localJumps nn $ do
     ss <- (convertBody body)
     rs <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = Tup as :-> b } -> do
@@ -220,13 +221,6 @@ convertBody (e :>>= Tup [] :-> e') = do
     ss <- localTodo (TodoExp []) (convertBody e)
     ss' <- convertBody e'
     return (ss & ss')
-convertBody (e :>>= Tup xs :-> e') = do
-    ts <- mapM ( convertType . getType) xs
-    st <- newVar (anonStructType ts)
-    ss <- localTodo (TodoExp [st]) (convertBody e)
-    ss' <- convertBody e'
-    vs <- mapM convertVal xs
-    return $  ss & mconcat [ v =* projectAnon i st | v <- vs | i <- [0..] ] & ss'
 convertBody (Return v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
 convertBody (Return v :>>= (NodeV t []) :-> e') = do
     v' <- convertVal v
@@ -345,6 +339,14 @@ convertBody (e :>>= v@(Var _ _) :-> e') = do
     ss' <- convertBody e'
     return (ss & ss')
 
+convertBody (e :>>= Tup xs :-> e') = do
+    ts <- mapM (convertType . getType) xs
+    st <- newVar (anonStructType ts)
+    ss <- localTodo (TodoExp [st]) (convertBody e)
+    ss' <- convertBody e'
+    vs <- mapM convertVal xs
+    return $  ss & mconcat [ v =* projectAnon i st | v <- vs | i <- [0..] ] & ss'
+
 -- IORef's do this
 convertBody (Store v) | tyINode == getType v = do
     v <- convertVal v
@@ -372,6 +374,15 @@ convertBody (Fetch v) | getType v == TyPtr tyINode  = do
 -- return, promote and demote
 convertBody (Fetch v)        | getType v == tyINode = simpleRet =<< f_promote `liftM` convertVal v
 convertBody (Store n@Var {}) | getType n == tyDNode = simpleRet =<< f_demote `liftM` convertVal n
+
+convertBody (Return (Tup xs)) = do
+    t <- asks rTodo
+    case t of
+        TodoExp [e] -> do
+            xs <- mapM convertVal xs
+            ss <- forMn xs $ \ (v,i) -> return (projectAnon i e =* v)
+            return (mconcat ss)
+        _ -> simpleRet =<< convertVal (Tup xs)
 convertBody (Return v) = simpleRet =<< convertVal v
 
 
@@ -404,8 +415,6 @@ isCompound Fetch {} = False
 isCompound Return {} = False
 isCompound Store {} = False
 isCompound Prim {} = False
---isCompound App {} = False
---isCompound Call {} = False
 isCompound _ = True
 
 
