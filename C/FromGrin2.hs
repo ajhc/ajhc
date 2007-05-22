@@ -215,7 +215,10 @@ convertBody Let { expDefs = defs, expBody = body } = do
     rs <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = Tup as :-> b } -> do
        ss <- convertBody b
        return (annotate (show as) (label (toName (show name ++ "_" ++ show u))) & subBlock ss)
-    return (ss & goto done & mconcat (intersperse (goto done) rs) & label done);
+    todo <- asks rTodo
+    case todo of
+        TodoReturn -> return (ss & mconcat rs);
+        _ -> return (ss & goto done & mconcat (intersperse (goto done) rs) & label done);
 convertBody (e :>>= Tup [x] :-> e') = convertBody (e :>>= x :-> e')
 convertBody (e :>>= Tup [] :-> e') = do
     ss <- localTodo (TodoExp []) (convertBody e)
