@@ -16,7 +16,10 @@ tn_2Tup  = convertName $ nameTuple DataConstructor 2
 tn_Boolzh = convertName dc_Boolzh
 tn_unit  = convertName dc_Unit
 
-region_heap = Item (toAtom "heap") TyRegion
+-- This allocates data on the heap.
+region_heap  = Item (toAtom "heap") TyRegion
+-- This allocates data in the innermost enclosing region, including implicit regions.
+region_block = Item (toAtom "block") TyRegion
 
 instance ConNames Val where
     vTrue  = NodeC tn_Boolzh [toUnVal (1 :: Int)]
