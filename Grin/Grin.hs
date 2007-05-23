@@ -84,6 +84,7 @@ import Support.FreeVars
 import Support.Tuple
 import Util.Perhaps
 import qualified Info.Info as Info
+import qualified C.Op as Op
 
 -- Extremely simple first order monadic code with basic type system.  similar
 -- to GRIN except for the explicit typing on variables. Note, that certain
@@ -208,6 +209,7 @@ data Ty =
     | TyPtr Ty                 -- ^ pointer to a heap location which contains its argument
     | TyNode                   -- ^ a whole tagged node
     | Ty Atom                  -- ^ a basic type
+    | TyPrim Op.Ty             -- ^ a basic type
     | TyTup [Ty]               -- ^ unboxed list of values
     | TyCall Callable [Ty] Ty  -- ^ something call,jump, or cut-to-able
     | TyRegion                 -- ^ a region
@@ -223,11 +225,11 @@ data FuncDef = FuncDef {
     funcDefProps :: FuncProps
     } deriving(Eq,Ord,Show)
 
-createFuncDef local name body@(Tup args :-> rest)  = updateFuncDefProps FuncDef { funcDefName = name, funcDefBody = body, funcDefCall = call, funcDefProps = funcProps } where
+createFuncDef local name body@(~(Tup args) :-> rest)  = updateFuncDefProps FuncDef { funcDefName = name, funcDefBody = body, funcDefCall = call, funcDefProps = funcProps } where
     call = Item name (TyCall (if local then LocalFunction else Function) (map getType args) (getType rest))
 
 
-updateFuncDefProps fd@FuncDef { funcDefBody = body@(Tup args :-> rest) } =  fd { funcDefProps = props } where
+updateFuncDefProps fd@FuncDef { funcDefBody = body@(~(Tup args) :-> rest) } =  fd { funcDefProps = props } where
     props = (funcDefProps fd) { funcFreeVars = freeVars body, funcTags = freeVars body, funcType = (map getType args,getType rest) }
 
 grinFuncs grin = map (\x -> (funcDefName x, funcDefBody x)) (grinFunctions grin)
@@ -256,6 +258,7 @@ funcProps = FuncProps {
     funcInfo = mempty,
     funcFreeVars = mempty,
     funcTags = mempty,
+    funcType = undefined,
     funcExits = Maybe,
     funcCuts = Maybe,
     funcAllocs = Maybe,
@@ -271,6 +274,7 @@ instance Show Ty where
     show (TyPtr t) = '&':show t
     show (TyTup []) = "()"
     show (TyTup ts) =  tupled (map show ts)
+    show (TyPrim t) = show t
     show TyRegion = "R"
     show (TyCall c as rt) = show c <> tupled (map show as) <+> "->" <+> show rt
     show TyUnknown = "?"
@@ -443,7 +447,8 @@ properHole x = case x of
     TyPtr TyNode -> Const (properHole TyNode)
     TyTag -> (Tag tagHole)
     ty@(Ty _) -> (Lit 0 ty)
-    TyNode -> (NodeC tagHole [])
+    ty@(TyPrim _) -> (Lit 0 ty)
+    ~TyNode -> (NodeC tagHole [])
 
 isHole x = x `elem` map properHole [TyPtr TyNode, TyNode, TyTag]
 
@@ -603,6 +608,7 @@ instance CanType Exp Ty where
     getType Let { expBody = body } = getType body
     getType MkCont { expLam = _ :-> rbody } = getType rbody
     getType Call { expType = ty } = ty
+    getType MkClosure { expType = ty } = ty
 
 instance CanType Val Ty where
     getType (Tag _) = TyTag
@@ -748,7 +754,7 @@ valToItem (Const v) = HeapValue (Set.singleton (HV (-1) (Right v)))
 valToItem (NodeC t as) = NodeValue (Set.singleton (NV t (map valToItem as)))
 valToItem (Lit _ ty) = BasicValue ty
 valToItem (Tup as) = TupledValue (map valToItem as)
-valToItem (Tag _) = BasicValue TyTag
+valToItem ~(Tag _) = BasicValue TyTag
 
 itemTag = BasicValue TyTag
 
@@ -768,7 +774,7 @@ instance Ord HeapValue where
 combineItem :: Item -> Item -> Item
 combineItem (BasicValue ty) (BasicValue ty') | ty == ty' = BasicValue ty
 combineItem (HeapValue s1) (HeapValue s2) = HeapValue (Set.union s1 s2)
-combineItem (NodeValue ns1) (NodeValue ns2) = NodeValue ns where
+combineItem ~(NodeValue ns1) ~(NodeValue ns2) = NodeValue ns where
     ns2map = Map.fromAscList [ (t,NV t as)| NV t as <- (Set.toAscList ns2)]
     ns = Set.fromAscList [ NV t1 (zipWith combineItem as1 as2) | NV t1 as1 <- Set.toAscList ns1, NV _ as2 <- Map.lookup t1 ns2map  ] `Set.union` ns1
 

@@ -1,5 +1,14 @@
 {-# OPTIONS_GHC -cpp -fbang-patterns #-}
-module C.Arch(determineArch,primitiveInfo,genericPrimitiveInfo) where
+module C.Arch(
+    ArchInfo(),
+    archGetPrimInfo,
+    archInfo,
+    archOpTy,
+    genericArchInfo,
+    determineArch,
+    primitiveInfo,
+    genericPrimitiveInfo
+    ) where
 
 
 
@@ -29,12 +38,17 @@ import C.Prims
 import Options
 import Util.Gen
 import qualified FlagOpts as FO
+import qualified C.Op as Op
 
 #include "../arch/generic.arch"
 #include "../arch/i686.arch"
 #include "../arch/x86_64.arch"
 
 #include "MachDeps.h"
+
+newtype ArchInfo = ArchInfo {
+    archPrimMap :: Map.Map ExtType PrimType
+}
 
 cpu_alias s = maybe arch_error id $ lookup s' $ [
     ("unknown","generic"),
@@ -50,21 +64,38 @@ arch_map = [
     ("generic",Nothing,arch_generic,[]),
     ("i686",Nothing,arch_i686,[]),
     ("x86_64",Just 64,arch_x86_64,[]),
-    ("x86_64",Just 32,arch_i686,["-m32"])
+    ("x86_64",Just (32::Int),arch_i686,["-m32"])
     ]
 
 available_archs = snub $ "ghc":"ghc-64":"ghc-32":[ n | (n,_,_,_) <- arch_map ]  ++ [ n ++ "-" ++ show b |  (n,Just b,_,_) <- arch_map]
 
+-- get information on a primitive type if it is available
+archGetPrimInfo :: Monad m => ArchInfo -> ExtType -> m PrimType
+archGetPrimInfo ArchInfo { archPrimMap = pi } et = case Map.lookup et pi of
+    Nothing -> fail $ "archGetPrimInfo: No info for: " ++ et
+    Just s -> return s
+
 primitiveInfo :: Monad m => ExtType -> m PrimType
-primitiveInfo et = Map.lookup et primMap
+primitiveInfo et = archGetPrimInfo archInfo et
 
 genericPrimitiveInfo :: Monad m => ExtType -> m PrimType
-genericPrimitiveInfo et = Map.lookup et primMap
+genericPrimitiveInfo et = archGetPrimInfo genericArchInfo et
 
+genericArchInfo = ArchInfo { archPrimMap = primMap }
+archInfo = ArchInfo { archPrimMap = primMap }
 
 primMap :: Map.Map ExtType PrimType
 primMap = Map.fromList [ (primTypeName a,a) | a <- as ] where
     (_,_,as,_) = unsafePerformIO determineArch
+
+archOpTy :: ArchInfo -> ExtType -> Op.Ty
+archOpTy ai s = case archGetPrimInfo ai s of
+    Nothing -> Op.TyBits (Op.BitsExt s) Op.HintNone
+    Just pt -> case primTypeType pt of
+        PrimTypeIntegral -> Op.TyBits (Op.Bits $ 8 * primTypeSizeOf pt) (if primTypeIsSigned pt then Op.HintSigned else Op.HintUnsigned)
+        PrimTypeFloating ->  Op.TyBits (Op.Bits $ 8 * primTypeSizeOf pt) Op.HintFloat
+        _ -> Op.TyBits (Op.BitsExt s) Op.HintNone
+
 
 
 determineArch = do
@@ -87,7 +118,7 @@ determineArch = do
             (_,"generic",_) -> ("generic",arch_generic,[])
             (_,"i686",32)   -> ("i686",arch_i686,[])
             (_,"x86_64",32) -> ("x86_64-32",arch_i686, ["-m32"])
-            (_,"x86_64",64) -> ("x86_64",arch_x86_64,[])
+            (_,"x86_64",(64::Int)) -> ("x86_64",arch_x86_64,[])
             _ -> arch_error
 
     return (backendGhc,fn,mp,opt)
