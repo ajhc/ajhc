@@ -129,6 +129,10 @@ lcm 0 _          =  0
 lcm x y          =  abs ((x `quot` (gcd x y)) * y)
 
 
+{-# SPECIALIZE (^) :: Int -> Int -> Int #-}
+{-# SPECIALIZE (^) :: Integer -> Int -> Integer #-}
+{-# SPECIALIZE (^) :: Double -> Int -> Double #-}
+
 (^)              :: (Num a, Integral b) => a -> b -> a
 x ^ 0            =  1
 x ^ n | n > 0    =  f x (n-1) x

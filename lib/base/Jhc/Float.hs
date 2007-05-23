@@ -126,8 +126,6 @@ class  (RealFrac a, Floating a) => RealFloat a  where
     encodeFloatf a i = scaleFloat i a
 
 
-doubleToRational :: Double -> Rational
-doubleToRational = _
 
 rationalToDouble :: Rational -> Double
 rationalToDouble (x:%y) = fromInteger x `divideDouble` fromInteger y

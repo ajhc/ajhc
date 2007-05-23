@@ -69,7 +69,7 @@ class  (Num a) => Fractional a  where
     recip x          =  1 / x
     x / y            =  x * recip y
 
-    fromDouble x = fromRational (doubleToRational x)
+    --fromDouble x = fromRational (doubleToRational x)
 
 
 fromIntegral   :: (Integral a, Num b) => a -> b
@@ -80,9 +80,9 @@ realToFrac x   =  fromRational (toRational x)
 
 {-# RULES
   "realToFrac/toRational"     realToFrac = toRational
---  "realToFrac/fromRational"   realToFrac = fromRational
---  "realToFrac/toDouble"       realToFrac = toDouble
---  "realToFrac/fromDouble"     realToFrac = fromDouble
+  "realToFrac/fromRational"   realToFrac = fromRational
+  "realToFrac/toDouble"       realToFrac = toDouble
+  "realToFrac/fromDouble"     realToFrac = fromDouble
  #-}
 
 {-# RULES

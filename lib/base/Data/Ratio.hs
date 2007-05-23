@@ -4,6 +4,7 @@ module  Data.Ratio (
     Ratio, Rational, (%), numerator, denominator, approxRational ) where
 
 import Prelude.Text
+import Prelude.Float(doubleToRational)
 import Jhc.Num
 import Jhc.Float
 

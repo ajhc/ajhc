@@ -16,6 +16,9 @@ import Prelude.Text
 -- This converts a rational to a floating.  This should be used in the
 -- Fractional instances of Float and Double.
 
+fromRat :: (RealFloat a) => Rational -> a
+fromRat = error "fromRat not implemented yet"
+
 {-
 fromRat :: (RealFloat a) => Rational -> a
 fromRat x =
@@ -330,8 +333,6 @@ floatToDigits base x =
 -- point than the Haskell lexer.  The `.' is optional.
 
 readFloat     :: (RealFrac a) => ReadS a
-readFloat = error "readFloat"
-{-
 readFloat r    = [(fromRational ((n%1)*10^^(k-d)),t) | (n,d,s) <- readFix r,
                                                        (k,t)   <- readExp s] ++
                  [ (0/0, t) | ("NaN",t)      <- lex r] ++
@@ -351,7 +352,6 @@ readFloat r    = [(fromRational ((n%1)*10^^(k-d)),t) | (n,d,s) <- readFix r,
                  readExp' ('+':s) = readDec s
                  readExp' s       = readDec s
 
--}
 
 lexDigits        :: ReadS String
 lexDigits        =  nonnull isDigit

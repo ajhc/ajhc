@@ -10,6 +10,7 @@ module Prelude.Text (
 -- are done via "deriving" clauses in Prelude.hs
 import Prelude
 import Jhc.Show
+import Prelude.Float
 
 
 import Data.Char(isSpace, isAlpha, isDigit, isAlphaNum,
@@ -121,13 +122,13 @@ instance  Show Float  where
     showsPrec p         = showFloat
 
 instance  Read Float  where
-    readsPrec p         = readSigned readFloat
+    readsPrec p s        = [ (doubleToFloat x,y) | (x,y) <- readSigned readDouble s]
 
 instance  Show Double  where
     showsPrec p         = showFloat
 
 instance  Read Double  where
-    readsPrec p         = readSigned readFloat
+    readsPrec p         = readSigned readDouble
 
 instance Read () where
     readsPrec p    = readParen False
