@@ -117,6 +117,6 @@ listSigsToSigEnv kt sigs
    = Map.fromList $ concatMap (aHsTypeSigToAssumps kt) sigs
 
 aHsTypeSigToAssumps :: KindEnv -> HsDecl -> [(Name,Type)]
-aHsTypeSigToAssumps kt sig@(HsTypeSig _ names qualType) = [ (toName Val n,typ) | n <- names] where
+aHsTypeSigToAssumps kt sig@(~(HsTypeSig _ names qualType)) = [ (toName Val n,typ) | n <- names] where
     Identity typ = hsQualTypeToSigma kt qualType
 

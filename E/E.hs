@@ -11,23 +11,17 @@ module E.E(
 
 import Char(chr)
 import Data.FunctorM
-import Data.Monoid
 import List
 import Maybe
-import Monad
 
 import E.FreeVars
-import Atom
 import C.Prims
 import Control.Monad.Identity
 import E.Type
-import GenUtil
 import Name.Id
 import Name.Name
 import Name.Names
 import Name.VConsts
-import Number
-import Util.SetLike as S
 
 
 

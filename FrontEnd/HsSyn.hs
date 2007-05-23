@@ -123,14 +123,16 @@ data HsAssoc = HsAssocNone | HsAssocLeft | HsAssocRight
   {-! derive: Binary !-}
 
 instance HasLocation HsDecl where
-    srcLoc HsTypeDecl	 { hsDeclSrcLoc  = sl } = sl
-    srcLoc HsDataDecl	 { hsDeclSrcLoc  = sl } = sl
-    srcLoc HsInfixDecl   { hsDeclSrcLoc = sl } = sl
-    srcLoc HsNewTypeDecl { hsDeclSrcLoc = sl } = sl
+    srcLoc HsTypeDecl	  { hsDeclSrcLoc  = sl } = sl
+    srcLoc HsDeclDeriving { hsDeclSrcLoc  = sl } = sl
+    srcLoc HsSpaceDecl    { hsDeclSrcLoc  = sl } = sl
+    srcLoc HsDataDecl	  { hsDeclSrcLoc  = sl } = sl
+    srcLoc HsInfixDecl    { hsDeclSrcLoc = sl } = sl
+    srcLoc HsNewTypeDecl  { hsDeclSrcLoc = sl } = sl
     srcLoc HsPragmaSpecialize { hsDeclSrcLoc = sl } = sl
     srcLoc (HsPragmaRules rs) = srcLoc rs
-    srcLoc HsForeignDecl { hsDeclSrcLoc = sl } = sl
-    srcLoc HsActionDecl { hsDeclSrcLoc = sl } = sl
+    srcLoc HsForeignDecl  { hsDeclSrcLoc = sl } = sl
+    srcLoc HsActionDecl   { hsDeclSrcLoc = sl } = sl
     srcLoc (HsForeignExport sl _ _ _) = sl
     srcLoc (HsClassDecl	 sl _ _) = sl
     srcLoc (HsInstDecl	 sl _ _) = sl

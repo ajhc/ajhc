@@ -1,30 +1,36 @@
-module C.FFI
-    (CallConv(..), Safety(..), FfiType(..), FfiExport(..), FfiSpec(..), Requires(..), nullRequires
+module C.FFI(
+    CallConv(..),
+    Safety(..),
+    FfiType(..),
+    FfiExport(..),
+    FfiSpec(..),
+    Requires(..),
+    nullRequires
     ) where
 
+import Data.Typeable
 import Data.Binary
-import Data.Generics
 import Data.Monoid
 
 type CName    = String
 
-data CallConv = CCall | StdCall | Primitive | DotNet deriving(Eq,Ord,Show,Data,Typeable)
+data CallConv = CCall | StdCall | Primitive | DotNet deriving(Eq,Ord,Show)
     {-! derive: Binary !-}
 
-data Safety = Safe | Unsafe deriving(Eq,Ord,Show,Data,Typeable)
+data Safety = Safe | Unsafe deriving(Eq,Ord,Show)
     {-! derive: Binary !-}
 
 data FfiType = Import CName Requires
              | ImportAddr CName Requires
              | Wrapper
              | Dynamic
-             deriving(Eq,Ord,Show,Data,Typeable)
+             deriving(Eq,Ord,Show)
              {-! derive: Binary !-}
 
 data Requires = Requires {
     reqIncludes :: [String],
     reqLibraries :: [String]
-    } deriving(Typeable, Data, Eq, Ord)
+    } deriving(Eq, Ord)
     {-! derive: Monoid, Binary !-}
 
 instance Show Requires where
@@ -34,10 +40,10 @@ instance Show Requires where
 nullRequires = Requires [] []
 
 data FfiSpec = FfiSpec FfiType Safety CallConv
-             deriving(Eq,Ord,Show,Data,Typeable)
+             deriving(Eq,Ord,Show)
              {-! derive: Binary !-}
 
 data FfiExport = FfiExport CName Safety CallConv
-             deriving(Eq,Ord,Show,Data,Typeable)
+             deriving(Eq,Ord,Show,Typeable)
              {-! derive: Binary !-}
 

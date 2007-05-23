@@ -6,20 +6,16 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Control.Monad.State
 import Data.Monoid
-import IO(hFlush,stderr,stdout,openFile,hClose,IOMode(..),hPutStrLn)
+import IO(hFlush,stderr,stdout)
 import List hiding(group,union,delete)
-import Maybe
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified List(group)
 import qualified System
 
-import Atom
-import qualified C.FromGrin2 as FG2
 import C.Arch
 import CharIO
-import FrontEnd.Class
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
@@ -28,31 +24,32 @@ import E.Annotate(annotate,annotateDs,annotateProgram)
 import E.Diff
 import E.E
 import E.Eta
+import E.FreeVars
 import E.FromHs
 import E.Inline
 import E.LambdaLift
-import E.ToHs
-import E.FreeVars
 import E.LetFloat
 import E.Program
 import E.Rules
 import E.Show hiding(render)
 import E.Subst(subst)
+import E.ToHs
 import E.Traverse
 import E.TypeAnalysis
 import E.TypeCheck
 import E.WorkerWrapper
+import FrontEnd.Class
 import FrontEnd.FrontEnd
 import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadCode
-import Grin.Lint
 import Grin.Devolve(devolveTransform)
 import Grin.EvalInline(createEvalApply)
 import Grin.FromE
 import Grin.Grin
-import Grin.Optimize
+import Grin.Lint
 import Grin.NodeAnalyze
+import Grin.Optimize
 import Grin.Show
 import Grin.Whiz
 import Ho.Build
@@ -66,20 +63,17 @@ import Name.Names
 import Name.VConsts
 import Options
 import SelfTest(selfTest)
-import Support.CanType(getType)
 import Support.FreeVars
-import Support.ShowTable
 import Support.Transform
 import Util.Graph
-import Util.NameMonad
 import Util.SetLike as S
 import Version(versionString,versionContext,versionSimple)
+import qualified C.FromGrin2 as FG2
 import qualified E.CPR
-import qualified E.Demand as Demand(analyzeProgram,solveDs)
+import qualified E.Demand as Demand(analyzeProgram)
 import qualified E.SSimplify as SS
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
-import qualified FrontEnd.Tc.Type as Type
 import qualified Grin.Simplify
 import qualified Info.Info as Info
 import qualified Interactive
@@ -164,10 +158,6 @@ transBarendregt = transformParms {
     barendregtProgram prog = programSetDs ds' prog where
         (ELetRec ds' Unknown,_) = renameE mempty mempty (ELetRec (programDs prog) Unknown)
 
-denewtype prog | null $ progCombinators prog = prog
-denewtype prog = prog' where
-    ELetRec ds _ = removeNewtypes (progDataTable prog) (programE prog)
-    prog' = programSetDs ds prog
 
 lamann _ nfo = return nfo
 letann e nfo = return (annotateArity e nfo)
@@ -180,9 +170,6 @@ idann rs ps i nfo = return (rules rs i (props ps i nfo)) where
         Nothing -> id
         Just x -> \nfo -> Info.insert (x `mappend` Info.fetch nfo) nfo
 
-collectIdAnn r p id nfo = do
-    tell $ singleton id
-    idann r p id nfo
 
 processInitialHo ::
     CollectedHo       -- ^ current accumulated ho
@@ -213,7 +200,7 @@ reprocessCho :: Rules -> IdMap Properties -> CollectedHo -> CollectedHo
 reprocessCho rules ps cho = cho { choVarMap = fmap h (choVarMap cho) , choHo = (choHo cho) { hoEs = Map.map f (hoEs $ choHo cho) }} where
     f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
     g id = runIdentity . idann rules ps id
-    h (Just (EVar t)) = Just (EVar (tvrInfo_u (g (tvrIdent t)) t))
+    h ~(Just (EVar t)) = Just (EVar (tvrInfo_u (g (tvrIdent t)) t))
 
 
 
@@ -548,7 +535,6 @@ compileModEnv' (cho,_) = do
 
     prog <- evaluate $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
 
---    prog <- denewtypeProgram prog
 
     prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) letann (\_ nfo -> return nfo) prog
 
@@ -566,7 +552,6 @@ compileModEnv' (cho,_) = do
     prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterMethod", transformDumpProgress = True } prog
     prog <- barendregtProg prog
 
---    prog <- denewtypeProgram prog
 
     prog <- simplifyProgram mempty "Main-One" True prog
     prog <- barendregtProg prog
@@ -692,20 +677,7 @@ compileToGrin prog = do
     x <- return $ normalizeGrin x
     wdump FD.GrinNormalized $ do dumpGrin "normalized" x
     lintCheckGrin x
-    let opt' s  x = do
-            stats' <- Stats.new
-            nf <- mapMsnd (grinPush stats') (grinFuncs x)
-            x <- return $ setGrinFunctions nf x
-            wdump FD.GrinPass $ printGrin x
-            x <- Grin.Simplify.simplify stats' x
-            t' <- Stats.isEmpty stats'
-            wdump FD.Progress $ Stats.print s stats'
-            Stats.combine stats stats'
-            lintCheckGrin x
-            case t' of
-                True -> return x
-                False -> opt s x
-        pushGrin grin = do
+    let pushGrin grin = do
             grin <- return $ normalizeGrin grin
             nf   <- mapMsnd (grinPush undefined) (grinFuncs grin)
             return $ setGrinFunctions nf grin
@@ -787,12 +759,7 @@ compileGrinToC grin = do
     when (r /= System.ExitSuccess) $ fail "C code did not compile."
     return ()
 
-dereferenceItem (HeapValue hvs) | not $ Set.null hvs = combineItems (map f $ Set.toList hvs) where
-    f (HV _ (Right v)) = valToItem v
-    f (HV _ (Left (_,i))) = i
-dereferenceItem x = x
 
-buildShowTableLL xs = buildTableLL [ (show x,show y) | (x,y) <- xs ]
 
 simplifyProgram sopt name dodump prog = liftIO $ do
     let istat = progStats prog
@@ -872,66 +839,9 @@ transformProgram tp prog = liftIO $ do
 
 
 
--- these are way too complicated and should be simplified
-
-doopt mangle dmp stats name func lc = do
-    stats' <- Stats.new
-    lc <- mangle (Stats.print "stats" stats') dmp name (func stats') lc
-    t' <- Stats.isEmpty stats'
-    case t'  of
-        False -> return lc
-        True -> do
-            when ((dmp && dump FD.Progress) || dmp && coreSteps) $ Stats.print "Optimization" stats'
-            Stats.combine stats stats'
-            doopt mangle dmp stats name func lc
 
 
-mangle' ::
-    Maybe IdSet  -- ^ Acceptable free variables
-    -> DataTable        -- ^ The datatable needed for typechecking
-    -> IO ()            -- ^ run on error
-    -> Bool             -- ^ Whether to dump progress
-    -> String           -- ^ Name of pass
-    -> (E -> IO E)      -- ^ Mangling function
-    -> E                -- ^ What to mangle
-    -> IO E             -- ^ Out it comes
-mangle'  fv dataTable erraction b  s action e = do
-    when ((b && dump FD.Progress) || (b && dump FD.CorePass)) $ putErrLn $ "-- " ++ s
-    e' <- action e
-    if not flint then return e' else do
-        let ufreevars e | Just as <- fv = filter ( not . (`member` as) . tvrIdent) (freeVars e)
-            ufreevars e = []
-        case inferType dataTable [] e' of
-        -- temporarily disabled due to newtypes of functions
---            Right _ |  xs@(_:_) <- ufreevars e' -> do
---                putErrLn $ "\n>>> internal error: Unaccountable Free Variables\n" ++ render (pprint (xs:: [TVr]))
---                putErrLn $ "\n>>>Before" <+> s
---                printEStats e
---                putDocM CharIO.putErr (ePretty e)
---                putErrLn $ "\n>>>After" <+> s
---                printEStats e'
---                erraction
---                --let (_,e'') = E.Diff.diff e e'
---                let e''' = findOddFreeVars xs e'
---                putDocM CharIO.putErr (ePrettyEx e''')
---                putErrLn $ "\n>>> internal error: Unaccountable Free Variables\n" ++ render (pprint (xs:: [TVr]))
---                case optKeepGoing options of
---                    True -> return e'
---                    False -> putErrDie "Unusual free vars in E"
-            Left ss -> do
-                putErrLn "Type Error..."
-                putErrLn $ "\n>>>Before" <+> s
-                printEStats e
-                putDocM CharIO.putErr (ePretty e)
-                putErrLn $ "\n>>>After" <+> s
-                printEStats e'
-                erraction
-                let (_,e'') = E.Diff.diff e e'
-                putDocM CharIO.putErr (ePretty e'')
-                putErrLn $ "\n>>> internal error:\n" ++ unlines (tail ss)
-                maybeDie
-                return e'
-            Right _ -> wdump FD.Stats (printEStats e') >>  return e'
+
 
 
 typecheck dataTable e = case inferType dataTable [] e of
@@ -1000,12 +910,7 @@ lintCheckProgram _ _ = return ()
 
 
 
-dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ show n <+> hsep (map show as) <+> "::" <+> show t |  (n,TyTy { tySlots = as, tyReturn = t }) <- Map.toList tt]
 
-printCheckName dataTable e = do
-    putErrLn  ( render $ hang 4 (pprint e <+> text "::") )
-    ty <- typecheck dataTable e
-    putErrLn  ( render $ indent 4 (pprint ty))
 
 printCheckName' dataTable tvr e = do
     putErrLn (show $ tvrInfo tvr)

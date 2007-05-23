@@ -303,6 +303,5 @@ patToE p = f p where
     f (LitCons { litAliasFor = af,  litName = x, litArgs = ts, litType = t }) = do
        return $  ELit litCons { litAliasFor = af, litName = x, litArgs = map EVar ts, litType = t }
     f (LitInt e t) = return $ ELit (LitInt e t)
-    f x = fail $ "E.Values.patToE: " ++ show x
 
 

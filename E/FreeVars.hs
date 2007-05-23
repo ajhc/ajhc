@@ -61,7 +61,7 @@ decomposeLet e = ([],e)
 
 caseUpdate :: E -> E
 caseUpdate ec@ECase {} = ec { eCaseAllFV = fv ec } where
-    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = mconcat (freeIds e:freeIds (tvrType  b):freeIds ty:(delete (tvrIdent b) $ mconcat (freeVars d:map freeVars as)  ):[])
+    fv ~(ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty }) = mconcat (freeIds e:freeIds (tvrType  b):freeIds ty:(delete (tvrIdent b) $ mconcat (freeVars d:map freeVars as)  ):[])
 caseUpdate e = e
 
 -- we export this to get a concrete type for free id sets.

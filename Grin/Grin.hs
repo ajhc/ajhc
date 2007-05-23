@@ -565,6 +565,7 @@ instance CanTypeCheck TyEnv Exp Ty where
         let nte = extendTyEnv defs te
         mapM_ (typecheck nte) [ b | FuncDef { funcDefBody = _ :-> b } <- defs ]
         typecheck nte body
+    typecheck _ t = return (getType t)
 
 instance CanTypeCheck TyEnv Val Ty where
     typecheck _ (Tag _) = return TyTag
@@ -589,6 +590,7 @@ instance CanTypeCheck TyEnv Val Ty where
         as'' <- mapM (typecheck te) as
         if as'' == as' then return TyNode else
             fail $ "NodeC: arguments do not match " ++ show n ++ show (as'',as')
+    typecheck _ (Item _ t) = return t
 
 instance CanType Exp Ty where
     getType (_ :>>= (_ :-> e2)) = getType e2

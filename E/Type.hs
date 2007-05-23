@@ -15,7 +15,6 @@ import Name.Name
 import Name.Names
 import Number
 import qualified Info.Info as Info
-import {-# SOURCE #-} Info.Binary(putInfo,getInfo)
 
 data RuleType = RuleSpecialization | RuleUser | RuleCatalyst
     deriving(Eq)
@@ -103,6 +102,7 @@ instance Show ESort where
     showsPrec _ EHashHash = showString "##"
     showsPrec _ ETuple = showString "(#)"
     showsPrec _ EBang = showString "!"
+    showsPrec _ (ESortNamed n) = shows n
 
 instance (Show e,Show t) => Show (Lit e t) where
     showsPrec p (LitInt x t) = showParen (p > 10) $  shows x <> showString "::" <> shows t
