@@ -19,7 +19,7 @@ import qualified Info.Info as Info
 import Info.Types
 import Name.Name
 import Name.Names
-import Stats
+import Stats hiding(null)
 import Support.CanType
 import Util.SetLike
 import qualified E.Demand as Demand

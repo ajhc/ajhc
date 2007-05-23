@@ -698,13 +698,13 @@ compileToGrin prog = do
             x <- return $ setGrinFunctions nf x
             wdump FD.GrinPass $ printGrin x
             x <- Grin.Simplify.simplify stats' x
-            t' <- Stats.getTicks stats'
+            t' <- Stats.isEmpty stats'
             wdump FD.Progress $ Stats.print s stats'
             Stats.combine stats stats'
             lintCheckGrin x
             case t' of
-                0 -> return x
-                _ -> opt s x
+                True -> return x
+                False -> opt s x
         pushGrin grin = do
             grin <- return $ normalizeGrin grin
             nf   <- mapMsnd (grinPush undefined) (grinFuncs grin)
@@ -720,12 +720,12 @@ compileToGrin prog = do
                     transformOperation = fop
                     }
             grin <- transformGrin tparms grin
-            t' <- Stats.getTicks stats'
+            t' <- Stats.isEmpty stats'
             wdump FD.Progress $ Stats.print s stats'
             Stats.combine stats stats'
             case t' of
-                0 -> return grin
-                _ -> opt s grin
+                True -> return grin
+                False -> opt s grin
     x <- deadCode stats (grinEntryPointNames x) x  -- XXX
     lintCheckGrin x
     x <- pushGrin x
@@ -861,13 +861,13 @@ transformProgram tp prog = liftIO $ do
         when dodump $ putErrLn "program not changed"
         return prog
      else do
-    when (dodump && dump FD.CoreSteps && estat /= mempty) $ Stats.printLStat (optStatLevel options) name estat
+    when (dodump && dump FD.CoreSteps && (not $ Stats.null estat)) $ Stats.printLStat (optStatLevel options) name estat
     when collectPassStats $ do
         Stats.tick Stats.theStats scname
         Stats.tickStat Stats.theStats (Stats.prependStat scname estat)
     wdump FD.ESize $ printESize ("After  "++name) prog'
     lintCheckProgram onerr prog'
-    if doIterate iterate (estat /= mempty) then transformProgram tp { transformIterate = iterateStep iterate } prog' { progStats = istat `mappend` estat } else
+    if doIterate iterate (not $ Stats.null estat) then transformProgram tp { transformIterate = iterateStep iterate } prog' { progStats = istat `mappend` estat } else
         return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
 
 
@@ -877,10 +877,10 @@ transformProgram tp prog = liftIO $ do
 doopt mangle dmp stats name func lc = do
     stats' <- Stats.new
     lc <- mangle (Stats.print "stats" stats') dmp name (func stats') lc
-    t' <- Stats.getTicks stats'
+    t' <- Stats.isEmpty stats'
     case t'  of
-        0 -> return lc
-        _ -> do
+        False -> return lc
+        True -> do
             when ((dmp && dump FD.Progress) || dmp && coreSteps) $ Stats.print "Optimization" stats'
             Stats.combine stats stats'
             doopt mangle dmp stats name func lc

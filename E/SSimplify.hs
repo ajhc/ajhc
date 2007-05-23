@@ -44,7 +44,7 @@ import Name.Names
 import Name.VConsts
 import Number
 import Options
-import Stats hiding(new,print,Stats,singleton)
+import Stats hiding(null,new,print,Stats,singleton)
 import Support.CanType
 import Support.FreeVars
 import Util.Graph

@@ -24,7 +24,7 @@ import Fixer.Supply
 import GenUtil
 import Name.Id
 import Name.Name
-import Stats
+import Stats(mtick,runStatM,runStatT)
 import Support.CanType
 import Support.FreeVars
 import Util.Graph as G

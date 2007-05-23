@@ -34,11 +34,11 @@ import Info.Types
 import Name.Id
 import Name.Name
 import Name.Names
-import Stats
 import Support.CanType
 import Support.FreeVars
 import Util.Gen
 import Util.SetLike
+import qualified Stats
 import qualified Info.Info as Info
 
 
@@ -82,7 +82,7 @@ typeAnalyze doSpecialize prog = do
     prog <- annotateProgram mempty lamread (\_ -> return) (\_ -> return) prog
     unusedRules <- supplyReadValues ur >>= return . fsts . filter (not . snd)
     unusedValues <- supplyReadValues uv >>= return . fsts . filter (not . snd)
-    let (prog',stats) = runStatM $ specializeProgram doSpecialize (Set.fromList unusedRules) (Set.fromList unusedValues) prog
+    let (prog',stats) = Stats.runStatM $ specializeProgram doSpecialize (Set.fromList unusedRules) (Set.fromList unusedValues) prog
     prog <- annotateProgram mempty lamdel (\_ -> return) (\_ -> return) prog'
     return prog { progStats = progStats prog `mappend` stats }
 
@@ -270,7 +270,7 @@ getTyp kind dataTable vm = f 10 kind vm where
          else return $ ELit (updateLit dataTable litCons { litName = h, litArgs = as', litType = kind })
     f _ _ _  = fail "getTyp: not constant type"
 
-specializeProgram :: (MonadStats m) =>
+specializeProgram :: (Stats.MonadStats m) =>
     Bool                       -- ^ do specialization
     -> (Set.Set (Module,Int))  -- ^ unused rules
     -> (Set.Set TVr)           -- ^ unused values
@@ -294,7 +294,7 @@ specializeDef True SpecEnv { senvDataTable = dataTable }  (tvr,e) = ans where
     (fe,ts) = fromLam e
     ne = sub $ foldr ELam fe [ t | (t,Nothing) <- sts]
     ans = do
-        sequence_ [ mtick ("Specialize.body.{" ++ pprint tvr ++ "}.{" ++ pprint t ++ "}.{" ++ pprint v) | (t,Just v) <- sts ]
+        sequence_ [ Stats.mtick ("Specialize.body.{" ++ pprint tvr ++ "}.{" ++ pprint t ++ "}.{" ++ pprint v) | (t,Just v) <- sts ]
         let vs = [ (n,v) | ((_,Just v),n) <- zip sts naturals ]
             sd = not $ null vs
         when sd $ tell (msingleton tvr (fsts vs))
@@ -340,14 +340,14 @@ caseCast t ty e = evalState  (f t ty e) (newIds (freeIds e),[]) where
         return t
 caseCast t _ty e = e
 
-specAlt :: MonadStats m => SpecEnv -> Alt E -> m (Alt E)
+specAlt :: Stats.MonadStats m => SpecEnv -> Alt E -> m (Alt E)
 specAlt env@SpecEnv { senvDataTable = dataTable } (Alt lc@LitCons { litArgs = ts } e) = ans where
     f xs = do
         ws <- forM xs $ \t -> evalErrorT id $ do
             False <- return $ isUnused env t
             Just nt <- return $ Info.lookup (tvrInfo t)
             Just tt <- return $ getTyp (getType t) dataTable nt
-            mtick $ "Specialize.alt.{" ++ pprint (show nt,tt) ++ "}"
+            Stats.mtick $ "Specialize.alt.{" ++ pprint (show nt,tt) ++ "}"
             return $ caseCast t tt
         return $ foldr (.) id ws
     ans = do
@@ -356,12 +356,12 @@ specAlt env@SpecEnv { senvDataTable = dataTable } (Alt lc@LitCons { litArgs = ts
 
 isUnused SpecEnv { senvUnusedVars = unusedVars } v = v `Set.member` unusedVars && isJust (Info.lookup $ tvrInfo v :: Maybe Typ)
 
-specBody :: MonadStats m => Bool -> SpecEnv -> E -> m E
+specBody :: Stats.MonadStats m => Bool -> SpecEnv -> E -> m E
 specBody _ env e | (EVar h,as) <- fromAp e, isUnused env h  = do
-    mtick $ "Specialize.delete.{" ++ pprint h ++ "}"
+    Stats.mtick $ "Specialize.delete.{" ++ pprint h ++ "}"
     return $ foldl EAp (EError ("Unused: " ++ pprint h) (getType h)) as
 specBody True SpecEnv { senvArgs = dmap } e | (EVar h,as) <- fromAp e, Just os <- mlookup h dmap = do
-    mtick $ "Specialize.use.{" ++ pprint h ++ "}"
+    Stats.mtick $ "Specialize.use.{" ++ pprint h ++ "}"
     return $ foldl EAp (EVar h) [ a | (a,i) <- zip as naturals, i `notElem` os ]
 specBody True env ec@ECase { eCaseScrutinee = EVar v } | sortKindLike (getType v) = do
     alts <- mapM (specAlt env) (eCaseAlts ec)

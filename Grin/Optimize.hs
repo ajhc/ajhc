@@ -11,7 +11,7 @@ import C.Prims
 import Grin.Grin
 import Grin.Noodle
 import Grin.Whiz
-import Stats
+import Stats hiding(null)
 import Support.CanType
 import Support.Tuple
 import Support.FreeVars
