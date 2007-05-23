@@ -61,6 +61,7 @@ instance  (RealFloat a) => Fractional (Complex a)  where
              k   = - max (exponent x') (exponent y')
              d   = x'*x'' + y'*y''
     fromRational a =  fromRational a :+ 0
+    fromDouble a = fromDouble a :+ 0
 
 instance  (RealFloat a) => Floating (Complex a) where
     pi             =  pi :+ 0
