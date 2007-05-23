@@ -6,7 +6,7 @@
 #include <inttypes.h>
 
 typedef int HsInt;
-typedef int32_t HsChar;
+typedef uint32_t HsChar;
 typedef int8_t HsInt8;
 typedef int16_t HsInt16;
 typedef int32_t HsInt32;

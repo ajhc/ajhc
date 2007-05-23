@@ -90,11 +90,23 @@ primMap = Map.fromList [ (primTypeName a,a) | a <- as ] where
 
 archOpTy :: ArchInfo -> ExtType -> Op.Ty
 archOpTy ai s = case archGetPrimInfo ai s of
-    Nothing -> Op.TyBits (Op.BitsExt s) Op.HintNone
+    Nothing -> f s
     Just pt -> case primTypeType pt of
         PrimTypeIntegral -> Op.TyBits (Op.Bits $ 8 * primTypeSizeOf pt) (if primTypeIsSigned pt then Op.HintSigned else Op.HintUnsigned)
         PrimTypeFloating ->  Op.TyBits (Op.Bits $ 8 * primTypeSizeOf pt) Op.HintFloat
-        _ -> Op.TyBits (Op.BitsExt s) Op.HintNone
+        _ -> f s
+  where
+    f "float" = Op.TyBits  (Op.BitsExt "float") Op.HintFloat
+    f "double" = Op.TyBits (Op.BitsExt "double") Op.HintFloat
+    f "int" = Op.TyBits (Op.BitsExt "int") Op.HintSigned
+    f "unsigned int" = Op.TyBits (Op.BitsExt "unsigned int") Op.HintUnsigned
+    f "uintmax_t" = Op.TyBits (Op.BitsExt "uintmax_t") Op.HintUnsigned
+    f "intmax_t" = Op.TyBits (Op.BitsExt "intmax_t") Op.HintSigned
+    f "uintptr_t" = Op.TyBits Op.BitsPtr Op.HintUnsigned
+    f "intptr_t" = Op.TyBits Op.BitsPtr Op.HintSigned
+    f "HsPtr" = Op.TyBits Op.BitsPtr Op.HintUnsigned
+    f "HsFunPtr" = Op.TyBits Op.BitsPtr Op.HintUnsigned
+    f s = Op.TyBits (Op.BitsExt s) Op.HintNone
 
 
 

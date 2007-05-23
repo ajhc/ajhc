@@ -1,13 +1,14 @@
 module C.Prims where
 
-import Data.Generics
 import Data.Monoid
-
+import Data.Typeable
 import Data.Binary
+
 import C.FFI(Requires(..))
 import Doc.DocLike
 import Doc.PPrint
 import PackedString
+import qualified C.Op as Op
 
 data PrimTypeType = PrimTypeIntegral | PrimTypeFloating | PrimTypePointer | PrimTypeVoid
     deriving(Show,Eq,Ord)
@@ -24,7 +25,7 @@ type ExtType = String
 
 
 data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
-    deriving(Typeable, Data, Eq, Ord, Show)
+    deriving(Typeable, Eq, Ord, Show)
     {-! derive: Binary !-}
 
 data Prim =
@@ -65,14 +66,16 @@ data Prim =
         primAssembly :: PackedString,
         primDotNetName :: PackedString
         }
-    deriving(Typeable, Data, Eq, Ord, Show)
+    | Op {
+        primCOp :: Op.Op Op.Ty,
+        primRetTy :: Op.Ty
+        }
+    deriving(Typeable, Eq, Ord, Show)
     {-! derive: Binary !-}
 
 data PrimTypeInfo = PrimSizeOf | PrimMaxBound | PrimMinBound | PrimAlignmentOf | PrimTypeIsSigned
-    deriving(Typeable, Data, Eq, Ord, Show)
+    deriving(Typeable, Eq, Ord, Show)
     {-! derive: Binary !-}
-
-instance Data PackedString where
 
 -- | These primitives may safely be duplicated without affecting performance or
 -- correctness too adversly. either because they are cheap to begin with, or
@@ -85,6 +88,7 @@ primIsCheap CConst {} = True
 primIsCheap PrimString {} = True
 primIsCheap Operator {} = True
 primIsCheap PrimTypeInfo {} = True
+primIsCheap Op { primCOp = op } = Op.isCheap op
 primIsCheap _ = False
 
 aprimIsCheap (APrim p _) = primIsCheap p
@@ -97,8 +101,8 @@ primIsConstant CConst {} = True
 primIsConstant AddrOf {} = True
 primIsConstant PrimString {} = True
 primIsConstant CCast {} = True
-primIsConstant PrimString {} = True
 primIsConstant PrimTypeInfo {} = True
+primIsConstant Op { primCOp = op } = Op.isEagerSafe op
 primIsConstant Operator { primOp = op } | op `elem` safeOps = True  where
     safeOps = ["+","-","*","==",">=","<=",">","<","&","|","^","~",">>","<<"]
 primIsConstant _ = False
@@ -109,9 +113,9 @@ primEagerSafe :: Prim -> Bool
 primEagerSafe CConst {} = True
 primEagerSafe PrimString {} = True
 primEagerSafe AddrOf {} = True
-primEagerSafe PrimString {} = True
 primEagerSafe CCast {} = True
 primEagerSafe PrimTypeInfo {} = True
+primEagerSafe Op { primCOp = op } = Op.isEagerSafe op
 primEagerSafe Operator { primOp = op } | op `elem` safeOps = True  where
     safeOps = ["+","-","*","==",">=","<=",">","<","&","|","^","~",">>","<<"]
 primEagerSafe _ = False
@@ -131,7 +135,7 @@ parsePrimString s = do
 primPrim s = APrim (PrimPrim $ packString s) mempty
 
 data APrim = APrim Prim Requires
-    deriving(Typeable, Data, Eq, Ord, Show)
+    deriving(Typeable,  Eq, Ord, Show)
     {-! derive: Binary !-}
 
 instance PPrint d Prim  => PPrint d APrim where
@@ -148,10 +152,18 @@ instance DocLike d => PPrint d Prim where
     pprint (Peek t) = char '*' <> text t
     pprint (Poke t) = char '=' <> text t
     pprint (CCast _ t) = parens (text t)
+    pprint Op { primCOp = op, primRetTy = rt } = parens (pprint rt) <> pprint op
     pprint PrimDotNet { primDotNet = dn,  primDotNetName = n} = parens (text (unpackPS n))
     pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimSizeOf } = text "sizeof" <> parens (text at)
+    pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimAlignmentOf } = text "alignmentof" <> parens (text at)
+    pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimTypeIsSigned } = text "is_signed" <> parens (text at)
     pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimMaxBound } = text "max" <> parens (text at)
     pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimMinBound } = text "min" <> parens (text at)
+
+instance DocLike d => PPrint d Op.Ty where
+    pprintPrec n p = text (showsPrec n p "")
+instance (DocLike d,Show v) => PPrint d (Op.Op v) where
+    pprintPrec n p = text (showsPrec n p "")
 
 parseDotNetFFI :: Monad m => String -> m Prim
 parseDotNetFFI s = ans where
