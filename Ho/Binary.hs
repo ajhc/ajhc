@@ -5,7 +5,7 @@ import Ho.Type
 import Data.Binary
 import PackedString(PackedString)
 import HsSyn(Module)
-import Name.Binary
+import Name.Binary()
 import MapBinaryInstance
 
 data HoHeader = HoHeader {

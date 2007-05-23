@@ -9,23 +9,22 @@ module Ho.Build (
     ) where
 
 
+import Codec.Compression.GZip
 import Control.Monad.Identity
-import Data.IORef
+import Data.Binary
 import Data.Monoid
+import Data.Tree
 import IO(bracket)
 import List
 import Maybe
 import Monad
-import Data.Tree
 import Prelude hiding(print,putStrLn)
 import System.IO hiding(print,putStrLn)
 import System.Posix.Files
 import System.Posix.IO
+import qualified Data.ByteString.Lazy as L
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
-import Data.Binary
-import qualified Data.ByteString.Lazy as L
-import Codec.Compression.GZip
 
 import Atom
 import CharIO
@@ -39,7 +38,6 @@ import E.E
 import E.Program
 import E.Rules
 import E.Show
-import E.Subst(substMap'')
 import E.Traverse(emapE)
 import E.TypeCheck()
 import FrontEnd.HsParser
@@ -52,7 +50,6 @@ import Ho.Type
 import Ho.Binary
 import Ho.LibraryMap
 import HsSyn
-import Name.Id
 import Options
 import PackedString
 import Util.FilterInput
@@ -279,7 +276,7 @@ recordHoFile ho fs header = do
     --return [ hsdep | (hs,hsdep,honm,ds) <- sc]
 
 -- | Check that ho library dependencies are right
-hoLibraryDeps newHo oldHo = hoLibraries newHo `Map.isSubmapOf` hoLibraries oldHo
+--hoLibraryDeps newHo oldHo = hoLibraries newHo `Map.isSubmapOf` hoLibraries oldHo
 
 -- | Find a module, returning just the read Ho file and the parsed
 -- contents of files that still need to be processed, This chases dependencies so

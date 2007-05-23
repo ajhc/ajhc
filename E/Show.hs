@@ -4,7 +4,6 @@ import Char
 import Control.Monad.Identity
 import Maybe
 
-import Atom
 import C.Prims
 import Doc.Attr
 import Doc.DocLike
@@ -17,12 +16,12 @@ import Name.Name
 import Name.Names
 import Name.VConsts
 import Options
-import qualified Doc.Chars as UC
-import qualified FlagDump as FD
 import Support.FreeVars
 import Support.Unparse
 import Util.SetLike
 import Util.VarName
+import qualified Doc.Chars as UC
+import qualified FlagDump as FD
 
 render :: Doc -> String
 render doc =  displayS (renderPretty 0.95 (optColumns options)  doc) ""
@@ -50,7 +49,7 @@ instance PPrint String (Lit E E) where
     pprintPrec n x | n <= 9    = prettyE (ELit x)
                    | otherwise = parens (prettyE (ELit x))
 
-newtype SEM a = SEM { unSEM :: VarNameT E Id String Identity a }
+newtype SEM a = SEM { _unSEM :: VarNameT E Id String Identity a }
     deriving(Monad,Functor)
 
 enumList = [

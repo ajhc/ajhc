@@ -2,10 +2,8 @@ module Ho.Type where
 
 import Data.Monoid
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 
 import Atom(Atom)
-import Data.Binary
 import DataConstructors(DataTable)
 import E.E(TVr,E)
 import E.Rules(Rules)
@@ -21,7 +19,6 @@ import Info.Types
 import Name.Id
 import Name.Name(Name)
 import Util.SetLike
-import PackedString(PackedString)
 import TypeSynonyms(TypeSynonyms)
 
 

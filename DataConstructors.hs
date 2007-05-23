@@ -93,7 +93,7 @@ tipe' (TForAll xs (_ :=> t)) = do
         return $ tVr v (kind $ tyvarKind tv)
     t' <- tipe' t
     return $ foldr EPi t' xs' -- [ tVr n (kind k) | n <- [2,4..] | k <- xs ]
-tipe' (TExists xs (_ :=> t)) = do
+tipe' ~(TExists xs (_ :=> t)) = do
     xs' <- flip mapM xs $ \tv -> do
         --v <- newName [70,72..] () tv
         --return $ tVr v (kind $ tyvarKind tv)
@@ -108,6 +108,7 @@ kind (KBase KHash) = eHash
 kind (KBase Star) = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."
+kind _ = error "DataConstructors.kind"
 
 
 data AliasType = NotAlias | ErasedAlias | RecursiveAlias
@@ -163,7 +164,6 @@ getHsSlots ss = map f ss where
     f (SlotUnpacked e _ es) = e
     f (SlotExistential e) = tvrType e
 
-origSlots = map SlotNormal
 
 newtype DataTable = DataTable {
     constructorMap :: (Map.Map Name Constructor)
@@ -290,9 +290,6 @@ primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,_,_,b,_) -> b
         tipe = ELit (litCons { litName = tc, litArgs = [], litType = eStar })
     f _ = []
 
-isAbsurd (ELit LitCons { litName = n, litArgs = [], litType = _ }) | n == tc_Absurd = True
-isAbsurd (ELit LitCons { litArgs = xs@(_:_) }) = all isAbsurd xs
-isAbsurd _ = False
 
 
 typesCompatable :: forall m . Monad m => DataTable -> E -> E -> m ()
@@ -416,7 +413,7 @@ deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where
                 mkCmpFunc (func_lt sFuncNames) "<",
                 mkCmpFunc (func_gt sFuncNames) ">"]
         h cl | cl == class_Enum = [{- (iv_te,ib_te), -}(iv_fe,ib_fe)] where
-            iv_te = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName (func_toEnum sFuncNames) (nameName $ conName c), tvrType = getType ib_te }
+            _iv_te = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName (func_toEnum sFuncNames) (nameName $ conName c), tvrType = getType ib_te }
             iv_fe = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName (func_fromEnum sFuncNames) (nameName $ conName c), tvrType = getType ib_fe }
             ib_te = ELam int1 (ec tInt dc_Int (EVar int1) i1 (ELit (litCons { litName = con, litArgs = [EVar i1], litType = typ })))
             ib_fe = ELam val1 (ec typ con (EVar val1) i1 (ELit (litCons { litName = dc_Int, litArgs = [EVar i1], litType = tInt })))
@@ -518,7 +515,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
 
         -- substitution is only about substituting type variables
         (ELit LitCons { litArgs = thisTypeArgs }, origArgs) = fromPi $ runVarName $ do
-            let (vs,ty) = case Map.lookup dataConsName cm of Just (TForAll vs (_ :=> ty)) -> (vs,ty); Just ty -> ([],ty)
+            let (vs,ty) = case Map.lookup dataConsName cm of Just (TForAll vs (_ :=> ty)) -> (vs,ty); ~(Just ty) -> ([],ty)
             mapM_ (newName [2,4..] ()) vs
             tipe' ty
         subst = substMap $ fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- thisTypeArgs | p <- [2,4..] ]
@@ -541,13 +538,14 @@ toDataTable km cm ds currentDataTable = newDataTable  where
                 let nv = tvr { tvrIdent = j, tvrType = st }
                 return $ Right (e { tvrIdent = i, tvrType = subst (tvrType e)},dc,[nv]):f is bs es
             f _ [] [] = []
+            f _ _ _ = error "DataConstructors.tslots"
             fvset = freeVars (thisTypeArgs,origArgs) `mappend` fromList [2,4 .. 2 * (length theTypeArgs + 2)]
 
         -- existentials are free variables in the arguments, that arn't bound in the type
         existentials = melems $ freeVars (map getType origArgs) S.\\ (freeVars thisTypeArgs :: IdMap TVr)
 
         -- arguments that the front end passes or pulls out of this constructor
-        hsArgs = existentials ++ [ tvr {tvrIdent = x} | tvr <- origArgs | x <- drop (5 + length theTypeArgs) [2,4..] ]
+        --hsArgs = existentials ++ [ tvr {tvrIdent = x} | tvr <- origArgs | x <- drop (5 + length theTypeArgs) [2,4..] ]
 
 
 
@@ -617,6 +615,7 @@ deconstructionExpression dataTable name typ@(ELit LitCons { litName = pn, litArg
                     as <- mapM g es
                     f vs ss (reverse as ++ rs) ((v,ELit litCons { litName = n, litArgs = map EVar as, litType = e }):ls)
                 f [] [] rs ls = return $ Alt (litCons { litName = name, litArgs = reverse rs, litType = typ }) (eLetRec ls e)
+                f _ _ _ _ = error "DataConstructors.deconstructuonExpression.f"
             f vs (conOrigSlots mc) [] []
 deconstructionExpression wdt n ty vs e | Just fa <- followAlias wdt ty  = deconstructionExpression wdt n fa vs e
 deconstructionExpression _ n e _ _ = error $ "deconstructionExpression: error in " ++ show n ++ ": " ++ show e
