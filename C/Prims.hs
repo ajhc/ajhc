@@ -16,9 +16,9 @@ data PrimTypeType = PrimTypeIntegral | PrimTypeFloating | PrimTypePointer | Prim
 data PrimType = PrimType {
     primTypeName :: ExtType,
     primTypeType :: PrimTypeType,
-    primTypeAlignmentOf :: Int,
-    primTypeIsSigned :: Bool,
-    primTypeSizeOf :: Int
+    primTypeAlignmentOf :: !Int,
+    primTypeIsSigned :: !Bool,
+    primTypeSizeOf :: !Int
     } deriving(Show)
 
 type ExtType = String
@@ -37,7 +37,7 @@ data Prim =
         primRetType :: ExtType
         }   -- C operator
     | Func {
-        funcIOLike :: Bool,
+        funcIOLike :: !Bool,
         funcName :: PackedString,
         primArgTypes :: [ExtType],
         primRetType :: ExtType
@@ -60,9 +60,9 @@ data Prim =
         }
     | PrimString PackedString                                 -- address of a raw string. encoded in utf8.
     | PrimDotNet {
-        primStatic :: Bool,
+        primStatic :: !Bool,
         primDotNet :: DotNetPrim,
-        primIOLike :: Bool,
+        primIOLike :: !Bool,
         primAssembly :: PackedString,
         primDotNetName :: PackedString
         }
