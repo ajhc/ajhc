@@ -49,6 +49,7 @@ import Atom
 import CharIO
 import GenUtil
 import qualified Doc.Chars as C
+import qualified Util.IntBag as IB
 
 
 
@@ -145,28 +146,28 @@ draw (Node x ts0) = x : drawSubTrees ts0
 
 -- Pure varients
 
-newtype Stat = Stat (Map.Map Atom Int)
-    deriving(Eq,Ord)
+newtype Stat = Stat IB.IntBag
+    deriving(Eq,Ord,Monoid)
 
 prependStat :: String -> Stat -> Stat
-prependStat name (Stat m) = Stat $ Map.fromList [ (toAtom $ "{" ++ name ++ "}." ++ fromAtom x,y) | (x,y) <- Map.toList m ]
+prependStat name (Stat m) = Stat $ IB.fromList [ (unsafeAtomToInt (toAtom $ "{" ++ name ++ "}." ++ fromAtom (unsafeIntToAtom x)),y) | (x,y) <- IB.toList m ]
 
 printStat greets (Stat s) = do
-    let fs = createForest 0 $ sort [(splitUp (-1) $ fromAtom x,y) | (x,y) <- Map.toList s]
+    let fs = createForest 0 $ sort [(splitUp (-1) $ fromAtom (unsafeIntToAtom x),y) | (x,y) <- IB.toList s]
     mapM_ CharIO.putErrLn $ ( draw . fmap p ) (Node (greets,0) fs)  where
         p (x,0) = x
         p (x,n) = x ++ ": " ++ show n
 
 printLStat n greets (Stat s) = do
-    let fs = createForest 0 $ Map.toList $ Map.fromListWith (+) [(splitUp n $ fromAtom x,y) | (x,y) <- Map.toList s]
+    let fs = createForest 0 $ [ (x,y) | (x,y) <- Map.toList $ Map.fromListWith (+) [( splitUp n (fromAtom (unsafeIntToAtom x)),y) | (x,y) <- IB.toList s]]
     mapM_ CharIO.putErrLn $ ( draw . fmap p ) (Node (greets,0) fs)  where
         p (x,0) = x
         p (x,n) = x ++ ": " ++ show n
 
 
-instance Monoid Stat where
-    mempty = Stat Map.empty
-    mappend (Stat a) (Stat b) = Stat $ Map.unionWith (+) a b
+--instance Monoid Stat where
+--    mempty = Stat Map.empty
+--    mappend (Stat a) (Stat b) = Stat $ Map.unionWith (+) a b
     --mconcat xs = Stat $ Map.unionsWith (+) [ x | Stat x <- xs]
 
 
@@ -176,10 +177,10 @@ instance Monoid Stat where
 
 
 tickStat ::  Stats -> Stat -> IO ()
-tickStat stats (Stat stat) = sequence_  [ ticks stats n a | (a,n) <- Map.toList stat]
+tickStat stats (Stat stat) = sequence_  [ ticks stats n (unsafeIntToAtom a) | (a,n) <- IB.toList stat]
 
 mtickStat :: MonadStats m =>  Stat -> m ()
-mtickStat (Stat stats)  = sequence_  [ mticks n a | (a,n) <- Map.toList stats]
+mtickStat (Stat stats)  = sequence_  [ mticks n (unsafeIntToAtom a) | (a,n) <- IB.toList stats]
 
 runStatIO :: MonadIO m =>  Stats -> StatT m a -> m a
 runStatIO stats action = do
@@ -190,7 +191,7 @@ runStatIO stats action = do
 getStat :: Stats -> IO Stat
 getStat stats = do
     ll <- toList stats
-    return (Stat $ Map.fromList ll)
+    return (Stat $ IB.fromList [ (unsafeAtomToInt x,y) | (x,y) <- ll])
 
 --------------
 -- monad stats
@@ -247,11 +248,11 @@ instance (Monad m, Monad (t m), MonadTrans t, MonadStats m) => MonadStats (t m) 
     mticks' n k = lift $ mticks' n k
 
 instance Monad m => MonadStats (StatT m) where
-    mticks' n k = StatT $ tell (Stat $ Map.singleton k n)
+    mticks' n k = StatT $ tell (Stat $ IB.msingleton (unsafeAtomToInt k) n)
 
-singleton n = Stat $ Map.singleton (toAtom n) 1
+singleton n = Stat $ IB.singleton (unsafeAtomToInt $ toAtom n)
 singleStat 0 _ = mempty
-singleStat n k = Stat $ Map.singleton (toAtom k) n
+singleStat n k = Stat $ IB.msingleton (unsafeAtomToInt $ toAtom k) n
 
 instance MonadStats IO where
     mticks' 0 _ = return ()

@@ -3,13 +3,15 @@ module Atom(
     Atom.toString,
     FromAtom(..),
     ToAtom(..),
-    atomIndex,
     dumpAtomTable,
     fromPackedStringIO,
     fromString,
     fromStringIO,
-    intToAtom,
-    toPackedString
+    toPackedString,
+    atomIndex,
+    unsafeAtomToInt,
+    unsafeIntToAtom,
+    intToAtom
     ) where
 
 import Char
@@ -56,6 +58,7 @@ instance Read Atom where
 
 toString atom = unpackPS $ toPackedString atom
 atomIndex (Atom x) = x
+unsafeAtomToInt (Atom x) = x
 
 {- these are separate in case operations are one-way -}
 class ToAtom a where
@@ -116,6 +119,9 @@ intToAtom i | odd i && i > 0 = unsafePerformIO $ readIORef (i `seq` reverseTable
     True -> return $ return $ Atom i
     False -> return $ fail $ "intToAtom: " ++ show i
 intToAtom i = fail $ "intToAtom: " ++ show i
+
+unsafeIntToAtom :: Int -> Atom
+unsafeIntToAtom x = Atom x
 
 {-# NOINLINE toPackedString #-}
 toPackedString :: Atom -> PackedString
