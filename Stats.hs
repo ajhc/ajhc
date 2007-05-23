@@ -6,7 +6,8 @@ module Stats(
     setPrintStats,
     ticks,
     theStats,
-    getTicks,
+    isEmpty,
+    null,
     Stats.print,
     clear,
     combine,
@@ -41,9 +42,10 @@ import Control.Monad.Writer
 import Data.IORef
 import Data.Tree
 import List(sort,groupBy)
-import qualified Data.HashTable as H
-import qualified Data.Map as Map
+import Prelude hiding(null)
 import System.IO.Unsafe
+import qualified Data.Map as Map
+import qualified Prelude(null)
 
 import Atom
 import CharIO
@@ -53,55 +55,9 @@ import qualified Util.IntBag as IB
 
 
 
--- Stateful stats
-
-data Stats = Stats !(IORef Int) !(H.HashTable Atom Int)
-
-{-# NOINLINE theStats #-}
-theStats :: Stats
-theStats = unsafePerformIO new
-
-{-# NOINLINE printStats #-}
-printStats :: IORef Bool
-printStats = unsafePerformIO $ newIORef False
-
-setPrintStats :: Bool -> IO ()
-setPrintStats b = writeIORef printStats b
-
-combine :: Stats -> Stats -> IO ()
-combine stats (Stats _ h2) = do
-    ls <- H.toList h2
-    let f (a,i) = ticks stats i a
-    mapM_ f ls
-
-new = do
-    h <- H.new (==) (fromIntegral . atomIndex)
-    r <- newIORef 0
-    return $ Stats r h
-
-clear (Stats r h) = do
-    writeIORef r 0
-    xs <- H.toList h
-    mapM_ (H.delete h) (fsts xs)
-
-toList (Stats _ h) = H.toList h
-getTicks (Stats r _)  = readIORef r
-
-tick stats k = ticks stats 1 k
-
-
-ticks _ 0 _ = return ()
-ticks (Stats r h) c k' = do
-    let k = toAtom k'
-    liftIO $ modifyIORef r (+ c)
-    liftIO $ readIORef r >>= evaluate
-    v <- liftIO $ H.lookup h k
-    case v of
-        Just n -> liftIO $ H.delete h k >> (H.insert h k $! (n + c))
-        Nothing -> liftIO $ H.insert h k c
 
 splitUp :: Int -> String -> [String]
-splitUp n str = filter (not . null) (f n str)  where
+splitUp n str = filter (not . Prelude.null) (f n str)  where
     f 0 str = []
     f n str = case span (`notElem` "/.{") str  of
         (x,"") -> [x]
@@ -165,33 +121,7 @@ printLStat n greets (Stat s) = do
         p (x,n) = x ++ ": " ++ show n
 
 
---instance Monoid Stat where
---    mempty = Stat Map.empty
---    mappend (Stat a) (Stat b) = Stat $ Map.unionWith (+) a b
-    --mconcat xs = Stat $ Map.unionsWith (+) [ x | Stat x <- xs]
 
-
------------------
--- pure + mutable
------------------
-
-
-tickStat ::  Stats -> Stat -> IO ()
-tickStat stats (Stat stat) = sequence_  [ ticks stats n (unsafeIntToAtom a) | (a,n) <- IB.toList stat]
-
-mtickStat :: MonadStats m =>  Stat -> m ()
-mtickStat (Stat stats)  = sequence_  [ mticks n (unsafeIntToAtom a) | (a,n) <- IB.toList stats]
-
-runStatIO :: MonadIO m =>  Stats -> StatT m a -> m a
-runStatIO stats action = do
-    (a,s) <- runStatT action
-    liftIO $ tickStat stats s
-    return a
-
-getStat :: Stats -> IO Stat
-getStat stats = do
-    ll <- toList stats
-    return (Stat $ IB.fromList [ (unsafeAtomToInt x,y) | (x,y) <- ll])
 
 --------------
 -- monad stats
@@ -200,6 +130,9 @@ getStat stats = do
 
 class Monad m => MonadStats m where
     mticks' ::  Int -> Atom -> m ()
+    mtickStat :: Stat -> m ()
+
+
 
 newtype StatT m a = StatT (WriterT Stat m a)
     deriving(MonadIO, Functor, MonadFix, MonadTrans, Monad)
@@ -222,6 +155,7 @@ instance Monad StatM where
 instance Stats.MonadStats StatM where
    mticks' 0 k = StatM () mempty
    mticks' n k = StatM () $ Stats.singleStat n k
+   mtickStat s = StatM () s
 
 
 
@@ -239,6 +173,7 @@ mticks n k = let k' = toAtom k in k' `seq` n `seq` mticks' n k'
 
 instance MonadStats Identity where
     mticks' _ _ = return ()
+    mtickStat _ = return ()
 
 instance MonadReader r m => MonadReader r (StatT m) where
     ask = lift $ ask
@@ -246,13 +181,19 @@ instance MonadReader r m => MonadReader r (StatT m) where
 
 instance (Monad m, Monad (t m), MonadTrans t, MonadStats m) => MonadStats (t m) where
     mticks' n k = lift $ mticks' n k
+    mtickStat s = lift $ mtickStat s
 
 instance Monad m => MonadStats (StatT m) where
     mticks' n k = StatT $ tell (Stat $ IB.msingleton (unsafeAtomToInt k) n)
+    mtickStat s =  StatT $ tell s
 
 singleton n = Stat $ IB.singleton (unsafeAtomToInt $ toAtom n)
+
+singleStat :: ToAtom a => Int -> a -> Stat
 singleStat 0 _ = mempty
 singleStat n k = Stat $ IB.msingleton (unsafeAtomToInt $ toAtom k) n
+
+null (Stat r) = IB.null r
 
 instance MonadStats IO where
     mticks' 0 _ = return ()
@@ -260,3 +201,67 @@ instance MonadStats IO where
         p <- readIORef printStats
         when p (CharIO.putStrLn $ (show a ++ ": " ++ show n))
         ticks theStats n a
+    mtickStat (Stat s) = do
+        tickStat theStats (Stat s)
+        p <- readIORef printStats
+        when p $ forM_ (IB.toList s) $ \ (x,y) -> do
+            CharIO.putStrLn (show (unsafeIntToAtom x) ++ ": " ++ show y)
+
+
+
+--------------------
+-- Stateful IO stats
+--------------------
+
+newtype Stats = Stats (IORef Stat)
+
+{-# NOINLINE theStats #-}
+theStats :: Stats
+theStats = unsafePerformIO new
+
+{-# NOINLINE printStats #-}
+printStats :: IORef Bool
+printStats = unsafePerformIO $ newIORef False
+
+setPrintStats :: Bool -> IO ()
+setPrintStats b = writeIORef printStats b
+
+combine :: Stats -> Stats -> IO ()
+combine (Stats s1) (Stats s2) = do
+    s <- readIORef s2
+    modifyIORef s1 (mappend s)
+
+new = Stats `liftM` newIORef mempty
+
+clear (Stats h) = writeIORef h mempty
+
+toList (Stats r) = do
+    Stat s <- readIORef r
+    return [(unsafeIntToAtom x,y) | (x,y) <- IB.toList s]
+
+isEmpty (Stats r) = null `liftM` readIORef r
+
+tick stats k = ticks stats 1 k
+
+
+ticks (Stats r) c k = modifyIORef r (mappend $ singleStat c k)
+
+-----------------
+-- pure + mutable
+-----------------
+
+
+tickStat ::  Stats -> Stat -> IO ()
+tickStat (Stats r) s = modifyIORef r (mappend s)
+
+
+runStatIO :: MonadIO m =>  Stats -> StatT m a -> m a
+runStatIO stats action = do
+    (a,s) <- runStatT action
+    liftIO $ tickStat stats s
+    return a
+
+getStat :: Stats -> IO Stat
+getStat stats = do
+    ll <- toList stats
+    return (Stat $ IB.fromList [ (unsafeAtomToInt x,y) | (x,y) <- ll])
