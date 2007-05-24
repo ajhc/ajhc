@@ -48,7 +48,7 @@ data BinOp
     | Rem   -- ^ rem rounding to 0
 
     | UDiv  -- ^ round to zero (unsigned)
-    | Modu  -- ^ unsigned mod
+    | UMod  -- ^ unsigned mod
 
     -- bitwise
     | And
@@ -90,7 +90,7 @@ data BinOp
     | FLte
     -- whether two values can be compared at all.
     | FOrdered
-    deriving(Eq,Show,Ord)
+    deriving(Eq,Show,Ord,Read)
     {-! derive: Binary !-}
 
 data UnOp
@@ -98,6 +98,7 @@ data UnOp
     | Com   -- ^ bitwise compliment
     -- floating
     | FAbs  -- ^ floating absolute value
+    | FNeg  -- ^ floating point negation
     | Sin
     | Cos
     | Tan
@@ -110,7 +111,7 @@ data UnOp
     | Log
     | Exp
     | Sqrt
-    deriving(Eq,Show,Ord)
+    deriving(Eq,Show,Ord,Read)
     {-! derive: Binary !-}
 
 
@@ -131,7 +132,8 @@ data ConvOp
     -- to extend or shrink the value
     | I2I
     | U2U
-    deriving(Eq,Show,Ord)
+    | F2F
+    deriving(Eq,Show,Ord,Read)
     {-! derive: Binary !-}
 
 
@@ -141,12 +143,15 @@ data ValOp
     | NInf
     | PZero
     | NZero
-    deriving(Eq,Show,Ord)
+    deriving(Eq,Show,Ord,Read)
     {-! derive: Binary !-}
 
+data ArchBits = BitsInt | BitsMax | BitsPtr
+    deriving(Eq,Ord)
+    {-! derive: Binary !-}
 
-data TyBits = Bits !Int | BitsPtr | BitsExt String
-    deriving(Eq,Show,Ord)
+data TyBits = Bits !Int | BitsArch !ArchBits |  BitsExt String
+    deriving(Eq,Ord)
     {-! derive: Binary !-}
 
 data TyHint
@@ -155,19 +160,43 @@ data TyHint
     | HintFloat        -- an IEEE floating point value
     | HintCharacter    -- a unicode character, implies unsigned
     | HintNone         -- no hint
-    deriving(Eq,Show,Ord)
+    deriving(Eq,Ord)
     {-! derive: Binary !-}
 
 data Ty
     = TyBits !TyBits !TyHint
     | TyBool
-    deriving(Eq,Show,Ord)
+    deriving(Eq,Ord)
     {-! derive: Binary !-}
+
+instance Show TyHint where
+    showsPrec _ HintSigned = ('s':)
+    showsPrec _ HintUnsigned = ('u':)
+    showsPrec _ HintFloat = ('f':)
+    showsPrec _ HintCharacter = ('c':)
+    showsPrec _ HintNone = ('?':)
+
+instance Show Ty where
+    showsPrec _ TyBool = showString "bool"
+    showsPrec _ (TyBits b h) = shows h . showString "bits" . shows b
+
+instance Show TyBits where
+    showsPrec _ (Bits n) = shows n
+    showsPrec _ (BitsExt s) = showString "<" . showString s . showString ">"
+    showsPrec _ (BitsArch s) = showString "<" . shows s . showString ">"
+
+instance Show ArchBits where
+    show BitsInt = "int"
+    show BitsMax = "max"
+    show BitsPtr = "ptr"
+
+
 
 data Op v
     = BinOp BinOp v v
     | UnOp UnOp v
     | ValOp ValOp
+    | ConvOp ConvOp v
     deriving(Eq,Show,Ord)
     {-! derive: Binary !-}
 
@@ -219,7 +248,7 @@ isAssociative x = f x where
 binopInfix :: BinOp -> Maybe (String,Int)
 binopInfix UDiv = Just ("/",8)
 binopInfix Mul  = Just ("*",8)
-binopInfix Modu = Just ("%",8)
+binopInfix UMod = Just ("%",8)
 binopInfix Sub  = Just ("-",7)
 binopInfix Add  = Just ("+",7)
 binopInfix Shr  = Just (">>",6)
@@ -249,7 +278,7 @@ instance IsOperator BinOp where
     isEagerSafe Quot = False
     isEagerSafe Rem  = False
     isEagerSafe UDiv = False
-    isEagerSafe Modu = False
+    isEagerSafe UMod = False
     isEagerSafe _ = True
 
 

@@ -4,6 +4,7 @@ module C.Arch(
     archGetPrimInfo,
     archInfo,
     archOpTy,
+    stringToOpTy,
     genericArchInfo,
     determineArch,
     primitiveInfo,
@@ -82,11 +83,16 @@ genericPrimitiveInfo :: Monad m => ExtType -> m PrimType
 genericPrimitiveInfo et = archGetPrimInfo genericArchInfo et
 
 genericArchInfo = ArchInfo { archPrimMap = primMap }
-archInfo = ArchInfo { archPrimMap = primMap }
+archInfo = ArchInfo { archPrimMap = genericPrimMap }
 
 primMap :: Map.Map ExtType PrimType
 primMap = Map.fromList [ (primTypeName a,a) | a <- as ] where
     (_,_,as,_) = unsafePerformIO determineArch
+
+genericPrimMap :: Map.Map ExtType PrimType
+genericPrimMap = Map.fromList [ (primTypeName a,a) | a <- arch_generic ] where
+
+stringToOpTy = archOpTy genericArchInfo
 
 archOpTy :: ArchInfo -> ExtType -> Op.Ty
 archOpTy ai s = case archGetPrimInfo ai s of
@@ -96,16 +102,17 @@ archOpTy ai s = case archGetPrimInfo ai s of
         PrimTypeFloating ->  Op.TyBits (Op.Bits $ 8 * primTypeSizeOf pt) Op.HintFloat
         _ -> f s
   where
-    f "float" = Op.TyBits  (Op.BitsExt "float") Op.HintFloat
-    f "double" = Op.TyBits (Op.BitsExt "double") Op.HintFloat
-    f "int" = Op.TyBits (Op.BitsExt "int") Op.HintSigned
-    f "unsigned int" = Op.TyBits (Op.BitsExt "unsigned int") Op.HintUnsigned
-    f "uintmax_t" = Op.TyBits (Op.BitsExt "uintmax_t") Op.HintUnsigned
-    f "intmax_t" = Op.TyBits (Op.BitsExt "intmax_t") Op.HintSigned
-    f "uintptr_t" = Op.TyBits Op.BitsPtr Op.HintUnsigned
-    f "intptr_t" = Op.TyBits Op.BitsPtr Op.HintSigned
-    f "HsPtr" = Op.TyBits Op.BitsPtr Op.HintUnsigned
-    f "HsFunPtr" = Op.TyBits Op.BitsPtr Op.HintUnsigned
+    f "float" = Op.TyBits  (Op.Bits 32) Op.HintFloat
+    f "double" = Op.TyBits (Op.Bits 64) Op.HintFloat
+    f "int" = Op.TyBits (Op.BitsArch Op.BitsInt) Op.HintSigned
+    f "unsigned int" = Op.TyBits (Op.BitsArch Op.BitsInt) Op.HintUnsigned
+
+    f "uintmax_t" = Op.TyBits (Op.BitsArch Op.BitsMax) Op.HintUnsigned
+    f "intmax_t" = Op.TyBits (Op.BitsArch Op.BitsMax)  Op.HintSigned
+    f "uintptr_t" = Op.TyBits (Op.BitsArch Op.BitsPtr) Op.HintUnsigned
+    f "intptr_t" = Op.TyBits (Op.BitsArch Op.BitsPtr) Op.HintSigned
+    f "HsPtr" = Op.TyBits (Op.BitsArch Op.BitsPtr) Op.HintUnsigned
+    f "HsFunPtr" = Op.TyBits (Op.BitsArch Op.BitsPtr) Op.HintUnsigned
     f s = Op.TyBits (Op.BitsExt s) Op.HintNone
 
 

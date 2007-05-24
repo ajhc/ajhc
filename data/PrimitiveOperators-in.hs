@@ -16,6 +16,7 @@ import Name.Names
 import Name.Prim
 import Name.VConsts
 import Support.CanType
+import qualified C.Op as Op
 
 
 tPtr t = ELit (litCons { litName = tc_Ptr, litArgs = [t], litType = eStar, litAliasFor = Just (ELam tvr { tvrIdent = 2, tvrType = eStar} (ELit litCons { litName = tc_Addr, litType = eStar })) })
@@ -43,12 +44,20 @@ toInstName x = toName Val ("Instance@",'i':x)
 unbox' e cn tvr wtd = eCase e [Alt (litCons { litName = cn, litArgs = [tvr], litType = te }) wtd] Unknown where
     te = getType e
 
-oper_aa op ct e = EPrim (APrim (Operator op [ct] ct) mempty) [e] (rawType ct)
-oper_aaB op ct a b = EPrim (APrim (Operator op [ct,ct] "int") mempty) [a,b] tBoolzh
-oper_aaa op ct a b = EPrim (APrim (Operator op [ct,ct] ct) mempty) [a,b] (rawType ct)
-oper_aIa op ct a b = EPrim (APrim (Operator op [ct,"int"] ct) mempty) [a,b] (rawType ct)
+binOp op ca cb cr = APrim (Op (Op.BinOp op ca cb) cr) mempty
+
+oper_aa op ct' e = EPrim (APrim (Op (Op.UnOp op ct) ct) mempty) [e] (rawType ct') where
+    ct = stringToOpTy ct'
+oper_aaB op ct' a b = EPrim (binOp op ct ct ot_int) [a,b] tBoolzh where
+    ct = stringToOpTy ct'
+oper_aaa op ct' a b = EPrim (binOp op ct ct ct) [a,b] (rawType ct') where
+    ct = stringToOpTy ct'
+oper_aIa op ct' a b = EPrim (binOp op ct ot_int ct) [a,b] (rawType ct') where    
+    ct = stringToOpTy ct'
 
 --zeroI =  LitInt 0 intt
+
+ot_int = stringToOpTy "int"
 
 op_aIa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
     tvra' = tVr 2 t
@@ -96,16 +105,33 @@ op_aaB op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
     wtd = eStrictLet tvrc (oper_aaB op ct (EVar tvra) (EVar tvrb)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar tvrc], litType = tBool }))  -- (caseof (EVar tvrc))
 --    caseof x = eCase x [Alt zeroI vFalse]  vTrue
 
-build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaB "<" ct (EVar tvra) zero)  [Alt lFalsezh (rebox $ EVar tvra), Alt lTruezh fs] Unknown) where
+build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaB Op.Lt ct (EVar tvra) zero)  [Alt lFalsezh (rebox $ EVar tvra), Alt lTruezh fs] Unknown) where
     te = getType v
     tvra = tVr 2 st
     tvrb = tVr 4 st
     zero = ELit $ LitInt 0 st
     st = rawType ct
-    fs = eStrictLet tvrb (oper_aa "-" ct (EVar tvra)) (rebox (EVar tvrb))
+    fs = eStrictLet tvrb (oper_aa Op.Neg ct (EVar tvra)) (rebox (EVar tvrb))
     rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
 
-build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaB "<" ct (EVar tvra) (ELit zero)) [Alt lFalsezh (rebox one),Alt lTruezh (rebox negativeOne)] Unknown)) where
+build_uabs ct cn v = v
+
+build_fabs ct cn v = unbox' v cn tvra (rebox (oper_aa Op.FAbs ct (EVar tvra))) where
+    te = getType v
+    tvra = tVr 2 st
+    st = rawType ct
+    rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
+
+build_usignum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (rebox (ELit one))) where
+    tvra = tVr 2 st
+    te = getType v
+    st = rawType ct
+    zero :: Lit a E
+    zero = LitInt 0 st
+    one = LitInt 1 st
+    rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
+
+build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaB Op.Lt ct (EVar tvra) (ELit zero)) [Alt lFalsezh (rebox one),Alt lTruezh (rebox negativeOne)] Unknown)) where
     tvra = tVr 2 st
     te = getType v
     st = rawType ct
@@ -116,6 +142,15 @@ build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELi
     rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
 
 
+build_fsignum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaB Op.FLt ct (EVar tvra) (ELit zero)) [Alt lFalsezh (rebox one),Alt lTruezh (rebox negativeOne)] Unknown)) where
+    tvra = tVr 2 st
+    te = getType v
+    st = rawType ct
+    zero :: Lit a E
+    zero = LitInt 0 st
+    one = ELit $ LitInt 1 st
+    negativeOne = ELit $ LitInt (-1) st
+    rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
 
 
 buildPeek cn t p = ELam tvr $ ELam tvrWorld (unbox' (EVar tvr) dc_Addr tvr' rest)  where

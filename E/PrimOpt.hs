@@ -5,13 +5,14 @@ module E.PrimOpt(
 
 import List
 import Monad
-import Control.Monad.Fix
+import Control.Monad.Fix()
 import Maybe
 import qualified Data.Map as Map
 
 import Atom
 import PackedString
 import C.Prims
+import C.Arch
 import DataConstructors
 import Data.Monoid
 import Doc.DocLike
@@ -20,15 +21,11 @@ import E.E
 import E.Values
 import GenUtil
 import Name.Id
-import Name.Names
-import Name.VConsts
 import PrimitiveOperators
 import Stats
 import Support.CanType
 import Support.FreeVars
-import Util.HasSize
-import Util.NameMonad(genNames)
-import Util.SetLike
+import qualified C.Op as Op
 
 
 {-
@@ -60,16 +57,13 @@ unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
 unbox dataTable e vn wtd = eCase e  [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd tvra)] Unknown where
     te = getType e
     tvra = tVr vn sta
-    Just (cna,sta,ta) = lookupCType' dataTable te
+    Just (cna,sta,_ta) = lookupCType' dataTable te
 
 intt = rawType "int"
 
 rawMap = Map.fromList [ (rawType w,toAtom t) | (_,_,_,w,t) <- allCTypes]
 typ_float = toAtom "float"
 
-vars :: [E] -> [TVr]
-vars ts = [ tVr n t | t <- ts | n <- [2,4 ..], n `notElem` fvs] where
-    fvs = freeVars ts
 
 iTrue = (ELit (LitInt 1 intt))
 iFalse = (ELit (LitInt 0 intt))
@@ -144,6 +138,22 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
 
     primopt "seq" [x,y] _  = return $ prim_seq x y
     primopt "exitFailure__" [w] rt  = return $ EError "" rt
+    primopt op [a,b] t | Just cop <- readM op = mdo
+        (pa,(ta,sta)) <- extractPrimitive dataTable a
+        (pb,(tb,stb)) <- extractPrimitive dataTable b
+        (bp,(tr,str)) <- boxPrimitive dataTable
+                (EPrim (APrim Op { primCOp = Op.BinOp cop (stringToOpTy ta) (stringToOpTy tb), primRetTy = (stringToOpTy tr) } mempty) [pa, pb] str) t
+        return bp
+    primopt op [a] t | Just cop <- readM op = mdo
+        (pa,(ta,sta)) <- extractPrimitive dataTable a
+        (bp,(tr,str)) <- boxPrimitive dataTable
+                (EPrim (APrim Op { primCOp = Op.UnOp cop (stringToOpTy ta), primRetTy = (stringToOpTy tr) } mempty) [pa] str) t
+        return bp
+    primopt op [a] t | Just cop <- readM op = mdo
+        (pa,(ta,sta)) <- extractPrimitive dataTable a
+        (bp,(tr,str)) <- boxPrimitive dataTable
+                (EPrim (APrim Op { primCOp = Op.ConvOp cop (stringToOpTy ta), primRetTy = (stringToOpTy tr) } mempty) [pa] str) t
+        return bp
     primopt op [a,b] t | Just cop <- lookup op binOps = mdo
         (pa,(ta,sta)) <- extractPrimitive dataTable a
         (pb,(tb,stb)) <- extractPrimitive dataTable b
@@ -153,7 +163,7 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
     primopt "equalsChar" [a,b] t = return (EPrim (APrim (Operator "==" ["HsChar","HsChar"] "int") mempty) [a,b] t)
     primopt "constPeekByte" [a] t = return (EPrim (APrim (Peek "uint8_t") mempty) [a] t)
     primopt "box" [a] t = return ans where
-        Just (cna,sta,ta) = lookupCType' dataTable t
+        Just (cna,_sta,_ta) = lookupCType' dataTable t
         ans = ELit litCons { litName = cna, litArgs = [a], litType = orig_t }
     primopt "unbox" [a] t = return ans where
         (vara:_) = newIds (freeVars (a,t,orig_t))
@@ -162,9 +172,9 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
         (pa,(ta,sta)) <- extractPrimitive dataTable a
         let tvra = tVr vn sta; (vn:_) = newIds (freeVars (a,t))
         (bp,(tr,str)) <- boxPrimitive dataTable (EVar tvra) t
-        let res = EPrim (APrim (Operator o [ta,ta] tr) mempty) [pa, ELit (LitInt 1 sta)] str
+        let res = EPrim (APrim (Op (Op.BinOp o (stringToOpTy ta) (stringToOpTy ta)) (stringToOpTy tr)) mempty) [pa, ELit (LitInt 1 sta)] str
         return $ eStrictLet tvra res bp
-        where unop = [("increment","+"),("decrement","-")]
+        where unop = [("increment",Op.Add),("decrement",Op.Sub)]
     primopt n [] t | Just num <- lookup n vs = mdo
         (res,(_,sta)) <- boxPrimitive dataTable (ELit (LitInt num sta)) t; return res
         where vs = [("zero",0),("one",1)]

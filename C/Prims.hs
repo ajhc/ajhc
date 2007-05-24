@@ -139,7 +139,7 @@ data APrim = APrim Prim Requires
     {-! derive: Binary !-}
 
 instance PPrint d Prim  => PPrint d APrim where
-    pprint (APrim p _) = pprint p
+    pprintPrec n (APrim p _) = pprintPrec n p
 
 instance DocLike d => PPrint d Prim where
     pprint (PrimPrim t) = text (unpackPS t)
@@ -152,8 +152,10 @@ instance DocLike d => PPrint d Prim where
     pprint (Peek t) = char '*' <> text t
     pprint (Poke t) = char '=' <> text t
     pprint (CCast _ t) = parens (text t)
+    pprint Op { primCOp = Op.BinOp bo ta tb, primRetTy = rt } | rt == ta && rt == tb = parens (pprint rt) <> tshow bo
+    pprint Op { primCOp = Op.UnOp bo ta, primRetTy = rt } | rt == ta = parens (pprint rt) <> tshow bo
     pprint Op { primCOp = op, primRetTy = rt } = parens (pprint rt) <> pprint op
-    pprint PrimDotNet { primDotNet = dn,  primDotNetName = n} = parens (text (unpackPS n))
+    pprint PrimDotNet { primDotNet = dn,  primDotNetName = nn} = parens (text (unpackPS nn))
     pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimSizeOf } = text "sizeof" <> parens (text at)
     pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimAlignmentOf } = text "alignmentof" <> parens (text at)
     pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimTypeIsSigned } = text "is_signed" <> parens (text at)

@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
 
 use strict;
+use warnings;
 use Data::Dumper;
 
 open OP, "<data/operators.txt";
@@ -10,6 +11,74 @@ my @in;
 
 my @add;
 my %stuff;
+
+my %oper_map = (
+    "-" => "Sub",
+    "+" => "Add",
+    "*" => "Mul",
+    "u-" => "Sub",
+    "u+" => "Add",
+    "u*" => "Mul",
+    "f*" => "FMul",
+    "f-" => "FSub",
+    "f+" => "FAdd",
+    "==" => "Eq",
+    "!=" => "NEq",
+    ">" => "Gt",
+    ">=" => "Gte",
+    "<" => "Lt",
+    "<=" => "Lte",
+    "u==" => "Eq",
+    "u!=" => "NEq",
+    "u>" => "UGt",
+    "u>=" => "UGte",
+    "u<" => "ULt",
+    "u<=" => "ULte",
+
+    "&" => "And",
+    "|" => "Or",
+    "^" => "Xor",
+    "<<" => "Shl",
+    ">>" => "Shra",
+    "u>>" => "Shr",
+    "/" => "Div",
+    "%" => "Mod",
+    "u/" => "UDiv",
+    "u%" => "UMod",
+    "u&" => "And",
+    "u|" => "Or",
+    "u^" => "Xor",
+    "u<<" => "Shl",
+
+
+    "f==" => "FEq",
+    "f!=" => "FNEq",
+    "f>" => "FGt",
+    "f>=" => "FGte",
+    "f<" => "FLt",
+    "f<=" => "FLte",
+
+    "_-" => "Neg",
+    "_~" => "Com",
+    "u_-" => "Neg",
+    "u_~" => "Com",
+    "f_-" => "FNeg"
+
+    );
+
+sub vtype {
+    ($_) = @_ if @_;
+    return 'u' if /^uint/;
+    return '' if /^int/;
+    return 'f' if /^float/;
+    return 'f' if /^double/;
+    return 'u' if /unsigned/;
+    return 'u' if /HsChar/;
+    return 'u' if /HsPtr/;
+    return 'u' if /HsFunPtr/;
+    return '';
+
+}
 
 while(<OP>) {
     chomp;
@@ -117,6 +186,8 @@ sub tycon($) {
 
 foreach my $d (@ds) {
     #my @cs = ($d->[2] =~ /int/) ? @in : @fl;
+    my $vtype = vtype $d->[1];
+    #print STDERR "$d->[1] - '$vtype'\n";
     my @cs = @{$stuff{$d->[2]}};
     my $t = tcon($d->[0]);
     my $rtype = rtype($d->[1]);
@@ -152,10 +223,8 @@ foreach my $d (@ds) {
         push @cmeth, "($c_num, toInstName \"Jhc.Num.fromInteger.$d->[0]\", ELam $ivart (create_integralCast_fromInteger $cncons $rtype (EVar $ivart) $t))";
         push @cmeth, "($c_num, toInstName \"Jhc.Num.toInteger.$d->[0]\", ELam $tvar (create_integralCast_toInteger $cncons $rtype (EVar $tvar)))" if $d->[2] =~ /int/ ;
     }
-    #push @cmeth, "(toInstName \"Prelude.abs.$d->[0]\", ELam $tvar (buildAbs $tvar $t))" if $d->[2] =~ /int/ ;
-    push @cmeth, "($c_num, toInstName \"Jhc.Num.abs.$d->[0]\", ELam $tvar (build_abs \"$d->[1]\" $cncons (EVar $tvar)  ))" if $d->[2] =~ /int/ ;
-    #push @cmeth, "(toInstName \"Prelude.signum.$d->[0]\", ELam $tvar (buildSignum $tvar $t))" if $d->[2] =~ /int/ ;
-    push @cmeth, "($c_num, toInstName \"Jhc.Num.signum.$d->[0]\", ELam $tvar (build_signum \"$d->[1]\" $cncons (EVar $tvar) ))" if $d->[2] =~ /int/ ;
+    push @cmeth, "($c_num, toInstName \"Jhc.Num.abs.$d->[0]\", ELam $tvar (build_${vtype}abs \"$d->[1]\" $cncons (EVar $tvar)  ))" if $d->[2] !~ /char/ ;
+    push @cmeth, "($c_num, toInstName \"Jhc.Num.signum.$d->[0]\", ELam $tvar (build_${vtype}signum \"$d->[1]\" $cncons (EVar $tvar) ))" if $d->[2] !~ /char/ ;
     #push @names, "(\"$d->[0]\", \"$d->[1]\", \"$d->[2]\")\n";
     my $sname = $d->[0];
     $sname =~ s/^.*\.//;
@@ -167,28 +236,18 @@ foreach my $d (@ds) {
         push @inst, "[] :=> IsIn $nn $tycon" unless $seen{$c->[2],$d->[0]}++;
         my $x = $c->[2];
         $x =~ s/^([\w.]+\.).*$/$1/;
-        if ($c->[0] =~ /^a[aI][aIB]?$/) {
-        push @cmeth, "($nn,toInstName \"$x$c->[1].$d->[0]\", op_$c->[0]  \"$c->[3]\" \"$d->[1]\" $cncons $t)";
+        if ($c->[0] =~ /^a[aI][aIB]$/) {
+            push @cmeth, "($nn,toInstName \"$x$c->[1].$d->[0]\", op_$c->[0]  Op." . $oper_map{$vtype . $c->[3]} ." \"$d->[1]\" $cncons $t)";
+        } elsif ($c->[0] =~ /^a[aI]$/) {
+            push @cmeth, "($nn,toInstName \"$x$c->[1].$d->[0]\", op_$c->[0]  Op." . $oper_map{$vtype . "_" . $c->[3]} ." \"$d->[1]\" $cncons $t)";
         } else {
-        push @meth, "($nn,toInstName \"$x$c->[1].$d->[0]\", \"$c->[0]\", \"prim_op_$c->[0].$c->[3]\", \"$d->[0]\")";
-    }
+            push @meth, "($nn,toInstName \"$x$c->[1].$d->[0]\", \"$c->[0]\", \"prim_op_$c->[0].$c->[3]\", \"$d->[0]\")";
+        }
     }
 }
 
 my $head = `cat data/PrimitiveOperators-in.hs`;
 print "$head\n";
-#print "{- This file is generated -}\n";
-#print "module PrimitiveOperators(primitiveInsts,constantMethods,theMethods,allCTypes) where\n\n";
-#print "import Representation\n";
-#print "import E.E\n";
-#print "import E.Values\n";
-#print "import C.Prims\n";
-#print "import VConsts\n";
-#print "import Name\n\n";
-#print "toHsName x = nameName \$ parseName TypeConstructor x\n\n";
-#print "toInstName x = toName Val (\"Instance@\",'i':x)\n\n";
-#print 'buildAbs v t = eIf (EPrim (primPrim "prim_op_aaB.<") [EVar v,(ELit (LitInt 0 t))] tBool) (EPrim (primPrim "prim_op_aa.-") [EVar v] t) (EVar v)'. "\n\n";
-#print 'buildSignum v t = eCase (EVar v) [Alt (LitInt 0 t) (ELit (LitInt 0 t))] (eIf (EPrim (primPrim "prim_op_aaB.<") [EVar v,(ELit (LitInt 0 t))] tBool) (ELit (LitInt (-1) t)) (ELit (LitInt 1  t)))' . "\n\n";
 print "primitiveInsts = [\n   ", join("\n  ,",@inst), " ]\n\n";
 print "constantMethods = [\n   ", join("\n  ,",@cmeth), " ]\n\n";
 print "theMethods = [\n   ", join("\n  ,",@meth), " ]\n\n";
@@ -208,9 +267,4 @@ print "\n\n";
 
 
 
-#    push @cmeth, "(toName Val (\"Instance@\",\"iForeign.Storable.sizeOf.$d->[0]\"), ELam (TVr 0 $t) \$ " . const("sizeof($d->[1])","tInt") . ")\n";
-#    push @cmeth, "(toName Val (\"Instance@\",\"iForeign.Storable.poke.$d->[0]\"), buildPoke $t \"$d->[1]\")\n";
-#    push @cmeth, "(toName Val (\"Instance@\",\"iForeign.Storable.peek.$d->[0]\"), buildPeek $t \"$d->[1]\")\n";
-#    push @cmeth, "(toName Val (\"Instance@\",\"iPrelude.maxBound.$d->[0]\"), " . const($d->[3],$t,"\"$d->[1]\"") . ")\n";
-#    push @cmeth, "(toName Val (\"Instance@\",\"iPrelude.minBound.$d->[0]\"), " . const($d->[4],$t,"\"$d->[1]\"") . ")\n";
 
