@@ -33,13 +33,15 @@ module FrontEnd.ParseUtils (
         , doForeignEq
  ) where
 
-import C.FFI
-import HsSyn
-import FrontEnd.SrcLoc
-import FrontEnd.ParseMonad
 import Char
-import Ratio
 import Data.FunctorM
+import Data.Monoid
+import Ratio
+
+import C.FFI
+import FrontEnd.ParseMonad
+import FrontEnd.SrcLoc
+import HsSyn
 
 type HsQName = HsName
 
@@ -375,8 +377,8 @@ doForeign srcLoc names ms qt = ans where
             Nothing -> do
                 (n:ns) <- return $ reverse names
                 return (Nothing,n,reverse ns)
-        let f ["import","primitive"] cname = return $ HsForeignDecl srcLoc (FfiSpec (Import cname nullRequires) Safe Primitive) vname qt
-            f ["import","dotnet"] cname = return $ HsForeignDecl srcLoc (FfiSpec (Import cname nullRequires) Safe DotNet) vname qt
+        let f ["import","primitive"] cname = return $ HsForeignDecl srcLoc (FfiSpec (Import cname mempty) Safe Primitive) vname qt
+            f ["import","dotnet"] cname = return $ HsForeignDecl srcLoc (FfiSpec (Import cname mempty) Safe DotNet) vname qt
             f ("import":rs) cname = do
                 let (safe,conv) = pconv rs
                 im <- parseImport mstring vname
@@ -409,12 +411,12 @@ parseExport cn hn =
       _               -> fail ("Invalid cname in export declaration: "++show cn)
 
 parseImport :: Monad m => Maybe String -> HsName -> m FfiType
-parseImport Nothing hn = return $ Import (show hn) nullRequires
+parseImport Nothing hn = return $ Import (show hn) mempty
 parseImport (Just cn) hn =
     case words cn of
       ["dynamic"]   -> return Dynamic
       ["wrapper"]   -> return Wrapper
-      []            -> return $ Import (show hn) nullRequires
+      []            -> return $ Import (show hn) mempty
       ("static":xs) -> parseIS [] [] xs
       xs            -> parseIS [] [] xs
 

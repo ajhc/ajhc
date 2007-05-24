@@ -249,7 +249,6 @@ tbox = emptyConstructor {
             conChildren = DataAbstract
     }
 
-worlds = []
 
 
 tarrow = emptyConstructor {
@@ -360,6 +359,48 @@ boxPrimitive dataTable e et = case followAliases dataTable et of
     e' -> fail $ "extractPrimitive: " ++ show (e,e')
 
 
+-- which C types these convert to in FFI specifications for
+-- figuring out calling conventions. not necessarily related
+-- to the representation.
+-- ideally, these could be set via a pragma
+
+typeTable = [
+    (tc_Char,"wchar_t"),
+    (tc_Int, "int"),
+    (tc_Int8, "int8_t"),
+    (tc_Int16, "int16_t"),
+    (tc_Int32, "int32_t"),
+    (tc_Int64, "int64_t"),
+    (tc_IntMax, "intmax_t"),
+    (tc_IntPtr, "intptr_t"),
+    (tc_Word, "unsigned"),
+    (tc_Word8, "uint8_t"),
+    (tc_Word16, "uint16_t"),
+    (tc_Word32, "uint32_t"),
+    (tc_Word64, "uint64_t"),
+    (tc_WordMax, "uintmax_t"),
+    (tc_WordPtr, "uintptr_t"),
+    (tc_Float, "float"),
+    (tc_Double, "double"),
+    (tc_Addr, "HsPtr"),
+    (tc_FunAddr, "HsFunPtr"),
+
+    (tc_CChar, "char"),
+    (tc_CShort, "short"),
+    (tc_CInt, "int"),
+    (tc_CLong, "long"),
+
+    (tc_CSChar, "signed char"),
+
+    (tc_CUChar, "unsigned char"),
+    (tc_CUShort, "unsigned short"),
+    (tc_CUInt, "unsigned int"),
+    (tc_CULong, "unsigned long"),
+
+    (tc_CWchar, "wchar_t"),
+    (tc_CWint, "wint_t"),
+    (tc_CTime, "time_t")
+    ]
 
 
 lookupCType dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
@@ -388,7 +429,7 @@ followAliases _dataTable e = f e where
     f (ELit LitCons { litAliasFor = Just af, litArgs = as }) = f (foldl eAp af as)
     f e = e
 
-dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tbox:tabsurd:tarrow:primitiveTable ] ++ worlds)
+dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tbox:tabsurd:tarrow:primitiveTable ])
 
 deriveClasses :: DataTable -> [(TVr,E)]
 deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where

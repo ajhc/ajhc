@@ -4,8 +4,7 @@ module C.FFI(
     FfiType(..),
     FfiExport(..),
     FfiSpec(..),
-    Requires(..),
-    nullRequires
+    Requires(..)
     ) where
 
 import Data.Typeable
@@ -37,7 +36,6 @@ instance Show Requires where
     show (Requires [] []) = "()"
     show (Requires xs ys) = show (xs,ys)
 
-nullRequires = Requires [] []
 
 data FfiSpec = FfiSpec FfiType Safety CallConv
              deriving(Eq,Ord,Show)
