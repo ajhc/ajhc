@@ -193,8 +193,8 @@ charIsRepresentable c = return (ord c < 256)
 --castCharToCChar :: Char -> CChar
 --castCharToCChar ch = fromIntegral (ord ch)
 
-foreign import primitive "integralCast" castCCharToChar :: CChar -> Char
-foreign import primitive "integralCast" castCharToCChar :: Char -> CChar
+foreign import primitive "U2U" castCCharToChar :: CChar -> Char
+foreign import primitive "U2U" castCharToCChar :: Char -> CChar
 
 -- | Marshal a NUL terminated C string into a Haskell string.
 --
@@ -449,8 +449,8 @@ charsToCWchars xs  = map castCharToCWchar xs
 --castCharToCWchar :: Char -> CWchar
 --castCharToCWchar ch = fromIntegral (ord ch)
 
-foreign import primitive "integralCast" castCWcharToChar :: CWchar -> Char
-foreign import primitive "integralCast" castCharToCWchar :: Char -> CWchar
+foreign import primitive "U2U" castCWcharToChar :: CWchar -> Char
+foreign import primitive "U2U" castCharToCWchar :: Char -> CWchar
 
 
 

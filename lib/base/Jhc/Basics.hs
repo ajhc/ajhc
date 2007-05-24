@@ -153,5 +153,5 @@ foldr k z (x:xs) = k x (foldr k z xs)
 
 foreign import primitive "error.Prelude.undefined" undefined :: a
 
-foreign import primitive "integralCast" ord :: Char -> Int
-foreign import primitive "integralCast" chr :: Int -> Char
+foreign import primitive "U2U" ord :: Char -> Int
+foreign import primitive "I2I" chr :: Int -> Char

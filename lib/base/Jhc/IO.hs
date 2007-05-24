@@ -165,6 +165,6 @@ putErrLn (c:cs) = putChar c `thenIO_` putErrLn cs
 putChar :: Char -> IO ()
 putChar c = c_putwchar (charToCWchar c)
 
-foreign import primitive "integralCast" charToCWchar :: Char -> CWchar
+foreign import primitive "U2U" charToCWchar :: Char -> CWchar
 foreign import ccall "stdio.h putwchar" c_putwchar :: CWchar -> IO ()
 

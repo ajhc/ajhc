@@ -92,7 +92,7 @@ hGetContents h = withHandle h $ \ptr -> do
     unsafeInterleaveIO getContents'
 --hIsEOF :: Handle -> IO Bool
 
-foreign import primitive "integralCast" cwintToChar :: CWint -> Char
+foreign import primitive "I2I" cwintToChar :: CWint -> Char
 
 foreign import ccall "stdio.h fflush" c_fflush :: Ptr Handle -> IO ()
 

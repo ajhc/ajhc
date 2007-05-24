@@ -118,8 +118,8 @@ getChar = do
     ch <- c_getwchar
     if ch == -1 then fail "End of file." else return (cwintToChar ch)
 
-foreign import primitive "integralCast" cwintToChar :: CWint -> Char
-foreign import primitive "integralCast" charToCWchar :: Char -> CWchar
+foreign import primitive "I2I" cwintToChar :: CWint -> Char
+foreign import primitive "U2U" charToCWchar :: Char -> CWchar
 
 foreign import ccall "stdio.h putwchar_unlocked" c_putwchar :: CWchar -> IO ()
 foreign import ccall "wchar.h getwchar_unlocked" c_getwchar :: IO CWint

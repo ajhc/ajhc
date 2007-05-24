@@ -23,7 +23,7 @@ readBinaryFile fn = do
                         return (cintToWord8 ch:xs)
         unsafeInterleaveIO gc
 
-foreign import primitive "integralCast" cintToWord8 :: CInt -> Word8
+foreign import primitive "Lobits" cintToWord8 :: CInt -> Word8
 foreign import primitive "const.\"rb\"" read_str :: Ptr CChar
 
 foreign import ccall "stdio.h getc" c_getc :: Ptr () -> IO CInt

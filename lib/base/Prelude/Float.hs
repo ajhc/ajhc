@@ -320,9 +320,9 @@ foreign import primitive "const.DBL_MANT_DIG" c_dbl_mant_dig :: Int
 foreign import primitive "const.DBL_MIN_EXP" c_dbl_min_exp :: Int
 foreign import primitive "const.DBL_MAX_EXP" c_dbl_max_exp :: Int
 
-foreign import primitive "integralCast" integer2float :: Integer -> Float
-foreign import primitive "integralCast" integer2double :: Integer -> Double
-foreign import primitive "integralCast" double2integer :: Double -> Integer
+foreign import primitive "I2F" integer2float :: Integer -> Float
+foreign import primitive "I2F" integer2double :: Integer -> Double
+foreign import primitive "F2I" double2integer :: Double -> Integer
 
 
 

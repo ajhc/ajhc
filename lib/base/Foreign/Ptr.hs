@@ -71,7 +71,7 @@ castFunPtr (FunPtr addr) = FunPtr addr
 --castPtrToFunPtr = unsafeCoerce
 
 
-foreign import primitive "integralCast" castFunPtrToPtr :: FunPtr a -> Ptr b
-foreign import primitive "integralCast" castPtrToFunPtr :: Ptr a -> FunPtr b
+foreign import primitive "U2U" castFunPtrToPtr :: FunPtr a -> Ptr b
+foreign import primitive "U2U" castPtrToFunPtr :: Ptr a -> FunPtr b
 
 

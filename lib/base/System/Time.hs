@@ -88,7 +88,7 @@ getClockTime = do
     secs <- c_time nullPtr -- can't fail, according to POSIX
     return (TOD (ctimeToInteger secs) 0)
 
-foreign import primitive "integralCast" ctimeToInteger :: CTime -> Integer
+foreign import primitive "U2U" ctimeToInteger :: CTime -> Integer
    -- -----------------------------------------------------------------------------
 -- | converts an internal clock time to a local time, modified by the
 -- timezone and daylight savings time settings in force at the time

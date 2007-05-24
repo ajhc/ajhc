@@ -13,8 +13,8 @@ data Float
 data Double
 
 
-foreign import primitive "integralCast" floatToDouble :: Float -> Double
-foreign import primitive "integralCast" doubleToFloat :: Double -> Float
+foreign import primitive "F2F" floatToDouble :: Float -> Double
+foreign import primitive "F2F" doubleToFloat :: Double -> Float
 
  -- floating point stuff
 
