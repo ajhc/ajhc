@@ -1,6 +1,7 @@
 module C.Op where
 
 import Data.Binary
+import Util.Gen
 
 {-
 
@@ -169,12 +170,26 @@ data Ty
     deriving(Eq,Ord)
     {-! derive: Binary !-}
 
+readTy :: Monad m => String -> m Ty
+readTy "bool" = return TyBool
+readTy "bits<ptr>" = return $ TyBits (BitsArch BitsPtr) HintNone
+readTy "bits<max>" = return $ TyBits (BitsArch BitsMax) HintNone
+readTy "bits<int>" = return $ TyBits (BitsArch BitsInt) HintNone
+readTy ('b':'i':'t':'s':'<':rs) = return $ TyBits (BitsExt (takeWhile ('>' /=) rs)) HintNone
+readTy ('b':'i':'t':'s':rs) = do n <- readM rs; return $ TyBits (Bits n) HintNone
+readTy ('s':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintSigned
+readTy ('u':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintUnsigned
+readTy ('f':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintFloat
+readTy ('c':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintCharacter
+readTy _ = fail "readTy: not type"
+
+
 instance Show TyHint where
     showsPrec _ HintSigned = ('s':)
     showsPrec _ HintUnsigned = ('u':)
     showsPrec _ HintFloat = ('f':)
     showsPrec _ HintCharacter = ('c':)
-    showsPrec _ HintNone = ('?':)
+    showsPrec _ HintNone = id
 
 instance Show Ty where
     showsPrec _ TyBool = showString "bool"
