@@ -1,5 +1,6 @@
 
 static void _amain(void);
+static void jhc_arch_assert(void);
 static int jhc_argc;
 static char **jhc_argv;
 static char *jhc_progname;
@@ -92,6 +93,7 @@ struct jhc_continuation {
 int
 main(int argc, char *argv[])
 {
+        jhc_arch_assert();
         jhc_malloc_init();
         jhc_argc = argc - 1;
         jhc_argv = argv + 1;

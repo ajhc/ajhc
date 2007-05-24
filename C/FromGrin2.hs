@@ -3,10 +3,12 @@ module C.FromGrin2(compileGrin) where
 
 import Control.Monad.Identity
 import Control.Monad.RWS
+import System.IO.Unsafe
 import Data.List
 import Data.Maybe
 import Data.Monoid
 import Text.PrettyPrint.HughesPJ(nest,($$))
+import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
@@ -21,13 +23,12 @@ import Doc.DocLike
 import Doc.PPrint
 import Grin.Grin
 import Grin.HashConst
+import Grin.Show()
 import Grin.Noodle
-import Grin.Show
 import Grin.Val
 import PackedString
 import RawFiles
 import Support.CanType
-import Support.Tuple
 import Support.FreeVars
 import Util.Gen
 import Util.SetLike
@@ -38,7 +39,6 @@ import Util.UniqueMonad
 -- C Monad
 ---------------
 
-type Structure = (Name,[(Name,Type)])
 data Todo = TodoReturn | TodoExp [Expression] | TodoDecl Name Type
 
 
@@ -80,7 +80,7 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
-compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c ++ jhc_rts2_c ++ P.render ans ++ "\n", snub (reqLibraries req))  where
+compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c ++ jhc_rts2_c ++ generateArchAssertions ++ P.render ans ++ "\n", snub (reqLibraries req))  where
     ans = vcat $ includes ++ [text "", enum_tag_t, header, cafs,buildConstants (grinTypeEnv grin) finalHcHash, body]
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
@@ -102,7 +102,7 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
     cafs = text "/* CAFS */" $$ (vcat $ map ccaf (grinCafs grin))
 
 convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C Function
-convertFunc ffie (n,Tup as :-> body) = do
+convertFunc ffie (n,~(Tup as) :-> body) = do
         s <- localTodo TodoReturn (convertBody body)
         let bt = getType body
             mmalloc (TyPtr _) = [a_MALLOC]
@@ -111,7 +111,7 @@ convertFunc ffie (n,Tup as :-> body) = do
             ats = (if isNothing ffie then a_STD else Public):mmalloc bt
             fnname = case ffie of
                 Nothing -> nodeFuncName n
-                Just (FfiExport cn Safe CCall) -> name cn
+                Just ~(FfiExport cn Safe CCall) -> name cn
         fr <- convertType bt
         as' <- flip mapM as $ \ (Var v t) -> do
             t' <- convertType t
@@ -246,7 +246,7 @@ convertBody (Case v@(Var _ ty) [p1@(NodeC t _) :-> e1,p2 :-> e2]) | ty == TyNode
             let tmp = concrete t  scrut
                 ass = mconcat [if needed a then a' =* (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
                 fve = freeVars e
-                needed (Var v _) = v `Set.member` fve
+                needed ~(Var v _) = v `Set.member` fve
             e' <- convertBody e
             return (ass & e')
         am Var {} e = e
@@ -305,7 +305,7 @@ convertBody (Case v@(Var _ t) ls) = do
         da (Tag t :-> e) = do
             e' <- convertBody e
             return $ (Just (enum (nodeTagName t)), e')
-        da (Tup [x] :-> e) = da ( x :-> e )
+        da (~(Tup [x]) :-> e) = da ( x :-> e )
     ls' <- mapM da ls
     return $ profile_case_inc & switch' scrut' ls'
 convertBody (Error s t) = do
@@ -342,7 +342,7 @@ convertBody (e :>>= v@(Var _ _) :-> e') = do
     ss' <- convertBody e'
     return (ss & ss')
 
-convertBody (e :>>= Tup xs :-> e') = do
+convertBody (e :>>= ~(Tup xs) :-> e') = do
     ts <- mapM (convertType . getType) xs
     st <- newVar (anonStructType ts)
     ss <- localTodo (TodoExp [st]) (convertBody e)
@@ -575,7 +575,7 @@ newNode ty node = do
     return (d,localVariable ty n)
 -}
 
-newNode ty (NodeC t as) = do
+newNode ty ~(NodeC t as) = do
     tyenv <- asks (grinTypeEnv . rGrin)
     let sf = tagIsSuspFunction t
     case basicNode tyenv t as of
@@ -609,7 +609,7 @@ declareStruct n = do
     let tag | tagIsSuspFunction n = [(name "head",fptr_t)]
             | Just [n'] <- ss, n == n' = []
             | otherwise = [(name "what",what_t)]
-        fields = (tag ++ zip [ name $ 'a':show i | i <-  [1 ..] ] ts')
+        fields = (tag ++ zip [ name $ 'a':show i | i <-  [(1 :: Int) ..] ] ts')
     unless (null fields) $ tell mempty { wStructures = Map.singleton (nodeStructName n) fields }
 
 
@@ -632,7 +632,7 @@ declareEvalFunc n = do
         aname = name "arg";
         rvar = localVariable wptr_t (name "r");
         atype = ptrType nt
-        body = rvar =* functionCall (toName (show $ fn)) [ project' (arg i) (variable aname) | _ <- ts | i <- [1 .. ] ]
+        body = rvar =* functionCall (toName (show $ fn)) [ project' (arg i) (variable aname) | _ <- ts | i <- [(1 :: Int) .. ] ]
         update =  f_update (cast sptr_t (variable aname)) rvar
     tellFunctions [function fname wptr_t [(aname,atype)] [a_STD] (body & update & creturn rvar )]
     return fname
@@ -770,6 +770,14 @@ infixl 1 &
 (&) :: (ToStatement a,ToStatement b) => a -> b -> Statement
 x & y = toStatement x `mappend` toStatement y
 
+
+generateArchAssertions :: String
+generateArchAssertions = unlines (h:map f (filter notVoid as) ++ [t]) where
+    (_,_,as,_) = unsafePerformIO determineArch
+    notVoid pt = primTypeName pt /= "void"
+    f pt = printf "      assert(sizeof(%s) == %d);" (primTypeName pt) (primTypeSizeOf pt)
+    h = "static void\njhc_arch_assert(void)\n{"
+    t = "}"
 
 
 
