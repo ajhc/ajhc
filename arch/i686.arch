@@ -6,6 +6,12 @@ arch_i686 = [
     primTypeAlignmentOf = 4,
     primTypeSizeOf = 4 },
   PrimType {
+    primTypeName = "HsChar",
+    primTypeIsSigned = False,
+    primTypeType = PrimTypeIntegral,
+    primTypeAlignmentOf = 4,
+    primTypeSizeOf = 4 },
+  PrimType {
     primTypeName = "int",
     primTypeIsSigned = True,
     primTypeType = PrimTypeIntegral,

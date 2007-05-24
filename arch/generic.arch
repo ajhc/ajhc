@@ -7,7 +7,7 @@ arch_generic = [
     primTypeSizeOf = 4 },
   PrimType {
     primTypeName = "HsChar",
-    primTypeIsSigned = True,
+    primTypeIsSigned = False,
     primTypeType = PrimTypeIntegral,
     primTypeAlignmentOf = 4,
     primTypeSizeOf = 4 },
