@@ -25,6 +25,7 @@ print "module Name.Prim where\n\n";
 print "import Name.Name\n\n";
 
 
+my %done;
 
 my %rt;
 
@@ -35,7 +36,8 @@ foreach my $d (@ds) {
     $rt{$ctype}++;
     $sname =~ s/(.*)\.([A-Za-z0-9]+)$/$2/ or die "improper name";
     my $mname = $1;
-
+    next if $done{"tc_$sname"}++;
+    next if $done{"dc_$sname"}++;
     print "{-# NOINLINE tc_$sname #-}\n";
     print "tc_$sname = toName TypeConstructor (\"$mname\",\"$sname\")\n";
     print "{-# NOINLINE dc_$sname #-}\n";
@@ -51,6 +53,23 @@ foreach my $ort (sort keys %rt) {
     print "rt_$rt = toName RawType \"$ort\"\n";
 
 }
+
+my ($nametype,$leader);
+open my $fd, "<data/names.txt";
+while(<$fd>) {
+    chomp;
+    next unless /\S/;
+    next if /^\s*#/;
+    ($nametype,$leader) = ($1,$2),next if /^([A-Za-z]+):([a-z]+):\s*$/;
+    /^([_A-Za-z]+)\s+([_A-Za-z.@]+)\.([)(#A-Za-z%:_\[\]]+)\s*$/ or die "unrecognized line $_";
+    my ($name,$mod,$var) = ($1,$2,$3);
+    $name = $leader . "_" . $name;
+    next if $done{$name};
+    print "{-# NOINLINE $name #-}\n";
+    print "$name = toName $nametype (\"$mod\",\"$var\")\n";
+
+}
+
 
 print "\n\n";
 

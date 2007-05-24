@@ -1,0 +1,40 @@
+
+TypeConstructor:tc:
+
+JumpPoint Jhc.JumpPoint.JumpPoint
+IO        Jhc.Prim.IO
+World__   Jhc.Prim.World__
+Bool      Jhc.Order.Bool
+Target    Jhc.Options.Target
+Ptr       Jhc.Addr.Ptr
+Ratio     Jhc.Num.Ratio
+Unit      Jhc.Basics.()
+
+DataConstructor:dc:
+
+Rational   Jhc.Num.:%
+Cons       Jhc.Prim.:
+EmptyList  Jhc.Prim.[]
+Unit       Jhc.Basics.()
+Boolzh     Jhc.Order.Bool#
+Target     Jhc.Options.Target#
+
+ClassName:class:
+Eq              Jhc.Order.Eq
+Ord             Jhc.Order.Ord
+Enum            Jhc.Enum.Enum
+Bounded         Jhc.Enum.Bounded
+Show            Jhc.Show.Show
+Read            Prelude.Text.Read
+Ix              Ix.Ix
+Functor         Jhc.Monad.Functor
+Monad           Jhc.Monad.Monad
+Num             Jhc.Num.Num
+Real            Jhc.Num.Real
+Integral	Jhc.Num.Integral
+Fractional	Jhc.Num.Fractional
+Floating	Jhc.Float.Floating
+RealFrac	Jhc.Float.RealFrac
+RealFloat	Jhc.Float.RealFloat
+
+

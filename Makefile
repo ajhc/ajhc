@@ -134,7 +134,7 @@ Info/Properties.hs: data/props.txt utils/gen_props.prl
 PrimitiveOperators.hs: utils/op_process.prl data/operators.txt data/primitives.txt data/PrimitiveOperators-in.hs
 	perl ./utils/op_process.prl > $@ || rm -f $@
 
-Name/Prim.hs: utils/op_names.prl data/primitives.txt
+Name/Prim.hs: utils/op_names.prl data/primitives.txt data/names.txt
 	perl ./utils/op_names.prl > $@ || rm -f $@
 
 RawFiles.hs:  data/HsFFI.h data/jhc_rts.c data/jhc_rts_header.h data/wsize.h data/jhc_rts_alloc.c data/jhc_rts2.c data/ViaGhc.hs

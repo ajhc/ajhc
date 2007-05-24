@@ -59,20 +59,11 @@ instance FromTupname Name where
 
 -- The constructors
 
-dc_Cons = toName DataConstructor ("Jhc.Prim",":")
-dc_EmptyList = toName DataConstructor ("Jhc.Prim","[]")
-dc_Rational = toName DataConstructor ("Jhc.Num",":%")
-dc_Unit = toName DataConstructor ("Jhc.Basics","()")
-dc_Boolzh = toName DataConstructor ("Jhc.Order","Bool#")
-dc_Target = toName DataConstructor  ("Jhc.Options","Target#")
 
 tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
 tc_Box = toName TypeConstructor    ("Jhc@","Box")
 tc_Arrow = toName TypeConstructor  ("Jhc@","->")
-tc_JumpPoint = toName TypeConstructor   ("Jhc.JumpPoint","JumpPoint")
 
-tc_IO = toName TypeConstructor       ("Jhc.Prim", "IO")
-tc_World__ = toName TypeConstructor  ("Jhc.Prim","World__")
 tc_Int__ = toName TypeConstructor  ("Jhc.Prim","Int__")
 tc_Addr__ = toName TypeConstructor  ("Jhc.Prim","Addr__")
 tc_Word8__ = toName TypeConstructor  ("Jhc.Prim","Word8__")
@@ -83,13 +74,8 @@ tc_MutArray__ = toName TypeConstructor  ("Jhc.Array","MutArray__")
 tc_Ref__ = toName TypeConstructor ("Data.IORef","Ref__")
 
 
-tc_Bool = toName TypeConstructor   ("Jhc.Order","Bool")
 tc_Boolzh = toName TypeConstructor ("Jhc.Order","Bool#")
-tc_Target = toName TypeConstructor ("Jhc.Options","Target")
 tc_List = toName TypeConstructor  ("Jhc.Prim","[]")
-tc_Ptr = toName TypeConstructor   ("Jhc.Addr","Ptr")
-tc_Ratio = toName TypeConstructor ("Jhc.Num","Ratio")
-tc_Unit = toName TypeConstructor  ("Jhc.Basics","()")
 
 
 rt_tag = toName RawType "tag#"
@@ -147,20 +133,4 @@ sFuncNames = FuncNames {
 
 
 
-class_Eq = toName ClassName ("Jhc.Order","Eq")
-class_Ord = toName ClassName ("Jhc.Order","Ord")
-class_Enum = toName ClassName ("Jhc.Enum","Enum")
-class_Bounded = toName ClassName ("Jhc.Enum","Bounded")
-class_Show = toName ClassName ("Jhc.Show","Show")
-class_Read = toName ClassName ("Prelude.Text","Read")
-class_Ix = toName ClassName ("Ix","Ix")
-class_Functor = toName ClassName ("Jhc.Monad","Functor")
-class_Monad = toName ClassName ("Jhc.Monad","Monad")
-class_Num = toName ClassName ("Jhc.Num","Num")
-class_Real = toName ClassName ("Jhc.Num","Real")
-class_Integral = toName ClassName ("Jhc.Num","Integral")
-class_Fractional = toName ClassName ("Jhc.Num","Fractional")
-class_Floating = toName ClassName ("Jhc.Float","Floating")
-class_RealFrac = toName ClassName ("Jhc.Float","RealFrac")
-class_RealFloat = toName ClassName ("Jhc.Float","RealFloat")
 
