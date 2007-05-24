@@ -18,7 +18,6 @@ import Prelude
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
-import Atom
 import C.FFI
 import C.Prims as CP
 import DataConstructors
@@ -32,10 +31,8 @@ import E.PrimOpt
 import E.Rules
 import E.Subst
 import E.Traverse
-import E.TypeAnalysis
 import E.TypeCheck
 import E.Values
-import Fixer.VMap
 import FrontEnd.Class
 import FrontEnd.Rename(unRename)
 import FrontEnd.SrcLoc
@@ -43,7 +40,6 @@ import FrontEnd.Syn.Traverse(getNamesFromHsPat)
 import FrontEnd.Tc.Main(isTypePlaceholder)
 import FrontEnd.Tc.Module(TiData(..))
 import FrontEnd.Tc.Type hiding(Rule(..))
-import FrontEnd.Utils
 import HsSyn as HS
 import Info.Types
 import Name.Name as Name
@@ -58,11 +54,9 @@ import Util.Gen
 import Util.NameMonad
 import Util.SetLike
 import qualified FlagOpts as FO
-import qualified FrontEnd.Tc.Monad as TM
 import qualified FrontEnd.Tc.Type as T(Rule(..))
 import qualified FrontEnd.Tc.Type as Type
 import qualified Info.Info as Info
-import qualified Stats
 
 ump sl e = EError (show sl ++ ": Unmatched pattern") e
 
@@ -102,6 +96,7 @@ tipe t = f t where
         | otherwise = tVr (lt n) (kind k)
     cmvar MetaVar { metaKind = k } = tAbsurd (kind k)
     lt n | nameType n == TypeVal = toId n  -- verifies namespace
+         | otherwise = error "E.FromHs.lt"
 
 kind (KBase KUTuple) = eHash
 kind (KBase KHash) = eHash
@@ -110,6 +105,7 @@ kind (KBase KQuest) = eStar      -- XXX why do these still exist?
 kind (KBase KQuestQuest) = eStar
 kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."
+kind _ = error "E.FromHs.kind: unknown"
 
 
 simplifyDecl (HsPatBind sl (HsPVar n)  rhs wh) = HsFunBind [HsMatch sl n [] rhs wh]
@@ -133,7 +129,7 @@ convertValue n = do
             let (vs,_) = fromSigma t
             return (flip (foldr eLam) vs)
         Just CTId -> do return id
-        Just (CTAbs ts) -> do return $ \e -> foldr eLam e (map fromTyvar ts)
+        Just ~(CTAbs ts) -> do return $ \e -> foldr eLam e (map fromTyvar ts)
     return (tVr (toId n) ty,ty,lm)
 
 
@@ -679,7 +675,7 @@ tidyPat p b = f p where
             ErasedAlias -> f p
             _ -> return (pa,id)
     f p@HsPApp {} = return (p,id)
-    f (HsPIrrPat (Located ss p)) = f p >>= \ (p',fe) -> case p' of
+    f ~(HsPIrrPat (Located ss p)) = f p >>= \ (p',fe) -> case p' of
         HsPWildCard -> return (p',fe)
         _ -> do
             (lbv,bv) <- varify b
@@ -702,7 +698,7 @@ tidyHeads ::
     -> [([HsPat],E->E)]  -- [(pats,else -> value)]
     -> Ce m [(HsPat,[HsPat],E->E)]  -- pulls the head off of each pattern, tidying it up perhaps
 tidyHeads b ps = mapM f ps where
-    f ((p:ps),fe) = do
+    f (~(p:ps),fe) = do
         (p',fe') <- tidyPat p b
         return (p',ps,fe' . fe)
 
@@ -756,7 +752,7 @@ convertMatches bs ms err = do
                                | otherwise =  (EAp (EAp fromInt tb) (intConvert i))
                         m <- match bs ps err
                         createIf (EAp (EAp eq bv) ip) m els
-                    f els (HsPLit (HsFrac i),ps) = do
+                    f els ~(HsPLit (HsFrac i),ps) = do
                         let ip = (EAp (EAp fromRational tb) (toE i))
                         m <- match bs ps err
                         createIf (EAp (EAp eq bv) ip) m els
@@ -770,7 +766,7 @@ convertMatches bs ms err = do
                     f els (HsPLit (HsString ""),ps) = do
                         m <- match bs ps err
                         return $ eCase bv [Alt (litCons { litName = dc_EmptyList, litType = tString }) m] els
-                    f els (HsPLit (HsString s),ps) = do
+                    f els ~(HsPLit (HsString s),ps) = do
                         m <- match bs ps err
                         let (s',packed) = packupString s
                         if packed
@@ -780,7 +776,7 @@ convertMatches bs ms err = do
                 return $ lbv e
             | all (isHsPLit . fst3) ps = do
                 let gps = [ (p,[ (ps,fe) |  (_,ps,fe) <- xs ]) | (p,xs) <- sortGroupUnderF fst3 ps]
-                    f (HsPLit l,ps) = do
+                    f (~(HsPLit l),ps) = do
                         m <- match bs ps err
                         return (Alt (litconvert l (getType b)) m)
                 as@(_:_) <- mapM f gps
@@ -796,7 +792,7 @@ convertMatches bs ms err = do
                         ps' <- mapM pp ps
                         m <- match (map EVar vs ++ bs) ps' err
                         deconstructionExpression dataTable (toName DataConstructor name) (getType b) vs m
-                    pp (HsPApp n ps,rps,e)  = do
+                    pp (~(HsPApp n ps),rps,e)  = do
                         return $ (ps ++ rps , e)
                 as@(_:_) <- mapM f gps
                 case conVirtual patCons of

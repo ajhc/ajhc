@@ -2,10 +2,9 @@ module E.Binary() where
 
 import Atom
 import Data.Binary
-import E.FreeVars(caseUpdate)
 import E.Type
 import Monad
-import Name.Binary
+import Name.Binary()
 import {-# SOURCE #-} Info.Binary(putInfo,getInfo)
 
 

@@ -4,7 +4,6 @@ import Control.Monad.Writer hiding(Product(..))
 import Data.Monoid hiding(Product(..))
 import Maybe
 import Monad
-import qualified Data.Set as Set
 
 import DataConstructors
 import E.CPR
@@ -24,10 +23,6 @@ import Support.CanType
 import Util.SetLike
 import qualified E.Demand as Demand
 
-
-topLike Top = True
-topLike (Fun v) = topLike v
-topLike _ = False
 
 
 data Arg =

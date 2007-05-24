@@ -9,7 +9,6 @@ module Grin.NodeAnalyze(nodeAnalyze) where
 import Control.Monad.RWS
 import Control.Monad.Identity hiding(join)
 import Data.Monoid
-import System
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -25,7 +24,6 @@ import Util.UnionSolve
 import Util.Gen
 
 
-atomUnknown = toAtom "(unknown)"
 
 
 
@@ -279,8 +277,6 @@ doFunc (name,arg :-> body) = ans where
 bottom = N WHNF (Only (Set.empty))
 top = N Lazy Top
 
-tyWNode = TyNode
-tySNode = TyPtr TyNode
 
 
 fixupFunc cmap (name,l :-> body) = fmap (\b -> (name, l :-> b)) (f body) where

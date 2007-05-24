@@ -7,7 +7,6 @@ import Atom
 import Data.Binary
 import C.FFI(FfiExport)
 import E.CPR
-import Util.SetLike(toList,fromDistinctAscList)
 import GenUtil
 import Info.Info
 import Info.Types

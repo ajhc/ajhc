@@ -11,7 +11,6 @@ import E.E
 import E.FreeVars
 import E.Show
 import E.Subst
-import Util.Seq as Seq
 
 
 

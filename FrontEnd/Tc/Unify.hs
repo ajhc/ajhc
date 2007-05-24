@@ -11,8 +11,6 @@ import qualified Data.Map as Map
 
 import Doc.DocLike
 import Doc.PPrint
-import FrontEnd.Class
-import FrontEnd.SrcLoc
 import FrontEnd.Tc.Class
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
@@ -20,8 +18,6 @@ import FrontEnd.Tc.Kind
 import Options
 import Support.CanType
 import Support.FreeVars
-import Util.Gen
-import Util.SetLike
 import qualified FlagDump as FD
 
 

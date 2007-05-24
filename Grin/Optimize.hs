@@ -2,7 +2,6 @@
 module Grin.Optimize(grinPush,grinSpeculate) where
 
 import Control.Monad.State
-import Data.Monoid
 import List
 import qualified Data.Set as Set
 
@@ -10,7 +9,6 @@ import Atom
 import C.Prims
 import Grin.Grin
 import Grin.Noodle
-import Grin.Whiz
 import Stats hiding(null)
 import Support.CanType
 import Support.Tuple
@@ -92,16 +90,16 @@ grinPush stats (l :-> e) = ans where
 --            mapM_ Prelude.print dropped
         return (mv',foldr ff exp' dropped :: Exp)
     -- | preferentially pull definitons of the variable this returns right next to it as it admits a peephole optimization
-    prefer (Store v@Var {}) = return v
-    prefer (App fn [v@Var {}] _)  | fn == funcEval = return v
-    prefer (App fn [v@Var {},_] _)| fn == funcApply = return v
-    prefer (App fn [v@Var {}] _)  | fn == funcApply = return v
-    prefer (Update _ v@Var {}) = return v
-    prefer (Update v@Var {} _) = return v
-    prefer _ = fail "no preference"
-    prefered pexps exp = do
-        v <- prefer exp
-        return [ p | p <- pexps, v == pexpBind p]
+--    prefer (Store v@Var {}) = return v
+--    prefer (App fn [v@Var {}] _)  | fn == funcEval = return v
+--    prefer (App fn [v@Var {},_] _)| fn == funcApply = return v
+--    prefer (App fn [v@Var {}] _)  | fn == funcApply = return v
+--    prefer (Update _ v@Var {}) = return v
+--    prefer (Update v@Var {} _) = return v
+--    prefer _ = fail "no preference"
+--    _prefered pexps exp = do
+--        v <- prefer exp
+--        return [ p | p <- pexps, v == pexpBind p]
 
 --grinPush :: Stats -> Lam -> IO Lam
 --grinPush stats lam = ans where

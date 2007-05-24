@@ -6,7 +6,6 @@ module Grin.Lint(
     ) where
 
 import Control.Exception
-import Control.Monad
 import Control.Monad.Reader
 import Data.Monoid
 import System.IO
@@ -14,10 +13,8 @@ import qualified Data.Set as Set
 
 import Doc.DocLike
 import Grin.Grin
-import Grin.Noodle
 import Grin.Show
 import Options
-import Support.CanType
 import Support.FreeVars
 import Support.Transform
 import Util.Gen
@@ -64,7 +61,7 @@ transformGrin TransformParms { transformIterate = IterateExactly n } prog | n <=
 transformGrin tp prog = do
     let dodump = transformDumpProgress tp
         name = transformCategory tp ++ pname (transformPass tp) ++ pname (transformName tp)
-        scname = transformCategory tp ++ pname (transformPass tp)
+        _scname = transformCategory tp ++ pname (transformPass tp)
         pname "" = ""
         pname xs = '-':xs
         iterate = transformIterate tp
@@ -183,8 +180,6 @@ tcExp e = f e where
         es <- mapM (tcLam (Just tv)) as
         foldl1M (same $ "case exp: " ++ show (map head $ sortGroupUnder fst (zip es as)) ) es
     f (Let { expDefs = defs, expBody = body }) = do
-        te <- asks envTyEnv
-        let nte = extendTyEnv defs te
         local (\e -> e { envTyEnv = extendTyEnv defs (envTyEnv e) }) $ do
             mapM_ (tcLam Nothing) [ b | FuncDef { funcDefBody = b } <- defs ]
             f body
@@ -220,5 +215,6 @@ tcVal v = f v where
         as'' <- mapM f as
         if as'' == as' then return TyNode else
             fail $ "NodeC: arguments do not match " ++ show n ++ show (as'',as')
+    f (Item _ t) = return t
 
 

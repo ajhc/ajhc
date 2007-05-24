@@ -9,7 +9,6 @@ import Monad
 import qualified Data.Map as Map
 import Text.PrettyPrint.HughesPJ as PPrint
 
-import Atom
 import FrontEnd.Class
 import DataConsAssump     (dataConsEnv)
 import DataConstructors
@@ -21,13 +20,11 @@ import FrontEnd.Desugar
 import FrontEnd.Infix
 import FrontEnd.KindInfer
 import FrontEnd.Rename
-import FrontEnd.SrcLoc
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Main
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import FrontEnd.Exports
-import GenUtil
 import Info.Properties
 import Ho.Type
 import HsSyn
@@ -64,16 +61,8 @@ data TiData = TiData {
 isGlobal x |  (_,(_::String,(h:_))) <- fromName x =  not $ isDigit h
 isGlobal _ = error "isGlobal"
 
-modInfoDecls = hsModuleDecls . modInfoHsModule
 
-getImports ModInfo { modInfoHsModule = mod }  = [  (hsImportDeclModule x) | x <-  hsModuleImports mod]
 
-pprintEnv :: PPrint Doc a => Map.Map Name a -> Doc
-pprintEnv env = pl global $+$ pl local_norm $+$ pl local_sys  where
-    es = Map.toList env
-    (local,global) = partition (\ (x,_) -> not (isGlobal x)) es -- isDigit $ head (hsIdentString (hsNameIdent x)) ) es
-    (local_sys,local_norm) = partition (\(x,_) -> last (show x) == '@' ) local
-    pl es = vcat [((pprint a) <+> (text "::") <+> (pprint b)) | (a, b) <- es]
 
 buildFieldMap :: Ho -> [ModInfo] -> FieldMap
 buildFieldMap ho ms = (ans',ans) where
@@ -197,7 +186,7 @@ tiModules' cho ms = do
          do {putStrLn "  ---- initial sigEnv information ---- ";
              putStrLn $ PPrint.render $ pprintEnvMap sigEnv}
     let bindings = (funPatBinds ++  liftedInstances)
-        classDefaults  = snub [ getDeclName z | z <- cDefBinds, isHsFunBind z || isHsPatBind z ]
+        --classDefaults  = snub [ getDeclName z | z <- cDefBinds, isHsFunBind z || isHsPatBind z ]
         classNoDefaults = snub (concat [ getDeclNames z | z <- cDefBinds ]) -- List.\\ classDefaults
         noDefaultSigs = Map.fromList [ (n,maybe (error $ "sigEnv:"  ++ show n) id $ Map.lookup n sigEnv) | n <- classNoDefaults ]
     --when verbose2 $ putStrLn (show bindings)

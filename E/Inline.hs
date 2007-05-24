@@ -16,16 +16,13 @@ import Atom
 import E.Annotate
 import E.E
 import E.Program
-import E.Rules
 import E.Subst
 import E.Values
-import GenUtil
 import Info.Info(Info)
 import Info.Types
 import Name.Id
 import Options
 import Stats
-import Support.FreeVars
 import Util.Graph
 import Util.SetLike
 import qualified FlagOpts as FO
@@ -171,8 +168,7 @@ programMapProgComponents :: Monad m =>
     -> Program
     -> m Program
 programMapProgComponents f prog = do
-    let cs = programComponents prog
-        prog' = prog { progStats = mempty, progType = MainComponent }
+    let prog' = prog { progStats = mempty, progType = MainComponent }
         g ds = f (programSetDs ds prog')
     ps <- mapM g (programComponents prog)
     return $ programSetDs (concatMap programDs ps) prog { progStats = progStats prog `mappend` (mconcat $ map progStats ps) }

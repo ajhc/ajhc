@@ -14,14 +14,12 @@ import Data.Typeable
 import List  hiding(delete,insert)
 import qualified Data.Map as Map
 
-import Atom
 import DataConstructors
 import Doc.PPrint
 import E.E
 import E.FreeVars
 import E.Inline
 import E.Program
-import E.Rules
 import E.Subst
 import E.Traverse
 import E.TypeCheck
@@ -31,7 +29,6 @@ import qualified Info.Info as Info
 import Info.Types
 import Name.Id
 import Name.Name
-import Name.Names
 import Options
 import Stats
 import Support.CanType
@@ -41,9 +38,6 @@ import Util.UniqueMonad()
 import qualified Util.Graph as G
 
 
-doLetRec stats [] e = return e
-doLetRec stats ds _ | flint && hasRepeatUnder fst ds = error "doLetRec: repeated variables!"
-doLetRec stats ds e = return $ ELetRec ds e
 
 
 
@@ -126,10 +120,10 @@ programFloatInward prog = do
     return nprog { progStats = nstats }
 
 
-cupbinds bs = f bs where
-    f (Left ((t,_),fv):rs) = (tvrShowName t,fv):f rs
-    f (Right ds:rs) = f $ map Left ds ++ rs
-    f [] = []
+--cupbinds bs = f bs where
+--    f (Left ((t,_),fv):rs) = (tvrShowName t,fv):f rs
+--    f (Right ds:rs) = f $ map Left ds ++ rs
+--    f [] = []
 
 floatInward ::
     E  -- ^ input term
@@ -223,7 +217,6 @@ floatOutward :: Program -> IO Program
 floatOutward prog = do
     -- set natural levels on all types
     let tl (t,e) imap = (tvrInfo_u (Info.insert top_level) t,g top_level e imap)
-        f n (t,e) imap = (tvrInfo_u (Info.insert n) t,g n e)
         g n e@ELam {} imap = foldr ELam (g n' b imap') ts' where
             (b,ts) = fromLam e
             n' = succ n
