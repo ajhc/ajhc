@@ -10,7 +10,7 @@ import Data.List
 import GenUtil hiding(replicateM)
 
 mconcatMap f xs = mconcat (map f xs)
-mconcatInter x xs = mconcat (intersperse x xs)
+mintercalate x xs = mconcat (intersperse x xs)
 
 mconcatMapM f xs = mapM f xs >>= return . mconcat
 
