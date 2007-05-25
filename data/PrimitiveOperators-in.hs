@@ -1,6 +1,6 @@
 
 {- This file is generated -}
-module PrimitiveOperators(primitiveInsts,constantMethods,theMethods,allCTypes,ctypeMap) where
+module PrimitiveOperators(primitiveInsts,constantMethods,theMethods,allCTypes) where
 
 import Data.Monoid
 import qualified Data.Map as Map
@@ -35,7 +35,6 @@ create_integralCast_toInteger c1 t1 e = create_integralCast c1 t1 dc_Integer tIn
 create_integralCast_fromInt c2 t2 e t = create_integralCast dc_Int tIntzh c2 t2 e t
 create_integralCast_fromInteger c2 t2 e t = create_integralCast dc_Integer tIntegerzh c2 t2 e t
 
-ctypeMap = Map.fromList [ (tc,v) | (_,tc,_,v,_) <- allCTypes ]
 
 toClassName x = parseName ClassName x
 
@@ -246,5 +245,4 @@ v0 t = tVr 0 t
 {-# NOINLINE constantMethods #-}
 {-# NOINLINE primitiveInsts #-}
 {-# NOINLINE allCTypes #-}
-{-# NOINLINE ctypeMap #-}
 

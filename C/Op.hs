@@ -183,6 +183,14 @@ readTy ('f':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintFloat
 readTy ('c':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintCharacter
 readTy _ = fail "readTy: not type"
 
+bool = TyBool
+bits_ptr = TyBits (BitsArch BitsPtr) HintNone
+bits_max = TyBits (BitsArch BitsMax) HintNone
+bits_int = TyBits (BitsArch BitsInt) HintNone
+bits8    = TyBits (Bits 8)  HintNone
+bits16   = TyBits (Bits 16) HintNone
+bits32   = TyBits (Bits 32) HintNone
+bits64   = TyBits (Bits 64) HintNone
 
 instance Show TyHint where
     showsPrec _ HintSigned = ('s':)

@@ -167,7 +167,7 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
             runExpr      = func_runExpr ds
             runNoWrapper = func_runNoWrapper ds
             runRaw       = func_runRaw ds
-        let e = case ioLike (getType maine) of
+        let e = case extractIO (getType maine) of
                 Just x | not (fopts FO.Wrapper) -> EAp (EAp runNoWrapper x) maine
                 Just x ->  EAp (EAp runMain  x ) maine
                 Nothing | fopts FO.Raw -> EAp (EAp runRaw ty) maine
@@ -179,10 +179,7 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs, sortKindLike k ]
             (_,xs) = fromPi ty
         return (cname, tvrInfo_u (case ffi of Just ffi -> Info.insert ffi; Nothing -> id) $ setProperty prop_EXPORTED theMainTvr,ne)
-    ioLike ty = case ty of
-        ELit LitCons { litName = n, litArgs = [x] } | n ==  tc_IO -> Just x
---        (EPi ioc (EPi tvr (ELit LitCons { litName = n, litArgs = [x] }))) | n == tc_IOResult -> Just x
-        _ -> Nothing
+
 
 {-# NOINLINE createInstanceRules #-}
 createInstanceRules :: Monad m => DataTable -> ClassHierarchy -> (Map.Map Name (TVr,E)) -> m Rules
@@ -367,11 +364,9 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         let name = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         let (ts,rt) = argTypes' ty
-            (isIO,rt') = case  rt of
-                ELit (LitCons { litName = c, litArgs = [x] }) | c == tc_IO -> (True,x)
-                _ -> (False,rt)
+            (isIO,rt') =  extractIO' rt
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
-        (_,pt) <- lookupCType dataTable rt'
+        pt <- lookupCType rt'
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
         let cFun = createFunc dataTable (map tvrType es)
             prim io rs rtt = EPrim (APrim (Func io (packString rcn) (snds rs) rtt) req)
@@ -392,11 +387,9 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
     cDecl (HsForeignDecl _ (FfiSpec (Import rcn _) _ DotNet) n _) = do
         (var,ty,lamt) <- convertValue (toName Name.Val n)
         let (ts,rt) = argTypes' ty
-            (isIO,rt') = case  rt of
-                ELit (LitCons { litName = c, litArgs = [x] }) | c == tc_IO -> (True,x)
-                _ -> (False,rt)
+            (isIO,rt') = extractIO' rt
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
-        (_,pt) <- lookupCType dataTable rt'
+        pt <- lookupCType rt'
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
         dnet <- parseDotNetFFI rcn
         let cFun = createFunc dataTable (map tvrType es)

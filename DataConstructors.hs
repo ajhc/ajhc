@@ -21,6 +21,8 @@ module DataConstructors(
     boxPrimitive,
     lookupCType',
     lookupCType,
+    extractIO,
+    extractIO',
     pprintTypeOfCons,
     showDataTable,
     slotTypes,
@@ -364,7 +366,7 @@ boxPrimitive dataTable e et = case followAliases dataTable et of
 -- to the representation.
 -- ideally, these could be set via a pragma
 
-typeTable = [
+typeTable = Map.fromList [
     (tc_Char,"wchar_t"),
     (tc_Int, "int"),
     (tc_Int8, "int8_t"),
@@ -399,17 +401,29 @@ typeTable = [
 
     (tc_CWchar, "wchar_t"),
     (tc_CWint, "wint_t"),
-    (tc_CTime, "time_t")
+    (tc_CTime, "time_t"),
+    (tc_Unit,  "void"),
+    (tc_World__,  "void")
     ]
 
+lookupCType :: Monad m => E -> m String
+lookupCType e = f e where
+    f (ELit LitCons { litName = c })
+        | Just s <- Map.lookup c typeTable = return s
+    f (ELit LitCons { litAliasFor = Just af, litArgs = as }) = f (foldl eAp af as)
+    f _ = fail "lookupCType: Not C Type"
 
-lookupCType dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
-    ELit LitCons { litName = c, litArgs = [], litType = _ }
-        | c == tc_Unit -> return (c,"void")
-        | c == tc_World__ -> return (c,"void")
-        | Just pt <- Map.lookup c ctypeMap -> return (c,pt)
 
-    e' -> fail $ "lookupCType: " ++ show (e,e')
+extractIO :: Monad m => E -> m E
+extractIO e = f e where
+    f (ELit LitCons { litName = c, litArgs = [x] }) | c == tc_IO  = return x
+    f (ELit LitCons { litAliasFor = Just af, litArgs = as }) = f (foldl eAp af as)
+    f _ = fail "extractIO: not an IO type"
+
+extractIO' :: E -> (Bool,E)
+extractIO' e = case extractIO e of
+    Just x -> (True,x)
+    Nothing -> (False,e)
 
 lookupCType' dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
     ELit LitCons { litName = c, litArgs = [], litType = _ }
