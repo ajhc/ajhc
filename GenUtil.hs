@@ -1,5 +1,5 @@
 
---  $Id: GenUtil.hs,v 1.51 2006/06/07 00:16:10 john Exp $
+--  $Id: GenUtil.hs,v 1.52 2007/05/25 23:54:08 john Exp $
 -- arch-tag: 835e46b7-8ffd-40a0-aaf9-326b7e347760
 
 
@@ -39,6 +39,7 @@ module GenUtil(
     -- ** Simple deconstruction
     fromLeft,fromRight,fsts,snds,splitEither,rights,lefts,
     isLeft,isRight,
+    fst3,snd3,thd3,
     -- ** System routines
     exitSuccess, System.exitFailure, epoch, lookupEnv,endOfTime,
     -- ** Random routines
@@ -60,6 +61,7 @@ module GenUtil(
     perhapsM,
     repeatM, repeatM_, replicateM, replicateM_, maybeToMonad,
     toMonadM, ioM, ioMp, foldlM, foldlM_, foldl1M, foldl1M_,
+    maybeM,
     -- ** Text Routines
     -- *** Quoting
     shellQuote, simpleQuote, simpleUnquote,
@@ -76,7 +78,7 @@ module GenUtil(
     -- *** Scrambling
     rot13,
     -- ** Random
-    concatInter,
+    intercalate,
     powerSet,
     randomPermute,
     randomPermuteIO,
@@ -307,15 +309,13 @@ class Monad m => UniqueProducer m where
     -- | produce a new unique value
     newUniq :: m Int
 
---    peekUniq :: m Int
---    modifyUniq :: (Int -> Int) -> m ()
---    newUniq = do
---	v <- peekUniq
---	modifyUniq (+1)
---	return v
 
 rtup a b = (b,a)
 triple a b c = (a,b,c)
+
+fst3 (a,_,_) = a
+snd3 (_,b,_) = b
+thd3 (_,_,c) = c
 
 -- | the standard unix epoch
 epoch :: ClockTime
@@ -358,11 +358,15 @@ replicateM n x = sequence $ replicate n x
 replicateM_ :: Monad m => Int -> m a -> m ()
 replicateM_ n x = sequence_ $ replicate n x
 
-{-# SPECIALIZE maybeToMonad :: Maybe a -> IO a #-}
 -- | convert a maybe to an arbitrary failable monad
 maybeToMonad :: Monad m => Maybe a -> m a
 maybeToMonad (Just x) = return x
 maybeToMonad Nothing = fail "Nothing"
+
+-- | convert a maybe to an arbitrary failable monad
+maybeM :: Monad m => String -> Maybe a -> m a
+maybeM _ (Just x) = return x
+maybeM s Nothing = fail s
 
 toMonadM :: Monad m => m (Maybe a) -> m a
 toMonadM action = join $ liftM maybeToMonad action
@@ -576,8 +580,8 @@ isConjoint xs ys = or [x == y | x <- xs, y <- ys]
 isDisjoint xs ys = not (isConjoint xs ys)
 
 -- | 'concat' composed with 'List.intersperse'. Can be used similarly to join in perl.
-concatInter :: String -> [String] -> String
-concatInter x = concat . (intersperse x)
+intercalate :: [a] -> [[a]] -> [a]
+intercalate x xss = concat (intersperse x xss)
 
 -- | place spaces before each line in string.
 indentLines :: Int -> String -> String
@@ -756,7 +760,7 @@ tokens p = filter (not.null) . split p
 buildTable ::  [String] -> [(String,[String])] -> String
 buildTable ts rs = bt [ x:xs | (x,xs) <- ("",ts):rs ] where
     bt ts = unlines (map f ts) where
-        f xs = concatInter " " [  es n s | s <- xs | n <- cw ]
+        f xs = intercalate " " [  es n s | s <- xs | n <- cw ]
         cw = [ maximum (map length xs) | xs <- transpose ts]
     es n s = replicate (n - length s) ' ' ++ s
 
