@@ -19,26 +19,20 @@ module E.Rules(
     rulesFromARules
     )where
 
-import Data.Monoid
-import Data.Typeable
+import Control.Monad.Writer
 import Data.FunctorM
 import List
-import Monad(liftM)
-import Control.Monad.Trans
 import Maybe
-import Control.Monad.Writer
 
-import Atom(toAtom,fromAtom,Atom)
+import Atom(toAtom)
 import Data.Binary
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
-import E.E
 import E.Binary()
-import E.Eval
-import E.Show
+import E.E
+import E.Show()
 import E.Subst
-import E.TypeCheck hiding(match)
 import E.Values
 import GenUtil
 import Info.Types
@@ -53,14 +47,13 @@ import Support.FreeVars
 import Util.HasSize
 import Util.SetLike as S
 import qualified CharIO
-import qualified Info.Info as Info
 import qualified Util.Seq as Seq
 
 
 
 
 instance Show Rule where
-    showsPrec _ r = showString (fromAtom $ ruleName r)
+    showsPrec _ r = shows $ ruleName r
 
 emptyRule :: Rule
 emptyRule = Rule {
