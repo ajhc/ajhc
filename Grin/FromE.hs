@@ -445,10 +445,9 @@ compile' cenv (tvr,as,e) = ans where
     ce (EPrim ap@(APrim p _) xs ty) = let
       prim = Primitive { primName = Atom.fromString (pprint ap), primAPrim = ap, primRets = Nothing, primType = ([],tyUnit) }
       in case p of
-        Func True fn as "void" -> return $ Prim prim { primType = (keepIts (map (Ty . toAtom) as),tyUnit) } (args $ tail xs)
+        Func True fn as "void" -> return $ Prim prim { primType = (keepIts (map stringNameToTy as),tyUnit) } (args $ tail xs)
         Func True fn as r -> do
             let p = prim { primType = (keepIts (map stringNameToTy as),stringNameToTy r) }
-                pt = Ty (toAtom r)
             return $ Prim p (keepIts $ args $ tail xs)
         Func False _ as r | Just _ <- fromRawType ty ->  do
             let p = prim { primType = (keepIts (map stringNameToTy as),stringNameToTy r) }
@@ -495,8 +494,7 @@ compile' cenv (tvr,as,e) = ans where
         e <- ce e
         r <- ce r
         return $ e :>>= unit :-> r
-    ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d } | (ELit LitCons { litName = n, litArgs = [] }) <- followAliases (dataTable cenv) (getType e), RawType <- nameType n = do
-            let ty = Ty $ toAtom (show n)
+    ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d } | (ELit LitCons { litName = n, litArgs = [] }) <- followAliases (dataTable cenv) (getType e), Just ty <- rawNameToTy n = do
             v <- if tvrIdent b == 0 then newPrimVar ty else return $ toVal b
             e <- ce e
             as' <- mapM cp'' as
@@ -542,7 +540,8 @@ compile' cenv (tvr,as,e) = ans where
     cp x = error $ "cp: " ++ show (funcName,x)
     cp'' (Alt (LitInt i (ELit LitCons { litName = nn, litArgs = [] })) e) = do
         x <- ce e
-        return (Lit i (Ty $ toAtom (show nn)) :-> x)
+        ty <- rawNameToTy nn
+        return (Lit i ty :-> x)
 
     getName x = getName' (dataTable cenv) x
 
@@ -739,9 +738,9 @@ compile' cenv (tvr,as,e) = ans where
         liftIO $ (writeIORef (counter cenv) $! (i + 2))
         return $! V i
 
-fromRawType (ELit LitCons { litName = tname, litArgs = [] })
-    | RawType <- nameType tname = return (Ty $ toAtom (show tname))
-fromRawType _ = fail "not a raw type"
+fromRawType (ELit LitCons { litName = tname, litArgs = [] }) = rawNameToTy tname
+--    | RawType <- nameType tname = return (Ty $ toAtom (show tname))
+--fromRawType _ = fail "not a raw type"
 
 -- | converts an unboxed literal
 literal :: Monad m =>  E -> m Val

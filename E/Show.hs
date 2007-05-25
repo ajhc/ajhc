@@ -63,8 +63,8 @@ showLit ::
     -> SEM (Unparse Doc)       -- ^ the final result
 showLit showBind l = do
     let const_color = col "blue"
-    let f (LitInt c t) | t == tCharzh = return $ atom $ (const_color (tshow $ chr i)) where
-            i = fromIntegral c
+    let --f (LitInt c t) | t == tCharzh = return $ atom $ (const_color (tshow $ chr i)) where
+        --    i = fromIntegral c
         f (LitInt i (ELit LitCons { litName = n })) | Just l <- lookup n enumList, i >= 0 && fromIntegral i < length l =
             return $ atom $ (const_color (text $ l !! (fromIntegral i)))
         f (LitInt i _) = return $ atom $ (const_color (text $ show i))

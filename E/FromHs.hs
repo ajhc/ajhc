@@ -467,7 +467,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
     cExpr (HsAsPat n' (HsCon n)) = return $ constructionExpression dataTable (toName DataConstructor n) rt where
         t' = getAssump n'
         (_,rt) = argTypes' (tipe t')
-    cExpr (HsLit (HsStringPrim s)) = return $ EPrim (APrim (PrimString (packString s)) mempty) [] (rawType "HsPtr")
+    cExpr (HsLit (HsStringPrim s)) = return $ EPrim (APrim (PrimString (packString s)) mempty) [] (rawType "bits<ptr>")
     cExpr (HsLit (HsString s)) = return $ E.Values.toE s
     cExpr (HsAsPat n' (HsLit (HsIntPrim i))) = ans where
         t' = getAssump n'
@@ -605,15 +605,16 @@ toTVr assumps dataTable n = tVr (toId n) typeOfName where
         Nothing -> error $ "convertVal.Lookup failed: " ++ (show n)
 
 
+
 integer_cutoff = 500000000
 
-intConvert i | abs i > integer_cutoff  =  ELit (litCons { litName = dc_Integer, litArgs = [ELit $ LitInt (fromInteger i) (rawType "intmax_t")], litType = tInteger })
-intConvert i =  ELit (litCons { litName = dc_Int, litArgs = [ELit $ LitInt (fromInteger i) (rawType "int")], litType = tInt })
+intConvert i | abs i > integer_cutoff  =  ELit (litCons { litName = dc_Integer, litArgs = [ELit $ LitInt (fromInteger i) (rawType "bits<max>")], litType = tInteger })
+intConvert i =  ELit (litCons { litName = dc_Int, litArgs = [ELit $ LitInt (fromInteger i) (rawType "bits<int>")], litType = tInt })
 
 intConvert' funcs typ i = EAp (EAp fun typ) (ELit (litCons { litName = con, litArgs = [ELit $ LitInt (fromInteger i) (rawType rawtyp)], litType = ltype }))  where
     (con,ltype,fun,rawtyp) = case abs i > integer_cutoff of
-        True -> (dc_Integer,tInteger,f_fromInteger,"intmax_t")
-        False -> (dc_Int,tInt,f_fromInt,"int")
+        True -> (dc_Integer,tInteger,f_fromInteger,"bits<max>")
+        False -> (dc_Int,tInt,f_fromInt,"bits<int>")
     f_fromInt = func_fromInt funcs
     f_fromInteger = func_fromInteger funcs
 
@@ -806,7 +807,7 @@ convertMatches bs ms err = do
     match bs ms err
 
 packupString :: String -> (E,Bool)
-packupString s | all (\c -> c > '\NUL' && c <= '\xff') s = (EPrim (APrim (PrimString (packString s)) mempty) [] (rawType "HsPtr"),True)
+packupString s | all (\c -> c > '\NUL' && c <= '\xff') s = (EPrim (APrim (PrimString (packString s)) mempty) [] (rawType "bits<ptr>"),True)
 packupString s = (toE s,False)
 
 

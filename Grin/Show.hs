@@ -17,6 +17,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Atom
+import C.Prims
 import CharIO
 import Data.Graph.Inductive.Basic(elfilter)
 import Data.Graph.Inductive.Graph(mkGraph,nmap)
@@ -31,10 +32,11 @@ import Grin.Val
 import Name.VConsts
 import Number
 import Options
-import Support.FreeVars
 import Support.CanType
+import Support.FreeVars
 import Support.Tuple
 import Util.Graphviz
+import qualified C.Op as Op
 import qualified FlagDump as FD
 
 
@@ -91,6 +93,7 @@ prettyExp vl (App t [v] _) | t == funcEval = vl <> keyword "eval" <+> prettyVal 
 prettyExp vl (App t [a] _) | t == funcApply = vl <> keyword "apply" <+> prettyVal a
 prettyExp vl (App t [a,b] _) | t == funcApply = vl <> keyword "apply" <+> prettyVal a <+> prettyVal b
 prettyExp vl (App a vs _)  = vl <> func (fromAtom a) <+> hsep (map prettyVal vs)
+prettyExp vl (Prim Primitive { primAPrim = APrim (Peek t) _ } [v])  = vl <> prim t <> char '[' <> prettyVal v <> char ']'
 prettyExp vl (Prim Primitive { primName = nm } vs)  = vl <> prim (fromAtom nm) <+> hsep (map prettyVal vs)
 prettyExp vl (Update x y) = vl <> keyword "update" <+> prettyVal x <+> prettyVal y
 prettyExp vl (Case v vs) = vl <> keyword "case" <+> prettyVal v <+> keyword "of" <$> indent 2 (vsep (map f vs)) where
@@ -126,9 +129,13 @@ prettyVal (Tag t) = tag (fromAtom t)
 prettyVal (Var (V i) t)
     | TyPtr t <- t = char 'p' <> prettyVal (Var (V i) t)
     | TyNode <- t = char 'n' <> tshow i
-    | t == tCharzh = char 'c' <> tshow i
-    | t == tIntzh  = char 'i' <> tshow i
+--    | t == tCharzh = char 'c' <> tshow i
+--    | t == tIntzh  = char 'i' <> tshow i
     | Ty _ <- t  = char 'l' <> tshow i
+    | TyPrim Op.TyBool <- t  = char 'b' <> tshow i
+    | TyPrim (Op.TyBits _ Op.HintFloat) <- t  = char 'f' <> tshow i
+    | TyPrim (Op.TyBits _ Op.HintCharacter) <- t  = char 'c' <> tshow i
+    | TyPrim (Op.TyBits _ _) <- t  = char 'l' <> tshow i
     | TyTag <- t  = char 't' <> tshow i
 prettyVal (Var (V i) _) = char 'v' <> tshow i
 prettyVal (Lit i t) | t == tCharzh, Just x <- toIntegral i = tshow (chr x)
@@ -139,7 +146,8 @@ prettyVal (Const v) = char '&' <> prettyVal v
 prettyVal (Addr _) = text "<ref>"
 prettyVal (ValUnknown ty) = text "?::" <> tshow ty
 prettyVal (Item a  ty) = tshow a <> text "::" <> tshow ty
-prettyVal (ValPrim aprim xs ty) = pprint aprim <> tupled (map tshow xs)
+prettyVal (ValPrim aprim [] _ty) = pprint aprim
+prettyVal (ValPrim aprim xs _ty) = pprint aprim <> tupled (map tshow xs)
 
 instance DocLike d => PPrint d Var where
     pprint (V i) = text $ 'v':show i

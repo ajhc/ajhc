@@ -135,8 +135,12 @@ parsePrimString s = do
 primPrim s = APrim (PrimPrim $ packString s) mempty
 
 data APrim = APrim Prim Requires
-    deriving(Typeable,  Eq, Ord, Show)
+    deriving(Typeable,  Eq, Ord)
     {-! derive: Binary !-}
+
+instance Show APrim where
+    showsPrec n (APrim p r) | r == mempty = showsPrec n p
+    showsPrec n (APrim p r) = showsPrec n p . shows r
 
 instance PPrint d Prim  => PPrint d APrim where
     pprintPrec n (APrim p _) = pprintPrec n p

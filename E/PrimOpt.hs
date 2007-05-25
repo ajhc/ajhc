@@ -134,7 +134,7 @@ primOpt' _  x = return x
 
 processPrimPrim :: DataTable -> E -> E
 processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o id (primopt (unpackPS s) es (followAliases dataTable orig_t)) where
-    binOps = [("divide","/"),("plus","+"),("minus","-"),("times","*"),("modulus","%")]
+--    binOps = [("divide","/"),("plus","+"),("minus","-"),("times","*"),("modulus","%")]
 
     primopt "seq" [x,y] _  = return $ prim_seq x y
     primopt "exitFailure__" [w] rt  = return $ EError "" rt
@@ -154,14 +154,14 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
         (bp,(tr,str)) <- boxPrimitive dataTable
                 (EPrim (APrim Op { primCOp = Op.ConvOp cop (stringToOpTy ta), primRetTy = (stringToOpTy tr) } mempty) [pa] str) t
         return bp
-    primopt op [a,b] t | Just cop <- lookup op binOps = mdo
-        (pa,(ta,sta)) <- extractPrimitive dataTable a
-        (pb,(tb,stb)) <- extractPrimitive dataTable b
-        (bp,(tr,str)) <- boxPrimitive dataTable
-                (EPrim (APrim (Operator cop [ta,ta] tr) mempty) [pa, pb] str) t
-        return bp
-    primopt "equalsChar" [a,b] t = return (EPrim (APrim (Operator "==" ["HsChar","HsChar"] "int") mempty) [a,b] t)
-    primopt "constPeekByte" [a] t = return (EPrim (APrim (Peek "uint8_t") mempty) [a] t)
+--    primopt op [a,b] t | Just cop <- lookup op binOps = mdo
+--        (pa,(ta,sta)) <- extractPrimitive dataTable a
+--        (pb,(tb,stb)) <- extractPrimitive dataTable b
+--        (bp,(tr,str)) <- boxPrimitive dataTable
+--                (EPrim (APrim (Operator cop [ta,ta] tr) mempty) [pa, pb] str) t
+--        return bp
+    primopt "equalsChar" [a,b] t = return (EPrim (APrim (Op (Op.BinOp Op.Eq Op.bits32 Op.bits32) Op.bits_int) mempty) [a,b] t)
+    primopt "constPeekByte" [a] t = return (EPrim (APrim (Peek "bits8") mempty) [a] t)
     primopt "box" [a] t = return ans where
         Just (cna,_sta,_ta) = lookupCType' dataTable t
         ans = ELit litCons { litName = cna, litArgs = [a], litType = orig_t }

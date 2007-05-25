@@ -3,11 +3,13 @@ if exists("b:current_syntax")
 endif
 
 
-syn match hsType "\<int\|char\|bool\|float\|double\|void\>"
+syn match hsType "\<int\>\|\<char\>\|\<bool\>\|\<float\>\|\<double\>\|\<void\>"
 syn match hsType "\<Hs[A-Z][a-zA-Z]*\>"
+syn match hsType "\<[usfc]\?bits[0-9]\+\>"
+syn match hsType "\<[usfc]\?bits<[A-Za-z_]\+>"
 syn match hsType "\<[a-z]\+_t\>"
 
-syn match grinFuncname "\<[fb][^" ]*\>"
+syn match grinFuncname "\<[fb][^i][^" ]*\>"
 syn match grinFuncname "\<@main\>"
 syn match grinWHNF  "\<[CP][^" ]*\>"
 syn match grinSusp  "\<[FB][^" ]*\>"
