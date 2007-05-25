@@ -119,7 +119,7 @@ byInst p Inst { instHead = ps :=> h } = do
 matchPred :: Monad m => Pred -> Pred -> m [(Tyvar,Type)]
 matchPred x@(IsIn c t) y@(IsIn c' t')
       | c == c'   = match t t'
-      | otherwise = fail $ "Classes do not match: " ++ show (x,y)
+matchPred x y = fail $ "Classes do not match: " ++ show (x,y)
 
 supersOf :: ClassHierarchy -> Class -> [Class]
 supersOf ch c = asksClassRecord ch c classSupers
@@ -227,7 +227,7 @@ topDefaults ps  = do
     h <- getClassHierarchy
     let ams = ambig h [] ps
         tss = [ ts | (v,qs,ts) <- ams ]
-        vs  = [ v  | (v,qs,ts) <- ams ]
+        _vs  = [ v  | (v,qs,ts) <- ams ]
     when (any null tss) $ fail $ "Top Level ambiguity " ++ (pprint ps)
     return ()
 --      | otherwise    -> return $ Map.fromList (zip vs (map head tss))

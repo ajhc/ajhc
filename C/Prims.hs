@@ -73,7 +73,7 @@ data Prim =
     deriving(Typeable, Eq, Ord, Show)
     {-! derive: Binary !-}
 
-data PrimTypeInfo = PrimSizeOf | PrimMaxBound | PrimMinBound | PrimAlignmentOf | PrimTypeIsSigned
+data PrimTypeInfo = PrimSizeOf | PrimMaxBound | PrimMinBound | PrimAlignmentOf | PrimTypeIsSigned  | PrimUMaxBound
     deriving(Typeable, Eq, Ord, Show)
     {-! derive: Binary !-}
 
@@ -160,6 +160,7 @@ instance DocLike d => PPrint d Prim where
     pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimAlignmentOf } = text "alignmentof" <> parens (text at)
     pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimTypeIsSigned } = text "is_signed" <> parens (text at)
     pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimMaxBound } = text "max" <> parens (text at)
+    pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimUMaxBound } = text "umax" <> parens (text at)
     pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimMinBound } = text "min" <> parens (text at)
 
 instance DocLike d => PPrint d Op.Ty where

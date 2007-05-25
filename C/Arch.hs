@@ -95,12 +95,14 @@ genericPrimMap = Map.fromList [ (primTypeName a,a) | a <- arch_generic ] where
 stringToOpTy = archOpTy genericArchInfo
 
 archOpTy :: ArchInfo -> ExtType -> Op.Ty
-archOpTy ai s = case archGetPrimInfo ai s of
-    Nothing -> f s
-    Just pt -> case primTypeType pt of
-        PrimTypeIntegral -> Op.TyBits (Op.Bits $ 8 * primTypeSizeOf pt) (if primTypeIsSigned pt then Op.HintSigned else Op.HintUnsigned)
-        PrimTypeFloating ->  Op.TyBits (Op.Bits $ 8 * primTypeSizeOf pt) Op.HintFloat
-        _ -> f s
+archOpTy ai s = case Op.readTy s of
+    Just t -> t
+    Nothing -> case archGetPrimInfo ai s of
+        Nothing -> f s
+        Just pt -> case primTypeType pt of
+            PrimTypeIntegral -> Op.TyBits (Op.Bits $ 8 * primTypeSizeOf pt) (if primTypeIsSigned pt then Op.HintSigned else Op.HintUnsigned)
+            PrimTypeFloating ->  Op.TyBits (Op.Bits $ 8 * primTypeSizeOf pt) Op.HintFloat
+            _ -> f s
   where
     f "float" = Op.TyBits  (Op.Bits 32) Op.HintFloat
     f "double" = Op.TyBits (Op.Bits 64) Op.HintFloat

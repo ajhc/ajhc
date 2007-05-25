@@ -68,15 +68,19 @@ my %oper_map = (
 
 sub vtype {
     ($_) = @_ if @_;
-    return 'u' if /^uint/;
-    return '' if /^int/;
-    return 'f' if /^float/;
-    return 'f' if /^double/;
-    return 'u' if /unsigned/;
-    return 'u' if /HsChar/;
-    return 'u' if /HsPtr/;
-    return 'u' if /HsFunPtr/;
-    return '';
+    return 'u' if /^u/;
+    return ''  if /^s/;
+    return 'f' if /^f/;
+
+#    return 'u' if /^uint/;
+#    return '' if /^int/;
+#    return 'f' if /^float/;
+#    return 'f' if /^double/;
+#    return 'u' if /unsigned/;
+#    return 'u' if /HsChar/;
+#    return 'u' if /HsPtr/;
+#    return 'u' if /HsFunPtr/;
+#    return '';
 
 }
 
@@ -190,6 +194,7 @@ foreach my $d (@ds) {
     #print STDERR "$d->[1] - '$vtype'\n";
     my @cs = @{$stuff{$d->[2]}};
     my $t = tcon($d->[0]);
+    $d->[1] =~ s/^[us]//;
     my $rtype = rtype($d->[1]);
     #my $t =  "(ELit (LitCons (parseName TypeConstructor \"$d->[0]\") [] eStar) )";
     #my $t =  "(ELit (LitCons $nn [] eStar) )";

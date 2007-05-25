@@ -148,7 +148,8 @@ transDataTable dataTable ns = vcat (theType:map g (lefts wtd)) where
     showSlot (ELit LitCons { litArgs = es, litAliasFor = Just af }) = showSlot (foldl eAp af es)
     showSlot (EPi TVr { tvrType = a } b) = parens $ showSlot a <+> text "->" <+> showSlot b
     showSlot (ELit (LitCons { litName = c, litArgs = as })) = showCon c (map showSlot as)
-    builtIns = [tc_Int,tc_Char,dc_Int,dc_Char,rt_int,rt_HsChar,tc_World__,tc_Array__,tc_MutArray__,tc_Ref__,rt_HsPtr]
+    --builtIns = [tc_Int,tc_Char,dc_Int,dc_Char,rt_int,rt_HsChar,tc_World__,tc_Array__,tc_MutArray__,tc_Ref__,rt_HsPtr]
+    builtIns = [tc_Int,tc_Char,dc_Int,dc_Char,tc_World__,tc_Array__,tc_MutArray__,tc_Ref__]
 
 data Environment = Env {
     envParen  :: Bool,

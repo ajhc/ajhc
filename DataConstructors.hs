@@ -42,9 +42,8 @@ import Data.Maybe
 import List(sortBy)
 import qualified Data.Map as Map hiding(map)
 
-import Data.Binary
 import C.Prims
-import FrontEnd.Class(instanceName)
+import Data.Binary
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
@@ -52,10 +51,12 @@ import E.Binary()
 import E.E
 import E.Show
 import E.Subst
-import E.TypeCheck
 import E.Traverse
+import E.TypeCheck
 import E.Values
+import FrontEnd.Class(instanceName)
 import FrontEnd.Syn.Traverse
+import FrontEnd.Tc.Type
 import GenUtil
 import HsSyn
 import Info.Types
@@ -65,8 +66,6 @@ import Name.Name as Name
 import Name.Names
 import Name.VConsts
 import PrimitiveOperators
-import FrontEnd.Tc.Type
-import FrontEnd.Tc.Kind
 import Support.CanType
 import Support.FreeVars
 import Support.Unparse
@@ -74,6 +73,7 @@ import Util.HasSize
 import Util.SameShape
 import Util.SetLike as S
 import Util.VarName
+import qualified C.Op as Op
 import qualified Util.Graph as G
 import qualified Util.Seq as Seq
 
@@ -461,12 +461,12 @@ deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where
         val1 = tvr { tvrIdent = 14, tvrType = typ }
         unbox e = ELam v1 (ELam v2 (ec (EVar v1) i1 (ec (EVar v2) i2 e)))  where
             ec v i e = eCase v [Alt (litCons { litName = con, litArgs = [i], litType = typ }) e] Unknown
-        h cl | cl == class_Eq = [mkCmpFunc (func_equals sFuncNames) "=="]
+        h cl | cl == class_Eq = [mkCmpFunc (func_equals sFuncNames) Op.Eq]
         h cl | cl == class_Ord = [
-                mkCmpFunc (func_geq sFuncNames) ">=",
-                mkCmpFunc (func_leq sFuncNames) "<=",
-                mkCmpFunc (func_lt sFuncNames) "<",
-                mkCmpFunc (func_gt sFuncNames) ">"]
+                mkCmpFunc (func_geq sFuncNames) Op.UGte,
+                mkCmpFunc (func_leq sFuncNames) Op.ULte,
+                mkCmpFunc (func_lt sFuncNames)  Op.ULt,
+                mkCmpFunc (func_gt sFuncNames)  Op.UGt]
         h cl | cl == class_Enum = [{- (iv_te,ib_te), -}(iv_fe,ib_fe)] where
             _iv_te = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName (func_toEnum sFuncNames) (nameName $ conName c), tvrType = getType ib_te }
             iv_fe = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName (func_fromEnum sFuncNames) (nameName $ conName c), tvrType = getType ib_fe }
@@ -478,7 +478,7 @@ deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where
         mkCmpFunc fname op = (iv_eq,ib_eq) where
             ib_eq = unbox (eStrictLet b3 (oper_IIB op (EVar i1) (EVar i2)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar b3], litType = tBool })))
             iv_eq = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (nameName $ conName c), tvrType = getType ib_eq }
-    oper_IIB op a b = EPrim (APrim (Operator op ["int","int"] "int") mempty) [a,b] tBoolzh
+    oper_IIB op a b = EPrim (APrim (Op (Op.BinOp op Op.bits_int Op.bits_int) Op.bits_int) mempty) [a,b] tBoolzh
 
 
 
@@ -800,10 +800,10 @@ class Monad m => DataTableMonad m where
 instance DataTableMonad Identity
 
 primitiveAliases = [
-    (tc_Int__,rt_int),
-    (tc_Addr__,rt_HsPtr),
-    (tc_Word8__,rt_uint8_t),
-    (tc_Char__,rt_HsChar),
-    (tc_Bool__,rt_int)]
+    (tc_Int__,rt_bits_int_),
+    (tc_Addr__,rt_bits_ptr_),
+    (tc_Word8__,rt_bits8),
+    (tc_Char__,rt_bits32),
+    (tc_Bool__,rt_bits_int_)]
 
 

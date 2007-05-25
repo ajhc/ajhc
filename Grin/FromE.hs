@@ -454,16 +454,16 @@ compile' cenv (tvr,as,e) = ans where
             let p = prim { primType = (keepIts (map stringNameToTy as),stringNameToTy r) }
             return $ Prim p (keepIts $ args xs)
         Peek pt' | [addr] <- xs -> do
-            let p = prim { primType = ([stringNameToTy (show rt_HsPtr)],pt) }
+            let p = prim { primType = ([stringNameToTy (show rt_bits_ptr_)],pt) }
                 pt = toType (stringNameToTy pt') ty
             return $ Prim p (args [addr])
         Peek pt' -> do
-            let p = prim { primType = ([stringNameToTy (show rt_HsPtr)],pt) }
+            let p = prim { primType = ([stringNameToTy (show rt_bits_ptr_)],pt) }
                 [_,addr] = xs
                 pt = stringNameToTy pt'
             return $ Prim p (args [addr])
         Poke pt' ->  do
-            let p = prim { primType = ([stringNameToTy (show rt_HsPtr),pt],tyUnit) }
+            let p = prim { primType = ([stringNameToTy (show rt_bits_ptr_),pt],tyUnit) }
                 [_,addr,val] = xs
                 pt = stringNameToTy pt'
             return $  Prim p (args [addr,val])

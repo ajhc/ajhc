@@ -2,39 +2,39 @@
 
 # limits.h, float.h, inttypes.h
 
-Jhc.Prim.Char, HsChar, char, UINT32_MAX, 0
-Jhc.Prim.Int, int, int, INT_MAX, INT_MIN
-Jhc.Basics.Integer, intmax_t, int, INTMAX_MAX, INTMAX_MIN
+Jhc.Prim.Char, ubits32, char, UINT32_MAX, 0
+Jhc.Prim.Int, sbits<int>, int, INT_MAX, INT_MIN
+Jhc.Basics.Integer, sbits<max>, int, INTMAX_MAX, INTMAX_MIN
 
-Data.Int.Int8, int8_t, int, INT8_MAX, INT8_MIN
-Data.Int.Int16, int16_t, int, INT16_MAX, INT16_MIN
-Data.Int.Int32, int32_t, int, INT32_MAX, INT32_MIN
-Data.Int.Int64, int64_t, int, INT64_MAX, INT64_MIN
-Data.Int.IntMax, intmax_t, int, INTMAX_MAX, INTMAX_MIN
-Data.Int.IntPtr, intptr_t, int, INTPTR_MAX, INTPTR_MIN
+Data.Int.Int8, sbits8, int, INT8_MAX, INT8_MIN
+Data.Int.Int16, sbits16, int, INT16_MAX, INT16_MIN
+Data.Int.Int32, sbits32, int, INT32_MAX, INT32_MIN
+Data.Int.Int64, sbits64, int, INT64_MAX, INT64_MIN
+Data.Int.IntMax, sbits<max>, int, INTMAX_MAX, INTMAX_MIN
+Data.Int.IntPtr, sbits<ptr>, int, INTPTR_MAX, INTPTR_MIN
 
-Data.Word.Word, unsigned int, int, UINT_MAX, 0
-Data.Word.Word8, uint8_t, int, UINT8_MAX, 0
-Data.Word.Word16, uint16_t, int, UINT16_MAX, 0
-Data.Word.Word32, uint32_t, int, UINT32_MAX, 0
-Data.Word.Word64, uint64_t, int, UINT64_MAX, 0
-Data.Word.WordMax, uintmax_t, int, UINTMAX_MAX, 0
-Data.Word.WordPtr, uintptr_t, int, UINTPTR_MAX, 0
+Data.Word.Word, ubits<int>, int, UINT_MAX, 0
+Data.Word.Word8, ubits8, int, UINT8_MAX, 0
+Data.Word.Word16, ubits16, int, UINT16_MAX, 0
+Data.Word.Word32, ubits32, int, UINT32_MAX, 0
+Data.Word.Word64, ubits64, int, UINT64_MAX, 0
+Data.Word.WordMax, ubits<max>, int, UINTMAX_MAX, 0
+Data.Word.WordPtr, ubits<ptr>, int, UINTPTR_MAX, 0
 
-Jhc.Float.Float, float, float, FLT_MAX, FLT_MIN
-Jhc.Float.Double, double, float, DBL_MAX, DBL_MIN
+Jhc.Float.Float, fbits<float>, float, FLT_MAX, FLT_MIN
+Jhc.Float.Double, fbits<double>, float, DBL_MAX, DBL_MIN
 
-Jhc.Addr.Addr, HsPtr, ptr,UINTPTR_MAX, 0
-Jhc.Addr.FunAddr, HsFunPtr, ptr,UINTPTR_MAX,0
+Jhc.Addr.Addr, ubits<ptr>, ptr,UINTPTR_MAX, 0
+Jhc.Addr.FunAddr, ubits<ptr>, ptr,UINTPTR_MAX,0
 
-Foreign.C.Types.CChar, char, int, CHAR_MAX, CHAR_MIN
-Foreign.C.Types.CShort, short, int, SHORT_MAX, SHORT_MIN
-Foreign.C.Types.CInt, int, int, INT_MAX, INT_MIN
-Foreign.C.Types.CUInt, unsigned int, int, UINT_MAX, 0
-Foreign.C.Types.CSize, size_t, int, UINTPTR_MAX, 0
-Foreign.C.Types.CWchar, wchar_t, int, 0x10FFFF, 0
-Foreign.C.Types.CWint, wint_t, int, 0x10FFFF, 0
+Foreign.C.Types.CChar, sbits8, int, CHAR_MAX, CHAR_MIN
+Foreign.C.Types.CShort, sbits<short>, int, SHORT_MAX, SHORT_MIN
+Foreign.C.Types.CInt, sbits<int>, int, INT_MAX, INT_MIN
+Foreign.C.Types.CUInt, ubits<int>, int, UINT_MAX, 0
+Foreign.C.Types.CSize, ubits<size_t>, int, UINTPTR_MAX, 0
+Foreign.C.Types.CWchar, ubits32, int, 0x10FFFF, 0
+Foreign.C.Types.CWint, sbits32, int, 0x10FFFF, 0
 # not really right, need to find out actual minimum/maximum somehow
-Foreign.C.Types.CTime, time_t, float, 0xffffffffff, 0
+Foreign.C.Types.CTime, ubits<time_t>, float, 0xffffffffff, 0
 
 

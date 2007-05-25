@@ -3,7 +3,6 @@
 module PrimitiveOperators(primitiveInsts,constantMethods,theMethods,allCTypes) where
 
 import Data.Monoid
-import qualified Data.Map as Map
 
 import C.Arch
 import C.Prims
@@ -12,7 +11,6 @@ import E.TypeCheck()
 import E.Values
 import FrontEnd.Tc.Type
 import Name.Name
-import Name.Names
 import Name.Prim
 import Name.VConsts
 import Support.CanType
@@ -56,7 +54,7 @@ oper_aIa op ct' a b = EPrim (binOp op ct ot_int ct) [a,b] (rawType ct') where
 
 --zeroI =  LitInt 0 intt
 
-ot_int = stringToOpTy "int"
+ot_int = stringToOpTy "bits<int>"
 
 op_aIa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
     tvra' = tVr 2 t
@@ -65,7 +63,7 @@ op_aIa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
     tvrb = tVr 8 intt
     tvrc = tVr 10 st
     st = rawType ct
-    intt = rawType "int"
+    intt = rawType "bits<int>"
     wtd = eStrictLet tvrc (oper_aIa op ct (EVar tvra) (EVar tvrb)) (rebox (EVar tvrc))
     rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = t })
 op_aaa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
@@ -154,7 +152,7 @@ build_fsignum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (EL
 
 buildPeek cn t p = ELam tvr $ ELam tvrWorld (unbox' (EVar tvr) dc_Addr tvr' rest)  where
     tvr = (tVr 2 (tPtr t))
-    tvr' = tVr 4 (rawType "HsPtr")
+    tvr' = tVr 4 (rawType "bits<ptr>")
     tvrWorld2 = tVr 258 tWorld__
     tvrWorld = tVr 256 tWorld__
     rtVar = tVr 260 (rawType p)
@@ -165,20 +163,13 @@ buildPeek cn t p = ELam tvr $ ELam tvrWorld (unbox' (EVar tvr) dc_Addr tvr' rest
 buildPoke cn t p = ELam ptr_tvr $ ELam v_tvr $ createIO_ $ (\tw -> unbox' (EVar ptr_tvr) dc_Addr ptr_tvr' $ unbox' (EVar v_tvr) cn v_tvr' $ EPrim (APrim (Poke p) mempty) [EVar tw, EVar ptr_tvr', EVar v_tvr'] tWorld__) where
     ptr_tvr =  (tVr 2 (tPtr t))
     v_tvr = tVr 4 t
-    ptr_tvr' =  (tVr 6 (rawType "HsPtr"))
+    ptr_tvr' =  (tVr 6 (rawType "bits<ptr>"))
     v_tvr' = tVr 8 (rawType p)
 
 toIO :: E -> E -> E
 toIO t x = x
 
 {-
-buildPeek t p = ELam tvr $ createIO t (\tvrWorld -> EPrim (APrim (Peek p) mempty) [EVar tvrWorld,EVar tvr] (ltTuple [tWorld__,t]))  where
-    tvr =  (tVr 2 (tPtr t))
-buildPoke t p = ELam ptr_tvr $ ELam v_tvr $ createIO_ $ (\tw -> EPrim (APrim (Poke p) mempty) [EVar tw, EVar ptr_tvr, EVar v_tvr] tWorld__) where
-    ptr_tvr =  (tVr 2 (tPtr t))
-    v_tvr = tVr 4 t
---toIO t x = prim_unsafeCoerce x (tIO t)
-
 createIO t pv = toIO t (ELam tvrWorld $  eCaseTup  (pv tvrWorld) [tvrWorld2,rtVar] (eJustIO (EVar tvrWorld2) (EVar rtVar))) where
     tvrWorld2 = tVr 258 tWorld__
     tvrWorld = tVr 256 tWorld__
@@ -190,13 +181,7 @@ createIO_ pv = toIO tUnit (ELam tvrWorld $  eStrictLet tvrWorld2 (pv tvrWorld)  
 
 
 prim_number cn v t et = ELit litCons { litName = cn, litArgs = [ELit (LitInt v t)], litType = et }
---    cn = toName DataConstructor $ nameName cn'
---prim_number _ _ _ _ = error "prim_number: invalid arg"
-
-
---prim_const cn s st et = eStrictLet (tVr 2 st) (EPrim (APrim (CConst s t) mempty) [] st) (ELit (litCons { litName = cn, litArgs = [EVar $ tVr 2 st], litType = et })) where
 prim_const cn s st t et = ELit litCons { litName = cn, litArgs = [EPrim (APrim (CConst s t) mempty) [] st], litType = et }
---prim_const _ _ _ _ _ = error "prim_const: invalid arg"
 
 prim_minbound, prim_maxbound :: Name -> E -> ExtType -> E -> E
 prim_minbound dc dt s e = f s where
@@ -213,20 +198,6 @@ prim_maxbound dc dt s e = f s where
         True -> ELit $ LitInt (2 ^ (8 * primTypeSizeOf pt - 1) - 1) (rawType s)
     f _ = e
     boxup a =  ELit litCons { litName = dc, litArgs = [a], litType = dt }
-    {-
-prim_maxbound "HsChar" e = ELit $ LitInt 0x10ffff (rawType "HsChar")
-prim_maxbound s e | Just pt <- genericPrimitiveInfo s = case primTypeIsSigned pt of
-    False -> ELit $ LitInt (2 ^ (8 * primTypeSizeOf pt)) (rawType s)
-    True -> ELit $ LitInt (2 ^ (8 * primTypeSizeOf pt - 1) - 1) (rawType s)
-prim_maxbound s e = e
-
-prim_bitsize s | Just pt <- genericPrimitiveInfo s = let
-    rp = ELit $ LitInt (fromIntegral (primTypeSizeOf pt) * 8) tIntzh
-    in (ELit (litCons { litName = dc_Int, litArgs = [rp], litType = tInt }))
-prim_bitsize s = (ELit (litCons { litName = dc_Int, litArgs = [rp'], litType = tInt })) where
-    rp = EPrim (APrim (PrimTypeInfo { primArgType = s, primRetType = "int", primTypeInfo = PrimSizeOf }) mempty) [] tIntzh
-    rp' = EPrim (APrim (Operator "*" ["int","int"] "int") mempty) [rp,(ELit (LitInt 8 tIntzh))] tIntzh
--}
 
 
 prim_sizeof s | Just pt <- genericPrimitiveInfo s = let
