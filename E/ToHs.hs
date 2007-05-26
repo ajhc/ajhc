@@ -88,30 +88,28 @@ restate = vcat $ map f restated where
         (tc_List,1,"ListTCon")
         ]
 
-fst3 (x,_,_) = x
-
 
 
 transForeign ps = vcat (map f ps) where
     f (AddrOf s) = text $ "foreign import ccall \"&" ++ unpackPS s ++ "\" addr_" ++ mangleIdent (unpackPS s) ++ " :: Ptr ()"
     f furc@Func { funcName = fn, funcIOLike = True, primArgTypes = as, primRetType = "void" } = ans <$> ans' where
-        ans  = text $ "foreign import ccall unsafe \"" ++ unpackPS fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ concatInter " -> " (map (snd . snd) vals ++ ["IO ()"])
-        ans' = text $ cfuncname furc <+> "w" <+> unwords (fsts vals) <+> " = case _" ++ cfuncname furc <+> concatInter " " [ parens (c <+> a) | (a,(c,_)) <- vals ] <+> "of IO f -> case f w of (# w, _ #) -> w"
+        ans  = text $ "foreign import ccall unsafe \"" ++ unpackPS fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ intercalate " -> " (map (snd . snd) vals ++ ["IO ()"])
+        ans' = text $ cfuncname furc <+> "w" <+> unwords (fsts vals) <+> " = case _" ++ cfuncname furc <+> intercalate " " [ parens (c <+> a) | (a,(c,_)) <- vals ] <+> "of IO f -> case f w of (# w, _ #) -> w"
         vals = [ ('a':show n,ioInfo a) | a <- as | n <- naturals ]
     f furc@Func { funcName = fn, funcIOLike = True, primArgTypes = as, primRetType = rt' } = ans <$> ans' where
-        ans  = text $ "foreign import ccall unsafe \"" ++ unpackPS fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ concatInter " -> " (map (snd . snd) vals ++ ["IO " ++ rt])
-        ans' = text $ cfuncname furc <+> "w" <+> unwords (fsts vals) <+> " = case _" ++ cfuncname furc <+> concatInter " " [ parens (c <+> a) | (a,(c,_)) <- vals ] <+> "of IO f -> case f w of (# w, " ++ rc ++ " r #) -> (# w, r #)"
+        ans  = text $ "foreign import ccall unsafe \"" ++ unpackPS fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ intercalate " -> " (map (snd . snd) vals ++ ["IO " ++ rt])
+        ans' = text $ cfuncname furc <+> "w" <+> unwords (fsts vals) <+> " = case _" ++ cfuncname furc <+> intercalate " " [ parens (c <+> a) | (a,(c,_)) <- vals ] <+> "of IO f -> case f w of (# w, " ++ rc ++ " r #) -> (# w, r #)"
         vals = [ ('a':show n,ioInfo a) | a <- as | n <- naturals ]
         (rc,rt) = ioInfo rt'
     f furc@Func { funcName = fn, funcIOLike = False, primArgTypes = as, primRetType = rt' } = ans <$> ans' where
-        ans  = text $ "foreign import ccall unsafe \"" ++ unpackPS fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ concatInter " -> " (map (snd . snd) vals ++ [rt])
-        ans' = text $ cfuncname furc <+> unwords (fsts vals) <+> " = case _" ++ cfuncname furc <+> concatInter " " [ parens (c <+> a) | (a,(c,_)) <- vals ] <+> "of " ++ rc ++ " r -> r"
+        ans  = text $ "foreign import ccall unsafe \"" ++ unpackPS fn ++ "\" " ++ '_':cfuncname furc ++ " :: " ++ intercalate " -> " (map (snd . snd) vals ++ [rt])
+        ans' = text $ cfuncname furc <+> unwords (fsts vals) <+> " = case _" ++ cfuncname furc <+> intercalate " " [ parens (c <+> a) | (a,(c,_)) <- vals ] <+> "of " ++ rc ++ " r -> r"
         vals = [ ('a':show n,ioInfo a) | a <- as | n <- naturals ]
         (rc,rt) = ioInfo rt'
 --    f furc@Func { funcName = fn, funcIOLike = False, primArgTypes = as, primRetType = rt } = ans where
---       ans = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ cfuncname furc ++ " :: " ++ concatInter " -> " (map showCType (as ++ [rt]))
+--       ans = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ cfuncname furc ++ " :: " ++ intercalate " -> " (map showCType (as ++ [rt]))
 --    f furc@Func { funcName = fn, funcIOLike = True, primArgTypes = as, primRetType = rt } = ans where
---        ans = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ cfuncname furc ++ " :: " ++ concatInter " -> " ("World__":(map showCType as ++ ["(# World__, " ++ showCType rt ++ " #)"]))
+--        ans = text $ "foreign import ccall unsafe \"" ++ fn ++ "\" " ++ cfuncname furc ++ " :: " ++ intercalate " -> " ("World__":(map showCType as ++ ["(# World__, " ++ showCType rt ++ " #)"]))
     f n = text "{- Foreign.Error " <+> tshow n <+> text "-}"
     ioInfo n = (x,y) where
         (_,x,y) = cTypeInfo n
@@ -394,7 +392,7 @@ castVal at rt x = case (showCType at,showCType rt) of
         (("Word#","Addr#"),"word2Addr__")
         ]
 
-cfuncname Func { funcName = fn, funcIOLike = iol, primArgTypes = as, primRetType = r  } =  text $ ("func_" ++ (if iol then "io" else "pure") ++ "_" ++ unpackPS fn ++ concatInter "_" (r:as))
+cfuncname Func { funcName = fn, funcIOLike = iol, primArgTypes = as, primRetType = r  } =  text $ ("func_" ++ (if iol then "io" else "pure") ++ "_" ++ unpackPS fn ++ intercalate "_" (r:as))
 
 hasBoxes e = or $ execWriter (f e) where
     f e | e == tBox = tell [True] >> return e

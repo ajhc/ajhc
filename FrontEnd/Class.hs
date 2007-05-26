@@ -103,7 +103,6 @@ combineClassRecords cra crb | className cra == className crb = ClassRecord {
     classArgs = if null (classArgs cra) then classArgs crb else classArgs cra
     }
 
-fst3 (x,_,_) = x
 
 
 newtype InstanceEnv = InstanceEnv { instanceEnv :: Map.Map (Name,Name) ([Tyvar],[Tyvar],Type) }
@@ -166,7 +165,7 @@ printClassSummary (ClassHierarchy h) = mapM_ f $  h' where
     f (cname, (ClassRecord { classSupers = supers, classInsts = insts, classAssumps = ma})) = do
         putStrLn $ "-- class: " ++ show cname
         unless (null supers) $ putStrLn $ "super classes:" ++ unwords (map show supers)
-        unless (null insts) $ putStrLn $ "instances: " ++ (concatInter ", " (map showInst insts))
+        unless (null insts) $ putStrLn $ "instances: " ++ (intercalate ", " (map showInst insts))
         putStrLn ""
 
 
@@ -178,7 +177,7 @@ printClassHierarchy (ClassHierarchy h) = mapM_ printClassDetails $  Map.toList h
         putStrLn "..........."
         putStrLn $ "class: " ++ hsep (pprint cname:map pprint classArgs)
         putStr $ "super classes:"
-        pnone supers $ do putStrLn $ " " ++ (concatInter " " (map show supers))
+        pnone supers $ do putStrLn $ " " ++ (intercalate " " (map show supers))
         putStr $ "instances:"
         pnone insts $  putStr $ "\n" ++ (showListAndSepInWidth showInst 80 ", " insts)
         putStr $ "method signatures:"

@@ -137,8 +137,6 @@ findModule cho need ifunc func  = do
     ho <- ifunc cho readHo
     f ho readHo scc
 
-fst3 (x,_,_) = x
-
 
 checkForHoFile :: String            -- ^ file name to check for
     -> IO (Maybe (HoHeader,Ho))

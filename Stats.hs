@@ -82,7 +82,7 @@ print greets stats = do
 
 createForest :: a -> [([String],a)] -> Forest (String,a)
 createForest def xs = map f gs where
-    f [(xs,ys)] =  Node (concatInter "." xs,ys) []
+    f [(xs,ys)] =  Node (intercalate "." xs,ys) []
     f xs@((x:_,_):_) = Node (x,def) (createForest def [ (xs,ys) | (_:xs@(_:_),ys)<- xs])
     f _ = error "createForest: should not happen."
     gs = groupBy (\(x:_,_) (y:_,_) -> x == y) xs

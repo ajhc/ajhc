@@ -57,7 +57,6 @@ program = Program {
     progStats = mempty
     }
 
-intercalate x xs = concat (intersperse x xs)
 
 programDs :: Program -> [(TVr,E)]
 programDs prog = [ (t,foldr ELam e as)  | (t,as,e) <- progCombinators prog]

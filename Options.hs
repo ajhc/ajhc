@@ -196,7 +196,7 @@ pfill maxn length xs = f maxn xs [] [] where
 processOptions :: IO Opt
 processOptions = getArguments >>= (\argv -> either putErrDie return $ do
     let header = "Usage: jhc [OPTION...] Main.hs"
-    let mkoptlist d os = "valid " ++ d ++ " arguments: 'help' for more info\n    " ++ concatInter "\n    " (map (concatInter ", ") $ pfill 100 ((2 +) . length) os) ++ "\n"
+    let mkoptlist d os = "valid " ++ d ++ " arguments: 'help' for more info\n    " ++ intercalate "\n    " (map (intercalate ", ") $ pfill 100 ((2 +) . length) os) ++ "\n"
     let trailer = "\n" ++ mkoptlist "-d" FlagDump.helpFlags ++ "\n" ++ mkoptlist "-f" FlagOpts.helpFlags
     let (o,ns,rc) = getOpt Permute theoptions argv
     when (rc /= []) $ fail (concat rc ++ usageInfo header theoptions ++ trailer)

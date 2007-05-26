@@ -697,7 +697,6 @@ tidyHeads b ps = mapM f ps where
         (p',fe') <- tidyPat p b
         return (p',ps,fe' . fe)
 
-fst3 (x,_,_) = x
 
 convertMatches ::
     Monad m
