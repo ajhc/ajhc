@@ -185,14 +185,14 @@ prim_const cn s st t et = ELit litCons { litName = cn, litArgs = [EPrim (APrim (
 
 prim_minbound, prim_maxbound :: Name -> E -> ExtType -> E -> E
 prim_minbound dc dt s e = f s where
-    f "HsChar" = boxup $ ELit $ LitInt 0 (rawType "HsChar")
+    f "HsChar" = boxup $ ELit $ LitInt 0 (rawType "bits32")
     f s | Just pt <- genericPrimitiveInfo s = boxup $ case primTypeIsSigned pt of
         False -> ELit $ LitInt 0 (rawType s)
         True -> ELit $ LitInt (negate $ 2 ^ (8 * primTypeSizeOf pt - 1)) (rawType s)
     f _ = e
     boxup a =  ELit litCons { litName = dc, litArgs = [a], litType = dt }
 prim_maxbound dc dt s e = f s where
-    f "HsChar" = boxup $ ELit $ LitInt 0x10ffff (rawType "HsChar")
+    f "HsChar" = boxup $ ELit $ LitInt 0x10ffff (rawType "bits32")
     f s | Just pt <- genericPrimitiveInfo s = boxup $ case primTypeIsSigned pt of
         False -> ELit $ LitInt (2 ^ (8 * primTypeSizeOf pt)) (rawType s)
         True -> ELit $ LitInt (2 ^ (8 * primTypeSizeOf pt - 1) - 1) (rawType s)

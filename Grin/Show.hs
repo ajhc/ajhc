@@ -146,8 +146,8 @@ prettyVal (Const v) = char '&' <> prettyVal v
 prettyVal (Addr _) = text "<ref>"
 prettyVal (ValUnknown ty) = text "?::" <> tshow ty
 prettyVal (Item a  ty) = tshow a <> text "::" <> tshow ty
-prettyVal (ValPrim aprim [] _ty) = pprint aprim
-prettyVal (ValPrim aprim xs _ty) = pprint aprim <> tupled (map tshow xs)
+prettyVal (ValPrim aprim [] ty) = pprint aprim <> text "::" <> tshow ty
+prettyVal (ValPrim aprim xs ty) = pprint aprim <> tupled (map tshow xs) <> text "::" <> tshow ty
 
 instance DocLike d => PPrint d Var where
     pprint (V i) = text $ 'v':show i

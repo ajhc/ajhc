@@ -442,48 +442,51 @@ compile' cenv (tvr,as,e) = ans where
 
 
     -- other primitives
-    ce (EPrim ap@(APrim p _) xs ty) = let
-      prim = Primitive { primName = Atom.fromString (pprint ap), primAPrim = ap, primRets = Nothing, primType = ([],tyUnit) }
-      in case p of
-        Func True fn as "void" -> return $ Prim prim { primType = (keepIts (map stringNameToTy as),tyUnit) } (args $ tail xs)
-        Func True fn as r -> do
-            let p = prim { primType = (keepIts (map stringNameToTy as),stringNameToTy r) }
-            return $ Prim p (keepIts $ args $ tail xs)
-        Func False _ as r | Just _ <- fromRawType ty ->  do
-            let p = prim { primType = (keepIts (map stringNameToTy as),stringNameToTy r) }
-            return $ Prim p (keepIts $ args xs)
-        Peek pt' | [addr] <- xs -> do
-            let p = prim { primType = ([stringNameToTy (show rt_bits_ptr_)],pt) }
-                pt = toType (stringNameToTy pt') ty
-            return $ Prim p (args [addr])
-        Peek pt' -> do
-            let p = prim { primType = ([stringNameToTy (show rt_bits_ptr_)],pt) }
-                [_,addr] = xs
-                pt = stringNameToTy pt'
-            return $ Prim p (args [addr])
-        Poke pt' ->  do
-            let p = prim { primType = ([stringNameToTy (show rt_bits_ptr_),pt],tyUnit) }
-                [_,addr,val] = xs
-                pt = stringNameToTy pt'
-            return $  Prim p (args [addr,val])
-        CCast from to -> do
-            let ptypeto' = stringNameToTy to
-                ptypefrom' = stringNameToTy from
-            let p = prim { primName = toAtom ("(" ++ to ++ ")"), primType = ([ptypefrom'],ptypeto') }
-            return $  Prim p (args xs)
-        Op (Op.BinOp _ a1 a2) rt -> do
-            let p = prim { primType = ([TyPrim a1,TyPrim a2],TyPrim rt) }
-            return $ Prim p (args xs)
-        Op (Op.UnOp _ a1) rt -> do
-            let p = prim { primType = ([TyPrim a1], TyPrim rt) }
-            return $ Prim p (args xs)
-        Op (Op.ConvOp _ a1) rt -> do
-            let p = prim { primType = ([TyPrim a1], TyPrim rt) }
-            return $ Prim p (args xs)
---        Operator n as r | Just _ <- fromRawType ty -> do
---            let p = prim { primType = ((map (Ty . toAtom) as),Ty (toAtom r)) }
---            return $ Prim p (args xs)
-        other -> fail $ "ce unknown primitive: " ++ show other
+    ce (EPrim ap@(APrim p _) xs ty) = do
+        let prim = Primitive { primName = Atom.fromString (pprint ap), primAPrim = ap, primRets = Nothing, primType = ([],tyUnit) }
+            xs' = keepIts $ args xs
+            ty' = toType TyNode ty
+
+        case p of
+            Func True fn as "void" -> return $ Prim prim { primType = (map getType xs',ty') } xs'
+            Func True fn as r -> do
+                let p = prim { primType = (map getType xs', ty') }
+                return $ Prim p xs'
+            Func False _ as r | Just _ <- fromRawType ty ->  do
+                let p = prim { primType = (map getType xs', ty') }
+                return $ Prim p xs'
+            Peek pt' | [addr] <- xs -> do
+                let p = prim { primType = ([stringNameToTy (show rt_bits_ptr_)],pt) }
+                    pt = toType (stringNameToTy pt') ty
+                return $ Prim p (args [addr])
+            Peek pt' -> do
+                let p = prim { primType = ([stringNameToTy (show rt_bits_ptr_)],pt) }
+                    [_,addr] = xs
+                    pt = stringNameToTy pt'
+                return $ Prim p (args [addr])
+            Poke pt' ->  do
+                let p = prim { primType = ([stringNameToTy (show rt_bits_ptr_),pt],tyUnit) }
+                    [_,addr,val] = xs
+                    pt = stringNameToTy pt'
+                return $  Prim p (args [addr,val])
+            CCast from to -> do
+                let ptypeto' = stringNameToTy to
+                    ptypefrom' = stringNameToTy from
+                let p = prim { primName = toAtom ("(" ++ to ++ ")"), primType = ([ptypefrom'],ptypeto') }
+                return $  Prim p (args xs)
+            Op (Op.BinOp _ a1 a2) rt -> do
+                let p = prim { primType = ([TyPrim a1,TyPrim a2],TyPrim rt) }
+                return $ Prim p (args xs)
+            Op (Op.UnOp _ a1) rt -> do
+                let p = prim { primType = ([TyPrim a1], TyPrim rt) }
+                return $ Prim p (args xs)
+            Op (Op.ConvOp _ a1) rt -> do
+                let p = prim { primType = ([TyPrim a1], TyPrim rt) }
+                return $ Prim p (args xs)
+    --        Operator n as r | Just _ <- fromRawType ty -> do
+    --            let p = prim { primType = ((map (Ty . toAtom) as),Ty (toAtom r)) }
+    --            return $ Prim p (args xs)
+            other -> fail $ "ce unknown primitive: " ++ show other
 
     -- case statements
     ce ECase { eCaseScrutinee = e, eCaseAlts = [Alt LitCons { litName = n, litArgs = xs } wh] } | Just _ <- fromUnboxedNameTuple n, DataConstructor <- nameType n  = do

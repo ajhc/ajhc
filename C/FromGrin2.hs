@@ -79,6 +79,9 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 -- entry point
 --------------
 
+stringNameToTy :: String -> Op.Ty
+stringNameToTy n = (archOpTy archInfo n)
+
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
 compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c ++ jhc_rts2_c ++ generateArchAssertions ++ P.render ans ++ "\n", snub (reqLibraries req))  where
@@ -188,7 +191,7 @@ convertType TyNode = return wptr_t
 convertType (TyPtr TyNode) = return sptr_t
 convertType (TyPtr (TyPtr TyNode)) = return $ ptrType sptr_t
 convertType (Ty t) = return (basicType (toString t))
-convertType (TyPrim Op.TyBool) = return (basicType "bool")
+convertType (TyPrim opty) = return (opTyToC opty)
 convertType (TyPrim (Op.TyBits (Op.BitsExt s) _)) = return (basicType s)
 convertType (TyPrim (Op.TyBits (Op.Bits n) _)) = return (basicType $ "uint" ++ show n ++ "_t")
 convertType (TyPrim (Op.TyBits (Op.BitsArch Op.BitsInt) _)) = return $ basicType "unsigned"
@@ -200,6 +203,14 @@ convertType (TyTup xs) = do
     xs <- mapM convertType xs
     return (anonStructType xs)
 
+opTyToC opty = basicType (opTyToC' opty)
+
+opTyToC' Op.TyBool = "bool"
+opTyToC' (Op.TyBits (Op.BitsExt s) _) = s
+opTyToC' (Op.TyBits (Op.Bits n) _) =  "uint" ++ show n ++ "_t"
+opTyToC' (Op.TyBits (Op.BitsArch Op.BitsInt) _) = "unsigned"
+opTyToC' (Op.TyBits (Op.BitsArch Op.BitsMax) _) = "uintmax_t"
+opTyToC' (Op.TyBits (Op.BitsArch Op.BitsPtr) _) = "uintptr_t"
 
 convertBody :: Exp -> C Statement
 convertBody (Prim p [a,b] :>>= Tup [q,r] :-> e') | primName p == toAtom "@primQuotRem" = do
@@ -507,10 +518,10 @@ convertConst (ValPrim (APrim p _) [] _) = case p of
     CConst s _ -> return $ expressionRaw s
     AddrOf t -> return $ expressionRaw ('&':unpackPS t)
     x -> return $ err (show x)
-convertConst (ValPrim (APrim p _) [x] _) = do
+convertConst (ValPrim (APrim p _) [x] (TyPrim opty)) = do
     x' <- convertConst x
     case p of
-        CCast _ to -> return $ cast (basicType to) x'
+        CCast _ to -> return $ cast (opTyToC opty) x'
 --        Operator n [_] r ->  return $ cast (basicType r) (uoperator n x')
         x -> return $ err (show x)
 convertConst (ValPrim (APrim p _) [x,y] _) = do
@@ -528,7 +539,7 @@ convertPrim p vs
         return $ expressionRaw s
     | APrim (CCast _ to) _ <- primAPrim p, [a] <- vs = do
         a' <- convertVal a
-        return $ cast (basicType to) a'
+        return $ cast (opTyToC (stringNameToTy to)) a'
 --    | APrim (Operator n [ta] r) _ <- primAPrim p, [a] <- vs = do
 --        a' <- convertVal a
 --        return $ cast (basicType r) (uoperator n a')
@@ -541,11 +552,11 @@ convertPrim p vs
         return $ cast (basicType r) (functionCall (name $ unpackPS n) [ cast (basicType t) v | v <- vs' | t <- as ])
     | APrim (Peek t) _ <- primAPrim p, [v] <- vs = do
         v' <- convertVal v
-        return $ expressionRaw ("*((" <> t <+> "*)" <> (parens $ renderG v') <> char ')')
+        return $ expressionRaw ("*((" <> (opTyToC' $ stringNameToTy t) <+> "*)" <> (parens $ renderG v') <> char ')')
     | APrim (Poke t) _ <- primAPrim p, [v,x] <- vs = do
         v' <- convertVal v
         x' <- convertVal x
-        return $ expressionRaw ("*((" <> t <+> "*)" <> (parens $ renderG v') <> text ") = " <> renderG x')
+        return $ expressionRaw ("*((" <> (opTyToC' $ stringNameToTy t) <+> "*)" <> (parens $ renderG v') <> text ") = " <> renderG x')
     | APrim (AddrOf t) _ <- primAPrim p, [] <- vs = do
         return $ expressionRaw ('&':unpackPS t)
     | otherwise = return $ err ("prim: " ++ show (p,vs))
