@@ -33,6 +33,7 @@ import Support.FreeVars
 import Util.Gen
 import Util.SetLike
 import Util.UniqueMonad
+import qualified C.Op as Op
 
 
 ---------------
@@ -171,13 +172,13 @@ convertVal (ValPrim (APrim p _) [x] _) = do
     x' <- convertVal x
     case p of
         CCast _ to -> return $ cast (basicType to) x'
-        Operator n [_] r ->  return $ cast (basicType r) (uoperator n x')
+--        Operator n [_] r ->  return $ cast (basicType r) (uoperator n x')
         x -> return $ err ("convertVal: " ++ show x)
 convertVal (ValPrim (APrim p _) [x,y] _) = do
     x' <- convertVal x
     y' <- convertVal y
     case p of
-        Operator n [_,_] r -> return $ cast (basicType r) (operator n x' y')
+--        Operator n [_,_] r -> return $ cast (basicType r) (operator n x' y')
         x -> return $ err ("convertVal: " ++ show x)
 
 convertVal x = return $ err ("convertVal: " ++ show x)
@@ -187,6 +188,12 @@ convertType TyNode = return wptr_t
 convertType (TyPtr TyNode) = return sptr_t
 convertType (TyPtr (TyPtr TyNode)) = return $ ptrType sptr_t
 convertType (Ty t) = return (basicType (toString t))
+convertType (TyPrim Op.TyBool) = return (basicType "bool")
+convertType (TyPrim (Op.TyBits (Op.BitsExt s) _)) = return (basicType s)
+convertType (TyPrim (Op.TyBits (Op.Bits n) _)) = return (basicType $ "uint" ++ show n ++ "_t")
+convertType (TyPrim (Op.TyBits (Op.BitsArch Op.BitsInt) _)) = return $ basicType "unsigned"
+convertType (TyPrim (Op.TyBits (Op.BitsArch Op.BitsMax) _)) = return $ basicType "uintmax_t"
+convertType (TyPrim (Op.TyBits (Op.BitsArch Op.BitsPtr) _)) = return $ basicType "uintptr_t"
 convertType (TyTup []) = return voidType
 convertType (TyTup [x]) = convertType x
 convertType (TyTup xs) = do
@@ -504,13 +511,13 @@ convertConst (ValPrim (APrim p _) [x] _) = do
     x' <- convertConst x
     case p of
         CCast _ to -> return $ cast (basicType to) x'
-        Operator n [_] r ->  return $ cast (basicType r) (uoperator n x')
+--        Operator n [_] r ->  return $ cast (basicType r) (uoperator n x')
         x -> return $ err (show x)
 convertConst (ValPrim (APrim p _) [x,y] _) = do
     x' <- convertConst x
     y' <- convertConst y
     case p of
-        Operator n [_,_] r -> return $ cast (basicType r) (operator n x' y')
+--        Operator n [_,_] r -> return $ cast (basicType r) (operator n x' y')
         x -> return $ err (show x)
 convertConst x = fail "convertConst"
 
@@ -522,13 +529,13 @@ convertPrim p vs
     | APrim (CCast _ to) _ <- primAPrim p, [a] <- vs = do
         a' <- convertVal a
         return $ cast (basicType to) a'
-    | APrim (Operator n [ta] r) _ <- primAPrim p, [a] <- vs = do
-        a' <- convertVal a
-        return $ cast (basicType r) (uoperator n a')
-    | APrim (Operator n [ta,tb] r) _ <- primAPrim p, [a,b] <- vs = do
-        a' <- convertVal a
-        b' <- convertVal b
-        return $ cast (basicType r) (operator n a' b')
+--    | APrim (Operator n [ta] r) _ <- primAPrim p, [a] <- vs = do
+--        a' <- convertVal a
+--        return $ cast (basicType r) (uoperator n a')
+--    | APrim (Operator n [ta,tb] r) _ <- primAPrim p, [a,b] <- vs = do
+--        a' <- convertVal a
+--        b' <- convertVal b
+--        return $ cast (basicType r) (operator n a' b')
     | APrim (Func _ n as r) _ <- primAPrim p = do
         vs' <- mapM convertVal vs
         return $ cast (basicType r) (functionCall (name $ unpackPS n) [ cast (basicType t) v | v <- vs' | t <- as ])
@@ -541,6 +548,7 @@ convertPrim p vs
         return $ expressionRaw ("*((" <> t <+> "*)" <> (parens $ renderG v') <> text ") = " <> renderG x')
     | APrim (AddrOf t) _ <- primAPrim p, [] <- vs = do
         return $ expressionRaw ('&':unpackPS t)
+    | otherwise = return $ err ("prim: " ++ show (p,vs))
 
 
 tagAssign :: Expression -> Atom -> C Statement

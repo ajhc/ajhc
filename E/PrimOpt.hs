@@ -69,6 +69,9 @@ iTrue = (ELit (LitInt 1 intt))
 iFalse = (ELit (LitInt 0 intt))
 isIntegral t = Map.lookup t rawMap /= Just typ_float
 
+primOpt' _  x = return x
+
+{-
 cextra Operator {} [] = ""
 cextra Operator {} xs = '.':map f xs where
     f ELit {} = 'c'
@@ -130,6 +133,7 @@ primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
         primopt (CCast _ _) [ELit (LitInt x _)] t = return $ ELit (LitInt x t)  -- TODO ensure constant fits
         primopt _ _ _ = fail "No primitive optimization to apply"
 primOpt' _  x = return x
+-}
 
 
 processPrimPrim :: DataTable -> E -> E

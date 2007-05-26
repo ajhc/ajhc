@@ -355,7 +355,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         let name       = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         let (ts,rt)    = argTypes' ty
-        (cn,st,ct) <- lookupCType' dataTable rt
+        (cn,st,_ct) <- lookupCType' dataTable rt
         [uvar] <- newVars [st]
         let expr x     = return [(name,var,lamt x)]
             prim       = APrim (AddrOf $ packString rcn) req
@@ -367,22 +367,23 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
             (isIO,rt') =  extractIO' rt
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
         pt <- lookupCType rt'
+        cts <- mapM lookupCType ts
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
         let cFun = createFunc dataTable (map tvrType es)
-            prim io rs rtt = EPrim (APrim (Func io (packString rcn) (snds rs) rtt) req)
+            prim io  = EPrim (APrim (Func io (packString rcn) cts pt) req)
         result <- case (isIO,pt) of
             (True,"void") -> cFun $ \rs -> (,) (ELam tvrWorld) $
-                        eStrictLet tvrWorld2 (prim True rs "void" (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
+                        eStrictLet tvrWorld2 (prim True  (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
             (False,"void") -> fail "pure foreign function must return a valid value"
             _ -> do
-                (cn,rtt',rtt) <- lookupCType' dataTable rt'
+                (cn,rtt',_) <- lookupCType' dataTable rt'
                 [rtVar,rtVar'] <- newVars [rt',rtt']
                 let rttIO = ltTuple [tWorld__, rt']
                     rttIO' = ltTuple' [tWorld__, rtt']
                 case isIO of
-                    False -> cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim False rs rtt [ EVar t | (t,_) <- rs ] rtt') (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
+                    False -> cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim False [ EVar t | (t,_) <- rs ] rtt') (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
                     True -> cFun $ \rs -> (,) (ELam tvrWorld) $
-                                eCaseTup' (prim True rs rtt (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' }) (eJustIO (EVar tvrWorld2) (EVar rtVar)))
+                                eCaseTup' (prim True (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' }) (eJustIO (EVar tvrWorld2) (EVar rtVar)))
         return [(name,var,lamt result)]
     cDecl (HsForeignDecl _ (FfiSpec (Import rcn _) _ DotNet) n _) = do
         (var,ty,lamt) <- convertValue (toName Name.Val n)
@@ -719,7 +720,7 @@ convertMatches bs ms err = do
         match  [] ps err = return $ foldr f err ps where f ([],fe) err = fe err
         -- when we are out of patterns, return the error term
         match _ [] err = return err
-        match (b:bs) ps err = do
+        match ~(b:bs) ps err = do
             (b',mf) <- if isEVar b   then return (b,id) else do
                 [ev] <- newVars [getType b]
                 return $ (EVar ev, eLet ev b)

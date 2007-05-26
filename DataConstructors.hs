@@ -426,11 +426,11 @@ extractIO' e = case extractIO e of
     Nothing -> (False,e)
 
 lookupCType' dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
-    ELit LitCons { litName = c, litArgs = [], litType = _ }
+    ELit LitCons { litName = c, litArgs = [] }
         | Just Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable,
-          Just Constructor { conOrigSlots = [SlotNormal st@(ELit LitCons { litName = n, litArgs = [], litType = _ })] } <- getConstructor cn dataTable
+          Just Constructor { conOrigSlots = [SlotNormal st@(ELit LitCons { litName = n, litArgs = [] })] } <- getConstructor cn dataTable
             -> return (cn,st,show n)
-    ELit LitCons { litName = c, litArgs = [], litType = _ } | Just cn  <- getConstructor c dataTable -> fail $ "lookupCType: " ++ show cn
+    ELit LitCons { litName = c, litArgs = [] } | Just cn  <- getConstructor c dataTable -> fail $ "lookupCType: " ++ show cn
     e' -> fail $ "lookupCType': " ++ show (e,e')
 
 

@@ -31,11 +31,6 @@ data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
 data Prim =
     PrimPrim PackedString          -- Special primitive implemented in the compiler somehow.
     | CConst { primConst :: String, primRetType :: ExtType }  -- C code which evaluates to a constant
-    | Operator {
-        primOp :: String,
-        primArgTypes ::  [ExtType],
-        primRetType :: ExtType
-        }   -- C operator
     | Func {
         funcIOLike :: !Bool,
         funcName :: PackedString,
@@ -86,7 +81,7 @@ primIsCheap AddrOf {} = True
 primIsCheap CCast {} = True
 primIsCheap CConst {} = True
 primIsCheap PrimString {} = True
-primIsCheap Operator {} = True
+--primIsCheap Operator {} = True
 primIsCheap PrimTypeInfo {} = True
 primIsCheap Op { primCOp = op } = Op.isCheap op
 primIsCheap _ = False
@@ -103,8 +98,8 @@ primIsConstant PrimString {} = True
 primIsConstant CCast {} = True
 primIsConstant PrimTypeInfo {} = True
 primIsConstant Op { primCOp = op } = Op.isEagerSafe op
-primIsConstant Operator { primOp = op } | op `elem` safeOps = True  where
-    safeOps = ["+","-","*","==",">=","<=",">","<","&","|","^","~",">>","<<"]
+--primIsConstant Operator { primOp = op } | op `elem` safeOps = True  where
+--    safeOps = ["+","-","*","==",">=","<=",">","<","&","|","^","~",">>","<<"]
 primIsConstant _ = False
 
 -- | whether a primitive can be eagarly evaluated.
@@ -116,8 +111,8 @@ primEagerSafe AddrOf {} = True
 primEagerSafe CCast {} = True
 primEagerSafe PrimTypeInfo {} = True
 primEagerSafe Op { primCOp = op } = Op.isEagerSafe op
-primEagerSafe Operator { primOp = op } | op `elem` safeOps = True  where
-    safeOps = ["+","-","*","==",">=","<=",">","<","&","|","^","~",">>","<<"]
+--primEagerSafe Operator { primOp = op } | op `elem` safeOps = True  where
+--    safeOps = ["+","-","*","==",">=","<=",">","<","&","|","^","~",">>","<<"]
 primEagerSafe _ = False
 
 
@@ -148,7 +143,7 @@ instance PPrint d Prim  => PPrint d APrim where
 instance DocLike d => PPrint d Prim where
     pprint (PrimPrim t) = text (unpackPS t)
     pprint (CConst s t) = parens (text t) <> parens (text s)
-    pprint (Operator s xs r) = parens (text r) <> text s <> tupled (map text xs)
+--    pprint (Operator s xs r) = parens (text r) <> text s <> tupled (map text xs)
     pprint (Func _ s xs r) = parens (text r) <> text (unpackPS s) <> tupled (map text xs)
     pprint (IFunc xs r) = parens (text r) <> parens (char '*') <> tupled (map text xs)
     pprint (AddrOf s) = char '&' <> text (unpackPS s)
