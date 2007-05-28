@@ -44,7 +44,7 @@ import TypeSyns
 import TypeSigs
 import Util.Interact
 import Version(versionString)
-import Warning
+import FrontEnd.Warning
 
 printDoc doc = do
     displayIO stdout (renderPretty 0.9 80 doc)

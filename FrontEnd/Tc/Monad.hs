@@ -80,7 +80,7 @@ import Support.FreeVars
 import Support.Tickle
 import Util.Inst
 import Util.SetLike
-import Warning
+import FrontEnd.Warning
 import qualified FlagDump as FD
 import {-# SOURCE #-} FrontEnd.Tc.Class(ClassHierarchy,simplify)
 

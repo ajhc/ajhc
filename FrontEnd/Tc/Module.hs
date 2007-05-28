@@ -38,7 +38,7 @@ import TypeSynonyms
 import TypeSyns
 import Util.Gen
 import Util.Inst()
-import Warning
+import FrontEnd.Warning
 
 trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env
 

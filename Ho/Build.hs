@@ -54,7 +54,7 @@ import Options
 import PackedString
 import Util.FilterInput
 import Util.SetLike
-import Warning
+import FrontEnd.Warning
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Util.Graph as G
@@ -96,7 +96,7 @@ toFileDep fn fs = FileDep {
     }
 
 findFirstFile :: String -> [(String,a)] -> IO (Handle,FileDep,a)
-findFirstFile err [] = Warning.err "missing-dep" ("Module not found: " ++ err) >> return (undefined,emptyFileDep,undefined)
+findFirstFile err [] = FrontEnd.Warning.err "missing-dep" ("Module not found: " ++ err) >> return (undefined,emptyFileDep,undefined)
 findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
     (fh,fd) <- openGetFileDep x
     return (fh,fd,a)

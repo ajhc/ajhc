@@ -21,7 +21,7 @@ import FrontEnd.Syn.Traverse
 import HsSyn
 import Name.Name
 import Util.HasSize
-import Warning
+import FrontEnd.Warning
 import MapBinaryInstance
 
 

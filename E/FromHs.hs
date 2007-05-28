@@ -40,6 +40,7 @@ import FrontEnd.Syn.Traverse(getNamesFromHsPat)
 import FrontEnd.Tc.Main(isTypePlaceholder)
 import FrontEnd.Tc.Module(TiData(..))
 import FrontEnd.Tc.Type hiding(Rule(..))
+import FrontEnd.Warning
 import HsSyn as HS
 import Info.Types
 import Name.Name as Name
@@ -291,11 +292,21 @@ data CeEnv = CeEnv {
     ceCoerce :: Map.Map Name CoerceTerm,
     ceFuncs  :: FuncNames E,
     ceProps  :: IdMap Properties,
+    ceSrcLoc :: SrcLoc,
     ceDataTable :: DataTable
     }
 
-newtype Ce t a = Ce (RWST CeEnv () Int t a)
+newtype Ce t a = Ce (RWST CeEnv [Warning] Int t a)
     deriving(Monad,Functor,MonadTrans,MonadIO,MonadReader CeEnv,MonadState Int)
+
+instance Monad t => MonadWarn (Ce t) where
+    addWarning w = Ce $ tell [w]
+
+instance Monad t => MonadSrcLoc (Ce t) where
+    getSrcLoc = asks ceSrcLoc
+
+instance Monad t => MonadSetSrcLoc (Ce t) where
+    withSrcLoc sl = local (\ce -> ce { ceSrcLoc = sl })
 
 instance Monad m => UniqueProducer (Ce m) where
     newUniq = do
@@ -332,6 +343,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         ceAssumps = assumps,
         ceFuncs = funcs,
         ceProps = props,
+        ceSrcLoc = bogusASrcLoc,
         ceDataTable = dataTable
         }
     Identity funcs = fmapM (return . EVar . toTVr assumps dataTable) sFuncNames
@@ -367,7 +379,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
             (isIO,rt') =  extractIO' rt
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
         pt <- lookupCType rt'
-        cts <- mapM lookupCType ts
+        cts <- mapM lookupCType (filter (not . sortKindLike) ts)
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
         let cFun = createFunc dataTable (map tvrType es)
             prim io  = EPrim (APrim (Func io (packString rcn) cts pt) req)

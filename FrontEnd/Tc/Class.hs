@@ -29,7 +29,7 @@ import Name.Names
 import Name.Name
 import Options
 import Support.CanType
-import Warning
+import FrontEnd.Warning
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 

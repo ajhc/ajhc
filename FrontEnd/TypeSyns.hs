@@ -9,7 +9,7 @@ import FrontEnd.Desugar (doToExp)
 import FrontEnd.SrcLoc hiding(srcLoc)
 import HsSyn
 import TypeSynonyms
-import Warning
+import FrontEnd.Warning
 import FrontEnd.Syn.Traverse
 
 

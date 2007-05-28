@@ -1,4 +1,15 @@
-module Warning(Warning(..), MonadWarn(..), processErrors, warn, warnF, err, addDiag, addWarn, processIOErrors, printIOErrors) where
+module FrontEnd.Warning(
+    Warning(..),
+    MonadWarn(..),
+    processErrors,
+    warn,
+    warnF,
+    err,
+    addDiag,
+    addWarn,
+    processIOErrors,
+    printIOErrors
+    ) where
 
 import List
 import GenUtil

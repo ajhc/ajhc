@@ -89,7 +89,7 @@ import Util.ContextMonad
 import Util.Gen
 import Util.Inst()
 import Util.UniqueMonad
-import Warning
+import FrontEnd.Warning
 import qualified FrontEnd.HsErrors as HsErrors
 import qualified Name.VConsts as V
 

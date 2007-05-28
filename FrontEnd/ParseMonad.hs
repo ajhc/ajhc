@@ -26,9 +26,10 @@ module FrontEnd.ParseMonad(
 		pushContextL, popContextL, lexParseMode
 	) where
 
-import FrontEnd.SrcLoc
 import qualified Data.Set as Set
-import Warning
+
+import FrontEnd.SrcLoc
+import FrontEnd.Warning
 import Options
 import qualified FlagOpts as FO
 

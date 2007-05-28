@@ -19,12 +19,13 @@
 
 module FrontEnd.Lexer (Token(..), lexer) where
 
-import FrontEnd.ParseMonad
 
 import Char
 import Data.Ratio
 import qualified Data.Map as Map
-import Warning
+
+import FrontEnd.ParseMonad
+import FrontEnd.Warning
 
 data Token
         = VarId String

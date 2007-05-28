@@ -19,7 +19,7 @@ import Ho.Library(loadLibraries)
 import HsSyn
 import Options
 import Util.SetLike
-import Warning
+import FrontEnd.Warning
 import qualified Doc.PPrint as PPrint
 import qualified FlagDump as FD
 import qualified FlagOpts as FO

@@ -16,7 +16,7 @@ import Monad
 import Name.Name
 import Name.Names
 import Name.VConsts
-import Warning
+import FrontEnd.Warning
 
 
 

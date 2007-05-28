@@ -20,7 +20,7 @@ import HsSyn
 import Name.Name as Name
 import Options
 import Util.Relation as R
-import Warning
+import FrontEnd.Warning
 
 data ModInfo = ModInfo {
     modInfoName :: Module,
