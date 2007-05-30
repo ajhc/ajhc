@@ -402,6 +402,7 @@ typeTable = Map.fromList [
     (tc_CWchar, "wchar_t"),
     (tc_CWint, "wint_t"),
     (tc_CTime, "time_t"),
+    (tc_CSize, "size_t"),
     (tc_Unit,  "void"),
     (tc_World__,  "void")
     ]
@@ -411,7 +412,7 @@ lookupCType e = f e where
     f (ELit LitCons { litName = c })
         | Just s <- Map.lookup c typeTable = return s
     f (ELit LitCons { litAliasFor = Just af, litArgs = as }) = f (foldl eAp af as)
-    f _ = fail "lookupCType: Not C Type"
+    f e = fail $ "lookupCType: Not C Type: " ++ pprint e
 
 
 extractIO :: Monad m => E -> m E
