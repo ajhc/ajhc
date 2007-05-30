@@ -6,6 +6,7 @@ module C.Generate(
     cast,
     cif,
     constant,
+    cTrue,cFalse,
     creturn,
     dereference,
     reference,
@@ -332,6 +333,9 @@ floating i = C (tshow i)
 
 character :: Char -> Constant
 character c = C (tshow c)
+
+cTrue = C (text "true")
+cFalse = C (text "false")
 
 -- statements
 expr :: Expression -> Statement
