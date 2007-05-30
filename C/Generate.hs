@@ -49,12 +49,14 @@ module C.Generate(
     structAnon,
     structType,
     switch',
+    character,
     toName,
     Type(),
     uoperator,
     variable,
     test,
-    voidType
+    voidType,
+    voidStarType
     ) where
 
 import Char
@@ -216,8 +218,6 @@ cast :: Type -> Expression -> Expression
 cast t e = expDC (parens (draw t) <> pdraw e)
 
 
-tif :: Expression -> Expression -> Expression -> Expression
-tif x y z = expDC (draw x <+> char '?' <+> draw y <+> char ':' <+> draw z)
 
 functionCall :: Name -> [Expression] -> Expression
 functionCall n es = expD (draw n <> tupled (map draw es))
@@ -408,7 +408,6 @@ forLoop i from to body = sd $ do
 
 
 data Function = F {
-    functionAnnotations :: String,
     functionName :: Name,
     functionReturnType :: Type,
     functionArgs :: [(Name,Type)],
@@ -420,7 +419,7 @@ data FunctionOpts = Public | Attribute String
     deriving(Eq)
 
 function :: Name -> Type -> [(Name,Type)] -> [FunctionOpts] -> Statement -> Function
-function n t as o s = F "" n t as o s
+function n t as o s = F n t as o s
 
 travCollect' :: Monoid w => ((a -> Writer w a) -> a -> Writer w a) -> (a -> w) -> a -> w
 travCollect' fn col x = execWriter (f x) where
@@ -550,6 +549,8 @@ test = do
     showIt test3
     showIt test4
 
+instance Show Expression where
+    show e = renderG e
 
 renderG x = render $ drawG x
 
