@@ -439,6 +439,7 @@ compile' cenv (tvr,as,e) = ans where
         f ft [v,_]  | ft `elem` ["unsafeFreezeArray__", "unsafeThawArray__"] = do
             let [v'] = args [v]
             return $ Return v'
+        f p xs = fail $ "Grin.FromE - Unknown primitive: " ++ show (p,xs)
 
 
     -- other primitives
@@ -457,17 +458,17 @@ compile' cenv (tvr,as,e) = ans where
                 return $ Prim p xs'
             Peek pt' | [addr] <- xs -> do
                 let p = prim { primType = ([stringNameToTy (show rt_bits_ptr_)],pt) }
-                    pt = toType (stringNameToTy pt') ty
+                    pt = toType (TyPrim pt') ty
                 return $ Prim p (args [addr])
             Peek pt' -> do
                 let p = prim { primType = ([stringNameToTy (show rt_bits_ptr_)],pt) }
                     [_,addr] = xs
-                    pt = stringNameToTy pt'
+                    pt = TyPrim pt'
                 return $ Prim p (args [addr])
             Poke pt' ->  do
                 let p = prim { primType = ([stringNameToTy (show rt_bits_ptr_),pt],tyUnit) }
                     [_,addr,val] = xs
-                    pt = stringNameToTy pt'
+                    pt = TyPrim pt'
                 return $  Prim p (args [addr,val])
             CCast from to -> do
                 let ptypeto' = stringNameToTy to
@@ -741,9 +742,8 @@ compile' cenv (tvr,as,e) = ans where
         liftIO $ (writeIORef (counter cenv) $! (i + 2))
         return $! V i
 
-fromRawType (ELit LitCons { litName = tname, litArgs = [] }) = rawNameToTy tname
---    | RawType <- nameType tname = return (Ty $ toAtom (show tname))
---fromRawType _ = fail "not a raw type"
+fromRawType (ELit LitCons { litName = tname, litArgs = [] }) | Just r <- rawNameToTy tname = return r
+fromRawType _ = fail "not a raw type"
 
 -- | converts an unboxed literal
 literal :: Monad m =>  E -> m Val

@@ -137,7 +137,7 @@ foreign import ccall "-lm math.h nearbyintf" c_nearbyintf :: Float -> Float
 
 
 
-foreign import primitive "divide" divideFloat ::  Float -> Float -> Float
+foreign import primitive "FDiv" divideFloat ::  Float -> Float -> Float
 
 
 
@@ -191,7 +191,7 @@ foreign import ccall "-lm math.h nearbyint" c_nearbyint :: Double -> Double
 
 
 
-foreign import primitive "divide" divideDouble ::  Double -> Double -> Double
+foreign import primitive "FDiv" divideDouble ::  Double -> Double -> Double
 
 
 instance Real Float where

@@ -161,12 +161,6 @@ convertVal (Tup xs) = do
     xs <- mapM convertVal xs
     return (structAnon (zip xs ts))
 convertVal (Tag t) = do tellTags t ; return $ constant (enum $ nodeTagName t)
-convertVal (ValPrim (APrim p _) [] _) = case p of
-    CConst s _ -> return $ expressionRaw s
-    AddrOf t -> return $ expressionRaw ('&':unpackPS t)
-    PrimTypeInfo { primArgType = arg, primTypeInfo = PrimSizeOf } -> return $ expressionRaw ("sizeof(" ++ arg ++ ")")
-    PrimString s -> return $ expressionRaw (show s)
-    x -> return $ err ("convertVal: " ++ show x)
 convertVal (ValPrim (APrim p _) [x] (TyPrim opty)) = do
     x' <- convertVal x
     case p of
@@ -528,6 +522,8 @@ convertConst (Tag t) = return $ constant (enum $ nodeTagName t)
 convertConst (ValPrim (APrim p _) [] _) = case p of
     CConst s _ -> return $ expressionRaw s
     AddrOf t -> return $ expressionRaw ('&':unpackPS t)
+    PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimSizeOf } -> return $ expressionRaw ("sizeof(" ++ tyToC Op.HintUnsigned arg ++ ")")
+    PrimString s -> return $ expressionRaw (show s)
     x -> return $ err (show x)
 convertConst (ValPrim (APrim p _) [x] (TyPrim opty)) = do
     x' <- convertConst x
@@ -560,11 +556,11 @@ convertPrim p vs
         return $ cast (basicType r) (functionCall (name $ unpackPS n) [ cast (basicType t) v | v <- vs' | t <- as ])
     | APrim (Peek t) _ <- primAPrim p, [v] <- vs = do
         v' <- convertVal v
-        return $ expressionRaw ("*((" <> (opTyToC' $ stringNameToTy t) <+> "*)" <> (parens $ renderG v') <> char ')')
+        return $ expressionRaw ("*((" <> (opTyToC' t) <+> "*)" <> (parens $ renderG v') <> char ')')
     | APrim (Poke t) _ <- primAPrim p, [v,x] <- vs = do
         v' <- convertVal v
         x' <- convertVal x
-        return $ expressionRaw ("*((" <> (opTyToC' $ stringNameToTy t) <+> "*)" <> (parens $ renderG v') <> text ") = " <> renderG x')
+        return $ expressionRaw ("*((" <> (opTyToC' t) <+> "*)" <> (parens $ renderG v') <> text ") = " <> renderG x')
     | APrim (AddrOf t) _ <- primAPrim p, [] <- vs = do
         return $ expressionRaw ('&':unpackPS t)
     | otherwise = return $ err ("prim: " ++ show (p,vs))

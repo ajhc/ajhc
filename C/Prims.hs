@@ -42,15 +42,15 @@ data Prim =
         primRetType :: ExtType
         } -- indirect function call
     | AddrOf PackedString              -- address of linker name
-    | Peek { primArgType :: ExtType }  -- read value from memory
-    | Poke { primArgType :: ExtType }  -- write value to memory
+    | Peek { primArgTy :: Op.Ty }  -- read value from memory
+    | Poke { primArgTy :: Op.Ty }  -- write value to memory
     | CCast {
         primArgType :: ExtType,
         primRetType :: ExtType
         }   -- Cast from one basic type to another, possibly lossy.
     | PrimTypeInfo {
-        primArgType :: ExtType,
-        primRetType :: ExtType,
+        primArgTy :: Op.Ty,
+        primRetTy :: Op.Ty,
         primTypeInfo :: PrimTypeInfo
         }
     | PrimString PackedString                                 -- address of a raw string. encoded in utf8.
@@ -148,19 +148,19 @@ instance DocLike d => PPrint d Prim where
     pprint (IFunc xs r) = parens (text r) <> parens (char '*') <> tupled (map text xs)
     pprint (AddrOf s) = char '&' <> text (unpackPS s)
     pprint (PrimString s) = tshow s <> char '#'
-    pprint (Peek t) = char '*' <> text t
-    pprint (Poke t) = char '=' <> text t
+    pprint (Peek t) = char '*' <> tshow t
+    pprint (Poke t) = char '=' <> tshow t
     pprint (CCast _ t) = parens (text t)
     pprint Op { primCOp = Op.BinOp bo ta tb, primRetTy = rt } | rt == ta && rt == tb = parens (pprint rt) <> tshow bo
     pprint Op { primCOp = Op.UnOp bo ta, primRetTy = rt } | rt == ta = parens (pprint rt) <> tshow bo
     pprint Op { primCOp = op, primRetTy = rt } = parens (pprint rt) <> pprint op
     pprint PrimDotNet { primDotNet = dn,  primDotNetName = nn} = parens (text (unpackPS nn))
-    pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimSizeOf } = text "sizeof" <> parens (text at)
-    pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimAlignmentOf } = text "alignmentof" <> parens (text at)
-    pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimTypeIsSigned } = text "is_signed" <> parens (text at)
-    pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimMaxBound } = text "max" <> parens (text at)
-    pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimUMaxBound } = text "umax" <> parens (text at)
-    pprint PrimTypeInfo { primArgType = at, primTypeInfo = PrimMinBound } = text "min" <> parens (text at)
+    pprint PrimTypeInfo { primArgTy = at, primTypeInfo = PrimSizeOf } = text "sizeof" <> parens (tshow at)
+    pprint PrimTypeInfo { primArgTy = at, primTypeInfo = PrimAlignmentOf } = text "alignmentof" <> parens (tshow at)
+    pprint PrimTypeInfo { primArgTy = at, primTypeInfo = PrimTypeIsSigned } = text "is_signed" <> parens (tshow at)
+    pprint PrimTypeInfo { primArgTy = at, primTypeInfo = PrimMaxBound } = text "max" <> parens (tshow at)
+    pprint PrimTypeInfo { primArgTy = at, primTypeInfo = PrimUMaxBound } = text "umax" <> parens (tshow at)
+    pprint PrimTypeInfo { primArgTy = at, primTypeInfo = PrimMinBound } = text "min" <> parens (tshow at)
 
 instance DocLike d => PPrint d Op.Ty where
     pprintPrec n p = text (showsPrec n p "")

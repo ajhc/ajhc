@@ -93,7 +93,7 @@ prettyExp vl (App t [v] _) | t == funcEval = vl <> keyword "eval" <+> prettyVal 
 prettyExp vl (App t [a] _) | t == funcApply = vl <> keyword "apply" <+> prettyVal a
 prettyExp vl (App t [a,b] _) | t == funcApply = vl <> keyword "apply" <+> prettyVal a <+> prettyVal b
 prettyExp vl (App a vs _)  = vl <> func (fromAtom a) <+> hsep (map prettyVal vs)
-prettyExp vl (Prim Primitive { primAPrim = APrim (Peek t) _ } [v])  = vl <> prim t <> char '[' <> prettyVal v <> char ']'
+prettyExp vl (Prim Primitive { primAPrim = APrim (Peek t) _ } [v])  = vl <> prim (show t) <> char '[' <> prettyVal v <> char ']'
 prettyExp vl (Prim Primitive { primName = nm } vs)  = vl <> prim (fromAtom nm) <+> hsep (map prettyVal vs)
 prettyExp vl (Update x y) = vl <> keyword "update" <+> prettyVal x <+> prettyVal y
 prettyExp vl (Case v vs) = vl <> keyword "case" <+> prettyVal v <+> keyword "of" <$> indent 2 (vsep (map f vs)) where

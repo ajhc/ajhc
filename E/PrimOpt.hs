@@ -165,7 +165,7 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
 --                (EPrim (APrim (Operator cop [ta,ta] tr) mempty) [pa, pb] str) t
 --        return bp
     primopt "equalsChar" [a,b] t = return (EPrim (APrim (Op (Op.BinOp Op.Eq Op.bits32 Op.bits32) Op.bits_int) mempty) [a,b] t)
-    primopt "constPeekByte" [a] t = return (EPrim (APrim (Peek "bits8") mempty) [a] t)
+    primopt "constPeekByte" [a] t = return (EPrim (APrim (Peek Op.bits8) mempty) [a] t)
     primopt "box" [a] t = return ans where
         Just (cna,_sta,_ta) = lookupCType' dataTable t
         ans = ELit litCons { litName = cna, litArgs = [a], litType = orig_t }

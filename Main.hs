@@ -33,7 +33,7 @@ import E.Program
 import E.Rules
 import E.Show hiding(render)
 import E.Subst(subst)
-import E.ToHs
+--import E.ToHs
 import E.Traverse
 import E.TypeAnalysis
 import E.TypeCheck
@@ -598,7 +598,8 @@ compileModEnv' (cho,_) = do
 
     when viaGhc $ do
         wdump FD.Core $ printProgram prog
-        compileToHs prog
+        fail "Compiling to GHC currently disabled"
+        --compileToHs prog
         exitSuccess
 
     wdump FD.CoreBeforelift $ printProgram prog
