@@ -138,8 +138,9 @@ fetchVar' v ty = do
     return $ (varName v,t)
 
 convertVal :: Val -> C Expression
+convertVal (Tup [x]) = convertVal x
+convertVal v | Just e <- convertConst v = return e
 convertVal (Var v ty) = fetchVar v ty
-convertVal (Const (NodeC h _)) | h == tagHole = return (cast sptr_t (f_VALUE (constant $ number 0)))
 convertVal (Const h) = do
     tyenv <- asks (grinTypeEnv . rGrin)
     case h of
@@ -154,12 +155,7 @@ convertVal h@(NodeC a ts) | valIsConstant h = do
         _ -> do
             (_,i) <- newConst h
             return $ f_PROMOTE (variable (name $  'c':show i ))
-convertVal (Lit i ty)
-    | ty == Ty (toAtom "float") || ty == Ty (toAtom "double") = return (constant $ floating (fromIntegral i))
-    | otherwise = return (constant $ number (fromIntegral i))
 
-convertVal (Tup [x]) = convertVal x
-convertVal (Tup []) = return emptyExpression
 convertVal (Tup xs) = do
     ts <- mapM convertType (map getType xs)
     xs <- mapM convertVal xs
@@ -171,17 +167,18 @@ convertVal (ValPrim (APrim p _) [] _) = case p of
     PrimTypeInfo { primArgType = arg, primTypeInfo = PrimSizeOf } -> return $ expressionRaw ("sizeof(" ++ arg ++ ")")
     PrimString s -> return $ expressionRaw (show s)
     x -> return $ err ("convertVal: " ++ show x)
-convertVal (ValPrim (APrim p _) [x] _) = do
+convertVal (ValPrim (APrim p _) [x] (TyPrim opty)) = do
     x' <- convertVal x
     case p of
-        CCast _ to -> return $ cast (basicType to) x'
---        Operator n [_] r ->  return $ cast (basicType r) (uoperator n x')
+        CCast _ to -> return $ cast (opTyToC opty) x'
+        Op (Op.UnOp n ta) r -> primUnOp n ta r x'
+        Op (Op.ConvOp n ta) r -> return $ castFunc n ta r x'
         x -> return $ err ("convertVal: " ++ show x)
 convertVal (ValPrim (APrim p _) [x,y] _) = do
     x' <- convertVal x
     y' <- convertVal y
     case p of
---        Operator n [_,_] r -> return $ cast (basicType r) (operator n x' y')
+        Op (Op.BinOp n ta tb) r -> primBinOp n ta tb r x' y'
         x -> return $ err ("convertVal: " ++ show x)
 
 convertVal x = return $ err ("convertVal: " ++ show x)
@@ -192,25 +189,35 @@ convertType (TyPtr TyNode) = return sptr_t
 convertType (TyPtr (TyPtr TyNode)) = return $ ptrType sptr_t
 convertType (Ty t) = return (basicType (toString t))
 convertType (TyPrim opty) = return (opTyToC opty)
-convertType (TyPrim (Op.TyBits (Op.BitsExt s) _)) = return (basicType s)
-convertType (TyPrim (Op.TyBits (Op.Bits n) _)) = return (basicType $ "uint" ++ show n ++ "_t")
-convertType (TyPrim (Op.TyBits (Op.BitsArch Op.BitsInt) _)) = return $ basicType "unsigned"
-convertType (TyPrim (Op.TyBits (Op.BitsArch Op.BitsMax) _)) = return $ basicType "uintmax_t"
-convertType (TyPrim (Op.TyBits (Op.BitsArch Op.BitsPtr) _)) = return $ basicType "uintptr_t"
 convertType (TyTup []) = return voidType
 convertType (TyTup [x]) = convertType x
 convertType (TyTup xs) = do
     xs <- mapM convertType xs
     return (anonStructType xs)
 
-opTyToC opty = basicType (opTyToC' opty)
+forceHint _ Op.TyBool = Op.TyBool
+forceHint h (Op.TyBits b _) = Op.TyBits b h
 
-opTyToC' Op.TyBool = "bool"
-opTyToC' (Op.TyBits (Op.BitsExt s) _) = s
-opTyToC' (Op.TyBits (Op.Bits n) _) =  "uint" ++ show n ++ "_t"
-opTyToC' (Op.TyBits (Op.BitsArch Op.BitsInt) _) = "unsigned"
-opTyToC' (Op.TyBits (Op.BitsArch Op.BitsMax) _) = "uintmax_t"
-opTyToC' (Op.TyBits (Op.BitsArch Op.BitsPtr) _) = "uintptr_t"
+tyToC _ Op.TyBool = "bool"
+tyToC dh (Op.TyBits (Op.BitsExt s) _) = s
+tyToC dh (Op.TyBits b h) = f b h where
+    f b Op.HintNone = f b dh
+    f b Op.HintUnsigned = case b of
+        (Op.Bits n) ->  "uint" ++ show n ++ "_t"
+        (Op.BitsArch Op.BitsInt) -> "unsigned"
+        (Op.BitsArch Op.BitsMax) -> "uintmax_t"
+        (Op.BitsArch Op.BitsPtr) -> "uintptr_t"
+    f b Op.HintSigned = case b of
+        (Op.Bits n) ->  "int" ++ show n ++ "_t"
+        (Op.BitsArch Op.BitsInt) -> "int"
+        (Op.BitsArch Op.BitsMax) -> "intmax_t"
+        (Op.BitsArch Op.BitsPtr) -> "intptr_t"
+
+
+opTyToC opty = basicType (tyToC Op.HintUnsigned opty)
+
+opTyToC' opty = tyToC Op.HintUnsigned opty
+
 
 convertBody :: Exp -> C Statement
 convertBody (Prim p [a,b] :>>= Tup [q,r] :-> e') | primName p == toAtom "@primQuotRem" = do
@@ -334,7 +341,8 @@ convertBody (Error s t) = do
         f TyNode = return nullPtr
         f (TyTup []) = return emptyExpression
         f (TyTup xs) = do ts <- mapM convertType xs; xs <- mapM f xs ; return $ structAnon (zip xs ts)
-        f (Ty x) = return $ cast (basicType (show x)) (constant $ number 0)
+        f (TyPrim x) = return $ cast (opTyToC x) (constant $ number 0)
+        --f (Ty x) = return $ cast (basicType (show x)) (constant $ number 0)
         f TyTag  = return $ constant (enum $ nodeTagName tagHole)
         f x = return $ err ("error-type " ++ show x)
     case x of
@@ -506,10 +514,13 @@ buildConstants tyenv fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
         rs = [ f z undefined |  z <- zs ]
         f (Right i) = text $ 'c':show i
         f (Left (Var n _)) = tshow $ varName n
-        f (Left v) | Just e <- convertConst v = text (show $ drawG e)
+        f (Left v) = text (show $ drawG e) where
+            Just e = convertConst v
 
 convertConst :: Monad m => Val -> m Expression
-convertConst (Const (NodeC h _)) | h == tagHole = return nullPtr
+convertConst (Const (NodeC h _)) | h == tagHole = return (cast sptr_t (f_VALUE (constant $ number 0)))
+convertConst (Lit i (TyPrim Op.TyBool)) = return $ if i == 0 then constant cFalse else constant cTrue
+convertConst (Lit i (TyPrim (Op.TyBits _ Op.HintFloat))) = return (constant $ floating (realToFrac i))
 convertConst (Lit i _) = return (constant $ number (fromIntegral i))
 convertConst (Tup [x]) = convertConst x
 convertConst (Tup []) = return emptyExpression
@@ -522,13 +533,14 @@ convertConst (ValPrim (APrim p _) [x] (TyPrim opty)) = do
     x' <- convertConst x
     case p of
         CCast _ to -> return $ cast (opTyToC opty) x'
---        Operator n [_] r ->  return $ cast (basicType r) (uoperator n x')
+        Op (Op.UnOp n ta) r -> primUnOp n ta r x'
+        Op (Op.ConvOp n ta) r -> return $ castFunc n ta r x'
         x -> return $ err (show x)
 convertConst (ValPrim (APrim p _) [x,y] _) = do
     x' <- convertConst x
     y' <- convertConst y
     case p of
---        Operator n [_,_] r -> return $ cast (basicType r) (operator n x' y')
+        Op (Op.BinOp n ta tb) r -> primBinOp n ta tb r x' y'
         x -> return $ err (show x)
 convertConst x = fail "convertConst"
 
@@ -540,13 +552,9 @@ convertPrim p vs
     | APrim (CCast _ to) _ <- primAPrim p, [a] <- vs = do
         a' <- convertVal a
         return $ cast (opTyToC (stringNameToTy to)) a'
---    | APrim (Operator n [ta] r) _ <- primAPrim p, [a] <- vs = do
---        a' <- convertVal a
---        return $ cast (basicType r) (uoperator n a')
---    | APrim (Operator n [ta,tb] r) _ <- primAPrim p, [a,b] <- vs = do
---        a' <- convertVal a
---        b' <- convertVal b
---        return $ cast (basicType r) (operator n a' b')
+    | APrim Op {} _ <- primAPrim p = do
+        let (_,rt) = primType p
+        convertVal (ValPrim (primAPrim p) vs rt)
     | APrim (Func _ n as r) _ <- primAPrim p = do
         vs' <- mapM convertVal vs
         return $ cast (basicType r) (functionCall (name $ unpackPS n) [ cast (basicType t) v | v <- vs' | t <- as ])
@@ -560,6 +568,39 @@ convertPrim p vs
     | APrim (AddrOf t) _ <- primAPrim p, [] <- vs = do
         return $ expressionRaw ('&':unpackPS t)
     | otherwise = return $ err ("prim: " ++ show (p,vs))
+
+signedOps = [
+    (Op.Div,"/"),  -- TODO round to -Infinity
+    (Op.Mod,"%"),  -- TODO round to -Infinity
+    (Op.Quot,"/"),
+    (Op.Rem,"%"),
+    (Op.Shra,">>"),
+    (Op.Gt,">"),
+    (Op.Lt,"<"),
+    (Op.Gte,">="),
+    (Op.Lte,"<=")
+    ]
+
+
+binopSigned :: Op.BinOp -> Maybe String
+binopSigned b = lookup b signedOps
+
+castSigned ty v = return $ cast (basicType $ tyToC Op.HintSigned ty) v
+
+primBinOp n ta tb r a b
+    | Just (t,_) <- Op.binopInfix n = return $ operator t a b
+    | Just t <- binopSigned n = do
+        a <- castSigned ta a
+        b <- castSigned tb b
+        return $ operator t a b
+    | otherwise = return $ err ("primBinOp: " ++ show ((n,ta,tb,r),a,b))
+
+primUnOp Op.Neg ta r a = do
+    a <- castSigned ta a
+    return $ uoperator "-" a
+primUnOp Op.Com ta r a = do return $ uoperator "~" a
+primUnOp n ta r a
+    | otherwise = return $ err ("primUnOp: " ++ show ((n,ta,r),a))
 
 
 tagAssign :: Expression -> Atom -> C Statement
@@ -586,13 +627,6 @@ tellTags t = do
         Nothing -> tell mempty { wTags = Set.singleton t }
 
 
-{-
-newNode ty node = do
-    u <- newUniq
-    let n = name $ 'x':show u
-    d <- newVarNode ty n node
-    return (d,localVariable ty n)
--}
 
 newNode ty ~(NodeC t as) = do
     tyenv <- asks (grinTypeEnv . rGrin)
@@ -657,35 +691,12 @@ declareEvalFunc n = do
     return fname
 
 
---------
--- shape
---------
-
-
-toShape TyPtr {} = ShapeNativePtr
-toShape TyNode = ShapeNativePtr
-toShape (Ty bt)
-    | show bt == "int" = ShapeNativeInt
-    | show bt == "HsPtr" = ShapeNativePtr
-    | show bt == "HsFunPtr" = ShapeNativePtr
-toShape (Ty bt) = case genericPrimitiveInfo (show bt) of
-    Just v -> ShapeBits $ primTypeSizeOf v
-    Nothing -> error $ "toShape: " ++ show bt
-toShape t = error $ "toShape: " ++ show t
-
-newtype Shapes = Shapes [Shape]
-    deriving(Eq,Ord)
-
-data Shape = ShapeNativePtr | ShapeNativeInt | ShapeBits !Int
-    deriving(Eq,Ord)
-
-instance Show Shape where
-    showsPrec _ ShapeNativeInt = ('i':)
-    showsPrec _ ShapeNativePtr = ('p':)
-    showsPrec _ (ShapeBits n) = ('b':) . shows n
-
-instance Show Shapes where
-    showsPrec _ (Shapes s) = foldr (.) id (map shows s)
+castFunc :: Op.ConvOp -> Op.Ty -> Op.Ty -> Expression -> Expression
+castFunc co ta tb e | ta == tb = e
+castFunc co _ Op.TyBool e = cast (basicType "bool") e
+castFunc co Op.TyBool tb e = cast (opTyToC tb) e
+-- TODO fix
+castFunc _ _ tb e = cast (opTyToC tb) e
 
 
 
