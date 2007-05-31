@@ -296,7 +296,7 @@ lexBOL = do
 lexToken :: Lex a Token
 lexToken = do
     s <- getInput
-    ParseMode { parseUnboxedTuples = utup, parseFFI = doFFI } <- lexParseMode
+    ParseMode { parseUnboxedValues = uval, parseUnboxedTuples = utup, parseFFI = doFFI } <- lexParseMode
     case s of
         [] -> return EOF
         '(':'#':_ | utup -> do
@@ -323,7 +323,10 @@ lexToken = do
 		  | toLower c == 'x' && isHexDigit d -> do
 			discard 2
 			n <- lexHexadecimal
-			return (IntTok n)
+                        rest <- getInput
+                        case rest of
+                            '#':_ | uval -> discard 1 >> return (UIntTok n)
+                            _ -> return (IntTok n)
 
 	c:_ | isDigit c -> lexDecimalOrFloat
 
@@ -368,7 +371,10 @@ lexToken = do
 		    '\'' -> do
 			    c2 <- lexChar
 			    matchChar '\'' "Improperly terminated character constant"
-			    return (Character c2)
+                            rest <- getInput
+                            case rest of
+                                '#':_ | uval -> discard 1 >> return (UIntTok $ fromIntegral $ ord c2)
+                                _ -> return (Character c2)
 
 		    '"' ->  lexString
 

@@ -165,7 +165,7 @@ tiExpr (HsLit l@(HsIntPrim _)) typ = do
     ty <- evalType typ
     case ty of
         TCon (Tycon n kh) | kh == kindHash -> return ()
-        _ -> ty `boxyMatch` (TCon (Tycon tc_Int__ kindHash))
+        _ -> ty `boxyMatch` (TCon (Tycon tc_Bits32 kindHash))
     (ne,n) <- wrapInAsPat (HsLit l)
     addToCollectedEnv (Map.singleton n ty)
     return ne
@@ -851,7 +851,7 @@ tiLit (HsFrac _) = do
     --    addPreds [IsIn class_Fractional v]
     --    return v
 
-tiLit (HsStringPrim _)  = return (TCon (Tycon tc_Addr__ kindHash))
+tiLit (HsStringPrim _)  = return (TCon (Tycon tc_BitsPtr kindHash))
 tiLit (HsString _)  = return tString
 
 
