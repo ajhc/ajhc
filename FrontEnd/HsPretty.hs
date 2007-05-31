@@ -28,7 +28,6 @@ import FlagDump as FD
 import FrontEnd.Rename(unRename)
 import FrontEnd.SrcLoc(Located(..))
 import HsSyn
-import Name.VConsts
 import Name.Names
 import Name.Name
 import Options
@@ -131,36 +130,23 @@ float = return . P.float
 double :: Double -> Doc
 double = return . P.double
 
-rational :: Rational -> Doc
-rational = return . P.rational
 
 -- Simple Combining Forms
 
-parens, brackets, braces,quotes,doubleQuotes :: Doc -> Doc
+parens, brackets, braces :: Doc -> Doc
 parens d = d >>= return . P.parens
 parenszh d = d >>= \d' -> return $ P.text "(# " P.<> d' P.<> P.text " #)"
 
 brackets d = d >>= return . P.brackets
 braces d = d >>= return . P.braces
-quotes d = d >>= return . P.quotes
-doubleQuotes d = d >>= return . P.doubleQuotes
 
 -- Constants
 
-semi,comma,colon,space,equals :: Doc
+semi,comma,equals :: Doc
 semi = return P.semi
 comma = return P.comma
-colon = return P.colon
-space = return P.space
 equals = return P.equals
 
-lparen,rparen,lbrack,rbrack,lbrace,rbrace :: Doc
-lparen = return  P.lparen
-rparen = return  P.rparen
-lbrack = return  P.lbrack
-rbrack = return  P.rbrack
-lbrace = return  P.lbrace
-rbrace = return  P.rbrace
 
 -- Combinators
 --
@@ -172,21 +158,13 @@ instance DocLike Doc where
     hsep dl = sequence dl >>= return . P.hsep
     vcat dl = sequence dl >>= return . P.vcat
 
-($$),($+$) :: Doc -> Doc -> Doc
+($$) :: Doc -> Doc -> Doc
 aM $$ bM = do{a<-aM;b<-bM;return (a P.$$ b)}
-aM $+$ bM = do{a<-aM;b<-bM;return (a P.$+$ b)}
 
 
-sep,cat,fsep,fcat :: [Doc] -> Doc
-sep dl = sequence dl >>= return . P.sep
-cat dl = sequence dl >>= return . P.cat
+fsep :: [Doc] -> Doc
 fsep dl = sequence dl >>= return . P.fsep
-fcat dl = sequence dl >>= return . P.fcat
 
--- Some More
-
-hang :: Doc -> Int -> Doc -> Doc
-hang dM i rM = do{d<-dM;r<-rM;return $ P.hang d i r}
 
 -- Yuk, had to cut-n-paste this one from Pretty.hs
 punctuate :: Doc -> [Doc] -> [Doc]
@@ -205,15 +183,6 @@ renderWithMode ppMode d = P.render . unDocM d $ ppMode
 render :: Doc -> String
 render = renderWithMode defaultMode
 
-fullRenderWithMode :: PPHsMode -> P.Mode -> Int -> Float ->
-		      (P.TextDetails -> a -> a) -> a -> Doc -> a
-fullRenderWithMode ppMode m i f fn e mD =
-		   P.fullRender m i f fn e $ (unDocM mD) ppMode
-
-
-fullRender :: P.Mode -> Int -> Float -> (P.TextDetails -> a -> a)
-	      -> a -> Doc -> a
-fullRender = fullRenderWithMode defaultMode
 
 -------------------------  Pretty-Print a Module --------------------
 ppHsModule :: HsModule -> Doc
@@ -659,9 +628,6 @@ bracketList = brackets . myFsepSimple
 
 -- Monadic PP Combinators -- these examine the env
 
-blankline :: Doc -> Doc
-blankline dl = do{e<-getPPEnv;if spacing e && layout e /= PPNoLayout
-			      then space $$ dl else dl}
 topLevel :: Doc -> [Doc] -> Doc
 topLevel header dl = do
 	 e <- fmap layout getPPEnv

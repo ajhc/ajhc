@@ -25,7 +25,6 @@ import E.Traverse
 import E.TypeCheck
 import E.Values
 import GenUtil
-import qualified Info.Info as Info
 import Info.Types
 import Name.Id
 import Name.Name
@@ -35,6 +34,7 @@ import Support.CanType
 import Support.FreeVars
 import Util.SetLike
 import Util.UniqueMonad()
+import qualified Info.Info as Info
 import qualified Util.Graph as G
 
 

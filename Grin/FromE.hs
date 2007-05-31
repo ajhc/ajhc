@@ -1,21 +1,17 @@
 module Grin.FromE(compile) where
 
 import Char
-import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.Trans
 import Data.Graph(stronglyConnComp, SCC(..))
 import Data.IORef
-import Data.Map(Map)
 import Data.Monoid
-import Data.Typeable
 import List
 import Maybe
-import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.Map as Map
 
 import Atom
-import PackedString
 import C.Arch
 import C.FFI hiding(Primitive)
 import C.Prims
@@ -38,10 +34,8 @@ import Info.Types
 import Name.Id
 import Name.Name
 import Name.Names
-import Name.VConsts
 import Options
-import qualified C.Op as Op
-import PrimitiveOperators
+import PackedString
 import Stats(mtick)
 import Support.CanType
 import Support.FreeVars
@@ -51,6 +45,7 @@ import Util.Once
 import Util.SetLike
 import Util.UniqueMonad()
 import qualified C.FFI as FFI
+import qualified C.Op as Op
 import qualified FlagDump as FD
 import qualified Info.Info as Info
 import qualified Stats

@@ -9,8 +9,6 @@ import Doc.DocLike
 import Doc.PPrint
 import HsSyn
 import Name.Name
-import Name.Names
-import Name.VConsts
 
 
 

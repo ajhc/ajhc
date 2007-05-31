@@ -20,7 +20,7 @@ import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Monoid
 import Data.Generics
-import Data.List((\\),partition,nub)
+import Data.List(nub)
 import Text.PrettyPrint.HughesPJ(render,Doc())
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
@@ -38,16 +38,12 @@ import Maybe
 import Monad
 import Name.Name
 import Name.Names
-import Name.VConsts
-import Options
 import Support.CanType
 import PrimitiveOperators(primitiveInsts)
 import Support.FreeVars
 import Util.Gen
 import Util.HasSize
 import Util.Inst()
-import Util.SetLike
-import qualified FlagOpts as FO
 import Support.Tickle
 
 --------------------------------------------------------------------------------
@@ -312,12 +308,6 @@ instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsClassDecl _ qualType me
 instanceToTopDecls _ _ _ = mempty
 
 
-
-getHsTypeCons (HsTyCon n) = n
-getHsTypeCons (HsTyApp a _) = getHsTypeCons a
-getHsTypeCons (HsTyFun {}) = nameName (tc_Arrow)
-getHsTypeCons (HsTyTuple xs) = toTuple (length xs)
-getHsTypeCons x = error $ "getHsTypeCons: " ++ show x
 
 
 instanceName n t = toName Val $ Qual (Module "Instance@") $ HsIdent ('i':show n ++ "." ++ show t)
