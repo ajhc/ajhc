@@ -2,7 +2,7 @@
 
 # limits.h, float.h, inttypes.h
 
-Jhc.Prim.Char, ubits32, char, UINT32_MAX, 0
+# Jhc.Prim.Char, ubits32, char, UINT32_MAX, 0
 Jhc.Prim.Int, sbits32, int, INT_MAX, INT_MIN
 Jhc.Basics.Integer, sbits<max>, int, INTMAX_MAX, INTMAX_MIN
 

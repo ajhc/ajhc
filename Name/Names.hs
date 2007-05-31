@@ -66,9 +66,6 @@ tc_Arrow = toName TypeConstructor  ("Jhc@","->")
 
 tc_Int__ = toName TypeConstructor  ("Jhc.Prim","Int__")
 tc_Addr__ = toName TypeConstructor  ("Jhc.Prim","Addr__")
-tc_Word8__ = toName TypeConstructor  ("Jhc.Prim","Word8__")
-tc_Char__ = toName TypeConstructor  ("Jhc.Prim","Char__")
-tc_Bool__ = toName TypeConstructor  ("Jhc.Prim","Bool__")
 tc_Array__ = toName TypeConstructor  ("Jhc.Array","Array__")
 tc_MutArray__ = toName TypeConstructor  ("Jhc.Array","MutArray__")
 tc_Ref__ = toName TypeConstructor ("Data.IORef","Ref__")
@@ -77,8 +74,6 @@ tc_Ref__ = toName TypeConstructor ("Data.IORef","Ref__")
 tc_Boolzh = toName TypeConstructor ("Jhc.Order","Bool#")
 tc_List = toName TypeConstructor  ("Jhc.Prim","[]")
 
-
-rt_tag = toName RawType "tag#"
 
 s_Star = toName SortName ("Jhc@","*")
 s_Hash = toName SortName ("Jhc@","#")

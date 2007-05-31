@@ -173,7 +173,6 @@ from_unsafeCoerce _ = fail "Not unsafeCoerce primitive"
 rawType s = ELit litCons { litName = toName RawType s, litType = eHash }
 
 tWorldzh = ELit litCons { litName = tc_World__, litArgs = [], litType = eHash }
-tTag = ELit litCons { litName = rt_tag, litArgs = [], litType = eHash }
 
 unsafeCoerceOpt (EPrim (APrim (PrimPrim uc) _) [e] t) | uc == packString "unsafeCoerce" = f (0::Int) e t where
     f n e t | Just (e',_) <- from_unsafeCoerce e = f (n + 1) e' t

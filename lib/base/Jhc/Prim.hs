@@ -14,9 +14,9 @@ newtype IO a = IO (World__ -> (# World__, a #))
 data World__ :: #
 
 data Int
-data Char
+data Char = Char Char__
 
-type Bool__ = Bits1_
+type Bool__ = Bits32_ -- Change to Bits1_ when the time comes
 type Addr__ = BitsPtr_
 type Int__  = Bits32_
 type Char__ = Bits32_

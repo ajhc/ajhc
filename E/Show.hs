@@ -68,7 +68,6 @@ showLit showBind l = do
         f (LitInt i (ELit LitCons { litName = n })) | Just l <- lookup n enumList, i >= 0 && fromIntegral i < length l =
             return $ atom $ (const_color (text $ l !! (fromIntegral i)))
         f (LitInt i _) = return $ atom $ (const_color (text $ show i))
-        f LitCons { litName = n, litArgs = [], litType = t } | t == tTag = return $  atom $ (const_color (text $ show n))
         f LitCons { litName = s, litArgs = es } | Just n <- fromTupname s , n == length es = do
             es' <- mapM (fmap unparse . showBind) es
             return $ atom $ tupled es'
@@ -254,7 +253,4 @@ bold = attrBold (attr oob)
 ePretty e = unparse pe where
     (SEM pe') = showE e
     Identity pe = runVarNameT pe'
-
-tTag = rawType "tag#"
-rawType s  = ELit litCons { litName = toName RawType s, litType = eHash }
 

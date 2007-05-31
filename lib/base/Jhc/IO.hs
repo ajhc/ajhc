@@ -2,8 +2,13 @@
 
 module Jhc.IO(
     IO(..),
+    thenIO,
+    thenIO_,
+    returnIO,
+
     UIO(),
     UIO_(),
+
     World__(),
     catch,
     unIO,
@@ -147,6 +152,9 @@ IO a `thenIO_` IO b = IO $ \w -> case a w of
 
 IO a `thenIO` b = IO $ \w -> case a w of
     (# w', v #) -> unIO (b v) w'
+
+returnIO :: a -> IO a
+returnIO x = IO $ \w -> (# w, x #)
 
 {-# NOINLINE error #-}
 error s = unsafePerformIO' $

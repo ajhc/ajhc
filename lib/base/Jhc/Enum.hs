@@ -1,8 +1,9 @@
-{-# OPTIONS_JHC -N -fffi #-}
+{-# OPTIONS_JHC -N -fffi -funboxed-values #-}
 module Jhc.Enum(Enum(..),Bounded(..)) where
 -- Enumeration and Bounded classes
 
 import Data.Int
+import Jhc.Types
 import Jhc.Basics
 import Jhc.Order
 import Jhc.Int
@@ -66,15 +67,27 @@ instance Enum Char where
                       where lastChar :: Char
                             lastChar | c' < c    = minBound
                                      | otherwise = maxBound
-    enumFromTo x y = f x where
-        f x | x > y = []
-            | otherwise = x:f (incrementChar x)
-    enumFromThenTo x y z | y `seq` True = f x where
-        inc = y `minusChar` x
-        f x | x >= z = x:f (x `plusChar` inc)
-            | otherwise = []
+    enumFromTo (Char x) (Char y) = f x where
+        f x = case x `bits32UGt` y of
+            0# -> []
+            1# -> Char x:f (bits32Increment x)
+    enumFromThenTo (Char x) (Char y) (Char z) =
+        case y `bits32Sub` x of
+            inc -> let f x = case x `bits32UGte` z of
+                            1# -> Char x:f (x `bits32Add` inc)
+                            0# -> []
+             in f x
 
 
-foreign import primitive "increment" incrementChar :: Char -> Char
-foreign import primitive "plus"      plusChar      :: Char -> Char -> Char
-foreign import primitive "minus"     minusChar     :: Char -> Char -> Char
+instance Bounded Char where
+    minBound = Char 0#
+    maxBound = Char 0x10ffff#
+
+foreign import primitive "UGt"       bits32UGt       :: Bits32_ -> Bits32_ -> Bool__
+foreign import primitive "UGte"       bits32UGte      :: Bits32_ -> Bits32_ -> Bool__
+foreign import primitive "increment" bits32Increment :: Bits32_ -> Bits32_
+
+foreign import primitive "Add"       bits32Add      :: Bits32_ -> Bits32_ -> Bits32_
+foreign import primitive "Sub"       bits32Sub      :: Bits32_ -> Bits32_ -> Bits32_
+
+

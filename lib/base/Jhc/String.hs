@@ -19,7 +19,7 @@ unpackString :: Addr__ -> [Char]
 unpackString addr = f addr where
     f addr = case constPeekByte addr of
         0# -> []
-        c -> (box c:f (increment addr))
+        c -> (Char c:f (increment addr))
 
 {-
 unpackFoldrString :: Addr__ -> (Char__ -> b -> b) -> b -> b
@@ -51,21 +51,21 @@ unpackStringFoldr :: Addr__ -> (Char -> b -> b) -> b -> b
 unpackStringFoldr addr cons nil = f addr where
     f addr = case constPeekByte addr of
         0# -> nil
-        c -> (box c `cons` f (increment addr))
+        c -> (Char c `cons` f (increment addr))
 
 {-# NOINLINE eqUnpackedString #-}
 eqUnpackedString :: Addr__ -> [Char] -> Bool__
 eqUnpackedString addr cs = f addr cs where
     f :: Addr__ -> [Char] -> Bool__
     f offset [] = case constPeekByte offset of 0# -> 1#; _ -> 0#
-    f offset (c:cs) = case constPeekByte offset of
+    f offset (Char c:cs) = case constPeekByte offset of
         0# -> 0#
-        uc -> case equalsChar uc (unbox c) of
+        uc -> case equalsChar uc c of
             0# -> 0#
             1# -> f (increment offset) cs
 
 eqSingleChar :: Char__ -> [Char] -> Bool__
-eqSingleChar ch (c:cs) = case equalsChar ch (unbox c) of
+eqSingleChar ch (Char c:cs) = case equalsChar ch c of
     0# -> 0#
     1# -> case cs of
         [] -> 1#
@@ -77,9 +77,9 @@ eqUnpacked :: Addr__ -> [Char] -> Bool__
 eqUnpacked addr cs = f addr cs where
     f :: Addr__ -> [Char] -> Bool__
     f offset [] = case constPeekByte offset of 0# -> 1#; _ -> 0#
-    f offset (c:cs) = case constPeekByte offset of
+    f offset (Char c:cs) = case constPeekByte offset of
         0# -> 0#
-        uc -> case equalsChar uc (unbox c) of
+        uc -> case equalsChar uc c of
             0# -> 0#
             1# -> f (increment offset) cs
 
@@ -89,15 +89,13 @@ foreign import primitive constPeekByte :: Addr__ -> Char__
 
 eqString :: [Char] -> [Char] -> Bool__
 eqString [] [] = 1#
-eqString (x:xs) (y:ys) = case equalsChar (unbox x) (unbox y) of
+eqString (Char x:xs) (Char y:ys) = case equalsChar x y of
     0# -> 0#
     1# -> eqString xs ys
 eqString _ _ = 0#
 
-foreign import primitive unbox :: Char -> Char__
 foreign import primitive increment :: Addr__ -> Addr__
-foreign import primitive box :: Char__ -> Char
-foreign import primitive equalsChar :: Char__ -> Char__ -> Bool__
+foreign import primitive "Eq" equalsChar :: Char__ -> Char__ -> Bool__
 
 
 

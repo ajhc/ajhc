@@ -2,6 +2,7 @@
 TypeConstructor:tc:
 
 JumpPoint Jhc.JumpPoint.JumpPoint
+Char      Jhc.Prim.Char
 IO        Jhc.Prim.IO
 World__   Jhc.Prim.World__
 Bool      Jhc.Order.Bool
@@ -37,6 +38,7 @@ EmptyList  Jhc.Prim.[]
 Unit       Jhc.Basics.()
 Boolzh     Jhc.Order.Bool#
 Target     Jhc.Options.Target#
+Char       Jhc.Prim.Char
 
 ClassName:class:
 Eq              Jhc.Order.Eq

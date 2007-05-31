@@ -622,12 +622,12 @@ toTVr assumps dataTable n = tVr (toId n) typeOfName where
 integer_cutoff = 500000000
 
 intConvert i | abs i > integer_cutoff  =  ELit (litCons { litName = dc_Integer, litArgs = [ELit $ LitInt (fromInteger i) (rawType "bits<max>")], litType = tInteger })
-intConvert i =  ELit (litCons { litName = dc_Int, litArgs = [ELit $ LitInt (fromInteger i) (rawType "bits<int>")], litType = tInt })
+intConvert i =  ELit (litCons { litName = dc_Int, litArgs = [ELit $ LitInt (fromInteger i) (rawType "bits32")], litType = tInt })
 
 intConvert' funcs typ i = EAp (EAp fun typ) (ELit (litCons { litName = con, litArgs = [ELit $ LitInt (fromInteger i) (rawType rawtyp)], litType = ltype }))  where
     (con,ltype,fun,rawtyp) = case abs i > integer_cutoff of
         True -> (dc_Integer,tInteger,f_fromInteger,"bits<max>")
-        False -> (dc_Int,tInt,f_fromInt,"bits<int>")
+        False -> (dc_Int,tInt,f_fromInt,"bits32")
     f_fromInt = func_fromInt funcs
     f_fromInteger = func_fromInteger funcs
 

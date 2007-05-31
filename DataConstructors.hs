@@ -480,7 +480,7 @@ deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where
         mkCmpFunc fname op = (iv_eq,ib_eq) where
             ib_eq = unbox (eStrictLet b3 (oper_IIB op (EVar i1) (EVar i2)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar b3], litType = tBool })))
             iv_eq = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (nameName $ conName c), tvrType = getType ib_eq }
-    oper_IIB op a b = EPrim (APrim (Op (Op.BinOp op Op.bits_int Op.bits_int) Op.bits_int) mempty) [a,b] tBoolzh
+    oper_IIB op a b = EPrim (APrim (Op (Op.BinOp op Op.bits32 Op.bits32) Op.bits32) mempty) [a,b] tBoolzh
 
 
 

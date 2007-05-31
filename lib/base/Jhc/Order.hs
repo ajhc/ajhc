@@ -74,6 +74,16 @@ instance Ord a => Ord [a] where
     compare [] _ = LT
     compare _ [] = GT
 
+instance Eq Char where
+    Char x == Char y = boxBool (equalsChar x y)
+    Char x /= Char y = boxBool (nequalsChar x y)
+
+instance Ord Char where
+    Char x < Char y = boxBool (bits32ULt x y)
+    Char x > Char y = boxBool (bits32UGt x y)
+    Char x <= Char y = boxBool (bits32ULte x y)
+    Char x >= Char y = boxBool (bits32UGte x y)
+
 infixr 3  &&
 infixr 2  ||
 
@@ -91,4 +101,12 @@ not x = if x then False else True
 
 otherwise        :: Bool
 otherwise        =  True
+
+foreign import primitive "Eq" equalsChar :: Char__ -> Char__ -> Bool__
+foreign import primitive "NEq" nequalsChar :: Char__ -> Char__ -> Bool__
+foreign import primitive "ULt" bits32ULt :: Char__ -> Char__ -> Bool__
+foreign import primitive "ULte" bits32ULte :: Char__ -> Char__ -> Bool__
+foreign import primitive "UGt" bits32UGt :: Char__ -> Char__ -> Bool__
+foreign import primitive "UGte" bits32UGte :: Char__ -> Char__ -> Bool__
+foreign import primitive "box" boxBool :: Bool__ -> Bool
 

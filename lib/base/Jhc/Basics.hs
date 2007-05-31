@@ -2,6 +2,7 @@
 module Jhc.Basics(module Jhc.Basics, module Jhc.Prim) where
 
 import Jhc.Prim
+import Jhc.Int
 
 data Integer
 
@@ -153,5 +154,23 @@ foldr k z (x:xs) = k x (foldr k z xs)
 
 foreign import primitive "error.Prelude.undefined" undefined :: a
 
-foreign import primitive "U2U" ord :: Char -> Int
-foreign import primitive "I2I" chr :: Int -> Char
+ord :: Char -> Int
+ord (Char c) = boxInt c
+
+chr :: Int -> Char
+chr i = Char (unboxInt i)
+
+{-
+foreign import primitive "ULte" bits32ULte  :: Bits32_ -> Bits32_ -> Bool__
+foreign import primitive "error.Prelude.chr: value out of range" chr_error :: a
+
+chr :: Int -> Char
+chr i = case unboxInt i of
+    i' -> case i' `bits32ULTE` 0x10FFFF# of
+        1# -> Char i'
+        0# -> chr_error
+
+unsafeChr :: Int -> Char
+unsafeChr i = Char (unboxInt i)
+-}
+
