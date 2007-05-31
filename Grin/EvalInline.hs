@@ -13,9 +13,8 @@ import Grin.Noodle
 import GenUtil
 import Support.FreeVars(freeVars)
 import Support.CanType(getType)
-import C.Arch
 import Util.Once
-import Util.UniqueMonad
+import Util.UniqueMonad()
 
 data UpdateType =
     NoUpdate                  -- ^ no update is performed
@@ -55,11 +54,11 @@ createEval shared  te ts'
         Case n2 (mapExp (:>>= sup p1 sts) (f ot):map f whnfts)
     | SwitchingUpdate sts <- shared = let
             lf = createEval NoUpdate te ts
-            cu t | tagIsTag t && tagIsWHNF t = return ans where
-                (ts,_) = runIdentity $ findArgsType te t
-                vs = [ Var v ty |  v <- [V 4 .. ] | ty <- ts]
-                ans = NodeC t vs :-> Update p1 (NodeC t vs)
-            cu t = error $ "not updatable:" ++ show t
+--            cu t | tagIsTag t && tagIsWHNF t = return ans where
+--                (ts,_) = runIdentity $ findArgsType te t
+--                vs = [ Var v ty |  v <- [V 4 .. ] | ty <- ts]
+--                ans = NodeC t vs :-> Update p1 (NodeC t vs)
+--            cu t = error $ "not updatable:" ++ show t
         in (p1 :-> (Return p1 :>>= lf) :>>= sup p1 sts) --  n3 :-> Case n3 (concatMap cu sts) :>>= unit :-> Return n3)
     where
     ts = sortUnder toPackedString ts'
@@ -128,8 +127,8 @@ createApply argType retType te ts'
 {-# NOINLINE createEvalApply #-}
 createEvalApply :: Grin -> IO Grin
 createEvalApply grin = do
-    let eval = (funcEval,Tup [earg] :-> ebody) where
-            earg :-> ebody  =  createEval TrailingUpdate (grinTypeEnv grin) tags
+    let --eval = (funcEval,Tup [earg] :-> ebody) where
+        --    earg :-> ebody  =  createEval TrailingUpdate (grinTypeEnv grin) tags
         tags = Set.toList $ ftags `Set.union` plads
         ftags = freeVars (map (lamExp . snd) $ grinFuncs grin)
         plads = Set.fromList $ concatMap mplad (Set.toList ftags)

@@ -2,7 +2,6 @@ module Grin.Whiz(whiz, fizz, whizState, normalizeGrin,normalizeGrin', applySubst
 
 import Control.Monad.Identity
 import Control.Monad.State
-import Control.Monad.Trans
 import Control.Monad.Writer
 import Data.Monoid
 import qualified Data.Map as Map

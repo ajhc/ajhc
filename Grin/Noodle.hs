@@ -7,7 +7,7 @@ import Data.Monoid
 import qualified Data.Set as Set
 
 import Support.FreeVars
-import Atom(Atom(),toAtom)
+import Atom(Atom())
 import Grin.Val
 import Name.Names
 import Options(flint)

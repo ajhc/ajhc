@@ -1,4 +1,12 @@
-module Grin.Val(FromVal(..),ToVal(..),tn_2Tup,valToList,convertName,region_heap) where
+module Grin.Val(
+    FromVal(..),
+    ToVal(..),
+    tn_2Tup,
+    valToList,
+    convertName,
+    region_heap,
+    region_block
+    ) where
 
 import Atom
 import Char
