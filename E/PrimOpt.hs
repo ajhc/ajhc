@@ -7,7 +7,6 @@ import List
 import Monad
 import Control.Monad.Fix()
 import Maybe
-import qualified Data.Map as Map
 
 import Atom
 import PackedString
@@ -22,7 +21,6 @@ import E.E
 import E.Values
 import GenUtil
 import Name.Id
-import PrimitiveOperators
 import Stats
 import Support.CanType
 import Support.FreeVars
@@ -55,6 +53,7 @@ unbox dataTable e vn wtd = eCase e  [Alt (litCons { litName = cna, litArgs = [tv
 cextra Op {} [] = ""
 cextra Op {} xs = '.':map f xs where
     f ELit {} = 'c'
+    f EPrim {} = 'p'
     f _ = 'e'
 cextra _ _ = ""
 
@@ -80,6 +79,8 @@ instance Expression E E where
     toBool False = ELit lFalsezh
     toConstant (ELit (LitInt n t)) = return (n,t)
     toConstant _ = Nothing
+    equalsExpression e1 e2 = e1 == e2
+    caseEquals scrut (n,t) e1 e2 = eCase scrut [Alt (LitInt n t) e1 ] e2
     toExpression n t = (ELit (LitInt n t))
     createBinOp bop t1 t2 tr e1 e2 str =
                 EPrim (APrim Op { primCOp = Op.BinOp bop t1 t2, primRetTy = tr } mempty) [e1, e2] str

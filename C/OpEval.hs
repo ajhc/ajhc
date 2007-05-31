@@ -13,10 +13,14 @@ class Expression t e | e -> t where
     createUnOp  :: UnOp -> Ty -> Ty -> e -> t -> e
     fromUnOp :: e -> Maybe (UnOp,Ty,Ty,e,t)
     fromBinOp :: e -> Maybe (BinOp,Ty,Ty,Ty,e,e,t)
+    caseEquals :: e -> (Number,t) -> e -> e -> e
+
+    equalsExpression :: e -> e -> Bool
 
     toConstant _ = Nothing
     fromBinOp _ = Nothing
     fromUnOp _ = Nothing
+    equalsExpression _ _ = False
 
 TyBool `tyLte` _ = True
 TyBits (Bits x) _ `tyLte` TyBits (Bits y) _ = x <= y
@@ -68,7 +72,7 @@ binOp bop t1 t2 tr e1 e2 str | Just (v1,t1) <- toConstant e1, Just (v2,t2) <- to
         ops = [(ULt,(<)), (UGt,(>)), (ULte,(<=)), (UGte,(>=))]
     f _ _ _ =  Nothing
 -- we normalize ops such that constants are always on the left side
-binOp bop t1 t2 tr e1 e2 str | Just _ <- toConstant e2, Just bop' <- commuteBinOp bop = binOp bop' t2 t1 tr e2 e1 str `mplus` Just (createBinOp bop' t2 t1 tr e2 e1 str)
+binOp bop t1 t2 tr e1 e2 str | Just _ <- toConstant e2, Just bop' <- commuteBinOp bop = Just $ createBinOp bop' t2 t1 tr e2 e1 str
 binOp bop t1 t2 tr e1 e2 str = f bop e1 e2 where
     f Shr e1 e2 | Just (0,_) <- toConstant e2 = return e1
     f Shra e1 e2 | Just (0,_) <- toConstant e2 = return e1
@@ -88,10 +92,32 @@ binOp bop t1 t2 tr e1 e2 str = f bop e1 e2 where
     f Rem e1 e2 | Just (1,_) <- toConstant e2 = return  $ toExpression 0 str
     f UGt e1 _ | Just (0,_) <- toConstant e1 = return $ toBool False
     f ULte e1 _ | Just (0,_) <- toConstant e1 = return $ toBool True
---    f bop e1 e2 | isAssociative bop, Just (bop',t1',t2',tr',e1',e2',str') <- fromBinOp e1, bop == bop' = let
---        g binop = binop bop e1' (binop
---        in g binOp `mplus` g (Just . createBinOp)
+    f Eq e1 e2 | Just (v1,t1) <- toConstant e1 = return $ caseEquals e2 (v1,t1) (toBool True) (toBool False)
+    f NEq e1 e2 | Just (v1,t1) <- toConstant e1 = return $ caseEquals e2 (v1,t1) (toBool False) (toBool True)
+
+    f Eq e1 e2 | e1 `equalsExpression` e2 = return $ toBool True
+    f NEq e1 e2 | e1 `equalsExpression` e2 = return $ toBool False
+    f Lte e1 e2 | e1 `equalsExpression` e2 = return $ toBool True
+    f Gte e1 e2 | e1 `equalsExpression` e2 = return $ toBool True
+    f Lt e1 e2 | e1 `equalsExpression` e2 = return $ toBool False
+    f Gt e1 e2 | e1 `equalsExpression` e2 = return $ toBool False
+    f ULte e1 e2 | e1 `equalsExpression` e2 = return $ toBool True
+    f UGte e1 e2 | e1 `equalsExpression` e2 = return $ toBool True
+    f ULt e1 e2 | e1 `equalsExpression` e2 = return $ toBool False
+    f UGt e1 e2 | e1 `equalsExpression` e2 = return $ toBool False
+
+    f Sub e1 e2 | e1 `equalsExpression` e2 = return $ toExpression 0 str
+    f Xor e1 e2 | e1 `equalsExpression` e2 = return $ toExpression 0 str
+    f And e1 e2 | e1 `equalsExpression` e2 = return e1
+    f Or e1 e2 | e1 `equalsExpression` e2 = return e1
+    f bop e1 e2 | isAssociative bop, Just (bop',t1',t2',tr',e1',e2',str') <- fromBinOp e1, bop == bop' = Just $
+        createBinOp bop tr tr tr e1' (createBinOp bop tr tr tr e2' e2 str) str
     f bop e1 e2 = Nothing -- return $ createBinOp bop t1 t2 tr e1 e2 str
+
+binOp' :: Expression t e => BinOp -> Ty -> Ty -> Ty -> e -> e -> t -> e
+binOp' bop t1 t2 tr e1 e2 str =  case binOp bop t1 t2 tr e1 e2 str of
+    Just e -> e
+    Nothing -> createBinOp bop t1 t2 tr e1 e2 str
 
 {-
 unOp :: Expression t e => UnOp -> Ty -> Ty -> e -> t -> Maybe e
