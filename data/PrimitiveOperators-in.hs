@@ -61,7 +61,7 @@ oper_aaB op ct' a b = EPrim (binOp op ct ct ot_int) [a,b] tBoolzh where
     ct = stringToOpTy ct'
 oper_aaa op ct' a b = EPrim (binOp op ct ct ct) [a,b] (rawType ct') where
     ct = stringToOpTy ct'
-oper_aIa op ct' a b = EPrim (binOp op ct ot_int ct) [a,b] (rawType ct') where    
+oper_aIa op ct' a b = EPrim (binOp op ct ot_int ct) [a,b] (rawType ct') where
     ct = stringToOpTy ct'
 
 --zeroI =  LitInt 0 intt
@@ -193,30 +193,23 @@ createIO_ pv = toIO tUnit (ELam tvrWorld $  eStrictLet tvrWorld2 (pv tvrWorld)  
 
 
 prim_number cn v t et = ELit litCons { litName = cn, litArgs = [ELit (LitInt v t)], litType = et }
-prim_const cn s st t et = ELit litCons { litName = cn, litArgs = [EPrim (APrim (CConst s t) mempty) [] st], litType = et }
 
-prim_minbound, prim_maxbound :: Name -> E -> ExtType -> E -> E
-prim_minbound dc dt s e = f s where
-    f "HsChar" = boxup $ ELit $ LitInt 0 (rawType "bits32")
-    f s | Just pt <- genericPrimitiveInfo s = boxup $ case primTypeIsSigned pt of
-        False -> ELit $ LitInt 0 (rawType s)
-        True -> ELit $ LitInt (negate $ 2 ^ (8 * primTypeSizeOf pt - 1)) (rawType s)
-    f _ = e
-    boxup a =  ELit litCons { litName = dc, litArgs = [a], litType = dt }
-prim_maxbound dc dt s e = f s where
-    f "HsChar" = boxup $ ELit $ LitInt 0x10ffff (rawType "bits32")
-    f s | Just pt <- genericPrimitiveInfo s = boxup $ case primTypeIsSigned pt of
-        False -> ELit $ LitInt (2 ^ (8 * primTypeSizeOf pt)) (rawType s)
-        True -> ELit $ LitInt (2 ^ (8 * primTypeSizeOf pt - 1) - 1) (rawType s)
-    f _ = e
-    boxup a =  ELit litCons { litName = dc, litArgs = [a], litType = dt }
+prim_minbound, prim_maxbound, prim_uminbound, prim_umaxbound :: Name -> E -> ExtType ->  E
+prim_uminbound dc dt s = prim_number dc 0 (rawType s) dt
+prim_umaxbound = prim_bound PrimUMaxBound
+prim_maxbound = prim_bound PrimMaxBound
+prim_minbound = prim_bound PrimMinBound
 
+prim_bound pt dc dt s = (ELit (litCons { litName = dc, litArgs = [rp], litType = dt })) where
+    rt = rawType s
+    Just at = Op.readTy s
+    rp | Just n <- primStaticTypeInfo at pt = (ELit (LitInt (fromInteger n) rt))
+       | otherwise = EPrim (APrim (PrimTypeInfo { primArgTy = at, primRetTy = at, primTypeInfo = pt }) mempty) [] rt
 
-prim_sizeof s | Just pt <- genericPrimitiveInfo s = let
-    rp = ELit $ LitInt (fromIntegral (primTypeSizeOf pt)) tIntzh
-    in (ELit (litCons { litName = dc_Int, litArgs = [rp], litType = tInt }))
 prim_sizeof s = (ELit (litCons { litName = dc_Int, litArgs = [rp], litType = tInt })) where
-    rp = EPrim (APrim (PrimTypeInfo { primArgTy = stringToOpTy s, primRetTy = ot_int, primTypeInfo = PrimSizeOf }) mempty) [] tIntzh
+    Just at = Op.readTy s
+    rp | Just n <- primStaticTypeInfo at PrimSizeOf = (ELit (LitInt (fromInteger n) tIntzh))
+       | otherwise = EPrim (APrim (PrimTypeInfo { primArgTy = stringToOpTy s, primRetTy = ot_int, primTypeInfo = PrimSizeOf }) mempty) [] tIntzh
 
 
 v2_Int = tVr 2 tInt

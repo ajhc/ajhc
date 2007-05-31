@@ -71,17 +71,6 @@ sub vtype {
     return 'u' if /^u/;
     return ''  if /^s/;
     return 'f' if /^f/;
-
-#    return 'u' if /^uint/;
-#    return '' if /^int/;
-#    return 'f' if /^float/;
-#    return 'f' if /^double/;
-#    return 'u' if /unsigned/;
-#    return 'u' if /HsChar/;
-#    return 'u' if /HsPtr/;
-#    return 'u' if /HsFunPtr/;
-#    return '';
-
 }
 
 while(<OP>) {
@@ -96,8 +85,6 @@ while(<OP>) {
     foreach my $y (@add) {
         push @{$stuff{$y}}, \@a;
     }
-#    push @fl, \@a unless $add eq 'int';
-#    push @in, \@a unless $add eq 'float';
 }
 
 my @ds;
@@ -203,14 +190,13 @@ foreach my $d (@ds) {
     my $prelude_bounded = hsname("Jhc.Enum.Bounded");
     my $foreign_storable = hsname("Foreign.Storable.Storable");
     my $c_num = hsname("Jhc.Num.Num");
-    push @inst, "[] :=> IsIn $prelude_bounded $tycon";
+    push @inst, "[] :=> IsIn $prelude_bounded $tycon" if $vtype ne 'f';
     push @inst, "[] :=> IsIn $foreign_storable $tycon";
-    #push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.sizeOf.$d->[0]\", ELam (v0 $t) \$ " . const("sizeof($d->[1])","tInt") . ")";
     push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.sizeOf.$d->[0]\", ELam (v0 $t) \$ prim_sizeof \"$d->[1]\")";
     push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.poke.$d->[0]\", buildPoke $cncons $t \"$d->[1]\")";
     push @cmeth, "($foreign_storable, toInstName \"Foreign.Storable.peek.$d->[0]\", buildPeek $cncons $t \"$d->[1]\")";
-    push @cmeth, "($prelude_bounded, toInstName \"Jhc.Enum.maxBound.$d->[0]\", " . "prim_maxbound $cncons $t \"$d->[1]\" (" . const($cncons, $d->[3],$t,"$d->[1]") . "))";
-    push @cmeth, "($prelude_bounded, toInstName \"Jhc.Enum.minBound.$d->[0]\", " . "prim_minbound $cncons $t \"$d->[1]\" (" . const($cncons,$d->[4],$t,"$d->[1]") . "))";
+    push @cmeth, "($prelude_bounded, toInstName \"Jhc.Enum.maxBound.$d->[0]\", " . "prim_${vtype}maxbound $cncons $t \"$d->[1]\")" if $vtype ne 'f';;
+    push @cmeth, "($prelude_bounded, toInstName \"Jhc.Enum.minBound.$d->[0]\", " . "prim_${vtype}minbound $cncons $t \"$d->[1]\")" if $vtype ne 'f';;
     my $ivar = "v2_Int";
     my $ivart = "v2_Integer";
     my $tvar = "(v2 $t)";
@@ -237,7 +223,6 @@ foreach my $d (@ds) {
     foreach my $c (@cs) {
         my $tycon = tycon($d->[0]);
         my $nn = hsname($c->[2]);
-        #push @inst, "[] :=> IsIn (toHsName \"$c->[2]\") (TCon \$ Tycon (toHsName \"$d->[0]\") Star)\n" unless $seen{$c->[2],$d->[0]}++;
         push @inst, "[] :=> IsIn $nn $tycon" unless $seen{$c->[2],$d->[0]}++;
         my $x = $c->[2];
         $x =~ s/^([\w.]+\.).*$/$1/;

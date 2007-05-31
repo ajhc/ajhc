@@ -89,6 +89,10 @@ struct jhc_continuation {
     jmp_buf jump_buf;
 };
 
+#define prim_umaxbound(t) ((t)~((t)0))
+#define prim_maxbound(t) ((t)(~((t)1 << (sizeof(t)*8 - 1))))
+#define prim_minbound(t) ((t)(((t)1 << (sizeof(t)*8 - 1))))
+
 
 int
 main(int argc, char *argv[])

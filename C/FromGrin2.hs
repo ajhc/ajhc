@@ -520,6 +520,9 @@ convertConst (ValPrim (APrim p _) [] _) = case p of
     CConst s _ -> return $ expressionRaw s
     AddrOf t -> return $ expressionRaw ('&':unpackPS t)
     PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimSizeOf } -> return $ expressionRaw ("sizeof(" ++ tyToC Op.HintUnsigned arg ++ ")")
+    PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMinBound } -> return $ expressionRaw ("prim_minbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
+    PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMaxBound } -> return $ expressionRaw ("prim_maxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
+    PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimUMaxBound } -> return $ expressionRaw ("prim_umaxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
     PrimString s -> return $ expressionRaw (show s)
     x -> return $ err (show x)
 convertConst (ValPrim (APrim p _) [x] (TyPrim opty)) = do

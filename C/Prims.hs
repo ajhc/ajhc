@@ -64,9 +64,20 @@ data Prim =
     deriving(Typeable, Eq, Ord, Show)
     {-! derive: Binary !-}
 
-data PrimTypeInfo = PrimSizeOf | PrimMaxBound | PrimMinBound | PrimAlignmentOf | PrimTypeIsSigned  | PrimUMaxBound
+data PrimTypeInfo = PrimSizeOf | PrimMaxBound | PrimMinBound | PrimAlignmentOf | PrimUMaxBound
     deriving(Typeable, Eq, Ord, Show)
     {-! derive: Binary !-}
+
+primStaticTypeInfo :: Op.Ty -> PrimTypeInfo -> Maybe Integer
+primStaticTypeInfo (Op.TyBits (Op.Bits b) _) w = Just ans where
+    bits = toInteger b
+    ans = case w of
+        PrimSizeOf -> bits `div` 8
+        PrimAlignmentOf ->  bits `div` 8
+        primMinBound -> negate $ 2^(bits - 1)
+        primMaxBound -> 2^(bits - 1) - 1
+        primUMaxBound -> 2^bits - 1
+primStaticTypeInfo _ _ = Nothing
 
 -- | These primitives may safely be duplicated without affecting performance or
 -- correctness too adversly. either because they are cheap to begin with, or
@@ -143,7 +154,6 @@ instance DocLike d => PPrint d Prim where
     pprint PrimDotNet { primDotNet = dn,  primDotNetName = nn} = parens (text (unpackPS nn))
     pprint PrimTypeInfo { primArgTy = at, primTypeInfo = PrimSizeOf } = text "sizeof" <> parens (tshow at)
     pprint PrimTypeInfo { primArgTy = at, primTypeInfo = PrimAlignmentOf } = text "alignmentof" <> parens (tshow at)
-    pprint PrimTypeInfo { primArgTy = at, primTypeInfo = PrimTypeIsSigned } = text "is_signed" <> parens (tshow at)
     pprint PrimTypeInfo { primArgTy = at, primTypeInfo = PrimMaxBound } = text "max" <> parens (tshow at)
     pprint PrimTypeInfo { primArgTy = at, primTypeInfo = PrimUMaxBound } = text "umax" <> parens (tshow at)
     pprint PrimTypeInfo { primArgTy = at, primTypeInfo = PrimMinBound } = text "min" <> parens (tshow at)
