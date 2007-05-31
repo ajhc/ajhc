@@ -197,12 +197,10 @@ tyToC dh (Op.TyBits b h) = f b h where
     f b Op.HintNone = f b dh
     f b Op.HintUnsigned = case b of
         (Op.Bits n) ->  "uint" ++ show n ++ "_t"
-        (Op.BitsArch Op.BitsInt) -> "unsigned"
         (Op.BitsArch Op.BitsMax) -> "uintmax_t"
         (Op.BitsArch Op.BitsPtr) -> "uintptr_t"
     f b Op.HintSigned = case b of
         (Op.Bits n) ->  "int" ++ show n ++ "_t"
-        (Op.BitsArch Op.BitsInt) -> "int"
         (Op.BitsArch Op.BitsMax) -> "intmax_t"
         (Op.BitsArch Op.BitsPtr) -> "intptr_t"
 

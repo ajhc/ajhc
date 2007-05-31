@@ -13,6 +13,7 @@ import Atom
 import PackedString
 import C.Prims
 import C.Arch
+import C.OpEval
 import DataConstructors
 import Data.Monoid
 import Doc.DocLike
@@ -49,24 +50,39 @@ unbox dataTable e vn wtd = eCase e  [Alt (litCons { litName = cna, litArgs = [tv
     tvra = tVr vn sta
     Just (cna,sta,_ta) = lookupCType' dataTable te
 
-intt = rawType "int"
-
-rawMap = Map.fromList [ (rawType w,toAtom t) | (_,_,_,w,t) <- allCTypes]
-typ_float = toAtom "float"
 
 
-iTrue = (ELit (LitInt 1 intt))
-iFalse = (ELit (LitInt 0 intt))
-isIntegral t = Map.lookup t rawMap /= Just typ_float
-
-primOpt' _  x = return x
-
-{-
-cextra Operator {} [] = ""
-cextra Operator {} xs = '.':map f xs where
+cextra Op {} [] = ""
+cextra Op {} xs = '.':map f xs where
     f ELit {} = 'c'
     f _ = 'e'
 cextra _ _ = ""
+
+primConv cop t1 t2 e rt = EPrim (APrim (Op (Op.ConvOp cop t1) t2) mempty) [e] rt
+
+primOpt' dataTable  e@(EPrim (APrim s _) xs t) = do
+    let --primopt (Op (Op.BinOp bop _ _) _) [e1,e2] rt = binOp bop e1 e2
+        primopt (Op (Op.ConvOp cop t1) t2) [ELit (LitInt n t)] rt = return $ ELit (LitInt (convNumber cop t1 t2 n) rt)
+        primopt (Op (Op.ConvOp cop t1) t2) [e1] rt = case convOp cop t1 t2 of
+            Nothing | getType e1 == rt -> return e1
+            Just cop' | cop' /= cop -> return $ primConv cop' t1 t2 e1 rt
+            _ -> fail "could not apply conversion optimization"
+        primopt _ _ _ = fail "No Primitive optimization to apply"
+    case primopt s xs t of
+        Just n -> do
+            mtick (toAtom $ "E.PrimOpt." ++ braces (pprint s) ++ cextra s xs )
+            primOpt' dataTable  n
+        Nothing -> return e
+primOpt' _ e = return e
+
+--instance Expression t E where
+--    toBool True = ELit lTruezh
+--    toBool False = ELit lFalse
+--    createBinOp bop e1 e2 =
+--                (EPrim (APrim Op { primCOp = Op.BinOp cop (stringToOpTy ta) (stringToOpTy tb), primRetTy = (stringToOpTy tr) } mempty) [pa, pb] str) t
+
+
+{-
 
 primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
     mtick (toAtom $ "E.PrimOpt." ++ braces (pprint s) ++ cextra s xs )

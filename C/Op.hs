@@ -55,7 +55,6 @@ data BinOp
     | And
     | Or
     | Xor
-    | Not
     | Shl
     | Shr    -- ^ shift right logical
     | Shra   -- ^ shift right arithmetic
@@ -147,7 +146,7 @@ data ValOp
     deriving(Eq,Show,Ord,Read)
     {-! derive: Binary !-}
 
-data ArchBits = BitsInt | BitsMax | BitsPtr
+data ArchBits = BitsMax | BitsPtr
     deriving(Eq,Ord)
     {-! derive: Binary !-}
 
@@ -174,7 +173,6 @@ readTy :: Monad m => String -> m Ty
 readTy "bool" = return TyBool
 readTy "bits<ptr>" = return $ TyBits (BitsArch BitsPtr) HintNone
 readTy "bits<max>" = return $ TyBits (BitsArch BitsMax) HintNone
-readTy "bits<int>" = return $ TyBits (BitsArch BitsInt) HintNone
 readTy ('b':'i':'t':'s':'<':rs) = return $ TyBits (BitsExt (takeWhile ('>' /=) rs)) HintNone
 readTy ('b':'i':'t':'s':rs) = do n <- readM rs; return $ TyBits (Bits n) HintNone
 readTy ('s':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintSigned
@@ -186,7 +184,6 @@ readTy _ = fail "readTy: not type"
 bool = TyBool
 bits_ptr = TyBits (BitsArch BitsPtr) HintNone
 bits_max = TyBits (BitsArch BitsMax) HintNone
-bits_int = TyBits (BitsArch BitsInt) HintNone
 bits8    = TyBits (Bits 8)  HintNone
 bits16   = TyBits (Bits 16) HintNone
 bits32   = TyBits (Bits 32) HintNone
@@ -209,7 +206,6 @@ instance Show TyBits where
     showsPrec _ (BitsArch s) = showString "<" . shows s . showString ">"
 
 instance Show ArchBits where
-    show BitsInt = "int"
     show BitsMax = "max"
     show BitsPtr = "ptr"
 
@@ -257,7 +253,26 @@ isCommutable x = f x where
     f NEq = True
     f FAdd = True
     f FMul = True
+    f FEq  = True
+    f FNEq = True
+    f FOrdered = True
     f _ = False
+
+commuteBinOp :: BinOp -> Maybe BinOp
+commuteBinOp x | isCommutable x = return x
+commuteBinOp Lt = return Gte
+commuteBinOp Gt = return Lte
+commuteBinOp Lte = return Gt
+commuteBinOp Gte = return Lt
+commuteBinOp ULt = return UGte
+commuteBinOp UGt = return ULte
+commuteBinOp ULte = return UGt
+commuteBinOp UGte = return ULt
+commuteBinOp FLt = return FGte
+commuteBinOp FGt = return FLte
+commuteBinOp FLte = return FGt
+commuteBinOp FGte = return FLt
+commuteBinOp _ = Nothing
 
 isAssociative :: BinOp -> Bool
 isAssociative x = f x where
@@ -321,5 +336,6 @@ instance IsOperator (Op v) where
     isCheap _ = False
     isEagerSafe (BinOp o _ _) = isEagerSafe o
     isEagerSafe (UnOp o _) = isEagerSafe o
+    isEagerSafe (ConvOp o _) = isEagerSafe o
     isEagerSafe _ = False
 
