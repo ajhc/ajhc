@@ -362,14 +362,14 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
             prim      = APrim (PrimPrim $ packString cn) req
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
         let result    = foldr ($) (processPrimPrim dataTable $ EPrim prim (map EVar es) rt) (map ELam es)
-        return [(name,var,lamt result)]
+        return [(name,setProperty prop_INLINE var,lamt result)]
     cDecl (HsForeignDecl _ (FfiSpec (ImportAddr rcn req) _ _) n _) = do
         let name       = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         let (ts,rt)    = argTypes' ty
         (cn,st,_ct) <- lookupCType' dataTable rt
         [uvar] <- newVars [st]
-        let expr x     = return [(name,var,lamt x)]
+        let expr x     = return [(name,setProperty prop_INLINE var,lamt x)]
             prim       = APrim (AddrOf $ packString rcn) req
         expr $ eStrictLet uvar (EPrim prim [] st) (ELit (litCons { litName = cn, litArgs = [EVar uvar], litType = rt }))
     cDecl (HsForeignDecl _ (FfiSpec (Import rcn req) _ CCall) n _) = do
@@ -396,7 +396,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
                     False -> cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim False [ EVar t | (t,_) <- rs ] rtt') (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
                     True -> cFun $ \rs -> (,) (ELam tvrWorld) $
                                 eCaseTup' (prim True (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' }) (eJustIO (EVar tvrWorld2) (EVar rtVar)))
-        return [(name,var,lamt result)]
+        return [(name,setProperty prop_INLINE var,lamt result)]
     cDecl (HsForeignDecl _ (FfiSpec (Import rcn _) _ DotNet) n _) = do
         (var,ty,lamt) <- convertValue (toName Name.Val n)
         let (ts,rt) = argTypes' ty
