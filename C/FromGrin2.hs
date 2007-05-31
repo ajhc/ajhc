@@ -523,7 +523,7 @@ convertConst (ValPrim (APrim p _) [] _) = case p of
     PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMinBound } -> return $ expressionRaw ("prim_minbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
     PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMaxBound } -> return $ expressionRaw ("prim_maxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
     PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimUMaxBound } -> return $ expressionRaw ("prim_umaxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
-    PrimString s -> return $ expressionRaw (show s)
+    PrimString s -> return $ cast (basicType "uintptr_t") (expressionRaw (show s))
     x -> return $ err (show x)
 convertConst (ValPrim (APrim p _) [x] (TyPrim opty)) = do
     x' <- convertConst x
