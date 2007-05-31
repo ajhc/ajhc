@@ -570,6 +570,19 @@ signedOps = [
     (Op.Lte,"<=")
     ]
 
+floatOps = [
+    (Op.FDiv,"/"),
+    (Op.FAdd,"+"),
+    (Op.FSub,"-"),
+    (Op.FMul,"*"),
+    (Op.FEq,"=="),
+    (Op.FNEq,"!="),
+    (Op.FGt,">"),
+    (Op.FLt,"<"),
+    (Op.FGte,">="),
+    (Op.FLte,"<=")
+    ]
+
 
 binopSigned :: Op.BinOp -> Maybe String
 binopSigned b = lookup b signedOps
@@ -582,12 +595,14 @@ primBinOp n ta tb r a b
         a <- castSigned ta a
         b <- castSigned tb b
         return $ operator t a b
+    | Just t <- lookup n floatOps = return $ operator t a b
     | otherwise = return $ err ("primBinOp: " ++ show ((n,ta,tb,r),a,b))
 
 primUnOp Op.Neg ta r a = do
     a <- castSigned ta a
     return $ uoperator "-" a
 primUnOp Op.Com ta r a = do return $ uoperator "~" a
+primUnOp Op.FNeg ta r a = do return $ uoperator "-" a
 primUnOp n ta r a
     | otherwise = return $ err ("primUnOp: " ++ show ((n,ta,r),a))
 
