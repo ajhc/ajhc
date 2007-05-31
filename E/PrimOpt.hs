@@ -61,7 +61,7 @@ cextra _ _ = ""
 primConv cop t1 t2 e rt = EPrim (APrim (Op (Op.ConvOp cop t1) t2) mempty) [e] rt
 
 primOpt' dataTable  e@(EPrim (APrim s _) xs t) = do
-    let --primopt (Op (Op.BinOp bop _ _) _) [e1,e2] rt = binOp bop e1 e2
+    let primopt (Op (Op.BinOp bop t1 t2) tr) [e1,e2] rt = binOp bop t1 t2 tr e1 e2 rt
         primopt (Op (Op.ConvOp cop t1) t2) [ELit (LitInt n t)] rt = return $ ELit (LitInt (convNumber cop t1 t2 n) rt)
         primopt (Op (Op.ConvOp cop t1) t2) [e1] rt = case convOp cop t1 t2 of
             Nothing | getType e1 == rt -> return e1
@@ -75,11 +75,20 @@ primOpt' dataTable  e@(EPrim (APrim s _) xs t) = do
         Nothing -> return e
 primOpt' _ e = return e
 
---instance Expression t E where
---    toBool True = ELit lTruezh
---    toBool False = ELit lFalse
---    createBinOp bop e1 e2 =
---                (EPrim (APrim Op { primCOp = Op.BinOp cop (stringToOpTy ta) (stringToOpTy tb), primRetTy = (stringToOpTy tr) } mempty) [pa, pb] str) t
+instance Expression E E where
+    toBool True = ELit lTruezh
+    toBool False = ELit lFalsezh
+    toConstant (ELit (LitInt n t)) = return (n,t)
+    toConstant _ = Nothing
+    toExpression n t = (ELit (LitInt n t))
+    createBinOp bop t1 t2 tr e1 e2 str =
+                EPrim (APrim Op { primCOp = Op.BinOp bop t1 t2, primRetTy = tr } mempty) [e1, e2] str
+    createUnOp bop t1 tr e1 str =
+                EPrim (APrim Op { primCOp = Op.UnOp bop t1, primRetTy = tr } mempty) [e1] str
+    fromBinOp (EPrim (APrim Op { primCOp = Op.BinOp bop t1 t2, primRetTy = tr } mempty) [e1, e2] str) = Just (bop,t1,t2,tr,e1,e2,str)
+    fromBinOp _ = Nothing
+    fromUnOp (EPrim (APrim Op { primCOp = Op.UnOp bop t1, primRetTy = tr } mempty) [e1] str) = Just (bop,t1,tr,e1,str)
+    fromUnOp _ = Nothing
 
 
 {-

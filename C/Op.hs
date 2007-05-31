@@ -260,18 +260,18 @@ isCommutable x = f x where
 
 commuteBinOp :: BinOp -> Maybe BinOp
 commuteBinOp x | isCommutable x = return x
-commuteBinOp Lt = return Gte
-commuteBinOp Gt = return Lte
-commuteBinOp Lte = return Gt
-commuteBinOp Gte = return Lt
-commuteBinOp ULt = return UGte
-commuteBinOp UGt = return ULte
-commuteBinOp ULte = return UGt
-commuteBinOp UGte = return ULt
-commuteBinOp FLt = return FGte
-commuteBinOp FGt = return FLte
-commuteBinOp FLte = return FGt
-commuteBinOp FGte = return FLt
+commuteBinOp Lt = return Gt
+commuteBinOp Gt = return Lt
+commuteBinOp Lte = return Gte
+commuteBinOp Gte = return Lte
+commuteBinOp ULt = return UGt
+commuteBinOp UGt = return ULt
+commuteBinOp ULte = return UGte
+commuteBinOp UGte = return ULte
+commuteBinOp FLt = return FGt
+commuteBinOp FGt = return FLt
+commuteBinOp FLte = return FGte
+commuteBinOp FGte = return FLte
 commuteBinOp _ = Nothing
 
 isAssociative :: BinOp -> Bool
