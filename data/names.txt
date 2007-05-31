@@ -15,6 +15,20 @@ CUChar    Foreign.C.Types.CUChar
 CUShort   Foreign.C.Types.CUShort
 CULong    Foreign.C.Types.CULong
 
+Bits1      Jhc.Types.Bits1_
+Bits8      Jhc.Types.Bits8_
+Bits16     Jhc.Types.Bits16_
+Bits32     Jhc.Types.Bits32_
+Bits64     Jhc.Types.Bits64_
+Bits128    Jhc.Types.Bits128_
+BitsPtr    Jhc.Types.BitsPtr_
+BitsMax    Jhc.Types.BitsMax_
+
+Float32    Jhc.Types.Float32_
+Float64    Jhc.Types.Float64_
+Float80    Jhc.Types.Float80_
+Float128   Jhc.Types.Float128_
+
 DataConstructor:dc:
 
 Rational   Jhc.Num.:%
@@ -31,7 +45,7 @@ Enum            Jhc.Enum.Enum
 Bounded         Jhc.Enum.Bounded
 Show            Jhc.Show.Show
 Read            Prelude.Text.Read
-Ix              Ix.Ix
+Ix              Data.Ix.Ix
 Functor         Jhc.Monad.Functor
 Monad           Jhc.Monad.Monad
 Num             Jhc.Num.Num
@@ -41,5 +55,14 @@ Fractional	Jhc.Num.Fractional
 Floating	Jhc.Float.Floating
 RealFrac	Jhc.Float.RealFrac
 RealFloat	Jhc.Float.RealFloat
+
+RawType:rt:
+
+bits128         bits128
+bool            bool
+float32         fbits32
+float64         fbits64
+float80         fbits80
+float128        fbits128
 
 

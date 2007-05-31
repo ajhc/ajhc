@@ -192,6 +192,7 @@ instance HasSize DataTable where
     size (DataTable d) = Map.size d
 
 getConstructor :: Monad m => Name -> DataTable -> m Constructor
+getConstructor n _ | RawType <- nameType n = return $ primitiveConstructor n
 getConstructor n _ | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = return $ snd $ tunboxedtuple v
 getConstructor n _ | Just v <- fromUnboxedNameTuple n, TypeConstructor <- nameType n = return $ fst $ tunboxedtuple v
 getConstructor n (DataTable map) = case Map.lookup n map of
@@ -262,16 +263,16 @@ tarrow = emptyConstructor {
             conChildren = DataAbstract
         }
 
+primitiveConstructor name = emptyConstructor {
+    conName = name,
+    conType = eHash,
+    conExpr = ELit (litCons { litName = name, litArgs = [], litType = eHash }),
+    conInhabits = tHash,
+    conChildren = DataPrimitive
+    }
 
-primitiveTable = concatMap f allCTypes ++ map g (snub $ map ( \ (_,_,_,b,_) -> b) allCTypes) where
-    g n = emptyConstructor {
-        conName = rn,
-        conType = eHash,
-        conDeriving = [],
-        conExpr = ELit (litCons { litName = rn, litArgs = [], litType = eHash }),
-        conInhabits = tHash,
-        conChildren = DataPrimitive
-       } where rn = toName RawType n
+
+primitiveTable = concatMap f allCTypes  where
     f (dc,tc,rt,y,z) | z /= "void" = [typeCons,dataCons] where
         dataCons = emptyConstructor {
             conName = dc,
@@ -801,10 +802,19 @@ class Monad m => DataTableMonad m where
 instance DataTableMonad Identity
 
 primitiveAliases = [
-    (tc_Int__,rt_bits_int_),
-    (tc_Addr__,rt_bits_ptr_),
-    (tc_Word8__,rt_bits8),
-    (tc_Char__,rt_bits32),
-    (tc_Bool__,rt_bits_int_)]
+    (tc_Bits1, rt_bool),
+    (tc_Bits8, rt_bits8),
+    (tc_Bits16, rt_bits16),
+    (tc_Bits32, rt_bits32),
+    (tc_Bits64, rt_bits64),
+    (tc_Bits128, rt_bits128),
+    (tc_BitsPtr, rt_bits_ptr_),
+    (tc_BitsMax, rt_bits_max_),
+
+    (tc_Float32, rt_float32),
+    (tc_Float64, rt_float64),
+    (tc_Float80, rt_float80),
+    (tc_Float128, rt_float128)
+    ]
 
 

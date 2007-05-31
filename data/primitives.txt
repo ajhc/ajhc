@@ -3,7 +3,7 @@
 # limits.h, float.h, inttypes.h
 
 Jhc.Prim.Char, ubits32, char, UINT32_MAX, 0
-Jhc.Prim.Int, sbits<int>, int, INT_MAX, INT_MIN
+Jhc.Prim.Int, sbits32, int, INT_MAX, INT_MIN
 Jhc.Basics.Integer, sbits<max>, int, INTMAX_MAX, INTMAX_MIN
 
 Data.Int.Int8, sbits8, int, INT8_MAX, INT8_MIN
@@ -13,7 +13,7 @@ Data.Int.Int64, sbits64, int, INT64_MAX, INT64_MIN
 Data.Int.IntMax, sbits<max>, int, INTMAX_MAX, INTMAX_MIN
 Data.Int.IntPtr, sbits<ptr>, int, INTPTR_MAX, INTPTR_MIN
 
-Data.Word.Word, ubits<int>, int, UINT_MAX, 0
+Data.Word.Word, ubits32, int, UINT_MAX, 0
 Data.Word.Word8, ubits8, int, UINT8_MAX, 0
 Data.Word.Word16, ubits16, int, UINT16_MAX, 0
 Data.Word.Word32, ubits32, int, UINT32_MAX, 0

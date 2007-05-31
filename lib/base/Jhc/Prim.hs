@@ -4,6 +4,7 @@ module Jhc.Prim where
 -- this module is always included in all programs compiled by jhc. it defines some things that are needed to make jhc work at all.
 
 import Jhc.String
+import Jhc.Types
 
 infixr 5  :
 data [] a =  a : ([] a) | []
@@ -15,11 +16,11 @@ data World__ :: #
 data Int
 data Char
 
-data Bool__ :: #
-data Int__ :: #
-data Addr__ :: #
-data Char__ :: #
-data Word8__ :: #
+type Bool__ = Bits1_
+type Addr__ = BitsPtr_
+type Int__  = Bits32_
+type Char__ = Bits32_
+
 
 -- | this is wrapped around arbitrary expressions and just evaluates them to whnf
 foreign import primitive "seq" runRaw :: a -> World__ -> World__

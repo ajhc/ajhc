@@ -54,7 +54,7 @@ oper_aIa op ct' a b = EPrim (binOp op ct ot_int ct) [a,b] (rawType ct') where
 
 --zeroI =  LitInt 0 intt
 
-ot_int = stringToOpTy "bits<int>"
+ot_int = stringToOpTy "bits32"
 
 op_aIa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
     tvra' = tVr 2 t
@@ -63,7 +63,7 @@ op_aIa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' 
     tvrb = tVr 8 intt
     tvrc = tVr 10 st
     st = rawType ct
-    intt = rawType "bits<int>"
+    intt = rawType "bits32"
     wtd = eStrictLet tvrc (oper_aIa op ct (EVar tvra) (EVar tvrb)) (rebox (EVar tvrc))
     rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = t })
 op_aaa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where

@@ -23,9 +23,9 @@ instance TypeNames Name where
     tStar = s_Star
     tHash = s_Hash
     tUnit = tc_Unit
-    tIntzh = toName RawType "bits<int>" -- rt_int
-    tCharzh = toName RawType "bits32" -- rt_HsChar
-    tIntegerzh = toName RawType "bits<max>" -- rt_intmax_t
+    tIntzh = rt_bits32
+    tCharzh = rt_bits32
+    tIntegerzh = rt_bits_max_
     tWorld__ = tc_World__
 
 instance ConNames Name where
