@@ -81,9 +81,9 @@ simplify1 stats env (n,l) = do
     gs (Update Const {} Var {}) = do
         lift $ tick stats at_OptSimplifyConstUpdate
         gs (Return unit)
-    gs (Prim Primitive { primAPrim = APrim CCast {} _, primType = (_,nty) } [Lit i _]) = do
-        lift $ tick stats at_OptSimplifyCastLit
-        return $ Return (Lit i nty)
+--    gs (Prim Primitive { primAPrim = APrim CCast {} _, primType = (_,nty) } [Lit i _]) = do
+--        lift $ tick stats at_OptSimplifyCastLit
+--        return $ Return (Lit i nty)
     gs (Store n) | valIsNF n, not (valIsMutable n) = do
         lift $ tick stats at_OptSimplifyConstStore
         gs (Return (Const n))

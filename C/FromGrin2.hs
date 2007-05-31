@@ -164,7 +164,6 @@ convertVal (Tag t) = do tellTags t ; return $ constant (enum $ nodeTagName t)
 convertVal (ValPrim (APrim p _) [x] (TyPrim opty)) = do
     x' <- convertVal x
     case p of
-        CCast _ to -> return $ cast (opTyToC opty) x'
         Op (Op.UnOp n ta) r -> primUnOp n ta r x'
         Op (Op.ConvOp n ta) r -> return $ castFunc n ta r x'
         x -> return $ err ("convertVal: " ++ show x)
@@ -528,7 +527,6 @@ convertConst (ValPrim (APrim p _) [] _) = case p of
 convertConst (ValPrim (APrim p _) [x] (TyPrim opty)) = do
     x' <- convertConst x
     case p of
-        CCast _ to -> return $ cast (opTyToC opty) x'
         Op (Op.UnOp n ta) r -> primUnOp n ta r x'
         Op (Op.ConvOp n ta) r -> return $ castFunc n ta r x'
         x -> return $ err (show x)
@@ -545,9 +543,6 @@ convertConst x = fail "convertConst"
 convertPrim p vs
     | APrim (CConst s _) _ <- primAPrim p = do
         return $ expressionRaw s
-    | APrim (CCast _ to) _ <- primAPrim p, [a] <- vs = do
-        a' <- convertVal a
-        return $ cast (opTyToC (stringNameToTy to)) a'
     | APrim Op {} _ <- primAPrim p = do
         let (_,rt) = primType p
         convertVal (ValPrim (primAPrim p) vs rt)

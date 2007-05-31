@@ -17,21 +17,33 @@ import Support.CanType
 import qualified C.Op as Op
 
 
+nameToOpTy n = do RawType <- return $ nameType n; Op.readTy (show n)
+
 tPtr t = ELit (litCons { litName = tc_Ptr, litArgs = [t], litType = eStar, litAliasFor = Just (ELam tvr { tvrIdent = 2, tvrType = eStar} (ELit litCons { litName = tc_Addr, litType = eStar })) })
 
-create_integralCast c1 t1 c2 t2 e t = eCase e [Alt (litCons { litName = c1, litArgs = [tvra], litType = te }) cc] Unknown  where
+create_integralCast conv c1 t1 c2 t2 e t = eCase e [Alt (litCons { litName = c1, litArgs = [tvra], litType = te }) cc] Unknown  where
     te = getType e
     ELit LitCons { litName = n1, litArgs = [] } = t1
     ELit LitCons { litName = n2, litArgs = [] } = t2
+    Just n1' = nameToOpTy n1
+    Just n2' = nameToOpTy n2
     tvra =  tVr 4 t1
     tvrb =  tVr 6 t2
     cc = if n1 == n2 then ELit (litCons { litName = c2, litArgs = [EVar tvra], litType = t }) else
-        eStrictLet  tvrb (EPrim (APrim (CCast (show n1) (show n2)) mempty) [EVar tvra] t2)  (ELit (litCons { litName = c2, litArgs = [EVar tvrb], litType = t }))
+        eStrictLet  tvrb (EPrim (APrim (Op (Op.ConvOp conv n1') n2') mempty) [EVar tvra] t2)  (ELit (litCons { litName = c2, litArgs = [EVar tvrb], litType = t }))
 
-create_integralCast_toInt c1 t1 e = create_integralCast c1 t1 dc_Int tIntzh e tInt
-create_integralCast_toInteger c1 t1 e = create_integralCast c1 t1 dc_Integer tIntegerzh e tInteger
-create_integralCast_fromInt c2 t2 e t = create_integralCast dc_Int tIntzh c2 t2 e t
-create_integralCast_fromInteger c2 t2 e t = create_integralCast dc_Integer tIntegerzh c2 t2 e t
+create_integralCast_toInt c1 t1 e = create_integralCast Op.I2I c1 t1 dc_Int tIntzh e tInt
+create_integralCast_toInteger c1 t1 e = create_integralCast Op.Sx c1 t1 dc_Integer tIntegerzh e tInteger
+create_integralCast_fromInt c2 t2 e t = create_integralCast Op.I2I dc_Int tIntzh c2 t2 e t
+create_integralCast_fromInteger c2 t2 e t = create_integralCast Op.Lobits dc_Integer tIntegerzh c2 t2 e t
+
+create_uintegralCast_toInt c1 t1 e = create_integralCast Op.U2U c1 t1 dc_Int tIntzh e tInt
+create_uintegralCast_toInteger c1 t1 e = create_integralCast Op.Zx c1 t1 dc_Integer tIntegerzh e tInteger
+create_uintegralCast_fromInt c2 t2 e t = create_integralCast Op.U2U dc_Int tIntzh c2 t2 e t
+create_uintegralCast_fromInteger c2 t2 e t = create_integralCast Op.Lobits dc_Integer tIntegerzh c2 t2 e t
+
+create_fintegralCast_fromInt c2 t2 e t = create_integralCast Op.I2F dc_Int tIntzh c2 t2 e t
+create_fintegralCast_fromInteger c2 t2 e t = create_integralCast Op.I2F dc_Integer tIntegerzh c2 t2 e t
 
 
 toClassName x = parseName ClassName x

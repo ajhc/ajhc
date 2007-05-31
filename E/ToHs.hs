@@ -354,7 +354,7 @@ transE (EPrim (APrim func@Func {} _) xs _) = mparen $ do
     tell mempty { collPrims = Set.singleton func }
     xs <- mapM transE xs
     return (hsep (text (cfuncname func):xs))
-transE (EPrim (APrim cast@CCast { primArgType = at, primRetType = rt } _) [x] _) = mparen $ transE x >>= \x ->  castVal at rt x
+--transE (EPrim (APrim cast@CCast { primArgType = at, primRetType = rt } _) [x] _) = mparen $ transE x >>= \x ->  castVal at rt x
 
 transE e = mparen $ return $ text "error" <+> tshow ("ToHs.Error: " ++ show e)
 

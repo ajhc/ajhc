@@ -181,15 +181,6 @@ showE e = do
         f (EError s t) = do
             ty <- showE t
             return $ atom $ angles ( UC.bottom <> char ':' <> text s <>  UC.coloncolon <> unparse ty)
---        f (EPrim (APrim Operator { primOp = op } _) [x,y] t) = do
---            x <- showE x
---            y <- showE y
---            t <- showE t
---            return $ atom $ angles $ unparse $ atom ((unparse x) <+> text op <+> (unparse y)) `inhabit` t
-        f (EPrim (APrim CCast {} _) [x] t) = do
-            x <- showE x
-            t <- showE t
-            return $ atom $ parens (unparse t) <> unparse x
         f (EPrim s es t) = do
             es' <- mapM showE es
             t <- showE t

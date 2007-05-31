@@ -470,11 +470,6 @@ compile' cenv (tvr,as,e) = ans where
                     [_,addr,val] = xs
                     pt = TyPrim pt'
                 return $  Prim p (args [addr,val])
-            CCast from to -> do
-                let ptypeto' = stringNameToTy to
-                    ptypefrom' = stringNameToTy from
-                let p = prim { primName = toAtom ("(" ++ to ++ ")"), primType = ([ptypefrom'],ptypeto') }
-                return $  Prim p (args xs)
             Op (Op.BinOp _ a1 a2) rt -> do
                 let p = prim { primType = ([TyPrim a1,TyPrim a2],TyPrim rt) }
                 return $ Prim p (args xs)

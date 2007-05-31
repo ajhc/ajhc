@@ -44,10 +44,6 @@ data Prim =
     | AddrOf PackedString              -- address of linker name
     | Peek { primArgTy :: Op.Ty }  -- read value from memory
     | Poke { primArgTy :: Op.Ty }  -- write value to memory
-    | CCast {
-        primArgType :: ExtType,
-        primRetType :: ExtType
-        }   -- Cast from one basic type to another, possibly lossy.
     | PrimTypeInfo {
         primArgTy :: Op.Ty,
         primRetTy :: Op.Ty,
@@ -78,10 +74,8 @@ data PrimTypeInfo = PrimSizeOf | PrimMaxBound | PrimMinBound | PrimAlignmentOf |
 
 primIsCheap :: Prim -> Bool
 primIsCheap AddrOf {} = True
-primIsCheap CCast {} = True
 primIsCheap CConst {} = True
 primIsCheap PrimString {} = True
---primIsCheap Operator {} = True
 primIsCheap PrimTypeInfo {} = True
 primIsCheap Op { primCOp = op } = Op.isCheap op
 primIsCheap _ = False
@@ -95,11 +89,8 @@ primIsConstant :: Prim -> Bool
 primIsConstant CConst {} = True
 primIsConstant AddrOf {} = True
 primIsConstant PrimString {} = True
-primIsConstant CCast {} = True
 primIsConstant PrimTypeInfo {} = True
 primIsConstant Op { primCOp = op } = Op.isEagerSafe op
---primIsConstant Operator { primOp = op } | op `elem` safeOps = True  where
---    safeOps = ["+","-","*","==",">=","<=",">","<","&","|","^","~",">>","<<"]
 primIsConstant _ = False
 
 -- | whether a primitive can be eagarly evaluated.
@@ -108,11 +99,8 @@ primEagerSafe :: Prim -> Bool
 primEagerSafe CConst {} = True
 primEagerSafe PrimString {} = True
 primEagerSafe AddrOf {} = True
-primEagerSafe CCast {} = True
 primEagerSafe PrimTypeInfo {} = True
 primEagerSafe Op { primCOp = op } = Op.isEagerSafe op
---primEagerSafe Operator { primOp = op } | op `elem` safeOps = True  where
---    safeOps = ["+","-","*","==",">=","<=",">","<","&","|","^","~",">>","<<"]
 primEagerSafe _ = False
 
 
@@ -143,14 +131,12 @@ instance PPrint d Prim  => PPrint d APrim where
 instance DocLike d => PPrint d Prim where
     pprint (PrimPrim t) = text (unpackPS t)
     pprint (CConst s t) = parens (text t) <> parens (text s)
---    pprint (Operator s xs r) = parens (text r) <> text s <> tupled (map text xs)
     pprint (Func _ s xs r) = parens (text r) <> text (unpackPS s) <> tupled (map text xs)
     pprint (IFunc xs r) = parens (text r) <> parens (char '*') <> tupled (map text xs)
     pprint (AddrOf s) = char '&' <> text (unpackPS s)
     pprint (PrimString s) = tshow s <> char '#'
     pprint (Peek t) = char '*' <> tshow t
     pprint (Poke t) = char '=' <> tshow t
-    pprint (CCast _ t) = parens (text t)
     pprint Op { primCOp = Op.BinOp bo ta tb, primRetTy = rt } | rt == ta && rt == tb = parens (pprint rt) <> tshow bo
     pprint Op { primCOp = Op.UnOp bo ta, primRetTy = rt } | rt == ta = parens (pprint rt) <> tshow bo
     pprint Op { primCOp = op, primRetTy = rt } = parens (pprint rt) <> pprint op

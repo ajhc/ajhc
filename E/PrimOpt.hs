@@ -38,20 +38,10 @@ zero/one - the zero and one values for primitive types
 const.<foo> - evaluates to the C constant <foo>
 error.<err> - equivalent to 'error <err>'
 exitFailure__ - abort program immediately with no message
-integralCast - cast between primitive integral types with c semantics
 increment/decrement - increment or decrement a primitive numeric type by 1
 
 -}
 
-create_integralCast dataTable e t = eCase e [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) cc] Unknown  where
-    te = getType e
-    (vara:varb:_) = newIds (freeVars (e,t))
-    tvra =  tVr vara sta
-    tvrb =  tVr varb stb
-    Just (cna,sta,ta) = lookupCType' dataTable te
-    Just (cnb,stb,tb) = lookupCType' dataTable t
-    cc = if ta == tb then ELit (litCons { litName = cnb, litArgs = [EVar tvra], litType = t }) else
-        eStrictLet  tvrb (EPrim (APrim (CCast ta tb) mempty) [EVar tvra] stb)  (ELit (litCons { litName = cnb, litArgs = [EVar tvrb], litType = t }))
 
 unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
 unbox dataTable e vn wtd = eCase e  [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd tvra)] Unknown where
@@ -176,7 +166,6 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
     primopt pn [] t | Just c <-  getPrefix "const." pn = mdo
         (res,(ta,sta)) <- boxPrimitive dataTable (EPrim (APrim (CConst c ta) mempty) [] sta) t; return res
     primopt pn [] _ | Just c <-  getPrefix "error." pn = return (EError c orig_t)
-    primopt "integralCast" es t = error $ "Invalid integralCast " ++ show (es,t)
     primopt _ _ _ = fail "not a primopt we care about"
 processPrimPrim _ e = e
 
