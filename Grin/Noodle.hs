@@ -8,8 +8,6 @@ import qualified Data.Set as Set
 
 import Support.FreeVars
 import Atom(Atom())
-import Grin.Val
-import Name.Names
 import Options(flint)
 import C.Prims
 import Util.Gen
@@ -64,8 +62,8 @@ mapFBodies f xs = mapM f' xs where
 isManifestNode :: Monad m => Exp -> m [Atom]
 isManifestNode e = f mempty e where
     f lf _ | False && trace ("isManifestNode: " ++ show lf) False = undefined
-    f lf (Return (Tag t)) = return [t]
-    f lf (Return (NodeC t _)) = return [t]
+    --f lf (Return (Tag t)) = return [t]
+    f lf (Return [(NodeC t _)]) = return [t]
     f lf Error {} = return []
     f lf (App a _ _) | a `Set.member` lf = return []
     f lf Let { expBody = body, expIsNormal = False } = f lf body
@@ -84,7 +82,7 @@ isManifestNode e = f mempty e where
 
 -- | Is a Val constant?
 valIsConstant :: Val -> Bool
-valIsConstant (Tup xs) = all valIsConstant xs
+--valIsConstant (Tup xs) = all valIsConstant xs
 valIsConstant (NodeC t _) | isMutableNodeTag t = False
 valIsConstant (NodeC _ xs) = all valIsConstant xs
 valIsConstant Tag {} = True
@@ -101,7 +99,7 @@ isMutableNodeTag _ = False
 --isMutableNodeTag t = t ==  convertName dc_Ref
 
 valIsMutable (NodeC t _) = isMutableNodeTag t || t == tagHole
-valIsMutable NodeC {} = False
+--valIsMutable NodeC {} = False
 valIsMutable _ = True
 
 
@@ -111,7 +109,7 @@ isOmittable (Return {}) = True
 isOmittable (Store x) | getType x /= TyNode = False
 isOmittable (Store (NodeC n _)) | isMutableNodeTag n || n == tagHole = False
 isOmittable (Store {}) = True
-isOmittable Prim { expPrimitive = Primitive { primAPrim = aprim } } = aprimIsCheap aprim
+isOmittable Prim { expPrimitive = aprim } = aprimIsCheap aprim
 isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
 isOmittable Let { expBody = x } = isOmittable x
 isOmittable (e1 :>>= _ :-> e2) = isOmittable e1 && isOmittable e2
@@ -178,9 +176,9 @@ getReturnInfo :: Exp -> [ReturnInfo]
 getReturnInfo  e = ans where
     ans = execWriter (f mempty e)
     tells x = tell [x]
-    f lf (Return (NodeV t as)) = tells (ReturnNode (Nothing,map getType as))
-    f lf (Return (NodeC t as)) = tells (ReturnNode (Just t,map getType as))
-    f lf (Return z) | valIsConstant z = tell [ReturnConst z]
+    f lf (Return [(NodeV t as)]) = tells (ReturnNode (Nothing,map getType as))
+    f lf (Return [(NodeC t as)]) = tells (ReturnNode (Just t,map getType as))
+    f lf (Return [z]) | valIsConstant z = tell [ReturnConst z]
     f lf Error {} = tells ReturnError
     f lf (Case _ ls) = do Prelude.mapM_ (f lf) [ e | _ :-> e <- ls ]
     f lf (_ :>>= _ :-> e) = f lf e

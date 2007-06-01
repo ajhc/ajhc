@@ -44,9 +44,6 @@ class FromVal a where
     fromUnVal :: Monad m => Val -> m a
     fromUnVal x = fromVal x
 
-instance ToVal () where
-    toVal () = vUnit
-    toUnVal () = unit
 
 instance ToVal Bool where
     toVal True = vTrue
@@ -81,11 +78,6 @@ instance FromVal Char where
     fromVal n = fail $ "Val is not Char: " ++ show n
     fromUnVal (Lit i _) | Just x <- toIntegral i = return (chr x)
     fromUnVal n = fail $ "Val is not UnChar: " ++ show n
-instance FromVal () where
-    fromVal n | n == toVal () = return ()
-    fromVal n = fail $ "Val is not (): " ++ show n
-    fromUnVal (Tup []) = return ()
-    fromUnVal n = fail $ "Val is not Un(): " ++ show n
 
 instance FromVal a => FromVal [a] where
     fromVal (NodeC n [])  | n == nil = return []

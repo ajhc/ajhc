@@ -106,17 +106,17 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
     cafs = text "/* CAFS */" $$ (vcat $ map ccaf (grinCafs grin))
 
 convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C Function
-convertFunc ffie (n,~(Tup as) :-> body) = do
+convertFunc ffie (n,as :-> body) = do
         s <- localTodo TodoReturn (convertBody body)
         let bt = getType body
-            mmalloc (TyPtr _) = [a_MALLOC]
-            mmalloc TyNode = [a_MALLOC]
+            mmalloc [TyPtr TyNode] = [a_MALLOC]
+            mmalloc [TyNode] = [a_MALLOC]
             mmalloc _ = []
             ats = (if isNothing ffie then a_STD else Public):mmalloc bt
             fnname = case ffie of
                 Nothing -> nodeFuncName n
                 Just ~(FfiExport cn Safe CCall) -> name cn
-        fr <- convertType bt
+        fr <- convertTypes bt
         as' <- flip mapM as $ \ (Var v t) -> do
             t' <- convertType t
             return (varName v,t')
@@ -137,8 +137,16 @@ fetchVar' v ty = do
     t <- convertType ty
     return $ (varName v,t)
 
+convertVals :: [Val] -> C Expression
+convertVals [] = return emptyExpression
+convertVals [x] = convertVal x
+convertVals xs = do
+    ts <- mapM convertType (map getType xs)
+    xs <- mapM convertVal xs
+    return (structAnon (zip xs ts))
+
 convertVal :: Val -> C Expression
-convertVal (Tup [x]) = convertVal x
+--convertVal (Tup [x]) = convertVal x
 convertVal v | Just e <- convertConst v = return e
 convertVal (Var v ty) = fetchVar v ty
 convertVal (Const h) = do
@@ -156,10 +164,10 @@ convertVal h@(NodeC a ts) | valIsConstant h = do
             (_,i) <- newConst h
             return $ f_PROMOTE (variable (name $  'c':show i ))
 
-convertVal (Tup xs) = do
-    ts <- mapM convertType (map getType xs)
-    xs <- mapM convertVal xs
-    return (structAnon (zip xs ts))
+--convertVal (Tup xs) = do
+--    ts <- mapM convertType (map getType xs)
+--    xs <- mapM convertVal xs
+--    return (structAnon (zip xs ts))
 convertVal (Tag t) = do tellTags t ; return $ constant (enum $ nodeTagName t)
 convertVal (ValPrim (APrim p _) [x] (TyPrim opty)) = do
     x' <- convertVal x
@@ -176,17 +184,23 @@ convertVal (ValPrim (APrim p _) [x,y] _) = do
 
 convertVal x = return $ err ("convertVal: " ++ show x)
 
+convertTypes [] = return voidType
+convertTypes [t] = convertType t
+convertTypes xs = do
+    xs <- mapM convertType xs
+    return (anonStructType xs)
+
 convertType TyTag = return tag_t
 convertType TyNode = return wptr_t
 convertType (TyPtr TyNode) = return sptr_t
 convertType (TyPtr (TyPtr TyNode)) = return $ ptrType sptr_t
 convertType (Ty t) = return (basicType (toString t))
 convertType (TyPrim opty) = return (opTyToC opty)
-convertType (TyTup []) = return voidType
-convertType (TyTup [x]) = convertType x
-convertType (TyTup xs) = do
-    xs <- mapM convertType xs
-    return (anonStructType xs)
+--convertType (TyTup []) = return voidType
+--convertType (TyTup [x]) = convertType x
+--convertType (TyTup xs) = do
+--    xs <- mapM convertType xs
+--    return (anonStructType xs)
 
 forceHint _ Op.TyBool = Op.TyBool
 forceHint h (Op.TyBits b _) = Op.TyBits b h
@@ -211,16 +225,9 @@ opTyToC' opty = tyToC Op.HintUnsigned opty
 
 
 convertBody :: Exp -> C Statement
-convertBody (Prim p [a,b] :>>= Tup [q,r] :-> e') | primName p == toAtom "@primQuotRem" = do
-    a' <- convertVal a
-    b' <- convertVal b
-    r' <- convertVal r
-    q' <- convertVal q
-    ss' <- convertBody e'
-    return $ mconcat [ q' =* (operator "/" a' b'), r' =* (operator "%" a' b'), ss' ]
 convertBody Let { expDefs = defs, expBody = body } = do
     u <- newUniq
-    nn <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = Tup as :-> _ } -> do
+    nn <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = as :-> _ } -> do
         vs' <- mapM convertVal as
         let nm = (toName (show name ++ "_" ++ show u))
         return (name,(nm,vs'))
@@ -228,25 +235,24 @@ convertBody Let { expDefs = defs, expBody = body } = do
     let localJumps xs = local (rEMap_u (Map.fromList xs `mappend`))
     localJumps nn $ do
     ss <- (convertBody body)
-    rs <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = Tup as :-> b } -> do
+    rs <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = as :-> b } -> do
        ss <- convertBody b
        return (annotate (show as) (label (toName (show name ++ "_" ++ show u))) & subBlock ss)
     todo <- asks rTodo
     case todo of
         TodoReturn -> return (ss & mconcat rs);
         _ -> return (ss & goto done & mconcat (intersperse (goto done) rs) & label done);
-convertBody (e :>>= Tup [x] :-> e') = convertBody (e :>>= x :-> e')
-convertBody (e :>>= Tup [] :-> e') = do
+convertBody (e :>>= [] :-> e') = do
     ss <- localTodo (TodoExp []) (convertBody e)
     ss' <- convertBody e'
     return (ss & ss')
-convertBody (Return v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
-convertBody (Return v :>>= (NodeV t []) :-> e') = do
+convertBody (Return [v] :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
+convertBody (Return [v] :>>= [(NodeV t [])] :-> e') = do
     v' <- convertVal v
     t' <- convertVal (Var t TyTag)
     return $ t' =* getWhat v'
-convertBody (Fetch v :>>= (NodeC t as) :-> e') = nodeAssign v t as e'
-convertBody (Case v@(Var _ ty) [p1@(NodeC t _) :-> e1,p2 :-> e2]) | ty == TyNode = do
+convertBody (Fetch v :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
+convertBody (Case v@(Var _ ty) [[p1@(NodeC t _)] :-> e1,[p2] :-> e2]) | ty == TyNode = do
     scrut <- convertVal v
     tellTags t
     let tag = getWhat scrut
@@ -254,7 +260,7 @@ convertBody (Case v@(Var _ ty) [p1@(NodeC t _) :-> e1,p2 :-> e2]) | ty == TyNode
             v'' <- convertVal v
             e' <- convertBody e
             return $ v'' =* scrut & e'
-        da n1@(NodeC t _) (Return n2@NodeC {}) | n1 == n2 = convertBody (Return v)
+        da n1@(NodeC t _) (Return [n2@NodeC {}]) | n1 == n2 = convertBody (Return [v])
         da (NodeC t as) e = do
             tellTags t
             declareStruct t
@@ -272,8 +278,8 @@ convertBody (Case v@(Var _ ty) [p1@(NodeC t _) :-> e1,p2 :-> e2]) | ty == TyNode
     return $ profile_case_inc & cif ((constant $ enum (nodeTagName t)) `eq` tag) p1' p2'
 
 -- zero is usually faster to test for than other values, so flip them if zero is being tested for.
-convertBody (Case v@Var {} [v1, v2@(Lit n _ :-> _)]) | n == 0 = convertBody (Case v [v2,v1])
-convertBody (Case v@(Var _ t) [p1 :-> e1, p2 :-> e2]) | Set.null ((freeVars p2 :: Set.Set Var) `Set.intersection` freeVars e2) = do
+convertBody (Case v@Var {} [v1, v2@([Lit n _] :-> _)]) | n == 0 = convertBody (Case v [v2,v1])
+convertBody (Case v@(Var _ t) [[p1] :-> e1, [p2] :-> e2]) | Set.null ((freeVars p2 :: Set.Set Var) `Set.intersection` freeVars e2) = do
     scrut <- convertVal v
     let ptrs = [Ty $ toAtom "HsPtr", Ty $ toAtom "HsFunPtr"]
         scrut' = (if t `elem` ptrs then cast uintptr_t scrut else scrut)
@@ -287,15 +293,15 @@ convertBody (Case v@(Var _ t) [p1 :-> e1, p2 :-> e2]) | Set.null ((freeVars p2 :
 convertBody (Case v@(Var _ t) ls) | t == TyNode = do
     scrut <- convertVal v
     let tag = getWhat scrut
-        da (v@(Var {}) :-> e) = do
+        da ([v@(Var {})] :-> e) = do
             v'' <- convertVal v
             e' <- convertBody e
             return $ (Nothing,v'' =* scrut & e')
-        da (n1@(NodeC t _) :-> Return n2@NodeC {}) | n1 == n2 = do
+        da ([n1@(NodeC t _)] :-> Return [n2@NodeC {}]) | n1 == n2 = do
             tellTags t
-            e' <- convertBody (Return v)
+            e' <- convertBody (Return [v])
             return (Just (enum (nodeTagName t)),e')
-        da ((NodeC t as) :-> e) = do
+        da ([(NodeC t as)] :-> e) = do
             tellTags t
             declareStruct t
             as' <- mapM convertVal as
@@ -311,17 +317,17 @@ convertBody (Case v@(Var _ t) ls) = do
     scrut <- convertVal v
     let ptrs = [Ty $ toAtom "HsPtr", Ty $ toAtom "HsFunPtr"]
         scrut' = (if t `elem` ptrs then cast uintptr_t scrut else scrut)
-        da (v@(Var {}) :-> e) = do
+        da ([v@(Var {})] :-> e) = do
             v'' <- convertVal v
             e' <- convertBody e
             return (Nothing,v'' =* scrut & e')
-        da ((Lit i _) :-> e) = do
+        da ([(Lit i _)] :-> e) = do
             e' <- convertBody e
             return $ (Just (number $ fromIntegral i), e')
-        da (Tag t :-> e) = do
+        da ([Tag t] :-> e) = do
             e' <- convertBody e
             return $ (Just (enum (nodeTagName t)), e')
-        da (~(Tup [x]) :-> e) = da ( x :-> e )
+        --da (~[x] :-> e) = da ( x :-> e )
     ls' <- mapM da ls
     return $ profile_case_inc & switch' scrut' ls'
 convertBody (Error s t) = do
@@ -330,36 +336,36 @@ convertBody (Error s t) = do
              | otherwise = expr $ functionCall (name "jhc_error") [string s]
     let f (TyPtr _) = return nullPtr
         f TyNode = return nullPtr
-        f (TyTup []) = return emptyExpression
-        f (TyTup xs) = do ts <- mapM convertType xs; xs <- mapM f xs ; return $ structAnon (zip xs ts)
         f (TyPrim x) = return $ cast (opTyToC x) (constant $ number 0)
-        --f (Ty x) = return $ cast (basicType (show x)) (constant $ number 0)
         f TyTag  = return $ constant (enum $ nodeTagName tagHole)
         f x = return $ err ("error-type " ++ show x)
+        g [] = return emptyExpression
+        g [x] = f x
+        g xs = do ts <- mapM convertType xs; xs <- mapM f xs ; return $ structAnon (zip xs ts)
     case x of
         TodoExp _ -> return jerr
         TodoDecl {} -> return jerr
         TodoReturn -> do
-            v <- f t
+            v <- g t
             return (jerr & creturn v)
 
 convertBody (Store  n@NodeC {})  = newNode sptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
-convertBody (Return n@NodeC {})  = newNode wptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
+convertBody (Return [n@NodeC {}])  = newNode wptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
 
 
-convertBody (e :>>= (Var vn vt) :-> e') | not $ isCompound e = do
+convertBody (e :>>= [(Var vn vt)] :-> e') | not $ isCompound e = do
     (vn,vt) <- fetchVar' vn vt
     ss <- localTodo (TodoDecl vn vt) (convertBody e)
     ss' <- local (rInscope_u (Set.insert vn)) $ convertBody e'
     return (ss & ss')
 
-convertBody (e :>>= v@(Var _ _) :-> e') = do
+convertBody (e :>>= [v@(Var _ _)] :-> e') = do
     v' <- convertVal v
     ss <- localTodo (TodoExp [v'])  (convertBody e)
     ss' <- convertBody e'
     return (ss & ss')
 
-convertBody (e :>>= ~(Tup xs) :-> e') = do
+convertBody (e :>>= xs@(_:_:_) :-> e') = do
     ts <- mapM (convertType . getType) xs
     st <- newVar (anonStructType ts)
     ss <- localTodo (TodoExp [st]) (convertBody e)
@@ -395,15 +401,16 @@ convertBody (Fetch v) | getType v == TyPtr tyINode  = do
 convertBody (Fetch v)        | getType v == tyINode = simpleRet =<< f_promote `liftM` convertVal v
 convertBody (Store n@Var {}) | getType n == tyDNode = simpleRet =<< f_demote `liftM` convertVal n
 
-convertBody (Return (Tup xs)) = do
+convertBody (Return []) = simpleRet emptyExpression
+convertBody (Return [v]) = simpleRet =<< convertVal v
+convertBody (Return xs@(_:_:_)) = do
     t <- asks rTodo
     case t of
         TodoExp [e] -> do
             xs <- mapM convertVal xs
             ss <- forMn xs $ \ (v,i) -> return (projectAnon i e =* v)
             return (mconcat ss)
-        _ -> simpleRet =<< convertVal (Tup xs)
-convertBody (Return v) = simpleRet =<< convertVal v
+        _ -> simpleRet =<< convertVals xs
 
 
 convertBody e = do
@@ -439,9 +446,9 @@ isCompound _ = True
 
 
 convertExp :: Exp -> C (Statement,Expression)
-convertExp (Prim p vs) | APrim _ req <- primAPrim p  =  do
+convertExp (Prim p vs ty) | APrim _ req <- p  =  do
     tell mempty { wRequires = req }
-    e <- convertPrim p vs
+    e <- convertPrim p vs ty
     return (mempty,e)
 
 
@@ -513,8 +520,8 @@ convertConst (Const (NodeC h _)) | h == tagHole = return (cast sptr_t (f_VALUE (
 convertConst (Lit i (TyPrim Op.TyBool)) = return $ if i == 0 then constant cFalse else constant cTrue
 convertConst (Lit i (TyPrim (Op.TyBits _ Op.HintFloat))) = return (constant $ floating (realToFrac i))
 convertConst (Lit i _) = return (constant $ number (fromIntegral i))
-convertConst (Tup [x]) = convertConst x
-convertConst (Tup []) = return emptyExpression
+--convertConst (Tup [x]) = convertConst x
+--convertConst (Tup []) = return emptyExpression
 convertConst (Tag t) = return $ constant (enum $ nodeTagName t)
 convertConst (ValPrim (APrim p _) [] _) = case p of
     CConst s _ -> return $ expressionRaw s
@@ -541,23 +548,23 @@ convertConst x = fail "convertConst"
 
 
 --convertPrim p vs = return (mempty,err $ show p)
-convertPrim p vs
-    | APrim (CConst s _) _ <- primAPrim p = do
+convertPrim p vs ty
+    | APrim (CConst s _) _ <- p = do
         return $ expressionRaw s
-    | APrim Op {} _ <- primAPrim p = do
-        let (_,rt) = primType p
-        convertVal (ValPrim (primAPrim p) vs rt)
-    | APrim (Func _ n as r) _ <- primAPrim p = do
+    | APrim Op {} _ <- p = do
+        let [rt] = ty
+        convertVal (ValPrim (p) vs rt)
+    | APrim (Func _ n as r) _ <- p = do
         vs' <- mapM convertVal vs
         return $ cast (basicType r) (functionCall (name $ unpackPS n) [ cast (basicType t) v | v <- vs' | t <- as ])
-    | APrim (Peek t) _ <- primAPrim p, [v] <- vs = do
+    | APrim (Peek t) _ <- p, [v] <- vs = do
         v' <- convertVal v
         return $ expressionRaw ("*((" <> (opTyToC' t) <+> "*)" <> (parens $ renderG v') <> char ')')
-    | APrim (Poke t) _ <- primAPrim p, [v,x] <- vs = do
+    | APrim (Poke t) _ <- p, [v,x] <- vs = do
         v' <- convertVal v
         x' <- convertVal x
         return $ expressionRaw ("*((" <> (opTyToC' t) <+> "*)" <> (parens $ renderG v') <> text ") = " <> renderG x')
-    | APrim (AddrOf t) _ <- primAPrim p, [] <- vs = do
+    | APrim (AddrOf t) _ <- p, [] <- vs = do
         return $ expressionRaw ('&':unpackPS t)
     | otherwise = return $ err ("prim: " ++ show (p,vs))
 
@@ -647,7 +654,7 @@ newNode ty ~(NodeC t as) = do
             malloc =  wmalloc (sizeof st)
             nonPtr TyPtr {} = False
             nonPtr TyNode = False
-            nonPtr (TyTup xs) = all nonPtr xs
+--            nonPtr (TyTup xs) = all nonPtr xs
             nonPtr _ = True
         (dtmp,tmp) <- ty `newTmpVar` malloc
         let tmp' = concrete t tmp

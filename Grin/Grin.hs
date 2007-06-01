@@ -6,14 +6,13 @@ module Grin.Grin(
     FuncDef(..),
     FuncProps(..),
     Grin(..),
-    HeapType(..),
+    --HeapType(..),
     TyThunk(..),
-    HeapValue(HV),
-    Item(..),
+--    HeapValue(HV),
+--    Item(..),
     Lam(..),
-    NodeValue(NV),
+--    NodeValue(NV),
     Phase(..),
-    Primitive(..),
     Tag,
     updateFuncDefProps,
     Ty(..),
@@ -25,7 +24,7 @@ module Grin.Grin(
     extendTyEnv,
     createFuncDef,
     setGrinFunctions,
-    combineItems,
+--    combineItems,
     grinFuncs,
     emptyGrin,
     tyINode,
@@ -39,8 +38,8 @@ module Grin.Grin(
     grinEntryPointNames,
     isHole,
     isValUnknown,
-    isVar,isTup,
-    itemTag,
+    isVar,
+--    itemTag,
     n0,n1,n2,n3,
     p0,p1,p2,p3,
     partialTag,
@@ -55,16 +54,13 @@ module Grin.Grin(
     tagIsWHNF,
     tagToFunction,
     tagUnfunction,
-    tyUnit,
-    unit,
     v0,v1,v2,v3,lamExp,lamBind,
-    valToItem,
+--    valToItem,
     valIsNF
     ) where
 
 import Char
 import Control.Monad.Identity
-import Data.IORef
 import Data.Monoid
 import List(isPrefixOf)
 import Prelude
@@ -81,10 +77,10 @@ import Number
 import Options
 import Support.CanType
 import Support.FreeVars
-import Support.Tuple
 import Util.Perhaps
 import qualified Info.Info as Info
 import qualified C.Op as Op
+import qualified Stats
 
 -- Extremely simple first order monadic code with basic type system.  similar
 -- to GRIN except for the explicit typing on variables. Note, that certain
@@ -100,12 +96,12 @@ data TyThunk =
 
 data TyTy = TyTy {
     tySlots :: [Ty],
-    tyReturn :: Ty,
+    tyReturn :: [Ty],
     tyThunk :: TyThunk,
     tySiblings :: Maybe [Atom]
 }
 
-tyTy = TyTy { tySlots = [], tyReturn = TyUnknown, tySiblings = Nothing, tyThunk = TyNotThunk }
+tyTy = TyTy { tySlots = [], tyReturn = [], tySiblings = Nothing, tyThunk = TyNotThunk }
 
 newtype TyEnv = TyEnv (Map.Map Atom TyTy)
     deriving(Monoid)
@@ -116,7 +112,7 @@ funcApply = toAtom "@apply"
 funcEval = toAtom "@eval"
 
 gEval :: Val -> Exp
-gEval x = App funcEval [x] TyNode
+gEval x = App funcEval [x] [TyNode]
 
 -- lazy node sptr_t
 tyINode = TyPtr TyNode
@@ -146,25 +142,26 @@ instance Show Var where
 infixr 1  :->, :>>=
 
 
-tyUnit = TyTup []
-unit = Tup []
-
-data Lam = Val :-> Exp
+data Lam = [Val] :-> Exp
     deriving(Eq,Ord,Show)
 
 data Exp =
      Exp :>>= Lam                                                         -- ^ Sequencing - the same as >>= for monads.
-    | App       { expFunction  :: Atom, expArgs :: [Val], expType :: Ty } -- ^ Application of functions and builtins
-    | Prim      { expPrimitive :: Primitive, expArgs :: [Val] }           -- ^ Primitive operation
+    | App       { expFunction  :: Atom,
+                  expArgs :: [Val],
+                  expType :: [Ty] }                                       -- ^ Application of functions and builtins
+    | Prim      { expPrimitive :: APrim,
+                  expArgs :: [Val],
+                  expType :: [Ty] }                                       -- ^ Primitive operation
     | Case      { expValue :: Val, expAlts :: [Lam] }                     -- ^ Case statement
-    | Return    { expValue :: Val }                                       -- ^ Return a value
+    | Return    { expValues :: [Val] }                                    -- ^ Return a value
     | Store     { expValue :: Val }                                       -- ^ Allocate a new heap node
     | Fetch     { expAddress :: Val }                                     -- ^ Load given heap node
     | Update    { expAddress :: Val, expValue :: Val }                    -- ^ Update given heap node
-    | Error     { expError :: String, expType :: Ty }                     -- ^ Abort with an error message, non recoverably.
+    | Error     { expError :: String, expType :: [Ty] }                   -- ^ Abort with an error message, non recoverably.
     | Call      { expValue :: Val,
                   expArgs :: [Val],
-                  expType :: Ty,
+                  expType :: [Ty],
                   expJump :: Bool,                                        -- ^ Jump is equivalent to a call except it deallocates the region it resides in before transfering control
                   expFuncProps :: FuncProps,
                   expInfo :: Info.Info }                                  -- ^ Call or jump to a callable
@@ -182,7 +179,7 @@ data Exp =
     | MkClosure { expValue :: Val,
                   expArgs :: [Val],
                   expRegion :: Val,
-                  expType :: Ty,
+                  expType :: [Ty],
                   expInfo :: Info.Info }                   -- ^ create a closure
     | MkCont    { expCont :: Lam,                          -- ^ the continuation routine
                   expLam :: Lam,                           -- ^ the computation that is passed the newly created computation
@@ -196,12 +193,11 @@ data Val =
     | Const Val               -- ^ pointer to constant data, only Lit, Tag, and NodeC may be children
     | Lit !Number Ty          -- ^ Literal
     | Var !Var Ty             -- ^ Variable
-    | Tup [Val]               -- ^ Unboxed tuple
+    | Unit                    -- ^ Empty value used as placeholder
     | ValPrim APrim [Val] Ty  -- ^ Primitive value
     | Index Val Val           -- ^ A pointer incremented some number of values (Index v 0) == v
     | Item Atom Ty            -- ^ Specific named thing. function, global, region, etc..
-    | ValUnknown Ty           -- ^ Unknown or empty value
-    | Addr {-# UNPACK #-} !(IORef Val)  -- ^ Used only in interpreter
+    | ValUnknown Ty           -- ^ Unknown value
     deriving(Eq,Ord)
 
 data Ty =
@@ -210,8 +206,8 @@ data Ty =
     | TyNode                   -- ^ a whole tagged node
     | Ty Atom                  -- ^ a basic type
     | TyPrim Op.Ty             -- ^ a basic type
-    | TyTup [Ty]               -- ^ unboxed list of values
-    | TyCall Callable [Ty] Ty  -- ^ something call,jump, or cut-to-able
+    | TyUnit                   -- ^ type of Unit
+    | TyCall Callable [Ty] [Ty]  -- ^ something call,jump, or cut-to-able
     | TyRegion                 -- ^ a region
     | TyUnknown                -- ^ an unknown possibly undefined type, All of these must be eliminated by code generation
     deriving(Eq,Ord)
@@ -225,11 +221,11 @@ data FuncDef = FuncDef {
     funcDefProps :: FuncProps
     } deriving(Eq,Ord,Show)
 
-createFuncDef local name body@(~(Tup args) :-> rest)  = updateFuncDefProps FuncDef { funcDefName = name, funcDefBody = body, funcDefCall = call, funcDefProps = funcProps } where
+createFuncDef local name body@(args :-> rest)  = updateFuncDefProps FuncDef { funcDefName = name, funcDefBody = body, funcDefCall = call, funcDefProps = funcProps } where
     call = Item name (TyCall (if local then LocalFunction else Function) (map getType args) (getType rest))
 
 
-updateFuncDefProps fd@FuncDef { funcDefBody = body@(~(Tup args) :-> rest) } =  fd { funcDefProps = props } where
+updateFuncDefProps fd@FuncDef { funcDefBody = body@(args :-> rest) } =  fd { funcDefProps = props } where
     props = (funcDefProps fd) { funcFreeVars = freeVars body, funcTags = freeVars body, funcType = (map getType args,getType rest) }
 
 grinFuncs grin = map (\x -> (funcDefName x, funcDefBody x)) (grinFunctions grin)
@@ -245,7 +241,7 @@ data FuncProps = FuncProps {
     funcInfo    :: Info.Info,
     funcFreeVars :: Set.Set Var,
     funcTags    :: Set.Set Tag,
-    funcType    :: ([Ty],Ty),
+    funcType    :: ([Ty],[Ty]),
     funcExits   :: Perhaps,      -- ^ function quits the program
     funcCuts    :: Perhaps,      -- ^ function cuts to a value
     funcAllocs  :: Perhaps,      -- ^ function allocates memory
@@ -272,17 +268,12 @@ instance Show Ty where
     show (Ty a) = fromAtom a
     show TyNode = "N"
     show (TyPtr t) = '&':show t
-    show (TyTup []) = "()"
-    show (TyTup ts) =  tupled (map show ts)
+    show (TyUnit) = "()"
     show (TyPrim t) = show t
     show TyRegion = "R"
     show (TyCall c as rt) = show c <> tupled (map show as) <+> "->" <+> show rt
     show TyUnknown = "?"
 
-instance Show (IORef a) where
-    show _ = "IORef"
-instance Ord (IORef a) where
-    compare a b = EQ
 
 instance Show Val where
     -- showsPrec _ s | Just st <- fromVal s = text $ show (st::String)
@@ -301,11 +292,10 @@ instance Show Val where
         | otherwise = char 'v' <> tshow i
     showsPrec _ (Lit i t) | t == tCharzh, Just x <- toIntegral i = tshow (chr x)
     showsPrec _ (Lit i _)  = tshow i
-    showsPrec _ (Tup xs)  = tupled $ map shows xs
+    showsPrec _ Unit  = showString "()"
     showsPrec _ (Const v) = char '&' <> shows v
     showsPrec _ (Item a  ty) = tshow a <> text "::" <> tshow ty
     showsPrec _ (ValUnknown ty) = text "?::" <> tshow ty
-    showsPrec _ (Addr _) = text "<ref>"
     showsPrec _ (ValPrim aprim xs _) = tshow aprim <> tupled (map tshow xs)
 
 data Phase = PhaseInit | PostInlineEval | PostAeOptimize | PostDevolve
@@ -319,10 +309,11 @@ data Grin = Grin {
     grinPhase :: Phase,
     grinTypeEnv :: TyEnv,
     grinFunctions :: [FuncDef],
-    grinReturnTags :: Map.Map Atom Item,
-    grinArgTags :: Map.Map Atom [Item],
+--    grinReturnTags :: Map.Map Atom Item,
+--    grinArgTags :: Map.Map Atom [Item],
     grinSuspFunctions :: Set.Set Atom,
     grinPartFunctions :: Set.Set Atom,
+    grinStats :: Stats.Stat,
     grinCafs :: [(Var,Val)]
 }
 
@@ -332,35 +323,14 @@ emptyGrin = Grin {
     grinPhase = PhaseInit,
     grinTypeEnv = mempty,
     grinFunctions = [],
-    grinReturnTags = mempty,
-    grinArgTags = mempty,
+--    grinReturnTags = mempty,
+--    grinArgTags = mempty,
     grinSuspFunctions = mempty,
     grinPartFunctions = mempty,
     grinCafs = mempty
 }
 
 grinEntryPointNames = Map.keys . grinEntryPoints
-
-
-
-
-data Primitive = Primitive {
-    primName :: Atom,
-    primRets :: Maybe [Atom],
-    primType :: ([Ty],Ty),
-    primAPrim :: APrim
-    } deriving(Show)
-
-instance Eq Primitive where
-    a == b = primName a == primName b
-    a /= b = primName a /= primName b
-
-instance Ord Primitive where
-    compare a b = compare (primName a) (primName b)
-
-
-
-
 
 
 partialTag :: Tag -> Int -> Tag
@@ -437,7 +407,6 @@ tagIsWHNF t
     where t' = fromAtom t
 
 valIsNF (NodeC t vs) = tagIsWHNF t && all valIsNF vs
-valIsNF (Tup xs) = all valIsNF xs
 valIsNF (Tag _) = True
 valIsNF Const {} = True
 valIsNF Lit {} = True
@@ -464,7 +433,7 @@ findTyTy (TyEnv m) a | Just tyty <-  Map.lookup a m = return tyty
 findTyTy (TyEnv m) a | ('Y':rs) <- fromAtom a, (ns,'_':rs) <- span isDigit rs  = case Map.lookup (toAtom ('T':rs)) m of
     Just TyTy { tySlots = ts, tyReturn = n } -> return tyTy { tySlots = take (length ts - read ns) ts, tyReturn = n }
     Nothing -> fail $ "findArgsType: " ++ show a
-findTyTy _ a | "@hole" `isPrefixOf` fromAtom a  = return tyTy { tySlots = [], tyReturn = TyNode }
+findTyTy _ a | "@hole" `isPrefixOf` fromAtom a  = return tyTy { tySlots = [], tyReturn = [TyNode] }
 findTyTy _ a =  fail $ "findArgsType: " ++ show a
 
 findArgsType m a = liftM (\tyty -> (tySlots tyty,tyReturn tyty)) (findTyTy m a)
@@ -489,22 +458,24 @@ p2 = Var v2 (TyPtr TyNode)
 p3 = Var v3 (TyPtr TyNode)
 
 
+instance CanType e t => CanType [e] [t] where
+    getType es = map getType es
 
-instance CanType Exp Ty where
+instance CanType Exp [Ty] where
     getType (_ :>>= (_ :-> e2)) = getType e2
-    getType (Prim p _) = snd (primType p)
+    getType (Prim _ _ ty) = ty
     getType App { expType = t } = t
-    getType (Store v) = TyPtr (getType v)
+    getType (Store v) = [TyPtr (getType v)]
     getType (Return v) = getType v
     getType (Fetch v) = case getType v of
-        TyPtr t -> t
+        TyPtr t -> [t]
         _ -> error "Exp.getType: fetch of non-pointer type"
     getType (Error _ t) = t
-    getType (Update w v) = tyUnit
+    getType (Update w v) = []
     getType (Case _ []) = error "empty case"
     getType (Case _ ((_ :-> e):_)) = getType e
     getType NewRegion { expLam = _ :-> body } = getType body
-    getType Alloc { expValue = v } = TyPtr (getType v)
+    getType Alloc { expValue = v } = [TyPtr (getType v)]
     getType Let { expBody = body } = getType body
     getType MkCont { expLam = _ :-> rbody } = getType rbody
     getType Call { expType = ty } = ty
@@ -516,10 +487,9 @@ instance CanType Val Ty where
     getType (Lit _ t) = t
     getType (Index v _) = getType v
     getType (NodeV {}) = TyNode
-    getType (Tup xs) = TyTup (map getType xs)
+    getType Unit = TyUnit
     getType (Const t) = TyPtr (getType t)
     getType (NodeC {}) = TyNode
-    getType (Addr _) = TyPtr (error "typecheck: Addr")
     getType (ValPrim _ _ ty) = ty
     getType (ValUnknown ty) = ty
     getType (Item _ ty) = ty
@@ -538,7 +508,6 @@ instance FreeVars Val (Set.Set Var) where
     freeVars (Const v) = freeVars v
     freeVars (Index a b) = freeVars (a,b)
     freeVars (Var v _) = Set.singleton v
-    freeVars (Tup vs) = freeVars vs
     freeVars _ = Set.empty
 
 instance FreeVars Val (Set.Set (Var,Ty)) where
@@ -547,7 +516,6 @@ instance FreeVars Val (Set.Set (Var,Ty)) where
     freeVars (Const v) = freeVars v
     freeVars (Index a b) = freeVars (a,b)
     freeVars (Var v t) = Set.singleton (v,t)
-    freeVars (Tup vs) = freeVars vs
     freeVars _ = Set.empty
 
 instance FreeVars FuncProps (Set.Set Var) where
@@ -567,7 +535,7 @@ instance FreeVars Exp (Set.Set Var) where
     freeVars (Store v) = freeVars v
     freeVars (Fetch v) = freeVars v
     freeVars (Update x y) = freeVars (x,y)
-    freeVars (Prim _ x) = freeVars x
+    freeVars (Prim _ x _) = freeVars x
     freeVars Error {} = Set.empty
     freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (funcFreeVars . funcDefProps) fdefs) `mappend` freeVars body
     freeVars NewRegion { expLam = l } = freeVars l
@@ -584,7 +552,7 @@ instance FreeVars Exp (Set.Set (Var,Ty)) where
     freeVars (Store v) = freeVars v
     freeVars (Fetch v) = freeVars v
     freeVars (Update x y) = freeVars (x,y)
-    freeVars (Prim _ x) = freeVars x
+    freeVars (Prim _ x _) = freeVars x
     freeVars Error {} = Set.empty
     freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (freeVars . funcDefBody) fdefs) `mappend` freeVars body
     freeVars NewRegion { expLam = l } = freeVars l
@@ -603,7 +571,6 @@ instance FreeVars Lam [Var] where
 instance FreeVars Val (Set.Set Tag) where
     freeVars (NodeC t xs) = Set.singleton t `Set.union` freeVars xs
     freeVars (NodeV _ xs) = freeVars xs
-    freeVars (Tup xs) = freeVars xs
     freeVars (Index a b) = freeVars (a,b)
     freeVars (Tag t) = Set.singleton t
     freeVars (Const v) = freeVars v
@@ -627,7 +594,7 @@ instance FreeVars Exp (Set.Set Tag) where
     freeVars (Store v) = freeVars v
     freeVars (Fetch v) = freeVars v
     freeVars (Update x y) = freeVars (x,y)
-    freeVars (Prim _ x) = freeVars x
+    freeVars (Prim _ x _) = freeVars x
     freeVars Error {} = Set.empty
     freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (funcTags . funcDefProps) fdefs) `mappend` freeVars body
     freeVars NewRegion { expLam = l } = freeVars l
@@ -638,6 +605,7 @@ instance FreeVars Exp (Set.Set Tag) where
 
 
 -- Points to information
+{-
 
 data HeapType = Constant | SharedEval | UnsharedEval | Reference | RecursiveThunk
     deriving(Eq,Ord)
@@ -653,7 +621,7 @@ valToItem (Index v _) = valToItem v
 valToItem (Const v) = HeapValue (Set.singleton (HV (-1) (Right v)))
 valToItem (NodeC t as) = NodeValue (Set.singleton (NV t (map valToItem as)))
 valToItem (Lit _ ty) = BasicValue ty
-valToItem (Tup as) = TupledValue (map valToItem as)
+--valToItem (Tup as) = TupledValue (map valToItem as)
 valToItem ~(Tag _) = BasicValue TyTag
 
 itemTag = BasicValue TyTag
@@ -662,7 +630,7 @@ instance CanType Item Ty where
     getType (HeapValue _) = TyPtr TyNode
     getType NodeValue {} = TyNode
     getType (BasicValue ty) = ty
-    getType (TupledValue xs) = TyTup (map getType xs)
+--    getType (TupledValue xs) = TyTup (map getType xs)
 
 
 -- heap locations are given a unique integer to break cycles.
@@ -705,6 +673,7 @@ instance Tuple Item where
 instance FromTuple Item where
     fromTuple (TupledValue ts) = ts
     fromTuple x = [x]
+-}
 
 lamExp (_ :-> e) = e
 lamBind (b :-> _) = b
@@ -712,8 +681,8 @@ lamBind (b :-> _) = b
 isVar Var {} = True
 isVar _ = False
 
-isTup Tup {} = True
-isTup _ = False
+--isTup Tup {} = True
+--isTup _ = False
 
 
 

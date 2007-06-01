@@ -30,10 +30,10 @@ devolveGrin grin = do
         f lt@Let { expDefs = defs, expBody = body } = do
             let nonTail = expNonNormal lt
                 (nmaps,rmaps) = splitEither (map z defs)
-                z fd@FuncDef { funcDefName = name, funcDefBody = ~(Tup as) :-> r }
-                    | name `Set.member` nonTail = Left ((name,Tup (as ++ xs) :-> proc r),xs)
-                    | otherwise = Right fd { funcDefBody = Tup as :-> proc r }
-                  where xs = [ Var v t |  (v,t) <- Set.toList $ freeVars (Tup as :-> r)]
+                z fd@FuncDef { funcDefName = name, funcDefBody = as :-> r }
+                    | name `Set.member` nonTail = Left ((name,(as ++ xs) :-> proc r),xs)
+                    | otherwise = Right fd { funcDefBody = as :-> proc r }
+                  where xs = [ Var v t |  (v,t) <- Set.toList $ freeVars (as :-> r)]
                 pmap = Map.fromList [ (n,xs) | ((n,_),xs) <- nmaps]
                 proc b = runIdentity (proc' b)
                 proc' (App a as t) | Just xs <- Map.lookup a pmap = return (App a (as ++ xs) t)

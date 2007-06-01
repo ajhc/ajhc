@@ -11,7 +11,6 @@ import Grin.Grin
 import Grin.Noodle
 import Stats hiding(null)
 import Support.CanType
-import Support.Tuple
 import Support.FreeVars
 import Util.Graph
 import Util.SetLike
@@ -19,7 +18,7 @@ import Util.SetLike
 
 data PExp = PExp {
     pexpUniq :: Int,
-    pexpBind :: Val,
+    pexpBind :: [Val],
     pexpExp  :: Exp,
     pexpProvides :: [Var],
     pexpDeps :: [Int]
@@ -82,8 +81,8 @@ grinPush stats (l :-> e) = ans where
             dropped =  reverse $ topSort $ newGraph reached pexpUniq pexpDeps
             ff pexp exp = pexpExp pexp :>>= pexpBind pexp :-> exp
             ebinds = [ Var v t | (v,t) <- Set.toList $ freeVars (map pexpBind dropped) ]
-            (exp',mv') | Just vv <- mv = let mv' = tuple $ fromTuple vv ++ ebinds in (exp :>>= vv :-> Return mv',mv')
-                       | otherwise = (exp,unit)
+            (exp',mv') | Just vv <- mv = let mv' = vv ++ ebinds in (exp :>>= vv :-> Return mv',mv')
+                       | otherwise = (exp,[])
         put (nn,[ x | x <- xs, pexpUniq x `notElem` (map pexpUniq reached) ])
 --        when (not $ null dropped) $ lift $ do
 --            putStrLn "@@@ dropped"
@@ -183,11 +182,11 @@ performSpeculate specs grin = do
         h (Store (NodeC t xs)) | not (isMutableNodeTag t), t `member` sset = do
             let t' = tagFlipFunction t
             mtick $ "Optimize.speculate.store.{" ++ show t'
-            return (App t' xs TyNode :>>= n1 :-> Store n1)
+            return (App t' xs [TyNode] :>>= [n1] :-> Store n1)
         h (Update v (NodeC t xs)) | not (isMutableNodeTag t), t `member` sset = do
             let t' = tagFlipFunction t
             mtick $ "Optimize.speculate.update.{" ++ show t'
-            return (App t' xs TyNode :>>= n1 :-> Update v n1)
+            return (App t' xs [TyNode] :>>= [n1] :-> Update v n1)
         h e = mapExpExp h e
     fs <- mapM f (grinFuncs grin)
     return $ setGrinFunctions fs grin
@@ -195,7 +194,7 @@ performSpeculate specs grin = do
 findSpeculatable :: Grin -> [Atom]
 findSpeculatable grin = ans where
     ans = [ x | Left (x,_) <- scc graph ]
-    graph = newGraph [ (a,concatMap f (freeVars l)) | (a,_ :-> l) <- grinFuncs grin, isSpeculatable l, getType l == TyNode ] fst snd
+    graph = newGraph [ (a,concatMap f (freeVars l)) | (a,_ :-> l) <- grinFuncs grin, isSpeculatable l, getType l == [TyNode] ] fst snd
     f t | tagIsSuspFunction t = [tagFlipFunction t]
         | tagIsFunction t = [t]
         | otherwise = []
@@ -203,7 +202,7 @@ findSpeculatable grin = ans where
     isSpeculatable Store {} = True
     isSpeculatable (x :>>= _ :-> y) = isSpeculatable x && isSpeculatable y
     isSpeculatable (Case e as) = all isSpeculatable [ e | _ :-> e <- as]
-    isSpeculatable Prim { expPrimitive = Primitive { primAPrim = APrim p _ } } = primIsConstant p
+    isSpeculatable Prim { expPrimitive = APrim p _ } = primIsConstant p
     isSpeculatable _ = False
 
 

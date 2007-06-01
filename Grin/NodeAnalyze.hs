@@ -13,7 +13,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Support.FreeVars
-import Support.Tuple
 import Support.CanType
 import Atom
 import IO
@@ -145,18 +144,18 @@ doFunc (name,arg :-> body) = ans where
     zVar v TyNode = tell $ Left (vr v TyNode) `equals` Right (N WHNF Top)
     zVar v t = tell $ Left (vr v t) `equals` Right top
     ans = do
-        let rts = fromTuple $ getType body
+        let rts = getType body
         forMn_ rts $ \ (t,i) -> dVar (fr name i t) t
-        forMn_ (fromTuple arg) $ \ (~(Var v vt),i) -> do
+        forMn_ arg $ \ (~(Var v vt),i) -> do
             dVar (vr v vt) vt
             tell $ Left (fa name i vt) `equals` Left (vr v vt)
         fn (Todo True [ fr name i t | i <- naturals | t <- rts ]) body
     fn ret body = f body where
-        f (x :>>= Var v vt :-> rest) = do
+        f (x :>>= [Var v vt] :-> rest) = do
             dVar (vr v vt) vt
             gn (Todo True [vr v vt]) x
             f rest
-        f (x :>>= Tup vs :-> rest) = do
+        f (x :>>= vs@(_:_:_) :-> rest) = do
             vs' <- forM vs $ \ (Var v vt) -> do
                 dVar (vr v vt) vt
                 return $ vr v vt
@@ -182,7 +181,7 @@ doFunc (name,arg :-> body) = ans where
             forM_ (Set.toList $ freeVars v) $ \ (v,vt) -> zVar v vt
             fn ret body
         dunno ty = do
-            dres [Right (if TyNode == t then N WHNF Top else top) | t <- fromTuple ty ]
+            dres [Right (if TyNode == t then N WHNF Top else top) | t <- ty ]
         dres res = do
             case ret of
                 Todo b vs -> forM_ (zip vs res) $ \ (v,r) -> tell (isfn ret v r)
@@ -204,21 +203,21 @@ doFunc (name,arg :-> body) = ans where
             vs' <- mapM convertVal vs
             forMn_ (zip vs vs') $ \ ((tv,v),i) -> when (isGood tv) $ do
                 tell $ v `islte` Left (fa fn i (getType tv))
-            dres [Left $ fr fn i t | i <- [ 0 .. ] | t <- fromTuple ty ]
+            dres [Left $ fr fn i t | i <- [ 0 .. ] | t <- ty ]
         f (Call { expValue = Item fn _, expArgs = vs, expType = ty }) = do
             vs' <- mapM convertVal vs
             forMn_ (zip vs vs') $ \ ((tv,v),i) -> when (isGood tv) $ do
                 tell $ v `islte` Left (fa fn i (getType tv))
-            dres [Left $ fr fn i t | i <- [ 0 .. ] | t <- fromTuple ty ]
+            dres [Left $ fr fn i t | i <- [ 0 .. ] | t <- ty ]
         f (Return x) = do
-            ww' <- mapM convertVal (fromTuple x)
+            ww' <- mapM convertVal x
             dres ww'
         f (Store w) | TyNode == getType w = do
             ww <- convertVal w
             dres [ww]
         f (Store w) = do
             ww <- convertVal w
-            dunno (TyPtr (getType w))
+            dunno [TyPtr (getType w)]
         f (Fetch w) | tyINode == getType w = do
             ww <- convertVal w
             --dres [ww]
@@ -232,7 +231,7 @@ doFunc (name,arg :-> body) = ans where
             dres [v']
         f Alloc { expValue = v } | getType v == tyINode = do
             convertVal v
-            dunno (TyPtr tyINode)
+            dunno [TyPtr tyINode]
 --            dres [v']
         f NewRegion { expLam = _ :-> body } = fn ret body
         f (Update (Var vname ty) v) | ty == TyPtr TyNode  = do

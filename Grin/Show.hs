@@ -18,8 +18,6 @@ import qualified Data.Set as Set
 
 import Atom
 import C.Prims
-import CharIO
-import Data.Graph.Inductive.Basic(elfilter)
 import Data.Graph.Inductive.Graph(mkGraph,nmap)
 import Data.Graph.Inductive.Tree
 import Doc.Attr
@@ -34,7 +32,6 @@ import Number
 import Options
 import Support.CanType
 import Support.FreeVars
-import Support.Tuple
 import Util.Graphviz
 import qualified C.Op as Op
 import qualified FlagDump as FD
@@ -48,10 +45,14 @@ instance DocLike d => PPrint d Val   where
 instance PPrint Doc Exp   where
     pprint v = prettyExp empty v
 
-pVar v | v == unit = empty
-pVar v  = prettyVal v <+> operator "<- "
+pVar [] = empty
+pVar v  = prettyVals v <+> operator "<- "
 
-pVar' v  = prettyVal v <+> operator "<- "
+pVar' v  = prettyVals v <+> operator "<- "
+
+prettyVals [] = prettyVal Unit
+prettyVals [x] = prettyVal x
+prettyVals xs = tupled (map prettyVal xs)
 
 attr = if dump FD.Html then html else ansi
 
@@ -84,7 +85,9 @@ isOneLine _ = True
 {-# NOINLINE prettyExp #-}
 prettyExp vl (e1 :>>= v :-> e2) | isComplex e1 = align $ ((pVar' v) <> (prettyExp empty e1)) <$> prettyExp vl e2
 prettyExp vl (e1 :>>= v :-> e2) = align (prettyExp (pVar v) e1 <$> prettyExp vl e2)
-prettyExp vl (Return v) = vl <> keyword "return" <+> prettyVal v
+prettyExp vl (Return []) = vl <> keyword "return" <+> text "()"
+prettyExp vl (Return [v]) = vl <> keyword "return" <+> prettyVal v
+prettyExp vl (Return vs) = vl <> keyword "return" <+> tupled (map prettyVal vs)
 prettyExp vl (Store v) = vl <> keyword "store" <+> prettyVal v
 prettyExp vl (Fetch v) = vl <> keyword "fetch" <+> prettyVal v
 prettyExp vl (Error "" _) = vl <> prim "exitFailure"
@@ -93,16 +96,16 @@ prettyExp vl (App t [v] _) | t == funcEval = vl <> keyword "eval" <+> prettyVal 
 prettyExp vl (App t [a] _) | t == funcApply = vl <> keyword "apply" <+> prettyVal a
 prettyExp vl (App t [a,b] _) | t == funcApply = vl <> keyword "apply" <+> prettyVal a <+> prettyVal b
 prettyExp vl (App a vs _)  = vl <> func (fromAtom a) <+> hsep (map prettyVal vs)
-prettyExp vl (Prim Primitive { primAPrim = APrim (Peek t) _ } [v])  = vl <> prim (show t) <> char '[' <> prettyVal v <> char ']'
-prettyExp vl (Prim Primitive { primName = nm } vs)  = vl <> prim (fromAtom nm) <+> hsep (map prettyVal vs)
+prettyExp vl Prim { expPrimitive = APrim (Peek t) _, expArgs = [v] }  = vl <> prim (show t) <> char '[' <> prettyVal v <> char ']'
+prettyExp vl Prim { expPrimitive = ap, expArgs = vs } = vl <> prim (pprint ap) <+> hsep (map prettyVal vs)
 prettyExp vl (Update x y) = vl <> keyword "update" <+> prettyVal x <+> prettyVal y
 prettyExp vl (Case v vs) = vl <> keyword "case" <+> prettyVal v <+> keyword "of" <$> indent 2 (vsep (map f vs)) where
-    f (v :-> e) | isOneLine e = prettyVal v <+> operator "->" <+> prettyExp empty e
-    f (v :-> e) = prettyVal v <+> operator "->" <+> keyword "do" <$> indent 2 (prettyExp empty e)
-prettyExp vl NewRegion { expLam = (r :-> body)} = vl <> keyword "region" <+> text "\\" <> prettyVal r <+> text "-> do" <$> indent 2 (prettyExp empty body)
+    f (~[v] :-> e) | isOneLine e = prettyVal v <+> operator "->" <+> prettyExp empty e
+    f (~[v] :-> e) = prettyVal v <+> operator "->" <+> keyword "do" <$> indent 2 (prettyExp empty e)
+prettyExp vl NewRegion { expLam = (r :-> body)} = vl <> keyword "region" <+> text "\\" <> prettyVals r <+> text "-> do" <$> indent 2 (prettyExp empty body)
 --prettyExp vl MkCont { expCont = (r :-> body) } = vl <> keyword "continuation" <+> text "\\" <> prettyVal r <+> text "-> do" <$> indent 2 (prettyExp empty body)
 prettyExp vl Let { expDefs = defs, expBody = body } = vl <> keyword "let" <$> indent 4 (vsep $ map f defs) <$> text " in" <$> indent 2 (prettyExp empty body) where
-    f FuncDef { funcDefName = name, funcDefBody = as :-> body } = func (show name) <+> hsep (map prettyVal $ fromTuple as) <+> operator "=" <+> keyword "do" <$> indent 2 (prettyExp empty body)
+    f FuncDef { funcDefName = name, funcDefBody = as :-> body } = func (show name) <+> hsep (map prettyVal as) <+> operator "=" <+> keyword "do" <$> indent 2 (prettyExp empty body)
 prettyExp vl Alloc { expValue = val, expCount = Lit n _, expRegion = r }| n == 1 = vl <> keyword "alloc" <+> prettyVal val <+> text "at" <+> prettyVal r
 prettyExp vl Alloc { expValue = val, expCount = count, expRegion = r } = vl <> keyword "alloc" <+> prettyVal val <> text "[" <> prettyVal count <> text "]" <+> text "at" <+> prettyVal r
 prettyExp vl Call { expValue = Item t (TyCall fun _ _), expArgs = vs, expJump = jump } | fun `elem` [Function,LocalFunction] =  vl <> f jump  <+> func (fromAtom t) <+> hsep (map prettyVal vs) where
@@ -141,9 +144,7 @@ prettyVal (Var (V i) _) = char 'v' <> tshow i
 prettyVal (Lit i t) | t == tCharzh, Just x <- toIntegral i = tshow (chr x)
 prettyVal (Lit i t) | t == Ty (toAtom "wchar_t"), Just x <- toIntegral i = tshow (chr x)
 prettyVal (Lit i _)  = tshow i
-prettyVal (Tup xs)  = tupled $ map prettyVal xs
 prettyVal (Const v) = char '&' <> prettyVal v
-prettyVal (Addr _) = text "<ref>"
 prettyVal (ValUnknown ty) = text "?::" <> tshow ty
 prettyVal (Item a  ty) = tshow a <> text "::" <> tshow ty
 prettyVal (ValPrim aprim [] ty) = pprint aprim <> text "::" <> tshow ty
@@ -156,7 +157,7 @@ instance DocLike d => PPrint d Var where
 
 
 prettyFun :: (Atom,Lam) -> Doc
-prettyFun (n,(Tup as :-> e)) = func (fromAtom n) <+> hsep (map prettyVal as) <+> operator "=" <+> keyword "do" <$> indent 2 (prettyExp empty e)
+prettyFun (n,(as :-> e)) = func (fromAtom n) <+> hsep (map prettyVal as) <+> operator "=" <+> keyword "do" <$> indent 2 (prettyExp empty e)
 
 render :: Doc -> String
 render doc =  displayS (renderPretty 0.95 (optColumns options)  doc) ""
@@ -171,10 +172,11 @@ hPrintGrin handle grin@Grin { grinCafs = cafs } = do
         mapM_ (hPutStrLn handle) $ map (\(x,y) -> show x ++ " := " ++  render (prettyVal y))  cafs
     hPutStrLn handle "-- Functions"
     forM_ (grinFuncs grin) $ \ f@(n,l :-> e) -> do
-        hPutStrLn handle . render $ func (fromAtom n) <+> operator "::" <+> hsep (map (tshow . getType) (fromTuple l))  <+> operator "->" <+> tshow (getType e)
+        hPutStrLn handle . render $ func (fromAtom n) <+> operator "::" <+> hsep (map (tshow . getType) l)  <+> operator "->" <+> tshow (getType e)
         hPutStrLn handle (render $ prettyFun f)
         hPutStrLn handle ""
 
+{-
 showSome xs = f 7 xs [] where
     f 0 _ xs = reverse ("...":xs)
     f _ [] xs = reverse xs
@@ -200,6 +202,7 @@ instance Show HeapType where
     show Reference = "Ref"
     show RecursiveThunk = "Rt"
 
+-}
 
 {-# NOINLINE graphGrin #-}
 

@@ -49,8 +49,8 @@ whizExps f l = liftM fst $ whiz (\_ x -> x) (\(p,e) -> f e >>= \e' -> return  (J
 -- for its components to better aid future optimizations.
 
 whiz :: Monad m =>
-    (forall a . Val -> m a -> m a)         -- ^ called for each sub-code block, such as in case statements
-    -> ((Val,Exp) -> m (Maybe (Val,Exp)))  -- ^ routine to transform or omit simple bindings
+    (forall a . [Val] -> m a -> m a)         -- ^ called for each sub-code block, such as in case statements
+    -> (([Val],Exp) -> m (Maybe ([Val],Exp)))  -- ^ routine to transform or omit simple bindings
     -> (Exp -> m Exp)       -- ^ routine to transform final statement in code block
     -> WhizState            -- ^ Initial state
     -> Lam                  -- ^ input lambda expression
@@ -58,10 +58,10 @@ whiz :: Monad m =>
 whiz sub te tf inState start = res where
     res = runStateT (dc mempty start) inState
     f (a :>>= (v :-> b)) xs env = f a ((env,v,b):xs) env
-    f a@(Return (Tup xs@(_:_))) ((senv,p@(Tup ys@(_:_)),b):rs) env | length xs == length ys  = do
-        Return (Tup xs) <- g env a
-        (Tup ys,env') <- renamePattern p
-        ts <- lift $ mapM te [(y,Return x) | x <- xs | y <- ys ]
+    f a@(Return (xs@(_:_:_))) ((senv,p@(ys@(_:_:_)),b):rs) env | length xs == length ys  = do
+        Return xs <- g env a
+        (ys,env') <- renamePattern p
+        ts <- lift $ mapM te [([y],Return [x]) | x <- xs | y <- ys ]
         z <- f b rs (env' `mappend` senv)
         let h [] = z
             h ((p,v):rs) = v :>>= p :-> h rs
@@ -114,8 +114,8 @@ whiz sub te tf inState start = res where
 -- fizz also removes all statements past an Error.
 
 fizz :: Monad m =>
-    (forall a . Val -> m a -> m a)         -- ^ called for each sub-code block, such as in case statements
-    -> ((Val,Exp) -> m (Maybe (Val,Exp)))  -- ^ routine to transform or omit simple bindings
+    (forall a . [Val] -> m a -> m a)         -- ^ called for each sub-code block, such as in case statements
+    -> (([Val],Exp) -> m (Maybe ([Val],Exp)))  -- ^ routine to transform or omit simple bindings
     -> (Exp -> m Exp)       -- ^ routine to transform final statement in code block
     -> WhizState            -- ^ Initial state
     -> Lam                  -- ^ input lambda expression
@@ -123,11 +123,11 @@ fizz :: Monad m =>
 fizz sub te tf inState start = res where
     res = runStateT (dc mempty start) inState
     f (a :>>= (v :-> b)) xs env = f a ((env,v,b):xs) env
-    f a@(Return (Tup xs@(_:_))) ((senv,p@(Tup ys@(_:_)),b):rs) env | length xs == length ys  = do
-        Return (Tup xs) <- g env a
-        (Tup ys,env') <- renamePattern p
+    f a@(Return (xs@(_:_:_))) ((senv,p@ys,b):rs) env | length xs == length ys  = do
+        Return xs <- g env a
+        (ys,env') <- renamePattern p
         z <- f b rs (env' `mappend` senv)
-        ts <- lift $ mapM te (reverse [(y,Return x) | x <- xs | y <- ys ])
+        ts <- lift $ mapM te (reverse [([y],Return [x]) | x <- xs | y <- ys ])
         let h [] = z
             h ((p,v):rs) = v :>>= p :-> h rs
         return $ h [ (p,v) |  Just (p,v) <- reverse ts]
@@ -175,11 +175,11 @@ applySubstE env x = f x where
         vs' <- mapM g vs
         return $ App a vs' t
     f (Return v) = do
-        v <- g v
+        v <- mapM g v
         return $ Return v
-    f (Prim x vs) = do
+    f (Prim x vs t) = do
         vs <- mapM g vs
-        return $ Prim x vs
+        return $ Prim x vs t
     f (Store v) = do
         v <- g v
         return $ Store v
@@ -208,20 +208,19 @@ applySubst env x = f x where
         vs' <- mapM f vs
         return $ NodeC t vs'
     f (Index a b) = return Index `ap` f a `ap` f b
-    f (Tup vs) = do
-        vs' <- mapM f vs
-        return $ Tup vs'
+--    f (Tup vs) = do
+--        vs' <- mapM f vs
+--        return $ Tup vs'
     f (NodeV t vs) | Just (Var t' _) <- Map.lookup t env = do
         vs' <- mapM f vs
         return $ NodeV t' vs'
     f (NodeV t vs) = do
         vs' <- mapM f vs
         return $ NodeV t vs'
-    f Addr {} = error "Address in subst"
     f x = return x
 
-renamePattern :: MonadState (WhizState) m => Val ->  m (Val,WhizEnv)
-renamePattern x = runWriterT (f x) where
+renamePattern :: MonadState (WhizState) m => [Val] ->  m ([Val],WhizEnv)
+renamePattern x = runWriterT (mapM f x) where
     f :: MonadState (WhizState) m => Val -> WriterT (WhizEnv) m Val
     f (Var v t) = do
         v' <- lift $ newVarName v
@@ -232,15 +231,14 @@ renamePattern x = runWriterT (f x) where
         vs' <- mapM f vs
         return $ NodeC t vs'
     f (Index a b) = return Index `ap` f a `ap` f b
-    f (Tup vs) = do
-        vs' <- mapM f vs
-        return $ Tup vs'
+--    f (Tup vs) = do
+--        vs' <- mapM f vs
+--        return $ Tup vs'
     f (NodeV t vs) = do
         t' <- lift $ newVarName t
         tell (Map.singleton t (Var t' TyTag))
         vs' <- mapM f vs
         return $ NodeV t' vs'
-    f Addr {} = error "Address in pattern"
     f x = return x
 
 newVarName :: MonadState WhizState m => Var -> m Var

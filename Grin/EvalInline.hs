@@ -16,6 +16,7 @@ import Support.CanType(getType)
 import Util.Once
 import Util.UniqueMonad()
 
+{-
 data UpdateType =
     NoUpdate                  -- ^ no update is performed
     | TrailingUpdate          -- ^ an update is placed after the whole evaluation
@@ -94,32 +95,32 @@ createEval shared  te ts'
      where
         fname = toAtom n
         Just (_,ty) = findArgsType te fname
-
-createApply :: Ty -> Ty -> TyEnv -> [Tag] -> Lam
+ -}
+createApply :: Ty -> [Ty] -> TyEnv -> [Tag] -> Lam
 createApply argType retType te ts'
-    | null cs && argType == tyUnit = Tup [n1] :-> Error ("Empty Apply:" ++ show ts)  retType
-    | null cs = Tup [n1,a2] :-> Error ("Empty Apply:" ++ show ts)  retType
-    | argType == tyUnit = Tup [n1] :-> Case n1 cs
-    | otherwise = Tup [n1,a2] :-> Case n1 cs
+    | null cs && argType == TyUnit = [n1] :-> Error ("Empty Apply:" ++ show ts)  retType
+    | null cs = [n1,a2] :-> Error ("Empty Apply:" ++ show ts)  retType
+    | argType == TyUnit = [n1] :-> Case n1 cs
+    | otherwise = [n1,a2] :-> Case n1 cs
     where
     ts = sortUnder toPackedString ts'
     a2 = Var v2 argType
     cs = [ f t | t <- ts, tagGood t]
     tagGood t | Just TyTy { tyThunk = TyPApp mt w } <- findTyTy te t =
-         (Just argType == mt || (argType == tyUnit && Nothing == mt)) && (fmap snd $ findArgsType te w) == Just retType
+         (Just argType == mt || (argType == TyUnit && Nothing == mt)) && (fmap snd $ findArgsType te w) == Just retType
     tagGood _ = False
 --    tagGood t | Just (n,fn) <- tagUnfunction t, n > 0 = let
 --        ptag = argType == ts !! (length ts - n)
 --        rtag = retType == TyNode || (n == 1 && rt == retType)
 --        (ts,rt) = runIdentity $ findArgsType te fn
 --        in rtag && ptag
-    f t = (NodeC t vs :-> g ) where
+    f t = ([NodeC t vs] :-> g ) where
         (ts,_) = runIdentity $ findArgsType te t
         vs = [ Var v ty |  v <- [v3 .. ] | ty <- ts]
         Just (n,fn) = tagUnfunction t
-        a2s = if argType == tyUnit then [] else [a2]
+        a2s = if argType == TyUnit then [] else [a2]
         g | n == 1 =  App fn (vs ++ a2s) ty
-          | n > 1 = Return $ NodeC (partialTag fn (n - 1)) (vs ++ a2s)
+          | n > 1 = Return $ [NodeC (partialTag fn (n - 1)) (vs ++ a2s)]
           | otherwise = error "createApply"
          where
             Just (_,ty) = findArgsType te fn
@@ -139,7 +140,7 @@ createEvalApply grin = do
             exp' <- g exp
             return $ ls :-> exp'
         g (App fn [fun] ty) | fn == funcApply = do
-            fn' <- runOnceMap appMap (tyUnit,ty) $ do
+            fn' <- runOnceMap appMap (TyUnit,ty) $ do
                 u <- newUniq
                 return (toAtom $ "bapply_" ++ show u)
             return (App fn' [fun] ty)
@@ -152,7 +153,7 @@ createEvalApply grin = do
     funcs <- mapMsnd f (grinFuncs grin)
     as <- onceMapToList appMap
     let (apps,ntyenv) = unzip $ map cf as
-        cf ((targ,tret),name) | targ == tyUnit = ((name,appBody),(name,tyTy { tySlots = [TyNode],tyReturn = tret })) where
+        cf ((targ,tret),name) | targ == TyUnit = ((name,appBody),(name,tyTy { tySlots = [TyNode],tyReturn = tret })) where
             appBody = createApply targ tret (grinTypeEnv grin) tags
         cf ((targ,tret),name) = ((name,appBody),(name,tyTy { tySlots = [TyNode,targ],tyReturn = tret })) where
             appBody = createApply targ tret (grinTypeEnv grin) tags

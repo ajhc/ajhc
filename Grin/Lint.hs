@@ -120,24 +120,22 @@ runTc env (Tc r) = runReaderT r env
 same _ t1 t2 | t1 == t2 = return t1
 same msg t1 t2 = fail $ "Types not the same:" <+> parens msg <+> parens (tshow t1) <+> parens (tshow t2)
 
-tcLam :: Maybe Ty -> Lam -> Tc Ty
+tcLam :: Maybe [Ty] -> Lam -> Tc [Ty]
 tcLam mty (v :-> e) = f mty where
-    f Nothing = ans (tcVal v)
+    f Nothing = ans (mapM tcVal v)
     f (Just ty) = ans $ do
-        t <- tcVal v
+        t <- mapM tcVal v
         same (":->" <+> show mty <+> show (v :-> e)) ty t
     ans r = local (\e -> e { envInScope = freeVars v `mappend` envInScope e }) $ r >> tcExp e
 
-tcExp :: Exp -> Tc Ty
+tcExp :: Exp -> Tc [Ty]
 tcExp e = f e where
     f (e :>>= lam) = do
         t1 <- f e
         tcLam (Just t1) lam
-    f n@(Prim p as) = do
-        let (as',t') = primType p
-        as'' <- mapM tcVal as
-        if as'' == as' then return t' else
-            fail $ "Prim: arguments do not match " ++ show n
+    f n@(Prim p as t') = do
+        mapM_ tcVal as
+        return t'
     f ap@(App fn [v,a] t) | fn == funcApply = do
         [v',a'] <- mapM tcVal [v,a]
         if v' == TyNode then return t
@@ -160,24 +158,24 @@ tcExp e = f e where
          else fail $ "App: results do not match: " ++ show (a,t,(as',t'))
     f (Store v) = do
         t <- tcVal v
-        return (TyPtr t)
+        return [TyPtr t]
     f Alloc { expValue = v } = do
         t <- tcVal v
-        return (TyPtr t)
-    f (Return v) = tcVal v
+        return [TyPtr t]
+    f (Return v) = mapM tcVal v
     f (Fetch v) = do
         (TyPtr t) <- tcVal v
-        return t
+        return [t]
     f (Error _ t) = return t
     f e@(Update w v) = do
         (TyPtr t) <- tcVal w
         t' <- tcVal v
         same (show e) t t'
-        return tyUnit
+        return []
     f (Case _ []) = fail "empty case"
     f (Case v as) = do
         tv <- tcVal v
-        es <- mapM (tcLam (Just tv)) as
+        es <- mapM (tcLam (Just [tv])) as
         foldl1M (same $ "case exp: " ++ show (map head $ sortGroupUnder fst (zip es as)) ) es
     f (Let { expDefs = defs, expBody = body }) = do
         local (\e -> e { envTyEnv = extendTyEnv defs (envTyEnv e) }) $ do
@@ -196,9 +194,7 @@ tcVal v = f v where
     f (NodeV _v as) = do
         mapM_ f as
         return TyNode
-    f (Tup xs) = do
-        xs <- mapM f xs
-        return $ TyTup xs
+    f Unit = return TyUnit
     f (Const t) = do
         v <- f t
         return (TyPtr v)
@@ -207,7 +203,6 @@ tcVal v = f v where
         Ty _ <- f offset
         return t
     f (ValUnknown ty) = return ty
-    f (Addr _) = return $ TyPtr (error "typecheck: Addr")
     f (ValPrim _ vs ty) = do mapM_ f vs >> return ty
     f n@(NodeC tg as) = do
         te <- asks envTyEnv

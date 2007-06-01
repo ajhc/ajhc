@@ -21,7 +21,6 @@ import Grin.Whiz
 import Stats hiding(combine)
 import Support.CanType
 import Support.FreeVars
-import Support.Tuple
 import Util.Graph
 import Util.HasSize
 import Util.Inst()
@@ -72,7 +71,7 @@ simplify1 stats env (n,l) = do
         (env,_) <- get
         x <- applySubst env  x
         lift $ tick stats at_OptSimplifyTrivialCase
-        return $ (Return x :>>= d)
+        return $ (Return [x] :>>= d)
     f x = do
         (env,_) <- get
         x <- applySubstE env  x
@@ -80,13 +79,13 @@ simplify1 stats env (n,l) = do
         inline x
     gs (Update Const {} Var {}) = do
         lift $ tick stats at_OptSimplifyConstUpdate
-        gs (Return unit)
+        gs (Return [])
 --    gs (Prim Primitive { primAPrim = APrim CCast {} _, primType = (_,nty) } [Lit i _]) = do
 --        lift $ tick stats at_OptSimplifyCastLit
 --        return $ Return (Lit i nty)
     gs (Store n) | valIsNF n, not (valIsMutable n) = do
         lift $ tick stats at_OptSimplifyConstStore
-        gs (Return (Const n))
+        gs (Return [Const n])
 --    gs (App a [n@NodeC {},v] typ) | a == funcApply = do
 --        lift $ tick stats at_OptSimplifyConstApply
 --        gs (doApply Return True n [v] typ)
@@ -95,10 +94,10 @@ simplify1 stats env (n,l) = do
 --        gs (doApply Store False x y TyNode)
     gs (App a [Const n] typ) | a == funcEval = do
         lift $ tick stats at_OptSimplifyConstEval
-        gs (Return n)
+        gs (Return [n])
     gs (Fetch (Const n)) = do
         lift $ tick stats at_OptSimplifyConstFetch
-        gs (Return n)
+        gs (Return [n])
     gs x = return x
     gv (p,Case x ds) = do
         (env,_) <- get
@@ -107,17 +106,17 @@ simplify1 stats env (n,l) = do
             [] -> error "empty case"
             [d] -> do
                 lift $ tick stats at_OptSimplifyTrivialCase
-                return $ Just (p,Return x :>>= d)
+                return $ Just (p,Return [x] :>>= d)
             _ -> return $ Just (p,Case x ds)
-    gv (NodeC t xs,Return (NodeC t' xs')) | t == t' = do
+    gv ([NodeC t xs],Return [NodeC t' xs']) | t == t' = do
             lift $ tick stats at_OptSimplifyNodeReduction
-            gv (Tup xs,Return (Tup xs'))
+            gv (xs,Return xs')
 --    gv (NodeC t xs,Return (NodeC t' [])) |  t' == tagHole = do
 --            lift $ tick stats at_OptSimplifyHoleAssignment
 --            gv (Tup xs, Return $ Tup $ Prelude.map (properHole . getType) xs)
-    gv (NodeC t xs,Return (NodeC t' xs')) | t /= t' = do
+    gv ([NodeC t xs],Return [(NodeC t' xs')]) | t /= t' = do
             lift $ tick stats at_OptSimplifyBadAssignment
-            gv (NodeC t xs,Error ("Bad Assignment: " ++ show (t,t')) TyNode)
+            gv (xs,Error ("Bad Assignment: " ++ show (t,t')) (map getType xs))
 --    gv (NodeV v [],Return (NodeC t' [])) = do
 --            lift $ tick stats at_OptSimplifyEnumAssignment
 --            gv (Var v TyTag, Return (Tag t'))
@@ -129,13 +128,13 @@ simplify1 stats env (n,l) = do
         e <- (applySubstE env e)
         e <- gs e
         case e of
-            Return v | valIsNF v, Just n <- varBind' p v -> do
+            Return v | all valIsNF v, Just n <- zipWithM varBind' p v -> do
                 lift $ tick stats at_OptSimplifyCopyPropConst
-                modify (`mappend` (n,mempty))
+                modify (`mappend` (Map.unions n,mempty))
                 return Nothing
-            Return v | Just n <- varBind p v -> do
+            Return v | Just n <- zipWithM varBind p v -> do
                 lift $ tick stats at_OptSimplifyCopyProp
-                modify (`mappend` (n,mempty))
+                modify (`mappend` (Map.unions n,mempty))
                 return Nothing
             _ -> do
                 e <- inline e
@@ -152,7 +151,7 @@ simplify1 stats env (n,l) = do
     inline app@(App fn as _)
         | Just (itype,l) <- Map.lookup fn env = do
             lift $ tick stats itype
-            return $ Return (Tup as) :>>= l
+            return $ Return as :>>= l
         | otherwise = tryCSE app
     inline x = tryCSE x
     tryCSE x = do
@@ -162,15 +161,15 @@ simplify1 stats env (n,l) = do
                 lift $ tick stats (cseStat x)
                 return v
             Nothing -> return x
-    getCS (b,app@(App a [vr@Var {}] _)) | a == funcEval = return $ Map.fromList [(app,Return b), (Store b,Return vr)]
+--    getCS (b,app@(App a [vr@Var {}] _)) | a == funcEval = return $ Map.fromList [(app,Return [b]), (Store b,Return [vr])]
     --getCS (b,app@App{})  = return $ Map.singleton app (Return b)
     --getCS (b@Var {},Store v@(Var _ _)) = return $ Map.singleton (App funcEval [b] TyNode) (Return v)     -- TODO - only works if node stores have always been evaluated.
-    getCS (b@Var {},Store v@(NodeC t _)) | not (isMutableNodeTag t), tagIsWHNF t, not (isHoly v) = return $ Map.fromList [(Store v,Return b),(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
-    getCS (b@Var {},Store v@(NodeC t _)) | not (isMutableNodeTag t), not (isHoly v) = return $ Map.fromList [(Store v,Return b)]
+--    getCS (b@Var {},Store v@(NodeC t _)) | not (isMutableNodeTag t), tagIsWHNF t, not (isHoly v) = return $ Map.fromList [(Store v,Return b),(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
+--    getCS (b@Var {},Store v@(NodeC t _)) | not (isMutableNodeTag t), not (isHoly v) = return $ Map.fromList [(Store v,Return [b])]
     --getCS (b@Var {},Store v@(NodeC t as)) | Just (0,fn) <- tagUnfunction t = return $ Map.fromList [(Store v,Return b),(App funcEval [b] TyNode, App fn as TyNode :>>= n1 :-> Update b n1 :>>= unit :-> Return n1)]
 --    getCS (b@Var {},Store v@(NodeC t as)) | Just (0,fn) <- tagUnfunction t = return $ Map.fromList [(Store v,Return b)]
-    getCS (b@Var {},Return (Const v)) = return $ Map.fromList [(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
-    getCS (b@Var {},Return v) = return $ Map.fromList [(Return b,Return v), (Store b, Store v), (Fetch b, Fetch v)]
+--    getCS (b@Var {},Return (Const v)) = return $ Map.fromList [(Fetch b,Return v),(App funcEval [b] TyNode,Return v)]
+--    getCS (b@Var {},Return v) = return $ Map.fromList [(Return b,Return v), (Store b, Store v), (Fetch b, Fetch v)]
     getCS _ = return mempty
     isHoly (NodeC _ as) | any isValUnknown as = True
     isHoly n = isHole n
@@ -188,7 +187,7 @@ doApply ret strict (NodeC t xs) ys typ | Just (n,v) <- tagUnfunction t = case n 
 doApply _ _ n y typ = error $ show ("doApply", n,y,typ)
 
 doEval n@(NodeC t xs) typ
-    | tagIsWHNF t = Return n
+    | tagIsWHNF t = Return [n]
     | tagIsSuspFunction t = App (tagFlipFunction t) xs typ
 doEval n typ = error $ show ("doEval", n,typ)
 
@@ -201,7 +200,7 @@ fromBap t = fail "not Bap"
 varBind :: Monad m => Val -> Val -> m (Map.Map Var Val)
 varBind (Var v t) nv@(Var v' t') | t == t' = return $ Map.singleton v nv
 varBind (Lit i t) (Lit i' t') | i == i' && t == t' = return mempty
-varBind (Tup xs) (Tup ys) | length xs == length ys  = liftM mconcat $ sequence $  zipWith varBind xs ys
+--varBind (Tup xs) (Tup ys) | length xs == length ys  = liftM mconcat $ sequence $  zipWith varBind xs ys
 varBind (Tag i) (Tag i') | i == i' = return mempty
 varBind (NodeC t vs) (NodeC t' vs') | t == t' = do
     liftM mconcat $ sequence $  zipWith varBind vs vs'
@@ -212,7 +211,7 @@ varBind x y = error $ "varBind: " ++ show (x,y)
 varBind' :: Monad m => Val -> Val -> m (Map.Map Var Val)
 varBind' (Var v t) nv | t == getType nv = return $ Map.singleton v nv
 varBind' (Lit i t) (Lit i' t') | i == i' && t == t' = return mempty
-varBind' (Tup xs) (Tup ys) | length xs == length ys  = liftM mconcat $ sequence $  zipWith varBind' xs ys
+--varBind' (Tup xs) (Tup ys) | length xs == length ys  = liftM mconcat $ sequence $  zipWith varBind' xs ys
 varBind' (Tag i) (Tag i') | i == i' = return mempty
 varBind' (NodeC t vs) (NodeC t' vs') | t == t' = do
     liftM mconcat $ sequence $  zipWith varBind' vs vs'
@@ -244,8 +243,8 @@ isCombinable postEval e = ans where
     equal (x:y:rs) = if x == y then equal (y:rs) else fail "not equal"
 --    f lf (Return (NodeV t [])) | postEval = return [UnboxTag]
 --    f lf (Return (NodeC t [])) | postEval = return [UnboxTag]
-    f lf (Return z) | z /= unit && valIsConstant z = return [UnboxConst z]
-    f lf (Return (NodeC t xs)) = return [UnboxTup (t,map getType xs)]
+    f lf (Return [z]) | valIsConstant z = return [UnboxConst z]
+    f lf (Return [NodeC t xs]) = return [UnboxTup (t,map getType xs)]
     f lf Error {} = return []
     f lf (Case _ ls) = do
         cs <- Prelude.mapM (f lf) [ e | _ :-> e <- ls ]
@@ -267,12 +266,12 @@ combineLam postEval nty (p :-> e) = p :-> combine postEval nty e where
 combine postEval nty exp = editTail nty f exp where
 --    f (Return (NodeV t [])) = Return (Var t TyTag)
 --    f (Return (NodeC t [])) | postEval  = Return (Tag t)
-    f (Return v) | valIsConstant v  = Return unit
-    f (Return (NodeC t xs)) = Return (tuple xs)
+    f (Return v) | all valIsConstant v  = Return []
+    f (Return [NodeC t xs]) = Return xs
     f lt@Let { expBody = body } = updateLetProps lt { expBody = combine postEval nty body }
     f e = error $ "combine: " ++ show (postEval,nty,e)
 
-editTail :: Ty -> (Exp -> Exp) -> Exp -> Exp
+editTail :: [Ty] -> (Exp -> Exp) -> Exp -> Exp
 editTail nty mt te = f mempty te where
     f _ (Error s ty) = Error s nty
     f lf (Case x ls) = Case x (map (g lf) ls)
@@ -307,89 +306,88 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
 --    f (Case e as :>>= lam)  | (sizeLam lam - 1) * length as <= 3 = do
 --        mtick "Optimize.optimize.case-pullin"
 --        return (Case e (map (mapExp (:>>= lam)) as))
-    f (Return t@NodeC {} :>>= v@Var {} :-> Update w v' :>>= lr) | v == v' = do
-        mtick "Optimize.optimize.return-update"
-        f (Return t :>>= v :-> Update w t :>>= lr)
-    f (Return t@NodeV {} :>>= v@Var {} :-> Update w v' :>>= lr) | v == v' = do
-        mtick "Optimize.optimize.return-update"
-        f (Return t :>>= v :-> Update w t :>>= lr)
-    f (e :>>= v1 :-> Return v2) | (isTup v1 || isVar v1) && v1 == v2 = do
+--    f (Return t@NodeC {} :>>= v@Var {} :-> Update w v' :>>= lr) | v == v' = do
+--        mtick "Optimize.optimize.return-update"
+--        f (Return t :>>= v :-> Update w t :>>= lr)
+--    f (Return t@NodeV {} :>>= v@Var {} :-> Update w v' :>>= lr) | v == v' = do
+--        mtick "Optimize.optimize.return-update"
+--        f (Return t :>>= v :-> Update w t :>>= lr)
+    f (e :>>= v1 :-> Return v2) | (all isVar v1) && v1 == v2 = do
         mtick "Optimize.optimize.unit-unit"
         f e
-    f (Store t :>>= v :-> Fetch v' :>>= lr) | v == v' = do
+    f (Store t :>>= [v] :-> Fetch v' :>>= lr) | v == v' = do
         mtick "Optimize.optimize.store-fetch"
-        f (Store t :>>= v :-> Return t :>>= lr)
-    f (Store t :>>= v@(Var vr _) :-> Update  v' w :>>= lr) | v == v', vr `notElem` freeVars w = do
+        f (Store t :>>= [v] :-> Return [t] :>>= lr)
+    f (Store t :>>= [v@(Var vr _)] :-> Update  v' w :>>= lr) | v == v', vr `notElem` freeVars w = do
         mtick "Optimize.optimize.store-update"
-        f (Store w :>>= v :-> Return unit :>>= lr)
-    f (Update v t :>>= Tup [] :-> Fetch v' :>>= lr) | v == v' = do
+        f (Store w :>>= [v] :-> Return [] :>>= lr)
+    f (Update v t :>>= [] :-> Fetch v' :>>= lr) | v == v' = do
         mtick "Optimize.optimize.update-fetch"
-        f (Update v t :>>= Tup [] :-> Return t :>>= lr)
-    f (Return t@NodeC {} :>>= v :-> App fa [v',a] typ :>>= lr) | fa == funcApply, v == v' = do
-        mtick "Optimize.optimize.return-apply"
-        f (Return t :>>= v :-> doApply Return True t [a] typ :>>= lr)
-    f (Return t@NodeC {} :>>= v :-> App fa [v',a] typ) | fa == funcApply, v == v' = do
-        mtick "Optimize.optimize.return-apply"
-        f (Return t :>>= v :-> doApply Return True t [a] typ)
-    f (Return t@NodeC {} :>>= v :-> App fa [v'] typ :>>= lr) | fa == funcApply, v == v' = do
+        f (Update v t :>>= [] :-> Return [t] :>>= lr)
+--    f (Return [t@NodeC {}] :>>= v :-> App fa [v',a] typ :>>= lr) | fa == funcApply, v == v' = do
+--        mtick "Optimize.optimize.return-apply"
+--        f (Return [t] :>>= v :-> doApply Return True t [a] typ :>>= lr)
+--    f (Return t@NodeC {} :>>= v :-> App fa [v',a] typ) | fa == funcApply, v == v' = do
+--        mtick "Optimize.optimize.return-apply"
+--        f (Return t :>>= v :-> doApply Return True t [a] typ)
+--    f (Return t@NodeC {} :>>= v :-> App fa [v'] typ :>>= lr) | fa == funcApply, v == v' = do
 
-        mtick "Optimize.optimize.return-apply0"
-        f (Return t :>>= v :-> doApply Return True t [] typ :>>= lr)
-    f (Return t@NodeC {} :>>= v :-> App fa [v'] typ) | fa == funcApply, v == v' = do
-        mtick "Optimize.optimize.return-apply0"
-        f (Return t :>>= v :-> doApply Return True t [] typ)
-    f (Store t@NodeC {} :>>= v :-> App fa [v'] typ :>>= lr) | not (valIsMutable t), fa == funcEval, v == v' = do
-
-        mtick "Optimize.optimize.store-eval"
-        f (Store t :>>= v :-> doEval t typ :>>= lr)
-    f (Store t@NodeC {} :>>= v :-> App fa [v'] typ) | not (valIsMutable t), fa == funcEval, v == v' = do
-        mtick "Optimize.optimize.store-eval"
-        f (Store t :>>= v :-> doEval t typ)
-    f (Update v t@NodeC {} :>>= Tup [] :-> App fa [v'] typ :>>= lr) | fa == funcEval, v == v' = do
-        mtick "Optimize.optimize.update-eval"
-        f (Update v t :>>= Tup [] :-> doEval t typ :>>= lr)
-    f (Update v t@NodeC {} :>>= Tup [] :-> App fa [v'] typ) | fa == funcEval, v == v' = do
-        mtick "Optimize.optimize.update-eval"
-        f (Update v t :>>= Tup [] :-> doEval t typ)
+--        mtick "Optimize.optimize.return-apply0"
+--        f (Return t :>>= v :-> doApply Return True t [] typ :>>= lr)
+--    f (Return t@NodeC {} :>>= v :-> App fa [v'] typ) | fa == funcApply, v == v' = do
+--        mtick "Optimize.optimize.return-apply0"
+--        f (Return t :>>= v :-> doApply Return True t [] typ)
+--    f (Store t@NodeC {} :>>= v :-> App fa [v'] typ :>>= lr) | not (valIsMutable t), fa == funcEval, v == [v'] = do
+--        mtick "Optimize.optimize.store-eval"
+--        f (Store t :>>= v :-> doEval t typ :>>= lr)
+--    f (Store t@NodeC {} :>>= v :-> App fa [v'] typ) | not (valIsMutable t), fa == funcEval, v == v' = do
+--        mtick "Optimize.optimize.store-eval"
+--        f (Store t :>>= v :-> doEval t typ)
+--    f (Update v t@NodeC {} :>>= [] :-> App fa [v'] typ :>>= lr) | fa == funcEval, v == v' = do
+--        mtick "Optimize.optimize.update-eval"
+--        f (Update v t :>>= [] :-> doEval t typ :>>= lr)
+--    f (Update v t@NodeC {} :>>= [] :-> App fa [v'] typ) | fa == funcEval, v == v' = do
+--        mtick "Optimize.optimize.update-eval"
+--        f (Update v t :>>= [] :-> doEval t typ)
     f (Case n as) | isKnown n = do
         kc <- knownCase n as
         f kc
     f (Case n as :>>= lr) | isKnown n = do
         kc <- knownCase n as
         f (kc :>>= lr)
-    f (Return n :>>= b :-> Case b' as :>>= lr) | isKnown n, b == b' = do
+        {-
+    f (Return n :>>= b :-> Case b' as :>>= lr) | isKnown n, b == [b'] = do
         c <- knownCase n as
         r <- f (c :>>= lr)
         return (Return n :>>= b :-> r)
-    f (Return n :>>= b :-> Case b' as ) | isKnown n, b == b' = do
+    f (Return n :>>= b :-> Case b' as ) | isKnown n, b == [b'] = do
         kc <- knownCase n as
         r <- f kc
         return (Return n :>>= b :-> r)
-    f (Case x as :>>= Tup [] :-> (Case x' as') :>>= lr) | x == x', not $ any (isVar . lamBind) as = do
+    f (Case x as :>>= [] :-> (Case x' as') :>>= lr) | x == x', not $ any (isVar . lamBind) as = do
         c <- caseCombine x as as'
         f (c :>>= lr)
-    f (Case x as :>>= Tup [] :-> (Case x' as')) | x == x', not $ any (isVar . lamBind) as = do
+    f (Case x as :>>= [] :-> (Case x' as')) | x == x', not $ any (isVar . lamBind) as = do
         c <- caseCombine x as as'
         f c
-        {-
     f (Case x as :>>= b :-> m) | count (/= Just []) (manifestNodes as) <= 1 = do
         mtick "Optimize.optimize.case-pullin"
         f $ Case x [ x :-> (e :>>= b :-> m) |  x :-> e <- as ]
-        -}
-    f (cc@Case {} :>>= v :-> Return v' :>>= NodeC t as :-> lr ) | v == v' = do
+    f (cc@Case {} :>>= v :-> Return v' :>>= [NodeC t as] :-> lr ) | v == v' = do
         mtick "Optimize.optimize.case-hoist-return"
         let (va:_) = [ v | v <- [v1..], not $ v `Set.member` fv ]
             var = Var va TyNode
             fv = freeVars as
-            mc = modifyTail ( var :-> Return var :>>=  NodeC t as :-> Return (tuple as))
-        return (mc cc :>>= tuple as :-> Return (NodeC t as) :>>= v :-> lr)
-    f (lt@Let { expIsNormal = True } :>>= v :-> Return v' :>>= NodeC t as :-> lr ) | v == v' = do
+            mc = modifyTail ( var :-> Return var :>>=  [NodeC t as] :-> Return as)
+        return (mc cc :>>= as :-> Return [NodeC t as] :>>= v :-> lr)
+    f (lt@Let { expIsNormal = True } :>>= v :-> Return v' :>>= [NodeC t as] :-> lr ) | v == v' = do
         mtick "Optimize.optimize.let-hoist-return"
         let (va:_) = [ v | v <- [v1..], not $ v `Set.member` fv ]
             var = Var va TyNode
             fv = freeVars as
-            mc = modifyTail ( var :-> Return var :>>=  NodeC t as :-> Return (tuple as))
-        return (mc lt :>>= tuple as :-> Return (NodeC t as) :>>= v :-> lr)
+            mc = modifyTail ( var :-> Return var :>>=  [NodeC t as] :-> Return (as))
+        return (mc lt :>>= as :-> Return [NodeC t as] :>>= v :-> lr)
+        -}
 
     f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars r `Set.intersection` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-tail"
@@ -415,7 +413,6 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
             (va:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
         lr <- g lr
         return ((Case x (map (combineLam postEval TyTag) as) :>>= Var va TyTag :-> Return (NodeV va [])) :>>= lr)
-  -}
     f (cs@(Case x as) :>>= lr) | Just (UnboxTup (t,ts)) <- isCombinable postEval cs = do
         mtick $ "Optimize.optimize.case-unbox-node.{" ++ show t
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
@@ -426,7 +423,7 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
     f (cs@(Case x as) :>>= lr) | Just (UnboxConst val) <- isCombinable postEval cs = do
         mtick $ "Optimize.optimize.case-unbox-const.{" ++ show val
         lr <- g lr
-        return ((Case x (map (combineLam postEval tyUnit) as) :>>= unit :-> Return val) :>>= lr)
+        return ((Case x (map (combineLam postEval []) as) :>>= [] :-> Return val) :>>= lr)
 
 
     -- let pullin
@@ -437,6 +434,7 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
     f (cs@Case {} :>>= lr) |  sizeLTE 1 (filter (/= ReturnError) (getReturnInfo cs)) = do
             mtick "Optimize.optimize.case-pullin"
             return $ modifyTail lr cs
+  -}
 
 {-
     f cs@(Case x as) | postEval && all isEnum [ p | p :-> _ <- as] = do
@@ -447,37 +445,37 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
         -}
 
     -- hoisting must come last
-    f (hexp@Case {} :>>= v@(Var vnum _) :-> rc@(Case v' as') :>>= lr) | v == v', not (vnum `Set.member` freeVars lr) = do
-        c <- caseHoist hexp v as' (getType rc)
-        lr <- g lr
-        return $ c :>>= lr
-    f (hexp@Case {} :>>= v@Var {} :-> rc@(Case v' as')) | v == v'  = do
-        caseHoist hexp v as' (getType rc)
+--    f (hexp@Case {} :>>= v@(Var vnum _) :-> rc@(Case v' as') :>>= lr) | v == v', not (vnum `Set.member` freeVars lr) = do
+--        c <- caseHoist hexp v as' (getType rc)
+--        lr <- g lr
+--        return $ c :>>= lr
+--    f (hexp@Case {} :>>= v@Var {} :-> rc@(Case v' as')) | v == v'  = do
+--        caseHoist hexp v as' (getType rc)
 
     -- let unboxing
     f (cs@Let {} :>>= lr) | Just comb <- isCombinable postEval cs = do
         lr <- g lr
         case comb of
-            UnboxTag -> do
-                mtick "Optimize.optimize.let-unbox-tag"
-                let (va:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
-                return ((combine postEval TyTag cs :>>= Var va TyTag :-> Return (NodeV va [])) :>>= lr)
+--            UnboxTag -> do
+--                mtick "Optimize.optimize.let-unbox-tag"
+--                let (va:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
+--                return ((combine postEval TyTag cs :>>= Var va TyTag :-> Return (NodeV va [])) :>>= lr)
             UnboxTup (t,ts) -> do
                 mtick $ "Optimize.optimize.let-unbox-node.{" ++ show t
                 let vs = [ v | v <- [v1..], not $ v `Set.member` fv ]
                     vars = [ Var v t | v <- vs | t <- ts ]
-                return ((combine postEval (tuple ts) cs :>>= tuple vars  :-> Return (NodeC t vars)) :>>= lr)
+                return ((combine postEval (ts) cs :>>= vars  :-> Return [NodeC t vars]) :>>= lr)
             UnboxConst val -> do
                 mtick $ "Optimize.optimize.let-unbox-const.{" ++ show val
-                return ((combine postEval tyUnit cs :>>= unit :-> Return val) :>>= lr)
+                return ((combine postEval [] cs :>>= [] :-> Return [val]) :>>= lr)
        where fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- map funcDefBody (expDefs cs) ]
 
-    f (hexp@Let {} :>>= v@(Var vnum _) :-> rc@(Case v' as') :>>= lr) | v == v', not (vnum `Set.member` freeVars lr) = do
-        c <- caseHoist hexp v as' (getType rc)
-        lr <- g lr
-        return $ c :>>= lr
-    f (hexp@Let {} :>>= v@Var {} :-> rc@(Case v' as')) | v == v'  = do
-        caseHoist hexp v as' (getType rc)
+--    f (hexp@Let {} :>>= v@(Var vnum _) :-> rc@(Case v' as') :>>= lr) | v == v', not (vnum `Set.member` freeVars lr) = do
+--        c <- caseHoist hexp v as' (getType rc)
+--        lr <- g lr
+--        return $ c :>>= lr
+--    f (hexp@Let {} :>>= v@Var {} :-> rc@(Case v' as')) | v == v'  = do
+--        caseHoist hexp v as' (getType rc)
 
     f (e1 :>>= _ :-> err@Error {}) | isErrOmittable e1 = do
         mtick "Optimize.optimize.del-error"
@@ -500,7 +498,7 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
                 return ne
         c (App a xs _) | a == funcDefName fd = do
             tell [a]
-            return $ Return (Tup xs) :>>= funcDefBody fd
+            return $ Return xs :>>= funcDefBody fd
         c e@Let { expDefs = defs } | funcDefName fd `elem` map funcDefName defs = return e
         c e = mapExpExp c e
     f e@Let {} = mapExpExp f e
@@ -508,72 +506,72 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
     notReturnNode (ReturnNode (Just _,_)) = False
     notReturnNode _ = True
     --caseHoist hexp v as' ty | sizeLTE 1 (filter (== Nothing ) (Prelude.map (isManifestNode . lamExp) as))  = do
-    caseHoist hexp v as' ty | sizeLTE 1 (filter (\x -> x /= ReturnError && notReturnNode x ) (getReturnInfo hexp))= do
-        mtick $ "Optimize.optimize.case-hoist" -- .{" ++ show (Prelude.map (isManifestNode . lamExp) as :: [Maybe [Atom]])
-        nic <- f (Case v as')
-        --True <- return $ Set.null $ Set.intersection (freeVars nic) (freeVars (map lamBind as) :: Set.Set Var)
-        return $ modifyTail (v :-> nic) hexp -- Case x [ b :-> e :>>= v :-> Case v as' | b :-> e <- as ]
-    caseHoist hexp v as' ty | False && grinPhase grin >= PostDevolve  = do
-        let ufuncs = freeVars fbody
-            fbody = Tup [v] :-> Case v as'
-            cfname = do
-                uniq <- newUniq
-                let fname = toAtom $ "fjumppoint-" ++ show n ++ "-" ++ show uniq
-                if fname `member` (ufuncs :: Set.Set Atom) then cfname else return fname
-        fname <- cfname
-        let f e@(Return NodeC {}) = e :>>= v :-> Case v as'
-            f e@(Return Lit {}) = e :>>= v :-> Case v as'
-            f e = e :>>= v :-> App fname [v] ty
-            nbody = editTail ty f hexp -- (v :-> App fname [v] (getType $ Case v as')) (Case x as)
-        mtick $ "Optimize.optimize.case-hoist-jumppoint.{" ++ show fname -- .{" ++ show (Prelude.map (isManifestNode . lamExp) as :: [Maybe [Atom]])
-        return $ grinLet [createFuncDef True fname fbody] nbody
-    caseHoist hexp v as' ty = do
-       mfc <- f hexp
-       fc <- f (Case v as')
-       return $ mfc :>>= v :-> fc
+--    caseHoist hexp v as' ty | sizeLTE 1 (filter (\x -> x /= ReturnError && notReturnNode x ) (getReturnInfo hexp))= do
+--        mtick $ "Optimize.optimize.case-hoist" -- .{" ++ show (Prelude.map (isManifestNode . lamExp) as :: [Maybe [Atom]])
+--        nic <- f (Case v as')
+--        --True <- return $ Set.null $ Set.intersection (freeVars nic) (freeVars (map lamBind as) :: Set.Set Var)
+--        return $ modifyTail ([v] :-> nic) hexp -- Case x [ b :-> e :>>= v :-> Case v as' | b :-> e <- as ]
+--    caseHoist hexp v as' ty | False && grinPhase grin >= PostDevolve  = do
+--        let ufuncs = freeVars fbody
+--            fbody = [v] :-> Case v as'
+--            cfname = do
+--                uniq <- newUniq
+--                let fname = toAtom $ "fjumppoint-" ++ show n ++ "-" ++ show uniq
+--                if fname `member` (ufuncs :: Set.Set Atom) then cfname else return fname
+--        fname <- cfname
+--        let f e@(Return NodeC {}) = e :>>= v :-> Case v as'
+--            f e@(Return Lit {}) = e :>>= v :-> Case v as'
+--            f e = e :>>= v :-> App fname [v] ty
+--            nbody = editTail ty f hexp -- (v :-> App fname [v] (getType $ Case v as')) (Case x as)
+--        mtick $ "Optimize.optimize.case-hoist-jumppoint.{" ++ show fname -- .{" ++ show (Prelude.map (isManifestNode . lamExp) as :: [Maybe [Atom]])
+--        return $ grinLet [createFuncDef True fname fbody] nbody
+--    caseHoist hexp v as' ty = do
+--       mfc <- f hexp
+--       fc <- f (Case v as')
+--       return $ mfc :>>= v :-> fc
     knownCase n@(NodeC t vs) as = do
         mtick $ "Optimize.optimize.known-case-node.{" ++ show t
         --let f [] = error $ "no known case:" ++ show (n,as)
         let f [] =  Error "known-case: No known case" (getType (Case n as))
-            f ((v@Var {} :-> b):_) = Return n :>>= v :-> b
-            f ((NodeC t' vs' :-> b):_) | t == t' =  Return (Tup vs) :>>= Tup vs' :-> b
+            f ((v@[Var {}] :-> b):_) = Return [n] :>>= v :-> b
+            f (([NodeC t' vs'] :-> b):_) | t == t' =  Return (vs) :>>= vs' :-> b
             -- f ((NodeC t' vs' :-> b):_) | t == t' = let (xs,ys) = unzip [ (Var x t,y) | (x,y@(Var _ t)) <- Map.toList mp] in Return (Tup ys) :>>= Tup xs :-> b
             f (_:as) = f as
         return $ f as
     knownCase n@(Lit l _) as = do
         mtick $ "Optimize.optimize.known-case-lit.{" ++ show n
         let f [] =  Error "known-case: No known case" (getType (Case n as))
-            f ((v@Var {} :-> b):_) = Return n :>>= v :-> b
-            f ((Lit l' _ :-> b):_) | l == l' = b
+            f ((v@[Var {}] :-> b):_) = Return [n] :>>= v :-> b
+            f (([Lit l' _] :-> b):_) | l == l' = b
             f (_:as) = f as
         return $ f as
-    knownCase (Tag t) as = do
-        mtick $ "Optimize.optimize.known-case-tag.{" ++ show t
-        let f [] =  Error "known-case: No known case" (getType (Case (Tag t) as))
-            f ((v@Var {} :-> b):_) = Return (Tag t) :>>= v :-> b
-            f ((Tag t' :-> b):_) | t == t' = b
-            f (_:as) = f as
-        return $ f as
-    caseCombine x as as' = do
-        mtick $ "Optimize.optimize.case-combine"
-        let etags = [ bd | bd@(NodeC t _ :-> _) <- as, t `notElem` [ t | NodeC t _ :-> _ <- as' ] ]
-            ttags = [ bd | bd@(Tag t:-> _) <- as, t `notElem` [ t | Tag t :-> _ <- as' ] ]
-            as'' = Prelude.map f as'
-            f (v@Var {} :-> b) | getType v == TyTag = v :-> Case v ttags :>>= unit :-> b
-            f (v@Var {} :-> b) = v :-> Case v etags :>>= unit :-> b
-            f (n@(NodeC t _) :-> b) = case [ a | a@(NodeC t' _ :-> _) <-  as, t == t'] of
-                [bind :-> body] -> n :-> Return n :>>= bind :-> body :>>= unit :-> b
-            f (n@(Tag t) :-> b) = case [ a | a@(Tag t' :-> _) <-  as, t == t'] of
-                [bind :-> body] -> n :-> Return n :>>= bind :-> body :>>= unit :-> b
-            -- f r
-        return $ Case x as''
+--    knownCase (Tag t) as = do
+--        mtick $ "Optimize.optimize.known-case-tag.{" ++ show t
+--        let f [] =  Error "known-case: No known case" (getType (Case (Tag t) as))
+--            f ((v@[Var {}] :-> b):_) = Return (Tag t) :>>= v :-> b
+----            f ((Tag t' :-> b):_) | t == t' = b
+--            f (_:as) = f as
+--        return $ f as
+--    caseCombine x as as' = do
+--        mtick $ "Optimize.optimize.case-combine"
+--        let etags = [ bd | bd@(NodeC t _ :-> _) <- as, t `notElem` [ t | NodeC t _ :-> _ <- as' ] ]
+--  --          ttags = [ bd | bd@(Tag t:-> _) <- as, t `notElem` [ t | Tag t :-> _ <- as' ] ]
+--            as'' = Prelude.map f as'
+-- --           f ([v@Var {}] :-> b) | getType v == TyTag = v :-> Case v ttags :>>= [] :-> b
+--            f ([v@Var {}] :-> b) = v :-> Case v etags :>>= [] :-> b
+--            f (n@[(NodeC t _)] :-> b) = case [ a | a@(NodeC t' _ :-> _) <-  as, t == t'] of
+--                [bind :-> body] -> n :-> Return n :>>= bind :-> body :>>= [] :-> b
+----            f (n@[(Tag t)] :-> b) = case [ a | a@(Tag t' :-> _) <-  as, t == t'] of
+----                [bind :-> body] -> n :-> Return n :>>= bind :-> body :>>= [] :-> b
+--            -- f r
+--        return $ Case x as''
 
 isEnum (NodeC t []) = True
 isEnum (Var t TyNode) = True
 isEnum _ = False
 
-untagPat _ (NodeC t [] :-> e) = Tag t :-> e
-untagPat vb (v@Var{} :-> e) = Var vb TyTag :-> Return (NodeV vb []) :>>= v :-> e
+--untagPat _ ([NodeC t []] :-> e) = [Tag t] :-> e
+--untagPat vb ([v@Var{}] :-> e) = [Var vb TyTag] :-> Return [NodeV vb []] :>>= [v] :-> e
 
 
 deadVars :: Stats -> (Atom,Lam) -> IO (Atom,Lam)
@@ -591,7 +589,7 @@ deadVars stats (n,l) = do
         if  any (`Set.member` uv) (freeVars v) then
             f e >> return (Just w)
          else lift (tick stats at_OptSimplifyDeadVar) >> return Nothing
-    gv w@(Tup vs,Case x xs) = do
+    gv w@(vs,Case x xs) = do
         uv <- get
         put $ (Set.union uv (freeVars x))
         let used v = any (`Set.member` uv) (freeVars v)
@@ -599,8 +597,8 @@ deadVars stats (n,l) = do
             (_,[]) -> return $ Just w
             (nvs,unused) -> do
                 replicateM_ (length unused) $ lift (tick stats "Optimize.simplify.dead-var-case-tup")
-                let ml = modifyTail (tuple vs :-> Return (tuple nvs))
-                return (Just (tuple nvs,ml (Case x xs) ))
+                let ml = modifyTail (vs :-> Return nvs)
+                return (Just (nvs,ml (Case x xs) ))
     gv w@(_,e) = f e >> return (Just w)
 
 
@@ -670,7 +668,7 @@ noInline = [toAtom "fData.IORef.readIORef", toAtom "fData.IORef.writeIORef"]
 -- TODO have this collect CAF info ignoring updates.
 
 collectUsedFuncs :: Lam -> ([Atom],[Atom])
-collectUsedFuncs (Tup as :-> exp) = (snub $ concatMap tagToFunction (Seq.toList iu),sort $ Seq.toList du) where
+collectUsedFuncs (as :-> exp) = (snub $ concatMap tagToFunction (Seq.toList iu),sort $ Seq.toList du) where
     (iu,du) =  f exp
     f (e1 :>>= _ :-> e2) = f e1 `mappend` f e2
     f (App a vs _) =  (Seq.fromList (freeVars vs), Seq.singleton a)
