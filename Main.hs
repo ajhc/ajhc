@@ -75,6 +75,7 @@ import qualified E.SSimplify as SS
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Grin.Simplify
+import qualified Grin.SSimplify
 import qualified Info.Info as Info
 import qualified Interactive
 import qualified Stats
@@ -675,7 +676,8 @@ compileToGrin prog = do
     x <- Grin.FromE.compile prog
     Stats.print "Grin" Stats.theStats
     wdump FD.GrinInitial $ do dumpGrin "initial" x
-    x <- return $ normalizeGrin x
+    --x <- return $ normalizeGrin x
+    x <- Grin.SSimplify.simplify x
     wdump FD.GrinNormalized $ do dumpGrin "normalized" x
     lintCheckGrin x
     let pushGrin grin = do
@@ -710,7 +712,8 @@ compileToGrin prog = do
     lintCheckGrin x
     x <- opt "Optimization" x
     lintCheckGrin x
-    x <- return $ normalizeGrin x
+    x <- Grin.SSimplify.simplify x
+--    x <- return $ normalizeGrin x
 
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
 
@@ -719,7 +722,8 @@ compileToGrin prog = do
     lintCheckGrin x
     x <- createEvalApply x
     lintCheckGrin x
-    x <- return $ normalizeGrin x
+    x <- Grin.SSimplify.simplify x
+    --x <- return $ normalizeGrin x
     --x <- unboxReturnValues x
     lintCheckGrin x
     x <- transformGrin devolveTransform x

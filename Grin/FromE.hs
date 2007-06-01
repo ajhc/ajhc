@@ -355,7 +355,7 @@ compile' cenv (tvr,as,e) = ans where
     ce (ELetRec ds e) = doLet ds (ce e)
     ce (EError s e) = return (Error s (toTypes TyNode e))
     ce (EVar tvr) | isUnboxed (getType tvr) = do
-        return (Return [toVal tvr])
+        return (Return $ keepIts [toVal tvr])
     ce (EVar tvr) | not $ isLifted (EVar tvr)  = do
         mtick "Grin.FromE.strict-unlifted"
         return (Fetch (toVal tvr))
@@ -387,7 +387,7 @@ compile' cenv (tvr,as,e) = ans where
                             ee <- evalVar [TyNode] tvr
                             app fty ee as
     ce e | Just z <- literal e = return (Return z)
-    ce e | Just (Const z) <- constant e = return (Return [z])
+    ce e | Just (Const z) <- constant e = return (Return $ keepIts [z])
     ce e | Just z <- constant e = return (gEval z)
     ce e | Just z <- con e = return (Return z)
 
@@ -585,7 +585,7 @@ compile' cenv (tvr,as,e) = ans where
     -- it is an invarient that evaling (cc e) produces the same value as (ce e)
     cc (EPrim (APrim (PrimPrim don) _) [e,_] _) | don == packString "dependingOn" = cc e
     cc e | Just _ <- literal e = error "unboxed literal in lazy context"
-    cc e | Just z <- constant e = return (Return [z])
+    cc e | Just z <- constant e = return (Return $ keepIts [z])
     cc e | Just [z] <- con e = return (Store z)
     cc (EError s e) = do
         let ty = toTypes TyNode e

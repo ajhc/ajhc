@@ -146,6 +146,7 @@ prettyVal (Lit i t) | t == Ty (toAtom "wchar_t"), Just x <- toIntegral i = tshow
 prettyVal (Lit i _)  = tshow i
 prettyVal (Const v) = char '&' <> prettyVal v
 prettyVal (ValUnknown ty) = text "?::" <> tshow ty
+prettyVal Unit = text "()"
 prettyVal (Item a  ty) = tshow a <> text "::" <> tshow ty
 prettyVal (ValPrim aprim [] ty) = pprint aprim <> text "::" <> tshow ty
 prettyVal (ValPrim aprim xs ty) = pprint aprim <> tupled (map tshow xs) <> text "::" <> tshow ty

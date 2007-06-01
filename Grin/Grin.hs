@@ -323,6 +323,7 @@ emptyGrin = Grin {
     grinPhase = PhaseInit,
     grinTypeEnv = mempty,
     grinFunctions = [],
+    grinStats = mempty,
 --    grinReturnTags = mempty,
 --    grinArgTags = mempty,
     grinSuspFunctions = mempty,
