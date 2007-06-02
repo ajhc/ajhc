@@ -68,18 +68,12 @@ jhc_error(char *s) {
         exit(255);
 }
 
-#if _JHC_DEBUG
 static void  A_NORETURN A_UNUSED
 jhc_case_fell_off(int n) {
         fflush(stdout);
         fprintf(stderr, "\n%s:%i: case fell off\n", __FILE__, n);
         abort();
 }
-#else
-
-#define jhc_case_fell_off(x) do {} while(0)
-
-#endif
 
 #define jhc_setjmp(jb) sigsetjmp(*(jmp_buf *)jb,0)
 #define jhc_longjmp(jb) siglongjmp(*(jmp_buf *)jb,1)
