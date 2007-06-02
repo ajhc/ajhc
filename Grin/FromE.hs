@@ -131,6 +131,7 @@ stringNameToTy n = TyPrim (archOpTy archInfo n)
 toType :: Ty -> E -> Ty
 toType node = toty . followAliases mempty where
 --    toty (ELit LitCons { litName = n, litArgs = es, litType = ty }) |  ty == eHash, TypeConstructor <- nameType n, Just _ <- fromUnboxedNameTuple n = (tuple (keepIts $ map (toType (TyPtr TyNode) ) es))
+    toty (ELit LitCons { litName = n, litArgs = [], litType = ty }) |  ty == eHash, TypeConstructor <- nameType n, Just 0 <- fromUnboxedNameTuple n = TyUnit
     --toty (ELit LitCons { litName = n, litArgs = [], litType = ty }) |  ty == eHash, RawType <- nameType n = (Ty $ toAtom (show n))
     toty (ELit LitCons { litName = n, litArgs = [], litType = ty }) |  ty == eHash, Just t <- rawNameToTy n = t
     toty e@(ELit LitCons { litName = n, litType = ty }) |  ty == eHash = case lookup n unboxedMap of
@@ -673,6 +674,7 @@ compile' cenv (tvr,as,e) = ans where
     doUpdate vr (x :>>= v :-> e) = let (du,t,ts) = doUpdate vr e in (x :>>= v :-> du,t,ts)
     doUpdate vr x = error $ "doUpdate: " ++ show x
     args es = map f es where
+        f x | Just [] <- literal x = Unit
         f x | Just [z] <- literal x = z
         f x | Just z <- constant x =  z
         f (EVar tvr) = toVal tvr
