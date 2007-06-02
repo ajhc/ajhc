@@ -51,7 +51,6 @@ import Grin.Lint
 import Grin.NodeAnalyze
 import Grin.Optimize
 import Grin.Show
-import Grin.Whiz
 import Ho.Build
 import Ho.Library
 import Ho.LibraryMap
@@ -668,6 +667,14 @@ cleanupE e = runIdentity (f e) where
     f ec@ECase { eCaseBind = t@TVr { tvrIdent = v } } | v /= 0, v `notMember` (freeVars (caseBodies ec)::IdSet) = f ec { eCaseBind = t { tvrIdent = 0 } }
     f e = emapEG f f e
 
+simplifyParms = transformParms {
+    transformDumpProgress = True,
+    transformCategory = "Simplify",
+    transformPass = "Grin",
+    transformOperation = Grin.SSimplify.simplify,
+    transformIterate = IterateDone
+    }
+
 compileToGrin prog = do
     stats <- Stats.new
     progress "Converting to Grin..."
@@ -677,11 +684,11 @@ compileToGrin prog = do
     Stats.print "Grin" Stats.theStats
     wdump FD.GrinInitial $ do dumpGrin "initial" x
     --x <- return $ normalizeGrin x
-    x <- Grin.SSimplify.simplify x
+    x <- transformGrin simplifyParms x
     wdump FD.GrinNormalized $ do dumpGrin "normalized" x
     lintCheckGrin x
     let pushGrin grin = do
-            grin <- return $ normalizeGrin grin
+            grin <- transformGrin simplifyParms grin
             nf   <- mapMsnd (grinPush undefined) (grinFuncs grin)
             return $ setGrinFunctions nf grin
 
@@ -728,7 +735,7 @@ compileToGrin prog = do
     lintCheckGrin x
     x <- transformGrin devolveTransform x
     x <- opt "After Devolve Optimization" x
-    x <- return $ normalizeGrin x
+    x <- transformGrin simplifyParms x
     dumpFinalGrin x
     compileGrinToC x
 

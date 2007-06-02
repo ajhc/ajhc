@@ -8,6 +8,8 @@ import Grin.Noodle
 import Util.Gen
 import Util.RWS
 import Support.CanType
+import qualified Stats
+import Stats(mtick)
 
 -- This goes through and puts grin into a normal form, in addition, it carries out some straightforward
 -- simplifications.
@@ -27,8 +29,12 @@ data SEnv = SEnv {
 
 newtype SState = SState { usedVars :: IS.IntSet }
 
-newtype S a = S (RWS SEnv () SState a)
+newtype S a = S (RWS SEnv Stats.Stat SState a)
     deriving(Monad,Functor,MonadReader SEnv,MonadState SState)
+
+instance Stats.MonadStats S where
+    mtickStat s = S (tell s)
+    mticks' n a = S (tell $ Stats.singleStat n a)
 
 
 data Binding = IsBoundTo Val | Promote Val | Demote Val
@@ -40,9 +46,9 @@ instance Monoid SEnv where
 
 simplify :: Grin -> IO Grin
 simplify grin = do
-    let (fs,_,_) = runRWS fun mempty SState { usedVars = mempty }
+    let (fs,_,stats) = runRWS fun mempty SState { usedVars = mempty }
         S fun = simpFuncs (grinFunctions grin)
-    return grin { grinFunctions = fs }
+    return grin { grinFunctions = fs, grinStats = grinStats grin `mappend` stats }
 
 
 simpFuncs :: [FuncDef] -> S [FuncDef]
@@ -61,7 +67,9 @@ simpLam (ps :-> e) = do
 
 simpBind :: ([Val],Exp) -> S (Maybe ([Val],Exp))
 simpBind (b,e) = f b e where
-    f b (Fetch (Const x)) = return $ Just (b,Return [x])
+    f b (Fetch (Const x)) = do
+        mtick "Grin.Simplify.fetch-const"
+        return $ Just (b,Return [x])
     f b e = return $ Just (b,e)
 
 extEnv :: Var -> Val -> SEnv -> SEnv
@@ -77,10 +85,19 @@ simpExp e = f e [] where
         f a ((env,v,b):xs)
 
     -- simple transforms
-    f (Fetch (Const x)) rs = f (Return [x]) rs
-    f (Store x) rs | valIsNF x = f (Return [Const x]) rs
-    f (App a [Const n] _) rs | a == funcEval = f (Return [n]) rs
-    f (Error s t) rs@(_:_) = let (_,_,b) = last rs in f (Error s (getType b)) []
+    f (Fetch (Const x)) rs = do
+        mtick "Grin.Simplify.fetch-const"
+        f (Return [x]) rs
+    f (Store x) rs | valIsNF x = do
+        mtick "Grin.Simplify.store-normalform"
+        f (Return [Const x]) rs
+    f (App a [Const n] _) rs | a == funcEval = do
+        mtick "Grin.Simplify.eval-const"
+        f (Return [n]) rs
+    f (Error s t) rs@(_:_) = do
+        mtick "Grin.Simplify.error-discard"
+        let (_,_,b) = last rs
+        f (Error s (getType b)) []
 
 --    f (Store [v@Var {}]) ((senv,[Var vn _],b):rs) = do
 --        v' <- applySubst v
@@ -92,11 +109,21 @@ simpExp e = f e [] where
 --        v' <- applySubst v
 --        local (\_ -> extScope vn (Demote v') senv) $ f b rs
 --    f (Return [v@(NodeC t _)]) ((senv,[Var vn _],b):rs) | tagIsWHNF t = fbind vn v senv b rs
-    f (Return [v@Const {}]) ((senv,[Var vn _],b):rs) = fbind vn v senv b rs
-    f (Return [v@Var {}]) ((senv,[Var vn _],b):rs) = fbind vn v senv b rs
-    f a@(Return [NodeC t xs]) ((senv,[NodeC t' ys],b):rs) | t == t' = dtup xs ys senv b rs
-    f (Return []) ((senv,[],b):rs) = dtup [] [] senv b rs
-    f a@(Return (xs@(_:_:_))) ((senv,ys,b):rs) = dtup xs ys senv b rs
+    f (Return [v@Const {}]) ((senv,[Var vn _],b):rs) = do
+        mtick "Grin.Simplify.Subst.const"
+        fbind vn v senv b rs
+    f (Return [v@Var {}]) ((senv,[Var vn _],b):rs) = do
+        mtick "Grin.Simplify.Subst.var"
+        fbind vn v senv b rs
+    f a@(Return [NodeC t xs]) ((senv,[NodeC t' ys],b):rs) | t == t' = do
+        mtick "Grin.Simplify.Assign.node-node"
+        dtup xs ys senv b rs
+    f (Return []) ((senv,[],b):rs) = do
+        mtick "Grin.Simplify.Assign.unit-unit"
+        dtup [] [] senv b rs
+    f a@(Return (xs@(_:_:_))) ((senv,ys,b):rs) = do
+        mtick "Grin.Simplify.Assign.tuple-tuple"
+        dtup xs ys senv b rs
     f (Case v [l]) rs = do
         f (Return [v] :>>= l) rs
     f a ((senv,p,b):xs) = do
