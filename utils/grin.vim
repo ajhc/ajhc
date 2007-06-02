@@ -31,14 +31,14 @@ syn match   hsLineComment      "--.*"
 syn region  hsBlockComment     start="{-"  end="-}" contains=hsBlockComment
 syn region  hsPragma           start="{-#" end="#-}"
 
-syn match hsOperator "->\|<-\|=\|&\|:="
+syn match hsOperator "->\|<-\|=\|&\|:=\|+\|-\|==\|!=\|>\|>=\|<\|<=\|*\|/"
 "syn match hsVarSym "\(\<[A-Z][a-zA-Z0-9_']*\.\)\=[-!#$%&\*\+/<=>\?@\\^|~.][-!#$%&\*\+/<=>\?@\\^|~:.]*"
 "syn match hsConSym "\(\<[A-Z][a-zA-Z0-9_']*\.\)\=:[-!#$%&\*\+./<=>\?@\\^|~:]*"
 "syn match hsVarSym "`\(\<[A-Z][a-zA-Z0-9_']*\.\)\=[a-z][a-zA-Z0-9_']*`"
 "syn match hsConSym "`\(\<[A-Z][a-zA-Z0-9_']*\.\)\=[A-Z][a-zA-Z0-9_']*`"
 
 syn keyword grinControl do case return of error let
-syn keyword grinMemory store fetch alloc update
+syn keyword grinMemory store fetch alloc update promote demote
 syn keyword grinEvalKeyword eval apply
 syn match grinEvalKeyword "\<@apply_\?[0-9]*\>"
 
