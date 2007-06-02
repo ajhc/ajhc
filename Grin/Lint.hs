@@ -198,7 +198,7 @@ tcVal v = f v where
         return (TyPtr v)
     f (Index v offset) = do
         t <- f v
-        Ty _ <- f offset
+        TyPrim _ <- f offset
         return t
     f (ValUnknown ty) = return ty
     f (ValPrim _ vs ty) = do mapM_ f vs >> return ty

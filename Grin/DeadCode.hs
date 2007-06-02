@@ -47,7 +47,7 @@ deadCode stats roots grin = do
     uf <- supplyReadValues usedFuncs
     pappFuncs <- readValue pappFuncs
     suspFuncs <- readValue suspFuncs
-    when True $ do
+    when False $ do
         putStrLn "usedArgs"
         mapM_ print ua
         putStrLn "usedCafs"

@@ -407,7 +407,7 @@ forLoop i from to body = sd $ do
     from <- draw from
     to <- draw to
     body <- draw body
-    return $ text "for" <> parens (i <+> equals <+> from <> semi <+> i <> text "++" <> semi <+> i <+> text "<" <+> to) <+> lbrace <$> nest 4 body <$> rbrace
+    return $ text "for" <> parens (i <+> equals <+> from <> semi <+> i <+> text "<" <+> to <> semi <+> i <> text "++" ) <+> lbrace <$> nest 4 body <$> rbrace
 
 
 

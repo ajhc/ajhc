@@ -412,13 +412,14 @@ compile' cenv (tvr,as,e) = ans where
         -- references
         f "newRef__" [v,_] = do
             let [v'] = args [v]
-            return $ Store v'
+            --return $ Store v'
+            return $ Alloc { expValue = v', expCount = toUnVal (1::Int), expRegion = region_heap, expInfo = mempty }
         f "readRef__" [r,_] = do
             let [r'] = args [r]
-            return $ Fetch r'
+            return $ Fetch (Index r' (toUnVal (0::Int)))
         f "writeRef__" [r,v,_] = do
             let [r',v'] = args [r,v]
-            return $ Update r' v'
+            return $ Update (Index r' (toUnVal (0::Int))) v'
 
         -- arrays
         f "newMutArray__" [v,def,_] = do

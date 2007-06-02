@@ -121,9 +121,9 @@ tyDNode = TyNode
 
 
 instance TypeNames Ty where
-    tIntzh = Ty (toAtom "int")
-    tCharzh = Ty (toAtom "HsChar")
-    tStar = Ty (toAtom "*")
+    tIntzh = TyPrim (Op.bits32) -- Ty (toAtom "int")
+    tCharzh = TyPrim (Op.bits32) -- Ty (toAtom "HsChar")
+    --tStar = Ty (toAtom "*")
 
 data Callable = Continuation | Function | Closure | LocalFunction | Primitive'
     deriving(Eq,Ord,Show)
