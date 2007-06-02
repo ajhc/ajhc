@@ -20,6 +20,7 @@ import Support.Transform
 import Util.Gen
 import Util.SetLike
 import qualified FlagDump as FD
+import qualified Stats
 
 
 lintCheckGrin grin = when flint $ typecheckGrin grin
@@ -66,8 +67,6 @@ transformGrin tp prog = do
         pname xs = '-':xs
         iterate = transformIterate tp
     when dodump $ putErrLn $ "-- " ++ name
-    --when (dodump && dump FD.CorePass) $ printGrin prog
-    --let istat = progStats prog
     let ferr e = do
         putErrLn $ "\n>>> Exception thrown"
         putErrLn $ "\n>>> Before " ++ name
@@ -76,24 +75,23 @@ transformGrin tp prog = do
         putErrLn (show e)
         maybeDie
         return prog
-    prog' <- Control.Exception.catch (transformOperation tp prog) ferr
---    let estat = progStats prog'
+    let istat = grinStats prog
+    prog' <- Control.Exception.catch (transformOperation tp prog { grinStats = mempty }) ferr
+    let estat = grinStats prog'
     let onerr grin' = do
             putErrLn $ "\n>>> Before " ++ name
             dumpGrin ("lint-before-" ++ name) prog
---            Stats.printStat name estat
+            Stats.printStat name estat
             putErrLn $ "\n>>> After " ++ name
             dumpGrin ("lint-after-" ++ name) grin'
---    if transformSkipNoStats tp && estat == mempty then do
---        when dodump $ putErrLn "program not changed"
---        return prog
---     else do
---    when (dodump && dump FD.CoreSteps && estat /= mempty) $ Stats.printLStat (optStatLevel options) name estat
- --   when collectPassStats $ do
---        Stats.tick Stats.theStats scname
---        Stats.tickStat Stats.theStats (Stats.prependStat scname estat)
+    if transformSkipNoStats tp && Stats.null estat then do
+        when dodump $ putErrLn "program not changed"
+        return prog
+     else do
+    when (dodump && not (Stats.null estat)) $ Stats.printStat  name estat
     lintCheckGrin' (onerr prog') prog'
-    if doIterate iterate False then transformGrin tp { transformIterate = iterateStep iterate } prog' else return prog'
+    let tstat = istat `mappend` estat
+    if doIterate iterate (not $ Stats.null estat) then transformGrin tp { transformIterate = iterateStep iterate } prog' { grinStats = tstat } else return prog' { grinStats = tstat }
 --    if doIterate iterate (estat /= mempty) then transformGrin tp { transformIterate = iterateStep iterate } prog' { progStats = istat `mappend` estat } else
 --        return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
 

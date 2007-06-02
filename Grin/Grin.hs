@@ -309,8 +309,6 @@ data Grin = Grin {
     grinPhase :: Phase,
     grinTypeEnv :: TyEnv,
     grinFunctions :: [FuncDef],
---    grinReturnTags :: Map.Map Atom Item,
---    grinArgTags :: Map.Map Atom [Item],
     grinSuspFunctions :: Set.Set Atom,
     grinPartFunctions :: Set.Set Atom,
     grinStats :: Stats.Stat,
@@ -323,11 +321,9 @@ emptyGrin = Grin {
     grinPhase = PhaseInit,
     grinTypeEnv = mempty,
     grinFunctions = [],
-    grinStats = mempty,
---    grinReturnTags = mempty,
---    grinArgTags = mempty,
     grinSuspFunctions = mempty,
     grinPartFunctions = mempty,
+    grinStats = mempty,
     grinCafs = mempty
 }
 
