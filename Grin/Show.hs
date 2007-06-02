@@ -88,7 +88,9 @@ prettyExp vl (e1 :>>= v :-> e2) = align (prettyExp (pVar v) e1 <$> prettyExp vl 
 prettyExp vl (Return []) = vl <> keyword "return" <+> text "()"
 prettyExp vl (Return [v]) = vl <> keyword "return" <+> prettyVal v
 prettyExp vl (Return vs) = vl <> keyword "return" <+> tupled (map prettyVal vs)
+prettyExp vl (Store v@Var {}) | getType v == tyDNode = vl <> keyword "demote" <+> prettyVal v
 prettyExp vl (Store v) = vl <> keyword "store" <+> prettyVal v
+prettyExp vl (Fetch v@Var {}) | getType v == tyINode = vl <> keyword "promote" <+> prettyVal v
 prettyExp vl (Fetch v) = vl <> keyword "fetch" <+> prettyVal v
 prettyExp vl (Error "" _) = vl <> prim "exitFailure"
 prettyExp vl (Error s _) = vl <> keyword "error" <+> tshow s
@@ -96,6 +98,7 @@ prettyExp vl (App t [v] _) | t == funcEval = vl <> keyword "eval" <+> prettyVal 
 prettyExp vl (App t [a] _) | t == funcApply = vl <> keyword "apply" <+> prettyVal a
 prettyExp vl (App t [a,b] _) | t == funcApply = vl <> keyword "apply" <+> prettyVal a <+> prettyVal b
 prettyExp vl (App a vs _)  = vl <> func (fromAtom a) <+> hsep (map prettyVal vs)
+prettyExp vl Prim { expPrimitive = APrim (Op (Op.BinOp bo _ _) _) _, expArgs = [x,y] } | Just (op,_) <- Op.binopInfix bo = vl <> prettyVal x <+> operator op <+> prettyVal y
 prettyExp vl Prim { expPrimitive = APrim (Peek t) _, expArgs = [v] }  = vl <> prim (show t) <> char '[' <> prettyVal v <> char ']'
 prettyExp vl Prim { expPrimitive = ap, expArgs = vs } = vl <> prim (pprint ap) <+> hsep (map prettyVal vs)
 prettyExp vl (Update x y) = vl <> keyword "update" <+> prettyVal x <+> prettyVal y
@@ -130,19 +133,21 @@ prettyVal (NodeV (V i) vs) = parens $ char 't' <> tshow i <+> hsep (map prettyVa
 prettyVal (Index p off) = prettyVal p <> char '[' <> prettyVal off <> char ']'
 prettyVal (Tag t) = tag (fromAtom t)
 prettyVal (Var (V i) t)
-    | TyPtr t <- t = char 'p' <> prettyVal (Var (V i) t)
-    | TyNode <- t = char 'n' <> tshow i
---    | t == tCharzh = char 'c' <> tshow i
---    | t == tIntzh  = char 'i' <> tshow i
-    | Ty _ <- t  = char 'l' <> tshow i
+    | TyPtr TyNode <- t = text "ni" <> tshow i
+    | TyNode <- t = text "nd" <> tshow i
+    | TyPtr (TyPtr TyNode) <- t = text "np" <> tshow i
     | TyPrim Op.TyBool <- t  = char 'b' <> tshow i
     | TyPrim (Op.TyBits _ Op.HintFloat) <- t  = char 'f' <> tshow i
     | TyPrim (Op.TyBits _ Op.HintCharacter) <- t  = char 'c' <> tshow i
+    | TyPrim (Op.TyBits (Op.Bits 8)  _) <- t  = char 'o' <> tshow i      -- octet
+    | TyPrim (Op.TyBits (Op.Bits 16)  _) <- t  = char 'h' <> tshow i     -- half
+    | TyPrim (Op.TyBits (Op.Bits 32)  _) <- t  = char 'w' <> tshow i     -- word
+    | TyPrim (Op.TyBits (Op.Bits 64)  _) <- t  = char 'd' <> tshow i     -- doubleword
+    | TyPrim (Op.TyBits (Op.Bits 128)  _) <- t  = char 'q' <> tshow i    -- quadword
+    | TyPrim (Op.TyBits (Op.BitsArch Op.BitsPtr)  _) <- t  = char 'p' <> tshow i
+    | TyPrim (Op.TyBits (Op.BitsArch Op.BitsMax)  _) <- t  = char 'm' <> tshow i
     | TyPrim (Op.TyBits _ _) <- t  = char 'l' <> tshow i
-    | TyTag <- t  = char 't' <> tshow i
 prettyVal (Var (V i) _) = char 'v' <> tshow i
-prettyVal (Lit i t) | t == tCharzh, Just x <- toIntegral i = tshow (chr x)
-prettyVal (Lit i t) | t == Ty (toAtom "wchar_t"), Just x <- toIntegral i = tshow (chr x)
 prettyVal (Lit i _)  = tshow i
 prettyVal (Const v) = char '&' <> prettyVal v
 prettyVal (ValUnknown ty) = text "?::" <> tshow ty
