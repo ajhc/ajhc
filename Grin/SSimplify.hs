@@ -2,7 +2,9 @@ module Grin.SSimplify(simplify) where
 
 import qualified Data.IntSet as IS
 import qualified Data.IntMap as IM
+import qualified Data.Map as Map
 
+import Atom
 import Grin.Grin
 import Grin.Noodle
 import Util.Gen
@@ -24,7 +26,8 @@ import Stats(mtick)
 
 data SEnv = SEnv {
     envSubst :: IM.IntMap Val,   -- renaming substitution
-    envScope :: IM.IntMap Binding
+    envScope :: IM.IntMap Binding,
+    envCSE   :: Map.Map Exp (Atom,Exp)
     }
 
 newtype SState = SState { usedVars :: IS.IntSet }
@@ -41,8 +44,14 @@ data Binding = IsBoundTo Val | Promote Val | Demote Val
 
 
 instance Monoid SEnv where
-    mempty = SEnv { envScope = mempty, envSubst = mempty }
-    mappend sa sb = SEnv { envScope = envScope sa `IM.union` envScope sb, envSubst = envSubst sa `IM.union` envSubst sb }
+    mempty = SEnv {
+        envScope = mempty,
+        envSubst = mempty,
+        envCSE = mempty }
+    mappend sa sb = SEnv {
+        envScope = envScope sa `IM.union` envScope sb,
+        envSubst = envSubst sa `IM.union` envSubst sb,
+        envCSE = envCSE sa `Map.union` envCSE sb }
 
 simplify :: Grin -> IO Grin
 simplify grin = do
@@ -65,18 +74,29 @@ simpLam (ps :-> e) = do
     return (ps :-> e)
 
 
-simpBind :: ([Val],Exp) -> S (Maybe ([Val],Exp))
-simpBind (b,e) = f b e where
-    f b (Fetch (Const x)) = do
-        mtick "Grin.Simplify.fetch-const"
-        return $ Just (b,Return [x])
-    f b e = return $ Just (b,e)
+simpBind :: [Val] -> Exp -> S Exp -> S Exp
+simpBind p e cont = f p e where
+    cse name xs = do
+        z <- local (\s -> s { envCSE = Map.fromList [ (x,(toAtom name,y)) | (x,y) <- xs] `Map.union` envCSE s }) cont
+        cmap <- asks envCSE
+        case Map.lookup e cmap of
+            Nothing -> return $ e :>>= (p :-> z)
+            Just (n,e') -> do mtick n; return $ e' :>>= (p :-> z)
+    cse' name xs = cse name ((e,Return p):xs)
+    f p app@(App a [v] _) | a == funcEval =  cse' "Simplify.CSE.eval" [(Fetch v,Return p)]
+    f p (Fetch v@Var {}) =  cse' "Simplify.CSE.fetch" [(gEval v,Return p)]
+    f p (Return [v@NodeC {}]) =  cse' "Simplify.CSE.return-node" []
+    f [p] (Store v@Var {})  =  cse' "Simplify.CSE.demote" [(Fetch p,Return [v]),(gEval p,Return [v])]
+    f [p@Var {}] (Store v@(NodeC t _)) | tagIsWHNF t, not (isHoly v) = cse' "Simplify.CSE.store-whnf" [(Fetch p,Return [v]),(gEval p,Return [v])]
+    f [p@Var {}] (Store v@(NodeC t _)) | not (isHoly v) = cse' "Simplify.CSE.store" []
+    f _ _ = cse "Simplify.CSE.NOT" []
 
 extEnv :: Var -> Val -> SEnv -> SEnv
 extEnv (V vn) v s = s { envSubst = IM.insert vn v (envSubst s) }
 
 extScope :: Var -> Binding -> SEnv -> SEnv
 extScope (V vn) v s = s { envScope = IM.insert vn v (envScope s) }
+
 
 simpExp :: Exp -> S Exp
 simpExp e = f e [] where
@@ -99,16 +119,6 @@ simpExp e = f e [] where
         let (_,_,b) = last rs
         f (Error s (getType b)) []
 
---    f (Store [v@Var {}]) ((senv,[Var vn _],b):rs) = do
---        v' <- applySubst v
---        local (\_ -> extScope vn (Demote v') senv) $ f b rs
---    f (Fetch [v@Var {}]) ((senv,[Var vn _],b):rs) = do
---        v' <- applySubst v
---        local (\_ -> extScope vn (Promote v') senv) $ f b rs
---    f (Store [v@(NodeC t _)]) ((senv,[Var vn _],b):rs) | tagIsWHNF t, not (isHoly v) = do
---        v' <- applySubst v
---        local (\_ -> extScope vn (Demote v') senv) $ f b rs
---    f (Return [v@(NodeC t _)]) ((senv,[Var vn _],b):rs) | tagIsWHNF t = fbind vn v senv b rs
     f (Return [v@Const {}]) ((senv,[Var vn _],b):rs) = do
         mtick "Grin.Simplify.Subst.const"
         fbind vn v senv b rs
@@ -130,15 +140,20 @@ simpExp e = f e [] where
         a <- g a
         (p,env') <- renamePattern p
         let env'' = env' `mappend` senv
-        x <- simpBind (p,a)
-        z <- local (const env'') $ f b xs
-        case x of
-            Just (p',a') -> do
-                return $ a' :>>= (p' :-> z)
-            Nothing -> do
-                return z
-    f x [] = g x
-
+        local (const env'') $ simpBind p a (f b xs)
+        --x <- simpBind (p,a)
+        --z <- local (const env'') $ f b xs
+--        case x of
+--            Just (p',a') -> do
+--                return $ a' :>>= (p' :-> z)
+--            Nothing -> do
+--                return z
+    f x [] = do
+        e <- g x
+        cmap <- asks envCSE
+        case Map.lookup e cmap of
+            Nothing -> return e
+            Just (n,e') -> do mtick n; return e'
     fbind vn v senv b rs = do
         v' <- applySubst v
         local (\_ -> extEnv vn v' senv) $ f b rs
@@ -148,7 +163,7 @@ simpExp e = f e [] where
         (ys,env') <- renamePattern ys
         let env'' = env' `mappend` senv
         z <- local (const env'') $ f b rs
-        ts <- mapM simpBind [([y],Return [x]) | x <- xs | y <- ys ]
+        ts <- mapM (return . Just) [([y],Return [x]) | x <- xs | y <- ys ]
         let h [] = z
             h ((p,v):rs) = v :>>= p :-> h rs
         return $ h [ (p,v) |  Just (p,v) <- ts]
@@ -238,4 +253,4 @@ newVarName (V sv) = do
 
 
 isHoly (NodeC _ as) | any isValUnknown as = True
-isHoly n = isHole n
+isHoly n = False
