@@ -19,9 +19,9 @@ runEither :: String -> Either String a -> a
 runEither msg (Left fm) = error $ msg ++ " - " ++ fm
 runEither _ (Right a) = a
 
-
-travCollect :: Monoid w => (forall m . Monad m => (a -> m a) -> a -> m a) -> (a -> w) -> a -> w
-travCollect fn col x = execWriter (fn (\x -> tell (col x) >> return x) x)
+travCollect :: Monoid w => ((a -> Writer w a) -> a -> Writer w a) -> (a -> w) -> a -> w
+travCollect fn col x = execWriter (f x) where
+    f x = tell (col x) >> fn f x
 
 forMn_ xs = forM_ (zip xs [0 :: Int .. ])
 forMn xs = forM (zip xs [0 :: Int .. ])
