@@ -425,15 +425,12 @@ data FunctionOpts = Public | Attribute String
 function :: Name -> Type -> [(Name,Type)] -> [FunctionOpts] -> Statement -> Function
 function n t as o s = F n t as o s
 
-travCollect' :: Monoid w => ((a -> Writer w a) -> a -> Writer w a) -> (a -> w) -> a -> w
-travCollect' fn col x = execWriter (f x) where
-    f x = tell (col x) >> fn f x
 
 drawFunction f = do
     frt <- draw (functionReturnType f)
     cenv <- ask
     let env = cenv { envUsedLabels = ul } where
-        ul = Set.fromList $ Seq.toList $ Seq.foldMap (travCollect' stmtMapStmt g) stseq
+        ul = Set.fromList $ Seq.toList $ Seq.foldMap (travCollect stmtMapStmt g) stseq
         St stseq = functionBody f
         g (SGoto n) = Seq.singleton n
         g s = mempty
