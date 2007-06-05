@@ -99,6 +99,7 @@ prettyExp vl (App t [a] _) | t == funcApply = vl <> keyword "apply" <+> prettyVa
 prettyExp vl (App t [a,b] _) | t == funcApply = vl <> keyword "apply" <+> prettyVal a <+> prettyVal b
 prettyExp vl (App a vs _)  = vl <> func (fromAtom a) <+> hsep (map prettyVal vs)
 prettyExp vl Prim { expPrimitive = APrim (Op (Op.BinOp bo _ _) _) _, expArgs = [x,y] } | Just (op,_) <- Op.binopInfix bo = vl <> prettyVal x <+> operator op <+> prettyVal y
+prettyExp vl Prim { expPrimitive = APrim (Op (Op.BinOp bo _ _) _) _, expArgs = [x,y] } = vl <> prettyVal x <+> char '`' <> tshow bo <> char '`' <+> prettyVal y
 prettyExp vl Prim { expPrimitive = APrim (Peek t) _, expArgs = [v] }  = vl <> prim (show t) <> char '[' <> prettyVal v <> char ']'
 prettyExp vl Prim { expPrimitive = ap, expArgs = vs } = vl <> prim (pprint ap) <+> hsep (map prettyVal vs)
 prettyExp vl (Update x y) = vl <> keyword "update" <+> prettyVal x <+> prettyVal y
