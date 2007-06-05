@@ -708,19 +708,23 @@ compileToGrin prog = do
             case t' of
                 True -> return grin
                 False -> opt s grin
+
     x <- deadCode stats (grinEntryPointNames x) x  -- XXX
-    lintCheckGrin x
+    x <- Grin.SSimplify.simplify x
+    --x <- transformGrin simplifyParms x
+
     x <- pushGrin x
     x <- opt "Optimization" x
     lintCheckGrin x
     x <- grinSpeculate x
     lintCheckGrin x
+
     x <- deadCode stats (grinEntryPointNames x) x  -- XXX
-    lintCheckGrin x
+    --x <- transformGrin simplifyParms x
+
     x <- opt "Optimization" x
-    lintCheckGrin x
+    --lintCheckGrin x
     x <- Grin.SSimplify.simplify x
---    x <- return $ normalizeGrin x
 
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
 
@@ -730,8 +734,7 @@ compileToGrin prog = do
     x <- createEvalApply x
     lintCheckGrin x
     x <- Grin.SSimplify.simplify x
-    --x <- return $ normalizeGrin x
-    --x <- unboxReturnValues x
+
     lintCheckGrin x
     x <- transformGrin devolveTransform x
     x <- opt "After Devolve Optimization" x
@@ -921,9 +924,6 @@ lintCheckProgram onerr prog | flint = do
 lintCheckProgram _ _ = return ()
 
 
-
-
-
 printCheckName' dataTable tvr e = do
     putErrLn (show $ tvrInfo tvr)
     putErrLn  ( render $ hang 4 (pprint tvr <+> equals <+> pprint e <+> text "::") )
@@ -931,16 +931,7 @@ printCheckName' dataTable tvr e = do
     putErrLn  ( render $ indent 4 (pprint ty))
 
 
-
-
 printESize :: String -> Program -> IO ()
 printESize str prog = putErrLn $ str ++ " program e-size: " ++ show (eSize (programE prog))
-
-
-
-
-
-
-
 
 

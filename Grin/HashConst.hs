@@ -36,6 +36,7 @@ newConst' fuzzy n = f n where
                 | otherwise = return $ Left (Tag t)
             g x@(Var (V n) _) | n < 0  = return $ Left x
             g (Const n) = liftM (Right . snd) $ f n
+            g n@NodeC {} = liftM (Right . snd) $ f n
             g e = error $ "HashConst.g: " ++ show e
         vs' <- mapM g vs
         let n = HcNode t vs'

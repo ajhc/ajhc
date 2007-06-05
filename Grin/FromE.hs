@@ -119,7 +119,7 @@ scTag n
 cafNum n = V $ - atomIndex (partialTag (scTag n) 0)
 
 toEntry (n,as,e) = f (scTag n) where
-        f x = (x,map (toType (TyPtr TyNode) . tvrType )  as,toTypes TyNode (getType (e::E) :: E))
+        f x = (x,map (toType tyINode . tvrType )  as,toTypes TyNode (getType (e::E) :: E))
 
 rawNameToTy :: Monad m => Name -> m Ty
 rawNameToTy n | RawType <- nameType n = return $ stringNameToTy (show n)
@@ -137,16 +137,18 @@ toType node = toty . followAliases mempty where
     toty e@(ELit LitCons { litName = n, litType = ty }) |  ty == eHash = case lookup n unboxedMap of
         Just x -> x
         Nothing -> error $ "Grin.FromE.toType: " ++ show e
+    toty e |  sortKindLike e = tyDNode
     toty _ = node
 
 toTypes :: Ty -> E -> [Ty]
 toTypes node = toty . followAliases mempty where
-    toty (ELit LitCons { litName = n, litArgs = es, litType = ty }) |  ty == eHash, TypeConstructor <- nameType n, Just _ <- fromUnboxedNameTuple n = ((keepIts $ map (toType (TyPtr TyNode) ) es))
+    toty (ELit LitCons { litName = n, litArgs = es, litType = ty }) |  ty == eHash, TypeConstructor <- nameType n, Just _ <- fromUnboxedNameTuple n = keepIts $ map (toType tyINode) es
     toty (ELit LitCons { litName = n, litArgs = [], litType = ty }) |  ty == eHash, Just t <- rawNameToTy n = [t]
     toty e@(ELit LitCons { litName = n, litType = ty }) |  ty == eHash = case lookup n unboxedMap of
         Just TyUnit -> []
         Just x -> [x]
         Nothing -> error $ "Grin.FromE.toType: " ++ show e
+    toty e |  sortKindLike e = [tyDNode]
     toty _ = [node]
 
 toTyTy (as,r) = tyTy { tySlots = as, tyReturn = r }
@@ -225,7 +227,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
     where
     scMap = fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- progCombinators prog]
     initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ concat [ makePartials (a,b,c) | (_,(a,b,c)) <-  massocs scMap] ++ concat [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
-    con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = return $ (tagArrow,toTyTy ([TyPtr TyNode, TyPtr TyNode],[TyNode]))
+    con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = return $ (tagArrow,toTyTy ([tyDNode, tyDNode],[TyNode]))
     con c | keepCon = return $ (n,TyTy { tyThunk = TyNotThunk, tySlots = keepIts as, tyReturn = [TyNode], tySiblings = fmap (map convertName) sibs}) where
         n | sortKindLike (conType c) = convertName (conName c)
           | otherwise = convertName (conName c)
@@ -263,8 +265,8 @@ makePartials (fn,ts,rt) | 'f':_ <- show fn = (fn,toTyTy (keepIts ts,rt)):f undef
 makePartials x = error "makePartials"
 
 primTyEnv = TyEnv . Map.map toTyTy $ Map.fromList $ [
-    (tagArrow,([TyPtr TyNode, TyPtr TyNode],[TyNode])),
-    (funcEval, ([TyPtr TyNode],[TyNode])),
+    (tagArrow,([tyDNode, tyDNode],[TyNode])),
+    (funcEval, ([tyINode],[tyDNode])),
     (tagHole, ([],[TyNode]))
     ]
 
@@ -297,7 +299,8 @@ constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans wh
     conv (EVar v) | v `Set.member` lbs = Var (cafNum v) (TyPtr TyNode)
     conv e | (EVar x,as) <- fromAp e, Just vs <- mlookup x res, vs > length as = Const (NodeC (partialTag (scTag x) (vs - length as)) (keepIts $ map conv as))
     conv (EVar v) | Just ce <- mlookup v coMap = ce
-    conv (EVar v) = Var (cafNum v) (TyPtr TyNode)
+    conv e@(EVar v) | isLifted e = Var (cafNum v) tyINode
+                    | otherwise = Var (cafNum v) tyDNode
     conv x = error $ "conv: " ++ show x
     getName = getName' dataTable
 
@@ -328,6 +331,8 @@ doApply x y ty = App funcApply [x,y] ty
 
 evalVar :: [Ty] -> TVr -> C Exp
 evalVar fty tvr  = do
+    let v = toVal tvr
+    if getType v == tyDNode then return $ Return [v] else do
     em <- asks evaledMap
     case mlookup (tvrIdent tvr) em of
         Just v -> do
@@ -359,7 +364,8 @@ compile' cenv (tvr,as,e) = ans where
         return (Return $ keepIts [toVal tvr])
     ce (EVar tvr) | not $ isLifted (EVar tvr)  = do
         mtick "Grin.FromE.strict-unlifted"
-        return (Fetch (toVal tvr))
+        return (Return $ keepIts [toVal tvr])
+        --return (Fetch (toVal tvr))
     ce e | (EVar tvr,as) <- fromAp e = do
         as <- return $ args as
         lfunc <- asks lfuncMap
@@ -380,7 +386,7 @@ compile' cenv (tvr,as,e) = ans where
                         return $ Return [NodeC pt (keepIts as)]
                 Nothing | not (isLifted $ EVar tvr) -> do
                     mtick "Grin.FromE.app-unlifted"
-                    app fty (Fetch $ toVal tvr) as
+                    app fty (Return [toVal tvr]) as
                 Nothing -> do
                     case as of
                         [] -> evalVar fty tvr
@@ -395,14 +401,6 @@ compile' cenv (tvr,as,e) = ans where
 
     ce (EPrim ap@(APrim (PrimPrim prim) _) as _) = f (unpackPS prim) as where
 
-        -- holes - are these still useful?
---        f "newHole__" [_] = do
---            let var = Var v2 (TyPtr TyNode)
---            return $ Store (NodeC (toAtom "@hole") []) :>>= var :-> Return (tuple [var])
---        f "fillHole__" [r,v,_] = do
---            let var = Var v2 TyNode
---                [r',v'] = args [r,v]
---            return $ gEval v' :>>= n1 :-> Update r' n1
 
         -- artificial dependencies
         f "newWorld__" [_] = do
@@ -413,7 +411,6 @@ compile' cenv (tvr,as,e) = ans where
         -- references
         f "newRef__" [v,_] = do
             let [v'] = args [v]
-            --return $ Store v'
             return $ Alloc { expValue = v', expCount = toUnVal (1::Int), expRegion = region_heap, expInfo = mempty }
         f "readRef__" [r,_] = do
             let [r'] = args [r]
@@ -471,9 +468,6 @@ compile' cenv (tvr,as,e) = ans where
                 return $ Prim ap (args xs) ty'
             Op (Op.ConvOp _ a1) rt -> do
                 return $ Prim ap (args xs) ty'
-    --        Operator n as r | Just _ <- fromRawType ty -> do
-    --            let p = prim { primType = ((map (Ty . toAtom) as),Ty (toAtom r)) }
-    --            return $ Prim p (args xs)
             other -> fail $ "ce unknown primitive: " ++ show other
 
     -- case statements
@@ -508,10 +502,14 @@ compile' cenv (tvr,as,e) = ans where
                 as <- mapM cp as
                 def <- createDef d newNodeVar
                 return $ e :>>= [v] :-> Case v (as ++ def)
-            (_,_) -> localEvaled [b] v $ do
+            (_,_) | isLifted scrut -> localEvaled [b] v $ do
                     as <- mapM cp as
                     def <- createDef d newNodeVar
                     return $ e :>>= [v] :-> Store v :>>= [toVal b] :-> Case v (as ++ def)
+            (_,_) | otherwise -> do
+                    as <- mapM cp as
+                    def <- createDef d newNodeVar
+                    return $ e :>>= [toVal b] :-> Case v (as ++ def)
     ce e = error $ "ce: " ++ render (pprint (funcName,e))
 
     localEvaled vs v action = local (\lenv -> lenv { evaledMap = nm `mappend` evaledMap lenv }) action where
@@ -551,20 +549,6 @@ compile' cenv (tvr,as,e) = ans where
         v <- newNodeVar
         app ty (e :>>= [v] :-> doApply v a [TyNode]) as
 
---    app' (Const (NodeC t cs)) (a:as) | tagIsPartialAp t = do
---        let Just (n,frs) = tagUnfunction t
---            lazy = do
---                mtick "Grin.FromE.lazy-app-const"
---                app' (Const (NodeC (partialTag frs (n - 1)) (cs ++ [a]))) as
---        case a of
---            Const {} -> lazy
---            Lit {} -> lazy
---            Var (V n) _ | n < 0 -> lazy
---            _ -> do
---                mtick "Grin.FromE.lazy-app-store"
---                tpv <- newNodePtrVar
---                x <- app' tpv as
---                return $ Store  (NodeC (partialTag frs (n - 1)) (cs ++ [a])) :>>= tpv :-> x
     app' e [] = return $ Return [e]
     app' e as = do
         mtick "Grin.FromE.lazy-app-bap"
@@ -588,7 +572,7 @@ compile' cenv (tvr,as,e) = ans where
     cc (EPrim (APrim (PrimPrim don) _) [e,_] _) | don == packString "dependingOn" = cc e
     cc e | Just _ <- literal e = error "unboxed literal in lazy context"
     cc e | Just z <- constant e = return (Return $ keepIts [z])
-    cc e | Just [z] <- con e = return (Store z)
+    cc e | Just [z] <- con e = return $ if isLifted e then Store z else Return [z]
     cc (EError s e) = do
         let ty = toTypes TyNode e
         a <- liftIO $ runOnceMap (errorOnce cenv) (ty,s) $ do
@@ -636,7 +620,7 @@ compile' cenv (tvr,as,e) = ans where
             e <- ce e
             z <- newNodeVar
             v <- localEvaled [t] z $ f ds x
-            return $ (e :>>= [z] :-> Store z) :>>= [toVal t] :-> v
+            return $ (e :>>= [z] :-> Return [z]) :>>= [toVal t] :-> v
         f (Left (t,e):ds) x = do
             e <- cc e
             v <- f ds x
@@ -693,11 +677,13 @@ compile' cenv (tvr,as,e) = ans where
     constant :: Monad m =>  E -> m Val
     constant (EVar tvr) | Just c <- mlookup (tvrIdent tvr) (ccafMap cenv) = return c
                         | Just (v,as,_) <- mlookup (tvrIdent tvr) (scMap cenv)
-                         , t <- partialTag v (length as), tagIsWHNF t = return $ Const $ NodeC t []
+                         , t <- partialTag v (length as), tagIsWHNF t = if isLifted (EVar tvr) then return $ Const $ NodeC t [] else return (NodeC t [])
     --                        False -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
     constant e | Just [l] <- literal e = return l
-    constant (ELit lc@LitCons { litName = n, litArgs = es }) | Just es <- mapM constant es, Just nn <- getName lc = (return $ Const (NodeC nn (keepIts es)))
-    constant (EPi (TVr { tvrIdent = 0, tvrType = a}) b) | Just a <- constant a, Just b <- constant b = return $ Const $ NodeC tagArrow [a,b]
+    constant e@(ELit lc@LitCons { litName = n, litArgs = es }) | Just es <- mapM constant es, Just nn <- getName lc = if isLifted e
+        then return $ Const (NodeC nn (keepIts es))
+        else return (NodeC nn (keepIts es))
+    constant (EPi (TVr { tvrIdent = 0, tvrType = a}) b) | Just a <- constant a, Just b <- constant b = return $ NodeC tagArrow [a,b]
     constant _ = fail "not a constant term"
 
     -- | convert a constructor into a Val, arguments may depend on local vars.
