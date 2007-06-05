@@ -83,7 +83,7 @@ simplify1 stats env (n,l) = do
 --    gs (Prim Primitive { primAPrim = APrim CCast {} _, primType = (_,nty) } [Lit i _]) = do
 --        lift $ tick stats at_OptSimplifyCastLit
 --        return $ Return (Lit i nty)
-    gs (Store n) | valIsNF n, not (valIsMutable n) = do
+    gs (Store n) | valIsNF n = do
         lift $ tick stats at_OptSimplifyConstStore
         gs (Return [Const n])
 --    gs (App a [n@NodeC {},v] typ) | a == funcApply = do
@@ -117,12 +117,6 @@ simplify1 stats env (n,l) = do
     gv ([NodeC t xs],Return [(NodeC t' xs')]) | t /= t' = do
             lift $ tick stats at_OptSimplifyBadAssignment
             gv (xs,Error ("Bad Assignment: " ++ show (t,t')) (map getType xs))
---    gv (NodeV v [],Return (NodeC t' [])) = do
---            lift $ tick stats at_OptSimplifyEnumAssignment
---            gv (Var v TyTag, Return (Tag t'))
---    gv (NodeV v [],Return (NodeV v' [])) = do
---            lift $ tick stats at_OptSimplifyEnumAssignment
---            gv (Var v TyTag, Return (Var v' TyTag))
     gv (p,e) = do
         (env,_) <- get
         e <- (applySubstE env e)
@@ -201,7 +195,6 @@ varBind :: Monad m => Val -> Val -> m (Map.Map Var Val)
 varBind (Var v t) nv@(Var v' t') | t == t' = return $ Map.singleton v nv
 varBind (Lit i t) (Lit i' t') | i == i' && t == t' = return mempty
 --varBind (Tup xs) (Tup ys) | length xs == length ys  = liftM mconcat $ sequence $  zipWith varBind xs ys
-varBind (Tag i) (Tag i') | i == i' = return mempty
 varBind (NodeC t vs) (NodeC t' vs') | t == t' = do
     liftM mconcat $ sequence $  zipWith varBind vs vs'
 varBind v r | (getType v) == (getType r)  = fail "unvarBindable"    -- check type to be sure
@@ -212,7 +205,6 @@ varBind' :: Monad m => Val -> Val -> m (Map.Map Var Val)
 varBind' (Var v t) nv | t == getType nv = return $ Map.singleton v nv
 varBind' (Lit i t) (Lit i' t') | i == i' && t == t' = return mempty
 --varBind' (Tup xs) (Tup ys) | length xs == length ys  = liftM mconcat $ sequence $  zipWith varBind' xs ys
-varBind' (Tag i) (Tag i') | i == i' = return mempty
 varBind' (NodeC t vs) (NodeC t' vs') | t == t' = do
     liftM mconcat $ sequence $  zipWith varBind' vs vs'
 varBind' v r | (getType v) == (getType r)  = fail "unvarBind'able"    -- check type to be sure
@@ -241,7 +233,6 @@ isCombinable postEval e = ans where
     equal [] = fail "empty isCombinable"
     equal [x] = return x
     equal (x:y:rs) = if x == y then equal (y:rs) else fail "not equal"
---    f lf (Return (NodeV t [])) | postEval = return [UnboxTag]
 --    f lf (Return (NodeC t [])) | postEval = return [UnboxTag]
     f lf (Return [z]) | valIsConstant z = return [UnboxConst z]
     f lf (Return [NodeC t xs]) = return [UnboxTup (t,map getType xs)]
@@ -264,7 +255,6 @@ isCombinable postEval e = ans where
 
 combineLam postEval nty (p :-> e) = p :-> combine postEval nty e where
 combine postEval nty exp = editTail nty f exp where
---    f (Return (NodeV t [])) = Return (Var t TyTag)
 --    f (Return (NodeC t [])) | postEval  = Return (Tag t)
     f (Return v) | all valIsConstant v  = Return []
     f (Return [NodeC t xs]) = Return xs
@@ -286,7 +276,6 @@ editTail nty mt te = f mempty te where
     g lf (p :-> e) = p :-> f lf e
 
 
-isKnown Tag {} = True
 isKnown NodeC {} = True
 isKnown Lit {} = True
 isKnown _ = False
@@ -307,9 +296,6 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
 --        mtick "Optimize.optimize.case-pullin"
 --        return (Case e (map (mapExp (:>>= lam)) as))
 --    f (Return t@NodeC {} :>>= v@Var {} :-> Update w v' :>>= lr) | v == v' = do
---        mtick "Optimize.optimize.return-update"
---        f (Return t :>>= v :-> Update w t :>>= lr)
---    f (Return t@NodeV {} :>>= v@Var {} :-> Update w v' :>>= lr) | v == v' = do
 --        mtick "Optimize.optimize.return-update"
 --        f (Return t :>>= v :-> Update w t :>>= lr)
     f (e :>>= v1 :-> Return v2) | (all isVar v1) && v1 == v2 = do
@@ -545,13 +531,6 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
             f (([Lit l' _] :-> b):_) | l == l' = b
             f (_:as) = f as
         return $ f as
---    knownCase (Tag t) as = do
---        mtick $ "Optimize.optimize.known-case-tag.{" ++ show t
---        let f [] =  Error "known-case: No known case" (getType (Case (Tag t) as))
---            f ((v@[Var {}] :-> b):_) = Return (Tag t) :>>= v :-> b
-----            f ((Tag t' :-> b):_) | t == t' = b
---            f (_:as) = f as
---        return $ f as
 --    caseCombine x as as' = do
 --        mtick $ "Optimize.optimize.case-combine"
 --        let etags = [ bd | bd@(NodeC t _ :-> _) <- as, t `notElem` [ t | NodeC t _ :-> _ <- as' ] ]

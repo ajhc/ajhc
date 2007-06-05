@@ -208,15 +208,6 @@ applySubst env x = f x where
         vs' <- mapM f vs
         return $ NodeC t vs'
     f (Index a b) = return Index `ap` f a `ap` f b
---    f (Tup vs) = do
---        vs' <- mapM f vs
---        return $ Tup vs'
-    f (NodeV t vs) | Just (Var t' _) <- Map.lookup t env = do
-        vs' <- mapM f vs
-        return $ NodeV t' vs'
-    f (NodeV t vs) = do
-        vs' <- mapM f vs
-        return $ NodeV t vs'
     f x = return x
 
 renamePattern :: MonadState (WhizState) m => [Val] ->  m ([Val],WhizEnv)
@@ -231,14 +222,6 @@ renamePattern x = runWriterT (mapM f x) where
         vs' <- mapM f vs
         return $ NodeC t vs'
     f (Index a b) = return Index `ap` f a `ap` f b
---    f (Tup vs) = do
---        vs' <- mapM f vs
---        return $ Tup vs'
-    f (NodeV t vs) = do
-        t' <- lift $ newVarName t
-        tell (Map.singleton t (Var t' TyTag))
-        vs' <- mapM f vs
-        return $ NodeV t' vs'
     f x = return x
 
 newVarName :: MonadState WhizState m => Var -> m Var

@@ -146,7 +146,6 @@ convertVals xs = do
     return (structAnon (zip xs ts))
 
 convertVal :: Val -> C Expression
---convertVal (Tup [x]) = convertVal x
 convertVal v | Just e <- convertConst v = return e
 convertVal (Var v ty) = fetchVar v ty
 convertVal (Const h) = do
@@ -164,11 +163,6 @@ convertVal h@(NodeC a ts) | valIsConstant h = do
             (_,i) <- newConst h
             return $ f_PROMOTE (variable (name $  'c':show i ))
 
---convertVal (Tup xs) = do
---    ts <- mapM convertType (map getType xs)
---    xs <- mapM convertVal xs
---    return (structAnon (zip xs ts))
-convertVal (Tag t) = do tellTags t ; return $ constant (enum $ nodeTagName t)
 convertVal (ValPrim (APrim p _) [x] (TyPrim opty)) = do
     x' <- convertVal x
     case p of
@@ -190,17 +184,10 @@ convertTypes xs = do
     xs <- mapM convertType xs
     return (anonStructType xs)
 
-convertType TyTag = return tag_t
 convertType TyNode = return wptr_t
 convertType (TyPtr TyNode) = return sptr_t
 convertType (TyPtr (TyPtr TyNode)) = return $ ptrType sptr_t
-convertType (Ty t) = return (basicType (toString t))
 convertType (TyPrim opty) = return (opTyToC opty)
---convertType (TyTup []) = return voidType
---convertType (TyTup [x]) = convertType x
---convertType (TyTup xs) = do
---    xs <- mapM convertType xs
---    return (anonStructType xs)
 
 forceHint _ Op.TyBool = Op.TyBool
 forceHint h (Op.TyBits b _) = Op.TyBits b h
@@ -247,10 +234,6 @@ convertBody (e :>>= [] :-> e') = do
     ss' <- convertBody e'
     return (ss & ss')
 convertBody (Return [v] :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
-convertBody (Return [v] :>>= [(NodeV t [])] :-> e') = do
-    v' <- convertVal v
-    t' <- convertVal (Var t TyTag)
-    return $ t' =* getWhat v'
 convertBody (Fetch v :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
 convertBody (Case v@(Var _ ty) [[p1@(NodeC t _)] :-> e1,[p2] :-> e2]) | ty == TyNode = do
     scrut <- convertVal v
@@ -281,15 +264,12 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t _)] :-> e1,[p2] :-> e2]) | ty == Ty
 convertBody (Case v@Var {} [v1, v2@([Lit n _] :-> _)]) | n == 0 = convertBody (Case v [v2,v1])
 convertBody (Case v@(Var _ t) [[p1] :-> e1, [p2] :-> e2]) | Set.null ((freeVars p2 :: Set.Set Var) `Set.intersection` freeVars e2) = do
     scrut <- convertVal v
-    let ptrs = [Ty $ toAtom "HsPtr", Ty $ toAtom "HsFunPtr"]
-        scrut' = (if t `elem` ptrs then cast uintptr_t scrut else scrut)
-        cp (Lit i _) = constant (number $ fromIntegral i)
-        cp (Tag t) = constant (enum (nodeTagName t))
+    let cp (Lit i _) = constant (number $ fromIntegral i)
         am e | isVar p2 = e
-             | otherwise = annotate (show p2) (f_assert ((cp p2) `eq` scrut') & e)
+             | otherwise = annotate (show p2) (f_assert ((cp p2) `eq` scrut) & e)
     e1' <- convertBody e1
     e2' <- convertBody e2
-    return $ profile_case_inc & cif (cp p1 `eq` scrut') e1' (am e2')
+    return $ profile_case_inc & cif (cp p1 `eq` scrut) e1' (am e2')
 convertBody (Case v@(Var _ t) ls) | t == TyNode = do
     scrut <- convertVal v
     let tag = getWhat scrut
@@ -315,21 +295,16 @@ convertBody (Case v@(Var _ t) ls) | t == TyNode = do
     return $ profile_case_inc & switch' tag ls'
 convertBody (Case v@(Var _ t) ls) = do
     scrut <- convertVal v
-    let ptrs = [Ty $ toAtom "HsPtr", Ty $ toAtom "HsFunPtr"]
-        scrut' = (if t `elem` ptrs then cast uintptr_t scrut else scrut)
-        da ([v@(Var {})] :-> e) = do
+    let da ([v@(Var {})] :-> e) = do
             v'' <- convertVal v
             e' <- convertBody e
             return (Nothing,v'' =* scrut & e')
         da ([(Lit i _)] :-> e) = do
             e' <- convertBody e
             return $ (Just (number $ fromIntegral i), e')
-        da ([Tag t] :-> e) = do
-            e' <- convertBody e
-            return $ (Just (enum (nodeTagName t)), e')
         --da (~[x] :-> e) = da ( x :-> e )
     ls' <- mapM da ls
-    return $ profile_case_inc & switch' scrut' ls'
+    return $ profile_case_inc & switch' scrut ls'
 convertBody (Error s t) = do
     x <- asks rTodo
     let jerr | null s    = expr $ functionCall (name "jhc_exit") [constant $ number 255]
@@ -337,7 +312,6 @@ convertBody (Error s t) = do
     let f (TyPtr _) = return nullPtr
         f TyNode = return nullPtr
         f (TyPrim x) = return $ cast (opTyToC x) (constant $ number 0)
-        f TyTag  = return $ constant (enum $ nodeTagName tagHole)
         f x = return $ err ("error-type " ++ show x)
         g [] = return emptyExpression
         g [x] = f x
@@ -520,9 +494,6 @@ convertConst (Const (NodeC h _)) | h == tagHole = return (cast sptr_t (f_VALUE (
 convertConst (Lit i (TyPrim Op.TyBool)) = return $ if i == 0 then constant cFalse else constant cTrue
 convertConst (Lit i (TyPrim (Op.TyBits _ Op.HintFloat))) = return (constant $ floating (realToFrac i))
 convertConst (Lit i _) = return (constant $ number (fromIntegral i))
---convertConst (Tup [x]) = convertConst x
---convertConst (Tup []) = return emptyExpression
-convertConst (Tag t) = return $ constant (enum $ nodeTagName t)
 convertConst (ValPrim (APrim p _) [] _) = case p of
     CConst s _ -> return $ expressionRaw s
     AddrOf t -> return $ expressionRaw ('&':unpackPS t)

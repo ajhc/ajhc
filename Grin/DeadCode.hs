@@ -78,12 +78,6 @@ deadCode stats roots grin = do
             ts' <- mconcatMapM da (zip ts naturals)
             return [(x,tyty { tySlots = ts' })]
         _ -> return [(x,tyty)]
-    let --newArgTags = concatMap foo (Map.toList $ grinArgTags grin)
-        foo (fn,ts) | not $ fn `Set.member` funSet = []
-        foo (fn,ts) | fn `Set.member` directFuncs = [(fn,concatMap da (zip ts naturals))] where
-            da (t,i) | Set.member (fn,i) argSet = [t]
-                     | otherwise =  []
-        foo (fn,ts) = [(fn,ts)]
 
     return $ setGrinFunctions newFuncs grin {
         grinCafs = newCafs,
@@ -156,7 +150,6 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,as :-> b
             doConst (Const n) = doNode n
 --            doConst (Tup ns) = mconcatMap doConst ns
             doConst (NodeC n as) = mconcatMap doConst as
-            doConst (NodeV n as) = mconcatMap doConst as
             doConst _ = mempty
 
         (nl,_) <- whiz (\_ -> id) h' f whizState (as :-> body)
@@ -202,15 +195,9 @@ removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps
     clearCaf (Var v (TyPtr TyNode)) | deadCaf v = do
         mtick $ toAtom "Optimize.dead-code.caf-arg"
         return (properHole (TyPtr TyNode))
---    clearCaf (Tup xs) = do
---        xs <- mapM clearCaf xs
---        return $ Tup xs
     clearCaf (NodeC a xs) = do
         xs <- mapM clearCaf xs
         return $ NodeC a xs
-    clearCaf (NodeV a xs) = do
-        xs <- mapM clearCaf xs
-        return $ NodeV a xs
     clearCaf (Index a b) = return Index `ap` clearCaf a `ap` clearCaf b
     clearCaf (Const a) = Const `liftM` clearCaf a
     clearCaf x = return x

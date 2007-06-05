@@ -182,16 +182,12 @@ tcExp e = f e where
 
 tcVal :: Val -> Tc Ty
 tcVal v = f v where
-    f (Tag _) = return TyTag
     f e@(Var v t) = do
         s <- asks envInScope
         case v `member` s of
             True -> return t
             False -> fail $ "variable not in scope: " ++ show e
     f (Lit _ t) = return t
-    f (NodeV _v as) = do
-        mapM_ f as
-        return TyNode
     f Unit = return TyUnit
     f (Const t) = do
         v <- f t

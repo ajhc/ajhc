@@ -15,6 +15,7 @@ import Name.VConsts
 import Name.Names
 import Name.Name
 import Number
+import qualified C.Op as Op
 
 nil      = convertName dc_EmptyList
 cons     = convertName dc_Cons
@@ -58,7 +59,7 @@ instance  ToVal (Val,Val) where
 
 instance ToVal Char where
     toVal c = NodeC cChar [toUnVal c]
-    toUnVal c =   Lit (fromIntegral $ ord c) (Ty cChar)
+    toUnVal c =   Lit (fromIntegral $ ord c) tIntzh
 instance ToVal Int where
     toVal c = NodeC cInt [toUnVal c]
     toUnVal c =  Lit (fromIntegral c) tIntzh

@@ -31,9 +31,6 @@ newConst' fuzzy n = f n where
             g vp@(ValPrim _ _ ty)
                 | fuzzy = return $ Left (Lit 0 ty)
                 | otherwise = return $ Left vp
-            g (Tag t)
-                | fuzzy = return $ Left (Tag tagHole)
-                | otherwise = return $ Left (Tag t)
             g x@(Var (V n) _) | n < 0  = return $ Left x
             g (Const n) = liftM (Right . snd) $ f n
             g n@NodeC {} = liftM (Right . snd) $ f n

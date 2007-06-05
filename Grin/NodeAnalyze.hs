@@ -266,7 +266,6 @@ doFunc (name,arg :-> body) = ans where
     convertVal (Var v t) = return $ Left (vr v t)
     convertVal v | isGood v = return $ Right (N Lazy Top)
     convertVal Lit {} = return $ Left VIgnore
-    convertVal Tag {} = return $ Left VIgnore
     convertVal ValPrim {} = return $ Left VIgnore
     convertVal Index {} = return $ Left VIgnore
     convertVal Item {} = return $ Left VIgnore

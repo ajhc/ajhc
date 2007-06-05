@@ -6,12 +6,8 @@ module Grin.Grin(
     FuncDef(..),
     FuncProps(..),
     Grin(..),
-    --HeapType(..),
     TyThunk(..),
---    HeapValue(HV),
---    Item(..),
     Lam(..),
---    NodeValue(NV),
     Phase(..),
     Tag,
     updateFuncDefProps,
@@ -24,7 +20,6 @@ module Grin.Grin(
     extendTyEnv,
     createFuncDef,
     setGrinFunctions,
---    combineItems,
     grinFuncs,
     emptyGrin,
     tyINode,
@@ -39,7 +34,6 @@ module Grin.Grin(
     isHole,
     isValUnknown,
     isVar,
---    itemTag,
     n0,n1,n2,n3,
     p0,p1,p2,p3,
     partialTag,
@@ -55,7 +49,6 @@ module Grin.Grin(
     tagToFunction,
     tagUnfunction,
     v0,v1,v2,v3,lamExp,lamBind,
---    valToItem,
     valIsNF
     ) where
 
@@ -188,8 +181,6 @@ data Exp =
 
 data Val =
     NodeC !Tag [Val]          -- ^ Complete node with constant tag
-    | NodeV !Var [Val]        -- ^ Complete node with variable tag
-    | Tag !Tag                -- ^ Single tag
     | Const Val               -- ^ pointer to constant data, only Lit, Tag, and NodeC may be children
     | Lit !Number Ty          -- ^ Literal
     | Var !Var Ty             -- ^ Variable
@@ -201,10 +192,8 @@ data Val =
     deriving(Eq,Ord)
 
 data Ty =
-    TyTag                      -- ^ a lone tag
-    | TyPtr Ty                 -- ^ pointer to a heap location which contains its argument
+    TyPtr Ty                 -- ^ pointer to a heap location which contains its argument
     | TyNode                   -- ^ a whole tagged node
-    | Ty Atom                  -- ^ a basic type
     | TyPrim Op.Ty             -- ^ a basic type
     | TyUnit                   -- ^ type of Unit
     | TyCall Callable [Ty] [Ty]  -- ^ something call,jump, or cut-to-able
@@ -264,8 +253,6 @@ funcProps = FuncProps {
 
 
 instance Show Ty where
-    show TyTag = "T"
-    show (Ty a) = fromAtom a
     show TyNode = "N"
     show (TyPtr t) = '&':show t
     show (TyUnit) = "()"
@@ -279,16 +266,22 @@ instance Show Val where
     -- showsPrec _ s | Just st <- fromVal s = text $ show (st::String)
     showsPrec _ (NodeC t []) = parens $ (fromAtom t)
     showsPrec _ (NodeC t vs) = parens $ (fromAtom t) <+> hsep (map shows vs)
-    showsPrec _ (NodeV (V i) vs) = parens $ char 't' <> tshow i <+> hsep (map shows vs)
-    showsPrec _ (Tag t) = (fromAtom t)
     showsPrec _ (Index v o) = shows v <> char '[' <> shows o <> char ']'
     showsPrec _ (Var (V i) t)
-        | TyPtr t <- t = char 'p' <> shows (Var (V i) t)
-        | TyNode <- t = char 'n' <> tshow i
-        | t == tCharzh = char 'c' <> tshow i
-        | t == tIntzh  = char 'i' <> tshow i
-        | Ty _ <- t  = char 'l' <> tshow i
-        | TyTag <- t  = char 't' <> tshow i
+        | TyPtr TyNode <- t = text "ni" <> tshow i
+        | TyNode <- t = text "nd" <> tshow i
+        | TyPtr (TyPtr TyNode) <- t = text "np" <> tshow i
+        | TyPrim Op.TyBool <- t  = char 'b' <> tshow i
+        | TyPrim (Op.TyBits _ Op.HintFloat) <- t  = char 'f' <> tshow i
+        | TyPrim (Op.TyBits _ Op.HintCharacter) <- t  = char 'c' <> tshow i
+        | TyPrim (Op.TyBits (Op.Bits 8)  _) <- t  = char 'o' <> tshow i      -- octet
+        | TyPrim (Op.TyBits (Op.Bits 16)  _) <- t  = char 'h' <> tshow i     -- half
+        | TyPrim (Op.TyBits (Op.Bits 32)  _) <- t  = char 'w' <> tshow i     -- word
+        | TyPrim (Op.TyBits (Op.Bits 64)  _) <- t  = char 'd' <> tshow i     -- doubleword
+        | TyPrim (Op.TyBits (Op.Bits 128)  _) <- t  = char 'q' <> tshow i    -- quadword
+        | TyPrim (Op.TyBits (Op.BitsArch Op.BitsPtr)  _) <- t  = char 'p' <> tshow i
+        | TyPrim (Op.TyBits (Op.BitsArch Op.BitsMax)  _) <- t  = char 'm' <> tshow i
+        | TyPrim (Op.TyBits _ _) <- t  = char 'l' <> tshow i
         | otherwise = char 'v' <> tshow i
     showsPrec _ (Lit i t) | t == tCharzh, Just x <- toIntegral i = tshow (chr x)
     showsPrec _ (Lit i _)  = tshow i
@@ -404,19 +397,16 @@ tagIsWHNF t
     where t' = fromAtom t
 
 valIsNF (NodeC t vs) = tagIsWHNF t && all valIsNF vs
-valIsNF (Tag _) = True
 valIsNF Const {} = True
 valIsNF Lit {} = True
 valIsNF _ = False
 
 properHole x = case x of
     TyPtr TyNode -> Const (properHole TyNode)
-    TyTag -> (Tag tagHole)
-    ty@(Ty _) -> (Lit 0 ty)
     ty@(TyPrim _) -> (Lit 0 ty)
     ~TyNode -> (NodeC tagHole [])
 
-isHole x = x `elem` map properHole [TyPtr TyNode, TyNode, TyTag]
+isHole x = x `elem` map properHole [TyPtr TyNode, TyNode]
 
 isValUnknown ValUnknown {} = True
 isValUnknown _ = False
@@ -479,11 +469,9 @@ instance CanType Exp [Ty] where
     getType MkClosure { expType = ty } = ty
 
 instance CanType Val Ty where
-    getType (Tag _) = TyTag
     getType (Var _ t) = t
     getType (Lit _ t) = t
     getType (Index v _) = getType v
-    getType (NodeV {}) = TyNode
     getType Unit = TyUnit
     getType (Const t) = TyPtr (getType t)
     getType (NodeC {}) = TyNode
@@ -501,7 +489,6 @@ instance  FreeVars Exp (Set.Set Var,Set.Set Tag) where
 
 instance FreeVars Val (Set.Set Var) where
     freeVars (NodeC t xs) = freeVars xs
-    freeVars (NodeV v xs) = Set.insert v $ freeVars xs
     freeVars (Const v) = freeVars v
     freeVars (Index a b) = freeVars (a,b)
     freeVars (Var v _) = Set.singleton v
@@ -509,7 +496,6 @@ instance FreeVars Val (Set.Set Var) where
 
 instance FreeVars Val (Set.Set (Var,Ty)) where
     freeVars (NodeC t xs) = freeVars xs
-    freeVars (NodeV v xs) = Set.insert (v,TyTag) $ freeVars xs
     freeVars (Const v) = freeVars v
     freeVars (Index a b) = freeVars (a,b)
     freeVars (Var v t) = Set.singleton (v,t)
@@ -567,9 +553,7 @@ instance FreeVars Lam [Var] where
 
 instance FreeVars Val (Set.Set Tag) where
     freeVars (NodeC t xs) = Set.singleton t `Set.union` freeVars xs
-    freeVars (NodeV _ xs) = freeVars xs
     freeVars (Index a b) = freeVars (a,b)
-    freeVars (Tag t) = Set.singleton t
     freeVars (Const v) = freeVars v
     freeVars _ = Set.empty
 
@@ -601,85 +585,12 @@ instance FreeVars Exp (Set.Set Tag) where
     freeVars MkCont { expCont = v, expLam = as} = freeVars (v,as)
 
 
--- Points to information
-{-
-
-data HeapType = Constant | SharedEval | UnsharedEval | Reference | RecursiveThunk
-    deriving(Eq,Ord)
-
-
-data Item = HeapValue (Set.Set HeapValue) | NodeValue (Set.Set NodeValue) | BasicValue Ty | TupledValue [Item]
-    deriving(Ord,Eq)
-data HeapValue = HV Int (Either (HeapType,Item) Val)  -- either a heap location or a constant
-data NodeValue = NV Tag [Item]
-    deriving(Ord,Eq)
-
-valToItem (Index v _) = valToItem v
-valToItem (Const v) = HeapValue (Set.singleton (HV (-1) (Right v)))
-valToItem (NodeC t as) = NodeValue (Set.singleton (NV t (map valToItem as)))
-valToItem (Lit _ ty) = BasicValue ty
---valToItem (Tup as) = TupledValue (map valToItem as)
-valToItem ~(Tag _) = BasicValue TyTag
-
-itemTag = BasicValue TyTag
-
-instance CanType Item Ty where
-    getType (HeapValue _) = TyPtr TyNode
-    getType NodeValue {} = TyNode
-    getType (BasicValue ty) = ty
---    getType (TupledValue xs) = TyTup (map getType xs)
-
-
--- heap locations are given a unique integer to break cycles.
-instance Eq HeapValue where
-    (HV x _) == (HV y _) = x == y
-instance Ord HeapValue where
-    compare (HV x _) (HV y _) = compare x y
-
-combineItem :: Item -> Item -> Item
-combineItem (BasicValue ty) (BasicValue ty') | ty == ty' = BasicValue ty
-combineItem (HeapValue s1) (HeapValue s2) = HeapValue (Set.union s1 s2)
-combineItem ~(NodeValue ns1) ~(NodeValue ns2) = NodeValue ns where
-    ns2map = Map.fromAscList [ (t,NV t as)| NV t as <- (Set.toAscList ns2)]
-    ns = Set.fromAscList [ NV t1 (zipWith combineItem as1 as2) | NV t1 as1 <- Set.toAscList ns1, NV _ as2 <- Map.lookup t1 ns2map  ] `Set.union` ns1
-
-combineItems :: [Item] -> Item
-combineItems [] = error "cannot combine no items"
-combineItems xs = foldl1 combineItem xs
-
-
-instance Tuple Val where
-    tupleMany vs = Tup vs
-
-instance Tuple Ty where
-    tupleMany ts = TyTup ts
-
-
-instance FromTuple Val where
-    fromTuple (Tup vs) = vs
-    fromTuple v = [v]
-
-instance FromTuple Ty where
-    fromTuple (TyTup ts) = ts
-    fromTuple v = [v]
-
-
-instance Tuple Item where
-    tupleMany vs = TupledValue vs
-
-instance FromTuple Item where
-    fromTuple (TupledValue ts) = ts
-    fromTuple x = [x]
--}
-
 lamExp (_ :-> e) = e
 lamBind (b :-> _) = b
 
 isVar Var {} = True
 isVar _ = False
 
---isTup Tup {} = True
---isTup _ = False
 
 
 

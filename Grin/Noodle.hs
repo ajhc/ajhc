@@ -83,7 +83,6 @@ mapFBodies f xs = mapM f' xs where
 isManifestNode :: Monad m => Exp -> m [Atom]
 isManifestNode e = f mempty e where
     f lf _ | False && trace ("isManifestNode: " ++ show lf) False = undefined
-    --f lf (Return (Tag t)) = return [t]
     f lf (Return [(NodeC t _)]) = return [t]
     f lf Error {} = return []
     f lf (App a _ _) | a `Set.member` lf = return []
@@ -103,10 +102,7 @@ isManifestNode e = f mempty e where
 
 -- | Is a Val constant?
 valIsConstant :: Val -> Bool
---valIsConstant (Tup xs) = all valIsConstant xs
-valIsConstant (NodeC t _) | isMutableNodeTag t = False
 valIsConstant (NodeC _ xs) = all valIsConstant xs
-valIsConstant Tag {} = True
 valIsConstant Lit {} = True
 valIsConstant Const {} = True
 valIsConstant (Var v _) | v < v0 = True
@@ -114,21 +110,12 @@ valIsConstant (Index v t) = valIsConstant v && valIsConstant t
 valIsConstant ValPrim {} = True
 valIsConstant _ = False
 
--- | Is type mutable (currently IORef)
-isMutableNodeTag :: Tag -> Bool
-isMutableNodeTag _ = False
---isMutableNodeTag t = t ==  convertName dc_Ref
-
-valIsMutable (NodeC t _) = isMutableNodeTag t || t == tagHole
---valIsMutable NodeC {} = False
-valIsMutable _ = True
 
 
 
 isOmittable (Fetch {}) = True
 isOmittable (Return {}) = True
 isOmittable (Store x) | getType x /= TyNode = False
-isOmittable (Store (NodeC n _)) | isMutableNodeTag n || n == tagHole = False
 isOmittable (Store {}) = True
 isOmittable Prim { expPrimitive = aprim } = aprimIsCheap aprim
 isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
@@ -197,7 +184,6 @@ getReturnInfo :: Exp -> [ReturnInfo]
 getReturnInfo  e = ans where
     ans = execWriter (f mempty e)
     tells x = tell [x]
-    f lf (Return [(NodeV t as)]) = tells (ReturnNode (Nothing,map getType as))
     f lf (Return [(NodeC t as)]) = tells (ReturnNode (Just t,map getType as))
     f lf (Return [z]) | valIsConstant z = tell [ReturnConst z]
     f lf Error {} = tells ReturnError

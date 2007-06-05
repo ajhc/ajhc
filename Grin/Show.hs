@@ -130,25 +130,8 @@ prettyVal s | Just st <- fromVal s = text $ show (st::String)
 prettyVal s | Just vs <- valToList s = list $ map prettyVal vs
 prettyVal (NodeC t []) = parens $ tag (fromAtom t)
 prettyVal (NodeC t vs) = parens $ tag (fromAtom t) <+> hsep (map prettyVal vs)
-prettyVal (NodeV (V i) vs) = parens $ char 't' <> tshow i <+> hsep (map prettyVal vs)
 prettyVal (Index p off) = prettyVal p <> char '[' <> prettyVal off <> char ']'
-prettyVal (Tag t) = tag (fromAtom t)
-prettyVal (Var (V i) t)
-    | TyPtr TyNode <- t = text "ni" <> tshow i
-    | TyNode <- t = text "nd" <> tshow i
-    | TyPtr (TyPtr TyNode) <- t = text "np" <> tshow i
-    | TyPrim Op.TyBool <- t  = char 'b' <> tshow i
-    | TyPrim (Op.TyBits _ Op.HintFloat) <- t  = char 'f' <> tshow i
-    | TyPrim (Op.TyBits _ Op.HintCharacter) <- t  = char 'c' <> tshow i
-    | TyPrim (Op.TyBits (Op.Bits 8)  _) <- t  = char 'o' <> tshow i      -- octet
-    | TyPrim (Op.TyBits (Op.Bits 16)  _) <- t  = char 'h' <> tshow i     -- half
-    | TyPrim (Op.TyBits (Op.Bits 32)  _) <- t  = char 'w' <> tshow i     -- word
-    | TyPrim (Op.TyBits (Op.Bits 64)  _) <- t  = char 'd' <> tshow i     -- doubleword
-    | TyPrim (Op.TyBits (Op.Bits 128)  _) <- t  = char 'q' <> tshow i    -- quadword
-    | TyPrim (Op.TyBits (Op.BitsArch Op.BitsPtr)  _) <- t  = char 'p' <> tshow i
-    | TyPrim (Op.TyBits (Op.BitsArch Op.BitsMax)  _) <- t  = char 'm' <> tshow i
-    | TyPrim (Op.TyBits _ _) <- t  = char 'l' <> tshow i
-prettyVal (Var (V i) _) = char 'v' <> tshow i
+prettyVal v@Var {} = tshow v
 prettyVal (Lit i _)  = tshow i
 prettyVal (Const v) = char '&' <> prettyVal v
 prettyVal (ValUnknown ty) = text "?::" <> tshow ty
@@ -183,33 +166,6 @@ hPrintGrin handle grin@Grin { grinCafs = cafs } = do
         hPutStrLn handle (render $ prettyFun f)
         hPutStrLn handle ""
 
-{-
-showSome xs = f 7 xs [] where
-    f 0 _ xs = reverse ("...":xs)
-    f _ [] xs = reverse xs
-    f n (x:xs) rs = f (n - 1) xs (x:rs)
-
-instance Show Item where
-    show (BasicValue ty) = "<" ++ show ty ++ ">"
-    show (HeapValue hv) = braces $ hcat $ punctuate "," (showSome $ map show (Set.toList hv))
-    show (NodeValue hv) = braces $ hcat $ punctuate "," (showSome $ map show (Set.toList hv))
-    show (TupledValue xs) = tupled (map show xs)
-
-instance Show NodeValue where
-    show (NV t as) = parens $ hsep (show t:map show as)
-
-instance Show HeapValue where
-    show (HV _ (Right v)) = prettyVal (Const v)
-    show (HV n (Left (ht,_))) = show ht ++ "-" ++ show n
-
-instance Show HeapType where
-    show Constant = "C"
-    show SharedEval = "Es"
-    show UnsharedEval = "Eu"
-    show Reference = "Ref"
-    show RecursiveThunk = "Rt"
-
--}
 
 {-# NOINLINE graphGrin #-}
 

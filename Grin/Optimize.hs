@@ -179,7 +179,7 @@ grinSpeculate grin = do
 performSpeculate specs grin = do
     let sset = Set.fromList (map tagFlipFunction specs)
     let f (a,l) = mapBodyM h l  >>= \l' -> return (a,l')
-        h (Store (NodeC t xs)) | not (isMutableNodeTag t), t `member` sset = do
+        h (Store (NodeC t xs)) | t `member` sset = do
             let t' = tagFlipFunction t
             mtick $ "Optimize.speculate.store.{" ++ show t'
             return (App t' xs [TyNode] :>>= [n1] :-> Store n1)
