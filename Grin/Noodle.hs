@@ -36,6 +36,27 @@ modifyTail lam@(_ :-> lb) te = f mempty te where
 
 mapBodyM f (x :-> y) = f y >>= return . (x :->)
 
+mapExpVal :: Monad m => (Val -> m Val) -> Exp -> m Exp
+mapExpVal g x = f x where
+    f (App a vs t) = return (App a) `ap` mapM g vs `ap` return t
+    f (Return vs) = return Return `ap` mapM g vs
+    f (Prim x vs t) = return (Prim x) `ap` mapM g vs `ap` return t
+    f (Store v) = return Store `ap` g v
+    f e@Alloc { expValue = v, expCount = c } = do
+        v <- g v
+        c <- g c
+        return e { expValue = v, expCount = c }
+    f (Fetch v) = return Fetch `ap` g v
+    f (Update a b) = return Update `ap` g a `ap` g b
+    f e = return e
+
+mapValVal fn x = f x where
+    f (NodeC t vs) = return (NodeC t) `ap` mapM fn vs
+    f (Index a b) = return Index `ap` fn a `ap` fn b
+    f (Const v) = return Const `ap` fn v
+    f (ValPrim p vs ty) = return (ValPrim p) `ap` mapM fn vs `ap` return ty
+    f x = return x
+
 mapExpExp f (a :>>= v :-> b) = do
     a <- f a
     b <- f b
