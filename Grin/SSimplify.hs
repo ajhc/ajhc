@@ -29,7 +29,8 @@ import Stats(mtick)
 data SEnv = SEnv {
     envSubst :: IM.IntMap Val,   -- renaming substitution
     envCSE   :: Map.Map Exp (Atom,Exp),
-    envPapp  :: IM.IntMap (Atom,[Val])
+    envPapp  :: IM.IntMap (Atom,[Val]),
+    envPush  :: IM.IntMap Exp
     }
     {-! derive: Monoid !-}
 
@@ -102,11 +103,11 @@ simpBind p e cont = f p e where
     f p app@(App a [v] _) | a == funcEval =  cse' "Simplify.CSE.eval" [(Fetch v,Return p)]
     f p (Fetch v@Var {}) =  cse' "Simplify.CSE.fetch" [(gEval v,Return p)]
     f [p@(Var (V vn) _)] (Return [v@(NodeC t vs)]) | not (isHoly v) = case tagUnfunction t of
-        Nothing -> cse' "Simplify.CSE.return-node" []
-        Just (n,fn) -> local (\s -> s { envPapp = IM.insert vn (t,vs) (envPapp s) }) $ cse' "Simplify.CSE.return-node" []
+        Nothing -> cse "Simplify.CSE.return-node" [(Return [p],Return [v]),(Store p,Store v)]
+        Just (n,fn) -> local (\s -> s { envPapp = IM.insert vn (t,vs) (envPapp s) }) $ cse' "Simplify.CSE.return-node" [(Return [p],Return [v]),(Store p,Store v)]
     f [p] (Store v@Var {})  =  cse' "Simplify.CSE.demote" [(Fetch p,Return [v]),(gEval p,Return [v])]
     f [p@(Var (V vn) _)] (Store v@(NodeC t vs)) | not (isHoly v) = case tagIsWHNF t of
-        True -> cse' "Simplify.CSE.store-whnf" [(Fetch p,Return [v]),(gEval p,Return [v])]
+        True -> local (\s -> s { envPush = IM.insert vn (Store v) (envPush s) }) $ cse "Simplify.CSE.store-whnf" [(Fetch p,Return [v]),(gEval p,Return [v])]
         False -> cse' "Simplify.CSE.store" []
     f _ _ = cse "Simplify.CSE.NOT" []
 
