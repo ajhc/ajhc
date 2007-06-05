@@ -3,6 +3,7 @@ module Grin.SSimplify(simplify) where
 import qualified Data.IntSet as IS
 import qualified Data.IntMap as IM
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Atom
 import Grin.Grin
@@ -27,10 +28,18 @@ import Stats(mtick)
 data SEnv = SEnv {
     envSubst :: IM.IntMap Val,   -- renaming substitution
     envScope :: IM.IntMap Binding,
-    envCSE   :: Map.Map Exp (Atom,Exp)
+    envCSE   :: Map.Map Exp (Atom,Exp),
+    envPapp  :: IM.IntMap (Atom,[Val])
     }
+    {-! derive: Monoid !-}
 
 newtype SState = SState { usedVars :: IS.IntSet }
+
+data SCol = SCol {
+    colStats :: Stats.Stat,
+    colFreeVars :: Set.Set Var
+    }
+    {-! derive: Monoid !-}
 
 newtype S a = S (RWS SEnv Stats.Stat SState a)
     deriving(Monad,Functor,MonadReader SEnv,MonadState SState)
@@ -43,15 +52,6 @@ instance Stats.MonadStats S where
 data Binding = IsBoundTo Val | Promote Val | Demote Val
 
 
-instance Monoid SEnv where
-    mempty = SEnv {
-        envScope = mempty,
-        envSubst = mempty,
-        envCSE = mempty }
-    mappend sa sb = SEnv {
-        envScope = envScope sa `IM.union` envScope sb,
-        envSubst = envSubst sa `IM.union` envSubst sb,
-        envCSE = envCSE sa `Map.union` envCSE sb }
 
 simplify :: Grin -> IO Grin
 simplify grin = do
@@ -73,22 +73,37 @@ simpLam (ps :-> e) = do
     e <- local (env' `mappend`) $ simpExp e
     return (ps :-> e)
 
+simpDone :: Exp -> S Exp
+simpDone e = do
+    pmap <- asks envPapp
+    case e of
+        (App fap (Var (V vn) _:fs) ty) | fap == funcApply, Just (tl,gs) <- IM.lookup vn pmap -> do
+            (cl,fn) <- tagUnfunction tl
+            let ne = if cl == 1 then App fn (gs ++ fs) ty else Return [NodeC (partialTag fn (cl - 1)) (gs ++ fs)]
+            mtick $ if cl == 1 then "Simplify.Apply.Papp.{" ++ show tl  else ("Simplify.Apply.App.{" ++ show fn)
+            return ne
+        _ -> do
+            cmap <- asks envCSE
+            case Map.lookup e cmap of
+                Just (n,e') -> do mtick n; return e'
+                Nothing -> return e
 
 simpBind :: [Val] -> Exp -> S Exp -> S Exp
 simpBind p e cont = f p e where
     cse name xs = do
         z <- local (\s -> s { envCSE = Map.fromList [ (x,(toAtom name,y)) | (x,y) <- xs] `Map.union` envCSE s }) cont
-        cmap <- asks envCSE
-        case Map.lookup e cmap of
-            Nothing -> return $ e :>>= (p :-> z)
-            Just (n,e') -> do mtick n; return $ e' :>>= (p :-> z)
+        e <- simpDone e
+        return $ e :>>= (p :-> z)
     cse' name xs = cse name ((e,Return p):xs)
     f p app@(App a [v] _) | a == funcEval =  cse' "Simplify.CSE.eval" [(Fetch v,Return p)]
     f p (Fetch v@Var {}) =  cse' "Simplify.CSE.fetch" [(gEval v,Return p)]
-    f p (Return [v@NodeC {}]) =  cse' "Simplify.CSE.return-node" []
+    f [p@(Var (V vn) _)] (Return [v@(NodeC t vs)]) | not (isHoly v) = case tagUnfunction t of
+        Nothing -> cse' "Simplify.CSE.return-node" []
+        Just (n,fn) -> local (\s -> s { envPapp = IM.insert vn (t,vs) (envPapp s) }) $ cse' "Simplify.CSE.return-node" []
     f [p] (Store v@Var {})  =  cse' "Simplify.CSE.demote" [(Fetch p,Return [v]),(gEval p,Return [v])]
-    f [p@Var {}] (Store v@(NodeC t _)) | tagIsWHNF t, not (isHoly v) = cse' "Simplify.CSE.store-whnf" [(Fetch p,Return [v]),(gEval p,Return [v])]
-    f [p@Var {}] (Store v@(NodeC t _)) | not (isHoly v) = cse' "Simplify.CSE.store" []
+    f [p@(Var (V vn) _)] (Store v@(NodeC t vs)) | not (isHoly v) = case tagIsWHNF t of
+        True -> cse' "Simplify.CSE.store-whnf" [(Fetch p,Return [v]),(gEval p,Return [v])]
+        False -> cse' "Simplify.CSE.store" []
     f _ _ = cse "Simplify.CSE.NOT" []
 
 extEnv :: Var -> Val -> SEnv -> SEnv
@@ -150,10 +165,7 @@ simpExp e = f e [] where
 --                return z
     f x [] = do
         e <- g x
-        cmap <- asks envCSE
-        case Map.lookup e cmap of
-            Nothing -> return e
-            Just (n,e') -> do mtick n; return e'
+        simpDone e
     fbind vn v senv b rs = do
         v' <- applySubst v
         local (\_ -> extEnv vn v' senv) $ f b rs

@@ -287,7 +287,7 @@ fixupFunc cmap (name,l :-> body) = fmap (\b -> (name, l :-> b)) (f body) where
     lupVar _ = fail "lupVar"
     f a@App { expFunction = fn, expArgs = [arg] } | fn == funcEval, Just n <- lupVar arg = case n of
         N WHNF _ -> do
-                putStrLn $ "NA-EVAL-WHNF-" ++ show fn
+                --putStrLn $ "NA-EVAL-WHNF-" ++ show fn
                 return (Fetch arg)
         _ -> return a
     f e = mapExpExp f e
