@@ -11,6 +11,7 @@ import Grin.Noodle
 import Util.Gen
 import Util.RWS
 import Support.CanType
+import Support.FreeVars
 import qualified Stats
 import Stats(mtick)
 
@@ -27,7 +28,6 @@ import Stats(mtick)
 
 data SEnv = SEnv {
     envSubst :: IM.IntMap Val,   -- renaming substitution
-    envScope :: IM.IntMap Binding,
     envCSE   :: Map.Map Exp (Atom,Exp),
     envPapp  :: IM.IntMap (Atom,[Val])
     }
@@ -41,21 +41,20 @@ data SCol = SCol {
     }
     {-! derive: Monoid !-}
 
-newtype S a = S (RWS SEnv Stats.Stat SState a)
-    deriving(Monad,Functor,MonadReader SEnv,MonadState SState)
+newtype S a = S (RWS SEnv SCol SState a)
+    deriving(Monad,Functor,MonadWriter SCol, MonadReader SEnv,MonadState SState)
 
 instance Stats.MonadStats S where
-    mtickStat s = S (tell s)
-    mticks' n a = S (tell $ Stats.singleStat n a)
+    mtickStat s = S (tell mempty { colStats = s })
+    mticks' n a = S (tell mempty { colStats = Stats.singleStat n a })
 
 
-data Binding = IsBoundTo Val | Promote Val | Demote Val
-
+tellFV v = tell mempty { colFreeVars = freeVars v }
 
 
 simplify :: Grin -> IO Grin
 simplify grin = do
-    let (fs,_,stats) = runRWS fun mempty SState { usedVars = mempty }
+    let (fs,_,SCol { colStats = stats}) = runRWS fun mempty SState { usedVars = mempty }
         S fun = simpFuncs (grinFunctions grin)
     return grin { grinFunctions = fs, grinStats = grinStats grin `mappend` stats }
 
@@ -70,7 +69,9 @@ simpFuncs fd = do
 simpLam :: Lam -> S Lam
 simpLam (ps :-> e) = do
     (ps,env') <- renamePattern ps
-    e <- local (env' `mappend`) $ simpExp e
+    let f col = col { colFreeVars = colFreeVars col Set.\\ freeVars ps }
+    (e,col) <- censor f $ listen $ local (env' `mappend`) $ simpExp e
+    ps <- mapM (zeroVars (`Set.member` colFreeVars col)) ps
     return (ps :-> e)
 
 simpDone :: Exp -> S Exp
@@ -91,9 +92,12 @@ simpDone e = do
 simpBind :: [Val] -> Exp -> S Exp -> S Exp
 simpBind p e cont = f p e where
     cse name xs = do
-        z <- local (\s -> s { envCSE = Map.fromList [ (x,(toAtom name,y)) | (x,y) <- xs] `Map.union` envCSE s }) cont
+        (z,col) <- listen $ local (\s -> s { envCSE = Map.fromList [ (x,(toAtom name,y)) | (x,y) <- xs] `Map.union` envCSE s }) cont
         e <- simpDone e
-        return $ e :>>= (p :-> z)
+        if isOmittable e && Set.null (freeVars p `Set.intersection` colFreeVars col) then do
+            mtick "Simplify.Omit.Bind"
+            return z
+         else return $ e :>>= (p :-> z)
     cse' name xs = cse name ((e,Return p):xs)
     f p app@(App a [v] _) | a == funcEval =  cse' "Simplify.CSE.eval" [(Fetch v,Return p)]
     f p (Fetch v@Var {}) =  cse' "Simplify.CSE.fetch" [(gEval v,Return p)]
@@ -109,8 +113,6 @@ simpBind p e cont = f p e where
 extEnv :: Var -> Val -> SEnv -> SEnv
 extEnv (V vn) v s = s { envSubst = IM.insert vn v (envSubst s) }
 
-extScope :: Var -> Binding -> SEnv -> SEnv
-extScope (V vn) v s = s { envScope = IM.insert vn v (envScope s) }
 
 
 simpExp :: Exp -> S Exp
@@ -156,13 +158,6 @@ simpExp e = f e [] where
         (p,env') <- renamePattern p
         let env'' = env' `mappend` senv
         local (const env'') $ simpBind p a (f b xs)
-        --x <- simpBind (p,a)
-        --z <- local (const env'') $ f b xs
---        case x of
---            Just (p',a') -> do
---                return $ a' :>>= (p' :-> z)
---            Nothing -> do
---                return z
     f x [] = do
         e <- g x
         simpDone e
@@ -182,61 +177,32 @@ simpExp e = f e [] where
     dtup _ _ _ _ _ = error "dtup: attempt to bind unequal lists"
     g (Case v as) = do
         v <- applySubst v
-        as <- mapM dc as
+        as <- mapM simpLam as
         return $ Case v as
 
     g  lt@Let { expDefs = defs, expBody = body } = do
         body <- f body []
-        let f def@FuncDef { funcDefName = n, funcDefBody = b } = do
-                b <- dc b
-                return $ createFuncDef True n b
-        defs <- mapM f defs
+        defs <- simpFuncs defs
         return $ updateLetProps lt { expBody = body, expDefs = defs }
     g x = applySubstE x
 
-    dc (p :-> e) = do
-        (p,env') <- renamePattern p
-        env <- ask
-        let env'' = env' `mappend` env
-        z <- local (const env'') $ f e []
-        return (p :-> z)
 
 
 applySubstE :: Exp -> S Exp
-applySubstE x = f x where
-    g = applySubst
-    f (App a vs t) = do
-        vs' <- mapM g vs
-        return $ App a vs' t
-    f (Return vs) = return Return `ap` mapM g vs
-    f (Prim x vs t) = do
-        vs <- mapM g vs
-        return $ Prim x vs t
-    f (Store v) = return Store `ap` g v
-    f e@Alloc { expValue = v, expCount = c } = do
-        v <- g v
-        c <- g c
-        return e { expValue = v, expCount = c }
-    f (Fetch v) = return Fetch `ap` g v
-    f (Update a b) = return Update `ap` g a `ap` g b
-    f e@Error {} = return e
---    f (Case e as) = do
---        e <- g e
---        return $ Case e as
---    f lt@Let {} = return lt
-    f x = error $ "applySubstE: " ++ show x
+applySubstE x = mapExpVal applySubst x
 
 applySubst x = f x where
     f var@(Var (V v) _) = do
         env <- asks envSubst
         case IM.lookup v env of
-            Just n -> return n
-            Nothing -> return var
-    f (NodeC t vs) = return (NodeC t) `ap` mapM f vs
-    f (Index a b) = return Index `ap` f a `ap` f b
-    f (Const v) = return Const `ap` f v
-    f (ValPrim p vs ty) = return (ValPrim p) `ap` mapM f vs `ap` return ty
-    f x = return x
+            Just n -> tellFV n >> return n
+            Nothing -> tellFV var >> return var
+    f x = mapValVal f x
+
+zeroVars fn x = f x where
+    f (Var v ty) | fn v || v == v0 = return (Var v ty)
+                 | otherwise = do mtick $ "Simplify.ZeroVar.{" ++ show (Var v ty); return (Var v0 ty)
+    f x = mapValVal f x
 
 renamePattern :: [Val] ->  S ([Val],SEnv)
 renamePattern x = runWriterT (mapM f x) where
