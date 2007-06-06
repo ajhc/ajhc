@@ -60,7 +60,6 @@ instance FromTupname Name where
 -- The constructors
 
 
-tc_Absurd = toName TypeConstructor ("Jhc@","Absurd#")
 tc_Box = toName TypeConstructor    ("Jhc@","Box")
 tc_Arrow = toName TypeConstructor  ("Jhc@","->")
 

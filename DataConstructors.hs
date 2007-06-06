@@ -11,6 +11,7 @@ module DataConstructors(
     deconstructionExpression,
     followAliases,
     followAlias,
+    tAbsurd,
     removeNewtypes,
     getConstructor,
     getConstructorArities,
@@ -192,6 +193,7 @@ instance HasSize DataTable where
     size (DataTable d) = Map.size d
 
 getConstructor :: Monad m => Name -> DataTable -> m Constructor
+getConstructor n _ | Just e <- fromAbsurd  n = return emptyConstructor { conName = n, conType = e, conExpr = tAbsurd e, conInhabits = tStar }
 getConstructor n _ | RawType <- nameType n = return $ primitiveConstructor n
 getConstructor n _ | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = return $ snd $ tunboxedtuple v
 getConstructor n _ | Just v <- fromUnboxedNameTuple n, TypeConstructor <- nameType n = return $ fst $ tunboxedtuple v
@@ -234,12 +236,6 @@ tunboxedtuple n = (typeCons,dataCons) where
         ftipe = ELit (litCons { litName = tc, litArgs = map EVar typeVars, litType = eHash })
         dtipe = foldr EPi (foldr EPi ftipe [ v { tvrIdent = 0 } | v <- vars]) typeVars
 
-tabsurd = emptyConstructor {
-            conName = tc_Absurd,
-            conType = eStar,
-            conExpr = tAbsurd eStar,
-            conInhabits = tStar
-    }
 
 -- | Jhc@.Box can hold any boxed value (something whose type inhabits *, or is a function)
 -- so, there is a bit of subtyping that goes on.
@@ -252,6 +248,27 @@ tbox = emptyConstructor {
             conChildren = DataAbstract
     }
 
+tAbsurd k = ELit (litCons { litName = nameAbsurd k, litArgs = [], litType = k })
+
+nameAbsurd :: E -> Name
+nameAbsurd n = toName TypeConstructor ("Jhc@.Absurd",f n "") where
+    f (ESort s) = shows s
+    f (EPi TVr { tvrType = t1 } t2) = ('^':) . shows t1 . shows t2
+    f _ = error $ "nameAbsurd: " ++ show n
+
+fromAbsurd :: Monad m => Name -> m E
+fromAbsurd n = maybeM ("fromAbsurd: " ++ show n) $ do
+    let f s = funit s `mplus` flam s
+        flam ('^':xs) = do (x,rs) <- f xs; (y,gs) <- f rs; return (EPi tvr { tvrType = x } y,gs)
+        flam _ = Nothing
+        funit ('*':xs) = return (eStar,xs)
+        funit ('#':xs) = return (eHash,xs)
+        funit ('!':xs) = return (ESort EBang,xs)
+        funit ('(':'#':')':xs) = return (ESort ETuple,xs)
+        funit _ = Nothing
+    (TypeConstructor,("Jhc@.Absurd",an)) <- return $  fromName n
+    (r,"") <- f an
+    return r
 
 
 tarrow = emptyConstructor {
@@ -445,7 +462,7 @@ followAliases _dataTable e = f e where
     f (ELit LitCons { litAliasFor = Just af, litArgs = as }) = f (foldl eAp af as)
     f e = e
 
-dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tbox:tabsurd:tarrow:primitiveTable ])
+dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tbox:tarrow:primitiveTable ])
 
 deriveClasses :: DataTable -> [(TVr,E)]
 deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where

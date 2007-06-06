@@ -124,8 +124,6 @@ toString x = eToList x >>= mapM fromChar where
     fromChar _ = fail "fromChar: not char"
 
 
-tAbsurd k = ELit (litCons { litName = tc_Absurd, litArgs = [], litType = k })
-
 
 ltTuple ts = ELit $ litCons { litName = nameTuple TypeConstructor (length ts), litArgs = ts, litType = eStar }
 ltTuple' ts = ELit $ litCons { litName = unboxedNameTuple TypeConstructor (length ts), litArgs = ts, litType = eHash }
