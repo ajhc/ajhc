@@ -285,6 +285,7 @@ convertE tiData classHierarchy assumps dataTable srcLoc exp = do
     [(_,_,e)] <- convertDecls tiData mempty classHierarchy assumps dataTable [HsPatBind srcLoc (HsPVar sillyName') (HsUnGuardedRhs exp) []]
     return e
 
+v_silly = toName Val ("Jhc@","silly")
 sillyName' = nameName v_silly
 
 data CeEnv = CeEnv {

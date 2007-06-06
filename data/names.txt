@@ -67,4 +67,46 @@ float64         fbits64
 float80         fbits80
 float128        fbits128
 
+Val:v:
+eqString         Jhc.String.eqString
+eqUnpackedString Jhc.String.eqUnpackedString
+unpackString     Jhc.String.unpackString
+target           Jhc.Options.target
+error            Jhc.IO.error
+minBound         Jhc.Enum.minBound
+maxBound         Jhc.Enum.maxBound
+fail             Jhc.Monad.fail
+map              Jhc.Basics.map
+and              Jhc.Order.&&
+filter           Jhc.List.filter
+foldr            Jhc.Basics.foldr
+undefined        Jhc.Basics.undefined
+
+
+bind                 Jhc.Monad.>>=
+bind_                Jhc.Monad.>>
+concatMap            Jhc.Basics.concatMap
+fromInteger          Jhc.Num.fromInteger
+fromInt              Jhc.Num.fromInt
+fromRational         Jhc.Num.fromRational
+negate               Jhc.Num.negate
+leq                  Jhc.Order.<=
+geq                  Jhc.Order.>=
+lt                   Jhc.Order.<
+gt                   Jhc.Order.>
+compare              Jhc.Order.compare
+equals               Jhc.Order.==
+neq                  Jhc.Order./=
+fromEnum             Jhc.Enum.fromEnum
+toEnum               Jhc.Enum.toEnum
+enumFrom             Jhc.Enum.enumFrom
+enumFromThen         Jhc.Enum.enumFromThen
+range                Data.Ix.range
+index                Data.Ix.index
+inRange              Data.Ix.inRange
+runExpr              Prelude.IO.runExpr
+runRaw               Jhc.Prim.runRaw
+runMain              Jhc.IO.runMain
+runNoWrapper         Jhc.Prim.runNoWrapper
+
 

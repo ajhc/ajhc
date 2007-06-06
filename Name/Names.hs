@@ -78,52 +78,35 @@ tc_List = toName TypeConstructor  ("Jhc.Prim","[]")
 s_Star = toName SortName ("Jhc@","*")
 s_Hash = toName SortName ("Jhc@","#")
 
-v_eqString = toName Val  ("Jhc.String","eqString")
-v_eqUnpackedString = toName Val  ("Jhc.String","eqUnpackedString")
-v_unpackString = toName Val  ("Jhc.String","unpackString")
-v_target = toName Val  ("Jhc.Options","target")
-v_error = toName Val ("Jhc.IO","error")
-v_toEnum = toName Val ("Jhc.Enum","toEnum")
-v_fromEnum = toName Val ("Jhc.Enum","fromEnum")
-v_minBound = toName Val ("Jhc.Enum","minBound")
-v_maxBound = toName Val ("Jhc.Enum","maxBound")
-v_fail = toName Val ("Jhc.Monad","fail")
-v_concatMap = toName Val ("Jhc.Basics","concatMap")
-v_map = toName Val ("Jhc.Basics","map")
-v_and = toName Val ("Jhc.Order","&&")
-v_filter = toName Val ("Jhc.List","filter")
-v_foldr = toName Val ("Jhc.Basics","foldr")
-v_undefined = toName Val ("Jhc.Basics","undefined")
-v_silly = toName Val ("Jhc@","silly")
 
 sFuncNames = FuncNames {
-    func_bind = toName Val ("Jhc.Monad",">>="),
-    func_bind_ = toName Val ("Jhc.Monad",">>"),
-    func_concatMap = toName Val ("Jhc.Basics","concatMap"),
-    func_fromInteger = toName Val ("Jhc.Num","fromInteger"),
-    func_fromInt = toName Val ("Jhc.Num","fromInt"),
-    func_fromRational = toName Val ("Jhc.Num","fromRational"),
-    func_negate = toName Val ("Jhc.Num","negate"),
-    func_leq = toName Val ("Jhc.Order","<="),
-    func_geq = toName Val ("Jhc.Order",">="),
-    func_lt = toName Val ("Jhc.Order","<"),
-    func_gt = toName Val ("Jhc.Order",">"),
-    func_compare = toName Val ("Jhc.Order","compare"),
-    func_equals = toName Val ("Jhc.Order","=="),
-    func_neq = toName Val ("Jhc.Order","/="),
-    func_fromEnum = toName Val ("Jhc.Enum","fromEnum"),
-    func_toEnum = toName Val ("Jhc.Enum","toEnum"),
-    func_minBound = toName Val ("Jhc.Enum","minBound"),
-    func_maxBound = toName Val ("Jhc.Enum","maxBound"),
-    func_enumFrom = toName Val ("Jhc.Enum","enumFrom"),
-    func_enumFromThen = toName Val ("Jhc.Enum","enumFromThen"),
-    func_range = toName Val ("Data.Ix","range"),
-    func_index = toName Val ("Data.Ix","index"),
-    func_inRange = toName Val ("Data.Ix","inRange"),
-    func_runExpr = toName Val ("Prelude.IO","runExpr"),
-    func_runRaw = toName Val ("Jhc.Prim","runRaw"),
-    func_runMain = toName Val ("Jhc.IO","runMain"),
-    func_runNoWrapper = toName Val ("Jhc.Prim","runNoWrapper")
+    func_bind = v_bind,
+    func_bind_ = v_bind_,
+    func_concatMap = v_concatMap,
+    func_fromInteger = v_fromInteger,
+    func_fromInt = v_fromInt,
+    func_fromRational = v_fromRational,
+    func_negate = v_negate,
+    func_leq = v_leq,
+    func_geq = v_geq,
+    func_lt = v_lt,
+    func_gt = v_gt,
+    func_compare = v_compare,
+    func_equals = v_equals,
+    func_neq = v_neq,
+    func_fromEnum = v_fromEnum,
+    func_toEnum = v_toEnum,
+    func_minBound = v_minBound,
+    func_maxBound = v_maxBound,
+    func_enumFrom = v_enumFrom,
+    func_enumFromThen = v_enumFromThen,
+    func_range = v_range,
+    func_index = v_index,
+    func_inRange = v_inRange,
+    func_runExpr = v_runExpr,
+    func_runRaw = v_runRaw,
+    func_runMain = v_runMain,
+    func_runNoWrapper = v_runNoWrapper
     }
 
 
