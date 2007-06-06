@@ -10,7 +10,6 @@ module E.Demand(
     ) where
 
 
-import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.Writer hiding(Product(..))
 import Data.Binary
@@ -26,7 +25,6 @@ import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
 import E.E
-import E.Inline
 import E.Program
 import GenUtil
 import Info.Types
@@ -89,6 +87,7 @@ instance Show DemandType where
 instance Show DemandEnv where
     showsPrec _ (DemandEnv m Absent) = showString "{" . foldr (.) id (intersperse (showString ",") [ showString (pprint t) . showString " -> " . shows v | (t,v) <- Map.toList m]) . showString "}"
     showsPrec _ (DemandEnv _ Bottom) = showString "_|_"
+    showsPrec _ (DemandEnv m demand) = showString "{" . shows demand . showString " - " . foldr (.) id (intersperse (showString ",") [ showString (pprint t) . showString " -> " . shows v | (t,v) <- Map.toList m]) . showString "}"
 
 
 instance Show DemandSignature where
@@ -99,8 +98,8 @@ idGlb = Absent
 absType = (DemandEnv mempty idGlb) :=> []
 botType = (DemandEnv mempty Bottom) :=> []
 
-lazyType = (DemandEnv mempty lazy) :=> []
-lazySig = DemandSignature 0 lazyType
+--lazyType = (DemandEnv mempty lazy) :=> []
+--lazySig = DemandSignature 0 lazyType
 absSig = DemandSignature 0 absType
 
 class Lattice a where
@@ -362,7 +361,7 @@ lazify (DemandEnv x r) = DemandEnv (Map.map f x) Absent where
     f Bottom = Absent
     f (Error xs) = l xs
 
-analyzeCase ec@ECase {} s = do
+analyzeCase ec s = do
     (ec',dts) <- extEnvE (eCaseBind ec) (eCaseScrutinee ec) $ runWriterT $ flip caseBodiesMapM ec $ \e -> do
         (ne,dt) <- lift $ analyze e s
         tell [dt]

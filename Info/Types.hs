@@ -4,10 +4,7 @@ module Info.Types(module Info.Types, module Info.Properties) where
 import Info.Properties
 import Data.Dynamic
 import Data.Monoid
-import List hiding(insert,delete)
-import qualified Data.Set as Set
 
-import Atom
 import Util.HasSize
 import Util.SetLike
 import Util.BitSet

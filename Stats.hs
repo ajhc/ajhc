@@ -27,15 +27,12 @@ module Stats(
     runStatT,
     runStatIO,
     runStatM,
-    mtickStat,
     -- combined
     tickStat
     ) where
 
 
 import Char
-import Control.Exception
-import Control.Monad.Fix
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
@@ -261,7 +258,3 @@ runStatIO stats action = do
     liftIO $ tickStat stats s
     return a
 
-getStat :: Stats -> IO Stat
-getStat stats = do
-    ll <- toList stats
-    return (Stat $ IB.fromList [ (unsafeAtomToInt x,y) | (x,y) <- ll])
