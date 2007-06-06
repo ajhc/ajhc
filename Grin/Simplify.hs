@@ -341,15 +341,15 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
     f (Case n as :>>= lr) | isKnown n = do
         kc <- knownCase n as
         f (kc :>>= lr)
-        {-
-    f (Return n :>>= b :-> Case b' as :>>= lr) | isKnown n, b == [b'] = do
+    f (Return [n] :>>= b :-> Case b' as :>>= lr) | isKnown n, b == [b'] = do
         c <- knownCase n as
         r <- f (c :>>= lr)
-        return (Return n :>>= b :-> r)
-    f (Return n :>>= b :-> Case b' as ) | isKnown n, b == [b'] = do
+        return (Return [n] :>>= b :-> r)
+    f (Return [n] :>>= b :-> Case b' as ) | isKnown n, b == [b'] = do
         kc <- knownCase n as
         r <- f kc
-        return (Return n :>>= b :-> r)
+        return (Return [n] :>>= b :-> r)
+        {-
     f (Case x as :>>= [] :-> (Case x' as') :>>= lr) | x == x', not $ any (isVar . lamBind) as = do
         c <- caseCombine x as as'
         f (c :>>= lr)
@@ -442,10 +442,6 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
     f (cs@Let {} :>>= lr) | Just comb <- isCombinable postEval cs = do
         lr <- g lr
         case comb of
---            UnboxTag -> do
---                mtick "Optimize.optimize.let-unbox-tag"
---                let (va:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
---                return ((combine postEval TyTag cs :>>= Var va TyTag :-> Return (NodeV va [])) :>>= lr)
             UnboxTup (t,ts) -> do
                 mtick $ "Optimize.optimize.let-unbox-node.{" ++ show t
                 let vs = [ v | v <- [v1..], not $ v `Set.member` fv ]
