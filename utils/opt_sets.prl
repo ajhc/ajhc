@@ -24,7 +24,7 @@ my @cat;
 while (<>) {
     next unless /\S/;
     next if /^\s*#/;
-    if (/^([a-z-]+)\s+(\S.*\S)\s*$/) {
+    if (/^([a-z0-9-]+)\s+(\S.*\S)\s*$/) {
         my @xs = ($1,$2);
         my $n = $1;
         my ($v,$d) = ($1,$2);

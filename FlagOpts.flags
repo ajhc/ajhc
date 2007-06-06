@@ -10,6 +10,7 @@ boxy use the new boxy typechecker
 monomorphism-restriction enforce monomorphism restriction
 defaulting perform defaulting of ambiguous types
 cpp pass haskell source through cpp
+m4 pass haskell source through m4
 
 !Debugging
 lint perform lots of extra type checks

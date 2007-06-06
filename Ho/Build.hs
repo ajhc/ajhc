@@ -28,7 +28,6 @@ import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import Atom
 import CharIO
-import FrontEnd.Class
 import DataConstructors
 import Directory
 import Doc.DocLike
@@ -40,21 +39,22 @@ import E.Rules
 import E.Show
 import E.Traverse(emapE)
 import E.TypeCheck()
+import FrontEnd.Class
 import FrontEnd.HsParser
 import FrontEnd.Infix
 import FrontEnd.ParseMonad
-import FrontEnd.Unlit
 import FrontEnd.Syn.Options
-import GenUtil hiding(putErrLn,putErr,putErrDie)
-import Ho.Type
+import FrontEnd.Unlit
+import FrontEnd.Warning
 import Ho.Binary
 import Ho.LibraryMap
+import Ho.Type
 import HsSyn
 import Options
 import PackedString
 import Util.FilterInput
+import Util.Gen hiding(putErrLn,putErr,putErrDie)
 import Util.SetLike
-import FrontEnd.Warning
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Util.Graph as G
@@ -317,9 +317,7 @@ nextModule ms tl ho (Right (name,files):rest) = result where
         Just (Just _) -> addNeed [] res
     cdeps nho (fh,_,_) [] = hClose fh >> nextModule (ms `mappend` fmap Just (hoModules nho)) tl (nho `mappend` ho) rest
     addNeed additional (fh,fd,ho_name) = do
-        cs <- if fopts FO.Cpp then filterInput "cpp" ["-D__JHC__","-traditional","-P"] fh
-                              else CharIO.hGetContents fh
-        hs <- parseHsSource (fromAtom $ fileName fd) cs
+        hs <- parseHsSource (fromAtom $ fileName fd) fh
         case (hsModuleName hs `mmember` ms) of
             True -> do putStrLn $ "Found module name that we alread gots: " ++ show (hsModuleName hs); nextModule ms tl ho (map Left additional ++ rest)
             False -> do
@@ -344,14 +342,22 @@ searchPaths m = ans where
     ans = [ (root ++ suf,root ++ ".ho") | i <- optIncdirs options, n <- f m, suf <- [".hs",".lhs"], let root = i ++ "/" ++ n]
 
 
-parseHsSource :: String -> String -> IO HsModule
-parseHsSource fn s = do
-    let opts = concat [ words as | (x,as) <- parseOptions s', x `elem` ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"]]
-        s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
-    opt <- case fileOptions opts of
-        Just o -> return o
-        Nothing -> return options
-    case runParserWithMode (parseModeOptions opt) { parseFilename = fn } parse  s'  of
+parseHsSource :: String -> Handle -> IO HsModule
+parseHsSource fn fh = do
+    pos <- hGetPosn fh
+    ls <- replicateM 10 (ioM $ hGetLine fh)
+    let f s = opt where
+            Just opt = fileOptions opts `mplus` Just options where
+            s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
+            opts = concat [ words as | (x,as) <- parseOptions s', x `elem` ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"]]
+    let fopts s = s `member` optFOptsSet opt where opt = f (concatMap concat ls)
+    hSetPosn pos
+    s <- case () of
+        _ | fopts FO.Cpp -> filterInput "cpp" ["-D__JHC__","-P","-CC","-traditional"] fh
+          | fopts FO.M4 ->  filterInput "m4" ["-D__JHC__"] fh
+          | otherwise -> CharIO.hGetContents fh
+    let s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
+    case runParserWithMode (parseModeOptions $ f s) { parseFilename = fn } parse  s'  of
                       ParseOk ws e -> processErrors ws >> return e
                       ParseFailed sl err -> putErrDie $ show sl ++ ": " ++ err
 
