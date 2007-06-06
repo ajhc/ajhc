@@ -74,6 +74,16 @@ instance Ord a => Ord [a] where
     compare [] _ = LT
     compare _ [] = GT
 
+    [] < [] = False
+    [] < _ = True
+    (x:xs) < (y:ys) = if x == y then xs < ys else x < y
+
+    x > y = y < x
+
+    x >= y = not (x < y)
+    x <= y = not (y < x)
+
+
 instance Eq Char where
     Char x == Char y = boxBool (equalsChar x y)
     Char x /= Char y = boxBool (nequalsChar x y)

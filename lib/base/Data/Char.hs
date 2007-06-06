@@ -14,6 +14,7 @@ module Data.Char (
 import Numeric (readDec, readOct, lexDigits, readHex)
 import Prelude.Text
 import Jhc.Basics
+import Data.Word(Word())
 
 -- Character-testing operations
 isAscii, isLatin1, isControl, isPrint, isSpace, isUpper, isLower,
@@ -48,16 +49,16 @@ isAlphaNum c             =  isAlpha c || isDigit c
 -- Digit conversion operations
 digitToInt :: Char -> Int
 digitToInt c
-  | isDigit c            =  fromEnum c - fromEnum '0'
-  | c >= 'a' && c <= 'f' =  fromEnum c - fromEnum 'a' + 10
-  | c >= 'A' && c <= 'F' =  fromEnum c - fromEnum 'A' + 10
+  | isDigit c            =  ord c - ord '0'
+  | c >= 'a' && c <= 'f' =  ord c - (ord 'a' + 10)
+  | c >= 'A' && c <= 'F' =  ord c - (ord 'A' + 10)
   | otherwise            =  error "Char.digitToInt: not a digit"
 
 intToDigit :: Int -> Char
-intToDigit i
-  | i >= 0  && i <=  9   =  chr (ord '0' + i)
-  | i >= 10 && i <= 15   =  chr (ord 'a' + i - 10)
-  | otherwise            =  error "Char.intToDigit: not a digit"
+intToDigit i = f (fromIntegral i :: Word) where
+    f w | w < 10 = chr (ord '0' + i)
+        | w < 16 = chr ((ord 'a' - 10) + i)
+        | otherwise = error "Char.intToDigit: not a digit"
 
 
 -- Case-changing operations
