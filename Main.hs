@@ -320,7 +320,6 @@ processDecls cho ho' tiData = do
         when coreMini $ putErrLn ("----\n" ++ names)
         let tparms = transformParms { transformPass = "Init", transformDumpProgress = coreMini }
 
-        mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformPass = "PreInit", transformOperation = typeAnalyze True } mprog
 
         mprog <- return $ etaAnnotateProgram mprog
 
@@ -330,6 +329,7 @@ processDecls cho ho' tiData = do
         -- | this catches more static arguments if we wait until after the initial normalizing simplification pass
         mprog <- transformProgram tparms { transformSkipNoStats = True, transformCategory = "SimpleRecursive", transformOperation = return . staticArgumentTransform } mprog
 
+        mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformPass = "PreInit", transformOperation = typeAnalyze True } mprog
 
         mprog <- transformProgram tparms { transformCategory = "FloatOutward", transformOperation = floatOutward } mprog
         -- perform another supersimplify in order to substitute the once used
