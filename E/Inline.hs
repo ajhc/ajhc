@@ -46,7 +46,7 @@ forceInline :: HasProperties a => a -> Bool
 forceInline x
     | forceNoinline props = False
     | not (fopts FO.InlinePragmas) = False
-    | otherwise  = member prop_INLINE props  || member prop_WRAPPER props || member prop_SUPERINLINE props
+    | otherwise  = fromList [prop_INLINE,prop_WRAPPER,prop_SUPERINLINE] `intersects` props
     where props = getProperties x
 
 forceSuperInline :: HasProperties a => a -> Bool
@@ -57,10 +57,7 @@ forceSuperInline x
     where props = getProperties x
 
 forceNoinline :: HasProperties a => a -> Bool
-forceNoinline x
-    | member prop_HASRULE props || member prop_NOINLINE props || member prop_PLACEHOLDER props = True
-    | otherwise = False
-    where props = getProperties x
+forceNoinline x  = fromList [prop_HASRULE,prop_NOINLINE,prop_PLACEHOLDER] `intersects` getProperties x
 
 app (e,[]) = return e
 app (e,xs) = app' e xs
