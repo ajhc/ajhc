@@ -65,6 +65,10 @@ binOp bop t1 t2 tr e1 e2 str | Just (v1,t1) <- toConstant e1, Just (v2,t2) <- to
     f UMod v1 v2 | v2 /= 0 = return $ toExpression (v1 `mod` v2) str
     f Eq v1 v2 | v2 /= 0 = return $ toBool (v1 == v2)
     f NEq v1 v2 | v2 /= 0 = return $ toBool (v1 /= v2)
+
+    f FDiv v1 v2 | v2 /= 0 = return $ toExpression (v1 / v2) str
+    f FMul v1 v2 = return $ toExpression (v1 * v2) str
+
     f op v1 v2 | Just v <- lookup op ops = return $ toBool (v1 `v` v2) where
         ops = [(Lt,(<)), (Gt,(>)), (Lte,(<=)), (Gte,(>=)),
                (FLt,(<)), (FGt,(>)), (FLte,(<=)), (FGte,(>=))]
@@ -90,10 +94,17 @@ binOp bop t1 t2 tr e1 e2 str = f bop e1 e2 where
     f UMod e1 e2 | Just (1,_) <- toConstant e2 = return $ toExpression 0 str
     f Quot e1 e2 | Just (1,_) <- toConstant e2 = return e1
     f Rem e1 e2 | Just (1,_) <- toConstant e2 = return  $ toExpression 0 str
+
     f UGt e1 _ | Just (0,_) <- toConstant e1 = return $ toBool False
     f ULte e1 _ | Just (0,_) <- toConstant e1 = return $ toBool True
     f Eq e1 e2 | Just (v1,t1) <- toConstant e1 = return $ caseEquals e2 (v1,t1) (toBool True) (toBool False)
     f NEq e1 e2 | Just (v1,t1) <- toConstant e1 = return $ caseEquals e2 (v1,t1) (toBool False) (toBool True)
+
+    f FDiv e1 e2 | Just (1,_) <- toConstant e2 = return e1
+    f FPwr e1 e2 | Just (1,_) <- toConstant e2 = return e1
+    f FMul e1 e2 | Just (1,_) <- toConstant e1 = return e2
+    f FAdd e1 e2 | Just (0,_) <- toConstant e1 = return e2
+    f FSub e1 e2 | Just (0,_) <- toConstant e2 = return e1
 
     f Eq e1 e2 | e1 `equalsExpression` e2 = return $ toBool True
     f NEq e1 e2 | e1 `equalsExpression` e2 = return $ toBool False
@@ -118,6 +129,14 @@ binOp' :: Expression t e => BinOp -> Ty -> Ty -> Ty -> e -> e -> t -> e
 binOp' bop t1 t2 tr e1 e2 str =  case binOp bop t1 t2 tr e1 e2 str of
     Just e -> e
     Nothing -> createBinOp bop t1 t2 tr e1 e2 str
+
+unOp :: Expression t e => UnOp -> Ty -> Ty -> e -> t -> Maybe e
+unOp op t1 tr e str | Just (v,t) <- toConstant e = f op v where
+    f Neg v = return $ toExpression (negate v) str
+    f FNeg v = return $ toExpression (negate v) str
+    f FAbs v = return $ toExpression (abs v) str
+    f _ _ = Nothing
+unOp op t1 tr e str = Nothing
 
 {-
 unOp :: Expression t e => UnOp -> Ty -> Ty -> e -> t -> Maybe e

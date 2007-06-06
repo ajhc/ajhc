@@ -65,7 +65,8 @@ primOpt' dataTable  e@(EPrim (APrim s _) xs t) = do
         primopt (Op (Op.ConvOp cop t1) t2) [e1] rt = case convOp cop t1 t2 of
             Nothing | getType e1 == rt -> return e1
             Just cop' | cop' /= cop -> return $ primConv cop' t1 t2 e1 rt
-            _ -> fail "could not apply conversion optimization"
+            _ -> fail "could noUnt apply conversion optimization"
+        primopt (Op (Op.UnOp bop t1) tr) [e1] rt = unOp bop t1 tr e1 rt
         primopt _ _ _ = fail "No Primitive optimization to apply"
     case primopt s xs t of
         Just n -> do
