@@ -7,6 +7,7 @@ module Util.BitSet(
     ) where
 
 
+import Data.List(foldl')
 import Data.Bits
 import Data.Word
 import Data.Monoid
@@ -20,6 +21,7 @@ newtype BitSet = BitSet Word
 instance Monoid BitSet where
     mempty = BitSet 0
     mappend (BitSet a) (BitSet b) = BitSet (a .|. b)
+    mconcat ss = foldl' mappend mempty ss
 
 
 
@@ -34,21 +36,24 @@ instance HasSize BitSet where
 instance SetLike BitSet where
     BitSet a `difference` BitSet b = BitSet (a .&. complement b)
     BitSet a `intersection` BitSet b = BitSet (a .&. b)
-    BitSet a `disjoint` BitSet b  = ((a .&. b) /= 0)
+    BitSet a `disjoint` BitSet b  = ((a .&. b) == 0)
     BitSet a `isSubsetOf` BitSet b = (a .|. b) == b
+    sempty = BitSet 0
+    union (BitSet a) (BitSet b) = BitSet (a .|. b)
+    unions ss = foldl' union sempty ss
 
 
 instance BuildSet Int BitSet where
     insert i (BitSet v) = BitSet (v .|. bit i)
     singleton i = BitSet (bit i)
-    fromList ts = BitSet (foldl setBit 0 ts)
+    fromList ts = BitSet (foldl' setBit 0 ts)
 
 instance ModifySet Int BitSet where
     delete i (BitSet v) = BitSet (clearBit v i)
     member i (BitSet v) = testBit v i
-    toList (BitSet v) = f 1 where
-        f c | c > 32 = []
-            | otherwise = if v .&. bit c /= 0 then c:f (c + 1) else f (c + 1)
+    toList (BitSet v) = f 0 where
+        f c | c >= 32 = []
+            | otherwise = if testBit v c then c:f (c + 1) else f (c + 1)
 
 
 
