@@ -156,7 +156,7 @@ instance Draw Stmt where
     draw (SReturn e) = text "return " <> draw e <> char ';'
     draw (SLabel n@(Name s)) = do
         ls <- asks envUsedLabels
-        if n `member` ls then  text s <> char ':' else return mempty
+        if n `member` ls then  text s <> char ':' <> char ';' else return mempty
     draw (SGoto (Name s)) = text "goto" <+> text s <> char ';'
     draw (SBlock s) = do
         s <- subBlockBody s
