@@ -20,6 +20,7 @@ import Util.Gen hiding(putErrLn)
 import Name.Id
 import Name.Name
 import Options
+import qualified IO
 import qualified FlagDump as FD
 import qualified Stats
 
@@ -107,22 +108,25 @@ programMapDs f prog = do
 
 programMapDs_ f prog = mapM_ f (programDs prog)
 
-
-printProgram prog@Program {progCombinators = cs, progDataTable = dataTable } = do
-    sequence_ $ intersperse (putErrLn "") [ printCheckName'' dataTable v (foldr ELam e as) | (v,as,e) <- cs]
+hPrintProgram fh prog@Program {progCombinators = cs, progDataTable = dataTable } = do
+    sequence_ $ intersperse (hPutStrLn fh "") [ hPrintCheckName fh dataTable v (foldr ELam e as) | (v,as,e) <- cs]
     when (progMainEntry prog /= tvr) $
-        putErrLn $ "MainEntry: " ++ pprint (progMainEntry prog)
+        hPutStrLn fh $ "MainEntry: " ++ pprint (progMainEntry prog)
     when (progEntryPoints prog /= [progMainEntry prog]) $
-        putErrLn $ "EntryPoints: " ++ hsep (map pprint (progEntryPoints prog))
+        hPutStrLn fh $ "EntryPoints: " ++ hsep (map pprint (progEntryPoints prog))
 
-printCheckName'' :: DataTable -> TVr -> E -> IO ()
-printCheckName'' dataTable tvr e = do
+printProgram prog = hPrintProgram IO.stderr prog
+
+printCheckName'' = hPrintCheckName IO.stderr
+
+hPrintCheckName :: IO.Handle -> DataTable -> TVr -> E -> IO ()
+hPrintCheckName fh dataTable tvr e = do
     let (ty,pty) = case inferType dataTable [] e of
             Left err -> (Unknown,vcat $ map text (intersperse "---" $ tail err))
             Right ty -> (ty,pprint ty)
         tmatch = isJust $ match (const Nothing) [] ty (tvrType tvr)
-    when (dump FD.EInfo || verbose2) $ putErrLn (show $ tvrInfo tvr)
-    putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> (pprint $ tvrType tvr)))
+    when (dump FD.EInfo || verbose2) $ hPutStrLn fh (show $ tvrInfo tvr)
+    hPutStrLn fh (render $ hang 4 (pprint tvr <+> text "::" <+> (pprint $ tvrType tvr)))
     when (not tmatch || dump FD.EVerbose) $
-        putErrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
-    putErrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
+        hPutStrLn fh (render $ hang 4 (pprint tvr <+> text "::" <+> pty))
+    hPutStrLn fh (render $ hang 4 (pprint tvr <+> equals <+> pprint e))

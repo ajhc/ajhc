@@ -78,6 +78,7 @@ import qualified Grin.SSimplify
 import qualified Info.Info as Info
 import qualified Interactive
 import qualified Stats
+import qualified IO
 
 ---------------
 -- ∀α∃β . α → β
@@ -775,6 +776,18 @@ compileGrinToC grin = do
     return ()
 
 
+dumpCore pname prog = do
+    let fn = optOutName options ++ "_" ++ pname ++ ".jhc_core"
+    putErrLn $ "Writing: " ++ fn
+    h <- IO.openFile fn IO.WriteMode
+    (argstring,sversion) <- getArgString
+    IO.hPutStrLn h $ unlines [ "-- " ++ argstring,"-- " ++ sversion,""]
+    hPrintProgram h prog
+    IO.hClose h
+    wdump FD.Core $ do
+        putErrLn $ "v-- " ++ pname ++ " Core"
+        printProgram prog
+        putErrLn $ "^-- " ++ pname ++ " Core"
 
 simplifyProgram sopt name dodump prog = liftIO $ do
     let istat = progStats prog
