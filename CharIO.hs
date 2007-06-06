@@ -1,6 +1,7 @@
 module CharIO(
     putStr,
     putStrLn,
+    hPutStrLn,
     putErr,
     putErrLn,
     putErrDie,
@@ -10,25 +11,28 @@ module CharIO(
     runMain
     ) where
 
-import Prelude hiding(putStr, putStrLn)
-import qualified Prelude (putStr, putStrLn)
-import IO hiding(putStr, putStrLn)
-import Control.Exception
-import UTF8
-import System
 import Char
+import Control.Exception
+import Prelude hiding(putStr, putStrLn)
+import System
+import UTF8
+import qualified IO
+import qualified Prelude (putStr, putStrLn)
 
 toUTF8 s = (map (chr. fromIntegral) $ toUTF s)
 fromUTF8 s = fromUTF (map (fromIntegral . ord) s)
 
-flushOut = Control.Exception.catch  (hFlush stdout) (\_ -> return ())
+flushOut = Control.Exception.catch  (IO.hFlush IO.stdout) (\_ -> return ())
 
 putStr = Prelude.putStr . toUTF8
 putStrLn = Prelude.putStrLn . toUTF8
 putErr s = flushOut >> IO.hPutStr IO.stderr (toUTF8 s)
-putErrLn s = flushOut >> IO.hPutStrLn IO.stderr (toUTF8 s)
-putErrDie s = flushOut >> IO.hPutStrLn IO.stderr (toUTF8 s) >> System.exitFailure
+putErrLn s = flushOut >> hPutStrLn IO.stderr s
+putErrDie s = flushOut >> hPutStrLn IO.stderr s >> System.exitFailure
 print x = putStrLn $ show x
+
+
+hPutStrLn fh = IO.hPutStrLn fh . toUTF8
 
 readFile fn = Prelude.readFile fn >>= \s -> return (fromUTF8 s)
 hGetContents h =  IO.hGetContents h >>= \s -> return (fromUTF8 s)
