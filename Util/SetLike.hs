@@ -3,10 +3,9 @@ module Util.SetLike(
     (\\),
     notMember,
     mnotMember,
-    union,
-    unions,
     minsert,
     msingleton,
+    intersects,
     SetLike(..),
     ModifySet(..),
     MapLike(..),
@@ -27,14 +26,19 @@ infixl 9 \\ --
 
 m1 \\ m2 = difference m1 m2
 
-class (Monoid s,HasSize s,IsEmpty s) => SetLike s where
+class (HasSize s,IsEmpty s) => SetLike s where
     difference :: s -> s -> s
     intersection :: s -> s -> s
     disjoint :: s -> s -> Bool
     isSubsetOf :: s -> s -> Bool
 
+    union :: s -> s -> s
+    unions :: [s] -> s
+    sempty :: s
+
     disjoint x y = isEmpty (x `intersection` y)
     isSubsetOf x y = size x <= size y && (size (x `intersection` y) == size x)
+    unions ss = foldr union sempty ss
 
 
 -- you can't pull values out of the set with this, as it might store the
@@ -57,11 +61,8 @@ class BuildSet t s => ModifySet t s | s -> t where
 notMember x t = not $ member x t
 mnotMember x t = not $ mmember x t
 
-union :: SetLike a => a -> a -> a
-union = mappend
+intersects x y = not $ disjoint x y
 
-unions :: SetLike a => [a] -> a
-unions = mconcat
 
 --  int set
 
@@ -69,6 +70,9 @@ instance SetLike IS.IntSet where
     difference = IS.difference
     intersection = IS.intersection
     isSubsetOf = IS.isSubsetOf
+    union      = IS.union
+    unions     = IS.unions
+    sempty      = IS.empty
 
 instance BuildSet Int IS.IntSet where
     fromList xs = IS.fromList xs
@@ -87,6 +91,9 @@ instance Ord a => SetLike (S.Set a) where
     difference = S.difference
     intersection = S.intersection
     isSubsetOf = S.isSubsetOf
+    union      = S.union
+    unions     = S.unions
+    sempty      = S.empty
 
 instance Ord a => BuildSet a (S.Set a) where
     fromList xs = S.fromList xs
@@ -104,6 +111,9 @@ instance Ord a => ModifySet a (S.Set a) where
 instance SetLike (IM.IntMap a) where    -- SIC
     difference = IM.difference
     intersection = IM.intersection
+    union      = IM.union
+    unions     = IM.unions
+    sempty      = IM.empty
 
 
 instance BuildSet (Int,a) (IM.IntMap a) where
@@ -116,6 +126,9 @@ instance BuildSet (Int,a) (IM.IntMap a) where
 instance Ord a => SetLike (M.Map a b) where
     difference = M.difference
     intersection = M.intersection
+    union      = M.union
+    unions     = M.unions
+    sempty      = M.empty
 
 instance Ord a => BuildSet (a,b) (M.Map a b) where
     fromList xs = M.fromList xs
