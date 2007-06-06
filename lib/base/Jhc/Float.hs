@@ -1,16 +1,30 @@
-{-# OPTIONS_JHC -N -fffi #-}
-module Jhc.Float where
+{-# OPTIONS_JHC -N -fffi -fm4 #-}
 
-import Jhc.IO(error)
-import Jhc.Order
-import Jhc.Int
-import Jhc.Num
+changequote({{,}})
+
+module Jhc.Float(
+    Float(..),
+    Double(..),
+    floatToDouble,
+    doubleToFloat,
+    Floating(..),
+    RealFrac(..),
+    RealFloat(..),
+    rationalToDouble
+    )
+    where
+
 import Jhc.Basics
+import Jhc.Int
+import Jhc.IO(error)
+import Jhc.Num
+import Jhc.Order
+import Jhc.Types
 
 infixr 8  **
 
-data Float
-data Double
+data Float = Float Float32_
+data Double = Double Float64_
 
 
 foreign import primitive "F2F" floatToDouble :: Float -> Double
@@ -130,4 +144,79 @@ class  (RealFrac a, Floating a) => RealFloat a  where
 rationalToDouble :: Rational -> Double
 rationalToDouble (x:%y) = fromInteger x `divideDouble` fromInteger y
 
-foreign import primitive "divide" divideDouble ::  Double -> Double -> Double
+foreign import primitive "FDiv" divideDouble ::  Double -> Double -> Double
+
+
+instance Eq Float where
+    Float x == Float y = boxBool (x `eqFloat` y)
+    Float x /= Float y = boxBool (x `neqFloat` y)
+
+instance Ord Float where
+    Float x < Float y = boxBool (float32FLt x y)
+    Float x > Float y = boxBool (float32FGt x y)
+    Float x <= Float y = boxBool (float32FLte x y)
+    Float x >= Float y = boxBool (float32FGte x y)
+
+
+
+foreign import primitive "FEq" eqFloat :: Float32_ -> Float32_ -> Bool__
+foreign import primitive "FNEq" neqFloat :: Float32_ -> Float32_ -> Bool__
+foreign import primitive "FLt" float32FLt :: Float32_ -> Float32_ -> Bool__
+foreign import primitive "FLte" float32FLte :: Float32_ -> Float32_ -> Bool__
+foreign import primitive "FGt" float32FGt :: Float32_ -> Float32_ -> Bool__
+foreign import primitive "FGte" float32FGte :: Float32_ -> Float32_ -> Bool__
+
+instance Eq Double where
+    Double x == Double y = boxBool (x `eqDouble` y)
+    Double x /= Double y = boxBool (x `neqDouble` y)
+
+instance Ord Double where
+    Double x < Double y = boxBool (float64FLt x y)
+    Double x > Double y = boxBool (float64FGt x y)
+    Double x <= Double y = boxBool (float64FLte x y)
+    Double x >= Double y = boxBool (float64FGte x y)
+
+foreign import primitive "FLt" float64FLt :: Float64_ -> Float64_ -> Bool__
+foreign import primitive "FLte" float64FLte :: Float64_ -> Float64_ -> Bool__
+foreign import primitive "FGt" float64FGt :: Float64_ -> Float64_ -> Bool__
+foreign import primitive "FGte" float64FGte :: Float64_ -> Float64_ -> Bool__
+
+foreign import primitive "FEq" eqDouble :: Float64_ -> Float64_ -> Bool__
+foreign import primitive "FNEq" neqDouble :: Float64_ -> Float64_ -> Bool__
+
+
+foreign import primitive "box" boxBool :: Bool__ -> Bool
+
+
+define(NUMINSTANCE,
+instance Num $1 where
+    $1 x * $1 y = $1 (times$1 x y)
+    $1 x + $1 y = $1 (plus$1 x y)
+    $1 x - $1 y = $1 (minus$1 x y)
+    abs ($1 x) = $1 (abs$1 x)
+    negate ($1 x) = $1 (neg$1 x)
+    fromInt x = fromInt$1 x
+    fromInteger x = fromInteger$1 x
+    signum x = case compare x 0 of
+        EQ -> 0
+        GT -> 1
+        LT -> -1
+
+foreign import primitive "FMul" times$1 :: $2 -> $2 -> $2
+foreign import primitive "FAdd" plus$1  :: $2 -> $2 -> $2
+foreign import primitive "FSub" minus$1 :: $2 -> $2 -> $2
+
+foreign import primitive "FAbs" abs$1 :: $2 -> $2
+foreign import primitive "FNeg" neg$1 :: $2 -> $2
+
+foreign import primitive "I2F"  fromInt$1 :: Int -> $1
+foreign import primitive "I2F"  fromInteger$1 :: Integer -> $1
+
+)
+
+
+
+
+NUMINSTANCE(Float,Float32_)
+NUMINSTANCE(Double,Float64_)
+

@@ -204,6 +204,10 @@ tyToC dh (Op.TyBits b h) = f b h where
         (Op.Bits n) ->  "int" ++ show n ++ "_t"
         (Op.BitsArch Op.BitsMax) -> "intmax_t"
         (Op.BitsArch Op.BitsPtr) -> "intptr_t"
+    f b Op.HintFloat = case b of
+        (Op.Bits 32) -> "float"
+        (Op.Bits 64) -> "double"
+        (Op.Bits 128) -> "__float128"
 
 
 opTyToC opty = basicType (tyToC Op.HintUnsigned opty)

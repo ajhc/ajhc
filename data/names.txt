@@ -10,6 +10,8 @@ Target    Jhc.Options.Target
 Ptr       Jhc.Addr.Ptr
 Ratio     Jhc.Num.Ratio
 Unit      Jhc.Basics.()
+Float     Jhc.Float.Float
+Double    Jhc.Float.Double
 CLong     Foreign.C.Types.CLong
 CSChar    Foreign.C.Types.CSChar
 CUChar    Foreign.C.Types.CUChar

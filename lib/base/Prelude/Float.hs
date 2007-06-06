@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi #-}
+{-# OPTIONS_JHC -fffi  #-}
 
 module Prelude.Float(readDouble,doubleToDigits,doubleToRational) where
 
@@ -240,9 +240,9 @@ instance RealFrac Double where
 
 
 instance RealFloat Float where
-    floatRadix _ = c_flt_radix
-    floatDigits _ = c_flt_mant_dig
-    floatRange _ = (c_flt_min_exp,c_flt_max_exp)
+    floatRadix _ = 2
+    floatDigits _ = 24
+    floatRange _ = (-125,128)
 
     exponent x		= case decodeFloatf x of (_,n) -> n
     significand x	= case decodeFloatf x of (m,_) -> m
@@ -278,17 +278,13 @@ foreign import ccall "math.h ldexpf" c_ldexpf :: Float -> CInt -> Float
 foreign import ccall "math.h frexp"  c_frexp :: Double -> Ptr CInt -> IO Double
 foreign import ccall "math.h frexpf" c_frexpf :: Float -> Ptr CInt -> IO Float
 
-foreign import primitive "const.FLT_RADIX" c_flt_radix :: Integer
-foreign import primitive "const.FLT_MANT_DIG" c_flt_mant_dig :: Int
-foreign import primitive "const.FLT_MIN_EXP" c_flt_min_exp :: Int
-foreign import primitive "const.FLT_MAX_EXP" c_flt_max_exp :: Int
 foreign import primitive "const.M_PI" c_pif :: Float
 foreign import primitive "const.M_PI" c_pi :: Double
 
 instance RealFloat Double where
-    floatRadix _ = c_flt_radix
-    floatDigits _ = c_dbl_mant_dig
-    floatRange _ = (c_dbl_min_exp,c_dbl_max_exp)
+    floatRadix _ = 2
+    floatDigits _ = 53
+    floatRange _ = (-1021,1024)
 
     exponent x		= case decodeFloatf x of (_,n) -> n
     significand x	= case decodeFloatf x of (m,_) -> m
@@ -316,9 +312,6 @@ instance RealFloat Double where
 foreign import ccall "math.h isnan" c_isnan :: Double -> CInt
 foreign import ccall "math.h isinf" c_isinfinite :: Double -> CInt
 
-foreign import primitive "const.DBL_MANT_DIG" c_dbl_mant_dig :: Int
-foreign import primitive "const.DBL_MIN_EXP" c_dbl_min_exp :: Int
-foreign import primitive "const.DBL_MAX_EXP" c_dbl_max_exp :: Int
 
 foreign import primitive "I2F" integer2float :: Integer -> Float
 foreign import primitive "I2F" integer2double :: Integer -> Double
