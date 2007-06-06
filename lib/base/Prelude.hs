@@ -47,6 +47,7 @@ module Prelude(
 import Jhc.Basics
 import Jhc.Float
 import Data.Int(Int())
+import Jhc.Inst.Enum
 
 import Data.Ratio
 import Jhc.Enum
@@ -64,6 +65,7 @@ import Prelude.Text
 import qualified Data.Char as Char(isSpace,ord,chr)
 
 
+
 -- infixr 9  .
 --infixr 8  ^, ^^, **
 infixr 8  ^, ^^
@@ -78,21 +80,6 @@ infixr 8  ^, ^^
 -- infixr 0  $, $!, `seq`
 
 
-
-
-
-instance Enum () where
-    succ _      = error "Prelude.Enum.().succ: bad argument"
-    pred _      = error "Prelude.Enum.().pred: bad argument"
-
-    toEnum x | x == 0 = ()
-             | otherwise    = error "Prelude.Enum.().toEnum: bad argument"
-
-    fromEnum () = 0
-    enumFrom () 	= [()]
-    enumFromThen () () 	= let many = ():many in many
-    enumFromTo () () 	= [()]
-    enumFromThenTo () () () = let many = ():many in many
 
 -- Numeric functions
 
@@ -490,44 +477,6 @@ unzip3           :: [(a,b,c)] -> ([a],[b],[c])
 unzip3           =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
                           ([],[],[])
 
-
-
-instance Enum Integer where
-    toEnum = fromInt
-    fromEnum = toInt
-    succ = (+ 1)
-    pred = (+ -1)
-    enumFrom x | x `seq` True =  x:enumFrom (x + 1)
-    enumFromTo x y = f x where
-        f x | x > y = []
-            | otherwise = x:f (x + 1)
-    enumFromThen x y | x `seq` y `seq` True = f x where
-        z = y - x
-        f x = x:f (x + z)
-    enumFromThenTo x y z | y >= x = f x where
-        inc = y - x
-        f x | x <= z = x:f (x + inc)
-            | otherwise = []
-    enumFromThenTo x y z  = f x where
-        inc = y - x
-        f x | x >= z = x:f (x + inc)
-            | otherwise = []
-
-
-{-
-instance (Ord a, Ord b) => Ord (a,b) where
-    compare (x,y) (a,b) = case compare x a of
-        EQ -> compare y b
-        z -> z
-    -}
-
-
-
-
-{-
-instance (Eq a, Eq b) => Eq (a,b) where
-    (x,y) == (a,b) = x == a && y == b
-    -}
 
 instance Real Integer where
     toRational = fromInteger
