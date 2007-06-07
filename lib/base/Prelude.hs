@@ -47,7 +47,9 @@ module Prelude(
 import Jhc.Basics
 import Jhc.Float
 import Data.Int(Int())
+
 import Jhc.Inst.Enum
+import Jhc.Inst.Read
 
 import Data.Ratio
 import Jhc.Enum

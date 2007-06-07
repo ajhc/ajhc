@@ -121,19 +121,11 @@ instance  Read Integer  where
 instance  Show Float  where
     showsPrec p         = showFloat
 
-instance  Read Float  where
-    readsPrec p s        = [ (doubleToFloat x,y) | (x,y) <- readSigned readDouble s]
 
 instance  Show Double  where
     showsPrec p         = showFloat
 
-instance  Read Double  where
-    readsPrec p         = readSigned readDouble
 
-instance Read () where
-    readsPrec p    = readParen False
-                            (\r -> [((),t) | ("(",s) <- lex r,
-                                             (")",t) <- lex s ] )
 instance  Show Char  where
     showsPrec p '\'' = showString "'\\''"
     showsPrec p c    = showChar '\'' . showLitChar c . showChar '\''
