@@ -7,6 +7,7 @@ module Numeric(fromRat,
                showEFloat, showFFloat, showGFloat, showFloat,
                readFloat, lexDigits) where
 
+import Data.Word
 import Data.Char   ( isDigit, isOctDigit, isHexDigit
                    , digitToInt, intToDigit )
 import Data.Ratio  ( (%), numerator, denominator )
@@ -100,8 +101,10 @@ integerLogBase b i =
 
 showSigned :: Real a => (a -> ShowS) -> Int -> a -> ShowS
 showSigned showPos p x
-  | x < 0     = showParen (p > 6) (showChar '-' . showPos (-x))
+  | x < 0     = showParen (p > 6) (showChar '-' . showPos (negate x))
   | otherwise = showPos x
+
+{-# INLINE showInt #-}
 
 -- showInt, showOct, showHex are used for positive numbers only
 showInt, showOct, showHex :: Integral a => a -> ShowS
@@ -109,8 +112,9 @@ showOct = showIntAtBase  8 intToDigit
 showInt = showIntAtBase 10 intToDigit
 showHex = showIntAtBase 16 intToDigit
 
-{-# SPECIALIZE showIntAtBase :: Int -> (Int -> Char) -> Int -> ShowS #-}
-{-# SPECIALIZE showIntAtBase :: Integer -> (Int -> Char) -> Integer -> ShowS #-}
+{-# SPECIALIZE showIntAtBase :: Word -> (Int -> Char) -> Word -> ShowS #-}
+{-# SPECIALIZE showIntAtBase :: WordMax -> (Int -> Char) -> WordMax -> ShowS #-}
+
 
 showIntAtBase :: Integral a
 	      => a              -- base

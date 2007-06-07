@@ -102,18 +102,12 @@ lex (c:s) | isSingle c = [([c],s)]
                          [(e:ds,t)   | (ds,t) <- lexDigits s]
               lexExp s = [("",s)]
 
-instance  Show Int  where
-    showsPrec n = showsPrec n . toInteger
-        -- Converting to Integer avoids
-        -- possible difficulty with minInt
 
 instance  Read Int  where
   readsPrec p r = [(fromInteger i, t) | (i,t) <- readsPrec p r]
         -- Reading at the Integer type avoids
         -- possible difficulty with minInt
 
-instance  Show Integer  where
-    showsPrec           = showSigned showInt
 
 instance  Read Integer  where
     readsPrec p         = readSigned readDec
@@ -169,66 +163,5 @@ instance Read Ordering where
               (\ inp -> [((GT) , rest) | ("GT" , rest) <- lex inp]) input
 
 
-
-    {-
-instance Show a => Show (Maybe a) where
-    showsPrec _p Nothing s = showString "Nothing" s
-    showsPrec p (Just x) s
-                          = (showParen (p > 10) $
-    			     showString "Just " .
-			     showsPrec 11 x) s
-
-instance (Show a, Show b) => Show (Either a b) where
-    showsPrec p e s =
-       (showParen (p > 10) $
-        case e of
-         Left  a -> showString "Left "  . showsPrec 11 a
-	 Right b -> showString "Right " . showsPrec 11 b)
-       s
-    -}
-
--- Tuples
-{-
-
-instance  (Show a, Show b) => Show (a,b)  where
-    showsPrec p (x,y) = showChar '(' . shows x . showChar ',' .
-                                       shows y . showChar ')'
-
-instance  (Read a, Read b) => Read (a,b)  where
-    readsPrec p       = readParen False
-                            (\r -> [((x,y), w) | ("(",s) <- lex r,
-                                                 (x,t)   <- reads s,
-                                                 (",",u) <- lex t,
-                                                 (y,v)   <- reads u,
-                                                 (")",w) <- lex v ] )
-
-instance  (Show a, Show b) => Show (a,b)  where
-    showsPrec _ (x,y) s = (showChar '(' . shows x . showChar ',' .
-                                          shows y . showChar ')')
-			  s
-
-instance (Show a, Show b, Show c) => Show (a, b, c) where
-    showsPrec _ (x,y,z) s = (showChar '(' . shows x . showChar ',' .
-					    shows y . showChar ',' .
-					    shows z . showChar ')')
-			    s
-
-instance (Show a, Show b, Show c, Show d) => Show (a, b, c, d) where
-    showsPrec _ (w,x,y,z) s = (showChar '(' . shows w . showChar ',' .
-					      shows x . showChar ',' .
-					      shows y . showChar ',' .
-					      shows z . showChar ')')
-			      s
-
-instance (Show a, Show b, Show c, Show d, Show e) => Show (a, b, c, d, e) where
-    showsPrec _ (v,w,x,y,z) s = (showChar '(' . shows v . showChar ',' .
-					     	shows w . showChar ',' .
-					     	shows x . showChar ',' .
-					     	shows y . showChar ',' .
-					     	shows z . showChar ')')
-				s
--- Other tuples have similar Read and Show instances
-
--}
 
 

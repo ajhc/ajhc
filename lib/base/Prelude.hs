@@ -50,6 +50,7 @@ import Data.Int(Int())
 
 import Jhc.Inst.Enum
 import Jhc.Inst.Read
+import Jhc.Inst.Show
 
 import Data.Ratio
 import Jhc.Enum
