@@ -5,19 +5,25 @@
 
 #include <inttypes.h>
 
-typedef int HsInt;
-typedef uint32_t HsChar;
-typedef int8_t HsInt8;
+
+typedef int32_t HsInt;
+typedef int8_t  HsInt8;
 typedef int16_t HsInt16;
 typedef int32_t HsInt32;
 typedef int64_t HsInt64;
-typedef uint8_t HsWord8;
+
+typedef uint32_t HsWord;
+typedef uint8_t  HsWord8;
 typedef uint16_t HsWord16;
 typedef uint32_t HsWord32;
 typedef uint64_t HsWord64;
+
+typedef uint32_t HsChar;
 typedef int HsBool;
+
 typedef double HsDouble;
 typedef float HsFloat;
+
 typedef void *HsPtr;
 typedef void (*HsFunPtr)(void);
 typedef void *HsStablePtr;
