@@ -18,6 +18,11 @@ classify (('\\':x):xs) | x == "begin{code}" = Blank : allProg xs
          allProg (('\\':x):xs) |  x == "end{code}" = Blank : classify xs
 	 allProg (x:xs) = Program x:allProg xs
 classify (('>':x):xs)      = Program (' ':x) : classify xs
+classify (('#':'l':'i':'n':'e':' ':x):xs)      = (case words x of
+                                (line:file:_) | all isDigit line
+                                   -> Include (read line) file
+                                _  -> Pre x
+                             ) : classify xs
 classify (('#':x):xs)      = (case words x of
                                 (line:file:_) | all isDigit line
                                    -> Include (read line) file

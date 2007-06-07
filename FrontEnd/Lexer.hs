@@ -26,6 +26,7 @@ import qualified Data.Map as Map
 
 import FrontEnd.ParseMonad
 import FrontEnd.Warning
+import FrontEnd.SrcLoc
 
 data Token
         = VarId String
@@ -210,39 +211,63 @@ lexer = runL $ do
 
 lexWhiteSpace :: Bool -> Lex a Bool
 lexWhiteSpace bol = do
-	s <- getInput
-	case s of
-            '{':'-':'#':s
-                | pname `Map.member` pragmas -> return bol
-                | otherwise -> do
-                    addWarn "unknown-pragma" $ "The pragma '" ++ pname ++ "' is unknown"
-                    discard 2
-                    bol <- lexNestedComment bol
-                    lexWhiteSpace bol
-                   where pname =  takeWhile isIdent (dropWhile isSpace s)
-	    '{':'-':_ -> do
-		discard 2
-		bol <- lexNestedComment bol
-		lexWhiteSpace bol
-	    '-':'-':rest | all (== '-') (takeWhile isSymbol rest) -> do
-		lexWhile (== '-')
-		lexWhile (/= '\n')
-		s' <- getInput
-		case s' of
-		    [] -> fail "Unterminated end-of-line comment"
-		    _ -> do
-			lexNewline
-			lexWhiteSpace True
-	    '\n':_ -> do
-		lexNewline
-		lexWhiteSpace True
-	    '\t':_ -> do
-		lexTab
-		lexWhiteSpace bol
-	    c:_ | isSpace c -> do
-		discard 1
-		lexWhiteSpace bol
-	    _ -> return bol
+    let linePragma = do
+            lexWhile (`elem` " \r\t")
+            v <- lexDecimal
+            lexWhile (`elem` " \r\t")
+            s <- getInput
+            fn <- case s of
+                '"':_ -> do
+                    discard 1
+                    StringTok s <- lexString
+                    return (Just s)
+                _ -> return Nothing
+            setFilePos (fromInteger v - 1) 1 fn
+            lexWhiteSpace False
+    s <- getInput
+    case s of
+        '{':'-':'#':s
+            | pname `Map.member` pragmas -> return bol
+            | otherwise -> do
+                addWarn "unknown-pragma" $ "The pragma '" ++ pname ++ "' is unknown"
+                discard 2
+                bol <- lexNestedComment bol
+                lexWhiteSpace bol
+               where pname =  takeWhile isIdent (dropWhile isSpace s)
+        '{':'-':_ -> do
+            discard 2
+            bol <- lexNestedComment bol
+            lexWhiteSpace bol
+        '-':'-':rest | all (== '-') (takeWhile isSymbol rest) -> do
+            lexWhile (== '-')
+            lexWhile (/= '\n')
+            s' <- getInput
+            case s' of
+                [] -> fail "Unterminated end-of-line comment"
+                _ -> do
+                    lexNewline
+                    lexWhiteSpace True
+        '\n':'#':' ':ns -> discard 2 >> linePragma
+        '\n':'#':'l':'i':'n':'e':' ':ns -> discard 6 >> linePragma
+        '\n':_ -> do
+            lexNewline
+            lexWhiteSpace True
+        '\t':_ -> do
+            lexTab
+            lexWhiteSpace bol
+        c:_ | isSpace c -> do
+            discard 1
+            lexWhiteSpace bol
+        _ -> return bol
+
+setFilePos :: Int -> Int -> Maybe String -> Lex a ()
+setFilePos line column ms = do
+    sl <- getSrcLoc
+    let sl' = sl { srcLocLine = line, srcLocColumn = column }
+    case ms of
+        Just fn -> setSrcLoc sl' { srcLocFileName = fn }
+        Nothing -> setSrcLoc sl'
+
 
 lexNestedComment :: Bool -> Lex a Bool
 lexNestedComment bol = do

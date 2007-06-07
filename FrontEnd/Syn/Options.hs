@@ -31,9 +31,17 @@ pragma = do
     return $ (nn,body)
 
 
-comment = line +++ block where
+comment = plone +++ pline +++ line +++ block where
     line = do
         string "--"
+        manyTill get (char '\n')
+        return ()
+    pline = do
+        string "# "
+        manyTill get (char '\n')
+        return ()
+    plone = do
+        string "#line "
         manyTill get (char '\n')
         return ()
     block = do

@@ -345,7 +345,7 @@ searchPaths m = ans where
 parseHsSource :: String -> Handle -> IO HsModule
 parseHsSource fn fh = do
     pos <- hGetPosn fh
-    ls <- replicateM 10 (ioM $ hGetLine fh)
+    ls <- replicateM 15 (ioM $ hGetLine fh)
     let f s = opt where
             Just opt = fileOptions opts `mplus` Just options where
             s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
@@ -353,10 +353,15 @@ parseHsSource fn fh = do
     let fopts s = s `member` optFOptsSet opt where opt = f (concatMap concat ls)
     hSetPosn pos
     s <- case () of
-        _ | fopts FO.Cpp -> filterInput "cpp" ["-D__JHC__","-P","-CC","-traditional"] fh
-          | fopts FO.M4 ->  filterInput "m4" ["-D__JHC__"] fh
+        _ | fopts FO.Cpp -> hClose fh >> readSystem "cpp" ["-D__JHC__","-CC","-traditional", "--", fn]
+          | fopts FO.M4 ->  hClose fh >> readSystem "m4" ["-D__JHC__", "-s", fn]
           | otherwise -> CharIO.hGetContents fh
-    let s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
+    let s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s'' else s''
+        s'' = case s of
+            '#':' ':_   -> '\n':s                --  line pragma
+            '#':'l':'i':'n':'e':' ':_  -> '\n':s --  line pragma
+            '#':'!':_ -> dropWhile (/= '\n') s   --  hashbang
+            _ -> s
     case runParserWithMode (parseModeOptions $ f s) { parseFilename = fn } parse  s'  of
                       ParseOk ws e -> processErrors ws >> return e
                       ParseFailed sl err -> putErrDie $ show sl ++ ": " ++ err

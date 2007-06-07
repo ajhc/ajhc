@@ -19,7 +19,7 @@ module FrontEnd.ParseMonad(
 		ParseMode(..),
                 parseModeOptions,
 		runParserWithMode, runParser,
-		getSrcLoc, pushCurrentContext, popContext,thenP,returnP,
+		getSrcLoc, setSrcLoc, pushCurrentContext, popContext,thenP,returnP,
 		-- * Lexing
 		Lex(runL), getInput, discard, lexNewline, lexTab, lexWhile,
 		alternative, checkBOL, setBOL, startToken, getOffside,
@@ -188,10 +188,14 @@ getInput = Lex $ \cont -> P $ \r -> runP (cont r) r
 discard :: Int -> Lex r ()
 discard n = Lex $ \cont -> P $ \r x -> runP (cont ()) (drop n r) (x+n)
 
+
+setSrcLoc :: SrcLoc -> Lex a ()
+setSrcLoc srcloc = Lex $ \cont -> P $ \r x l _ -> runP (cont ()) r x l srcloc
+
 -- | Discard the next character, which must be a newline.
 
 lexNewline :: Lex a ()
-lexNewline = Lex $ \cont -> P $ \(_:r) _x y -> runP (cont ()) r 1 (y+1)
+lexNewline = Lex $ \cont -> P $ \(_:r) _x y loc -> runP (cont ()) r 1 (y+1) loc { srcLocLine = srcLocLine loc + 1 }
 
 -- | Discard the next character, which must be a tab.
 
@@ -248,12 +252,8 @@ setBOL = Lex $ \cont -> P $ \r _ -> runP (cont ()) r 0
 -- Set the loc to the current position
 
 startToken :: Lex a ()
-startToken = Lex $ \cont -> P $ \s x y _ stk mode ->
-	let loc = SrcLoc {
-		srcLocFileName = parseFilename mode,
-		srcLocLine = y,
-		srcLocColumn = x
-	} in
+startToken = Lex $ \cont -> P $ \s x y oloc stk mode ->
+	let loc = oloc { srcLocColumn = x } in
 	runP (cont ()) s x y loc stk mode
 
 -- Current status with respect to the offside (layout) rule:
