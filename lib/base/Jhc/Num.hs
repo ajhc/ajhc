@@ -94,3 +94,15 @@ realToFrac x   =  fromRational (toRational x)
   "fromIntegral/fromInteger"  fromIntegral = fromInteger
  #-}
 
+
+{-# INLINE subtract #-}
+subtract         :: (Num a) => a -> a -> a
+subtract         =  flip (-)
+
+{-# INLINE even #-}
+{-# INLINE odd #-}
+
+even, odd        :: (Integral a) => a -> Bool
+even n           =  n `rem` 2 == 0
+odd              =  not . even
+

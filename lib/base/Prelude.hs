@@ -14,6 +14,9 @@ module Prelude(
     concat,
     any,
     all,
+    subtract,
+    even,
+    odd,
     foldr,
     and,
     filter,
@@ -87,19 +90,6 @@ infixr 8  ^, ^^
 -- Numeric functions
 
 
-{-# INLINE subtract #-}
-subtract         :: (Num a) => a -> a -> a
-subtract         =  flip (-)
-
-
-{-# SPECIALIZE even :: Int -> Bool #-}
-{-# SPECIALIZE odd :: Int -> Bool #-}
-{-# SPECIALIZE even :: Integer -> Bool #-}
-{-# SPECIALIZE odd :: Integer -> Bool #-}
-
-even, odd        :: (Integral a) => a -> Bool
-even n           =  n `rem` 2 == 0
-odd              =  not . even
 
 
 {-# SPECIALIZE gcd :: Int -> Int -> Int #-}
