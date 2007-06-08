@@ -48,6 +48,9 @@ mapExpVal g x = f x where
         return e { expValue = v, expCount = c }
     f (Fetch v) = return Fetch `ap` g v
     f (Update a b) = return Update `ap` g a `ap` g b
+    f (Case v as) = do
+        v <- g v
+        return (Case v as)
     f e = return e
 
 mapValVal fn x = f x where
@@ -57,18 +60,32 @@ mapValVal fn x = f x where
     f (ValPrim p vs ty) = return (ValPrim p) `ap` mapM fn vs `ap` return ty
     f x = return x
 
-mapExpExp f (a :>>= v :-> b) = do
-    a <- f a
-    b <- f b
-    return (a :>>= v :-> b)
-mapExpExp f (Case e as) = do
-    as' <- mapM (mapBodyM f) as
-    return (Case e as')
-mapExpExp f l@Let { expBody = b, expDefs = defs } = do
-    b <- f b
-    defs' <- mapFBodies f defs
-    return $ updateLetProps l { expBody = b, expDefs = defs' }
-mapExpExp _ x = return x
+mapExpLam fn e = f e where
+    f (a :>>= b) = return (a :>>=) `ap` fn b
+    f (Case e as) = return (Case e) `ap` mapM fn as
+    f lt@Let { expDefs = defs } = do
+        defs' <- forM defs $ \d -> do
+            b <- fn $ funcDefBody d
+            return $ updateFuncDefProps d { funcDefBody = b }
+        return $ updateLetProps lt { expDefs = defs' }
+    f nr@NewRegion { expLam = lam } = do
+        lam <- fn lam
+        return $ nr { expLam = lam }
+    f e@MkCont { expCont = c, expLam = l } = do
+        c <- fn c
+        l <- fn l
+        return $ e { expCont = c, expLam = l }
+    f e = return e
+
+
+
+mapExpExp fn e = f e where
+    f (a :>>= b) = return (:>>=) `ap` fn a `ap` g b
+    f l@Let { expBody = b, expDefs = defs } = do
+        b <- fn b
+        mapExpLam g l { expBody = b }
+    f e = mapExpLam g e
+    g (l :-> e) = return (l :->) `ap` fn e
 
 mapFBodies f xs = mapM f' xs where
     f' fd@FuncDef { funcDefBody = l :-> r } = do
