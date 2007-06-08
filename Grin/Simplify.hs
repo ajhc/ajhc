@@ -7,7 +7,7 @@ import Control.Monad.State
 import Control.Monad.Trans
 import Control.Monad.RWS
 import Data.Monoid
-import List hiding (insert)
+import List hiding (insert,union)
 import Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -222,7 +222,7 @@ isSimple (fn,x) = f (2::Int) x where
 
 manifestNodes as = Prelude.map (isManifestNode . lamExp) as
 
-data UnboxingResult = UnboxTag | UnboxTup (Atom,[Ty]) | UnboxConst Val
+data UnboxingResult = UnboxTup (Atom,[Ty]) | UnboxConst Val
     deriving(Eq,Ord)
 
 isCombinable :: Monad m => Bool -> Exp -> m UnboxingResult
@@ -233,7 +233,6 @@ isCombinable postEval e = ans where
     equal [] = fail "empty isCombinable"
     equal [x] = return x
     equal (x:y:rs) = if x == y then equal (y:rs) else fail "not equal"
---    f lf (Return (NodeC t [])) | postEval = return [UnboxTag]
     f lf (Return [z]) | valIsConstant z = return [UnboxConst z]
     f lf (Return [NodeC t xs]) = return [UnboxTup (t,map getType xs)]
     f lf Error {} = return []
@@ -244,7 +243,7 @@ isCombinable postEval e = ans where
     f lf Let { expBody = body, expIsNormal = False } = f lf body
     f lf (App a _ _) | a `member` lf = return []
     f lf Let { expBody = body, expDefs = defs, expIsNormal = True } = ans where
-        nlf = lf `Set.union` Set.fromList (map funcDefName defs)
+        nlf = lf `union` Set.fromList (map funcDefName defs)
         ans = do
             xs <- mapM (f nlf . lamExp . funcDefBody) defs
             b <- f nlf body
@@ -253,27 +252,32 @@ isCombinable postEval e = ans where
 
 
 
-combineLam postEval nty (p :-> e) = p :-> combine postEval nty e where
+--combineLam postEval nty (p :-> e) = p :-> combine postEval nty e where
 combine postEval nty exp = editTail nty f exp where
---    f (Return (NodeC t [])) | postEval  = Return (Tag t)
-    f (Return v) | all valIsConstant v  = Return []
-    f (Return [NodeC t xs]) = Return xs
-    f lt@Let { expBody = body } = updateLetProps lt { expBody = combine postEval nty body }
-    f e = error $ "combine: " ++ show (postEval,nty,e)
+    f (Return v) | all valIsConstant v  = return $ Return []
+    f (Return [NodeC t xs]) = return $ Return xs
+    f e = fail $ "combine: " ++ show (postEval,nty,e)
 
-editTail :: [Ty] -> (Exp -> Exp) -> Exp -> Exp
+editTail :: Monad m => [Ty] -> (Exp -> m Exp) -> Exp -> m Exp
 editTail nty mt te = f mempty te where
-    f _ (Error s ty) = Error s nty
-    f lf (Case x ls) = Case x (map (g lf) ls)
-    f _ lt@Let {expIsNormal = False } = mt lt
-    f lf lt@Let {expDefs = defs, expBody = body, expIsNormal = True } = updateLetProps lt { expBody = f nlf body, expDefs = defs' } where
-        nlf = lf `Set.union` Set.fromList (map funcDefName defs)
-        defs' = [ updateFuncDefProps d { funcDefBody = g nlf (funcDefBody d) } | d <- defs ]
-    f lf lt@MkCont {expLam = lam, expCont = cont } = lt { expLam = g lf lam, expCont = g lf cont }
-    f lf (e1 :>>= p :-> e2) = e1 :>>= p :-> f lf e2
-    f lf e@(App a as t) | a `member` lf = App a as nty
+    f _ (Error s ty) = return $ Error s nty
+    f lf (Case x ls) = return (Case x) `ap` mapM (g lf) ls
+    f lf lt@Let {expIsNormal = False, expBody = body } = do
+        body <- f lf body
+        return $ updateLetProps lt { expBody = body }
+    f lf lt@Let {expDefs = defs, expIsNormal = True } = do
+        let nlf = lf `union` Set.fromList (map funcDefName defs)
+        mapExpExp (f nlf) lt
+    f lf lt@MkCont {expLam = lam, expCont = cont } = do
+        a <- g lf lam
+        b <- g lf cont
+        return $ lt { expLam = a, expCont = b }
+    f lf (e1 :>>= p :-> e2) = do
+        e2 <- f lf e2
+        return $ e1 :>>= p :-> e2
+    f lf e@(App a as t) | a `member` lf = return $ App a as nty
     f lf e = mt e
-    g lf (p :-> e) = p :-> f lf e
+    g lf (p :-> e) = do e <- f lf e; return $ p :-> e
 
 
 isKnown NodeC {} = True
@@ -393,12 +397,6 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
         ch <- caseHoist x as v as' (getType rc)
         f ch
     -- case unboxing
-    f (cs@(Case x as) :>>= lr) | Just UnboxTag <- isCombinable postEval cs = do
-        mtick "Optimize.optimize.case-unbox-tag"
-        let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
-            (va:_vr) = [ v | v <- [v1..], not $ v `Set.member` fv ]
-        lr <- g lr
-        return ((Case x (map (combineLam postEval TyTag) as) :>>= Var va TyTag :-> Return (NodeV va [])) :>>= lr)
     f (cs@(Case x as) :>>= lr) | Just (UnboxTup (t,ts)) <- isCombinable postEval cs = do
         mtick $ "Optimize.optimize.case-unbox-node.{" ++ show t
         let fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- as ]
@@ -446,10 +444,12 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
                 mtick $ "Optimize.optimize.let-unbox-node.{" ++ show t
                 let vs = [ v | v <- [v1..], not $ v `Set.member` fv ]
                     vars = [ Var v t | v <- vs | t <- ts ]
-                return ((combine postEval (ts) cs :>>= vars  :-> Return [NodeC t vars]) :>>= lr)
+                cpe <- combine postEval ts cs
+                return ((cpe :>>= vars  :-> Return [NodeC t vars]) :>>= lr)
             UnboxConst val -> do
                 mtick $ "Optimize.optimize.let-unbox-const.{" ++ show val
-                return ((combine postEval [] cs :>>= [] :-> Return [val]) :>>= lr)
+                cpe <- combine postEval [] cs
+                return ((cpe :>>= [] :-> Return [val]) :>>= lr)
        where fv = freeVars cs `Set.union` freeVars [ p | p :-> _ <- map funcDefBody (expDefs cs) ]
 
 --    f (hexp@Let {} :>>= v@(Var vnum _) :-> rc@(Case v' as') :>>= lr) | v == v', not (vnum `Set.member` freeVars lr) = do
