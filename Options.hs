@@ -39,7 +39,6 @@ import Version(versionString)
 
 data Mode = BuildHl String -- ^ Build the specified hl-file given a description file.
           | Interactive    -- ^ Run interactively.
-          | SelfTest       -- ^ Perform self-test
           | Version        -- ^ Print version and die.
           | VersionCtx     -- ^ Print version context and die.
           | Interpret      -- ^ Interpret.
@@ -147,7 +146,6 @@ theoptions =
     , Option []    ["nowrite-ho"]  (NoArg  (optNoWriteHo_s True))      "Do not write new haskell object files"
     , Option []    ["no-ho"]       (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "same as --ignore-ho and --nowrite-ho"
     , Option []    ["no-follow-deps"] (NoArg  (optFollowDeps_s False)) "Don't follow depencies not listed on command line."
-    , Option []    ["selftest"]       (NoArg  (optMode_s SelfTest))    "Perform internal integrity testing"
     , Option []    ["list-libraries"] (NoArg  (optMode_s ListLibraries)) "List of installed libraries."
     ]
 

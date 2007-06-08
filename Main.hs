@@ -61,7 +61,6 @@ import Name.Name
 import Name.Names
 import Name.VConsts
 import Options
-import SelfTest(selfTest)
 import Support.FreeVars
 import Support.Transform
 import Util.Graph
@@ -108,9 +107,6 @@ main = runMain $ bracketHtml $ do
                 mapM_ putStrLn (optHlPath options)
                 putStrLn "Libraries found:"
             sequence_ [ putStrLn name | (name,_) <- libraryList ]
-        SelfTest      -> do
-            putStrLn "Starting self testing..."
-            SelfTest.selfTest (optArgs o)
         ShowHo ho     -> dumpHoFile ho
         Version       -> putStrLn versionString
         VersionCtx    -> putStrLn (versionString ++ versionContext)

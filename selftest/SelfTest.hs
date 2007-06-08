@@ -1,4 +1,3 @@
-module SelfTest(selfTest) where
 
 import Data.Monoid
 import List(sort)
@@ -29,9 +28,9 @@ import qualified C.Generate
 
 type Prop = Info.Types.Property
 
-{-# NOINLINE selfTest #-}
-selfTest :: [String] -> IO ()
-selfTest _ = do
+{-# NOINLINE main #-}
+main :: IO ()
+main = do
     putStrLn "Testing Atom"
     quickCheck prop_atomid
     quickCheck prop_atomeq
