@@ -168,47 +168,14 @@ fizz sub te tf inState start = res where
         return (p :-> z)
 
 
-
-applySubstE env x = f x where
-    g = applySubst env
-    f (App a vs t) = do
-        vs' <- mapM g vs
-        return $ App a vs' t
-    f (Return v) = do
-        v <- mapM g v
-        return $ Return v
-    f (Prim x vs t) = do
-        vs <- mapM g vs
-        return $ Prim x vs t
-    f (Store v) = do
-        v <- g v
-        return $ Store v
-    f e@Alloc { expValue = v, expCount = c } = do
-        v <- g v
-        c <- g c
-        return e { expValue = v, expCount = c }
-    f (Fetch v) = do
-        v <- g v
-        return $ Fetch v
-    f (Update a b) = do
-        a <- g a
-        b <- g b
-        return $ Update a b
-    f e@Error {} = return e
-    f (Case e as) = do
-        e <- g e
-        return $ Case e as
-    f lt@Let {} = return lt
-    f x = error $ "applySubstE: " ++ show x
+applySubstE env x = mapExpVal (applySubst env) x
 
 applySubst env x = f x where
     f var@(Var v _)
         | Just n <- Map.lookup v env =  return n
-    f (NodeC t vs) = do
-        vs' <- mapM f vs
-        return $ NodeC t vs'
-    f (Index a b) = return Index `ap` f a `ap` f b
-    f x = return x
+    f x = mapValVal f x
+
+
 
 renamePattern :: MonadState (WhizState) m => [Val] ->  m ([Val],WhizEnv)
 renamePattern x = runWriterT (mapM f x) where
