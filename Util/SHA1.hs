@@ -25,7 +25,7 @@ Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 {-# OPTIONS -funbox-strict-fields -fglasgow-exts -fno-warn-name-shadowing -O2 #-}
 
-module Util.SHA1 (sha1file,ABCDE(..),Hash) where
+module Util.SHA1 (sha1file,sha1Handle,ABCDE(..),Hash) where
 
 
 import Control.Monad (unless)
@@ -43,10 +43,10 @@ data ABCDE = ABCDE !Word32 !Word32 !Word32 !Word32 !Word32
 
 data XYZ = XYZ !Word32 !Word32 !Word32
 
-{-# NOINLINE sha1file #-}
-sha1file :: FilePath -> IO Hash
-sha1file fp = do
-    h   <- openBinaryFile fp ReadMode
+{-# NOINLINE sha1Handle #-}
+sha1Handle :: Handle -> IO Hash
+sha1Handle h = do
+    hSeek h AbsoluteSeek 0
     len <- hFileSize h
     len <- return $ fromIntegral len
     let plen = sha1_step_1_2_plength len
@@ -60,6 +60,14 @@ sha1file fp = do
     unless big_endian $ fiddle_endianness ptr' plen
     res <- sha1_step_4_main abcde ptr' plen
     return res
+
+{-# NOINLINE sha1file #-}
+sha1file :: FilePath -> IO Hash
+sha1file fp = do
+    h   <- openBinaryFile fp ReadMode
+    hash <- sha1Handle h
+    hClose h
+    return hash
 
 big_endian = unsafePerformIO $ do
     let x :: Word32
