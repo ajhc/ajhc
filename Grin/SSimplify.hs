@@ -213,10 +213,7 @@ renamePattern x = runWriterT (mapM f x) where
         let nv = Var v' t
         tell (mempty { envSubst = IM.singleton vn nv })
         return nv
-    f (NodeC t vs) = do
-        vs' <- mapM f vs
-        return $ NodeC t vs'
-    f x = return x
+    f x = mapValVal f x
 
 newVarName :: Var -> S Var
 newVarName (V 0) = return (V 0)
