@@ -137,8 +137,11 @@ prettyVal (Const v) = char '&' <> prettyVal v
 prettyVal (ValUnknown ty) = text "?::" <> tshow ty
 prettyVal Unit = text "()"
 prettyVal (Item a  ty) = tshow a <> text "::" <> tshow ty
-prettyVal (ValPrim aprim [] ty) = pprint aprim <> text "::" <> tshow ty
-prettyVal (ValPrim aprim xs ty) = pprint aprim <> tupled (map tshow xs) <> text "::" <> tshow ty
+prettyVal (ValPrim aprim args ty) = f aprim args where
+    f aprim [] = pprint aprim <> text "::" <> tshow ty
+    f (APrim (Op (Op.BinOp bo _ _) _) _) [x,y] | Just (op,prec) <- Op.binopInfix bo = parens (pprintPrec prec x <+> text op <+> pprintPrec prec y)
+    f (APrim (Op (Op.BinOp bo _ _) _) _) [x,y] =  parens $ pprintPrec 1 x <+> char '`' <> tshow bo <> char '`' <+> pprintPrec 1 y
+    f aprim xs = pprint aprim <> tupled (map tshow xs) <> text "::" <> tshow ty
 
 instance DocLike d => PPrint d Var where
     pprint (V i) = text $ 'v':show i

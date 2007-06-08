@@ -283,7 +283,6 @@ instance Show Val where
         | TyPrim (Op.TyBits (Op.BitsArch Op.BitsMax)  _) <- t  = char 'm' <> tshow i
         | TyPrim (Op.TyBits _ _) <- t  = char 'l' <> tshow i
         | otherwise = char 'v' <> tshow i
-    showsPrec _ (Lit i t) | t == tCharzh, Just x <- toIntegral i = tshow (chr x)
     showsPrec _ (Lit i _)  = tshow i
     showsPrec _ Unit  = showString "()"
     showsPrec _ (Const v) = char '&' <> shows v
