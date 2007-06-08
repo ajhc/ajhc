@@ -1,5 +1,5 @@
 {-# OPTIONS_JHC -fffi #-}
-module Time (
+module System.Time (
     ClockTime,
     Month(..),
     Day(..),
@@ -74,12 +74,12 @@ data CalendarTime = CalendarTime {
     ctTZName     :: String,
     ctTZ         :: !Int,
     ctIsDST      :: !Bool
-    } deriving (Eq, Ord, Read, Show)
+    } deriving (Eq, Ord)
 
 data TimeDiff = TimeDiff {
     tdYear, tdMonth, tdDay, tdHour, tdMin, tdSec :: !Int,
     tdPicosec      :: !Integer
-    } deriving (Eq, Ord, Read, Show)
+    } deriving (Eq, Ord)
 
 
 -- Functions on times
