@@ -49,7 +49,7 @@ getContents = unsafeInterleaveIO getContents' where
         ch <- c_getwchar
         if ch == -1 then return [] else  do
             xs <- unsafeInterleaveIO getContents'
-            return (cwintToChar ch:xs)
+            return (unsafeChr ch:xs)
 
 
 readFile :: FilePath -> IO String
@@ -60,13 +60,13 @@ readFile fn = do
                 ch <- c_fgetwc file
                 if ch == -1 then c_fclose file >> return [] else do
                         xs <- unsafeInterleaveIO gc
-                        return (cwintToChar ch:xs)
+                        return (unsafeChr ch:xs)
         unsafeInterleaveIO gc
 
 
 foreign import ccall "stdio.h fopen" c_fopen :: CString -> CString -> IO (Ptr ())
 foreign import ccall "stdio.h fclose" c_fclose :: Ptr () -> IO CInt
-foreign import ccall "wchar.h getwc" c_fgetwc :: Ptr () -> IO CWint
+foreign import ccall "wchar.h jhc_utf8_getc" c_fgetwc :: Ptr () -> IO Int
 
 -- | The 'interact' function takes a function of type @String->String@
 -- as its argument.  The entire input from the standard input device is
@@ -106,7 +106,7 @@ readLn =  do l <- getLine
              return r
 
 putChar :: Char -> IO ()
-putChar c = c_putwchar (charToCWchar c)
+putChar c = c_putwchar (ord c)
 
 -- | this is wrapped around arbitrary showable expressions when used as the main entry point
 runExpr :: Show a => a -> World__ -> World__
@@ -116,12 +116,12 @@ runExpr x w = runNoWrapper (print x) w
 getChar :: IO Char
 getChar = do
     ch <- c_getwchar
-    if ch == -1 then fail "End of file." else return (cwintToChar ch)
+    if ch == -1 then fail "End of file." else return (unsafeChr ch)
 
 foreign import primitive "I2I" cwintToChar :: CWint -> Char
 foreign import primitive "U2U" charToCWchar :: Char -> CWchar
 
-foreign import ccall "stdio.h putwchar_unlocked" c_putwchar :: CWchar -> IO ()
-foreign import ccall "wchar.h getwchar_unlocked" c_getwchar :: IO CWint
+foreign import ccall "stdio.h jhc_utf8_putchar" c_putwchar :: Int -> IO ()
+foreign import ccall "wchar.h jhc_utf8_getchar" c_getwchar :: IO Int
 
 

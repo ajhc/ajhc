@@ -1,5 +1,5 @@
 {-# OPTIONS_JHC -fffi #-}
-module System.IO.Binary(readBinaryFile) where
+module System.IO.Binary(readBinaryFile,putWord8,getWord8) where
 
 import Data.Word
 import Jhc.IO
@@ -26,6 +26,22 @@ readBinaryFile fn = do
 foreign import primitive "Lobits" cintToWord8 :: CInt -> Word8
 foreign import primitive "const.\"rb\"" read_str :: Ptr CChar
 
-foreign import ccall "stdio.h getc" c_getc :: Ptr () -> IO CInt
+foreign import ccall "stdio.h getc_unlocked" c_getc :: Ptr () -> IO CInt
 foreign import ccall "stdio.h fopen" c_fopen :: CString -> CString -> IO (Ptr ())
 foreign import ccall "stdio.h fclose" c_fclose :: Ptr () -> IO CInt
+
+-- Int translates to CInt in the calling conventions so this is safe.
+foreign import ccall "stdio.h putchar_unlocked" c_putchar :: Int -> IO Int
+foreign import ccall "stdio.h getchar_unlocked" c_getchar :: IO Int
+
+
+putWord8 :: Word8 -> IO ()
+putWord8 w = c_putchar (fromIntegral w) >> return ()
+
+getWord8 :: IO Word8
+getWord8 = do
+    c <- c_getchar
+    case c of
+        -1 -> fail "EOF"
+        _ -> return $ fromIntegral c
+

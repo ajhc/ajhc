@@ -171,8 +171,8 @@ putErrLn :: [Char] -> IO ()
 putErrLn [] = putChar '\n'
 putErrLn (c:cs) = putChar c `thenIO_` putErrLn cs
 putChar :: Char -> IO ()
-putChar c = c_putwchar (charToCWchar c)
+putChar c = c_putwchar (charToInt c)
 
-foreign import primitive "U2U" charToCWchar :: Char -> CWchar
-foreign import ccall "stdio.h putwchar" c_putwchar :: CWchar -> IO ()
+foreign import primitive "U2U" charToInt :: Char -> Int
+foreign import ccall "stdio.h jhc_utf8_putchar" c_putwchar :: Int -> IO ()
 

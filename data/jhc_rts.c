@@ -32,25 +32,25 @@ jhc_print_profile(void) {
         times(&tm);
         if(!(_JHC_PROFILE || getenv("JHC_RTS_PROFILE"))) return;
 
-        fwprintf(stderr, L"\n-----------------\n");
-        fwprintf(stderr, L"Profiling: %s\n", jhc_progname);
-        fwprintf(stderr, L"Command: %s\n", jhc_command);
-        fwprintf(stderr, L"Complie: %s\n", jhc_c_compile);
-        fwprintf(stderr, L"Version: %s\n\n", jhc_version);
+        fprintf(stderr, "\n-----------------\n");
+        fprintf(stderr, "Profiling: %s\n", jhc_progname);
+        fprintf(stderr, "Command: %s\n", jhc_command);
+        fprintf(stderr, "Complie: %s\n", jhc_c_compile);
+        fprintf(stderr, "Version: %s\n\n", jhc_version);
 #if !_JHC_BOEHM_GC
-        fwprintf(stderr, L"Memory Allocated: %llu bytes\n", (unsigned long long)(jhc_mem - jhc_memstart));
+        fprintf(stderr, "Memory Allocated: %llu bytes\n", (unsigned long long)(jhc_mem - jhc_memstart));
 #endif
         float cpt = (float)sysconf(_SC_CLK_TCK);
-        fwprintf(stderr, L"User Time:   %.2fs\n", (float)tm.tms_utime/cpt);
-        fwprintf(stderr, L"System Time: %.2fs\n", (float)tm.tms_stime/cpt);
-        fwprintf(stderr, L"Total Time:  %.2fs\n", (float)(tm.tms_stime + tm.tms_utime)/cpt);
+        fprintf(stderr, "User Time:   %.2fs\n", (float)tm.tms_utime/cpt);
+        fprintf(stderr, "System Time: %.2fs\n", (float)tm.tms_stime/cpt);
+        fprintf(stderr, "Total Time:  %.2fs\n", (float)(tm.tms_stime + tm.tms_utime)/cpt);
 
 #if _JHC_PROFILE
-        fwprintf(stderr, L"\nFunction Calls:   %llu\n", (unsigned long long)jhc_prof_function_calls);
-        fwprintf(stderr, L"Case Statements:  %llu\n", (unsigned long long)jhc_prof_case_statements);
-        fwprintf(stderr, L"Updates:          %llu\n", (unsigned long long)jhc_prof_updates);
+        fprintf(stderr, "\nFunction Calls:   %llu\n", (unsigned long long)jhc_prof_function_calls);
+        fprintf(stderr, "Case Statements:  %llu\n", (unsigned long long)jhc_prof_case_statements);
+        fprintf(stderr, "Updates:          %llu\n", (unsigned long long)jhc_prof_updates);
 #endif
-        fwprintf(stderr, L"-----------------\n");
+        fprintf(stderr, "-----------------\n");
 }
 
 
@@ -88,9 +88,44 @@ struct jhc_continuation {
 #define prim_minbound(t) ((t)(((t)1 << (sizeof(t)*8 - 1))))
 
 
+inline static int A_UNUSED
+jhc_utf8_getchar(void)
+{
+    return getchar_unlocked();
+}
+
+inline static int A_UNUSED
+jhc_utf8_getc(FILE *f)
+{
+    return getc_unlocked(f);
+}
+
+inline static int A_UNUSED
+jhc_utf8_putchar(int ch)
+{
+    return putchar_unlocked(ch);
+}
+
+inline static int A_UNUSED
+jhc_utf8_putc(int ch, FILE *f)
+{
+    return putc_unlocked(ch,f);
+}
+
+
 int
 main(int argc, char *argv[])
 {
+        /* A few random assertions about the architecture that the compiler
+         * assumes. should be true of any but the oddest of beasts.
+         */
+
+        assert(sizeof(HsPtr) == sizeof(HsFunPtr));
+        assert(sizeof(HsPtr) == sizeof(intptr_t));
+        assert(sizeof(HsPtr) == sizeof(uintptr_t));
+        assert(CHAR_BITS == 8);
+        assert(EOF == -1);
+
         jhc_arch_assert();
         jhc_malloc_init();
         jhc_argc = argc - 1;
@@ -104,6 +139,7 @@ main(int argc, char *argv[])
         jhc_print_profile();
         return 0;
 }
+
 
 
 

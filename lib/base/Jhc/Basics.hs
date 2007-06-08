@@ -160,6 +160,9 @@ ord (Char c) = boxInt c
 chr :: Int -> Char
 chr i = Char (unboxInt i)
 
+unsafeChr :: Int -> Char
+unsafeChr = chr
+
 {-
 foreign import primitive "ULte" bits32ULte  :: Bits32_ -> Bits32_ -> Bool__
 foreign import primitive "error.Prelude.chr: value out of range" chr_error :: a

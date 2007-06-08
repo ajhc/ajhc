@@ -88,7 +88,7 @@ hGetContents h = withHandle h $ \ptr -> do
                 -1 -> return []
                 _ -> do
                     xs <- unsafeInterleaveIO getContents'
-                    return (cwintToChar ch:xs)
+                    return (unsafeChr ch:xs)
     unsafeInterleaveIO getContents'
 --hIsEOF :: Handle -> IO Bool
 
@@ -96,8 +96,8 @@ foreign import primitive "I2I" cwintToChar :: CWint -> Char
 
 foreign import ccall "stdio.h fflush" c_fflush :: Ptr Handle -> IO ()
 
-foreign import ccall "wchar.h getwc" c_fgetwc :: Ptr Handle -> IO CWint
-foreign import ccall "wchar.h putwc" c_fputwc :: CWchar -> Ptr Handle -> IO CWint
+foreign import ccall "wchar.h jhc_utf8_getc" c_fgetwc :: Ptr Handle -> IO Int
+foreign import ccall "wchar.h jhc_utf8_putc" c_fputwc :: Int -> Ptr Handle -> IO Int
 
 foreign import ccall "stdio.h feof" c_feof :: Ptr Handle -> IO CInt
 
