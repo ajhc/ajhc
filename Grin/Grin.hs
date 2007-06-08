@@ -299,12 +299,12 @@ phaseEvalInlined e = e >= PostInlineEval
 
 data Grin = Grin {
     grinEntryPoints :: Map.Map Atom FfiExport,
-    grinPhase :: Phase,
+    grinPhase :: !Phase,
     grinTypeEnv :: TyEnv,
     grinFunctions :: [FuncDef],
     grinSuspFunctions :: Set.Set Atom,
     grinPartFunctions :: Set.Set Atom,
-    grinStats :: Stats.Stat,
+    grinStats :: !Stats.Stat,
     grinCafs :: [(Var,Val)]
 }
 

@@ -76,7 +76,7 @@ transformGrin tp prog = do
         maybeDie
         return prog
     let istat = grinStats prog
-    prog' <- Control.Exception.catch (transformOperation tp prog { grinStats = mempty }) ferr
+    prog' <- Control.Exception.catch (transformOperation tp prog { grinStats = mempty } >>= Control.Exception.evaluate ) ferr
     let estat = grinStats prog'
     let onerr grin' = do
             putErrLn $ "\n>>> Before " ++ name
