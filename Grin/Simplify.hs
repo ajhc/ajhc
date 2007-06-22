@@ -293,8 +293,11 @@ sizeExp Let { expDefs = defs, expBody = body } = sizeExp body + sum (map (sizeLa
 sizeExp MkCont { expCont = l1, expLam = l2 } = 1 + sizeLam l1 + sizeLam l2
 sizeExp x = 1
 
-optimize1 ::  Grin -> Bool -> (Atom,Lam) -> StatM Lam
+optimize1 ::  Grin -> Bool -> (Atom,Lam) -> StatT IO Lam
 optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
+    mtick x = do
+        lift $ lift $ putStrLn x
+        Stats.mtick x
     g (b :-> e) = f e >>= return . (b :->)
 --    f (Case e as :>>= lam)  | (sizeLam lam - 1) * length as <= 3 = do
 --        mtick "Optimize.optimize.case-pullin"
@@ -340,19 +343,18 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
 --        mtick "Optimize.optimize.update-eval"
 --        f (Update v t :>>= [] :-> doEval t typ)
     f (Case n as) | isKnown n = do
-        kc <- knownCase n as
-        f kc
+        knownCase n as
     f (Case n as :>>= lr) | isKnown n = do
         kc <- knownCase n as
-        f (kc :>>= lr)
+        lr' <- g lr
+        return (kc :>>= lr')
     f (Return [n] :>>= b :-> Case b' as :>>= lr) | isKnown n, b == [b'] = do
         c <- knownCase n as
-        r <- f (c :>>= lr)
-        return (Return [n] :>>= b :-> r)
+        lr' <- g lr
+        return (Return [n] :>>= b :-> c :>>= lr')
     f (Return [n] :>>= b :-> Case b' as ) | isKnown n, b == [b'] = do
         kc <- knownCase n as
-        r <- f kc
-        return (Return [n] :>>= b :-> r)
+        return (Return [n] :>>= b :-> kc)
         {-
     f (Case x as :>>= [] :-> (Case x' as') :>>= lr) | x == x', not $ any (isVar . lamBind) as = do
         c <- caseCombine x as as'
@@ -381,13 +383,13 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
 
     f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars r `Set.intersection` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-tail"
-        f (updateLetProps lt { expBody = e } :>>= l :-> r)
+        return (updateLetProps lt { expBody = e } :>>= l :-> r)
 --    f lt@(Let { expDefs = defs, expBody = e :>>= l :-> r } :>>= lr) | Set.null (freeVars r `Set.intersect` (Set.fromList $ map funcDefName defs)) = do
 --        mtick "Optimize.optimize.let-shrink-tail"
 --        f ((updateLetProps lt { expBody = e } :>>= l :-> r) :>>= lr)
     f lt@Let { expDefs = defs, expBody = e :>>= l :-> r } | Set.null (freeVars e `Set.intersection` (Set.fromList $ map funcDefName defs)) = do
         mtick "Optimize.optimize.let-shrink-head"
-        f (e :>>= l :-> updateLetProps lt { expBody = r })
+        return (e :>>= l :-> updateLetProps lt { expBody = r })
 
 {-
     f (Case x as :>>= v@(Var vnum _) :-> rc@(Case v' as') :>>= lr) | v == v', count (== Nothing ) (Prelude.map (isManifestNode . lamExp) as) <= 1, not (vnum `Set.member` freeVars lr) = do
@@ -597,11 +599,12 @@ simplify stats grin = do
         indirectFuncs = if postEval then Set.empty else Set.fromList (concat [ fi | (_,(fi,_)) <- rf ])
         hist =  Hist.fromList $ concat [ fd | (_,(_,fd)) <- rf ]
     let opt env a n l = do
-                (_,nl) <- deadVars stats (a,l)
-                (_,nl) <- simplify1 stats env (a,nl)
-                let Identity nl'' = whizExps return nl
+                --(_,nl) <- deadVars stats (a,l)
+                --(_,nl) <- simplify1 stats env (a,nl)
+                --let Identity nl'' = whizExps return nl
                 -- putDocM CharIO.putErr (prettyFun (a,nl''))
-                let (nl',stat) = runStatM (optimize1 grin postEval (a,nl''))
+                --let (nl',stat) = runStatM (optimize1 grin postEval (a,nl''))
+                (nl',stat) <- runStatT (optimize1 grin postEval (a,l))
                 tickStat stats stat
                 return nl'
                 {-
