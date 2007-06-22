@@ -25,13 +25,11 @@ Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 {-# OPTIONS -funbox-strict-fields -fglasgow-exts -fno-warn-name-shadowing -O2 #-}
 
-module Util.SHA1 (sha1file,sha1Handle,ABCDE(..),Hash) where
+module Util.SHA1 (sha1file,sha1Handle,ABCDE(..),Hash,emptyHash) where
 
 
 import Control.Monad (unless)
 import Data.Char (intToDigit)
-import Data.Bits (xor, (.&.), (.|.), complement, rotateL, shiftL, shiftR)
-import Data.Word (Word8, Word32)
 import Foreign
 import Foreign.C
 import System.IO
@@ -40,6 +38,8 @@ import System.IO.Unsafe (unsafePerformIO)
 type Hash = ABCDE
 data ABCDE = ABCDE !Word32 !Word32 !Word32 !Word32 !Word32
     deriving(Eq,Ord)
+
+emptyHash = ABCDE 0 0 0 0 0
 
 data XYZ = XYZ !Word32 !Word32 !Word32
 
@@ -53,6 +53,7 @@ sha1Handle h = do
     allocaBytes plen $ \ptr -> do
     cnt <- hGetBuf h ptr len
     unless (cnt == len) $ fail "sha1File - read returned too few bytes"
+    hSeek h AbsoluteSeek 0
     let num_nuls = (55 - len) `mod` 64
     pokeArray (advancePtr ptr len) ((128:replicate num_nuls 0)++(reverse $ size_split 8 (fromIntegral len*8)))
     let abcde = sha1_step_3_init
