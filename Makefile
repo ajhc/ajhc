@@ -99,7 +99,7 @@ depend: $(BUILTSOURCES)
 	rm -f dep.tmp
 
 clean:
-	rm -f  jhc jhcp *.hs_code.c `find . -name \*.hi -or -name \*.o-boot -or -name \*.hi-boot -or -name \*.o`
+	rm -f  jhc jhcp depend.make *.hs_code.c `find . -name \*.hi -or -name \*.o-boot -or -name \*.hi-boot -or -name \*.o`
 
 tests: helloworld calendar primes
 
