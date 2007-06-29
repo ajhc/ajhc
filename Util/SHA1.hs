@@ -25,7 +25,7 @@ Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 
 {-# OPTIONS -funbox-strict-fields -fglasgow-exts -fno-warn-name-shadowing -O2 #-}
 
-module Util.SHA1 (sha1file,sha1Handle,ABCDE(..),Hash,emptyHash) where
+module Util.SHA1 (sha1file,sha1Bytes,hashToBytes,sha1Handle,ABCDE(..),Hash,emptyHash) where
 
 
 import Control.Monad (unless)
@@ -42,6 +42,21 @@ data ABCDE = ABCDE !Word32 !Word32 !Word32 !Word32 !Word32
 emptyHash = ABCDE 0 0 0 0 0
 
 data XYZ = XYZ !Word32 !Word32 !Word32
+
+sha1Bytes :: [Word8] -> Hash
+sha1Bytes ss = unsafePerformIO $ do
+    let len = length ss
+        plen = sha1_step_1_2_plength len
+    allocaBytes plen $ \ptr -> do
+    pokeArray ptr ss
+    let num_nuls = (55 - len) `mod` 64
+    pokeArray (advancePtr ptr len) ((128:replicate num_nuls 0)++(reverse $ size_split 8 (fromIntegral len*8)))
+    let abcde = sha1_step_3_init
+    let ptr' = castPtr ptr
+    unless big_endian $ fiddle_endianness ptr' plen
+    res <- sha1_step_4_main abcde ptr' plen
+    return res
+
 
 {-# NOINLINE sha1Handle #-}
 sha1Handle :: Handle -> IO Hash
@@ -224,6 +239,17 @@ sha1_step_4_main (ABCDE a0@a b0@b c0@c d0@d e0@e) s len
            do i' <- i
               return (rotateL a 5 + f (XYZ b c d) + e + i' + k,
                       rotateL b 30)
+
+hashToBytes :: Hash -> [Word8]
+hashToBytes (ABCDE a b c d e) = tb a . tb b . tb c . tb d . tb e $ [] where
+    tb :: Word32 -> [Word8] -> [Word8]
+    tb n = showIt 4 n
+    showIt :: Int -> Word32 -> [Word8] -> [Word8]
+    showIt 0 _ r = r
+    showIt i x r = case quotRem x 256 of
+                       (y, z) -> let c = fromIntegral z
+                                 in c `seq` showIt (i-1) y (c:r)
+
 
 instance Show ABCDE where
     showsPrec _ (ABCDE a b c d e) = showAsHex a . showAsHex b . showAsHex c . showAsHex d . showAsHex e
