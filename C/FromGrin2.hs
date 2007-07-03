@@ -532,6 +532,10 @@ convertPrim p vs ty
     | APrim (Func _ n as r) _ <- p = do
         vs' <- mapM convertVal vs
         return $ cast (basicType r) (functionCall (name $ unpackPS n) [ cast (basicType t) v | v <- vs' | t <- as ])
+    | APrim (IFunc _ as r) _ <- p = do
+        v':vs' <- mapM convertVal vs
+        let fn = cast (funPtrType (basicType r) (map basicType as)) v'
+        return $ cast (basicType r) (indirectFunctionCall fn [ cast (basicType t) v | v <- vs' | t <- as ])
     | APrim (Peek t) _ <- p, [v] <- vs = do
         v' <- convertVal v
         return $ expressionRaw ("*((" <> (opTyToC' t) <+> "*)" <> (parens $ renderG v') <> char ')')

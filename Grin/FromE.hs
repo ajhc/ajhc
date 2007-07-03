@@ -449,10 +449,13 @@ compile' cenv (tvr,as,e) = ans where
             ty' = toTypes TyNode ty
 
         case p of
-            Func True fn as "void" -> return $ Prim ap  xs' ty'
-            Func True fn as r -> do
-                return $ Prim ap xs' ty'
+            Func True fn as "void" -> return $ Prim ap xs' ty'
+            Func True fn as r      -> return $ Prim ap xs' ty'
             Func False _ as r | Just _ <- fromRawType ty ->  do
+                return $ Prim ap xs' ty'
+            IFunc True _ _ ->
+                return $ Prim ap xs' ty'
+            IFunc False _ _ | Just _ <- fromRawType ty ->
                 return $ Prim ap xs' ty'
             Peek pt' | [addr] <- xs -> do
                 return $ Prim ap (args [addr]) ty'

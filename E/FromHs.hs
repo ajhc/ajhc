@@ -355,6 +355,54 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
     anninst (a,b,c)
         | "Instance@" `isPrefixOf` show a = (a,setProperty prop_INSTANCE b, deNewtype dataTable c)
         | otherwise = (a,b, deNewtype dataTable c)
+
+    -- first argument builds the actual call primitive, given 
+    -- (a) the C argtypes
+    -- (b) the C return type
+    -- (c) whether it's IO-like or not
+    -- (d) the real return type
+    -- (e) the arguments themselves
+    -- ccallHelper returns a function expression to perform the call, when given the arguments
+    ccallHelper :: Monad m => ([ExtType] -> ExtType -> Bool -> [E] -> E -> E) -> E -> Ce m E
+    ccallHelper myPrim ty = do
+        let (ts,rt) = argTypes' ty
+            (isIO,rt') =  extractIO' rt
+        es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
+        pt <- lookupCType rt'
+        cts <- mapM lookupCType (filter (not . sortKindLike) ts)
+        [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
+        let cFun = createFunc dataTable (map tvrType es)
+            prim = myPrim cts pt
+        case (isIO,pt) of
+            (True,"void") -> cFun $ \rs -> (,) (ELam tvrWorld) $
+                        eStrictLet tvrWorld2 
+                                   (prim True
+                                         (EVar tvrWorld
+                                          :[EVar t | (t,_) <- rs ])
+                                         tWorld__)
+                                   (eJustIO (EVar tvrWorld2) vUnit)
+            (False,"void") -> fail "pure foreign function must return a valid value"
+            _ -> do
+                (cn,rtt',_) <- lookupCType' dataTable rt'
+                [rtVar,rtVar'] <- newVars [rt',rtt']
+                let rttIO = ltTuple [tWorld__, rt']
+                    rttIO' = ltTuple' [tWorld__, rtt']
+                case isIO of
+                    False -> cFun $ \rs -> (,) id $
+                                 eStrictLet rtVar'
+                                           (prim False
+                                                 [ EVar t | (t,_) <- rs ]
+                                                 rtt')
+                                           (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
+                    True -> cFun $ \rs -> (,) (ELam tvrWorld) $
+                                eCaseTup' (prim True
+                                                (EVar tvrWorld:[EVar t | (t,_) <- rs ])
+                                                rttIO')
+                                          [tvrWorld2,rtVar']
+                                          (eLet rtVar 
+                                                (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
+                                                (eJustIO (EVar tvrWorld2) (EVar rtVar)))
+
     cDecl :: Monad m => HsDecl -> Ce m [(Name,TVr,E)]
     cDecl (HsForeignDecl _ (FfiSpec (Import cn req) _ Primitive) n _) = do
         let name      = toName Name.Val n
@@ -373,31 +421,28 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         let expr x     = return [(name,setProperty prop_INLINE var,lamt x)]
             prim       = APrim (AddrOf $ packString rcn) req
         expr $ eStrictLet uvar (EPrim prim [] st) (ELit (litCons { litName = cn, litArgs = [EVar uvar], litType = rt }))
+
     cDecl (HsForeignDecl _ (FfiSpec (Import rcn req) _ CCall) n _) = do
         let name = toName Name.Val n
         (var,ty,lamt) <- convertValue name
-        let (ts,rt) = argTypes' ty
-            (isIO,rt') =  extractIO' rt
-        es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
-        pt <- lookupCType rt'
-        cts <- mapM lookupCType (filter (not . sortKindLike) ts)
-        [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
-        let cFun = createFunc dataTable (map tvrType es)
-            prim io  = EPrim (APrim (Func io (packString rcn) cts pt) req)
-        result <- case (isIO,pt) of
-            (True,"void") -> cFun $ \rs -> (,) (ELam tvrWorld) $
-                        eStrictLet tvrWorld2 (prim True  (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
-            (False,"void") -> fail "pure foreign function must return a valid value"
-            _ -> do
-                (cn,rtt',_) <- lookupCType' dataTable rt'
-                [rtVar,rtVar'] <- newVars [rt',rtt']
-                let rttIO = ltTuple [tWorld__, rt']
-                    rttIO' = ltTuple' [tWorld__, rtt']
-                case isIO of
-                    False -> cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim False [ EVar t | (t,_) <- rs ] rtt') (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
-                    True -> cFun $ \rs -> (,) (ELam tvrWorld) $
-                                eCaseTup' (prim True (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' }) (eJustIO (EVar tvrWorld2) (EVar rtVar)))
+        result <- ccallHelper
+                     (\cts crt io args rt ->
+                      EPrim (APrim (Func io (packString rcn) cts crt) req) args rt)
+                     ty
         return [(name,setProperty prop_INLINE var,lamt result)]
+    cDecl (HsForeignDecl _ (FfiSpec Dynamic _ CCall) n _) = do
+        -- XXX ensure that the type is of form FunPtr /ft/ -> /ft/
+        let name = toName Name.Val n
+        (var,ty,lamt) <- convertValue name
+        let ((fptrTy:_), _) = argTypes' ty
+            fty = discardArgs 1 ty
+
+        result <- ccallHelper
+                     (\cts crt io args rt ->
+                      EPrim (APrim (IFunc io (tail cts) crt) (Requires [] [])) args rt)
+                     ty
+        return [(name,setProperty prop_INLINE var,lamt result)]
+
     cDecl (HsForeignDecl _ (FfiSpec (Import rcn _) _ DotNet) n _) = do
         (var,ty,lamt) <- convertValue (toName Name.Val n)
         let (ts,rt) = argTypes' ty

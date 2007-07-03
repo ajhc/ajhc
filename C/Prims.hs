@@ -38,9 +38,10 @@ data Prim =
         primRetType :: ExtType
         }   -- function call with C calling convention
     | IFunc {
+        funcIOLike :: !Bool,
         primArgTypes :: [ExtType],
         primRetType :: ExtType
-        } -- indirect function call
+        } -- indirect function call with C calling convention
     | AddrOf PackedString              -- address of linker name
     | Peek { primArgTy :: Op.Ty }  -- read value from memory
     | Poke { primArgTy :: Op.Ty }  -- write value to memory
@@ -143,7 +144,7 @@ instance DocLike d => PPrint d Prim where
     pprint (PrimPrim t) = text (unpackPS t)
     pprint (CConst s t) = parens (text t) <> parens (text s)
     pprint (Func _ s xs r) = parens (text r) <> text (unpackPS s) <> tupled (map text xs)
-    pprint (IFunc xs r) = parens (text r) <> parens (char '*') <> tupled (map text xs)
+    pprint (IFunc _ xs r) = parens (text r) <> parens (char '*') <> tupled (map text xs)
     pprint (AddrOf s) = char '&' <> text (unpackPS s)
     pprint (PrimString s) = tshow s <> char '#'
     pprint (Peek t) = char '*' <> tshow t

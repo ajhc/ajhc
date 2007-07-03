@@ -22,6 +22,7 @@ module C.Generate(
     function,
     Function(functionName),
     functionCall,
+    indirectFunctionCall,
     FunctionOpts(..),
     generateC,
     goto,
@@ -43,6 +44,7 @@ module C.Generate(
     project',
     projectAnon,
     ptrType,
+    funPtrType,
     renderG,
     sizeof,
     Statement(),
@@ -130,7 +132,7 @@ stmtMapStmt f s = g s where
     h (St sms) = return St `ap` Seq.mapM f sms
 
 
-data Type = TB String | TPtr Type | TAnon [Type] | TNStruct Name
+data Type = TB String | TPtr Type | TAnon [Type] | TNStruct Name | TFunPtr Type [Type]
     deriving(Eq,Ord)
 
 data E = ED (G Doc) | EP E | EE
@@ -208,6 +210,7 @@ instance Draw Type where
                 put (n + 1,Map.insert ts nm mp)
                 text "struct" <+> draw nm
     draw (TNStruct n) = text "struct" <+> draw n
+    draw (TFunPtr r as) = draw r <+> text "(*)" <> tupled (map draw as)
 
     err s = TB $ terr s
 
@@ -219,9 +222,13 @@ cast :: Type -> Expression -> Expression
 cast t e = expDC (parens (draw t) <> pdraw e)
 
 
+functionCall' fe es = expD (draw fe <> tupled (map draw es))
 
 functionCall :: Name -> [Expression] -> Expression
-functionCall n es = expD (draw n <> tupled (map draw es))
+functionCall = functionCall'
+
+indirectFunctionCall :: Expression -> [Expression] -> Expression
+indirectFunctionCall e = functionCall' (expD (parens (draw e)))
 
 dereference :: Expression -> Expression
 dereference x = expDC $ char '*' <> pdraw x
@@ -462,6 +469,9 @@ structType n = TNStruct n
 
 ptrType :: Type -> Type
 ptrType t = TPtr t
+
+funPtrType :: Type -> [Type] -> Type
+funPtrType r as = TFunPtr r as
 
 --namedStructType :: Name -> [(Name,Type)] -> Type
 --structType :: Name -> [Type] -> Type
