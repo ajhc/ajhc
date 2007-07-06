@@ -81,6 +81,7 @@ s_Hash = toName SortName ("Jhc@","#")
 sFuncNames = FuncNames {
     func_bind = v_bind,
     func_bind_ = v_bind_,
+    func_return = v_return,
     func_concatMap = v_concatMap,
     func_fromInteger = v_fromInteger,
     func_fromInt = v_fromInt,

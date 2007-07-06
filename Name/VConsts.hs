@@ -77,6 +77,7 @@ instance ToTuple (String,String) where
 data FuncNames a = FuncNames {
     func_bind :: a,
     func_bind_ :: a,
+    func_return :: a,
     func_concatMap :: a,
     func_equals :: a,
     func_fromInt :: a,

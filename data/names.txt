@@ -87,6 +87,7 @@ undefined        Jhc.Basics.undefined
 
 bind                 Jhc.Monad.>>=
 bind_                Jhc.Monad.>>
+return               Jhc.Monad.return
 concatMap            Jhc.Basics.concatMap
 fromInteger          Jhc.Num.fromInteger
 fromInt              Jhc.Num.fromInt
