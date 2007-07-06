@@ -188,7 +188,9 @@ showE e = do
         f ELetRec { eDefs = ds, eBody = e } = do
             e <- fmap unparse $ showE e
             ds <- mapM (fmap unparse . showDecl) ds
-            return $ fixitize (L,(-10)) $ atom $ group (nest 4  ( keyword "let" </> (align $ sep (map (<> bc ';') ds) </> (keyword "in" <+> e))))
+            return $ fixitize (L,(-10)) $ atom $ group $ align (( keyword "let"
+                                                                  </> (align $ sep (map (<> bc ';') ds))
+                                                                  </> (keyword "in" <+> align e) ))
 
         f ec@(ECase { eCaseScrutinee = e, eCaseAlts = alts }) = mt (showE (eCaseType ec)) $  allocTVr (eCaseBind ec) $ do
             scrut <- fmap unparse $ showE e
