@@ -36,7 +36,7 @@ jhc: $(BUILTSOURCES) $(HSFILES)
 	$(HC) $(GHCOPTS) $(EXTRAOPTS) --make $(MAIN) -o $@
 	touch -t `cat /tmp/$@.date.tmp` $@
 
-i:
+i ghci:
 	ghci $(GHCOPTS) $(EXTRAOPTS) Main.hs
 
 LIBPACKAGES=base-1.0.hl haskell98-1.0.hl
