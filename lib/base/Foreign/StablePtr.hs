@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi #-}
+{-# OPTIONS_JHC -N -fffi #-}
 module Foreign.StablePtr(
     StablePtr(),
     castStablePtrToPtr,
@@ -8,7 +8,10 @@ module Foreign.StablePtr(
     freeStablePtr
     ) where
 
-import Foreign.Ptr
+import Jhc.Addr
+import Jhc.Basics
+import Jhc.IO
+import Jhc.Monad
 
 newtype StablePtr a = StablePtr (Ptr ())
 data PlaceHolder
