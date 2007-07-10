@@ -222,6 +222,7 @@ maybeimpspec :: { Maybe (Bool, [HsImportSpec]) }
 
 impspec :: { (Bool, [HsImportSpec]) }
       :  '(' importlist maybecomma ')'        { (False, reverse $2) }
+      |  '(' ')'                              { (False, []) }
       |  'hiding' '(' importlist maybecomma ')' { (True,  reverse $3) }
 
 importlist :: { [HsImportSpec] }
