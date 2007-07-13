@@ -425,6 +425,8 @@ typeTable = Map.fromList [
     (tc_World__,  "void")
     ]
 
+-- | Returns a string naming the C type that the given type is
+-- converted to/from in foreign imports/exports
 lookupCType :: Monad m => E -> m String
 lookupCType e = f e where
     f (ELit LitCons { litName = c })
@@ -444,6 +446,9 @@ extractIO' e = case extractIO e of
     Just x -> (True,x)
     Nothing -> (False,e)
 
+-- | Finds the internal constructor, E field type, and C field type
+-- for an FFI-able single-field, single-constructor datatype like
+-- 'Int' (or a newtype thereof)
 lookupCType' dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
     ELit LitCons { litName = c, litArgs = [] }
         | Just Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable,
