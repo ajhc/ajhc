@@ -29,6 +29,7 @@ import E.Eval(eval)
 import E.LetFloat(atomizeAp)
 import E.PrimOpt
 import E.Rules
+import E.Show(render)
 import E.Subst
 import E.Traverse
 import E.TypeCheck
@@ -356,6 +357,20 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         | "Instance@" `isPrefixOf` show a = (a,setProperty prop_INSTANCE b, deNewtype dataTable c)
         | otherwise = (a,b, deNewtype dataTable c)
 
+    marshallToC :: UniqueProducer m => DataTable -> E -> E -> m E
+    marshallToC dataTable e te | otherwise = do
+        (cna,sta,ta) <- lookupCType' dataTable te
+        [tvra] <- newVars [sta]
+        return $ eCase e
+                       [Alt (litCons { litName = cna, litArgs = [tvra], litType = te })
+                            (EVar tvra)]
+                       Unknown
+
+    marshallFromC :: UniqueProducer m => DataTable -> E -> E -> m E
+    marshallFromC dataTable ce te | otherwise = do
+        (cna,sta,ta) <- lookupCType' dataTable te
+        return $ ELit (litCons { litName = cna, litArgs = [ce], litType = te })
+
     -- first argument builds the actual call primitive, given 
     -- (a) the C argtypes
     -- (b) the C return type
@@ -469,10 +484,53 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         return [(toName Name.Val n,var,lamt result)]
 
     cDecl x@HsForeignDecl {} = fail ("Unsupported foreign declaration: "++ show x)
-    cDecl (HsForeignExport _ ffi@(FfiExport ecn _ CCall) n _) = do
+
+    cDecl (HsForeignExport _ ffi@(FfiExport ecn _ cc@CCall) n _) = do
+        let name = ffiExportName ffi
+        fn <- convertVar name
         tn <- convertVar (toName Name.Val n)
-        funcs <- asks ceFuncs
-        (:[]) `liftM` nameToEntryPoint dataTable tn (toName Name.FfiExportName ecn) (Just ffi) funcs
+
+        (var,ty,lamt) <- convertValue name
+        let (argTys,retTy') = argTypes' ty
+            (isIO,retTy) = extractIO' retTy'
+
+        retCTy <- if retTy == tUnit
+                  then return unboxedTyUnit
+                  else liftM (\(_, _, x) -> rawType x) $ lookupCType' dataTable retTy
+                          
+        argCTys <- liftM (map rawType) (mapM (liftM (\(_,_,x) -> x) . lookupCType' dataTable) argTys)
+
+        argTvrs <- newVars argCTys
+        argEs <- sequence [(marshallFromC dataTable (EVar v) et) | v <- argTvrs | et <- argTys]
+        
+        fe <- actuallySpecializeE (EVar tn) ty
+        let inner = foldl EAp fe argEs
+
+        retE <- case isIO of
+                  False -> marshallToC dataTable inner retTy
+                  True -> do [world_, world__, ret] <- newVars [tWorld__, tWorld__, retTy]
+                             retMarshall <- if retTy == tUnit
+                                            then return (ELit (unboxedTuple []))
+                                            else marshallToC dataTable (EVar ret) retTy
+                             return (eLam world_ (eCaseTup' (eAp inner (EVar world_))
+                                                            [world__, ret]
+                                                            (ELit (unboxedTuple [EVar world__, retMarshall]))))
+        
+        let retCTy' = typeInfer dataTable retE
+
+        -- trace ("retE: "++pprint retE) $ return ()
+        
+        let result = foldr ELam retE argTvrs
+
+        realRetCTy:realArgCTys <- mapM lookupCType (retTy:argTys)
+
+        return [(name,
+                 tvrInfo_u (Info.insert (ffi, (realArgCTys,realRetCTy)))
+                           (fmap (const (foldr tFunc retCTy' argCTys)) $
+                            --fmap (const Unknown) $
+                              setProperty prop_EXPORTED fn),
+                 result)]
+
     cDecl x@HsForeignExport {} = fail ("Unsupported foreign export: "++ show x)
 
     cDecl (HsPatBind sl (HsPVar n) (HsUnGuardedRhs exp) []) | n == sillyName' = do
@@ -869,6 +927,14 @@ packupString s | all (\c -> c > '\NUL' && c <= '\xff') s = (EPrim (APrim (PrimSt
 packupString s = (toE s,False)
 
 
+actuallySpecializeE :: Monad m 
+    => E   -- ^ the general expression
+    -> E   -- ^ the specific type
+    -> m E -- ^ the specialized value
+actuallySpecializeE ge st = do
+    -- trace (pprint (ge, getType ge, st)) $ return ()
+    liftM (foldl EAp ge)
+          (specializeE (getType ge) st)
 
 specializeE :: Monad m
     => E   -- ^ the general type
@@ -880,7 +946,10 @@ specializeE gt st = do
                 Just x -> return x
                 Nothing -> fail $ "specializeE: variable not bound: " ++ pprint (((gt,st),(mm,tvr)),(zs,x))
         f zs (EPi vbind exp) = f (vbind:zs) exp
-        f _ _ = fail "specializeE: attempt to specialize types that do not unify"
+        f _ _ = fail $ render (text "specializeE: attempt to specialize types that do not unify:" 
+                               <$> pprint (gt,st)
+                               <$> tshow  gt
+                               <$> tshow st)
     f [] gt
 
 

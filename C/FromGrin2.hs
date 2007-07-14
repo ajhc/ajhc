@@ -96,7 +96,7 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
             f t n = tshow t <> text " = " <> tshow (n :: Int)
             enums =  map (uncurry f) (Map.toList wenum) ++ (zipWith f (Set.toList (Set.map nodeTagName ts)) [0 ..])
     go = do
-        funcs <- flip mapM (grinFuncs grin) $ \(a,l) -> do
+        funcs <- liftM concat $ flip mapM (grinFuncs grin) $ \(a,l) -> do
                     convertFunc (Map.lookup a (grinEntryPoints grin)) (a,l)
         tellFunctions funcs
         h <- get
@@ -105,22 +105,36 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
         mapM_ tellTags (Set.toList tset)
     cafs = text "/* CAFS */" $$ (vcat $ map ccaf (grinCafs grin))
 
-convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C Function
+convertFunc :: Maybe (FfiExport, ([ExtType], ExtType)) -> (Atom,Lam) -> C [Function]
 convertFunc ffie (n,as :-> body) = do
         s <- localTodo TodoReturn (convertBody body)
         let bt = getType body
             mmalloc [TyPtr TyNode] = [a_MALLOC]
             mmalloc [TyNode] = [a_MALLOC]
             mmalloc _ = []
-            ats = (if isNothing ffie then a_STD else Public):mmalloc bt
-            fnname = case ffie of
-                Nothing -> nodeFuncName n
-                Just ~(FfiExport cn Safe CCall) -> name cn
+            ats = a_STD:mmalloc bt
+            fnname = nodeFuncName n
+
         fr <- convertTypes bt
         as' <- flip mapM as $ \ (Var v t) -> do
             t' <- convertType t
             return (varName v,t')
-        return $ function fnname fr as' ats (profile_function_inc & s)
+
+        mstub <- case ffie of
+                Nothing -> return []
+                Just ~(FfiExport cn Safe CCall, (argTys, retTy)) -> do
+                    newVars <- mapM (liftM (name . show) . newVar . basicType) argTys
+                    
+                    let fnname2 = name cn
+                        as2 = zip (newVars) (map basicType argTys)
+                        fr2 = basicType retTy
+
+                    return [function fnname2 fr2 as2 [Public]
+                                     (creturn $ cast fr2 $ functionCall fnname $ 
+                                      zipWith cast (map snd as')
+                                                   (map variable newVars))]
+                    
+        return (function fnname fr as' ats (profile_function_inc & s) : mstub)
 
 
 fetchVar :: Var -> Ty -> C Expression

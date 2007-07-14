@@ -59,8 +59,12 @@ deadCode stats roots grin = do
         putStrLn "suspFuncs"
         print suspFuncs
     let cafSet = fg uc
-        argSet = fg ua
         funSet = fg uf
+        argSet = fg ua 
+                 `Set.union`
+                 Set.fromList [ (n,i) | FuncDef n (args :-> _) _ _ <- grinFunctions grin,
+                                        n `Map.member` grinEntryPoints grin,
+                                        i <- [0 .. length args] ]
         directFuncs =  funSet Set.\\ suspFuncs Set.\\ pappFuncs
         fg xs = Set.fromList [ x | (x,True) <- xs ]
     newCafs <- flip mconcatMapM (grinCafs grin) $ \ (x,y) -> if x `Set.member` cafSet then return [(x,y)] else tick stats "Optimize.dead-code.caf" >> return []

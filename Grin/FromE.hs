@@ -217,7 +217,8 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
         sequenceG_ [] = Return []
         sequenceG_ (x:xs) = foldl (@>>) x xs
     let grin = setGrinFunctions theFuncs emptyGrin {
-            grinEntryPoints = Map.insert funcMain (FfiExport "_amain" Safe CCall) $ Map.fromList epv,
+            grinEntryPoints = Map.insert funcMain (FfiExport "_amain" Safe CCall, ([],"void")) $
+                                Map.fromList epv,
             grinPhase = PhaseInit,
             grinTypeEnv = newTyEnv,
             grinCafs = [ (x,NodeC tagHole []) | (x,_) <- cafs]

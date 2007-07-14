@@ -42,7 +42,6 @@ data NameType =
     | SortName
     | FieldLabel
     | RawType
-    | FfiExportName -- Name is the C name of a FFI export
     deriving(Ord,Eq,Enum,Read,Show)
 
 
@@ -180,4 +179,5 @@ mapName (f,g) n = case nameParts n of
 mainModule = Module "Main@"
 
 ffiExportName :: FfiExport -> Name
-ffiExportName (FfiExport cn _ _) = toName FfiExportName cn
+ffiExportName (FfiExport cn _ cc) = toName Val ("FE@", show cc ++ "." ++ cn)
+

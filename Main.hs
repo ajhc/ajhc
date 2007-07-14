@@ -223,7 +223,8 @@ processDecls cho ho' tiData = do
     -- some useful values
     let allHo = ho `mappend` ho'
         ho = choHo cho
-        decls | fopts FO.Boxy = tiDataDecls tiData
+        -- XXX typechecker drops foreign exports!
+        decls | fopts FO.Boxy = tiDataDecls tiData ++ [ x | x@HsForeignExport {} <- originalDecls ]
               | otherwise = concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ] ++ Map.elems (tiDataLiftedInstances tiData)
         originalDecls =  concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ]
 
@@ -501,7 +502,9 @@ compileModEnv' (cho,_) = do
 
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
     (_,main,mainv) <- getMainFunction dataTable mainFunc (programEsMap prog)
-    let ffiExportNames = filter (\t -> (tvrName t >>= return . nameType) == Just FfiExportName) $ map (\(x,_,_) -> x) $ progCombinators prog
+    let ffiExportNames = [tv | (tv, _, _) <- progCombinators prog,
+                               name <- tvrName tv,
+                               "FE@" `isPrefixOf` show name]
     prog <- return prog { progMainEntry   = main,
                           progEntryPoints = (main:ffiExportNames),
                           progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog]
