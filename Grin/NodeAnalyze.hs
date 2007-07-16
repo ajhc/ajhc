@@ -6,8 +6,9 @@
 
 module Grin.NodeAnalyze(nodeAnalyze) where
 
-import Control.Monad.RWS
-import Control.Monad.Identity hiding(join)
+import Control.Monad(forM, forM_, when)
+import Control.Monad.RWS(MonadWriter(..), RWS(..))
+import Control.Monad.Identity(runIdentity)
 import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
