@@ -13,6 +13,7 @@ import Codec.Compression.GZip
 import Control.Monad.Identity
 import Data.Binary
 import Data.Monoid
+import Data.IORef
 import Data.Tree
 import IO(bracket)
 import List
@@ -24,6 +25,7 @@ import System.Posix.Files
 import System.Posix.IO
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import Atom
@@ -58,6 +60,7 @@ import Util.SetLike
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Util.Graph as G
+import qualified Util.SHA1 as SHA1
 
 version :: Int
 version = 7
@@ -102,6 +105,122 @@ findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
     return (fh,fd,a)
 
 
+type DoneMap = IORef (Map.Map Module ModuleDone)
+
+data ModuleDone =
+    ModuleNotThere
+    | ModuleParsed {
+        modParsed :: HsModule,
+        modName :: String,
+        modHash :: SHA1.Hash,
+        modFileDep :: FileDep
+        }
+    | ModuleNoHo
+
+
+type MRet = Maybe (Module,SHA1.Hash)
+
+fetchModule :: DoneMap -> Either Module String -> IO MRet
+fetchModule r_dm (Right n) = lookupModule r_dm True (Right n)
+fetchModule r_dm (Left m) = ans where
+    ans = do
+        dm <- readIORef r_dm
+        case Map.lookup m dm of
+            Nothing -> lookupModule r_dm True (Left m)
+            Just ModuleNoHo -> lookupModule r_dm False (Left m)
+            Just ModuleNotThere -> return Nothing
+            Just ModuleParsed { modParsed = hs, modHash =  s1h } -> return $ Just (hsModuleName hs,s1h)
+
+lookupModule :: DoneMap -> Bool -> Either Module String -> IO MRet
+lookupModule r_dm useHo ms = do
+        dm <- readIORef r_dm
+        let (name,spath) = case ms of
+                Left m -> (fromModule m, searchPaths (fromModule m))
+                Right n -> (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
+            nogood = case ms of
+                Left m -> modifyIORef r_dm (Map.insert m ModuleNotThere) >> return Nothing
+                Right n -> return Nothing
+        (fh,fd,ho_name) <- findFirstFile name spath
+        if fd == emptyFileDep then nogood else do
+        let fname = fromAtom $ fileName fd
+        hs <- parseHsSource fname fh
+        wdump FD.Progress $ do
+            sp <- shortenPath fname
+            putErrLn $ "Found dependency:" <+> name <+> "at" <+> sp
+        if hsModuleName hs `mmember` dm then do putStrLn $ "Found a module name we already have: " ++ show (hsModuleName hs); nogood else do
+        modifyIORef r_dm (Map.insert (hsModuleName hs) ModuleParsed { modParsed = hs, modName = fname, modFileDep = fd, modHash  = SHA1.emptyHash })
+        mapM_ (fetchModule r_dm) $  map Left (hsModuleRequires hs)
+        return $ Just (hsModuleName hs,SHA1.emptyHash)
+
+        --if useHo && not (optIgnoreHo options) then do
+        --    mho <- checkForHoFile ho_name
+        --    undefined
+
+
+--type MMap = Map.Map Module (IORef
+
+findModule :: CollectedHo                                           -- ^ Accumulated Ho
+              -> [Either Module String]                             -- ^ Either a module or filename to find
+              -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
+              -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
+              -> IO (CollectedHo,Ho)                                -- ^ (Final accumulated ho,just the ho read to satisfy this command)
+findModule cho need ifunc func  = do
+    r_dm <- newIORef Map.empty
+    ms <- mapM (fetchModule r_dm) need
+    processIOErrors
+    let f (m:xs) ds | m `member` ds = f xs ds
+        f (m:xs) ds = do
+            Just ModuleParsed { modParsed = hs, modFileDep = fd, modName = s }  <- Map.lookup m `fmap` readIORef r_dm
+            rs <- f (hsModuleRequires hs ++ xs) (Set.insert m ds)
+            return ((hs,fd,s):rs)
+        f [] _ = return []
+    ms <- f [ m | Just (m,_) <- ms] Set.empty
+        {-
+    let mgraph =  (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires' . fst3) )
+        scc = G.sccGroups mgraph
+        mgraph' =  (G.newGraph scc (fromModule . hsModuleName . fst3 . head) (concatMap ff . concatMap (hsModuleRequires' . fst3)) )
+        ff n = [ fromModule . hsModuleName $ ms | gs@((ms,_,_):_) <- scc, n `elem` map (fromModule . hsModuleName . fst3) gs]
+    when (dump FD.SccModules) $ do
+        CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
+        putErrLn $ drawForest (map (fmap (show . map (hsModuleName . fst3))) (G.dff mgraph'))
+    exitSuccess
+
+
+    let f (Left (Module m)) = Left (Module m)
+        f (Right n) = Right (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
+    (readHo,ms) <- nextModule (fmap Just . hoModules . choHo $ cho) [] mempty (map f (snub need))
+    processIOErrors
+    -}
+    readHo <- return mempty
+    let mgraph =  (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires' . fst3) )
+        scc = G.sccGroups mgraph
+        mgraph' =  (G.newGraph scc (fromModule . hsModuleName . fst3 . head) (concatMap ff . concatMap (hsModuleRequires' . fst3)) )
+        ff n = [ fromModule . hsModuleName $ ms | gs@((ms,_,_):_) <- scc, n `elem` map (fromModule . hsModuleName . fst3) gs]
+    when (dump FD.SccModules) $ do
+        CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
+        putErrLn $ drawForest (map (fmap (show . map (hsModuleName . fst3))) (G.dff mgraph'))
+    let f ho readHo [] = return (ho,readHo)
+        f ho readHo (sc:scs) = do
+            (cho',newHo) <- func ho [ hs | (hs,_,_) <- sc ]
+            let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
+                mods' = snub [ m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, m `notElem` mods]
+                mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules . choHo $ cho')]
+                ldeps = Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules . choHo $ cho)]
+            let hoh = HoHeader { hohDepends    = [ x | (_,x,_) <- sc],
+                                 hohModDepends = mdeps,
+                                 hohMetaInfo   = []
+                               }
+            newHo <- return (newHo `mappend` mempty { hoLibraries = ldeps })
+            newHo <- recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
+            f (cho' `mappend` collectedHo { choHo = mempty { hoModules = hoModules newHo }}) (readHo `mappend` newHo)  scs
+    ho <- ifunc cho readHo
+    f ho readHo scc
+
+
+
+
+
+{-
 
 findModule :: CollectedHo                                           -- ^ Accumulated Ho
               -> [Either Module String]                             -- ^ Either a module or filename to find
@@ -136,6 +255,7 @@ findModule cho need ifunc func  = do
             f (cho' `mappend` collectedHo { choHo = mempty { hoModules = hoModules newHo }}) (readHo `mappend` newHo)  scs
     ho <- ifunc cho readHo
     f ho readHo scc
+-}
 
 
 checkForHoFile :: String            -- ^ file name to check for
@@ -324,16 +444,18 @@ nextModule ms tl ho (Right (name,files):rest) = result where
                 wdump FD.Progress $ do
                     sp <- shortenPath $ fromAtom (fileName fd)
                     putErrLn $ "Found dependency:" <+> name <+> "at" <+> sp -- fromAtom (fileName fd) --  <+> show (hsModuleRequires hs)
-                nextModule (minsert (hsModuleName hs) Nothing ms) ((hs,fd,ho_name):tl) ho (rest ++ [ Left (Module m) | m <- hsModuleRequires hs] ++ map Left additional)
+                nextModule (minsert (hsModuleName hs) Nothing ms) ((hs,fd,ho_name):tl) ho (rest ++ [ Left m | m <- hsModuleRequires hs] ++ map Left additional)
 
 
 
 
 
 
-hsModuleRequires x = "Jhc.Prim":ans where
+hsModuleRequires' = map fromModule . hsModuleRequires
+
+hsModuleRequires x = Module "Jhc.Prim":ans where
     noPrelude =   or $ not (optPrelude options):[ opt == c | opt <- hsModuleOptions x, c <- ["-N","--noprelude"]]
-    ans = snub $ (if noPrelude then id else  ("Prelude":)) [ fromModule $ hsImportDeclModule y | y <- hsModuleImports x]
+    ans = snub $ (if noPrelude then id else  (Module "Prelude":)) [  hsImportDeclModule y | y <- hsModuleImports x]
 
 searchPaths :: String -> [(String,String)]
 searchPaths m = ans where
