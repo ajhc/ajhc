@@ -29,6 +29,7 @@ type LibraryName = String
 
 -- the collected information that is passed around
 data CollectedHo = CollectedHo {
+    choModules :: Map.Map Module SHA1.Hash,
     choExternalNames :: IdSet,
     choVarMap :: IdMap (Maybe E),
     choHo :: Ho
@@ -37,6 +38,7 @@ data CollectedHo = CollectedHo {
 instance Monoid CollectedHo where
     mempty = collectedHo
     a `mappend` b = CollectedHo {
+        choModules = choModules a `mappend` choModules b,
         choExternalNames = choExternalNames a `mappend` choExternalNames b,
         choVarMap = choVarMap a `mappend` choVarMap b,
         choHo = choHo a `mappend` choHo b
@@ -45,12 +47,10 @@ instance Monoid CollectedHo where
 choDataTable cho = hoDataTable $ choHo cho
 
 collectedHo :: CollectedHo
-collectedHo = CollectedHo { choExternalNames = mempty, choHo = mempty, choVarMap = mempty }
+collectedHo = CollectedHo { choModules = mempty, choExternalNames = mempty, choHo = mempty, choVarMap = mempty }
 
 -- The raw data as it appears on disk
 data Ho = Ho {
-    -- filled in by front end
-    hoModules :: Map.Map Module (Either SHA1.Hash (LibraryName,CheckSum)),     -- ^ Map of module to ho file, This never actually ends up in the binary file on disk, but is filled in when the file is read, libraries have no non-library dependencies.
     -- * libraries depended on
     hoLibraries :: Map.Map LibraryName CheckSum,
     hoExports :: Map.Map Module [Name],
@@ -69,9 +69,8 @@ data Ho = Ho {
     }
 
 instance Monoid Ho where
-    mempty = Ho mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
+    mempty = Ho mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
     mappend a b = Ho {
-        hoModules = hoModules a `mappend` hoModules b,
         hoLibraries = hoLibraries a `mappend` hoLibraries b,
         hoExports = hoExports a `mappend` hoExports b,
         hoDefs = hoDefs a `mappend` hoDefs b,

@@ -16,7 +16,7 @@ import Data.Monoid
 import Data.IORef
 import Data.Tree
 import IO(bracket)
-import List
+import Data.List hiding(union)
 import Maybe
 import Monad
 import Prelude hiding(print,putStrLn)
@@ -230,16 +230,17 @@ findModule cho need ifunc func  = do
             Just mp <- Map.lookup m `fmap` readIORef r_dm
             case mp of
                 ModuleParsed { modParsed = hs, modHash = fd, modHoName = s } -> do
-                    (readHo,rs) <- f (hsModuleRequires hs ++ xs) (Set.insert m ds)
-                    return (readHo,((hs,(m,fd),s):rs))
+                    (mp,readHo,rs) <- f (hsModuleRequires hs ++ xs) (Set.insert m ds)
+                    return (mp,readHo,((hs,(m,fd),s):rs))
                 ModuleHo hoh ho -> do
                     let ss = Set.fromList $ fsts (hohDepends hoh)
-                    (readHo,rs) <- f (fsts (hohModDepends hoh) ++ xs) (Set.union ss ds)
-                    return (ho `mappend` readHo,rs)
+                    (mp,readHo,rs) <- f (fsts (hohModDepends hoh) ++ xs) (Set.union ss ds)
+                    return (mp `union` mprovides hoh, ho `mappend` readHo,rs)
                 ModuleNotThere -> fail $ "Module not found:" <+> show m
                 ModuleNoHo -> fail $ "Module noho:" <+> show m
-        f [] _ = return (mempty,mempty)
-    (readHo,ms) <- f (concat ms) Set.empty
+        f [] _ = return (mempty,mempty,mempty)
+        mprovides hoh = Map.fromList [ (x,hohHash hoh) | (x,_) <- hohDepends hoh]
+    (mp,readHo,ms) <- f (concat ms) Set.empty
     let mgraph =  (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires' . fst3) )
         scc = G.sccGroups mgraph
         mgraph' =  (G.newGraph scc (fromModule . hsModuleName . fst3 . head) (concatMap ff . concatMap (hsModuleRequires' . fst3)) )
@@ -247,64 +248,28 @@ findModule cho need ifunc func  = do
     when (dump FD.SccModules) $ do
         CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
         putErrLn $ drawForest (map (fmap (show . map (hsModuleName . fst3))) (G.dff mgraph'))
+
     let f ho readHo [] = return (ho,readHo)
         f ho readHo (sc:scs) = do
             (cho',newHo) <- func ho [ hs | (hs,_,_) <- sc ]
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
                 mods' = snub [ m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, m `notElem` mods]
-                mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules . choHo $ cho')]
-                ldeps = Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules . choHo $ cho)]
-            let hoh = HoHeader { hohDepends    = [ x | (_,x,_) <- sc],
+                mdeps = [ (m,dep) | m <- mods', dep <- Map.lookup m (choModules cho')]
+                ldeps = mempty -- [] -- Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules . choHo $ cho)]
+            let hoh = fillInHohHash HoHeader { hohDepends    = [ x | (_,x,_) <- sc],
                                  hohModDepends = mdeps,
                                  hohHash = undefined,
                                  hohMetaInfo   = []
                                }
             newHo <- return (newHo `mappend` mempty { hoLibraries = ldeps })
-            newHo <- recordHoFile newHo [ x | (_,_,x) <- sc ] (fillInHohHash hoh)
-            f (cho' `mappend` collectedHo { choHo = mempty { hoModules = hoModules newHo }}) (readHo `mappend` newHo)  scs
-    ho <- ifunc cho readHo
-    f ho readHo scc
+            recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
+            f (cho' `mappend` mempty { choModules = mprovides hoh }) (readHo `mappend` newHo)  scs
+
+    cho <- ifunc cho { choModules = choModules cho `union` mp } readHo
+    f cho readHo scc
 
 
 
-
-
-{-
-
-findModule :: CollectedHo                                           -- ^ Accumulated Ho
-              -> [Either Module String]                             -- ^ Either a module or filename to find
-              -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
-              -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
-              -> IO (CollectedHo,Ho)                                -- ^ (Final accumulated ho,just the ho read to satisfy this command)
-findModule cho need ifunc func  = do
-    let f (Left (Module m)) = Left (Module m)
-        f (Right n) = Right (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
-    (readHo,ms) <- nextModule (fmap Just . hoModules . choHo $ cho) [] mempty (map f (snub need))
-    processIOErrors
-    let mgraph =  (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires . fst3) )
-        scc = G.sccGroups mgraph
-        mgraph' =  (G.newGraph scc (fromModule . hsModuleName . fst3 . head) (concatMap ff . concatMap (hsModuleRequires . fst3)) )
-        ff n = [ fromModule . hsModuleName $ ms | gs@((ms,_,_):_) <- scc, n `elem` map (fromModule . hsModuleName . fst3) gs]
-    when (dump FD.SccModules) $ do
-        CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
-        putErrLn $ drawForest (map (fmap (show . map (hsModuleName . fst3))) (G.dff mgraph'))
-    let f ho readHo [] = return (ho,readHo)
-        f ho readHo (sc:scs) = do
-            (cho',newHo) <- func ho [ hs | (hs,_,_) <- sc ]
-            let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
-                mods' = snub [ Module m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, Module m `notElem` mods]
-                mdeps = [ (m,dep) | m <- mods', Left dep <- Map.lookup m (hoModules . choHo $ cho')]
-                ldeps = Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules . choHo $ cho)]
-            let hoh = HoHeader { hohDepends    = [ x | (_,x,_) <- sc],
-                                 hohModDepends = mdeps,
-                                 hohMetaInfo   = []
-                               }
-            newHo <- return (newHo `mappend` mempty { hoLibraries = ldeps })
-            newHo <- recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
-            f (cho' `mappend` collectedHo { choHo = mempty { hoModules = hoModules newHo }}) (readHo `mappend` newHo)  scs
-    ho <- ifunc cho readHo
-    f ho readHo scc
--}
 
 
 checkForHoFile :: String            -- ^ file name to check for
@@ -319,7 +284,8 @@ checkForHoFile fn = flip catch (\e -> return Nothing) $ do
     --    fn' <- shortenPath fn
     --    putErrLn $ "Found object file:" <+> fn'
     if (all (`elem` loadedLibraries) (Map.keys $ hoLibraries ho)) then do
-        return $ Just (hh,ho { hoModules = fmap (const (Left (hohHash hh))) (hoExports ho) })
+        --return $ Just (hh,ho { hoModules = fmap (const (Left (hohHash hh))) (hoExports ho) })
+        return $ Just (hh,ho)
      else do
         putErrLn $ "No library dep for ho file:" <+> fn
         return Nothing
@@ -396,13 +362,12 @@ recordHoFile ::
     Ho               -- ^ File to record
     -> [String]      -- ^ files to write to
     -> HoHeader      -- ^ file header
-    -> IO Ho         -- ^ Ho updated with this recordfile dependencies
+    -> IO ()         -- ^ Ho updated with this recordfile dependencies
 recordHoFile ho fs header = do
     if optNoWriteHo options then do
         wdump FD.Progress $ do
             fs' <- mapM shortenPath fs
             putErrLn $ "Skipping Writing Ho Files: " ++ show fs'
-        return (ho { hoModules = fmap (const $ Left (hohHash header)) (hoExports ho) })
       else do
     let removeLink' fn = catch  (removeLink fn)  (\_ -> return ())
     let g (fn:fs) = do
@@ -429,13 +394,12 @@ recordHoFile ho fs header = do
             if optNoWriteHo options then return emptyFileDep else do
             let tfn = fn ++ ".tmp"
             fh <- openBinaryFile tfn WriteMode
-            let theho =  mapHoBodies eraseE ho { hoUsedIds = mempty, hoModules = mempty }
+            let theho =  mapHoBodies eraseE ho { hoUsedIds = mempty }
             L.hPut fh (compress $ encode (magic,header,theho,magic2))
             hFlush fh
             hClose fh
             rename tfn fn
     g fs
-    return (ho { hoModules = fmap (const $ Left (hohHash header)) (hoExports ho) })
 
 
 hsModuleRequires' = map fromModule . hsModuleRequires

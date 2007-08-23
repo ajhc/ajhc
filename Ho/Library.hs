@@ -140,7 +140,7 @@ readLibraryFile lname fp mbcs = do
           Library { libraryDesc = hohMetaInfo hoh,
                     libraryFP   = fp,
                     librarySHA1 = pkgCS,
-                    libraryHo   = ho { hoModules = Map.map (const $ Right (lname,pkgCS)) $ hoModules ho }
+                    libraryHo   = ho -- { hoModules = Map.map (const $ Right (lname,pkgCS)) $ hoModules ho }
                   }
 
 writeLibraryFile :: FilePath -> Library -> IO ()
