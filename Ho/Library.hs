@@ -18,7 +18,7 @@ import Ho.Type
 import HsSyn
 import Options
 import PackedString
-import Util.SHA1(sha1file)
+import Util.SHA1(emptyHash,sha1file)
 import Util.SetLike
 import Version(versionString)
 import qualified CharIO
@@ -88,7 +88,7 @@ createLibrary fp wtd = do
             "hs.out" -> name ++ "-" ++ vers ++ ".hl"
             fn -> fn
     let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
-    writeLibraryFile outName $ Library pdesc ho "" ""
+    writeLibraryFile outName $ Library pdesc ho "" emptyHash
 
 parseLibraryDescription :: Monad m => String -> m [(String,String)]
 parseLibraryDescription fs =  g [] (lines (f [] fs)) where
@@ -130,7 +130,7 @@ readDescFile fp = do
 readLibraryFile :: LibraryName -> FilePath -> Maybe CheckSum -> IO Library
 readLibraryFile lname fp mbcs = do
     wdump FD.Progress $ putErrLn $ "Loading library: " ++ show lname ++ " @ " ++ show fp
-    pkgCS <- liftM show $ sha1file fp
+    pkgCS <- sha1file fp
     when (maybe False (pkgCS /=) mbcs) $
         putErrDie ("Loading library "++show fp++" failed: Checksum does not match")
     mho <- checkForHoFile fp
@@ -145,4 +145,5 @@ readLibraryFile lname fp mbcs = do
 
 writeLibraryFile :: FilePath -> Library -> IO ()
 writeLibraryFile fp pkg = recordHoFile (libraryHo pkg) [fp] hoh >> return ()
-    where hoh = HoHeader [] [] (libraryDesc pkg)
+    where hoh = HoHeader [] [] (librarySHA1 pkg) (libraryDesc pkg)
+

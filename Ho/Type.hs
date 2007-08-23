@@ -14,16 +14,17 @@ import FrontEnd.KindInfer(KindEnv)
 import FrontEnd.SrcLoc(SrcLoc)
 import FrontEnd.Tc.Type(Type())
 import HsSyn(Module)
-import MapBinaryInstance()
 import Info.Types
+import MapBinaryInstance()
 import Name.Id
 import Name.Name(Name)
-import Util.SetLike
 import TypeSynonyms(TypeSynonyms)
+import Util.SetLike
+import qualified Util.SHA1 as SHA1
 
 
 
-type CheckSum = String
+type CheckSum = SHA1.Hash
 type LibraryName = String
 
 -- the collected information that is passed around
@@ -46,10 +47,10 @@ choDataTable cho = hoDataTable $ choHo cho
 collectedHo :: CollectedHo
 collectedHo = CollectedHo { choExternalNames = mempty, choHo = mempty, choVarMap = mempty }
 
--- The raw data as ut appears on disk
+-- The raw data as it appears on disk
 data Ho = Ho {
     -- filled in by front end
-    hoModules :: Map.Map Module (Either FileDep (LibraryName,CheckSum)),     -- ^ Map of module to ho file, This never actually ends up in the binary file on disk, but is filled in when the file is read, libraries have no non-library dependencies.
+    hoModules :: Map.Map Module (Either SHA1.Hash (LibraryName,CheckSum)),     -- ^ Map of module to ho file, This never actually ends up in the binary file on disk, but is filled in when the file is read, libraries have no non-library dependencies.
     -- * libraries depended on
     hoLibraries :: Map.Map LibraryName CheckSum,
     hoExports :: Map.Map Module [Name],
@@ -88,19 +89,3 @@ instance Monoid Ho where
 
 
 
--- | Contains hopefully enough meta-info to uniquely identify a file
--- independent of its name.
-
-data FileDep = FileDep {
-    fileName :: Atom,
-    fileModifyTime :: Int,
-    fileDeviceID :: Atom,
-    fileFileID :: Int,
-    fileFileSize :: Int
-    } deriving(Show)
-
-
-
-
-
---  Imported from other files :-

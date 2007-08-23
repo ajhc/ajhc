@@ -22,13 +22,11 @@ import Monad
 import Prelude hiding(print,putStrLn)
 import System.IO hiding(print,putStrLn)
 import System.Posix.Files
-import System.Posix.IO
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
-import Atom
 import CharIO
 import DataConstructors
 import Directory
@@ -80,45 +78,37 @@ shortenPath x@('/':_) = do
 shortenPath x = return x
 
 
+instance DocLike d => PPrint d SHA1.Hash where
+    pprintPrec _ h = tshow h
 
-emptyFileDep = FileDep mempty 0 mempty 0 0
 
-instance Eq FileDep where
-    a == b = map ($ a) fs == map ($ b) fs && fileDeviceID a == fileDeviceID b where
-        fs = [fileModifyTime,fileFileID,fileFileSize]
+type FileName = String
 
-instance DocLike d => PPrint d FileDep where
-    pprint fd = tshow (fileName fd) <> char ':' <+> tshow (fileModifyTime fd)
-
-toFileDep fn fs = FileDep {
-    fileName = toAtom fn
-    ,fileModifyTime = fromEnum (modificationTime fs)
-    ,fileDeviceID = toAtom $ show (deviceID fs)
-    ,fileFileID = fromIntegral (fileID fs)
-    ,fileFileSize = fromIntegral (fileSize fs)
-    }
-
-findFirstFile :: String -> [(String,a)] -> IO (Handle,FileDep,a)
-findFirstFile err [] = FrontEnd.Warning.err "missing-dep" ("Module not found: " ++ err) >> return (undefined,emptyFileDep,undefined)
+findFirstFile :: String -> [(String,a)] -> IO (Handle,SHA1.Hash,FileName,a)
+findFirstFile err [] = FrontEnd.Warning.err "missing-dep" ("Module not found: " ++ err) >> return (undefined,SHA1.emptyHash,undefined,undefined)
 findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
-    (fh,fd) <- openGetFileDep x
-    return (fh,fd,a)
+    fh <- openBinaryFile x ReadMode
+    hash <- SHA1.sha1Handle fh
+    return (fh,hash,x,a)
 
 
 type DoneMap = IORef (Map.Map Module ModuleDone)
 
 data ModuleDone =
+    -- final classifications
     ModuleNotThere
     | ModuleParsed {
         modParsed :: HsModule,
         modName :: String,
-        modHash :: SHA1.Hash,
-        modFileDep :: FileDep
+        modHoName :: String,
+        modHash :: SHA1.Hash
         }
+    | ModuleHo HoHeader Ho
+    -- temporary classifications
     | ModuleNoHo
 
 
-type MRet = Maybe (Module,SHA1.Hash)
+type MRet = [Module]
 
 fetchModule :: DoneMap -> Either Module String -> IO MRet
 fetchModule r_dm (Right n) = lookupModule r_dm True (Right n)
@@ -128,8 +118,75 @@ fetchModule r_dm (Left m) = ans where
         case Map.lookup m dm of
             Nothing -> lookupModule r_dm True (Left m)
             Just ModuleNoHo -> lookupModule r_dm False (Left m)
-            Just ModuleNotThere -> return Nothing
-            Just ModuleParsed { modParsed = hs, modHash =  s1h } -> return $ Just (hsModuleName hs,s1h)
+            -- final results
+            Just ModuleNotThere -> return []
+            Just ModuleParsed { modParsed = hs, modHash =  s1h } -> return $ [hsModuleName hs]
+            Just (ModuleHo hoh _) -> return $ fsts (hohDepends hoh)
+
+
+fillInHohHash :: HoHeader -> HoHeader
+fillInHohHash hoh = hoh { hohHash = h } where
+    h = SHA1.sha1Bytes $ concatMap (SHA1.hashToBytes . snd) $ sort (hohDepends hoh)
+
+checkHoFile :: DoneMap -> Module -> IO (HoHeader,Ho)
+checkHoFile r_dm m = do
+    dm <- readIORef r_dm
+    case mlookup m dm of
+        Just (ModuleHo hoh ho) -> return (hoh,ho)
+        Just _ -> fail "checkHoFile"
+        Nothing -> do
+            (_,_,_,ho_name) <- moduleFind r_dm (Left m)
+            loadHoFile r_dm ho_name
+
+-- perhaps load a single ho file
+loadHoFile :: DoneMap -> FileName -> IO (HoHeader,Ho)
+loadHoFile r_dm ho_name = ans where
+    ans = do
+        ho_name' <- shortenPath ho_name
+        Just (hoh,ho) <- checkForHoFile ho_name
+        let cd (m,h) = do
+                (_,h',fn,_) <- moduleFind r_dm (Left m)
+                unless (h == h') $ do
+                    fn <- shortenPath fn
+                    putVerboseLn $ ho_name' <+> "is out of date due to changed file:" <+> fn
+                    True <- return False
+                    return ()
+            cd' (m,h) = do
+                (h',_) <- checkHoFile r_dm m
+                unless (h == hohHash h') $ do
+                    putVerboseLn $ ho_name' <+> "is out of date due to modified ho file:" <+> (show m)
+                    True <- return False
+                    return ()
+        flip catch (\e -> poison r_dm (map fst $ hohDepends hoh) >> ioError e) $ do
+        mapM_ cd (hohDepends hoh)
+        mapM_ cd' (hohModDepends hoh)
+        putVerboseLn $ "Found ho file:   " <+> ho_name'
+        forM_ (fsts $ hohDepends hoh) $ \m -> do
+            modifyIORef r_dm (Map.insert m (ModuleHo hoh ho))
+        return (hoh,ho)
+
+poison :: DoneMap -> [Module] -> IO ()
+poison r_dm xs = mapM_ f xs where
+    f m = do
+        dm <- readIORef r_dm
+        case m `mlookup` dm of
+            Nothing -> modifyIORef r_dm (minsert m ModuleNoHo)
+            _ -> return ()
+
+moduleFind :: DoneMap -> Either Module String -> IO (Handle,SHA1.Hash,FileName,FileName)
+moduleFind r_dm (Right n) = findFirstFile n [(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))]
+moduleFind r_dm (Left m) = do
+    dm <- readIORef r_dm
+    let (name,spath) = (fromModule m, searchPaths (fromModule m))
+    case m `mlookup` dm of
+        Nothing -> findFirstFile name spath
+        Just _ -> do fail "moduleFind found"
+
+
+checkTheHoFile r_dm ho_name = do
+    --putVerboseLn $ "checkTheHoFile:" <+> ho_name
+    flip catch (\e -> return Nothing) $ Just `fmap` loadHoFile r_dm ho_name
+
 
 lookupModule :: DoneMap -> Bool -> Either Module String -> IO MRet
 lookupModule r_dm useHo ms = do
@@ -138,23 +195,23 @@ lookupModule r_dm useHo ms = do
                 Left m -> (fromModule m, searchPaths (fromModule m))
                 Right n -> (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
             nogood = case ms of
-                Left m -> modifyIORef r_dm (Map.insert m ModuleNotThere) >> return Nothing
-                Right n -> return Nothing
-        (fh,fd,ho_name) <- findFirstFile name spath
-        if fd == emptyFileDep then nogood else do
-        let fname = fromAtom $ fileName fd
-        hs <- parseHsSource fname fh
-        wdump FD.Progress $ do
-            sp <- shortenPath fname
-            putErrLn $ "Found dependency:" <+> name <+> "at" <+> sp
-        if hsModuleName hs `mmember` dm then do putStrLn $ "Found a module name we already have: " ++ show (hsModuleName hs); nogood else do
-        modifyIORef r_dm (Map.insert (hsModuleName hs) ModuleParsed { modParsed = hs, modName = fname, modFileDep = fd, modHash  = SHA1.emptyHash })
-        mapM_ (fetchModule r_dm) $  map Left (hsModuleRequires hs)
-        return $ Just (hsModuleName hs,SHA1.emptyHash)
+                Left m -> modifyIORef r_dm (Map.insert m ModuleNotThere) >> return []
+                Right n -> return []
+        (fh,hash,fname,ho_name) <- findFirstFile name spath
+        if hash == SHA1.emptyHash then nogood else do
+        mho <- if useHo && not (optIgnoreHo options) then checkTheHoFile r_dm ho_name else return Nothing
+        case mho of
+            Just (hoh,_) -> return $ fsts (hohDepends hoh)
+            Nothing -> do
+                hs <- parseHsSource fname fh
+                wdump FD.Progress $ do
+                    sp <- shortenPath fname
+                    putErrLn $ "Found dependency:" <+> name <+> "at" <+> sp
+                --if hsModuleName hs `mmember` dm then do putStrLn $ "Found a module name we already have: " ++ show (hsModuleName hs); nogood else do
+                modifyIORef r_dm (Map.insert (hsModuleName hs) ModuleParsed { modParsed = hs, modHoName = ho_name, modName = fname, modHash = hash })
+                mapM_ (fetchModule r_dm) $  map Left (hsModuleRequires hs)
+                return $ [hsModuleName hs]
 
-        --if useHo && not (optIgnoreHo options) then do
-        --    mho <- checkForHoFile ho_name
-        --    undefined
 
 
 --type MMap = Map.Map Module (IORef
@@ -170,28 +227,19 @@ findModule cho need ifunc func  = do
     processIOErrors
     let f (m:xs) ds | m `member` ds = f xs ds
         f (m:xs) ds = do
-            Just ModuleParsed { modParsed = hs, modFileDep = fd, modName = s }  <- Map.lookup m `fmap` readIORef r_dm
-            rs <- f (hsModuleRequires hs ++ xs) (Set.insert m ds)
-            return ((hs,fd,s):rs)
-        f [] _ = return []
-    ms <- f [ m | Just (m,_) <- ms] Set.empty
-        {-
-    let mgraph =  (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires' . fst3) )
-        scc = G.sccGroups mgraph
-        mgraph' =  (G.newGraph scc (fromModule . hsModuleName . fst3 . head) (concatMap ff . concatMap (hsModuleRequires' . fst3)) )
-        ff n = [ fromModule . hsModuleName $ ms | gs@((ms,_,_):_) <- scc, n `elem` map (fromModule . hsModuleName . fst3) gs]
-    when (dump FD.SccModules) $ do
-        CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
-        putErrLn $ drawForest (map (fmap (show . map (hsModuleName . fst3))) (G.dff mgraph'))
-    exitSuccess
-
-
-    let f (Left (Module m)) = Left (Module m)
-        f (Right n) = Right (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
-    (readHo,ms) <- nextModule (fmap Just . hoModules . choHo $ cho) [] mempty (map f (snub need))
-    processIOErrors
-    -}
-    readHo <- return mempty
+            Just mp <- Map.lookup m `fmap` readIORef r_dm
+            case mp of
+                ModuleParsed { modParsed = hs, modHash = fd, modHoName = s } -> do
+                    (readHo,rs) <- f (hsModuleRequires hs ++ xs) (Set.insert m ds)
+                    return (readHo,((hs,(m,fd),s):rs))
+                ModuleHo hoh ho -> do
+                    let ss = Set.fromList $ fsts (hohDepends hoh)
+                    (readHo,rs) <- f (fsts (hohModDepends hoh) ++ xs) (Set.union ss ds)
+                    return (ho `mappend` readHo,rs)
+                ModuleNotThere -> fail $ "Module not found:" <+> show m
+                ModuleNoHo -> fail $ "Module noho:" <+> show m
+        f [] _ = return (mempty,mempty)
+    (readHo,ms) <- f (concat ms) Set.empty
     let mgraph =  (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires' . fst3) )
         scc = G.sccGroups mgraph
         mgraph' =  (G.newGraph scc (fromModule . hsModuleName . fst3 . head) (concatMap ff . concatMap (hsModuleRequires' . fst3)) )
@@ -208,10 +256,11 @@ findModule cho need ifunc func  = do
                 ldeps = Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules . choHo $ cho)]
             let hoh = HoHeader { hohDepends    = [ x | (_,x,_) <- sc],
                                  hohModDepends = mdeps,
+                                 hohHash = undefined,
                                  hohMetaInfo   = []
                                }
             newHo <- return (newHo `mappend` mempty { hoLibraries = ldeps })
-            newHo <- recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
+            newHo <- recordHoFile newHo [ x | (_,_,x) <- sc ] (fillInHohHash hoh)
             f (cho' `mappend` collectedHo { choHo = mempty { hoModules = hoModules newHo }}) (readHo `mappend` newHo)  scs
     ho <- ifunc cho readHo
     f ho readHo scc
@@ -261,26 +310,21 @@ findModule cho need ifunc func  = do
 checkForHoFile :: String            -- ^ file name to check for
     -> IO (Maybe (HoHeader,Ho))
 checkForHoFile fn = flip catch (\e -> return Nothing) $ do
-    bracket (openGetFileDep fn) (\_ -> return ()) $ \ (fh,dep) -> do
+    bracket (openBinaryFile fn ReadMode) (\_ -> return ()) $ \ fh -> do
     lbs <- L.hGetContents fh
     let (x,hh,ho,m2) = decode (decompress lbs)
     if x /= magic then (putErrLn $ "Bad ho file:" <+> fn)  >> return Nothing else do
-    xs <- mapM checkDep (hohDepends hh)
-    if not (and xs) then  return Nothing else do
-        if m2 /= magic2 then (putErrLn $ "Bad ho file:" <+> fn)  >>  return Nothing else do
-        wdump FD.Progress $ do
-            fn' <- shortenPath fn
-            putErrLn $ "Found object file:" <+> fn'
-        if (all (`elem` loadedLibraries) (Map.keys $ hoLibraries ho)) then do
-            return $ Just (hh,ho { hoModules = fmap (const (Left dep)) (hoExports ho) })
-         else do
-            putErrLn $ "No library dep for ho file:" <+> fn
-            return Nothing
+    if m2 /= magic2 then (putErrLn $ "Bad ho file:" <+> fn)  >>  return Nothing else do
+    --wdump FD.Progress $ do
+    --    fn' <- shortenPath fn
+    --    putErrLn $ "Found object file:" <+> fn'
+    if (all (`elem` loadedLibraries) (Map.keys $ hoLibraries ho)) then do
+        return $ Just (hh,ho { hoModules = fmap (const (Left (hohHash hh))) (hoExports ho) })
+     else do
+        putErrLn $ "No library dep for ho file:" <+> fn
+        return Nothing
 
 
-checkDep fd = do
-    fs <- getFileStatus (fromAtom $ fileName fd)
-    return (fd == toFileDep (fileName fd) fs)
 
 
 -- | This reads in an entire ho file for diagnostic purposes.
@@ -298,8 +342,9 @@ dumpHoFile :: String -> IO ()
 dumpHoFile fn = do
     (hoh,ho) <- readHoFile fn
     putStrLn fn
-    when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "Dependencies:" <+>  pprint (sortUnder (show . fileName) $ hohDepends hoh)
-    when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "ModDependencies:" <+>  pprint (sortUnder fst $ hohModDepends hoh)
+    when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "Dependencies:\n" <>  vcat (map pprint $ sortUnder fst $ hohDepends hoh)
+    when (not $ Prelude.null (hohModDepends hoh)) $ putStrLn $ "ModDependencies:\n" <>  vcat (map pprint $ sortUnder fst $ hohModDepends hoh)
+    putStrLn $ "HoHash:" <+> pprint (hohHash hoh)
     putStrLn $ "MetaInfo:\n" <> vcat (sort [text (' ':' ':unpackPS k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
     putStrLn $ "Libraries depended on:" <+> pprint (sort $ Map.toList $ hoLibraries ho)
     putStrLn $ "Modules contained:" <+> tshow (mkeys $ hoExports ho)
@@ -345,6 +390,8 @@ dumpHoFile fn = do
 
 --recordHoFile :: Ho -> [(HsModule,FileDep,String,[FileDep])] -> [FileDep] -> IO [FileDep]
 
+emptyFileDep = error "emptyFileDep"
+
 recordHoFile ::
     Ho               -- ^ File to record
     -> [String]      -- ^ files to write to
@@ -355,13 +402,13 @@ recordHoFile ho fs header = do
         wdump FD.Progress $ do
             fs' <- mapM shortenPath fs
             putErrLn $ "Skipping Writing Ho Files: " ++ show fs'
-        return (ho { hoModules = fmap (const $ Left emptyFileDep) (hoExports ho) })
+        return (ho { hoModules = fmap (const $ Left (hohHash header)) (hoExports ho) })
       else do
     let removeLink' fn = catch  (removeLink fn)  (\_ -> return ())
     let g (fn:fs) = do
-            fd <- f fn
+            f fn
             mapM_ (l fn) fs
-            return fd
+            return ()
         g [] = error "Ho.g: shouldn't happen"
         l fn fn' = do
             wdump FD.Progress $ do
@@ -385,70 +432,10 @@ recordHoFile ho fs header = do
             let theho =  mapHoBodies eraseE ho { hoUsedIds = mempty, hoModules = mempty }
             L.hPut fh (compress $ encode (magic,header,theho,magic2))
             hFlush fh
-            (fh,fd) <- hGetFileDep fn fh
             hClose fh
             rename tfn fn
-            return fd
-    dep <- g fs
-    return (ho { hoModules = fmap (const $ Left dep) (hoExports ho) })
-    --return [ hsdep | (hs,hsdep,honm,ds) <- sc]
-
--- | Check that ho library dependencies are right
---hoLibraryDeps newHo oldHo = hoLibraries newHo `Map.isSubmapOf` hoLibraries oldHo
-
--- | Find a module, returning just the read Ho file and the parsed
--- contents of files that still need to be processed, This chases dependencies so
--- you could end up getting parsed source for several files back.
--- We only look for ho files where there is a cooresponding haskell source file.
-
-nextModule ::
-    Map.Map Module (Maybe (Either FileDep (LibraryName,CheckSum))) -- ^ modules we got, and don't need to worry about
-    -> [(HsModule,FileDep,String)]  -- ^ todo list
-    -> Ho -- ^ what we have read so far
-    -> [Either Module (String,[(String,String)])] -- ^ either a module name or some files to search
-    -> IO (Ho,[(HsModule,FileDep,String)]) -- ^ (everything read,what still needs to be done)
-
-nextModule ms tl ho [] = return (ho,tl)
-nextModule ms tl ho (Left m:rest) | m `mmember` ms = nextModule ms tl ho rest
-nextModule ms tl ho (Left m:rest) = nextModule ms tl ho (Right (fromModule m,searchPaths (fromModule m)):rest)
-nextModule ms tl ho (Right (name,files):rest) = result where
-    result = do
-        res@(_,fd,ho_name) <- findFirstFile name files
-        when (fd == emptyFileDep) $ processIOErrors >> fail "Could not find file"
-        if optIgnoreHo options then addNeed [] res else do
-        mho <- checkForHoFile ho_name
-        cho [] res mempty mho
-    cho drest res zho mho = case mho of
-            Nothing -> addNeed [] res
-            Just (hoh,ho) -> cdeps (ho `mappend` zho:: Ho) res (drest ++ hohModDepends hoh)
-    cdeps nho res ((m,fd):drest) = case mlookup m ms of
-        Nothing | Just (Left fd') <- mlookup m (hoModules nho), fd' == fd -> cdeps nho res drest
-        Nothing -> do
-            r <- checkDep fd
-            case r of
-                True -> checkForHoFile (fromAtom $ fileName fd) >>= cho drest res nho
-                False -> addNeed [] res
-        Just Nothing -> cdeps nho res drest
-        Just (Just (Left fd')) | fd == fd' -> cdeps nho res drest
-        Just (Just (Left fd')) | fd /= emptyFileDep -> do
-            wdump FD.Progress $ do
-                putErrLn $ "Found newer dependency:" <+> fromModule m <+> "at" <+> pprint (fd,fd')
-            addNeed [] res
-        Just (Just _) -> addNeed [] res
-    cdeps nho (fh,_,_) [] = hClose fh >> nextModule (ms `mappend` fmap Just (hoModules nho)) tl (nho `mappend` ho) rest
-    addNeed additional (fh,fd,ho_name) = do
-        hs <- parseHsSource (fromAtom $ fileName fd) fh
-        case (hsModuleName hs `mmember` ms) of
-            True -> do putStrLn $ "Found module name that we alread gots: " ++ show (hsModuleName hs); nextModule ms tl ho (map Left additional ++ rest)
-            False -> do
-                wdump FD.Progress $ do
-                    sp <- shortenPath $ fromAtom (fileName fd)
-                    putErrLn $ "Found dependency:" <+> name <+> "at" <+> sp -- fromAtom (fileName fd) --  <+> show (hsModuleRequires hs)
-                nextModule (minsert (hsModuleName hs) Nothing ms) ((hs,fd,ho_name):tl) ho (rest ++ [ Left m | m <- hsModuleRequires hs] ++ map Left additional)
-
-
-
-
+    g fs
+    return (ho { hoModules = fmap (const $ Left (hohHash header)) (hoExports ho) })
 
 
 hsModuleRequires' = map fromModule . hsModuleRequires
@@ -501,22 +488,6 @@ eraseE e = runIdentity $ f e where
 
 
 
-hGetFileDep fn fh = do
-    fd <- handleToFd fh
-    fs <- getFdStatus fd
-    fh <- fdToHandle fd
-    return (fh,toFileDep fn fs)
-
-openGetFileDep fn = do
-    (fh,fs) <- openGetStatus fn
-    return (fh,toFileDep fn fs)
-
-openGetStatus fn = do
-    fh <- openBinaryFile fn ReadMode
-    fd <- handleToFd fh
-    fs <- getFdStatus fd
-    fh <- fdToHandle fd
-    return (fh,fs)
 
 hoToProgram :: Ho -> Program
 hoToProgram ho = programSetDs (melems $ hoEs ho) program {
