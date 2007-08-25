@@ -3,10 +3,7 @@ module Ho.Build (
     dumpHoFile,
     findModule,
     hoToProgram,
-    initialHo,
-    recordHoFile,
-    createLibrary,
-    checkForHoFile
+    createLibrary
     ) where
 
 
@@ -266,10 +263,11 @@ findModule need ifunc func  = do
                                  hohHash = undefined,
                                  hohMetaInfo   = []
                                }
+            --modifyIORef r_dm (Map.union $ Map.fromList [ (hsModuleName hs,ModuleHo hoh newHo) | (hs,_,_) <- sc ])
             recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
             f (cho' `mappend` mempty { choFiles = Map.fromList $ hohDepends hoh, choModules = mprovides hoh }) (readHo `mappend` newHo)  scs
 
-    cho <- ifunc cho (initialHo `mappend` readHo)
+    cho <- ifunc cho (mempty { hoDataTable = dataTablePrims } `mappend` readHo)
     f cho readHo scc
 
 
@@ -355,9 +353,9 @@ emptyFileDep = error "emptyFileDep"
 
 recordHoFile ::
     Ho               -- ^ File to record
-    -> [String]      -- ^ files to write to
+    -> [FileName]    -- ^ files to write to
     -> HoHeader      -- ^ file header
-    -> IO ()         -- ^ Ho updated with this recordfile dependencies
+    -> IO ()
 recordHoFile ho fs header = do
     if optNoWriteHo options then do
         wdump FD.Progress $ do
@@ -454,8 +452,6 @@ hoToProgram ho = programSetDs (melems $ hoEs ho) program {
     progDataTable = hoDataTable ho
     }
 
-initialHo = mempty { hoDataTable = dataTablePrims  }
-
 ---------------------------------
 -- library specific routines
 ---------------------------------
@@ -469,14 +465,14 @@ createLibrary fp wtd = do
     desc <- readDescFile fp
     when verbose2 $ mapM_ print desc
     let field x = lookup x desc
-    let jfield x = maybe (error "createLibrary: description lacks required field "++show x) id $ field x
-    let mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ field x
-    let name  = jfield "name"
-        vers  = jfield "version"
-        hmods = snub $ mfield "hidden-modules"
-        emods = snub $ mfield "exposed-modules"
-    let allmods  = sort $ map Module (emods ++ hmods)
-    (cho,ho) <- wtd (map Module emods)
+        jfield x = maybe (fail $ "createLibrary: description lacks required field " ++ show x) return $ field x
+        mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ field x
+    name <- jfield "name"
+    vers <- jfield "version"
+    let hmods = map Module $ snub $ mfield "hidden-modules"
+        emods = map Module $ snub $ mfield "exposed-modules"
+    let allmods  = sort (emods ++ hmods)
+    (cho,ho) <- wtd emods
     let unknownMods = [ m | m <- mkeys (hoExports ho), m `notElem` allmods  ]
     mapM_ ((putStrLn . ("*** Module included in library that is not in export list: " ++)) . show) unknownMods
     let outName = case optOutName options of

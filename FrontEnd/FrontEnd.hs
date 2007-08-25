@@ -1,15 +1,14 @@
 module FrontEnd.FrontEnd(
     parseFiles,
+    makeLibrary,
     Tc.TiData(..)
     ) where
 
 import Monad
 import Data.Monoid
 import qualified Data.Map as Map
-import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import Doc.DocLike
-import Doc.PPrint
 import FrontEnd.Exports
 import FrontEnd.Rename
 import FrontEnd.SrcLoc
@@ -17,14 +16,17 @@ import GenUtil
 import Ho.Build
 import HsSyn
 import Options
-import Util.SetLike
 import FrontEnd.Warning
-import qualified Doc.PPrint as PPrint
 import qualified FlagDump as FD
-import qualified FlagOpts as FO
 import qualified FrontEnd.Tc.Module as Tc
 
 
+makeLibrary processInitialHo processDecls hl = createLibrary hl buildLibrary where
+    buildLibrary [] = do putErrLn "WARNING: building empty library" >> return mempty
+    buildLibrary mods = do
+        putVerboseLn $ "Building library containing: " ++ show mods
+        -- TODO - remove hidden exports
+        parseFiles (map Left mods) processInitialHo processDecls
 
 -- | Main entry point to front end
 
@@ -35,15 +37,14 @@ parseFiles :: [Either Module String]      -- ^ List of files or modules to read
 parseFiles fs ifunc func = do
     wdump FD.Progress $ do
         putErrLn $ "Compiling " ++ show fs
-    (initialHo,ho) <- findModule fs ifunc (doModules func)
+    res <- findModule fs ifunc (doModules func)
     processIOErrors
-    return (initialHo,ho)
+    return res
 
 -- Process modules found by Ho
 doModules :: (CollectedHo -> Ho -> Tc.TiData -> IO (CollectedHo,Ho)) -> CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)
 doModules func ho ms  = do
     ms <- mapM modInfo ms
-    --putErrLn $ show (hoExports ho)
     when (dump FD.Defs) $ flip mapM_ ms $ \m -> do
          putStrLn $ " ---- Definitions for" <+> show (modInfoName m) <+> "----";
          mapM_ print ( modInfoDefs m)

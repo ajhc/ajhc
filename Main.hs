@@ -99,7 +99,7 @@ main = runMain $ bracketHtml $ do
         (argstring,_) <- getArgString
         return (argstring ++ "\n" ++ versionSimple)
     case optMode o of
-        BuildHl hl    -> createLibrary hl buildLibrary
+        BuildHl hl    -> makeLibrary processInitialHo processDecls hl
         ListLibraries -> do
             when (optVerbose options > 0) $ do
                 putStrLn "Search path:"
@@ -111,17 +111,6 @@ main = runMain $ bracketHtml $ do
         Version       -> putStrLn versionString
         VersionCtx    -> putStrLn (versionString ++ versionContext)
         _             -> processFiles  (optArgs o)
-
-
-buildLibrary [] = do
-    putStrLn "WARNING: building empty library"
-    return mempty
-buildLibrary mods = do
-    putVerboseLn $ "Building library containing: " ++ show mods
-    (cho,ho) <- parseFiles (map Left mods) processInitialHo processDecls
-    -- TODO optimize, leaving out hidden module exports
-    return (cho,ho)
-
 
 
 processFiles [] | Nothing <- optMainFunc options = do
