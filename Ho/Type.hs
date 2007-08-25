@@ -53,7 +53,6 @@ collectedHo = CollectedHo { choFiles = mempty, choModules = mempty, choExternalN
 -- The raw data as it appears on disk
 data Ho = Ho {
     -- * libraries depended on
-    hoLibraries :: Map.Map LibraryName CheckSum,
     hoExports :: Map.Map Module [Name],
     hoDefs :: Map.Map Name (SrcLoc,[Name]),
     hoAssumps :: Map.Map Name Type,        -- used for typechecking
@@ -65,14 +64,12 @@ data Ho = Ho {
     -- Filled in by E generation
     hoDataTable :: DataTable,
     hoEs :: Map.Map Name (TVr,E),
-    hoRules :: Rules,
-    hoUsedIds :: IdSet
+    hoRules :: Rules
     }
 
 instance Monoid Ho where
-    mempty = Ho mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
+    mempty = Ho mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
     mappend a b = Ho {
-        hoLibraries = hoLibraries a `mappend` hoLibraries b,
         hoExports = hoExports a `mappend` hoExports b,
         hoDefs = hoDefs a `mappend` hoDefs b,
         hoAssumps = hoAssumps a `mappend` hoAssumps b,
@@ -83,8 +80,7 @@ instance Monoid Ho where
         hoProps = munionWith mappend (hoProps a) (hoProps b),
         hoDataTable = hoDataTable a `mappend` hoDataTable b,
         hoEs = hoEs a `mappend` hoEs b,
-        hoRules = hoRules a `mappend` hoRules b,
-        hoUsedIds = hoUsedIds a `mappend` hoUsedIds b
+        hoRules = hoRules a `mappend` hoRules b
     }
 
 

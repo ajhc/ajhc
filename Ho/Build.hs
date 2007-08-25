@@ -217,8 +217,6 @@ lookupModule r_dm useHo ms = do
 
 
 
---type MMap = Map.Map Module (IORef
-
 findModule :: [Either Module String]                             -- ^ Either a module or filename to find
               -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
               -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
@@ -263,13 +261,11 @@ findModule need ifunc func  = do
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
                 mods' = snub [ m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, m `notElem` mods]
                 mdeps = [ (m,dep) | m <- mods', dep <- Map.lookup m (choModules cho')]
-                ldeps = mempty -- [] -- Map.fromList [ x | m <- mods', Right x <- Map.lookup m (hoModules . choHo $ cho)]
             let hoh = fillInHohHash HoHeader { hohDepends    = [ x | (_,x,_) <- sc],
                                  hohModDepends = mdeps,
                                  hohHash = undefined,
                                  hohMetaInfo   = []
                                }
-            newHo <- return (newHo `mappend` mempty { hoLibraries = ldeps })
             recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
             f (cho' `mappend` mempty { choFiles = Map.fromList $ hohDepends hoh, choModules = mprovides hoh }) (readHo `mappend` newHo)  scs
 
@@ -289,15 +285,6 @@ checkForHoFile fn = flip catch (\e -> return Nothing) $ do
     if x /= magic then (putErrLn $ "Bad ho file:" <+> fn)  >> return Nothing else do
     if m2 /= magic2 then (putErrLn $ "Bad ho file:" <+> fn)  >>  return Nothing else do
     return $ Just (hh,ho)
-    --wdump FD.Progress $ do
-    --    fn' <- shortenPath fn
-    --    putErrLn $ "Found object file:" <+> fn'
-    --if (all (`elem` loadedLibraries) (Map.keys $ hoLibraries ho)) then do
-        --return $ Just (hh,ho { hoModules = fmap (const (Left (hohHash hh))) (hoExports ho) })
-     --   return $ Just (hh,ho)
-     --else do
-     --   putErrLn $ "No library dep for ho file:" <+> fn
-     --   return Nothing
 
 
 
@@ -321,7 +308,6 @@ dumpHoFile fn = do
     when (not $ Prelude.null (hohModDepends hoh)) $ putStrLn $ "ModDependencies:\n" <>  vcat (map pprint $ sortUnder fst $ hohModDepends hoh)
     putStrLn $ "HoHash:" <+> pprint (hohHash hoh)
     putStrLn $ "MetaInfo:\n" <> vcat (sort [text (' ':' ':unpackPS k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
-    putStrLn $ "Libraries depended on:" <+> pprint (sort $ Map.toList $ hoLibraries ho)
     putStrLn $ "Modules contained:" <+> tshow (mkeys $ hoExports ho)
     putStrLn $ "number of definitions:" <+> tshow (size $ hoDefs ho)
     putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps ho)
@@ -403,7 +389,7 @@ recordHoFile ho fs header = do
             if optNoWriteHo options then return emptyFileDep else do
             let tfn = fn ++ ".tmp"
             fh <- openBinaryFile tfn WriteMode
-            let theho =  mapHoBodies eraseE ho { hoUsedIds = mempty }
+            let theho =  mapHoBodies eraseE ho
             L.hPut fh (compress $ encode (magic,header,theho,magic2))
             hFlush fh
             hClose fh

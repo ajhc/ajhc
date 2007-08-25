@@ -175,7 +175,9 @@ processInitialHo ::
 processInitialHo accumho ho = do
     let ho' = reprocessHo (hoRules ho) (hoProps ho) ho
 
-        (ds,uids) = runWriter $ annotateDs (choVarMap accumho') (\_ -> return) letann lamann (Map.elems $ hoEs ho')
+        -- XXX do we need to do this?
+        ds = runIdentity $ annotateDs (choVarMap accumho') (\_ -> return) letann lamann (Map.elems $ hoEs ho')
+
         prog = etaAnnotateProgram (programSetDs ds program { progDataTable = choDataTable accumho `mappend` hoDataTable ho })
 
         rules' = runIdentity $ mapBodies (annotate imapRules (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
@@ -185,7 +187,7 @@ processInitialHo accumho ho = do
         newVarMap = fromList [ (tvrIdent t,Just (EVar t)) | (t,_) <- programDs prog ]
 
     --lintCheckProgram (putStrLn "processInitialHo") prog
-    return $ accumho' `mappend` mempty { choVarMap = newVarMap, choExternalNames = idMapToIdSet newVarMap, choHo = ho { hoUsedIds = uids, hoEs = programEsMap prog } }
+    return $ accumho' `mappend` mempty { choVarMap = newVarMap, choExternalNames = idMapToIdSet newVarMap, choHo = ho { hoEs = programEsMap prog } }
 
 -- reprocess an old ho to include new rules and properties
 reprocessHo :: Rules -> IdMap Properties -> Ho -> Ho
@@ -429,8 +431,7 @@ processDecls cho ho' tiData = do
     let newHo = ho' {
         hoDataTable = dataTable,
         hoEs = programEsMap prog,
-        hoRules = hoRules ho' `mappend` rules,
-        hoUsedIds = collectIds (ELetRec (programDs prog) Unknown)
+        hoRules = hoRules ho' `mappend` rules
         }
         newMap = fromList [ (tvrIdent n,Just (EVar n)) | (n,_) <- Map.elems $ hoEs newHo ]
     return (mempty { choHo = newHo, choExternalNames = idMapToIdSet newMap, choVarMap = newMap  } `mappend` cho,newHo)
