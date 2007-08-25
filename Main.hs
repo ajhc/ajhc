@@ -53,7 +53,6 @@ import Grin.Optimize
 import Grin.Show
 import Ho.Build
 import Ho.Library
-import Ho.LibraryMap
 import HsSyn
 import Info.Types
 import Name.Id
@@ -106,7 +105,8 @@ main = runMain $ bracketHtml $ do
                 putStrLn "Search path:"
                 mapM_ putStrLn (optHlPath options)
                 putStrLn "Libraries found:"
-            sequence_ [ putStrLn name | (name,_) <- libraryList ]
+            ll <- libraryList
+            sequence_ [ putStrLn name | (name,_) <- ll ]
         ShowHo ho     -> dumpHoFile ho
         Version       -> putStrLn versionString
         VersionCtx    -> putStrLn (versionString ++ versionContext)
@@ -118,9 +118,9 @@ buildLibrary [] = do
     return mempty
 buildLibrary mods = do
     putVerboseLn $ "Building library containing: " ++ show mods
-    (_,ho) <- parseFiles (map Left mods) processInitialHo processDecls
+    (cho,ho) <- parseFiles (map Left mods) processInitialHo processDecls
     -- TODO optimize, leaving out hidden module exports
-    return ho
+    return (cho,ho)
 
 
 

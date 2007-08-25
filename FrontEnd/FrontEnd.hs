@@ -15,7 +15,6 @@ import FrontEnd.Rename
 import FrontEnd.SrcLoc
 import GenUtil
 import Ho.Build
-import Ho.Library(loadLibraries)
 import HsSyn
 import Options
 import Util.SetLike
@@ -36,9 +35,7 @@ parseFiles :: [Either Module String]      -- ^ List of files or modules to read
 parseFiles fs ifunc func = do
     wdump FD.Progress $ do
         putErrLn $ "Compiling " ++ show fs
-    libraries <- loadLibraries
-    initialHo <- ifunc mempty (initialHo `mappend` libraries)
-    (initialHo,ho) <- findModule initialHo fs ifunc (doModules func)
+    (initialHo,ho) <- findModule fs ifunc (doModules func)
     processIOErrors
     return (initialHo,ho)
 

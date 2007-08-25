@@ -3,7 +3,6 @@ module Ho.Type where
 import Data.Monoid
 import qualified Data.Map as Map
 
-import Atom(Atom)
 import DataConstructors(DataTable)
 import E.E(TVr,E)
 import E.Rules(Rules)
@@ -29,6 +28,7 @@ type LibraryName = String
 
 -- the collected information that is passed around
 data CollectedHo = CollectedHo {
+    choFiles :: Map.Map Module SHA1.Hash,
     choModules :: Map.Map Module SHA1.Hash,
     choExternalNames :: IdSet,
     choVarMap :: IdMap (Maybe E),
@@ -38,6 +38,7 @@ data CollectedHo = CollectedHo {
 instance Monoid CollectedHo where
     mempty = collectedHo
     a `mappend` b = CollectedHo {
+        choFiles = choFiles a `mappend` choFiles b,
         choModules = choModules a `mappend` choModules b,
         choExternalNames = choExternalNames a `mappend` choExternalNames b,
         choVarMap = choVarMap a `mappend` choVarMap b,
@@ -47,7 +48,7 @@ instance Monoid CollectedHo where
 choDataTable cho = hoDataTable $ choHo cho
 
 collectedHo :: CollectedHo
-collectedHo = CollectedHo { choModules = mempty, choExternalNames = mempty, choHo = mempty, choVarMap = mempty }
+collectedHo = CollectedHo { choFiles = mempty, choModules = mempty, choExternalNames = mempty, choHo = mempty, choVarMap = mempty }
 
 -- The raw data as it appears on disk
 data Ho = Ho {

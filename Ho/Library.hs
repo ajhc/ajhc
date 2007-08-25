@@ -1,94 +1,41 @@
 module Ho.Library(
-    loadLibraries,
-    createLibrary
+    readDescFile,
+    findLibrary,
+    libraryList
     ) where
 
 import Char
 import Control.Monad
-import Data.List(sort)
-import Data.Monoid
 import System.IO
+import System.Directory
 import qualified Data.Map as Map
 
 import GenUtil
-import Ho.Build
-import Ho.Binary
-import Ho.LibraryMap
 import Ho.Type
-import HsSyn
 import Options
-import PackedString
-import Util.SHA1(emptyHash,sha1file)
-import Util.SetLike
-import Version(versionString)
 import qualified CharIO
 import qualified FlagDump as FD
 
 
 
-data Library = Library {
-    libraryDesc  :: [(PackedString,PackedString)],
-    libraryHo    :: Ho,
-    libraryFP    :: FilePath,
-    librarySHA1  :: CheckSum
-    }
-type LMap = Map.Map LibraryName Library
 
--- Load a library in a recursive fashion
-
-libraryDeps :: Library -> [(LibraryName, CheckSum)]
-libraryDeps = Map.toList . hoLibraries . libraryHo
-
-loadP :: Maybe CheckSum -> LMap -> LibraryName -> IO LMap
-loadP mbcs got name = do
-    (n',fp) <- libraryMapFind name
-    case Map.lookup n' got of
-      Nothing -> do
-        pkg <- readLibraryFile n' fp mbcs
-        let got' = Map.insert n' pkg got
-        foldM (\gm (pn,cs) -> loadP (Just cs) gm pn) got' $ libraryDeps pkg
-      Just pkg | mbcs == Nothing                -> return got
-               | mbcs == Just (librarySHA1 pkg) -> return got
-               | otherwise                      -> fail ("Checksum mismatch for library "++name)
-
--- load libraries
-
-
-
-loadLibraries :: IO Ho
-loadLibraries = do
-    wdump FD.Progress $ putErrLn $ "Loading libraries: " ++ show (optHls options)
-    ps <- foldM (loadP Nothing) Map.empty (optHls options)
-    return $ mconcat (map libraryHo (Map.elems ps))
 
 -- Write a library and mutilate it to fit the description
 
 
 
-createLibrary ::
-    FilePath
-    -> ([Module] -> IO Ho)
-    -> IO ()
-createLibrary fp wtd = do
-    putVerboseLn $ "Creating library from description file: " ++ show fp
-    desc <- readDescFile fp
-    when verbose2 $ mapM_ print desc
-    let field x = lookup x desc
-    let jfield x = maybe (error "createLibrary: description lacks required field "++show x) id $ field x
-    let mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ field x
-    let name  = jfield "name"
-        vers  = jfield "version"
-        hmods = snub $ mfield "hidden-modules"
-        emods = snub $ mfield "exposed-modules"
-    let allmods  = sort $ map Module (emods ++ hmods)
-    ho <- wtd (map Module emods)
-    let unknownMods = [ m | m <- mkeys (hoExports ho), m `notElem` allmods  ]
-    mapM_ ((putStrLn . ("*** Module included in library that is not in export list: " ++)) . show) unknownMods
-    let outName = case optOutName options of
-            "hs.out" -> name ++ "-" ++ vers ++ ".hl"
-            fn -> fn
-    let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
-    writeLibraryFile outName $ Library pdesc ho "" emptyHash
+
+-------------------------
+-- parse description file
+-------------------------
+
+readDescFile :: FilePath -> IO [(String,String)]
+readDescFile fp = do
+    wdump FD.Progress $ putErrLn $ "Reading: " ++ show fp
+    fc <- CharIO.readFile fp
+    case parseLibraryDescription fc of
+        Left err -> fail $ "Error reading library description file: " ++ show fp ++ " " ++ err
+        Right ps -> return ps
 
 parseLibraryDescription :: Monad m => String -> m [(String,String)]
 parseLibraryDescription fs =  g [] (lines (f [] fs)) where
@@ -115,35 +62,40 @@ condenseWhitespace xs =  reverse $ dropWhile isSpace (reverse (dropWhile isSpace
     cw [] = []
 
 
+--------------------------------
+-- finding and listing libraries
+--------------------------------
 
-readDescFile :: FilePath -> IO [(String,String)]
-readDescFile fp = do
-    wdump FD.Progress $ putErrLn $ "Reading: " ++ show fp
-    fc <- CharIO.readFile fp
-    case parseLibraryDescription fc of
-        Left err -> fail $ "Error reading library description file: " ++ show fp ++ " " ++ err
-        Right ps -> return ps
-
--- IO with Libraries
+type LibraryMap = Map.Map LibraryName FilePath
 
 
-readLibraryFile :: LibraryName -> FilePath -> Maybe CheckSum -> IO Library
-readLibraryFile lname fp mbcs = do
-    wdump FD.Progress $ putErrLn $ "Loading library: " ++ show lname ++ " @ " ++ show fp
-    pkgCS <- sha1file fp
-    when (maybe False (pkgCS /=) mbcs) $
-        putErrDie ("Loading library "++show fp++" failed: Checksum does not match")
-    mho <- checkForHoFile fp
-    case mho of
-      Nothing       -> putErrDie ("Loading library "++fp++" failed due to missing dependencies")
-      Just (hoh,ho) -> return $
-          Library { libraryDesc = hohMetaInfo hoh,
-                    libraryFP   = fp,
-                    librarySHA1 = pkgCS,
-                    libraryHo   = ho -- { hoModules = Map.map (const $ Right (lname,pkgCS)) $ hoModules ho }
-                  }
+findLibrary ::  LibraryName -> IO (LibraryName,FilePath)
+findLibrary pn = do
+    lm <- getLibraryMap (optHlPath options)
+    case Map.lookup pn lm of
+        Just x  -> return (pn,x)
+        Nothing -> case range (pn++"-") (pn++"-"++repeat maxBound) lm of
+                 [] -> fail ("LibraryMap: Library "++pn++" not found!")
+                 xs -> return $ last xs
 
-writeLibraryFile :: FilePath -> Library -> IO ()
-writeLibraryFile fp pkg = recordHoFile (libraryHo pkg) [fp] hoh >> return ()
-    where hoh = HoHeader [] [] (librarySHA1 pkg) (libraryDesc pkg)
+
+
+libraryList :: IO [(LibraryName,FilePath)]
+libraryList = Map.toList `fmap` getLibraryMap (optHlPath options)
+
+---- range queries for Data.Map
+
+range :: Ord k => k -> k -> Map.Map k v -> [(k,v)]
+range low high = Map.toList . fst . Map.split high . snd . Map.split low
+
+----
+
+getLibraryMap :: [FilePath] -> IO LibraryMap
+getLibraryMap fps = fmap Map.unions $ mapM getPM fps where
+    getPM fp = flip catch (\_ -> return Map.empty) $ do
+        raw <- getDirectoryContents fp
+        return $ Map.fromList $ flip concatMap raw $ \e ->
+            case reverse e of
+              ('l':'h':'.':r) -> [(reverse r,fp++"/"++e)]
+              _               -> []
 

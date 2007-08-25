@@ -5,6 +5,7 @@ module Ho.Build (
     hoToProgram,
     initialHo,
     recordHoFile,
+    createLibrary,
     checkForHoFile
     ) where
 
@@ -47,7 +48,7 @@ import FrontEnd.Syn.Options
 import FrontEnd.Unlit
 import FrontEnd.Warning
 import Ho.Binary
-import Ho.LibraryMap
+import Ho.Library
 import Ho.Type
 import HsSyn
 import Options
@@ -55,6 +56,7 @@ import PackedString
 import Util.FilterInput
 import Util.Gen hiding(putErrLn,putErr,putErrDie)
 import Util.SetLike
+import Version(versionString)
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Util.Graph as G
@@ -144,13 +146,14 @@ loadHoFile r_dm ho_name = ans where
     ans = do
         ho_name' <- shortenPath ho_name
         Just (hoh,ho) <- checkForHoFile ho_name
-        let cd (m,h) = do
+        let cd (m,h) | h /= SHA1.emptyHash = do
                 (_,h',fn,_) <- moduleFind r_dm (Left m)
                 unless (h == h') $ do
                     fn <- shortenPath fn
                     putVerboseLn $ ho_name' <+> "is out of date due to changed file:" <+> fn
                     True <- return False
                     return ()
+            cd _ = return ()
             cd' (m,h) = do
                 (h',_) <- checkHoFile r_dm m
                 unless (h == hohHash h') $ do
@@ -216,13 +219,18 @@ lookupModule r_dm useHo ms = do
 
 --type MMap = Map.Map Module (IORef
 
-findModule :: CollectedHo                                           -- ^ Accumulated Ho
-              -> [Either Module String]                             -- ^ Either a module or filename to find
+findModule :: [Either Module String]                             -- ^ Either a module or filename to find
               -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
               -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
               -> IO (CollectedHo,Ho)                                -- ^ (Final accumulated ho,just the ho read to satisfy this command)
-findModule cho need ifunc func  = do
+findModule need ifunc func  = do
     r_dm <- newIORef Map.empty
+
+    putVerboseLn $ "Loading libraries:" <+> show (optHls options)
+    forM_ (optHls options) $ \l -> do
+        (n',fn) <- findLibrary l
+        putVerboseLn $ "Found" <+> show (l,n') <+> "at" <+> fn
+        checkTheHoFile r_dm fn
     ms <- mapM (fetchModule r_dm) need
     processIOErrors
     let f (m:xs) ds | m `member` ds = f xs ds
@@ -231,16 +239,16 @@ findModule cho need ifunc func  = do
             case mp of
                 ModuleParsed { modParsed = hs, modHash = fd, modHoName = s } -> do
                     (mp,readHo,rs) <- f (hsModuleRequires hs ++ xs) (Set.insert m ds)
-                    return (mp,readHo,((hs,(m,fd),s):rs))
+                    return (mp `mappend` mempty { choFiles = Map.singleton m fd },readHo,((hs,(m,fd),s):rs))
                 ModuleHo hoh ho -> do
                     let ss = Set.fromList $ fsts (hohDepends hoh)
                     (mp,readHo,rs) <- f (fsts (hohModDepends hoh) ++ xs) (Set.union ss ds)
-                    return (mp `union` mprovides hoh, ho `mappend` readHo,rs)
+                    return (mp `mappend` mempty { choModules = mprovides hoh, choFiles = Map.fromList $ hohDepends hoh }, ho `mappend` readHo,rs)
                 ModuleNotThere -> fail $ "Module not found:" <+> show m
                 ModuleNoHo -> fail $ "Module noho:" <+> show m
         f [] _ = return (mempty,mempty,mempty)
         mprovides hoh = Map.fromList [ (x,hohHash hoh) | (x,_) <- hohDepends hoh]
-    (mp,readHo,ms) <- f (concat ms) Set.empty
+    (cho,readHo,ms) <- f (concat ms) Set.empty
     let mgraph =  (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires' . fst3) )
         scc = G.sccGroups mgraph
         mgraph' =  (G.newGraph scc (fromModule . hsModuleName . fst3 . head) (concatMap ff . concatMap (hsModuleRequires' . fst3)) )
@@ -263,9 +271,9 @@ findModule cho need ifunc func  = do
                                }
             newHo <- return (newHo `mappend` mempty { hoLibraries = ldeps })
             recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
-            f (cho' `mappend` mempty { choModules = mprovides hoh }) (readHo `mappend` newHo)  scs
+            f (cho' `mappend` mempty { choFiles = Map.fromList $ hohDepends hoh, choModules = mprovides hoh }) (readHo `mappend` newHo)  scs
 
-    cho <- ifunc cho { choModules = choModules cho `union` mp } readHo
+    cho <- ifunc cho (initialHo `mappend` readHo)
     f cho readHo scc
 
 
@@ -280,15 +288,16 @@ checkForHoFile fn = flip catch (\e -> return Nothing) $ do
     let (x,hh,ho,m2) = decode (decompress lbs)
     if x /= magic then (putErrLn $ "Bad ho file:" <+> fn)  >> return Nothing else do
     if m2 /= magic2 then (putErrLn $ "Bad ho file:" <+> fn)  >>  return Nothing else do
+    return $ Just (hh,ho)
     --wdump FD.Progress $ do
     --    fn' <- shortenPath fn
     --    putErrLn $ "Found object file:" <+> fn'
-    if (all (`elem` loadedLibraries) (Map.keys $ hoLibraries ho)) then do
+    --if (all (`elem` loadedLibraries) (Map.keys $ hoLibraries ho)) then do
         --return $ Just (hh,ho { hoModules = fmap (const (Left (hohHash hh))) (hoExports ho) })
-        return $ Just (hh,ho)
-     else do
-        putErrLn $ "No library dep for ho file:" <+> fn
-        return Nothing
+     --   return $ Just (hh,ho)
+     --else do
+     --   putErrLn $ "No library dep for ho file:" <+> fn
+     --   return Nothing
 
 
 
@@ -460,4 +469,38 @@ hoToProgram ho = programSetDs (melems $ hoEs ho) program {
     }
 
 initialHo = mempty { hoDataTable = dataTablePrims  }
+
+---------------------------------
+-- library specific routines
+---------------------------------
+
+createLibrary ::
+    FilePath
+    -> ([Module] -> IO (CollectedHo,Ho))
+    -> IO ()
+createLibrary fp wtd = do
+    putVerboseLn $ "Creating library from description file: " ++ show fp
+    desc <- readDescFile fp
+    when verbose2 $ mapM_ print desc
+    let field x = lookup x desc
+    let jfield x = maybe (error "createLibrary: description lacks required field "++show x) id $ field x
+    let mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ field x
+    let name  = jfield "name"
+        vers  = jfield "version"
+        hmods = snub $ mfield "hidden-modules"
+        emods = snub $ mfield "exposed-modules"
+    let allmods  = sort $ map Module (emods ++ hmods)
+    (cho,ho) <- wtd (map Module emods)
+    let unknownMods = [ m | m <- mkeys (hoExports ho), m `notElem` allmods  ]
+    mapM_ ((putStrLn . ("*** Module included in library that is not in export list: " ++)) . show) unknownMods
+    let outName = case optOutName options of
+            "hs.out" -> name ++ "-" ++ vers ++ ".hl"
+            fn -> fn
+    let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
+    let lhash = SHA1.sha1String (show $ choFiles cho)
+    let hoh =  HoHeader [ (m,SHA1.emptyHash) | m <- mkeys (hoExports ho)] [] lhash pdesc
+    recordHoFile ho [outName] hoh
+
+
+
 
