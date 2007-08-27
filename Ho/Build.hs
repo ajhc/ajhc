@@ -3,7 +3,7 @@ module Ho.Build (
     dumpHoFile,
     findModule,
     hoToProgram,
-    createLibrary
+    buildLibrary
     ) where
 
 
@@ -44,7 +44,7 @@ import FrontEnd.ParseMonad
 import FrontEnd.Syn.Options
 import FrontEnd.Unlit
 import FrontEnd.Warning
-import Ho.Binary
+import Ho.Binary()
 import Ho.Library
 import Ho.Type
 import HsSyn
@@ -211,6 +211,8 @@ lookupModule r_dm useHo ms = do
                 modifyIORef r_dm (Map.insert (hsModuleName hs) ModuleParsed { modParsed = hs, modHoName = ho_name, modName = fname, modHash = hash })
                 mapM_ (fetchModule r_dm) $  map Left (hsModuleRequires hs)
                 return $ [hsModuleName hs]
+
+
 
 
 
@@ -456,6 +458,13 @@ hoToProgram ho = programSetDs (melems $ hoEs ho) program {
 -- library specific routines
 ---------------------------------
 
+buildLibrary :: (CollectedHo -> Ho -> IO CollectedHo)
+             -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho))
+             -> FilePath
+             -> IO ()
+buildLibrary ifunc func fp = createLibrary fp bl where
+    bl ms = findModule (map Left ms) ifunc func
+
 createLibrary ::
     FilePath
     -> ([Module] -> IO (CollectedHo,Ho))
@@ -480,7 +489,12 @@ createLibrary fp wtd = do
             fn -> fn
     let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
     let lhash = SHA1.sha1String (show $ choFiles cho)
-    let hoh =  HoHeader [ (m,SHA1.emptyHash) | m <- mkeys (hoExports ho)] [] lhash pdesc
+    let hoh =  HoHeader {
+            hohHash = lhash,
+            hohDepends = [ (m,SHA1.emptyHash) | m <- mkeys (hoExports ho)],
+            hohModDepends = [],
+            hohMetaInfo = pdesc
+            }
     recordHoFile ho [outName] hoh
 
 

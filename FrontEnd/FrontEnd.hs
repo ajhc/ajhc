@@ -5,7 +5,6 @@ module FrontEnd.FrontEnd(
     ) where
 
 import Monad
-import Data.Monoid
 import qualified Data.Map as Map
 
 import Doc.DocLike
@@ -21,12 +20,7 @@ import qualified FlagDump as FD
 import qualified FrontEnd.Tc.Module as Tc
 
 
-makeLibrary processInitialHo processDecls hl = createLibrary hl buildLibrary where
-    buildLibrary [] = do putErrLn "WARNING: building empty library" >> return mempty
-    buildLibrary mods = do
-        putVerboseLn $ "Building library containing: " ++ show mods
-        -- TODO - remove hidden exports
-        parseFiles (map Left mods) processInitialHo processDecls
+makeLibrary ifunc func hl = do buildLibrary ifunc (doModules func) hl
 
 -- | Main entry point to front end
 

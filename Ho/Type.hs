@@ -19,12 +19,9 @@ import Name.Id
 import Name.Name(Name)
 import TypeSynonyms(TypeSynonyms)
 import Util.SetLike
+import PackedString
 import qualified Util.SHA1 as SHA1
 
-
-
-type CheckSum = SHA1.Hash
-type LibraryName = String
 
 -- the collected information that is passed around
 data CollectedHo = CollectedHo {
@@ -49,6 +46,17 @@ choDataTable cho = hoDataTable $ choHo cho
 
 collectedHo :: CollectedHo
 collectedHo = CollectedHo { choFiles = mempty, choModules = mempty, choExternalNames = mempty, choHo = mempty, choVarMap = mempty }
+
+data HoHeader = HoHeader {
+    -- * my sha1 id
+    hohHash       :: SHA1.Hash,
+    -- * Haskell Source files depended on
+    hohDepends    :: [(Module,SHA1.Hash)],
+    -- * Other objects depended on
+    hohModDepends :: [(Module,SHA1.Hash)],
+    -- * metainformation, filled for hl-files, empty for normal objects.
+    hohMetaInfo   :: [(PackedString,PackedString)]
+    }
 
 -- The raw data as it appears on disk
 data Ho = Ho {

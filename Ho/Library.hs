@@ -16,6 +16,7 @@ import Options
 import qualified CharIO
 import qualified FlagDump as FD
 
+type LibraryName = String
 
 
 

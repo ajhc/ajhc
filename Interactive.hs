@@ -5,7 +5,7 @@ import Control.Monad.Identity
 import Control.Monad.Trans
 import Control.Exception as CE
 import Data.Monoid
-import IO(stdout,ioeGetErrorString)
+import IO(stdout)
 import List(sort)
 import Maybe
 import Monad
@@ -23,14 +23,12 @@ import FrontEnd.HsParser(parseHsStmt)
 import FrontEnd.KindInfer
 import FrontEnd.ParseMonad
 import FrontEnd.Rename
-import FrontEnd.SrcLoc
 import FrontEnd.Tc.Main
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Class
 import FrontEnd.Desugar(desugarHsStmt)
 import GenUtil
-import FrontEnd.Class
 import Ho.Type
 import HsPretty()
 import HsSyn
@@ -134,7 +132,6 @@ interact ho = mre where
                 xs -> f "" xs where
             f opt [x] = (opt,x)
             f opt ~(x:xs) = f (x ++ opt) xs
-            f _ _ = undefined
         rx <- CE.catch ( Just `fmap` evaluate (mkRegex reg)) (\_ -> return Nothing)
         case rx of
             Nothing -> putStrLn $ "Invalid regex: " ++ arg
