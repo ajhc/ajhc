@@ -118,7 +118,9 @@ realclean: clean
 
 builtfiles: $(BUILTSOURCES)
 
-clean-ho:
+ho-clean:
+	rm -f -- `find -name \*.ho`
+hl-clean:
 	rm -f -- `find -name \*.ho`
 
 

@@ -219,7 +219,7 @@ lookupModule r_dm useHo ms = do
 findModule :: [Either Module String]                             -- ^ Either a module or filename to find
               -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
               -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
-              -> IO (CollectedHo,Ho)                                -- ^ (Final accumulated ho,just the ho read to satisfy this command)
+              -> IO (CollectedHo,[(Module,SHA1.Hash)],Ho)                                -- ^ (Final accumulated ho,just the ho read to satisfy this command)
 findModule need ifunc func  = do
     r_dm <- newIORef Map.empty
 
@@ -235,17 +235,22 @@ findModule need ifunc func  = do
             Just mp <- Map.lookup m `fmap` readIORef r_dm
             case mp of
                 ModuleParsed { modParsed = hs, modHash = fd, modHoName = s } -> do
-                    (mp,readHo,rs) <- f (hsModuleRequires hs ++ xs) (Set.insert m ds)
-                    return (mp `mappend` mempty { choFiles = Map.singleton m fd },readHo,((hs,(m,fd),s):rs))
+                    (mp,readHo,libHo,rs) <- f (hsModuleRequires hs ++ xs) (Set.insert m ds)
+                    return (mp `mappend` mempty { choFiles = Map.singleton m fd },readHo,libHo,((hs,(m,fd),s):rs))
                 ModuleHo hoh ho -> do
                     let ss = Set.fromList $ fsts (hohDepends hoh)
-                    (mp,readHo,rs) <- f (fsts (hohModDepends hoh) ++ xs) (Set.union ss ds)
-                    return (mp `mappend` mempty { choModules = mprovides hoh, choFiles = Map.fromList $ hohDepends hoh }, ho `mappend` readHo,rs)
+                    (mp,readHo,(libDeps,libHo),rs) <- f (fsts (hohModDepends hoh) ++ xs) (Set.union ss ds)
+                    let mp' = mp `mappend` mempty { choModules = mprovides hoh, choFiles = Map.fromList $ hohDepends hoh }
+                        ho' = ho `mappend` readHo
+                    case hohMetaInfo hoh of
+                        [] -> return (mp', ho',(libDeps,libHo `mappend` ho),rs)
+                        _  -> return (mp', ho',((m,hohHash hoh):libDeps,libHo),rs)
                 ModuleNotThere -> fail $ "Module not found:" <+> show m
                 ModuleNoHo -> fail $ "Module noho:" <+> show m
-        f [] _ = return (mempty,mempty,mempty)
+        f [] _ = return (mempty,mempty,mempty,mempty)
         mprovides hoh = Map.fromList [ (x,hohHash hoh) | (x,_) <- hohDepends hoh]
-    (cho,readHo,ms) <- f (concat ms) Set.empty
+    (cho,readHo,(libDeps,libHo), ms) <- f (concat ms) Set.empty
+    writeIORef r_dm (error "r_dm")  -- to encourage garbage collection.
     let mgraph =  (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires' . fst3) )
         scc = G.sccGroups mgraph
         mgraph' =  (G.newGraph scc (fromModule . hsModuleName . fst3 . head) (concatMap ff . concatMap (hsModuleRequires' . fst3)) )
@@ -254,23 +259,23 @@ findModule need ifunc func  = do
         CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
         putErrLn $ drawForest (map (fmap (show . map (hsModuleName . fst3))) (G.dff mgraph'))
 
-    let f ho readHo [] = return (ho,readHo)
-        f ho readHo (sc:scs) = do
+    let f ho libHo [] = processIOErrors >> return (ho,libDeps,libHo)
+        f ho libHo (sc:scs) = do
             (cho',newHo) <- func ho [ hs | (hs,_,_) <- sc ]
             let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
                 mods' = snub [ m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, m `notElem` mods]
                 mdeps = [ (m,dep) | m <- mods', dep <- Map.lookup m (choModules cho')]
-            let hoh = fillInHohHash HoHeader { hohDepends    = [ x | (_,x,_) <- sc],
+            let hoh = fillInHohHash HoHeader {
+                                 hohDepends    = [ x | (_,x,_) <- sc],
                                  hohModDepends = mdeps,
                                  hohHash = undefined,
                                  hohMetaInfo   = []
                                }
-            --modifyIORef r_dm (Map.union $ Map.fromList [ (hsModuleName hs,ModuleHo hoh newHo) | (hs,_,_) <- sc ])
             recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
-            f (cho' `mappend` mempty { choFiles = Map.fromList $ hohDepends hoh, choModules = mprovides hoh }) (readHo `mappend` newHo)  scs
+            f (cho' `mappend` mempty { choFiles = Map.fromList $ hohDepends hoh, choModules = mprovides hoh }) (libHo `mappend` newHo)  scs
 
     cho <- ifunc cho (mempty { hoDataTable = dataTablePrims } `mappend` readHo)
-    f cho readHo scc
+    f cho libHo scc
 
 
 
@@ -462,40 +467,40 @@ buildLibrary :: (CollectedHo -> Ho -> IO CollectedHo)
              -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho))
              -> FilePath
              -> IO ()
-buildLibrary ifunc func fp = createLibrary fp bl where
-    bl ms = findModule (map Left ms) ifunc func
+buildLibrary ifunc func = ans where
+    ans fp = do
+        (desc,name,hmods,emods) <- parse fp
+        let allmods  = sort (emods ++ hmods)
+        (cho,libDeps,ho) <- findModule (map Left (emods ++ hmods)) ifunc func
+        let unknownMods = [ m | m <- mkeys (hoExports ho), m `notElem` allmods  ]
+        mapM_ ((putStrLn . ("*** Module included in library that is not in export list: " ++)) . show) unknownMods
+        let outName = case optOutName options of
+                "hs.out" -> name ++ ".hl"
+                fn -> fn
+        let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
+        let lhash = SHA1.sha1String (show $ choFiles cho)
+        let hoh =  HoHeader {
+                hohHash = lhash,
+                hohDepends = [ (m,SHA1.emptyHash) | m <- mkeys (hoExports ho)],
+                hohModDepends = libDeps,
+                hohMetaInfo = pdesc
+                }
+        recordHoFile ho [outName] hoh
 
-createLibrary ::
-    FilePath
-    -> ([Module] -> IO (CollectedHo,Ho))
-    -> IO ()
-createLibrary fp wtd = do
-    putVerboseLn $ "Creating library from description file: " ++ show fp
-    desc <- readDescFile fp
-    when verbose2 $ mapM_ print desc
-    let field x = lookup x desc
-        jfield x = maybe (fail $ "createLibrary: description lacks required field " ++ show x) return $ field x
-        mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ field x
-    name <- jfield "name"
-    vers <- jfield "version"
-    let hmods = map Module $ snub $ mfield "hidden-modules"
-        emods = map Module $ snub $ mfield "exposed-modules"
-    let allmods  = sort (emods ++ hmods)
-    (cho,ho) <- wtd emods
-    let unknownMods = [ m | m <- mkeys (hoExports ho), m `notElem` allmods  ]
-    mapM_ ((putStrLn . ("*** Module included in library that is not in export list: " ++)) . show) unknownMods
-    let outName = case optOutName options of
-            "hs.out" -> name ++ "-" ++ vers ++ ".hl"
-            fn -> fn
-    let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
-    let lhash = SHA1.sha1String (show $ choFiles cho)
-    let hoh =  HoHeader {
-            hohHash = lhash,
-            hohDepends = [ (m,SHA1.emptyHash) | m <- mkeys (hoExports ho)],
-            hohModDepends = [],
-            hohMetaInfo = pdesc
-            }
-    recordHoFile ho [outName] hoh
+    -- parse library description file
+    parse fp = do
+        putVerboseLn $ "Creating library from description file: " ++ show fp
+        desc <- readDescFile fp
+        when verbose2 $ mapM_ print desc
+        let field x = lookup x desc
+            jfield x = maybe (fail $ "createLibrary: description lacks required field " ++ show x) return $ field x
+            mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ field x
+        name <- jfield "name"
+        vers <- jfield "version"
+        let hmods = map Module $ snub $ mfield "hidden-modules"
+            emods = map Module $ snub $ mfield "exposed-modules"
+        return (desc,name ++ "-" ++ vers,hmods,emods)
+
 
 
 

@@ -27,12 +27,11 @@ makeLibrary ifunc func hl = do buildLibrary ifunc (doModules func) hl
 parseFiles :: [Either Module String]      -- ^ List of files or modules to read
                -> (CollectedHo -> Ho -> IO CollectedHo) -- ^ Process initial data loaded from ho files
                -> (CollectedHo -> Ho -> Tc.TiData -> IO (CollectedHo,Ho))  -- ^ routine which takes the global ho, the partial local ho and the output of the front end, and returns the completed ho.
-               -> IO (CollectedHo,Ho)     -- ^ (the final combined ho,all the loaded ho data)
+               -> IO CollectedHo          -- ^ (the final combined ho,all the loaded ho data)
 parseFiles fs ifunc func = do
     wdump FD.Progress $ do
         putErrLn $ "Compiling " ++ show fs
-    res <- findModule fs ifunc (doModules func)
-    processIOErrors
+    (res,_,_) <- findModule fs ifunc (doModules func)
     return res
 
 -- Process modules found by Ho

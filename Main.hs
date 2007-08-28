@@ -457,7 +457,7 @@ isInteractive = do
 
 transTypeAnalyze = transformParms { transformCategory = "typeAnalyze",  transformOperation = typeAnalyze True }
 
-compileModEnv' (cho,_) = do
+compileModEnv' cho = do
     let ho = choHo cho
     if optMode options == CompileHo then return () else do
 
