@@ -16,7 +16,7 @@
 
 -------------------------------------------------------------------------------}
 
-module FrontEnd.Infix (buildFixityMap, infixHsModule, FixityMap,size, infixStatement) where
+module FrontEnd.Infix (buildFixityMap, infixHsModule, FixityMap,size, infixStatement, restrictFixityMap) where
 
 import Data.Binary
 import Data.Monoid
@@ -30,8 +30,6 @@ import Name.Name
 ----------------------------------------------------------------------------
 
 type FixityInfo = (Int, HsAssoc)
---type OpKey      = (Module, HsIdentifier)
---type SymbolMap = FiniteMap OpKey FixityInfo
 type SymbolMap = Map.Map Name FixityInfo
 
 newtype FixityMap = FixityMap SymbolMap
@@ -40,6 +38,10 @@ newtype FixityMap = FixityMap SymbolMap
 instance Binary FixityMap where
     put (FixityMap ts) = putMap ts
     get = fmap FixityMap getMap
+
+restrictFixityMap :: (Name -> Bool) -> FixityMap -> FixityMap
+restrictFixityMap f (FixityMap fm) = FixityMap (Map.filterWithKey (\k _ -> f k) fm)
+
 
 ----------------------------------------------------------------------------
 

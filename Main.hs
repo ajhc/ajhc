@@ -211,8 +211,7 @@ processDecls cho ho' tiData = do
     let allHo = ho `mappend` ho'
         ho = choHo cho
         -- XXX typechecker drops foreign exports!
-        decls | fopts FO.Boxy = tiDataDecls tiData ++ [ x | x@HsForeignExport {} <- originalDecls ]
-              | otherwise = concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ] ++ Map.elems (tiDataLiftedInstances tiData)
+        decls  = tiDataDecls tiData ++ [ x | x@HsForeignExport {} <- originalDecls ]
         originalDecls =  concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ]
 
     -- build datatables

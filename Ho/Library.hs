@@ -11,7 +11,6 @@ import System.Directory
 import qualified Data.Map as Map
 
 import GenUtil
-import Ho.Type
 import Options
 import qualified CharIO
 import qualified FlagDump as FD

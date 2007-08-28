@@ -3,6 +3,7 @@ module TypeSynonyms (
     removeSynonymsFromType,
     declsToTypeSynonyms,
     TypeSynonyms,
+    restrictTypeSynonyms,
     showSynonym
     ) where
 
@@ -31,6 +32,9 @@ newtype TypeSynonyms = TypeSynonyms (Map.Map Name ([HsName], HsType, SrcLoc))
 instance Binary TypeSynonyms where
     put (TypeSynonyms ts) = putMap ts
     get = fmap TypeSynonyms getMap
+
+restrictTypeSynonyms :: (Name -> Bool) -> TypeSynonyms -> TypeSynonyms
+restrictTypeSynonyms f (TypeSynonyms fm) = TypeSynonyms (Map.filterWithKey (\k _ -> f k) fm)
 
 showSynonym :: (DocLike d,Monad m) => (HsType -> d) -> Name -> TypeSynonyms -> m d
 showSynonym pprint n (TypeSynonyms m) = do

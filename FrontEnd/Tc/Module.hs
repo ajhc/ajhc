@@ -6,39 +6,40 @@ import IO
 import List
 import Maybe
 import Monad
-import qualified Data.Map as Map
 import Text.PrettyPrint.HughesPJ as PPrint
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
-import FrontEnd.Class
 import DataConsAssump     (dataConsEnv)
 import DataConstructors
 import DeclsDepends       (getDeclDeps, debugDeclBindGroups)
 import DependAnalysis     (getBindGroups)
 import DerivingDrift.Drift
 import Doc.PPrint as PPrint
+import FrontEnd.Class
 import FrontEnd.Desugar
+import FrontEnd.Exports
 import FrontEnd.Infix
 import FrontEnd.KindInfer
 import FrontEnd.Rename
-import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Main
+import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
-import FrontEnd.Exports
-import Info.Properties
+import FrontEnd.Warning
 import Ho.Type
 import HsSyn
+import Info.Properties
 import Name.Name as Name
 import Options
-import qualified FlagDump as FD
-import qualified HsPretty
-import Util.SetLike
 import TypeSigs           (collectSigs, listSigsToSigEnv)
 import TypeSynonyms
 import TypeSyns
 import Util.Gen
 import Util.Inst()
-import FrontEnd.Warning
+import Util.SetLike
+import qualified FlagDump as FD
+import qualified HsPretty
 
 trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env
 
@@ -49,7 +50,6 @@ getDeclNames d = maybeGetDeclName d
 
 -- Extra data produced by the front end, used to fill in the Ho file.
 data TiData = TiData {
-    tiDataLiftedInstances :: Map.Map Name HsDecl,
     tiDataDecls      :: [HsDecl],
     tiDataModules    :: [(Module,HsModule)],
     tiModuleOptions  :: [(Module,Opt)],
@@ -241,32 +241,26 @@ tiModules' cho ms = do
         putStrLn " ---- the coersions of identifiers ---- "
         mapM_ putStrLn [ show n ++  " --> " ++ show s |  (n,s) <- Map.toList coercions]
 
-    let getMod x = case getModule x of
-                     Just m  -> m
-                     Nothing -> error ("getModule "++show x++" => Nothing")
-        interesting x = isGlobal x
-    let externalEnv = Map.filterWithKey (\ x _ -> interesting x && (getMod x `elem` map modInfoName ms)) localVarEnv `Map.union` noDefaultSigs
     localVarEnv <- return $  localVarEnv `Map.union` noDefaultSigs
-    let externalKindEnv = restrictKindEnv (\ x  -> interesting x && (getMod x `elem` map modInfoName ms)) kindInfo
 
     let pragmaProps = fromList $ Map.toList $ Map.fromListWith mappend [ (toId $ toName Name.Val x,fromList $ readProp w) |  HsPragmaProps _ w xs <- ds, x <- xs ]
 
     let allAssumps = localDConsEnv `Map.union` localVarEnv
-        expAssumps = localDConsEnv `Map.union` externalEnv
+        allExports = Set.fromList (concatMap modInfoExport ms)
+        externalKindEnv = restrictKindEnv (\ x  -> isGlobal x && (getModule x `elem` map (Just . modInfoName) ms)) kindInfo
     let ho = mempty {
-        hoExports = Map.fromList [ (modInfoName m,modInfoExport m) | m <- ms ],
-        hoDefs =  Map.fromList [ (x,(y,z)) | (x,y,z) <- concat $ map modInfoDefs ms],
-        hoAssumps = expAssumps,
-        hoFixities = thisFixityMap,
-        hoKinds = externalKindEnv,
-        hoClassHierarchy = smallClassHierarchy,
-        hoProps = pragmaProps,
-        hoTypeSynonyms = thisTypeSynonyms
-
+            hoExports = Map.fromList [ (modInfoName m,modInfoExport m) | m <- ms ],
+            hoDefs =  Map.fromList [ (x,(y,filter (`member` allExports) z)) | (x,y,z) <- concat $ map modInfoDefs ms, x `member` allExports],
+            hoAssumps = Map.filterWithKey (\k _ -> k `member` allExports) allAssumps,
+            hoFixities = restrictFixityMap (`member` allExports) thisFixityMap,
+            -- TODO - this contains unexported names, we should filter these before writing to disk.
+            hoKinds = externalKindEnv,
+            --hoKinds = restrictKindEnv (`member` allExports) kindInfo,
+            hoClassHierarchy = smallClassHierarchy,
+            hoTypeSynonyms = restrictTypeSynonyms (`member` allExports) thisTypeSynonyms,
+            hoProps = pragmaProps
         }
         tiData = TiData {
-            --tiDataLiftedInstances = Map.fromList [ (getDeclName d,d) | d <- liftedInstances],
-            tiDataLiftedInstances = error "tiDataLiftedInstances not used", -- Map.fromList [ (getDeclName d,d) | d <- ds],
             tiDataDecls = tcDs ++ filter isHsClassDecl ds,
             tiDataModules = [ (modInfoName m, modInfoHsModule m) |  m <- ms],
             tiModuleOptions = [ (modInfoName m, modInfoOptions m) |  m <- ms],
