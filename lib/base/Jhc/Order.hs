@@ -1,6 +1,15 @@
 {-# OPTIONS_JHC -N -fffi #-}
 
-module Jhc.Order where
+module Jhc.Order(
+    Bool(..),
+    Ordering(..),
+    Eq(..),
+    Ord(..),
+    (&&),
+    (||),
+    not,
+    otherwise
+    ) where
 
 import Jhc.Enum
 import Jhc.Basics
