@@ -44,6 +44,7 @@ import FrontEnd.ParseMonad
 import FrontEnd.Syn.Options
 import FrontEnd.Unlit
 import FrontEnd.Warning
+import FrontEnd.SrcLoc
 import Ho.Binary()
 import Ho.Library
 import Ho.Type
@@ -304,6 +305,10 @@ readHoFile fn = do
     when (m2 /= magic2) (putErrDie $ "Bad ho file magic2:" <+> fn)
     return (hh,ho)
 
+
+instance DocLike d => PPrint d SrcLoc where
+    pprint sl = tshow sl
+
 {-# NOINLINE dumpHoFile #-}
 dumpHoFile :: String -> IO ()
 dumpHoFile fn = do
@@ -324,14 +329,20 @@ dumpHoFile fn = do
     putStrLn $ "hoEs:" <+> tshow (size $  hoEs ho)
     putStrLn $ "hoProps:" <+> tshow (size $  hoProps ho)
     putStrLn $ "hoRules:" <+> tshow (size $  hoRules ho)
+    wdump FD.Exports $ do
+        putStrLn "---- exports information ----";
+        CharIO.putStrLn $  (pprint $ hoExports ho :: String)
+    wdump FD.Defs $ do
+        putStrLn "---- defs information ----";
+        CharIO.putStrLn $  (pprint $ hoDefs ho :: String)
     when (dump FD.Kind) $ do
-        putStrLn " \n ---- kind information ---- \n";
-        CharIO.putStrLn $  (pprint $ hoKinds ho :: String) -- pprintEnvMap kindInfo}
+        putStrLn "---- kind information ----";
+        CharIO.putStrLn $  (pprint $ hoKinds ho :: String)
     when (dump FD.ClassSummary) $ do
-        putStrLn "  ---- class summary ---- "
+        putStrLn "---- class summary ---- "
         printClassSummary (hoClassHierarchy ho)
     when (dump FD.Class) $
-         do {putStrLn "  ---- class hierarchy ---- ";
+         do {putStrLn "---- class hierarchy ---- ";
              printClassHierarchy (hoClassHierarchy ho)}
     let rules = hoRules ho
     wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
