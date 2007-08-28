@@ -4,8 +4,23 @@ module Prelude.IO(
     ioError,
     catch,
     runExpr,
-    module Prelude.IO,
-    userError) where
+    FilePath(),
+    putStr,
+    putStrLn,
+    print,
+    getLine,
+    getContents,
+    readFile,
+    interact,
+    writeFile,
+    appendFile,
+    readIO,
+    readLn,
+    putChar,
+    runExpr,
+    getChar,
+    userError
+    ) where
 
 import Prelude
 import Prelude.Text
