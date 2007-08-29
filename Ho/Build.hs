@@ -20,6 +20,7 @@ import Prelude hiding(print,putStrLn)
 import System.IO hiding(print,putStrLn)
 import System.Posix.Files
 import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString.Base as L
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
@@ -50,6 +51,7 @@ import Ho.Type
 import HsSyn
 import Options
 import PackedString
+import Support.CFF
 import Util.FilterInput
 import Util.Gen hiding(putErrLn,putErr,putErrDie)
 import Util.SetLike
@@ -58,6 +60,26 @@ import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Util.Graph as G
 import qualified Util.SHA1 as SHA1
+
+
+--
+-- Ho File Format
+--
+-- ho files are standard CFF format files (PNG-like) as described in the Support.CFF modules.
+--
+-- the CFF magic for the files is the string "JHC"
+--
+-- JHDR - header info, contains a list of modules contained and dependencies that need to be checked to read the file
+-- LIBR - only present if this is a library, contains library metainfo
+-- TCIN - type checking information
+-- CORE - compiled core and associated data
+-- GRIN - compiled grin code
+--
+--
+
+cff_magic = chunkType "JHC"
+cff_jhdr  = chunkType "JHDR"
+cff_core  = chunkType "CORE"
 
 version :: Int
 version = 7
@@ -287,9 +309,16 @@ checkForHoFile fn = flip catch (\e -> return Nothing) $ Just `fmap` readHoFile f
 readHoFile :: String -> IO (HoHeader,Ho)
 readHoFile fn = do
     fh <- openBinaryFile fn ReadMode
-    c <- L.hGetContents fh
-    let (m1,hh,ho) = decode (decompress c)
-    when (m1 /= magic) (putErrDie $ "Bad ho file magic1:" <+> fn)
+    (ct,mp) <- lazyReadCFF fh
+    True <- return $ ct == cff_magic
+    [rhh] <- Map.lookup cff_jhdr mp
+    [rho] <- Map.lookup cff_core mp
+    let hh = decode (decompress $ L.LPS [rhh])
+    let ho = decode (decompress $ L.LPS [rho])
+
+--    c <- L.hGetContents fh
+--    let (m1,hh,ho) = decode (decompress c)
+--    when (m1 /= magic) (putErrDie $ "Bad ho file magic1:" <+> fn)
     return (hh,ho)
 
 
@@ -330,7 +359,7 @@ recordHoFile ho fs header = do
             let tfn = fn ++ ".tmp"
             fh <- openBinaryFile tfn WriteMode
             let theho =  mapHoBodies eraseE ho
-            L.hPut fh (compress $ encode (magic,header,theho))
+            lazyWriteCFF fh cff_magic [(cff_jhdr, compress $ encode header),(cff_core, compress $ encode theho)]
             hFlush fh
             hClose fh
             rename tfn fn
