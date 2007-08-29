@@ -68,7 +68,6 @@ data Ho = Ho {
     hoKinds :: KindEnv,                      -- used for typechecking
     hoClassHierarchy :: ClassHierarchy,
     hoTypeSynonyms :: TypeSynonyms,
-    hoProps :: IdMap Properties,
     -- Filled in by E generation
     hoDataTable :: DataTable,
     hoEs :: Map.Map Name (TVr,E),
@@ -76,7 +75,7 @@ data Ho = Ho {
     }
 
 instance Monoid Ho where
-    mempty = Ho mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
+    mempty = Ho mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
     mappend a b = Ho {
         hoExports = hoExports a `mappend` hoExports b,
         hoDefs = hoDefs a `mappend` hoDefs b,
@@ -85,7 +84,6 @@ instance Monoid Ho where
         hoKinds = hoKinds a `mappend` hoKinds b,
         hoClassHierarchy = hoClassHierarchy a `mappend` hoClassHierarchy b,
         hoTypeSynonyms = hoTypeSynonyms a `mappend` hoTypeSynonyms b,
-        hoProps = munionWith mappend (hoProps a) (hoProps b),
         hoDataTable = hoDataTable a `mappend` hoDataTable b,
         hoEs = hoEs a `mappend` hoEs b,
         hoRules = hoRules a `mappend` hoRules b

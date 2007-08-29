@@ -28,7 +28,7 @@ instance Binary HoHeader where
         return (HoHeader aa ab ac ad)
 
 instance Binary Ho where
-    put (Ho ac ad ae af ag ah ai aj ak al am) = do
+    put (Ho ac ad ae af ag ah ai ak al am) = do
 	    put ac
 	    putMap ad
 	    putMap ae
@@ -36,7 +36,6 @@ instance Binary Ho where
 	    put ag
 	    put ah
 	    put ai
-	    put aj
 	    put ak
 	    putMap al
 	    put am
@@ -48,10 +47,9 @@ instance Binary Ho where
     ag <- get
     ah <- get
     ai <- get
-    aj <- get
     ak <- get
     al <- getMap
     am <- get
-    return (Ho ac ad ae af ag ah ai aj ak al am)
+    return (Ho ac ad ae af ag ah ai ak al am)
 
 

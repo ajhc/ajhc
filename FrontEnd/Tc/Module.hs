@@ -29,7 +29,7 @@ import FrontEnd.Utils
 import FrontEnd.Warning
 import Ho.Type
 import HsSyn
-import Info.Properties
+import Info.Types
 import Name.Name as Name
 import Options
 import TypeSigs           (collectSigs, listSigsToSigEnv)
@@ -55,6 +55,7 @@ data TiData = TiData {
     tiModuleOptions  :: [(Module,Opt)],
     tiCheckedRules   :: [Rule],
     tiCoerce         :: Map.Map Name CoerceTerm,
+    tiProps          :: Map.Map Name Properties,
     tiAllAssumptions :: Map.Map Name Type
 }
 
@@ -243,7 +244,7 @@ tiModules' cho ms = do
 
     localVarEnv <- return $  localVarEnv `Map.union` noDefaultSigs
 
-    let pragmaProps = fromList $ Map.toList $ Map.fromListWith mappend [ (toId $ toName Name.Val x,fromList $ readProp w) |  HsPragmaProps _ w xs <- ds, x <- xs ]
+    let pragmaProps = fromList $ Map.toList $ Map.fromListWith mappend [ (toName Name.Val x,fromList $ readProp w) |  HsPragmaProps _ w xs <- ds, x <- xs ]
 
     let allAssumps = localDConsEnv `Map.union` localVarEnv
         allExports = Set.fromList (concatMap modInfoExport ms)
@@ -257,8 +258,7 @@ tiModules' cho ms = do
             hoKinds = externalKindEnv,
             --hoKinds = restrictKindEnv (`member` allExports) kindInfo,
             hoClassHierarchy = smallClassHierarchy,
-            hoTypeSynonyms = restrictTypeSynonyms (`member` allExports) thisTypeSynonyms,
-            hoProps = pragmaProps
+            hoTypeSynonyms = restrictTypeSynonyms (`member` allExports) thisTypeSynonyms
         }
         tiData = TiData {
             tiDataDecls = tcDs ++ filter isHsClassDecl ds,
@@ -266,6 +266,7 @@ tiModules' cho ms = do
             tiModuleOptions = [ (modInfoName m, modInfoOptions m) |  m <- ms],
             tiCheckedRules = checkedRules,
             tiCoerce       = coercions,
+            tiProps        = pragmaProps,
             tiAllAssumptions = allAssumps
         }
     return (ho,tiData)

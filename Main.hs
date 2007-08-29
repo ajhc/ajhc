@@ -162,7 +162,7 @@ processInitialHo ::
     -> Ho    -- ^ new ho, freshly read from file
     -> IO CollectedHo -- ^ final combined ho data.
 processInitialHo accumho ho = do
-    let ho' = reprocessHo (hoRules ho) (hoProps ho) ho
+    let ho' = reprocessHo (hoRules ho) mempty ho
 
         -- XXX do we need to do this?
         ds = runIdentity $ annotateDs (choVarMap accumho') (\_ -> return) letann lamann (Map.elems $ hoEs ho')
@@ -170,7 +170,7 @@ processInitialHo accumho ho = do
         prog = etaAnnotateProgram (programSetDs ds program { progDataTable = choDataTable accumho `mappend` hoDataTable ho })
 
         rules' = runIdentity $ mapBodies (annotate imapRules (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
-        accumho' = reprocessCho rules' (hoProps ho) accumho
+        accumho' = reprocessCho rules' mempty accumho
 
         imapRules = choVarMap accumho'  `mappend` newVarMap -- fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho' `mappend` hoEs ho)]
         newVarMap = fromList [ (tvrIdent t,Just (EVar t)) | (t,_) <- programDs prog ]
@@ -232,7 +232,8 @@ processDecls cho ho' tiData = do
 
     -- Convert Haskell decls to E
     let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
-    ds' <- convertDecls tiData (hoProps allHo) (hoClassHierarchy ho') allAssumps  fullDataTable decls
+        theProps = fromList [ (toId x,y) | (x,y) <- Map.toList $ tiProps tiData]
+    ds' <- convertDecls tiData theProps (hoClassHierarchy ho') allAssumps  fullDataTable decls
     let ds = [ (v,e) | (v,e) <- classInstances ] ++  [ (v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
  --   sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 
@@ -260,7 +261,7 @@ processDecls cho ho' tiData = do
     let prog' = programSetDs ds prog
     let Identity prog = programMapDs (\ (t,e) -> return (shouldBeExported (getExports ho') t,e)) $ atomizeApps False prog'
     prog <- barendregtProg prog
-    let allProps = munionWith mappend (hoProps ho')  (idSetToIdMap (const (singleton prop_HASRULE)) (ruleHeadFreeVars allRules))
+    let allProps = munionWith mappend theProps (idSetToIdMap (const (singleton prop_HASRULE)) (ruleHeadFreeVars allRules))
 
     cho <- evaluate $ reprocessCho rules allProps cho
 

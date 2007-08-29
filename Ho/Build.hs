@@ -492,7 +492,6 @@ dumpHoFile fn = do
     putStrLn $ "hoTypeSynonyms:" <+> tshow (size $  hoTypeSynonyms ho)
     putStrLn $ "hoDataTable:" <+> tshow (size $  hoDataTable ho)
     putStrLn $ "hoEs:" <+> tshow (size $  hoEs ho)
-    putStrLn $ "hoProps:" <+> tshow (size $  hoProps ho)
     putStrLn $ "hoRules:" <+> tshow (size $  hoRules ho)
     wdump FD.Exports $ do
         putStrLn "---- exports information ----";
