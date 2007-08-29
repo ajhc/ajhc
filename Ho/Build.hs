@@ -13,7 +13,6 @@ import Data.Binary
 import Data.Monoid
 import Data.IORef
 import Data.Tree
-import IO(bracket)
 import Data.List hiding(union)
 import Maybe
 import Monad
@@ -64,7 +63,6 @@ version :: Int
 version = 7
 
 magic = (packString "jhc Haskell Object File",version)
-magic2 = packString "John's Haskell Compiler"
 
 
 shortenPath :: String -> IO String
@@ -281,93 +279,19 @@ findModule need ifunc func  = do
 
 
 
+-- Read in a Ho file.
 
-checkForHoFile :: String            -- ^ file name to check for
-    -> IO (Maybe (HoHeader,Ho))
-checkForHoFile fn = flip catch (\e -> return Nothing) $ do
-    bracket (openBinaryFile fn ReadMode) (\_ -> return ()) $ \ fh -> do
-    lbs <- L.hGetContents fh
-    let (x,hh,ho,m2) = decode (decompress lbs)
-    if x /= magic then (putErrLn $ "Bad ho file:" <+> fn)  >> return Nothing else do
-    if m2 /= magic2 then (putErrLn $ "Bad ho file:" <+> fn)  >>  return Nothing else do
-    return $ Just (hh,ho)
+checkForHoFile :: String -> IO (Maybe (HoHeader,Ho))
+checkForHoFile fn = flip catch (\e -> return Nothing) $ Just `fmap` readHoFile fn
 
-
-
-
--- | This reads in an entire ho file for diagnostic purposes.
 readHoFile :: String -> IO (HoHeader,Ho)
 readHoFile fn = do
     fh <- openBinaryFile fn ReadMode
     c <- L.hGetContents fh
-    let (m1,hh,ho,m2) = decode (decompress c)
+    let (m1,hh,ho) = decode (decompress c)
     when (m1 /= magic) (putErrDie $ "Bad ho file magic1:" <+> fn)
-    when (m2 /= magic2) (putErrDie $ "Bad ho file magic2:" <+> fn)
     return (hh,ho)
 
-
-instance DocLike d => PPrint d SrcLoc where
-    pprint sl = tshow sl
-
-{-# NOINLINE dumpHoFile #-}
-dumpHoFile :: String -> IO ()
-dumpHoFile fn = do
-    (hoh,ho) <- readHoFile fn
-    putStrLn fn
-    when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "Dependencies:\n" <>  vcat (map pprint $ sortUnder fst $ hohDepends hoh)
-    when (not $ Prelude.null (hohModDepends hoh)) $ putStrLn $ "ModDependencies:\n" <>  vcat (map pprint $ sortUnder fst $ hohModDepends hoh)
-    putStrLn $ "HoHash:" <+> pprint (hohHash hoh)
-    putStrLn $ "MetaInfo:\n" <> vcat (sort [text (' ':' ':unpackPS k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
-    putStrLn $ "Modules contained:" <+> tshow (mkeys $ hoExports ho)
-    putStrLn $ "number of definitions:" <+> tshow (size $ hoDefs ho)
-    putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps ho)
-    putStrLn $ "hoFixities:" <+> tshow (size $  hoFixities ho)
-    putStrLn $ "hoKinds:" <+> tshow (size $  hoKinds ho)
-    putStrLn $ "hoClassHierarchy:" <+> tshow (size $  hoClassHierarchy ho)
-    putStrLn $ "hoTypeSynonyms:" <+> tshow (size $  hoTypeSynonyms ho)
-    putStrLn $ "hoDataTable:" <+> tshow (size $  hoDataTable ho)
-    putStrLn $ "hoEs:" <+> tshow (size $  hoEs ho)
-    putStrLn $ "hoProps:" <+> tshow (size $  hoProps ho)
-    putStrLn $ "hoRules:" <+> tshow (size $  hoRules ho)
-    wdump FD.Exports $ do
-        putStrLn "---- exports information ----";
-        CharIO.putStrLn $  (pprint $ hoExports ho :: String)
-    wdump FD.Defs $ do
-        putStrLn "---- defs information ----";
-        CharIO.putStrLn $  (pprint $ hoDefs ho :: String)
-    when (dump FD.Kind) $ do
-        putStrLn "---- kind information ----";
-        CharIO.putStrLn $  (pprint $ hoKinds ho :: String)
-    when (dump FD.ClassSummary) $ do
-        putStrLn "---- class summary ---- "
-        printClassSummary (hoClassHierarchy ho)
-    when (dump FD.Class) $
-         do {putStrLn "---- class hierarchy ---- ";
-             printClassHierarchy (hoClassHierarchy ho)}
-    let rules = hoRules ho
-    wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
-    wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
-    wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
-    wdump FD.Datatable $ do
-         putStrLn "  ---- data table ---- "
-         putDocM CharIO.putStr (showDataTable (hoDataTable ho))
-         putChar '\n'
-    wdump FD.Types $ do
-        putStrLn " ---- the types of identifiers ---- "
-        putStrLn $ PPrint.render $ pprint (hoAssumps ho)
-    wdump FD.Core $ do
-        putStrLn " ---- lambdacube  ---- "
-        mapM_ (\ (v,lc) -> putChar '\n' >> printCheckName'' (hoDataTable ho) v lc) (melems $ hoEs ho)
-    where
-    printCheckName'' :: DataTable -> TVr -> E -> IO ()
-    printCheckName'' _dataTable tvr e = do
-        when (dump FD.EInfo || verbose2) $ putStrLn (show $ tvrInfo tvr)
-        putStrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pprint (tvrType tvr)))
-        putStrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
-
---recordHoFile :: Ho -> [(HsModule,FileDep,String,[FileDep])] -> [FileDep] -> IO [FileDep]
-
-emptyFileDep = error "emptyFileDep"
 
 recordHoFile ::
     Ho               -- ^ File to record
@@ -402,11 +326,11 @@ recordHoFile ho fs header = do
                 when (optNoWriteHo options) $ putErr "Skipping "
                 fn' <- shortenPath fn
                 putErrLn $ "Writing haskell object file:" <+> fn'
-            if optNoWriteHo options then return emptyFileDep else do
+            if optNoWriteHo options then return () else do
             let tfn = fn ++ ".tmp"
             fh <- openBinaryFile tfn WriteMode
             let theho =  mapHoBodies eraseE ho
-            L.hPut fh (compress $ encode (magic,header,theho,magic2))
+            L.hPut fh (compress $ encode (magic,header,theho))
             hFlush fh
             hClose fh
             rename tfn fn
@@ -513,6 +437,67 @@ buildLibrary ifunc func = ans where
         return (desc,name ++ "-" ++ vers,hmods,emods)
 
 
+------------------------------------
+-- dumping contents of a ho file
+------------------------------------
 
 
+instance DocLike d => PPrint d SrcLoc where
+    pprint sl = tshow sl
+
+{-# NOINLINE dumpHoFile #-}
+dumpHoFile :: String -> IO ()
+dumpHoFile fn = do
+    (hoh,ho) <- readHoFile fn
+    putStrLn fn
+    when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "Dependencies:\n" <>  vcat (map pprint $ sortUnder fst $ hohDepends hoh)
+    when (not $ Prelude.null (hohModDepends hoh)) $ putStrLn $ "ModDependencies:\n" <>  vcat (map pprint $ sortUnder fst $ hohModDepends hoh)
+    putStrLn $ "HoHash:" <+> pprint (hohHash hoh)
+    putStrLn $ "MetaInfo:\n" <> vcat (sort [text (' ':' ':unpackPS k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
+    putStrLn $ "Modules contained:" <+> tshow (mkeys $ hoExports ho)
+    putStrLn $ "number of definitions:" <+> tshow (size $ hoDefs ho)
+    putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps ho)
+    putStrLn $ "hoFixities:" <+> tshow (size $  hoFixities ho)
+    putStrLn $ "hoKinds:" <+> tshow (size $  hoKinds ho)
+    putStrLn $ "hoClassHierarchy:" <+> tshow (size $  hoClassHierarchy ho)
+    putStrLn $ "hoTypeSynonyms:" <+> tshow (size $  hoTypeSynonyms ho)
+    putStrLn $ "hoDataTable:" <+> tshow (size $  hoDataTable ho)
+    putStrLn $ "hoEs:" <+> tshow (size $  hoEs ho)
+    putStrLn $ "hoProps:" <+> tshow (size $  hoProps ho)
+    putStrLn $ "hoRules:" <+> tshow (size $  hoRules ho)
+    wdump FD.Exports $ do
+        putStrLn "---- exports information ----";
+        CharIO.putStrLn $  (pprint $ hoExports ho :: String)
+    wdump FD.Defs $ do
+        putStrLn "---- defs information ----";
+        CharIO.putStrLn $  (pprint $ hoDefs ho :: String)
+    when (dump FD.Kind) $ do
+        putStrLn "---- kind information ----";
+        CharIO.putStrLn $  (pprint $ hoKinds ho :: String)
+    when (dump FD.ClassSummary) $ do
+        putStrLn "---- class summary ---- "
+        printClassSummary (hoClassHierarchy ho)
+    when (dump FD.Class) $
+         do {putStrLn "---- class hierarchy ---- ";
+             printClassHierarchy (hoClassHierarchy ho)}
+    let rules = hoRules ho
+    wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
+    wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
+    wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
+    wdump FD.Datatable $ do
+         putStrLn "  ---- data table ---- "
+         putDocM CharIO.putStr (showDataTable (hoDataTable ho))
+         putChar '\n'
+    wdump FD.Types $ do
+        putStrLn " ---- the types of identifiers ---- "
+        putStrLn $ PPrint.render $ pprint (hoAssumps ho)
+    wdump FD.Core $ do
+        putStrLn " ---- lambdacube  ---- "
+        mapM_ (\ (v,lc) -> putChar '\n' >> printCheckName'' (hoDataTable ho) v lc) (melems $ hoEs ho)
+    where
+    printCheckName'' :: DataTable -> TVr -> E -> IO ()
+    printCheckName'' _dataTable tvr e = do
+        when (dump FD.EInfo || verbose2) $ putStrLn (show $ tvrInfo tvr)
+        putStrLn (render $ hang 4 (pprint tvr <+> text "::" <+> pprint (tvrType tvr)))
+        putStrLn (render $ hang 4 (pprint tvr <+> equals <+> pprint e))
 
