@@ -15,6 +15,7 @@ module Support.CFF(
     lazyReadCFF,
     lazyGetCFF,
     readChunk,
+    lazyWriteCFF,
     writeCFF
     )where
 
@@ -29,9 +30,8 @@ import System.IO
 import System.IO.Unsafe
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Map as Map
 
-newtype ChunkType = ChunkType Word32
-    deriving(Eq,Ord)
 
 type FileOffset = Word
 type ChunkLength = Word
@@ -44,6 +44,12 @@ type ChunkLength = Word
 -- 0x1A      - EOF marker, to avoid corrupting the screen when typed under dos/windows
 -- 0x0A      - unix EOL marker, to detect line conversion errors
 
+-----------------------------------
+-- Routines dealing with ChunkTypes
+-----------------------------------
+
+newtype ChunkType = ChunkType Word32
+    deriving(Eq,Ord)
 
 instance Show ChunkType where
     showsPrec _ (ChunkType w) xs = b 3:b 2:b 1:b 0:xs where
@@ -55,6 +61,7 @@ instance Read ChunkType where
 
 chunkType [b1,b2,b3,b4] = bytesToChunkType (fi b1) (fi b2) (fi b3) (fi b4) where
     fi = fromIntegral . ord
+chunkType [b1,b2,b3] = chunkType [b1,b2,b3,' ']
 chunkType _ = error "chunkType: not a chunk."
 
 
@@ -141,17 +148,14 @@ readChunk h eft ect = do
             if b then fail "readChunk: specified chunk was not found" else do
             len <- readWord32 h
             ct <- readChunkType h
-            if ct == ect
-            then do
-                BS.hGet h (fromIntegral len)
-            else do
+            if ct == ect then do BS.hGet h (fromIntegral len) else do
                 hSeek h RelativeSeek (fromIntegral len + 4)
                 readChunk
     readChunk
 
 
-writeCFF :: Handle -> (ChunkType,[(ChunkType,BS.ByteString)]) -> IO ()
-writeCFF h (ft,xs) = do
+writeCFF :: Handle -> ChunkType -> [(ChunkType,BS.ByteString)] -> IO ()
+writeCFF h ft xs = do
     writeCFFHeader h ft
     let writeChunk (ChunkType ct,bs) = do
             writeWord32 h (fromIntegral $ BS.length bs)
@@ -160,33 +164,46 @@ writeCFF h (ft,xs) = do
             writeWord32 h 0 -- TODO proper checksum
     mapM_ writeChunk xs
 
+lazyWriteCFF :: Handle -> ChunkType -> [(ChunkType,LBS.ByteString)] -> IO ()
+lazyWriteCFF h ft xs = do
+    writeCFFHeader h ft
+    let writeChunk (ChunkType ct,bs) = do
+            writeWord32 h (fromIntegral $ LBS.length bs)
+            writeWord32 h ct
+            LBS.hPut h bs
+            writeWord32 h 0 -- TODO proper checksum
+    mapM_ writeChunk xs
 
 
 lazyReadCFF :: Handle -> IO (ChunkType,Map.Map ChunkType [BS.ByteString])
 lazyReadCFF h = do
-    mv <- newMVar ()
+    mv <- newEmptyMVar
     let getMap = do
             xs <- readChunk
             let xs' = sortBy (\ (x,y) (a,b) -> compare x a) xs
                 xs'' = groupBy  (\ (x,y) (a,b) -> x == a) xs'
-            return (Map.fromList xs'')
+                xs''' = [ (ct,map snd xs) | xs@((ct,_):_) <- xs'' ]
+            return (Map.fromList xs''')
         readChunk = do
             b <- hIsEOF h
             if b then return [] else do
-            len <- readWord32 h
+            len <- fromIntegral `fmap` readWord32 h
             ct <- readChunkType h
             off <- hTell h
+            hSeek h RelativeSeek (fromIntegral len)
+            hSeek h RelativeSeek 4
             bs <- unsafeInterleaveIO $ do
                 takeMVar mv
                 hSeek h AbsoluteSeek off
-                BS.hGet h (fromIntegral len)
+                res <- BS.hGet h len
                 putMVar mv ()
-            hSeek h RelativeSeek 4
+                return res
             xs <- readChunk
             return ((ct,bs):xs)
 
     cffType <- readCFFHeader h
     map <-  getMap
+    putMVar mv ()
     return (cffType,map)
 
 
