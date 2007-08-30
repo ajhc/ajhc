@@ -165,27 +165,27 @@ processInitialHo accumho ho = do
     let ho' = reprocessHo (hoRules ho) mempty ho
 
         -- XXX do we need to do this?
-        ds = runIdentity $ annotateDs (choVarMap accumho') (\_ -> return) letann lamann (Map.elems $ hoEs ho')
+        ds = runIdentity $ annotateDs (choVarMap accumho') (\_ -> return) letann lamann (hoEs ho')
 
         prog = etaAnnotateProgram (programSetDs ds program { progDataTable = choDataTable accumho `mappend` hoDataTable ho })
 
         rules' = runIdentity $ mapBodies (annotate imapRules (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
         accumho' = reprocessCho rules' mempty accumho
 
-        imapRules = choVarMap accumho'  `mappend` newVarMap -- fromList [ (tvrIdent v,Just (EVar v))| (v,_) <- Map.elems (hoEs accumho' `mappend` hoEs ho)]
+        imapRules = choVarMap accumho'  `mappend` newVarMap
         newVarMap = fromList [ (tvrIdent t,Just (EVar t)) | (t,_) <- programDs prog ]
 
     --lintCheckProgram (putStrLn "processInitialHo") prog
-    return $ accumho' `mappend` mempty { choVarMap = newVarMap, choExternalNames = idMapToIdSet newVarMap, choHo = ho { hoEs = programEsMap prog } }
+    return $ accumho' `mappend` mempty { choVarMap = newVarMap, choExternalNames = idMapToIdSet newVarMap, choHo = ho { hoEs = programDs prog } }
 
 -- reprocess an old ho to include new rules and properties
 reprocessHo :: Rules -> IdMap Properties -> Ho -> Ho
-reprocessHo rules ps ho = ho { hoEs = Map.map f (hoEs ho) } where
+reprocessHo rules ps ho = ho { hoEs = map f (hoEs ho) } where
     f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
     g id = runIdentity . idann rules ps id
 
 reprocessCho :: Rules -> IdMap Properties -> CollectedHo -> CollectedHo
-reprocessCho rules ps cho = cho { choVarMap = fmap h (choVarMap cho) , choHo = (choHo cho) { hoEs = Map.map f (hoEs $ choHo cho) }} where
+reprocessCho rules ps cho = cho { choVarMap = fmap h (choVarMap cho) , choHo = (choHo cho) { hoEs = map f (hoEs $ choHo cho) }} where
     f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
     g id = runIdentity . idann rules ps id
     h ~(Just (EVar t)) = Just (EVar (tvrInfo_u (g (tvrIdent t)) t))
@@ -238,7 +238,7 @@ processDecls cho ho' tiData = do
  --   sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 
     -- Build rules from instances, specializations, and user specified rules and catalysts
-    rules' <- createInstanceRules fullDataTable (hoClassHierarchy ho')  (Map.fromList [ (runIdentity $ fromId (tvrIdent y),(y,z)) | (y,z) <- ds] `mappend` hoEs ho)
+    rules' <- createInstanceRules fullDataTable (hoClassHierarchy ho')  (ds `mappend` hoEs ho)
     nrules <- convertRules (progModule prog) tiData (hoClassHierarchy ho') allAssumps fullDataTable decls
     (nds,srules) <- procAllSpecs (tiCheckedRules tiData) ds
 
@@ -289,7 +289,7 @@ processDecls cho ho' tiData = do
     -- floating inward
 
     let sopt = mempty {
-            SS.so_boundVars = fromList [ (tvrIdent v,(v,e)) | (v,e) <- Map.elems (hoEs ho)],
+            SS.so_boundVars = fromList [ (tvrIdent v,(v,e)) | (v,e) <- hoEs ho],
             SS.so_dataTable = fullDataTable
             }
     let tparms = transformParms {
@@ -419,10 +419,10 @@ processDecls cho ho' tiData = do
 
     let newHo = ho' {
         hoDataTable = dataTable,
-        hoEs = programEsMap prog,
+        hoEs = programDs prog,
         hoRules = hoRules ho' `mappend` rules
         }
-        newMap = fromList [ (tvrIdent n,Just (EVar n)) | (n,_) <- Map.elems $ hoEs newHo ]
+        newMap = fromList [ (tvrIdent n,Just (EVar n)) | (n,_) <- hoEs newHo ]
     return (mempty { choHo = newHo, choExternalNames = idMapToIdSet newMap, choVarMap = newMap  } `mappend` cho,newHo)
 
 programPruneUnreachable :: Program -> Program
@@ -935,5 +935,6 @@ printCheckName' dataTable tvr e = do
 
 printESize :: String -> Program -> IO ()
 printESize str prog = putErrLn $ str ++ " program e-size: " ++ show (eSize (programE prog))
+
 
 

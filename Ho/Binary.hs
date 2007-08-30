@@ -37,7 +37,7 @@ instance Binary Ho where
 	    put ah
 	    put ai
 	    put ak
-	    putMap al
+	    put al
 	    put am
     get = do
     ac <- get
@@ -48,7 +48,7 @@ instance Binary Ho where
     ah <- get
     ai <- get
     ak <- get
-    al <- getMap
+    al <- get
     am <- get
     return (Ho ac ad ae af ag ah ai ak al am)
 

@@ -184,7 +184,7 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
 
 
 {-# NOINLINE createInstanceRules #-}
-createInstanceRules :: Monad m => DataTable -> ClassHierarchy -> (Map.Map Name (TVr,E)) -> m Rules
+createInstanceRules :: Monad m => DataTable -> ClassHierarchy -> [(TVr,E)] -> m Rules
 createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans where
     ans = concatMap cClass (classRecords classHierarchy)
     cClass classRecord =  concat [ method classRecord n | (n,TForAll _ (_ :=> t)) <- classAssumps classRecord ]
@@ -216,7 +216,14 @@ createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans wher
                         tv = tvr { tvrIdent = head [ n | n <- newIds (freeVars vp)], tvrType = getType vp }
                     Nothing -> foldl EAp (EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) (eAp ty (fst $ valToPat' (tipe t)))) (map EVar args)
     method _ _ = []
-    findName name = case Map.lookup name funcs of
+    nfuncs = runIdentity $ do
+        let f d@(v,_) = case fromId (tvrIdent v) of
+                Just n -> return (n,d)
+                Nothing -> fail $ "createInstanceRules: top level var with temporary name " ++ show v
+        xs <- mapM f funcs
+        return (Map.fromList xs)
+
+    findName name = case Map.lookup name nfuncs of
         Nothing -> fail $ "Cannot find: " ++ show name
         Just n -> return n
 

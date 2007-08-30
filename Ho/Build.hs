@@ -405,7 +405,7 @@ parseHsSource fn fh = do
 
 
 mapHoBodies  :: (E -> E) -> Ho -> Ho
-mapHoBodies sm ho = ho { hoEs = fmap f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) } where
+mapHoBodies sm ho = ho { hoEs = map f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) } where
     f (t,e) = (t,sm e)
 
 
@@ -418,7 +418,7 @@ eraseE e = runIdentity $ f e where
 
 
 hoToProgram :: Ho -> Program
-hoToProgram ho = programSetDs (melems $ hoEs ho) program {
+hoToProgram ho = programSetDs (hoEs ho) program {
     progClassHierarchy = hoClassHierarchy ho,
     progDataTable = hoDataTable ho
     }
@@ -521,7 +521,7 @@ dumpHoFile fn = do
         putStrLn $ PPrint.render $ pprint (hoAssumps ho)
     wdump FD.Core $ do
         putStrLn " ---- lambdacube  ---- "
-        mapM_ (\ (v,lc) -> putChar '\n' >> printCheckName'' (hoDataTable ho) v lc) (melems $ hoEs ho)
+        mapM_ (\ (v,lc) -> putChar '\n' >> printCheckName'' (hoDataTable ho) v lc) (hoEs ho)
     where
     printCheckName'' :: DataTable -> TVr -> E -> IO ()
     printCheckName'' _dataTable tvr e = do

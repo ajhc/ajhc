@@ -13,12 +13,10 @@ import FrontEnd.KindInfer(KindEnv)
 import FrontEnd.SrcLoc(SrcLoc)
 import FrontEnd.Tc.Type(Type())
 import HsSyn(Module)
-import Info.Types
 import MapBinaryInstance()
 import Name.Id
 import Name.Name(Name)
 import TypeSynonyms(TypeSynonyms)
-import Util.SetLike
 import PackedString
 import qualified Util.SHA1 as SHA1
 
@@ -70,7 +68,7 @@ data Ho = Ho {
     hoTypeSynonyms :: TypeSynonyms,
     -- Filled in by E generation
     hoDataTable :: DataTable,
-    hoEs :: Map.Map Name (TVr,E),
+    hoEs :: [(TVr,E)],
     hoRules :: Rules
     }
 
