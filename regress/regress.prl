@@ -226,7 +226,7 @@ sub done {
     }
     close RLOG;
     unlink "$results_dir/last";
-    system "mv $results_dir/latest $results_dir/last";
+    system "mv -f $results_dir/latest $results_dir/last";
     unlink "$results_dir/latest";
     system "ln -sf $time $results_dir/latest";
     unless ($error) {
