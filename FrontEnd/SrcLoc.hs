@@ -3,6 +3,9 @@ module FrontEnd.SrcLoc where
 import Control.Monad.Writer
 import Control.Monad.Identity
 import Control.Monad
+import Control.Applicative
+import Data.Traversable
+import Data.Foldable
 import Data.FunctorM
 
 import Data.Monoid
@@ -60,8 +63,15 @@ fromLocated (Located _ x) = x
 
 instance Functor Located where
     fmap f (Located l x) = Located l (f x)
-instance FunctorM Located where
-    fmapM f (Located l x) = Located l `liftM` f x
+
+--instance FunctorM Located where
+--    fmapM f (Located l x) = Located l `liftM` f x
+
+instance Foldable Located where
+    foldMap f (Located l x) = f x
+
+instance Traversable Located where
+    traverse f (Located l x) = Located l <$> f x
 
 
 located ss x = Located (srcSpan ss) x

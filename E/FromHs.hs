@@ -10,7 +10,7 @@ import Char
 import Control.Monad.Trans
 import Control.Monad.Identity
 import Control.Monad.RWS
-import Data.FunctorM
+import qualified Data.Traversable as T
 import Data.Monoid
 import List(isPrefixOf)
 import Maybe
@@ -159,7 +159,7 @@ getMainFunction dataTable name ds = do
   mt <- case Map.lookup name ds of
     Just x -> return x
     Nothing -> fail $ "Could not find main function: " ++ show name
-  let funcs = runIdentity $ fmapM (\n -> return . EVar . fst $ runEither (show n) $ Map.lookup n ds) sFuncNames
+  let funcs = runIdentity $ T.mapM (\n -> return . EVar . fst $ runEither (show n) $ Map.lookup n ds) sFuncNames
   nameToEntryPoint dataTable (fst mt) (toName Name.Val "theMain") Nothing funcs
 
 nameToEntryPoint :: Monad m => DataTable -> TVr -> Name -> Maybe FfiExport -> FuncNames E -> m (Name,TVr,E)
@@ -355,7 +355,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         ceSrcLoc = bogusASrcLoc,
         ceDataTable = dataTable
         }
-    Identity funcs = fmapM (return . EVar . toTVr assumps dataTable) sFuncNames
+    Identity funcs = T.mapM (return . EVar . toTVr assumps dataTable) sFuncNames
     Ce ans = do
         nds <- mapM cDecl hsDecls
         return (map anninst $ concat nds)

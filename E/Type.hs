@@ -1,14 +1,16 @@
 module E.Type where
 
-import Data.FunctorM
 import Maybe
 import Control.Monad.Identity
+import Data.Traversable
+import Data.Foldable hiding(concat)
+import Control.Applicative
 
 
 import Atom
 import C.Prims
 import Data.Typeable
-import Doc.DocLike
+import Doc.DocLike hiding((<$>))
 import Name.Id
 import Util.Gen
 import Name.Name
@@ -41,7 +43,7 @@ data ARules = ARules {
 data Lit e t = LitInt { litNumber :: Number, litType :: t }
     | LitCons  { litName :: Name, litArgs :: [e], litType :: t, litAliasFor :: Maybe E }
     deriving(Eq,Ord)
-        {-!derive: is !-}
+        {-!derive: is, Functor, Foldable, Traversable !-}
 
 
 --------------------------------------
@@ -87,13 +89,13 @@ data E = EAp E E
 
 
 
-instance Functor (Lit e) where
-    fmap f x = runIdentity $ fmapM (return . f) x
+--instance Functor (Lit e) where
+--    fmap f x = runIdentity $ fmapM (return . f) x
 
-instance FunctorM (Lit e) where
-    fmapM f x = case x of
-        LitCons { litName = a, litArgs = es, litType = e, litAliasFor = af } -> do  e <- f e; return LitCons { litName = a, litArgs = es, litType = e, litAliasFor = af }
-        LitInt i t -> do t <- f t; return $ LitInt i t
+--instance FunctorM (Lit e) where
+--    fmapM f x = case x of
+--        LitCons { litName = a, litArgs = es, litType = e, litAliasFor = af } -> do  e <- f e; return LitCons { litName = a, litArgs = es, litType = e, litAliasFor = af }
+--        LitInt i t -> do t <- f t; return $ LitInt i t
 
 instance Show ESort where
     showsPrec _ EStar = showString "*"
@@ -117,15 +119,15 @@ instance Show a => Show (TVr' a) where
 
 type TVr = TVr' E
 data TVr' e = TVr { tvrIdent :: !Id, tvrType :: e, tvrInfo :: Info.Info }
-    {-! derive: update !-}
+        {-!derive: update, Functor, Foldable, Traversable !-}
 
 data Alt e = Alt (Lit TVr e) e
     deriving(Eq,Ord)
 
-instance FunctorM TVr' where
-    fmapM f t = do e <- f (tvrType t); return t { tvrType = e }
-instance Functor TVr' where
-    fmap f t = runIdentity (fmapM (return . f) t)
+--instance FunctorM TVr' where
+--    fmapM f t = do e <- f (tvrType t); return t { tvrType = e }
+--instance Functor TVr' where
+--    fmap f t = runIdentity (fmapM (return . f) t)
 
 instance Show e => Show (Alt e) where
     showsPrec n (Alt l e) = showParen (n > 10) $ shows l . showString " -> " . shows e

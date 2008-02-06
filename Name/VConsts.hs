@@ -1,6 +1,9 @@
 module Name.VConsts where
 
-import Data.FunctorM
+import Data.Traversable
+import Data.Foldable
+import Control.Applicative
+import Data.Monoid
 
 -- This is much more verbose/complicated than it needs be.
 
@@ -104,7 +107,7 @@ data FuncNames a = FuncNames {
     func_inRange :: a,
     func_runNoWrapper :: a
     }
-    {-! derive: FunctorM !-}
+    {-! derive: Functor, Traversable, Foldable !-}
 
 
 

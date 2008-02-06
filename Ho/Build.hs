@@ -20,7 +20,6 @@ import Prelude hiding(print,putStrLn)
 import System.IO hiding(print,putStrLn)
 import System.Posix.Files
 import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString.Base as L
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
@@ -313,8 +312,8 @@ readHoFile fn = do
     True <- return $ ct == cff_magic
     [rhh] <- Map.lookup cff_jhdr mp
     [rho] <- Map.lookup cff_core mp
-    let hh = decode (decompress $ L.LPS [rhh])
-    let ho = decode (decompress $ L.LPS [rho])
+    let hh = decode (decompress $ L.fromChunks [rhh])
+    let ho = decode (decompress $ L.fromChunks [rho])
 
 --    c <- L.hGetContents fh
 --    let (m1,hh,ho) = decode (decompress c)

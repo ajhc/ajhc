@@ -23,7 +23,8 @@ module Name.Id(
 
 import Control.Monad.State
 import Control.Monad.Reader
-import Data.FunctorM
+import Data.Traversable
+import Data.Foldable
 import Data.Monoid
 import Data.Typeable
 import qualified Data.IntMap  as IM
@@ -60,7 +61,7 @@ idToInt = id
 -- IdMap
 
 newtype IdMap a = IdMap (IM.IntMap a)
-    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet (Id,a),MapLike Id a,Functor,FunctorM,IsEmpty,Eq,Ord)
+    deriving(Typeable,Monoid,HasSize,SetLike,BuildSet (Id,a),MapLike Id a,Functor,Traversable,Foldable,IsEmpty,Eq,Ord)
 
 
 idSetToIdMap :: (Id -> a) -> IdSet -> IdMap a

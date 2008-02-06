@@ -10,7 +10,7 @@ module E.E(
     ) where
 
 import Char(chr)
-import Data.FunctorM
+import qualified Data.Traversable as T
 import List
 import Maybe
 
@@ -109,7 +109,7 @@ caseBodiesMapM :: Monad m => (E -> m E) -> E -> m E
 caseBodiesMapM f ec@ECase { eCaseAlts = as, eCaseDefault = d } = do
     let g (Alt l e) = f e >>= return . Alt l
     as' <- mapM g as
-    d' <- fmapM f d
+    d' <- T.mapM f d
     return $ caseUpdate ec { eCaseAlts = as', eCaseDefault = d' }
 caseBodiesMapM _ _ = error "caseBodiesMapM"
 
