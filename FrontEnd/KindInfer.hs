@@ -18,7 +18,7 @@ module FrontEnd.KindInfer (
 
 import Control.Monad.Reader
 import Data.List
-import Data.FunctorM
+import qualified Data.Traversable as T
 import Util.Inst
 import Data.Maybe
 import Control.Monad
@@ -251,13 +251,13 @@ kiDecls inputEnv classAndDataDecls = ans where
         getEnv >>= postProcess
 
 postProcess ke = do
-    kindEnv <- fmapM flattenKind (kindEnv ke)
-    kindEnvClasses <- fmapM (mapM flattenKind) (kindEnvClasses ke)
+    kindEnv <- T.mapM flattenKind (kindEnv ke)
+    kindEnvClasses <- T.mapM (mapM flattenKind) (kindEnvClasses ke)
     let defs = snub (freeVars (Map.elems kindEnv,Map.elems kindEnvClasses))
     printRule $ "defaulting the following kinds: " ++ pprint defs
     mapM_ (flip varBind kindStar) defs
-    kindEnv <- fmapM flattenKind kindEnv
-    kindEnvClasses <- fmapM (mapM flattenKind) kindEnvClasses
+    kindEnv <- T.mapM flattenKind kindEnv
+    kindEnvClasses <- T.mapM (mapM flattenKind) kindEnvClasses
     return ke { kindEnvClasses = kindEnvClasses, kindEnv = kindEnv }
 
 

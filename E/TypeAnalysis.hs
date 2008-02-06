@@ -9,9 +9,9 @@ import Control.Monad.Identity
 import Control.Monad.State
 import Data.Monoid
 import Data.Maybe
-import Data.FunctorM
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import qualified Data.Foldable as T
 
 import DataConstructors
 import Doc.PPrint
@@ -165,7 +165,7 @@ calcE env (ELetRec ds e) = calcDs nenv ds >> calcE nenv e where
     nenv = env { envEnv = extractValMap ds `union` envEnv env }
 calcE env ec@ECase {} | sortKindLike (getType $ eCaseScrutinee ec) = do
     calcE env (eCaseScrutinee ec)
-    fmapM_ (calcE env) (eCaseDefault ec)
+    T.mapM_ (calcE env) (eCaseDefault ec)
     v <- getValue (eCaseScrutinee ec)
     mapM_ (calcAlt env v) (eCaseAlts ec)
 calcE env e | (e',(_:_)) <- fromLam e = calcE env e'

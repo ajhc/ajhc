@@ -6,7 +6,6 @@ import Control.Monad
 import Control.Applicative
 import Data.Traversable
 import Data.Foldable
-import Data.FunctorM
 
 import Data.Monoid
 import Data.Generics
@@ -63,9 +62,6 @@ fromLocated (Located _ x) = x
 
 instance Functor Located where
     fmap f (Located l x) = Located l (f x)
-
---instance FunctorM Located where
---    fmapM f (Located l x) = Located l `liftM` f x
 
 instance Foldable Located where
     foldMap f (Located l x) = f x

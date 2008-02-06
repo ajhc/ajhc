@@ -12,7 +12,6 @@ import Util.RWS
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Control.Monad.Reader
-import Data.FunctorM
 import Data.Typeable
 import Data.Monoid
 import List hiding(delete,union,insert)
@@ -20,6 +19,7 @@ import Debug.Trace
 import Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.Traversable as T
 
 import Atom
 import C.Prims
@@ -163,7 +163,7 @@ collectOccurance e = f e  where
         return (foldl EAp x xs)
     f ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d} = do
         scrut' <- f e
-        (d',fvb) <- grump (fmapM f d)
+        (d',fvb) <- grump (T.mapM f d)
         (as',fvas) <- mapAndUnzipM (grump . alt) as
         let fidm = orMaps (fvb:fvas)
         ct <- arg $ f (eCaseType ec)
@@ -178,7 +178,7 @@ collectOccurance e = f e  where
     alt (Alt l e) = do
         (e',fvs) <- grump (f e)
         l <- arg (mapLitBindsM ftvr l)
-        l <- arg (fmapM f l)
+        l <- arg (T.mapM f l)
         let fvs' = foldr mdelete fvs (map tvrIdent $ litBinds l)
             l' = mapLitBinds (annbind' fvs) l
         tell (fvs',fromList $ map tvrIdent (litBinds l'))
@@ -586,7 +586,7 @@ simplifyDs prog sopts dsIn = ans where
                     --g e >>= return . Alt l
                     g x = localEnv (insertInScope (tvrIdent b) NotKnown) $ doCaseCont StartContext x t b' as' d'
                 as'' <- mapM f as
-                d'' <- fmapM g d
+                d'' <- T.mapM g d
                 t' <- dosub t
                 done cont $ caseUpdate ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
             doCase ic@ECase { eCaseType = it, eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d' | not (isUnboxedTuple it) = do
@@ -682,7 +682,7 @@ simplifyDs prog sopts dsIn = ans where
                     mins _ _ = id
                     --mins _ _ = id
 
-                d' <- fmapM dd d
+                d' <- T.mapM dd d
                 as' <- mapM da as
                 t' <- dosub t
                 t' <- contType cont t'

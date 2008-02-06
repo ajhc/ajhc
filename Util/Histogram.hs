@@ -52,16 +52,5 @@ union = mappend
 unions :: Ord a => [Histogram a] -> Histogram a
 unions = mconcat
 
-{-
-instance Functor Histogram where
-    fmap f (Histogram m) = Histogram $ Map.fromList [ (f k,i) | (k,i) <- Map.toList m ]
-
-instance FunctorM Histogram where
-    fmapM f (Histogram m) = do
-        ds <- sequence [ do f k >>= return . flip (,) i  | (k,i) <- Map.toList m ]
-        return $ Histogram (Map.fromList ds)
-    fmapM_ f (Histogram m) = sequence_ [ do f k >>= return . flip (,) i  | (k,i) <- Map.toList m ]
-
--}
 
 

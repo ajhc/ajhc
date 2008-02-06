@@ -6,10 +6,10 @@ import Control.Monad
 import Control.Monad.RWS
 import Control.Monad.Trans
 import Control.Monad.Writer
-import Data.FunctorM
 import Data.Monoid
 import System.IO
 import Text.PrettyPrint.HughesPJ(render,($$),nest,Doc())
+import qualified Data.Traversable as T
 import qualified System
 import qualified Data.Set as Set
 
@@ -273,7 +273,7 @@ transE ECase { eCaseBind = bind, eCaseScrutinee = scrut, eCaseDefault = md, eCas
     scrut <- noParens $ transE scrut
     let dobind = 0 /= tvrIdent bind
     b <- transTVr bind
-    md <- fmapM transE md
+    md <- T.mapM transE md
     let md' = flip fmap md $ \e ->  b <+> text "->" <+> if dobind && isLifted (getType bind) then text "seq" <+> b <+> e else e
     as <- mapM (transAlt dobind b) as
     let alts = as ++ maybeToMonad md'

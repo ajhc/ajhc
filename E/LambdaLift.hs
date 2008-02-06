@@ -2,7 +2,6 @@ module E.LambdaLift(lambdaLift,staticArgumentTransform)  where
 
 import Control.Monad.Reader
 import Control.Monad.Writer
-import Data.FunctorM
 import Data.IORef
 import Text.Printf
 import List hiding(insert)

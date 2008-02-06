@@ -13,8 +13,8 @@ module E.Subst(
 -- This is tricky.
 
 import Control.Monad.Reader
-import Data.FunctorM
 import Data.Monoid
+import qualified Data.Traversable as T
 import List hiding(union,insert,delete)
 
 import E.E
@@ -99,14 +99,14 @@ doSubst substInVars allShadow bm e  = f e bm where
     f ec@(ECase {}) = do
         e' <- f $ eCaseScrutinee ec
         (b',r) <- ntvr [] $ eCaseBind ec
-        d <- local r $ fmapM f $ eCaseDefault ec
+        d <- local r $ T.mapM f $ eCaseDefault ec
         let da (Alt lc@LitCons { litName = s, litArgs = vs, litType = t } e) = do
                 t' <- f t
                 (as,rs) <- liftM unzip $ mapMntvr vs
                 e' <- local (foldr (.) id rs) $ f e
                 return $ Alt lc { litArgs = as, litType = t' } e'
             da (Alt l e) = do
-                l' <- fmapM f l
+                l' <- T.mapM f l
                 e' <- f e
                 return $ Alt l' e'
         alts <- local r (mapM da $ eCaseAlts ec)
@@ -219,7 +219,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
     f ec@(ECase {}) = do
         e' <- f $ eCaseScrutinee ec
         (b',r) <- ntvr [] $ eCaseBind ec
-        d <- local r $ fmapM f $ eCaseDefault ec
+        d <- local r $ T.mapM f $ eCaseDefault ec
         let da (Alt lc@LitCons { litName = s, litArgs = vs, litType = t } e) = do
                 t' <- inType $ f t
                 (as,rs) <- liftM unzip $ mapMntvr vs

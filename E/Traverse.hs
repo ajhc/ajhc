@@ -13,8 +13,8 @@ module E.Traverse(
 
 import Control.Monad.Reader
 import Control.Monad.Writer
-import Data.FunctorM
 import Data.Monoid
+import qualified Data.Traversable as T
 
 import E.E
 import E.FreeVars(caseUpdate)
@@ -54,27 +54,27 @@ emapEGH f g h e = z e where
     z (Unknown) = do return $ Unknown
     z (ESort aa) = do return $ ESort aa
     z (ELit lc@LitCons { litArgs = es, litType = t }) = do t' <- g t; es' <- mapM f es; return $ ELit lc { litArgs = es', litType = t' }
-    z (ELit aa) = do aa <- fmapM g aa; return $ ELit aa
+    z (ELit aa) = do aa <- T.mapM g aa; return $ ELit aa
     z ELetRec { eDefs = aa, eBody = ab } = do aa <- mapM (\x -> do x <- (do (aa,ab) <- return x; aa <- mapmTvr g aa;ab <- f ab;return (aa,ab)); return x) aa;ab <- f ab; return $ ELetRec aa ab
     z ec@ECase {} = do
         e' <- f $ eCaseScrutinee ec
-        b' <- fmapM g (eCaseBind ec)
+        b' <- T.mapM g (eCaseBind ec)
         as' <- mapM mapmAlt (eCaseAlts ec)
-        d' <- fmapM f (eCaseDefault ec)
+        d' <- T.mapM f (eCaseDefault ec)
         t' <- g (eCaseType ec)
         return $ caseUpdate ec { eCaseScrutinee =e', eCaseBind = b', eCaseAlts = as', eCaseDefault = d', eCaseType = t'}
-    --    aa ab) = do aa <- f aa;ab <- mapM (\(x,y) -> do x <- fmapM f x; y <- f y; return (x,y)) ab; return $ ECase aa ab
+    --    aa ab) = do aa <- f aa;ab <- mapM (\(x,y) -> do x <- T.mapM f x; y <- f y; return (x,y)) ab; return $ ECase aa ab
     z (EPrim aa ab ac) = do ab <- mapM f ab;ac <- g ac; return $ EPrim aa ab ac
     z (EError aa ab) = do ab <- g ab; return $ EError aa ab
-    mapmTvr = fmapM
+    mapmTvr = T.mapM
     mapmAlt (Alt lc@LitCons {  litArgs = xs, litType = t } e) = do
         e' <- f e
-        xs' <- mapM (fmapM g) xs
+        xs' <- mapM (T.mapM g) xs
         t' <- g t
         return $ Alt lc { litArgs = xs', litType = t' } e'
     mapmAlt (Alt l e) = do
         e' <- f e
-        l' <- fmapM g l
+        l' <- T.mapM g l
         return (Alt l' e')
 
 
@@ -124,7 +124,7 @@ renameE initSet initMap e = runReader (runIdNameT' $ addBoundNamesIdMap initMap 
         (ob,b') <- ntvr False f' b
         localSubst ob $ do
             as' <- mapM da as
-            d' <- fmapM f d
+            d' <- T.mapM f d
             return $ caseUpdate ec { eCaseScrutinee = e', eCaseType = t', eCaseBind = b', eCaseAlts = as', eCaseDefault = d' }
     f ELetRec { eDefs = ds, eBody = e } = do
         addNames (map (tvrIdent . fst) ds)

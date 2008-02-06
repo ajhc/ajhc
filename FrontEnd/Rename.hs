@@ -67,7 +67,7 @@ import Char
 import Control.Monad.State
 import Control.Monad.Writer
 import Control.Monad.Identity
-import Data.FunctorM
+import qualified Data.Traversable as T
 import Data.Monoid
 import List
 import Maybe
@@ -641,7 +641,7 @@ renameHsExps = mapRename renameHsExp
 
 
 uqFuncNames :: V.FuncNames HsName
-Identity uqFuncNames = fmapM (return . nameName . toUnqualified) sFuncNames
+Identity uqFuncNames = T.mapM (return . nameName . toUnqualified) sFuncNames
 
 func_fromInt = (HsVar $ V.func_fromInt uqFuncNames)
 func_fromInteger = (HsVar $ V.func_fromInteger uqFuncNames)

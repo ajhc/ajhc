@@ -50,7 +50,8 @@ module FrontEnd.Tc.Monad(
 import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.Writer
-import Data.FunctorM
+import qualified Data.Traversable as T
+
 import Data.IORef
 import Data.Monoid
 import List
@@ -152,14 +153,14 @@ getCollectedEnv :: Tc TypeEnv
 getCollectedEnv = do
     v <- asks tcCollectedEnv
     r <- liftIO $ readIORef v
-    r <- fmapM flattenType r
+    r <- T.mapM flattenType r
     return r
 
 getCollectedCoerce :: Tc (Map.Map Name CoerceTerm)
 getCollectedCoerce = do
     v <- asks tcCollectedCoerce
     r <- liftIO $ readIORef v
-    r <- fmapM flattenType r
+    r <- T.mapM flattenType r
     return r
 
 

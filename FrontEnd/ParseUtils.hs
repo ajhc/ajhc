@@ -34,9 +34,9 @@ module FrontEnd.ParseUtils (
  ) where
 
 import Char
-import Data.FunctorM
 import Data.Monoid
 import Ratio
+import qualified Data.Traversable as T
 
 import C.FFI
 import FrontEnd.ParseMonad
@@ -152,7 +152,7 @@ checkPat e [] = case e of
 			      return (HsPAsPat n p)
 	HsWildCard _	   -> return HsPWildCard
 	HsIrrPat e         -> do
-			      p <- fmapM checkPattern e
+			      p <- T.mapM checkPattern e
 			      return (HsPIrrPat p)
 	HsRecConstr c fs   -> do
 			      fs <- mapM checkPatField fs

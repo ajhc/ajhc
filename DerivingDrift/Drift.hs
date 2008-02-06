@@ -3,7 +3,7 @@ module DerivingDrift.Drift(driftDerive) where
 import Char
 import List
 import Control.Monad.Identity
-import Data.FunctorM
+import qualified Data.Traversable as T
 
 import CharIO
 import DerivingDrift.DataP
@@ -41,7 +41,7 @@ enumDontDerive = [
     (f class_Ord, [func_geq fns, func_leq fns, func_lt fns, func_gt fns]),
     (f class_Enum, [func_toEnum fns,func_fromEnum fns])
     ]  where
-        Identity fns = fmapM (return . f) sFuncNames
+        Identity fns = T.mapM (return . f) sFuncNames
         f n = nameName (toUnqualified n)
 
 

@@ -20,7 +20,7 @@ module E.Rules(
     )where
 
 import Control.Monad.Writer
-import Data.FunctorM
+import qualified Data.Traversable as T
 import List
 import Maybe
 
@@ -84,7 +84,7 @@ mapBodies g (Rules mp) = do
     let f rule = do
             b <- g (ruleBody rule)
             return rule { ruleBody = b }
-    mp' <- fmapM (mapM f) mp
+    mp' <- T.mapM (mapM f) mp
     return $ Rules mp'
     --mp' <- sequence [ do rs' <- mapM f rs; return (k,rs') | (k,rs) <- Map.toAscList mp ]
     --return $ Rules $ Map.fromAscList mp'

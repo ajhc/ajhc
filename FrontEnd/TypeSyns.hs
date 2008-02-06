@@ -2,7 +2,7 @@ module TypeSyns( expandTypeSyns, expandTypeSynsStmt ) where
 
 import Control.Monad.State
 import Control.Monad.Writer
-import Data.FunctorM
+import qualified Data.Traversable as T
 import List
 
 import FrontEnd.Desugar (doToExp)
@@ -159,7 +159,7 @@ renameHsDecl otherHsDecl _ = return otherHsDecl
 
 
 renameHsRule prules@HsRule { hsRuleSrcLoc = srcLoc, hsRuleFreeVars = fvs, hsRuleLeftExpr = e1, hsRuleRightExpr = e2 } subTable = withSrcLoc srcLoc $ do
-    fvs' <- sequence [ fmapM (`renameHsType` subTable) t  >>= return . (,) n | (n,t) <- fvs]
+    fvs' <- sequence [ T.mapM (`renameHsType` subTable) t  >>= return . (,) n | (n,t) <- fvs]
     e1' <- renameHsExp e1 subTable
     e2' <- renameHsExp e2 subTable
     return prules {  hsRuleFreeVars = fvs', hsRuleLeftExpr = e1', hsRuleRightExpr = e2' }
