@@ -75,12 +75,13 @@ Version/Raw.hs: _darcs/inventory
 	rm -f $@
 	echo "module Version.Raw where"                                    > $@
 	echo "jhcVersion = \"@VERSION@\""                                  >> $@
-	date +'compileDate = "%Y%m%d"'                                     >> $@
+	date +'compileDate = "%Y-%m-%d"'                                   >> $@
 	darcs changes -t '.' \
 	|  perl -e '<>;$$_=<>;s/^\s*tagged\s+/darcsTag = "/;s/$$/"/;print' >> $@
 	darcs changes --from-tag='' --xml-output | grep '</patch>' \
 	| wc -l | perl -e 'print "darcsPatches = \"".(<>-1)."\"\n"'        >> $@
-	echo '{-# NOINLINE libraryPath #-}'                                >> $@
+	echo 'libdir="$(libdir)"'                                          >> $@
+	echo 'host="$(host)"'                                              >> $@
 	echo 'libraryPath=["$(libdir)/jhc-@VERSION@"]'                     >> $@
 
 
@@ -100,4 +101,14 @@ rpm: jhc.spec dist
 	rpmbuild -ba jhc.spec
 
 # .PHONY: bin-dist depend clean
+
+.INTERMEDIATE: deps.txt
+.DELETE_ON_ERROR: deps.txt depend.make
+
+deps.txt: Main.hs $(BUILT_SOURCES)
+	$(HC) -M -optdep-f -optdep$@ $(HC_OPTS) $<
+
+depend.make: deps.txt
+	echo HSFILES=`egrep -o '[A-Za-z0-9/.]+.hs' $< | sed -e 's/^\.\///' | sort` > $@
+
 

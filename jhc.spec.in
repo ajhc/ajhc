@@ -2,7 +2,7 @@ Summary: Jhc Haskell Compiler
 Name: @PACKAGE@
 Version: @VERSION@
 Release: 0
-License: LICENSE
+License: COPYING
 Group: Development/Languages/Haskell
 BuildRoot: %{_tmppath}/%{name}-root
 Source: http://repetae.net/computer/jhc/drop/%{name}-%{version}.tar.gz
@@ -18,12 +18,10 @@ Jhc Haskell compiler.
 
 %build
 %configure
-# ./configure --prefix=%{prefix}
 make
 
 %install
 %makeinstall
-# make prefix=$RPM_BUILD_ROOT%{prefix} install
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -34,6 +32,6 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %{_bindir}/jhc
 
-%doc LICENSE
+%doc COPYING
 
 
