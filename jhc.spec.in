@@ -32,6 +32,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %{_bindir}/jhc
 %{_bindir}/jhci
+%{_mandir}/man1/jhc.1
 
 %doc COPYING
 

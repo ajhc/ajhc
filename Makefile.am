@@ -66,6 +66,12 @@ jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES)
 jhcp: Main.hs $(BUILT_SOURCES) $(HSFILES)
 	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< -o $@
 
+jhc.1: Options.hs $(top_srcdir)/configure.ac
+	$(MAKE) $(AM_MAKEFLAGS) jhc$(EXEEXT)
+	help2man -N --output=jhc.1 ./jhc$(EXEEXT)
+
+dist_man_MANS = jhc.1
+
 install-exec-hook:
 	cd $(DESTDIR)$(bindir) && $(LN_S) jhc$(EXEEXT) jhci$(EXEEXT)
 
@@ -163,9 +169,11 @@ clean-local:
 MAINTAINERCLEANFILES= $(BUILT_SOURCES)
 
 base-1.0.hl: jhc lib/base/base.cabal
-	-[ -e base.log ] && mv -f base.log base.log.bak
-	set -o pipefail; ./jhc -v -funboxed-tuples $(RTSOPTS) $(JHC_TEST)  -ilib/base --noauto --build-hl lib/base/base.cabal -o $@ 2>&1 | tee base.log
+	./jhc -v -funboxed-tuples $(RTSOPTS) $(JHC_TEST)  -ilib/base --noauto --build-hl lib/base/base.cabal -o $@
 
-base-1.0.prof.hl: jhc lib/base/base.cabal
-	-[ -e base.prof.log ] && mv -f base.prof.log base.prof.log.bak
-	./jhcp -v $(RTSOPTS) $(JHC_TEST) -ilib/base --noauto --build-hl lib/base/base.cabal -o base-1.0.prof.hl +RTS $(PROF_OPTS)  2>&1 | tee base.log
+haskell98-1.0.hl: jhc lib/haskell98/haskell98.cabal base-1.0.hl
+	./jhc -v $(RTSOPTS) $(JHC_TEST) -ilib/haskell98 --noauto -L- -L. -p base --build-hl lib/haskell98.cabal -o $@
+
+
+libs: base-1.0.hl haskell98-1.0.hl
+

@@ -41,6 +41,7 @@ data Mode = BuildHl String -- ^ Build the specified hl-file given a description 
           | Interactive    -- ^ Run interactively.
           | Version        -- ^ Print version and die.
           | VersionCtx     -- ^ Print version context and die.
+          | ShowHelp       -- ^ Show help message and die.
           | Interpret      -- ^ Interpret.
           | CompileHo      -- ^ Compile ho
           | CompileHoGrin  -- ^ Compile ho and grin
@@ -116,6 +117,7 @@ theoptions :: [OptDescr (Opt -> Opt)]
 theoptions =
     [ Option ['V'] ["version"]   (NoArg  (optMode_s Version))          "print version info and exit"
     , Option []    ["version-context"] (NoArg  (optMode_s VersionCtx)) "print version context info and exit"
+    , Option []    ["help"]      (NoArg  (optMode_s ShowHelp))         "print help information and exit"
     , Option ['v'] ["verbose"]   (NoArg  (optVerbose_u (+1)))          "chatty output on stderr"
     , Option ['z'] []            (NoArg  (optStatLevel_u (+1)))        "Increase verbosity of statistics"
     , Option ['d'] []            (ReqArg (\d -> optDump_u (d:)) "[no-]flag")  "dump specified data during compilation"
@@ -192,17 +194,21 @@ pfill maxn length xs = f maxn xs [] [] where
 {-# NOINLINE processOptions #-}
 -- | Parse commandline options.
 processOptions :: IO Opt
-processOptions = getArguments >>= (\argv -> either putErrDie return $ do
+processOptions = do
+    argv <- getArguments
     let header = "Usage: jhc [OPTION...] Main.hs"
     let mkoptlist d os = "valid " ++ d ++ " arguments: 'help' for more info\n    " ++ intercalate "\n    " (map (intercalate ", ") $ pfill 100 ((2 +) . length) os) ++ "\n"
     let trailer = "\n" ++ mkoptlist "-d" FlagDump.helpFlags ++ "\n" ++ mkoptlist "-f" FlagOpts.helpFlags
     let (o,ns,rc) = getOpt Permute theoptions argv
-    when (rc /= []) $ fail (concat rc ++ usageInfo header theoptions ++ trailer)
-    o1 <- postProcessFD (foldl (flip ($)) opt o)
-    o2 <- postProcessFO o1
+    when (rc /= []) $ putErrDie (concat rc ++ usageInfo header theoptions ++ trailer)
+    o1 <- either putErrDie return $ postProcessFD (foldl (flip ($)) opt o)
+    o2 <- either putErrDie return $ postProcessFO o1
+    when (optMode o2 == ShowHelp) $ do
+        putStrLn (usageInfo header theoptions ++ trailer)
+        exitSuccess
     case optNoAuto o2 of
       True -> return (o2 { optArgs = ns })
-      False-> return (o2 { optArgs = ns, optHls  = ("base":"haskell98":optHls o2) }))
+      False-> return (o2 { optArgs = ns, optHls  = ("base":"haskell98":optHls o2) })
 
 {-# NOINLINE fileOptions #-}
 fileOptions :: Monad m => [String] -> m Opt
