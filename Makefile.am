@@ -41,38 +41,37 @@ HSBOOT= DataConstructors.hs-boot FrontEnd/Tc/Class.hs-boot Grin/Grin.hs-boot Gri
 %.hs: %.hsc
 	$(HSC2HS) -C "$(CFLAGS)" -C -I. -C -I@srcdir@ -o $@ $<
 
-%.hs: %.flags  $(srcdir)/utils/opt_sets.prl
+%.hs: %.flags  utils/opt_sets.prl
 	perl $(srcdir)/utils/opt_sets.prl -n $< $<  > $@
 
-Info/Properties.hs: $(srcdir)/data/props.txt $(srcdir)/utils/gen_props.prl
+Info/Properties.hs: data/props.txt utils/gen_props.prl
 	perl $(srcdir)/utils/gen_props.prl $< > $@ || rm -f $@
 
 
-PrimitiveOperators.hs: utils/op_process.prl $(srcdir)/data/operators.txt $(srcdir)/data/primitives.txt $(srcdir)/data/PrimitiveOperators-in.hs
+PrimitiveOperators.hs: utils/op_process.prl data/operators.txt data/primitives.txt data/PrimitiveOperators-in.hs
 	perl $< > $@ || rm -f $@
 
-Name/Prim.hs: $(srcdir)/utils/op_names.prl $(srcdir)/data/primitives.txt $(srcdir)/data/names.txt
-	perl $(srcdir)/utils/op_names.prl > $@ || rm -f $@
+Name/Prim.hs: utils/op_names.prl data/primitives.txt data/names.txt
+	perl $< > $@ || rm -f $@
 
-RawFiles.hs:  $(RAWFILES)
-	perl $(srcdir)/utils/op_raw.prl $(basename $@)  $^ > $@
+RawFiles.hs:  utils/op_raw.prl $(RAWFILES)
+	perl $< $(basename $@)  $(RAWFILES) > $@
 
 FrontEnd/HsParser.hs: FrontEnd/HsParser.y
 	happy -a -g -c $<
 
 .INTERMEDIATE: changes.txt
 
-_darcs/inventory:
-	touch $@
-#  $(srcdir)/_darcs/inventory
-changes.txt:
+.SECONDARY: _darcs/inventory
+
+changes.txt: _darcs/inventory
 	(darcs changes --context || echo "No darcs Context Available!") > $@
 
 Version/Ctx.hs: changes.txt
 	rm -f $@
 	perl ./utils/op_raw.prl Version.Ctx $< > $@
-#                 $(srcdir)/_darcs/inventory
-Version/Raw.hs:
+
+Version/Raw.hs: _darcs/inventory
 	rm -f $@
 	echo "module Version.Raw where"                                    > $@
 	echo "jhcVersion = \"@VERSION@\""                                  >> $@
