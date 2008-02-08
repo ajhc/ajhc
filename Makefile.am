@@ -53,7 +53,7 @@ HCI = ghci
 HC_OPTS = $(GHCOPTS)
 PROF_OPTS = -P
 
-EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) lib/base lib/haskell98 lib/haskell98.cabal
+EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) lib/base lib/haskell98 lib/haskell98.cabal base-1.0.hl haskell98-1.0.hl
 
 dist-hook:
 	find $(distdir)  -name _darcs -o -name \*.ho | xargs rm -rf --
@@ -171,12 +171,21 @@ clean-local:
 
 MAINTAINERCLEANFILES= $(BUILT_SOURCES)
 
-base-1.0.hl: jhc lib/base/base.cabal
+base-1.0.hl: lib/base/base.cabal
 	./jhc -v -funboxed-tuples $(RTSOPTS) $(JHC_TEST)  -ilib/base --noauto --build-hl lib/base/base.cabal -o $@
 
-haskell98-1.0.hl: jhc lib/haskell98.cabal base-1.0.hl
+haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 	./jhc -v $(RTSOPTS) $(JHC_TEST) -ilib/haskell98 --noauto -L- -L. -p base --build-hl lib/haskell98.cabal -o $@
 
 
 libs: base-1.0.hl haskell98-1.0.hl
 
+helloworld: test/HelloWorld.hs jhc
+	-[ -e $@.log ] && mv -f $@.log $@.log.bak
+	./jhc -v -L. $(JHC_TEST) test/HelloWorld.hs -o $@ 2>&1 | tee $@.log
+calendar: test/Calendar.hs jhc
+	-[ -e $@.log ] && mv -f $@.log $@.log.bak
+	./jhc -v -L. $(JHC_TEST) test/Calendar.hs -o $@ 2>&1 | tee $@.log
+primes: test/Primes.hs jhc
+	-[ -e $@.log ] && mv -f $@.log $@.log.bak
+	./jhc -v -L. $(JHC_TEST) test/Primes.hs -o $@ 2>&1 | tee $@.log
