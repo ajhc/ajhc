@@ -6,6 +6,8 @@ AM_INIT_AUTOMAKE([foreign no-dependencies])
 
 AC_CANONICAL_HOST
 
+AC_PROG_LN_S
+
 
 AC_PROGRAM_REQUIRE(hc,ghc,     [  --with-hc=<haskell compiler>    Specify location of ghc.])
 AC_ARG_WITH(hcflags,

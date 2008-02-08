@@ -6,7 +6,40 @@ bin_PROGRAMS = jhc
 jhc_SOURCES = Main.hs  $(HSFILES) $(BUILT_SOURCES) $(HSBOOT)
 
 SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
-BUILT_SOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs FlagOpts.hs Version/Raw.hs Version/Ctx.hs Name/Prim.hs Info/Properties.hs
+
+BUILT_SOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs \
+	       FlagOpts.hs Version/Raw.hs Version/Ctx.hs Name/Prim.hs Info/Properties.hs
+
+
+HSFILES= Atom.hs C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpEval.hs C/Op.hs \
+         C/Prims.hs DataConstructors.hs DataConstructors.hs DerivingDrift/DataP.hs DerivingDrift/Drift.hs \
+	 DerivingDrift/RuleUtils.hs DerivingDrift/StandardRules.hs Doc/Attr.hs Doc/Chars.hs Doc/DocLike.hs \
+	 Doc/PPrint.hs Doc/Pretty.hs E/Annotate.hs E/Binary.hs E/CPR.hs E/Demand.hs E/Diff.hs E/E.hs \
+	 E/Eta.hs E/Eval.hs E/FreeVars.hs E/FromHs.hs E/Inline.hs E/LambdaLift.hs E/LetFloat.hs E/PrimOpt.hs \
+	 E/Program.hs E/Rules.hs E/Show.hs E/SSimplify.hs E/Subst.hs E/Traverse.hs E/TypeAnalysis.hs \
+	 E/TypeCheck.hs E/Type.hs E/Values.hs E/WorkerWrapper.hs FindFixpoint.hs Fixer/Fixer.hs Fixer/Supply.hs \
+	 Fixer/VMap.hs FlagDump.hs FlagOpts.hs FrontEnd/Class.hs FrontEnd/DataConsAssump.hs FrontEnd/DeclsDepends.hs \
+	 FrontEnd/DependAnalysis.hs FrontEnd/Desugar.hs FrontEnd/Diagnostic.hs FrontEnd/Exports.hs \
+	 FrontEnd/FrontEnd.hs FrontEnd/HsErrors.hs FrontEnd/HsParser.hs FrontEnd/HsPretty.hs FrontEnd/HsSyn.hs \
+	 FrontEnd/Infix.hs FrontEnd/KindInfer.hs FrontEnd/Lexer.hs FrontEnd/ParseMonad.hs FrontEnd/ParseUtils.hs \
+	 FrontEnd/Rename.hs FrontEnd/Representation.hs FrontEnd/SrcLoc.hs FrontEnd/Syn/Options.hs \
+	 FrontEnd/Syn/Traverse.hs FrontEnd/Tc/Class.hs FrontEnd/Tc/Class.hs FrontEnd/Tc/Kind.hs \
+	 FrontEnd/Tc/Main.hs FrontEnd/Tc/Module.hs FrontEnd/Tc/Monad.hs FrontEnd/Tc/Type.hs \
+	 FrontEnd/Tc/Unify.hs FrontEnd/TypeSigs.hs FrontEnd/TypeSynonyms.hs FrontEnd/TypeSyns.hs \
+	 FrontEnd/Unlit.hs FrontEnd/Utils.hs FrontEnd/Warning.hs GenUtil.hs Grin/DeadCode.hs Grin/Devolve.hs \
+	 Grin/EvalInline.hs Grin/FromE.hs Grin/Grin.hs Grin/HashConst.hs Grin/Lint.hs Grin/NodeAnalyze.hs \
+	 Grin/Noodle.hs Grin/Optimize.hs Grin/Show.hs Grin/Simplify.hs Grin/SSimplify.hs Grin/Val.hs Grin/Whiz.hs \
+	 Ho/Binary.hs Ho/Build.hs Ho/Library.hs Ho/Type.hs Info/Binary.hs Info/Binary.hs Info/Info.hs \
+	 Info/Properties.hs Info/Types.hs Interactive.hs Main.hs MapBinaryInstance.hs Name/Binary.hs Name/Id.hs \
+	 Name/Name.hs Name/Names.hs Name/Prim.hs Name/VConsts.hs Number.hs Options.hs PackedString.hs \
+	 PrimitiveOperators.hs RawFiles.hs Stats.hs Support/CanType.hs Support/CFF.hs Support/FreeVars.hs \
+	 Support/Tickle.hs Support/Transform.hs Support/Tuple.hs Support/Unparse.hs UTF8.hs Util/BitSet.hs \
+	 Util/ContextMonad.hs Util/FilterInput.hs Util/Gen.hs Util/Graph.hs Util/Graphviz.hs Util/HasSize.hs \
+	 Util/Histogram.hs Util/Inst.hs Util/IntBag.hs Util/Interact.hs \
+         Util/NameMonad.hs Util/Once.hs Util/Perhaps.hs Util/ReaderWriter.hs \
+         Util/Relation.hs Util/RWS.hs Util/SameShape.hs Util/Seq.hs Util/SetLike.hs \
+         Util/SHA1.hs Util/UnionFind.hs Util/UnionSolve.hs Util/UniqueMonad.hs \
+         Util/VarName.hs Version/Ctx.hs Version.hs Version/Raw.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
@@ -20,18 +53,21 @@ HCI = ghci
 HC_OPTS = $(GHCOPTS)
 PROF_OPTS = -P
 
-EXTRA_DIST = FrontEnd/HsParser.y Version/Ctx.hs Version/Raw.hs $(DATAFILES) $(UTILS) $(RAWFILES) depend.make  arch/generic.arch arch/arch.c arch/i686.arch arch/x86_64.arch  data/PrimitiveOperators-in.hs
+EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES)
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
 RAWFILES = data/HsFFI.h data/jhc_rts.c data/jhc_rts_header.h data/wsize.h data/jhc_rts_alloc.c data/jhc_rts2.c data/ViaGhc.hs
 
-DATAFILES = data/operators.txt data/primitives.txt  data/names.txt data/props.txt
-
--include depend.make
 
 jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES)
 	$(HC) $(GHCOPTS) --make $< -o $@
+
+jhcp: Main.hs $(BUILT_SOURCES) $(HSFILES)
+	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< -o $@
+
+install-exec-hook:
+	cd $(DESTDIR)$(bindir) && $(LN_S) jhc$(EXEEXT) jhci$(EXEEXT)
 
 HSBOOT= DataConstructors.hs-boot FrontEnd/Tc/Class.hs-boot Grin/Grin.hs-boot Grin/Show.hs-boot Info/Binary.hs-boot
 
@@ -60,7 +96,6 @@ RawFiles.hs:  utils/op_raw.prl $(RAWFILES)
 FrontEnd/HsParser.hs: FrontEnd/HsParser.y
 	happy -a -g -c $<
 
-.INTERMEDIATE: changes.txt
 
 .SECONDARY: _darcs/inventory
 
@@ -100,15 +135,37 @@ rpm: jhc.spec dist
 	cp jhc-$(VERSION).tar.gz $(HOME)/var/rpm/SOURCES/jhc-$(VERSION).tar.gz
 	rpmbuild -ba jhc.spec
 
-# .PHONY: bin-dist depend clean
 
-.INTERMEDIATE: deps.txt
+.INTERMEDIATE: deps.txt changes.txt
 .DELETE_ON_ERROR: deps.txt depend.make
 
-deps.txt: Main.hs $(BUILT_SOURCES)
-	$(HC) -M -optdep-f -optdep$@ $(HC_OPTS) $<
+deps.txt:
+	$(MAKE) $(AM_MAKEFLAGS) $(BUILT_SOURCES)
+	$(HC) -M -optdep-f -optdep$@ $(HC_OPTS) Main.hs
+
 
 depend.make: deps.txt
-	echo HSFILES=`egrep -o '[A-Za-z0-9/.]+.hs' $< | sed -e 's/^\.\///' | sort` > $@
+	echo HSFILES=`egrep -o '[A-Za-z0-9/.]+.hs' $< | sed -e 's/^\.\///' | sort` > depend.make
 
+i:
+	ghci $(GHCOPTS) Main.hs
 
+PHONY= ho-clean hl-clean i
+
+ho-clean:
+	rm -f -- `find -name \*.ho`
+hl-clean:
+	rm -f -- `find -name \*.hl`
+
+clean-local:
+	find . \! -wholename \*/_\* \( -name \*.o-boot -o -name \*.hi -o -name \*.o -o -name \*.hi-boot \) | xargs rm -f --
+
+MAINTAINERCLEANFILES= $(BUILT_SOURCES)
+
+base-1.0.hl: jhc lib/base/base.cabal
+	-[ -e base.log ] && mv -f base.log base.log.bak
+	set -o pipefail; ./jhc -v -funboxed-tuples $(RTSOPTS) $(JHC_TEST)  -ilib/base --noauto --build-hl lib/base/base.cabal -o $@ 2>&1 | tee base.log
+
+base-1.0.prof.hl: jhc lib/base/base.cabal
+	-[ -e base.prof.log ] && mv -f base.prof.log base.prof.log.bak
+	./jhcp -v $(RTSOPTS) $(JHC_TEST) -ilib/base --noauto --build-hl lib/base/base.cabal -o base-1.0.prof.hl +RTS $(PROF_OPTS)  2>&1 | tee base.log
