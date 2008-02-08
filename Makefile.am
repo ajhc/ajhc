@@ -13,16 +13,20 @@ GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
 GHCINC=  -i$(srcdir)/. -i$(srcdir)/FrontEnd -odir $(builddir) -hidir $(builddir)
 PACKAGES= -package mtl  -package unix -package QuickCheck -ignore-package lang
 GHCLANG=    -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
-GHCOPTS=  @HSOPTS@  -O -ignore-package lang  -pgmF drift-ghc  -F $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
+GHCOPTS=  $(HSOPTS)  -O -ignore-package lang  -pgmF drift-ghc  -F $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
 HC = ghc
 HCI = ghci
 HC_OPTS = $(GHCOPTS)
 PROF_OPTS = -P
 
-EXTRA_DIST = FrontEnd/HsParser.y Version/Ctx.hs Version/Raw.hs $(RAWFILES) depend.make  arch/generic.arch arch/arch.c arch/i686.arch arch/x86_64.arch
+EXTRA_DIST = FrontEnd/HsParser.y Version/Ctx.hs Version/Raw.hs $(DATAFILES) $(UTILS) $(RAWFILES) depend.make  arch/generic.arch arch/arch.c arch/i686.arch arch/x86_64.arch  data/PrimitiveOperators-in.hs
 
-RAWFILES = $(srcdir)/data/HsFFI.h $(srcdir)/data/jhc_rts.c $(srcdir)/data/jhc_rts_header.h $(srcdir)/data/wsize.h $(srcdir)/data/jhc_rts_alloc.c $(srcdir)/data/jhc_rts2.c $(srcdir)/data/ViaGhc.hs
+UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
+
+RAWFILES = data/HsFFI.h data/jhc_rts.c data/jhc_rts_header.h data/wsize.h data/jhc_rts_alloc.c data/jhc_rts2.c data/ViaGhc.hs
+
+DATAFILES = data/operators.txt data/primitives.txt  data/names.txt data/props.txt
 
 -include depend.make
 
@@ -44,8 +48,8 @@ Info/Properties.hs: $(srcdir)/data/props.txt $(srcdir)/utils/gen_props.prl
 	perl $(srcdir)/utils/gen_props.prl $< > $@ || rm -f $@
 
 
-PrimitiveOperators.hs: $(srcdir)/utils/op_process.prl $(srcdir)/data/operators.txt $(srcdir)/data/primitives.txt $(srcdir)/data/PrimitiveOperators-in.hs
-	perl $(srcdir)/utils/op_process.prl > $@ || rm -f $@
+PrimitiveOperators.hs: utils/op_process.prl $(srcdir)/data/operators.txt $(srcdir)/data/primitives.txt $(srcdir)/data/PrimitiveOperators-in.hs
+	perl $< > $@ || rm -f $@
 
 Name/Prim.hs: $(srcdir)/utils/op_names.prl $(srcdir)/data/primitives.txt $(srcdir)/data/names.txt
 	perl $(srcdir)/utils/op_names.prl > $@ || rm -f $@
@@ -58,17 +62,17 @@ FrontEnd/HsParser.hs: FrontEnd/HsParser.y
 
 .INTERMEDIATE: changes.txt
 
-_dacs/inventory:
+_darcs/inventory:
 	touch $@
-
-changes.txt: $(srcdir)/_darcs/inventory
+#  $(srcdir)/_darcs/inventory
+changes.txt:
 	(darcs changes --context || echo "No darcs Context Available!") > $@
 
 Version/Ctx.hs: changes.txt
 	rm -f $@
 	perl ./utils/op_raw.prl Version.Ctx $< > $@
-
-Version/Raw.hs: $(srcdir)/_darcs/inventory
+#                 $(srcdir)/_darcs/inventory
+Version/Raw.hs:
 	rm -f $@
 	echo "module Version.Raw where"                                    > $@
 	echo "jhcVersion = \"@VERSION@\""                                  >> $@
@@ -93,7 +97,8 @@ bin-dist: jhc
 	rm -rf -- $(BINDISTDIR)
 
 rpm: jhc.spec dist
-	cp jhc-$(VERSION).tar.gz $(HOME)/var/rpm/SOURCES/
+	cp jhc-$(VERSION).tar.gz $(HOME)/var/rpm/SOURCES/jhc-$(VERSION).tar.gz
 	rpmbuild -ba jhc.spec
 
 # .PHONY: bin-dist depend clean
+
