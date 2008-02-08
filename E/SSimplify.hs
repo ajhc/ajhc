@@ -16,7 +16,7 @@ import Data.Typeable
 import Data.Monoid
 import List hiding(delete,union,insert)
 import Debug.Trace
-import Maybe
+import Data.Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Traversable as T
@@ -540,7 +540,7 @@ simplifyDs prog sopts dsIn = ans where
     g :: InE -> SM OutE
     --g e | trace ("g: " ++ take 20 (show e)) False = undefined
     g e = error $ "SSimplify.simplify.g: " ++ show e ++ "\n" ++ pprint e
-    showName t | odd t || dump FD.EVerbose = tvrShowName (tVr t Unknown)
+    showName t | isJust (intToAtom t) || dump FD.EVerbose = tvrShowName (tVr t Unknown)
              | otherwise = "(epheremal)"
 
     nname tvr@(TVr { tvrIdent = n, tvrType =  t})  = do
