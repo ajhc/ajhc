@@ -27,14 +27,15 @@ import Control.Monad.Error()    -- IO MonadPlus instance
 import Control.Monad.Identity
 import Control.Monad.Reader
 import qualified Data.Set as S
+import Data.List(nub)
 import System
 import System.Console.GetOpt
 import System.IO.Unsafe
 
-import GenUtil
+import Util.Gen
 import qualified FlagDump
 import qualified FlagOpts
-import Version.Config(libraryInstall)
+import Version.Config
 import Version.Version(versionString)
 
 data Mode = BuildHl String -- ^ Build the specified hl-file given a description file.
@@ -42,6 +43,7 @@ data Mode = BuildHl String -- ^ Build the specified hl-file given a description 
           | Version        -- ^ Print version and die.
           | VersionCtx     -- ^ Print version context and die.
           | ShowHelp       -- ^ Show help message and die.
+          | ShowConfig     -- ^ Show configuration info.
           | Interpret      -- ^ Interpret.
           | CompileHo      -- ^ Compile ho
           | CompileHoGrin  -- ^ Compile ho and grin
@@ -118,6 +120,7 @@ theoptions =
     [ Option ['V'] ["version"]   (NoArg  (optMode_s Version))          "print version info and exit"
     , Option []    ["version-context"] (NoArg  (optMode_s VersionCtx)) "print version context info and exit"
     , Option []    ["help"]      (NoArg  (optMode_s ShowHelp))         "print help information and exit"
+    , Option []    ["config"]    (NoArg  (optMode_s ShowConfig))       "show a variety of config info"
     , Option ['v'] ["verbose"]   (NoArg  (optVerbose_u (+1)))          "chatty output on stderr"
     , Option ['z'] []            (NoArg  (optStatLevel_u (+1)))        "Increase verbosity of statistics"
     , Option ['d'] []            (ReqArg (\d -> optDump_u (d:)) "[no-]flag")  "dump specified data during compilation"
@@ -206,9 +209,25 @@ processOptions = do
     when (optMode o2 == ShowHelp) $ do
         putStrLn (usageInfo header theoptions ++ trailer)
         exitSuccess
+    when (optMode o2 == ShowConfig) $ do
+        mapM_ (\ (x,y) -> putStrLn (x ++ ": " ++ y))  configs
+        exitSuccess
     case optNoAuto o2 of
       True -> return (o2 { optArgs = ns })
       False-> return (o2 { optArgs = ns, optHls  = ("base":"haskell98":optHls o2) })
+
+a ==> b = (a,show b)
+
+configs = [
+    "jhclibpath" ==> initialLibIncludes,
+    "version" ==> version,
+    "package" ==> package,
+    "libdir" ==> libdir,
+    "datadir" ==> datadir,
+    "libraryInstall" ==> libraryInstall,
+    "host" ==> host
+    ]
+
 
 {-# NOINLINE fileOptions #-}
 fileOptions :: Monad m => [String] -> m Opt
@@ -260,11 +279,12 @@ initialIncludes = unsafePerformIO $ do
 -- | Include directories taken from JHCLIBPATH enviroment variable.
 initialLibIncludes :: [String]
 initialLibIncludes = unsafePerformIO $ do
-    p <- lookupEnv "JHCLIBPATH"
+    ps <- lookupEnv "JHCLIBPATH"
     h <- lookupEnv "HOME"
-    let x = maybe "" id p
-        mh = fmap (++ "/lib/jhc") h
-    return (mh ++ (tokens (== ':') x) ++ [libraryInstall])
+    let paths = h ++ ["/usr/local","/usr"]
+        bases = ["/lib","/share"]
+        vers = ["/jhc-" ++ shortVersion, "/jhc"]
+    return $ nub $ maybe [] (tokens (':' ==))  ps ++ [ p ++ b ++ v | b <- bases, p <- paths, v <- vers ] ++ [libraryInstall]
 
 
 class Monad m => OptionMonad m where

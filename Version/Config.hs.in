@@ -1,5 +1,6 @@
 module Version.Config where
 
+shortVersion = "@SHORTVERSION@"
 version = "@VERSION@"
 package = "@PACKAGE@"
 libdir  = "@LIBDIR@"
