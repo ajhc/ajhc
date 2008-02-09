@@ -1,4 +1,4 @@
-module Version(
+module Version.Version(
     versionContext,
     versionSimple,
     versionString
@@ -8,14 +8,14 @@ module Version(
 import Data.Version
 import System.Info
 
-import Version.Ctx
-import Version.Raw
+import Version.Config
+import RawFiles
 
 {-# NOINLINE versionSimple #-}
-versionSimple = concat ["jhc ", jhcVersion, " ", compileDate, " (", darcsTag, "+",darcsPatches, ")"]
+versionSimple = concat [package, " ", version, " (", shortchange_txt, ")"]
 
 {-# NOINLINE versionString #-}
 versionString = concat [versionSimple, "\n", "compiled by ",compilerName,"-",showVersion compilerVersion," on a ",arch," running ",os]
 
 {-# NOINLINE versionContext #-}
-versionContext = changes_txt
+versionContext = changelog

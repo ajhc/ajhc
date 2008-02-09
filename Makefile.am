@@ -10,7 +10,7 @@ jhc_SOURCES = Main.hs  $(HSFILES) $(BUILT_SOURCES) $(HSBOOT)
 SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
 
 BUILT_SOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs \
-	       FlagOpts.hs Version/Raw.hs Version/Ctx.hs Name/Prim.hs Info/Properties.hs
+	       FlagOpts.hs Name/Prim.hs Info/Properties.hs
 
 
 HSFILES= Atom.hs C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpEval.hs C/Op.hs \
@@ -41,7 +41,7 @@ HSFILES= Atom.hs C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpE
          Util/NameMonad.hs Util/Once.hs Util/Perhaps.hs Util/ReaderWriter.hs \
          Util/Relation.hs Util/RWS.hs Util/SameShape.hs Util/Seq.hs Util/SetLike.hs \
          Util/SHA1.hs Util/UnionFind.hs Util/UnionSolve.hs Util/UniqueMonad.hs \
-         Util/VarName.hs Version/Ctx.hs Version.hs Version/Raw.hs
+         Util/VarName.hs Version/Version.hs Version/Config.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
@@ -62,7 +62,7 @@ dist-hook:
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
-RAWFILES = data/HsFFI.h data/jhc_rts.c data/jhc_rts_header.h data/wsize.h data/jhc_rts_alloc.c data/jhc_rts2.c data/ViaGhc.hs
+RAWFILES = data/HsFFI.h data/jhc_rts.c data/jhc_rts_header.h data/wsize.h data/jhc_rts_alloc.c data/jhc_rts2.c data/ViaGhc.hs ChangeLog shortchange.txt
 
 
 jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES)
@@ -108,27 +108,14 @@ FrontEnd/HsParser.hs: FrontEnd/HsParser.y
 	happy -a -g -c $<
 
 
-.SECONDARY: _darcs/inventory
+.SECONDARY: _darcs/inventory shortchange.txt
 
-changes.txt: _darcs/inventory
-	(darcs changes --context || echo "No darcs Context Available!") > $@
+ChangeLog: _darcs/inventory
+	darcs changes --from-tag . > $@
 
-Version/Ctx.hs: changes.txt
-	rm -f $@
-	perl ./utils/op_raw.prl Version.Ctx $< > $@
+shortchange.txt: ChangeLog
+	echo "`sed -ne 's/^  tagged \(.*\)/\1/p' $<`-`grep -c '^  \*' $<`"  > $@
 
-Version/Raw.hs: _darcs/inventory
-	rm -f $@
-	echo "module Version.Raw where"                                    > $@
-	echo "jhcVersion = \"@VERSION@\""                                  >> $@
-	date +'compileDate = "%Y-%m-%d"'                                   >> $@
-	darcs changes -t '.' \
-	|  perl -e '<>;$$_=<>;s/^\s*tagged\s+/darcsTag = "/;s/$$/"/;print' >> $@
-	darcs changes --from-tag='' --xml-output | grep '</patch>' \
-	| wc -l | perl -e 'print "darcsPatches = \"".(<>-1)."\"\n"'        >> $@
-	echo 'libdir="$(libdir)"'                                          >> $@
-	echo 'host="$(host)"'                                              >> $@
-	echo 'libraryPath=["$(libdir)/jhc-@VERSION@"]'                     >> $@
 
 
 BINDISTDIR=$(PACKAGE)-$(VERSION)-$(host)
@@ -147,8 +134,8 @@ rpm: jhc.spec dist
 	rpmbuild -ba jhc.spec
 
 
-.INTERMEDIATE: deps.txt changes.txt
-.DELETE_ON_ERROR: deps.txt depend.make
+.INTERMEDIATE: deps.txt
+.DELETE_ON_ERROR: deps.txt depend.make ChangeLog shortchange.txt
 
 deps.txt:
 	$(MAKE) $(AM_MAKEFLAGS) $(BUILT_SOURCES)

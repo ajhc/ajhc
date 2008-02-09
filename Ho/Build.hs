@@ -54,7 +54,7 @@ import Support.CFF
 import Util.FilterInput
 import Util.Gen hiding(putErrLn,putErr,putErrDie)
 import Util.SetLike
-import Version(versionString)
+import Version.Version(versionString)
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Util.Graph as G

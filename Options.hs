@@ -34,8 +34,8 @@ import System.IO.Unsafe
 import GenUtil
 import qualified FlagDump
 import qualified FlagOpts
-import Version.Raw(libraryPath)
-import Version(versionString)
+import Version.Config(libraryInstall)
+import Version.Version(versionString)
 
 data Mode = BuildHl String -- ^ Build the specified hl-file given a description file.
           | Interactive    -- ^ Run interactively.
@@ -264,7 +264,7 @@ initialLibIncludes = unsafePerformIO $ do
     h <- lookupEnv "HOME"
     let x = maybe "" id p
         mh = fmap (++ "/lib/jhc") h
-    return (mh ++ (tokens (== ':') x) ++ libraryPath)
+    return (mh ++ (tokens (== ':') x) ++ [libraryInstall])
 
 
 class Monad m => OptionMonad m where
