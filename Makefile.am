@@ -57,8 +57,14 @@ PROF_OPTS = -P
 
 EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) lib/base lib/haskell98 lib/haskell98.cabal base-1.0.hl haskell98-1.0.hl
 
+JHC_LIBS =  base-1.0.hl haskell98-1.0.hl
+
 dist-hook:
 	find $(distdir)  -name _darcs -o -name \*.ho | xargs rm -rf --
+
+install-data-hook: $(JHC_LIBS)
+	$(INSTALL) -d $(DESTDIR)$(JLIBPATH)
+	$(INSTALL_DATA) $(JHC_LIBS) $(DESTDIR)$(JLIBPATH)
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
@@ -71,14 +77,14 @@ jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES)
 jhcp: Main.hs $(BUILT_SOURCES) $(HSFILES)
 	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< -o $@
 
-jhc.1: Options.hs $(top_srcdir)/configure.ac
+jhc.1: Options.hs
 	$(MAKE) $(AM_MAKEFLAGS) jhc$(EXEEXT)
 	help2man -N --output=jhc.1 ./jhc$(EXEEXT)
 
 dist_man_MANS = jhc.1
 
 install-exec-hook:
-	cd $(DESTDIR)$(bindir) && $(LN_S) jhc$(EXEEXT) jhci$(EXEEXT)
+	cd $(DESTDIR)$(bindir) && $(LN_S) -f jhc$(EXEEXT) jhci$(EXEEXT)
 
 HSBOOT= DataConstructors.hs-boot FrontEnd/Tc/Class.hs-boot Grin/Grin.hs-boot Grin/Show.hs-boot Info/Binary.hs-boot
 
@@ -114,8 +120,7 @@ ChangeLog: _darcs/inventory
 	darcs changes --from-tag . > $@
 
 shortchange.txt: ChangeLog
-	echo "`sed -ne 's/^  tagged \(.*\)/\1/p' $<`-`grep -c '^  \*' $<`"  > $@
-
+	echo -n "`sed -ne 's/^  tagged \(.*\)/\1/p' $<`-`grep -c '^  \*' $<`"  > $@
 
 
 BINDISTDIR=$(PACKAGE)-$(VERSION)-$(host)
@@ -141,6 +146,8 @@ deps.txt:
 	$(MAKE) $(AM_MAKEFLAGS) $(BUILT_SOURCES)
 	$(HC) -M -optdep-f -optdep$@ $(HC_OPTS) Main.hs
 
+update-datestamp: ChangeLog
+	sh utils/update_datestamp.sh $< configure.ac
 
 depend.make: deps.txt
 	echo HSFILES=`egrep -o '[A-Za-z0-9/.]+.hs' $< | sed -e 's/^\.\///' | sort` > depend.make
@@ -148,7 +155,7 @@ depend.make: deps.txt
 i:
 	ghci $(GHCOPTS) Main.hs
 
-PHONY= ho-clean hl-clean i
+.PHONY: ho-clean hl-clean i update-datestamp
 
 ho-clean:
 	rm -f -- `find -name \*.ho`
@@ -167,7 +174,7 @@ haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 	./jhc -v $(RTSOPTS) $(JHC_TEST) -ilib/haskell98 --noauto -L- -L. -p base --build-hl lib/haskell98.cabal -o $@
 
 
-libs: base-1.0.hl haskell98-1.0.hl
+libs: $(JHC_LIBS)
 
 helloworld: test/HelloWorld.hs jhc
 	-[ -e $@.log ] && mv -f $@.log $@.log.bak

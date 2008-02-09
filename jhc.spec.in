@@ -34,6 +34,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/jhci
 %{_mandir}/man1/jhc.1
 
+%{_libdir}/@PACKAGE@-@VERSION@/base-1.0.hl
+%{_libdir}/@PACKAGE@-@VERSION@/haskell98-1.0.hl
+
 %doc COPYING
 
 

@@ -1,4 +1,4 @@
-AC_INIT([jhc],[0.3])
+AC_INIT([jhc],[0.3.20080208])
 AC_CONFIG_SRCDIR(Main.hs)
 AC_CONFIG_MACRO_DIR(ac-macros)
 AC_CONFIG_AUX_DIR(ac-macros)
