@@ -22,13 +22,12 @@ while (@ARGV) {
     print "$nn = \"\\\n \\";
     #print "$nn = \"";
     while (<F>) {
-        chomp;
         s/\\/\\\\/g;
+        s/\n/\\n/g;
         s/[^\x20-\x7e]/sprintf("\\x%04x\\&", ord($&))/eg;
 
         s/\"/\\"/g;
-        print "$_\\n\\\n \\";
-        #print "$_\\n";
+        print "$_\\\n \\";
     }
 
     print "\"\n\n";
