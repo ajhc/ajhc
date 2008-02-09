@@ -1,7 +1,7 @@
 Summary: Jhc Haskell Compiler
 Name: @PACKAGE@
 Version: @VERSION@
-Release: 1
+Release: @RPMRELEASE@
 License: COPYING
 Group: Development/Languages/Haskell
 BuildRoot: %{_tmppath}/%{name}-root

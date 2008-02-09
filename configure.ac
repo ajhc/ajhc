@@ -2,7 +2,7 @@ AC_INIT([jhc],[0.3.20080208])
 AC_CONFIG_SRCDIR(Main.hs)
 AC_CONFIG_MACRO_DIR(ac-macros)
 AC_CONFIG_AUX_DIR(ac-macros)
-AM_INIT_AUTOMAKE([foreign no-dependencies])
+AM_INIT_AUTOMAKE([foreign no-dependencies std-options])
 
 REVISION=20080208
 SHORTVERSION=0.3
@@ -11,6 +11,9 @@ AC_CANONICAL_HOST
 
 AC_PROG_LN_S
 
+AC_ARG_WITH(rpmrelease,
+            [  --with-rpmrelease=RPMRELEASE  specify rpm release number],
+	    [RPMRELEASE=$withval], [RPMRELEASE=1])
 
 AC_PROGRAM_REQUIRE(hc,ghc,     [  --with-hc=<haskell compiler>    Specify location of ghc.])
 AC_ARG_WITH(hcflags,
@@ -34,6 +37,7 @@ AC_DEFINE_DIR(JLIBPATH,jlibpath)
 AC_SUBST(HC)
 AC_SUBST(HCFLAGS)
 AC_SUBST(HSC2HS)
+AC_SUBST(RPMRELEASE)
 AC_SUBST(SHORTVERSION)
 AC_SUBST(REVISION)
 AC_SUBST(JLIBPATH)

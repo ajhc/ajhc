@@ -48,11 +48,6 @@ PACKAGES= -package mtl  -package unix -package QuickCheck -ignore-package lang
 GHCLANG=    -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
 GHCOPTS=  $(HSOPTS)  -O -ignore-package lang  -pgmF drift-ghc  -F $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
-HC = ghc
-HCI = ghci
-HC_OPTS = $(GHCOPTS)
-PROF_OPTS = -P
-
 JHC_LIBS =  base-1.0.hl haskell98-1.0.hl
 
 EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)
@@ -62,7 +57,16 @@ dist-hook:
 
 install-data-hook: $(JHC_LIBS)
 	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@
-	$(INSTALL_DATA) $(JHC_LIBS) $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@
+	for lib in $(JHC_LIBS); do  \
+		test -f "$$lib" && $(INSTALL_DATA) $$lib $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
+		test -f "$(srcdir)/$$lib" && $(INSTALL_DATA) "$(srcdir)/$$lib" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
+	done
+
+uninstall-hook: $(JHC_LIBS)
+	rm -f -- "$(DESTDIR)$(bindir)/jhci$(EXTEXT)"
+	for lib in $(JHC_LIBS); do  \
+		rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/$$lib" ; \
+	done
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
@@ -132,17 +136,24 @@ bin-dist: jhc
 	gzip -f -- $(BINDISTDIR).tar
 	rm -rf -- $(BINDISTDIR)
 
-rpm: jhc.spec dist
+rpmbuild: jhc.spec dist
 	cp jhc-$(VERSION).tar.gz $(HOME)/var/rpm/SOURCES/jhc-$(VERSION).tar.gz
-	rpmbuild -ba jhc.spec
+	rpmbuild -ba $<
 
+rpm: rpmbuild
+	mkdir -p drop
+	mv jhc-$(VERSION).tar.gz drop/jhc-$(VERSION).tar.gz
+	mv ~/var/rpm/RPMS/*/jhc-$(VERSION)-$(RPMRELEASE).*.rpm drop
+	mv ~/var/rpm/SRPMS/jhc-$(VERSION)-$(RPMRELEASE).src.rpm drop
+
+publish:
 
 .INTERMEDIATE: deps.txt
 .DELETE_ON_ERROR: deps.txt depend.make ChangeLog shortchange.txt
 
 deps.txt:
 	$(MAKE) $(AM_MAKEFLAGS) $(BUILT_SOURCES)
-	$(HC) -M -optdep-f -optdep$@ $(HC_OPTS) Main.hs
+	$(HC) -M -optdep-f -optdep$@ $(GHCOPTS) Main.hs
 
 update-datestamp: ChangeLog
 	sh utils/update_datestamp.sh $< configure.ac
