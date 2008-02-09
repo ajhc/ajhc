@@ -4,6 +4,8 @@ AC_CONFIG_MACRO_DIR(ac-macros)
 AC_CONFIG_AUX_DIR(ac-macros)
 AM_INIT_AUTOMAKE([foreign no-dependencies])
 
+REVISION=20080208
+SHORTVERSION=0.3
 
 AC_CANONICAL_HOST
 
@@ -22,7 +24,7 @@ fi
 
 AC_PROGRAM_REQUIRE(hsc2hs,hsc2hs,     [  --with-hsc2hs=<hsc2hs location>    Specify location of hsc2hs.])
 
-jlibpath=${libdir}/$PACKAGE-$VERSION
+jlibpath=${datadir}/$PACKAGE-$SHORTVERSION
 
 AC_DEFINE_DIR(LIBDIR,libdir)
 AC_DEFINE_DIR(DATADIR,datadir)
@@ -32,6 +34,8 @@ AC_DEFINE_DIR(JLIBPATH,jlibpath)
 AC_SUBST(HC)
 AC_SUBST(HCFLAGS)
 AC_SUBST(HSC2HS)
+AC_SUBST(SHORTVERSION)
+AC_SUBST(REVISION)
 AC_SUBST(JLIBPATH)
 AC_CONFIG_FILES([Makefile jhc.spec Version/Config.hs])
 AC_OUTPUT

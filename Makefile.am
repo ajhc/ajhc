@@ -3,8 +3,6 @@ ACLOCAL_AMFLAGS=-I ac-macros
 
 bin_PROGRAMS = jhc
 
-data_DATA = base-1.0.hl haskell98-1.0.hl
-
 jhc_SOURCES = Main.hs  $(HSFILES) $(BUILT_SOURCES) $(HSBOOT)
 
 SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
@@ -63,8 +61,8 @@ dist-hook:
 	find $(distdir)  -name _darcs -o -name \*.ho | xargs rm -rf --
 
 install-data-hook: $(JHC_LIBS)
-	$(INSTALL) -d $(DESTDIR)$(JLIBPATH)
-	$(INSTALL_DATA) $(JHC_LIBS) $(DESTDIR)$(JLIBPATH)
+	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@
+	$(INSTALL_DATA) $(JHC_LIBS) $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
@@ -135,7 +133,7 @@ bin-dist: jhc
 	rm -rf -- $(BINDISTDIR)
 
 rpm: jhc.spec dist
-	cp jhc-$(VERSION).tar.gz $(HOME)/var/rpm/SOURCES/jhc-$(VERSION).tar.gz
+	cp jhc-$(VERSION).tar.gz $(HOME)/var/rpm/SOURCES/jhc-$(SHORTVERSION).tar.gz
 	rpmbuild -ba jhc.spec
 
 

@@ -1,7 +1,7 @@
 Summary: Jhc Haskell Compiler
 Name: @PACKAGE@
 Version: @VERSION@
-Release: 0
+Release: 1
 License: COPYING
 Group: Development/Languages/Haskell
 BuildRoot: %{_tmppath}/%{name}-root
@@ -32,10 +32,10 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %{_bindir}/jhc
 %{_bindir}/jhci
-%{_mandir}/man1/jhc.1
+%{_mandir}/man1/jhc.1.gz
 
-%{_libdir}/@PACKAGE@-@VERSION@/base-1.0.hl
-%{_libdir}/@PACKAGE@-@VERSION@/haskell98-1.0.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/base-1.0.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/haskell98-1.0.hl
 
 %doc COPYING
 
