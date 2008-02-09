@@ -23,9 +23,11 @@ fi
 AC_PROGRAM_REQUIRE(hsc2hs,hsc2hs,     [  --with-hsc2hs=<hsc2hs location>    Specify location of hsc2hs.])
 
 
-AC_SUBST(DRIFTGHC)
+AC_DEFINE_DIR(LIBDIR,libdir)
+AC_DEFINE_DIR(DATADIR,datadir)
+
 AC_SUBST(HC)
 AC_SUBST(HCFLAGS)
 AC_SUBST(HSC2HS)
-AC_CONFIG_FILES([Makefile jhc.spec])
+AC_CONFIG_FILES([Makefile jhc.spec Version/Config.hs])
 AC_OUTPUT

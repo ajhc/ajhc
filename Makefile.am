@@ -3,6 +3,8 @@ ACLOCAL_AMFLAGS=-I ac-macros
 
 bin_PROGRAMS = jhc
 
+data_DATA = base-1.0.hl haskell98-1.0.hl
+
 jhc_SOURCES = Main.hs  $(HSFILES) $(BUILT_SOURCES) $(HSBOOT)
 
 SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot

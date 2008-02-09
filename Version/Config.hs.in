@@ -1,0 +1,7 @@
+module Version.Config where
+
+version = "@VERSION@"
+package = "@PACKAGE@"
+libdir  = "@LIBDIR@"
+datadir = "@DATADIR@"
+host    = "@host@"
