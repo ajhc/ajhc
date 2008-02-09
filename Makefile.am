@@ -133,7 +133,7 @@ bin-dist: jhc
 	rm -rf -- $(BINDISTDIR)
 
 rpm: jhc.spec dist
-	cp jhc-$(VERSION).tar.gz $(HOME)/var/rpm/SOURCES/jhc-$(SHORTVERSION).tar.gz
+	cp jhc-$(VERSION).tar.gz $(HOME)/var/rpm/SOURCES/jhc-$(VERSION).tar.gz
 	rpmbuild -ba jhc.spec
 
 
