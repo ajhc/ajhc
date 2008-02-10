@@ -23,7 +23,7 @@ import HsSyn
 import Name.Name
 import Util.HasSize
 import FrontEnd.Warning
-import MapBinaryInstance
+import Support.MapBinaryInstance
 
 
 newtype TypeSynonyms = TypeSynonyms (Map.Map Name ([HsName], HsType, SrcLoc))

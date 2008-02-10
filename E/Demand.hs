@@ -32,7 +32,7 @@ import Name.Id
 import qualified Info.Info as Info
 import Util.HasSize
 import Util.SetLike
-import MapBinaryInstance
+import Support.MapBinaryInstance
 
 data Demand =
     Bottom             -- always diverges

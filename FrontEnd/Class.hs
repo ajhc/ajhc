@@ -33,7 +33,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import HsSyn
-import MapBinaryInstance
+import Support.MapBinaryInstance
 import Maybe
 import Monad
 import Name.Name

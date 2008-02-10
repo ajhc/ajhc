@@ -24,7 +24,7 @@ import qualified Data.Map as Map
 
 import Util.HasSize
 import HsSyn
-import MapBinaryInstance
+import Support.MapBinaryInstance
 import Name.Name
 
 ----------------------------------------------------------------------------

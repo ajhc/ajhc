@@ -30,7 +30,7 @@ HSFILES= Atom.hs C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpE
 	 Grin/EvalInline.hs Grin/FromE.hs Grin/Grin.hs Grin/HashConst.hs Grin/Lint.hs Grin/NodeAnalyze.hs \
 	 Grin/Noodle.hs Grin/Optimize.hs Grin/Show.hs Grin/Simplify.hs Grin/SSimplify.hs Grin/Val.hs Grin/Whiz.hs \
 	 Ho/Binary.hs Ho/Build.hs Ho/Library.hs Ho/Type.hs Info/Binary.hs Info/Binary.hs Info/Info.hs \
-	 Info/Properties.hs Info/Types.hs Interactive.hs Main.hs MapBinaryInstance.hs Name/Binary.hs Name/Id.hs \
+	 Info/Properties.hs Info/Types.hs Interactive.hs Main.hs Support/MapBinaryInstance.hs Name/Binary.hs Name/Id.hs \
 	 Name/Name.hs Name/Names.hs Name/Prim.hs Name/VConsts.hs Number.hs Options.hs PackedString.hs \
 	 PrimitiveOperators.hs RawFiles.hs Stats.hs Support/CanType.hs Support/CFF.hs Support/FreeVars.hs \
 	 Support/Tickle.hs Support/Transform.hs Support/Tuple.hs Support/Unparse.hs UTF8.hs Util/BitSet.hs \

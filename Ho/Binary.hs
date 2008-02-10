@@ -5,7 +5,7 @@ import Control.Monad
 import Data.Binary
 
 import Ho.Type
-import MapBinaryInstance
+import Support.MapBinaryInstance
 import Name.Binary()
 import Util.SHA1 as SHA1
 

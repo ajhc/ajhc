@@ -61,7 +61,7 @@ import FrontEnd.Tc.Type
 import GenUtil
 import HsSyn
 import Info.Types
-import MapBinaryInstance
+import Support.MapBinaryInstance
 import Name.Id
 import Name.Name as Name
 import Name.Names

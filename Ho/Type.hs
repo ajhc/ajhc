@@ -13,7 +13,7 @@ import FrontEnd.KindInfer(KindEnv)
 import FrontEnd.SrcLoc(SrcLoc)
 import FrontEnd.Tc.Type(Type())
 import HsSyn(Module)
-import MapBinaryInstance()
+import Support.MapBinaryInstance()
 import Name.Id
 import Name.Name(Name)
 import TypeSynonyms(TypeSynonyms)

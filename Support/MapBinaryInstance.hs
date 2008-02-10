@@ -1,4 +1,4 @@
-module MapBinaryInstance where
+module Support.MapBinaryInstance where
 
 
 import Data.Binary

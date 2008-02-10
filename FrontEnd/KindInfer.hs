@@ -41,7 +41,7 @@ import FrontEnd.Utils
 import GenUtil
 import Support.FreeVars
 import HsSyn
-import MapBinaryInstance
+import Support.MapBinaryInstance
 import Name.Name
 import qualified Util.Seq as Seq
 import qualified FlagDump as FD
