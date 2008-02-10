@@ -40,7 +40,7 @@ HSFILES= C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpEval.hs C
          Util/Relation.hs Util/RWS.hs Util/SameShape.hs Util/Seq.hs Util/SetLike.hs \
          Util/SHA1.hs Util/UnionFind.hs Util/UnionSolve.hs Util/UniqueMonad.hs \
          Util/VarName.hs Version/Version.hs Version/Config.hs \
-	 StringTable/Atom.hsc
+	 StringTable/Atom.hsc Util/Util.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
@@ -52,7 +52,7 @@ GHCOPTS=  $(HSOPTS)  -O -ignore-package lang  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAG
 
 JHC_LIBS =  base-1.0.hl haskell98-1.0.hl
 
-EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS) StringTable/StringTable_cbits.c StringTable_cbits.h
+EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS) StringTable/StringTable_cbits.c StringTable/StringTable_cbits.h
 
 dist-hook:
 	find $(distdir)  -name _darcs -o -name \*.ho | xargs rm -rf --
