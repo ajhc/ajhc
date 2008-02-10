@@ -6,15 +6,14 @@ jhc is a haskell compiler which aims to produce the most efficient programs poss
 Getting jhc
 -----------
 
-See the [Installation page](building.shtml) for information about
+See the [Installation page](building.shtml) for information about downloading and installing jhc.
 
-Development
------------
+Development and other info
+--------------------------
 
-For information on getting and building the development tree of jhc, see
-[the development page](development.shtml). The
-[darcs repository](http://repetae.net/repos/jhc) may be browsed
-[with the darcsweb repository browser](http://repetae.net/dw/darcsweb.cgi?r=jhc).
-
-An informal graph of the internal code motion in jhc is [here (pdf)](big-picture.pdf).
+ * [The Orignal Page](jhc.shtml) is the somewhat modified original information page on jhc. lots of good stuff, some of it out of date.
+ * [the development page](development.shtml) has information on how to pull the development tree from the darcs repository
+ * the [darcs repository](http://repetae.net/repos/jhc) is where the code is housed
+ * [the darcsweb repository browser](http://repetae.net/dw/darcsweb.cgi?r=jhc) can be used to see a changelog and view individual patches
+ * An informal graph of the internal code motion in jhc is [here (pdf)](big-picture.pdf).
 
