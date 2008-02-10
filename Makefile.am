@@ -3,12 +3,12 @@ ACLOCAL_AMFLAGS=-I ac-macros
 
 bin_PROGRAMS = jhc
 
-jhc_SOURCES = Main.hs  $(HSFILES) $(BUILT_SOURCES) $(HSBOOT)
+jhc_SOURCES = Main.hs  $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
 
 SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
 
 BUILT_SOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs \
-	       FlagOpts.hs Name/Prim.hs Info/Properties.hs
+	       FlagOpts.hs Name/Prim.hs Info/Properties.hs $(DRIFTFILES)
 
 
 HSFILES= Atom.hs C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpEval.hs C/Op.hs \
@@ -43,10 +43,11 @@ HSFILES= Atom.hs C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpE
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
-GHCINC=  -i$(srcdir)/. -i$(srcdir)/FrontEnd -odir $(builddir) -hidir $(builddir)
+GHCINC=  -i -i$(srcdir)/drift_processed -i$(srcdir)/drift_processed/FrontEnd \
+	 -i$(srcdir)/. -i$(srcdir)/FrontEnd -odir $(builddir) -hidir $(builddir)
 PACKAGES= -package mtl  -package unix -package QuickCheck -ignore-package lang
 GHCLANG=    -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
-GHCOPTS=  $(HSOPTS)  -O -ignore-package lang  -pgmF drift-ghc  -F $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
+GHCOPTS=  $(HSOPTS)  -O -ignore-package lang  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
 JHC_LIBS =  base-1.0.hl haskell98-1.0.hl
 
@@ -71,6 +72,18 @@ uninstall-hook: $(JHC_LIBS)
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
 RAWFILES = data/HsFFI.h data/jhc_rts.c data/jhc_rts_header.h data/wsize.h data/jhc_rts_alloc.c data/jhc_rts2.c data/ViaGhc.hs ChangeLog data/shortchange.txt
+
+DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/C/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \
+   drift_processed/DerivingDrift/StandardRules.hs drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \
+   drift_processed/E/SSimplify.hs drift_processed/E/ToHs.hs drift_processed/E/TypeCheck.hs drift_processed/E/Type.hs drift_processed/FrontEnd/Class.hs \
+   drift_processed/FrontEnd/Exports.hs drift_processed/FrontEnd/HsSyn.hs drift_processed/FrontEnd/KindInfer.hs \
+   drift_processed/FrontEnd/Representation.hs drift_processed/FrontEnd/SrcLoc.hs drift_processed/FrontEnd/Tc/Kind.hs \
+   drift_processed/FrontEnd/Tc/Monad.hs drift_processed/Grin/SSimplify.hs drift_processed/Name/VConsts.hs drift_processed/Options.hs \
+   drift_processed/DataConstructors.hs-boot
+
+drift_processed/%: %
+	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
+	DrIFT $< -o $@
 
 
 jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES)
@@ -173,6 +186,7 @@ hl-clean:
 
 clean-local:
 	find . \! -wholename \*/_\* \( -name \*.o-boot -o -name \*.hi -o -name \*.o -o -name \*.hi-boot \) | xargs rm -f --
+	rm -rf -- drift_processed
 
 MAINTAINERCLEANFILES= $(BUILT_SOURCES)
 
