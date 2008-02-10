@@ -15,9 +15,7 @@ import Control.Monad.Reader
 import Data.Typeable
 import Data.Monoid
 import List hiding(delete,union,insert)
-import Debug.Trace
 import Data.Maybe
-import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Traversable as T
 
@@ -25,7 +23,6 @@ import Atom
 import C.Prims
 import DataConstructors
 import Doc.PPrint
-import E.Annotate
 import E.E
 import E.Eta
 import E.Inline
@@ -56,7 +53,6 @@ import qualified E.Demand as Demand
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Info.Info as Info
-import qualified Util.Seq as Seq
 
 type Bind = (TVr,E)
 
@@ -291,8 +287,6 @@ data SimplifyOpts = SimpOpts {
 data Range = Done OutE | Susp InE Subst OutE -- cached result
     deriving(Show,Eq,Ord)
 type Subst = IdMap Range
-
-type InScope = IdMap Binding
 
 data Forced = ForceInline | ForceNoinline | NotForced
     deriving(Eq,Ord)
@@ -537,9 +531,6 @@ simplifyDs prog sopts dsIn = ans where
 --                    Just (_,e) -> f cont e
 --                    Nothing -> els
 
-    g :: InE -> SM OutE
-    --g e | trace ("g: " ++ take 20 (show e)) False = undefined
-    g e = error $ "SSimplify.simplify.g: " ++ show e ++ "\n" ++ pprint e
     showName t | isJust (intToAtom t) || dump FD.EVerbose = tvrShowName (tVr t Unknown)
              | otherwise = "(epheremal)"
 
@@ -588,7 +579,13 @@ simplifyDs prog sopts dsIn = ans where
                 as'' <- mapM f as
                 d'' <- T.mapM g d
                 t' <- dosub t
-                done cont $ caseUpdate ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind = b, eCaseAlts = as'', eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
+                done cont $ caseUpdate ECase { 
+                    eCaseAllFV = error "eCaseAllFV",
+                    eCaseScrutinee = e, 
+                    eCaseType = t', 
+                    eCaseBind = b, 
+                    eCaseAlts = as'', 
+                    eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
             doCase ic@ECase { eCaseType = it, eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d' | not (isUnboxedTuple it) = do
                 mtick (toAtom "E.Simplify.case-of-case-join")
                 n1 <- newName
@@ -686,7 +683,13 @@ simplifyDs prog sopts dsIn = ans where
                 as' <- mapM da as
                 t' <- dosub t
                 t' <- contType cont t'
-                done StartContext $ caseUpdate ECase { eCaseScrutinee = e, eCaseType = t', eCaseBind =  b', eCaseAlts = as', eCaseDefault = d'}
+                done StartContext $ caseUpdate ECase { 
+                    eCaseAllFV = error "eCaseAllFV",
+                    eCaseScrutinee = e, 
+                    eCaseType = t', 
+                    eCaseBind =  b', 
+                    eCaseAlts = as', 
+                    eCaseDefault = d'}
         doCase e t b as d
 
     isOmittable _ ELit {} = True

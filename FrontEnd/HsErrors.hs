@@ -15,7 +15,6 @@ import HsSyn
 import Monad
 import Name.Name
 import Name.Names
-import Name.VConsts
 import FrontEnd.Warning
 
 

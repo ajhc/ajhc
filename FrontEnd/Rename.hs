@@ -80,15 +80,12 @@ import FrontEnd.Desugar (doToExp)
 import FrontEnd.SrcLoc hiding(srcLoc)
 import FrontEnd.Syn.Traverse
 import FrontEnd.Utils
-import GenUtil hiding(replicateM)
 import HsSyn
 import Name.Name as Name hiding(qualifyName)
 import Name.Names
 import Support.FreeVars
-import Util.ContextMonad
 import Util.Gen
 import Util.Inst()
-import Util.UniqueMonad
 import FrontEnd.Warning
 import qualified FrontEnd.HsErrors as HsErrors
 import qualified Name.VConsts as V
@@ -142,8 +139,6 @@ instance UniqueProducer ScopeSM where
 getCurrentModule :: ScopeSM Module
 getCurrentModule = gets currentModule
 
-getGlobalSubTable :: ScopeSM SubTable
-getGlobalSubTable = gets globalSubTable
 
 setSrcLoc e = modify (\s -> s { srcLoc =  e `mappend` srcLoc s })
 
@@ -643,8 +638,6 @@ renameHsExps = mapRename renameHsExp
 uqFuncNames :: V.FuncNames HsName
 Identity uqFuncNames = T.mapM (return . nameName . toUnqualified) sFuncNames
 
-func_fromInt = (HsVar $ V.func_fromInt uqFuncNames)
-func_fromInteger = (HsVar $ V.func_fromInteger uqFuncNames)
 func_fromRational = (HsVar $ V.func_fromRational uqFuncNames)
 
 newVar = do
@@ -821,8 +814,6 @@ renameHsAlt (HsAlt srcLoc hsPat hsGuardedAlts {-where-} hsDecls) subTable = do
     return (HsAlt srcLoc hsPat' hsGuardedAlts' hsDecls')
 
 
-renameHsGuardedRhsList :: [HsGuardedRhs] -> SubTable -> ScopeSM [HsGuardedRhs]
-renameHsGuardedRhsList = mapRename renameHsGuardedRhs
 
 
 -- renameHsStmts is trickier than you would expect because
@@ -1049,18 +1040,6 @@ updateSubTableWithHsTypes subTable hsType = do
       return (subTable')
 
 
--- takes a list of decls and examines only the class decls
--- to get the names of variables used in their type sigs
-
-updateSubTableWithClasses :: SubTable -> [HsDecl] -> ScopeSM (SubTable)
-updateSubTableWithClasses subTable []
-  = return subTable
-updateSubTableWithClasses subTable (hsDecl:hsDecls)
-  = do
-      let hsNames = getHsNamesFromClass hsDecl
-      subTable'  <- clobberHsNames hsNames subTable
-      subTable'' <- updateSubTableWithClasses subTable' hsDecls
-      return (subTable'')
 
 getHsNamesAndASrcLocsFromHsDecl :: HsDecl -> [(HsName, SrcLoc)]
 getHsNamesAndASrcLocsFromHsDecl (HsPatBind srcLoc (HsPVar hsName) _ _) = [(hsName, srcLoc)]
@@ -1162,22 +1141,6 @@ getHsNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls)
 -- the getNew... functions are used only inside class declarations to avoid _re_ renaming things
 -- that should be left as is.
 
-getNewHsNamesFromHsQualType :: SubTable -> HsQualType -> [HsName]
-getNewHsNamesFromHsQualType subTable (HsQualType _hsContext hsType)
-  = getNewHsNamesFromHsType subTable hsType
-
-getNewHsNamesFromHsType :: SubTable -> HsType -> [HsName]
-getNewHsNamesFromHsType subTable (HsTyFun hsType1 hsType2)
-  = (getNewHsNamesFromHsType subTable hsType1) ++ (getNewHsNamesFromHsType subTable hsType2)
-getNewHsNamesFromHsType subTable (HsTyTuple hsTypes)
-  = concat $ map (getNewHsNamesFromHsType subTable) hsTypes
-getNewHsNamesFromHsType subTable (HsTyApp hsType1 hsType2)
-  = (getNewHsNamesFromHsType subTable hsType1) ++ (getNewHsNamesFromHsType subTable hsType2)
-getNewHsNamesFromHsType subTable (HsTyVar hsName)
-  | Map.lookup hsName subTable == Nothing = [hsName]
-  | otherwise                           = []
-getNewHsNamesFromHsType _subTable (HsTyCon _hsName)
-  = [] -- don't rename the Constructors
 
 getHsNamesFromHsQualType :: HsQualType -> [HsName]
 getHsNamesFromHsQualType (HsQualType _hsContext hsType) = getHsNamesFromHsType hsType
@@ -1190,18 +1153,7 @@ getNamesFromType t = traverseHsType_ getNamesFromType t
 -- XXX getHsNamesFromHsType (HsTyExists _bs t) = getHsNamesFromHsQualType t -- TODO, scoping?
 
 
--- gets the names of the functions declared in a class declaration
 
-getHsNamesFromClass :: HsDecl -> [HsName]
-getHsNamesFromClass (HsClassDecl _srcLoc _hsQualType hsDecls) = getHsNamesFromTypeSigs hsDecls
-getHsNamesFromClass _otherDecl = []
-
--- gets the names of the functions whose types are declared in class decls
-
-getHsNamesFromTypeSigs :: [HsDecl] -> [HsName]
-getHsNamesFromTypeSigs ((HsTypeSig _srcLoc hsNames _hsQualType):hsDecls) = hsNames ++ getHsNamesFromTypeSigs hsDecls
-getHsNamesFromTypeSigs (_otherDecl:hsDecls) = getHsNamesFromTypeSigs hsDecls
-getHsNamesFromTypeSigs [] = []
 
 --------------------------------------------------------------------------------
 
