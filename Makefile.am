@@ -70,7 +70,7 @@ uninstall-hook: $(JHC_LIBS)
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
-RAWFILES = data/HsFFI.h data/jhc_rts.c data/jhc_rts_header.h data/wsize.h data/jhc_rts_alloc.c data/jhc_rts2.c data/ViaGhc.hs ChangeLog shortchange.txt
+RAWFILES = data/HsFFI.h data/jhc_rts.c data/jhc_rts_header.h data/wsize.h data/jhc_rts_alloc.c data/jhc_rts2.c data/ViaGhc.hs ChangeLog data/shortchange.txt
 
 
 jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES)
@@ -116,12 +116,12 @@ FrontEnd/HsParser.hs: FrontEnd/HsParser.y
 	happy -a -g -c $<
 
 
-.SECONDARY: _darcs/inventory shortchange.txt
+.SECONDARY: _darcs/inventory data/shortchange.txt
 
 ChangeLog: _darcs/inventory
 	darcs changes --from-tag . > $@
 
-shortchange.txt: ChangeLog
+data/shortchange.txt: ChangeLog
 	echo -n "`sed -ne 's/^  tagged \(.*\)/\1/p' $<`-`grep -c '^  \*' $<`"  > $@
 
 
@@ -149,7 +149,7 @@ rpm: rpmbuild
 publish:
 
 .INTERMEDIATE: deps.txt
-.DELETE_ON_ERROR: deps.txt depend.make ChangeLog shortchange.txt
+.DELETE_ON_ERROR: deps.txt depend.make ChangeLog data/shortchange.txt
 
 deps.txt:
 	$(MAKE) $(AM_MAKEFLAGS) $(BUILT_SOURCES)
