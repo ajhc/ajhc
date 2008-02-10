@@ -5,7 +5,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <pthread.h>
-#define NDEBUG 1
+//  #define NDEBUG 1
 #include <assert.h>
 
 #include "StringTable_cbits.h"
@@ -13,8 +13,8 @@
 static pthread_mutex_t mutex_hash = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t mutex_string = PTHREAD_MUTEX_INITIALIZER;
 
-#define pthread_mutex_lock(x) ;
-#define pthread_mutex_unlock(x) ;
+// #define pthread_mutex_lock(x) ;
+// #define pthread_mutex_unlock(x) ;
 
 // 23 bits of chunk space to leave one bit for 'valid' flag.
 // valid flag must be set to 1 for it to be a valid atom
@@ -26,19 +26,21 @@ static void print_quoted(FILE *file,unsigned char *s,int len);
 // string allocation stuff
 
 #define NUM_CHUNKS 256
-#define CHUNK_SIZE 32768
+#define CHUNK_SIZE 16384
 
 
 
-#define ATOM_LEN(c)     (((atom_t)(c)) & ATOM_LEN_MASK)
-#define CHUNK_INDEX(c)  (((atom_t)(c) >> 8)&0xFF)
-#define CHUNK_OFFSET(c) (((atom_t)(c) & ~VALID_BITMASK) >> 16 )
+#define ATOM_LEN(c)     (((atom_t)(c) >> ATOM_LEN_SHIFT) & ATOM_LEN_MASK)
+#define CHUNK_INDEX(c)  (((atom_t)(c) >> 9)&0xFF)
+#define CHUNK_OFFSET(c) (((atom_t)(c) >> 17) & 0x3FFF)
 
-#define MAKE_ATOM(ci,co,len) ((((len) & 0xFF) | ((((unsigned)ci) & 0xff) << 8) | (((unsigned)co) << 16))|VALID_BITMASK)
+#define MAKE_ATOM(ci,co,len) ((((((atom_t)len) & ATOM_LEN_MASK) << ATOM_LEN_SHIFT) | ((((atom_t)ci) & 0xff) << 9) | (((atom_t)co & 0x3FFF) << 17)) | VALID_BITMASK)
 
 #define ATOM_PTR(c) ((unsigned char *)&(stringtable_chunks[CHUNK_INDEX(c)][CHUNK_OFFSET(c)]))
 
-#define ATOM_VALID(a) ((a) & VALID_BITMASK)
+#define ATOM_VALID(a) (a)
+
+// ((a) & VALID_BITMASK)
 
 
 
@@ -309,7 +311,7 @@ atom_append(atom_t x,atom_t y)
     return stringtable_lookup(buf,xl + yl);
 }
 
-char *
+unsigned char *
 stringtable_ptr(atom_t cl)
 {
         assert(ATOM_VALID(cl));

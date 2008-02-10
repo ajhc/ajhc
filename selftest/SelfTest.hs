@@ -1,6 +1,6 @@
 
 import Data.Monoid
-import List(sort)
+import List(sort,nub)
 import qualified List
 import Monad
 import qualified Data.Set as Set
@@ -37,6 +37,8 @@ main = do
     quickCheck prop_atomIndex
     quickCheck prop_atomneq
     quickCheck prop_atomneq'
+    quickCheck $ label "atomint" prop_atomint
+    quickCheck $ label "atomii" prop_atomii
     quickCheck prop_aappend
 
     testProperties
@@ -59,6 +61,11 @@ prop_atomIndex (xs :: String) = intToAtom (atomIndex a) == Just a where
 prop_atomneq' xs ys = (xs `compare` ys) == (toPackedString a1 `compare` toPackedString a2) where
     a1 = toAtom xs
     a2 = toAtom (ys :: String)
+prop_atomint xs = an > 0 && odd an where
+    an = fromAtom $ toAtom (xs :: String) :: Int
+
+prop_atomii xs = Just xs == fromAtom `fmap` (intToAtom an) where
+    an = fromAtom $ toAtom (xs :: String) :: Int
 
 prop_aappend (xs,ys) = (toAtom xs `mappend` toAtom ys) == toAtom ((xs::String) ++ ys)
 prop_aappend' (xs,ys) = fromAtom (toAtom xs `mappend` toAtom ys) == ((xs::String) ++ ys)
@@ -107,12 +114,12 @@ testName = do
 
 testProperties = do
     putStrLn "Testing Properties"
-    let prop_list x xs = List.delete x xs == toList p where
+    let prop_list x xs = sort (List.delete x $ nub xs) == toList p where
             p = unsetProperty x ((fromList xs) :: Properties)
         prop_enum :: Prop -> Prop -> Bool
         prop_enum x y = (fromEnum x `compare` fromEnum y) == (x `compare` y)
-    quickCheck prop_list
-    quickCheck prop_enum
+    quickCheck $ label "prop_list"  prop_list
+    quickCheck $ label "prop_enum"  prop_enum
 
 
 

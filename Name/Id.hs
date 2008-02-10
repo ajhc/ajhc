@@ -11,6 +11,7 @@ module Name.Id(
     idNameUsedNames,
     etherialIds,
     isEtherialId,
+    isInvalidId,
     idSetToIdMap,
     idSetFromList,
     idSetFromDistinctAscList,
@@ -156,9 +157,16 @@ instance Show v => Show (IdMap v) where
     showsPrec n is = showsPrec n $ map f (idMapToList is) where
         f (n,v) =  (maybe (toAtom ('x':show n)) (toAtom . show) (fromId n),v)
 
+-- Id types
+-- odd - an atom
+-- 0 - special, indicating lack of binding
+-- negative - etherial id, used as placeholder within algorithms
+-- positive and even - arbitrary numbers.
+
 etherialIds :: [Id]
-etherialIds = [-1, -2 .. -100 ]
-isEtherialId id = id < 0 && id >= -100
+etherialIds = [-2, -4 ..  ]
+isEtherialId id = id < 0
+isInvalidId id = id <= 0
 
 
 -- | find some temporary ids that are not members of the set,

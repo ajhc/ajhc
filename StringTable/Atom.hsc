@@ -94,7 +94,7 @@ instance ToAtom BS.ByteString where
     toAtomIO bs = BS.unsafeUseAsCStringLen bs toAtomIO
 
 instance FromAtom CStringLen where
-    fromAtom a@(Atom v) = (stPtr a,fromIntegral $ v .&. (#const ATOM_LEN_MASK))
+    fromAtom a@(Atom v) = (stPtr a,fromIntegral $ (v `shiftR` (#const ATOM_LEN_SHIFT)) .&. (#const ATOM_LEN_MASK))
 
 instance FromAtom Word where
     fromAtom (Atom i) = fromIntegral i
@@ -121,7 +121,7 @@ intToAtom :: Monad m => Int -> m Atom
 intToAtom i = if isValidAtom i then return (Atom $ fromIntegral i) else fail $ "intToAtom: " ++ show i
 
 isValidAtom :: Int -> Bool
-isValidAtom i = i < -100
+isValidAtom i = odd i
 
 unsafeIntToAtom :: Int -> Atom
 unsafeIntToAtom x = Atom (fromIntegral x)
