@@ -1,3 +1,4 @@
+{-# OPTIONS -funbox-strict-fields  -O2 #-}
 
 -- chunked file format.
 -- A generalization of the PNG format for user defined file formats.
@@ -12,6 +13,8 @@ module Support.CFF(
     isSafeToCopy,
     readCFFHeader,
     readCFF,
+    bsCFF,
+    lbsCFF,
     lazyReadCFF,
     lazyGetCFF,
     readChunk,
@@ -76,6 +79,72 @@ isPrivate  (ChunkType w) =  w .&. 0x00200000 == 0
 -- chunk should be copied if unrecognized by an editor
 isSafeToCopy :: ChunkType -> Bool
 isSafeToCopy (ChunkType w) =  w .&. 0x00000020 == 0
+
+
+lbsCFF :: Monad m => LBS.ByteString -> m (ChunkType,[(ChunkType,LBS.ByteString)])
+lbsCFF bs = ans bs where
+    ans bs = do
+        let checkByte n b = do
+                unless ((bs `LBS.index` n) == b) $ fail "bsCFF: invalid chunked file"
+        when (LBS.length bs < 8) $ fail "bsCFF: chunked file is too short"
+        checkByte 0 0x89
+        checkByte 4 0x0d
+        let b1 = bs `LBS.index` 1
+            b2 = bs `LBS.index` 2
+            b3 = bs `LBS.index` 3
+        checkByte 5 0x0a
+        checkByte 6 0x1a
+        checkByte 7 0x0a
+        let header =  bytesToChunkType b1 b2 b3 (fromIntegral $ ord ' ')
+        return (header,readRest (LBS.drop 8 bs))
+
+    bsWord32 :: LBS.ByteString -> Word32
+    bsWord32 bs = w where
+        b1 = bs `LBS.index` 0
+        b2 = bs `LBS.index` 1
+        b3 = bs `LBS.index` 2
+        b4 = bs `LBS.index` 3
+        ChunkType w = bytesToChunkType b1 b2 b3 b4
+
+    readRest bs = f bs where
+        f bs | LBS.null bs = []
+        f bs = (ct,bdata):f (LBS.drop 4 brest) where
+            len = bsWord32 bs
+            ct = ChunkType $ bsWord32 (LBS.drop 4 bs)
+            (bdata,brest)  = LBS.splitAt (fromIntegral len) (LBS.drop 8 bs)
+
+
+bsCFF :: Monad m => BS.ByteString -> m (ChunkType,[(ChunkType,BS.ByteString)])
+bsCFF bs = ans bs where
+    ans bs = do
+        let checkByte n b = do
+                unless ((bs `BS.index` n) == b) $ fail "bsCFF: invalid chunked file"
+        when (BS.length bs < 8) $ fail "bsCFF: chunked file is too short"
+        checkByte 0 0x89
+        checkByte 4 0x0d
+        let b1 = bs `BS.index` 1
+            b2 = bs `BS.index` 2
+            b3 = bs `BS.index` 3
+        checkByte 5 0x0a
+        checkByte 6 0x1a
+        checkByte 7 0x0a
+        let header =  bytesToChunkType b1 b2 b3 (fromIntegral $ ord ' ')
+        return (header,readRest (BS.drop 8 bs))
+
+    bsWord32 :: BS.ByteString -> Word32
+    bsWord32 bs = w where
+        b1 = bs `BS.index` 0
+        b2 = bs `BS.index` 1
+        b3 = bs `BS.index` 2
+        b4 = bs `BS.index` 3
+        ChunkType w = bytesToChunkType b1 b2 b3 b4
+
+    readRest bs = f bs where
+        f bs | BS.null bs = []
+        f bs = (ct,bdata):f (BS.drop 4 brest) where
+            len = bsWord32 bs
+            ct = ChunkType $ bsWord32 (BS.drop 4 bs)
+            (bdata,brest)  = BS.splitAt (fromIntegral len) (BS.drop 8 bs)
 
 
 readCFFHeader :: Handle -> IO ChunkType
