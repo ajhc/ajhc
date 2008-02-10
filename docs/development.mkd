@@ -1,0 +1,49 @@
+Developing jhc
+==============
+
+jhc is maintained via the [Darcs revision control system](http://darcs.net/).
+The darcs repository is located at <http://repetae.net/repos/jhc>, you can also
+[browse the repository](http://repetae.net/dw/darcsweb.cgi?r=jhc;a=summary) via
+darcsweb.
+
+
+Getting the source
+------------------
+
+In order to build from the darcs repo, you need the following things installed:
+
+    * GHC 6.8.2 or better
+    * binary ghc library
+    * zlib ghc library
+    * A recent version of DrIFT
+    * pandoc if you wish to build documentation
+    * graphviz if you wish to create code motion graphs
+    * a working 'perl' install for various sundry tasks
+    * the happy haskell parser generator
+
+First you must install darcs, there are a couple projects you need to pull in order to compile jhc, the following should produce a working tree:
+
+    darcs get http://repetae.net/repos/jhc
+    cd jhc
+    darcs get http://repetae.net/repos/Doc
+    cd lib
+    darcs get http://darcs.haskell.org/packages/haskell98
+
+Now you can begin to build jhc, in order to do so, switch to the jhc directory and do:
+
+    autoreconf -i
+    ./configure
+    make
+
+after jhc has finished building, you can create the standard libraries via
+
+    make libs
+
+jhc can now be tested via
+
+    make helloworld
+
+however, during development it is often easier to use the raw haskell source of the libraries directly. in order to do that, you can run jhc with the following options when run in the development tree.
+
+    ./jhc -v --noauto -ilib/base -ilib/haskell98 test/HelloWorld.hs -o helloworld
+

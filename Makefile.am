@@ -182,6 +182,21 @@ base-1.0.hl: lib/base/base.cabal
 haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 	./jhc -v $(RTSOPTS) $(JHC_TEST) -ilib/haskell98 --noauto -L- -L. -p base --build-hl lib/haskell98.cabal -o $@
 
+%.pdf: %.ps
+	epstopdf $< --outfile $@
+
+%.ps : %.dot
+	dot $< -Tps -o$@
+
+%.pdf : %.dot
+	dot $< -Tpdf -o$@
+
+%.html: %.mkd
+	pandoc $< -s -f markdown -t html -o $@
+
+publish: docs/building.html docs/big-picture.pdf docs/development.html
+	cp -- $^ /home/john/public_html/computer/jhc
+
 
 libs: $(JHC_LIBS)
 

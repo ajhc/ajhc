@@ -41,5 +41,5 @@ AC_SUBST(RPMRELEASE)
 AC_SUBST(SHORTVERSION)
 AC_SUBST(REVISION)
 AC_SUBST(JLIBPATH)
-AC_CONFIG_FILES([Makefile jhc.spec Version/Config.hs])
+AC_CONFIG_FILES([Makefile jhc.spec Version/Config.hs docs/building.mkd])
 AC_OUTPUT
