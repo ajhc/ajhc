@@ -4,6 +4,7 @@ module Info.Info(
     Entry(..),
     HasInfo(..),
     Info.Info.lookup,
+    Info.Info.lookupTyp,
     insertWith,
     insert,
     limit,
@@ -24,7 +25,6 @@ import Data.Monoid
 import Monad
 import qualified Data.List as List
 
-import Atom
 import GenUtil
 import Util.HasSize
 
@@ -80,21 +80,17 @@ lookupTyp :: forall a . Typeable a => a -> Info -> Maybe a
 lookupTyp a = f where
     f (Info mp) = g mp
     typ = typeOf (undefined :: a)
-    g [] = fail "Info: could not find " ++ show typ
-
-lookup :: forall a m .  (Monad m,Typeable a) => Info -> m a
-lookup (Info mp) = do
-    let typ = typeOf (undefined :: a)
-        f [] = fail $ "Info: could not find " ++ show typ
-        f (x:xs) | entryType x == typ = case fromDynamic (entryThing x) of
-            Just x -> return x
-            Nothing -> error "Info.lookup: this can't happen"
-        f (_:xs) = f xs
-    f mp
+    g [] = Nothing
+    g (x:xs) | entryType x == typ = fromDynamic (entryThing x)
+    g (_:xs) = g xs
 
 
-createTyp :: Typeable a => a -> Atom
-createTyp (_::a) = toAtom (show (typeOf (undefined :: a)))
+lookup :: forall a m . (Monad m,Typeable a) => Info -> m a
+lookup = maybe (fail $ "Info: could not find: " ++ show typ) return . f where
+    typ = typeOf (undefined :: a)
+    f = lookupTyp (undefined :: a)
+
+
 
 insertWith :: (Show a,Typeable a) => (a -> a -> a) -> a -> Info -> Info
 insertWith f newx (Info mp) = Info (g mp) where

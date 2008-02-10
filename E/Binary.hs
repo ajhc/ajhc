@@ -9,7 +9,7 @@ import {-# SOURCE #-} Info.Binary(putInfo,getInfo)
 
 
 -- Binary instance
-data TvrBinary = TvrBinaryNone | TvrBinaryAtom Atom | TvrBinaryInt Int
+data TvrBinary = TvrBinaryNone | TvrBinaryAtom Atom | TvrBinaryInt Word32
 
 instance Binary TVr where
     put (TVr { tvrIdent = 0, tvrType =  e, tvrInfo = nf} ) = do
@@ -21,7 +21,7 @@ instance Binary TVr where
         put e
         putInfo nf
     put (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) = do
-        put (TvrBinaryInt i)
+        put (TvrBinaryInt $ fromIntegral i)
         put e
         putInfo nf
     get  = do
@@ -31,7 +31,7 @@ instance Binary TVr where
         case x of
             TvrBinaryNone -> return $ TVr 0 e nf
             TvrBinaryAtom a -> return $ TVr (atomIndex a) e nf
-            TvrBinaryInt i -> return $ TVr (i) e nf
+            TvrBinaryInt i -> return $ TVr (fromIntegral i) e nf
 
 instance Binary TvrBinary where
     put TvrBinaryNone = do putWord8  0

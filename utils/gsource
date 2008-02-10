@@ -1,2 +1,3 @@
 #!/bin/sh
-find . ! -wholename '*/test/*' ! -wholename '*/lib/*' ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' \)
+
+find . ! -wholename '*/test/*' ! -wholename '*/lib/*' ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' \) | xargs grep "$@" --

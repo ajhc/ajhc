@@ -20,7 +20,7 @@ static pthread_mutex_t mutex_string = PTHREAD_MUTEX_INITIALIZER;
 // valid flag must be set to 1 for it to be a valid atom
 
 static void dieif(bool,char *);
-static uint32_t hash2(uint32_t salt,unsigned char *key, int key_len);
+uint32_t hash2(uint32_t salt,unsigned char *key, int key_len);
 static void print_quoted(FILE *file,unsigned char *s,int len);
 
 // string allocation stuff
@@ -378,7 +378,7 @@ dieif(bool w,char *str)
 // hash functions
 
 
-static uint32_t
+uint32_t
 hash2(uint32_t salt, unsigned char *key, int key_len)
 {
         uint32_t hash = salt;

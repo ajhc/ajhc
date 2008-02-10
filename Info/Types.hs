@@ -49,12 +49,14 @@ instance HasProperties Properties where
     putProperties prop _ = prop
     modifyProperties f = f
 
+fetchProperties :: Info.Info -> Maybe Properties
+fetchProperties = Info.lookupTyp (undefined :: Properties)
 
 instance HasProperties Info.Info where
-    modifyProperties f info = case Info.lookup info of
+    modifyProperties f info = case fetchProperties info of
         Just x -> Info.insert (f x) info
         Nothing -> Info.insert (f mempty) info
-    getProperties info = case Info.lookup info of
+    getProperties info = case fetchProperties info of
         Just p -> p
         Nothing -> mempty
     putProperties prop info = Info.insert prop info

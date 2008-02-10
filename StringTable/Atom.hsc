@@ -3,6 +3,7 @@ module StringTable.Atom(
     Atom(),
     ToAtom(..),
     FromAtom(..),
+    HasHash(..),
     intToAtom,
     isValidAtom,
     unsafeIntToAtom,
@@ -19,6 +20,7 @@ import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe as BS
 import System.IO.Unsafe
 import Foreign
+import Foreign.Marshal
 import Data.Word
 import Data.Char
 import Foreign.C
@@ -44,6 +46,21 @@ class ToAtom a where
 
     toAtomIO a = return (toAtom a)
     toAtom a = unsafePerformIO (toAtomIO a)
+
+class HasHash a where
+    hash32 :: a -> Word32
+
+instance HasHash Atom where
+    hash32 a = let (x,y) = fromAtom a :: CStringLen in unsafePerformIO $ hash2 0 x (fromIntegral y)
+
+instance HasHash BS.ByteString where
+    hash32 bs = unsafePerformIO $ do
+        BS.unsafeUseAsCStringLen bs $ \ (x,y) -> hash2 0 x (fromIntegral y)
+
+instance HasHash String where
+    hash32 s = unsafePerformIO $ withCStringLen s $ \ (x,y) -> hash2 0 x (fromIntegral y)
+
+
 
 instance ToAtom Atom where
     toAtom x = x
@@ -116,6 +133,7 @@ foreign import ccall unsafe "dump_table" dumpTable :: IO ()
 foreign import ccall unsafe "atom_append" atomAppend :: Atom -> Atom -> IO Atom
 foreign import ccall unsafe "lexigraphic_compare" c_atomCompare :: Atom -> Atom -> CInt
 foreign import ccall unsafe "dump_to_file" dumpToFile :: IO ()
+foreign import ccall unsafe hash2  :: Word32 -> CString -> CInt -> IO Word32
 
 atomCompare a b = if c == 0 then EQ else if c > 0 then GT else LT where
     c = c_atomCompare a b

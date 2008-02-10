@@ -18,6 +18,8 @@ import Char
 import Foreign
 import Control.Monad
 import Data.Binary
+import Data.Binary.Get
+import Data.Binary.Put
 import PackedString(PackedString(..))
 import qualified Data.ByteString as BS
 import StringTable.Atom
@@ -59,6 +61,12 @@ toPackedString :: Atom -> PackedString
 toPackedString = fromAtom
 
 instance Binary Atom where
-    get = (toAtom :: BS.ByteString -> Atom) `fmap` get
-    put a = put (fromAtom a :: BS.ByteString)
+    get = do
+        x <- getWord8
+        bs <- getBytes (fromIntegral x)
+        return $ toAtom bs
+    put a = do
+        let bs = fromAtom a
+        putWord8 $ fromIntegral $ BS.length bs
+        putByteString bs
 
