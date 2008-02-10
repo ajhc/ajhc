@@ -1,0 +1,11 @@
+
+<html>
+<head>
+<title>jhc</title>
+<link rel=stylesheet type="text/css" href="/style/blue-style.css">
+</head>
+<body>
+    <h1 class=maintitle style="visibility: hidden">Jhc</h1>
+<!--#include virtual="/try/navbar.html" -->
+<div class=foo>
+

@@ -194,7 +194,12 @@ haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 %.html: %.mkd
 	pandoc $< -s -f markdown -t html -o $@
 
-publish: docs/building.html docs/big-picture.pdf docs/development.html
+%.shtml: %.mkd
+	cat $(srcdir)/docs/my_header.shtml > $@
+	pandoc $<  -f markdown -t html >> $@
+	cat $(srcdir)/docs/my_footer.shtml >> $@
+
+publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml
 	cp -- $^ /home/john/public_html/computer/jhc
 
 
