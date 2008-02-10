@@ -2,9 +2,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <pthread.h>
-//#define NDEBUG 1
+#define NDEBUG 1
 #include <assert.h>
 
 #include "StringTable_cbits.h"
@@ -12,12 +13,15 @@
 static pthread_mutex_t mutex_hash = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t mutex_string = PTHREAD_MUTEX_INITIALIZER;
 
+#define pthread_mutex_lock(x) ;
+#define pthread_mutex_unlock(x) ;
+
 // 23 bits of chunk space to leave one bit for 'valid' flag.
 // valid flag must be set to 1 for it to be a valid atom
 
 static void dieif(bool,char *);
 static uint32_t hash2(uint32_t salt,unsigned char *key, int key_len);
-static uint32_t hash3(uint32_t salt,unsigned char *key, int key_len);
+static void print_quoted(FILE *file,unsigned char *s,int len);
 
 // string allocation stuff
 
@@ -32,7 +36,7 @@ static uint32_t hash3(uint32_t salt,unsigned char *key, int key_len);
 
 #define MAKE_ATOM(ci,co,len) ((((len) & 0xFF) | ((((unsigned)ci) & 0xff) << 8) | (((unsigned)co) << 16))|VALID_BITMASK)
 
-#define ATOM_PTR(c) (&(stringtable_chunks[CHUNK_INDEX(c)][CHUNK_OFFSET(c)]))
+#define ATOM_PTR(c) ((unsigned char *)&(stringtable_chunks[CHUNK_INDEX(c)][CHUNK_OFFSET(c)]))
 
 #define ATOM_VALID(a) ((a) & VALID_BITMASK)
 
@@ -111,15 +115,15 @@ fast_insert(int t, int tb, struct hentry hb) {
         hash_insert(hb);
 }
 
-bool
+static bool
 atom_exists(atom_t a) {
         for(int i = 0; i < HASHSIZE*CUCKOO_HASHES; i++) {
                 if(a == htable[i].atom) return true;
         }
         return false;
 }
-bool
-item_exists(char *cs, int len) {
+static bool
+item_exists(unsigned char *cs, int len) {
         for(int i = 0; i < HASHSIZE*CUCKOO_HASHES; i++) {
                 atom_t a = htable[i].atom;
                 if(ATOM_VALID(a)) {
@@ -128,6 +132,19 @@ item_exists(char *cs, int len) {
                 }
         }
         return false;
+}
+
+void
+dump_to_file(void) {
+        FILE *file = fopen("atom.dump","w");
+        for(int i = 0; i < HASHSIZE*CUCKOO_HASHES; i++) {
+                atom_t a = htable[i].atom;
+                if(ATOM_VALID(a)) {
+                        fprintf(file,"%u:",ATOM_LEN(a));
+                        print_quoted(file, ATOM_PTR(a),ATOM_LEN(a));
+                        fwrite("\n",1,1,file);
+                }
+        }
 }
 
 void
@@ -145,7 +162,7 @@ dump_table(void) {
 
 static void
 grow_table(void) {
-    fprintf(stderr,"grow_table[[[\n");
+ //   fprintf(stderr,"grow_table[[[\n");
         uint32_t os = (1 << hsize++) * CUCKOO_HASHES;
         struct hentry *ot = htable;
         htable = calloc(sizeof(struct hentry),CUCKOO_HASHES * (1 << hsize));
@@ -155,7 +172,7 @@ grow_table(void) {
                         fast_insert(0,0,ot[i]);
         }
         if(ot != init_htable) free(ot);
-    fprintf(stderr,"]]]\n");
+//    fprintf(stderr,"]]]\n");
 }
 
 #if KEEP_HASH
@@ -167,9 +184,9 @@ grow_table(void) {
 static void
 hash_insert(struct hentry x) {
         assert(ATOM_VALID(x.atom));
-         fprintf(stderr,"hash_insert(%x,%p:%i,%x,%x,[%x,%x]", x.atom, ATOM_PTR(x.atom), ATOM_LEN(x.atom), x.hashes[0], x.hashes[1],HASH_INDEX(0,x.hashes[0]),HASH_INDEX(1,x.hashes[1]));
+//         fprintf(stderr,"hash_insert(%x,%p:%i,%x,%x,[%x,%x]", x.atom, ATOM_PTR(x.atom), ATOM_LEN(x.atom), x.hashes[0], x.hashes[1],HASH_INDEX(0,x.hashes[0]),HASH_INDEX(1,x.hashes[1]));
         assert(!atom_exists(x.atom));
-        if(item_exists(ATOM_PTR(x.atom),ATOM_LEN(x.atom))) 
+        if(item_exists(ATOM_PTR(x.atom),ATOM_LEN(x.atom)))
             dump_table();
         assert(!item_exists(ATOM_PTR(x.atom),ATOM_LEN(x.atom)));
         atom_t start = x.atom;
@@ -182,7 +199,7 @@ hash_insert(struct hentry x) {
                                 struct hentry *b = &htable[HASH_INDEX(i,FHASH(x,i) + j)];
                                 if(!ATOM_VALID(b->atom)) {
                                         *b = x;
-                                        fprintf(stderr,")\n");
+//                                        fprintf(stderr,")\n");
                                         return;
                                 }
                                 struct hentry tb = x;
@@ -196,16 +213,39 @@ hash_insert(struct hentry x) {
                 }
         }
         grow_table();
-        fprintf(stderr,"R");
+//        fprintf(stderr,"R");
         return hash_insert(x);
 }
 
 
 
+static void
+print_quoted(FILE *file,unsigned char *s,int len)
+{
+        for(int i = 0;i < len; i ++) {
+                switch(s[i]) {
+                case '\n': fputs("\\n",file); continue;
+                case '\r': fputs("\\r",file); continue;
+                case '\t': fputs("\\t",file); continue;
+                default: ;
+                }
+                if(isprint(s[i]))
+                        fputc(s[i],file);
+                else
+                        fprintf(file,"\\x%2.2X", (unsigned)s[i]);
+        }
+}
+
+
 atom_t
 stringtable_lookup(unsigned char *cs, int len)
 {
-        fprintf(stderr,"stringtable_lookup(%c,%c,%*s,%i)\n",cs[0],cs[1],len,cs,len);
+        static FILE *file = NULL;
+        if(!file)
+                file = fopen("atom.lookup","w");
+        fprintf(file,"stringtable_lookup(");
+        print_quoted(file,cs,len);
+        fprintf(file,")\n");
         pthread_mutex_lock(&mutex_hash);
         assert(len >= 0);
         assert(len < MAX_ENTRY_SIZE);

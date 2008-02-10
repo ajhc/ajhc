@@ -149,7 +149,8 @@ doSubst substInVars allShadow bm e  = f e bm where
 
 mnv allShadow xs i ss
     | allShadow = nv ss
-    | i <= 0 || i `mmember` ss = nv (fromList [ (x,undefined) | x <- xs ] `mappend` ss)
+--    | i <= 0 || i `mmember` ss = nv (fromList [ (x,undefined) | x <- xs ] `mappend` ss)
+    | isEtherialId i || i == 0 || i `mmember` ss = nv (fromList [ (x,undefined) | x <- xs ] `mappend` ss)
     | otherwise = i
 
 

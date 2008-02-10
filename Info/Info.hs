@@ -76,6 +76,11 @@ instance HasInfo Info where
     getInfo = id
     modifyInfo f x = f x
 
+lookupTyp :: forall a . Typeable a => a -> Info -> Maybe a
+lookupTyp a = f where
+    f (Info mp) = g mp
+    typ = typeOf (undefined :: a)
+    g [] = fail "Info: could not find " ++ show typ
 
 lookup :: forall a m .  (Monad m,Typeable a) => Info -> m a
 lookup (Info mp) = do

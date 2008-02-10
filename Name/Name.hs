@@ -25,7 +25,7 @@ import Char
 import Monad(liftM)
 import Data.Typeable
 
-import Atom
+import StringTable.Atom
 import Data.Binary
 import C.FFI
 import Doc.DocLike
@@ -142,16 +142,16 @@ parseName t name = toName t (intercalate "." ms, intercalate "." (ns ++ [last sn
 
 
 nameType :: Name -> NameType
-nameType (Name a) = toEnum (ord (head (toString a)))
+nameType (Name a) = toEnum (ord (head (fromAtom a)))
 
 nameName :: Name -> HsName
-nameName (Name a) = f $ tail (toString a) where
+nameName (Name a) = f $ tail (fromAtom a) where
     f ('\NUL':xs) = UnQual $ HsIdent xs
     f xs | (a,_:b) <- span (/= '\NUL') xs  = Qual (Module a) (HsIdent b)
-    f _ = error $ "invalid Name: " ++ (show $ toString a)
+    f _ = error $ "invalid Name: " ++ (show $ (fromAtom a :: String))
 
 nameParts :: Name -> (NameType,Maybe String,String)
-nameParts n@(Name a) = f $ tail (toString a) where
+nameParts n@(Name a) = f $ tail (fromAtom a) where
     f ('\NUL':xs) = (nameType n,Nothing,xs)
     f xs = (nameType n,Just a,b) where
         (a,_:b) = span (/= '\NUL') xs
@@ -163,10 +163,11 @@ instance DocLike d => PPrint d Name  where
     pprint n = text (show n)
 
 toId :: Name -> Int
-toId x = atomIndex (toAtom x)
+toId x = fromAtom (toAtom x)
 
 fromId :: Monad m => Int -> m Name
-fromId i | even i || i < 0 = fail $ "Name.fromId: not a name " ++ show i
+--fromId i | even i || i < 0 = fail $ "Name.fromId: not a name " ++ show i
+fromId i | not $ isValidAtom i = fail $ "Name.fromId: not a name " ++ show i
 fromId i = return $ case intToAtom i of
     Just a -> Name a
     Nothing -> error $ "Name.fromId: not a name " ++ show i

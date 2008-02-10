@@ -19,7 +19,7 @@ import Data.Maybe
 import qualified Data.Set as Set
 import qualified Data.Traversable as T
 
-import Atom
+import StringTable.Atom
 import C.Prims
 import DataConstructors
 import Doc.PPrint
@@ -531,7 +531,7 @@ simplifyDs prog sopts dsIn = ans where
 --                    Just (_,e) -> f cont e
 --                    Nothing -> els
 
-    showName t | isJust (intToAtom t) || dump FD.EVerbose = tvrShowName (tVr t Unknown)
+    showName t | isValidAtom t || dump FD.EVerbose = tvrShowName (tVr t Unknown)
              | otherwise = "(epheremal)"
 
     nname tvr@(TVr { tvrIdent = n, tvrType =  t})  = do

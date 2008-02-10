@@ -7,7 +7,7 @@ import Data.IORef
 import Text.Printf
 import List hiding(insert)
 
-import Atom
+import StringTable.Atom
 import Doc.PPrint
 import E.Annotate
 import E.E
@@ -276,7 +276,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                 t <- globalName t
                 tellCombinator (t,ls,e'')
             r
-        globalName tvr | isNothing $ intToAtom (tvrIdent tvr) = do
+        globalName tvr | not $ isValidAtom (tvrIdent tvr) = do
             TVr { tvrIdent = t } <- newName Unknown
             let ntvr = tvr { tvrIdent = t }
             tell ([],msingleton (tvrIdent tvr) (Just $ EVar ntvr))

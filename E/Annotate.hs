@@ -139,7 +139,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
             return tvr { tvrInfo = Info.insert r' (tvrInfo tvr) }
 
 mnv xs i ss
-    | i <= 0 || i `mmember` ss = nv (fromList [ (x,undefined) | x <- xs ] `mappend` ss)
+    | isEtherialId i || i == 0 || i `mmember` ss = nv (fromList [ (x,undefined) | x <- xs ] `mappend` ss)
     | otherwise = i
 
 

@@ -4,9 +4,11 @@ module StringTable.Atom(
     ToAtom(..),
     FromAtom(..),
     intToAtom,
+    isValidAtom,
     unsafeIntToAtom,
     atomCompare,
     dumpTable,
+    dumpToFile,
     dumpStringTableStats
     ) where
 
@@ -14,6 +16,7 @@ module StringTable.Atom(
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
+import qualified Data.ByteString.Unsafe as BS
 import System.IO.Unsafe
 import Foreign
 import Data.Word
@@ -71,7 +74,7 @@ instance FromAtom String where
     fromAtom = fromUTF . BS.unpack . fromAtom
 
 instance ToAtom BS.ByteString where
-    toAtomIO bs = BS.useAsCStringLen bs toAtomIO
+    toAtomIO bs = BS.unsafeUseAsCStringLen bs toAtomIO
 
 instance FromAtom CStringLen where
     fromAtom a@(Atom v) = (stPtr a,fromIntegral $ v .&. (#const ATOM_LEN_MASK))
@@ -84,10 +87,8 @@ instance FromAtom Int where
 
 instance FromAtom BS.ByteString where
     fromAtomIO a = do
-        (p,l) <- fromAtomIO a :: IO CStringLen
-        BS.packCStringLen (p,fromIntegral l)
-    --    fp <- newForeignPtr_ =<< (castPtr `fmap` peek p)
-    --    return $ BS.fromForeignPtr fp 0 (fromIntegral l)
+        sl <- fromAtomIO a :: IO CStringLen
+        BS.unsafePackCStringLen sl
 
 instance Monoid Atom where
     mempty = toAtom BS.empty
@@ -100,18 +101,21 @@ instance Read Atom where
     readsPrec _ s = [ (toAtom s,"") ]
 
 intToAtom :: Monad m => Int -> m Atom
-intToAtom i = if 0 /= (#const VALID_BITMASK) .&. i then return (Atom $ fromIntegral i) else fail $ "intToAtom: " ++ show i
+intToAtom i = if isValidAtom i then return (Atom $ fromIntegral i) else fail $ "intToAtom: " ++ show i
+
+isValidAtom :: Int -> Bool
+isValidAtom i = i < -100
 
 unsafeIntToAtom :: Int -> Atom
 unsafeIntToAtom x = Atom (fromIntegral x)
 
 foreign import ccall unsafe "stringtable_lookup" stAdd :: CString -> CInt -> IO Atom
 foreign import ccall unsafe "stringtable_ptr" stPtr :: Atom -> CString
-foreign import ccall unsafe "stringtable_get" stGet :: Atom -> Ptr CChar -> IO CInt
 foreign import ccall unsafe "stringtable_stats" dumpStringTableStats :: IO ()
 foreign import ccall unsafe "dump_table" dumpTable :: IO ()
 foreign import ccall unsafe "atom_append" atomAppend :: Atom -> Atom -> IO Atom
 foreign import ccall unsafe "lexigraphic_compare" c_atomCompare :: Atom -> Atom -> CInt
+foreign import ccall unsafe "dump_to_file" dumpToFile :: IO ()
 
 atomCompare a b = if c == 0 then EQ else if c > 0 then GT else LT where
     c = c_atomCompare a b

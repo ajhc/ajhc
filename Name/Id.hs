@@ -9,6 +9,8 @@ module Name.Id(
     idMapToIdSet,
     idNameBoundNames,
     idNameUsedNames,
+    etherialIds,
+    isEtherialId,
     idSetToIdMap,
     idSetFromList,
     idSetFromDistinctAscList,
@@ -153,6 +155,10 @@ instance Show IdSet where
 instance Show v => Show (IdMap v) where
     showsPrec n is = showsPrec n $ map f (idMapToList is) where
         f (n,v) =  (maybe (toAtom ('x':show n)) (toAtom . show) (fromId n),v)
+
+etherialIds :: [Id]
+etherialIds = [-1, -2 .. -100 ]
+isEtherialId id = id < 0 && id >= -100
 
 
 -- | find some temporary ids that are not members of the set,

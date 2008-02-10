@@ -129,7 +129,7 @@ allocTVr tvr (SEM action) | tvrType tvr == eStar  = do
     SEM $ subVarName $ newName (map (:[]) ['a' ..]) eStar (tvrIdent tvr) >> action
 allocTVr tvr (SEM action) | tvrType tvr == eStar `tFunc` eStar  = do
     SEM $ subVarName $ newName (map (('f':) . show) [0::Int ..])  (tvrType tvr) (tvrIdent tvr) >> action
-allocTVr tvr (SEM action) | isNothing $ intToAtom (tvrIdent tvr) = do
+allocTVr tvr (SEM action) | not $ isValidAtom (tvrIdent tvr) = do
     SEM $ subVarName $ newName (map (('v':) . show) [1::Int ..]) Unknown (tvrIdent tvr) >> action
 allocTVr _ action = action
 

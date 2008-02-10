@@ -93,6 +93,7 @@ bracketHtml action = do
     wdump FD.Html $ putStrLn $ "<html><head><title>" ++ argstring ++ "</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body style=\"background: black; color: lightgrey\"><pre>"
     action `finally` (wdump FD.Html $ putStrLn "</pre></body></html>")
 
+catom action = action `finally` dumpToFile
 catom action = Control.Exception.catch action (\e -> dumpTable >> dumpStringTableStats >> throw e)
 
 main = runMain $ catom $ bracketHtml $ do
@@ -245,6 +246,8 @@ processDecls cho ho' tiData = do
     (nds,srules) <- procAllSpecs (tiCheckedRules tiData) ds
 
     ds <- return $ ds ++ nds
+    wdump FD.CoreInitial $
+        mapM_ (\(v,lc) -> printCheckName'' fullDataTable v lc) ds
     ds <- annotateDs mempty (\_ nfo -> return nfo) (\_ nfo -> return nfo) (\_ nfo -> return nfo) ds
     wdump FD.CoreInitial $
         mapM_ (\(v,lc) -> printCheckName'' fullDataTable v lc) ds
@@ -898,7 +901,7 @@ lintCheckProgram onerr prog | flint = do
         printProgram prog
         putErrLn $ ">>> program has repeated toplevel definitions" ++ pprint repeats
         maybeDie
-    let f (tvr@TVr { tvrIdent = n },e) | isNothing $ intToAtom n = do
+    let f (tvr@TVr { tvrIdent = n },e) | not $ isValidAtom n = do
             onerr
             putErrLn $ ">>> non-unique name at top level: " ++ pprint tvr
             printProgram prog
