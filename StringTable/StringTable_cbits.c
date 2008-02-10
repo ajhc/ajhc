@@ -5,7 +5,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <pthread.h>
-//  #define NDEBUG 1
+#define NDEBUG 1
 #include <assert.h>
 
 #include "StringTable_cbits.h"
@@ -13,8 +13,8 @@
 static pthread_mutex_t mutex_hash = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t mutex_string = PTHREAD_MUTEX_INITIALIZER;
 
-// #define pthread_mutex_lock(x) ;
-// #define pthread_mutex_unlock(x) ;
+#define pthread_mutex_lock(x) ;
+#define pthread_mutex_unlock(x) ;
 
 // 23 bits of chunk space to leave one bit for 'valid' flag.
 // valid flag must be set to 1 for it to be a valid atom
@@ -242,12 +242,12 @@ print_quoted(FILE *file,unsigned char *s,int len)
 atom_t
 stringtable_lookup(unsigned char *cs, int len)
 {
-        static FILE *file = NULL;
-        if(!file)
-                file = fopen("atom.lookup","w");
-        fprintf(file,"stringtable_lookup(");
-        print_quoted(file,cs,len);
-        fprintf(file,")\n");
+//        static FILE *file = NULL;
+//        if(!file)
+//                file = fopen("atom.lookup","w");
+//        fprintf(file,"stringtable_lookup(");
+//        print_quoted(file,cs,len);
+//        fprintf(file,")\n");
         pthread_mutex_lock(&mutex_hash);
         assert(len >= 0);
         assert(len < MAX_ENTRY_SIZE);
