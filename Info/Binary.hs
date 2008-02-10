@@ -55,8 +55,8 @@ getDyn = do
         Nothing -> fail $ "getDyn: don't know how to read something of type: " ++ show ps
 
 instance Binary Properties where
-    put (Properties (EnumBitSet props)) = put (BS.toWord props)
-    get = get >>= return . Properties . EnumBitSet . BS.fromWord
+    put (Properties (EnumBitSet props)) = put (fromIntegral $ BS.toWord props :: Word32)
+    get = (get :: Get Word32) >>= return . Properties . EnumBitSet . BS.fromWord . fromIntegral
 
 
 instance Binary Info where
@@ -71,13 +71,13 @@ putInfo (Info ds) = do
             x <- Map.lookup ps binTable
             return (ps,entryThing d,x)
           ) ds
-    put (length ds')
+    putWord8 (fromIntegral $ length ds')
     mapM_ putDyn ds'
 
 getInfo :: Get Info.Info.Info
 getInfo = do
-    (n::Int) <- get
-    xs <- replicateM n getDyn
+    n <- getWord8
+    xs <- replicateM (fromIntegral n) getDyn
     return (Info  [ x | x <- xs])
 
 
