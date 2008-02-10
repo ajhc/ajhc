@@ -24,6 +24,8 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
+import StringTable.Atom
+import PackedString(packString)
 import CharIO
 import DataConstructors
 import Directory
@@ -49,7 +51,6 @@ import Ho.Library
 import Ho.Type
 import HsSyn
 import Options
-import PackedString
 import Support.CFF
 import Util.FilterInput
 import Util.Gen hiding(putErrLn,putErr,putErrDie)
@@ -79,11 +80,6 @@ import qualified Util.SHA1 as SHA1
 cff_magic = chunkType "JHC"
 cff_jhdr  = chunkType "JHDR"
 cff_core  = chunkType "CORE"
-
-version :: Int
-version = 7
-
-magic = (packString "jhc Haskell Object File",version)
 
 
 shortenPath :: String -> IO String
@@ -440,7 +436,7 @@ buildLibrary ifunc func = ans where
         let outName = case optOutName options of
                 "hs.out" -> name ++ ".hl"
                 fn -> fn
-        let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
+        let pdesc = [(toAtom n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
         let lhash = SHA1.sha1String (show $ choFiles cho)
         let hoh =  HoHeader {
                 hohHash = lhash,
@@ -481,7 +477,7 @@ dumpHoFile fn = do
     when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "Dependencies:\n" <>  vcat (map pprint $ sortUnder fst $ hohDepends hoh)
     when (not $ Prelude.null (hohModDepends hoh)) $ putStrLn $ "ModDependencies:\n" <>  vcat (map pprint $ sortUnder fst $ hohModDepends hoh)
     putStrLn $ "HoHash:" <+> pprint (hohHash hoh)
-    putStrLn $ "MetaInfo:\n" <> vcat (sort [text (' ':' ':unpackPS k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
+    putStrLn $ "MetaInfo:\n" <> vcat (sort [text (' ':' ':fromAtom k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
     putStrLn $ "Modules contained:" <+> tshow (mkeys $ hoExports ho)
     putStrLn $ "number of definitions:" <+> tshow (size $ hoDefs ho)
     putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps ho)

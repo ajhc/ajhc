@@ -8,8 +8,7 @@ import Monad
 import Control.Monad.Fix()
 import Maybe
 
-import Atom
-import PackedString
+import StringTable.Atom
 import C.Prims
 import C.Arch
 import C.OpEval
@@ -154,7 +153,7 @@ primOpt' _  x = return x
 
 
 processPrimPrim :: DataTable -> E -> E
-processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o id (primopt (unpackPS s) es (followAliases dataTable orig_t)) where
+processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o id (primopt (fromAtom s) es (followAliases dataTable orig_t)) where
     primopt "seq" [x,y] _  = return $ prim_seq x y
     primopt "exitFailure__" [w] rt  = return $ EError "" rt
     primopt op [a,b] t | Just cop <- readM op = mdo

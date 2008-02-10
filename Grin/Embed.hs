@@ -3,7 +3,7 @@ module Grin.Embed((.>>=),(.>>),GG,VVar,TyNode,TyTag,TyPtr,TyRaw,embedTest) where
 import Grin.Grin
 import Util.UniqueMonad
 import Support.CanType
-import Atom
+import StringTable.Atom
 import GenUtil
 import Grin.Show
 import Doc.Pretty

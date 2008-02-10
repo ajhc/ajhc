@@ -1,6 +1,6 @@
 module Grin.Interpret(evaluate) where
 
-import Atom
+import StringTable.Atom
 import Support.CanType
 import Char
 import CharIO

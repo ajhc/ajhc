@@ -4,6 +4,7 @@ import Data.Monoid
 import Data.Typeable
 import Data.Binary
 
+import StringTable.Atom
 import C.FFI(Requires(..))
 import Doc.DocLike
 import Doc.PPrint
@@ -29,7 +30,7 @@ data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
     {-! derive: Binary !-}
 
 data Prim =
-    PrimPrim PackedString          -- Special primitive implemented in the compiler somehow.
+    PrimPrim Atom          -- Special primitive implemented in the compiler somehow.
     | CConst { primConst :: String, primRetType :: ExtType }  -- C code which evaluates to a constant
     | Func {
         funcIOLike :: !Bool,
@@ -127,7 +128,7 @@ parsePrimString s = do
     return (APrim v (mconcat (map f (init ws))))
 
 
-primPrim s = APrim (PrimPrim $ packString s) mempty
+primPrim s = APrim (PrimPrim $ toAtom s) mempty
 
 data APrim = APrim Prim Requires
     deriving(Typeable,  Eq, Ord)
@@ -141,7 +142,7 @@ instance PPrint d Prim  => PPrint d APrim where
     pprintPrec n (APrim p _) = pprintPrec n p
 
 instance DocLike d => PPrint d Prim where
-    pprint (PrimPrim t) = text (unpackPS t)
+    pprint (PrimPrim t) = text (fromAtom t)
     pprint (CConst s t) = parens (text t) <> parens (text s)
     pprint (Func _ s xs r) = parens (text r) <> text (unpackPS s) <> tupled (map text xs)
     pprint (IFunc _ xs r) = parens (text r) <> parens (char '*') <> tupled (map text xs)

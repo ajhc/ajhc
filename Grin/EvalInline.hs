@@ -7,7 +7,7 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 
 
-import Atom
+import StringTable.Atom
 import Grin.Grin
 import Grin.Noodle
 import GenUtil
@@ -103,7 +103,7 @@ createApply argType retType te ts'
     | argType == TyUnit = [n1] :-> Case n1 cs
     | otherwise = [n1,a2] :-> Case n1 cs
     where
-    ts = sortUnder toPackedString ts'
+    ts = sortBy atomCompare ts'
     a2 = Var v2 argType
     cs = [ f t | t <- ts, tagGood t]
     tagGood t | Just TyTy { tyThunk = TyPApp mt w } <- findTyTy te t =

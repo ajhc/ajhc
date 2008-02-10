@@ -38,7 +38,7 @@ import Control.Monad.Identity
 import Data.IORef
 import Text.PrettyPrint.HughesPJ(Doc)
 
-import Atom
+import StringTable.Atom
 import Data.Binary
 import Doc.DocLike
 import Doc.PPrint(pprint,PPrint)
@@ -123,7 +123,7 @@ tExists x y = TExists x y
 instance Show (IORef a) where
     showsPrec _ _ = ("<IORef>" ++)
 
-tyvar n k = Tyvar (fromString $ show n) n k
+tyvar n k = Tyvar (toAtom $ show n) n k
 
 instance Eq Tyvar where
     Tyvar { tyvarAtom = x } == Tyvar { tyvarAtom = y } = x == y

@@ -5,7 +5,7 @@ import qualified Data.IntMap as IM
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Atom
+import StringTable.Atom
 import Grin.Grin
 import Grin.Noodle
 import Util.Gen

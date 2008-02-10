@@ -33,7 +33,7 @@ import Data.Typeable
 import qualified Data.IntMap  as IM
 import qualified Data.IntSet as IS
 
-import Atom
+import StringTable.Atom
 import Util.HasSize
 import Util.Inst()
 import Util.NameMonad

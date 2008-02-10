@@ -3,6 +3,7 @@ module Ho.Type where
 import Data.Monoid
 import qualified Data.Map as Map
 
+import StringTable.Atom
 import DataConstructors(DataTable)
 import E.E(TVr,E)
 import E.Rules(Rules)
@@ -53,7 +54,7 @@ data HoHeader = HoHeader {
     -- * Other objects depended on
     hohModDepends :: [(Module,SHA1.Hash)],
     -- * metainformation, filled for hl-files, empty for normal objects.
-    hohMetaInfo   :: [(PackedString,PackedString)]
+    hohMetaInfo   :: [(Atom,PackedString)]
     }
 
 -- The raw data as it appears on disk

@@ -12,7 +12,7 @@ module E.Inline(
 import Control.Monad.Writer
 import Data.Monoid
 
-import Atom
+import StringTable.Atom
 import E.Annotate
 import E.E
 import E.Program

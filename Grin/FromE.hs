@@ -11,7 +11,7 @@ import Maybe
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 
-import Atom
+import StringTable.Atom
 import C.Arch
 import C.FFI hiding(Primitive)
 import C.Prims
@@ -35,7 +35,6 @@ import Name.Id
 import Name.Name
 import Name.Names
 import Options
-import PackedString
 import Stats(mtick)
 import Support.CanType
 import Support.FreeVars
@@ -116,7 +115,7 @@ flattenScc xs = concatMap f xs where
 scTag n
     | Just nm <- fromId (tvrIdent n) = toAtom ('f':show nm)
     | otherwise = toAtom ('f':show (tvrIdent n))
-cafNum n = V $ - atomIndex (partialTag (scTag n) 0)
+cafNum n = V $ - fromAtom (partialTag (scTag n) 0)
 
 toEntry (n,as,e) = f (scTag n) where
         f x = (x,map (toType tyINode . tvrType )  as,toTypes TyNode (getType (e::E) :: E))
@@ -400,7 +399,7 @@ compile' cenv (tvr,as,e) = ans where
     ce e | Just z <- con e = return (Return z)
 
 
-    ce (EPrim ap@(APrim (PrimPrim prim) _) as _) = f (unpackPS prim) as where
+    ce (EPrim ap@(APrim (PrimPrim prim) _) as _) = f (fromAtom prim) as where
 
 
         -- artificial dependencies
@@ -573,7 +572,7 @@ compile' cenv (tvr,as,e) = ans where
 
     -- | cc evaluates something in lazy context, returning a pointer to a node which when evaluated will produce the strict result.
     -- it is an invarient that evaling (cc e) produces the same value as (ce e)
-    cc (EPrim (APrim (PrimPrim don) _) [e,_] _) | don == packString "dependingOn" = cc e
+    cc (EPrim don [e,_] _) | don == p_dependingOn  = cc e
     cc e | Just _ <- literal e = error "unboxed literal in lazy context"
     cc e | Just z <- constant e = return (Return $ keepIts [z])
     cc e | Just [z] <- con e = return $ if isLifted e then Store z else Return [z]
@@ -682,7 +681,7 @@ compile' cenv (tvr,as,e) = ans where
     constant (EVar tvr) | Just c <- mlookup (tvrIdent tvr) (ccafMap cenv) = return c
                         | Just (v,as,_) <- mlookup (tvrIdent tvr) (scMap cenv)
                          , t <- partialTag v (length as), tagIsWHNF t = if isLifted (EVar tvr) then return $ Const $ NodeC t [] else return (NodeC t [])
-    --                        False -> return $ Var (V $ - atomIndex t) (TyPtr TyNode)
+    --                        False -> return $ Var (V $ - fromAtom t) (TyPtr TyNode)
     constant e | Just [l] <- literal e = return l
     constant e@(ELit lc@LitCons { litName = n, litArgs = es }) | Just es <- mapM constant es, Just nn <- getName lc = if isLifted e
         then return $ Const (NodeC nn (keepIts es))

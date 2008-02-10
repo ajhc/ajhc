@@ -7,7 +7,7 @@ import Data.Monoid
 import qualified Data.Set as Set
 
 import Support.FreeVars
-import Atom(Atom())
+import StringTable.Atom(Atom())
 import Options(flint)
 import C.Prims
 import Util.Gen

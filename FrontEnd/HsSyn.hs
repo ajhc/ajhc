@@ -2,11 +2,11 @@ module HsSyn where
 
 
 
-import Atom
+import StringTable.Atom
+import StringTable.Atom()
 import Data.Binary
 import C.FFI
 import Data.Generics
-import PackedString
 import FrontEnd.SrcLoc
 
 
@@ -43,7 +43,7 @@ data HsName
 
 
 instance ToAtom HsName where
-    toAtom = Atom.fromString . show
+    toAtom = toAtom . show
 
 instance Show HsName where
    showsPrec _ (Qual (Module m) s) =
@@ -56,14 +56,14 @@ newtype HsIdentifier = HsIdent { hsIdentString :: String }
 instance Binary Module where
     get = do
         ps <- get
-        return (Module $ unpackPS ps)
-    put (Module n) = put (packString n)
+        return (Module $ fromAtom ps)
+    put (Module n) = put (toAtom n)
 
 instance Binary HsIdentifier where
     get = do
         ps <- get
-        return (HsIdent $ unpackPS ps)
-    put (HsIdent n) = put (packString n)
+        return (HsIdent $ fromAtom ps)
+    put (HsIdent n) = put (toAtom n)
 
 hsIdentString_u f x = x { hsIdentString = f $ hsIdentString x }
 

@@ -19,8 +19,6 @@ import Data.Maybe
 import Data.Typeable
 import qualified Data.Map as Map
 
-import PackedString
-import C.Prims
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
@@ -294,13 +292,14 @@ analyze el@(ELit lc@LitCons { litName = h, litArgs = ts@(_:_) }) (S (Product ss)
             rts <- mapM (\e -> analyze e lazy) ts
             return (ELit lc { litArgs = fsts rts }, foldr glb absType (snds rts))
 
+
 analyze (ELit lc@LitCons { litArgs = ts }) _s = do
     rts <- mapM (\e -> analyze e lazy) ts
     return (ELit lc { litArgs = fsts rts }, foldr glb absType (snds rts))
 analyze e s | Just (t1,t2,pt) <- from_dependingOn e = do
     (t1',dt1) <- analyze t1 s
     (t2',dt2) <- analyze t2 lazy
-    return (EPrim (APrim (PrimPrim $ packString "dependingOn") mempty) [t1',t2'] pt,dt1 `glb` dt2)
+    return (EPrim p_dependingOn [t1',t2'] pt,dt1 `glb` dt2)
 analyze (EPrim ap ts pt) _s = do
     rts <- mapM (\e -> analyze e lazy) ts
     return (EPrim ap (fsts rts) pt, foldr glb absType (snds rts))
@@ -351,7 +350,7 @@ analyze es@ESort {} _ = return (es,absType)
 analyze es@(ELit LitInt {}) _ = return (es,absType)
 analyze e x = fail $ "analyze: " ++ show (e,x)
 
-from_dependingOn (EPrim (APrim (PrimPrim don) _) [t1,t2] pt) | don == packString "dependingOn" = return (t1,t2,pt)
+from_dependingOn (EPrim don [t1,t2] pt) | don == p_dependingOn = return (t1,t2,pt)
 from_dependingOn _ = fail "not dependingOn"
 
 lazify (DemandEnv x r) = DemandEnv (Map.map f x) Absent where

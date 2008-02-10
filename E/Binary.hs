@@ -1,6 +1,6 @@
 module E.Binary() where
 
-import Atom
+import StringTable.Atom
 import Data.Binary
 import E.Type
 import Monad
@@ -30,7 +30,7 @@ instance Binary TVr where
         nf <- getInfo
         case x of
             TvrBinaryNone -> return $ TVr 0 e nf
-            TvrBinaryAtom a -> return $ TVr (atomIndex a) e nf
+            TvrBinaryAtom a -> return $ TVr (fromAtom a) e nf
             TvrBinaryInt i -> return $ TVr (fromIntegral i) e nf
 
 instance Binary TvrBinary where

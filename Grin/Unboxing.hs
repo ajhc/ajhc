@@ -5,7 +5,7 @@ import Monad
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Atom
+import StringTable.Atom
 import GenUtil
 import Grin.Grin
 import Support.CanType

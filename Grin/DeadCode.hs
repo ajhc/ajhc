@@ -6,7 +6,7 @@ import Monad
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 
-import Atom
+import StringTable.Atom
 import Fixer.Fixer
 import Fixer.Supply
 import Grin.Grin

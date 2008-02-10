@@ -11,7 +11,7 @@ BUILT_SOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.h
 	       FlagOpts.hs Name/Prim.hs Info/Properties.hs $(DRIFTFILES)
 
 
-HSFILES= Atom.hs C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpEval.hs C/Op.hs \
+HSFILES= C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpEval.hs C/Op.hs \
          C/Prims.hs DataConstructors.hs DataConstructors.hs DerivingDrift/DataP.hs DerivingDrift/Drift.hs \
 	 DerivingDrift/RuleUtils.hs DerivingDrift/StandardRules.hs Doc/Attr.hs Doc/Chars.hs Doc/DocLike.hs \
 	 Doc/PPrint.hs Doc/Pretty.hs E/Annotate.hs E/Binary.hs E/CPR.hs E/Demand.hs E/Diff.hs E/E.hs \

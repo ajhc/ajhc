@@ -24,7 +24,7 @@ import qualified Data.Traversable as T
 import List
 import Maybe
 
-import Atom(toAtom)
+import StringTable.Atom(toAtom)
 import Data.Binary
 import Doc.DocLike
 import Doc.PPrint

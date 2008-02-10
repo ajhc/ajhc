@@ -12,7 +12,7 @@ import Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Atom
+import StringTable.Atom
 import C.Prims
 import GenUtil hiding(putErrLn,replicateM_)
 import Grin.Grin
@@ -187,7 +187,7 @@ doEval n typ = error $ show ("doEval", n,typ)
 
 
 fromBap :: Monad m => Atom -> m Int
-fromBap t | 'B':'a':'p':'_':(n:ns) <- toString t, isDigit n = return $ read (n:takeWhile isDigit ns)
+fromBap t | 'B':'a':'p':'_':(n:ns) <- fromAtom t, isDigit n = return $ read (n:takeWhile isDigit ns)
 fromBap t = fail "not Bap"
 
 -- This only binds variables to variables

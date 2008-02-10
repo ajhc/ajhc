@@ -8,7 +8,7 @@ module Grin.Val(
     region_block
     ) where
 
-import Atom
+import StringTable.Atom
 import Char
 import Grin.Grin
 import Name.VConsts

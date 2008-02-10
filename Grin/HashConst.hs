@@ -3,7 +3,7 @@ module Grin.HashConst where
 import Control.Monad.State
 import qualified Data.Map as Map
 
-import Atom
+import StringTable.Atom
 import Grin.Grin
 import Util.Graph
 

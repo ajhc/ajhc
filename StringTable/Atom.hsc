@@ -18,6 +18,10 @@ module StringTable.Atom(
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe as BS
+import Control.Monad
+import Data.Binary
+import Data.Binary.Get
+import Data.Binary.Put
 import System.IO.Unsafe
 import Foreign
 import Foreign.Marshal
@@ -26,6 +30,7 @@ import Data.Char
 import Foreign.C
 import Data.Monoid
 import Data.Dynamic
+import PackedString(PackedString(..))
 import Data.Bits
 
 
@@ -59,6 +64,14 @@ instance HasHash BS.ByteString where
 
 instance HasHash String where
     hash32 s = unsafePerformIO $ withCStringLen s $ \ (x,y) -> hash2 0 x (fromIntegral y)
+
+instance FromAtom (String -> String) where
+    fromAtom x = shows (fromAtom x :: String)
+
+instance ToAtom PackedString where
+    toAtomIO (PS x) = toAtomIO x
+instance FromAtom PackedString where
+    fromAtomIO atom = PS `liftM` fromAtomIO atom
 
 
 
@@ -173,3 +186,13 @@ fromUTF xs = fromUTF' (map fromIntegral xs) where
     threeBytes _ = error "fromUTF: illegal three byte sequence"
 
     err = error "fromUTF: illegal UTF-8 character"
+
+instance Binary Atom where
+    get = do
+        x <- getWord8
+        bs <- getBytes (fromIntegral x)
+        return $ toAtom bs
+    put a = do
+        let bs = fromAtom a
+        putWord8 $ fromIntegral $ BS.length bs
+        putByteString bs

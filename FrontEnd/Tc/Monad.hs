@@ -62,7 +62,7 @@ import System
 import Text.PrettyPrint.HughesPJ(Doc)
 
 
-import Atom
+import StringTable.Atom
 import Diagnostic
 import Doc.DocLike
 import Doc.PPrint

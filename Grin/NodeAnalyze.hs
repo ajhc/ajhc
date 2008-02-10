@@ -15,7 +15,7 @@ import qualified Data.Set as Set
 
 import Support.FreeVars
 import Support.CanType
-import Atom
+import StringTable.Atom
 import IO
 import Grin.Grin hiding(V)
 import Grin.Simplify

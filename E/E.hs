@@ -129,6 +129,7 @@ ltTuple ts = ELit $ litCons { litName = nameTuple TypeConstructor (length ts), l
 ltTuple' ts = ELit $ litCons { litName = unboxedNameTuple TypeConstructor (length ts), litArgs = ts, litType = eHash }
 
 p_unsafeCoerce = primPrim "unsafeCoerce"
+p_dependingOn = primPrim "dependingOn"
 p_toTag = primPrim "toTag"
 p_fromTag = primPrim "fromTag"
 

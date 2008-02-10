@@ -60,7 +60,7 @@ import Prelude
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Atom
+import StringTable.Atom
 import C.FFI
 import C.Prims
 import Doc.DocLike

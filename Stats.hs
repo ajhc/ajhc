@@ -44,7 +44,7 @@ import System.IO.Unsafe
 import qualified Data.Map as Map
 import qualified Prelude(null)
 
-import Atom
+import StringTable.Atom
 import CharIO
 import GenUtil
 import qualified Doc.Chars as C
@@ -103,7 +103,7 @@ newtype Stat = Stat IB.IntBag
     deriving(Eq,Ord,Monoid)
 
 prependStat :: String -> Stat -> Stat
-prependStat name (Stat m) = Stat $ IB.fromList [ (unsafeAtomToInt (toAtom $ "{" ++ name ++ "}." ++ fromAtom (unsafeIntToAtom x)),y) | (x,y) <- IB.toList m ]
+prependStat name (Stat m) = Stat $ IB.fromList [ (fromAtom (toAtom $ "{" ++ name ++ "}." ++ fromAtom (unsafeIntToAtom x)),y) | (x,y) <- IB.toList m ]
 
 printStat greets (Stat s) = do
     let fs = createForest 0 $ sort [(splitUp (-1) $ fromAtom (unsafeIntToAtom x),y) | (x,y) <- IB.toList s]
@@ -181,14 +181,14 @@ instance (Monad m, Monad (t m), MonadTrans t, MonadStats m) => MonadStats (t m) 
     mtickStat s = lift $ mtickStat s
 
 instance Monad m => MonadStats (StatT m) where
-    mticks' n k = StatT $ tell (Stat $ IB.msingleton (unsafeAtomToInt k) n)
+    mticks' n k = StatT $ tell (Stat $ IB.msingleton (fromAtom k) n)
     mtickStat s =  StatT $ tell s
 
-singleton n = Stat $ IB.singleton (unsafeAtomToInt $ toAtom n)
+singleton n = Stat $ IB.singleton (fromAtom $ toAtom n)
 
 singleStat :: ToAtom a => Int -> a -> Stat
 singleStat 0 _ = mempty
-singleStat n k = Stat $ IB.msingleton (unsafeAtomToInt $ toAtom k) n
+singleStat n k = Stat $ IB.msingleton (fromAtom $ toAtom k) n
 
 null (Stat r) = IB.null r
 

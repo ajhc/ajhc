@@ -16,7 +16,7 @@ import Monad
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Atom
+import StringTable.Atom
 import C.Prims
 import Data.Graph.Inductive.Graph(mkGraph,nmap)
 import Data.Graph.Inductive.Tree

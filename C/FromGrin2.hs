@@ -14,7 +14,7 @@ import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
 
 
-import Atom
+import StringTable.Atom
 import C.Arch
 import C.FFI
 import C.Generate
@@ -458,7 +458,7 @@ convertExp (App a vs _) = do
         Just (nm,as) -> do
             let ss = [ a =* v | a <- as | v <- vs' ]
             return (mconcat ss & goto nm, emptyExpression)
-        Nothing -> return $ (mempty, functionCall (toName (toString a)) vs')
+        Nothing -> return $ (mempty, functionCall (toName (fromAtom a)) vs')
 convertExp (Update v@(Var vv _) tn@(NodeC t as)) | getType v == TyPtr TyNode = do
     v' <- convertVal v
     as' <- mapM convertVal as
@@ -736,9 +736,9 @@ varName (V n) | n < 0 = name $ 'g':show (- n)
 varName (V n) = name $ 'v':show n
 
 nodeTagName :: Atom -> Name
-nodeTagName a = toName (toString a)
+nodeTagName a = toName (fromAtom a)
 nodeFuncName :: Atom -> Name
-nodeFuncName a = toName (toString a)
+nodeFuncName a = toName (fromAtom a)
 
 sptr_t    = basicType "sptr_t"
 fptr_t    = basicType "fptr_t"
@@ -764,7 +764,7 @@ getWhat e = project' (name "what") e
 nodeTypePtr a = liftM ptrType (nodeType a)
 nodeType a = return $ structType (nodeStructName a)
 nodeStructName :: Atom -> Name
-nodeStructName a = toName ('s':toString a)
+nodeStructName a = toName ('s':fromAtom a)
 
 ------------
 -- C helpers

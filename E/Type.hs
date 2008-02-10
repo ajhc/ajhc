@@ -7,7 +7,7 @@ import Data.Foldable hiding(concat)
 import Control.Applicative
 
 
-import Atom
+import StringTable.Atom
 import C.Prims
 import Data.Typeable
 import Doc.DocLike hiding((<$>))

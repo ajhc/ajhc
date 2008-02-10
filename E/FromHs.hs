@@ -20,6 +20,7 @@ import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import C.FFI
 import C.Prims as CP
+import StringTable.Atom
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
@@ -430,7 +431,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         let name      = toName Name.Val n
         (var,ty,lamt) <- convertValue name
         let (ts,rt)   = argTypes' ty
-            prim      = APrim (PrimPrim $ packString cn) req
+            prim      = APrim (PrimPrim $ toAtom cn) req
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
         let result    = foldr ($) (processPrimPrim dataTable $ EPrim prim (map EVar es) rt) (map ELam es)
         return [(name,setProperty prop_INLINE var,lamt result)]

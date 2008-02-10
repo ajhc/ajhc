@@ -5,7 +5,7 @@ import Control.Monad.State
 import List
 import qualified Data.Set as Set
 
-import Atom
+import StringTable.Atom
 import C.Prims
 import Grin.Grin
 import Grin.Noodle
