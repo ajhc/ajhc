@@ -37,6 +37,7 @@ main = do
     quickCheck prop_atomIndex
     quickCheck prop_atomneq
     quickCheck prop_atomneq'
+    quickCheck prop_aappend
 
     testProperties
 
@@ -59,6 +60,8 @@ prop_atomneq' xs ys = (xs `compare` ys) == (toPackedString a1 `compare` toPacked
     a1 = toAtom xs
     a2 = toAtom (ys :: String)
 
+prop_aappend (xs,ys) = (toAtom xs `mappend` toAtom ys) == toAtom ((xs::String) ++ ys)
+prop_aappend' (xs,ys) = fromAtom (toAtom xs `mappend` toAtom ys) == ((xs::String) ++ ys)
 
 --strings = [ "foo", "foobar", "baz", "", "bob"]
 strings =  ["h","n\206^um\198(","\186","yOw\246$\187x#",";\221x<n","\201\209\236\213J\244\233","\189eW\176v\175\209"]
@@ -147,12 +150,13 @@ testInfo = do
 
 
 testBinary = do
-    let test = ("hello",3::Int)
+    let test = ("hello",3::Int,toAtom "Up and Atom!")
         fn = "/tmp/jhc.test.bin"
     putStrLn "Testing Binary"
     encodeFile fn test
     x <- decodeFile fn
     if (x /= test) then fail "Test Failed" else return ()
+    print x
     let fn = "/tmp/jhc.info.bin"
         t = (singleton prop_INLINE) `mappend` fromList [prop_WORKER,prop_SPECIALIZATION]
         t :: Properties

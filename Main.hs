@@ -5,15 +5,15 @@ import Control.Exception
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Control.Monad.State
-import Data.Monoid
 import IO(hFlush,stderr,stdout)
-import List hiding(group,union,delete)
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified List(group)
 import qualified System
 
+import Util.Util
+import StringTable.Atom
 import C.Arch
 import CharIO
 import DataConstructors
@@ -93,7 +93,9 @@ bracketHtml action = do
     wdump FD.Html $ putStrLn $ "<html><head><title>" ++ argstring ++ "</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body style=\"background: black; color: lightgrey\"><pre>"
     action `finally` (wdump FD.Html $ putStrLn "</pre></body></html>")
 
-main = runMain $ bracketHtml $ do
+catom action = Control.Exception.catch action (\e -> dumpTable >> dumpStringTableStats >> throw e)
+
+main = runMain $ catom $ bracketHtml $ do
     o <- processOptions
     progressM $ do
         (argstring,_) <- getArgString
@@ -397,7 +399,7 @@ processDecls cho ho' tiData = do
         mprog <- Demand.analyzeProgram mprog
         mprog <- return $ E.CPR.cprAnalyzeProgram mprog
 
-        put $ fromList [ (tvrIdent v,(v,lc)) | (v,lc) <- programDs mprog] `union` smap
+        put $ fromList [ (tvrIdent v,(v,lc)) | (v,lc) <- programDs mprog] `S.union` smap
 
         liftIO $ wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
         return mprog
@@ -560,7 +562,7 @@ compileModEnv' cho = do
     -- run optimization again with no rules enabled
 
     -- delete rules
-    prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ modifyProperties (flip (foldr delete) [prop_HASRULE,prop_WORKER]) nfo) letann (\_ -> return) prog
+    prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ modifyProperties (flip (foldr S.delete) [prop_HASRULE,prop_WORKER]) nfo) letann (\_ -> return) prog
     --prog <- transformProgram "float inward" DontIterate True programFloatInward prog
 
     prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify no rules" True prog
@@ -896,7 +898,7 @@ lintCheckProgram onerr prog | flint = do
         printProgram prog
         putErrLn $ ">>> program has repeated toplevel definitions" ++ pprint repeats
         maybeDie
-    let f (tvr@TVr { tvrIdent = n },e) | even n = do
+    let f (tvr@TVr { tvrIdent = n },e) | isNothing $ intToAtom n = do
             onerr
             putErrLn $ ">>> non-unique name at top level: " ++ pprint tvr
             printProgram prog

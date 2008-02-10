@@ -2,6 +2,7 @@ module E.LambdaLift(lambdaLift,staticArgumentTransform)  where
 
 import Control.Monad.Reader
 import Control.Monad.Writer
+import Data.Maybe
 import Data.IORef
 import Text.Printf
 import List hiding(insert)
@@ -275,7 +276,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                 t <- globalName t
                 tellCombinator (t,ls,e'')
             r
-        globalName tvr | even (tvrIdent tvr) = do
+        globalName tvr | isNothing $ intToAtom (tvrIdent tvr) = do
             TVr { tvrIdent = t } <- newName Unknown
             let ntvr = tvr { tvrIdent = t }
             tell ([],msingleton (tvrIdent tvr) (Just $ EVar ntvr))

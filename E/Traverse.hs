@@ -14,8 +14,10 @@ module E.Traverse(
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.Monoid
+import Data.Maybe
 import qualified Data.Traversable as T
 
+import StringTable.Atom
 import E.E
 import E.FreeVars(caseUpdate)
 import E.Type
@@ -151,7 +153,7 @@ renameE initSet initMap e = runReader (runIdNameT' $ addBoundNamesIdMap initMap 
         t' <- fg t
         return (mempty,tv { tvrType = t'})
     ntvr ralways fg tv@(TVr { tvrIdent = n, tvrType = t}) = do
-        n' <- if n > 0 && (not ralways || odd n) then uniqueName  n else newName
+        n' <- if n > 0 && (not ralways || isJust (intToAtom n)) then uniqueName  n else newName
         t' <- fg t
         let tv' = tv { tvrIdent = n', tvrType = t' }
         return (msingleton n (EVar tv'),tv')

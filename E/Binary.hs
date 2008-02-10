@@ -21,7 +21,6 @@ instance Binary TVr where
         put e
         putInfo nf
     put (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) = do
-        unless (even i) $ fail "number not even"
         put (TvrBinaryInt i)
         put e
         putInfo nf

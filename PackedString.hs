@@ -74,15 +74,8 @@ instance Monoid PackedString where
 -- | A space-efficient representation of a 'String', which supports various
 -- efficient operations.  A 'PackedString' contains full Unicode 'Char's.
 newtype PackedString = PS BS.ByteString
-    deriving(Typeable,Binary)
+    deriving(Typeable,Binary,Eq,Ord)
 
-
-instance Eq PackedString where
-    (==) (PS x) (PS y) =  x == y
-    (/=) (PS x) (PS y) =  x /= y
-
-instance Ord PackedString where
-    compare (PS x) (PS y) = compare x y
 
 instance Show PackedString where
     showsPrec p ps r = showsPrec p (unpackPS ps) r
