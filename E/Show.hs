@@ -4,7 +4,6 @@ import Char
 import Control.Monad.Identity
 import Maybe
 
-import C.Prims
 import Doc.Attr
 import Doc.DocLike
 import Doc.PPrint

@@ -19,9 +19,8 @@ module FrontEnd.KindInfer (
 import Control.Monad.Reader
 import Data.List
 import qualified Data.Traversable as T
-import Util.Inst
+import Util.Inst()
 import Data.Maybe
-import Control.Monad
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Generics
@@ -31,10 +30,8 @@ import qualified Data.Map as Map
 import System.IO.Unsafe
 
 import Data.Binary
-import DependAnalysis
 import Doc.DocLike
 import Doc.PPrint
-import Name.Names
 import FrontEnd.Tc.Type
 import FrontEnd.Tc.Kind
 import FrontEnd.Utils
@@ -391,7 +388,7 @@ kiDecl (HsTypeSig _ _ (HsQualType ps t)) = do
     mapM_ kiPred ps
     kiType kindStar t
 kiDecl (HsClassDecl _sloc qualType sigsAndDefaults) = ans where
-    HsQualType contxt (HsTyApp (HsTyCon className) (HsTyVar classArg)) =  qualType
+    HsQualType contxt (HsTyApp (HsTyCon _className) (HsTyVar classArg)) =  qualType
     ans = do
         carg <- lookupKind KindSimple (toName TypeVal classArg)
         mapM_ kiPred contxt

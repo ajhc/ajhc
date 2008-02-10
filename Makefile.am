@@ -126,7 +126,8 @@ RawFiles.hs:  utils/op_raw.prl $(RAWFILES)
 	perl $< $(basename $@)  $(RAWFILES) > $@
 
 FrontEnd/HsParser.hs: FrontEnd/HsParser.y
-	happy -a -g -c $<
+	happy -a -g -c $< -o $@
+	sed -i $@ -e 's/^{-# OPTIONS/{-# OPTIONS_GHC -w/'
 
 
 .SECONDARY: _darcs/inventory data/shortchange.txt

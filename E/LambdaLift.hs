@@ -7,7 +7,6 @@ import Text.Printf
 import List hiding(insert)
 
 import Atom
-import DataConstructors
 import Doc.PPrint
 import E.Annotate
 import E.E

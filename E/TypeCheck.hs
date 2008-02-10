@@ -11,7 +11,6 @@ module E.TypeCheck(
     typeInfer'
     ) where
 
-import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Monad(when,liftM)
@@ -24,7 +23,6 @@ import E.E
 import E.Eval(strong)
 import E.Show
 import E.Subst
-import E.Traverse
 import GenUtil
 import Name.Id
 import Name.Name
