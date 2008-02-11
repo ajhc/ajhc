@@ -123,7 +123,7 @@ main(int argc, char *argv[])
         assert(sizeof(HsPtr) == sizeof(HsFunPtr));
         assert(sizeof(HsPtr) == sizeof(intptr_t));
         assert(sizeof(HsPtr) == sizeof(uintptr_t));
-        assert(CHAR_BITS == 8);
+        assert(CHAR_BIT == 8);
         assert(EOF == -1);
 
         jhc_arch_assert();
