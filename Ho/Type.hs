@@ -47,6 +47,13 @@ choDataTable cho = hoDataTable $ hoBuild (choHo cho)
 collectedHo :: CollectedHo
 collectedHo = CollectedHo { choFiles = mempty, choModules = mempty, choExternalNames = mempty, choHo = mempty, choVarMap = mempty }
 
+
+-- this is the immutable information about modules that depnends only on their contents
+-- it can be trusted even if the ho file itself is out of date.
+data HoIDeps = HoIDeps {
+    hoIDeps :: Map.Map MD5.Hash (Module,[Module])
+    }
+
 data HoHeader = HoHeader {
     -- * my sha1 id
     hohHash       :: MD5.Hash,

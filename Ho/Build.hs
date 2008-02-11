@@ -62,6 +62,7 @@ import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Util.Graph as G
 import qualified Support.MD5 as MD5
+import qualified UTF8
 
 
 --
@@ -73,6 +74,7 @@ import qualified Support.MD5 as MD5
 --
 -- JHDR - header info, contains a list of modules contained and dependencies that need to be checked to read the file
 -- LIBR - only present if this is a library, contains library metainfo
+-- IDEF - immutable import information
 -- DEFS - definitions and exports for modules, all that is needed for name resolution
 -- TCIN - type checking information
 -- CORE - compiled core and associated data
@@ -84,6 +86,7 @@ cff_magic = chunkType "JHC"
 cff_jhdr  = chunkType "JHDR"
 cff_core  = chunkType "CORE"
 cff_defs  = chunkType "DEFS"
+cff_idef  = chunkType "IDEF"
 
 
 shortenPath :: String -> IO String
@@ -104,12 +107,11 @@ instance DocLike d => PPrint d MD5.Hash where
 
 type FileName = String
 
-findFirstFile :: String -> [(String,a)] -> IO (Handle,MD5.Hash,FileName,a)
-findFirstFile err [] = FrontEnd.Warning.err "missing-dep" ("Module not found: " ++ err) >> return (undefined,MD5.emptyHash,undefined,undefined)
+findFirstFile :: String -> [(String,a)] -> IO (LBS.ByteString,FileName,a)
+findFirstFile err [] = FrontEnd.Warning.err "missing-dep" ("Module not found: " ++ err) >> fail ("Module not found: " ++ err) -- return (error "findFirstFile not found","",undefined)
 findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
-    fh <- openBinaryFile x ReadMode
-    hash <- MD5.md5Handle fh
-    return (fh,hash,x,a)
+    bs <- LBS.readFile x
+    return (bs,x,a)
 
 
 type DoneMap = IORef (Map.Map Module ModuleDone)
@@ -155,41 +157,35 @@ checkHoFile r_dm m = do
         Just (ModuleHo hoh ho) -> return (hoh,ho)
         Just _ -> fail "checkHoFile"
         Nothing -> do
-            (_,hash,_,ho_name) <- moduleFind r_dm (Left m)
-            if hash == MD5.emptyHash
-                then fail $ "could not find ho file: " ++ show m
-                else loadHoFile r_dm ho_name
+            (_,_,ho_name) <- moduleFind r_dm (Left m)
+            loadHoFile r_dm ho_name
 
 -- perhaps load a single ho file
 loadHoFile :: DoneMap -> FileName -> IO (HoHeader,Ho)
-loadHoFile r_dm ho_name = ans where
-    ans = do
-        ho_name' <- shortenPath ho_name
-        Just (hoh,ho) <- checkForHoFile ho_name
-        let cd (m,h) | h /= MD5.emptyHash = do
-                (_,h',fn,_) <- moduleFind r_dm (Left m)
-                unless (h == h') $
-                    if h' == MD5.emptyHash then do
-                        putVerboseLn $ ho_name' <+> "not found at" <+> show m
-                        fail "odd module thing"
-                    else do
-                        fn <- shortenPath fn
-                        putVerboseLn $ ho_name' <+> "is out of date due to changed file:" <+> fn
-                        fail "Module out of date"
-            cd _ = return ()
-            cd' (m,h) = do
-                (h',_) <- checkHoFile r_dm m
-                unless (h == hohHash h') $ do
-                    putVerboseLn $ ho_name' <+> "is out of date due to modified ho file:" <+> (show m)
-                    True <- return False
-                    return ()
-        flip catch (\e -> poison r_dm (map fst $ hohDepends hoh) >> ioError e) $ do
-        mapM_ cd (hohDepends hoh)
-        mapM_ cd' (hohModDepends hoh)
-        putVerboseLn $ "Found ho file:   " <+> ho_name'
-        forM_ (fsts $ hohDepends hoh) $ \m -> do
-            modifyIORef r_dm (Map.insert m (ModuleHo hoh ho))
-        return (hoh,ho)
+loadHoFile r_dm ho_name = do
+    ho_name' <- shortenPath ho_name
+    Just (hoh,ho) <- checkForHoFile ho_name
+    let cd (m,h) | h /= MD5.emptyHash = do
+            (lbs,fn,_) <- moduleFind r_dm (Left m)
+            let h' = MD5.md5lazy lbs
+            unless (h == h') $ do
+                fn <- shortenPath fn
+                putVerboseLn $ ho_name' <+> "is out of date due to changed file:" <+> fn
+                fail "Module out of date"
+        cd _ = return ()
+        cd' (m,h) = do
+            (h',_) <- checkHoFile r_dm m
+            unless (h == hohHash h') $ do
+                putVerboseLn $ ho_name' <+> "is out of date due to modified ho file:" <+> (show m)
+                True <- return False
+                return ()
+    flip catch (\e -> poison r_dm (map fst $ hohDepends hoh) >> ioError e) $ do
+    mapM_ cd (hohDepends hoh)
+    mapM_ cd' (hohModDepends hoh)
+    putVerboseLn $ "Found ho file:   " <+> ho_name'
+    forM_ (fsts $ hohDepends hoh) $ \m -> do
+        modifyIORef r_dm (Map.insert m (ModuleHo hoh ho))
+    return (hoh,ho)
 
 poison :: DoneMap -> [Module] -> IO ()
 poison r_dm xs = mapM_ f xs where
@@ -199,7 +195,7 @@ poison r_dm xs = mapM_ f xs where
             Nothing -> modifyIORef r_dm (minsert m ModuleNoHo)
             _ -> return ()
 
-moduleFind :: DoneMap -> Either Module String -> IO (Handle,MD5.Hash,FileName,FileName)
+moduleFind :: DoneMap -> Either Module String -> IO (LBS.ByteString,FileName,FileName)
 moduleFind r_dm (Right n) = findFirstFile n [(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))]
 moduleFind r_dm (Left m) = do
     dm <- readIORef r_dm
@@ -216,27 +212,29 @@ checkTheHoFile r_dm ho_name = do
 
 lookupModule :: DoneMap -> Bool -> Either Module String -> IO MRet
 lookupModule r_dm useHo ms = do
-        dm <- readIORef r_dm
-        let (name,spath) = case ms of
-                Left m -> (fromModule m, searchPaths (fromModule m))
-                Right n -> (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
-            nogood = case ms of
-                Left m -> modifyIORef r_dm (Map.insert m ModuleNotThere) >> return []
-                Right n -> return []
-        (fh,hash,fname,ho_name) <- findFirstFile name spath
-        if hash == MD5.emptyHash then nogood else do
-        mho <- if useHo && not (optIgnoreHo options) then checkTheHoFile r_dm ho_name else return Nothing
-        case mho of
-            Just (hoh,_) -> return $ fsts (hohDepends hoh)
-            Nothing -> do
-                hs <- parseHsSource fname fh
-                wdump FD.Progress $ do
-                    sp <- shortenPath fname
-                    putErrLn $ "Found dependency:" <+> name <+> "at" <+> sp
-                --if hsModuleName hs `mmember` dm then do putStrLn $ "Found a module name we already have: " ++ show (hsModuleName hs); nogood else do
-                modifyIORef r_dm (Map.insert (hsModuleName hs) ModuleParsed { modParsed = hs, modHoName = ho_name, modName = fname, modHash = hash })
-                mapM_ (fetchModule r_dm) $  map Left (hsModuleRequires hs)
-                return $ [hsModuleName hs]
+    dm <- readIORef r_dm
+    let (name,spath) = case ms of
+            Left m -> (fromModule m, searchPaths (fromModule m))
+            Right n -> (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
+    fff <- catch (Just `fmap` findFirstFile name spath) (\_ -> return Nothing)
+    case fff of
+        Nothing ->  case ms of
+            Left m -> modifyIORef r_dm (Map.insert m ModuleNotThere) >> return []
+            Right n -> return []
+        Just (lbs,fname,ho_name) -> do
+            mho <- if useHo && not (optIgnoreHo options) then checkTheHoFile r_dm ho_name else return Nothing
+            case mho of
+                Just (hoh,_) -> return $ fsts (hohDepends hoh)
+                Nothing -> do
+                    hs <- parseHsSource fname lbs
+                    wdump FD.Progress $ do
+                        sp <- shortenPath fname
+                        putErrLn $ "Found dependency:" <+> name <+> "at" <+> sp
+                    --if hsModuleName hs `mmember` dm then do putStrLn $ "Found a module name we already have: " ++ show (hsModuleName hs); nogood else do
+                    let hash = MD5.md5lazy lbs
+                    modifyIORef r_dm (Map.insert (hsModuleName hs) ModuleParsed { modParsed = hs, modHoName = ho_name, modName = fname, modHash = hash })
+                    mapM_ (fetchModule r_dm) $  map Left (hsModuleRequires hs)
+                    return $ [hsModuleName hs]
 
 
 
@@ -383,20 +381,18 @@ searchPaths m = ans where
     ans = [ (root ++ suf,root ++ ".ho") | i <- optIncdirs options, n <- f m, suf <- [".hs",".lhs"], let root = i ++ "/" ++ n]
 
 
-parseHsSource :: String -> Handle -> IO HsModule
-parseHsSource fn fh = do
-    pos <- hGetPosn fh
-    ls <- replicateM 15 (ioM $ hGetLine fh)
+parseHsSource :: String -> LBS.ByteString -> IO HsModule
+parseHsSource fn lbs = do
+    let txt = UTF8.fromUTF $ LBS.unpack lbs
     let f s = opt where
             Just opt = fileOptions opts `mplus` Just options where
             s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
             opts = concat [ words as | (x,as) <- parseOptions s', x `elem` ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"]]
-    let fopts s = s `member` optFOptsSet opt where opt = f (concatMap concat ls)
-    hSetPosn pos
+    let fopts s = s `member` optFOptsSet opt where opt = f (take 1024 txt)
     s <- case () of
-        _ | fopts FO.Cpp -> hClose fh >> readSystem "cpp" ["-D__JHC__","-CC","-traditional", "--", fn]
-          | fopts FO.M4 ->  hClose fh >> readSystem "m4" ["-D__JHC__", "-s", fn]
-          | otherwise -> CharIO.hGetContents fh
+        _ | fopts FO.Cpp -> readSystem "cpp" ["-D__JHC__","-CC","-traditional", "--", fn]
+          | fopts FO.M4 ->  readSystem "m4" ["-D__JHC__", "-s", fn]
+          | otherwise -> return txt
     let s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s'' else s''
         s'' = case s of
             '#':' ':_   -> '\n':s                --  line pragma
