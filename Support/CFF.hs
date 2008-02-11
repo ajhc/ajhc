@@ -5,6 +5,7 @@
 
 module Support.CFF(
     ChunkType(),
+    FileType(),
     FileOffset(),
     ChunkLength(),
     chunkType,
@@ -15,8 +16,7 @@ module Support.CFF(
     readCFF,
     bsCFF,
     lbsCFF,
-    lazyReadCFF,
-    lazyGetCFF,
+    mkCFFfile,
     readChunk,
     lazyWriteCFF,
     writeCFF
@@ -51,6 +51,7 @@ type ChunkLength = Word
 -- Routines dealing with ChunkTypes
 -----------------------------------
 
+type FileType = ChunkType
 newtype ChunkType = ChunkType Word32
     deriving(Eq,Ord)
 
@@ -81,11 +82,12 @@ isSafeToCopy :: ChunkType -> Bool
 isSafeToCopy (ChunkType w) =  w .&. 0x00000020 == 0
 
 
-lbsCFF :: Monad m => LBS.ByteString -> m (ChunkType,[(ChunkType,LBS.ByteString)])
+lbsCFF :: Monad m => LBS.ByteString -> m (FileType,[(ChunkType,LBS.ByteString)])
 lbsCFF bs = ans bs where
-    ans bs = do
+    ans bs' = do
         let checkByte n b = do
                 unless ((bs `LBS.index` n) == b) $ fail "bsCFF: invalid chunked file"
+            bs = LBS.take 8 bs'
         when (LBS.length bs < 8) $ fail "bsCFF: chunked file is too short"
         checkByte 0 0x89
         checkByte 4 0x0d
@@ -114,7 +116,7 @@ lbsCFF bs = ans bs where
             (bdata,brest)  = LBS.splitAt (fromIntegral len) (LBS.drop 8 bs)
 
 
-bsCFF :: Monad m => BS.ByteString -> m (ChunkType,[(ChunkType,BS.ByteString)])
+bsCFF :: Monad m => BS.ByteString -> m (FileType,[(ChunkType,BS.ByteString)])
 bsCFF bs = ans bs where
     ans bs = do
         let checkByte n b = do
@@ -146,6 +148,9 @@ bsCFF bs = ans bs where
             ct = ChunkType $ bsWord32 (BS.drop 4 bs)
             (bdata,brest)  = BS.splitAt (fromIntegral len) (BS.drop 8 bs)
 
+mkCFFHeader :: FileType -> BS.ByteString
+mkCFFHeader (ChunkType ft) = BS.pack [0x89,b1,b2,b3,0x0d,0x0a,0x1a,0x0a] where
+    (b1,b2,b3,_) = word32ToBytes ft
 
 readCFFHeader :: Handle -> IO ChunkType
 readCFFHeader h = do
@@ -162,17 +167,8 @@ readCFFHeader h = do
     checkByte 0x0a
     return $ bytesToChunkType b1 b2 b3 (fromIntegral $ ord ' ')
 
-writeCFFHeader :: Handle -> ChunkType -> IO ()
-writeCFFHeader h (ChunkType ft) = do
-    writeByte h 0x89
-    let (b1,b2,b3,_) = word32ToBytes ft
-    writeByte h b1
-    writeByte h b2
-    writeByte h b3
-    writeByte h 0x0d
-    writeByte h 0x0a
-    writeByte h 0x1a
-    writeByte h 0x0a
+writeCFFHeader :: Handle -> FileType -> IO ()
+writeCFFHeader h ft = BS.hPut h (mkCFFHeader ft)
 
 
 readCFFInfo :: Handle -> IO (ChunkType,[(ChunkType,FileOffset,ChunkLength)])
@@ -223,6 +219,14 @@ readChunk h eft ect = do
     readChunk
 
 
+mkCFFfile :: FileType -> [(ChunkType,LBS.ByteString)] -> LBS.ByteString
+mkCFFfile ft cs = LBS.fromChunks [mkCFFHeader ft] `LBS.append` LBS.concat (concatMap f cs) where
+    f (ChunkType ct,bs) = [hl,bs,zero]  where
+        (b1,b2,b3,b4) = word32ToBytes ct
+        (l1,l2,l3,l4) = word32ToBytes (fromIntegral $ LBS.length bs)
+        hl = LBS.pack [l1,l2,l3,l4,b1,b2,b3,b4]
+zero = LBS.pack [0,0,0,0]
+
 writeCFF :: Handle -> ChunkType -> [(ChunkType,BS.ByteString)] -> IO ()
 writeCFF h ft xs = do
     writeCFFHeader h ft
@@ -243,40 +247,6 @@ lazyWriteCFF h ft xs = do
             writeWord32 h 0 -- TODO proper checksum
     mapM_ writeChunk xs
 
-
-lazyReadCFF :: Handle -> IO (ChunkType,Map.Map ChunkType [BS.ByteString])
-lazyReadCFF h = do
-    mv <- newEmptyMVar
-    let getMap = do
-            xs <- readChunk
-            let xs' = sortBy (\ (x,y) (a,b) -> compare x a) xs
-                xs'' = groupBy  (\ (x,y) (a,b) -> x == a) xs'
-                xs''' = [ (ct,map snd xs) | xs@((ct,_):_) <- xs'' ]
-            return (Map.fromList xs''')
-        readChunk = do
-            b <- hIsEOF h
-            if b then return [] else do
-            len <- fromIntegral `fmap` readWord32 h
-            ct <- readChunkType h
-            off <- hTell h
-            hSeek h RelativeSeek (fromIntegral len)
-            hSeek h RelativeSeek 4
-            bs <- unsafeInterleaveIO $ do
-                takeMVar mv
-                hSeek h AbsoluteSeek off
-                res <- BS.hGet h len
-                putMVar mv ()
-                return res
-            xs <- readChunk
-            return ((ct,bs):xs)
-
-    cffType <- readCFFHeader h
-    map <-  getMap
-    putMVar mv ()
-    return (cffType,map)
-
-
-lazyGetCFF fn = do openBinaryFile fn ReadMode >>= lazyReadCFF
 
 
 -------------------------------------------------
@@ -321,18 +291,3 @@ writeWord32 h w = do
     writeByte h b3
     writeByte h b4
 
-
---main = do
---    --xs <- getArgs
---    --mapM_ print ([ (x,isCritical x) | x <- map readChunk xs])
---    --mapM_ print (sort $ map readChunk xs)
---    xs <- getArgs
---    flip mapM xs $ \fn -> do
---        h <- openBinaryFile fn ReadMode
---        cf <- readCFF h
---        hClose h
---        print cf
---        nh <- openBinaryFile "out.cff" WriteMode
---        writeCFF nh cf
---        hClose nh
---    return ()
