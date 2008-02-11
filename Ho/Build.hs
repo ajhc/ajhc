@@ -56,10 +56,10 @@ import Util.FilterInput
 import Util.Gen hiding(putErrLn,putErr,putErrDie)
 import Util.SetLike
 import Version.Version(versionString)
+import qualified Data.ByteString as BS
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Util.Graph as G
-import qualified Util.SHA1 as SHA1
 import qualified Support.MD5 as MD5
 
 
@@ -94,8 +94,6 @@ shortenPath x@('/':_) = do
 shortenPath x = return x
 
 
-instance DocLike d => PPrint d SHA1.Hash where
-    pprintPrec _ h = tshow h
 
 instance DocLike d => PPrint d MD5.Hash where
     pprintPrec _ h = tshow h
@@ -307,17 +305,13 @@ checkForHoFile fn = flip catch (\e -> return Nothing) $ Just `fmap` readHoFile f
 
 readHoFile :: String -> IO (HoHeader,Ho)
 readHoFile fn = do
-    fh <- openBinaryFile fn ReadMode
-    (ct,mp) <- lazyReadCFF fh
+    bs <- BS.readFile fn
+    (ct,mp) <- bsCFF bs
     True <- return $ ct == cff_magic
-    [rhh] <- Map.lookup cff_jhdr mp
-    [rho] <- Map.lookup cff_core mp
+    Just rhh <- return $ lookup cff_jhdr mp
+    Just rho <- return $ lookup cff_core mp
     let hh = decode (decompress $ L.fromChunks [rhh])
     let ho = decode (decompress $ L.fromChunks [rho])
-
---    c <- L.hGetContents fh
---    let (m1,hh,ho) = decode (decompress c)
---    when (m1 /= magic) (putErrDie $ "Bad ho file magic1:" <+> fn)
     return (hh,ho)
 
 
