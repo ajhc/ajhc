@@ -41,7 +41,7 @@ doModules func ho ms  = do
     when (dump FD.Defs) $ flip mapM_ ms $ \m -> do
          putStrLn $ " ---- Definitions for" <+> show (modInfoName m) <+> "----";
          mapM_ print ( modInfoDefs m)
-    ms <- determineExports [ (x,y,z) | (x,(y,z)) <- Map.toList $ hoDefs $ choHo ho] (Map.toList $ hoExports $ choHo ho) ms
+    ms <- determineExports [ (x,y,z) | (x,(y,z)) <- Map.toList $ hoDefs $ hoExp $ choHo ho] (Map.toList $ hoExports $ hoExp $ choHo ho) ms
     (ho',tiData) <- Tc.tiModules' ho ms
     func ho ho' tiData
 

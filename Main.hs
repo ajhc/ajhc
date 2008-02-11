@@ -164,9 +164,9 @@ processInitialHo ::
     CollectedHo       -- ^ current accumulated ho
     -> Ho    -- ^ new ho, freshly read from file
     -> IO CollectedHo -- ^ final combined ho data.
-processInitialHo accumho ho = do
+processInitialHo accumho aho = do
     let ho' = reprocessHo (hoRules ho) mempty ho
-
+        ho = hoBuild aho
         -- XXX do we need to do this?
         ds = runIdentity $ annotateDs (choVarMap accumho') (\_ -> return) letann lamann (hoEs ho')
 
@@ -179,16 +179,16 @@ processInitialHo accumho ho = do
         newVarMap = fromList [ (tvrIdent t,Just (EVar t)) | (t,_) <- programDs prog ]
 
     --lintCheckProgram (putStrLn "processInitialHo") prog
-    return $ accumho' `mappend` mempty { choVarMap = newVarMap, choExternalNames = idMapToIdSet newVarMap, choHo = ho { hoEs = programDs prog } }
+    return $ accumho' `mappend` mempty { choVarMap = newVarMap, choExternalNames = idMapToIdSet newVarMap, choHo = aho { hoBuild = ho { hoEs = programDs prog } } }
 
 -- reprocess an old ho to include new rules and properties
-reprocessHo :: Rules -> IdMap Properties -> Ho -> Ho
+reprocessHo :: Rules -> IdMap Properties -> HoBuild -> HoBuild
 reprocessHo rules ps ho = ho { hoEs = map f (hoEs ho) } where
     f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
     g id = runIdentity . idann rules ps id
 
 reprocessCho :: Rules -> IdMap Properties -> CollectedHo -> CollectedHo
-reprocessCho rules ps cho = cho { choVarMap = fmap h (choVarMap cho) , choHo = (choHo cho) { hoEs = map f (hoEs $ choHo cho) }} where
+reprocessCho rules ps cho = choHo_u (hoBuild_u (hoEs_u (map f))) $ choVarMap_u (fmap h) cho where
     f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
     g id = runIdentity . idann rules ps id
     h ~(Just (EVar t)) = Just (EVar (tvrInfo_u (g (tvrIdent t)) t))
@@ -218,31 +218,31 @@ processDecls cho ho' tiData = do
         originalDecls =  concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ]
 
     -- build datatables
-    let dataTable = toDataTable (getConstructorKinds (hoKinds ho')) (tiAllAssumptions tiData) originalDecls (hoDataTable ho)
+    let dataTable = toDataTable (getConstructorKinds (hoKinds $ hoBuild ho')) (tiAllAssumptions tiData) originalDecls (hoDataTable $ hoBuild ho)
         classInstances = deriveClasses dataTable
-        fullDataTable = dataTable `mappend` hoDataTable ho
+        fullDataTable = dataTable `mappend` hoDataTable (hoBuild ho)
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
 
     wdump FD.Derived $
         mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) classInstances
     -- initial program
     let prog = program {
-            progClassHierarchy = hoClassHierarchy allHo,
+            progClassHierarchy = hoClassHierarchy $ hoBuild allHo,
             progDataTable = fullDataTable,
             progExternalNames = choExternalNames cho,
             progModule = head (fsts $ tiDataModules tiData)
             }
 
     -- Convert Haskell decls to E
-    let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps ho)
+    let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps (hoBuild ho))
         theProps = fromList [ (toId x,y) | (x,y) <- Map.toList $ tiProps tiData]
-    ds' <- convertDecls tiData theProps (hoClassHierarchy ho') allAssumps  fullDataTable decls
+    ds' <- convertDecls tiData theProps (hoClassHierarchy $ hoBuild ho') allAssumps  fullDataTable decls
     let ds = [ (v,e) | (v,e) <- classInstances ] ++  [ (v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
  --   sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 
     -- Build rules from instances, specializations, and user specified rules and catalysts
-    rules' <- createInstanceRules fullDataTable (hoClassHierarchy ho')  (ds `mappend` hoEs ho)
-    nrules <- convertRules (progModule prog) tiData (hoClassHierarchy ho') allAssumps fullDataTable decls
+    rules' <- createInstanceRules fullDataTable (hoClassHierarchy $ hoBuild ho')  (ds `mappend` hoEs (hoBuild ho))
+    nrules <- convertRules (progModule prog) tiData (hoClassHierarchy  $ hoBuild ho') allAssumps fullDataTable decls
     (nds,srules) <- procAllSpecs (tiCheckedRules tiData) ds
 
     ds <- return $ ds ++ nds
@@ -258,13 +258,13 @@ processDecls cho ho' tiData = do
     wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
     wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
 
-    let allRules = hoRules ho `mappend` rules
+    let allRules = hoRules (hoBuild ho) `mappend` rules
 
     -- some more useful values.
     --let  namesInscope = fromList $ [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (n,_) <- ds ]
 
     let prog' = programSetDs ds prog
-    let Identity prog = programMapDs (\ (t,e) -> return (shouldBeExported (getExports ho') t,e)) $ atomizeApps False prog'
+    let Identity prog = programMapDs (\ (t,e) -> return (shouldBeExported (getExports $ hoExp ho') t,e)) $ atomizeApps False prog'
     prog <- barendregtProg prog
     let allProps = munionWith mappend theProps (idSetToIdMap (const (singleton prop_HASRULE)) (ruleHeadFreeVars allRules))
 
@@ -294,7 +294,7 @@ processDecls cho ho' tiData = do
     -- floating inward
 
     let sopt = mempty {
-            SS.so_boundVars = fromList [ (tvrIdent v,(v,e)) | (v,e) <- hoEs ho],
+            SS.so_boundVars = fromList [ (tvrIdent v,(v,e)) | (v,e) <- hoEs $ hoBuild ho],
             SS.so_dataTable = fullDataTable
             }
     let tparms = transformParms {
@@ -422,13 +422,13 @@ processDecls cho ho' tiData = do
     lintCheckProgram (putErrLn "After the Opimization") prog
     wdump FD.Core $ printProgram prog
 
-    let newHo = ho' {
+    let newHoBuild = (hoBuild ho') {
         hoDataTable = dataTable,
         hoEs = programDs prog,
-        hoRules = hoRules ho' `mappend` rules
+        hoRules = hoRules (hoBuild ho') `mappend` rules
         }
-        newMap = fromList [ (tvrIdent n,Just (EVar n)) | (n,_) <- hoEs newHo ]
-    return (mempty { choHo = newHo, choExternalNames = idMapToIdSet newMap, choVarMap = newMap  } `mappend` cho,newHo)
+        newMap = fromList [ (tvrIdent n,Just (EVar n)) | (n,_) <- hoEs newHoBuild ]
+    return (mempty { choHo = ho' { hoBuild = newHoBuild}, choExternalNames = idMapToIdSet newMap, choVarMap = newMap  } `mappend` cho,ho' { hoBuild = newHoBuild })
 
 programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = programSetDs ds' prog where
@@ -467,24 +467,24 @@ compileModEnv' cho = do
     if optMode options == CompileHo then return () else do
 
     let dataTable = progDataTable prog
-        rules = hoRules ho
+        rules = hoRules $ hoBuild ho
         prog = hoToProgram ho
 
     -- dump final version of various requested things
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
     when (dump FD.ClassSummary) $ do
         putStrLn "  ---- class summary ---- "
-        printClassSummary (hoClassHierarchy ho)
+        printClassSummary (hoClassHierarchy $ hoBuild ho)
     when (dump FD.Class) $ do
         putStrLn "  ---- class hierarchy ---- "
-        printClassHierarchy (hoClassHierarchy ho)
+        printClassHierarchy (hoClassHierarchy $ hoBuild ho)
     wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
     wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
     wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
 
     -- enter interactive mode
     int <- isInteractive
-    if int then Interactive.interact ho else do
+    if int then Interactive.interact cho else do
 
     when collectPassStats $ do
         Stats.print "PassStats" Stats.theStats

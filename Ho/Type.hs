@@ -30,6 +30,7 @@ data CollectedHo = CollectedHo {
     choVarMap :: IdMap (Maybe E),
     choHo :: Ho
     }
+    {-! derive: update !-}
 
 instance Monoid CollectedHo where
     mempty = collectedHo
@@ -41,7 +42,7 @@ instance Monoid CollectedHo where
         choHo = choHo a `mappend` choHo b
         }
 
-choDataTable cho = hoDataTable $ choHo cho
+choDataTable cho = hoDataTable $ hoBuild (choHo cho)
 
 collectedHo :: CollectedHo
 collectedHo = CollectedHo { choFiles = mempty, choModules = mempty, choExternalNames = mempty, choHo = mempty, choVarMap = mempty }
@@ -57,11 +58,14 @@ data HoHeader = HoHeader {
     hohMetaInfo   :: [(Atom,PackedString)]
     }
 
--- The raw data as it appears on disk
-data Ho = Ho {
-    -- * libraries depended on
+-- data only needed for name resolution
+data HoExp = HoExp {
     hoExports :: Map.Map Module [Name],
-    hoDefs :: Map.Map Name (SrcLoc,[Name]),
+    hoDefs :: Map.Map Name (SrcLoc,[Name])
+    }
+
+
+data HoBuild = HoBuild {
     hoAssumps :: Map.Map Name Type,        -- used for typechecking
     hoFixities :: FixityMap,
     hoKinds :: KindEnv,                      -- used for typechecking
@@ -72,12 +76,31 @@ data Ho = Ho {
     hoEs :: [(TVr,E)],
     hoRules :: Rules
     }
+    {-! derive: update !-}
+
+data Ho = Ho {
+    hoExp :: HoExp,
+    hoBuild :: HoBuild
+    }
+    {-! derive: update !-}
 
 instance Monoid Ho where
-    mempty = Ho mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
+    mempty = Ho mempty mempty
     mappend a b = Ho {
+        hoExp = hoExp a `mappend` hoExp b,
+        hoBuild = hoBuild a `mappend` hoBuild b
+    }
+
+instance Monoid HoExp where
+    mempty = HoExp mempty mempty
+    mappend a b = HoExp {
         hoExports = hoExports a `mappend` hoExports b,
-        hoDefs = hoDefs a `mappend` hoDefs b,
+        hoDefs = hoDefs a `mappend` hoDefs b
+    }
+
+instance Monoid HoBuild where
+    mempty = HoBuild mempty mempty mempty mempty mempty mempty mempty mempty
+    mappend a b = HoBuild {
         hoAssumps = hoAssumps a `mappend` hoAssumps b,
         hoFixities = hoFixities a `mappend` hoFixities b,
         hoKinds = hoKinds a `mappend` hoKinds b,

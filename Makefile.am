@@ -81,7 +81,7 @@ DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_proce
    drift_processed/FrontEnd/Exports.hs drift_processed/FrontEnd/HsSyn.hs drift_processed/FrontEnd/KindInfer.hs \
    drift_processed/FrontEnd/Representation.hs drift_processed/FrontEnd/SrcLoc.hs drift_processed/FrontEnd/Tc/Kind.hs \
    drift_processed/FrontEnd/Tc/Monad.hs drift_processed/Grin/SSimplify.hs drift_processed/Name/VConsts.hs drift_processed/Options.hs \
-   drift_processed/DataConstructors.hs-boot
+   drift_processed/DataConstructors.hs-boot drift_processed/Ho/Type.hs
 
 drift_processed/%: %
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`

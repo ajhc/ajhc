@@ -68,9 +68,9 @@ isGlobal _ = error "isGlobal"
 buildFieldMap :: Ho -> [ModInfo] -> FieldMap
 buildFieldMap ho ms = (ans',ans) where
         theDefs = [ (x,z) | (x,_,z) <- concat $ map modInfoDefs ms, nameType x == DataConstructor ]
-        allDefs = theDefs ++ [ (x,z) | (x,(_,z)) <- Map.toList (hoDefs ho), nameType x == DataConstructor ]
+        allDefs = theDefs ++ [ (x,z) | (x,(_,z)) <- Map.toList (hoDefs $ hoExp ho), nameType x == DataConstructor ]
         ans = Map.fromList $ sortGroupUnderFG fst snd $ concat [ [ (y,(x,i)) |  y <- ys | i <- [0..] ]  | (x,ys) <-  allDefs ]
-        ans' = Map.fromList $ concatMap modInfoConsArity ms ++ getConstructorArities (hoDataTable ho)
+        ans' = Map.fromList $ concatMap modInfoConsArity ms ++ getConstructorArities (hoDataTable $ hoBuild ho)
 
 
 processModule :: FieldMap -> ModInfo -> IO ModInfo
@@ -100,18 +100,20 @@ or' fs x = or [ f x | f <- fs ]
 tiModules' ::  CollectedHo -> [ModInfo] -> IO (Ho,TiData)
 tiModules' cho ms = do
     let me = choHo cho
+        hoB = hoBuild me
+        hoE = hoExp me
 --    let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
 --        importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
-    let importClassHierarchy = hoClassHierarchy me
-        importKindEnv = hoKinds me
+    let importClassHierarchy = hoClassHierarchy hoB
+        importKindEnv = hoKinds hoB
     wdump FD.Progress $ do
         putErrLn $ "Typing: " ++ show ([ m | Module m <- map modInfoName ms])
     let fieldMap = buildFieldMap me ms
     ms <- mapM (processModule fieldMap) ms
     let thisFixityMap = buildFixityMap (concat [ filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
-    let fixityMap = thisFixityMap `mappend` hoFixities me
+    let fixityMap = thisFixityMap `mappend` hoFixities hoB
     let thisTypeSynonyms =  (declsToTypeSynonyms $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
-    let ts = thisTypeSynonyms  `mappend` hoTypeSynonyms me
+    let ts = thisTypeSynonyms  `mappend` hoTypeSynonyms hoB
     let f x = expandTypeSyns ts (modInfoHsModule x) >>= FrontEnd.Infix.infixHsModule fixityMap >>= \z -> return (modInfoHsModule_s ( z) x)
     ms <- mapM f ms
     processIOErrors
@@ -207,14 +209,14 @@ tiModules' cho ms = do
 
     when (dump FD.AllTypes) $ do
         putStrLn "  ---- all types ---- "
-        putStrLn $ PPrint.render $ pprintEnvMap (sigEnv `mappend` localDConsEnv `mappend` hoAssumps me)
+        putStrLn $ PPrint.render $ pprintEnvMap (sigEnv `mappend` localDConsEnv `mappend` hoAssumps hoB)
 
     wdump FD.Progress $ do
         putErrLn $ "Type inference"
     let moduleName = modInfoName tms
         (tms:_) = ms
     let tcInfo = tcInfoEmpty {
-        tcInfoEnv = hoAssumps me `mappend` localDConsEnv, -- (importVarEnv `mappend` globalDConsEnv),
+        tcInfoEnv = hoAssumps hoB `mappend` localDConsEnv, -- (importVarEnv `mappend` globalDConsEnv),
         tcInfoSigEnv = sigEnv,
         tcInfoModName =  show moduleName,
         tcInfoKindInfo = kindInfo,
@@ -249,9 +251,7 @@ tiModules' cho ms = do
     let allAssumps = localDConsEnv `Map.union` localVarEnv
         allExports = Set.fromList (concatMap modInfoExport ms)
         externalKindEnv = restrictKindEnv (\ x  -> isGlobal x && (getModule x `elem` map (Just . modInfoName) ms)) kindInfo
-    let ho = mempty {
-            hoExports = Map.fromList [ (modInfoName m,modInfoExport m) | m <- ms ],
-            hoDefs =  Map.fromList [ (x,(y,filter (`member` allExports) z)) | (x,y,z) <- concat $ map modInfoDefs ms, x `member` allExports],
+    let hoBld = mempty {
             hoAssumps = Map.filterWithKey (\k _ -> k `member` allExports) allAssumps,
             hoFixities = restrictFixityMap (`member` allExports) thisFixityMap,
             -- TODO - this contains unexported names, we should filter these before writing to disk.
@@ -259,6 +259,10 @@ tiModules' cho ms = do
             --hoKinds = restrictKindEnv (`member` allExports) kindInfo,
             hoClassHierarchy = smallClassHierarchy,
             hoTypeSynonyms = restrictTypeSynonyms (`member` allExports) thisTypeSynonyms
+        }
+        hoEx = mempty {
+            hoExports = Map.fromList [ (modInfoName m,modInfoExport m) | m <- ms ],
+            hoDefs =  Map.fromList [ (x,(y,filter (`member` allExports) z)) | (x,y,z) <- concat $ map modInfoDefs ms, x `member` allExports]
         }
         tiData = TiData {
             tiDataDecls = tcDs ++ filter isHsClassDecl ds,
@@ -269,5 +273,5 @@ tiModules' cho ms = do
             tiProps        = pragmaProps,
             tiAllAssumptions = allAssumps
         }
-    return (ho,tiData)
+    return (mempty { hoBuild = hoBld, hoExp = hoEx },tiData)
 

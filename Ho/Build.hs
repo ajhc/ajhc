@@ -72,6 +72,7 @@ import qualified Support.MD5 as MD5
 --
 -- JHDR - header info, contains a list of modules contained and dependencies that need to be checked to read the file
 -- LIBR - only present if this is a library, contains library metainfo
+-- DEFS - definitions and exports for modules, all that is needed for name resolution
 -- TCIN - type checking information
 -- CORE - compiled core and associated data
 -- GRIN - compiled grin code
@@ -81,6 +82,7 @@ import qualified Support.MD5 as MD5
 cff_magic = chunkType "JHC"
 cff_jhdr  = chunkType "JHDR"
 cff_core  = chunkType "CORE"
+cff_defs  = chunkType "DEFS"
 
 
 shortenPath :: String -> IO String
@@ -292,7 +294,7 @@ findModule need ifunc func  = do
             recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
             f (cho' `mappend` mempty { choFiles = Map.fromList $ hohDepends hoh, choModules = mprovides hoh }) (libHo `mappend` newHo)  scs
 
-    cho <- ifunc cho (mempty { hoDataTable = dataTablePrims } `mappend` readHo)
+    cho <- ifunc cho (mempty { hoBuild = mempty { hoDataTable = dataTablePrims } } `mappend` readHo)
     f cho libHo scc
 
 
@@ -309,10 +311,12 @@ readHoFile fn = do
     (ct,mp) <- bsCFF bs
     True <- return $ ct == cff_magic
     Just rhh <- return $ lookup cff_jhdr mp
-    Just rho <- return $ lookup cff_core mp
+    Just rhe <- return $ lookup cff_defs mp
+    Just rhb <- return $ lookup cff_core mp
     let hh = decode (decompress $ L.fromChunks [rhh])
-    let ho = decode (decompress $ L.fromChunks [rho])
-    return (hh,ho)
+    let he = decode (decompress $ L.fromChunks [rhe])
+    let hb = decode (decompress $ L.fromChunks [rhb])
+    return (hh,mempty { hoExp = he, hoBuild = hb})
 
 
 recordHoFile ::
@@ -352,7 +356,10 @@ recordHoFile ho fs header = do
             let tfn = fn ++ ".tmp"
             fh <- openBinaryFile tfn WriteMode
             let theho =  mapHoBodies eraseE ho
-            lazyWriteCFF fh cff_magic [(cff_jhdr, compress $ encode header),(cff_core, compress $ encode theho)]
+            lazyWriteCFF fh cff_magic [
+                (cff_jhdr, compress $ encode header),
+                (cff_defs, compress $ encode $ hoExp theho),
+                (cff_core, compress $ encode $ hoBuild theho)]
             hFlush fh
             hClose fh
             rename tfn fn
@@ -398,7 +405,8 @@ parseHsSource fn fh = do
 
 
 mapHoBodies  :: (E -> E) -> Ho -> Ho
-mapHoBodies sm ho = ho { hoEs = map f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) } where
+mapHoBodies sm ho = ho { hoBuild = g (hoBuild ho) } where
+    g ho = ho { hoEs = map f (hoEs ho) , hoRules =  runIdentity (E.Rules.mapBodies (return . sm) (hoRules ho)) }
     f (t,e) = (t,sm e)
 
 
@@ -411,9 +419,9 @@ eraseE e = runIdentity $ f e where
 
 
 hoToProgram :: Ho -> Program
-hoToProgram ho = programSetDs (hoEs ho) program {
-    progClassHierarchy = hoClassHierarchy ho,
-    progDataTable = hoDataTable ho
+hoToProgram ho = programSetDs (hoEs $ hoBuild ho) program {
+    progClassHierarchy = hoClassHierarchy $ hoBuild ho,
+    progDataTable = hoDataTable $ hoBuild ho
     }
 
 ---------------------------------
@@ -429,7 +437,7 @@ buildLibrary ifunc func = ans where
         (desc,name,hmods,emods) <- parse fp
         let allmods  = sort (emods ++ hmods)
         (cho,libDeps,ho) <- findModule (map Left (emods ++ hmods)) ifunc func
-        let unknownMods = [ m | m <- mkeys (hoExports ho), m `notElem` allmods  ]
+        let unknownMods = [ m | m <- mkeys (hoExports $ hoExp ho), m `notElem` allmods  ]
         mapM_ ((putStrLn . ("*** Module included in library that is not in export list: " ++)) . show) unknownMods
         let outName = case optOutName options of
                 "hs.out" -> name ++ ".hl"
@@ -438,7 +446,7 @@ buildLibrary ifunc func = ans where
         let lhash = MD5.md5String (show $ choFiles cho)
         let hoh =  HoHeader {
                 hohHash = lhash,
-                hohDepends = [ (m,MD5.emptyHash) | m <- mkeys (hoExports ho)],
+                hohDepends = [ (m,MD5.emptyHash) | m <- mkeys (hoExports $ hoExp ho)],
                 hohModDepends = libDeps,
                 hohMetaInfo = pdesc
                 }
@@ -471,50 +479,52 @@ instance DocLike d => PPrint d SrcLoc where
 dumpHoFile :: String -> IO ()
 dumpHoFile fn = do
     (hoh,ho) <- readHoFile fn
+    let hoB = hoBuild ho
+        hoE = hoExp ho
     putStrLn fn
     when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "Dependencies:\n" <>  vcat (map pprint $ sortUnder fst $ hohDepends hoh)
     when (not $ Prelude.null (hohModDepends hoh)) $ putStrLn $ "ModDependencies:\n" <>  vcat (map pprint $ sortUnder fst $ hohModDepends hoh)
     putStrLn $ "HoHash:" <+> pprint (hohHash hoh)
     putStrLn $ "MetaInfo:\n" <> vcat (sort [text (' ':' ':fromAtom k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
-    putStrLn $ "Modules contained:" <+> tshow (mkeys $ hoExports ho)
-    putStrLn $ "number of definitions:" <+> tshow (size $ hoDefs ho)
-    putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps ho)
-    putStrLn $ "hoFixities:" <+> tshow (size $  hoFixities ho)
-    putStrLn $ "hoKinds:" <+> tshow (size $  hoKinds ho)
-    putStrLn $ "hoClassHierarchy:" <+> tshow (size $  hoClassHierarchy ho)
-    putStrLn $ "hoTypeSynonyms:" <+> tshow (size $  hoTypeSynonyms ho)
-    putStrLn $ "hoDataTable:" <+> tshow (size $  hoDataTable ho)
-    putStrLn $ "hoEs:" <+> tshow (size $  hoEs ho)
-    putStrLn $ "hoRules:" <+> tshow (size $  hoRules ho)
+    putStrLn $ "Modules contained:" <+> tshow (mkeys $ hoExports hoE)
+    putStrLn $ "number of definitions:" <+> tshow (size $ hoDefs hoE)
+    putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps hoB)
+    putStrLn $ "hoFixities:" <+> tshow (size $  hoFixities hoB)
+    putStrLn $ "hoKinds:" <+> tshow (size $  hoKinds hoB)
+    putStrLn $ "hoClassHierarchy:" <+> tshow (size $  hoClassHierarchy hoB)
+    putStrLn $ "hoTypeSynonyms:" <+> tshow (size $  hoTypeSynonyms hoB)
+    putStrLn $ "hoDataTable:" <+> tshow (size $  hoDataTable hoB)
+    putStrLn $ "hoEs:" <+> tshow (size $  hoEs hoB)
+    putStrLn $ "hoRules:" <+> tshow (size $  hoRules hoB)
     wdump FD.Exports $ do
         putStrLn "---- exports information ----";
-        CharIO.putStrLn $  (pprint $ hoExports ho :: String)
+        CharIO.putStrLn $  (pprint $ hoExports hoE :: String)
     wdump FD.Defs $ do
         putStrLn "---- defs information ----";
-        CharIO.putStrLn $  (pprint $ hoDefs ho :: String)
+        CharIO.putStrLn $  (pprint $ hoDefs hoE :: String)
     when (dump FD.Kind) $ do
         putStrLn "---- kind information ----";
-        CharIO.putStrLn $  (pprint $ hoKinds ho :: String)
+        CharIO.putStrLn $  (pprint $ hoKinds hoB :: String)
     when (dump FD.ClassSummary) $ do
         putStrLn "---- class summary ---- "
-        printClassSummary (hoClassHierarchy ho)
+        printClassSummary (hoClassHierarchy hoB)
     when (dump FD.Class) $
          do {putStrLn "---- class hierarchy ---- ";
-             printClassHierarchy (hoClassHierarchy ho)}
-    let rules = hoRules ho
+             printClassHierarchy (hoClassHierarchy hoB)}
+    let rules = hoRules hoB
     wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
     wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
     wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
     wdump FD.Datatable $ do
          putStrLn "  ---- data table ---- "
-         putDocM CharIO.putStr (showDataTable (hoDataTable ho))
+         putDocM CharIO.putStr (showDataTable (hoDataTable hoB))
          putChar '\n'
     wdump FD.Types $ do
         putStrLn " ---- the types of identifiers ---- "
-        putStrLn $ PPrint.render $ pprint (hoAssumps ho)
+        putStrLn $ PPrint.render $ pprint (hoAssumps hoB)
     wdump FD.Core $ do
         putStrLn " ---- lambdacube  ---- "
-        mapM_ (\ (v,lc) -> putChar '\n' >> printCheckName'' (hoDataTable ho) v lc) (hoEs ho)
+        mapM_ (\ (v,lc) -> putChar '\n' >> printCheckName'' (hoDataTable hoB) v lc) (hoEs hoB)
     where
     printCheckName'' :: DataTable -> TVr -> E -> IO ()
     printCheckName'' _dataTable tvr e = do
