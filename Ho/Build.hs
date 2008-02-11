@@ -57,6 +57,7 @@ import Util.Gen hiding(putErrLn,putErr,putErrDie)
 import Util.SetLike
 import Version.Version(versionString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Util.Graph as G
@@ -154,8 +155,10 @@ checkHoFile r_dm m = do
         Just (ModuleHo hoh ho) -> return (hoh,ho)
         Just _ -> fail "checkHoFile"
         Nothing -> do
-            (_,_,_,ho_name) <- moduleFind r_dm (Left m)
-            loadHoFile r_dm ho_name
+            (_,hash,_,ho_name) <- moduleFind r_dm (Left m)
+            if hash == MD5.emptyHash
+                then fail $ "could not find ho file: " ++ show m
+                else loadHoFile r_dm ho_name
 
 -- perhaps load a single ho file
 loadHoFile :: DoneMap -> FileName -> IO (HoHeader,Ho)
@@ -165,11 +168,14 @@ loadHoFile r_dm ho_name = ans where
         Just (hoh,ho) <- checkForHoFile ho_name
         let cd (m,h) | h /= MD5.emptyHash = do
                 (_,h',fn,_) <- moduleFind r_dm (Left m)
-                unless (h == h') $ do
-                    fn <- shortenPath fn
-                    putVerboseLn $ ho_name' <+> "is out of date due to changed file:" <+> fn
-                    True <- return False
-                    return ()
+                unless (h == h') $
+                    if h' == MD5.emptyHash then do
+                        putVerboseLn $ ho_name' <+> "not found at" <+> show m
+                        fail "odd module thing"
+                    else do
+                        fn <- shortenPath fn
+                        putVerboseLn $ ho_name' <+> "is out of date due to changed file:" <+> fn
+                        fail "Module out of date"
             cd _ = return ()
             cd' (m,h) = do
                 (h',_) <- checkHoFile r_dm m
@@ -236,10 +242,10 @@ lookupModule r_dm useHo ms = do
 
 
 
-findModule :: [Either Module String]                             -- ^ Either a module or filename to find
+findModule :: [Either Module String]                                -- ^ Either a module or filename to find
               -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
               -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
-              -> IO (CollectedHo,[(Module,MD5.Hash)],Ho)                                -- ^ (Final accumulated ho,just the ho read to satisfy this command)
+              -> IO (CollectedHo,[(Module,MD5.Hash)],Ho)            -- ^ (Final accumulated ho,just the ho read to satisfy this command)
 findModule need ifunc func  = do
     r_dm <- newIORef Map.empty
 
@@ -288,7 +294,7 @@ findModule need ifunc func  = do
             let hoh = fillInHohHash HoHeader {
                                  hohDepends    = [ x | (_,x,_) <- sc],
                                  hohModDepends = mdeps,
-                                 hohHash = undefined,
+                                 hohHash = error "fillInHohHash - hoHash",
                                  hohMetaInfo   = []
                                }
             recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
@@ -354,14 +360,12 @@ recordHoFile ho fs header = do
                 putErrLn $ "Writing haskell object file:" <+> fn'
             if optNoWriteHo options then return () else do
             let tfn = fn ++ ".tmp"
-            fh <- openBinaryFile tfn WriteMode
             let theho =  mapHoBodies eraseE ho
-            lazyWriteCFF fh cff_magic [
-                (cff_jhdr, compress $ encode header),
-                (cff_defs, compress $ encode $ hoExp theho),
-                (cff_core, compress $ encode $ hoBuild theho)]
-            hFlush fh
-            hClose fh
+                cfflbs = mkCFFfile cff_magic [
+                    (cff_jhdr, compress $ encode header),
+                    (cff_defs, compress $ encode $ hoExp theho),
+                    (cff_core, compress $ encode $ hoBuild theho)]
+            LBS.writeFile tfn cfflbs
             rename tfn fn
     g fs
 
