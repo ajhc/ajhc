@@ -1,7 +1,7 @@
 #ifndef ST_CBITS_H
 #define ST_CBITS_H
 
-#include <inttypes.h>
+#include <_stdint.h>
 
 #define MAX_ENTRY_SIZE 256
 #define VALID_BITMASK 0x1

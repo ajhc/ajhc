@@ -19,13 +19,13 @@ import Name.Id
 import Name.Name(Name)
 import TypeSynonyms(TypeSynonyms)
 import PackedString
-import qualified Util.SHA1 as SHA1
+import qualified Support.MD5 as MD5
 
 
 -- the collected information that is passed around
 data CollectedHo = CollectedHo {
-    choFiles :: Map.Map Module SHA1.Hash,
-    choModules :: Map.Map Module SHA1.Hash,
+    choFiles :: Map.Map Module MD5.Hash,
+    choModules :: Map.Map Module MD5.Hash,
     choExternalNames :: IdSet,
     choVarMap :: IdMap (Maybe E),
     choHo :: Ho
@@ -48,11 +48,11 @@ collectedHo = CollectedHo { choFiles = mempty, choModules = mempty, choExternalN
 
 data HoHeader = HoHeader {
     -- * my sha1 id
-    hohHash       :: SHA1.Hash,
+    hohHash       :: MD5.Hash,
     -- * Haskell Source files depended on
-    hohDepends    :: [(Module,SHA1.Hash)],
+    hohDepends    :: [(Module,MD5.Hash)],
     -- * Other objects depended on
-    hohModDepends :: [(Module,SHA1.Hash)],
+    hohModDepends :: [(Module,MD5.Hash)],
     -- * metainformation, filled for hl-files, empty for normal objects.
     hohMetaInfo   :: [(Atom,PackedString)]
     }

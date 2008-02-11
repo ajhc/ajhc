@@ -60,6 +60,7 @@ import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Util.Graph as G
 import qualified Util.SHA1 as SHA1
+import qualified Support.MD5 as MD5
 
 
 --
@@ -96,14 +97,17 @@ shortenPath x = return x
 instance DocLike d => PPrint d SHA1.Hash where
     pprintPrec _ h = tshow h
 
+instance DocLike d => PPrint d MD5.Hash where
+    pprintPrec _ h = tshow h
+
 
 type FileName = String
 
-findFirstFile :: String -> [(String,a)] -> IO (Handle,SHA1.Hash,FileName,a)
-findFirstFile err [] = FrontEnd.Warning.err "missing-dep" ("Module not found: " ++ err) >> return (undefined,SHA1.emptyHash,undefined,undefined)
+findFirstFile :: String -> [(String,a)] -> IO (Handle,MD5.Hash,FileName,a)
+findFirstFile err [] = FrontEnd.Warning.err "missing-dep" ("Module not found: " ++ err) >> return (undefined,MD5.emptyHash,undefined,undefined)
 findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
     fh <- openBinaryFile x ReadMode
-    hash <- SHA1.sha1Handle fh
+    hash <- MD5.md5Handle fh
     return (fh,hash,x,a)
 
 
@@ -116,7 +120,7 @@ data ModuleDone =
         modParsed :: HsModule,
         modName :: String,
         modHoName :: String,
-        modHash :: SHA1.Hash
+        modHash :: MD5.Hash
         }
     | ModuleHo HoHeader Ho
     -- temporary classifications
@@ -141,7 +145,7 @@ fetchModule r_dm (Left m) = ans where
 
 fillInHohHash :: HoHeader -> HoHeader
 fillInHohHash hoh = hoh { hohHash = h } where
-    h = SHA1.sha1Bytes $ concatMap (SHA1.hashToBytes . snd) $ sort (hohDepends hoh)
+    h = MD5.md5Bytes $ concatMap (MD5.hashToBytes . snd) $ sort (hohDepends hoh)
 
 checkHoFile :: DoneMap -> Module -> IO (HoHeader,Ho)
 checkHoFile r_dm m = do
@@ -159,7 +163,7 @@ loadHoFile r_dm ho_name = ans where
     ans = do
         ho_name' <- shortenPath ho_name
         Just (hoh,ho) <- checkForHoFile ho_name
-        let cd (m,h) | h /= SHA1.emptyHash = do
+        let cd (m,h) | h /= MD5.emptyHash = do
                 (_,h',fn,_) <- moduleFind r_dm (Left m)
                 unless (h == h') $ do
                     fn <- shortenPath fn
@@ -189,7 +193,7 @@ poison r_dm xs = mapM_ f xs where
             Nothing -> modifyIORef r_dm (minsert m ModuleNoHo)
             _ -> return ()
 
-moduleFind :: DoneMap -> Either Module String -> IO (Handle,SHA1.Hash,FileName,FileName)
+moduleFind :: DoneMap -> Either Module String -> IO (Handle,MD5.Hash,FileName,FileName)
 moduleFind r_dm (Right n) = findFirstFile n [(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))]
 moduleFind r_dm (Left m) = do
     dm <- readIORef r_dm
@@ -214,7 +218,7 @@ lookupModule r_dm useHo ms = do
                 Left m -> modifyIORef r_dm (Map.insert m ModuleNotThere) >> return []
                 Right n -> return []
         (fh,hash,fname,ho_name) <- findFirstFile name spath
-        if hash == SHA1.emptyHash then nogood else do
+        if hash == MD5.emptyHash then nogood else do
         mho <- if useHo && not (optIgnoreHo options) then checkTheHoFile r_dm ho_name else return Nothing
         case mho of
             Just (hoh,_) -> return $ fsts (hohDepends hoh)
@@ -235,7 +239,7 @@ lookupModule r_dm useHo ms = do
 findModule :: [Either Module String]                             -- ^ Either a module or filename to find
               -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
               -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
-              -> IO (CollectedHo,[(Module,SHA1.Hash)],Ho)                                -- ^ (Final accumulated ho,just the ho read to satisfy this command)
+              -> IO (CollectedHo,[(Module,MD5.Hash)],Ho)                                -- ^ (Final accumulated ho,just the ho read to satisfy this command)
 findModule need ifunc func  = do
     r_dm <- newIORef Map.empty
 
@@ -437,10 +441,10 @@ buildLibrary ifunc func = ans where
                 "hs.out" -> name ++ ".hl"
                 fn -> fn
         let pdesc = [(toAtom n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
-        let lhash = SHA1.sha1String (show $ choFiles cho)
+        let lhash = MD5.md5String (show $ choFiles cho)
         let hoh =  HoHeader {
                 hohHash = lhash,
-                hohDepends = [ (m,SHA1.emptyHash) | m <- mkeys (hoExports ho)],
+                hohDepends = [ (m,MD5.emptyHash) | m <- mkeys (hoExports ho)],
                 hohModDepends = libDeps,
                 hohMetaInfo = pdesc
                 }

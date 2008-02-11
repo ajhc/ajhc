@@ -4,8 +4,12 @@ GHCOPTS= -fallow-overlapping-instances -fallow-undecidable-instances -fglasgow-e
 
 HC= ghc
 
-all: sha1 TestParse cff SelfTest
+all: md5 sha1 TestParse cff SelfTest
 
+md5: md5.hs
+	$(HC) $(GHCOPTS) --make $< -o $@ -I../cbits ../cbits/md5sum.c
 
 %: %.hs
-	$(HC) $(GHCOPTS) --make $< -o $@ ../StringTable/StringTable_cbits.c
+	$(HC) $(GHCOPTS) --make $< -o $@
+
+#       ../StringTable/StringTable_cbits.c

@@ -11,6 +11,8 @@ AC_CANONICAL_HOST
 
 AC_PROG_LN_S
 
+AC_C_BIGENDIAN([BYTE_ORDER=BIG_ENDIAN],[BYTE_ORDER=LITTLE_ENDIAN],[BYTE_ORDER=PDP_ENDIAN])
+
 AC_ARG_WITH(rpmrelease,
             [  --with-rpmrelease=RPMRELEASE  specify rpm release number],
 	    [RPMRELEASE=$withval], [RPMRELEASE=1])
@@ -33,6 +35,8 @@ AC_DEFINE_DIR(LIBDIR,libdir)
 AC_DEFINE_DIR(DATADIR,datadir)
 AC_DEFINE_DIR(JLIBPATH,jlibpath)
 
+AX_CREATE_STDINT_H([cbits/_stdint.h])
+
 
 AC_SUBST(HC)
 AC_SUBST(HCFLAGS)
@@ -40,6 +44,7 @@ AC_SUBST(HSC2HS)
 AC_SUBST(RPMRELEASE)
 AC_SUBST(SHORTVERSION)
 AC_SUBST(REVISION)
+AC_SUBST(BYTE_ORDER)
 AC_SUBST(JLIBPATH)
-AC_CONFIG_FILES([Makefile jhc.spec Version/Config.hs docs/building.mkd])
+AC_CONFIG_FILES([Makefile jhc.spec Version/Config.hs docs/building.mkd cbits/config.h])
 AC_OUTPUT

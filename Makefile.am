@@ -10,6 +10,7 @@ SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
 BUILT_SOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs \
 	       FlagOpts.hs Name/Prim.hs Info/Properties.hs $(DRIFTFILES)
 
+MY_CFLAGS= -I$(srcdir)/StringTable -I$(srcdir)/cbits -I$(builddir)/cbits
 
 HSFILES= C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpEval.hs C/Op.hs \
          C/Prims.hs DataConstructors.hs DataConstructors.hs DerivingDrift/DataP.hs DerivingDrift/Drift.hs \
@@ -40,7 +41,7 @@ HSFILES= C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpEval.hs C
          Util/Relation.hs Util/RWS.hs Util/SameShape.hs Util/Seq.hs Util/SetLike.hs \
          Util/SHA1.hs Util/UnionFind.hs Util/UnionSolve.hs Util/UniqueMonad.hs \
          Util/VarName.hs Version/Version.hs Version/Config.hs \
-	 StringTable/Atom.hsc Util/Util.hs
+	 StringTable/Atom.hsc Util/Util.hs Support/MD5.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
@@ -48,11 +49,11 @@ GHCINC=  -i -i$(srcdir)/drift_processed -i$(srcdir)/drift_processed/FrontEnd \
 	 -i$(srcdir)/. -i$(srcdir)/FrontEnd -odir $(builddir) -hidir $(builddir)
 PACKAGES= -package mtl  -package unix -package QuickCheck -ignore-package lang
 GHCLANG=    -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
-GHCOPTS=  $(HSOPTS)  -O -ignore-package lang  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG) -optc-std=c99 -optc-O2 -optc-Wall
+GHCOPTS=  $(HSOPTS)  -O -ignore-package lang  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG) -optc-std=c99 -optc-O2 -optc-Wall $(MY_CFLAGS)
 
 JHC_LIBS =  base-1.0.hl haskell98-1.0.hl
 
-EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS) StringTable/StringTable_cbits.c StringTable/StringTable_cbits.h
+EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS) StringTable/StringTable_cbits.c StringTable/StringTable_cbits.h cbits/md5sum.c
 
 dist-hook:
 	find $(distdir)  -name _darcs -o -name \*.ho | xargs rm -rf --
@@ -87,8 +88,10 @@ drift_processed/%: %
 	DrIFT $< -o $@
 
 
-jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES) StringTable/Atom.hs StringTable/StringTable_cbits.c
-	$(HC) $(GHCOPTS) --make $< StringTable/StringTable_cbits.c -o $@
+CFILES =  StringTable/StringTable_cbits.c  cbits/md5sum.c
+
+jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES) StringTable/Atom.hs $(CFILES)
+	$(HC) $(GHCOPTS) --make $< $(CFILES) -o $@
 
 jhcp: Main.hs $(BUILT_SOURCES) $(HSFILES)
 	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< -o $@
@@ -108,7 +111,7 @@ HSBOOT= DataConstructors.hs-boot FrontEnd/Tc/Class.hs-boot Grin/Grin.hs-boot Gri
 
 
 %.hs: %.hsc
-	$(HSC2HS) -I@srcdir@/StringTable -o $@ $<
+	$(HSC2HS) $(MY_CFLAGS)  -o $@ $<
 
 %.hs: %.flags  utils/opt_sets.prl
 	perl $(srcdir)/utils/opt_sets.prl -n $< $<  > $@

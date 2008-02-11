@@ -7,12 +7,7 @@ import Data.Binary
 import Ho.Type
 import Support.MapBinaryInstance
 import Name.Binary()
-import Util.SHA1 as SHA1
 
-
-instance Binary ABCDE where
-    put (ABCDE a b c d e) = put a >> put b >> put c >> put d >> put e
-    get = return ABCDE `ap` get `ap` get `ap` get `ap` get `ap` get
 
 instance Binary HoHeader where
     put (HoHeader aa ab ac ad) = do
