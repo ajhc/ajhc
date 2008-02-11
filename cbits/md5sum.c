@@ -1,5 +1,6 @@
 
 /*
+ *
   Copyright (C) 1999, 2002 Aladdin Enterprises.  All rights reserved.
 
   This software is provided 'as-is', without any express or implied
@@ -40,14 +41,16 @@ typedef struct md5_state_s {
 } md5_state_t;
 
 
+int get_md5_statesize(void) { return sizeof(md5_state_t); }
+
 /* Initialize the algorithm. */
-static void md5_init(md5_state_t *pms);
+void md5_init(md5_state_t *pms);
 
 /* Append a string to the message. */
-static void md5_append(md5_state_t *pms, const md5_byte_t *data, int nbytes);
+void md5_append(md5_state_t *pms, const md5_byte_t *data, int nbytes);
 
 /* Finish the message and return the digest. */
-static void md5_finish(md5_state_t *pms, md5_byte_t digest[16]);
+void md5_finish(md5_state_t *pms, md5_byte_t digest[16]);
 
 
 #include <string.h>
@@ -309,7 +312,7 @@ md5_process(md5_state_t *pms, const md5_byte_t *data /*[64]*/)
     pms->abcd[3] += d;
 }
 
-static void
+void
 md5_init(md5_state_t *pms)
 {
     pms->count[0] = pms->count[1] = 0;
@@ -319,7 +322,7 @@ md5_init(md5_state_t *pms)
     pms->abcd[3] = 0x10325476;
 }
 
-static void
+void
 md5_append(md5_state_t *pms, const md5_byte_t *data, int nbytes)
 {
     const md5_byte_t *p = data;
@@ -357,7 +360,7 @@ md5_append(md5_state_t *pms, const md5_byte_t *data, int nbytes)
 	memcpy(pms->buf, p, left);
 }
 
-static void
+void
 md5_finish(md5_state_t *pms, md5_byte_t digest[16])
 {
     static const md5_byte_t pad[64] = {

@@ -1,7 +1,8 @@
 {-# OPTIONS -funbox-strict-fields  -O2 #-}
-module Support.MD5(Hash(),emptyHash,md5,md5file,md5Bytes,md5String,md5Handle,hashToBytes) where
+module Support.MD5(Hash(),emptyHash,md5,md5file,md5lazy,md5Bytes,md5String,md5Handle,hashToBytes) where
 
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 import Data.Binary
 import Control.Monad
 import qualified Data.ByteString.Unsafe as BS
@@ -21,6 +22,17 @@ md5 :: BS.ByteString -> Hash
 md5 bs = unsafePerformIO $ allocaBytes 16 $ \digest -> do
         BS.unsafeUseAsCStringLen bs $ \ (x,y) -> md5Data (castPtr x) (fromIntegral y) digest
         readDigest digest
+
+md5lazy :: LBS.ByteString -> Hash
+md5lazy lbs = unsafePerformIO $ do
+    allocaBytes (fromIntegral $ get_md5_statesize) $ \msp -> do
+        let ms = MState msp
+        md5_init ms
+        forM_ (LBS.toChunks lbs) $ \bs -> do
+            BS.unsafeUseAsCStringLen bs $ \ (x,y) -> md5_append ms (castPtr x) (fromIntegral y)
+        allocaBytes 16 $ \digest -> do
+            md5_finish ms digest
+            readDigest digest
 
 readDigest digest = do
     w1 <- peekWord32 digest 0
@@ -42,10 +54,15 @@ instance Binary Hash where
     get = return Hash `ap` get `ap` get `ap` get `ap` get
 
 md5file :: FilePath -> IO Hash
-md5file fp = md5 `fmap` BS.readFile fp
+md5file fp = md5lazy `fmap` LBS.readFile fp
 
+newtype MState = MState (Ptr MState)
 
 foreign import ccall unsafe "md5_data" md5Data :: Ptr Word8 -> CInt -> Ptr Word8 -> IO ()
+foreign import ccall unsafe md5_init  :: MState -> IO ()
+foreign import ccall unsafe md5_append :: MState -> Ptr Word8 -> CInt -> IO ()
+foreign import ccall unsafe md5_finish :: MState -> Ptr Word8 -> IO ()
+foreign import ccall unsafe get_md5_statesize :: CInt
 
 hashToBytes :: Hash -> [Word8]
 hashToBytes (Hash a b c d) = tb a . tb b . tb c . tb d $ [] where
