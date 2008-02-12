@@ -61,8 +61,8 @@ data HoHeader = HoHeader {
     hohHash       :: MD5.Hash,
     -- * Haskell Source files depended on
     hohDepends    :: [(Module,MD5.Hash)],
-    -- * Other objects depended on
-    hohModDepends :: [(Module,MD5.Hash)],
+    -- * Other objects depended on to be considered up to date.
+    hohModDepends :: [MD5.Hash],
     -- * metainformation, filled for hl-files, empty for normal objects.
     hohMetaInfo   :: [(Atom,PackedString)]
     }

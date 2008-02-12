@@ -69,7 +69,7 @@ determineExports defs ae ms = do
 determineExports' :: [(Name,[Name])] -> [(Module,[Name])] -> [ModInfo] -> IO [ModInfo]
 determineExports' owns doneMods todoMods = mdo
     rs <- solve Nothing  mempty [ x |(_,_,x) <- ms]
-    let lf m =  Map.lookup m  $ dmodMap `mappend` Map.fromList [ (modInfoName x,Set.fromList [(toUnqualified x,x) | x <- modInfoExport x]) |  x  <- xs]
+    let lf m = maybe (fail $ "determineExports'.lf: " ++ show m) return $  Map.lookup m  $ dmodMap `mappend` Map.fromList [ (modInfoName x,Set.fromList [(toUnqualified x,x) | x <- modInfoExport x]) |  x  <- xs]
     let g  (mi,ne) = do
             ne' <- ce mi ne
             return mi { modInfoExport = ne', modInfoImport = toRelationList $ runIdentity $  getImports mi lf  }
@@ -80,7 +80,7 @@ determineExports' owns doneMods todoMods = mdo
     dmodMap = Map.fromList  [ ( x,Set.fromList [(toUnqualified n,n) | n <- xs]) |  (x,xs) <- doneMods ]
     modMap = fmap return dmodMap `mappend` (Map.fromList [ (modInfoName n,getVal i) | (i,n,_) <- ms])
     ownsMap = Map.fromList owns
-    le m = runIdentity $ Map.lookup m modMap
+    le m = runIdentity $ maybe (fail $ "determineExports'.le: " ++ show m) return $ Map.lookup m modMap
     ce m x = mapM f (toRelationList x) where
         f (x,[y]) = return y
         f (_,[]) = error "can't happen"

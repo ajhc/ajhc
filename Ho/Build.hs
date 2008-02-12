@@ -102,39 +102,18 @@ shortenPath x@('/':_) = do
 shortenPath x = return x
 
 
+type SourceHash = MD5.Hash
+type HoHash     = MD5.Hash
 
 instance DocLike d => PPrint d MD5.Hash where
     pprintPrec _ h = tshow h
 
 
-type FileName = String
-
-findFirstFile :: String -> [(FilePath,a)] -> IO (LBS.ByteString,FileName,a)
+findFirstFile :: String -> [(FilePath,a)] -> IO (LBS.ByteString,FilePath,a)
 findFirstFile err [] = FrontEnd.Warning.err "missing-dep" ("Module not found: " ++ err) >> fail ("Module not found: " ++ err) -- return (error "findFirstFile not found","",undefined)
 findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
     bs <- LBS.readFile x
     return (bs,x,a)
-
-
-type DoneMap = IORef (Map.Map Module ModuleDone)
-
-data ModuleDone =
-    -- final classifications
-    ModuleNotThere
-    | ModuleParsed {
-        modParsed :: HsModule,
-        modName :: String,
-        modHoName :: String,
-        modHash :: MD5.Hash
-        }
-    | ModuleHo HoHeader Ho
-    -- temporary classifications
-    | ModuleNoHo
-
-
-type MRet = [Module]
-type SourceHash = MD5.Hash
-type HoHash     = MD5.Hash
 
 
 data ModDone
@@ -170,13 +149,12 @@ findHoFile :: IORef Done -> FilePath -> Maybe Module -> SourceHash -> IO (Maybe 
 findHoFile done_ref fp _ sh = do
     done <- readIORef done_ref
     if sh `Map.member` knownSourceMap done then return Nothing else do
-    let honame = reverse ('o':'h':dropWhile ('.' /=) (reverse fp))
+    let honame = replaceSuffix "ho" fp
     onErr (return Nothing) (readHoFile honame) $ \ (hoh,hidep,ho) -> do
         case hohHash hoh `Map.lookup` hosEncountered done of
             Just (fn,_,_a) -> return (Just fn)
             Nothing -> do
                 honame <- shortenPath honame
-                --putVerboseLn $ printf "Found Ho:     %-20s [%s]" "" honame
                 modifyIORef done_ref (knownSourceMap_u $ mappend (hoIDeps hidep))
                 modifyIORef done_ref (hosEncountered_u $ Map.insert (hohHash hoh) (honame,hoh,ho))
                 return (Just honame)
@@ -228,113 +206,6 @@ resolveDeps done_ref m = do
     return ()
 
 
-
-
-
-fetchModule :: DoneMap -> Either Module String -> IO MRet
-fetchModule r_dm (Right n) = lookupModule r_dm True (Right n)
-fetchModule r_dm (Left m) = ans where
-    ans = do
-        dm <- readIORef r_dm
-        case Map.lookup m dm of
-            Nothing -> lookupModule r_dm True (Left m)
-            Just ModuleNoHo -> lookupModule r_dm False (Left m)
-            -- final results
-            Just ModuleNotThere -> return []
-            Just ModuleParsed { modParsed = hs, modHash =  s1h } -> return $ [hsModuleName hs]
-            Just (ModuleHo hoh _) -> return $ fsts (hohDepends hoh)
-
-
-fillInHohHash :: HoHeader -> HoHeader
-fillInHohHash hoh = hoh { hohHash = h } where
-    h = MD5.md5Bytes $ concatMap (MD5.hashToBytes . snd) $ sort (hohDepends hoh)
-
-checkHoFile :: DoneMap -> Module -> IO (HoHeader,Ho)
-checkHoFile r_dm m = do
-    dm <- readIORef r_dm
-    case mlookup m dm of
-        Just (ModuleHo hoh ho) -> return (hoh,ho)
-        Just _ -> fail "checkHoFile"
-        Nothing -> do
-            (_,_,ho_name) <- moduleFind r_dm (Left m)
-            loadHoFile r_dm ho_name
-
--- perhaps load a single ho file
-loadHoFile :: DoneMap -> FileName -> IO (HoHeader,Ho)
-loadHoFile r_dm ho_name = do
-    ho_name' <- shortenPath ho_name
-    Just (hoh,_,ho) <- checkForHoFile ho_name
-    let cd (m,h) | h /= MD5.emptyHash = do
-            (lbs,fn,_) <- moduleFind r_dm (Left m)
-            let h' = MD5.md5lazy lbs
-            unless (h == h') $ do
-                fn <- shortenPath fn
-                putVerboseLn $ ho_name' <+> "is out of date due to changed file:" <+> fn
-                fail "Module out of date"
-        cd _ = return ()
-        cd' (m,h) = do
-            (h',_) <- checkHoFile r_dm m
-            unless (h == hohHash h') $ do
-                putVerboseLn $ ho_name' <+> "is out of date due to modified ho file:" <+> (show m)
-                True <- return False
-                return ()
-    flip catch (\e -> poison r_dm (map fst $ hohDepends hoh) >> ioError e) $ do
-    mapM_ cd (hohDepends hoh)
-    mapM_ cd' (hohModDepends hoh)
-    putVerboseLn $ printf "Found Ho:     [%s]" ho_name'
-    forM_ (fsts $ hohDepends hoh) $ \m -> do
-        modifyIORef r_dm (Map.insert m (ModuleHo hoh ho))
-    return (hoh,ho)
-
-poison :: DoneMap -> [Module] -> IO ()
-poison r_dm xs = mapM_ f xs where
-    f m = do
-        dm <- readIORef r_dm
-        case m `mlookup` dm of
-            Nothing -> modifyIORef r_dm (minsert m ModuleNoHo)
-            _ -> return ()
-
-moduleFind :: DoneMap -> Either Module String -> IO (LBS.ByteString,FileName,FileName)
-moduleFind r_dm (Right n) = findFirstFile n [(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))]
-moduleFind r_dm (Left m) = do
-    dm <- readIORef r_dm
-    let (name,spath) = (fromModule m, searchPaths (fromModule m))
-    case m `mlookup` dm of
-        Nothing -> findFirstFile name spath
-        Just _ -> do fail "moduleFind found"
-
-
-checkTheHoFile r_dm ho_name = do
-    --putVerboseLn $ "checkTheHoFile:" <+> ho_name
-    flip catch (\e -> return Nothing) $ Just `fmap` loadHoFile r_dm ho_name
-
-
-lookupModule :: DoneMap -> Bool -> Either Module String -> IO MRet
-lookupModule r_dm useHo ms = do
-    dm <- readIORef r_dm
-    let (name,spath) = case ms of
-            Left m -> (fromModule m, searchPaths (fromModule m))
-            Right n -> (n,[(n,reverse $ 'o':'h':dropWhile (/= '.') (reverse n))])
-    fff <- catch (Just `fmap` findFirstFile name spath) (\_ -> return Nothing)
-    case fff of
-        Nothing ->  case ms of
-            Left m -> modifyIORef r_dm (Map.insert m ModuleNotThere) >> return []
-            Right n -> return []
-        Just (lbs,fname,ho_name) -> do
-            mho <- if useHo && not (optIgnoreHo options) then checkTheHoFile r_dm ho_name else return Nothing
-            case mho of
-                Just (hoh,_) -> return $ fsts (hohDepends hoh)
-                Nothing -> do
-                    hs <- parseHsSource fname lbs
-                    wdump FD.Progress $ do
-                        sp <- shortenPath fname
-                        putErrLn $ "Found dependency:" <+> name <+> "at" <+> sp
-                    --if hsModuleName hs `mmember` dm then do putStrLn $ "Found a module name we already have: " ++ show (hsModuleName hs); nogood else do
-                    let hash = MD5.md5lazy lbs
-                    modifyIORef r_dm (Map.insert (hsModuleName hs) ModuleParsed { modParsed = hs, modHoName = ho_name, modName = fname, modHash = hash })
-                    mapM_ (fetchModule r_dm) $  map Left (hsModuleRequires hs)
-                    return $ [hsModuleName hs]
-
 data SourceCode
     = SourceParsed { sourceHash :: SourceHash, sourceDeps :: [Module], sourceModule :: HsModule, sourceFP :: FilePath }
     | SourceRaw    { sourceHash :: SourceHash, sourceDeps :: [Module], sourceModName :: Module, sourceLBS :: LBS.ByteString, sourceFP :: FilePath }
@@ -345,20 +216,16 @@ sourceIdent SourceRaw { sourceModName = fp } = show fp
 
 data CompUnit
     = CompLibrary String
-    | CompHo      (HoHeader,Ho)
+    | CompHo      HoHeader Ho
     | CompSources [SourceCode]
 
 type CompUnitGraph = [(HoHash,([HoHash],CompUnit))]
 
 showCUnit (hash,(deps,cu)) = printf "%s : %s" (show hash) (show deps)  ++ "\n" ++ f cu where
     f (CompLibrary s) = s
-    f (CompHo _) = "ho"
+    f (CompHo _ _) = "ho"
     f (CompSources ss) = show $ map sourceIdent ss
 
-
-data PUnit
-    = PUnit [((Module,SourceHash),[Module])]
-    | FUnit HoHash
 
 toCompUnitGraph :: Done -> [Module] -> IO CompUnitGraph
 toCompUnitGraph done roots = do
@@ -366,47 +233,58 @@ toCompUnitGraph done roots = do
         gr = G.newGraph  [ ((m,sourceHash sc),fs (sourceHash sc)) | (m,Found sc) <- Map.toList (modEncountered done)] (fst . fst) snd
         gr' = G.sccGroups gr
         phomap = Map.fromListWith (++) (concat [  [ (m,[hh]) | (m,_) <- hohDepends hoh ] | (hh,(_,hoh,_)) <- Map.toList (hosEncountered done)])
-    putErrLn $ drawForest (map (fmap (show . fst . fst)) (G.dff gr))
+        sources = Map.fromList [ (m,sourceHash sc) | (m,Found sc) <- Map.toList (modEncountered done)]
+    when (dump FD.SccModules) $ do
+        putErrLn $ drawForest (map (fmap (show . fst . fst)) (G.dff gr))
 
     cug_ref <- newIORef []
-    hom_ref <- newIORef (hosEncountered done)
+    hom_ref <- newIORef (Map.map ((,) False) $ hosEncountered done)
     ms <- forM gr' $ \ns -> do
-            r <- newIORef (PUnit ns)
+            r <- newIORef (Left ns)
             return [ (m,r) | ((m,_),_) <- ns ]
     let mods = Map.fromList (concat ms)
     let f m = do
             rr <- Map.lookup m mods  >>= readIORef
             case rr of
-                FUnit hh -> return hh
-                PUnit ns -> g ns
+                Right hh -> return hh
+                Left ns -> g ns
         g ms@(((m,_),ds):_) = do
             let amods = map (fst . fst) ms
             pm (join (Map.lookup m phomap)) $ do
                 let deps = Set.toList $ Set.fromList (concat $ snds ms) `Set.difference` (Set.fromList (map (fst . fst) ms))
                 deps' <- snub `fmap` mapM f deps
                 let mhash = MD5.md5String (concatMap (show . fst) ms ++ show deps')
-                Map.lookup m mods >>= flip writeIORef (FUnit mhash)
+                Map.lookup m mods >>= flip writeIORef (Right mhash)
                 let cunit = CompSources $ map fs amods
                 modifyIORef cug_ref ((mhash,(deps',cunit)):)
                 return mhash
         pm :: [HoHash] -> IO HoHash -> IO HoHash
-        pm _ els = els
         pm [] els = els
---        pm (h:hs) els = do
---            ll <- Map.lookup h `fmap` readIORef hom_ref
---            case ll of
---                Nothing -> els
---                Just
-
-
+        pm (h:hs) els = do catch (hvalid h) (\_ -> pm hs els)
+        hvalid h = do
+            ll <- Map.lookup h `fmap` readIORef hom_ref
+            case ll of
+                Nothing -> fail "Don't know anything about this hash"
+                Just (True,_) -> return h
+                Just (False,af@(fp,hoh,ho)) -> do
+                    good <- catch ( mapM_ cdep (hohDepends hoh) >> mapM_ hvalid (hohModDepends hoh) >> return True) (\_ -> return False)
+                    if good then do
+                        putVerboseLn $ printf "Fresh: <%s>" fp
+                        modifyIORef cug_ref ((h,(hohModDepends hoh,CompHo hoh ho)):)
+                        modifyIORef hom_ref (Map.insert h (True,af))
+                        return h
+                     else do
+                        putVerboseLn $ printf "Stale: <%s>" fp
+                        modifyIORef hom_ref (Map.delete h)
+                        fail "don't know this file"
+        cdep (mod,hash) = case Map.lookup mod sources of
+            Just hash' | hash == hash' -> return ()
+            _ -> fail "Can't verify module up to date"
         fs m = case Map.lookup m (modEncountered done) of
             Just (Found sc) -> sc
             _ -> error $ "fs: " ++ show m
     mapM_ f roots
     readIORef cug_ref
-
-
-
 
 
 findModule :: [Either Module String]                                -- ^ Either a module or filename to find
@@ -434,152 +312,33 @@ findModule need ifunc func  = do
 
     done <- readIORef done_ref
     cug <- toCompUnitGraph done roots
-    mapM_ (putStrLn . showCUnit) cug
+--    mapM_ (putStrLn . showCUnit) cug
 
 
     let f ho libHo [] = processIOErrors >> return (ho,mempty,libHo)
-        f ho libHo (sc:scs) = do
+        f ho libHo ((hh,hdep,sc):scs) = do
             modules <- forM sc $ \x -> case x of
                 SourceParsed { sourceHash = h,sourceModule = mod } -> return (h,mod)
-                SourceRaw { sourceHash = h,sourceLBS = lbs, sourceFP = fp } -> parseHsSource fp lbs >>= return . (,) h 
+                SourceRaw { sourceHash = h,sourceLBS = lbs, sourceFP = fp } -> parseHsSource fp lbs >>= return . (,) h
             (cho',newHo) <- func ho (snds modules)
-            let mods = [ hsModuleName hs | hs <- snds modules ]
-                mods' = snub [ m  | hs <- snds modules, m <- hsModuleRequires hs, m `notElem` mods]
-                mdeps = [ (m,dep) | m <- mods', dep <- Map.lookup m (choModules cho')]
-            let hoh = fillInHohHash HoHeader {
+            let hoh = HoHeader {
                                  hohDepends    = [ (hsModuleName mod,h) | (h,mod) <- modules],
-                                 hohModDepends = mdeps,
-                                 hohHash = error "fillInHohHash - hoHash",
+                                 hohModDepends = hdep,
+                                 hohHash = hh,
                                  hohMetaInfo   = []
                                }
-            recordHoFile newHo (map (replaceSuffix "ho" . sourceFP) sc) hoh
+                idep = HoIDeps $ Map.fromList [ (h,(hsModuleName mod,hsModuleRequires mod)) | (h,mod) <- modules]
+            recordHoFile newHo idep (map (replaceSuffix "ho" . sourceFP) sc) hoh
             f (cho' `mappend` mempty { choFiles = Map.fromList $ hohDepends hoh, choModules = mprovides hoh }) (libHo `mappend` newHo)  scs
         mprovides hoh = Map.fromList [ (x,hohHash hoh) | (x,_) <- hohDepends hoh]
 
     let sccm = G.sccGroups $ G.newGraph cug fst (fst . snd)
-    let readHo = mconcat [ ho | [(_,(_,CompHo (_,ho)))] <- sccm ]
+    let readHo = mconcat [ ho | [(_,(_,CompHo _ ho))] <- sccm ]
     cho <- ifunc mempty (mempty { hoBuild = mempty { hoDataTable = dataTablePrims } } `mappend` readHo)
-    f cho mempty [ ss | [(_,(_,CompSources ss))] <- sccm ]
-
-
-    {-
-            Just mp <- Map.lookup m `fmap` readIORef r_dm
-            case mp of
-                ModuleParsed { modParsed = hs, modHash = fd, modHoName = s } -> do
-                    (mp,readHo,libHo,rs) <- f (hsModuleRequires hs ++ xs) (Set.insert m ds)
-                    return (mp `mappend` mempty { choFiles = Map.singleton m fd },readHo,libHo,((hs,(m,fd),s):rs))
-                ModuleHo hoh ho -> do
-                    let ss = Set.fromList $ fsts (hohDepends hoh)
-                    (mp,readHo,(libDeps,libHo),rs) <- f (fsts (hohModDepends hoh) ++ xs) (Set.union ss ds)
-                    let mp' = mp `mappend` mempty { choModules = mprovides hoh, choFiles = Map.fromList $ hohDepends hoh }
-                        ho' = ho `mappend` readHo
-                    case hohMetaInfo hoh of
-                        [] -> return (mp', ho',(libDeps,libHo `mappend` ho),rs)
-                        _  -> return (mp', ho',((m,hohHash hoh):libDeps,libHo),rs)
-                ModuleNotThere -> fail $ "Module not found:" <+> show m
-                ModuleNoHo -> fail $ "Module noho:" <+> show m
-        f [] _ = return (mempty,mempty,mempty,mempty)
-        mprovides hoh = Map.fromList [ (x,hohHash hoh) | (x,_) <- hohDepends hoh]
-    (cho,readHo,(libDeps,libHo), ms) <- f (concat ms) Set.empty
-    writeIORef r_dm (error "r_dm")  -- to encourage garbage collection.
-    let mgraph =  (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires' . fst3) )
-        scc = G.sccGroups mgraph
-        mgraph' =  (G.newGraph scc (fromModule . hsModuleName . fst3 . head) (concatMap ff . concatMap (hsModuleRequires' . fst3)) )
-        ff n = [ fromModule . hsModuleName $ ms | gs@((ms,_,_):_) <- scc, n `elem` map (fromModule . hsModuleName . fst3) gs]
-    when (dump FD.SccModules) $ do
-        CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
-        putErrLn $ drawForest (map (fmap (show . map (hsModuleName . fst3))) (G.dff mgraph'))
-
-    let f ho libHo [] = processIOErrors >> return (ho,libDeps,libHo)
-        f ho libHo (sc:scs) = do
-            (cho',newHo) <- func ho [ hs | (hs,_,_) <- sc ]
-            let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
-                mods' = snub [ m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, m `notElem` mods]
-                mdeps = [ (m,dep) | m <- mods', dep <- Map.lookup m (choModules cho')]
-            let hoh = fillInHohHash HoHeader {
-                                 hohDepends    = [ x | (_,x,_) <- sc],
-                                 hohModDepends = mdeps,
-                                 hohHash = error "fillInHohHash - hoHash",
-                                 hohMetaInfo   = []
-                               }
-            recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
-            f (cho' `mappend` mempty { choFiles = Map.fromList $ hohDepends hoh, choModules = mprovides hoh }) (libHo `mappend` newHo)  scs
-
-    cho <- ifunc cho (mempty { hoBuild = mempty { hoDataTable = dataTablePrims } } `mappend` readHo)
-    f cho libHo scc
-
-
--}
-
-
-findModule' :: [Either Module String]                                -- ^ Either a module or filename to find
-              -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
-              -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
-              -> IO (CollectedHo,[(Module,MD5.Hash)],Ho)            -- ^ (Final accumulated ho,just the ho read to satisfy this command)
-findModule' need ifunc func  = do
-    r_dm <- newIORef Map.empty
-
-    putVerboseLn $ "Loading libraries:" <+> show (optHls options)
-    forM_ (optHls options) $ \l -> do
-        (n',fn) <- findLibrary l
-        putVerboseLn $ "Found" <+> show (l,n') <+> "at" <+> fn
-        checkTheHoFile r_dm fn
-    ms <- mapM (fetchModule r_dm) need
-    processIOErrors
-    let f (m:xs) ds | m `member` ds = f xs ds
-        f (m:xs) ds = do
-            Just mp <- Map.lookup m `fmap` readIORef r_dm
-            case mp of
-                ModuleParsed { modParsed = hs, modHash = fd, modHoName = s } -> do
-                    (mp,readHo,libHo,rs) <- f (hsModuleRequires hs ++ xs) (Set.insert m ds)
-                    return (mp `mappend` mempty { choFiles = Map.singleton m fd },readHo,libHo,((hs,(m,fd),s):rs))
-                ModuleHo hoh ho -> do
-                    let ss = Set.fromList $ fsts (hohDepends hoh)
-                    (mp,readHo,(libDeps,libHo),rs) <- f (fsts (hohModDepends hoh) ++ xs) (Set.union ss ds)
-                    let mp' = mp `mappend` mempty { choModules = mprovides hoh, choFiles = Map.fromList $ hohDepends hoh }
-                        ho' = ho `mappend` readHo
-                    case hohMetaInfo hoh of
-                        [] -> return (mp', ho',(libDeps,libHo `mappend` ho),rs)
-                        _  -> return (mp', ho',((m,hohHash hoh):libDeps,libHo),rs)
-                ModuleNotThere -> fail $ "Module not found:" <+> show m
-                ModuleNoHo -> fail $ "Module noho:" <+> show m
-        f [] _ = return (mempty,mempty,mempty,mempty)
-        mprovides hoh = Map.fromList [ (x,hohHash hoh) | (x,_) <- hohDepends hoh]
-    (cho,readHo,(libDeps,libHo), ms) <- f (concat ms) Set.empty
-    writeIORef r_dm (error "r_dm")  -- to encourage garbage collection.
-    let mgraph =  (G.newGraph ms (fromModule . hsModuleName . fst3) (hsModuleRequires' . fst3) )
-        scc = G.sccGroups mgraph
-        mgraph' =  (G.newGraph scc (fromModule . hsModuleName . fst3 . head) (concatMap ff . concatMap (hsModuleRequires' . fst3)) )
-        ff n = [ fromModule . hsModuleName $ ms | gs@((ms,_,_):_) <- scc, n `elem` map (fromModule . hsModuleName . fst3) gs]
-    when (dump FD.SccModules) $ do
-        CharIO.putErrLn $ "scc modules:\n" ++ unlines ( map  (\xs -> show [ hsModuleName x | (x,y,z) <- xs ]) scc)
-        putErrLn $ drawForest (map (fmap (show . map (hsModuleName . fst3))) (G.dff mgraph'))
-
-    let f ho libHo [] = processIOErrors >> return (ho,libDeps,libHo)
-        f ho libHo (sc:scs) = do
-            (cho',newHo) <- func ho [ hs | (hs,_,_) <- sc ]
-            let mods = [ hsModuleName hs | (hs,_,_) <- sc ]
-                mods' = snub [ m  | (hs,_,_) <- sc, m <- hsModuleRequires hs, m `notElem` mods]
-                mdeps = [ (m,dep) | m <- mods', dep <- Map.lookup m (choModules cho')]
-            let hoh = fillInHohHash HoHeader {
-                                 hohDepends    = [ x | (_,x,_) <- sc],
-                                 hohModDepends = mdeps,
-                                 hohHash = error "fillInHohHash - hoHash",
-                                 hohMetaInfo   = []
-                               }
-            recordHoFile newHo [ x | (_,_,x) <- sc ] hoh
-            f (cho' `mappend` mempty { choFiles = Map.fromList $ hohDepends hoh, choModules = mprovides hoh }) (libHo `mappend` newHo)  scs
-
-    cho <- ifunc cho (mempty { hoBuild = mempty { hoDataTable = dataTablePrims } } `mappend` readHo)
-    f cho libHo scc
-
-
+    f cho mempty [ (hh,hdep,ss) | [(hh,(hdep,CompSources ss))] <- sccm ]
 
 
 -- Read in a Ho file.
-
-checkForHoFile :: FilePath -> IO (Maybe (HoHeader,HoIDeps,Ho))
-checkForHoFile fn = flip catch (\e -> return Nothing) $ Just `fmap` readHoFile fn
 
 readHoFile :: FilePath -> IO (HoHeader,HoIDeps,Ho)
 readHoFile fn = do
@@ -594,10 +353,11 @@ readHoFile fn = do
 
 recordHoFile ::
     Ho               -- ^ File to record
-    -> [FileName]    -- ^ files to write to
+    -> HoIDeps
+    -> [FilePath]    -- ^ files to write to
     -> HoHeader      -- ^ file header
     -> IO ()
-recordHoFile ho fs header = do
+recordHoFile ho idep fs header = do
     if optNoWriteHo options then do
         wdump FD.Progress $ do
             fs' <- mapM shortenPath fs
@@ -630,16 +390,14 @@ recordHoFile ho fs header = do
             let theho =  mapHoBodies eraseE ho
                 cfflbs = mkCFFfile cff_magic [
                     (cff_jhdr, compress $ encode header),
-                    (cff_idep, compress $ encode ideps),
+                    (cff_idep, compress $ encode idep),
                     (cff_defs, compress $ encode $ hoExp theho),
                     (cff_core, compress $ encode $ hoBuild theho)]
-                ideps = HoIDeps $ Map.fromList [ (h,(m,fsts $ hohModDepends header)) | (m,h) <- hohDepends header]
             LBS.writeFile tfn cfflbs
             rename tfn fn
     g fs
 
 
-hsModuleRequires' = map fromModule . hsModuleRequires
 
 hsModuleRequires x = Module "Jhc.Prim":ans where
     noPrelude =   or $ not (optPrelude options):[ opt == c | opt <- hsModuleOptions x, c <- ["-N","--noprelude"]]
@@ -711,10 +469,10 @@ buildLibrary ifunc func = ans where
         let hoh =  HoHeader {
                 hohHash = lhash,
                 hohDepends = [ (m,MD5.emptyHash) | m <- mkeys (hoExports $ hoExp ho)],
-                hohModDepends = libDeps,
+                hohModDepends = snds libDeps,
                 hohMetaInfo = pdesc
                 }
-        recordHoFile ho [outName] hoh
+        recordHoFile ho (HoIDeps Map.empty) [outName] hoh
 
     -- parse library description file
     parse fp = do
@@ -742,12 +500,13 @@ instance DocLike d => PPrint d SrcLoc where
 {-# NOINLINE dumpHoFile #-}
 dumpHoFile :: String -> IO ()
 dumpHoFile fn = do
-    (hoh,_,ho) <- readHoFile fn
+    (hoh,idep,ho) <- readHoFile fn
     let hoB = hoBuild ho
         hoE = hoExp ho
     putStrLn fn
-    when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "Dependencies:\n" <>  vcat (map pprint $ sortUnder fst $ hohDepends hoh)
-    when (not $ Prelude.null (hohModDepends hoh)) $ putStrLn $ "ModDependencies:\n" <>  vcat (map pprint $ sortUnder fst $ hohModDepends hoh)
+    when (not $ Map.null (hoIDeps idep)) $ putStrLn $ "IDeps:\n" <>  vcat (map pprint . Map.toList $ hoIDeps idep)
+    when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "Dependencies:\n" <>  vcat (map pprint . sortUnder fst $ hohDepends hoh)
+    when (not $ Prelude.null (hohModDepends hoh)) $ putStrLn $ "ModDependencies:\n" <>  vcat (map pprint $ hohModDepends hoh)
     putStrLn $ "HoHash:" <+> pprint (hohHash hoh)
     putStrLn $ "MetaInfo:\n" <> vcat (sort [text (' ':' ':fromAtom k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
     putStrLn $ "Modules contained:" <+> tshow (mkeys $ hoExports hoE)
