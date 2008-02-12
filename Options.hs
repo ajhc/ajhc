@@ -48,6 +48,7 @@ data Mode = BuildHl String -- ^ Build the specified hl-file given a description 
           | CompileHo      -- ^ Compile ho
           | CompileHoGrin  -- ^ Compile ho and grin
           | CompileExe     -- ^ Compile executable
+          | DependencyTree -- ^ show simple dependency tree
           | ShowHo String  -- ^ Show ho-file.
           | ListLibraries  -- ^ List libraries
             deriving(Eq)
@@ -66,6 +67,8 @@ data Opt = Opt {
     optHls         ::  [String],  -- ^ Load the specified hl-files (haskell libraries).
     optHlPath      ::  [String],  -- ^ Path to look for libraries.
     optCC          ::  String,    -- ^ C compiler.
+    optHoDir       ::  Maybe FilePath,
+    optHoCache     ::  Maybe FilePath,
     optArgs        ::  [String],
     optKeepGoing   :: !Bool,      -- ^ Keep going when encountering errors.
     optMainFunc    ::  Maybe (Bool,String),    -- ^ Entry point name for the main function.
@@ -95,6 +98,8 @@ opt = Opt {
     optStmts       = [],
     optFOpts       = ["default"],
     optCCargs      = [],
+    optHoDir       = Nothing,
+    optHoCache     = Nothing,
     optCC          = "gcc",
     optArgs        = [],
     optIgnoreHo    = False,
@@ -150,6 +155,9 @@ theoptions =
     , Option []    ["ignore-ho"]   (NoArg  (optIgnoreHo_s True))       "Ignore existing haskell object files"
     , Option []    ["nowrite-ho"]  (NoArg  (optNoWriteHo_s True))      "Do not write new haskell object files"
     , Option []    ["no-ho"]       (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "same as --ignore-ho and --nowrite-ho"
+    , Option []    ["ho-cache"]    (ReqArg (optHoCache_s . Just ) "HOCACHEDIR")    "Use a global ho cache located at the argument"
+    , Option []    ["ho-dir"]      (ReqArg (optHoDir_s . Just ) "<dir>")    "Where to place and look for ho files"
+    , Option []    ["dependency"]  (NoArg  (optMode_s DependencyTree))  "Follow import dependencies only then quit"
     , Option []    ["no-follow-deps"] (NoArg  (optFollowDeps_s False)) "Don't follow depencies not listed on command line."
     , Option []    ["list-libraries"] (NoArg  (optMode_s ListLibraries)) "List of installed libraries."
     ]

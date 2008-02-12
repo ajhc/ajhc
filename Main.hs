@@ -112,6 +112,7 @@ main = runMain $ catom $ bracketHtml $ do
             sequence_ [ putStrLn name | (name,_) <- ll ]
         ShowHo ho     -> dumpHoFile ho
         Version       -> putStrLn versionString
+        DependencyTree -> doDependency (optArgs o)
         VersionCtx    -> putStrLn (versionString ++ versionContext)
         _             -> processFiles  (optArgs o)
 
