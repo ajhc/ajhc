@@ -26,7 +26,6 @@ import qualified Support.MD5 as MD5
 -- the collected information that is passed around
 data CollectedHo = CollectedHo {
     choFiles :: Map.Map Module MD5.Hash,
-    choModules :: Map.Map Module MD5.Hash,
     choExternalNames :: IdSet,
     choVarMap :: IdMap (Maybe E),
     choHo :: Ho
@@ -37,7 +36,6 @@ instance Monoid CollectedHo where
     mempty = collectedHo
     a `mappend` b = CollectedHo {
         choFiles = choFiles a `mappend` choFiles b,
-        choModules = choModules a `mappend` choModules b,
         choExternalNames = choExternalNames a `mappend` choExternalNames b,
         choVarMap = choVarMap a `mappend` choVarMap b,
         choHo = choHo a `mappend` choHo b
@@ -46,7 +44,7 @@ instance Monoid CollectedHo where
 choDataTable cho = hoDataTable $ hoBuild (choHo cho)
 
 collectedHo :: CollectedHo
-collectedHo = CollectedHo { choFiles = mempty, choModules = mempty, choExternalNames = mempty, choHo = mempty, choVarMap = mempty }
+collectedHo = CollectedHo { choFiles = mempty, choExternalNames = mempty, choHo = mempty, choVarMap = mempty }
 
 
 -- this is the immutable information about modules that depnends only on their contents

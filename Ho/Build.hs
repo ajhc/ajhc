@@ -145,19 +145,27 @@ doDependency as = do
 
 replaceSuffix suffix fp = reverse (dropWhile ('.' /=) (reverse fp)) ++ suffix
 
-findHoFile :: IORef Done -> FilePath -> Maybe Module -> SourceHash -> IO (Maybe FilePath)
-findHoFile done_ref fp _ sh = do
+hoFile :: FilePath -> Maybe Module -> SourceHash -> FilePath
+hoFile fp mm sh = case optHoDir options of
+    Nothing -> replaceSuffix "ho" fp
+    Just hdir -> case mm of
+        Nothing -> hdir ++ "/" ++ show sh ++ ".ho"
+        Just m -> hdir ++ "/" ++ map ft (show m) ++ ".ho" where
+            ft '/' = '.'
+            ft x = x
+
+findHoFile :: IORef Done -> FilePath -> Maybe Module -> SourceHash -> IO (Bool,FilePath)
+findHoFile done_ref fp mm sh = do
     done <- readIORef done_ref
-    if sh `Map.member` knownSourceMap done then return Nothing else do
-    let honame = replaceSuffix "ho" fp
-    onErr (return Nothing) (readHoFile honame) $ \ (hoh,hidep,ho) -> do
+    let honame = hoFile fp mm sh
+    if sh `Map.member` knownSourceMap done then return (False,honame) else do
+    onErr (return (False,honame)) (readHoFile honame) $ \ (hoh,hidep,ho) -> do
         case hohHash hoh `Map.lookup` hosEncountered done of
-            Just (fn,_,_a) -> return (Just fn)
+            Just (fn,_,_a) -> return (True,fn)
             Nothing -> do
-                honame <- shortenPath honame
                 modifyIORef done_ref (knownSourceMap_u $ mappend (hoIDeps hidep))
                 modifyIORef done_ref (hosEncountered_u $ Map.insert (hohHash hoh) (honame,hoh,ho))
-                return (Just honame)
+                return (True,honame)
 
 
 
@@ -173,7 +181,7 @@ fetchSource done_ref fs mm = do
             Just m -> modifyIORef done_ref (modEncountered_u $ Map.insert m ModNotFound) >> return m
     onErr killMod (findFirstFile mod [ (f,undefined) | f <- fs]) $ \ (lbs,fn,_) -> do
     let hash = MD5.md5lazy lbs
-    mho <- findHoFile done_ref fn mm hash
+    (foundho,mho) <- findHoFile done_ref fn mm hash
     done <- readIORef done_ref
     (mod,m,ds) <- case mlookup hash (knownSourceMap done) of
         Just (m,ds) -> do return (Left lbs,m,ds)
@@ -188,13 +196,14 @@ fetchSource done_ref fs mm = do
             putErrLn $ "Skipping file" <+> fn <+> "because it's module declaration of" <+> show m <+> "does not equal the expected" <+> show m'
             killMod
         _ -> do
-            fn' <- shortenPath fn
-            let sc (Right mod) = SourceParsed hash ds mod fn
-                sc (Left lbs) = SourceRaw hash ds m lbs fn
+            let sc (Right mod) = SourceParsed hash ds mod fn mho
+                sc (Left lbs) = SourceRaw hash ds m lbs fn mho
             modifyIORef done_ref (modEncountered_u $ Map.insert m (Found (sc mod)))
-            case mho of
-                Nothing -> putVerboseLn $ printf "%-23s [%s]" (show m) fn'
-                Just ho -> putVerboseLn $ printf "%-23s [%s] <%s>" (show m) fn' ho
+            fn' <- shortenPath fn
+            mho' <- shortenPath mho
+            case foundho of
+                False -> putVerboseLn $ printf "%-23s [%s]" (show m) fn'
+                True -> putVerboseLn $ printf "%-23s [%s] <%s>" (show m) fn' mho'
             mapM_ (resolveDeps done_ref) ds
             return m
 
@@ -207,8 +216,8 @@ resolveDeps done_ref m = do
 
 
 data SourceCode
-    = SourceParsed { sourceHash :: SourceHash, sourceDeps :: [Module], sourceModule :: HsModule, sourceFP :: FilePath }
-    | SourceRaw    { sourceHash :: SourceHash, sourceDeps :: [Module], sourceModName :: Module, sourceLBS :: LBS.ByteString, sourceFP :: FilePath }
+    = SourceParsed { sourceHash :: SourceHash, sourceDeps :: [Module], sourceModule :: HsModule, sourceFP :: FilePath, sourceHoName :: FilePath }
+    | SourceRaw    { sourceHash :: SourceHash, sourceDeps :: [Module], sourceModName :: Module, sourceLBS :: LBS.ByteString, sourceFP :: FilePath, sourceHoName :: FilePath }
 
 
 sourceIdent SourceParsed { sourceModule = m } = show $ hsModuleName m
@@ -324,12 +333,12 @@ findModule need ifunc func  = do
             let hoh = HoHeader {
                                  hohDepends    = [ (hsModuleName mod,h) | (h,mod) <- modules],
                                  hohModDepends = hdep,
-                                 hohHash = hh,
+                                 hohHash       = hh,
                                  hohMetaInfo   = []
                                }
                 idep = HoIDeps $ Map.fromList [ (h,(hsModuleName mod,hsModuleRequires mod)) | (h,mod) <- modules]
-            recordHoFile newHo idep (map (replaceSuffix "ho" . sourceFP) sc) hoh
-            f (cho' `mappend` mempty { choFiles = Map.fromList $ hohDepends hoh, choModules = mprovides hoh }) (libHo `mappend` newHo)  scs
+            recordHoFile newHo idep (map sourceHoName sc) hoh
+            f (cho' `mappend` mempty { choFiles = Map.fromList $ hohDepends hoh  }) (libHo `mappend` newHo)  scs
         mprovides hoh = Map.fromList [ (x,hohHash hoh) | (x,_) <- hohDepends hoh]
 
     let sccm = G.sccGroups $ G.newGraph cug fst (fst . snd)
