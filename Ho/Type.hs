@@ -19,6 +19,7 @@ import Name.Id
 import Name.Name(Name)
 import TypeSynonyms(TypeSynonyms)
 import PackedString
+import Data.Binary
 import qualified Support.MD5 as MD5
 
 
@@ -50,9 +51,10 @@ collectedHo = CollectedHo { choFiles = mempty, choModules = mempty, choExternalN
 
 -- this is the immutable information about modules that depnends only on their contents
 -- it can be trusted even if the ho file itself is out of date.
-data HoIDeps = HoIDeps {
+newtype HoIDeps = HoIDeps {
     hoIDeps :: Map.Map MD5.Hash (Module,[Module])
     }
+    deriving(Binary)
 
 data HoHeader = HoHeader {
     -- * my sha1 id

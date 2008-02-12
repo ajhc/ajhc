@@ -470,6 +470,12 @@ compileModEnv' cho = do
     let dataTable = progDataTable prog
         rules = hoRules $ hoBuild ho
         prog = hoToProgram ho
+        hoToProgram :: Ho -> Program
+        hoToProgram ho = programSetDs (hoEs $ hoBuild ho) program {
+            progClassHierarchy = hoClassHierarchy $ hoBuild ho,
+            progDataTable = hoDataTable $ hoBuild ho
+            }
+
 
     -- dump final version of various requested things
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
