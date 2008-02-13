@@ -17,14 +17,6 @@ import qualified FlagDump as FD
 
 type LibraryName = String
 
-
-
-
--- Write a library and mutilate it to fit the description
-
-
-
-
 -------------------------
 -- parse description file
 -------------------------
