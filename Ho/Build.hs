@@ -273,6 +273,7 @@ toCompUnitGraph done roots = do
         phomap = Map.fromListWith (++) (concat [  [ (m,[hh]) | (m,_) <- hohDepends hoh ] | (hh,(_,hoh,_)) <- Map.toList (hosEncountered done)])
         sources = Map.fromList [ (m,sourceHash sc) | (m,Found sc) <- Map.toList (modEncountered done)]
     when (dump FD.SccModules) $ do
+        mapM_ (putErrLn . show) $ map (map $ fst . fst) gr'
         putErrLn $ drawForest (map (fmap (show . fst . fst)) (G.dff gr))
 
     cug_ref <- newIORef []

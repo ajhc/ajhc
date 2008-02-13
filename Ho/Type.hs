@@ -25,7 +25,6 @@ import qualified Support.MD5 as MD5
 
 -- the collected information that is passed around
 data CollectedHo = CollectedHo {
-    choFiles :: Map.Map Module MD5.Hash,
     choExternalNames :: IdSet,
     choVarMap :: IdMap (Maybe E),
     choHo :: Ho
@@ -35,7 +34,6 @@ data CollectedHo = CollectedHo {
 instance Monoid CollectedHo where
     mempty = collectedHo
     a `mappend` b = CollectedHo {
-        choFiles = choFiles a `mappend` choFiles b,
         choExternalNames = choExternalNames a `mappend` choExternalNames b,
         choVarMap = choVarMap a `mappend` choVarMap b,
         choHo = choHo a `mappend` choHo b
@@ -45,7 +43,6 @@ choDataTable cho = hoDataTable $ hoBuild (choHo cho)
 
 collectedHo :: CollectedHo
 collectedHo = CollectedHo {
-    choFiles = mempty,
     choExternalNames = mempty,
     choHo = mempty { hoBuild = mempty { hoDataTable = dataTablePrims } },
     choVarMap = mempty
