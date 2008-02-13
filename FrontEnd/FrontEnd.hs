@@ -31,8 +31,7 @@ parseFiles :: [Either Module String]      -- ^ List of files or modules to read
 parseFiles fs ifunc func = do
     wdump FD.Progress $ do
         putErrLn $ "Compiling " ++ show fs
-    (res,_,_) <- findModule fs ifunc (doModules func)
-    return res
+    compileModules fs ifunc (doModules func)
 
 -- Process modules found by Ho
 doModules :: (CollectedHo -> Ho -> Tc.TiData -> IO (CollectedHo,Ho)) -> CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)

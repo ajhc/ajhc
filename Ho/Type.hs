@@ -4,7 +4,7 @@ import Data.Monoid
 import qualified Data.Map as Map
 
 import StringTable.Atom
-import DataConstructors(DataTable)
+import DataConstructors(DataTable,dataTablePrims)
 import E.E(TVr,E)
 import E.Rules(Rules)
 import E.TypeCheck()
@@ -44,7 +44,12 @@ instance Monoid CollectedHo where
 choDataTable cho = hoDataTable $ hoBuild (choHo cho)
 
 collectedHo :: CollectedHo
-collectedHo = CollectedHo { choFiles = mempty, choExternalNames = mempty, choHo = mempty, choVarMap = mempty }
+collectedHo = CollectedHo {
+    choFiles = mempty,
+    choExternalNames = mempty,
+    choHo = mempty { hoBuild = mempty { hoDataTable = dataTablePrims } },
+    choVarMap = mempty
+    }
 
 
 -- this is the immutable information about modules that depnends only on their contents
