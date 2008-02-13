@@ -102,6 +102,17 @@ xs !! n | n < zero  =  error "Prelude.(!!): negative index\n"
                                then y
                                else sub ys $! (n `minus` one)
 
+null             :: [a] -> Bool
+null []          =  True
+null (_:_)       =  False
+
+-- length returns the length of a finite list as an Int.
+
+length           :: [a] -> Int
+length xs = f xs zero where
+    f [] n = n
+    f (_:xs) n = f xs $! n `plus` one
+
 
 
 {- SPECIALIZE sequence :: forall a . [IO a] -> IO [a] #-}

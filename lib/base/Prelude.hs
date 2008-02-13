@@ -21,7 +21,11 @@ module Prelude(
     and,
     filter,
     or,
+    length,
+    null,
     (!!),
+    Maybe(Just,Nothing),
+    maybe,
     sequence,
     sequence_,
     -- submodules
@@ -63,6 +67,7 @@ import Jhc.Monad
 import Jhc.Num
 import Jhc.Order
 import Jhc.Show
+import Jhc.Maybe
 import Jhc.Tuples
 import Prelude.Float
 import Prelude.IO
@@ -131,30 +136,8 @@ x ^^ n           =  if n >= 0 then x^n else recip (x^(-n))
 
 
 
-instance Monad Maybe where
-    return x = Just x
-    Nothing >>= _ = Nothing
-    Just x >>= y = y x
-    fail _ = Nothing
 
 
-
-instance Functor Maybe where
-    fmap _ Nothing = Nothing
-    fmap f (Just x) = Just (f x)
-
-
-
--- Maybe
-
-data Maybe a  =  Nothing | Just a
-    deriving (Eq, Ord, Read, Show)
-
-
-maybe :: b -> (a -> b) -> Maybe a -> b
-maybe n f m = case m of
-    Just x -> f x
-    Nothing -> n
 
 data Either a b = Left a | Right b
     deriving (Eq, Ord, Read, Show)
@@ -198,17 +181,6 @@ init (x:xs)      =  init' x xs where
     init' _ [] = []
     init' y (z:zs) = y:init' z zs
 
-
-null             :: [a] -> Bool
-null []          =  True
-null (_:_)       =  False
-
--- length returns the length of a finite list as an Int.
-
-length           :: [a] -> Int
-length xs = f xs 0 where
-    f [] n = n
-    f (_:xs) n = f xs $! n + 1
 
 
 -- foldl, applied to a binary operator, a starting value (typically the

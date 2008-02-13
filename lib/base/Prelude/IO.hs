@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi -funboxed-values #-}
+{-# OPTIONS_JHC -N -fffi -funboxed-values #-}
 module Prelude.IO(
     IO(),
     ioError,
@@ -14,23 +14,22 @@ module Prelude.IO(
     interact,
     writeFile,
     appendFile,
-    readIO,
-    readLn,
     putChar,
     runExpr,
     getChar,
     userError
     ) where
 
-import Prelude
-import Prelude.Text
-import Prelude.IOError
-import Jhc.Addr
-import Jhc.IO
-import Data.Char
-import Foreign.C.Types
 import Foreign.C.String
+import Foreign.C.Types
 import Foreign.Ptr
+import Jhc.Addr
+import Jhc.Basics
+import Jhc.IO
+import Jhc.Monad
+import Jhc.Order
+import Jhc.Show
+import Prelude.IOError
 
 
 -- IO operations exported by the prelude
@@ -108,17 +107,7 @@ writeFile  =  error "writeFile"
 appendFile :: FilePath -> String -> IO ()
 appendFile =  error "appendFile"
 
-  -- raises an exception instead of an error
-readIO   :: Read a => String -> IO a
-readIO s =  case [x | (x,t) <- reads s, ("","") <- lex t] of
-              [x] -> return x
-              []  -> ioError (userError "Prelude.readIO: no parse")
-              _   -> ioError (userError "Prelude.readIO: ambiguous parse")
 
-readLn :: Read a => IO a
-readLn =  do l <- getLine
-             r <- readIO l
-             return r
 
 putChar :: Char -> IO ()
 putChar c = c_putwchar (ord c)

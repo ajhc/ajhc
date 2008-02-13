@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi #-}
+{-# OPTIONS_JHC -N -fffi #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.Marshal.Utils
@@ -51,6 +51,13 @@ import Foreign.Ptr	        ( Ptr, nullPtr )
 import Foreign.Storable		( Storable(poke) )
 import Foreign.C.Types    	( CSize )
 import Foreign.Marshal.Alloc 	( malloc, alloca )
+import Jhc.Basics
+import Jhc.IO
+import Jhc.List
+import Jhc.Monad
+import Jhc.Num
+import Jhc.Order
+import Jhc.Maybe
 
 
 -- combined allocation and marshalling

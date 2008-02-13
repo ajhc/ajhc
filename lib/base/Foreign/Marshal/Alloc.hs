@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi #-}
+{-# OPTIONS_JHC -N -fffi #-}
 module Foreign.Marshal.Alloc (
   -- * Memory allocation
   -- ** Local allocation
@@ -23,9 +23,13 @@ import Foreign.C.Types
 import Foreign.Marshal.Utils
 import Prelude.IOError
 import Jhc.Prim
+import Jhc.Basics
+import Jhc.Monad
+import Jhc.Order
 import Jhc.IO
 import Jhc.Int(unboxInt)
 import Jhc.Addr
+import Jhc.Num
 import qualified Jhc.Options as JO
 
 

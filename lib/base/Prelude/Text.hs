@@ -3,13 +3,14 @@ module Prelude.Text (
     Read(readsPrec, readList),
     Show(showsPrec, show, showList),
     reads, shows, read, lex,
-    showChar, showString, readParen, showParen ) where
+    showChar, showString, readParen, showParen,readIO,readLn ) where
 
 -- The instances of Read and Show for
 --      Bool, Maybe, Either, Ordering
 -- are done via "deriving" clauses in Prelude.hs
 import Prelude
 import Jhc.Show
+import Jhc.Inst.Show()
 import Prelude.Float
 
 
@@ -18,6 +19,18 @@ import Data.Char(isSpace, isAlpha, isDigit, isAlphaNum,
 
 import Numeric(showSigned, showInt, readSigned, readDec, showFloat,
                readFloat, lexDigits)
+
+readLn :: Read a => IO a
+readLn =  do l <- getLine
+             r <- readIO l
+             return r
+
+  -- raises an exception instead of an error
+readIO   :: Read a => String -> IO a
+readIO s =  case [x | (x,t) <- reads s, ("","") <- lex t] of
+              [x] -> return x
+              []  -> ioError (userError "Prelude.readIO: no parse")
+              _   -> ioError (userError "Prelude.readIO: ambiguous parse")
 
 type  ReadS a  = String -> [(a,String)]
 

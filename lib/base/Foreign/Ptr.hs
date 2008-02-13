@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi #-}
+{-# OPTIONS_JHC -N -fffi #-}
 module Foreign.Ptr(
     Ptr(),
     nullPtr,
@@ -15,6 +15,13 @@ module Foreign.Ptr(
     ) where
 
 
+import Jhc.Show
+import Jhc.Inst.Show
+import Jhc.Monad
+import Jhc.Order
+import Jhc.IO
+import Jhc.Basics
+import Jhc.Num
 import Jhc.Addr
 import Foreign.Storable
 

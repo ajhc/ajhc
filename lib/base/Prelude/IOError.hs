@@ -1,12 +1,13 @@
+{-# OPTIONS_JHC -N #-}
 module Prelude.IOError(IOError(),showIOError,userError) where
 
 import Jhc.IO
+import Jhc.Show
 
 instance Show IOError where
     showsPrec _ s = showString (showIOError s)
 
 {-
-
 
 data IOError = IOError {
      ioe_handle   :: Maybe Handle,   -- the handle used by the action flagging
