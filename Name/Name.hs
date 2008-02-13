@@ -15,14 +15,15 @@ module Name.Name(
     toId,
     fromId,
     Module,
+    isTypeNamespace,
+    isValNamespace,
     mainModule,
     nameParts,
     mapName,
     setModule
     ) where
 
-import Char
-import Monad(liftM)
+import Data.Char
 import Data.Typeable
 
 import StringTable.Atom
@@ -72,10 +73,10 @@ fromValishHsName name
 
 createName _ "" i = error $ "createName: empty module "  ++ i
 createName _ m "" = error $ "createName: empty ident "   ++ m
-createName t m i = Name $  toAtom $ (chr $ fromEnum t):m ++ "\NUL" ++ i
+createName t m i = Name $  toAtom $ (chr $  ord '1' + fromEnum t):m ++ ";" ++ i
 createUName :: NameType -> String -> Name
 createUName _ "" = error $ "createUName: empty ident"
-createUName t i =  Name $ toAtom $ (chr $ fromEnum t):"\NUL" ++ i
+createUName t i =  Name $ toAtom $ (chr $ fromEnum t + ord '1'):";" ++ i
 
 class ToName a where
     toName :: NameType -> a -> Name
@@ -142,19 +143,19 @@ parseName t name = toName t (intercalate "." ms, intercalate "." (ns ++ [last sn
 
 
 nameType :: Name -> NameType
-nameType (Name a) = toEnum (ord (head (fromAtom a)))
+nameType (Name a) = toEnum $ fromIntegral ( a `unsafeByteIndex` 0)  - ord '1'
 
 nameName :: Name -> HsName
 nameName (Name a) = f $ tail (fromAtom a) where
-    f ('\NUL':xs) = UnQual $ HsIdent xs
-    f xs | (a,_:b) <- span (/= '\NUL') xs  = Qual (Module a) (HsIdent b)
+    f (';':xs) = UnQual $ HsIdent xs
+    f xs | (a,_:b) <- span (/= ';') xs  = Qual (Module a) (HsIdent b)
     f _ = error $ "invalid Name: " ++ (show $ (fromAtom a :: String))
 
 nameParts :: Name -> (NameType,Maybe String,String)
 nameParts n@(Name a) = f $ tail (fromAtom a) where
-    f ('\NUL':xs) = (nameType n,Nothing,xs)
+    f (';':xs) = (nameType n,Nothing,xs)
     f xs = (nameType n,Just a,b) where
-        (a,_:b) = span (/= '\NUL') xs
+        (a,_:b) = span (/= ';') xs
 
 instance Show Name where
     show a = show $ nameName a

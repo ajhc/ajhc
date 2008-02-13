@@ -4,18 +4,27 @@
 #include <inttypes.h>
 #include <ctype.h>
 #include <stdbool.h>
-#include <pthread.h>
 #define NDEBUG 1
 #include <assert.h>
 
-#include "StringTable_cbits.h"
+
+#define USE_THREADS 0
+
+#if USE_THREADS
+
+#include <pthread.h>
 
 static pthread_mutex_t mutex_hash = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t mutex_string = PTHREAD_MUTEX_INITIALIZER;
 
+#else
+
 #define pthread_mutex_lock(x) ;
 #define pthread_mutex_unlock(x) ;
 
+#endif
+
+#include "StringTable_cbits.h"
 // 23 bits of chunk space to leave one bit for 'valid' flag.
 // valid flag must be set to 1 for it to be a valid atom
 
@@ -117,6 +126,8 @@ fast_insert(int t, int tb, struct hentry hb) {
         hash_insert(hb);
 }
 
+#ifndef NDEBUG
+
 static bool
 atom_exists(atom_t a) {
         for(int i = 0; i < HASHSIZE*CUCKOO_HASHES; i++) {
@@ -135,6 +146,8 @@ item_exists(unsigned char *cs, int len) {
         }
         return false;
 }
+
+#endif
 
 void
 dump_to_file(void) {
@@ -188,8 +201,6 @@ hash_insert(struct hentry x) {
         assert(ATOM_VALID(x.atom));
 //         fprintf(stderr,"hash_insert(%x,%p:%i,%x,%x,[%x,%x]", x.atom, ATOM_PTR(x.atom), ATOM_LEN(x.atom), x.hashes[0], x.hashes[1],HASH_INDEX(0,x.hashes[0]),HASH_INDEX(1,x.hashes[1]));
         assert(!atom_exists(x.atom));
-        if(item_exists(ATOM_PTR(x.atom),ATOM_LEN(x.atom)))
-            dump_table();
         assert(!item_exists(ATOM_PTR(x.atom),ATOM_LEN(x.atom)));
         atom_t start = x.atom;
         for(int loop = 0; loop < DEPTH_LIMIT;loop++) {

@@ -8,6 +8,7 @@ module StringTable.Atom(
     isValidAtom,
     unsafeIntToAtom,
     atomCompare,
+    unsafeByteIndex,
     dumpTable,
     dumpToFile,
     dumpStringTableStats
@@ -22,7 +23,6 @@ import Control.Monad
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
-import System.IO.Unsafe
 import Foreign
 import Foreign.Marshal
 import Data.Word
@@ -138,6 +138,9 @@ isValidAtom i = odd i
 
 unsafeIntToAtom :: Int -> Atom
 unsafeIntToAtom x = Atom (fromIntegral x)
+
+unsafeByteIndex :: Atom -> Int -> Word8
+unsafeByteIndex atom off = fromIntegral (unsafePerformIO $ peek (stPtr atom `advancePtr` off))
 
 foreign import ccall unsafe "stringtable_lookup" stAdd :: CString -> CInt -> IO Atom
 foreign import ccall unsafe "stringtable_ptr" stPtr :: Atom -> CString
