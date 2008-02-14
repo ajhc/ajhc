@@ -100,7 +100,7 @@ jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES) StringTable/Atom.hs $(CFILES)
 	$(HC) $(GHCOPTS) --make $< $(CFILES) -o $@
 
 jhcp: Main.hs $(BUILT_SOURCES) $(HSFILES)
-	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< -o $@
+	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< $(CFILES) -o $@
 
 jhc.1: Options.hs
 	$(MAKE) $(AM_MAKEFLAGS) jhc$(EXEEXT)
