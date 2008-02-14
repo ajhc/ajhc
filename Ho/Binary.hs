@@ -43,14 +43,6 @@ instance Binary HoBuild where
     am <- get
     return (HoBuild ae af ag ah ai ak al am)
 
-instance Binary Ho where
-    put (Ho ac ad) = do
-	    put ac
-	    put ad
-    get = do
-    ac <- get
-    ad <- get
-    return (Ho ac ad)
 
 instance Binary HoExp where
     put (HoExp ac ad) = do

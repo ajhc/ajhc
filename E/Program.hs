@@ -81,8 +81,8 @@ programAddDs ds prog = prog { progCombinators = [ (t,as,body) | (t,e) <- ds, let
 programE :: Program -> E
 programE prog = ELetRec (programDs prog) (EVar (progMainEntry prog))
 
-programEsMap :: Program -> Map.Map Name (TVr,E)
-programEsMap prog = runIdentity $ do
+programEsMap :: Monad m => Program -> m (Map.Map Name (TVr,E))
+programEsMap prog = do
     let f d@(v,_) = case fromId (tvrIdent v) of
             Just n -> return (n,d)
             Nothing -> fail $ "Program.programEsMap: top level var with temporary name " ++ show v

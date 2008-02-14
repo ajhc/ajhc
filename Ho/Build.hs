@@ -102,9 +102,6 @@ shortenPath x@('/':_) = do
 shortenPath x = return x
 
 
-type SourceHash = MD5.Hash
-type HoHash     = MD5.Hash
-
 instance DocLike d => PPrint d MD5.Hash where
     pprintPrec _ h = tshow h
 

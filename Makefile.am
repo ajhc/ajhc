@@ -3,6 +3,7 @@ ACLOCAL_AMFLAGS=-I ac-macros
 
 bin_PROGRAMS = jhc
 
+
 jhc_SOURCES = Main.hs  $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
 
 SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
@@ -10,7 +11,7 @@ SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
 BUILT_SOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs \
 	       FlagOpts.hs Name/Prim.hs Info/Properties.hs $(DRIFTFILES)
 
-MY_CFLAGS= -I$(srcdir)/StringTable -I$(srcdir)/cbits -I$(builddir)/cbits
+MY_CFLAGS= -I$(srcdir)/StringTable -I$(srcdir)/cbits -I$(builddir)/cbits -optc-std=c99 -optc-O2 -optc-Wall
 
 HSFILES= C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpEval.hs C/Op.hs \
          C/Prims.hs DataConstructors.hs DataConstructors.hs DerivingDrift/DataP.hs DerivingDrift/Drift.hs \
@@ -49,11 +50,13 @@ GHCINC=  -i -i$(srcdir)/drift_processed -i$(srcdir)/drift_processed/FrontEnd \
 	 -i$(srcdir)/. -i$(srcdir)/FrontEnd -odir $(builddir) -hidir $(builddir)
 PACKAGES= -package mtl  -package unix -package QuickCheck -ignore-package lang
 GHCLANG=    -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
-GHCOPTS=  $(HSOPTS)  -O -ignore-package lang  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG) -optc-std=c99 -optc-O2 -optc-Wall $(MY_CFLAGS)
+GHCOPTS=  $(HSOPTS)  -O -ignore-package lang  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
 JHC_LIBS =  base-1.0.hl haskell98-1.0.hl
 
 EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS) StringTable/StringTable_cbits.c StringTable/StringTable_cbits.h cbits/md5sum.c
+
+CC = $(HC)
 
 dist-hook:
 	find $(distdir)  -name _darcs -o -name \*.ho | xargs rm -rf --
@@ -88,7 +91,10 @@ drift_processed/%: %
 	DrIFT $< -o $@
 
 
-CFILES =  StringTable/StringTable_cbits.c  cbits/md5sum.c
+CFILES =  StringTable/StringTable_cbits.o  cbits/md5sum.o
+
+%.o : %.c
+	$(HC) $(MY_CFLAGS) $< -c -o $@
 
 jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES) StringTable/Atom.hs $(CFILES)
 	$(HC) $(GHCOPTS) --make $< $(CFILES) -o $@
@@ -180,7 +186,7 @@ depend.make: deps.txt
 	echo HSFILES=`egrep -o '[A-Za-z0-9/.]+.hs' $< | sed -e 's/^\.\///' | sort` > depend.make
 
 i:
-	ghci $(GHCOPTS) Main.hs
+	ghci $(GHCOPTS) Main.hs $(CFILES)
 
 .PHONY: ho-clean hl-clean i update-datestamp
 

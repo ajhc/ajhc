@@ -1,5 +1,5 @@
 
-module Main(main) where
+module Main(main,compileModEnv') where
 
 import Control.Exception
 import Control.Monad.Identity
@@ -96,7 +96,7 @@ bracketHtml action = do
 catom action = action `finally` dumpToFile
 catom action = Control.Exception.catch action (\e -> dumpTable >> dumpStringTableStats >> throw e)
 
-main = runMain $ catom $ bracketHtml $ do
+main = do -- runMain $ catom $ bracketHtml $ do
     o <- processOptions
     progressM $ do
         (argstring,_) <- getArgString
@@ -169,18 +169,19 @@ processInitialHo accumho aho = do
     let ho' = reprocessHo (hoRules ho) mempty ho
         ho = hoBuild aho
         -- XXX do we need to do this?
-        ds = runIdentity $ annotateDs (choVarMap accumho') (\_ -> return) letann lamann (hoEs ho')
+    let-- rules' = runIdentity $ mapBodies (annotate imapRules (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
+        --imapRules = choVarMap accumho  `mappend` newVarMap
+        --accumho' = reprocessCho rules' mempty accumho
+    let ds = runIdentity $ annotateDs (choVarMap accumho) (\_ -> return) letann lamann (hoEs ho')
 
         prog = etaAnnotateProgram (programSetDs ds program { progDataTable = choDataTable accumho `mappend` hoDataTable ho })
-
-        rules' = runIdentity $ mapBodies (annotate imapRules (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
-        accumho' = reprocessCho rules' mempty accumho
-
-        imapRules = choVarMap accumho'  `mappend` newVarMap
         newVarMap = fromList [ (tvrIdent t,Just (EVar t)) | (t,_) <- programDs prog ]
 
+
+        (mod:_) = Map.keys $ hoExports $ hoExp aho
+
     --lintCheckProgram (putStrLn "processInitialHo") prog
-    return $ accumho' `mappend` mempty { choVarMap = newVarMap, choExternalNames = idMapToIdSet newVarMap, choHo = aho { hoBuild = ho { hoEs = programDs prog } } }
+    return $ updateCollectedHo $ accumho `mappend` mempty { choVarMap = newVarMap, choExternalNames = idMapToIdSet newVarMap, choHoMap = Map.singleton (show mod) aho { hoBuild = ho { hoEs = programDs prog } } }
 
 -- reprocess an old ho to include new rules and properties
 reprocessHo :: Rules -> IdMap Properties -> HoBuild -> HoBuild
@@ -189,7 +190,7 @@ reprocessHo rules ps ho = ho { hoEs = map f (hoEs ho) } where
     g id = runIdentity . idann rules ps id
 
 reprocessCho :: Rules -> IdMap Properties -> CollectedHo -> CollectedHo
-reprocessCho rules ps cho = choHo_u (hoBuild_u (hoEs_u (map f))) $ choVarMap_u (fmap h) cho where
+reprocessCho rules ps cho = updateCollectedHo $ choHoMap_u (Map.map $ hoBuild_u (hoEs_u (map f))) $ choVarMap_u (fmap h) cho where
     f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
     g id = runIdentity . idann rules ps id
     h ~(Just (EVar t)) = Just (EVar (tvrInfo_u (g (tvrIdent t)) t))
@@ -429,7 +430,8 @@ processDecls cho ho' tiData = do
         hoRules = hoRules (hoBuild ho') `mappend` rules
         }
         newMap = fromList [ (tvrIdent n,Just (EVar n)) | (n,_) <- hoEs newHoBuild ]
-    return (mempty { choHo = ho' { hoBuild = newHoBuild}, choExternalNames = idMapToIdSet newMap, choVarMap = newMap  } `mappend` cho,ho' { hoBuild = newHoBuild })
+        (mod:_) = Map.keys $ hoExports $ hoExp ho'
+    return (mempty { choHoMap = Map.singleton (show mod) ho' { hoBuild = newHoBuild}, choExternalNames = idMapToIdSet newMap, choVarMap = newMap  } `mappend` cho,ho' { hoBuild = newHoBuild })
 
 programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = programSetDs ds' prog where
@@ -476,6 +478,7 @@ compileModEnv' cho = do
             progDataTable = hoDataTable $ hoBuild ho
             }
 
+    wdump FD.Core $ printProgram prog
 
     -- dump final version of various requested things
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
@@ -499,10 +502,14 @@ compileModEnv' cho = do
 
 
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
-    (_,main,mainv) <- getMainFunction dataTable mainFunc (programEsMap prog)
+    putErrLn "!!!!!"
+    esmap <- programEsMap prog
+    putErrLn "!!!!!"
+    (_,main,mainv) <- getMainFunction dataTable mainFunc esmap
     let ffiExportNames = [tv | (tv, _, _) <- progCombinators prog,
                                name <- tvrName tv,
                                "FE@" `isPrefixOf` show name]
+    putErrLn "!!!!!"
     prog <- return prog { progMainEntry   = main,
                           progEntryPoints = (main:ffiExportNames),
                           progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog]

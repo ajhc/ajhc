@@ -22,47 +22,52 @@ import PackedString
 import Data.Binary
 import qualified Support.MD5 as MD5
 
+type SourceHash = MD5.Hash
+type HoHash     = MD5.Hash
 
 -- the collected information that is passed around
 data CollectedHo = CollectedHo {
     choExternalNames :: IdSet,
     choVarMap :: IdMap (Maybe E),
+    choHoMap :: Map.Map String Ho,
     choHo :: Ho
     }
     {-! derive: update !-}
 
+updateCollectedHo cho = cho { choHo = mconcat $ Map.elems (choHoMap cho) }
+
 instance Monoid CollectedHo where
-    mempty = collectedHo
+    mempty = CollectedHo {
+        choExternalNames = mempty,
+        choHo = pho,
+        choHoMap = Map.singleton "Prim@" pho,
+        choVarMap = mempty
+        } where pho = mempty { hoBuild = mempty { hoDataTable = dataTablePrims } }
     a `mappend` b = CollectedHo {
         choExternalNames = choExternalNames a `mappend` choExternalNames b,
         choVarMap = choVarMap a `mappend` choVarMap b,
-        choHo = choHo a `mappend` choHo b
-        }
+        choHoMap = newHoMap,
+        choHo = mconcat $ Map.elems newHoMap
+        } where newHoMap = Map.union (choHoMap a) (choHoMap b)
 
 choDataTable cho = hoDataTable $ hoBuild (choHo cho)
 
-collectedHo :: CollectedHo
-collectedHo = CollectedHo {
-    choExternalNames = mempty,
-    choHo = mempty { hoBuild = mempty { hoDataTable = dataTablePrims } },
-    choVarMap = mempty
-    }
 
 
 -- this is the immutable information about modules that depnends only on their contents
 -- it can be trusted even if the ho file itself is out of date.
 newtype HoIDeps = HoIDeps {
-    hoIDeps :: Map.Map MD5.Hash (Module,[Module])
+    hoIDeps :: Map.Map SourceHash (Module,[Module])
     }
     deriving(Binary)
 
 data HoHeader = HoHeader {
     -- * my sha1 id
-    hohHash       :: MD5.Hash,
+    hohHash       :: HoHash,
     -- * Haskell Source files depended on
-    hohDepends    :: [(Module,MD5.Hash)],
+    hohDepends    :: [(Module,SourceHash)],
     -- * Other objects depended on to be considered up to date.
-    hohModDepends :: [MD5.Hash],
+    hohModDepends :: [HoHash],
     -- * metainformation, filled for hl-files, empty for normal objects.
     hohMetaInfo   :: [(Atom,PackedString)]
     }
