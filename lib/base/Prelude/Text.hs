@@ -178,3 +178,14 @@ instance Read Ordering where
 
 
 
+instance (Read a) => Read (Maybe a) where
+    readsPrec d input =
+	      (\ inp -> [((Nothing) , rest) | ("Nothing" , rest) <- lex inp])
+	      input
+	      ++
+	      readParen (d > 9)
+	      (\ inp ->
+	       [((Just aa) , rest) | ("Just" , inp) <- lex inp ,
+		(aa , rest) <- readsPrec 10 inp])
+	      input
+

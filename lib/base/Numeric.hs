@@ -8,7 +8,7 @@ module Numeric(fromRat,
                readFloat, lexDigits) where
 
 import Data.Word
-import Data.Char   ( isDigit, isOctDigit, isHexDigit
+import Prelude.CType   ( isDigit, isOctDigit, isHexDigit
                    , digitToInt, intToDigit )
 import Data.Ratio  ( (%), numerator, denominator )
 --import Array  ( (!), Array, array )
