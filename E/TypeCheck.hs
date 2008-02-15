@@ -101,7 +101,7 @@ instance CanType E E where
     getType (ELit l) = getType l
     getType (EVar v) =  getType v
     getType e@(EPi TVr { tvrType = a } b)
-        | typa == Unknown || typb == Unknown = Unknown
+        | isUnknown typa || isUnknown typb = Unknown
         | otherwise = maybe (error $ "getType: " ++ show e) ESort $ do
             ESort s1 <- return $ getType a
             ESort s2 <- return $ getType b
@@ -111,7 +111,7 @@ instance CanType E E where
     getType (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = getType (foldl eAp af (litArgs lc ++ [b]))
     getType e@(EAp (ELit LitCons {}) b) = error $ "getType: application of type alias " ++ (render $ ePretty e)
     getType (EAp (EPi tvr a) b) = getType (subst tvr b a)
-    getType (EAp a b) = if typa == Unknown then Unknown else eAp typa b where typa = getType a
+    getType (EAp a b) = if isUnknown typa then Unknown else eAp typa b where typa = getType a
     getType (ELam (TVr { tvrIdent = x, tvrType =  a}) b) = EPi (tVr x a) (getType b)
     getType (ELetRec _ e) = getType e
     getType ECase {eCaseType = ty} = ty
@@ -133,10 +133,10 @@ instance CanType e t => CanType (Alt e) t where
     getType (Alt _ e) = getType e
 
 
-sortSortLike (ESort s) = s ==  EHashHash || s == EStarStar
+sortSortLike (ESort s) = isEHashHash s || isEStarStar s
 sortSortLike _ = False
 
-sortKindLike (ESort s) =  s /=  EHashHash && s /= EStarStar
+sortKindLike (ESort s) =  not (isEHashHash s) && not (isEStarStar s)
 sortKindLike e = sortSortLike (getType e)
 
 sortTypeLike ESort {} = False

@@ -239,11 +239,11 @@ isSmall _ = False
 -- | whether an expression may be duplicated or pushed inside a lambda without duplicating too much work
 
 isCheap :: E -> Bool
-isCheap x | isAtomic x = True
 isCheap EError {} = True
 isCheap ELit {} = True
 isCheap EPi {} = True
 isCheap ELam {} = True -- should exclude values dropped at compile time
+isCheap x | isAtomic x = True
 isCheap (EPrim p _ _) = aprimIsCheap p
 isCheap ec@ECase {} = isCheap (eCaseScrutinee ec) && all isCheap (caseBodies ec)
 isCheap e | (EVar v,xs) <- fromAp e, Just (Arity n b) <- Info.lookup (tvrInfo v) =
