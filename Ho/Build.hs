@@ -96,8 +96,10 @@ shortenPath x@('/':_) = do
     cd <- getCurrentDirectory
     pwd <- lookupEnv "PWD"
     h <- lookupEnv "HOME"
-    --print (x,cd,h)
-    let f d = d >>= \d -> getPrefix d x >>= \ ('/':rest) -> return rest
+    let f d = do
+            d <- d
+            '/':rest <- getPrefix d x
+            return rest
     return $ fromJust $ f (return cd) `mplus` f pwd `mplus` liftM ("~/" ++) (f h) `mplus` return x
 shortenPath x = return x
 
