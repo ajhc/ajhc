@@ -1,7 +1,5 @@
 {-# OPTIONS_JHC -N -fffi -fm4 #-}
 
-changequote({{,}})
-
 module Jhc.Float(
     Float(..),
     Double(..),
@@ -188,7 +186,7 @@ foreign import primitive "FNEq" neqDouble :: Float64_ -> Float64_ -> Bool__
 foreign import primitive "box" boxBool :: Bool__ -> Bool
 
 
-define(NUMINSTANCE,
+m4_define(NUMINSTANCE,
 instance Num $1 where
     $1 x * $1 y = $1 (times$1 x y)
     $1 x + $1 y = $1 (plus$1 x y)

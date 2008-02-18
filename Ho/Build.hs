@@ -46,6 +46,7 @@ import FrontEnd.Syn.Options
 import FrontEnd.Unlit
 import FrontEnd.Warning
 import FrontEnd.SrcLoc
+import RawFiles(prelude_m4)
 import Ho.Binary()
 import Ho.Library
 import Ho.Type
@@ -507,6 +508,10 @@ searchPaths m = ans where
     ans = [ (root ++ suf,root ++ ".ho") | i <- optIncdirs options, n <- f m, suf <- [".hs",".lhs"], let root = i ++ "/" ++ n]
 
 
+m4Prelude :: IO FilePath
+m4Prelude = writeFile "/tmp/jhc_prelude.m4" prelude_m4 >> return "/tmp/jhc_prelude.m4"
+
+
 parseHsSource :: String -> LBS.ByteString -> IO HsModule
 parseHsSource fn lbs = do
     let txt = UTF8.fromUTF $ LBS.unpack lbs
@@ -515,9 +520,12 @@ parseHsSource fn lbs = do
             s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
             opts = concat [ words as | (x,as) <- parseOptions s', x `elem` ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"]]
     let fopts s = s `member` optFOptsSet opt where opt = f (take 1024 txt)
+        incFlags =  [ "-I" ++ d | d <- optIncdirs options]
     s <- case () of
         _ | fopts FO.Cpp -> readSystem "cpp" ["-D__JHC__","-CC","-traditional", "--", fn]
-          | fopts FO.M4 ->  readSystem "m4" ["-D__JHC__", "-s", fn]
+          | fopts FO.M4 -> do
+            m4p <- m4Prelude
+            readSystem "m4" $ ["-D__JHC__", "-s", "-P"] ++ incFlags ++ [m4p,fn]
           | otherwise -> return txt
     let s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s'' else s''
         s'' = case s of

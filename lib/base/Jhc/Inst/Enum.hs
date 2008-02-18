@@ -1,5 +1,4 @@
 {-# OPTIONS_JHC -N -fffi -funboxed-values -fm4 #-}
-changequote({{,}})
 
 module Jhc.Inst.Enum() where
 
@@ -11,7 +10,7 @@ import Jhc.Order
 import Jhc.IO(error)
 import Jhc.Basics
 
-define(ENUMINST,{{
+m4_define(ENUMINST,{{
 instance Enum $1 where
     toEnum = fromInt
     fromEnum = toInt

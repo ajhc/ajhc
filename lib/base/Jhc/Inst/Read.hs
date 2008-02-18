@@ -1,9 +1,5 @@
 {-# OPTIONS_JHC -N -fm4 #-}
 
-
-changequote({{,}})
-
-
 module Jhc.Inst.Read() where
 
 import Prelude.Text
@@ -20,7 +16,7 @@ import Numeric(showSigned, showInt, readSigned, readDec, showFloat,
 -- Reading at the Integer type avoids
 -- possible difficulty with minInt
 
-define(READINST,{{
+m4_define(READINST,{{
 instance  Read $1  where
   readsPrec p r = [(fromInteger i, t) | (i,t) <- readsPrec p r]
 }})
@@ -33,7 +29,7 @@ READINST(Int64)
 READINST(IntMax)
 READINST(IntPtr)
 
-define(READWORD,{{
+m4_define(READWORD,{{
 instance  Read $1  where
   readsPrec _ r = readDec r
 }})
