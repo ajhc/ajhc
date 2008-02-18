@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi  #-}
+{-# OPTIONS_JHC -N -fffi  #-}
 
 module Prelude.Float(readDouble,doubleToDigits,doubleToRational) where
 
@@ -14,6 +14,9 @@ import Foreign.C.Types
 import Foreign.Ptr
 import Foreign.Marshal.Alloc
 import Numeric
+import Prelude.Text
+import Jhc.List
+import Prelude((^),(^^),elem,take)
 
 
 {-  template

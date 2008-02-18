@@ -1,8 +1,14 @@
+{-# OPTIONS_JHC -N #-}
 
 -- | A place to collect the tuple instances.
 
 module Jhc.Tuples where
 
+import Jhc.Basics
+import Jhc.Show
+import Jhc.Order
+import Jhc.List
+import Jhc.Text.Read
 
 
 {- TUPGEN!

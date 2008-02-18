@@ -1,4 +1,4 @@
-
+{-# OPTIONS_JHC -N #-}
 module Data.Maybe(
     isJust, isNothing,
     fromJust, fromMaybe, listToMaybe, maybeToList,
@@ -9,7 +9,10 @@ module Data.Maybe(
     maybe
   ) where
 
-import Prelude
+import Jhc.Maybe
+import Jhc.Order
+import Jhc.Basics
+import Jhc.IO
 
 isJust                 :: Maybe a -> Bool
 isJust (Just a)        =  True

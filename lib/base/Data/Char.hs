@@ -83,26 +83,3 @@ asciiTab = --listArray ('\NUL', ' ')
             "DLE", "DC1", "DC2", "DC3", "DC4", "NAK", "SYN", "ETB",
             "CAN", "EM",  "SUB", "ESC", "FS",  "GS",  "RS",  "US",
             "SP"]
-
-lexLitChar          :: ReadS String
-lexLitChar ('\\':s) =  map (prefix '\\') (lexEsc s)
-        where
-          lexEsc :: String -> [(String,String)]
-          lexEsc (c:s)     | c `elem` "abfnrtv\\\"'"  = [([c],s)]
-          lexEsc ('^':(c:s)) | (c >= '@') && (c <= '_') = [(['^',c],s)]
-
-          -- Numeric escapes
-          lexEsc ('o':s)               = [prefix 'o' (span isOctDigit s)]
-          lexEsc ('x':s)               = [prefix 'x' (span isHexDigit s)]
-          lexEsc s@(d:_)   | isDigit d = [span isDigit s]
-
-          -- Very crude approximation to \XYZ.
-          lexEsc s@(c:_)   | isUpper c = [span isCharName s]
-          lexEsc _                     = []
-
-          isCharName c   = isUpper c || isDigit c
-          prefix c (t,s) = (c:t, s)
-
-lexLitChar (c:s)    =  [([c],s)]
-lexLitChar ""       =  []
-

@@ -13,6 +13,7 @@ import Prelude.CType   ( isDigit, isOctDigit, isHexDigit
 import Data.Ratio  ( (%), numerator, denominator )
 --import Array  ( (!), Array, array )
 import Prelude.Text
+import Jhc.Text.Read
 
 -- This converts a rational to a floating.  This should be used in the
 -- Fractional instances of Float and Double.
@@ -356,10 +357,4 @@ readFloat r    = [(fromRational ((n%1)*10^^(k-d)),t) | (n,d,s) <- readFix r,
                  readExp' ('+':s) = readDec s
                  readExp' s       = readDec s
 
-
-lexDigits        :: ReadS String
-lexDigits        =  nonnull isDigit
-
-nonnull          :: (Char -> Bool) -> ReadS String
-nonnull p s      =  [(cs,t) | (cs@(_:_),t) <- [span p s]]
 

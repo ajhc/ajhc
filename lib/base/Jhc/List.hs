@@ -90,6 +90,45 @@ filter p []                 = []
 filter p (x:xs) | p x       = x : filter p xs
                 | otherwise = filter p xs
 
+-- elem is the list membership predicate, usually written in infix form,
+-- e.g., x `elem` xs.  notElem is the negation.
+
+infix  4  `elem`, `notElem`
+
+
+-- the implementation looks a little funny, but the reason for the
+-- inner loop is so that both the == function and the unboxing of the
+-- argument may occur right away outside the inner loop when the list isn't
+-- empty.
+
+
+elem, notElem    :: (Eq a) => a -> [a] -> Bool
+elem _ []	= False
+elem x (y:ys)
+    | x == y = True
+    | otherwise = f y ys where
+        f y _ | x == y = True
+        f _ (y:ys) = f y ys
+        f _ [] = False
+
+{-# SPECIALIZE elem :: Char -> String -> Bool #-}
+{-# SPECIALIZE elem :: Int -> [Int] -> Bool #-}
+{-# RULES "elem/[]" forall c . elem c [] = False #-}
+{-# RULES "elem/[_]" forall c v . elem c [v] = c == v #-}
+
+notElem	_ []	=  True
+notElem x (y:ys)
+    | x == y = False
+    | otherwise = f y ys where
+        f y ys | x == y = False
+        f _ (y:ys) = f y ys
+        f _ [] = True
+
+{-# SPECIALIZE notElem :: Char -> String -> Bool #-}
+{-# SPECIALIZE notElem :: Int -> [Int] -> Bool #-}
+{-# RULES "notElem/[]" forall c . notElem c [] = True #-}
+{-# RULES "notElem/[_]" forall c v . notElem c [v] = c /= v #-}
+
 infixl 9  !!
 
 (!!)                :: [a] -> Int -> a
@@ -224,4 +263,33 @@ takeFB :: (a -> b -> c) -> c -> a -> (Int# -> b) -> Int# -> c
 takeFB c n x xs m | m <=# 0#  = n
 		  | otherwise = x `c` xs (m -# 1#)
   -}
+
+-- takeWhile, applied to a predicate p and a list xs, returns the longest
+-- prefix (possibly empty) of xs of elements that satisfy p.  dropWhile p xs
+-- returns the remaining suffix.  span p xs is equivalent to
+-- (takeWhile p xs, dropWhile p xs), while break p uses the negation of p.
+
+
+takeWhile               :: (a -> Bool) -> [a] -> [a]
+takeWhile p []          =  []
+takeWhile p (x:xs)
+            | p x       =  x : takeWhile p xs
+            | otherwise =  []
+
+
+dropWhile               :: (a -> Bool) -> [a] -> [a]
+dropWhile p []          =  []
+dropWhile p xs@(x:xs')
+            | p x       =  dropWhile p xs'
+            | otherwise =  xs
+
+span, break             :: (a -> Bool) -> [a] -> ([a],[a])
+span p []            = ([],[])
+span p xs@(x:xs')
+            | p x       =  (x:ys,zs)
+            | otherwise =  ([],xs)
+                           where (ys,zs) = span p xs'
+
+{-# INLINE break #-}
+break p                 =  span (not . p)
 

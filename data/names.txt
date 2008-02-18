@@ -48,7 +48,7 @@ Ord             Jhc.Order.Ord
 Enum            Jhc.Enum.Enum
 Bounded         Jhc.Enum.Bounded
 Show            Jhc.Show.Show
-Read            Prelude.Text.Read
+Read            Jhc.Text.Read
 Ix              Data.Ix.Ix
 Functor         Jhc.Monad.Functor
 Monad           Jhc.Monad.Monad
