@@ -1,4 +1,5 @@
-{-# OPTIONS_JHC -N -fffi #-}
+{-# OPTIONS_JHC -N -fffi -funboxed-tuples #-}
+
 module Foreign.Ptr(
     Ptr(),
     nullPtr,
@@ -24,8 +25,6 @@ import Jhc.Basics
 import Jhc.Num
 import Jhc.Addr
 import Foreign.Storable
-
-
 
 instance Storable (Ptr a) where
     sizeOf (Ptr a) = sizeOf a

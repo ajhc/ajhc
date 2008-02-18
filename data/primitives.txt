@@ -24,8 +24,8 @@ Data.Word.WordPtr, ubits<ptr>, int, UINTPTR_MAX, 0
 #Jhc.Float.Float, fbits<float>, float, FLT_MAX, FLT_MIN
 #Jhc.Float.Double, fbits<double>, float, DBL_MAX, DBL_MIN
 
-Jhc.Addr.Addr, ubits<ptr>, ptr,UINTPTR_MAX, 0
-Jhc.Addr.FunAddr, ubits<ptr>, ptr,UINTPTR_MAX,0
+#Jhc.Addr.Addr, ubits<ptr>, ptr,UINTPTR_MAX, 0
+#Jhc.Addr.FunAddr, ubits<ptr>, ptr,UINTPTR_MAX,0
 
 Foreign.C.Types.CChar, sbits8, int, CHAR_MAX, CHAR_MIN
 Foreign.C.Types.CShort, sbits<short>, int, SHORT_MAX, SHORT_MIN

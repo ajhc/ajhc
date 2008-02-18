@@ -8,6 +8,8 @@ World__   Jhc.Prim.World__
 Bool      Jhc.Order.Bool
 Target    Jhc.Options.Target
 Ptr       Jhc.Addr.Ptr
+Addr      Jhc.Addr.Addr
+FunAddr   Jhc.Addr.FunAddr
 Ratio     Jhc.Num.Ratio
 Unit      Jhc.Basics.()
 Float     Jhc.Float.Float
@@ -41,6 +43,7 @@ Unit       Jhc.Basics.()
 Boolzh     Jhc.Order.Bool#
 Target     Jhc.Options.Target#
 Char       Jhc.Prim.Char
+Addr       Jhc.Addr.Addr
 
 ClassName:class:
 Eq              Jhc.Order.Eq
