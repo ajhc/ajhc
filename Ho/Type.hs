@@ -69,7 +69,7 @@ data HoHeader = HoHeader {
     -- * Other objects depended on to be considered up to date.
     hohModDepends :: [HoHash],
     -- * metainformation, filled for hl-files, empty for normal objects.
-    hohMetaInfo   :: [(Atom,PackedString)]
+    hohMetaInfo   :: [(String,PackedString)]
     }
 
 -- data only needed for name resolution

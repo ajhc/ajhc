@@ -587,7 +587,7 @@ buildLibrary ifunc func = ans where
         let outName = case optOutName options of
                 "hs.out" -> name ++ ".hl"
                 fn -> fn
-        let pdesc = [(toAtom n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
+        let pdesc = [(n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
         let hoh =  HoHeader {
                 hohHash = lhash,
                 hohDepends = [ (m,MD5.emptyHash) | m <- Set.toList prvds ],
@@ -632,7 +632,7 @@ dumpHoFile fn = do
     when (not $ Map.null (hoIDeps idep)) $ putStrLn $ "IDeps:\n" <>  vindent (map pprint . Map.toList $ hoIDeps idep)
     when (not $ Prelude.null (hohDepends hoh)) $ putStrLn $ "Dependencies:\n" <>  vindent (map pprint . sortUnder fst $ hohDepends hoh)
     when (not $ Prelude.null (hohModDepends hoh)) $ putStrLn $ "ModDependencies:\n" <>  vindent (map pprint $ hohModDepends hoh)
-    when (not $ Prelude.null (hohMetaInfo hoh)) $ putStrLn $ "MetaInfo:\n" <> vindent (sort [text (' ':' ':fromAtom k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
+    when (not $ Prelude.null (hohMetaInfo hoh)) $ putStrLn $ "MetaInfo:\n" <> vindent (sort [text (' ':' ':k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
     putStrLn $ "Modules contained:" <+> tshow (mkeys $ hoExports hoE)
     putStrLn $ "number of definitions:" <+> tshow (size $ hoDefs hoE)
     putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps hoB)
