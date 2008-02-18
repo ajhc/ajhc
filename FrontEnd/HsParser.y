@@ -103,6 +103,7 @@ import FrontEnd.SrcLoc
 -- Reserved Ids
 
       'as'            { KW_As }
+      'derive'        { KW_Derive }
       'case'          { KW_Case }
       'class'         { KW_Class }
       'data'          { KW_Data }
@@ -295,6 +296,8 @@ topdecl :: { HsDecl }
                       { HsClassDecl $2 $3 $5 }
       | 'instance' srcloc ctype optvaldefs
                       { HsInstDecl $2 $3 $4 }
+      | 'derive' 'instance' srcloc ctype
+                      { HsDeclDeriving $3 $4 }
       | 'default' srcloc type
                       { HsDefaultDecl $2 $3 }
       | infixexp srcloc '<-' exp      {% checkPattern $1 `thenP` \p ->
@@ -820,6 +823,7 @@ varid :: { HsName }
       | 'kind'                { UnQual (HsIdent "kind") }
       | 'qualified'           { qualified_name }
       | 'hiding'              { hiding_name }
+      | 'derive'              { derive_name }
 
 qconid :: { HsName }
       : conid                 {  $1 }
@@ -915,4 +919,30 @@ happyError = parseError "Parse error"
 hsSymbol x = HsIdent x
 readInteger x = fromIntegral x
 readRational x = x
+
+as_name	              = UnQual $ HsIdent "as"
+derive_name	      = UnQual $ HsIdent "derive"
+qualified_name        = UnQual $ HsIdent "qualified"
+hiding_name	      = UnQual $ HsIdent "hiding"
+minus_name	      = UnQual $ HsIdent "-"
+pling_name	      = UnQual $ HsIdent "!"
+star_name	      = UnQual $ HsIdent "*"
+hash_name	      = UnQual $ HsIdent "#"
+dot_name	      = UnQual $ HsIdent "."
+prelude_mod	      = Module "Prelude"
+main_mod	      = Module "Main"
+
+unit_con_name	      = UnQual (HsIdent "()")
+tuple_con_name i      = Qual (Module "Jhc.Basics") (HsIdent ("("++replicate i ','++")"))
+
+unit_con	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = unit_con_name }
+tuple_con i	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = (tuple_con_name i) }
+
+
+unit_tycon_name       = unit_con_name
+fun_tycon_name        = Qual (Module "Jhc@") (HsIdent "->")
+list_tycon_name       = UnQual (HsIdent "[]")
+tuple_tycon_name i    = tuple_con_name i
+
+list_tycon	      = HsTyCon list_tycon_name
 }

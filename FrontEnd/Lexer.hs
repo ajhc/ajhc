@@ -95,6 +95,7 @@ data Token
 	| KW_Data
 	| KW_Default
 	| KW_Deriving
+	| KW_Derive
 	| KW_Do
 	| KW_Else
         | KW_Hiding
@@ -186,6 +187,7 @@ special_varids = [
  ( "as", 	KW_As ),
  ( "kind", 	KW_Kind ),
  ( "qualified", KW_Qualified ),
+ ( "derive",    KW_Derive ),
  ( "hiding", 	KW_Hiding )
  ]
 
