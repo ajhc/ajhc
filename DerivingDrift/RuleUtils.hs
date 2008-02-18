@@ -7,11 +7,6 @@ import DerivingDrift.DataP
 
 -- Rule Declarations
 
-type Tag = String
-type Rule = (Tag,Data -> Doc)
--- Rule (name, rule, category, helpline, helptext)
-type RuleDef = (Tag, Data -> Doc, String, String, Maybe String)
-
 x = text "x"
 f = text "f"
 
@@ -67,7 +62,7 @@ simpleInstance s d = hsep [text "instance"
 		, opt1 (texts (name d : vars d)) parenSpace id]
    where
    constr = map (\(c,v) -> text c <+> text v) (constraints d) ++
-		      map (\x -> text s <+> text x) (vars d)	
+		      map (\x -> text s <+> text x) (vars d)
    parenSpace = parens . hcat . sepWith space
 
 

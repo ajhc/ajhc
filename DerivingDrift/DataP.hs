@@ -6,7 +6,6 @@
 
 module DerivingDrift.DataP where
 
-import Char
 import HsSyn
 
 

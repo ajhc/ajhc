@@ -2,182 +2,22 @@ module DerivingDrift.StandardRules (standardRules) where
 
 import DerivingDrift.RuleUtils
 import List
-import GenUtil
+import Name.Prim
+import Name.Name
+import qualified Data.Map as Map
 
-tshow = text . show
 
 --- Add Rules Below Here ----------------------------------------------------
 
-standardRules :: [RuleDef]
-standardRules = [("test",dattest, "Utility", "output raw data for testing", Nothing),
-		  ("update",updatefn, "Utility","for label 'foo' provides 'foo_u' to update it and foo_s to set it", Nothing ),
-		  ("is",isfn, "Utility", "provides isFoo for each constructor", Nothing),
-		  ("get",getfn, "Utility", "for label 'foo' provide foo_g to get it", Nothing),
-	          ("from",fromfn, "Utility", "provides fromFoo for each constructor", Nothing),
-		  ("has",hasfn, "Utility", "hasfoo for record types", Nothing),
-		  ("un",unfn, "Utility", "provides unFoo for unary constructors", Nothing),
-		  ("NFData",nffn, "General","provides 'rnf' to reduce to normal form (deepSeq)", Nothing ),
-		  ("Eq",eqfn, "Prelude","", Nothing),
-		  ("Ord",ordfn, "Prelude", "", Nothing),
-		  ("Enum",enumfn, "Prelude", "", Nothing),
-		  ("Show",showfn, "Prelude", "", Nothing),
-		  ("Read",readfn, "Prelude", "", Nothing),
-		  ("Bounded",boundedfn, "Prelude", "", Nothing)]
+standardRules :: Map.Map Name.Name.Name (Data -> Doc)
+standardRules = Map.fromList [
+    (class_Eq,eqfn),
+    (class_Ord,ordfn),
+    (class_Enum,enumfn),
+    (class_Show,showfn),
+    (class_Read,readfn),
+    (class_Bounded,boundedfn)]
 
------------------------------------------------------------------------------
--- NFData - This class provides 'rnf' to reduce to normal form.
--- This has a default for non-constructed datatypes
--- Assume that base cases have been defined for lists, functions, and
--- (arbitrary) tuples - makeRnf produces a function which applies rnf to
--- each of the combined types in each constructor of the datatype. (If
--- this isn't very clear, just look at the code to figure out what happens)
-
-nffn = instanceSkeleton "NFData" [(makeRnf,empty)]
-
-makeRnf :: IFunction
-makeRnf (Body{constructor=constructor,types=types})
-	| null types = text "rnf" <+>
-		fsep [pattern constructor [],equals,text "()"]
-	| otherwise = let
-   vars = varNames types
-   head = [pattern constructor vars, equals]
-   body =  sepWith (text "`seq`") . map (text "rnf" <+>) $ vars
-       in  text "rnf" <+> fsep (head ++  body)
-
-
------------------------------------------------------------------------------
--- Forming 'update' functions for each label in a record
---
--- for a datatype G, where label has type G -> a
--- the corresponding update fn has type (a -> a) -> G -> G
--- The update fn has the same name as the label with _u appended
-
--- an example of what we want to generate
--- 	--> foo_u f d{foo}=d{foo = f foo}
---
--- labels can be common to more than one constructor in a type. -- this
--- is a problem, and the reason why a sort is used.
-
-updatefn :: Data -> Doc
-updatefn d@(D{body=body,name=name})
-	| hasRecord d = vcat (updates ++ sets)
-	| otherwise = commentLine $
-	text "Warning - can't derive `update' functions for non-record type: "
-	<+> text name
-	where
-    nc = length body
-    labs = gf $ sort . concatMap f $ body
-    updates = map genup labs --  $$  hsep [text (n ++ "_u"), char '_', char 'x', equals, char 'x']
-    sets = map genset . nub . map fst $ labs
-    f :: Body -> [(Name,Constructor)]
-    f (Body{constructor=constructor,labels=labels}) = zip (filter (not . null) labels ) (repeat constructor)
-    gf ts = map (\ts -> (fst (head ts), snds ts)) (groupBy (\(a,_) (b,_) -> a == b) (sort ts))
-
-    genup :: (Name,[Constructor]) -> Doc
-    genup (n,cs) = vcat (map up cs) $$ up' where
-        up c = hsep [text (n ++ "_u") , char 'f'
-            , char 'r' <> char '@' <> text c <> braces (text n <+> text " = x")
-            , equals , char 'r' <> braces (hsep [text n, text "= f x"])]
-        up' | nc > length cs = hsep [text (n ++ "_u"), char '_', char 'x', equals, char 'x']
-            | otherwise =  empty
-
-    -- while we're at it, may as well define a set function too...
-    genset :: Name -> Doc
-    genset n = hsep [text (n ++ "_s v = "), text (n ++ "_u"), text " (const v)"]
-
-getfn :: Data -> Doc
-getfn d@(D{body=body,name=name})
-	| hasRecord d = vcat (updates ++ sets)
-	| otherwise = commentLine $
-	text "Warning - can't derive `get' functions for non-record type: "
-	<+> text name
-	where
-    nc = length body
-    labs = gf $ sort . concatMap f $ body
-    updates = map genup labs
-    sets = map genset . nub . map fst $ labs
-    f :: Body -> [(Name,Constructor)]
-    f (Body{constructor=constructor,labels=labels}) = zip (filter (not . null) labels ) (repeat constructor)
-    gf ts = map (\ts -> (fst (head ts), snds ts)) (groupBy (\(a,_) (b,_) -> a == b) (sort ts))
-
-    genup :: (Name,[Constructor]) -> Doc
-    genup (n,cs) = vcat (map up cs) $$ up' where
-        fn = n ++ "_g"
-        up c = hsep [text fn
-            , char 'r' <> char '@' <> text c <> braces (text n <+> text " = x")
-            , equals , text "return x"]
-        up' | nc > length cs = hsep [text fn, char '_',  equals, text "fail", tshow fn]
-            | otherwise =  empty
-
-    -- while we're at it, may as well define a set function too...
-    genset :: Name -> Doc
-    genset n = hsep [text (n ++ "_s v = "), text (n ++ "_u"), text " (const v)"]
-
-----------------------------------------------------------------------
--- Similar rules to provide predicates for the presence of a constructor / label
-
-isfn :: Data -> Doc
-isfn (D{body=body}) =  vcat (map is body)
-	where	
-	is Body{constructor=constructor,types=types} = let
-		fnName = text ("is" ++ constructor)
-		fn = fnName <+>
-			hsep [pattern_ constructor types,text "=",text "True"]
-		defaultFn = fnName <+> hsep (texts ["_","=","False"])
-		in fn $$ defaultFn
-
-fromfn :: Data -> Doc
-fromfn (D{body=body}) =  vcat (map from body) where	
-    from Body{constructor=constructor,types=types} = fn $$ defaultFn where
-            fnName = ("from" ++ constructor)
-            fnName' = text fnName
-            fn = fnName' <+>
-                    hsep [pattern constructor types,text "=",text "return", tuple (varNames types) ]
-            defaultFn = fnName' <+> hsep (texts ["_","=","fail",show fnName ])
-
-hasfn :: Data -> Doc
-hasfn d@(D{body=body,name=name})
-	| hasRecord d = vcat [has l b | l <- labs, b <- body]
-	| otherwise = commentLine $
-	    text "Warning - can't derive `has' functions for non-record type:"
-	    <+> text name
-	where
-	has lab Body{constructor=constructor,labels=labels} = let
-		bool = text . show $ lab `elem` labels
-		pattern = text (constructor ++ "{}")
-		fnName = text ( "has" ++ lab)
-		in fsep[fnName, pattern, text "=", bool]     	
-	labs = nub . concatMap (labels) $  body
-		
-
--- Function to make using newtypes a bit nicer.
--- for newtype N = T a , unN :: T -> a
-
-unfn :: Data -> Doc
-unfn (D{body=body,name=name,statement=statement}) | statement == DataStmt
-	= commentLine
-	  $ text "Warning - can't derive 'un' function for data declaration "
-	  <+> text name
-			      | otherwise
-	= let fnName = text ("un" ++ name)
-	      b = head body
-	      pattern = parens $ text (constructor b) <+> text "a"
-	      in fsep [fnName,pattern, equals, text "a"]
-
-
------------------------------------------------------------------------------
--- A test rule for newtypes datastructures - just outputs
--- parsed information. Can put {-! global : Test !-} in an input file, and output
--- from the entire file should be generated.
-
-
-dattest d =  commentBlock . vcat $
-           [text (name d)
-		, fsep . texts . map show $ constraints d
-		, fsep . texts . map show $ vars d
-	        , fsep . texts . map show $ body d
-		, fsep . texts . map show $ derives d
-		, text .  show $ statement d]
 
 
 ------------------------------------------------------------------------------
@@ -237,7 +77,7 @@ ordfn d = let
 -- Show & Read
 -- 	won't work for infix constructors
 -- 	(and anyway, neither does the parser currently)
--- 	
+--
 -- Show
 
 showfn = instanceSkeleton "Show" [(makeShow,empty)]
@@ -331,21 +171,21 @@ fromEnumFn :: Data -> [Doc]
 fromEnumFn (D{body=body}) = map f (zip body [0 ..])
 	where
 	f (Body{constructor=constructor},n) = text "fromEnum" <+> (fsep $
-		texts [constructor , "=", show n])	
-		
+		texts [constructor , "=", show n])
+
 toEnumFn :: Data -> [Doc]
 toEnumFn (D{body=body}) = map f (zip body [0 ..])
 	where
 	f (Body{constructor=constructor},n) = text "toEnum" <+> (fsep $
 		texts [show n , "=", constructor])
-		
+
 enumFromFn :: Data -> Doc
 enumFromFn D{body=body} = let
 	conList = bracketList . texts . map constructor $ body
 	bodydoc = fsep [char 'e', char '=', text "drop",
 		parens (text "fromEnum" <+> char 'e'), conList]
 	in text "enumFrom" <+> bodydoc
-		
+
 enumFromThenFn ::  Doc
 enumFromThenFn = let
 	wrapper = fsep $ texts ["i","j","=","enumFromThen\'","i","j","(",
