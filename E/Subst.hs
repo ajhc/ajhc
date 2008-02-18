@@ -1,5 +1,6 @@
 module E.Subst(
     doSubst,
+    doSubst',
     eAp,
     litSMapM,
     subst,
@@ -25,6 +26,9 @@ import Support.FreeVars
 import GenUtil
 import Util.SetLike as S
 import Util.HasSize
+import System.Random
+
+import qualified Data.Set as Set
 
 eLetRec :: [(TVr,E)] -> E -> E
 eLetRec ds e = f (filter ((/= 0) . tvrIdent . fst) ds) where
@@ -73,12 +77,16 @@ substMap'' im = doSubst False False im -- (fmap Just im)
 
 -- Monadic code is so much nicer
 doSubst :: Bool -> Bool -> IdMap (Maybe E) -> E -> E
-doSubst substInVars allShadow bm e  = f e bm where
-    f :: E -> IdMap (Maybe E) -> E
+doSubst substInVars allShadow bm e
+    = doSubst' substInVars allShadow (mapMaybeIdMap id bm) (`mmember` bm) e
+
+doSubst' :: Bool -> Bool -> IdMap E -> (Id -> Bool) -> E -> E
+doSubst' substInVars allShadow bm check e  = f e (Set.empty, bm) where
+    f :: E -> (Set.Set Id, IdMap E) -> E
     f eo@(EVar tvr@(TVr { tvrIdent = i, tvrType =  t })) = do
-        mp <- ask
+        (_,mp) <- ask
         case mlookup i mp of
-          Just (Just v) -> return v
+          Just v -> return v
           _
             | substInVars -> f t >>= \t' -> return $ EVar (tvr { tvrType =  t'})
             | otherwise  -> return  eo
@@ -88,7 +96,7 @@ doSubst substInVars allShadow bm e  = f e bm where
     f (EError x e) = liftM (EError x) (f e)
     f (EPrim x es e) = liftM2 (EPrim x) (mapM f es) (f e)
     f ELetRec { eDefs = dl, eBody = e } = do
-        (as,rs) <- liftM unzip $ mapMntvr (fsts dl)
+        (as,rs) <- mapMntvr (fsts dl)
         local (foldr (.) id rs) $ do
             ds <- mapM f (snds dl)
             e' <- f e
@@ -98,11 +106,11 @@ doSubst substInVars allShadow bm e  = f e bm where
     f e@(ESort {}) = return e
     f ec@(ECase {}) = do
         e' <- f $ eCaseScrutinee ec
-        (b',r) <- ntvr [] $ eCaseBind ec
+        (b',r) <- ntvr Set.empty $ eCaseBind ec
         d <- local r $ T.mapM f $ eCaseDefault ec
         let da (Alt lc@LitCons { litName = s, litArgs = vs, litType = t } e) = do
                 t' <- f t
-                (as,rs) <- liftM unzip $ mapMntvr vs
+                (as,rs) <- mapMntvr vs
                 e' <- local (foldr (.) id rs) $ f e
                 return $ Alt lc { litArgs = as, litType = t' } e'
             da (Alt l e) = do
@@ -114,49 +122,42 @@ doSubst substInVars allShadow bm e  = f e bm where
         return  $ caseUpdate ec { eCaseScrutinee = e', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts, eCaseType = nty }
     lp lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == 0 || (allShadow && n `notElem` freeVars e) = do
         t' <- f t
-        e' <- local (minsert n Nothing) $ f e
+        e' <- local (\(s,m) -> (Set.insert n s, mdelete n m)) $ f e
         return $ lam (tvr { tvrIdent =  0, tvrType =  t'}) e'
     lp lam tvr e = do
-        (tv,r) <- ntvr [] tvr
+        (tv,r) <- ntvr Set.empty tvr
         e' <- local r $ f e
         return $ lam tv e'
     mapMntvr ts = f ts [] where
-        f [] xs = return $ reverse xs
+        f [] xs = return $ unzip $ reverse xs
         f (t:ts) rs = do
             (t',r) <- ntvr vs t
             local r $ f ts ((t',r):rs)
-        vs = [ tvrIdent x | x <- ts ]
+        vs = Set.fromList [ tvrIdent x | x <- ts ]
 
-    --mapMntvr [] = return []
-    --mapMntvr (t:ts) = do
-    --    (t',r) <- ntvr t
-    --    ts' <- local r (mapMntvr ts)
-    --    return ((t',r):ts')
-    --ntvr :: TVr -> Map Int (Maybe E) -> (TVr, Map Int (Maybe E) -> Map Int (Maybe E))
     ntvr xs tvr@(TVr { tvrIdent = 0, tvrType =  t}) = do
         t' <- f t
         let nvr = (tvr { tvrType =  t'})
         return (nvr,id)
     ntvr xs tvr@(TVr {tvrIdent = i, tvrType =  t}) = do
         t' <- f t
-        i' <- mnv allShadow xs i
+        (s,ss) <- ask
+        let i' = mnv allShadow xs i s ss
         let nvr = (tvr { tvrIdent =  i', tvrType =  t'})
-        case i == i' of
-            True -> return (nvr,minsert i (Just $ EVar nvr))
-            False -> return (nvr,minsert i (Just $ EVar nvr) . minsert i' Nothing)
+        return (nvr,\(s,m) -> (Set.insert i' . Set.insert i $ s, minsert i (EVar nvr) . mdelete i' $ m))
 
 
 
-mnv allShadow xs i ss
-    | allShadow = nv ss
---    | i <= 0 || i `mmember` ss = nv (fromList [ (x,undefined) | x <- xs ] `mappend` ss)
-    | isInvalidId i || i `mmember` ss = nv (fromList [ (x,undefined) | x <- xs ] `mappend` ss)
+mnv allShadow xs i s ss
+    | allShadow = nv scheck (Set.size xs + Set.size s + size ss)
+    | isInvalidId i || scheck i = nv check (Set.size xs + Set.size s + size ss)
+            -- It is very important that we don't check for 'xs' membership in the guard above.
     | otherwise = i
+    where scheck n = n `mmember` ss || n `Set.member` s
+          check n = scheck n || n `Set.member` xs
 
-
-nv ss = v (2 * (size ss + 1)) where
-    v n | n `mmember` ss = v (n + 2)
-    v n = n
+nv check seed = head $ filter (not . check) $ filter even $ filter (>0) ls
+    where ls  = randoms (mkStdGen seed)
 
 nv' ss = v (2 * (size ss + 1)) where
     v n | (Just Nothing) <- mlookup n ss = v (n + 2)
@@ -219,7 +220,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
     f e@(ESort {}) = return e
     f ec@(ECase {}) = do
         e' <- f $ eCaseScrutinee ec
-        (b',r) <- ntvr [] $ eCaseBind ec
+        (b',r) <- ntvr Set.empty $ eCaseBind ec
         d <- local r $ T.mapM f $ eCaseDefault ec
         let da (Alt lc@LitCons { litName = s, litArgs = vs, litType = t } e) = do
                 t' <- inType $ f t
@@ -238,7 +239,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
         e' <- f e
         return $ lam (tvr { tvrIdent =  0, tvrType =  t'}) e'
     lp lam tvr e = do
-        (tv,r) <- ntvr [] tvr
+        (tv,r) <- ntvr Set.empty tvr
         e' <- local r $ f e
         return $ lam tv e'
     mapMntvr ts = f ts [] where
@@ -246,7 +247,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
         f (t:ts) rs = do
             (t',r) <- ntvr vs t
             local r $ f ts ((t',r):rs)
-        vs = [ tvrIdent x | x <- ts ]
+        vs = Set.fromList [ tvrIdent x | x <- ts ]
     inType = local (\ (_,trm,typ) -> (True,trm,typ) )
     addMap i (Just e) (b,trm,typ) = (b,minsert i (Just e) trm, minsert i e typ)
     addMap i Nothing (b,trm,typ) = (b,minsert i Nothing trm, typ)
@@ -264,7 +265,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
     ntvr xs tvr@(TVr {tvrIdent = i, tvrType =  t}) = do
         t' <- inType (f t)
         (_,map,_) <- ask
-        let i' = mnv False xs i map
+        let i' = mnv False xs i Set.empty map
         let nvr = (tvr { tvrIdent =  i', tvrType =  t'})
         case i == i' of
             True -> return (nvr,addMap i  (Just $ EVar nvr))

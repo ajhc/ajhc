@@ -334,7 +334,7 @@ calcForced finalPhase v =
 
 
 data Env = Env {
-    envCachedSubst :: IdMap (Maybe E),
+    envCachedSubst :: IdMap E,
     envSubst :: Subst,
     envInScope :: IdMap Binding
     }
@@ -350,6 +350,7 @@ insertSuspSubst' :: Id -> InE -> Env -> Env
 insertSuspSubst' 0 _e env = env
 insertSuspSubst' t e env = cacheSubst env { envSubst = minsert t (susp e (envSubst env)) (envSubst env) }
 
+insertRange :: Id -> Range -> Env -> Env
 insertRange 0 e env = env
 insertRange t e env = cacheSubst env { envSubst = minsert t e (envSubst env) }
 
@@ -358,7 +359,7 @@ insertDoneSubst t e env = insertDoneSubst' (tvrIdent t) e env
 
 insertDoneSubst' :: Id -> OutE -> Env -> Env
 insertDoneSubst' 0 _e env = env
-insertDoneSubst' t e env = cacheSubst env { envSubst = minsert t (Done e) (envSubst env) }
+insertDoneSubst' t e env = insertRange t (Done e) env
 
 
 insertInScope :: Id -> Binding -> Env -> Env
@@ -371,13 +372,12 @@ substLookup id = SM $ ask >>= return . mlookup id . envSubst
 substAddList ls env = cacheSubst env { envSubst = fromList ls `union` envSubst env }
 
 
-applySubst :: Subst -> IdMap a -> IdMap (Maybe OutE)
+applySubst :: Subst -> IdMap a -> IdMap OutE
 applySubst s nn = applySubst' s where
-    nn' = fmap (const Nothing) s `mappend` fmap (const Nothing) nn
-    applySubst' s = (tm `mappend` nn') where
-        tm = fmap g s
-        g (Done e) = Just e
-        g (Susp e s' _) = Just $ substMap'' (applySubst' s') e
+    check n = n `mmember` s || n `mmember` nn
+    applySubst' s = fmap g s
+    g (Done e) = e
+    g (Susp e s' _) = doSubst' False False (applySubst' s') check e
 
 evalRange :: Range -> SM OutE
 evalRange (Done e) = return e
@@ -386,7 +386,7 @@ evalRange (Susp e s _) = localEnv (envSubst_s s)  $ dosub e
 cacheSubst env = env { envCachedSubst = applySubst (envSubst env) (envInScope env) }
 
 dosub :: InE -> SM OutE
-dosub e = ask >>= \inb ->  coerceOpt return (substMap'' (envCachedSubst inb) e)
+dosub e = ask >>= \inb ->  coerceOpt return (doSubst' False False (envCachedSubst inb) (`mmember` envCachedSubst inb) e)
 
 simplifyE :: SimplifyOpts -> InE -> (Stat,OutE)
 simplifyE sopts e = (stat,e') where

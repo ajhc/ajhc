@@ -40,7 +40,7 @@ generalize ps r = do
     ch <- getClassHierarchy
     r <- flattenType r
     fmvenv <- freeMetaVarsEnv
-    let mvs =  nub [ v  | v <- freeMetaVars r, not $ v `Set.member` fmvenv ]
+    let mvs =  freeMetaVars r `Set.difference` fmvenv
     --(nps,rp) <- splitPreds ch (Set.toList fmvenv) ps
     (mvs',nps,rp) <- splitReduce (Set.toList fmvenv) mvs (simplify ch ps)
     addPreds nps

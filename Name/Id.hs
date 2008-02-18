@@ -13,6 +13,7 @@ module Name.Id(
     isEtherialId,
     isInvalidId,
     idSetToIdMap,
+    mapMaybeIdMap,
     idSetFromList,
     idSetFromDistinctAscList,
     idMapFromList,
@@ -59,6 +60,9 @@ idMapToList (IdMap is) = IM.toList is
 
 idToInt :: Id -> Int
 idToInt = id
+
+mapMaybeIdMap :: (a -> Maybe b) -> IdMap a -> IdMap b
+mapMaybeIdMap fn (IdMap m) = IdMap (IM.mapMaybe fn m)
 
 
 -- IdMap
