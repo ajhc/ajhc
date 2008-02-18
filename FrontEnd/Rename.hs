@@ -55,6 +55,7 @@ data ScopeState = ScopeState {
 
 data Env = Env {
     envSubTable  :: Map.Map HsName HsName,  -- all these need to go away
+    envNameSpace :: [NameType],
     envModule  :: Module,
     envNameMap :: Map.Map Name (Either String Name),
     envSrcLoc  :: SrcLoc
@@ -82,8 +83,6 @@ instance UniqueProducer RM where
 getCurrentModule :: RM Module
 getCurrentModule = asks envModule
 
-
-
 instance MonadSrcLoc RM where
     getSrcLoc = asks envSrcLoc
 instance MonadSetSrcLoc RM where
@@ -91,14 +90,8 @@ instance MonadSetSrcLoc RM where
 
 
 
------------------------------------------------------------
--- The renaming code:
---
-
-
-addTopLevels ::  [HsDecl]  -> RM ()
-addTopLevels  []  = return ()
-addTopLevels  hsDecls = do
+addTopLevels ::  [HsDecl]  -> RM a -> RM a
+addTopLevels  hsDecls action = do
     mod <- getCurrentModule
     let (ns,ts) = mconcat (map namesHsDecl hsDecls)
         nm = Map.fromList $ foldl f [] (fsts ns)
@@ -113,16 +106,13 @@ addTopLevels  hsDecls = do
     z ns >> z ts
     modify (\s -> s { globalSubTable = nm `Map.union` globalSubTable s })
     modify (\s -> s { typeSubTable = tm `Map.union` typeSubTable s })
-    return ()
+    action
 
 
 ambig x ys = "Ambiguous Name: " ++ show x ++ "\nCould refer to: " ++ tupled (map show ys)
 
--- | Main entry point.
-
-{-# NOINLINE renameModule #-}
-renameModule :: MonadWarn m => FieldMap -> [(Name,[Name])] -> HsModule -> m HsModule
-renameModule fls ns m = mapM_ addWarning errors >> return renamedMod where
+runRename :: MonadWarn m => (a -> RM a) -> Module -> FieldMap -> [(Name,[Name])] -> a -> m a
+runRename doit mod fls ns m = mapM_ addWarning errors >> return renamedMod where
     initialGlobalSubTable = Map.fromList [ (x,y) | ((typ,x),[y]) <- ns', typ == Val || typ == DataConstructor ]
     initialTypeSubTable = Map.fromList [ (x,y) | ((typ,x),[y]) <- ns', typ == TypeConstructor || typ == ClassName ]
     nameMap = Map.fromList $ map f ns where
@@ -140,15 +130,22 @@ renameModule fls ns m = mapM_ addWarning errors >> return renamedMod where
         globalSubTable = initialGlobalSubTable,
         fieldLabels    = fls
         }
-
     startEnv = Env {
         envSubTable = initialGlobalSubTable,
-        envModule = hsModuleName m,
+        envNameSpace = [Val,DataConstructor],
+        envModule = mod,
         envNameMap  = nameMap,
         envSrcLoc = mempty
     }
+    (renamedMod, _, errors) = runRWS (unRM $ doit m) startEnv startState
 
-    (renamedMod, _, errors) = runRWS (unRM $ renameDecls m) startEnv startState
+{-# NOINLINE renameModule #-}
+renameModule :: MonadWarn m => FieldMap -> [(Name,[Name])] -> HsModule -> m HsModule
+renameModule fls ns m = runRename renameDecls (hsModuleName m) fls ns m
+
+{-# NOINLINE renameStatement #-}
+renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] -> Module -> HsStmt -> m HsStmt
+renameStatement fls ns modName stmt = runRename rename modName fls ns stmt
 
 renameOld :: (SubTable -> RM a) -> RM a
 renameOld rm = asks envSubTable >>= rm
@@ -156,42 +153,13 @@ renameOld rm = asks envSubTable >>= rm
 withSubTable :: SubTable -> RM a -> RM a
 withSubTable st action = local ( \e -> e { envSubTable = st `Map.union` envSubTable e }) action
 
-{-# NOINLINE renameStatement #-}
-renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] -> Module -> HsStmt -> m HsStmt
-renameStatement fls ns modName stmt = mapM_ addWarning errors >> return renamedStmt where
-    initialGlobalSubTable = Map.fromList [ (x,y) | ((typ,x),[y]) <- ns', typ == Val || typ == DataConstructor ]
-    initialTypeSubTable = Map.fromList [ (x,y) | ((typ,x),[y]) <- ns', typ == TypeConstructor || typ == ClassName ]
-    ns' = map fn ns
-    fn (n,ns) = (fromName n, map nameName ns)
-    nameMap = Map.fromList $ map f ns where
-        f (x,[y]) = (x,Right y)
-        f (x,ys)  = (x,Left $ ambig x ys)
-
-    errorTab =  Map.fromList [ (x,ambig x ys) | ((typ,x),ys@(_:_:_)) <- ns' ]
-
-    startState = ScopeState {
-        typeSubTable   = initialTypeSubTable,
-        errorTable     = errorTab,
-        unique         = 1,   -- start the counting at 1
-        globalSubTable = initialGlobalSubTable,
-        fieldLabels    = fls
-        }
-    startEnv = Env {
-        envSubTable = initialGlobalSubTable,
-        envModule   = modName,
-        envNameMap  = nameMap,
-        envSrcLoc   = mempty
-    }
-
-    (renamedStmt, _, errors) = runRWS (unRM $ rename stmt) startEnv startState
 
 
 renameDecls :: HsModule -> RM HsModule
 renameDecls tidy = do
-        addTopLevels $ hsModuleDecls tidy
+        addTopLevels (hsModuleDecls tidy) $ do
         gst <- gets globalSubTable
         withSubTable gst $ do
---        local (\e -> e { envSubTable = envSubTable e `Map.union`  gst }) $ do
         decls' <- rename (hsModuleDecls tidy)
         mapM_ HsErrors.hsDeclTopLevel decls'
         return tidy { hsModuleDecls = decls' }
@@ -306,7 +274,7 @@ instance Rename HsClassHead where
     rename (HsClassHead cx n ts) = do
         updateWith ts $ HsClassHead <$> rename cx <*> renameTypeName n <*> rename ts
 
-    
+
 
 instance Rename HsRule where
     rename prules@HsRule { hsRuleSrcLoc = srcLoc, hsRuleFreeVars = fvs, hsRuleLeftExpr = e1, hsRuleRightExpr = e2 } = do
@@ -400,7 +368,7 @@ class UpdateTable a where
     getUpdates x = Map.unions `fmap` mapM clobberName (getNames x)
 
     getNames :: a -> [HsName]
-    getNames a = [] 
+    getNames a = []
 
 
 instance UpdateTable a => UpdateTable [a] where
@@ -528,21 +496,15 @@ wrapInAsPat e = do
     let hsName'' = (Qual mod (HsIdent $ show unique {- ++ fromHsName hsName' -} ++ "_as@"))
     return (HsAsPat hsName''  e )
 
-
 renameHsExp :: HsExp -> SubTable -> RM HsExp
 renameHsExp (HsVar hsName) subTable = do
     hsName' <- renameHsName hsName subTable
     return (HsVar hsName')
---    wrapInAsPat (HsVar hsName')
-
 renameHsExp (HsCon hsName) subTable = do
     hsName' <- renameHsName hsName subTable
     wrapInAsPat (HsCon hsName')
 
 renameHsExp i@(HsLit (HsInt _num)) _st = do return i
-    --let fi = if abs num > 500000000 then func_fromInteger else func_fromInt
-    --z <- renameHsExp fi st
-    --return $ HsParen (HsApp z i)
 renameHsExp i@(HsLit (HsFrac _)) st = do
     z <- renameHsExp func_fromRational st
     return $ HsParen (HsApp z i)
