@@ -2,10 +2,8 @@
 
 module DerivingDrift.RuleUtils (module Text.PrettyPrint.HughesPJ,module DerivingDrift.RuleUtils, module DerivingDrift.DataP)where
 
---import DerivingDrift.Pretty
 import Text.PrettyPrint.HughesPJ
-import DerivingDrift.DataP (Statement(..),Data(..),Type(..),Name,Var,Class,
-		Body(..),Constructor)
+import DerivingDrift.DataP
 
 -- Rule Declarations
 
@@ -24,14 +22,6 @@ blank = text "_"
 semicolon = char ';'
 
 
-prettyType :: Type -> Doc
---prettyType (Apply t1 t2) = parens (prettyType t1 <+> prettyType t2)
-prettyType (Arrow x y) = parens (prettyType x <+> text "->" <+> prettyType y)
-prettyType (List x) = brackets (prettyType x)
-prettyType (Tuple xs) = tuple (map prettyType xs)
-prettyType (Var s) = text s
-prettyType (Con s) = text s
-prettyType (LApply t ts) = prettyType t <+> hsep (map prettyType ts)
 
 -- New Pretty Printers ---------------
 
