@@ -8,6 +8,7 @@ module FrontEnd.Tc.Unify(
 import Control.Monad.Writer
 import Control.Monad.Reader
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Doc.DocLike
 import Doc.PPrint
@@ -109,7 +110,7 @@ subsumes s1 s2 = do
 -- we can skip the occurs check for boxy types
 occursCheck u@MetaVar { metaType = Tau } t = do
     tt <- evalFullType t
-    when (u `elem` freeMetaVars tt) $ unificationError (TMetaVar u) tt -- occurs check
+    when (u `Set.member` freeMetaVars tt) $ unificationError (TMetaVar u) tt -- occurs check
     return tt
 occursCheck u t = return t
 

@@ -34,8 +34,10 @@ module FrontEnd.Tc.Type(
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.IORef
-import List
+import Data.List
+import Data.Monoid
 import qualified Data.Map as Map
+import qualified Data.Set as S
 
 import Doc.DocLike
 import Doc.PPrint
@@ -101,15 +103,15 @@ isTau TForAll {} = False
 isTau (TMetaVar MetaVar { metaType = t })
     | t == Tau = True
     | otherwise = False
-isTau t = and $ tickleCollect ((:[]) . isTau) t
+isTau t = getAll $ tickleCollect (All . isTau) t
 
 isTau' :: Type -> Bool
 isTau' TForAll {} = False
-isTau' t = and $ tickleCollect ((:[]) . isTau') t
+isTau' t = getAll $ tickleCollect (All . isTau') t
 
 isBoxy :: Type -> Bool
 isBoxy (TMetaVar MetaVar { metaType = t }) | t > Tau = True
-isBoxy t = or $ tickleCollect ((:[]) . isBoxy) t
+isBoxy t = getAny $ tickleCollect (Any . isBoxy) t
 
 
 isRho' :: Type -> Bool
@@ -217,17 +219,20 @@ readMetaVar MetaVar { metaRef = r }  = liftIO $ do
 
 
 
-freeMetaVars :: Type -> [MetaVar]
-freeMetaVars (TMetaVar mv) = [mv]
-freeMetaVars t = foldr union [] $ tickleCollect ((:[]) . freeMetaVars) t
+freeMetaVars :: Type -> S.Set MetaVar
+freeMetaVars (TMetaVar mv) = S.singleton mv
+freeMetaVars t = tickleCollect freeMetaVars t
 
 instance FreeVars Type [Tyvar] where
     freeVars (TVar u)      = [u]
-    freeVars (TForAll vs qt) = freeVars qt List.\\ vs
-    freeVars (TExists vs qt) = freeVars qt List.\\ vs
+    freeVars (TForAll vs qt) = freeVars qt Data.List.\\ vs
+    freeVars (TExists vs qt) = freeVars qt Data.List.\\ vs
     freeVars t = foldr union [] $ tickleCollect ((:[]) . (freeVars :: Type -> [Tyvar])) t
 
 instance FreeVars Type [MetaVar] where
+    freeVars t = S.toList $ freeMetaVars t
+
+instance FreeVars Type (S.Set MetaVar) where
     freeVars t = freeMetaVars t
 
 instance (FreeVars t b,FreeVars Pred b) => FreeVars (Qual t) b where

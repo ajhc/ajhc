@@ -538,7 +538,7 @@ tiNonRecImpl decl = withContext (locSimple (srcLoc decl) ("in the implicitly typ
     ps' <- flattenType ps
     mv' <- flattenType mv
     fs <- freeMetaVarsEnv
-    let vss = Set.fromList $ freeMetaVars mv'
+    let vss = freeMetaVars mv'
         gs = vss Set.\\ fs
     (mvs,ds,rs) <- splitReduce (Set.toList fs) (Set.toList vss) ps'
     addPreds ds
@@ -644,7 +644,7 @@ tcRule prule@HsRule { hsRuleUniq = uniq, hsRuleFreeVars = vs, hsRuleLeftExpr = e
             mapM_ unBox vs
             vs <- flattenType vs
             tr <- flattenType tr
-            let mvs = snub $ concatMap freeMetaVars (tr:vs)
+            let mvs = Set.toList $ Set.unions $ map freeMetaVars (tr:vs)
             nvs <- mapM (newVar . metaKind) mvs
             sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- mvs ]
             (rs1,rs2) <- flattenType (rs1,rs2)

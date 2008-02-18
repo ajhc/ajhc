@@ -217,8 +217,10 @@ resolveDeps done_ref m = do
 
 
 data SourceCode
-    = SourceParsed { sourceHash :: SourceHash, sourceDeps :: [Module], sourceModule :: HsModule, sourceFP :: FilePath, sourceHoName :: FilePath }
-    | SourceRaw    { sourceHash :: SourceHash, sourceDeps :: [Module], sourceModName :: Module, sourceLBS :: LBS.ByteString, sourceFP :: FilePath, sourceHoName :: FilePath }
+    = SourceParsed { sourceHash :: SourceHash, sourceDeps :: [Module]
+                   , sourceModule :: HsModule, sourceFP :: FilePath, sourceHoName :: FilePath }
+    | SourceRaw    { sourceHash :: SourceHash, sourceDeps :: [Module]
+                   , sourceModName :: Module, sourceLBS :: LBS.ByteString, sourceFP :: FilePath, sourceHoName :: FilePath }
 
 
 sourceIdent SourceParsed { sourceModule = m } = show $ hsModuleName m

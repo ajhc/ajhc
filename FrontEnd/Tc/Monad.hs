@@ -387,7 +387,7 @@ freeMetaVarsEnv = do
     xs <- flip mapM (Map.elems env)  $ \ x -> do
         x <- flattenType x
         return $ freeMetaVars x
-    return (Set.fromList $ concat xs)
+    return (Set.unions xs)
 
 quantify :: [MetaVar] -> [Pred] -> Rho -> Tc Sigma
 quantify vs ps r | not $ any isBoxyMetaVar vs = do
@@ -447,7 +447,7 @@ varBind u t
         --when be $ error $ "binding boxy: " ++ tupled [pprint u,prettyPrintType t]
         tt <- evalFullType tt
         when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "varBind: " ++ pprint u <+> text ":=" <+> prettyPrintType tt
-        when (u `elem` freeMetaVars tt) $ do
+        when (u `Set.member` freeMetaVars tt) $ do
             unificationError (TMetaVar u) tt -- occurs check
         let r = metaRef u
         x <- liftIO $ readIORef r

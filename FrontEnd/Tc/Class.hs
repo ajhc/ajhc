@@ -42,7 +42,7 @@ generalize ps r = do
     fmvenv <- freeMetaVarsEnv
     let mvs =  freeMetaVars r `Set.difference` fmvenv
     --(nps,rp) <- splitPreds ch (Set.toList fmvenv) ps
-    (mvs',nps,rp) <- splitReduce (Set.toList fmvenv) mvs (simplify ch ps)
+    (mvs',nps,rp) <- splitReduce (Set.toList fmvenv) (Set.toList mvs) (simplify ch ps)
     addPreds nps
     quantify mvs' rp r
 
@@ -50,8 +50,8 @@ freeMetaVarsPreds :: Preds -> [MetaVar]
 freeMetaVarsPreds ps = concatMap freeMetaVarsPred ps
 
 freeMetaVarsPred :: Pred -> [MetaVar]
-freeMetaVarsPred (IsIn _ t) = freeMetaVars t
-freeMetaVarsPred (IsEq t1 t2) = freeMetaVars t1 ++ freeMetaVars t2
+freeMetaVarsPred (IsIn _ t) = Set.toList $ freeMetaVars t
+freeMetaVarsPred (IsEq t1 t2) = Set.toList (freeMetaVars t1) ++ Set.toList (freeMetaVars t2)
 
 -- | split predicates into ones that only mention metavars in the list vs other ones
 splitPreds :: Monad m => ClassHierarchy -> [MetaVar] -> Preds -> m (Preds, Preds)
