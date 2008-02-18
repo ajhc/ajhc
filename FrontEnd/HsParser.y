@@ -296,7 +296,7 @@ topdecl :: { HsDecl }
                       { HsClassDecl $2 $3 $5 }
       | 'instance' srcloc ctype optvaldefs
                       { HsInstDecl $2 $3 $4 }
-      | 'derive' 'instance' srcloc ctype
+      | 'derive' 'instance' srcloc classhead
                       { HsDeclDeriving $3 $4 }
       | 'default' srcloc type
                       { HsDefaultDecl $2 $3 }
@@ -461,6 +461,9 @@ ctype :: { HsQualType }
       : btype '=>' type               {% checkContext $1 `thenP` \c ->
                                          returnP (HsQualType c $3) }
       | type                          { HsQualType [] $1 }
+
+classhead :: { HsClassHead }
+    : ctype {% qualTypeToClassHead $1 }
 
 types :: { [HsType] }
       : types ',' type                { $3 : $1 }

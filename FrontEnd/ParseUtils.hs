@@ -29,6 +29,7 @@ module FrontEnd.ParseUtils (
         , fixupHsDecls
         , parseError
         , parseExport
+        , qualTypeToClassHead
         , doForeign
         , doForeignEq
  ) where
@@ -59,6 +60,15 @@ splitTyConApp t0 = split t0 []
 
 -----------------------------------------------------------------------------
 -- Various Syntactic Checks
+
+qualTypeToClassHead :: HsQualType -> P HsClassHead
+qualTypeToClassHead qt = do
+    let fromHsTypeApp t = f t [] where
+            f (HsTyApp a b) rs = f a (b:rs)
+            f t rs = (t,rs)
+    case fromHsTypeApp $ hsQualTypeType qt of
+        (HsTyCon className,as) -> return HsClassHead { hsClassHeadContext = hsQualTypeContext qt, hsClassHead = className, hsClassHeadArgs = as }
+        _ -> fail "Invalid Class Head"
 
 checkContext :: HsType -> P HsContext
 checkContext (HsTyTuple ts) =

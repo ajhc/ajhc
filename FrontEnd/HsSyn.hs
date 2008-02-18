@@ -186,7 +186,7 @@ data HsDecl
         {- deriving -} hsDeclDerives :: [HsName]
         }
     | HsInfixDecl   { hsDeclSrcLoc :: SrcLoc, hsDeclAssoc :: HsAssoc, hsDeclInt :: !Int, hsDeclNames :: [HsName]  }
-    | HsClassDecl	 { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType, hsDeclDecls :: [HsDecl] }
+    | HsClassDecl   { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType, hsDeclDecls :: [HsDecl] }
     | HsInstDecl    { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType, hsDeclDecls :: [HsDecl] }
     | HsDefaultDecl SrcLoc HsType
     | HsTypeSig	 SrcLoc [HsName] HsQualType
@@ -220,7 +220,7 @@ data HsDecl
     | HsPragmaProps SrcLoc String [HsName]
     | HsPragmaRules [HsRule]
     | HsPragmaSpecialize { hsDeclUniq :: (Module,Int), hsDeclSrcLoc :: SrcLoc, hsDeclBool :: Bool, hsDeclName :: HsName, hsDeclType :: HsType }
-    | HsDeclDeriving { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType }
+    | HsDeclDeriving { hsDeclSrcLoc :: SrcLoc, hsDeclClassHead :: HsClassHead }
   deriving(Eq,Show)
   {-! derive: is !-}
 
@@ -373,6 +373,10 @@ data HsExp
 	| HsIrrPat { hsExpLExp :: LHsExp }
  deriving(Eq,Show)
     {-! derive: is, update !-}
+
+data HsClassHead = HsClassHead { hsClassHeadContext :: HsContext, hsClassHead :: HsName, hsClassHeadArgs :: [HsType] }
+ deriving(Eq,Show)
+    {-! derive: update !-}
 
 type LHsPat = Located HsPat
 
