@@ -58,10 +58,10 @@ instance Show IntPtr where
 showWord :: Word -> String -> String
 showWord w rest = case quotRem w 10 of
     (n',d) -> if n' == 0 then rest' else showWord n' rest'
-        where rest' = chr (fromIntegral n' + ord '1') : rest
+        where rest' = chr (fromIntegral d + ord '0') : rest
 
 showWordMax :: WordMax -> String -> String
 showWordMax w rest = case quotRem w 10 of
     (n',d) -> if n' == 0 then rest' else showWordMax n' rest'
-        where rest' = chr (fromIntegral n' + ord '1') : rest
+        where rest' = chr (fromIntegral d + ord '0') : rest
 
