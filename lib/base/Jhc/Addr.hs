@@ -10,6 +10,7 @@ module Jhc.Addr(
     FunPtr(..),
     ptrFromAddr__,
     nullAddr,
+    castPtr,
     nullFunAddr,
     plusAddr,
     addrToWordPtr,
@@ -58,4 +59,25 @@ foreign import primitive "Add" plusWordPtr :: BitsPtr_ -> BitsPtr_ -> BitsPtr_
 
 ptrFromAddr__ :: Addr__ -> Ptr a
 ptrFromAddr__ addr = Ptr (Addr addr)
+
+instance Storable (Ptr a) where
+    sizeOf (Ptr a) = sizeOf a
+    alignment (Ptr a) = alignment a
+    peek p = peek (castPtr p) `thenIO` (returnIO . Ptr)
+    poke p (Ptr x) = poke (castPtr p) x
+
+instance Eq (Ptr a) where
+    Ptr a == Ptr b = a == b
+    Ptr a /= Ptr b = a /= b
+
+instance Ord (Ptr a) where
+    compare (Ptr a) (Ptr b) = compare a b
+    Ptr a <= Ptr b = a <= b
+    Ptr a < Ptr b = a < b
+    Ptr a > Ptr b = a > b
+    Ptr a >= Ptr b = a >= b
+
+castPtr :: Ptr a -> Ptr b
+castPtr (Ptr addr) = Ptr addr
+
 

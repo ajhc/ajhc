@@ -26,22 +26,6 @@ import Jhc.Num
 import Jhc.Addr
 import Foreign.Storable
 
-instance Storable (Ptr a) where
-    sizeOf (Ptr a) = sizeOf a
-    alignment (Ptr a) = alignment a
-    peek p = peek (castPtr p) >>= return . Ptr
-    poke p (Ptr x) = poke (castPtr p) x
-
-instance Eq (Ptr a) where
-    Ptr a == Ptr b = a == b
-    Ptr a /= Ptr b = a /= b
-
-instance Ord (Ptr a) where
-    compare (Ptr a) (Ptr b) = compare a b
-    Ptr a <= Ptr b = a <= b
-    Ptr a < Ptr b = a < b
-    Ptr a > Ptr b = a > b
-    Ptr a >= Ptr b = a >= b
 
 instance Show (Ptr a) where
     showsPrec n (Ptr x) = showsPrec n (toInteger (addrToWordPtr  x))
@@ -55,8 +39,6 @@ plusPtr (Ptr addr) off = Ptr (plusAddr addr off)
 minusPtr :: Ptr a -> Int -> Ptr b
 minusPtr (Ptr addr) off = Ptr (plusAddr addr (negate off))
 
-castPtr :: Ptr a -> Ptr b
-castPtr (Ptr addr) = Ptr addr
 
 alignPtr :: Ptr a -> Int -> Ptr a
 alignPtr = error "alignPtr"
