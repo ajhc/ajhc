@@ -143,7 +143,7 @@ match' (TVar mv) t | getType mv == getType t = return [(mv,t)]
 match' (TCon tc1) (TCon tc2) | tc1==tc2 = return mempty
 match' t1 t2  = fail $ "match: " ++ show (t1,t2)
 
-
+-- FIXME: Use sets.
 splitReduce :: [MetaVar] -> [MetaVar] -> [Pred] -> Tc ([MetaVar],[Pred], [Pred])
 splitReduce fs gs ps = do
     h <- getClassHierarchy

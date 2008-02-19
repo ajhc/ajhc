@@ -336,12 +336,13 @@ calcForced finalPhase v =
 data Env = Env {
     envCachedSubst :: IdMap E,
     envSubst :: Subst,
-    envInScope :: IdMap Binding
+    envInScope :: IdMap Binding,
+    envInScopeCache :: IdMap E
     }
     {-! derive: Monoid, update !-}
 
 susp:: E -> Subst -> Range
-susp e sub =  Susp e sub Unknown -- (substMap'' (fmap mkSubst sub) e)
+susp e sub =  Susp e sub Unknown
 
 insertSuspSubst :: TVr -> InE -> Env -> Env
 insertSuspSubst t e env = insertSuspSubst' (tvrIdent t) e env
@@ -364,7 +365,22 @@ insertDoneSubst' t e env = insertRange t (Done e) env
 
 insertInScope :: Id -> Binding -> Env -> Env
 insertInScope 0 _b env = env
-insertInScope t b env = cacheSubst env { envInScope = minsert t b (envInScope env) }
+insertInScope t b env = extendScope (msingleton t b) env
+
+extendScope :: IdMap Binding -> Env -> Env
+extendScope m env = cacheSubst env { envInScope = m `union` envInScope env
+                                   , envInScopeCache = cachedM `union` envInScopeCache env }
+    where cachedM = mapMaybeIdMap fromBinding m
+          fromBinding (IsBoundTo {bindingE = e}) = Just e
+          fromBinding _                          = Nothing
+
+changeScope :: (Binding -> Binding) -> Env -> Env
+changeScope fn env = cacheScope $ cacheSubst env { envInScope = fmap fn (envInScope env) }
+
+cacheScope :: Env -> Env
+cacheScope env = env { envInScopeCache = mapMaybeIdMap fromBinding (envInScope env) }
+    where fromBinding (IsBoundTo {bindingE = e}) = Just e
+          fromBinding _                          = Nothing
 
 substLookup :: Id -> SM (Maybe Range)
 substLookup id = SM $ ask >>= return . mlookup id . envSubst
@@ -438,7 +454,8 @@ simplifyDs prog sopts dsIn = ans where
     initialB = let
             bb (t,(_,e)) | isFullyConst e = [(t,Done e)]
             bb _ = []
-        in cacheSubst mempty { envSubst = fromList $ concatMap bb  (massocs $ so_boundVars sopts),  envInScope =  fmap (\ (t,e) -> fixInline finalPhase t $ isBoundTo noUseInfo e) (so_boundVars sopts) }
+            initScope = fmap (\ (t,e) -> fixInline finalPhase t $ isBoundTo noUseInfo e) (so_boundVars sopts)
+        in cacheSubst (extendScope initScope mempty { envSubst = fromList $ concatMap bb  (massocs $ so_boundVars sopts) })
     doit = do
         smAddNamesIdSet (progUsedIds prog)
         smAddBoundNamesIdSet (progFreeIds prog)
@@ -537,7 +554,7 @@ simplifyDs prog sopts dsIn = ans where
     nname tvr@(TVr { tvrIdent = n, tvrType =  t})  = do
         t' <- dosub t
         inb <- ask
-        let t'' = substMap'' (fmap (\ IsBoundTo { bindingE = e } -> Just e) $ mfilter isIsBoundTo (envInScope inb)) t'
+        let t'' = substMap' (envInScopeCache inb) t'
         n' <- if n == 0 then return 0 else uniqueName n
         return $ tvr { tvrIdent = n', tvrType =  t'' }
     -- TODO - case simplification
@@ -569,10 +586,14 @@ simplifyDs prog sopts dsIn = ans where
                 t' <- makeRange t
                 done (Coerce t' cont) e
 
-            doCase ic@ECase { eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d' | length (filter (not . isBottom) (caseBodies ic)) <= 1 || all whnfOrBot (caseBodies ic)  || all whnfOrBot (caseBodies emptyCase { eCaseAlts = as', eCaseDefault = d'} )  = do
+            doCase ic@ECase { eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d'
+                | length (filter (not . isBottom) (caseBodies ic)) <= 1 ||
+                  all whnfOrBot (caseBodies ic)  ||
+                  all whnfOrBot (caseBodies emptyCase { eCaseAlts = as', eCaseDefault = d'} )  = do
                 mtick (toAtom "E.Simplify.case-of-case")
                 let f (Alt l e) = do
-                        e' <- localEnv (envInScope_u (fromList [ (n,NotKnown) | TVr { tvrIdent = n } <- litBinds l ] `union`)) $ doCaseCont StartContext e t b' as' d'
+                        e' <- localEnv (extendScope (fromList [ (n,NotKnown) | TVr { tvrIdent = n } <- litBinds l ]))
+                                $ doCaseCont StartContext e t b' as' d'
                         return (Alt l e')
                     --g e >>= return . Alt l
                     g x = localEnv (insertInScope (tvrIdent b) NotKnown) $ doCaseCont StartContext x t b' as' d'
@@ -658,7 +679,7 @@ simplifyDs prog sopts dsIn = ans where
                     (EVar v,_) -> return $ (insertDoneSubst b (EVar b') . insertInScope (tvrIdent v) (isBoundTo noUseInfo (EVar b')),b')
                     _ -> return $ (insertDoneSubst b (EVar b'),b')
                 inb <- ask
-                let dd e' = localEnv (const $ ids $ envInScope_u (newinb `union`) inb) $ f cont e' where
+                let dd e' = localEnv (const $ ids $ extendScope newinb inb) $ f cont e' where
                         na = NotAmong [ n | Alt LitCons { litName = n } _ <- as]
                         newinb = fromList [ (n,na) | EVar (TVr { tvrIdent = n }) <- [EVar b']]
                     da (Alt (LitInt n t) ae) = do
@@ -672,12 +693,10 @@ simplifyDs prog sopts dsIn = ans where
                         let p' = lc { litArgs = ns', litType = t' }
                             nsub =  [ (n,Done (EVar t))  | TVr { tvrIdent = n } <- ns | t <- ns' ]
                             ninb = fromList [ (n,NotKnown)  | TVr { tvrIdent = n } <- ns' ]
-                        e' <- localEnv (const $ ids $ substAddList nsub (envInScope_u (ninb `union`) $ mins e (patToLitEE p') inb)) $ f cont ae
+                        e' <- localEnv (const $ ids $ substAddList nsub (extendScope ninb $ mins e (patToLitEE p') inb)) $ f cont ae
                         return $ Alt p' e'
-                    --mins (EVar v) e = envInScope_u (minsert (tvrIdent v) (isBoundTo Many e))
                     mins _ e | 0 `notMember` (freeVars e :: IdSet) = insertInScope (tvrIdent b') (isBoundTo noUseInfo e)
                     mins _ _ = id
-                    --mins _ _ = id
 
                 d' <- T.mapM dd d
                 as' <- mapM da as
@@ -711,7 +730,7 @@ simplifyDs prog sopts dsIn = ans where
             Just (bs,e) -> do
                 let bs' = [ x | x@(TVr { tvrIdent = n },_) <- bs, n /= 0]
                 binds <- mapM (\ (v,e) -> nname v >>= return . (,,) e v) bs'
-                e' <- localEnv (substAddList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] . envInScope_u (fromList [ (n,isBoundTo noUseInfo e) | (e,_,TVr { tvrIdent = n }) <- binds] `union`)) $ f StartContext e
+                e' <- localEnv (substAddList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] . extendScope (fromList [ (n,isBoundTo noUseInfo e) | (e,_,TVr { tvrIdent = n }) <- binds])) $ f StartContext e
                 done cont $ eLetRec [ (v,e) | (e,_,v) <- binds ] e'
             Nothing -> do
                 done cont $ EError ("match falls off bottom: " ++ pprint l) t'
@@ -850,14 +869,13 @@ simplifyDs prog sopts dsIn = ans where
                 mtick $ "E.Simplify.inline.Once/{" ++ showName t ++ "}"
                 w rs ds -- (minsert t (Susp e sub) sub) inb ds
             w ((t,n,t',e):rs) ds = do
-                inb <- ask
-                let inb' = case isForced of
-                        ForceInline -> (cacheSubst $ envInScope_u (fmap nogrowth) inb)
-                        _ -> inb
+                let inb = case isForced of
+                        ForceInline -> cacheSubst . changeScope nogrowth
+                        _ -> id
                     isForced = calcForced finalPhase t'
                     nogrowth IsBoundTo { bindingAtomic = False } = NotKnown
                     nogrowth x = x
-                e' <- localEnv (const inb') $ f (LazyContext t') e
+                e' <- localEnv inb $ f (LazyContext t') e
                 let ibt = fixInline finalPhase t' $ isBoundTo n e'
                 case (bindingAtomic ibt,inlineForced ibt) of
                     (True,f) | f /= ForceNoinline -> do
@@ -868,7 +886,7 @@ simplifyDs prog sopts dsIn = ans where
         s' <- mapM z ds
         inb <- ask
         let sub'' = fromList [ (t,susp e sub'') | (t, UseInfo { useOccurance = Once },_,e) <- s'] `union` fromList [ (t,Done (EVar t'))  | (t,n,t',_) <- s', useOccurance n /= Once] `union` envSubst inb
-        (ds',inb') <- localEnv (envSubst_s sub'' . envInScope_u (fromList [ (tvrIdent t',NotKnown) | (_,n,t',_) <- s', useOccurance n /= Once] `union`)) $ w s' []
+        (ds',inb') <- localEnv (envSubst_s sub'' . extendScope (fromList [ (tvrIdent t',NotKnown) | (_,n,t',_) <- s', useOccurance n /= Once])) $ w s' []
         let minArgs t = case Info.lookup (tvrInfo t) of
                 Just (UseInfo { minimumArgs = min }) -> min
                 Nothing -> 0

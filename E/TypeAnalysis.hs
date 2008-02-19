@@ -252,7 +252,7 @@ repi e = runIdentity $ emapE (return . repi ) e
 specializeDef _ env  (tvr,e) | isUnused env tvr = return ((tvr,EError ("Unused Def: " ++ tvrShowName tvr) (tvrType tvr)), mempty)
 specializeDef _ _ (t,e) | getProperty prop_PLACEHOLDER t = return ((t,e), mempty)
 specializeDef True SpecEnv { senvDataTable = dataTable }  (tvr,e) | needsSpec = ans where
-    sub = substMap''  $ fromList [ (tvrIdent t,Just v) | (t,Just v) <- sts ]
+    sub = substMap'  $ fromList [ (tvrIdent t,v) | (t,Just v) <- sts ]
     sts = map spec ts
     spec t | Just nt <- Info.lookup (tvrInfo t) >>= getTyp (getType t) dataTable, sortKindLike (getType t) = (t,Just (repi nt))
     spec t = (t,Nothing)

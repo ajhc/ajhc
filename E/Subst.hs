@@ -6,7 +6,7 @@ module E.Subst(
     subst,
     subst',
     substMap,
-    substMap'',
+    substMap',
     typeSubst,
     typeSubst'
     ) where
@@ -43,7 +43,7 @@ subst ::
     -> E  -- ^ input term
     -> E  -- ^ output term
 subst (TVr { tvrIdent = 0 }) _ e = e
-subst (TVr { tvrIdent = i }) w e = doSubst False False (minsert i (Just w) $ (freeVars w `union` freeVars e))  e
+subst (TVr { tvrIdent = i }) w e = doSubst' False False (msingleton i w) (\n -> n `member` (freeVars w `union` freeVars e :: IdSet))  e
 
 -- | Identitcal to 'subst' except that it substitutes inside the local types
 -- for variables in expressions. This should not be used because it breaks the
@@ -53,7 +53,7 @@ subst (TVr { tvrIdent = i }) w e = doSubst False False (minsert i (Just w) $ (fr
 
 subst' :: TVr -> E -> E -> E
 subst' (TVr { tvrIdent = 0 }) _ e = e
-subst' (TVr { tvrIdent = (i) }) w e = doSubst True False (minsert i (Just w) $ (freeVars w `union` freeVars e)) e
+subst' (TVr { tvrIdent = (i) }) w e = doSubst' True False (msingleton i w) (\n -> n `member` (freeVars w `union` freeVars e :: IdSet)) e
 
 
 
@@ -69,11 +69,29 @@ litSMapM f (LitInt n t) = do
 
 
 substMap :: IdMap E -> E -> E
-substMap im e = doSubst False False (fmap ( (`mlookup` im) . tvrIdent) (unions $ (freeVars e :: IdMap TVr):map freeVars (melems im))) e
+substMap im e = doSubst' False False im (\n -> n `member` (unions $ (freeVars e :: IdSet):map freeVars (melems im))) e
 
 -- | doesn't seed with free variables.
-substMap'' :: IdMap (Maybe E) -> E -> E
-substMap'' im = doSubst False False im -- (fmap Just im)
+substMap' :: IdMap E -> E -> E
+substMap' im = doSubst' False False im (`mmember` im)
+
+{-
+data E = EAp E E
+    | ELam TVr E
+    | EPi TVr E
+    | EVar TVr
+    | Unknown
+    | ESort ESort
+    | ELit !(Lit E E)
+    | ELetRec { eDefs :: [(TVr, E)], eBody :: E }
+    | EPrim APrim [E] E
+    | EError String E
+-}
+
+litE = ELit (LitInt 10 Unknown)
+idE = ELam (TVr 2 Unknown mempty) (EVar (TVr 2 Unknown mempty))
+
+testE = EAp (EVar (TVr 2 Unknown mempty)) idE
 
 -- Monadic code is so much nicer
 doSubst :: Bool -> Bool -> IdMap (Maybe E) -> E -> E

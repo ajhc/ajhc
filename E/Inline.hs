@@ -113,7 +113,7 @@ programMapRecGroups imap idann letann lamann f prog = do
             ds' <- annotateDs imap idann letann lamann ds
             nds <- f (True,ds')
             let imap' = (bm nds imap)
-            let smap = substMap'' $ fromList [ (tvrIdent x,Just $ EVar x) | (x,y) <- nds]
+            let smap = substMap' $ fromList [ (tvrIdent x,EVar x) | (x,y) <- nds]
                 nds' = [ (x,smap y) | (x,y) <- nds]
             g (nds':rs) imap' rds
         g rs _ [] = return $ concat rs
@@ -148,7 +148,7 @@ programMapProgGroups imap f prog = do
             ds' <- annotateDs imap nann nann nann ds
             nprog <- f (programSubProgram prog' True ds')
             let imap' = bm nds imap
-                smap = substMap'' $ fromList [ (tvrIdent x,Just $ EVar x) | (x,y) <- nds]
+                smap = substMap' $ fromList [ (tvrIdent x,EVar x) | (x,y) <- nds]
                 nds = programDs nprog
                 nds' = [ (x,smap y) | (x,y) <- nds]
             g (unames nds' nprog) (nds':rs) imap' rds
