@@ -28,6 +28,7 @@ import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import FrontEnd.Warning
 import Ho.Type
+import Ho.Collected
 import HsSyn
 import Info.Types
 import Name.Name as Name

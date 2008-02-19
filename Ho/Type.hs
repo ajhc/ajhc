@@ -3,7 +3,6 @@ module Ho.Type where
 import Data.Monoid
 import qualified Data.Map as Map
 
-import StringTable.Atom
 import DataConstructors(DataTable,dataTablePrims)
 import E.E(TVr,E)
 import E.Rules(Rules)
@@ -27,31 +26,17 @@ type HoHash     = MD5.Hash
 
 -- the collected information that is passed around
 data CollectedHo = CollectedHo {
+    -- this is a list of external names that are valid but that we may not know anything else about
+    -- it is used to recognize invalid ids.
     choExternalNames :: IdSet,
+    -- this is a map of ids to their full TVrs with all rules and whatnot attached.
     choVarMap :: IdMap (Maybe E),
-    choHoMap :: Map.Map String Ho,
-    choHo :: Ho
+    -- these are rules that may need to be retroactively applied to other modules
+    choOrphanRules :: Rules,
+    -- the hos
+    choHoMap :: Map.Map String Ho
     }
     {-! derive: update !-}
-
-updateCollectedHo cho = cho { choHo = mconcat $ Map.elems (choHoMap cho) }
-
-instance Monoid CollectedHo where
-    mempty = CollectedHo {
-        choExternalNames = mempty,
-        choHo = pho,
-        choHoMap = Map.singleton "Prim@" pho,
-        choVarMap = mempty
-        } where pho = mempty { hoBuild = mempty { hoDataTable = dataTablePrims } }
-    a `mappend` b = CollectedHo {
-        choExternalNames = choExternalNames a `mappend` choExternalNames b,
-        choVarMap = choVarMap a `mappend` choVarMap b,
-        choHoMap = newHoMap,
-        choHo = mconcat $ Map.elems newHoMap
-        } where newHoMap = Map.union (choHoMap a) (choHoMap b)
-
-choDataTable cho = hoDataTable $ hoBuild (choHo cho)
-
 
 
 -- this is the immutable information about modules that depnends only on their contents

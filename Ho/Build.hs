@@ -46,9 +46,11 @@ import FrontEnd.Syn.Options
 import FrontEnd.Unlit
 import FrontEnd.Warning
 import FrontEnd.SrcLoc
+import Info.Types
 import RawFiles(prelude_m4)
 import Ho.Binary()
 import Ho.Library
+import Ho.Collected
 import Ho.Type
 import HsSyn
 import Options
@@ -57,6 +59,7 @@ import Util.FilterInput
 import Util.Gen hiding(putErrLn,putErr,putErrDie)
 import Util.SetLike
 import Version.Version(versionString)
+import qualified Info.Info as Info
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified FlagDump as FD
@@ -342,8 +345,6 @@ compileModules :: [Either Module String]                             -- ^ Either
 compileModules need ifunc func = do
     (needed,cug) <- loadModules (optHls options) need
     processCug cug >>= mkPhonyCompNode needed >>= compileCompNode ifunc func
-
-
 
 
 -- this takes a list of modules or files to load, and produces a compunit graph

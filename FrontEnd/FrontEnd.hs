@@ -13,6 +13,7 @@ import FrontEnd.Rename
 import FrontEnd.SrcLoc
 import GenUtil
 import Ho.Build
+import Ho.Collected
 import HsSyn
 import Options
 import FrontEnd.Warning

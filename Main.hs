@@ -32,7 +32,7 @@ import E.LetFloat
 import E.Program
 import E.Rules
 import E.Show hiding(render)
-import E.Subst(subst)
+import E.Subst(subst,substMap'')
 --import E.ToHs
 import E.Traverse
 import E.TypeAnalysis
@@ -53,6 +53,7 @@ import Grin.Optimize
 import Grin.Show
 import Ho.Build
 import Ho.Library
+import Ho.Collected
 import HsSyn
 import Info.Types
 import Name.Id
@@ -61,6 +62,8 @@ import Name.Names
 import Name.VConsts
 import Options
 import Support.FreeVars
+import Support.CanType(getType)
+import Util.HasSize
 import Support.Transform
 import Util.Graph
 import Util.SetLike as S
@@ -161,27 +164,53 @@ idann rs ps i nfo = return (rules rs i (props ps i nfo)) where
         Just x -> \nfo -> Info.insert (x `mappend` Info.fetch nfo) nfo
 
 
+
 processInitialHo ::
     CollectedHo       -- ^ current accumulated ho
     -> Ho    -- ^ new ho, freshly read from file
     -> IO CollectedHo -- ^ final combined ho data.
 processInitialHo accumho aho = do
-    let ho' = reprocessHo (hoRules ho) mempty ho
-        ho = hoBuild aho
-        -- XXX do we need to do this?
-    let-- rules' = runIdentity $ mapBodies (annotate imapRules (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
-        --imapRules = choVarMap accumho  `mappend` newVarMap
-        --accumho' = reprocessCho rules' mempty accumho
+    let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- newTVrs ]) $ reRule (choVarMap accumho)
+        newTVrs = map annTVr . fsts $ hoEs (hoBuild aho)
+        annTVr t = dorule rules' t
+
+        --reRule x = if isEmpty orphanRules then x else fmap (fmap rr) x where
+        reRule x = fmap (fmap rr) x where
+            rr ~(EVar t) = EVar $ dorule rules' t
+        dorule rules t = tvrInfo_u (g (tvrIdent t)) t where
+            g id = runIdentity . idann rules mempty id
+        orphanRules = findOrphanRules (Map.keys . hoExports $ hoExp aho) rules'
+        --rules' = (hoRules (hoBuild aho))
+        --rules' = mapRuleBodies (substfmap) (hoRules (hoBuild aho))
+        rules' = mapRuleBodies (substMap'' $ choVarMap accumho) (hoRules (hoBuild aho))
+        substfmap = runIdentity . annotate finalVarMap (\_ -> return) letann lamann
+
     let ds = runIdentity $ annotateDs (choVarMap accumho) (\_ -> return) letann lamann (hoEs ho')
-
-        prog = etaAnnotateProgram (programSetDs ds program { progDataTable = choDataTable accumho `mappend` hoDataTable ho })
-        newVarMap = fromList [ (tvrIdent t,Just (EVar t)) | (t,_) <- programDs prog ]
-
-
+        ho' = reprocessHo rules' mempty (hoBuild aho)
+        prog = etaAnnotateProgram (programSetDs ds program { progDataTable = hoDataTable (hoBuild $ choHo accumho) `mappend` hoDataTable (hoBuild aho) })
         (mod:_) = Map.keys $ hoExports $ hoExp aho
+    return $ mempty {
+        choVarMap = finalVarMap,
+        choExternalNames = fromList . map tvrIdent $ newTVrs,
+        choHoMap = Map.singleton (show mod) $ hoBuild_u (hoEs_s $ programDs prog) aho
+        } `mappend` accumho
 
-    --lintCheckProgram (putStrLn "processInitialHo") prog
-    return $ updateCollectedHo $ accumho `mappend` mempty { choVarMap = newVarMap, choExternalNames = idMapToIdSet newVarMap, choHoMap = Map.singleton (show mod) aho { hoBuild = ho { hoEs = programDs prog } } }
+--    let ho' = reprocessHo (hoRules ho) mempty ho
+--        ho = hoBuild aho
+--        -- XXX do we need to do this? YES!
+--    let-- rules' = runIdentity $ mapBodies (annotate imapRules (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
+--        --imapRules = choVarMap accumho  `mappend` newVarMap
+--        --accumho' = reprocessCho rules' mempty accumho
+--    let ds = runIdentity $ annotateDs (choVarMap accumho) (\_ -> return) letann lamann (hoEs ho')
+--
+--        prog = etaAnnotateProgram (programSetDs ds program { progDataTable = choDataTable accumho `mappend` hoDataTable ho })
+--        newVarMap = fromList [ (tvrIdent t,Just (EVar t)) | (t,_) <- programDs prog ]
+--
+--
+--        (mod:_) = Map.keys $ hoExports $ hoExp aho
+--
+--    --lintCheckProgram (putStrLn "processInitialHo") prog
+--    return $ updateCollectedHo $ accumho `mappend` mempty { choVarMap = newVarMap, choExternalNames = idMapToIdSet newVarMap, choHoMap = Map.singleton (show mod) aho { hoBuild = ho { hoEs = programDs prog } } }
 
 -- reprocess an old ho to include new rules and properties
 reprocessHo :: Rules -> IdMap Properties -> HoBuild -> HoBuild
@@ -190,7 +219,7 @@ reprocessHo rules ps ho = ho { hoEs = map f (hoEs ho) } where
     g id = runIdentity . idann rules ps id
 
 reprocessCho :: Rules -> IdMap Properties -> CollectedHo -> CollectedHo
-reprocessCho rules ps cho = updateCollectedHo $ choHoMap_u (Map.map $ hoBuild_u (hoEs_u (map f))) $ choVarMap_u (fmap h) cho where
+reprocessCho rules ps cho = choHoMap_u (Map.map $ hoBuild_u (hoEs_u (map f))) $ choVarMap_u (fmap h) cho where
     f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
     g id = runIdentity . idann rules ps id
     h ~(Just (EVar t)) = Just (EVar (tvrInfo_u (g (tvrIdent t)) t))
@@ -478,8 +507,6 @@ compileModEnv' cho = do
             progDataTable = hoDataTable $ hoBuild ho
             }
 
-    wdump FD.Core $ printProgram prog
-
     -- dump final version of various requested things
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
     when (dump FD.ClassSummary) $ do
@@ -502,14 +529,11 @@ compileModEnv' cho = do
 
 
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
-    putErrLn "!!!!!"
     esmap <- programEsMap prog
-    putErrLn "!!!!!"
     (_,main,mainv) <- getMainFunction dataTable mainFunc esmap
     let ffiExportNames = [tv | (tv, _, _) <- progCombinators prog,
                                name <- tvrName tv,
                                "FE@" `isPrefixOf` show name]
-    putErrLn "!!!!!"
     prog <- return prog { progMainEntry   = main,
                           progEntryPoints = (main:ffiExportNames),
                           progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog]
@@ -526,11 +550,11 @@ compileModEnv' cho = do
 
     --wdump FD.Core $ printProgram prog
     prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze False prog else return prog
---    putStrLn "Type analyzed methods"
---    flip mapM_ (programDs prog) $ \ (t,e) -> do
---        let (_,ts) = fromLam e
---            ts' = takeWhile (sortKindLike . getType) ts
---        when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
+    putStrLn "Type analyzed methods"
+    flip mapM_ (programDs prog) $ \ (t,e) -> do
+        let (_,ts) = fromLam e
+            ts' = takeWhile (sortKindLike . getType) ts
+        when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
     lintCheckProgram onerrNone prog
     prog <- programPrune prog
     --wdump FD.Core $ printProgram prog

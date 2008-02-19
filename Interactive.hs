@@ -30,6 +30,7 @@ import FrontEnd.Tc.Class
 import FrontEnd.Desugar(desugarHsStmt)
 import GenUtil
 import Ho.Type
+import Ho.Collected
 import HsPretty()
 import HsSyn
 import Name.Name
