@@ -14,8 +14,10 @@ module E.Rules(
     mapABodiesArgs,
     ruleHeadFreeVars,
     mapBodies,
+    mapRuleBodies,
     printRules,
     ruleAllFreeVars,
+    findOrphanRules,
     rulesFromARules
     )where
 
@@ -70,7 +72,7 @@ emptyRule = Rule {
 -- a collection of rules
 
 newtype Rules = Rules (IdMap [Rule])
-    deriving(HasSize)
+    deriving(HasSize,IsEmpty)
 
 
 instance Binary Rules where
@@ -78,6 +80,10 @@ instance Binary Rules where
     get = do
         rs <- get
         return $ fromRules rs
+
+mapRuleBodies :: (E -> E) -> Rules -> Rules
+mapRuleBodies g (Rules mp) = Rules (fmap (map f) mp) where
+    f rule = rule { ruleBody = g $ ruleBody rule }
 
 mapBodies :: Monad m => (E -> m E) -> Rules -> m Rules
 mapBodies g (Rules mp) = do
@@ -98,6 +104,10 @@ ruleHeadFreeVars :: Rules -> IdSet
 ruleHeadFreeVars (Rules rs) = unions $ map f (concat $ melems rs) where
     f r = (S.insert (tvrIdent $ ruleHead r) $ freeVars (ruleArgs r)) S.\\ fromList (map tvrIdent $ ruleBinds r)
 
+findOrphanRules :: [Module] -> Rules -> Rules
+findOrphanRules ms (Rules rs) = Rules $ mapMaybeIdMap f rs where
+    f rs = let grs = filter (not . bad) rs in if List.null grs then Nothing else Just grs
+    bad r = List.null $ map Just ms `intersect` (map (\x -> getModule =<< fromId x) $ idSetToList ((S.insert (tvrIdent $ ruleHead r) $ freeVars (ruleArgs r)) S.\\ fromList (map tvrIdent $ ruleBinds r)))
 
 
 instance FreeVars Rule [Id] where
