@@ -75,24 +75,6 @@ substMap im e = doSubst' False False im (\n -> n `member` (unions $ (freeVars e 
 substMap' :: IdMap E -> E -> E
 substMap' im = doSubst' False False im (`mmember` im)
 
-{-
-data E = EAp E E
-    | ELam TVr E
-    | EPi TVr E
-    | EVar TVr
-    | Unknown
-    | ESort ESort
-    | ELit !(Lit E E)
-    | ELetRec { eDefs :: [(TVr, E)], eBody :: E }
-    | EPrim APrim [E] E
-    | EError String E
--}
-
-litE = ELit (LitInt 10 Unknown)
-idE = ELam (TVr 2 Unknown mempty) (EVar (TVr 2 Unknown mempty))
-
-testE = EAp (EVar (TVr 2 Unknown mempty)) idE
-
 -- Monadic code is so much nicer
 doSubst :: Bool -> Bool -> IdMap (Maybe E) -> E -> E
 doSubst substInVars allShadow bm e
