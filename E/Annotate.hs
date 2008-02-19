@@ -61,7 +61,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
     f ELetRec { eDefs = dl, eBody = e } = do
         dl' <- flip mapM dl $ \ (t,e) -> do
             nfo <- lift $ letann e (tvrInfo t)
-            return (tvrInfo_u (Info.insert LetBound) t { tvrInfo = nfo })
+            return t { tvrInfo = nfo }
         (as,rs) <- liftM unzip $ mapMntvr dl'
         local (foldr (.) id rs) $ do
             as <- mapM procRules as
@@ -75,11 +75,11 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         e' <- f $ eCaseScrutinee ec
         let caseBind = eCaseBind ec
         caseBind <- procRules caseBind
-        (b',r) <- ntvr [] $ caseBind { tvrInfo = Info.insert CaseDefault (tvrInfo caseBind) }
+        (b',r) <- ntvr [] caseBind
         d <- local r $ T.mapM f $ eCaseDefault ec
         let da (Alt lc@LitCons { litName = s, litArgs = vs, litType = t } e) = do
                 t' <- f t
-                (as,rs) <- liftM unzip $ mapMntvr (map (tvrInfo_u (Info.insert CasePattern)) vs)
+                (as,rs) <- liftM unzip $ mapMntvr vs
                 e' <- local (foldr (.) id rs) $ f e
                 return $ Alt lc { litArgs = as, litType = t' } e'
             da (Alt l e) = do
@@ -95,7 +95,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         nfo <- lift $ lamann e (tvrInfo tvr)
         nfo <- lift $ idann n nfo
         e' <- local (minsert n Nothing) $ f e
-        return $ lam (tvr { tvrIdent =  0, tvrType =  t', tvrInfo =  Info.insert bnd nfo}) e'
+        return $ lam (tvr { tvrIdent =  0, tvrType =  t', tvrInfo =  nfo}) e'
     lp bnd lam tvr e = do
         nfo <- lift $ lamann e (tvrInfo tvr)
         (tv,r) <- ntvr  [] tvr { tvrInfo = nfo }
