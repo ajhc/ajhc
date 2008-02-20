@@ -31,7 +31,7 @@ data ProgramType = SubProgram Bool | MainProgram | MainComponent
 data Program = Program {
     progExternalNames :: IdSet,
     progClassHierarchy :: ClassHierarchy,
-    progCombinators :: [(TVr,[TVr],E)],
+    progCombinators :: [Comb],
     progDataTable :: DataTable,
     progEntryPoints :: [TVr],
     progMainEntry :: TVr,
@@ -61,7 +61,7 @@ program = Program {
 
 
 programDs :: Program -> [(TVr,E)]
-programDs prog = [ (t,foldr ELam e as)  | (t,as,e) <- progCombinators prog]
+programDs prog = [ (t,e)  | Comb { combHead = t, combBody = e }  <- progCombinators prog]
 
 programSetDs :: [(TVr,E)] -> Program -> Program
 programSetDs ds prog | flint && hasRepeatUnder (tvrIdent . fst) ds = error $ "programSetDs: program has redundant definitions: \n" ++ intercalate "\n"  (sort $ map (show . tvrShowName . fst) ds)
@@ -69,14 +69,14 @@ programSetDs ds prog | flint && any (not . isValidAtom) (map (tvrIdent . fst) ds
 programSetDs ds prog = prog {
     progMainEntry = f (progMainEntry prog),
     progEntryPoints = map f (progEntryPoints prog),
-    progCombinators = [ (t,as,body) | (t,e) <- ds, let (body,as) = fromLam e ]
+    progCombinators = [ emptyComb { combHead = t, combBody = e } | (t,e) <- ds ]
     } where
     f tvr | Just n <- Map.lookup (tvrIdent tvr) mp = n
           | otherwise = tvr
     mp = Map.fromList [ (tvrIdent t,t) | (t,_) <- ds ]
 
 programAddDs :: [(TVr,E)] -> Program -> Program
-programAddDs ds prog = prog { progCombinators = [ (t,as,body) | (t,e) <- ds, let (body,as) = fromLam e ] ++ progCombinators prog }
+programAddDs ds prog = prog { progCombinators = [ emptyComb { combHead = t, combBody = e } | (t,e) <- ds ] ++ progCombinators prog }
 
 programE :: Program -> E
 programE prog = ELetRec (programDs prog) (EVar (progMainEntry prog))
@@ -89,16 +89,6 @@ programEsMap prog = do
     xs <- mapM f (programDs prog)
     return (Map.fromList xs)
 
--- | note, this will reset your entry points
-programSetE :: E -> Program -> Program
-programSetE ELetRec { eDefs = ds, eBody = EVar v } prog = programSetDs ds prog { progMainEntry = v }
-programSetE ELetRec { eDefs = ds, eBody = mainBody } prog = programSetDs ((main,mainBody):ds) prog { progEntryPoints = [main], progMainEntry = main } where
-    main = (tVr num (typeInfer (progDataTable prog) mainBody))
-    Just num = List.find (`notElem` [ n  | (TVr { tvrIdent = n },_) <- ds ]) [toId $ toName Val (show $ progModule prog,"main" ++ show n) |  n <- [1 :: Int ..] ]
-programSetE e prog = prog { progCombinators = [(main,as,mainBody)], progEntryPoints = [main], progMainEntry = main } where
-    (mainBody,as) = fromLam e
-    main = tVr (toId $ toName Val (show $ progModule prog,"main")) (typeInfer (progDataTable prog) e)
-
 programMapBodies f prog = do
      ds <- sequence [ f e >>= return . (,) t | (t,e) <- programDs prog ]
      return $ programSetDs ds prog
@@ -110,7 +100,7 @@ programMapDs f prog = do
 programMapDs_ f prog = mapM_ f (programDs prog)
 
 hPrintProgram fh prog@Program {progCombinators = cs, progDataTable = dataTable } = do
-    sequence_ $ intersperse (hPutStrLn fh "") [ hPrintCheckName fh dataTable v (foldr ELam e as) | (v,as,e) <- cs]
+    sequence_ $ intersperse (hPutStrLn fh "") [ hPrintCheckName fh dataTable v e | Comb { combHead = v, combBody = e } <- cs]
     when (progMainEntry prog /= tvr) $
         hPutStrLn fh $ "MainEntry: " ++ pprint (progMainEntry prog)
     when (progEntryPoints prog /= [progMainEntry prog]) $

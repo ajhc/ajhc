@@ -161,14 +161,15 @@ assert x = value True `implies` x
 lambdaLift ::  Program -> IO Program
 lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
     noLift <- calculateLiftees prog
-    let wp =  fromList [ tvrIdent x | (x,_,_) <- cs ]
+    let wp =  fromList [ combIdent x | x <- cs ] :: IdSet
     fc <- newIORef []
     fm <- newIORef mempty
     statRef <- newIORef mempty
-    let z (n,as,v) = do
+    let z comb  = do      
+            (n,as,v) <- return $ combTriple comb
             let ((v',(cs',rm)),stat) = runReader (runStatT $ execUniqT 1 $ runWriterT (f v)) S { funcName = mkFuncName (tvrIdent n), topVars = wp,isStrict = True, declEnv = [] }
             modifyIORef statRef (mappend stat)
-            modifyIORef fc (\xs -> (n,as,v'):cs' ++ xs)
+            modifyIORef fc (\xs -> combTriple_s (n,as,v') comb:cs' ++ xs)
             modifyIORef fm (rm `mappend`)
         shouldLift t _ | tvrIdent t `member` noLift = False
         shouldLift _ ECase {} = True
@@ -255,8 +256,8 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                         return (t,e'')
             h ds e' (rs' ++ ds')
         h [] e ds = f e >>= return . eLetRec ds
-        tellCombinator c = tell ([c],mempty)
-        tellCombinators c = tell (c,mempty)
+        tellCombinator c = tell ([combTriple_s c emptyComb],mempty)
+        tellCombinators c = tell (map (`combTriple_s` emptyComb) c,mempty)
         doLift t e r = local (topVars_u (insert (tvrIdent t)) ) $ do
             --(e,tn) <- return $ etaReduce e
             let (e',ls) = fromLam e

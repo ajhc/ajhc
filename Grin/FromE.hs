@@ -181,7 +181,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
             errorOnce = errorOnce,
             ccafMap = fromList $ [(tvrIdent v,e) |(v,_,e) <- cc ]  ++ [ (tvrIdent v,Var vv (TyPtr TyNode)) | (v,vv,_) <- rcafs]
             }
-    ds <- runC lenv $ mapM doCompile [ c | c@(v,_,_) <- progCombinators prog, v `notElem` [x | (x,_,_) <- cc]]
+    ds <- runC lenv $ mapM doCompile [ c | c@(v,_,_) <- map combTriple $ progCombinators prog, v `notElem` [x | (x,_,_) <- cc]]
     wdump FD.Progress $ do
         os <- onceMapToList errorOnce
         mapM_ print os
@@ -225,7 +225,7 @@ compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, pro
         theFuncs = (funcMain ,[] :-> initCafs :>>= [] :->  discardResult (App (scTag mainEntry) [] [])) : efv ++ ds'
     return grin
     where
-    scMap = fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- progCombinators prog]
+    scMap = fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- map combTriple $ progCombinators prog]
     initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ concat [ makePartials (a,b,c) | (_,(a,b,c)) <-  massocs scMap] ++ concat [con x| x <- Map.elems $ constructorMap dataTable, conType x /= eHash]
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = return $ (tagArrow,toTyTy ([tyDNode, tyDNode],[TyNode]))
     con c | keepCon = return $ (n,TyTy { tyThunk = TyNotThunk, tySlots = keepIts as, tyReturn = [TyNode], tySiblings = fmap (map convertName) sibs}) where
@@ -279,7 +279,8 @@ primTyEnv = TyEnv . Map.map toTyTy $ Map.fromList $ [
 -- takes a program and returns (cafs which are actually constants,which are recursive,rest of cafs)
 
 constantCaf :: Program -> ([(TVr,Var,Val)],[Var],[(TVr,Var,Val)])
-constantCaf Program { progDataTable = dataTable, progCombinators = ds } = ans where
+constantCaf Program { progDataTable = dataTable, progCombinators = combs } = ans where
+    ds = map combTriple combs
     -- All CAFS
     ecafs = [ (v,e) | (v,[],e) <- ds ]
     -- just CAFS that can be converted to constants need dependency analysis

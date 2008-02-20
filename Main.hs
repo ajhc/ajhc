@@ -531,12 +531,12 @@ compileModEnv' cho = do
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
     esmap <- programEsMap prog
     (_,main,mainv) <- getMainFunction dataTable mainFunc esmap
-    let ffiExportNames = [tv | (tv, _, _) <- progCombinators prog,
+    let ffiExportNames = [tv | tv <- map combHead $  progCombinators prog,
                                name <- tvrName tv,
                                "FE@" `isPrefixOf` show name]
     prog <- return prog { progMainEntry   = main,
                           progEntryPoints = (main:ffiExportNames),
-                          progCombinators = (main,[],mainv):[ (unsetProperty prop_EXPORTED t,as,e) | (t,as,e) <- progCombinators prog]
+                          progCombinators = emptyComb { combHead = main, combBody = mainv }:map (combHead_u (unsetProperty prop_EXPORTED)) (progCombinators prog)
                         }
     prog <- transformProgram transformParms { transformCategory = "PruneUnreachable", transformOperation = evaluate . programPruneUnreachable } prog
     prog <- barendregtProg prog

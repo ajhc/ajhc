@@ -26,6 +26,13 @@ data Comb = Comb {
     }
     {-!derive: update !-}
 
+emptyComb = Comb { combHead = tvr, combBody = Unknown, combRules = [] }
+combIdent = tvrIdent . combHead
+combArgs  = snd . fromLam . combBody
+combABody = fst . fromLam . combBody
+combTriple comb = (combHead comb,combArgs comb,combABody comb)
+combTriple_s (t,as,e) comb = comb { combHead = t, combBody = Prelude.foldr ELam e as }
+
 data RuleType = RuleSpecialization | RuleUser | RuleCatalyst
     deriving(Eq)
 
