@@ -20,7 +20,9 @@ module Name.Id(
     idMapFromDistinctAscList,
     idSetToList,
     idMapToList,
+    emptyId,
     newIds,
+    newId,
     runIdNameT',
     runIdNameT
     )where
@@ -31,6 +33,8 @@ import Data.Traversable
 import Data.Foldable
 import Data.Monoid
 import Data.Typeable
+import System.Random
+import Data.Bits
 import qualified Data.IntMap  as IM
 import qualified Data.IntSet as IS
 
@@ -169,8 +173,13 @@ instance Show v => Show (IdMap v) where
 
 etherialIds :: [Id]
 etherialIds = [-2, -4 ..  ]
+
 isEtherialId id = id < 0
+
 isInvalidId id = id <= 0
+
+emptyId :: Id
+emptyId = 0
 
 
 -- | find some temporary ids that are not members of the set,
@@ -179,5 +188,15 @@ isInvalidId id = id <= 0
 newIds :: IdSet -> [Id]
 newIds ids = [ i | i <- [s, s + 2 ..] , i `notMember` ids ] where
     s = 2 + (2 * size ids)
+
+
+newId :: Int           -- ^ a seed value, useful for speeding up finding a unique id
+      -> (Id -> Bool)  -- ^ whether an Id is acceptable
+      -> Id            -- ^ your new Id
+newId seed check = head $ filter check ls where
+    ls = map mask $ randoms (mkStdGen seed)
+    mask x = x .&. 0x0FFFFFFE
+
+
 
 
