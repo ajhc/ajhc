@@ -7,6 +7,7 @@ module E.Subst(
     subst',
     substMap,
     substMap',
+    substMap'',
     typeSubst,
     typeSubst'
     ) where
@@ -74,6 +75,10 @@ substMap im e = doSubst' False False im (\n -> n `member` (unions $ (freeVars e 
 -- | doesn't seed with free variables.
 substMap' :: IdMap E -> E -> E
 substMap' im = doSubst' False False im (`mmember` im)
+
+-- | doesn't seed with free variables.
+substMap'' :: IdMap (Maybe E) -> E -> E
+substMap'' im = doSubst' False False (mapMaybeIdMap id im) (`mmember` im)
 
 -- Monadic code is so much nicer
 doSubst :: Bool -> Bool -> IdMap (Maybe E) -> E -> E
