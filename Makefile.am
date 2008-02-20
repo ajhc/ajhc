@@ -11,7 +11,8 @@ SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
 BUILT_SOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs \
 	       FlagOpts.hs Name/Prim.hs Info/Properties.hs $(DRIFTFILES)
 
-MY_CFLAGS= -I$(srcdir)/StringTable -I$(srcdir)/cbits -I$(builddir)/cbits -optc-std=c99 -optc-O2 -optc-Wall
+MY_CINCLUDES= -I$(srcdir)/StringTable -I$(srcdir)/cbits -I$(builddir)/cbits
+MY_CFLAGS= $(MY_CINCLUDES) -optc-std=c99 -optc-O2 -optc-Wall
 
 HSFILES= C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpEval.hs C/Op.hs \
          C/Prims.hs DataConstructors.hs DataConstructors.hs DerivingDrift/DataP.hs DerivingDrift/Drift.hs \
@@ -99,7 +100,7 @@ CFILES =  StringTable/StringTable_cbits.o  cbits/md5sum.o
 jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES) StringTable/Atom.hs $(CFILES)
 	$(HC) $(GHCOPTS) --make $< $(CFILES) -o $@
 
-jhcp: Main.hs $(BUILT_SOURCES) $(HSFILES)
+jhcp: Main.hs $(BUILT_SOURCES) $(HSFILES) StringTable/Atom.hs $(CFILES)
 	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< $(CFILES) -o $@
 
 jhc.1: Options.hs
@@ -117,7 +118,7 @@ HSBOOT= DataConstructors.hs-boot FrontEnd/Tc/Class.hs-boot Grin/Grin.hs-boot Gri
 
 
 %.hs: %.hsc
-	$(HSC2HS) $(MY_CFLAGS)  -o $@ $<
+	$(HSC2HS) $(MY_CINCLUDES) -o $@ $<
 
 %.hs: %.flags  utils/opt_sets.prl
 	perl $(srcdir)/utils/opt_sets.prl -n $< $<  > $@
