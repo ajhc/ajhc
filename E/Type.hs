@@ -18,6 +18,14 @@ import Name.Names
 import Number
 import qualified Info.Info as Info
 
+-- the type of a supercombinator
+data Comb = Comb {
+    combHead :: TVr,
+    combBody :: E,
+    combRules :: [Rule]
+    }
+    {-!derive: update !-}
+
 data RuleType = RuleSpecialization | RuleUser | RuleCatalyst
     deriving(Eq)
 
