@@ -27,7 +27,6 @@ import Support.FreeVars
 import GenUtil
 import Util.SetLike as S
 import Util.HasSize
-import System.Random
 
 import qualified Data.Set as Set
 
@@ -153,20 +152,14 @@ doSubst' substInVars allShadow bm check e  = f e (Set.empty, bm) where
 
 
 
+mnv :: Bool -> Set.Set Id -> Id -> Set.Set Id -> IdMap a -> Id
 mnv allShadow xs i s ss
-    | allShadow = nv scheck (Set.size xs + Set.size s + size ss)
-    | isInvalidId i || scheck i = nv check (Set.size xs + Set.size s + size ss)
+    | allShadow = newId (Set.size xs + Set.size s + size ss) scheck
+    | isInvalidId i || not (scheck i) = newId (Set.size xs + Set.size s + size ss) check
             -- It is very important that we don't check for 'xs' membership in the guard above.
     | otherwise = i
-    where scheck n = n `mmember` ss || n `Set.member` s
-          check n = scheck n || n `Set.member` xs
-
-nv check seed = head $ filter (not . check) $ filter even $ filter (>0) ls
-    where ls  = randoms (mkStdGen seed)
-
-nv' ss = v (2 * (size ss + 1)) where
-    v n | (Just Nothing) <- mlookup n ss = v (n + 2)
-    v n = n
+    where scheck n = n `mnotMember` ss && n `notMember` s
+          check n = scheck n && n `notMember` xs
 
 
 

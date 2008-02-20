@@ -139,14 +139,8 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
             return tvr { tvrInfo = Info.insert r' (tvrInfo tvr) }
 
 mnv xs i ss
-    | isInvalidId i || i `mmember` ss = nv (fromList [ (x,undefined) | x <- xs ] `mappend` ss)
+    | isInvalidId i || i `mmember` ss  = newId (size ss) isOkay
     | otherwise = i
+    where isOkay i = (i `mnotMember` ss) && (i `notElem` xs)
 
 
-nv ss = v (2 * (size ss + 1)) where
-    v n | n `mmember` ss = v (n + 2)
-    v n = n
-
-nv' ss = v (2 * (size ss + 1)) where
-    v n | (Just Nothing) <- mlookup n ss = v (n + 2)
-    v n = n
