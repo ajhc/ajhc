@@ -8,6 +8,7 @@ my @order = qw(
     Pragmas
     Extensions
     Differences
+    Internals
     );
 
 my %h;
@@ -15,7 +16,7 @@ my %h;
 foreach my $fn (@ARGV) {
     open my $fh, "<$fn" or die "$!: could not open $fn";
     while(<$fh>) {
-        /^\{\-#(\w+)\s*$/ or next;
+        /^\{\-[#@](\w+)\s*$/ or next;
         my ($section,$text) = ($1,"");
         while(<$fh>) {
             /^\-\}\s*$/ and last;

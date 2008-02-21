@@ -34,42 +34,46 @@ import qualified Util.Seq as Seq
 import {-# SOURCE #-} DataConstructors
 
 
--- PTS type checker
--- core is the following PTS
--- S = (*,!,**,#,(#),##)
--- A = (*::**,#::##,(#)::##,!::**)
---
---
--- * is the sort of boxed values
--- ! is the sort of boxed strict values
--- ** is the supersort of all boxed value
--- # is the sort of unboxed values
--- (#) is the sort of unboxed tuples
--- ## is the supersort of all unboxed values
--- we also have user defined kinds, which are always of supersort ##
---
--- notice that functions are always boxed, but may be strict if they take an unboxed tuple as an argument
+{-@Internals
 
---  -- these rules apply to lambda abstractions, data constructors can be _defined_ to have types that would be invalid otherwise
--- as a shortcut we will use *# to mean either * or # and so forth
---
--- so (*#,*#,*) means (*,*,*) (#,*,*) (*,#,*) (#,#,*)
---
--- R =
---    (*#!,*#!,*)  -- functions from values to values are boxed and lazy
---    (*#!,(#),*)  -- functions from values to unboxed tuples are boxed and lazy
---    ((#),*#!,!)  -- functions from unboxed tuples to values are boxed and strict
---    ((#),(#),!)  -- functions from unboxed tuples to unboxed tuples are boxed and strict
---    (**,*,*)     -- may have a function from an unboxed type to a value
---    (**,#,*)
---    (**,!,*)
---    (**,**,**)  -- we have functions from types to types
---    (**,##,##)  -- Array__ a :: #
---
--- _|_ :: t iff t::*
---
--- this PTS is functional but not injective
+# Jhc Core Type System
 
+    PTS type checker
+    core is the following PTS
+    S = (*,!,**,#,(#),##)
+    A = (*::**,#::##,(#)::##,!::**)
+
+
+    * is the sort of boxed values
+    ! is the sort of boxed strict values
+    ** is the supersort of all boxed value
+    # is the sort of unboxed values
+    (#) is the sort of unboxed tuples
+    ## is the supersort of all unboxed values
+    we also have user defined kinds, which are always of supersort ##
+
+    notice that functions are always boxed, but may be strict if they take an unboxed tuple as an argument
+
+     -- these rules apply to lambda abstractions, data constructors can be _defined_ to have types that would be invalid otherwise
+    as a shortcut we will use *# to mean either * or # and so forth
+
+    so (*#,*#,*) means (*,*,*) (#,*,*) (*,#,*) (#,#,*)
+
+    R =
+       (*#!,*#!,*)  -- functions from values to values are boxed and lazy
+       (*#!,(#),*)  -- functions from values to unboxed tuples are boxed and lazy
+       ((#),*#!,!)  -- functions from unboxed tuples to values are boxed and strict
+       ((#),(#),!)  -- functions from unboxed tuples to unboxed tuples are boxed and strict
+       (**,*,*)     -- may have a function from an unboxed type to a value
+       (**,#,*)
+       (**,!,*)
+       (**,**,**)  -- we have functions from types to types
+       (**,##,##)  -- Array__ a :: #
+
+    _|_ :: t iff t::*
+
+    this PTS is functional but not injective
+-}
 
 
 ptsAxioms :: Map.Map ESort ESort
