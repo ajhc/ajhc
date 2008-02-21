@@ -121,8 +121,9 @@ freeVarsInfo nfo = maybe mempty freeVars (Info.lookup nfo :: Maybe ARules)
 instance FreeVars ARules IdSet where
     freeVars a = aruleFreeVars a
 
+-- note, we include references to this combinator in its free variables.
 instance FreeVars Comb IdSet where
-    freeVars a = delete (tvrIdent $ combHead a) $ freeVars (combBody a) `union` (freeVars $ combRules a)
+    freeVars a = freeVars (combBody a) `union` (freeVars $ combRules a)
 
 -- | we delete the free variables of the heads of a rule from the rule's free
 -- variables. the reason for doing this is that the rule cannot fire if all its

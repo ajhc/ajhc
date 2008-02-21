@@ -4,7 +4,6 @@ module E.Inline(
     forceInline,
     programDecomposedDs,
     programMapProgGroups,
-    programMapProgComponents,
     forceNoinline,
     baseInlinability
     ) where
@@ -18,6 +17,7 @@ import E.E
 import E.Program
 import E.Subst
 import E.Values
+import Support.FreeVars
 import Info.Info(Info)
 import Info.Types
 import Name.Id
@@ -101,37 +101,37 @@ programMapRecGroups :: Monad m =>
     -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
     -> (E -> Info -> m Info)    -- ^ annotate letbound bindings
     -> (E -> Info -> m Info)    -- ^ annotate lambdabound bindings
-    -> ((Bool,[(TVr,E)]) -> m [(TVr,E)])  -- ^ bool is true if group is recursive.
+    -> ((Bool,[Comb]) -> m [Comb])  -- ^ bool is true if group is recursive.
     -> Program
     -> m Program
 programMapRecGroups imap idann letann lamann f prog = do
-    let g rs imap (Left d:rds) = do
-            [d'] <- annotateDs imap idann letann lamann [d]
-            nds <- f (False,[d'])
+    let g rs imap ((False,ds):rds) = do
+            ds' <- annotateCombs imap idann letann lamann ds
+            nds <- f (False,ds')
             g (nds:rs) (bm nds imap) rds
-        g rs imap (Right ds:rds) = do
-            ds' <- annotateDs imap idann letann lamann ds
+        g rs imap ((True,ds):rds) = do
+            ds' <- annotateCombs imap idann letann lamann ds
             nds <- f (True,ds')
             let imap' = (bm nds imap)
-            let smap = substMap' $ fromList [ (tvrIdent x,EVar x) | (x,y) <- nds]
-                nds' = [ (x,smap y) | (x,y) <- nds]
+            let smap = substMap' $ fromList [ (combIdent  x,EVar (combHead  x)) | x <- nds]
+                nds' = [ combBody_u smap x | x <- nds]
             g (nds':rs) imap' rds
         g rs _ [] = return $ concat rs
-        bm xs imap = fromList [ (tvrIdent t,Just $ EVar t) | (t,_) <- xs ] `union` imap
-    ds <- g [] imap $ programDecomposedDs prog
-    return $ programSetDs ds prog
+        bm xs imap = fromList [ (combIdent c,Just $ EVar (combHead c)) | c <- xs ] `union` imap
+    ds <- g [] imap $ programDecomposedCombs prog
+    return $ programUpdate $ prog { progCombinators = ds }
 
-
-
+programDecomposedCombs :: Program -> [(Bool,[Comb])]
+programDecomposedCombs prog = map f $ scc g where
+    g = newGraph (progCombinators prog) combIdent (toList . (freeVars :: Comb -> IdSet))
+    f (Left c) = (False,[c])
+    f (Right cs) = (True,cs)
 
 
 programDecomposedDs :: Program -> [Either (TVr, E) [(TVr,E)]]
 programDecomposedDs prog = decomposeDs $ programDs prog
 
-programComponents :: Program -> [[(TVr,E)]]
-programComponents prog = components $ newGraph (programDs prog) (tvrIdent . fst) (toList . uncurry bindingFreeVars)
-
-programSubProgram prog rec ds = programSetDs ds prog { progType = SubProgram rec, progEntryPoints = map fst ds }
+programSubProgram prog rec ds = prog { progCombinators = ds, progType = SubProgram rec, progEntryPoints = map combHead ds }
 
 programMapProgGroups :: Monad m =>
     IdMap (Maybe E)        -- ^ initial map to apply
@@ -139,34 +139,24 @@ programMapProgGroups :: Monad m =>
     -> Program
     -> m Program
 programMapProgGroups imap f prog = do
-    let g prog' rs imap (Left d:rds) = do
-            [d'] <- annotateDs imap nann nann nann [d]
-            nprog <- f (programSubProgram prog' False [d'])
-            let nds = programDs nprog
+    let g prog' rs imap ((False,ds):rds) = do
+            ds' <- annotateCombs imap nann nann nann ds
+            nprog <- f (programSubProgram prog' False ds')
+            let nds = progCombinators nprog
             g (unames nds nprog) (nds:rs) (bm nds imap) rds
-        g prog' rs imap (Right ds:rds) = do
-            ds' <- annotateDs imap nann nann nann ds
+        g prog' rs imap ((True,ds):rds) = do
+            ds' <- annotateCombs imap nann nann nann ds
             nprog <- f (programSubProgram prog' True ds')
             let imap' = bm nds imap
-                smap = substMap' $ fromList [ (tvrIdent x,EVar x) | (x,y) <- nds]
-                nds = programDs nprog
-                nds' = [ (x,smap y) | (x,y) <- nds]
+                smap = substMap' $ fromList [ (combIdent  x,EVar (combHead  x)) | x <- nds]
+                nds = progCombinators nprog
+                nds' = [ combBody_u smap x | x <- nds]
             g (unames nds' nprog) (nds':rs) imap' rds
         g prog' rs _ [] = return $ (concat rs,prog')
-        bm xs imap = fromList [ (tvrIdent t,Just $ EVar t) | (t,_) <- xs ] `union` imap
+        bm xs imap = fromList [ (combIdent c,Just $ EVar (combHead c)) | c <- xs ] `union` imap
         nann _ = return
-        unames ds prog = prog { progExternalNames = progExternalNames prog `mappend` fromList [ tvrIdent t | (t,_) <- ds ] }
-    (ds,prog'') <- g prog { progStats = mempty } [] imap $ programDecomposedDs prog
-    return $ programSetDs ds prog { progStats = progStats prog `mappend` progStats prog'' }
+        unames ds prog = prog { progExternalNames = progExternalNames prog `mappend` fromList (map combIdent ds) }
+    (ds,prog'') <- g prog { progStats = mempty } [] imap $ programDecomposedCombs prog
+    return $ programUpdate $ prog { progCombinators = ds, progStats = progStats prog `mappend` progStats prog'' }
 
-
-programMapProgComponents :: Monad m =>
-    (Program -> m Program)
-    -> Program
-    -> m Program
-programMapProgComponents f prog = do
-    let prog' = prog { progStats = mempty, progType = MainComponent }
-        g ds = f (programSetDs ds prog')
-    ps <- mapM g (programComponents prog)
-    return $ programSetDs (concatMap programDs ps) prog { progStats = progStats prog `mappend` (mconcat $ map progStats ps) }
 

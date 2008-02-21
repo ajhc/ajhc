@@ -16,6 +16,19 @@ import Info.Info(Info)
 import Util.SetLike
 import Util.HasSize
 
+annotateCombs :: Monad m =>
+    (IdMap (Maybe E))
+    -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
+    -> (E -> Info -> m Info) -- ^ annotate letbound bindings
+    -> (E -> Info -> m Info) -- ^ annotate lambdabound bindings
+    -> [Comb]            -- ^ terms to annotate
+    -> m [Comb]
+
+annotateCombs imap idann letann lamann ds = do
+    let ds' = [ (combHead c,combBody c) | c <- ds]
+    ELetRec { eDefs = ds'', eBody = Unknown } <- annotate imap idann letann lamann (ELetRec ds' Unknown)
+    return [ combBody_s y . combHead_s x $ emptyComb | (x,y) <- ds'']
+
 annotateDs :: Monad m =>
     (IdMap (Maybe E))
     -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
@@ -36,8 +49,8 @@ annotateProgram :: Monad m =>
     -> Program                -- ^ terms to annotate
     -> m Program
 annotateProgram imap idann letann lamann prog = do
-    ds <- annotateDs imap idann letann lamann (programDs prog)
-    return $ programSetDs ds prog
+    ds <- annotateCombs imap idann letann lamann (progCombinators prog)
+    return $ programUpdate $ prog { progCombinators = ds }
 
 
 annotate :: Monad m =>
