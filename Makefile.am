@@ -123,6 +123,9 @@ HSBOOT= DataConstructors.hs-boot FrontEnd/Tc/Class.hs-boot Grin/Grin.hs-boot Gri
 %.hs: %.flags  utils/opt_sets.prl
 	perl $(srcdir)/utils/opt_sets.prl -n $< $<  > $@
 
+%.mkd: %.flags  utils/opt_sets.prl
+	perl $(srcdir)/utils/opt_sets.prl -f f -m -n $< $<  > $@
+
 Info/Properties.hs: data/props.txt utils/gen_props.prl
 	perl $(srcdir)/utils/gen_props.prl $< > $@ || rm -f $@
 
@@ -228,8 +231,11 @@ haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml
 	cp -- $^ /home/john/public_html/computer/jhc
 
-manual: utils/stitch.prl
+manual: utils/stitch.prl FlagDump.mkd FlagOpts.mkd
 	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' \) | xargs perl utils/stitch.prl > manual.mkd
+
+manual.html : manual
+	pandoc manual.mkd -s -f markdown -t html -s -c wiki.css -o $@
 
 libs: $(JHC_LIBS)
 

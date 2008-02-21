@@ -6,22 +6,31 @@ use strict;
 
 use Getopt::Std;
 
-my %h;
-getopts("n:",\%h);
+my %opt;
+getopts("n:mf:",\%opt);
 
-die "no name" unless $h{n};
-my $name = $h{n};
+die "no name" unless $opt{n};
+my $name = $opt{n};
 $name =~ s/\.[a-z]+$//;
 
 my @l;
-undef %h;
+my %h;
 
 # this is fun
 my $cat;
 my %cat;
 my @cat;
 
-while (<>) {
+my @lines = (<>);
+
+if($opt{m}) {
+    while($_ = shift @lines) {
+        unshift(@lines, $_),last if /^\!/;
+        print $_;
+    }
+}
+
+while($_ = shift @lines) {
     next unless /\S/;
     next if /^\s*#/;
     if (/^([a-z0-9-]+)\s+(\S.*\S)\s*$/) {
@@ -43,6 +52,16 @@ while (<>) {
         }
 }
 
+if($opt{m}) {
+
+    foreach (@cat) {
+        print "\n## $_\n\n";
+        foreach my $j (sort @{$cat{$_}}) {
+            print "$h{$j}{oname}\n: $h{$j}{desc}\n\n";
+        }
+    }
+    exit;
+}
 
 my @ds;
 foreach (@l) {

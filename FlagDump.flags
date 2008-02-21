@@ -1,4 +1,10 @@
-# dump-flags
+{-@Options
+
+# Dumping Debugging Information
+
+You can have jhc print out a variety of things while running as Controlled by
+the '-d' flag. The following is a list of possible parameters you can pass to
+'-d'.
 
 !Front End
 renamed code after uniqueness renaming
@@ -36,7 +42,7 @@ core-pass    show each iteration of code while transforming
 core-steps   show what happens in each pass
 core-mini    show details even when optimizing individual functions
 core-initial show core right after E.FromHs conversion
-core-beforelift show core before lambdalifting
+core-beforelift show core before lambda lifting
 core-afterlift  show final core before writing ho file
 core         show intermediate core code
 core-mangled de-typed core right before it is converted to grin

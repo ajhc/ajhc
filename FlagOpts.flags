@@ -1,16 +1,22 @@
-# -f code options
+{-@Options
+
+# Code Options
+
+Various options affecting how jhc interprets and compiles code can be
+controlled with the '-f' flag, the following options are availible, you can
+negate any particular one by prepending 'no-' to it.
+
 
 !Code options
 unboxed-tuples allow unboxed tuple syntax to be recognized
 unboxed-values allow unboxed value syntax
 ffi support foreign function declarations
+cpp pass haskell source through c preprocessor
+m4 pass haskell source through m4 preprocessor
 
 !Typechecking
-boxy use the new boxy typechecker
 monomorphism-restriction enforce monomorphism restriction
 defaulting perform defaulting of ambiguous types
-cpp pass haskell source through cpp
-m4 pass haskell source through m4
 
 !Debugging
 lint perform lots of extra type checks
@@ -22,7 +28,6 @@ float-in perform float inward transform
 strictness perform strictness analysis
 cpr do CPR analysis
 type-analysis perhaps a basic points-to analysis on types right after method generation
-eval-optimize perform eval-apply analysis and optimization
 global-optimize perform whole program E optimization
 
 !Code Generation
@@ -35,5 +40,3 @@ raw just evaluate main to WHNF and nothing else.
 
 !Default settings
 @default inline-pragmas rules wrapper float-in strictness defaulting type-analysis monomorphism-restriction boxy eval-optimize global-optimize
-
-@fast no-eval-optimize no-global-optimize
