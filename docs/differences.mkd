@@ -1,0 +1,68 @@
+{-#Differences
+
+# Differences from Haskell 98
+
+## Library Differences
+
+In addition to a larger set of base libraries roughly modeled on ghc's base.
+jhc provides a number of extensions/minor modifications to the standard
+libraries. These are designed to be mostly backwards compatable and most are
+to the class system.
+
+* Data.Int and Data.Word provide WordPtr, WordMax, IntPtr, and IntMax that
+   coorespond to the C types uintptr_t, uintmax_t, intptr_t, and uintmax_t
+   respectively.
+
+* class methods are fully 'eta expanded' out to the argument count specified
+   by the type. this is often beneficial as instances that need to share
+   partial applications are rare. this behavior can be turned off with the
+   NOETA pragma for specific methods.
+
+* Data.Bits
+    * Num is no longer a super class of Data.Bits. It never should have been.
+    * There are new methods logicalShiftR and arithmeticShiftR that do a logical and
+      arithmetic shift respectively. shiftR will always map to one of those as
+      appropriate.
+    * shiftR and shiftL do not check for negative arguments, if you might want
+      netative argumenst, use the general 'shift' routine. 'shift' also comes
+      in logical and arithmetic varieties.
+
+* fromInt,toInt,fromDouble,toDouble have been added
+   alongside Integer and Rational routines in their respective classes.
+
+* floating point trucation and rounding functions have varieties that don't
+   return an integral type, but rather return something of the same type
+   as its argument. these have the same name but end in 'f'.
+
+
+# Notable Differences from GHC
+
+Jhc differs from GHC in certain ways that are allowed by Haskell 98, but might
+come as a surprise to some.
+
+ * Int's may be only 30 bits and may not observe simple binary truncation on
+   overflow. If you need known bitwidth and binary semantics for your numbers
+   then use the types in Data.Int and Data.Word
+
+ * Char's only preserve values within the unicode range. trying to store
+   values > 0x10FFFF may be truncated.
+
+ * Ints and Words are at most 32 bits, even on 64 bit architectures.
+
+ * All text based IO is performed according to the current locale. this means
+   that unicode works seamlessly, but older programs that assumed IO was
+   performed by simple truncation of chars down to 8 bits will fail. use the
+   explicit binary routines if you need binary IO.
+
+
+# Differences That are Considered Misfeatures
+
+These misfeatures will be fixed at some point.
+
+ * Integer cooresponds to IntMax rather than an arbitrary precision type. as
+   soon as a suitable arbitrary precision library emerges, it will be
+   replaced.
+
+ * Ix is not derivable.
+
+

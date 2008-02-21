@@ -1,0 +1,30 @@
+{-#Extensions
+
+# Unboxed Values
+
+Unboxed values in jhc are specified in a similar fashion to ghc however the
+lexical syntax is not changed to allow # in identifiers. # is still used in
+the syntax for various unboxed constructs, but normal haskell rules apply to
+other haskell values. The convention is to suffix such types with '_' to
+indicate their status as unboxed.
+
+## Unboxed Tuples
+
+Jhc supports unboxed tuples with the same syntax as ghc, (# 2, 4 #) is an
+unboxed tuple of two numbers. unboxed tuples are enabled with -funboxed-tuples
+
+
+## Unboxed Strings
+
+Unboxed strings are enabled with the -funboxed-values flag. they are
+specified like a normal string but have a '#' at the end. Unboxed strings
+have types 'Addr__' which is as synonym for 'BitsPtr_'
+
+## Unboxed Numbers
+
+Unboxed numbers are enabled with the -funboxed-values flag. They are postpended
+with a '#' such as in 3# or 4#. jhc supports a limited form of type inference
+for unboxed numbers, if the type is fully specified by the environment and it
+is a suitable unboxed numeric type then that type is used. otherwise it
+defaults to Int__.
+

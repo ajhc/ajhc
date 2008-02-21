@@ -1,0 +1,21 @@
+{-#Using
+
+# Building Projects With make
+
+using make to build projects with jhc is straightforward, simply add a line like the following in your Makefile
+
+
+    % : %.hs
+            jhc -v $< -o $@
+
+If you wish jhc to automatically generate dependency information, you can do the following
+
+    % : %.hs
+            jhc --deps depend.make -v $< -o $@
+
+    -include depend.make
+
+
+
+    %.hl : %.cabal
+            jhc -v --build-hl $< -o $@

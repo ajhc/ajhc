@@ -1,0 +1,36 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+my @order = qw(
+    Using
+    Extensions
+    Differences
+    );
+
+my %h;
+
+foreach my $fn (@ARGV) {
+    open my $fh, "<$fn" or die "$!: could not open $fn";
+    while(<$fh>) {
+        /^\{\-#(\w+)\s*$/ or next;
+        my ($section,$text) = ($1,"");
+        while(<$fh>) {
+            /^\-\}\s*$/ and last;
+            $text .= $_;
+        }
+        $h{$section}{text} .= $text;
+        $h{$section}{files} .= ":$fn";
+    }
+}
+
+foreach(@order) {
+    print "\n# $_\n\n";
+    $h{$_}{text} =~ s/^(#+ )/#$1/mg;
+    print $h{$_}{text};
+}
+
+foreach(keys %h) {
+    print STDERR $_," ",$h{$_}{files},"\n";
+}

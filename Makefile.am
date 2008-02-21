@@ -189,7 +189,7 @@ depend.make: deps.txt
 i:
 	ghci $(GHCOPTS) Main.hs $(CFILES)
 
-.PHONY: ho-clean hl-clean i update-datestamp
+.PHONY: ho-clean hl-clean i update-datestamp manual
 
 ho-clean:
 	rm -f -- `find -name \*.ho`
@@ -228,6 +228,8 @@ haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml
 	cp -- $^ /home/john/public_html/computer/jhc
 
+manual: utils/stitch.prl
+	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' \) | xargs perl utils/stitch.prl > manual.mkd
 
 libs: $(JHC_LIBS)
 
