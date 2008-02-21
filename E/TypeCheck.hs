@@ -38,28 +38,39 @@ import {-# SOURCE #-} DataConstructors
 
 # Jhc Core Type System
 
-    PTS type checker
-    core is the following PTS
-    S = (*,!,**,#,(#),##)
-    A = (*::**,#::##,(#)::##,!::**)
+Jhc's core is based on a pure type system. A pure type system (also called a
+PTS) is actually a parameterized set of type systems. Jhc's version is
+described by the following.
+
+    Sorts  = (*,!,**,#,(#),##)
+    Axioms = (*::**,#::##,(#)::##,!::**)
 
 
-    * is the sort of boxed values
-    ! is the sort of boxed strict values
-    ** is the supersort of all boxed value
-    # is the sort of unboxed values
+    *   is the sort of boxed values
+    !   is the sort of boxed strict values
+    **  is the supersort of all boxed value
+    #   is the sort of unboxed values
     (#) is the sort of unboxed tuples
-    ## is the supersort of all unboxed values
-    we also have user defined kinds, which are always of supersort ##
+    ##  is the supersort of all unboxed values
 
-    notice that functions are always boxed, but may be strict if they take an unboxed tuple as an argument
+    in addition there exist user defined kinds, which are always of supersort ##
 
-     -- these rules apply to lambda abstractions, data constructors can be _defined_ to have types that would be invalid otherwise
+
+The following Rules table shows what sort of abstractions are allowed, a rule
+of the form (A,B,C) means you can have functions of things of sort A to things
+of sort B and the result is something of sort C. _Function_ in this context
+subsumes both term and type level abstractions. Notice that functions are
+always boxed, but may be strict if they take an unboxed tuple as an argument.
+(TODO: explain strict in this context) These type system rules apply to lambda
+abstractions. it is possible to inherit values from the environment that would
+not be typable via lambda abstractions. for instance, although a data
+constructor may have a functional type, it was not created via a lambda
+abstraction so these rules do not apply.
+
     as a shortcut we will use *# to mean either * or # and so forth
-
     so (*#,*#,*) means (*,*,*) (#,*,*) (*,#,*) (#,#,*)
 
-    R =
+    Rules =
        (*#!,*#!,*)  -- functions from values to values are boxed and lazy
        (*#!,(#),*)  -- functions from values to unboxed tuples are boxed and lazy
        ((#),*#!,!)  -- functions from unboxed tuples to values are boxed and strict
@@ -70,9 +81,12 @@ import {-# SOURCE #-} DataConstructors
        (**,**,**)  -- we have functions from types to types
        (**,##,##)  -- Array__ a :: #
 
+    The defining feature of boxed values is
+
     _|_ :: t iff t::*
 
-    this PTS is functional but not injective
+    This PTS is functional but not injective
+
 -}
 
 
