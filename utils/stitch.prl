@@ -5,6 +5,7 @@ use warnings;
 
 my @order = qw(
     Using
+    Pragmas
     Extensions
     Differences
     );

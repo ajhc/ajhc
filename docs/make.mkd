@@ -2,7 +2,7 @@
 
 # Building Projects With make
 
-using make to build projects with jhc is straightforward, simply add a line like the following in your Makefile
+Using make to build projects with jhc is straightforward, simply add a line like the following in your Makefile
 
 
     % : %.hs

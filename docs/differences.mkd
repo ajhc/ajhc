@@ -2,20 +2,24 @@
 
 # Differences from Haskell 98
 
+## Language Differences
+
+* Class contexts on data types are silently ignored.
+
 ## Library Differences
 
-In addition to a larger set of base libraries roughly modeled on ghc's base.
-jhc provides a number of extensions/minor modifications to the standard
-libraries. These are designed to be mostly backwards compatable and most are
+In addition to a larger set of base libraries roughly modeled on GHC's base.
+Jhc provides a number of extensions/minor modifications to the standard
+libraries. These are designed to be mostly backwards compatible and most are
 to the class system.
 
 * Data.Int and Data.Word provide WordPtr, WordMax, IntPtr, and IntMax that
-   coorespond to the C types uintptr_t, uintmax_t, intptr_t, and uintmax_t
+   correspond to the C types uintptr_t, uintmax_t, intptr_t, and intmax_t
    respectively.
 
 * class methods are fully 'eta expanded' out to the argument count specified
-   by the type. this is often beneficial as instances that need to share
-   partial applications are rare. this behavior can be turned off with the
+   by the type. This is often beneficial as instances that need to share
+   partial applications are rare. This behavior can be turned off with the
    NOETA pragma for specific methods.
 
 * Data.Bits
@@ -24,15 +28,15 @@ to the class system.
       arithmetic shift respectively. shiftR will always map to one of those as
       appropriate.
     * shiftR and shiftL do not check for negative arguments, if you might want
-      netative argumenst, use the general 'shift' routine. 'shift' also comes
+      negative arguments, use the general 'shift' routine. 'shift' also comes
       in logical and arithmetic varieties.
 
 * fromInt,toInt,fromDouble,toDouble have been added
    alongside Integer and Rational routines in their respective classes.
 
-* floating point trucation and rounding functions have varieties that don't
+* floating point truncation and rounding functions have varieties that don't
    return an integral type, but rather return something of the same type
-   as its argument. these have the same name but end in 'f'.
+   as its argument. These have the same name but end in 'f'.
 
 
 # Notable Differences from GHC
@@ -40,18 +44,19 @@ to the class system.
 Jhc differs from GHC in certain ways that are allowed by Haskell 98, but might
 come as a surprise to some.
 
- * Int's may be only 30 bits and may not observe simple binary truncation on
-   overflow. If you need known bitwidth and binary semantics for your numbers
-   then use the types in Data.Int and Data.Word
+ * An Int may be only 30 bits and may not observe simple binary truncation on
+   overflow. If you need known bit width and binary semantics for your numbers
+   then use the types in Data.Int and Data.Word. Overflow on Int or Word has
+   undefined results.
 
- * Char's only preserve values within the unicode range. trying to store
-   values > 0x10FFFF may be truncated.
+ * A Char may only preserve values within the Unicode range. Storing
+   values greater than 0x10FFFF has undefined results.
 
- * Ints and Words are at most 32 bits, even on 64 bit architectures.
+ * The Int and Word types are at most 32 bits, even on 64 bit architectures.
 
- * All text based IO is performed according to the current locale. this means
-   that unicode works seamlessly, but older programs that assumed IO was
-   performed by simple truncation of chars down to 8 bits will fail. use the
+ * All text based IO is performed according to the current locale. This means
+   that Unicode works seamlessly, but older programs that assumed IO was
+   performed by simple truncation of chars down to 8 bits will fail. Use the
    explicit binary routines if you need binary IO.
 
 
@@ -59,7 +64,7 @@ come as a surprise to some.
 
 These misfeatures will be fixed at some point.
 
- * Integer cooresponds to IntMax rather than an arbitrary precision type. as
+ * Integer corresponds to IntMax rather than an arbitrary precision type. As
    soon as a suitable arbitrary precision library emerges, it will be
    replaced.
 
