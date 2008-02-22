@@ -6,6 +6,7 @@ module Util.SetLike(
     minsert,
     msingleton,
     intersects,
+    mfindWithDefault,
     SetLike(..),
     ModifySet(..),
     MapLike(..),
@@ -150,6 +151,7 @@ class SetLike m => MapLike k v m | m -> k v where
     melems :: m -> [v]
     massocs :: m -> [(k,v)]
     mkeys :: m -> [k]
+    mmapWithKey :: (k -> v -> v) -> m -> m
     mfilter :: (v -> Bool) -> m -> m
     mfilterWithKey :: (k -> v -> Bool) -> m -> m
     munionWith :: (v -> v -> v) -> m -> m -> m
@@ -167,6 +169,7 @@ instance MapLike Int a (IM.IntMap a) where
     mkeys = IM.keys
     massocs = IM.toList
     mfilter = IM.filter
+    mmapWithKey = IM.mapWithKey
     mfilterWithKey = IM.filterWithKey
     munionWith = IM.unionWith
 
@@ -178,9 +181,13 @@ instance Ord k => MapLike k v (M.Map k v) where
     mkeys = M.keys
     massocs = M.toList
     mfilter = M.filter
+    mmapWithKey = M.mapWithKey
     mfilterWithKey = M.filterWithKey
     munionWith = M.unionWith
 
+mfindWithDefault d k m = case mlookup k m of
+    Nothing -> d
+    Just x -> x
 
 -- EnumSet
 
