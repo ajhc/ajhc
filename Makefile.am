@@ -231,8 +231,12 @@ haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml
 	cp -- $^ /home/john/public_html/computer/jhc
 
-manual: utils/stitch.prl FlagDump.mkd FlagOpts.mkd
+manual: utils/stitch.prl FlagDump.mkd FlagOpts.mkd options.mkd
 	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' \) | xargs perl utils/stitch.prl > manual.mkd
+
+options.mkd: jhc
+	echo "{-@Options 1" > $@
+	./jhc --help | sed -e 's/^/    /'  >> $@
 
 manual.html : manual
 	pandoc manual.mkd -s -f markdown -t html -s -c wiki.css -o $@

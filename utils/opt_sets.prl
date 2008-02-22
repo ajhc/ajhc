@@ -53,11 +53,16 @@ while($_ = shift @lines) {
 }
 
 if($opt{m}) {
+    my $fmt = "%-25s %s\n";
 
+#    printf $fmt, "Option", "Description";
+#    printf $fmt, "-"x6, "-"x75;
     foreach (@cat) {
-        print "\n## $_\n\n";
+    printf "\n$fmt", "$_", "";
+    printf $fmt, "-"x6, "-"x75;
+        #print "\n## $_\n\n";
         foreach my $j (sort @{$cat{$_}}) {
-            print "$h{$j}{oname}\n: $h{$j}{desc}\n\n";
+            printf $fmt,"_$h{$j}{oname}_", $h{$j}{desc};
         }
     }
     exit;
