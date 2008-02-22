@@ -334,7 +334,7 @@ processDecls cho ho' tiData = do
     -- simplify
     -- floating inward
 
-    let sopt = mempty {
+    let sopt = SS.cacheSimpOpts mempty {
             SS.so_boundVars = fromList [ (tvrIdent v,(v,e)) | (v,e) <- hoEs $ hoBuild ho],
             SS.so_dataTable = fullDataTable
             }
@@ -414,7 +414,9 @@ processDecls cho ho' tiData = do
         liftIO $ when coreMini $ putErrLn ("----\n" ++ names)
         smap <- get
         let tparms = transformParms { transformPass = "OptWW", transformDumpProgress = coreMini }
-            sopt = mempty {  SS.so_boundVars = smap, SS.so_dataTable = progDataTable mprog }
+            sopt = SS.cacheSimpOpts mempty {  SS.so_boundVars = smap,
+                                              SS.so_boundVarsCache = idMapToIdSet smap,
+                                              SS.so_dataTable = progDataTable mprog }
 
         mprog <- simplifyProgram sopt "Simplify-One" coreMini mprog
         mprog <- barendregtProg mprog

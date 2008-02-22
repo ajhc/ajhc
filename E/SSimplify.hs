@@ -1,5 +1,6 @@
 module E.SSimplify(
     Occurance(..),
+    cacheSimpOpts,
     simplifyE,
     collectOccurance',
     programPruneOccurance,
@@ -279,9 +280,19 @@ data SimplifyOpts = SimpOpts {
     so_noInlining :: Bool,                 -- ^ this inhibits all inlining inside functions which will always be inlined
     so_finalPhase :: Bool,                 -- ^ no rules and don't inhibit inlining
     so_boundVars :: IdMap (TVr,E),         -- ^ bound variables
+    so_boundVarsCache :: IdSet,
+    so_cachedScope :: Env,
     so_dataTable :: DataTable              -- ^ the data table
     }
     {-! derive: Monoid !-}
+
+cacheSimpOpts opts
+    = opts { so_boundVarsCache = idMapToIdSet (so_boundVars opts)
+           , so_cachedScope = cacheSubst (extendScope initScope mempty { envSubst = mapMaybeIdMap bb  (so_boundVars opts) })
+           }
+    where bb (_,e) | isFullyConst e = Just (Done e)
+          bb _ = Nothing
+          initScope = fmap (\ (t,e) -> fixInline (so_finalPhase opts) t $ isBoundTo noUseInfo e) (so_boundVars opts)
 
 
 data Range = Done OutE | Susp InE Subst OutE -- cached result
@@ -446,20 +457,15 @@ simplifyDs :: forall m . MonadStats m => Program -> SimplifyOpts -> [(TVr,E)] ->
 simplifyDs prog sopts dsIn = ans where
     finalPhase = so_finalPhase sopts
     ans = do
-        let ((dsOut,_),stats) = runSM initialB doit
+        let ((dsOut,_),stats) = runSM (so_cachedScope sopts) doit
         mtickStat stats
         return dsOut
     exportedSet = fromList $ map tvrIdent (progEntryPoints prog) :: IdSet
     getType e = infertype (so_dataTable sopts) e
-    initialB = let
-            bb (t,(_,e)) | isFullyConst e = [(t,Done e)]
-            bb _ = []
-            initScope = fmap (\ (t,e) -> fixInline finalPhase t $ isBoundTo noUseInfo e) (so_boundVars sopts)
-        in cacheSubst (extendScope initScope mempty { envSubst = fromList $ concatMap bb  (massocs $ so_boundVars sopts) })
     doit = do
         smAddNamesIdSet (progUsedIds prog)
         smAddBoundNamesIdSet (progFreeIds prog)
-        smAddBoundNamesIdMap (so_boundVars sopts)
+        smAddBoundNamesIdSet (so_boundVarsCache sopts)
         doDs dsIn
     makeRange b = do
         sub <- asks envSubst
@@ -1059,8 +1065,6 @@ smBoundNames = SM $ gets idsBound
 smAddNamesIdSet nset = do modifyIds (\ (used,bound) -> (nset `union` used, bound) )
 smAddBoundNamesIdSet nset = do modifyIds (\ (used,bound) -> (nset `union` used, nset `union` bound) )
 
-smAddBoundNamesIdMap nmap = do
-    modifyIds (\ (used,bound) -> (nset `union` used, nset `union` bound) ) where
-        nset = idMapToIdSet nmap
+smAddBoundNamesIdMap = smAddNamesIdSet . idMapToIdSet
 
 
