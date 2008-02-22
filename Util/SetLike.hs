@@ -155,6 +155,7 @@ class SetLike m => MapLike k v m | m -> k v where
     mfilter :: (v -> Bool) -> m -> m
     mfilterWithKey :: (k -> v -> Bool) -> m -> m
     munionWith :: (v -> v -> v) -> m -> m -> m
+    mpartitionWithKey :: (k -> v -> Bool) -> m -> (m,m)
 
     mkeys = map fst . massocs
     melems = map snd . massocs
@@ -172,6 +173,7 @@ instance MapLike Int a (IM.IntMap a) where
     mmapWithKey = IM.mapWithKey
     mfilterWithKey = IM.filterWithKey
     munionWith = IM.unionWith
+    mpartitionWithKey = IM.partitionWithKey
 
 instance Ord k => MapLike k v (M.Map k v) where
     mdelete = M.delete
@@ -184,6 +186,7 @@ instance Ord k => MapLike k v (M.Map k v) where
     mmapWithKey = M.mapWithKey
     mfilterWithKey = M.filterWithKey
     munionWith = M.unionWith
+    mpartitionWithKey = M.partitionWithKey
 
 mfindWithDefault d k m = case mlookup k m of
     Nothing -> d
