@@ -14,18 +14,25 @@ my @order = qw(
 
 my %h;
 
+my %s;
+
 foreach my $fn (@ARGV) {
     open my $fh, "<$fn" or die "$!: could not open $fn";
     while(<$fh>) {
-        /^\{\-[#@](\w+)\s*$/ or next;
-        my ($section,$text) = ($1,"");
+        /^\{\-[#@](\w+)(\s+(\d+))?\s*$/ or next;
+        my ($section,$text,$order) = ($1,"",defined $3 ? $3 : 100);
         while(<$fh>) {
             /^\-\}\s*$/ and last;
             $text .= $_;
         }
-        $h{$section}{text} .= $text;
+        $s{$section} ||= [];
+        push @{$s{$section} ||= []}, [$order,$text];
         $h{$section}{files} .= ":$fn";
     }
+}
+
+foreach (keys %s) {
+    $h{$_}{text} = join "\n",map { $_->[1] } sort { $a->[0] <=> $b->[0] } @{$s{$_}};
 }
 
 foreach(@order) {
