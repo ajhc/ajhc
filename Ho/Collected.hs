@@ -1,10 +1,18 @@
 module Ho.Collected(
     CollectedHo(..),
+    choDataTable,
+    choClassHierarchy,
+    choTypeSynonyms,
+    choFixities,
+    choAssumps,
+    choRules,
+    choEs,
     choHo
     )where
 
 import Data.Monoid
 import Control.Monad.Identity
+import Data.List
 
 import Util.SetLike
 import Ho.Type
@@ -15,17 +23,28 @@ import E.Annotate
 import qualified Info.Info as Info
 import qualified Data.Map as Map
 
+
+choDataTable = hoDataTable . hoBuild . choHo
+choClassHierarchy = hoClassHierarchy . hoBuild . choHo
+choTypeSynonyms = hoTypeSynonyms . hoBuild . choHo
+choFixities = hoFixities . hoBuild . choHo
+choAssumps = hoAssumps . hoBuild . choHo
+choRules = hoRules . hoBuild . choHo
+choEs cho = [ (combHead c,combBody c) | c <- melems $  choCombinators cho]
+
 instance Monoid CollectedHo where
     mempty = CollectedHo {
         choExternalNames = mempty,
         choOrphanRules = mempty,
         choHoMap = Map.singleton "Prim@" pho,
+        choCombinators = mempty,
         choVarMap = mempty
         } where pho = mempty { hoBuild = mempty { hoDataTable = dataTablePrims } }
     a `mappend` b = CollectedHo {
         choExternalNames = choExternalNames a `mappend` choExternalNames b,
         choVarMap = choVarMap a `mergeChoVarMaps` choVarMap b,
         choOrphanRules = choOrphanRules a `mappend` choOrphanRules b,
+        choCombinators = choCombinators a `mappend` choCombinators b,
         choHoMap = Map.union (choHoMap a) (choHoMap b)
         }
 
@@ -42,6 +61,17 @@ mergeChoVarMaps :: IdMap (Maybe E) -> IdMap (Maybe E) -> IdMap (Maybe E)
 mergeChoVarMaps x y = munionWith f x y where
     f (Just (EVar x)) (Just (EVar y)) = Just . EVar $ merge x y
     f x y = error "mergeChoVarMaps: bad merge."
+    merge ta tb = ta { tvrInfo = minfo' }   where
+        minfo = tvrInfo ta `mappend` tvrInfo tb
+        minfo' = dex (undefined :: ARules) . dex (undefined :: Properties) $ minfo
+        dex dummy y = g (Info.lookup (tvrInfo tb) `asTypeOf` Just dummy) where
+            g Nothing = y
+            g (Just x) = Info.insertWith mappend x y
+
+-- this will have to merge rules and properties.
+mergeChoCombinators :: IdMap Comb -> IdMap Comb -> IdMap Comb
+mergeChoCombinators x y = munionWith f x y where
+    f c1 c2 = combHead_s (merge (combHead c1) (combHead c2)) c1 { combRules = combRules c1 `Data.List.union`  combRules c2 }
     merge ta tb = ta { tvrInfo = minfo' }   where
         minfo = tvrInfo ta `mappend` tvrInfo tb
         minfo' = dex (undefined :: ARules) . dex (undefined :: Properties) $ minfo

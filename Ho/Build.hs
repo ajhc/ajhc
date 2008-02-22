@@ -542,6 +542,8 @@ parseHsSource fn lbs = do
             '#':'l':'i':'n':'e':' ':_  -> '\n':s --  line pragma
             '#':'!':_ -> dropWhile (/= '\n') s   --  hashbang
             _ -> s
+    wdump FD.Preprocessed $ do
+        putStrLn s'
     case runParserWithMode (parseModeOptions $ f s) { parseFilename = fn } parse  s'  of
                       ParseOk ws e -> processErrors ws >> return e
                       ParseFailed sl err -> putErrDie $ show sl ++ ": " ++ err

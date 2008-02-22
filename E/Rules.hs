@@ -74,6 +74,8 @@ emptyRule = Rule {
 newtype Rules = Rules (IdMap [Rule])
     deriving(HasSize,IsEmpty)
 
+instance Eq Rule where
+    r1 == r2 = ruleUniq r1 == ruleUniq r2
 
 instance Binary Rules where
     put (Rules mp) = put (concat $ melems mp)

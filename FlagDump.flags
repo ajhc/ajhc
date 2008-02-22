@@ -7,6 +7,7 @@ the '-d' flag. The following is a list of possible parameters you can pass to
 '-d'.
 
 !Front End
+preprocessed code after preprocessing/deliting
 renamed code after uniqueness renaming
 parsed  parsed code
 derived show generated derived instances

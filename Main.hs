@@ -20,7 +20,7 @@ import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
-import E.Annotate(annotate,annotateDs,annotateProgram)
+import E.Annotate(annotate,annotateDs,annotateCombs,annotateProgram)
 import E.Diff
 import E.E
 import E.Eta
@@ -170,30 +170,40 @@ processInitialHo ::
     -> Ho    -- ^ new ho, freshly read from file
     -> IO CollectedHo -- ^ final combined ho data.
 processInitialHo accumho aho = do
-    let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- newTVrs ]) $ reRule (choVarMap accumho)
-        newTVrs = map annTVr . fsts $ hoEs (hoBuild aho)
-        annTVr t = dorule rules' t
-
-        --reRule x = if isEmpty orphanRules then x else fmap (fmap rr) x where
-        reRule x = fmap (fmap rr) x where
-            rr ~(EVar t) = EVar $ dorule rules' t
-        dorule rules t = tvrInfo_u (g (tvrIdent t)) t where
-            g id = runIdentity . idann rules mempty id
-        orphanRules = findOrphanRules (Map.keys . hoExports $ hoExp aho) rules'
-        --rules' = (hoRules (hoBuild aho))
-        --rules' = mapRuleBodies (substfmap) (hoRules (hoBuild aho))
-        rules' = mapRuleBodies (substMap'' $ choVarMap accumho) (hoRules (hoBuild aho))
-        substfmap = runIdentity . annotate finalVarMap (\_ -> return) letann lamann
-
-    let ds = runIdentity $ annotateDs (choVarMap accumho) (\_ -> return) letann lamann (hoEs ho')
-        ho' = reprocessHo rules' mempty (hoBuild aho)
-        prog = etaAnnotateProgram (programSetDs ds program { progDataTable = hoDataTable (hoBuild $ choHo accumho) `mappend` hoDataTable (hoBuild aho) })
+    let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- newTVrs ]) (choVarMap accumho)
+        newTVrs = fsts $ hoEs (hoBuild aho)
+    let choCombinators = fromList [ (combIdent c,c) | c <- runIdentity $ annotateCombs (choVarMap accumho) (\_ -> return) letann lamann combs]
+        combs = [ (emptyComb { combHead = t, combBody = e }) | (t,e) <- hoEs (hoBuild aho) ]
         (mod:_) = Map.keys $ hoExports $ hoExp aho
+
     return $ mempty {
         choVarMap = finalVarMap,
         choExternalNames = fromList . map tvrIdent $ newTVrs,
-        choHoMap = Map.singleton (show mod) $ hoBuild_u (hoEs_s $ programDs prog) aho
+        choCombinators = choCombinators,
+        --choHoMap = Map.singleton (show mod) $ hoBuild_u (hoEs_s ds') aho
+        choHoMap = Map.singleton (show mod) aho
         } `mappend` accumho
+
+        --reRule x = if isEmpty orphanRules then x else fmap (fmap rr) x where
+--        reRule x = fmap (fmap rr) x where
+--            rr ~(EVar t) = EVar $ dorule rules' t
+--        dorule rules t = tvrInfo_u (g (tvrIdent t)) t where
+--            g id = runIdentity . idann rules mempty id
+--        orphanRules = findOrphanRules (Map.keys . hoExports $ hoExp aho) rules'
+--        --rules' = (hoRules (hoBuild aho))
+--        --rules' = mapRuleBodies (substfmap) (hoRules (hoBuild aho))
+--        rules' = mapRuleBodies (substMap'' $ choVarMap accumho) (hoRules (hoBuild aho))
+--        substfmap = runIdentity . annotate finalVarMap (\_ -> return) letann lamann
+--
+--    let ds = runIdentity $ annotateDs (choVarMap accumho) (\_ -> return) letann lamann (hoEs ho')
+--        ho' = reprocessHo rules' mempty (hoBuild aho)
+--        prog = etaAnnotateProgram (programSetDs ds program { progDataTable = hoDataTable (hoBuild $ choHo accumho) `mappend` hoDataTable (hoBuild aho) })
+--        (mod:_) = Map.keys $ hoExports $ hoExp aho
+--    return $ mempty {
+--        choVarMap = finalVarMap,
+--        choExternalNames = fromList . map tvrIdent $ newTVrs,
+--        choHoMap = Map.singleton (show mod) $ hoBuild_u (hoEs_s $ programDs prog) aho
+--        } `mappend` accumho
 
 --    let ho' = reprocessHo (hoRules ho) mempty ho
 --        ho = hoBuild aho
@@ -460,7 +470,12 @@ processDecls cho ho' tiData = do
         }
         newMap = fromList [ (tvrIdent n,Just (EVar n)) | (n,_) <- hoEs newHoBuild ]
         (mod:_) = Map.keys $ hoExports $ hoExp ho'
-    return (mempty { choHoMap = Map.singleton (show mod) ho' { hoBuild = newHoBuild}, choExternalNames = idMapToIdSet newMap, choVarMap = newMap  } `mappend` cho,ho' { hoBuild = newHoBuild })
+    return (mempty {
+        choHoMap = Map.singleton (show mod) ho' { hoBuild = newHoBuild},
+        choCombinators = fromList $ [ (tvrIdent t,emptyComb { combHead = t, combBody = e }) | (t,e) <- hoEs newHoBuild ],
+        choExternalNames = idMapToIdSet newMap,
+        choVarMap = newMap
+        } `mappend` cho,ho' { hoBuild = newHoBuild })
 
 programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = programSetDs ds' prog where
@@ -495,26 +510,24 @@ isInteractive = do
 transTypeAnalyze = transformParms { transformCategory = "typeAnalyze",  transformOperation = typeAnalyze True }
 
 compileModEnv' cho = do
-    let ho = choHo cho
     if optMode options == CompileHo then return () else do
 
     let dataTable = progDataTable prog
-        rules = hoRules $ hoBuild ho
-        prog = hoToProgram ho
-        hoToProgram :: Ho -> Program
-        hoToProgram ho = programSetDs (hoEs $ hoBuild ho) program {
-            progClassHierarchy = hoClassHierarchy $ hoBuild ho,
-            progDataTable = hoDataTable $ hoBuild ho
+        rules = choRules cho
+        prog = programUpdate program {
+            progCombinators = melems $ choCombinators cho,
+            progClassHierarchy = choClassHierarchy cho,
+            progDataTable = choDataTable cho
             }
 
     -- dump final version of various requested things
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
     when (dump FD.ClassSummary) $ do
         putStrLn "  ---- class summary ---- "
-        printClassSummary (hoClassHierarchy $ hoBuild ho)
+        printClassSummary (choClassHierarchy cho)
     when (dump FD.Class) $ do
         putStrLn "  ---- class hierarchy ---- "
-        printClassHierarchy (hoClassHierarchy $ hoBuild ho)
+        printClassHierarchy (choClassHierarchy cho)
     wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
     wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
     wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules

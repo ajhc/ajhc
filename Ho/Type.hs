@@ -3,9 +3,9 @@ module Ho.Type where
 import Data.Monoid
 import qualified Data.Map as Map
 
-import DataConstructors(DataTable,dataTablePrims)
-import E.E(TVr,E)
+import DataConstructors(DataTable)
 import E.Rules(Rules)
+import E.Type
 import E.TypeCheck()
 import FrontEnd.Class(ClassHierarchy)
 import FrontEnd.Infix(FixityMap)
@@ -29,6 +29,7 @@ data CollectedHo = CollectedHo {
     -- this is a list of external names that are valid but that we may not know anything else about
     -- it is used to recognize invalid ids.
     choExternalNames :: IdSet,
+    choCombinators  :: IdMap Comb,
     -- this is a map of ids to their full TVrs with all rules and whatnot attached.
     choVarMap :: IdMap (Maybe E),
     -- these are rules that may need to be retroactively applied to other modules
