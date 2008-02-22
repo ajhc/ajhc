@@ -15,6 +15,7 @@ module Name.Id(
     idSetToIdMap,
     mapMaybeIdMap,
     idSetFromList,
+    idToInt,
     idSetFromDistinctAscList,
     idMapFromList,
     idMapFromDistinctAscList,
@@ -79,7 +80,7 @@ idSetToIdMap :: (Id -> a) -> IdSet -> IdMap a
 idSetToIdMap f (IdSet is) = IdMap $ IM.fromDistinctAscList [ (x,f x) |  x <- IS.toAscList is]
 
 idMapToIdSet :: IdMap a -> IdSet
-idMapToIdSet (IdMap im) = IdSet $ IS.fromDistinctAscList (IM.keys im)
+idMapToIdSet (IdMap im) = IdSet $ (IM.keysSet im)
 
 
 -- | Name monad transformer.
