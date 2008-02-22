@@ -66,6 +66,8 @@ data Opt = Opt {
     optCCargs      ::  [String],  -- ^ Optional arguments to the C compiler.
     optHls         ::  [String],  -- ^ Load the specified hl-files (haskell libraries).
     optHlPath      ::  [String],  -- ^ Path to look for libraries.
+    optIncs        ::  [String],
+    optDefs        ::  [String],
     optCC          ::  String,    -- ^ C compiler.
     optHoDir       ::  Maybe FilePath,
     optHoCache     ::  Maybe FilePath,
@@ -93,6 +95,8 @@ opt = Opt {
     optIncdirs     = initialIncludes,
     optHls         = [],
     optHlPath      = initialLibIncludes,
+    optIncs        = [],
+    optDefs        = [],
     optProgArgs    = [],
     optDump        = [],
     optStmts       = [],
@@ -131,14 +135,16 @@ theoptions =
     , Option ['d'] []            (ReqArg (\d -> optDump_u (d:)) "[no-]flag")  "dump specified data during compilation"
     , Option ['f'] []            (ReqArg (\d -> optFOpts_u (d:)) "[no-]flag") "set or clear compilation options"
     , Option ['o'] ["output"]    (ReqArg (optOutName_s) "FILE")        "output to FILE"
-    , Option ['i'] ["include"]   (ReqArg (optIncdirs_u . idu) "DIR")   "library directory"
+    , Option ['i'] ["include"]   (ReqArg (optIncdirs_u . idu) "DIR")   "where to look for source files"
+    , Option ['I'] []            (ReqArg (optIncs_u . idu) "DIR")       "add to preprocessor include path"
+    , Option ['D'] []            (ReqArg (\d -> optDefs_u (d:)) "NAME=VALUE") "add new definitions to set in preprocessor"
     , Option []    ["optc"]      (ReqArg (optCCargs_u . idu) "option") "extra options to pass to c compiler"
     , Option []    ["progc"]     (ReqArg (\d -> optCC_s d) "gcc")      "c compiler to use"
     , Option []    ["arg"]       (ReqArg (\d -> optProgArgs_u (++ [d])) "arg") "arguments to pass interpreted program"
     , Option ['N'] ["noprelude"] (NoArg  (optPrelude_s False))         "no implicit prelude"
     , Option ['C'] []            (NoArg  (optMode_s CompileHoGrin))    "Typecheck, compile ho and grin."
     , Option ['c'] []            (NoArg  (optMode_s CompileHo))        "Typecheck and compile ho."
-    , Option ['I'] ["interpret"] (NoArg  (optMode_s Interpret))        "interpret."
+    , Option []    ["interpret"] (NoArg  (optMode_s Interpret))        "interpret."
     , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))        "keep going on errors."
     , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output."
     , Option []    ["main"]      (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point."

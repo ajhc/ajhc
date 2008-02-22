@@ -41,6 +41,10 @@ These pragmas are only valid in the 'head' of a file, meaning they must come
 before the initial 'module' definition and in the first 4096 bytes of the file
 and must be preceded by and contain only characters in the ASCII character set.
 
+NOPRELUDE
+: do not load the 'Prelude' automatically. equivalent to passing --noprelude on
+the command line.
+
 OPTIONS_JHC
 : Specify extra options to use when processing this file. The options available
 are equivalent to the command line options, though, not all may have meaning

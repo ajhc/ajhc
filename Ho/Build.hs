@@ -59,6 +59,7 @@ import Util.FilterInput
 import Util.Gen hiding(putErrLn,putErr,putErrDie)
 import Util.SetLike
 import Version.Version(versionString)
+import Version.Config(revision)
 import qualified Info.Info as Info
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -521,14 +522,19 @@ parseHsSource fn lbs = do
     let f s = opt where
             Just opt = fileOptions opts `mplus` Just options where
             s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
-            opts = concat [ words as | (x,as) <- parseOptions s', x `elem` ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"]]
-    let fopts s = s `member` optFOptsSet opt where opt = f (take 1024 txt)
-        incFlags =  [ "-I" ++ d | d <- optIncdirs options]
+            opts' = concat [ words as | (x,as) <- parseOptions s', x `elem` ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"]]
+            opts = opts' ++ [ "--noprelude" | ("NOPRELUDE",_) <- parseOptions s']
+            langs = concat [ words as | ("LANGUAGE",as) <- parseOptions s' ]
+    let fopts s = s `member` optFOptsSet initialOpts
+        initialOpts = f (take 4096 txt)
+        incFlags = [ "-I" ++ d | d <- optIncdirs options ++ optIncs initialOpts]
+        defFlags = ("-D__JHC__=" ++ revision):[ "-D" ++ d | d <- optDefs initialOpts]
+
     s <- case () of
-        _ | fopts FO.Cpp -> readSystem "cpp" ["-D__JHC__","-CC","-traditional", "--", fn]
+        _ | fopts FO.Cpp -> readSystem "cpp" $ ["-CC","-traditional"] ++ incFlags ++ defFlags ++ [fn]
           | fopts FO.M4 -> do
             m4p <- m4Prelude
-            readSystem "m4" $ ["-D__JHC__", "-s", "-P"] ++ incFlags ++ [m4p,fn]
+            readSystem "m4" $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
           | otherwise -> return txt
     let s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s'' else s''
         s'' = case s of
