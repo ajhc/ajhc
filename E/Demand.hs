@@ -17,7 +17,6 @@ import Data.List
 import Data.Monoid hiding(Product(..))
 import Data.Maybe
 import Data.Typeable
-import qualified Data.Map as Map
 
 import DataConstructors
 import Doc.DocLike
@@ -30,7 +29,6 @@ import Name.Id
 import qualified Info.Info as Info
 import Util.HasSize
 import Util.SetLike
-import Support.MapBinaryInstance
 
 data Demand =
     Bottom             -- always diverges
@@ -65,15 +63,15 @@ data DemandType = (:=>) DemandEnv [Demand]
     deriving(Eq,Ord,Typeable)
         {-! derive: Binary !-}
 
-data DemandEnv = DemandEnv (Map.Map TVr Demand) Demand
+data DemandEnv = DemandEnv (IdMap Demand) Demand
     deriving(Eq,Ord,Typeable)
 
 instance Binary DemandEnv where
     put (DemandEnv dt d) = do
-        putMap dt
+        put dt
         put d
     get = do
-        m <- getMap
+        m <- get
         d <- get
         return $ DemandEnv m d
 
@@ -83,9 +81,9 @@ instance Show DemandType where
     showsPrec _ (env :=> ds) = shows env . showString " :=> " .  shows ds
 
 instance Show DemandEnv where
-    showsPrec _ (DemandEnv m Absent) = showString "{" . foldr (.) id (intersperse (showString ",") [ showString (pprint t) . showString " -> " . shows v | (t,v) <- Map.toList m]) . showString "}"
+    showsPrec _ (DemandEnv m Absent) = showString "{" . foldr (.) id (intersperse (showString ",") [ showString (pprint t) . showString " -> " . shows v | (t,v) <- idMapToList m]) . showString "}"
     showsPrec _ (DemandEnv _ Bottom) = showString "_|_"
-    showsPrec _ (DemandEnv m demand) = showString "{" . shows demand . showString " - " . foldr (.) id (intersperse (showString ",") [ showString (pprint t) . showString " -> " . shows v | (t,v) <- Map.toList m]) . showString "}"
+    showsPrec _ (DemandEnv m demand) = showString "{" . shows demand . showString " - " . foldr (.) id (intersperse (showString ",") [ showString (pprint t) . showString " -> " . shows v | (t,v) <- idMapToList m]) . showString "}"
 
 
 instance Show DemandSignature where
@@ -204,22 +202,22 @@ instance Lattice Demand where
 
 
 
-lenv e (DemandEnv m r) = case Map.lookup e m of
+lenv e (DemandEnv m r) = case mlookup e m of
     Nothing -> r
     Just x -> x
 
 demandEnvSingleton :: TVr -> Demand -> DemandEnv
 demandEnvSingleton _ Absent = DemandEnv mempty idGlb
-demandEnvSingleton t d = DemandEnv (Map.singleton t d) idGlb
+demandEnvSingleton t d = DemandEnv (msingleton (tvrIdent t) d) idGlb
 
 demandEnvMinus :: DemandEnv -> TVr -> DemandEnv
-demandEnvMinus (DemandEnv m r) x = DemandEnv (Map.delete x m) r
+demandEnvMinus (DemandEnv m r) x = DemandEnv (mdelete (tvrIdent x) m) r
 
 instance Lattice DemandEnv where
     lub d1@(DemandEnv m1 r1) d2@(DemandEnv m2 r2) = DemandEnv m (r1 `lub` r2) where
-        m = Map.fromList [ (x,lenv x d1 `lub` lenv x d2) | x <- Map.keys m1 ++ Map.keys m2]
+        m = fromList [ (x,lenv x d1 `lub` lenv x d2) | x <- mkeys m1 ++ mkeys m2]
     glb d1@(DemandEnv m1 r1) d2@(DemandEnv m2 r2) = DemandEnv m (r1 `glb` r2) where
-        m = Map.fromList [ (x,lenv x d1 `glb` lenv x d2) | x <- Map.keys m1 ++ Map.keys m2]
+        m = fromList [ (x,lenv x d1 `glb` lenv x d2) | x <- mkeys m1 ++ mkeys m2]
 
 
 newtype IM a = IM (Reader (Env,DataTable) a)
@@ -314,12 +312,12 @@ analyze (ELam x@TVr { tvrIdent = 0 } e) (S (Product [s])) = do
     return (ELam (tvrInfo_u (Info.insert sx) x) e',demandEnvMinus phi x :=> (sx:sigma))
 analyze (ELam x e) (S (Product [s])) = do
     (e',phi :=> sigma) <- analyze e s
-    let sx = lenv x phi
+    let sx = lenv (tvrIdent x) phi
     return (ELam (tvrInfo_u (Info.insert sx) x) e',demandEnvMinus phi x :=> (sx:sigma))
 
 analyze (ELam x e) (L (Product [s])) = do
     (e',phi :=> sigma) <- analyze e s
-    let sx = lenv x phi
+    let sx = lenv (tvrIdent x) phi
     return (ELam (tvrInfo_u (Info.insert sx) x) e',lazify (demandEnvMinus phi x) :=> (sx:sigma))
 analyze (ELam x e) (S None) = analyze (ELam x e) (S (Product [lazy]))  -- simply to ensure binder is annotated
 analyze (ELam x e) (L None) = analyze (ELam x e) (L (Product [lazy]))  -- simply to ensure binder is annotated
@@ -331,7 +329,7 @@ analyze ec@ECase { eCaseBind = b, eCaseAlts = [Alt lc@LitCons { litName = h, lit
     case onlyChild dataTable h of
         True -> do  -- product type
             (alt',enva :=> siga) <- extEnvE b (eCaseScrutinee ec) $ analyze alt s
-            (e',enve :=> []) <- analyze (eCaseScrutinee ec) (sp [ lenv t enva | t <- ts])
+            (e',enve :=> []) <- analyze (eCaseScrutinee ec) (sp [ lenv (tvrIdent t) enva | t <- ts])
             let nenv = enve `glb` foldr denvDelete enva (b:ts)
             return (caseUpdate $ ec { eCaseScrutinee = e', eCaseAlts = [Alt lc alt'] }, nenv :=> siga)
         _ -> analyzeCase ec s
@@ -339,7 +337,7 @@ analyze ec@ECase {} s = analyzeCase ec s
 analyze ELetRec { eDefs = ds, eBody = b } s = f (decomposeDs ds) [] where
     f [] ds' = do
         (b',phi :=> sig) <- analyze b s
-        let g (t,e) = (tvrInfo_u (Info.insert (lenv t phi)) t,e)
+        let g (t,e) = (tvrInfo_u (Info.insert (lenv (tvrIdent t) phi)) t,e)
         return (ELetRec (map g ds') b', foldr denvDelete phi (fsts ds) :=> sig)
     f (Left (t,e):rs) fs =
         solveDs' (Just False) [(t,e)] id (\nn -> f rs (nn ++ fs))
@@ -353,7 +351,7 @@ analyze e x = fail $ "analyze: " ++ show (e,x)
 from_dependingOn (EPrim don [t1,t2] pt) | don == p_dependingOn = return (t1,t2,pt)
 from_dependingOn _ = fail "not dependingOn"
 
-lazify (DemandEnv x r) = DemandEnv (Map.map f x) Absent where
+lazify (DemandEnv x r) = DemandEnv (fmap f x) Absent where
     f (S xs) = l xs
     f Absent = Absent
     f (L xs) = l xs
@@ -370,7 +368,7 @@ analyzeCase ec s = do
     let nenv = foldr denvDelete (glb enva env) (caseBinds ec')
     return (caseUpdate $ ec' {eCaseScrutinee = ecs},nenv :=> siga)
 
-denvDelete x (DemandEnv m r) = DemandEnv (Map.delete x m) r
+denvDelete x (DemandEnv m r) = DemandEnv (mdelete (tvrIdent x) m) r
 
 
 
