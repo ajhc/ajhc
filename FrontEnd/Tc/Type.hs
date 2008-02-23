@@ -218,10 +218,25 @@ readMetaVar MetaVar { metaRef = r }  = liftIO $ do
             return (Just t')
 
 
-
+{-
 freeMetaVars :: Type -> S.Set MetaVar
 freeMetaVars (TMetaVar mv) = S.singleton mv
 freeMetaVars t = tickleCollect freeMetaVars t
+-}
+freeMetaVars :: Type -> S.Set MetaVar
+freeMetaVars t = worker t S.empty
+    where worker :: Type -> (S.Set MetaVar -> S.Set MetaVar)
+          worker (TMetaVar mv) = S.insert mv
+          worker (TAp l r) = worker l . worker r
+          worker (TArrow l r) = worker l . worker r
+          worker (TAssoc c cas eas) = foldr (.) id (map worker cas) . foldr (.) id (map worker eas)
+          worker (TForAll ta (ps :=> t)) = foldr (.) id (map worker2 ps) . worker t
+          worker (TExists ta (ps :=> t)) = foldr (.) id (map worker2 ps) . worker t
+          worker _ = id
+          worker2 :: Pred -> (S.Set MetaVar -> S.Set MetaVar)
+          worker2 (IsIn c t) = worker t
+          worker2 (IsEq t1 t2) = worker t1 . worker t2
+
 
 instance FreeVars Type [Tyvar] where
     freeVars (TVar u)      = [u]
