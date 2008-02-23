@@ -169,20 +169,20 @@ doSubst' substInVars allShadow bm check e  = f e (Set.empty, bm) where
     ntvr xs tvr@(TVr {tvrIdent = i, tvrType =  t}) = do
         t' <- f t
         (s,ss) <- ask
-        let i' = mnv allShadow xs i s ss
+        let i' = mnv allShadow xs i check s ss
         let nvr = (tvr { tvrIdent =  i', tvrType =  t'})
         return (nvr,\(s,m) -> (Set.insert i' . Set.insert i $ s, minsert i (EVar nvr) . mdelete i' $ m))
 
 
 
-mnv :: Bool -> Set.Set Id -> Id -> Set.Set Id -> IdMap a -> Id
-mnv allShadow xs i s ss
-    | allShadow = newId (Set.size xs + Set.size s + size ss) scheck
-    | isInvalidId i || not (scheck i) = newId (Set.size xs + Set.size s + size ss) check
+mnv :: Bool -> Set.Set Id -> Id -> (Id -> Bool) -> Set.Set Id -> IdMap a -> Id
+mnv allShadow xs i checkTaken s ss
+    | allShadow = newId (Set.size xs + Set.size s + size ss) (not . scheck)
+    | isInvalidId i || scheck i = newId (Set.size xs + Set.size s + size ss) (not . check)
             -- It is very important that we don't check for 'xs' membership in the guard above.
     | otherwise = i
-    where scheck n = n `mnotMember` ss && n `notMember` s
-          check n = scheck n && n `notMember` xs
+    where scheck n = n `mmember` ss || n `member` s || checkTaken n
+          check n = scheck n || n `member` xs
 
 
 
@@ -286,7 +286,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
     ntvr xs tvr@(TVr {tvrIdent = i, tvrType =  t}) = do
         t' <- inType (f t)
         (_,map,_) <- ask
-        let i' = mnv False xs i Set.empty map
+        let i' = mnv False xs i (\_ -> False) Set.empty map
         let nvr = (tvr { tvrIdent =  i', tvrType =  t'})
         case i == i' of
             True -> return (nvr,addMap i  (Just $ EVar nvr))
