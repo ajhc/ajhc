@@ -187,15 +187,10 @@ unsafeCoerceOpt (EPrim uc [e] t) | uc == p_unsafeCoerce = f (0::Int) e t where
 unsafeCoerceOpt e = (0,e,id)
 
 
-instance HasProperties TVr where
-    modifyProperties f = tvrInfo_u (modifyProperties f)
-    getProperties = getProperties . tvrInfo
-    putProperties prop =  tvrInfo_u (putProperties prop)
 
 instance HasInfo TVr where
     getInfo = tvrInfo
     modifyInfo = tvrInfo_u
-
 
 -- various routines used to classify expressions
 -- many assume atomicity constraints are in place

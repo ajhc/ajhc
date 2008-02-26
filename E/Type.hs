@@ -16,6 +16,7 @@ import Util.Gen
 import Name.Name
 import Name.Names
 import Number
+import Info.Types
 import qualified Info.Info as Info
 
 -- the type of a supercombinator
@@ -25,6 +26,17 @@ data Comb = Comb {
     combRules :: [Rule]
     }
     {-!derive: update !-}
+
+instance HasProperties Comb where
+    modifyProperties f comb = combHead_u (modifyProperties f) comb
+    getProperties comb = getProperties $ combHead comb
+    putProperties p comb = combHead_u (putProperties p) comb
+
+instance HasProperties TVr where
+    modifyProperties f = tvrInfo_u (modifyProperties f)
+    getProperties = getProperties . tvrInfo
+    putProperties prop =  tvrInfo_u (putProperties prop)
+
 
 emptyComb = Comb { combHead = tvr, combBody = Unknown, combRules = [] }
 combIdent = tvrIdent . combHead
