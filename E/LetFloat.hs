@@ -100,21 +100,19 @@ canFloatPast _ = False
 {-# NOINLINE programFloatInward #-}
 programFloatInward :: Program -> IO Program
 programFloatInward prog = do
-    let binds = G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- programDs prog, x `notElem` fsts epoints ] (tvrIdent . fst . fst) (idSetToList . snd)
-        binds :: Binds
-        epoints :: [(TVr,E)]
-        epoints = [ d | d@(x,_) <- programDs prog, (x `elem` progEntryPoints prog) || forceNoinline x || getProperty prop_INSTANCE x || getProperty prop_SPECIALIZATION x ]
+    let binds = G.scc $  G.newGraph [ (c ,freeVars c) | c <- progCombinators prog, combIdent c  `notElem` map combIdent epoints ] (combIdent . fst) (idSetToList . snd)
+        epoints = [ c | c@Comb { combHead = x } <- progCombinators prog, (x `elem` progEntryPoints prog) || forceNoinline x || getProperty prop_INSTANCE x || getProperty prop_SPECIALIZATION x ]
         (oall,pints) = sepByDropPoint dpoints  (reverse binds)
-        dpoints = (map (\ (x,y) -> bindingFreeVars x y) epoints)
-        nprog = programSetDs ([ (k,fi k v y)| ((k,v),y) <- zip epoints pints] ++ [ (x,floatInwardE y []) | (x,y) <- dsBinds oall]) prog
+        dpoints = map freeVars epoints
+        nprog = progCombinators_s ([ combBody_u (\v -> fi c v y) c | (c,y) <- zip epoints pints] ++ [ combBody_u (\y -> floatInwardE y []) c | c <- dsBinds oall]) prog
         fi k = if getProperty prop_ONESHOT k then floatInwardE' else floatInwardE
     --mapM_ (putStrLn . pprint) (map fst $ dsBinds (concat pints))
     --Prelude.print (cupbinds binds)
     --Prelude.print dpoints
     --Prelude.putStrLn (pprint $ map fst (dsBinds binds))
     --Prelude.putStrLn (pprint $ (map fst $ dsBinds oall,map (\binds -> map fst $ dsBinds binds) pints))
-    let mstats = mconcat [ Stats.singleton $ "FloatInward.{" ++ pprint n ++ "}" | n <- map fst $ dsBinds (concat pints)]
-        mstats' = mconcat [ Stats.singleton $ "FloatInward.all.{" ++ pprint n ++ "}" | n <- map fst $ dsBinds oall]
+    let mstats = mconcat [ Stats.singleton $ "FloatInward.{" ++ pprint n ++ "}" | n <- map combHead $ dsBinds (concat pints)]
+        mstats' = mconcat [ Stats.singleton $ "FloatInward.all.{" ++ pprint n ++ "}" | n <- map combHead $ dsBinds oall]
         nstats = progStats prog `mappend` mstats `mappend` mstats'
     --nprog <- programMapBodies (return . floatInward) nprog
     return nprog { progStats = nstats }
@@ -130,38 +128,40 @@ floatInward ::
     -> E  -- ^ output term
 floatInward e = floatInwardE e [] where
 
+floatInwardE :: E -> Binds -> E
 floatInwardE e fvs = f e fvs where
     f ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault =  d } xs = ans where
         ans = letRec p' $ caseUpdate ec { eCaseScrutinee = (f e pe), eCaseAlts = [ Alt l (f e pn) | Alt l e <- as | pn <- ps ], eCaseDefault = (fmap (flip f pd) d)}
         (p',_:pe:pd:ps) = sepByDropPoint (mconcat [freeVars l | Alt l _ <- as ]:freeVars e: tvrIdent b `delete` freeVars d :[freeVars a | a <- as ]) xs
-    f ELetRec { eDefs = ds, eBody = e } xs = g (G.scc $  G.newGraph [ (d,bindingFreeVars x y) | d@(x,y) <- ds ] (tvrIdent . fst . fst) (idSetToList . snd) ) xs where
+    f ELetRec { eDefs = ds, eBody = e } xs = g (G.scc $  G.newGraph [ (bindComb d,freeVars $ bindComb d) | d <- ds ] (combIdent . fst) (idSetToList . snd) ) xs where
         g [] p' = f e p'
-        g ((Left ((v,ev),fv)):xs) p = g xs (p0 ++ [Left ((v,ev'),bindingFreeVars v ev')] ++ p') where
+        g ((Left (comb@Comb { combHead = v, combBody = ev},fv)):xs) p = g xs (p0 ++ [Left (comb',freeVars comb')] ++ p') where
+            comb' = combBody_s ev' comb
             ev' = if getProperty prop_ONESHOT v then floatInwardE' ev pv else f ev pv
             (p',[p0,pv,_]) = sepByDropPoint [(frest xs), bindingFreeVars v ev, freeVars (tvrType v)] p
-        g (Right bs:xs) p =  g xs (p0 ++ [Right [ let ev' = f ev pv in ((v,ev'),bindingFreeVars v ev') | ((v,ev),_) <- bs | pv <- ps ]] ++ p') where
-            (p',_:p0:ps) = sepByDropPoint (freeVars (map (tvrType . fst . fst) bs) :(frest xs):snds bs) p
+        g (Right bs:xs) p =  g xs (p0 ++ [Right [ let comb' = combBody_u (\ev -> f ev pv) comb in (comb',freeVars comb') | (comb,_) <- bs | pv <- ps ]] ++ p') where
+            (p',_:p0:ps) = sepByDropPoint (freeVars (map (tvrType . combHead . fst) bs) :(frest xs):snds bs) p
         frest xs = mconcat (freeVars e:map fvBind xs)
     f e@ELam {} xs | all canFloatPast  ls = (foldr ELam (f b xs) ls) where
         (b,ls) = fromLam e
     f e@ELam {} xs = letRec unsafe_to_dup (foldr ELam (f b safe_to_dup) ls) where
         (unsafe_to_dup,safe_to_dup) = sepDupableBinds (freeVars ls) xs
         (b,ls) = fromLam e
-    f e (Left ((v',ev),_):xs)
-        | (EVar v,as) <- fromAp e, v == v', not (tvrIdent v' `member` (freeVars as :: IdSet))  = f (runIdentity $ app (ev,as) {- foldl EAp ev as -} ) xs
+    f e (Left (Comb { combHead = v', combBody = ev},_):xs)
+        | (EVar v,as) <- fromAp e, v == v', not (tvrIdent v' `member` (freeVars as :: IdSet))  = f (runIdentity $ app (ev,as)) xs
     f e xs = letRec xs e
     letRec [] e = e
-    letRec xs e = f (G.scc $ G.newGraph (concatMap G.fromScc xs) (tvrIdent . fst . fst) (idSetToList . snd)) where
+    letRec xs e = f (G.scc $ G.newGraph (concatMap G.fromScc xs) (combIdent . fst) (idSetToList . snd)) where
         f [] = e
-        f (Left (te,_):rs) = eLetRec [te] $ f rs
-        f (Right ds:rs) = eLetRec (fsts ds) $ f rs
+        f (Left (te,_):rs) = eLetRec [combBind te] $ f rs
+        f (Right ds:rs) = eLetRec (map (combBind . fst) ds) $ f rs
 
 floatInwardE' e@ELam {} xs  = (foldr ELam (floatInwardE b xs) ls) where
     (b,ls) = fromLam e
 floatInwardE' e xs = floatInwardE e xs
 
 type FVarSet = IdSet
-type Binds = [Either ((TVr,E),FVarSet) [((TVr,E),FVarSet)]]
+type Binds = [Either (Comb,FVarSet) [(Comb,FVarSet)]]
 
 dsBinds bs = foldr ($) [] (map f bs) where
     f (Left (x,_)) = (x:)
@@ -169,10 +169,10 @@ dsBinds bs = foldr ($) [] (map f bs) where
 
 sepDupableBinds :: [Id] -> Binds -> (Binds,Binds)
 sepDupableBinds fvs xs = partition ind xs where
-    g = G.reachable (G.newGraph (concatMap G.fromScc xs) (tvrIdent . fst . fst) (idSetToList . snd)) (fvs `mappend` unsafe_ones)
-    uso = map (tvrIdent . fst . fst) g
-    unsafe_ones = concat [ map (tvrIdent . fst . fst) vs | vs <- map G.fromScc xs,any (not . isCheap) (map (snd . fst) vs)]
-    ind x = any ( (`elem` uso) . tvrIdent . fst . fst ) (G.fromScc x)
+    g = G.reachable (G.newGraph (concatMap G.fromScc xs) (combIdent . fst) (idSetToList . snd)) (fvs `mappend` unsafe_ones)
+    uso = map (combIdent . fst) g
+    unsafe_ones = concat [ map (combIdent . fst) vs | vs <- map G.fromScc xs,any (not . isCheap) (map (combBody . fst) vs)]
+    ind x = any ( (`elem` uso) . combIdent . fst ) (G.fromScc x)
 
 
 -- | seperate bindings based on whether they can be floated inward
@@ -198,8 +198,8 @@ sepByDropPoint ds fs' = (r,xs) where
         fb' = fvBind b
         ds' = [ (d,any  (`member` d) (fvDecls b)) | d <- ds ]
         nu = length (filter snd ds')
-    fvDecls (Left ((t,_),_)) = [tvrIdent t]
-    fvDecls (Right ts) = [tvrIdent t | ((t,_),_) <- ts ]
+    fvDecls (Left (c,_)) = [combIdent c]
+    fvDecls (Right ts) = [combIdent c | (c,_) <- ts ]
 
 
 newtype Level = Level Int

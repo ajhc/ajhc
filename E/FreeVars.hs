@@ -123,7 +123,7 @@ instance FreeVars ARules IdSet where
 
 -- note, we include references to this combinator in its free variables.
 instance FreeVars Comb IdSet where
-    freeVars a = freeVars (combBody a) `union` (freeVars $ combRules a)
+    freeVars a = freeVars (tvrType $ combHead a) `union` freeVars (combBody a) `union` (freeVars $ combRules a)
 
 instance FreeVars Comb [Id] where
     freeVars a = toList $ (freeVars a :: IdSet)
