@@ -4,7 +4,6 @@
 module E.TypeAnalysis(typeAnalyze, Typ(),expandPlaceholder) where
 
 import Control.Monad.Error
-import Control.Monad.Writer
 import Control.Monad.Identity
 import Control.Monad.State
 import Data.Monoid
@@ -70,7 +69,7 @@ typeAnalyze doSpecialize prog = do
     let ds = programDs prog
         env = Env { envRuleSupply = ur, envValSupply = uv, envEnv = extractValMap ds }
         entries = progEntryPoints prog
-    calcDs env ds
+    calcCombs env $ progCombinators prog
     forM_ entries $ \tvr ->  do
         vv <- supplyValue uv tvr
         addRule $ assert vv
@@ -96,11 +95,12 @@ toLit _ = fail "not convertable to literal"
 assert :: Value Bool -> Fixer.Fixer.Rule
 assert v = v `isSuperSetOf` value True
 
-calcDef :: Env -> (TVr,E) -> IO ()
-calcDef env@Env { envRuleSupply = ur, envValSupply = uv } (t,e) = do
-    let (_,ls) = fromLam e
+calcComb :: Env -> Comb -> IO ()
+calcComb env@Env { envRuleSupply = ur, envValSupply = uv } comb = do
+    let (_,ls) = fromLam $ combBody comb
         tls = takeWhile (sortKindLike . getType) ls
-        rs = rulesFromARules (Info.fetch (tvrInfo t))
+        rs = combRules comb
+        t = combHead comb
         hr r = do
             ruleUsed <- supplyValue ur (ruleUniq r)
             addRule $ conditionalRule id ruleUsed (ioToRule $  calcE env (ruleBody r))
@@ -123,14 +123,22 @@ calcDef env@Env { envRuleSupply = ur, envValSupply = uv } (t,e) = do
     valUsed <- supplyValue uv t
     addRule $ conditionalRule id valUsed $ ioToRule $ do
         mapM_ hr rs
+        calcE env $ combBody comb
+
+
+calcDef :: Env -> (TVr,E) -> IO ()
+calcDef env@Env { envValSupply = uv } (t,e) = do
+    valUsed <- supplyValue uv t
+    addRule $ conditionalRule id valUsed $ ioToRule $ do
         calcE env e
 
-calcDs ::  Env -> [(TVr,E)] -> IO ()
-calcDs env@Env { envRuleSupply = ur, envValSupply = uv } ds = do
-    mapM_ d ds
-    forM_ ds $ \ (v,e) -> do calcDef env (v,e)
-      --  addRule $ conditionalRule id nv (ioToRule $ calcDef env (v,e))
-     where
+calcCombs ::  Env -> [Comb] -> IO ()
+calcCombs env@Env { envRuleSupply = ur, envValSupply = uv } ds = do
+    mapM_ (calcTE env) [ (combHead c,combBody c) | c <- ds ]
+    mapM_ (calcComb env) ds
+
+calcTE ::  Env -> (TVr,E) -> IO ()
+calcTE env@Env { envRuleSupply = ur, envValSupply = uv } ds = d ds where
     d (t,e) | not (sortKindLike (getType t)) = return ()
     d (t,e) | Just v <- getValue e = do
         let Just t' = Info.lookup (tvrInfo t)
@@ -150,6 +158,11 @@ calcDs env@Env { envRuleSupply = ur, envValSupply = uv } ds = do
                 Just vs -> concat $ flip map vs $ \h -> (flip map (zip as' [0.. ])  $ \ (a,i) -> modifiedSuperSetOf t' a $ \ v -> vmapArgSingleton h i v)
                 Nothing -> flip map (zip as' [0.. ])  $ \ (_,i) -> isSuperSetOf t' (value $ vmapProxyIndirect i v)
     d (t,e) = fail $ "calcDs: " ++ show (t,e)
+
+calcDs ::  Env -> [(TVr,E)] -> IO ()
+calcDs env@Env { envRuleSupply = ur, envValSupply = uv } ds = do
+    mapM_ (calcTE env) ds
+    forM_ ds $ \ (v,e) -> do calcDef env (v,e)
 
 -- TODO - make default case conditional
 calcAlt env v (Alt LitCons { litName = n, litArgs = xs } e) = do
@@ -223,7 +236,7 @@ data SpecEnv = SpecEnv {
 
 
 getTyp :: Monad m => E -> DataTable -> Typ -> m E
-getTyp kind dataTable vm = f 10 kind vm where
+getTyp kind dataTable vm = f (10::Int) kind vm where
     f n _ _ | n <= 0 = fail "getTyp: too deep"
     f n kind vm | Just [] <- vmapHeads vm = return $ tAbsurd kind  -- TODO - absurdize values properly
     f n kind vm | Just [h] <- vmapHeads vm = do
@@ -388,7 +401,7 @@ expandPlaceholder comb  | getProperty prop_PLACEHOLDER (combHead comb) = do
             eCaseBind = a { tvrIdent = 0 },
             eCaseType = ct
             }
-        calt rule@Rule { ruleArgs = (arg:rs) } = Alt vp (substMap (fromList [ (tvrIdent v,EVar r) | ~(EVar v) <- rs | r <- ras ]) $ ruleBody rule) where
+        calt rule@Rule { ruleArgs = ~(arg:rs) } = Alt vp (substMap (fromList [ (tvrIdent v,EVar r) | ~(EVar v) <- rs | r <- ras ]) $ ruleBody rule) where
             Just vp = eToPat arg
     return (mcomb (foldr ELam ne as'))
 
