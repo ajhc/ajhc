@@ -32,7 +32,7 @@ import E.LetFloat
 import E.Program
 import E.Rules
 import E.Show hiding(render)
-import E.Subst(subst,substMap'')
+import E.Subst(subst)
 --import E.ToHs
 import E.Traverse
 import E.TypeAnalysis
@@ -196,49 +196,7 @@ processInitialHo accumho aho = do
         choHoMap = Map.singleton (show mod) aho `mappend` choHoMap accumho
         }
 
-        --reRule x = if isEmpty orphanRules then x else fmap (fmap rr) x where
---        reRule x = fmap (fmap rr) x where
---            rr ~(EVar t) = EVar $ dorule rules' t
---        dorule rules t = tvrInfo_u (g (tvrIdent t)) t where
---            g id = runIdentity . idann rules mempty id
---        orphanRules = findOrphanRules (Map.keys . hoExports $ hoExp aho) rules'
---        --rules' = (hoRules (hoBuild aho))
---        --rules' = mapRuleBodies (substfmap) (hoRules (hoBuild aho))
---        rules' = mapRuleBodies (substMap'' $ choVarMap accumho) (hoRules (hoBuild aho))
---        substfmap = runIdentity . annotate finalVarMap (\_ -> return) letann lamann
---
---    let ds = runIdentity $ annotateDs (choVarMap accumho) (\_ -> return) letann lamann (hoEs ho')
---        ho' = reprocessHo rules' mempty (hoBuild aho)
---        prog = etaAnnotateProgram (programSetDs ds program { progDataTable = hoDataTable (hoBuild $ choHo accumho) `mappend` hoDataTable (hoBuild aho) })
---        (mod:_) = Map.keys $ hoExports $ hoExp aho
---    return $ mempty {
---        choVarMap = finalVarMap,
---        choExternalNames = fromList . map tvrIdent $ newTVrs,
---        choHoMap = Map.singleton (show mod) $ hoBuild_u (hoEs_s $ programDs prog) aho
---        } `mappend` accumho
 
---    let ho' = reprocessHo (hoRules ho) mempty ho
---        ho = hoBuild aho
---        -- XXX do we need to do this? YES!
---    let-- rules' = runIdentity $ mapBodies (annotate imapRules (\_ nfo -> return nfo) (\_ -> return) (\_ -> return)) (hoRules ho)
---        --imapRules = choVarMap accumho  `mappend` newVarMap
---        --accumho' = reprocessCho rules' mempty accumho
---    let ds = runIdentity $ annotateDs (choVarMap accumho) (\_ -> return) letann lamann (hoEs ho')
---
---        prog = etaAnnotateProgram (programSetDs ds program { progDataTable = choDataTable accumho `mappend` hoDataTable ho })
---        newVarMap = fromList [ (tvrIdent t,Just (EVar t)) | (t,_) <- programDs prog ]
---
---
---        (mod:_) = Map.keys $ hoExports $ hoExp aho
---
---    --lintCheckProgram (putStrLn "processInitialHo") prog
---    return $ updateCollectedHo $ accumho `mappend` mempty { choVarMap = newVarMap, choExternalNames = idMapToIdSet newVarMap, choHoMap = Map.singleton (show mod) aho { hoBuild = ho { hoEs = programDs prog } } }
-
--- reprocess an old ho to include new rules and properties
-reprocessHo :: Rules -> IdMap Properties -> HoBuild -> HoBuild
-reprocessHo rules ps ho = ho { hoEs = map f (hoEs ho) } where
-    f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
-    g id = runIdentity . idann rules ps id
 
 reprocessCho :: Rules -> IdMap Properties -> CollectedHo -> CollectedHo
 reprocessCho rules ps cho = choHoMap_u (Map.map $ hoBuild_u (hoEs_u (map f))) $ choVarMap_u (fmap h) cho where
@@ -533,8 +491,6 @@ compileModEnv cho = do
             progDataTable = choDataTable cho
             }
         rules' = Rules $ fromList [ (combIdent x,combRules x) | x <- melems (choCombinators cho), not $ null (combRules x) ]
-    --forM_  (melems $ choCombinators cho) $ \comb -> do
-    --    unless (null $ combRules comb) $ print (combHead comb,combRules comb)
 
     -- dump final version of various requested things
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
