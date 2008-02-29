@@ -239,7 +239,7 @@ options.mkd: jhc
 	./jhc --help | sed -e 's/^/    /'  >> $@
 
 manual.html : manual
-	pandoc manual.mkd -s -f markdown -t html -s -c wiki.css -o $@
+	pandoc manual.mkd --toc -s -f markdown -t html -s -c wiki.css -o $@
 
 libs: $(JHC_LIBS)
 
