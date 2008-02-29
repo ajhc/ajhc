@@ -77,9 +77,9 @@ notUsedInfo = UseInfo { useOccurance = Unused, minimumArgs = maxBound }
 
 programPruneOccurance :: Program -> Program
 programPruneOccurance prog =
-    let dsIn = programDs (runIdentity $ programMapBodies (return . subst (tVr (-1) Unknown) Unknown) prog)
+    let dsIn = progCombinators (runIdentity $ programMapBodies (return . subst (tVr (-1) Unknown) Unknown) prog)
         (dsIn',(OMap fvs,uids)) = runReaderWriter (unOM $ collectDs dsIn mempty) (fromList $ map tvrIdent $ progEntryPoints prog)
-    in (programSetDs dsIn' prog) { progFreeIds = idMapToIdSet fvs, progUsedIds = uids }
+    in (progCombinators_s dsIn' prog) { progFreeIds = idMapToIdSet fvs, progUsedIds = uids }
 
 
 newtype OM a = OM (ReaderWriter IdSet (OMap,IdSet) a)
@@ -169,8 +169,8 @@ collectOccurance e = f e  where
         return $ caseUpdate ec { eCaseScrutinee = scrut', eCaseAlts = as', eCaseBind = annbind' fidm b, eCaseType = ct, eCaseDefault = d'}
     f ELetRec { eDefs = ds, eBody = e } = do
         (e',fve) <- grump (f e)
-        ds''' <- collectDs ds fve
-        return (maybeLetRec ds''' e')
+        ds''' <- collectDs (map bindComb ds) fve
+        return (maybeLetRec (map combBind ds''') e')
     f e = error $ "SSimplify.collectOcc.f: " ++ show e
     alt (Alt l e) = do
         (e',fvs) <- grump (f e)
@@ -206,44 +206,47 @@ mapLitBindsM f lc@LitCons { litArgs = es } = do
     return lc { litArgs = es }
 mapLitBindsM f (LitInt e t) = return $  LitInt e t
 
-collectBinding :: Bind -> OM (Bind,OMap)
-collectBinding (t,e) = do
-    e' <- collectOccurance e
-    let rvars = freeVars (Info.fetch (tvrInfo t) :: ARules) :: IdSet
+collectBinding :: Comb -> OM (Comb,OMap)
+collectBinding comb = do
+    e' <- collectOccurance $ combBody comb
+    let rvars = freeVars (combRules comb)  :: IdSet
         romap = OMap (idSetToIdMap (const noUseInfo) rvars)
-    return ((t,e'),romap)
+    return (combBody_s e' comb,romap)
 
 unOMap (OMap x) = x
 
-collectDs :: [Bind] -> OMap -> OM [Bind]
+collectCombs :: [Comb] -> OMap -> OM [Comb]
+collectCombs cs _ = return cs
+
+collectDs :: [Comb] -> OMap -> OM [Comb]
 collectDs ds (OMap fve) = do
     ds' <- mapM (grump . collectBinding) ds
     exp <- ask
-    let graph = newGraph ds' (\ (((t,_),_),_) -> tvrIdent t) (\ ((_,rv),fv) -> mkeys (fv `mappend` rv))
-        rds = reachable graph (mkeys fve ++ [ tvrIdent t | (t,_) <- ds,  (tvrIdent t `member` exp)])
+    let graph = newGraph ds' (\ ((comb,_),_) -> combIdent comb) (\ ((_,rv),fv) -> mkeys (fv `mappend` rv))
+        rds = reachable graph (mkeys fve ++ [ combIdent t | t <- ds,  (combIdent t `member` exp)])
         -- ignore rules when calculating loopbreakers
         -- we must not simplify the expanded body of a rule without recalculating occurance info.
-        graph' = newGraph rds (\ (((t,_),_),_) -> tvrIdent t) (\ (_,fv) -> mkeys fv)
-        (lb,lbds) =  findLoopBreakers (\ (((t,e),_),_) -> loopFunc t e) (const True) graph'
+        graph' = newGraph rds (\ ((comb,_),_) -> combIdent comb) (\ (_,fv) -> mkeys fv)
+        (lb,lbds) =  findLoopBreakers (\ ((comb,_),_) -> loopFunc (combHead comb) (combBody comb)) (const True) graph'
         ds'' = map ( \ ((t,rv),rv') -> (t,rv `mappend` rv') ) lbds
         fids = foldl andOM mempty (fve:map unOMap (snds ds''))
-        ffids = fromList [ (tvrIdent t,lup t) | ((t,_),_) <- ds'' ]
-        cycNodes = (fromList $ [ tvrIdent v | (((v,_),_),_) <- cyclicNodes graph'] :: IdSet)
+        ffids = fromList [ (tvrIdent t,lup t) | (Comb { combHead = t },_) <- ds'' ]
+        cycNodes = (fromList $ [ combIdent c | ((c,_),_) <- cyclicNodes graph'] :: IdSet)
         calcStrictInfo :: TVr -> TVr
         calcStrictInfo t
             | tvrIdent t `member` cycNodes = setProperty prop_CYCLIC t
             | otherwise = t
-        lup t = case tvrIdent t `elem` [ tvrIdent t | (((t,_),_),_) <- lb] of
+        lup t = case tvrIdent t `elem` [ combIdent c | ((c,_),_) <- lb] of
             True -> noUseInfo { useOccurance = LoopBreaker }
             False -> case  (tvrIdent t `member` exp) of
                 True -> noUseInfo
                 False | Just r <- mlookup (tvrIdent t) fids -> r
-        ds''' = [ (calcStrictInfo $ annbind ffids t ,e) | ((t,e),_) <- ds'']
-        froo (t,e) = ((t {tvrType = t' },e),fvs) where
-            (t',fvs) = collectOccurance' (tvrType t)
+        ds''' = [ combHead_s (calcStrictInfo $ annbind ffids (combHead comb)) comb | (comb,_) <- ds'']
+        froo comb = (combHead_s (combHead comb) {tvrType = t' } comb,fvs) where
+            (t',fvs) = collectOccurance' (tvrType $ combHead comb)
         (ds'''',nfids) = unzip $ map froo ds'''
         nfid' = fmap (const noUseInfo) (mconcat nfids)
-    tell $ ((OMap $ nfid' `andOM` fids) S.\\ ffids,fromList (map (tvrIdent . fst) ds''''))
+    tell $ ((OMap $ nfid' `andOM` fids) S.\\ ffids,fromList (map combIdent ds''''))
     return (ds'''')
 
 -- TODO this should use the occurance info
@@ -280,6 +283,7 @@ data SimplifyOpts = SimpOpts {
     so_noInlining :: Bool,                 -- ^ this inhibits all inlining inside functions which will always be inlined
     so_finalPhase :: Bool,                 -- ^ no rules and don't inhibit inlining
     so_boundVars :: IdMap (TVr,E),         -- ^ bound variables
+    so_rules     :: IdMap ARules,
     so_boundVarsCache :: IdSet,
     so_cachedScope :: Env,
     so_dataTable :: DataTable              -- ^ the data table
@@ -288,7 +292,7 @@ data SimplifyOpts = SimpOpts {
 
 cacheSimpOpts opts
     = opts { so_boundVarsCache = idMapToIdSet (so_boundVars opts)
-           , so_cachedScope = cacheSubst (extendScope initScope mempty { envSubst = mapMaybeIdMap bb  (so_boundVars opts) })
+           , so_cachedScope = cacheSubst (extendScope initScope mempty { envSubst = mapMaybeIdMap bb  (so_boundVars opts), envRules = so_rules opts })
            }
     where bb (_,e) | isFullyConst e = Just (Done e)
           bb _ = Nothing
@@ -347,6 +351,7 @@ calcForced finalPhase v =
 data Env = Env {
     envCachedSubst :: IdMap E,
     envSubst :: Subst,
+    envRules :: IdMap ARules,
     envInScope :: IdMap Binding,
     envInScopeCache :: IdMap E
     }
@@ -417,18 +422,18 @@ dosub e = ask >>= \inb ->  coerceOpt return (doSubst' False False (envCachedSubs
 
 simplifyE :: SimplifyOpts -> InE -> (Stat,OutE)
 simplifyE sopts e = (stat,e') where
-    Identity ([(_,e')],stat) =  runStatT $ simplifyDs program sopts [(tvrSilly,e)]
+    Identity ([Comb { combBody = e' }],stat) =  runStatT $ simplifyDs program sopts [bindComb (tvrSilly,e)]
 
 programSSimplify :: SimplifyOpts -> Program -> Program
 programSSimplify sopts prog = let
-    Identity (dsIn,stats) = runStatT $ simplifyDs prog sopts (programDs prog)
-    in (programSetDs dsIn prog) { progStats = progStats prog `mappend` stats }
+    Identity (dsIn,stats) = runStatT $ simplifyDs prog sopts (progCombinators prog)
+    in (progCombinators_s dsIn prog) { progStats = progStats prog `mappend` stats }
 
 programSSimplifyPStat :: SimplifyOpts -> Program -> IO Program
 programSSimplifyPStat sopts prog = do
     setPrintStats True
-    dsIn <- simplifyDs prog sopts (programDs prog)
-    return (programSetDs dsIn prog)
+    dsIn <- simplifyDs prog sopts (progCombinators prog)
+    return (progCombinators_s dsIn prog)
 
 
 type InE = E
@@ -453,20 +458,20 @@ data Cont =
 isApplyTo ApplyTo {} = True
 isApplyTo _ = False
 
-simplifyDs :: forall m . MonadStats m => Program -> SimplifyOpts -> [(TVr,E)] -> m [(TVr,E)]
+simplifyDs :: forall m . MonadStats m => Program -> SimplifyOpts -> [Comb] -> m [Comb]
 simplifyDs prog sopts dsIn = ans where
     finalPhase = so_finalPhase sopts
     ans = do
         let ((dsOut,_),stats) = runSM (so_cachedScope sopts) doit
         mtickStat stats
-        return dsOut
+        return (map bindComb dsOut)
     exportedSet = fromList $ map tvrIdent (progEntryPoints prog) :: IdSet
     getType e = infertype (so_dataTable sopts) e
     doit = do
         smAddNamesIdSet (progUsedIds prog)
         smAddBoundNamesIdSet (progFreeIds prog)
         smAddBoundNamesIdSet (so_boundVarsCache sopts)
-        doDs dsIn
+        doDs (map combBind dsIn)
     makeRange b = do
         sub <- asks envSubst
         return $ susp b sub
@@ -606,12 +611,12 @@ simplifyDs prog sopts dsIn = ans where
                 as'' <- mapM f as
                 d'' <- T.mapM g d
                 t' <- dosub t
-                done cont $ caseUpdate ECase { 
+                done cont $ caseUpdate ECase {
                     eCaseAllFV = error "eCaseAllFV",
-                    eCaseScrutinee = e, 
-                    eCaseType = t', 
-                    eCaseBind = b, 
-                    eCaseAlts = as'', 
+                    eCaseScrutinee = e,
+                    eCaseType = t',
+                    eCaseBind = b,
+                    eCaseAlts = as'',
                     eCaseDefault = d''} -- XXX     -- we duplicate code so continue for next renaming pass before going further.
             doCase ic@ECase { eCaseType = it, eCaseScrutinee = e, eCaseBind =  b, eCaseAlts =  as, eCaseDefault =  d } t b' as' d' | not (isUnboxedTuple it) = do
                 mtick (toAtom "E.Simplify.case-of-case-join")
@@ -708,12 +713,12 @@ simplifyDs prog sopts dsIn = ans where
                 as' <- mapM da as
                 t' <- dosub t
                 t' <- contType cont t'
-                done StartContext $ caseUpdate ECase { 
+                done StartContext $ caseUpdate ECase {
                     eCaseAllFV = error "eCaseAllFV",
-                    eCaseScrutinee = e, 
-                    eCaseType = t', 
-                    eCaseBind =  b', 
-                    eCaseAlts = as', 
+                    eCaseScrutinee = e,
+                    eCaseType = t',
+                    eCaseBind =  b',
+                    eCaseAlts = as',
                     eCaseDefault = d'}
         doCase e t b as d
 
