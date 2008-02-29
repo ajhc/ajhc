@@ -76,14 +76,21 @@ instance HasProperties TVr where
 
 combBody_u f r@Comb{combBody  = x} = r{combBody = f x}
 combHead_u f r@Comb{combHead  = x} = r{combHead = f x}
-combRules_u f r@Comb{combRules  = x} = r{combRules = f x}
+combRules_u f r@Comb{combRules  = x} = cp r{combRules = fx} where
+    cp = if null fx then unsetProperty PROP_HASRULE else setProperty PROP_HASRULE
+    fx = f x
+
 combBody_s v =  combBody_u  (const v)
 combHead_s v =  combHead_u  (const v)
 combRules_s v =  combRules_u  (const v)
+
+
 emptyComb = Comb { combHead = tvr, combBody = Unknown, combRules = [] }
 combIdent = tvrIdent . combHead
 combArgs  = snd . fromLam . combBody
 combABody = fst . fromLam . combBody
+combBind b = (combHead b,combBody b)
+bindComb (t,e) = combHead_s t . combBody_s e $ emptyComb
 combTriple comb = (combHead comb,combArgs comb,combABody comb)
 combTriple_s (t,as,e) comb = comb { combHead = t, combBody = Prelude.foldr ELam e as }
 

@@ -160,6 +160,7 @@ idann rs ps i nfo = return (rules rs i (props ps i nfo)) where
     props ps i = case mlookup i ps of
         Just ps ->  modifyProperties (mappend ps)
         Nothing ->  id
+    rules rs i = id
     rules rs i = case getARules rs i of
         Nothing -> id
         Just x -> \nfo -> Info.insert (x `mappend` Info.fetch nfo) nfo
@@ -177,7 +178,7 @@ processInitialHo accumho aho = do
         (_,orphans) = mpartitionWithKey (\k _ -> k `elem` map tvrIdent newTVrs) rm
 
     let fakeEntry = emptyComb { combRules = concat $ melems orphans }
-        combs =  fakeEntry:[ (emptyComb { combHead = t, combBody = e, combRules = mfindWithDefault [] (tvrIdent t) rm }) | (t,e) <- hoEs (hoBuild aho) ]
+        combs =  fakeEntry:[combRules_s (mfindWithDefault [] (tvrIdent t) rm) (bindComb (t,e))  | (t,e) <- hoEs (hoBuild aho) ]
 
     -- extract new combinators and processed rules
     let choCombinators' = fromList [ (combIdent c,c) | c <- runIdentity $ annotateCombs (choVarMap accumho) (\_ -> return) letann lamann combs]
