@@ -63,7 +63,6 @@ data Comb = Comb {
     combBody :: E,
     combRules :: [Rule]
     }
-    {-!derive: update !-}
 
 instance HasProperties Comb where
     modifyProperties f comb = combHead_u (modifyProperties f) comb
@@ -75,7 +74,12 @@ instance HasProperties TVr where
     getProperties = getProperties . tvrInfo
     putProperties prop =  tvrInfo_u (putProperties prop)
 
-
+combBody_u f r@Comb{combBody  = x} = r{combBody = f x}
+combHead_u f r@Comb{combHead  = x} = r{combHead = f x}
+combRules_u f r@Comb{combRules  = x} = r{combRules = f x}
+combBody_s v =  combBody_u  (const v)
+combHead_s v =  combHead_u  (const v)
+combRules_s v =  combRules_u  (const v)
 emptyComb = Comb { combHead = tvr, combBody = Unknown, combRules = [] }
 combIdent = tvrIdent . combHead
 combArgs  = snd . fromLam . combBody
@@ -267,3 +271,6 @@ eHash = ESort EHash
 tVr x y = tvr { tvrIdent = x, tvrType = y }
 tvr = TVr { tvrIdent = 0, tvrType = Unknown, tvrInfo = Info.empty }
 
+
+
+--  Imported from other files :-

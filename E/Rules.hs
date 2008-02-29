@@ -10,6 +10,7 @@ module E.Rules(
     fromRules,
     getARules,
     mapRules,
+    mapRBodyArgs,
     makeRule,
     mapABodiesArgs,
     ruleHeadFreeVars,
@@ -152,6 +153,14 @@ mapABodies g ARules { aruleRules = rs } = do
             return rule { ruleBody = b }
     rs' <- mapM f rs
     return $ arules $ rs'
+
+mapRBodyArgs :: Monad m => (E -> m E) -> Rule -> m Rule
+mapRBodyArgs g r = do
+    let f rule = do
+            b <- g (ruleBody rule)
+            as <- mapM g (ruleArgs rule)
+            return rule { ruleArgs = as, ruleBody = b }
+    f r
 
 mapABodiesArgs :: Monad m => (E -> m E) -> ARules -> m ARules
 mapABodiesArgs g ARules { aruleRules = rs } = do

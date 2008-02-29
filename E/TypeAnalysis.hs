@@ -242,12 +242,16 @@ specializeProgram :: (Stats.MonadStats m) =>
     -> Program
     -> m Program
 specializeProgram doSpecialize unusedRules unusedValues prog = do
-    (nds,_) <- specializeDs doSpecialize SpecEnv { senvUnusedRules = unusedRules, senvUnusedVars = unusedValues, senvDataTable = progDataTable prog, senvArgs = mempty } (programDs prog)
-    return $ programSetDs nds prog
+    (nds,_) <- specializeCombs doSpecialize SpecEnv { senvUnusedRules = unusedRules, senvUnusedVars = unusedValues, senvDataTable = progDataTable prog, senvArgs = mempty } (progCombinators prog)
+    return $ progCombinators_s nds prog
 
 
 repi (ELit LitCons { litName = n, litArgs = [a,b] }) | n == tc_Arrow = EPi tvr { tvrIdent = 0, tvrType = repi a } (repi b)
 repi e = runIdentity $ emapE (return . repi ) e
+
+specializeComb doSpecialize env comb = do
+    ((t,e),nds) <- specializeDef doSpecialize env (combHead comb,combBody comb)
+    return (combHead_s t . combBody_s e $ comb,nds)
 
 specializeDef _ env  (tvr,e) | isUnused env tvr = return ((tvr,EError ("Unused Def: " ++ tvrShowName tvr) (tvrType tvr)), mempty)
 specializeDef _ _ (t,e) | getProperty prop_PLACEHOLDER t = return ((t,e), mempty)
@@ -351,6 +355,18 @@ specializeDs doSpecialize env@SpecEnv { senvUnusedRules = unusedRules, senvDataT
     ds <- mapM f ds
     return (ds,tenv)
 
+--specializeDs :: MonadStats m => DataTable -> Map.Map TVr [Int] -> [(TVr,E)] -> m ([(TVr,E)]
+specializeCombs doSpecialize env@SpecEnv { senvUnusedRules = unusedRules, senvDataTable = dataTable }  ds = do
+    (ds,nenv) <- mapAndUnzipM (specializeComb doSpecialize env) ds
+    let tenv = env { senvArgs = unions nenv `union` senvArgs env }
+        sb = specBody doSpecialize tenv
+    let f comb = do
+            e <- sb (combBody comb)
+            rs <- mapM (mapRBodyArgs sb) (combRules comb)
+            let rs' =  filter ( not . (`member` unusedRules) . ruleUniq) rs
+            return . combBody_s e . combRules_s rs' $ comb
+    ds <- mapM f ds
+    return (ds,tenv)
 
 expandPlaceholder :: Monad m => Comb -> m Comb
 expandPlaceholder comb  | getProperty prop_PLACEHOLDER (combHead comb) = do
