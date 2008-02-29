@@ -421,8 +421,8 @@ solveDs' (Just True) ds fixup wdone = do
 
 {-# NOINLINE analyzeProgram #-}
 analyzeProgram prog = do
-    nds <- solveDs (progDataTable prog) (programDs prog)
-    return $ programSetDs nds prog
+    dsOut <- solveDs (progDataTable prog) (programDs prog)
+    return $ progCombinators_s [ combRules_s rs $ bindComb (t,e) | (t,e) <- dsOut, rs <- [ combRules c | c <- progCombinators prog, combHead c == t]] prog
 
 
 

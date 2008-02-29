@@ -270,8 +270,11 @@ processDecls cho ho' tiData = do
     wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
     wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
 
+    let seasoning = freeVars [ rs | (k,rs) <- massocs rules', k `notMember` defined ] `intersection` defined
+        defined = fromList $ map (tvrIdent . fst) ds :: IdSet
 
     -- our initial program
+    prog <- return prog { progSeasoning = seasoning }
     Identity prog <- return $ programMapDs (\ (t,e) -> return (shouldBeExported (getExports $ hoExp ho') t,e)) $ atomizeApps False (programSetDs ds prog)
 
     -- now we must attach rules to the existing chos, as well as the current ones

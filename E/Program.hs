@@ -39,6 +39,7 @@ data Program = Program {
     progPasses :: [String],       -- ^ record of passes the program goes through
     progUsedIds :: IdSet,         -- ^ filled in by occurance info collection
     progFreeIds :: IdSet,         -- ^ filled in by occurance info collection
+    progSeasoning :: IdSet,       -- ^ these ids are depended on by external names via RULES
     progType    :: ProgramType,
     progStats :: Stats.Stat
     }
@@ -55,6 +56,7 @@ program = Program {
     progPasses = [],
     progUsedIds = mempty,
     progFreeIds = mempty,
+    progSeasoning = mempty,
     progType = MainProgram,
     progStats = mempty
     }
