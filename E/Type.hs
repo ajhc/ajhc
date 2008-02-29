@@ -1,3 +1,5 @@
+-- | The definitions related to jhc core
+
 module E.Type where
 
 import Maybe
@@ -18,6 +20,42 @@ import Name.Names
 import Number
 import Info.Types
 import qualified Info.Info as Info
+
+{-@Internals
+
+# Jhc core normalized forms
+
+Jhc core has a number of 'normalized forms' in which certain invarients are
+met. many routines expect code to be in a certain form, and guarentee theier
+output is also in a given form. The type system also can change with each form
+by adding/removing terms from the PTS axioms and rules.
+
+normalized form alpha
+: There are basically no restrictions other than the code is typesafe, but
+certain constructs that are checked by the type checker are okay when they
+wouldn't otherwise be. In particular, 'newtype' casts still exist at the data
+level.  'enum' scrutinizations are creations may be in terms of the virtual
+constructors rather than the internal representations. let may bind unboxed
+values, which is normaly not allowed.
+
+
+normalized form beta
+: This is like alpha except all data type constructors and case scrutinizations
+are in their final form. As in, newtype coercions are removed, Enums are
+desugared etc. also, 'let' bindings of unboxed values are translated to the
+appropriate 'case' statements. The output of E.FromHs is in this form.
+
+normalized form blue
+: This is the form that most routines work on.
+
+normalized form larry
+: post lambda-lifting
+
+normalized form mangled
+: All polymorphism has been replaced with subtyping
+
+
+-}
 
 -- the type of a supercombinator
 data Comb = Comb {
