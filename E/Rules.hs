@@ -2,7 +2,7 @@ module E.Rules(
     ARules,
     Rule(Rule,ruleHead,ruleBinds,ruleArgs,ruleBody,ruleUniq,ruleName),
     RuleType(..),
-    Rules,
+    Rules(..),
     applyRules,
     arules,
     builtinRule,

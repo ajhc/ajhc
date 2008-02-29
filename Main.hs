@@ -165,6 +165,7 @@ idann rs ps i nfo = return (rules rs i (props ps i nfo)) where
 
 
 
+
 processInitialHo ::
     CollectedHo       -- ^ current accumulated ho
     -> Ho    -- ^ new ho, freshly read from file
@@ -357,7 +358,7 @@ processDecls cho ho' tiData = do
 
         mprog <- return $ etaAnnotateProgram mprog
 
-        mprog <- simplifyProgram sopt "Init-One" (dump FD.CoreMini) mprog
+        mprog <- simplifyProgram sopt "Init-One" coreMini mprog
         mprog <- barendregtProg mprog
 
         -- | this catches more static arguments if we wait until after the initial normalizing simplification pass
@@ -370,7 +371,7 @@ processDecls cho ho' tiData = do
         -- variables back in and replace the variable of case of variables with
         -- the default binding of the case statement.
 
-        mprog <- simplifyProgram sopt "Init-Two-FloatOutCleanup" (dump FD.CoreMini) mprog
+        mprog <- simplifyProgram sopt "Init-Two-FloatOutCleanup" coreMini mprog
         mprog <- barendregtProg mprog
         mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } mprog
 
@@ -881,7 +882,7 @@ transformProgram tp prog = liftIO $ do
         pname xs = '-':xs
         iterate = transformIterate tp
     when dodump $ putErrLn $ "-- " ++ name
-    when (dodump && dump FD.CorePass) $ printProgram prog
+    when (dodump && corePass) $ printProgram prog
     wdump FD.ESize $ printESize ("Before "++name) prog
     let istat = progStats prog
     let ferr e = do
