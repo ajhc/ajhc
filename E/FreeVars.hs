@@ -125,6 +125,9 @@ instance FreeVars ARules IdSet where
 instance FreeVars Comb IdSet where
     freeVars a = freeVars (combBody a) `union` (freeVars $ combRules a)
 
+instance FreeVars Comb [Id] where
+    freeVars a = toList $ (freeVars a :: IdSet)
+
 -- | we delete the free variables of the heads of a rule from the rule's free
 -- variables. the reason for doing this is that the rule cannot fire if all its
 -- heads are in scope, and if it were not done then many functions seem
