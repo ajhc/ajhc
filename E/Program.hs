@@ -63,6 +63,9 @@ program = Program {
 programDs :: Program -> [(TVr,E)]
 programDs prog = [ (t,e)  | Comb { combHead = t, combBody = e }  <- progCombinators prog]
 
+progCombinators_u f prog = programUpdate prog { progCombinators = f $ progCombinators prog }
+progCombinators_s cs prog = programUpdate prog { progCombinators = cs }
+
 programUpdate ::  Program -> Program
 programUpdate prog = check prog where
     ds = progCombinators prog
@@ -85,9 +88,6 @@ programSetDs ds prog = prog {
           | otherwise = tvr
     mp = Map.fromList [ (tvrIdent t,t) | (t,_) <- ds ]
 
-programAddDs :: [(TVr,E)] -> Program -> Program
-programAddDs ds prog = prog { progCombinators = [ emptyComb { combHead = t, combBody = e } | (t,e) <- ds ] ++ progCombinators prog }
-
 programE :: Program -> E
 programE prog = ELetRec (programDs prog) (EVar (progMainEntry prog))
 
@@ -99,13 +99,16 @@ programEsMap prog = do
     xs <- mapM f (programDs prog)
     return (Map.fromList xs)
 
+programMapBodies :: Monad m => (E -> m E) -> Program -> m Program
 programMapBodies f prog = do
-     ds <- sequence [ f e >>= return . (,) t | (t,e) <- programDs prog ]
-     return $ programSetDs ds prog
+    let f' (t,e) = f e >>= \e' -> return (t,e')
+    programMapDs f' prog
 
 programMapDs f prog = do
-     ds <- mapM f (programDs prog)
-     return $ programSetDs ds prog
+    cs <- forM (progCombinators prog) $ \comb -> do
+        (t,e) <- f (combHead comb,combBody comb)
+        return . combHead_s t . combBody_s e $ comb
+    return $ progCombinators_s cs prog
 
 programMapDs_ f prog = mapM_ f (programDs prog)
 

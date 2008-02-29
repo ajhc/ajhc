@@ -25,9 +25,25 @@ annotateCombs :: Monad m =>
     -> m [Comb]
 
 annotateCombs imap idann letann lamann ds = do
-    let ds' = [ (combHead c,combBody c) | c <- ds]
-    ELetRec { eDefs = ds'', eBody = Unknown } <- annotate imap idann letann lamann (ELetRec ds' Unknown)
-    return [ combBody_s y . combHead_s x $ emptyComb | (x,y) <- ds'']
+
+    cs <- forM ds $ \comb -> do
+        nfo <- letann (combBody comb) (tvrInfo $ combHead comb)
+        nt <- annotate imap idann letann lamann (tvrType  $ combHead comb)
+        return $ combHead_u (tvrInfo_s nfo . tvrType_s nt) comb
+    let nimap = fromList [ (combIdent c, Just . EVar $ combHead c) | c <- cs ] `mappend` imap
+    cs <- forM cs $ \comb -> do
+        rs <- forM (combRules comb) $ \r -> do
+            r' <- annotate nimap idann letann lamann $ ruleBody r
+            return r { ruleBody = r' }
+        nb <- annotate nimap idann letann lamann (combBody comb)
+        return . combRules_s rs . combBody_s nb $ comb
+    return cs
+
+
+    --let ds' = [ (combHead c,combBody c) | c <- ds]
+    --ELetRec { eDefs = ds'', eBody = Unknown } <- annotate imap idann letann lamann (ELetRec ds' Unknown)
+    -- TODO. slow
+    --return [ combBody_s y . combHead_s x $ c | c <- ds, (x,y) <- ds'', x == combHead c]
 
 annotateDs :: Monad m =>
     (IdMap (Maybe E))
