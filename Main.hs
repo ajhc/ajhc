@@ -253,9 +253,9 @@ processDecls cho ho' tiData = do
  --   sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 
     -- Build rules from instances, specializations, and user specified rules and catalysts
-    rules' <- createInstanceRules fullDataTable (hoClassHierarchy $ hoBuild ho')  (ds `mappend` hoEs (hoBuild ho))
-    nrules <- convertRules (progModule prog) tiData (hoClassHierarchy  $ hoBuild ho') allAssumps fullDataTable decls
-    (nds,srules) <- procAllSpecs (tiCheckedRules tiData) ds
+    instanceRules <- createInstanceRules fullDataTable (hoClassHierarchy $ hoBuild ho')  (ds `mappend` hoEs (hoBuild ho))
+    userRules <- convertRules (progModule prog) tiData (hoClassHierarchy  $ hoBuild ho') allAssumps fullDataTable decls
+    (nds,specializeRules) <- procAllSpecs (tiCheckedRules tiData) ds
 
     ds <- return $ ds ++ nds
     wdump FD.CoreInitial $
@@ -264,26 +264,25 @@ processDecls cho ho' tiData = do
     wdump FD.CoreInitial $
         mapM_ (\(v,lc) -> printCheckName'' fullDataTable v lc) ds
 
-    let rules = rules' `mappend` nrules `mappend` srules
+    let rules@(Rules rules') = instanceRules `mappend` userRules `mappend` specializeRules
 
     wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
     wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
     wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
 
-    let allRules = hoRules (hoBuild ho) `mappend` rules
 
-    -- some more useful values.
-    --let  namesInscope = fromList $ [ tvrIdent n | (n,_) <- Map.elems $ hoEs ho ] ++ [tvrIdent n | (n,_) <- ds ]
+    -- our initial program
+    Identity prog <- return $ programMapDs (\ (t,e) -> return (shouldBeExported (getExports $ hoExp ho') t,e)) $ atomizeApps False (programSetDs ds prog)
 
-    let prog' = programSetDs ds prog
-    let Identity prog = programMapDs (\ (t,e) -> return (shouldBeExported (getExports $ hoExp ho') t,e)) $ atomizeApps False prog'
-    prog <- barendregtProg prog
-    let allProps = munionWith mappend theProps (idSetToIdMap (const (singleton prop_HASRULE)) (ruleHeadFreeVars allRules))
-
-    cho <- evaluate $ reprocessCho rules allProps cho
+    -- now we must attach rules to the existing chos, as well as the current ones
+    let addRule c = case mlookup (combIdent c) rules' of
+            Nothing -> c
+            Just rs -> combRules_u (List.union rs) c
+    prog <- return $ progCombinators_u (map addRule) prog
+    cho <- return $ choCombinators_u (fmap addRule) cho
 
     -- Here we substitute in all the original types, with rules and properties defined in the current module included
-    prog <- return $ runIdentity $ annotateProgram (choVarMap cho) (idann allRules allProps) letann lamann prog
+    prog <- return $ runIdentity $ annotateProgram (choVarMap cho) (idann mempty theProps) letann lamann prog
 
     lintCheckProgram (putErrLn "LintPostProcess") prog
 
@@ -446,7 +445,7 @@ processDecls cho ho' tiData = do
         (mod:_) = Map.keys $ hoExports $ hoExp ho'
     return (mempty {
         choHoMap = Map.singleton (show mod) ho' { hoBuild = newHoBuild},
-        choCombinators = fromList $ [ (tvrIdent t,emptyComb { combHead = t, combBody = e }) | (t,e) <- hoEs newHoBuild ],
+        choCombinators = fromList $ [ (combIdent c,c) | c <- progCombinators prog ],
         choExternalNames = idMapToIdSet newMap,
         choVarMap = newMap
         } `mappend` cho,ho' { hoBuild = newHoBuild })
