@@ -16,41 +16,44 @@ import Info.Info(Info)
 import Util.SetLike
 import Util.HasSize
 
-annotateCombs :: Monad m =>
+annotateCombs :: forall m . Monad m =>
     (IdMap (Maybe E))
     -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
-    -> (E -> Info -> m Info) -- ^ annotate letbound bindings
-    -> (E -> Info -> m Info) -- ^ annotate lambdabound bindings
-    -> [Comb]            -- ^ terms to annotate
+    -> (E -> Info -> m Info)    -- ^ annotate letbound bindings
+    -> (E -> Info -> m Info)    -- ^ annotate lambdabound bindings
+    -> [Comb]                   -- ^ terms to annotate
     -> m [Comb]
 
-annotateCombs imap idann letann lamann ds = do
-
-    cs <- forM ds $ \comb -> do
+annotateCombs imap idann letann lamann cs = do
+    cs <- forM cs $ \comb -> do
         nfo <- letann (combBody comb) (tvrInfo $ combHead comb)
         nt <- annotate imap idann letann lamann (tvrType  $ combHead comb)
         return $ combHead_u (tvrInfo_s nfo . tvrType_s nt) comb
     let nimap = fromList [ (combIdent c, Just . EVar $ combHead c) | c <- cs ] `mappend` imap
-    cs <- forM cs $ \comb -> do
-        rs <- forM (combRules comb) $ \r -> do
-            r' <- annotate nimap idann letann lamann $ ruleBody r
-            return r { ruleBody = r' }
-        nb <- annotate nimap idann letann lamann (combBody comb)
+        f :: (IdMap (Maybe E)) -> E -> m E
+        f ni e = annotate ni idann letann lamann e
+    let mrule :: Rule -> m Rule
+        mrule r = do
+            let g tvr = do
+                nfo <- idann (tvrIdent tvr) (tvrInfo tvr)
+                let ntvr = tvr { tvrInfo = nfo }
+                return (ntvr,minsert (tvrIdent tvr) (Just $ EVar ntvr))
+            bs <- mapM g $ ruleBinds r
+            let nnimap = (foldr (.) id $ snds bs) nimap :: IdMap (Maybe E)
+            args <- mapM (f nnimap) (ruleArgs r)
+            body <- (f nnimap) (ruleBody r)
+            return r { ruleBinds = fsts bs, ruleBody = body, ruleArgs = args }
+    forM cs $ \comb -> do
+        rs <- mapM mrule (combRules comb)
+        nb <- f nimap (combBody comb)
         return . combRules_s rs . combBody_s nb $ comb
-    return cs
-
-
-    --let ds' = [ (combHead c,combBody c) | c <- ds]
-    --ELetRec { eDefs = ds'', eBody = Unknown } <- annotate imap idann letann lamann (ELetRec ds' Unknown)
-    -- TODO. slow
-    --return [ combBody_s y . combHead_s x $ c | c <- ds, (x,y) <- ds'', x == combHead c]
 
 annotateDs :: Monad m =>
     (IdMap (Maybe E))
-    -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
-    -> (E -> Info -> m Info) -- ^ annotate letbound bindings
-    -> (E -> Info -> m Info) -- ^ annotate lambdabound bindings
-    -> [(TVr,E)]            -- ^ terms to annotate
+    -> (Id -> Info -> m Info)  -- ^ annotate based on Id map
+    -> (E -> Info -> m Info)   -- ^ annotate letbound bindings
+    -> (E -> Info -> m Info)   -- ^ annotate lambdabound bindings
+    -> [(TVr,E)]               -- ^ terms to annotate
     -> m [(TVr,E)]
 
 annotateDs imap idann letann lamann ds = do
@@ -62,19 +65,21 @@ annotateProgram :: Monad m =>
     -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
     -> (E -> Info -> m Info)    -- ^ annotate letbound bindings
     -> (E -> Info -> m Info)    -- ^ annotate lambdabound bindings
-    -> Program                -- ^ terms to annotate
+    -> Program                  -- ^ terms to annotate
     -> m Program
 annotateProgram imap idann letann lamann prog = do
     ds <- annotateCombs imap idann letann lamann (progCombinators prog)
     return $ programUpdate $ prog { progCombinators = ds }
 
 
+type AM m = ReaderT (IdMap (Maybe E)) m
+
 annotate :: Monad m =>
     (IdMap (Maybe E))
     -> (Id -> Info -> m Info)   -- ^ annotate based on Id map
-    -> (E -> Info -> m Info) -- ^ annotate letbound bindings
-    -> (E -> Info -> m Info) -- ^ annotate lambdabound bindings
-    ->  E            -- ^ term to annotate
+    -> (E -> Info -> m Info)    -- ^ annotate letbound bindings
+    -> (E -> Info -> m Info)    -- ^ annotate lambdabound bindings
+    ->  E                       -- ^ term to annotate
     -> m E
 annotate imap idann letann lamann e = runReaderT (f e) imap where
     f eo@(EVar tvr@(TVr { tvrIdent = i, tvrType =  t })) = do
