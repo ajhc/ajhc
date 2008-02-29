@@ -352,18 +352,20 @@ specializeDs doSpecialize env@SpecEnv { senvUnusedRules = unusedRules, senvDataT
     return (ds,tenv)
 
 
-expandPlaceholder :: Monad m => (TVr,E) -> m (TVr,E)
-expandPlaceholder (tvr,oe) | getProperty prop_PLACEHOLDER tvr = do
-    let rules = filter isBodyRule $  rulesFromARules $ Info.fetch (tvrInfo tvr)
+expandPlaceholder :: Monad m => Comb -> m Comb
+expandPlaceholder comb  | getProperty prop_PLACEHOLDER (combHead comb) = do
+    let rules = filter isBodyRule $  combRules comb
+        tvr = combHead comb
         isBodyRule Rule { ruleBody = e } | (EVar vv,_) <- fromAp e, getProperty prop_INSTANCE vv = True
         isBodyRule _ = False
-    if null rules then return (unsetProperty prop_PLACEHOLDER tvr, EError ("Placeholder, no bodies: " ++ tvrShowName tvr) (getType tvr)) else do
-    let (oe',as) = fromLam oe
+    let mcomb nb = (combBody_s nb  . combHead_u (unsetProperty prop_PLACEHOLDER) $ comb)
+    if null rules then return (mcomb $  EError ("Placeholder, no bodies: " ++ tvrShowName tvr) (getType tvr)) else do
+    let (oe',as) = fromLam $ combBody comb
         rule1:_ = rules
         ct = getType $ foldr ELam oe' (drop (length $ ruleArgs rule1) as)
         as'@(a:ras)
                 | (a:ras) <- take (length $ ruleArgs rule1) as = (a:ras)
-                | otherwise = error $ pprint (tvr,(oe,show rule1))
+                | otherwise = error $ pprint (tvr,(combBody comb,show rule1))
         ne = emptyCase {
             eCaseScrutinee = EVar a,
             eCaseAlts = map calt rules,
@@ -372,14 +374,9 @@ expandPlaceholder (tvr,oe) | getProperty prop_PLACEHOLDER tvr = do
             }
         calt rule@Rule { ruleArgs = (arg:rs) } = Alt vp (substMap (fromList [ (tvrIdent v,EVar r) | ~(EVar v) <- rs | r <- ras ]) $ ruleBody rule) where
             Just vp = eToPat arg
-    return (unsetProperty prop_PLACEHOLDER tvr,foldr ELam ne as')
+    return (mcomb (foldr ELam ne as'))
 
 expandPlaceholder _x = fail "not placeholder"
-
-
-
-
-
 
 
 
