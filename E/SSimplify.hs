@@ -282,21 +282,22 @@ orMany xs = f (filter ((/= Unused) . useOccurance) xs) where
 data SimplifyOpts = SimpOpts {
     so_noInlining :: Bool,                 -- ^ this inhibits all inlining inside functions which will always be inlined
     so_finalPhase :: Bool,                 -- ^ no rules and don't inhibit inlining
-    so_boundVars :: IdMap (TVr,E),         -- ^ bound variables
-    so_rules     :: IdMap ARules,
+    so_boundVars :: IdMap Comb,         -- ^ bound variables
     so_boundVarsCache :: IdSet,
     so_cachedScope :: Env,
     so_dataTable :: DataTable              -- ^ the data table
     }
     {-! derive: Monoid !-}
 
-cacheSimpOpts opts
-    = opts { so_boundVarsCache = idMapToIdSet (so_boundVars opts)
-           , so_cachedScope = cacheSubst (extendScope initScope mempty { envSubst = mapMaybeIdMap bb  (so_boundVars opts), envRules = so_rules opts })
-           }
-    where bb (_,e) | isFullyConst e = Just (Done e)
-          bb _ = Nothing
-          initScope = fmap (\ (t,e) -> fixInline (so_finalPhase opts) t $ isBoundTo noUseInfo e) (so_boundVars opts)
+cacheSimpOpts opts = opts {
+    so_boundVarsCache = idMapToIdSet (so_boundVars opts),
+    so_cachedScope = cacheSubst (extendScope initScope mempty { envSubst = mapMaybeIdMap bb  (so_boundVars opts), envRules = rules })
+   } where
+    bb Comb { combBody = e } | isFullyConst e = Just (Done e)
+    bb _ = Nothing
+    initScope = fmap (\ c -> fixInline (so_finalPhase opts) (combHead c) $ isBoundTo noUseInfo (combBody c)) (so_boundVars opts)
+    rules = mapMaybeIdMap f (so_boundVars opts)
+    f Comb { combRules = rs } = if null rs then Nothing else Just $ arules rs
 
 
 data Range = Done OutE | Susp InE Subst OutE -- cached result
@@ -464,7 +465,7 @@ simplifyDs prog sopts dsIn = ans where
     ans = do
         let ((dsOut,_),stats) = runSM (so_cachedScope sopts) doit
         mtickStat stats
-        return (map bindComb dsOut)
+        return [ combRules_s rs $ bindComb (t,e) | (t,e) <- dsOut, rs <- [ combRules c | c <- dsIn, combHead c == t]]
     exportedSet = fromList $ map tvrIdent (progEntryPoints prog) :: IdSet
     getType e = infertype (so_dataTable sopts) e
     doit = do
@@ -774,7 +775,7 @@ simplifyDs prog sopts dsIn = ans where
                 Just IsBoundTo { bindingE = e } -> Just e
                 _ -> Nothing
         case z of
-            Nothing | fopts FO.Rules -> applyRules lup (Info.fetch (tvrInfo v)) xs
+            Nothing | fopts FO.Rules -> applyRules lup (mfindWithDefault mempty (tvrIdent v) $ envRules inb) xs
             x -> return x
     done cont e = z cont [] where
         z (ApplyTo r cont') rs = evalRange r >>= \a -> z cont' (a:rs)

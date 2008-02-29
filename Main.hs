@@ -306,7 +306,7 @@ processDecls cho ho' tiData = do
     -- floating inward
 
     let sopt = SS.cacheSimpOpts mempty {
-            SS.so_boundVars = fromList [ (tvrIdent v,(v,e)) | (v,e) <- hoEs $ hoBuild ho],
+            SS.so_boundVars = choCombinators cho,
             SS.so_dataTable = fullDataTable
             }
     let tparms = transformParms {
@@ -385,9 +385,10 @@ processDecls cho ho' tiData = do
         liftIO $ when coreMini $ putErrLn ("----\n" ++ names)
         smap <- get
         let tparms = transformParms { transformPass = "OptWW", transformDumpProgress = coreMini }
-            sopt = SS.cacheSimpOpts mempty {  SS.so_boundVars = smap,
-                                              SS.so_boundVarsCache = idMapToIdSet smap,
-                                              SS.so_dataTable = progDataTable mprog }
+            sopt = SS.cacheSimpOpts mempty {
+                SS.so_boundVars = smap,
+                SS.so_dataTable = progDataTable mprog
+                }
 
         mprog <- simplifyProgram sopt "Simplify-One" coreMini mprog
         mprog <- barendregtProg mprog
@@ -416,7 +417,7 @@ processDecls cho ho' tiData = do
         mprog <- Demand.analyzeProgram mprog
         mprog <- return $ E.CPR.cprAnalyzeProgram mprog
 
-        put $ fromList [ (tvrIdent v,(v,lc)) | (v,lc) <- programDs mprog] `S.union` smap
+        put $ fromList [ (combIdent c,c) | c <- progCombinators mprog] `S.union` smap
 
         liftIO $ wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
         return mprog
