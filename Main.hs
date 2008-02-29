@@ -1,5 +1,5 @@
 
-module Main(main,compileModEnv') where
+module Main(main) where
 
 import Control.Exception
 import Control.Monad.Identity
@@ -9,7 +9,7 @@ import IO(hFlush,stderr,stdout)
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified List(group)
+import qualified List(group,union)
 import qualified System
 
 import Util.Util
@@ -131,7 +131,7 @@ processFiles [] | Just (b,m) <- optMainFunc options = do
 processFiles cs = do processFilesModules (map fileOrModule cs)
 
 processFilesModules fs = do
-    compileModEnv' =<< parseFiles fs processInitialHo processDecls
+    compileModEnv =<< parseFiles fs processInitialHo processDecls
 
 fileOrModule f = case reverse f of
                    ('s':'h':'.':_)     -> Right f
@@ -139,7 +139,8 @@ fileOrModule f = case reverse f of
                    _                   -> Left $ Module f
 
 
-barendregtProg prog = transformProgram transBarendregt prog
+--barendregtProg prog = transformProgram transBarendregt prog
+barendregtProg prog = return prog
 
 transBarendregt = transformParms {
         transformCategory = "Barendregt",
@@ -171,19 +172,29 @@ processInitialHo ::
     -> Ho    -- ^ new ho, freshly read from file
     -> IO CollectedHo -- ^ final combined ho data.
 processInitialHo accumho aho = do
-    let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- newTVrs ]) (choVarMap accumho)
+    let Rules rm = hoRules $ hoBuild aho
         newTVrs = fsts $ hoEs (hoBuild aho)
-    let choCombinators = fromList [ (combIdent c,c) | c <- runIdentity $ annotateCombs (choVarMap accumho) (\_ -> return) letann lamann combs]
-        combs = [ (emptyComb { combHead = t, combBody = e }) | (t,e) <- hoEs (hoBuild aho) ]
-        (mod:_) = Map.keys $ hoExports $ hoExp aho
+        (_,orphans) = mpartitionWithKey (\k _ -> k `elem` map tvrIdent newTVrs) rm
 
+    let fakeEntry = emptyComb { combRules = concat $ melems orphans }
+        combs =  fakeEntry:[ (emptyComb { combHead = t, combBody = e, combRules = mfindWithDefault [] (tvrIdent t) rm }) | (t,e) <- hoEs (hoBuild aho) ]
+
+    -- extract new combinators and processed rules
+    let choCombinators' = fromList [ (combIdent c,c) | c <- runIdentity $ annotateCombs (choVarMap accumho) (\_ -> return) letann lamann combs]
+        nrules = combRules $ mfindWithDefault emptyComb emptyId choCombinators'
+        reRule :: Comb -> Comb
+        reRule comb = combRules_u f comb where
+            f rs = List.union  rs [ x | x <- nrules, ruleHead x == combHead comb]
+
+    let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- map combHead $ melems choCombs ]) (choVarMap accumho)
+        choCombs = mfilterWithKey (\k _ -> k /= emptyId) choCombinators'
+        (mod:_) = Map.keys $ hoExports $ hoExp aho
     return $ mempty {
         choVarMap = finalVarMap,
-        choExternalNames = fromList . map tvrIdent $ newTVrs,
-        choCombinators = choCombinators,
-        --choHoMap = Map.singleton (show mod) $ hoBuild_u (hoEs_s ds') aho
-        choHoMap = Map.singleton (show mod) aho
-        } `mappend` accumho
+        choExternalNames = choExternalNames accumho `mappend` (fromList . map tvrIdent $ newTVrs),
+        choCombinators = choCombs `mappend` fmap reRule (choCombinators accumho),
+        choHoMap = Map.singleton (show mod) aho `mappend` choHoMap accumho
+        }
 
         --reRule x = if isEmpty orphanRules then x else fmap (fmap rr) x where
 --        reRule x = fmap (fmap rr) x where
@@ -356,7 +367,7 @@ processDecls cho ho' tiData = do
         let tparms = transformParms { transformPass = "Init", transformDumpProgress = coreMini }
 
 
-        mprog <- return $ etaAnnotateProgram mprog
+        mprog <- evaluate $ etaAnnotateProgram mprog
 
         mprog <- simplifyProgram sopt "Init-One" coreMini mprog
         mprog <- barendregtProg mprog
@@ -481,8 +492,8 @@ processDecls cho ho' tiData = do
         } `mappend` cho,ho' { hoBuild = newHoBuild })
 
 programPruneUnreachable :: Program -> Program
-programPruneUnreachable prog = programSetDs ds' prog where
-    ds' = reachable (newGraph (programDs prog) (tvrIdent . fst) (\ (t,e) -> idSetToList $ bindingFreeVars t e)) (map tvrIdent $ progEntryPoints prog)
+programPruneUnreachable prog = progCombinators_s ds' prog where
+    ds' = reachable (newGraph (progCombinators prog) combIdent freeVars) (map tvrIdent $ progEntryPoints prog)
 
 programPrune :: Program -> IO Program
 programPrune prog = transformProgram transformParms { transformCategory = "PruneUnreachable", transformDumpProgress  = miniCorePass, transformOperation = evaluate . programPruneUnreachable } prog
@@ -512,16 +523,18 @@ isInteractive = do
 
 transTypeAnalyze = transformParms { transformCategory = "typeAnalyze",  transformOperation = typeAnalyze True }
 
-compileModEnv' cho = do
+compileModEnv cho = do
     if optMode options == CompileHo then return () else do
 
     let dataTable = progDataTable prog
-        rules = choRules cho
         prog = programUpdate program {
             progCombinators = melems $ choCombinators cho,
             progClassHierarchy = choClassHierarchy cho,
             progDataTable = choDataTable cho
             }
+        rules' = Rules $ fromList [ (combIdent x,combRules x) | x <- melems (choCombinators cho), not $ null (combRules x) ]
+    --forM_  (melems $ choCombinators cho) $ \comb -> do
+    --    unless (null $ combRules comb) $ print (combHead comb,combRules comb)
 
     -- dump final version of various requested things
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
@@ -531,9 +544,9 @@ compileModEnv' cho = do
     when (dump FD.Class) $ do
         putStrLn "  ---- class hierarchy ---- "
         printClassHierarchy (choClassHierarchy cho)
-    wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
-    wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
-    wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
+    wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules'
+    wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules'
+    wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules'
 
     -- enter interactive mode
     int <- isInteractive
@@ -546,13 +559,13 @@ compileModEnv' cho = do
 
     let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
     esmap <- programEsMap prog
-    (_,main,mainv) <- getMainFunction dataTable mainFunc esmap
+    (main,mainv) <- getMainFunction dataTable mainFunc esmap
     let ffiExportNames = [tv | tv <- map combHead $  progCombinators prog,
                                name <- tvrName tv,
                                "FE@" `isPrefixOf` show name]
     prog <- return prog { progMainEntry   = main,
                           progEntryPoints = (main:ffiExportNames),
-                          progCombinators = emptyComb { combHead = main, combBody = mainv }:map (combHead_u (unsetProperty prop_EXPORTED)) (progCombinators prog)
+                          progCombinators = emptyComb { combHead = main, combBody = mainv }:map (unsetProperty prop_EXPORTED) (progCombinators prog)
                         }
     prog <- transformProgram transformParms { transformCategory = "PruneUnreachable", transformOperation = evaluate . programPruneUnreachable } prog
     prog <- barendregtProg prog
@@ -576,13 +589,13 @@ compileModEnv' cho = do
     --wdump FD.Core $ printProgram prog
 
     cmethods <- do
-        let es' = concatMap expandPlaceholder (programDs prog)
-        es' <- return [ (y,floatInward z) |  (y,z) <- es' ]
+        let es' = concatMap expandPlaceholder (progCombinators prog)
+        es' <- return [ combBody_u floatInward e |  e <- es' ]
         wdump FD.Class $ do
-            sequence_ [ printCheckName' dataTable y z |  (y,z) <- es']
+            sequence_ [ printCheckName' dataTable (combHead x) (combBody x) |  x <- es']
         return es'
 
-    prog <- evaluate $ programSetDs ([ (t,e) | (t,e) <- programDs prog, t `notElem` fsts cmethods] ++ cmethods) prog
+    prog <- evaluate $ progCombinators_s ([ p | p <- progCombinators prog, combHead p `notElem` map combHead cmethods] ++ cmethods) prog
 
 
     prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) letann (\_ nfo -> return nfo) prog

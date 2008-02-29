@@ -356,7 +356,7 @@ expandPlaceholder :: Monad m => Comb -> m Comb
 expandPlaceholder comb  | getProperty prop_PLACEHOLDER (combHead comb) = do
     let rules = filter isBodyRule $  combRules comb
         tvr = combHead comb
-        isBodyRule Rule { ruleBody = e } | (EVar vv,_) <- fromAp e, getProperty prop_INSTANCE vv = True
+        isBodyRule Rule { ruleType = RuleSpecialization } = True
         isBodyRule _ = False
     let mcomb nb = (combBody_s nb  . combHead_u (unsetProperty prop_PLACEHOLDER) $ comb)
     if null rules then return (mcomb $  EError ("Placeholder, no bodies: " ++ tvrShowName tvr) (getType tvr)) else do

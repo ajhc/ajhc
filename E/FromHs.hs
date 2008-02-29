@@ -155,7 +155,7 @@ argTypes' :: E -> ([E],E)
 argTypes' e = let (x,y) = fromPi e in (map tvrType y,x)
 
 
-getMainFunction :: Monad m => DataTable -> Name -> (Map.Map Name (TVr,E)) -> m (Name,TVr,E)
+getMainFunction :: Monad m => DataTable -> Name -> (Map.Map Name (TVr,E)) -> m (TVr,E)
 getMainFunction dataTable name ds = do
   mt <- case Map.lookup name ds of
     Just x -> return x
@@ -163,7 +163,7 @@ getMainFunction dataTable name ds = do
   let funcs = runIdentity $ T.mapM (\n -> return . EVar . fst $ runEither (show n) $ Map.lookup n ds) sFuncNames
   nameToEntryPoint dataTable (fst mt) (toName Name.Val "theMain") Nothing funcs
 
-nameToEntryPoint :: Monad m => DataTable -> TVr -> Name -> Maybe FfiExport -> FuncNames E -> m (Name,TVr,E)
+nameToEntryPoint :: Monad m => DataTable -> TVr -> Name -> Maybe FfiExport -> FuncNames E -> m (TVr,E)
 nameToEntryPoint dataTable main cname ffi ds = ans where
     ans = do
         let runMain      = func_runMain ds
@@ -181,7 +181,7 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
             tvm@(TVr { tvrType =  ty}) =  main
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs, sortKindLike k ]
             (_,xs) = fromPi ty
-        return (cname, tvrInfo_u (case ffi of Just ffi -> Info.insert ffi; Nothing -> id) $ setProperty prop_EXPORTED theMainTvr,ne)
+        return (tvrInfo_u (case ffi of Just ffi -> Info.insert ffi; Nothing -> id) $ setProperty prop_EXPORTED theMainTvr,ne)
 
 
 {-# NOINLINE createInstanceRules #-}
