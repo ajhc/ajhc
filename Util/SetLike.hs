@@ -58,6 +58,7 @@ class BuildSet t s => ModifySet t s | s -> t where
     toList :: s -> [t]
     delete :: t -> s -> s
     member :: t -> s -> Bool
+    sfilter :: (t -> Bool) -> s -> s
 
 notMember x t = not $ member x t
 mnotMember x t = not $ mmember x t
@@ -82,9 +83,10 @@ instance BuildSet Int IS.IntSet where
     singleton x = IS.singleton x
 
 instance ModifySet Int IS.IntSet where
-    toList s = IS.toList s
+    toList s   = IS.toList s
     delete x s = IS.delete x s
     member x s = IS.member x s
+    sfilter    = IS.filter
 
 -- normal set
 
@@ -103,9 +105,10 @@ instance Ord a => BuildSet a (S.Set a) where
     singleton x = S.singleton x
 
 instance Ord a => ModifySet a (S.Set a) where
-    toList s = S.toList s
+    toList s   = S.toList s
     member x s = S.member x s
     delete x s = S.delete x s
+    sfilter    = S.filter
 
 -- maps
 
@@ -114,7 +117,7 @@ instance SetLike (IM.IntMap a) where    -- SIC
     intersection = IM.intersection
     union      = IM.union
     unions     = IM.unions
-    sempty      = IM.empty
+    sempty     = IM.empty
 
 
 instance BuildSet (Int,a) (IM.IntMap a) where
@@ -129,7 +132,7 @@ instance Ord a => SetLike (M.Map a b) where
     intersection = M.intersection
     union      = M.union
     unions     = M.unions
-    sempty      = M.empty
+    sempty     = M.empty
 
 instance Ord a => BuildSet (a,b) (M.Map a b) where
     fromList xs = M.fromList xs
@@ -207,5 +210,6 @@ instance Enum a => ModifySet a (EnumSet a) where
     toList (EnumSet s) = map toEnum $ toList s
     member x (EnumSet s) = IS.member (fromEnum x) s
     delete x (EnumSet s) = EnumSet $ IS.delete (fromEnum x) s
+    sfilter f (EnumSet s) = EnumSet $ IS.filter (f . toEnum)  s
 
 
