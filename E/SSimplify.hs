@@ -282,10 +282,11 @@ orMany xs = f (filter ((/= Unused) . useOccurance) xs) where
 data SimplifyOpts = SimpOpts {
     so_noInlining :: Bool,                 -- ^ this inhibits all inlining inside functions which will always be inlined
     so_finalPhase :: Bool,                 -- ^ no rules and don't inhibit inlining
-    so_boundVars :: IdMap Comb,         -- ^ bound variables
+    so_boundVars :: IdMap Comb,            -- ^ bound variables
+    so_forwardVars :: IdSet,               -- ^ variables that we know will exist, but might not yet.
+
     so_boundVarsCache :: IdSet,
-    so_cachedScope :: Env,
-    so_dataTable :: DataTable              -- ^ the data table
+    so_cachedScope :: Env
     }
     {-! derive: Monoid !-}
 
@@ -465,12 +466,15 @@ simplifyDs prog sopts dsIn = ans where
     ans = do
         let ((dsOut,_),stats) = runSM (so_cachedScope sopts) doit
         mtickStat stats
-        return [ combRules_s rs $ bindComb (t,e) | (t,e) <- dsOut, rs <- [ combRules c | c <- dsIn, combHead c == t]]
+        let lupRules t = concat [ combRules c | c <- dsIn, combIdent c == t]
+        return [ combRules_s (lupRules (tvrIdent t)) $ bindComb (t,e) | (t,e) <- dsOut ]
+
     exportedSet = fromList $ map tvrIdent (progEntryPoints prog) :: IdSet
-    getType e = infertype (so_dataTable sopts) e
+    getType e = infertype (progDataTable prog) e
     doit = do
         smAddNamesIdSet (progUsedIds prog)
         smAddBoundNamesIdSet (progFreeIds prog)
+        smAddBoundNamesIdSet (sfilter (`notElem` map combIdent dsIn) $ so_forwardVars sopts)
         smAddBoundNamesIdSet (so_boundVarsCache sopts)
         doDs (map combBind dsIn)
     makeRange b = do
@@ -501,7 +505,7 @@ simplifyDs prog sopts dsIn = ans where
     f cont v | Just (e,t) <- from_unsafeCoerce v =
         makeRange t >>= \t' -> f (g t' cont) e where g t' (Coerce _ cont) = Coerce t' cont ; g t' cont = Coerce t' cont
     f cont ep@EPrim {} = do
-        ep' <- primOpt' (so_dataTable sopts) ep
+        ep' <- primOpt' (progDataTable prog) ep
         ep'' <- dosub ep'
         done cont ep''
     f cont e@ELit {} = dosub e >>= done cont
@@ -629,7 +633,7 @@ simplifyDs prog sopts dsIn = ans where
                     zvar = setProperties [prop_JOINPOINT,prop_ONESHOT] $ tVr n2 (EPi tvr { tvrType = it } (getType rcc))
                 nic <- flip caseBodiesMapM ic $ \body -> return $ eLet cvar body (eAp (EVar zvar) (EVar cvar))
                 done cont $ eLet zvar fbody nic { eCaseType = getType rcc }
-            doCase e t b as@(Alt LitCons { litName = n } _:_) (Just d) | Just nsib <- numberSiblings (so_dataTable sopts) n, nsib <= length as = do
+            doCase e t b as@(Alt LitCons { litName = n } _:_) (Just d) | Just nsib <- numberSiblings (progDataTable prog) n, nsib <= length as = do
                 mtick "E.Simplify.case-no-default"
                 doCase e t b as Nothing
             doCase e t b (a@(Alt LitCons { litName = n } _):_) (Just d) | Just _ <- fromUnboxedNameTuple n = do
@@ -643,9 +647,9 @@ simplifyDs prog sopts dsIn = ans where
                         let g t = do
                                 n <- newName
                                 return $ tVr n t
-                        ts <- mapM g (slotTypes (so_dataTable sopts) n te)
-                        let wtd = ELit $ updateLit (so_dataTable sopts) litCons { litName = n, litArgs = map EVar ts, litType = te }
-                        return $ Alt (updateLit (so_dataTable sopts) litCons { litName = n, litArgs = ts, litType = te }) (eLet b wtd d)
+                        ts <- mapM g (slotTypes (progDataTable prog) n te)
+                        let wtd = ELit $ updateLit (progDataTable prog) litCons { litName = n, litArgs = map EVar ts, litType = te }
+                        return $ Alt (updateLit (progDataTable prog) litCons { litName = n, litArgs = ts, litType = te }) (eLet b wtd d)
                 mtick $ "E.Simplify.case-improve-default.{" ++ show (sort ls) ++ "}"
                 ls' <- mapM ff ls
                 --ec <- dosub $ caseUpdate emptyCase { eCaseScrutinee = e, eCaseType = t, eCaseBind = b, eCaseAlts = as ++ ls' }
@@ -653,7 +657,7 @@ simplifyDs prog sopts dsIn = ans where
                 doCase e t b (as ++ ls') Nothing
                 where
                 te = getType b
-                dt = (so_dataTable sopts)
+                dt = (progDataTable prog)
             doCase e _ b [] (Just d) | not (isLifted e || isUnboxed (getType e)) = do
                 mtick "E.Simplify.case-unlifted"
                 b' <- nname b
@@ -831,7 +835,7 @@ simplifyDs prog sopts dsIn = ans where
         smAddNamesIdSet nn
         return ne
     appVar v xs = do
-        me <- etaExpandAp (so_dataTable sopts) v xs
+        me <- etaExpandAp (progDataTable prog) v xs
         case me of
             Just e -> return e
             Nothing -> app (EVar v,xs)
@@ -903,7 +907,7 @@ simplifyDs prog sopts dsIn = ans where
                 Just (UseInfo { minimumArgs = min }) -> min
                 Nothing -> 0
 
-        ds' <- sequence [ etaExpandDef' (so_dataTable sopts) (minArgs t) t e | (t,e) <- ds']
+        ds' <- sequence [ etaExpandDef' (progDataTable prog) (minArgs t) t e | (t,e) <- ds']
         return (ds',inb')
 
 

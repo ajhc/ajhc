@@ -123,7 +123,8 @@ programMapRecGroups imap idann letann lamann f prog = do
 
 programDecomposedCombs :: Program -> [(Bool,[Comb])]
 programDecomposedCombs prog = map f $ scc g where
-    g = newGraph (progCombinators prog) combIdent ( toList . (union $ progSeasoning prog) . (freeVars :: Comb -> IdSet))
+    --g = newGraph (progCombinators prog) combIdent ( toList . (union $ progSeasoning prog) . (freeVars :: Comb -> IdSet))
+    g = newGraph (progCombinators prog) combIdent ( toList . (freeVars :: Comb -> IdSet))
     f (Left c) = (False,[c])
     f (Right cs) = (True,cs)
 

@@ -298,7 +298,7 @@ processDecls cho ho' tiData = do
 
     let sopt = SS.cacheSimpOpts mempty {
             SS.so_boundVars = choCombinators cho,
-            SS.so_dataTable = fullDataTable
+            SS.so_forwardVars = progSeasoning prog
             }
     let tparms = transformParms {
             transformPass = "PreInit",
@@ -378,7 +378,7 @@ processDecls cho ho' tiData = do
         let tparms = transformParms { transformPass = "OptWW", transformDumpProgress = coreMini }
             sopt = SS.cacheSimpOpts mempty {
                 SS.so_boundVars = smap,
-                SS.so_dataTable = progDataTable mprog
+                SS.so_forwardVars = progSeasoning mprog
                 }
 
         mprog <- simplifyProgram sopt "Simplify-One" coreMini mprog
@@ -804,7 +804,7 @@ simplifyProgram sopt name dodump prog = liftIO $ do
             when (corePass && dodump) $ do
                 putStrLn "-- After Occurance Analysis"
                 printProgram nprog
-            return $ SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } nprog
+            return $ SS.programSSimplify sopt  nprog
     prog <- transformProgram transformParms { transformCategory = "Simplify", transformPass = name, transformIterate = IterateDone, transformDumpProgress = dodump, transformOperation = g } prog { progStats = mempty }
     when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printLStat (optStatLevel options) ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
@@ -819,7 +819,7 @@ simplifyProgramPStat sopt name dodump prog = do
 -}
 simplifyProgram' sopt name dodump iterate prog = do
     let istat = progStats prog
-    let g =  return . SS.programSSimplify sopt { SS.so_dataTable = progDataTable prog } . SS.programPruneOccurance
+    let g =  return . SS.programSSimplify sopt . SS.programPruneOccurance
     prog <- transformProgram transformParms { transformCategory = "Simplify", transformPass = name, transformIterate = iterate, transformDumpProgress = dodump, transformOperation = g } prog { progStats = mempty }
     when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printLStat (optStatLevel options) ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
@@ -932,7 +932,7 @@ lintCheckProgram onerr prog | flint = do
                 Right () -> return ()
             lintCheckE onerr (progDataTable prog) tvr e
     mapM_ f (programDs prog)
-    let ids = progExternalNames prog `mappend` fromList (map tvrIdent $ fsts (programDs prog))
+    let ids = progExternalNames prog `mappend` fromList (map tvrIdent $ fsts (programDs prog)) `mappend` progSeasoning prog
         fvs = Set.fromList $ melems (freeVars $ snds $ programDs prog :: IdMap TVr)
         unaccounted = Set.filter (not . (`member` ids) . tvrIdent) fvs
     unless (Set.null unaccounted) $ do

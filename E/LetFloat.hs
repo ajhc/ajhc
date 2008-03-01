@@ -240,7 +240,7 @@ floatOutward prog = do
             dds [] nrs e imap = ELetRec (concat nrs) (g n e imap)
         g n e imap = runIdentity $ (emapE' (\e -> g' n e imap) e)
         g' n e imap = return $ g n e imap
-    let imap = Map.fromList $ map (\x -> (x,top_level)) ([ tvrIdent t| (t,_) <-  programDs prog ] ++ idSetToList (progExternalNames prog))
+    let imap = Map.fromList $ map (\x -> (x,top_level)) ([ tvrIdent t| (t,_) <-  programDs prog ] ++ idSetToList (progExternalNames prog `mappend` progSeasoning prog))
     prog <- flip programMapDs prog (\ (t,e) -> do
         e' <- letBindAll (progDataTable prog) (progModule prog) e
         return $ tl (t,e') imap)
