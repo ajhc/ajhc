@@ -51,7 +51,7 @@ GHCINC=  -i -i$(srcdir)/drift_processed -i$(srcdir)/drift_processed/FrontEnd \
 	 -i$(srcdir)/. -i$(srcdir)/FrontEnd -odir $(builddir) -hidir $(builddir)
 PACKAGES= -package mtl  -package unix -package QuickCheck -ignore-package lang
 GHCLANG=    -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
-GHCOPTS=  $(HSOPTS)  -O -ignore-package lang  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
+GHCOPTS=  $(HSOPTS) -fbang-patterns -O -ignore-package lang  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
 JHC_LIBS =  base-1.0.hl haskell98-1.0.hl
 

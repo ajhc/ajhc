@@ -41,7 +41,7 @@ data Program = Program {
     progFreeIds :: IdSet,         -- ^ filled in by occurance info collection
     progSeasoning :: IdSet,       -- ^ these ids are depended on by external names via RULES
     progType    :: ProgramType,
-    progStats :: Stats.Stat
+    progStats :: !Stats.Stat
     }
 
 
