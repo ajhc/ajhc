@@ -44,7 +44,7 @@ instance Monoid CollectedHo where
         choExternalNames = choExternalNames a `mappend` choExternalNames b,
         choVarMap = choVarMap a `mergeChoVarMaps` choVarMap b,
         choOrphanRules = choOrphanRules a `mappend` choOrphanRules b,
-        choCombinators = choCombinators a `mappend` choCombinators b,
+        choCombinators = choCombinators a `mergeChoCombinators` choCombinators b,
         choHoMap = Map.union (choHoMap a) (choHoMap b)
         }
 
@@ -54,7 +54,7 @@ choHo cho = hoBuild_u (hoEs_u f) . mconcat . Map.elems $ choHoMap cho where
     g (t,e) = case mlookup (tvrIdent t) (choVarMap cho) of
         Just (Just (EVar t')) -> (t',e)
         _ -> (t,e)
-    ae = runIdentity . annotate (choVarMap cho) (\_ -> return) (\_ -> return) (\_ -> return)
+ --   ae = runIdentity . annotate (choVarMap cho) (\_ -> return) (\_ -> return) (\_ -> return)
 
 -- this will have to merge rules and properties.
 mergeChoVarMaps :: IdMap (Maybe E) -> IdMap (Maybe E) -> IdMap (Maybe E)
@@ -71,7 +71,7 @@ mergeChoVarMaps x y = munionWith f x y where
 -- this will have to merge rules and properties.
 mergeChoCombinators :: IdMap Comb -> IdMap Comb -> IdMap Comb
 mergeChoCombinators x y = munionWith f x y where
-    f c1 c2 = combHead_s (merge (combHead c1) (combHead c2)) c1 { combRules = combRules c1 `Data.List.union`  combRules c2 }
+    f c1 c2 = combRules_s  (combRules c1 `Data.List.union`  combRules c2) . combHead_s (merge (combHead c1) (combHead c2)) $ c1
     merge ta tb = ta { tvrInfo = minfo' }   where
         minfo = tvrInfo ta `mappend` tvrInfo tb
         minfo' = dex (undefined :: Properties) $ minfo
