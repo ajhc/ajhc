@@ -79,7 +79,8 @@ programUpdate prog = check prog where
     names = intercalate "\n"  (sort $ map (show . tvrShowName . combHead) ds)
 
 programSetDs' :: [(TVr,E)] -> Program -> Program
-programSetDs' ds prog = progCombinators_s [ combRules_s rs $ bindComb (t,e) | (t,e) <- ds, rs <- [ combRules c | c <- progCombinators prog, combHead c == t]] prog
+programSetDs' ds prog = progCombinators_s [ combRules_s (lupRules (tvrIdent t)) $ bindComb (t,e) | (t,e) <- ds ] prog where
+    lupRules t = concat [ combRules c | c <- progCombinators prog, combIdent c == t]
 
 programSetDs :: [(TVr,E)] -> Program -> Program
 programSetDs ds prog | flint && hasRepeatUnder (tvrIdent . fst) ds = error $ "programSetDs: program has redundant definitions: \n" ++ intercalate "\n"  (sort $ map (show . tvrShowName . fst) ds)
