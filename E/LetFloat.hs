@@ -272,8 +272,8 @@ floatOutward prog = do
 --        dtl (t,ELetRec ds e) = do
 --            (e',fs) <- runWriterT (dofloat e)
 --            return $ (t,e'):snds fs
-        dtl (t,e) = do
-            (e,fs) <- runWriterT (dofloat e)
+        dtl comb = do
+            (e,fs) <- runWriterT (dofloat $ combBody comb)
             let (e',fs') = case e of
                     ELetRec { eDefs = ds, eBody = e } -> (e,ds++snds fs)
                     _ -> (e,snds fs)
@@ -288,9 +288,9 @@ floatOutward prog = do
             let (fs''',sm') = unzip [ ((n,sm e),(t,EVar n)) | (t,e) <- fs'', let n = nn t ]
                 sm = substLet sm'
                 nn tvr = tvr { tvrIdent = toId $ lfName u (progModule prog) Val (tvrIdent tvr) }
-            return $ (t,sm e''):fs'''
-    (cds,stats) <- runStatT (mapM dtl $ programDs prog)
-    let nprog = programSetDs (concat cds) prog
+            return $ combBody_s (sm e'') comb:map bindComb fs'''
+    (cds,stats) <- runStatT (mapM dtl $ progCombinators prog)
+    let nprog = progCombinators_s (concat cds) prog
     return nprog { progStats = progStats nprog `mappend` stats }
 
 

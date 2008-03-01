@@ -78,6 +78,9 @@ programUpdate prog = check prog where
         | otherwise = x
     names = intercalate "\n"  (sort $ map (show . tvrShowName . combHead) ds)
 
+programSetDs' :: [(TVr,E)] -> Program -> Program
+programSetDs' ds prog = progCombinators_s [ combRules_s rs $ bindComb (t,e) | (t,e) <- ds, rs <- [ combRules c | c <- progCombinators prog, combHead c == t]] prog
+
 programSetDs :: [(TVr,E)] -> Program -> Program
 programSetDs ds prog | flint && hasRepeatUnder (tvrIdent . fst) ds = error $ "programSetDs: program has redundant definitions: \n" ++ intercalate "\n"  (sort $ map (show . tvrShowName . fst) ds)
 programSetDs ds prog | flint && any (not . isValidAtom) (map (tvrIdent . fst) ds) = error $ "programSetDs: trying to set non unique top level name: \n" ++ intercalate "\n"  (sort $ map (show . tvrShowName . fst) ds)

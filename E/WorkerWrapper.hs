@@ -138,7 +138,7 @@ workWrap' _dataTable tvr e = fail "not workWrapable"
 workWrapProgram :: Program -> Program
 workWrapProgram prog = ans where
     (nds,stats) = performWorkWrap (progDataTable prog) (programDs prog)
-    ans = programSetDs nds prog { progStats = progStats prog `mappend` stats }
+    ans = programSetDs' nds prog { progStats = progStats prog `mappend` stats }
 
 {-# NOINLINE performWorkWrap #-}
 performWorkWrap :: DataTable -> [(TVr,E)] -> ([(TVr,E)],Stats.Stat)

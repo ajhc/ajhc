@@ -73,7 +73,7 @@ instance Monoid Val where
 cprAnalyzeProgram :: Program -> Program
 cprAnalyzeProgram prog = ans where
     nds = cprAnalyzeDs (progDataTable prog) (programDs prog)
-    ans = programSetDs nds prog -- { progStats = progStats prog `mappend` stats }
+    ans = programSetDs' nds prog -- { progStats = progStats prog `mappend` stats }
 
 cprAnalyzeDs :: DataTable -> [(TVr,E)] -> [(TVr,E)]
 cprAnalyzeDs dataTable ds = fst $ cprAnalyzeBinds dataTable mempty ds
