@@ -138,7 +138,7 @@ floatInwardE e fvs = f e fvs where
         g ((Left (comb@Comb { combHead = v, combBody = ev},fv)):xs) p = g xs (p0 ++ [Left (comb',freeVars comb')] ++ p') where
             comb' = combBody_s ev' comb
             ev' = if getProperty prop_ONESHOT v then floatInwardE' ev pv else f ev pv
-            (p',[p0,pv,_]) = sepByDropPoint [(frest xs), bindingFreeVars v ev, freeVars (tvrType v)] p
+            (p',[p0,pv,_]) = sepByDropPoint [(frest xs), freeVars comb, freeVars (tvrType v)] p
         g (Right bs:xs) p =  g xs (p0 ++ [Right [ let comb' = combBody_u (\ev -> f ev pv) comb in (comb',freeVars comb') | (comb,_) <- bs | pv <- ps ]] ++ p') where
             (p',_:p0:ps) = sepByDropPoint (freeVars (map (tvrType . combHead . fst) bs) :(frest xs):snds bs) p
         frest xs = mconcat (freeVars e:map fvBind xs)

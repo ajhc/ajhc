@@ -180,8 +180,8 @@ mapRules f ARules { aruleRules = rules } = do
     return $ arules rs
 
 -- replace the given arguments with the E values, dropping impossible rules
-dropArguments :: [(Int,E)] -> ARules -> ARules
-dropArguments os ARules { aruleRules = rs } = arules (catMaybes $  map f rs) where
+dropArguments :: [(Int,E)] -> [Rule] -> [Rule]
+dropArguments os  rs  = catMaybes $  map f rs where
     f r = do
         let g (i,a) | Just v <- lookup i os = do
                 rs <- match (const Nothing) (ruleBinds r) a v

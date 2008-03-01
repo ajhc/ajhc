@@ -262,13 +262,18 @@ specializeProgram doSpecialize unusedRules unusedValues prog = do
 repi (ELit LitCons { litName = n, litArgs = [a,b] }) | n == tc_Arrow = EPi tvr { tvrIdent = 0, tvrType = repi a } (repi b)
 repi e = runIdentity $ emapE (return . repi ) e
 
+{-
 specializeComb doSpecialize env comb = do
     ((t,e),nds) <- specializeDef doSpecialize env (combHead comb,combBody comb)
     return (combHead_s t . combBody_s e $ comb,nds)
+-}
 
-specializeDef _ env  (tvr,e) | isUnused env tvr = return ((tvr,EError ("Unused Def: " ++ tvrShowName tvr) (tvrType tvr)), mempty)
-specializeDef _ _ (t,e) | getProperty prop_PLACEHOLDER t = return ((t,e), mempty)
-specializeDef True SpecEnv { senvDataTable = dataTable }  (tvr,e) | needsSpec = ans where
+specializeComb _ env  comb | isUnused env (combHead comb) = let tvr = combHead comb in
+    return (combRules_s [] . combBody_s (EError ("Unused Def: " ++ tvrShowName tvr) (tvrType tvr)) $ comb , mempty)
+specializeComb _ _ comb | getProperty prop_PLACEHOLDER comb = return (comb, mempty)
+specializeComb True SpecEnv { senvDataTable = dataTable }  comb | needsSpec = ans where
+    tvr = combHead comb
+    e = combBody comb
     sub = substMap'  $ fromList [ (tvrIdent t,v) | (t,Just v) <- sts ]
     sts = map spec ts
     spec t | Just nt <- Info.lookup (tvrInfo t) >>= getTyp (getType t) dataTable, sortKindLike (getType t) = (t,Just (repi nt))
@@ -279,8 +284,12 @@ specializeDef True SpecEnv { senvDataTable = dataTable }  (tvr,e) | needsSpec = 
     needsSpec = not $ null vs
     ans = do
         sequence_ [ Stats.mtick ("Specialize.body.{" ++ pprint tvr ++ "}.{" ++ pprint t ++ "}.{" ++ pprint v) | (t,Just v) <- sts ]
-        return ((tvr { tvrType = infertype dataTable ne, tvrInfo = infoMap (dropArguments vs) (tvrInfo tvr) },ne),msingleton tvr (fsts vs))
-specializeDef _ _ (t,e) = return ((t,e),mempty)
+        let nc  = combHead_s tvr { tvrType = infertype dataTable ne }
+                . combBody_s ne
+                . combRules_u (dropArguments vs)
+                $ comb
+        return (nc,msingleton tvr (fsts vs))
+specializeComb _ _ comb = return (comb,mempty)
 
 instance Error () where
 
@@ -357,14 +366,13 @@ specBody doSpecialize env e = emapE' (specBody doSpecialize env) e
 
 --specializeDs :: MonadStats m => DataTable -> Map.Map TVr [Int] -> [(TVr,E)] -> m ([(TVr,E)]
 specializeDs doSpecialize env@SpecEnv { senvUnusedRules = unusedRules, senvDataTable = dataTable }  ds = do
-    (ds,nenv) <- mapAndUnzipM (specializeDef doSpecialize env) ds
+    (ds,nenv) <- mapAndUnzipM (specializeComb doSpecialize env) (map bindComb ds)
+    ds <- return $ map combBind ds
     let tenv = env { senvArgs = unions nenv `union` senvArgs env }
         sb = specBody doSpecialize tenv
     let f (t,e) = do
             e <- sb e
-            nfo <- infoMapM (mapABodiesArgs sb) (tvrInfo t)
-            nfo <- infoMapM (return . arules . filter ( not . (`member` unusedRules) . ruleUniq) . rulesFromARules) nfo
-            return (t { tvrInfo = nfo }, e)
+            return (t,e)
     ds <- mapM f ds
     return (ds,tenv)
 

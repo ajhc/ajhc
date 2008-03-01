@@ -2,7 +2,6 @@
 module E.FreeVars(
     decomposeLet,
     decomposeDs,
-    bindingFreeVars,
     caseUpdate,
     freeIds
     ) where
@@ -15,7 +14,6 @@ import Name.Id
 import Support.FreeVars
 import Util.SetLike as S
 import Util.Graph
-import qualified Info.Info as Info
 
 -------------------------
 -- finding free variables
@@ -114,7 +112,7 @@ instance FreeVars TVr IdSet where
 bindingFreeVars :: TVr -> E -> IdSet
 bindingFreeVars t e = freeVars t `mappend` freeVars e
 
-freeVarsInfo nfo = maybe mempty freeVars (Info.lookup nfo :: Maybe ARules)
+freeVarsInfo nfo = mempty
 --instance FreeVars TVr (IdMap TVr) where
 --    freeVars t = freeVars (tvrType t) `mappend` freeVars (Info.fetch (tvrInfo t) :: ARules)
 

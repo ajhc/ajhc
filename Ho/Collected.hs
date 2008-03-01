@@ -63,7 +63,7 @@ mergeChoVarMaps x y = munionWith f x y where
     f x y = error "mergeChoVarMaps: bad merge."
     merge ta tb = ta { tvrInfo = minfo' }   where
         minfo = tvrInfo ta `mappend` tvrInfo tb
-        minfo' = dex (undefined :: ARules) . dex (undefined :: Properties) $ minfo
+        minfo' = dex (undefined :: Properties) $ minfo
         dex dummy y = g (Info.lookup (tvrInfo tb) `asTypeOf` Just dummy) where
             g Nothing = y
             g (Just x) = Info.insertWith mappend x y
@@ -74,7 +74,7 @@ mergeChoCombinators x y = munionWith f x y where
     f c1 c2 = combHead_s (merge (combHead c1) (combHead c2)) c1 { combRules = combRules c1 `Data.List.union`  combRules c2 }
     merge ta tb = ta { tvrInfo = minfo' }   where
         minfo = tvrInfo ta `mappend` tvrInfo tb
-        minfo' = dex (undefined :: ARules) . dex (undefined :: Properties) $ minfo
+        minfo' = dex (undefined :: Properties) $ minfo
         dex dummy y = g (Info.lookup (tvrInfo tb) `asTypeOf` Just dummy) where
             g Nothing = y
             g (Just x) = Info.insertWith mappend x y

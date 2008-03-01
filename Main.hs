@@ -155,15 +155,11 @@ transBarendregt = transformParms {
 
 lamann _ nfo = return nfo
 letann e nfo = return (annotateArity e nfo)
-idann rs ps i nfo = return (rules rs i (props ps i nfo)) where
+idann ps i nfo = return (props ps i nfo) where
     props :: IdMap Properties -> Id -> Info.Info -> Info.Info
     props ps i = case mlookup i ps of
         Just ps ->  modifyProperties (mappend ps)
         Nothing ->  id
-    rules rs i = id
-    rules rs i = case getARules rs i of
-        Nothing -> id
-        Just x -> \nfo -> Info.insert (x `mappend` Info.fetch nfo) nfo
 
 
 
@@ -197,13 +193,6 @@ processInitialHo accumho aho = do
         choHoMap = Map.singleton (show mod) aho `mappend` choHoMap accumho
         }
 
-
-
-reprocessCho :: Rules -> IdMap Properties -> CollectedHo -> CollectedHo
-reprocessCho rules ps cho = choHoMap_u (Map.map $ hoBuild_u (hoEs_u (map f))) $ choVarMap_u (fmap h) cho where
-    f (t,e) = (tvrInfo_u (g (tvrIdent t)) t,e)
-    g id = runIdentity . idann rules ps id
-    h ~(Just (EVar t)) = Just (EVar (tvrInfo_u (g (tvrIdent t)) t))
 
 
 
@@ -285,7 +274,7 @@ processDecls cho ho' tiData = do
     cho <- return $ choCombinators_u (fmap addRule) cho
 
     -- Here we substitute in all the original types, with rules and properties defined in the current module included
-    prog <- return $ runIdentity $ annotateProgram (choVarMap cho) (idann mempty theProps) letann lamann prog
+    prog <- return $ runIdentity $ annotateProgram (choVarMap cho) (idann theProps) letann lamann prog
 
     lintCheckProgram (putErrLn "LintPostProcess") prog
 
@@ -660,9 +649,7 @@ compileModEnv cho = do
 
 boxifyProgram :: Program -> IO Program
 boxifyProgram prog = ans where
-    ans = do
-        prog' <- programMapDs f prog
-        return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_HASRULE $ Info.delete (undefined :: ARules) nfo) (\_ nfo -> return nfo)  (\_ nfo -> return nfo) prog'
+    ans = do programMapDs f (progCombinators_u (map $ combRules_s []) prog)
     f (t,e) = do
 --        putStrLn $ ">>> " ++ pprint t
         e <- g e

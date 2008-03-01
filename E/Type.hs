@@ -11,7 +11,6 @@ import Control.Applicative
 
 import StringTable.Atom
 import C.Prims
-import Data.Typeable
 import Doc.DocLike hiding((<$>))
 import Name.Id
 import Util.Gen
@@ -114,7 +113,6 @@ data ARules = ARules {
     aruleFreeVars :: IdSet,
     aruleRules :: [Rule]
     }
-    deriving(Typeable)
 
 data Lit e t = LitInt { litNumber :: Number, litType :: t }
     | LitCons  { litName :: Name, litArgs :: [e], litType :: t, litAliasFor :: Maybe E }

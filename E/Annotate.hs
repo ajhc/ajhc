@@ -98,7 +98,6 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
             return t { tvrInfo = nfo }
         (as,rs) <- liftM unzip $ mapMntvr dl'
         local (foldr (.) id rs) $ do
-            as <- mapM procRules as
             ds <- mapM f (snds dl)
             e' <- f e
             return $ ELetRec (zip as ds) e'
@@ -108,7 +107,6 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
     f ec@(ECase {}) = do
         e' <- f $ eCaseScrutinee ec
         let caseBind = eCaseBind ec
-        caseBind <- procRules caseBind
         (b',r) <- ntvr [] caseBind
         d <- local r $ T.mapM f $ eCaseDefault ec
         let da (Alt lc@LitCons { litName = s, litArgs = vs, litType = t } e) = do
@@ -125,7 +123,6 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         return $ caseUpdate ECase { eCaseAllFV = error "no eCaseAllFV needed",  eCaseScrutinee = e', eCaseType = t', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts }
     lp bnd lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == 0  = do
         t' <- f t
-        tvr <- procRules tvr
         nfo <- lift $ lamann e (tvrInfo tvr)
         nfo <- lift $ idann n nfo
         e' <- local (minsert n Nothing) $ f e
@@ -143,34 +140,18 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         vs = [ tvrIdent x | x <- ts ]
     ntvr xs tvr@(TVr { tvrIdent = 0, tvrType =  t}) = do
         t' <- f t
-        tvr <- procRules tvr
         nfo <- lift $ idann 0 (tvrInfo tvr)
         let nvr = (tvr { tvrType =  t', tvrInfo = nfo})
         return (nvr,id)
     ntvr xs tvr@(TVr {tvrIdent = i, tvrType =  t}) = do
         t' <- f t
         ss <- ask
-        tvr <- procRules tvr
         nfo' <- lift $ idann i (tvrInfo tvr)
         let i' = mnv xs i ss
         let nvr = (tvr { tvrIdent =  i', tvrType =  t', tvrInfo =  nfo'})
         case i == i' of
             True -> return (nvr,minsert i (Just $ EVar nvr))
             False -> return (nvr,minsert i (Just $ EVar nvr) . minsert i' Nothing)
-    mrule r = do
-        let g tvr = do
-            nfo <- lift $ idann (tvrIdent tvr) (tvrInfo tvr)
-            return (tvr { tvrInfo = nfo },minsert (tvrIdent tvr) (Just $ EVar tvr))
-        bs <- mapM g $ ruleBinds r
-        local (foldr (.) id $ snds bs) $ do
-            args <- mapM f (ruleArgs r)
-            body <- f (ruleBody r)
-            return r { ruleBinds = fsts bs, ruleBody = body, ruleArgs = args }
-    procRules tvr = case Info.lookup (tvrInfo tvr) of
-        Nothing -> return tvr
-        Just r -> do
-            r' <- mapRules mrule r
-            return tvr { tvrInfo = Info.insert r' (tvrInfo tvr) }
 
 mnv xs i ss
     | isInvalidId i || i `mmember` ss  = newId (size ss) isOkay
