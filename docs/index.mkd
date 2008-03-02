@@ -11,6 +11,7 @@ See the [Installation page](building.shtml) for information about downloading an
 Development and other info
 --------------------------
 
+ * [The (incomplete) Manual](manual.html) The beginings of the jhc manual
  * [The Orignal Page](jhc.shtml) is the somewhat modified original information page on jhc. lots of good stuff, some of it out of date.
  * [the development page](development.shtml) has information on how to pull the development tree from the darcs repository
  * the [darcs repository](http://repetae.net/repos/jhc) is where the code is housed

@@ -231,7 +231,7 @@ haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 	pandoc $<  -f markdown -t html >> $@
 	cat $(srcdir)/docs/my_footer.shtml >> $@
 
-publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml
+publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml manual.html
 	cp -- $^ /home/john/public_html/computer/jhc
 
 manual: utils/stitch.prl FlagDump.mkd FlagOpts.mkd options.mkd
