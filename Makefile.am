@@ -206,10 +206,12 @@ clean-local:
 MAINTAINERCLEANFILES= $(BUILT_SOURCES)
 
 base-1.0.hl: lib/base/base.cabal
-	./jhc -v -funboxed-tuples $(RTSOPTS) $(JHC_TEST)  -ilib/base --noauto --build-hl lib/base/base.cabal -o $@
+	mkdir -p tmp/libho
+	./jhc -v -funboxed-tuples $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/base --noauto --build-hl lib/base/base.cabal -o $@
 
 haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
-	./jhc -v $(RTSOPTS) $(JHC_TEST) -ilib/haskell98 --noauto -L- -L. -p base --build-hl lib/haskell98.cabal -o $@
+	mkdir -p tmp/libho
+	./jhc -v $(RTSOPTS) $(JHC_TEST) --ho-dir tmp/libho -ilib/haskell98 --noauto -L- -L. -p base --build-hl lib/haskell98.cabal -o $@
 
 %.pdf: %.ps
 	epstopdf $< --outfile $@
@@ -245,10 +247,10 @@ libs: $(JHC_LIBS)
 
 helloworld: test/HelloWorld.hs jhc
 	-[ -e $@.log ] && mv -f $@.log $@.log.bak
-	./jhc -v -L. $(JHC_TEST) test/HelloWorld.hs -o $@ 2>&1 | tee $@.log
+	./jhc -v -L- -L. $(JHC_TEST) test/HelloWorld.hs -o $@ 2>&1 | tee $@.log
 calendar: test/Calendar.hs jhc
 	-[ -e $@.log ] && mv -f $@.log $@.log.bak
-	./jhc -v -L. $(JHC_TEST) test/Calendar.hs -o $@ 2>&1 | tee $@.log
+	./jhc -v -L- -L. $(JHC_TEST) test/Calendar.hs -o $@ 2>&1 | tee $@.log
 primes: test/Primes.hs jhc
 	-[ -e $@.log ] && mv -f $@.log $@.log.bak
-	./jhc -v -L. $(JHC_TEST) test/Primes.hs -o $@ 2>&1 | tee $@.log
+	./jhc -v -L- -L. $(JHC_TEST) test/Primes.hs -o $@ 2>&1 | tee $@.log
