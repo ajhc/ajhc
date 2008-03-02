@@ -318,8 +318,8 @@ toCompUnitGraph done roots = do
                     if good then do
                         putVerboseLn $ printf "Fresh: <%s>" fp
                         let lib = case reverse fp of
-                                'l':'h':'.':_ -> Just fp
-                                _ -> Nothing
+                                'o':'h':'.':_ -> Nothing
+                                _ -> Just fp
                         modifyIORef cug_ref ((h,(hohModDepends hoh,CompHo lib hoh ho)):)
                         modifyIORef hom_ref (Map.insert h (True,af))
                         return h
