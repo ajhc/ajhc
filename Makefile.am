@@ -48,7 +48,7 @@ HSFILES= C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs C/OpEval.hs C
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
 GHCINC=  -i -i$(srcdir)/drift_processed -i$(srcdir)/drift_processed/FrontEnd \
-	 -i$(srcdir)/. -i$(srcdir)/FrontEnd -odir $(builddir) -hidir $(builddir)
+	 -i$(srcdir)/. -i$(srcdir)/FrontEnd -i$(builddir) -odir $(builddir) -hidir $(builddir)
 PACKAGES= -package mtl  -package unix -package QuickCheck -ignore-package lang
 GHCLANG=    -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
 GHCOPTS=  $(HSOPTS) -fbang-patterns -O -ignore-package lang  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
@@ -118,6 +118,7 @@ HSBOOT= DataConstructors.hs-boot FrontEnd/Tc/Class.hs-boot Grin/Grin.hs-boot Gri
 
 
 %.hs: %.hsc
+	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
 	$(HSC2HS) $(MY_CINCLUDES) -o $@ $<
 
 %.hs: %.flags  utils/opt_sets.prl
