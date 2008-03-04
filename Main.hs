@@ -9,7 +9,7 @@ import IO(hFlush,stderr,stdout)
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified List(group,union)
+import List(group,union)
 import qualified System
 
 import Util.Util
@@ -20,7 +20,7 @@ import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
-import E.Annotate(annotate,annotateDs,annotateCombs,annotateProgram)
+import E.Annotate(annotateDs,annotateCombs,annotateProgram)
 import E.Diff
 import E.E
 import E.Eta
@@ -33,7 +33,6 @@ import E.Program
 import E.Rules
 import E.Show hiding(render)
 import E.Subst(subst)
---import E.ToHs
 import E.Traverse
 import E.TypeAnalysis
 import E.TypeCheck
@@ -63,7 +62,6 @@ import Name.VConsts
 import Options
 import Support.FreeVars
 import Support.CanType(getType)
-import Util.HasSize
 import Support.Transform
 import Util.Graph
 import Util.SetLike as S
@@ -173,12 +171,12 @@ processInitialHo accumho aho = do
         newTVrs = fsts $ hoEs (hoBuild aho)
         (_,orphans) = mpartitionWithKey (\k _ -> k `elem` map tvrIdent newTVrs) rm
 
-    let fakeEntry = emptyComb { combRules = concat $ melems orphans }
-        combs =  fakeEntry:[combRules_s (mfindWithDefault [] (tvrIdent t) rm) (bindComb (t,e))  | (t,e) <- hoEs (hoBuild aho) ]
+    let fakeEntry = emptyComb { combRules = map ruleUpdate . concat $ melems orphans }
+        combs =  fakeEntry:[combRules_s (map ruleUpdate $ mfindWithDefault [] (tvrIdent t) rm) (bindComb (t,e))  | (t,e) <- hoEs (hoBuild aho) ]
 
     -- extract new combinators and processed rules
     let choCombinators' = fromList [ (combIdent c,c) | c <- runIdentity $ annotateCombs (choVarMap accumho) (\_ -> return) letann lamann combs]
-        nrules = combRules $ mfindWithDefault emptyComb emptyId choCombinators'
+        nrules = map ruleUpdate . combRules $ mfindWithDefault emptyComb emptyId choCombinators'
         reRule :: Comb -> Comb
         reRule comb = combRules_u f comb where
             f rs = List.union  rs [ x | x <- nrules, ruleHead x == combHead comb]
@@ -269,7 +267,7 @@ processDecls cho ho' tiData = do
     -- now we must attach rules to the existing chos, as well as the current ones
     let addRule c = case mlookup (combIdent c) rules' of
             Nothing -> c
-            Just rs -> combRules_u (List.union rs) c
+            Just rs -> combRules_u (map ruleUpdate . List.union rs) c
     prog <- return $ progCombinators_u (map addRule) prog
     cho <- return $ choCombinators_u (fmap addRule) cho
 
@@ -280,8 +278,8 @@ processDecls cho ho' tiData = do
 
 
 
-    let entryPoints = fromList . execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || getProperty prop_INSTANCE t)  (tell [tvrIdent t])) prog
-    prog <- return $ prog { progEntry = entryPoints }
+    let entryPoints = fromList . execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || getProperty prop_INSTANCE t || getProperty prop_SPECIALIZATION t)  (tell [tvrIdent t])) prog
+    prog <- return $ prog { progEntry = entryPoints `mappend` progSeasoning prog }
 
     lintCheckProgram (putErrLn "InitialLint") prog
 
@@ -433,7 +431,7 @@ processDecls cho ho' tiData = do
         hoEs = programDs prog,
         hoRules = hoRules (hoBuild ho') `mappend` rules
         }
-        newMap = fromList [ (tvrIdent n,Just (EVar n)) | (n,_) <- hoEs newHoBuild ]
+        newMap = fmap (\c -> Just (EVar $ combHead c)) $ progCombMap prog
         (mod:_) = Map.keys $ hoExports $ hoExp ho'
     return (mempty {
         choHoMap = Map.singleton (show mod) ho' { hoBuild = newHoBuild},
@@ -462,7 +460,6 @@ shouldBeExported exports tvr
     | otherwise = tvr
 
 
-collectIds e = execWriter $ annotate mempty (\id nfo -> tell (singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 --idHistogram e = execWriter $ annotate mempty (\id nfo -> tell (Histogram.singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 
 isInteractive :: IO Bool

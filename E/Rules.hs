@@ -10,6 +10,7 @@ module E.Rules(
     fromRules,
     getARules,
     mapRules,
+    ruleUpdate,
     mapRBodyArgs,
     makeRule,
     mapABodiesArgs,
@@ -141,7 +142,7 @@ instance Monoid Rules where
 
 
 fromRules :: [Rule] -> Rules
-fromRules rs = Rules $ fmap snds $ fromList $ sortGroupUnderF fst [ (tvrIdent $ ruleHead r,r) | r <- rs ]
+fromRules rs = Rules $ fmap snds $ fromList $ sortGroupUnderF fst [ (tvrIdent $ ruleHead r,ruleUpdate r) | r <- rs ]
 
 getARules :: Monad m => Rules -> Id -> m ARules
 getARules (Rules mp) tvr = liftM arules (mlookup tvr mp)
@@ -219,6 +220,14 @@ instance Monoid ARules where
     mempty = ARules { aruleFreeVars = mempty, aruleRules = [] }
     mappend = joinARules
 
+ruleUpdate rule = rule {
+        ruleNArgs = length  (ruleArgs rule),
+        ruleBinds = bs,
+        ruleBody = g (ruleBody rule),
+        ruleArgs = map g (ruleArgs rule)
+    } where
+        bs = map (setProperty prop_RULEBINDER) (ruleBinds rule)
+        g e = substMap (fromList [ (tvrIdent t, EVar t) | t <- bs ]) e
 
 joinARules ar@(ARules fvsa a) br@(ARules fvsb b)
     | [] <- rs = ARules mempty []
