@@ -20,7 +20,6 @@ my $opt_p;
 my @opt_rts;
 my $opt_clean;
 my $opt_timeout=60*5;
-my $opt_ho;
 
 Getopt::Long::Configure ("bundling");
 GetOptions(
@@ -31,7 +30,6 @@ GetOptions(
     l => \$opt_l,
     n => \$opt_n,
     p => \$opt_p,
-    ho => \$opt_ho,
     'rts=s' =>\@opt_rts,
     clean => \$opt_clean
     ) or die "Invalid options";
@@ -79,6 +77,11 @@ mkdir $rd or die "$!: could not make $rd";
 unlink "$results_dir/current";
 system "ln -sf $time $results_dir/current";
 
+
+my $ho_dir = $opt_clean ? "$rd/ho" : "$results_dir/ho";
+$ho_dir .= "_l" if $opt_l;
+mkdir $ho_dir;
+
 open RLOG, ">$rd/log.txt" or die "$!: Could not open log";
 
 rlog("$now_string");
@@ -123,11 +126,6 @@ sub do_it {
     #print "Entering $cwd\n";
     my $no_run = -f "$cwd/norun";
     my @flags = maybe_read "$cwd/flags.txt";
-    if(-f "Main.hs") {
-        my $dh = $opt_ho ? "" : "$cwd/*.ho";
-        system "rm -f -- $dh $cwd/*_code.hs $cwd/*_code.c";
-
-    }
     test: foreach my $fn (sort(split /\n/,`ls $cwd`)) {
         my $n = "$cwd/$fn";
         if (-d $n && $n ne "results") {
@@ -156,13 +154,10 @@ sub do_it {
                 }
             }
             rlog "-- $name";
-            system "rm -f -- $cwd/$ln.ho" unless $opt_ho;
-            system "rm -f -- $cwd/${ln}_code.hs";
-            system "rm -f -- $cwd/${ln}_code.c";
             my @libs = $opt_l ? () : ("--noauto", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
             my @fast = $opt_n ? () : ("-flint");
             my @jhc  = $opt_p ? ("$jhc_dir/jhcp","+RTS", "-S$rd/$name.jhcp_prof",@opt_rts,"-RTS")  :  ("$jhc_dir/jhc");
-            my @cmd = (@jhc, "-v", @libs , @fast, "-o", "$fbase", @flags, @opts, "$cwd/$fn");
+            my @cmd = (@jhc, "-v", '--ho-dir', $ho_dir, @libs , @fast, "-o", "$rd/$name", @flags, @opts, "$cwd/$fn");
             my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
             my ($r,$time) = my_system $res;
             my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out", compile_time => $time };
@@ -179,7 +174,7 @@ sub do_it {
             my @args = maybe_read("$fbase.args");
             $result->{run_stdout} = "$rd/$name.stdout";
             my $stdin = " < $fbase.stdin" if -f "$fbase.stdin";
-            my $run_cmd = "$fbase " . join(" ",@args) . " > $result->{run_stdout}" . ($stdin || "");
+            my $run_cmd = "$rd/$name " . join(" ",@args) . " > $result->{run_stdout}" . ($stdin || "");
             $result->{run_cmd} = $run_cmd;
             ($r,$time) = my_system $run_cmd;
             $result->{run_status} = $r;
