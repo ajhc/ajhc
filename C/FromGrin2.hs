@@ -116,9 +116,9 @@ convertFunc ffie (n,as :-> body) = do
             fnname = nodeFuncName n
 
         fr <- convertTypes bt
-        as' <- flip mapM as $ \ (Var v t) -> do
+        as' <- flip mapM (zip [1 :: Int .. ] as) $ \ (ix,(Var v t)) -> do
             t' <- convertType t
-            return (varName v,t')
+            return $ if v == v0 then (name $ 'u':show ix,t') else (varName v,t')
 
         mstub <- case ffie of
                 Nothing -> return []
@@ -257,6 +257,7 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t _)] :-> e1,[p2] :-> e2]) | ty == Ty
     scrut <- convertVal v
     tellTags t
     let tag = getWhat scrut
+        da (Var v _) e | v == v0 = convertBody e
         da v@Var {} e = do
             v'' <- convertVal v
             e' <- convertBody e
