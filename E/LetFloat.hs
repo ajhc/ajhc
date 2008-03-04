@@ -101,7 +101,7 @@ canFloatPast _ = False
 programFloatInward :: Program -> IO Program
 programFloatInward prog = do
     let binds = G.scc $  G.newGraph [ (c ,freeVars c) | c <- progCombinators prog, combIdent c  `notElem` map combIdent epoints ] (combIdent . fst) (idSetToList . snd)
-        epoints = [ c | c@Comb { combHead = x } <- progCombinators prog, (x `elem` progEntryPoints prog) || forceNoinline x || getProperty prop_INSTANCE x || getProperty prop_SPECIALIZATION x ]
+        epoints = [ c | c@Comb { combHead = x } <- progCombinators prog, (tvrIdent x `member` progEntry prog) || forceNoinline x || getProperty prop_INSTANCE x || getProperty prop_SPECIALIZATION x ]
         (oall,pints) = sepByDropPoint dpoints  (reverse binds)
         dpoints = map freeVars epoints
         nprog = progCombinators_s ([ combBody_u (\v -> fi c v y) c | (c,y) <- zip epoints pints] ++ [ combBody_u (\y -> floatInwardE y []) c | c <- dsBinds oall]) prog

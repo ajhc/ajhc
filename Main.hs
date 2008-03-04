@@ -280,8 +280,8 @@ processDecls cho ho' tiData = do
 
 
 
-    let entryPoints = execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || getProperty prop_INSTANCE t)  (tell [t])) prog
-    prog <- return $ prog { progEntryPoints = entryPoints }
+    let entryPoints = fromList . execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || getProperty prop_INSTANCE t)  (tell [tvrIdent t])) prog
+    prog <- return $ prog { progEntry = entryPoints }
 
     lintCheckProgram (putErrLn "InitialLint") prog
 
@@ -444,7 +444,7 @@ processDecls cho ho' tiData = do
 
 programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = progCombinators_s ds' prog where
-    ds' = reachable (newGraph (progCombinators prog) combIdent freeVars) (map tvrIdent $ progEntryPoints prog)
+    ds' = reachable (newGraph (progCombinators prog) combIdent freeVars) (toList $ progEntry prog)
 
 programPrune :: Program -> IO Program
 programPrune prog = transformProgram transformParms { transformCategory = "PruneUnreachable", transformDumpProgress  = miniCorePass, transformOperation = evaluate . programPruneUnreachable } prog
@@ -512,8 +512,8 @@ compileModEnv cho = do
     let ffiExportNames = [tv | tv <- map combHead $  progCombinators prog,
                                name <- tvrName tv,
                                "FE@" `isPrefixOf` show name]
-    prog <- return prog { progMainEntry   = main,
-                          progEntryPoints = (main:ffiExportNames),
+    prog <- return prog { progMain   = tvrIdent main,
+                          progEntry = fromList $ map tvrIdent (main:ffiExportNames),
                           progCombinators = emptyComb { combHead = main, combBody = mainv }:map (unsetProperty prop_EXPORTED) (progCombinators prog)
                         }
     prog <- transformProgram transformParms { transformCategory = "PruneUnreachable", transformOperation = evaluate . programPruneUnreachable } prog

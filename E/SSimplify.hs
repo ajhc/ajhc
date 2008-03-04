@@ -78,7 +78,7 @@ notUsedInfo = UseInfo { useOccurance = Unused, minimumArgs = maxBound }
 programPruneOccurance :: Program -> Program
 programPruneOccurance prog =
     let dsIn = progCombinators (runIdentity $ programMapBodies (return . subst (tVr (-1) Unknown) Unknown) prog)
-        (dsIn',(OMap fvs,uids)) = runReaderWriter (unOM $ collectDs dsIn mempty) (fromList $ map tvrIdent $ progEntryPoints prog)
+        (dsIn',(OMap fvs,uids)) = runReaderWriter (unOM $ collectDs dsIn mempty) (progEntry prog)
     in (progCombinators_s dsIn' prog) { progFreeIds = idMapToIdSet fvs, progUsedIds = uids }
 
 
@@ -469,7 +469,6 @@ simplifyDs prog sopts dsIn = ans where
         let lupRules t = concat [ combRules c | c <- dsIn, combIdent c == t]
         return [ combRules_s (lupRules (tvrIdent t)) $ bindComb (t,e) | (t,e) <- dsOut ]
 
-    exportedSet = fromList $ map tvrIdent (progEntryPoints prog) :: IdSet
     getType e = infertype (progDataTable prog) e
     doit = do
         smAddNamesIdSet (progUsedIds prog)

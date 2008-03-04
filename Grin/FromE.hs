@@ -155,7 +155,9 @@ toTyTy (as,r) = tyTy { tySlots = as, tyReturn = r }
 
 {-# NOINLINE compile #-}
 compile :: Program -> IO Grin
-compile prog@Program { progDataTable = dataTable, progMainEntry = mainEntry, progEntryPoints = entries } = do
+compile prog@Program { progDataTable = dataTable } = do
+    let entries = progEntryPoints prog
+        mainEntry = progMainEntry prog
     tyEnv <- liftIO $ newIORef initTyEnv
     funcBaps <- liftIO $ newIORef []
     counter <- liftIO $ newIORef 100000  -- TODO real number

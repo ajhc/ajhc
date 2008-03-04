@@ -132,7 +132,7 @@ programDecomposedCombs prog = map f $ scc g where
 programDecomposedDs :: Program -> [Either (TVr, E) [(TVr,E)]]
 programDecomposedDs prog = decomposeDs $ programDs prog
 
-programSubProgram prog rec ds = prog { progCombinators = ds, progType = SubProgram rec, progEntryPoints = map combHead ds }
+programSubProgram prog rec ds = progCombinators_s ds prog {  progType = SubProgram rec, progEntry = fromList (map combIdent ds) }
 
 programMapProgGroups :: Monad m =>
     IdMap (Maybe E)        -- ^ initial map to apply
