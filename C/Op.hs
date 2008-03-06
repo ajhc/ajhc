@@ -283,6 +283,29 @@ isAssociative x = f x where
     f Xor = True
     f _ = False
 
+unopFloat :: Ty -> UnOp -> Maybe String
+unopFloat (TyBits b HintFloat) op = g b =<< f op where
+    g (Bits 64) x = return x
+    g (Bits 32) x = return $ x ++ "f"
+    g _ _ = Nothing
+    f FAbs = return "fabs"
+    f Sin  = return "sin"
+    f Cos  = return "cos"
+    f Tan  = return "tan"
+    f Sinh  = return "sinh"
+    f Cosh  = return "cosh"
+    f Tanh  = return "tanh"
+    f Asin  = return "asin"
+    f Acos  = return "acos"
+    f Atan  = return "atan"
+    f Sqrt = return "sqrt"
+    f Log = return "log"
+    f Exp = return "exp"
+
+    f _ = Nothing
+unopFloat _ _ = Nothing
+
+
 binopInfix :: BinOp -> Maybe (String,Int)
 binopInfix UDiv = Just ("/",8)
 binopInfix Mul  = Just ("*",8)

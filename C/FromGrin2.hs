@@ -607,6 +607,7 @@ primUnOp Op.Neg ta r a = do
     return $ uoperator "-" a
 primUnOp Op.Com ta r a = do return $ uoperator "~" a
 primUnOp Op.FNeg ta r a = do return $ uoperator "-" a
+primUnOp op ta r a | Just fn <- Op.unopFloat ta op = return $ functionCall (toName fn) [a]
 primUnOp n ta r a
     | otherwise = return $ err ("primUnOp: " ++ show ((n,ta,r),a))
 
