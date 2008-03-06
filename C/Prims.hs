@@ -76,9 +76,9 @@ primStaticTypeInfo (Op.TyBits (Op.Bits b) _) w = Just ans where
     ans = case w of
         PrimSizeOf -> bits `div` 8
         PrimAlignmentOf ->  bits `div` 8
-        primMinBound -> negate $ 2^(bits - 1)
-        primMaxBound -> 2^(bits - 1) - 1
-        primUMaxBound -> 2^bits - 1
+        PrimMinBound -> negate $ 2^(bits - 1)
+        PrimMaxBound -> 2^(bits - 1) - 1
+        PrimUMaxBound -> 2^bits - 1
 primStaticTypeInfo _ _ = Nothing
 
 -- | These primitives may safely be duplicated without affecting performance or
