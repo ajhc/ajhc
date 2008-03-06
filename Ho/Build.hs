@@ -520,11 +520,11 @@ parseHsSource :: String -> LBS.ByteString -> IO HsModule
 parseHsSource fn lbs = do
     let txt = UTF8.fromUTF $ LBS.unpack lbs
     let f s = opt where
-            Just opt = fileOptions opts `mplus` Just options where
-            s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
-            opts' = concat [ words as | (x,as) <- parseOptions s', x `elem` ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"]]
-            opts = opts' ++ [ "--noprelude" | ("NOPRELUDE",_) <- parseOptions s']
-            langs = concat [ words as | ("LANGUAGE",as) <- parseOptions s' ]
+            Just opt = fileOptions opts `mplus` Just options
+            popts = parseOptions $ if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
+            opts' = concat [ words as | (x,as) <- popts, x `elem` ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"]]
+            opts = opts' ++ [ "--noprelude" | ("NOPRELUDE",_) <- popts]
+            langs = concat [ words as | ("LANGUAGE",as) <- popts ]
     let fopts s = s `member` optFOptsSet initialOpts
         initialOpts = f (take 4096 txt)
         incFlags = [ "-I" ++ d | d <- optIncdirs options ++ optIncs initialOpts]
