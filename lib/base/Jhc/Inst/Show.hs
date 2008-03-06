@@ -56,12 +56,12 @@ instance Show IntPtr where
 
 -- specialized base 10 only versions of show
 showWord :: Word -> String -> String
-showWord w rest = case quotRem w 10 of
-    (n',d) -> if n' == 0 then rest' else showWord n' rest'
+showWord w rest = w `seq` case quotRem w 10 of
+    (n',d) -> n' `seq` d `seq` rest' `seq` if n' == 0 then rest' else showWord n' rest'
         where rest' = chr (fromIntegral d + ord '0') : rest
 
 showWordMax :: WordMax -> String -> String
-showWordMax w rest = case quotRem w 10 of
-    (n',d) -> if n' == 0 then rest' else showWordMax n' rest'
+showWordMax w rest = w `seq` case quotRem w 10 of
+    (n',d) -> n' `seq` d `seq` rest' `seq` if n' == 0 then rest' else showWordMax n' rest'
         where rest' = chr (fromIntegral d + ord '0') : rest
 
