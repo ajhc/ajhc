@@ -826,6 +826,8 @@ varid :: { HsName }
       | 'kind'                { UnQual (HsIdent "kind") }
       | 'qualified'           { qualified_name }
       | 'hiding'              { hiding_name }
+      | 'forall'              { UnQual (HsIdent "forall") }
+      | 'exists'              { UnQual (HsIdent "exists") }
       | 'derive'              { derive_name }
 
 qconid :: { HsName }
