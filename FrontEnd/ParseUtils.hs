@@ -71,6 +71,7 @@ qualTypeToClassHead qt = do
         _ -> fail "Invalid Class Head"
 
 checkContext :: HsType -> P HsContext
+checkContext (HsTyCon (UnQual (HsIdent "()"))) = return []
 checkContext (HsTyTuple ts) =
 	mapM checkAssertion ts
 checkContext t = do
