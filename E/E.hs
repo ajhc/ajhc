@@ -22,6 +22,7 @@ import Name.Id
 import Name.Name
 import Name.Names
 import Name.VConsts
+import Util.Gen
 
 
 
@@ -98,6 +99,31 @@ tvrName tvr = fail $ "TVr is not Name: " ++ show tvr
 tvrShowName :: TVr -> String
 tvrShowName t = maybe ('x':(show $ tvrIdent t)) show (tvrName t)
 
+
+modAbsurd = "Jhc@.Absurd"
+modBox    = "Jhc@.Box"
+
+
+nameConjured :: String -> E -> Name
+nameConjured mod n = toName TypeConstructor (mod,f n "") where
+    f (ESort s) = shows s
+    f (EPi TVr { tvrType = t1 } t2) = ('^':) . shows t1 . shows t2
+    f _ = error $ "nameConjured: " ++ show (mod,n)
+
+fromConjured :: Monad m => String -> Name -> m E
+fromConjured mod n = maybeM ("fromConjured: " ++ show (mod,n)) $ do
+    let f s = funit s `mplus` flam s
+        flam ('^':xs) = do (x,rs) <- f xs; (y,gs) <- f rs; return (EPi tvr { tvrType = x } y,gs)
+        flam _ = Nothing
+        funit ('*':xs) = return (eStar,xs)
+        funit ('#':xs) = return (eHash,xs)
+        funit ('!':xs) = return (ESort EBang,xs)
+        funit ('(':'#':')':xs) = return (ESort ETuple,xs)
+        funit _ = Nothing
+    (TypeConstructor,(mod',an)) <- return $  fromName n
+    guard (mod' == mod)
+    (r,"") <- f an
+    return r
 
 
 

@@ -12,6 +12,8 @@ module DataConstructors(
     followAliases,
     followAlias,
     tAbsurd,
+    mktBox,
+    modBox,
     removeNewtypes,
     getConstructor,
     getConstructorArities,
@@ -193,7 +195,8 @@ instance HasSize DataTable where
     size (DataTable d) = Map.size d
 
 getConstructor :: Monad m => Name -> DataTable -> m Constructor
-getConstructor n _ | Just e <- fromAbsurd  n = return emptyConstructor { conName = n, conType = e, conExpr = tAbsurd e, conInhabits = tStar }
+getConstructor n _ | Just e <- fromConjured modAbsurd  n = return emptyConstructor { conName = n, conType = e, conExpr = tAbsurd e, conInhabits = tStar }
+getConstructor n _ | Just e <- fromConjured modBox  n = return emptyConstructor { conName = n, conType = e, conExpr = mktBox e, conInhabits = tStar }
 getConstructor n _ | RawType <- nameType n = return $ primitiveConstructor n
 getConstructor n _ | Just v <- fromUnboxedNameTuple n, DataConstructor <- nameType n = return $ snd $ tunboxedtuple v
 getConstructor n _ | Just v <- fromUnboxedNameTuple n, TypeConstructor <- nameType n = return $ fst $ tunboxedtuple v
@@ -237,8 +240,17 @@ tunboxedtuple n = (typeCons,dataCons) where
         dtipe = foldr EPi (foldr EPi ftipe [ v { tvrIdent = 0 } | v <- vars]) typeVars
 
 
--- | Jhc@.Box can hold any boxed value (something whose type inhabits *, or is a function)
--- so, there is a bit of subtyping that goes on.
+-- | conjured data types, these data types are created as needed and can be of any type, their
+-- actual type is encoded in their names.
+--
+-- Absurd - this is a type that it used to default otherwise unconstrained
+-- types, it is not special in any particular way but is just an arbitrary type
+-- to give to things.
+--
+-- Box - this type can be used to represent any boxed values. It is considered
+-- equivalent to all boxed values so is not a very precise type. It is used in
+-- the final stages of compilation before core mangling so that optimizations
+-- that were previously blocked by type variables can be carried out.
 
 tbox = emptyConstructor {
             conName = tc_Box,
@@ -248,27 +260,11 @@ tbox = emptyConstructor {
             conChildren = DataAbstract
     }
 
-tAbsurd k = ELit (litCons { litName = nameAbsurd k, litArgs = [], litType = k })
-
-nameAbsurd :: E -> Name
-nameAbsurd n = toName TypeConstructor ("Jhc@.Absurd",f n "") where
-    f (ESort s) = shows s
-    f (EPi TVr { tvrType = t1 } t2) = ('^':) . shows t1 . shows t2
-    f _ = error $ "nameAbsurd: " ++ show n
-
-fromAbsurd :: Monad m => Name -> m E
-fromAbsurd n = maybeM ("fromAbsurd: " ++ show n) $ do
-    let f s = funit s `mplus` flam s
-        flam ('^':xs) = do (x,rs) <- f xs; (y,gs) <- f rs; return (EPi tvr { tvrType = x } y,gs)
-        flam _ = Nothing
-        funit ('*':xs) = return (eStar,xs)
-        funit ('#':xs) = return (eHash,xs)
-        funit ('!':xs) = return (ESort EBang,xs)
-        funit ('(':'#':')':xs) = return (ESort ETuple,xs)
-        funit _ = Nothing
-    (TypeConstructor,("Jhc@.Absurd",an)) <- return $  fromName n
-    (r,"") <- f an
-    return r
+tAbsurd k = ELit (litCons { litName = nameConjured modAbsurd k, litArgs = [], litType = k })
+mktBox k = ELit (litCons { litName = nameConjured modBox k, litArgs = [], litType = k, litAliasFor = af }) where
+    af = case k of
+        EPi TVr { tvrType = t1 } t2 -> Just (ELam tvr { tvrType = t1 } (mktBox t2))
+        _ -> Nothing
 
 
 tarrow = emptyConstructor {
@@ -336,14 +332,15 @@ typesCompatable dataTable a b = f (-2 :: Id) a b where
         f c (ELit (LitCons { litName = n, litArgs = [a',b'], litType = t })) (EPi (TVr { tvrIdent = 0, tvrType =  a}) b)  | conName tarrow == n, t == eStar = do
             f c a a'
             f c b b'
-        f c a b | a == tBox && canBeBox b = return ()
-        f c a b | b == tBox && canBeBox a = return ()
+        f _ a b | boxCompat a b || boxCompat b a = return ()
         f _ a b = fail $ "Types don't match:" ++ pprint (a,b)
 
         lam :: TVr -> E -> TVr -> E -> Id -> m ()
         lam va ea vb eb c = do
             f c (tvrType va) (tvrType vb)
             f (c - 2) (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb)
+        boxCompat (ELit (LitCons { litName = n }))  t | Just e <- fromConjured modBox n =  e == getType t
+        boxCompat _ _ = False
 
 
 extractPrimitive :: Monad m => DataTable -> E -> m (E,(ExtType,E))

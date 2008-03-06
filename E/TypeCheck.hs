@@ -127,6 +127,7 @@ instance CanType E E where
         where typa = getType a; typb = getType b
     getType (EAp (ELit LitCons { litType = EPi tvr a }) b) = getType (subst tvr b a)
     getType (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = getType (foldl eAp af (litArgs lc ++ [b]))
+--    getType (EAp a _) | a == tBox = getType a
     getType e@(EAp (ELit LitCons {}) b) = error $ "getType: application of type alias " ++ (render $ ePretty e)
     getType (EAp (EPi tvr a) b) = getType (subst tvr b a)
     getType (EAp a b) = if isUnknown typa then Unknown else eAp typa b where typa = getType a
@@ -278,8 +279,10 @@ inferType dataTable ds e = rfc e where
     valid' nds s
         | Unknown <- s = return ()
         | otherwise =  withContextDoc (text "valid:" <+> prettyE s) (do t <- inferType' nds s;  valid' nds t)
-    eq box t2 | box == tBox, canBeBox t2 = return t2
-    eq t1 box | box == tBox, canBeBox t1 = return t1
+    eq box t2 | boxCompat box t2 = return t2
+    eq t1 box | boxCompat box t1 = return t1
+   -- box == tBox, canBeBox t2 = return t2
+   -- eq t1 box | box == tBox, canBeBox t1 = return t1
     eq Unknown t2 = return t2
     eq t1 Unknown = return t1
     eq t1 t2 = eq' ds t1 t2
@@ -293,6 +296,8 @@ inferType dataTable ds e = rfc e where
         withContextDoc (hsep [text "fceq:", align $ vcat [parens $ prettyE e1,  parens $ prettyE t2]]) $ do
         t1 <- inferType' nds e1
         eq' nds t1 t2
+    boxCompat (ELit (LitCons { litName = n }))  t | Just e <- fromConjured modBox n =  e == getType t
+    boxCompat _ _ = False
 
 
 instance CanTypeCheck DataTable E E where

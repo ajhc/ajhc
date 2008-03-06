@@ -657,9 +657,9 @@ boxifyProgram prog = ans where
         emapEG g (return . boxify) e -- (\e -> do putStrLn ("box: " ++ pprint e) ; return $ boxify e) e
     boxify t | Just e <- followAlias (progDataTable prog) t = boxify e
     boxify (EPi t e) = EPi t { tvrType = boxify (tvrType t) } (boxify e)
-    boxify v@EVar {} | canBeBox v = tBox
+    boxify v@EVar {} | canBeBox v = mktBox (getType v)
     boxify (ELit lc) = ELit lc { litArgs = map boxify (litArgs lc) }
-    boxify v@(EAp _ _) | canBeBox v = tBox
+    boxify v@(EAp _ _) | canBeBox v = mktBox (getType v)
     boxify (EAp (ELam t b) e) = boxify (subst t e b)
     boxify (EAp a b) = EAp (boxify a) b -- TODO there should be no applications at the type level by now (boxify b)
     boxify s@ESort {} = s
