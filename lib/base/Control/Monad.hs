@@ -4,6 +4,8 @@ module Control.Monad(
     filterM, mapAndUnzipM, zipWithM, zipWithM_, foldM,
     liftM, liftM2, liftM3, liftM4, liftM5,
 
+    foldM_,replicateM,replicateM_,(>=>),(<=<),forever,
+
     -- ...and what the Prelude exports
     Monad((>>=), (>>), return, fail),
     Functor(fmap),
@@ -89,4 +91,46 @@ liftM5           :: (Monad m) => (a -> b -> c -> d -> e -> f) ->
                                  (m a -> m b -> m c -> m d -> m e -> m f)
 liftM5 f         =  \a b c d e -> do { a' <- a; b' <- b; c' <- c; d' <- d;
        e' <- e; return (f a' b' c' d' e') }
+
+
+-- extensions
+
+-- | Like 'foldM', but discards the result.
+foldM_            :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m ()
+foldM_ f a xs     = foldM f a xs >> return ()
+
+-- | @'replicateM' n act@ performs the action @n@ times,
+-- gathering the results.
+replicateM        :: (Monad m) => Int -> m a -> m [a]
+replicateM n x    = sequence (replicate n x)
+
+-- | Like 'replicateM', but discards the result.
+replicateM_       :: (Monad m) => Int -> m a -> m ()
+replicateM_ n x   = sequence_ (replicate n x)
+
+
+-- | 'forM' is 'mapM' with its arguments flipped
+forM            :: Monad m => [a] -> (a -> m b) -> m [b]
+{-# INLINE forM #-}
+forM            = flip mapM
+
+-- | 'forM_' is 'mapM_' with its arguments flipped
+forM_           :: Monad m => [a] -> (a -> m b) -> m ()
+{-# INLINE forM_ #-}
+forM_           = flip mapM_
+
+infixr 1 <=<, >=>
+
+-- | Left-to-right Kleisli composition of monads.
+(>=>)       :: Monad m => (a -> m b) -> (b -> m c) -> (a -> m c)
+f >=> g     = \x -> f x >>= g
+
+-- | Right-to-left Kleisli composition of monads. '(>=>)', with the
+-- arguments flipped
+(<=<)       :: Monad m => (b -> m c) -> (a -> m b) -> (a -> m c)
+(<=<)       = flip (>=>)
+
+-- | @'forever' act@ repeats the action infinitely.
+forever     :: (Monad m) => m a -> m ()
+forever a   = a >> forever a
 

@@ -40,21 +40,40 @@ instance  (Read a, Read b) => Read (a,b)  where
                                                  (y,v)   <- reads u,
                                                  (")",w) <- lex v ] )
 
+instance  (Read a, Read b, Read c) => Read (a,b,c)  where
+    readsPrec p       = readParen False
+                            (\r -> [((x,y,z), w) | ("(",s) <- lex r,
+                                                 (x,t)   <- reads s,
+                                                 (",",u) <- lex t,
+                                                 (y,v)   <- reads u,
+                                                 (",",w) <- lex v,
+                                                 (z,p)   <- reads w,
+                                                 (")",w) <- lex p ] )
+
 
 
 instance (Show a, Show b, Show c, Show d) => Show (a, b, c, d) where
     showsPrec _ (w,x,y,z) s = (showChar '(' . shows w . showChar ',' .
-					      shows x . showChar ',' .
-					      shows y . showChar ',' .
-					      shows z . showChar ')')
-			      s
+                                              shows x . showChar ',' .
+                                              shows y . showChar ',' .
+                                              shows z . showChar ')')
+                              s
 
 instance (Show a, Show b, Show c, Show d, Show e) => Show (a, b, c, d, e) where
     showsPrec _ (v,w,x,y,z) s = (showChar '(' . shows v . showChar ',' .
-					     	shows w . showChar ',' .
-					     	shows x . showChar ',' .
-					     	shows y . showChar ',' .
-					     	shows z . showChar ')')
+                                                shows w . showChar ',' .
+                                                shows x . showChar ',' .
+                                                shows y . showChar ',' .
+                                                shows z . showChar ')')
+                                    s
+
+instance (Show a, Show b, Show c, Show d, Show e, Show f) => Show (a, b, c, d, e, f) where
+    showsPrec _ (v,w,x,y,z,a) s = (showChar '(' . shows v . showChar ',' .
+                                                  shows w . showChar ',' .
+                                                  shows x . showChar ',' .
+                                                  shows y . showChar ',' .
+                                                  shows z . showChar ',' .
+                                                  shows a . showChar ')')
                                     s
 
 

@@ -14,6 +14,8 @@ module Data.List (
     zipWith4, zipWith5, zipWith6, zipWith7,
     unzip4, unzip5, unzip6, unzip7, unfoldr,
 
+    foldl', foldl1',
+
     -- ...and what the Prelude exports
     -- []((:), []), -- This is built-in syntax
     map, (++), concat, filter,
@@ -51,23 +53,23 @@ findIndices p xs        =  [ i | (x,i) <- zip xs [0..], p x ]
 
 nub                     :: Eq a => [a] -> [a]
 nub l                   = nub' l [] where
-    nub' [] _		= []
+    nub' [] _           = []
     nub' (x:xs) ls
-	| x `elem` ls   = nub' xs ls
-	| otherwise     = x : nub' xs (x:ls)
+        | x `elem` ls   = nub' xs ls
+        | otherwise     = x : nub' xs (x:ls)
 
 --nub                     =  nubBy (==)
 
 nubBy                   :: (a -> a -> Bool) -> [a] -> [a]
 nubBy eq l              = nubBy' l []
   where
-    nubBy' [] _		= []
+    nubBy' [] _         = []
     nubBy' (y:ys) xs
        | elem_by eq y xs = nubBy' ys xs
-       | otherwise	 = y : nubBy' ys (y:xs)
+       | otherwise       = y : nubBy' ys (y:xs)
     elem_by :: (a -> a -> Bool) -> a -> [a] -> Bool
-    elem_by _  _ []		=  False
-    elem_by eq y (x:xs)	=  x `eq` y || elem_by eq y xs
+    elem_by _  _ []             =  False
+    elem_by eq y (x:xs) =  x `eq` y || elem_by eq y xs
 
 --nubBy eq []             =  []
 --nubBy eq (x:xs)         =  x : nubBy eq (filter (\y -> not (eq x y)) xs)
@@ -294,7 +296,6 @@ zipWith7 z (a:as) (b:bs) (c:cs) (d:ds) (e:es) (f:fs) (g:gs)
                    =  z a b c d e f g : zipWith7 z as bs cs ds es fs gs
 zipWith7 _ _ _ _ _ _ _ _ = []
 
-{-
 unzip4                  :: [(a,b,c,d)] -> ([a],[b],[c],[d])
 unzip4                  =  foldr (\(a,b,c,d) ~(as,bs,cs,ds) ->
                                         (a:as,b:bs,c:cs,d:ds))
@@ -314,7 +315,22 @@ unzip7          :: [(a,b,c,d,e,f,g)] -> ([a],[b],[c],[d],[e],[f],[g])
 unzip7          =  foldr (\(a,b,c,d,e,f,g) ~(as,bs,cs,ds,es,fs,gs) ->
                                 (a:as,b:bs,c:cs,d:ds,e:es,f:fs,g:gs))
                          ([],[],[],[],[],[],[])
--}
 
 {-# RULES "sort/sort"  forall  xs . sort (sort xs) = sort xs #-}
 {-# RULES "nub/nub"  forall  xs . nub (nub xs) = nub xs #-}
+
+
+-- | A strict version of 'foldl'.
+foldl'           :: (a -> b -> a) -> a -> [b] -> a
+foldl' f z xs = lgo z xs where
+    lgo z []     = z
+    lgo z (x:xs) = let z' = f z x in z' `seq` lgo z' xs
+
+
+-- | A strict version of 'foldl1'
+foldl1'                  :: (a -> a -> a) -> [a] -> a
+foldl1' f (x:xs)         =  foldl' f x xs
+foldl1' _ []             =  error "foldl1': empty list"
+
+
+

@@ -5,6 +5,7 @@ import Jhc.Int
 import Jhc.Enum
 import Jhc.Order
 import Jhc.Basics
+import Jhc.Num
 import Jhc.IO
 
 class  Ord a => Ix a  where
@@ -36,15 +37,31 @@ instance  Ix Int  where
         | otherwise     =  error "Ix.index: Index out of range."
     inRange (m,n) i     =  m <= i && i <= n
 
-{-
-XXX
-instance  Ix Integer  where
+instance  (Ix a, Ix b)  => Ix (a,b) where
+        range   ((l,l'),(u,u')) = [(i,i') | i <- range (l,u), i' <- range (l',u')]
+        index   ((l,l'),(u,u')) (i,i') =  index (l,u) i * rangeSize (l',u') + index (l',u') i'
+        inRange ((l,l'),(u,u')) (i,i') = inRange (l,u) i && inRange (l',u') i'
+
+--instance  Ix Integer  where
+--    range (m,n)		= [m..n]
+--    index b@(m,n) i
+--        | inRange b i   =  fromInteger (i - m)
+--        | otherwise     =  error "Ix.index: Index out of range."
+--    inRange (m,n) i     =  m <= i && i <= n
+
+instance  Ix Bool  where
     range (m,n)		= [m..n]
-    index b@(m,n) i
-        | inRange b i   =  fromInteger (i - m)
-        | otherwise     =  error "Ix.index: Index out of range."
-    inRange (m,n) i     =  m <= i && i <= n
--}
+    index b@(c,c') ci
+        | inRange b ci  =  fromEnum ci `minus` fromEnum c
+        | otherwise     =  error "Ix.index: 'Bool' Index out of range."
+    inRange (c,c') i    =  c <= i && i <= c'
+
+instance  Ix Ordering  where
+    range (m,n)		= [m..n]
+    index b@(c,c') ci
+        | inRange b ci  =  fromEnum ci `minus` fromEnum c
+        | otherwise     =  error "Ix.index: 'Ordering' Index out of range."
+    inRange (c,c') i    =  c <= i && i <= c'
 
 -- instance (Ix a,Ix b) => Ix (a, b) -- as derived, for all tuples
 -- instance Ix Bool                  -- as derived
