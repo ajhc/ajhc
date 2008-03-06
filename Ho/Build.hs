@@ -190,7 +190,6 @@ fetchSource done_ref fs mm = do
     (mod,m,ds) <- case mlookup hash (knownSourceMap done) of
         Just (m,ds) -> do return (Left lbs,m,ds)
         Nothing -> do
-            fn <- shortenPath fn
             hmod <- parseHsSource fn lbs
             let m = hsModuleName hmod
                 ds = hsModuleRequires hmod
@@ -412,7 +411,6 @@ compileCompNode ifunc func cn = f cn where
             modules <- forM sc $ \x -> case x of
                 SourceParsed { sourceHash = h,sourceModule = mod } -> return (h,mod)
                 SourceRaw { sourceHash = h,sourceLBS = lbs, sourceFP = fp } -> do
-                    fp <- shortenPath fp
                     mod <- parseHsSource fp lbs
                     return (h,mod)
             (cho',newHo) <- func cho (snds modules)
