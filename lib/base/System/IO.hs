@@ -12,6 +12,8 @@ module System.IO(
     hGetContents,
     hClose,
     openFile,
+    hPutBuf,
+    hGetBuf,
     hIsOpen
 
     ) where
@@ -71,12 +73,12 @@ hPutChar h ch = withHandle h $ \ptr -> do
 hPutStr     :: Handle -> String -> IO ()
 hPutStr h s   = withHandle h $ \ptr -> do
     sequence_ [ c_fputwc (fromInt (ord ch)) ptr | ch <- s ]
-	
+
 hPutStrLn   :: Handle -> String -> IO ()
 hPutStrLn h s = do
     hPutStr h s
     hPutChar h '\n'
-	
+
 hPrint      :: Show a => Handle -> a -> IO ()
 hPrint h x    =  hPutStrLn h (show x)
 
@@ -90,6 +92,25 @@ hGetContents h = withHandle h $ \ptr -> do
                     xs <- unsafeInterleaveIO getContents'
                     return (unsafeChr ch:xs)
     unsafeInterleaveIO getContents'
+
+
+
+hPutBuf :: Handle -> Ptr a -> Int -> IO ()
+hPutBuf h p c = do
+    let count = fromIntegral c
+    rc <- withHandle h $ fwrite p 1 count
+    if rc /= count then fail "hPutBuf: short write" else return ()
+
+hGetBuf :: Handle -> Ptr a -> Int -> IO Int
+hGetBuf h p c = do
+    let count = fromIntegral c
+    rc <- withHandle h $ fread p 1 count
+    return $ fromIntegral rc
+
+
+foreign import ccall "stdio.h fwrite_unlocked" fwrite  :: Ptr a -> CSize -> CSize -> Ptr Handle -> IO CSize
+foreign import ccall "stdio.h fread_unlocked" fread :: Ptr a -> CSize -> CSize -> Ptr Handle -> IO CSize
+
 --hIsEOF :: Handle -> IO Bool
 
 foreign import primitive "I2I" cwintToChar :: CWint -> Char
