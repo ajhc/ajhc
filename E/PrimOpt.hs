@@ -185,7 +185,7 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
         (bp,(tr,str)) <- boxPrimitive dataTable (EVar tvra) t
         let res = EPrim (APrim (Op (Op.BinOp o (stringToOpTy ta) (stringToOpTy ta)) (stringToOpTy tr)) mempty) [pa, ELit (LitInt 1 sta)] str
         return $ eStrictLet tvra res bp
-        where unop = [("increment",Op.Add),("decrement",Op.Sub)]
+        where unop = [("increment",Op.Add),("decrement",Op.Sub),("fincrement",Op.FAdd),("fdecrement",Op.FSub)]
     primopt n [] t | Just num <- lookup n vs = mdo
         (res,(_,sta)) <- boxPrimitive dataTable (ELit (LitInt num sta)) t; return res
         where vs = [("zero",0),("one",1)]

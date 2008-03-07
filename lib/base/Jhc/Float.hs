@@ -18,6 +18,7 @@ import Jhc.IO(error)
 import Jhc.Num
 import Jhc.Order
 import Jhc.Types
+import Jhc.Enum
 
 infixr 8  **
 
@@ -143,46 +144,6 @@ rationalToDouble :: Rational -> Double
 rationalToDouble (x:%y) = fromInteger x `divideDouble` fromInteger y
 
 foreign import primitive "FDiv" divideDouble ::  Double -> Double -> Double
-
-
-instance Eq Float where
-    Float x == Float y = boxBool (x `eqFloat` y)
-    Float x /= Float y = boxBool (x `neqFloat` y)
-
-instance Ord Float where
-    Float x < Float y = boxBool (float32FLt x y)
-    Float x > Float y = boxBool (float32FGt x y)
-    Float x <= Float y = boxBool (float32FLte x y)
-    Float x >= Float y = boxBool (float32FGte x y)
-
-
-
-foreign import primitive "FEq" eqFloat :: Float32_ -> Float32_ -> Bool__
-foreign import primitive "FNEq" neqFloat :: Float32_ -> Float32_ -> Bool__
-foreign import primitive "FLt" float32FLt :: Float32_ -> Float32_ -> Bool__
-foreign import primitive "FLte" float32FLte :: Float32_ -> Float32_ -> Bool__
-foreign import primitive "FGt" float32FGt :: Float32_ -> Float32_ -> Bool__
-foreign import primitive "FGte" float32FGte :: Float32_ -> Float32_ -> Bool__
-
-instance Eq Double where
-    Double x == Double y = boxBool (x `eqDouble` y)
-    Double x /= Double y = boxBool (x `neqDouble` y)
-
-instance Ord Double where
-    Double x < Double y = boxBool (float64FLt x y)
-    Double x > Double y = boxBool (float64FGt x y)
-    Double x <= Double y = boxBool (float64FLte x y)
-    Double x >= Double y = boxBool (float64FGte x y)
-
-foreign import primitive "FLt" float64FLt :: Float64_ -> Float64_ -> Bool__
-foreign import primitive "FLte" float64FLte :: Float64_ -> Float64_ -> Bool__
-foreign import primitive "FGt" float64FGt :: Float64_ -> Float64_ -> Bool__
-foreign import primitive "FGte" float64FGte :: Float64_ -> Float64_ -> Bool__
-
-foreign import primitive "FEq" eqDouble :: Float64_ -> Float64_ -> Bool__
-foreign import primitive "FNEq" neqDouble :: Float64_ -> Float64_ -> Bool__
-
-
 foreign import primitive "box" boxBool :: Bool__ -> Bool
 
 
@@ -210,8 +171,55 @@ foreign import primitive "FNeg" neg$1 :: $2 -> $2
 foreign import primitive "I2F"  fromInt$1 :: Int -> $1
 foreign import primitive "I2F"  fromInteger$1 :: Integer -> $1
 
-)
+foreign import primitive "F2I"  toInt$1 :: $1 -> Int
 
+instance Enum $1 where
+    succ = increment$1
+    pred = decrement$1
+    toEnum x = fromInt$1 x
+    fromEnum x = toInt$1 x
+
+    enumFrom x  | x `seq` True     =  x:enumFrom (increment$1 x)
+    enumFromTo x y = f x where
+        f x | x > y = []
+            | otherwise = x:f (increment$1 x)
+    enumFromThen x y | x `seq` y `seq` True = f x where
+        z = y `fminus$1` x
+        f x = x:f (x `fplus$1` z)
+    enumFromThenTo x y z | y >= x = f x where
+        inc = y `fminus$1` x
+        f x | x <= z = x:f (x `fplus$1` inc)
+            | otherwise = []
+    enumFromThenTo x y z  = f x where
+        inc = y `fminus$1` x
+        f x | x >= z = x:f (x `fplus$1` inc)
+            | otherwise = []
+
+foreign import primitive "fincrement" increment$1 :: $1 -> $1
+foreign import primitive "fdecrement" decrement$1 :: $1 -> $1
+foreign import primitive "FAdd" fplus$1  :: $1 -> $1 -> $1
+foreign import primitive "FSub" fminus$1 :: $1 -> $1 -> $1
+
+instance Eq $1 where
+    $1 x == $1 y = boxBool (x `eq$2` y)
+    $1 x /= $1 y = boxBool (x `neq$2` y)
+
+instance Ord $1 where
+    $1 x < $1 y = boxBool (flt$2 x y)
+    $1 x > $1 y = boxBool (fgt$2 x y)
+    $1 x <= $1 y = boxBool (flte$2 x y)
+    $1 x >= $1 y = boxBool (fgte$2 x y)
+
+
+
+foreign import primitive "FEq" eq$2   :: $2 -> $2 -> Bool__
+foreign import primitive "FNEq" neq$2 :: $2 -> $2 -> Bool__
+foreign import primitive "FLt" flt$2  :: $2 -> $2 -> Bool__
+foreign import primitive "FLte" flte$2 :: $2 -> $2 -> Bool__
+foreign import primitive "FGt" fgt$2 :: $2 -> $2 -> Bool__
+foreign import primitive "FGte" fgte$2 :: $2 -> $2 -> Bool__
+
+)
 
 
 

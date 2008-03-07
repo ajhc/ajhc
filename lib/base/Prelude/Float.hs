@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi  #-}
+{-# OPTIONS_JHC -N -fffi -fm4  #-}
 
 module Prelude.Float(readDouble,doubleToDigits,doubleToRational) where
 
@@ -8,6 +8,7 @@ import Jhc.Monad
 import Jhc.IO
 import Jhc.Float
 import Jhc.Num
+import Jhc.Types
 import Data.Word
 import Foreign.Storable
 import Foreign.C.Types
@@ -19,34 +20,60 @@ import Jhc.List
 import Prelude((^),(^^),elem,take)
 
 
-{-  template
 
 
---instance Fractional @type@ where
---    (/) = divide@type@
---    fromRational x = numerator x / denominator x
-
-instance Floating @type@ where
-    pi = atan 1 * 4
-    sqrt = c_sqrt@x@
-    exp = c_exp@x@
-    log = c_log@x@
-    sin = c_sin@x@
-    cos = c_cos@x@
-    tan = c_tan@x@
-    asin = c_asin@x@
-    acos = c_acos@x@
-    atan = c_atan@x@
-    (**) = exponent@type@
-    asinh = c_asinh@x@
-    acosh = c_acosh@x@
-    atanh = c_atanh@x@
-    sinh = c_sinh@x@
-    cosh = c_cosh@x@
-    tanh = c_tanh@x@
+m4_define(INST,{{
 
 
-instance RealFrac Float where
+foreign import primitive "FDiv" divide$2 ::  $2 -> $2 -> $2
+foreign import primitive "FPwr" exponent$2 ::  $2 -> $2 -> $2
+foreign import primitive "FAtan2" atan2$1 ::  $1 -> $1 -> $1
+foreign import primitive "F2I"  toInteger$1 :: $1 -> Integer
+foreign import primitive "const.M_PI" c_pi$1 :: $1
+
+instance Fractional $1 where
+    $1 x / $1 y = $1 (divide$2 x y)
+    fromRational x = fromInteger (numerator x) / fromInteger (denominator x)
+
+m4_define(FI,foreign import primitive "{{$}}1"  {{$}}2$2 :: $2 -> $2)
+
+FI(Sqrt,sqrt)
+FI(Exp,exp)
+FI(Log,log)
+FI(Sin,sin)
+FI(Cos,cos)
+FI(Tan,tan)
+FI(Sinh,sinh)
+FI(Cosh,cosh)
+FI(Tanh,tanh)
+FI(Asin,asin)
+FI(Acos,acos)
+FI(Atan,atan)
+
+m4_undefine({{FI}})
+
+instance Floating $1 where
+    pi = c_pi$1
+    sqrt ($1 x) = $1 (sqrt$2 x)
+    exp ($1 x) = $1 (exp$2 x)
+    log ($1 x) = $1 (log$2 x)
+    sin ($1 x) = $1 (sin$2 x)
+    cos ($1 x) = $1 (cos$2 x)
+    tan ($1 x) = $1 (tan$2 x)
+    asin ($1 x) = $1 (asin$2 x)
+    acos ($1 x) = $1 (acos$2 x)
+    atan ($1 x) = $1 (atan$2 x)
+    sinh ($1 x) = $1 (sinh$2 x)
+    cosh ($1 x) = $1 (cosh$2 x)
+    tanh ($1 x) = $1 (tanh$2 x)
+    $1 x ** $1 y = $1 (exponent$2 x y)
+
+    asinh = c_asinh$1
+    acosh = c_acosh$1
+    atanh = c_atanh$1
+
+
+instance RealFrac $1 where
     properFraction x
       = case (decodeFloat x)      of { (m,n) ->
     	let  b = floatRadix x     in
@@ -58,143 +85,38 @@ instance RealFrac Float where
 	    }
         }
 
-    truncatef x = c_trunc@x@ x
-    roundf x = c_nearbyint@x@ x
-    ceilingf x = c_ceil@x@ x
-    floorf x = c_floor@x@ x
+    truncate x = fromInteger (toInteger$1 x)
+    round x = fromInteger (toInteger$1 (roundf x))
+    ceiling x = fromInteger (toInteger$1 (ceilingf x))
+    floor x = fromInteger (toInteger$1 (floorf x))
 
 
-foreign import ccall "-lm math.h sqrt@x@" c_sqrt@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h exp@x@" c_exp@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h log@x@" c_log@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h sin@x@" c_sin@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h cos@x@" c_cos@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h tan@x@" c_tan@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h asin@x@" c_asin@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h acos@x@" c_acos@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h atan@x@" c_atan@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h asinh@x@" c_asinh@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h acosh@x@" c_acosh@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h atanh@x@" c_atanh@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h sinh@x@" c_sinh@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h cosh@x@" c_cosh@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h tanh@x@" c_tanh@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h pow@x@" exponent@type@ ::  @type@ -> @type@ -> @type@
-foreign import ccall "-lm math.h trunc@x@" c_trunc@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h ceil@x@" c_ceil@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h floor@x@" c_floor@x@ :: @type@ -> @type@
-foreign import ccall "-lm math.h nearbyint@x@" c_nearbyint@x@ :: @type@ -> @type@
-
-foreign import primitive "divide" divide@type@ ::  @type@ -> @type@ -> @type@
-
--}
+    properFractionf x = (c_trunc$1 x,x - c_trunc$1 x)
+    truncatef x = c_trunc$1 x
+    roundf x = c_nearbyint$1 x
+    ceilingf x = c_ceil$1 x
+    floorf x = c_floor$1 x
 
 
+foreign import ccall "-lm math.h asinh$3" c_asinh$1 :: $1 -> $1
+foreign import ccall "-lm math.h acosh$3" c_acosh$1 :: $1 -> $1
+foreign import ccall "-lm math.h atanh$3" c_atanh$1 :: $1 -> $1
+foreign import ccall "-lm math.h trunc$3" c_trunc$1 :: $1 -> $1
+foreign import ccall "-lm math.h ceil$3" c_ceil$1 :: $1 -> $1
+foreign import ccall "-lm math.h floor$3" c_floor$1 :: $1 -> $1
+foreign import ccall "-lm math.h nearbyint$3" c_nearbyint$1 :: $1 -> $1
 
+foreign import ccall "math.h isnan" c_isnan$3 :: $1 -> CInt
+foreign import ccall "math.h isinf" c_isinfinite$3 :: $1 -> CInt
+foreign import ccall "math.h signbit" c_signbit$3 :: $1 -> CInt
 
-instance Fractional Float where
-    a / b = divideFloat a b
-    fromRational x = fromInteger (numerator x) / fromInteger (denominator x)
-    fromDouble x = doubleToFloat x
+foreign import ccall "math.h ldexp$3"  c_ldexp$3 :: $1 -> CInt -> $1
+foreign import ccall "math.h frexp$3"  c_frexp$3 :: $1 -> Ptr CInt -> IO $1
 
-instance Floating Float where
-    pi = c_pif
-    sqrt = c_sqrtf
-    exp = c_expf
-    log = c_logf
-    sin = c_sinf
-    cos = c_cosf
-    tan = c_tanf
-    asin = c_asinf
-    acos = c_acosf
-    atan = c_atanf
-    (**) = exponentFloat
-    asinh = c_asinhf
-    acosh = c_acoshf
-    atanh = c_atanhf
-    sinh = c_sinhf
-    cosh = c_coshf
-    tanh = c_tanhf
+}})
 
-
-foreign import ccall "-lm math.h sqrtf" c_sqrtf :: Float -> Float
-foreign import ccall "-lm math.h expf" c_expf :: Float -> Float
-foreign import ccall "-lm math.h logf" c_logf :: Float -> Float
-foreign import ccall "-lm math.h sinf" c_sinf :: Float -> Float
-foreign import ccall "-lm math.h cosf" c_cosf :: Float -> Float
-foreign import ccall "-lm math.h tanf" c_tanf :: Float -> Float
-foreign import ccall "-lm math.h asinf" c_asinf :: Float -> Float
-foreign import ccall "-lm math.h acosf" c_acosf :: Float -> Float
-foreign import ccall "-lm math.h atanf" c_atanf :: Float -> Float
-foreign import ccall "-lm math.h asinhf" c_asinhf :: Float -> Float
-foreign import ccall "-lm math.h acoshf" c_acoshf :: Float -> Float
-foreign import ccall "-lm math.h atanhf" c_atanhf :: Float -> Float
-foreign import ccall "-lm math.h sinhf" c_sinhf :: Float -> Float
-foreign import ccall "-lm math.h coshf" c_coshf :: Float -> Float
-foreign import ccall "-lm math.h tanhf" c_tanhf :: Float -> Float
-foreign import ccall "-lm math.h powf" exponentFloat ::  Float -> Float -> Float
-foreign import ccall "-lm math.h truncf" c_truncf :: Float -> Float
-foreign import ccall "-lm math.h ceilf" c_ceilf :: Float -> Float
-foreign import ccall "-lm math.h floorf" c_floorf :: Float -> Float
-foreign import ccall "-lm math.h nearbyintf" c_nearbyintf :: Float -> Float
-
-
-
-foreign import primitive "FDiv" divideFloat ::  Float -> Float -> Float
-
-
-
-
-
-instance Fractional Double where
-    (/) = divideDouble
-    fromRational x = fromInteger (numerator x) / fromInteger (denominator x)
-    fromDouble x = x
-
-instance Floating Double where
-    pi = c_pi
-    sqrt = c_sqrt
-    exp = c_exp
-    log = c_log
-    sin = c_sin
-    cos = c_cos
-    tan = c_tan
-    asin = c_asin
-    acos = c_acos
-    atan = c_atan
-    (**) = exponentDouble
-    asinh = c_asinh
-    acosh = c_acosh
-    atanh = c_atanh
-    sinh = c_sinh
-    cosh = c_cosh
-    tanh = c_tanh
-
-
-foreign import ccall "-lm math.h sqrt" c_sqrt :: Double -> Double
-foreign import ccall "-lm math.h exp" c_exp :: Double -> Double
-foreign import ccall "-lm math.h log" c_log :: Double -> Double
-foreign import ccall "-lm math.h sin" c_sin :: Double -> Double
-foreign import ccall "-lm math.h cos" c_cos :: Double -> Double
-foreign import ccall "-lm math.h tan" c_tan :: Double -> Double
-foreign import ccall "-lm math.h asin" c_asin :: Double -> Double
-foreign import ccall "-lm math.h acos" c_acos :: Double -> Double
-foreign import ccall "-lm math.h atan" c_atan :: Double -> Double
-foreign import ccall "-lm math.h asinh" c_asinh :: Double -> Double
-foreign import ccall "-lm math.h acosh" c_acosh :: Double -> Double
-foreign import ccall "-lm math.h atanh" c_atanh :: Double -> Double
-foreign import ccall "-lm math.h sinh" c_sinh :: Double -> Double
-foreign import ccall "-lm math.h cosh" c_cosh :: Double -> Double
-foreign import ccall "-lm math.h tanh" c_tanh :: Double -> Double
-foreign import ccall "-lm math.h pow" exponentDouble ::  Double -> Double -> Double
-foreign import ccall "-lm math.h trunc" c_trunc :: Double -> Double
-foreign import ccall "-lm math.h ceil" c_ceil :: Double -> Double
-foreign import ccall "-lm math.h floor" c_floor :: Double -> Double
-foreign import ccall "-lm math.h nearbyint" c_nearbyint :: Double -> Double
-
-
-
-foreign import primitive "FDiv" divideDouble ::  Double -> Double -> Double
+INST(Float,Float32_,f)
+INST(Double,Float64_)
 
 
 instance Real Float where
@@ -208,38 +130,6 @@ instance Real Double where
     toDouble x = x
 
 
-instance RealFrac Float where
-    properFraction x
-      = case (decodeFloat x)      of { (m,n) ->
-    	let  b = floatRadix x     in
-    	if n >= 0 then
-	    (fromInteger m * fromInteger b ^ n, 0.0)
-    	else
-	    case (quotRem m (b^(negate n))) of { (w,r) ->
-	    (fromInteger w, encodeFloat r n)
-	    }
-        }
-    truncatef x = c_truncf x
-    roundf x = c_nearbyintf x
-    ceilingf x = c_ceilf x
-    floorf x = c_floorf x
-
-
-instance RealFrac Double where
-    properFraction x
-      = case (decodeFloat x)      of { (m,n) ->
-    	let  b = floatRadix x     in
-    	if n >= 0 then
-	    (fromInteger m * fromInteger b ^ n, 0.0)
-    	else
-	    case (quotRem m (b^(negate n))) of { (w,r) ->
-	    (fromInteger w, encodeFloat r n)
-	    }
-        }
-    truncatef x = c_trunc x
-    roundf x = c_nearbyint x
-    ceilingf x = c_ceil x
-    floorf x = c_floor x
 
 
 instance RealFloat Float where
@@ -269,20 +159,10 @@ instance RealFloat Float where
         let x'' =  c_ldexp x' (fromInt $ floatDigits x)
         return (double2integer x'', fromIntegral exp  - floatDigits x)
 
+    atan2 = atan2Float
 
 
-foreign import ccall "math.h isnan" c_isnanf :: Float -> CInt
-foreign import ccall "math.h isinf" c_isinfinitef :: Float -> CInt
-foreign import ccall "math.h signbit" c_signbit :: Double -> CInt
-foreign import ccall "math.h signbit" c_signbitf :: Float -> CInt
 
-foreign import ccall "math.h ldexp"  c_ldexp :: Double -> CInt -> Double
-foreign import ccall "math.h ldexpf" c_ldexpf :: Float -> CInt -> Float
-foreign import ccall "math.h frexp"  c_frexp :: Double -> Ptr CInt -> IO Double
-foreign import ccall "math.h frexpf" c_frexpf :: Float -> Ptr CInt -> IO Float
-
-foreign import primitive "const.M_PI" c_pif :: Float
-foreign import primitive "const.M_PI" c_pi :: Double
 
 instance RealFloat Double where
     floatRadix _ = 2
@@ -311,9 +191,8 @@ instance RealFloat Double where
         return (double2integer x'', fromIntegral exp  - floatDigits x)
 
 
+    atan2 = atan2Double
 
-foreign import ccall "math.h isnan" c_isnan :: Double -> CInt
-foreign import ccall "math.h isinf" c_isinfinite :: Double -> CInt
 
 
 foreign import primitive "I2F" integer2float :: Integer -> Float
