@@ -821,7 +821,8 @@ tiProgram bgs es = ans where
         ch <- getClassHierarchy
         withContext (makeMsg "in the binding group:" $ show (getBindGroupName bg)) $ do
             ([],leftovers) <- splitPreds ch [] ps
-            topDefaults leftovers
+            --topDefaults leftovers
+            return ()
         liftIO $ do putChar '.'; hFlush stdout
         localEnv env $ f bgs (ds ++ rs) (env `mappend` cenv)
     f [] rs _cenv = do
@@ -829,7 +830,8 @@ tiProgram bgs es = ans where
         (pdecls,ps) <- listenPreds $ mapM tcPragmaDecl es
         withContext (makeMsg "in the pragmas:" $ "rules") $ do
             ([],leftovers) <- splitPreds ch [] ps
-            topDefaults leftovers
+            --topDefaults leftovers
+            return ()
         liftIO $ putStrLn "!"
         return (rs ++ concat pdecls)
 
