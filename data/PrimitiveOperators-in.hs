@@ -68,7 +68,7 @@ oper_aIa op ct' a b = EPrim (binOp op ct ot_int ct) [a,b] (rawType ct') where
 
 ot_int = stringToOpTy "bits32"
 
-op_aIa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
+op_aIa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') dc_Int tvrb wtd))) where
     tvra' = tVr 2 t
     tvrb' = tVr 4 tInt
     tvra = tVr 6 st
