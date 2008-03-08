@@ -74,7 +74,7 @@ data ClassRecord = ClassRecord {
     classArgs :: [Tyvar],
     classSupers :: [Class],
     classInsts :: [Inst],
-    classAssumps :: [(Name,Sigma)],
+    classAssumps :: [(Name,Sigma)], -- ^ method signatures
     classAssocs :: [(Tycon,[Tyvar],Maybe Sigma)]
     }
     {-! derive: Binary !-}

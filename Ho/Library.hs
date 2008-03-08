@@ -17,9 +17,9 @@ import qualified FlagDump as FD
 
 type LibraryName = String
 
--------------------------
--- parse description file
--------------------------
+---------------------------------------
+-- parse description file (.cabal file)
+---------------------------------------
 
 readDescFile :: FilePath -> IO [(String,String)]
 readDescFile fp = do
