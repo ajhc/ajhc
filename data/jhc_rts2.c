@@ -1,28 +1,39 @@
 
 #define ISLAZY(x)    (((uintptr_t)(x)) & 0x1)
-#define DETAG(x)     ((uintptr_t)(x) & ~0x1)
+#define DETAG(x)     ((uintptr_t)(x) & ~0x3)
 #define GETTAG(x)    ((uintptr_t)(x) & 0x3)
 
 #define GETHEAD(x)   (NODEP(x)->head)
 #define GETWHAT(x)   (DNODEP(x)->what)
 #define NODEP(x)     ((node_t *)(x))
 #define DNODEP(x)    ((dnode_t *)(x))
-#define EVALTAG(fn)  (assert(((uintptr_t)(fn) & 0x3) == 0),(sptr_t)((uintptr_t)(fn) | P_LAZY))
-#define EVALTAGC(fn) ((sptr_t)((void *)(fn) + P_LAZY))
+#define EVALTAG(fn)  (assert(((uintptr_t)(fn) & 0x3) == 0),(sptr_t)((uintptr_t)(fn) | P_FUNC))
+#define EVALTAGC(fn) ((sptr_t)((void *)(fn) + P_FUNC))
 #define VALUE(n)     ((wptr_t)(((uintptr_t)(n) << 2) | P_VALUE))
 #define ISVALUE(n)   (assert(!ISLAZY(n)), ((uintptr_t)(n) & 0x2))
 #define PROMOTE(n)   ((wptr_t)(n))
 #define DEMOTE(n)    ((sptr_t)(n))
 
 
-#define P_VALUE 0x2
 #define P_WHNF  0x0
 #define P_LAZY  0x1
+#define P_VALUE 0x2
+#define P_FUNC  0x3
 
 #define BLACK_HOLE ((fptr_t)0xDEADBEEF)
 
 
-/* a value may be one of the following and is represented by a sptr_t
+/*
+ * smart pointers take on a general form as follows:
+ *
+ * -------------------------
+ * |    payload        | GL|
+ * -------------------------
+ *
+ *   G - if set, then the garbage collector should not treat value as a pointer to be followed
+ *   L - lazy, this bit being set means the value is somehow lazy
+ *
+ * a value may be one of the following and is represented by a sptr_t
  *
  * -------------------------
  * |    raw value      | 10|
@@ -53,7 +64,7 @@
  *  which are interpreted exactly as above or
  *
  * -------------------------
- * |    code pointer   | 01|
+ * |    code pointer   | 11|
  * -------------------------
  * |     data ...          |
  *
@@ -86,7 +97,7 @@
 typedef struct node *  sptr_t;
 typedef struct dnode * wptr_t;
 typedef void *         fptr_t;
-typedef unsigned       what_t;
+typedef uintptr_t      what_t;
 
 
 typedef struct node {
@@ -126,7 +137,7 @@ jhc_valid_lazy(sptr_t s)
         assert(jhc_malloc_sanity(ds,P_LAZY));
         if(ISLAZY(ds->head)) {
                 if(ds->head == BLACK_HOLE) return 1;
-                assert(GETTAG(ds->head) == P_LAZY);
+                assert(GETTAG(ds->head) == P_FUNC);
                 fptr_t dhead = (fptr_t)DETAG(ds->head);
                 assert(dhead >= &_start && dhead < &_end);
                 return 1;

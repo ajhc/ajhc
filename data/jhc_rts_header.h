@@ -17,8 +17,13 @@
 
 // #define our options
 
-#ifndef _JHC_BOEHM_GC
-#define _JHC_BOEHM_GC 0
+#define _JHC_GC_NONE  0
+#define _JHC_GC_JUDY  1
+#define _JHC_GC_BOEHM 2
+
+
+#ifndef _JHC_GC
+#define _JHC_GC _JHC_GC_NONE
 #endif
 
 #ifndef _JHC_PROFILE

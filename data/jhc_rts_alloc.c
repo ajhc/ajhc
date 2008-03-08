@@ -1,5 +1,5 @@
 
-#if   _JHC_BOEHM_GC
+#if _JHC_GC == _JHC_GC_BOEHM
 
 #include <gc/gc.h>
 #define jhc_malloc GC_malloc
@@ -82,7 +82,7 @@ jhc_malloc(size_t n)
 #define jhc_malloc_suspension(x)  jhc_malloc(x)
 
 
-#endif // USE_BOEHM_GC
+#endif
 
 
 

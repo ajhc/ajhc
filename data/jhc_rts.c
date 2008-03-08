@@ -37,7 +37,7 @@ jhc_print_profile(void) {
         fprintf(stderr, "Command: %s\n", jhc_command);
         fprintf(stderr, "Complie: %s\n", jhc_c_compile);
         fprintf(stderr, "Version: %s\n\n", jhc_version);
-#if !_JHC_BOEHM_GC
+#if _JHC_GC == _JHC_GC_NONE
         fprintf(stderr, "Memory Allocated: %llu bytes\n", (unsigned long long)(jhc_mem - jhc_memstart));
 #endif
         float cpt = (float)sysconf(_SC_CLK_TCK);
