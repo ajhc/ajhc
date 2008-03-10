@@ -124,16 +124,16 @@ convertFunc ffie (n,as :-> body) = do
                 Nothing -> return []
                 Just ~(FfiExport cn Safe CCall, (argTys, retTy)) -> do
                     newVars <- mapM (liftM (name . show) . newVar . basicType) argTys
-                    
+
                     let fnname2 = name cn
                         as2 = zip (newVars) (map basicType argTys)
                         fr2 = basicType retTy
 
                     return [function fnname2 fr2 as2 [Public]
-                                     (creturn $ cast fr2 $ functionCall fnname $ 
+                                     (creturn $ cast fr2 $ functionCall fnname $
                                       zipWith cast (map snd as')
                                                    (map variable newVars))]
-                    
+
         return (function fnname fr as' ats (profile_function_inc & s) : mstub)
 
 
@@ -165,13 +165,20 @@ convertVal (Var v ty) = fetchVar v ty
 convertVal (Const h) = do
     tyenv <- asks (grinTypeEnv . rGrin)
     case h of
-        NodeC a ts | Just bn <- basicNode tyenv a ts -> return (cast sptr_t bn)
+        NodeC a ts -> do
+            bn <- basicNode tyenv a ts 
+            case bn of 
+                Just bn ->  return (cast sptr_t bn)
+                _ -> do
+                    (_,i) <- newConst h
+                    return $ variable (name $  'c':show i )
         _ -> do
             (_,i) <- newConst h
             return $ variable (name $  'c':show i )
 convertVal h@(NodeC a ts) | valIsConstant h = do
     tyenv <- asks (grinTypeEnv . rGrin)
-    case basicNode tyenv a ts of
+    bn <- basicNode tyenv a ts
+    case bn of
         Just bn -> return bn
         _ -> do
             (_,i) <- newConst h
@@ -615,7 +622,7 @@ primUnOp n ta r a
 tagAssign :: Expression -> Atom -> C Statement
 tagAssign e t | tagIsSuspFunction t = do
     en <- declareEvalFunc t
-    return $ getHead e =* f_EVALTAG (reference (variable en))
+    return $ getHead e =* f_EVALFUNC (reference (variable en))
 tagAssign e t = do
     declareStruct t
     tyenv <- asks (grinTypeEnv . rGrin)
@@ -631,7 +638,7 @@ tellTags t = do
     tyenv <- asks (grinTypeEnv . rGrin)
     TyTy { tySiblings = sib } <- findTyTy tyenv t
     case sib of
-        Just [n'] | n' == t -> return ()
+        --Just [n'] | n' == t ->  return ()
         Just rs -> tell mempty { wEnums = Map.fromList (zip (map nodeTagName rs) [0..]) }
         Nothing -> tell mempty { wTags = Set.singleton t }
 
@@ -640,7 +647,8 @@ tellTags t = do
 newNode ty ~(NodeC t as) = do
     tyenv <- asks (grinTypeEnv . rGrin)
     let sf = tagIsSuspFunction t
-    case basicNode tyenv t as of
+    bn <- basicNode tyenv t as
+    case bn of
       Just e -> return (mempty,e)
       Nothing -> do
         st <- nodeType t
@@ -675,13 +683,17 @@ declareStruct n = do
     unless (null fields) $ tell mempty { wStructures = Map.singleton (nodeStructName n) fields }
 
 
-basicNode :: TyEnv -> Atom -> [Val] -> (Maybe Expression)
+basicNode :: TyEnv -> Atom -> [Val] -> C (Maybe Expression)
+basicNode tyenv a [] = do tellTags a ; return . Just $ (f_RAWWHAT (constant $ enum (nodeTagName a)))
+basicNode _ _ _ = return Nothing
+{-
 basicNode tyenv a [] | isJust s = ans where
     Just TyTy { tySiblings = s@(~(Just ss)) } = findTyTy tyenv a
     ans = case ss of
         [n'] | n' == a -> Just (f_VALUE (constant $ number 0))
         _ -> Nothing
 basicNode _ _ _ = Nothing
+-}
 
 
 declareEvalFunc n = do
@@ -718,6 +730,7 @@ f_assert e    = functionCall (name "assert") [e]
 f_DETAG e     = functionCall (name "DETAG") [e]
 f_NODEP e     = functionCall (name "NODEP") [e]
 f_EVALTAG e   = functionCall (name "EVALTAG") [e]
+f_EVALFUNC e  = functionCall (name "EVALFUNC") [e]
 f_VALUE e     = functionCall (name "VALUE") [e]
 f_ISVALUE e   = functionCall (name "ISVALUE") [e]
 f_eval e      = functionCall (name "eval") [e]
@@ -725,6 +738,7 @@ f_promote e   = functionCall (name "promote") [e]
 f_PROMOTE e   = functionCall (name "PROMOTE") [e]
 f_GETWHAT e   = functionCall (name "GETWHAT") [e]
 f_SETWHAT e v = functionCall (name "SETWHAT") [e,v]
+f_RAWWHAT e   = functionCall (name "RAWWHAT") [e]
 f_demote e    = functionCall (name "demote") [e]
 f_follow e    = functionCall (name "follow") [e]
 f_update x y  = functionCall (name "update") [x,y]

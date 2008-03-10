@@ -6,14 +6,17 @@
 #define GETHEAD(x)   (NODEP(x)->head)
 #define NODEP(x)     ((node_t *)(x))
 #define DNODEP(x)    ((dnode_t *)(x))
-#define EVALTAG(fn)  (assert(((uintptr_t)(fn) & 0x3) == 0),(sptr_t)((uintptr_t)(fn) | P_FUNC))
-#define EVALTAGC(fn) ((sptr_t)((void *)(fn) + P_FUNC))
+#define EVALTAG(fn)  (assert(((uintptr_t)(fn) & 0x3) == 0),(sptr_t)((uintptr_t)(fn) | P_LAZY))
+#define EVALTAGC(fn) ((sptr_t)((void *)(fn) + P_LAZY))
+#define EVALFUNC(fn) ((fptr_t)((uintptr_t)(fn) | P_FUNC))
 #define VALUE(n)     ((wptr_t)(((uintptr_t)(n) << 2) | P_VALUE))
 #define ISVALUE(n)   (assert(!ISLAZY(n)), ((uintptr_t)(n) & 0x2))
 #define PROMOTE(n)   ((wptr_t)(n))
 #define DEMOTE(n)    ((sptr_t)(n))
-#define GETWHAT(x)   (DNODEP(x)->what)
+#define GETWHAT(x)   (GETTAG(x) == P_VALUE ? ((uintptr_t)(x) >> 16) : DNODEP(x)->what)
+
 #define SETWHAT(x,v)   (DNODEP(x)->what = (v))
+#define RAWWHAT(w)     (wptr_t)(((uintptr_t)w << 16) | P_VALUE)
 
 
 #define P_WHNF  0x0
@@ -116,7 +119,7 @@ as the above is concered. It happens to possibly contain a code pointer.
 typedef struct node *  sptr_t;
 typedef struct dnode * wptr_t;
 typedef void *         fptr_t;
-typedef uint16_t       what_t;
+typedef uintptr_t      what_t;
 
 
 typedef struct node {
