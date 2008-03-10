@@ -256,7 +256,7 @@ convertBody (Fetch v :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
 convertBody (Case v@(Var _ ty) [[p1@(NodeC t _)] :-> e1,[p2] :-> e2]) | ty == TyNode = do
     scrut <- convertVal v
     tellTags t
-    let tag = getWhat scrut
+    let tag = f_GETWHAT scrut
         da (Var v _) e | v == v0 = convertBody e
         da v@Var {} e = do
             v'' <- convertVal v
@@ -291,7 +291,7 @@ convertBody (Case v@(Var _ t) [[p1] :-> e1, [p2] :-> e2]) | Set.null ((freeVars 
     return $ profile_case_inc & cif (cp p1 `eq` scrut) e1' (am e2')
 convertBody (Case v@(Var _ t) ls) | t == TyNode = do
     scrut <- convertVal v
-    let tag = getWhat scrut
+    let tag = f_GETWHAT scrut
         da ([v@(Var {})] :-> e) = do
             v'' <- convertVal v
             e' <- convertBody e
@@ -623,7 +623,7 @@ tagAssign e t = do
     tellTags t
     case sib of
         Just [n'] | n' == t -> return mempty
-        _ -> do return $ getWhat e =* constant (enum $ nodeTagName t)
+        _ -> do return . toStatement $ f_SETWHAT e (constant (enum $ nodeTagName t))
 
 tellTags :: Atom -> C ()
 tellTags t | tagIsSuspFunction t = return ()
@@ -723,6 +723,8 @@ f_ISVALUE e   = functionCall (name "ISVALUE") [e]
 f_eval e      = functionCall (name "eval") [e]
 f_promote e   = functionCall (name "promote") [e]
 f_PROMOTE e   = functionCall (name "PROMOTE") [e]
+f_GETWHAT e   = functionCall (name "GETWHAT") [e]
+f_SETWHAT e v = functionCall (name "SETWHAT") [e,v]
 f_demote e    = functionCall (name "demote") [e]
 f_follow e    = functionCall (name "follow") [e]
 f_update x y  = functionCall (name "update") [x,y]
@@ -742,12 +744,11 @@ nodeTagName a = toName (fromAtom a)
 nodeFuncName :: Atom -> Name
 nodeFuncName a = toName (fromAtom a)
 
-sptr_t    = basicType "sptr_t"
-fptr_t    = basicType "fptr_t"
+sptr_t    = basicGCType "sptr_t"
+fptr_t    = basicGCType "fptr_t"
+wptr_t    = basicGCType "wptr_t"
 what_t    = basicType "what_t"
-wptr_t    = basicType "wptr_t"
 size_t    = basicType "size_t"
-tag_t     = basicType "tag_t"
 uintptr_t = basicType "uintptr_t"
 
 a_STD = Attribute "A_STD"
@@ -759,9 +760,6 @@ concrete t e = cast (ptrType $ structType (nodeStructName t)) e
 
 getHead :: Expression -> Expression
 getHead e = project' (name "head") e
-
-getWhat :: Expression -> Expression
-getWhat e = project' (name "what") e
 
 nodeTypePtr a = liftM ptrType (nodeType a)
 nodeType a = return $ structType (nodeStructName a)

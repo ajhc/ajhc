@@ -4,7 +4,6 @@
 #define GETTAG(x)    ((uintptr_t)(x) & 0x3)
 
 #define GETHEAD(x)   (NODEP(x)->head)
-#define GETWHAT(x)   (DNODEP(x)->what)
 #define NODEP(x)     ((node_t *)(x))
 #define DNODEP(x)    ((dnode_t *)(x))
 #define EVALTAG(fn)  (assert(((uintptr_t)(fn) & 0x3) == 0),(sptr_t)((uintptr_t)(fn) | P_FUNC))
@@ -13,6 +12,8 @@
 #define ISVALUE(n)   (assert(!ISLAZY(n)), ((uintptr_t)(n) & 0x2))
 #define PROMOTE(n)   ((wptr_t)(n))
 #define DEMOTE(n)    ((sptr_t)(n))
+#define GETWHAT(x)   (DNODEP(x)->what)
+#define SETWHAT(x,v)   (DNODEP(x)->what = (v))
 
 
 #define P_WHNF  0x0
@@ -115,7 +116,7 @@ as the above is concered. It happens to possibly contain a code pointer.
 typedef struct node *  sptr_t;
 typedef struct dnode * wptr_t;
 typedef void *         fptr_t;
-typedef uintptr_t      what_t;
+typedef uint16_t       what_t;
 
 
 typedef struct node {

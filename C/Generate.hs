@@ -3,6 +3,7 @@ module C.Generate(
     anonStructType,
     assign,
     basicType,
+    basicGCType,
     cast,
     cif,
     constant,
@@ -132,7 +133,9 @@ stmtMapStmt f s = g s where
     h (St sms) = return St `ap` Seq.mapM f sms
 
 
-data Type = TB String | TPtr Type | TAnon [Type] | TNStruct Name | TFunPtr Type [Type]
+-- The Bool in TB and TPtr are whether the GC needs to consider the types to
+-- possibly contain garbage collectable pointers.
+data Type = TB String Bool | TPtr Type | TAnon [Type] | TNStruct Name | TFunPtr Type [Type]
     deriving(Eq,Ord)
 
 data E = ED (G Doc) | EP E | EE
@@ -199,7 +202,7 @@ instance Draw Constant where
     err s = C $ terr s
 
 instance Draw Type where
-    draw (TB x) = text x
+    draw (TB x _) = text x
     draw (TPtr x) = draw x <> char '*'
     draw (TAnon ts) = do
         (n,mp) <- get
@@ -212,7 +215,7 @@ instance Draw Type where
     draw (TNStruct n) = text "struct" <+> draw n
     draw (TFunPtr r as) = draw r <+> text "(*)" <> tupled (map draw as)
 
-    err s = TB $ terr s
+    err s = TB (terr s) False
 
 -- expressions
 sizeof :: Type -> Expression
@@ -462,7 +465,12 @@ anonStructType :: [Type] -> Type
 anonStructType ts = TAnon ts
 
 basicType :: String -> Type
-basicType s = TB s
+basicType s = TB s False
+
+-- | a basic type the garbage collector might want to follow, guarenteed to be
+-- the size of a pointer.
+basicGCType :: String -> Type
+basicGCType s = TB s True
 
 structType :: Name -> Type
 structType n = TNStruct n
