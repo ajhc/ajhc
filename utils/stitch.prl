@@ -19,10 +19,10 @@ my %s;
 foreach my $fn (@ARGV) {
     open my $fh, "<$fn" or die "$!: could not open $fn";
     while(<$fh>) {
-        /^\{\-[#@](\w+)(\s+(\d+))?\s*$/ or next;
-        my ($section,$text,$order) = ($1,"",defined $3 ? $3 : 100);
+        /^(\{\-|\/\*)[#@](\w+)(\s+(\d+))?\s*$/ or next;
+        my ($section,$text,$order) = ($2,"",defined $4 ? $4 : 100);
         while(<$fh>) {
-            /^\-\}\s*$/ and last;
+            /^(\-\}|\*\/)\s*$/ and last;
             $text .= $_;
         }
         $s{$section} ||= [];

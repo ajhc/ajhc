@@ -23,65 +23,83 @@
 #define BLACK_HOLE ((fptr_t)0xDEADBEEF)
 
 
-/*
- * smart pointers take on a general form as follows:
- *
- * -------------------------
- * |    payload        | GL|
- * -------------------------
- *
- *   G - if set, then the garbage collector should not treat value as a pointer to be followed
- *   L - lazy, this bit being set means the value is somehow lazy
- *
- * a value may be one of the following and is represented by a sptr_t
- *
- * -------------------------
- * |    raw value      | 10|
- * -------------------------
- *
- * -------------------------
- * |    whnf location  | 00|
- * -------------------------
- *
- * -------------------------
- * |   lazy location   | 01|
- * -------------------------
- *
- * whnf and raw value field formats are completly determined by the data type
- * and need not conform to any particular format.
- *
- *  a lazy location is always at least a single word long which is always one
- *  of the following
- *
- * -------------------------
- * |    raw value      | 10|
- * -------------------------
- *
- * -------------------------
- * |    whnf location  | 00|
- * -------------------------
- *
- *  which are interpreted exactly as above or
- *
- * -------------------------
- * |    code pointer   | 11|
- * -------------------------
- * |     data ...          |
- *
- * something to evaluate, code pointer is a pointer to a function that takes
- * the memory location as its only argument, the called function is in charge
- * of updating the location if needed.
- *
- * note that it is invalid to have a lazy location point to another lazy
- * location. there is only ever one level of indirection allowed, and only from
- * lazy locations
- *
- * note that a partial application is just like any other value in WHNF as far
- * as the above is concered. It happens to possibly contain a code pointer.
- *
- * u bits are undefined.
- *
- */
+/*@Internals
+
+# The Run Time System
+
+Jhc is very minimalist in that it does not have a precompiled run time system,
+but rather generates what is needed as part of the compilation process.
+However, we call whatever conventions and binary layouts used in the generated
+executable the run time system. Since jhc generates the code anew each time, it
+can build a different 'run time' based on compiler options, trading things like
+the garbage collector as needed or changing the closure layout when we know we
+have done full program optimization. This describes the 'native' layout upon
+which other conventions are layered.
+
+A basic value in jhc is represented by a 'smart pointer' of c type sptr_t. a
+smart pointer is the size of a native pointer, but can take on different roles
+depending on a pair of tag bits.
+
+smart pointers take on a general form as follows:
+
+    -------------------------
+    |    payload        | GL|
+    -------------------------
+
+      G - if set, then the garbage collector should not treat value as a pointer to be followed
+      L - lazy, this bit being set means the value is not in WHNF
+
+A raw sptr_t on its own in the wild can only take on one of the following values:
+
+    -------------------------
+    |    raw value      | 10|
+    -------------------------
+
+    -------------------------
+    |    whnf location  | 00|
+    -------------------------
+
+    -------------------------
+    |   lazy location   | 01|
+    -------------------------
+
+A raw value can be anything and not necessarily a pointer in general, a WHNF
+location is a pointer to some value in WHNF. The system places no restrictions
+on what is actually pointed to by a WHNF pointer, however the garbage collector
+in use may. In general, the back end is free to choose what to place in the raw
+value field or in what a WHNF points to with complete freedom. If an
+implementation sees the L bit is clear, it can pass on the smart pointer
+without examining it knowing the value is in WHNF.
+
+A lazy location points to a potential closure or an indirection to a WHNF
+value. The lazy location is an allocated chunk of memory that is at least
+one pointer long. the very first location in a closure must be one of the
+following.
+
+    -------------------------
+    | raw value or whnf  |X0|
+    -------------------------
+
+An evaluated value, interpreted exactly as above. one can always replace any occurance of a
+lazy location with an evaluated indirecton.
+
+    -------------------------
+    |    code pointer   | 11|
+    -------------------------
+    |     data ...          |
+
+This is something to evaluate, code pointer is a pointer to a function that takes
+the memory location as its only argument, the called function is in charge
+of updating the location if needed.
+
+note that it is invalid to have a lazy location point to another lazy
+location. there is only ever one level of indirection allowed, and only from
+lazy locations
+
+note that a partial application is just like any other value in WHNF as far
+as the above is concered. It happens to possibly contain a code pointer.
+
+*/
 
 
 /*

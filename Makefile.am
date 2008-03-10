@@ -235,7 +235,7 @@ publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/in
 	cp -- $^ /home/john/public_html/computer/jhc
 
 manual: utils/stitch.prl FlagDump.mkd FlagOpts.mkd options.mkd
-	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' \) | xargs perl utils/stitch.prl > manual.mkd
+	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/*.c' \) | xargs perl utils/stitch.prl > manual.mkd
 
 options.mkd: jhc
 	echo "{-@Options 1" > $@
