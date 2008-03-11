@@ -100,9 +100,10 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
                     convertFunc (Map.lookup a (grinEntryPoints grin)) (a,l)
         tellFunctions funcs
         h <- get
-        let tset = Set.fromList [ n | (HcNode n _,_) <- Grin.HashConst.toList h]
+        let tset = Set.fromList [ n | (HcNode n (_:_),_) <- Grin.HashConst.toList h]
+            tset' = Set.fromList [ n | (HcNode n [],_) <- Grin.HashConst.toList h]
         mapM_ declareStruct  (Set.toList tset)
-        mapM_ tellTags (Set.toList tset)
+        mapM_ tellTags (Set.toList $ tset `mappend` tset')
     cafs = text "/* CAFS */" $$ (vcat $ map ccaf (grinCafs grin))
 
 convertFunc :: Maybe (FfiExport, ([ExtType], ExtType)) -> (Atom,Lam) -> C [Function]
@@ -166,8 +167,8 @@ convertVal (Const h) = do
     tyenv <- asks (grinTypeEnv . rGrin)
     case h of
         NodeC a ts -> do
-            bn <- basicNode tyenv a ts 
-            case bn of 
+            bn <- basicNode tyenv a ts
+            case bn of
                 Just bn ->  return (cast sptr_t bn)
                 _ -> do
                     (_,i) <- newConst h
@@ -501,8 +502,11 @@ ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ P.render (pp
 
 
 buildConstants tyenv fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
-    cc nn@(HcNode a zs,i) = comm $$ cd $$ def where
-        comm = text "/* " <> tshow (nn) <> text " */"
+    comm nn = text "/* " <> tshow (nn) <> text " */"
+    cc nn@(HcNode a [],i) = comm nn $$ def where
+        def = text "#define c" <> tshow i <+> text "(sptr_t)" <> tshow (f_RAWWHAT (constant $ enum (nodeTagName a)))
+
+    cc nn@(HcNode a zs,i) = comm nn $$ cd $$ def where
         cd = text "const static struct " <> tshow (nodeStructName a) <+> text "_c" <> tshow i <+> text "= {" <> hsep (punctuate P.comma (ntag ++ rs)) <> text "};"
         Just TyTy { tySiblings = sibs } = findTyTy tyenv a
         ntag = case sibs of
@@ -638,7 +642,7 @@ tellTags t = do
     tyenv <- asks (grinTypeEnv . rGrin)
     TyTy { tySiblings = sib } <- findTyTy tyenv t
     case sib of
-        --Just [n'] | n' == t ->  return ()
+        Just [n'] | n' == t ->  return ()
         Just rs -> tell mempty { wEnums = Map.fromList (zip (map nodeTagName rs) [0..]) }
         Nothing -> tell mempty { wTags = Set.singleton t }
 
@@ -677,6 +681,7 @@ declareStruct n = do
     let TyTy { tySlots = ts, tySiblings = ss } = runIdentity $ findTyTy (grinTypeEnv grin) n
     ts' <- mapM convertType ts
     let tag | tagIsSuspFunction n = [(name "head",fptr_t)]
+            | null ts = []
             | Just [n'] <- ss, n == n' = []
             | otherwise = [(name "what",what_t)]
         fields = (tag ++ zip [ name $ 'a':show i | i <-  [(1 :: Int) ..] ] ts')
@@ -684,6 +689,10 @@ declareStruct n = do
 
 
 basicNode :: TyEnv -> Atom -> [Val] -> C (Maybe Expression)
+basicNode tyenv a [] = case s of
+    Just [n'] | n' == a -> return $ Just (f_VALUE (constant $ number 0))
+    _ -> do tellTags a ; return . Just $ (f_RAWWHAT (constant $ enum (nodeTagName a)))
+    where Just TyTy { tySiblings = s@(~(Just ss)) } = findTyTy tyenv a
 basicNode tyenv a [] = do tellTags a ; return . Just $ (f_RAWWHAT (constant $ enum (nodeTagName a)))
 basicNode _ _ _ = return Nothing
 {-
