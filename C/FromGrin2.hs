@@ -85,7 +85,7 @@ stringNameToTy n = (archOpTy archInfo n)
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
 compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c ++ jhc_rts2_c ++ generateArchAssertions ++ P.render ans ++ "\n", snub (reqLibraries req))  where
-    ans = vcat $ includes ++ [text "", enum_tag_t, header, cafs,buildConstants (grinTypeEnv grin) finalHcHash, body]
+    ans = vcat $ includes ++ [text "", enum_tag_t, header, cafs,buildConstants grin finalHcHash, body]
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
     (header,body) = generateC False (Map.elems fm) (Map.assocs sm)
@@ -100,8 +100,10 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
                     convertFunc (Map.lookup a (grinEntryPoints grin)) (a,l)
         tellFunctions funcs
         h <- get
-        let tset = Set.fromList [ n | (HcNode n (_:_),_) <- Grin.HashConst.toList h]
-            tset' = Set.fromList [ n | (HcNode n [],_) <- Grin.HashConst.toList h]
+        let tset = Set.fromList [ n | (HcNode n (_:_),_) <- hconsts]
+            tset' = Set.fromList [ n | (HcNode n [],_) <- hconsts]
+            hconsts = Grin.HashConst.toList h
+        mapM_ tellAllTags [ v  | (HcNode _ vs,_) <- hconsts, Left v <- vs]
         mapM_ declareStruct  (Set.toList tset)
         mapM_ tellTags (Set.toList $ tset `mappend` tset')
     cafs = text "/* CAFS */" $$ (vcat $ map ccaf (grinCafs grin))
@@ -161,7 +163,7 @@ convertVals xs = do
     return (structAnon (zip xs ts))
 
 convertVal :: Val -> C Expression
-convertVal v | Just e <- convertConst v = return e
+convertVal v | Just e <- convertConst v = e
 convertVal (Var v ty) = fetchVar v ty
 convertVal (Const h) = do
     tyenv <- asks (grinTypeEnv . rGrin)
@@ -501,7 +503,8 @@ ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ P.render (pp
      text "#define " <> tshow (varName v) <+>  text "(EVALTAGC(&_" <> tshow (varName v) <> text "))\n";
 
 
-buildConstants tyenv fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
+buildConstants grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
+    tyenv = grinTypeEnv grin
     comm nn = text "/* " <> tshow (nn) <> text " */"
     cc nn@(HcNode a [],i) = comm nn $$ def where
         def = text "#define c" <> tshow i <+> text "(sptr_t)" <> tshow (f_RAWWHAT (constant $ enum (nodeTagName a)))
@@ -516,36 +519,39 @@ buildConstants tyenv fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
         rs = [ f z undefined |  z <- zs ]
         f (Right i) = text $ 'c':show i
         f (Left (Var n _)) = tshow $ varName n
-        f (Left v) = text (show $ drawG e) where
+        f (Left v) = text (show $ drawG (fst3 $ runC grin e)) where
             Just e = convertConst v
 
-convertConst :: Monad m => Val -> m Expression
-convertConst (Const (NodeC h _)) | h == tagHole = return (cast sptr_t (f_VALUE (constant $ number 0)))
-convertConst (Lit i (TyPrim Op.TyBool)) = return $ if i == 0 then constant cFalse else constant cTrue
-convertConst (Lit i (TyPrim (Op.TyBits _ Op.HintFloat))) = return (constant $ floating (realToFrac i))
-convertConst (Lit i _) = return (constant $ number (fromIntegral i))
-convertConst (ValPrim (APrim p _) [] _) = case p of
-    CConst s _ -> return $ expressionRaw s
-    AddrOf t -> return $ expressionRaw ('&':unpackPS t)
-    PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimSizeOf } -> return $ expressionRaw ("sizeof(" ++ tyToC Op.HintUnsigned arg ++ ")")
-    PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMinBound } -> return $ expressionRaw ("prim_minbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
-    PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMaxBound } -> return $ expressionRaw ("prim_maxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
-    PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimUMaxBound } -> return $ expressionRaw ("prim_umaxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
-    PrimString s -> return $ cast (basicType "uintptr_t") (expressionRaw (show s))
-    x -> return $ err (show x)
-convertConst (ValPrim (APrim p _) [x] (TyPrim opty)) = do
-    x' <- convertConst x
-    case p of
-        Op (Op.UnOp n ta) r -> primUnOp n ta r x'
-        Op (Op.ConvOp n ta) r -> return $ castFunc n ta r x'
+convertConst :: Val -> Maybe (C Expression)
+convertConst (Const (NodeC n [])) = Just $ do tellTags n ; return (cast sptr_t $ f_RAWWHAT (constant $ enum (nodeTagName n)))
+convertConst (NodeC n [])  = Just $ do tellTags n ;  return (f_RAWWHAT (constant $ enum (nodeTagName n)))
+convertConst v = fmap return (f v) where
+    f :: Val -> Maybe Expression
+    f (Lit i (TyPrim Op.TyBool)) = return $ if i == 0 then constant cFalse else constant cTrue
+    f (Lit i (TyPrim (Op.TyBits _ Op.HintFloat))) = return (constant $ floating (realToFrac i))
+    f (Lit i _) = return (constant $ number (fromIntegral i))
+    f (ValPrim (APrim p _) [] _) = case p of
+        CConst s _ -> return $ expressionRaw s
+        AddrOf t -> return $ expressionRaw ('&':unpackPS t)
+        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimSizeOf } -> return $ expressionRaw ("sizeof(" ++ tyToC Op.HintUnsigned arg ++ ")")
+        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMinBound } -> return $ expressionRaw ("prim_minbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
+        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMaxBound } -> return $ expressionRaw ("prim_maxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
+        PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimUMaxBound } -> return $ expressionRaw ("prim_umaxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
+        PrimString s -> return $ cast (basicType "uintptr_t") (expressionRaw (show s))
         x -> return $ err (show x)
-convertConst (ValPrim (APrim p _) [x,y] _) = do
-    x' <- convertConst x
-    y' <- convertConst y
-    case p of
-        Op (Op.BinOp n ta tb) r -> primBinOp n ta tb r x' y'
-        x -> return $ err (show x)
-convertConst x = fail "convertConst"
+    f (ValPrim (APrim p _) [x] (TyPrim opty)) = do
+        x' <- f x
+        case p of
+            Op (Op.UnOp n ta) r -> primUnOp n ta r x'
+            Op (Op.ConvOp n ta) r -> return $ castFunc n ta r x'
+            x -> return $ err (show x)
+    f (ValPrim (APrim p _) [x,y] _) = do
+        x' <- f x
+        y' <- f y
+        case p of
+            Op (Op.BinOp n ta tb) r -> primBinOp n ta tb r x' y'
+            x -> return $ err (show x)
+    f x = fail "f"
 
 
 --convertPrim p vs = return (mempty,err $ show p)
@@ -636,13 +642,19 @@ tagAssign e t = do
         Just [n'] | n' == t -> return mempty
         _ -> do return . toStatement $ f_SETWHAT e (constant (enum $ nodeTagName t))
 
+
+tellAllTags :: Val -> C ()
+tellAllTags (NodeC n vs) = tellTags n >> mapM_ tellAllTags vs
+tellAllTags n = mapValVal tt n >> return () where
+    tt v = tellAllTags v >> return v
+
 tellTags :: Atom -> C ()
 tellTags t | tagIsSuspFunction t = return ()
 tellTags t = do
     tyenv <- asks (grinTypeEnv . rGrin)
     TyTy { tySiblings = sib } <- findTyTy tyenv t
     case sib of
-        Just [n'] | n' == t ->  return ()
+--        Just [n'] | n' == t ->  return ()
         Just rs -> tell mempty { wEnums = Map.fromList (zip (map nodeTagName rs) [0..]) }
         Nothing -> tell mempty { wTags = Set.singleton t }
 
@@ -690,7 +702,7 @@ declareStruct n = do
 
 basicNode :: TyEnv -> Atom -> [Val] -> C (Maybe Expression)
 basicNode tyenv a [] = case s of
-    Just [n'] | n' == a -> return $ Just (f_VALUE (constant $ number 0))
+--    Just [n'] | n' == a -> return $ Just (f_VALUE (constant $ number 0))
     _ -> do tellTags a ; return . Just $ (f_RAWWHAT (constant $ enum (nodeTagName a)))
     where Just TyTy { tySiblings = s@(~(Just ss)) } = findTyTy tyenv a
 basicNode tyenv a [] = do tellTags a ; return . Just $ (f_RAWWHAT (constant $ enum (nodeTagName a)))

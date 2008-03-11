@@ -1,4 +1,4 @@
-module Grin.HashConst where
+module Grin.HashConst(newConst,HcHash(),HcNode(..),toList,emptyHcHash) where
 
 import Control.Monad.State
 import qualified Data.Map as Map
@@ -17,8 +17,6 @@ data HcHash = HcHash !Int (Map.Map HcNode Int)
 
 emptyHcHash = HcHash 1 Map.empty
 
-{-# INLINE newConst #-}
-{-# INLINE newConst' #-}
 newConst :: MonadState HcHash m => Val -> m (Bool,Int)
 newConst n = newConst' False n
 
@@ -32,6 +30,8 @@ newConst' fuzzy n = f n where
                 | fuzzy = return $ Left (Lit 0 ty)
                 | otherwise = return $ Left vp
             g x@(Var (V n) _) | n < 0  = return $ Left x
+            g n@(Const (NodeC _ [])) = return $ Left n
+            g n@(NodeC _ []) = return $ Left n
             g (Const n) = liftM (Right . snd) $ f n
             g n@NodeC {} = liftM (Right . snd) $ f n
             g e = error $ "HashConst.g: " ++ show e
