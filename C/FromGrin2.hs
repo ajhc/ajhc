@@ -213,9 +213,6 @@ convertType (TyPtr TyNode) = return sptr_t
 convertType (TyPtr (TyPtr TyNode)) = return $ ptrType sptr_t
 convertType (TyPrim opty) = return (opTyToC opty)
 
-forceHint _ Op.TyBool = Op.TyBool
-forceHint h (Op.TyBits b _) = Op.TyBits b h
-
 tyToC _ Op.TyBool = "bool"
 tyToC dh (Op.TyBits (Op.BitsExt s) _) = s
 tyToC dh (Op.TyBits b h) = f b h where
@@ -293,7 +290,7 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t _)] :-> e1,[p2] :-> e2]) | ty == Ty
 convertBody (Case v@Var {} [v1, v2@([Lit n _] :-> _)]) | n == 0 = convertBody (Case v [v2,v1])
 convertBody (Case v@(Var _ t) [[p1] :-> e1, [p2] :-> e2]) | Set.null ((freeVars p2 :: Set.Set Var) `Set.intersection` freeVars e2) = do
     scrut <- convertVal v
-    let cp (Lit i _) = constant (number $ fromIntegral i)
+    let cp ~(Lit i _) = constant (number $ fromIntegral i)
         am e | isVar p2 = e
              | otherwise = annotate (show p2) (f_assert ((cp p2) `eq` scrut) & e)
     e1' <- convertBody e1
@@ -530,9 +527,9 @@ convertConst v = fmap return (f v) where
     f (Lit i (TyPrim Op.TyBool)) = return $ if i == 0 then constant cFalse else constant cTrue
     f (Lit i (TyPrim (Op.TyBits _ Op.HintFloat))) = return (constant $ floating (realToFrac i))
     f (Lit i _) = return (constant $ number (fromIntegral i))
-    f (ValPrim (APrim p _) [] _) = case p of
+    f (ValPrim (APrim p _) [] ty) = case p of
         CConst s _ -> return $ expressionRaw s
-        AddrOf t -> return $ expressionRaw ('&':unpackPS t)
+        AddrOf t -> do rt <- convertType ty; return . cast rt $ expressionRaw ('&':unpackPS t)
         PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimSizeOf } -> return $ expressionRaw ("sizeof(" ++ tyToC Op.HintUnsigned arg ++ ")")
         PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMinBound } -> return $ expressionRaw ("prim_minbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
         PrimTypeInfo { primArgTy = arg, primTypeInfo = PrimMaxBound } -> return $ expressionRaw ("prim_maxbound(" ++ tyToC Op.HintUnsigned arg ++ ")")
@@ -563,11 +560,13 @@ convertPrim p vs ty
         convertVal (ValPrim (p) vs rt)
     | APrim (Func _ n as r) _ <- p = do
         vs' <- mapM convertVal vs
-        return $ cast (basicType r) (functionCall (name $ unpackPS n) [ cast (basicType t) v | v <- vs' | t <- as ])
+        rt <- convertTypes ty
+        return $ cast (rt) (functionCall (name $ unpackPS n) [ cast (basicType t) v | v <- vs' | t <- as ])
     | APrim (IFunc _ as r) _ <- p = do
         v':vs' <- mapM convertVal vs
+        rt <- convertTypes ty
         let fn = cast (funPtrType (basicType r) (map basicType as)) v'
-        return $ cast (basicType r) (indirectFunctionCall fn [ cast (basicType t) v | v <- vs' | t <- as ])
+        return $ cast (rt) (indirectFunctionCall fn [ cast (basicType t) v | v <- vs' | t <- as ])
     | APrim (Peek t) _ <- p, [v] <- vs = do
         v' <- convertVal v
         return $ expressionRaw ("*((" <> (opTyToC' t) <+> "*)" <> (parens $ renderG v') <> char ')')
@@ -576,7 +575,8 @@ convertPrim p vs ty
         x' <- convertVal x
         return $ expressionRaw ("*((" <> (opTyToC' t) <+> "*)" <> (parens $ renderG v') <> text ") = " <> renderG x')
     | APrim (AddrOf t) _ <- p, [] <- vs = do
-        return $ expressionRaw ('&':unpackPS t)
+        rt <- convertTypes ty
+        return . cast rt $ expressionRaw ('&':unpackPS t)
     | otherwise = return $ err ("prim: " ++ show (p,vs))
 
 signedOps = [
