@@ -31,7 +31,6 @@ import RawFiles
 import Support.CanType
 import Support.FreeVars
 import Util.Gen
-import Util.SetLike
 import Util.UniqueMonad
 import qualified C.Op as Op
 
@@ -55,6 +54,7 @@ data Written = Written {
 data Env = Env {
     rTodo :: Todo,
     rInscope :: Set.Set Name,
+    rDeclare :: Bool,
     rEMap :: Map.Map Atom (Name,[Expression]),
     rGrin :: Grin
     }
@@ -62,11 +62,11 @@ data Env = Env {
 
 
 newtype C a = C (RWST Env Written HcHash Uniq a)
-    deriving(Monad,UniqueProducer,MonadState HcHash,MonadWriter Written,MonadReader Env)
+    deriving(Monad,UniqueProducer,MonadState HcHash,MonadWriter Written,MonadReader Env,Functor)
 
 
 runC :: Grin -> C a -> (a,HcHash,Written)
-runC grin (C m) =  execUniq1 (runRWST m Env { rGrin = grin, rTodo = TodoExp [], rEMap = mempty, rInscope = mempty } emptyHcHash)
+runC grin (C m) =  execUniq1 (runRWST m Env { rGrin = grin, rDeclare = False, rTodo = TodoExp [], rEMap = mempty, rInscope = mempty } emptyHcHash)
 
 tellFunctions :: [Function] -> C ()
 tellFunctions fs = tell mempty { wFunctions = Map.fromList $ map (\x -> (functionName x,x)) fs }
@@ -78,9 +78,6 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 --------------
 -- entry point
 --------------
-
-stringNameToTy :: String -> Op.Ty
-stringNameToTy n = (archOpTy archInfo n)
 
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
@@ -146,7 +143,8 @@ fetchVar v ty = do
     t <- convertType ty
     is <- asks rInscope
     let n = varName v
-    return $ if n `member` is then variable n else localVariable t n
+    dclare <- asks rDeclare
+    return $ if not dclare then variable n else localVariable t n
 
 fetchVar' :: Var -> Ty -> C (Name,Type)
 fetchVar' (V n) _ | n < 0 = error "fetchVar': CAF"
@@ -221,20 +219,30 @@ tyToC dh (Op.TyBits b h) = f b h where
         (Op.Bits n) ->  "uint" ++ show n ++ "_t"
         (Op.BitsArch Op.BitsMax) -> "uintmax_t"
         (Op.BitsArch Op.BitsPtr) -> "uintptr_t"
+        _ -> error "tyToC: unknown"
     f b Op.HintSigned = case b of
         (Op.Bits n) ->  "int" ++ show n ++ "_t"
         (Op.BitsArch Op.BitsMax) -> "intmax_t"
         (Op.BitsArch Op.BitsPtr) -> "intptr_t"
+        _ -> error "tyToC: unknown"
     f b Op.HintFloat = case b of
         (Op.Bits 32) -> "float"
         (Op.Bits 64) -> "double"
         (Op.Bits 128) -> "__float128"
+        _ -> error "tyToC: unknown"
+    f _ _ = error "tyToC: unknown"
 
 
 opTyToC opty = basicType (tyToC Op.HintUnsigned opty)
 
 opTyToC' opty = tyToC Op.HintUnsigned opty
 
+localScope xs action = do
+    let fvs = freeVars xs
+    aas <- mapM (\ (v,t) -> do t <- convertType t ; return . toStatement $ localVariable t (varName v)) (filter ((v0 /=) . fst) $ Set.toList fvs)
+    local (rInscope_u $ Set.union (Set.map varName (freeVars xs))) (action . statementOOB $ mconcat aas)
+
+iDeclare action = local (\e -> e { rDeclare = True }) action
 
 convertBody :: Exp -> C Statement
 convertBody Let { expDefs = defs, expBody = body } = do
@@ -242,14 +250,14 @@ convertBody Let { expDefs = defs, expBody = body } = do
     nn <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = as :-> _ } -> do
         vs' <- mapM convertVal as
         let nm = (toName (show name ++ "_" ++ show u))
-        return (name,(nm,vs'))
+        return (as,(name,(nm,vs')))
     let done = (toName $ "done" ++ show u)
-    let localJumps xs = local (rEMap_u (Map.fromList xs `mappend`))
+    let localJumps xs action = localScope (fsts xs) $ \dcls ->  local (rEMap_u (Map.fromList (snds xs) `mappend`)) (fmap (dcls &) action)
     localJumps nn $ do
-    ss <- (convertBody body)
     rs <- flip mapM defs $ \FuncDef { funcDefName = name, funcDefBody = as :-> b } -> do
-       ss <- convertBody b
-       return (annotate (show as) (label (toName (show name ++ "_" ++ show u))) & subBlock ss)
+        ss <- convertBody b
+        return (annotate (show as) (label (toName (show name ++ "_" ++ show u))) & subBlock ss)
+    ss <- (convertBody body)
     todo <- asks rTodo
     case todo of
         TodoReturn -> return (ss & mconcat rs);
@@ -266,14 +274,14 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == 
     tellTags t
     let da (Var v _) e | v == v0 = convertBody e
         da v@Var {} e = do
-            v'' <- convertVal v
+            v'' <- iDeclare $ convertVal v
             e' <- convertBody e
             return $ v'' =* scrut & e'
         da n1@(NodeC t _) (Return [n2@NodeC {}]) | n1 == n2 = convertBody (Return [v])
         da ~(NodeC t as) e = do
             tellTags t
             declareStruct t
-            as' <- mapM convertVal as
+            as' <- iDeclare $ mapM convertVal as
             let tmp = concrete t  scrut
                 ass = mconcat [if needed a then a' =* (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
                 fve = freeVars e
@@ -306,7 +314,7 @@ convertBody (Case v@(Var _ t) ls) | t == TyNode = do
             e' <- convertBody e
             return $ (Nothing,e')
         da ([v@(Var {})] :-> e) = do
-            v'' <- convertVal v
+            v'' <- iDeclare $ convertVal v
             e' <- convertBody e
             return $ (Nothing,v'' =* scrut & e')
         da ([n1@(NodeC t _)] :-> Return [n2@NodeC {}]) | n1 == n2 = do
@@ -316,7 +324,7 @@ convertBody (Case v@(Var _ t) ls) | t == TyNode = do
         da (~[(NodeC t as)] :-> e) = do
             tellTags t
             declareStruct t
-            as' <- mapM convertVal as
+            as' <- iDeclare $ mapM convertVal as
             e' <- convertBody e
             let tmp = concrete t scrut
                 ass = mconcat [if needed a then a' =* (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
@@ -331,7 +339,7 @@ convertBody (Case v@(Var _ t) ls) = do
             e' <- convertBody e
             return (Nothing,e')
         da ([v@(Var {})] :-> e) = do
-            v'' <- convertVal v
+            v'' <- iDeclare $ convertVal v
             e' <- convertBody e
             return (Nothing,v'' =* scrut & e')
         da (~[(Lit i _)] :-> e) = do
@@ -362,25 +370,27 @@ convertBody (Store  n@NodeC {})  = newNode sptr_t n >>= \(x,y) -> simpleRet y >>
 convertBody (Return [n@NodeC {}])  = newNode wptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
 
 
-convertBody (e :>>= [(Var vn vt)] :-> e') | not $ isCompound e = do
-    (vn,vt) <- fetchVar' vn vt
+convertBody (e :>>= [(Var vn' vt')] :-> e') | not $ isCompound e = do
+    (vn,vt) <- fetchVar' vn' vt'
     ss <- localTodo (TodoDecl vn vt) (convertBody e)
-    ss' <- local (rInscope_u (Set.insert vn)) $ convertBody e'
-    return (ss & ss')
-
-convertBody (e :>>= [v@(Var _ _)] :-> e') = do
-    v' <- convertVal v
-    ss <- localTodo (TodoExp [v'])  (convertBody e)
     ss' <- convertBody e'
     return (ss & ss')
+
+convertBody (e :>>= [v@(Var vn vt)] :-> e') = do
+    v' <- convertVal v
+    vt <- convertType vt
+    let sdecl = statementOOB $ toStatement (localVariable vt (varName vn))
+    ss <- localTodo (TodoExp [v'])  (convertBody e)
+    ss' <- convertBody e'
+    return (sdecl & ss & ss')
 
 convertBody (e :>>= xs@(_:_:_) :-> e') = do
     ts <- mapM (convertType . getType) xs
-    st <- newVar (anonStructType ts)
+    (dcl,st) <- newDeclVar (anonStructType ts)
+    vs <- iDeclare $ mapM convertVal xs
     ss <- localTodo (TodoExp [st]) (convertBody e)
     ss' <- convertBody e'
-    vs <- mapM convertVal xs
-    return $  ss & mconcat [ v =* projectAnon i st | v <- vs | i <- [0..] ] & ss'
+    return $ dcl & ss & mconcat [ v =* projectAnon i st | v <- vs | i <- [0..] ] & ss'
 
 -- IORef's do this
 convertBody (Store v) | tyINode == getType v = do
@@ -442,11 +452,11 @@ simpleRet er = do
 nodeAssign v t as e' = do
     declareStruct t
     v' <- convertVal v
-    as' <- mapM convertVal as
+    as' <- iDeclare $ mapM convertVal as
     let ass = concat [perhapsM (a `Set.member` fve) $ a' =* (project' (arg i) (concrete t v')) | a' <- as' | Var a _ <- as |  i <- [( 1 :: Int) ..] ]
         fve = freeVars e'
     ss' <- convertBody e'
-    return $  mconcat ass & ss'
+    return $ mconcat ass & ss'
 
 isCompound Fetch {} = False
 isCompound Return {} = False
@@ -759,8 +769,6 @@ f_DETAG e     = functionCall (name "DETAG") [e]
 f_NODEP e     = functionCall (name "NODEP") [e]
 f_EVALTAG e   = functionCall (name "EVALTAG") [e]
 f_EVALFUNC e  = functionCall (name "EVALFUNC") [e]
-f_VALUE e     = functionCall (name "VALUE") [e]
-f_ISVALUE e   = functionCall (name "ISVALUE") [e]
 f_eval e      = functionCall (name "eval") [e]
 f_promote e   = functionCall (name "promote") [e]
 f_PROMOTE e   = functionCall (name "PROMOTE") [e]
@@ -790,8 +798,6 @@ sptr_t    = basicGCType "sptr_t"
 fptr_t    = basicGCType "fptr_t"
 wptr_t    = basicGCType "wptr_t"
 what_t    = basicType "what_t"
-size_t    = basicType "size_t"
-uintptr_t = basicType "uintptr_t"
 
 a_STD = Attribute "A_STD"
 a_MALLOC = Attribute "A_MALLOC"

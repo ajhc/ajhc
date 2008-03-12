@@ -19,6 +19,7 @@ module C.Generate(
     Expression(),
     Constant(),
     expressionRaw,
+    statementOOB,
     indexArray,
     function,
     Function(functionName),
@@ -34,6 +35,7 @@ module C.Generate(
     name,
     Name(),
     newVar,
+    newDeclVar,
     newAssignVar,
     newTmpVar,
     forLoop,
@@ -87,10 +89,12 @@ data Env = Env {
     envInScope    :: Set.Set Name
     }
 
+--envInScope_u f e = e { envInScope = f $ envInScope e }
+
 emptyEnv = Env { envUsedLabels = mempty, envInScope = mempty }
 
 newtype G a = G (RWS Env [(Name,Type)] (Int,Map.Map [Type] Name) a)
-    deriving(Monad,MonadWriter [(Name,Type)],MonadState (Int,Map.Map [Type] Name),MonadReader Env)
+    deriving(Monad,MonadWriter [(Name,Type)],MonadState (Int,Map.Map [Type] Name),MonadReader Env,MonadFix)
 
 
 newtype Name = Name String
@@ -176,12 +180,12 @@ instance Draw Stmt where
         sc (Nothing,ss) = do ss <- draw (SBlock ss); return $ text "default:"  $$  ( nest 4 ss $$ text "break;")
         md = if any isNothing (fsts ts) then empty else text "default: jhc_case_fell_off(__LINE__);"
 
-subBlockBody s = draw s
+--subBlockBody s = draw s
 subBlockBody s = do
     let vcmp (n,t@(TB _ b)) = (not b,n)
         vcmp (n,t) = (True,n)
     is <- asks envInScope
-    (body,uv) <- censor (const []) $ listen (draw s)
+    (body,uv) <-  censor (const []) $ listen (draw s)
     uv' <- forM [ (x,t) | (x,t) <- snubUnder vcmp uv, (x /= toName "v0") && (x `Set.notMember` is)] $ \ (n,t) -> do
         t <- draw t
         return $ t <+> tshow n <> semi
@@ -267,6 +271,10 @@ localVariable :: Type -> Name -> Expression
 localVariable t n = expD $ do
     tell [(n,t)]
     draw n
+
+statementOOB :: Statement -> Statement
+statementOOB s = (sd $ draw s >> return empty)
+
 
 
 instance Monoid Statement where
@@ -391,12 +399,16 @@ newAssignVar t n e = do
             return $ t <+> va
     return d
 
-newVar t = snd `liftM` newDeclVar t
+newVar t = do
+    u <- newUniq
+    let n = name $ 'x':show u
+    return (localVariable t n)
+
 
 newDeclVar t = do
     u <- newUniq
     let n = name $ 'x':show u
-    return (sd (tell [(n,t)] >> return mempty),localVariable t n)
+    return (sd (tell [(n,t)] >> return mempty),variable n)
 
 
 labelPull :: Statement -> (Statement,Statement)
