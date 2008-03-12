@@ -39,7 +39,7 @@ import qualified C.Op as Op
 -- C Monad
 ---------------
 
-data Todo = TodoReturn | TodoExp [Expression] | TodoDecl Name Type
+data Todo = TodoReturn | TodoExp [Expression] | TodoDecl Name Type | TodoNothing
 
 
 data Written = Written {
@@ -138,13 +138,14 @@ convertFunc ffie (n,as :-> body) = do
 
 
 fetchVar :: Var -> Ty -> C Expression
+fetchVar (V 0) _ = return $ noAssign (err "fetchVar v0")
 fetchVar v@(V n) _ | n < 0 = return $ (variable  $ varName v)
 fetchVar v ty = do
     t <- convertType ty
     is <- asks rInscope
     let n = varName v
     dclare <- asks rDeclare
-    return $ if not dclare then variable n else localVariable t n
+    return $ (if v == v0 then noAssign else id) $ if not dclare then variable n else localVariable t n
 
 fetchVar' :: Var -> Ty -> C (Name,Type)
 fetchVar' (V n) _ | n < 0 = error "fetchVar': CAF"
@@ -263,7 +264,7 @@ convertBody Let { expDefs = defs, expBody = body } = do
         TodoReturn -> return (ss & mconcat rs);
         _ -> return (ss & goto done & mconcat (intersperse (goto done) rs) & label done);
 convertBody (e :>>= [] :-> e') = do
-    ss <- localTodo (TodoExp []) (convertBody e)
+    ss <- localTodo TodoNothing (convertBody e)
     ss' <- convertBody e'
     return (ss & ss')
 convertBody (Return [v] :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
@@ -360,6 +361,7 @@ convertBody (Error s t) = do
         g [x] = f x
         g xs = do ts <- mapM convertType xs; xs <- mapM f xs ; return $ structAnon (zip xs ts)
     case x of
+        TodoNothing -> return jerr
         TodoExp _ -> return jerr
         TodoDecl {} -> return jerr
         TodoReturn -> do
@@ -370,7 +372,12 @@ convertBody (Store  n@NodeC {})  = newNode sptr_t n >>= \(x,y) -> simpleRet y >>
 convertBody (Return [n@NodeC {}])  = newNode wptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
 
 
-convertBody (e :>>= [(Var vn' vt')] :-> e') | not $ isCompound e = do
+convertBody (e :>>= [(Var vn _)] :-> e') | vn == v0 = do
+    ss <- localTodo TodoNothing (convertBody e)
+    ss' <- convertBody e'
+    return (ss & ss')
+
+convertBody (e :>>= [(Var vn' vt')] :-> e') | not (isCompound e) = do
     (vn,vt) <- fetchVar' vn' vt'
     ss <- localTodo (TodoDecl vn vt) (convertBody e)
     ss' <- convertBody e'
@@ -444,6 +451,7 @@ simpleRet er = do
     case x of
         TodoReturn -> return (creturn er)
         _ | isEmptyExpression er -> return mempty
+        TodoNothing -> return (toStatement er)
         TodoExp [v] -> return (v =* er)
         TodoDecl n t -> do newAssignVar t n er
         TodoExp [] -> return $ expr er

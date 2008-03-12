@@ -60,6 +60,13 @@ mapValVal fn x = f x where
     f (ValPrim p vs ty) = return (ValPrim p) `ap` mapM fn vs `ap` return ty
     f x = return x
 
+mapValVal_ fn x = f x where
+    f (NodeC t vs) = mapM_ fn vs
+    f (Index a b) = fn a >> fn b >> return ()
+    f (Const v) = fn v >> return ()
+    f (ValPrim p vs ty) =  mapM_ fn vs >> return ()
+    f _ = return ()
+
 mapExpLam fn e = f e where
     f (a :>>= b) = return (a :>>=) `ap` fn b
     f (Case e as) = return (Case e) `ap` mapM fn as
@@ -91,6 +98,12 @@ mapFBodies f xs = mapM f' xs where
     f' fd@FuncDef { funcDefBody = l :-> r } = do
         r' <- f r
         return $  updateFuncDefProps fd { funcDefBody = l :-> r' }
+
+funcDefBody_uM f fd@FuncDef { funcDefBody = b } = do
+    b' <- f b
+    return $  updateFuncDefProps fd { funcDefBody = b' }
+
+grinFunctions_s nf grin = grin { grinFunctions = nf }
 
 
 --------------------------
@@ -176,6 +189,7 @@ collectFuncs exp = runWriter (cfunc exp) where
             a <- clfunc l1
             b <- clfunc l2
             return (a `mappend` b)
+        cfunc x = error "Grin.Noodle.collectFuncs: unknown"
 
 grinLet defs body = updateLetProps Let {
     expDefs = defs,

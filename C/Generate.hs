@@ -5,6 +5,7 @@ module C.Generate(
     basicType,
     basicGCType,
     cast,
+    noAssign,
     cif,
     constant,
     cTrue,cFalse,
@@ -105,7 +106,18 @@ instance Show Name where
     show (Name n) = n
 
 
-data TypeHint = ThNone | ThConst | ThPtr
+data TypeHint = TypeHint {
+    thPtr :: Bool,
+    thConst :: Bool,
+    thNoAssign :: Bool,
+    thOmittable :: Bool
+    }
+
+hintConst = typeHint { thConst = True, thOmittable = True }
+hintPtr   = typeHint { thPtr = True }
+
+typeHint = TypeHint { thPtr = False, thConst = False, thNoAssign = False, thOmittable = False }
+
 data Expression = Exp TypeHint E
 
 newtype Statement = St (Seq.Seq Stmt)
@@ -203,7 +215,7 @@ instance Draw E where
 instance Draw Expression where
     draw (Exp _ e) = draw e
     pdraw (Exp _ e) = pdraw e
-    err s = (Exp ThNone (err s))
+    err s = (Exp typeHint (err s))
 
 
 instance Draw Name where
@@ -249,23 +261,26 @@ indirectFunctionCall e = functionCall' (expD (parens (draw e)))
 dereference :: Expression -> Expression
 dereference x = expDC $ char '*' <> pdraw x
 
+noAssign :: Expression -> Expression
+noAssign (Exp th v) = Exp th { thNoAssign = True } v
+
 reference :: Expression -> Expression
 reference x = expDC $ char '&' <> pdraw x
 
 indexArray :: Expression -> Expression -> Expression
-indexArray w i = expD (pdraw w <> char '[' <> pdraw i <> char ']')
+indexArray w i = expDO (pdraw w <> char '[' <> pdraw i <> char ']')
 
 project :: Name -> Expression -> Expression
-project n e = expD (pdraw e <> char '.' <> draw n)
+project n e = expDO (pdraw e <> char '.' <> draw n)
 
 project' :: Name -> Expression -> Expression
-project' n e = expD (pdraw e <> text "->" <> draw n)
+project' n e = expDO (pdraw e <> text "->" <> draw n)
 
 projectAnon :: Int -> Expression -> Expression
 projectAnon n e = project (Name $ 't':show n) e
 
 variable :: Name -> Expression
-variable n = expD (draw n)
+variable n = expDO (draw n)
 
 localVariable :: Type -> Name -> Expression
 localVariable t n = expD $ do
@@ -300,7 +315,7 @@ pairOpt peep as bs = f as bs where
     f as bs =  as Seq.>< bs
 
 
-emptyExpression = Exp ThNone EE
+emptyExpression = Exp typeHint EE
 
 expressionRaw s = expD $ text s
 
@@ -320,7 +335,7 @@ commaExpression ss = expD $ do
 
 structAnon :: [(Expression,Type)] -> Expression
 --structAnon _ = err "structAnon"
-structAnon es = Exp ThNone $ ED $ do
+structAnon es = Exp typeHint $ ED $ do
     (n,mp) <- get
     put (n + 1,mp)
     let nm = name ("_t" ++ show n)
@@ -338,15 +353,16 @@ constant :: Constant -> Expression
 constant c = expD (draw c)
 
 string :: String -> Expression
-string s = Exp ThPtr (ED (return $ text (show s))) -- TODO, use C quoting conventions
+string s = Exp hintPtr (ED (return $ text (show s))) -- TODO, use C quoting conventions
 
-nullPtr = Exp ThPtr (ED $ text "NULL")
+nullPtr = Exp hintPtr (ED $ text "NULL")
 
 name = Name
 
-expD x = Exp ThNone (ED x)
-expDC x = Exp ThNone (EP $ ED x)
-expC x = Exp ThConst (ED x)
+expDO x = Exp typeHint { thOmittable = True } (ED x)
+expD x = Exp typeHint (ED x)
+expDC x = Exp hintConst (EP $ ED x)
+expC x = Exp hintConst (ED x)
 
 -- Constant
 enum :: Name -> Constant
@@ -374,6 +390,8 @@ creturn :: Expression -> Statement
 creturn e = stmt $ SReturn e
 
 assign :: Expression -> Expression -> Statement
+assign (Exp TypeHint { thNoAssign = True} _) (Exp TypeHint { thOmittable = True } _)  = mempty
+assign (Exp TypeHint { thNoAssign = True} _) b = expr b
 assign a b = expr $ operator "=" a b
 
 label :: Name -> Statement

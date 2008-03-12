@@ -42,7 +42,7 @@ import FrontEnd.FrontEnd
 import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadCode
-import Grin.Devolve(devolveTransform)
+import Grin.Devolve(twiddleGrin,devolveTransform)
 import Grin.EvalInline(createEvalApply)
 import Grin.FromE
 import Grin.Grin
@@ -95,7 +95,6 @@ bracketHtml action = do
     action `finally` (wdump FD.Html $ putStrLn "</pre></body></html>")
 
 catom action = action `finally` dumpToFile
-catom action = Control.Exception.catch action (\e -> dumpTable >> dumpStringTableStats >> throw e)
 
 main = do -- runMain $ catom $ bracketHtml $ do
     o <- processOptions
@@ -745,6 +744,7 @@ compileToGrin prog = do
     x <- transformGrin devolveTransform x
     x <- opt "After Devolve Optimization" x
     x <- transformGrin simplifyParms x
+    x <- return $ twiddleGrin x
     dumpFinalGrin x
     compileGrinToC x
 
