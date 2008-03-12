@@ -260,11 +260,11 @@ convertBody (e :>>= [] :-> e') = do
     return (ss & ss')
 convertBody (Return [v] :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
 convertBody (Fetch v :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
-convertBody (Case v@(Var _ ty) [[p1@(NodeC t _)] :-> e1,[p2] :-> e2]) | ty == TyNode = do
+convertBody (Case v [p1@([NodeC _ (_:_)] :-> _),p2@([NodeC _ []] :-> _)]) = convertBody $ Case v [p2,p1]
+convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == TyNode = do
     scrut <- convertVal v
     tellTags t
-    let tag = f_GETWHAT scrut
-        da (Var v _) e | v == v0 = convertBody e
+    let da (Var v _) e | v == v0 = convertBody e
         da v@Var {} e = do
             v'' <- convertVal v
             e' <- convertBody e
@@ -282,9 +282,12 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t _)] :-> e1,[p2] :-> e2]) | ty == Ty
             return (ass & e')
         am Var {} e = e
         am (NodeC t2 _) e = annotate (show p2) (f_assert ((constant $ enum (nodeTagName t2)) `eq` tag) & e)
+        tag = f_GETWHAT scrut
+        ifscrut = if null fps then f_RAWWHAT tenum `eq` scrut else tenum `eq` tag where
+            tenum = (constant $ enum (nodeTagName t))
     p1' <- da p1 e1
     p2' <- liftM (am p2) $ da p2 e2
-    return $ profile_case_inc & cif ((constant $ enum (nodeTagName t)) `eq` tag) p1' p2'
+    return $ profile_case_inc & cif ifscrut p1' p2'
 
 -- zero is usually faster to test for than other values, so flip them if zero is being tested for.
 convertBody (Case v@Var {} [v1, v2@([Lit n _] :-> _)]) | n == 0 = convertBody (Case v [v2,v1])
@@ -521,7 +524,7 @@ buildConstants grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
 
 convertConst :: Val -> Maybe (C Expression)
 convertConst (Const (NodeC n [])) = Just $ do tellTags n ; return (cast sptr_t $ f_RAWWHAT (constant $ enum (nodeTagName n)))
-convertConst (NodeC n [])  = Just $ do tellTags n ;  return (f_RAWWHAT (constant $ enum (nodeTagName n)))
+convertConst (NodeC n []) | not (tagIsSuspFunction n)  = Just $ do tellTags n ;  return (f_RAWWHAT (constant $ enum (nodeTagName n)))
 convertConst v = fmap return (f v) where
     f :: Val -> Maybe Expression
     f (Lit i (TyPrim Op.TyBool)) = return $ if i == 0 then constant cFalse else constant cTrue
@@ -702,11 +705,7 @@ declareStruct n = do
 
 
 basicNode :: TyEnv -> Atom -> [Val] -> C (Maybe Expression)
-basicNode tyenv a [] = case s of
---    Just [n'] | n' == a -> return $ Just (f_VALUE (constant $ number 0))
-    _ -> do tellTags a ; return . Just $ (f_RAWWHAT (constant $ enum (nodeTagName a)))
-    where Just TyTy { tySiblings = s@(~(Just ss)) } = findTyTy tyenv a
-basicNode tyenv a [] = do tellTags a ; return . Just $ (f_RAWWHAT (constant $ enum (nodeTagName a)))
+basicNode tyenv a [] | not (tagIsSuspFunction a) = do tellTags a ; return . Just $ (f_RAWWHAT (constant $ enum (nodeTagName a)))
 basicNode _ _ _ = return Nothing
 {-
 basicNode tyenv a [] | isJust s = ans where
