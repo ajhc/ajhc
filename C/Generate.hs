@@ -133,7 +133,7 @@ stmtMapStmt f s = g s where
     h (St sms) = return St `ap` Seq.mapM f sms
 
 
--- The Bool in TB and TPtr are whether the GC needs to consider the types to
+-- The Bool in TB and is whether the GC needs to consider the types to
 -- possibly contain garbage collectable pointers.
 data Type = TB String Bool | TPtr Type | TAnon [Type] | TNStruct Name | TFunPtr Type [Type]
     deriving(Eq,Ord)
@@ -177,6 +177,15 @@ instance Draw Stmt where
         md = if any isNothing (fsts ts) then empty else text "default: jhc_case_fell_off(__LINE__);"
 
 subBlockBody s = draw s
+subBlockBody s = do
+    let vcmp (n,t@(TB _ b)) = (not b,n)
+        vcmp (n,t) = (True,n)
+    is <- asks envInScope
+    (body,uv) <- censor (const []) $ listen (draw s)
+    uv' <- forM [ (x,t) | (x,t) <- snubUnder vcmp uv, (x /= toName "v0") && (x `Set.notMember` is)] $ \ (n,t) -> do
+        t <- draw t
+        return $ t <+> tshow n <> semi
+    return $ vcat uv' $$ body
 
 instance Draw E where
     draw (ED g) = g
@@ -439,13 +448,15 @@ function n t as o s = F n t as o s
 drawFunction f = do
     frt <- draw (functionReturnType f)
     cenv <- ask
-    let env = cenv { envUsedLabels = ul } where
+    let env = cenv { envUsedLabels = ul, envInScope = Set.fromList $ fsts (functionArgs f) } where
         ul = Set.fromList $ Seq.toList $ Seq.foldMap (travCollect stmtMapStmt g) stseq
         St stseq = functionBody f
         g (SGoto n) = Seq.singleton n
         g s = mempty
+        vcmp (n,t@(TB _ b)) = (not b,n)
+        vcmp (n,t) = (True,n)
     (body,uv) <- local (const env) $ listen (draw (functionBody f))
-    uv' <- forM [ (x,t) | (x,t) <- snubUnder fst uv, x `notElem` fsts (functionArgs f)] $ \ (n,t) -> do
+    uv' <- forM [ (x,t) | (x,t) <- snubUnder vcmp uv, x `notElem` fsts (functionArgs f)] $ \ (n,t) -> do
         t <- draw t
         return $ t <+> tshow n <> semi
     name <- draw (functionName f)

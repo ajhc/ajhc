@@ -211,7 +211,7 @@ convertTypes xs = do
 convertType TyNode = return wptr_t
 convertType (TyPtr TyNode) = return sptr_t
 convertType (TyPtr (TyPtr TyNode)) = return $ ptrType sptr_t
-convertType (TyPrim opty) = return (opTyToC opty)
+convertType ~(TyPrim opty) = return (opTyToC opty)
 
 tyToC _ Op.TyBool = "bool"
 tyToC dh (Op.TyBits (Op.BitsExt s) _) = s
@@ -270,7 +270,7 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == 
             e' <- convertBody e
             return $ v'' =* scrut & e'
         da n1@(NodeC t _) (Return [n2@NodeC {}]) | n1 == n2 = convertBody (Return [v])
-        da (NodeC t as) e = do
+        da ~(NodeC t as) e = do
             tellTags t
             declareStruct t
             as' <- mapM convertVal as
@@ -281,7 +281,7 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == 
             e' <- convertBody e
             return (ass & e')
         am Var {} e = e
-        am (NodeC t2 _) e = annotate (show p2) (f_assert ((constant $ enum (nodeTagName t2)) `eq` tag) & e)
+        am ~(NodeC t2 _) e = annotate (show p2) (f_assert ((constant $ enum (nodeTagName t2)) `eq` tag) & e)
         tag = f_GETWHAT scrut
         ifscrut = if null fps then f_RAWWHAT tenum `eq` scrut else tenum `eq` tag where
             tenum = (constant $ enum (nodeTagName t))
@@ -302,6 +302,9 @@ convertBody (Case v@(Var _ t) [[p1] :-> e1, [p2] :-> e2]) | Set.null ((freeVars 
 convertBody (Case v@(Var _ t) ls) | t == TyNode = do
     scrut <- convertVal v
     let tag = f_GETWHAT scrut
+        da ([(Var v _)] :-> e) | v == v0 = do
+            e' <- convertBody e
+            return $ (Nothing,e')
         da ([v@(Var {})] :-> e) = do
             v'' <- convertVal v
             e' <- convertBody e
@@ -310,7 +313,7 @@ convertBody (Case v@(Var _ t) ls) | t == TyNode = do
             tellTags t
             e' <- convertBody (Return [v])
             return (Just (enum (nodeTagName t)),e')
-        da ([(NodeC t as)] :-> e) = do
+        da (~[(NodeC t as)] :-> e) = do
             tellTags t
             declareStruct t
             as' <- mapM convertVal as
@@ -318,17 +321,20 @@ convertBody (Case v@(Var _ t) ls) | t == TyNode = do
             let tmp = concrete t scrut
                 ass = mconcat [if needed a then a' =* (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
                 fve = freeVars e
-                needed (Var v _) = v `Set.member` fve
+                needed ~(Var v _) = v `Set.member` fve
             return $ (Just (enum (nodeTagName t)), ass & e')
     ls' <- mapM da ls
     return $ profile_case_inc & switch' tag ls'
 convertBody (Case v@(Var _ t) ls) = do
     scrut <- convertVal v
-    let da ([v@(Var {})] :-> e) = do
+    let da ([(Var vv _)] :-> e) | vv == v0 = do
+            e' <- convertBody e
+            return (Nothing,e')
+        da ([v@(Var {})] :-> e) = do
             v'' <- convertVal v
             e' <- convertBody e
             return (Nothing,v'' =* scrut & e')
-        da ([(Lit i _)] :-> e) = do
+        da (~[(Lit i _)] :-> e) = do
             e' <- convertBody e
             return $ (Just (number $ fromIntegral i), e')
         --da (~[x] :-> e) = da ( x :-> e )
@@ -431,6 +437,7 @@ simpleRet er = do
         TodoExp [v] -> return (v =* er)
         TodoDecl n t -> do newAssignVar t n er
         TodoExp [] -> return $ expr er
+        _ -> error "simpleRet: odd rTodo"
 
 nodeAssign v t as e' = do
     declareStruct t
@@ -510,7 +517,7 @@ buildConstants grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
         def = text "#define c" <> tshow i <+> text "(sptr_t)" <> tshow (f_RAWWHAT (constant $ enum (nodeTagName a)))
 
     cc nn@(HcNode a zs,i) = comm nn $$ cd $$ def where
-        cd = text "const static struct " <> tshow (nodeStructName a) <+> text "_c" <> tshow i <+> text "= {" <> hsep (punctuate P.comma (ntag ++ rs)) <> text "};"
+        cd = text "static const  struct " <> tshow (nodeStructName a) <+> text "_c" <> tshow i <+> text "= {" <> hsep (punctuate P.comma (ntag ++ rs)) <> text "};"
         Just TyTy { tySiblings = sibs } = findTyTy tyenv a
         ntag = case sibs of
             Just [a'] | a' == a -> []
