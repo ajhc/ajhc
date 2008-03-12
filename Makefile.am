@@ -190,10 +190,12 @@ update-datestamp: ChangeLog
 depend.make: deps.txt
 	echo HSFILES=`egrep -o '[A-Za-z0-9/.]+.hs' $< | sed -e 's/^\.\///' | sort` > depend.make
 
-i:
+built-sources: $(BUILT_SOURCES)
+
+i: $(BUILT_SOURCES)
 	ghci $(GHCOPTS) Main.hs $(CFILES)
 
-.PHONY: ho-clean hl-clean i update-datestamp manual
+.PHONY: ho-clean hl-clean built-sources i update-datestamp manual
 
 ho-clean:
 	rm -f -- `find -name \*.ho`

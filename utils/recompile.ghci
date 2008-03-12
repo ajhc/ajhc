@@ -1,0 +1,1 @@
+:def recompile \_ -> return . unlines $ [":!make built-sources", ":reload"]
