@@ -1,34 +1,30 @@
 {-# OPTIONS_JHC -fffi #-}
 module System.IO(
+    BufferMode(..),
     Handle,
     IOMode(..),
-    BufferMode(..),
     SeekMode(..),
+    hClose,
+    hFileSize,
+    hSeek,
+    hTell,
+    hFlush,
+    hGetBuf,
+    hGetPosn,
+    hSetPosn,
+    hGetContents,
+    hIsOpen,
+    hPrint,
+    hPutBuf,
     hPutChar,
     hPutStr,
     hPutStrLn,
-    hPrint,
-    try,hFlush,stdin,stdout,stderr,
-    hGetContents,
-    hClose,
     openFile,
-    hPutBuf,
-    hGetBuf,
-    hIsOpen
+    withFile,
+    stdin,stdout,stderr,
+    try
 
     ) where
-{-
-module IO(
-    Handle,
-    IOMode(..),
-    BufferMode(..),
-    SeekMode(..),
-    stdin,
-    stdout,
-    stderr
-    )  where
-    -}
-
 
 import Jhc.IO
 import Jhc.Handle
@@ -37,12 +33,15 @@ import Foreign.Ptr
 import Foreign.Storable
 import Foreign.C.Types
 import Data.Char(ord)
+import Data.Int
 
 
 data BufferMode = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
     deriving(Eq, Ord, Read, Show)
 data SeekMode = AbsoluteSeek | RelativeSeek | SeekFromEnd
     deriving(Eq,Ord,Bounded,Enum,Read,Show)
+
+type HandlePosn = Integer
 
 
 
@@ -52,6 +51,12 @@ try f          =  catch (do r <- f
                         (return . Left)
 
 
+withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
+withFile fp iom action = do
+    h <- openFile fp iom
+    r <- action h
+    hClose h
+    return r
 
 
 
@@ -82,6 +87,7 @@ hPutStrLn h s = do
 hPrint      :: Show a => Handle -> a -> IO ()
 hPrint h x    =  hPutStrLn h (show x)
 
+
 hGetContents :: Handle -> IO String
 hGetContents h = withHandle h $ \ptr -> do
     let getContents' = do
@@ -93,7 +99,23 @@ hGetContents h = withHandle h $ \ptr -> do
                     return (unsafeChr ch:xs)
     unsafeInterleaveIO getContents'
 
+hTell :: Handle -> IO Integer
+hTell h = withHandle h $ \ptr -> fmap fromIntegral (c_ftell ptr)
 
+hSeek :: Handle -> SeekMode -> Integer -> IO ()
+hSeek h v w = withHandle h $ \ptr -> do
+    let sm x = case x of
+            AbsoluteSeek -> c_SEEK_SET
+            RelativeSeek -> c_SEEK_CUR
+            SeekFromEnd  -> c_SEEK_END
+    c_fseek ptr (fromIntegral w) (sm v)
+    return ()
+
+hGetPosn :: Handle -> IO HandlePosn
+hGetPosn h = hTell h
+
+hSetPosn :: Handle -> HandlePosn -> IO ()
+hSetPosn h hp = hSeek h AbsoluteSeek hp
 
 hPutBuf :: Handle -> Ptr a -> Int -> IO ()
 hPutBuf h p c = do
@@ -107,11 +129,16 @@ hGetBuf h p c = do
     rc <- withHandle h $ fread p 1 count
     return $ fromIntegral rc
 
+hFileSize :: Handle -> IO Integer
+hFileSize h = do
+    cp <- hTell h
+    hSeek h SeekFromEnd 0
+    fl <- hTell h
+    hSeek h AbsoluteSeek cp
+    return fl
 
 foreign import ccall "stdio.h fwrite_unlocked" fwrite  :: Ptr a -> CSize -> CSize -> Ptr Handle -> IO CSize
 foreign import ccall "stdio.h fread_unlocked" fread :: Ptr a -> CSize -> CSize -> Ptr Handle -> IO CSize
-
---hIsEOF :: Handle -> IO Bool
 
 foreign import primitive "I2I" cwintToChar :: CWint -> Char
 
@@ -121,4 +148,10 @@ foreign import ccall "wchar.h jhc_utf8_getc" c_fgetwc :: Ptr Handle -> IO Int
 foreign import ccall "wchar.h jhc_utf8_putc" c_fputwc :: Int -> Ptr Handle -> IO Int
 
 foreign import ccall "stdio.h feof" c_feof :: Ptr Handle -> IO CInt
+foreign import ccall "stdio.h ftell" c_ftell :: Ptr Handle -> IO IntMax                  -- XXX
+foreign import ccall "stdio.h fseek" c_fseek :: Ptr Handle -> IntMax -> CInt -> IO CInt  -- XXX
+
+foreign import primitive "const.SEEK_SET" c_SEEK_SET :: CInt
+foreign import primitive "const.SEEK_CUR" c_SEEK_CUR :: CInt
+foreign import primitive "const.SEEK_END" c_SEEK_END :: CInt
 
