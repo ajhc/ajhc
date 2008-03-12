@@ -611,6 +611,7 @@ binopSigned b = lookup b signedOps
 castSigned ty v = return $ cast (basicType $ tyToC Op.HintSigned ty) v
 
 primBinOp n ta tb r a b
+    | Just fn <- Op.binopFunc ta tb n = return $ functionCall (toName fn) [a,b]
     | Just (t,_) <- Op.binopInfix n = return $ operator t a b
     | Just t <- binopSigned n = do
         a <- castSigned ta a

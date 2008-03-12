@@ -305,6 +305,14 @@ unopFloat (TyBits b HintFloat) op = g b =<< f op where
     f _ = Nothing
 unopFloat _ _ = Nothing
 
+binopFunc :: Ty -> Ty -> BinOp -> Maybe String
+binopFunc (TyBits b _) _ bop = g b =<< f bop where
+    g (Bits 64) x = return x
+    g (Bits 32) x = return $ x ++ "f"
+    g _ _ = Nothing
+    f FPwr = Just "pow"
+    f FAtan2 = Just "atan2"
+    f _ = Nothing
 
 binopInfix :: BinOp -> Maybe (String,Int)
 binopInfix UDiv = Just ("/",8)
