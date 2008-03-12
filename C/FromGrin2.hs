@@ -399,29 +399,16 @@ convertBody (e :>>= xs@(_:_:_) :-> e') = do
     ss' <- convertBody e'
     return $ dcl & ss & mconcat [ v =* projectAnon i st | v <- vs | i <- [0..] ] & ss'
 
--- IORef's do this
-convertBody (Store v) | tyINode == getType v = do
-    v <- convertVal v
-    (d,tmp) <- (ptrType sptr_t) `newTmpVar`  jhc_malloc (sizeof sptr_t)
-    r <- simpleRet tmp
-    return (d & (dereference tmp =* v) & r)
+-- mutable arrays and iorefs
 convertBody (Update (Index base off) z) | getType base == TyPtr tyINode = do
     base <- convertVal base
     off <- convertVal off
     z' <- convertVal z
     return $ indexArray base off `assign` z'
-convertBody (Update v z) | getType z == tyINode = do
-    v' <- convertVal v
-    z' <- convertVal z
-    r <- simpleRet emptyExpression
-    return (dereference v' =* z' & r)
 convertBody (Fetch (Index base off)) | getType base == TyPtr tyINode = do
     base <- convertVal base
     off <- convertVal off
     simpleRet (indexArray base off)
-convertBody (Fetch v) | getType v == TyPtr tyINode  = do
-    v <- convertVal v
-    simpleRet $ dereference v
 
 -- return, promote and demote
 convertBody (Fetch v)        | getType v == tyINode = simpleRet =<< f_promote `liftM` convertVal v
