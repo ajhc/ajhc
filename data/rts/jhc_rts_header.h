@@ -18,7 +18,7 @@
 // #define our options
 
 #define _JHC_GC_NONE  0
-#define _JHC_GC_JUDY  1
+#define _JHC_JGC      1
 #define _JHC_GC_BOEHM 2
 
 
@@ -42,12 +42,13 @@
 // GNU attributes
 
 #ifdef __GNUC__
-#define A_NORETURN __attribute__ ((noreturn))
-#define A_PURE __attribute__ ((pure))
-#define A_CONST __attribute__ ((const))
-#define A_UNUSED __attribute__ ((unused))
-#define A_MALLOC __attribute__ ((malloc))
+#define A_ALIGNED  __attribute__ ((aligned))
+#define A_CONST    __attribute__ ((const))
+#define A_MALLOC   __attribute__ ((malloc))
 #define A_MAYALIAS __attribute__ ((__may_alias__))
+#define A_NORETURN __attribute__ ((noreturn))
+#define A_PURE     __attribute__ ((pure))
+#define A_UNUSED   __attribute__ ((unused))
 #ifdef __i386__
 #define A_REGPARM __attribute__ ((fastcall))
 #else
@@ -56,12 +57,13 @@
 #define A_STD    A_REGPARM
 
 #else
+#define A_ALIGNED
+#define A_CONST
+#define A_MALLOC
 #define A_MAYALIAS
 #define A_NORETURN
 #define A_PURE
-#define A_CONST
 #define A_UNUSED
-#define A_MALLOC
 #define A_STD
 #endif
 
