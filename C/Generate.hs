@@ -1,9 +1,13 @@
 module C.Generate(
     Annotate(..),
     Structure(..),
+    (=*),
+    (&),
+    ToExpression(..),
+    ToStatement(..),
+    eq,
     basicStructure,
     anonStructType,
-    assign,
     basicType,
     basicGCType,
     cast,
@@ -18,7 +22,6 @@ module C.Generate(
     drawG,
     emptyExpression,
     enum,
-    expr,
     Expression(),
     Constant(),
     expressionRaw,
@@ -63,7 +66,6 @@ module C.Generate(
     Type(),
     uoperator,
     variable,
-    test,
     voidType,
     voidStarType
     ) where
@@ -524,10 +526,6 @@ ptrType t = TPtr t
 funPtrType :: Type -> [Type] -> Type
 funPtrType r as = TFunPtr r as
 
---namedStructType :: Name -> [(Name,Type)] -> Type
---structType :: Name -> [Type] -> Type
---enumType :: Name -> [Name] -> Type
-
 -- type constants
 voidStarType :: Type
 voidStarType = ptrType voidType
@@ -629,18 +627,6 @@ generateC fs ss = ans where
 line = text ""
 vsep xs = vcat $ intersperse line xs
 
-test1 = constant (number 3)
-test2 = operator "-" (operator "+" test1 test1) test1
-test3 = expr $ functionCall (toName "foo") [test1,test2]
-test4 = mconcat [test3,expr test2,test3]
-
-showIt x = putStrLn (render $ drawG x)
-
-
-test = do
-    showIt test2
-    showIt test3
-    showIt test4
 
 instance Show Expression where
     show e = renderG e
@@ -652,4 +638,45 @@ drawG x = fns where
     G ga = draw x
     (fns,_,_) = runRWS ga emptyEnv (1,Map.empty)
 
+
+------------
+-- C helpers
+------------
+
+infix 3 `eq`
+
+eq :: Expression -> Expression -> Expression
+eq = operator "=="
+
+infix 2 =*
+
+(=*) :: Expression -> Expression -> Statement
+x =* y = x `assign` y
+
+class ToStatement a  where
+    toStatement :: a -> Statement
+
+instance ToStatement Statement where
+    toStatement x = x
+
+instance ToStatement Expression where
+    toStatement x = expr x
+
+class ToExpression a where
+    toExpression :: a -> Expression
+
+instance ToExpression Expression where
+    toExpression e = e
+
+instance ToExpression Constant where
+    toExpression c = constant c
+
+instance ToExpression Name where
+    toExpression c = variable c
+
+
+infixl 1 &
+
+(&) :: (ToStatement a,ToStatement b) => a -> b -> Statement
+x & y = toStatement x `mappend` toStatement y
 

@@ -351,8 +351,8 @@ convertBody (Case v@(Var _ t) ls) = do
     return $ profile_case_inc & switch' scrut ls'
 convertBody (Error s t) = do
     x <- asks rTodo
-    let jerr | null s    = expr $ functionCall (name "jhc_exit") [constant $ number 255]
-             | otherwise = expr $ functionCall (name "jhc_error") [string s]
+    let jerr | null s    = toStatement $ functionCall (name "jhc_exit") [constant $ number 255]
+             | otherwise = toStatement $ functionCall (name "jhc_error") [string s]
     let f (TyPtr _) = return nullPtr
         f TyNode = return nullPtr
         f (TyPrim x) = return $ cast (opTyToC x) (constant $ number 0)
@@ -404,7 +404,7 @@ convertBody (Update (Index base off) z) | getType base == TyPtr tyINode = do
     base <- convertVal base
     off <- convertVal off
     z' <- convertVal z
-    return $ indexArray base off `assign` z'
+    return $ indexArray base off =* z'
 convertBody (Fetch (Index base off)) | getType base == TyPtr tyINode = do
     base <- convertVal base
     off <- convertVal off
@@ -441,7 +441,7 @@ simpleRet er = do
         TodoNothing -> return (toStatement er)
         TodoExp [v] -> return (v =* er)
         TodoDecl n t -> do newAssignVar t n er
-        TodoExp [] -> return $ expr er
+        TodoExp [] -> return $ toStatement er
         _ -> error "simpleRet: odd rTodo"
 
 nodeAssign v t as e' = do
@@ -499,12 +499,12 @@ convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_hea
     v' <- convertVal v
     c' <- convertVal c
     tmp <- newVar (ptrType sptr_t)
-    let malloc = tmp `assign` jhc_malloc (operator "*" (sizeof sptr_t) c')
+    let malloc = tmp =* jhc_malloc (operator "*" (sizeof sptr_t) c')
     fill <- case v of
         ValUnknown _ -> return mempty
         _ -> do
             i <- newVar (basicType "int")
-            return $ forLoop i (expressionRaw "0") c' $ indexArray tmp i `assign` v'
+            return $ forLoop i (expressionRaw "0") c' $ indexArray tmp i =* v'
     return (malloc `mappend` fill, tmp)
 
 convertExp e = return (err (show e),err "nothing")
@@ -778,9 +778,9 @@ f_demote e    = functionCall (name "demote") [e]
 f_follow e    = functionCall (name "follow") [e]
 f_update x y  = functionCall (name "update") [x,y]
 jhc_malloc_atomic sz = functionCall (name "jhc_malloc_atomic") [sz]
-profile_update_inc   = expr $ functionCall (name "jhc_update_inc") []
-profile_case_inc     = expr $ functionCall (name "jhc_case_inc") []
-profile_function_inc = expr $ functionCall (name "jhc_function_inc") []
+profile_update_inc   = toStatement $ functionCall (name "jhc_update_inc") []
+profile_case_inc     = toStatement $ functionCall (name "jhc_case_inc") []
+profile_function_inc = toStatement $ functionCall (name "jhc_function_inc") []
 
 arg i = name $ 'a':show i
 
@@ -812,47 +812,6 @@ nodeTypePtr a = liftM ptrType (nodeType a)
 nodeType a = return $ structType (nodeStructName a)
 nodeStructName :: Atom -> Name
 nodeStructName a = toName ('s':fromAtom a)
-
-------------
--- C helpers
-------------
-
-infix 3 `eq`
-
-eq :: Expression -> Expression -> Expression
-eq = operator "=="
-
-infix 2 =*
-
-(=*) :: Expression -> Expression -> Statement
-x =* y = x `assign` y
-
-class ToStatement a  where
-    toStatement :: a -> Statement
-
-instance ToStatement Statement where
-    toStatement x = x
-
-instance ToStatement Expression where
-    toStatement x = expr x
-
-class ToExpression a where
-    toExpression :: a -> Expression
-
-instance ToExpression Expression where
-    toExpression e = e
-
-instance ToExpression Constant where
-    toExpression c = constant c
-
-instance ToExpression Name where
-    toExpression c = variable c
-
-
-infixl 1 &
-
-(&) :: (ToStatement a,ToStatement b) => a -> b -> Statement
-x & y = toStatement x `mappend` toStatement y
 
 
 generateArchAssertions :: String
