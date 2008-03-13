@@ -181,7 +181,7 @@ typedef wptr_t (*eval_fn)(node_t *node) A_STD;
 // both promote and demote evaluate to nothing when debugging is not enabled
 // otherwise, they check that their arguments are in the correct form.
 
-static inline wptr_t A_STD A_UNUSED
+static inline wptr_t A_STD A_UNUSED  A_HOT
 promote(sptr_t s)
 {
         assert(!ISLAZY(s));
@@ -189,7 +189,7 @@ promote(sptr_t s)
         return (wptr_t)s;
 }
 
-static inline sptr_t A_STD A_UNUSED
+static inline sptr_t A_STD A_UNUSED A_HOT
 demote(wptr_t s)
 {
         assert(!ISLAZY(s));
@@ -198,7 +198,7 @@ demote(wptr_t s)
 }
 
 // like eval but you know the target is in WHNF or is a already evaluated indirection
-static inline wptr_t A_STD A_UNUSED
+static inline wptr_t A_STD A_UNUSED  A_HOT
 follow(sptr_t s)
 {
         assert(jhc_valid_lazy(s));
@@ -210,7 +210,7 @@ follow(sptr_t s)
         return (wptr_t)s;
 }
 
-static inline wptr_t A_STD A_UNUSED
+static inline wptr_t A_STD A_UNUSED  A_HOT
 eval(sptr_t s)
 {
         assert(jhc_valid_lazy(s));
@@ -237,7 +237,7 @@ eval(sptr_t s)
 }
 
 
-static inline void A_STD A_UNUSED
+static inline void A_STD A_UNUSED A_HOT
 update(sptr_t thunk, wptr_t new)
 {
         jhc_update_inc();

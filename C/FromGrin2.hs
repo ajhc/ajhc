@@ -44,7 +44,7 @@ data Todo = TodoReturn | TodoExp [Expression] | TodoDecl Name Type | TodoNothing
 
 data Written = Written {
     wRequires :: Requires,
-    wStructures :: Map.Map Name [(Name,Type)],
+    wStructures :: Map.Map Name Structure,
     wTags :: Set.Set Atom,
     wEnums :: Map.Map Name Int,
     wFunctions :: Map.Map Name Function
@@ -85,7 +85,7 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
     ans = vcat $ includes ++ [text "", enum_tag_t, header, cafs,buildConstants grin finalHcHash, body]
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
-    (header,body) = generateC False (Map.elems fm) (Map.assocs sm)
+    (header,body) = generateC False (Map.elems fm) (Map.elems sm)
     ((),finalHcHash,Written { wRequires = req, wFunctions = fm, wEnums = wenum, wStructures = sm, wTags = ts }) = runC grin go
     enum_tag_t | null enums = mempty
                | otherwise  = text "enum {" $$ nest 4 (P.vcat (punctuate P.comma $ enums)) $$ text "};"
@@ -713,7 +713,7 @@ declareStruct n = do
             | Just [n'] <- ss, n == n' = []
             | otherwise = [(name "what",what_t)]
         fields = (tag ++ zip [ name $ 'a':show i | i <-  [(1 :: Int) ..] ] ts')
-    unless (null fields) $ tell mempty { wStructures = Map.singleton (nodeStructName n) fields }
+    unless (null fields) $ tell mempty { wStructures = Map.singleton (nodeStructName n) $ Structure { structureName = nodeStructName n, structureFields = fields, structureAligned = True } }
 
 
 basicNode :: TyEnv -> Atom -> [Val] -> C (Maybe Expression)
@@ -741,7 +741,7 @@ declareEvalFunc n = do
         atype = ptrType nt
         body = rvar =* functionCall (toName (show $ fn)) [ project' (arg i) (variable aname) | _ <- ts | i <- [(1 :: Int) .. ] ]
         update =  f_update (cast sptr_t (variable aname)) rvar
-    tellFunctions [function fname wptr_t [(aname,atype)] [a_STD] (body & update & creturn rvar )]
+    tellFunctions [function fname wptr_t [(aname,atype)] [a_STD, a_FALIGNED] (body & update & creturn rvar )]
     return fname
 
 
@@ -795,6 +795,7 @@ wptr_t    = basicGCType "wptr_t"
 what_t    = basicType "what_t"
 
 a_STD = Attribute "A_STD"
+a_FALIGNED = Attribute "A_FALIGNED"
 a_MALLOC = Attribute "A_MALLOC"
 
 concrete :: Atom -> Expression -> Expression

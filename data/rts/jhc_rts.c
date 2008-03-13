@@ -26,7 +26,7 @@ static uintmax_t jhc_prof_updates;
 
 #endif
 
-static void
+static void A_COLD
 jhc_print_profile(void) {
         struct tms tm;
         times(&tm);
@@ -52,13 +52,13 @@ jhc_print_profile(void) {
 }
 
 
-static void A_NORETURN A_UNUSED
+static void A_NORETURN A_UNUSED A_COLD
 jhc_exit(int n) {
         jhc_print_profile();
         exit(n);
 }
 
-static void  A_NORETURN A_UNUSED
+static void  A_NORETURN A_UNUSED  A_COLD
 jhc_error(char *s) {
         fputs(s,stderr);
         fputs("\n",stderr);
@@ -66,7 +66,7 @@ jhc_error(char *s) {
         exit(255);
 }
 
-static void  A_NORETURN A_UNUSED
+static void  A_NORETURN A_UNUSED  A_COLD
 jhc_case_fell_off(int n) {
         fflush(stdout);
         fprintf(stderr, "\n%s:%i: case fell off\n", __FILE__, n);
@@ -111,7 +111,7 @@ jhc_utf8_putc(int ch, FILE *f)
 }
 
 
-int
+int  A_COLD
 main(int argc, char *argv[])
 {
         /* A few random assertions about the architecture that the compiler

@@ -1,5 +1,6 @@
 module C.Generate(
     Annotate(..),
+    Structure(..),
     anonStructType,
     assign,
     basicType,
@@ -566,26 +567,32 @@ mangleIdent xs =  concatMap f xs where
 
 toName s = Name (mangleIdent s)
 
+data Structure = Structure {
+    structureName :: Name,
+    structureFields :: [(Name,Type)],
+    structureAligned :: Bool
+    }
+
 generateC :: Bool              -- ^ whether to add tag nodes
     -> [Function]              -- ^ functions
-    -> [(Name,[(Name,Type)])]  -- ^ extra structures
+    -> [Structure]             -- ^ extra structures
     -> (Doc,Doc)               -- ^ final result
 generateC genTag fs ss = ans where
     G ga = do
         fs <- mapM drawFunction fs
         let (protos,bodys) = unzip fs
-        let shead = vcat $ map (text . (++ ";") . ("struct " ++) . show . fst) ss
+        let shead = vcat [ text "struct" <+> tshow (structureName s) <> (if structureAligned s then text " A_ALIGNED" else empty) <> text ";" | s <- ss ]
         shead2 <- declStructs genTag ss
         return (shead $$ line $$ shead2, vcat protos $$ line $$  vsep bodys)
     ((hd,fns),(_,ass),_written) = runRWS ga emptyEnv (1,Map.empty)
 
-    anons = [ (n, fields ts ) | (ts,n) <- Map.toList ass ] where
+    anons = [ Structure { structureName = n, structureFields = fields ts, structureAligned = False }  | (ts,n) <- Map.toList ass ] where
         fields :: [Type] -> [(Name,Type)]
         fields ts = [ (name ('t':show tn),t) | t <- ts | tn <- [0::Int .. ]]
     G anons' = declStructs False anons
     (anons'',_,_) = runRWS anons' emptyEnv (1,Map.empty)
 
-    declStructs ht ss = liftM vsep $ forM ss $ \ (n,ts) -> do
+    declStructs ht ss = liftM vsep $ forM ss $ \ Structure { structureName = n, structureFields = ts } -> do
             ts' <- forM ts $ \ (n,t) -> do
                 t <- draw t
                 return $ t <+> tshow n <> semi

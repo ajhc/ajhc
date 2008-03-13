@@ -67,6 +67,10 @@
 #define A_STD
 #endif
 
+// these should be enabled with newer versions of gcc
+#define A_HOT
+#define A_COLD
+#define A_FALIGNED
 
 #define STR(s) #s
 #define XSTR(s) STR(s)
