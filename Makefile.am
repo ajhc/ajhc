@@ -77,7 +77,7 @@ uninstall-hook: $(JHC_LIBS)
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
-RAWFILES = data/HsFFI.h data/jhc_rts.c data/jhc_rts_header.h data/wsize.h data/jhc_rts_alloc.c data/jhc_rts2.c data/ViaGhc.hs ChangeLog data/shortchange.txt data/prelude.m4
+RAWFILES = data/HsFFI.h data/rts/jhc_rts.c data/rts/jhc_rts_header.h data/wsize.h data/rts/jhc_rts_alloc.c data/rts/jhc_rts2.c data/ViaGhc.hs ChangeLog data/shortchange.txt data/prelude.m4
 
 DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/C/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \
    drift_processed/DerivingDrift/StandardRules.hs drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \
@@ -237,7 +237,7 @@ publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/in
 	cp -- $^ /home/john/public_html/computer/jhc
 
 manual: utils/stitch.prl FlagDump.mkd FlagOpts.mkd options.mkd
-	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/*.c' \) | xargs perl utils/stitch.prl > manual.mkd
+	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl > manual.mkd
 
 options.mkd: jhc
 	echo "{-@Options 1" > $@

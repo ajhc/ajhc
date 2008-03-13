@@ -102,7 +102,6 @@ tiModules' ::  CollectedHo -> [ModInfo] -> IO (Ho,TiData)
 tiModules' cho ms = do
     let me = choHo cho
         hoB = hoBuild me
-        hoE = hoExp me
 --    let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
 --        importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
     let importClassHierarchy = hoClassHierarchy hoB
