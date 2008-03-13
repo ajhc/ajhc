@@ -85,7 +85,7 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
     ans = vcat $ includes ++ [text "", enum_tag_t, header, cafs,buildConstants grin finalHcHash, body]
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
-    (header,body) = generateC False (Map.elems fm) (Map.elems sm)
+    (header,body) = generateC (Map.elems fm) (Map.elems sm)
     ((),finalHcHash,Written { wRequires = req, wFunctions = fm, wEnums = wenum, wStructures = sm, wTags = ts }) = runC grin go
     enum_tag_t | null enums = mempty
                | otherwise  = text "enum {" $$ nest 4 (P.vcat (punctuate P.comma $ enums)) $$ text "};"
@@ -518,20 +518,17 @@ ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ P.render (pp
 buildConstants grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
     tyenv = grinTypeEnv grin
     comm nn = text "/* " <> tshow (nn) <> text " */"
-    cc nn@(HcNode a [],i) = comm nn $$ def where
-        def = text "#define c" <> tshow i <+> text "(sptr_t)" <> tshow (f_RAWWHAT (constant $ enum (nodeTagName a)))
-
     cc nn@(HcNode a zs,i) = comm nn $$ cd $$ def where
-        cd = text "static const  struct " <> tshow (nodeStructName a) <+> text "_c" <> tshow i <+> text "= {" <> hsep (punctuate P.comma (ntag ++ rs)) <> text "};"
+        cd = text "static const struct" <+> tshow (nodeStructName a) <+> text "_c" <> tshow i <+> text "= {" <> hsep (punctuate P.comma (ntag ++ rs)) <> text "};"
         Just TyTy { tySiblings = sibs } = findTyTy tyenv a
         ntag = case sibs of
             Just [a'] | a' == a -> []
-            _ -> [tshow (nodeTagName a)]
+            _ -> [text ".what =" <+> tshow (nodeTagName a)]
         def = text "#define c" <> tshow i <+> text "((sptr_t)&_c" <> tshow i <> text ")"
-        rs = [ f z undefined |  z <- zs ]
-        f (Right i) = text $ 'c':show i
-        f (Left (Var n _)) = tshow $ varName n
-        f (Left v) = text (show $ drawG (fst3 $ runC grin e)) where
+        rs = [ f z i |  (z,i) <- zip zs [ 1 :: Int .. ]]
+        f (Right i) a = text ".a" <> tshow a <+> text "=" <+> text ('c':show i)
+        f (Left (Var n _)) a = text ".a" <> tshow a <+> text "=" <+> tshow (varName n)
+        f (Left v) a = text ".a" <> tshow a <+> text "=" <+> text (show $ drawG (fst3 $ runC grin e)) where
             Just e = convertConst v
 
 convertConst :: Val -> Maybe (C Expression)
@@ -708,12 +705,19 @@ declareStruct n = do
     grin <- asks rGrin
     let TyTy { tySlots = ts, tySiblings = ss } = runIdentity $ findTyTy (grinTypeEnv grin) n
     ts' <- mapM convertType ts
-    let tag | tagIsSuspFunction n = [(name "head",fptr_t)]
-            | null ts = []
-            | Just [n'] <- ss, n == n' = []
-            | otherwise = [(name "what",what_t)]
-        fields = (tag ++ zip [ name $ 'a':show i | i <-  [(1 :: Int) ..] ] ts')
-    unless (null fields) $ tell mempty { wStructures = Map.singleton (nodeStructName n) $ Structure { structureName = nodeStructName n, structureFields = fields, structureAligned = True } }
+    let (dis,needsDis) | tagIsSuspFunction n = ([(name "head",fptr_t)],False)
+                       | null ts = ([],False)
+                       | Just [n'] <- ss, n == n' = ([],False)
+                       | otherwise = ([],True)
+        fields = (dis ++ zip [ name $ 'a':show i | i <-  [(1 :: Int) ..] ] ts')
+        theStruct = basicStructure {
+            structureName = nodeStructName n,
+            structureFields = fields,
+            structureAligned = True,
+            structureHasDiscriminator = not $ null dis,
+            structureNeedsDiscriminator = needsDis
+            }
+    unless (null fields) $ tell mempty { wStructures = Map.singleton (structureName theStruct) theStruct }
 
 
 basicNode :: TyEnv -> Atom -> [Val] -> C (Maybe Expression)
@@ -792,7 +796,6 @@ nodeFuncName a = toName (fromAtom a)
 sptr_t    = basicGCType "sptr_t"
 fptr_t    = basicGCType "fptr_t"
 wptr_t    = basicGCType "wptr_t"
-what_t    = basicType "what_t"
 
 a_STD = Attribute "A_STD"
 a_FALIGNED = Attribute "A_FALIGNED"

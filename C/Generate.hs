@@ -1,6 +1,7 @@
 module C.Generate(
     Annotate(..),
     Structure(..),
+    basicStructure,
     anonStructType,
     assign,
     basicType,
@@ -570,34 +571,59 @@ toName s = Name (mangleIdent s)
 data Structure = Structure {
     structureName :: Name,
     structureFields :: [(Name,Type)],
-    structureAligned :: Bool
+    structureNeedsDiscriminator :: Bool,    -- ^ emit a macro that declares a discriminator when needed
+    structureHasDiscriminator   :: Bool,    -- ^ the first field must appear first in the on memory layout, don't move it.
+    structureAligned :: Bool                -- ^ this structure needs to be aligned to a pointer boundry, even if it woudn't be otherwise.
     }
 
-generateC :: Bool              -- ^ whether to add tag nodes
-    -> [Function]              -- ^ functions
+basicStructure = Structure {
+    structureName = error "basicStructure: Name",
+    structureFields = [],
+    structureNeedsDiscriminator = False,
+    structureHasDiscriminator   = False,
+    structureAligned            = False
+    }
+
+generateC
+    :: [Function]              -- ^ functions
     -> [Structure]             -- ^ extra structures
     -> (Doc,Doc)               -- ^ final result
-generateC genTag fs ss = ans where
+generateC fs ss = ans where
     G ga = do
         fs <- mapM drawFunction fs
         let (protos,bodys) = unzip fs
         let shead = vcat [ text "struct" <+> tshow (structureName s) <> (if structureAligned s then text " A_ALIGNED" else empty) <> text ";" | s <- ss ]
-        shead2 <- declStructs genTag ss
+        shead2 <- declStructs ss
         return (shead $$ line $$ shead2, vcat protos $$ line $$  vsep bodys)
     ((hd,fns),(_,ass),_written) = runRWS ga emptyEnv (1,Map.empty)
 
-    anons = [ Structure { structureName = n, structureFields = fields ts, structureAligned = False }  | (ts,n) <- Map.toList ass ] where
+    anons = [ basicStructure { structureName = n, structureFields = fields ts }  | (ts,n) <- Map.toList ass ] where
         fields :: [Type] -> [(Name,Type)]
         fields ts = [ (name ('t':show tn),t) | t <- ts | tn <- [0::Int .. ]]
-    G anons' = declStructs False anons
+    G anons' = declStructs anons
     (anons'',_,_) = runRWS anons' emptyEnv (1,Map.empty)
-
-    declStructs ht ss = liftM vsep $ forM ss $ \ Structure { structureName = n, structureFields = ts } -> do
-            ts' <- forM ts $ \ (n,t) -> do
-                t <- draw t
-                return $ t <+> tshow n <> semi
-            return $ text "struct" <+> tshow n <+> lbrace $$ nest 4 (vcat $ (if ht then text "tag_t tag;" else empty):ts') $$ rbrace <> semi
     ans = (hd $$ anons'',fns)
+
+    declStructs ss = liftM vsep $ forM ss $ \ s@Structure { structureName = n, structureFields = ts } -> do
+        let tsort [] = []
+            tsort (t:ts) | structureHasDiscriminator s = t:rsort ts
+                         | otherwise = rsort (t:ts)
+            rsort = sortUnder (cmp . snd)
+            numGC = length [ () | (_,TB _ True) <- ts ]
+            ppri = if numGC /= 0 then 2 else 5
+            -- pointers first, garbage collected, then rest
+            cmp (TB _ True) = (1::Int)
+            cmp TFunPtr {}  = ppri
+            cmp TPtr {}     = ppri
+            cmp (TB s _)    = maybe 5  id (lookup s tmap)
+            cmp _ = 5
+            tmap = [ "uintmax_t" ==> 3, "uintptr_t" ==> ppri, "double" ==> 4, "uint32_t" ==> 6, "float" ==> 6, "uint16_t" ==> 7, "uint8_t" ==> 8]
+            x ==> y = (x,y)
+
+        ts' <- forM (tsort ts) $ \ (n,t) -> do
+            t <- draw t
+            return $ t <+> tshow n <> semi
+        return $ text "struct" <+> tshow n <+> lbrace $$ nest 4 (vcat $ (if structureNeedsDiscriminator s  then text "what_t what;" else empty):ts') $$ rbrace <> semi
 
 
 line = text ""
