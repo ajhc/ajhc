@@ -8,18 +8,11 @@ module E.Rules(
     builtinRule,
     dropArguments,
     fromRules,
-    getARules,
-    mapRules,
     ruleUpdate,
     mapRBodyArgs,
     makeRule,
-    mapABodiesArgs,
-    ruleHeadFreeVars,
     mapBodies,
-    mapRuleBodies,
     printRules,
-    ruleAllFreeVars,
-    findOrphanRules,
     rulesFromARules
     )where
 
@@ -85,10 +78,6 @@ instance Binary Rules where
         rs <- get
         return $ fromRules rs
 
-mapRuleBodies :: (E -> E) -> Rules -> Rules
-mapRuleBodies g (Rules mp) = Rules (fmap (map f) mp) where
-    f rule = rule { ruleBody = g $ ruleBody rule }
-
 mapBodies :: Monad m => (E -> m E) -> Rules -> m Rules
 mapBodies g (Rules mp) = do
     let f rule = do
@@ -99,19 +88,6 @@ mapBodies g (Rules mp) = do
     --mp' <- sequence [ do rs' <- mapM f rs; return (k,rs') | (k,rs) <- Map.toAscList mp ]
     --return $ Rules $ Map.fromAscList mp'
 
-
-ruleAllFreeVars :: Rules -> IdSet
-ruleAllFreeVars (Rules r) = freeVars (melems r)
-
-
-ruleHeadFreeVars :: Rules -> IdSet
-ruleHeadFreeVars (Rules rs) = unions $ map f (concat $ melems rs) where
-    f r = (S.insert (tvrIdent $ ruleHead r) $ freeVars (ruleArgs r)) S.\\ fromList (map tvrIdent $ ruleBinds r)
-
-findOrphanRules :: [Module] -> Rules -> Rules
-findOrphanRules ms (Rules rs) = Rules $ mapMaybeIdMap f rs where
-    f rs = let grs = filter (not . bad) rs in if List.null grs then Nothing else Just grs
-    bad r = List.null $ map Just ms `intersect` (map (\x -> getModule =<< fromId x) $ idSetToList ((S.insert (tvrIdent $ ruleHead r) $ freeVars (ruleArgs r)) S.\\ fromList (map tvrIdent $ ruleBinds r)))
 
 
 instance FreeVars Rule [Id] where
@@ -144,16 +120,6 @@ instance Monoid Rules where
 fromRules :: [Rule] -> Rules
 fromRules rs = Rules $ fmap snds $ fromList $ sortGroupUnderF fst [ (tvrIdent $ ruleHead r,ruleUpdate r) | r <- rs ]
 
-getARules :: Monad m => Rules -> Id -> m ARules
-getARules (Rules mp) tvr = liftM arules (mlookup tvr mp)
-
-mapABodies :: Monad m => (E -> m E) -> ARules -> m ARules
-mapABodies g ARules { aruleRules = rs } = do
-    let f rule = do
-            b <- g (ruleBody rule)
-            return rule { ruleBody = b }
-    rs' <- mapM f rs
-    return $ arules $ rs'
 
 mapRBodyArgs :: Monad m => (E -> m E) -> Rule -> m Rule
 mapRBodyArgs g r = do
@@ -163,22 +129,10 @@ mapRBodyArgs g r = do
             return rule { ruleArgs = as, ruleBody = b }
     f r
 
-mapABodiesArgs :: Monad m => (E -> m E) -> ARules -> m ARules
-mapABodiesArgs g ARules { aruleRules = rs } = do
-    let f rule = do
-            b <- g (ruleBody rule)
-            as <- mapM g (ruleArgs rule)
-            return rule { ruleArgs = as, ruleBody = b }
-    rs' <- mapM f rs
-    return $ arules $ rs'
 
 rulesFromARules :: ARules -> [Rule]
 rulesFromARules = aruleRules
 
-mapRules :: Monad m => (Rule -> m Rule) -> ARules -> m ARules
-mapRules f ARules { aruleRules = rules } = do
-    rs <- mapM f rules
-    return $ arules rs
 
 -- replace the given arguments with the E values, dropping impossible rules
 dropArguments :: [(Int,E)] -> [Rule] -> [Rule]
