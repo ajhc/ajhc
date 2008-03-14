@@ -767,7 +767,7 @@ compileGrinToC grin = do
     progress ("Writing " ++ show cf)
     (argstring,sversion) <- getArgString
     let
-        boehmOpts | fopts FO.Boehm = ["-D_JHC_BOEHM_GC=1", "-lgc"]
+        boehmOpts | fopts FO.Boehm = ["-D_JHC_GC=2", "-lgc"]
                   | otherwise = []
         profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE=1"]
                   | otherwise = []
