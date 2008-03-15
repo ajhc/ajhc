@@ -362,11 +362,13 @@ kiPred (HsAsstEq a b) = do
     kiType' (KVar mv) b
 
 kiInitClasses :: [HsDecl] -> Ki ()
-kiInitClasses ds =  sequence_ [ f className [classArg] |  HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon className) (HsTyVar classArg))) _ <- ds] where
+kiInitClasses ds =  sequence_ [ f className [classArg] |  HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon className) (HsTyVar classArg))) _ <- ds]
+                    >> sequence_ [ f (hsDeclName cad) [v | HsTyVar v <- hsDeclTypeArgs cad]
+                                   | cad@(HsClassAliasDecl {}) <- ds ]
+    where
     f className args = do
         args <- mapM (lookupKind KindSimple . toName TypeVal) args
         extendEnv mempty { kindEnvClasses = Map.singleton (toName ClassName className) args }
-
 
 
 kiDecl :: HsDecl -> Ki ()

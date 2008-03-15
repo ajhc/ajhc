@@ -25,7 +25,8 @@ import FrontEnd.Lexer
 import FrontEnd.ParseUtils hiding(readInteger,readRational)
 import FrontEnd.SrcLoc
 
-
+import Control.Monad (liftM, liftM2)
+import Debug.Trace (trace)
 
 }
 
@@ -106,6 +107,7 @@ import FrontEnd.SrcLoc
       'derive'        { KW_Derive }
       'case'          { KW_Case }
       'class'         { KW_Class }
+      'alias'         { KW_Alias }
       'data'          { KW_Data }
       'default'       { KW_Default }
       'deriving'      { KW_Deriving }
@@ -294,6 +296,12 @@ topdecl :: { HsDecl }
                          returnP (HsNewTypeDecl $3 cs c t $5 $6) }
       | 'class' srcloc ctype optfundep optcbody
                       { HsClassDecl $2 $3 $5 }
+      | 'class' 'alias' srcloc conid varids '=' carhs optcbody
+                      {% let
+                         { (cxt, clss) = $7;
+                           ret = HsClassAliasDecl { hsDeclSrcLoc = $3, hsDeclName = $4, hsDeclTypeArgs = map HsTyVar $5, hsDeclContext = cxt, hsDeclClasses = clss, hsDeclDecls =$8 }
+                         } in trace ("\n"++show ret++"\n") (return ret)
+                      }
       | 'instance' srcloc ctype optvaldefs
                       { HsInstDecl $2 $3 $4 }
       | 'derive' 'instance' srcloc classhead
@@ -313,6 +321,7 @@ topdecl :: { HsDecl }
       | srcloc PRAGMASPECIALIZE var '::' type PRAGMAEND
                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $3, hsDeclType = $5 } }
       | decl          { $1 }
+
 
 rule :: { HsRule }
       : srcloc STRING mfreevars exp '=' exp
@@ -462,8 +471,13 @@ ctype :: { HsQualType }
                                          returnP (HsQualType c $3) }
       | type                          { HsQualType [] $1 }
 
+carhs :: { (HsContext, HsContext) }
+       : btype '=>' btype {% liftM2 (,)     (checkContext $1) (checkContext $3) }
+       | btype            {% liftM ((,) []) (checkContext $1) }
+
 classhead :: { HsClassHead }
     : ctype {% qualTypeToClassHead $1 }
+
 
 types :: { [HsType] }
       : types ',' type                { $3 : $1 }
@@ -823,6 +837,7 @@ qvarid :: { HsName }
 varid :: { HsName }
       : VARID                 { UnQual (HsIdent $1) }
       | 'as'                  { as_name }
+      | 'alias'               { UnQual (HsIdent "alias") }
       | 'kind'                { UnQual (HsIdent "kind") }
       | 'qualified'           { qualified_name }
       | 'hiding'              { hiding_name }

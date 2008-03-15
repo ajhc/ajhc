@@ -135,6 +135,7 @@ instance HasLocation HsDecl where
     srcLoc HsActionDecl   { hsDeclSrcLoc = sl } = sl
     srcLoc (HsForeignExport sl _ _ _) = sl
     srcLoc (HsClassDecl	 sl _ _) = sl
+    srcLoc HsClassAliasDecl { hsDeclSrcLoc = sl } = sl
     srcLoc (HsInstDecl	 sl _ _) = sl
     srcLoc (HsDefaultDecl sl _) = sl
     srcLoc (HsTypeSig	 sl _ _) = sl
@@ -187,6 +188,14 @@ data HsDecl
         }
     | HsInfixDecl   { hsDeclSrcLoc :: SrcLoc, hsDeclAssoc :: HsAssoc, hsDeclInt :: !Int, hsDeclNames :: [HsName]  }
     | HsClassDecl   { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType, hsDeclDecls :: [HsDecl] }
+    | HsClassAliasDecl {
+        hsDeclSrcLoc :: SrcLoc,
+        hsDeclName :: HsName,
+        hsDeclTypeArgs :: [HsType],
+        {- rhs -} hsDeclContext :: HsContext,
+                  hsDeclClasses :: HsContext,
+        hsDeclDecls :: [HsDecl]
+        }
     | HsInstDecl    { hsDeclSrcLoc :: SrcLoc, hsDeclQualType :: HsQualType, hsDeclDecls :: [HsDecl] }
     | HsDefaultDecl SrcLoc HsType
     | HsTypeSig	 SrcLoc [HsName] HsQualType

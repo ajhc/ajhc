@@ -283,6 +283,12 @@ ppHsDecl (HsClassDecl pos qualType declList) =
 	   mySep [text "class", ppHsQualType qualType, text "where"]
 	   $$$ body classIndent (map ppHsDecl declList)
 
+ppHsDecl (HsClassAliasDecl pos name args context classes declList) =
+	   --blankline $
+	   mySep ([text "class alias", ppHsName name] ++ map ppHsType args
+                  ++ [equals, ppHsContext context, text "=>", ppHsContext classes, text "where"])
+	   $$$ body classIndent (map ppHsDecl declList)
+
 -- m{spacing=False}
 -- special case for empty instance declaration
 ppHsDecl (HsInstDecl pos qualType []) =

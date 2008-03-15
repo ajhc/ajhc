@@ -36,6 +36,7 @@ import Options
 import TypeSigs           (collectSigs, listSigsToSigEnv)
 import TypeSynonyms
 import TypeSyns
+--import ClassAliases
 import Util.Gen
 import Util.Inst()
 import Util.SetLike
@@ -111,9 +112,9 @@ tiModules' cho ms = do
     let fieldMap = buildFieldMap me ms
     ms <- mapM (processModule fieldMap) ms
     let thisFixityMap = buildFixityMap (concat [ filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
-    let fixityMap = thisFixityMap `mappend` hoFixities hoB
+    let fixityMap = thisFixityMap  `mappend` hoFixities hoB
     let thisTypeSynonyms =  (declsToTypeSynonyms $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
-    let ts = thisTypeSynonyms  `mappend` hoTypeSynonyms hoB
+    let ts = thisTypeSynonyms `mappend` hoTypeSynonyms hoB
     let f x = expandTypeSyns ts (modInfoHsModule x) >>= FrontEnd.Infix.infixHsModule fixityMap >>= \z -> return (modInfoHsModule_s ( z) x)
     ms <- mapM f ms
     processIOErrors
@@ -125,7 +126,7 @@ tiModules' cho ms = do
 
 
     -- kind inference for all type constructors type variables and classes in the module
-    let classAndDataDecls = filter (or' [isHsDataDecl, isHsNewTypeDecl, isHsClassDecl]) ds  -- rDataDecls ++ rNewTyDecls ++ rClassDecls
+    let classAndDataDecls = filter (or' [isHsDataDecl, isHsNewTypeDecl, isHsClassDecl, isHsClassAliasDecl]) ds  -- rDataDecls ++ rNewTyDecls ++ rClassDecls
 
     wdump FD.Progress $ do
         putErrLn $ "Kind inference"
@@ -148,7 +149,7 @@ tiModules' cho ms = do
 
 
     smallClassHierarchy <- makeClassHierarchy importClassHierarchy kindInfo ds
-    cHierarchyWithInstances <- return $ smallClassHierarchy `mappend` importClassHierarchy
+    cHierarchyWithInstances <- scatterAliasInstances $ smallClassHierarchy `mappend` importClassHierarchy
 
     when (dump FD.ClassSummary) $ do
         putStrLn "  ---- class summary ---- "

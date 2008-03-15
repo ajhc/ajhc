@@ -236,6 +236,15 @@ instance Rename HsDecl where
         doesClassMakeSense hsQualType'
         hsDecls' <- rename hsDecls
         return (HsClassDecl srcLoc hsQualType' hsDecls')
+    rename (HsClassAliasDecl srcLoc name args hsContext hsClasses hsDecls) = do
+        withSrcLoc srcLoc $ do
+        name' <- renameTypeName name
+        updateWith args $ do
+        args' <- mapM rename args
+        hsContext' <- rename hsContext
+        hsClasses' <- rename hsClasses
+        hsDecls' <- rename hsDecls
+        return (HsClassAliasDecl srcLoc name' args' hsContext' hsClasses' hsDecls')
     rename (HsInstDecl srcLoc hsQualType hsDecls) = do
         withSrcLoc srcLoc $ do
         updateWith hsQualType $ do
@@ -825,6 +834,11 @@ collectDefsHsModule m = execWriter (mapM_ f (hsModuleDecls m)) where
             Just x | nameType x == ClassName -> x
             _ -> error "not a class name"
         cs = fst (mconcatMap (namesHsDeclTS' toName) ds)
+    f cad@(HsClassAliasDecl { hsDeclSrcLoc = sl, hsDeclName = n, hsDeclDecls = ds }) 
+           = tellF $ (toName Name.ClassName n,sl,snub $ fsts cs):[ (n,a,[]) | (n,a) <- cs]
+        where 
+          cs = fst (mconcatMap (namesHsDeclTS' toName) ds)
+
     f _ = return ()
     zup cs = tellS (map g cs) where
         g ca = (toName DataConstructor (hsConDeclName ca), length $ hsConDeclArgs ca)

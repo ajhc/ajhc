@@ -92,6 +92,7 @@ data Token
 	| KW_As
 	| KW_Case
 	| KW_Class
+        | KW_Alias
 	| KW_Data
 	| KW_Default
 	| KW_Deriving
@@ -158,6 +159,7 @@ reserved_ids = [
  ( "_",         Underscore ),
  ( "case",      KW_Case ),
  ( "class",     KW_Class ),
+ ( "alias",     KW_Alias ),
  ( "data",      KW_Data ),
  ( "default",   KW_Default ),
  ( "deriving",  KW_Deriving ),

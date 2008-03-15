@@ -231,6 +231,9 @@ traverseHsDeclHsExp fn d = f d where
     f (HsClassDecl srcLoc hsQualType hsDecls)  = withSrcLoc srcLoc $ do
         hsDecls'  <- mapM (traverseHsDeclHsExp fn) hsDecls
         return (HsClassDecl srcLoc hsQualType hsDecls')
+    f decl@(HsClassAliasDecl { hsDeclSrcLoc = sl})  = withSrcLoc sl $ do
+        hsDecls'  <- mapM (traverseHsDeclHsExp fn) (hsDeclDecls decl)
+        return (decl { hsDeclDecls = hsDecls' })
     f (HsInstDecl srcLoc hsQualType hsDecls)  = withSrcLoc srcLoc $ do
         hsDecls'  <- mapM (traverseHsDeclHsExp fn) hsDecls
         return (HsInstDecl srcLoc hsQualType hsDecls')
