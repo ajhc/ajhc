@@ -3,6 +3,8 @@ module FrontEnd.Class(
     instanceToTopDecls,
     ClassHierarchy,
     ClassRecord(..),
+    isClassRecord,
+    isClassAliasRecord,
     instanceName,
     defaultInstanceName,
     printClassSummary,
@@ -84,7 +86,7 @@ data ClassRecord = ClassRecord      { className :: Class,
                                       classSupers :: [Class],
                                       classInsts :: [Inst],
                                       classClasses :: [Class],
-                                      classScatterMap :: Map.Map Class [Name]
+                                      classMethodMap :: Map.Map Name Class  
                                     }
     deriving Show
     {-! derive: Binary, is !-}
@@ -116,7 +118,7 @@ combineClassRecords cra@(ClassAliasRecord {}) crb@(ClassRecord {}) | className c
     classInsts = snub $ classInsts cra ++ classInsts crb,
     classArgs = if null (classArgs cra) then classArgs crb else classArgs cra,
     classClasses = classClasses cra,
-    classScatterMap = classScatterMap cra
+    classMethodMap = classMethodMap cra
 }
 
 combineClassRecords cra@(ClassRecord {}) crb@(ClassAliasRecord {}) = combineClassRecords crb cra
@@ -325,8 +327,8 @@ fromHsTypeApp t = f t [] where
     f t rs = (t,rs)
 
 instanceToTopDecls :: KindEnv -> ClassHierarchy -> HsDecl -> (([HsDecl],[Assump]))
-instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsInstDecl _ qualType methods)
-    = unzip $ map (methodToTopDecls kt [] crecord qualType) $ methodGroups where
+instanceToTopDecls kt ch@(ClassHierarchy classHierarchy) (HsInstDecl _ qualType methods)
+    = unzip $ map (methodToTopDecls ch kt [] crecord qualType) $ methodGroups where
     methodGroups = groupEquations methods
     (_,(className,_)) = qtToClassHead kt qualType
     crecord = case Map.lookup className classHierarchy  of
@@ -334,15 +336,23 @@ instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsInstDecl _ qualType met
         Just crecord -> crecord
     tsubst na vv v = applyTyvarMap [(na,vv)] v
 
-instanceToTopDecls kt (ClassHierarchy classHierarchy) (HsClassDecl _ qualType methods)
+instanceToTopDecls kt ch@(ClassHierarchy classHierarchy) (HsClassDecl _ qualType methods)
    = unzip $ map (defaultMethodToTopDecls kt methodSigs qualType) $ methodGroups where
    HsQualType _ (HsTyApp (HsTyCon className) _) = qualType
    methodGroups = groupEquations (filter (\x -> isHsPatBind x || isHsFunBind x)  methods)
    methodSigs = case Map.lookup (toName ClassName className) classHierarchy  of
            Nothing -> error $ "defaultInstanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
            Just sigs -> classAssumps sigs
-instanceToTopDecls kt (ClassHierarchy classHierarchy) cad@(HsClassAliasDecl {})
-    = error ("instanceToTopDecls: "++show cad)
+
+instanceToTopDecls kt ch@(ClassHierarchy classHierarchy) cad@(HsClassAliasDecl {})
+   = unzip $ map (aliasDefaultMethodToTopDecls kt methodSigs aliasName) $ methodGroups where
+   aliasName = toName ClassName (hsDeclName cad)
+   methodGroups = groupEquations (filter (\x -> isHsPatBind x || isHsFunBind x) (hsDeclDecls cad))
+   methodSigs = case Map.lookup aliasName classHierarchy  of
+           Nothing -> error $ "aliasDefaultInstanceToTopDecls: could not find class "
+                              ++ show aliasName ++ "in class hierarchy"
+           Just sigs -> concatMap (classAssumps . findClassRecord ch) (classClasses sigs)
+
 instanceToTopDecls _ _ _ = mempty
 
 
@@ -350,17 +360,23 @@ instanceToTopDecls _ _ _ = mempty
 
 instanceName n t = toName Val $ Qual (Module "Instance@") $ HsIdent ('i':show n ++ "." ++ show t)
 defaultInstanceName n = toName Val $ Qual (Module "Instance@") $ HsIdent ('i':show n ++ ".default")
-aliasDefaultInstanceName n ca = toName Val $ Qual (Module "Instance@") $ HsIdent ('i':show n ++ ".default." ++ ca)
+aliasDefaultInstanceName :: Name -> Class -> Name
+aliasDefaultInstanceName n ca = toName Val $ Qual (Module "Instance@") $ HsIdent ('i':show n ++ ".default."++show ca)
 
 methodToTopDecls ::
-    KindEnv            -- ^ the kindenv
+    ClassHierarchy
+    -> KindEnv         -- ^ the kindenv
     -> [Pred]          -- ^ random extra predicates to add
     -> ClassRecord     -- ^ the class we are lifting methods from
     -> HsQualType
     -> (Name, HsDecl)
     -> (HsDecl,Assump)
 
-methodToTopDecls kt preds crecord qt (methodName, methodDecls)
+methodToTopDecls ch kt preds crecord@(ClassAliasRecord {}) qt meth@(methodName, methodDecls) 
+   = methodToTopDecls ch kt preds (findClassRecord ch cls) qt meth
+     where Just cls = Map.lookup methodName (classMethodMap crecord)
+
+methodToTopDecls _  kt preds crecord qt (methodName, methodDecls)
    = (renamedMethodDecls,(newMethodName, instantiatedSig)) where
     (cntxt,(className,[argType])) = qtToClassHead kt qt
     newMethodName = instanceName methodName (getTypeHead argType)
@@ -382,6 +398,16 @@ defaultMethodToTopDecls kt methodSigs (HsQualType cntxt classApp) (methodName, m
         _ -> error $ "sigFromClass: " ++ show methodSigs ++ " " ++ show  methodName
      --  = newMethodSig cntxt newMethodName sigFromClass argType
     renamedMethodDecls = renameOneDecl newMethodName methodDecls
+
+aliasDefaultMethodToTopDecls :: KindEnv -> [Assump] -> Class -> (Name, HsDecl) -> (HsDecl,Assump)
+aliasDefaultMethodToTopDecls kt methodSigs aliasName (methodName, methodDecls)
+   = (renamedMethodDecls,(newMethodName,sigFromClass)) where
+     newMethodName = aliasDefaultInstanceName methodName aliasName
+     sigFromClass = case [ s | (n, s) <- methodSigs, n == methodName] of
+         [x] -> x
+         _ -> error $ "sigFromClass: " ++ show methodSigs ++ " " ++ show  methodName
+      --  = newMethodSig cntxt newMethodName sigFromClass argType
+     renamedMethodDecls = renameOneDecl newMethodName methodDecls
 
 renameOneDecl :: Name -> HsDecl -> HsDecl
 renameOneDecl newName (HsFunBind matches)
@@ -435,11 +461,29 @@ classMethodAssumps hierarchy = concatMap classAssumps $ classRecords hierarchy
 
 --------------------------------------------------------------------------------
 
-scatterAliasInstances :: Monad m => ClassHierarchy -> m ClassHierarchy
+scatterAliasInstances :: MonadIO m => ClassHierarchy -> m ClassHierarchy
 scatterAliasInstances ch = do
-  let cas = [cr | cr@(ClassAliasRecord {}) <- classRecords ch]
-  fail ("scatterAliasInstances: " ++ show cas)
-      
+    let cas = [cr | cr@(ClassAliasRecord {}) <- classRecords ch]
+    ch `seq` liftIO $ putStrLn ("scatterAliasInstances: " ++ show cas)
+    let instances = concatMap scatterInstancesOf cas
+    let ret = foldr (modifyClassRecord $ \cr -> cr 
+                     { classInsts = [],
+                       classMethodMap = Map.fromList [(meth, cls) | cls <- classClasses cr,
+                                                                    (meth,_) <- classAssumps (findClassRecord ch cls)]
+                     })
+                    (ch `mappend` classHierarchyFromRecords instances)
+                    (map className cas)
+    -- liftIO $ mapM_ print (classRecords ret)
+    return ret
+    
+scatterInstancesOf :: ClassRecord -> [ClassRecord]
+scatterInstancesOf cr = map extract (classClasses cr)
+    where
+      extract c =
+          (newClassRecord c) { classInsts = 
+                                   [Inst sl d ((cxt ++ [IsIn c2 xs | c2 <- classClasses cr, c2 /= c]) :=> IsIn c xs) []
+                                        | Inst sl d (cxt :=> IsIn _ xs) [] <- classInsts cr] }
+
 --------------------------------------------------------------------------------
 
 failSl sl m = fail $ show sl ++ ": " ++ m
@@ -468,7 +512,7 @@ makeClassHierarchy (ClassHierarchy ch) kt ds = return (ClassHierarchy ans) where
                                  classSupers = [toName ClassName n | HsAsst n _ <- (hsDeclContext decl)],
                                  classClasses = [toName ClassName n | HsAsst n _ <- (hsDeclClasses decl)],
                                  classInsts = [],
-                                 classScatterMap = mempty
+                                 classMethodMap = Map.empty
                                }]
             
     f decl@(HsInstDecl {}) = hsInstDeclToInst kt decl >>= \insts -> do

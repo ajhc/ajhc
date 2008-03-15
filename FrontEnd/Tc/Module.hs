@@ -162,7 +162,7 @@ tiModules' cho ms = do
     -- lift the instance methods up to top-level decls
 
     let cDefBinds = concat [ [ z | z <- ds] | HsClassDecl _ _ ds <- ds]
-    let myClassAssumps = concat  [ classAssumps as | as <- (classRecords cHierarchyWithInstances)]
+    let myClassAssumps = concat  [ classAssumps as | as <- classRecords cHierarchyWithInstances, isClassRecord as ]
         instanceEnv   = Map.fromList instAssumps
         classDefs = snub (concatMap getDeclNames cDefBinds)
         classEnv  = Map.fromList $ [ (x,y) | (x,y) <- myClassAssumps, x `elem` classDefs  ]
