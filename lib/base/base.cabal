@@ -35,6 +35,7 @@ Exposed-Modules: Control.Exception,
                  Jhc.Basics,
                  Jhc.Float
                  Jhc.Array,
+                 Jhc.IOArray,
                  Jhc.Handle,
                  Jhc.IO,
                  Jhc.Tuples,
