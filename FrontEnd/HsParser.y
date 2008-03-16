@@ -673,7 +673,7 @@ aexp1 :: { HsExp }
       | '[' list ']'                  { $2 }
       | '(' infixexp qop ')'          { HsLeftSection $3 $2  }
       | '(' qopm infixexp ')'         { HsRightSection $3 $2 }
-      | qvar '@' aexp1                {% checkUnQual $1 `thenP` \n ->
+      | qvar '@' aexp                 {% checkUnQual $1 `thenP` \n ->
                                          returnP (HsAsPat n $3) }
       | srcloc '_'                    { HsWildCard $1 }
       | '~' srcloc aexp1 srcloc       { HsIrrPat $ located ($2,$4) $3 }
