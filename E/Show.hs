@@ -23,8 +23,12 @@ import Util.VarName
 import qualified Doc.Chars as UC
 import qualified FlagDump as FD
 
+{-# NOINLINE render #-}
+{-# NOINLINE ePretty #-}
+{-# NOINLINE prettyE #-}
+{-# NOINLINE ePrettyEx #-}
 render :: Doc -> String
-render doc =  displayS (renderPretty 0.95 (optColumns options)  doc) ""
+render doc =  displayS (renderPretty 100.0 (optColumns options)  doc) ""
 
 prettyE :: E -> String
 prettyE e = render $ ePretty e
@@ -188,9 +192,9 @@ showE e = do
         f ELetRec { eDefs = ds, eBody = e } = do
             e <- fmap unparse $ showE e
             ds <- mapM (fmap unparse . showDecl) ds
-            return $ fixitize (L,(-10)) $ atom $ group $ align (( keyword "let"
-                                                                  </> (align $ sep (map (<> bc ';') ds))
-                                                                  </> (keyword "in" <+> align e) ))
+            return $ fixitize (L,(-10)) $ atom $ nest 4 (group ( keyword "let"
+                                                                  <$> (align $ sep (map (<> bc ';') ds))
+                                                                  <$> (keyword "in")) </> e )
 
         f ec@(ECase { eCaseScrutinee = e, eCaseAlts = alts }) = mt (showE (eCaseType ec)) $  allocTVr (eCaseBind ec) $ do
             scrut <- fmap unparse $ showE e
@@ -208,16 +212,16 @@ showE e = do
                       | (isUsed && isNothing (eCaseDefault ec)) || dump FD.EVerbose = text " " <> (if isUsed then id else (char '_' <>)) (unparse db) <+> text "<-"
                       | otherwise = empty
             return $ fixitize ((L,(-10))) $ atom $
-                group ( nest 4 ( keyword "case" <> mbind <+> scrut <+> keyword "of" <$>  (align $ vcat (alts'))) )
+                group (nest 4 ( keyword "case" <> mbind <+> scrut <+> keyword "of" <$>  (align $ vcat (alts'))) )
         showAlt (Alt l e) = foldr allocTVr ans (litBinds l) where
             ans = do
                 l <- showLit showTVr l
                 e <- showE e
-                return $ nest 4 $ fill 10 ((unparse l) <+>  UC.rArrow </> (unparse e))
+                return $ fill 10 ((unparse l) <+>  UC.rArrow </> (unparse e))
         showDecl (t,e) = do
             t <- subSEM $ showTVr t
             e <- subSEM $ showE e
-            return $ atom $ nest 4 $ unparse t <+> retOp (char '=') </> unparse e
+            return $ atom $ unparse t <+> retOp (char '=') </> unparse e
         bold' = bold
         bc = bold' . char
         keyword x = col "magenta" (text x)
@@ -242,7 +246,6 @@ inhabit = bop (N,-2) $ retOp UC.coloncolon
 bold :: Doc -> Doc
 bold = attrBold (attr oob)
 
-{-# NOINLINE ePretty #-}
 ePretty e = unparse pe where
     (SEM pe') = showE e
     Identity pe = runVarNameT pe'
