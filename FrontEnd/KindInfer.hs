@@ -287,9 +287,6 @@ kiType k (HsTyVar v) = do
 kiType k (HsTyCon v) = do
     kv <- lookupKind KindAny (toName TypeConstructor v)
     unify k kv
-kiType k (HsTyCon v) = do
-    kv <- lookupKind KindAny (toName TypeConstructor v)
-    unify k kv
 kiType k HsTyAssoc = do
     constrain KindSimple k
 kiType _ HsTyEq {} = error "kiType.HsTyEq"
