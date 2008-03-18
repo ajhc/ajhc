@@ -95,6 +95,7 @@ import Debug.Trace (trace)
       '=>'    { DoubleArrow }
       '-'     { Minus }
       '!'     { Exclamation }
+      '?'     { Quest }
       '??'    { QuestQuest }
       '*!'    { StarBang }
       '*'     { Star }
@@ -426,6 +427,7 @@ bkind :: { HsKind }
        |  '#'                   { hsKindHash }
        |  '!'                   { hsKindBang }
        |  '*!'                  { hsKindStarBang }
+       |  '?'                   { hsKindQuest }
        |  '??'                  { hsKindQuestQuest }
        |  qconid                { HsKind $1 }
 
@@ -871,6 +873,7 @@ varsym :: { HsName }
       : VARSYM                { UnQual (hsSymbol $1) }
       | '-'                   { minus_name }
       | '!'                   { pling_name }
+      | '?'                   { UnQual (hsSymbol "?") }
       | '??'                  { UnQual (hsSymbol "??") }
       | '*!'                  { UnQual (hsSymbol "*!") }
       | '*'                   { star_name }
@@ -960,7 +963,7 @@ tuple_con i	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = (tuple_
 
 
 unit_tycon_name       = unit_con_name
-fun_tycon_name        = Qual (Module "Jhc@") (HsIdent "->")
+fun_tycon_name        = Qual (Module "Jhc.Basics") (HsIdent "->")
 list_tycon_name       = UnQual (HsIdent "[]")
 tuple_tycon_name i    = tuple_con_name i
 

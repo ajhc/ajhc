@@ -61,6 +61,7 @@ instance FromTupname Name where
 -- The constructors
 
 
+tc_Box = toName TypeConstructor    ("Jhc@","Box")
 tc_Arrow = toName TypeConstructor  ("Jhc@","->")
 
 tc_Int__ = toName TypeConstructor  ("Jhc.Prim","Int__")

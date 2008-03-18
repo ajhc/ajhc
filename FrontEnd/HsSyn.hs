@@ -431,6 +431,7 @@ data HsKind = HsKind HsName | HsKindFn HsKind HsKind
 hsKindStar = HsKind (Qual (Module "Jhc@") (HsIdent "*"))
 hsKindHash = HsKind (Qual (Module "Jhc@") (HsIdent "#"))
 hsKindBang = HsKind (Qual (Module "Jhc@") (HsIdent "!"))
+hsKindQuest = HsKind (Qual (Module "Jhc@") (HsIdent "?"))
 hsKindQuestQuest = HsKind (Qual (Module "Jhc@") (HsIdent "??"))
 hsKindStarBang   = HsKind (Qual (Module "Jhc@") (HsIdent "*!"))
 

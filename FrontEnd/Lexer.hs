@@ -80,6 +80,7 @@ data Token
 	| Tilde
 	| DoubleArrow
 	| Minus
+        | Quest
 	| QuestQuest
 	| StarBang
 	| Exclamation
@@ -146,8 +147,9 @@ reserved_ops = [
 special_varops :: [(String,Token)]
 special_varops = [
  ( "-",  Minus ),	--ToDo: shouldn't be here
- ( "??",  QuestQuest ),--ditto
- ( "*!",  StarBang ),--ditto
+ ( "?",  Quest ),     --ditto
+ ( "??", QuestQuest ),--ditto
+ ( "*!", StarBang ),--ditto
  ( "!",  Exclamation ),	--ditto
  ( ".",  Dot ),		--ditto
  ( "*",  Star ),	--ditto

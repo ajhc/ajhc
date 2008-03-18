@@ -4,6 +4,7 @@ module Jhc.Basics(module Jhc.Basics, module Jhc.Prim) where
 import Jhc.Prim
 import Jhc.Int
 
+data (->) :: ?? -> ? -> *
 data Integer
 
 type String = [Char]

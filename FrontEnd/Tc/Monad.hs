@@ -420,7 +420,7 @@ unBox tv = ft' tv where
     ft t = tickleM ft' t
     ft' t = evalType t >>= ft
 
-evalType t = findType t >>= evalTAssoc
+evalType t = findType t >>= evalTAssoc >>= evalArrowApp
 evalFullType t = f' t where
     f t = tickleM f' t
     f' t =  evalType t >>= f
@@ -435,6 +435,13 @@ evalTAssoc ta@TAssoc { typeCon = Tycon { tyconName = n1 }, typeClassArgs = ~[car
                 _ -> fail "no instance for associated type"
         _ -> return ta { typeClassArgs = [carg'] }
 evalTAssoc t = return t
+
+
+evalArrowApp (TAp (TAp (TCon tcon) ta) tb) 
+    | tyconName tcon == tc_Arrow = return (TArrow ta tb) 
+
+evalArrowApp t = return t
+
 
 -- Bind mv to type, first filling in any boxes in type with tau vars
 varBind :: MetaVar -> Type -> Tc ()

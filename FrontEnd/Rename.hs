@@ -99,6 +99,8 @@ addTopLevels  hsDecls action = do
         f r hsName@Qual {}
             | Just _ <- V.fromTupname hsName, Module "Jhc.Basics" <- mod
                 = let nn = hsName in (nn,nn):r
+            | nameName tc_Arrow == hsName, Module "Jhc.Basics" == mod
+                = let nn = hsName in (nn,nn):r
             | otherwise = error $ "strong bad: " ++ show hsName
         f r z@(UnQual n) = let nn = Qual mod n in (z,nn):(nn,nn):r
         z ns = mapM mult (filter (\x -> length x > 1) $ groupBy (\a b -> fst a == fst b) (sort ns))
@@ -705,6 +707,7 @@ renameTypeName n = renameOld $ renameTypeHsName n
 -- it will be qualified with the current module's prefix.
 renameHsName :: HsName -> SubTable -> RM (HsName)
 renameHsName hsName subTable
+    | nameName tc_Arrow == hsName = return hsName
     | Qual (Module ('@':m)) (HsIdent i) <- hsName = return $ Qual (Module m) (HsIdent i)
 renameHsName hsName subTable = case Map.lookup hsName subTable of
     Just name@(Qual _ _) -> return name

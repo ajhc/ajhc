@@ -334,7 +334,7 @@ instance CanType Type Kind where
   getType (TVar u)  = getType u
   getType typ@(TAp t _) = case (getType t) of
                      (Kfun _ k) -> k
-                     x -> error $ "Type.getType: kind error in: " ++ (show typ)
+                     x -> error $ "Representation.getType: kind error in: " ++ (show typ)
   getType (TArrow _l _r) = kindStar
   getType (TForAll _ (_ :=> t)) = getType t
   getType (TExists _ (_ :=> t)) = getType t

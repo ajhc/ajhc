@@ -311,8 +311,10 @@ initTyVarBind HsTyVarBind { hsTyVarBindName = name, hsTyVarBindKind = kk } = do
 
 
 hsKindToKind (HsKindFn a b) = hsKindToKind a `Kfun` hsKindToKind b
-hsKindToKind a | a == hsKindStar = kindStar
-hsKindToKind a | a == hsKindHash = kindHash
+hsKindToKind a | a == hsKindStar       = kindStar
+               | a == hsKindHash       = kindHash
+               | a == hsKindQuest      = kindFunRet
+               | a == hsKindQuestQuest = kindArg
 hsKindToKind (HsKind n) = KBase (KNamed (toName SortName n))
 -- hsKindToKind (HsKind n) = toName SortName n
 

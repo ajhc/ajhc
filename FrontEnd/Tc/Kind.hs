@@ -9,6 +9,7 @@ module FrontEnd.Tc.Kind(
     kindFunRet,
     kindHash,
     kindArg,
+    isSubsumedBy,
     unfoldKind
     ) where
 
@@ -37,9 +38,8 @@ import Name.Name
       / \
      ?? (#)
      /\
-    *?  #
-   /  \
-  *    !
+    *  #
+
 in addition, user defined named kinds are allowed. these can only occur via
 kind annotations, and only unify with themselves
 
@@ -55,6 +55,12 @@ data KBase =
     deriving(Eq, Ord)   -- but we need them for kind inference
     {-! derive: Binary !-}
 
+KNamed s1 `isSubsumedBy2` KNamed s2   = s1 == s2
+_         `isSubsumedBy2` KQuest      = True
+Star      `isSubsumedBy2` KQuestQuest = True
+KHash     `isSubsumedBy2` KQuestQuest = True
+k1        `isSubsumedBy2` k2          = k1 == k2
+
 kindStar   = KBase Star
 kindHash   = KBase KHash
 kindUTuple = KBase KUTuple
@@ -66,6 +72,10 @@ data Kind  = KBase KBase
            | KVar Kindvar               -- variables aren't really allowed in haskell in kinds
              deriving(Eq, Ord)   -- but we need them for kind inference
     {-! derive: Binary !-}
+
+KBase kb    `isSubsumedBy` KBase kb'    = isSubsumedBy2 kb kb'
+Kfun  k1 k2 `isSubsumedBy` Kfun k1' k2' = isSubsumedBy k1 k1' && isSubsumedBy k2 k2'
+_           `isSubsumedBy` _            = False
 
 
 kindCombine :: Monad m => Kind -> Kind -> m Kind

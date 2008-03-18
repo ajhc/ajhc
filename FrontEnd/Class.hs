@@ -33,6 +33,7 @@ import Data.Binary
 import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.KindInfer
+import FrontEnd.Tc.Kind
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
@@ -243,16 +244,17 @@ addOneInstanceToHierarchy ch inst@Inst { instHead = cntxt :=> IsIn className _ }
 
 hsInstDeclToInst :: Monad m => KindEnv -> HsDecl -> m [Inst]
 hsInstDeclToInst kt (HsInstDecl sloc qType decls)
-   | classKind == argTypeKind
+   | length classKind == length argTypeKind, and subsumptions
         = return [emptyInstance { instSrcLoc = sloc, instDerived = False, instHead = cntxt :=> IsIn className convertedArgType, instAssocs = assocs }]
    | otherwise = failSl sloc $ "hsInstDeclToInst: kind error, attempt to make\n" ++
                       show convertedArgType ++ " (with kind " ++ show argTypeKind ++ ")\n" ++
                       "an instance of class " ++ show className ++
-                      " (with kind " ++ show classKind ++ ")"
+                      " (with kind " ++ show classKind ++ ") " ++ show subsumptions
    where
    (cntxt, (className, cargs@[convertedArgType])) = qtToClassHead kt qType
    classKind = kindOfClass className kt
    argTypeKind = map getType cargs
+   subsumptions = zipWith isSubsumedBy classKind argTypeKind
    assocs = [ (tc,as,bs,s) | (tc,as,bs,~(Just s)) <- createInstAssocs kt decls ]
 hsInstDeclToInst _ _ = return []
 
