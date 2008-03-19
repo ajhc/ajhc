@@ -299,7 +299,7 @@ processDecls cho ho' tiData = do
             }
     let tparms = transformParms {
             transformPass = "PreInit",
-            transformDumpProgress = True
+            transformDumpProgress = verbose
             }
 
     -- quick float inward pass to inline once used functions and prune unused ones
@@ -362,7 +362,7 @@ processDecls cho ho' tiData = do
         } prog
 
     prog <- Demand.analyzeProgram prog
-    prog <- simplifyProgram' sopt "Init-Big-One" True (IterateMax 4) prog
+    prog <- simplifyProgram' sopt "Init-Big-One" verbose (IterateMax 4) prog
 
     wdump FD.Progress $
         Stats.printLStat (optStatLevel options) "Init-Big-One Stats" (progStats prog)
@@ -560,17 +560,17 @@ compileModEnv cho = do
     prog <- barendregtProg prog
 
 
-    prog <- simplifyProgram mempty "Main-One" True prog
+    prog <- simplifyProgram mempty "Main-One" verbose prog
     prog <- barendregtProg prog
 
 
     prog <- etaExpandProg "Main-AfterOne" prog
     prog <- barendregtProg prog
-    prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterSimp", transformDumpProgress = True } prog
+    prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterSimp", transformDumpProgress = verbose } prog
 
 
     prog <- barendregtProg prog
-    prog <- simplifyProgram mempty "Main-Two" True prog
+    prog <- simplifyProgram mempty "Main-Two" verbose prog
     prog <- barendregtProg prog
 
 
@@ -580,7 +580,7 @@ compileModEnv cho = do
     prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ modifyProperties (flip (foldr S.delete) [prop_HASRULE,prop_WORKER]) nfo) letann (\_ -> return) prog
     --prog <- transformProgram "float inward" DontIterate True programFloatInward prog
 
-    prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify no rules" True prog
+    prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify no rules" verbose prog
     prog <- barendregtProg prog
 
 
@@ -599,7 +599,7 @@ compileModEnv cho = do
     prog <- Demand.analyzeProgram prog
     prog <- return $ E.CPR.cprAnalyzeProgram prog
     prog <- transformProgram transformParms { transformCategory = "Boxy WorkWrap", transformDumpProgress = dump FD.Progress, transformOperation = evaluate . workWrapProgram } prog
-    prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify after Boxy WorkWrap" True prog
+    prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify after Boxy WorkWrap" verbose prog
     prog <- barendregtProg prog
     prog <- return $ runIdentity $ programMapBodies (return . cleanupE) prog
 
@@ -673,7 +673,7 @@ cleanupE e = runIdentity (f e) where
     f e = emapEG f f e
 
 simplifyParms = transformParms {
-    transformDumpProgress = True,
+    transformDumpProgress = verbose,
     transformCategory = "Simplify",
     transformPass = "Grin",
     transformOperation = Grin.SSimplify.simplify,
@@ -701,7 +701,7 @@ compileToGrin prog = do
             stats' <- Stats.new
             let fop grin = do Grin.Simplify.simplify stats' grin
                 tparms = transformParms {
-                    transformDumpProgress = True,
+                    transformDumpProgress = verbose,
                     transformCategory = s,
                     transformPass = "Grin",
                     transformOperation = fop

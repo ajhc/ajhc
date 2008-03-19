@@ -296,7 +296,7 @@ toCompUnitGraph done roots = do
         g ms@(((m,_),ds):_) = do
             let amods = map (fst . fst) ms
             pm (join (Map.lookup m phomap)) $ do
-                let deps = Set.toList $ Set.fromList (concat $ snds ms) `Set.difference` (Set.fromList (map (fst . fst) ms))
+                let deps = Set.toList $ Set.fromList (concat $ snds ms) `Set.difference` (Set.fromList amods)
                 deps' <- snub `fmap` mapM f deps
                 let mhash = MD5.md5String (concatMap (show . fst) ms ++ show deps')
                 Map.lookup m mods >>= flip writeIORef (Right mhash)
@@ -305,7 +305,7 @@ toCompUnitGraph done roots = do
                 return mhash
         pm :: [HoHash] -> IO HoHash -> IO HoHash
         pm [] els = els
-        pm (h:hs) els = do catch (hvalid h) (\_ -> pm hs els)
+        pm (h:hs) els = hvalid h `catch` (\_ -> pm hs els)
         hvalid h = do
             ll <- Map.lookup h `fmap` readIORef hom_ref
             case ll of
@@ -316,9 +316,9 @@ toCompUnitGraph done roots = do
                     good <- catch ( mapM_ cdep (hohDepends hoh) >> mapM_ hvalid (hohModDepends hoh) >> return True) (\_ -> return False)
                     if good then do
                         putVerboseLn $ printf "Fresh: <%s>" fp
-                        let lib = case reverse fp of
-                                'o':'h':'.':_ -> Nothing
-                                _ -> Just fp
+                        let lib = case ".ho" `isSuffixOf` fp of
+                                    True  -> Nothing
+                                    False -> Just fp
                         modifyIORef cug_ref ((h,(hohModDepends hoh,CompHo lib hoh ho)):)
                         modifyIORef hom_ref (Map.insert h (True,af))
                         return h
@@ -335,7 +335,6 @@ toCompUnitGraph done roots = do
             _ -> error $ "fs: " ++ show m
     mapM_ f roots
     readIORef cug_ref
-
 
 compileModules :: [Either Module String]                             -- ^ Either a module or filename to find
                -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file

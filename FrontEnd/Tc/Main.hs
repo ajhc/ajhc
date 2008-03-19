@@ -823,7 +823,7 @@ tiProgram bgs es = ans where
             ([],leftovers) <- splitPreds ch [] ps
             --topDefaults leftovers
             return ()
-        liftIO $ do putChar '.'; hFlush stdout
+        when verbose $ liftIO $ do putChar '.'; hFlush stdout
         localEnv env $ f bgs (ds ++ rs) (env `mappend` cenv)
     f [] rs _cenv = do
         ch <- getClassHierarchy
@@ -832,7 +832,7 @@ tiProgram bgs es = ans where
             ([],leftovers) <- splitPreds ch [] ps
             --topDefaults leftovers
             return ()
-        liftIO $ putStrLn "!"
+        when verbose $ liftIO $ putStrLn "!"
         return (rs ++ concat pdecls)
 
 -- Typing Literals
