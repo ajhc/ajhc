@@ -34,10 +34,10 @@ readIORef (IORef r) = IO $ \w -> readRef__ r w
 writeIORef :: IORef a -> a -> IO ()
 writeIORef (IORef r) v = IO $ \w -> case writeRef__ r v w of w' -> (# w', () #)
 
-foreign import primitive eqRef__ :: Ref__ a -> Ref__ a -> Bool
+--foreign import primitive eqRef__ :: Ref__ a -> Ref__ a -> Bool
 
-instance Eq (IORef a) where
-    (IORef x) == (IORef y) = eqRef__ x y
+--instance Eq (IORef a) where
+--    (IORef x) == (IORef y) = eqRef__ x y
 
 
 --{-# NOINLINE modifyIORef #-}

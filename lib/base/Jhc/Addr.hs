@@ -4,8 +4,8 @@ m4_include(Jhc/Order.m4)
 m4_include(Foreign/Storable.m4)
 
 module Jhc.Addr(
-    Addr(),
-    FunAddr(),
+    Addr(..),
+    FunAddr(..),
     Ptr(..),
     FunPtr(..),
     ptrFromAddr__,
