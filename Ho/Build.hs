@@ -9,6 +9,7 @@ module Ho.Build (
 
 import Codec.Compression.GZip
 import Control.Monad.Identity
+import Control.Concurrent
 import Data.Binary
 import Data.Monoid
 import Data.IORef
@@ -392,26 +393,44 @@ compileCompNode :: (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Proce
                 -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
                 -> CompNode
                 -> IO CollectedHo
-compileCompNode ifunc func cn = f cn where
-    f (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
+compileCompNode ifunc func cn = do ns <- countNodes cn
+                                   cur <- newMVar (1::Int)
+                                   f (Set.size ns) cur cn where
+    countNodes (CompNode hh deps ref) = readIORef ref >>= worker
+        where worker (CompCollected _ _) = return Set.empty
+              worker (CompPhony) = mconcat `fmap` mapM countNodes deps
+              worker (CompHo _ hoh _) = do ds <- mconcat `fmap` mapM countNodes deps
+                                           return $ ds `Set.union` Set.fromList (map (show.fst) (hohDepends hoh))
+              worker (CompSources sc) = do ds <- mconcat `fmap` mapM countNodes deps
+                                           return $ ds `Set.union` Set.fromList (map sourceIdent sc)
+    tickProgress cur
+        = modifyMVar cur $ \val -> return (val+1,val)
+    showProgress maxModules cur ms
+        = forM_ ms $ \modName ->
+          do curModule <- tickProgress cur
+             let l = ceiling (logBase 10 (fromIntegral maxModules+1)) :: Int
+             printf "[%*d of %*d] %s\n" l curModule l maxModules (show $ hsModuleName modName)
+    f n cur (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
         CompCollected ch _ -> return ch
         CompPhony -> do
-            xs <- mconcat `fmap` mapM f deps
+            xs <- mconcat `fmap` mapM (f n cur) deps
             writeIORef ref (CompCollected xs CompPhony)
             return xs
-        CompHo _ _ ho -> do
-            cho <- mconcat `fmap` mapM f deps
+        CompHo _ hoh ho -> do
+            cho <- mconcat `fmap` mapM (f n cur) deps
+            forM_ (hohDepends hoh) $ \_ -> tickProgress cur
             cho <- ifunc cho ho
             writeIORef ref (CompCollected cho cn)
             return cho
         CompSources sc -> do
             let hdep = [ h | CompNode h _ _ <- deps]
-            cho <- mconcat `fmap` mapM f deps
+            cho <- mconcat `fmap` mapM (f n cur) deps
             modules <- forM sc $ \x -> case x of
                 SourceParsed { sourceHash = h,sourceModule = mod } -> return (h,mod)
                 SourceRaw { sourceHash = h,sourceLBS = lbs, sourceFP = fp } -> do
                     mod <- parseHsSource fp lbs
                     return (h,mod)
+            showProgress n cur (snds modules)
             (cho',newHo) <- func cho (snds modules)
             let hoh = HoHeader {
                                  hohDepends    = [ (hsModuleName mod,h) | (h,mod) <- modules],
