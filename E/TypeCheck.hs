@@ -110,8 +110,10 @@ ptsRulesMap = Map.fromList [ ((a,b),c) | (as,bs,c) <- ptsRules, a <- as, b <- bs
         ]
 
 
-canBeBox x | getType x == eStar = True
+canBeBox x | getType (getType x) == ESort EStarStar = True
 canBeBox _ = False
+
+tBox = mktBox eStar
 
 -- Fast (and lazy, and perhaps unsafe) typeof
 instance CanType E E where
@@ -127,10 +129,12 @@ instance CanType E E where
         where typa = getType a; typb = getType b
     getType (EAp (ELit LitCons { litType = EPi tvr a }) b) = getType (subst tvr b a)
     getType (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = getType (foldl eAp af (litArgs lc ++ [b]))
---    getType (EAp a _) | a == tBox = getType a
-    getType e@(EAp (ELit LitCons {}) b) = error $ "getType: application of type alias " ++ (render $ ePretty e)
     getType (EAp (EPi tvr a) b) = getType (subst tvr b a)
-    getType (EAp a b) = if isUnknown typa then Unknown else eAp typa b where typa = getType a
+    getType e@(EAp a b) = ans where
+        ans = if isUnknown typa then Unknown else if a == tBox || typa == tBox then tBox else (case a of
+            (ELit LitCons {}) -> error $ "getType: application of type alias " ++ (render $ ePretty e)
+            _ -> eAp typa b)
+        typa = getType a
     getType (ELam (TVr { tvrIdent = x, tvrType =  a}) b) = EPi (tVr x a) (getType b)
     getType (ELetRec _ e) = getType e
     getType ECase {eCaseType = ty} = ty
@@ -217,7 +221,7 @@ inferType dataTable ds e = rfc e where
     fc (EAp a b) = do
         withContextDoc (text "EAp:" </> parens (prettyE a) </> parens (prettyE b)) $ do
             a' <- rfc a
-            strong' $ eAp a' b
+            if a' == tBox then return tBox else strong' (eAp a' b)
     fc (ELetRec vs e) = do
         let ck (TVr { tvrIdent = 0 },_) = fail "binding of empty var"
             ck (tv@(TVr { tvrType =  t}),e) = withContextDoc (hsep [text "Checking Let: ", parens (pprint tv),text  " = ", parens $ prettyE e ])  $ do
@@ -375,7 +379,7 @@ tcE e = rfc e where
     fc (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = fc (EAp (foldl eAp af (litArgs lc)) b)
     fc (EAp a b) = do
         a' <- rfc a
-        strong' (eAp a' b)
+        if a' == tBox then return tBox else strong' (eAp a' b)
     fc (ELetRec vs e) = local (tcDefns_u (vs ++)) $ rfc e
     fc (EError _ e) = strong' e
     fc (EPrim _ ts t) = strong' t
@@ -409,7 +413,7 @@ typeInfer'' dataTable ds e = rfc e where
     fc (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = fc (EAp (foldl eAp af (litArgs lc)) b)
     fc (EAp a b) = do
         a' <- rfc a
-        strong' (eAp a' b)
+        if a' == tBox then return tBox else strong' (eAp a' b)
     fc (ELetRec vs e) = do
         let nds = vs ++ ds
         et <- inferType' nds e

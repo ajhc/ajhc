@@ -252,13 +252,6 @@ tunboxedtuple n = (typeCons,dataCons) where
 -- the final stages of compilation before core mangling so that optimizations
 -- that were previously blocked by type variables can be carried out.
 
-tbox = emptyConstructor {
-            conName = tc_Box,
-            conType = eStar,
-            conExpr = tBox,
-            conInhabits = tStar,
-            conChildren = DataAbstract
-    }
 
 tAbsurd k = ELit (litCons { litName = nameConjured modAbsurd k, litArgs = [], litType = k })
 mktBox k = ELit (litCons { litName = nameConjured modBox k, litArgs = [], litType = k, litAliasFor = af }) where
@@ -464,7 +457,7 @@ followAliases _dataTable e = f e where
     f (ELit LitCons { litAliasFor = Just af, litArgs = as }) = f (foldl eAp af as)
     f e = e
 
-dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tbox:tarrow:primitiveTable ])
+dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tarrow:primitiveTable ])
 
 deriveClasses :: DataTable -> [(TVr,E)]
 deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where

@@ -63,7 +63,6 @@ instance ConNames (Lit E E) where
     vUnit  = (litCons { litName = vUnit, litArgs = [], litType = tUnit })
 
 
-tBox = ELit (litCons { litName = tc_Box, litArgs = [], litType = eStar })
 
 tFunc a b = ePi (tVr 0 a) b
 
