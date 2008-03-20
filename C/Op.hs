@@ -115,24 +115,20 @@ data UnOp
     {-! derive: Binary !-}
 
 
--- conversion ops always are NOPs and can be omitted when
--- the initial and target types are the same when the hint is ignored.
+-- conversion ops
 
 data ConvOp
-    = F2I
-    | F2U
-    | U2F
-    | I2F
-    | Lobits
-    | Sx
-    | Zx
-    -- these should only be used when the
-    -- size of the concrete types is not
-    -- known. so you don't know whether
-    -- to extend or shrink the value
-    | I2I
-    | U2U
-    | F2F
+    = F2I         -- ^ convert a floating point to an integral value via truncation
+    | F2U         -- ^ convert a floating point to an unsigned integral value via truncation, negative values become zero
+    | U2F         -- ^ convert an unsigned integral value to a floating point number
+    | I2F         -- ^ convert an integral value to a floating point number
+    | F2F         -- ^ convert a float from one precision to another, preserving value as much as possible
+    | Lobits      -- ^ extract the low order bits
+    | Sx          -- ^ sign extend a value (signed)
+    | Zx          -- ^ zero extend a value (unsigned)
+    | I2I         -- ^ perform a 'Lobits' or a 'Sx' depending on the sizes of the arguments
+    | U2U         -- ^ perform a 'Lobits' or a 'Zx' depending on the sizes of the arguments
+    | B2B         -- ^ a nop, useful for coercing hints (bits 2 bits)
     deriving(Eq,Show,Ord,Read)
     {-! derive: Binary !-}
 
