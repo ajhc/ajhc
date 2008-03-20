@@ -88,10 +88,10 @@ createForest def xs = map f gs where
 draw :: Tree String -> [String]
 draw (Node x ts0) = x : drawSubTrees ts0
   where drawSubTrees [] = []
-        drawSubTrees [t] =
-                {-[vLine] :-} shift [chr 0x2570, chr 0x2574] "  " (draw t)
+        drawSubTrees [t] = 
+                {-[vLine] :-} shift lastBranch "  " (draw t)
         drawSubTrees (t:ts) =
-                {-[vLine] :-} shift (C.lTee ++ [chr 0x2574]) (C.vLine  ++ " ") (draw t) ++ drawSubTrees ts
+                {-[vLine] :-} shift branch (C.vLine  ++ " ") (draw t) ++ drawSubTrees ts
 
         branch     | dump FD.SquareStats = C.lTee ++ C.hLine
                    | otherwise           = C.lTee ++ [chr 0x2574]
