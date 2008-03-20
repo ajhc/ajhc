@@ -49,7 +49,8 @@ import CharIO
 import GenUtil
 import qualified Doc.Chars as C
 import qualified Util.IntBag as IB
-
+import Options (dump)
+import qualified FlagDump as FD
 
 
 
@@ -92,6 +93,11 @@ draw (Node x ts0) = x : drawSubTrees ts0
         drawSubTrees (t:ts) =
                 {-[vLine] :-} shift (C.lTee ++ [chr 0x2574]) (C.vLine  ++ " ") (draw t) ++ drawSubTrees ts
 
+        branch     | dump FD.SquareStats = C.lTee ++ C.hLine
+                   | otherwise           = C.lTee ++ [chr 0x2574]
+        lastBranch | dump FD.SquareStats = C.llCorner ++ C.hLine
+                   | otherwise           = [chr 0x2570, chr 0x2574]
+        
         shift first other = zipWith (++) (first : repeat other)
         --vLine = chr 0x254F
 

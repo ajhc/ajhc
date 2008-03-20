@@ -70,8 +70,9 @@ grin-steps show what happens in each transformation
 grin-graph print dot file of final grin code to outputname_grin.dot
 
 !General
-@verbose progress
+@verbose     progress
 @veryverbose progress stats
-progress show basic progress indicators
-stats show extra information about stuff
-html use html escape codes in output
+progress     show basic progress indicators
+stats        show extra information about stuff
+html         use html escape codes in output
+square-stats use square corners rather than curved ones, for compatibility
