@@ -1,4 +1,12 @@
-module C.OpEval where
+module C.OpEval(
+    Expression(..),
+    convOp,
+    convNumber,
+    convCombine,
+    binOp,
+    binOp',
+    unOp
+    ) where
 
 import Number
 import C.Op
@@ -36,6 +44,8 @@ x `tyEq` y = (x `tyLte` y) && (y `tyLte` x)
 convOp :: ConvOp -> Ty -> Ty -> Maybe ConvOp
 convOp F2I _ _ = Just F2I
 convOp I2F _ _ = Just I2F
+convOp F2U _ _ = Just F2U
+convOp U2F _ _ = Just U2F
 convOp _ t1 t2 | t1 == t2 = Nothing
 convOp U2U t1 t2 | t2 `tyLte` t1 = Just Lobits
 convOp I2I t1 t2 | t2 `tyLte` t1 = Just Lobits
@@ -45,9 +55,17 @@ convOp n _ _ = Just n
 
 convNumber :: ConvOp -> Ty -> Ty -> Number -> Number
 convNumber _ _ _ n = n
+{-
+convNumber :: ConvOp -> Val -> Ty -> Val
+convNumber F2I (Val _ (ValFloat f)) ty = Val ty (fromInteger $ truncate f)
+convNumber F2U (Val _ (ValFloat f)) ty = Val ty (if f < 0 then 0 else fromInteger $ truncate f)
+convNumber I2F (Val _ (ValInteger f)) ty = Val ty (ValFloat $ fromInteger f)
+convNumber U2F (Val _ (ValInteger f)) ty = Val ty (ValFloat $ fromInteger f)
+convNumber _ (Val _ v) ty  = (Val ty v)
+-}
 
 convCombine :: Ty -> ConvOp -> Ty -> ConvOp -> Ty -> Maybe ConvOp
-convCombine _ c1 _ c2 _ | c1 `elem` [F2I,I2F] || c2 `elem` [F2I,I2F] = Nothing
+convCombine _ c1 _ c2 _ | c1 `elem` [F2I,I2F,U2F,F2U] || c2 `elem` [F2I,I2F,U2F,F2U] = Nothing
 convCombine _ c1 t2 c2 t3 | tyEq t2 t3 && c1 == c2 = Just c2
 convCombine _ _ _ _ _ = Nothing
 

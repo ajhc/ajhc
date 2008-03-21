@@ -18,16 +18,11 @@ data HcHash = HcHash !Int (Map.Map HcNode Int)
 emptyHcHash = HcHash 1 Map.empty
 
 newConst :: MonadState HcHash m => Val -> m (Bool,Int)
-newConst n = newConst' False n
-
-newConst' :: MonadState HcHash m => Bool -> Val -> m (Bool,Int)
-newConst' fuzzy n = f n where
+newConst n = f n where
     f (NodeC t vs) = do
         let g (Lit i ty)
-                | fuzzy = return $ Left (Lit 0 ty)
                 | otherwise = return $ Left (Lit i ty)
             g vp@(ValPrim _ _ ty)
-                | fuzzy = return $ Left (Lit 0 ty)
                 | otherwise = return $ Left vp
             g x@(Var (V n) _) | n < 0  = return $ Left x
             g n@(Const (NodeC _ [])) = return $ Left n

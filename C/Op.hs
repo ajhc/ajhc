@@ -142,7 +142,7 @@ data ValOp
     deriving(Eq,Show,Ord,Read)
     {-! derive: Binary !-}
 
-data ArchBits = BitsMax | BitsPtr
+data ArchBits = BitsMax | BitsPtr | BitsUnknown
     deriving(Eq,Ord)
     {-! derive: Binary !-}
 
@@ -169,6 +169,7 @@ readTy :: Monad m => String -> m Ty
 readTy "bool" = return TyBool
 readTy "bits<ptr>" = return $ TyBits (BitsArch BitsPtr) HintNone
 readTy "bits<max>" = return $ TyBits (BitsArch BitsMax) HintNone
+readTy "bits<?>" = return $ TyBits (BitsArch BitsUnknown) HintNone
 readTy ('b':'i':'t':'s':'<':rs) = return $ TyBits (BitsExt (takeWhile ('>' /=) rs)) HintNone
 readTy ('b':'i':'t':'s':rs) = do n <- readM rs; return $ TyBits (Bits n) HintNone
 readTy ('s':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintSigned
@@ -198,12 +199,13 @@ instance Show Ty where
 
 instance Show TyBits where
     showsPrec _ (Bits n) = shows n
-    showsPrec _ (BitsExt s) = showString "<" . showString s . showString ">"
-    showsPrec _ (BitsArch s) = showString "<" . shows s . showString ">"
+    showsPrec _ (BitsExt s) = showChar '<' . showString s . showChar '>'
+    showsPrec _ (BitsArch s) = showChar '<' . shows s . showChar '>'
 
 instance Show ArchBits where
     show BitsMax = "max"
     show BitsPtr = "ptr"
+    show BitsUnknown = "?"
 
 
 
@@ -309,6 +311,7 @@ binopFunc (TyBits b _) _ bop = g b =<< f bop where
     f FPwr = Just "pow"
     f FAtan2 = Just "atan2"
     f _ = Nothing
+binopFunc TyBool _ bop = Nothing where
 
 binopInfix :: BinOp -> Maybe (String,Int)
 binopInfix UDiv = Just ("/",8)
