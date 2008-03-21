@@ -12,11 +12,11 @@ import FrontEnd.Infix(FixityMap)
 import FrontEnd.KindInfer(KindEnv)
 import FrontEnd.SrcLoc(SrcLoc)
 import FrontEnd.Tc.Type(Type())
-import HsSyn(Module)
+import FrontEnd.HsSyn(Module)
 import Support.MapBinaryInstance()
 import Name.Id
 import Name.Name(Name)
-import TypeSynonyms(TypeSynonyms)
+import FrontEnd.TypeSynonyms(TypeSynonyms)
 import PackedString
 import Data.Binary
 import qualified Support.MD5 as MD5

@@ -10,10 +10,10 @@ import Text.PrettyPrint.HughesPJ as PPrint
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import DataConsAssump     (dataConsEnv)
+import FrontEnd.DataConsAssump     (dataConsEnv)
 import DataConstructors
-import DeclsDepends       (getDeclDeps, debugDeclBindGroups)
-import DependAnalysis     (getBindGroups)
+import FrontEnd.DeclsDepends       (getDeclDeps, debugDeclBindGroups)
+import FrontEnd.DependAnalysis     (getBindGroups)
 import DerivingDrift.Drift
 import Doc.PPrint as PPrint
 import FrontEnd.Class
@@ -29,19 +29,19 @@ import FrontEnd.Utils
 import FrontEnd.Warning
 import Ho.Type
 import Ho.Collected
-import HsSyn
+import FrontEnd.HsSyn
 import Info.Types
 import Name.Name as Name
 import Options
-import TypeSigs           (collectSigs, listSigsToSigEnv)
-import TypeSynonyms
-import TypeSyns
+import FrontEnd.TypeSigs           (collectSigs, listSigsToSigEnv)
+import FrontEnd.TypeSynonyms
+import FrontEnd.TypeSyns
 --import ClassAliases
 import Util.Gen
 import Util.Inst()
 import Util.SetLike
 import qualified FlagDump as FD
-import qualified HsPretty
+import qualified FrontEnd.HsPretty as HsPretty
 
 trimEnv env = Map.filterWithKey (\k _ -> isGlobal k) env
 

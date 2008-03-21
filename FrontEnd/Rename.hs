@@ -19,7 +19,7 @@ import FrontEnd.Desugar (doToExp)
 import FrontEnd.SrcLoc hiding(srcLoc)
 import FrontEnd.Syn.Traverse
 import FrontEnd.Utils
-import HsSyn
+import FrontEnd.HsSyn
 import Name.Name as Name hiding(qualifyName)
 import Name.Names
 import Support.FreeVars

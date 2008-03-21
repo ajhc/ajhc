@@ -7,7 +7,7 @@
 --
 -----------------------------------------------------------------------------
 
-module HsPretty (PPLayout(..),PPHsMode(..),
+module FrontEnd.HsPretty (PPLayout(..),PPHsMode(..),
 		render,
 		ppHsModule,
 		ppHsDecl,
@@ -27,7 +27,7 @@ import Doc.PPrint(pprint)
 import FlagDump as FD
 import FrontEnd.Rename(unRename)
 import FrontEnd.SrcLoc(Located(..))
-import HsSyn
+import FrontEnd.HsSyn
 import Name.Names
 import Name.Name
 import Options

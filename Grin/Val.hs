@@ -14,8 +14,8 @@ import Grin.Grin
 import Name.VConsts
 import Name.Names
 import Name.Name
-import Number
-import qualified C.Op as Op
+import Cmm.Number
+import qualified Cmm.Op as Op
 
 nil      = convertName dc_EmptyList
 cons     = convertName dc_Cons

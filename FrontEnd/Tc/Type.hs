@@ -46,7 +46,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.Tc.Kind
 import Name.Names
 import Name.VConsts
-import Representation
+import FrontEnd.Representation
 import Support.CanType
 import Support.FreeVars
 import Support.Tickle

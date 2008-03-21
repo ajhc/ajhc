@@ -63,7 +63,7 @@ import Text.PrettyPrint.HughesPJ(Doc)
 
 
 import StringTable.Atom
-import Diagnostic
+import FrontEnd.Diagnostic
 import Doc.DocLike
 import Doc.PPrint
 import FrontEnd.Class

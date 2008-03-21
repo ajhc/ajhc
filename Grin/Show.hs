@@ -28,12 +28,12 @@ import Grin.Grin
 import Grin.Noodle
 import Grin.Val
 import Name.VConsts
-import Number
+import Cmm.Number
 import Options
 import Support.CanType
 import Support.FreeVars
 import Util.Graphviz
-import qualified C.Op as Op
+import qualified Cmm.Op as Op
 import qualified FlagDump as FD
 
 

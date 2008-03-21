@@ -25,14 +25,14 @@
 
 -------------------------------------------------------------------------------}
 
-module DataConsAssump (dataConsEnv) where
+module FrontEnd.DataConsAssump (dataConsEnv) where
 
 import Control.Monad.Identity
 import qualified Data.Map as Map
 
 import FrontEnd.KindInfer
 import FrontEnd.Tc.Type
-import HsSyn
+import FrontEnd.HsSyn
 import Name.Name
 import Support.FreeVars
 

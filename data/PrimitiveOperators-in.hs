@@ -14,7 +14,7 @@ import Name.Name
 import Name.Prim
 import Name.VConsts
 import Support.CanType
-import qualified C.Op as Op
+import qualified Cmm.Op as Op
 
 
 nameToOpTy n = do RawType <- return $ nameType n; Op.readTy (show n)

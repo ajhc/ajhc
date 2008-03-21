@@ -53,7 +53,7 @@ import Ho.Binary()
 import Ho.Library
 import Ho.Collected
 import Ho.Type
-import HsSyn
+import FrontEnd.HsSyn
 import Options
 import Support.CFF
 import Util.FilterInput

@@ -32,7 +32,7 @@ import C.FFI
 import Doc.DocLike
 import Doc.PPrint
 import GenUtil
-import HsSyn
+import FrontEnd.HsSyn
 
 data NameType =
     TypeConstructor

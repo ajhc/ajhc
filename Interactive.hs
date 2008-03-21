@@ -31,16 +31,16 @@ import FrontEnd.Desugar(desugarHsStmt)
 import GenUtil
 import Ho.Type
 import Ho.Collected
-import HsPretty()
-import HsSyn
+import FrontEnd.HsPretty()
+import FrontEnd.HsSyn
 import Name.Name
 import Options
 import qualified FrontEnd.Infix
-import qualified HsPretty
+import qualified FrontEnd.HsPretty as HsPretty
 import qualified Text.PrettyPrint.HughesPJ as PP
-import TypeSynonyms(showSynonym)
-import TypeSyns
-import TypeSigs
+import FrontEnd.TypeSynonyms(showSynonym)
+import FrontEnd.TypeSyns
+import FrontEnd.TypeSigs
 import Util.Interact
 import Version.Version(versionString)
 import FrontEnd.Warning

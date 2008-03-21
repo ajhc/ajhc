@@ -1,4 +1,4 @@
-module Number(Number(..),toIntegral) where
+module Cmm.Number(Number(..),toIntegral) where
 
 import Ratio
 import Data.Binary

@@ -13,7 +13,7 @@
 
 -------------------------------------------------------------------------------}
 
-module Diagnostic (
+module FrontEnd.Diagnostic (
        Diagnostic(..), dumpDiagnostic,
        makeMsg,
        locMsg,

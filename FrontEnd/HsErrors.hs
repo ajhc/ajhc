@@ -11,7 +11,7 @@ module FrontEnd.HsErrors(
 import FrontEnd.Class
 import FrontEnd.SrcLoc
 import FrontEnd.Syn.Traverse
-import HsSyn
+import FrontEnd.HsSyn
 import Monad
 import Name.Name
 import Name.Names

@@ -61,7 +61,7 @@ import FrontEnd.Class(instanceName)
 import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Type
 import GenUtil
-import HsSyn
+import FrontEnd.HsSyn
 import Info.Types
 import Support.MapBinaryInstance
 import Name.Id
@@ -76,7 +76,7 @@ import Util.HasSize
 import Util.SameShape
 import Util.SetLike as S
 import Util.VarName
-import qualified C.Op as Op
+import qualified Cmm.Op as Op
 import qualified Util.Graph as G
 import qualified Util.Seq as Seq
 

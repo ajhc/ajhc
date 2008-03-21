@@ -66,13 +66,13 @@ import C.Prims
 import Doc.DocLike
 import GenUtil
 import Name.VConsts
-import Number
+import Cmm.Number
 import Options
 import Support.CanType
 import Support.FreeVars
 import Util.Perhaps
 import qualified Info.Info as Info
-import qualified C.Op as Op
+import qualified Cmm.Op as Op
 import qualified Stats
 
 -- Extremely simple first order monadic code with basic type system.  similar

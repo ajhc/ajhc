@@ -10,7 +10,7 @@ import DerivingDrift.DataP
 import DerivingDrift.StandardRules
 import FrontEnd.HsParser
 import FrontEnd.ParseMonad
-import HsSyn
+import FrontEnd.HsSyn
 import Name.Name
 import Name.Names
 import Name.VConsts

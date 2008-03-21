@@ -12,7 +12,7 @@ import Data.Binary
 import E.Arbitrary
 import E.E
 import GenUtil
-import HsSyn
+import FrontEnd.HsSyn
 import Info.Binary()
 import qualified Info.Info as Info
 import Info.Types

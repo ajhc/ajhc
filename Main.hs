@@ -53,7 +53,7 @@ import Grin.Show
 import Ho.Build
 import Ho.Library
 import Ho.Collected
-import HsSyn
+import FrontEnd.HsSyn
 import Info.Types
 import Name.Id
 import Name.Name

@@ -1,4 +1,4 @@
-module C.OpEval(
+module Cmm.OpEval(
     Expression(..),
     convOp,
     convNumber,
@@ -8,8 +8,8 @@ module C.OpEval(
     unOp
     ) where
 
-import Number
-import C.Op
+import Cmm.Number
+import Cmm.Op
 import Control.Monad
 
 

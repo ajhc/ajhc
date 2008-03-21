@@ -1,4 +1,4 @@
-module HsSyn where
+module FrontEnd.HsSyn where
 
 
 

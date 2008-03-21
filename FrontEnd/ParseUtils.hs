@@ -42,7 +42,7 @@ import qualified Data.Traversable as T
 import C.FFI
 import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
-import HsSyn
+import FrontEnd.HsSyn
 
 type HsQName = HsName
 

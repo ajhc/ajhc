@@ -14,7 +14,7 @@ import FrontEnd.SrcLoc
 import GenUtil
 import Ho.Build
 import Ho.Collected
-import HsSyn
+import FrontEnd.HsSyn
 import Options
 import FrontEnd.Warning
 import qualified FlagDump as FD

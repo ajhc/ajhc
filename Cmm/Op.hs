@@ -1,4 +1,4 @@
-module C.Op where
+module Cmm.Op where
 
 import Data.Binary
 import Util.Gen

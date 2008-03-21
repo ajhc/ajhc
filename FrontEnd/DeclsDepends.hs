@@ -10,12 +10,12 @@
 
 -------------------------------------------------------------------------------}
 
-module DeclsDepends (getDeclDeps, debugDeclBindGroups) where
+module FrontEnd.DeclsDepends (getDeclDeps, debugDeclBindGroups) where
 
 import Control.Monad.Writer
 
-import HsSyn
-import DependAnalysis(debugBindGroups)
+import FrontEnd.HsSyn
+import FrontEnd.DependAnalysis(debugBindGroups)
 import FrontEnd.Utils(getDeclName)
 import FrontEnd.Rename(unRename)
 import Name.Name

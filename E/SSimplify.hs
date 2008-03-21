@@ -40,7 +40,7 @@ import Name.Id
 import Name.Name
 import Name.Names
 import Name.VConsts
-import Number
+import Cmm.Number
 import Options
 import Stats hiding(null,new,print,Stats,singleton)
 import Support.CanType

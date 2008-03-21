@@ -11,7 +11,7 @@
                           Haskell", (http://www.cse.ogi.edu/~mpj/thih/)
 -}
 
-module Representation(
+module FrontEnd.Representation(
     Type(..),
     Tyvar(..),
     tyvar,
@@ -42,7 +42,7 @@ import StringTable.Atom
 import Data.Binary
 import Doc.DocLike
 import Doc.PPrint(pprint,PPrint)
-import HsSyn
+import FrontEnd.HsSyn
 import Name.Name
 import Name.Names
 import Support.CanType

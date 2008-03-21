@@ -7,7 +7,7 @@ import qualified Data.Map as Map
 
 import Doc.DocLike
 import Doc.PPrint
-import HsSyn
+import FrontEnd.HsSyn
 import Name.Name
 
 

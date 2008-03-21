@@ -16,7 +16,7 @@ import Doc.DocLike
 import FindFixpoint
 import FlagDump as FD
 import FrontEnd.SrcLoc
-import HsSyn
+import FrontEnd.HsSyn
 import Name.Name as Name
 import Options
 import Util.Relation as R

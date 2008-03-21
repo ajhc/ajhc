@@ -17,7 +17,7 @@
 -------------------------------------------------------------------------------}
 
 
-module DependAnalysis (getBindGroups,  debugBindGroups) where
+module FrontEnd.DependAnalysis (getBindGroups,  debugBindGroups) where
 
 import List (nub)
 import Data.Graph(stronglyConnComp, SCC(..))

@@ -14,7 +14,7 @@ import GenUtil
 import E.Program
 import Name.Name
 import Name.Names
-import Number
+import Cmm.Number
 import Util.SameShape
 import qualified Doc.Chars as C
 import qualified E.Demand as Demand

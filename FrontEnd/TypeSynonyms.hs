@@ -1,5 +1,5 @@
 
-module TypeSynonyms (
+module FrontEnd.TypeSynonyms (
     removeSynonymsFromType,
     declsToTypeSynonyms,
     TypeSynonyms,
@@ -19,7 +19,7 @@ import FrontEnd.SrcLoc
 import GenUtil
 import Util.UniqueMonad
 import FrontEnd.Syn.Traverse
-import HsSyn
+import FrontEnd.HsSyn
 import Name.Name
 import Util.HasSize
 import FrontEnd.Warning

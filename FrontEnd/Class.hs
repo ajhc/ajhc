@@ -36,7 +36,7 @@ import FrontEnd.KindInfer
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Type
 import FrontEnd.Utils
-import HsSyn
+import FrontEnd.HsSyn
 import Support.MapBinaryInstance
 import Maybe
 import Monad

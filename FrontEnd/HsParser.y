@@ -19,7 +19,7 @@
 module FrontEnd.HsParser (parse, parseHsStmt) where
 
 import C.FFI
-import HsSyn
+import FrontEnd.HsSyn
 import FrontEnd.ParseMonad
 import FrontEnd.Lexer
 import FrontEnd.ParseUtils hiding(readInteger,readRational)

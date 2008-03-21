@@ -39,7 +39,7 @@ import C.Prims
 import Options
 import Util.Gen
 import qualified FlagOpts as FO
-import qualified C.Op as Op
+import qualified Cmm.Op as Op
 
 #include "../arch/generic.arch"
 #include "../arch/i686.arch"

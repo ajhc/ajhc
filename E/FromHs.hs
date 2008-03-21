@@ -43,7 +43,7 @@ import FrontEnd.Tc.Main(isTypePlaceholder)
 import FrontEnd.Tc.Module(TiData(..))
 import FrontEnd.Tc.Type hiding(Rule(..))
 import FrontEnd.Warning
-import HsSyn as HS
+import FrontEnd.HsSyn as HS
 import Info.Types
 import Name.Name as Name
 import Name.Names

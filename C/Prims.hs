@@ -9,7 +9,7 @@ import C.FFI(Requires(..))
 import Doc.DocLike
 import Doc.PPrint
 import PackedString
-import qualified C.Op as Op
+import qualified Cmm.Op as Op
 
 data PrimTypeType = PrimTypeIntegral | PrimTypeFloating | PrimTypePointer | PrimTypeVoid
     deriving(Show,Eq,Ord)

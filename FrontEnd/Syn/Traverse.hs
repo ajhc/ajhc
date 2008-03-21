@@ -3,7 +3,7 @@ module FrontEnd.Syn.Traverse where
 import qualified Data.Set as Set
 import Control.Monad.Writer
 
-import HsSyn
+import FrontEnd.HsSyn
 import Control.Monad.Identity
 import FrontEnd.SrcLoc
 import Support.FreeVars

@@ -9,8 +9,8 @@ import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
 
 import Control.Monad.Reader
-import DeclsDepends(getDeclDeps)
-import Diagnostic
+import FrontEnd.DeclsDepends(getDeclDeps)
+import FrontEnd.Diagnostic
 import Doc.DocLike
 import Doc.PPrint as PPrint
 import FrontEnd.Desugar(doToExp)
@@ -23,8 +23,8 @@ import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Unify
 import FrontEnd.Utils(getDeclName)
 import GenUtil
-import HsPretty
-import HsSyn
+import FrontEnd.HsPretty
+import FrontEnd.HsSyn
 import Name.Name
 import Name.Names
 import Name.VConsts

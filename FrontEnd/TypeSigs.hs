@@ -8,7 +8,7 @@
 
 -------------------------------------------------------------------------------}
 
-module TypeSigs (collectSigs,
+module FrontEnd.TypeSigs (collectSigs,
                  collectSigEnv,
                  SigEnv,
                  listSigsToSigEnv) where
@@ -21,7 +21,7 @@ import FrontEnd.KindInfer
 import FrontEnd.Syn.Traverse
 import FrontEnd.Tc.Type
 import FrontEnd.SrcLoc
-import HsSyn
+import FrontEnd.HsSyn
 import Name.Name
 
 newtype SC a = SC (Writer [HsDecl] a)

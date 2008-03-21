@@ -16,7 +16,7 @@ import Name.Id
 import Util.Gen
 import Name.Name
 import Name.Names
-import Number
+import Cmm.Number
 import Info.Types
 import qualified Info.Info as Info
 

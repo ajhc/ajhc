@@ -6,7 +6,7 @@
 
 module DerivingDrift.DataP where
 
-import HsSyn
+import FrontEnd.HsSyn
 
 
 data Statement = DataStmt | NewTypeStmt 

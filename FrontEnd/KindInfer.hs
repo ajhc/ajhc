@@ -37,7 +37,7 @@ import FrontEnd.Tc.Kind
 import FrontEnd.Utils
 import GenUtil
 import Support.FreeVars
-import HsSyn
+import FrontEnd.HsSyn
 import Support.MapBinaryInstance
 import Name.Name
 import qualified Util.Seq as Seq

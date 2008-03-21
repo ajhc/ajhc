@@ -40,7 +40,7 @@ import Control.Monad.State
 
 import FrontEnd.SrcLoc
 import GenUtil
-import HsSyn
+import FrontEnd.HsSyn
 import Name.Name
 import Name.Names
 import Name.VConsts

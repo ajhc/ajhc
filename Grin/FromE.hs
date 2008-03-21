@@ -44,7 +44,7 @@ import Util.Once
 import Util.SetLike
 import Util.UniqueMonad()
 import qualified C.FFI as FFI
-import qualified C.Op as Op
+import qualified Cmm.Op as Op
 import qualified FlagDump as FD
 import qualified Info.Info as Info
 import qualified Stats

@@ -1,4 +1,4 @@
-module TypeSyns( expandTypeSyns, expandTypeSynsStmt ) where
+module FrontEnd.TypeSyns( expandTypeSyns, expandTypeSynsStmt ) where
 
 import Control.Monad.State
 import Control.Monad.Writer
@@ -7,8 +7,8 @@ import List
 
 import FrontEnd.Desugar (doToExp)
 import FrontEnd.SrcLoc hiding(srcLoc)
-import HsSyn
-import TypeSynonyms
+import FrontEnd.HsSyn
+import FrontEnd.TypeSynonyms
 import FrontEnd.Warning
 import FrontEnd.Syn.Traverse
 

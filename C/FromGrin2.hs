@@ -32,7 +32,7 @@ import Support.CanType
 import Support.FreeVars
 import Util.Gen
 import Util.UniqueMonad
-import qualified C.Op as Op
+import qualified Cmm.Op as Op
 
 
 ---------------
