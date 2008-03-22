@@ -14,20 +14,21 @@ import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
 
 
-import StringTable.Atom
 import C.Arch
 import C.FFI
 import C.Generate
 import C.Prims
+import Cmm.Number
 import Doc.DocLike
 import Doc.PPrint
 import Grin.Grin
 import Grin.HashConst
-import Grin.Show()
 import Grin.Noodle
+import Grin.Show()
 import Grin.Val
 import PackedString
 import RawFiles
+import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
 import Util.Gen
@@ -162,44 +163,43 @@ convertVals xs = do
     return (structAnon (zip xs ts))
 
 convertVal :: Val -> C Expression
-convertVal v | Just e <- convertConst v = e
-convertVal (Var v ty) = fetchVar v ty
-convertVal (Const h) = do
-    tyenv <- asks (grinTypeEnv . rGrin)
-    case h of
-        NodeC a ts -> do
-            bn <- basicNode tyenv a ts
-            case bn of
-                Just bn ->  return (cast sptr_t bn)
-                _ -> do
-                    (_,i) <- newConst h
-                    return $ variable (name $  'c':show i )
-        _ -> do
-            (_,i) <- newConst h
-            return $ variable (name $  'c':show i )
-convertVal h@(NodeC a ts) | valIsConstant h = do
-    tyenv <- asks (grinTypeEnv . rGrin)
-    bn <- basicNode tyenv a ts
-    case bn of
-        Just bn -> return bn
-        _ -> do
-            (_,i) <- newConst h
-            return $ f_PROMOTE (variable (name $  'c':show i ))
+convertVal v = cvc v where
+    cvc v = convertConst v >>= maybe (cv v) return
+    cv (Var v ty) = fetchVar v ty
+    cv (Const h) = do
+        case h of
+            NodeC a ts -> do
+                bn <- basicNode a ts
+                case bn of
+                    Just bn ->  return (cast sptr_t bn)
+                    _ -> do
+                        (_,i) <- newConst h
+                        return $ variable (name $  'c':show i )
+            _ -> do
+                (_,i) <- newConst h
+                return $ variable (name $  'c':show i )
+    cv h@(NodeC a ts) | valIsConstant h = do
+        bn <- basicNode a ts
+        case bn of
+            Just bn -> return bn
+            _ -> do
+                (_,i) <- newConst h
+                return $ f_PROMOTE (variable (name $  'c':show i ))
 
-convertVal (ValPrim (APrim p _) [x] (TyPrim opty)) = do
-    x' <- convertVal x
-    case p of
-        Op (Op.UnOp n ta) r -> primUnOp n ta r x'
-        Op (Op.ConvOp n ta) r -> return $ castFunc n ta r x'
-        x -> return $ err ("convertVal: " ++ show x)
-convertVal (ValPrim (APrim p _) [x,y] _) = do
-    x' <- convertVal x
-    y' <- convertVal y
-    case p of
-        Op (Op.BinOp n ta tb) r -> primBinOp n ta tb r x' y'
-        x -> return $ err ("convertVal: " ++ show x)
+    cv (ValPrim (APrim p _) [x] (TyPrim opty)) = do
+        x' <- convertVal x
+        case p of
+            Op (Op.UnOp n ta) r -> primUnOp n ta r x'
+            Op (Op.ConvOp n ta) r -> return $ castFunc n ta r x'
+            x -> return $ err ("convertVal: " ++ show x)
+    cv (ValPrim (APrim p _) [x,y] _) = do
+        x' <- convertVal x
+        y' <- convertVal y
+        case p of
+            Op (Op.BinOp n ta tb) r -> primBinOp n ta tb r x' y'
+            x -> return $ err ("convertVal: " ++ show x)
 
-convertVal x = return $ err ("convertVal: " ++ show x)
+    cv x = return $ err ("convertVal: " ++ show x)
 
 convertTypes [] = return voidType
 convertTypes [t] = convertType t
@@ -528,13 +528,13 @@ buildConstants grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
         rs = [ f z i |  (z,i) <- zip zs [ 1 :: Int .. ]]
         f (Right i) a = text ".a" <> tshow a <+> text "=" <+> text ('c':show i)
         f (Left (Var n _)) a = text ".a" <> tshow a <+> text "=" <+> tshow (varName n)
-        f (Left v) a = text ".a" <> tshow a <+> text "=" <+> text (show $ drawG (fst3 $ runC grin e)) where
-            Just e = convertConst v
+        f (Left v) a = text ".a" <> tshow a <+> text "=" <+> text (show $ drawG e) where
+            Just e = fst3 . runC grin $ convertConst v
 
-convertConst :: Val -> Maybe (C Expression)
-convertConst (Const (NodeC n [])) = Just $ do tellTags n ; return (cast sptr_t $ f_RAWWHAT (constant $ enum (nodeTagName n)))
-convertConst (NodeC n []) | not (tagIsSuspFunction n)  = Just $ do tellTags n ;  return (f_RAWWHAT (constant $ enum (nodeTagName n)))
-convertConst v = fmap return (f v) where
+convertConst :: Val -> C (Maybe Expression)
+convertConst (NodeC n as) = basicNode n as
+convertConst (Const (NodeC n as)) = fmap (fmap $ cast sptr_t) $ basicNode n as
+convertConst v = return (f v) where
     f :: Val -> Maybe Expression
     f (Lit i (TyPrim Op.TyBool)) = return $ if i == 0 then constant cFalse else constant cTrue
     f (Lit i (TyPrim (Op.TyBits _ Op.HintFloat))) = return (constant $ floating (realToFrac i))
@@ -674,9 +674,8 @@ tellTags t = do
 
 
 newNode ty ~(NodeC t as) = do
-    tyenv <- asks (grinTypeEnv . rGrin)
     let sf = tagIsSuspFunction t
-    bn <- basicNode tyenv t as
+    bn <- basicNode t as
     case bn of
       Just e -> return (mempty,e)
       Nothing -> do
@@ -720,18 +719,25 @@ declareStruct n = do
     unless (null fields) $ tell mempty { wStructures = Map.singleton (structureName theStruct) theStruct }
 
 
-basicNode :: TyEnv -> Atom -> [Val] -> C (Maybe Expression)
-basicNode tyenv a [] | not (tagIsSuspFunction a) = do tellTags a ; return . Just $ (f_RAWWHAT (constant $ enum (nodeTagName a)))
-basicNode _ _ _ = return Nothing
-{-
-basicNode tyenv a [] | isJust s = ans where
-    Just TyTy { tySiblings = s@(~(Just ss)) } = findTyTy tyenv a
-    ans = case ss of
-        [n'] | n' == a -> Just (f_VALUE (constant $ number 0))
-        _ -> Nothing
-basicNode _ _ _ = Nothing
--}
+basicNode :: Atom -> [Val] -> C (Maybe Expression)
+basicNode a _ | tagIsSuspFunction a = return Nothing
+basicNode a []  = do tellTags a ; return . Just $ (f_RAWWHAT (constant $ enum (nodeTagName a)))
+basicNode a [Lit v ty] = do
+    tyenv <- asks (grinTypeEnv . rGrin)
+    return $ do
+        TyTy { tySiblings = s } <- findTyTy tyenv a
+        [n'] <- s
+        guard $ n' == a
+        b <- Op.cmmTyBits ty
+        guard $ b <= 30
+        Op.HintNone <- Op.cmmTyHint ty
+        v <- toIntegral v
+        Just (f_VALUE (constant $ number v))
+basicNode _ _ = return Nothing
 
+instance Op.ToCmmTy Ty where
+    toCmmTy (TyPrim p) = Just p
+    toCmmTy _ = Nothing
 
 declareEvalFunc n = do
     fn <- tagToFunction n
@@ -766,6 +772,7 @@ jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
 f_assert e    = functionCall (name "assert") [e]
 f_DETAG e     = functionCall (name "DETAG") [e]
 f_NODEP e     = functionCall (name "NODEP") [e]
+f_VALUE e     = functionCall (name "VALUE") [e]
 f_EVALTAG e   = functionCall (name "EVALTAG") [e]
 f_EVALFUNC e  = functionCall (name "EVALFUNC") [e]
 f_eval e      = functionCall (name "eval") [e]
