@@ -11,6 +11,7 @@ module Cmm.OpEval(
 import Cmm.Number
 import Cmm.Op
 import Control.Monad
+import Maybe
 
 
 class Expression t e | e -> t where
@@ -75,17 +76,20 @@ binOp bop t1 t2 tr e1 e2 str | Just (v1,t1) <- toConstant e1, Just (v2,t2) <- to
     f Add v1 v2 = return $ toExpression (v1 + v2) str
     f Sub v1 v2 = return $ toExpression (v1 - v2) str
     f Mul v1 v2 = return $ toExpression (v1 * v2) str
-    f Div v1 v2 | v2 /= 0 = return $ toExpression (v1 `div` v2) str
-    f Mod v1 v2 | v2 /= 0 = return $ toExpression (v1 `mod` v2) str
-    f Quot v1 v2 | v2 /= 0 = return $ toExpression (v1 `quot` v2) str
-    f Rem v1 v2 | v2 /= 0 = return $ toExpression (v1 `rem` v2) str
-    f UDiv v1 v2 | v2 /= 0 = return $ toExpression (v1 `div` v2) str
-    f UMod v1 v2 | v2 /= 0 = return $ toExpression (v1 `mod` v2) str
-    f Eq v1 v2 | v2 /= 0 = return $ toBool (v1 == v2)
-    f NEq v1 v2 | v2 /= 0 = return $ toBool (v1 /= v2)
-
-    f FDiv v1 v2 | v2 /= 0 = return $ toExpression (v1 / v2) str
+    f Eq  v1 v2 = return $ toBool (v1 == v2)
+    f NEq v1 v2 = return $ toBool (v1 /= v2)
+    f op v1 v2 | v2 /= 0, isJust ans = ans where
+        ans = case op of
+            Div  -> return $ toExpression (v1 `div` v2) str
+            Mod  -> return $ toExpression (v1 `mod` v2) str
+            Quot -> return $ toExpression (v1 `quot` v2) str
+            Rem  -> return $ toExpression (v1 `rem` v2) str
+            UDiv -> return $ toExpression (v1 `div` v2) str
+            UMod -> return $ toExpression (v1 `mod` v2) str
+            FDiv -> return $ toExpression (v1 / v2) str
+            _ -> Nothing
     f FMul v1 v2 = return $ toExpression (v1 * v2) str
+    f FPwr v1 v2 = return $ toExpression (realToFrac (realToFrac v1 ** realToFrac v2 :: Double)) str
 
     f op v1 v2 | Just v <- lookup op ops = return $ toBool (v1 `v` v2) where
         ops = [(Lt,(<)), (Gt,(>)), (Lte,(<=)), (Gte,(>=)),
@@ -96,59 +100,84 @@ binOp bop t1 t2 tr e1 e2 str | Just (v1,t1) <- toConstant e1, Just (v2,t2) <- to
 -- we normalize ops such that constants are always on the left side
 binOp bop t1 t2 tr e1 e2 str | Just _ <- toConstant e2, Just bop' <- commuteBinOp bop = Just $ createBinOp bop' t2 t1 tr e2 e1 str
 binOp bop t1 t2 tr e1 e2 str = f bop e1 e2 where
-    f Shr  e1 e2 | Just (0,_) <- toConstant e2 = return e1
-    f Shra e1 e2 | Just (0,_) <- toConstant e2 = return e1
-    f Shl  e1 e2 | Just (0,_) <- toConstant e2 = return e1
-    f Rotl e1 e2 | Just (0,_) <- toConstant e2 = return e1
-    f Rotr e1 e2 | Just (0,_) <- toConstant e2 = return e1
+    zero = toExpression 0 str
+    one = toExpression 1 str
+    true = toBool True
+    false = toBool False
 
-    f And e1 e2 | Just (0,_) <- toConstant e1 = return $ toExpression 0 str
-    f Or  e1 e2 | Just (0,_) <- toConstant e1 = return e2
-    f Xor e1 e2 | Just (0,_) <- toConstant e1 = return e2
 
-    f Add e1 e2 | Just (0,_) <- toConstant e1 = return e2
-    f Sub e1 e2 | Just (0,_) <- toConstant e2 = return e1
-    f Mul e1 e2 | Just (0,t1) <- toConstant e1 = return $ toExpression 0 str
-    f Mul e1 e2 | Just (1,_) <- toConstant e1 = return e2
-    f Div e1 e2 | Just (1,_) <- toConstant e2 = return e1
-    f Mod e1 e2 | Just (1,_) <- toConstant e2 = return  $ toExpression 0 str
-    f UDiv e1 e2 | Just (1,_) <- toConstant e2 = return e1
-    f UMod e1 e2 | Just (1,_) <- toConstant e2 = return $ toExpression 0 str
-    f Quot e1 e2 | Just (1,_) <- toConstant e2 = return e1
-    f Rem  e1 e2 | Just (1,_) <- toConstant e2 = return  $ toExpression 0 str
+    f op e1 e2 | Just (v,_) <- toConstant e2 = ans v where
+        ans 0 = case op of
+            Shr  -> return e1
+            Shra -> return e1
+            Shl  -> return e1
+            Rotl -> return e1
+            Rotr -> return e1
+            Sub  -> return e1
+            FSub -> return e1
+            FPwr -> return one
+            _ -> Nothing
+        ans 1 = case op of
+            Div -> return e1
+            Mod -> return zero
+            UDiv -> return e1
+            UMod -> return zero
+            Quot -> return e1
+            Rem  -> return zero
+            FPwr -> return e1
+            FDiv -> return e1
+            Mul  -> return e1
+            FMul  -> return e1
+            _ -> Nothing
+        ans _ = Nothing
 
-    f UGt  e1 _ | Just (0,_) <- toConstant e1 = return $ toBool False
-    f ULte e1 _ | Just (0,_) <- toConstant e1 = return $ toBool True
+    f op e1 e2 | Just (v,t1) <- toConstant e1 = eans t1 v where
+        eans t1 v1 = case op of
+            Eq  -> return $ caseEquals e2 (v1,t1) true false
+            NEq -> return $ caseEquals e2 (v1,t1) false true
+            _ -> ans t1 v1
+        ans t1 0 = case op of
+            Shr  -> return zero
+            Shra -> return zero
+            Shl  -> return zero
+            Rotl -> return zero
+            Rotr -> return zero
+            And  -> return zero
+            Or   -> return e2
+            Xor  -> return e2
+            Add  -> return e2
+            Mul  -> return zero
+            UGt  -> return false
+            ULte -> return true
+            FAdd -> return e2
+            UGte -> return $ caseEquals e2 (0,t1) true false
+            ULt  -> return $ caseEquals e2 (0,t1) false true
+            _ -> Nothing
+        ans t1 1 = case op of
+            Mul  -> return e2
+            FMul -> return e2
+            UGt  -> return $ caseEquals e2 (0,t1) true false
+            _ -> Nothing
+        ans _ _ = Nothing
 
-    f UGte e1 e2 | Just (0,t1) <- toConstant e1 = return $ caseEquals e2 (0,t1) (toBool True) (toBool False)
-    f ULt  e1 e2 | Just (0,t1) <- toConstant e1 = return $ caseEquals e2 (0,t1) (toBool False) (toBool True)
+    f op e1 e2 | e1 `equalsExpression` e2, isJust ans = ans where
+        ans = case op of
+            Eq    -> return true
+            NEq   -> return false
+            Lte   -> return true
+            Gte   -> return true
+            Lt    -> return false
+            Gt    -> return false
+            ULte  -> return true
+            UGte  -> return true
+            ULt   -> return false
+            UGt   -> return false
+            Sub   -> return zero
+            Xor   -> return zero
+            And   -> return e1
+            Or    -> return e1
+            _ -> Nothing
 
-    f UGt  e1 e2 | Just (1,t1) <- toConstant e1 = return $ caseEquals e2 (0,t1) (toBool True) (toBool False)
-
-    f Eq  e1 e2 | Just (v1,t1) <- toConstant e1 = return $ caseEquals e2 (v1,t1) (toBool True) (toBool False)
-    f NEq e1 e2 | Just (v1,t1) <- toConstant e1 = return $ caseEquals e2 (v1,t1) (toBool False) (toBool True)
-
-    f FDiv e1 e2 | Just (1,_) <- toConstant e2 = return e1
-    f FPwr e1 e2 | Just (1,_) <- toConstant e2 = return e1
-    f FMul e1 e2 | Just (1,_) <- toConstant e1 = return e2
-    f FAdd e1 e2 | Just (0,_) <- toConstant e1 = return e2
-    f FSub e1 e2 | Just (0,_) <- toConstant e2 = return e1
-
-    f Eq  e1 e2 | e1 `equalsExpression` e2 = return $ toBool True
-    f NEq e1 e2 | e1 `equalsExpression` e2 = return $ toBool False
-    f Lte e1 e2 | e1 `equalsExpression` e2 = return $ toBool True
-    f Gte e1 e2 | e1 `equalsExpression` e2 = return $ toBool True
-    f Lt  e1 e2 | e1 `equalsExpression` e2 = return $ toBool False
-    f Gt  e1 e2 | e1 `equalsExpression` e2 = return $ toBool False
-    f ULte e1 e2 | e1 `equalsExpression` e2 = return $ toBool True
-    f UGte e1 e2 | e1 `equalsExpression` e2 = return $ toBool True
-    f ULt  e1 e2 | e1 `equalsExpression` e2 = return $ toBool False
-    f UGt  e1 e2 | e1 `equalsExpression` e2 = return $ toBool False
-
-    f Sub e1 e2 | e1 `equalsExpression` e2 = return $ toExpression 0 str
-    f Xor e1 e2 | e1 `equalsExpression` e2 = return $ toExpression 0 str
-    f And e1 e2 | e1 `equalsExpression` e2 = return e1
-    f Or  e1 e2 | e1 `equalsExpression` e2 = return e1
     f bop e1 e2 | isAssociative bop, Just (bop',t1',t2',tr',e1',e2',str') <- fromBinOp e1, bop == bop' = Just $
         createBinOp bop tr tr tr e1' (createBinOp bop tr tr tr e2' e2 str) str
     f bop e1 e2 = Nothing -- return $ createBinOp bop t1 t2 tr e1 e2 str
@@ -166,30 +195,3 @@ unOp op t1 tr e str | Just (v,t) <- toConstant e = f op v where
     f _ _ = Nothing
 unOp op t1 tr e str = Nothing
 
-{-
-unOp :: Expression t e => UnOp -> Ty -> Ty -> e -> t -> Maybe e
--- evaluate expressions at compile time if we can
-binOp bop t1 t2 tr e1 e2 str | Just (v1,t1) <- toConstant e1, Just (v2,t2) <- toConstant e2 = f bop v1 v2 where
-    f Add v1 v2 = return $ toExpression (v1 + v2) str
-    f Sub v1 v2 = return $ toExpression (v1 - v2) str
-    f Mul v1 v2 = return $ toExpression (v1 * v2) str
-    f Div v1 v2 | v2 /= 0 = return $ toExpression (v1 `div` v2) str
-    f Mod v1 v2 | v2 /= 0 = return $ toExpression (v1 `mod` v2) str
-    f Quot v1 v2 | v2 /= 0 = return $ toExpression (v1 `quot` v2) str
-    f Rem v1 v2 | v2 /= 0 = return $ toExpression (v1 `rem` v2) str
-    f UDiv v1 v2 | v2 /= 0 = return $ toExpression (v1 `div` v2) str
-    f UMod v1 v2 | v2 /= 0 = return $ toExpression (v1 `mod` v2) str
-    f Eq v1 v2 | v2 /= 0 = return $ toBool (v1 == v2)
-    f NEq v1 v2 | v2 /= 0 = return $ toBool (v1 /= v2)
-    f _ _ _ =  Nothing
--- we normalize ops such that constants are always on the left side
-binOp bop t1 t2 tr e1 e2 str | Just _ <- toConstant e2, Just bop' <- commuteBinOp bop = binOp bop' t2 t1 tr e2 e1 str `mplus` Just (createBinOp bop t2 t1 tr e2 e1 str)
-binOp bop t1 t2 tr e1 e2 str = f bop e1 e2 where
-    f Add e1 e2 | Just (0,_) <- toConstant e1 = return e2
-    f Sub e1 e2 | Just (0,_) <- toConstant e2 = return e1
-    f Mul e1 e2 | Just (0,t1) <- toConstant e1 = return $ toExpression 0 str
-    f Div e1 e2 | Just (1,_) <- toConstant e2 = return e1
-    f UDiv e1 e2 | Just (1,_) <- toConstant e2 = return e1
-    f Quot e1 e2 | Just (1,_) <- toConstant e2 = return e1
-    f bop e1 e2 = return $ createBinOp bop t1 t2 tr e1 e2 str
-  -}
