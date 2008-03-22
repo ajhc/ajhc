@@ -186,6 +186,19 @@ bits16   = TyBits (Bits 16) HintNone
 bits32   = TyBits (Bits 32) HintNone
 bits64   = TyBits (Bits 64) HintNone
 
+class ToCmmTy a where
+    toCmmTy :: a -> Maybe Ty
+
+instance ToCmmTy Ty where
+    toCmmTy a = Just a
+
+instance ToCmmTy String where
+    toCmmTy s = readTy s
+
+cmmTyBits :: ToCmmTy a => a -> Maybe Int
+cmmTyBits x = do TyBits (Bits b) _ <- toCmmTy x; return b
+cmmTyHint x = do TyBits _ hint <- toCmmTy x; return hint
+
 instance Show TyHint where
     showsPrec _ HintSigned = ('s':)
     showsPrec _ HintUnsigned = ('u':)
