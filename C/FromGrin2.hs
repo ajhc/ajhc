@@ -18,7 +18,6 @@ import C.Arch
 import C.FFI
 import C.Generate
 import C.Prims
-import Cmm.Number
 import Doc.DocLike
 import Doc.PPrint
 import Grin.Grin
@@ -57,6 +56,7 @@ data Env = Env {
     rInscope :: Set.Set Name,
     rDeclare :: Bool,
     rEMap :: Map.Map Atom (Name,[Expression]),
+    rCPR  :: Set.Set Atom,
     rGrin :: Grin
     }
     {-! derive: update !-}
@@ -67,7 +67,15 @@ newtype C a = C (RWST Env Written HcHash Uniq a)
 
 
 runC :: Grin -> C a -> (a,HcHash,Written)
-runC grin (C m) =  execUniq1 (runRWST m Env { rGrin = grin, rDeclare = False, rTodo = TodoExp [], rEMap = mempty, rInscope = mempty } emptyHcHash)
+runC grin (C m) =  execUniq1 (runRWST m Env { rCPR = cpr, rGrin = grin, rDeclare = False, rTodo = TodoExp [], rEMap = mempty, rInscope = mempty } emptyHcHash) where
+    TyEnv tmap = grinTypeEnv grin
+    cpr = Set.fromList [ a | (a,TyTy { tySlots = [s], tySiblings = Just [a'] }) <- Map.assocs tmap, a == a', isJust (good s) ]
+    good s = do
+        ct <- Op.toCmmTy s
+        b <- Op.cmmTyBits ct
+        guard $ b <= 30
+        Op.HintNone <- Op.cmmTyHint ct
+        return True
 
 tellFunctions :: [Function] -> C ()
 tellFunctions fs = tell mempty { wFunctions = Map.fromList $ map (\x -> (functionName x,x)) fs }
@@ -167,23 +175,25 @@ convertVal v = cvc v where
     cvc v = convertConst v >>= maybe (cv v) return
     cv (Var v ty) = fetchVar v ty
     cv (Const h) = do
+        cpr <- asks rCPR
         case h of
             NodeC a ts -> do
                 bn <- basicNode a ts
                 case bn of
                     Just bn ->  return (cast sptr_t bn)
                     _ -> do
-                        (_,i) <- newConst h
+                        (_,i) <- newConst cpr h
                         return $ variable (name $  'c':show i )
             _ -> do
-                (_,i) <- newConst h
+                (_,i) <- newConst cpr h
                 return $ variable (name $  'c':show i )
     cv h@(NodeC a ts) | valIsConstant h = do
+        cpr <- asks rCPR
         bn <- basicNode a ts
         case bn of
             Just bn -> return bn
             _ -> do
-                (_,i) <- newConst h
+                (_,i) <- newConst cpr h
                 return $ f_PROMOTE (variable (name $  'c':show i ))
 
     cv (ValPrim (APrim p _) [x] (TyPrim opty)) = do
@@ -272,6 +282,7 @@ convertBody (Fetch v :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
 convertBody (Case v [p1@([NodeC _ (_:_)] :-> _),p2@([NodeC _ []] :-> _)]) = convertBody $ Case v [p2,p1]
 convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == TyNode = do
     scrut <- convertVal v
+    cpr <- asks rCPR
     tellTags t
     let da (Var v _) e | v == v0 = convertBody e
         da v@Var {} e = do
@@ -279,6 +290,16 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == 
             e' <- convertBody e
             return $ v'' =* scrut & e'
         da n1@(NodeC t _) (Return [n2@NodeC {}]) | n1 == n2 = convertBody (Return [v])
+        da ~(NodeC t as) e = nodeAssign v t as e
+        {-
+        da (NodeC t [a]) e | t `Set.member` cpr = do
+            a' <- iDeclare $ convertVal a
+            let tmp = concrete t  scrut
+                ass = mconcat [if needed a then a' =* (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
+                fve = freeVars e
+                needed ~(Var v _) = v `Set.member` fve
+            e' <- convertBody e
+            return (ass & e')
         da ~(NodeC t as) e = do
             tellTags t
             declareStruct t
@@ -289,6 +310,7 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == 
                 needed ~(Var v _) = v `Set.member` fve
             e' <- convertBody e
             return (ass & e')
+            -}
         am Var {} e = e
         am ~(NodeC t2 _) e = annotate (show p2) (f_assert ((constant $ enum (nodeTagName t2)) `eq` tag) & e)
         tag = f_GETWHAT scrut
@@ -444,14 +466,26 @@ simpleRet er = do
         TodoExp [] -> return $ toStatement er
         _ -> error "simpleRet: odd rTodo"
 
-nodeAssign v t as e' = do
-    declareStruct t
-    v' <- convertVal v
-    as' <- iDeclare $ mapM convertVal as
-    let ass = concat [perhapsM (a `Set.member` fve) $ a' =* (project' (arg i) (concrete t v')) | a' <- as' | Var a _ <- as |  i <- [( 1 :: Int) ..] ]
-        fve = freeVars e'
-    ss' <- convertBody e'
-    return $ mconcat ass & ss'
+nodeAssign :: Val -> Atom -> [Val] -> Exp -> C Statement
+nodeAssign v t as e' = cna where
+    cna = do
+        cpr <- asks rCPR
+        if t `Set.notMember` cpr then na else do
+        v' <- convertVal v
+        [arg] <- return as
+        t <- convertType $ getType arg
+        arg' <- iDeclare $ convertVal arg
+        let s = arg' =* cast t (f_GETVALUE v')
+        ss <- convertBody e'
+        return $ s & ss
+    na = do
+        declareStruct t
+        v' <- convertVal v
+        as' <- iDeclare $ mapM convertVal as
+        let ass = concat [perhapsM (a `Set.member` fve) $ a' =* (project' (arg i) (concrete t v')) | a' <- as' | Var a _ <- as |  i <- [( 1 :: Int) ..] ]
+            fve = freeVars e'
+        ss' <- convertBody e'
+        return $ mconcat ass & ss'
 
 isCompound Fetch {} = False
 isCompound Return {} = False
@@ -532,7 +566,7 @@ buildConstants grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
             Just e = fst3 . runC grin $ convertConst v
 
 convertConst :: Val -> C (Maybe Expression)
-convertConst (NodeC n as) = basicNode n as
+convertConst (NodeC n as) | all valIsConstant as = basicNode n as
 convertConst (Const (NodeC n as)) = fmap (fmap $ cast sptr_t) $ basicNode n as
 convertConst v = return (f v) where
     f :: Val -> Maybe Expression
@@ -677,7 +711,7 @@ newNode ty ~(NodeC t as) = do
     let sf = tagIsSuspFunction t
     bn <- basicNode t as
     case bn of
-      Just e -> return (mempty,e)
+      Just e -> return (mempty,if ty == wptr_t then e else cast ty e)
       Nothing -> do
         st <- nodeType t
         as' <- mapM convertVal as
@@ -722,17 +756,11 @@ declareStruct n = do
 basicNode :: Atom -> [Val] -> C (Maybe Expression)
 basicNode a _ | tagIsSuspFunction a = return Nothing
 basicNode a []  = do tellTags a ; return . Just $ (f_RAWWHAT (constant $ enum (nodeTagName a)))
-basicNode a [Lit v ty] = do
-    tyenv <- asks (grinTypeEnv . rGrin)
-    return $ do
-        TyTy { tySiblings = s } <- findTyTy tyenv a
-        [n'] <- s
-        guard $ n' == a
-        b <- Op.cmmTyBits ty
-        guard $ b <= 30
-        Op.HintNone <- Op.cmmTyHint ty
-        v <- toIntegral v
-        Just (f_VALUE (constant $ number v))
+basicNode a [v] = do
+    cpr <- asks rCPR
+    if a `Set.notMember` cpr then return Nothing else do
+        v <- convertVal v
+        return $ Just (f_VALUE v)
 basicNode _ _ = return Nothing
 
 instance Op.ToCmmTy Ty where
@@ -773,6 +801,7 @@ f_assert e    = functionCall (name "assert") [e]
 f_DETAG e     = functionCall (name "DETAG") [e]
 f_NODEP e     = functionCall (name "NODEP") [e]
 f_VALUE e     = functionCall (name "VALUE") [e]
+f_GETVALUE e  = functionCall (name "GETVALUE") [e]
 f_EVALTAG e   = functionCall (name "EVALTAG") [e]
 f_EVALFUNC e  = functionCall (name "EVALFUNC") [e]
 f_eval e      = functionCall (name "eval") [e]
