@@ -196,6 +196,8 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
     primopt pn [v] t | Just c <- getPrefix "maxBound." pn    >>= Op.readTy = return (EPrim (APrim (PrimTypeInfo c c PrimMaxBound) mempty) [] t)
     primopt pn [v] t | Just c <- getPrefix "minBound." pn    >>= Op.readTy = return (EPrim (APrim (PrimTypeInfo c c PrimMinBound) mempty) [] t)
     primopt pn [v] t | Just c <- getPrefix "umaxBound." pn   >>= Op.readTy = return (EPrim (APrim (PrimTypeInfo c c PrimUMaxBound) mempty) [] t)
+    primopt pn [] t | Just c <-  getPrefix "const.M_PI" pn = mdo
+        (res,(ta,sta)) <- boxPrimitive dataTable (ELit (LitInt (realToFrac (pi :: Double)) sta)) t; return res
     primopt pn [] t | Just c <-  getPrefix "const." pn = mdo
         (res,(ta,sta)) <- boxPrimitive dataTable (EPrim (APrim (CConst c ta) mempty) [] sta) t; return res
     primopt pn [] _ | Just c <-  getPrefix "error." pn = return (EError c orig_t)

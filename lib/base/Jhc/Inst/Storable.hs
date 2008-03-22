@@ -13,7 +13,7 @@ import Jhc.Int
 import Jhc.IO
 
 
-INST_STORABLE(Float,Float32_,fbits<32>)
-INST_STORABLE(Double,Float64_,fbits<64>)
+INST_STORABLE(Float,Float32_,fbits32)
+INST_STORABLE(Double,Float64_,fbits64)
 
 
