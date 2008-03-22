@@ -1,5 +1,5 @@
 {-# OPTIONS_JHC -N -funboxed-tuples -fffi #-}
-module Jhc.IOArray where
+module Data.Array.IO where
 
 import Jhc.Basics
 import Data.Ix
