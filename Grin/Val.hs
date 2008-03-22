@@ -3,6 +3,8 @@ module Grin.Val(
     ToVal(..),
     tn_2Tup,
     valToList,
+    cChar,
+    cInt,
     convertName,
     region_heap,
     region_block

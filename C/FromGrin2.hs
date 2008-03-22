@@ -5,6 +5,7 @@ import Control.Monad.Identity
 import Control.Monad.RWS
 import System.IO.Unsafe
 import Data.List
+import Data.Char
 import Data.Maybe
 import Data.Monoid
 import Text.PrettyPrint.HughesPJ(nest,($$))
@@ -18,6 +19,7 @@ import C.Arch
 import C.FFI
 import C.Generate
 import C.Prims
+import Cmm.Number
 import Doc.DocLike
 import Doc.PPrint
 import Grin.Grin
@@ -69,7 +71,7 @@ newtype C a = C (RWST Env Written HcHash Uniq a)
 runC :: Grin -> C a -> (a,HcHash,Written)
 runC grin (C m) =  execUniq1 (runRWST m Env { rCPR = cpr, rGrin = grin, rDeclare = False, rTodo = TodoExp [], rEMap = mempty, rInscope = mempty } emptyHcHash) where
     TyEnv tmap = grinTypeEnv grin
-    cpr = Set.fromList [ a | (a,TyTy { tySlots = [s], tySiblings = Just [a'] }) <- Map.assocs tmap, a == a', isJust (good s) ]
+    cpr = Set.insert cChar $ Set.fromList [ a | (a,TyTy { tySlots = [s], tySiblings = Just [a'] }) <- Map.assocs tmap, a == a', isJust (good s) ]
     good s = do
         ct <- Op.toCmmTy s
         b <- Op.cmmTyBits ct
@@ -758,9 +760,16 @@ basicNode a _ | tagIsSuspFunction a = return Nothing
 basicNode a []  = do tellTags a ; return . Just $ (f_RAWWHAT (constant $ enum (nodeTagName a)))
 basicNode a [v] = do
     cpr <- asks rCPR
-    if a `Set.notMember` cpr then return Nothing else do
-        v <- convertVal v
-        return $ Just (f_VALUE v)
+    if a `Set.notMember` cpr then return Nothing else
+        case v of
+            Lit i ty | a == cChar, Just c <- ch -> return $ Just (f_VALUE (toExpression c)) where
+                ch = do
+                    c <- fmap toEnum $toIntegral i
+                    guard $ isPrint c && isAscii c
+                    return c
+            _ -> do
+                v <- convertVal v
+                return $ Just (f_VALUE v)
 basicNode _ _ = return Nothing
 
 instance Op.ToCmmTy Ty where

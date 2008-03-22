@@ -674,6 +674,9 @@ instance ToExpression Constant where
 instance ToExpression Name where
     toExpression c = variable c
 
+instance ToExpression Char where
+    toExpression c = constant $ character c
+
 
 infixl 1 &
 
