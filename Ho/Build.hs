@@ -11,6 +11,7 @@ import Codec.Compression.GZip
 import Control.Monad.Identity
 import Control.Concurrent
 import Data.Binary
+import Data.Char
 import Data.Monoid
 import Data.IORef
 import Data.Tree
@@ -531,6 +532,14 @@ searchPaths m = ans where
 m4Prelude :: IO FilePath
 m4Prelude = writeFile "/tmp/jhc_prelude.m4" prelude_m4 >> return "/tmp/jhc_prelude.m4"
 
+langmap = [
+    "m4" ==> "m4",
+    "cpp" ==> "cpp",
+    "foreignfunctioninterface" ==> "ffi",
+    "noimplicitprelude" ==> "--noprelude",
+    "unboxedtuples" ==> "unboxed-tuples"
+    ] where x ==> y = (x,if head y == '-' then y else "-f" ++ y)
+
 
 parseHsSource :: String -> LBS.ByteString -> IO HsModule
 parseHsSource fn lbs = do
@@ -539,8 +548,8 @@ parseHsSource fn lbs = do
             Just opt = fileOptions opts `mplus` Just options
             popts = parseOptions $ if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
             opts' = concat [ words as | (x,as) <- popts, x `elem` ["OPTIONS","JHC_OPTIONS","OPTIONS_JHC"]]
-            opts = opts' ++ [ "--noprelude" | ("NOPRELUDE",_) <- popts]
-            langs = concat [ words as | ("LANGUAGE",as) <- popts ]
+            opts = opts' ++ [ "--noprelude" | ("NOPRELUDE",_) <- popts] ++ langs
+            langs = catMaybes $ map (flip lookup langmap) $ concat [ words (map (\c -> if c == ',' then ' ' else toLower c) as) | ("LANGUAGE",as) <- popts ]
     let fopts s = s `member` optFOptsSet initialOpts
         initialOpts = f (take 4096 txt)
         incFlags = [ "-I" ++ d | d <- optIncdirs options ++ optIncs initialOpts]
