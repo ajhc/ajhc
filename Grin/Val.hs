@@ -4,6 +4,7 @@ module Grin.Val(
     tn_2Tup,
     valToList,
     cChar,
+    cWord,
     cInt,
     convertName,
     region_heap,
@@ -17,11 +18,11 @@ import Name.VConsts
 import Name.Names
 import Name.Name
 import Cmm.Number
-import qualified Cmm.Op as Op
 
 nil      = convertName dc_EmptyList
 cons     = convertName dc_Cons
 cChar    = convertName dc_Char
+cWord    = convertName dc_Word
 cInt     = convertName dc_Int
 tn_2Tup  = convertName $ nameTuple DataConstructor 2
 tn_Boolzh = convertName dc_Boolzh
@@ -77,9 +78,9 @@ instance FromVal Int where
     fromUnVal (Lit i _) | Just x <- toIntegral i = return x
     fromUnVal n = fail $ "Val is not UnInt: " ++ show n
 instance FromVal Char where
-    fromVal (NodeC _ [Lit i _]) | Just x <- toIntegral i = return (chr x)
+    fromVal (NodeC _ [Lit i _]) | Just x <- toIntegral i, x >= ord minBound && x <= ord maxBound = return (chr x)
     fromVal n = fail $ "Val is not Char: " ++ show n
-    fromUnVal (Lit i _) | Just x <- toIntegral i = return (chr x)
+    fromUnVal (Lit i _) | Just x <- toIntegral i, x >= ord minBound && x <= ord maxBound = return (chr x)
     fromUnVal n = fail $ "Val is not UnChar: " ++ show n
 
 instance FromVal a => FromVal [a] where

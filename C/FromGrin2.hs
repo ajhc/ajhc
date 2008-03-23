@@ -27,6 +27,7 @@ import Grin.HashConst
 import Grin.Noodle
 import Grin.Show()
 import Grin.Val
+import Options
 import PackedString
 import RawFiles
 import StringTable.Atom
@@ -35,6 +36,7 @@ import Support.FreeVars
 import Util.Gen
 import Util.UniqueMonad
 import qualified Cmm.Op as Op
+import qualified FlagOpts as FO
 
 
 ---------------
@@ -71,7 +73,8 @@ newtype C a = C (RWST Env Written HcHash Uniq a)
 runC :: Grin -> C a -> (a,HcHash,Written)
 runC grin (C m) =  execUniq1 (runRWST m Env { rCPR = cpr, rGrin = grin, rDeclare = False, rTodo = TodoExp [], rEMap = mempty, rInscope = mempty } emptyHcHash) where
     TyEnv tmap = grinTypeEnv grin
-    cpr = Set.insert cChar $ Set.fromList [ a | (a,TyTy { tySlots = [s], tySiblings = Just [a'] }) <- Map.assocs tmap, a == a', isJust (good s) ]
+    cpr = iw `Set.union` Set.insert cChar (Set.fromList [ a | (a,TyTy { tySlots = [s], tySiblings = Just [a'] }) <- Map.assocs tmap, a == a', isJust (good s) ])
+    iw = if fopts FO.FullInt then Set.empty else Set.fromList [cInt, cWord]
     good s = do
         ct <- Op.toCmmTy s
         b <- Op.cmmTyBits ct
@@ -246,8 +249,8 @@ tyToC dh (Op.TyBits b h) = f b h where
     f _ _ = error "tyToC: unknown"
 
 
+opTyToCh hint opty = basicType (tyToC hint opty)
 opTyToC opty = basicType (tyToC Op.HintUnsigned opty)
-
 opTyToC' opty = tyToC Op.HintUnsigned opty
 
 localScope xs action = do
@@ -764,7 +767,9 @@ basicNode a [v] = do
         case v of
             Lit i ty | a == cChar, Just c <- ch -> return $ Just (f_VALUE (toExpression c)) where
                 ch = do
-                    c <- fmap toEnum $toIntegral i
+                    c <- toIntegral i
+                    guard $ c >= ord minBound && c <= ord maxBound
+                    c <- return $ chr c
                     guard $ isPrint c && isAscii c
                     return c
             _ -> do
@@ -796,7 +801,17 @@ castFunc :: Op.ConvOp -> Op.Ty -> Op.Ty -> Expression -> Expression
 castFunc co ta tb e | ta == tb = e
 castFunc co _ Op.TyBool e = cast (basicType "bool") e
 castFunc co Op.TyBool tb e = cast (opTyToC tb) e
--- TODO fix
+
+castFunc Op.Lobits _ tb e = cast (opTyToC tb) e
+castFunc Op.U2U _ tb e = cast (opTyToC tb) e
+castFunc Op.Zx _ tb e = cast (opTyToC tb) e
+
+castFunc Op.I2I tf tb e = cast (opTyToCh Op.HintSigned tb) (cast (opTyToCh Op.HintSigned tf) e)
+castFunc Op.Sx tf tb e = cast (opTyToCh Op.HintSigned tb) (cast (opTyToCh Op.HintSigned tf) e)
+
+castFunc Op.F2I tf tb e = cast (opTyToCh Op.HintSigned tb) e
+castFunc Op.I2F tf tb e = cast (opTyToC tb) (cast (opTyToCh Op.HintSigned tf) e)
+
 castFunc _ _ tb e = cast (opTyToC tb) e
 
 
