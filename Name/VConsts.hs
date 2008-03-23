@@ -12,6 +12,7 @@ class TypeNames a where
     tRational :: a
     tChar :: a
     tIntzh :: a
+    tEnumzh :: a
     tIntegerzh :: a
     tCharzh :: a
     tStar :: a
@@ -26,6 +27,7 @@ class TypeNames a where
     tRational = error "tRational"
     tChar = error "tChar"
     tIntzh = error "tIntzh"
+--    tEnumzh = error "tEnumzh"
     tIntegerzh = error "tIntegerzh"
     tCharzh = error "tCharzh"
     tStar = error "VConsts: tStar"

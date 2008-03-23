@@ -518,7 +518,7 @@ compileModEnv cho = do
     (viaGhc,fn,_,_) <- determineArch
     wdump FD.Progress $ putStrLn $ "Arch: " ++ fn
 
-    let theTarget = ELit litCons { litName = dc_Target, litArgs = [ELit (LitInt targetIndex tIntzh)], litType = ELit litCons { litName = tc_Target, litArgs = [], litType = eStar } }
+    let theTarget = ELit litCons { litName = dc_Target, litArgs = [ELit (LitInt targetIndex tEnumzh)], litType = ELit litCons { litName = tc_Target, litArgs = [], litType = eStar } }
         targetIndex = if viaGhc then 1 else 0
     prog <- return $ runIdentity $ flip programMapDs prog $ \(t,e) -> return $ if tvrIdent t == toId v_target then (t { tvrInfo = setProperty prop_INLINE mempty },theTarget) else (t,e)
 

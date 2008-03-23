@@ -115,6 +115,7 @@ tyDNode = TyNode
 
 instance TypeNames Ty where
     tIntzh = TyPrim (Op.bits32) -- Ty (toAtom "int")
+    tEnumzh = TyPrim (Op.bits16) -- Ty (toAtom "int")
     tCharzh = TyPrim (Op.bits32) -- Ty (toAtom "HsChar")
     --tStar = Ty (toAtom "*")
 

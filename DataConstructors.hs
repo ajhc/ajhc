@@ -541,7 +541,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             virtualCons = map f (zip [(0 :: Int) ..] virtualCons')
             consName =  mapName (id,(++ "#")) $ toName DataConstructor (nameName (conName theType))
             rtypeName =  mapName (id,(++ "#")) $ toName TypeConstructor (nameName (conName theType))
-            rtype = ELit litCons { litName = rtypeName, litType = eHash, litAliasFor = Just tIntzh }
+            rtype = ELit litCons { litName = rtypeName, litType = eHash, litAliasFor = Just tEnumzh }
             dataCons = fc { conName = consName, conType = getType (conExpr dataCons), conOrigSlots = [SlotNormal rtype], conExpr = ELam (tVr 12 rtype) (ELit (litCons { litName = consName, litArgs = [EVar (tVr 12 rtype)], litType =  conExpr theType })) }
             rtypeCons = emptyConstructor {
                 conName = rtypeName,

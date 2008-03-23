@@ -24,6 +24,7 @@ instance TypeNames Name where
     tHash = s_Hash
     tUnit = tc_Unit
     tIntzh = rt_bits32
+    tEnumzh = rt_bits16
     tCharzh = rt_bits32
     tIntegerzh = rt_bits_max_
     tWorld__ = tc_World__

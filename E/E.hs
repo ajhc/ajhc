@@ -49,6 +49,7 @@ instance TypeNames E where
     tInteger = ELit (litCons { litName = tInteger, litArgs = [], litType = eStar })
     tWorld__ = ELit (litCons { litName = tWorld__, litArgs = [], litType = eHash })
     tIntzh = ELit (litCons { litName = tIntzh, litArgs = [], litType = eHash })
+    tEnumzh = ELit (litCons { litName = tEnumzh, litArgs = [], litType = eHash })
     tIntegerzh = ELit (litCons { litName = tIntegerzh, litArgs = [], litType = eHash })
     tCharzh = ELit (litCons { litName = tCharzh, litArgs = [], litType = eHash })
 
@@ -58,8 +59,8 @@ instance ConNames E where
     vUnit  = ELit vUnit
 
 instance ConNames (Lit E E) where
-    vTrue  = (litCons { litName = dc_Boolzh, litArgs = [ELit (LitInt 1 tIntzh)], litType = tBool })
-    vFalse = (litCons { litName = dc_Boolzh, litArgs = [ELit (LitInt 0 tIntzh)], litType = tBool })
+    vTrue  = (litCons { litName = dc_Boolzh, litArgs = [ELit (LitInt 1 tEnumzh)], litType = tBool })
+    vFalse = (litCons { litName = dc_Boolzh, litArgs = [ELit (LitInt 0 tEnumzh)], litType = tBool })
     vUnit  = (litCons { litName = vUnit, litArgs = [], litType = tUnit })
 
 
