@@ -72,6 +72,7 @@ data Opt = Opt {
     optHoDir       ::  Maybe FilePath,
     optHoCache     ::  Maybe FilePath,
     optArgs        ::  [String],
+    optStale       ::  [String],  -- ^ treat these modules as stale
     optKeepGoing   :: !Bool,      -- ^ Keep going when encountering errors.
     optMainFunc    ::  Maybe (Bool,String),    -- ^ Entry point name for the main function.
     optArch        ::  Maybe String,           -- ^ target architecture
@@ -99,6 +100,7 @@ opt = Opt {
     optDefs        = [],
     optProgArgs    = [],
     optDump        = [],
+    optStale       = [],
     optStmts       = [],
     optFOpts       = ["default"],
     optCCargs      = [],
@@ -163,6 +165,7 @@ theoptions =
     , Option []    ["no-ho"]       (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "same as --ignore-ho and --nowrite-ho"
     , Option []    ["ho-cache"]    (ReqArg (optHoCache_s . Just ) "HOCACHEDIR")    "Use a global ho cache located at the argument"
     , Option []    ["ho-dir"]      (ReqArg (optHoDir_s . Just ) "<dir>")    "Where to place and look for ho files"
+    , Option []    ["stale"]       (ReqArg (optStale_u . idu) "Module")     "Treat these modules as stale, even if a ho file is present"
     , Option []    ["dependency"]  (NoArg  (optMode_s DependencyTree))  "Follow import dependencies only then quit"
     , Option []    ["no-follow-deps"] (NoArg  (optFollowDeps_s False)) "Don't follow depencies not listed on command line."
     , Option []    ["list-libraries"] (NoArg  (optMode_s ListLibraries)) "List of installed libraries."

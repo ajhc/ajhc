@@ -27,7 +27,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
-import StringTable.Atom
 import PackedString(packString)
 import CharIO
 import DataConstructors
@@ -48,11 +47,10 @@ import FrontEnd.Syn.Options
 import FrontEnd.Unlit
 import FrontEnd.Warning
 import FrontEnd.SrcLoc
-import Info.Types
 import RawFiles(prelude_m4)
 import Ho.Binary()
 import Ho.Library
-import Ho.Collected
+import Ho.Collected()
 import Ho.Type
 import FrontEnd.HsSyn
 import Options
@@ -62,7 +60,6 @@ import Util.Gen hiding(putErrLn,putErr,putErrDie)
 import Util.SetLike
 import Version.Version(versionString)
 import Version.Config(revision)
-import qualified Info.Info as Info
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified FlagDump as FD
@@ -164,7 +161,7 @@ findHoFile :: IORef Done -> FilePath -> Maybe Module -> SourceHash -> IO (Bool,F
 findHoFile done_ref fp mm sh = do
     done <- readIORef done_ref
     let honame = hoFile fp mm sh
-    if sh `Map.member` knownSourceMap done then return (False,honame) else do
+    if sh `Map.member` knownSourceMap done || optIgnoreHo options then return (False,honame) else do
     onErr (return (False,honame)) (readHoFile honame) $ \ (hoh,hidep,ho) -> do
         case hohHash hoh `Map.lookup` hosEncountered done of
             Just (fn,_,_a) -> return (True,fn)
@@ -315,8 +312,9 @@ toCompUnitGraph done roots = do
                 Just (True,_) -> return h
                 Just (False,af@(fp,hoh,ho)) -> do
                     fp <- shortenPath fp
+                    let stale = map (show . fst) (hohDepends hoh) `intersect` optStale options
                     good <- catch ( mapM_ cdep (hohDepends hoh) >> mapM_ hvalid (hohModDepends hoh) >> return True) (\_ -> return False)
-                    if good then do
+                    if good && null stale then do
                         putVerboseLn $ printf "Fresh: <%s>" fp
                         let lib = case ".ho" `isSuffixOf` fp of
                                     True  -> Nothing
@@ -325,7 +323,9 @@ toCompUnitGraph done roots = do
                         modifyIORef hom_ref (Map.insert h (True,af))
                         return h
                      else do
-                        putVerboseLn $ printf "Stale: <%s>" fp
+                        putVerboseLn $ if null stale
+                            then printf "Stale: <%s>" fp
+                            else printf "Stale: <%s> (forced)" fp
                         modifyIORef hom_ref (Map.delete h)
                         fail "don't know this file"
         cdep (_,hash) | hash == MD5.emptyHash = return ()
@@ -409,7 +409,7 @@ compileCompNode ifunc func cn = do ns <- countNodes cn
     showProgress maxModules cur ms
         = forM_ ms $ \modName ->
           do curModule <- tickProgress cur
-             let l = ceiling (logBase 10 (fromIntegral maxModules+1)) :: Int
+             let l = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
              printf "[%*d of %*d] %s\n" l curModule l maxModules (show $ hsModuleName modName)
     f n cur (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
         CompCollected ch _ -> return ch
