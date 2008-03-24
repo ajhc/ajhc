@@ -47,8 +47,8 @@ defaultEq = hsep $ texts ["_", "==", "_", "=" ,"False"]
 
 ordfn d = let
    ifn = [f c c'
-		| c <- zip (body d) [1 ..]
-		, c' <- zip (body d) [1 ..]]
+		| c <- zip (body d) [1 :: Int ..]
+		, c' <- zip (body d) [1 :: Int ..]]
    cmp n n' = show $  compare n n'
    f (b,n) (b',n')
 	| null (types b) = text "compare" <+>
@@ -139,7 +139,7 @@ makeRead (Body{constructor=constructor,labels=labels,types=types})
 			: (concat . sepWith comma) (zipWith f labels vars)
 			 ++ [closeB]
 	lambda x = parens ( fsep [text "\\",ip,text "->",x])
-	listComp x (l:ll) = brackets . fsep . sepWith comma $
+	listComp x ~(l:ll) = brackets . fsep . sepWith comma $
 				((fsep[x, char '|', l]) : ll)
 	result x = tup (pattern constructor vars) x
 	lexConstr x = fsep [tup (text $ show constructor) x, lex]
@@ -168,13 +168,13 @@ enumfn d = let
 		$$ block (fromE ++ toE ++ [eFrom,enumFromThenFn])
 
 fromEnumFn :: Data -> [Doc]
-fromEnumFn (D{body=body}) = map f (zip body [0 ..])
+fromEnumFn (D{body=body}) = map f (zip body [0:: Int ..])
 	where
 	f (Body{constructor=constructor},n) = text "fromEnum" <+> (fsep $
 		texts [constructor , "=", show n])
 
 toEnumFn :: Data -> [Doc]
-toEnumFn (D{body=body}) = map f (zip body [0 ..])
+toEnumFn (D{body=body}) = map f (zip body [0 :: Int ..])
 	where
 	f (Body{constructor=constructor},n) = text "toEnum" <+> (fsep $
 		texts [show n , "=", constructor])
