@@ -45,6 +45,7 @@ import Util.SetLike
 import Util.UniqueMonad()
 import qualified C.FFI as FFI
 import qualified Cmm.Op as Op
+import Cmm.Op(ToCmmTy(..))
 import qualified FlagDump as FD
 import qualified Info.Info as Info
 import qualified Stats
@@ -111,6 +112,18 @@ flattenScc xs = concatMap f xs where
     f (CyclicSCC xs) = xs
 
 
+instance Op.ToCmmTy Name where
+    toCmmTy n = do
+        RawType <- return $ nameType n
+        toCmmTy $ show n
+
+
+
+instance Op.ToCmmTy E where
+    toCmmTy (ELit LitCons { litName = tname, litArgs = [], litAliasFor = af, litType = eh  }) | eh == eHash = toCmmTy tname `mplus` (af >>= toCmmTy)
+    toCmmTy _ = Nothing
+
+
 
 scTag n
     | Just nm <- fromId (tvrIdent n) = toAtom ('f':show nm)
@@ -120,19 +133,14 @@ cafNum n = V $ - fromAtom (partialTag (scTag n) 0)
 toEntry (n,as,e) = f (scTag n) where
         f x = (x,map (toType tyINode . tvrType )  as,toTypes TyNode (getType (e::E) :: E))
 
-rawNameToTy :: Monad m => Name -> m Ty
-rawNameToTy n | RawType <- nameType n = return $ stringNameToTy (show n)
-              | otherwise = fail "rawNameToTy: not primitive type"
 
 stringNameToTy :: String -> Ty
 stringNameToTy n = TyPrim (archOpTy archInfo n)
 
 toType :: Ty -> E -> Ty
 toType node = toty . followAliases mempty where
---    toty (ELit LitCons { litName = n, litArgs = es, litType = ty }) |  ty == eHash, TypeConstructor <- nameType n, Just _ <- fromUnboxedNameTuple n = (tuple (keepIts $ map (toType (TyPtr TyNode) ) es))
     toty (ELit LitCons { litName = n, litArgs = [], litType = ty }) |  ty == eHash, TypeConstructor <- nameType n, Just 0 <- fromUnboxedNameTuple n = TyUnit
-    --toty (ELit LitCons { litName = n, litArgs = [], litType = ty }) |  ty == eHash, RawType <- nameType n = (Ty $ toAtom (show n))
-    toty (ELit LitCons { litName = n, litArgs = [], litType = ty }) |  ty == eHash, Just t <- rawNameToTy n = t
+    toty e | Just t <- toCmmTy e = TyPrim t
     toty e@(ELit LitCons { litName = n, litType = ty }) |  ty == eHash = case lookup n unboxedMap of
         Just x -> x
         Nothing -> error $ "Grin.FromE.toType: " ++ show e
@@ -142,7 +150,7 @@ toType node = toty . followAliases mempty where
 toTypes :: Ty -> E -> [Ty]
 toTypes node = toty . followAliases mempty where
     toty (ELit LitCons { litName = n, litArgs = es, litType = ty }) |  ty == eHash, TypeConstructor <- nameType n, Just _ <- fromUnboxedNameTuple n = keepIts $ map (toType tyINode) es
-    toty (ELit LitCons { litName = n, litArgs = [], litType = ty }) |  ty == eHash, Just t <- rawNameToTy n = [t]
+    toty e | Just t <- toCmmTy e = [TyPrim t]
     toty e@(ELit LitCons { litName = n, litType = ty }) |  ty == eHash = case lookup n unboxedMap of
         Just TyUnit -> []
         Just x -> [x]
@@ -454,11 +462,11 @@ compile' cenv (tvr,as,e) = ans where
         case p of
             Func True fn as "void" -> return $ Prim ap xs' ty'
             Func True fn as r      -> return $ Prim ap xs' ty'
-            Func False _ as r | Just _ <- fromRawType ty ->  do
+            Func False _ as r | Just _ <- toCmmTy ty ->  do
                 return $ Prim ap xs' ty'
             IFunc True _ _ ->
                 return $ Prim ap xs' ty'
-            IFunc False _ _ | Just _ <- fromRawType ty ->
+            IFunc False _ _ | Just _ <- toCmmTy ty ->
                 return $ Prim ap xs' ty'
             Peek pt' | [addr] <- xs -> do
                 return $ Prim ap (args [addr]) ty'
@@ -485,8 +493,8 @@ compile' cenv (tvr,as,e) = ans where
         e <- ce e
         r <- ce r
         return $ e :>>= [] :-> r
-    ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d } | (ELit LitCons { litName = n, litArgs = [] }) <- followAliases (dataTable cenv) (getType e), Just ty <- rawNameToTy n = do
-            v <- if tvrIdent b == 0 then newPrimVar ty else return $ toVal b
+    ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d } |  Just ty <- toCmmTy (getType e :: E) = do
+            v <- if tvrIdent b == 0 then newPrimVar $ TyPrim ty else return $ toVal b
             e <- ce e
             as' <- mapM cp'' as
             def <- createDef d (return (toVal b))
@@ -533,10 +541,9 @@ compile' cenv (tvr,as,e) = ans where
         nn <- getName lc
         return ([NodeC nn (keepIts $ map toVal es)] :-> x)
     cp x = error $ "cp: " ++ show (funcName,x)
-    cp'' (Alt (LitInt i (ELit LitCons { litName = nn, litArgs = [] })) e) = do
+    cp'' (Alt (LitInt i t) e) | Just ty <- toCmmTy t = do
         x <- ce e
-        ty <- rawNameToTy nn
-        return ([Lit i ty] :-> x)
+        return ([Lit i $ TyPrim ty] :-> x)
 
     getName x = getName' (dataTable cenv) x
 
@@ -632,12 +639,12 @@ compile' cenv (tvr,as,e) = ans where
             v <- f ds x
             return $ e :>>= [toVal t] :-> v
         f (Right bs:ds) x | any (isELam . snd) bs = do
-            let g (t,e@ELam {}) = do
+            let g (t,e@(~ELam {})) = do
                     let (a,as) = fromLam e
                         (nn,_,_) = toEntry (t,[],getType t)
                     x <- ce a
                     return $ [createFuncDef True nn ((keepIts $ map toVal as) :-> x)]
-                g' (t,e@ELam {}) =
+                g' (t,e@(~ELam {})) =
                     let (a,as) = fromLam e
                         (nn,_,_) = toEntry (t,[],getType t)
                     in (tvrIdent t,(nn,length as,toTypes TyNode (getType a)))
@@ -722,15 +729,14 @@ compile' cenv (tvr,as,e) = ans where
         liftIO $ (writeIORef (counter cenv) $! (i + 2))
         return $! V i
 
-fromRawType (ELit LitCons { litName = tname, litArgs = [] }) | Just r <- rawNameToTy tname = return r
-fromRawType _ = fail "not a raw type"
 
 -- | converts an unboxed literal
 literal :: Monad m =>  E -> m [Val]
 literal (ELit LitCons { litName = n, litArgs = xs })  |  Just xs <- mapM literal xs, Just _ <- fromUnboxedNameTuple n = return (keepIts $ concat xs)
-literal (ELit (LitInt i ty)) | Just ptype <- fromRawType ty = return $ [Lit i ptype]
-literal (EPrim aprim@(APrim p _) xs ty) | Just ptype <- fromRawType ty, primIsConstant p = do
+literal (ELit (LitInt i ty)) | Just ptype <- toCmmTy ty = return $ [Lit i (TyPrim ptype)]
+literal (ELit (LitInt i (ELit (LitCons { litArgs = [], litAliasFor = Just af }))))  = literal $ ELit (LitInt i af)
+literal (EPrim aprim@(APrim p _) xs ty) | Just ptype <- toCmmTy ty, primIsConstant p = do
     xs <- mapM literal xs
-    return $ [ValPrim aprim (concat xs) ptype]
+    return $ [ValPrim aprim (concat xs) (TyPrim ptype)]
 literal _ = fail "not a literal term"
 
