@@ -2,6 +2,7 @@
 module Jhc.Enum(Enum(..),Bounded(..)) where
 -- Enumeration and Bounded classes
 
+import Jhc.Inst.PrimEnum()
 import Data.Int
 import Jhc.Types
 import Jhc.Basics
@@ -42,13 +43,13 @@ instance Enum Int where
     toEnum x = x
     fromEnum x = x
 
-    enumFrom x  | x `seq` True     =  x:enumFrom (increment x)
+    enumFrom x  | x `seq` True  =  enumFromTo x maxBound
+    enumFromThen c c' = [c, c' .. lastInt]
+                      where lastInt | c' < c    = minBound
+                                    | otherwise = maxBound
     enumFromTo x y = f x where
         f x | x > y = []
             | otherwise = x:f (increment x)
-    enumFromThen x y | x `seq` y `seq` True = f x where
-        z = y `minus` x
-        f x = x:f (x `plus` z)
     enumFromThenTo x y z | y >= x = f x where
         inc = y `minus` x
         f x | x <= z = x:f (x `plus` inc)
@@ -67,16 +68,16 @@ instance Enum Char where
                       where lastChar :: Char
                             lastChar | c' < c    = minBound
                                      | otherwise = maxBound
-    enumFromTo (Char x) (Char y) = f x where
-        f x = case x `bits32UGt` y of
-            0# -> []
-            1# -> Char x:f (bits32Increment x)
-    enumFromThenTo (Char x) (Char y) (Char z) =
-        case y `bits32Sub` x of
-            inc -> let f x = case x `bits32UGte` z of
-                            1# -> Char x:f (x `bits32Add` inc)
-                            0# -> []
-             in f x
+--    enumFromTo (Char x) (Char y) = f x where
+--        f x = case x `bits32UGt` y of
+--            0# -> []
+--            1# -> Char x:f (bits32Increment x)
+--    enumFromThenTo (Char x) (Char y) (Char z) =
+--        case y `bits32Sub` x of
+--            inc -> let f x = case x `bits32UGte` z of
+--                            1# -> Char x:f (x `bits32Add` inc)
+--                            0# -> []
+--             in f x
 
 
 instance Bounded Char where
@@ -84,10 +85,11 @@ instance Bounded Char where
     maxBound = Char 0x10ffff#
 
 foreign import primitive "UGt"       bits32UGt       :: Bits32_ -> Bits32_ -> Bool__
-foreign import primitive "UGte"       bits32UGte      :: Bits32_ -> Bits32_ -> Bool__
+foreign import primitive "UGte"      bits32UGte      :: Bits32_ -> Bits32_ -> Bool__
 foreign import primitive "increment" bits32Increment :: Bits32_ -> Bits32_
 
-foreign import primitive "Add"       bits32Add      :: Bits32_ -> Bits32_ -> Bits32_
-foreign import primitive "Sub"       bits32Sub      :: Bits32_ -> Bits32_ -> Bits32_
+foreign import primitive "Add"       bits32Add       :: Bits32_ -> Bits32_ -> Bits32_
+foreign import primitive "Sub"       bits32Sub       :: Bits32_ -> Bits32_ -> Bits32_
+
 
 

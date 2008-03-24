@@ -106,7 +106,11 @@ neq                  Jhc.Order./=
 fromEnum             Jhc.Enum.fromEnum
 toEnum               Jhc.Enum.toEnum
 enumFrom             Jhc.Enum.enumFrom
+enumFromTo           Jhc.Enum.enumFromTo
+enumFromThenTo       Jhc.Enum.enumFromThenTo
 enumFromThen         Jhc.Enum.enumFromThen
+succ                 Jhc.Enum.succ
+pred                 Jhc.Enum.pred
 range                Data.Ix.range
 index                Data.Ix.index
 inRange              Data.Ix.inRange
@@ -115,4 +119,10 @@ runRaw               Jhc.Prim.runRaw
 runMain              Jhc.IO.runMain
 runNoWrapper         Jhc.Prim.runNoWrapper
 
-
+enum_succ            Jhc.Inst.PrimEnum.enum_succ
+enum_pred            Jhc.Inst.PrimEnum.enum_pred
+enum_from            Jhc.Inst.PrimEnum.enum_from
+enum_fromTo          Jhc.Inst.PrimEnum.enum_fromTo
+enum_fromThen        Jhc.Inst.PrimEnum.enum_fromThen
+enum_fromThenTo      Jhc.Inst.PrimEnum.enum_fromThenTo
+enum_toEnum          Jhc.Inst.PrimEnum.enum_toEnum

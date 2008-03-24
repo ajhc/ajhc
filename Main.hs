@@ -217,7 +217,7 @@ processDecls cho ho' tiData = do
 
     -- build datatables
     let dataTable = toDataTable (getConstructorKinds (hoKinds $ hoBuild ho')) (tiAllAssumptions tiData) originalDecls (hoDataTable $ hoBuild ho)
-        classInstances = deriveClasses dataTable
+        classInstances = deriveClasses (choCombinators cho) dataTable
         fullDataTable = dataTable `mappend` hoDataTable (hoBuild ho)
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
 

@@ -39,7 +39,7 @@ enumDontDerive :: [(HsName,[HsName])]
 enumDontDerive = [
     (f class_Eq, [func_equals fns]),
     (f class_Ord, [func_geq fns, func_leq fns, func_lt fns, func_gt fns]),
-    (f class_Enum, [func_toEnum fns,func_fromEnum fns])
+    (f class_Enum, [func_toEnum fns,func_fromEnum fns] ++ map (nameName . toUnqualified) [v_enumFrom, v_succ, v_pred, v_enumFromThen, v_enumFromThenTo, v_enumFromTo])
     ]  where
         Identity fns = T.mapM (return . f) sFuncNames
         f n = nameName (toUnqualified n)

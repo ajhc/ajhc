@@ -459,19 +459,24 @@ followAliases _dataTable e = f e where
 
 dataTablePrims = DataTable $ Map.fromList ([ (conName x,x) | x <- tarrow:primitiveTable ])
 
-deriveClasses :: DataTable -> [(TVr,E)]
-deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where
+deriveClasses :: IdMap Comb -> DataTable -> [(TVr,E)]
+deriveClasses cmap (DataTable mp) = concatMap f (Map.elems mp) where
     f c | TypeConstructor == nameType (conName c), Just is <- conVirtual c = concatMap (g is c) (conDeriving c)
     f _ = []
     g is c cl = h cl where
+        lupvar v = EVar (combHead comb) where
+            Just comb = mlookup (toId v) cmap
         typ = conExpr c
         DataNormal [con] = conChildren c
+        Just conr = getConstructor con (DataTable mp)
+        [it@(ELit LitCons { litName = it_name })] = conSlots conr
+        Just itr = getConstructor it_name (DataTable mp)
+        DataEnum mv = conChildren itr
         v1 = tvr { tvrIdent = 2,  tvrType = typ }
         v2 = tvr { tvrIdent = 4,  tvrType = typ }
-        i1 = tvr { tvrIdent = 6,  tvrType = tIntzh }
-        i2 = tvr { tvrIdent = 8,  tvrType = tIntzh }
+        i1 = tvr { tvrIdent = 6,  tvrType = it }
+        i2 = tvr { tvrIdent = 8,  tvrType = it }
         b3 = tvr { tvrIdent = 10, tvrType = tBoolzh }
-        int1 = tvr { tvrIdent = 12, tvrType = tInt }
         val1 = tvr { tvrIdent = 14, tvrType = typ }
         unbox e = ELam v1 (ELam v2 (ec (EVar v1) i1 (ec (EVar v2) i2 e)))  where
             ec v i e = eCase v [Alt (litCons { litName = con, litArgs = [i], litType = typ }) e] Unknown
@@ -481,18 +486,42 @@ deriveClasses (DataTable mp) = concatMap f (Map.elems mp) where
                 mkCmpFunc (func_leq sFuncNames) Op.ULte,
                 mkCmpFunc (func_lt sFuncNames)  Op.ULt,
                 mkCmpFunc (func_gt sFuncNames)  Op.UGt]
-        h cl | cl == class_Enum = [{- (iv_te,ib_te), -}(iv_fe,ib_fe)] where
-            _iv_te = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName (func_toEnum sFuncNames) (nameName $ conName c), tvrType = getType ib_te }
+        h cl | cl == class_Enum = funcs where
+            funcs = [
+                (iv_te,ib_te),
+                (iv_fe,ib_fe),
+                iv v_succ succ_body,
+                iv v_pred pred_body,
+                iv v_enumFrom from_body,
+                iv v_enumFromTo fromTo_body,
+                iv v_enumFromThen fromThen_body,
+                iv v_enumFromThenTo fromThenTo_body
+                ]
+            iv_te = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName (func_toEnum sFuncNames) (nameName $ conName c), tvrType = getType ib_te }
             iv_fe = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName (func_fromEnum sFuncNames) (nameName $ conName c), tvrType = getType ib_fe }
-            ib_te = ELam int1 (ec tInt dc_Int (EVar int1) i1 (ELit (litCons { litName = con, litArgs = [EVar i1], litType = typ })))
-            ib_fe = ELam val1 (ec typ con (EVar val1) i1 (ELit (litCons { litName = dc_Int, litArgs = [EVar i1], litType = tInt })))
-            ec typ con v i e = eCase v [Alt (litCons { litName = con, litArgs = [i], litType = typ }) e] Unknown
+            iv fname body = (setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (nameName $ conName c), tvrType = getType body },body)
+            succ_body = foldl EAp (lupvar v_enum_succ) [typ, box, debox, max]
+            pred_body = foldl EAp (lupvar v_enum_pred) [typ, box, debox]
+            from_body = foldl EAp (lupvar v_enum_from) [typ, box, debox, max]
+            fromTo_body = foldl EAp (lupvar v_enum_fromTo) [typ, box, debox]
+            fromThen_body = foldl EAp (lupvar v_enum_fromThen) [typ, box, debox, max]
+            fromThenTo_body = foldl EAp (lupvar v_enum_fromThenTo) [typ, box, debox]
+
+
+            ib_te = foldl EAp (lupvar v_enum_toEnum) [typ, box, toEzh (mv - 1)]
+            ib_fe = ELam val1 (create_uintegralCast_toInt con tEnumzh (EVar val1))
+
+            max = ELit (LitInt (fromIntegral $ mv - 1) tEnumzh)
+
+            box = ELam i1 (ELit (litCons { litName = con, litArgs = [EVar i1], litType = typ }))
+            debox = ELam v1 (ec (EVar v1) i1 (EVar i1))  where
+                ec v i e = eCase v [Alt (litCons { litName = con, litArgs = [i], litType = typ }) e] Unknown
 
         h _ = []
         mkCmpFunc fname op = (iv_eq,ib_eq) where
             ib_eq = unbox (eStrictLet b3 (oper_IIB op (EVar i1) (EVar i2)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar b3], litType = tBool })))
             iv_eq = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (nameName $ conName c), tvrType = getType ib_eq }
-    oper_IIB op a b = EPrim (APrim (Op (Op.BinOp op Op.bits32 Op.bits32) Op.bits32) mempty) [a,b] tBoolzh
+    oper_IIB op a b = EPrim (APrim (Op (Op.BinOp op Op.bits16 Op.bits16) Op.bits16) mempty) [a,b] tBoolzh
 
 
 

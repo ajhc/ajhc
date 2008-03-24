@@ -1,6 +1,13 @@
 
 {- This file is generated -}
-module PrimitiveOperators(primitiveInsts,constantMethods,theMethods,allCTypes) where
+module PrimitiveOperators(
+    primitiveInsts,
+    constantMethods,
+    create_uintegralCast_toInt,
+    create_uintegralCast_fromInt,
+    theMethods,
+    allCTypes
+    ) where
 
 import Data.Monoid
 

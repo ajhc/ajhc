@@ -20,6 +20,7 @@ type Bool__ = Bits16_ -- Change to Bits1_ when the time comes
 type Addr__ = BitsPtr_
 type Int__  = Bits32_
 type Char__ = Bits32_
+type Enum__ = Bits16_
 
 
 -- | this is wrapped around arbitrary expressions and just evaluates them to whnf
