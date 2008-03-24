@@ -39,7 +39,8 @@ devolveGrin grin = do
                 proc' (App a as t) | Just xs <- Map.lookup a pmap = return (App a (as ++ xs) t)
                 proc' e = mapExpExp proc' e
             mapM_ print (Map.toList pmap)
-            modifyIORef col (++ fsts nmaps)
+            nmaps <- mapM (g . fst) nmaps
+            modifyIORef col (++ nmaps)
             mapExpExp f $  updateLetProps lt { expDefs = rmaps, expBody = proc body }
         f e = mapExpExp f e
     nf <- mapM g (grinFuncs grin)
