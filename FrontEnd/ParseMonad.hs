@@ -145,7 +145,7 @@ pushCurrentContext :: P ()
 pushCurrentContext = do
 	loc <- getSrcLoc
 	indent <- currentIndent
-	pushContext (Layout (max (indent+1) (srcLocColumn loc)))
+	pushContext (Layout (max (indent) (srcLocColumn loc)))
 
 currentIndent :: P Int
 currentIndent = P $ \_r _x _y loc stk _mode -> Ok stk (indentOfParseState stk)

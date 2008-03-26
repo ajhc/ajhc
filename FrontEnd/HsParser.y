@@ -317,8 +317,8 @@ topdecl :: { HsDecl }
                       {% doForeign $2 (reverse $3) $4 $6  }
       | 'foreign' srcloc varids mstring '::' ctype '=' exp
                       {% doForeignEq $2 (reverse $3) $4 $6 $8 }
-      | PRAGMARULES layout_on rules close PRAGMAEND
-              { HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) (reverse $3) }
+      | PRAGMARULES rulelist PRAGMAEND
+              { HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) (reverse $2) }
       | srcloc PRAGMASPECIALIZE var '::' type PRAGMAEND
                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $3, hsDeclType = $5 } }
       | decl          { $1 }
@@ -332,6 +332,9 @@ rules :: { [HsRule] }
       : rules optsemi rule  { $3 : $1 }
       | rule optsemi           { [$1] }
 
+rulelist :: { [HsRule] }
+      : '{' rules '}' { $2 }
+      | layout_on rules close { $2 }
 
 mfreevars :: { [(HsName,Maybe HsType)] }
       : 'forall' vbinds '.' { $2 }
@@ -908,7 +911,7 @@ close :: { () }
       : vccurly               { () } -- context popped in lexer.
       | error                 {% popContext }
 
-layout_on  :: { () }  :       {% getSrcLoc `thenP` \sl ->
+layout_on  :: { () }  : optsemi  {% getSrcLoc `thenP` \sl ->
                                  pushCurrentContext  }
 
 --                                 pushCurrentContext (Layout (srcLocColumn sl)) }
