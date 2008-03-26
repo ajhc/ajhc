@@ -25,6 +25,18 @@ class Monad m  where
     m >> k  =  m >>= \_ -> k
     fail s  = error s
 
+{- SPECIALIZE sequence :: forall a . [IO a] -> IO [a] #-}
+{- SPECIALIZE sequence_ :: forall a . [IO a] -> IO () #-}
+{- SPECIALIZE mapM :: forall a b . (a -> IO b) -> [a]-> IO [b] #-}
+{- SPECIALIZE mapM_ :: forall a b . (a -> IO b) -> [a]-> IO () #-}
+
+{-# RULES "sequence/[]"   sequence [] = return [] #-}
+{-# RULES "sequence_/[]"  sequence_ [] = return () #-}
+{-# RULES "mapM/[]"       forall f . mapM f [] = return [] #-}
+{-# RULES "mapM_/[]"      forall f . mapM_ f [] = return () #-}
+{-# RULES "sequence_/++"  forall xs ys . sequence_ (xs ++ ys) = sequence_ xs >> sequence_ ys #-}
+{-# RULES "mapM_/++"      forall xs ys f . mapM_ f (xs ++ ys) = mapM_ f xs >> mapM_ f ys #-}
+
 mapM             :: Monad m => (a -> m b) -> [a] -> m [b]
 mapM f as = go as where
     go [] = return []
@@ -37,6 +49,16 @@ mapM_            :: Monad m => (a -> m b) -> [a] -> m ()
 mapM_ f as = go as where
     go [] = return ()
     go (a:as) = f a >> go as
+
+sequence       :: Monad m => [m a] -> m [a]
+sequence xs = f xs where
+    f [] = return []
+    f (x:xs) = x >>= \r -> f xs >>= \rs -> return (r:rs)
+
+sequence_      :: Monad m => [m a] -> m ()
+sequence_ xs  =  f xs where
+    f [] = return ()
+    f (x:xs) = x >> f xs
 
 (=<<)            :: Monad m => (a -> m b) -> m a -> m b
 f =<< x          =  x >>= f

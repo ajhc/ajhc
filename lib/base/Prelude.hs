@@ -23,6 +23,10 @@ module Prelude(
     or,
     length,
     null,
+    head,
+    tail,
+    last,
+    init,
     takeWhile,
     dropWhile,
     span,
@@ -162,30 +166,6 @@ until p f x
 
 
 
-
-{-# SUPERINLINE head, tail, null #-}
-head             :: [a] -> a
-head (x:_)       =  x
-head []          =  error "Prelude.head: empty list"
-
-
-tail             :: [a] -> [a]
-tail (_:xs)      =  xs
-tail []          =  error "Prelude.tail: empty list"
-
-
-last             :: [a] -> a
-last []          =  error "Prelude.last: empty list"
-last (x:xs)      = last' x xs where
-    last' x []     = x
-    last' _ (y:ys) = last' y xs
-
-
-init             :: [a] -> [a]
-init []          =  error "Prelude.init: empty list"
-init (x:xs)      =  init' x xs where
-    init' _ [] = []
-    init' y (z:zs) = y:init' z zs
 
 
 
@@ -389,11 +369,6 @@ instance Real Int where
 
 
 
-{-# RULES "iterate/id" forall . iterate id = repeat #-}
-{-# RULES "head/iterate"  forall f x . head (iterate f x) = x #-}
-{-# RULES "head/repeat"   forall x . head (repeat x) = x #-}
-{-# RULES "tail/repeat"   forall x . tail (repeat x) = repeat x #-}
-{-# RULES "tail/iterate"  forall f x . tail (iterate f x) = iterate f (f x) #-}
 {-# RULES "drop/0"        forall . drop 0 = \xs -> xs #-}
 {-# RULES "drop/1"        forall x xs . drop 1 (x:xs) = xs #-}
 {-# RULES "drop/2"        forall x y xs . drop 2 (x:y:xs) = xs #-}
@@ -405,10 +380,6 @@ instance Real Int where
 {-# RULES "!!/0"          forall x xs . (x:xs) !! 0 = x #-}
 {-# RULES "!!/1"          forall x y xs . (x:y:xs) !! 1 = y #-}
 {-# RULES "!!/2"          forall x y z xs . (x:y:z:xs) !! 2 = z #-}
-{-# RULES "tail/map"      forall f xs . tail (map f xs) = map f (tail xs) #-}
-{-# RULES "head/map"      forall f xs . head (map f xs) = f (head xs) #-}
-{-# RULES "head/:"        forall x xs . head (x:xs) = x #-}
-{-# RULES "tail/:"        forall x xs . tail (x:xs) = xs #-}
 {-# RULES "concat/Map"    forall f xs . concat (map f xs) = concatMap f xs #-}
 {-# RULES "sequence/map"  forall f xs . sequence (map f xs) = mapM f xs #-}
 {-# RULES "sequence_/map" forall f xs . sequence_ (map f xs) = mapM_ f xs #-}
@@ -427,14 +398,8 @@ instance Real Int where
 {-# RULES "concat/[]"     concat [] = [] #-}
 {-# RULES "map/[]"        forall f . map f [] = [] #-}
 {-# RULES "concatMap/[]"  forall f . concatMap f [] = [] #-}
-{-# RULES "sequence/[]"   sequence [] = return [] #-}
-{-# RULES "sequence_/[]"  sequence_ [] = return () #-}
-{-# RULES "mapM/[]"       forall f . mapM f [] = return [] #-}
-{-# RULES "mapM_/[]"      forall f . mapM_ f [] = return () #-}
 {-# RULES "concatMap/++"  forall xs ys f . concatMap f (xs ++ ys) = concatMap f xs ++ concatMap f ys #-}
 {-# RULES "map/++"        forall xs ys f . map f (xs ++ ys) = map f xs ++ map f ys #-}
-{-# RULES "sequence_/++"  forall xs ys . sequence_ (xs ++ ys) = sequence_ xs >> sequence_ ys #-}
-{-# RULES "mapM_/++"      forall xs ys f . mapM_ f (xs ++ ys) = mapM_ f xs >> mapM_ f ys #-}
 
 {-# RULES "foldr/map" forall k z f xs . foldr k z (map f xs) = foldr (\x y -> k (f x) y) z xs #-}
 {-# RULES "foldr/concatMap" forall k z f xs . foldr k z (concatMap f xs) = foldr (\x y -> foldr k (f x) y) z xs #-}

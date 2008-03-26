@@ -5,7 +5,6 @@ import Jhc.Basics
 import Jhc.IO(error)
 import Jhc.Int
 import Jhc.Order
-import Jhc.Monad
 
 import Jhc.String
 
@@ -57,12 +56,20 @@ mapFilter f p xs = fm xs where
     fm (x:xs) = if p x then f x:fm xs else fm xs
     fm [] = []
 
+{-# RULES "tail/map"      forall f xs . tail (map f xs) = map f (tail xs) #-}
+{-# RULES "head/map"      forall f xs . head (map f xs) = f (head xs) #-}
+{-# RULES "head/:"        forall x xs . head (x:xs) = x #-}
+{-# RULES "tail/:"        forall x xs . tail (x:xs) = xs #-}
+
 {-# RULES "filter/iterate" forall p f x . filter p (iterate f x) = filterIterate p f x  #-}
 {-# RULES "map/iterate" forall f g x . map f (iterate g x) = mapIterate f g x  #-}
 {-# RULES "map/filter" forall f p xs . map f (filter p xs) = mapFilter f p xs  #-}
 {-# RULES "filter/map" forall f p xs . filter p (map f xs) = filterMap p f xs  #-}
 
 -- efficient implementations of prelude routines
+
+{-# CATALYST "and/foldr" forall . and = foldr (&&) True #-}
+{-# CATALYST "or/foldr"  forall . or = foldr (||) False #-}
 
 and, or          :: [Bool] -> Bool
 and [] = True
@@ -72,6 +79,11 @@ and (True:xs) = and xs
 or [] = False
 or (True:_) = True
 or (False:xs) = or xs
+
+{-# RULES "any/build"     forall p (g::forall b.(a->b->b)->b->b) .  any p (build g) = g ((||) . p) False #-}
+
+
+{-# RULES "all/build"     forall p (g::forall b.(a->b->b)->b->b) .  all p (build g) = g ((&&) . p) True #-}
 
 
 any, all         :: (a -> Bool) -> [a] -> Bool
@@ -132,11 +144,11 @@ notElem x (y:ys)
 infixl 9  !!
 
 (!!)                :: [a] -> Int -> a
-xs !! n | n < zero  =  error "Prelude.(!!): negative index\n"
+xs !! n | n < zero  =  error "Prelude.(!!): negative index"
 	| otherwise =  sub xs n where
                 sub :: [a] -> Int -> a
                 sub _ n | n `seq` False = undefined
-                sub []     _ = error "Prelude.(!!): index too large\n"
+                sub []     _ = error "Prelude.(!!): index too large"
                 sub (y:ys) n = if n == zero
                                then y
                                else sub ys $! (n `minus` one)
@@ -152,23 +164,35 @@ length xs = f xs zero where
     f [] n = n
     f (_:xs) n = f xs $! n `plus` one
 
+head             :: [a] -> a
+head (x:_)       =  x
+head []          =  error "Prelude.head: empty list"
 
 
-{- SPECIALIZE sequence :: forall a . [IO a] -> IO [a] #-}
-{- SPECIALIZE sequence_ :: forall a . [IO a] -> IO () #-}
-{- SPECIALIZE mapM :: forall a b . (a -> IO b) -> [a]-> IO [b] #-}
-{- SPECIALIZE mapM_ :: forall a b . (a -> IO b) -> [a]-> IO () #-}
+tail             :: [a] -> [a]
+tail (_:xs)      =  xs
+tail []          =  error "Prelude.tail: empty list"
 
--- | use local routine so monad type is shared.
-sequence       :: Monad m => [m a] -> m [a]
-sequence xs = f xs where
-    f [] = return []
-    f (x:xs) = x >>= \r -> f xs >>= \rs -> return (r:rs)
 
-sequence_      :: Monad m => [m a] -> m ()
-sequence_ xs  =  f xs where
-    f [] = return ()
-    f (x:xs) = x >> f xs
+last             :: [a] -> a
+last []          =  error "Prelude.last: empty list"
+last (x:xs)      = last' x xs where
+    last' x []     = x
+    last' _ (y:ys) = last' y xs
+
+
+init             :: [a] -> [a]
+init []          =  error "Prelude.init: empty list"
+init (x:xs)      =  init' x xs where
+    init' _ [] = []
+    init' y (z:zs) = y:init' z zs
+
+
+{-# RULES "head/iterate"  forall f x . head (iterate f x) = x #-}
+{-# RULES "head/repeat"   forall x . head (repeat x) = x #-}
+{-# RULES "tail/repeat"   forall x . tail (repeat x) = repeat x #-}
+{-# RULES "tail/iterate"  forall f x . tail (iterate f x) = iterate f (f x) #-}
+{-# RULES "iterate/id" forall . iterate id = repeat #-}
 
 {-
 concatMap f = foldr ((++) . f) []
