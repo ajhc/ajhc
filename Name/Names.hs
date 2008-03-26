@@ -61,11 +61,8 @@ instance FromTupname Name where
 -- The constructors
 
 
-tc_Box = toName TypeConstructor    ("Jhc@","Box")
-tc_Arrow = toName TypeConstructor  ("Jhc@","->")
-
+tc_Arrow = toName TypeConstructor  ("Jhc.Basics","->")
 tc_Int__ = toName TypeConstructor  ("Jhc.Prim","Int__")
-tc_Addr__ = toName TypeConstructor  ("Jhc.Prim","Addr__")
 tc_Array__ = toName TypeConstructor  ("Jhc.Array","Array__")
 tc_MutArray__ = toName TypeConstructor  ("Jhc.Array","MutArray__")
 tc_Ref__ = toName TypeConstructor ("Data.IORef","Ref__")
