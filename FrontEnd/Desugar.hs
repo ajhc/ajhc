@@ -289,7 +289,7 @@ desugarGRhs (HsGuardedRhs sloc e1 e2)
 
 desugarExp :: (HsExp) -> PatSM (HsExp)
 desugarExp (HsLambda sloc pats e)
-    | all isLazyPat pats = do
+    | all isLazyPat pats && not (any isHsPIrrPat pats) = do
         newE <- desugarExp e
         return (HsLambda sloc pats newE)
 desugarExp (HsLambda sloc pats e) = z where
