@@ -193,7 +193,7 @@ depend.make: deps.txt
 built-sources: $(BUILT_SOURCES)
 
 i: $(BUILT_SOURCES)
-	ghci $(GHCOPTS) Main.hs $(CFILES)
+	$(HC) --interactive $(GHCOPTS) Main.hs $(CFILES)
 
 .PHONY: ho-clean hl-clean built-sources i update-datestamp manual
 
