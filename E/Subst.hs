@@ -45,7 +45,8 @@ import List hiding(union,insert,delete)
 import E.E
 import E.FreeVars()
 import Name.Id
-import E.Show
+import Name.Names (tc_Arrow)
+import {-# SOURCE #-} E.Show
 import Support.FreeVars
 import GenUtil
 import Util.SetLike as S

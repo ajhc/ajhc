@@ -11,6 +11,7 @@ import Doc.PPrint
 import Doc.Pretty
 import E.E
 import E.FreeVars()
+import E.TypeCheck
 import Name.Id
 import Name.Name
 import Name.Names
@@ -139,6 +140,18 @@ allocTVr _ action = action
 
 tBoolzh = ELit litCons { litName = tc_Boolzh, litType = eHash, litAliasFor = Just tIntzh }
 
+-- collects lambda and pi abstractions
+collectAbstractions e0 = go e0 [] where
+    go e1@(EPi tvr e)  xs | tvrIdent tvr == 0                = done e1 xs
+                          | not (sortKindLike (tvrType tvr)) = go e ((UC.pI,     tvr, True) :xs)
+                          | dump FD.EVerbose || tvrIdent tvr `member` (freeVars e::IdSet)
+                                                             = go e ((UC.forall, tvr, False):xs)
+                          | otherwise                        = done e1 xs
+    go e1@(ELam tvr e) xs | sortKindLike (tvrType tvr)       = go e ((UC.lAmbda, tvr, False):xs)
+                          | otherwise                        = go e ((UC.lambda, tvr, True) :xs)
+    go  e           xs = done e xs
+    done e xs = (reverse xs, e)
+                                                  
 showE :: E -> SEM (Unparse Doc)
 showE e = do
     let const_color = col "blue"
@@ -161,20 +174,16 @@ showE e = do
         f (EAp a b) = liftM2 app (showE a) (showE b)
         f (EPi (TVr { tvrIdent = 0, tvrType =  e1}) e2) = liftM2 arr (showE e1) (showE e2)
         f (EPi (TVr { tvrIdent = n, tvrType =  e1}) e2) | not $ dump FD.EVerbose, not $ n `member` (freeVars e2 ::IdSet) = liftM2 arr (showE e1) (showE e2)
-        f (EPi tvr@(TVr {  tvrType =  z}) e) | z == eStar = allocTVr tvr $ do
-            tvr <- showTVr' tvr
-            liftM2 dot (return $ pop (retOp UC.forall) tvr) (showE e)
-        f (EPi t e) = allocTVr t $ do
-            tvr <- showTVr t
-            e <- showE e
-            return $ (pop (retOp UC.pI) tvr) `dot` e
-        f (ELam tvr@TVr {tvrType =  z} e) | z == eStar = allocTVr tvr $ do
-            tvr <- showTVr' tvr
-            liftM2 dot (return $ pop (retOp UC.lAmbda) tvr) (showE e)
-        f (ELam t e) = allocTVr t $ do
-            tvr <- showTVr t
-            e <- showE e
-            return $ (pop (retOp UC.lambda) tvr) `dot` e
+        f e0 | (as@(_:_), e) <- collectAbstractions e0 =
+            foldr (\(_, tvr, _) -> allocTVr tvr)
+                  (do tops <- mapM p as
+                      e <- showE e
+                      return (atom $ group $ (align $ skipToNest <> fillCat tops) <$> unparse e))
+                  as
+            where 
+              p :: (Doc, TVr, Bool) -> SEM Doc
+              p (c,t,detailed) = do tvr <- if detailed then showTVr t else showTVr' t
+                                    return (retOp c <> unparse tvr <> retOp (char '.'))
         f (EVar tvr) = if dump FD.EVerbose then showTVr tvr else showTVr' tvr
         f Unknown = return $ symbol (char  '?')
         f (ESort s) = return $ symbol (tshow s)
@@ -250,3 +259,8 @@ ePretty e = unparse pe where
     (SEM pe') = showE e
     Identity pe = runVarNameT pe'
 
+-- skip to the current nesting level, breaking the line if already past it
+skipToNest      = column (\k ->
+                  nesting (\i -> if k > i
+                                 then linebreak
+                                 else text (replicate (i-k) ' ')))

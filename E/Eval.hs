@@ -9,7 +9,7 @@ import qualified Data.Map as Map
 import Doc.PPrint
 import E.E
 import E.FreeVars
-import E.Show
+import {-# SOURCE #-} E.Show
 import E.Subst
 
 

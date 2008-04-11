@@ -21,7 +21,7 @@ import Doc.PPrint
 import Doc.Pretty
 import E.E
 import E.Eval(strong)
-import E.Show
+import {-# SOURCE #-} E.Show
 import E.Subst
 import GenUtil
 import Name.Id
