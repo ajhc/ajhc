@@ -2,6 +2,7 @@
 
 data MyWorld__ :: #
 
+
 newtype State s a = State (s -> (# s, a #))
 
 data Char

@@ -21,6 +21,7 @@ module System.IO(
     hPutStrLn,
     openFile,
     withFile,
+    fixIO,
     stdin,stdout,stderr,
     try
 

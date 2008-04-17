@@ -388,17 +388,6 @@ vars  :: { [HsName] }
                                          returnP [n] }
 
 -- FFI parts
-{-
-mcconv :: { CallConv }
-mcconv : 'ccall'        { CCall }
-       | 'stdcall'      { StdCall }
-       | {- empty -}    { CCall }
-
-msafety :: { Safety }
-msafety : 'safe'        { Safe }
-        | 'unsafe'      { Unsafe }
-        | {- empty -}   { Safe }
--}
 mstring :: { Maybe (String,HsName) }
 mstring : STRING var        { Just ($1,$2) }
         | {- empty -}    { Nothing }
@@ -941,6 +930,9 @@ tyvar :: { HsName }
 -- -----------------------------------------------------------------------------
 
 {
+{-# NOINLINE parse #-}
+{-# NOINLINE parseHsStmt #-}
+
 happyError = parseError "Parse error"
 hsSymbol x = HsIdent x
 readInteger x = fromIntegral x
