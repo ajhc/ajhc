@@ -142,7 +142,7 @@ RawFiles.hs:  utils/op_raw.prl $(RAWFILES)
 
 FrontEnd/HsParser.hs: FrontEnd/HsParser.y
 	happy -a -g -c $< -o $@
-	sed -i $@ -e 's/^{-# OPTIONS/{-# OPTIONS_GHC -w/'
+	sed -e 's/^{-# OPTIONS/{-# OPTIONS_GHC -w/' -i $@
 
 
 .SECONDARY: _darcs/inventory data/shortchange.txt
