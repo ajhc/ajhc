@@ -68,8 +68,9 @@ putInfo :: Info.Info.Info -> Put
 putInfo (Info ds) = do
     let ds' = concatMap (\d -> do
             let ps = hash32 $ (show $ entryType d)
-            x <- Map.lookup ps binTable
-            return (ps,entryThing d,x)
+            case Map.lookup ps binTable of
+              Just x  -> return (ps,entryThing d,x)
+              Nothing -> fail "key not found"
           ) ds
     putWord8 (fromIntegral $ length ds')
     mapM_ putDyn ds'

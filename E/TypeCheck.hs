@@ -115,6 +115,10 @@ canBeBox _ = False
 
 tBox = mktBox eStar
 
+monadicLookup key m = case Map.lookup key m of
+    Just x  -> return x
+    Nothing -> fail "Key not found"
+
 -- Fast (and lazy, and perhaps unsafe) typeof
 instance CanType E E where
     getType (ESort s) = ESort $ getType s
@@ -125,7 +129,7 @@ instance CanType E E where
         | otherwise = maybe (error $ "getType: " ++ show e) ESort $ do
             ESort s1 <- return $ getType a
             ESort s2 <- return $ getType b
-            Map.lookup (s1,s2) ptsRulesMap
+            monadicLookup (s1,s2) ptsRulesMap
         where typa = getType a; typb = getType b
     getType (EAp (ELit LitCons { litType = EPi tvr a }) b) = getType (subst tvr b a)
     getType (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = getType (foldl eAp af (litArgs lc ++ [b]))
@@ -209,7 +213,7 @@ inferType dataTable ds e = rfc e where
     fc (EPi (TVr { tvrIdent = n, tvrType =  at}) b) = do
         ESort a <- rfc at
         ESort b <- rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
-        liftM ESort $ Map.lookup (a,b) ptsRulesMap
+        liftM ESort $ monadicLookup (a,b) ptsRulesMap
         --valid at >> rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
     --fc (ELam tvr@(TVr n at) b) = valid at >> rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b >>= \b' -> (strong' $ EPi tvr b')
     fc (ELam tvr@(TVr { tvrIdent = n, tvrType =  at}) b) = do
@@ -368,7 +372,7 @@ tcE e = rfc e where
     fc (EPi TVr { tvrIdent = n, tvrType = at} b) =  do
         ESort a <- rfc at
         ESort b <- local (tcDefns_u (\ds -> [ d | d@(v,_) <- ds, tvrIdent v /= n ])) $ rfc b
-        liftM ESort $ Map.lookup (a,b) ptsRulesMap
+        liftM ESort $ monadicLookup (a,b) ptsRulesMap
     fc (ELam tvr@TVr { tvrIdent = n, tvrType =  at} b) = do
         at' <- strong' at
         b' <- local (tcDefns_u (\ds -> [ d | d@(v,_) <- ds, tvrIdent v /= n ])) $ rfc b
@@ -402,7 +406,7 @@ typeInfer'' dataTable ds e = rfc e where
     fc (EPi TVr { tvrIdent = n, tvrType = at} b) =  do
         ESort a <- rfc at
         ESort b <- rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
-        liftM ESort $ Map.lookup (a,b) ptsRulesMap
+        liftM ESort $ monadicLookup (a,b) ptsRulesMap
     fc (ELam tvr@TVr { tvrIdent = n, tvrType =  at} b) = do
         at' <- strong' at
         b' <- rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b

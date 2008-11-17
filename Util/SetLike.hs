@@ -150,7 +150,7 @@ msingleton k v = singleton (k,v)
 class SetLike m => MapLike k v m | m -> k v where
     mdelete :: k -> m -> m
     mmember :: k -> m -> Bool
-    mlookup :: Monad g => k -> m -> g v
+    mlookup :: k -> m -> Maybe v
     melems :: m -> [v]
     massocs :: m -> [(k,v)]
     mkeys :: m -> [k]
@@ -166,9 +166,7 @@ class SetLike m => MapLike k v m | m -> k v where
 instance MapLike Int a (IM.IntMap a) where
     mdelete = IM.delete
     mmember = IM.member
-    mlookup k m = case IM.lookup k m of
-        Nothing -> fail $ "IntMap: can't find " ++ show k
-        Just x -> return x
+    mlookup k m = IM.lookup k m
     melems = IM.elems
     mkeys = IM.keys
     massocs = IM.toList

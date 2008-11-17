@@ -37,9 +37,10 @@ restrictTypeSynonyms :: (Name -> Bool) -> TypeSynonyms -> TypeSynonyms
 restrictTypeSynonyms f (TypeSynonyms fm) = TypeSynonyms (Map.filterWithKey (\k _ -> f k) fm)
 
 showSynonym :: (DocLike d,Monad m) => (HsType -> d) -> Name -> TypeSynonyms -> m d
-showSynonym pprint n (TypeSynonyms m) = do
-    (ns, t, _) <- Map.lookup n m
-    return $ hsep (tshow n:map tshow ns) <+> text "=" <+> pprint t
+showSynonym pprint n (TypeSynonyms m) =
+    case Map.lookup n m of
+      Just (ns, t, _) -> return $ hsep (tshow n:map tshow ns) <+> text "=" <+> pprint t
+      Nothing         -> fail "key not found"
 
 -- | convert a set of type synonym declarations to a synonym map used for efficient synonym
 -- expansion

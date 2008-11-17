@@ -294,11 +294,11 @@ toCompUnitGraph done roots = do
                 Left ns -> g ns
         g ms@(((m,_),ds):_) = do
             let amods = map (fst . fst) ms
-            pm (join (Map.lookup m phomap)) $ do
+            pm (fromMaybe [] (Map.lookup m phomap)) $ do
                 let deps = Set.toList $ Set.fromList (concat $ snds ms) `Set.difference` (Set.fromList amods)
                 deps' <- snub `fmap` mapM f deps
                 let mhash = MD5.md5String (concatMap (show . fst) ms ++ show deps')
-                Map.lookup m mods >>= flip writeIORef (Right mhash)
+                writeIORef (fromJust $ Map.lookup m mods) (Right mhash)
                 let cunit = CompSources $ map fs amods
                 modifyIORef cug_ref ((mhash,(deps',cunit)):)
                 return mhash

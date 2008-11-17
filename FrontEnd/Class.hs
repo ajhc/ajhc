@@ -181,7 +181,7 @@ qualifyMethod [HsAsst c [n]] (HsTypeSig sloc names (HsQualType oc t))
 
 printClassSummary :: ClassHierarchy -> IO ()
 printClassSummary (ClassHierarchy h) = mapM_ f $  h' where
-    h' = [ (n,runIdentity $ Map.lookup n h) | n <- (map fst [ (cn, classSupers ss) | (cn,ss) <- Map.toList h]) ]
+    h' = [ (n,fromJust $ Map.lookup n h) | n <- (map fst [ (cn, classSupers ss) | (cn,ss) <- Map.toList h]) ]
     f (cname, (ClassRecord { classSupers = supers, classInsts = insts, classAssumps = ma})) = do
         putStrLn $ "-- class: " ++ show cname
         unless (null supers) $ putStrLn $ "super classes:" ++ unwords (map show supers)

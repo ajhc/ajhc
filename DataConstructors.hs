@@ -649,7 +649,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
 
     makeType decl = (theType,theTypeArgs,theTypeExpr) where
         theTypeName = toName Name.TypeConstructor (hsDeclName decl)
-        theKind = kind $ runIdentity (Map.lookup theTypeName km)
+        theKind = kind $ fromJust (Map.lookup theTypeName km)
         (theTypeFKind,theTypeKArgs') = fromPi theKind
         theTypeArgs = [ tvr { tvrIdent = x } | tvr  <- theTypeKArgs' | x <- [2,4..] ]
         theTypeExpr = ELit litCons { litName = theTypeName, litArgs = map EVar theTypeArgs, litType = theTypeFKind }

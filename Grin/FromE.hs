@@ -362,7 +362,7 @@ compile' cenv (tvr,as,e) = ans where
     ans = do
         --putStrLn $ "Compiling: " ++ show nn
         x <- cr e
-        let (nn,_,_) = runIdentity $ mlookup (tvrIdent tvr) (scMap cenv)
+        let (nn,_,_) = fromJust $ mlookup (tvrIdent tvr) (scMap cenv)
         return (nn,((keepIts $ map toVal as) :-> x))
     funcName = maybe (show $ tvrIdent tvr) show (fromId (tvrIdent tvr))
     cc, ce, cr :: E -> C Exp

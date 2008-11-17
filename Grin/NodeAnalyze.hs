@@ -10,6 +10,7 @@ import Control.Monad(forM, forM_, when)
 import Control.Monad.RWS(MonadWriter(..), RWS(..))
 import Control.Monad.Identity(runIdentity)
 import Data.Monoid
+import Data.Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -120,7 +121,7 @@ nodeAnalyze grin' = do
     putStrLn "-- NodeAnayze"
     (rm,res) <- solve (const (return ())) cs
     --(rm,res) <- solve putStrLn cs
-    let cmap = Map.map (runIdentity . flip Map.lookup res) rm
+    let cmap = Map.map (fromJust . flip Map.lookup res) rm
     --putStrLn "----------------------------"
     --mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList rm)
     --putStrLn "----------------------------"

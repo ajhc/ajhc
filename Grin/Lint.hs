@@ -72,7 +72,7 @@ transformGrin tp prog = do
         putErrLn $ "\n>>> Before " ++ name
         dumpGrin ("lint-before-" ++ name) prog
         putErrLn $ "\n>>>"
-        putErrLn (show e)
+        putErrLn (show (e::SomeException))
         maybeDie
         return prog
     let istat = grinStats prog

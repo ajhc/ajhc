@@ -850,7 +850,7 @@ transformProgram tp prog = liftIO $ do
         putErrLn $ "\n>>> Before " ++ name
         printProgram prog
         putErrLn $ "\n>>>"
-        putErrLn (show e)
+        putErrLn (show (e::SomeException))
         maybeDie
         return prog
     prog' <- Control.Exception.catch (transformOperation tp prog { progStats = mempty }) ferr
