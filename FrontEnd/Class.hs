@@ -466,7 +466,7 @@ classMethodAssumps hierarchy = concatMap classAssumps $ classRecords hierarchy
 scatterAliasInstances :: MonadIO m => ClassHierarchy -> m ClassHierarchy
 scatterAliasInstances ch = do
     let cas = [cr | cr@(ClassAliasRecord {}) <- classRecords ch]
-    ch `seq` liftIO $ putStrLn ("scatterAliasInstances: " ++ show cas)
+    --ch `seq` liftIO $ putStrLn ("scatterAliasInstances: " ++ show cas)
     let instances = concatMap scatterInstancesOf cas
     let ret = foldr (modifyClassRecord $ \cr -> cr 
                      { classInsts = [],
