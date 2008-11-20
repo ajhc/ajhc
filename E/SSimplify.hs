@@ -34,7 +34,7 @@ import E.Subst
 import E.Traverse(runRename)
 import E.TypeCheck
 import E.Values
-import GenUtil
+import GenUtil hiding (split)
 import Info.Types
 import Name.Id
 import Name.Name
@@ -54,6 +54,9 @@ import qualified E.Demand as Demand
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Info.Info as Info
+
+import System.Random
+import Debug.Trace
 
 type Bind = (TVr,E)
 
@@ -77,9 +80,10 @@ notUsedInfo = UseInfo { useOccurance = Unused, minimumArgs = maxBound }
 
 programPruneOccurance :: Program -> Program
 programPruneOccurance prog =
-    let dsIn = progCombinators (runIdentity $ programMapBodies (return . subst (tVr (-1) Unknown) Unknown) prog)
+    let dsIn = progCombinators prog -- (runIdentity $ programMapBodies (return . subst (tVr (-1) Unknown) Unknown) prog)
         (dsIn',(OMap fvs,uids)) = runReaderWriter (unOM $ collectDs dsIn mempty) (progEntry prog)
-    in (progCombinators_s dsIn' prog) { progFreeIds = idMapToIdSet fvs, progUsedIds = uids }
+    in --trace ("dsIn: "++show (length dsIn)) $
+       (progCombinators_s dsIn' prog) { progFreeIds = idMapToIdSet fvs, progUsedIds = uids }
 
 
 newtype OM a = OM (ReaderWriter IdSet (OMap,IdSet) a)
@@ -301,7 +305,7 @@ cacheSimpOpts opts = opts {
     f Comb { combRules = rs } = if null rs then Nothing else Just $ arules rs
 
 
-data Range = Done OutE | Susp InE Subst OutE -- cached result
+data Range = Done OutE | Susp InE Subst
     deriving(Show,Eq,Ord)
 type Subst = IdMap Range
 
@@ -360,7 +364,7 @@ data Env = Env {
     {-! derive: Monoid, update !-}
 
 susp:: E -> Subst -> Range
-susp e sub =  Susp e sub Unknown
+susp e sub =  Susp e sub
 
 insertSuspSubst :: TVr -> InE -> Env -> Env
 insertSuspSubst t e env = insertSuspSubst' (tvrIdent t) e env
@@ -411,11 +415,11 @@ applySubst s nn = applySubst' s where
     check n = n `mmember` s || n `mmember` nn
     applySubst' s = fmap g s
     g (Done e) = e
-    g (Susp e s' _) = doSubst' False False (applySubst' s') check e
+    g (Susp e s') = doSubst' False False (applySubst' s') check e
 
 evalRange :: Range -> SM OutE
 evalRange (Done e) = return e
-evalRange (Susp e s _) = localEnv (envSubst_s s)  $ dosub e
+evalRange (Susp e s) = localEnv (envSubst_s s)  $ dosub e
 
 cacheSubst env = env { envCachedSubst = applySubst (envSubst env) (envInScope env) }
 
@@ -450,11 +454,11 @@ data Cont =
         }
     | LazyContext TVr  -- the RHS of a let statement
     | StartContext
-    | ArgContext
+--    | ArgContext
     | Coerce Range Cont
-    | Scrutinee {
+{-    | Scrutinee {
         contExamined :: Bool  -- ^ whether the result is actually examined, or just bound to a variable
-        }
+        }-}
     deriving(Show)
 
 isApplyTo ApplyTo {} = True
@@ -481,7 +485,7 @@ simplifyDs prog sopts dsIn = ans where
         return $ susp b sub
     f :: Cont -> InE -> SM OutE
     --f cont e | trace (take 20 (show cont) ++ " - " ++ take 40 (show e)) False = undefined
-    f ArgContext e = dosub e
+--    f ArgContext e = dosub e
     f c (EAp a b) = do
         b' <- makeRange b
         f ApplyTo { contArg = b', contNext = c } a
@@ -497,7 +501,7 @@ simplifyDs prog sopts dsIn = ans where
         z <- substLookup (tvrIdent v)
         case z of
             Just (Done e) -> done cont e
-            Just (Susp e s _) -> localEnv (envSubst_s s)  $ f cont e
+            Just (Susp e s) -> localEnv (envSubst_s s)  $ f cont e
             Nothing -> done cont (EVar v)
     f (Coerce t cont) (EError s _) = evalRange t >>= \t' -> done cont (EError s t')
     f (Coerce t cont) (ELit (LitInt n _)) = evalRange t >>= \t' -> done cont (ELit (LitInt n t'))
@@ -520,7 +524,8 @@ simplifyDs prog sopts dsIn = ans where
     f cont (EError s t) = (EError s `fmap` dosub t) >>= done cont
     f cont ec@ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d} = do
         addNames (map tvrIdent $ caseBinds ec)
-        e' <- f (Scrutinee (not $ null as)) e
+--        e' <- f (Scrutinee (not $ null as)) e
+        e' <- f StartContext e
         ec' <- doCaseCont cont e' (eCaseType ec) b as d
         done StartContext ec'
     f cont ELetRec { eDefs = [], eBody = e } = f cont e
@@ -550,22 +555,12 @@ simplifyDs prog sopts dsIn = ans where
                 mticks  (length ds'' - length ds') (toAtom $ "E.Simplify.let-coalesce")
                 return $ eLetRec ds'' e''
         done StartContext res
-    f cont e = dosub e >>= done cont
---    f cont e | isApplyTo cont = els
---             | otherwise = tryEta
---            where
---            els = do
---                x' <- dosub e
---                done cont x'
---            tryEta = do
---                eed <- etaExpandDef (so_dataTable sopts) 0 tvr { tvrIdent = 0 } e
---                case eed of
---                    Just (_,e) -> f cont e
---                    Nothing -> els
+    f cont e = trace ("Fall through: " ++ show (cont,e)) $ dosub e >>= done cont
 
     showName t | isValidAtom t || dump FD.EVerbose = tvrShowName (tVr t Unknown)
              | otherwise = "(epheremal)"
 
+    -- Rename a if necessary. We always have to substitute all occurrences because we update the type.
     nname tvr@(TVr { tvrIdent = n, tvrType =  t})  = do
         t' <- dosub t
         inb <- ask
@@ -784,11 +779,11 @@ simplifyDs prog sopts dsIn = ans where
         z (ApplyTo r cont') rs = evalRange r >>= \a -> z cont' (a:rs)
         z (Coerce t cont) rs = do
             t' <- evalRange t
-            z <- h e (reverse rs)
+            z <- hFunc e (reverse rs)
             done cont (prim_unsafeCoerce z t')
-        z _ rs = h e (reverse rs)
-    h :: OutE -> [OutE] -> SM OutE
-    h (EVar v) xs' = do
+        z _ rs = hFunc e (reverse rs)
+    hFunc :: OutE -> [OutE] -> SM OutE
+    hFunc (EVar v) xs' = do
         inb <- ask
         z <- applyRule v xs'
         let txs = map tx xs' where
@@ -826,8 +821,9 @@ simplifyDs prog sopts dsIn = ans where
                 Nothing  -> appVar v xs'
                 -- Nothing | tvrIdent v `Set.member` exports -> app (EVar v,xs')
                 -- Nothing -> error $ "Var not in scope: " ++ show v
-    h e xs' = do app (e,xs')
+    hFunc e xs' = do app (e,xs')
     didInline ::OutE -> [OutE] -> SM OutE
+    didInline z zs = return (foldl EAp z zs)
     didInline z zs = do
         used <- smUsedNames
         let (ne,nn) = runRename used (foldl EAp z zs)
@@ -848,16 +844,6 @@ simplifyDs prog sopts dsIn = ans where
     app' (ELit LitCons { litName = n, litArgs = es, litAliasFor = Just af }) bs@(_:_) = do
         mtick (toAtom $ "E.Simplify.newtype-reduce.{" ++ show n ++ "}" )
         app' (foldl eAp af (es ++ bs)) []
---    app' ec@ECase {} xs = do
---        mticks (length xs) (toAtom "E.Simplify.case-application")
---        let f e = app' e xs
---        ec' <- caseBodiesMapM f ec
---        let t = foldl eAp (eCaseType ec') xs
---        return $ caseUpdate ec' { eCaseType = t }
---    app' ELetRec { eDefs = ds, eBody = e } xs = do
---        mticks (length xs) (toAtom "E.Simplify.let-application")
---        e' <- app' e xs
---        return $ eLetRec ds e'
     app' (EError s t) xs = do
         mticks (length xs) (toAtom "E.Simplify.error-application")
         return $ EError s (foldl eAp t xs)
@@ -1016,13 +1002,14 @@ stat_unsafeCoerce = toAtom "E.Simplify.unsafeCoerce"
 
 data SmState = SmState {
     idsUsed :: !IdSet,
-    idsBound :: !IdSet
+    idsBound :: !IdSet,
+    smStdGen :: !StdGen
     }
 
-smState = SmState { idsUsed = mempty, idsBound = mempty }
+smState = SmState { idsUsed = mempty, idsBound = mempty, smStdGen = mkStdGen 42 }
 
 newtype SM a = SM (RWS Env Stats.Stat SmState a)
-    deriving(Monad,Functor,MonadReader Env)
+    deriving(Monad,Functor,MonadReader Env, MonadState SmState)
 
 localEnv f (SM action) = SM $ local (cacheSubst . f) action
 
@@ -1035,7 +1022,7 @@ instance MonadStats SM where
    mticks' n k = SM $ tell (Stats.singleStat n k) >> return ()
 
 modifyIds fn = SM $ modify f where
-    f s@SmState { idsUsed = used, idsBound = bound } = case fn (used,bound) of (used',bound') -> s { idsUsed = used', idsBound = bound' }
+    f s@SmState { idsUsed = used, idsBound = bound, smStdGen=gen } = case fn (used,bound) of (used',bound') -> s { idsUsed = used', idsBound = bound', smStdGen = gen }
 getIds = SM $ liftM f get where
     f s@SmState { idsUsed = used, idsBound = bound } = (used,bound)
 putIds x = SM $ modify (f x) where
@@ -1043,10 +1030,12 @@ putIds x = SM $ modify (f x) where
 
 instance NameMonad Id SM where
     addNames ns = do
-        modifyIds (\ (used,bound) -> (fromList ns `union` used, bound) )
+        modifyIds (\ (used,bound) -> -- trace ("AddNames: " ++ show (size used,size bound)) $
+                   (fromList ns `union` used, bound) )
     addBoundNames ns = do
         let nset = fromList ns
-        modifyIds (\ (used,bound) -> (nset `union` used, nset `union` bound) )
+        modifyIds (\ (used,bound) -> --trace ("AddBoundNames: " ++ show (size used, size bound))
+                   (nset `union` used, nset `union` bound) )
     uniqueName n = do
         (used,bound) <- getIds
         if n `member` bound then newName else putIds (insert n used,insert n bound) >> return n
@@ -1063,16 +1052,22 @@ instance NameMonad Id SM where
         (used,bound) <- getIds
         let genNames i = [st, st + 2 ..]  where
                 st = abs i + 2 + abs i `mod` 2
-        newNameFrom  (genNames (size used + size bound))
-
+--        trace ("newName: "++ show (size used, size bound)) $ return ()
+        --newNameFrom  (genNames (size used + size bound))
+        sm <- get
+        let (g1,g2) = split (smStdGen sm)
+        put sm{smStdGen = g1}
+        newNameFrom (filter even $ randoms g2)
 
 smUsedNames = SM $ gets idsUsed
 smBoundNames = SM $ gets idsBound
 
 
 
-smAddNamesIdSet nset = do modifyIds (\ (used,bound) -> (nset `union` used, bound) )
-smAddBoundNamesIdSet nset = do modifyIds (\ (used,bound) -> (nset `union` used, nset `union` bound) )
+smAddNamesIdSet nset = --trace ("addNamesIdSet: "++ show (size nset)) $
+   do modifyIds (\ (used,bound) -> (nset `union` used, bound) )
+smAddBoundNamesIdSet nset = --trace ("addBoundNamesIdSet: "++show (size nset)) $
+   do modifyIds (\ (used,bound) -> (nset `union` used, nset `union` bound) )
 
 smAddBoundNamesIdMap = smAddNamesIdSet . idMapToIdSet
 
