@@ -86,7 +86,9 @@ fetchQtArgs sl _ = warn sl "invalid-decl" "invalid head in class or instance dec
 
 checkDeriving _ _ xs | all (`elem` derivableClasses) xs = return ()
 checkDeriving sl True _ = warn sl "h98-newtypederiv" "arbitrary newtype derivations are a non-haskell98 feature"
-checkDeriving sl False _ = warn sl "unknown-deriving" "attempt to derive from a non-derivable class"
+checkDeriving sl False xs
+  = let nonDerivable = filter (`notElem` derivableClasses) xs
+    in warn sl "unknown-deriving" ("attempt to derive from a non-derivable class: " ++ unwords (map show nonDerivable))
 
 
 fromHsTypeApp t = f t [] where
