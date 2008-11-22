@@ -295,7 +295,7 @@ processDecls cho ho' tiData = do
     -- simplify
     -- floating inward
 
-    let sopt = SS.cacheSimpOpts mempty {
+    let sopt = SS.cacheSimpOpts SS.emptySimplifyOpts {
             SS.so_boundVars = choCombinators cho,
             SS.so_forwardVars = progSeasoning prog
             }
@@ -375,7 +375,7 @@ processDecls cho ho' tiData = do
         liftIO $ when coreMini $ putErrLn ("----\n" ++ names)
         smap <- get
         let tparms = transformParms { transformPass = "OptWW", transformDumpProgress = coreMini }
-            sopt = SS.cacheSimpOpts mempty {
+            sopt = SS.cacheSimpOpts SS.emptySimplifyOpts {
                 SS.so_boundVars = smap,
                 SS.so_forwardVars = progSeasoning mprog
                 }
@@ -562,7 +562,7 @@ compileModEnv cho = do
     prog <- barendregtProg prog
 
 
-    prog <- simplifyProgram mempty "Main-One" verbose prog
+    prog <- simplifyProgram SS.emptySimplifyOpts "Main-One" verbose prog
     prog <- barendregtProg prog
 
 
@@ -572,7 +572,7 @@ compileModEnv cho = do
 
 
     prog <- barendregtProg prog
-    prog <- simplifyProgram mempty "Main-Two" verbose prog
+    prog <- simplifyProgram SS.emptySimplifyOpts "Main-Two" verbose prog
     prog <- barendregtProg prog
 
 
@@ -582,7 +582,7 @@ compileModEnv cho = do
     prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ modifyProperties (flip (foldr S.delete) [prop_HASRULE,prop_WORKER]) nfo) letann (\_ -> return) prog
     --prog <- transformProgram "float inward" DontIterate True programFloatInward prog
 
-    prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify no rules" verbose prog
+    prog <- simplifyProgram SS.emptySimplifyOpts { SS.so_finalPhase = True } "SuperSimplify no rules" verbose prog
     prog <- barendregtProg prog
 
 
@@ -601,7 +601,7 @@ compileModEnv cho = do
     prog <- Demand.analyzeProgram prog
     prog <- return $ E.CPR.cprAnalyzeProgram prog
     prog <- transformProgram transformParms { transformCategory = "Boxy WorkWrap", transformDumpProgress = dump FD.Progress, transformOperation = evaluate . workWrapProgram } prog
-    prog <- simplifyProgram mempty { SS.so_finalPhase = True } "SuperSimplify after Boxy WorkWrap" verbose prog
+    prog <- simplifyProgram SS.emptySimplifyOpts { SS.so_finalPhase = True } "SuperSimplify after Boxy WorkWrap" verbose prog
     prog <- barendregtProg prog
     prog <- return $ runIdentity $ programMapBodies (return . cleanupE) prog
 

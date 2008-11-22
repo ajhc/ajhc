@@ -6,7 +6,8 @@ module E.SSimplify(
     programPruneOccurance,
     programSSimplify,
     programSSimplifyPStat,
-    SimplifyOpts(..)
+    SimplifyOpts(..),
+    emptySimplifyOpts
     ) where
 
 import Util.RWS
@@ -292,7 +293,14 @@ data SimplifyOpts = SimpOpts {
     so_boundVarsCache :: IdSet,
     so_cachedScope :: Env
     }
-    {-! derive: Monoid !-}
+    {- derive: Monoid -}
+
+emptySimplifyOpts = SimpOpts { so_noInlining  = False
+                             , so_finalPhase  = False
+                             , so_boundVars   = mempty
+                             , so_forwardVars = mempty
+                             , so_boundVarsCache = mempty
+                             , so_cachedScope = mempty }
 
 cacheSimpOpts opts = opts {
     so_boundVarsCache = idMapToIdSet (so_boundVars opts),
