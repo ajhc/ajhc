@@ -1065,7 +1065,7 @@ instance NameMonad Id SM where
         sm <- get
         let (g1,g2) = split (smStdGen sm)
         put sm{smStdGen = g1}
-        newNameFrom (filter even $ randoms g2)
+        newNameFrom (filter (>0) $ filter even $ randoms g2)
 
 smUsedNames = SM $ gets idsUsed
 smBoundNames = SM $ gets idsBound
