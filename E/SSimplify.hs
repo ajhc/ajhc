@@ -331,7 +331,6 @@ data Binding =
         }
     | NotKnown
     deriving(Ord,Eq)
-    {-! derive: is !-}
 
 isBoundTo o e = IsBoundTo {
     bindingOccurance = useOccurance o,
