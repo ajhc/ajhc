@@ -641,7 +641,15 @@ simplifyDs prog sopts dsIn = ans where
             doCase e t b (a@(Alt LitCons { litName = n } _):_) (Just d) | Just _ <- fromUnboxedNameTuple n = do
                 mtick "E.Simplify.case-unboxed-no-default"
                 doCase e t b [a] Nothing
-            doCase e t b as (Just d) | te /= tWorld__, (ELit LitCons { litName = cn }) <- followAliases dt te, Just Constructor { conChildren = DataNormal cs } <- getConstructor cn dt, length as == length cs - 1 || (False && length as < length cs && isAtomic d)  = do
+{-
+  Remove the default case if possible.
+  case lst of [] -> True; _ -> False
+  ==>
+  case lst of [] -> True; (:) _ _ -> False
+-}
+            doCase e t b as (Just d) | te /= tWorld__, (ELit LitCons { litName = cn }) <- followAliases dt te
+                                     , Just Constructor { conChildren = DataNormal cs } <- getConstructor cn dt
+                                     , length as == length cs - 1 || (False && length as < length cs && isAtomic d)  = do
                 let ns = [ n | Alt ~LitCons { litName = n } _ <- as ]
                     ls = filter (`notElem` ns) cs
                     ff n = do
