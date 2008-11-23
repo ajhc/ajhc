@@ -59,4 +59,5 @@ Exposed-Modules: Control.Exception,
                  System.Time,
                  System
                  Text.Show.Functions
+                 Text.Printf
 
