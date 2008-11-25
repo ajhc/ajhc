@@ -182,7 +182,7 @@ executeStatement stmt = do
     procErrors $ do
     --printStatement stmt'
     stmt'' <- expandTypeSynsStmt (hoTypeSynonyms hoB) (stateModule is) stmt'
-    stmt''' <- FrontEnd.Infix.infixStatement (hoFixities hoB) stmt''
+    stmt''' <- return $ FrontEnd.Infix.infixStatement (hoFixities hoB) stmt''
     procErrors $ do
     printStatement stmt'''
     tcStatementTc stmt'''

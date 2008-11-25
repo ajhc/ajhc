@@ -68,13 +68,13 @@ terminalFixity = (10, HsAssocLeft)
 
   -- infixer(): The exported top-level function. See header for usage.
 
-infixHsModule :: Monad m => FixityMap -> HsModule -> m HsModule
-infixHsModule (FixityMap ism) m = return $ hsModuleDecls_u f m where
+infixHsModule :: FixityMap -> HsModule -> HsModule
+infixHsModule (FixityMap ism) m = hsModuleDecls_u f m where
     f = map (processDecl ism)
     --ism = buildSMap is
 
-infixStatement :: Monad m => FixityMap -> HsStmt -> m HsStmt
-infixStatement (FixityMap ism) m = return $ processStmt ism m
+infixStatement :: FixityMap -> HsStmt -> HsStmt
+infixStatement (FixityMap ism) m = processStmt ism m
 
 
 

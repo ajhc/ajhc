@@ -463,12 +463,12 @@ classMethodAssumps hierarchy = concatMap classAssumps $ classRecords hierarchy
 
 --------------------------------------------------------------------------------
 
-scatterAliasInstances :: MonadIO m => ClassHierarchy -> m ClassHierarchy
-scatterAliasInstances ch = do
+scatterAliasInstances :: ClassHierarchy -> ClassHierarchy
+scatterAliasInstances ch =
     let cas = [cr | cr@(ClassAliasRecord {}) <- classRecords ch]
     --ch `seq` liftIO $ putStrLn ("scatterAliasInstances: " ++ show cas)
-    let instances = concatMap scatterInstancesOf cas
-    let ret = foldr (modifyClassRecord $ \cr -> cr 
+        instances = concatMap scatterInstancesOf cas
+        ret = foldr (modifyClassRecord $ \cr -> cr 
                      { classInsts = [],
                        classMethodMap = Map.fromList [(meth, cls) | cls <- classClasses cr,
                                                                     (meth,_) <- classAssumps (findClassRecord ch cls)]
@@ -476,7 +476,7 @@ scatterAliasInstances ch = do
                     (ch `mappend` classHierarchyFromRecords instances)
                     (map className cas)
     -- liftIO $ mapM_ print (classRecords ret)
-    return ret
+    in ret
     
 scatterInstancesOf :: ClassRecord -> [ClassRecord]
 scatterInstancesOf cr = map extract (classClasses cr)
@@ -493,8 +493,8 @@ failSl sl m = fail $ show sl ++ ": " ++ m
 classHierarchyFromRecords rs = ClassHierarchy $ Map.fromListWith combineClassRecords [  (className x,x)| x <- rs ]
 
 -- I love tying el knot.
-makeClassHierarchy :: Monad m => ClassHierarchy -> KindEnv -> [HsDecl] -> m ClassHierarchy
-makeClassHierarchy (ClassHierarchy ch) kt ds = return (ClassHierarchy ans) where
+makeClassHierarchy :: ClassHierarchy -> KindEnv -> [HsDecl] -> ClassHierarchy
+makeClassHierarchy (ClassHierarchy ch) kt ds = (ClassHierarchy ans) where
     ans =  Map.fromListWith combineClassRecords [  (className x,x)| x <- execWriter (mapM_ f ds) ]
     f (HsClassDecl sl t decls)
         | HsTyApp (HsTyCon className) (HsTyVar argName)  <- tbody = do

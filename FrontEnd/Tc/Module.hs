@@ -82,6 +82,7 @@ processModule defs m = do
         putStrLn $ HsPretty.render
             $ HsPretty.ppHsModule
                 $ modInfoHsModule m
+    -- driftDerive only uses IO to print the derived instances.
     zmod' <-  driftDerive (modInfoHsModule m)
     let mod = desugarHsModule (zmod')
     let (mod',errs) = runWriter $ renameModule defs (modInfoImport m)  mod
@@ -99,6 +100,7 @@ processModule defs m = do
 or' :: [(a -> Bool)] -> a -> Bool
 or' fs x = or [ f x | f <- fs ]
 
+-- FIXME: Use an warnings+writer+error monad instead of IO.
 tiModules' ::  CollectedHo -> [ModInfo] -> IO (Ho,TiData)
 tiModules' cho ms = do
     let me = choHo cho
@@ -110,12 +112,14 @@ tiModules' cho ms = do
     wdump FD.Progress $ do
         putErrLn $ "Typing: " ++ show ([ m | Module m <- map modInfoName ms])
     let fieldMap = buildFieldMap me ms
+    -- 'processModule' doesn't need IO. We can use a plain writer+error monad.
     ms <- mapM (processModule fieldMap) ms
     let thisFixityMap = buildFixityMap (concat [ filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
     let fixityMap = thisFixityMap  `mappend` hoFixities hoB
     let thisTypeSynonyms =  (declsToTypeSynonyms $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
     let ts = thisTypeSynonyms `mappend` hoTypeSynonyms hoB
-    let f x = expandTypeSyns ts (modInfoHsModule x) >>= FrontEnd.Infix.infixHsModule fixityMap >>= \z -> return (modInfoHsModule_s ( z) x)
+    -- 'expandTypeSyns' is in the Warning monad and doesn't require IO.
+    let f x = expandTypeSyns ts (modInfoHsModule x) >>= return . FrontEnd.Infix.infixHsModule fixityMap >>= \z -> return (modInfoHsModule_s ( z) x)
     ms <- mapM f ms
     processIOErrors
     let ds = concat [ hsModuleDecls $ modInfoHsModule m | m <- ms ]
@@ -148,8 +152,8 @@ tiModules' cho ms = do
     --let globalDConsEnv = localDConsEnv `Map.union` importDConsEnv
 
 
-    smallClassHierarchy <- makeClassHierarchy importClassHierarchy kindInfo ds
-    cHierarchyWithInstances <- scatterAliasInstances $ smallClassHierarchy `mappend` importClassHierarchy
+    let smallClassHierarchy = makeClassHierarchy importClassHierarchy kindInfo ds
+    let cHierarchyWithInstances = scatterAliasInstances $ smallClassHierarchy `mappend` importClassHierarchy
 
     when (dump FD.ClassSummary) $ do
         putStrLn "  ---- class summary ---- "
