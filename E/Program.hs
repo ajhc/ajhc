@@ -42,7 +42,7 @@ data Program = Program {
     progFreeIds        :: IdSet,       -- ^ filled in by occurance info collection
     progSeasoning      :: IdSet,       -- ^ these ids are depended on by external names via RULES
     progType           :: ProgramType,
-    progCombMap        :: IdMap Comb,
+    progCombMap        :: IdMap Comb,  -- progCombMap is always (fromList . progCombinators)
     progStats          :: !Stats.Stat
     }
 
