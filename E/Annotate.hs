@@ -87,8 +87,8 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         case mlookup i mp of
           Just (Just v) -> return v
           _  -> return eo
-    f (ELam tvr e) = lp LambdaBound ELam tvr e
-    f (EPi tvr e) = lp PiBound EPi tvr e
+    f (ELam tvr e) = lp ELam tvr e
+    f (EPi tvr e) = lp EPi tvr e
     f (EAp a b) = liftM2 EAp (f a) (f b)
     f (EError x e) = liftM (EError x) (f e)
     f (EPrim x es e) = liftM2 (EPrim x) (mapM f es) (f e)
@@ -121,13 +121,13 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         alts <- local r (mapM da $ eCaseAlts ec)
         t' <- f (eCaseType ec)
         return $ caseUpdate ECase { eCaseAllFV = error "no eCaseAllFV needed",  eCaseScrutinee = e', eCaseType = t', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts }
-    lp bnd lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == emptyId  = do
+    lp bnd lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == 0  = do
         t' <- f t
         nfo <- lift $ lamann e (tvrInfo tvr)
         nfo <- lift $ idann n nfo
         e' <- local (minsert n Nothing) $ f e
         return $ lam (tvr { tvrIdent = emptyId, tvrType =  t', tvrInfo =  nfo}) e'
-    lp bnd lam tvr e = do
+    lp lam tvr e = do
         nfo <- lift $ lamann e (tvrInfo tvr)
         (tv,r) <- ntvr  [] tvr { tvrInfo = nfo }
         e' <- local r $ f e

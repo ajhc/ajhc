@@ -16,8 +16,8 @@ data Arity = Arity Int Bool
     deriving(Typeable,Show,Ord,Eq)
 
 -- | how the variable is bound
-data BindType = CaseDefault | CasePattern | LetBound | LambdaBound | PiBound
-    deriving(Show,Ord,Eq)
+--data BindType = CaseDefault | CasePattern | LetBound | LambdaBound | PiBound
+--    deriving(Show,Ord,Eq)
 
 instance Show Properties where
     showsPrec _ props = shows (toList props)
