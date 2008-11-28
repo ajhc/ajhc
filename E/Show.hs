@@ -50,6 +50,10 @@ instance PPrint Doc E where
 instance PPrint String E where
     pprint x = prettyE x
 
+instance PPrint String e => PPrint String (Maybe e) where
+    pprint Nothing = "Nothing"
+    pprint (Just e) = pprint e
+
 instance PPrint String (Lit E E) where
     pprintPrec n x | n <= 9    = prettyE (ELit x)
                    | otherwise = parens (prettyE (ELit x))
