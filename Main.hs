@@ -322,9 +322,11 @@ processDecls cho ho' tiData = do
         mprog <- barendregtProg mprog
 
         -- | this catches more static arguments if we wait until after the initial normalizing simplification pass
-        mprog <- transformProgram tparms { transformSkipNoStats = True, transformCategory = "SimpleRecursive", transformOperation = return . staticArgumentTransform } mprog
+        mprog <- transformProgram tparms { transformSkipNoStats = True, transformCategory = "SimpleRecursive"
+                                         , transformOperation = return . staticArgumentTransform } mprog
 
-        mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformPass = "PreInit", transformOperation = typeAnalyze True } mprog
+        mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformPass = "PreInit"
+                                         , transformOperation = typeAnalyze True } mprog
 
         mprog <- transformProgram tparms { transformCategory = "FloatOutward", transformOperation = floatOutward } mprog
         -- perform another supersimplify in order to substitute the once used
@@ -446,13 +448,16 @@ programPruneUnreachable prog = progCombinators_s ds' prog where
     ds' = reachable (newGraph (progCombinators prog) combIdent freeVars) (toList $ progEntry prog)
 
 programPrune :: Program -> IO Program
-programPrune prog = transformProgram transformParms { transformCategory = "PruneUnreachable", transformDumpProgress  = miniCorePass, transformOperation = evaluate . programPruneUnreachable } prog
+programPrune prog = transformProgram transformParms { transformCategory = "PruneUnreachable"
+                                                    , transformDumpProgress  = miniCorePass
+                                                    , transformOperation = evaluate . programPruneUnreachable } prog
 
 etaExpandProg :: String -> Program -> IO Program
 etaExpandProg pass prog = do
     let f prog = prog' { progStats = progStats prog `mappend` stats } where
         (prog',stats) = Stats.runStatM $  etaExpandProgram prog
-    transformProgram transformParms { transformPass = pass, transformCategory = "EtaExpansion", transformDumpProgress = miniCorePass,  transformOperation = evaluate . f } prog
+    transformProgram transformParms { transformPass = pass, transformCategory = "EtaExpansion"
+                                    , transformDumpProgress = miniCorePass,  transformOperation = evaluate . f } prog
 
 
 getExports ho =  Set.fromList $ map toId $ concat $  Map.elems (hoExports ho)
@@ -774,7 +779,9 @@ compileGrinToC grin = do
                   | otherwise = []
         profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE=1"]
                   | otherwise = []
-        comm = shellQuote $ [optCC options, "-std=gnu99", "-D_GNU_SOURCE", "-falign-functions=4", "-ffast-math", "-Wshadow", "-Wextra", "-Wall", "-Wno-unused-parameter", "-o", fn, cf ] ++ (map ("-l" ++) rls) ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
+        comm = shellQuote $ [optCC options, "-std=gnu99", "-D_GNU_SOURCE", "-falign-functions=4", "-ffast-math"
+                            , "-Wshadow", "-Wextra", "-Wall", "-Wno-unused-parameter", "-o", fn, cf ] ++
+                            (map ("-l" ++) rls) ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
         debug = if fopts FO.Debug then ["-g"] else ["-DNDEBUG", "-O3", "-fomit-frame-pointer"]
         globalvar n c = "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" sversion,"",cg]
@@ -805,7 +812,11 @@ simplifyProgram sopt name dodump prog = liftIO $ do
                 putStrLn "-- After Occurance Analysis"
                 printProgram nprog
             return $ SS.programSSimplify sopt  nprog
-    prog <- transformProgram transformParms { transformCategory = "Simplify", transformPass = name, transformIterate = IterateDone, transformDumpProgress = dodump, transformOperation = g } prog { progStats = mempty }
+    prog <- transformProgram transformParms { transformCategory = "Simplify"
+                                            , transformPass = name
+                                            , transformIterate = IterateDone
+                                            , transformDumpProgress = dodump
+                                            , transformOperation = g } prog { progStats = mempty }
     when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printLStat (optStatLevel options) ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
@@ -820,7 +831,11 @@ simplifyProgramPStat sopt name dodump prog = do
 simplifyProgram' sopt name dodump iterate prog = do
     let istat = progStats prog
     let g =  return . SS.programSSimplify sopt . SS.programPruneOccurance
-    prog <- transformProgram transformParms { transformCategory = "Simplify", transformPass = name, transformIterate = iterate, transformDumpProgress = dodump, transformOperation = g } prog { progStats = mempty }
+    prog <- transformProgram transformParms { transformCategory = "Simplify"
+                                            , transformPass = name
+                                            , transformIterate = iterate
+                                            , transformDumpProgress = dodump
+                                            , transformOperation = g } prog { progStats = mempty }
     when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printLStat (optStatLevel options) ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
