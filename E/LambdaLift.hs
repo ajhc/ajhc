@@ -30,6 +30,7 @@ import Util.Graph as G
 import Util.HasSize
 import Util.SetLike
 import Util.UniqueMonad
+import Options (verbose)
 
 annotateId mn x = case fromId x of
     Just y -> toId (toName Val (mn,'f':show y))
@@ -146,10 +147,10 @@ calculateLiftees prog = do
         f _ _ EAp {} = error "this should not happen"
     mapM_ (f (value False) mempty) [ fst (fromLam e) | (_,e) <- programDs prog]
 
-    calcFixpoint "Liftees" fixer
+    findFixpoint Nothing {-"Liftees"-} fixer
     vs <- supplyReadValues sup
     let nlset =  (fromList [ x | (x,False) <- vs])
-    printf "%d lambdas not lifted\n" (size nlset)
+    when verbose $ printf "%d lambdas not lifted\n" (size nlset)
     return nlset
 
 implies :: Value Bool -> Value Bool -> IO ()

@@ -202,7 +202,7 @@ compile prog@Program { progDataTable = dataTable } = do
     let tvrAtom t  = liftM convertName (fromId $ tvrIdent t)
     let ef x = do n <- tvrAtom x
                   return (n, [] :-> discardResult (App (scTag x) [] []))
-        ep x = do putStrLn ("EP FOR "++show x)
+        ep x = do when verbose $ putStrLn ("EP FOR "++show x)
                   n <- tvrAtom x
                   case Info.lookup (tvrInfo x) of
                     Just l -> return [(n, l)]

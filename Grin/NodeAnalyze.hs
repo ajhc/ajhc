@@ -118,7 +118,7 @@ nodeAnalyze grin' = do
     --putStrLn "----------------------------"
     --print cs
     --putStrLn "----------------------------"
-    putStrLn "-- NodeAnayze"
+    -- putStrLn "-- NodeAnalyze"
     (rm,res) <- solve (const (return ())) cs
     --(rm,res) <- solve putStrLn cs
     let cmap = Map.map (fromJust . flip Map.lookup res) rm

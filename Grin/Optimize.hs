@@ -14,7 +14,7 @@ import Support.CanType
 import Support.FreeVars
 import Util.Graph
 import Util.SetLike
-
+import Options (verbose)
 
 data PExp = PExp {
     pexpUniq :: Int,
@@ -169,10 +169,10 @@ grinPush stats (l :-> e) = ans where
 grinSpeculate :: Grin -> IO Grin
 grinSpeculate grin = do
     let ss = findSpeculatable grin
-    putStrLn "Speculatable:"
-    mapM_ Prelude.print ss
+    when verbose $ putStrLn "Speculatable:"
+    when verbose $ mapM_ Prelude.print ss
     let (grin',stats) = runStatM (performSpeculate ss grin)
-    Stats.printStat "Speculate" stats
+    when verbose $ Stats.printStat "Speculate" stats
     return grin'
 
 

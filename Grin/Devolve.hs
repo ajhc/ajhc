@@ -11,9 +11,10 @@ import Support.Transform
 import Grin.Grin
 import Grin.Noodle
 import Support.FreeVars
+import Options (verbose)
 
 devolveTransform = transformParms {
-    transformDumpProgress = True,
+    transformDumpProgress = verbose,
     transformCategory = "Devolve",
     transformPass = "Grin",
     transformOperation = devolveGrin

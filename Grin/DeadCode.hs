@@ -41,7 +41,7 @@ deadCode stats roots grin = do
 
 
     mapM_ (go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline) (grinFuncs grin)
-    calcFixpoint "Dead Code" fixer
+    findFixpoint Nothing {-"Dead Code"-} fixer
     ua <- supplyReadValues usedArgs
     uc <- supplyReadValues usedCafs
     uf <- supplyReadValues usedFuncs

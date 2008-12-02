@@ -531,11 +531,11 @@ compileModEnv cho = do
 
     --wdump FD.Core $ printProgram prog
     prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze False prog else return prog
-    putStrLn "Type analyzed methods"
-    flip mapM_ (programDs prog) $ \ (t,e) -> do
-        let (_,ts) = fromLam e
-            ts' = takeWhile (sortKindLike . getType) ts
-        when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
+    when (verbose) $ do putStrLn "Type analyzed methods"
+                        flip mapM_ (programDs prog) $ \ (t,e) -> do
+                        let (_,ts) = fromLam e
+                            ts' = takeWhile (sortKindLike . getType) ts
+                        when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
     lintCheckProgram onerrNone prog
     prog <- programPrune prog
     --wdump FD.Core $ printProgram prog
@@ -563,7 +563,7 @@ compileModEnv cho = do
         exitSuccess
 
 
-    prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterMethod", transformDumpProgress = True } prog
+    prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterMethod", transformDumpProgress = verbose } prog
     prog <- barendregtProg prog
 
 
@@ -694,7 +694,7 @@ compileToGrin prog = do
     prog <- return $ atomizeApps True prog
     wdump FD.CoreMangled $ printProgram prog
     x <- Grin.FromE.compile prog
-    Stats.print "Grin" Stats.theStats
+    when verbose $ Stats.print "Grin" Stats.theStats
     wdump FD.GrinInitial $ do dumpGrin "initial" x
     --x <- return $ normalizeGrin x
     x <- transformGrin simplifyParms x
