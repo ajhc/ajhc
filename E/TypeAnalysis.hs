@@ -60,11 +60,6 @@ typeAnalyze doSpecialize prog = do
     let lambind _ nfo = do
             x <- newValue fixer ( bottom :: Typ)
             return $ Info.insert x (Info.delete (undefined :: Typ) nfo)
-        lamread _ nfo | Just v <- Info.lookup nfo = do
-            rv <- readValue v
-            return (Info.insert (rv :: Typ) $ Info.delete (undefined :: Value Typ) nfo)
-        lamread _ nfo = return nfo
-        lamdel _ nfo = return (Info.delete (undefined :: Value Typ) nfo)
     prog <- annotateProgram mempty lambind (\_ -> return . deleteArity) (\_ -> return) prog
     let ds = programDs prog
         env = Env { envRuleSupply = ur, envValSupply = uv, envEnv = extractValMap ds }
@@ -75,10 +70,15 @@ typeAnalyze doSpecialize prog = do
         addRule $ assert vv
     mapM_ (sillyEntry env) entries
     findFixpoint Nothing fixer
+    let lamread _ nfo | Just v <- Info.lookup nfo = do
+            rv <- readValue v
+            return (Info.insert (rv :: Typ) $ Info.delete (undefined :: Value Typ) nfo)
+        lamread _ nfo = return nfo
     prog <- annotateProgram mempty lamread (\_ -> return) (\_ -> return) prog
     unusedRules <- supplyReadValues ur >>= return . fsts . filter (not . snd)
     unusedValues <- supplyReadValues uv >>= return . fsts . filter (not . snd)
     let (prog',stats) = Stats.runStatM $ specializeProgram doSpecialize (fromList unusedRules) (fromList unusedValues) prog
+    let lamdel _ nfo = return (Info.delete (undefined :: Value Typ) nfo)
     prog <- annotateProgram mempty lamdel (\_ -> return) (\_ -> return) prog'
     return prog { progStats = progStats prog `mappend` stats }
 
