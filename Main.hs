@@ -88,7 +88,7 @@ progress str = wdump FD.Progress $  (putErrLn str) >> hFlush stderr
 progressM c  = wdump FD.Progress $ (c >>= putErrLn) >> hFlush stderr
 
 
-collectPassStats = True
+collectPassStats = verbose
 
 bracketHtml action = do
     (argstring,_) <- getArgString
