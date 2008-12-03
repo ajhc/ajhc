@@ -18,7 +18,6 @@
 {
 module FrontEnd.HsParser (parse, parseHsStmt) where
 
-import C.FFI
 import FrontEnd.HsSyn
 import FrontEnd.ParseMonad
 import FrontEnd.Lexer
@@ -149,8 +148,10 @@ module :: { HsModule }
       | srcloc PRAGMAOPTIONS module     { $3 { hsModuleSrcLoc = $1, hsModuleOptions = hsModuleOptions $3 ++ $2 } }
 
 modulep  :: { HsModule }
-      : 'module' modid maybeexports 'where' body      { HsModule { hsModuleName = $2, hsModuleExports = $3, hsModuleImports = (fst $5), hsModuleDecls = (snd $5) } }
-      | body                                          { HsModule { hsModuleName = main_mod, hsModuleExports = Just [HsEVar (UnQual (HsIdent "main"))], hsModuleImports = (fst $1), hsModuleDecls = (snd $1) } }
+      : 'module' modid maybeexports 'where' body      { HsModule { hsModuleName = $2, hsModuleExports = $3, hsModuleImports = (fst $5), hsModuleDecls = (snd $5)
+                                                                 , hsModuleSrcLoc = error "hsModuleSrcLoc not set", hsModuleOptions = error "hsModuleOptions not set" } }
+      | body                                          { HsModule { hsModuleName = main_mod, hsModuleExports = Just [HsEVar (UnQual (HsIdent "main"))], hsModuleImports = (fst $1), hsModuleDecls = (snd $1)
+                                                                 , hsModuleSrcLoc = error "hsModuleSrcLoc not set", hsModuleOptions = error "hsModuleOptions not set" } }
 
 body :: { ([HsImportDecl],[HsDecl]) }
       :  '{' bodyaux '}'                              { $2 }
@@ -320,13 +321,15 @@ topdecl :: { HsDecl }
       | PRAGMARULES rulelist PRAGMAEND
               { HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) (reverse $2) }
       | srcloc PRAGMASPECIALIZE var '::' type PRAGMAEND
-                      { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $3, hsDeclType = $5 } }
+                      { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $3, hsDeclType = $5
+                                           , hsDeclUniq = error "hsDeclUniq not set"  } }
       | decl          { $1 }
 
 
 rule :: { HsRule }
       : srcloc STRING mfreevars exp '=' exp
-         { HsRule { hsRuleSrcLoc = $1, hsRuleString = $2, hsRuleFreeVars = $3, hsRuleLeftExpr = $4, hsRuleRightExpr = $6 } }
+         { HsRule { hsRuleSrcLoc = $1, hsRuleString = $2, hsRuleFreeVars = $3, hsRuleLeftExpr = $4, hsRuleRightExpr = $6
+                  , hsRuleUniq = error "hsRuleUniq not set", hsRuleIsMeta = error "hsRuleIsMeta not set" } }
 
 rules :: { [HsRule] }
       : rules optsemi rule  { $3 : $1 }
