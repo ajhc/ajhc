@@ -255,7 +255,10 @@ specializeProgram :: (Stats.MonadStats m) =>
     -> Program
     -> m Program
 specializeProgram doSpecialize unusedRules unusedValues prog = do
-    (nds,_) <- specializeCombs doSpecialize SpecEnv { senvUnusedRules = unusedRules, senvUnusedVars = unusedValues, senvDataTable = progDataTable prog, senvArgs = mempty } (progCombinators prog)
+    (nds,_) <- specializeCombs doSpecialize SpecEnv { senvUnusedRules = unusedRules
+                                                    , senvUnusedVars = unusedValues
+                                                    , senvDataTable = progDataTable prog
+                                                    , senvArgs = mempty } (progCombinators prog)
     return $ progCombinators_s nds prog
 
 
