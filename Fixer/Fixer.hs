@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts #-}
+{-# LANGUAGE BangPatterns #-}
 -- find fixpoint of constraint problem
 
 {- 2009.01.05: Lemmih
@@ -231,8 +231,7 @@ findFixpoint msh@(~(Just (mstring,_))) Fixer { vars = vars, todo = todo } = lift
     to <- readIORef todo
     if Set.null to then return () else do
     vars <- readIORef vars
-    let f _ tl n | (tl::Int) `seq` n `seq` False = undefined
-        f [] tl n | n > 0, tl /= 0 = do
+    let f [] !tl !n | n > 0, tl /= 0 = do
             vs <- readIORef todo
             writeIORef todo Set.empty
             mputStr "(" >> mputStr (show n) >> mputStr ")" >> mFlush
@@ -261,7 +260,7 @@ findFixpoint msh@(~(Just (mstring,_))) Fixer { vars = vars, todo = todo } = lift
             Just (_,h) -> hFlush h
     mputStr $ "Finding fixpoint for " ++ mstring ++ ": " ++ "[" ++ show (Set.size to) ++ "]"
     mFlush
-    f (Set.toList to) (-1) (0::Int)
+    f (Set.toList to) (-1::Int) (0::Int)
 
 
 
