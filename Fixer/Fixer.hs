@@ -1,6 +1,30 @@
 {-# OPTIONS_GHC -fglasgow-exts #-}
 -- find fixpoint of constraint problem
 
+{- 2009.01.05: Lemmih
+
+This may be obvious to a lot of people but it certainly wasn't obvious to me.
+
+The following module help you solve problems that involve iterating over
+a piece of data until some steady-state (aka. a fixpoint) is found.
+
+One example problem would be dead-code elimination. To remove all dead
+functions and function arguments, we have to mark everything that
+could possibly be alive (we necessarily have to be conservative).
+This is done in two steps:
+1) Walk through the code and make a note of all the dependencies
+   (eg. function 'x' uses function 'y' and function 'z'). The dependencies
+   are then handed over to the fixpoint solver.
+2) The fixpoint solver iterate over all the data and use the dependencies
+   to propagate the usage information. That is, if 'x' is used then 'y' and 'z'
+   are as well. The next iteration will deal with the dependencies of 'y' and 'z'.
+
+Once there's no more usage information to propagate, we know we've found our fixpoint.
+There are several other problems that require fixpoint iteration. Perhaps the most
+distinguished is the heap points-to analysis we use to eliminate eval/apply calls.
+
+-}
+
 module Fixer.Fixer(
     Fixable(..),
     Value(),
