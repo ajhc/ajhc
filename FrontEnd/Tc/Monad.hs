@@ -271,7 +271,7 @@ class Instantiate a where
     inst:: Map.Map Int Type -> Map.Map Atom Type -> a -> a
 
 instance Instantiate Type where
-    inst mm ts (TAp l r)     = TAp (inst mm ts l) (inst mm ts r)
+    inst mm ts (TAp l r)     = tAp (inst mm ts l) (inst mm ts r)
     inst mm ts (TArrow l r)  = TArrow (inst mm ts l) (inst mm ts r)
     inst mm  _ t@TCon {}     = t
     inst mm ts (TVar tv ) = case Map.lookup (tyvarAtom tv) ts of
@@ -367,7 +367,7 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
             tell [(t,b)]
             return b
         f e@TCon {} _ = return e
-        f (TAp a b) vs = liftM2 TAp (f a vs) (f b vs)
+        f (TAp a b) vs = liftM2 tAp (f a vs) (f b vs)
         f (TArrow a b) vs = liftM2 TArrow (f a vs) (f b vs)
         f (TForAll as (ps :=> t)) vs = do
             t' <- f t (vs List.\\ as)

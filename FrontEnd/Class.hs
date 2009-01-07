@@ -295,7 +295,7 @@ hsInstDeclToInst kt (HsNewTypeDecl _sloc _cntxt tyConName argNames _condecls der
 -- the types will only ever be constructors or vars
 
 convType :: [(HsType, Kind)] -> Type
-convType tsks = foldl1 TAp (map toType tsks)
+convType tsks = foldl1 tAp (map toType tsks)
 
 toType :: (HsType, Kind) -> Type
 toType (HsTyCon n, k) = TCon $ Tycon (toName TypeConstructor n) k

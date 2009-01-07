@@ -263,7 +263,7 @@ instance Tickleable Type Pred where
     tickleM f (IsEq t1 t2) = return IsEq `ap` f t1 `ap` f t2
 
 instance Tickleable Type Type where
-    tickleM f (TAp l r) = return TAp `ap` f l `ap` f r
+    tickleM f (TAp l r) = return tAp `ap` f l `ap` f r
     tickleM f (TArrow l r) = return TArrow `ap` f l `ap` f r
     tickleM f (TAssoc c cas eas) = return (TAssoc c) `ap` mapM f cas `ap` mapM f eas
     tickleM f (TForAll ta (ps :=> t)) = do

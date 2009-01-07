@@ -260,6 +260,12 @@ tiExpr expr@(HsLambda sloc ps e) typ = withContext (locSimple sloc $ "in the lam
             localEnv env $ do
                 s2' <- evalType s2'
                 lamPoly ps e s2' (p':rs)  -- TODO poly
+        lam (p:ps) e t@(TAp (TAp (TMetaVar mv) s1') s2') rs = do
+            boxyMatch (TMetaVar mv) tArrow
+            (p',env) <- tcPat p s1'
+            localEnv env $ do
+                s2' <- evalType s2'
+                lamPoly ps e s2' (p':rs)  -- TODO poly
         lam [] e typ rs = do
             e' <- tcExpr e typ
             return (HsLambda sloc (reverse rs) e')

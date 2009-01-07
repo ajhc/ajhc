@@ -101,7 +101,7 @@ instance Eq Type where
     (TArrow a' a) == (TArrow b' b) = a' == b' && b == a
     _ == _ = False
 
-tassocToAp TAssoc { typeCon = con, typeClassArgs = cas, typeExtraArgs = eas } = foldl TAp (TCon con) (cas ++ eas)
+tassocToAp TAssoc { typeCon = con, typeClassArgs = cas, typeExtraArgs = eas } = foldl tAp (TCon con) (cas ++ eas)
 
 -- Unquantified type variables
 

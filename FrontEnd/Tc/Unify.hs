@@ -166,7 +166,7 @@ boxyMatch s1 s2 = do
     bm a (TMetaVar mv) | (TCon ca,as) <- fromTAp a = do
         printRule $ "CEQ1: " ++ prettyPrintType a
         a <- occursCheck mv a
-        withMetaVars mv (map getType as) (\ ts -> foldl TAp (TCon ca) ts) $ \ ts ->
+        withMetaVars mv (map getType as) (\ ts -> foldl tAp (TCon ca) ts) $ \ ts ->
             sequence_ [ boxyMatch a t | t <- ts | a <- as ]
         return False
 
@@ -174,7 +174,7 @@ boxyMatch s1 s2 = do
         --printRule $ "CEQ1: " ++ pprint a
         let xxs = x:xs
         a <- occursCheck mv a
-        withMetaVars mv (map getType xxs) (\ (t:ts) -> foldl TAp t ts) $ \ ts ->
+        withMetaVars mv (map getType xxs) (\ (t:ts) -> foldl tAp t ts) $ \ ts ->
             sequence_ [ boxyMatch a t | t <- ts | a <- xxs ]
         return False
 

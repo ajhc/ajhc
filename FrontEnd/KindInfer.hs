@@ -460,7 +460,7 @@ aHsTypeToType kt (HsTyFun t1 t2) = aHsTypeToType kt t1 `fn` aHsTypeToType kt t2
 aHsTypeToType kt HsTyExpKind { hsTyType = t } = aHsTypeToType kt t
 aHsTypeToType kt tuple@(HsTyTuple types) = tTTuple $ map (aHsTypeToType kt) types
 aHsTypeToType kt tuple@(HsTyUnboxedTuple types) = tTTuple' $ map (aHsTypeToType kt) types
-aHsTypeToType kt (HsTyApp t1 t2) = TAp (aHsTypeToType kt t1) (aHsTypeToType kt t2)
+aHsTypeToType kt (HsTyApp t1 t2) = tAp (aHsTypeToType kt t1) (aHsTypeToType kt t2)
 
 
 -- variables, we must know the kind of the variable here!

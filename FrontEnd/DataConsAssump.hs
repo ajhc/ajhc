@@ -52,7 +52,7 @@ dataDeclEnv modName kt HsDataDecl { hsDeclContext = context, hsDeclName = typeNa
    where
    typeName' = toName TypeConstructor typeName
    typeKind = kindOf typeName' kt
-   resultType = foldl TAp tycon argVars
+   resultType = foldl tAp tycon argVars
    tycon = TCon (Tycon typeName' typeKind)
    argVars = map fromHsNameToTyVar $ zip argKinds args
    argKinds = init $ unfoldKind typeKind
@@ -66,7 +66,7 @@ dataDeclEnv modName kt (HsNewTypeDecl _sloc context typeName args condecl _)
    where
    typeName' = toName TypeConstructor typeName
    typeKind = kindOf typeName' kt
-   resultType = foldl TAp tycon argVars
+   resultType = foldl tAp tycon argVars
    tycon = TCon (Tycon typeName' typeKind)
    argVars = map fromHsNameToTyVar $ zip argKinds args
    argKinds = init $ unfoldKind typeKind
