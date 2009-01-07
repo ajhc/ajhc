@@ -9,6 +9,7 @@ module FrontEnd.KindInfer (
     KindEnv(),
     hsQualTypeToSigma,
     hsAsstToPred,
+    kiHsQualType,
     kindOfClass,
     kindOf,
     restrictKindEnv,
@@ -175,7 +176,7 @@ zonkConstraint nk mv = do
 constrain KindAny k = return ()
 constrain KindStar        (KBase Star) = return ()
 constrain KindQuest       k@KBase {}  = kindCombine kindFunRet k >> return ()
-constrain KindQuestQuest  (KBase KQuest) = fail "cannot constraint ? to be ??"
+constrain KindQuestQuest  (KBase KQuest) = fail "cannot constrain ? to be ??"
 constrain KindQuestQuest  k@KBase {}  = kindCombine kindArg k >> return ()
 constrain KindSimple (KBase Star) = return ()
 constrain KindSimple (a `Kfun` b) = do
@@ -429,7 +430,7 @@ kiHsQualType inputEnv qualType@(HsQualType ps t) = newState where
 
 kindOf :: Name -> KindEnv -> Kind
 kindOf name KindEnv { kindEnv = env } = case Map.lookup name env of
-            Nothing | nameType name `elem` [TypeConstructor,TypeVal] -> kindStar
+--          Nothing | nameType name `elem` [TypeConstructor,TypeVal] -> kindStar
             Just k -> k
             _ -> error $ "kindOf: could not find kind of : " ++ show (nameType name,name)
 
@@ -492,14 +493,22 @@ hsAsstToPred kt (HsAsst className [varName])
    -- = IsIn className (TVar $ Tyvar varName (kindOf varName kt))
    | isConstructorLike (hsIdentString . hsNameIdent $ varName) = IsIn  (toName ClassName className) (TCon (Tycon (toName TypeConstructor varName) (head $ kindOfClass (toName ClassName className) kt)))
    | otherwise = IsIn (toName ClassName className) (TVar $ tyvar (toName TypeVal varName) (head $ kindOfClass (toName ClassName className) kt))
-hsAsstToPred kt (HsAsstEq t1 t2) = IsEq (runIdentity $ hsTypeToType kt t1) (runIdentity $ hsTypeToType kt t2)
+hsAsstToPred kt (HsAsstEq t1 t2) = IsEq (runIdentity $ hsTypeToType' kt t1) (runIdentity $ hsTypeToType' kt t2)
 
 
 
 hsQualTypeToSigma kt qualType = hsQualTypeToType kt (Just []) qualType
 
 hsTypeToType :: Monad m => KindEnv -> HsType -> m Type
-hsTypeToType kt t = return $ hoistType $ aHsTypeToType kt t -- (forallHoist t)
+hsTypeToType kt t = return $ unsafePerformIO $ runKI kt $
+                    do kv <- newKindVar KindAny
+                       kiType (KVar kv) t
+                       kt' <- postProcess =<< getEnv
+                       hsTypeToType' kt' t
+
+
+hsTypeToType' :: Monad m => KindEnv -> HsType -> m Type
+hsTypeToType' kt t = return $ hoistType $ aHsTypeToType kt t -- (forallHoist t)
 
 hsQualTypeToType :: Monad m =>
     KindEnv            -- ^ the kind environment
@@ -509,7 +518,7 @@ hsQualTypeToType :: Monad m =>
 hsQualTypeToType kindEnv qs qualType = return $ hoistType $ tForAll quantOver ( ps' :=> t') where
    newEnv = kiHsQualType kindEnv qualType
    --newEnv = kindEnv
-   Just t' = hsTypeToType newEnv (hsQualTypeType qualType)
+   Just t' = hsTypeToType' newEnv (hsQualTypeType qualType)
    ps = hsQualTypeHsContext qualType
    ps' = map (hsAsstToPred newEnv) ps
    quantOver = nub $ freeVars ps' ++ fvs

@@ -309,7 +309,12 @@ toType x = error $ "toType: " ++ show x
 
 
 qtToClassHead :: KindEnv -> HsQualType -> ([Pred],(Name,[Type]))
-qtToClassHead kt (HsQualType cntx (HsTyApp (HsTyCon className) ty)) = (map (hsAsstToPred kt) cntx,(toName ClassName className,[runIdentity $ hsTypeToType kt ty]))
+qtToClassHead kt qt@(HsQualType cntx (HsTyApp (HsTyCon className) ty)) =
+    trace ("qtToClassHead" <+> show qt) $
+    let res = (map (hsAsstToPred kt) cntx,(toName ClassName className,
+                                           [runIdentity $ hsTypeToType (kiHsQualType kt (HsQualType cntx (HsTyTuple []))) ty]))
+    in trace ("=" <+> show res) res
+
 
 createClassAssocs kt decls = [ (ctc n,map ct as,ctype t)| HsTypeDecl { hsDeclName = n, hsDeclTArgs = as, hsDeclType = t } <- decls ] where
     ctc n = let nn = toName TypeConstructor n in Tycon nn (kindOf nn kt)
