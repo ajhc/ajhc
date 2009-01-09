@@ -50,6 +50,7 @@ import Util.Gen
 import Util.HasSize
 import Util.Inst()
 import Support.Tickle
+import Options (verbose)
 
 --------------------------------------------------------------------------------
 
@@ -305,15 +306,16 @@ toType x = error $ "toType: " ++ show x
 -}
 
 
-
+vtrace s v | verbose = trace s v
+vtrace s v | otherwise = v
 
 
 qtToClassHead :: KindEnv -> HsQualType -> ([Pred],(Name,[Type]))
 qtToClassHead kt qt@(HsQualType cntx (HsTyApp (HsTyCon className) ty)) =
-    trace ("qtToClassHead" <+> show qt) $
+    vtrace ("qtToClassHead" <+> show qt) $
     let res = (map (hsAsstToPred kt) cntx,(toName ClassName className,
                                            [runIdentity $ hsTypeToType (kiHsQualType kt (HsQualType cntx (HsTyTuple []))) ty]))
-    in trace ("=" <+> show res) res
+    in vtrace ("=" <+> show res) res
 
 
 createClassAssocs kt decls = [ (ctc n,map ct as,ctype t)| HsTypeDecl { hsDeclName = n, hsDeclTArgs = as, hsDeclType = t } <- decls ] where
