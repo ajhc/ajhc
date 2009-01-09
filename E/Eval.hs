@@ -6,6 +6,7 @@ module E.Eval(eval, strong) where
 import Control.Monad.Writer
 import qualified Data.Map as Map
 
+import Doc.DocLike
 import Doc.PPrint
 import E.E
 import E.FreeVars
@@ -93,7 +94,12 @@ strong dsMap' term = eval' dsMap term [] where
         return (EError s nt)
     eval' ds e@EError {} [] = do return e
 
-    eval' ds e stack= fail $ "Cannot strong: \n" ++ render (pprint (e,stack))
+    eval' ds e stack= fail . render $ text "Cannot strong:"
+                                      <$> pprint e
+                                      <$> text "With stack:"
+                                      <$> pprint stack
+                                      <$> text "And bindings for:"
+                                      <$> pprint (Map.keys ds)
 
     unwind ds t [] = return t
     unwind ds t (t1:rest) = do
