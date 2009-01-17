@@ -113,12 +113,14 @@ programMapBodies f prog = do
     let f' (t,e) = f e >>= \e' -> return (t,e')
     programMapDs f' prog
 
+programMapDs :: Monad m => ((TVr, E) -> m (TVr, E)) -> Program -> m Program
 programMapDs f prog = do
     cs <- forM (progCombinators prog) $ \comb -> do
         (t,e) <- f (combHead comb,combBody comb)
         return . combHead_s t . combBody_s e $ comb
     return $ progCombinators_s cs prog
 
+programMapDs_ :: Monad m => ((TVr,E) -> m ()) -> Program -> m ()
 programMapDs_ f prog = mapM_ f (programDs prog)
 
 hPrintProgram fh prog@Program {progCombinators = cs, progDataTable = dataTable } = do
