@@ -316,13 +316,15 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == 
             e' <- convertBody e
             return (ass & e')
             -}
-        am Var {} e = e
-        am ~(NodeC t2 _) e = annotate (show p2) (f_assert ((constant $ enum (nodeTagName t2)) `eq` tag) & e)
+        am Var {} e = return e
+        am ~(NodeC t2 _) e = do 
+            tellTags t2
+            return $ annotate (show p2) (f_assert ((constant $ enum (nodeTagName t2)) `eq` tag) & e)
         tag = f_GETWHAT scrut
         ifscrut = if null fps then f_RAWWHAT tenum `eq` scrut else tenum `eq` tag where
             tenum = (constant $ enum (nodeTagName t))
     p1' <- da p1 e1
-    p2' <- liftM (am p2) $ da p2 e2
+    p2' <- am p2 =<< da p2 e2
     return $ profile_case_inc & cif ifscrut p1' p2'
 
 -- zero is usually faster to test for than other values, so flip them if zero is being tested for.
