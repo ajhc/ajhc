@@ -22,11 +22,16 @@ import Name.Prim
 import Name.VConsts
 import Support.CanType
 import qualified Cmm.Op as Op
-
+import Name.Id
 
 nameToOpTy n = do RawType <- return $ nameType n; Op.readTy (show n)
 
-tPtr t = ELit (litCons { litName = tc_Ptr, litArgs = [t], litType = eStar, litAliasFor = Just (ELam tvr { tvrIdent = 2, tvrType = eStar} (ELit litCons { litName = tc_Addr, litType = eStar })) })
+tPtr t = ELit (litCons { litName = tc_Ptr
+                       , litArgs = [t]
+                       , litType = eStar
+                       , litAliasFor = Just (ELam tvr { tvrIdent = anonymous 2
+                                                      , tvrType = eStar}
+                                             (ELit litCons { litName = tc_Addr, litType = eStar })) })
 
 create_integralCast conv c1 t1 c2 t2 e t = eCase e [Alt (litCons { litName = c1, litArgs = [tvra], litType = te }) cc] Unknown  where
     te = getType e
@@ -34,8 +39,8 @@ create_integralCast conv c1 t1 c2 t2 e t = eCase e [Alt (litCons { litName = c1,
     ELit LitCons { litName = n2, litArgs = [] } = t2
     Just n1' = nameToOpTy n1
     Just n2' = nameToOpTy n2
-    tvra =  tVr 4 t1
-    tvrb =  tVr 6 t2
+    tvra =  tVr (anonymous 4) t1
+    tvrb =  tVr (anonymous 6) t2
     cc = if n1 == n2 then ELit (litCons { litName = c2, litArgs = [EVar tvra], litType = t }) else
         eStrictLet  tvrb (EPrim (APrim (Op (Op.ConvOp conv n1') n2') mempty) [EVar tvra] t2)  (ELit (litCons { litName = c2, litArgs = [EVar tvrb], litType = t }))
 
@@ -76,28 +81,28 @@ oper_aIa op ct' a b = EPrim (binOp op ct ot_int ct) [a,b] (rawType ct') where
 ot_int = stringToOpTy "bits32"
 
 op_aIa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') dc_Int tvrb wtd))) where
-    tvra' = tVr 2 t
-    tvrb' = tVr 4 tInt
-    tvra = tVr 6 st
-    tvrb = tVr 8 intt
-    tvrc = tVr 10 st
+    tvra' = tVr (anonymous 2) t
+    tvrb' = tVr (anonymous 4) tInt
+    tvra = tVr (anonymous 6) st
+    tvrb = tVr (anonymous 8) intt
+    tvrc = tVr (anonymous 10) st
     st = rawType ct
     intt = rawType "bits32"
     wtd = eStrictLet tvrc (oper_aIa op ct (EVar tvra) (EVar tvrb)) (rebox (EVar tvrc))
     rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = t })
 op_aaa op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
-    tvra' = tVr 2 t
-    tvrb' = tVr 4 t
-    tvra = tVr 6 st
-    tvrb = tVr 8 st
-    tvrc = tVr 10 st
+    tvra' = tVr (anonymous 2) t
+    tvrb' = tVr (anonymous 4) t
+    tvra = tVr (anonymous 6) st
+    tvrb = tVr (anonymous 8) st
+    tvrc = tVr (anonymous 10) st
     st = rawType ct
     wtd = eStrictLet tvrc (oper_aaa op ct (EVar tvra) (EVar tvrb)) (rebox (EVar tvrc))
     rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = t })
 op_aa op ct cn t = ELam tvra' (unbox' (EVar tvra') cn tvra wtd) where
-    tvra' = tVr 2 t
-    tvra = tVr 6 st
-    tvrc = tVr 10 st
+    tvra' = tVr (anonymous 2) t
+    tvra = tVr (anonymous 6) st
+    tvrc = tVr (anonymous 10) st
     st = rawType ct
     wtd = eStrictLet tvrc (oper_aa op ct (EVar tvra)) (rebox (EVar tvrc))
     rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = t })
@@ -112,19 +117,19 @@ op_aa op ct cn t = ELam tvra' (unbox' (EVar tvra') cn tvra wtd) where
 --    rebox x = ELit (litCons { litName = dc_Int, litArgs = [x], litType = t })
 
 op_aaB op ct cn t = ELam tvra' (ELam tvrb' (unbox' (EVar tvra') cn tvra (unbox' (EVar tvrb') cn tvrb wtd))) where
-    tvra' = tVr 2 t
-    tvrb' = tVr 4 t
-    tvra = tVr 6 st
-    tvrb = tVr 8 st
-    tvrc = tVr 10 tBoolzh
+    tvra' = tVr (anonymous 2) t
+    tvrb' = tVr (anonymous 4) t
+    tvra = tVr (anonymous 6) st
+    tvrb = tVr (anonymous 8) st
+    tvrc = tVr (anonymous 10) tBoolzh
     st = rawType ct
     wtd = eStrictLet tvrc (oper_aaB op ct (EVar tvra) (EVar tvrb)) (ELit (litCons { litName = dc_Boolzh, litArgs = [EVar tvrc], litType = tBool }))  -- (caseof (EVar tvrc))
 --    caseof x = eCase x [Alt zeroI vFalse]  vTrue
 
 build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaB Op.Lt ct (EVar tvra) zero)  [Alt lFalsezh (rebox $ EVar tvra), Alt lTruezh fs] Unknown) where
     te = getType v
-    tvra = tVr 2 st
-    tvrb = tVr 4 st
+    tvra = tVr (anonymous 2) st
+    tvrb = tVr (anonymous 4) st
     zero = ELit $ LitInt 0 st
     st = rawType ct
     fs = eStrictLet tvrb (oper_aa Op.Neg ct (EVar tvra)) (rebox (EVar tvrb))
@@ -134,12 +139,12 @@ build_uabs ct cn v = v
 
 build_fabs ct cn v = unbox' v cn tvra (rebox (oper_aa Op.FAbs ct (EVar tvra))) where
     te = getType v
-    tvra = tVr 2 st
+    tvra = tVr (anonymous 2) st
     st = rawType ct
     rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
 
 build_usignum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (rebox (ELit one))) where
-    tvra = tVr 2 st
+    tvra = tVr (anonymous 2) st
     te = getType v
     st = rawType ct
     zero :: Lit a E
@@ -148,7 +153,7 @@ build_usignum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (EL
     rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
 
 build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaB Op.Lt ct (EVar tvra) (ELit zero)) [Alt lFalsezh (rebox one),Alt lTruezh (rebox negativeOne)] Unknown)) where
-    tvra = tVr 2 st
+    tvra = tVr (anonymous 2) st
     te = getType v
     st = rawType ct
     zero :: Lit a E
@@ -159,7 +164,7 @@ build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELi
 
 
 build_fsignum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaB Op.FLt ct (EVar tvra) (ELit zero)) [Alt lFalsezh (rebox one),Alt lTruezh (rebox negativeOne)] Unknown)) where
-    tvra = tVr 2 st
+    tvra = tVr (anonymous 2) st
     te = getType v
     st = rawType ct
     zero :: Lit a E
@@ -170,20 +175,20 @@ build_fsignum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (EL
 
 
 buildPeek cn t p = ELam tvr $ ELam tvrWorld (unbox' (EVar tvr) dc_Addr tvr' rest)  where
-    tvr = (tVr 2 (tPtr t))
-    tvr' = tVr 4 (rawType "bits<ptr>")
-    tvrWorld2 = tVr 258 tWorld__
-    tvrWorld = tVr 256 tWorld__
-    rtVar = tVr 260 (rawType p)
-    rtVar' = tVr 262 t
+    tvr = (tVr (anonymous 2) (tPtr t))
+    tvr' = tVr (anonymous 4) (rawType "bits<ptr>")
+    tvrWorld2 = tVr (anonymous 258) tWorld__
+    tvrWorld = tVr (anonymous 256) tWorld__
+    rtVar = tVr (anonymous 260) (rawType p)
+    rtVar' = tVr (anonymous 262) t
     rest = eCaseTup' (EPrim (APrim (Peek (stringToOpTy p)) mempty) [EVar tvrWorld, EVar tvr'] (ltTuple' [tWorld__,rawType p])) [tvrWorld2,rtVar] (eLet rtVar' (ELit $ litCons { litName = cn, litArgs = [EVar rtVar], litType = t }) $ eJustIO (EVar tvrWorld2) (EVar rtVar') )
 
 
 buildPoke cn t p = ELam ptr_tvr $ ELam v_tvr $ createIO_ $ (\tw -> unbox' (EVar ptr_tvr) dc_Addr ptr_tvr' $ unbox' (EVar v_tvr) cn v_tvr' $ EPrim (APrim (Poke (stringToOpTy p)) mempty) [EVar tw, EVar ptr_tvr', EVar v_tvr'] tWorld__) where
-    ptr_tvr =  (tVr 2 (tPtr t))
-    v_tvr = tVr 4 t
-    ptr_tvr' =  (tVr 6 (rawType "bits<ptr>"))
-    v_tvr' = tVr 8 (rawType p)
+    ptr_tvr =  (tVr (anonymous 2) (tPtr t))
+    v_tvr = tVr (anonymous 4) t
+    ptr_tvr' =  (tVr (anonymous 6) (rawType "bits<ptr>"))
+    v_tvr' = tVr (anonymous 8) (rawType p)
 
 toIO :: E -> E -> E
 toIO t x = x
@@ -195,8 +200,8 @@ createIO t pv = toIO t (ELam tvrWorld $  eCaseTup  (pv tvrWorld) [tvrWorld2,rtVa
     rtVar = tVr 260 t
 -}
 createIO_ pv = toIO tUnit (ELam tvrWorld $  eStrictLet tvrWorld2 (pv tvrWorld)  (eJustIO (EVar tvrWorld2) vUnit)) where
-    tvrWorld2 = tVr 258 tWorld__
-    tvrWorld = tVr 256 tWorld__
+    tvrWorld2 = tVr (anonymous 258) tWorld__
+    tvrWorld = tVr (anonymous 256) tWorld__
 
 
 prim_number cn v t et = ELit litCons { litName = cn, litArgs = [ELit (LitInt v t)], litType = et }
@@ -219,11 +224,11 @@ prim_sizeof s = (ELit (litCons { litName = dc_Int, litArgs = [rp], litType = tIn
        | otherwise = EPrim (APrim (PrimTypeInfo { primArgTy = stringToOpTy s, primRetTy = ot_int, primTypeInfo = PrimSizeOf }) mempty) [] tIntzh
 
 
-v2_Int = tVr 2 tInt
-v2_Integer = tVr 2 tInteger
-v2 t = tVr 2 t
+v2_Int = tVr (anonymous 2) tInt
+v2_Integer = tVr (anonymous 2) tInteger
+v2 t = tVr (anonymous 2) t
 
-v0 t = tVr 0 t
+v0 t = tVr emptyId t
 
 {-# NOINLINE constantMethods #-}
 {-# NOINLINE primitiveInsts #-}
