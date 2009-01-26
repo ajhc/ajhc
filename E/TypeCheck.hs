@@ -299,7 +299,7 @@ inferType dataTable ds e = rfc e where
         e2 <- strong nds (t2)
         case typesCompatable dataTable e1 e2 of
             Right () -> return (e1)
-            Left s -> failDoc $ hsep [text "eq:",text s, align $ vcat [ prettyE (e1),prettyE (e2) ]  ]
+            Left s -> failDoc $ text "eq:" <+> align $ vcat [ text s, prettyE (e1), prettyE (e2) ]
     fceq nds e1 t2 = do
         withContextDoc (hsep [text "fceq:", align $ vcat [parens $ prettyE e1,  parens $ prettyE t2]]) $ do
         t1 <- inferType' nds e1
