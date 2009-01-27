@@ -228,6 +228,9 @@ lexWhiteSpace bol = do
                     StringTok s <- lexString
                     return (Just s)
                 _ -> return Nothing
+            -- discard any "flags" at end of line ...
+            lexWhile (`elem` " \r\t")
+            lexWhile (isDigit)
             setFilePos (fromInteger v - 1) 1 fn
             lexWhiteSpace False
     s <- getInput
