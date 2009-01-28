@@ -253,9 +253,7 @@ lexWhiteSpace bol = do
             s' <- getInput
             case s' of
                 [] -> fail "Unterminated end-of-line comment"
-                _ -> do
-                    lexNewline
-                    lexWhiteSpace True
+                _  -> lexWhiteSpace False
         '\n':'#':' ':ns -> discard 2 >> linePragma
         '\n':'#':'l':'i':'n':'e':' ':ns -> discard 6 >> linePragma
         '\n':_ -> do
