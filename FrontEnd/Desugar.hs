@@ -258,7 +258,8 @@ replaceVarNamesInPat name p = f name p where
     f name (HsPUnboxedTuple pats) = HsPUnboxedTuple (map (f name) pats)
     f name (HsPList pats) = HsPList (map (f name) pats)
     f name (HsPParen pat) = HsPParen (f name pat)
-    f name (HsPRec _ _) = error  "f name (HsPRec _ _): not implemented"
+    f name (HsPRec conName fields) = HsPRec conName [ HsPFieldPat fname (f name pat) 
+                                                      | HsPFieldPat fname pat <- fields ]
     f name (HsPAsPat asName pat)
        | name == asName = HsPAsPat newPatVarName (f name pat)
        | otherwise = f name pat
