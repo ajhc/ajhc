@@ -210,6 +210,7 @@ lookupKind con name = do
     KindEnv { kindEnv = env } <- getEnv
     case Map.lookup name env of
         Just k -> do
+            k <- f k
             k <- findKind k
             constrain con k
             findKind k
@@ -217,6 +218,13 @@ lookupKind con name = do
             kv <- newKindVar con
             extendEnv mempty { kindEnv = Map.singleton name (KVar kv) }
             return (KVar kv)
+    where
+      -- ?? and ? aren't *really* kinds
+      f (KBase KQuestQuest) = liftM KVar $ newKindVar KindQuestQuest
+      f (KBase KQuest)      = liftM KVar $ newKindVar KindQuest
+      f k@(KBase _)         = return k
+      f (Kfun k1 k2)        = liftM2 Kfun (f k1) (f k2)
+      f k@(KVar _)          = return k
 
 extendEnv :: KindEnv -> Ki ()
 extendEnv newEnv = do
