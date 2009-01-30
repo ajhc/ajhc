@@ -524,7 +524,8 @@ compile' cenv (tvr,as,e) = ans where
                     as <- mapM cp as
                     def <- createDef d newNodeVar
                     return $ e :>>= [toVal b] :-> Case v (as ++ def)
-    ce e = error $ "ce: " ++ render (pprint (funcName,e))
+    ce e = error $ render (text "Grin.FromE.compile'.ce in function:" <+> pprint funcName
+                           <$> text "can't grok expression:" <+> pprint e)
 
     localEvaled vs v action = local (\lenv -> lenv { evaledMap = nm `mappend` evaledMap lenv }) action where
         nm = fromList [ (tvrIdent x, v) | x <- vs, tvrIdent x /= 0 ]
