@@ -529,7 +529,14 @@ compileModEnv cho = do
     prog <- return $ runIdentity $ flip programMapDs prog $ \(t,e) -> return $ if tvrIdent t == toId v_target then (t { tvrInfo = setProperty prop_INLINE mempty },theTarget) else (t,e)
 
     --wdump FD.Core $ printProgram prog
-    prog <- if (fopts FO.TypeAnalysis) then do typeAnalyze False prog else return prog
+
+    prog <- if (fopts FO.TypeAnalysis) then do 
+      transformProgram transformParms { transformCategory = "typeAnalyzeMethods",
+                                        transformOperation = typeAnalyze False,
+                                        transformDumpProgress = dump FD.Progress }
+                       prog
+            else return prog
+
     when (verbose) $ do putStrLn "Type analyzed methods"
                         flip mapM_ (programDs prog) $ \ (t,e) -> do
                         let (_,ts) = fromLam e
