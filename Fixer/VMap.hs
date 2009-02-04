@@ -23,7 +23,7 @@ import Fixer.Fixer
 import GenUtil
 
 
--- VMap general data type for finding the fixpoint of a general tree-like structure.
+-- | General data type for finding the fixpoint of a general tree-like structure.
 
 data VMap p n = VMap {
     vmapArgs    :: Map.Map (n,Int) (VMap p n),
@@ -38,15 +38,18 @@ instance Show p => Show (Proxy p) where
     showsPrec n (Proxy p) = showsPrec n p
     showsPrec n DepthExceeded = ('*':)
 
-emptyVMap :: (Ord a,Ord b) => VMap a b
+emptyVMap :: (Ord p, Ord n) => VMap p n
 emptyVMap = VMap { vmapArgs = mempty, vmapNodes = Right mempty }
 
+vmapSingleton :: (Ord p, Ord n) => n -> VMap p n
 vmapSingleton n = emptyVMap { vmapNodes = Right $ Set.singleton n }
 
+vmapArgSingleton :: (Ord p,Ord n,Show p,Show n) => n -> Int -> VMap p n -> VMap p n
 vmapArgSingleton n i v
     | isBottom v = emptyVMap
     | otherwise = pruneVMap $ emptyVMap { vmapArgs = Map.singleton (n,i) v }
 
+vmapArg :: (Ord p,Ord n,Show p,Show n) => n -> Int -> VMap p n -> VMap p n
 vmapArg n i vm@VMap { vmapArgs =  map } = case Map.lookup (n,i) map of
     Just x -> x `lub` vmapProxyIndirect i vm
     Nothing -> vmapProxyIndirect i vm
@@ -61,15 +64,19 @@ vmapValue n xs = pruneVMap VMap { vmapArgs = Map.fromAscList (zip (zip (repeat n
 vmapPlaceholder :: (Show p,Show n,Ord p,Ord n) => p  -> VMap p n
 vmapPlaceholder p = emptyVMap { vmapNodes = Left (Proxy p) }
 
+vmapDropArgs :: Ord n => VMap p n -> VMap p n
 vmapDropArgs vm = vm { vmapArgs = mempty }
 
+vmapHeads :: Monad m => VMap p n -> m [n]
 vmapHeads VMap { vmapNodes = Left _ } = fail "vmapHeads: VMap is unknown"
 vmapHeads VMap { vmapNodes = Right set } = return $ Set.toList set
 
+vmapMember :: Ord n => n -> VMap p n -> Bool
 vmapMember n VMap { vmapNodes = Left _ } = True
 vmapMember n VMap { vmapNodes = Right set } = n `Set.member` set
 
 
+pruneVMap :: (Ord n,Ord p,Show n,Show p) => VMap p n -> VMap p n
 pruneVMap vmap = f (7::Int) vmap where
     f 0 _ = emptyVMap { vmapNodes = Left DepthExceeded }
     f _ VMap { vmapNodes = Left p} = emptyVMap {vmapNodes = Left p}
