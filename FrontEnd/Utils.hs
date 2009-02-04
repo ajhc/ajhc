@@ -34,6 +34,7 @@ maybeGetDeclName (HsForeignExport _ e _ _)   = return $ ffiExportName e
 --maybeGetDeclName (HsTypeSig _ [n] _ ) = return n
 maybeGetDeclName d = fail  $ "getDeclName: could not find name for a decl: " ++ show d
 
+getDeclName :: HsDecl -> Name
 getDeclName d =  runIdentity $ maybeGetDeclName d
 
 
@@ -48,7 +49,7 @@ hsNameToOrig n = hsNameIdent_u (hsIdentString_u dn) n where
 
 
 
-
+pprintEnvMap :: (PPrint d k, PPrint d a) => Map.Map k a -> d
 pprintEnvMap m = vcat [ pprint x <+> text "::" <+> pprint y | (x,y) <- Map.toList m ]
 
 
