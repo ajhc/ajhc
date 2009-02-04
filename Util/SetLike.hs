@@ -25,6 +25,7 @@ import Util.HasSize
 
 infixl 9 \\ --
 
+(\\) :: SetLike s => s -> s -> s
 m1 \\ m2 = difference m1 m2
 
 class (HasSize s,IsEmpty s) => SetLike s where
@@ -60,9 +61,12 @@ class BuildSet t s => ModifySet t s | s -> t where
     member :: t -> s -> Bool
     sfilter :: (t -> Bool) -> s -> s
 
+notMember :: (ModifySet t s) => t -> s -> Bool
 notMember x t = not $ member x t
+mnotMember :: (MapLike k v m) => k -> m -> Bool
 mnotMember x t = not $ mmember x t
 
+intersects :: (SetLike s) => s -> s -> Bool
 intersects x y = not $ disjoint x y
 
 
@@ -191,6 +195,7 @@ instance Ord k => MapLike k v (M.Map k v) where
     munionWith = M.unionWith
     mpartitionWithKey = M.partitionWithKey
 
+mfindWithDefault :: MapLike k v m => v -> k -> m -> v
 mfindWithDefault d k m = case mlookup k m of
     Nothing -> d
     Just x -> x
