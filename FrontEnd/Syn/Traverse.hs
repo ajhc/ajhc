@@ -141,8 +141,10 @@ traverseHsExp fn e = f e where
 
 -}
 
+traverseHsType_ :: Monad m => (HsType -> m b) -> HsType -> m ()
 traverseHsType_ fn p = traverseHsType (traverse_ fn) p >> return ()
 
+traverseHsType :: Monad m => (HsType -> m HsType) -> HsType -> m HsType
 traverseHsType f (HsTyFun a b) = return HsTyFun `ap` f a `ap` f b
 traverseHsType f (HsTyTuple xs) = do
     xs <- mapM f xs
@@ -159,6 +161,7 @@ traverseHsType _ HsTyAssoc = return HsTyAssoc
 traverseHsType f x@HsTyExpKind { hsTyType = t } = f t >>= \t' -> return x { hsTyType = t' }
 traverseHsType f (HsTyEq a b) = return HsTyEq `ap` f a `ap` f b
 
+doQual :: Monad m => (a -> HsQualType -> b) -> (HsType -> m HsType) -> a -> HsQualType -> m b
 doQual hsTyForall f vs qt = do
     x <- f $ hsQualTypeType qt
     cntx <- flip mapM (hsQualTypeContext qt) $ \v -> case v of
@@ -166,6 +169,7 @@ doQual hsTyForall f vs qt = do
         HsAsstEq a b -> return HsAsstEq `ap` f a `ap` f b
     return $ hsTyForall vs qt { hsQualTypeContext = cntx, hsQualTypeType = x }
 
+traverseHsPat_ :: MonadSetSrcLoc m => (HsPat -> m b) -> HsPat -> m ()
 traverseHsPat_ fn p = traverseHsPat (traverse_ fn) p >> return ()
 
 traverseHsPat :: MonadSetSrcLoc m => (HsPat -> m HsPat) -> HsPat -> m HsPat
