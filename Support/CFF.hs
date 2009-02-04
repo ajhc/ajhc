@@ -63,6 +63,7 @@ instance Read ChunkType where
     readsPrec _ (b1:b2:b3:b4:xs) = [(chunkType [b1,b2,b3,b4],xs)]
     readsPrec _ _ = []
 
+chunkType :: String -> ChunkType
 chunkType [b1,b2,b3,b4] = bytesToChunkType (fi b1) (fi b2) (fi b3) (fi b4) where
     fi = fromIntegral . ord
 chunkType [b1,b2,b3] = chunkType [b1,b2,b3,' ']
@@ -225,6 +226,7 @@ mkCFFfile ft cs = LBS.fromChunks [mkCFFHeader ft] `LBS.append` LBS.concat (conca
         (b1,b2,b3,b4) = word32ToBytes ct
         (l1,l2,l3,l4) = word32ToBytes (fromIntegral $ LBS.length bs)
         hl = LBS.pack [l1,l2,l3,l4,b1,b2,b3,b4]
+zero :: LBS.ByteString
 zero = LBS.pack [0,0,0,0]
 
 writeCFF :: Handle -> ChunkType -> [(ChunkType,BS.ByteString)] -> IO ()
@@ -259,6 +261,7 @@ getByte h = liftM (fromIntegral . ord) (hGetChar h)
 writeByte :: Handle -> Word8 -> IO ()
 writeByte h b = hPutChar h (chr $ fromIntegral b)
 
+bytesToChunkType :: Word8 -> Word8 -> Word8 -> Word8 -> ChunkType
 bytesToChunkType b1 b2 b3 b4 = ChunkType $ bytesToWord32 b1 b2 b3 b4
 
 word32ToBytes :: Word32 -> (Word8,Word8,Word8,Word8)

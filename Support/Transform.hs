@@ -11,6 +11,7 @@ data TransformParms p = TransformParms {
     transformName :: String        -- ^ name of what we are working on
     }
 
+transformParms :: TransformParms p
 transformParms = TransformParms {
     transformIterate = DontIterate,
     transformDumpProgress = False,
@@ -24,11 +25,13 @@ transformParms = TransformParms {
 data Iterate = DontIterate | IterateMax !Int | IterateExactly !Int | IterateDone
     deriving(Eq)
 
+doIterate :: Iterate -> Bool -> Bool
 doIterate IterateMax {}     True = True
 doIterate IterateDone       True = True
 doIterate IterateExactly {} _    = True
 doIterate _ _ = False
 
+iterateStep :: Iterate -> Iterate
 iterateStep (IterateMax n) = IterateMax (n - 1)
 iterateStep (IterateExactly n) = IterateExactly (n - 1)
 iterateStep x = x
