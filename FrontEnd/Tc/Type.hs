@@ -124,6 +124,7 @@ isRho :: Type -> Bool
 isRho r = isRho' r && not (isBoxy r)
 
 
+isBoxyMetaVar :: MetaVar -> Bool
 isBoxyMetaVar MetaVar { metaType = t } = t > Tau
 
 
@@ -146,6 +147,7 @@ data UnVarOpt = UnVarOpt {
     failEmptyMetaVar :: Bool
     }
 
+flattenType :: (MonadIO m, UnVar t) => t -> m t
 flattenType t =  unVar UnVarOpt { openBoxes = True, failEmptyMetaVar = False } t
 
 
@@ -301,18 +303,27 @@ instance Show CoerceTerm where
     showsPrec n (CTCompose ct1 ct2) = ptrans (n > 10) parens $ (showsPrec 11 ct1) <+> char '.' <+> (showsPrec 11 ct2)
 
 
+-- | Apply the function if the 'Bool' is 'True'.
+ptrans :: Bool -> (a -> a) -> (a -> a)
 ptrans b f = if b then f else id
 
 instance Monoid CoerceTerm where
     mempty = CTId
     mappend = composeCoerce
 
+ctFun :: CoerceTerm -> CoerceTerm
 ctFun CTId = CTId
 ctFun x = CTFun x
+
+ctAbs :: [Tyvar] -> CoerceTerm
 ctAbs [] = CTId
 ctAbs xs = CTAbs xs
+
+ctAp :: [Type] -> CoerceTerm
 ctAp [] = CTId
 ctAp xs = CTAp xs
+
+ctId :: CoerceTerm
 ctId = CTId
 
 composeCoerce :: CoerceTerm -> CoerceTerm -> CoerceTerm
