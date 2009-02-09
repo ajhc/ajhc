@@ -197,7 +197,7 @@ sub do_it {
             }
             rlog "-- $name";
             my @libs = $opt_l ? () : ("--noauto", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
-            my @fast = $opt_n ? () : ("-flint");
+            my @fast = $opt_n ? ("-fno-lint") : ("-flint");
             my @jhc  = $opt_p ? ("$jhc_dir/jhcp","+RTS", "-S$rd/$name.jhcp_prof",@opt_rts,"-RTS")  :  ("$jhc_dir/jhc");
             my @cmd = (@jhc, "-v", '--ho-dir', $ho_dir, @libs , @fast, "-o", "$rd/$name", @flags, @opts, "$cwd/$fn");
             my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
