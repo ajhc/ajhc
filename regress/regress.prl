@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Getopt::Long;
+use Pod::Usage;
 use Data::Dumper;
 use POSIX qw(strftime);
 use Cwd;
@@ -20,9 +21,13 @@ my $opt_p;
 my @opt_rts;
 my $opt_clean;
 my $opt_timeout=60*5;
+my $opt_help;
+my $opt_man;
 
-Getopt::Long::Configure ("bundling");
+Getopt::Long::Configure ("bundling", "auto_help");
 GetOptions(
+    help  => \$opt_help,
+    man   => \$opt_man,
     'm=s' => \@mopts,
     'f=s' => \@fopts,
     'o=s' => \@opts,
@@ -31,8 +36,45 @@ GetOptions(
     n => \$opt_n,
     p => \$opt_p,
     'rts=s' =>\@opt_rts,
-    clean => \$opt_clean
-    ) or die "Invalid options";
+    clean => \$opt_clean,
+    ) or pod2usage(2);
+pod2usage(-verbose => 2) if $opt_man;
+pod2usage(1) if $opt_help;
+
+=head1 NAME
+
+regress
+
+=head1 SYNOPSIS
+
+regress [options] [conditions]
+
+ Conditions:
+   <regex>       only run tests mathing regex
+   !<regex>      don't run tests matching regex
+
+ Options:
+   --help        brief help message
+   --man         full documentation
+
+   -m ARCH       passed through to LHC
+   -f FLAG       passed through to LHC
+   -o OPTION     pass given option to LHC
+   -t INT        timeout in seconds of CPU time
+
+   -l            use base package (.hl file) rather than just pulling
+                 in the .ho files from lib/base/dist/build/
+   -n            go faster by not linting
+   -p            profile LHC (requires lhcp to have been built)
+
+   --rts         extra GHC RTS flags for LHC
+   --clean       build .ho files for tests from scratch
+ 
+=head1 DESCRIPTION
+
+Run the LHC test suite.
+
+=cut
 
 @opts = (@opts, (map { "-f$_" } @fopts), (map { "-m$_" } @mopts));
 
