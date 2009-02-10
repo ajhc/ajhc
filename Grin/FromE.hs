@@ -508,10 +508,10 @@ compile' cenv (tvr,as,e) = ans where
                     as <- mapM cp as
                     def <- createDef d newNodeVar
                     return $ e :>>= [v] :-> Case v (as ++ def)
-            (_,EVar etvr) -> localEvaled [etvr,b] v $ do
-                    as <- mapM cp as
-                    def <- createDef d newNodeVar
-                    return $ e :>>= [v] :-> Return [toVal etvr] :>>= [toVal b] :-> Case v (as ++ def)
+--            (_,EVar etvr) -> localEvaled [etvr,b] v $ do
+--                    as <- mapM cp as
+--                    def <- createDef d newNodeVar
+--                    return $ e :>>= [v] :-> Return [toVal etvr] :>>= [toVal b] :-> Case v (as ++ def)
             (TVr { tvrIdent = 0 },_) -> do
                 as <- mapM cp as
                 def <- createDef d newNodeVar
