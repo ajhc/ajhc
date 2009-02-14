@@ -546,7 +546,7 @@ tiNonRecImpl decl = withContext (locSimple (srcLoc decl) ("in the implicitly typ
     fs <- freeMetaVarsEnv
     let vss = freeMetaVars mv'
         gs = vss Set.\\ fs
-    (mvs,ds,rs) <- splitReduce (Set.toList fs) (Set.toList vss) ps'
+    (mvs,ds,rs) <- splitReduce fs vss ps'
     addPreds ds
     sc' <- if restricted [decl] then do
         let gs' = gs Set.\\ Set.fromList (freeVars rs)
@@ -578,7 +578,7 @@ tiImpls bs = withContext (locSimple (srcLoc bs) ("in the recursive implicitly ty
     fs <- freeMetaVarsEnv
     let vss = map (Set.fromList . freeVars) ts'
         gs = (Set.unions vss) Set.\\ fs
-    (mvs,ds,rs) <- splitReduce (Set.toList fs) (Set.toList $ foldr1 Set.intersection vss) ps'
+    (mvs,ds,rs) <- splitReduce fs (foldr1 Set.intersection vss) ps'
     addPreds ds
     scs' <- if restricted bs then do
         let gs' = gs Set.\\ Set.fromList (freeVars rs)
@@ -644,8 +644,8 @@ tcRule prule@HsRule { hsRuleUniq = uniq, hsRuleFreeVars = vs, hsRuleLeftExpr = e
             ((e1,rs1),(e2,rs2)) <- localEnv (mconcat envs) $ do
                     (e1,ps1) <- listenPreds (tcExpr e1 tr)
                     (e2,ps2) <- listenPreds (tcExpr e2 tr)
-                    ([],rs1) <- splitPreds ch [] ps1
-                    ([],rs2) <- splitPreds ch [] ps2
+                    ([],rs1) <- splitPreds ch Set.empty ps1
+                    ([],rs2) <- splitPreds ch Set.empty ps2
                     return ((e1,rs1),(e2,rs2))
             mapM_ unBox vs
             vs <- flattenType vs
@@ -742,7 +742,7 @@ tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typ
     ps <- flattenType ps
     ch <- getClassHierarchy
     env <- freeMetaVarsEnv
-    (_,ds,rs) <- splitReduce (Set.toList env) (freeMetaVarsPreds qs) ps
+    (_,ds,rs) <- splitReduce env (freeMetaVarsPreds qs) ps
     assertEntailment qs (rs ++ ds)
     return ret
 
@@ -816,7 +816,7 @@ tiProgram bgs es = ans where
         (r,ps) <- listenPreds $ f bgs [] mempty
         ps <- flattenType ps
         ch <- getClassHierarchy
-        ([],rs) <- splitPreds ch [] ps
+        ([],rs) <- splitPreds ch Set.empty ps
         topDefaults rs
         return r
         --ps <- return $ simplify ch ps
@@ -826,7 +826,7 @@ tiProgram bgs es = ans where
         ((ds,env),ps) <- listenPreds (tcBindGroup bg)
         ch <- getClassHierarchy
         withContext (makeMsg "in the binding group:" $ show (getBindGroupName bg)) $ do
-            ([],leftovers) <- splitPreds ch [] ps
+            ([],leftovers) <- splitPreds ch Set.empty ps
             --topDefaults leftovers
             return ()
         when verbose $ liftIO $ do putChar '.'; hFlush stdout
@@ -835,7 +835,7 @@ tiProgram bgs es = ans where
         ch <- getClassHierarchy
         (pdecls,ps) <- listenPreds $ mapM tcPragmaDecl es
         withContext (makeMsg "in the pragmas:" $ "rules") $ do
-            ([],leftovers) <- splitPreds ch [] ps
+            ([],leftovers) <- splitPreds ch Set.empty ps
             --topDefaults leftovers
             return ()
         when verbose $ liftIO $ putStrLn "!"

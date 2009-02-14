@@ -42,22 +42,22 @@ generalize ps r = do
     fmvenv <- freeMetaVarsEnv
     let mvs =  freeMetaVars r `Set.difference` fmvenv
     --(nps,rp) <- splitPreds ch (Set.toList fmvenv) ps
-    (mvs',nps,rp) <- splitReduce (Set.toList fmvenv) (Set.toList mvs) (simplify ch ps)
+    (mvs',nps,rp) <- splitReduce fmvenv mvs (simplify ch ps)
     addPreds nps
     quantify mvs' rp r
 
-freeMetaVarsPreds :: Preds -> [MetaVar]
-freeMetaVarsPreds ps = concatMap freeMetaVarsPred ps
+freeMetaVarsPreds :: Preds -> Set.Set MetaVar
+freeMetaVarsPreds ps = Set.unions (map freeMetaVarsPred ps)
 
-freeMetaVarsPred :: Pred -> [MetaVar]
-freeMetaVarsPred (IsIn _ t) = Set.toList $ freeMetaVars t
-freeMetaVarsPred (IsEq t1 t2) = Set.toList (freeMetaVars t1) ++ Set.toList (freeMetaVars t2)
+freeMetaVarsPred :: Pred -> Set.Set MetaVar
+freeMetaVarsPred (IsIn _ t) = freeMetaVars t
+freeMetaVarsPred (IsEq t1 t2) = freeMetaVars t1 `Set.union` freeMetaVars t2
 
 -- | split predicates into ones that only mention metavars in the list vs other ones
-splitPreds :: Monad m => ClassHierarchy -> [MetaVar] -> Preds -> m (Preds, Preds)
+splitPreds :: Monad m => ClassHierarchy -> Set.Set MetaVar -> Preds -> m (Preds, Preds)
 splitPreds h fs ps  = do
     ps' <- toHnfs h ps
-    return $ partition (all (`elem` fs) . freeMetaVarsPred) $ simplify h  $ ps'
+    return $ partition (\p -> freeMetaVarsPred p `Set.isSubsetOf` fs) $ simplify h  $ ps'
 
 toHnfs      :: Monad m => ClassHierarchy -> [Pred] -> m [Pred]
 toHnfs h ps =  mapM (toHnf h) ps >>= return . concat
@@ -144,31 +144,31 @@ match' (TCon tc1) (TCon tc2) | tc1==tc2 = return mempty
 match' t1 t2  = fail $ "match: " ++ show (t1,t2)
 
 -- FIXME: Use sets.
-splitReduce :: [MetaVar] -> [MetaVar] -> [Pred] -> Tc ([MetaVar],[Pred], [Pred])
+splitReduce :: Set.Set MetaVar -> Set.Set MetaVar -> [Pred] -> Tc ([MetaVar],[Pred], [Pred])
 splitReduce fs gs ps = do
     h <- getClassHierarchy
     --liftIO $ putStrLn $ pprint (fs,gs,ps)
     (ds, rs) <- splitPreds h fs ps
     --liftIO $ putStrLn $ pprint (ds,rs)
-    (rs',sub) <- genDefaults h (fs++gs) rs
+    (rs',sub) <- genDefaults h (fs `Set.union` gs) rs
     --liftIO $ putStrLn $ pprint (rs')
     flip mapM_ sub $ \ (x,y) ->  do
         let msg = "defaulting: " <+> pprint x <+> "=>" <+> prettyPrintType y
         wdump FD.BoxySteps $ liftIO $ putStrLn msg
         addWarn "type-defaults" msg
     sequence_ [ varBind x y | (x,y) <- nub sub]
-    return (nub gs List.\\ map fst sub, ds,rs')
+    return (Set.toList gs List.\\ map fst sub, ds,rs')
 
-withDefaults     :: Monad m => ClassHierarchy ->  [MetaVar] -> [Pred] -> m [(MetaVar, [Pred], Type)]
+withDefaults     :: Monad m => ClassHierarchy ->  Set.Set MetaVar -> [Pred] -> m [(MetaVar, [Pred], Type)]
 withDefaults h vs ps
-  | any null tss = fail $ "withDefaults.ambiguity: " ++ (pprint ps)  ++ pprint vs -- ++ show ps
+  | any null tss = fail $ "withDefaults.ambiguity: " ++ (pprint ps)  ++ pprint (Set.toList vs) -- ++ show ps
 --  | otherwise = fail $ "Zambiguity: " ++ (render $ pprint ps) ++  show (ps,ps',ams)
   | otherwise    = return $ [ (v,qs,head ts) | (v,qs,ts) <- ams ]
     where ams = ambig h vs ps
           tss = [ ts | (v,qs,ts) <- ams ]
 
 -- Return retained predicates and a defaulting substitution
-genDefaults :: Monad m => ClassHierarchy ->  [MetaVar] -> [Pred] -> m ([Pred],[(MetaVar,Type)])
+genDefaults :: Monad m => ClassHierarchy ->  Set.Set MetaVar -> [Pred] -> m ([Pred],[(MetaVar,Type)])
 genDefaults h vs ps = do
     ams <- withDefaults h vs ps
     let ps' = [ p | (v,qs,ts) <- ams, p<-qs ]
@@ -176,12 +176,12 @@ genDefaults h vs ps = do
     return (ps \\ ps',  vs)
 
 -- ambiguities from THIH + call to candidates
-ambig :: ClassHierarchy -> [MetaVar] -> [Pred] -> [(MetaVar,[Pred],[Type])]
+ambig :: ClassHierarchy -> Set.Set MetaVar -> [Pred] -> [(MetaVar,[Pred],[Type])]
 
 ambig h vs ps
   = [ (v, qs, defs h v qs) |
-         v <- nub (freeMetaVarsPreds ps) \\ vs,
-         let qs = [ p | p<-ps, v `elem` freeMetaVarsPred p ] ]
+         v <- Set.toList (freeMetaVarsPreds ps `Set.difference` vs),
+         let qs = [ p | p<-ps, v `Set.member` freeMetaVarsPred p ] ]
 
 
 assertEntailment :: Preds -> Preds -> Tc ()
@@ -225,7 +225,7 @@ defaults
 topDefaults     :: [Pred] -> Tc ()
 topDefaults ps  = do
     h <- getClassHierarchy
-    let ams = ambig h [] ps
+    let ams = ambig h Set.empty ps
         tss = [ ts | (v,qs,ts) <- ams ]
         _vs  = [ v  | (v,qs,ts) <- ams ]
     when (any null tss) $ fail $ "Top Level ambiguity " ++ (pprint ps)
