@@ -54,7 +54,11 @@ freeMetaVarsPred (IsIn _ t) = freeMetaVars t
 freeMetaVarsPred (IsEq t1 t2) = freeMetaVars t1 `Set.union` freeMetaVars t2
 
 -- | split predicates into ones that only mention metavars in the list vs other ones
-splitPreds :: Monad m => ClassHierarchy -> Set.Set MetaVar -> Preds -> m (Preds, Preds)
+splitPreds :: Monad m
+           => ClassHierarchy
+           -> Set.Set MetaVar
+           -> Preds
+           -> m (Preds, Preds)
 splitPreds h fs ps  = do
     ps' <- toHnfs h ps
     return $ partition (\p -> freeMetaVarsPred p `Set.isSubsetOf` fs) $ simplify h  $ ps'
@@ -143,8 +147,10 @@ match' (TVar mv) t | getType mv == getType t = return [(mv,t)]
 match' (TCon tc1) (TCon tc2) | tc1==tc2 = return mempty
 match' t1 t2  = fail $ "match: " ++ show (t1,t2)
 
--- FIXME: Use sets.
-splitReduce :: Set.Set MetaVar -> Set.Set MetaVar -> [Pred] -> Tc ([MetaVar],[Pred], [Pred])
+splitReduce :: Set.Set MetaVar -- ^ Meta vars from the environment
+            -> Set.Set MetaVar -- ???
+            -> [Pred]          -- ^ Relevant predicates
+            -> Tc ([MetaVar], [Pred], [Pred]) -- ^ (retained ??? meta-vars, untouched predicates, altered predicates)
 splitReduce fs gs ps = do
     h <- getClassHierarchy
     --liftIO $ putStrLn $ pprint (fs,gs,ps)
@@ -157,9 +163,14 @@ splitReduce fs gs ps = do
         wdump FD.BoxySteps $ liftIO $ putStrLn msg
         addWarn "type-defaults" msg
     sequence_ [ varBind x y | (x,y) <- nub sub]
-    return (Set.toList gs List.\\ map fst sub, ds,rs')
+    return (Set.toList gs List.\\ map fst sub, ds, rs')
 
-withDefaults     :: Monad m => ClassHierarchy ->  Set.Set MetaVar -> [Pred] -> m [(MetaVar, [Pred], Type)]
+withDefaults :: Monad m
+             => ClassHierarchy
+             -> Set.Set MetaVar -- ^ Variables to be considered known
+             -> [Pred]          -- ^ Predicates to consider
+             -> m [(MetaVar, [Pred], Type)] 
+             -- ^ List of (defaulted meta var, predicates involving it, type defaulted to)
 withDefaults h vs ps
   | any null tss = fail $ "withDefaults.ambiguity: " ++ (pprint ps)  ++ pprint (Set.toList vs) -- ++ show ps
 --  | otherwise = fail $ "Zambiguity: " ++ (render $ pprint ps) ++  show (ps,ps',ams)
@@ -167,8 +178,12 @@ withDefaults h vs ps
     where ams = ambig h vs ps
           tss = [ ts | (v,qs,ts) <- ams ]
 
--- Return retained predicates and a defaulting substitution
-genDefaults :: Monad m => ClassHierarchy ->  Set.Set MetaVar -> [Pred] -> m ([Pred],[(MetaVar,Type)])
+-- | Return retained predicates and a defaulting substitution
+genDefaults :: Monad m
+            => ClassHierarchy
+            -> Set.Set MetaVar -- ^ Variables to be considered known
+            -> [Pred]          -- ^ Predicates to examine
+            -> m ([Pred], [(MetaVar,Type)])
 genDefaults h vs ps = do
     ams <- withDefaults h vs ps
     let ps' = [ p | (v,qs,ts) <- ams, p<-qs ]
@@ -176,7 +191,10 @@ genDefaults h vs ps = do
     return (ps \\ ps',  vs)
 
 -- ambiguities from THIH + call to candidates
-ambig :: ClassHierarchy -> Set.Set MetaVar -> [Pred] -> [(MetaVar,[Pred],[Type])]
+ambig :: ClassHierarchy
+      -> Set.Set MetaVar -- ^ Variables that are to be considered known
+      -> [Pred]          -- ^ Predicates to consider
+      -> [(MetaVar, [Pred], [Type])] -- ^ List of (ambiguous meta var, predicates involving it, potential defaults)
 
 ambig h vs ps
   = [ (v, qs, defs h v qs) |
@@ -217,6 +235,7 @@ defs h v qs = [ t | all ((TMetaVar v)==) ts,
        ts = [ t | (IsIn c t) <- qs ]
 
 
+-- FIXME use @default@ declarations!
 defaults    :: [Type]
 defaults
     | not $ fopts FO.Defaulting = []
