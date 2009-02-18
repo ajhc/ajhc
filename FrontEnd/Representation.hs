@@ -30,7 +30,9 @@ module FrontEnd.Representation(
     MetaVar(..),
     tTTuple,
     tTTuple',
-    tList
+    tList,
+    tArrow,
+    tAp
     )where
 
 
@@ -91,7 +93,17 @@ instance TypeNames Type where
 instance Ord (IORef a)
 instance Binary (IORef a)
 
+tList :: Type
 tList = TCon (Tycon tc_List (Kfun kindStar kindStar))
+
+-- | The @(->)@ type constructor. Invariant: @tArrow@ shall not be fully applied. To this end, see 'tAp'.
+tArrow :: Type
+tArrow = TCon (Tycon tc_Arrow (kindArg `Kfun` kindFunRet `Kfun` kindStar))
+
+-- | Type application, enforcing the invariant that there be no fully-applied 'tArrow's
+tAp :: Type -> Type -> Type
+tAp (TAp c@TCon{} a) b | c == tArrow = TArrow a b
+tAp a b = TAp a b
 
 instance Eq Type where
     (TVar a) == (TVar b) = a == b

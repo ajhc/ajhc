@@ -28,6 +28,8 @@ module FrontEnd.Tc.Type(
     Kindvar(..),
     tTTuple,
     tTTuple',
+    tAp,
+    tArrow,
     tyvar
     ) where
 
