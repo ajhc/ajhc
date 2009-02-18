@@ -28,8 +28,10 @@ static uintmax_t jhc_prof_updates;
 
 static void A_COLD
 jhc_print_profile(void) {
+#ifndef __WIN32__
         struct tms tm;
         times(&tm);
+#endif
         if(!(_JHC_PROFILE || getenv("JHC_RTS_PROFILE"))) return;
 
         fprintf(stderr, "\n-----------------\n");
@@ -38,10 +40,12 @@ jhc_print_profile(void) {
         fprintf(stderr, "Complie: %s\n", jhc_c_compile);
         fprintf(stderr, "Version: %s\n\n", jhc_version);
         jhc_alloc_print_stats();
+#ifndef __WIN32__
         float cpt = (float)sysconf(_SC_CLK_TCK);
         fprintf(stderr, "User Time:   %.2fs\n", (float)tm.tms_utime/cpt);
         fprintf(stderr, "System Time: %.2fs\n", (float)tm.tms_stime/cpt);
         fprintf(stderr, "Total Time:  %.2fs\n", (float)(tm.tms_stime + tm.tms_utime)/cpt);
+#endif
 
 #if _JHC_PROFILE
         fprintf(stderr, "\nFunction Calls:   %llu\n", (unsigned long long)jhc_prof_function_calls);
@@ -73,8 +77,17 @@ jhc_case_fell_off(int n) {
         abort();
 }
 
+#ifdef __WIN32__
+#define jhc_setjmp(jb) setjmp(*(jmp_buf *)jb)
+#define jhc_longjmp(jb) longjmp(*(jmp_buf *)jb,1)
+#define getchar_unlocked() getchar()
+#define putchar_unlocked(x) putchar(x)
+#define getc_unlocked(x) getc(x)
+#define putc_unlocked(x,y) putc(x,y)
+#else
 #define jhc_setjmp(jb) sigsetjmp(*(jmp_buf *)jb,0)
 #define jhc_longjmp(jb) siglongjmp(*(jmp_buf *)jb,1)
+#endif
 
 struct jhc_continuation {
     void *argument;
@@ -130,7 +143,7 @@ main(int argc, char *argv[])
         jhc_argv = argv + 1;
         jhc_progname = argv[0];
         setlocale(LC_ALL,"");
-        if (sigsetjmp(jhc_uncaught,0))
+        if (jhc_setjmp(jhc_uncaught))
                 jhc_error("Uncaught Exception");
         else
                 _amain();

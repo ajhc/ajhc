@@ -11,7 +11,9 @@
 #include <math.h>
 #include <assert.h>
 #include <float.h>
+#ifndef __WIN32__
 #include <sys/times.h>
+#endif
 #include <setjmp.h>
 
 
