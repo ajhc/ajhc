@@ -51,6 +51,7 @@ data Mode = BuildHl String -- ^ Build the specified hl-file given a description 
           | DependencyTree -- ^ show simple dependency tree
           | ShowHo String  -- ^ Show ho-file.
           | ListLibraries  -- ^ List libraries
+          | PrintHscOptions -- ^ Print options for hsc2hs
             deriving(Eq)
 
 
@@ -144,20 +145,20 @@ theoptions =
     , Option []    ["progc"]     (ReqArg (\d -> optCC_s d) "gcc")      "c compiler to use"
     , Option []    ["arg"]       (ReqArg (\d -> optProgArgs_u (++ [d])) "arg") "arguments to pass interpreted program"
     , Option ['N'] ["noprelude"] (NoArg  (optPrelude_s False))         "no implicit prelude"
-    , Option ['C'] []            (NoArg  (optMode_s CompileHoGrin))    "Typecheck, compile ho and grin."
-    , Option ['c'] []            (NoArg  (optMode_s CompileHo))        "Typecheck and compile ho."
-    , Option []    ["interpret"] (NoArg  (optMode_s Interpret))        "interpret."
-    , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))        "keep going on errors."
-    , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output."
-    , Option []    ["main"]      (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point."
-    , Option ['m'] ["arch"]      (ReqArg (optArch_s . Just ) "arch")            "target architecture."
-    , Option []    ["entry"]     (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression."
+    , Option ['C'] []            (NoArg  (optMode_s CompileHoGrin))    "Typecheck, compile ho and grin"
+    , Option ['c'] []            (NoArg  (optMode_s CompileHo))        "Typecheck and compile ho"
+    , Option []    ["interpret"] (NoArg  (optMode_s Interpret))        "interpret"
+    , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))        "keep going on errors"
+    , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output"
+    , Option []    ["main"]      (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point"
+    , Option ['m'] ["arch"]      (ReqArg (optArch_s . Just ) "arch")            "target architecture"
+    , Option []    ["entry"]     (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression"
     , Option ['e'] []            (ReqArg (\d -> optStmts_u (d:)) "<statement>")  "run given statement as if on jhci prompt"
     , Option []    ["debug"]     (NoArg  (optDebug_s True))            "debugging"
     , Option []    ["show-ho"]   (ReqArg  (optMode_s . ShowHo) "file.ho") "Show ho file"
     , Option []    ["noauto"]    (NoArg  (optNoAuto_s True))           "Don't automatically load base and haskell98 packages"
     , Option ['p'] []            (ReqArg (\d -> optHls_u (++ [d])) "file.hl") "Load given haskell library .hl file"
-    , Option ['L'] []            (ReqArg (optHlPath_u . idu) "path")   "Look for haskell libraries in the given directory."
+    , Option ['L'] []            (ReqArg (optHlPath_u . idu) "path")   "Look for haskell libraries in the given directory"
     , Option []    ["build-hl"]  (ReqArg (optMode_s . BuildHl) "file.cabal") "Build hakell library from given library description file"
     , Option []    ["interactive"] (NoArg  (optMode_s Interactive))    "run interactivly"
     , Option []    ["ignore-ho"]   (NoArg  (optIgnoreHo_s True))       "Ignore existing haskell object files"
@@ -167,8 +168,9 @@ theoptions =
     , Option []    ["ho-dir"]      (ReqArg (optHoDir_s . Just ) "<dir>")    "Where to place and look for ho files"
     , Option []    ["stale"]       (ReqArg (optStale_u . idu) "Module")     "Treat these modules as stale, even if a ho file is present"
     , Option []    ["dependency"]  (NoArg  (optMode_s DependencyTree))  "Follow import dependencies only then quit"
-    , Option []    ["no-follow-deps"] (NoArg  (optFollowDeps_s False)) "Don't follow depencies not listed on command line."
-    , Option []    ["list-libraries"] (NoArg  (optMode_s ListLibraries)) "List of installed libraries."
+    , Option []    ["no-follow-deps"] (NoArg  (optFollowDeps_s False)) "Don't follow depencies not listed on command line"
+    , Option []    ["list-libraries"] (NoArg  (optMode_s ListLibraries)) "List of installed libraries"
+    , Option []    ["print-hsc-options"] (NoArg (optMode_s PrintHscOptions)) "print options to pass to hsc2hs"
     ]
 
 -- | Width of terminal.

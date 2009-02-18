@@ -36,6 +36,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/base-1.0.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/haskell98-1.0.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/include/HsFFI.h
 
 %doc COPYING
 

@@ -66,6 +66,7 @@ import Support.Transform
 import Util.Graph
 import Util.SetLike as S
 import Version.Version(versionString,versionContext,versionSimple)
+import qualified Version.Config as VC
 import qualified C.FromGrin2 as FG2
 import qualified E.CPR
 import qualified E.Demand as Demand(analyzeProgram)
@@ -110,11 +111,12 @@ main = do -- runMain $ catom $ bracketHtml $ do
                 putStrLn "Libraries found:"
             ll <- libraryList
             sequence_ [ putStrLn name | (name,_) <- ll ]
-        ShowHo ho     -> dumpHoFile ho
-        Version       -> putStrLn versionString
-        DependencyTree -> doDependency (optArgs o)
-        VersionCtx    -> putStrLn (versionString ++ versionContext)
-        _             -> processFiles  (optArgs o)
+        ShowHo ho       -> dumpHoFile ho
+        Version         -> putStrLn versionString
+        PrintHscOptions -> putStrLn $ "-I" ++ VC.datadir ++ "/" ++ VC.package ++ "-" ++ VC.shortVersion ++ "/include"
+        DependencyTree  -> doDependency (optArgs o)
+        VersionCtx      -> putStrLn (versionString ++ versionContext)
+        _               -> processFiles  (optArgs o)
 
 
 processFiles [] | Nothing <- optMainFunc options = do
