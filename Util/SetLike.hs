@@ -181,7 +181,9 @@ instance MapLike Int a (IM.IntMap a) where
 instance Ord k => MapLike k v (M.Map k v) where
     mdelete = M.delete
     mmember = M.member
-    mlookup = M.lookup
+    mlookup k m = case M.lookup k m of
+        Nothing -> fail "Map: mlookup can't find key"
+        Just x -> return x
     melems = M.elems
     mkeys = M.keys
     massocs = M.toList
