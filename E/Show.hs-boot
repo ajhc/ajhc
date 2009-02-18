@@ -9,7 +9,7 @@ import Doc.PPrint
 
 render :: Doc -> String
 prettyE :: E -> String
-ePrettyEx :: E -> Doc 
+ePrettyEx :: E -> Doc
 ePretty :: E -> Doc
 
 instance DocLike d => PPrint d TVr
