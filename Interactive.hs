@@ -45,6 +45,8 @@ import Util.Interact
 import Version.Version(versionString)
 import FrontEnd.Warning
 
+type SomeException = Exception
+
 printDoc doc = do
     displayIO stdout (renderPretty 0.9 80 doc)
     putStrLn ""

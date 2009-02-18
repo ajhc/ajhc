@@ -80,6 +80,8 @@ import qualified Interactive
 import qualified Stats
 import qualified IO
 
+type SomeException = Exception
+
 ---------------
 -- ∀α∃β . α → β
 ---------------

@@ -22,6 +22,8 @@ import Util.SetLike
 import qualified FlagDump as FD
 import qualified Stats
 
+type SomeException = Exception
+
 
 lintCheckGrin grin = when flint $ typecheckGrin grin
 
