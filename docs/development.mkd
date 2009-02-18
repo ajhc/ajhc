@@ -10,6 +10,11 @@ darcsweb.
 Getting the source
 ------------------
 
+If you simply wish to use jhc, it is easier to build from the distribution
+tarball, as described on the [Building Page](building.shtml). If you are interested
+in developing or modifying jhc itself, then building from darcs as described on this
+page is recommended.
+
 In order to build from the darcs repo, you need the following things installed:
 
     * GHC 6.8.2 or better
@@ -21,7 +26,8 @@ In order to build from the darcs repo, you need the following things installed:
     * a working 'perl' install for various sundry tasks
     * the happy haskell parser generator
 
-First you must install darcs, there are a couple projects you need to pull in order to compile jhc, the following should produce a working tree:
+First you must install darcs, there are a couple projects you need to pull in
+order to compile jhc, the following should produce a working tree:
 
     darcs get http://repetae.net/repos/jhc
     cd jhc
@@ -43,7 +49,9 @@ jhc can now be tested via
 
     make helloworld
 
-however, during development it is often easier to use the raw haskell source of the libraries directly. in order to do that, you can run jhc with the following options when run in the development tree.
+however, during development it is often easier to use the raw haskell source of
+the libraries directly. in order to do that, you can run jhc with the following
+options when run in the development tree.
 
     ./jhc -v --noauto -ilib/base -ilib/haskell98 test/HelloWorld.hs -o helloworld
 
