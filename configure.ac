@@ -24,7 +24,7 @@ AC_ARG_WITH(hcflags,
 
 AC_PATH_PROG([DRIFTGHC],[drift-ghc], [])
 if test -z "$DRIFTGHC"; then
-    AC_MSG_ERROR([ DrIFT not found get it from http://repetae.net/computer/haskell/DrIFT/])
+    echo [DrIFT not found: using preprocessed files]
 fi
 
 AC_PROGRAM_REQUIRE(hsc2hs,hsc2hs,     [  --with-hsc2hs=<hsc2hs location>    Specify location of hsc2hs.])
