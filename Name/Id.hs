@@ -3,6 +3,7 @@ module Name.Id(
     IdMap(),
     IdNameT(),
     IdSet(),
+    anonymous,
     addBoundNamesIdMap,
     addBoundNamesIdSet,
     addNamesIdSet,
@@ -49,6 +50,8 @@ import Name.Name
 -- TODO - make this a newtype
 type Id = Int
 
+anonymous :: Int -> Id
+anonymous x = x
 
 -- IdSet
 
