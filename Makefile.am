@@ -148,9 +148,9 @@ FrontEnd/HsParser.hs: FrontEnd/HsParser.y
 	sed -e 's/^{-# OPTIONS/{-# OPTIONS_GHC -w/' -i $@
 
 
-.SECONDARY: _darcs/inventory data/shortchange.txt
+.SECONDARY: _darcs/hashed_inventory data/shortchange.txt
 
-ChangeLog: _darcs/inventory
+ChangeLog: _darcs/hashed_inventory
 	darcs changes --from-tag . > $@
 
 data/shortchange.txt: ChangeLog
