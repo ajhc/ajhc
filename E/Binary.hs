@@ -5,23 +5,25 @@ import Data.Binary
 import E.Type
 import Monad
 import Name.Binary()
+import Name.Id
 import {-# SOURCE #-} Info.Binary(putInfo,getInfo)
+
 
 
 -- Binary instance
 data TvrBinary = TvrBinaryNone | TvrBinaryAtom Atom | TvrBinaryInt Word32
 
 instance Binary TVr where
-    put (TVr { tvrIdent = 0, tvrType =  e, tvrInfo = nf} ) = do
+    put (TVr { tvrIdent = eid, tvrType =  e, tvrInfo = nf} ) | eid == emptyId = do
         put (TvrBinaryNone)
         put e
         putInfo nf
-    put (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) | Just x <- intToAtom i = do
+    put (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) | Just x <- intToAtom (idToInt i) = do
         put (TvrBinaryAtom x)
         put e
         putInfo nf
     put (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) = do
-        put (TvrBinaryInt $ fromIntegral i)
+        put (TvrBinaryInt $ fromIntegral (idToInt i))
         put e
         putInfo nf
     get  = do
@@ -29,9 +31,9 @@ instance Binary TVr where
         e <- get
         nf <- getInfo
         case x of
-            TvrBinaryNone -> return $ TVr 0 e nf
+            TvrBinaryNone -> return $ TVr emptyId e nf
             TvrBinaryAtom a -> return $ TVr (fromAtom a) e nf
-            TvrBinaryInt i -> return $ TVr (fromIntegral i) e nf
+            TvrBinaryInt i -> return $ TVr (anonymous $ fromIntegral i) e nf
 
 instance Binary TvrBinary where
     put TvrBinaryNone = do putWord8  0

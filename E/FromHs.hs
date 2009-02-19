@@ -47,6 +47,7 @@ import FrontEnd.HsSyn as HS
 import Info.Types
 import Name.Name as Name
 import Name.Names
+import Name.Id
 import Name.VConsts
 import Options
 import PackedString
@@ -80,12 +81,12 @@ newVars xs = f xs [] where
     f [] xs = return $ reverse xs
     f (x:xs) ys = do
         s <- newUniq
-        f xs (tVr (2*s) x:ys)
+        f xs (tVr (anonymous $ 2*s) x:ys)
 
 
 tipe t = f t where
     f (TAp t1 t2) = eAp (f t1) (f t2)
-    f (TArrow t1 t2) =  EPi (tVr 0 (f t1)) (f t2)
+    f (TArrow t1 t2) =  EPi (tVr emptyId (f t1)) (f t2)
     f (TCon (Tycon n k)) | Just n' <- lookup n primitiveAliases = ELit litCons { litName = n', litType = kind k }
     f (TCon (Tycon n k)) =  ELit litCons { litName = n, litType = kind k }
     f (TVar tv) = EVar (cvar [] tv)
@@ -106,7 +107,7 @@ kind (KBase KHash) = eHash
 kind (KBase Star) = eStar
 kind (KBase KQuest) = eStar      -- XXX why do these still exist?
 kind (KBase KQuestQuest) = eStar
-kind (Kfun k1 k2) = EPi (tVr 0 (kind k1)) (kind k2)
+kind (Kfun k1 k2) = EPi (tVr emptyId (kind k1)) (kind k2)
 kind (KVar _) = error "Kind variable still existing."
 kind _ = error "E.FromHs.kind: unknown"
 
@@ -180,7 +181,7 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
                 Nothing | fopts FO.Raw -> EAp (EAp runRaw ty) maine
                 Nothing ->  EAp (EAp runExpr ty) maine
             ne = ELam worldVar (EAp e (EVar worldVar))
-            worldVar = tvr { tvrIdent = 2, tvrType = tWorld__ }
+            worldVar = tvr { tvrIdent = anonymous 2, tvrType = tWorld__ }
             theMainTvr =  tVr (toId cname) (infertype dataTable ne)
             tvm@(TVr { tvrType =  ty}) =  main
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs, sortKindLike k ]
@@ -198,12 +199,12 @@ createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans wher
         _methodName@(~(Just (TVr {tvrType = ty},_))) = findName methodName
         defaultName =  (defaultInstanceName methodName)
         valToPat' (ELit LitCons { litAliasFor = af,  litName = x, litArgs = ts, litType = t }) = (ELit litCons { litAliasFor = af, litName = x, litArgs = ts', litType = t },ts') where
-            ts' = [ EVar (tVr j (getType z)) | z <- ts | j <- [2,4 ..], j `notElem` map tvrIdent args]
+            ts' = [ EVar (tVr j (getType z)) | z <- ts | j' <- [2,4 ..], let j = anonymous j', j `notElem` map tvrIdent args]
         --valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ litCons { litName = tc_Arrow, litArgs = [ EVar (tVr j (getType z)) | z <- [a,b] | j <- [2,4 ..], j `notElem` map tvrIdent args], litType = eStar }
         valToPat' (EPi tv@TVr { tvrType =  a} b)  = (EPi tvr { tvrType =  a'} b',[a',b']) where
             a' = EVar (tVr ja (getType a))
             b' = EVar (tVr jb (getType b))
-            (ja:jb:_) = [ j |  j <- [2,4 ..], j `notElem` map tvrIdent args]
+            (ja:jb:_) = [ anonymous j |  j <- [2,4 ..], anonymous j `notElem` map tvrIdent args]
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
         as = [ rule  t | Inst { instHead = _ :=> IsIn _ t }  <- snub (classInsts classRecord) ]
         (_ft,_:args') = fromPi ty
@@ -239,7 +240,7 @@ getTypeCons x = error $ "getTypeCons: " ++ show x
 
 
 
-unbox :: DataTable -> E -> Int -> (E -> E) -> E
+unbox :: DataTable -> E -> Id -> (E -> E) -> E
 unbox dataTable e _vn wtd | getType (getType e) == eHash = wtd e
 unbox dataTable e vn wtd = eCase e [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd (EVar tvra))] Unknown where
     te = getType e

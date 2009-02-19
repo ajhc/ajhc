@@ -55,7 +55,7 @@ import Util.HasSize
 import qualified Data.Set as Set
 
 eLetRec :: [(TVr,E)] -> E -> E
-eLetRec ds e = f (filter ((/= 0) . tvrIdent . fst) ds) where
+eLetRec ds e = f (filter ((/= emptyId) . tvrIdent . fst) ds) where
     f [] = e
     f ds = ELetRec ds e
 
@@ -66,7 +66,7 @@ subst ::
     -> E  -- ^ What to substitute with
     -> E  -- ^ input term
     -> E  -- ^ output term
-subst (TVr { tvrIdent = 0 }) _ e = e
+subst (TVr { tvrIdent = eid }) _ e | eid == emptyId = e
 subst (TVr { tvrIdent = i }) w e = doSubst' False False (msingleton i w) (\n -> n `member` (freeVars w `union` freeVars e :: IdSet))  e
 
 -- | Identitcal to 'subst' except that it substitutes inside the local types
@@ -76,7 +76,7 @@ subst (TVr { tvrIdent = i }) w e = doSubst' False False (msingleton i w) (\n -> 
 -- transient terms for typechecking.
 
 subst' :: TVr -> E -> E -> E
-subst' (TVr { tvrIdent = 0 }) _ e = e
+subst' (TVr { tvrIdent = eid }) _ e | eid == emptyId = e
 subst' (TVr { tvrIdent = (i) }) w e = doSubst' True False (msingleton i w) (\n -> n `member` (freeVars w `union` freeVars e :: IdSet)) e
 
 
@@ -148,10 +148,10 @@ doSubst' substInVars allShadow bm check e  = f e (Set.empty, bm) where
         alts <- local r (mapM da $ eCaseAlts ec)
         nty <- f (eCaseType ec)
         return  $ caseUpdate ec { eCaseScrutinee = e', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts, eCaseType = nty }
-    lp lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == 0 || (allShadow && n `notElem` freeVars e) = do
+    lp lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == emptyId || (allShadow && n `notElem` freeVars e) = do
         t' <- f t
         e' <- local (\(s,m) -> (Set.insert n s, mdelete n m)) $ f e
-        return $ lam (tvr { tvrIdent =  0, tvrType =  t'}) e'
+        return $ lam (tvr { tvrIdent =  emptyId, tvrType =  t'}) e'
     lp lam tvr e = do
         (tv,r) <- ntvr Set.empty tvr
         e' <- local r $ f e
@@ -163,7 +163,7 @@ doSubst' substInVars allShadow bm check e  = f e (Set.empty, bm) where
             local r $ f ts ((t',r):rs)
         vs = Set.fromList [ tvrIdent x | x <- ts ]
 
-    ntvr xs tvr@(TVr { tvrIdent = 0, tvrType =  t}) = do
+    ntvr xs tvr@(TVr { tvrIdent = eid, tvrType =  t}) | eid == emptyId = do
         t' <- f t
         let nvr = (tvr { tvrType =  t'})
         return (nvr,id)
@@ -187,8 +187,8 @@ mnv allShadow xs i checkTaken s ss
 
 
 
-eAp (EPi t b) e = if tvrIdent t == 0 then b else subst t e b
-eAp (ELam t b) e = if tvrIdent t == 0 then b else subst t e b
+eAp (EPi t b) e = if tvrIdent t == emptyId then b else subst t e b
+eAp (ELam t b) e = if tvrIdent t == emptyId then b else subst t e b
 --eAp (EPrim n es t@(EPi _ _)) b = EPrim n (es ++ [b]) (eAp t b)  -- only apply if type is pi-like
 eAp (ELit lc@LitCons { litArgs = es, litType = (EPi t r) }) b = ELit lc { litArgs = es ++ [b], litType = subst t b r }
 eAp (ELit LitCons { litArgs = es, litAliasFor = Just af }) b = foldl eAp af (es ++ [b])
@@ -256,10 +256,10 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
         alts <- (mapM da $ eCaseAlts ec)
         nty <- inType (f $ eCaseType ec)
         return $ caseUpdate ec { eCaseScrutinee = e', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts, eCaseType = nty }
-    lp lam tvr@(TVr { tvrIdent = 0, tvrType = t}) e  = do
+    lp lam tvr@(TVr { tvrIdent = eid, tvrType = t}) e | eid == emptyId = do
         t' <- inType (f t)
         e' <- f e
-        return $ lam (tvr { tvrIdent =  0, tvrType =  t'}) e'
+        return $ lam (tvr { tvrIdent =  emptyId, tvrType =  t'}) e'
     lp lam tvr e = do
         (tv,r) <- ntvr Set.empty tvr
         e' <- local r $ f e
@@ -280,7 +280,7 @@ typeSubst termSubst typeSubst e  = f e (False,termSubst',typeSubst) where
     litSMapM (LitInt n t) = do
         t' <- inType $ f t
         return $ LitInt n t'
-    ntvr xs tvr@(TVr { tvrIdent = 0, tvrType =  t}) = do
+    ntvr xs tvr@(TVr { tvrIdent = eid, tvrType =  t}) | eid == emptyId = do
         t' <- inType (f t)
         let nvr = (tvr { tvrType =  t'})
         return (nvr,id)

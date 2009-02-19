@@ -306,7 +306,7 @@ constantCaf Program { progDataTable = dataTable, progCombinators = combs } = ans
     conv :: E -> Val
     conv e | Just [v] <- literal e = v
     conv (ELit lc@LitCons { litName = n, litArgs = es }) | Just nn <- getName lc = (Const (NodeC nn (keepIts $ map conv es)))
-    conv (EPi (TVr { tvrIdent = 0, tvrType =  a}) b)  =  Const $ NodeC tagArrow [conv a,conv b]
+    conv (EPi (TVr { tvrIdent = z, tvrType =  a}) b) | isEmptyId z =  Const $ NodeC tagArrow [conv a,conv b]
     conv (EVar v) | v `Set.member` lbs = Var (cafNum v) (TyPtr TyNode)
     conv e | (EVar x,as) <- fromAp e, Just vs <- mlookup x res, vs > length as = Const (NodeC (partialTag (scTag x) (vs - length as)) (keepIts $ map conv as))
     conv (EVar v) | Just ce <- mlookup v coMap = ce
@@ -334,7 +334,7 @@ getName' dataTable v@LitCons { litName = n, litArgs = es }
 instance ToVal TVr where
     toVal TVr { tvrType = ty, tvrIdent = num } = case toType (TyPtr TyNode) ty of
 --        TyTup [] -> Tup []
-        ty -> Var (V num) ty
+        ty -> Var (V $ idToInt num) ty
 
 
 doApply x y ty | not (keepIt y) = App funcApply [x] ty
@@ -494,7 +494,7 @@ compile' cenv (tvr,as,e) = ans where
         r <- ce r
         return $ e :>>= [] :-> r
     ce ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d } |  Just ty <- toCmmTy (getType e :: E) = do
-            v <- if tvrIdent b == 0 then newPrimVar $ TyPrim ty else return $ toVal b
+            v <- if tvrIdent b == emptyId then newPrimVar $ TyPrim ty else return $ toVal b
             e <- ce e
             as' <- mapM cp'' as
             def <- createDef d (return (toVal b))
@@ -504,7 +504,7 @@ compile' cenv (tvr,as,e) = ans where
         v <- newNodeVar
         e <- ce scrut
         case (b,scrut) of
-            (TVr { tvrIdent = 0 },EVar etvr) -> localEvaled [etvr] v $ do
+            (TVr { tvrIdent = z },EVar etvr) | isEmptyId z -> localEvaled [etvr] v $ do
                     as <- mapM cp as
                     def <- createDef d newNodeVar
                     return $ e :>>= [v] :-> Case v (as ++ def)
@@ -512,7 +512,7 @@ compile' cenv (tvr,as,e) = ans where
 --                    as <- mapM cp as
 --                    def <- createDef d newNodeVar
 --                    return $ e :>>= [v] :-> Return [toVal etvr] :>>= [toVal b] :-> Case v (as ++ def)
-            (TVr { tvrIdent = 0 },_) -> do
+            (TVr { tvrIdent = z },_) | isEmptyId z -> do
                 as <- mapM cp as
                 def <- createDef d newNodeVar
                 return $ e :>>= [v] :-> Case v (as ++ def)
@@ -528,7 +528,7 @@ compile' cenv (tvr,as,e) = ans where
                            <$> text "can't grok expression:" <+> pprint e)
 
     localEvaled vs v action = local (\lenv -> lenv { evaledMap = nm `mappend` evaledMap lenv }) action where
-        nm = fromList [ (tvrIdent x, v) | x <- vs, tvrIdent x /= 0 ]
+        nm = fromList [ (tvrIdent x, v) | x <- vs, tvrIdent x /= emptyId ]
 
     localFuncs vs action = local (\lenv -> lenv { lfuncMap = fromList vs `mappend` lfuncMap lenv }) action
 
@@ -697,12 +697,12 @@ compile' cenv (tvr,as,e) = ans where
     constant e@(ELit lc@LitCons { litName = n, litArgs = es }) | Just es <- mapM constant es, Just nn <- getName lc = if isLifted e
         then return $ Const (NodeC nn (keepIts es))
         else return (NodeC nn (keepIts es))
-    constant (EPi (TVr { tvrIdent = 0, tvrType = a}) b) | Just a <- constant a, Just b <- constant b = return $ NodeC tagArrow [a,b]
+    constant (EPi (TVr { tvrIdent = z, tvrType = a}) b) | isEmptyId z, Just a <- constant a, Just b <- constant b = return $ NodeC tagArrow [a,b]
     constant _ = fail "not a constant term"
 
     -- | convert a constructor into a Val, arguments may depend on local vars.
     con :: Monad m => E -> m [Val]
-    con (EPi (TVr {tvrIdent =  0, tvrType = x}) y) = do
+    con (EPi (TVr {tvrIdent =  z, tvrType = x}) y) | isEmptyId z = do
         return $  [NodeC tagArrow (args [x,y])]
     con v@(ELit LitCons { litName = n, litArgs = es })
         | conAlias cons /= NotAlias = error $ "Alias still exists: " ++ show v

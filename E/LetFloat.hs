@@ -55,10 +55,10 @@ atomizeAp inscope atomizeTypes dataTable e = runReader (f e) inscope where
     f el@ELetRec { eDefs = ds } = local (`mappend` fromList (map (tvrIdent . fst) ds)) $ emapEG f return el
     f ec@ECase {} = local (`mappend` fromList (map tvrIdent (caseBinds ec))) $ emapEG f return ec
     f (ELit lc@LitCons { litArgs = xs }) = mapM f xs >>= dl (\xs -> ELit lc { litArgs = xs })
-    f ep@(EPi tvr@TVr {tvrIdent = i, tvrType = t} b) | i == 0 || i `notMember` freeIds b  = do
+    f ep@(EPi tvr@TVr {tvrIdent = i, tvrType = t} b) | i == emptyId || i `notMember` freeIds b  = do
         t <- f t
         b <- f b
-        dl (\ [t,b] -> EPi tvr { tvrIdent = 0, tvrType = t } b) [t,b]
+        dl (\ [t,b] -> EPi tvr { tvrIdent = emptyId, tvrType = t } b) [t,b]
     f ep@(EPi  TVr { tvrIdent = i } _) = local (insert i) $ emapEG f return ep
     f (EPrim n xs t) = mapM f xs >>= dl (\xs -> EPrim n xs t)
     f e = case fromAp e of

@@ -12,8 +12,6 @@ module Name.Name(
     parseName,
     ffiExportName,
     isConstructorLike,
-    toId,
-    fromId,
     Module,
     isTypeNamespace,
     isValNamespace,
@@ -163,15 +161,6 @@ instance Show Name where
 instance DocLike d => PPrint d Name  where
     pprint n = text (show n)
 
-toId :: Name -> Int
-toId x = fromAtom (toAtom x)
-
-fromId :: Monad m => Int -> m Name
---fromId i | even i || i < 0 = fail $ "Name.fromId: not a name " ++ show i
---fromId i | not $ isValidAtom i = fail $ "Name.fromId: not a name " ++ show i
-fromId i = case intToAtom i of
-    Just a -> return $ Name a
-    Nothing -> fail $ "Name.fromId: not a name " ++ show i
 
 mapName :: (String -> String,String -> String) -> Name -> Name
 mapName (f,g) n = case nameParts n of

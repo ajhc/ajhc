@@ -7,7 +7,6 @@ import List
 import Maybe
 import qualified Data.Map as Map
 
-import StringTable.Atom
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
@@ -86,7 +85,7 @@ programUpdate prog = check $ ucache prog where
     check x
         | not flint = x
         | hasRepeatUnder combIdent ds = error $ "programSetDs: program has redundant definitions: \n" ++ names
-        | any (not . isValidAtom) (map combIdent ds) = error $ "programSetDs: trying to set non unique top level name: \n" ++ names
+        | any (not . isJust . fromId) (map combIdent ds) = error $ "programSetDs: trying to set non unique top level name: \n" ++ names
         | otherwise = x
     names = intercalate "\n"  (sort $ map (show . tvrShowName . combHead) ds)
 

@@ -262,7 +262,7 @@ specializeProgram doSpecialize unusedRules unusedValues prog = do
     return $ progCombinators_s nds prog
 
 
-repi (ELit LitCons { litName = n, litArgs = [a,b] }) | n == tc_Arrow = EPi tvr { tvrIdent = 0, tvrType = repi a } (repi b)
+repi (ELit LitCons { litName = n, litArgs = [a,b] }) | n == tc_Arrow = EPi tvr { tvrIdent = emptyId, tvrType = repi a } (repi b)
 repi e = runIdentity $ emapE (return . repi ) e
 
 {-
@@ -409,7 +409,7 @@ expandPlaceholder comb  | getProperty prop_PLACEHOLDER (combHead comb) = do
         ne = emptyCase {
             eCaseScrutinee = EVar a,
             eCaseAlts = map calt rules,
-            eCaseBind = a { tvrIdent = 0 },
+            eCaseBind = a { tvrIdent = emptyId },
             eCaseType = ct
             }
         calt rule@Rule { ruleArgs = ~(arg:rs) } = Alt vp (substMap (fromList [ (tvrIdent v,EVar r) | ~(EVar v) <- rs | r <- ras ]) $ ruleBody rule) where

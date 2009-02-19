@@ -41,7 +41,7 @@ increment/decrement - increment or decrement a primitive numeric type by 1
 -}
 
 
-unbox :: DataTable -> E -> Int -> (TVr -> E) -> E
+unbox :: DataTable -> E -> Id -> (TVr -> E) -> E
 unbox dataTable e vn wtd = eCase e  [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd tvra)] Unknown where
     te = getType e
     tvra = tVr vn sta

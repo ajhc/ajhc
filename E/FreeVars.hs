@@ -24,7 +24,7 @@ getLitTyp LitCons { litType = t } = t
 
 instance FreeVars E [TVr] where
     freeVars x = melems $ (freeVars x :: IdMap TVr)
-instance FreeVars E [Int] where
+instance FreeVars E [Id] where
     freeVars e =  idSetToList (freeVars e)
 
 instance FreeVars E t => FreeVars TVr t where

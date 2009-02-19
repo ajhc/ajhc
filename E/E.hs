@@ -65,13 +65,13 @@ instance ConNames (Lit E E) where
 
 
 
-tFunc a b = ePi (tVr 0 a) b
+tFunc a b = ePi (tVr emptyId a) b
 
 -- values
 
 
 
-tvrSilly = tVr ((-1)) Unknown
+tvrSilly = tVr (anonymous (-1)) Unknown
 
 -----------------
 -- E constructors

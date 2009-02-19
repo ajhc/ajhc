@@ -116,7 +116,7 @@ collectOccurance :: E -> OM E -- ^ (annotated expression, free variables mapped 
 collectOccurance e = f e  where
     f e@ESort {} = return e
     f e@Unknown {} = return e
-    f (EPi tvr@TVr { tvrIdent = 0, tvrType =  a} b) = arg $ do
+    f (EPi tvr@TVr { tvrIdent = eid, tvrType =  a} b) | isEmptyId eid = arg $ do
         a <- f a
         b <- f b
         return (EPi tvr { tvrType = a } b)
@@ -124,7 +124,7 @@ collectOccurance e = f e  where
         a <- f a
         (b,tfvs) <- grump (f b)
         case mlookup n tfvs of
-            Nothing -> tell (tfvs,mempty) >>  return (EPi tvr { tvrIdent =  0, tvrType = a } b)
+            Nothing -> tell (tfvs,mempty) >>  return (EPi tvr { tvrIdent =  emptyId, tvrType = a } b)
             Just occ -> tell (mdelete n tfvs,singleton n) >> return (EPi (annb' tvr { tvrType = a }) b)
     f (ELit lc@LitCons { litArgs = as, litType = t }) = arg $ do
         t <- f t
@@ -195,12 +195,12 @@ collectOccurance e = f e  where
 -- delete any occurance info for non-let-bound vars to be safe
 annb' tvr = tvrInfo_u (Info.delete noUseInfo) tvr
 annbind' idm tvr = case mlookup (tvrIdent tvr) idm of
-    Nothing | sortTermLike (getType tvr) -> annb' tvr { tvrIdent = 0 }
+    Nothing | sortTermLike (getType tvr) -> annb' tvr { tvrIdent = emptyId }
     _ -> annb' tvr
 
 -- add ocucrance info
 annbind idm tvr = case mlookup (tvrIdent tvr) idm of
-    Nothing -> annb notUsedInfo tvr { tvrIdent = 0 }
+    Nothing -> annb notUsedInfo tvr { tvrIdent = emptyId }
     Just x -> annb x tvr
 annb x tvr = tvrInfo_u (Info.insert x) tvr
 
@@ -378,23 +378,23 @@ insertSuspSubst :: TVr -> InE -> Env -> Env
 insertSuspSubst t e env = insertSuspSubst' (tvrIdent t) e env
 
 insertSuspSubst' :: Id -> InE -> Env -> Env
-insertSuspSubst' 0 _e env = env
+insertSuspSubst' z _e env | isEmptyId z = env
 insertSuspSubst' t e env = cacheSubst env { envSubst = minsert t (susp e (envSubst env)) (envSubst env) }
 
 insertRange :: Id -> Range -> Env -> Env
-insertRange 0 e env = env
+insertRange z e env | isEmptyId z = env
 insertRange t e env = cacheSubst env { envSubst = minsert t e (envSubst env) }
 
 insertDoneSubst :: TVr -> OutE -> Env -> Env
 insertDoneSubst t e env = insertDoneSubst' (tvrIdent t) e env
 
 insertDoneSubst' :: Id -> OutE -> Env -> Env
-insertDoneSubst' 0 _e env = env
+insertDoneSubst' z _e env | isEmptyId z = env
 insertDoneSubst' t e env = insertRange t (Done e) env
 
 
 insertInScope :: Id -> Binding -> Env -> Env
-insertInScope 0 _b env = env
+insertInScope z _b env | isEmptyId z = env
 insertInScope t b env = extendScope (msingleton t b) env
 
 extendScope :: IdMap Binding -> Env -> Env
@@ -565,7 +565,7 @@ simplifyDs prog sopts dsIn = ans where
         done StartContext res
     f cont e = trace ("Fall through: " ++ show (cont,e)) $ dosub e >>= done cont
 
-    showName t | isValidAtom t || dump FD.EVerbose = tvrShowName (tVr t Unknown)
+    showName t | isJust (fromId t) || dump FD.EVerbose = tvrShowName (tVr t Unknown)
              | otherwise = "(epheremal)"
 
     -- Rename a if necessary. We always have to substitute all occurrences because we update the type.
@@ -573,7 +573,7 @@ simplifyDs prog sopts dsIn = ans where
         t' <- dosub t
         inb <- ask
         let t'' = substMap' (envInScopeCache inb) t'
-        n' <- if n == 0 then return 0 else uniqueName n
+        n' <- if n == emptyId then return emptyId else uniqueName n
         return $ tvr { tvrIdent = n', tvrType =  t'' }
     -- TODO - case simplification
     tickCont (ApplyTo _ cont) cs = mtick ("E.Simplify.application-push." ++ cs) >> tickCont cont cs
@@ -682,7 +682,7 @@ simplifyDs prog sopts dsIn = ans where
             doCase e _ b [] (Just d) | isUnboxed (getType e), isAtomic e = do
                 mtick "E.Simplify.case-atomic-unboxed"
                 localEnv (insertDoneSubst b e) $ f cont d
-            doCase e _ TVr { tvrIdent = 0 } [] (Just d) | isOmittable inb e = do
+            doCase e _ TVr { tvrIdent = z } [] (Just d) | isEmptyId z, isOmittable inb e = do
                 mtick "E.Simplify.case-omittable"
                 f cont d
             doCase (EVar v) _ b [] (Just d) | Just (NotAmong _) <-  varval  = do
@@ -698,7 +698,7 @@ simplifyDs prog sopts dsIn = ans where
                 tickCont cont "case"
                 b' <- nname b
                 (ids,b') <- case (e,tvrIdent b') of
-                    (EVar v,0) -> do
+                    (EVar v,z) | isEmptyId z -> do
                         nn <- newName
                         b' <- return b' { tvrIdent = nn }
                         return $ (insertInScope (tvrIdent v) (isBoundTo noUseInfo (EVar b')),b')
@@ -721,7 +721,7 @@ simplifyDs prog sopts dsIn = ans where
                             ninb = fromList [ (n,NotKnown)  | TVr { tvrIdent = n } <- ns' ]
                         e' <- localEnv (const $ ids $ substAddList nsub (extendScope ninb $ mins e (patToLitEE p') inb)) $ f cont ae
                         return $ Alt p' e'
-                    mins _ e | 0 `notMember` (freeVars e :: IdSet) = insertInScope (tvrIdent b') (isBoundTo noUseInfo e)
+                    mins _ e | emptyId `notMember` (freeVars e :: IdSet) = insertInScope (tvrIdent b') (isBoundTo noUseInfo e)
                     mins _ _ = id
 
                 d' <- T.mapM dd d
@@ -754,7 +754,7 @@ simplifyDs prog sopts dsIn = ans where
         inb <- ask
         case mr of
             Just (bs,e) -> do
-                let bs' = [ x | x@(TVr { tvrIdent = n },_) <- bs, n /= 0]
+                let bs' = [ x | x@(TVr { tvrIdent = n },_) <- bs, n /= emptyId]
                 binds <- mapM (\ (v,e) -> nname v >>= return . (,,) e v) bs'
                 e' <- localEnv (substAddList [ (n,Done $ EVar nt) | (_,TVr { tvrIdent = n },nt) <- binds] . extendScope (fromList [ (n,isBoundTo noUseInfo e) | (e,_,TVr { tvrIdent = n }) <- binds])) $ f StartContext e
                 done cont $ eLetRec [ (v,e) | (e,_,v) <- binds ] e'
@@ -1073,7 +1073,7 @@ instance NameMonad Id SM where
         sm <- get
         let (g1,g2) = split (smStdGen sm)
         put sm{smStdGen = g1}
-        newNameFrom (filter (>0) $ filter even $ randoms g2)
+        newNameFrom (map anonymous $ filter (>0) $ filter even $ randoms g2)
 
 smUsedNames = SM $ gets idsUsed
 smBoundNames = SM $ gets idsBound

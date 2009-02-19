@@ -62,7 +62,7 @@ staticArgumentTransform prog = ans where
         (body,args) = fromLam v
         (droppedAs,keptAs) = splitAt dropArgs args
         rbody = foldr ELam (subst t newV body)  keptAs
-        newV = foldr ELam (EVar tvr') [ t { tvrIdent = 0 } | t <- droppedAs ]
+        newV = foldr ELam (EVar tvr') [ t { tvrIdent = emptyId } | t <- droppedAs ]
         tvr' = tvr { tvrIdent = nname, tvrType = getType rbody }
         ne' = foldr ELam (ELetRec [(tvr',rbody)]  (foldl EAp (EVar tvr') (map EVar keptAs))) args
         ans = do
@@ -278,7 +278,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
                 t <- globalName t
                 tellCombinator (t,ls,e'')
             r
-        globalName tvr | not $ isValidAtom (tvrIdent tvr) = do
+        globalName tvr | isNothing $ fromId (tvrIdent tvr) = do
             TVr { tvrIdent = t } <- newName Unknown
             let ntvr = tvr { tvrIdent = t }
             tell ([],msingleton (tvrIdent tvr) (Just $ EVar ntvr))

@@ -17,7 +17,6 @@ import Data.Monoid
 import Data.Maybe
 import qualified Data.Traversable as T
 
-import StringTable.Atom
 import E.E
 import E.FreeVars(caseUpdate)
 import E.Type
@@ -149,12 +148,12 @@ renameE initSet initMap e = runReader (runIdNameT' $ addBoundNamesIdMap initMap 
         return (Alt (LitInt n t') l')
     localSubst :: (IdMap E) -> IdNameT (Reader (IdMap E)) a  -> IdNameT (Reader (IdMap E)) a
     localSubst ex action = do local (ex `mappend`) action
-    ntvr _ fg tv@TVr { tvrIdent = 0, tvrType = t} = do
+    ntvr _ fg tv@TVr { tvrIdent = eid, tvrType = t} | eid == emptyId = do
         t' <- fg t
         return (mempty,tv { tvrType = t'})
     ntvr ralways fg tv@(TVr { tvrIdent = n, tvrType = t}) = do
         --n' <- if n > 0 && (not ralways || isValidAtom n) then uniqueName  n else newName
-        n' <- if not (isEtherialId n) && (not ralways || isValidAtom n) then uniqueName  n else newName
+        n' <- if not (isEtherealId n) && (not ralways || isJust (fromId n)) then uniqueName  n else newName
         --n' <- if (not ralways || isValidAtom n) then uniqueName  n else newName
         t' <- fg t
         let tv' = tv { tvrIdent = n', tvrType = t' }

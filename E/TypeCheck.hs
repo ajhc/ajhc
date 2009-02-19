@@ -208,7 +208,7 @@ inferType dataTable ds e = rfc e where
         zipWithM_ eq sts es'
         return t'
     fc e@(ELit _) = let t = getType e in valid t >> return t
-    fc (EVar (TVr { tvrIdent = 0 })) = fail "variable with nothing!"
+    fc (EVar (TVr { tvrIdent = eid })) | eid == emptyId = fail "variable with nothing!"
     fc (EVar (TVr { tvrType =  t})) = valid t >> strong' t
     fc (EPi (TVr { tvrIdent = n, tvrType =  at}) b) = do
         ESort a <- rfc at
@@ -227,7 +227,7 @@ inferType dataTable ds e = rfc e where
             a' <- rfc a
             if a' == tBox then return tBox else strong' (eAp a' b)
     fc (ELetRec vs e) = do
-        let ck (TVr { tvrIdent = 0 },_) = fail "binding of empty var"
+        let ck (TVr { tvrIdent = eid },_) | eid == emptyId = fail "binding of empty var"
             ck (tv@(TVr { tvrType =  t}),e) = withContextDoc (hsep [text "Checking Let: ", parens (pprint tv),text  " = ", parens $ prettyE e ])  $ do
                 when (getType t == eHash && not (isEPi t)) $ fail $ "Let binding unboxed value: " ++ show (tv,e)
                 valid' nds t
@@ -278,7 +278,7 @@ inferType dataTable ds e = rfc e where
         mapM_ verifyPats' xs
         when (hasRepeatUnder litHead xs) $ fail "Duplicate case alternatives"
 
-    verifyPats' LitCons { litArgs = xs } = when (hasRepeatUnder id (filter (/= 0) $ map tvrIdent xs)) $ fail "Case pattern is non-linear"
+    verifyPats' LitCons { litArgs = xs } = when (hasRepeatUnder id (filter (/= emptyId) $ map tvrIdent xs)) $ fail "Case pattern is non-linear"
     verifyPats' _ = return ()
 
     eqAll ts = withContextDoc (text "eqAll" </> list (map prettyE ts)) $ foldl1M_ eq ts
@@ -367,7 +367,7 @@ tcE e = rfc e where
     fc s@ESort {} = return $ getType s
     fc (ELit LitCons { litType = t }) = strong' t
     fc e@ELit {} = strong' (getType e)
-    fc (EVar TVr { tvrIdent = 0 }) = fail "variable with nothing!"
+    fc (EVar TVr { tvrIdent = eid }) | eid == emptyId = fail "variable with nothing!"
     fc (EVar TVr { tvrType =  t}) =  strong' t
     fc (EPi TVr { tvrIdent = n, tvrType = at} b) =  do
         ESort a <- rfc at
@@ -401,7 +401,7 @@ typeInfer'' dataTable ds e = rfc e where
     fc s@ESort {} = return $ getType s
     fc (ELit LitCons { litType = t }) = strong' t
     fc e@ELit {} = strong' (getType e)
-    fc (EVar TVr { tvrIdent = 0 }) = fail "variable with nothing!"
+    fc (EVar TVr { tvrIdent = eid }) | eid == emptyId = fail "variable with nothing!"
     fc (EVar TVr { tvrType =  t}) =  strong' t
     fc (EPi TVr { tvrIdent = n, tvrType = at} b) =  do
         ESort a <- rfc at
@@ -440,7 +440,7 @@ match :: Monad m =>
     -> E                  -- ^ pattern to match
     -> E                  -- ^ input expression
     -> m [(TVr,E)]
-match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () (-2::Int)) where
+match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () etherealIds) where
     bvs :: IdSet
     bvs = fromList (map tvrIdent vs)
 
@@ -460,14 +460,14 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () (-2::Int)) 
         un t t' mm c
 
     un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | i == j = un t u mm c
-    un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | i < 0 || j < 0  = fail "Expressions don't match"
+    un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | isEtherealId i || isEtherealId j   = fail "Expressions don't match"
     un (EVar tvr@TVr { tvrIdent = i, tvrType = t}) b mm c
         | i `member` bvs = tell (Seq.single (tvr,b))
         | otherwise = fail $ "Expressions do not unify: " ++ show tvr ++ show b
     un a (EVar tvr) mm c | Just b <- lup (tvrIdent tvr), not $ isEVar b = un a b mm c
 
     un a b _ _ = fail $ "Expressions do not unify: " ++ show a ++ show b
-    lam va ea vb eb mm c = do
-        un (tvrType va) (tvrType vb) mm c
-        un (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb) mm (c - 2)
+    lam va ea vb eb mm (c:cs) = do
+        un (tvrType va) (tvrType vb) mm (c:cs)
+        un (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb) mm cs
 

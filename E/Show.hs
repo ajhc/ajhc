@@ -37,7 +37,7 @@ prettyE e = render $ ePretty e
 ePrettyEx = ePretty
 
 showId :: DocLike d => Id -> d
-showId 0 = (char '_')
+showId e | e == emptyId = (char '_')
 showId i | Just x <- fromId i  = (text $ show x)
 showId i = (text $ 'x':show i)
 
@@ -133,12 +133,12 @@ showTVr' TVr { tvrIdent = i} = do
 
 allocTVr :: TVr -> SEM a -> SEM a
 allocTVr _tvr action | dump FD.EVerbose = action
-allocTVr tvr action | tvrIdent tvr == 0 = action
+allocTVr tvr action | tvrIdent tvr == emptyId = action
 allocTVr tvr (SEM action) | tvrType tvr == eStar  = do
     SEM $ subVarName $ newName (map (:[]) ['a' ..]) eStar (tvrIdent tvr) >> action
 allocTVr tvr (SEM action) | tvrType tvr == eStar `tFunc` eStar  = do
     SEM $ subVarName $ newName (map (('f':) . show) [0::Int ..])  (tvrType tvr) (tvrIdent tvr) >> action
-allocTVr tvr (SEM action) | not $ isValidAtom (tvrIdent tvr) = do
+allocTVr tvr (SEM action) | not $ isJust (fromId (tvrIdent tvr)) = do
     SEM $ subVarName $ newName (map (('v':) . show) [1::Int ..]) Unknown (tvrIdent tvr) >> action
 allocTVr _ action = action
 
@@ -146,7 +146,7 @@ tBoolzh = ELit litCons { litName = tc_Boolzh, litType = eHash, litAliasFor = Jus
 
 -- collects lambda and pi abstractions
 collectAbstractions e0 = go e0 [] where
-    go e1@(EPi tvr e)  xs | tvrIdent tvr == 0                = done e1 xs
+    go e1@(EPi tvr e)  xs | tvrIdent tvr == emptyId          = done e1 xs
                           | not (sortKindLike (tvrType tvr)) = go e ((UC.pI,     tvr, True) :xs)
                           | tvrType tvr /= eStar             = go e ((UC.forall, tvr, True) :xs)
                           | dump FD.EVerbose || tvrIdent tvr `member` (freeVars e::IdSet)
@@ -178,7 +178,7 @@ showE e = do
         f e | e == vTrue     = return $ atom $ text "True"
         f e | e == vUnit     = return $ atom $ text "()"
         f (EAp a b) = liftM2 app (showE a) (showE b)
-        f (EPi (TVr { tvrIdent = 0, tvrType =  e1}) e2) = liftM2 arr (showE e1) (showE e2)
+        f (EPi (TVr { tvrIdent = eid, tvrType =  e1}) e2) | eid == emptyId = liftM2 arr (showE e1) (showE e2)
         f (EPi (TVr { tvrIdent = n, tvrType =  e1}) e2) | not $ dump FD.EVerbose, not $ n `member` (freeVars e2 ::IdSet) = liftM2 arr (showE e1) (showE e2)
         f e0 | (as@(_:_), e) <- collectAbstractions e0 =
             foldr (\(_, tvr, _) -> allocTVr tvr)
@@ -216,7 +216,7 @@ showE e = do
             alts <- mapM showAlt alts
             let ecb = eCaseBind ec
                 isUsed = tvrIdent ecb `member` (freeVars (caseBodies ec) :: IdSet)
-            db <- showTVr (if dump FD.EVerbose || isUsed then ecb else ecb { tvrIdent = 0 })
+            db <- showTVr (if dump FD.EVerbose || isUsed then ecb else ecb { tvrIdent = emptyId })
             dcase <- case (eCaseDefault ec) of
                 Nothing -> return []
                 Just e -> do

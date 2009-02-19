@@ -111,18 +111,18 @@ emptyCase = ECase {
     }
 
 
-eCaseTup e vs w = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind =  (tVr 0 (getType e)), eCaseType = getType w, eCaseAlts =  [Alt litCons { litName = nameTuple DataConstructor (length vs), litArgs = vs, litType = getType e } w] }
-eCaseTup' e vs w = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseType = getType w, eCaseAlts =  [Alt litCons { litName = unboxedNameTuple DataConstructor (length vs), litArgs = vs, litType = getType e} w] }
+eCaseTup e vs w = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind =  (tVr emptyId (getType e)), eCaseType = getType w, eCaseAlts =  [Alt litCons { litName = nameTuple DataConstructor (length vs), litArgs = vs, litType = getType e } w] }
+eCaseTup' e vs w = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind = (tVr emptyId (getType e)), eCaseType = getType w, eCaseAlts =  [Alt litCons { litName = unboxedNameTuple DataConstructor (length vs), litArgs = vs, litType = getType e} w] }
 
 eJustIO w x = eTuple' [w,x] -- ELit litCons { litName = dc_JustIO, litArgs = [w,x], litType = ELit litCons { litName = tc_IOResult, litArgs = [getType x], litType = eStar } }
 tIO t = ELit (litCons { litName = tc_IO, litArgs = [t], litType = eStar })
 
-eCase e alts@(alt:_) Unknown = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseType = getType alt,  eCaseAlts =  alts }
-eCase e alts els = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind = (tVr 0 (getType e)), eCaseDefault = Just els, eCaseAlts =  alts, eCaseType = getType els }
+eCase e alts@(alt:_) Unknown = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind = (tVr emptyId (getType e)), eCaseType = getType alt,  eCaseAlts =  alts }
+eCase e alts els = caseUpdate emptyCase { eCaseScrutinee = e, eCaseBind = (tVr emptyId (getType e)), eCaseDefault = Just els, eCaseAlts =  alts, eCaseType = getType els }
 
 -- | This takes care of types right away, it simplifies various other things to do it this way.
 eLet :: TVr -> E -> E -> E
-eLet TVr { tvrIdent = 0 } _ e' = e'
+eLet TVr { tvrIdent = eid } _ e' | eid == emptyId = e'
 eLet t@(TVr { tvrType =  ty}) e e'
     | sortKindLike ty && isAtomic e = subst t e e'
     | sortKindLike ty = ELetRec [(t,e)] (typeSubst mempty (msingleton (tvrIdent t) e) e')
@@ -136,7 +136,7 @@ eStrictLet t v e = caseUpdate emptyCase { eCaseScrutinee = v, eCaseBind = t, eCa
 
 substLet :: [(TVr,E)] -> E -> E
 substLet ds e  = ans where
-    (as,nas) = partition (isAtomic . snd) (filter ((/= 0) . tvrIdent . fst) ds)
+    (as,nas) = partition (isAtomic . snd) (filter ((/= emptyId) . tvrIdent . fst) ds)
     tas = filter (sortKindLike . tvrType . fst) nas
     ans = eLetRec (as ++ nas) (typeSubst' (fromList [ (n,e) | (TVr { tvrIdent = n },e) <- as]) (fromList [ (n,e) | (TVr { tvrIdent = n },e) <- tas]) e)
 
@@ -144,7 +144,7 @@ substLet ds e  = ans where
 substLet' :: [(TVr,E)] -> E -> E
 substLet' ds' e  = ans where
     (hh,ds) = partition (isUnboxed . tvrType . fst) ds'
-    nas = filter ((/= 0) . tvrIdent . fst) ds
+    nas = filter ((/= emptyId) . tvrIdent . fst) ds
     tas = filter (sortKindLike . tvrType . fst) nas
     ans = case (nas,tas) of
         ([],_) -> hhh hh $ e
@@ -161,7 +161,7 @@ eLetRec = substLet'
 
 
 prim_seq a b | isWHNF a = b
-prim_seq a b = caseUpdate emptyCase { eCaseScrutinee = a, eCaseBind =  (tVr 0 (getType a)), eCaseDefault = Just b, eCaseType = getType b }
+prim_seq a b = caseUpdate emptyCase { eCaseScrutinee = a, eCaseBind =  (tVr emptyId (getType a)), eCaseDefault = Just b, eCaseType = getType b }
 
 
 prim_unsafeCoerce e t = p e' where

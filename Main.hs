@@ -677,9 +677,9 @@ boxifyProgram prog = ans where
 -- | get rid of unused bindings
 cleanupE :: E -> E
 cleanupE e = runIdentity (f e) where
-    f (ELam t@TVr { tvrIdent = v } e) | v /= 0, v `notMember` freeIds e = f (ELam t { tvrIdent = 0 } e)
-    f (EPi t@TVr { tvrIdent = v } e) | v /= 0, v `notMember` freeIds e = f (EPi t { tvrIdent = 0 } e)
-    f ec@ECase { eCaseBind = t@TVr { tvrIdent = v } } | v /= 0, v `notMember` (freeVars (caseBodies ec)::IdSet) = f ec { eCaseBind = t { tvrIdent = 0 } }
+    f (ELam t@TVr { tvrIdent = v } e) | v /= emptyId, v `notMember` freeIds e = f (ELam t { tvrIdent = emptyId } e)
+    f (EPi t@TVr { tvrIdent = v } e) | v /= emptyId, v `notMember` freeIds e = f (EPi t { tvrIdent = emptyId } e)
+    f ec@ECase { eCaseBind = t@TVr { tvrIdent = v } } | v /= emptyId, v `notMember` (freeVars (caseBodies ec)::IdSet) = f ec { eCaseBind = t { tvrIdent = emptyId } }
     f e = emapEG f f e
 
 simplifyParms = transformParms {
@@ -932,7 +932,7 @@ lintCheckProgram onerr prog | flint = do
         printProgram prog
         putErrLn $ ">>> program has repeated toplevel definitions" ++ pprint repeats
         maybeDie
-    let f (tvr@TVr { tvrIdent = n },e) | not $ isValidAtom n = do
+    let f (tvr@TVr { tvrIdent = n },e) | isNothing $ fromId n = do
             onerr
             putErrLn $ ">>> non-unique name at top level: " ++ pprint tvr
             printProgram prog

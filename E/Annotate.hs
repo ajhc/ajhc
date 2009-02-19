@@ -121,12 +121,12 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         alts <- local r (mapM da $ eCaseAlts ec)
         t' <- f (eCaseType ec)
         return $ caseUpdate ECase { eCaseAllFV = error "no eCaseAllFV needed",  eCaseScrutinee = e', eCaseType = t', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts }
-    lp bnd lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == 0  = do
+    lp bnd lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == emptyId  = do
         t' <- f t
         nfo <- lift $ lamann e (tvrInfo tvr)
         nfo <- lift $ idann n nfo
         e' <- local (minsert n Nothing) $ f e
-        return $ lam (tvr { tvrIdent =  0, tvrType =  t', tvrInfo =  nfo}) e'
+        return $ lam (tvr { tvrIdent = emptyId, tvrType =  t', tvrInfo =  nfo}) e'
     lp bnd lam tvr e = do
         nfo <- lift $ lamann e (tvrInfo tvr)
         (tv,r) <- ntvr  [] tvr { tvrInfo = nfo }
@@ -138,9 +138,9 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
             (t',r) <- ntvr vs t
             local r $ f ts ((t',r):rs)
         vs = [ tvrIdent x | x <- ts ]
-    ntvr xs tvr@(TVr { tvrIdent = 0, tvrType =  t}) = do
+    ntvr xs tvr@(TVr { tvrIdent = n, tvrType =  t}) | n == emptyId = do
         t' <- f t
-        nfo <- lift $ idann 0 (tvrInfo tvr)
+        nfo <- lift $ idann emptyId (tvrInfo tvr)
         let nvr = (tvr { tvrType =  t', tvrInfo = nfo})
         return (nvr,id)
     ntvr xs tvr@(TVr {tvrIdent = i, tvrType =  t}) = do

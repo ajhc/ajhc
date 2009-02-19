@@ -174,7 +174,7 @@ etaExpandDef dataTable min t e  = ans where
         (ne,flag) <- f (min - 1) a e (subst tvr' (EVar tvr) rt) _ns
         return (ELam tvr ne,flag)
     f min (AFun _ a) e (EPi tt rt) _nns = do
-        if tvrIdent t == 0
+        if tvrIdent t == emptyId
          then Stats.mtick ("EtaExpand." ++ zeroName)
           else Stats.mtick ("EtaExpand.def.{" ++ tvrShowName t)
         n <- newName
@@ -183,7 +183,7 @@ etaExpandDef dataTable min t e  = ans where
         (ne,_) <- f (min - 1) a eb (subst tt (EVar nv) rt) _nns
         return (ELam nv ne,True)
     f min a e (EPi tt rt) _nns | min > 0 = do
-        if tvrIdent t == 0
+        if tvrIdent t == emptyId
          then Stats.mtick ("EtaExpand.min." ++ zeroName)
           else Stats.mtick ("EtaExpand.min.def.{" ++ tvrShowName t)
         n <- newName
@@ -199,7 +199,7 @@ etaExpandDef dataTable min t e  = ans where
 -- | eta expand a use of a value
 etaExpandAp :: (NameMonad Id m,Stats.MonadStats m) => DataTable -> TVr -> [E] -> m (Maybe E)
 etaExpandAp dataTable tvr xs = do
-    r <- etaExpandDef dataTable 0 tvr { tvrIdent = 0} (foldl EAp (EVar tvr) xs)
+    r <- etaExpandDef dataTable 0 tvr { tvrIdent = emptyId} (foldl EAp (EVar tvr) xs)
     return (fmap snd r)
 
 {-
