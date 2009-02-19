@@ -51,9 +51,14 @@ instance BuildSet Int BitSet where
 instance ModifySet Int BitSet where
     delete i (BitSet v) = BitSet (clearBit v i)
     member i (BitSet v) = testBit v i
-    toList (BitSet v) = f 0 where
-        f c | c >= 32 = []
-            | otherwise = if testBit v c then c:f (c + 1) else f (c + 1)
+    toList (BitSet w) = f w 0 where
+        f 0 _ = []
+        f w n = if even w then f (w `shiftR` 1) (n + 1) else n:f (w `shiftR` 1) (n + 1)
+    sfilter fn (BitSet w) = f w 0 0 where
+        f 0 _ r = BitSet r
+        f w n r = if even w || not (fn n) then f w1 n1 r else f w1 n1 (setBit r n) where
+            !n1 = n + 1
+            !w1 = w `shiftR` 1
 
 
 
@@ -73,6 +78,8 @@ instance Enum a => ModifySet a (EnumBitSet a) where
     toList (EnumBitSet s) = map toEnum $ toList s
     member x (EnumBitSet s) = member (fromEnum x) s
     delete x (EnumBitSet s) = EnumBitSet $ delete (fromEnum x) s
+    sfilter fn (EnumBitSet s) = EnumBitSet $ sfilter (fn . toEnum) s
+
 
 instance (Enum a,Show a) => Show (EnumBitSet a) where
     showsPrec n bs = showsPrec n (toList bs)
