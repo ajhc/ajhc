@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -cpp #-}
+{-# LANGUAGE CPP  #-}
 module CharIO(
     putStr,
     putStrLn,
@@ -15,6 +17,7 @@ import Char
 import Control.Exception
 import Prelude hiding(putStr, putStrLn)
 import System
+import Support.Compat
 import UTF8
 import qualified IO
 import qualified Prelude (putStr, putStrLn)
@@ -22,8 +25,8 @@ import qualified Prelude (putStr, putStrLn)
 toUTF8 s = (map (chr. fromIntegral) $ toUTF s)
 fromUTF8 s = fromUTF (map (fromIntegral . ord) s)
 
---flushOut = Control.Exception.catch  (IO.hFlush IO.stdout) (\(e::SomeException) -> return ())
-flushOut = Control.Exception.catch  (IO.hFlush IO.stdout) (\_ -> return ())
+
+flushOut = Control.Exception.catch  (IO.hFlush IO.stdout) (\(e::SomeException) -> return ())
 
 putStr = Prelude.putStr . toUTF8
 putStrLn = Prelude.putStrLn . toUTF8
@@ -39,9 +42,12 @@ readFile fn = Prelude.readFile fn >>= \s -> return (fromUTF8 s)
 hGetContents h =  IO.hGetContents h >>= \s -> return (fromUTF8 s)
 
 runMain :: IO a -> IO ()
+#if __GLASGOW_HASKELL__ < 610
 runMain action = Control.Exception.catch (action >> return ()) $ \x -> case x of
         ExitException _ -> throw x
         _ -> putErrDie $ show x
---runMain action = Control.Exception.catches (action >> return ())
---                   [ Handler $ \ (e::ExitCode) -> throw e
---                   , Handler $ \ (e::SomeException) -> putErrDie $ show e ]
+#else
+runMain action = Control.Exception.catches (action >> return ())
+                   [ Handler $ \ (e::ExitCode) -> throw e
+                   , Handler $ \ (e::SomeException) -> putErrDie $ show e ]
+#endif

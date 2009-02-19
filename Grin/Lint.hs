@@ -17,12 +17,11 @@ import Grin.Show
 import Options
 import Support.FreeVars
 import Support.Transform
+import Support.Compat
 import Util.Gen
 import Util.SetLike
 import qualified FlagDump as FD
 import qualified Stats
-
-type SomeException = Exception
 
 
 lintCheckGrin grin = when flint $ typecheckGrin grin

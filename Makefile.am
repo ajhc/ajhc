@@ -43,7 +43,8 @@ HSFILES= C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs Cmm/OpEval.hs
          Util/Relation.hs Util/RWS.hs Util/SameShape.hs Util/Seq.hs Util/SetLike.hs \
          Util/SHA1.hs Util/UnionFind.hs Util/UnionSolve.hs Util/UniqueMonad.hs \
          Util/VarName.hs Version/Version.hs Version/Config.hs \
-	 StringTable/Atom.hsc Util/Util.hs Support/MD5.hs Ho/Collected.hs
+	 StringTable/Atom.hsc Util/Util.hs Support/MD5.hs Ho/Collected.hs \
+	 Support/Compat.hs
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi

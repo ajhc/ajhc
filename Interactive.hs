@@ -33,6 +33,7 @@ import Ho.Type
 import Ho.Collected
 import FrontEnd.HsPretty()
 import FrontEnd.HsSyn
+import Support.Compat
 import Name.Name
 import Options
 import qualified FrontEnd.Infix
@@ -45,7 +46,6 @@ import Util.Interact
 import Version.Version(versionString)
 import FrontEnd.Warning
 
-type SomeException = Exception
 
 printDoc doc = do
     displayIO stdout (renderPretty 0.9 80 doc)

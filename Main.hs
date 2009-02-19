@@ -1,4 +1,3 @@
-
 module Main(main) where
 
 import Control.Exception
@@ -63,6 +62,7 @@ import Options
 import Support.FreeVars
 import Support.CanType(getType)
 import Support.Transform
+import Support.Compat
 import Util.Graph
 import Util.SetLike as S
 import Version.Version(versionString,versionContext,versionSimple)
@@ -80,7 +80,6 @@ import qualified Interactive
 import qualified Stats
 import qualified IO
 
-type SomeException = Exception
 
 ---------------
 -- ∀α∃β . α → β
