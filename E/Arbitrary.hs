@@ -16,6 +16,7 @@ import Support.FreeVars
 import Name.VConsts
 import Support.CanType
 import CharIO
+import Name.Id
 
 
 
@@ -38,7 +39,7 @@ value t
 
 var t = do
     x <- randomRIO (1,100)
-    return $ TVr (2*x) t mempty
+    return $ TVr (anonymous $ 2*x) t mempty
 
 complicate :: Set.Set TVr -> E -> IO E
 complicate fvs e = do

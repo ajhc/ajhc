@@ -48,8 +48,6 @@ main = do
     testName
     testInfo
     testBinary
-    C.Generate.test
-    -- testE
 
 prop_atomid xs = fromAtom (toAtom xs) == (xs::String)
 prop_atomeq xs = (toAtom xs) == toAtom (xs::String)

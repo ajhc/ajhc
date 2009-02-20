@@ -6,10 +6,8 @@ HC= ghc
 
 all: md5 sha1 TestParse cff SelfTest
 
-md5: md5.hs
-	$(HC) $(GHCOPTS) --make $< -o $@ -I../cbits ../cbits/md5sum.c
 
 %: %.hs
-	$(HC) $(GHCOPTS) --make $< -o $@
+	$(HC) $(GHCOPTS) --make $< -o $@  -I../cbits ../cbits/md5sum.c ../StringTable/StringTable_cbits.c
 
 #       ../StringTable/StringTable_cbits.c
