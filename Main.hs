@@ -96,9 +96,8 @@ bracketHtml action = do
     wdump FD.Html $ putStrLn $ "<html><head><title>" ++ argstring ++ "</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body style=\"background: black; color: lightgrey\"><pre>"
     action `finally` (wdump FD.Html $ putStrLn "</pre></body></html>")
 
-catom action = action `finally` dumpToFile
 
-main = do -- runMain $ catom $ bracketHtml $ do
+main =  runMain $ bracketHtml $ do
     o <- processOptions
     progressM $ do
         (argstring,_) <- getArgString

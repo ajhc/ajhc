@@ -20,6 +20,7 @@ In order to build from the darcs repo, you need the following things installed:
     * GHC 6.8.2 or better
     * binary ghc library
     * zlib ghc library
+    * utf8-string ghc library
     * A recent version of DrIFT
     * pandoc if you wish to build documentation
     * graphviz if you wish to create code motion graphs

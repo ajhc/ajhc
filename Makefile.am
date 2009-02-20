@@ -33,7 +33,7 @@ HSFILES=C/Arch.hs C/Generate.hs CharIO.hs Cmm/Number.hs Cmm/OpEval.hs DerivingDr
 	Name/Prim.hs PackedString.hs PrimitiveOperators.hs \
 	RawFiles.hs Stats.hs Support/CanType.hs Support/CFF.hs Support/Compat.hs \
 	Support/FreeVars.hs Support/MapBinaryInstance.hs Support/MD5.hs Support/Tickle.hs Support/Transform.hs \
-	Support/Tuple.hs Support/Unparse.hs UTF8.hs Util/BitSet.hs Util/ContextMonad.hs Util/FilterInput.hs \
+	Support/Tuple.hs Support/Unparse.hs Util/BitSet.hs Util/ContextMonad.hs Util/FilterInput.hs \
 	Util/Gen.hs Util/Graph.hs Util/Graphviz.hs Util/HasSize.hs Util/Histogram.hs Util/Inst.hs \
 	Util/IntBag.hs Util/Interact.hs Util/NameMonad.hs Util/Once.hs Util/Perhaps.hs Util/ReaderWriter.hs \
 	Util/Relation.hs Util/RWS.hs Util/SameShape.hs Util/Seq.hs Util/SetLike.hs Util/UnionFind.hs \
@@ -44,7 +44,7 @@ GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
 GHCINC=  -i -i$(srcdir)/drift_processed  \
 	 -i$(srcdir)/.  -i$(builddir) -odir $(builddir) -hidir $(builddir)
-PACKAGES= -package mtl  -package unix -package QuickCheck -ignore-package lang
+PACKAGES= -package mtl  -package unix  -ignore-package lang -package utf8-string -package binary -package zlib
 GHCLANG=    -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
 GHCOPTS=  $(HSOPTS) -fbang-patterns -O -ignore-package lang  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 

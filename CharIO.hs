@@ -7,39 +7,28 @@ module CharIO(
     putErr,
     putErrLn,
     putErrDie,
-    CharIO.readFile,
-    CharIO.print,
-    CharIO.hGetContents,
+    readFile,
+    print,
+    hGetContents,
     runMain
     ) where
 
-import Char
 import Control.Exception
-import Prelude hiding(putStr, putStrLn)
+import Prelude hiding(readFile, print, putStr, putStrLn)
 import System
 import Support.Compat
-import UTF8
 import qualified IO
-import qualified Prelude (putStr, putStrLn)
+import System.IO.UTF8 as U
 
-toUTF8 s = (map (chr. fromIntegral) $ toUTF s)
-fromUTF8 s = fromUTF (map (fromIntegral . ord) s)
 
 
 flushOut = Control.Exception.catch  (IO.hFlush IO.stdout) (\(e::SomeException) -> return ())
 
-putStr = Prelude.putStr . toUTF8
-putStrLn = Prelude.putStrLn . toUTF8
-putErr s = flushOut >> IO.hPutStr IO.stderr (toUTF8 s)
-putErrLn s = flushOut >> hPutStrLn IO.stderr s
-putErrDie s = flushOut >> hPutStrLn IO.stderr s >> System.exitFailure
-print x = putStrLn $ show x
+putErr s = flushOut >> U.hPutStr IO.stderr s
+putErrLn s = flushOut >> U.hPutStrLn IO.stderr s
+putErrDie s = flushOut >> U.hPutStrLn IO.stderr s >> System.exitFailure
 
 
-hPutStrLn fh = IO.hPutStrLn fh . toUTF8
-
-readFile fn = Prelude.readFile fn >>= \s -> return (fromUTF8 s)
-hGetContents h =  IO.hGetContents h >>= \s -> return (fromUTF8 s)
 
 runMain :: IO a -> IO ()
 #if __GLASGOW_HASKELL__ < 610
