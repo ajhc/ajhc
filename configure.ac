@@ -22,7 +22,7 @@ AC_ARG_WITH(hcflags,
             [  --with-hcflags=HCFLAGS  specify flags for Haskell compiler],
 	    [HCFLAGS=$withval])
 
-AC_PATH_PROG([DRIFTGHC],[drift-ghc], [])
+AC_PATH_PROG([DRIFTGHC],[DrIFT], [])
 if test -z "$DRIFTGHC"; then
     echo [DrIFT not found: using preprocessed files]
 fi

@@ -14,37 +14,31 @@ BUILT_SOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.h
 MY_CINCLUDES= -I$(srcdir)/StringTable -I$(srcdir)/cbits -I$(builddir)/cbits
 MY_CFLAGS= $(MY_CINCLUDES) -optc-std=c99 -optc-O2 -optc-Wall
 
-HSFILES= C/Arch.hs C/FFI.hs C/FromGrin2.hs C/Generate.hs CharIO.hs Cmm/OpEval.hs Cmm/Op.hs \
-         C/Prims.hs DataConstructors.hs DataConstructors.hs DerivingDrift/DataP.hs DerivingDrift/Drift.hs \
-	 DerivingDrift/RuleUtils.hs DerivingDrift/StandardRules.hs Doc/Attr.hs Doc/Chars.hs Doc/DocLike.hs \
-	 Doc/PPrint.hs Doc/Pretty.hs E/Annotate.hs E/Binary.hs E/CPR.hs E/Demand.hs E/Diff.hs E/E.hs \
-	 E/Eta.hs E/Eval.hs E/FreeVars.hs E/FromHs.hs E/Inline.hs E/LambdaLift.hs E/LetFloat.hs E/PrimOpt.hs \
-	 E/Program.hs E/Rules.hs E/Show.hs E/SSimplify.hs E/Subst.hs E/Traverse.hs E/TypeAnalysis.hs \
-	 E/TypeCheck.hs E/Type.hs E/Values.hs E/WorkerWrapper.hs FindFixpoint.hs Fixer/Fixer.hs Fixer/Supply.hs \
-	 Fixer/VMap.hs FlagDump.hs FlagOpts.hs FrontEnd/Class.hs FrontEnd/DataConsAssump.hs FrontEnd/DeclsDepends.hs \
-	 FrontEnd/DependAnalysis.hs FrontEnd/Desugar.hs FrontEnd/Diagnostic.hs FrontEnd/Exports.hs \
-	 FrontEnd/FrontEnd.hs FrontEnd/HsErrors.hs FrontEnd/HsParser.hs FrontEnd/HsPretty.hs FrontEnd/HsSyn.hs \
-	 FrontEnd/Infix.hs FrontEnd/KindInfer.hs FrontEnd/Lexer.hs FrontEnd/ParseMonad.hs FrontEnd/ParseUtils.hs \
-	 FrontEnd/Rename.hs FrontEnd/Representation.hs FrontEnd/SrcLoc.hs FrontEnd/Syn/Options.hs \
-	 FrontEnd/Syn/Traverse.hs FrontEnd/Tc/Class.hs FrontEnd/Tc/Class.hs FrontEnd/Tc/Kind.hs \
-	 FrontEnd/Tc/Main.hs FrontEnd/Tc/Module.hs FrontEnd/Tc/Monad.hs FrontEnd/Tc/Type.hs \
-	 FrontEnd/Tc/Unify.hs FrontEnd/TypeSigs.hs FrontEnd/TypeSynonyms.hs FrontEnd/TypeSyns.hs \
-	 FrontEnd/Unlit.hs FrontEnd/Utils.hs FrontEnd/Warning.hs GenUtil.hs Grin/DeadCode.hs Grin/Devolve.hs \
-	 Grin/EvalInline.hs Grin/FromE.hs Grin/Grin.hs Grin/HashConst.hs Grin/Lint.hs Grin/NodeAnalyze.hs \
-	 Grin/Noodle.hs Grin/Optimize.hs Grin/Show.hs Grin/Simplify.hs Grin/SSimplify.hs Grin/Val.hs Grin/Whiz.hs \
-	 Ho/Binary.hs Ho/Build.hs Ho/Library.hs Ho/Type.hs Info/Binary.hs Info/Binary.hs Info/Info.hs \
-	 Info/Properties.hs Info/Types.hs Interactive.hs Main.hs Support/MapBinaryInstance.hs Name/Binary.hs Name/Id.hs \
-	 Name/Name.hs Name/Names.hs Name/Prim.hs Name/VConsts.hs Cmm/Number.hs Options.hs PackedString.hs \
-	 PrimitiveOperators.hs RawFiles.hs Stats.hs Support/CanType.hs Support/CFF.hs Support/FreeVars.hs \
-	 Support/Tickle.hs Support/Transform.hs Support/Tuple.hs Support/Unparse.hs UTF8.hs Util/BitSet.hs \
-	 Util/ContextMonad.hs Util/FilterInput.hs Util/Gen.hs Util/Graph.hs Util/Graphviz.hs Util/HasSize.hs \
-	 Util/Histogram.hs Util/Inst.hs Util/IntBag.hs Util/Interact.hs \
-         Util/NameMonad.hs Util/Once.hs Util/Perhaps.hs Util/ReaderWriter.hs \
-         Util/Relation.hs Util/RWS.hs Util/SameShape.hs Util/Seq.hs Util/SetLike.hs \
-         Util/SHA1.hs Util/UnionFind.hs Util/UnionSolve.hs Util/UniqueMonad.hs \
-         Util/VarName.hs Version/Version.hs Version/Config.hs \
-	 StringTable/Atom.hsc Util/Util.hs Support/MD5.hs Ho/Collected.hs \
-	 Support/Compat.hs
+HSFILES=C/Arch.hs C/Generate.hs CharIO.hs Cmm/Number.hs Cmm/OpEval.hs DerivingDrift/DataP.hs \
+	DerivingDrift/Drift.hs DerivingDrift/RuleUtils.hs Doc/Attr.hs Doc/Chars.hs Doc/DocLike.hs \
+	Doc/PPrint.hs Doc/Pretty.hs E/Annotate.hs E/Binary.hs E/Diff.hs E/E.hs E/Eta.hs E/Eval.hs \
+	E/FreeVars.hs E/FromHs.hs E/Inline.hs E/LetFloat.hs E/PrimOpt.hs E/Program.hs E/Rules.hs \
+	E/Show.hs E/Subst.hs E/Traverse.hs E/TypeAnalysis.hs E/Values.hs E/WorkerWrapper.hs \
+	FindFixpoint.hs Fixer/Fixer.hs Fixer/Supply.hs Fixer/VMap.hs FlagDump.hs FlagOpts.hs \
+	FrontEnd/DataConsAssump.hs FrontEnd/DeclsDepends.hs FrontEnd/DependAnalysis.hs FrontEnd/Desugar.hs \
+	FrontEnd/Diagnostic.hs FrontEnd/FrontEnd.hs FrontEnd/HsErrors.hs FrontEnd/HsParser.hs \
+	FrontEnd/HsPretty.hs FrontEnd/Infix.hs FrontEnd/Lexer.hs FrontEnd/ParseMonad.hs FrontEnd/ParseUtils.hs \
+	FrontEnd/Rename.hs FrontEnd/Syn/Options.hs FrontEnd/Syn/Traverse.hs FrontEnd/Tc/Class.hs FrontEnd/Tc/Main.hs \
+	FrontEnd/Tc/Module.hs FrontEnd/Tc/Type.hs FrontEnd/Tc/Unify.hs FrontEnd/TypeSigs.hs FrontEnd/TypeSynonyms.hs\
+       	FrontEnd/TypeSyns.hs FrontEnd/Unlit.hs FrontEnd/Utils.hs FrontEnd/Warning.hs GenUtil.hs Grin/DeadCode.hs\
+       	Grin/Devolve.hs Grin/EvalInline.hs Grin/FromE.hs Grin/Grin.hs Grin/HashConst.hs Grin/Lint.hs\
+       	Grin/NodeAnalyze.hs Grin/Noodle.hs Grin/Optimize.hs Grin/Show.hs Grin/Simplify.hs Grin/Val.hs \
+	Grin/Whiz.hs Ho/Binary.hs Ho/Collected.hs Ho/Library.hs Info/Binary.hs Info/Info.hs Info/Properties.hs \
+	Info/Types.hs Interactive.hs Main.hs Name/Binary.hs Name/Id.hs Name/Name.hs Name/Names.hs \
+	Name/Prim.hs PackedString.hs PrimitiveOperators.hs \
+	RawFiles.hs Stats.hs Support/CanType.hs Support/CFF.hs Support/Compat.hs \
+	Support/FreeVars.hs Support/MapBinaryInstance.hs Support/MD5.hs Support/Tickle.hs Support/Transform.hs \
+	Support/Tuple.hs Support/Unparse.hs UTF8.hs Util/BitSet.hs Util/ContextMonad.hs Util/FilterInput.hs \
+	Util/Gen.hs Util/Graph.hs Util/Graphviz.hs Util/HasSize.hs Util/Histogram.hs Util/Inst.hs \
+	Util/IntBag.hs Util/Interact.hs Util/NameMonad.hs Util/Once.hs Util/Perhaps.hs Util/ReaderWriter.hs \
+	Util/Relation.hs Util/RWS.hs Util/SameShape.hs Util/Seq.hs Util/SetLike.hs Util/UnionFind.hs \
+	Util/UnionSolve.hs Util/UniqueMonad.hs Util/Util.hs Util/VarName.hs Version/Config.hs Version/Version.hs
+
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
@@ -56,7 +50,10 @@ GHCOPTS=  $(HSOPTS) -fbang-patterns -O -ignore-package lang  $(GHCDEBUGOPTS) $(G
 
 JHC_LIBS =  base-1.0.hl haskell98-1.0.hl
 
-EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS) StringTable/StringTable_cbits.c StringTable/StringTable_cbits.h cbits/md5sum.c
+EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) \
+             lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
+	     StringTable/StringTable_cbits.c StringTable/StringTable_cbits.h cbits/md5sum.c jhc.1 \
+	     StringTable/Atom.hsc
 
 CC = $(HC)
 
@@ -78,6 +75,8 @@ uninstall-hook: $(JHC_LIBS)
 		rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/$$lib" ; \
 	done
 	rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include/HsFFI.h" ;
+	-rmdir $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include
+	-rmdir $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
@@ -99,6 +98,7 @@ drift_processed/%: %
 CFILES =  StringTable/StringTable_cbits.o  cbits/md5sum.o
 
 %.o : %.c
+	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
 	$(HC) $(MY_CFLAGS) $< -c -o $@
 
 jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES) StringTable/Atom.hs $(CFILES)
@@ -107,7 +107,7 @@ jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES) StringTable/Atom.hs $(CFILES)
 jhcp: Main.hs $(BUILT_SOURCES) $(HSFILES) StringTable/Atom.hs $(CFILES)
 	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< $(CFILES) -o $@
 
-jhc.1: Options.hs
+jhc.1: drift_processed/Options.hs
 	$(MAKE) $(AM_MAKEFLAGS) jhc$(EXEEXT)
 	help2man -N --output=jhc.1 ./jhc$(EXEEXT)
 
@@ -192,7 +192,7 @@ update-datestamp: ChangeLog
 	sh utils/update_datestamp.sh $< configure.ac
 
 depend.make: deps.txt
-	echo HSFILES=`egrep -o '[A-Za-z0-9/.]+.hs' $< | sed -e 's/^\.\///' | sort` > depend.make
+	echo HSFILES=`egrep -o '[A-Za-z0-9/._]+.hs' $< | sed -e 's/^\.\///' | sort | uniq` > depend.make
 
 built-sources: $(BUILT_SOURCES)
 
