@@ -121,7 +121,7 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
         alts <- local r (mapM da $ eCaseAlts ec)
         t' <- f (eCaseType ec)
         return $ caseUpdate ECase { eCaseAllFV = error "no eCaseAllFV needed",  eCaseScrutinee = e', eCaseType = t', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts }
-    lp bnd lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == 0  = do
+    lp lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == emptyId  = do
         t' <- f t
         nfo <- lift $ lamann e (tvrInfo tvr)
         nfo <- lift $ idann n nfo
