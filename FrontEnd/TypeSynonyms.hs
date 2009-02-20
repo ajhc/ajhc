@@ -7,7 +7,6 @@ module FrontEnd.TypeSynonyms (
     showSynonym
     ) where
 
-import Control.Monad.Identity
 import Control.Monad.Writer
 import Data.Monoid
 import Data.Binary

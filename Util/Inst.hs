@@ -7,7 +7,6 @@ import qualified Data.Map as Map
 import qualified Data.IntMap as IM
 import Data.Monoid
 import List
-import Data.Foldable  hiding(or)
 import Data.Traversable
 
 

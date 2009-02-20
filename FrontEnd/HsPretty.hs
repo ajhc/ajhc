@@ -331,6 +331,8 @@ ppHsDecl (HsInfixDecl pos assoc prec nameList) =
 	    ppAssoc HsAssocLeft  = text "infixl"
 	    ppAssoc HsAssocRight = text "infixr"
 ppHsDecl (HsPragmaProps _ w ns) = text "{-# " <> text w <+> mySep (punctuate comma . map ppHsNameParen $ ns) <+> text "#-}"
+ppHsDecl _ = error "ppHsDecl: unknown construct"
+
 
 ppMatch (HsMatch pos f ps rhs whereDecls)
    =   myFsep (ppHsQNameParen f : map ppHsPat ps ++ [ppHsRhs rhs])
@@ -549,7 +551,7 @@ ppHsPat (HsPAsPat name (HsPIrrPat (Located _ pat))) =
 	myFsep[ppHsName name <> char '@', char '~' <> ppHsPat pat]
 ppHsPat	(HsPAsPat name pat) = hcat[ppHsName name,char '@',ppHsPat pat]
 ppHsPat	HsPWildCard = char '_'
-ppHsPat	(HsPIrrPat (Located _ pat)) = char '~' <> ppHsPat pat
+ppHsPat	~(HsPIrrPat (Located _ pat)) = char '~' <> ppHsPat pat
 
 ppHsPatField (HsPFieldPat name pat) = myFsep[ppHsQName name, equals, ppHsPat pat]
 

@@ -44,9 +44,7 @@ import FrontEnd.HsSyn
 import Name.Name
 import Name.Names
 import Name.VConsts
-import Options
 import FrontEnd.Syn.Traverse
-import qualified FlagOpts as FO
 import FrontEnd.SrcLoc
 
 removeSynonymsFromType _ t = t
@@ -133,8 +131,8 @@ desugarHsModule m = hsModuleDecls_s ds' m where
 desugarHsStmt :: Monad m => HsStmt -> m HsStmt
 desugarHsStmt s = return $ fst $ runPatSM (0::Int, undefined) $ desugarStmt s
 
-desugarHsExp :: Monad m => HsExp -> m HsExp
-desugarHsExp s = return $ fst $ runPatSM (0::Int, undefined) $ desugarExp s
+--desugarHsExp :: Monad m => HsExp -> m HsExp
+--desugarHsExp s = return $ fst $ runPatSM (0::Int, undefined) $ desugarExp s
 
 
 desugarDecl :: HsDecl -> PatSM [HsDecl]
@@ -398,7 +396,7 @@ f_concatMap = nameName $ toUnqualified v_concatMap
 f_map = nameName $ toUnqualified v_map
 f_foldr = nameName $ toUnqualified v_foldr
 f_fail = nameName $ toUnqualified v_fail
-f_filter = nameName $ toUnqualified v_filter
+--f_filter = nameName $ toUnqualified v_filter
 f_and = nameName $ toUnqualified v_and
 con_cons = nameName $ toUnqualified dc_Cons
 

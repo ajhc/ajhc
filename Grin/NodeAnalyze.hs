@@ -8,7 +8,6 @@ module Grin.NodeAnalyze(nodeAnalyze) where
 
 import Control.Monad(forM, forM_, when)
 import Control.Monad.RWS(MonadWriter(..), RWS(..))
-import Control.Monad.Identity(runIdentity)
 import Data.Monoid
 import Data.Maybe
 import qualified Data.Map as Map
@@ -30,7 +29,7 @@ import Util.Gen
 
 data NodeType =
     WHNF         -- ^ guarenteed to be a WHNF
-    | LazyWHNF   -- ^ WHNF or an indirection to a WHNF
+--    | LazyWHNF   -- ^ WHNF or an indirection to a WHNF
     | Lazy       -- ^ a suspension, a WHNF, or an indirection to a WHNF
     deriving(Eq,Ord,Show)
 
@@ -274,7 +273,7 @@ doFunc (name,arg :-> body) = ans where
     convertVal ValUnknown {} = return $ Left VIgnore
     convertVal v = error $ "convertVal " ++ show v
 
-bottom = N WHNF (Only (Set.empty))
+--bottom = N WHNF (Only (Set.empty))
 top = N Lazy Top
 
 

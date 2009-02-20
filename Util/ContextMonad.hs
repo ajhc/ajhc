@@ -1,7 +1,6 @@
 module Util.ContextMonad where
 
 import Control.Monad.Error
-import Control.Monad.Identity
 import Control.Monad
 
 

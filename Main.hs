@@ -8,11 +8,10 @@ import IO(hFlush,stderr,stdout)
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import List(group,union)
+import qualified List(group,union)
 import qualified System
 
 import Util.Util
-import StringTable.Atom
 import C.Arch
 import CharIO
 import DataConstructors

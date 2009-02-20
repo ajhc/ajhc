@@ -25,9 +25,6 @@ traverseHsExp_ fn e = traverseHsExp (traverse_ fn) e >> return ()
 traverseHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsExp -> m HsExp
 traverseHsExp fn e = f e where
     fns = mapM fn
-    f (HsAsPat n e) = do
-        e' <- fn e
-        return $ HsAsPat n e'
     f e@HsVar {} = return e
     f e@HsCon {} = return e
     f e@HsLit {} = return e
@@ -105,6 +102,7 @@ traverseHsExp fn e = f e where
         fus' <- mapM fFieldUpdate fus
         e' <- fn e
         return $ HsRecUpdate e' fus'
+    f _ = error "FrontEnd.Syn.Traverse.traverseHsExp f unrecognized construct"
     fFieldUpdate (HsFieldUpdate n e) = do
         e' <- fn e
         return $ HsFieldUpdate n e'

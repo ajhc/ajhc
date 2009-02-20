@@ -180,6 +180,7 @@ tcExp e = f e where
         local (\e -> e { envTyEnv = extendTyEnv defs (envTyEnv e) }) $ do
             mapM_ (tcLam Nothing) [ b | FuncDef { funcDefBody = b } <- defs ]
             f body
+    f _ = error "Grin.Lint: unknown value passed to f"
 
 tcVal :: Val -> Tc Ty
 tcVal v = f v where

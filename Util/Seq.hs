@@ -31,8 +31,8 @@ module Util.Seq( -- * Type
           , fromList
           ) where
 
-import Data.Monoid()
-import Control.Monad.Writer as W
+import Data.Monoid
+import Control.Monad
 
 {--------------------------------------------------------------------
   Operators
@@ -93,12 +93,9 @@ fromList xs
   = Seq (\ts -> xs++ts)
 
 
-tell x = W.tell (Util.Seq.singleton x)
-tells xs = W.tell (Util.Seq.fromList xs)
+--tell x = W.tell (Util.Seq.singleton x)
+--tells xs = W.tell (Util.Seq.fromList xs)
 
---instance Monoid (Seq.Seq a) where
---    mempty = Seq.empty
---    mappend = (Seq.<>)
 
 concat :: Seq (Seq a) -> Seq a
 concat (Seq f) = (foldr Util.Seq.append Util.Seq.empty (f []))
