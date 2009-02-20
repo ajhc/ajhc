@@ -208,9 +208,8 @@ hl-clean:
 
 clean-local:
 	find . \! -wholename \*/_\* \( -name \*.o-boot -o -name \*.hi -o -name \*.o -o -name \*.hi-boot \) | xargs rm -f --
-	rm -rf -- drift_processed
 
-MAINTAINERCLEANFILES= $(BUILT_SOURCES)
+MAINTAINERCLEANFILES= $(BUILT_SOURCES)  $(DRIFTFILES)
 
 base-1.0.hl: lib/base/base.cabal
 	mkdir -p tmp/libho
