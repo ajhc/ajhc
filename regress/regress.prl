@@ -23,6 +23,7 @@ my $opt_clean;
 my $opt_timeout=60*5;
 my $opt_help;
 my $opt_man;
+my $verbose;
 
 Getopt::Long::Configure ("bundling", "auto_help");
 GetOptions(
@@ -35,46 +36,13 @@ GetOptions(
     l => \$opt_l,
     n => \$opt_n,
     p => \$opt_p,
+    v => \$verbose,
     'rts=s' =>\@opt_rts,
     clean => \$opt_clean,
     ) or pod2usage(2);
 pod2usage(-verbose => 2) if $opt_man;
 pod2usage(1) if $opt_help;
 
-=head1 NAME
-
-regress
-
-=head1 SYNOPSIS
-
-regress [options] [conditions]
-
- Conditions:
-   <regex>       only run tests mathing regex
-   !<regex>      don't run tests matching regex
-
- Options:
-   --help        brief help message
-   --man         full documentation
-
-   -m ARCH       passed through to LHC
-   -f FLAG       passed through to LHC
-   -o OPTION     pass given option to LHC
-   -t INT        timeout in seconds of CPU time
-
-   -l            use base package (.hl file) rather than just pulling
-                 in the .ho files from lib/base/dist/build/
-   -n            go faster by not linting
-   -p            profile LHC (requires lhcp to have been built)
-
-   --rts         extra GHC RTS flags for LHC
-   --clean       build .ho files for tests from scratch
- 
-=head1 DESCRIPTION
-
-Run the LHC test suite.
-
-=cut
 
 @opts = (@opts, (map { "-f$_" } @fopts), (map { "-m$_" } @mopts));
 
@@ -154,21 +122,32 @@ sub rlog {
     print $msg, "\n";
 }
 
+sub frlog {
+    my $msg = join "",@_;
+    chomp $msg;
+    print RLOG $msg, "\n";
+    print $msg, "\n" if $verbose;
+}
+
 sub my_system {
     my $time_start = time();
-    rlog "; ", join " ",@_;
+    frlog "; ", join " ",@_;
     my $r = $opt_timeout ? system ("ulimit -t $opt_timeout ; ". join " ",@_) : system @_;
     my $time_end = time();
     return ($r,$time_end - $time_start);
 }
 
+my @libs = $opt_l ? () : ("--noauto", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
+my @fast = $opt_n ? ("-fno-lint") : ("-flint");
 
 sub do_it {
     my ($cwd,$name) = @_;
     #print "Entering $cwd\n";
     my $no_run = -f "$cwd/norun";
     my @flags = maybe_read "$cwd/flags.txt";
-    test: foreach my $fn (sort(split /\n/,`ls $cwd`)) {
+    opendir my $dh,$cwd or die "$!: could not read $cwd";
+    test: foreach my $fn (sort readdir $dh) {
+        next unless $fn =~ /^\w/;
         my $n = "$cwd/$fn";
         if (-d $n && $n ne "results") {
             my $fnn = $fn;
@@ -195,9 +174,7 @@ sub do_it {
                     next test;
                 }
             }
-            rlog "-- $name";
-            my @libs = $opt_l ? () : ("--noauto", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
-            my @fast = $opt_n ? ("-fno-lint") : ("-flint");
+            rlog "---- $name";
             my @jhc  = $opt_p ? ("$jhc_dir/jhcp","+RTS", "-S$rd/$name.jhcp_prof",@opt_rts,"-RTS")  :  ("$jhc_dir/jhc");
             my @cmd = (@jhc, "-v", '--ho-dir', $ho_dir, @libs , @fast, "-o", "$rd/$name", @flags, @opts, "$cwd/$fn");
             my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
@@ -236,6 +213,7 @@ sub do_it {
             }
         }
     }
+    closedir $dh;
 }
 
 do_it($test_dir,"tests");
@@ -274,5 +252,39 @@ sub done {
 }
 
 
+__END__
 
+=head1 NAME
 
+regress
+
+=head1 SYNOPSIS
+
+regress [options] [conditions]
+
+ Conditions:
+   <regex>       only run tests mathing regex
+   !<regex>      don't run tests matching regex
+
+ Options:
+   --help        brief help message
+   --man         full documentation
+
+   -m ARCH       passed through to JHC
+   -f FLAG       passed through to JHC
+   -o OPTION     pass given option to JHC
+   -t INT        timeout in seconds of CPU time
+
+   -l            use base package (.hl file) rather than just pulling
+                 in the .ho files from lib/base/dist/build/
+   -n            go faster by not linting
+   -p            profile JHC (requires jhcp to have been built)
+
+   --rts         extra GHC RTS flags for JHC
+   --clean       build .ho files for tests from scratch
+
+=head1 DESCRIPTION
+
+Run the JHC test suite.
+
+=cut
