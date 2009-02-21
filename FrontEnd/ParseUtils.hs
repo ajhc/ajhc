@@ -165,6 +165,9 @@ checkPat e [] = case e of
 	HsIrrPat e         -> do
 			      p <- T.mapM checkPattern e
 			      return (HsPIrrPat p)
+	HsBangPat e         -> do
+			      p <- T.mapM checkPattern e
+			      return (HsPBangPat p)
 	HsRecConstr c fs   -> do
 			      fs <- mapM checkPatField fs
 			      return (HsPRec c fs)

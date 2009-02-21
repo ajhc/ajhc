@@ -380,6 +380,7 @@ data HsExp
         | HsError { hsExpSrcLoc :: SrcLoc, hsExpErrorType :: HsErrorType, hsExpString :: String }
 	| HsWildCard SrcLoc			-- ditto
 	| HsIrrPat { hsExpLExp :: LHsExp }
+	| HsBangPat { hsExpLExp :: LHsExp }
  deriving(Eq,Show)
     {-! derive: is, update !-}
 
@@ -403,6 +404,7 @@ data HsPat
 	| HsPAsPat { hsPatName :: HsName, hsPatPat :: HsPat }
 	| HsPWildCard
 	| HsPIrrPat { hsPatLPat :: LHsPat }
+	| HsPBangPat { hsPatLPat :: LHsPat }
 	| HsPTypeSig SrcLoc HsPat HsQualType  -- scoped type variable extension
  deriving(Eq,Ord,Show)
  {-! derive: is !-}

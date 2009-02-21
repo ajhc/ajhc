@@ -513,6 +513,7 @@ ppHsExp (HsAsPat name (HsIrrPat (Located _ exp))) =
 ppHsExp (HsAsPat name exp) = hcat[ppHsName name,char '@',ppHsExp exp]
 ppHsExp (HsWildCard _) = char '_'
 ppHsExp (HsIrrPat (Located _ exp)) = char '~' <> ppHsExp exp
+ppHsExp (HsBangPat (Located _ exp)) = char '!' <> ppHsExp exp
 -- Lists
 ppHsExp (HsList list) =
 	bracketList . punctuate comma . map ppHsExp $ list
@@ -551,7 +552,8 @@ ppHsPat (HsPAsPat name (HsPIrrPat (Located _ pat))) =
 	myFsep[ppHsName name <> char '@', char '~' <> ppHsPat pat]
 ppHsPat	(HsPAsPat name pat) = hcat[ppHsName name,char '@',ppHsPat pat]
 ppHsPat	HsPWildCard = char '_'
-ppHsPat	~(HsPIrrPat (Located _ pat)) = char '~' <> ppHsPat pat
+ppHsPat	(HsPIrrPat (Located _ pat)) = char '~' <> ppHsPat pat
+ppHsPat	~(HsPBangPat (Located _ pat)) = char '!' <> ppHsPat pat
 
 ppHsPatField (HsPFieldPat name pat) = myFsep[ppHsQName name, equals, ppHsPat pat]
 

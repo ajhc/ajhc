@@ -28,4 +28,4 @@ loop i n alt a1 a2 a3 a4 a5 a6 a7 a8 a9
                        (a7 + 1 / k2)
                        (a8 + alt * dk)
                        (a9 + alt / (2 * k - 1))
-    where k3 = k2*k; k2 = k*k; dk = 1/k; k = fromIntegral i; sk = sin k; ck = cos k; x!y = x`seq`y
+    where k3 = k2*k; k2 = k*k; dk = 1/k; k = fromIntegral i; sk = sin k; ck = cos k; (!) x y = x`seq`y

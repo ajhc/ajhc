@@ -799,7 +799,7 @@ tidyPat p b = f p where
             ErasedAlias -> f p
             _ -> return (pa,id)
     f p@HsPApp {} = return (p,id)
-    f ~(HsPIrrPat (Located ss p)) = f p >>= \ (p',fe) -> case p' of
+    f (HsPIrrPat (Located ss p)) = f p >>= \ (p',fe) -> case p' of
         HsPWildCard -> return (p',fe)
         _ -> do
             (lbv,bv) <- varify b
@@ -809,6 +809,10 @@ tidyPat p b = f p where
                 return (v,fe)
             zs <- mapM f (getNamesFromHsPat p)
             return (HsPWildCard,lbv . eLetRec zs)
+    f ~(HsPBangPat (Located ss (HsPAsPat v p))) = do
+        (p',fe) <- f p
+        v <- convertVar (toName Name.Val v)
+        return (p',eStrictLet v b . fe)
 
 -- converts a value to an updatable closure if it isn't one already.
 varify b@EVar {} = return (id,b)

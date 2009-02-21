@@ -432,11 +432,17 @@ tiPat (HsPNeg (HsPLit (HsIntPrim i))) typ = tiPat (HsPLit $ HsIntPrim (negate i)
 tiPat (HsPNeg (HsPLit (HsFloatPrim i))) typ = tiPat (HsPLit $ HsFloatPrim (negate i)) typ
 tiPat (HsPNeg (HsPLit (HsDoublePrim i))) typ = tiPat (HsPLit $ HsDoublePrim (negate i)) typ
 tiPat (HsPNeg pat) typ = fail $ "non-literal negative patterns are not allowed"
-tiPat (HsPNeg pat) typ = tiPat pat typ
+--tiPat (HsPNeg pat) typ = tiPat pat typ
 
 tiPat (HsPIrrPat (Located l p)) typ = do
     (p,ns) <- tiPat p typ
     return (HsPIrrPat (Located l p),ns)
+tiPat (HsPBangPat (Located l p@HsPAsPat {})) typ = do
+    (p,ns) <- tiPat p typ
+    return (HsPBangPat (Located l p),ns)
+tiPat (HsPBangPat (Located l p)) typ = do
+    v <- newHsVar "Bang"
+    tiPat (HsPBangPat (Located l (HsPAsPat (nameName v) p))) typ
 tiPat (HsPParen p) typ = tiPat p typ
 
 

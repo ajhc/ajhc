@@ -263,6 +263,7 @@ replaceVarNamesInPat name p = f name p where
        | otherwise = f name pat
     f name HsPWildCard = HsPWildCard
     f name (HsPIrrPat pat) = HsPIrrPat $ fmap (f name) pat
+    f name (HsPBangPat pat) = HsPBangPat $ fmap (f name) pat
     f name p = error $ "f: " ++ show (name,p)
 
 

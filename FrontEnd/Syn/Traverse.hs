@@ -95,6 +95,9 @@ traverseHsExp fn e = f e where
     f (HsIrrPat hsExp)  = do
         hsExp' <- fnl hsExp
         return (HsIrrPat hsExp')
+    f (HsBangPat hsExp)  = do
+        hsExp' <- fnl hsExp
+        return (HsBangPat hsExp')
     f (HsRecConstr n fus) = do
         fus' <- mapM fFieldUpdate fus
         return $ HsRecConstr n fus'
@@ -203,6 +206,9 @@ traverseHsPat fn p = f p where
     f (HsPIrrPat hsPat)  = do
           hsPat' <- fnl hsPat
           return (HsPIrrPat hsPat')
+    f (HsPBangPat hsPat)  = do
+          hsPat' <- fnl hsPat
+          return (HsPBangPat hsPat')
     f (HsPTypeSig srcLoc hsPat qt) = withSrcLoc srcLoc $ do
           hsPat' <- fn hsPat
           return (HsPTypeSig srcLoc hsPat' qt)

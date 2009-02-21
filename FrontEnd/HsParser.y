@@ -310,7 +310,7 @@ topdecl :: { HsDecl }
                       { HsDeclDeriving $3 $4 }
       | 'default' srcloc type
                       { HsDefaultDecl $2 $3 }
-      | infixexp srcloc '<-' exp      {% checkPattern $1 `thenP` \p ->
+      | pinfixexp srcloc '<-' exp      {% checkPattern $1 `thenP` \p ->
                                          returnP (HsActionDecl $2 p $4) }
       | 'foreign' srcloc 'import' varids mstring '::' ctype
                       {% doForeign $2 (UnQual (HsIdent "import"):reverse $4) $5 $7  }
@@ -596,8 +596,8 @@ valdef :: { HsDecl }
                       { HsTypeDecl $3 (fst $2) (snd $2) $5 }
       | 'type' simpletype srcloc
                       { HsTypeDecl $3 (fst $2) (snd $2) HsTyAssoc }
-      | infixexp srcloc rhs                   {% checkValDef $2 $1 $3 []}
-      | infixexp srcloc rhs 'where' decllist  {% checkValDef $2 $1 $3 $5}
+      | pinfixexp srcloc rhs                   {% checkValDef $2 $1 $3 []}
+      | pinfixexp srcloc rhs 'where' decllist  {% checkValDef $2 $1 $3 $5}
 
 rhs   :: { HsRhs }
       : '=' exp                       {% checkExpr $2 `thenP` \e ->
@@ -674,6 +674,7 @@ aexp1 :: { HsExp }
                                          returnP (HsAsPat n $3) }
       | srcloc '_'                    { HsWildCard $1 }
       | '~' srcloc aexp1 srcloc       { HsIrrPat $ located ($2,$4) $3 }
+--      | '!' srcloc aexp1 srcloc       { HsBangPat $ located ($2,$4) $3 }
 
 commas :: { Int }
       : commas ','                    { $1 + 1 }
@@ -703,6 +704,80 @@ lexps :: { [HsExp] }
       | exp ',' exp                   { [$3,$1] }
 
 -- -----------------------------------------------------------------------------
+-- Expressions
+
+pexp   :: { HsExp }
+      : pinfixexp '::' srcloc ctype    { HsExpTypeSig $3 $1 $4 }
+      | pinfixexp                      { $1 }
+
+pinfixexp :: { HsExp }
+      : pexp10                         { $1 }
+      | pinfixexp qop pexp10            { HsInfixApp $1 $2 $3 }
+
+pexp10 :: { HsExp }
+      : '-' pfexp                      { HsNegApp $2 }
+      | pfexp                          { $1 }
+
+pfexp :: { HsExp }
+      : pfexp paexp                     { HsApp $1 $2 }
+      | paexp                          { $1 }
+
+paexps :: { [HsExp] }
+      : paexps paexp                    { $2 : $1 }
+      | paexp                          { [$1] }
+
+-- UGLY: Because patterns and expressions are mixed, aexp has to be split into
+-- two rules: One left-recursive and one right-recursive. Otherwise we get two
+-- reduce/reduce-errors (for as-patterns and irrefutable patters).
+
+-- Note: The first alternative of aexp is not neccessarily a record update, it
+-- could be a labeled construction, too.
+
+paexp  :: { HsExp }
+      : paexp '{' pfbinds '}'           {% mkRecConstrOrUpdate $1 (reverse $3) }
+      | paexp1                         { $1 }
+
+-- Even though the variable in an as-pattern cannot be qualified, we use
+-- qvar here to avoid a shift/reduce conflict, and then check it ourselves
+-- (as for vars above).
+
+paexp1 :: { HsExp }
+      : qvar                          { HsVar $1 }
+      | gcon                          { $1 }
+      | literal                       { $1 }
+      | '(' pexp ')'                  { HsParen $2 }
+      | '(' ptexps ')'                { HsTuple (reverse $2) }
+      | '(#' '#)'                     { HsUnboxedTuple [] }
+      | '(#' pexp '#)'                { HsUnboxedTuple [$2] }
+      | '(#' ptexps '#)'              { HsUnboxedTuple (reverse $2) }
+      | '[' plist ']'                 { $2 }
+      | '(' pinfixexp qop ')'          { HsLeftSection $3 $2  }
+      | '(' qopm pinfixexp ')'         { HsRightSection $3 $2 }
+      | qvar '@' paexp                {% checkUnQual $1 `thenP` \n ->
+                                         returnP (HsAsPat n $3) }
+      | srcloc '_'                    { HsWildCard $1 }
+      | '~' srcloc paexp1 srcloc      { HsIrrPat $ located ($2,$4) $3 }
+      | '!' srcloc paexp1 srcloc      { HsBangPat $ located ($2,$4) $3 }
+
+
+ptexps :: { [HsExp] }
+      : ptexps ',' pexp                 { $3 : $1 }
+      | pexp ',' pexp                   { [$3,$1] }
+
+-- -----------------------------------------------------------------------------
+-- List expressions
+
+-- The rules below are little bit contorted to keep lexps left-recursive while
+-- avoiding another shift/reduce-conflict.
+
+plist :: { HsExp }
+      : pexp                           { HsList [$1] }
+      | plexps                         { HsList (reverse $1) }
+
+plexps :: { [HsExp] }
+      : plexps ',' pexp                 { $3 : $1 }
+      | pexp ',' pexp                   { [$3,$1] }
+-- -----------------------------------------------------------------------------
 -- List comprehensions
 
 quals :: { [HsStmt] }
@@ -728,9 +803,9 @@ alts :: { [HsAlt] }
       | alt                                   { [$1] }
 
 alt :: { HsAlt }
-      : infixexp srcloc ralt  {% checkPattern $1 `thenP` \p ->
+      : pinfixexp srcloc ralt  {% checkPattern $1 `thenP` \p ->
                                  returnP (HsAlt $2 p $3 []) }
-      | infixexp srcloc ralt 'where' decllist
+      | pinfixexp srcloc ralt 'where' decllist
                               {% checkPattern $1 `thenP` \p ->
                                  returnP (HsAlt $2 p $3 $5) }
 
@@ -769,6 +844,13 @@ fbinds :: { [HsFieldUpdate] }
 
 fbind :: { HsFieldUpdate }
       : qvar '=' exp                  { HsFieldUpdate $1 $3 }
+
+pfbinds :: { [HsFieldUpdate] }
+      : pfbinds ',' pfbind              { $3 : $1 }
+      | pfbind                         { [$1] }
+
+pfbind :: { HsFieldUpdate }
+      : qvar '=' pexp                  { HsFieldUpdate $1 $3 }
 
 -- -----------------------------------------------------------------------------
 -- Variables, Constructors and Operators.
