@@ -242,6 +242,7 @@ renameHsType' dovar t st = pp (rt t st) where
         return $ HsTyExists ts v
     rt (HsTyAssoc) subTable = return HsTyAssoc
     rt (HsTyEq a b) subTable = return HsTyEq `ap` (flip rt subTable a) `ap` (flip rt subTable b)
+    rt HsTyExpKind {} _subTable = error "cannot rename HsTyExpKind TypeSyns"
     pp t | not dovar = t
     pp t = do
         t' <- t
@@ -334,13 +335,6 @@ renameHsAlt (HsAlt srcLoc hsPat hsGuardedAlts {-where-} hsDecls) subTable = with
     hsGuardedAlts' <- renameHsRhs hsGuardedAlts subTable''
     return (HsAlt srcLoc hsPat' hsGuardedAlts' hsDecls')
 
-renameHsGuardedRhss :: HsRhs -> SubTable -> ScopeSM (HsRhs)
-renameHsGuardedRhss (HsUnGuardedRhs hsExp) subTable = do
-      hsExp' <- renameHsExp hsExp subTable
-      return (HsUnGuardedRhs hsExp')
-renameHsGuardedRhss (HsGuardedRhss hsGuardedAltList) subTable = do
-      hsGuardedAltList' <- renameHsGuardedRhsList hsGuardedAltList subTable
-      return (HsGuardedRhss hsGuardedAltList')
 
 renameHsGuardedRhsList :: [HsGuardedRhs] -> SubTable -> ScopeSM [HsGuardedRhs]
 renameHsGuardedRhsList = mapRename renameHsGuardedRhs
@@ -546,6 +540,9 @@ getHsNamesFromHsType (HsTyVar hsName) = [hsName]
 getHsNamesFromHsType (HsTyForall vs qt) = getHsNamesFromHsQualType qt List.\\ map hsTyVarBindName vs
 getHsNamesFromHsType (HsTyExists vs qt) = getHsNamesFromHsQualType qt List.\\ map hsTyVarBindName vs
 getHsNamesFromHsType (HsTyCon _hsName) = [] -- don't rename the Constructors
+getHsNamesFromHsType ty = execWriter $ traverseHsType_ f ty where
+    f t = tell $ getHsNamesFromHsType t
+
 
 
 
