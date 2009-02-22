@@ -181,7 +181,7 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
                 Nothing | fopts FO.Raw -> EAp (EAp runRaw ty) maine
                 Nothing ->  EAp (EAp runExpr ty) maine
             ne = ELam worldVar (EAp e (EVar worldVar))
-            worldVar = tvr { tvrIdent = anonymous 2, tvrType = tWorld__ }
+            worldVar = tvr { tvrIdent = va1, tvrType = tWorld__ }
             theMainTvr =  tVr (toId cname) (infertype dataTable ne)
             tvm@(TVr { tvrType =  ty}) =  main
             maine = foldl EAp (EVar tvm) [ tAbsurd k |  TVr { tvrType = k } <- xs, sortKindLike k ]

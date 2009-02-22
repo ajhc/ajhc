@@ -10,50 +10,18 @@ import {-# SOURCE #-} Info.Binary(putInfo,getInfo)
 
 
 
--- Binary instance
-data TvrBinary = TvrBinaryNone | TvrBinaryAtom Atom | TvrBinaryInt Word32
 
 instance Binary TVr where
-    put (TVr { tvrIdent = eid, tvrType =  e, tvrInfo = nf} ) | eid == emptyId = do
-        put (TvrBinaryNone)
-        put e
-        putInfo nf
-    put (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) | Just x <- intToAtom (idToInt i) = do
-        put (TvrBinaryAtom x)
-        put e
-        putInfo nf
-    put (TVr { tvrIdent = i, tvrType =  e, tvrInfo = nf}) = do
-        put (TvrBinaryInt $ fromIntegral (idToInt i))
+    put TVr { tvrIdent = eid, tvrType =  e, tvrInfo = nf} = do
+        put eid
         put e
         putInfo nf
     get  = do
-        (x ) <- get
+        x <- get
         e <- get
         nf <- getInfo
-        case x of
-            TvrBinaryNone -> return $ TVr emptyId e nf
-            TvrBinaryAtom a -> return $ TVr (fromAtom a) e nf
-            TvrBinaryInt i -> return $ TVr (anonymous $ fromIntegral i) e nf
+        return $ TVr x e nf
 
-instance Binary TvrBinary where
-    put TvrBinaryNone = do putWord8  0
-    put (TvrBinaryAtom aa) = do
-        putWord8 1
-        put aa
-    put (TvrBinaryInt ab) = do
-	    putWord8 2
-	    put ab
-    get = do
-	    h <- getWord8
-	    case h of
-	      0 -> do return TvrBinaryNone
-	      1 -> do
-		    aa <- get
-		    return (TvrBinaryAtom aa)
-	      2 -> do
-		    ab <- get
-		    return (TvrBinaryInt ab)
-	      _ -> fail "invalid binary data found"
 
 instance Data.Binary.Binary RuleType where
     put RuleSpecialization = do

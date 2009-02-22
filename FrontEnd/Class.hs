@@ -306,7 +306,7 @@ toType x = error $ "toType: " ++ show x
 -}
 
 
-vtrace s v | verbose = trace s v
+vtrace s v | False && verbose = trace s v
 vtrace s v | otherwise = v
 
 

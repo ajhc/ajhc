@@ -71,7 +71,7 @@ tFunc a b = ePi (tVr emptyId a) b
 
 
 
-tvrSilly = tVr (anonymous (-1)) Unknown
+tvrSilly = tVr sillyId Unknown
 
 -----------------
 -- E constructors

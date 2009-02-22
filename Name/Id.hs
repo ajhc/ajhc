@@ -4,12 +4,15 @@ module Name.Id(
     IdNameT(),
     IdSet(),
     anonymous,
+    va1,va2,va3,va4,va5,
     addBoundNamesIdMap,
     addBoundNamesIdSet,
     addNamesIdSet,
     idMapToIdSet,
     idNameBoundNames,
     idNameUsedNames,
+    anonymousIds,
+    sillyId,
     etherealIds,
     isEtherealId,
     isInvalidId,
@@ -28,37 +31,69 @@ module Name.Id(
     newId,
     toId,
     fromId,
+    candidateIds,
     runIdNameT',
     runIdNameT
     )where
 
-import Control.Monad.State
 import Control.Monad.Reader
-import Data.Binary(Binary())
-import Data.Traversable
+import Control.Monad.State
+import Data.Bits
 import Data.Foldable
+import Data.Int
 import Data.Monoid
+import Data.Traversable
 import Data.Typeable
 import System.Random
-import Data.Bits
+import qualified Data.Binary as B
 import qualified Data.IntMap  as IM
 import qualified Data.IntSet as IS
 
+import Doc.DocLike
+import Doc.PPrint
+import Name.Name
 import StringTable.Atom
 import Util.HasSize
 import Util.Inst()
 import Util.NameMonad
 import Util.SetLike as S
-import Name.Name
-import Doc.PPrint
-import Doc.DocLike
 
--- TODO - make this a newtype
+
+{-
+ - An Id is an opaque type with equality and ordering, Its range is split into the following categories
+ - all the following categories are disjoint.
+ -
+ - the unique empty id, called 'emptyId'
+ -
+ - for every Atom there is a unique cooresponding Id.
+ -
+ - a set of anonymous ids, indexed by positive numbers.
+ -
+ - a set of epheremal Ids presented as the list 'epheremalIds'. these are
+ - generally used as placeholders for unification algorithms.
+ -
+ - In general, only atomic and anonymous ids are used as values, and the empty id is used to indicate
+ - an usused binding site. epheremal and silly ids are used internally in certain algorithms and have no
+ - meaning outside of said context. They never escape the code that uses them.
+ -
+ -}
+
+
+
 newtype Id = Id Int
-    deriving(Eq,Ord,Enum,Binary)
+    deriving(Eq,Ord)
 
 anonymous :: Int -> Id
-anonymous x = Id x
+anonymous x | x <= 0 = error "invalid anonymous id"
+            | otherwise = Id (2*x)
+
+-- | some convinience anonymous ids
+va1,va2,va3,va4,va5 :: Id
+va1  = anonymous 1
+va2  = anonymous 2
+va3  = anonymous 3
+va4  = anonymous 4
+va5  = anonymous 5
 
 -- IdSet
 
@@ -175,9 +210,7 @@ instance Monad m => NameMonad Id (IdNameT m) where
         return nn
     newName  = IdNameT $ do
         (used,bound) <- get
-        let genNames i = map Id [st, st + 2 ..]  where
-                st = abs i + 2 + abs i `mod` 2
-        fromIdNameT $ newNameFrom  (genNames (size used + size bound))
+        fromIdNameT $ newNameFrom (candidateIds (size used `xor` size bound))
 
 addNamesIdSet nset = IdNameT $ do
     modify (\ (used,bound) -> (nset `union` used, bound) )
@@ -203,29 +236,32 @@ idMapFromDistinctAscList ids = IdMap (IM.fromDistinctAscList [ (x,y) | (Id x,y) 
 
 
 instance Show Id where
-        showsPrec _ n =  maybe (showString ('x':show (idToInt n))) shows (fromId n)
-    
+        showsPrec _ (Id 0) =  showChar '_'
+        showsPrec _ (Id x) =  maybe (showString ('x':show (x `div` 2))) shows (fromId $ Id x)
 
 instance Show IdSet where
-    showsPrec n is = showsPrec n $ map f (idSetToList is) where
-        f n =  maybe (toAtom ('x':show (idToInt n))) (toAtom . show) (fromId n)
+    showsPrec n is = showsPrec n (idSetToList is)
 
 instance Show v => Show (IdMap v) where
-    showsPrec n is = showsPrec n $ map f (idMapToList is) where
-        f (n,v) =  (maybe (toAtom ('x':show (idToInt n))) (toAtom . show) (fromId n),v)
+    showsPrec n is = showsPrec n (idMapToList is)
 
--- Id types
--- odd - an atom
--- 0 - special, indicating lack of binding
--- negative - etherial id, used as placeholder within algorithms
--- positive and even - arbitrary numbers.
+anonymousIds :: [Id]
+anonymousIds = map anonymous [1 .. ]
+
+
 
 etherealIds :: [Id]
-etherealIds = map Id [-2, -4 ..  ]
+etherealIds = map Id [-4, -6 ..  ]
 
+isEmptyId x = x == emptyId
 isEtherealId id = id < emptyId
 
+-- | id isn't anonymous or atom-mapped
 isInvalidId id = id <= emptyId
+
+-- | A occasionally useful random ethereal id
+sillyId :: Id
+sillyId = Id $ -2
 
 emptyId :: Id
 emptyId = Id 0
@@ -235,17 +271,19 @@ emptyId = Id 0
 -- useful for generating a small number of local unique names.
 
 newIds :: IdSet -> [Id]
-newIds ids = [ Id i | i <- [s, s + 2 ..] , Id i `notMember` ids ] where
-    s = 2 + (2 * size ids)
+newIds (IdSet ids) = [ i | i <- candidateIds (size ids' `xor` IS.findMin ids' `xor` IS.findMax ids') , i `notMember` IdSet ids ] where
+    ids' = IS.insert 0 ids
 
 
 newId :: Int           -- ^ a seed value, useful for speeding up finding a unique id
       -> (Id -> Bool)  -- ^ whether an Id is acceptable
       -> Id            -- ^ your new Id
-newId seed check = head $ filter check ls where
-    ls = map mask $ randoms (mkStdGen seed)
-    mask x = Id $ x .&. 0x0FFFFFFE
+newId seed check = head $ filter check (candidateIds seed)
 
+-- generate a list of candidate anonymous ids based on a seed value
+candidateIds :: Int -> [Id]
+candidateIds seed = map mask $ randoms (mkStdGen seed) where
+    mask x = Id $ x .&. 0x0FFFFFFE
 
 
 toId :: Name -> Id
@@ -255,18 +293,31 @@ instance FromAtom Id where
     fromAtom x = Id $ fromAtom x
 
 fromId :: Monad m => Id -> m Name
---fromId i | even i || i < 0 = fail $ "Name.fromId: not a name " ++ show i
---fromId i | not $ isValidAtom i = fail $ "Name.fromId: not a name " ++ show i
 fromId (Id i) = case intToAtom i of
     Just a -> return $ fromAtom a
-    Nothing -> fail $ "Name.fromId: not a name " ++ show i
+    Nothing -> fail $ "Name.fromId: not a name " ++ show (Id i)
 
-isEmptyId x = x == emptyId
 
 instance DocLike d => PPrint d Id where
     pprint x = tshow x
 
 instance GenName Id where
-    genNames i = map Id [st, st + 2 ..]  where
-        st = abs i + 2 + abs i `mod` 2
+    genNames = candidateIds
 
+instance B.Binary Id where
+    put (Id x) = case intToAtom x of
+        Just a -> do B.putWord8 128 >> B.put a
+        Nothing | x >= 0 && x < 128 -> B.putWord8 (fromIntegral x)
+                | otherwise -> do
+                    B.putWord8 129
+                    B.put (fromIntegral x :: Int32)
+    get = do
+        x <- B.getWord8
+        case x of
+            128 -> do
+                a <- B.get
+                return (toId $ fromAtom a)
+            129 -> do
+                v <- B.get
+                return (Id $ fromIntegral (v :: Int32))
+            _ -> return (Id $ fromIntegral x)

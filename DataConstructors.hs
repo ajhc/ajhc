@@ -94,7 +94,7 @@ tipe' (TForAll [] (_ :=> t)) = tipe' t
 tipe' (TExists [] (_ :=> t)) = tipe' t
 tipe' (TForAll xs (_ :=> t)) = do
     xs' <- flip mapM xs $ \tv -> do
-        v <- newName (map anonymous [70,72..]) () tv
+        v <- newName (map anonymous [35 .. ]) () tv
         return $ tVr v (kind $ tyvarKind tv)
     t' <- tipe' t
     return $ foldr EPi t' xs' -- [ tVr n (kind k) | n <- [2,4..] | k <- xs ]
@@ -234,8 +234,8 @@ tunboxedtuple n = (typeCons,dataCons) where
         dc = unboxedNameTuple DataConstructor n
         tc = unboxedNameTuple TypeConstructor n
         tipe = foldr ELam ftipe typeVars
-        typeVars = take n [ tvr { tvrType = eStar, tvrIdent = v } | v <- map anonymous [ 2,4 ..]]
-        vars =  [ tvr { tvrType = EVar t, tvrIdent = v } | v <- map anonymous [ 2*n + 16, 2*n + 18 ..] | t <- typeVars ]
+        typeVars = take n [ tvr { tvrType = eStar, tvrIdent = v } | v <- anonymousIds ]
+        vars =  [ tvr { tvrType = EVar t, tvrIdent = v } | v <- map anonymous [ n + 8, n + 9 ..] | t <- typeVars ]
         ftipe = ELit (litCons { litName = tc, litArgs = map EVar typeVars, litType = eHash })
         dtipe = foldr EPi (foldr EPi ftipe [ v { tvrIdent = emptyId } | v <- vars]) typeVars
 
@@ -264,10 +264,10 @@ tarrow = emptyConstructor {
             conName = tc_Arrow,
             conType = EPi (tVr emptyId eStar) (EPi (tVr emptyId eStar) eStar),
             conOrigSlots = [SlotNormal eStar,SlotNormal eStar],
-            conExpr = ELam (tVr id2 eStar) (ELam (tVr id4 eStar) (EPi (tVr emptyId (EVar $ tVr id2 eStar)) (EVar $ tVr id4 eStar))),
+            conExpr = ELam (tVr va1 eStar) (ELam (tVr va2 eStar) (EPi (tVr emptyId (EVar $ tVr va1 eStar)) (EVar $ tVr va2 eStar))),
             conInhabits = tStar,
             conChildren = DataAbstract
-        } where id2 = anonymous 2 ; id4 = anonymous 4
+        }
 
 primitiveConstructor name = emptyConstructor {
     conName = name,
@@ -284,7 +284,7 @@ primitiveTable = concatMap f allCTypes  where
             conName = dc,
             conType = tipe,
             conOrigSlots = [SlotNormal rt],
-            conExpr = ELam (tVr (anonymous 2) rt) (ELit (litCons { litName = dc, litArgs = [EVar (tVr (anonymous 2) rt)], litType = tipe })),
+            conExpr = ELam (tVr va1 rt) (ELit (litCons { litName = dc, litArgs = [EVar (tVr va1 rt)], litType = tipe })),
             conInhabits = tc
            }
         typeCons = emptyConstructor {
@@ -472,12 +472,12 @@ deriveClasses cmap (DataTable mp) = concatMap f (Map.elems mp) where
         [it@(ELit LitCons { litName = it_name })] = conSlots conr
         Just itr = getConstructor it_name (DataTable mp)
         DataEnum mv = conChildren itr
-        v1 = tvr { tvrIdent = anonymous 2,  tvrType = typ }
-        v2 = tvr { tvrIdent = anonymous 4,  tvrType = typ }
-        i1 = tvr { tvrIdent = anonymous 6,  tvrType = it }
-        i2 = tvr { tvrIdent = anonymous 8,  tvrType = it }
-        b3 = tvr { tvrIdent = anonymous 10, tvrType = tBoolzh }
-        val1 = tvr { tvrIdent = anonymous 14, tvrType = typ }
+        v1 = tvr { tvrIdent = anonymous 1,  tvrType = typ }
+        v2 = tvr { tvrIdent = anonymous 2,  tvrType = typ }
+        i1 = tvr { tvrIdent = anonymous 3,  tvrType = it }
+        i2 = tvr { tvrIdent = anonymous 4,  tvrType = it }
+        b3 = tvr { tvrIdent = anonymous 5, tvrType = tBoolzh }
+        val1 = tvr { tvrIdent = anonymous 7, tvrType = typ }
         unbox e = ELam v1 (ELam v2 (ec (EVar v1) i1 (ec (EVar v2) i2 e)))  where
             ec v i e = eCase v [Alt (litCons { litName = con, litArgs = [i], litType = typ }) e] Unknown
         h cl | cl == class_Eq = [mkCmpFunc (func_equals sFuncNames) Op.Eq]
@@ -532,7 +532,7 @@ updateLit dataTable lc@LitCons { litName = n } =  lc { litAliasFor = af } where
     af = do
         Constructor { conChildren = DataNormal [x], conOrigSlots = cs } <- getConstructor n dataTable
         Constructor { conAlias = ErasedAlias, conOrigSlots = [SlotNormal sl] } <- getConstructor x dataTable
-        return (foldr ELam sl [ tVr (anonymous i) s | s <- getSlots cs | i <- [2,4..]])
+        return (foldr ELam sl [ tVr i s | s <- getSlots cs | i <- anonymousIds])
 
 removeNewtypes :: DataTable -> E -> E
 removeNewtypes dataTable e = runIdentity (f e) where
@@ -571,7 +571,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             consName =  mapName (id,(++ "#")) $ toName DataConstructor (nameName (conName theType))
             rtypeName =  mapName (id,(++ "#")) $ toName TypeConstructor (nameName (conName theType))
             rtype = ELit litCons { litName = rtypeName, litType = eHash, litAliasFor = Just tEnumzh }
-            dataCons = fc { conName = consName, conType = getType (conExpr dataCons), conOrigSlots = [SlotNormal rtype], conExpr = ELam (tVr (anonymous 12) rtype) (ELit (litCons { litName = consName, litArgs = [EVar (tVr (anonymous 12) rtype)], litType =  conExpr theType })) }
+            dataCons = fc { conName = consName, conType = getType (conExpr dataCons), conOrigSlots = [SlotNormal rtype], conExpr = ELam (tVr (anonymous 3) rtype) (ELit (litCons { litName = consName, litArgs = [EVar (tVr (anonymous 6) rtype)], litType =  conExpr theType })) }
             rtypeCons = emptyConstructor {
                 conName = rtypeName,
                 conType = eHash,
@@ -604,7 +604,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
 
         theExpr =  foldr ELam (strictize tslots $ ELit litCons { litName = dataConsName, litArgs = map EVar dvars, litType = theTypeExpr }) hsvars
 
-        strictize tslots con = E.Subst.subst tvr { tvrIdent = anonymous $ -1 } Unknown $ f tslots con where
+        strictize tslots con = E.Subst.subst tvr { tvrIdent = sillyId } Unknown $ f tslots con where
             f (Left (v,False):rs) con = f rs con
             f (Left (v,True):rs) con = eStrictLet v (EVar v) (f rs con)
             f (Right (v,dc,rcs):rs) con = eCase (EVar v) [Alt pat (f rs con)] Unknown where
@@ -614,9 +614,9 @@ toDataTable km cm ds currentDataTable = newDataTable  where
         -- substitution is only about substituting type variables
         (ELit LitCons { litArgs = thisTypeArgs }, origArgs) = fromPi $ runVarName $ do
             let (vs,ty) = case Map.lookup dataConsName cm of Just (TForAll vs (_ :=> ty)) -> (vs,ty); ~(Just ty) -> ([],ty)
-            mapM_ (newName (map anonymous [2,4..]) ()) vs
+            mapM_ (newName anonymousIds ()) vs
             tipe' ty
-        subst = substMap $ fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- thisTypeArgs | p <- map anonymous [2,4..] ]
+        subst = substMap $ fromList [ (tvrIdent tv ,EVar $ tv { tvrIdent = p }) | EVar tv <- thisTypeArgs | p <- anonymousIds ]
 
         origSlots = map SlotExistential existentials ++ map f tslots where
             f (Left (e,_)) = SlotNormal (getType e)
@@ -637,7 +637,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
                 return $ Right (e { tvrIdent = i, tvrType = subst (tvrType e)},dc,[nv]):f is bs es
             f _ [] [] = []
             f _ _ _ = error "DataConstructors.tslots"
-            fvset = freeVars (thisTypeArgs,origArgs) `mappend` fromList (map anonymous [2,4 .. 2 * (length theTypeArgs + 2)])
+            fvset = freeVars (thisTypeArgs,origArgs) `mappend` fromList (take (length theTypeArgs + 2) anonymousIds)
 
         -- existentials are free variables in the arguments, that arn't bound in the type
         existentials = melems $ freeVars (map getType origArgs) S.\\ (freeVars thisTypeArgs :: IdMap TVr)
@@ -651,7 +651,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
         theTypeName = toName Name.TypeConstructor (hsDeclName decl)
         theKind = kind $ fromJust (Map.lookup theTypeName km)
         (theTypeFKind,theTypeKArgs') = fromPi theKind
-        theTypeArgs = [ tvr { tvrIdent = x } | tvr  <- theTypeKArgs' | x <- map anonymous [2,4..] ]
+        theTypeArgs = [ tvr { tvrIdent = x } | tvr  <- theTypeKArgs' | x <- anonymousIds ]
         theTypeExpr = ELit litCons { litName = theTypeName, litArgs = map EVar theTypeArgs, litType = theTypeFKind }
         theType = emptyConstructor {
             conName = theTypeName,
@@ -686,7 +686,7 @@ constructionExpression dataTable n typ@(ELit LitCons { litName = pn, litArgs = x
     (vid:_) = newIds (freeVars typ)
     Just mc = getConstructor n dataTable
     Just pc = getConstructor (conInhabits mc) dataTable
-    sub = substMap $ fromDistinctAscList [ (anonymous i,sl) | sl <- xs | i <- [2,4..] ]
+    sub = substMap $ fromDistinctAscList [ (i,sl) | sl <- xs | i <- anonymousIds ]
 constructionExpression wdt n e | Just fa <- followAlias wdt e  = constructionExpression wdt n fa
 constructionExpression _ n e = error $ "constructionExpression: error in " ++ show n ++ ": " ++ show e
 
@@ -709,7 +709,7 @@ deconstructionExpression dataTable name typ@(ELit LitCons { litName = pn, litArg
                 f (v:vs) (SlotUnpacked e n es:ss) rs ls = do
                     let g t = do
                             s <- newUniq
-                            return $ tVr (anonymous $ 2*s) t
+                            return $ tVr (anonymous s) t
                     as <- mapM g es
                     f vs ss (reverse as ++ rs) ((v,ELit litCons { litName = n, litArgs = map EVar as, litType = e }):ls)
                 f [] [] rs ls = return $ Alt (litCons { litName = name, litArgs = reverse rs, litType = typ }) (eLetRec ls e)
@@ -728,7 +728,7 @@ slotTypes wdt n (ELit LitCons { litName = pn, litArgs = xs, litType = _ })
     where
     Identity mc = getConstructor n wdt
     Identity pc = getConstructor (conInhabits mc) wdt
-    sub = substMap $ fromDistinctAscList [ (anonymous i,sl) | sl <- xs | i <- [2,4..] ]
+    sub = substMap $ fromDistinctAscList [ (i,sl) | sl <- xs | i <- anonymousIds ]
 slotTypes wdt n kind
     | sortKindLike kind, (e,ts) <- fromPi kind = drop (length ts) (conSlots mc)
     where Identity mc = getConstructor n wdt
@@ -745,7 +745,7 @@ slotTypesHs wdt n (ELit LitCons { litName = pn, litArgs = xs, litType = _ })
     where
     Identity mc = getConstructor n wdt
     Identity pc = getConstructor (conInhabits mc) wdt
-    sub = substMap $ fromDistinctAscList [ (anonymous i,sl) | sl <- xs | i <- [2,4..] ]
+    sub = substMap $ fromDistinctAscList [ (i,sl) | sl <- xs | i <- anonymousIds ]
 slotTypesHs wdt n kind
     | sortKindLike kind, (e,ts) <- fromPi kind = drop (length ts) (conSlots mc)
     where Identity mc = getConstructor n wdt

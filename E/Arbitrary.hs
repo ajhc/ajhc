@@ -39,7 +39,7 @@ value t
 
 var t = do
     x <- randomRIO (1,100)
-    return $ TVr (anonymous $ 2*x) t mempty
+    return $ TVr (anonymous x) t mempty
 
 complicate :: Set.Set TVr -> E -> IO E
 complicate fvs e = do

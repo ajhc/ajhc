@@ -1064,15 +1064,8 @@ instance NameMonad Id SM where
         putIds (insert nn used, insert nn bound)
         return nn
     newName  = do
-        (used,bound) <- getIds
-        let genNames i = [st, st + 2 ..]  where
-                st = abs i + 2 + abs i `mod` 2
---        trace ("newName: "++ show (size used, size bound)) $ return ()
-        --newNameFrom  (genNames (size used + size bound))
-        sm <- get
-        let (g1,g2) = split (smStdGen sm)
-        put sm{smStdGen = g1}
-        newNameFrom (map anonymous $ filter (>0) $ filter even $ randoms g2)
+        (used,_bound) <- getIds
+        newNameFrom (newIds used)
 
 smUsedNames = SM $ gets idsUsed
 smBoundNames = SM $ gets idsBound
