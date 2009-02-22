@@ -35,13 +35,9 @@ prettyE e = render $ ePretty e
 
 ePrettyEx = ePretty
 
-showId :: DocLike d => Id -> d
-showId e | e == emptyId = (char '_')
-showId i | Just x <- fromId i  = (text $ show x)
-showId i = (text $ 'x':show i)
 
 instance DocLike d => PPrint d TVr where
-    pprint TVr { tvrIdent = i }  = showId i
+    pprint TVr { tvrIdent = i }  = pprint i
 
 instance PPrint Doc E where
     pprint x = ePretty x
@@ -115,9 +111,8 @@ attr = if dump FD.Html then html else ansi
 showI i = do
     n <- SEM $ maybeLookupName i
     case n of
-        Nothing -> showId i
+        Nothing -> pprint i
         Just n -> text n
-
 
 showTVr :: TVr -> SEM (Unparse Doc)
 showTVr TVr { tvrIdent = i, tvrType =  t, tvrInfo = nfo}  = do
@@ -156,7 +151,7 @@ collectAbstractions e0 = go e0 [] where
                           | otherwise                        = go e ((UC.lambda, tvr, True) :xs)
     go  e           xs = done e xs
     done e xs = (reverse xs, e)
-                                                  
+
 showE :: E -> SEM (Unparse Doc)
 showE e = do
     let const_color = col "blue"
@@ -185,7 +180,7 @@ showE e = do
                       e <- showE e
                       return (atom $ group $ (align $ skipToNest <> fillCat tops) <$> unparse e))
                   as
-            where 
+            where
               p :: (Doc, TVr, Bool) -> SEM Doc
               p (c,t,detailed) = do tvr <- if detailed then showTVr t else showTVr' t
                                     return (retOp c <> unparse tvr <> retOp (char '.'))
