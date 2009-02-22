@@ -38,15 +38,12 @@ See Name.Id.newId for more information.
 -}
 
 import Control.Monad.Reader
-import Data.Monoid
 import qualified Data.Traversable as T
 import List hiding(union,insert,delete)
 
 import E.E
 import E.FreeVars()
 import Name.Id
-import Name.Names (tc_Arrow)
-import {-# SOURCE #-} E.Show
 import Support.FreeVars
 import GenUtil
 import Util.SetLike as S
@@ -54,10 +51,10 @@ import Util.HasSize
 
 import qualified Data.Set as Set
 
-eLetRec :: [(TVr,E)] -> E -> E
-eLetRec ds e = f (filter ((/= emptyId) . tvrIdent . fst) ds) where
-    f [] = e
-    f ds = ELetRec ds e
+--eLetRec :: [(TVr,E)] -> E -> E
+--eLetRec ds e = f (filter ((/= emptyId) . tvrIdent . fst) ds) where
+--    f [] = e
+--    f ds = ELetRec ds e
 
 
 -- | Basic substitution routine
@@ -206,7 +203,7 @@ typeSubst' termSub typeSub e = typeSubst  (fmap Just termSub `union` fmap ((`mlo
     fvs = (freeVars e `union` fvmap termSub `union` fvmap typeSub)
     fvmap m = unions (map freeVars (melems m))
 
-substType t e e' = typeSubst (freeVars e `union` freeVars e') (msingleton t e) e'
+--substType t e e' = typeSubst (freeVars e `union` freeVars e') (msingleton t e) e'
 
 -- | substitution routine that can substitute different values at the term and type level.
 -- this is useful to enforce the invarient that let-bound variables must not occur at the type level, yet
