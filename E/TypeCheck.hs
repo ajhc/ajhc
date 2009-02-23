@@ -42,16 +42,19 @@ Jhc's core is based on a pure type system. A pure type system (also called a
 PTS) is actually a parameterized set of type systems. Jhc's version is
 described by the following.
 
-    Sorts  = (*,!,**,#,(#),##)
-    Axioms = (*::**,#::##,(#)::##,!::**)
+    Sorts  = (*, !, **, #, (#), ##, □)
+    Axioms = (*:**, #:##, !:**, **:□, ##:□)
 
-
-    *   is the sort of boxed values
-    !   is the sort of boxed strict values
-    **  is the supersort of all boxed value
-    #   is the sort of unboxed values
-    (#) is the sort of unboxed tuples
-    ##  is the supersort of all unboxed values
+    -- sort kind
+    *   is the kind of boxed values
+    !   is the kind of boxed strict values
+    #   is the kind of unboxed values
+    (#) is the kind of unboxed tuples
+    -- sort superkind
+    **  is the superkind of all boxed value
+    ##  is the superkind of all unboxed values
+    -- sort box
+    □   superkinds inhabit this
 
     in addition there exist user defined kinds, which are always of supersort ##
 
@@ -59,16 +62,22 @@ described by the following.
 The following Rules table shows what sort of abstractions are allowed, a rule
 of the form (A,B,C) means you can have functions of things of sort A to things
 of sort B and the result is something of sort C. _Function_ in this context
-subsumes both term and type level abstractions. Notice that functions are
-always boxed, but may be strict if they take an unboxed tuple as an argument.
-(TODO: explain strict in this context) These type system rules apply to lambda
-abstractions. it is possible to inherit values from the environment that would
-not be typable via lambda abstractions. for instance, although a data
-constructor may have a functional type, it was not created via a lambda
-abstraction so these rules do not apply.
+subsumes both term and type level abstractions. 
 
-    as a shortcut we will use *# to mean either * or # and so forth
-    so (*#,*#,*) means (*,*,*) (#,*,*) (*,#,*) (#,#,*)
+Notice that functions are always boxed, but may be strict if they take an
+unboxed tuple as an argument.  When a function is strict it means that it is
+represented by a pointer to code directly, it cannot be a suspended value that
+evaluates to a function. 
+
+These type system rules apply to lambda abstractions. It is possible that data
+constructors might exist that cannot be given a type on their own with these
+rules, even though when fully applied it has a well formed type. An example
+would be unboxed tuples. This presents no difficulty as one concludes correctly
+that it is a type error for these constructors to ever appear when not fully
+saturated with arguments.
+
+    as a shortcut we will use *# to mean every combination involving * and #, and so forth. 
+    for instance, (*#,*#,*) means the set (*,*,*) (#,*,*) (*,#,*) (#,#,*)
 
     Rules =
        (*#!,*#!,*)  -- functions from values to values are boxed and lazy
@@ -86,6 +95,64 @@ abstraction so these rules do not apply.
     _|_ :: t iff t::*
 
     This PTS is functional but not injective
+
+The PTS can be considered stratified into the following levels
+
+    □                - sort box
+    **,##,           - sort superkind
+    *,#,(#),!        - sort kind
+    Int,Bits32_,Char - sort type
+    3,True,"bob"     - sort value
+
+## On boxed kinds
+
+The boxed kinds (* and !) represent types that have a uniform run time
+representation. Due to this, functions may be written that are polymorphic in types of these kinds. 
+Hence the rules of the form (**,?,?), allowing taking types of boxed kinds as arguments.
+
+the unboxed kind # is inhabited with types that have their own specific run
+time representation. Hence you cannot write functions that are polymorphic in
+unboxed types
+
+## On sort box, the unboxed tuple, and friends
+
+Although sort box does not appear in the code, it is useful from a theoretical
+point of view to talk about certain types such as the types of unboxed tuples.
+Unboxed tuples may have boxed and unboxed arguments, without sort box it would
+be impossible to express this since it must be superkind polymorphic. sort box
+allows one to express this as (in the case of the unboxed 2-tuple)
+
+    ∀s1:□ ∀s2:□ ∀k1:s1 ∀k2:s2 ∀t1:k1 ∀t2:k2 . (# t1, t2 #)
+
+However, although this is a valid typing of what it would mean if a unboxed
+tuple were not fully applied, since we do not have any rules of form (##,?,?) or
+(□,?,?) this type obviously does not typecheck. Which is what enforces the
+invarient that unboxed tuples are always fully applied, and is also why we do
+not need a code representation of sort box.
+
+### Do we need a superbox?
+
+You will notice that if you look at the axioms involving the sorts, you end up
+with a disjoint graph
+
+             □             - the box
+            / \
+          **   ##          - superkind
+          /\     \
+         *  !     #   (#)  - kind
+
+This is simply due to the fact that nothing is polymorphic in unboxed tuples of
+kind (#) so we never need to refer to any super-sorts of them. We can add sorts
+(##),(□) and □□ to fill in the gaps, but since these sorts will never appear in
+code or discourse, we will ignore them from now on.
+
+               □□            - sort superbox
+              /  \
+             □    (□)        - sort box
+            / \      \
+          **   ##     (##)   - sort superkind
+          /\     \    | 
+         *  !     #   (#)    - sort kind
 
 -}
 
@@ -136,7 +203,7 @@ instance CanType E E where
     getType (EAp (EPi tvr a) b) = getType (subst tvr b a)
     getType e@(EAp a b) = ans where
         ans = if isUnknown typa then Unknown else if a == tBox || typa == tBox then tBox else (case a of
-            (ELit LitCons {}) -> error $ "getType: application of type alias " ++ (render $ ePretty e)
+            (ELit LitCons {}) -> error $ "getType: application of type alias " ++ (render $ parens $ ePretty e)
             _ -> eAp typa b)
         typa = getType a
     getType (ELam (TVr { tvrIdent = x, tvrType =  a}) b) = EPi (tVr x a) (getType b)
