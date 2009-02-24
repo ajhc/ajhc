@@ -43,7 +43,7 @@ import Text.PrettyPrint.HughesPJ(Doc)
 import StringTable.Atom
 import Data.Binary
 import Doc.DocLike
-import Doc.PPrint(pprint,PPrint)
+import Doc.PPrint
 import FrontEnd.HsSyn
 import Name.Name
 import Name.Names
@@ -233,8 +233,6 @@ instance DocLike d => PPrint d Module where
 instance DocLike d => PPrint d HsIdentifier where
    pprint (HsIdent   s) = text s
 
-instance DocLike d => PPrint d Type where
-    pprint = prettyPrintType
 
 withNewNames ts action = subVarName $ do
     ts' <- mapM newTyvarName ts
@@ -250,7 +248,15 @@ newTyvarName t = case tyvarKind t of
 
 
 prettyPrintType :: DocLike d => Type -> d
-prettyPrintType t  = unparse $ runIdentity (runVarNameT (f t)) where
+prettyPrintType = pprint
+
+
+instance DocLike d => PPrint d Type where
+    pprintAssoc _ n t = prettyPrintTypePrec n t
+
+prettyPrintTypePrec :: DocLike d => Int -> Type -> d
+prettyPrintTypePrec n t  = unparse $ zup (runIdentity (runVarNameT (f t))) where
+    zup = if n >= 10 then pop empty else id
     arr = bop (R,0) (space <> text "->" <> space)
     app = bop (L,100) (text " ")
     fp (IsIn cn t) = do
@@ -315,7 +321,7 @@ instance DocLike d => PPrint d MetaVarType where
 
 
 instance DocLike d => PPrint d Pred where
-    pprint (IsIn c t) = text (show c) <+> prettyPrintType t
+    pprint (IsIn c t) = tshow c <+> pprintParen t
     pprint (IsEq t1 t2) = parens $ prettyPrintType t1 <+> text "=" <+> prettyPrintType t2
 
 instance DocLike d => PPrint d MetaVar where
