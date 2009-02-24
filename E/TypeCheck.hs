@@ -507,34 +507,39 @@ match :: Monad m =>
     -> E                  -- ^ pattern to match
     -> E                  -- ^ input expression
     -> m [(TVr,E)]
-match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 () etherealIds) where
+match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 etherealIds) where
     bvs :: IdSet
     bvs = fromList (map tvrIdent vs)
 
-    un _ _ _ c | c `seq` False = undefined
-    un (EAp a b) (EAp a' b') mm c = do
-        un a a' mm c
-        un b b' mm c
-    un (ELam va ea) (ELam vb eb) mm c = lam va ea vb eb mm c
-    un (EPi va ea) (EPi vb eb) mm c = lam va ea vb eb mm c
-    un (EPrim s xs t) (EPrim s' ys t') mm c | length xs == length ys = do
-        sequence_ [ un x y mm c | x <- xs | y <- ys]
-        un t t' mm c
-    un (ESort x) (ESort y) mm c | x == y = return ()
-    un (ELit (LitInt x t1))  (ELit (LitInt y t2)) mm c | x == y = un t1 t2 mm c
-    un (ELit LitCons { litName = n, litArgs = xs, litType = t })  (ELit LitCons { litName = n', litArgs = ys, litType =  t'}) mm c | n == n' && length xs == length ys = do
-        sequence_ [ un x y mm c | x <- xs | y <- ys]
-        un t t' mm c
+    un (EAp a b) (EAp a' b') c = do
+        un a a' c
+        un b b' c
+    un (ELam va ea) (ELam vb eb) c = lam va ea vb eb c
+    un (EPi va ea) (EPi vb eb) c = lam va ea vb eb c
+    un (EPrim s xs t) (EPrim s' ys t') c | length xs == length ys = do
+        sequence_ [ un x y c | x <- xs | y <- ys]
+        un t t' c
+    un (ESort x) (ESort y) c | x == y = return ()
+    un (ELit (LitInt x t1))  (ELit (LitInt y t2)) c | x == y = un t1 t2 c
+    un (ELit LitCons { litName = n, litArgs = xs, litType = t })  (ELit LitCons { litName = n', litArgs = ys, litType =  t'}) c | n == n' && length xs == length ys = do
+        sequence_ [ un x y c | x <- xs | y <- ys]
+        un t t' c
 
-    un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | i == j = un t u mm c
-    un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) mm c | isEtherealId i || isEtherealId j   = fail "Expressions don't match"
-    un (EVar tvr@TVr { tvrIdent = i, tvrType = t}) b mm c
+    un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) c | i == j = un t u c
+    un (EVar TVr { tvrIdent = i, tvrType =  t}) (EVar TVr {tvrIdent = j, tvrType =  u}) c | isEtherealId i || isEtherealId j   = fail "Expressions don't match"
+    un (EAp a b) (ELit lc@LitCons { litArgs = bas@(_:_), litType = t }) c = do
+        let (al:as) = reverse bas
+        un a (ELit lc { litArgs = reverse as, litType = ePi tvr { tvrType = getType al } t }) c
+        un b al c
+    un (EVar tvr@TVr { tvrIdent = i, tvrType = t}) b c
         | i `member` bvs = tell (Seq.single (tvr,b))
         | otherwise = fail $ "Expressions do not unify: " ++ show tvr ++ show b
-    un a (EVar tvr) mm c | Just b <- lup (tvrIdent tvr), not $ isEVar b = un a b mm c
+    un a (EVar tvr) c | Just b <- lup (tvrIdent tvr), not $ isEVar b = un a b c
+    un a b c | Just a' <- followAlias undefined a = un a' b c
+    un a b c | Just b' <- followAlias undefined b = un a b' c
 
-    un a b _ _ = fail $ "Expressions do not unify: " ++ show a ++ show b
-    lam va ea vb eb mm (c:cs) = do
-        un (tvrType va) (tvrType vb) mm (c:cs)
-        un (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb) mm cs
+    un a b _ = fail $ "Expressions do not unify: " ++ show a ++ show b
+    lam va ea vb eb (c:cs) = do
+        un (tvrType va) (tvrType vb) (c:cs)
+        un (subst va (EVar va { tvrIdent = c }) ea) (subst vb (EVar vb { tvrIdent = c }) eb) cs
 
