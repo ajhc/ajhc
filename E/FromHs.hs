@@ -12,7 +12,6 @@ import Control.Monad.RWS
 import qualified Data.Traversable as T
 import Data.Monoid
 import List(isPrefixOf)
-import Maybe
 import Prelude
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
@@ -94,6 +93,7 @@ tipe t = f t where
     f (TExists xs (_ :=> t)) = let
         xs' = map (kind . tyvarKind) xs
         in ELit litCons { litName = unboxedNameTuple TypeConstructor (length xs' + 1), litArgs = f t:xs', litType = eHash }
+    f TAssoc {} = error "E.FromHs.tipe TAssoc"
     cvar fvs tv@Tyvar { tyvarName = n, tyvarKind = k }
         | tv `elem` fvs = setProperty prop_SCRUTINIZED (tVr (lt n) (kind k))
         | otherwise = tVr (lt n) (kind k)
@@ -111,8 +111,6 @@ kind (KVar _) = error "Kind variable still existing."
 kind _ = error "E.FromHs.kind: unknown"
 
 
-simplifyDecl (HsPatBind sl (HsPVar n)  rhs wh) = HsFunBind [HsMatch sl n [] rhs wh]
-simplifyDecl x = x
 
 
 
@@ -187,49 +185,52 @@ nameToEntryPoint dataTable main cname ffi ds = ans where
             (_,xs) = fromPi ty
         return (tvrInfo_u (case ffi of Just ffi -> Info.insert ffi; Nothing -> id) $ setProperty prop_EXPORTED theMainTvr,ne)
 
+-- | create a RULE for each instance attached to the class methods.
+-- These rules allow early specialization of monomorphic code, and are
+-- eventually used in E.TypeAnalysis.expandPlaceholder to fill out
+-- the generic class method bodies.
 
 {-# NOINLINE createInstanceRules #-}
 createInstanceRules :: Monad m => DataTable -> ClassHierarchy -> [(TVr,E)] -> m Rules
 createInstanceRules dataTable classHierarchy funcs = return $ fromRules ans where
     ans = concatMap cClass (classRecords classHierarchy)
-    cClass classRecord =  concat [ method classRecord n | (n,TForAll _ (_ :=> t)) <- classAssumps classRecord ]
-    method classRecord methodName | isJust _methodName = as where
-        methodVar = tVr (toId methodName) ty
-        _methodName@(~(Just (TVr {tvrType = ty},_))) = findName methodName
-        defaultName =  (defaultInstanceName methodName)
-        valToPat' (ELit LitCons { litAliasFor = af,  litName = x, litArgs = ts, litType = t }) = (ELit litCons { litAliasFor = af, litName = x, litArgs = ts', litType = t },ts') where
+    cClass classRecord =  concat [ method classRecord n mve | (n,TForAll _ (_ :=> t)) <- classAssumps classRecord, mve <- findName n ]
+
+    method classRecord methodName (methodVar,_) = as where
+        ty = tvrType methodVar
+        defaultName = defaultInstanceName methodName
+
+        as = [ rule  t | Inst { instHead = _ :=> IsIn _ t }  <- snub (classInsts classRecord) ]
+        rule t = makeRule ("Rule.{" ++ show name ++ "}") (Module (show name),0) RuleSpecialization ruleFvs methodVar (vp:map EVar args) (removeNewtypes dataTable body)  where
+            ruleFvs = [ t | ~(EVar t) <- vs] ++ args
+            (vp,vs) = valToPat' (removeNewtypes dataTable $ tipe t)
+            name = instanceName methodName (getTypeCons t)
+            bodyt = foldl eAp ty (vp:map EVar args)
+            body = case findName name of
+                Just (n,_) -> runIdentity $ do actuallySpecializeE (EVar n) bodyt
+                Nothing -> case findName defaultName of
+                    Just (deftvr,_) | otherwise -> runIdentity $ do actuallySpecializeE (EVar deftvr) bodyt
+                    Nothing -> EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) bodyt
+                    --Just (deftvr,_) -> eLet tv vp $ runIdentity $ do actuallySpecializeE (EVar deftvr) (foldl eAp ty $ EVar tv:map EVar args) where -- foldl EAp (EAp (EVar deftvr) (EVar tv)) (map EVar args) where
+                    --    tv = tvr { tvrIdent = head [ n | n <- newIds (freeVars vp `mappend` fromList (map tvrIdent args))], tvrType = getType vp }
+                    --Just (deftvr,_) | null vs -> foldl EAp (EAp (EVar deftvr) vp) (map EVar args)
+
+        -- this assumes the class argument is always the first type parameter
+        (_,_:args') = fromPi ty
+        (args,_) = span (sortKindLike . tvrType)  args'
+
+        someIds = newIds (fromList $ map tvrIdent args')
+        valToPat' (ELit LitCons { litAliasFor = af,  litName = x, litArgs = ts, litType = t }) = ans where
+            ans = (ELit litCons { litAliasFor = af, litName = x, litArgs = ts', litType = t },ts')
             ts' = [ EVar (tVr j (getType z)) | z <- ts | j <- someIds]
-        --valToPat' (EPi (TVr { tvrType =  a}) b)  = ELit $ litCons { litName = tc_Arrow, litArgs = [ EVar (tVr j (getType z)) | z <- [a,b] | j <- [2,4 ..], j `notElem` map tvrIdent args], litType = eStar }
         valToPat' (EPi tv@TVr { tvrType =  a} b)  = (EPi tvr { tvrType =  a'} b',[a',b']) where
             a' = EVar (tVr ja (getType a))
             b' = EVar (tVr jb (getType b))
             (ja:jb:_) = someIds
         valToPat' x = error $ "FromHs.valToPat': " ++ show x
-        as = [ rule  t | Inst { instHead = _ :=> IsIn _ t }  <- snub (classInsts classRecord) ]
-        (_ft,_:args') = fromPi ty
-        someIds = newIds (fromList $ map tvrIdent args')
-        (args,_rargs) = span (sortKindLike . getType)  args'
-        rule t = makeRule ("Rule.{" ++ show name ++ "}") (Module (show name),0) RuleSpecialization ruleFvs methodVar (vp:map EVar args) (removeNewtypes dataTable body)  where
-            ruleFvs = [ t | ~(EVar t) <- vs] ++ args
-            (vp,vs) = valToPat' (removeNewtypes dataTable $ tipe t)
-            name = (instanceName methodName (getTypeCons t))
-            --vp@(ELit LitCons { litArgs =  vs }) = tpat
-            body = case findName name of
-                Just (n,_) -> foldl EAp (EVar n) (vs ++ map EVar args)
-                Nothing -> case findName defaultName of
-                    Just (deftvr,_) | null vs -> foldl EAp (EAp (EVar deftvr) vp) (map EVar args)
-                    Just (deftvr,_) -> eLet tv vp $ foldl EAp (EAp (EVar deftvr) (EVar tv)) (map EVar args) where
-                        tv = tvr { tvrIdent = head [ n | n <- newIds (freeVars vp)], tvrType = getType vp }
-                    Nothing -> foldl EAp (EError ( show methodName ++ ": undefined at type " ++  PPrint.render (pprint t)) (eAp ty (fst $ valToPat' (tipe t)))) (map EVar args)
-    method _ _ = []
-    nfuncs = runIdentity $ do
-        let f d@(v,_) = case fromId (tvrIdent v) of
-                Just n -> return (n,d)
-                Nothing -> fail $ "createInstanceRules: top level var with temporary name " ++ show v
-        xs <- mapM f funcs
-        return (Map.fromList xs)
 
-    findName name = case Map.lookup name nfuncs of
+    funcsMap = Map.fromList [ (n,(v,e)) | (v,e) <- funcs, let Just n = fromId (tvrIdent v) ]
+    findName name = case Map.lookup name funcsMap of
         Nothing -> fail $ "Cannot find: " ++ show name
         Just n -> return n
 
@@ -245,7 +246,7 @@ unbox dataTable e _vn wtd | getType (getType e) == eHash = wtd e
 unbox dataTable e vn wtd = eCase e [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd (EVar tvra))] Unknown where
     te = getType e
     tvra = tVr vn sta
-    Just (cna,sta,ta) = lookupCType' dataTable te
+    Just (cna,sta,_ta) = lookupCType' dataTable te
 
 createFunc :: UniqueProducer m => DataTable -> [E] -> ([(TVr,String)] -> (E -> E,E)) -> m E
 createFunc dataTable es ee = do
@@ -384,7 +385,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         (cna,sta,ta) <- lookupCType' dataTable te
         return $ ELit (litCons { litName = cna, litArgs = [ce], litType = te })
 
-    -- first argument builds the actual call primitive, given 
+    -- first argument builds the actual call primitive, given
     -- (a) the C argtypes
     -- (b) the C return type
     -- (c) whether it's IO-like or not
@@ -403,7 +404,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
             prim = myPrim cts pt
         case (isIO,pt) of
             (True,"void") -> cFun $ \rs -> (,) (ELam tvrWorld) $
-                        eStrictLet tvrWorld2 
+                        eStrictLet tvrWorld2
                                    (prim True
                                          (EVar tvrWorld
                                           :[EVar t | (t,_) <- rs ])
@@ -413,7 +414,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
             _ -> do
                 (cn,rtt',_) <- lookupCType' dataTable rt'
                 [rtVar,rtVar'] <- newVars [rt',rtt']
-                let rttIO = ltTuple [tWorld__, rt']
+                let _rttIO = ltTuple [tWorld__, rt']
                     rttIO' = ltTuple' [tWorld__, rtt']
                 case isIO of
                     False -> cFun $ \rs -> (,) id $
@@ -427,7 +428,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
                                                 (EVar tvrWorld:[EVar t | (t,_) <- rs ])
                                                 rttIO')
                                           [tvrWorld2,rtVar']
-                                          (eLet rtVar 
+                                          (eLet rtVar
                                                 (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
                                                 (eJustIO (EVar tvrWorld2) (EVar rtVar)))
 
@@ -442,8 +443,8 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         return [(name,setProperty prop_INLINE var,lamt result)]
     cDecl (HsForeignDecl _ (FfiSpec (ImportAddr rcn req) _ _) n _) = do
         let name       = toName Name.Val n
-        (var,ty,lamt) <- convertValue name
-        let (ts,rt)    = argTypes' ty
+        (var,ty,lamt)  <- convertValue name
+        let (_ts,rt)   = argTypes' ty
         (cn,st,_ct) <- lookupCType' dataTable rt
         [uvar] <- newVars [st]
         let expr x     = return [(name,setProperty prop_INLINE var,lamt x)]
@@ -462,8 +463,8 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         -- XXX ensure that the type is of form FunPtr /ft/ -> /ft/
         let name = toName Name.Val n
         (var,ty,lamt) <- convertValue name
-        let ((fptrTy:_), _) = argTypes' ty
-            fty = discardArgs 1 ty
+        --let ((fptrTy:_), _) = argTypes' ty
+        --    fty = discardArgs 1 ty
 
         result <- ccallHelper
                      (\cts crt io args rt ->
@@ -488,7 +489,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
             _ -> do
                 (cn,rtt',rtt) <- lookupCType' dataTable rt'
                 [rtVar,rtVar'] <- newVars [rt',rtt']
-                let rttIO = ltTuple [tWorld__, rt']
+                let _rttIO = ltTuple [tWorld__, rt']
                     rttIO' = ltTuple' [tWorld__, rtt']
                 case isIO of
                     False -> cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim rs rtt [ EVar t | (t,_) <- rs ] rtt') (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
@@ -510,12 +511,12 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         retCTy <- if retTy == tUnit
                   then return unboxedTyUnit
                   else liftM (\(_, _, x) -> rawType x) $ lookupCType' dataTable retTy
-                          
+
         argCTys <- liftM (map rawType) (mapM (liftM (\(_,_,x) -> x) . lookupCType' dataTable) argTys)
 
         argTvrs <- newVars argCTys
         argEs <- sequence [(marshallFromC dataTable (EVar v) et) | v <- argTvrs | et <- argTys]
-        
+
         fe <- actuallySpecializeE (EVar tn) ty
         let inner = foldl EAp fe argEs
 
@@ -528,11 +529,11 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
                              return (eLam world_ (eCaseTup' (eAp inner (EVar world_))
                                                             [world__, ret]
                                                             (ELit (unboxedTuple [EVar world__, retMarshall]))))
-        
+
         let retCTy' = typeInfer dataTable retE
 
         -- trace ("retE: "++pprint retE) $ return ()
-        
+
         let result = foldr ELam retE argTvrs
 
         realRetCTy:realArgCTys <- mapM lookupCType (retTy:argTys)
@@ -708,8 +709,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
 
     cClassDecl (HsClassDecl _ (HsQualType _ (HsTyApp (HsTyCon name) _)) decls) = do
         props <- asks ceProps
-        let ds = map simplifyDecl decls
-            cr = findClassRecord classHierarchy className
+        let cr = findClassRecord classHierarchy className
             className = (toName ClassName name)
             cClass classRecord =  [ f n (toId n) (removeNewtypes dataTable $ tipe t) | (n,t) <- classAssumps classRecord ] where
                 f n i t = (n,setProperties [prop_METHOD,prop_PLACEHOLDER] $ tVr i t, foldr ELam (EPrim (primPrim ("Placeholder: " ++ show n)) [] ft) args)  where
@@ -758,6 +758,7 @@ fromHsPLitInt (HsPLit l@(HsInt _)) = return l
 fromHsPLitInt (HsPLit l@(HsFrac _)) = return l
 fromHsPLitInt x = fail $ "fromHsPLitInt: " ++ show x
 
+{-
 patVar ::
     Monad m
     => HsPat -- ^ the pattern
@@ -772,6 +773,7 @@ patVar (HsPAsPat n p) t | isTypePlaceholder n = patVar p t
 patVar p t = do
     [nv] <- newVars [t]
     return (p,nv)
+    -}
 
 
 tidyPat ::
@@ -914,7 +916,7 @@ convertMatches bs ms err = do
                     (Just patCons) = getConstructor (toName DataConstructor $ fst $ head gps) dataTable
                     f (name,ps) = do
                         let spats = hsPatPats $ fst3 (head ps)
-                            nargs = length spats
+                            _nargs = length spats
                         vs <- newVars (slotTypesHs dataTable (toName DataConstructor name) (getType b))
                         ps' <- mapM pp ps
                         m <- match (map EVar vs ++ bs) ps' err
@@ -944,7 +946,7 @@ packupString s | all (\c -> c > '\NUL' && c <= '\xff') s = (EPrim (APrim (PrimSt
 packupString s = (toE s,False)
 
 
-actuallySpecializeE :: Monad m 
+actuallySpecializeE :: Monad m
     => E   -- ^ the general expression
     -> E   -- ^ the specific type
     -> m E -- ^ the specialized value
@@ -963,7 +965,7 @@ specializeE gt st = do
                 Just x -> return x
                 Nothing -> fail $ "specializeE: variable not bound: " ++ pprint (((gt,st),(mm,tvr)),(zs,x))
         f zs (EPi vbind exp) = f (vbind:zs) exp
-        f _ _ = fail $ render (text "specializeE: attempt to specialize types that do not unify:" 
+        f _ _ = fail $ render (text "specializeE: attempt to specialize types that do not unify:"
                                <$> pprint (gt,st)
                                <$> tshow  gt
                                <$> tshow st)
@@ -992,6 +994,7 @@ makeSpec (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (Module m,ui), T.ruleS
         sspec = if ss then [prop_SUPERSPECIALIZE] else []
         ar = makeRule ("Specialize.{" ++ show newName) (Module m,ui) RuleSpecialization [] t as (EVar ntvr)
     return ((ntvr,foldl EAp e as),ar)
+makeSpec _ _ = fail "E.FromHs.makeSpec: invalid specialization"
 
 
 deNewtype :: DataTable -> E -> E
