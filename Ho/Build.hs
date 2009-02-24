@@ -109,7 +109,7 @@ shortenPath x = return x
 
 
 instance DocLike d => PPrint d MD5.Hash where
-    pprintPrec _ h = tshow h
+    pprint h = tshow h
 
 
 findFirstFile :: String -> [(FilePath,a)] -> IO (LBS.ByteString,FilePath,a)

@@ -139,7 +139,7 @@ instance Show APrim where
     showsPrec n (APrim p r) = showsPrec n p . shows r
 
 instance PPrint d Prim  => PPrint d APrim where
-    pprintPrec n (APrim p _) = pprintPrec n p
+    pprintAssoc a n (APrim p _) = pprintAssoc a n p
 
 instance DocLike d => PPrint d Prim where
     pprint (PrimPrim t) = text (fromAtom t)
@@ -161,9 +161,9 @@ instance DocLike d => PPrint d Prim where
     pprint PrimTypeInfo { primArgTy = at, primTypeInfo = PrimMinBound } = text "min" <> parens (tshow at)
 
 instance DocLike d => PPrint d Op.Ty where
-    pprintPrec n p = text (showsPrec n p "")
+    pprintAssoc _ n p = text (showsPrec n p "")
 instance (DocLike d,Show v) => PPrint d (Op.Op v) where
-    pprintPrec n p = text (showsPrec n p "")
+    pprintAssoc _ n p = text (showsPrec n p "")
 
 parseDotNetFFI :: Monad m => String -> m Prim
 parseDotNetFFI s = ans where

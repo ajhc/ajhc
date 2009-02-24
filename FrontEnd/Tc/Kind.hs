@@ -19,7 +19,7 @@ import Data.IORef
 
 import Data.Binary
 import Doc.DocLike
-import Doc.PPrint(pprint,pprintPrec,PPrint)
+import Doc.PPrint(pprint,pprintPrec,pprintAssoc,Assoc(..),PPrint,pprintBinary)
 import Name.Name
 
 {-
@@ -153,10 +153,9 @@ instance DocLike d => PPrint d KBase where
     pprint kb = text (show kb)
 
 instance DocLike d => PPrint d Kind where
-   pprintPrec _ (KBase b) = pprint b
-   pprintPrec _ (KVar kindVar)   = pprint kindVar
-   pprintPrec p k | p > 9 = parens $ pprint k
-   pprintPrec _ (Kfun k1 k2) = pprintPrec 10 k1 <+> text "->" <+> pprint k2
+   pprintAssoc _ _ (KBase b) = pprint b
+   pprintAssoc _ _ (KVar kindVar)   = pprint kindVar
+   pprintAssoc a n (Kfun k1 k2) = pprintBinary AssocRight 5 a n k1 (text "->") k2 -- checkAssoc AssocRight 5 a n $ pprintPrec 5 k1 <+> text "->" <+> pprintAssoc AssocRight 5 k2
 
 
 

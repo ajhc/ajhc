@@ -207,7 +207,7 @@ printClassHierarchy (ClassHierarchy h) = mapM_ printClassDetails $  Map.toList h
             assocs = classAssocs cr
             classes = classClasses cr
         putStrLn "..........."
-        putStrLn $ "class: " ++ hsep (pprint cname:map pprint args)
+        putStrLn $ "class: " ++ hsep (pprint cname:map pprintParen args)
         putStr $ "super classes:"
         pnone supers $ do putStrLn $ " " ++ (intercalate " " (map show supers))
         putStr $ "instances:"
