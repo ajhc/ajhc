@@ -1,18 +1,21 @@
-module Grin.Devolve(twiddleGrin,devolveTransform,devolveGrin) where
+module Grin.Devolve(twiddleGrin,devolveTransform) where
 
 import Control.Monad.Identity
 import Control.Monad.RWS
 import Data.IORef
+import Data.Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Util.Gen
+import Util.SetLike
 import Support.Transform
 import Grin.Grin
 import Grin.Noodle
 import Support.FreeVars
 import Options (verbose)
 
+{-# NOINLINE devolveTransform #-}
 devolveTransform = transformParms {
     transformDumpProgress = verbose,
     transformCategory = "Devolve",
@@ -26,28 +29,40 @@ devolveTransform = transformParms {
 
 devolveGrin :: Grin -> IO Grin
 devolveGrin grin = do
+    putStrLn "-- devolve"
     col <- newIORef []
     let g (n,l :-> r) = f r >>= \r -> return (n,l :-> r)
         f lt@Let { expDefs = defs, expBody = body } = do
             let nonTail = expNonNormal lt
+                iterZ :: Bool -> Map.Map Tag (Set.Set Val) -> [FuncDef] -> Map.Map Tag (Set.Set Val)
+                iterZ b pmap (fd@FuncDef { funcDefName = name, funcDefBody = as :-> r }:fs) = iterZ (b || xs' /= xs) (Map.insert name xs pmap) fs where
+                    xs = Set.unions $ xs':catMaybes [ Map.lookup t pmap | t <- Set.toList $ freeVars fd]
+                    xs' = maybe Set.empty id (Map.lookup name pmap)
+                iterZ True pmap [] = iterZ False pmap defs
+                iterZ False pmap [] = pmap
+
+                nndefs = [ fd | fd <- defs, funcDefName fd `Set.member` nonTail ]
+                pmap = iterZ False (fromList [ (funcDefName fd, fromList [ Var x y | (x,y) <- Set.toList $ freeVars (funcDefBody fd), x > v0]) | fd <- nndefs ]) nndefs
+
                 (nmaps,rmaps) = splitEither (map z defs)
                 z fd@FuncDef { funcDefName = name, funcDefBody = as :-> r }
-                    | name `Set.member` nonTail = Left ((name,(as ++ xs) :-> proc r),xs)
-                    | otherwise = Right fd { funcDefBody = as :-> proc r }
-                  where xs = [ Var v t |  (v,t) <- Set.toList $ freeVars (as :-> r), v > v0]
-                pmap = Map.fromList [ (n,xs) | ((n,_),xs) <- nmaps]
-                proc b = runIdentity (proc' b)
-                proc' (App a as t) | Just xs <- Map.lookup a pmap = return (App a (as ++ xs) t)
-                proc' e = mapExpExp proc' e
+                    | name `Set.member` nonTail = Left ((name,(as ++ xs) :-> pr),xs)
+                    | otherwise = Right fd { funcDefBody = as :-> pr }
+                  where xs = maybe [] Set.toList $ Map.lookup name pmap
+                        pr = runIdentity $ proc r
+                proc (App a as t) | Just xs <- Map.lookup a pmap = return (App a (as ++ Set.toList xs) t)
+                proc e = mapExpExp proc e
             mapM_ print (Map.toList pmap)
-            nmaps <- mapM (g . fst) nmaps
-            modifyIORef col (++ nmaps)
-            mapExpExp f $  updateLetProps lt { expDefs = rmaps, expBody = proc body }
+            --nmaps <- mapM (g . fst) nmaps
+            modifyIORef col (++ fsts nmaps)
+            --mapExpExp f $  updateLetProps lt { expDefs = rmaps, expBody = proc body }
+            return $ updateLetProps lt { expDefs = rmaps, expBody = runIdentity $ proc body }
         f e = mapExpExp f e
     nf <- mapM g (grinFuncs grin)
     lf <- readIORef col
     let ntenv = extendTyEnv [ createFuncDef False x y | (x,y) <- lf ] (grinTypeEnv grin)
-    return $ setGrinFunctions (lf ++ nf) grin { grinPhase = PostDevolve, grinTypeEnv = ntenv }
+    let ng = setGrinFunctions (lf ++ nf) grin { grinPhase = PostDevolve, grinTypeEnv = ntenv }
+    if null lf then return ng else devolveGrin ng
 
 
 data Env = Env {
