@@ -9,4 +9,4 @@ instance Monad m => Arrow (Kleisli m) where
     Kleisli f >>> Kleisli g = Kleisli (\x -> f x >>= g)
 
 main :: IO ()
-main = return ()
+main = runKleisli (arr id) ()
