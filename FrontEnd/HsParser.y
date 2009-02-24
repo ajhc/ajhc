@@ -278,6 +278,7 @@ ops   :: { [HsName] }
 
 topdecls :: { [HsDecl] }
       : topdecls ';' topdecl          { $3 : $1 }
+      | topdecls ';'                  { $1 }
       | topdecl                       { [$1] }
 
 topdecl :: { HsDecl }
