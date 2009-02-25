@@ -9,7 +9,6 @@ import E.Program
 import E.Rules
 import E.Subst
 import GenUtil
-import Info.Types
 import Name.Id
 import qualified Info.Info as Info
 import Info.Info(Info)
