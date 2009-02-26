@@ -2,10 +2,14 @@
 module Data.Typeable(TypeRep,typeOf) where
 
 
+import Maybe
+import Jhc.Prim
+
+
 data TypeRep
 
-instance Eq TypeRep where
-    (==) = primTypeRepEq
+--instance Eq TypeRep where
+--    (==) = primTypeRepEq
 
 foreign import primitive typeOf :: a -> TypeRep
 foreign import primitive typeOf1 :: t a -> TypeRep
@@ -23,6 +27,8 @@ foreign import primitive typeRepEq :: TypeRep -> TypeRep -> Bool
 --		Type-safe cast
 --
 -------------------------------------------------------------
+
+unsafeCoerce = unsafeCoerce__
 
 -- | The type-safe cast operation
 cast ::  a -> Maybe b
