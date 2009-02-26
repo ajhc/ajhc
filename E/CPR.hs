@@ -14,6 +14,7 @@ import GenUtil
 import E.Program
 import Name.Name
 import Name.Names
+import Name.VConsts
 import Cmm.Number
 import Util.SameShape
 import qualified Doc.Chars as C
@@ -33,6 +34,13 @@ data Val =
     deriving(Eq,Ord,Typeable)
     {-! derive: Binary !-}
 
+trimVal v = f (0::Int) v where
+    f !n Tup {} | n > 5 = Top
+    f n (Tup x vs) = Tup x (map (f (n + 1)) vs)
+    f n (Fun v) = Fun (f n v)
+    f _ x = x
+
+
 toVal c = case conSlots c of
     [] -> Tag [conName c]
     ss -> Tup (conName c) [ Top | _ <- ss]
@@ -42,8 +50,12 @@ instance Show Val where
     showsPrec _ Top = C.top
     showsPrec _ Bot = C.bot
     showsPrec n (Fun v) = C.lambda <> showsPrec n v
+    showsPrec _ (Tup n [x,xs]) | n == dc_Cons = shows x <> showChar ':' <> shows xs
+    showsPrec _ (Tup n xs) | Just _ <- fromTupname n  = tupled (map shows xs)
     showsPrec _ (Tup n xs) = shows n <> tupled (map shows xs)
     showsPrec _ (VInt n) = shows n
+    showsPrec _ (Tag [n]) | n == dc_EmptyList = showString "[]"
+    showsPrec _ (Tag [n]) = shows n
     showsPrec _ (Tag ns) = shows ns
 
 lub :: Val -> Val -> Val
@@ -82,9 +94,9 @@ cprAnalyzeDs dataTable ds = fst $ cprAnalyzeBinds dataTable mempty ds
 cprAnalyzeBinds :: DataTable -> Env -> [(TVr,E)] -> ([(TVr,E)],Env)
 cprAnalyzeBinds dataTable env bs = f env  (decomposeDs bs) [] where
     f env (Left (t,e):rs) zs = case cprAnalyze dataTable env e of
-        (e',v) -> f (envInsert t v env) rs ((tvrInfo_u (Info.insert v) t,e'):zs)
+        (e',v) -> f (envInsert t v env) rs ((tvrInfo_u (Info.insert $ trimVal v) t,e'):zs)
     f env (Right xs:rs) zs = g (length xs + 2) ([ (t,(e,Bot)) | (t,e) <- xs]) where
-        g 0 mp =  f nenv rs ([ (tvrInfo_u (Info.insert b) t,e)   | (t,(e,b)) <- mp] ++ zs)  where
+        g 0 mp =  f nenv rs ([ (tvrInfo_u (Info.insert $ trimVal b) t,e)   | (t,(e,b)) <- mp] ++ zs)  where
             nenv = Env (Map.fromList [ (t,b) | (t,(e,b)) <- mp]) `mappend` env
         g n mp = g (n - 1) [ (t,cprAnalyze dataTable nenv e)  | (t,e) <- xs] where
             nenv = Env (Map.fromList [ (t,b) | (t,(e,b)) <- mp]) `mappend` env
