@@ -313,9 +313,9 @@ analyze ELetRec { eDefs = ds, eBody = b } s = f (decomposeDs ds) [] where
         let g (t,e) = (tvrInfo_u (Info.insert $! (lenv (tvrIdent t) phi)) t,e)
         return (ELetRec (map g ds') b', foldr denvDelete phi (fsts ds) :=> sig)
     f (Left (t,e):rs) fs =
-        solveDs' (Just False) [(t,e)] id (\nn -> f rs (nn ++ fs))
+        solveDs' (Just False) [(t,e)] fixupDemandSignature (\nn -> f rs (nn ++ fs))
     f (Right rg:rs) fs = do
-        solveDs' (Just True) rg id (\nn -> f rs (nn ++ fs))
+        solveDs' (Just True) rg fixupDemandSignature (\nn -> f rs (nn ++ fs))
 analyze Unknown _ = return (Unknown,absType)
 analyze es@ESort {} _ = return (es,absType)
 analyze es@(ELit LitInt {}) _ = return (es,absType)
