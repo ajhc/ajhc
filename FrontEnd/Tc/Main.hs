@@ -589,8 +589,10 @@ tiImpls bs = withContext (locSimple (srcLoc bs) ("in the recursive implicitly ty
     scs' <- if restricted bs then do
         let gs' = gs Set.\\ Set.fromList (freeVars rs)
         addPreds rs
-        mapM (quantify (Set.toList gs') []) ts'
-     else mapM (quantify (Set.toList gs) rs) ts'
+        quantify_n (Set.toList gs') [] ts'
+     else do
+        when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "*** tiimpls quantify " ++ show (gs,rs,ts')
+        quantify_n (Set.toList gs) rs ts'
     let f n s = do
         let (TForAll vs _) = toSigma s
         addCoerce n (ctAbs vs)
