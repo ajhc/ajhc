@@ -60,7 +60,7 @@ import FrontEnd.Tc.Kind
 -- Types
 
 data MetaVarType = Tau | Rho | Sigma
-             deriving(Eq,Ord,Show)
+             deriving(Eq,Ord)
     {-! derive: Binary !-}
 
 data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
@@ -75,7 +75,6 @@ data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
     {-! derive: Binary !-}
 
 data MetaVar = MetaVar { metaUniq :: !Int, metaKind :: Kind, metaRef :: (IORef (Maybe Type)), metaType :: MetaVarType } -- ^ used only in typechecker
-             deriving(Show)
     {-! derive: Binary !-}
 
 instance Eq MetaVar where
@@ -132,8 +131,6 @@ tExists vs (ps :=> TExists vs' (ps' :=> t)) = tExists (vs ++ vs') ((ps ++ ps') :
 tExists x y = TExists x y
 
 
-instance Show (IORef a) where
-    showsPrec _ _ = ("<IORef>" ++)
 
 tyvar n k = Tyvar (toAtom $ show n) n k
 
@@ -328,6 +325,12 @@ instance DocLike d => PPrint d MetaVar where
     pprint MetaVar { metaUniq = u, metaKind = k, metaType = t }
         | KBase Star <- k =  pprint t <> tshow u
         | otherwise = parens $ pprint t <> tshow u <> text " :: " <> pprint k
+
+instance Show MetaVarType where
+    show mv = pprint mv
+
+instance Show MetaVar where
+    show mv = pprint mv
 
 fromTAp t = f t [] where
     f (TAp a b) rs = f a (b:rs)
