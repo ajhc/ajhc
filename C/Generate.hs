@@ -372,7 +372,7 @@ expC x = Exp hintConst (ED x)
 enum :: Name -> Constant
 enum n = C (draw n)
 
-number :: Int -> Constant
+number :: Integer -> Constant
 number i = C (tshow i)
 
 floating :: Double -> Constant
