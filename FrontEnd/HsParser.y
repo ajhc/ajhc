@@ -736,6 +736,7 @@ paexps :: { [HsExp] }
 
 paexp  :: { HsExp }
       : paexp '{' pfbinds '}'           {% mkRecConstrOrUpdate $1 (reverse $3) }
+      | paexp '{'  '}'                  {% mkRecConstrOrUpdate $1 [] }
       | paexp1                         { $1 }
 
 -- Even though the variable in an as-pattern cannot be qualified, we use
