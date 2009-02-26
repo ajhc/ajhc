@@ -57,7 +57,9 @@ Exposed-Modules: Control.Exception,
                  System.Locale,
                  System.Random,
                  System.Time,
-                 System
-                 Text.Show.Functions
+                 Control.Monad.Fix,
+                 Data.Function,
+                 System,
+                 Text.Show.Functions,
                  Text.Printf
 
