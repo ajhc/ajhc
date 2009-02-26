@@ -307,7 +307,7 @@ topdecl :: { HsDecl }
                       }
       | 'instance' srcloc ctype optvaldefs
                       { HsInstDecl $2 $3 $4 }
-      | 'derive' 'instance' srcloc classhead
+      | 'deriving' 'instance' srcloc classhead
                       { HsDeclDeriving $3 $4 }
       | 'default' srcloc type
                       { HsDefaultDecl $2 $3 }
