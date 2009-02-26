@@ -7,6 +7,7 @@ static char *jhc_progname;
 static jmp_buf jhc_uncaught;
 
 static HsInt jhc_stdrnd[2] A_UNUSED = { 1 , 1 };
+static HsInt jhc_data_unique;
 
 #if _JHC_PROFILE
 
