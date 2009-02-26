@@ -5,7 +5,6 @@ module E.Demand(
     SubDemand(..),
     analyzeProgram,
     absSig,
-    solveDs,
     lazy
     ) where
 
@@ -13,7 +12,7 @@ module E.Demand(
 import Control.Monad.Reader
 import Control.Monad.Writer hiding(Product(..))
 import Data.Binary
-import Data.List
+import Data.List hiding(union)
 import Data.Monoid hiding(Product(..))
 import Data.Maybe
 import Data.Typeable
@@ -29,69 +28,41 @@ import Name.Id
 import qualified Info.Info as Info
 import Util.HasSize
 import Util.SetLike
+--import Debug.Trace
+
+trace _ x = x
 
 data Demand =
     Bottom             -- always diverges
-    | L SubDemand      -- lazy
-    | S SubDemand      -- strict
-    | Error SubDemand  -- diverges, might use arguments
+    | L !SubDemand      -- lazy
+    | S !SubDemand      -- strict
+    | Error !SubDemand  -- diverges, might use arguments
     | Absent           -- Not used
     deriving(Eq,Ord,Typeable)
         {-! derive: Binary !-}
 
-instance Show Demand where
-    showsPrec _ Bottom = ("_|_" ++)
-    showsPrec _ Absent = ('A':)
-    showsPrec _ (L None) = ('L':)
-    showsPrec _ (L (Product ds)) = showString "L(" . foldr (.) id (map shows ds) . showString ")"
-    showsPrec _ (S None) = ('S':)
-    showsPrec _ (S (Product ds)) = showString "S(" . foldr (.) id (map shows ds) . showString ")"
-    showsPrec _ (Error None) = showString "Err"
-    showsPrec _ (Error (Product ds)) = showString "Err(" . foldr (.) id (map shows ds) . showString ")"
+data SubDemand = None | Product ![Demand]
+    deriving(Eq,Ord)
+        {-! derive: Binary !-}
 
-instance DocLike d => PPrint d Demand where
-    pprint demand = tshow demand
+data DemandEnv = DemandEnv !(IdMap Demand) !Demand
+    deriving(Eq,Ord)
+        {-! derive: Binary !-}
 
-data SubDemand = None | Product [Demand]
+data DemandType = (:=>) !DemandEnv ![Demand]
+    deriving(Eq,Ord)
+        {-! derive: Binary !-}
+
+data DemandSignature = DemandSignature !Int !DemandType
     deriving(Eq,Ord,Typeable)
         {-! derive: Binary !-}
 
-data DemandSignature = DemandSignature !Int DemandType
-    deriving(Eq,Ord,Typeable)
-        {-! derive: Binary !-}
-data DemandType = (:=>) DemandEnv [Demand]
-    deriving(Eq,Ord,Typeable)
-        {-! derive: Binary !-}
 
-data DemandEnv = DemandEnv (IdMap Demand) Demand
-    deriving(Eq,Ord,Typeable)
-
-instance Binary DemandEnv where
-    put (DemandEnv dt d) = do
-        put dt
-        put d
-    get = do
-        m <- get
-        d <- get
-        return $ DemandEnv m d
-
-
-instance Show DemandType where
-    showsPrec _ (DemandEnv e Absent :=> d) | isEmpty e = shows d
-    showsPrec _ (env :=> ds) = shows env . showString " :=> " .  shows ds
-
-instance Show DemandEnv where
-    showsPrec _ (DemandEnv m Absent) = showString "{" . foldr (.) id (intersperse (showString ",") [ showString (pprint t) . showString " -> " . shows v | (t,v) <- idMapToList m]) . showString "}"
-    showsPrec _ (DemandEnv _ Bottom) = showString "_|_"
-    showsPrec _ (DemandEnv m demand) = showString "{" . shows demand . showString " - " . foldr (.) id (intersperse (showString ",") [ showString (pprint t) . showString " -> " . shows v | (t,v) <- idMapToList m]) . showString "}"
-
-
-instance Show DemandSignature where
-    showsPrec _ (DemandSignature n dt) = showString "<" . shows n . showString "," . shows dt . showString ">"
 
 idGlb = Absent
 
 absType = (DemandEnv mempty idGlb) :=> []
+--botType = (DemandEnv mempty Bottom) :=> []
 botType = (DemandEnv mempty Bottom) :=> []
 
 --lazyType = (DemandEnv mempty lazy) :=> []
@@ -140,14 +111,19 @@ sp s = sp' True s where
 
 
 instance Lattice DemandType where
-    lub (env :=> ts) (env' :=> ts') | length ts < length ts' = (env `lub` env') :=> zipWith lub (ts ++ repeat lazy) ts'
-                                    | otherwise = (env `lub` env') :=> zipWith lub ts (ts' ++ repeat lazy)
-    glb (env :=> ts) (env' :=> ts') | length ts < length ts' = (env `glb` env') :=> zipWith glb (ts ++ repeat lazy) ts'
-                                    | otherwise = (env `glb` env') :=> zipWith glb ts (ts' ++ repeat lazy)
+    lub (env :=> ts) (env' :=> ts') | length ts < length ts' = (env `lub` env') :=> strictList (zipWith lub (ts ++ repeat lazy) ts')
+                                    | otherwise = (env `lub` env') :=> strictList (zipWith lub ts (ts' ++ repeat lazy))
+    glb (env :=> ts) (env' :=> ts') | length ts < length ts' = (env `glb` env') :=> strictList (zipWith glb (ts ++ repeat lazy) ts')
+                                    | otherwise = (env `glb` env') :=> strictList (zipWith glb ts (ts' ++ repeat lazy))
 
 lazy = L None
 strict = S None
 err = Error None
+
+
+strictList (x:xs) = x `seq` xs' `seq` (x:xs') where
+    xs' = strictList xs
+strictList [] = []
 
 comb _ None None = None
 comb f None (Product xs) = Product $ zipWith f (repeat lazy) xs
@@ -215,9 +191,9 @@ demandEnvMinus (DemandEnv m r) x = DemandEnv (mdelete (tvrIdent x) m) r
 
 instance Lattice DemandEnv where
     lub d1@(DemandEnv m1 r1) d2@(DemandEnv m2 r2) = DemandEnv m (r1 `lub` r2) where
-        m = fromList [ (x,lenv x d1 `lub` lenv x d2) | x <- mkeys m1 ++ mkeys m2]
+        m = fromList [ (x,lenv x d1 `lub` lenv x d2) | x <- mkeys (m1 `union` m2)]
     glb d1@(DemandEnv m1 r1) d2@(DemandEnv m2 r2) = DemandEnv m (r1 `glb` r2) where
-        m = fromList [ (x,lenv x d1 `glb` lenv x d2) | x <- mkeys m1 ++ mkeys m2]
+        m = fromList [ (x,lenv x d1 `glb` lenv x d2) | x <- mkeys (m1 `union` m2)]
 
 
 newtype IM a = IM (Reader (Env,DataTable) a)
@@ -234,7 +210,6 @@ extEnv t e = local (\ (env,dt) -> (minsert (tvrIdent t) (Left e) env,dt))
 
 extEnvE TVr { tvrIdent = i } _ | isEmptyId i = id
 extEnvE t e = local (\ (env,dt) -> (minsert (tvrIdent t) (Right e) env,dt))
-extEnvs ts = local  (\ (env,dt) -> (mappend (fromList [ (tvrIdent t,Left s) |  (t,s) <- ts, not (isEmptyId (tvrIdent t))]) env,dt))
 
 
 instance DataTableMonad IM where
@@ -307,16 +282,16 @@ analyze (EPi tvr@TVr { tvrType = t1 } t2)  _s = do
 analyze (ELam x@TVr { tvrIdent = eid } e) (S (Product [s])) | eid == emptyId = do
     (e',phi :=> sigma) <- analyze e s
     let sx = Absent
-    return (ELam (tvrInfo_u (Info.insert sx) x) e',demandEnvMinus phi x :=> (sx:sigma))
+    return (ELam (tvrInfo_u (Info.insert $! sx) x) e',demandEnvMinus phi x :=> (sx:sigma))
 analyze (ELam x e) (S (Product [s])) = do
     (e',phi :=> sigma) <- analyze e s
     let sx = lenv (tvrIdent x) phi
-    return (ELam (tvrInfo_u (Info.insert sx) x) e',demandEnvMinus phi x :=> (sx:sigma))
+    return (ELam (tvrInfo_u (Info.insert $! sx) x) e',demandEnvMinus phi x :=> (sx:sigma))
 
 analyze (ELam x e) (L (Product [s])) = do
     (e',phi :=> sigma) <- analyze e s
     let sx = lenv (tvrIdent x) phi
-    return (ELam (tvrInfo_u (Info.insert sx) x) e',lazify (demandEnvMinus phi x) :=> (sx:sigma))
+    return (ELam (tvrInfo_u (Info.insert $! sx) x) e',lazify (demandEnvMinus phi x) :=> (sx:sigma))
 analyze (ELam x e) (S None) = analyze (ELam x e) (S (Product [lazy]))  -- simply to ensure binder is annotated
 analyze (ELam x e) (L None) = analyze (ELam x e) (L (Product [lazy]))  -- simply to ensure binder is annotated
 analyze (ELam x e) (Error None) = analyze (ELam x e) (Error (Product [lazy]))  -- simply to ensure binder is annotated
@@ -335,7 +310,7 @@ analyze ec@ECase {} s = analyzeCase ec s
 analyze ELetRec { eDefs = ds, eBody = b } s = f (decomposeDs ds) [] where
     f [] ds' = do
         (b',phi :=> sig) <- analyze b s
-        let g (t,e) = (tvrInfo_u (Info.insert (lenv (tvrIdent t) phi)) t,e)
+        let g (t,e) = (tvrInfo_u (Info.insert $! (lenv (tvrIdent t) phi)) t,e)
         return (ELetRec (map g ds') b', foldr denvDelete phi (fsts ds) :=> sig)
     f (Left (t,e):rs) fs =
         solveDs' (Just False) [(t,e)] id (\nn -> f rs (nn ++ fs))
@@ -381,13 +356,6 @@ topAnalyze _tvr e = clam e strict 0 where
 fixupDemandSignature (DemandSignature n (DemandEnv _ r :=> dt)) = DemandSignature n (DemandEnv mempty r :=> dt)
 
 
-{-# NOINLINE solveDs #-}
-solveDs dataTable ds = do
-    nds <- runIM (solveDs' Nothing ds fixupDemandSignature return) dataTable
-    --flip mapM_ nds $ \ (t,_) ->
-    --    putStrLn $ "strictness: " ++ pprint t ++ ": " ++ show (maybe absSig id $ Info.lookup (tvrInfo t))
-    return nds
-
 
 shouldBind ELit {} = True
 shouldBind EVar {} = True
@@ -395,33 +363,71 @@ shouldBind EPi {} = True
 shouldBind _ = False
 
 solveDs' :: (Maybe Bool) -> [(TVr,E)] -> (DemandSignature -> DemandSignature) -> ([(TVr,E)] -> IM a) -> IM a
+solveDs' Nothing ds fixup wdone = do
+    let f (Left d:rs) xs = solveDs' (Just False) [d] fixup (\nds -> f rs (nds ++ xs))
+        f (Right ds:rs) xs = solveDs' (Just True) ds fixup (\nds -> f rs (nds ++ xs))
+        f [] xs = wdone xs
+    f (decomposeDs ds) []
 solveDs' (Just False) [(t,e)] fixup wdone | shouldBind e = do
     (ne,ds) <- topAnalyze t e
     extEnvE t e $ wdone [(tvrInfo_u (Info.insert (fixup ds)) t,ne)]
 solveDs' (Just False) [(t,e)] fixup wdone = do
     (ne,ds) <- topAnalyze t e
     extEnv t ds $ wdone [(tvrInfo_u (Info.insert (fixup ds)) t,ne)]
-solveDs' (Just False) ds fixup wdone = solveDs' Nothing ds fixup wdone
-solveDs' Nothing ds fixup wdone = do
-    let f (Left d:rs) xs = solveDs' (Just False) [d] fixup (\nds -> f rs (nds ++ xs))
-        f (Right ds:rs) xs = solveDs' (Just True) ds fixup (\nds -> f rs (nds ++ xs))
-        f [] xs = wdone xs
-    f (decomposeDs ds) []
-solveDs' (Just True) ds fixup wdone = do
+--solveDs' (Just False) ds fixup wdone = solveDs' Nothing ds fixup wdone
+solveDs' (Just False) ds fixup wdone = error "solveDs' (Just False) called with more than one definition"
+solveDs' (Just True) ds fixup wdone = trace "solveDs': jt" $ do
     let ds' = [ ((t,e),sig) | (t,e) <- ds, let sig = maybe absSig id (Info.lookup (tvrInfo t))]
-        g False [] ds = wdone [ (tvrInfo_u (Info.insert (fixup sig)) t,e) | ((t,e),sig) <- ds ]
-        g True [] ds = extEnvs [ (t,sig)| ((t,_),sig) <- ds] $ g False ds []
-        g ch (((t,e),sig):rs) fs = do
+        g 0 _ [] ds = trace "gdonetout" $ wdone [ (tvrInfo_u (Info.insert $! (fixup sig)) t,e) | ((t,e),sig) <- ds ]
+        g _ False [] ds = trace "gdone1" $ wdone [ (tvrInfo_u (Info.insert $! (fixup sig)) t,e) | ((t,e),sig) <- ds ]
+        g n True [] ds = do
+            (oe,dt) <- ask
+            let nenv = fromList [ (tvrIdent t,Left s) |  ((t,_),s) <- ds, not (isEmptyId (tvrIdent t))] `Util.SetLike.union` oe
+            local (const (nenv,dt)) $ trace ("grepeating: " ++ show (length ds)) $ g (n - 1) False ds []
+        g n ch (((t,e),sig):rs) fs = do
             (ne,sig') <- topAnalyze t e
             let sig'' = sig `extendSig` sig'
-            g (ch || (sig'' /= sig)) rs (((t,ne),sig''):fs)
-    g True [] ds'
+            --(if sig'' /= sig then trace ("signe: " ++ show(tvrIdent t,sig)) else id) $
+            g n (ch || (sig'' /= sig)) rs (((t,ne),sig''):fs)
+    g (5::Int) True [] ds'
 
 {-# NOINLINE analyzeProgram #-}
 analyzeProgram prog = do
-    dsOut <- solveDs (progDataTable prog) (programDs prog)
-    return $ programSetDs' dsOut prog
+    let ds = programDs prog
+    nds <- runIM (solveDs' Nothing ds fixupDemandSignature return) (progDataTable prog)
+    --flip mapM_ nds $ \ (t,_) ->
+    --    putStrLn $ "strictness: " ++ pprint t ++ ": " ++ show (maybe absSig id $ Info.lookup (tvrInfo t))
+    return $ programSetDs' nds prog
 
 
 
+----------------------------
+-- show and pprint instances
+----------------------------
+
+instance Show Demand where
+    showsPrec _ Bottom = ("_|_" ++)
+    showsPrec _ Absent = ('A':)
+    showsPrec _ (L None) = ('L':)
+    showsPrec _ (L (Product ds)) = showString "L(" . foldr (.) id (map shows ds) . showString ")"
+    showsPrec _ (S None) = ('S':)
+    showsPrec _ (S (Product ds)) = showString "S(" . foldr (.) id (map shows ds) . showString ")"
+    showsPrec _ (Error None) = showString "Err"
+    showsPrec _ (Error (Product ds)) = showString "Err(" . foldr (.) id (map shows ds) . showString ")"
+
+instance DocLike d => PPrint d Demand where
+    pprint demand = tshow demand
+
+instance Show DemandType where
+    showsPrec _ (DemandEnv e Absent :=> d) | isEmpty e = shows d
+    showsPrec _ (env :=> ds) = shows env . showString " :=> " .  shows ds
+
+instance Show DemandEnv where
+    showsPrec _ (DemandEnv m Absent) = showString "{" . foldr (.) id (intersperse (showString ",") [ showString (pprint t) . showString " -> " . shows v | (t,v) <- idMapToList m]) . showString "}"
+    showsPrec _ (DemandEnv _ Bottom) = showString "_|_"
+    showsPrec _ (DemandEnv m demand) = showString "{" . shows demand . showString " - " . foldr (.) id (intersperse (showString ",") [ showString (pprint t) . showString " -> " . shows v | (t,v) <- idMapToList m]) . showString "}"
+
+
+instance Show DemandSignature where
+    showsPrec _ (DemandSignature n dt) = showString "<" . shows n . showString "," . shows dt . showString ">"
 
