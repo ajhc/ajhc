@@ -16,6 +16,7 @@ import Control.Monad.Writer
 import Control.Monad.Reader
 import Data.Typeable
 import Data.Monoid
+import Debug.Trace
 import List hiding(delete,union,insert)
 import Data.Maybe
 import qualified Data.Set as Set
@@ -57,7 +58,6 @@ import qualified FlagOpts as FO
 import qualified Info.Info as Info
 
 import System.Random
-import Debug.Trace
 
 type Bind = (TVr,E)
 
@@ -1017,11 +1017,10 @@ stat_unsafeCoerce = toAtom "E.Simplify.unsafeCoerce"
 
 data SmState = SmState {
     idsUsed :: !IdSet,
-    idsBound :: !IdSet,
-    smStdGen :: !StdGen
+    idsBound :: !IdSet
     }
 
-smState = SmState { idsUsed = mempty, idsBound = mempty, smStdGen = mkStdGen 42 }
+smState = SmState { idsUsed = mempty, idsBound = mempty }
 
 newtype SM a = SM (RWS Env Stats.Stat SmState a)
     deriving(Monad,Functor,MonadReader Env, MonadState SmState)
@@ -1037,7 +1036,7 @@ instance MonadStats SM where
    mticks' n k = SM $ tell (Stats.singleStat n k) >> return ()
 
 modifyIds fn = SM $ modify f where
-    f s@SmState { idsUsed = used, idsBound = bound, smStdGen=gen } = case fn (used,bound) of (used',bound') -> s { idsUsed = used', idsBound = bound', smStdGen = gen }
+    f s@SmState { idsUsed = used, idsBound = bound } = case fn (used,bound) of (used',bound') -> s { idsUsed = used', idsBound = bound' }
 getIds = SM $ liftM f get where
     f s@SmState { idsUsed = used, idsBound = bound } = (used,bound)
 putIds x = SM $ modify (f x) where
@@ -1064,8 +1063,8 @@ instance NameMonad Id SM where
         putIds (insert nn used, insert nn bound)
         return nn
     newName  = do
-        (used,_bound) <- getIds
-        newNameFrom (newIds used)
+        (used,bound) <- getIds
+        newNameFrom $ candidateIds (size used + 10000*size bound)
 
 smUsedNames = SM $ gets idsUsed
 smBoundNames = SM $ gets idsBound

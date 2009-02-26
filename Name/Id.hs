@@ -9,8 +9,6 @@ module Name.Id(
     addBoundNamesIdSet,
     addNamesIdSet,
     idMapToIdSet,
-    idNameBoundNames,
-    idNameUsedNames,
     anonymousIds,
     sillyId,
     etherealIds,
@@ -32,7 +30,6 @@ module Name.Id(
     toId,
     fromId,
     candidateIds,
-    runIdNameT',
     runIdNameT
     )where
 
@@ -57,7 +54,7 @@ import Util.HasSize
 import Util.Inst()
 import Util.NameMonad
 import Util.SetLike as S
-
+--import Debug.Trace
 
 {-
  - An Id is an opaque type with equality and ordering, Its range is split into the following categories
@@ -152,6 +149,7 @@ instance MapLike Id a (IdMap a) where
     mfilterWithKey f (IdMap m) = IdMap $ IM.filterWithKey (\k v -> f (Id k) v) m
 
 
+--deriving instance MapLike Int a (IM.IntMap a) => MapLike Id a (IdMap a)
 
 
 idSetToIdMap :: (Id -> a) -> IdSet -> IdMap a
@@ -169,22 +167,9 @@ instance (MonadReader r m) => MonadReader r (IdNameT m) where
 	ask       = lift ask
 	local f (IdNameT m) = IdNameT $ local f m
 
--- | Get bound and used names
-idNameBoundNames :: Monad m => IdNameT m IdSet
-idNameBoundNames = IdNameT $ do
-    (_used,bound) <- get
-    return bound
-idNameUsedNames :: Monad m => IdNameT m IdSet
-idNameUsedNames = IdNameT $  do
-    (used,_bound) <- get
-    return used
-
 -- | Run the name monad transformer.
-runIdNameT :: (Monad m) => IdNameT m a -> m a
-runIdNameT (IdNameT x) = liftM fst $ runStateT x (mempty,mempty)
-
-runIdNameT' :: (Monad m) => IdNameT m a -> m (a,IdSet)
-runIdNameT' (IdNameT x) = do
+runIdNameT :: (Monad m) => IdNameT m a -> m (a,IdSet)
+runIdNameT (IdNameT x) = do
     (r,(used,bound)) <- runStateT x (mempty,mempty)
     return (r,bound)
 
@@ -272,7 +257,7 @@ emptyId = Id 0
 
 newIds :: IdSet -> [Id]
 newIds (IdSet ids) = [ i | i <- candidateIds (size ids' `xor` IS.findMin ids' `xor` IS.findMax ids') , i `notMember` IdSet ids ] where
-    ids' = IS.insert 0 ids
+    ids' = if size ids == 0 then IS.insert 0 ids else ids
 
 
 newId :: Int           -- ^ a seed value, useful for speeding up finding a unique id
@@ -284,6 +269,7 @@ newId seed check = head $ filter check (candidateIds seed)
 candidateIds :: Int -> [Id]
 candidateIds seed = map mask $ randoms (mkStdGen seed) where
     mask x = Id $ x .&. 0x0FFFFFFE
+    --mask x = trace ("candidate " ++ show seed) $ Id $ x .&. 0x0FFFFFFE
 
 
 toId :: Name -> Id

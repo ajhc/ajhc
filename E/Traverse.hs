@@ -93,7 +93,7 @@ eSize e = n where
 
 
 renameE :: IdSet -> IdMap E -> E -> (E,IdSet)
-renameE initSet initMap e = runReader (runIdNameT' $ addBoundNamesIdMap initMap >> addBoundNamesIdSet initSet >> f e) initMap  where
+renameE initSet initMap e = runReader (runIdNameT $ addBoundNamesIdMap initMap >> addBoundNamesIdSet initSet >> f e) initMap  where
     f,f' :: E -> IdNameT (Reader (IdMap E)) E
     f' e = f e
     f  (EAp a b) = return EAp `ap` f a `ap` f b
