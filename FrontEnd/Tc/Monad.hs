@@ -34,6 +34,7 @@ module FrontEnd.Tc.Monad(
     newMetaVar,
     newVar,
     quantify,
+    quantify_n,
     runTc,
     skolomize,
     tcInfoEmpty,
@@ -389,15 +390,21 @@ freeMetaVarsEnv = do
         return $ freeMetaVars x
     return (Set.unions xs)
 
-quantify :: [MetaVar] -> [Pred] -> Rho -> Tc Sigma
-quantify vs ps r | not $ any isBoxyMetaVar vs = do
+quantify_n :: [MetaVar] -> [Pred] -> [Rho] -> Tc [Sigma]
+quantify_n vs ps rs | not $ any isBoxyMetaVar vs = do
+    -- we bind the quantified variables to fresh tvars
     vs <- mapM groundKind vs
-    r <- flattenType r
     nvs <- mapM (newVar . fixKind . metaKind) vs
     sequence_ [ varBind mv (TVar v) | v <- nvs |  mv <- vs ]
-    (ps :=> r) <- flattenType (ps :=> r)
+
+    ps <- flattenType ps
+    rs <- flattenType rs
+
     ch <- getClassHierarchy
-    return $ TForAll nvs (FrontEnd.Tc.Class.simplify ch ps :=> r)
+    return $ [TForAll nvs (FrontEnd.Tc.Class.simplify ch ps :=> r) | r <- rs ]
+
+quantify :: [MetaVar] -> [Pred] -> Rho -> Tc Sigma
+quantify vs ps r = do [s] <- quantify_n vs ps [r]; return s
 
 -- turn all ?? into * types, as we can't abstract over unboxed types
 fixKind :: Kind -> Kind
@@ -437,8 +444,8 @@ evalTAssoc ta@TAssoc { typeCon = Tycon { tyconName = n1 }, typeClassArgs = ~[car
 evalTAssoc t = return t
 
 
-evalArrowApp (TAp (TAp (TCon tcon) ta) tb) 
-    | tyconName tcon == tc_Arrow = return (TArrow ta tb) 
+evalArrowApp (TAp (TAp (TCon tcon) ta) tb)
+    | tyconName tcon == tc_Arrow = return (TArrow ta tb)
 
 evalArrowApp t = return t
 
