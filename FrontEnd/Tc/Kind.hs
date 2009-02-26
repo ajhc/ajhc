@@ -67,6 +67,8 @@ kindUTuple = KBase KUTuple
 kindFunRet = KBase KQuest
 kindArg    = KBase KQuestQuest
 
+infixr 5 `Kfun`
+
 data Kind  = KBase KBase
            | Kfun Kind Kind
            | KVar Kindvar               -- variables aren't really allowed in haskell in kinds

@@ -516,6 +516,9 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 etherealIds) w
         un b b' c
     un (ELam va ea) (ELam vb eb) c = lam va ea vb eb c
     un (EPi va ea) (EPi vb eb) c = lam va ea vb eb c
+    un (EPi va ea) (ELit LitCons { litName = ar, litArgs = [x,y], litType = lt}) c | ar == tc_Arrow = do
+        un (tvrType va) x c
+        un ea y c
     un (EPrim s xs t) (EPrim s' ys t') c | length xs == length ys = do
         sequence_ [ un x y c | x <- xs | y <- ys]
         un t t' c
@@ -531,11 +534,14 @@ match lup vs = \e1 e2 -> liftM Seq.toList $ execWriterT (un e1 e2 etherealIds) w
         let (al:as) = reverse bas
         un a (ELit lc { litArgs = reverse as, litType = ePi tvr { tvrType = getType al } t }) c
         un b al c
+    un (EAp a b) (EPi TVr { tvrType = a1 } a2) c = do
+        un a (ELit litCons { litArgs = [a1], litName = tc_Arrow, litType = EPi tvr { tvrType = getType a2 } (getType a1) }) c
+        un b a2 c
     un (EVar tvr@TVr { tvrIdent = i, tvrType = t}) b c
         | i `member` bvs = tell (Seq.single (tvr,b))
         | otherwise = fail $ "Expressions do not unify: " ++ show tvr ++ show b
     un a (EVar tvr) c | Just b <- lup (tvrIdent tvr), not $ isEVar b = un a b c
-    un a b c | Just a' <- followAlias undefined a = un a' b c
+    --un a b c | Just a' <- followAlias undefined a = un a' b c
     un a b c | Just b' <- followAlias undefined b = un a b' c
 
     un a b _ = fail $ "Expressions do not unify: " ++ show a ++ show b

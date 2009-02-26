@@ -97,7 +97,7 @@ tList = TCon (Tycon tc_List (Kfun kindStar kindStar))
 
 -- | The @(->)@ type constructor. Invariant: @tArrow@ shall not be fully applied. To this end, see 'tAp'.
 tArrow :: Type
-tArrow = TCon (Tycon tc_Arrow (kindArg `Kfun` kindFunRet `Kfun` kindStar))
+tArrow = TCon (Tycon tc_Arrow (kindArg `Kfun` (kindFunRet `Kfun` kindStar)))
 
 -- | Type application, enforcing the invariant that there be no fully-applied 'tArrow's
 tAp :: Type -> Type -> Type

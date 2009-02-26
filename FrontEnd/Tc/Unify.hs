@@ -19,6 +19,7 @@ import FrontEnd.Tc.Kind
 import Options
 import Support.CanType
 import Support.FreeVars
+import Name.Names
 import qualified FlagDump as FD
 
 
@@ -86,6 +87,8 @@ subsumes s1 s2 = do
         subsumes t (a `fn` b)
 
 
+    sub t1@TArrow {} t2@TAp {} = boxyMatch t1 t2 >> return ctId
+
 
     -- ASSOC
     sub s1@TAssoc {} s2 = do
@@ -105,6 +108,9 @@ subsumes s1 s2 = do
 
 
     sub a b = fail $ "subsumes failure: " <> ppretty a <+> ppretty b
+
+tArrow_star :: Type
+tArrow_star = TCon (Tycon tc_Arrow (kindStar `Kfun` (kindStar `Kfun` kindStar)))
 
 -- might as well return flattened type
 -- we can skip the occurs check for boxy types
@@ -160,6 +166,12 @@ boxyMatch s1 s2 = do
         return False
 
 
+    bm t@(TArrow s1 s2) (TAp (TAp arr a1) a2) = do
+        printRule "AF2-arrow"
+        tArrow `boxyMatch` arr
+        boxyMatch s1 a1
+        boxyMatch s2 a2
+        return False
 
     -- CEQ1
 

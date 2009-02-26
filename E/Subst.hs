@@ -41,6 +41,7 @@ import Control.Monad.Reader
 import qualified Data.Traversable as T
 import List hiding(union,insert,delete)
 
+import Name.Names
 import E.E
 import E.FreeVars()
 import Name.Id
@@ -187,6 +188,7 @@ mnv allShadow xs i checkTaken s ss
 eAp (EPi t b) e = if tvrIdent t == emptyId then b else subst t e b
 eAp (ELam t b) e = if tvrIdent t == emptyId then b else subst t e b
 --eAp (EPrim n es t@(EPi _ _)) b = EPrim n (es ++ [b]) (eAp t b)  -- only apply if type is pi-like
+eAp (ELit LitCons { litName = arr, litArgs = [a1], litType = (EPi _ r) }) a2 | arr == tc_Arrow = EPi tvr { tvrType = a1  } a2
 eAp (ELit lc@LitCons { litArgs = es, litType = (EPi t r) }) b = ELit lc { litArgs = es ++ [b], litType = subst t b r }
 eAp (ELit LitCons { litArgs = es, litAliasFor = Just af }) b = foldl eAp af (es ++ [b])
 --eAp a@ELit {} b = error $ "very strange application: (" ++ prettyE a ++ ") (" ++ prettyE b ++ ")"

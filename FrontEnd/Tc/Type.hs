@@ -182,6 +182,7 @@ instance UnVar Type where
             ft (TExists vs qt) = do
                 qt' <- unVar' opt qt
                 return $ TExists vs qt'
+            ft (TAp (TAp (TCon arr) a1) a2) | tyconName arr == tc_Arrow = ft (TArrow a1 a2)
             ft t@(TMetaVar _) = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return t
             ft t = tickleM (unVar' opt . (id :: Type -> Type)) t
         tv' <- findType tv
