@@ -11,6 +11,10 @@ data Exception = IOException IOException
 
 -- throw :: Exception -> a
 
+assert :: Bool -> a -> a
+assert True x = x
+assert False _ = error "assertion failure"
+
 throwIO :: Exception -> IO a
 throwIO (IOException ioe) = ioError ioe
 

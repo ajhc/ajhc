@@ -135,3 +135,10 @@ reallocBytes ptr size  =
 foreign import ccall "stdlib.h malloc" _malloc :: CSize -> IO (Ptr a)
 foreign import ccall "stdlib.h free" free :: Ptr a -> IO ()
 foreign import ccall "stdlib.h realloc" _realloc :: Ptr a -> CSize -> IO (Ptr b)
+
+-- | A pointer to a foreign function equivalent to 'free', which may be
+-- used as a finalizer (cf 'Foreign.ForeignPtr.ForeignPtr') for storage
+-- allocated with 'malloc', 'mallocBytes', 'realloc' or 'reallocBytes'.
+foreign import ccall unsafe "stdlib.h &free" finalizerFree :: FunPtr (Ptr a -> IO ())
+
+

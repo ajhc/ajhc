@@ -31,6 +31,7 @@ Foreign.C.Types.CChar, sbits8, int, CHAR_MAX, CHAR_MIN
 Foreign.C.Types.CShort, sbits<short>, int, SHORT_MAX, SHORT_MIN
 Foreign.C.Types.CInt, sbits<int>, int, INT_MAX, INT_MIN
 Foreign.C.Types.CUInt, ubits<int>, int, UINT_MAX, 0
+Foreign.C.Types.CULong, ubits<ptr>, int, UINTPTR_MAX, 0
 Foreign.C.Types.CSize, ubits<size_t>, int, UINTPTR_MAX, 0
 Foreign.C.Types.CWchar, ubits32, int, 0x10FFFF, 0
 Foreign.C.Types.CWint, sbits32, int, 0x10FFFF, 0

@@ -13,6 +13,8 @@ module System.IO(
     hGetPosn,
     hSetPosn,
     hGetContents,
+    hGetChar,
+    hGetLine,
     hIsOpen,
     hPrint,
     hPutBuf,
@@ -20,6 +22,7 @@ module System.IO(
     hPutStr,
     hPutStrLn,
     openFile,
+    openBinaryFile,
     withFile,
     fixIO,
     stdin,stdout,stderr,
@@ -86,8 +89,20 @@ hPutStrLn h s = do
     hPutChar h '\n'
 
 hPrint      :: Show a => Handle -> a -> IO ()
-hPrint h x    =  hPutStrLn h (show x)
+hPrint h x  =  hPutStrLn h (show x)
 
+hGetLine    :: Handle -> IO String
+hGetLine h  =  do c <- hGetChar h
+                  if c == '\n' then return "" else
+                    do s <- hGetLine h
+                       return (c:s)
+
+hGetChar :: Handle -> IO Char
+hGetChar h = withHandle h $ \ptr -> do
+    ch <- c_fgetwc ptr
+    case ch of
+        -1 -> fail "hGetChar: EOF"
+        _  -> return (unsafeChr ch)
 
 hGetContents :: Handle -> IO String
 hGetContents h = withHandle h $ \ptr -> do

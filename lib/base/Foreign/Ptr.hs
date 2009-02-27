@@ -36,8 +36,8 @@ nullPtr = Ptr nullAddr
 plusPtr :: Ptr a -> Int -> Ptr b
 plusPtr (Ptr addr) off = Ptr (plusAddr addr off)
 
-minusPtr :: Ptr a -> Int -> Ptr b
-minusPtr (Ptr addr) off = Ptr (plusAddr addr (negate off))
+minusPtr :: Ptr a -> Ptr b -> Int
+minusPtr (Ptr a1) (Ptr a2) =  minusAddr a1 a2
 
 
 alignPtr :: Ptr a -> Int -> Ptr a

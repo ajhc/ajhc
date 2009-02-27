@@ -13,6 +13,7 @@ module Jhc.Addr(
     castPtr,
     nullFunAddr,
     plusAddr,
+    minusAddr,
     addrToWordPtr,
     wordPtrToAddr,
     wordPtrToFunAddr,
@@ -48,14 +49,20 @@ plusAddr :: Addr -> Int -> Addr
 plusAddr (Addr addr) off = case unboxInt off of
     off_ -> Addr (addr `plusWordPtr` intToPtr__ off_)
 
+{-# INLINE minusAddr #-}
+minusAddr :: Addr -> Addr -> Int
+minusAddr (Addr a1) (Addr a2) = boxInt (ptrToInt__ (a1 `minusWP` a2))
+
 foreign import primitive "U2U" addrToWordPtr :: Addr -> WordPtr
 foreign import primitive "U2U" wordPtrToAddr :: WordPtr -> Addr
 foreign import primitive "U2U" wordPtrToFunAddr :: WordPtr -> FunAddr
 foreign import primitive "U2U" funAddrToWordPtr :: FunAddr -> WordPtr
 
 foreign import primitive "Sx" intToPtr__ :: Int__ -> BitsPtr_
+foreign import primitive "I2I" ptrToInt__ :: BitsPtr_ -> Int__
 
 foreign import primitive "Add" plusWordPtr :: BitsPtr_ -> BitsPtr_ -> BitsPtr_
+foreign import primitive "Sub" minusWP :: BitsPtr_ -> BitsPtr_ -> BitsPtr_
 
 ptrFromAddr__ :: Addr__ -> Ptr a
 ptrFromAddr__ addr = Ptr (Addr addr)

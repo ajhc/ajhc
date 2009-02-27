@@ -8,6 +8,7 @@ module Jhc.Handle(
     withHandle,
     hClose,
     hIsOpen,
+    openBinaryFile,
     openFile
     ) where
 
@@ -25,8 +26,9 @@ data IOMode = ReadMode | WriteMode | AppendMode | ReadWriteMode
 
 data Handle = Handle {
     handleName :: String,
-    handleFile :: Ptr (Ptr Handle),
-    handleIOMode :: IOMode
+    handleFile :: !(Ptr (Ptr Handle)),
+    handleBinary :: !Bool,
+    handleIOMode :: !IOMode
     }
 
 instance Show Handle where
@@ -78,7 +80,12 @@ openFile fp m = do
     ptr <- withCString fp $ \cfp -> c_fopen cfp (toStr m)
     if ptr == nullPtr then throwErrnoFN "openFile" fp  else do
         pptr <- new ptr
-        return Handle { handleName = fp, handleIOMode = m, handleFile = pptr }
+        return Handle { handleBinary = False, handleName = fp, handleIOMode = m, handleFile = pptr }
+
+openBinaryFile :: FilePath -> IOMode -> IO Handle
+openBinaryFile fp m = do
+    h <- openFile fp m
+    return h { handleBinary = True }
 
 toStr ReadMode = ptrFromAddr__ "r"#
 toStr WriteMode = ptrFromAddr__ "w"#
