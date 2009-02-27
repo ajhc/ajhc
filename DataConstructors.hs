@@ -29,6 +29,7 @@ module DataConstructors(
     extractIO',
     pprintTypeOfCons,
     showDataTable,
+    samplePrimitiveDataTable,
     slotTypes,
     slotTypesHs,
     toDataTable,
@@ -739,9 +740,14 @@ showDataTable (DataTable mp) = vcat xs where
             conChildren = conChildren
             } = const
     xs = [text x <+> hang 0 (c y) | (x,y) <- ds ]
-    (ubt,ubd) = tunboxedtuple 3
-    ds = sortBy (\(x,_) (y,_) -> compare x y) [ (show x,y)  | (x,y) <-  Map.toList mp ++ [(conName ubt,ubt),(conName ubd,ubd)]]
+    ds = sortBy (\(x,_) (y,_) -> compare x y) [(show x,y)  | (x,y) <-  Map.toList mp]
 
+
+samplePrimitiveDataTable :: DataTable
+samplePrimitiveDataTable = DataTable $ Map.fromList [ (x,c) | x <- xs, c <- getConstructor x mempty] where
+    nt v = map (flip unboxedNameTuple (v::Int)) [DataConstructor, TypeConstructor]
+    xs = nt 0 ++ nt 3 ++ [nameConjured modAbsurd eStar,nameConjured modBox hs,rt_bits16,rt_bits_ptr_]
+    hs = EPi (tVr emptyId eHash) eStar
 
 getSiblings :: DataTable -> Name -> Maybe [Name]
 getSiblings dt n

@@ -47,6 +47,7 @@ core-beforelift show core before lambda lifting
 core-afterlift  show final core before writing ho file
 core         show intermediate core code
 core-mangled de-typed core right before it is converted to grin
+datatable-builtin show data table entries for some built in types
 datatable    show data table of constructors
 optimization-stats show combined stats of optimization passes
 rules        show all user rules and catalysts

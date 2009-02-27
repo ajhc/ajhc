@@ -107,7 +107,7 @@ modBox    = "Jhc@.Box"
 nameConjured :: String -> E -> Name
 nameConjured mod n = toName TypeConstructor (mod,f n "") where
     f (ESort s) = shows s
-    f (EPi TVr { tvrType = t1 } t2) = ('^':) . shows t1 . shows t2
+    f (EPi TVr { tvrType = t1 } t2) = ('^':) . f t1 . f t2
     f _ = error $ "nameConjured: " ++ show (mod,n)
 
 fromConjured :: Monad m => String -> Name -> m E

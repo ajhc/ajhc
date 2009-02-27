@@ -489,6 +489,7 @@ compileModEnv cho = do
 
     -- dump final version of various requested things
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
+    wdump FD.DatatableBuiltin $ putErrLn (render $ showDataTable samplePrimitiveDataTable)
     when (dump FD.ClassSummary) $ do
         putStrLn "  ---- class summary ---- "
         printClassSummary (choClassHierarchy cho)
