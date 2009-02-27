@@ -513,7 +513,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
                         eStrictLet tvrWorld2 (prim rs "void" (EVar tvrWorld:[EVar t | t <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
             (False,ExtTypeVoid) -> fail "pure foreign function must return a valid value"
             _ -> do
-                (cn,rtt',rtt) <- lookupCType' dataTable rt'
+                ExtTypeBoxed cn rtt' rtt <- lookupExtTypeInfo dataTable rt'
                 [rtVar,rtVar'] <- newVars [rt',rtt']
                 let _rttIO = ltTuple [tWorld__, rt']
                     rttIO' = ltTuple' [tWorld__, rtt']
@@ -538,10 +538,24 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
          --         then return unboxedTyUnit
          --         else liftM (\(_, _, x) -> rawType x) $ lookupCType' dataTable retTy
 
-        argCTys <- mapM (liftM (\(_,st,_) -> st) . lookupCType' dataTable) argTys
+        aets <- forM argTys $ \ty -> do
+            eti <- lookupExtTypeInfo dataTable ty
+            ty' <- case eti of
+                ExtTypeVoid -> fail "attempt to foreign export function with void argument"
+                ExtTypeRaw _ -> do return ty
+                ExtTypeBoxed _ ty' _  -> do return ty'
+            [v] <- newVars [ty']
+            e <- marshallFromC dataTable (EVar v) ty
+            return (e,v,ty')
 
-        argTvrs <- newVars argCTys
-        argEs <- sequence [(marshallFromC dataTable (EVar v) et) | v <- argTvrs | et <- argTys]
+
+        let argEs   = [ e | (e,_,_) <- aets ]
+            argTvrs = [ v | (_,v,_) <- aets ]
+            argCTys = [ t | (_,_,t) <- aets ]
+--        argCTys <- mapM (liftM (\(_,st,_) -> st) . lookupCType' dataTable) argTys
+
+ --       argTvrs <- newVars argCTys
+--        argEs <- sequence [(marshallFromC dataTable (EVar v) et) | v <- argTvrs | et <- argTys]
 
         fe <- actuallySpecializeE (EVar tn) ty
         let inner = foldl EAp fe argEs
@@ -569,8 +583,6 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
                            (fmap (const (foldr tFunc retCTy' argCTys)) $
                               setProperty prop_EXPORTED fn),
                  result)]
-
-    cDecl x@HsForeignExport {} = fail ("Unsupported foreign export: "++ show x)
 
     cDecl (HsPatBind sl (HsPVar n) (HsUnGuardedRhs exp) []) | n == sillyName' = do
         e <- cExpr exp
