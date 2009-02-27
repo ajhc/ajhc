@@ -61,5 +61,6 @@ Exposed-Modules: Control.Exception,
                  Data.Function,
                  System,
                  Text.Show.Functions,
+                 Data.Typeable,
                  Text.Printf
 
