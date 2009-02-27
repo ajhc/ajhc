@@ -247,20 +247,26 @@ unbox dataTable e _vn wtd | getType (getType e) == eHash = wtd e
 unbox dataTable e vn wtd = eCase e [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd (EVar tvra))] Unknown where
     te = getType e
     tvra = tVr vn sta
-    Just (cna,sta,_ta) = lookupCType' dataTable te
+    Just (ExtTypeBoxed cna sta _) = lookupExtTypeInfo dataTable te
 
-createFunc :: UniqueProducer m => DataTable -> [E] -> ([(TVr,String)] -> (E -> E,E)) -> m E
+createFunc :: UniqueProducer m => DataTable -> [E] -> ([TVr] -> (E -> E,E)) -> m E
 createFunc dataTable es ee = do
     xs <- flip mapM es $ \te -> do
-        res@(_,sta,rt) <- lookupCType' dataTable te
-        [n,n'] <- newVars [te,sta]
-        return (n,(n',rt),res)
+        eti <- lookupExtTypeInfo dataTable te
+        [n] <- newVars [te]
+        case eti of
+            ExtTypeVoid -> fail "createFunc: attempt to pass a void argument"
+            ExtTypeBoxed cn sta _ -> do
+                [n'] <- newVars [sta]
+                return (n,n',Just cn)
+            ExtTypeRaw _ -> do
+                return (n,n,Nothing)
     let tvrs' = [ n' | (_,n',_) <- xs ]
         tvrs = [ t | (t,_,_) <- xs]
         (me,innerE) = ee tvrs'
         eee = me $ foldr esr innerE xs
-        esr (tvr,(tvr',_),(cn,_,_)) e = eCase (EVar tvr) [Alt (litCons { litName = cn, litArgs = [tvr'], litType = te }) e] Unknown  where
-            te = getType $ EVar tvr
+        esr (tvr,tvr',Just cn) e = eCase (EVar tvr) [Alt (litCons { litName = cn, litArgs = [tvr'], litType = tvrType tvr }) e] Unknown
+        esr (_,_,Nothing) e = e
     return $ foldr ELam eee tvrs
 
 instance GenName String where
@@ -373,18 +379,25 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         | otherwise = (a,b, deNewtype dataTable c)
 
     marshallToC :: UniqueProducer m => DataTable -> E -> E -> m E
-    marshallToC dataTable e te | otherwise = do
-        (cna,sta,ta) <- lookupCType' dataTable te
-        [tvra] <- newVars [sta]
-        return $ eCase e
-                       [Alt (litCons { litName = cna, litArgs = [tvra], litType = te })
-                            (EVar tvra)]
-                       Unknown
+    marshallToC dataTable e te = do
+        eti <- lookupExtTypeInfo dataTable te
+        case eti of
+            ExtTypeBoxed cna sta _ -> do
+                [tvra] <- newVars [sta]
+                return $ eCase e
+                               [Alt (litCons { litName = cna, litArgs = [tvra], litType = te })
+                                    (EVar tvra)]
+                               Unknown
+            ExtTypeRaw _ -> return e
+            ExtTypeVoid -> fail "marshallToC: trying to marshall void"
 
-    marshallFromC :: UniqueProducer m => DataTable -> E -> E -> m E
-    marshallFromC dataTable ce te | otherwise = do
-        (cna,sta,ta) <- lookupCType' dataTable te
-        return $ ELit (litCons { litName = cna, litArgs = [ce], litType = te })
+    marshallFromC :: Monad m => DataTable -> E -> E -> m E
+    marshallFromC dataTable ce te = do
+        eti <- lookupExtTypeInfo dataTable te
+        case eti of
+            ExtTypeBoxed cna _ _ -> return $ ELit (litCons { litName = cna, litArgs = [ce], litType = te })
+            ExtTypeRaw _ -> return ce
+            ExtTypeVoid -> fail "marshallFromC: trying to marshall void"
 
     -- first argument builds the actual call primitive, given
     -- (a) the C argtypes
@@ -398,40 +411,47 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         let (ts,rt) = argTypes' ty
             (isIO,rt') =  extractIO' rt
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
-        pt <- lookupCType rt'
-        cts <- mapM lookupCType (filter (not . sortKindLike) ts)
+        pt <- lookupExtTypeInfo dataTable rt'
+        cts <- mapM (lookupExtTypeInfo dataTable) (filter (not . sortKindLike) ts)
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
         let cFun = createFunc dataTable (map tvrType es)
-            prim = myPrim cts pt
+            prim = myPrim (map extTypeInfoExtType cts) (extTypeInfoExtType pt)
         case (isIO,pt) of
-            (True,"void") -> cFun $ \rs -> (,) (ELam tvrWorld) $
+            (True,ExtTypeVoid) -> cFun $ \rs -> (,) (ELam tvrWorld) $
                         eStrictLet tvrWorld2
                                    (prim True
                                          (EVar tvrWorld
-                                          :[EVar t | (t,_) <- rs ])
+                                          :[EVar t | t <- rs ])
                                          tWorld__)
                                    (eJustIO (EVar tvrWorld2) vUnit)
-            (False,"void") -> fail "pure foreign function must return a valid value"
-            _ -> do
-                (cn,rtt',_) <- lookupCType' dataTable rt'
+            (False,ExtTypeVoid) -> fail "pure foreign function must return a valid value"
+            (_,ExtTypeBoxed cn rtt' _) -> do
                 [rtVar,rtVar'] <- newVars [rt',rtt']
-                let _rttIO = ltTuple [tWorld__, rt']
-                    rttIO' = ltTuple' [tWorld__, rtt']
+                let rttIO' = ltTuple' [tWorld__, rtt']
                 case isIO of
                     False -> cFun $ \rs -> (,) id $
                                  eStrictLet rtVar'
                                            (prim False
-                                                 [ EVar t | (t,_) <- rs ]
+                                                 [ EVar t | t <- rs ]
                                                  rtt')
                                            (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
                     True -> cFun $ \rs -> (,) (ELam tvrWorld) $
                                 eCaseTup' (prim True
-                                                (EVar tvrWorld:[EVar t | (t,_) <- rs ])
+                                                (EVar tvrWorld:[EVar t | t <- rs ])
                                                 rttIO')
                                           [tvrWorld2,rtVar']
                                           (eLet rtVar
                                                 (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
                                                 (eJustIO (EVar tvrWorld2) (EVar rtVar)))
+            (_,ExtTypeRaw  _) -> do
+                [rtVar] <- newVars [rt']
+                let rttIO' = ltTuple' [tWorld__, rt']
+                case isIO of
+                    False -> cFun $ \rs -> (,) id $ (prim False [ EVar t | t <- rs ] rt') 
+                    True -> cFun $ \rs -> (,) (ELam tvrWorld) $
+                                eCaseTup' (prim True (EVar tvrWorld:[EVar t | t <- rs ]) rttIO')
+                                          [tvrWorld2,rtVar]
+                                          (eJustIO (EVar tvrWorld2) (EVar rtVar))
 
     cDecl :: Monad m => HsDecl -> Ce m [(Name,TVr,E)]
     cDecl (HsForeignDecl _ (FfiSpec (Import cn req) _ Primitive) n _) = do
@@ -446,11 +466,16 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         let name       = toName Name.Val n
         (var,ty,lamt)  <- convertValue name
         let (_ts,rt)   = argTypes' ty
-        (cn,st,_ct) <- lookupCType' dataTable rt
-        [uvar] <- newVars [st]
-        let expr x     = return [(name,setProperty prop_INLINE var,lamt x)]
+            expr x     = return [(name,setProperty prop_INLINE var,lamt x)]
             prim       = APrim (AddrOf $ packString rcn) req
-        expr $ eStrictLet uvar (EPrim prim [] st) (ELit (litCons { litName = cn, litArgs = [EVar uvar], litType = rt }))
+        -- this needs to be a boxed value since we can't have top-level
+        -- unboxed values yet.
+        eti <- lookupExtTypeInfo dataTable rt
+        case eti of
+            ExtTypeBoxed cn st _ -> do
+                [uvar] <- newVars [st]
+                expr $ eStrictLet uvar (EPrim prim [] st) (ELit (litCons { litName = cn, litArgs = [EVar uvar], litType = rt }))
+            _ -> fail "foreign import of address must be of a boxed type"
 
     cDecl (HsForeignDecl _ (FfiSpec (Import rcn req) _ CCall) n _) = do
         let name = toName Name.Val n
@@ -478,24 +503,24 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         let (ts,rt) = argTypes' ty
             (isIO,rt') = extractIO' rt
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
-        pt <- lookupCType rt'
+        pt <- lookupExtTypeInfo dataTable rt'
         [tvrWorld, tvrWorld2] <- newVars [tWorld__,tWorld__]
         dnet <- parseDotNetFFI rcn
         let cFun = createFunc dataTable (map tvrType es)
             prim rs rtt = EPrim (APrim dnet { primIOLike = isIO } mempty)
         result <- case (isIO,pt) of
-            (True,"void") -> cFun $ \rs -> (,) (ELam tvrWorld) $
-                        eStrictLet tvrWorld2 (prim rs "void" (EVar tvrWorld:[EVar t | (t,_) <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
-            (False,"void") -> fail "pure foreign function must return a valid value"
+            (True,ExtTypeVoid) -> cFun $ \rs -> (,) (ELam tvrWorld) $
+                        eStrictLet tvrWorld2 (prim rs "void" (EVar tvrWorld:[EVar t | t <- rs ]) tWorld__) (eJustIO (EVar tvrWorld2) vUnit)
+            (False,ExtTypeVoid) -> fail "pure foreign function must return a valid value"
             _ -> do
                 (cn,rtt',rtt) <- lookupCType' dataTable rt'
                 [rtVar,rtVar'] <- newVars [rt',rtt']
                 let _rttIO = ltTuple [tWorld__, rt']
                     rttIO' = ltTuple' [tWorld__, rtt']
                 case isIO of
-                    False -> cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim rs rtt [ EVar t | (t,_) <- rs ] rtt') (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
+                    False -> cFun $ \rs -> (,) id $ eStrictLet rtVar' (prim rs rtt [ EVar t | t <- rs ] rtt') (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' })
                     True -> cFun $ \rs -> (,) (ELam tvrWorld) $
-                                eCaseTup' (prim rs rtt (EVar tvrWorld:[EVar t | (t,_) <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' }) (eJustIO (EVar tvrWorld2) (EVar rtVar)))
+                                eCaseTup' (prim rs rtt (EVar tvrWorld:[EVar t | t <- rs ]) rttIO')  [tvrWorld2,rtVar'] (eLet rtVar (ELit $ litCons { litName = cn, litArgs = [EVar rtVar'], litType = rt' }) (eJustIO (EVar tvrWorld2) (EVar rtVar)))
         return [(toName Name.Val n,var,lamt result)]
 
     cDecl x@HsForeignDecl {} = fail ("Unsupported foreign declaration: "++ show x)
@@ -509,11 +534,11 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         let (argTys,retTy') = argTypes' ty
             (isIO,retTy) = extractIO' retTy'
 
-        retCTy <- if retTy == tUnit
-                  then return unboxedTyUnit
-                  else liftM (\(_, _, x) -> rawType x) $ lookupCType' dataTable retTy
+        --retCTy <- if retTy == tUnit
+         --         then return unboxedTyUnit
+         --         else liftM (\(_, _, x) -> rawType x) $ lookupCType' dataTable retTy
 
-        argCTys <- liftM (map rawType) (mapM (liftM (\(_,_,x) -> x) . lookupCType' dataTable) argTys)
+        argCTys <- mapM (liftM (\(_,st,_) -> st) . lookupCType' dataTable) argTys
 
         argTvrs <- newVars argCTys
         argEs <- sequence [(marshallFromC dataTable (EVar v) et) | v <- argTvrs | et <- argTys]
@@ -537,7 +562,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
 
         let result = foldr ELam retE argTvrs
 
-        realRetCTy:realArgCTys <- mapM lookupCType (retTy:argTys)
+        realRetCTy:realArgCTys <- mapM (\x -> extTypeInfoExtType `liftM`  lookupExtTypeInfo dataTable x) (retTy:argTys)
 
         return [(name,
                  tvrInfo_u (Info.insert (ffi, (realArgCTys,realRetCTy)))
@@ -599,7 +624,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
     cExpr (HsAsPat n' (HsCon n)) = return $ constructionExpression dataTable (toName DataConstructor n) rt where
         t' = getAssump n'
         (_,rt) = argTypes' (tipe t')
-    cExpr (HsLit (HsStringPrim s)) = return $ EPrim (APrim (PrimString (packString s)) mempty) [] (rawType "bits<ptr>")
+    cExpr (HsLit (HsStringPrim s)) = return $ EPrim (APrim (PrimString (packString s)) mempty) [] r_bits_ptr_
     cExpr (HsLit (HsString s)) = return $ E.Values.toE s
     cExpr (HsAsPat n' (HsLit (HsIntPrim i))) = ans where
         t' = getAssump n'
@@ -607,9 +632,11 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
     cExpr (HsAsPat n' (HsLit (HsInt i))) = ans where
         t' = getAssump n'
         ty = tipe t'
-        ans = case lookupCType' dataTable ty of
-            Just (cn,st,_it) -> return $ ELit (litCons { litName = cn, litArgs = [ELit (LitInt (fromIntegral i) st)], litType = ty })
-            Nothing -> return $ intConvert' funcs ty i
+        -- XXX this can allow us to create integer literals out of things that
+        -- arn't in Num if we arn't careful
+        ans = case lookupExtTypeInfo dataTable ty of
+            Just (ExtTypeBoxed cn st _) -> return $ ELit (litCons { litName = cn, litArgs = [ELit (LitInt (fromIntegral i) st)], litType = ty })
+            _ -> return $ intConvert' funcs ty i
             --Just (cn,st,it) ->
     --cExpr (HsLit (HsInt i)) = return $ intConvert i
     cExpr (HsLit (HsChar ch)) = return $ toE ch
@@ -739,13 +766,13 @@ toTVr assumps dataTable n = tVr (toId n) typeOfName where
 
 integer_cutoff = 500000000
 
-intConvert i | abs i > integer_cutoff  =  ELit (litCons { litName = dc_Integer, litArgs = [ELit $ LitInt (fromInteger i) (rawType "bits<max>")], litType = tInteger })
-intConvert i =  ELit (litCons { litName = dc_Int, litArgs = [ELit $ LitInt (fromInteger i) (rawType "bits32")], litType = tInt })
+intConvert i | abs i > integer_cutoff  =  ELit (litCons { litName = dc_Integer, litArgs = [ELit $ LitInt (fromInteger i) r_bits_max_], litType = tInteger })
+intConvert i =  ELit (litCons { litName = dc_Int, litArgs = [ELit $ LitInt (fromInteger i) r_bits32], litType = tInt })
 
-intConvert' funcs typ i = EAp (EAp fun typ) (ELit (litCons { litName = con, litArgs = [ELit $ LitInt (fromInteger i) (rawType rawtyp)], litType = ltype }))  where
+intConvert' funcs typ i = EAp (EAp fun typ) (ELit (litCons { litName = con, litArgs = [ELit $ LitInt (fromInteger i) rawtyp], litType = ltype }))  where
     (con,ltype,fun,rawtyp) = case abs i > integer_cutoff of
-        True -> (dc_Integer,tInteger,f_fromInteger,"bits<max>")
-        False -> (dc_Int,tInt,f_fromInt,"bits32")
+        True -> (dc_Integer,tInteger,f_fromInteger,r_bits_max_)
+        False -> (dc_Int,tInt,f_fromInt,r_bits32)
     f_fromInt = func_fromInt funcs
     f_fromInteger = func_fromInteger funcs
 
@@ -943,7 +970,7 @@ convertMatches bs ms err = do
     match bs ms err
 
 packupString :: String -> (E,Bool)
-packupString s | all (\c -> c > '\NUL' && c <= '\xff') s = (EPrim (APrim (PrimString (packString s)) mempty) [] (rawType "bits<ptr>"),True)
+packupString s | all (\c -> c > '\NUL' && c <= '\xff') s = (EPrim (APrim (PrimString (packString s)) mempty) [] r_bits_ptr_,True)
 packupString s = (toE s,False)
 
 

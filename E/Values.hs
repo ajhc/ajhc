@@ -169,7 +169,6 @@ prim_unsafeCoerce e t = p e' where
 from_unsafeCoerce (EPrim pp [e] t) | pp == p_unsafeCoerce = return (e,t)
 from_unsafeCoerce _ = fail "Not unsafeCoerce primitive"
 
-rawType s = ELit litCons { litName = toName RawType s, litType = eHash }
 
 tWorldzh = ELit litCons { litName = tc_World__, litArgs = [], litType = eHash }
 

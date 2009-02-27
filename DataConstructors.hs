@@ -5,6 +5,8 @@ module DataConstructors(
     AliasType(..),
     DataFamily(..),
     Slot(..),
+    ExtTypeInfo(..),
+    extTypeInfoExtType,
     primitiveAliases,
     dataTablePrims,
     constructionExpression,
@@ -24,6 +26,7 @@ module DataConstructors(
     boxPrimitive,
     lookupCType',
     lookupCType,
+    lookupExtTypeInfo,
     extractIO,
     extractIO',
     pprintTypeOfCons,
@@ -436,16 +439,55 @@ extractIO' e = case extractIO e of
     Just x -> (True,x)
     Nothing -> (False,e)
 
+data ExtTypeInfo
+    = ExtTypeVoid                  -- maps to 'void'
+    | ExtTypeRaw ExtType           -- value is an unboxed type suitable for passing with the argument calling convention
+    | ExtTypeBoxed Name E ExtType  -- boxed type, name is constructor of box, E is type of the slice, and ExtType is the calling convention to use
+
+extTypeInfoExtType (ExtTypeRaw et) = et
+extTypeInfoExtType (ExtTypeBoxed _ _ et) = et
+extTypeInfoExtType ExtTypeVoid = "void"
+
+lookupExtTypeInfo :: Monad m => DataTable -> E -> m ExtTypeInfo
+lookupExtTypeInfo dataTable oe = f oe where
+    -- handle the void context ones first
+    f e@(ELit LitCons { litName = c }) | c == tc_Unit || c == tc_World__ = return ExtTypeVoid
+    -- if the constructor is in the external type map, replace its external
+    -- type with the one in the map
+    f e@(ELit LitCons { litName = c }) | Just et <- Map.lookup c typeTable = do
+        res <- g e
+        return $ case res of
+            ExtTypeRaw _ -> ExtTypeRaw et
+            ExtTypeBoxed b t _ -> ExtTypeBoxed b t et
+            ExtTypeVoid -> ExtTypeVoid 
+    f e = g e
+    -- if we are a single constructor data type with a single foreignable unboxed
+    -- slot, we are foreiginable
+    g (ELit LitCons { litName = c }) 
+        | Just Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable,
+          Just Constructor { conOrigSlots = [SlotNormal st] } <- getConstructor cn dataTable,
+          Just (ExtTypeRaw et) <- lookupExtTypeInfo dataTable st = return $ ExtTypeBoxed cn st et
+    -- if we are a raw type, we can be foreigned
+    g (ELit LitCons { litName = c }) | Just et <- Map.lookup c rawExtTypeMap = return (ExtTypeRaw et)
+    g e | Just e' <- followAlias dataTable e = f e'
+        | otherwise = fail $ "lookupExtTypeInfo: " ++ show (oe,e)
+
+
 -- | Finds the internal constructor, E field type, and C field type
 -- for an FFI-able single-field, single-constructor datatype like
 -- 'Int' (or a newtype thereof)
-lookupCType' dataTable e = case followAliases (mappend dataTablePrims dataTable) e of
+lookupCType' dataTable e = do
+    ExtTypeBoxed a b c <- lookupExtTypeInfo dataTable e 
+    return (a,b,c)
+{-
+    = g ecase followAliases (mappend dataTablePrims dataTable) e of
     ELit LitCons { litName = c, litArgs = [] }
         | Just Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable,
           Just Constructor { conOrigSlots = [SlotNormal st@(ELit LitCons { litName = n, litArgs = [] })] } <- getConstructor cn dataTable
             -> return (cn,st,show n)
     ELit LitCons { litName = c, litArgs = [] } | Just cn  <- getConstructor c dataTable -> fail $ "lookupCType: " ++ show cn
     e' -> fail $ "lookupCType': " ++ show (e,e')
+    -}
 
 
 followAlias :: Monad m => DataTable -> E -> m E
@@ -858,4 +900,23 @@ primitiveAliases = [
     (tc_Float128, rt_float128)
     ]
 
+rawExtTypeMap = Map.fromList [
+    (rt_bool,  "bool"),
+    (rt_bits8,  "uint8_t"),
+    (rt_bits16, "uint16_t"),
+    (rt_bits32, "uint32_t"),
+    (rt_bits64, "uint64_t"),
+    (rt_bits128,"uint128_t"),
+    (rt_bits_ptr_, "uintptr_t" ),
+    (rt_bits_max_, "uintmax_t"),
+    (rt_bits_size_t_, "size_t" ),
+    (rt_bits_time_t_, "time_t" ),
+    (rt_bits_int_, "int" ),
+    (rt_bits_short_, "short" ),
+
+    (rt_float32, "float"),
+    (rt_float64, "double"),
+    (rt_float80, "long double"),
+    (rt_float128, "__float128")
+    ]
 

@@ -6,6 +6,9 @@ module PrimitiveOperators(
     create_uintegralCast_toInt,
     create_uintegralCast_fromInt,
     theMethods,
+    r_bits_ptr_,
+    r_bits_max_,
+    r_bits32,
     allCTypes
     ) where
 
@@ -24,6 +27,7 @@ import Support.CanType
 import qualified Cmm.Op as Op
 import Name.Id
 
+rawType s = ELit litCons { litName = toName RawType s, litType = eHash }
 nameToOpTy n = do RawType <- return $ nameType n; Op.readTy (show n)
 
 tPtr t = ELit (litCons { litName = tc_Ptr
@@ -53,10 +57,6 @@ create_uintegralCast_toInt c1 t1 e = create_integralCast Op.U2U c1 t1 dc_Int tIn
 create_uintegralCast_toInteger c1 t1 e = create_integralCast Op.Zx c1 t1 dc_Integer tIntegerzh e tInteger
 create_uintegralCast_fromInt c2 t2 e t = create_integralCast Op.U2U dc_Int tIntzh c2 t2 e t
 create_uintegralCast_fromInteger c2 t2 e t = create_integralCast Op.Lobits dc_Integer tIntegerzh c2 t2 e t
-
-create_fintegralCast_fromInt c2 t2 e t = create_integralCast Op.I2F dc_Int tIntzh c2 t2 e t
-create_fintegralCast_fromInteger c2 t2 e t = create_integralCast Op.I2F dc_Integer tIntegerzh c2 t2 e t
-
 
 toClassName x = parseName ClassName x
 
@@ -137,11 +137,6 @@ build_abs ct cn v = unbox' v cn tvra (eCase (oper_aaB Op.Lt ct (EVar tvra) zero)
 
 build_uabs ct cn v = v
 
-build_fabs ct cn v = unbox' v cn tvra (rebox (oper_aa Op.FAbs ct (EVar tvra))) where
-    te = getType v
-    tvra = tVr va1 st
-    st = rawType ct
-    rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
 
 build_usignum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (rebox (ELit one))) where
     tvra = tVr va1 st
@@ -161,18 +156,6 @@ build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELi
     one = ELit $ LitInt 1 st
     negativeOne = ELit $ LitInt (-1) st
     rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
-
-
-build_fsignum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELit zero))] (eCase (oper_aaB Op.FLt ct (EVar tvra) (ELit zero)) [Alt lFalsezh (rebox one),Alt lTruezh (rebox negativeOne)] Unknown)) where
-    tvra = tVr va1 st
-    te = getType v
-    st = rawType ct
-    zero :: Lit a E
-    zero = LitInt 0 st
-    one = ELit $ LitInt 1 st
-    negativeOne = ELit $ LitInt (-1) st
-    rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
-
 
 buildPeek cn t p = ELam tvr $ ELam tvrWorld (unbox' (EVar tvr) dc_Addr tvr' rest)  where
     tvr = (tVr va1 (tPtr t))
