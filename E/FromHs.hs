@@ -86,7 +86,7 @@ tipe t = f t where
     f (TAp (TAp (TCon arr) a1) a2) | tyconName arr == tc_Arrow = f (TArrow a1 a2)
     f (TAp t1 t2) = eAp (f t1) (f t2)
     f (TArrow t1 t2) =  EPi (tVr emptyId (f t1)) (f t2)
-    f (TCon (Tycon n k)) | Just n' <- lookup n primitiveAliases = ELit litCons { litName = n', litType = kind k }
+    f (TCon (Tycon n k)) | Just n' <- Map.lookup n primitiveAliases = ELit litCons { litName = n', litType = kind k }
     f (TCon (Tycon n k)) =  ELit litCons { litName = n, litType = kind k }
     f (TVar tv) = EVar (cvar [] tv)
     f (TMetaVar mv) = cmvar mv

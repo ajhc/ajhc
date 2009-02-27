@@ -17,10 +17,15 @@ data Int
 data Char = Char Char__
 
 type Bool__ = Bits16_ -- Change to Bits1_ when the time comes
-type Addr__ = BitsPtr_
 type Int__  = Bits32_
 type Char__ = Bits32_
 type Enum__ = Bits16_
+type Addr__ = BitsPtr_
+
+-- these exist simply to modify the calling
+-- convention with unboxed types
+newtype Addr_ = Addr_ BitsPtr_
+newtype FunAddr_ = FunAddr_ BitsPtr_
 
 
 -- | this is wrapped around arbitrary expressions and just evaluates them to whnf

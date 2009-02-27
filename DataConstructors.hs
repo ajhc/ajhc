@@ -24,7 +24,6 @@ module DataConstructors(
     numberSiblings,
     extractPrimitive,
     boxPrimitive,
-    lookupCType',
     lookupExtTypeInfo,
     extractIO,
     extractIO',
@@ -87,7 +86,7 @@ tipe' (TArrow t1 t2) =  do
     t1' <- tipe' t1
     t2' <- tipe' t2
     return $ EPi (tVr emptyId (t1')) t2'
-tipe' (TCon (Tycon n k)) | Just n' <- lookup n primitiveAliases = return $ ELit litCons { litName = n', litType = kind k }
+tipe' (TCon (Tycon n k)) | Just n' <- Map.lookup n primitiveAliases = return $ ELit litCons { litName = n', litType = kind k }
 tipe' (TCon (Tycon n k)) =  return $ ELit litCons { litName = n, litType = kind k }
 tipe' (TVar tv@Tyvar { tyvarKind = k}) = do
     v <- lookupName tv
@@ -371,52 +370,6 @@ boxPrimitive dataTable e et = case followAliases dataTable et of
     e' -> fail $ "extractPrimitive: " ++ show (e,e')
 
 
--- which C types these convert to in FFI specifications for
--- figuring out calling conventions. not necessarily related
--- to the representation.
--- ideally, these could be set via a pragma
-
-typeTable = Map.fromList [
-    (tc_Char,"wchar_t"),
-    (tc_Int, "int"),
-    (tc_Int8, "int8_t"),
-    (tc_Int16, "int16_t"),
-    (tc_Int32, "int32_t"),
-    (tc_Int64, "int64_t"),
-    (tc_IntMax, "intmax_t"),
-    (tc_IntPtr, "intptr_t"),
-    (tc_Word, "unsigned"),
-    (tc_Word8, "uint8_t"),
-    (tc_Word16, "uint16_t"),
-    (tc_Word32, "uint32_t"),
-    (tc_Word64, "uint64_t"),
-    (tc_WordMax, "uintmax_t"),
-    (tc_WordPtr, "uintptr_t"),
-    (tc_Float, "float"),
-    (tc_Double, "double"),
-    (tc_Addr, "HsPtr"),
-    (tc_FunAddr, "HsFunPtr"),
-
-    (tc_CChar, "char"),
-    (tc_CShort, "short"),
-    (tc_CInt, "int"),
-    (tc_CLong, "long"),
-
-    (tc_CSChar, "signed char"),
-
-    (tc_CUChar, "unsigned char"),
-    (tc_CUShort, "unsigned short"),
-    (tc_CUInt, "unsigned int"),
-    (tc_CULong, "unsigned long"),
-
-    (tc_CWchar, "wchar_t"),
-    (tc_CWint, "wint_t"),
-    (tc_CTime, "time_t"),
-    (tc_CSize, "size_t"),
-    (tc_Unit,  "void"),
-    (tc_World__,  "void")
-    ]
-
 
 
 extractIO :: Monad m => E -> m E
@@ -450,11 +403,11 @@ lookupExtTypeInfo dataTable oe = f oe where
         return $ case res of
             ExtTypeRaw _ -> ExtTypeRaw et
             ExtTypeBoxed b t _ -> ExtTypeBoxed b t et
-            ExtTypeVoid -> ExtTypeVoid 
+            ExtTypeVoid -> ExtTypeVoid
     f e = g e
     -- if we are a single constructor data type with a single foreignable unboxed
     -- slot, we are foreiginable
-    g (ELit LitCons { litName = c }) 
+    g (ELit LitCons { litName = c })
         | Just Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable,
           Just Constructor { conOrigSlots = [SlotNormal st] } <- getConstructor cn dataTable,
           Just (ExtTypeRaw et) <- lookupExtTypeInfo dataTable st = return $ ExtTypeBoxed cn st et
@@ -462,23 +415,6 @@ lookupExtTypeInfo dataTable oe = f oe where
     g (ELit LitCons { litName = c }) | Just et <- Map.lookup c rawExtTypeMap = return (ExtTypeRaw et)
     g e | Just e' <- followAlias dataTable e = f e'
         | otherwise = fail $ "lookupExtTypeInfo: " ++ show (oe,e)
-
-
--- | Finds the internal constructor, E field type, and C field type
--- for an FFI-able single-field, single-constructor datatype like
--- 'Int' (or a newtype thereof)
-lookupCType' dataTable e = do
-    ExtTypeBoxed a b c <- lookupExtTypeInfo dataTable e 
-    return (a,b,c)
-{-
-    = g ecase followAliases (mappend dataTablePrims dataTable) e of
-    ELit LitCons { litName = c, litArgs = [] }
-        | Just Constructor { conChildren = DataNormal [cn] }  <- getConstructor c dataTable,
-          Just Constructor { conOrigSlots = [SlotNormal st@(ELit LitCons { litName = n, litArgs = [] })] } <- getConstructor cn dataTable
-            -> return (cn,st,show n)
-    ELit LitCons { litName = c, litArgs = [] } | Just cn  <- getConstructor c dataTable -> fail $ "lookupCType: " ++ show cn
-    e' -> fail $ "lookupCType': " ++ show (e,e')
-    -}
 
 
 followAlias :: Monad m => DataTable -> E -> m E
@@ -580,7 +516,7 @@ removeNewtypes dataTable e = runIdentity (f e) where
 {-# NOINLINE toDataTable #-}
 toDataTable :: (Map.Map Name Kind) -> (Map.Map Name Type) -> [HsDecl] -> DataTable -> DataTable
 toDataTable km cm ds currentDataTable = newDataTable  where
-    newDataTable = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conName x,procNewTypes x) | x <- ds', conName x `notElem` map fst primitiveAliases ])
+    newDataTable = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conName x,procNewTypes x) | x <- ds', conName x `notElem` mkeys primitiveAliases ])
     fullDataTable = (newDataTable `mappend` currentDataTable)
     procNewTypes c = c { conExpr = f (conExpr c), conType = f (conType c), conOrigSlots = map (mapESlot f) (conOrigSlots c) } where
         f = removeNewtypes fullDataTable
@@ -875,7 +811,11 @@ class Monad m => DataTableMonad m where
 
 instance DataTableMonad Identity
 
-primitiveAliases = [
+-- | list of declared data types that map
+-- directly to primitive real types
+
+primitiveAliases :: Map.Map Name Name
+primitiveAliases = Map.fromList [
     (tc_Bits1, rt_bool),
     (tc_Bits8, rt_bits8),
     (tc_Bits16, rt_bits16),
@@ -891,6 +831,11 @@ primitiveAliases = [
     (tc_Float128, rt_float128)
     ]
 
+
+-- mapping of primitive types to the C calling convention used
+-- when passing to/from foreign functions
+
+rawExtTypeMap :: Map.Map Name ExtType
 rawExtTypeMap = Map.fromList [
     (rt_bool,  "bool"),
     (rt_bits8,  "uint8_t"),
@@ -909,5 +854,56 @@ rawExtTypeMap = Map.fromList [
     (rt_float64, "double"),
     (rt_float80, "long double"),
     (rt_float128, "__float128")
+    ]
+
+-- which C types these convert to in FFI specifications for
+-- figuring out calling conventions. not necessarily related
+-- to the representation.
+--
+-- ideally, these could be set via a pragma
+
+typeTable :: Map.Map Name ExtType
+typeTable = Map.fromList [
+    (tc_Char,"wchar_t"),
+    (tc_Int, "int"),
+    (tc_Int8, "int8_t"),
+    (tc_Int16, "int16_t"),
+    (tc_Int32, "int32_t"),
+    (tc_Int64, "int64_t"),
+    (tc_IntMax, "intmax_t"),
+    (tc_IntPtr, "intptr_t"),
+    (tc_Word, "unsigned"),
+    (tc_Word8, "uint8_t"),
+    (tc_Word16, "uint16_t"),
+    (tc_Word32, "uint32_t"),
+    (tc_Word64, "uint64_t"),
+    (tc_WordMax, "uintmax_t"),
+    (tc_WordPtr, "uintptr_t"),
+    (tc_Float, "float"),
+    (tc_Double, "double"),
+    (tc_Addr, "HsPtr"),
+    (tc_FunAddr, "HsFunPtr"),
+
+    (tc_Addr_, "HsPtr"),
+    (tc_FunAddr_, "HsFunPtr"),
+
+    (tc_CChar, "char"),
+    (tc_CShort, "short"),
+    (tc_CInt, "int"),
+    (tc_CLong, "long"),
+
+    (tc_CSChar, "signed char"),
+
+    (tc_CUChar, "unsigned char"),
+    (tc_CUShort, "unsigned short"),
+    (tc_CUInt, "unsigned int"),
+    (tc_CULong, "unsigned long"),
+
+    (tc_CWchar, "wchar_t"),
+    (tc_CWint, "wint_t"),
+    (tc_CTime, "time_t"),
+    (tc_CSize, "size_t"),
+    (tc_Unit,  "void"),
+    (tc_World__,  "void")
     ]
 

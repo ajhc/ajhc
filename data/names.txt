@@ -34,6 +34,9 @@ Float64    Jhc.Types.Float64_
 Float80    Jhc.Types.Float80_
 Float128   Jhc.Types.Float128_
 
+Addr_      Jhc.Types.Addr_
+FunAddr_   Jhc.Types.FunAddr_
+
 DataConstructor:dc:
 
 Rational   Jhc.Num.:%
