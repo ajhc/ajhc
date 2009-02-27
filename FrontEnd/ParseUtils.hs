@@ -101,10 +101,6 @@ checkDataHeader (HsQualType cs t) = do
 	(c,ts) <- checkSimple "data/newtype" t []
 	return (cs,c,ts)
 
-checkClassHeader :: HsQualType -> P (HsContext,HsName,[HsName])
-checkClassHeader (HsQualType cs t) = do
-	(c,ts) <- checkSimple "class" t []
-	return (cs,c,ts)
 
 checkSimple :: String -> HsType -> [HsName] -> P ((HsName,[HsName]))
 checkSimple kw (HsTyApp l (HsTyVar a)) xs = checkSimple kw l (a:xs)
@@ -401,15 +397,13 @@ doForeign srcLoc names ms qt = ans where
                 let (safe,conv) = pconv rs
                 return $ HsForeignExport srcLoc (FfiExport cname safe conv undefined undefined) vname qt
         f (map show names') (maybe cname id mstring) where
-    pconv rs = case rs of
-                ("safe":rs) -> g Safe rs
-                ("unsafe":rs) -> g Unsafe rs
-                rs -> g Safe rs
-            where
-            g safe [] = (safe,CCall)
-            g safe ["ccall"] = (safe,CCall)
-            g safe ["stdcall"] = (safe,StdCall)
-            g x y = error $ "FrontEnd.ParseUtils: " ++ show (x,y)
+    pconv rs = g Safe CCall rs where
+        g _ cc ("safe":rs) = g Safe cc rs
+        g _ cc ("unsafe":rs) = g Unsafe cc rs
+        g s _  ("ccall":rs)  = g s CCall rs
+        g s _  ("stdcall":rs) = g s StdCall rs
+        g s c  [] = (s,c)
+        g _ _ rs = error $ "FrontEnd.ParseUtils: unknown foreign flags " ++ show rs
 
 
 doForeignEq :: Monad m => SrcLoc -> [HsName] -> Maybe (String,HsName) -> HsQualType -> HsExp -> m HsDecl
