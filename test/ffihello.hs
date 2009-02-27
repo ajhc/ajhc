@@ -1,4 +1,5 @@
-{-# OPTIONS_JHC -N #-}
+
+{-# OPTIONS_JHC -N -fffi #-}
 
 import Jhc.Addr
 import Jhc.Basics
@@ -14,4 +15,6 @@ foreign export ccall "myputc" putChar :: Char -> IO ()
 foreign import ccall "&myputc" p_putc :: FunPtr (Char -> IO ())
 foreign import ccall "dynamic" callPutc :: FunPtr (Char -> IO ()) -> Char -> IO ()
 
-main = mapM_ (callPutc p_putc) "Hello, World!"
+main = do
+    mapM_ (callPutc p_putc) "Hello, World!"
+    c_putwchar (charToInt '\n')

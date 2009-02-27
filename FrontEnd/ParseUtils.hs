@@ -399,7 +399,7 @@ doForeign srcLoc names ms qt = ans where
                 return $ HsForeignDecl srcLoc (FfiSpec im safe conv) vname qt
             f ("export":rs) cname = do
                 let (safe,conv) = pconv rs
-                return $ HsForeignExport srcLoc (FfiExport cname safe conv) vname qt
+                return $ HsForeignExport srcLoc (FfiExport cname safe conv undefined undefined) vname qt
         f (map show names') (maybe cname id mstring) where
     pconv rs = case rs of
                 ("safe":rs) -> g Safe rs

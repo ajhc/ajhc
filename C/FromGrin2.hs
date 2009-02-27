@@ -119,7 +119,7 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
         mapM_ tellTags (Set.toList $ tset `mappend` tset')
     cafs = text "/* CAFS */" $$ (vcat $ map ccaf (grinCafs grin))
 
-convertFunc :: Maybe (FfiExport, ([ExtType], ExtType)) -> (Atom,Lam) -> C [Function]
+convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C [Function]
 convertFunc ffie (n,as :-> body) = do
         s <- localTodo TodoReturn (convertBody body)
         let bt = getType body
@@ -136,7 +136,7 @@ convertFunc ffie (n,as :-> body) = do
 
         mstub <- case ffie of
                 Nothing -> return []
-                Just ~(FfiExport cn Safe CCall, (argTys, retTy)) -> do
+                Just ~(FfiExport cn Safe CCall argTys retTy) -> do
                     newVars <- mapM (liftM (name . show) . newVar . basicType) argTys
 
                     let fnname2 = name cn

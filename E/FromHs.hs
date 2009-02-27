@@ -525,7 +525,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
 
     cDecl x@HsForeignDecl {} = fail ("Unsupported foreign declaration: "++ show x)
 
-    cDecl (HsForeignExport _ ffi@(FfiExport ecn _ cc@CCall) n _) = do
+    cDecl (HsForeignExport _ ffi@FfiExport { ffiExportCName = ecn } n _) = do
         let name = ffiExportName ffi
         fn <- convertVar name
         tn <- convertVar (toName Name.Val n)
@@ -565,9 +565,8 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         realRetCTy:realArgCTys <- mapM (\x -> extTypeInfoExtType `liftM`  lookupExtTypeInfo dataTable x) (retTy:argTys)
 
         return [(name,
-                 tvrInfo_u (Info.insert (ffi, (realArgCTys,realRetCTy)))
+                 tvrInfo_u (Info.insert ffi { ffiExportArgTypes = realArgCTys, ffiExportRetType = realRetCTy } )
                            (fmap (const (foldr tFunc retCTy' argCTys)) $
-                            --fmap (const Unknown) $
                               setProperty prop_EXPORTED fn),
                  result)]
 

@@ -170,5 +170,5 @@ mapName (f,g) n = case nameParts n of
 mainModule = Module "Main@"
 
 ffiExportName :: FfiExport -> Name
-ffiExportName (FfiExport cn _ cc) = toName Val ("FE@", show cc ++ "." ++ cn)
+ffiExportName (FfiExport cn _ cc _ _) = toName Val ("FE@", show cc ++ "." ++ cn)
 

@@ -9,7 +9,7 @@ module C.FFI(
 
 import Data.Typeable
 import Data.Binary
-import Data.Monoid
+import C.Prims
 
 type CName    = String
 
@@ -24,24 +24,19 @@ data FfiType = Import CName Requires
              | Wrapper
              | Dynamic
              deriving(Eq,Ord,Show)
-             {-! derive: Binary !-}
 
-data Requires = Requires {
-    reqIncludes :: [String],
-    reqLibraries :: [String]
-    } deriving(Eq, Ord)
-    {-! derive: Monoid, Binary !-}
-
-instance Show Requires where
-    show (Requires [] []) = "()"
-    show (Requires xs ys) = show (xs,ys)
 
 
 data FfiSpec = FfiSpec FfiType Safety CallConv
              deriving(Eq,Ord,Show)
-             {-! derive: Binary !-}
 
-data FfiExport = FfiExport CName Safety CallConv
-             deriving(Eq,Ord,Show,Typeable)
-             {-! derive: Binary !-}
+data FfiExport = FfiExport {
+    ffiExportCName :: CName,
+    ffiExportSafety :: Safety,
+    ffiExportCallConv :: CallConv,
+    ffiExportArgTypes ::[ExtType], 
+    ffiExportRetType  :: ExtType
+    }
+ deriving(Eq,Ord,Show,Typeable)
+     {-! derive: Binary !-}
 

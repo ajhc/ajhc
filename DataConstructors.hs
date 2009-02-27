@@ -25,7 +25,6 @@ module DataConstructors(
     extractPrimitive,
     boxPrimitive,
     lookupCType',
-    lookupCType,
     lookupExtTypeInfo,
     extractIO,
     extractIO',
@@ -418,14 +417,6 @@ typeTable = Map.fromList [
     (tc_World__,  "void")
     ]
 
--- | Returns a string naming the C type that the given type is
--- converted to/from in foreign imports/exports
-lookupCType :: Monad m => E -> m String
-lookupCType e = f e where
-    f (ELit LitCons { litName = c })
-        | Just s <- Map.lookup c typeTable = return s
-    f (ELit LitCons { litAliasFor = Just af, litArgs = as }) = f (foldl eAp af as)
-    f e = fail $ "lookupCType: Not C Type: " ++ pprint e
 
 
 extractIO :: Monad m => E -> m E

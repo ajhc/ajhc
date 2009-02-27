@@ -5,7 +5,6 @@ import Data.Typeable
 import Data.Binary
 
 import StringTable.Atom
-import C.FFI(Requires(..))
 import Doc.DocLike
 import Doc.PPrint
 import PackedString
@@ -24,6 +23,15 @@ data PrimType = PrimType {
 
 type ExtType = String
 
+instance Show Requires where
+    show (Requires [] []) = "()"
+    show (Requires xs ys) = show (xs,ys)
+
+data Requires = Requires {
+    reqIncludes :: [String],
+    reqLibraries :: [String]
+    } deriving(Eq, Ord)
+    {-! derive: Monoid, Binary !-}
 
 data DotNetPrim = DotNetField | DotNetCtor | DotNetMethod
     deriving(Typeable, Eq, Ord, Show)
