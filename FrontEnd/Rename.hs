@@ -519,7 +519,9 @@ instance Rename HsExp where
         hsExp' <- rename hsExp
         return (HsLet hsDecls' hsExp')
     rename (HsCase hsExp hsAlts) = do return HsCase `ap` rename hsExp `ap` rename hsAlts
-    rename (HsDo hsStmts) = rename =<< doToExp newVar (nameName v_bind) (nameName v_bind_) (nameName v_fail) hsStmts
+    rename (HsDo hsStmts) = do
+        (ss,()) <- renameHsStmts hsStmts (return ())
+        doToExp newVar (nameName v_bind) (nameName v_bind_) (nameName v_fail) ss
     rename (HsRecConstr hsName hsFieldUpdates) = do
         hsName' <- rename hsName  -- do I need to change this name?
         hsFieldUpdates' <- rename hsFieldUpdates
