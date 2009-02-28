@@ -105,11 +105,17 @@ traverseHsExp fn e = f e where
         fus' <- mapM fFieldUpdate fus
         e' <- fn e
         return $ HsRecUpdate e' fus'
+    f (HsLocatedExp le) = HsLocatedExp `liftM` fnl le
+    f (HsLet hsDecls hsExp)  = do
+        ds <- mapM (traverseHsDeclHsExp fn) hsDecls
+        e <- fn hsExp
+        return $ HsLet ds e
+    f (HsDo hsStmts)  = HsDo `liftM` mapM (traverseHsStmtHsExp fn) hsStmts
     f _ = error "FrontEnd.Syn.Traverse.traverseHsExp f unrecognized construct"
     fFieldUpdate (HsFieldUpdate n e) = do
         e' <- fn e
         return $ HsFieldUpdate n e'
-    fnl (Located l e) = Located l `liftM` fn e
+    fnl (Located l e) = withSrcSpan l $ Located l `liftM` fn e
 
     {-
 -- not done
@@ -216,13 +222,19 @@ traverseHsPat fn p = f p where
           hsPatFields' <- mapM fField hsPatFields
           return (HsPRec hsName hsPatFields')
     fField (HsPFieldPat n p) = fn p >>= return . HsPFieldPat n
-    fnl (Located l e) = Located l `liftM` fn e
+    fnl (Located l e) = withSrcSpan l (Located l `liftM` fn e)
 
 traverseHsRhsHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsRhs -> m HsRhs
 traverseHsRhsHsExp fn d = f d where
     f (HsUnGuardedRhs e) = fn e >>= return . HsUnGuardedRhs
     f (HsGuardedRhss rs) = return HsGuardedRhss `ap` mapM g rs
     g (HsGuardedRhs sl e1 e2) = return (HsGuardedRhs sl) `ap` fn e1 `ap` fn e2
+
+traverseHsStmtHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsStmt -> m HsStmt
+traverseHsStmtHsExp fn d = f d where
+    f (HsGenerator sl p e) = withSrcLoc sl $ HsGenerator sl p `liftM` fn e
+    f (HsQualifier e) = HsQualifier `liftM` fn e
+    f (HsLetStmt ds) = HsLetStmt `liftM` mapM (traverseHsDeclHsExp fn) ds
 
 traverseHsDeclHsExp :: MonadSetSrcLoc m => (HsExp -> m HsExp) -> HsDecl -> m HsDecl
 traverseHsDeclHsExp fn d = f d where

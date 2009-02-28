@@ -322,9 +322,9 @@ tiExpr expr@(HsList exps@(_:_)) typ = withContext (makeMsg "in the list " $ rend
 
 tiExpr (HsParen e) typ = tcExpr e typ
 
-tiExpr (HsDo stmts) typ = withContext (simpleMsg "in a do expression") $ do
-        newExp <- doToExp stmts
-        tcExpr newExp typ
+--tiExpr (HsDo stmts) typ = withContext (simpleMsg "in a do expression") $ do
+--        newExp <- doToExp stmts
+--        tcExpr newExp typ
 
 tiExpr expr@(HsLet decls e) typ = withContext (makeMsg "in the let binding" $ render $ ppHsExp expr) $ do
     sigEnv <- getSigEnv

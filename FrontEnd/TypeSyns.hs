@@ -5,7 +5,6 @@ import Control.Monad.Writer
 import qualified Data.Traversable as T
 import List
 
-import FrontEnd.Desugar (doToExp)
 import FrontEnd.SrcLoc hiding(srcLoc)
 import FrontEnd.HsSyn
 import FrontEnd.TypeSynonyms
@@ -299,9 +298,6 @@ renameHsExp (HsCase hsExp hsAlts) subTable = do
     hsExp' <- renameHsExp hsExp subTable
     hsAlts' <- renameHsAlts hsAlts subTable
     return (HsCase hsExp' hsAlts')
-renameHsExp (HsDo hsStmts) subTable = do
-    e <- doToExp hsStmts
-    renameHsExp e subTable
 renameHsExp (HsRecConstr hsName hsFieldUpdates) subTable = do
     hsName' <- renameHsName hsName subTable  -- do I need to change this name?
     hsFieldUpdates' <- renameHsFieldUpdates hsFieldUpdates subTable
