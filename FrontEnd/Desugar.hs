@@ -1,38 +1,9 @@
-{-------------------------------------------------------------------------------
-
-        Copyright:              The Hatchet Team (see file Contributors)
-
-        Module:                 Desugar
-
-        Description:            Desugaring of the abstract syntax.
-
-                                The main tasks implemented by this module are:
-                                        - pattern bindings are converted
-                                          into "simple" pattern bindings
-                                          (x, y, z) = foo
-                                             becomes
-                                          newVal = foo
-                                          x = (\(a, _, _) -> a) newVal
-                                          y = (\(_, a, _) -> a) newVal
-                                          z = (\(_, _, a) -> a) newVal
-                                        - do notation is converted into
-                                          expression form, using (>>) and
-                                          (>>=)
-                                        - type synonyms are removed
-
-        Primary Authors:        Bernie Pope
-
-        Notes:                  See the file License for license information
-
-                                According to the Haskell report a pattern
-                                binding is called "simple" if it consists only
-                                of a single variable - thus we convert all
-                                pattern bindings to simple bindings.
-
--------------------------------------------------------------------------------}
-
--- Type synonyms are no longer handled here. only 'local' desugaring is done.
--- Does this module need to exist?
+-- various desugaring routines
+--
+-- The general desugaring routine creates selectors for data 
+-- constructors with named fields, changes all pattern bindings
+-- into 'simple' pattern bindings, and adds failure cases to lambda
+-- expressions which have failable patterns
 
 module FrontEnd.Desugar (doToExp, listCompToExp, desugarHsModule, desugarHsStmt) where
 
@@ -43,34 +14,15 @@ import GenUtil
 import FrontEnd.HsSyn
 import Name.Name
 import Name.Names
-import Name.VConsts
 import FrontEnd.Syn.Traverse
 import FrontEnd.SrcLoc
 
-removeSynonymsFromType _ t = t
-removeSynsFromSig _ t = t
-
--- (unique int, list of type synoyms)
-type PatState = (Int, [HsDecl])
+type PatState = Int
 
 getUnique = do
-    n <- readUnique
-    incUnique
+    n <- get
+    put (n + 1)
     return n
-
-readUnique :: PatSM Int
-readUnique = do
-        state <- readPatSM
-        return (fst state)
-
-readSyns :: PatSM [HsDecl]
-readSyns = do
-        state <- readPatSM
-        return (snd state)
-
-
-incUnique :: PatSM ()
-incUnique = updatePatSM (\(u, s) -> (u + 1, s))
 
 type PatSM = State PatState
 
@@ -79,31 +31,11 @@ instance MonadSetSrcLoc PatSM where
     withSrcLoc _ a = a
 
 
-{------------------------------------------------------------------------------}
-
-readPatSM = get
-updatePatSM = modify
-runPatSM = flip runState
-
-
 -- a new (unique) name introduced in pattern selector functions
 newPatVarName :: HsName
 newPatVarName = nameName $ toName Val "patvar@0"
 
 
-remSynsSig :: HsDecl -> PatSM HsDecl
-remSynsSig sig
-   = do
-        syns <- readSyns
-        let newSig = removeSynsFromSig syns sig
-        return newSig
-
-remSynsType :: HsType -> PatSM HsType
-remSynsType t
-   = do
-        syns <- readSyns
-        let newType = removeSynonymsFromType syns t
-        return newType
 
 
 {-
@@ -125,23 +57,13 @@ remSynsType t
 
 desugarHsModule :: HsModule -> HsModule
 desugarHsModule m = hsModuleDecls_s ds' m where
-    (ds', _) = runPatSM (0::Int, undefined) $ dsm (hsModuleDecls m)
+    (ds', _) = runState (dsm (hsModuleDecls m))   (0::Int)
     dsm ds = fmap concat $ mapM desugarDecl ds
 
 desugarHsStmt :: Monad m => HsStmt -> m HsStmt
-desugarHsStmt s = return $ fst $ runPatSM (0::Int, undefined) $ desugarStmt s
-
---desugarHsExp :: Monad m => HsExp -> m HsExp
---desugarHsExp s = return $ fst $ runPatSM (0::Int, undefined) $ desugarExp s
-
+desugarHsStmt s = return $ fst $ runState (desugarStmt s) (0::Int)
 
 desugarDecl :: HsDecl -> PatSM [HsDecl]
-desugarDecl (HsForeignDecl a b c qt) = do
-    qt <- remSynsQualType qt
-    return [HsForeignDecl a b c qt]
-desugarDecl (HsForeignExport a b c qt) = do
-    qt <- remSynsQualType qt
-    return [HsForeignExport a b c qt]
 desugarDecl (HsFunBind matches) = do
     newMatches <- mapM desugarMatch matches
     return [HsFunBind newMatches]
@@ -169,32 +91,18 @@ desugarDecl (HsClassDecl sloc qualtype decls) = do
     return [HsClassDecl sloc qualtype (concat newDecls)]
 
 desugarDecl (HsInstDecl sloc qualtype decls) = do
-    newQualType <- remSynsQualType qualtype
     newDecls <- mapM desugarDecl decls
-    return [HsInstDecl sloc newQualType (concat newDecls)]
-
-desugarDecl sig@(HsTypeSig _sloc _names _qualType) = do
-    newSig <- remSynsSig sig
-    return [newSig]
-
+    return [HsInstDecl sloc qualtype (concat newDecls)]
 
 desugarDecl dl@HsDataDecl { hsDeclSrcLoc = sloc, hsDeclName =  name, hsDeclArgs = args, hsDeclCons = condecls, hsDeclDerives = derives } = do
-        --newConDecls <- mapM remSynsFromCondecl condecls
-        newConDecls <- return condecls
-        ds <- deriveInstances sloc name args newConDecls derives
-        ss <- createSelectors sloc newConDecls
-        return $ dl:(ds ++ ss)
+        ss <- createSelectors sloc condecls
+        return $ dl:ss
 
 desugarDecl dl@(HsNewTypeDecl sloc cntxt name args condecl derives) = do
-        --newConDecl <- remSynsFromCondecl condecl
-        newConDecl <- return condecl
-        ds <- deriveInstances sloc name args [newConDecl] derives
-        ss <- createSelectors sloc [newConDecl]
-        return $ dl:(ds ++ ss)
+        ss <- createSelectors sloc [condecl]
+        return $ dl:ss
 
 desugarDecl anyOtherDecl = return [anyOtherDecl]
-
-
 
 createSelectors _sloc ds = ans where
     ds' :: [(HsName,[(HsName,HsBangType)])]
@@ -207,17 +115,13 @@ createSelectors _sloc ds = ans where
         f (_,(c,i,l)) = HsMatch _sloc n [pat c i l] (HsUnGuardedRhs (HsVar var)) []
         pat c i l = HsPApp c [ if p == i then HsPVar var else HsPWildCard | p <- [0 .. l - 1]]
         els = HsMatch _sloc n [HsPWildCard] (HsUnGuardedRhs HsError { hsExpSrcLoc = _sloc, hsExpString = show n, hsExpErrorType = HsErrorFieldSelect } ) []
-
     var = nameName $ toName Val "x"
 
 
-deriveInstances :: Monad m => SrcLoc -> HsName -> [HsName] -> [HsConDecl] -> [HsName] -> m [HsDecl]
-deriveInstances sloc name args cons ds = return []
 
 
 desugarMatch :: (HsMatch) -> PatSM (HsMatch)
-desugarMatch (HsMatch sloc funName pats rhs wheres)
-   = do
+desugarMatch (HsMatch sloc funName pats rhs wheres) = do
         newWheres <- mapM desugarDecl wheres
         newRhs <- desugarRhs rhs
         return (HsMatch sloc funName pats newRhs (concat newWheres))
@@ -266,26 +170,8 @@ replaceVarNamesInPat name p = f name p where
     f name (HsPBangPat pat) = HsPBangPat $ fmap (f name) pat
     f name p = error $ "f: " ++ show (name,p)
 
-
 desugarRhs :: (HsRhs) -> PatSM (HsRhs)
-desugarRhs (HsUnGuardedRhs e)
-   = do
-        newE <- desugarExp e
-        return (HsUnGuardedRhs newE)
-
-desugarRhs (HsGuardedRhss gRhss)
-   = do
-        newRhss <- mapM desugarGRhs gRhss
-        return (HsGuardedRhss newRhss)
-
-desugarGRhs :: HsGuardedRhs -> PatSM (HsGuardedRhs)
-desugarGRhs (HsGuardedRhs sloc e1 e2)
-   = do
-        newE1 <- desugarExp e1
-        newE2 <- desugarExp e2
-        return (HsGuardedRhs sloc newE1 newE2)
-
-
+desugarRhs  = traverseHsRhsHsExp desugarExp 
 
 desugarExp :: (HsExp) -> PatSM (HsExp)
 desugarExp (HsLambda sloc pats e)
@@ -324,68 +210,24 @@ desugarExp (HsListComp e stmts) = do
         newE <- desugarExp e
         newStmts <- mapM desugarStmt stmts
         return (HsListComp e stmts)
-desugarExp (HsExpTypeSig sloc e qualType) = do
-        e' <- desugarExp e
-        newQualType <- remSynsQualType qualType
-        return (HsExpTypeSig sloc e' newQualType)
 desugarExp e = traverseHsExp desugarExp e
 
-
-
 desugarAlt :: (HsAlt) -> PatSM (HsAlt)
-
 desugarAlt (HsAlt sloc pat gAlts wheres) = do
-        newGAlts <- desugarGAlts gAlts
+        newGAlts <- desugarRhs gAlts
         newWheres <- mapM desugarDecl wheres
         return (HsAlt sloc pat newGAlts (concat newWheres))
-
-desugarGAlts :: (HsRhs) -> PatSM (HsRhs)
-
-desugarGAlts (HsUnGuardedRhs e) = do
-        newE <- desugarExp e
-        return (HsUnGuardedRhs newE)
-
-desugarGAlts (HsGuardedRhss gAlts) = do
-        newGAlts <- mapM desugarGuardedAlt gAlts
-        return (HsGuardedRhss newGAlts)
-
-desugarGuardedAlt :: (HsGuardedRhs) -> PatSM (HsGuardedRhs)
-
-desugarGuardedAlt (HsGuardedRhs sloc e1 e2) = do
-        newE1 <- desugarExp e1
-        newE2 <- desugarExp e2
-        return (HsGuardedRhs sloc newE1 newE2)
 
 desugarStmt :: (HsStmt) -> PatSM (HsStmt)
 desugarStmt (HsGenerator srcLoc pat e) = do
         newE <- desugarExp e
         return (HsGenerator srcLoc pat newE)
-
 desugarStmt (HsQualifier e) = do
         newE <- desugarExp e
         return (HsQualifier newE)
-
 desugarStmt (HsLetStmt decls) = do
         newDecls <- mapM desugarDecl decls
         return (HsLetStmt $ concat newDecls)
-
-
-remSynsQualType :: HsQualType -> PatSM HsQualType
-remSynsQualType qualtype
-   = case qualtype of
-        HsQualType cntxt t
-           -> do
-                 newT <- remSynsType t
-                 return (HsQualType cntxt newT)
-
---------------------------------------------------------------------------------
-
--- desugar the do-notation
-
--- flatten out do notation into an expression
--- involving ">>" and ">>="
--- TODO -  THIS IS BROKEN
-
 
 
 
@@ -418,13 +260,9 @@ doToExp newName f_bind f_bind_ f_fail ss = f ss where
         ss <- f ss
         return $ HsLet decls ss
 
---    f_bind = nameName $ toUnqualified (func_bind sFuncNames)
---    f_bind_ = nameName $ toUnqualified (func_bind_ sFuncNames)
---    f_fail = nameName $ toUnqualified v_fail
 
 hsApp e es = hsParen $ foldl HsApp (hsParen e) (map hsParen es)
 hsIf e a b = hsParen $ HsIf e a b
-patVar = HsVar newPatVarName
 
 listCompToExp :: Monad m => m HsName -> HsExp -> [HsStmt] -> m HsExp
 listCompToExp newName exp ss = hsParen `liftM` f ss where
