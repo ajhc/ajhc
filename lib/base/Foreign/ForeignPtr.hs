@@ -12,6 +12,9 @@ import Foreign.Ptr
 import Foreign.Storable
 
 newtype ForeignPtr a = FP (Ptr a)
+    deriving(Eq,Ord)
+
+
 type FinalizerPtr  a = FunPtr (Ptr a -> IO ())
 
 newForeignPtr_ :: Ptr a -> IO (ForeignPtr a)
