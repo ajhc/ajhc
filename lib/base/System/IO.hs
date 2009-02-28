@@ -21,6 +21,8 @@ module System.IO(
     hPutChar,
     hPutStr,
     hPutStrLn,
+    hIsEOF,
+    hWaitForInput,
     openFile,
     openBinaryFile,
     withFile,
@@ -74,6 +76,9 @@ hIsEOF :: Handle -> IO Bool
 hIsEOF h = withHandle h $ \ptr -> do
     r <- c_feof ptr
     return (r /= 0)
+
+hWaitForInput :: Handle -> Int -> IO Bool
+hWaitForInput h to = withHandle h $ \ptr -> c_wait_for_input ptr to
 
 hPutChar h ch = withHandle h $ \ptr -> do
     c_fputwc (fromInt (ord ch)) ptr
@@ -163,6 +168,7 @@ foreign import ccall "stdio.h fflush" c_fflush :: Ptr Handle -> IO ()
 foreign import ccall "wchar.h jhc_utf8_getc" c_fgetwc :: Ptr Handle -> IO Int
 foreign import ccall "wchar.h jhc_utf8_putc" c_fputwc :: Int -> Ptr Handle -> IO Int
 
+foreign import ccall "jhc_wait_for_input" c_wait_for_input :: Ptr Handle -> Int -> IO Bool
 foreign import ccall "stdio.h feof" c_feof :: Ptr Handle -> IO CInt
 foreign import ccall "stdio.h ftell" c_ftell :: Ptr Handle -> IO IntMax                  -- XXX
 foreign import ccall "stdio.h fseek" c_fseek :: Ptr Handle -> IntMax -> CInt -> IO CInt  -- XXX

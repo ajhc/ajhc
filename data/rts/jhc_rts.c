@@ -7,7 +7,7 @@ static char *jhc_progname;
 static jmp_buf jhc_uncaught;
 
 static HsInt jhc_stdrnd[2] A_UNUSED = { 1 , 1 };
-static HsInt jhc_data_unique;
+static HsInt jhc_data_unique A_UNUSED;
 
 #if _JHC_PROFILE
 
@@ -76,6 +76,20 @@ jhc_case_fell_off(int n) {
         fflush(stdout);
         fprintf(stderr, "\n%s:%i: case fell off\n", __FILE__, n);
         abort();
+}
+
+static HsBool A_UNUSED
+jhc_wait_for_input(FILE *f,HsInt timeout) {
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(fileno(f),&fds);
+        struct timeval to = {  0, timeout * 1000 };
+        int retval = select(1,&fds,NULL,&fds,&to);
+        if(retval)
+                return HS_BOOL_TRUE;
+        else
+                return HS_BOOL_FALSE;
+
 }
 
 #ifdef __WIN32__

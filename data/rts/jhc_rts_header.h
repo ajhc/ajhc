@@ -9,6 +9,7 @@
 #include <limits.h>
 #include <locale.h>
 #include <math.h>
+#include <sys/select.h>
 #include <assert.h>
 #include <float.h>
 #ifndef __WIN32__
