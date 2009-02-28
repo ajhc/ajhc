@@ -450,12 +450,12 @@ deriveClasses cmap (DataTable mp) = concatMap f (Map.elems mp) where
         val1 = tvr { tvrIdent = anonymous 7, tvrType = typ }
         unbox e = ELam v1 (ELam v2 (ec (EVar v1) i1 (ec (EVar v2) i2 e)))  where
             ec v i e = eCase v [Alt (litCons { litName = con, litArgs = [i], litType = typ }) e] Unknown
-        h cl | cl == class_Eq = [mkCmpFunc (func_equals sFuncNames) Op.Eq]
+        h cl | cl == class_Eq = [mkCmpFunc v_equals Op.Eq]
         h cl | cl == class_Ord = [
-                mkCmpFunc (func_geq sFuncNames) Op.UGte,
-                mkCmpFunc (func_leq sFuncNames) Op.ULte,
-                mkCmpFunc (func_lt sFuncNames)  Op.ULt,
-                mkCmpFunc (func_gt sFuncNames)  Op.UGt]
+                mkCmpFunc v_geq Op.UGte,
+                mkCmpFunc v_leq Op.ULte,
+                mkCmpFunc v_lt  Op.ULt,
+                mkCmpFunc v_gt  Op.UGt]
         h cl | cl == class_Enum = funcs where
             funcs = [
                 (iv_te,ib_te),
@@ -467,8 +467,8 @@ deriveClasses cmap (DataTable mp) = concatMap f (Map.elems mp) where
                 iv v_enumFromThen fromThen_body,
                 iv v_enumFromThenTo fromThenTo_body
                 ]
-            iv_te = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName (func_toEnum sFuncNames) (nameName $ conName c), tvrType = getType ib_te }
-            iv_fe = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName (func_fromEnum sFuncNames) (nameName $ conName c), tvrType = getType ib_fe }
+            iv_te = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName v_toEnum (nameName $ conName c), tvrType = getType ib_te }
+            iv_fe = setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName v_fromEnum (nameName $ conName c), tvrType = getType ib_fe }
             iv fname body = (setProperty prop_INSTANCE tvr { tvrIdent = toId $ instanceName fname (nameName $ conName c), tvrType = getType body },body)
             succ_body = foldl EAp (lupvar v_enum_succ) [typ, box, debox, max]
             pred_body = foldl EAp (lupvar v_enum_pred) [typ, box, debox]

@@ -3,7 +3,6 @@ module DerivingDrift.Drift(driftDerive) where
 import Char
 import List
 import Control.Monad.Identity
-import qualified Data.Traversable as T
 
 import CharIO
 import DerivingDrift.DataP
@@ -13,7 +12,6 @@ import FrontEnd.ParseMonad
 import FrontEnd.HsSyn
 import Name.Name
 import Name.Names
-import Name.VConsts
 import Options
 import Text.PrettyPrint.HughesPJ(render)
 import qualified Data.Map as Map
@@ -37,11 +35,10 @@ driftDerive hsModule = ans where
 
 enumDontDerive :: [(HsName,[HsName])]
 enumDontDerive = [
-    (f class_Eq, [func_equals fns]),
-    (f class_Ord, [func_geq fns, func_leq fns, func_lt fns, func_gt fns]),
-    (f class_Enum, [func_toEnum fns,func_fromEnum fns] ++ map (nameName . toUnqualified) [v_enumFrom, v_succ, v_pred, v_enumFromThen, v_enumFromThenTo, v_enumFromTo])
+    (f class_Eq, [f v_equals]),
+    (f class_Ord, [f v_geq, f v_leq, f v_lt, f v_gt]),
+    (f class_Enum, [f v_toEnum,f v_fromEnum] ++ map (nameName . toUnqualified) [v_enumFrom, v_succ, v_pred, v_enumFromThen, v_enumFromThenTo, v_enumFromTo])
     ]  where
-        Identity fns = T.mapM (return . f) sFuncNames
         f n = nameName (toUnqualified n)
 
 

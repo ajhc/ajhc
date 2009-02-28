@@ -1,7 +1,6 @@
 module FrontEnd.Rename(unRename, collectDefsHsModule, renameModule, FieldMap, renameStatement ) where
 
 import Char
-import Control.Monad.Identity
 import Control.Monad.RWS
 import Control.Monad.State
 import Control.Monad.Writer
@@ -11,7 +10,6 @@ import List
 import Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified Data.Traversable as T
 
 
 import Doc.DocLike(tupled)
@@ -492,10 +490,7 @@ instance Rename HsGuardedRhs where
         return (HsGuardedRhs srcLoc hsExp1' hsExp2')
 
 
-uqFuncNames :: V.FuncNames HsName
-Identity uqFuncNames = T.mapM (return . nameName . toUnqualified) sFuncNames
-
-func_fromRational = (HsVar $ V.func_fromRational uqFuncNames)
+f_fromRational = HsVar $ nameName (toUnqualified v_fromRational)
 
 newVar = do
     unique <- newUniq
@@ -509,7 +504,7 @@ instance Rename HsExp where
     rename (HsCon hsName) = return HsCon `ap` rename hsName
     rename i@(HsLit HsInt {}) = do return i
     rename i@(HsLit HsFrac {}) = do
-        z <- rename func_fromRational
+        z <- rename f_fromRational
         return $ HsParen (HsApp z i)
     rename (HsLambda srcLoc hsPats hsExp) = do
         withSrcLoc srcLoc $ do
@@ -524,7 +519,7 @@ instance Rename HsExp where
         hsExp' <- rename hsExp
         return (HsLet hsDecls' hsExp')
     rename (HsCase hsExp hsAlts) = do return HsCase `ap` rename hsExp `ap` rename hsAlts
-    rename (HsDo hsStmts) = rename =<< doToExp hsStmts
+    rename (HsDo hsStmts) = rename =<< doToExp newVar (nameName v_bind) (nameName v_bind_) (nameName v_fail) hsStmts
     rename (HsRecConstr hsName hsFieldUpdates) = do
         hsName' <- rename hsName  -- do I need to change this name?
         hsFieldUpdates' <- rename hsFieldUpdates

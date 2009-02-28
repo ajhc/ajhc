@@ -76,6 +76,7 @@ float80         fbits80
 float128        fbits128
 
 Val:v:
+
 eqString         Jhc.String.eqString
 eqUnpackedString Jhc.String.eqUnpackedString
 unpackString     Jhc.String.unpackString
@@ -83,7 +84,6 @@ target           Jhc.Options.target
 error            Jhc.IO.error
 minBound         Jhc.Enum.minBound
 maxBound         Jhc.Enum.maxBound
-fail             Jhc.Monad.fail
 map              Jhc.Basics.map
 and              Jhc.Order.&&
 filter           Jhc.List.filter
@@ -94,6 +94,7 @@ undefined        Jhc.Basics.undefined
 bind                 Jhc.Monad.>>=
 bind_                Jhc.Monad.>>
 return               Jhc.Monad.return
+fail                 Jhc.Monad.fail
 concatMap            Jhc.Basics.concatMap
 fromInteger          Jhc.Num.fromInteger
 fromInt              Jhc.Num.fromInt

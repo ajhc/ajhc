@@ -77,34 +77,15 @@ s_Hash = toName SortName ("Jhc@","#")
 
 
 sFuncNames = FuncNames {
-    func_bind = v_bind,
-    func_bind_ = v_bind_,
-    func_return = v_return,
-    func_concatMap = v_concatMap,
+    func_equals = v_equals,
     func_fromInteger = v_fromInteger,
     func_fromInt = v_fromInt,
     func_fromRational = v_fromRational,
     func_negate = v_negate,
-    func_leq = v_leq,
-    func_geq = v_geq,
-    func_lt = v_lt,
-    func_gt = v_gt,
-    func_compare = v_compare,
-    func_equals = v_equals,
-    func_neq = v_neq,
-    func_fromEnum = v_fromEnum,
-    func_toEnum = v_toEnum,
-    func_minBound = v_minBound,
-    func_maxBound = v_maxBound,
-    func_enumFrom = v_enumFrom,
-    func_enumFromThen = v_enumFromThen,
-    func_range = v_range,
-    func_index = v_index,
-    func_inRange = v_inRange,
     func_runExpr = v_runExpr,
-    func_runRaw = v_runRaw,
     func_runMain = v_runMain,
-    func_runNoWrapper = v_runNoWrapper
+    func_runNoWrapper = v_runNoWrapper,
+    func_runRaw = v_runRaw
     }
 
 

@@ -319,10 +319,7 @@ desugarExp (HsCase e alts) = do
         newE <- desugarExp e
         newAlts <- mapM desugarAlt alts
         return (HsCase newE newAlts)
-desugarExp (HsDo stmts) = do
-        newStmts <- mapM desugarStmt stmts
-        ss <- doToExp newStmts
-        return ss
+desugarExp (HsDo stmts) = HsDo `liftM` mapM desugarStmt stmts
 desugarExp (HsListComp e stmts) = do
         newE <- desugarExp e
         newStmts <- mapM desugarStmt stmts
@@ -390,42 +387,40 @@ remSynsQualType qualtype
 -- TODO -  THIS IS BROKEN
 
 
-{-
-f_bind = nameName $ toUnqualified (func_bind sFuncNames)
-f_bind_ = nameName $ toUnqualified (func_bind_ sFuncNames)
-f_concatMap = nameName $ toUnqualified v_concatMap
-f_map = nameName $ toUnqualified v_map
-f_foldr = nameName $ toUnqualified v_foldr
-f_fail = nameName $ toUnqualified v_fail
---f_filter = nameName $ toUnqualified v_filter
-f_and = nameName $ toUnqualified v_and
-con_cons = nameName $ toUnqualified dc_Cons
--}
 
-f_bind = nameName $ toUnqualified (func_bind sFuncNames)
-f_bind_ = nameName $ toUnqualified (func_bind_ sFuncNames)
-f_fail = nameName $ toUnqualified v_fail
 
-doToExp :: Monad m => [HsStmt] -> m HsExp
-doToExp [] = fail "doToExp: empty statements in do notation"
-doToExp [HsQualifier e] = return e
-doToExp [gen@(HsGenerator srcLoc _pat _e)] = fail $ "doToExp: last expression n do notation is a generator (srcLoc):" ++ show srcLoc
-doToExp [letst@(HsLetStmt _decls)] = fail $ "doToExp: last expression n do notation is a let statement"
-doToExp ((HsQualifier e):ss) = do
-    ss <- doToExp ss
-    return $ HsInfixApp (hsParen e) (HsVar f_bind_) (hsParen ss)
-doToExp ((HsGenerator _srcLoc pat e):ss) | isLazyPat pat = do
-    ss <- doToExp ss
-    return $ HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda _srcLoc [pat] ss)
-doToExp ((HsGenerator srcLoc pat e):ss) = do
-    ss <- doToExp ss
-    let kase = HsCase patVar [a1, a2 ]
-        a1 =  HsAlt srcLoc pat (HsUnGuardedRhs ss) []
-        a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar f_fail) (HsLit $ HsString $ show srcLoc ++ " failed pattern match in do"))) []
-    return $ HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda srcLoc [HsPVar newPatVarName] kase)  where
-doToExp (HsLetStmt decls:ss) = do
-    ss <- doToExp ss
-    return $ HsLet decls ss
+doToExp :: Monad m
+    => m HsName    -- ^ name generator
+    -> HsName      -- ^ bind (>>=) to use
+    -> HsName      -- ^ bind_ (>>) to use
+    -> HsName      -- ^ fail to use
+    -> [HsStmt]
+    -> m HsExp
+doToExp newName f_bind f_bind_ f_fail ss = f ss where
+    f [] = fail "doToExp: empty statements in do notation"
+    f [HsQualifier e] = return e
+    f [gen@(HsGenerator srcLoc _pat _e)] = fail $ "doToExp: last expression n do notation is a generator (srcLoc):" ++ show srcLoc
+    f [letst@(HsLetStmt _decls)] = fail $ "doToExp: last expression n do notation is a let statement"
+    f (HsQualifier e:ss) = do
+        ss <- f ss
+        return $ HsInfixApp (hsParen e) (HsVar f_bind_) (hsParen ss)
+    f ((HsGenerator _srcLoc pat e):ss) | isLazyPat pat = do
+        ss <- f ss
+        return $ HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda _srcLoc [pat] ss)
+    f ((HsGenerator srcLoc pat e):ss) = do
+        npvar <- newName
+        ss <- f ss
+        let kase = HsCase (HsVar npvar) [a1, a2 ]
+            a1 =  HsAlt srcLoc pat (HsUnGuardedRhs ss) []
+            a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar f_fail) (HsLit $ HsString $ show srcLoc ++ " failed pattern match in do"))) []
+        return $ HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda srcLoc [HsPVar npvar] kase)  where
+    f (HsLetStmt decls:ss) = do
+        ss <- f ss
+        return $ HsLet decls ss
+
+--    f_bind = nameName $ toUnqualified (func_bind sFuncNames)
+--    f_bind_ = nameName $ toUnqualified (func_bind_ sFuncNames)
+--    f_fail = nameName $ toUnqualified v_fail
 
 hsApp e es = hsParen $ foldl HsApp (hsParen e) (map hsParen es)
 hsIf e a b = hsParen $ HsIf e a b
