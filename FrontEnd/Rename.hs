@@ -525,13 +525,6 @@ instance Rename HsExp where
         return (HsLet hsDecls' hsExp')
     rename (HsCase hsExp hsAlts) = do return HsCase `ap` rename hsExp `ap` rename hsAlts
     rename (HsDo hsStmts) = rename =<< doToExp hsStmts
-    --f (HsDo hsStmts) = return HsDo `ap` rename hsStmts
-    rename (HsList hsExps) = do
-        unique <- newUniq
-        hsExps' <- rename hsExps
-        mod <- getCurrentModule
-        let hsName' = Qual mod (HsIdent $ show unique ++ "_as@")
-        return (HsAsPat hsName' $ HsList hsExps')
     rename (HsRecConstr hsName hsFieldUpdates) = do
         hsName' <- rename hsName  -- do I need to change this name?
         hsFieldUpdates' <- rename hsFieldUpdates
@@ -548,11 +541,8 @@ instance Rename HsExp where
     rename (HsEnumFromThen hsExp1 hsExp2) = rename $ desugarEnum "enumFromThen" [hsExp1, hsExp2]
     rename (HsEnumFromThenTo hsExp1 hsExp2 hsExp3) = rename $  desugarEnum "enumFromThenTo" [hsExp1, hsExp2, hsExp3]
     rename (HsListComp hsExp hsStmts) = do
-        rename (listCompToExp hsExp hsStmts)
-        --updateWith hsStmts $ do
-        --    hsStmts' <- rename hsStmts
-        --    hsExp' <- rename hsExp
-        --    return (HsListComp hsExp' hsStmts')
+        (ss,e) <- renameHsStmts hsStmts (rename hsExp)
+        listCompToExp newVar e ss
     rename (HsExpTypeSig srcLoc hsExp hsQualType) = do
         hsExp' <- rename hsExp
         updateWith hsQualType $ do
@@ -625,7 +615,33 @@ instance Rename HsAlt where
         return (HsAlt srcLoc hsPat' hsGuardedAlts' hsDecls')
 
 
+renameHsStmts :: [HsStmt] -> RM a  -> RM ([HsStmt],a)
+renameHsStmts ss fe = f ss [] where
+    f (HsGenerator sl p e:ss) rs = do
+        e' <- rename e
+        updateWith p $ do
+          p' <- rename p
+          f ss (HsGenerator sl p' e':rs)
+    f (s:ss) rs = do
+        updateWith s $ do
+          s' <- rename s
+          f ss (s':rs)
+    f [] rs = do
+        e <- fe
+        return (reverse rs,e)
 
+
+{-
+renameHsStmts (hsStmt:hsStmts) exp = do
+    updateWith hsStmt $ do
+      subTable' <- getUpdates hsStmt
+      withSubTable subTable' $ do
+      hsStmt' <- withSubTable subTable' $ rename hsStmt
+      (hsStmts',subTable'') <- renameHsStmts hsStmts subTable'
+      return ((hsStmt':hsStmts'),subTable'')
+renameHsStmts [] = do
+    fe <- exp
+    return ([],subTable)
 
 -- renameHsStmts is trickier than you would expect because
 -- the statements are only in scope after they have been declared
@@ -644,6 +660,7 @@ renameHsStmts (hsStmt:hsStmts) subTable = do
       return ((hsStmt':hsStmts'),subTable'')
 renameHsStmts [] subTable = do
       return ([],subTable)
+ -}
 
 instance Rename HsStmt where
     rename (HsGenerator srcLoc hsPat hsExp) = do

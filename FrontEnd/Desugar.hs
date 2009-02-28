@@ -256,7 +256,7 @@ replaceVarNamesInPat name p = f name p where
     f name (HsPUnboxedTuple pats) = HsPUnboxedTuple (map (f name) pats)
     f name (HsPList pats) = HsPList (map (f name) pats)
     f name (HsPParen pat) = HsPParen (f name pat)
-    f name (HsPRec conName fields) = HsPRec conName [ HsPFieldPat fname (f name pat) 
+    f name (HsPRec conName fields) = HsPRec conName [ HsPFieldPat fname (f name pat)
                                                       | HsPFieldPat fname pat <- fields ]
     f name (HsPAsPat asName pat)
        | name == asName = HsPAsPat newPatVarName (f name pat)
@@ -431,38 +431,52 @@ hsApp e es = hsParen $ foldl HsApp (hsParen e) (map hsParen es)
 hsIf e a b = hsParen $ HsIf e a b
 patVar = HsVar newPatVarName
 
-listCompToExp :: HsExp -> [HsStmt] -> HsExp
-listCompToExp exp ss = hsParen (f ss) where
-    f [] = HsList [exp]
+listCompToExp :: Monad m => m HsName -> HsExp -> [HsStmt] -> m HsExp
+listCompToExp newName exp ss = hsParen `liftM` f ss where
+    f [] = return $ HsList [exp]
     f (gen:HsQualifier q1:HsQualifier q2:ss)  = f (gen:HsQualifier (hsApp (HsVar f_and) [q1,q2]):ss)
-    f ((HsLetStmt ds):ss) = hsParen (HsLet ds (f ss))
-    f (HsQualifier e:ss) = hsParen (HsIf e (f ss) (HsList []))
-    f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat, Just exp' <- g ss = hsParen $ HsApp (HsApp (HsVar f_map)  (hsParen $ HsLambda srcLoc [pat] exp')) e
+    f ((HsLetStmt ds):ss) = do ss' <- f ss; return $ hsParen (HsLet ds ss')
+    f (HsQualifier e:ss) = do ss' <- f ss; return $ hsParen (HsIf e ss' (HsList []))
+    f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat, Just exp' <- g ss = do
+        return $ hsParen $ HsVar f_map `app` HsLambda srcLoc [pat] exp' `app` e
     --f ((HsGenerator srcLoc pat e):[HsQualifier q]) | isHsPVar pat = hsParen $ HsApp (HsApp (HsVar f_filter)  (hsParen $ HsLambda srcLoc [pat] q) ) e
-    f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isLazyPat pat, Just exp' <- g ss =  hsApp (HsVar f_foldr)  [HsLambda srcLoc [pat,HsPVar newPatVarName] $ hsIf q (hsApp (HsCon con_cons) [exp',patVar]) (HsVar newPatVarName), HsList [],e]
-    f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat = hsParen $ HsApp (HsApp (HsVar f_concatMap)  (hsParen $ HsLambda srcLoc [pat] (f ss))) e
-    f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isFailablePat pat || Nothing == (g ss) = hsParen $ HsApp (HsApp (HsVar f_concatMap)  (hsParen $ HsLambda srcLoc [HsPVar newPatVarName] kase)) e where
-        kase = HsCase (HsVar newPatVarName) [a1, a2 ]
-        a1 =  HsAlt srcLoc pat (HsGuardedRhss [HsGuardedRhs srcLoc q (f ss)]) []
-        a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
-    f ((HsGenerator srcLoc pat e):ss) | isFailablePat pat || Nothing == (g ss) = hsParen $ HsApp (HsApp (HsVar f_concatMap)  (hsParen $ HsLambda srcLoc [HsPVar newPatVarName] kase)) e where
-        kase = HsCase (HsVar newPatVarName) [a1, a2 ]
-        a1 =  HsAlt srcLoc pat (HsUnGuardedRhs (f ss)) []
-        a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
-    f ((HsGenerator srcLoc pat e):ss)  = hsParen $ HsApp (HsApp (HsVar f_map)  (hsParen $ HsLambda srcLoc [HsPVar newPatVarName] kase)) e where
-        Just exp' = g ss
-        kase = HsCase (HsVar newPatVarName) [a1 ]
-        a1 =  HsAlt srcLoc pat (HsUnGuardedRhs exp') []
+    f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isLazyPat pat, Just exp' <- g ss = do
+        npvar <- newName
+        return $ hsApp (HsVar f_foldr)  [HsLambda srcLoc [pat,HsPVar npvar] $ hsIf q (hsApp (HsCon con_cons) [exp',HsVar npvar]) (HsVar npvar), HsList [],e]
+    f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat = do
+        ss' <- f ss
+        return $ hsParen $ HsVar f_concatMap `app`  HsLambda srcLoc [pat] ss' `app` e
+    f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isFailablePat pat || Nothing == g ss = do
+        npvar <- newName
+        ss' <- f ss
+        let kase = HsCase (HsVar npvar) [a1, a2 ]
+            a1 =  HsAlt srcLoc pat (HsGuardedRhss [HsGuardedRhs srcLoc q ss']) []
+            a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
+        return $ hsParen $ HsVar f_concatMap `app`  HsLambda srcLoc [HsPVar npvar] kase `app`  e
+    f ((HsGenerator srcLoc pat e):ss) | isFailablePat pat || Nothing == g ss = do
+        npvar <- newName
+        ss' <- f ss
+        let kase = HsCase (HsVar npvar) [a1, a2 ]
+            a1 =  HsAlt srcLoc pat (HsUnGuardedRhs ss') []
+            a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
+        return $ hsParen $ HsVar f_concatMap `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
+    f ((HsGenerator srcLoc pat e):ss) = do
+        npvar <- newName
+        let Just exp' = g ss
+            kase = HsCase (HsVar npvar) [a1 ]
+            a1 =  HsAlt srcLoc pat (HsUnGuardedRhs exp') []
+        return $ hsParen $ HsVar f_map `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
     g [] = return exp
     g (HsLetStmt ds:ss) = do
         e <- g ss
         return (hsParen (HsLet ds e))
     g _ = Nothing
-    f_concatMap = nameName $ toUnqualified v_concatMap
-    f_map = nameName $ toUnqualified v_map
-    f_foldr = nameName $ toUnqualified v_foldr
-    f_and = nameName $ toUnqualified v_and
-    con_cons = nameName $ toUnqualified dc_Cons
+    app x y = HsApp x (hsParen y)
+    f_concatMap = nameName v_concatMap
+    f_map = nameName v_map
+    f_foldr = nameName v_foldr
+    f_and = nameName v_and
+    con_cons = nameName dc_Cons
 
 -- patterns are
 -- failable - may fail to match

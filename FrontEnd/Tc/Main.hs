@@ -117,6 +117,12 @@ wrapInAsPat e = do
     n <- newHsVar "As"
     return (HsAsPat (nameName n) e, n)
 
+wrapInAsPatEnv :: HsExp -> Type -> Tc HsExp
+wrapInAsPatEnv e typ = do
+    (ne,ap) <- wrapInAsPat e
+    addToCollectedEnv (Map.singleton ap typ)
+    return ne
+
 newHsVar ns = do
     nn <- newUniq
     return $ toName Val (ns ++ "@",show nn)
@@ -150,17 +156,13 @@ tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n 
     scrutinee <- newBox kindFunRet
     e' <- tcExpr e scrutinee
     alts' <- mapM (tcAlt scrutinee typ) alts
-    (ne,ap) <- wrapInAsPat (HsCase e' alts')
-    addToCollectedEnv (Map.singleton ap typ)
-    return ne
+    wrapInAsPatEnv (HsCase e' alts') typ
 
 
 tiExpr (HsCon conName) typ = do
     sc <- lookupName (toName DataConstructor conName)
     sc `subsumes` typ
-    (ne,ap) <- wrapInAsPat (HsCon conName)
-    addToCollectedEnv (Map.singleton ap typ)
-    return ne
+    wrapInAsPatEnv (HsCon conName) typ
 
 tiExpr (HsLit l@(HsIntPrim _)) typ = do
     unBox typ
@@ -168,23 +170,17 @@ tiExpr (HsLit l@(HsIntPrim _)) typ = do
     case ty of
         TCon (Tycon n kh) | kh == kindHash -> return ()
         _ -> ty `boxyMatch` (TCon (Tycon tc_Bits32 kindHash))
-    (ne,n) <- wrapInAsPat (HsLit l)
-    addToCollectedEnv (Map.singleton n ty)
-    return ne
+    wrapInAsPatEnv (HsLit l) ty
 
 
 tiExpr (HsLit l@(HsInt _)) typ = do
     t <- tiLit l
     t `subsumes` typ
-    (ne,n) <- wrapInAsPat (HsLit l)
-    addToCollectedEnv (Map.singleton n typ)
-    return ne
+    wrapInAsPatEnv (HsLit l) typ
 
 tiExpr err@HsError {} typ = do
     unBox typ
-    (ne,n) <- wrapInAsPat err
-    addToCollectedEnv (Map.singleton n typ)
-    return ne
+    wrapInAsPatEnv err typ
 
 tiExpr (HsLit l) typ = do
     t <- tiLit l
@@ -299,26 +295,26 @@ tiExpr tuple@(HsUnboxedTuple exps) typ = withContext (makeMsg "in the unboxed tu
 -- special case for the empty list
 tiExpr (HsList []) (TAp c v) | c == tList = do
     unBox v
-    return (HsList [])
+    wrapInAsPatEnv (HsList []) (TAp c v)
 
 -- special case for the empty list
 tiExpr (HsList []) typ = do
     v <- newVar kindStar
     let lt = TForAll [v] ([] :=> TAp tList (TVar v))
     lt `subsumes` typ
-    return (HsList [])
+    wrapInAsPatEnv (HsList []) typ
 
 -- non empty list
 tiExpr expr@(HsList exps@(_:_)) (TAp tList' v) | tList == tList' = withContext (makeMsg "in the list " $ render $ ppHsExp expr) $ do
         exps' <- mapM (`tcExpr` v) exps
-        return (HsList exps')
+        wrapInAsPatEnv (HsList exps') (TAp tList' v)
 
 -- non empty list
 tiExpr expr@(HsList exps@(_:_)) typ = withContext (makeMsg "in the list " $ render $ ppHsExp expr) $ do
         v <- newBox kindStar
         exps' <- mapM (`tcExpr` v) exps
         (TAp tList v) `subsumes` typ
-        return (HsList exps')
+        wrapInAsPatEnv (HsList exps') typ
 
 tiExpr (HsParen e) typ = tcExpr e typ
 
