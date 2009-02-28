@@ -85,7 +85,7 @@ processModule defs m = do
     -- driftDerive only uses IO to print the derived instances.
     zmod' <-  driftDerive (modInfoHsModule m)
     let mod = desugarHsModule (zmod')
-    let (mod',errs) = runWriter $ renameModule defs (modInfoImport m)  mod
+    let (mod',errs) = runWriter $ renameModule (modInfoOptions m) defs (modInfoImport m)  mod
     when (dump FD.Renamed) $ do
         putStrLn " \n ---- renamed code ---- \n"
         putStrLn $ HsPretty.render $ HsPretty.ppHsModule $  mod'

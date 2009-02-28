@@ -15,7 +15,7 @@ import qualified Data.Traversable as T
 
 
 import Doc.DocLike(tupled)
-import FrontEnd.Desugar (doToExp)
+import FrontEnd.Desugar (doToExp,listCompToExp)
 import FrontEnd.SrcLoc hiding(srcLoc)
 import FrontEnd.Syn.Traverse
 import FrontEnd.Utils
@@ -26,8 +26,10 @@ import Support.FreeVars
 import Util.Gen
 import Util.Inst()
 import FrontEnd.Warning
+import qualified FlagOpts as FO
 import qualified FrontEnd.HsErrors as HsErrors
 import qualified Name.VConsts as V
+import Options
 
 type FieldMap =  (Map.Map Name Int,Map.Map Name [(Name,Int)])
 
@@ -58,6 +60,7 @@ data Env = Env {
     envNameSpace :: [NameType],
     envModule  :: Module,
     envNameMap :: Map.Map Name (Either String Name),
+    envOptions :: Opt,
     envSrcLoc  :: SrcLoc
 }
 
@@ -113,8 +116,8 @@ addTopLevels  hsDecls action = do
 
 ambig x ys = "Ambiguous Name: " ++ show x ++ "\nCould refer to: " ++ tupled (map show ys)
 
-runRename :: MonadWarn m => (a -> RM a) -> Module -> FieldMap -> [(Name,[Name])] -> a -> m a
-runRename doit mod fls ns m = mapM_ addWarning errors >> return renamedMod where
+runRename :: MonadWarn m => (a -> RM a) -> Opt -> Module -> FieldMap -> [(Name,[Name])] -> a -> m a
+runRename doit opt mod fls ns m = mapM_ addWarning errors >> return renamedMod where
     initialGlobalSubTable = Map.fromList [ (x,y) | ((typ,x),[y]) <- ns', typ == Val || typ == DataConstructor ]
     initialTypeSubTable = Map.fromList [ (x,y) | ((typ,x),[y]) <- ns', typ == TypeConstructor || typ == ClassName ]
     nameMap = Map.fromList $ map f ns where
@@ -137,17 +140,18 @@ runRename doit mod fls ns m = mapM_ addWarning errors >> return renamedMod where
         envNameSpace = [Val,DataConstructor],
         envModule = mod,
         envNameMap  = nameMap,
+        envOptions = opt,
         envSrcLoc = mempty
     }
     (renamedMod, _, errors) = runRWS (unRM $ doit m) startEnv startState
 
 {-# NOINLINE renameModule #-}
-renameModule :: MonadWarn m => FieldMap -> [(Name,[Name])] -> HsModule -> m HsModule
-renameModule fls ns m = runRename renameDecls (hsModuleName m) fls ns m
+renameModule :: MonadWarn m => Opt -> FieldMap -> [(Name,[Name])] -> HsModule -> m HsModule
+renameModule opt fls ns m = runRename renameDecls opt (hsModuleName m) fls ns m
 
 {-# NOINLINE renameStatement #-}
-renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] -> Module -> HsStmt -> m HsStmt
-renameStatement fls ns modName stmt = runRename rename modName fls ns stmt
+renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] ->  Module -> HsStmt -> m HsStmt
+renameStatement fls ns modName stmt = runRename rename options modName fls ns stmt
 
 renameOld :: (SubTable -> RM a) -> RM a
 renameOld rm = asks envSubTable >>= rm
@@ -499,17 +503,10 @@ newVar = do
     let hsName'' = (Qual mod (HsIdent $ show unique {- ++ fromHsName hsName' -} ++ "_var@"))
     return hsName''
 
-wrapInAsPat e = do
-    unique <- newUniq
-    mod <- getCurrentModule
-    let hsName'' = (Qual mod (HsIdent $ show unique {- ++ fromHsName hsName' -} ++ "_as@"))
-    return (HsAsPat hsName''  e )
 
 instance Rename HsExp where
     rename (HsVar hsName) = return HsVar `ap` rename hsName
-    rename (HsCon hsName) = do
-        nn <- rename hsName
-        wrapInAsPat $ HsCon nn
+    rename (HsCon hsName) = return HsCon `ap` rename hsName
     rename i@(HsLit HsInt {}) = do return i
     rename i@(HsLit HsFrac {}) = do
         z <- rename func_fromRational
@@ -551,10 +548,11 @@ instance Rename HsExp where
     rename (HsEnumFromThen hsExp1 hsExp2) = rename $ desugarEnum "enumFromThen" [hsExp1, hsExp2]
     rename (HsEnumFromThenTo hsExp1 hsExp2 hsExp3) = rename $  desugarEnum "enumFromThenTo" [hsExp1, hsExp2, hsExp3]
     rename (HsListComp hsExp hsStmts) = do
-        updateWith hsStmts $ do
-            hsStmts' <- rename hsStmts
-            hsExp' <- rename hsExp
-            return (HsListComp hsExp' hsStmts')
+        rename (listCompToExp hsExp hsStmts)
+        --updateWith hsStmts $ do
+        --    hsStmts' <- rename hsStmts
+        --    hsExp' <- rename hsExp
+        --    return (HsListComp hsExp' hsStmts')
     rename (HsExpTypeSig srcLoc hsExp hsQualType) = do
         hsExp' <- rename hsExp
         updateWith hsQualType $ do
@@ -568,7 +566,6 @@ instance Rename HsExp where
     rename p = traverseHsExp rename p
 
 desugarEnum s as = foldl HsApp (HsVar (nameName $ toName Val s)) as
-
 
 createError et s = do
     sl <- getSrcLoc
@@ -594,8 +591,7 @@ buildRecConstr (amp,fls) n us = do
             let rs = map g [0 .. t - 1 ]
                 g i | Just e <- lookup i fm = e
                     | otherwise = undef
-            con <- wrapInAsPat (HsCon n)
-            return $ foldl HsApp con rs
+            return $ foldl HsApp (HsCon n) rs
 
 buildRecUpdate ::  FieldMap -> HsExp -> [HsFieldUpdate] -> RM HsExp
 buildRecUpdate (amp,fls) n us = do
@@ -611,8 +607,7 @@ buildRecUpdate (amp,fls) n us = do
                     vars <- replicateM t newVar
                     let vars' = (map HsVar vars)
                     let c' = nameName c
-                    con <- wrapInAsPat (HsCon c')
-                    let x = foldl HsApp con [ maybe v id (lookup i zs) | v <- vars' | i <- [ 0 .. t - 1] ]
+                    let x = foldl HsApp (HsCon c') [ maybe v id (lookup i zs) | v <- vars' | i <- [ 0 .. t - 1] ]
                     return $ HsAlt sl (HsPApp c' (map HsPVar vars))  (HsUnGuardedRhs x) []
         as <- mapM g fm'
         pe <- createError HsErrorRecordUpdate "Record Update Error"
@@ -814,9 +809,9 @@ collectDefsHsModule m = execWriter (mapM_ f (hsModuleDecls m)) where
             Just x | nameType x == ClassName -> x
             _ -> error "not a class name"
         cs = fst (mconcatMap (namesHsDeclTS' toName) ds)
-    f cad@(HsClassAliasDecl { hsDeclSrcLoc = sl, hsDeclName = n, hsDeclDecls = ds }) 
+    f cad@(HsClassAliasDecl { hsDeclSrcLoc = sl, hsDeclName = n, hsDeclDecls = ds })
            = tellF $ (toName Name.ClassName n,sl,snub $ fsts cs):[ (n,a,[]) | (n,a) <- cs]
-        where 
+        where
           cs = fst (mconcatMap (namesHsDeclTS' toName) ds)
 
     f _ = return ()

@@ -71,11 +71,11 @@ tcApps e@(HsVar v) as typ = do
     if (vname `Set.member` rc) then tcApps' e as typ else do
     tcKnownApp e True vname as typ
 
-tcApps e@(HsAsPat n (HsCon v)) as typ = do
+tcApps e@(HsCon v) as typ = do
+    (e,nname) <- wrapInAsPat e
     let vname = toName DataConstructor v
-    let nname = toName Val n
     when (dump FD.BoxySteps) $ liftIO $ putStrLn $ "tcApps: " ++ (show nname ++ "@" ++ show vname)
-    addToCollectedEnv (Map.singleton (toName Val n) typ)
+    addToCollectedEnv (Map.singleton nname typ)
     tcKnownApp e False vname as typ
 
 tcApps e as typ = tcApps' e as typ
@@ -158,7 +158,9 @@ tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n 
 tiExpr (HsCon conName) typ = do
     sc <- lookupName (toName DataConstructor conName)
     sc `subsumes` typ
-    return (HsCon conName)
+    (ne,ap) <- wrapInAsPat (HsCon conName)
+    addToCollectedEnv (Map.singleton ap typ)
+    return ne
 
 tiExpr (HsLit l@(HsIntPrim _)) typ = do
     unBox typ

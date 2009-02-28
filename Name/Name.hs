@@ -32,8 +32,8 @@ import Doc.PPrint
 import GenUtil
 import FrontEnd.HsSyn
 
-data NameType =
-    TypeConstructor
+data NameType
+    = TypeConstructor
     | DataConstructor
     | ClassName
     | TypeVal
@@ -41,6 +41,7 @@ data NameType =
     | SortName
     | FieldLabel
     | RawType
+    | UnknownType
     deriving(Ord,Eq,Enum,Read,Show)
 
 

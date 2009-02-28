@@ -381,6 +381,7 @@ data HsExp
 	| HsWildCard SrcLoc			-- ditto
 	| HsIrrPat { hsExpLExp :: LHsExp }
 	| HsBangPat { hsExpLExp :: LHsExp }
+        | HsLocatedExp LHsExp
  deriving(Eq,Show)
     {-! derive: is, update !-}
 

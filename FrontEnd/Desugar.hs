@@ -34,7 +34,7 @@
 -- Type synonyms are no longer handled here. only 'local' desugaring is done.
 -- Does this module need to exist?
 
-module FrontEnd.Desugar (doToExp, desugarHsModule, desugarHsStmt) where
+module FrontEnd.Desugar (doToExp, listCompToExp, desugarHsModule, desugarHsStmt) where
 
 import Control.Monad.State
 
@@ -326,7 +326,7 @@ desugarExp (HsDo stmts) = do
 desugarExp (HsListComp e stmts) = do
         newE <- desugarExp e
         newStmts <- mapM desugarStmt stmts
-        return (listCompToExp newE newStmts)
+        return (HsListComp e stmts)
 desugarExp (HsExpTypeSig sloc e qualType) = do
         e' <- desugarExp e
         newQualType <- remSynsQualType qualType
@@ -390,7 +390,7 @@ remSynsQualType qualtype
 -- TODO -  THIS IS BROKEN
 
 
-
+{-
 f_bind = nameName $ toUnqualified (func_bind sFuncNames)
 f_bind_ = nameName $ toUnqualified (func_bind_ sFuncNames)
 f_concatMap = nameName $ toUnqualified v_concatMap
@@ -400,6 +400,11 @@ f_fail = nameName $ toUnqualified v_fail
 --f_filter = nameName $ toUnqualified v_filter
 f_and = nameName $ toUnqualified v_and
 con_cons = nameName $ toUnqualified dc_Cons
+-}
+
+f_bind = nameName $ toUnqualified (func_bind sFuncNames)
+f_bind_ = nameName $ toUnqualified (func_bind_ sFuncNames)
+f_fail = nameName $ toUnqualified v_fail
 
 doToExp :: Monad m => [HsStmt] -> m HsExp
 doToExp [] = fail "doToExp: empty statements in do notation"
@@ -453,6 +458,11 @@ listCompToExp exp ss = hsParen (f ss) where
         e <- g ss
         return (hsParen (HsLet ds e))
     g _ = Nothing
+    f_concatMap = nameName $ toUnqualified v_concatMap
+    f_map = nameName $ toUnqualified v_map
+    f_foldr = nameName $ toUnqualified v_foldr
+    f_and = nameName $ toUnqualified v_and
+    con_cons = nameName $ toUnqualified dc_Cons
 
 -- patterns are
 -- failable - may fail to match
