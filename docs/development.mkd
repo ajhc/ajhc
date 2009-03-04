@@ -35,6 +35,7 @@ order to compile jhc, the following should produce a working tree:
     darcs get http://repetae.net/repos/Doc
     cd lib
     darcs get http://darcs.haskell.org/packages/haskell98
+    darcs get http://darcs.haskell.org/packages/containers
 
 Now you can begin to build jhc, in order to do so, switch to the jhc directory and do:
 

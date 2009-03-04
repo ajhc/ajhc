@@ -48,7 +48,7 @@ PACKAGES= -package mtl  -package unix  -ignore-package lang -package utf8-string
 GHCLANG=    -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
 GHCOPTS=  $(HSOPTS) -fbang-patterns -O -ignore-package lang  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
-JHC_LIBS =  base-1.0.hl haskell98-1.0.hl applicative-1.0.hl
+JHC_LIBS =  base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl
 
 EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
@@ -218,6 +218,10 @@ base-1.0.hl: lib/base/base.cabal
 applicative-1.0.hl: lib/applicative/applicative.cabal base-1.0.hl
 	mkdir -p tmp/libho
 	./jhc -v $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/applicative  --noauto -L- -L. -p base --build-hl lib/applicative/applicative.cabal -o $@
+
+containers-0.2.0.hl: lib/containers.cabal base-1.0.hl applicative-1.0.hl
+	mkdir -p tmp/libho
+	./jhc -v $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/containers  --noauto -L- -L. -p base -p applicative --build-hl lib/containers.cabal -fcpp -o $@
 
 haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 	mkdir -p tmp/libho
