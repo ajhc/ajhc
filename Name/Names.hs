@@ -75,6 +75,8 @@ tc_List = toName TypeConstructor  ("Jhc.Prim","[]")
 s_Star = toName SortName ("Jhc@","*")
 s_Hash = toName SortName ("Jhc@","#")
 
+u_instance = toName UnknownType ("Jhc@","instance")
+
 
 sFuncNames = FuncNames {
     func_equals = v_equals,

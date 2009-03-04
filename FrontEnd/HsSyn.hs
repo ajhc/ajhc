@@ -228,7 +228,13 @@ data HsDecl
         }
     | HsPragmaProps SrcLoc String [HsName]
     | HsPragmaRules [HsRule]
-    | HsPragmaSpecialize { hsDeclUniq :: (Module,Int), hsDeclSrcLoc :: SrcLoc, hsDeclBool :: Bool, hsDeclName :: HsName, hsDeclType :: HsType }
+    | HsPragmaSpecialize {
+        hsDeclUniq :: (Module,Int),
+        hsDeclSrcLoc :: SrcLoc,
+        hsDeclBool :: Bool,
+        hsDeclName :: HsName,
+        hsDeclType :: HsType
+        }
     | HsDeclDeriving { hsDeclSrcLoc :: SrcLoc, hsDeclClassHead :: HsClassHead }
   deriving(Eq,Show)
   {-! derive: is !-}

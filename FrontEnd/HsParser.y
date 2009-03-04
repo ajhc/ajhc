@@ -24,6 +24,9 @@ import FrontEnd.Lexer
 import FrontEnd.ParseUtils hiding(readInteger,readRational)
 import FrontEnd.SrcLoc
 
+import Name.Names
+import Name.Name
+
 import Control.Monad (liftM, liftM2)
 import Debug.Trace (trace)
 
@@ -599,6 +602,9 @@ valdef :: { HsDecl }
                       { HsTypeDecl $3 (fst $2) (snd $2) HsTyAssoc }
       | pinfixexp srcloc rhs                   {% checkValDef $2 $1 $3 []}
       | pinfixexp srcloc rhs 'where' decllist  {% checkValDef $2 $1 $3 $5}
+      | srcloc PRAGMASPECIALIZE 'instance'  type PRAGMAEND
+                      { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = nameName u_instance , hsDeclType = $4
+                                           , hsDeclUniq = error "hsDeclUniq not set"  } }
 
 rhs   :: { HsRhs }
       : '=' exp                       {% checkExpr $2 `thenP` \e ->
