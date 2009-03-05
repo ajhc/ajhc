@@ -2,7 +2,7 @@ Installation of jhc
 ===================
 
 All versions of jhc are available from the
-[Download Directory](http://repetae.net/computer/jhc/drop/). The project is
+[Download Directory](http://repetae.net/dist/). The project is
 also under darcs revision control however the build process from darcs is
 somewhat more involved. For information on getting the source code from darcs
 and building it, see the [Development Page](development.shtml).
@@ -12,7 +12,7 @@ Getting the RPM
 
 This is by far the easiest way to go about it if you have an rpm based system, an RPM for x86 based systems
  can be instaled from:
-<http://repetae.net/computer/jhc/drop/@PACKAGE@-@VERSION@-@RPMRELEASE@.x86_64.rpm>.
+<http://repetae.net/yum/@PACKAGE@-@VERSION@-@RPMRELEASE@.i386.rpm>.
 There is also a 'src' rpm in the download directory for rebuilding from source.
 
 Building from the tarball
@@ -24,9 +24,10 @@ has the following dependencies:
  * GHC 6.8.2 or better
  * haskell library [binary](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/binary)
  * haskell library [zlib](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/zlib)
+ * haskell library [utf8-string](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/utf8-string)
 
 You can get the tarball
-at <http://repetae.net/computer/jhc/drop/@PACKAGE@-@VERSION@.tar.gz>. In order
+at <http://repetae.net/dist/@PACKAGE@-@VERSION@.tar.gz>. In order
 to build it, download it into a directory and perform the following
 
     tar zxvf @PACKAGE@-@VERSION@.tar.gz
