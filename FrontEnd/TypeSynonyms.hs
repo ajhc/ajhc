@@ -54,7 +54,7 @@ removeSynonymsFromType syns t = evalTypeSyms  syns t
 
 quantifyHsType :: [HsName] -> HsQualType -> HsType
 quantifyHsType inscope t
-  | null vs, null (hsQualTypeHsContext t) = hsQualTypeType t
+  | null vs, null (hsQualTypeContext t) = hsQualTypeType t
   | otherwise  = HsTyForall vs t   where
     vs = map g $ snub (execWriter (fv (hsQualTypeType t))) \\ inscope
     g n = hsTyVarBind { hsTyVarBindName = n }

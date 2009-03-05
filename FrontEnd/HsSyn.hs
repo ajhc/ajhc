@@ -280,12 +280,9 @@ data HsGuardedRhs
 	 = HsGuardedRhs SrcLoc HsExp HsExp
   deriving(Eq,Show)
 
-data HsQualType
-	 = HsQualType   { hsQualTypeContext :: HsContext, hsQualTypeType :: HsType }
+data HsQualType = HsQualType { hsQualTypeContext :: HsContext, hsQualTypeType :: HsType }
   deriving(Data,Typeable,Eq,Ord,Show)
   {-! derive: Binary !-}
-
-hsQualTypeHsContext HsQualType { hsQualTypeContext = c } = c
 
 data HsType
 	 = HsTyFun   HsType HsType
