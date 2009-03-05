@@ -29,7 +29,6 @@ devolveTransform = transformParms {
 
 devolveGrin :: Grin -> IO Grin
 devolveGrin grin = do
-    putStrLn "-- devolve"
     col <- newIORef []
     let g (n,l :-> r) = f r >>= \r -> return (n,l :-> r)
         f lt@Let { expDefs = defs, expBody = body } = do
@@ -52,17 +51,17 @@ devolveGrin grin = do
                         pr = runIdentity $ proc r
                 proc (App a as t) | Just xs <- Map.lookup a pmap = return (App a (as ++ Set.toList xs) t)
                 proc e = mapExpExp proc e
-            mapM_ print (Map.toList pmap)
-            --nmaps <- mapM (g . fst) nmaps
-            modifyIORef col (++ fsts nmaps)
-            --mapExpExp f $  updateLetProps lt { expDefs = rmaps, expBody = proc body }
-            return $ updateLetProps lt { expDefs = rmaps, expBody = runIdentity $ proc body }
+            --mapM_ print (Map.toList pmap)
+            nmaps <- mapM (g . fst) nmaps
+            modifyIORef col (++ nmaps)
+            mapExpExp f $  updateLetProps lt { expDefs = rmaps, expBody = runIdentity $ proc body }
         f e = mapExpExp f e
     nf <- mapM g (grinFuncs grin)
     lf <- readIORef col
     let ntenv = extendTyEnv [ createFuncDef False x y | (x,y) <- lf ] (grinTypeEnv grin)
-    let ng = setGrinFunctions (lf ++ nf) grin { grinPhase = PostDevolve, grinTypeEnv = ntenv }
-    if null lf then return ng else devolveGrin ng
+    return $  setGrinFunctions (lf ++ nf) grin { grinPhase = PostDevolve, grinTypeEnv = ntenv }
+    --if null lf then return ng else devolveGrin ng
+    --if null lf then return ng else devolveGrin ng
 
 
 data Env = Env {
