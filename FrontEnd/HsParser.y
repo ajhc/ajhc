@@ -765,7 +765,7 @@ paexp1 :: { HsExp }
                                          returnP (HsAsPat n $3) }
       | srcloc '_'                    { HsWildCard $1 }
       | '~' srcloc paexp1 srcloc      { HsIrrPat $ located ($2,$4) $3 }
-      | '!' srcloc paexp1 srcloc      { HsBangPat $ located ($2,$4) $3 }
+--      | '!' srcloc paexp1 srcloc      { HsBangPat $ located ($2,$4) $3 }
 
 
 ptexps :: { [HsExp] }

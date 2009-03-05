@@ -24,6 +24,7 @@ import Support.FreeVars
 import Util.Gen
 import Util.Inst()
 import FrontEnd.Warning
+import qualified FlagOpts as FO
 import qualified FrontEnd.HsErrors as HsErrors
 import qualified Name.VConsts as V
 import Options
@@ -60,6 +61,9 @@ data Env = Env {
     envOptions :: Opt,
     envSrcLoc  :: SrcLoc
 }
+
+instance OptionMonad RM where
+    getOptions = asks envOptions
 
 instance Applicative RM where
     pure = return

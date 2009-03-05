@@ -13,6 +13,7 @@ unboxed-values allow unboxed value syntax
 ffi support foreign function declarations
 cpp pass haskell source through c preprocessor
 m4 pass haskell source through m4 preprocessor
+bang-patterns support bang pattern strictness annotations
 
 !Typechecking
 monomorphism-restriction enforce monomorphism restriction
