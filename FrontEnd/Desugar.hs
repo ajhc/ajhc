@@ -102,6 +102,9 @@ desugarDecl dl@(HsNewTypeDecl sloc cntxt name args condecl derives) = do
         ss <- createSelectors sloc [condecl]
         return $ dl:ss
 
+-- XXX we currently discard instance specializations
+desugarDecl HsPragmaSpecialize { hsDeclName = n } | n == nameName u_instance = return []
+
 desugarDecl anyOtherDecl = return [anyOtherDecl]
 
 createSelectors _sloc ds = ans where

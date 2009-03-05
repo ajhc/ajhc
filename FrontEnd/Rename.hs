@@ -24,7 +24,6 @@ import Support.FreeVars
 import Util.Gen
 import Util.Inst()
 import FrontEnd.Warning
-import qualified FlagOpts as FO
 import qualified FrontEnd.HsErrors as HsErrors
 import qualified Name.VConsts as V
 import Options
@@ -77,7 +76,7 @@ instance MonadWarn RM where
 instance UniqueProducer RM where
     newUniq = do
         u <- gets unique
-        modify (\state -> state {unique = (unique state) + 1})
+        modify (\s -> s {unique = unique s + 1})
         return u
 
 
@@ -151,13 +150,8 @@ renameModule opt fls ns m = runRename renameDecls opt (hsModuleName m) fls ns m
 renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] ->  Module -> HsStmt -> m HsStmt
 renameStatement fls ns modName stmt = runRename rename options modName fls ns stmt
 
-renameOld :: (SubTable -> RM a) -> RM a
-renameOld rm = asks envSubTable >>= rm
-
 withSubTable :: SubTable -> RM a -> RM a
 withSubTable st action = local ( \e -> e { envSubTable = st `Map.union` envSubTable e }) action
-
-
 
 renameDecls :: HsModule -> RM HsModule
 renameDecls tidy = do
@@ -205,8 +199,8 @@ instance Rename HsDecl where
         withSrcLoc srcLoc $ do
         hsNames' <- rename hsNames
         updateWith hsQualType $ do
-        hsQualType' <- rename hsQualType
-        return (HsTypeSig srcLoc hsNames' hsQualType')
+            hsQualType' <- rename hsQualType
+            return (HsTypeSig srcLoc hsNames' hsQualType')
     rename dl@HsDataDecl { hsDeclSrcLoc = srcLoc, hsDeclContext = hsContext, hsDeclName = hsName, hsDeclArgs = hsNames1, hsDeclCons = hsConDecls, hsDeclDerives = hsNames2 } = do
         withSrcLoc srcLoc $ do
         hsName' <- renameTypeName hsName
@@ -273,11 +267,16 @@ instance Rename HsDecl where
         return $ HsPragmaRules rs'
     rename prules@HsPragmaSpecialize { hsDeclSrcLoc = srcLoc, hsDeclName = n, hsDeclType = t } = do
         withSrcLoc srcLoc $ do
-        n <- rename n
-        t <- rename t
-        m <- getCurrentModule
-        i <- newUniq
-        return prules { hsDeclUniq = (m,i), hsDeclName = n, hsDeclType = t }
+        n <- if n == nameName u_instance then return n else rename n
+        let ns = snub (getNames t)
+        updateWith t $ do
+            ns' <- rename ns
+            t <- rename t
+            m <- getCurrentModule
+            i <- newUniq
+            let nt = if null ns' then t else HsTyForall bs (HsQualType [] t)
+                bs = [ hsTyVarBind { hsTyVarBindName = n } | n <- ns']
+            return prules { hsDeclUniq = (m,i), hsDeclName = n, hsDeclType = t }
     rename (HsDefaultDecl sl e) = HsDefaultDecl sl <$> rename e
     rename (HsDeclDeriving sl ch) = HsDeclDeriving sl <$> rename ch
     rename h = error $ "renameerr: " ++ show h
@@ -382,6 +381,7 @@ class UpdateTable a where
 
     getNames :: a -> [HsName]
     getNames a = []
+
 
 
 instance UpdateTable a => UpdateTable [a] where
@@ -543,8 +543,8 @@ instance Rename HsExp where
     rename (HsExpTypeSig srcLoc hsExp hsQualType) = do
         hsExp' <- rename hsExp
         updateWith hsQualType $ do
-        hsQualType' <- rename hsQualType
-        return (HsExpTypeSig srcLoc hsExp' hsQualType')
+            hsQualType' <- rename hsQualType
+            return (HsExpTypeSig srcLoc hsExp' hsQualType')
     rename (HsAsPat hsName hsExp) = return HsAsPat `ap` rename hsName `ap` rename hsExp
     rename (HsWildCard sl) = do
         withSrcLoc sl $ do
@@ -627,38 +627,6 @@ renameHsStmts ss fe = f ss [] where
         e <- fe
         return (reverse rs,e)
 
-
-{-
-renameHsStmts (hsStmt:hsStmts) exp = do
-    updateWith hsStmt $ do
-      subTable' <- getUpdates hsStmt
-      withSubTable subTable' $ do
-      hsStmt' <- withSubTable subTable' $ rename hsStmt
-      (hsStmts',subTable'') <- renameHsStmts hsStmts subTable'
-      return ((hsStmt':hsStmts'),subTable'')
-renameHsStmts [] = do
-    fe <- exp
-    return ([],subTable)
-
--- renameHsStmts is trickier than you would expect because
--- the statements are only in scope after they have been declared
--- and thus the subTable must be more carefully threaded through
-
--- the updated subTable is returned at the end because it is needed by
--- the first section of a list comprehension.
-
-renameHsStmts :: [HsStmt] -> SubTable -> RM (([HsStmt],SubTable))
-renameHsStmts (hsStmt:hsStmts) subTable = do
-    updateWith hsStmt $ do
-      subTable' <- getUpdates hsStmt
-      withSubTable subTable' $ do
-      hsStmt' <- withSubTable subTable' $ rename hsStmt
-      (hsStmts',subTable'') <- renameHsStmts hsStmts subTable'
-      return ((hsStmt':hsStmts'),subTable'')
-renameHsStmts [] subTable = do
-      return ([],subTable)
- -}
-
 instance Rename HsStmt where
     rename (HsGenerator srcLoc hsPat hsExp) = do
         hsExp' <- rename hsExp
@@ -672,8 +640,6 @@ instance Rename HsStmt where
         mapM_ HsErrors.hsDeclLocal hsDecls'
         return (HsLetStmt hsDecls')
 
-
-
 instance Rename HsFieldUpdate where
     rename (HsFieldUpdate hsName hsExp) = do
         gt <- gets globalSubTable              -- field names are global and not shadowed
@@ -681,12 +647,17 @@ instance Rename HsFieldUpdate where
         hsExp' <- rename hsExp
         return (HsFieldUpdate hsName' hsExp')
 
-
-
 instance Rename HsName where
-    rename n = renameOld $ renameHsName n
+    rename n = do
+        subTable <- asks envSubTable
+        renameHsName n subTable
 
-renameTypeName n = renameOld $ renameTypeHsName n
+renameTypeName hsName = do
+    t <- gets typeSubTable
+    subTable <- asks envSubTable
+    case Map.lookup hsName t of
+        Just _ -> renameHsName hsName t
+        Nothing -> renameHsName hsName subTable
 
 -- This looks up a replacement name in the subtable.
 -- Regardless of whether the name is found, if it's not qualified
@@ -711,9 +682,6 @@ renameHsName hsName subTable = case Map.lookup hsName subTable of
             return $ hsName
             --return (Qual modName name)
 
-renameTypeHsName hsName subTable  =  gets typeSubTable  >>= \t -> case Map.lookup hsName t of
-    Just _ -> renameHsName hsName t
-    Nothing -> renameHsName hsName subTable
 
 clobberName :: HsName -> RM SubTable
 clobberName hsName = do
