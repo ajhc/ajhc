@@ -53,7 +53,7 @@ JHC_LIBS =  base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl
 EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
 	     StringTable/StringTable_cbits.c StringTable/StringTable_cbits.h cbits/md5sum.c jhc.1 \
-	     StringTable/Atom.hsc jhc.spec
+	     StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal lib/containers.cabal
 
 CC = $(HC)
 
