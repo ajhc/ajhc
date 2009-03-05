@@ -242,7 +242,7 @@ processDecls cho ho' tiData = do
     -- Build rules from instances, specializations, and user specified rules and catalysts
     instanceRules <- createInstanceRules fullDataTable (hoClassHierarchy $ hoBuild ho')  (ds `mappend` hoEs (hoBuild ho))
     userRules <- convertRules (progModule prog) tiData (hoClassHierarchy  $ hoBuild ho') allAssumps fullDataTable decls
-    (nds,specializeRules) <- procAllSpecs (tiCheckedRules tiData) ds
+    (nds,specializeRules) <- procAllSpecs fullDataTable (tiCheckedRules tiData) ds
 
     ds <- return $ ds ++ nds
     wdump FD.CoreInitial $

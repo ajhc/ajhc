@@ -11,7 +11,7 @@ import Control.Monad.Identity
 import Control.Monad.RWS
 import qualified Data.Traversable as T
 import Data.Monoid
-import List(isPrefixOf)
+import List(isPrefixOf,nub)
 import Prelude
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
@@ -81,6 +81,7 @@ newVars xs = f xs [] where
         s <- newUniq
         f xs (tVr (anonymous s) x:ys)
 
+eArrow t1 t2  =  EPi (tVr emptyId t1) t2
 
 tipe t = f t where
     f (TAp (TAp (TCon arr) a1) a2) | tyconName arr == tc_Arrow = f (TArrow a1 a2)
@@ -1011,29 +1012,31 @@ specializeE gt st = do
     f [] gt
 
 
-procAllSpecs :: Monad m => [Type.Rule] -> [(TVr,E)] -> m ([(TVr,E)],Rules)
-procAllSpecs rs ds = do
+procAllSpecs :: Monad m => DataTable -> [Type.Rule] -> [(TVr,E)] -> m ([(TVr,E)],Rules)
+procAllSpecs dataTable rs ds = do
     let specMap = Map.fromListWith (++) [ (toId n,[r]) | r@Type.RuleSpec { Type.ruleName = n } <- rs]
         f (t,e) | Just rs <- Map.lookup (tvrIdent t) specMap = do
-            hs <- mapM (makeSpec (t,e)) rs
+            hs <- mapM (makeSpec dataTable (t,e)) rs
             return (unzip hs)
         f _ = return mempty
     (nds,rules) <- mconcat `liftM` mapM f ds
     return $ (nds,fromRules rules)
 
 
-makeSpec :: Monad m => (TVr,E) -> T.Rule -> m ((TVr,E),Rule)
-makeSpec (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (Module m,ui), T.ruleSuper = ss } = do
-    let nt = tipe rt
+makeSpec :: Monad m => DataTable -> (TVr,E) -> T.Rule -> m ((TVr,E),Rule)
+makeSpec dataTable (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (Module m,ui), T.ruleSuper = ss } = do
+    let nt = removeNewtypes dataTable $ tipe rt
     as <- specializeE (getType t) nt
-    let ntvr = tvr { tvrIdent = toId newName, tvrType = nt, tvrInfo = setProperties (prop_SPECIALIZATION:sspec) mempty }
+    let ntvr = tvr { tvrIdent = toId newName, tvrType = getType nbody, tvrInfo = setProperties (prop_SPECIALIZATION:sspec) mempty }
         Just nn = fromId (tvrIdent t)
         (ntype,Just m,q) = nameParts nn
         newName = toName ntype (Just $ "Spec@." ++ m ++ "." ++ show ui,'f':m ++ "." ++ q)
         sspec = if ss then [prop_SUPERSPECIALIZE] else []
-        ar = makeRule ("Specialize.{" ++ show newName) (Module m,ui) RuleSpecialization [] t as (EVar ntvr)
-    return ((ntvr,foldl EAp e as),ar)
-makeSpec _ _ = fail "E.FromHs.makeSpec: invalid specialization"
+        ar = makeRule ("Specialize.{" ++ show newName) (Module m,ui) RuleSpecialization bvars t as (foldl eAp (EVar ntvr) (map EVar bvars)) 
+        bvars = nub $ freeVars as
+        nbody = foldr ELam (foldl EAp e as) bvars
+    return ((ntvr,nbody),ar)
+makeSpec _ _ _ = fail "E.FromHs.makeSpec: invalid specialization"
 
 
 deNewtype :: DataTable -> E -> E
