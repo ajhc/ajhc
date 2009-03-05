@@ -118,7 +118,7 @@ bySuper h p@(IsIn c t)
 byInst             :: Monad m => Pred -> Inst -> m [Pred]
 byInst p Inst { instHead = ps :=> h } = do
     u <- matchPred h p
-    return (map (inst mempty (Map.fromList [ (tyvarAtom mv,t) | (mv,t) <- u ])) ps)
+    return (map (inst mempty (Map.fromList [ (tyvarName mv,t) | (mv,t) <- u ])) ps)
 
 matchPred :: Monad m => Pred -> Pred -> m [(Tyvar,Type)]
 matchPred x@(IsIn c t) y@(IsIn c' t')

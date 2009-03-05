@@ -63,7 +63,6 @@ import System
 import Text.PrettyPrint.HughesPJ(Doc)
 
 
-import StringTable.Atom
 import FrontEnd.Diagnostic
 import Doc.DocLike
 import Doc.PPrint
@@ -269,17 +268,17 @@ newMetaVar t k = do
 
 
 class Instantiate a where
-    inst:: Map.Map Int Type -> Map.Map Atom Type -> a -> a
+    inst:: Map.Map Int Type -> Map.Map Name Type -> a -> a
 
 instance Instantiate Type where
     inst mm ts (TAp l r)     = tAp (inst mm ts l) (inst mm ts r)
     inst mm ts (TArrow l r)  = TArrow (inst mm ts l) (inst mm ts r)
     inst mm  _ t@TCon {}     = t
-    inst mm ts (TVar tv ) = case Map.lookup (tyvarAtom tv) ts of
+    inst mm ts (TVar tv ) = case Map.lookup (tyvarName tv) ts of
             Just t'  -> t'
             Nothing -> (TVar tv)
-    inst mm ts (TForAll as qt) = TForAll as (inst mm (foldr Map.delete ts (map tyvarAtom as)) qt)
-    inst mm ts (TExists as qt) = TExists as (inst mm (foldr Map.delete ts (map tyvarAtom as)) qt)
+    inst mm ts (TForAll as qt) = TForAll as (inst mm (foldr Map.delete ts (map tyvarName as)) qt)
+    inst mm ts (TExists as qt) = TExists as (inst mm (foldr Map.delete ts (map tyvarName as)) qt)
     inst mm ts (TMetaVar mv) | Just t <- Map.lookup (metaUniq mv) mm  = t
     inst mm ts (TMetaVar mv) = TMetaVar mv
     inst mm ts (TAssoc tc as bs) = TAssoc tc (map (inst mm ts) as) (map (inst mm ts) bs)
@@ -376,7 +375,7 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
         f t _ = return t
         -- f t _ = error $ "boxySpec: " ++ show t
     (t',vs) <- runWriterT (f t as)
-    addPreds $ inst mempty (Map.fromList [ (tyvarAtom bt,s) | (bt,s) <- vs ]) ps
+    addPreds $ inst mempty (Map.fromList [ (tyvarName bt,s) | (bt,s) <- vs ]) ps
     return (sortGroupUnderFG fst snd vs,t')
 
 

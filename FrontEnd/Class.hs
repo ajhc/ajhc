@@ -452,7 +452,7 @@ newMethodSig' kt methodName newCntxt qt' instanceType  = newQualType where
         f (TExists ta (ps :=> t)) = tickle f (TExists (map at ta) (ps :=> t))
         f t = tickle f t
 
-    at (Tyvar _ n k) =  tyvar (updateName (++ foo) n) k
+    at (Tyvar n k) =  tyvar (updateName (++ foo) n) k
     updateName f n = toName nt (md,f nm) where
          (nt,(md::String,nm)) = fromName n
 --    qt = (newCntxt ++ restContext) :=> t

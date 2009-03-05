@@ -116,7 +116,7 @@ kind _ = error "E.FromHs.kind: unknown"
 
 
 
-fromTyvar (Tyvar _ n k) = tVr (toId n) (kind k)
+fromTyvar (Tyvar n k) = tVr (toId n) (kind k)
 
 fromSigma (TForAll vs (_ :=> t)) = (map fromTyvar vs, tipe t)
 fromSigma t = ([], tipe t)

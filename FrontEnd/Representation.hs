@@ -116,7 +116,7 @@ tassocToAp TAssoc { typeCon = con, typeClassArgs = cas, typeExtraArgs = eas } = 
 
 -- Unquantified type variables
 
-data Tyvar = Tyvar { tyvarAtom :: {-# UNPACK #-} !Atom, tyvarName ::  !Name, tyvarKind :: Kind }
+data Tyvar = Tyvar { tyvarName ::  !Name, tyvarKind :: Kind }
     {-  derive: Binary -}
 
 instance Show Tyvar where
@@ -132,18 +132,18 @@ tExists x y = TExists x y
 
 
 
-tyvar n k = Tyvar (toAtom $ show n) n k
+tyvar n k = Tyvar n k
 
 instance Eq Tyvar where
-    Tyvar { tyvarAtom = x } == Tyvar { tyvarAtom = y } = x == y
-    Tyvar { tyvarAtom = x } /= Tyvar { tyvarAtom = y } = x /= y
+    Tyvar { tyvarName = x } == Tyvar { tyvarName = y } = x == y
+    Tyvar { tyvarName = x } /= Tyvar { tyvarName = y } = x /= y
 
 instance Ord Tyvar where
-    compare (Tyvar { tyvarAtom = x }) (Tyvar { tyvarAtom = y }) = compare x y
-    (Tyvar { tyvarAtom = x }) <= (Tyvar { tyvarAtom = y }) = x <= y
-    (Tyvar { tyvarAtom = x }) >= (Tyvar { tyvarAtom = y }) = x >= y
-    (Tyvar { tyvarAtom = x }) <  (Tyvar { tyvarAtom = y })  = x < y
-    (Tyvar { tyvarAtom = x }) >  (Tyvar { tyvarAtom = y })  = x > y
+    compare (Tyvar { tyvarName = x }) (Tyvar { tyvarName = y }) = compare x y
+    (Tyvar { tyvarName = x }) <= (Tyvar { tyvarName = y }) = x <= y
+    (Tyvar { tyvarName = x }) >= (Tyvar { tyvarName = y }) = x >= y
+    (Tyvar { tyvarName = x }) <  (Tyvar { tyvarName = y })  = x < y
+    (Tyvar { tyvarName = x }) >  (Tyvar { tyvarName = y })  = x > y
 
 
 
@@ -196,15 +196,13 @@ instance  DocLike d => PPrint d Tyvar where
   pprint tv = tshow (tyvarName tv)
 
 instance Binary Tyvar where
-    put (Tyvar aa ab ac) = do
+    put (Tyvar aa ab) = do
         put aa
         put ab
-        put ac
     get = do
         aa <- get
         ab <- get
-        ac <- get
-        return (Tyvar aa ab ac)
+        return (Tyvar aa ab)
 
 
 instance FromTupname HsName where
@@ -286,7 +284,7 @@ prettyPrintTypePrec n t  = unparse $ zup (runIdentity (runVarNameT (f t))) where
         vo <- maybeLookupName tyvar
         case vo of
             Just c  -> return $ atom $ text c
-            Nothing -> return $ atom $ tshow (tyvarAtom tyvar)
+            Nothing -> return $ atom $ tshow (tyvarName tyvar)
     f (TAp (TCon (Tycon n _)) x) | n == tc_List = do
         x <- f x
         return $ atom (char '[' <> unparse x <> char ']')

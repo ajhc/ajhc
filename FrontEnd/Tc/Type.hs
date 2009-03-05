@@ -76,11 +76,11 @@ instance HasLocation Constraint where
 
 applyTyvarMap :: [(Tyvar,Type)] -> Type -> Type
 applyTyvarMap ts t = f initMp t where
-    initMp = Map.fromList [ (tyvarAtom v,t) | (v,t) <- ts ]
+    initMp = Map.fromList [ (tyvarName v,t) | (v,t) <- ts ]
     -- XXX name capture!
-    f mp (TForAll as qt) = TForAll as (fq (foldr Map.delete mp (map tyvarAtom as)) qt)
-    f mp (TExists as qt) = TExists as (fq (foldr Map.delete mp (map tyvarAtom as)) qt)
-    f mp (TVar tv) = case Map.lookup (tyvarAtom tv) mp of
+    f mp (TForAll as qt) = TForAll as (fq (foldr Map.delete mp (map tyvarName as)) qt)
+    f mp (TExists as qt) = TExists as (fq (foldr Map.delete mp (map tyvarName as)) qt)
+    f mp (TVar tv) = case Map.lookup (tyvarName tv) mp of
             Just t'  -> t'
             Nothing -> (TVar tv)
     f mp t = tickle (f mp) t
