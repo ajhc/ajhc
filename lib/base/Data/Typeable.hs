@@ -21,12 +21,12 @@ instance Show TypeRep where
 
 
 instance Eq TypeRep where
-    TypeRep a xs == TypeRep b ys = case c_strcmp a b of
+    TypeRep a xs == TypeRep b ys = case c_strcmp (Addr_ a) (Addr_ b) of
         0 -> xs == ys
         _ -> False
 
 
-foreign import ccall "strcmp" c_strcmp :: Addr__ -> Addr__ -> Int
+foreign import ccall "strcmp" c_strcmp :: Addr_ -> Addr_ -> Int
 
 {-
 foreign import primitive ptypeOf :: a -> TypeRep
