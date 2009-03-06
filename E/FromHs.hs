@@ -461,7 +461,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
         let (ts,rt)   = argTypes' ty
             prim      = APrim (PrimPrim $ toAtom cn) req
         es <- newVars [ t |  t <- ts, not (sortKindLike t) ]
-        let result    = foldr ($) (processPrimPrim dataTable $ EPrim prim (map EVar es) rt) (map ELam es)
+        let result    = foldr ($) (processPrimPrim dataTable $ EPrim prim [ EVar e | e <- es, not (tvrType e == tUnit)] rt) (map ELam es)
         return [(name,setProperty prop_INLINE var,lamt result)]
     cDecl (HsForeignDecl _ (FfiSpec (ImportAddr rcn req) _ _) n _) = do
         let name       = toName Name.Val n
