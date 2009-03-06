@@ -205,7 +205,7 @@ formatRealFloat fmt decs x
               Just dec ->
                 let dec' = max dec 1 in
                 case is of
-                  [] -> '0':'.':take dec' (repeat '0') ++ "e0"
+                  [] -> '0':'.':replicate dec' '0' ++ "e0"
                   _ ->
                     let (ei, is') = roundTo base (dec'+1) is
                         d:ds = map intToDigit
