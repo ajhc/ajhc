@@ -14,6 +14,8 @@
 #include <float.h>
 #ifndef __WIN32__
 #include <sys/times.h>
+#include <endian.h>
+#include <sys/utsname.h>
 #endif
 #include <setjmp.h>
 
@@ -80,4 +82,13 @@
 #define ALIGN(a,n) ((n) - 1 + ((a) - ((n) - 1) % (a)))
 
 
+#ifdef __WIN32__
+#define JHC_isWindows   1
+#define JHC_isBigEndian 0
+#else
+#define JHC_isWindows 0
+#define JHC_isBigEndian (__BYTE_ORDER == __BIG_ENDIAN)
+#endif
+
+#define JHC_isPosix (!JHC_isWindows)
 

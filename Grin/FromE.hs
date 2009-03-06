@@ -34,6 +34,7 @@ import Info.Types
 import Name.Id
 import Name.Name
 import Name.Names
+import Name.VConsts
 import Options
 import Stats(mtick)
 import Support.CanType
@@ -134,8 +135,6 @@ toEntry (n,as,e) = f (scTag n) where
         f x = (x,map (toType tyINode . tvrType )  as,toTypes TyNode (getType (e::E) :: E))
 
 
-stringNameToTy :: String -> Ty
-stringNameToTy n = TyPrim (archOpTy archInfo n)
 
 toType :: Ty -> E -> Ty
 toType node = toty . followAliases mempty where
@@ -412,6 +411,13 @@ compile' cenv (tvr,as,e) = ans where
 
     ce (EPrim ap@(APrim (PrimPrim prim) _) as _) = f (fromAtom prim) as where
 
+        pconst s = Prim (APrim CConst { primConst = s, primRetType = "int" } mempty) [] [tIntzh]
+        -- options
+
+        f "options_target" [_] = do return $ Return [toUnVal (0::Int)]
+        f "options_isWindows" [_] = do return $ pconst "JHC_isWindows"
+        f "options_isPosix" [_] = do return $ pconst "JHC_isPosix"
+        f "options_isBigEndian" [_] = do return $ pconst "JHC_isBigEndian"
 
         -- artificial dependencies
         f "newWorld__" [_] = do

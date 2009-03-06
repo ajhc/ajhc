@@ -8,6 +8,15 @@ static jmp_buf jhc_uncaught;
 
 static HsInt jhc_stdrnd[2] A_UNUSED = { 1 , 1 };
 static HsInt jhc_data_unique A_UNUSED;
+#ifdef __WIN32__
+static char *jhc_options_os =  "mingw32";
+static char *jhc_options_arch = "i386";
+#else
+struct utsname jhc_utsname;
+static char *jhc_options_os = "(unknown os)";
+static char *jhc_options_arch = "(unknown arch)";
+#endif
+
 
 #if _JHC_PROFILE
 
@@ -157,6 +166,12 @@ main(int argc, char *argv[])
         jhc_argc = argc - 1;
         jhc_argv = argv + 1;
         jhc_progname = argv[0];
+#if JHC_isPosix
+        if(!uname(&jhc_utsname)) {
+                jhc_options_arch = jhc_utsname.machine;
+                jhc_options_os   = jhc_utsname.sysname;
+        }
+#endif
         setlocale(LC_ALL,"");
         if (jhc_setjmp(jhc_uncaught))
                 jhc_error("Uncaught Exception");
