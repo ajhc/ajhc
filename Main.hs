@@ -641,6 +641,9 @@ compileModEnv cho = do
 
     wdump FD.Progress $ printEStats (programE prog)
 
+    prog <- simplifyProgram SS.emptySimplifyOpts { SS.so_postLift = True, SS.so_finalPhase = True } "PostLiftSimplify" verbose prog
+--    prog <- programFloatInward prog
+
     when collectPassStats $ do
         Stats.print "PassStats" Stats.theStats
         Stats.clear Stats.theStats

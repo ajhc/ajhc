@@ -287,6 +287,7 @@ orMany xs = f (filter ((/= Unused) . useOccurance) xs) where
 data SimplifyOpts = SimpOpts {
     so_noInlining :: Bool,                 -- ^ this inhibits all inlining inside functions which will always be inlined
     so_finalPhase :: Bool,                 -- ^ no rules and don't inhibit inlining
+    so_postLift   :: Bool,                 -- ^ don't inline anything that was lifted out
     so_boundVars :: IdMap Comb,            -- ^ bound variables
     so_forwardVars :: IdSet,               -- ^ variables that we know will exist, but might not yet.
 
@@ -298,6 +299,7 @@ emptySimplifyOpts = SimpOpts { so_noInlining  = False
                              , so_finalPhase  = False
                              , so_boundVars   = mempty
                              , so_forwardVars = mempty
+                             , so_postLift    = False
                              , so_boundVarsCache = mempty
                              , so_cachedScope = mempty }
 
@@ -843,6 +845,7 @@ simplifyDs prog sopts dsIn = ans where
         let (ne,nn) = runRename used (foldl EAp z zs)
         smAddNamesIdSet nn
         return ne
+    appVar v xs | so_postLift sopts = app (EVar v,xs)
     appVar v xs = do
         me <- etaExpandAp (progDataTable prog) v xs
         case me of
@@ -874,6 +877,7 @@ simplifyDs prog sopts dsIn = ans where
                 t' <- nname t
                 case Info.lookup (tvrInfo t) of
                     _ | forceNoinline t -> return (tvrIdent t,noUseInfo { useOccurance = LoopBreaker },t',e)
+                      | so_postLift sopts && (isELam e || isECase e) -> return (tvrIdent t,noUseInfo { useOccurance = LoopBreaker },t',e)
                     Just ui@UseInfo { useOccurance = Once } -> return (tvrIdent t,ui,error $ "Once: " ++ show t,e)
                     Just n -> return (tvrIdent t,n,t',e)
                     -- We don't want to inline things we don't have occurance info for because they might lead to an infinite loop. hopefully the next pass will fix it.
@@ -906,7 +910,7 @@ simplifyDs prog sopts dsIn = ans where
                 Just (UseInfo { minimumArgs = min }) -> min
                 Nothing -> 0
 
-        ds' <- sequence [ etaExpandDef' (progDataTable prog) (minArgs t) t e | (t,e) <- ds']
+        ds' <- if so_postLift sopts then return ds' else  sequence [ etaExpandDef' (progDataTable prog) (minArgs t) t e | (t,e) <- ds']
         return (ds',inb')
 
 

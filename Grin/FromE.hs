@@ -529,7 +529,7 @@ compile' cenv (tvr,as,e) = ans where
             (_,_) | otherwise -> do
                     as <- mapM cp as
                     def <- createDef d newNodeVar
-                    return $ e :>>= [toVal b] :-> Case v (as ++ def)
+                    return $ e :>>= [toVal b] :-> Case (toVal b) (as ++ def)
     ce e = error $ render (text "Grin.FromE.compile'.ce in function:" <+> pprint funcName
                            <$> text "can't grok expression:" <+> pprint e)
 
