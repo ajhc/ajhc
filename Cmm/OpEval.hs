@@ -12,6 +12,7 @@ import Cmm.Number
 import Cmm.Op
 import Control.Monad
 import Maybe
+import qualified Data.Map as Map
 
 
 class Expression t e | e -> t where
@@ -76,8 +77,6 @@ binOp bop t1 t2 tr e1 e2 str | Just (v1,t1) <- toConstant e1, Just (v2,t2) <- to
     f Add v1 v2 = return $ toExpression (v1 + v2) str
     f Sub v1 v2 = return $ toExpression (v1 - v2) str
     f Mul v1 v2 = return $ toExpression (v1 * v2) str
-    f Eq  v1 v2 = return $ toBool (v1 == v2)
-    f NEq v1 v2 = return $ toBool (v1 /= v2)
     f op v1 v2 | v2 /= 0, isJust ans = ans where
         ans = case op of
             Div  -> return $ toExpression (v1 `div` v2) str
@@ -91,11 +90,12 @@ binOp bop t1 t2 tr e1 e2 str | Just (v1,t1) <- toConstant e1, Just (v2,t2) <- to
     f FMul v1 v2 = return $ toExpression (v1 * v2) str
     f FPwr v1 v2 = return $ toExpression (realToFrac (realToFrac v1 ** realToFrac v2 :: Double)) str
 
-    f op v1 v2 | Just v <- lookup op ops = return $ toBool (v1 `v` v2) where
-        ops = [(Lt,(<)), (Gt,(>)), (Lte,(<=)), (Gte,(>=)),
-               (FLt,(<)), (FGt,(>)), (FLte,(<=)), (FGte,(>=))]
-    f op v1 v2 | Just v <- lookup op ops, v1 >= 0 && v2 >= 0 = return $ toBool (v1 `v` v2) where
-        ops = [(ULt,(<)), (UGt,(>)), (ULte,(<=)), (UGte,(>=))]
+    f op v1 v2 | Just v <- Map.lookup op ops = return $ toBool (v1 `v` v2) where
+        ops = Map.fromList [(Lt,(<)), (Gt,(>)), (Lte,(<=)), (Gte,(>=)),
+               (FLt,(<)), (FGt,(>)), (FLte,(<=)), (FGte,(>=)), (Eq,(==)),(NEq,(/=))]
+
+    f op v1 v2 | Just v <- Map.lookup op ops, v1 >= 0 && v2 >= 0 = return $ toBool (v1 `v` v2) where
+        ops = Map.fromList [(ULt,(<)), (UGt,(>)), (ULte,(<=)), (UGte,(>=))]
     f _ _ _ =  Nothing
 -- we normalize ops such that constants are always on the left side
 binOp bop t1 t2 tr e1 e2 str | Just _ <- toConstant e2, Just bop' <- commuteBinOp bop = Just $ createBinOp bop' t2 t1 tr e2 e1 str

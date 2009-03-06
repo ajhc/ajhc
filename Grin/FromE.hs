@@ -411,13 +411,13 @@ compile' cenv (tvr,as,e) = ans where
 
     ce (EPrim ap@(APrim (PrimPrim prim) _) as _) = f (fromAtom prim) as where
 
-        pconst s = Prim (APrim CConst { primConst = s, primRetType = "int" } mempty) [] [tIntzh]
+--        pconst s = Prim (APrim CConst { primConst = s, primRetType = "int" } mempty) [] [tEnumzh]
         -- options
 
-        f "options_target" [_] = do return $ Return [toUnVal (0::Int)]
-        f "options_isWindows" [_] = do return $ pconst "JHC_isWindows"
-        f "options_isPosix" [_] = do return $ pconst "JHC_isPosix"
-        f "options_isBigEndian" [_] = do return $ pconst "JHC_isBigEndian"
+--        f "options_target" [] = do return $ Return [Lit 0 tEnumzh]
+--        f "options_isWindows" [] = do return $ pconst "JHC_isWindows"
+--        f "options_isPosix" [] = do return $ pconst "JHC_isPosix"
+--        f "options_isBigEndian" [] = do return $ pconst "JHC_isBigEndian"
 
         -- artificial dependencies
         f "newWorld__" [_] = do

@@ -26,19 +26,67 @@ import Support.FreeVars
 import qualified Cmm.Op as Op
 
 
-{-
+{-@Extensions
 
-The primitive operators provided which may be imported into code are
+# Foreign Primitives
 
-'seq' - evaluate first argument to WHNF, return second one
-plus/divide/minus  - perform operation on primitive type
-zero/one - the zero and one values for primitive types
-const.<foo> - evaluates to the C constant <foo>
-error.<err> - equivalent to 'error <err>'
-exitFailure__ - abort program immediately with no message
-increment/decrement - increment or decrement a primitive numeric type by 1
+In addition to foreign imports of external functions as described in the FFI
+spec. Jhc supports 'primitive' imports that let you communicate primitives directly
+to the compiler. In general, these should not be used other than in the implementation
+of the standard libraries. They generally do little error checking as it is assumed you
+know what you are doing if you use them. All haskell visible entities are
+introduced via foreign declarations in jhc.
+
+They all have the form
+
+    foreign import primitive "specification" haskell_name :: type
+
+where "specification" is one of the following
+
+seq
+: evaluate first argument to WHNF, then return the second argument
+
+zero,one
+: the values zero and one of any primitive type.
+
+const.C_CONSTANT
+: the text following const is directly inserted into the resulting C file
+
+peek.TYPE
+: the peek primitive for raw value TYPE
+
+poke.TYPE
+: the poke primitive for raw value TYPE
+
+sizeOf.TYPE, alignmentOf.TYPE, minBound.TYPE, maxBound.TYPE, umaxBound.TYPE
+: various properties of a given internal type.
+
+error.MESSAGE
+: results in an error with constant message MESSAGE.
+
+constPeekByte
+: peek of a constant value specialized to bytes, used internally by Jhc.String
+
+box
+: take an unboxed value and box it, the shape of the box is determined by the type at which this is imported
+
+unbox
+: take an boxed value and unbox it, the shape of the box is determined by the type at which this is imported
+
+increment, decrement
+: increment or decrement a numerical integral primitive value
+
+fincrement, fdecrement
+: increment or decrement a numerical floating point primitive value
+
+exitFailure__
+: abort the program immediately
+
+C-- Primitive
+: any C-- primitive may be imported in this manner.
 
 -}
+
 
 
 unbox :: DataTable -> E -> Id -> (TVr -> E) -> E
@@ -48,6 +96,9 @@ unbox dataTable e vn wtd = eCase e  [Alt (litCons { litName = cna, litArgs = [tv
     Just (ExtTypeBoxed cna sta _) = lookupExtTypeInfo dataTable te
 
 
+
+-- | this creates a string representing the type of primitive optimization was
+-- performed for bookkeeping purposes
 
 cextra Op {} [] = ""
 cextra Op {} xs = '.':map f xs where
@@ -92,65 +143,8 @@ instance Expression E E where
     fromUnOp _ = Nothing
 
 
-{-
-
-primOpt' dataTable  (EPrim (APrim s _) xs t) | Just n <- primopt s xs t = do
-    mtick (toAtom $ "E.PrimOpt." ++ braces (pprint s) ++ cextra s xs )
-    primOpt' dataTable  n  where
-
-        -- constant operations
-        primopt (Operator "+" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ (ELit (LitInt (l1 + l2) rt))
-        primopt (Operator "-" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ (ELit (LitInt (l1 - l2) rt))
-        primopt (Operator "*" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ (ELit (LitInt (l1 * l2) rt))
-        primopt (Operator "==" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ if l1 == l2 then iTrue else iFalse
-        primopt (Operator ">=" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ if l1 >= l2 then iTrue else iFalse
-        primopt (Operator "<=" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ if l1 <= l2 then iTrue else iFalse
-        primopt (Operator ">" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ if l1 > l2 then iTrue else iFalse
-        primopt (Operator "<" [ta,tb] tr) [(ELit (LitInt l1 t1)),(ELit (LitInt l2 t2))] rt  = return $ if l1 < l2 then iTrue else iFalse
-        primopt (Operator "-" [ta] tr) [ELit (LitInt x t)] rt | ta == tr && rt == t = return $ ELit (LitInt (negate x) t)
-        -- compare of equals
-        primopt (Operator "==" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return iTrue
-        primopt (Operator ">=" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return iTrue
-        primopt (Operator "<=" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return iTrue
-        primopt (Operator ">" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return iFalse
-        primopt (Operator "<" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return iFalse
-        -- x + 0 = x
-        primopt (Operator "+" [ta,tb] tr) [e1,(ELit (LitInt 0 t))] rt  = return $ e1
-        primopt (Operator "+" [ta,tb] tr) [(ELit (LitInt 0 t)),e1] rt  = return $ e1
-        -- x * 0 = 0
-        primopt (Operator "*" [ta,tb] tr) [_,(ELit (LitInt 0 t))] rt  = return $ (ELit (LitInt 0 t))
-        primopt (Operator "*" [ta,tb] tr) [(ELit (LitInt 0 t)),_] rt  = return $ (ELit (LitInt 0 t))
-        -- x * 1 = x
-        primopt (Operator "*" [ta,tb] tr) [e1,(ELit (LitInt 1 t))] rt  = return $ e1
-        primopt (Operator "*" [ta,tb] tr) [(ELit (LitInt 1 t)),e1] rt  = return $ e1
-        -- x / 1 = x
-        primopt (Operator "/" [ta,tb] tr) [e1,(ELit (LitInt 1 t))] rt  = return $ e1
-        -- x / x = 1  - check for 0 / 0
-        --primopt (Operator "/" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return $ (ELit (LitInt 1 rt))
-        -- 0 / x = 0  - check for 0 / 0
-        --primopt (Operator "/" [ta,tb] tr) [(ELit (LitInt 0 t)),_] rt  = return $ (ELit (LitInt 0 t))
-        -- x - 0 = x
-        primopt (Operator "-" [ta,tb] tr) [e1,(ELit (LitInt 0 t))] rt  = return $ e1
-        -- 0 - x = -x
-        primopt (Operator "-" [ta,tb] tr) [(ELit (LitInt 0 t)),e1] rt  = return $ EPrim (APrim (Operator "-" [ta] tr) mempty) [e1] rt
-        -- x << 0 = x, x >> 0 = x
-        primopt (Operator "<<" [ta,tb] tr) [e1,(ELit (LitInt 0 t))] rt  = return $ e1
-        primopt (Operator ">>" [ta,tb] tr) [e1,(ELit (LitInt 0 t))] rt  = return $ e1
-        -- x % 1 = 0
-        primopt (Operator "%" [ta,tb] tr) [e1,(ELit (LitInt 1 t))] rt  = return $ (ELit (LitInt 0 rt))
-        -- x % x = 0 - check for 0 % 0
-        --primopt (Operator "%" [ta,tb] tr) [e1,e2] rt | e1 == e2  = return $ (ELit (LitInt 0 rt))
-        -- 0 % x = 0 - check for 0 % 0
-        --primopt (Operator "%" [ta,tb] tr) [(ELit (LitInt 0 t)),_] rt  = return $ (ELit (LitInt 0 t))
-        -- eq to case
-        primopt (Operator "==" [ta,tb] tr) [e,(ELit (LitInt x t))] rt | isIntegral t  = return $ eCase e [Alt (LitInt x t) iTrue ] iFalse
-        primopt (Operator "==" [ta,tb] tr) [(ELit (LitInt x t)),e] rt | isIntegral t = return $ eCase e [Alt (LitInt x t) iTrue ] iFalse
-        -- cast of constant
-        primopt (CCast _ _) [ELit (LitInt x _)] t = return $ ELit (LitInt x t)  -- TODO ensure constant fits
-        primopt _ _ _ = fail "No primitive optimization to apply"
-primOpt' _  x = return x
--}
-
+-- | this is called once after conversion to E on all primitives, it performs various
+-- one time only transformations.
 
 processPrimPrim :: DataTable -> E -> E
 processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o id (primopt (fromAtom s) es (followAliases dataTable orig_t)) where
@@ -189,6 +183,8 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
     primopt n [] t | Just num <- lookup n vs = mdo
         (res,(_,sta)) <- boxPrimitive dataTable (ELit (LitInt num sta)) t; return res
         where vs = [("zero",0),("one",1)]
+    primopt "options_target" [] t     = return (ELit (LitInt 0 t))
+    primopt pn [] t | Just c <- getPrefix "options_" pn      = return (EPrim (APrim (CConst ("JHC_" ++ c) "int") mempty) [] t)
     primopt pn [a,w] t | Just c <- getPrefix "peek." pn      >>= Op.readTy = return (EPrim (APrim (Peek c) mempty) [w,a] t)
     primopt pn [a,v,w] t | Just c <- getPrefix "poke." pn    >>= Op.readTy = return (EPrim (APrim (Poke c) mempty) [w,a,v] t)
     primopt pn [v] t | Just c <- getPrefix "sizeOf." pn      >>= Op.readTy = return (EPrim (APrim (PrimTypeInfo c Op.bits32 PrimSizeOf) mempty) [] t)

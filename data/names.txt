@@ -80,7 +80,6 @@ Val:v:
 eqString         Jhc.String.eqString
 eqUnpackedString Jhc.String.eqUnpackedString
 unpackString     Jhc.String.unpackString
-target           Jhc.Options.target
 error            Jhc.IO.error
 minBound         Jhc.Enum.minBound
 maxBound         Jhc.Enum.maxBound
