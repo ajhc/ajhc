@@ -40,7 +40,6 @@ import Control.Monad.Identity
 import Data.IORef
 import Text.PrettyPrint.HughesPJ(Doc)
 
-import StringTable.Atom
 import Data.Binary
 import Doc.DocLike
 import Doc.PPrint
@@ -63,18 +62,24 @@ data MetaVarType = Tau | Rho | Sigma
              deriving(Eq,Ord)
     {-! derive: Binary !-}
 
-data Type  = TVar { typeVar :: {-# UNPACK #-} !Tyvar }
-           | TCon { typeCon :: !Tycon }
-           | TAp  Type Type
-           | TArrow Type Type
-           | TForAll { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
-           | TExists { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
+data Type  = TVar     { typeVar :: !Tyvar }
+           | TCon     { typeCon :: !Tycon }
+           | TAp      Type Type
+           | TArrow   Type Type
+           | TForAll  { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
+           | TExists  { typeArgs :: [Tyvar], typeBody :: (Qual Type) }
            | TMetaVar { metaVar :: MetaVar }
            | TAssoc   { typeCon :: !Tycon, typeClassArgs :: [Type], typeExtraArgs :: [Type] }
              deriving(Ord,Show)
     {-! derive: Binary !-}
 
-data MetaVar = MetaVar { metaUniq :: !Int, metaKind :: Kind, metaRef :: (IORef (Maybe Type)), metaType :: MetaVarType } -- ^ used only in typechecker
+-- | metavars are used in type checking
+data MetaVar = MetaVar {
+    metaUniq :: {-# UNPACK #-} !Int,
+    metaKind :: Kind,
+    metaRef :: {-# UNPACK #-} !(IORef (Maybe Type)),
+    metaType :: MetaVarType
+    }
     {-! derive: Binary !-}
 
 instance Eq MetaVar where
@@ -116,7 +121,7 @@ tassocToAp TAssoc { typeCon = con, typeClassArgs = cas, typeExtraArgs = eas } = 
 
 -- Unquantified type variables
 
-data Tyvar = Tyvar { tyvarName ::  !Name, tyvarKind :: Kind }
+data Tyvar = Tyvar { tyvarName ::  {-# UNPACK #-} !Name, tyvarKind :: Kind }
     {-  derive: Binary -}
 
 instance Show Tyvar where
