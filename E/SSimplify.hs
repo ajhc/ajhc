@@ -293,7 +293,6 @@ data SimplifyOpts = SimpOpts {
     so_boundVarsCache :: IdSet,
     so_cachedScope :: Env
     }
-    {- derive: Monoid -}
 
 emptySimplifyOpts = SimpOpts { so_noInlining  = False
                              , so_finalPhase  = False

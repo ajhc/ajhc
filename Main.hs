@@ -619,10 +619,11 @@ compileModEnv cho = do
         --compileToHs prog
         exitSuccess
 
-    wdump FD.CoreBeforelift $ printProgram prog
+    wdump FD.CoreBeforelift $ dumpCore "before-lift" prog
     prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift } prog
 
-    wdump FD.CoreAfterlift $ printProgram prog
+    wdump FD.CoreAfterlift $ dumpCore "after-lift" prog
+
 
     finalStats <- Stats.new
 
@@ -695,7 +696,8 @@ compileToGrin prog = do
     stats <- Stats.new
     progress "Converting to Grin..."
     prog <- return $ atomizeApps True prog
-    wdump FD.CoreMangled $ printProgram prog
+    --wdump FD.CoreMangled $ printProgram prog
+    wdump FD.CoreMangled $ dumpCore "mangled" prog
     x <- Grin.FromE.compile prog
     when verbose $ Stats.print "Grin" Stats.theStats
     wdump FD.GrinInitial $ do dumpGrin "initial" x
@@ -765,7 +767,7 @@ dumpFinalGrin grin = do
         let dot = graphGrin grin
             fn = optOutName options
         writeFile (fn ++ "_grin.dot") dot
-    dumpGrin "final" grin
+    wdump FD.GrinFinal $ dumpGrin "final" grin
 
 
 
