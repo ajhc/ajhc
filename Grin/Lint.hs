@@ -16,10 +16,12 @@ import Grin.Grin
 import Grin.Show
 import Options
 import Support.FreeVars
+import Support.CanType
 import Support.Transform
 import Support.Compat
 import Util.Gen
 import Util.SetLike
+import Text.Printf
 import qualified FlagDump as FD
 import qualified Stats
 
@@ -42,18 +44,112 @@ typecheckGrin grin = do
     mapM_ putErrLn  errs
     unless (null errs || optKeepGoing options) $ fail "There were type errors!"
 
+{-# NOINLINE dumpGrin #-}
 dumpGrin pname grin = do
-    let fn = optOutName options ++ "_" ++ pname ++ ".grin"
-    putErrLn $ "Writing: " ++ fn
-    h <- openFile fn  WriteMode
     (argstring,sversion) <- getArgString
-    hPutStrLn h $ unlines [ "-- " ++ argstring,"-- " ++ sversion,""]
-    hPrintGrin h grin
-    hClose h
+
+    let fn ext action = do
+            let oname = optOutName options ++ "_" ++ pname ++ "." ++ ext
+            putErrLn $ "Writing: " ++ oname
+            h <- openFile oname WriteMode
+            action h
+            hClose h
+    fn "grin" $ \h -> do
+        hPutStrLn h $ unlines [ "-- " ++ argstring,"-- " ++ sversion,""]
+        hPrintGrin h grin
+    wdump FD.GrinDatalog $ fn "datalog" $ \h -> do
+        hPutStrLn h $ unlines [ "% " ++ argstring,"% " ++ sversion,""]
+        hPrintGrinDL h grin
     wdump FD.Grin $ do
         putErrLn $ "v-- " ++ pname ++ " Grin"
         printGrin grin
         putErrLn $ "^-- " ++ pname ++ " Grin"
+
+
+class DShow a where
+    dshow :: a -> String
+
+instance DShow String where
+    dshow s = '\'':f s where
+        f ('\'':rs) = "''" ++ f rs
+        f (x:xs) = x:f xs
+        f [] = "'"
+
+instance DShow Tag where
+    dshow s = '\'':f (show s) where
+        f ('\'':rs) = "''" ++ f rs
+        f (x:xs) = x:f xs
+        f [] = "'"
+
+instance DShow Var where
+    dshow v = dshow (show v)
+
+instance DShow Ty where
+    dshow v | v == tyINode = "'inode'"
+            | v == tyDNode = "'dnode'"
+            | otherwise = "'unknown'"
+
+funArg n i = show n ++ "@arg@" ++ show i
+funRet n i = show n ++ "@ret@" ++ show i
+
+
+printFunc h n (l :-> e) = do
+    hPrintf h "func(%s,%i).\n" (dshow n) (length l)
+    forM_ (zip naturals l) $ \ (i,Var v t) -> do
+        hPrintf h "perform(assign,%s,%s).\n" (dshow v) (dshow $ funArg n i)
+        hPrintf h "what(%s,funarg).\n" (dshow $ funArg n i)
+        hPrintf h "typeof(%s,%s).\n" (dshow $ funArg n i) (dshow t)
+        hPrintf h "typeof(%s,%s).\n" (dshow v) (dshow t)
+    let rts = getType e
+        lts = [ (t,funRet n i) | t <- rts | i <- naturals ]
+    mapM_ (hPrintf h "what(%s,funret).\n" . dshow) (snds lts)
+    mapM_ (\ (t,n) -> hPrintf h "typeof(%s,%s).\n" (dshow n) (dshow t)) lts
+    printDL h n (map (Left . snd) lts) e
+
+hPrintGrinDL :: Handle -> Grin -> IO ()
+hPrintGrinDL h grin = do
+    let cafs = grinCafs grin
+    when (not $ null cafs) $ do
+        hPutStrLn h "% cafs"
+        mapM_ (\ (x,y) -> hPrintf h "what(%s,'caf').\ntypeof(%s,inode).\n" (dshow x) (dshow x))  cafs
+    hPutStrLn h "% functions"
+    forM_ (grinFuncs grin) $ \ (n,l :-> e) -> printFunc h n (l :-> e)
+
+bindUnknown h l = do
+    mapM_ (\x -> hPrintf h "unknown(%s,'bindUnknown').\n" (dshow x)) (freeVars l :: [Var])
+
+printDL h n fs e = f fs e where
+    f fs (x :>>= l :-> y) = do
+        f (map Right l) x
+        f fs y
+    f bs (Return vs) = do zipWithM_ (assign "assign") bs vs
+    f [b] (Store x) = do assign "store" b x
+    f [b] (Fetch x) = do assign "fetch" b x
+    f [b] (App ev [x] _) | ev == funcEval  = do assign "eval" b x
+    f b (App fn as ty) = do
+        forM_ (zip naturals as) $ \ (i,a) -> do
+            assign "assign" (Left $ funArg fn i) a
+        forM_ (zip naturals b) $ \ (i,a) -> do
+            genAssign "assign" a (Left $ funRet fn i)
+    f b   (Case v ls) = mapM_ (\l -> f b (Return [v] :>>= l)) ls
+    f b Let { expDefs = defs, expBody = body } = do
+
+        f b body
+
+    f bs e = do
+        zipWithM_ (assign "assign") bs (map ValUnknown (getType e))
+
+    assign op b v = genAssign op b (Right v)
+
+    genAssign :: String -> Either String Val -> Either String Val -> IO ()
+    genAssign op (Left b) (Left l) = hPrintf h "perform(%s,%s,%s).\n" op (dshow b) (dshow l)
+    genAssign op (Right (Var v1 _)) (Left l) = hPrintf h "perform(%s,%s,%s).\n" op (dshow v1) (dshow l)
+    genAssign op (Left b) (Right (Var v _)) = hPrintf h "perform(%s,%s,%s).\n" op (dshow b) (dshow v)
+    genAssign op (Right (Var v1 _)) (Right (Var v2 _)) = hPrintf h "perform(%s,%s,%s).\n" op (dshow v1) (dshow v2)
+    genAssign op (Left b) rv = hPrintf h "unknown(%s,%s).\n" (dshow b) (dshow $ show rv)
+    genAssign op (Right b) rv =  bindUnknown h b
+
+
 
 
 transformGrin :: TransformParms Grin -> Grin -> IO Grin

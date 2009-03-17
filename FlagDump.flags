@@ -61,7 +61,7 @@ e-size       print the size of E after each pass
 tags list of all tags and their types
 steps show interpreter go
 grin dump all grin to the screen
-
+grin-datalog print out grin information in a format suitable for loading into a database
 grin-preeval show grin code just before eval/apply inlining
 grin-posteval show grin code just before eval/apply inlining
 grin-initial grin right after conversion from core
