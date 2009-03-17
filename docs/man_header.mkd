@@ -1,0 +1,10 @@
+
+# NAME
+
+    jhc - jhc haskell compiler
+
+# SYNOPSIS
+
+    jhc [OPTION ..] Main.hs -o main
+
+

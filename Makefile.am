@@ -107,10 +107,6 @@ jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES) StringTable/Atom.hs $(CFILES)
 jhcp: Main.hs $(BUILT_SOURCES) $(HSFILES) StringTable/Atom.hs $(CFILES)
 	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< $(CFILES) -o $@
 
-jhc.1: drift_processed/Options.hs
-	$(MAKE) $(AM_MAKEFLAGS) jhc$(EXEEXT)
-	help2man -N --output=jhc.1 ./jhc$(EXEEXT)
-
 dist_man_MANS = jhc.1
 
 install-exec-hook:
@@ -169,17 +165,6 @@ bin-dist: jhc
 	gzip -f -- $(BINDISTDIR).tar
 	rm -rf -- $(BINDISTDIR)
 
-rpmbuild: jhc.spec dist
-	cp jhc-$(VERSION).tar.gz $(HOME)/var/rpm/SOURCES/jhc-$(VERSION).tar.gz
-	rpmbuild -ba $<
-
-rpm: rpmbuild
-	mkdir -p drop
-	mv jhc-$(VERSION).tar.gz drop/jhc-$(VERSION).tar.gz
-	mv ~/var/rpm/RPMS/*/jhc-$(VERSION)-$(RPMRELEASE).*.rpm drop
-	mv ~/var/rpm/SRPMS/jhc-$(VERSION)-$(RPMRELEASE).src.rpm drop
-
-publish:
 
 .INTERMEDIATE: deps.txt
 .DELETE_ON_ERROR: deps.txt depend.make ChangeLog data/shortchange.txt
@@ -250,12 +235,18 @@ publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/in
 manual: utils/stitch.prl FlagDump.mkd FlagOpts.mkd options.mkd
 	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl > manual.mkd
 
+jhc_man.mkd: utils/stitch.prl FlagDump.mkd FlagOpts.mkd options.mkd docs/man_header.mkd
+	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > $@
+
 options.mkd: jhc
 	echo "{-@Options 1" > $@
 	./jhc --help | sed -e 's/^/    /'  >> $@
 
 manual.html : manual
-	pandoc manual.mkd --toc -s -f markdown -t html -s -c wiki.css -o $@
+	pandoc manual.mkd --toc -s -f markdown -t html -s -c manual.css -o $@
+
+jhc.1 : jhc_man.mkd
+	pandoc $< -s -f markdown -t man -s  -o $@
 
 libs: $(JHC_LIBS)
 

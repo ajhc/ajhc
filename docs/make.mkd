@@ -1,5 +1,33 @@
 {-#Using
 
+# Building Projects
+
+Jhc does its own dependency chasing to track down source files, you need only
+provide it with the file containing your 'main' function on the command line.
+For instance, if you had a program 'HelloWorld.hs', the following would compile
+it to an executable named 'hello'.
+
+    ; jhc -v HelloWorld.hs -o hello
+
+Libraries are built by passing jhc a file describing the library via the
+--build-hl option. The file format is a simplified version of the cabal format.
+The name of the generated file will be <basename>-<version>.hl.
+
+    ; jhc -v --build-hl mylibrary.cabal
+
+
+# installing and using libraries
+
+jhc libraries are distributed as files with an 'hl' suffix, such as
+'base-1.0.hl'. You simply need to drop this file somewhere that jhc can find
+it. for instance, $HOME/lib/jhc. You can then set $JHCLIBPATH to said
+directory, or specify it on the command line with the '-L' option. Extra
+libraries are specified on the command line with the '-p' option.
+
+    ; jhc -v -L/home/john/devel/jhc -pmylibrary MyProgram.hs -o myprogram
+
+
+
 # Building Projects With make
 
 Using make to build projects with jhc is straightforward, simply add a line like the following in your Makefile
@@ -8,14 +36,7 @@ Using make to build projects with jhc is straightforward, simply add a line like
     % : %.hs
             jhc -v $< -o $@
 
-If you wish jhc to automatically generate dependency information, you can do the following
-
-    % : %.hs
-            jhc --deps depend.make -v $< -o $@
-
-    -include depend.make
-
-
+Or, to build a library, something similar to this will do.
 
     %.hl : %.cabal
             jhc -v --build-hl $< -o $@

@@ -3,7 +3,12 @@
 use strict;
 use warnings;
 
-my @order = qw(
+use Getopt::Std;
+
+my %o;
+getopts('h:c:',\%o) or die "unknown option";
+
+my @order = $o{c} ? split /,/,$o{c} : qw(
     Using
     Options
     Pragmas
@@ -33,6 +38,14 @@ foreach my $fn (@ARGV) {
 
 foreach (keys %s) {
     $h{$_}{text} = join "\n",map { $_->[1] } sort { $a->[0] <=> $b->[0] } @{$s{$_}};
+}
+
+print "% Jhc User's Manual\n";
+print "% John Meacham\n\n";
+
+if($o{h}) {
+    open my $h,"<",$o{h} or die "$!: couldn't open $o{h}";
+    print (<$h>);
 }
 
 foreach(@order) {
