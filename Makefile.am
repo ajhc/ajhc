@@ -53,11 +53,15 @@ JHC_LIBS =  base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl
 EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
 	     StringTable/StringTable_cbits.c StringTable/StringTable_cbits.h cbits/md5sum.c jhc.1 \
-	     StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal lib/containers.cabal
+	     StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal lib/containers.cabal \
+	     manual.html
 
 CC = $(HC)
 
-dist-hook:
+# we recreate the manual and man page here just to ensure they are up to date
+dist-hook: jhc_man manual
+	cp $(srcdir)/manual.html $(distdir)/manual.html
+	cp $(srcdir)/jhc.1 $(distdir)/jhc.1
 	find $(distdir)  -name _darcs -o -name \*.ho | xargs rm -rf --
 
 install-data-hook: $(JHC_LIBS)
@@ -184,7 +188,7 @@ built-sources: $(BUILT_SOURCES)
 i: $(BUILT_SOURCES)
 	$(HC) --interactive $(GHCOPTS) Main.hs $(CFILES)
 
-.PHONY: ho-clean hl-clean built-sources i update-datestamp manual
+.PHONY: ho-clean hl-clean built-sources i update-datestamp manual jhc_man
 
 ho-clean:
 	rm -f -- `find -name \*.ho`
@@ -229,24 +233,26 @@ haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 	pandoc $<  -f markdown -t html >> $@
 	cat $(srcdir)/docs/my_footer.shtml >> $@
 
-publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml manual.html
+publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml manual.html docs/manual.css
 	cp -- $^ /home/john/public_html/computer/jhc
 
 manual: utils/stitch.prl FlagDump.mkd FlagOpts.mkd options.mkd
 	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl > manual.mkd
+	pandoc manual.mkd --toc -s -f markdown -t html -s -c manual.css -o $@
 
-jhc_man.mkd: utils/stitch.prl FlagDump.mkd FlagOpts.mkd options.mkd docs/man_header.mkd
-	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > $@
+man: utils/stitch.prl FlagDump.mkd FlagOpts.mkd options.mkd docs/man_header.mkd
+	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
+	pandoc jhc_man.mkd -s -f markdown -t man -s  -o jhc.1
 
 options.mkd: jhc
 	echo "{-@Options 1" > $@
 	./jhc --help | sed -e 's/^/    /'  >> $@
 
-manual.html : manual
-	pandoc manual.mkd --toc -s -f markdown -t html -s -c manual.css -o $@
+jhc.1 :
+	$(MAKE) jhc_man
 
-jhc.1 : jhc_man.mkd
-	pandoc $< -s -f markdown -t man -s  -o $@
+manual.html :
+	$(MAKE) manual
 
 libs: $(JHC_LIBS)
 
