@@ -41,12 +41,14 @@ HSFILES=C/Arch.hs C/Generate.hs CharIO.hs Cmm/Number.hs Cmm/OpEval.hs DerivingDr
 
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
-GHCPROFOPTS=   -prof -auto-all -osuf prof.o -hisuf prof.hi
+GHCPROFOPTS= -prof -auto-all -osuf prof.o -hisuf prof.hi
 GHCINC=  -i -i$(srcdir)/drift_processed  \
 	 -i$(srcdir)/.  -i$(builddir) -odir $(builddir) -hidir $(builddir)
-PACKAGES= -package mtl  -package unix  -ignore-package lang -package utf8-string -package binary -package zlib
-GHCLANG=    -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
-GHCOPTS=  $(HSOPTS) -fbang-patterns -O -ignore-package lang  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
+PACKAGES= -package fgl -package regex-compat -package random -package array -package readline -package directory \
+          -package bytestring -package binary -package pretty -package base -package mtl -package containers  \
+	  -package unix  -package haskell98 -package utf8-string -package binary -package zlib
+GHCLANG= -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
+GHCOPTS= $(HSOPTS) -fbang-patterns -O -hide-all-packages  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
 JHC_LIBS =  base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl
 
