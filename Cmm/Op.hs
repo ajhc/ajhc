@@ -365,6 +365,8 @@ instance IsOperator BinOp where
 
 instance IsOperator UnOp where
     isCheap _ = True
+    isEagerSafe Sin = False
+    isEagerSafe Sqrt = False
     isEagerSafe _ = True
 
 

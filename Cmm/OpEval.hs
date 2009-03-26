@@ -88,6 +88,9 @@ binOp bop t1 t2 tr e1 e2 str | Just (v1,t1) <- toConstant e1, Just (v2,t2) <- to
             FDiv -> return $ toExpression (v1 / v2) str
             _ -> Nothing
     f FMul v1 v2 = return $ toExpression (v1 * v2) str
+    f FDiv v1 v2 | v2 /= 0 = return $ toExpression (v1 / v2) str
+    f FAdd v1 v2 = return $ toExpression (v1 + v2) str
+    f FSub v1 v2 = return $ toExpression (v1 - v2) str
     f FPwr v1 v2 = return $ toExpression (realToFrac (realToFrac v1 ** realToFrac v2 :: Double)) str
 
     f op v1 v2 | Just v <- Map.lookup op ops = return $ toBool (v1 `v` v2) where
@@ -192,6 +195,10 @@ unOp op t1 tr e str | Just (v,t) <- toConstant e = f op v where
     f Neg v = return $ toExpression (negate v) str
     f FNeg v = return $ toExpression (negate v) str
     f FAbs v = return $ toExpression (abs v) str
+    f Sin v = return $ toExpression (realToFrac $ sin (realToFrac v :: Double)) str
+    f Cos v = return $ toExpression (realToFrac $ cos (realToFrac v :: Double)) str
+    f Tan v = return $ toExpression (realToFrac $ tan (realToFrac v :: Double)) str
+    f Sqrt v = return $ toExpression (realToFrac $ sqrt (realToFrac v :: Double)) str
     f _ _ = Nothing
 unOp op t1 tr e str = Nothing
 
