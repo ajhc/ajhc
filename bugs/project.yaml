@@ -12,5 +12,35 @@ components:
   name: optimizer
 - !ditz.rubyforge.org,2008-03-06/component 
   name: front_end
-releases: []
-
+releases: 
+- !ditz.rubyforge.org,2008-03-06/release 
+  name: 0.6.0
+  status: :released
+  release_time: 2009-03-27 08:22:13.520019 Z
+  log_events: 
+  - - 2009-03-27 08:22:03.507070 Z
+    - John Meacham <john@repetae.net>
+    - created
+    - ""
+  - - 2009-03-27 08:22:13.520034 Z
+    - John Meacham <john@repetae.net>
+    - released
+    - ""
+- !ditz.rubyforge.org,2008-03-06/release 
+  name: 0.7.0
+  status: :unreleased
+  release_time: 
+  log_events: 
+  - - 2009-03-27 08:23:04.267831 Z
+    - John Meacham <john@repetae.net>
+    - created
+    - ""
+- !ditz.rubyforge.org,2008-03-06/release 
+  name: 1.0.0
+  status: :unreleased
+  release_time: 
+  log_events: 
+  - - 2009-03-27 08:23:38.978338 Z
+    - John Meacham <john@repetae.net>
+    - created
+    - ""
