@@ -1,6 +1,5 @@
 module Grin.Show(
     prettyFun,
-    prettyVal,
     prettyExp,
     printGrin,
     hPrintGrin,
@@ -39,7 +38,7 @@ import qualified FlagDump as FD
 
 
 instance DocLike d => PPrint d Val   where
-    pprint v = prettyVal v
+    pprintAssoc _ _ v = prettyVal v
 
 
 instance PPrint Doc Exp   where
@@ -141,7 +140,7 @@ prettyVal (ValPrim aprim args ty) = f aprim args where
     f aprim [] = pprint aprim <> text "::" <> tshow ty
     f (APrim (Op (Op.BinOp bo _ _) _) _) [x,y] | Just (op,prec) <- Op.binopInfix bo = parens (pprintPrec prec x <+> text op <+> pprintPrec prec y)
     f (APrim (Op (Op.BinOp bo _ _) _) _) [x,y] =  parens $ pprintPrec 1 x <+> char '`' <> tshow bo <> char '`' <+> pprintPrec 1 y
-    f aprim xs = pprint aprim <> tupled (map tshow xs) <> text "::" <> tshow ty
+    f aprim xs = pprint aprim <> tupled (map prettyVal xs) <> text "::" <> tshow ty
 
 instance DocLike d => PPrint d Var where
     pprint (V i) = text $ 'v':show i
