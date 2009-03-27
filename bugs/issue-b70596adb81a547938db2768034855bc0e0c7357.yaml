@@ -1,0 +1,20 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: module exports arn't tested for ambiguity
+desc: |-
+  The export list for modules is not checked for ambiguous or missing names.
+  valid ones are correctly handled, but invalid ones are silently ignored.
+type: :bugfix
+component: front_end
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2009-03-27 09:07:45.731508 Z
+references: []
+
+id: b70596adb81a547938db2768034855bc0e0c7357
+log_events: 
+- - 2009-03-27 09:07:47.572498 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
