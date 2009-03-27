@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: show pre-renamed source code when reporting type errors
+desc: When printing the context in which an error occured, we should print out the source code using unqualified names as written, rather than what it looks like post-renaming
+type: :feature
+component: user_interface
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2009-03-27 01:07:37.746968 Z
+references: []
+
+id: 3d23981eef30f8639272158a5a32743cdc23def6
+log_events: 
+- - 2009-03-27 01:07:43.683237 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

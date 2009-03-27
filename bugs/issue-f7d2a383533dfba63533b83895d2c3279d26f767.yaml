@@ -1,0 +1,22 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: The renamer should be able to disambiguate method names
+desc: When writing an instance for a class, the method names should always be renamed to match the class, as it is, they can generate errors if they are not in scope or ambiguous.
+type: :bugfix
+component: front_end
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2009-03-27 04:14:20.929152 Z
+references: []
+
+id: f7d2a383533dfba63533b83895d2c3279d26f767
+log_events: 
+- - 2009-03-27 04:14:24.852834 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
+- - 2009-03-27 04:15:07.713985 Z
+  - John Meacham <john@repetae.net>
+  - assigned to component front_end from jhc
+  - ""

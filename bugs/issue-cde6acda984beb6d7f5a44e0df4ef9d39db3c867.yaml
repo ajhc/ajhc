@@ -1,0 +1,28 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: unused return value of a function in grin should be elided
+desc: when the return value of a grin function is not used, we should modify the function to not return anything.
+type: :feature
+component: optimizer
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2009-03-27 01:13:31.785342 Z
+references: []
+
+id: cde6acda984beb6d7f5a44e0df4ef9d39db3c867
+log_events: 
+- - 2009-03-27 01:13:33.953475 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
+- - 2009-03-27 01:28:11.170035 Z
+  - John Meacham <john@repetae.net>
+  - edited title
+  - ""
+- - 2009-03-27 01:39:11.288564 Z
+  - John Meacham <john@repetae.net>
+  - commented
+  - "The following warning from the C compiler could be a sign this issue is affecting your code\n\
+    hruska_ray_code.c: In function \xE2\x80\x98ftheMain\xE2\x80\x99:\n\
+    hruska_ray_code.c:1976: warning: statement with no effect"

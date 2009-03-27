@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: We should populate the grin TypeEnv only with entries that actually exist in the generated code
+desc: The type enviornment created as initTyEnv in Grin.FromE currently slurps the entire dataTable, this not only wastes work but misses conjured types such as absurd and box that may occur in the code. We should utilize the same mechanism we use to add new funciton types to only add constructor types that are needed.
+type: :bugfix
+component: jhc
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2009-03-27 04:07:34.808322 Z
+references: []
+
+id: 316512487a0533307c6c362afd1f1b6c19d288a3
+log_events: 
+- - 2009-03-27 04:07:38.394373 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
