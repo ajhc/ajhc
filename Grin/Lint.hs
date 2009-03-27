@@ -85,9 +85,12 @@ instance DShow Var where
     dshow v = dshow (show v)
 
 instance DShow Ty where
-    dshow v | v == tyINode = "'inode'"
-            | v == tyDNode = "'dnode'"
-            | otherwise = "'unknown'"
+    dshow v = dshow $ show v
+
+
+instance (DShow a,DShow b) => DShow (Either a b) where
+    dshow (Left x) = dshow x
+    dshow (Right x) = dshow x
 
 funArg n i = show n ++ "@arg@" ++ show i
 funRet n i = show n ++ "@ret@" ++ show i
@@ -115,29 +118,42 @@ hPrintGrinDL h grin = do
     hPutStrLn h "% functions"
     forM_ (grinFuncs grin) $ \ (n,l :-> e) -> printFunc h n (l :-> e)
 
-bindUnknown h l = do
-    mapM_ (\x -> hPrintf h "unknown(%s,'bindUnknown').\n" (dshow x)) (freeVars l :: [Var])
+bindUnknown h l r = do
+    mapM_ (\ (x,t) -> when (tyInteresting t) $ setUnknown h x r) (Set.toList $ freeVars l :: [(Var,Ty)])
+
+setUnknown :: DShow a => Handle -> a -> String -> IO ()
+setUnknown h x r = do hPrintf h "unknown(%s,%s).\n" (dshow x) (dshow r)
+
+
 
 printDL h n fs e = f fs e where
     f fs (x :>>= l :-> y) = do
         f (map Right l) x
         f fs y
     f bs (Return vs) = do zipWithM_ (assign "assign") bs vs
-    f [b] (Store x) = do assign "store" b x
-    f [b] (Fetch x) = do assign "fetch" b x
+    f [Left b] (Store (NodeC n vs)) = hPrintf h "store(%s,%s,%s).\n" (dshow b) (dshow n) (if tagIsWHNF n then "true" else "false")
+    f [Right (Var b _)] (Store (NodeC n vs)) = hPrintf h "store(%s,%s,%s).\n" (dshow b) (dshow n) (if tagIsWHNF n then "true" else "false")
+    f [b] (Store x@Var {}) = do assign "demote" b x
+    f [b] (Fetch x@Var {}) = do assign "promote" b x
     f [b] (App ev [x] _) | ev == funcEval  = do assign "eval" b x
     f b (App fn as ty) = do
         forM_ (zip naturals as) $ \ (i,a) -> do
             assign "assign" (Left $ funArg fn i) a
         forM_ (zip naturals b) $ \ (i,a) -> do
             genAssign "assign" a (Left $ funRet fn i)
-    f b   (Case v ls) = mapM_ (\l -> f b (Return [v] :>>= l)) ls
+    f b (Case v ls) = mapM_ (\l -> f b (Return [v] :>>= l)) ls
     f b Let { expDefs = defs, expBody = body } = do
-
+        forM_ defs $ \d -> printFunc h (funcDefName d) (funcDefBody d)
+        forM_ defs $ \d -> hPrintf h "subfunc(%s,%s).\n" (dshow $ funcDefName d) (dshow n)
         f b body
+    f b Error {} = return ()
+    f b Call { expValue = Item fn _, expArgs =  as, expType = ty} = do
+        forM_ (zip naturals as) $ \ (i,a) -> do
+            assign "assign" (Left $ funArg fn i) a
+        forM_ (zip naturals b) $ \ (i,a) -> do
+            genAssign "assign" a (Left $ funRet fn i)
 
-    f bs e = do
-        zipWithM_ (assign "assign") bs (map ValUnknown (getType e))
+    f bs e = do zipWithM_ (assign "assign") bs (map ValUnknown (getType e))
 
     assign op b v = genAssign op b (Right v)
 
@@ -146,9 +162,11 @@ printDL h n fs e = f fs e where
     genAssign op (Right (Var v1 _)) (Left l) = hPrintf h "perform(%s,%s,%s).\n" op (dshow v1) (dshow l)
     genAssign op (Left b) (Right (Var v _)) = hPrintf h "perform(%s,%s,%s).\n" op (dshow b) (dshow v)
     genAssign op (Right (Var v1 _)) (Right (Var v2 _)) = hPrintf h "perform(%s,%s,%s).\n" op (dshow v1) (dshow v2)
-    genAssign op (Left b) rv = hPrintf h "unknown(%s,%s).\n" (dshow b) (dshow $ show rv)
-    genAssign op (Right b) rv =  bindUnknown h b
+    genAssign op (Left b) (Right v) = when (tyInteresting $ getType v) $ setUnknown h b (show v)
+    genAssign op (Right b) rv =  bindUnknown h b (take 20 $ show rv)
 
+
+tyInteresting ty = ty == TyNode || ty == tyINode
 
 
 
