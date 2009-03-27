@@ -516,9 +516,12 @@ simplifyDs prog sopts dsIn = ans where
     f cont v | Just (e,t) <- from_unsafeCoerce v =
         makeRange t >>= \t' -> f (g t' cont) e where g t' (Coerce _ cont) = Coerce t' cont ; g t' cont = Coerce t' cont
     f cont ep@EPrim {} = do
-        ep' <- primOpt' (progDataTable prog) ep
+        ep' <- performPrimOpt ep
         ep'' <- dosub ep'
         done cont ep''
+    f cont (ELit lc@LitCons { litArgs = xs }) = do
+        xs' <- mapM performPrimOpt xs
+        dosub (ELit lc { litArgs = xs' }) >>= done cont
     f cont e@ELit {} = dosub e >>= done cont
     f cont (ELam v e)  = do
         addNames [tvrIdent v]

@@ -88,7 +88,6 @@ binOp bop t1 t2 tr e1 e2 str | Just (v1,t1) <- toConstant e1, Just (v2,t2) <- to
             FDiv -> return $ toExpression (v1 / v2) str
             _ -> Nothing
     f FMul v1 v2 = return $ toExpression (v1 * v2) str
-    f FDiv v1 v2 | v2 /= 0 = return $ toExpression (v1 / v2) str
     f FAdd v1 v2 = return $ toExpression (v1 + v2) str
     f FSub v1 v2 = return $ toExpression (v1 - v2) str
     f FPwr v1 v2 = return $ toExpression (realToFrac (realToFrac v1 ** realToFrac v2 :: Double)) str

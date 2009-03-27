@@ -365,8 +365,6 @@ instance IsOperator BinOp where
 
 instance IsOperator UnOp where
     isCheap _ = True
-    isEagerSafe Sin = False
-    isEagerSafe Sqrt = False
     isEagerSafe _ = True
 
 
@@ -378,6 +376,7 @@ instance IsOperator ConvOp where
 instance IsOperator (Op v) where
     isCheap (BinOp o _ _) = isCheap o
     isCheap (UnOp o _) = isCheap o
+    isCheap (ConvOp o _) = isCheap o
     isCheap _ = False
     isEagerSafe (BinOp o _ _) = isEagerSafe o
     isEagerSafe (UnOp o _) = isEagerSafe o

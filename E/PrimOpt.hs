@@ -1,5 +1,5 @@
 module E.PrimOpt(
-    primOpt',
+    performPrimOpt,
     processPrimPrim
     ) where
 
@@ -109,21 +109,31 @@ cextra _ _ = ""
 
 primConv cop t1 t2 e rt = EPrim (APrim (Op (Op.ConvOp cop t1) t2) mempty) [e] rt
 
-primOpt' dataTable  e@(EPrim (APrim s _) xs t) = do
+
+performPrimOpt (ELit lc@LitCons { litArgs = xs }) = do
+    xs' <- mapM performPrimOpt xs
+    primOpt' (ELit lc { litArgs = xs' })
+performPrimOpt (EPrim ap xs t) = do
+    xs' <- mapM performPrimOpt xs
+    primOpt' (EPrim ap xs' t)
+performPrimOpt e = return e
+
+
+primOpt' e@(EPrim (APrim s _) xs t) = do
     let primopt (Op (Op.BinOp bop t1 t2) tr) [e1,e2] rt = binOp bop t1 t2 tr e1 e2 rt
         primopt (Op (Op.ConvOp cop t1) t2) [ELit (LitInt n t)] rt = return $ ELit (LitInt (convNumber cop t1 t2 n) rt)
         primopt (Op (Op.ConvOp cop t1) t2) [e1] rt = case convOp cop t1 t2 of
             Nothing | getType e1 == rt -> return e1
             Just cop' | cop' /= cop -> return $ primConv cop' t1 t2 e1 rt
-            _ -> fail "could noUnt apply conversion optimization"
+            _ -> fail "couldn't apply conversion optimization"
         primopt (Op (Op.UnOp bop t1) tr) [e1] rt = unOp bop t1 tr e1 rt
         primopt _ _ _ = fail "No Primitive optimization to apply"
     case primopt s xs t of
         Just n -> do
             mtick (toAtom $ "E.PrimOpt." ++ braces (pprint s) ++ cextra s xs )
-            primOpt' dataTable  n
+            primOpt' n
         Nothing -> return e
-primOpt' _ e = return e
+primOpt' e = return e
 
 instance Expression E E where
     toBool True = ELit lTruezh
