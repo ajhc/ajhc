@@ -662,26 +662,27 @@ constructionExpression _ n e = error $ "constructionExpression: error in " ++ sh
 
 deconstructionExpression ::
     UniqueProducer m
-    => DataTable -- ^ table of data constructors
-    -> Name   -- ^ name of said constructor
-    -> E      -- ^ type of pattern
-    -> [TVr]  -- ^ variables to be bound
-    -> E      -- ^ body of alt
+    => DataTable  -- ^ table of data constructors
+    -> Name       -- ^ name of said constructor
+    -> E          -- ^ type of pattern
+    -> [TVr]      -- ^ variables to be bound
+    -> E          -- ^ body of alt
     -> m (Alt E)  -- ^ resulting alternative
 deconstructionExpression dataTable name typ@(ELit LitCons { litName = pn, litArgs = xs }) vs  e | pn == conName pc = ans where
     Just mc = getConstructor name dataTable
     Just pc = getConstructor (conInhabits mc) dataTable
+    sub = substMap $ fromDistinctAscList [ (i,sl) | sl <- xs | i <- anonymousIds ]
     ans = case conVirtual mc of
         Just _ -> return $ let ELit LitCons {  litArgs = [ELit (LitInt n t)] } = conExpr mc in Alt (LitInt n t) e
         Nothing -> do
             let f vs (SlotExistential t:ss) rs ls = f vs ss (t:rs) ls
-                f (v:vs) (SlotNormal e:ss) rs ls = f vs ss (v:rs) ls
+                f (v:vs) (SlotNormal _:ss) rs ls = f vs ss (v:rs) ls
                 f (v:vs) (SlotUnpacked e n es:ss) rs ls = do
                     let g t = do
                             s <- newUniq
                             return $ tVr (anonymous s) t
-                    as <- mapM g es
-                    f vs ss (reverse as ++ rs) ((v,ELit litCons { litName = n, litArgs = map EVar as, litType = e }):ls)
+                    as <- mapM g (map sub es)
+                    f vs ss (reverse as ++ rs) ((v,ELit litCons { litName = n, litArgs = map EVar as, litType = sub e }):ls)
                 f [] [] rs ls = return $ Alt (litCons { litName = name, litArgs = reverse rs, litType = typ }) (eLetRec ls e)
                 f _ _ _ _ = error "DataConstructors.deconstructuonExpression.f"
             f vs (conOrigSlots mc) [] []
