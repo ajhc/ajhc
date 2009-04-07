@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: support newtype deriving
+desc: support newtype deriving, it can not only signifigantly cut down on the number of stub instance functions, but is just a darn useful extension
+type: :feature
+component: language
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2009-04-07 23:49:02.586233 Z
+references: []
+
+id: 5170bab4ef2248a3604acd03f9f3b9578e998fd4
+log_events: 
+- - 2009-04-07 23:49:04.170214 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

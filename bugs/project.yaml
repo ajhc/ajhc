@@ -12,6 +12,10 @@ components:
   name: optimizer
 - !ditz.rubyforge.org,2008-03-06/component 
   name: front_end
+- !ditz.rubyforge.org,2008-03-06/component 
+  name: libraries
+- !ditz.rubyforge.org,2008-03-06/component 
+  name: language
 releases: 
 - !ditz.rubyforge.org,2008-03-06/release 
   name: 0.6.0
