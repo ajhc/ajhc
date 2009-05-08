@@ -78,4 +78,3 @@ grin-final final grin before conversion to C
 progress     show basic progress indicators
 stats        show extra information about stuff
 html         use html escape codes in output
-square-stats use square corners rather than curved ones, for compatibility
