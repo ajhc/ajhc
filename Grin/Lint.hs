@@ -132,7 +132,7 @@ printDL h n fs e = f fs e where
         f fs y
     f bs (Return vs) = do zipWithM_ (assign "assign") bs vs
     f [Left b] (Store (NodeC n vs)) = hPrintf h "store(%s,%s,%s).\n" (dshow b) (dshow n) (if tagIsWHNF n then "true" else "false")
-    f [Right (Var b _)] (Store (NodeC n vs)) = hPrintf h "store(%s,%s,%s).\n" (dshow b) (dshow n) (if tagIsWHNF n then "true" else "false")
+    f [Right (Var b _)] (Store (NodeC n vs)) = hPrintf h "store(%s,%s,%s).\n" (dshow b) (dshow n) (if tagIsWHNF n then "true" else "false") >> app n vs
     f [b] (Store x@Var {}) = do assign "demote" b x
     f [b] (Fetch x@Var {}) = do assign "promote" b x
     f [b] (App ev [x] _) | ev == funcEval  = do assign "eval" b x
@@ -154,6 +154,12 @@ printDL h n fs e = f fs e where
             genAssign "assign" a (Left $ funRet fn i)
 
     f bs e = do zipWithM_ (assign "assign") bs (map ValUnknown (getType e))
+    app n as | Just (0,fn) <- tagUnfunction n = do
+        hPrintf h "lazyfunc(%s).\n" (dshow fn)
+        forM_ (zip naturals as) $ \ (i,a) -> do
+            assign "assign" (Left $ funArg fn i) a
+    app _ _ = return ()
+
 
     assign op b v = genAssign op b (Right v)
 
@@ -161,9 +167,10 @@ printDL h n fs e = f fs e where
     genAssign op (Left b) (Left l) = hPrintf h "perform(%s,%s,%s).\n" op (dshow b) (dshow l)
     genAssign op (Right (Var v1 _)) (Left l) = hPrintf h "perform(%s,%s,%s).\n" op (dshow v1) (dshow l)
     genAssign op (Left b) (Right (Var v _)) = hPrintf h "perform(%s,%s,%s).\n" op (dshow b) (dshow v)
+    genAssign op (Left b) (Right (Const {})) = hPrintf h "perform(%s,%s,%s).\n" op (dshow b) "const"
     genAssign op (Right (Var v1 _)) (Right (Var v2 _)) = hPrintf h "perform(%s,%s,%s).\n" op (dshow v1) (dshow v2)
-    genAssign op (Left b) (Right v) = when (tyInteresting $ getType v) $ setUnknown h b (show v)
-    genAssign op (Right b) rv =  bindUnknown h b (take 20 $ show rv)
+    genAssign op (Left b) (Right v) = when (tyInteresting $ getType v) $ setUnknown h b (show (op,v))
+    genAssign op (Right b) rv =  bindUnknown h b (take 20 $ show (op,rv))
 
 
 tyInteresting ty = ty == TyNode || ty == tyINode
