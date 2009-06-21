@@ -1,5 +1,5 @@
 
---  $Id: GenUtil.hs,v 1.52 2007/05/25 23:54:08 john Exp $
+--  $Id: GenUtil.hs,v 1.53 2009/06/04 04:39:15 john Exp $
 -- arch-tag: 835e46b7-8ffd-40a0-aaf9-326b7e347760
 
 
@@ -760,7 +760,7 @@ tokens p = filter (not.null) . split p
 buildTable ::  [String] -> [(String,[String])] -> String
 buildTable ts rs = bt [ x:xs | (x,xs) <- ("",ts):rs ] where
     bt ts = unlines (map f ts) where
-        f xs = intercalate " " [  es n s | s <- xs | n <- cw ]
+        f xs = intercalate " " (zipWith es cw xs)
         cw = [ maximum (map length xs) | xs <- transpose ts]
     es n s = replicate (n - length s) ' ' ++ s
 
