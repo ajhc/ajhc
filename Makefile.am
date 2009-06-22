@@ -64,7 +64,7 @@ EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) \
 CC = $(HC)
 
 # we recreate the manual and man page here just to ensure they are up to date
-dist-hook: jhc_man manual
+dist-hook: man manual
 	cp $(srcdir)/manual.html $(distdir)/manual.html
 	cp $(srcdir)/jhc.1 $(distdir)/jhc.1
 	find $(distdir)  -name _darcs -o -name \*.ho | xargs rm -rf --
@@ -195,7 +195,7 @@ built-sources: $(BUILT_SOURCES)
 i: $(BUILT_SOURCES)
 	$(HC) --interactive $(GHCOPTS) Main.hs $(CFILES)
 
-.PHONY: ho-clean hl-clean built-sources i update-datestamp manual jhc_man
+.PHONY: ho-clean hl-clean built-sources i update-datestamp manual man
 
 ho-clean:
 	rm -f -- `find -name \*.ho`
@@ -256,7 +256,7 @@ options.mkd: jhc
 	./jhc --help | sed -e 's/^/    /'  >> $@
 
 jhc.1 :
-	$(MAKE) jhc_man
+	$(MAKE) man
 
 manual.html :
 	$(MAKE) manual
