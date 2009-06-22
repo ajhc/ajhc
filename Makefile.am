@@ -217,7 +217,7 @@ applicative-1.0.hl: lib/applicative/applicative.cabal base-1.0.hl
 
 containers-0.2.0.hl: lib/containers.cabal base-1.0.hl applicative-1.0.hl
 	mkdir -p tmp/libho
-	./jhc -v $(RTSOPTS) $(JHC_TEST)  -Ilib/containers/include --ho-dir tmp/libho -ilib/containers  --noauto -L- -L. -p base -p applicative --build-hl lib/containers.cabal -fcpp -o $@
+	./jhc -v $(RTSOPTS) $(JHC_TEST) -Idata -Ilib/containers/include --ho-dir tmp/libho -ilib/containers  --noauto -L- -L. -p base -p applicative --build-hl lib/containers.cabal -fcpp -o $@
 
 haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 	mkdir -p tmp/libho
