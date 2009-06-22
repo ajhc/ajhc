@@ -11,7 +11,7 @@ SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
 BUILT_SOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs \
 	       FlagOpts.hs Name/Prim.hs Info/Properties.hs $(DRIFTFILES)
 
-MY_CINCLUDES= -I$(srcdir)/StringTable -I$(srcdir)/cbits -I$(builddir)/cbits
+MY_CINCLUDES= -I$(srcdir)/data -I$(srcdir)/StringTable -I$(srcdir)/cbits -I$(builddir)/cbits
 MY_CFLAGS= $(MY_CINCLUDES) -optc-std=c99 -optc-O2 -optc-Wall
 
 HSFILES=C/Arch.hs C/Generate.hs CharIO.hs Cmm/Number.hs Cmm/OpEval.hs DerivingDrift/DataP.hs \
