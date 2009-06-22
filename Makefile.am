@@ -53,6 +53,8 @@ GHCOPTS= $(HSOPTS) -fbang-patterns -O -hide-all-packages  $(GHCDEBUGOPTS) $(GHCI
 
 JHC_LIBS =  base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl
 
+.PHONY: $(JHC_LIBS)
+
 EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
 	     StringTable/StringTable_cbits.c StringTable/StringTable_cbits.h cbits/md5sum.c jhc.1 \
@@ -66,6 +68,8 @@ dist-hook: jhc_man manual
 	cp $(srcdir)/manual.html $(distdir)/manual.html
 	cp $(srcdir)/jhc.1 $(distdir)/jhc.1
 	find $(distdir)  -name _darcs -o -name \*.ho | xargs rm -rf --
+
+all-local: libs
 
 install-data-hook: $(JHC_LIBS)
 	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@
@@ -213,7 +217,7 @@ applicative-1.0.hl: lib/applicative/applicative.cabal base-1.0.hl
 
 containers-0.2.0.hl: lib/containers.cabal base-1.0.hl applicative-1.0.hl
 	mkdir -p tmp/libho
-	./jhc -v $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/containers  --noauto -L- -L. -p base -p applicative --build-hl lib/containers.cabal -fcpp -o $@
+	./jhc -v $(RTSOPTS) $(JHC_TEST)  -Ilib/containers/include --ho-dir tmp/libho -ilib/containers  --noauto -L- -L. -p base -p applicative --build-hl lib/containers.cabal -fcpp -o $@
 
 haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 	mkdir -p tmp/libho
@@ -257,6 +261,7 @@ jhc.1 :
 manual.html :
 	$(MAKE) manual
 
+.PHONY: libs
 libs: $(JHC_LIBS)
 
 helloworld: test/HelloWorld.hs jhc
