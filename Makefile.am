@@ -46,7 +46,8 @@ GHCINC=  -i -i$(srcdir)/drift_processed  \
 	 -i$(srcdir)/.  -i$(builddir) -odir $(builddir) -hidir $(builddir)
 PACKAGES= -package fgl -package regex-compat -package random -package array -package readline -package directory \
           -package bytestring -package binary -package pretty -package base -package mtl -package containers  \
-	  -package unix  -package haskell98 -package utf8-string -package binary -package zlib
+	  -package unix  -package haskell98 -package utf8-string -package binary -package zlib \
+      -package base-4.0.0.0 -package syb
 GHCLANG= -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
 GHCOPTS= $(HSOPTS) -fbang-patterns -O -hide-all-packages  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
