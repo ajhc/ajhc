@@ -27,16 +27,121 @@ import Control.Monad.Error()    -- IO MonadPlus instance
 import Control.Monad.Identity
 import Control.Monad.Reader
 import qualified Data.Set as S
+import qualified Data.Map as M
 import Data.List(nub)
 import System
 import System.Console.GetOpt
 import System.IO.Unsafe
 
+import Support.IniParse
 import Util.Gen
 import qualified FlagDump
 import qualified FlagOpts
 import Version.Config
 import Version.Version(versionString)
+
+
+{-@Cross Compilation
+
+# Basics
+
+Unlike many other compilers, jhc is a native cross compiler. What this means is
+that every compile of jhc is able to create code for all possible target
+systems. This leads to many simplifications when it comes to cross compiling
+with jhc. Basically in order to cross compile, you need only pass the flag
+'--cross' to jhc, and pass an appropriate '-m' option to tell jhc what machine
+you are targetting. The targets list is extensible at run-time via the
+targets.ini file explained below.
+
+# targets.ini
+
+This file determines what targets are available. The format consists of entries as follows.
+
+  [targetname]
+  key1=value
+  key2=value
+  key3+=value
+  merge=targetname2
+
+merge is a special key meaning to merge the contents of another target into the
+current one. The configuration file is read in order, and the final value set
+for a given key is the one that is used.
+
+An example describing how to cross compile for windows is as follows:
+
+  [win32]
+  gcc=i386-mingw32-gcc
+  cflags+=-mwindows -mno-cygwin
+  executable_extension=.exe
+  merge=i686
+
+This sets the compiler to use as well as a few other options then jumps to the
+generic i686 routine. The special target [default] is always read before all
+other targets. If '--cross' is specified on the command line then this is the
+only implicitly included configuration, otherwise jhc will assume you are
+compiling for the current architecture and choose an appropriate target to
+include in addition to default.
+
+jhc will attempt to read several targets.ini files in order. they are 
+
+<installprefix>/etc/jhc-<version>/targets.ini 
+: this is the targets.ini that is included with jhc and contains the default options.
+
+<installprefix>/etc/jhc-<version>/targets-local.ini 
+: jhc will read this if it exists, it is used to specify custom system wide configuration options, such as the name of local compilers.
+
+$HOME/.jhc/targets.ini
+: this is where a users local configuration information goes.
+
+$HOME/etc/jhc/targets.ini
+: this is simply for people that prefer to not use hidden directories for configuration
+
+The last value specified for an option is the one used, so a users local
+configuration overrides the system local version which overrides the built in
+options.
+
+# Options available
+
+cc
+: what c compiler to use. generally this will be gcc for local builds and <arch>-<os>-gcc for cross compiles
+
+byteorder
+: one of le or be for little or big endian
+
+gc
+: what garbage collector to use. It should be one of 'static' or 'boehm'.
+
+cflags
+: options to pass to the c compiler
+
+cflags_debug
+: options to pass to the c compiler only when debugging is enabled
+
+cflags_nodebug
+: options to pass to the c compiler only when debugging is disabled
+
+profile
+: whether to include profiling code in the generated executable
+
+autoload
+: what haskell libraries to autoload, seperated by commas.
+
+executable_extension
+: specifies an extension that should be appended to executable files, (i.e. .EXE on windows)
+
+merge
+: a special option that merges the contents of another configuration target into the currrent one.
+
+bits:
+: the number of bits a pointer contains on this architecture
+
+bits_max
+: the number of bits in the largest integral type. should be the number of bits in the 'intmax_t' C type.
+
+arch
+: what to pass to gcc as the architecture
+
+-}
 
 data Mode = BuildHl String -- ^ Build the specified hl-file given a description file.
           | Interactive    -- ^ Run interactively.
@@ -76,7 +181,8 @@ data Opt = Opt {
     optStale       ::  [String],  -- ^ treat these modules as stale
     optKeepGoing   :: !Bool,      -- ^ Keep going when encountering errors.
     optMainFunc    ::  Maybe (Bool,String),    -- ^ Entry point name for the main function.
-    optArch        ::  Maybe String,           -- ^ target architecture
+    optArch        ::  [String],           -- ^ target architecture
+    optCross       ::  Bool,
     optOutName     ::  String,                 -- ^ Name of output file.
     optPrelude     :: !Bool,                   -- ^ No implicit Prelude.
     optIgnoreHo    :: !Bool,                   -- ^ Ignore ho-files.
@@ -85,6 +191,7 @@ data Opt = Opt {
     optFollowDeps  :: !Bool,                   -- ^ Don't follow dependencies, all deps must be loaded from packages or specified on the command line.
     optVerbose     :: !Int,                    -- ^ Verbosity
     optStatLevel   :: !Int,                    -- ^ Level to print statistics
+    optInis        ::  M.Map String String,    -- ^ options read from ini files
     optDumpSet     ::  S.Set FlagDump.Flag,    -- ^ Dump flags.
     optFOptsSet    ::  S.Set FlagOpts.Flag     -- ^ Flag options (-f\<opt\>).
   } {-!derive: update !-}
@@ -94,6 +201,7 @@ opt = Opt {
     optMode        = CompileExe,
     optColumns     = getColumns,
     optDebug       = False,
+    optCross       = False,
     optIncdirs     = initialIncludes,
     optHls         = [],
     optHlPath      = initialLibIncludes,
@@ -113,7 +221,7 @@ opt = Opt {
     optNoWriteHo   = False,
     optKeepGoing   = False,
     optMainFunc    = Nothing,
-    optArch        = Nothing,
+    optArch        = ["default"],
     optOutName     = "hs.out",
     optPrelude     = True,
     optFollowDeps  = True,
@@ -142,16 +250,17 @@ theoptions =
     , Option ['I'] []            (ReqArg (optIncs_u . idu) "DIR")       "add to preprocessor include path"
     , Option ['D'] []            (ReqArg (\d -> optDefs_u (d:)) "NAME=VALUE") "add new definitions to set in preprocessor"
     , Option []    ["optc"]      (ReqArg (optCCargs_u . idu) "option") "extra options to pass to c compiler"
-    , Option []    ["progc"]     (ReqArg (\d -> optCC_s d) "gcc")      "c compiler to use"
-    , Option []    ["arg"]       (ReqArg (\d -> optProgArgs_u (++ [d])) "arg") "arguments to pass interpreted program"
+--    , Option []    ["progc"]     (ReqArg (\d -> optCC_s d) "gcc")      "c compiler to use"
+--    , Option []    ["arg"]       (ReqArg (\d -> optProgArgs_u (++ [d])) "arg") "arguments to pass interpreted program"
     , Option ['N'] ["noprelude"] (NoArg  (optPrelude_s False))         "no implicit prelude"
     , Option ['C'] []            (NoArg  (optMode_s CompileHoGrin))    "Typecheck, compile ho and grin"
     , Option ['c'] []            (NoArg  (optMode_s CompileHo))        "Typecheck and compile ho"
-    , Option []    ["interpret"] (NoArg  (optMode_s Interpret))        "interpret"
+ --   , Option []    ["interpret"] (NoArg  (optMode_s Interpret))        "interpret"
     , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))        "keep going on errors"
+    , Option []    ["cross"]     (NoArg  (optCross_s True))            "enable cross-compilation, choose target with the -m flag"
     , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output"
     , Option []    ["main"]      (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point"
-    , Option ['m'] ["arch"]      (ReqArg (optArch_s . Just ) "arch")            "target architecture"
+    , Option ['m'] ["arch"]      (ReqArg (optArch_u . idu ) "arch")      "target architecture options"
     , Option []    ["entry"]     (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression"
     , Option ['e'] []            (ReqArg (\d -> optStmts_u (d:)) "<statement>")  "run given statement as if on jhci prompt"
     , Option []    ["debug"]     (NoArg  (optDebug_s True))            "debugging"
@@ -231,9 +340,14 @@ processOptions = do
     when (optMode o2 == ShowConfig) $ do
         mapM_ (\ (x,y) -> putStrLn (x ++ ": " ++ y))  configs
         exitSuccess
+    Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME" 
+    inis <- parseIniFiles (optVerbose o2 > 0) ["data/targets.ini", confDir ++ "/targets.ini", confDir ++ "/targets-local.ini", home ++ "/etc/jhc/targets.ini", home ++ "/.jhc/targets.ini"] (optArch o2)
+    when (FlagDump.Ini `S.member` optDumpSet o2) $ flip mapM_ (M.toList inis) $ \(a,b) -> putStrLn (a ++ "=" ++ b)
+    let autoloads = maybe [] (tokens (',' ==)) (M.lookup "autoload" inis)
+        o3 = o2 { optArgs = ns, optInis = inis }
     case optNoAuto o2 of
-      True -> return (o2 { optArgs = ns })
-      False-> return (o2 { optArgs = ns, optHls  = ("base":"haskell98":optHls o2) })
+      True -> return o3
+      False-> return o3 {  optHls  = (autoloads ++ optHls o2) }
 
 a ==> b = (a,show b)
 
@@ -294,6 +408,7 @@ initialIncludes = unsafePerformIO $ do
     p <- lookupEnv "JHCPATH"
     let x = maybe "" id p
     return (".":(tokens (== ':') x))
+
 
 -- | Include directories taken from JHCLIBPATH enviroment variable.
 initialLibIncludes :: [String]

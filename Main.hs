@@ -527,7 +527,7 @@ compileModEnv cho = do
 
     --wdump FD.Core $ printProgram prog
 
-    prog <- if (fopts FO.TypeAnalysis) then do 
+    prog <- if (fopts FO.TypeAnalysis) then do
       transformProgram transformParms { transformCategory = "typeAnalyzeMethods",
                                         transformOperation = typeAnalyze False,
                                         transformDumpProgress = dump FD.Progress }
@@ -782,17 +782,17 @@ compileGrinToC grin = do
     let (cg,rls) = FG2.compileGrin grin
     let fn = optOutName options
     let cf = (fn ++ "_code.c")
+    let lup k = maybe "" id $ Map.lookup k (optInis options)
     progress ("Writing " ++ show cf)
     (argstring,sversion) <- getArgString
     let
-        boehmOpts | fopts FO.Boehm = ["-D_JHC_GC=2", "-lgc"]
+        boehmOpts | fopts FO.Boehm || lup "gc" == "boehm"  = ["-D_JHC_GC=2", "-lgc"]
                   | otherwise = []
-        profileOpts | fopts FO.Profile = ["-D_JHC_PROFILE=1"]
-                  | otherwise = []
-        comm = shellQuote $ [optCC options, "-std=gnu99", "-D_GNU_SOURCE", "-falign-functions=4", "-ffast-math"
-                            , "-Wshadow", "-Wextra", "-Wall", "-Wno-unused-parameter", "-o", fn, cf ] ++
+        profileOpts | fopts FO.Profile || lup "profile" == "true" = ["-D_JHC_PROFILE=1"]
+                    | otherwise = []
+        comm = shellQuote $ [lup "cc"] ++ words (lup "cflags") ++ ["-o", fn, cf] ++
                             (map ("-l" ++) rls) ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
-        debug = if fopts FO.Debug then ["-g"] else ["-DNDEBUG", "-O3", "-fomit-frame-pointer"]
+        debug = if fopts FO.Debug then words (lup "cflags_debug") else words (lup "cflags_nodebug")
         globalvar n c = "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" sversion,"",cg]
     progress ("Running: " ++ comm)

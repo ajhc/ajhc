@@ -121,7 +121,7 @@ archOpTy ai s = case Op.readTy s of
 
 
 determineArch = do
-    let specs = maybe [] (split (== '-')) (optArch options)
+    let specs = maybe [] (split (== '-')) (Just "") -- (optArch options)
         (backendGhc,specs') | ("ghc":rs) <- specs = (True,rs)
                             | ("grin":rs) <- specs = (False,rs)
                             | ("fgrin":rs) <- specs = (False,rs)

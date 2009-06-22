@@ -7,6 +7,7 @@ the '-d' flag. The following is a list of possible parameters you can pass to
 '-d'.
 
 !Front End
+ini all ini configuration options
 preprocessed code after preprocessing/deliting
 renamed code after uniqueness renaming
 parsed  parsed code
