@@ -44,6 +44,7 @@ GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -auto-all -osuf prof.o -hisuf prof.hi
 GHCINC=  -i -i$(srcdir)/drift_processed  \
 	 -i$(srcdir)/.  -i$(builddir) -odir $(builddir) -hidir $(builddir)
+
 PACKAGES= -package fgl -package regex-compat -package random -package array -package readline -package directory \
           -package bytestring -package binary -package pretty -package base -package mtl -package containers  \
 	  -package unix  -package haskell98 -package utf8-string -package binary -package zlib \
@@ -74,11 +75,13 @@ all-local: libs
 install-data-hook: $(JHC_LIBS)
 	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@
 	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include
+	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@
 	for lib in $(JHC_LIBS); do  \
 		test -f "$$lib" && $(INSTALL_DATA) $$lib $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 		test -f "$(srcdir)/$$lib" && $(INSTALL_DATA) "$(srcdir)/$$lib" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 	done
 	$(INSTALL_DATA) "$(srcdir)/data/HsFFI.h" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include ;
+	$(INSTALL_DATA) "$(srcdir)/data/targets.ini" $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@ ;
 
 uninstall-hook: $(JHC_LIBS)
 	rm -f -- "$(DESTDIR)$(bindir)/jhci$(EXTEXT)"

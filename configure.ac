@@ -1,11 +1,11 @@
-AC_INIT([jhc],[0.6.0])
+AC_INIT([jhc],[0.6.1])
 AC_CONFIG_SRCDIR(Main.hs)
 AC_CONFIG_MACRO_DIR(ac-macros)
 AC_CONFIG_AUX_DIR(ac-macros)
 AM_INIT_AUTOMAKE([foreign no-dependencies std-options])
 
-REVISION=20090304
-SHORTVERSION=0.5
+REVISION=20090622
+SHORTVERSION=0.6
 
 AC_CANONICAL_HOST
 
@@ -30,10 +30,12 @@ fi
 AC_PROGRAM_REQUIRE(hsc2hs,hsc2hs,     [  --with-hsc2hs=<hsc2hs location>    Specify location of hsc2hs.])
 
 jlibpath=${datadir}/$PACKAGE-$SHORTVERSION
+jetcpath=${sysconfdir}/$PACKAGE-$SHORTVERSION
 
 AC_DEFINE_DIR(LIBDIR,libdir)
 AC_DEFINE_DIR(DATADIR,datadir)
 AC_DEFINE_DIR(JLIBPATH,jlibpath)
+AC_DEFINE_DIR(JETCPATH,jetcpath)
 
 AX_CREATE_STDINT_H([cbits/_stdint.h])
 
@@ -46,5 +48,6 @@ AC_SUBST(SHORTVERSION)
 AC_SUBST(REVISION)
 AC_SUBST(BYTE_ORDER)
 AC_SUBST(JLIBPATH)
+AC_SUBST(JETCPATH)
 AC_CONFIG_FILES([Makefile jhc.spec Version/Config.hs docs/building.mkd cbits/config.h])
 AC_OUTPUT
