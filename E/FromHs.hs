@@ -81,8 +81,6 @@ newVars xs = f xs [] where
         s <- newUniq
         f xs (tVr (anonymous s) x:ys)
 
-eArrow t1 t2  =  EPi (tVr emptyId t1) t2
-
 tipe t = f t where
     f (TAp (TAp (TCon arr) a1) a2) | tyconName arr == tc_Arrow = f (TArrow a1 a2)
     f (TAp t1 t2) = eAp (f t1) (f t2)

@@ -878,7 +878,8 @@ nodeStructName a = toName ('s':fromAtom a)
 
 generateArchAssertions :: String
 generateArchAssertions = unlines (h:map f (filter notVoid as) ++ [t]) where
-    (_,_,as,_) = unsafePerformIO determineArch
+--    (_,_,as,_) = unsafePerformIO determineArch
+    as = []
     notVoid pt = primTypeName pt /= "void"
     f pt = printf "      assert(sizeof(%s) == %d);" (primTypeName pt) (primTypeSizeOf pt)
     h = "static void\njhc_arch_assert(void)\n{"

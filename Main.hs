@@ -522,8 +522,8 @@ compileModEnv cho = do
     prog <- transformProgram transformParms { transformCategory = "PruneUnreachable", transformOperation = evaluate . programPruneUnreachable } prog
     prog <- barendregtProg prog
 
-    (viaGhc,fn,_,_) <- determineArch
-    wdump FD.Progress $ putStrLn $ "Arch: " ++ fn
+--    (viaGhc,fn,_,_) <- determineArch
+--    wdump FD.Progress $ putStrLn $ "Arch: " ++ fn
 
     --wdump FD.Core $ printProgram prog
 
@@ -613,11 +613,11 @@ compileModEnv cho = do
     prog <- barendregtProg prog
     prog <- return $ runIdentity $ programMapBodies (return . cleanupE) prog
 
-    when viaGhc $ do
-        wdump FD.Core $ printProgram prog
-        fail "Compiling to GHC currently disabled"
+--    when viaGhc $ do
+ --       wdump FD.Core $ printProgram prog
+ --       fail "Compiling to GHC currently disabled"
         --compileToHs prog
-        exitSuccess
+ --       exitSuccess
 
     wdump FD.CoreBeforelift $ dumpCore "before-lift" prog
     prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift } prog
@@ -780,9 +780,9 @@ compileGrinToC grin | optMode options == Interpret = fail "Interpretation curren
 compileGrinToC grin | optMode options /= CompileExe = return ()
 compileGrinToC grin = do
     let (cg,rls) = FG2.compileGrin grin
-    let fn = optOutName options
-    let cf = (fn ++ "_code.c")
-    let lup k = maybe "" id $ Map.lookup k (optInis options)
+        fn = optOutName options ++ lup "executable_extension"
+        cf = (fn ++ "_code.c")
+        lup k = maybe "" id $ Map.lookup k (optInis options)
     progress ("Writing " ++ show cf)
     (argstring,sversion) <- getArgString
     let

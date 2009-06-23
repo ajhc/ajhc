@@ -46,15 +46,19 @@ GHCINC=  -i -i$(srcdir)/drift_processed  \
 	 -i$(srcdir)/.  -i$(builddir) -odir $(builddir) -hidir $(builddir)
 
 PACKAGES= -package fgl -package regex-compat -package random -package array -package readline -package directory \
+          -package bytestring -package binary -package pretty -package base -package mtl -package containers   \
+	  -package unix  -package haskell98 -package utf8-string  -package zlib
+
+PACKAGES_OLD= -package regex-compat -package random -package array -package directory \
           -package bytestring -package binary -package pretty -package base -package mtl -package containers  \
-	  -package unix  -package haskell98 -package utf8-string -package binary -package zlib \
-      -package base-4.0.0.0 -package syb
+	  -package unix  -package haskell98 -package utf8-string  -package zlib \
+	  -package base -package syb  -package readline -package fgl
+
 GHCLANG= -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
 GHCOPTS= $(HSOPTS) -fbang-patterns -O -hide-all-packages  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
 JHC_LIBS =  base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl
 
-.PHONY: $(JHC_LIBS)
 
 EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
