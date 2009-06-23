@@ -12,7 +12,6 @@ import qualified List(group,union)
 import qualified System
 
 import Util.Util
-import C.Arch
 import CharIO
 import DataConstructors
 import Doc.DocLike

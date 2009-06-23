@@ -12,7 +12,6 @@ import qualified Data.Set as Set
 import qualified Data.Map as Map
 
 import StringTable.Atom
-import C.Arch
 import C.FFI hiding(Primitive)
 import C.Prims
 import Control.Monad.Identity

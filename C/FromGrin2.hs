@@ -15,7 +15,6 @@ import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
 
 
-import C.Arch
 import C.FFI
 import C.Generate
 import C.Prims

@@ -178,6 +178,11 @@ readTy ('f':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintFloat
 readTy ('c':rs) = do TyBits x _ <- readTy rs; return $ TyBits x HintCharacter
 readTy _ = fail "readTy: not type"
 
+stringToOpTy ::  String -> Ty
+stringToOpTy s = case readTy s of
+    Just t -> t
+    _ -> error $ "stringToOpTy: " ++ show s
+
 bool = TyBool
 bits_ptr = TyBits (BitsArch BitsPtr) HintNone
 bits_max = TyBits (BitsArch BitsMax) HintNone

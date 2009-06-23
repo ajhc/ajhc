@@ -14,7 +14,7 @@ BUILT_SOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.h
 MY_CINCLUDES= -I$(srcdir)/data -I$(srcdir)/StringTable -I$(srcdir)/cbits -I$(builddir)/cbits
 MY_CFLAGS= $(MY_CINCLUDES) -optc-std=c99 -optc-O2 -optc-Wall
 
-HSFILES=C/Arch.hs C/Generate.hs CharIO.hs Cmm/Number.hs Cmm/OpEval.hs DerivingDrift/DataP.hs \
+HSFILES=C/Generate.hs CharIO.hs Cmm/Number.hs Cmm/OpEval.hs DerivingDrift/DataP.hs \
 	DerivingDrift/Drift.hs DerivingDrift/RuleUtils.hs Doc/Attr.hs Doc/Chars.hs Doc/DocLike.hs \
 	Doc/PPrint.hs Doc/Pretty.hs E/Annotate.hs E/Binary.hs E/Diff.hs E/E.hs E/Eta.hs E/Eval.hs \
 	E/FreeVars.hs E/FromHs.hs E/Inline.hs E/LetFloat.hs E/PrimOpt.hs E/Program.hs E/Rules.hs \

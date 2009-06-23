@@ -14,7 +14,6 @@ module PrimitiveOperators(
 
 import Data.Monoid
 
-import C.Arch
 import C.Prims
 import E.E
 import E.TypeCheck()
@@ -25,6 +24,7 @@ import Name.Prim
 import Name.VConsts
 import Support.CanType
 import qualified Cmm.Op as Op
+import Cmm.Op(stringToOpTy)
 import Name.Id
 
 rawType s = ELit litCons { litName = toName RawType s, litType = eHash }

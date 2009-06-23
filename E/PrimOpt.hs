@@ -10,7 +10,6 @@ import Maybe
 
 import StringTable.Atom
 import C.Prims
-import C.Arch
 import Cmm.OpEval
 import DataConstructors
 import Data.Monoid
@@ -24,6 +23,7 @@ import Stats
 import Support.CanType
 import Support.FreeVars
 import qualified Cmm.Op as Op
+import Cmm.Op(stringToOpTy)
 
 
 {-@Extensions
