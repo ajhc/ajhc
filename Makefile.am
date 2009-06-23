@@ -37,7 +37,8 @@ HSFILES=C/Generate.hs CharIO.hs Cmm/Number.hs Cmm/OpEval.hs DerivingDrift/DataP.
 	Util/Gen.hs Util/Graph.hs Util/Graphviz.hs Util/HasSize.hs Util/Histogram.hs Util/Inst.hs \
 	Util/IntBag.hs Util/Interact.hs Util/NameMonad.hs Util/Once.hs Util/Perhaps.hs Util/ReaderWriter.hs \
 	Util/Relation.hs Util/RWS.hs Util/SameShape.hs Util/Seq.hs Util/SetLike.hs Util/UnionFind.hs \
-	Util/UnionSolve.hs Util/UniqueMonad.hs Util/Util.hs Util/VarName.hs Version/Config.hs Version/Version.hs
+	Util/UnionSolve.hs Util/UniqueMonad.hs Util/Util.hs Util/VarName.hs Version/Config.hs Version/Version.hs \
+	Support/IniParse.hs
 
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
@@ -56,7 +57,7 @@ GHCOPTS= $(HSOPTS) -fbang-patterns -O @GHCFLAGS@  $(GHCDEBUGOPTS) $(GHCINC) $(PA
 JHC_LIBS =  base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl
 
 
-EXTRA_DIST = data utils arch docs FrontEnd/HsParser.y $(BUILT_SOURCES) \
+EXTRA_DIST = data utils docs FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
 	     StringTable/StringTable_cbits.c StringTable/StringTable_cbits.h cbits/md5sum.c jhc.1 \
 	     StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal lib/containers.cabal \
