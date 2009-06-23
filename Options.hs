@@ -41,7 +41,7 @@ import Version.Config
 import Version.Version(versionString)
 
 
-{-@Cross Compilation
+{-@CrossCompilation
 
 # Basics
 
@@ -50,18 +50,22 @@ that every compile of jhc is able to create code for all possible target
 systems. This leads to many simplifications when it comes to cross compiling
 with jhc. Basically in order to cross compile, you need only pass the flag
 '--cross' to jhc, and pass an appropriate '-m' option to tell jhc what machine
-you are targetting. The targets list is extensible at run-time via the
-targets.ini file explained below.
+you are targetting. An example would be
+
+    ; jhc --cross -mwin32 test/HelloWorld.hs
+
+The targets list is extensible at run-time via the targets.ini file explained
+below.
 
 # targets.ini
 
 This file determines what targets are available. The format consists of entries as follows.
 
-  [targetname]
-  key1=value
-  key2=value
-  key3+=value
-  merge=targetname2
+    [targetname]
+    key1=value
+    key2=value
+    key3+=value
+    merge=targetname2
 
 merge is a special key meaning to merge the contents of another target into the
 current one. The configuration file is read in order, and the final value set
@@ -69,11 +73,11 @@ for a given key is the one that is used.
 
 An example describing how to cross compile for windows is as follows:
 
-  [win32]
-  gcc=i386-mingw32-gcc
-  cflags+=-mwindows -mno-cygwin
-  executable_extension=.exe
-  merge=i686
+    [win32]
+    gcc=i386-mingw32-gcc
+    cflags+=-mwindows -mno-cygwin
+    executable_extension=.exe
+    merge=i686
 
 This sets the compiler to use as well as a few other options then jumps to the
 generic i686 routine. The special target [default] is always read before all
@@ -82,12 +86,12 @@ only implicitly included configuration, otherwise jhc will assume you are
 compiling for the current architecture and choose an appropriate target to
 include in addition to default.
 
-jhc will attempt to read several targets.ini files in order. they are 
+jhc will attempt to read several targets.ini files in order. they are
 
-<installprefix>/etc/jhc-<version>/targets.ini 
+$PREFIX/etc/jhc-\$VERSION/targets.ini
 : this is the targets.ini that is included with jhc and contains the default options.
 
-<installprefix>/etc/jhc-<version>/targets-local.ini 
+$PREFIX/etc/jhc-\$VERSION/targets-local.ini
 : jhc will read this if it exists, it is used to specify custom system wide configuration options, such as the name of local compilers.
 
 $HOME/.jhc/targets.ini
@@ -102,44 +106,21 @@ options.
 
 # Options available
 
-cc
-: what c compiler to use. generally this will be gcc for local builds and <arch>-<os>-gcc for cross compiles
-
-byteorder
-: one of le or be for little or big endian
-
-gc
-: what garbage collector to use. It should be one of 'static' or 'boehm'.
-
-cflags
-: options to pass to the c compiler
-
-cflags_debug
-: options to pass to the c compiler only when debugging is enabled
-
-cflags_nodebug
-: options to pass to the c compiler only when debugging is disabled
-
-profile
-: whether to include profiling code in the generated executable
-
-autoload
-: what haskell libraries to autoload, seperated by commas.
-
-executable_extension
-: specifies an extension that should be appended to executable files, (i.e. .EXE on windows)
-
-merge
-: a special option that merges the contents of another configuration target into the currrent one.
-
-bits:
-: the number of bits a pointer contains on this architecture
-
-bits_max
-: the number of bits in the largest integral type. should be the number of bits in the 'intmax_t' C type.
-
-arch
-: what to pass to gcc as the architecture
+Option                    Meaning
+------                    ---------------------------------------------------------------------------
+_cc_                      what c compiler to use. generally this will be gcc for local builds and something like $ARCH-$HOST-gcc for cross compiles
+_byteorder_               one of *le* or *be* for little or big endian
+_gc_                      what garbage collector to use. It should be one of *static* or *boehm*.
+_cflags_                  options to pass to the c compiler
+_cflags\_debug_            options to pass to the c compiler only when debugging is enabled
+_cflags\_nodebug_          options to pass to the c compiler only when debugging is disabled
+_profile_                 whether to include profiling code in the generated executable
+_autoload_                what haskell libraries to autoload, seperated by commas.
+_executable\_extension_    specifies an extension that should be appended to executable files, (i.e. .EXE on windows)
+_merge_                   a special option that merges the contents of another configuration target into the currrent one.
+_bits_                    the number of bits a pointer contains on this architecture
+_bits\_max_                the number of bits in the largest integral type. should be the number of bits in the 'intmax_t' C type.
+_arch_                    what to pass to gcc as the architecture
 
 -}
 
@@ -340,7 +321,7 @@ processOptions = do
     when (optMode o2 == ShowConfig) $ do
         mapM_ (\ (x,y) -> putStrLn (x ++ ": " ++ y))  configs
         exitSuccess
-    Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME" 
+    Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME"
     inis <- parseIniFiles (optVerbose o2 > 0) ["data/targets.ini", confDir ++ "/targets.ini", confDir ++ "/targets-local.ini", home ++ "/etc/jhc/targets.ini", home ++ "/.jhc/targets.ini"] (optArch o2)
     when (FlagDump.Ini `S.member` optDumpSet o2) $ flip mapM_ (M.toList inis) $ \(a,b) -> putStrLn (a ++ "=" ++ b)
     let autoloads = maybe [] (tokens (',' ==)) (M.lookup "autoload" inis)

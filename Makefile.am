@@ -252,7 +252,7 @@ publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/in
 
 manual: utils/stitch.prl FlagDump.mkd FlagOpts.mkd options.mkd
 	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl > manual.mkd
-	pandoc manual.mkd --toc -s -f markdown -t html -s -c manual.css -o $@
+	pandoc manual.mkd --toc -s -f markdown -t html -s -c manual.css -o $@.html
 
 man: utils/stitch.prl FlagDump.mkd FlagOpts.mkd options.mkd docs/man_header.mkd
 	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
