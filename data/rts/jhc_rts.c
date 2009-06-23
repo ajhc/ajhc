@@ -89,6 +89,7 @@ jhc_case_fell_off(int n) {
 
 static HsBool A_UNUSED
 jhc_wait_for_input(FILE *f,HsInt timeout) {
+#if JHC_isPosix
         fd_set fds;
         FD_ZERO(&fds);
         FD_SET(fileno(f),&fds);
@@ -98,6 +99,9 @@ jhc_wait_for_input(FILE *f,HsInt timeout) {
                 return HS_BOOL_TRUE;
         else
                 return HS_BOOL_FALSE;
+#else
+        return HS_BOOL_FALSE;
+#endif
 
 }
 

@@ -9,10 +9,10 @@
 #include <limits.h>
 #include <locale.h>
 #include <math.h>
-#include <sys/select.h>
 #include <assert.h>
 #include <float.h>
 #ifndef __WIN32__
+#include <sys/select.h>
 #include <sys/times.h>
 #include <endian.h>
 #include <sys/utsname.h>
