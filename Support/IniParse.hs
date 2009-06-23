@@ -92,8 +92,8 @@ pHeader = do
 
 
 -- We use laziness cleverly to avoid repeating work
-processIni :: Seq.Seq (String,Seq.Seq (String,String)) -> Map.Map String (Map.Map String String)
-processIni iniRaw = ans where
+processIni :: Seq.Seq (String,Seq.Seq (String,String)) -> Map.Map String (Seq.Seq (String,String))
+processIni iniRaw = iniMap' where
     iniMap,iniMap' :: Map.Map String (Seq.Seq (String,String))
     iniMap = Map.fromListWith (flip (Seq.><)) (Seq.toList iniRaw)
     iniMap' = Map.map expandChains iniMap
@@ -101,10 +101,10 @@ processIni iniRaw = ans where
     ecp :: (String,String) -> Seq.Seq (String,String)
     ecp ("merge",v) = Map.findWithDefault Seq.empty v iniMap'
     ecp x = Seq.singleton x
-    ans = Map.map (\c -> Seq.foldl res Map.empty c) iniMap'
-    res mp (k,v) | Just r <- getPrefix "+" (reverse k) = Map.insertWith f (reverse $ dropWhile isSpace r) v mp where
-        f y x = x ++ " " ++ y
-    res mp (k,v) = Map.insert k v mp
+--    ans = Map.map (\c -> Seq.foldl res Map.empty c) iniMap'
+--    res mp (k,v) | Just r <- getPrefix "+" (reverse k) = Map.insertWith f (reverse $ dropWhile isSpace r) v mp where
+--        f y x = x ++ " " ++ y
+--    res mp (k,v) = Map.insert k v mp
 
     
 
@@ -127,8 +127,12 @@ parseIniFiles verbose fs ss = do
     let pini = processIni (foldr (Seq.><) Seq.empty fsc)
         f (x:xs) cm = case span (/= '=') x of
             (be,'=':re) -> f xs (Map.insert be re cm)
-            (be,[]) -> f xs (Map.findWithDefault Map.empty be pini `Map.union` cm)
+            (be,[]) -> f xs (Seq.foldl res cm (Map.findWithDefault Seq.empty be pini))
         f [] cm = cm
+--    ans = Map.map (\c -> Seq.foldl res Map.empty c) iniMap'
+        res mp (k,v) | Just r <- getPrefix "+" (reverse k) = Map.insertWith f (reverse $ dropWhile isSpace r) v mp where
+            f y x = x ++ " " ++ y
+        res mp (k,v) = Map.insert k v mp
     return (f ss Map.empty)
         
 
