@@ -46,16 +46,12 @@ GHCINC=  -i -i$(srcdir)/drift_processed  \
 	 -i$(srcdir)/.  -i$(builddir) -odir $(builddir) -hidir $(builddir)
 
 PACKAGES= -package fgl -package regex-compat -package random -package array -package readline -package directory \
-          -package bytestring -package binary -package pretty -package base -package mtl -package containers   \
+          -package bytestring -package binary -package pretty -package mtl -package containers   \
 	  -package unix  -package haskell98 -package utf8-string  -package zlib
 
-PACKAGES_OLD= -package regex-compat -package random -package array -package directory \
-          -package bytestring -package binary -package pretty -package base -package mtl -package containers  \
-	  -package unix  -package haskell98 -package utf8-string  -package zlib \
-	  -package base -package syb  -package readline -package fgl
 
 GHCLANG= -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
-GHCOPTS= $(HSOPTS) -fbang-patterns -O -hide-all-packages  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
+GHCOPTS= $(HSOPTS) -fbang-patterns -O @GHCFLAGS@  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
 JHC_LIBS =  base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl
 

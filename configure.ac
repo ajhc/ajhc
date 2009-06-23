@@ -27,6 +27,10 @@ if test -z "$DRIFTGHC"; then
     echo [DrIFT not found: using preprocessed files]
 fi
 
+GHC=$HC
+GHCFLAGS="-hide-all-packages -package base"
+GHC_CHECK_MODULE(Data.Generics.Instances,syb,,,[])
+
 AC_PROGRAM_REQUIRE(hsc2hs,hsc2hs,     [  --with-hsc2hs=<hsc2hs location>    Specify location of hsc2hs.])
 
 jlibpath=${datadir}/$PACKAGE-$SHORTVERSION
@@ -43,6 +47,8 @@ AX_CREATE_STDINT_H([cbits/_stdint.h])
 AC_SUBST(HC)
 AC_SUBST(HCFLAGS)
 AC_SUBST(HSC2HS)
+AC_SUBST(GHCFLAGS)
+AC_SUBST(EXTRA_PACKAGES)
 AC_SUBST(RPMRELEASE)
 AC_SUBST(SHORTVERSION)
 AC_SUBST(REVISION)
