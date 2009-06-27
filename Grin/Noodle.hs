@@ -185,6 +185,7 @@ collectFuncs exp = runWriter (cfunc exp) where
         cfunc Store {} = return mempty
         cfunc Update {} = return mempty
         cfunc Alloc {} = return mempty
+        cfunc GcRoots { expBody = b} = cfunc b
         cfunc NewRegion { expLam = l } = clfunc l
         cfunc MkCont { expCont = l1, expLam = l2 } = do
             a <- clfunc l1

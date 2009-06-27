@@ -749,15 +749,14 @@ compileToGrin prog = do
     x <- Grin.SSimplify.simplify x
 
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
-
     wdump FD.GrinPreeval $ dumpGrin "preeval" x
     x <- nodeAnalyze x
     lintCheckGrin x
     x <- createEvalApply x
     lintCheckGrin x
     x <- Grin.SSimplify.simplify x
-
     lintCheckGrin x
+    wdump FD.GrinFinal $ dumpGrin "predevolve" x
     x <- transformGrin devolveTransform x
     x <- opt "After Devolve Optimization" x
     x <- transformGrin simplifyParms x
@@ -785,7 +784,8 @@ compileGrinToC grin = do
     progress ("Writing " ++ show cf)
     (argstring,sversion) <- getArgString
     let
-        boehmOpts | fopts FO.Boehm || lup "gc" == "boehm"  = ["-D_JHC_GC=2", "-lgc"]
+        boehmOpts | fopts FO.Boehm || lup "gc" == "boehm"  = ["-D_JHC_GC=_JHC_GC_BOEHM", "-lgc"]
+                  | fopts FO.Jgc || lup "gc" == "jgc"  = ["-D_JHC_GC=_JHC_GC_JGC"]
                   | otherwise = []
         profileOpts | fopts FO.Profile || lup "profile" == "true" = ["-D_JHC_PROFILE=1"]
                     | otherwise = []

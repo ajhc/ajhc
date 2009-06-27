@@ -133,6 +133,8 @@ instance Show Var where
 
 
 
+--data VContext = Demoted Val VContext  | Promoted Val VContext | Evaled Val VContext |
+
 infixr 1  :->, :>>=
 
 
@@ -178,6 +180,8 @@ data Exp =
     | MkCont    { expCont :: Lam,                          -- ^ the continuation routine
                   expLam :: Lam,                           -- ^ the computation that is passed the newly created computation
                   expInfo :: Info.Info }                   -- ^ Make a continuation, always allocated on region encompasing expLam
+    | GcRoots   { expValues :: [Val],                  -- ^ add some new variables to the GC roots for a subcomputation
+                  expBody :: Exp }
     deriving(Eq,Show,Ord)
 
 data Val =
@@ -219,7 +223,7 @@ updateFuncDefProps fd@FuncDef { funcDefBody = body@(args :-> rest) } =  fd { fun
     props = (funcDefProps fd) { funcFreeVars = freeVars body, funcTags = freeVars body, funcType = (map getType args,getType rest) }
 
 grinFuncs grin = map (\x -> (funcDefName x, funcDefBody x)) (grinFunctions grin)
-setGrinFunctions xs _grin | flint && hasRepeatUnder fst xs = error $ "setGrinFunctions: grin has redundent defeninitions" ++ show (fsts xs)
+setGrinFunctions xs _grin | flint && hasRepeatUnder fst xs = error $ "setGrinFunctions: grin has redundent definitions" ++ show (fsts xs)
 setGrinFunctions xs grin = grin { grinFunctions = map (uncurry (createFuncDef False)) xs }
 
 
@@ -467,6 +471,7 @@ instance CanType Exp [Ty] where
     getType MkCont { expLam = _ :-> rbody } = getType rbody
     getType Call { expType = ty } = ty
     getType MkClosure { expType = ty } = ty
+    getType GcRoots { expBody = body } = getType body
 
 instance CanType Val Ty where
     getType (Var _ t) = t
@@ -526,6 +531,7 @@ instance FreeVars Exp (Set.Set Var) where
     freeVars Call { expValue = v, expArgs = as } = freeVars (v:as)
     freeVars MkClosure { expValue = v, expArgs = as, expRegion = r } = freeVars (v,as,r)
     freeVars MkCont { expCont = v, expLam = as} = freeVars (v,as)
+    freeVars GcRoots { expValues = v, expBody = b } = freeVars (v,b)
 
 instance FreeVars Exp (Set.Set (Var,Ty)) where
     freeVars (a :>>= b) = freeVars (a,b)
@@ -543,6 +549,7 @@ instance FreeVars Exp (Set.Set (Var,Ty)) where
     freeVars Call { expValue = v, expArgs = as } = freeVars (v:as)
     freeVars MkClosure { expValue = v, expArgs = as, expRegion = r } = freeVars (v,as,r)
     freeVars MkCont { expCont = v, expLam = as} = freeVars (v,as)
+    freeVars GcRoots { expValues = v, expBody = b } = freeVars (v,b)
 
 instance FreeVars Exp [Var] where
     freeVars e = Set.toList $ freeVars e
@@ -583,6 +590,7 @@ instance FreeVars Exp (Set.Set Tag) where
     freeVars Call { expValue = v, expArgs = as } = freeVars (v:as)
     freeVars MkClosure { expValue = v, expArgs = as, expRegion = r } = freeVars (v,as,r)
     freeVars MkCont { expCont = v, expLam = as} = freeVars (v,as)
+    freeVars GcRoots { expValues = v, expBody = b } = freeVars (v,b)
 
 
 lamExp (_ :-> e) = e

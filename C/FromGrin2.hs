@@ -57,6 +57,7 @@ data Written = Written {
 data Env = Env {
     rTodo :: Todo,
     rInscope :: Set.Set Name,
+    rStowed :: Set.Set Name,  -- names that the garbage collector knows about
     rDeclare :: Bool,
     rEMap :: Map.Map Atom (Name,[Expression]),
     rCPR  :: Set.Set Atom,
@@ -70,8 +71,17 @@ newtype C a = C (RWST Env Written HcHash Uniq a)
 
 
 runC :: Grin -> C a -> (a,HcHash,Written)
-runC grin (C m) =  execUniq1 (runRWST m Env { rCPR = cpr, rGrin = grin, rDeclare = False, rTodo = TodoExp [], rEMap = mempty, rInscope = mempty } emptyHcHash) where
+runC grin (C m) =  execUniq1 (runRWST m startEnv  emptyHcHash) where
     TyEnv tmap = grinTypeEnv grin
+    startEnv = Env {
+        rCPR = cpr,
+        rGrin = grin,
+        rStowed = Set.empty,
+        rDeclare = False,
+        rTodo = TodoExp [],
+        rEMap = mempty,
+        rInscope = mempty
+        }
     cpr = iw `Set.union` Set.insert cChar (Set.fromList [ a | (a,TyTy { tySlots = [s], tySiblings = Just [a'] }) <- Map.assocs tmap, a == a', isJust (good s) ])
     iw = if fopts FO.FullInt then Set.empty else Set.fromList [cInt, cWord]
     good s = do
@@ -316,7 +326,7 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == 
             return (ass & e')
             -}
         am Var {} e = return e
-        am ~(NodeC t2 _) e = do 
+        am ~(NodeC t2 _) e = do
             tellTags t2
             return $ annotate (show p2) (f_assert ((constant $ enum (nodeTagName t2)) `eq` tag) & e)
         tag = f_GETWHAT scrut
@@ -437,6 +447,11 @@ convertBody (Fetch (Index base off)) | getType base == TyPtr tyINode = do
     base <- convertVal base
     off <- convertVal off
     simpleRet (indexArray base off)
+
+convertBody (GcRoots vs b) = do
+    vs <- mapM convertVal vs
+    b' <- convertBody b
+    return $ gc_roots vs & b' & gc_end
 
 -- return, promote and demote
 convertBody (Fetch v)        | getType v == tyINode = simpleRet =<< f_promote `liftM` convertVal v
@@ -821,6 +836,8 @@ castFunc _ _ tb e = cast (opTyToC tb) e
 -- c constants and utilities
 ----------------------------
 
+gc_roots vs = functionCall (name "gc_begin_frame0") (constant (number (fromIntegral $ length vs)):vs)
+gc_end =      functionCall (name "gc_end") []
 jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
 f_assert e    = functionCall (name "assert") [e]
 f_DETAG e     = functionCall (name "DETAG") [e]

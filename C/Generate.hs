@@ -89,6 +89,7 @@ import Doc.DocLike
 import Util.Gen
 import Util.SetLike
 
+
 data Env = Env {
     envUsedLabels :: Set.Set Name,
     envInScope    :: Set.Set Name
@@ -479,6 +480,7 @@ function :: Name -> Type -> [(Name,Type)] -> [FunctionOpts] -> Statement -> Func
 function n t as o s = F n t as o s
 
 
+drawFunction :: Function -> G (Doc,Doc)
 drawFunction f = do
     frt <- draw (functionReturnType f)
     cenv <- ask

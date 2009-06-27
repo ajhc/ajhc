@@ -135,7 +135,15 @@ jhc_malloc_atomic(size_t n) {
 
 #elif _JHC_GC == _JHC_GC_JGC
 
-#error "jgc not supported yet."
+#define GC_STACK_LIMIT 8192
+static sptr_t *gc_stack_base;
+
+static inline void
+jhc_malloc_init(void) {
+        gc_stack_base = malloc(sizeof(sptr_t) * GC_STACK_LIMIT);
+}
+
+
 
 #endif
 

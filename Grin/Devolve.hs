@@ -10,10 +10,12 @@ import qualified Data.Set as Set
 import Util.Gen
 import Util.SetLike
 import Support.Transform
+import Support.CanType
 import Grin.Grin
 import Grin.Noodle
 import Support.FreeVars
-import Options (verbose)
+import Options (verbose,fopts)
+import qualified FlagOpts as FO
 
 {-# NOINLINE devolveTransform #-}
 devolveTransform = transformParms {
@@ -64,15 +66,24 @@ devolveGrin grin = do
     --if null lf then return ng else devolveGrin ng
 
 
+-- twiddle does some final clean up before translation to C
+-- it replaces unused arguments with 'v0' and adds GC notations
+
 data Env = Env {
-    envMap :: Map.Map Var Var,
-    envVar :: Var
+    envMap   :: Map.Map Var Var,
+    envRoots :: Set.Set Val,
+    envVar   :: Var
+    }
+
+data Written = Written {
+    wPotentialRoots :: Set.Set Val,
+    wIsAllocing  :: Bool
     }
 
 newtype R a = R (RWS Env (Set.Set Var) () a)
     deriving(Monad,Functor,MonadReader Env,MonadWriter (Set.Set Var))
 
-runR (R x) = fst $ evalRWS x Env { envMap = mempty, envVar = v1 } ()
+runR (R x) = fst $ evalRWS x Env { envRoots = mempty, envMap = mempty, envVar = v1 } ()
 
 
 class Twiddle a where
@@ -89,6 +100,12 @@ instance Twiddle a => Twiddle [a] where
     twiddle xs = mapM twiddle xs
 
 twiddleExp e = f e where
+    f (x :>>= lam) | fopts FO.Jgc && isAllocing x = do
+        roots <- asks envRoots
+        let nroots = Set.fromList [ Var v t | (v,t) <- Set.toList (freeVars lam), isNode t, v > v0] Set.\\ roots
+        local (\e -> e { envRoots = envRoots e `Set.union` nroots}) $ do
+            ne <- return (:>>=) `ap` twiddle x `ap` twiddle lam
+            return $ gcRoots (Set.toList nroots) ne
     f (x :>>= lam) = return (:>>=) `ap` twiddle x `ap` twiddle lam
     f l@Let {} = do
         ds <- twiddle (expDefs l)
@@ -96,6 +113,24 @@ twiddleExp e = f e where
         return . updateLetProps $ l { expDefs = ds, expBody = b }
     f (Case v as) = return Case `ap` twiddle v `ap` twiddle as
     f n = do e <- mapExpVal twiddleVal n ; mapExpExp twiddle e
+
+    isAllocing Store {} = True
+    isAllocing (Return [Var {}]) = False
+    isAllocing (Return [NodeC {}]) = True
+    isAllocing App {} = True
+    isAllocing Call {} = True
+    isAllocing Let {} = True
+    isAllocing (Case _ as) = any isAllocing [ b | _ :-> b <- as]
+    isAllocing Alloc {} = True
+    isAllocing (e :>>= _ :-> y) = isAllocing e || isAllocing y
+    isAllocing _ = False
+
+    gcRoots [] x = x
+    gcRoots xs e = GcRoots xs e
+
+    isNode TyNode = True
+    isNode (TyPtr TyNode) = True
+    isNode _ = False
 
 instance Twiddle Lam where
     twiddle (vs :-> y) = do
