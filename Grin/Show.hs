@@ -26,8 +26,6 @@ import Doc.Pretty
 import Grin.Grin
 import Grin.Noodle
 import Grin.Val
-import Name.VConsts
-import Cmm.Number
 import Options
 import Support.CanType
 import Support.FreeVars
@@ -121,7 +119,9 @@ prettyExp vl Call { expValue = Var v (TyCall fun _ _), expArgs = vs, expJump = j
     f True Function = text "jump to"
     f False Closure = text "enter"
     f True Closure = text "jump into"
+    f x y = tshow (x,y)
 prettyExp vl Call { expValue = ValPrim ap [] (TyCall Primitive' _ _), expArgs = vs } = vl <> prim (tshow ap) <+> hsep (map prettyVal vs)
+prettyExp vl y = vl <> tshow y
 
 {-# NOINLINE prettyVal #-}
 prettyVal :: DocLike d => Val -> d
