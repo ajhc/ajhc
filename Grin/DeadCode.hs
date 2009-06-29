@@ -176,7 +176,7 @@ removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps
         as <- dff' fn' as
         as <- mapM clearCaf as
         return $ Store (NodeC fn as)
-    f (Update (Var v (TyPtr TyNode)) _) | deadCaf v = do
+    f (Update (Var v TyINode) _) | deadCaf v = do
         mtick $ toAtom "Optimize.dead-code.caf-update"
         return $ Return []
     f (Update p (NodeC fn as)) |  Just fn' <- tagToFunction fn = do
@@ -196,9 +196,9 @@ removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps
             mtick $ toAtom "Optimize.dead-code.func-arg"
             return $ properHole (getType a)
         df (a,_)  = return a
-    clearCaf (Var v (TyPtr TyNode)) | deadCaf v = do
+    clearCaf (Var v TyINode) | deadCaf v = do
         mtick $ toAtom "Optimize.dead-code.caf-arg"
-        return (properHole (TyPtr TyNode))
+        return (properHole TyINode)
     clearCaf (NodeC a xs) = do
         xs <- mapM clearCaf xs
         return $ NodeC a xs

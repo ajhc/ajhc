@@ -132,7 +132,7 @@ convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C [Function]
 convertFunc ffie (n,as :-> body) = do
         s <- localTodo TodoReturn (convertBody body)
         let bt = getType body
-            mmalloc [TyPtr TyNode] = [a_MALLOC]
+            mmalloc [TyINode] = [a_MALLOC]
             mmalloc [TyNode] = [a_MALLOC]
             mmalloc _ = []
             ats = a_STD:mmalloc bt
@@ -232,8 +232,9 @@ convertTypes xs = do
     return (anonStructType xs)
 
 convertType TyNode = return wptr_t
-convertType (TyPtr TyNode) = return sptr_t
-convertType (TyPtr (TyPtr TyNode)) = return $ ptrType sptr_t
+convertType TyINode = return sptr_t
+convertType (TyPtr TyINode) = return $ ptrType sptr_t
+convertType (TyPtr TyNode) = return $ ptrType wptr_t
 convertType ~(TyPrim opty) = return (opTyToC opty)
 
 tyToC _ Op.TyBool = "bool"
@@ -393,6 +394,7 @@ convertBody (Error s t) = do
              | otherwise = toStatement $ functionCall (name "jhc_error") [string s]
     let f (TyPtr _) = return nullPtr
         f TyNode = return nullPtr
+        f TyINode = return nullPtr
         f (TyPrim x) = return $ cast (opTyToC x) (constant $ number 0)
         f x = return $ err ("error-type " ++ show x)
         g [] = return emptyExpression
@@ -537,7 +539,7 @@ convertExp (App a vs _) = do
             let ss = [ a =* v | a <- as | v <- vs' ]
             return (mconcat ss & goto nm, emptyExpression)
         Nothing -> return $ (mempty, functionCall (toName (fromAtom a)) vs')
-convertExp (Update v@(Var vv _) tn@(NodeC t as)) | getType v == TyPtr TyNode = do
+convertExp (Update v@(Var vv _) tn@(NodeC t as)) | getType v == TyINode = do
     v' <- convertVal v
     as' <- mapM convertVal as
     nt <- nodeTypePtr t
@@ -550,7 +552,7 @@ convertExp (Update v@(Var vv _) tn@(NodeC t as)) | getType v == TyPtr TyNode = d
         let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
         return (mconcat $ profile_update_inc:s:ass,emptyExpression)
 
-convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_heap, TyPtr TyNode == getType v  = do
+convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_heap, TyINode == getType v  = do
     v' <- convertVal v
     c' <- convertVal c
     tmp <- newVar (ptrType sptr_t)

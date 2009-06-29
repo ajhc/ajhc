@@ -108,7 +108,7 @@ gEval :: Val -> Exp
 gEval x = App funcEval [x] [TyNode]
 
 -- lazy node sptr_t
-tyINode = TyPtr TyNode
+tyINode = TyINode
 -- strict node wptr_t
 tyDNode = TyNode
 
@@ -131,6 +131,21 @@ newtype Var = V Int
 instance Show Var where
     showsPrec _ (V n) xs = 'v':shows n xs
 
+
+-- For historical reasons, some of the grin expressions do different things depending on the arguments type and whether it is a variable.
+--
+--
+--
+-- Store : NodeC:TyNode  -> TyINode   - this allocates a new indirect node
+-- Store : var:TyNode -> TyINode - this demotes a node to an indirect node. called 'demote'
+-- Update : var:TyINode, TyNode - this stores an indirection to the second argument in the first
+-- Update : TyPtr t, t - this sets the memory pointed to by the first argumnet to the second. it is called 'poke'
+-- Update : var:TyNode, x:TyNode - this copies the contents of the second argument over the first
+-- Update : var:TyINode, x:TyINode - this copies the contents of the second argument over the first
+-- Fetch  : TyINode -> TyNode - follow an indirection, also called 'promote'
+-- Fetch  : TyPtr t -> t - read a pointer, also called 'peek'
+--
+--
 
 
 --data VContext = Demoted Val VContext  | Promoted Val VContext | Evaled Val VContext |
@@ -185,25 +200,26 @@ data Exp =
     deriving(Eq,Show,Ord)
 
 data Val =
-    NodeC !Tag [Val]          -- ^ Complete node with constant tag
-    | Const Val               -- ^ pointer to constant data, only Lit, Tag, and NodeC may be children
+    NodeC !Tag [Val]          -- ^ Complete node, of type TyNode
+    | Const Val               -- ^ constant data, only Lit, Const and NodeC may be children. of type TyINode
     | Lit !Number Ty          -- ^ Literal
     | Var !Var Ty             -- ^ Variable
     | Unit                    -- ^ Empty value used as placeholder
     | ValPrim APrim [Val] Ty  -- ^ Primitive value
     | Index Val Val           -- ^ A pointer incremented some number of values (Index v 0) == v
     | Item Atom Ty            -- ^ Specific named thing. function, global, region, etc..
-    | ValUnknown Ty           -- ^ Unknown value
+    | ValUnknown Ty           -- ^ Unknown or unimportant value
     deriving(Eq,Ord)
 
 data Ty =
-    TyPtr Ty                 -- ^ pointer to a heap location which contains its argument
-    | TyNode                   -- ^ a whole tagged node
-    | TyPrim Op.Ty             -- ^ a basic type
-    | TyUnit                   -- ^ type of Unit
+    TyPtr Ty                     -- ^ pointer to a memory location which contains its argument
+    | TyNode                     -- ^ a whole node
+    | TyINode                    -- ^ a whole possibly indirect node
+    | TyPrim Op.Ty               -- ^ a basic type
+    | TyUnit                     -- ^ type of Unit
     | TyCall Callable [Ty] [Ty]  -- ^ something call,jump, or cut-to-able
-    | TyRegion                 -- ^ a region
-    | TyUnknown                -- ^ an unknown possibly undefined type, All of these must be eliminated by code generation
+    | TyRegion                   -- ^ a region
+    | TyUnknown                  -- ^ an unknown possibly undefined type, All of these must be eliminated by code generation
     deriving(Eq,Ord)
 
 
@@ -259,6 +275,7 @@ funcProps = FuncProps {
 
 instance Show Ty where
     show TyNode = "N"
+    show TyINode = "I"
     show (TyPtr t) = '&':show t
     show (TyUnit) = "()"
     show (TyPrim t) = show t
@@ -273,9 +290,10 @@ instance Show Val where
     showsPrec _ (NodeC t vs) = parens $ (fromAtom t) <+> hsep (map shows vs)
     showsPrec _ (Index v o) = shows v <> char '[' <> shows o <> char ']'
     showsPrec _ (Var (V i) t)
-        | TyPtr TyNode <- t = text "ni" <> tshow i
+        | TyINode <- t = text "ni" <> tshow i
         | TyNode <- t = text "nd" <> tshow i
-        | TyPtr (TyPtr TyNode) <- t = text "np" <> tshow i
+--        | TyPtr TyINode <- t = text "np" <> tshow i
+        | TyPtr t' <- t = text "p" <> shows (Var (V i) t')
         | TyPrim Op.TyBool <- t  = char 'b' <> tshow i
         | TyPrim (Op.TyBits _ Op.HintFloat) <- t  = char 'f' <> tshow i
         | TyPrim (Op.TyBits _ Op.HintCharacter) <- t  = char 'c' <> tshow i
@@ -284,8 +302,8 @@ instance Show Val where
         | TyPrim (Op.TyBits (Op.Bits 32)  _) <- t  = char 'w' <> tshow i     -- word
         | TyPrim (Op.TyBits (Op.Bits 64)  _) <- t  = char 'd' <> tshow i     -- doubleword
         | TyPrim (Op.TyBits (Op.Bits 128)  _) <- t  = char 'q' <> tshow i    -- quadword
-        | TyPrim (Op.TyBits (Op.BitsArch Op.BitsPtr)  _) <- t  = char 'p' <> tshow i
-        | TyPrim (Op.TyBits (Op.BitsArch Op.BitsMax)  _) <- t  = char 'm' <> tshow i
+        | TyPrim (Op.TyBits (Op.BitsArch Op.BitsPtr)  _) <- t  = text "bp" <> tshow i
+        | TyPrim (Op.TyBits (Op.BitsArch Op.BitsMax)  _) <- t  = text "bm" <> tshow i
         | TyPrim (Op.TyBits _ _) <- t  = char 'l' <> tshow i
         | otherwise = char 'v' <> tshow i
     showsPrec _ (Lit i _)  = tshow i
@@ -406,11 +424,11 @@ valIsNF Lit {} = True
 valIsNF _ = False
 
 properHole x = case x of
-    TyPtr TyNode -> Const (properHole TyNode)
+    TyINode -> Const (properHole TyNode)
     ty@(TyPrim _) -> (Lit 0 ty)
     ~TyNode -> (NodeC tagHole [])
 
-isHole x = x `elem` map properHole [TyPtr TyNode, TyNode]
+isHole x = x `elem` map properHole [TyINode, TyNode]
 
 isValUnknown ValUnknown {} = True
 isValUnknown _ = False
@@ -443,10 +461,10 @@ n1 = Var v1 TyNode
 n2 = Var v2 TyNode
 n3 = Var v3 TyNode
 
-p0 = Var v0 (TyPtr TyNode)
-p1 = Var v1 (TyPtr TyNode)
-p2 = Var v2 (TyPtr TyNode)
-p3 = Var v3 (TyPtr TyNode)
+p0 = Var v0 TyINode
+p1 = Var v1 TyINode
+p2 = Var v2 TyINode
+p3 = Var v3 TyINode
 
 
 instance CanType e t => CanType [e] [t] where
@@ -456,9 +474,12 @@ instance CanType Exp [Ty] where
     getType (_ :>>= (_ :-> e2)) = getType e2
     getType (Prim _ _ ty) = ty
     getType App { expType = t } = t
-    getType (Store v) = [TyPtr (getType v)]
+    getType (Store v) = case getType v of
+        TyNode -> [TyINode]
+        t -> [TyPtr t]
     getType (Return v) = getType v
     getType (Fetch v) = case getType v of
+        TyINode -> [TyNode]
         TyPtr t -> [t]
         _ -> error "Exp.getType: fetch of non-pointer type"
     getType (Error _ t) = t
@@ -478,7 +499,9 @@ instance CanType Val Ty where
     getType (Lit _ t) = t
     getType (Index v _) = getType v
     getType Unit = TyUnit
-    getType (Const t) = TyPtr (getType t)
+    getType (Const t) = case (getType t) of
+        TyNode -> TyINode
+        t -> TyPtr t
     getType (NodeC {}) = TyNode
     getType (ValPrim _ _ ty) = ty
     getType (ValUnknown ty) = ty

@@ -129,7 +129,7 @@ twiddleExp e = f e where
     gcRoots xs e = GcRoots xs e
 
     isNode TyNode = True
-    isNode (TyPtr TyNode) = True
+    isNode TyINode = True
     isNode _ = False
 
 instance Twiddle Lam where

@@ -187,7 +187,7 @@ compile prog@Program { progDataTable = dataTable } = do
             counter = counter,
             dataTable = dataTable,
             errorOnce = errorOnce,
-            ccafMap = fromList $ [(tvrIdent v,e) |(v,_,e) <- cc ]  ++ [ (tvrIdent v,Var vv (TyPtr TyNode)) | (v,vv,_) <- rcafs]
+            ccafMap = fromList $ [(tvrIdent v,e) |(v,_,e) <- cc ]  ++ [ (tvrIdent v,Var vv TyINode) | (v,vv,_) <- rcafs]
             }
     ds <- runC lenv $ mapM doCompile [ c | c@(v,_,_) <- map combTriple $ progCombinators prog, v `notElem` [x | (x,_,_) <- cc]]
     wdump FD.Progress $ do
@@ -218,7 +218,7 @@ compile prog@Program { progDataTable = dataTable } = do
         dumpTyEnv newTyEnv
     fbaps <- readIORef funcBaps
     let cafs = [ (x,y) | (_,x,y) <- rcafs ]
-        initCafs = sequenceG_ [ Update (Var v (TyPtr TyNode)) node | (v,node) <- cafs ]
+        initCafs = sequenceG_ [ Update (Var v TyINode) node | (v,node) <- cafs ]
         ds' = ds ++ fbaps
         a @>> b = a :>>= ([] :-> b)
         sequenceG_ [] = Return []
@@ -240,7 +240,7 @@ compile prog@Program { progDataTable = dataTable } = do
     con c | keepCon = return $ (n,TyTy { tyThunk = TyNotThunk, tySlots = keepIts as, tyReturn = [TyNode], tySiblings = fmap (map convertName) sibs}) where
         n | sortKindLike (conType c) = convertName (conName c)
           | otherwise = convertName (conName c)
-        as = [ toType (TyPtr TyNode) s |  s <- conSlots c]
+        as = [ toType TyINode s |  s <- conSlots c]
         keepCon = isNothing (conVirtual c) || TypeConstructor == nameType (conName c)
         sibs = getSiblings dataTable (conName c)
     con _ = fail "not needed"
@@ -306,7 +306,7 @@ constantCaf Program { progDataTable = dataTable, progCombinators = combs } = ans
     conv e | Just [v] <- literal e = v
     conv (ELit lc@LitCons { litName = n, litArgs = es }) | Just nn <- getName lc = (Const (NodeC nn (keepIts $ map conv es)))
     conv (EPi (TVr { tvrIdent = z, tvrType =  a}) b) | isEmptyId z =  Const $ NodeC tagArrow [conv a,conv b]
-    conv (EVar v) | v `Set.member` lbs = Var (cafNum v) (TyPtr TyNode)
+    conv (EVar v) | v `Set.member` lbs = Var (cafNum v) TyINode
     conv e | (EVar x,as) <- fromAp e, Just vs <- mlookup x res, vs > length as = Const (NodeC (partialTag (scTag x) (vs - length as)) (keepIts $ map conv as))
     conv (EVar v) | Just ce <- mlookup v coMap = ce
     conv e@(EVar v) | isLifted e = Var (cafNum v) tyINode
@@ -331,7 +331,7 @@ getName' dataTable v@LitCons { litName = n, litArgs = es }
     nargs = length (conSlots cons)
 
 instance ToVal TVr where
-    toVal TVr { tvrType = ty, tvrIdent = num } = case toType (TyPtr TyNode) ty of
+    toVal TVr { tvrType = ty, tvrIdent = num } = case toType TyINode ty of
 --        TyTup [] -> Tup []
         ty -> Var (V $ idToInt num) ty
 
@@ -442,7 +442,7 @@ compile' cenv (tvr,as,e) = ans where
             return $ Alloc { expValue = def', expCount = v', expRegion = region_heap, expInfo = mempty }
         f "newBlankMutArray__" [v,_] = do
             let [v'] = args [v]
-            return $ Alloc { expValue = ValUnknown (TyPtr TyNode), expCount = v', expRegion = region_heap, expInfo = mempty }
+            return $ Alloc { expValue = ValUnknown TyINode, expCount = v', expRegion = region_heap, expInfo = mempty }
         f "readArray__" [r,o,_] = do
             let [r',o'] = args [r,o]
             return $ Fetch (Index r' o')
@@ -575,7 +575,7 @@ compile' cenv (tvr,as,e) = ans where
         V vn <- newVar
         let t  = toAtom $ "Bap_" ++ show (length as) ++ "_" ++ funcName ++ "_" ++ show vn
             tl = toAtom $ "bap_" ++ show (length as) ++ "_" ++  funcName ++ "_" ++ show vn
-            targs = [Var v ty | v <- [v1..] | ty <- (TyPtr TyNode:map getType as)]
+            targs = [Var v ty | v <- [v1..] | ty <- (TyINode:map getType as)]
             s = Store (NodeC t (keepIts $ e:as))
         d <- app [TyNode] (gEval p1) (tail targs)
         liftIO $ addNewFunction cenv (tl,(keepIts targs) :-> d)
@@ -730,7 +730,7 @@ compile' cenv (tvr,as,e) = ans where
     scInfo tvr = fail $ "not a supercombinator:" <+> show tvr
     newNodeVar =  fmap (\x -> Var x TyNode) newVar
     newPrimVar ty =  fmap (\x -> Var x ty) newVar
-    newNodePtrVar =  fmap (\x -> Var x (TyPtr TyNode)) newVar
+    newNodePtrVar =  fmap (\x -> Var x TyINode) newVar
     newVar = do
         i <- liftIO $ readIORef (counter cenv)
         liftIO $ (writeIORef (counter cenv) $! (i + 2))

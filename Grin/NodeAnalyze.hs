@@ -77,7 +77,7 @@ class NodeLike a where
 
 instance NodeLike Ty where
     isGood TyNode = True
-    isGood (TyPtr TyNode) = True
+    isGood TyINode = True
     isGood _ = False
 
 instance NodeLike Val where
@@ -112,7 +112,7 @@ nodeAnalyze grin' = do
             mapM_ doFunc (grinFuncs grin)
             mapM_ docaf (grinCafs grin)
         grin = renameUniqueGrin grin'
-        docaf (v,tt) | True = tell $ Right top `equals` Left (V (Vr v) (TyPtr TyNode))
+        docaf (v,tt) | True = tell $ Right top `equals` Left (V (Vr v) TyINode)
                      | otherwise = return ()
     --putStrLn "----------------------------"
     --print cs
@@ -235,11 +235,11 @@ doFunc (name,arg :-> body) = ans where
             dunno [TyPtr tyINode]
 --            dres [v']
         f NewRegion { expLam = _ :-> body } = fn ret body
-        f (Update (Var vname ty) v) | ty == TyPtr TyNode  = do
+        f (Update (Var vname ty) v) | ty == TyINode  = do
             v' <- convertVal v
             tell $ Left (vr vname ty) `isgte` v'
             dres []
-        f (Update (Var vname ty) v) | ty == TyPtr (TyPtr TyNode)  = do
+        f (Update (Var vname ty) v) | ty == TyPtr TyINode  = do
             v' <- convertVal v
             dres []
         f (Update v1 v)  = do
@@ -262,7 +262,7 @@ doFunc (name,arg :-> body) = ans where
             forMn_ (zip vs vs') $ \ ((vt,v),i) -> do
                 tell $ v `islte` Left (fa fn i (getType vt))
             forM_ [0 .. n - 1 ] $ \i -> do
-               tell $ Right top `islte` Left (fa fn (length vs + i) (TyPtr TyNode))
+               tell $ Right top `islte` Left (fa fn (length vs + i) TyINode)
             return $ Right (N (if n == 0 then Lazy else WHNF) (Only $ Set.singleton t))
     convertVal (Var v t) = return $ Left (vr v t)
     convertVal v | isGood v = return $ Right (N Lazy Top)
