@@ -278,14 +278,16 @@ tcExp e = f e where
          else fail $ "App: results do not match: " ++ show (a,t,(as',t'))
     f (Store v) = do
         t <- tcVal v
-        return [TyPtr t]
+        return (getType (Store v))
     f Alloc { expValue = v } = do
         t <- tcVal v
         return [TyPtr t]
     f (Return v) = mapM tcVal v
     f (Fetch v) = do
-        (TyPtr t) <- tcVal v
-        return [t]
+        v' <- tcVal v
+        case v' of
+            (TyPtr t) -> return [t]
+            TyINode -> return [TyNode]
     f (Error _ t) = return t
     f e@(Update w v) = do
         (TyPtr t) <- tcVal w
@@ -314,7 +316,9 @@ tcVal v = f v where
     f Unit = return TyUnit
     f (Const t) = do
         v <- f t
-        return (TyPtr v)
+        case v of
+            TyNode -> return TyINode
+            v -> return (TyPtr v)
     f (Index v offset) = do
         t <- f v
         TyPrim _ <- f offset

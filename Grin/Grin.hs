@@ -148,7 +148,13 @@ instance Show Var where
 --
 
 
---data VContext = Demoted Val VContext  | Promoted Val VContext | Evaled Val VContext |
+{-
+data PrimApp = Demote | Promote | Eval
+
+data VCont = VCont Val VContext
+
+data VContext = PrimApp PrimApp VCont | Decons Tag Int VCont | ContUnknown
+-}
 
 infixr 1  :->, :>>=
 
