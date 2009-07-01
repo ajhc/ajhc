@@ -19,7 +19,6 @@ import StringTable.Atom
 import C.Prims
 import Data.Graph.Inductive.Graph(mkGraph)
 import Data.Graph.Inductive.Tree
-import Doc.Attr
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
@@ -31,7 +30,6 @@ import Support.CanType
 import Support.FreeVars
 import Util.Graphviz
 import qualified Cmm.Op as Op
-import qualified FlagDump as FD
 
 
 
@@ -51,23 +49,12 @@ prettyVals [] = prettyVal Unit
 prettyVals [x] = prettyVal x
 prettyVals xs = tupled (map prettyVal xs)
 
-attr = if dump FD.Html then html else ansi
 
-bold :: Doc -> Doc
-bold = attrBold (attr oob)
-color n x = attrColor (attr oob) n x
-
---color :: Int -> Doc -> Doc
---color 1 doc = oob (attr [1]) <> doc <> oob (attr [0])
---color c doc = oob (attr [c]) <> doc <> oob (attr [39])
-
-operator = bold . text
-keyword = bold . text
+operator = text
+keyword = text
 tag x = text x
-func = color "lightgreen" . text
-prim = color "red" . text
---func = text
---tag = color 92 . text
+func = text
+prim = text
 
 
 isComplex (_ :>>= _) = True
@@ -113,7 +100,7 @@ prettyExp vl Alloc { expValue = val, expCount = count, expRegion = r } = vl <> k
 prettyExp vl Call { expValue = Item t (TyCall fun _ _), expArgs = vs, expJump = jump } | fun `elem` [Function,LocalFunction] =  vl <> f jump  <+> func (fromAtom t) <+> hsep (map prettyVal vs) where
     f True = text "jump to"
     f False = text "call"
-prettyExp vl Call { expValue = Var v (TyCall fun _ _), expArgs = vs, expJump = jump}  =  vl <> f jump fun  <+> color "lightgreen" (pprint v) <+> hsep (map prettyVal vs) where
+prettyExp vl Call { expValue = Var v (TyCall fun _ _), expArgs = vs, expJump = jump}  =  vl <> f jump fun  <+> pprint v <+> hsep (map prettyVal vs) where
     f False Continuation = text "cut to"
     f False Function = text "call"
     f True Function = text "jump to"
