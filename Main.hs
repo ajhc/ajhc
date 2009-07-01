@@ -546,7 +546,7 @@ compileModEnv cho = do
         let es' = concatMap expandPlaceholder (progCombinators prog)
         es' <- return [ combBody_u floatInward e |  e <- es' ]
         wdump FD.Class $ do
-            sequence_ [ printCheckName' dataTable (combHead x) (combBody x) |  x <- es']
+            sequence_ [ printCheckName'' dataTable (combHead x) (combBody x) |  x <- es']
         return es'
 
     prog <- evaluate $ progCombinators_s ([ p | p <- progCombinators prog, combHead p `notElem` map combHead cmethods] ++ cmethods) prog
@@ -897,21 +897,6 @@ transformProgram tp prog = liftIO $ do
     if doIterate iterate (not $ Stats.null estat) then transformProgram tp { transformIterate = iterateStep iterate } prog' { progStats = istat `mappend` estat } else
         return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
 
-
-
-
-
-
-
-
-typecheck dataTable e = case inferType dataTable [] e of
-    Left ss -> do
-        putErrLn (render $ ePretty e)
-        putErrLn $ "\n>>> internal error:\n" ++ unlines (intersperse "----" $ tail ss)
-        maybeDie
-        return Unknown
-    Right v -> return v
-
 maybeDie = case optKeepGoing options of
     True -> return ()
     False -> putErrDie "Internal Error"
@@ -969,11 +954,6 @@ lintCheckProgram onerr prog | flint = do
 lintCheckProgram _ _ = return ()
 
 
-printCheckName' dataTable tvr e = do
-    putErrLn (show $ tvrInfo tvr)
-    putErrLn  ( render $ hang 4 (pprint tvr <+> equals <+> pprint e <+> text "::") )
-    ty <- typecheck dataTable e
-    putErrLn  ( render $ indent 4 (pprint ty))
 
 
 printESize :: String -> Program -> IO ()
