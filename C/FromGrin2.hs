@@ -440,11 +440,20 @@ convertBody (e :>>= xs@(_:_:_) :-> e') = do
     return $ dcl & ss & mconcat [ v =* projectAnon i st | v <- vs | i <- [0..] ] & ss'
 
 -- mutable arrays and iorefs
-convertBody (Update (Index base off) z) | getType base == TyPtr tyINode = do
+convertBody (BaseOp PokeVal [Index base off,z])  = do
     base <- convertVal base
     off <- convertVal off
     z' <- convertVal z
     return $ indexArray base off =* z'
+convertBody (BaseOp PokeVal [base,z])  = do
+    base <- convertVal base
+    z' <- convertVal z
+    return $ indexArray base (constant $ number 0) =* z'
+--convertBody (Update (Index base off) z) | getType base == TyPtr tyINode = do
+--    base <- convertVal base
+--    off <- convertVal off
+--    z' <- convertVal z
+--    return $ indexArray base off =* z'
 convertBody (Fetch (Index base off)) | getType base == TyPtr tyINode = do
     base <- convertVal base
     off <- convertVal off
@@ -539,7 +548,7 @@ convertExp (App a vs _) = do
             let ss = [ a =* v | a <- as | v <- vs' ]
             return (mconcat ss & goto nm, emptyExpression)
         Nothing -> return $ (mempty, functionCall (toName (fromAtom a)) vs')
-convertExp (Update v@(Var vv _) tn@(NodeC t as)) | getType v == TyINode = do
+convertExp (BaseOp Overwrite [v@(Var vv _),tn@(NodeC t as)]) | getType v == TyINode = do
     v' <- convertVal v
     as' <- mapM convertVal as
     nt <- nodeTypePtr t
@@ -551,6 +560,18 @@ convertExp (Update v@(Var vv _) tn@(NodeC t as)) | getType v == TyINode = do
         s <- tagAssign tmp' t
         let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
         return (mconcat $ profile_update_inc:s:ass,emptyExpression)
+--convertExp (Update v@(Var vv _) tn@(NodeC t as)) | getType v == TyINode = do
+--    v' <- convertVal v
+--    as' <- mapM convertVal as
+--    nt <- nodeTypePtr t
+--    let tmp' = cast nt (f_DETAG v') -- (if vv < v0 then f_DETAG v' else v')
+--    if not (tagIsSuspFunction t) && vv < v0 then do
+--        (nns, nn) <- newNode fptr_t tn
+--        return (nns & getHead (f_NODEP(f_DETAG v')) =* nn,emptyExpression)
+--     else do
+--        s <- tagAssign tmp' t
+--        let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
+--        return (mconcat $ profile_update_inc:s:ass,emptyExpression)
 
 convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_heap, TyINode == getType v  = do
     v' <- convertVal v

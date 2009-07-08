@@ -87,7 +87,13 @@ prettyExp vl Prim { expPrimitive = APrim (Op (Op.BinOp bo _ _) _) _, expArgs = [
 prettyExp vl Prim { expPrimitive = APrim (Peek t) _, expArgs = [v] }  = vl <> prim (show t) <> char '[' <> prettyVal v <> char ']'
 prettyExp vl Prim { expPrimitive = ap, expArgs = vs } = vl <> prim (pprint ap) <+> hsep (map prettyVal vs)
 prettyExp vl (GcRoots vs b) = vl <> keyword "withRoots" <> tupled (map prettyVal vs) <$> indent 2 (prettyExp empty b)
-prettyExp vl (Update x y) = vl <> keyword "update" <+> prettyVal x <+> prettyVal y
+--prettyExp vl (Update x y) = vl <> keyword "update" <+> prettyVal x <+> prettyVal y
+prettyExp vl (BaseOp Overwrite [x,y]) = vl <> keyword "overwrite" <+> prettyVal x <+> prettyVal y
+prettyExp vl (BaseOp Redirect [x,y]) = vl <> keyword "redirect" <+> prettyVal x <+> prettyVal y
+prettyExp vl (BaseOp PokeVal [x,y]) = vl <> keyword "pokeVal" <+> prettyVal x <+> prettyVal y
+prettyExp vl (BaseOp PeekVal [x]) = vl <> keyword "peekVal" <+> prettyVal x
+prettyExp vl (BaseOp Promote [x]) = vl <> keyword "promote" <+> prettyVal x
+--prettyExp vl (BaseOp Promote [x]) = vl <> keyword "promote" <+> prettyVal x
 prettyExp vl (Case v vs) = vl <> keyword "case" <+> prettyVal v <+> keyword "of" <$> indent 2 (vsep (map f vs)) where
     f (~[v] :-> e) | isOneLine e = prettyVal v <+> operator "->" <+> prettyExp empty e
     f (~[v] :-> e) = prettyVal v <+> operator "->" <+> keyword "do" <$> indent 2 (prettyExp empty e)

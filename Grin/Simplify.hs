@@ -78,9 +78,9 @@ simplify1 stats env (n,l) = do
         x <- applySubstE env  x
         x <- gs x
         inline x
-    gs (Update Const {} Var {}) = do
-        lift $ tick stats at_OptSimplifyConstUpdate
-        gs (Return [])
+--    gs (Update Const {} Var {}) = do
+--        lift $ tick stats at_OptSimplifyConstUpdate
+--        gs (Return [])
 --    gs (Prim Primitive { primAPrim = APrim CCast {} _, primType = (_,nty) } [Lit i _]) = do
 --        lift $ tick stats at_OptSimplifyCastLit
 --        return $ Return (Lit i nty)
@@ -312,12 +312,12 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
     f (Store t :>>= [v] :-> Fetch v' :>>= lr) | v == v' = do
         mtick "Optimize.optimize.store-fetch"
         f (Store t :>>= [v] :-> Return [t] :>>= lr)
-    f (Store t :>>= [v@(Var vr _)] :-> Update  v' w :>>= lr) | v == v', vr `notElem` freeVars w = do
-        mtick "Optimize.optimize.store-update"
-        f (Store w :>>= [v] :-> Return [] :>>= lr)
-    f (Update v t :>>= [] :-> Fetch v' :>>= lr) | v == v' = do
-        mtick "Optimize.optimize.update-fetch"
-        f (Update v t :>>= [] :-> Return [t] :>>= lr)
+--    f (Store t :>>= [v@(Var vr _)] :-> Update  v' w :>>= lr) | v == v', vr `notElem` freeVars w = do
+--        mtick "Optimize.optimize.store-update"
+--        f (Store w :>>= [v] :-> Return [] :>>= lr)
+--    f (Update v t :>>= [] :-> Fetch v' :>>= lr) | v == v' = do
+--        mtick "Optimize.optimize.update-fetch"
+--        f (Update v t :>>= [] :-> Return [t] :>>= lr)
 --    f (Return [t@NodeC {}] :>>= v :-> App fa [v',a] typ :>>= lr) | fa == funcApply, v == v' = do
 --        mtick "Optimize.optimize.return-apply"
 --        f (Return [t] :>>= v :-> doApply Return True t [a] typ :>>= lr)

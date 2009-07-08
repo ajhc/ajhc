@@ -9,6 +9,7 @@ module Grin.Grin(
     TyThunk(..),
     Lam(..),
     Phase(..),
+    BaseOp(..),
     Tag,
     updateFuncDefProps,
     Ty(..),
@@ -148,38 +149,44 @@ instance Show Var where
 
 
 {-
-data PrimApp = Demote | Promote | Eval
 
 data VCont = VCont Val VContext
 
 data VContext = PrimApp PrimApp VCont | Decons Tag Int VCont | ContUnknown
 
-data BaseOp
-    = Demote                -- turn a node into an inode, always okay
-    | Promote               -- turn an inode into a node, the inode _must_ already be a valid node
-    | Eval                  -- evaluate an inode, returns a node representing the evaluated value. Bool is whether to update the inode
-    | StoreNode !Bool Val   -- create a new node, Bool is true if it should be an indirect node, the second val is the region
-    | Redirect              -- write an indirection over its first argument to point to its second one
-    | Overwrite             -- overwrite an existing node with new data (the tag must match what was used for the initial Store)
-    | Peek                  -- read a value from a pointed to location
-    | Poke                  -- write a value to a pointed to location
-    deriving(Eq,Ord,Show)
 
-    | BaseOp    { expBaseOp :: BaseOp,
-                  expArgs :: [Val],
-                  expType :: [Ty]
-                }
 -}
 
 infixr 1  :->, :>>=
 
+-- The basic operations of our monad
+--
+-- PeekVal and PokeVal differ from the primitive peek and poke in that the Val
+-- varients operate on node references, while the primitive versions work on
+-- raw memory with unboxed pointers.
+--
 
+data BaseOp
+--    = Demote                -- turn a node into an inode, always okay
+    = Promote               -- turn an inode into a node, the inode _must_ already be a valid node
+    | Eval                  -- evaluate an inode, returns a node representing the evaluated value. Bool is whether to update the inode
+    | Apply                 -- apply a partial application to a value
+    | StoreNode !Bool       -- create a new node, Bool is true if it should be an indirect node, the second val is the region
+    | Redirect              -- write an indirection over its first argument to point to its second one
+    | Overwrite             -- overwrite an existing node with new data (the tag must match what was used for the initial Store)
+    | PeekVal               -- read a value from a pointed to location
+    | PokeVal               -- write a value to a pointed to location
+    | Consume               -- consume a value, depending on the back end this may be needed to free memory
+    deriving(Eq,Ord,Show)
 
 data Lam = [Val] :-> Exp
     deriving(Eq,Ord,Show)
 
 data Exp =
      Exp :>>= Lam                                                         -- ^ Sequencing - the same as >>= for monads.
+    | BaseOp    { expBaseOp :: BaseOp,
+                  expArgs :: [Val]
+                }
     | App       { expFunction  :: Atom,
                   expArgs :: [Val],
                   expType :: [Ty] }                                       -- ^ Application of functions and builtins
@@ -190,7 +197,6 @@ data Exp =
     | Return    { expValues :: [Val] }                                    -- ^ Return a value
     | Store     { expValue :: Val }                                       -- ^ Allocate a new heap node
     | Fetch     { expAddress :: Val }                                     -- ^ Load given heap node
-    | Update    { expAddress :: Val, expValue :: Val }                    -- ^ Update given heap node
     | Error     { expError :: String, expType :: [Ty] }                   -- ^ Abort with an error message, non recoverably.
     | Call      { expValue :: Val,
                   expArgs :: [Val],
@@ -238,6 +244,9 @@ data Ty =
     TyPtr Ty                     -- ^ pointer to a memory location which contains its argument
     | TyNode                     -- ^ a whole node
     | TyINode                    -- ^ a whole possibly indirect node
+    | TyAttr Ty Ty               -- ^ attach an attribute to a type
+    | TyAnd Ty Ty                -- ^ boolean conjunction of types
+    | TyOr  Ty Ty                -- ^ boolean disjunction of types
     | TyPrim Op.Ty               -- ^ a basic type
     | TyUnit                     -- ^ type of Unit
     | TyCall Callable [Ty] [Ty]  -- ^ something call,jump, or cut-to-able
@@ -500,13 +509,14 @@ instance CanType Exp [Ty] where
     getType (Store v) = case getType v of
         TyNode -> [TyINode]
         t -> [TyPtr t]
+    getType (BaseOp Overwrite _) = []
+    getType (BaseOp Redirect _) = []
     getType (Return v) = getType v
     getType (Fetch v) = case getType v of
         TyINode -> [TyNode]
         TyPtr t -> [t]
         _ -> error "Exp.getType: fetch of non-pointer type"
     getType (Error _ t) = t
-    getType (Update w v) = []
     getType (Case _ []) = error "empty case"
     getType (Case _ ((_ :-> e):_)) = getType e
     getType NewRegion { expLam = _ :-> body } = getType body
@@ -568,7 +578,7 @@ instance FreeVars Exp (Set.Set Var) where
     freeVars (Return v) = freeVars v
     freeVars (Store v) = freeVars v
     freeVars (Fetch v) = freeVars v
-    freeVars (Update x y) = freeVars (x,y)
+    freeVars (BaseOp _ vs) = freeVars vs
     freeVars (Prim _ x _) = freeVars x
     freeVars Error {} = Set.empty
     freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (funcFreeVars . funcDefProps) fdefs) `mappend` freeVars body
@@ -586,7 +596,7 @@ instance FreeVars Exp (Set.Set (Var,Ty)) where
     freeVars (Return v) = freeVars v
     freeVars (Store v) = freeVars v
     freeVars (Fetch v) = freeVars v
-    freeVars (Update x y) = freeVars (x,y)
+    freeVars (BaseOp _ vs) = freeVars vs
     freeVars (Prim _ x _) = freeVars x
     freeVars Error {} = Set.empty
     freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (freeVars . funcDefBody) fdefs) `mappend` freeVars body
@@ -627,7 +637,7 @@ instance FreeVars Exp (Set.Set Tag) where
     freeVars (Return v) = freeVars v
     freeVars (Store v) = freeVars v
     freeVars (Fetch v) = freeVars v
-    freeVars (Update x y) = freeVars (x,y)
+    freeVars (BaseOp _ vs) = freeVars vs
     freeVars (Prim _ x _) = freeVars x
     freeVars Error {} = Set.empty
     freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (funcTags . funcDefProps) fdefs) `mappend` freeVars body

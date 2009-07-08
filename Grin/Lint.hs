@@ -289,11 +289,18 @@ tcExp e = f e where
             (TyPtr t) -> return [t]
             TyINode -> return [TyNode]
     f (Error _ t) = return t
-    f e@(Update w v) = do
-        (TyPtr t) <- tcVal w
-        t' <- tcVal v
-        same (show e) t t'
+    f e@(BaseOp Overwrite [w,v]) = do
         return []
+    f e@(BaseOp PokeVal [w,v]) = do
+        return []
+    f e@(BaseOp PeekVal [w]) = do
+        TyPtr t <- tcVal w
+        return [t]
+--    f e@(Update w v) = do
+--        (TyPtr t) <- tcVal w
+--        t' <- tcVal v
+--        same (show e) t t'
+--        return []
     f (Case _ []) = fail "empty case"
     f (Case v as) = do
         tv <- tcVal v

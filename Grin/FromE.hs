@@ -218,7 +218,7 @@ compile prog@Program { progDataTable = dataTable } = do
         dumpTyEnv newTyEnv
     fbaps <- readIORef funcBaps
     let cafs = [ (x,y) | (_,x,y) <- rcafs ]
-        initCafs = sequenceG_ [ Update (Var v TyINode) node | (v,node) <- cafs ]
+        initCafs = sequenceG_ [ BaseOp Overwrite [(Var v TyINode),node] | (v,node) <- cafs ]
         ds' = ds ++ fbaps
         a @>> b = a :>>= ([] :-> b)
         sequenceG_ [] = Return []
@@ -434,7 +434,7 @@ compile' cenv (tvr,as,e) = ans where
             return $ Fetch (Index r' (toUnVal (0::Int)))
         f "writeRef__" [r,v,_] = do
             let [r',v'] = args [r,v]
-            return $ Update (Index r' (toUnVal (0::Int))) v'
+            return $ BaseOp PokeVal [r',v']
 
         -- arrays
         f "newMutArray__" [v,def,_] = do
@@ -451,7 +451,7 @@ compile' cenv (tvr,as,e) = ans where
             return $ Fetch (Index r' o')
         f "writeArray__" [r,o,v,_] = do
             let [r',o',v'] = args [r,o,v]
-            return $ Update (Index r' o') v'
+            return $ BaseOp PokeVal [(Index r' o'),v']
 
         f ft [v,_]  | ft `elem` ["unsafeFreezeArray__", "unsafeThawArray__"] = do
             let [v'] = args [v]
@@ -674,7 +674,7 @@ compile' cenv (tvr,as,e) = ans where
             return (rr v)
 
     -- This avoids a blind update on recursive thunks
-    doUpdate vr (Store n@(NodeC t ts)) = (Update vr n,t,map getType ts)
+    doUpdate vr (Store n@(NodeC t ts)) = (BaseOp Overwrite [vr,n],t,map getType ts)
     doUpdate vr (x :>>= v :-> e) = let (du,t,ts) = doUpdate vr e in (x :>>= v :-> du,t,ts)
     doUpdate vr x = error $ "doUpdate: " ++ show x
     args es = map f es where

@@ -235,17 +235,30 @@ doFunc (name,arg :-> body) = ans where
             dunno [TyPtr tyINode]
 --            dres [v']
         f NewRegion { expLam = _ :-> body } = fn ret body
-        f (Update (Var vname ty) v) | ty == TyINode  = do
+        f (BaseOp Overwrite [Var vname ty,v]) | ty == TyINode = do
             v' <- convertVal v
             tell $ Left (vr vname ty) `isgte` v'
             dres []
-        f (Update (Var vname ty) v) | ty == TyPtr TyINode  = do
-            v' <- convertVal v
+        f (BaseOp Overwrite vs) = do
+            mapM_ convertVal vs
             dres []
-        f (Update v1 v)  = do
-            v' <- convertVal v
-            v' <- convertVal v1
+        f (BaseOp PokeVal vs) = do
+            mapM_ convertVal vs
             dres []
+        f (BaseOp PeekVal vs) = do
+            mapM_ convertVal vs
+            dres []
+--        f (Update (Var vname ty) v) | ty == TyINode  = do
+--            v' <- convertVal v
+--            tell $ Left (vr vname ty) `isgte` v'
+--            dres []
+--        f (Update (Var vname ty) v) | ty == TyPtr TyINode  = do
+--            v' <- convertVal v
+--            dres []
+--        f (Update v1 v)  = do
+--            v' <- convertVal v
+--            v' <- convertVal v1
+--            dres []
         f Let { expDefs = ds, expBody = e } = do
             mapM_ doFunc (map (\x -> (funcDefName x, funcDefBody x)) ds)
             fn ret e

@@ -39,6 +39,7 @@ mapBodyM f (x :-> y) = f y >>= return . (x :->)
 mapExpVal :: Monad m => (Val -> m Val) -> Exp -> m Exp
 mapExpVal g x = f x where
     f (App a vs t) = return (App a) `ap` mapM g vs `ap` return t
+    f (BaseOp a vs) = return (BaseOp a) `ap` mapM g vs
     f (Return vs) = return Return `ap` mapM g vs
     f (Prim x vs t) = return (Prim x) `ap` mapM g vs `ap` return t
     f (Store v) = return Store `ap` g v
@@ -47,7 +48,6 @@ mapExpVal g x = f x where
         c <- g c
         return e { expValue = v, expCount = c }
     f (Fetch v) = return Fetch `ap` g v
-    f (Update a b) = return Update `ap` g a `ap` g b
     f (Case v as) = do
         v <- g v
         return (Case v as)
@@ -153,7 +153,8 @@ isOmittable Let { expBody = x } = isOmittable x
 isOmittable (e1 :>>= _ :-> e2) = isOmittable e1 && isOmittable e2
 isOmittable _ = False
 
-isErrOmittable Update {} = True
+isErrOmittable (BaseOp Overwrite _) = True
+isErrOmittable (BaseOp PokeVal _) = True
 isErrOmittable (e1 :>>= _ :-> e2) = isErrOmittable e1 && isErrOmittable e2
 isErrOmittable (Case x ds) = all isErrOmittable [ e | _ :-> e <- ds ]
 isErrOmittable x = isOmittable x
@@ -182,8 +183,8 @@ collectFuncs exp = runWriter (cfunc exp) where
         cfunc Error {} = return mempty
         cfunc Prim {} = return mempty
         cfunc Return {} = return mempty
+        cfunc BaseOp {} = return mempty
         cfunc Store {} = return mempty
-        cfunc Update {} = return mempty
         cfunc Alloc {} = return mempty
         cfunc GcRoots { expBody = b} = cfunc b
         cfunc NewRegion { expLam = l } = clfunc l

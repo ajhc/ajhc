@@ -116,14 +116,15 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,as :-> b
                 addRule $ conditionalRule id fn' $ mconcat [ mconcatMap (implies (sValue usedArgs fn) . varValue) (freeVars a) | (fn,a) <- combineArgs a vs]
                 addRule $ fn' `implies` sValue usedFuncs a
                 addRule (mconcatMap doConst vs)
-            g (Update (Var v _) n) | v < v0 = do
+            g (BaseOp Overwrite [Var v _,n]) | v < v0 = do
                 v' <- supplyValue usedCafs v
                 addRule $ conditionalRule id v' $ doNode n
-            g (Update vv@(Index (Var v _) r) n) | v < v0 = do
-                v' <- supplyValue usedCafs v
-                addRule (doNode r)
-                addRule $ conditionalRule id v' $ doNode n
-            g (Update vv n) = addRule $ (doNode vv) `mappend` (doNode n)
+           -- g (Update vv@(Index (Var v _) r) n) | v < v0 = do
+           --     v' <- supplyValue usedCafs v
+           --     addRule (doNode r)
+           --     addRule $ conditionalRule id v' $ doNode n
+            g (BaseOp Overwrite [vv,n]) = addRule $ (doNode vv) `mappend` (doNode n)
+            g (BaseOp PokeVal [vv,n]) = addRule $ (doNode vv) `mappend` (doNode n)
             g (Store n) = addRule $ doNode n
             g (Fetch x) = addRule $ doNode x
             g Alloc { expValue = v, expCount = c, expRegion = r } = addRule $ doNode v `mappend` doNode c `mappend` doNode r
@@ -176,13 +177,20 @@ removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps
         as <- dff' fn' as
         as <- mapM clearCaf as
         return $ Store (NodeC fn as)
-    f (Update (Var v TyINode) _) | deadCaf v = do
+    f (BaseOp Overwrite [(Var v TyINode),_]) | deadCaf v = do
         mtick $ toAtom "Optimize.dead-code.caf-update"
         return $ Return []
-    f (Update p (NodeC fn as)) |  Just fn' <- tagToFunction fn = do
+    f (BaseOp Overwrite [p,NodeC fn as]) |  Just fn' <- tagToFunction fn = do
         as <- dff' fn' as
         as <- mapM clearCaf as
-        return $ Update p (NodeC fn as)
+        return $ BaseOp Overwrite  [p,NodeC fn as]
+--    f (Update (Var v TyINode) _) | deadCaf v = do
+--        mtick $ toAtom "Optimize.dead-code.caf-update"
+--        return $ Return []
+--    f (Update p (NodeC fn as)) |  Just fn' <- tagToFunction fn = do
+--        as <- dff' fn' as
+--        as <- mapM clearCaf as
+--        return $ Update p (NodeC fn as)
     f lt@Let { expDefs = defs }  = return $ updateLetProps lt { expDefs = defs' } where
         defs' = [ updateFuncDefProps df { funcDefBody = margs name body } | df@FuncDef { funcDefName = name, funcDefBody = body } <- defs, name `Set.member` funSet ]
     f x = return x
