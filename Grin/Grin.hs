@@ -114,10 +114,9 @@ tyDNode = TyNode
 
 
 instance TypeNames Ty where
-    tIntzh = TyPrim (Op.bits32) -- Ty (toAtom "int")
-    tEnumzh = TyPrim (Op.bits16) -- Ty (toAtom "int")
-    tCharzh = TyPrim (Op.bits32) -- Ty (toAtom "HsChar")
-    --tStar = Ty (toAtom "*")
+    tIntzh = TyPrim (Op.bits32)
+    tEnumzh = TyPrim (Op.bits16)
+    tCharzh = TyPrim (Op.bits32)
 
 data Callable = Continuation | Function | Closure | LocalFunction | Primitive'
     deriving(Eq,Ord,Show)
@@ -154,9 +153,26 @@ data PrimApp = Demote | Promote | Eval
 data VCont = VCont Val VContext
 
 data VContext = PrimApp PrimApp VCont | Decons Tag Int VCont | ContUnknown
+
+data BaseOp
+    = Demote                -- turn a node into an inode, always okay
+    | Promote               -- turn an inode into a node, the inode _must_ already be a valid node
+    | Eval                  -- evaluate an inode, returns a node representing the evaluated value. Bool is whether to update the inode
+    | StoreNode !Bool Val   -- create a new node, Bool is true if it should be an indirect node, the second val is the region
+    | Redirect              -- write an indirection over its first argument to point to its second one
+    | Overwrite             -- overwrite an existing node with new data (the tag must match what was used for the initial Store)
+    | Peek                  -- read a value from a pointed to location
+    | Poke                  -- write a value to a pointed to location
+    deriving(Eq,Ord,Show)
+
+    | BaseOp    { expBaseOp :: BaseOp,
+                  expArgs :: [Val],
+                  expType :: [Ty]
+                }
 -}
 
 infixr 1  :->, :>>=
+
 
 
 data Lam = [Val] :-> Exp
@@ -208,6 +224,7 @@ data Exp =
 data Val =
     NodeC !Tag [Val]          -- ^ Complete node, of type TyNode
     | Const Val               -- ^ constant data, only Lit, Const and NodeC may be children. of type TyINode
+    | Demote Val              -- ^ explicitly cast a node into an inode
     | Lit !Number Ty          -- ^ Literal
     | Var !Var Ty             -- ^ Variable
     | Unit                    -- ^ Empty value used as placeholder
