@@ -225,7 +225,6 @@ data Exp =
 data Val =
     NodeC !Tag [Val]          -- ^ Complete node, of type TyNode
     | Const Val               -- ^ constant data, only Lit, Const and NodeC may be children. of type TyINode
-    | Demote Val              -- ^ explicitly cast a node into an inode
     | Lit !Number Ty          -- ^ Literal
     | Var !Var Ty             -- ^ Variable
     | Unit                    -- ^ Empty value used as placeholder

@@ -60,9 +60,9 @@ instance Ord Info where
 instance Show Info where
     show (Info ds) = show (sortUnder (show . entryType) ds)
 
-instance Data Info where
-    toConstr = undefined
-    dataTypeOf = undefined
+--instance Data Info where
+--    toConstr = undefined
+--    dataTypeOf = undefined
 
 instance Monoid Info where
     mempty = empty

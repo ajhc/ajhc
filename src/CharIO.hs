@@ -22,7 +22,7 @@ import System.IO.UTF8 as U
 
 
 
-flushOut = Control.Exception.catch  (IO.hFlush IO.stdout) (\(e::SomeException) -> return ())
+flushOut = Control.Exception.catch  (IO.hFlush IO.stdout) (\(e::SomeException') -> return ())
 
 putErr s = flushOut >> U.hPutStr IO.stderr s
 putErrLn s = flushOut >> U.hPutStrLn IO.stderr s
@@ -38,5 +38,5 @@ runMain action = Control.Exception.catch (action >> return ()) $ \x -> case x of
 #else
 runMain action = Control.Exception.catches (action >> return ())
                    [ Handler $ \ (e::ExitCode) -> throw e
-                   , Handler $ \ (e::SomeException) -> putErrDie $ show e ]
+                   , Handler $ \ (e::SomeException') -> putErrDie $ show e ]
 #endif

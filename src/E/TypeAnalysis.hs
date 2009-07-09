@@ -26,7 +26,6 @@ import E.Values
 import Fixer.Fixer
 import Fixer.Supply
 import Fixer.VMap
-import Info.Info(infoMapM,infoMap)
 import Info.Types
 import Name.Id
 import Name.Name

@@ -37,11 +37,13 @@ TyBits (Bits x) _ `tyLte` TyBits (Bits y) _ = x <= y
 _ `tyLte` TyBits (BitsArch BitsMax) _ = True
 TyBits (Bits x) _ `tyLte` TyBits (BitsArch BitsPtr) _ = x <= 32
 x `tyLte` y  = x == y
+x `tyEq` y = (x `tyLte` y) && (y `tyLte` x)
 
+{-
 x `tyLt` y = (x `tyLte` y) && not (y `tyLte` x)
 x `tyGt` y = y `tyLt` x
 x `tyGte` y = y `tyLte` x
-x `tyEq` y = (x `tyLte` y) && (y `tyLte` x)
+-}
 
 convOp :: ConvOp -> Ty -> Ty -> Maybe ConvOp
 convOp F2I _ _ = Just F2I

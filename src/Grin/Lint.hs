@@ -193,7 +193,7 @@ transformGrin tp prog = do
         putErrLn $ "\n>>> Before " ++ name
         dumpGrin ("lint-before-" ++ name) prog
         putErrLn $ "\n>>>"
-        putErrLn (show (e::SomeException))
+        putErrLn (show (e::SomeException'))
         maybeDie
         return prog
     let istat = grinStats prog
@@ -281,9 +281,6 @@ tcExp e = f e where
     f (BaseOp Promote [v]) = do
         TyINode <- tcVal v
         return [TyNode]
-    f (BaseOp PeekVal [v]) = do
-        TyPtr t <- tcVal v
-        return [t]
     f (Error _ t) = return t
     f e@(BaseOp Overwrite [w,v]) = do
         return []

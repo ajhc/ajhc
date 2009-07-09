@@ -117,7 +117,7 @@ runInteraction act s = do
     let commands' = commands ++ [ (n,h) | InteractCommand { commandName = n, commandHelp = h } <- interactCommands act ]
         help_text = unlines $ buildTableLL (commands' ++ extra_help)
     let args s =  [ bb | bb@(n,_) <- commands', s `isPrefixOf` n ]
-        expand s = fsts (args s) ++ filter (isPrefixOf s) (interactSettables act)
+--        expand s = fsts (args s) ++ filter (isPrefixOf s) (interactSettables act)
 
     let showSet
          | null $ interactSettables act = putStrLn "Nothing may be set"

@@ -49,7 +49,6 @@ module PackedString (
 
     ) where
 
-import Data.Array.IO
 import Data.Typeable
 import Data.Char
 import Data.Int
@@ -58,10 +57,8 @@ import qualified Data.ByteString as BS
 
 import Bits
 import GHC.Exts
-import Data.Array.Base
 import Word
 import Data.Monoid
-import Foreign.C.Types
 
 instance Monoid PackedString where
     mempty = nilPS
@@ -346,6 +343,7 @@ joinPS filler pss = concatPS (splice pss)
 --  return (packString chars)
 
 
+{-
 utfCount :: String -> Int#
 utfCount cs = uc 0# cs where
     uc n []  = n
@@ -358,6 +356,7 @@ utfCount cs = uc 0# cs where
         | ord x <= 0x7fffffff = uc (n +# 6#) xs
         | otherwise = error "invalid string"
 
+-}
 
 -- | Convert Unicode characters to UTF-8.
 toUTF :: String -> [Word8]
@@ -393,6 +392,7 @@ fromUTF xs = fromUTF' (map fromIntegral xs) where
     err = error "fromUTF: illegal UTF-8 character"
 
 
+{-
 
 
 {-# INLINE unpackFoldrUtf8# #-}
@@ -440,6 +440,7 @@ unpackFoldlUtf8# f e addr count = unpack 0# e where
       where
 	ch = indexCharArray# addr nh
 
+-}
 
 {-
 

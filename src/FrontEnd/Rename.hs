@@ -24,7 +24,6 @@ import Support.FreeVars
 import Util.Gen
 import Util.Inst()
 import FrontEnd.Warning
-import qualified FlagOpts as FO
 import qualified FrontEnd.HsErrors as HsErrors
 import qualified Name.VConsts as V
 import Options
@@ -278,7 +277,7 @@ instance Rename HsDecl where
             t <- rename t
             m <- getCurrentModule
             i <- newUniq
-            let nt = if null ns' then t else HsTyForall bs (HsQualType [] t)
+            let _nt = if null ns' then t else HsTyForall bs (HsQualType [] t)
                 bs = [ hsTyVarBind { hsTyVarBindName = n } | n <- ns']
             return prules { hsDeclUniq = (m,i), hsDeclName = n, hsDeclType = t }
     rename (HsDefaultDecl sl e) = HsDefaultDecl sl <$> rename e

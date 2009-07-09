@@ -131,7 +131,7 @@ parseIniFiles verbose raw fs ss = do
     let pini = processIni (foldr (Seq.><) Seq.empty (rawp:fsc))
         f (x:xs) cm = case span (/= '=') x of
             (be,'=':re) -> f xs (Map.insert be re cm)
-            (be,[]) -> f xs (Seq.foldl res cm (Map.findWithDefault Seq.empty be pini))
+            ~(be,[]) -> f xs (Seq.foldl res cm (Map.findWithDefault Seq.empty be pini))
         f [] cm = cm
 --    ans = Map.map (\c -> Seq.foldl res Map.empty c) iniMap'
         res mp (k,v) | Just r <- getPrefix "+" (reverse k) = Map.insertWith f (reverse $ dropWhile isSpace r) v mp where

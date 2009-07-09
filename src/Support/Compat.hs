@@ -10,5 +10,7 @@ import Control.Exception
 
 
 #if __GLASGOW_HASKELL__ < 610
-type SomeException = Exception
+type SomeException' = Exception
+#else
+type SomeException' = SomeException
 #endif

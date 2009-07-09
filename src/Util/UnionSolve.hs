@@ -7,7 +7,6 @@ module Util.UnionSolve(
     islte,isgte,equals
     ) where
 
-import Control.Monad(when)
 import Data.List(intersperse)
 import Data.Monoid
 import qualified Data.Set as Set
@@ -164,12 +163,7 @@ solve putLog (C csp) = do
                     mapM_ (v `greaterThen`) (Set.toList lb)
                     mapM_ (v `lessThen`)    (Set.toList ub)
                     updateW (const (R v)) xe
-        nem Nothing Nothing = False
-        nem (Just x) (Just y) = not (x `eq` y)
-        nem _ _ = True
-        getBounds Lower (Ri _ lb _ _) = lb
-        getBounds Upper (Ri _ _ _ ub) = ub
-        getBounds _ _ = Set.empty
+                _ -> error "Util.UnionSolve: invalid Ri"
         testBoundLT Nothing _ = True
         testBoundLT (Just x) y = x `lte` y
         testBoundGT Nothing _ = True
@@ -248,6 +242,7 @@ solve putLog (C csp) = do
                     nlb <- finds (xlb `mappend` ylb)
                     nub <- finds (yub `mappend` xub)
                     doUpdate (Ri nml (Set.delete xe nlb) nmu (Set.delete xe nub)) xe
+                _ -> error "Util.UnionSolve: equality, can't happen."
         mjoin Nothing b = b
         mjoin x Nothing = x
         mjoin (Just x) (Just y) = Just (join x y)

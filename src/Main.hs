@@ -10,7 +10,7 @@ import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified System
-import qualified Data.List as L
+import List as L
 
 import Doc.PPrint
 import Util.Util
