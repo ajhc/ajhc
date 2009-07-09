@@ -4,6 +4,7 @@ use strict;
 
 
 my $mod = shift @ARGV;
+$mod =~ s/^.*\///;
 
 print "module $mod where\n\n\n";
 

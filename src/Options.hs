@@ -33,6 +33,7 @@ import System
 import System.Console.GetOpt
 import System.IO.Unsafe
 
+import RawFiles(targets_ini)
 import Support.IniParse
 import Util.Gen
 import qualified FlagDump
@@ -322,7 +323,7 @@ processOptions = do
         mapM_ (\ (x,y) -> putStrLn (x ++ ": " ++ y))  configs
         exitSuccess
     Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME"
-    inis <- parseIniFiles (optVerbose o2 > 0) ["data/targets.ini", confDir ++ "/targets.ini", confDir ++ "/targets-local.ini", home ++ "/etc/jhc/targets.ini", home ++ "/.jhc/targets.ini"] (optArch o2)
+    inis <- parseIniFiles (optVerbose o2 > 0) targets_ini [confDir ++ "/targets.ini", confDir ++ "/targets-local.ini", home ++ "/etc/jhc/targets.ini", home ++ "/.jhc/targets.ini"] (optArch o2)
     when (FlagDump.Ini `S.member` optDumpSet o2) $ flip mapM_ (M.toList inis) $ \(a,b) -> putStrLn (a ++ "=" ++ b)
     let autoloads = maybe [] (tokens (',' ==)) (M.lookup "autoload" inis)
         o3 = o2 { optArgs = ns, optInis = inis }

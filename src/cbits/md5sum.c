@@ -26,7 +26,7 @@
 
 
 #include "config.h"
-#include "_stdint.h"
+#include <stdint.h>
 
 
 

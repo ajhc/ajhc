@@ -4,47 +4,48 @@ ACLOCAL_AMFLAGS=-I ac-macros
 bin_PROGRAMS = jhc
 
 
-jhc_SOURCES = Main.hs  $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
+jhc_SOURCES = src/Main.hs  $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
 
-SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
+#SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
+#SUFFIXES=
 
-BUILT_SOURCES= PrimitiveOperators.hs RawFiles.hs FrontEnd/HsParser.hs FlagDump.hs \
-	       FlagOpts.hs Name/Prim.hs Info/Properties.hs $(DRIFTFILES)
+BUILT_SOURCES= src/PrimitiveOperators.hs src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
+	       src/FlagOpts.hs src/Name/Prim.hs src/Info/Properties.hs $(DRIFTFILES)
 
-MY_CINCLUDES= -I$(srcdir)/data -I$(srcdir)/StringTable -I$(srcdir)/cbits -I$(builddir)/cbits
+MY_CINCLUDES= -I$(srcdir)/src/data -I$(srcdir)/src/StringTable -I$(srcdir)/src/cbits -I$(builddir)/src/cbits
 MY_CFLAGS= $(MY_CINCLUDES) -optc-std=c99 -optc-O2 -optc-Wall
 
-HSFILES=C/Generate.hs CharIO.hs Cmm/Number.hs Cmm/OpEval.hs DerivingDrift/DataP.hs \
-	DerivingDrift/Drift.hs DerivingDrift/RuleUtils.hs Doc/Attr.hs Doc/Chars.hs Doc/DocLike.hs \
-	Doc/PPrint.hs Doc/Pretty.hs E/Annotate.hs E/Binary.hs E/Diff.hs E/E.hs E/Eta.hs E/Eval.hs \
-	E/FreeVars.hs E/FromHs.hs E/Inline.hs E/LetFloat.hs E/PrimOpt.hs E/Program.hs E/Rules.hs \
-	E/Show.hs E/Subst.hs E/Traverse.hs E/TypeAnalysis.hs E/Values.hs E/WorkerWrapper.hs \
-	FindFixpoint.hs Fixer/Fixer.hs Fixer/Supply.hs Fixer/VMap.hs FlagDump.hs FlagOpts.hs \
-	FrontEnd/DataConsAssump.hs FrontEnd/DeclsDepends.hs FrontEnd/DependAnalysis.hs FrontEnd/Desugar.hs \
-	FrontEnd/Diagnostic.hs FrontEnd/FrontEnd.hs FrontEnd/HsErrors.hs FrontEnd/HsParser.hs \
-	FrontEnd/HsPretty.hs FrontEnd/Infix.hs FrontEnd/Lexer.hs FrontEnd/ParseMonad.hs FrontEnd/ParseUtils.hs \
-	FrontEnd/Rename.hs FrontEnd/Syn/Options.hs FrontEnd/Syn/Traverse.hs FrontEnd/Tc/Class.hs FrontEnd/Tc/Main.hs \
-	FrontEnd/Tc/Module.hs FrontEnd/Tc/Type.hs FrontEnd/Tc/Unify.hs FrontEnd/TypeSigs.hs FrontEnd/TypeSynonyms.hs\
-       	FrontEnd/TypeSyns.hs FrontEnd/Unlit.hs FrontEnd/Utils.hs FrontEnd/Warning.hs GenUtil.hs Grin/DeadCode.hs\
-       	Grin/Devolve.hs Grin/EvalInline.hs Grin/FromE.hs Grin/Grin.hs Grin/HashConst.hs Grin/Lint.hs\
-       	Grin/NodeAnalyze.hs Grin/Noodle.hs Grin/Optimize.hs Grin/Show.hs Grin/Simplify.hs Grin/Val.hs \
-	Grin/Whiz.hs Ho/Binary.hs Ho/Collected.hs Ho/Library.hs Info/Binary.hs Info/Info.hs Info/Properties.hs \
-	Info/Types.hs Interactive.hs Main.hs Name/Binary.hs Name/Id.hs Name/Name.hs Name/Names.hs \
-	Name/Prim.hs PackedString.hs PrimitiveOperators.hs \
-	RawFiles.hs Stats.hs Support/CanType.hs Support/CFF.hs Support/Compat.hs \
-	Support/FreeVars.hs Support/MapBinaryInstance.hs Support/MD5.hs Support/Tickle.hs Support/Transform.hs \
-	Support/Tuple.hs Support/Unparse.hs Util/BitSet.hs Util/ContextMonad.hs Util/FilterInput.hs \
-	Util/Gen.hs Util/Graph.hs Util/Graphviz.hs Util/HasSize.hs Util/Histogram.hs Util/Inst.hs \
-	Util/IntBag.hs Util/Interact.hs Util/NameMonad.hs Util/Once.hs Util/Perhaps.hs Util/ReaderWriter.hs \
-	Util/Relation.hs Util/RWS.hs Util/SameShape.hs Util/Seq.hs Util/SetLike.hs Util/UnionFind.hs \
-	Util/UnionSolve.hs Util/UniqueMonad.hs Util/Util.hs Util/VarName.hs Version/Config.hs Version/Version.hs \
-	Support/IniParse.hs E/Lint.hs
+HSFILES=src/C/Generate.hs src/CharIO.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/DataP.hs \
+	src/DerivingDrift/Drift.hs src/DerivingDrift/RuleUtils.hs src/Doc/Attr.hs src/Doc/Chars.hs src/Doc/DocLike.hs \
+	src/Doc/PPrint.hs src/Doc/Pretty.hs src/E/Annotate.hs src/E/Binary.hs src/E/Diff.hs src/E/E.hs src/E/Eta.hs src/E/Eval.hs \
+	src/E/FreeVars.hs src/E/FromHs.hs src/E/Inline.hs src/E/LetFloat.hs src/E/PrimOpt.hs src/E/Program.hs src/E/Rules.hs \
+	src/E/Show.hs src/E/Subst.hs src/E/Traverse.hs src/E/TypeAnalysis.hs src/E/Values.hs src/E/WorkerWrapper.hs \
+	src/FindFixpoint.hs src/Fixer/Fixer.hs src/Fixer/Supply.hs src/Fixer/VMap.hs src/FlagDump.hs src/FlagOpts.hs \
+	src/FrontEnd/DataConsAssump.hs src/FrontEnd/DeclsDepends.hs src/FrontEnd/DependAnalysis.hs src/FrontEnd/Desugar.hs \
+	src/FrontEnd/Diagnostic.hs src/FrontEnd/FrontEnd.hs src/FrontEnd/HsErrors.hs src/FrontEnd/HsParser.hs \
+	src/FrontEnd/HsPretty.hs src/FrontEnd/Infix.hs src/FrontEnd/Lexer.hs src/FrontEnd/ParseMonad.hs src/FrontEnd/ParseUtils.hs \
+	src/FrontEnd/Rename.hs src/FrontEnd/Syn/Options.hs src/FrontEnd/Syn/Traverse.hs src/FrontEnd/Tc/Class.hs src/FrontEnd/Tc/Main.hs \
+	src/FrontEnd/Tc/Module.hs src/FrontEnd/Tc/Type.hs src/FrontEnd/Tc/Unify.hs src/FrontEnd/TypeSigs.hs src/FrontEnd/TypeSynonyms.hs\
+       	src/FrontEnd/TypeSyns.hs src/FrontEnd/Unlit.hs src/FrontEnd/Utils.hs src/FrontEnd/Warning.hs src/GenUtil.hs src/Grin/DeadCode.hs\
+       	src/Grin/Devolve.hs src/Grin/EvalInline.hs src/Grin/FromE.hs src/Grin/Grin.hs src/Grin/HashConst.hs src/Grin/Lint.hs\
+       	src/Grin/NodeAnalyze.hs src/Grin/Noodle.hs src/Grin/Optimize.hs src/Grin/Show.hs src/Grin/Simplify.hs src/Grin/Val.hs \
+	src/Grin/Whiz.hs src/Ho/Binary.hs src/Ho/Collected.hs src/Ho/Library.hs src/Info/Binary.hs src/Info/Info.hs src/Info/Properties.hs \
+	src/Info/Types.hs src/Interactive.hs src/Main.hs src/Name/Binary.hs src/Name/Id.hs src/Name/Name.hs src/Name/Names.hs \
+	src/Name/Prim.hs src/PackedString.hs src/PrimitiveOperators.hs \
+	src/RawFiles.hs src/Stats.hs src/Support/CanType.hs src/Support/CFF.hs src/Support/Compat.hs \
+	src/Support/FreeVars.hs src/Support/MapBinaryInstance.hs src/Support/MD5.hs src/Support/Tickle.hs src/Support/Transform.hs \
+	src/Support/Tuple.hs src/Support/Unparse.hs src/Util/BitSet.hs src/Util/ContextMonad.hs src/Util/FilterInput.hs \
+	src/Util/Gen.hs src/Util/Graph.hs src/Util/Graphviz.hs src/Util/HasSize.hs src/Util/Histogram.hs src/Util/Inst.hs \
+	src/Util/IntBag.hs src/Util/Interact.hs src/Util/NameMonad.hs src/Util/Once.hs src/Util/Perhaps.hs src/Util/ReaderWriter.hs \
+	src/Util/Relation.hs src/Util/RWS.hs src/Util/SameShape.hs src/Util/Seq.hs src/Util/SetLike.hs src/Util/UnionFind.hs \
+	src/Util/UnionSolve.hs src/Util/UniqueMonad.hs src/Util/Util.hs src/Util/VarName.hs src/Version/Config.hs src/Version/Version.hs \
+	src/Support/IniParse.hs src/E/Lint.hs
 
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -auto-all -osuf prof.o -hisuf prof.hi
 GHCINC=  -i -i$(srcdir)/drift_processed  \
-	 -i$(srcdir)/.  -i$(builddir) -odir $(builddir) -hidir $(builddir)
+	 -i$(srcdir)/src  -i$(builddir)/src -odir $(builddir)/src -hidir $(builddir)/src
 
 PACKAGES= -package fgl -package regex-compat -package random -package array -package readline -package directory \
           -package bytestring -package binary -package pretty -package mtl -package containers   \
@@ -57,10 +58,10 @@ GHCOPTS= $(HSOPTS) -fbang-patterns -O @GHCFLAGS@  $(GHCDEBUGOPTS) $(GHCINC) $(PA
 JHC_LIBS =  base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl
 
 
-EXTRA_DIST = data utils docs FrontEnd/HsParser.y $(BUILT_SOURCES) \
+EXTRA_DIST = src/data utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
-	     StringTable/StringTable_cbits.c StringTable/StringTable_cbits.h cbits/md5sum.c jhc.1 \
-	     StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal lib/containers.cabal \
+	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
+	     src/StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal lib/containers.cabal \
 	     manual.html
 
 CC = $(HC)
@@ -81,8 +82,8 @@ install-data-hook: $(JHC_LIBS)
 		test -f "$$lib" && $(INSTALL_DATA) $$lib $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 		test -f "$(srcdir)/$$lib" && $(INSTALL_DATA) "$(srcdir)/$$lib" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 	done
-	$(INSTALL_DATA) "$(srcdir)/data/HsFFI.h" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include ;
-	$(INSTALL_DATA) "$(srcdir)/data/targets.ini" $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@ ;
+	$(INSTALL_DATA) "$(srcdir)/src/data/HsFFI.h" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include ;
+	$(INSTALL_DATA) "$(srcdir)/src/data/targets.ini" $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@ ;
 
 uninstall-hook: $(JHC_LIBS)
 	rm -f -- "$(DESTDIR)$(bindir)/jhci$(EXTEXT)"
@@ -95,7 +96,7 @@ uninstall-hook: $(JHC_LIBS)
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
-RAWFILES = data/HsFFI.h data/rts/jhc_rts.c data/rts/jhc_rts_header.h data/wsize.h data/rts/jhc_rts_alloc.c data/rts/jhc_rts2.c data/ViaGhc.hs ChangeLog data/shortchange.txt data/prelude.m4
+RAWFILES = src/data/HsFFI.h src/data/rts/jhc_rts.c src/data/rts/jhc_rts_header.h src/data/wsize.h src/data/rts/jhc_rts_alloc.c src/data/rts/jhc_rts2.c src/data/ViaGhc.hs ChangeLog src/data/shortchange.txt src/data/prelude.m4 src/data/targets.ini
 
 DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/Cmm/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \
    drift_processed/DerivingDrift/StandardRules.hs drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \
@@ -105,21 +106,21 @@ DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_proce
    drift_processed/FrontEnd/Tc/Monad.hs drift_processed/Grin/SSimplify.hs drift_processed/Name/VConsts.hs drift_processed/Options.hs \
    drift_processed/DataConstructors.hs-boot drift_processed/Ho/Type.hs  drift_processed/Ho/Build.hs
 
-drift_processed/%: %
+drift_processed/%: src/%
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
 	DrIFT $< -o $@
 
 
-CFILES =  StringTable/StringTable_cbits.o  cbits/md5sum.o
+CFILES =  src/StringTable/StringTable_cbits.o  src/cbits/md5sum.o
 
 %.o : %.c
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
 	$(HC) $(MY_CFLAGS) $< -c -o $@
 
-jhc: Main.hs  $(HSFILES) $(BUILT_SOURCES) StringTable/Atom.hs $(CFILES)
+jhc: src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
 	$(HC) $(GHCOPTS) --make $< $(CFILES) -o $@
 
-jhcp: Main.hs $(BUILT_SOURCES) $(HSFILES) StringTable/Atom.hs $(CFILES)
+jhcp: src/Main.hs $(BUILT_SOURCES) $(HSFILES) src/StringTable/Atom.hs $(CFILES)
 	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< $(CFILES) -o $@
 
 dist_man_MANS = jhc.1
@@ -127,7 +128,7 @@ dist_man_MANS = jhc.1
 install-exec-hook:
 	cd $(DESTDIR)$(bindir) && $(LN_S) -f jhc$(EXEEXT) jhci$(EXEEXT)
 
-HSBOOT= DataConstructors.hs-boot FrontEnd/Tc/Class.hs-boot Grin/Grin.hs-boot Grin/Show.hs-boot Info/Binary.hs-boot E/Show.hs-boot
+HSBOOT= src/DataConstructors.hs-boot src/FrontEnd/Tc/Class.hs-boot src/Grin/Grin.hs-boot src/Grin/Show.hs-boot src/Info/Binary.hs-boot src/E/Show.hs-boot
 
 # Various rules for generated Haskell files
 
@@ -142,30 +143,30 @@ HSBOOT= DataConstructors.hs-boot FrontEnd/Tc/Class.hs-boot Grin/Grin.hs-boot Gri
 %.mkd: %.flags  utils/opt_sets.prl
 	perl $(srcdir)/utils/opt_sets.prl -f f -m -n $< $<  > $@
 
-Info/Properties.hs: data/props.txt utils/gen_props.prl
+src/Info/Properties.hs: src/data/props.txt utils/gen_props.prl
 	perl $(srcdir)/utils/gen_props.prl $< > $@ || rm -f $@
 
 
-PrimitiveOperators.hs: utils/op_process.prl data/operators.txt data/primitives.txt data/PrimitiveOperators-in.hs
+src/PrimitiveOperators.hs: utils/op_process.prl src/data/operators.txt src/data/primitives.txt src/data/PrimitiveOperators-in.hs
 	perl $< > $@ || rm -f $@
 
-Name/Prim.hs: utils/op_names.prl data/primitives.txt data/names.txt
+src/Name/Prim.hs: utils/op_names.prl src/data/primitives.txt src/data/names.txt
 	perl $< > $@ || rm -f $@
 
-RawFiles.hs:  utils/op_raw.prl $(RAWFILES)
+src/RawFiles.hs:  utils/op_raw.prl $(RAWFILES)
 	perl $< $(basename $@)  $(RAWFILES) > $@
 
-FrontEnd/HsParser.hs: FrontEnd/HsParser.y
+src/FrontEnd/HsParser.hs: src/FrontEnd/HsParser.y
 	happy -a -g -c $< -o $@
 	sed -e 's/^{-# OPTIONS/{-# OPTIONS_GHC -w/' -i $@
 
 
-.SECONDARY: _darcs/hashed_inventory data/shortchange.txt
+.SECONDARY: _darcs/hashed_inventory src/data/shortchange.txt
 
 ChangeLog: _darcs/hashed_inventory
 	darcs changes --from-tag . > $@
 
-data/shortchange.txt: ChangeLog
+src/data/shortchange.txt: ChangeLog
 	echo -n "`sed -ne 's/^  tagged \(.*\)/\1/p' $<`-`grep -c '^  \*' $<`"  > $@
 
 
@@ -186,7 +187,7 @@ bin-dist: jhc
 
 deps.txt:
 	$(MAKE) $(AM_MAKEFLAGS) $(BUILT_SOURCES)
-	$(HC) -M -optdep-f -optdep$@ $(GHCOPTS) Main.hs
+	$(HC) -M -optdep-f -optdep$@ $(GHCOPTS) src/Main.hs
 
 update-datestamp: ChangeLog
 	sh utils/update_datestamp.sh $< configure.ac
@@ -197,7 +198,7 @@ depend.make: deps.txt
 built-sources: $(BUILT_SOURCES)
 
 i: $(BUILT_SOURCES)
-	$(HC) --interactive $(GHCOPTS) Main.hs $(CFILES)
+	$(HC) --interactive $(GHCOPTS) src/Main.hs $(CFILES)
 
 .PHONY: ho-clean hl-clean built-sources i update-datestamp manual man
 
@@ -247,12 +248,12 @@ haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml manual.html docs/manual.css
 	cp -- $^ /home/john/public_html/computer/jhc
 
-manual: utils/stitch.prl FlagDump.mkd FlagOpts.mkd options.mkd
-	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl > manual.mkd
+manual: utils/stitch.prl src/FlagDump.mkd src/FlagOpts.mkd options.mkd
+	find . ! -wholename '*/examples/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl > manual.mkd
 	pandoc manual.mkd --toc -s -f markdown -t html -s -c manual.css -o $@.html
 
-man: utils/stitch.prl FlagDump.mkd FlagOpts.mkd options.mkd docs/man_header.mkd
-	find . ! -wholename '*/test/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
+man: utils/stitch.prl src/FlagDump.mkd src/FlagOpts.mkd options.mkd docs/man_header.mkd
+	find . ! -wholename '*/examples/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
 	pandoc jhc_man.mkd -s -f markdown -t man -s  -o jhc.1
 
 options.mkd: jhc
@@ -268,12 +269,7 @@ manual.html :
 .PHONY: libs
 libs: $(JHC_LIBS)
 
-helloworld: test/HelloWorld.hs jhc
+%: examples/%.hs jhc
 	-[ -e $@.log ] && mv -f $@.log $@.log.bak
-	./jhc -v -L- -L. $(JHC_TEST) test/HelloWorld.hs -o $@ 2>&1 | tee $@.log
-calendar: test/Calendar.hs jhc
-	-[ -e $@.log ] && mv -f $@.log $@.log.bak
-	./jhc -v -L- -L. $(JHC_TEST) test/Calendar.hs -o $@ 2>&1 | tee $@.log
-primes: test/Primes.hs jhc
-	-[ -e $@.log ] && mv -f $@.log $@.log.bak
-	./jhc -v -L- -L. $(JHC_TEST) test/Primes.hs -o $@ 2>&1 | tee $@.log
+	./jhc -v -L- -L. $(JHC_TEST) $< -o $@ 2>&1 | tee $@.log
+

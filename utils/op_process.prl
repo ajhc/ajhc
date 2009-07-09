@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 
-open OP, "<data/operators.txt";
+open OP, "<src/data/operators.txt";
 
 my @fl;
 my @in;
@@ -88,7 +88,7 @@ while(<OP>) {
 }
 
 my @ds;
-open PR, "<data/primitives.txt";
+open PR, "<src/data/primitives.txt";
 while(<PR>) {
     chomp;
     next unless /\S/;
@@ -236,7 +236,7 @@ foreach my $d (@ds) {
     }
 }
 
-my $head = `cat data/PrimitiveOperators-in.hs`;
+my $head = `cat src/data/PrimitiveOperators-in.hs`;
 print "$head\n";
 print "primitiveInsts = [\n   ", join("\n  ,",@inst), " ]\n\n";
 print "constantMethods = [\n   ", join("\n  ,",@cmeth), " ]\n\n";

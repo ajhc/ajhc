@@ -106,25 +106,29 @@ processIni iniRaw = iniMap' where
 --        f y x = x ++ " " ++ y
 --    res mp (k,v) = Map.insert k v mp
 
-    
+
 
 parseIniFile :: FilePath -> IO (Seq.Seq (String,Seq.Seq (String,String)))
-parseIniFile fp = do
+parseIniFile fp = readFile fp >>= parseIniRaw fp
+
+parseIniRaw :: String -> String -> IO (Seq.Seq (String,Seq.Seq (String,String)))
+parseIniRaw fp c = do
     let P act = dropSpace >> pThings "default" Seq.empty Seq.empty
-    c <- readFile fp
     return $ evalState act (0,fp,c)
 
 
-parseIniFiles 
+parseIniFiles
     :: Bool          -- ^ whether verbose is enabled
+    -> String        -- ^ raw ini contents to parse first
     -> [FilePath]    -- ^ the files (in order) we attempt to parse
-    -> [String]      -- ^ the m-flags 
+    -> [String]      -- ^ the m-flags
     -> IO (Map.Map String String)
-parseIniFiles verbose fs ss = do
-    let rf fn = catch (do c <- parseIniFile fn; pverb ("reading " ++ fn); return c) (\_ -> return Seq.empty) 
+parseIniFiles verbose raw fs ss = do
+    let rf fn = catch (do c <- parseIniFile fn; pverb ("reading " ++ fn); return c) (\_ -> return Seq.empty)
         pverb s = if verbose then putErrLn s else return ()
+    rawp <- parseIniRaw "(builtin targets.ini)" raw
     fsc <- mapM rf fs
-    let pini = processIni (foldr (Seq.><) Seq.empty fsc)
+    let pini = processIni (foldr (Seq.><) Seq.empty (rawp:fsc))
         f (x:xs) cm = case span (/= '=') x of
             (be,'=':re) -> f xs (Map.insert be re cm)
             (be,[]) -> f xs (Seq.foldl res cm (Map.findWithDefault Seq.empty be pini))
@@ -134,7 +138,7 @@ parseIniFiles verbose fs ss = do
             f y x = x ++ " " ++ y
         res mp (k,v) = Map.insert k v mp
     return (f ss Map.empty)
-        
+
 
 
 

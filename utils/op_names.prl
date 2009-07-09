@@ -11,7 +11,7 @@ my %stuff;
 
 
 my @ds;
-open PR, "<data/primitives.txt";
+open PR, "<src/data/primitives.txt";
 while(<PR>) {
     chomp;
     next unless /\S/;
@@ -57,7 +57,7 @@ foreach my $ort (sort keys %rt) {
 }
 
 my ($nametype,$leader);
-open my $fd, "<data/names.txt";
+open my $fd, "<src/data/names.txt";
 while(<$fd>) {
     chomp;
     next unless /\S/;

@@ -18,22 +18,20 @@ page is recommended.
 In order to build from the darcs repo, you need the following things installed:
 
     * GHC 6.8.2 or better
-    * binary ghc library
-    * zlib ghc library
-    * utf8-string ghc library
     * A recent version of DrIFT
     * pandoc if you wish to build documentation
     * graphviz if you wish to create code motion graphs
     * a working 'perl' install for various sundry tasks
     * the happy haskell parser generator
+    * for ghc 6.8 you need the binary, zlib, and utf8-string libraries installed. ghc 6.10 may require more depending on how it is installed.
 
 First you must install darcs, there are a couple projects you need to pull in
 order to compile jhc, the following should produce a working tree:
 
     darcs get http://repetae.net/repos/jhc
-    cd jhc
+    cd jhc/src
     darcs get http://repetae.net/repos/Doc
-    cd lib
+    cd ../lib
     darcs get http://darcs.haskell.org/packages/haskell98
     darcs get http://darcs.haskell.org/packages/containers
 
@@ -49,11 +47,11 @@ after jhc has finished building, you can create the standard libraries via
 
 jhc can now be tested via
 
-    make helloworld
+    make HelloWorld
 
 however, during development it is often easier to use the raw haskell source of
 the libraries directly. in order to do that, you can run jhc with the following
 options when run in the development tree.
 
-    ./jhc -v --noauto -ilib/base -ilib/haskell98 test/HelloWorld.hs -o helloworld
+    ./jhc -v --noauto -ilib/base -ilib/haskell98 examples/HelloWorld.hs -o helloworld
 

@@ -12,6 +12,7 @@ getopts("n:mf:",\%opt);
 die "no name" unless $opt{n};
 my $name = $opt{n};
 $name =~ s/\.[a-z]+$//;
+$name =~ s/^.*\///;
 
 my @l;
 my %h;
