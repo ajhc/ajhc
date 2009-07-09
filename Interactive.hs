@@ -1,18 +1,18 @@
-module Interactive(Interactive.interact) where
+module Interactive(Interactive.interact, isInteractive) where
 
-import Control.Monad.Reader
-import Control.Monad.Identity
-import Control.Monad.Trans
 import Control.Exception as CE
+import Control.Monad.Identity
+import Control.Monad.Reader
+import Control.Monad.Trans
 import Data.Monoid
 import IO(stdout)
-import List(sort)
+import List(sort,isPrefixOf)
 import Maybe
 import Monad
+import System
+import Text.Regex
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as P
-import Text.Regex
---import Text.Regex.Posix(regcomp,regExtended)
 
 
 import DataConstructors
@@ -253,3 +253,9 @@ calcImports ho qual mod = case Map.lookup mod (hoExports ho) of
             ls' = concat [ zip (concat nns) (repeat [n]) | (n,nns) <- ls ]
         return $ Map.toList $ Map.map snub $ Map.fromListWith (++) ls'
 
+isInteractive :: IO Bool
+isInteractive = do
+    pn <- System.getProgName
+    return $ (optMode options == Interactive)
+          || "ichj" `isPrefixOf` reverse pn
+          || not (null $ optStmts options)

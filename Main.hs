@@ -8,19 +8,18 @@ import IO(hFlush,stderr,stdout)
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified List(group,union)
 import qualified System
+import qualified Data.List as L
 
+import Doc.PPrint
 import Util.Util
 import CharIO
 import DataConstructors
-import Doc.DocLike
-import Doc.PPrint
-import Doc.Pretty
 import E.Annotate(annotateDs,annotateCombs,annotateProgram)
 import E.Diff
 import E.E
 import E.Eta
+import E.Lint
 import E.FreeVars
 import E.FromHs
 import E.Inline
@@ -28,7 +27,6 @@ import E.LambdaLift
 import E.LetFloat
 import E.Program
 import E.Rules
-import E.Show hiding(render)
 import E.Subst(subst)
 import E.Traverse
 import E.TypeAnalysis
@@ -54,13 +52,10 @@ import FrontEnd.HsSyn
 import Info.Types
 import Name.Id
 import Name.Name
-import Name.Names
-import Name.VConsts
 import Options
 import Support.FreeVars
 import Support.CanType(getType)
 import Support.Transform
-import Support.Compat
 import Util.Graph
 import Util.SetLike as S
 import Version.Version(versionString,versionContext,versionSimple)
@@ -118,7 +113,7 @@ main =  runMain $ bracketHtml $ do
 
 
 processFiles [] | Nothing <- optMainFunc options = do
-    int <- isInteractive
+    int <- Interactive.isInteractive
     when (not int) $ putErrDie "jhc: no input files"
     processFilesModules [Left (Module "Prelude")]
 processFiles [] | Just (b,m) <- optMainFunc options = do
@@ -135,19 +130,6 @@ fileOrModule f = case reverse f of
                    ('s':'h':'l':'.':_) -> Right f
                    _                   -> Left $ Module f
 
-
---barendregtProg prog = transformProgram transBarendregt prog
-barendregtProg prog = return prog
-
-transBarendregt = transformParms {
-        transformCategory = "Barendregt",
-        transformIterate = DontIterate,
-        transformDumpProgress = corePass,
-        transformOperation =  evaluate . barendregtProgram
-        } where
-    barendregtProgram prog | null $ progCombinators prog = prog
-    barendregtProgram prog = programSetDs ds' prog where
-        (ELetRec ds' Unknown,_) = renameE mempty mempty (ELetRec (programDs prog) Unknown)
 
 
 lamann _ nfo = return nfo
@@ -178,7 +160,7 @@ processInitialHo accumho aho = do
         nrules = map ruleUpdate . combRules $ mfindWithDefault emptyComb emptyId choCombinators'
         reRule :: Comb -> Comb
         reRule comb = combRules_u f comb where
-            f rs = List.union  rs [ x | x <- nrules, ruleHead x == combHead comb]
+            f rs = L.union  rs [ x | x <- nrules, ruleHead x == combHead comb]
 
     let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- map combHead $ melems choCombs ]) (choVarMap accumho)
         choCombs = mfilterWithKey (\k _ -> k /= emptyId) choCombinators'
@@ -266,7 +248,7 @@ processDecls cho ho' tiData = do
     -- now we must attach rules to the existing chos, as well as the current ones
     let addRule c = case mlookup (combIdent c) rules' of
             Nothing -> c
-            Just rs -> combRules_u (map ruleUpdate . List.union rs) c
+            Just rs -> combRules_u (map ruleUpdate . L.union rs) c
     prog <- return $ progCombinators_u (map addRule) prog
     cho <- return $ choCombinators_u (fmap addRule) cho
 
@@ -317,7 +299,6 @@ processDecls cho ho' tiData = do
         mprog <- evaluate $ etaAnnotateProgram mprog
 
         mprog <- simplifyProgram sopt "Init-One" coreMini mprog
-        mprog <- barendregtProg mprog
 
         -- | this catches more static arguments if we wait until after the initial normalizing simplification pass
         mprog <- transformProgram tparms { transformSkipNoStats = True, transformCategory = "SimpleRecursive"
@@ -332,14 +313,12 @@ processDecls cho ho' tiData = do
         -- the default binding of the case statement.
 
         mprog <- simplifyProgram sopt "Init-Two-FloatOutCleanup" coreMini mprog
-        mprog <- barendregtProg mprog
         mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } mprog
 
         mprog <- transformProgram tparms { transformCategory = "FloatInward", transformOperation = programFloatInward } mprog
         mprog <- Demand.analyzeProgram mprog
         lintCheckProgram onerrNone mprog
         mprog <- simplifyProgram sopt "Init-Three-AfterDemand" False mprog
-        mprog <- barendregtProg mprog
         when miniCorePass $ printProgram mprog -- mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
         when miniCoreSteps $ Stats.printLStat (optStatLevel options) ("InitialOptimize:" ++ names) (progStats mprog)
         wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
@@ -355,8 +334,7 @@ processDecls cho ho' tiData = do
         Stats.printLStat (optStatLevel options) "Initial Pass Stats" (progStats prog)
     lintCheckProgram onerrNone prog
 
-    prog <- barendregtProg prog { progStats = mempty }
-    prog <- etaExpandProg "Init-Big-One" prog
+    prog <- etaExpandProg "Init-Big-One" prog { progStats = mempty }
     prog <- transformProgram tparms {
         transformPass = "Init-Big-One",
         transformCategory = "FloatInward",
@@ -381,7 +359,6 @@ processDecls cho ho' tiData = do
                 }
 
         mprog <- simplifyProgram sopt "Simplify-One" coreMini mprog
-        mprog <- barendregtProg mprog
         mprog <- transformProgram tparms { transformCategory = "FloatInward", transformOperation = programFloatInward } mprog
         mprog <- Demand.analyzeProgram mprog
         mprog <- simplifyProgram sopt "Simplify-Two" coreMini mprog
@@ -412,8 +389,7 @@ processDecls cho ho' tiData = do
         liftIO $ wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
         return mprog
 
-    prog <- barendregtProg prog { progStats = mempty }
-    prog <- evalStateT (programMapProgGroups mempty optWW prog) (SS.so_boundVars sopt)
+    prog <- evalStateT (programMapProgGroups mempty optWW prog { progStats = mempty }) (SS.so_boundVars sopt)
     progress "!"
     hFlush stdout >> hFlush stderr
     wdump FD.Progress $
@@ -466,13 +442,6 @@ shouldBeExported exports tvr
 
 --idHistogram e = execWriter $ annotate mempty (\id nfo -> tell (Histogram.singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
 
-isInteractive :: IO Bool
-isInteractive = do
-    pn <- System.getProgName
-    return $ (optMode options == Interactive)
-          || "ichj" `isPrefixOf` reverse pn
-          || not (null $ optStmts options)
-
 transTypeAnalyze = transformParms { transformCategory = "typeAnalyze",  transformOperation = typeAnalyze True }
 
 compileModEnv cho = do
@@ -500,7 +469,7 @@ compileModEnv cho = do
     wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules'
 
     -- enter interactive mode
-    int <- isInteractive
+    int <- Interactive.isInteractive
     if int then Interactive.interact cho else do
 
     when collectPassStats $ do
@@ -519,7 +488,6 @@ compileModEnv cho = do
                           progCombinators = emptyComb { combHead = main, combBody = mainv }:map (unsetProperty prop_EXPORTED) (progCombinators prog)
                         }
     prog <- transformProgram transformParms { transformCategory = "PruneUnreachable", transformOperation = evaluate . programPruneUnreachable } prog
-    prog <- barendregtProg prog
 
 --    (viaGhc,fn,_,_) <- determineArch
 --    wdump FD.Progress $ putStrLn $ "Arch: " ++ fn
@@ -557,7 +525,6 @@ compileModEnv cho = do
 
     unless (fopts FO.GlobalOptimize) $ do
         prog <- programPrune prog
-        prog <- barendregtProg prog
         wdump FD.CoreBeforelift $ printProgram prog
         prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift } prog
         wdump FD.CoreAfterlift $ printProgram prog -- printCheckName dataTable (programE prog)
@@ -566,21 +533,16 @@ compileModEnv cho = do
 
 
     prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterMethod", transformDumpProgress = verbose } prog
-    prog <- barendregtProg prog
 
 
     prog <- simplifyProgram SS.emptySimplifyOpts "Main-One" verbose prog
-    prog <- barendregtProg prog
 
 
     prog <- etaExpandProg "Main-AfterOne" prog
-    prog <- barendregtProg prog
     prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterSimp", transformDumpProgress = verbose } prog
 
 
-    prog <- barendregtProg prog
     prog <- simplifyProgram SS.emptySimplifyOpts "Main-Two" verbose prog
-    prog <- barendregtProg prog
 
 
     -- run optimization again with no rules enabled
@@ -590,7 +552,6 @@ compileModEnv cho = do
     --prog <- transformProgram "float inward" DontIterate True programFloatInward prog
 
     prog <- simplifyProgram SS.emptySimplifyOpts { SS.so_finalPhase = True } "SuperSimplify no rules" verbose prog
-    prog <- barendregtProg prog
 
 
     -- We should float inward right before lambda lifting so that when a case statement is lifted out, it takes any local definitions with it.
@@ -609,7 +570,6 @@ compileModEnv cho = do
     prog <- return $ E.CPR.cprAnalyzeProgram prog
     prog <- transformProgram transformParms { transformCategory = "Boxy WorkWrap", transformDumpProgress = dump FD.Progress, transformOperation = evaluate . workWrapProgram } prog
     prog <- simplifyProgram SS.emptySimplifyOpts { SS.so_finalPhase = True } "SuperSimplify after Boxy WorkWrap" verbose prog
-    prog <- barendregtProg prog
     prog <- return $ runIdentity $ programMapBodies (return . cleanupE) prog
 
 --    when viaGhc $ do
@@ -800,18 +760,6 @@ compileGrinToC grin = do
     return ()
 
 
-dumpCore pname prog = do
-    let fn = optOutName options ++ "_" ++ pname ++ ".jhc_core"
-    putErrLn $ "Writing: " ++ fn
-    h <- IO.openFile fn IO.WriteMode
-    (argstring,sversion) <- getArgString
-    IO.hPutStrLn h $ unlines [ "-- " ++ argstring,"-- " ++ sversion,""]
-    hPrintProgram h prog
-    IO.hClose h
-    wdump FD.Core $ do
-        putErrLn $ "v-- " ++ pname ++ " Core"
-        printProgram prog
-        putErrLn $ "^-- " ++ pname ++ " Core"
 
 simplifyProgram sopt name dodump prog = liftIO $ do
     let istat = progStats prog
@@ -848,116 +796,8 @@ simplifyProgram' sopt name dodump iterate prog = do
     when (dodump && (dump FD.Progress || coreSteps)) $ Stats.printLStat (optStatLevel options) ("Total: " ++ name) (progStats prog)
     return prog { progStats = progStats prog `mappend` istat }
 
--- all transformation routines assume they are being passed a correct program, and only check the output
 
 
-
-
-
-transformProgram :: MonadIO m => TransformParms Program -> Program -> m Program
-
-transformProgram TransformParms { transformIterate = IterateMax n } prog | n <= 0 = return prog
-transformProgram TransformParms { transformIterate = IterateExactly n } prog | n <= 0 = return prog
-transformProgram tp prog = liftIO $ do
-    let dodump = transformDumpProgress tp
-        name = transformCategory tp ++ pname (transformPass tp) ++ pname (transformName tp)
-        scname = transformCategory tp ++ pname (transformPass tp)
-        pname "" = ""
-        pname xs = '-':xs
-        iterate = transformIterate tp
-    when dodump $ putErrLn $ "-- " ++ name
-    when (dodump && corePass) $ printProgram prog
-    wdump FD.ESize $ printESize ("Before "++name) prog
-    let istat = progStats prog
-    let ferr e = do
-        putErrLn $ "\n>>> Exception thrown"
-        putErrLn $ "\n>>> Before " ++ name
-        printProgram prog
-        putErrLn $ "\n>>>"
-        putErrLn (show (e::SomeException))
-        maybeDie
-        return prog
-    prog' <- Control.Exception.catch (transformOperation tp prog { progStats = mempty }) ferr
-    let estat = progStats prog'
-        onerr = do
-            putErrLn $ "\n>>> Before " ++ name
-            printProgram prog
-            Stats.printStat name estat
-            putErrLn $ "\n>>> After " ++ name
-    if transformSkipNoStats tp && estat == mempty then do
-        when dodump $ putErrLn "program not changed"
-        return prog
-     else do
-    when (dodump && dump FD.CoreSteps && (not $ Stats.null estat)) $ Stats.printLStat (optStatLevel options) name estat
-    when collectPassStats $ do
-        Stats.tick Stats.theStats scname
-        Stats.tickStat Stats.theStats (Stats.prependStat scname estat)
-    wdump FD.ESize $ printESize ("After  "++name) prog'
-    lintCheckProgram onerr prog'
-    if doIterate iterate (not $ Stats.null estat) then transformProgram tp { transformIterate = iterateStep iterate } prog' { progStats = istat `mappend` estat } else
-        return prog' { progStats = istat `mappend` estat, progPasses = name:progPasses prog' }
-
-maybeDie = case optKeepGoing options of
-    True -> return ()
-    False -> putErrDie "Internal Error"
-
-onerrNone :: IO ()
-onerrNone = return ()
-
-
-
-lintCheckE onerr dataTable tvr e | flint = case inferType dataTable [] e of
-    Left ss -> do
-        onerr
-        putErrLn ">>> Type Error"
-        putErrLn  ( render $ hang 4 (pprint tvr <+> equals <+> pprint e))
-        putErrLn $ "\n>>> internal error:\n" ++ unlines (intersperse "----" $ tail ss)
-        maybeDie
-    Right v -> return ()
-lintCheckE _ _ _ _ = return ()
-
-lintCheckProgram onerr prog | flint = do
-    when (hasRepeatUnder fst (programDs prog)) $ do
-        onerr
-        let repeats = [ x | x@(_:_:_) <- List.group $ sort (map fst (programDs prog))]
-        putErrLn $ ">>> Repeated top level decls: " ++ pprint repeats
-        printProgram prog
-        putErrLn $ ">>> program has repeated toplevel definitions" ++ pprint repeats
-        maybeDie
-    let f (tvr@TVr { tvrIdent = n },e) | isNothing $ fromId n = do
-            onerr
-            putErrLn $ ">>> non-unique name at top level: " ++ pprint tvr
-            printProgram prog
-            putErrLn $ ">>> non-unique name at top level: " ++ pprint tvr
-            maybeDie
-        f (tvr,e) = do
-            case scopeCheck False mempty e of
-                Left s -> do
-                    onerr
-                    putErrLn $ ">>> scopecheck failed in " ++ pprint tvr ++ " " ++ s
-                    printProgram prog
-                    putErrLn $ ">>> scopecheck failed in " ++ pprint tvr ++ " " ++ s
-                    maybeDie
-                Right () -> return ()
-            lintCheckE onerr (progDataTable prog) tvr e
-    mapM_ f (programDs prog)
-    let ids = progExternalNames prog `mappend` fromList (map tvrIdent $ fsts (programDs prog)) `mappend` progSeasoning prog
-        fvs = Set.fromList $ melems (freeVars $ snds $ programDs prog :: IdMap TVr)
-        unaccounted = Set.filter (not . (`member` ids) . tvrIdent) fvs
-    unless (Set.null unaccounted) $ do
-        onerr
-        putErrLn ("\n>>> Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
-        printProgram prog
-        putErrLn (">>> Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
-        --putErrLn (show ids)
-        maybeDie
-lintCheckProgram _ _ = return ()
-
-
-
-
-printESize :: String -> Program -> IO ()
-printESize str prog = putErrLn $ str ++ " program e-size: " ++ show (eSize (programE prog))
 
 
 

@@ -38,7 +38,7 @@ HSFILES=C/Generate.hs CharIO.hs Cmm/Number.hs Cmm/OpEval.hs DerivingDrift/DataP.
 	Util/IntBag.hs Util/Interact.hs Util/NameMonad.hs Util/Once.hs Util/Perhaps.hs Util/ReaderWriter.hs \
 	Util/Relation.hs Util/RWS.hs Util/SameShape.hs Util/Seq.hs Util/SetLike.hs Util/UnionFind.hs \
 	Util/UnionSolve.hs Util/UniqueMonad.hs Util/Util.hs Util/VarName.hs Version/Config.hs Version/Version.hs \
-	Support/IniParse.hs
+	Support/IniParse.hs E/Lint.hs
 
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
