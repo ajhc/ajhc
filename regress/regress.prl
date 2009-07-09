@@ -6,7 +6,7 @@ use warnings;
 use Getopt::Long;
 use Pod::Usage;
 use Data::Dumper;
-use POSIX qw(strftime);
+use POSIX qw(strftime SIGINT);
 use Cwd;
 
 my @opts;
@@ -190,7 +190,7 @@ sub do_it {
                 my $msg = `tail $result->{compile_results}`;
                 rlog $msg;
                 $error++;
-                if($r == 64512) {done()};
+                if(statf($r) eq 'INT') {done()};
                 next;
             }
             next if $no_run;
@@ -205,7 +205,7 @@ sub do_it {
             unless($r == 0) {
                 rlog "-- Run Failed: $r";
                 $error++;
-                if($r == 64512) {done()};
+                if(statf($r) eq 'INT') {done()};
                 next;
             }
 
@@ -224,10 +224,11 @@ do_it($test_dir,"tests");
 done();
 
 
+sub statf {
+    return defined $_[0] ? ($_[0] == 64512 || ($_[0] & 127) == SIGINT  ? "INT" : $_[0] == 35072 || ($_[0] & 127) ==  24 ? "TIME" : $_[0]) : "-";
+}
+
 sub done {
-    sub statf {
-        return defined $_[0] ? ($_[0] == 64512 ? "INT" : $_[0] == 35072 ? "TIME" : $_[0]) : "-";
-    }
     sub timef {
         return defined $_[0] ? "$_[0]s" : "-";
     }

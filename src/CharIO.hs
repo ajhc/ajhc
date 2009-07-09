@@ -37,6 +37,6 @@ runMain action = Control.Exception.catch (action >> return ()) $ \x -> case x of
         _ -> putErrDie $ show x
 #else
 runMain action = Control.Exception.catches (action >> return ())
-                   [ Handler $ \ (e::ExitCode) -> throw e
-                   , Handler $ \ (e::SomeException') -> putErrDie $ show e ]
+                   [ Handler $ \ (e::ErrorCall) -> putErrDie $ show e
+                   , Handler $ \ (e::IOException) -> putErrDie $ show e ]
 #endif
