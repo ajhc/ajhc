@@ -3,7 +3,9 @@
 #ifndef _JHC_HSFFI_H
 #define _JHC_HSFFI_H
 
-#include <inttypes.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
 
 
 typedef int32_t HsInt;
@@ -18,8 +20,8 @@ typedef uint16_t HsWord16;
 typedef uint32_t HsWord32;
 typedef uint64_t HsWord64;
 
-typedef uint32_t HsChar;
-typedef int HsBool;
+typedef wchar_t HsChar;
+typedef bool HsBool;
 
 typedef double HsDouble;
 typedef float HsFloat;

@@ -905,6 +905,7 @@ typeTable = Map.fromList [
     (tc_CUShort, "unsigned short"),
     (tc_CUInt, "unsigned int"),
     (tc_CULong, "unsigned long"),
+    (tc_Bool, "HsBool"),
 
     (tc_CWchar, "wchar_t"),
     (tc_CWint, "wint_t"),
