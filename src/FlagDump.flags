@@ -72,6 +72,9 @@ grin-steps show what happens in each transformation
 grin-graph print dot file of final grin code to outputname_grin.dot
 grin-final final grin before conversion to C
 
+!Backend code
+c don't delete C source file after compilation
+
 
 !General
 @verbose     progress

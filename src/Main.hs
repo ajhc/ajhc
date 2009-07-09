@@ -4,6 +4,7 @@ import Control.Exception
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Control.Monad.State
+import Directory
 import IO(hFlush,stderr,stdout)
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.Map as Map
@@ -741,7 +742,6 @@ compileGrinToC grin = do
         fn = optOutName options ++ lup "executable_extension"
         cf = (fn ++ "_code.c")
         lup k = maybe "" id $ Map.lookup k (optInis options)
-    progress ("Writing " ++ show cf)
     (argstring,sversion) <- getArgString
     let
         boehmOpts | fopts FO.Boehm || lup "gc" == "boehm"  = ["-D_JHC_GC=_JHC_GC_BOEHM", "-lgc"]
@@ -753,10 +753,12 @@ compileGrinToC grin = do
                             (map ("-l" ++) rls) ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
         debug = if fopts FO.Debug then words (lup "cflags_debug") else words (lup "cflags_nodebug")
         globalvar n c = "char " ++ n ++ "[] = \"" ++ c ++ "\";"
+    progress ("Writing " ++ show cf)
     writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" sversion,"",cg]
     progress ("Running: " ++ comm)
     r <- System.system comm
     when (r /= System.ExitSuccess) $ fail "C code did not compile."
+    unless (dump FD.C) $ removeFile cf
     return ()
 
 

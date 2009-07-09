@@ -270,6 +270,5 @@ manual.html :
 libs: $(JHC_LIBS)
 
 %: examples/%.hs jhc
-	-[ -e $@.log ] && mv -f $@.log $@.log.bak
 	./jhc -v -L- -L. $(JHC_TEST) $< -o $@ 2>&1 | tee $@.log
 
