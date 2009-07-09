@@ -125,8 +125,9 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,as :-> b
            --     addRule $ conditionalRule id v' $ doNode n
             g (BaseOp Overwrite [vv,n]) = addRule $ (doNode vv) `mappend` (doNode n)
             g (BaseOp PokeVal [vv,n]) = addRule $ (doNode vv) `mappend` (doNode n)
+            g (BaseOp PeekVal [vv]) = addRule $ (doNode vv)
+            g (BaseOp Promote [vv]) = addRule $ (doNode vv)
             g (Store n) = addRule $ doNode n
-            g (Fetch x) = addRule $ doNode x
             g Alloc { expValue = v, expCount = c, expRegion = r } = addRule $ doNode v `mappend` doNode c `mappend` doNode r
             g Let { expDefs = defs, expBody = body } = do
                 mapM_ goAgain [ (name,bod) | FuncDef { funcDefBody = bod, funcDefName = name } <- defs]
@@ -141,8 +142,8 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,as :-> b
             h' (p,e) = h (p,e) >> return (Just (p,e))
             h (p,Store v) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
             h (p,Alloc { expValue = v, expCount = c, expRegion = r }) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v `mappend` doNode c `mappend` doNode r) | pv <- freeVars p]
-            h (p,Return vs) = mapM_ (h . \v -> (p,Fetch v)) vs -- addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
-            h (p,Fetch v) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
+            h (p,Return vs) = mapM_ (h . \v -> (p,BaseOp Promote [v])) vs -- addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
+            h (p,BaseOp Promote [v]) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
             h (p,e) = g e
             doNode (NodeC n as) | not postInline, Just (x,fn) <- tagUnfunction n  = let
                 consts = (mconcatMap doConst as)

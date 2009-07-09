@@ -219,11 +219,11 @@ doFunc (name,arg :-> body) = ans where
         f (Store w) = do
             ww <- convertVal w
             dunno [TyPtr (getType w)]
-        f (Fetch w) | tyINode == getType w = do
+        f (BaseOp Promote [w]) = do
             ww <- convertVal w
             --dres [ww]
             dres [Right (N WHNF Top)]
-        f (Fetch w) | TyPtr tyINode == getType w = do
+        f (BaseOp PeekVal [w])  = do
             dres [Right top]
         f Error {} = dres []
         f Prim { expArgs = as } = mapM_ convertVal as
@@ -301,7 +301,7 @@ fixupFunc cmap (name,l :-> body) = fmap (\b -> (name, l :-> b)) (f body) where
     f a@App { expFunction = fn, expArgs = [arg] } | fn == funcEval, Just n <- lupVar arg = case n of
         N WHNF _ -> do
                 --putStrLn $ "NA-EVAL-WHNF-" ++ show fn
-                return (Fetch arg)
+                return (BaseOp Promote [arg])
         _ -> return a
     f e = mapExpExp f e
 

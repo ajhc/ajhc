@@ -100,14 +100,14 @@ simpBind p e cont = f p e where
             return z
          else return $ e :>>= (p :-> z)
     cse' name xs = cse name ((e,Return p):xs)
-    f p app@(App a [v] _) | a == funcEval =  cse' "Simplify.CSE.eval" [(Fetch v,Return p)]
-    f p (Fetch v@Var {}) =  cse' "Simplify.CSE.fetch" [(gEval v,Return p)]
+    f p app@(App a [v] _) | a == funcEval =  cse' "Simplify.CSE.eval" [(BaseOp Promote [v],Return p)]
+    f p (BaseOp Promote [v@Var {}]) =  cse' "Simplify.CSE.fetch" [(gEval v,Return p)]
     f [p@(Var (V vn) _)] (Return [v@(NodeC t vs)]) | not (isHoly v) = case tagUnfunction t of
         Nothing -> cse "Simplify.CSE.return-node" [(Return [p],Return [v]),(Store p,Store v)]
         Just (n,fn) -> local (\s -> s { envPapp = IM.insert vn (t,vs) (envPapp s) }) $ cse' "Simplify.CSE.return-node" [(Return [p],Return [v]),(Store p,Store v)]
-    f [p] (Store v@Var {})  =  cse' "Simplify.CSE.demote" [(Fetch p,Return [v]),(gEval p,Return [v])]
+    f [p] (Store v@Var {})  =  cse' "Simplify.CSE.demote" [(BaseOp Promote [p],Return [v]),(gEval p,Return [v])]
     f [p@(Var (V vn) _)] (Store v@(NodeC t vs)) | not (isHoly v) = case tagIsWHNF t of
-        True -> local (\s -> s { envPush = IM.insert vn (Store v) (envPush s) }) $ cse "Simplify.CSE.store-whnf" [(Fetch p,Return [v]),(gEval p,Return [v])]
+        True -> local (\s -> s { envPush = IM.insert vn (Store v) (envPush s) }) $ cse "Simplify.CSE.store-whnf" [(BaseOp Promote [p],Return [v]),(gEval p,Return [v])]
         False -> cse' "Simplify.CSE.store" []
     f _ _ = cse "Simplify.CSE.NOT" []
 
@@ -123,7 +123,7 @@ simpExp e = f e [] where
         f a ((env,v,b):xs)
 
     -- simple transforms
-    f (Fetch (Const x)) rs = do
+    f (BaseOp Promote [Const x]) rs = do
         mtick "Grin.Simplify.fetch-const"
         f (Return [x]) rs
     f (Store x) rs | valIsNF x = do

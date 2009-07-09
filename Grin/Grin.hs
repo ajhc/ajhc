@@ -196,7 +196,6 @@ data Exp =
     | Case      { expValue :: Val, expAlts :: [Lam] }                     -- ^ Case statement
     | Return    { expValues :: [Val] }                                    -- ^ Return a value
     | Store     { expValue :: Val }                                       -- ^ Allocate a new heap node
-    | Fetch     { expAddress :: Val }                                     -- ^ Load given heap node
     | Error     { expError :: String, expType :: [Ty] }                   -- ^ Abort with an error message, non recoverably.
     | Call      { expValue :: Val,
                   expArgs :: [Val],
@@ -511,11 +510,11 @@ instance CanType Exp [Ty] where
         t -> [TyPtr t]
     getType (BaseOp Overwrite _) = []
     getType (BaseOp Redirect _) = []
-    getType (Return v) = getType v
-    getType (Fetch v) = case getType v of
-        TyINode -> [TyNode]
+    getType (BaseOp Promote _) = [TyNode]
+    getType (BaseOp PeekVal [v]) = case getType v of
         TyPtr t -> [t]
-        _ -> error "Exp.getType: fetch of non-pointer type"
+        _ -> error "Exp.getType: PeekVal of non-pointer type"
+    getType (Return v) = getType v
     getType (Error _ t) = t
     getType (Case _ []) = error "empty case"
     getType (Case _ ((_ :-> e):_)) = getType e
@@ -577,7 +576,6 @@ instance FreeVars Exp (Set.Set Var) where
     freeVars (Case x xs) = freeVars (x,xs)
     freeVars (Return v) = freeVars v
     freeVars (Store v) = freeVars v
-    freeVars (Fetch v) = freeVars v
     freeVars (BaseOp _ vs) = freeVars vs
     freeVars (Prim _ x _) = freeVars x
     freeVars Error {} = Set.empty
@@ -595,7 +593,6 @@ instance FreeVars Exp (Set.Set (Var,Ty)) where
     freeVars (Case x xs) = freeVars (x,xs)
     freeVars (Return v) = freeVars v
     freeVars (Store v) = freeVars v
-    freeVars (Fetch v) = freeVars v
     freeVars (BaseOp _ vs) = freeVars vs
     freeVars (Prim _ x _) = freeVars x
     freeVars Error {} = Set.empty
@@ -636,7 +633,6 @@ instance FreeVars Exp (Set.Set Tag) where
     freeVars (Case x xs) = freeVars (x,xs)
     freeVars (Return v) = freeVars v
     freeVars (Store v) = freeVars v
-    freeVars (Fetch v) = freeVars v
     freeVars (BaseOp _ vs) = freeVars vs
     freeVars (Prim _ x _) = freeVars x
     freeVars Error {} = Set.empty

@@ -134,7 +134,6 @@ printDL h n fs e = f fs e where
     f [Left b] (Store (NodeC n vs)) = hPrintf h "store(%s,%s,%s).\n" (dshow b) (dshow n) (if tagIsWHNF n then "true" else "false")
     f [Right (Var b _)] (Store (NodeC n vs)) = hPrintf h "store(%s,%s,%s).\n" (dshow b) (dshow n) (if tagIsWHNF n then "true" else "false") >> app n vs
     f [b] (Store x@Var {}) = do assign "demote" b x
-    f [b] (Fetch x@Var {}) = do assign "promote" b x
     f [b] (App ev [x] _) | ev == funcEval  = do assign "eval" b x
     f b (App fn as ty) = do
         forM_ (zip naturals as) $ \ (i,a) -> do
@@ -283,11 +282,12 @@ tcExp e = f e where
         t <- tcVal v
         return [TyPtr t]
     f (Return v) = mapM tcVal v
-    f (Fetch v) = do
-        v' <- tcVal v
-        case v' of
-            (TyPtr t) -> return [t]
-            TyINode -> return [TyNode]
+    f (BaseOp Promote [v]) = do
+        TyINode <- tcVal v
+        return [TyNode]
+    f (BaseOp PeekVal [v]) = do
+        TyPtr t <- tcVal v
+        return [t]
     f (Error _ t) = return t
     f e@(BaseOp Overwrite [w,v]) = do
         return []

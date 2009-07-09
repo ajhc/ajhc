@@ -293,7 +293,7 @@ convertBody (e :>>= [] :-> e') = do
     ss' <- convertBody e'
     return (ss & ss')
 convertBody (Return [v] :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
-convertBody (Fetch v :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
+--convertBody (Fetch v :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
 convertBody (Case v [p1@([NodeC _ (_:_)] :-> _),p2@([NodeC _ []] :-> _)]) = convertBody $ Case v [p2,p1]
 convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == TyNode = do
     scrut <- convertVal v
@@ -454,7 +454,7 @@ convertBody (BaseOp PokeVal [base,z])  = do
 --    off <- convertVal off
 --    z' <- convertVal z
 --    return $ indexArray base off =* z'
-convertBody (Fetch (Index base off)) | getType base == TyPtr tyINode = do
+convertBody (BaseOp PeekVal [Index base off]) | getType base == TyPtr tyINode = do
     base <- convertVal base
     off <- convertVal off
     simpleRet (indexArray base off)
@@ -465,7 +465,7 @@ convertBody (GcRoots vs b) = do
     return $ gc_roots vs & b' & gc_end
 
 -- return, promote and demote
-convertBody (Fetch v)        | getType v == tyINode = simpleRet =<< f_promote `liftM` convertVal v
+convertBody (BaseOp Promote [v])        | getType v == tyINode = simpleRet =<< f_promote `liftM` convertVal v
 convertBody (Store n@Var {}) | getType n == tyDNode = simpleRet =<< f_demote `liftM` convertVal n
 
 convertBody (Return []) = simpleRet emptyExpression
@@ -519,7 +519,8 @@ nodeAssign v t as e' = cna where
         ss' <- convertBody e'
         return $ mconcat ass & ss'
 
-isCompound Fetch {} = False
+--isCompound Fetch {} = False
+isCompound BaseOp {} = False
 isCompound Return {} = False
 isCompound Store {} = False
 isCompound Prim {} = False

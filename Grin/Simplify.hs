@@ -43,7 +43,7 @@ at_OptSimplifyCopyPropConst  = toAtom "Optimize.simplify.copy-propagate-const"
 at_OptSimplifyNodeReduction  = toAtom "Optimize.simplify.node-reduction"
 at_OptSimplifyDeadVar  = toAtom "Optimize.simplify.dead-var"
 at_OptSimplifyConstApply  = toAtom "Optimize.simplify.const-apply"
-at_OptSimplifyConstFetch  = toAtom "Optimize.simplify.const-fetch"
+at_OptSimplifyConstPromote  = toAtom "Optimize.simplify.const-promote"
 at_OptSimplifyConstEval  = toAtom "Optimize.simplify.const-eval"
 at_OptSimplifyTrivialCase  = toAtom "Optimize.simplify.trivial-case"
 at_OptSimplifyBadAssignment  = toAtom "Optimize.simplify.bad-assignment"
@@ -96,8 +96,8 @@ simplify1 stats env (n,l) = do
     gs (App a [Const n] typ) | a == funcEval = do
         lift $ tick stats at_OptSimplifyConstEval
         gs (Return [n])
-    gs (Fetch (Const n)) = do
-        lift $ tick stats at_OptSimplifyConstFetch
+    gs (BaseOp Promote [Const n]) = do
+        lift $ tick stats at_OptSimplifyConstPromote
         gs (Return [n])
     gs x = return x
     gv (p,Case x ds) = do
@@ -172,7 +172,9 @@ simplify1 stats env (n,l) = do
 
 cseStat n = toAtom $ "Optimize.simplify.cse." ++ g n where
     g App { expFunction = n } = fromAtom n
-    g Fetch {} = "Fetch"
+    --g Fetch {} = "Fetch"
+    g (BaseOp Promote _) = "Promote"
+    g (BaseOp PeekVal _) = "PeekVal"
     g Store {} = "Store"
     g _ = "Misc"
 
@@ -309,9 +311,9 @@ optimize1 grin postEval (n,l) = execUniqT 1 (g l) where
     f (e :>>= v1 :-> Return v2) | (all isVar v1) && v1 == v2 = do
         mtick "Optimize.optimize.unit-unit"
         f e
-    f (Store t :>>= [v] :-> Fetch v' :>>= lr) | v == v' = do
-        mtick "Optimize.optimize.store-fetch"
-        f (Store t :>>= [v] :-> Return [t] :>>= lr)
+--    f (Store t :>>= [v] :-> Fetch v' :>>= lr) | v == v' = do
+--        mtick "Optimize.optimize.store-fetch"
+--        f (Store t :>>= [v] :-> Return [t] :>>= lr)
 --    f (Store t :>>= [v@(Var vr _)] :-> Update  v' w :>>= lr) | v == v', vr `notElem` freeVars w = do
 --        mtick "Optimize.optimize.store-update"
 --        f (Store w :>>= [v] :-> Return [] :>>= lr)

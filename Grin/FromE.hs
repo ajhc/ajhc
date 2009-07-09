@@ -353,7 +353,7 @@ evalVar fty tvr  = do
 --            return (Fetch (toVal tvr))
         Nothing | getProperty prop_WHNF tvr -> do
             mtick "Grin.FromE.strict-propevaled"
-            return (Fetch (toVal tvr))
+            return (BaseOp Promote [toVal tvr])
         Nothing -> return $ App funcEval [toVal tvr] fty
 
 compile' ::  CEnv -> (TVr,[TVr],E) -> C (Atom,Lam)
@@ -431,7 +431,8 @@ compile' cenv (tvr,as,e) = ans where
             return $ Alloc { expValue = v', expCount = toUnVal (1::Int), expRegion = region_heap, expInfo = mempty }
         f "readRef__" [r,_] = do
             let [r'] = args [r]
-            return $ Fetch (Index r' (toUnVal (0::Int)))
+            --return $ Fetch (Index r' (toUnVal (0::Int)))
+            return $ BaseOp PeekVal [Index r' (toUnVal (0::Int))]
         f "writeRef__" [r,v,_] = do
             let [r',v'] = args [r,v]
             return $ BaseOp PokeVal [r',v']
@@ -445,10 +446,11 @@ compile' cenv (tvr,as,e) = ans where
             return $ Alloc { expValue = ValUnknown TyINode, expCount = v', expRegion = region_heap, expInfo = mempty }
         f "readArray__" [r,o,_] = do
             let [r',o'] = args [r,o]
-            return $ Fetch (Index r' o')
+            --return $ Fetch (Index r' o')
+            return $ BaseOp PeekVal [Index r' o']
         f "indexArray__" [r,o] = do
             let [r',o'] = args [r,o]
-            return $ Fetch (Index r' o')
+            return $ BaseOp PeekVal [Index r' o']
         f "writeArray__" [r,o,v,_] = do
             let [r',o',v'] = args [r,o,v]
             return $ BaseOp PokeVal [(Index r' o'),v']

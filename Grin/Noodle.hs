@@ -47,7 +47,6 @@ mapExpVal g x = f x where
         v <- g v
         c <- g c
         return e { expValue = v, expCount = c }
-    f (Fetch v) = return Fetch `ap` g v
     f (Case v as) = do
         v <- g v
         return (Case v as)
@@ -143,7 +142,8 @@ valIsConstant _ = False
 
 
 
-isOmittable (Fetch {}) = True
+isOmittable (BaseOp Promote _) = True
+isOmittable (BaseOp PeekVal _) = True
 isOmittable (Return {}) = True
 isOmittable (Store x) | getType x /= TyNode = False
 isOmittable (Store {}) = True
@@ -179,7 +179,6 @@ collectFuncs exp = runWriter (cfunc exp) where
         cfunc Let { expFuncCalls = (tail,nonTail) } = do
             tell nonTail
             return tail
-        cfunc Fetch {} = return mempty
         cfunc Error {} = return mempty
         cfunc Prim {} = return mempty
         cfunc Return {} = return mempty
