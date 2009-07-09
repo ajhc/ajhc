@@ -107,9 +107,8 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,as :-> b
         let varValue v | v < v0 = sValue usedCafs v
                        | otherwise = sValue usedVars v
             f e = g e >> return e
-            g (App a [e] _)   | a == funcEval =  addRule (doNode e)
-            g (App a [x,y] _) | a == funcApply =  addRule (doNode x `mappend` doNode y)
-            g (App a [x] _)   | a == funcApply =  addRule (doNode x)
+            g (BaseOp Eval [e]) =  addRule (doNode e)
+            g (BaseOp Apply {} vs) =  addRule (mconcatMap doNode vs)
             g (Case e _) =  addRule (doNode e)
             g Prim { expArgs = as } = addRule (mconcatMap doNode as)
             g (App a vs _) = do
@@ -166,7 +165,7 @@ removeDeadArgs :: MonadStats m => Bool -> Set.Set Atom -> Set.Set Atom -> (Set.S
 removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps f (margs a l) >>= return . (,) a where
     margs fn (as :-> e) | a `Set.member` directFuncs = ((removeArgs fn as) :-> e)
     margs _ x = x
-    f (App fn as ty) | fn `notElem` [funcApply, funcEval] = do
+    f (App fn as ty)  = do
         as <- dff fn as
         as <- mapM clearCaf as
         return $ App fn as ty

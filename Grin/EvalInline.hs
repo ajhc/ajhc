@@ -139,12 +139,12 @@ createEvalApply grin = do
     let f (ls :-> exp) = do
             exp' <- g exp
             return $ ls :-> exp'
-        g (App fn [fun] ty) | fn == funcApply = do
+        g (BaseOp (Apply ty) [fun]) = do
             fn' <- runOnceMap appMap (TyUnit,ty) $ do
                 u <- newUniq
                 return (toAtom $ "bapply_" ++ show u)
             return (App fn' [fun] ty)
-        g (App fn [fun,arg] ty) | fn == funcApply = do
+        g (BaseOp (Apply ty) [fun,arg]) = do
             fn' <- runOnceMap appMap (getType arg,ty) $ do
                 u <- newUniq
                 return (toAtom $ "bapply_" ++ show u)

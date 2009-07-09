@@ -275,7 +275,6 @@ makePartials x = error "makePartials"
 
 primTyEnv = TyEnv . Map.map toTyTy $ Map.fromList $ [
     (tagArrow,([tyDNode, tyDNode],[TyNode])),
-    (funcEval, ([tyINode],[tyDNode])),
     (tagHole, ([],[TyNode]))
     ]
 
@@ -336,8 +335,8 @@ instance ToVal TVr where
         ty -> Var (V $ idToInt num) ty
 
 
-doApply x y ty | not (keepIt y) = App funcApply [x] ty
-doApply x y ty = App funcApply [x,y] ty
+doApply x y ty | not (keepIt y) = BaseOp (Apply ty) [x]
+doApply x y ty = BaseOp (Apply ty) [x,y]
 
 evalVar :: [Ty] -> TVr -> C Exp
 evalVar fty tvr  = do
@@ -354,7 +353,7 @@ evalVar fty tvr  = do
         Nothing | getProperty prop_WHNF tvr -> do
             mtick "Grin.FromE.strict-propevaled"
             return (BaseOp Promote [toVal tvr])
-        Nothing -> return $ App funcEval [toVal tvr] fty
+        Nothing -> return $ gEval (toVal tvr)
 
 compile' ::  CEnv -> (TVr,[TVr],E) -> C (Atom,Lam)
 compile' cenv (tvr,as,e) = ans where
@@ -560,13 +559,13 @@ compile' cenv (tvr,as,e) = ans where
     app _ e [] = return e
     app ty e [a] | not (keepIt a) = do
         v <- newNodeVar
-        return (e :>>= [v] :-> App funcApply [v] ty)
+        return (e :>>= [v] :-> BaseOp (Apply ty) [v])
     app ty e [a] = do
         v <- newNodeVar
         return (e :>>= [v] :-> doApply v a ty)
     app ty e (a:as) | not (keepIt a) = do
         v <- newNodeVar
-        app ty (e :>>= [v] :-> App funcApply [v] [TyNode]) as
+        app ty (e :>>= [v] :-> BaseOp (Apply [TyNode]) [v]) as
     app ty e (a:as) = do
         v <- newNodeVar
         app ty (e :>>= [v] :-> doApply v a [TyNode]) as

@@ -538,7 +538,7 @@ convertExp (Prim p vs ty) | APrim _ req <- p  =  do
 --    fn' <- convertVal fn
 --    x' <- convertVal x
 --    return (mempty,(functionCall (name "eval") [v']))
-convertExp (App a [v] _) | a == funcEval = do
+convertExp (BaseOp Eval [v]) = do
     v' <- convertVal v
     return (mempty,f_eval v')
 convertExp (App a vs _) = do

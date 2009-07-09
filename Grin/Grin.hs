@@ -28,8 +28,6 @@ module Grin.Grin(
     findArgs,
     findArgsType,
     findTyTy,
-    funcApply,
-    funcEval,
     gEval,
     grinEntryPointNames,
     isHole,
@@ -102,11 +100,9 @@ newtype TyEnv = TyEnv (Map.Map Atom TyTy)
 
 
 tagHole = toAtom "@hole"
-funcApply = toAtom "@apply"
-funcEval = toAtom "@eval"
 
 gEval :: Val -> Exp
-gEval x = App funcEval [x] [TyNode]
+gEval x = BaseOp Eval [x]
 
 -- lazy node sptr_t
 tyINode = TyINode
@@ -170,7 +166,7 @@ data BaseOp
 --    = Demote                -- turn a node into an inode, always okay
     = Promote               -- turn an inode into a node, the inode _must_ already be a valid node
     | Eval                  -- evaluate an inode, returns a node representing the evaluated value. Bool is whether to update the inode
-    | Apply                 -- apply a partial application to a value
+    | Apply [Ty]            -- apply a partial application to a value, returning the given type
     | StoreNode !Bool       -- create a new node, Bool is true if it should be an indirect node, the second val is the region
     | Redirect              -- write an indirection over its first argument to point to its second one
     | Overwrite             -- overwrite an existing node with new data (the tag must match what was used for the initial Store)
@@ -511,6 +507,8 @@ instance CanType Exp [Ty] where
     getType (BaseOp Overwrite _) = []
     getType (BaseOp Redirect _) = []
     getType (BaseOp Promote _) = [TyNode]
+    getType (BaseOp Eval _) = [TyNode]
+    getType (BaseOp (Apply ty) _) = ty
     getType (BaseOp PeekVal [v]) = case getType v of
         TyPtr t -> [t]
         _ -> error "Exp.getType: PeekVal of non-pointer type"

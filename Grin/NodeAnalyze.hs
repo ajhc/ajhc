@@ -191,14 +191,10 @@ doFunc (name,arg :-> body) = ans where
         f (Case v as)
             | Todo _ n <- ret = mapM_ (fl (Todo False n)) as
             | TodoNothing <- ret = mapM_ (fl TodoNothing) as
-        f (App { expFunction = fn, expArgs = [x] }) | fn == funcEval = do
+        f (BaseOp Eval [x]) = do
             dres [Right (N WHNF Top)]
-        f (App { expFunction = fn, expArgs = [x], expType = ty }) | fn == funcApply = do
-            convertVal x
-            dunno ty
-        f (App { expFunction = fn, expArgs = [x,y], expType = ty }) | fn == funcApply = do
-            convertVal x
-            convertVal y
+        f (BaseOp (Apply ty) xs) = do
+            mapM_ convertVal xs
             dunno ty
         f (App { expFunction = fn, expArgs = vs, expType = ty }) = do
             vs' <- mapM convertVal vs
@@ -298,7 +294,7 @@ fixupFunc cmap (name,l :-> body) = fmap (\b -> (name, l :-> b)) (f body) where
         Just ResultBounded { resultLB = Just lb } -> return lb
         _ -> fail "lupVar"
     lupVar _ = fail "lupVar"
-    f a@App { expFunction = fn, expArgs = [arg] } | fn == funcEval, Just n <- lupVar arg = case n of
+    f a@(BaseOp Eval [arg]) | Just n <- lupVar arg = case n of
         N WHNF _ -> do
                 --putStrLn $ "NA-EVAL-WHNF-" ++ show fn
                 return (BaseOp Promote [arg])

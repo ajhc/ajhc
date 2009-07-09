@@ -79,7 +79,7 @@ simpDone :: Exp -> S Exp
 simpDone e = do
     pmap <- asks envPapp
     case e of
-        (App fap (Var (V vn) _:fs) ty) | fap == funcApply, Just (tl,gs) <- IM.lookup vn pmap -> do
+        (BaseOp (Apply ty) (Var (V vn) _:fs)) | Just (tl,gs) <- IM.lookup vn pmap -> do
             (cl,fn) <- tagUnfunction tl
             let ne = if cl == 1 then App fn (gs ++ fs) ty else Return [NodeC (partialTag fn (cl - 1)) (gs ++ fs)]
             mtick $ if cl == 1 then "Simplify.Apply.Papp.{" ++ show tl  else ("Simplify.Apply.App.{" ++ show fn)
@@ -100,7 +100,7 @@ simpBind p e cont = f p e where
             return z
          else return $ e :>>= (p :-> z)
     cse' name xs = cse name ((e,Return p):xs)
-    f p app@(App a [v] _) | a == funcEval =  cse' "Simplify.CSE.eval" [(BaseOp Promote [v],Return p)]
+    f p app@(BaseOp Eval [v]) =  cse' "Simplify.CSE.eval" [(BaseOp Promote [v],Return p)]
     f p (BaseOp Promote [v@Var {}]) =  cse' "Simplify.CSE.fetch" [(gEval v,Return p)]
     f [p@(Var (V vn) _)] (Return [v@(NodeC t vs)]) | not (isHoly v) = case tagUnfunction t of
         Nothing -> cse "Simplify.CSE.return-node" [(Return [p],Return [v]),(Store p,Store v)]
@@ -129,7 +129,7 @@ simpExp e = f e [] where
     f (Store x) rs | valIsNF x = do
         mtick "Grin.Simplify.store-normalform"
         f (Return [Const x]) rs
-    f (App a [Const n] _) rs | a == funcEval = do
+    f (BaseOp Eval [Const n]) rs = do
         mtick "Grin.Simplify.eval-const"
         f (Return [n]) rs
     f (Error s t) rs@(_:_) = do

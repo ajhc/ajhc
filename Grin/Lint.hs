@@ -134,7 +134,7 @@ printDL h n fs e = f fs e where
     f [Left b] (Store (NodeC n vs)) = hPrintf h "store(%s,%s,%s).\n" (dshow b) (dshow n) (if tagIsWHNF n then "true" else "false")
     f [Right (Var b _)] (Store (NodeC n vs)) = hPrintf h "store(%s,%s,%s).\n" (dshow b) (dshow n) (if tagIsWHNF n then "true" else "false") >> app n vs
     f [b] (Store x@Var {}) = do assign "demote" b x
-    f [b] (App ev [x] _) | ev == funcEval  = do assign "eval" b x
+    f [b] (BaseOp Eval [x]) = do assign "eval" b x
     f b (App fn as ty) = do
         forM_ (zip naturals as) $ \ (i,a) -> do
             assign "assign" (Left $ funArg fn i) a
@@ -255,17 +255,13 @@ tcExp e = f e where
     f n@(Prim p as t') = do
         mapM_ tcVal as
         return t'
-    f ap@(App fn [v,a] t) | fn == funcApply = do
-        [v',a'] <- mapM tcVal [v,a]
+    f ap@(BaseOp (Apply t) vs) = do
+        (v':_) <- mapM tcVal vs
         if v' == TyNode then return t
          else fail $ "App apply arg doesn't match: " ++ show ap
-    f ap@(App fn [v] t) | fn == funcApply = do
+    f ap@(BaseOp Eval [v]) = do
         v' <- tcVal v
-        if v' == TyNode then return t
-         else fail $ "App apply arg doesn't match: " ++ show ap
-    f ap@(App fn [v] t) | fn == funcEval = do
-        v' <- tcVal v
-        if v' == tyINode then return t
+        if v' == tyINode then return [TyNode]
          else fail $ "App eval arg doesn't match: " ++ show ap
     f a@(App fn as t) = do
         te <- asks envTyEnv
@@ -296,11 +292,6 @@ tcExp e = f e where
     f e@(BaseOp PeekVal [w]) = do
         TyPtr t <- tcVal w
         return [t]
---    f e@(Update w v) = do
---        (TyPtr t) <- tcVal w
---        t' <- tcVal v
---        same (show e) t t'
---        return []
     f (Case _ []) = fail "empty case"
     f (Case v as) = do
         tv <- tcVal v

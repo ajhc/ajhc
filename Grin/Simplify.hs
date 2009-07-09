@@ -93,7 +93,7 @@ simplify1 stats env (n,l) = do
 --    gs (Store (NodeC t [Const x@NodeC {},y])) | Just 1 <- fromBap t = do --  App a [n@NodeC {},v] typ) | a == funcApply = do
 --        lift $ tick stats "Optimize.simplify.const-lazy-apply"
 --        gs (doApply Store False x y TyNode)
-    gs (App a [Const n] typ) | a == funcEval = do
+    gs (BaseOp Eval [Const n]) = do
         lift $ tick stats at_OptSimplifyConstEval
         gs (Return [n])
     gs (BaseOp Promote [Const n]) = do
