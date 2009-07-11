@@ -113,23 +113,21 @@ main =  runMain $ bracketHtml $ do
         _               -> processFiles  (optArgs o)
 
 
-processFiles [] | Nothing <- optMainFunc options = do
-    int <- Interactive.isInteractive
-    when (not int) $ putErrDie "jhc: no input files"
-    processFilesModules [Left (Module "Prelude")]
-processFiles [] | Just (b,m) <- optMainFunc options = do
-    m <- return $ parseName Val m
-    m <- getModule m
-    processFilesModules [Left m]
-processFiles cs = do processFilesModules (map fileOrModule cs)
-
-processFilesModules fs = do
-    compileModEnv =<< parseFiles fs processInitialHo processDecls
-
-fileOrModule f = case reverse f of
-                   ('s':'h':'.':_)     -> Right f
-                   ('s':'h':'l':'.':_) -> Right f
-                   _                   -> Left $ Module f
+processFiles :: [String] -> IO ()
+processFiles cs = f cs (optMainFunc options) where
+    f [] Nothing  = do
+        int <- Interactive.isInteractive
+        when (not int) $ putErrDie "jhc: no input files"
+        g [Left (Module "Prelude")]
+    f [] (Just (b,m)) = do
+        m <- getModule (parseName Val m)
+        g [Left m]
+    f cs _ = g (map fileOrModule cs)
+    g fs =  compileModEnv =<< parseFiles fs processInitialHo processDecls
+    fileOrModule f = case reverse f of
+       ('s':'h':'.':_)     -> Right f
+       ('s':'h':'l':'.':_) -> Right f
+       _                   -> Left $ Module f
 
 
 
@@ -146,7 +144,7 @@ idann ps i nfo = return (props ps i nfo) where
 
 processInitialHo ::
     CollectedHo       -- ^ current accumulated ho
-    -> Ho    -- ^ new ho, freshly read from file
+    -> Ho             -- ^ new ho, freshly read from file
     -> IO CollectedHo -- ^ final combined ho data.
 processInitialHo accumho aho = do
     let Rules rm = hoRules $ hoBuild aho
@@ -165,7 +163,7 @@ processInitialHo accumho aho = do
 
     let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- map combHead $ melems choCombs ]) (choVarMap accumho)
         choCombs = mfilterWithKey (\k _ -> k /= emptyId) choCombinators'
-        (mod:_) = Map.keys $ hoExports $ hoExp aho
+        (mod:_) = Map.keys $ hoExports $ hoTcInfo aho
     return $ mempty {
         choVarMap = finalVarMap,
         choExternalNames = choExternalNames accumho `mappend` (fromList . map tvrIdent $ newTVrs),
@@ -194,12 +192,13 @@ processDecls cho ho' tiData = do
     -- some useful values
     let allHo = ho `mappend` ho'
         ho = choHo cho
+        htc = hoTcInfo ho
         -- XXX typechecker drops foreign exports!
         decls  = tiDataDecls tiData ++ [ x | x@HsForeignExport {} <- originalDecls ]
         originalDecls =  concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ]
 
     -- build datatables
-    let dataTable = toDataTable (getConstructorKinds (hoKinds $ hoBuild ho')) (tiAllAssumptions tiData) originalDecls (hoDataTable $ hoBuild ho)
+    let dataTable = toDataTable (getConstructorKinds (hoKinds $ hoTcInfo ho')) (tiAllAssumptions tiData) originalDecls (hoDataTable $ hoBuild ho)
         classInstances = deriveClasses (choCombinators cho) dataTable
         fullDataTable = dataTable `mappend` hoDataTable (hoBuild ho)
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
@@ -208,22 +207,22 @@ processDecls cho ho' tiData = do
         mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) classInstances
     -- initial program
     let prog = program {
-            progClassHierarchy = hoClassHierarchy $ hoBuild allHo,
+            progClassHierarchy = hoClassHierarchy $ hoTcInfo allHo,
             progDataTable = fullDataTable,
             progExternalNames = choExternalNames cho,
             progModule = head (fsts $ tiDataModules tiData)
             }
 
     -- Convert Haskell decls to E
-    let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps (hoBuild ho))
+    let allAssumps = (tiAllAssumptions tiData `mappend` hoAssumps (hoTcInfo ho))
         theProps = fromList [ (toId x,y) | (x,y) <- Map.toList $ tiProps tiData]
-    ds' <- convertDecls tiData theProps (hoClassHierarchy $ hoBuild ho') allAssumps  fullDataTable decls
+    ds' <- convertDecls tiData theProps (hoClassHierarchy $ hoTcInfo ho') allAssumps  fullDataTable decls
     let ds = [ (v,e) | (v,e) <- classInstances ] ++  [ (v,lc) | (n,v,lc) <- ds', v `notElem` fsts classInstances ]
  --   sequence_ [lintCheckE onerrNone fullDataTable v e | (_,v,e) <- ds ]
 
     -- Build rules from instances, specializations, and user specified rules and catalysts
-    instanceRules <- createInstanceRules fullDataTable (hoClassHierarchy $ hoBuild ho')  (ds `mappend` hoEs (hoBuild ho))
-    userRules <- convertRules (progModule prog) tiData (hoClassHierarchy  $ hoBuild ho') allAssumps fullDataTable decls
+    instanceRules <- createInstanceRules fullDataTable (hoClassHierarchy $ hoTcInfo ho')  (ds `mappend` hoEs (hoBuild ho))
+    userRules <- convertRules (progModule prog) tiData (hoClassHierarchy  $ hoTcInfo ho') allAssumps fullDataTable decls
     (nds,specializeRules) <- procAllSpecs fullDataTable (tiCheckedRules tiData) ds
 
     ds <- return $ ds ++ nds
@@ -244,7 +243,7 @@ processDecls cho ho' tiData = do
 
     -- our initial program
     prog <- return prog { progSeasoning = seasoning }
-    Identity prog <- return $ programMapDs (\ (t,e) -> return (shouldBeExported (getExports $ hoExp ho') t,e)) $ atomizeApps False (programSetDs ds prog)
+    Identity prog <- return $ programMapDs (\ (t,e) -> return (shouldBeExported (getExports $ hoTcInfo ho') t,e)) $ atomizeApps False (programSetDs ds prog)
 
     -- now we must attach rules to the existing chos, as well as the current ones
     let addRule c = case mlookup (combIdent c) rules' of
@@ -410,7 +409,7 @@ processDecls cho ho' tiData = do
         hoRules = hoRules (hoBuild ho') `mappend` rules
         }
         newMap = fmap (\c -> Just (EVar $ combHead c)) $ progCombMap prog
-        (mod:_) = Map.keys $ hoExports $ hoExp ho'
+        (mod:_) = Map.keys $ hoExports $ hoTcInfo ho'
     return (mempty {
         choHoMap = Map.singleton (show mod) ho' { hoBuild = newHoBuild},
         choCombinators = fromList $ [ (combIdent c,c) | c <- progCombinators prog ],

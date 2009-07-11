@@ -21,6 +21,7 @@ import PackedString
 import Data.Binary
 import qualified Support.MD5 as MD5
 import Data.Version
+import FrontEnd.Rename(FieldMap())
 
 
 -- A SourceHash is the hash of a specific file, it is associated with a
@@ -86,51 +87,62 @@ data HoLib = HoLib {
     -- * arbitrary metainformation such as library author, web site, etc.
     hoMetaInfo   :: [(String,PackedString)],
     hoModuleMap  :: Map.Map Module ModuleGroup,
+--    hoModuleDeps :: Map.Map ModuleGroup [ModuleGroup],
     hoHiddenModules :: [Module]
     }
 
--- data only needed for name resolution
-data HoExp = HoExp {
-    hoExports :: Map.Map Module [Name],
-    hoDefs :: Map.Map Name (SrcLoc,[Name])
+data CollectedTc = CollectedTc {
+    ctcClassHierarchy :: ClassHierarchy,
+    ctcInfo :: HoTcInfo
     }
+    {-! derive: update, Monoid !-}
 
--- classes are used by both the core transformations and front end typechecking
--- so they are in their own section
-
-newtype HoClass = HoClass {
-    hoClasses :: Map.Map Module ClassHierarchy
-    } deriving(Binary)
-
-data HoBuild = HoBuild {
+-- data only needed for type checking.
+data HoTcInfo = HoTcInfo {
+    hoExports :: Map.Map Module [Name],
+    hoDefs :: Map.Map Name (SrcLoc,[Name]),
     hoAssumps :: Map.Map Name Type,        -- used for typechecking
     hoFixities :: FixityMap,
-    hoKinds :: KindEnv,                      -- used for typechecking
-    hoClassHierarchy :: ClassHierarchy,
+    hoKinds :: KindEnv,                    -- used for typechecking
     hoTypeSynonyms :: TypeSynonyms,
+    hoClassHierarchy :: ClassHierarchy,
+    hoFieldMap :: FieldMap
+    }
+    {-! derive: update, Monoid !-}
+
+-- classes and the datatable are used by both the core transformations and
+-- front end typechecking so they are in their own section
+
+-- this needs datatable
+newtype HoClass = HoClass {
+    hoClasses :: Map.Map Module ClassHierarchy
+    } deriving(Binary,Monoid)
+
+data HoBuild = HoBuild {
     -- Filled in by E generation
     hoDataTable :: DataTable,
     hoEs :: [(TVr,E)],
     hoRules :: Rules
     }
-    {-! derive: update !-}
+    {-! derive: update, Monoid !-}
 
 data Ho = Ho {
-    hoExp :: HoExp,
+    hoTcInfo :: HoTcInfo,
     hoBuild :: HoBuild
     }
-    {-! derive: update !-}
+    {-! derive: update, Monoid !-}
 
+{-
 instance Monoid Ho where
     mempty = Ho mempty mempty
     mappend a b = Ho {
-        hoExp = hoExp a `mappend` hoExp b,
+        hoTcInfo = hoTcInfo a `mappend` hoTcInfo b,
         hoBuild = hoBuild a `mappend` hoBuild b
     }
 
-instance Monoid HoExp where
-    mempty = HoExp mempty mempty
-    mappend a b = HoExp {
+instance Monoid HoTcInfo where
+    mempty = HoTcInfo mempty mempty
+    mappend a b = HoTcInfo {
         hoExports = hoExports a `mappend` hoExports b,
         hoDefs = hoDefs a `mappend` hoDefs b
     }
@@ -149,4 +161,4 @@ instance Monoid HoBuild where
     }
 
 
-
+ -}

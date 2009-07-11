@@ -66,7 +66,7 @@ nameTag Val = 'f'
 nameTag _ = '?'
 
 data InteractiveState = IS {
-    stateHo :: HoBuild,
+    stateHo :: HoTcInfo,
     stateInteract :: Interact,
     stateModule :: Module,
     stateImports :: [(Name,[Name])],
@@ -98,7 +98,7 @@ instance MonadWarn In where
 
 interact :: CollectedHo -> IO ()
 interact cho = mre where
-    hoE = hoExp $ choHo cho
+    hoE = hoTcInfo $ choHo cho
     hoB = hoBuild $ choHo cho
 
     mre = case optStmts options of
@@ -145,10 +145,10 @@ interact cho = mre where
             Just rx -> mapM_ putStrLn $ sort [ pshow opt v  | v <- Map.keys (hoDefs hoE), isJust (matchRegex rx (show v)), nameTag (nameType v) `elem` opt ]
         return act
     ptype x | Just r <- pprintTypeOfCons dataTable x = r
-    ptype k | Just r <- Map.lookup k (hoAssumps hoB) = show (pprint r:: PP.Doc)
-    ptype x | nameType x == ClassName = hsep (map kindShow $ kindOfClass x (hoKinds hoB))
+    ptype k | Just r <- Map.lookup k (hoAssumps hoE) = show (pprint r:: PP.Doc)
+    ptype x | nameType x == ClassName = hsep (map kindShow $ kindOfClass x (hoKinds hoE))
     ptype x = "UNKNOWN: " ++ show (nameType x,x)
-    isStart =  isInitial { stateHo = hoB, stateImports = runIdentity $ calcImports hoE False (Module "Prelude") }
+    isStart =  isInitial { stateHo = hoE, stateImports = runIdentity $ calcImports hoE False (Module "Prelude") }
     do_expr :: Interact -> String -> IO Interact
     do_expr act s = case parseStmt (s ++ "\n") of
         Left m -> putStrLn m >> return act
@@ -156,7 +156,7 @@ interact cho = mre where
             CE.catch (runIn isStart { stateInteract = act } $ executeStatement e) $ (\e -> putStrLn $ show (e::SomeException'))
             return act
     pshow _opt v
-        | Just d <- showSynonym (show . (pprint :: HsType -> PP.Doc) ) v (hoTypeSynonyms hoB) = nameTag (nameType v):' ':d
+        | Just d <- showSynonym (show . (pprint :: HsType -> PP.Doc) ) v (hoTypeSynonyms hoE) = nameTag (nameType v):' ':d
         | otherwise = nameTag (nameType v):' ':show v <+> "::" <+> ptype v
 
 kindShow (KBase b) = pprint b
@@ -178,13 +178,13 @@ procErrors act = do
 
 executeStatement :: HsStmt -> In ()
 executeStatement stmt = do
-    is@IS { stateHo = hoB } <- ask
+    is@IS { stateHo = hoE } <- ask
     stmt <- desugarHsStmt stmt
     stmt' <- renameStatement mempty (stateImports is) (stateModule is) stmt
     procErrors $ do
     --printStatement stmt'
-    stmt'' <- expandTypeSynsStmt (hoTypeSynonyms hoB) (stateModule is) stmt'
-    stmt''' <- return $ FrontEnd.Infix.infixStatement (hoFixities hoB) stmt''
+    stmt'' <- expandTypeSynsStmt (hoTypeSynonyms hoE) (stateModule is) stmt'
+    stmt''' <- return $ FrontEnd.Infix.infixStatement (hoFixities hoE) stmt''
     procErrors $ do
     printStatement stmt'''
     tcStatementTc stmt'''
@@ -244,7 +244,7 @@ tcStatementTc (HsQualifier e) = do
     liftIO $ mapM_ putStrLn [ pprint n <+>  "::" <+> prettyPrintType s |  (n,s) <- Map.toList ce]
 
 
-calcImports :: Monad m => HoExp -> Bool -> Module -> m [(Name,[Name])]
+calcImports :: Monad m => HoTcInfo -> Bool -> Module -> m [(Name,[Name])]
 calcImports ho qual mod = case Map.lookup mod (hoExports ho) of
     Nothing -> fail $ "calcImports: module not known " ++ show mod
     Just es -> do

@@ -25,10 +25,10 @@ import qualified Data.Map as Map
 
 
 choDataTable = hoDataTable . hoBuild . choHo
-choClassHierarchy = hoClassHierarchy . hoBuild . choHo
-choTypeSynonyms = hoTypeSynonyms . hoBuild . choHo
-choFixities = hoFixities . hoBuild . choHo
-choAssumps = hoAssumps . hoBuild . choHo
+choClassHierarchy = hoClassHierarchy . hoTcInfo . choHo
+choTypeSynonyms = hoTypeSynonyms . hoTcInfo . choHo
+choFixities = hoFixities . hoTcInfo . choHo
+choAssumps = hoAssumps . hoTcInfo . choHo
 choRules = hoRules . hoBuild . choHo
 choEs cho = [ (combHead c,combBody c) | c <- melems $  choCombinators cho]
 

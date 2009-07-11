@@ -1,4 +1,4 @@
-module FrontEnd.Rename(unRename, collectDefsHsModule, renameModule, FieldMap, renameStatement ) where
+module FrontEnd.Rename(unRename, collectDefsHsModule, renameModule, FieldMap(..), renameStatement ) where
 
 import Char
 import Control.Monad.RWS
@@ -28,7 +28,11 @@ import qualified FrontEnd.HsErrors as HsErrors
 import qualified Name.VConsts as V
 import Options
 
-type FieldMap =  (Map.Map Name Int,Map.Map Name [(Name,Int)])
+data FieldMap = FieldMap (Map.Map Name Int) (Map.Map Name [(Name,Int)])
+
+instance Monoid FieldMap where
+    mempty = FieldMap mempty mempty
+    mappend (FieldMap a b) (FieldMap c d) = FieldMap (a `mappend` c) (b `mappend` d)
 
 --------------------------------------------------------------------------------
 
@@ -456,7 +460,7 @@ instance Rename HsPat where
     rename p = traverseHsPat rename p
 
 buildRecPat :: FieldMap -> HsName -> [HsPatField] -> RM HsPat
-buildRecPat (amp,fls) n us = case Map.lookup (toName DataConstructor n) amp of
+buildRecPat (FieldMap amp fls) n us = case Map.lookup (toName DataConstructor n) amp of
     Nothing -> failRename $ "Unknown Constructor: " ++ show n
     Just t -> do
         let f (HsPFieldPat x p) = case  Map.lookup (toName FieldLabel x) fls of
@@ -567,7 +571,7 @@ failRename s = do
 
 
 buildRecConstr ::  FieldMap -> HsName -> [HsFieldUpdate] -> RM HsExp
-buildRecConstr (amp,fls) n us = do
+buildRecConstr (FieldMap amp fls) n us = do
     undef <- createError HsErrorUninitializedField "Uninitialized Field"
     case Map.lookup (toName DataConstructor n) amp of
         Nothing -> failRename $ "Unknown Constructor: " ++ show n
@@ -584,7 +588,7 @@ buildRecConstr (amp,fls) n us = do
             return $ foldl HsApp (HsCon n) rs
 
 buildRecUpdate ::  FieldMap -> HsExp -> [HsFieldUpdate] -> RM HsExp
-buildRecUpdate (amp,fls) n us = do
+buildRecUpdate (FieldMap amp fls) n us = do
         sl <- getSrcLoc
         let f (HsFieldUpdate x e) = case  Map.lookup (toName FieldLabel x) fls of
                 Nothing -> failRename $ "Field Label does not exist: " ++ show x

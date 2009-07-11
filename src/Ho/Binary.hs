@@ -8,39 +8,21 @@ import Data.Version
 import Ho.Type
 import Support.MapBinaryInstance
 import Name.Binary()
+import FrontEnd.Rename(FieldMap(..))
 
 
 
-instance Binary HoBuild where
-    put (HoBuild ae af ag ah ai ak al am) = do
-	    putMap ae
-	    put af
-	    put ag
-	    put ah
-	    put ai
-	    put ak
-	    put al
-	    put am
-    get = do
-    ae <- getMap
-    af <- get
-    ag <- get
-    ah <- get
-    ai <- get
-    ak <- get
-    al <- get
-    am <- get
-    return (HoBuild ae af ag ah ai ak al am)
 
 
-instance Binary HoExp where
-    put (HoExp ac ad) = do
-	    put ac
+
+instance Binary FieldMap where
+    put (FieldMap ac ad) = do
+	    putMap ac
 	    putMap ad
     get = do
-    ac <- get
+    ac <- getMap
     ad <- getMap
-    return (HoExp ac ad)
+    return (FieldMap ac ad)
 
 
 
@@ -86,4 +68,39 @@ instance Data.Binary.Binary HoLib where
 instance Binary Data.Version.Version where
     put (Version a b) = put a >> put b 
     get = liftM2 Version get get
+
+
+
+instance Data.Binary.Binary HoTcInfo where
+    put (HoTcInfo aa ab ac ad ae af ag ah) = do
+	    Data.Binary.put aa
+	    putMap ab
+	    putMap ac
+	    Data.Binary.put ad
+	    Data.Binary.put ae
+	    Data.Binary.put af
+	    Data.Binary.put ag
+	    Data.Binary.put ah
+    get = do
+    aa <- get
+    ab <- getMap
+    ac <- getMap
+    ad <- get
+    ae <- get
+    af <- get
+    ag <- get
+    ah <- get
+    return (HoTcInfo aa ab ac ad ae af ag ah)
+
+
+instance Data.Binary.Binary HoBuild where
+    put (HoBuild aa ab ac) = do
+	    Data.Binary.put aa
+	    Data.Binary.put ab
+	    Data.Binary.put ac
+    get = do
+    aa <- get
+    ab <- get
+    ac <- get
+    return (HoBuild aa ab ac)
 

@@ -103,7 +103,7 @@ import qualified Data.ByteString.Lazy.UTF8 as LBS
 -- version number of the compiler.
 
 current_version :: Int
-current_version = 1
+current_version = 2
 
 cff_magic = chunkType "JHC"
 cff_link  = chunkType "LINK"
@@ -236,21 +236,25 @@ resolveDeps done_ref m = do
     return ()
 
 
-data SourceCode
-    = SourceParsed { sourceHash :: SourceHash, sourceDeps :: [Module]
-                   , sourceModule :: HsModule, sourceFP :: FilePath, sourceHoName :: FilePath }
-    | SourceRaw    { sourceHash :: SourceHash, sourceDeps :: [Module]
-                   , sourceModName :: Module, sourceLBS :: LBS.ByteString, sourceFP :: FilePath, sourceHoName :: FilePath }
+data CompNode = CompNode !HoHash [CompNode] !(IORef CompUnit)
 
-
-sourceIdent SourceParsed { sourceModule = m } = show $ hsModuleName m
-sourceIdent SourceRaw { sourceModName = fp } = show fp
+type CompUnitGraph = [(HoHash,([HoHash],CompUnit))]
 
 data CompUnit
     = CompHo   (Maybe String)  HoHeader HoIDeps Ho
     | CompSources [SourceCode]
     | CompPhony
     | CompCollected CollectedHo CompUnit
+    | CompTCed Bool CompUnit
+
+data SourceCode
+    = SourceParsed { sourceHash :: SourceHash, sourceDeps :: [Module]
+                   , sourceModule :: HsModule, sourceFP :: FilePath, sourceHoName :: FilePath }
+    | SourceRaw    { sourceHash :: SourceHash, sourceDeps :: [Module]
+                   , sourceModName :: Module, sourceLBS :: LBS.ByteString, sourceFP :: FilePath, sourceHoName :: FilePath }
+
+sourceIdent SourceParsed { sourceModule = m } = show $ hsModuleName m
+sourceIdent SourceRaw { sourceModName = fp } = show fp
 
 class ProvidesModules a where
     providesModules :: a -> [Module]
@@ -271,7 +275,6 @@ instance ProvidesModules SourceCode where
     providesModules SourceRaw    { sourceModName = n } = [n]
 
 
-type CompUnitGraph = [(HoHash,([HoHash],CompUnit))]
 
 showCUnit (hash,(deps,cu)) = printf "%s : %s" (show hash) (show deps)  ++ "\n" ++ f cu where
     f (CompHo (Just s) _ _ _) = s
@@ -391,8 +394,8 @@ loadModules libs need = do
     return (needed,cug)
 
 
-data CompNode = CompNode HoHash [CompNode] (IORef CompUnit)
 
+-- turn the list of CompUnits into a true mutable graph.
 processCug :: CompUnitGraph -> IO [CompNode]
 processCug cug = mdo
     let mmap = Map.fromList xs
@@ -403,12 +406,74 @@ processCug cug = mdo
     xs <- mapM f cug
     return $ snds xs
 
+-- take the list of CompNodes and what modules we want and create a root node
+-- that will reach all dependencies when compiled.
+
 mkPhonyCompNode :: [Module] -> [CompNode] -> IO CompNode
 mkPhonyCompNode need cs = do
     xs <- forM cs $ \cn@(CompNode _ _ cu) -> readIORef cu >>= \u -> return $ if null $ providesModules u `intersect` need then [] else [cn]
     let hash = MD5.md5String $ show [ h | CompNode h _ _ <- concat xs ]
     CompNode hash (concat xs) `fmap` newIORef CompPhony
 
+
+-- typechecking, this goes through and typechecks everything. It returns 'True' if there were errors.
+{-
+typeCheckGraph :: CompNode -> IO Bool
+typeCheckGraph cn = do
+    cur <- newMVar (1::Int)
+    let countNodes (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
+            CompCollected _ _ -> return Set.empty
+            CompPhony         -> mconcat `fmap` mapM countNodes deps
+            CompHo _ hoh idep _  -> do ds <- mconcat `fmap` mapM countNodes deps
+                                       return $ ds `Set.union` Set.fromList (map (show.fst) (hoDepends idep))
+            CompSources sc    -> do ds <- mconcat `fmap` mapM countNodes deps
+                                    return $ ds `Set.union` Set.fromList (map sourceIdent sc)
+        tickProgress = modifyMVar cur $ \val -> return (val+1,val)
+    maxModules <- Set.size `fmap` countNodes cn
+    let showProgress ms = forM_ ms $ \modName ->
+          do curModule <- tickProgress cur
+             printf fmtStr curModule maxModules (show $ hsModuleName modName)
+        fmtStr = printf "[%%%dd of %*d] %%s]" fmtLen fmtLen maxModules where
+            fmtLen = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
+    let f (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
+            CompCollected ch _ -> return False
+            CompTCed errors _ -> return errors
+            CompPhony -> do
+                xs <- or `fmap` mapM f deps
+                writeIORef ref (CompTCed xs CompPhony)
+                return xs
+            CompHo {} -> return False
+            CompSources sc -> do
+                let hdep = [ h | CompNode h _ _ <- deps]
+                cho <- mconcat `fmap` mapM f deps
+                modules <- forM sc $ \x -> case x of
+                    SourceParsed { sourceHash = h,sourceModule = mod } -> return (h,mod)
+                    SourceRaw { sourceHash = h,sourceLBS = lbs, sourceFP = fp } -> do
+                        mod <- parseHsSource fp lbs
+                        return (h,mod)
+                showProgress (snds modules)
+--                (cho',newHo) <- func cho (snds modules)
+--
+--                let hoh = HoHeader {
+--                             hohVersion = current_version,
+--                             hohName = Left mgName,
+--                             hohHash       = hh,
+--                             hohArchDeps = [],
+--                             hohLibDeps   = []
+--                             }
+--                    idep = HoIDeps {
+--                            hoIDeps = Map.fromList [ (h,(hsModuleName mod,hsModuleRequires mod)) | (h,mod) <- modules],
+--                            hoDepends    = [ (hsModuleName mod,h) | (h,mod) <- modules],
+--                            hoModDepends = hdep
+--                            }
+--                    (mgName:_) = sort $ map (hsModuleName . snd) modules
+--
+--                recordHoFile newHo idep (map sourceHoName sc) hoh
+--                writeIORef ref (CompCollected cho' (CompHo Nothing hoh idep newHo))
+--                return cho'
+    f cn
+
+-}
 compileCompNode :: (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
                 -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
                 -> CompNode
@@ -495,7 +560,7 @@ readHoFile fn = do
             Just x -> decode . decompress $ L.fromChunks [x]
         hoh = fc cff_jhdr
     when (hohVersion hoh /= current_version) $ fail "invalid version in hofile"
-    return (hoh,fc cff_idep,mempty { hoExp = fc cff_defs, hoBuild = fc cff_core})
+    return (hoh,fc cff_idep,mempty { hoTcInfo = fc cff_defs, hoBuild = fc cff_core})
 
 
 recordHoFile ::
@@ -538,7 +603,7 @@ recordHoFile ho idep fs header = do
                 cfflbs = mkCFFfile cff_magic [
                     (cff_jhdr, compress $ encode header),
                     (cff_idep, compress $ encode idep),
-                    (cff_defs, compress $ encode $ hoExp theho),
+                    (cff_defs, compress $ encode $ hoTcInfo theho),
                     (cff_core, compress $ encode $ hoBuild theho)]
             LBS.writeFile tfn cfflbs
             rename tfn fn
@@ -691,7 +756,7 @@ dumpHoFile :: String -> IO ()
 dumpHoFile fn = do
     (hoh,idep,ho) <- readHoFile fn
     let hoB = hoBuild ho
-        hoE = hoExp ho
+        hoE = hoTcInfo ho
     putStrLn fn
     putStrLn $ "HoHash:" <+> pprint (hohHash hoh)
     let showList nm xs = when (not $ null xs) $ putStrLn $ (nm ++ ":\n") <>  vindent xs
@@ -700,11 +765,11 @@ dumpHoFile fn = do
 --    when (not $ Prelude.null (hohMetaInfo hoh)) $ putStrLn $ "MetaInfo:\n" <> vindent (sort [text (' ':' ':k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
     putStrLn $ "Modules contained:" <+> tshow (mkeys $ hoExports hoE)
     putStrLn $ "number of definitions:" <+> tshow (size $ hoDefs hoE)
-    putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps hoB)
-    putStrLn $ "hoFixities:" <+> tshow (size $  hoFixities hoB)
-    putStrLn $ "hoKinds:" <+> tshow (size $  hoKinds hoB)
-    putStrLn $ "hoClassHierarchy:" <+> tshow (size $  hoClassHierarchy hoB)
-    putStrLn $ "hoTypeSynonyms:" <+> tshow (size $  hoTypeSynonyms hoB)
+    putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps hoE)
+    putStrLn $ "hoFixities:" <+> tshow (size $  hoFixities hoE)
+    putStrLn $ "hoKinds:" <+> tshow (size $  hoKinds hoE)
+    putStrLn $ "hoClassHierarchy:" <+> tshow (size $  hoClassHierarchy hoE)
+    putStrLn $ "hoTypeSynonyms:" <+> tshow (size $  hoTypeSynonyms hoE)
     putStrLn $ "hoDataTable:" <+> tshow (size $  hoDataTable hoB)
     putStrLn $ "hoEs:" <+> tshow (size $  hoEs hoB)
     putStrLn $ "hoRules:" <+> tshow (size $  hoRules hoB)
@@ -716,13 +781,13 @@ dumpHoFile fn = do
         CharIO.putStrLn $  (pprint $ hoDefs hoE :: String)
     when (dump FD.Kind) $ do
         putStrLn "---- kind information ----";
-        CharIO.putStrLn $  (pprint $ hoKinds hoB :: String)
+        CharIO.putStrLn $  (pprint $ hoKinds hoE :: String)
     when (dump FD.ClassSummary) $ do
         putStrLn "---- class summary ---- "
-        printClassSummary (hoClassHierarchy hoB)
+        printClassSummary (hoClassHierarchy hoE)
     when (dump FD.Class) $
          do {putStrLn "---- class hierarchy ---- ";
-             printClassHierarchy (hoClassHierarchy hoB)}
+             printClassHierarchy (hoClassHierarchy hoE)}
     let rules = hoRules hoB
     wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
     wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
@@ -733,7 +798,7 @@ dumpHoFile fn = do
          putChar '\n'
     wdump FD.Types $ do
         putStrLn " ---- the types of identifiers ---- "
-        putStrLn $ PPrint.render $ pprint (hoAssumps hoB)
+        putStrLn $ PPrint.render $ pprint (hoAssumps hoE)
     wdump FD.Core $ do
         putStrLn " ---- lambdacube  ---- "
         mapM_ (\ (v,lc) -> putChar '\n' >> printCheckName'' (hoDataTable hoB) v lc) (hoEs hoB)

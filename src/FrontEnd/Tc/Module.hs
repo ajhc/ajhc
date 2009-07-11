@@ -1,4 +1,4 @@
-module FrontEnd.Tc.Module (tiModules',TiData(..)) where
+module FrontEnd.Tc.Module (tiModules,TiData(..)) where
 
 import Char
 import Control.Monad.Writer
@@ -11,7 +11,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import FrontEnd.DataConsAssump     (dataConsEnv)
-import DataConstructors
 import FrontEnd.DeclsDepends       (getDeclDeps, debugDeclBindGroups)
 import FrontEnd.DependAnalysis     (getBindGroups)
 import DerivingDrift.Drift
@@ -28,7 +27,6 @@ import FrontEnd.Tc.Type
 import FrontEnd.Utils
 import FrontEnd.Warning
 import Ho.Type
-import Ho.Collected
 import FrontEnd.HsSyn
 import Info.Types
 import Name.Name as Name
@@ -66,13 +64,21 @@ isGlobal _ = error "isGlobal"
 
 
 
+buildFieldMap :: [ModInfo] -> FieldMap
+buildFieldMap ms = FieldMap ans' ans where
+        allDefs = [ (x,z) | (x,_,z) <- concat $ map modInfoDefs ms, nameType x == DataConstructor ]
+        ans = Map.fromList $ sortGroupUnderFG fst snd $ concat [ [ (y,(x,i)) |  y <- ys | i <- [0..] ]  | (x,ys) <-  allDefs ]
+        ans' = Map.fromList $ concatMap modInfoConsArity ms
 
+
+{-
 buildFieldMap :: Ho -> [ModInfo] -> FieldMap
 buildFieldMap ho ms = (ans',ans) where
         theDefs = [ (x,z) | (x,_,z) <- concat $ map modInfoDefs ms, nameType x == DataConstructor ]
         allDefs = theDefs ++ [ (x,z) | (x,(_,z)) <- Map.toList (hoDefs $ hoExp ho), nameType x == DataConstructor ]
         ans = Map.fromList $ sortGroupUnderFG fst snd $ concat [ [ (y,(x,i)) |  y <- ys | i <- [0..] ]  | (x,ys) <-  allDefs ]
         ans' = Map.fromList $ concatMap modInfoConsArity ms ++ getConstructorArities (hoDataTable $ hoBuild ho)
+-}
 
 
 processModule :: FieldMap -> ModInfo -> IO ModInfo
@@ -101,23 +107,20 @@ or' :: [(a -> Bool)] -> a -> Bool
 or' fs x = or [ f x | f <- fs ]
 
 -- FIXME: Use an warnings+writer+error monad instead of IO.
-tiModules' ::  CollectedHo -> [ModInfo] -> IO (Ho,TiData)
-tiModules' cho ms = do
-    let me = choHo cho
-        hoB = hoBuild me
+tiModules ::  HoTcInfo -> [ModInfo] -> IO (HoTcInfo,TiData)
+tiModules htc ms = do
 --    let importVarEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x == Name.Val ]
 --        importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
-    let importClassHierarchy = hoClassHierarchy hoB
-        importKindEnv = hoKinds hoB
+    let importClassHierarchy = hoClassHierarchy htc
+        importKindEnv = hoKinds htc
     wdump FD.Progress $ do
         putErrLn $ "Typing: " ++ show ([ m | Module m <- map modInfoName ms])
-    let fieldMap = buildFieldMap me ms
     -- 'processModule' doesn't need IO. We can use a plain writer+error monad.
-    ms <- mapM (processModule fieldMap) ms
+    ms <- mapM (processModule (hoFieldMap htc)) ms
     let thisFixityMap = buildFixityMap (concat [ filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
-    let fixityMap = thisFixityMap  `mappend` hoFixities hoB
+    let fixityMap = thisFixityMap  `mappend` hoFixities htc
     let thisTypeSynonyms =  (declsToTypeSynonyms $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
-    let ts = thisTypeSynonyms `mappend` hoTypeSynonyms hoB
+    let ts = thisTypeSynonyms `mappend` hoTypeSynonyms htc
     -- 'expandTypeSyns' is in the Warning monad and doesn't require IO.
     let f x = expandTypeSyns ts (modInfoHsModule x) >>= return . FrontEnd.Infix.infixHsModule fixityMap >>= \z -> return (modInfoHsModule_s ( z) x)
     ms <- mapM f ms
@@ -214,14 +217,14 @@ tiModules' cho ms = do
 
     when (dump FD.AllTypes) $ do
         putStrLn "  ---- all types ---- "
-        putStrLn $ PPrint.render $ pprintEnvMap (sigEnv `mappend` localDConsEnv `mappend` hoAssumps hoB)
+        putStrLn $ PPrint.render $ pprintEnvMap (sigEnv `mappend` localDConsEnv `mappend` hoAssumps htc)
 
     wdump FD.Progress $ do
         putErrLn $ "Type inference"
     let moduleName = modInfoName tms
         (tms:_) = ms
     let tcInfo = tcInfoEmpty {
-        tcInfoEnv = hoAssumps hoB `mappend` localDConsEnv, -- (importVarEnv `mappend` globalDConsEnv),
+        tcInfoEnv = hoAssumps htc `mappend` localDConsEnv, -- (importVarEnv `mappend` globalDConsEnv),
         tcInfoSigEnv = sigEnv,
         tcInfoModName =  show moduleName,
         tcInfoKindInfo = kindInfo,
@@ -256,18 +259,17 @@ tiModules' cho ms = do
     let allAssumps = localDConsEnv `Map.union` localVarEnv
         allExports = Set.fromList (concatMap modInfoExport ms)
         externalKindEnv = restrictKindEnv (\ x  -> isGlobal x && (getModule x `elem` map (Just . modInfoName) ms)) kindInfo
-    let hoBld = mempty {
+    let hoEx = HoTcInfo {
+            hoExports = Map.fromList [ (modInfoName m,modInfoExport m) | m <- ms ],
+            hoDefs =  Map.fromList [ (x,(y,filter (`member` allExports) z)) | (x,y,z) <- concat $ map modInfoDefs ms, x `member` allExports],
             hoAssumps = Map.filterWithKey (\k _ -> k `member` allExports) allAssumps,
             hoFixities = restrictFixityMap (`member` allExports) thisFixityMap,
             -- TODO - this contains unexported names, we should filter these before writing to disk.
-            hoKinds = externalKindEnv,
             --hoKinds = restrictKindEnv (`member` allExports) kindInfo,
+            hoKinds = externalKindEnv,
             hoClassHierarchy = smallClassHierarchy,
+            hoFieldMap = buildFieldMap ms,
             hoTypeSynonyms = restrictTypeSynonyms (`member` allExports) thisTypeSynonyms
-        }
-        hoEx = mempty {
-            hoExports = Map.fromList [ (modInfoName m,modInfoExport m) | m <- ms ],
-            hoDefs =  Map.fromList [ (x,(y,filter (`member` allExports) z)) | (x,y,z) <- concat $ map modInfoDefs ms, x `member` allExports]
         }
         tiData = TiData {
             tiDataDecls = tcDs ++ filter isHsClassDecl ds,
@@ -278,5 +280,5 @@ tiModules' cho ms = do
             tiProps        = pragmaProps,
             tiAllAssumptions = allAssumps
         }
-    return (mempty { hoBuild = hoBld, hoExp = hoEx },tiData)
+    return (hoEx,tiData)
 

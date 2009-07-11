@@ -5,6 +5,7 @@ module FrontEnd.FrontEnd(
     ) where
 
 import Monad
+import Data.Monoid
 import qualified Data.Map as Map
 
 import Doc.DocLike
@@ -41,9 +42,11 @@ doModules func ho ms  = do
     when (dump FD.Defs) $ flip mapM_ ms $ \m -> do
          putStrLn $ " ---- Definitions for" <+> show (modInfoName m) <+> "----";
          mapM_ print ( modInfoDefs m)
-    ms <- determineExports [ (x,y,z) | (x,(y,z)) <- Map.toList $ hoDefs $ hoExp $ choHo ho] (Map.toList $ hoExports $ hoExp $ choHo ho) ms
-    (ho',tiData) <- Tc.tiModules' ho ms
-    func ho ho' tiData
+    ms <- determineExports [ (x,y,z) | (x,(y,z)) <- Map.toList $ hoDefs $ hoTcInfo $ choHo ho] (Map.toList $ hoExports $ hoTcInfo $ choHo ho) ms
+    --(ho',tiData) <- Tc.tiModules' ho ms
+    (htc,tiData) <- Tc.tiModules (hoTcInfo (choHo ho)) ms
+    func ho mempty { hoTcInfo = htc } tiData
+    --func ho ho' tiData
 
 modInfo m = do
     opt <- case fileOptions (hsModuleOptions m) of
