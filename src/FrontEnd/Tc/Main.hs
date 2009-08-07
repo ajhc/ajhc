@@ -7,6 +7,7 @@ import List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
+import System.IO(hPutChar,stderr)
 
 import Control.Monad.Reader
 import FrontEnd.DeclsDepends(getDeclDeps)
@@ -835,7 +836,8 @@ tiProgram bgs es = ans where
             ([],leftovers) <- splitPreds ch Set.empty ps
             --topDefaults leftovers
             return ()
-        when verbose $ liftIO $ do putChar '.'; hFlush stdout
+        liftIO $ do hPutChar stderr '.'
+        liftIO $ hFlush stderr
         localEnv env $ f bgs (ds ++ rs) (env `mappend` cenv)
     f [] rs _cenv = do
         ch <- getClassHierarchy
@@ -844,7 +846,7 @@ tiProgram bgs es = ans where
             ([],leftovers) <- splitPreds ch Set.empty ps
             --topDefaults leftovers
             return ()
-        when verbose $ liftIO $ putStrLn "!"
+        liftIO $ putErrLn "!"
         return (rs ++ concat pdecls)
 
 -- Typing Literals

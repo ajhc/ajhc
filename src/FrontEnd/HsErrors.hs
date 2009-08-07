@@ -20,12 +20,12 @@ import FrontEnd.Warning
 
 
 
-hsType :: MonadWarn m => HsType -> m ()
+hsType :: (MonadSrcLoc m, MonadWarn m) => HsType -> m ()
 hsType x@HsTyForall {} = do
-    err "h98-forall" "Explicit quantification is a non-haskell98 feature"
+    addWarn "h98-forall" "Explicit quantification is a non-haskell98 feature"
     hsQualType (hsTypeType x)
 hsType x@HsTyExists {} = do
-    err "h98-forall" "Explicit quantification is a non-haskell98 feature"
+    addWarn "h98-forall" "Explicit quantification is a non-haskell98 feature"
     hsQualType (hsTypeType x)
 hsType x = traverseHsType (\x -> hsType x >> return x) x >> return ()
 

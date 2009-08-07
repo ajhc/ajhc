@@ -6,9 +6,12 @@ module Options(
     Mode(..),
     putVerbose,
     putVerboseLn,
+    putProgress,
+    putProgressLn,
     getArguments,
     verbose,
     verbose2,
+    progress,
     dump,
     wdump,
     fopts,
@@ -210,7 +213,7 @@ opt = Opt {
     optVerbose     = 0,
     optStatLevel   = 1,
     optNoAuto      = False,
-    optDumpSet     = S.empty,
+    optDumpSet     = S.singleton FlagDump.Progress,
     optFOptsSet    = S.empty
 }
 
@@ -362,6 +365,17 @@ putVerbose s = when (optVerbose options > 0) $ putErr s
 -- | Put a line to stderr when running verbose.
 putVerboseLn :: String -> IO ()
 putVerboseLn s = putVerbose (s ++ "\n")
+
+putProgress :: String -> IO ()
+putProgress s = when progress $ putErr s
+
+-- | Put a line to stderr when running verbose.
+putProgressLn :: String -> IO ()
+putProgressLn s = putProgress (s ++ "\n")
+
+-- | Is verbose > 0?
+progress :: Bool
+progress = dump FlagDump.Progress
 
 -- | Is verbose > 0?
 verbose :: Bool

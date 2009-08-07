@@ -9,6 +9,7 @@ import Monad
 import Text.PrettyPrint.HughesPJ as PPrint
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import qualified Data.Foldable as T
 
 import FrontEnd.DataConsAssump     (dataConsEnv)
 import FrontEnd.DeclsDepends       (getDeclDeps, debugDeclBindGroups)
@@ -81,7 +82,7 @@ buildFieldMap ho ms = (ans',ans) where
 -}
 
 
-processModule :: FieldMap -> ModInfo -> IO ModInfo
+processModule :: FieldMap -> ModInfo -> IO (ModInfo,[Warning])
 processModule defs m = do
     when (dump FD.Parsed) $ do
         putStrLn " \n ---- parsed code ---- \n";
@@ -95,8 +96,7 @@ processModule defs m = do
     when (dump FD.Renamed) $ do
         putStrLn " \n ---- renamed code ---- \n"
         putStrLn $ HsPretty.render $ HsPretty.ppHsModule $  mod'
-    processErrors errs
-    return $ modInfoHsModule_s mod' m
+    return $ (modInfoHsModule_s mod' m,errs)
 
 
 -- type check a set of mutually recursive modules.
@@ -113,10 +113,11 @@ tiModules htc ms = do
 --        importDConsEnv = Map.fromList [ (x,y) | (x,y) <- Map.toList $ hoAssumps me, nameType x ==  Name.DataConstructor ]
     let importClassHierarchy = hoClassHierarchy htc
         importKindEnv = hoKinds htc
-    wdump FD.Progress $ do
-        putErrLn $ "Typing: " ++ show ([ m | Module m <- map modInfoName ms])
+    --wdump FD.Progress $ do
+    --    putErrLn $ "Typing: " ++ show ([ m | Module m <- map modInfoName ms])
     -- 'processModule' doesn't need IO. We can use a plain writer+error monad.
-    ms <- mapM (processModule (hoFieldMap htc)) ms
+    mserrs <- mapM (processModule (hoFieldMap htc)) ms
+    let ms = fsts mserrs
     let thisFixityMap = buildFixityMap (concat [ filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
     let fixityMap = thisFixityMap  `mappend` hoFixities htc
     let thisTypeSynonyms =  (declsToTypeSynonyms $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
@@ -135,8 +136,8 @@ tiModules htc ms = do
     -- kind inference for all type constructors type variables and classes in the module
     let classAndDataDecls = filter (or' [isHsDataDecl, isHsNewTypeDecl, isHsClassDecl, isHsClassAliasDecl]) ds  -- rDataDecls ++ rNewTyDecls ++ rClassDecls
 
-    wdump FD.Progress $ do
-        putErrLn $ "Kind inference"
+    --wdump FD.Progress $ do
+    --    putErrLn $ "Kind inference"
     kindInfo <- kiDecls importKindEnv classAndDataDecls
 
     when (dump FD.Kind) $
@@ -219,8 +220,8 @@ tiModules htc ms = do
         putStrLn "  ---- all types ---- "
         putStrLn $ PPrint.render $ pprintEnvMap (sigEnv `mappend` localDConsEnv `mappend` hoAssumps htc)
 
-    wdump FD.Progress $ do
-        putErrLn $ "Type inference"
+    --wdump FD.Progress $ do
+    --    putErrLn $ "Type inference"
     let moduleName = modInfoName tms
         (tms:_) = ms
     let tcInfo = tcInfoEmpty {
@@ -232,6 +233,7 @@ tiModules htc ms = do
         }
 
     (localVarEnv,checkedRules,coercions,tcDs) <- withOptionsT (modInfoOptions tms) $ runTc tcInfo $ do
+        mapM_ addWarning (concatMap snd mserrs)
         (tcDs,out) <- listen (tiProgram program ds)
         env <- getCollectedEnv
         cc <- getCollectedCoerce
@@ -239,7 +241,7 @@ tiModules htc ms = do
             lup v = case Map.lookup v cc of
                 Just (CTAbs xs) -> ctAp (map TVar xs)
                 _ -> ctId
-        return (env,checkedRules out,cc',tcDs)
+        return (env,T.toList $ checkedRules out,cc',tcDs)
 
     when (dump FD.Decls) $ do
         putStrLn " \n ---- typechecked code ---- \n"

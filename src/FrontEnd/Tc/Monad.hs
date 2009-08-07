@@ -52,6 +52,9 @@ import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.Writer
 import qualified Data.Traversable as T
+import qualified Data.Foldable as T
+import qualified Data.Sequence as Seq
+
 
 import Data.IORef
 import Data.Monoid
@@ -108,8 +111,9 @@ data Output = Output {
     collectedPreds   :: Preds,
     existentialPreds :: Preds,
     constraints      :: [Constraint],
-    checkedRules     :: [Rule],
+    checkedRules     :: Seq.Seq Rule,
     existentialVars  :: [Tyvar],
+    tcWarnings       :: Seq.Seq Warning,
     outKnots         :: [(Name,Name)]
     }
    {-! derive: update, Monoid !-}
@@ -183,6 +187,7 @@ runTc tcInfo  (Tc tim) = do
         tcCurrentScope = mempty,
         tcOptions = opt
         }
+    liftIO $ processErrors (T.toList $ tcWarnings out)
     return a
 
 instance OptionMonad Tc where
@@ -198,7 +203,7 @@ withContext diagnostic comp = do
     local (tcDiagnostics_u (diagnostic:)) comp
 
 addRule :: Rule -> Tc ()
-addRule r = tell mempty { checkedRules = [r] }
+addRule r = tell mempty { checkedRules = Seq.singleton r }
 
 
 getErrorContext :: Tc [Diagnostic]
@@ -318,7 +323,9 @@ listenCPreds :: Tc a -> Tc (a,(Preds,[Constraint]))
 listenCPreds action = censor (\x -> x { constraints = mempty, collectedPreds = mempty }) $ listens (\x -> (collectedPreds x,constraints x)) action
 
 listenCheckedRules :: Tc a -> Tc (a,[Rule])
-listenCheckedRules action = censor (\x -> x { checkedRules = mempty }) $ listens checkedRules action
+listenCheckedRules action = do
+    (a,r) <- censor (\x -> x { checkedRules = mempty }) $ listens checkedRules action
+    return (a,T.toList r)
 
 newVar :: Kind -> Tc Tyvar
 newVar k = do
@@ -522,7 +529,9 @@ instance Monad Tc where
         liftIO $ fail x
 
 instance MonadWarn Tc where
-    addWarning w = liftIO $ processErrors [w]
+--    addWarning w = liftIO $ processErrors [w]
+    addWarning w = tell mempty { tcWarnings = Seq.singleton w }
+
 
 instance MonadSrcLoc Tc where
     getSrcLoc = do

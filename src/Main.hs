@@ -79,7 +79,6 @@ import qualified IO
 -- ∀α∃β . α → β
 ---------------
 
-progress str = wdump FD.Progress $  (putErrLn str) >> hFlush stderr
 progressM c  = wdump FD.Progress $ (c >>= putErrLn) >> hFlush stderr
 
 
@@ -324,10 +323,10 @@ processDecls cho ho' tiData = do
         wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
         return mprog
     lintCheckProgram onerrNone prog
-    progress "Initial optimization pass"
+    putProgressLn "Initial optimization pass"
 
     prog <- programMapProgGroups mempty  fint prog
-    progress "!"
+    putProgressLn "!"
     hFlush stdout >> hFlush stderr
 
     wdump FD.Progress $
@@ -390,7 +389,7 @@ processDecls cho ho' tiData = do
         return mprog
 
     prog <- evalStateT (programMapProgGroups mempty optWW prog { progStats = mempty }) (SS.so_boundVars sopt)
-    progress "!"
+    putProgressLn "!"
     hFlush stdout >> hFlush stderr
     wdump FD.Progress $
         Stats.printLStat (optStatLevel options) "MainPass Stats" (progStats prog)
@@ -658,7 +657,7 @@ simplifyParms = transformParms {
 
 compileToGrin prog = do
     stats <- Stats.new
-    progress "Converting to Grin..."
+    putProgressLn "Converting to Grin..."
     prog <- return $ atomizeApps True prog
     --wdump FD.CoreMangled $ printProgram prog
     wdump FD.CoreMangled $ dumpCore "mangled" prog
@@ -752,9 +751,9 @@ compileGrinToC grin = do
                             (map ("-l" ++) rls) ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
         debug = if fopts FO.Debug then words (lup "cflags_debug") else words (lup "cflags_nodebug")
         globalvar n c = "char " ++ n ++ "[] = \"" ++ c ++ "\";"
-    progress ("Writing " ++ show cf)
+    putProgressLn ("Writing " ++ show cf)
     writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" sversion,"",cg]
-    progress ("Running: " ++ comm)
+    putProgressLn ("Running: " ++ comm)
     r <- System.system comm
     when (r /= System.ExitSuccess) $ fail "C code did not compile."
     unless (dump FD.C) $ removeFile cf

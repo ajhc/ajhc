@@ -225,8 +225,8 @@ fetchSource done_ref fs mm = do
             fn' <- shortenPath fn
             mho' <- shortenPath mho
             case foundho of
-                False -> putVerboseLn $ printf "%-23s [%s]" (show m) fn'
-                True -> putVerboseLn $ printf "%-23s [%s] <%s>" (show m) fn' mho'
+                False -> putProgressLn $ printf "%-23s [%s]" (show m) fn'
+                True -> putProgressLn $ printf "%-23s [%s] <%s>" (show m) fn' mho'
             mapM_ (resolveDeps done_ref) ds
             return m
 
@@ -341,7 +341,7 @@ toCompUnitGraph done roots = do
                     let stale = map (show . fst) (hoDepends idep) `intersect` optStale options
                     good <- catch ( mapM_ cdep (hoDepends idep) >> mapM_ hvalid (hoModDepends idep) >> return True) (\_ -> return False)
                     if good && null stale then do
-                        putVerboseLn $ printf "Fresh: <%s>" fp
+                        putProgressLn $ printf "Fresh: <%s>" fp
                         let lib = case ".ho" `isSuffixOf` fp of
                                     True  -> Nothing
                                     False -> Just fp
@@ -349,7 +349,7 @@ toCompUnitGraph done roots = do
                         modifyIORef hom_ref (Map.insert h (True,af))
                         return h
                      else do
-                        putVerboseLn $ if null stale
+                        putProgressLn $ if null stale
                             then printf "Stale: <%s>" fp
                             else printf "Stale: <%s> (forced)" fp
                         modifyIORef hom_ref (Map.delete h)
@@ -383,7 +383,7 @@ loadModules :: [String]                 -- ^ libraries to load
             -> IO ([Module],CompUnitGraph)         -- ^ the resulting acyclic graph of compilation units
 loadModules libs need = do
     done_ref <- newIORef mempty
-    unless (null libs) $ putVerboseLn $ "Loading libraries:" <+> show libs
+    unless (null libs) $ putProgressLn $ "Loading libraries:" <+> show libs
 --    forM_ (optHls options) $ \l -> do
 --        (n',fn) <- findLibrary l
 --        (hoh,_,ho) <- catch (readHoFile fn) $ \_ ->
@@ -422,6 +422,16 @@ mkPhonyCompNode need cs = do
     let hash = MD5.md5String $ show [ h | CompNode h _ _ <- concat xs ]
     CompNode hash (concat xs) `fmap` newIORef CompPhony
 
+printModProgress :: Int -> Int -> IO Int -> [HsModule] -> IO ()
+printModProgress _ _ _ [] = return ()
+printModProgress _ _ tickProgress ms | not progress = mapM_ (const tickProgress) ms
+printModProgress fmtLen maxModules tickProgress ms = f "[" ms where
+    f bl ms = do
+        curModule <- tickProgress
+        case ms of
+            [x] -> g curModule bl "]" x
+            (x:xs) -> do g curModule bl "|" x; putErrLn ""; f "|" xs
+    g curModule bl el modName = putErr $ printf "%s%*d of %*d%s %s" bl fmtLen curModule fmtLen maxModules el (show $ hsModuleName modName)
 
 -- typechecking, this goes through and typechecks everything. It returns 'True' if there were errors.
 typeCheckGraph :: CompNode -> IO HoTcInfo
@@ -436,9 +446,13 @@ typeCheckGraph cn = do
                                     return $ ds `Set.union` Set.fromList (map sourceIdent sc)
         tickProgress = modifyMVar cur $ \val -> return (val+1,val)
     maxModules <- Set.size `fmap` countNodes cn
-    let showProgress ms = forM_ ms $ \modName ->
-          do curModule <- tickProgress
-             printf "[%*d of %*d] %s\n" fmtLen curModule fmtLen maxModules (show $ hsModuleName modName)
+    let showProgress ms = printModProgress fmtLen maxModules tickProgress ms
+--    let showProgress ms = forM_ ms $ \modName ->
+--          do curModule <- tickProgress
+--             printf "[%*d of %*d] %s\n" fmtLen curModule fmtLen maxModules (show $ hsModuleName modName)
+--        showProgress ms = forM_ ms $ \modName ->
+--          do curModule <- tickProgress
+--             printf "[%*d of %*d] %s\n" fmtLen curModule fmtLen maxModules (show $ hsModuleName modName)
 --             printf fmtStr curModule maxModules (show $ hsModuleName modName)
         --fmtStr = printf "[%%%id of %*d] %%s]" fmtLen fmtLen maxModules where
         fmtLen = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
@@ -560,7 +574,7 @@ recordHoFile ::
     -> IO ()
 recordHoFile ho idep fs header = do
     if optNoWriteHo options then do
-        wdump FD.Progress $ do
+        when verbose $ do
             fs' <- mapM shortenPath fs
             putErrLn $ "Skipping Writing Ho Files: " ++ show fs'
       else do
@@ -651,6 +665,7 @@ parseHsSource fn lbs = do
             _ -> s
     wdump FD.Preprocessed $ do
         putStrLn s'
+    fn <- shortenPath fn
     case runParserWithMode (parseModeOptions $ f s) { parseFilename = fn } parse  s'  of
                       ParseOk ws e -> processErrors ws >> return e
                       ParseFailed sl err -> putErrDie $ show sl ++ ": " ++ err
