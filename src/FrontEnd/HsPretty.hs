@@ -531,6 +531,7 @@ ppHsExp (HsListComp exp stmtList) =
 		++ (punctuate comma . map ppHsStmt $ stmtList))
 ppHsExp (HsExpTypeSig pos exp ty) =
 	myFsep[ppHsExp exp, text "::", ppHsQualType ty]
+ppHsExp (HsLocatedExp (Located _ x)) = ppHsExp x
 
 ------------------------- Patterns -----------------------------
 

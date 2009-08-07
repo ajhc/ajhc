@@ -1,7 +1,8 @@
 module Ho.Build (
     module Ho.Type,
     dumpHoFile,
-    compileModules,
+--    compileModules,
+    parseFiles,
     doDependency,
     buildLibrary
     ) where
@@ -39,6 +40,7 @@ import E.Rules
 import E.Show
 import E.Traverse(emapE)
 import E.TypeCheck()
+import FrontEnd.FrontEnd
 import FrontEnd.Class
 import FrontEnd.HsParser
 import FrontEnd.Infix
@@ -245,7 +247,9 @@ data CompUnit
     | CompSources [SourceCode]
     | CompPhony
     | CompCollected CollectedHo CompUnit
-    | CompTCed Bool CompUnit
+    | CompTCed HoTcInfo (Maybe (HoTcInfo,TiData,[(HoHash,HsModule)],[String])) CompUnit
+    | CompTCedSource HoTcInfo TiData [(HoHash,HsModule)] [String]
+    | CompTcError
 
 data SourceCode
     = SourceParsed { sourceHash :: SourceHash, sourceDeps :: [Module]
@@ -360,14 +364,17 @@ toCompUnitGraph done roots = do
     mapM_ f roots
     readIORef cug_ref
 
-compileModules :: [Either Module String]                             -- ^ Either a module or filename to find
+parseFiles :: [Either Module String]                             -- ^ Either a module or filename to find
                -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
-               -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
+               -> (CollectedHo -> Ho -> TiData -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
+--               -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
                -> IO CollectedHo                                     -- ^ Final accumulated ho
 
-compileModules need ifunc func = do
+parseFiles need ifunc func = do
     (needed,cug) <- loadModules (optHls options) need
-    processCug cug >>= mkPhonyCompNode needed >>= compileCompNode ifunc func
+    cnode <- processCug cug >>= mkPhonyCompNode needed
+    typeCheckGraph cnode
+    compileCompNode ifunc func cnode
 
 
 -- this takes a list of modules or files to load, and produces a compunit graph
@@ -417,8 +424,7 @@ mkPhonyCompNode need cs = do
 
 
 -- typechecking, this goes through and typechecks everything. It returns 'True' if there were errors.
-{-
-typeCheckGraph :: CompNode -> IO Bool
+typeCheckGraph :: CompNode -> IO HoTcInfo
 typeCheckGraph cn = do
     cur <- newMVar (1::Int)
     let countNodes (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
@@ -431,63 +437,57 @@ typeCheckGraph cn = do
         tickProgress = modifyMVar cur $ \val -> return (val+1,val)
     maxModules <- Set.size `fmap` countNodes cn
     let showProgress ms = forM_ ms $ \modName ->
-          do curModule <- tickProgress cur
-             printf fmtStr curModule maxModules (show $ hsModuleName modName)
-        fmtStr = printf "[%%%dd of %*d] %%s]" fmtLen fmtLen maxModules where
-            fmtLen = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
+          do curModule <- tickProgress
+             printf "[%*d of %*d] %s\n" fmtLen curModule fmtLen maxModules (show $ hsModuleName modName)
+--             printf fmtStr curModule maxModules (show $ hsModuleName modName)
+        --fmtStr = printf "[%%%id of %*d] %%s]" fmtLen fmtLen maxModules where
+        fmtLen = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
     let f (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
-            CompCollected ch _ -> return False
-            CompTCed errors _ -> return errors
+            CompCollected ch _ -> error "compcollected in typechecknig phase"
+            CompTCed tcc _ _  -> return tcc
+            CompTcError -> error "comptcerror"
             CompPhony -> do
-                xs <- or `fmap` mapM f deps
-                writeIORef ref (CompTCed xs CompPhony)
+                xs <- mconcat `fmap` mapM f deps
+                writeIORef ref (CompTCed xs Nothing CompPhony)
                 return xs
-            CompHo {} -> return False
+            CompHo _ hoh idep ho  -> do
+                ctc <- mconcat `fmap` mapM f deps
+                forM_ (hoDepends idep) $ \_ -> tickProgress
+                let ctc' = hoTcInfo ho `mappend` ctc
+                writeIORef ref (CompTCed ctc' Nothing cn)
+                return ctc'
             CompSources sc -> do
+                ctc <- mconcat `fmap` mapM f deps
                 let hdep = [ h | CompNode h _ _ <- deps]
-                cho <- mconcat `fmap` mapM f deps
                 modules <- forM sc $ \x -> case x of
                     SourceParsed { sourceHash = h,sourceModule = mod } -> return (h,mod)
                     SourceRaw { sourceHash = h,sourceLBS = lbs, sourceFP = fp } -> do
                         mod <- parseHsSource fp lbs
                         return (h,mod)
                 showProgress (snds modules)
---                (cho',newHo) <- func cho (snds modules)
---
---                let hoh = HoHeader {
---                             hohVersion = current_version,
---                             hohName = Left mgName,
---                             hohHash       = hh,
---                             hohArchDeps = [],
---                             hohLibDeps   = []
---                             }
---                    idep = HoIDeps {
---                            hoIDeps = Map.fromList [ (h,(hsModuleName mod,hsModuleRequires mod)) | (h,mod) <- modules],
---                            hoDepends    = [ (hsModuleName mod,h) | (h,mod) <- modules],
---                            hoModDepends = hdep
---                            }
---                    (mgName:_) = sort $ map (hsModuleName . snd) modules
---
---                recordHoFile newHo idep (map sourceHoName sc) hoh
---                writeIORef ref (CompCollected cho' (CompHo Nothing hoh idep newHo))
---                return cho'
+                (htc,tidata) <- doModules' ctc (snds modules)
+                let ctc' = htc `mappend` ctc
+                --writeIORef ref (CompTCed ctc' (Just (htc,tidata,modules,map sourceHoName sc)) cn)
+                writeIORef ref (CompTCed ctc' (Just (htc,tidata,modules,map sourceHoName sc)) CompPhony)
+                return ctc'
     f cn
 
--}
 compileCompNode :: (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
-                -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
+                -> (CollectedHo -> Ho -> TiData  -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
                 -> CompNode
                 -> IO CollectedHo
 compileCompNode ifunc func cn = do ns <- countNodes cn
                                    cur <- newMVar (1::Int)
                                    f (Set.size ns) cur cn where
-    countNodes (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
-        CompCollected _ _ -> return Set.empty
-        CompPhony         -> mconcat `fmap` mapM countNodes deps
-        CompHo _ hoh idep _  -> do ds <- mconcat `fmap` mapM countNodes deps
-                                   return $ ds `Set.union` Set.fromList (map (show.fst) (hoDepends idep))
-        CompSources sc    -> do ds <- mconcat `fmap` mapM countNodes deps
-                                return $ ds `Set.union` Set.fromList (map sourceIdent sc)
+    countNodes (CompNode hh deps ref) = readIORef ref >>= g where
+        g cn =  case cn of
+            CompTCed _ _ cn   -> g cn
+            CompCollected _ _ -> return Set.empty
+            CompPhony         -> mconcat `fmap` mapM countNodes deps
+            CompHo _ hoh idep _  -> do ds <- mconcat `fmap` mapM countNodes deps
+                                       return $ ds `Set.union` Set.fromList (map (show.fst) (hoDepends idep))
+            CompSources sc    -> do ds <- mconcat `fmap` mapM countNodes deps
+                                    return $ ds `Set.union` Set.fromList (map sourceIdent sc)
     tickProgress cur
         = modifyMVar cur $ \val -> return (val+1,val)
     showProgress maxModules cur ms
@@ -495,58 +495,47 @@ compileCompNode ifunc func cn = do ns <- countNodes cn
           do curModule <- tickProgress cur
              let l = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
              printf "[%*d of %*d] %s\n" l curModule l maxModules (show $ hsModuleName modName)
-    f n cur (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
-        CompCollected ch _ -> return ch
-        CompPhony -> do
-            xs <- mconcat `fmap` mapM (f n cur) deps
-            writeIORef ref (CompCollected xs CompPhony)
-            return xs
-        CompHo _ hoh idep ho -> do
-            cho <- mconcat `fmap` mapM (f n cur) deps
-            forM_ (hoDepends idep) $ \_ -> tickProgress cur
-            cho <- ifunc cho ho
-            writeIORef ref (CompCollected cho cn)
-            return cho
-        CompSources sc -> do
-            let hdep = [ h | CompNode h _ _ <- deps]
-            cho <- mconcat `fmap` mapM (f n cur) deps
-            modules <- forM sc $ \x -> case x of
-                SourceParsed { sourceHash = h,sourceModule = mod } -> return (h,mod)
-                SourceRaw { sourceHash = h,sourceLBS = lbs, sourceFP = fp } -> do
-                    mod <- parseHsSource fp lbs
-                    return (h,mod)
-            showProgress n cur (snds modules)
-            (cho',newHo) <- func cho (snds modules)
+    f n cur (CompNode hh deps ref) = readIORef ref >>= g where
+        g cn = case cn of
+            CompCollected ch _ -> return ch
+            CompPhony -> do
+                xs <- mconcat `fmap` mapM (f n cur) deps
+                writeIORef ref (CompCollected xs CompPhony)
+                return xs
+            CompHo _ hoh idep ho -> do
+                cho <- mconcat `fmap` mapM (f n cur) deps
+                forM_ (hoDepends idep) $ \_ -> tickProgress cur
+                cho <- ifunc cho ho
+                writeIORef ref (CompCollected cho cn)
+                return cho
+            CompTCed _ Nothing nn -> g nn
+            CompTCed _ (Just (htc,tidata,modules,shns)) _  -> do
+                let hdep = [ h | CompNode h _ _ <- deps]
+                cho <- mconcat `fmap` mapM (f n cur) deps
+                --showProgress n cur (snds modules)
+                --(cho',newHo) <- func cho (snds modules)
+                (cho',newHo) <- func cho mempty { hoTcInfo = htc } tidata
 
-            let hoh = HoHeader {
-                         hohVersion = current_version,
-                         hohName = Left mgName,
-                         hohHash       = hh,
-                         hohArchDeps = [],
-                         hohLibDeps   = []
-                         }
-                idep = HoIDeps {
-                        hoIDeps = Map.fromList [ (h,(hsModuleName mod,hsModuleRequires mod)) | (h,mod) <- modules],
-                        hoDepends    = [ (hsModuleName mod,h) | (h,mod) <- modules],
-                        hoModDepends = hdep
-                        }
-                (mgName:_) = sort $ map (hsModuleName . snd) modules
+                let hoh = HoHeader {
+                             hohVersion = current_version,
+                             hohName = Left mgName,
+                             hohHash       = hh,
+                             hohArchDeps = [],
+                             hohLibDeps   = []
+                             }
+                    idep = HoIDeps {
+                            hoIDeps = Map.fromList [ (h,(hsModuleName mod,hsModuleRequires mod)) | (h,mod) <- modules],
+                            hoDepends    = [ (hsModuleName mod,h) | (h,mod) <- modules],
+                            hoModDepends = hdep
+                            }
+                    (mgName:_) = sort $ map (hsModuleName . snd) modules
 
-            recordHoFile newHo idep (map sourceHoName sc) hoh
-            writeIORef ref (CompCollected cho' (CompHo Nothing hoh idep newHo))
-            return cho'
+                recordHoFile newHo idep shns hoh
+                writeIORef ref (CompCollected cho' (CompHo Nothing hoh idep newHo))
+                return cho'
+            CompSources _ -> error "sources still exist!?"
 
 
-findModule :: [Either Module String]                                -- ^ Either a module or filename to find
-              -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
-              -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
-              -> IO (CollectedHo,[(Module,MD5.Hash)],Ho)            -- ^ (Final accumulated ho,just the ho read to satisfy this command)
-findModule need ifunc func  = do
-    (needed,cug) <- loadModules (optHls options) need
-    cnodes <- processCug cug
-    rnode <- mkPhonyCompNode needed cnodes
-    cho <- compileCompNode ifunc func rnode
-    return (cho,undefined,undefined)
 
 -- Read in a Ho file.
 
@@ -738,6 +727,17 @@ buildLibrary ifunc func = ans where
         let hmods = map Module $ snub $ mfield "hidden-modules"
             emods = map Module $ snub $ mfield "exposed-modules"
         return (desc,name ++ "-" ++ vers,hmods,emods)
+findModule :: [Either Module String]                                -- ^ Either a module or filename to find
+              -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
+              -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
+              -> IO (CollectedHo,[(Module,MD5.Hash)],Ho)            -- ^ (Final accumulated ho,just the ho read to satisfy this command)
+findModule need ifunc func  = do
+    (needed,cug) <- loadModules (optHls options) need
+    cnodes <- processCug cug
+    rnode <- mkPhonyCompNode needed cnodes
+    typeCheckGraph rnode
+    cho <- compileCompNode ifunc func rnode
+    return (cho,undefined,undefined)
 
 -}
 
