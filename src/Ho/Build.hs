@@ -27,6 +27,7 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
+import Debug.Trace
 
 import PackedString(packString)
 import CharIO
@@ -534,7 +535,8 @@ compileCompNode ifunc func ksm cn = do ns <- countNodes cn
                 cho <- mconcat `fmap` mapM (f n cur ksm_r) deps
                 --showProgress n cur (snds modules)
                 --(cho',newHo) <- func cho (snds modules)
-                (cho',newHo) <- func cho mempty { hoTcInfo = htc } tidata
+                let (mgName:_) = sort $ map (hsModuleName . snd) modules
+                (cho',newHo) <- func cho mempty { hoModuleGroup = mgName, hoTcInfo = htc } tidata
                 modifyIORef ksm_r (Map.union $ Map.fromList [ (h,(hsModuleName mod,hsModuleRequires mod)) | (h,mod) <- modules])
                 ksm <- readIORef ksm_r
 
@@ -550,7 +552,6 @@ compileCompNode ifunc func ksm cn = do ns <- countNodes cn
                             hoDepends    = [ (hsModuleName mod,h) | (h,mod) <- modules],
                             hoModDepends = hdep
                             }
-                    (mgName:_) = sort $ map (hsModuleName . snd) modules
 
                 recordHoFile newHo idep shns hoh
                 writeIORef ref (CompCollected cho' (CompHo Nothing hoh idep newHo))
@@ -564,14 +565,17 @@ compileCompNode ifunc func ksm cn = do ns <- countNodes cn
 readHoFile :: FilePath -> IO (HoHeader,HoIDeps,Ho)
 readHoFile fn = do
     bs <- BS.readFile fn
+    fn' <- shortenPath fn
     (ct,mp) <- bsCFF bs
     True <- return $ ct == cff_magic
     let fc ct = case lookup ct mp of
             Nothing -> error $ "No chunk '" ++ show ct ++ "' found in file " ++ fn
             Just x -> decode . decompress $ L.fromChunks [x]
+            --Just x -> trace (printf "**** Reading %s from %s ****\n" (show ct) fn') $ decode . decompress $ L.fromChunks [x]
         hoh = fc cff_jhdr
+        Left modGroup = hohName hoh
     when (hohVersion hoh /= current_version) $ fail "invalid version in hofile"
-    return (hoh,fc cff_idep,mempty { hoTcInfo = fc cff_defs, hoBuild = fc cff_core})
+    return (hoh,fc cff_idep,mempty { hoModuleGroup = modGroup, hoTcInfo = fc cff_defs, hoBuild = fc cff_core})
 
 
 recordHoFile ::

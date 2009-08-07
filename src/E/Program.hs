@@ -30,7 +30,6 @@ data ProgramType = SubProgram Bool | MainProgram | MainComponent
 
 data Program = Program {
     progExternalNames  :: IdSet,
-    progClassHierarchy :: ClassHierarchy,
     progCombinators    :: [Comb],
     progDataTable      :: DataTable,
     progEntry          :: IdSet,
@@ -48,7 +47,6 @@ data Program = Program {
 
 program = Program {
     progExternalNames  = mempty,
-    progClassHierarchy = mempty,
     progCombinators    = mempty,
     progDataTable      = mempty,
     progEntry          = mempty,

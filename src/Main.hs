@@ -11,6 +11,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified System
 import List as L
+import System.Mem
 
 import Doc.PPrint
 import Util.Util
@@ -122,7 +123,7 @@ processFiles cs = f cs (optMainFunc options) where
         m <- getModule (parseName Val m)
         g [Left m]
     f cs _ = g (map fileOrModule cs)
-    g fs =  compileModEnv =<< parseFiles fs processInitialHo processDecls
+    g fs =  processCollectedHo =<< parseFiles fs processInitialHo processDecls
     fileOrModule f = case reverse f of
        ('s':'h':'.':_)     -> Right f
        ('s':'h':'l':'.':_) -> Right f
@@ -162,12 +163,12 @@ processInitialHo accumho aho = do
 
     let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- map combHead $ melems choCombs ]) (choVarMap accumho)
         choCombs = mfilterWithKey (\k _ -> k /= emptyId) choCombinators'
-        (mod:_) = Map.keys $ hoExports $ hoTcInfo aho
+        --(mod:_) = Map.keys $ hoExports $ hoTcInfo aho
     return $ mempty {
         choVarMap = finalVarMap,
         choExternalNames = choExternalNames accumho `mappend` (fromList . map tvrIdent $ newTVrs),
         choCombinators = choCombs `mappend` fmap reRule (choCombinators accumho),
-        choHoMap = Map.singleton (show mod) aho `mappend` choHoMap accumho
+        choHoMap = Map.singleton (show $ hoModuleGroup aho) aho `mappend` choHoMap accumho
         }
 
 
@@ -206,7 +207,6 @@ processDecls cho ho' tiData = do
         mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) classInstances
     -- initial program
     let prog = program {
-            progClassHierarchy = hoClassHierarchy $ hoTcInfo allHo,
             progDataTable = fullDataTable,
             progExternalNames = choExternalNames cho,
             progModule = head (fsts $ tiDataModules tiData)
@@ -408,9 +408,9 @@ processDecls cho ho' tiData = do
         hoRules = hoRules (hoBuild ho') `mappend` rules
         }
         newMap = fmap (\c -> Just (EVar $ combHead c)) $ progCombMap prog
-        (mod:_) = Map.keys $ hoExports $ hoTcInfo ho'
+--        (mod:_) = Map.keys $ hoExports $ hoTcInfo ho'
     return (mempty {
-        choHoMap = Map.singleton (show mod) ho' { hoBuild = newHoBuild},
+        choHoMap = Map.singleton (show $ hoModuleGroup ho') ho' { hoBuild = newHoBuild},
         choCombinators = fromList $ [ (combIdent c,c) | c <- progCombinators prog ],
         choExternalNames = idMapToIdSet newMap,
         choVarMap = newMap
@@ -443,33 +443,45 @@ shouldBeExported exports tvr
 
 transTypeAnalyze = transformParms { transformCategory = "typeAnalyze",  transformOperation = typeAnalyze True }
 
-compileModEnv cho = do
+processCollectedHo cho = do
     if optMode options == CompileHo then return () else do
+    putProgressLn "Starting Collected Compilation"
 
-    let dataTable = progDataTable prog
-        prog = programUpdate program {
-            progCombinators = melems $ choCombinators cho,
-            progClassHierarchy = choClassHierarchy cho,
-            progDataTable = choDataTable cho
-            }
-        rules' = Rules $ fromList [ (combIdent x,combRules x) | x <- melems (choCombinators cho), not $ null (combRules x) ]
-
-    -- dump final version of various requested things
-    wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
-    wdump FD.DatatableBuiltin $ putErrLn (render $ showDataTable samplePrimitiveDataTable)
     when (dump FD.ClassSummary) $ do
         putStrLn "  ---- class summary ---- "
         printClassSummary (choClassHierarchy cho)
     when (dump FD.Class) $ do
         putStrLn "  ---- class hierarchy ---- "
         printClassHierarchy (choClassHierarchy cho)
+
+    let dataTable = choDataTable cho
+        combinators = melems $ choCombinators cho
+
+    evaluate dataTable
+    evaluate combinators
+
+    let prog = programUpdate program {
+            progCombinators = combinators,
+            progDataTable = dataTable
+            }
+        rules' = Rules $ fromList [ (combIdent x,combRules x) | x <- combinators, not $ null (combRules x) ]
+    -- dump final version of various requested things
+    wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
+    wdump FD.DatatableBuiltin $ putErrLn (render $ showDataTable samplePrimitiveDataTable)
     wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules'
     wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules'
     wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules'
 
     -- enter interactive mode
     int <- Interactive.isInteractive
-    if int then Interactive.interact cho else do
+    if int then Interactive.interact cho else compileWholeProgram prog
+
+
+{-# NOINLINE compileWholeProgram #-}
+compileWholeProgram prog = do
+    performGC
+
+    let dataTable = progDataTable prog
 
     when collectPassStats $ do
         Stats.print "PassStats" Stats.theStats

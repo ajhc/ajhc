@@ -127,10 +127,15 @@ data HoBuild = HoBuild {
     {-! derive: update, Monoid !-}
 
 data Ho = Ho {
+    hoModuleGroup :: ModuleGroup,
     hoTcInfo :: HoTcInfo,
     hoBuild :: HoBuild
     }
-    {-! derive: update, Monoid !-}
+    {-! derive: update !-}
+
+instance Monoid Ho where
+    mempty = Ho (error "unknown module group") mempty mempty
+    mappend ha hb = Ho (hoModuleGroup ha) (hoTcInfo ha `mappend` hoTcInfo hb) (hoBuild ha `mappend` hoBuild hb)
 
 {-
 instance Monoid Ho where
