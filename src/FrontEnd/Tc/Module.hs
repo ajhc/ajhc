@@ -116,7 +116,8 @@ tiModules htc ms = do
     --wdump FD.Progress $ do
     --    putErrLn $ "Typing: " ++ show ([ m | Module m <- map modInfoName ms])
     -- 'processModule' doesn't need IO. We can use a plain writer+error monad.
-    mserrs <- mapM (processModule (hoFieldMap htc)) ms
+    let nfm = buildFieldMap ms `mappend` hoFieldMap htc
+    mserrs <- mapM (processModule nfm) ms
     let ms = fsts mserrs
     let thisFixityMap = buildFixityMap (concat [ filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
     let fixityMap = thisFixityMap  `mappend` hoFixities htc

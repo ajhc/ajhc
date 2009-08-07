@@ -530,10 +530,10 @@ instance Rename HsExp where
         (ss,()) <- renameHsStmts hsStmts (return ())
         doToExp newVar (nameName v_bind) (nameName v_bind_) (nameName v_fail) ss
     rename (HsRecConstr hsName hsFieldUpdates) = do
-        hsName' <- rename hsName  -- do I need to change this name?
+        hsName' <- rename hsName
         hsFieldUpdates' <- rename hsFieldUpdates
         fls <- gets fieldLabels
-        buildRecConstr fls (hsName':: HsName) (hsFieldUpdates'::[HsFieldUpdate]) -- HsRecConstr hsName' hsFieldUpdates')
+        buildRecConstr fls hsName' (hsFieldUpdates'::[HsFieldUpdate])
     rename (HsRecUpdate hsExp hsFieldUpdates) = do
         hsExp' <- rename hsExp
         hsFieldUpdates' <- rename hsFieldUpdates
