@@ -253,10 +253,9 @@ data CompLink
 type CompUnitGraph = [(HoHash,([HoHash],CompUnit))]
 
 data CompUnit
-    = CompHo (Maybe String)  HoHeader HoIDeps Ho
+    = CompHo HoHeader HoIDeps Ho
     | CompSources [SourceCode]
     | CompTCed ((HoTcInfo,TiData,[(HoHash,HsModule)],[String]))
-    | CompTcError
 
 data SourceCode
     = SourceParsed { sourceHash :: SourceHash, sourceDeps :: [Module]
@@ -276,10 +275,8 @@ instance ProvidesModules HoIDeps where
 
 
 instance ProvidesModules CompUnit where
-    providesModules (CompHo _ _ hoh _)   = providesModules hoh
+    providesModules (CompHo _ hoh _)   = providesModules hoh
     providesModules (CompSources ss) = concatMap providesModules ss
---    providesModules CompPhony        = []
- --   providesModules (CompCollected _ cu) = providesModules cu
 
 instance ProvidesModules CompLink where
     providesModules CompLinkNone = []
@@ -291,12 +288,6 @@ instance ProvidesModules SourceCode where
     providesModules SourceParsed { sourceModule = mod } = [hsModuleName mod]
     providesModules SourceRaw    { sourceModName = n } = [n]
 
-
-
-showCUnit (hash,(deps,cu)) = printf "%s : %s" (show hash) (show deps)  ++ "\n" ++ f cu where
-    f (CompHo (Just s) _ _ _) = s
-    f (CompHo _ _ _ _) = "ho"
-    f (CompSources ss) = show $ map sourceIdent ss
 
 
 -- | this walks the loaded modules and ho files, discarding out of
@@ -355,10 +346,7 @@ toCompUnitGraph done roots = do
                     good <- catch ( mapM_ cdep (hoDepends idep) >> mapM_ hvalid (hoModDepends idep) >> return True) (\_ -> return False)
                     if good && null stale then do
                         putProgressLn $ printf "Fresh: <%s>" fp
-                        let lib = case ".ho" `isSuffixOf` fp of
-                                    True  -> Nothing
-                                    False -> Just fp
-                        modifyIORef cug_ref ((h,(hoModDepends idep,CompHo lib hoh idep ho)):)
+                        modifyIORef cug_ref ((h,(hoModDepends idep,CompHo hoh idep ho)):)
                         modifyIORef hom_ref (Map.insert h (True,af))
                         return h
                      else do
@@ -431,6 +419,7 @@ processCug cug = mdo
     xs <- mapM f cug
     return $ snds xs
 
+
 -- take the list of CompNodes and what modules we want and create a root node
 -- that will reach all dependencies when compiled.
 
@@ -451,36 +440,37 @@ printModProgress fmtLen maxModules tickProgress ms = f "[" ms where
             (x:xs) -> do g curModule bl "-" x; putErrLn ""; f "-" xs
     g curModule bl el modName = putErr $ printf "%s%*d of %*d%s %-17s" bl fmtLen curModule fmtLen maxModules el (show $ hsModuleName modName)
 
+
 countNodes cn = do
     seen <- newIORef Set.empty
     let h (CompNode hh deps ref) = do
             s <- readIORef seen
             if hh `Set.member` s then return Set.empty else do
                 writeIORef seen (Set.insert hh s)
-                ds <- mapM countNodes deps
+                ds <- mapM h deps
                 cm <- readIORef ref >>= g
                 return (Set.unions (cm:ds))
-        g cn =  case cn of
+        g cn = case cn of
             CompLinkNone -> return Set.empty
             CompLinkUnit cu -> f cu
             CompTcCollected _ cu -> g cu
             CompCollected _ cu -> g cu
         f cu = case cu of
-            CompTCed (_,_,_,ss)   -> return $ Set.fromList ss
-            CompHo _ hoh idep _  -> do
-                return $ Set.fromList (map (show.fst) (hoDepends idep))
-            CompSources sc    -> do
+            CompTCed (_,_,_,ss) -> return $ Set.fromList ss
+            CompHo {} -> return Set.empty
+            --CompHo hoh idep _   -> do
+            --    return $ Set.fromList (map (show.fst) (hoDepends idep))
+            CompSources sc      -> do
                 return $ Set.fromList (map sourceIdent sc)
     h cn
 
--- typechecking, this goes through and typechecks everything. It returns 'True' if there were errors.
-typeCheckGraph :: CompNode -> IO HoTcInfo
+typeCheckGraph :: CompNode -> IO ()
 typeCheckGraph cn = do
     cur <- newMVar (1::Int)
-    let tickProgress = modifyMVar cur $ \val -> return (val+1,val)
     maxModules <- Set.size `fmap` countNodes cn
     let showProgress ms = printModProgress fmtLen maxModules tickProgress ms
         fmtLen = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
+        tickProgress = modifyMVar cur $ \val -> return (val+1,val)
     let f (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
             CompLinkNone -> do
                 ctc <- mconcat `fmap` mapM f deps
@@ -488,10 +478,8 @@ typeCheckGraph cn = do
                 return ctc
             CompTcCollected ctc _ -> return ctc
             CompLinkUnit lu -> case lu of
-                CompTcError -> error "comptcerror"
-                CompHo _ hoh idep ho  -> do
+                CompHo hoh idep ho  -> do
                     ctc <- mconcat `fmap` mapM f deps
-                    forM_ (hoDepends idep) $ \_ -> tickProgress
                     let ctc' = hoTcInfo ho `mappend` ctc
                     writeIORef ref (CompTcCollected ctc' cn)
                     return ctc'
@@ -509,6 +497,7 @@ typeCheckGraph cn = do
                     writeIORef ref (CompTcCollected ctc' (CompLinkUnit $ CompTCed ((htc,tidata,modules,map sourceHoName sc))))
                     return ctc'
     f cn
+    return ()
 
 compileCompNode :: (CollectedHo -> Ho -> IO CollectedHo)                 -- ^ Process initial ho loaded from file
                 -> (CollectedHo -> Ho -> TiData  -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
@@ -532,9 +521,8 @@ compileCompNode ifunc func ksm cn = do
                 CompTcCollected _ cl -> g cl
                 CompLinkUnit cu -> h cu
             h cu = case cu of
-                cn@(CompHo _ hoh idep ho) -> do
+                cn@(CompHo hoh idep ho) -> do
                     cho <- mconcat `fmap` mapM f deps
-                    forM_ (hoDepends idep) $ \_ -> tickProgress
                     cho <- ifunc cho ho
                     writeIORef ref (CompCollected cho (CompLinkUnit cn))
                     return cho
@@ -561,7 +549,7 @@ compileCompNode ifunc func ksm cn = do
                                 }
 
                     recordHoFile newHo idep shns hoh
-                    writeIORef ref (CompCollected cho' (CompLinkUnit $ CompHo Nothing hoh idep newHo))
+                    writeIORef ref (CompCollected cho' (CompLinkUnit $ CompHo hoh idep newHo))
                     return cho'
                 CompSources _ -> error "sources still exist!?"
     f cn
