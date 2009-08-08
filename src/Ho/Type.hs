@@ -62,7 +62,7 @@ data CollectedHo = CollectedHo {
     -- the hos
     -- this is a cache
     choHo :: Ho,
-    choHoMap :: Map.Map String Ho
+    choHoMap :: Map.Map ModuleGroup Ho
     }
     {-! derive: update !-}
 

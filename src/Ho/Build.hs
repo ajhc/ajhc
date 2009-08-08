@@ -103,8 +103,6 @@ import qualified Util.Graph as G
 -- version number of the compiler.
 
 
-instance DocLike d => PPrint d MD5.Hash where
-    pprint h = tshow h
 
 findFirstFile :: String -> [(FilePath,a)] -> IO (LBS.ByteString,FilePath,a)
 findFirstFile err [] = FrontEnd.Warning.err "missing-dep" ("Module not found: " ++ err) >> fail ("Module not found: " ++ err) -- return (error "findFirstFile not found","",undefined)
@@ -217,10 +215,10 @@ resolveDeps done_ref m = do
 
 data CompNode = CompNode !HoHash [CompNode] !(IORef CompLink)
 data CompLink
-    = CompLinkNone
-    | CompLinkUnit CompUnit
-    | CompCollected CollectedHo CompLink
-    | CompTcCollected HoTcInfo CompLink
+    = CompLinkUnit CompUnit
+    | CompCollected CollectedHo CompUnit
+    | CompTcCollected HoTcInfo CompUnit
+--    | CompLinkLib ()
 
 type CompUnitGraph = [(HoHash,([HoHash],CompUnit))]
 
@@ -228,6 +226,7 @@ data CompUnit
     = CompHo HoHeader HoIDeps Ho
     | CompSources [SourceCode]
     | CompTCed ((HoTcInfo,TiData,[(HoHash,HsModule)],[String]))
+    | CompDummy
     | CompLibrary Ho Library
 
 
@@ -251,9 +250,10 @@ instance ProvidesModules HoIDeps where
 instance ProvidesModules CompUnit where
     providesModules (CompHo _ hoh _)   = providesModules hoh
     providesModules (CompSources ss) = concatMap providesModules ss
+    providesModules CompDummy = []
 
 instance ProvidesModules CompLink where
-    providesModules CompLinkNone = []
+--    providesModules CompLinkNone = []
     providesModules (CompLinkUnit cu) = providesModules cu
     providesModules (CompCollected _ cu) = providesModules cu
     providesModules (CompTcCollected _ cu) = providesModules cu
@@ -401,7 +401,7 @@ mkPhonyCompNode :: [Module] -> [CompNode] -> IO CompNode
 mkPhonyCompNode need cs = do
     xs <- forM cs $ \cn@(CompNode _ _ cu) -> readIORef cu >>= \u -> return $ if null $ providesModules u `intersect` need then [] else [cn]
     let hash = MD5.md5String $ show [ h | CompNode h _ _ <- concat xs ]
-    CompNode hash (concat xs) `fmap` newIORef CompLinkNone
+    CompNode hash (concat xs) `fmap` newIORef (CompLinkUnit CompDummy)
 
 printModProgress :: Int -> Int -> IO Int -> [HsModule] -> IO ()
 printModProgress _ _ _ [] = return ()
@@ -425,13 +425,13 @@ countNodes cn = do
                 cm <- readIORef ref >>= g
                 return (Set.unions (cm:ds))
         g cn = case cn of
-            CompLinkNone -> return Set.empty
             CompLinkUnit cu -> f cu
-            CompTcCollected _ cu -> g cu
-            CompCollected _ cu -> g cu
+            CompTcCollected _ cu -> f cu
+            CompCollected _ cu -> f cu
         f cu = case cu of
             CompTCed (_,_,_,ss) -> return $ Set.fromList ss
             CompHo {} -> return Set.empty
+            CompDummy -> return Set.empty
             CompSources sc      -> do
                 return $ Set.fromList (map sourceIdent sc)
     h cn
@@ -444,30 +444,29 @@ typeCheckGraph cn = do
         fmtLen = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
         tickProgress = modifyMVar cur $ \val -> return (val+1,val)
     let f (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
-            CompLinkNone -> do
-                ctc <- mconcat `fmap` mapM f deps
-                writeIORef ref (CompTcCollected ctc CompLinkNone)
-                return ctc
             CompTcCollected ctc _ -> return ctc
-            CompLinkUnit lu -> case lu of
-                CompHo hoh idep ho  -> do
-                    ctc <- mconcat `fmap` mapM f deps
-                    let ctc' = hoTcInfo ho `mappend` ctc
-                    writeIORef ref (CompTcCollected ctc' cn)
-                    return ctc'
-                CompSources sc -> do
-                    ctc <- mconcat `fmap` mapM f deps
-                    let hdep = [ h | CompNode h _ _ <- deps]
-                    modules <- forM sc $ \x -> case x of
-                        SourceParsed { sourceHash = h,sourceModule = mod } -> return (h,mod)
-                        SourceRaw { sourceHash = h,sourceLBS = lbs, sourceFP = fp } -> do
-                            mod <- parseHsSource fp lbs
-                            return (h,mod)
-                    showProgress (snds modules)
-                    (htc,tidata) <- doModules' ctc (snds modules)
-                    let ctc' = htc `mappend` ctc
-                    writeIORef ref (CompTcCollected ctc' (CompLinkUnit $ CompTCed ((htc,tidata,modules,map sourceHoName sc))))
-                    return ctc'
+            CompLinkUnit lu -> do
+                ctc <- mconcat `fmap` mapM f deps
+                case lu of
+                    CompDummy -> do
+                        writeIORef ref (CompTcCollected ctc CompDummy)
+                        return ctc
+                    CompHo hoh idep ho  -> do
+                        let ctc' = hoTcInfo ho `mappend` ctc
+                        writeIORef ref (CompTcCollected ctc' lu)
+                        return ctc'
+                    CompSources sc -> do
+                        let hdep = [ h | CompNode h _ _ <- deps]
+                        modules <- forM sc $ \x -> case x of
+                            SourceParsed { sourceHash = h,sourceModule = mod } -> return (h,mod)
+                            SourceRaw { sourceHash = h,sourceLBS = lbs, sourceFP = fp } -> do
+                                mod <- parseHsSource fp lbs
+                                return (h,mod)
+                        showProgress (snds modules)
+                        (htc,tidata) <- doModules' ctc (snds modules)
+                        let ctc' = htc `mappend` ctc
+                        writeIORef ref (CompTcCollected ctc' (CompTCed ((htc,tidata,modules,map sourceHoName sc))))
+                        return ctc'
     f cn
     return ()
 
@@ -486,44 +485,41 @@ compileCompNode ifunc func ksm cn = do
     let f (CompNode hh deps ref) = readIORef ref >>= g where
             g cn = case cn of
                 CompCollected ch _ -> return ch
-                CompLinkNone -> do
-                    xs <- mconcat `fmap` mapM f deps
-                    writeIORef ref (CompCollected xs CompLinkNone)
-                    return xs
-                CompTcCollected _ cl -> g cl
+                CompTcCollected _ cl -> h cl
                 CompLinkUnit cu -> h cu
-            h cu = case cu of
-                cn@(CompHo hoh idep ho) -> do
-                    cho <- mconcat `fmap` mapM f deps
-                    cho <- ifunc cho ho
-                    writeIORef ref (CompCollected cho (CompLinkUnit cn))
-                    return cho
-                CompTCed ((htc,tidata,modules,shns))  -> do
-                    let hdep = [ h | CompNode h _ _ <- deps]
-                    cho <- mconcat `fmap` mapM f deps
-                    showProgress (snds modules)
-                    let (mgName:_) = sort $ map (hsModuleName . snd) modules
-                    (cho',newHo) <- func cho mempty { hoModuleGroup = mgName, hoTcInfo = htc } tidata
-                    modifyIORef ksm_r (Map.union $ Map.fromList [ (h,(hsModuleName mod,hsModuleRequires mod)) | (h,mod) <- modules])
-                    ksm <- readIORef ksm_r
-
-                    let hoh = HoHeader {
-                                 hohVersion = error "hohVersion",
-                                 hohName = Left mgName,
-                                 hohHash       = hh,
-                                 hohArchDeps = [],
-                                 hohLibDeps   = []
-                                 }
-                        idep = HoIDeps {
-                                hoIDeps =    ksm,
-                                hoDepends    = [ (hsModuleName mod,h) | (h,mod) <- modules],
-                                hoModDepends = hdep
-                                }
-
-                    recordHoFile (mapHoBodies eraseE newHo) idep shns hoh
-                    writeIORef ref (CompCollected cho' (CompLinkUnit $ CompHo hoh idep newHo))
-                    return cho'
-                CompSources _ -> error "sources still exist!?"
+            h cu = do
+                cho <- mconcat `fmap` mapM f deps
+                case cu of
+                    CompDummy -> do
+                        writeIORef ref (CompCollected cho CompDummy)
+                        return cho
+                    cn@(CompHo hoh idep ho) -> do
+                        cho <- ifunc cho ho
+                        writeIORef ref (CompCollected cho cn)
+                        return cho
+                    CompTCed ((htc,tidata,modules,shns))  -> do
+                        let hdep = [ h | CompNode h _ _ <- deps]
+                        showProgress (snds modules)
+                        let (mgName:_) = sort $ map (hsModuleName . snd) modules
+                        (cho',newHo) <- func cho mempty { hoModuleGroup = mgName, hoTcInfo = htc } tidata
+                        modifyIORef ksm_r (Map.union $ Map.fromList [ (h,(hsModuleName mod,hsModuleRequires mod)) | (h,mod) <- modules])
+                        ksm <- readIORef ksm_r
+                        let hoh = HoHeader {
+                                     hohVersion = error "hohVersion",
+                                     hohName = Left mgName,
+                                     hohHash       = hh,
+                                     hohArchDeps = [],
+                                     hohLibDeps   = []
+                                     }
+                            idep = HoIDeps {
+                                    hoIDeps =    ksm,
+                                    hoDepends    = [ (hsModuleName mod,h) | (h,mod) <- modules],
+                                    hoModDepends = hdep
+                                    }
+                        recordHoFile (mapHoBodies eraseE newHo) idep shns hoh
+                        writeIORef ref (CompCollected cho' (CompHo hoh idep newHo))
+                        return cho'
+                    CompSources _ -> error "sources still exist!?"
     f cn
 
 
@@ -615,8 +611,57 @@ buildLibrary ifunc func = ans where
         (desc,name,hmods,emods) <- parse fp
         let allmods = snub (emods ++ hmods)
         -- TODO - must check we depend only on libraries
-        (cnode,_) <- parseFiles (map Left allmods) ifunc func
+        (rnode@(CompNode lhash _ _),_) <- parseFiles (map Left allmods) ifunc func
+        {-
+        (prvds,ho,ldeps) <- let
+            f (CompNode hs cd ref) = do
+                let g x = case x of
+                    CompLinkLib l -> return l
+                    CompCollected _ y -> g y
+                    CompLinkNone -> return mempty
+
+                cl <- readIORef ref
+                deps <- mconcat `fmap` mapM f cd
+                return $ d `mappend` deps
+            hunit hs x = case x of
+
+                    CompHo (Just s) _ _ -> return (mempty,mempty,Map.singleton hs s)
+                    CompHo Nothing hoh ho -> return (Set.fromList $ providesModules hoh,Map.singleton hs ho,mempty)
+                    CompCollected _ u -> hunit hs u
+                    CompPhony -> return mempty
+          in f rnode
+
+-}
         return ()
+        {-
+
+        (prvds,ho,ldeps) <- let
+            f (CompNode hs cd ref) = do
+                deps <- mconcat `fmap` mapM f cd
+                d <- readIORef ref >>= hunit hs
+                return $ d `mappend` deps
+            hunit hs x = case x of
+                    CompHo (Just s) _ _ -> return (mempty,mempty,Map.singleton hs s)
+                    CompHo Nothing hoh ho -> return (Set.fromList $ providesModules hoh,Map.singleton hs ho,mempty)
+                    CompCollected _ u -> hunit hs u
+                    CompPhony -> return mempty
+          in f rnode
+
+        --(cho,libDeps,ho) <- findModule (map Left (emods ++ hmods)) ifunc func
+        let unknownMods = Set.toList $ Set.filter (`notElem` allmods) prvds
+        mapM_ ((putStrLn . ("*** Module included in library that is not in export list: " ++)) . show) unknownMods
+        let outName = case optOutName options of
+                "hs.out" -> name ++ ".hl"
+                fn -> fn
+        let pdesc = [(n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
+        let hoh =  HoHeader {
+                hohHash = lhash,
+                hohDepends = [ (m,MD5.emptyHash) | m <- Set.toList prvds ],
+                hohModDepends = Map.keys ldeps,
+                hohMetaInfo = pdesc
+                }
+        recordHoFile (mconcat $ Map.elems ho) (HoIDeps Map.empty) [outName] hoh
+        -}
     -- parse library description file
     parse fp = do
         putProgressLn $ "Creating library from description file: " ++ show fp
@@ -682,15 +727,17 @@ buildLibrary ifunc func = ans where
 -- dumping contents of a ho file
 ------------------------------------
 
+instance DocLike d => PPrint d MD5.Hash where
+    pprint h = tshow h
 
 instance DocLike d => PPrint d SrcLoc where
     pprint sl = tshow sl
 
-vindent xs = vcat (map ("    " ++) xs)
 
 {-# NOINLINE dumpHoFile #-}
 dumpHoFile :: String -> IO ()
 dumpHoFile fn = do
+    let vindent xs = vcat (map ("    " ++) xs)
     (hoh,idep,ho) <- readHoFile fn
     let hoB = hoBuild ho
         hoE = hoTcInfo ho

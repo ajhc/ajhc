@@ -16,6 +16,7 @@ module Name.Name(
     isTypeNamespace,
     isValNamespace,
     mainModule,
+    primModule,
     nameParts,
     mapName,
     setModule
@@ -169,6 +170,7 @@ mapName (f,g) n = case nameParts n of
     (nt,Just m,i) -> toName nt (Just (f m :: String),g i)
 
 mainModule = Module "Main@"
+primModule = Module "Prim@"
 
 ffiExportName :: FfiExport -> Name
 ffiExportName (FfiExport cn _ cc _ _) = toName Val ("FE@", show cc ++ "." ++ cn)

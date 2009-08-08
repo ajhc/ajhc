@@ -169,7 +169,7 @@ processInitialHo accumho aho = do
         choVarMap = finalVarMap,
         choExternalNames = choExternalNames accumho `mappend` (fromList . map tvrIdent $ newTVrs),
         choCombinators = choCombs `mappend` fmap reRule (choCombinators accumho),
-        choHoMap = Map.singleton (show $ hoModuleGroup aho) aho `mappend` choHoMap accumho
+        choHoMap = Map.singleton (hoModuleGroup aho) aho `mappend` choHoMap accumho
         }
 
 
@@ -410,7 +410,7 @@ processDecls cho ho' tiData = do
         }
         newMap = fmap (\c -> Just (EVar $ combHead c)) $ progCombMap prog
     return (updateChoHo $ mempty {
-        choHoMap = Map.singleton (show $ hoModuleGroup ho') ho' { hoBuild = newHoBuild},
+        choHoMap = Map.singleton (hoModuleGroup ho') ho' { hoBuild = newHoBuild},
         choCombinators = fromList $ [ (combIdent c,c) | c <- progCombinators prog ],
         choExternalNames = idMapToIdSet newMap,
         choVarMap = newMap
