@@ -109,7 +109,6 @@ main =  runMain $ bracketHtml $ do
         ShowHo ho       -> dumpHoFile ho
         Version         -> putStrLn versionString
         PrintHscOptions -> putStrLn $ "-I" ++ VC.datadir ++ "/" ++ VC.package ++ "-" ++ VC.shortVersion ++ "/include"
-        DependencyTree  -> doDependency (optArgs o)
         VersionCtx      -> putStrLn (versionString ++ versionContext)
         _               -> processFiles  (optArgs o)
 
@@ -739,17 +738,15 @@ compileToGrin prog = do
 dumpFinalGrin grin = do
     wdump FD.GrinGraph $ do
         let dot = graphGrin grin
-            fn = optOutName options
-        writeFile (fn ++ "_grin.dot") dot
+        writeFile (outputName ++ "_grin.dot") dot
     wdump FD.GrinFinal $ dumpGrin "final" grin
 
 
 
-compileGrinToC grin | optMode options == Interpret = fail "Interpretation currently not supported."
 compileGrinToC grin | optMode options /= CompileExe = return ()
 compileGrinToC grin = do
     let (cg,rls) = FG2.compileGrin grin
-        fn = optOutName options ++ lup "executable_extension"
+        fn = outputName ++ lup "executable_extension"
         cf = (fn ++ "_code.c")
         lup k = maybe "" id $ Map.lookup k (optInis options)
     (argstring,sversion) <- getArgString

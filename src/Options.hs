@@ -20,6 +20,7 @@ module Options(
     withOptions,
     withOptionsT,
     getArgString,
+    outputName,
     OptM(),
     OptT(),
     OptionMonad(..),
@@ -134,11 +135,9 @@ data Mode = BuildHl String -- ^ Build the specified hl-file given a description 
           | VersionCtx     -- ^ Print version context and die.
           | ShowHelp       -- ^ Show help message and die.
           | ShowConfig     -- ^ Show configuration info.
-          | Interpret      -- ^ Interpret.
           | CompileHo      -- ^ Compile ho
           | CompileHoGrin  -- ^ Compile ho and grin
           | CompileExe     -- ^ Compile executable
-          | DependencyTree -- ^ show simple dependency tree
           | ShowHo String  -- ^ Show ho-file.
           | ListLibraries  -- ^ List libraries
           | PrintHscOptions -- ^ Print options for hsc2hs
@@ -153,13 +152,11 @@ data Opt = Opt {
     optStmts       ::  [String],  -- ^ statements to execute
     optFOpts       ::  [String],  -- ^ Flag options (raw).
     optIncdirs     ::  [String],  -- ^ Include directories.
-    optProgArgs    ::  [String],  -- ^ Arguments to pass to the interpreted program.
     optCCargs      ::  [String],  -- ^ Optional arguments to the C compiler.
     optHls         ::  [String],  -- ^ Load the specified hl-files (haskell libraries).
     optHlPath      ::  [String],  -- ^ Path to look for libraries.
     optIncs        ::  [String],
     optDefs        ::  [String],
-    optCC          ::  String,    -- ^ C compiler.
     optHoDir       ::  Maybe FilePath,
     optHoCache     ::  Maybe FilePath,
     optArgs        ::  [String],
@@ -168,15 +165,13 @@ data Opt = Opt {
     optMainFunc    ::  Maybe (Bool,String),    -- ^ Entry point name for the main function.
     optArch        ::  [String],           -- ^ target architecture
     optCross       ::  Bool,
-    optOutName     ::  String,                 -- ^ Name of output file.
+    optOutName     ::  Maybe String,           -- ^ Name of output file.
     optPrelude     :: !Bool,                   -- ^ No implicit Prelude.
     optIgnoreHo    :: !Bool,                   -- ^ Ignore ho-files.
     optNoWriteHo   :: !Bool,                   -- ^ Don't write ho-files.
     optNoAuto      :: !Bool,                   -- ^ Don't autoload packages
-    optFollowDeps  :: !Bool,                   -- ^ Don't follow dependencies, all deps must be loaded from packages or specified on the command line.
     optVerbose     :: !Int,                    -- ^ Verbosity
     optStatLevel   :: !Int,                    -- ^ Level to print statistics
-    optBatch       :: !Int,                    -- ^ How many modules to attempt in parallel
     optInis        ::  M.Map String String,    -- ^ options read from ini files
     optDumpSet     ::  S.Set FlagDump.Flag,    -- ^ Dump flags.
     optFOptsSet    ::  S.Set FlagOpts.Flag     -- ^ Flag options (-f\<opt\>).
@@ -193,7 +188,6 @@ opt = Opt {
     optHlPath      = initialLibIncludes,
     optIncs        = [],
     optDefs        = [],
-    optProgArgs    = [],
     optDump        = [],
     optStale       = [],
     optStmts       = [],
@@ -201,17 +195,14 @@ opt = Opt {
     optCCargs      = [],
     optHoDir       = Nothing,
     optHoCache     = Nothing,
-    optCC          = "gcc",
     optArgs        = [],
     optIgnoreHo    = False,
     optNoWriteHo   = False,
     optKeepGoing   = False,
     optMainFunc    = Nothing,
     optArch        = ["default"],
-    optOutName     = "hs.out",
+    optOutName     = Nothing,
     optPrelude     = True,
-    optFollowDeps  = True,
-    optBatch       = 10,
     optVerbose     = 0,
     optStatLevel   = 1,
     optNoAuto      = False,
@@ -232,21 +223,17 @@ theoptions =
     , Option ['z'] []            (NoArg  (optStatLevel_u (+1)))        "Increase verbosity of statistics"
     , Option ['d'] []            (ReqArg (\d -> optDump_u (d:)) "[no-]flag")  "dump specified data during compilation"
     , Option ['f'] []            (ReqArg (\d -> optFOpts_u (d:)) "[no-]flag") "set or clear compilation options"
-    , Option ['o'] ["output"]    (ReqArg (optOutName_s) "FILE")        "output to FILE"
+    , Option ['o'] ["output"]    (ReqArg (optOutName_s . Just) "FILE")        "output to FILE"
     , Option ['i'] ["include"]   (ReqArg (optIncdirs_u . idu) "DIR")   "where to look for source files"
     , Option ['I'] []            (ReqArg (optIncs_u . idu) "DIR")       "add to preprocessor include path"
     , Option ['D'] []            (ReqArg (\d -> optDefs_u (d:)) "NAME=VALUE") "add new definitions to set in preprocessor"
     , Option []    ["optc"]      (ReqArg (optCCargs_u . idu) "option") "extra options to pass to c compiler"
---    , Option []    ["progc"]     (ReqArg (\d -> optCC_s d) "gcc")      "c compiler to use"
---    , Option []    ["arg"]       (ReqArg (\d -> optProgArgs_u (++ [d])) "arg") "arguments to pass interpreted program"
     , Option ['N'] ["noprelude"] (NoArg  (optPrelude_s False))         "no implicit prelude"
     , Option ['C'] []            (NoArg  (optMode_s CompileHoGrin))    "Typecheck, compile ho and grin"
     , Option ['c'] []            (NoArg  (optMode_s CompileHo))        "Typecheck and compile ho"
- --   , Option []    ["interpret"] (NoArg  (optMode_s Interpret))        "interpret"
     , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))        "keep going on errors"
     , Option []    ["cross"]     (NoArg  (optCross_s True))            "enable cross-compilation, choose target with the -m flag"
     , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output"
---    , Option []    ["batch"]     (ReqArg (optBatch_s . read) "15") "number of modules to compile as a group at once, lower numbers trade speed for memory"
     , Option []    ["main"]      (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point"
     , Option ['m'] ["arch"]      (ReqArg (optArch_u . idu ) "arch")      "target architecture options"
     , Option []    ["entry"]     (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression"
@@ -264,8 +251,6 @@ theoptions =
     , Option []    ["ho-cache"]    (ReqArg (optHoCache_s . Just ) "HOCACHEDIR")    "Use a global ho cache located at the argument"
     , Option []    ["ho-dir"]      (ReqArg (optHoDir_s . Just ) "<dir>")    "Where to place and look for ho files"
     , Option []    ["stale"]       (ReqArg (optStale_u . idu) "Module")     "Treat these modules as stale, even if a ho file is present"
-    , Option []    ["dependency"]  (NoArg  (optMode_s DependencyTree))  "Follow import dependencies only then quit"
-    , Option []    ["no-follow-deps"] (NoArg  (optFollowDeps_s False)) "Don't follow depencies not listed on command line"
     , Option []    ["list-libraries"] (NoArg  (optMode_s ListLibraries)) "List of installed libraries"
     , Option []    ["print-hsc-options"] (NoArg (optMode_s PrintHscOptions)) "print options to pass to hsc2hs"
     ]
@@ -442,6 +427,7 @@ withOptions opt (OptT x) = runIdentity (runReaderT x opt)
 withOptionsT :: Opt -> OptT m a -> m a
 withOptionsT opt (OptT x) = runReaderT x opt
 
+outputName = maybe "hs.out" id (optOutName options)
 
 flagOpt :: OptionMonad m => FlagOpts.Flag -> m Bool
 flagOpt flag = do

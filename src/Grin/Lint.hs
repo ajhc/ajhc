@@ -49,7 +49,7 @@ dumpGrin pname grin = do
     (argstring,sversion) <- getArgString
 
     let fn ext action = do
-            let oname = optOutName options ++ "_" ++ pname ++ "." ++ ext
+            let oname = outputName ++ "_" ++ pname ++ "." ++ ext
             putErrLn $ "Writing: " ++ oname
             h <- openFile oname WriteMode
             action h

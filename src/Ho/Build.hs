@@ -2,7 +2,6 @@ module Ho.Build (
     module Ho.Type,
     dumpHoFile,
     parseFiles,
-    doDependency,
     buildLibrary
     ) where
 
@@ -129,15 +128,6 @@ fileOrModule f = case reverse f of
                    ('s':'h':'l':'.':_) -> Right f
                    _                   -> Left $ Module f
 
-{-# NOINLINE doDependency #-}
-doDependency :: [String] -> IO ()
-doDependency as = do
-    done_ref <- newIORef mempty;
-    let f (Right f) = fetchSource done_ref [f] Nothing >> return ()
-        f (Left m) = resolveDeps done_ref m
-    mapM_ (f . fileOrModule) as
-    sm <- knownSourceMap `fmap` readIORef done_ref
-    mapM_ print $ melems sm
 
 replaceSuffix suffix fp = reverse (dropWhile ('.' /=) (reverse fp)) ++ suffix
 
@@ -425,24 +415,19 @@ countNodes cn = do
                 cm <- readIORef ref >>= g
                 return (Set.unions (cm:ds))
         g cn = case cn of
-            CompLinkUnit cu -> f cu
-            CompTcCollected _ cu -> f cu
-            CompCollected _ cu -> f cu
+            CompLinkUnit cu      -> return $ f cu
+            CompTcCollected _ cu -> return $ f cu
+            CompCollected _ cu   -> return $ f cu
         f cu = case cu of
-            CompTCed (_,_,_,ss) -> return $ Set.fromList ss
-            CompHo {} -> return Set.empty
-            CompDummy -> return Set.empty
-            CompSources sc      -> do
-                return $ Set.fromList (map sourceIdent sc)
+            CompTCed (_,_,_,ss) -> Set.fromList ss
+            CompSources sc      -> Set.fromList (map sourceIdent sc)
+            _                   -> Set.empty
     h cn
 
 typeCheckGraph :: CompNode -> IO ()
 typeCheckGraph cn = do
     cur <- newMVar (1::Int)
     maxModules <- Set.size `fmap` countNodes cn
-    let showProgress ms = printModProgress fmtLen maxModules tickProgress ms
-        fmtLen = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
-        tickProgress = modifyMVar cur $ \val -> return (val+1,val)
     let f (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
             CompTcCollected ctc _ -> return ctc
             CompLinkUnit lu -> do
@@ -467,6 +452,9 @@ typeCheckGraph cn = do
                         let ctc' = htc `mappend` ctc
                         writeIORef ref (CompTcCollected ctc' (CompTCed ((htc,tidata,modules,map sourceHoName sc))))
                         return ctc'
+        showProgress ms = printModProgress fmtLen maxModules tickProgress ms
+        fmtLen = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
+        tickProgress = modifyMVar cur $ \val -> return (val+1,val)
     f cn
     return ()
 

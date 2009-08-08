@@ -130,7 +130,7 @@ lintCheckProgram _ _ = return ()
 
 
 dumpCore pname prog = do
-    let fn = optOutName options ++ "_" ++ pname ++ ".jhc_core"
+    let fn = outputName ++ "_" ++ pname ++ ".jhc_core"
     putErrLn $ "Writing: " ++ fn
     h <- IO.openFile fn IO.WriteMode
     (argstring,sversion) <- getArgString
