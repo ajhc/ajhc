@@ -1,10 +1,10 @@
-AC_INIT([jhc],[0.6.1])
+AC_INIT([jhc],[0.6.2])
 AC_CONFIG_SRCDIR(src/Main.hs)
 AC_CONFIG_MACRO_DIR(ac-macros)
 AC_CONFIG_AUX_DIR(ac-macros)
 AM_INIT_AUTOMAKE([foreign no-dependencies std-options])
 
-REVISION=20090622
+REVISION=20090806
 SHORTVERSION=0.6
 
 AC_CANONICAL_HOST

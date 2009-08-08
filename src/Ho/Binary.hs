@@ -52,6 +52,7 @@ instance Data.Binary.Binary HoIDeps where
     ac <- get
     return (HoIDeps aa ab ac)
 
+{-
 instance Data.Binary.Binary HoLib where
     put (HoLib aa ab ac) = do
 	    Data.Binary.put aa
@@ -62,6 +63,7 @@ instance Data.Binary.Binary HoLib where
     ab <- get
     ac <- get
     return (HoLib aa ab ac)
+    -}
 
 
 

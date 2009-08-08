@@ -323,13 +323,13 @@ processDecls cho ho' tiData = do
         wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
         return mprog
     lintCheckProgram onerrNone prog
-    putProgressLn "Initial optimization pass"
+    --putProgressLn "Initial optimization pass"
 
     prog <- programMapProgGroups mempty  fint prog
     putProgressLn "!"
     hFlush stdout >> hFlush stderr
 
-    wdump FD.Progress $
+    wdump FD.Stats $
         Stats.printLStat (optStatLevel options) "Initial Pass Stats" (progStats prog)
     lintCheckProgram onerrNone prog
 
@@ -343,7 +343,7 @@ processDecls cho ho' tiData = do
     prog <- Demand.analyzeProgram prog
     prog <- simplifyProgram' sopt "Init-Big-One" verbose (IterateMax 4) prog
 
-    wdump FD.Progress $
+    wdump FD.Stats $
         Stats.printLStat (optStatLevel options) "Init-Big-One Stats" (progStats prog)
 
     -- This is the main function that optimizes the routines before writing them out
@@ -391,7 +391,7 @@ processDecls cho ho' tiData = do
     prog <- evalStateT (programMapProgGroups mempty optWW prog { progStats = mempty }) (SS.so_boundVars sopt)
     putProgressLn "!"
     hFlush stdout >> hFlush stderr
-    wdump FD.Progress $
+    wdump FD.Stats $
         Stats.printLStat (optStatLevel options) "MainPass Stats" (progStats prog)
 
     lintCheckProgram (putErrLn "After the workwrap/CPR") prog
@@ -408,7 +408,6 @@ processDecls cho ho' tiData = do
         hoRules = hoRules (hoBuild ho') `mappend` rules
         }
         newMap = fmap (\c -> Just (EVar $ combHead c)) $ progCombMap prog
---        (mod:_) = Map.keys $ hoExports $ hoTcInfo ho'
     return (mempty {
         choHoMap = Map.singleton (show $ hoModuleGroup ho') ho' { hoBuild = newHoBuild},
         choCombinators = fromList $ [ (combIdent c,c) | c <- progCombinators prog ],
@@ -445,7 +444,7 @@ transTypeAnalyze = transformParms { transformCategory = "typeAnalyze",  transfor
 
 processCollectedHo cho = do
     if optMode options == CompileHo then return () else do
-    putProgressLn "Starting Collected Compilation"
+    putProgressLn "Collected Compilation..."
 
     when (dump FD.ClassSummary) $ do
         putStrLn "  ---- class summary ---- "

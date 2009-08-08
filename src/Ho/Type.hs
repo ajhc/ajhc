@@ -87,15 +87,15 @@ data HoLib = HoLib {
     -- * arbitrary metainformation such as library author, web site, etc.
     hoMetaInfo   :: [(String,PackedString)],
     hoModuleMap  :: Map.Map Module ModuleGroup,
---    hoModuleDeps :: Map.Map ModuleGroup [ModuleGroup],
-    hoHiddenModules :: [Module]
+    hoModuleDeps :: Map.Map ModuleGroup [ModuleGroup],
+    hoHiddenModules :: [Module],
+    -- for libraries we have to keep these seperated
+    -- by module group since they are inherited whenever
+    -- the corresponding modules are imported
+    hoClasses :: Map.Map ModuleGroup ClassHierarchy,
+    hoLibRules :: Map.Map ModuleGroup Rules
     }
 
-data CollectedTc = CollectedTc {
-    ctcClassHierarchy :: ClassHierarchy,
-    ctcInfo :: HoTcInfo
-    }
-    {-! derive: update, Monoid !-}
 
 -- data only needed for type checking.
 data HoTcInfo = HoTcInfo {
@@ -110,13 +110,6 @@ data HoTcInfo = HoTcInfo {
     }
     {-! derive: update, Monoid !-}
 
--- classes and the datatable are used by both the core transformations and
--- front end typechecking so they are in their own section
-
--- this needs datatable
-newtype HoClass = HoClass {
-    hoClasses :: Map.Map Module ClassHierarchy
-    } deriving(Binary,Monoid)
 
 data HoBuild = HoBuild {
     -- Filled in by E generation

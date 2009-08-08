@@ -9,6 +9,7 @@ import Control.Monad
 import System.IO
 import System.Directory
 import qualified Data.Map as Map
+import Data.List
 
 import GenUtil
 import Options
@@ -60,7 +61,6 @@ condenseWhitespace xs =  reverse $ dropWhile isSpace (reverse (dropWhile isSpace
 
 type LibraryMap = Map.Map LibraryName FilePath
 
-
 findLibrary ::  LibraryName -> IO (LibraryName,FilePath)
 findLibrary pn = do
     lm <- getLibraryMap (optHlPath options)
@@ -69,6 +69,34 @@ findLibrary pn = do
         Nothing -> case range (pn++"-") (pn++"-"++repeat maxBound) lm of
                  [] -> fail ("LibraryMap: Library "++pn++" not found!")
                  xs -> return $ last xs
+
+{-
+collectLibraries :: IO [FilePath]
+collectLibraries ms = concat `fmap` mapM f (optHlPath options) where
+    f fp = flip catch (\_ -> return []) $ do
+        fs <- getDirectoryContents fp
+        return $ flip concatMap fs $ \e ->
+            case reverse e of
+              ('l':'h':'.':r) | good e -> [(fp++"/"++e)]
+              _               -> []
+    good e = case ms of
+        Nothing -> True
+        Just rs -> any (`isPrefixOf` e) rs
+
+collectPotentialLibraries :: Maybe [String] -> IO [FilePath]
+collectPotentialLibraries ms = concat `fmap` mapM f (optHlPath options) where
+    f fp = flip catch (\_ -> return []) $ do
+        fs <- getDirectoryContents fp
+        return $ flip concatMap fs $ \e ->
+            case reverse e of
+              ('l':'h':'.':r) | good e -> [(fp++"/"++e)]
+              _               -> []
+    good e = case ms of
+        Nothing -> True
+        Just rs -> any (`isPrefixOf` e) rs
+
+    -}
+
 
 
 
