@@ -28,6 +28,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 import Debug.Trace
+import System.Mem
 
 import PackedString(packString)
 import CharIO
@@ -254,8 +255,7 @@ type CompUnitGraph = [(HoHash,([HoHash],CompUnit))]
 data CompUnit
     = CompHo (Maybe String)  HoHeader HoIDeps Ho
     | CompSources [SourceCode]
---    | CompCollected CollectedHo CompUnit
-    | CompTCed HoTcInfo (Maybe (HoTcInfo,TiData,[(HoHash,HsModule)],[String])) CompUnit
+    | CompTCed ((HoTcInfo,TiData,[(HoHash,HsModule)],[String]))
     | CompTcError
 
 data SourceCode
@@ -377,18 +377,19 @@ toCompUnitGraph done roots = do
     mapM_ f roots
     readIORef cug_ref
 
-parseFiles :: [Either Module String]                             -- ^ Either a module or filename to find
-               -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
+parseFiles :: [Either Module String]                                   -- ^ Either a module or filename to find
+               -> (CollectedHo -> Ho -> IO CollectedHo)                -- ^ Process initial ho loaded from file
                -> (CollectedHo -> Ho -> TiData -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
---               -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
-               -> IO CollectedHo                                     -- ^ Final accumulated ho
+               -> IO CollectedHo                                       -- ^ Final accumulated ho
 
 parseFiles need ifunc func = do
     putProgressLn "Finding Dependencies..."
     (ksm, needed,cug) <- loadModules (optHls options) need
     cnode <- processCug cug >>= mkPhonyCompNode needed
+    performGC
     putProgressLn "Typechecking..."
     typeCheckGraph cnode
+    performGC
     putProgressLn "Compiling..."
     compileCompNode ifunc func ksm cnode
 
@@ -450,24 +451,27 @@ printModProgress fmtLen maxModules tickProgress ms = f "[" ms where
             (x:xs) -> do g curModule bl "-" x; putErrLn ""; f "-" xs
     g curModule bl el modName = putErr $ printf "%s%*d of %*d%s %-17s" bl fmtLen curModule fmtLen maxModules el (show $ hsModuleName modName)
 
-countNodes (CompNode hh deps ref) = do
-    ds <- mapM countNodes deps
-    let g cn =  case cn of
+countNodes cn = do
+    seen <- newIORef Set.empty
+    let h (CompNode hh deps ref) = do
+            s <- readIORef seen
+            if hh `Set.member` s then return Set.empty else do
+                writeIORef seen (Set.insert hh s)
+                ds <- mapM countNodes deps
+                cm <- readIORef ref >>= g
+                return (Set.unions (cm:ds))
+        g cn =  case cn of
             CompLinkNone -> return Set.empty
             CompLinkUnit cu -> f cu
             CompTcCollected _ cu -> g cu
             CompCollected _ cu -> g cu
         f cu = case cu of
-            CompTCed _ _ cn   -> f cn
---            CompCollected _ _ -> return Set.empty
+            CompTCed (_,_,_,ss)   -> return $ Set.fromList ss
             CompHo _ hoh idep _  -> do
-                ds <- mconcat `fmap` mapM countNodes deps
-                return $ ds `Set.union` Set.fromList (map (show.fst) (hoDepends idep))
+                return $ Set.fromList (map (show.fst) (hoDepends idep))
             CompSources sc    -> do
-                ds <- mconcat `fmap` mapM countNodes deps
-                return $ ds `Set.union` Set.fromList (map sourceIdent sc)
-    cm <- readIORef ref >>= g
-    return (Set.unions (cm:ds))
+                return $ Set.fromList (map sourceIdent sc)
+    h cn
 
 -- typechecking, this goes through and typechecks everything. It returns 'True' if there were errors.
 typeCheckGraph :: CompNode -> IO HoTcInfo
@@ -484,8 +488,6 @@ typeCheckGraph cn = do
                 return ctc
             CompTcCollected ctc _ -> return ctc
             CompLinkUnit lu -> case lu of
---                CompCollected ch _ -> error "compcollected in typechecknig phase"
-                CompTCed tcc _ _  -> return tcc
                 CompTcError -> error "comptcerror"
                 CompHo _ hoh idep ho  -> do
                     ctc <- mconcat `fmap` mapM f deps
@@ -504,11 +506,11 @@ typeCheckGraph cn = do
                     showProgress (snds modules)
                     (htc,tidata) <- doModules' ctc (snds modules)
                     let ctc' = htc `mappend` ctc
-                    writeIORef ref (CompTcCollected ctc' (CompLinkUnit $ CompTCed ctc' (Just (htc,tidata,modules,map sourceHoName sc)) lu))
+                    writeIORef ref (CompTcCollected ctc' (CompLinkUnit $ CompTCed ((htc,tidata,modules,map sourceHoName sc))))
                     return ctc'
     f cn
 
-compileCompNode :: (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
+compileCompNode :: (CollectedHo -> Ho -> IO CollectedHo)                 -- ^ Process initial ho loaded from file
                 -> (CollectedHo -> Ho -> TiData  -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
                 -> Map.Map SourceHash (Module,[Module])
                 -> CompNode
@@ -536,8 +538,7 @@ compileCompNode ifunc func ksm cn = do
                     cho <- ifunc cho ho
                     writeIORef ref (CompCollected cho (CompLinkUnit cn))
                     return cho
-                CompTCed _ Nothing nn -> h nn
-                CompTCed _ (Just (htc,tidata,modules,shns)) _  -> do
+                CompTCed ((htc,tidata,modules,shns))  -> do
                     let hdep = [ h | CompNode h _ _ <- deps]
                     cho <- mconcat `fmap` mapM f deps
                     showProgress (snds modules)
