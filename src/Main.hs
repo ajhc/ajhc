@@ -98,7 +98,7 @@ main =  runMain $ bracketHtml $ do
         (argstring,_) <- getArgString
         return (argstring ++ "\n" ++ versionSimple)
     case optMode o of
-        BuildHl hl    -> makeLibrary processInitialHo processDecls hl
+        BuildHl hl    -> buildLibrary processInitialHo processDecls hl
         ListLibraries -> do
             when (optVerbose options > 0) $ do
                 putStrLn "Search path:"

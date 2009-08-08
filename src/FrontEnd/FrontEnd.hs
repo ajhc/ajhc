@@ -1,6 +1,4 @@
 module FrontEnd.FrontEnd(
---    parseFiles,
-    makeLibrary,
     doModules',
     Tc.TiData(..)
     ) where
@@ -23,8 +21,6 @@ import qualified FlagDump as FD
 import qualified FrontEnd.Tc.Module as Tc
 
 
---makeLibrary ifunc func hl = do buildLibrary ifunc (doModules func) hl
-makeLibrary ifunc func hl = undefined -- do buildLibrary ifunc (doModules func) hl
 
 -- | Main entry point to front end
 

@@ -176,6 +176,7 @@ data Opt = Opt {
     optFollowDeps  :: !Bool,                   -- ^ Don't follow dependencies, all deps must be loaded from packages or specified on the command line.
     optVerbose     :: !Int,                    -- ^ Verbosity
     optStatLevel   :: !Int,                    -- ^ Level to print statistics
+    optBatch       :: !Int,                    -- ^ How many modules to attempt in parallel
     optInis        ::  M.Map String String,    -- ^ options read from ini files
     optDumpSet     ::  S.Set FlagDump.Flag,    -- ^ Dump flags.
     optFOptsSet    ::  S.Set FlagOpts.Flag     -- ^ Flag options (-f\<opt\>).
@@ -210,6 +211,7 @@ opt = Opt {
     optOutName     = "hs.out",
     optPrelude     = True,
     optFollowDeps  = True,
+    optBatch       = 10,
     optVerbose     = 0,
     optStatLevel   = 1,
     optNoAuto      = False,
@@ -244,6 +246,7 @@ theoptions =
     , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))        "keep going on errors"
     , Option []    ["cross"]     (NoArg  (optCross_s True))            "enable cross-compilation, choose target with the -m flag"
     , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output"
+--    , Option []    ["batch"]     (ReqArg (optBatch_s . read) "15") "number of modules to compile as a group at once, lower numbers trade speed for memory"
     , Option []    ["main"]      (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point"
     , Option ['m'] ["arch"]      (ReqArg (optArch_u . idu ) "arch")      "target architecture options"
     , Option []    ["entry"]     (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression"

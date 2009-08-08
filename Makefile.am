@@ -214,19 +214,19 @@ MAINTAINERCLEANFILES= $(BUILT_SOURCES)  $(DRIFTFILES)
 
 base-1.0.hl: lib/base/base.cabal
 	mkdir -p tmp/libho
-	./jhc -v -funboxed-tuples $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/base --noauto --build-hl lib/base/base.cabal -o $@
+	./jhc -funboxed-tuples $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/base --noauto --build-hl lib/base/base.cabal -o $@
 
 applicative-1.0.hl: lib/applicative/applicative.cabal base-1.0.hl
 	mkdir -p tmp/libho
-	./jhc -v $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/applicative  --noauto -L- -L. -p base --build-hl lib/applicative/applicative.cabal -o $@
+	./jhc $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/applicative  --noauto -L- -L. -p base --build-hl lib/applicative/applicative.cabal -o $@
 
 containers-0.2.0.hl: lib/containers.cabal base-1.0.hl applicative-1.0.hl
 	mkdir -p tmp/libho
-	./jhc -v $(RTSOPTS) $(JHC_TEST) -Idata -Ilib/containers/include --ho-dir tmp/libho -ilib/containers  --noauto -L- -L. -p base -p applicative --build-hl lib/containers.cabal -fcpp -o $@
+	./jhc $(RTSOPTS) $(JHC_TEST) -Idata -Ilib/containers/include --ho-dir tmp/libho -ilib/containers  --noauto -L- -L. -p base -p applicative --build-hl lib/containers.cabal -fcpp -o $@
 
 haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 	mkdir -p tmp/libho
-	./jhc -v $(RTSOPTS) $(JHC_TEST) --ho-dir tmp/libho -ilib/haskell98 --noauto -L- -L. -p base --build-hl lib/haskell98.cabal -o $@
+	./jhc $(RTSOPTS) $(JHC_TEST) --ho-dir tmp/libho -ilib/haskell98 --noauto -L- -L. -p base --build-hl lib/haskell98.cabal -o $@
 
 %.pdf: %.ps
 	epstopdf $< --outfile $@
