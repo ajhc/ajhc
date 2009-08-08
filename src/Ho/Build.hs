@@ -1,39 +1,37 @@
 module Ho.Build (
     module Ho.Type,
     dumpHoFile,
---    compileModules,
     parseFiles,
     doDependency,
     buildLibrary
     ) where
 
 
-import Codec.Compression.GZip
-import Control.Monad.Identity
 import Control.Concurrent
+import Control.Monad.Identity
 import Data.Binary
 import Data.Char
-import Data.Monoid
 import Data.IORef
-import Data.Tree
 import Data.List hiding(union)
+import Data.Monoid
+import Data.Tree
+import Debug.Trace
 import Maybe
 import Monad
-import Text.Printf
 import Prelude hiding(print,putStrLn)
 import System.IO hiding(print,putStrLn)
+import System.Mem
 import System.Posix.Files
-import qualified Data.ByteString.Lazy as L
+import Text.Printf
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Lazy.UTF8 as LBS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
-import Debug.Trace
-import System.Mem
 
-import PackedString(packString)
 import CharIO
 import DataConstructors
-import Directory
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
@@ -42,35 +40,33 @@ import E.Rules
 import E.Show
 import E.Traverse(emapE)
 import E.TypeCheck()
-import FrontEnd.FrontEnd
 import FrontEnd.Class
+import FrontEnd.FrontEnd
 import FrontEnd.HsParser
+import FrontEnd.HsSyn
 import FrontEnd.Infix
 import FrontEnd.ParseMonad
+import FrontEnd.SrcLoc
 import FrontEnd.Syn.Options
 import FrontEnd.Unlit
 import FrontEnd.Warning
-import FrontEnd.SrcLoc
-import RawFiles(prelude_m4)
-import Ho.Binary()
-import Ho.Library
+import Ho.Binary
 import Ho.Collected()
+import Ho.Library
 import Ho.Type
-import FrontEnd.HsSyn
 import Options
+import PackedString(packString)
+import RawFiles(prelude_m4)
 import Support.CFF
 import Util.FilterInput
 import Util.Gen hiding(putErrLn,putErr,putErrDie)
 import Util.SetLike
-import Version.Version(versionString)
 import Version.Config(revision)
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as LBS
+import Version.Version(versionString)
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
-import qualified Util.Graph as G
 import qualified Support.MD5 as MD5
-import qualified Data.ByteString.Lazy.UTF8 as LBS
+import qualified Util.Graph as G
 
 
 --
@@ -82,13 +78,13 @@ import qualified Data.ByteString.Lazy.UTF8 as LBS
 --
 -- JHDR - header info, contains a list of modules contained and dependencies that need to be checked to read the file
 -- LIBR - only present if this is a library, contains library metainfo
--- IDEP - immutable import information
+-- IDEP - immutable import information, needed to tell if ho files are up to date
 -- LINK - redirect to another file for systems without symlinks
--- DEFS - definitions and exports for modules, all that is needed for name resolution
--- TCIN - type checking information
+-- DEFS - definitions type checking information
 -- CORE - compiled core and associated data
+-- LDEF - library map of module group name to DEFS
+-- LCOR - library map of module group name to CORE
 -- GRIN - compiled grin code
---
 
 
 {-
@@ -106,33 +102,9 @@ import qualified Data.ByteString.Lazy.UTF8 as LBS
 -- | this should be updated every time the on-disk file format changes for a chunk. It is independent of the
 -- version number of the compiler.
 
-current_version :: Int
-current_version = 2
-
-cff_magic = chunkType "JHC"
-cff_link  = chunkType "LINK"
-cff_jhdr  = chunkType "JHDR"
-cff_core  = chunkType "CORE"
-cff_defs  = chunkType "DEFS"
-cff_idep  = chunkType "IDEP"
-
-
-shortenPath :: String -> IO String
-shortenPath x@('/':_) = do
-    cd <- getCurrentDirectory
-    pwd <- lookupEnv "PWD"
-    h <- lookupEnv "HOME"
-    let f d = do
-            d <- d
-            '/':rest <- getPrefix d x
-            return rest
-    return $ fromJust $ f (return cd) `mplus` f pwd `mplus` liftM ("~/" ++) (f h) `mplus` return x
-shortenPath x = return x
-
 
 instance DocLike d => PPrint d MD5.Hash where
     pprint h = tshow h
-
 
 findFirstFile :: String -> [(FilePath,a)] -> IO (LBS.ByteString,FilePath,a)
 findFirstFile err [] = FrontEnd.Warning.err "missing-dep" ("Module not found: " ++ err) >> fail ("Module not found: " ++ err) -- return (error "findFirstFile not found","",undefined)
@@ -256,6 +228,8 @@ data CompUnit
     = CompHo HoHeader HoIDeps Ho
     | CompSources [SourceCode]
     | CompTCed ((HoTcInfo,TiData,[(HoHash,HsModule)],[String]))
+    | CompLibrary Ho Library
+
 
 data SourceCode
     = SourceParsed { sourceHash :: SourceHash, sourceDeps :: [Module]
@@ -287,7 +261,6 @@ instance ProvidesModules CompLink where
 instance ProvidesModules SourceCode where
     providesModules SourceParsed { sourceModule = mod } = [hsModuleName mod]
     providesModules SourceRaw    { sourceModName = n } = [n]
-
 
 
 -- | this walks the loaded modules and ho files, discarding out of
@@ -368,7 +341,7 @@ toCompUnitGraph done roots = do
 parseFiles :: [Either Module String]                                   -- ^ Either a module or filename to find
                -> (CollectedHo -> Ho -> IO CollectedHo)                -- ^ Process initial ho loaded from file
                -> (CollectedHo -> Ho -> TiData -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
-               -> IO CollectedHo                                       -- ^ Final accumulated ho
+               -> IO (CompNode,CollectedHo)                            -- ^ Final accumulated ho
 
 parseFiles need ifunc func = do
     putProgressLn "Finding Dependencies..."
@@ -379,7 +352,8 @@ parseFiles need ifunc func = do
     typeCheckGraph cnode
     performGC
     putProgressLn "Compiling..."
-    compileCompNode ifunc func ksm cnode
+    cho <- compileCompNode ifunc func ksm cnode
+    return (cnode,cho)
 
 
 -- this takes a list of modules or files to load, and produces a compunit graph
@@ -458,8 +432,6 @@ countNodes cn = do
         f cu = case cu of
             CompTCed (_,_,_,ss) -> return $ Set.fromList ss
             CompHo {} -> return Set.empty
-            --CompHo hoh idep _   -> do
-            --    return $ Set.fromList (map (show.fst) (hoDepends idep))
             CompSources sc      -> do
                 return $ Set.fromList (map sourceIdent sc)
     h cn
@@ -536,7 +508,7 @@ compileCompNode ifunc func ksm cn = do
                     ksm <- readIORef ksm_r
 
                     let hoh = HoHeader {
-                                 hohVersion = current_version,
+                                 hohVersion = error "hohVersion",
                                  hohName = Left mgName,
                                  hohHash       = hh,
                                  hohArchDeps = [],
@@ -548,81 +520,13 @@ compileCompNode ifunc func ksm cn = do
                                 hoModDepends = hdep
                                 }
 
-                    recordHoFile newHo idep shns hoh
+                    recordHoFile (mapHoBodies eraseE newHo) idep shns hoh
                     writeIORef ref (CompCollected cho' (CompLinkUnit $ CompHo hoh idep newHo))
                     return cho'
                 CompSources _ -> error "sources still exist!?"
     f cn
 
 
-readHFile :: FilePath -> IO (FilePath,HoHeader,forall a . Binary a => ChunkType -> a)
-readHFile fn = do
-    bs <- BS.readFile fn
-    fn' <- shortenPath fn
-    (ct,mp) <- bsCFF bs
-    True <- return $ ct == cff_magic
-    let fc ct = case lookup ct mp of
-            Nothing -> error $ "No chunk '" ++ show ct ++ "' found in file " ++ fn
-            Just x -> decode . decompress $ L.fromChunks [x]
-            --Just x -> trace (printf "**** Reading %s from %s ****\n" (show ct) fn') $ decode . decompress $ L.fromChunks [x]
-    let hoh = fc cff_jhdr
-    when (hohVersion hoh /= current_version) $ fail "invalid version in hofile"
-    return (fn',hoh,fc)
-
--- Read in a Ho file.
-
-readHoFile :: FilePath -> IO (HoHeader,HoIDeps,Ho)
-readHoFile fn = do
-    (_fn',hoh,fc) <- readHFile fn
-    let Left modGroup = hohName hoh
-    return (hoh,fc cff_idep,mempty { hoModuleGroup = modGroup, hoTcInfo = fc cff_defs, hoBuild = fc cff_core})
-
-
-recordHoFile ::
-    Ho               -- ^ File to record
-    -> HoIDeps
-    -> [FilePath]    -- ^ files to write to
-    -> HoHeader      -- ^ file header
-    -> IO ()
-recordHoFile ho idep fs header = do
-    if optNoWriteHo options then do
-        when verbose $ do
-            fs' <- mapM shortenPath fs
-            putErrLn $ "Skipping Writing Ho Files: " ++ show fs'
-      else do
-    let removeLink' fn = catch  (removeLink fn)  (\_ -> return ())
-    let g (fn:fs) = do
-            f fn
-            mapM_ (l fn) fs
-            return ()
-        g [] = error "Ho.g: shouldn't happen"
-        l fn fn' = do
-            when verbose $ do
-                fn_ <- shortenPath fn
-                fn_' <- shortenPath fn'
-                when (optNoWriteHo options) $ putErr "Skipping "
-                putErrLn $ "Linking haskell object file:" <+> fn_' <+> "to" <+> fn_
-            if optNoWriteHo options then return () else do
-            let tfn = fn' ++ ".tmp"
-            removeLink' tfn
-            createLink fn tfn
-            rename tfn fn'
-        f fn = do
-            when verbose $ do
-                when (optNoWriteHo options) $ putErr "Skipping "
-                fn' <- shortenPath fn
-                putErrLn $ "Writing haskell object file:" <+> fn'
-            if optNoWriteHo options then return () else do
-            let tfn = fn ++ ".tmp"
-            let theho =  mapHoBodies eraseE ho
-                cfflbs = mkCFFfile cff_magic [
-                    (cff_jhdr, compress $ encode header),
-                    (cff_idep, compress $ encode idep),
-                    (cff_defs, compress $ encode $ hoTcInfo theho),
-                    (cff_core, compress $ encode $ hoBuild theho)]
-            LBS.writeFile tfn cfflbs
-            rename tfn fn
-    g fs
 
 
 
@@ -700,15 +604,7 @@ eraseE e = runIdentity $ f e where
 -- library specific routines
 ---------------------------------
 
---collectLibraries :: IO [FilePath]
---collectLibraries = concat `fmap` mapM f (optHlPath options) where
---    f fp = do
---        fs <- flip catch (\_ -> return []) $ getDirectoryContents fp
---        flip mapM fs $ \e -> case reverse e of
---            ('l':'h':'.':r)  -> do
---                (fn',hoh,mp) <- readHFile (fp++"/"++e)
---
---        _               -> []
+
 
 buildLibrary :: (CollectedHo -> Ho -> IO CollectedHo)
              -> (CollectedHo -> Ho -> TiData -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
@@ -717,12 +613,13 @@ buildLibrary :: (CollectedHo -> Ho -> IO CollectedHo)
 buildLibrary ifunc func = ans where
     ans fp = do
         (desc,name,hmods,emods) <- parse fp
-        let allmods  = sort (emods ++ hmods)
-        cho <- parseFiles (map Left allmods) ifunc func
+        let allmods = snub (emods ++ hmods)
+        -- TODO - must check we depend only on libraries
+        (cnode,_) <- parseFiles (map Left allmods) ifunc func
         return ()
     -- parse library description file
     parse fp = do
-        putVerboseLn $ "Creating library from description file: " ++ show fp
+        putProgressLn $ "Creating library from description file: " ++ show fp
         desc <- readDescFile fp
         when verbose2 $ mapM_ print desc
         let field x = lookup x desc
@@ -733,6 +630,16 @@ buildLibrary ifunc func = ans where
         let hmods = map Module $ snub $ mfield "hidden-modules"
             emods = map Module $ snub $ mfield "exposed-modules"
         return (desc,name ++ "-" ++ vers,hmods,emods)
+
+--collectLibraries :: IO [FilePath]
+--collectLibraries = concat `fmap` mapM f (optHlPath options) where
+--    f fp = do
+--        fs <- flip catch (\_ -> return []) $ getDirectoryContents fp
+--        flip mapM fs $ \e -> case reverse e of
+--            ('l':'h':'.':r)  -> do
+--                (fn',hoh,mp) <- readHFile (fp++"/"++e)
+--
+--        _               -> []
 
 {-
     ans fp = do
@@ -768,31 +675,6 @@ buildLibrary ifunc func = ans where
                 hohMetaInfo = pdesc
                 }
         recordHoFile (mconcat $ Map.elems ho) (HoIDeps Map.empty) [outName] hoh
-
-    -- parse library description file
-    parse fp = do
-        putVerboseLn $ "Creating library from description file: " ++ show fp
-        desc <- readDescFile fp
-        when verbose2 $ mapM_ print desc
-        let field x = lookup x desc
-            jfield x = maybe (fail $ "createLibrary: description lacks required field " ++ show x) return $ field x
-            mfield x = maybe [] (words . map (\c -> if c == ',' then ' ' else c)) $ field x
-        name <- jfield "name"
-        vers <- jfield "version"
-        let hmods = map Module $ snub $ mfield "hidden-modules"
-            emods = map Module $ snub $ mfield "exposed-modules"
-        return (desc,name ++ "-" ++ vers,hmods,emods)
-findModule :: [Either Module String]                                -- ^ Either a module or filename to find
-              -> (CollectedHo -> Ho -> IO CollectedHo)              -- ^ Process initial ho loaded from file
-              -> (CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
-              -> IO (CollectedHo,[(Module,MD5.Hash)],Ho)            -- ^ (Final accumulated ho,just the ho read to satisfy this command)
-findModule need ifunc func  = do
-    (needed,cug) <- loadModules (optHls options) need
-    cnodes <- processCug cug
-    rnode <- mkPhonyCompNode needed cnodes
-    typeCheckGraph rnode
-    cho <- compileCompNode ifunc func rnode
-    return (cho,undefined,undefined)
 
 -}
 

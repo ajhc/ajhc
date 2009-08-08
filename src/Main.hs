@@ -124,7 +124,7 @@ processFiles cs = f cs (optMainFunc options) where
         m <- getModule (parseName Val m)
         g [Left m]
     f cs _ = g (map fileOrModule cs)
-    g fs =  processCollectedHo =<< parseFiles fs processInitialHo processDecls
+    g fs = processCollectedHo . snd =<< parseFiles fs processInitialHo processDecls
     fileOrModule f = case reverse f of
        ('s':'h':'.':_)     -> Right f
        ('s':'h':'l':'.':_) -> Right f
@@ -165,14 +165,12 @@ processInitialHo accumho aho = do
     let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- map combHead $ melems choCombs ]) (choVarMap accumho)
         choCombs = mfilterWithKey (\k _ -> k /= emptyId) choCombinators'
         --(mod:_) = Map.keys $ hoExports $ hoTcInfo aho
-    return $ mempty {
+    return $ updateChoHo mempty {
         choVarMap = finalVarMap,
         choExternalNames = choExternalNames accumho `mappend` (fromList . map tvrIdent $ newTVrs),
         choCombinators = choCombs `mappend` fmap reRule (choCombinators accumho),
         choHoMap = Map.singleton (show $ hoModuleGroup aho) aho `mappend` choHoMap accumho
         }
-
-
 
 
 -- | this is called on parsed, typechecked haskell code to convert it to the internal representation
@@ -191,9 +189,7 @@ processDecls ::
     -> IO (CollectedHo,Ho)  -- ^ (new accumulated ho, final ho for this modules)
 processDecls cho ho' tiData = do
     -- some useful values
-    let allHo = ho `mappend` ho'
-        ho = choHo cho
-        htc = hoTcInfo ho
+    let ho = choHo cho
         -- XXX typechecker drops foreign exports!
         decls  = tiDataDecls tiData ++ [ x | x@HsForeignExport {} <- originalDecls ]
         originalDecls =  concat [ hsModuleDecls  m | (_,m) <- tiDataModules tiData ]
@@ -413,7 +409,7 @@ processDecls cho ho' tiData = do
         hoRules = hoRules (hoBuild ho') `mappend` rules
         }
         newMap = fmap (\c -> Just (EVar $ combHead c)) $ progCombMap prog
-    return (mempty {
+    return (updateChoHo $ mempty {
         choHoMap = Map.singleton (show $ hoModuleGroup ho') ho' { hoBuild = newHoBuild},
         choCombinators = fromList $ [ (combIdent c,c) | c <- progCombinators prog ],
         choExternalNames = idMapToIdSet newMap,

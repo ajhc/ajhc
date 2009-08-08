@@ -6,6 +6,9 @@ import Control.Monad.Writer
 import Control.Monad.Identity
 import Data.Monoid
 import Data.List
+import Directory
+import System.IO
+import Data.Maybe
 
 import GenUtil hiding(replicateM)
 
@@ -25,3 +28,17 @@ travCollect fn col x = execWriter (f x) where
 
 forMn_ xs = forM_ (zip xs [0 :: Int .. ])
 forMn xs = forM (zip xs [0 :: Int .. ])
+
+shortenPath :: String -> IO String
+shortenPath x@('/':_) = do
+    cd <- getCurrentDirectory
+    pwd <- lookupEnv "PWD"
+    h <- lookupEnv "HOME"
+    let f d = do
+            d <- d
+            '/':rest <- getPrefix d x
+            return rest
+    return $ fromJust $ f (return cd) `mplus` f pwd `mplus` liftM ("~/" ++) (f h) `mplus` return x
+shortenPath x = return x
+
+

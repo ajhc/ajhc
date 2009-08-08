@@ -18,11 +18,20 @@ import Name.Id
 import Name.Name(Name)
 import FrontEnd.TypeSynonyms(TypeSynonyms)
 import PackedString
-import Data.Binary
 import qualified Support.MD5 as MD5
 import Data.Version
 import FrontEnd.Rename(FieldMap())
+import Support.CFF
 
+cff_magic = chunkType "JHC"
+cff_link  = chunkType "LINK"
+cff_libr  = chunkType "LIBR"
+cff_jhdr  = chunkType "JHDR"
+cff_core  = chunkType "CORE"
+cff_defs  = chunkType "DEFS"
+cff_lcor  = chunkType "LCOR"
+cff_ldef  = chunkType "LDEF"
+cff_idep  = chunkType "IDEP"
 
 -- A SourceHash is the hash of a specific file, it is associated with a
 -- specific 'Module' that said file implements.
@@ -51,7 +60,10 @@ data CollectedHo = CollectedHo {
     -- modules
     choOrphanRules :: Rules,
     -- the hos
-    choHoMap :: Map.Map String Ho }
+    -- this is a cache
+    choHo :: Ho,
+    choHoMap :: Map.Map String Ho
+    }
     {-! derive: update !-}
 
 
@@ -81,20 +93,18 @@ data HoIDeps = HoIDeps {
     -- * Haskell Source files depended on
     hoDepends    :: [(Module,SourceHash)],
     -- * Other objects depended on to be considered up to date.
-    hoModDepends :: [HoHash] }
+    hoModDepends :: [HoHash]
+    }
 
 data HoLib = HoLib {
     -- * arbitrary metainformation such as library author, web site, etc.
     hoMetaInfo   :: [(String,PackedString)],
     hoModuleMap  :: Map.Map Module ModuleGroup,
-    hoModuleDeps :: Map.Map ModuleGroup [ModuleGroup],
-    hoHiddenModules :: [Module],
-    -- for libraries we have to keep these seperated
-    -- by module group since they are inherited whenever
-    -- the corresponding modules are imported
-    hoClasses :: Map.Map ModuleGroup ClassHierarchy,
-    hoLibRules :: Map.Map ModuleGroup Rules
+    hoModuleDeps :: Map.Map ModuleGroup [ModuleGroup]
     }
+
+
+data Library = Library HoHeader HoLib (Map.Map ModuleGroup HoTcInfo) (Map.Map ModuleGroup HoBuild)
 
 
 -- data only needed for type checking.

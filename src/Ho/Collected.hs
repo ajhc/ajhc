@@ -7,7 +7,7 @@ module Ho.Collected(
     choAssumps,
     choRules,
     choEs,
-    choHo
+    updateChoHo
     )where
 
 import Data.Monoid
@@ -33,22 +33,25 @@ choRules = hoRules . hoBuild . choHo
 choEs cho = [ (combHead c,combBody c) | c <- melems $  choCombinators cho]
 
 instance Monoid CollectedHo where
-    mempty = CollectedHo {
+    mempty = updateChoHo CollectedHo {
         choExternalNames = mempty,
         choOrphanRules = mempty,
         choHoMap = Map.singleton "Prim@" pho,
         choCombinators = mempty,
+        choHo = error "choHo-a",
         choVarMap = mempty
         } where pho = mempty { hoBuild = mempty { hoDataTable = dataTablePrims } }
-    a `mappend` b = CollectedHo {
+    a `mappend` b = updateChoHo CollectedHo {
         choExternalNames = choExternalNames a `mappend` choExternalNames b,
         choVarMap = choVarMap a `mergeChoVarMaps` choVarMap b,
         choOrphanRules = choOrphanRules a `mappend` choOrphanRules b,
         choCombinators = choCombinators a `mergeChoCombinators` choCombinators b,
+        choHo = error "choHo-b",
         choHoMap = Map.union (choHoMap a) (choHoMap b)
         }
 
-choHo cho = hoBuild_u (hoEs_u f) . mconcat . Map.elems $ choHoMap cho where
+updateChoHo cho = cho { choHo = ho } where
+    ho = hoBuild_u (hoEs_u f) . mconcat . Map.elems $ choHoMap cho
     f ds = runIdentity $ annotateDs mmap  (\_ -> return) (\_ -> return) (\_ -> return) (map g ds) where
         mmap = mfilterWithKey (\k _ -> (k `notElem` (map (tvrIdent . fst) ds))) (choVarMap cho)
     g (t,e) = case mlookup (tvrIdent t) (choVarMap cho) of
