@@ -59,6 +59,7 @@ import Support.FreeVars
 import Support.CanType(getType)
 import Support.Transform
 import Util.Graph
+import Util.Progress
 import Util.SetLike as S
 import Version.Version(versionString,versionContext,versionSimple)
 import qualified Version.Config as VC
@@ -289,6 +290,9 @@ processDecls cho ho' tiData = do
         transformOperation = programFloatInward
         } prog
 
+    putProgress "<"
+    pr_r <- progressIONew (length $ programDecomposedDs prog) 25 '.'
+
     let fint mprog = do
         let names = pprint [ n | (n,_) <- programDs mprog]
         when coreMini $ putErrLn ("----\n" ++ names)
@@ -320,14 +324,13 @@ processDecls cho ho' tiData = do
         mprog <- simplifyProgram sopt "Init-Three-AfterDemand" False mprog
         when miniCorePass $ printProgram mprog -- mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
         when miniCoreSteps $ Stats.printLStat (optStatLevel options) ("InitialOptimize:" ++ names) (progStats mprog)
-        wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
+        --wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
+        wdump FD.Progress $ let SubProgram rec = progType mprog in  progressIOSteps pr_r (if rec then "*" else ".")
         return mprog
     lintCheckProgram onerrNone prog
     --putProgressLn "Initial optimization pass"
 
-    prog <- programMapProgGroups mempty  fint prog
-    putProgressLn "!"
-    hFlush stdout >> hFlush stderr
+    prog <- programMapProgGroups mempty fint prog
 
     wdump FD.Stats $
         Stats.printLStat (optStatLevel options) "Initial Pass Stats" (progStats prog)
@@ -345,6 +348,8 @@ processDecls cho ho' tiData = do
 
     wdump FD.Stats $
         Stats.printLStat (optStatLevel options) "Init-Big-One Stats" (progStats prog)
+
+    pr_r <- progressIONew (length $ programDecomposedDs prog) 25 '.'
 
     -- This is the main function that optimizes the routines before writing them out
     let optWW mprog = do
@@ -366,7 +371,7 @@ processDecls cho ho' tiData = do
         mprog <- return $ E.CPR.cprAnalyzeProgram mprog
         mprog' <- transformProgram tparms { transformSkipNoStats = True, transformCategory = "WorkWrap", transformOperation = return . workWrapProgram } mprog
         let wws = length (programDs mprog') - length (programDs mprog)
-        liftIO $ wdump FD.Progress $ putErr (replicate wws 'w')
+--        liftIO $ wdump FD.Progress $ putErr (replicate wws 'w')
         mprog <- return mprog'
 
         mprog <- simplifyProgram sopt "Simplify-Three" coreMini mprog
@@ -385,12 +390,12 @@ processDecls cho ho' tiData = do
 
         put $ fromList [ (combIdent c,c) | c <- progCombinators mprog] `S.union` smap
 
-        liftIO $ wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
+        --liftIO $ wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
+        liftIO $ wdump FD.Progress $ let SubProgram rec = progType mprog in  progressIOSteps pr_r (if wws > 0 then "w" else if rec then "*" else ".")
         return mprog
 
     prog <- evalStateT (programMapProgGroups mempty optWW prog { progStats = mempty }) (SS.so_boundVars sopt)
-    putProgressLn "!"
-    hFlush stdout >> hFlush stderr
+    putProgressLn ">"
     wdump FD.Stats $
         Stats.printLStat (optStatLevel options) "MainPass Stats" (progStats prog)
 

@@ -7,7 +7,7 @@ import List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
-import System.IO(hPutChar,stderr)
+import System.IO(hPutStr,stderr)
 
 import Control.Monad.Reader
 import FrontEnd.DeclsDepends(getDeclDeps)
@@ -33,6 +33,7 @@ import Options
 import Support.FreeVars
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
+import Util.Progress
 
 
 listenPreds = listenSolvePreds
@@ -820,7 +821,9 @@ getBindGroupName (expl,impls) =  map getDeclName (snds expl ++ concat (rights im
 tiProgram ::  [BindGroup] -> [HsDecl] -> Tc [HsDecl]
 tiProgram bgs es = ans where
     ans = do
-        (r,ps) <- listenPreds $ f bgs [] mempty
+        let (pr,is) = progressStep (progressNew (length bgs + 1) 45) '.'
+        wdump FD.Progress $ liftIO $ do hPutStr stderr ("(" ++ is)
+        (r,ps) <- listenPreds $ f pr bgs [] mempty
         ps <- flattenType ps
         ch <- getClassHierarchy
         ([],rs) <- splitPreds ch Set.empty ps
@@ -829,24 +832,25 @@ tiProgram bgs es = ans where
         --ps <- return $ simplify ch ps
         --liftIO $ mapM_ (putStrLn.show) ps
         --return r
-    f (bg:bgs) rs cenv  = do
+    f pr (bg:bgs) rs cenv  = do
         ((ds,env),ps) <- listenPreds (tcBindGroup bg)
         ch <- getClassHierarchy
         withContext (makeMsg "in the binding group:" $ show (getBindGroupName bg)) $ do
             ([],leftovers) <- splitPreds ch Set.empty ps
             --topDefaults leftovers
             return ()
-        liftIO $ do hPutChar stderr '.'
-        liftIO $ hFlush stderr
-        localEnv env $ f bgs (ds ++ rs) (env `mappend` cenv)
-    f [] rs _cenv = do
+
+        let (pr',os) = progressStep pr '.'
+        wdump FD.Progress $ liftIO $ do hPutStr stderr os
+        localEnv env $ f pr' bgs (ds ++ rs) (env `mappend` cenv)
+    f _ [] rs _cenv = do
         ch <- getClassHierarchy
         (pdecls,ps) <- listenPreds $ mapM tcPragmaDecl es
         withContext (makeMsg "in the pragmas:" $ "rules") $ do
             ([],leftovers) <- splitPreds ch Set.empty ps
             --topDefaults leftovers
             return ()
-        liftIO $ putErrLn "!"
+        wdump FD.Progress $ liftIO $ do hPutStr stderr ")\n"
         return (rs ++ concat pdecls)
 
 -- Typing Literals

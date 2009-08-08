@@ -438,8 +438,8 @@ printModProgress fmtLen maxModules tickProgress ms = f "[" ms where
         curModule <- tickProgress
         case ms of
             [x] -> g curModule bl "]" x
-            (x:xs) -> do g curModule bl "|" x; putErrLn ""; f "|" xs
-    g curModule bl el modName = putErr $ printf "%s%*d of %*d%s %s" bl fmtLen curModule fmtLen maxModules el (show $ hsModuleName modName)
+            (x:xs) -> do g curModule bl "-" x; putErrLn ""; f "-" xs
+    g curModule bl el modName = putErr $ printf "%s%*d of %*d%s %-17s" bl fmtLen curModule fmtLen maxModules el (show $ hsModuleName modName)
 
 -- typechecking, this goes through and typechecks everything. It returns 'True' if there were errors.
 typeCheckGraph :: CompNode -> IO HoTcInfo
@@ -596,7 +596,7 @@ recordHoFile ho idep fs header = do
             return ()
         g [] = error "Ho.g: shouldn't happen"
         l fn fn' = do
-            wdump FD.Progress $ do
+            when verbose $ do
                 fn_ <- shortenPath fn
                 fn_' <- shortenPath fn'
                 when (optNoWriteHo options) $ putErr "Skipping "
@@ -607,7 +607,7 @@ recordHoFile ho idep fs header = do
             createLink fn tfn
             rename tfn fn'
         f fn = do
-            wdump FD.Progress $ do
+            when verbose $ do
                 when (optNoWriteHo options) $ putErr "Skipping "
                 fn' <- shortenPath fn
                 putErrLn $ "Writing haskell object file:" <+> fn'
