@@ -94,11 +94,11 @@ bracketHtml action = do
 
 main =  runMain $ bracketHtml $ do
     o <- processOptions
-    progressM $ do
+    let darg = progressM $ do
         (argstring,_) <- getArgString
         return (argstring ++ "\n" ++ versionSimple)
     case optMode o of
-        BuildHl hl    -> buildLibrary processInitialHo processDecls hl
+        BuildHl hl    -> darg >> buildLibrary processInitialHo processDecls hl
         ListLibraries -> do
             when (optVerbose options > 0) $ do
                 putStrLn "Search path:"
@@ -110,7 +110,7 @@ main =  runMain $ bracketHtml $ do
         Version         -> putStrLn versionString
         PrintHscOptions -> putStrLn $ "-I" ++ VC.datadir ++ "/" ++ VC.package ++ "-" ++ VC.shortVersion ++ "/include"
         VersionCtx      -> putStrLn (versionString ++ versionContext)
-        _               -> processFiles  (optArgs o)
+        _               -> darg >> processFiles  (optArgs o)
 
 
 processFiles :: [String] -> IO ()

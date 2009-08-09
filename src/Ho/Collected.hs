@@ -40,13 +40,15 @@ instance Monoid CollectedHo where
         choHoMap = Map.singleton primModule pho,
         choCombinators = mempty,
         choHo = error "choHo-a",
-        choVarMap = mempty
+        choVarMap = mempty,
+        choLibDeps = mempty
         } where pho = mempty { hoBuild = mempty { hoDataTable = dataTablePrims } }
     a `mappend` b = updateChoHo CollectedHo {
         choExternalNames = choExternalNames a `mappend` choExternalNames b,
         choVarMap = choVarMap a `mergeChoVarMaps` choVarMap b,
         choOrphanRules = choOrphanRules a `mappend` choOrphanRules b,
         choCombinators = choCombinators a `mergeChoCombinators` choCombinators b,
+        choLibDeps = choLibDeps a `mappend` choLibDeps b,
         choHo = error "choHo-b",
         choHoMap = Map.union (choHoMap a) (choHoMap b)
         }

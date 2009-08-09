@@ -9,6 +9,7 @@ import Data.List
 import Directory
 import System.IO
 import Data.Maybe
+import Text.ParserCombinators.ReadP
 
 import GenUtil hiding(replicateM)
 
@@ -17,6 +18,11 @@ mintercalate x xs = mconcat (intersperse x xs)
 
 mconcatMapM f xs = mapM f xs >>= return . mconcat
 
+runReadP :: Monad m => ReadP a -> String -> m a
+runReadP rp s = case [ x | (x,t) <- readP_to_S rp s, ("","") <- lex t] of
+    [x] -> return x
+    []  -> fail "runReadP: no parse"
+    _   -> fail "runReadP: ambiguous parse"
 
 runEither :: String -> Either String a -> a
 runEither msg (Left fm) = error $ msg ++ " - " ++ fm

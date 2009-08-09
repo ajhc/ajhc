@@ -222,7 +222,7 @@ applicative-1.0.hl: lib/applicative/applicative.cabal base-1.0.hl
 
 containers-0.2.0.hl: lib/containers.cabal base-1.0.hl applicative-1.0.hl
 	mkdir -p tmp/libho
-	./jhc $(RTSOPTS) $(JHC_TEST) -Idata -Ilib/containers/include --ho-dir tmp/libho -ilib/containers  --noauto -L- -L. -p base -p applicative --build-hl lib/containers.cabal -fcpp -o $@
+	./jhc $(RTSOPTS) $(JHC_TEST) -Isrc/data -Ilib/containers/include --ho-dir tmp/libho -ilib/containers  --noauto -L- -L. -p base -p applicative --build-hl lib/containers.cabal -fcpp -o $@
 
 haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 	mkdir -p tmp/libho
@@ -249,11 +249,11 @@ publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/in
 	cp -- $^ /home/john/public_html/computer/jhc
 
 manual: utils/stitch.prl src/FlagDump.mkd src/FlagOpts.mkd options.mkd
-	find . ! -wholename '*/examples/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl > manual.mkd
+	find . ! -wholename '*/examples/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/src/data/rts/*.c' \) | xargs perl utils/stitch.prl > manual.mkd
 	pandoc manual.mkd --toc -s -f markdown -t html -s -c manual.css -o $@.html
 
 man: utils/stitch.prl src/FlagDump.mkd src/FlagOpts.mkd options.mkd docs/man_header.mkd
-	find . ! -wholename '*/examples/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/data/rts/*.c' \) | xargs perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
+	find . ! -wholename '*/examples/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/src/data/rts/*.c' \) | xargs perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
 	pandoc jhc_man.mkd -s -f markdown -t man -s  -o jhc.1
 
 options.mkd: jhc

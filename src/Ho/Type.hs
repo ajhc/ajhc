@@ -60,9 +60,10 @@ data CollectedHo = CollectedHo {
     -- modules
     choOrphanRules :: Rules,
     -- the hos
-    -- this is a cache
-    choHo :: Ho,
-    choHoMap :: Map.Map ModuleGroup Ho
+    choHo :: Ho, -- this is a cache, it must be updated whenever choHoMap is updated.
+    choHoMap :: Map.Map ModuleGroup Ho,
+    -- libraries depended on
+    choLibDeps :: Map.Map PackedString HoHash
     }
     {-! derive: update !-}
 
@@ -93,7 +94,9 @@ data HoIDeps = HoIDeps {
     -- * Haskell Source files depended on
     hoDepends    :: [(Module,SourceHash)],
     -- * Other objects depended on to be considered up to date.
-    hoModDepends :: [HoHash]
+    hoModDepends :: [HoHash],
+    -- * library module groups needed
+    hoModuleGroupNeeds :: [ModuleGroup]
     }
 
 data HoLib = HoLib {
@@ -105,6 +108,9 @@ data HoLib = HoLib {
 
 
 data Library = Library HoHeader HoLib (Map.Map ModuleGroup HoTcInfo) (Map.Map ModuleGroup HoBuild)
+
+instance Show Library where
+    showsPrec n (Library hoh _ _ _) = showsPrec n (hohHash hoh)
 
 
 -- data only needed for type checking.
