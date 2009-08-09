@@ -233,8 +233,9 @@ tiModules htc ms = do
         tcInfoClassHierarchy = cHierarchyWithInstances
         }
 
+    processErrors (concatMap snd mserrs)
     (localVarEnv,checkedRules,coercions,tcDs) <- withOptionsT (modInfoOptions tms) $ runTc tcInfo $ do
-        mapM_ addWarning (concatMap snd mserrs)
+        --mapM_ addWarning (concatMap snd mserrs)
         (tcDs,out) <- listen (tiProgram program ds)
         env <- getCollectedEnv
         cc <- getCollectedCoerce

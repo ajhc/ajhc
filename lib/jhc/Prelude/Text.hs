@@ -1,3 +1,4 @@
+{-# OPTIONS_JHC -N #-}
 module Prelude.Text (
     ReadS, ShowS,
     Read(readsPrec, readList),
@@ -18,6 +19,8 @@ import Prelude.IO
 import Jhc.Order
 import Jhc.Maybe
 import Jhc.Text.Read
+import Jhc.Num
+import Jhc.Float
 
 
 import Data.Char(isSpace, isAlpha, isDigit, isAlphaNum,

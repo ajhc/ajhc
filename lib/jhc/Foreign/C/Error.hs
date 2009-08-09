@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi #-}
+{-# OPTIONS_JHC  -fffi #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Foreign.C.Error
@@ -93,6 +93,10 @@ import Foreign.Storable
 import Foreign.Ptr
 import Foreign.C.Types
 import Foreign.C.String
+import Jhc.Order
+import Jhc.Num
+import Jhc.Basics
+import Jhc.Monad
 
 import System.IO.Unsafe		( unsafePerformIO )
 

@@ -1,5 +1,5 @@
 {-# OPTIONS_JHC -fm4 -N -fffi -funboxed-tuples -funboxed-values #-}
-module Jhc.Inst.Storable where
+module Jhc.Inst.Storable() where
 
 m4_include(Foreign/Storable.m4)
 

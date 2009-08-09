@@ -1,8 +1,12 @@
-{-# OPTIONS_JHC -fffi #-}
+{-# OPTIONS_JHC -N -fffi #-}
 module Jhc.JumpPoint(JumpPoint(), withJumpPoint__, jumpJumpPoint__, errorJumpPoint) where
 
 import Jhc.IO
 import Jhc.Addr
+import Jhc.Monad
+import Jhc.Order
+import Jhc.Int
+import Jhc.Basics
 
 newtype JumpPoint = JumpPoint Addr
 
@@ -13,7 +17,7 @@ withJumpPoint__ action = do
     p <- _malloc jmp_buf_size
     let jp = (JumpPoint p)
     r <- jhc_setjmp jp
-    r <- action jp (r /= 0)
+    r <- action jp (r /= zero)
     _free p
     return r
 

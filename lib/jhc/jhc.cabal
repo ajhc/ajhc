@@ -1,6 +1,14 @@
 Name: jhc
 Version: 1.0
 Extensions: ForeignFunctionInterface
+Hidden-Modules:
+    Jhc.Int,
+    Jhc.Inst.Enum,
+    Jhc.Inst.PrimEnum,
+    Jhc.Inst.Read,
+    Jhc.Inst.Show,
+    Jhc.Inst.Storable
+
 Exposed-Modules:
 	Data.Char,
 	Data.Int,
@@ -21,12 +29,6 @@ Exposed-Modules:
 	Jhc.Float,
         Jhc.Handle,
         Jhc.Hole,
-	Jhc.Inst.Enum,
-	Jhc.Inst.PrimEnum,
-	Jhc.Inst.Read,
-	Jhc.Inst.Show,
-	Jhc.Inst.Storable,
-	Jhc.Int,
         Jhc.IO,
         Jhc.JumpPoint,
         Jhc.List,
