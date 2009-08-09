@@ -34,6 +34,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_bindir}/jhci
 %{_mandir}/man1/jhc.1.gz
 
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/jhc-1.0.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/base-1.0.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/haskell98-1.0.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/applicative-1.0.hl

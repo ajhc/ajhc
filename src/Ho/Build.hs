@@ -303,8 +303,9 @@ toCompUnitGraph done roots = do
         r <- newIORef (Left ns)
         return (Map.fromList [ (m,r) | ((m,_),_) <- ns ])
     let mods = Map.unions ms
+        lmods m = fromMaybe (error $ "modsLookup: " ++ show m) (Map.lookup m mods)
     let f m = do
-            rr <- readIORef (fromJust $ Map.lookup m mods)
+            rr <- readIORef (lmods m)
             case rr of
                 Right hh -> return hh
                 Left ns -> g ns
@@ -315,7 +316,7 @@ toCompUnitGraph done roots = do
                 let deps = Set.toList $ Set.fromList (concat $ snds ms) `Set.difference` (Set.fromList amods)
                 deps' <- snub `fmap` mapM f deps
                 let mhash = MD5.md5String (concatMap (show . fst) ms ++ show deps')
-                writeIORef (fromJust $ Map.lookup m mods) (Right mhash)
+                writeIORef (lmods m) (Right mhash)
                 modifyIORef cug_ref ((mhash,(deps',CompSources $ map fs amods)):)
                 return mhash
         g [((mg,Right lib@(Library _ libr mhot mhob)),ds)] = do
@@ -325,7 +326,7 @@ toCompUnitGraph done roots = do
                     ho = Ho { hoModuleGroup = mg, hoBuild = hob, hoTcInfo = hot }
                     myHash = libMgHash mg lib
                 deps <- snub `fmap` mapM f ds
-                writeIORef (fromJust $ Map.lookup mg mods) (Right myHash)
+                writeIORef (lmods mg) (Right myHash)
                 modifyIORef cug_ref ((myHash,(deps,CompLibrary ho lib)):)
                 return myHash
         pm :: [HoHash] -> IO HoHash -> IO HoHash
@@ -361,7 +362,7 @@ toCompUnitGraph done roots = do
         fs m = case Map.lookup m (modEncountered done) of
             Just (Found sc) -> sc
             _ -> error $ "fs: " ++ show m
-    mapM_ f roots
+    mapM_ f (map inject roots)
     readIORef cug_ref
 
 libHash (Library hoh _ _ _) = hohHash hoh
@@ -465,6 +466,7 @@ countNodes cn = do
             _                   -> Set.empty
     h cn
 
+
 typeCheckGraph :: CompNode -> IO ()
 typeCheckGraph cn = do
     cur <- newMVar (1::Int)
@@ -472,7 +474,8 @@ typeCheckGraph cn = do
     let f (CompNode hh deps ref) = readIORef ref >>= \cn -> case cn of
             CompTcCollected ctc _ -> return ctc
             CompLinkUnit lu -> do
-                ctc <- mconcat `fmap` mapM f deps
+                deps' <- randomPermuteIO deps
+                ctc <- mconcat `fmap` mapM f deps'
                 case lu of
                     CompDummy -> do
                         writeIORef ref (CompTcCollected ctc CompDummy)
@@ -486,7 +489,6 @@ typeCheckGraph cn = do
                         writeIORef ref (CompTcCollected ctc' lu)
                         return ctc'
                     CompSources sc -> do
-                        let hdep = [ h | CompNode h _ _ <- deps]
                         modules <- forM sc $ \x -> case x of
                             SourceParsed { sourceHash = h,sourceModule = mod } -> return (h,mod)
                             SourceRaw { sourceHash = h,sourceLBS = lbs, sourceFP = fp } -> do
@@ -521,7 +523,9 @@ compileCompNode ifunc func ksm cn = do
                 CompTcCollected _ cl -> h cl
                 CompLinkUnit cu -> h cu
             h cu = do
-                cho <- mconcat `fmap` mapM f deps
+                deps' <- randomPermuteIO deps
+                cho <- mconcat `fmap` mapM f deps'
+
                 case cu of
                     CompDummy -> do
                         writeIORef ref (CompCollected cho CompDummy)

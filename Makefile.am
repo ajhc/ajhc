@@ -55,11 +55,11 @@ PACKAGES= -package fgl -package regex-compat -package random -package array -pac
 GHCLANG= -fallow-undecidable-instances  -fglasgow-exts -fallow-overlapping-instances
 GHCOPTS= $(HSOPTS) -fbang-patterns -O @GHCFLAGS@  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
-JHC_LIBS =  base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl
+JHC_LIBS =  jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl
 
 
 EXTRA_DIST = src/data utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
-             lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
+             lib/jhc lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal lib/containers.cabal \
 	     manual.html
@@ -212,21 +212,25 @@ clean-local:
 
 MAINTAINERCLEANFILES= $(BUILT_SOURCES)  $(DRIFTFILES)
 
-base-1.0.hl: lib/base/base.cabal
+base-1.0.hl: lib/base/base.cabal jhc-1.0.hl
 	mkdir -p tmp/libho
-	./jhc -funboxed-tuples $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/base --noauto --build-hl lib/base/base.cabal -o $@
+	./jhc -funboxed-tuples $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/base --noauto -L. -pjhc --build-hl lib/base/base.cabal -o $@
+
+jhc-1.0.hl: lib/jhc/jhc.cabal
+	mkdir -p tmp/libho
+	./jhc $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/jhc --noauto --build-hl $< -o $@
 
 applicative-1.0.hl: lib/applicative/applicative.cabal base-1.0.hl
 	mkdir -p tmp/libho
-	./jhc $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/applicative  --noauto -L- -L. -p base --build-hl lib/applicative/applicative.cabal -o $@
+	./jhc $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/applicative  --noauto -L- -L. -pjhc -p base --build-hl lib/applicative/applicative.cabal -o $@
 
 containers-0.2.0.hl: lib/containers.cabal base-1.0.hl applicative-1.0.hl
 	mkdir -p tmp/libho
-	./jhc $(RTSOPTS) $(JHC_TEST) -Isrc/data -Ilib/containers/include --ho-dir tmp/libho -ilib/containers  --noauto -L- -L. -p base -p applicative --build-hl lib/containers.cabal -fcpp -o $@
+	./jhc $(RTSOPTS) $(JHC_TEST) -Isrc/data -Ilib/containers/include --ho-dir tmp/libho -ilib/containers  --noauto -L- -L. -pjhc -p base -p applicative --build-hl lib/containers.cabal -fcpp -o $@
 
 haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 	mkdir -p tmp/libho
-	./jhc $(RTSOPTS) $(JHC_TEST) --ho-dir tmp/libho -ilib/haskell98 --noauto -L- -L. -p base --build-hl lib/haskell98.cabal -o $@
+	./jhc $(RTSOPTS) $(JHC_TEST) --ho-dir tmp/libho -ilib/haskell98 --noauto -L- -L. -pjhc -p base --build-hl lib/haskell98.cabal -o $@
 
 %.pdf: %.ps
 	epstopdf $< --outfile $@

@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi #-}
+{-# OPTIONS_JHC -fffi -funboxed-tuples #-}
 -- | this module provides a once-updatable value that may be used in pure code.
 -- it is an _unchecked_ error to read a hole before it has been filled in.
 -- filling in a hole has the effect of 'seq'ing its value immediatly so lift it in
