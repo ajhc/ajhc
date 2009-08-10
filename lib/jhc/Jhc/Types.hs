@@ -15,3 +15,10 @@ data Float32_ :: #
 data Float64_ :: #
 data Float80_ :: #
 data Float128_ :: #
+
+data BitsShort_ :: #
+data BitsInt_ :: #
+data BitsLong_ :: #
+data BitsLLong_ :: #
+
+

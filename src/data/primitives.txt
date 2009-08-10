@@ -28,6 +28,8 @@ Data.Word.WordPtr, ubits<ptr>, int, UINTPTR_MAX, 0
 #Jhc.Addr.FunAddr, ubits<ptr>, ptr,UINTPTR_MAX,0
 
 Foreign.C.Types.CChar, sbits8, int, CHAR_MAX, CHAR_MIN
+Foreign.C.Types.CSChar, sbits8, int, CHAR_MAX, CHAR_MIN
+Foreign.C.Types.CUChar, sbits8, int, CHAR_MAX, CHAR_MIN
 Foreign.C.Types.CShort, sbits<short>, int, SHORT_MAX, SHORT_MIN
 Foreign.C.Types.CInt, sbits<int>, int, INT_MAX, INT_MIN
 Foreign.C.Types.CUInt, ubits<int>, int, UINT_MAX, 0

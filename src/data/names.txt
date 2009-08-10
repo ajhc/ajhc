@@ -34,6 +34,11 @@ Float64    Jhc.Types.Float64_
 Float80    Jhc.Types.Float80_
 Float128   Jhc.Types.Float128_
 
+BitsShort  Jhc.Types.BitsShort_
+BitsInt    Jhc.Types.BitsInt_
+BitsLong   Jhc.Types.BitsLong_
+BitsLLong  Jhc.Types.BitsLLong_
+
 Addr_      Jhc.Prim.Addr_
 FunAddr_   Jhc.Prim.FunAddr_
 
@@ -74,6 +79,9 @@ float32         fbits32
 float64         fbits64
 float80         fbits80
 float128        fbits128
+#bits_short_     bits<short>
+#bits_int_       bits<int>
+#bits_long_      bits<long>
 
 Val:v:
 

@@ -93,7 +93,7 @@ unbox :: DataTable -> E -> Id -> (TVr -> E) -> E
 unbox dataTable e vn wtd = eCase e  [Alt (litCons { litName = cna, litArgs = [tvra], litType = te }) (wtd tvra)] Unknown where
     te = getType e
     tvra = tVr vn sta
-    Just (ExtTypeBoxed cna sta _) = lookupExtTypeInfo dataTable te
+    (ExtTypeBoxed cna sta _) = fromMaybe (error $ "lookupExtTypeInfo: " ++ show te) $ lookupExtTypeInfo dataTable te
 
 
 
@@ -178,7 +178,7 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
         return bp
     primopt "constPeekByte" [a] t = return (EPrim (APrim (Peek Op.bits8) mempty) [a] t)
     primopt "box" [a] t = return ans where
-        Just (ExtTypeBoxed cna _ _) = lookupExtTypeInfo dataTable t
+        (ExtTypeBoxed cna _ _) = fromMaybe (error $ "lookupExtTypeInfo: " ++ show t) $ lookupExtTypeInfo dataTable t
         ans = ELit litCons { litName = cna, litArgs = [a], litType = orig_t }
     primopt "unbox" [a] t = return ans where
         (vara:_) = newIds (freeVars (a,t,orig_t))
