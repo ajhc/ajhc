@@ -15,6 +15,9 @@ data Graph n k = Graph G.Graph (Vertex -> n) (k -> Maybe Vertex) (n -> k)
 instance Show n => Show (Graph n k) where
     showsPrec n g = showsPrec n (Util.Graph.scc g)
 
+fromGraph :: Graph n k -> [(n,[n])] 
+fromGraph (Graph g lv _ _) = [ (lv v,map lv vs) | (v,vs) <- assocs g ] 
+
 newGraph :: Ord k => [n] -> (n -> k) -> (n -> [k]) -> Graph n k
 newGraph ns fn fd = Graph ans lv' kv fn where
     (ans,lv,kv) = graphFromEdges [ (n,fn n,snub $ fd n) | n <- ns ]
@@ -98,4 +101,6 @@ transitiveClosure (Graph g x1 x2 x3) = Graph (transitiveClosure' g) x1 x2 x3
 
 mapT    :: (Vertex -> a -> b) -> Table a -> Table b
 mapT f t = array (bounds t) [ (,) v (f v (t!v)) | v <- indices t ]
+
+
 

@@ -66,7 +66,7 @@ import Version.Version(versionString)
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Support.MD5 as MD5
-import qualified Util.Graph as G
+import qualified Util.Graph2 as G
 
 
 --
@@ -229,6 +229,8 @@ data CompUnit
     | CompDummy
     | CompLibrary Ho Library
 
+instance Show CompUnit where
+    showsPrec _ cu = shows $ providesModules cu
 
 data SourceCode
     = SourceParsed { sourceHash :: SourceHash, sourceDeps :: [Module]
@@ -277,7 +279,7 @@ instance ProvidesModules SourceCode where
 
 libModMap (Library _ libr _ _) = hoModuleMap libr
 
-toCompUnitGraph :: Done -> [Module] -> IO CompUnitGraph
+toCompUnitGraph :: Done -> [Module] -> IO (HoHash,CompUnitGraph)
 toCompUnitGraph done roots = do
     let fs m = map inject $ maybe (error $ "can't find deps for: " ++ show m) snd (Map.lookup m (knownSourceMap done))
         fs' m (Library _ libr _ _) = fromMaybe (error $ "can't find deps for: " ++ show m) (Map.lookup m (hoModuleDeps libr))
@@ -363,7 +365,19 @@ toCompUnitGraph done roots = do
             Just (Found sc) -> sc
             _ -> error $ "fs: " ++ show m
     mapM_ f (map inject roots)
-    readIORef cug_ref
+    cug <- readIORef cug_ref
+    let (rhash,cug') = mkPhonyCompUnit roots cug
+    let gr = G.newGraph cug  fst (fst . snd)
+    let gr' = G.transitiveClosure gr
+    mapM_ print [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph gr]
+--    putStrLn $ drawForest (map (fmap (show . snd . snd))  (G.dff gr))
+    putStrLn "dff"
+    mapM_ print [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph gr']
+--    putStrLn $ drawForest (map (fmap (show . snd . snd))  (G.dff gr'))
+--    putStrLn "dfx"
+--    mapM_ print [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph (G.graph2Plus gr)]
+    exitSuccess
+    return (rhash,cug')
 
 libHash (Library hoh _ _ _) = hohHash hoh
 libMgHash mg lib = MD5.md5String $ show (libHash lib,mg)
@@ -376,8 +390,8 @@ parseFiles :: [Either Module String]                                   -- ^ Eith
 
 parseFiles need ifunc func = do
     putProgressLn "Finding Dependencies..."
-    (ksm, needed,cug) <- loadModules (optHls options) need
-    cnode <- processCug cug >>= mkPhonyCompNode needed
+    (ksm,chash,cug) <- loadModules (optHls options) need
+    cnode <- processCug cug chash
     performGC
     putProgressLn "Typechecking..."
     typeCheckGraph cnode
@@ -390,7 +404,7 @@ parseFiles need ifunc func = do
 -- this takes a list of modules or files to load, and produces a compunit graph
 loadModules :: [String]                 -- ^ libraries to load
             -> [Either Module String]   -- ^ a list of modules or filenames
-            -> IO (Map.Map SourceHash (Module,[Module]),[Module],CompUnitGraph)  -- ^ the resulting acyclic graph of compilation units
+            -> IO (Map.Map SourceHash (Module,[Module]),HoHash,CompUnitGraph)  -- ^ the resulting acyclic graph of compilation units
 loadModules libs need = do
     done_ref <- newIORef mempty
     unless (null libs) $ putProgressLn $ "Loading libraries:" <+> show libs
@@ -408,23 +422,28 @@ loadModules libs need = do
     processIOErrors
     done <- readIORef done_ref
     let needed = (ms1 ++ lefts need)
-    cug <- toCompUnitGraph done needed
+    (chash,cug) <- toCompUnitGraph done needed
     --mapM_ print [  (h,hs)| (h,(hs,cu)) <- cug ]
-    return (Map.filterWithKey (\k _ -> k `Set.member` validSources done) (knownSourceMap done),needed,cug)
+    return (Map.filterWithKey (\k _ -> k `Set.member` validSources done) (knownSourceMap done),chash,cug)
 
 
 
 -- turn the list of CompUnits into a true mutable graph.
-processCug :: CompUnitGraph -> IO [CompNode]
-processCug cug = mdo
+processCug :: CompUnitGraph -> HoHash -> IO CompNode
+processCug cug root = mdo
     let mmap = Map.fromList xs
         lup x = maybe (error $ "processCug: " ++ show x) id (Map.lookup x mmap)
         f (h,(ds,cu)) = do
             cur <- newIORef (CompLinkUnit cu)
             return $ (h,CompNode h (map lup ds) cur)
     xs <- mapM f cug
-    return $ snds xs
+    Just x <- return $ Map.lookup root mmap
+    return $ x
 
+mkPhonyCompUnit :: [Module] -> CompUnitGraph -> (HoHash,CompUnitGraph)
+mkPhonyCompUnit need cs = (fhash,(fhash,(fdeps,CompDummy)):cs) where
+        fhash = MD5.md5String $ show fdeps
+        fdeps = [ h | (h,(_,cu)) <- cs, not . null $ providesModules cu `intersect` need ]
 
 -- take the list of CompNodes and what modules we want and create a root node
 -- that will reach all dependencies when compiled.
