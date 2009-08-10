@@ -367,17 +367,15 @@ toCompUnitGraph done roots = do
     mapM_ f (map inject roots)
     cug <- readIORef cug_ref
     let (rhash,cug') = mkPhonyCompUnit roots cug
-    let gr = G.newGraph cug  fst (fst . snd)
-    let gr' = G.transitiveClosure gr
-    mapM_ print [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph gr]
---    putStrLn $ drawForest (map (fmap (show . snd . snd))  (G.dff gr))
-    putStrLn "dff"
-    mapM_ print [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph gr']
---    putStrLn $ drawForest (map (fmap (show . snd . snd))  (G.dff gr'))
---    putStrLn "dfx"
---    mapM_ print [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph (G.graph2Plus gr)]
-    exitSuccess
-    return (rhash,cug')
+    let gr = G.newGraph cug'  fst (fst . snd)
+        gr' = G.transitiveReduction gr
+--    putStrLn "gr"
+ --   mapM_ print [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph gr]
+ --   putStrLn "grr"
+ --   mapM_ print [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph gr']
+    return (rhash,[ (h,([ d | (d,_) <- ns ],cu)) | ((h,(_,cu)),ns) <- G.fromGraph gr' ])
+
+--    return (rhash,cug')
 
 libHash (Library hoh _ _ _) = hohHash hoh
 libMgHash mg lib = MD5.md5String $ show (libHash lib,mg)

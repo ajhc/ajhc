@@ -5,9 +5,9 @@ module Util.Graph2 where
 
 import Control.Monad
 import Control.Monad.ST
-import Data.Array
-import Data.Array.ST (STArray, newArray, readArray, writeArray,getAssocs)
-import Control.Monad.ST
+import Data.Array.MArray
+import Data.Array.IArray
+import Data.Array.ST
 import Data.Graph hiding(Graph)
 import Data.Maybe
 import GenUtil
@@ -109,35 +109,58 @@ toDag (Graph g lv) = Graph g' ns' where
         f (Node v ts) rs = v:foldr f rs ts
 
 type AdjacencyMatrix s  = STArray s (Vertex,Vertex) Bool
+type IAdjacencyMatrix  = Array (Vertex,Vertex) Bool
 
+transitiveClosureAM :: AdjacencyMatrix s -> ST s ()
 transitiveClosureAM arr = do
+    bnds@(_,(max_v,_)) <- getBounds arr
     forM_ [0 .. max_v] $ \k -> do
-        forM_ [0 .. max_v] $ \i -> do
-            forM_ [0 .. max_v] $ \j -> do
+        forM_ (range bnds) $ \ (i,j) -> do
                 dij <- readArray arr (i,j)
                 dik <- readArray arr (i,k)
                 dkj <- readArray arr (k,j)
                 writeArray arr (i,j) (dij || (dik && dkj))
 
+
+
+transitiveReductionAM :: AdjacencyMatrix s -> ST s ()
+transitiveReductionAM arr = do
+    bnds@(_,(max_v,_)) <- getBounds arr
+    transitiveClosureAM arr
+    (farr :: IAdjacencyMatrix) <- freeze arr
+    forM_ [0 .. max_v] $ \k -> do
+        forM_ (range bnds) $ \ (i,j) -> do
+            if farr!(k,i) && farr!(i,j) then
+                writeArray arr (k,j) False
+             else return ()
+
+toAdjacencyMatrix :: G.Graph -> ST s (AdjacencyMatrix s)
+toAdjacencyMatrix g = do
+    let (0,max_v) = bounds g
+    arr <- newArray ((0,0),(max_v,max_v)) False :: ST s (STArray s (Vertex,Vertex) Bool)
+    sequence_ [ writeArray arr (v,u) True | (v,vs) <- assocs g, u <- vs ]
+    return arr
+
+fromAdjacencyMatrix :: AdjacencyMatrix s -> ST s G.Graph
+fromAdjacencyMatrix arr = do
+    bnds@(_,(max_v,_)) <- getBounds arr
+    rs <- getAssocs arr
+    let rs' = [ x | (x,True) <- rs ]
+    return (listArray (0,max_v) [ [ v | (n',v) <- rs', n == n' ] | n <- [ 0 .. max_v] ])
+
 transitiveClosure :: Graph n -> Graph n
 transitiveClosure (Graph g ns) = let g' = runST (tc g) in (Graph g' ns) where
-    (0,max_v) = bounds g
-    tc :: G.Graph -> ST s G.Graph
     tc g = do
-        arr <- newArray ((0,0),(max_v,max_v)) False :: ST s (STArray s (Vertex,Vertex) Bool)
-        sequence_ [ writeArray arr (v,u) True | (v,vs) <- assocs g, u <- vs ]
-        forM_ [0 .. max_v] $ \k -> do
-            forM_ [0 .. max_v] $ \i -> do
-                forM_ [0 .. max_v] $ \j -> do
-                    dij <- readArray arr (i,j)
-                    dik <- readArray arr (i,k)
-                    dkj <- readArray arr (k,j)
-                    writeArray arr (i,j) (dij || (dik && dkj))
-                    return ()
-        rs <- getAssocs arr
-        let rs' = [ x | (x,True) <- rs ]
---        unsafeIOToST $ print rs'
-        return (listArray (bounds g) [ [ v | (n',v) <- rs', n == n' ] | n <- vertices g ])
+        a <- toAdjacencyMatrix g
+        transitiveClosureAM a
+        fromAdjacencyMatrix a
+
+transitiveReduction :: Graph n -> Graph n
+transitiveReduction (Graph g ns) = let g' = runST (tc g) in (Graph g' ns) where
+    tc g = do
+        a <- toAdjacencyMatrix g
+        transitiveReductionAM a
+        fromAdjacencyMatrix a
 
 --transitiveClosure' ::  G.Graph -> G.Graph
 --transitiveClosure' g = array (bounds g) [ (i,G.reachable g i) | i <- vertices g]
