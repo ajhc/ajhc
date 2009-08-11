@@ -2,31 +2,31 @@ module Main(main) where
 
 import Control.Exception
 import Control.Monad.Identity
-import Control.Monad.Writer
 import Control.Monad.State
+import Control.Monad.Writer
 import Directory
 import IO(hFlush,stderr,stdout)
+import List as L
 import Prelude hiding(putStrLn, putStr,print)
+import System.Mem
+import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified System
-import List as L
-import System.Mem
 
-import Doc.PPrint
-import Util.Util
 import CharIO
 import DataConstructors
+import Doc.PPrint
 import E.Annotate(annotateDs,annotateCombs,annotateProgram)
 import E.Diff
 import E.E
 import E.Eta
-import E.Lint
 import E.FreeVars
 import E.FromHs
 import E.Inline
 import E.LambdaLift
 import E.LetFloat
+import E.Lint
 import E.Program
 import E.Rules
 import E.Subst(subst)
@@ -36,6 +36,7 @@ import E.TypeCheck
 import E.WorkerWrapper
 import FrontEnd.Class
 import FrontEnd.FrontEnd
+import FrontEnd.HsSyn
 import FrontEnd.KindInfer(getConstructorKinds)
 import GenUtil hiding(replicateM,putErrLn,putErr,putErrDie)
 import Grin.DeadCode
@@ -48,33 +49,33 @@ import Grin.NodeAnalyze
 import Grin.Optimize
 import Grin.Show
 import Ho.Build
-import Ho.Library
 import Ho.Collected
-import FrontEnd.HsSyn
+import Ho.Library
 import Info.Types
 import Name.Id
 import Name.Name
 import Options
-import Support.FreeVars
 import Support.CanType(getType)
+import Support.FreeVars
 import Support.Transform
 import Util.Graph
 import Util.Progress
 import Util.SetLike as S
+import Util.Util
 import Version.Version(versionString,versionContext,versionSimple)
-import qualified Version.Config as VC
 import qualified C.FromGrin2 as FG2
 import qualified E.CPR
 import qualified E.Demand as Demand(analyzeProgram)
 import qualified E.SSimplify as SS
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
-import qualified Grin.Simplify
 import qualified Grin.SSimplify
+import qualified Grin.Simplify
+import qualified IO
 import qualified Info.Info as Info
 import qualified Interactive
 import qualified Stats
-import qualified IO
+import qualified Version.Config as VC
 
 
 ---------------
@@ -110,6 +111,8 @@ main =  runMain $ bracketHtml $ do
         Version         -> putStrLn versionString
         PrintHscOptions -> putStrLn $ "-I" ++ VC.datadir ++ "/" ++ VC.package ++ "-" ++ VC.shortVersion ++ "/include"
         VersionCtx      -> putStrLn (versionString ++ versionContext)
+        Preprocess      -> forM_ (optArgs o) $ \fn -> do
+            LBS.readFile fn >>= preprocess fn >>= LBS.putStr
         _               -> darg >> processFiles  (optArgs o)
 
 

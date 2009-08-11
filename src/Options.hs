@@ -129,18 +129,19 @@ _arch_                    what to pass to gcc as the architecture
 
 -}
 
-data Mode = BuildHl String -- ^ Build the specified hl-file given a description file.
-          | Interactive    -- ^ Run interactively.
-          | Version        -- ^ Print version and die.
-          | VersionCtx     -- ^ Print version context and die.
-          | ShowHelp       -- ^ Show help message and die.
-          | ShowConfig     -- ^ Show configuration info.
-          | CompileHo      -- ^ Compile ho
-          | CompileHoGrin  -- ^ Compile ho and grin
-          | CompileExe     -- ^ Compile executable
-          | ShowHo String  -- ^ Show ho-file.
-          | ListLibraries  -- ^ List libraries
+data Mode = BuildHl String  -- ^ Build the specified hl-file given a description file.
+          | Interactive     -- ^ Run interactively.
+          | Version         -- ^ Print version and die.
+          | VersionCtx      -- ^ Print version context and die.
+          | ShowHelp        -- ^ Show help message and die.
+          | ShowConfig      -- ^ Show configuration info.
+          | CompileHo       -- ^ Compile ho
+          | CompileHoGrin   -- ^ Compile ho and grin
+          | CompileExe      -- ^ Compile executable
+          | ShowHo String   -- ^ Show ho-file.
+          | ListLibraries   -- ^ List libraries
           | PrintHscOptions -- ^ Print options for hsc2hs
+          | Preprocess      -- ^ Filter through preprocessor
             deriving(Eq)
 
 
@@ -229,8 +230,8 @@ theoptions =
     , Option ['D'] []            (ReqArg (\d -> optDefs_u (d:)) "NAME=VALUE") "add new definitions to set in preprocessor"
     , Option []    ["optc"]      (ReqArg (optCCargs_u . idu) "option") "extra options to pass to c compiler"
     , Option ['N'] ["noprelude"] (NoArg  (optPrelude_s False))         "no implicit prelude"
-    , Option ['C'] []            (NoArg  (optMode_s CompileHoGrin))    "Typecheck, compile ho and grin"
     , Option ['c'] []            (NoArg  (optMode_s CompileHo))        "Typecheck and compile ho"
+    , Option ['E'] []            (NoArg  (optMode_s Preprocess))       "preprocess the input and print result to stdout"
     , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))        "keep going on errors"
     , Option []    ["cross"]     (NoArg  (optCross_s True))            "enable cross-compilation, choose target with the -m flag"
     , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output"
