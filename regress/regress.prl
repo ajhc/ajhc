@@ -6,7 +6,7 @@ use warnings;
 use Getopt::Long;
 use Pod::Usage;
 use Data::Dumper;
-use POSIX qw(strftime SIGINT);
+use POSIX  qw(strftime SIGINT);
 use Cwd;
 
 my @opts;
@@ -141,7 +141,7 @@ sub my_system {
     return ($r,$time_end - $time_start);
 }
 
-my @libs = $opt_l ? () : ("--noauto", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
+my @libs = $opt_l ? () : ("--noauto", "-i$jhc_dir/lib/jhc", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
 my @fast = $opt_n ? ("-fno-lint") : ("-flint");
 
 sub do_it {
@@ -225,7 +225,7 @@ done();
 
 
 sub statf {
-    return defined $_[0] ? ($_[0] == 64512 || ($_[0] & 127) == SIGINT  ? "INT" : $_[0] == 35072 || ($_[0] & 127) ==  24 ? "TIME" : $_[0]) : "-";
+    return defined $_[0] ? ($_[0] == 64512 || ($_[0] & 127) == SIGINT()  ? "INT" : $_[0] == 35072 || ($_[0] & 127) ==  24 ? "TIME" : $_[0]) : "-";
 }
 
 sub done {

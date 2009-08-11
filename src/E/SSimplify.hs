@@ -227,8 +227,8 @@ collectDs :: [Comb] -> OMap -> OM [Comb]
 collectDs ds (OMap fve) = do
     ds' <- mapM (grump . collectBinding) ds
     exp <- ask
-    let graph = newGraph ds' (\ ((comb,_),_) -> combIdent comb) (\ ((_,rv),fv) -> mkeys (fv `mappend` rv))
-        rds = reachable graph (mkeys fve ++ [ combIdent t | t <- ds,  (combIdent t `member` exp)])
+    let (reachable',graph) = newGraphReachable ds' (\ ((comb,_),_) -> combIdent comb) (\ ((_,rv),fv) -> mkeys (fv `mappend` rv))
+        rds = reachable' (mkeys fve ++ [ combIdent t | t <- ds,  (combIdent t `member` exp)])
         -- ignore rules when calculating loopbreakers
         -- we must not simplify the expanded body of a rule without recalculating occurance info.
         graph' = newGraph rds (\ ((comb,_),_) -> combIdent comb) (\ (_,fv) -> mkeys fv)

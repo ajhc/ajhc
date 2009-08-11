@@ -72,9 +72,9 @@ grinPush stats (l :-> e) = ans where
     fixupLet exp = return exp
     dropAny mv (exp::Exp) = do
         (nn,xs) <- get
-        let graph = newGraph xs pexpUniq pexpDeps
+        let (reachable',graph) = newGraphReachable xs pexpUniq pexpDeps
             deps = justDeps xs (freeVars exp)
-            reached = reachable graph deps
+            reached = reachable' deps
             --dropped = case prefered reached exp of
             --    Just (x:_) | [] <- [ r | r <- reached, pexpUniq x `elem` pexpDeps r ] -> (reverse $ topSort $ newGraph (filter (/= x) reached) pexpUniq pexpDeps) ++ [x]
             --    _ -> reverse $ topSort $ newGraph reached pexpUniq pexpDeps

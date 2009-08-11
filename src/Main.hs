@@ -417,7 +417,7 @@ processDecls cho ho' tiData = do
 
 programPruneUnreachable :: Program -> Program
 programPruneUnreachable prog = progCombinators_s ds' prog where
-    ds' = reachable (newGraph (progCombinators prog) combIdent freeVars) (toList $ progEntry prog)
+    ds' = reachableFrom combIdent freeVars (progCombinators prog) (toList $ progEntry prog)
 
 programPrune :: Program -> IO Program
 programPrune prog = transformProgram transformParms { transformCategory = "PruneUnreachable"
@@ -493,7 +493,7 @@ compileWholeProgram prog = do
     let ffiExportNames = [tv | tv <- map combHead $  progCombinators prog,
                                name <- tvrName tv,
                                "FE@" `isPrefixOf` show name]
-    prog <- return prog { progMain   = tvrIdent main,
+    prog <- return $ programUpdate prog { progMain   = tvrIdent main,
                           progEntry = fromList $ map tvrIdent (main:ffiExportNames),
                           progCombinators = emptyComb { combHead = main, combBody = mainv }:map (unsetProperty prop_EXPORTED) (progCombinators prog)
                         }

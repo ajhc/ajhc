@@ -19,6 +19,23 @@ CSChar    Foreign.C.Types.CSChar
 CUChar    Foreign.C.Types.CUChar
 CUShort   Foreign.C.Types.CUShort
 CULong    Foreign.C.Types.CULong
+#Int       Jhc.Prim.Int
+#Integer   Jhc.Basics.Integer
+#
+#Int8      Data.Int.Int8
+#Int16     Data.Int.Int16
+#Int32     Data.Int.Int32
+#Int64     Data.Int.Int64
+#IntMax    Data.Int.IntMax
+#IntPtr    Data.Int.IntPtr
+#
+#Word       Jhc.Prim.Word
+#Word8      Data.Word.Word8
+#Word16     Data.Word.Word16
+#Word32     Data.Word.Word32
+#Word64     Data.Word.Word64
+#WordMax    Data.Word.WordMax
+#WordPtr    Data.Word.WordPtr
 
 Bits1      Jhc.Types.Bits1_
 Bits8      Jhc.Types.Bits8_
@@ -38,6 +55,8 @@ BitsShort  Jhc.Types.BitsShort_
 BitsInt    Jhc.Types.BitsInt_
 BitsLong   Jhc.Types.BitsLong_
 BitsLLong  Jhc.Types.BitsLLong_
+BitsSize   Jhc.Types.BitsSize_
+BitsWchar  Jhc.Types.BitsWchar_
 
 Addr_      Jhc.Prim.Addr_
 FunAddr_   Jhc.Prim.FunAddr_
@@ -52,6 +71,8 @@ Boolzh     Jhc.Order.Bool#
 Target     Jhc.Options.Target#
 Char       Jhc.Prim.Char
 Addr       Jhc.Addr.Addr
+#Int        Int#
+#Integer    Integer#
 
 ClassName:class:
 Eq              Jhc.Order.Eq
@@ -73,15 +94,25 @@ RealFloat	Jhc.Float.RealFloat
 
 RawType:rt:
 
-bits128         bits128
-bool            bool
-float32         fbits32
-float64         fbits64
-float80         fbits80
-float128        fbits128
-#bits_short_     bits<short>
-#bits_int_       bits<int>
-#bits_long_      bits<long>
+
+bits8         bits8
+bits16        bits16
+bits32        bits32
+bits64        bits64
+bits128       bits128
+bool          bool
+float32       fbits32
+float64       fbits64
+float80       fbits80
+float128      fbits128
+bits_short_   bits<short>
+bits_int_     bits<int>
+bits_long_    bits<long>
+bits_wchar_t_ bits<wchar_t>
+bits_max_     bits<max>
+bits_ptr_     bits<ptr>
+bits_size_t_  bits<size_t>
+bits_time_t_  bits<time_t>
 
 Val:v:
 

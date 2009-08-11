@@ -66,7 +66,7 @@ import Version.Version(versionString)
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Support.MD5 as MD5
-import qualified Util.Graph2 as G
+import qualified Util.Graph as G
 
 
 --
@@ -356,7 +356,7 @@ toCompUnitGraph done roots = do
                             modifyIORef hom_ref (Map.insert h (True,af))
                             return h
                         (True,_) -> noGood " (forced)"
-                        (_,False) -> noGood (show (isGood,libsGood))
+                        (_,False) -> noGood ""
         cdep (_,hash) | hash == MD5.emptyHash = return ()
         cdep (mod,hash) = case Map.lookup mod sources of
             Just hash' | hash == hash' -> return ()
@@ -371,8 +371,9 @@ toCompUnitGraph done roots = do
         gr' = G.transitiveReduction gr
 --    putStrLn "gr"
  --   mapM_ print [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph gr]
- --   putStrLn "grr"
- --   mapM_ print [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph gr']
+    when (dump FD.SccModules) $ do
+        putErrLn "ComponentsDeps:"
+        mapM_ (putErrLn . show) [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph gr']
     return (rhash,[ (h,([ d | (d,_) <- ns ],cu)) | ((h,(_,cu)),ns) <- G.fromGraph gr' ])
 
 --    return (rhash,cug')

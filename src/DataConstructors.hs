@@ -831,6 +831,9 @@ primitiveAliases = Map.fromList [
     (tc_Bits128, rt_bits128),
     (tc_BitsPtr, rt_bits_ptr_),
     (tc_BitsMax, rt_bits_max_),
+    (tc_BitsInt, rt_bits_int_),
+    (tc_BitsWchar, rt_bits_wchar_t_),
+    (tc_BitsSize, rt_bits_size_t_),
 
     (tc_Float32, rt_float32),
     (tc_Float64, rt_float64),
@@ -890,6 +893,9 @@ typeTable = Map.fromList [
     (tc_Double, "double"),
     (tc_Addr, "HsPtr"),
     (tc_FunAddr, "HsFunPtr"),
+    (tc_BitsSize, "size_t"),
+    (tc_BitsWchar, "wchar_t"),
+    (tc_BitsInt, "Int"),
 
     (tc_Addr_, "HsPtr"),
     (tc_FunAddr_, "HsFunPtr"),

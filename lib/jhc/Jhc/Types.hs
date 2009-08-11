@@ -21,4 +21,7 @@ data BitsInt_ :: #
 data BitsLong_ :: #
 data BitsLLong_ :: #
 
+data BitsSize_ :: #
+data BitsWchar_ :: #
+
 

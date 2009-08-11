@@ -169,7 +169,7 @@ dsBinds bs = foldr ($) [] (map f bs) where
 
 sepDupableBinds :: [Id] -> Binds -> (Binds,Binds)
 sepDupableBinds fvs xs = partition ind xs where
-    g = G.reachable (G.newGraph (concatMap G.fromScc xs) (combIdent . fst) (idSetToList . snd)) (fvs `mappend` unsafe_ones)
+    g = G.reachableFrom  (combIdent . fst) (idSetToList . snd) (concatMap G.fromScc xs ) (fvs `mappend` unsafe_ones)
     uso = map (combIdent . fst) g
     unsafe_ones = concat [ map (combIdent . fst) vs | vs <- map G.fromScc xs,any (not . isCheap) (map (combBody . fst) vs)]
     ind x = any ( (`elem` uso) . combIdent . fst ) (G.fromScc x)
