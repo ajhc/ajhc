@@ -857,6 +857,7 @@ rawExtTypeMap = Map.fromList [
     (rt_bits_max_, "uintmax_t"),
     (rt_bits_size_t_, "size_t" ),
     (rt_bits_time_t_, "time_t" ),
+    (rt_bits_wchar_t_, "wchar_t" ),
     (rt_bits_int_, "int" ),
     (rt_bits_short_, "short" ),
 
