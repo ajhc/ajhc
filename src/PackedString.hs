@@ -35,7 +35,7 @@ module PackedString (
 	joinPS,      -- :: PackedString -> [PackedString] -> PackedString
 	-- * List-like manipulation functions
 	nilPS,       -- :: PackedString
-	consPS,      -- :: Char -> PackedString -> PackedString
+--	consPS,      -- :: Char -> PackedString -> PackedString
 	nullPS,      -- :: PackedString -> Bool
 	appendPS,    -- :: PackedString -> PackedString -> PackedString
 --        foldrPS,
@@ -53,7 +53,9 @@ import Data.Typeable
 import Data.Char
 import Data.Int
 import Data.Binary
+import Data.List
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.UTF8 as BSU
 
 import Bits
 import GHC.Exts
@@ -87,12 +89,12 @@ nilPS = PS BS.empty
 
 -- | The 'consPS' function prepends the given character to the
 -- given string.
-consPS :: Char -> PackedString -> PackedString
-consPS c cs = packString (c : (unpackPS cs)) -- ToDo:better
+--consPS :: Char -> PackedString -> PackedString
+--consPS c cs = packString (c : (unpackPS cs)) -- ToDo:better
 
 -- | Convert a 'String' into a 'PackedString'
 packString :: String -> PackedString
-packString str = PS $ (BS.pack $ toUTF str)
+packString str = PS (BSU.fromString str)
 
 
 -- -----------------------------------------------------------------------------
@@ -100,14 +102,10 @@ packString str = PS $ (BS.pack $ toUTF str)
 
 
 unpackPS :: PackedString -> String
-unpackPS (PS bs) = fromUTF (BS.unpack bs)
---unpackPS (PS (UArray _ (I# e) ba)) = unpackFoldrUtf8# (ba) (e +# 1#) f [] where
---    f ch r = C# ch : r
+unpackPS (PS bs) = BSU.toString bs
 
 showsPS :: PackedString -> String -> String
 showsPS ps = (unpackPS ps ++)
---showsPS  (PS (UArray _ (I# e) ba)) xs = unpackFoldrUtf8# (ba) (e +# 1#) f xs where
---    f ch r = C# ch : r
 
 
 toUTF8 :: PackedString -> [Word8]
@@ -245,7 +243,7 @@ hashPS (PS (UArray 0 (I# e) ba)) =  W# (f (unsafeCoerce# 5381#) 0#) where
 
 -- | The 'concatPS' function concatenates a list of 'PackedString's.
 concatPS :: [PackedString] -> PackedString
-concatPS pss = packString (concat (map unpackPS pss))
+concatPS pss = PS $ BS.concat [ x | PS x <- pss ]
 
 ------------------------------------------------------------
 
@@ -253,11 +251,7 @@ concatPS pss = packString (concat (map unpackPS pss))
 -- and concatenates the list after interspersing the first argument between
 -- each element of the list.
 joinPS :: PackedString -> [PackedString] -> PackedString
-joinPS filler pss = concatPS (splice pss)
- where
-  splice []  = []
-  splice [x] = [x]
-  splice (x:y:xs) = x:filler:splice (y:xs)
+joinPS filler pss = concatPS (intersperse filler pss)
 
 -- ToDo: the obvious generalisation
 {-
@@ -356,7 +350,6 @@ utfCount cs = uc 0# cs where
         | ord x <= 0x7fffffff = uc (n +# 6#) xs
         | otherwise = error "invalid string"
 
--}
 
 -- | Convert Unicode characters to UTF-8.
 toUTF :: String -> [Word8]
@@ -392,6 +385,7 @@ fromUTF xs = fromUTF' (map fromIntegral xs) where
     err = error "fromUTF: illegal UTF-8 character"
 
 
+-}
 {-
 
 
@@ -440,9 +434,6 @@ unpackFoldlUtf8# f e addr count = unpack 0# e where
       where
 	ch = indexCharArray# addr nh
 
--}
-
-{-
 
 less efficient non-ghc versions
 
