@@ -25,7 +25,7 @@ import System.Posix.Files
 import Text.Printf
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
-import qualified Data.ByteString.Lazy.UTF8 as LBS
+import qualified Data.ByteString.Lazy.UTF8 as LBSU
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
@@ -616,9 +616,10 @@ langmap = [
     ] where x ==> y = (x,if head y == '-' then y else "-f" ++ y)
 
 
+
+
 parseHsSource :: String -> LBS.ByteString -> IO HsModule
 parseHsSource fn lbs = do
-    let txt = LBS.toString lbs
     let f s = opt where
             Just opt = fileOptions opts `mplus` Just options
             popts = parseOptions $ if "shl." `isPrefixOf` reverse fn  then unlit fn s else s
@@ -626,16 +627,17 @@ parseHsSource fn lbs = do
             opts = opts' ++ [ "--noprelude" | ("NOPRELUDE",_) <- popts] ++ langs
             langs = catMaybes $ map (flip lookup langmap) $ concat [ words (map (\c -> if c == ',' then ' ' else toLower c) as) | ("LANGUAGE",as) <- popts ]
     let fopts s = s `member` optFOptsSet initialOpts
-        initialOpts = f (take 4096 txt)
+        initialOpts = f (LBSU.toString $ LBS.take 2048 lbs)
         incFlags = [ "-I" ++ d | d <- optIncdirs options ++ optIncs initialOpts]
         defFlags = ("-D__JHC__=" ++ revision):[ "-D" ++ d | d <- optDefs initialOpts]
 
-    s <- case () of
+    lbs' <- case () of
         _ | fopts FO.Cpp -> readSystem "cpp" $ ["-CC","-traditional"] ++ incFlags ++ defFlags ++ [fn]
           | fopts FO.M4 -> do
             m4p <- m4Prelude
             readSystem "m4" $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
-          | otherwise -> return txt
+          | otherwise -> return lbs
+    let s = LBSU.toString lbs'
     let s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s'' else s''
         s'' = case s of
             '#':' ':_   -> '\n':s                --  line pragma

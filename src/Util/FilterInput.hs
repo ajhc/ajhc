@@ -1,10 +1,15 @@
 module Util.FilterInput (filterInput,readSystem) where
 
+import Data.List
 import CharIO
 import Control.Monad (when)
 import System
 import System.IO(Handle)
 import System.Posix
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Lazy.UTF8 as LBSU
+import qualified Data.ByteString as BS
+import Text.Printf
 
 
 filterInput :: String -> [String] -> Handle -> IO String
@@ -24,16 +29,17 @@ filterInput prog args ifh = do
 dupAndClose :: Fd -> Fd -> IO ()
 dupAndClose from to = dupTo from to >> closeFd from
 
-readSystem :: String -> [String] -> IO String
+readSystem :: String -> [String] -> IO LBS.ByteString
 readSystem prog args = do
     (rfd,wfd) <- createPipe
     pid <- forkProcess (do dupAndClose wfd stdOutput
                            executeFile prog True args Nothing
                            putErrDie "exec failed")
     closeFd wfd
-    str <- hGetContents =<< fdToHandle rfd
-    ret <- length str `seq` getProcessStatus True False pid
-    when (ret /= Just (Exited ExitSuccess)) $ putErrDie (prog ++ " exited abnormally")
-    return str
+--    printf "readSystem %s %s\n" prog (show args)
+    str <- BS.hGetContents =<< fdToHandle rfd
+    ret <- getProcessStatus True False pid
+    when (ret /= Just (Exited ExitSuccess)) $ putErrDie (printf "'%s' exited abnormally (%s)" (intercalate " " (prog:args)) (show ret))
+    return $ LBS.fromChunks [str]
 
 
