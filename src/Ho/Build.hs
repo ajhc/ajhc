@@ -119,13 +119,14 @@ data ModDone
     | Found SourceCode
 
 data Done = Done {
+    hoCache         :: Maybe FilePath,
     knownSourceMap  :: Map.Map SourceHash (Module,[Module]),
     validSources    :: Set.Set SourceHash,
     loadedLibraries :: Map.Map LibraryName Library,
     hosEncountered  :: Map.Map HoHash     (FilePath,HoHeader,HoIDeps,Ho),
     modEncountered  :: Map.Map Module     ModDone
     }
-    {-! derive: Monoid, update !-}
+    {-! derive: update !-}
 
 fileOrModule f = case reverse f of
                    ('s':'h':'.':_)     -> Right f
@@ -135,19 +136,20 @@ fileOrModule f = case reverse f of
 
 replaceSuffix suffix fp = reverse (dropWhile ('.' /=) (reverse fp)) ++ suffix
 
-hoFile :: FilePath -> Maybe Module -> SourceHash -> FilePath
-hoFile fp mm sh = case optHoDir options of
-    Nothing -> replaceSuffix "ho" fp
-    Just hdir -> case mm of
+hoFile :: Maybe FilePath -> FilePath -> Maybe Module -> SourceHash -> FilePath
+hoFile cacheDir fp mm sh = case (cacheDir,optHoDir options) of
+    (Nothing,Nothing) -> replaceSuffix "ho" fp
+    (Nothing,Just hdir) -> case mm of
         Nothing -> hdir ++ "/" ++ show sh ++ ".ho"
         Just m -> hdir ++ "/" ++ map ft (show m) ++ ".ho" where
             ft '/' = '.'
             ft x = x
+    (Just hdir,_) -> hdir ++ "/" ++ show sh ++ ".ho"
 
 findHoFile :: IORef Done -> FilePath -> Maybe Module -> SourceHash -> IO (Bool,FilePath)
 findHoFile done_ref fp mm sh = do
     done <- readIORef done_ref
-    let honame = hoFile fp mm sh
+    let honame = hoFile (hoCache done) fp mm sh
     writeIORef done_ref (done { validSources = Set.insert sh (validSources done) })
     if sh `Set.member` validSources done || optIgnoreHo options then return (False,honame) else do
     onErr (return (False,honame)) (readHoFile honame) $ \ (hoh,hidep,ho) -> do
@@ -382,6 +384,7 @@ toCompUnitGraph done roots = do
 libHash (Library hoh _ _ _) = hohHash hoh
 libMgHash mg lib = MD5.md5String $ show (libHash lib,mg)
 libProvides mg (Library _ lib _ _) = [ m | (m,mg') <- Map.toList (hoModuleMap lib), mg == mg']
+libName (Library HoHeader { hohName = Right (name,vers) } _ _ _) = unpackPS name ++ "-" ++ showVersion vers
 
 parseFiles :: [Either Module String]                                   -- ^ Either a module or filename to find
                -> (CollectedHo -> Ho -> IO CollectedHo)                -- ^ Process initial ho loaded from file
@@ -406,7 +409,18 @@ loadModules :: [String]                 -- ^ libraries to load
             -> [Either Module String]   -- ^ a list of modules or filenames
             -> IO (Map.Map SourceHash (Module,[Module]),HoHash,CompUnitGraph)  -- ^ the resulting acyclic graph of compilation units
 loadModules libs need = do
-    done_ref <- newIORef mempty
+    theCache <- findHoCache
+    case theCache of
+        Just s -> putProgressLn $ printf "Using Ho Cache: '%s'" s
+        Nothing -> return ()
+    done_ref <- newIORef Done {
+        hoCache = theCache,
+        knownSourceMap = Map.empty,
+        validSources = Set.empty,
+        loadedLibraries = Map.empty,
+        hosEncountered = Map.empty,
+        modEncountered = Map.empty
+        }
     unless (null libs) $ putProgressLn $ "Loading libraries:" <+> show libs
     forM_ (optHls options) $ \l -> do
         (n',fn) <- findLibrary l
@@ -416,6 +430,13 @@ loadModules libs need = do
         putProgressLn $ printf "Library: %-15s <%s>" n' fn
         modifyIORef done_ref (modEncountered_u $ Map.union (Map.fromList [ (m,ModLibrary mg lib) | (m,mg) <- Map.toList (hoModuleMap libr) ]))
         modifyIORef done_ref (loadedLibraries_u $ Map.insert libName lib)
+    done <- readIORef done_ref
+    forM_ (Map.elems $ loadedLibraries done) $ \ lib@(Library hoh  _ _ _) -> do
+        let libsBad = filter (\ (p,h) -> fmap (libHash) (Map.lookup p (loadedLibraries done)) /= Just h) (hohLibDeps hoh)
+        unless (null libsBad) $ do
+            putErr $ printf "Library Dependencies not met. %s needs\n" (libName lib)
+            forM_ libsBad $ \ (p,h) -> putErr $ printf "    %s (hash:%s)\n" (unpackPS p) (show h)
+            putErrDie "\n"
     ms1 <- forM (rights need) $ \fn -> do
         fetchSource done_ref [fn] Nothing
     forM_ (lefts need) $ resolveDeps done_ref
@@ -557,8 +578,9 @@ compileCompNode ifunc func ksm cn = do
                         cho <- ifunc cho ho
                         let Right (ln,_) = hohName hoh
                             lh = hohHash hoh
-                        writeIORef ref (CompCollected (choLibDeps_u (Map.insert ln lh) cho) cu)
-                        return cho
+                            cho' = (choLibDeps_u (Map.insert ln lh) cho)
+                        writeIORef ref (CompCollected cho' cu)
+                        return cho'
                     CompTCed ((htc,tidata,modules,shns))  -> do
                         (hdep,ldep) <- fmap mconcat . forM deps $ \ (CompNode h _ ref) -> do
                             cl <- readIORef ref

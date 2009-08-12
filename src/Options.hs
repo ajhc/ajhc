@@ -9,6 +9,7 @@ module Options(
     putProgress,
     putProgressLn,
     getArguments,
+    findHoCache,
     verbose,
     verbose2,
     progress,
@@ -30,20 +31,22 @@ module Options(
 import Control.Monad.Error()    -- IO MonadPlus instance
 import Control.Monad.Identity
 import Control.Monad.Reader
-import qualified Data.Set as S
-import qualified Data.Map as M
 import Data.List(nub)
+import Data.Maybe
 import System
 import System.Console.GetOpt
+import System.Directory
 import System.IO.Unsafe
+import qualified Data.Map as M
+import qualified Data.Set as S
 
 import RawFiles(targets_ini)
 import Support.IniParse
 import Util.Gen
-import qualified FlagDump
-import qualified FlagOpts
 import Version.Config
 import Version.Version(versionString)
+import qualified FlagDump
+import qualified FlagOpts
 
 
 {-@CrossCompilation
@@ -322,6 +325,21 @@ processOptions = do
     case optNoAuto o2 of
       True -> return o3
       False-> return o3 {  optHls  = (autoloads ++ optHls o2) }
+
+findHoCache :: IO (Maybe FilePath)
+findHoCache = do
+    cd <- lookupEnv "HOCACHEDIR"
+    case optHoCache options `mplus` cd of
+        Just s -> do return (Just s)
+        Just "-" -> do return Nothing
+        Nothing | isNothing (optHoDir options) -> do
+            Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME"
+            let cd = home ++ "/.jhc/cache"
+            createDirectoryIfMissing True cd
+            return (Just cd)
+        _  -> return Nothing
+
+
 
 a ==> b = (a,show b)
 
