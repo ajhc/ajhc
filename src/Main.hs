@@ -77,23 +77,12 @@ import qualified Interactive
 import qualified Stats
 import qualified Version.Config as VC
 
-
----------------
--- ∀α∃β . α → β
----------------
-
-progressM c  = wdump FD.Progress $ (c >>= putErrLn) >> hFlush stderr
-
-
-collectPassStats = verbose
-
 bracketHtml action = do
     (argstring,_) <- getArgString
     wdump FD.Html $ putStrLn $ "<html><head><title>" ++ argstring ++ "</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body style=\"background: black; color: lightgrey\"><pre>"
     action `finally` (wdump FD.Html $ putStrLn "</pre></body></html>")
 
-
-main =  runMain $ bracketHtml $ do
+main = runMain $ bracketHtml $ do
     o <- processOptions
     let darg = progressM $ do
         (argstring,_) <- getArgString
@@ -128,11 +117,9 @@ processFiles cs = f cs (optMainFunc options) where
     f cs _ = g (map fileOrModule cs)
     g fs = processCollectedHo . snd =<< parseFiles fs processInitialHo processDecls
     fileOrModule f = case reverse f of
-       ('s':'h':'.':_)     -> Right f
-       ('s':'h':'l':'.':_) -> Right f
-       _                   -> Left $ Module f
-
-
+        ('s':'h':'.':_)     -> Right f
+        ('s':'h':'l':'.':_) -> Right f
+        _                   -> Left $ Module f
 
 lamann _ nfo = return nfo
 letann e nfo = return (annotateArity e nfo)
@@ -166,7 +153,6 @@ processInitialHo accumho aho = do
 
     let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- map combHead $ melems choCombs ]) (choVarMap accumho)
         choCombs = mfilterWithKey (\k _ -> k /= emptyId) choCombinators'
-        --(mod:_) = Map.keys $ hoExports $ hoTcInfo aho
     return $ updateChoHo mempty {
         choVarMap = finalVarMap,
         choExternalNames = choExternalNames accumho `mappend` (fromList . map tvrIdent $ newTVrs),
@@ -182,10 +168,16 @@ corePass = dump FD.CorePass
 coreSteps = dump FD.CoreSteps
 miniCorePass = coreMini && corePass
 miniCoreSteps = coreMini && coreSteps
+progressM c  = wdump FD.Progress $ (c >>= putErrLn) >> hFlush stderr
+collectPassStats = verbose
 
+dumpRules rules = do
+    wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
+    wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
+    wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
 
 processDecls ::
-    CollectedHo          -- ^ Collected ho
+    CollectedHo             -- ^ Collected ho
     -> Ho                   -- ^ preliminary haskell object  data
     -> TiData               -- ^ front end output
     -> IO (CollectedHo,Ho)  -- ^ (new accumulated ho, final ho for this modules)
@@ -232,9 +224,7 @@ processDecls cho ho' tiData = do
 
     let rules@(Rules rules') = instanceRules `mappend` userRules `mappend` specializeRules
 
-    wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules
-    wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules
-    wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
+    dumpRules rules
 
     let seasoning = freeVars [ rs | (k,rs) <- massocs rules', k `notMember` defined ] `intersection` defined
         defined = fromList $ map (tvrIdent . fst) ds :: IdSet
@@ -441,8 +431,6 @@ shouldBeExported exports tvr
     | otherwise = tvr
 
 
---idHistogram e = execWriter $ annotate mempty (\id nfo -> tell (Histogram.singleton id) >> return nfo) (\_ -> return) (\_ -> return) e
-
 transTypeAnalyze = transformParms { transformCategory = "typeAnalyze",  transformOperation = typeAnalyze True }
 
 processCollectedHo cho = do
@@ -466,13 +454,10 @@ processCollectedHo cho = do
             progCombinators = combinators,
             progDataTable = dataTable
             }
-        rules' = Rules $ fromList [ (combIdent x,combRules x) | x <- combinators, not $ null (combRules x) ]
     -- dump final version of various requested things
     wdump FD.Datatable $ putErrLn (render $ showDataTable dataTable)
     wdump FD.DatatableBuiltin $ putErrLn (render $ showDataTable samplePrimitiveDataTable)
-    wdump FD.Rules $ putStrLn "  ---- user rules ---- " >> printRules RuleUser rules'
-    wdump FD.Rules $ putStrLn "  ---- user catalysts ---- " >> printRules RuleCatalyst rules'
-    wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules'
+    dumpRules (Rules $ fromList [ (combIdent x,combRules x) | x <- combinators, not $ null (combRules x) ])
 
     -- enter interactive mode
     int <- Interactive.isInteractive
@@ -483,29 +468,25 @@ processCollectedHo cho = do
 compileWholeProgram prog = do
     performGC
 
-    let dataTable = progDataTable prog
-
     when collectPassStats $ do
         Stats.print "PassStats" Stats.theStats
         Stats.clear Stats.theStats
 
-
-    let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
     esmap <- programEsMap prog
+    let mainFunc = parseName Val (maybe "Main.main" snd (optMainFunc options))
+        dataTable = progDataTable prog
+        ffiExportNames = [ tv | tv <- map combHead $ progCombinators prog, name <- tvrName tv, "FE@" `isPrefixOf` show name ]
     (main,mainv) <- getMainFunction dataTable mainFunc esmap
-    let ffiExportNames = [tv | tv <- map combHead $  progCombinators prog,
-                               name <- tvrName tv,
-                               "FE@" `isPrefixOf` show name]
-    prog <- return $ programUpdate prog { progMain   = tvrIdent main,
-                          progEntry = fromList $ map tvrIdent (main:ffiExportNames),
-                          progCombinators = emptyComb { combHead = main, combBody = mainv }:map (unsetProperty prop_EXPORTED) (progCombinators prog)
-                        }
-    prog <- transformProgram transformParms { transformCategory = "PruneUnreachable", transformOperation = evaluate . programPruneUnreachable } prog
+    prog <- return $ programUpdate prog {
+        progMain   = tvrIdent main,
+        progEntry = fromList $ map tvrIdent (main:ffiExportNames),
+        progCombinators = emptyComb { combHead = main, combBody = mainv }:map (unsetProperty prop_EXPORTED) (progCombinators prog)
+        }
+    prog <- transformProgram transformParms {
+        transformCategory = "PruneUnreachable",
+        transformOperation = evaluate . programPruneUnreachable
+        } prog
 
---    (viaGhc,fn,_,_) <- determineArch
---    wdump FD.Progress $ putStrLn $ "Arch: " ++ fn
-
-    --wdump FD.Core $ printProgram prog
 
     prog <- if (fopts FO.TypeAnalysis) then do
       transformProgram transformParms { transformCategory = "typeAnalyzeMethods",
@@ -514,14 +495,14 @@ compileWholeProgram prog = do
                        prog
             else return prog
 
-    when (verbose) $ do putStrLn "Type analyzed methods"
-                        flip mapM_ (programDs prog) $ \ (t,e) -> do
-                        let (_,ts) = fromLam e
-                            ts' = takeWhile (sortKindLike . getType) ts
-                        when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
+    when verbose $ do
+        putStrLn "Type analyzed methods"
+        flip mapM_ (programDs prog) $ \ (t,e) -> do
+        let (_,ts) = fromLam e
+            ts' = takeWhile (sortKindLike . getType) ts
+        when (not (null ts')) $ putStrLn $ (pprint t) ++ " \\" ++ concat [ "(" ++ show  (Info.fetch (tvrInfo t) :: Typ) ++ ")" | t <- ts' ]
     lintCheckProgram onerrNone prog
     prog <- programPrune prog
-    --wdump FD.Core $ printProgram prog
 
     cmethods <- do
         let es' = concatMap expandPlaceholder (progCombinators prog)
@@ -531,41 +512,28 @@ compileWholeProgram prog = do
         return es'
 
     prog <- evaluate $ progCombinators_s ([ p | p <- progCombinators prog, combHead p `notElem` map combHead cmethods] ++ cmethods) prog
-
-
     prog <- annotateProgram mempty (\_ nfo -> return $ unsetProperty prop_INSTANCE nfo) letann (\_ nfo -> return nfo) prog
-
 
     unless (fopts FO.GlobalOptimize) $ do
         prog <- programPrune prog
         wdump FD.CoreBeforelift $ printProgram prog
         prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift } prog
-        wdump FD.CoreAfterlift $ printProgram prog -- printCheckName dataTable (programE prog)
+        wdump FD.CoreAfterlift $ printProgram prog
         compileToGrin prog
         exitSuccess
 
 
     prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterMethod", transformDumpProgress = verbose } prog
-
-
     prog <- simplifyProgram SS.emptySimplifyOpts "Main-One" verbose prog
-
-
     prog <- etaExpandProg "Main-AfterOne" prog
     prog <- transformProgram transTypeAnalyze { transformPass = "Main-AfterSimp", transformDumpProgress = verbose } prog
-
-
     prog <- simplifyProgram SS.emptySimplifyOpts "Main-Two" verbose prog
 
-
     -- run optimization again with no rules enabled
-
-    -- delete rules
     prog <- return $ runIdentity $ annotateProgram mempty (\_ nfo -> return $ modifyProperties (flip (foldr S.delete) [prop_HASRULE,prop_WORKER]) nfo) letann (\_ -> return) prog
     --prog <- transformProgram "float inward" DontIterate True programFloatInward prog
 
     prog <- simplifyProgram SS.emptySimplifyOpts { SS.so_finalPhase = True } "SuperSimplify no rules" verbose prog
-
 
     -- We should float inward right before lambda lifting so that when a case statement is lifted out, it takes any local definitions with it.
 --    prog <- transformProgram transformParms {
@@ -585,17 +553,10 @@ compileWholeProgram prog = do
     prog <- simplifyProgram SS.emptySimplifyOpts { SS.so_finalPhase = True } "SuperSimplify after Boxy WorkWrap" verbose prog
     prog <- return $ runIdentity $ programMapBodies (return . cleanupE) prog
 
---    when viaGhc $ do
- --       wdump FD.Core $ printProgram prog
- --       fail "Compiling to GHC currently disabled"
-        --compileToHs prog
- --       exitSuccess
-
     wdump FD.CoreBeforelift $ dumpCore "before-lift" prog
     prog <- transformProgram transformParms { transformCategory = "LambdaLift", transformDumpProgress = dump FD.Progress, transformOperation = lambdaLift } prog
 
     wdump FD.CoreAfterlift $ dumpCore "after-lift" prog
-
 
     finalStats <- Stats.new
 
@@ -625,22 +586,18 @@ compileWholeProgram prog = do
     compileToGrin prog
 
 
--- | this gets rid of all type variables, replacing them with boxes that can hold any type
--- the program is still type-safe, but all polymorphism has been removed in favor of
--- implicit coercion to a universal type.
---
--- also, all rules are deleted.
+-- | this gets rid of all type variables, replacing them with boxes that can hold any type.
+-- The program is still type-safe, but all polymorphism has been removed in favor of
+-- implicit coercion to a universal type in preparation for the grin transformation.
 
 boxifyProgram :: Program -> IO Program
 boxifyProgram prog = ans where
     ans = do programMapDs f (progCombinators_u (map $ combRules_s []) prog)
     f (t,e) = do
---        putStrLn $ ">>> " ++ pprint t
         e <- g e
         return (tv t,e)
     tv t = t { tvrType = boxify (tvrType t) }
     g e = do
-  --      putStrLn $ "g: " ++ pprint e
         emapEG g (return . boxify) e -- (\e -> do putStrLn ("box: " ++ pprint e) ; return $ boxify e) e
     boxify t | Just e <- followAlias (progDataTable prog) t = boxify e
     boxify (EPi t e) = EPi t { tvrType = boxify (tvrType t) } (boxify e)
