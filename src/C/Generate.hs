@@ -594,7 +594,7 @@ generateC fs ss = ans where
         let (protos,bodys) = unzip fs
         let shead = vcat [ text "struct" <+> tshow (structureName s) <> (if structureAligned s then text " A_ALIGNED" else empty) <> text ";" | s <- ss ]
         shead2 <- declStructs ss
-        return (shead $$ line $$ shead2, vcat protos $$ line $$  vsep bodys)
+        return (shead $$ line $$ shead2 $$ vcat protos, line $$  vsep bodys)
     ((hd,fns),(_,ass),_written) = runRWS ga emptyEnv (1,Map.empty)
 
     anons = [ basicStructure { structureName = n, structureFields = fields ts }  | (ts,n) <- Map.toList ass ] where

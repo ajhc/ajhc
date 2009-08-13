@@ -44,6 +44,10 @@
 #endif
 #endif
 
+#ifndef _JHC_STANDALONE
+#define _JHC_STANDALONE 1
+#endif
+
 
 // GNU attributes
 

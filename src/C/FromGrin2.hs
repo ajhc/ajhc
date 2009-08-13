@@ -105,11 +105,11 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
 compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c ++ jhc_rts2_c ++ generateArchAssertions ++ P.render ans ++ "\n", snub (reqLibraries req))  where
-    ans = vcat $ includes ++ [text "", enum_tag_t, header, cafs,buildConstants grin finalHcHash, body]
+    ans = vcat $ includes ++ [text "", enum_tag_t, header,cafs, buildConstants grin finalHcHash, body]
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
     (header,body) = generateC (Map.elems fm) (Map.elems sm)
-    ((),finalHcHash,Written { wRequires = req, wFunctions = fm, wEnums = wenum, wStructures = sm, wTags = ts }) = runC grin go
+    (cafs',finalHcHash,Written { wRequires = req, wFunctions = fm, wEnums = wenum, wStructures = sm, wTags = ts }) = runC grin $ go >> mapM convertCAF (grinCafs grin)
     enum_tag_t | null enums = mempty
                | otherwise  = text "enum {" $$ nest 4 (P.vcat (punctuate P.comma $ enums)) $$ text "};"
         where
@@ -126,7 +126,15 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
         mapM_ tellAllTags [ v  | (HcNode _ vs,_) <- hconsts, Left v <- vs]
         mapM_ declareStruct  (Set.toList tset)
         mapM_ tellTags (Set.toList $ tset `mappend` tset')
-    cafs = text "/* CAFS */" $$ (vcat $ map ccaf (grinCafs grin))
+    cafs = text "/* CAFS */" $$ (vcat $ cafs')
+    convertCAF (v,val@(NodeC a [])) = do
+        en <- declareEvalFunc a
+        let ef =  drawG $ f_EVALFUNC (reference $ variable en)
+        let ts =  text "/* " <> text (show v) <> text " = " <> (text $ P.render (pprint val)) <> text "*/\n" <>
+                text "static node_t _" <> tshow (varName v) <> text " = { .head = " <> ef <> text " };\n" <>
+                text "#define " <> tshow (varName v) <+>  text "(EVALTAGC(&_" <> tshow (varName v) <> text "))\n";
+        return ts
+        
 
 convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C [Function]
 convertFunc ffie (n,as :-> body) = do

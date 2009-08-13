@@ -10,6 +10,10 @@
 
 extern void _start,_end;
 
+void hs_perform_gc(void) {}
+void hs_free_stable_ptr(HsStablePtr sp) {}
+void hs_free_fun_ptr(HsFunPtr fp) {}
+
 #if _JHC_PROFILE
 
 #define BUCKETS 7

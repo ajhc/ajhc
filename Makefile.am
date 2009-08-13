@@ -210,27 +210,25 @@ hl-clean:
 clean-local:
 	find . \! -wholename \*/_\* \( -name \*.o-boot -o -name \*.hi -o -name \*.o -o -name \*.hi-boot \) | xargs rm -f --
 
-MAINTAINERCLEANFILES= $(BUILT_SOURCES)  $(DRIFTFILES)
+MAINTAINERCLEANFILES= $(BUILT_SOURCES) $(DRIFTFILES)
 
-base-1.0.hl: lib/base/base.cabal jhc-1.0.hl
-	mkdir -p tmp/libho
-	./jhc -funboxed-tuples $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/base --noauto -L. -pjhc --build-hl lib/base/base.cabal -o $@
+LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST) --noauto -L- -L.
+
 
 jhc-1.0.hl: lib/jhc/jhc.cabal
-	mkdir -p tmp/libho
-	./jhc $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/jhc --noauto --build-hl $< -o $@
+	./jhc $(LIB_OPTIONS) -ilib/jhc --build-hl $< -o $@
+
+base-1.0.hl: lib/base/base.cabal jhc-1.0.hl
+	./jhc $(LIB_OPTIONS) -ilib/base -pjhc --build-hl $< -o $@
 
 applicative-1.0.hl: lib/applicative/applicative.cabal base-1.0.hl
-	mkdir -p tmp/libho
-	./jhc $(RTSOPTS) $(JHC_TEST)  --ho-dir tmp/libho -ilib/applicative  --noauto -L- -L. -pjhc -p base --build-hl lib/applicative/applicative.cabal -o $@
+	./jhc $(LIB_OPTIONS) -ilib/applicative -pjhc -pbase --build-hl $< -o $@
 
 containers-0.2.0.hl: lib/containers.cabal base-1.0.hl applicative-1.0.hl
-	mkdir -p tmp/libho
-	./jhc $(RTSOPTS) $(JHC_TEST) -Isrc/data -Ilib/containers/include --ho-dir tmp/libho -ilib/containers  --noauto -L- -L. -pjhc -p base -p applicative --build-hl lib/containers.cabal -fcpp -o $@
+	./jhc $(LIB_OPTIONS) -Isrc/data -Ilib/containers/include -ilib/containers -pjhc -pbase -papplicative -fcpp --build-hl $<  -o $@
 
 haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
-	mkdir -p tmp/libho
-	./jhc $(RTSOPTS) $(JHC_TEST) --ho-dir tmp/libho -ilib/haskell98 --noauto -L- -L. -pjhc -p base --build-hl lib/haskell98.cabal -o $@
+	./jhc $(LIB_OPTIONS) -ilib/haskell98 -pjhc -pbase --build-hl $< -o $@
 
 %.pdf: %.ps
 	epstopdf $< --outfile $@

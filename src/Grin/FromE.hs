@@ -228,7 +228,7 @@ compile prog@Program { progDataTable = dataTable } = do
                                 Map.fromList epv,
             grinPhase = PhaseInit,
             grinTypeEnv = newTyEnv,
-            grinCafs = [ (x,NodeC tagHole []) | (x,_) <- cafs]
+            grinCafs = [ (x,node) | (x,node) <- cafs]
             }
         theFuncs = (funcMain ,[] :-> initCafs :>>= [] :->  discardResult (App (scTag mainEntry) [] [])) : efv ++ ds'
     return grin

@@ -8,7 +8,7 @@
 #define DNODEP(x)    ((dnode_t *)(x))
 #define EVALTAG(fn)  (assert(((uintptr_t)(fn) & 0x3) == 0),(sptr_t)((uintptr_t)(fn) | P_LAZY))
 #define EVALTAGC(fn) ((sptr_t)((void *)(fn) + P_LAZY))
-#define EVALFUNC(fn) ((fptr_t)((uintptr_t)(fn) | P_FUNC))
+#define EVALFUNC(fn) ((fptr_t)((uintptr_t)(fn) + P_FUNC))
 #define VALUE(n)     ((wptr_t)(((intptr_t)(n) << 2) | P_VALUE))
 #define GETVALUE(n)  ((intptr_t)(n) >> 2)
 #define ISVALUE(n)   (assert(!ISLAZY(n)), ((uintptr_t)(n) & 0x2))
