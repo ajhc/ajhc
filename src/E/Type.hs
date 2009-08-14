@@ -20,7 +20,7 @@ import Cmm.Number
 import Info.Types
 import qualified Info.Info as Info
 
-{-@Internals
+{- @Internals
 
 # Jhc core normalized forms
 

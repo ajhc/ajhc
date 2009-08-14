@@ -7,36 +7,62 @@ provide it with the file containing your 'main' function on the command line.
 For instance, if you had a program 'HelloWorld.hs', the following would compile
 it to an executable named 'hello'.
 
-    ; jhc -v HelloWorld.hs -o hello
+    ; jhc HelloWorld.hs -o hello
+
+Jhc searches for modules in its search path, which defaults to the current
+directory. Modules are searched for based on their names. For instance, the
+module Data.Foo will be searched for in 'Data/Foo.hs'. As an extension, jhc will
+also search for 'Data.Foo.hs'. The search path may be modifed with the '-i'
+command line option, or by setting the 'JHC_PATH' environment variable.
+
+# Using Libraries
+
+jhc libraries are distributed as files with an 'hl' suffix, such as
+'base-1.0.hl'. In order to use a haskell  library you simply need to place the
+file in a directory that jhc will search for it. For instance, $HOME/lib/jhc.
+You may set the environment variable  JHC_LIBRARY_PATH to specify alternate
+locations to search for libraries or specify directory to search with the -L
+command line option. -L- will clear the search path.
+
+You can then use libraries with the '-p' command line option, for instance if
+you had a library 'mylibrary-1.0.hl' in your search path, the following would
+use it.
+
+    ; jhc -p mylibrary MyProgram.hs -o myprogram
+
+
+# Environment Variables
+
+Jhc's behavior is modified by several enviornment variables.
+
+JHC_OPTS
+: this is read and appended to the command line of jhc invocations.
+
+JHC_PATH
+: This specifies the path to search for modules.
+
+JHC_LIBRARY_PATH
+: This specifies the path to search for libraries.
+
+JHC_CACHE
+: This specified the directory jhc will use to cache values. having a valid cache is essential for jhc performance. It defaults to ~/.jhc/cache.
+
+# Building Haskell Libraries
 
 Libraries are built by passing jhc a file describing the library via the
 --build-hl option. The file format is a simplified version of the cabal format.
-The name of the generated file will be <basename>-<version>.hl.
+The name of the generated file will be basename-version.hl.
 
-    ; jhc -v --build-hl mylibrary.cabal
+    ; jhc --build-hl mylibrary.cabal
 
+## Library File Format
 
-# installing and using libraries
+The library file is a simple list of key value pairs seperated by colon. The fields that jhc cares about are
 
-jhc libraries are distributed as files with an 'hl' suffix, such as
-'base-1.0.hl'. You simply need to drop this file somewhere that jhc can find
-it. for instance, $HOME/lib/jhc. You can then set $JHCLIBPATH to said
-directory, or specify it on the command line with the '-L' option. Extra
-libraries are specified on the command line with the '-p' option.
+    Name: The Name of your library
+    Version: The Version of your library
+    Exposed-Modules: Comma Seperated list of modules to be included in the library and made availabe to users of the library
+    Hidden-Modules: Comma Seperated list of modules that will be used by the library internally, but not be made available outside it.
 
-    ; jhc -v -L/home/john/devel/jhc -pmylibrary MyProgram.hs -o myprogram
+Other fields are stored as-is inside of the generated hl file and can be seen with jhc --show-ho file.hl.
 
-
-
-# Building Projects With make
-
-Using make to build projects with jhc is straightforward, simply add a line like the following in your Makefile
-
-
-    % : %.hs
-            jhc -v $< -o $@
-
-Or, to build a library, something similar to this will do.
-
-    %.hl : %.cabal
-            jhc -v --build-hl $< -o $@

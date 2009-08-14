@@ -1,5 +1,20 @@
 {-#Extensions
 
+# Module Search Path
+
+Modules in jhc are searched for based on their name as in other Haskell
+compilers. However in addition to searching for 'Data/Foo.hs' for the module
+'Data.Foo', jhc will also search for 'Data.Foo.hs'.
+
+# Rank-N Polymorphism
+
+Jhc supports higher ranked polymorphism. jhc will never infer types of higher
+rank, however when the context unambiguously specifies a higher ranked type, it
+will be infered. For instance, user supplied type annotations and arguments to
+data constructors defined to by polymorphic will work.
+
+# Existential types
+
 # Unboxed Values
 
 Unboxed values in jhc are specified in a similar fashion to GHC however the
@@ -18,7 +33,7 @@ unboxed tuple of two numbers. Unboxed tuples are enabled with -funboxed-tuples
 
 Unboxed strings are enabled with the -funboxed-values flag. They are
 specified like a normal string but have a '#' at the end. Unboxed strings
-have types 'Addr__' which is as synonym for 'BitsPtr_'
+have types 'Addr__' which is as synonym for 'BitsPtr_'.
 
 ## Unboxed Numbers
 
@@ -26,5 +41,6 @@ Unboxed numbers are enabled with the -funboxed-values flag. They are postpended
 with a '#' such as in 3# or 4#. Jhc supports a limited form of type inference
 for unboxed numbers, if the type is fully specified by the environment and it
 is a suitable unboxed numeric type then that type is used. Otherwise it
-defaults to Int__.
+defaults to Int__. Whether the type is fully specifed follows the same rules as
+rank-n types.
 

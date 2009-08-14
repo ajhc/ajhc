@@ -281,7 +281,7 @@ postProcessFO o = case FlagOpts.process (optFOptsSet o) (optFOpts o) of
                         ++ unwords xs ++ "\nValid flags:\n\n" ++ FlagOpts.helpMsg)
 
 getArguments = do
-    x <- lookupEnv "JHCOPTS"
+    x <- lookupEnv "JHC_OPTS"
     let eas = maybe [] words x
     as <- System.getArgs
     return (eas ++ as)
@@ -326,9 +326,11 @@ processOptions = do
       True -> return o3
       False-> return o3 {  optHls  = (autoloads ++ optHls o2) }
 
+
+
 findHoCache :: IO (Maybe FilePath)
 findHoCache = do
-    cd <- lookupEnv "HOCACHEDIR"
+    cd <- lookupEnv "JHC_CACHE"
     case optHoCache options `mplus` cd of
         Just s -> do return (Just s)
         Just "-" -> do return Nothing
@@ -408,7 +410,7 @@ flint = FlagOpts.Lint `S.member` optFOptsSet options
 -- | Include directories taken from JHCPATH enviroment variable.
 initialIncludes :: [String]
 initialIncludes = unsafePerformIO $ do
-    p <- lookupEnv "JHCPATH"
+    p <- lookupEnv "JHC_PATH"
     let x = maybe "" id p
     return (".":(tokens (== ':') x))
 
@@ -416,7 +418,7 @@ initialIncludes = unsafePerformIO $ do
 -- | Include directories taken from JHCLIBPATH enviroment variable.
 initialLibIncludes :: [String]
 initialLibIncludes = unsafePerformIO $ do
-    ps <- lookupEnv "JHCLIBPATH"
+    ps <- lookupEnv "JHC_LIBRARY_PATH"
     h <- lookupEnv "HOME"
     let paths = h ++ ["/usr/local","/usr"]
         bases = ["/lib","/share"]
