@@ -32,7 +32,6 @@ module Stats(
     ) where
 
 
-import Char
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
@@ -49,10 +48,6 @@ import CharIO
 import GenUtil
 import qualified Doc.Chars as C
 import qualified Util.IntBag as IB
-import Options (dump)
-import qualified FlagDump as FD
-
-
 
 splitUp :: Int -> String -> [String]
 splitUp n str = filter (not . Prelude.null) (f n str)  where
@@ -88,14 +83,14 @@ createForest def xs = map f gs where
 draw :: Tree String -> [String]
 draw (Node x ts0) = x : drawSubTrees ts0
   where drawSubTrees [] = []
-        drawSubTrees [t] = 
+        drawSubTrees [t] =
                 {-[vLine] :-} shift lastBranch "  " (draw t)
         drawSubTrees (t:ts) =
                 {-[vLine] :-} shift branch (C.vLine  ++ " ") (draw t) ++ drawSubTrees ts
 
         branch     = C.lTee ++ C.hLine
         lastBranch = C.llCorner ++ C.hLine
-        
+
         shift first other = zipWith (++) (first : repeat other)
         --vLine = chr 0x254F
 
@@ -107,7 +102,7 @@ newtype Stat = Stat IB.IntBag
     deriving(Eq,Ord,Monoid)
 
 prependStat :: String -> Stat -> Stat
-prependStat name (Stat m) = Stat $ IB.fromList [ (fromAtom (toAtom $ "{" ++ name ++ "}." ++ fromAtom (unsafeIntToAtom x)),y) | (x,y) <- IB.toList m ]
+prependStat name (Stat m) = Stat $ IB.fromList [ (fromAtom $ mappend (toAtom $ "{" ++ name ++ "}.")  (unsafeIntToAtom x),y) | (x,y) <- IB.toList m ]
 
 printStat greets (Stat s) = do
     let fs = createForest 0 $ sort [(splitUp (-1) $ fromAtom (unsafeIntToAtom x),y) | (x,y) <- IB.toList s]
