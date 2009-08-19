@@ -14,7 +14,8 @@
 #ifndef __WIN32__
 #include <sys/select.h>
 #include <sys/times.h>
-#include <endian.h>
+#include <sys/types.h>
+#include <sys/param.h>
 #include <sys/utsname.h>
 #endif
 #include <setjmp.h>
