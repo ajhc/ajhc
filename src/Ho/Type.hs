@@ -101,9 +101,10 @@ data HoIDeps = HoIDeps {
 
 data HoLib = HoLib {
     -- * arbitrary metainformation such as library author, web site, etc.
-    hoMetaInfo   :: [(String,PackedString)],
     hoModuleMap  :: Map.Map Module ModuleGroup,
-    hoModuleDeps :: Map.Map ModuleGroup [ModuleGroup]
+    hoReexports  :: Map.Map Module Module,
+    hoModuleDeps :: Map.Map ModuleGroup [ModuleGroup],
+    hoMetaInfo   :: [(PackedString,PackedString)]
     }
 
 

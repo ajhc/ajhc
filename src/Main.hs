@@ -88,14 +88,8 @@ main = runMain $ bracketHtml $ do
         (argstring,_) <- getArgString
         return (argstring ++ "\n" ++ versionSimple)
     case optMode o of
-        BuildHl hl    -> darg >> buildLibrary processInitialHo processDecls hl
-        ListLibraries -> do
-            when (optVerbose options > 0) $ do
-                putStrLn "Search path:"
-                mapM_ putStrLn (optHlPath options)
-                putStrLn "Libraries found:"
-            ll <- libraryList
-            sequence_ [ putStrLn name | (name,_) <- ll ]
+        BuildHl hl      -> darg >> buildLibrary processInitialHo processDecls hl
+        ListLibraries   -> listLibraries
         ShowHo ho       -> dumpHoFile ho
         Version         -> putStrLn versionString
         PrintHscOptions -> putStrLn $ "-I" ++ VC.datadir ++ "/" ++ VC.package ++ "-" ++ VC.shortVersion ++ "/include"

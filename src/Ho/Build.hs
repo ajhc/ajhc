@@ -9,22 +9,18 @@ module Ho.Build (
 
 import Control.Concurrent
 import Control.Monad.Identity
-import Data.Binary
 import Data.Char
 import Data.IORef
 import Data.List hiding(union)
 import Data.Monoid
 import Data.Tree
 import Data.Version(Version,parseVersion,showVersion)
-import Debug.Trace
 import Maybe
 import Monad
 import Prelude hiding(print,putStrLn)
 import System.IO hiding(print,putStrLn)
 import System.Mem
-import System.Posix.Files
 import Text.Printf
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.UTF8 as LBSU
 import qualified Data.Map as Map
@@ -58,7 +54,6 @@ import Ho.Type
 import Options
 import PackedString(PackedString,packString,unpackPS)
 import RawFiles(prelude_m4)
-import Support.CFF
 import Util.FilterInput
 import Util.Gen hiding(putErrLn,putErr,putErrDie)
 import Util.SetLike
@@ -115,7 +110,7 @@ findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
 
 data ModDone
     = ModNotFound
-    | ModLibrary ModuleGroup Library
+    | ModLibrary Bool ModuleGroup Library
     | Found SourceCode
 
 data Done = Done {
@@ -127,11 +122,6 @@ data Done = Done {
     modEncountered  :: Map.Map Module     ModDone
     }
     {-! derive: update !-}
-
-fileOrModule f = case reverse f of
-                   ('s':'h':'.':_)     -> Right f
-                   ('s':'h':'l':'.':_) -> Right f
-                   _                   -> Left $ Module f
 
 
 replaceSuffix suffix fp = reverse (dropWhile ('.' /=) (reverse fp)) ++ suffix
@@ -204,9 +194,10 @@ fetchSource done_ref fs mm = do
 resolveDeps :: IORef Done -> Module -> IO ()
 resolveDeps done_ref m = do
     done <- readIORef done_ref
-    if isJust $ m `mlookup` modEncountered done then return () else do
-    fetchSource done_ref (map fst $ searchPaths (show m)) (Just m)
-    return ()
+    case m `mlookup` modEncountered done of
+        Just (ModLibrary False _ lib) -> putErrDie $ printf  "ERROR: Attempt to import module '%s' which is a member of the library '%s'." (show m) (libName lib)
+        Just _ -> return ()
+        Nothing -> fetchSource done_ref (map fst $ searchPaths (show m)) (Just m) >> return ()
 
 
 type LibInfo = (Map.Map Module ModuleGroup, Map.Map ModuleGroup [ModuleGroup], Set.Set Module,Map.Map ModuleGroup HoBuild,Map.Map ModuleGroup HoTcInfo)
@@ -280,19 +271,17 @@ instance ProvidesModules SourceCode where
 -- in terms of dependencies
 
 
-libModMap (Library _ libr _ _) = hoModuleMap libr
 
 toCompUnitGraph :: Done -> [Module] -> IO (HoHash,CompUnitGraph)
 toCompUnitGraph done roots = do
     let fs m = map inject $ maybe (error $ "can't find deps for: " ++ show m) snd (Map.lookup m (knownSourceMap done))
         fs' m (Library _ libr _ _) = fromMaybe (error $ "can't find deps for: " ++ show m) (Map.lookup m (hoModuleDeps libr))
         foundMods = [ ((m,Left (sourceHash sc)),fs (sourceHash sc)) | (m,Found sc) <- Map.toList (modEncountered done)]
-        foundMods' = Map.elems $ Map.fromList [ (mg,((mg,Right lib),fs' mg lib)) | (_,ModLibrary mg lib) <- Map.toList (modEncountered done)]
+        foundMods' = Map.elems $ Map.fromList [ (mg,((mg,Right lib),fs' mg lib)) | (_,ModLibrary _ mg lib) <- Map.toList (modEncountered done)]
         fullModMap = Map.unions (map libModMap $ Map.elems (loadedLibraries done))
         inject m = Map.findWithDefault m m fullModMap
         gr = G.newGraph  (foundMods ++ foundMods') (fst . fst) snd
         gr' = G.sccGroups gr
-        lmods = Map.mapMaybe ( \ x -> case x of ModLibrary mg lib -> Just (mg,lib) ; _ -> Nothing) (modEncountered done)
         phomap = Map.fromListWith (++) (concat [  [ (m,[hh]) | (m,_) <- hoDepends idep ] | (hh,(_,_,idep,_)) <- Map.toList (hosEncountered done)])
         sources = Map.fromList [ (m,sourceHash sc) | (m,Found sc) <- Map.toList (modEncountered done)]
 
@@ -325,8 +314,7 @@ toCompUnitGraph done roots = do
                 modifyIORef cug_ref ((mhash,(deps',CompSources $ map fs amods)):)
                 return mhash
         g [((mg,Right lib@(Library _ libr mhot mhob)),ds)] = do
-                let Just mgs = Map.lookup mg (hoModuleDeps libr)
-                    Just hob = Map.lookup mg mhob
+                let Just hob = Map.lookup mg mhob
                     Just hot = Map.lookup mg mhot
                     ho = Ho { hoModuleGroup = mg, hoBuild = hob, hoTcInfo = hot }
                     myHash = libMgHash mg lib
@@ -381,10 +369,6 @@ toCompUnitGraph done roots = do
 
 --    return (rhash,cug')
 
-libHash (Library hoh _ _ _) = hohHash hoh
-libMgHash mg lib = MD5.md5String $ show (libHash lib,mg)
-libProvides mg (Library _ lib _ _) = [ m | (m,mg') <- Map.toList (hoModuleMap lib), mg == mg']
-libName (Library HoHeader { hohName = Right (name,vers) } _ _ _) = unpackPS name ++ "-" ++ showVersion vers
 
 parseFiles :: [Either Module String]                                   -- ^ Either a module or filename to find
                -> (CollectedHo -> Ho -> IO CollectedHo)                -- ^ Process initial ho loaded from file
@@ -421,15 +405,26 @@ loadModules libs need = do
         hosEncountered = Map.empty,
         modEncountered = Map.empty
         }
-    unless (null libs) $ putProgressLn $ "Loading libraries:" <+> show libs
-    forM_ (optHls options) $ \l -> do
-        (n',fn) <- findLibrary l
-        lib@(Library hoh libr _ _)  <- catch (readHlFile fn) $ \_ ->
-            fail $ "Error loading library file: " ++ fn
-        let Right (libName,libVers) = hohName hoh
-        putProgressLn $ printf "Library: %-15s <%s>" n' fn
-        modifyIORef done_ref (modEncountered_u $ Map.union (Map.fromList [ (m,ModLibrary mg lib) | (m,mg) <- Map.toList (hoModuleMap libr) ]))
-        modifyIORef done_ref (loadedLibraries_u $ Map.insert libName lib)
+    (es,is) <- collectLibraries
+    let combModMap es = Map.unions [ Map.map ((,) l) mm | l@(Library _ HoLib { hoModuleMap = mm } _ _) <- es]
+        explicitModMap = combModMap es
+        implicitModMap = combModMap is
+        reexported  = Set.fromList [ m | l <- es, (m,_) <- Map.toList $ hoReexports (libHoLib l) ]
+        modEnc exp emap = Map.fromList [ (m,ModLibrary (exp || Set.member m reexported)  mg l) | (m,(l,mg)) <- Map.toList emap ]
+
+    modifyIORef done_ref (loadedLibraries_u $ Map.union $ Map.fromList [ (libBaseName lib,lib) | lib <- es ++ is])
+    modifyIORef done_ref (modEncountered_u $ Map.union (modEnc True explicitModMap))
+    modifyIORef done_ref (modEncountered_u $ Map.union (modEnc False implicitModMap))
+
+--    unless (null libs) $ putProgressLn $ "Loading libraries:" <+> show libs
+--    forM_ (optHls options) $ \l -> do
+--        (n',fn) <- findLibrary l
+--        lib@(Library hoh libr _ _)  <- catch (readHlFile fn) $ \_ ->
+--            fail $ "Error loading library file: " ++ fn
+--        let Right (libName,_libVers) = hohName hoh
+--        putProgressLn $ printf "Library: %-15s <%s>" n' fn
+--        modifyIORef done_ref (modEncountered_u $ Map.union (Map.fromList [ (m,ModLibrary mg lib) | (m,mg) <- Map.toList (hoModuleMap libr) ]))
+--        modifyIORef done_ref (loadedLibraries_u $ Map.insert libName lib)
     done <- readIORef done_ref
     forM_ (Map.elems $ loadedLibraries done) $ \ lib@(Library hoh  _ _ _) -> do
         let libsBad = filter (\ (p,h) -> fmap (libHash) (Map.lookup p (loadedLibraries done)) /= Just h) (hohLibDeps hoh)
@@ -466,14 +461,6 @@ mkPhonyCompUnit need cs = (fhash,(fhash,(fdeps,CompDummy)):cs) where
         fhash = MD5.md5String $ show fdeps
         fdeps = [ h | (h,(_,cu)) <- cs, not . null $ providesModules cu `intersect` need ]
 
--- take the list of CompNodes and what modules we want and create a root node
--- that will reach all dependencies when compiled.
-
-mkPhonyCompNode :: [Module] -> [CompNode] -> IO CompNode
-mkPhonyCompNode need cs = do
-    xs <- forM cs $ \cn@(CompNode _ _ cu) -> readIORef cu >>= \u -> return $ if null $ providesModules u `intersect` need then [] else [cn]
-    let hash = MD5.md5String $ show [ h | CompNode h _ _ <- concat xs ]
-    CompNode hash (concat xs) `fmap` newIORef (CompLinkUnit CompDummy)
 
 printModProgress :: Int -> Int -> IO Int -> [HsModule] -> IO ()
 printModProgress _ _ _ [] = return ()
@@ -706,9 +693,12 @@ buildLibrary ifunc func = ans where
     ans fp = do
         (desc,name,vers,hmods,emods) <- parse fp
         vers <- runReadP parseVersion vers
-        let allmods = snub (emods ++ hmods)
+        let allMods = emodSet `Set.union` hmodSet
+            emodSet = Set.fromList emods
+            hmodSet = Set.fromList hmods
+
         -- TODO - must check we depend only on libraries
-        (rnode@(CompNode lhash _ _),cho) <- parseFiles (map Left allmods) ifunc func
+        (rnode@(CompNode lhash _ _),cho) <- parseFiles (map Left $ Set.toList allMods) ifunc func
         (_,(mmap,mdeps,prvds,lcor,ldef)) <- let
             f (CompNode hs cd ref) = do
                 cl <- readIORef ref
@@ -733,8 +723,9 @@ buildLibrary ifunc func = ans where
                 writeIORef ref (CompLinkLib res cn)
                 return res
           in f rnode
-        let unknownMods = Set.toList $ Set.filter (`notElem` allmods) prvds
-        mapM_ ((putStrLn . ("*** Module included in library that is not in export list: " ++)) . show) unknownMods
+        let unknownMods = Set.toList $ Set.filter (`Set.notMember` allMods) prvds
+        mapM_ ((putStrLn . ("*** Module depended on in library that is not in export list: " ++)) . show) unknownMods
+        mapM_ ((putStrLn . ("*** We are re-exporting the following modules from other libraries: " ++)) . show) $ Set.toList (allMods Set.\\ prvds)
         let hoh =  HoHeader {
                 hohHash = lhash,
                 hohName = Right (packString name,vers),
@@ -745,8 +736,9 @@ buildLibrary ifunc func = ans where
         let outName = case optOutName options of
                 Nothing -> name ++ "-" ++ showVersion vers ++ ".hl"
                 Just fn -> fn
-        let pdesc = [(n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
+        let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
             libr = HoLib {
+                hoReexports = Map.fromList [ (m,m) | m <- Set.toList $ allMods Set.\\ prvds],
                 hoMetaInfo = pdesc,
                 hoModuleMap = mmap,
                 hoModuleDeps = mdeps
@@ -766,16 +758,6 @@ buildLibrary ifunc func = ans where
         let hmods = map Module $ snub $ mfield "hidden-modules"
             emods = map Module $ snub $ mfield "exposed-modules"
         return (desc,name,vers,hmods,emods)
-
---collectLibraries :: IO [FilePath]
---collectLibraries = concat `fmap` mapM f (optHlPath options) where
---    f fp = do
---        fs <- flip catch (\_ -> return []) $ getDirectoryContents fp
---        flip mapM fs $ \e -> case reverse e of
---            ('l':'h':'.':r)  -> do
---                (fn',hoh,mp) <- readHFile (fp++"/"++e)
---
---        _               -> []
 
 
 ------------------------------------
@@ -814,9 +796,10 @@ dumpHoFile fn = ans where
     doHl fn = do
         Library hoh libr mhob mhot <- readHlFile fn
         doHoh hoh
-        showList "MetaInfo" (sort [text k <> char ':' <+> show v | (k,v) <- hoMetaInfo libr])
+        showList "MetaInfo" (sort [text (unpackPS k) <> char ':' <+> show v | (k,v) <- hoMetaInfo libr])
         showList "ModuleMap" (map pprint . sortUnder fst $ Map.toList $ hoModuleMap libr)
         showList "ModuleDeps" (map pprint . sortUnder fst $ Map.toList $ hoModuleDeps libr)
+        showList "ModuleReexports" (map pprint . sortUnder fst $ Map.toList $ hoReexports libr)
 
     doHo fn = do
         (hoh,idep,ho) <- readHoFile fn

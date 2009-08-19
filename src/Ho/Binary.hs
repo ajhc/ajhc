@@ -20,7 +20,7 @@ import Support.CFF
 
 
 current_version :: Int
-current_version = 3
+current_version = 4
 
 readHFile :: FilePath -> IO (FilePath,HoHeader,forall a . Binary a => ChunkType -> a)
 readHFile fn = do
@@ -147,15 +147,17 @@ instance Data.Binary.Binary HoIDeps where
     return (HoIDeps aa ab ac ad)
 
 instance Data.Binary.Binary HoLib where
-    put (HoLib aa ab ac) = do
+    put (HoLib aa ab ac ad) = do
 	    Data.Binary.put aa
 	    Data.Binary.put ab
 	    Data.Binary.put ac
+	    Data.Binary.put ad
     get = do
     aa <- get
     ab <- get
     ac <- get
-    return (HoLib aa ab ac)
+    ad <- get
+    return (HoLib aa ab ac ad)
 
 
 instance Binary Data.Version.Version where
