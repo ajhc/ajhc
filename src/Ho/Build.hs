@@ -195,7 +195,7 @@ resolveDeps :: IORef Done -> Module -> IO ()
 resolveDeps done_ref m = do
     done <- readIORef done_ref
     case m `mlookup` modEncountered done of
-        Just (ModLibrary False _ lib) -> putErrDie $ printf  "ERROR: Attempt to import module '%s' which is a member of the library '%s'." (show m) (libName lib)
+        Just (ModLibrary False _ lib) | m /= Module "Jhc.Prim" -> putErrDie $ printf  "ERROR: Attempt to import module '%s' which is a member of the library '%s'." (show m) (libName lib)
         Just _ -> return ()
         Nothing -> fetchSource done_ref (map fst $ searchPaths (show m)) (Just m) >> return ()
 
@@ -458,7 +458,7 @@ processCug cug root = mdo
 
 mkPhonyCompUnit :: [Module] -> CompUnitGraph -> (HoHash,CompUnitGraph)
 mkPhonyCompUnit need cs = (fhash,(fhash,(fdeps,CompDummy)):cs) where
-        fhash = MD5.md5String $ show fdeps
+        fhash = MD5.md5String $ show (sort fdeps)
         fdeps = [ h | (h,(_,cu)) <- cs, not . null $ providesModules cu `intersect` need ]
 
 
@@ -558,7 +558,7 @@ compileCompNode ifunc func ksm cn = do
                         writeIORef ref (CompCollected cho CompDummy)
                         return cho
                     (CompHo hoh idep ho) -> do
-                        cho <- ifunc cho ho
+                        cho <- choLibDeps_u (Map.union $ Map.fromList (hohLibDeps hoh)) `fmap` ifunc cho ho
                         writeIORef ref (CompCollected cho cu)
                         return cho
                     (CompLibrary ho (Library hoh _ _ _)) -> do
@@ -738,7 +738,7 @@ buildLibrary ifunc func = ans where
                 Just fn -> fn
         let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
             libr = HoLib {
-                hoReexports = Map.fromList [ (m,m) | m <- Set.toList $ allMods Set.\\ prvds],
+                hoReexports = Map.fromList [ (m,m) | m <- Set.toList $ allMods Set.\\ prvds ],
                 hoMetaInfo = pdesc,
                 hoModuleMap = mmap,
                 hoModuleDeps = mdeps
