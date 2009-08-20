@@ -9,6 +9,7 @@ Source: http://repetae.net/computer/jhc/drop/%{name}-%{version}.tar.gz
 URL: http://repetae.net/computer/jhc/
 Packager: John Meacham <john@repetae.net>
 Prefix: %{_prefix}
+BuildRequires: ghc, ghc-zlib-devel, ghc-utf8-string-devel
 
 %description
 Jhc Haskell compiler.

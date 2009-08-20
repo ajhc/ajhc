@@ -18,6 +18,10 @@ AC_ARG_WITH(rpmrelease,
 	    [RPMRELEASE=$withval], [RPMRELEASE=1])
 
 AC_PROGRAM_REQUIRE(hc,ghc,     [  --with-hc=<haskell compiler>    Specify location of ghc.])
+if test -z "$HC"; then
+    echo "The ghc compiler was not found, please specify a location for it with the --with-hc flag"
+    exit 1
+fi
 AC_ARG_WITH(hcflags,
             [  --with-hcflags=HCFLAGS  specify flags for Haskell compiler],
 	    [HCFLAGS=$withval])
@@ -32,6 +36,10 @@ GHCFLAGS="-hide-all-packages -package base"
 GHC_CHECK_MODULE(Data.Generics.Instances,syb,,,[])
 
 AC_PROGRAM_REQUIRE(hsc2hs,hsc2hs,     [  --with-hsc2hs=<hsc2hs location>    Specify location of hsc2hs.])
+if test -z "$HSC2HS"; then
+    echo "The hsc2hs program not found, please specify a location for it with the --with-hsc2hs flag"
+    exit 1
+fi
 
 jlibpath=${datadir}/$PACKAGE-$SHORTVERSION
 jetcpath=${sysconfdir}/$PACKAGE-$SHORTVERSION
