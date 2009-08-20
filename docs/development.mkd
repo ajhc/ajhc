@@ -29,17 +29,14 @@ First you must install darcs, there are a couple projects you need to pull in
 order to compile jhc, the following should produce a working tree:
 
     darcs get http://repetae.net/repos/jhc
-    cd jhc/src
-    darcs get http://repetae.net/repos/Doc
-    cd ../lib
-    darcs get http://darcs.haskell.org/packages/haskell98
-    darcs get http://darcs.haskell.org/packages/containers
+    cd jhc
+    autoreconf -i
+    ./configure
+    make darcs-fetch
 
 Now you can begin to build jhc, in order to do so, switch to the jhc directory and do:
 
-    autoreconf -i
-    ./configure
-    make
+    make jhc
 
 after jhc has finished building, you can create the standard libraries via
 
@@ -49,9 +46,9 @@ jhc can now be tested via
 
     make HelloWorld
 
-however, during development it is often easier to use the raw haskell source of
+however, during development, it is sometimes easier to use the raw haskell source of
 the libraries directly. in order to do that, you can run jhc with the following
 options when run in the development tree.
 
-    ./jhc -v --noauto -ilib/base -ilib/haskell98 examples/HelloWorld.hs -o helloworld
+    ./jhc --noauto -ilib/base -ilib/jhc -ilib/haskell98 examples/HelloWorld.hs -o helloworld
 

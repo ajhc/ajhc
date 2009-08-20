@@ -72,6 +72,12 @@ dist-hook: man manual
 	cp $(srcdir)/jhc.1 $(distdir)/jhc.1
 	find $(distdir)  -name _darcs -o -name \*.ho | xargs rm -rf --
 
+darcs-fetch:
+	test -d src/Doc || darcs get --partial http://repetae.net/repos/Doc --repodir=src/Doc
+	test -d lib/haskell98 || darcs get --partial http://darcs.haskell.org/packages/haskell98 --repodir=lib/haskell98
+	test -d lib/containers || darcs get --partial http://darcs.haskell.org/packages/containers --repodir=lib/containers
+
+
 all-local: libs
 
 install-data-hook: $(JHC_LIBS)
@@ -276,5 +282,5 @@ manual.html :
 libs: $(JHC_LIBS)
 
 %: examples/%.hs jhc
-	./jhc -v -L- -L. $(JHC_TEST) $< -o $@ 2>&1 | tee $@.log
+	./jhc  -L- -L. $(JHC_TEST) $< -o $@ 2>&1 | tee $@.log
 
