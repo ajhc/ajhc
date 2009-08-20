@@ -82,17 +82,19 @@ install-data-hook: $(JHC_LIBS)
 		test -f "$$lib" && $(INSTALL_DATA) $$lib $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 		test -f "$(srcdir)/$$lib" && $(INSTALL_DATA) "$(srcdir)/$$lib" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 	done
-	$(INSTALL_DATA) "$(srcdir)/src/data/HsFFI.h" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include ;
-	$(INSTALL_DATA) "$(srcdir)/src/data/targets.ini" $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@ ;
+	$(INSTALL_DATA) "$(srcdir)/src/data/HsFFI.h" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include
+	$(INSTALL_DATA) "$(srcdir)/src/data/targets.ini" $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@
 
 uninstall-hook: $(JHC_LIBS)
 	rm -f -- "$(DESTDIR)$(bindir)/jhci$(EXTEXT)"
 	for lib in $(JHC_LIBS); do  \
 		rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/$$lib" ; \
 	done
-	rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include/HsFFI.h" ;
+	rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include/HsFFI.h"
+	rm -f -- "$(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@/targets.ini"
 	-rmdir $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include
 	-rmdir $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@
+	-rmdir $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
@@ -211,6 +213,8 @@ clean-local:
 	find . \! -wholename \*/_\* \( -name \*.o-boot -o -name \*.hi -o -name \*.o -o -name \*.hi-boot \) | xargs rm -f --
 
 MAINTAINERCLEANFILES= $(BUILT_SOURCES) $(DRIFTFILES)
+
+CLEANFILES= $(JHC_LIBS)
 
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST) --noauto -L- -L.
 
