@@ -194,6 +194,33 @@ init (x:xs)      =  init' x xs where
 {-# RULES "tail/iterate"  forall f x . tail (iterate f x) = iterate f (f x) #-}
 {-# RULES "iterate/id" forall . iterate id = repeat #-}
 
+
+
+foldl1           :: (a -> a -> a) -> [a] -> a
+foldl1 f (x:xs)  =  foldl f x xs
+foldl1 _ []      =  error "Prelude.foldl1: empty list"
+
+
+
+scanl1           :: (a -> a -> a) -> [a] -> [a]
+scanl1 f (x:xs)  =  scanl f x xs
+scanl1 _ []      =  []
+
+foldr1           :: (a -> a -> a) -> [a] -> a
+foldr1 f [x]     =  x
+foldr1 f (x:xs)  =  f x (foldr1 f xs)
+foldr1 _ []      =  error "Prelude.foldr1: empty list"
+
+scanr             :: (a -> b -> b) -> b -> [a] -> [b]
+scanr f q0 []     =  [q0]
+scanr f q0 (x:xs) =  f x q : qs where qs@(q:_) = scanr f q0 xs
+
+
+scanr1          :: (a -> a -> a) -> [a] -> [a]
+scanr1 f []     =  []
+scanr1 f [x]    =  [x]
+scanr1 f (x:xs) =  f x q : qs where qs@(q:_) = scanr1 f xs
+
 {-
 concatMap f = foldr ((++) . f) []
 --concat xss = foldr (++) [] xss

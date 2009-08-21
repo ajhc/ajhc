@@ -54,6 +54,7 @@ module Prelude(
     RealFloat(..),
     module Jhc.Monad,
     Int(),
+    foldl1,scanl1,foldr1,scanr,scanr1,
 
     module Prelude.IO,
     module Prelude.Text
@@ -183,40 +184,8 @@ until p f x
 
 
 
-foldl1           :: (a -> a -> a) -> [a] -> a
-foldl1 f (x:xs)  =  foldl f x xs
-foldl1 _ []      =  error "Prelude.foldl1: empty list"
 
 
-
-scanl1           :: (a -> a -> a) -> [a] -> [a]
-scanl1 f (x:xs)  =  scanl f x xs
-scanl1 _ []      =  []
-
--- foldr, foldr1, scanr, and scanr1 are the right-to-left duals of the
--- above functions.
-
-
---foldr :: (a -> b -> b) -> b -> [a] -> b
---foldr k z [] = z
---foldr k z (x:xs) = k x (foldr k z xs)
-
-
-foldr1           :: (a -> a -> a) -> [a] -> a
-foldr1 f [x]     =  x
-foldr1 f (x:xs)  =  f x (foldr1 f xs)
-foldr1 _ []      =  error "Prelude.foldr1: empty list"
-
-
-scanr             :: (a -> b -> b) -> b -> [a] -> [b]
-scanr f q0 []     =  [q0]
-scanr f q0 (x:xs) =  f x q : qs where qs@(q:_) = scanr f q0 xs
-
-
-scanr1          :: (a -> a -> a) -> [a] -> [a]
-scanr1 f []     =  []
-scanr1 f [x]    =  [x]
-scanr1 f (x:xs) =  f x q : qs where qs@(q:_) = scanr1 f xs
 
 
 -- replicate n x is a list of length n with x the value of every element
