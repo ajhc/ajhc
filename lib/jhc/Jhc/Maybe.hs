@@ -1,12 +1,12 @@
 {-# OPTIONS_JHC -N -fffi #-}
 module Jhc.Maybe where
 
+import Jhc.Basics
+import Jhc.List
 import Jhc.Monad
+import Jhc.Num
 import Jhc.Order
 import Jhc.Show
-import Jhc.List
-import Jhc.Basics
-import Jhc.Num
 
 instance Monad Maybe where
     return x = Just x

@@ -9,18 +9,18 @@ module Prelude.Text (
 -- The instances of Read and Show for
 --      Bool, Maybe, Either, Ordering
 -- are done via "deriving" clauses in Prelude.hs
-import Jhc.Show
-import Jhc.Inst.Show()
-import Prelude.Float
 import Jhc.Basics
-import Jhc.Monad
-import Jhc.IO
-import Prelude.IO
-import Jhc.Order
-import Jhc.Maybe
-import Jhc.Text.Read
-import Jhc.Num
 import Jhc.Float
+import Jhc.Inst.Show()
+import Jhc.IO
+import Jhc.Maybe
+import Jhc.Monad
+import Jhc.Num
+import Jhc.Order
+import Jhc.Show
+import Jhc.Text.Read
+import Prelude.Float
+import Prelude.IO
 
 
 import Data.Char(isSpace, isAlpha, isDigit, isAlphaNum,

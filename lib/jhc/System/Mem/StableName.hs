@@ -1,10 +1,8 @@
-
 {-# OPTIONS_JHC -N -fffi -fm4   #-}
 
 m4_include(Jhc/Order.m4)
 
 module System.Mem.StableName(StableName(),makeStableName,hashStableName) where
-
 
 import Jhc.IO
 import Jhc.Order

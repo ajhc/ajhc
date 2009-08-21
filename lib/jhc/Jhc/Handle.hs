@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi -funboxed-values #-}
+{-# OPTIONS_JHC -N -fffi -funboxed-values #-}
 module Jhc.Handle(
     Handle(..),
     IOMode(..),
@@ -20,9 +20,17 @@ import Jhc.Addr
 import Foreign.C.String
 import Foreign.Marshal.Utils
 import Foreign.C.Error
+import Jhc.Show
+import Jhc.Order
+import Jhc.Enum
+import Jhc.Basics
+import Jhc.Monad
+import Jhc.Maybe
+import Prelude.IO
+
 
 data IOMode = ReadMode | WriteMode | AppendMode | ReadWriteMode
-    deriving(Eq, Ord, Bounded, Enum, Read, Show)
+    deriving(Eq, Ord, Bounded, Enum, Show)
 
 data Handle = Handle {
     handleName :: String,

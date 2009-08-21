@@ -10,8 +10,8 @@ import Jhc.Basics
 import Jhc.Order
 import Jhc.Num
 import Data.Word
-import Jhc.IO
 import Jhc.List
+import Jhc.IO
 
 -- Character-testing operations
 isAscii, isLatin1, isControl, isPrint, isSpace, isUpper, isLower,

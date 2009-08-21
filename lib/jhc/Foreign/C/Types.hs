@@ -1,4 +1,4 @@
-{-# OPTIONS --noprelude #-}
+{-# OPTIONS_JHC -N #-}
 module Foreign.C.Types where
 
 data CChar
