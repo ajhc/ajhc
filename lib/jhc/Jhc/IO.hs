@@ -16,7 +16,6 @@ module Jhc.IO(
     dependingOn,
     fixIO,
     ioError,
-    runExpr,
     runMain,
     runNoWrapper,
     exitFailure,

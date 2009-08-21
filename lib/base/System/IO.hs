@@ -1,5 +1,6 @@
 {-# OPTIONS_JHC -fffi #-}
 module System.IO(
+    module System.IO.Error,
     BufferMode(..),
     Handle,
     IOMode(..),
@@ -16,30 +17,39 @@ module System.IO(
     hGetChar,
     hGetLine,
     hIsOpen,
+    hIsClosed,
     hPrint,
     hPutBuf,
     hPutChar,
     hPutStr,
     hPutStrLn,
     hIsEOF,
+    isEOF,
     hWaitForInput,
     openFile,
     openBinaryFile,
     withFile,
     fixIO,
+    HandlePosn,
     stdin,stdout,stderr,
-    try
+    hIsReadable,
+    hIsSeekable,
+    hIsWritable,
+    hLookAhead,
+    hReady,
+    hSetBuffering,
+    hGetBuffering
 
     ) where
 
 import Jhc.IO
 import Jhc.Handle
-import Prelude.IOError
 import Foreign.Ptr
 import Foreign.Storable
 import Foreign.C.Types
 import Data.Char(ord)
 import Data.Int
+import System.IO.Error
 
 
 data BufferMode = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
@@ -49,13 +59,8 @@ data SeekMode = AbsoluteSeek | RelativeSeek | SeekFromEnd
 
 type HandlePosn = Integer
 
-
-
-try            :: IO a -> IO (Either IOError a)
-try f          =  catch (do r <- f
-                            return (Right r))
-                        (return . Left)
-
+hIsReadable h = return $ handleIOMode h `elem` [ReadMode,ReadWriteMode]
+hIsWritable h = return $ handleIOMode h `elem` [AppendMode,WriteMode,ReadWriteMode]
 
 withFile :: FilePath -> IOMode -> (Handle -> IO r) -> IO r
 withFile fp iom action = do
@@ -64,6 +69,7 @@ withFile fp iom action = do
     hClose h
     return r
 
+hIsClosed h = not `fmap` hIsOpen h
 
 
 hFlush :: Handle -> IO ()
@@ -149,6 +155,21 @@ hGetBuf h p c = do
     let count = fromIntegral c
     rc <- withHandle h $ fread p 1 count
     return $ fromIntegral rc
+
+hIsSeekable :: Handle -> IO Bool
+hIsSeekable _ = return True
+
+hLookAhead :: Handle -> IO Char
+hLookAhead = error "hLookAhead"
+
+hReady :: Handle -> IO Bool
+hReady _ = return True
+
+hSetBuffering :: Handle -> BufferMode -> IO ()
+hSetBuffering _ _ = return ()
+
+hGetBuffering :: Handle -> IO BufferMode
+hGetBuffering _ = error "hGetBuffering"
 
 hFileSize :: Handle -> IO Integer
 hFileSize h = do

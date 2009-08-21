@@ -39,6 +39,8 @@ alignPtr = error "alignPtr"
 --      0# -> addr;
 --      n -> Ptr (plusAddr# a (i -# n)) }
 
+castFunPtr :: FunPtr a -> FunPtr b
+castFunPtr (FunPtr x) = FunPtr x
 
 castFunPtrToPtr :: FunPtr a -> Ptr b
 castFunPtrToPtr (FunPtr x) = Ptr x
@@ -46,6 +48,9 @@ castFunPtrToPtr (FunPtr x) = Ptr x
 castPtrToFunPtr :: Ptr a -> FunPtr b
 castPtrToFunPtr (Ptr x) = FunPtr x
 
+
+freeHaskellFunPtr :: FunPtr a -> IO ()
+freeHaskellFunPtr _ = error "freeHaskellFunPtr"
 
 foreign import primitive "U2U" ptrToWordPtr :: Ptr a -> WordPtr
 foreign import primitive "U2U" wordPtrToPtr :: WordPtr -> Ptr a

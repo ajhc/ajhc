@@ -29,7 +29,6 @@ import Jhc.IO
 import Jhc.Monad
 import Jhc.Order
 import Jhc.Show
-import Prelude.IOError
 
 
 -- IO operations exported by the prelude

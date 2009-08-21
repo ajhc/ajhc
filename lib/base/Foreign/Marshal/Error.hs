@@ -29,7 +29,6 @@ module Foreign.Marshal.Error (
 
 import Foreign.Ptr
 import Prelude.IO
-import Prelude.IOError
 
 
 -- exported functions

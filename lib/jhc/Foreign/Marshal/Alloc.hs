@@ -21,7 +21,6 @@ import Foreign.Storable
 import Prelude.IO
 import Foreign.C.Types
 import Foreign.Marshal.Utils
-import Prelude.IOError
 import Jhc.Prim
 import Jhc.Basics
 import Jhc.Monad

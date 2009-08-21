@@ -48,7 +48,6 @@ Exposed-Modules:
 	Prelude.CType,
 	Prelude.Float,
 	Prelude.IO,
-	Prelude.IOError,
 	Prelude.Text,
         System.IO.Unsafe,
         System.Mem,

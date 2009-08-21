@@ -81,7 +81,6 @@ import Jhc.Maybe
 import Jhc.Tuples
 import Prelude.Float
 import Prelude.IO
-import Prelude.IOError
 import Prelude.Text
 import qualified Data.Char as Char(isSpace,ord,chr)
 

@@ -21,6 +21,9 @@ import Prelude.CType
 
 
 
+lexLitChar :: ReadS String
+lexLitChar ('\\':s) = lexEsc s
+lexLitChar (c:s) = [([c],s)]
 
 -- Text functions
 readLitChar          :: ReadS Char
@@ -51,6 +54,22 @@ readEsc s@(c:_) | isUpper c
                       of (pr:_) -> [pr]
                          []     -> []
 readEsc _        = []
+
+lexEsc          :: ReadS String
+lexEsc (c:s) | c `elem` "abfnrtv\\\"\'" = [('\\':[c],s)]
+lexEsc ('^':(c:s)) | c >= '@' && c <= '_'
+                 = [('\\':'^':[c], s)]
+--lexEsc s@(d:_) | isDigit d
+--                 = [(chr n, t) | (n,t) <- readDec s]
+--lexEsc ('o':s)  = [(chr n, t) | (n,t) <- readOct s]
+--lexEsc ('x':s)  = [(chr n, t) | (n,t) <- readHex s]
+--lexEsc s@(c:_) | isUpper c
+--                 = let table = ('\DEL', "DEL") : zip ['\NUL' .. ] asciiTab
+--                   in case [(c,s') | (c, mne) <- table,
+--                                     ([],s') <- [match mne s]]
+--                      of (pr:_) -> [pr]
+--                         []     -> []
+lexEsc _        = []
 
 match                         :: (Eq a) => [a] -> [a] -> ([a],[a])
 match (x:xs) (y:ys) | x == y  =  match xs ys

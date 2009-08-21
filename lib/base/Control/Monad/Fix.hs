@@ -23,9 +23,9 @@ module Control.Monad.Fix (
   ) where
 
 import Prelude
-import System.IO
 import Control.Monad.Instances ()
 import Data.Function (fix)
+import Jhc.IO
 
 -- | Monads having fixed points with a \'knot-tying\' semantics.
 -- Instances of 'MonadFix' should satisfy the following laws:

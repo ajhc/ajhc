@@ -58,7 +58,6 @@ import Jhc.List
 import Jhc.Monad
 import Jhc.Num
 import Jhc.Order
-import Prelude.IOError
 
 -- allocation
 -- ----------
