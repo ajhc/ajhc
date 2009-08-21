@@ -1,6 +1,6 @@
 {-# OPTIONS_JHC -fffi #-}
 module System.Time (
-    ClockTime,
+    ClockTime(),
     Month(..),
     Day(..),
     CalendarTime(..),
@@ -22,7 +22,7 @@ import Foreign.Ptr
 import System.Locale
 import System.IO.Unsafe
 
-data ClockTime = TOD !Integer !Integer -- Implementation-dependent
+newtype ClockTime = TOD Integer
     deriving(Eq,Ord)
 
 -- When a ClockTime is shown, it is converted to a CalendarTime in the current
@@ -86,7 +86,7 @@ data TimeDiff = TimeDiff {
 getClockTime         :: IO ClockTime
 getClockTime = do
     secs <- c_time nullPtr -- can't fail, according to POSIX
-    return (TOD (ctimeToInteger secs) 0)
+    return (TOD (ctimeToInteger secs))
 
 foreign import primitive "U2U" ctimeToInteger :: CTime -> Integer
    -- -----------------------------------------------------------------------------
@@ -120,13 +120,14 @@ calendarTimeToString    =  formatCalendarTime defaultTimeLocale "%c"
 
 addToClockTime  :: TimeDiff  -> ClockTime -> ClockTime
 addToClockTime (TimeDiff year mon day hour min sec psec)
-	       (TOD c_sec c_psec) =
+	       (TOD c_sec) =
 	let
 	  sec_diff = toInteger sec +
                      60 * toInteger min +
                      3600 * toInteger hour +
                      24 * 3600 * toInteger day
-	  cal      = toUTCTime (TOD (c_sec + sec_diff) (c_psec + psec))
+	  --cal      = toUTCTime (TOD (c_sec + sec_diff) (c_psec + psec))
+	  cal      = toUTCTime (TOD (c_sec + sec_diff))
                                                        -- FIXME! ^^^^
           new_mon  = fromEnum (ctMonth cal) + r_mon
 	  month' = fst tmp
@@ -151,11 +152,8 @@ diffClockTimes  :: ClockTime -> ClockTime -> TimeDiff
 -- `normalizeTimeDiff' on this function's result
 --
 -- CAVEAT: see comment of normalizeTimeDiff
-diffClockTimes (TOD sa pa) (TOD sb pb) =
-    noTimeDiff{ tdSec     = fromIntegral (sa - sb)
-                -- FIXME: can handle just 68 years...
-              , tdPicosec = pa - pb
-              }
+diffClockTimes (TOD sa) (TOD sb) =
+    noTimeDiff{ tdSec  = fromIntegral (sa - sb) }
 
 noTimeDiff :: TimeDiff
 noTimeDiff = TimeDiff 0 0 0 0 0 0 0
