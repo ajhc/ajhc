@@ -162,12 +162,26 @@ withSubTable st action = local ( \e -> e { envSubTable = st `Map.union` envSubTa
 
 renameDecls :: HsModule -> RM HsModule
 renameDecls tidy = do
+        withSrcLoc (hsModuleSrcLoc tidy) $ do
         addTopLevels (hsModuleDecls tidy) $ do
         gst <- gets globalSubTable
         withSubTable gst $ do
         decls' <- rename (hsModuleDecls tidy)
         mapM_ HsErrors.hsDeclTopLevel decls'
+        mapM_ checkExportSpec $ fromMaybe [] (hsModuleExports tidy)
         return tidy { hsModuleDecls = decls' }
+
+checkExportSpec :: HsExportSpec -> RM ()
+checkExportSpec e = f e  where
+    f :: HsExportSpec -> RM ()
+    f (HsEVar n) = do rename n; return ()
+    f (HsEAbs n) = do renameTypeName n; return ()
+    f (HsEThingAll n) = do renameTypeName n ; return ()
+    f (HsEThingWith n ns) = do
+        renameTypeName n
+        mapM_ rename ns
+    f HsEModuleContents {} = return ()
+
 
 
 expandTypeSigs :: [HsDecl] -> [HsDecl]
@@ -659,6 +673,7 @@ instance Rename HsName where
         subTable <- asks envSubTable
         renameHsName n subTable
 
+renameTypeName :: HsName -> RM HsName
 renameTypeName hsName = do
     t <- gets typeSubTable
     subTable <- asks envSubTable
@@ -738,7 +753,6 @@ unRenameString s = (dropUnderscore . dropDigits) s where
    dropUnderscore ('_':rest) = rest
    dropUnderscore otherList = otherList
    dropDigits = dropWhile isDigit
-
 
 
 --------------------------------------------------------
