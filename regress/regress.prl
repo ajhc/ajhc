@@ -141,7 +141,7 @@ sub my_system {
     return ($r,$time_end - $time_start);
 }
 
-my @libs = $opt_l ? () : ("--noauto", "-i$jhc_dir/lib/jhc", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
+my @libs = $opt_l ? ("-pjhc") : ("--noauto", "-i$jhc_dir/lib/jhc", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
 my @fast = $opt_n ? ("-fno-lint") : ("-flint");
 
 sub do_it {
