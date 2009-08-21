@@ -40,11 +40,18 @@ import qualified Jhc.Options
 -- basic types
 
 
-unIO :: IO a -> World__ -> (# World__, a #)
+unIO :: IO a -> UIO a
 unIO (IO x) = x
 
 type UIO a = World__ -> (# World__, a #)
 type UIO_ = World__ -> World__
+
+fromUIO :: UIO a -> IO a
+fromUIO x = IO x
+
+fromUIO_ :: UIO_ -> IO ()
+fromUIO_ f = IO $ \w -> (# f w, () #) 
+
 
 -- | this ensures the world parameter is eta expanded out
 {-# INLINE etaIO #-}

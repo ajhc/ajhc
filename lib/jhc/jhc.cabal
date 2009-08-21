@@ -51,4 +51,5 @@ Exposed-Modules:
 	Prelude.IOError,
 	Prelude.Text,
         System.IO.Unsafe,
-        System.Mem
+        System.Mem,
+        System.Mem.StableName

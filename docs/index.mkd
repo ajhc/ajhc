@@ -7,7 +7,7 @@ Getting jhc
 -----------
 
  * See the [Installation page](building.shtml) for information about downloading and installing jhc.
- * [The (incomplete) Manual](manual.html) The beginings of the jhc manual
+ * For information on running jhc, see [The Manual](manual.html). 
 
 
 Development and other info

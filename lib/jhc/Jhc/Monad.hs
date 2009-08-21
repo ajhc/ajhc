@@ -14,7 +14,7 @@ class Functor f  where
     fmap              :: (a -> b) -> f a -> f b
 
 {- INLINE return, fail, (>>=), (>>) -}
-class Monad m  where
+class Monad m where
     (>>=)  :: m a -> (a -> m b) -> m b
     (>>)   :: m a -> m b -> m b
     return :: a -> m a
@@ -37,7 +37,7 @@ class Monad m  where
 {-# RULES "sequence_/++"  forall xs ys . sequence_ (xs ++ ys) = sequence_ xs >> sequence_ ys #-}
 {-# RULES "mapM_/++"      forall xs ys f . mapM_ f (xs ++ ys) = mapM_ f xs >> mapM_ f ys #-}
 
-mapM             :: Monad m => (a -> m b) -> [a] -> m [b]
+mapM :: Monad m => (a -> m b) -> [a] -> m [b]
 mapM f as = go as where
     go [] = return []
     go (a:as) = do
@@ -45,23 +45,23 @@ mapM f as = go as where
         as' <- go as
         return (a':as')
 
-mapM_            :: Monad m => (a -> m b) -> [a] -> m ()
+mapM_ :: Monad m => (a -> m b) -> [a] -> m ()
 mapM_ f as = go as where
     go [] = return ()
     go (a:as) = f a >> go as
 
-sequence       :: Monad m => [m a] -> m [a]
+sequence :: Monad m => [m a] -> m [a]
 sequence xs = f xs where
     f [] = return []
     f (x:xs) = x >>= \r -> f xs >>= \rs -> return (r:rs)
 
-sequence_      :: Monad m => [m a] -> m ()
+sequence_ :: Monad m => [m a] -> m ()
 sequence_ xs  =  f xs where
     f [] = return ()
     f (x:xs) = x >> f xs
 
-(=<<)            :: Monad m => (a -> m b) -> m a -> m b
-f =<< x          =  x >>= f
+(=<<) :: Monad m => (a -> m b) -> m a -> m b
+f =<< x =  x >>= f
 
 
 

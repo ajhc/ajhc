@@ -1,13 +1,14 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -N -fm4 -funboxed-values -funboxed-tuples -fffi #-}
 module Foreign.Storable(Storable(..)) where
 
+m4_include(Foreign/Storable.m4)
+
+import Jhc.Types
 import Jhc.Basics
 import Jhc.Addr
 import Jhc.Int
 import Jhc.IO
 
-plusPtr :: Ptr a -> Int -> Ptr b
-plusPtr (Ptr addr) off = Ptr (plusAddr addr off)
 
 class Storable a where
     sizeOf :: a -> Int
@@ -22,10 +23,14 @@ class Storable a where
     alignment x = sizeOf x
     peekElemOff addr idx = IO $ \w -> unIO (peek $! (addr `plusPtr` (idx `times` sizeOf (_f addr)))) w
     pokeElemOff addr idx x = IO $ \w -> unIO (let adr = (addr `plusPtr` (idx `times` sizeOf x)) in adr `seq` poke adr x) w
-    peekByteOff addr off = IO $ \w -> unIO (peek $! (addr `plusPtr` off)) w
-    pokeByteOff addr off x = IO $ \w -> unIO (let adr = (addr `plusPtr` off) in adr `seq` poke adr x) w
+    peekByteOff addr off = IO $ \w -> unIO (peek $! (castPtr $ addr `plusPtr` off)) w
+    pokeByteOff addr off x = IO $ \w -> unIO (let adr = castPtr (addr `plusPtr` off) in adr `seq` poke adr x) w
 
 _f :: Ptr a -> a
 _f _ = undefined
 
 
+INST_STORABLE((Ptr a),Ptr,BitsPtr_,bits<ptr>)
+INST_STORABLE((FunPtr a),FunPtr,BitsPtr_,bits<ptr>)
+
+-- foreign import "Add" plusBitsPtr_ :: BitsPtr_ -> Int -> BitsPtr_

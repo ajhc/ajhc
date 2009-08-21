@@ -8,7 +8,7 @@ import Jhc.Order
 import Jhc.Int
 import Jhc.Basics
 
-newtype JumpPoint = JumpPoint Addr
+newtype JumpPoint = JumpPoint (Ptr ())
 
 
 -- | in order to be safe, the JumpPoint must not escape the handling function
@@ -30,8 +30,8 @@ foreign import ccall "&jhc_uncaught" errorJumpPoint :: JumpPoint
 foreign import ccall jhc_setjmp :: JumpPoint -> IO Int
 foreign import ccall jhc_longjmp :: JumpPoint -> IO ()
 foreign import primitive "const.sizeof(jmp_buf)" jmp_buf_size  :: Int
-foreign import ccall "malloc.h malloc" _malloc :: Int -> IO Addr
-foreign import ccall "malloc.h free" _free :: Addr -> IO ()
+foreign import ccall "malloc.h malloc" _malloc :: Int -> IO (Ptr a)
+foreign import ccall "malloc.h free" _free :: Ptr a -> IO ()
 
 
 

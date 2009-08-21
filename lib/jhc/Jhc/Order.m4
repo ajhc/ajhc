@@ -7,33 +7,32 @@ foreign import primitive "box" boxBool :: Bool__ -> Bool
 
 m4_define(INST_EQ,{{
 instance Eq $1 where
-    $1 x == $1 y = boxBool (equals$2 x y)
-    $1 x /= $1 y = boxBool (nequals$2 x y)
+    $2 x == $2 y = boxBool (equals$3 x y)
+    $2 x /= $2 y = boxBool (nequals$3 x y)
 ONCE({{
-foreign import primitive "Eq" equals$2 :: $2 -> $2 -> Bool__
-foreign import primitive "NEq" nequals$2 :: $2 -> $2 -> Bool__
+foreign import primitive "Eq" equals$3 :: $3 -> $3 -> Bool__
+foreign import primitive "NEq" nequals$3 :: $3 -> $3 -> Bool__
 }})
 BOXBOOL()
 }})
+
 
 
 m4_define(INST_ORDER,{{
 instance Ord $1 where
-    $1 x < $1 y = boxBool (lt$2 x y)
-    $1 x > $1 y = boxBool (gt$2 x y)
-    $1 x <= $1 y = boxBool (lte$2 x y)
-    $1 x >= $1 y = boxBool (gte$2 x y)
+    $2 x < $2 y = boxBool (lt$4$3 x y)
+    $2 x > $2 y = boxBool (gt$4$3 x y)
+    $2 x <= $2 y = boxBool (lte$4$3 x y)
+    $2 x >= $2 y = boxBool (gte$4$3 x y)
 ONCE({{
-foreign import primitive "$3Lt" lt$3$2   :: $2 -> $2 -> Bool__
-foreign import primitive "$3Lte" lte$3$2 :: $2 -> $2 -> Bool__
-foreign import primitive "$3Gt" gt$3$2   :: $2 -> $2 -> Bool__
-foreign import primitive "$3Gte" gte$3$2 :: $2 -> $2 -> Bool__
+foreign import primitive "$4Lt" lt$4$3   :: $3 -> $3 -> Bool__
+foreign import primitive "$4Lte" lte$4$3 :: $3 -> $3 -> Bool__
+foreign import primitive "$4Gt" gt$4$3   :: $3 -> $3 -> Bool__
+foreign import primitive "$4Gte" gte$4$3 :: $3 -> $3 -> Bool__
 }})
 BOXBOOL()
 }})
 
-m4_define(INST_EQORDER,{{INST_EQ($1,$2)INST_ORDER($1,$2,$3)}})
+m4_define(INST_EQORDER,{{INST_EQ($1,$2,$3)INST_ORDER($1,$2,$3,$4)}})
 
 m4_divert
-
-

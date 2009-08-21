@@ -77,7 +77,7 @@ throwErrnoFN loc fn  = do
 
 openFile :: FilePath -> IOMode -> IO Handle
 openFile fp m = do
-    ptr <- withCString fp $ \cfp -> c_fopen cfp (toStr m)
+    ptr <- withCString fp $ \cfp -> c_fopen cfp (Ptr (toStr m))
     if ptr == nullPtr then throwErrnoFN "openFile" fp  else do
         pptr <- new ptr
         return Handle { handleBinary = False, handleName = fp, handleIOMode = m, handleFile = pptr }
@@ -87,10 +87,10 @@ openBinaryFile fp m = do
     h <- openFile fp m
     return h { handleBinary = True }
 
-toStr ReadMode = ptrFromAddr__ "r"#
-toStr WriteMode = ptrFromAddr__ "w"#
-toStr AppendMode = ptrFromAddr__ "a"#
-toStr ReadWriteMode = ptrFromAddr__ "r+"#
+toStr ReadMode = "r"#
+toStr WriteMode = "w"#
+toStr AppendMode = "a"#
+toStr ReadWriteMode = "r+"#
 
 foreign import ccall "stdio.h fclose" c_fclose :: Ptr Handle -> IO CInt
 foreign import ccall "stdio.h fopen" c_fopen :: Ptr CChar -> Ptr CChar ->  IO (Ptr Handle)

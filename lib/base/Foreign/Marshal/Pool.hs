@@ -105,8 +105,8 @@ pooledMallocBytes :: Pool -> Int -> IO (Ptr a)
 pooledMallocBytes (Pool pool) size = do
     ptr <- mallocBytes (size + sizeOf pool)
     v <- peek pool
-    poke ptr (v :: Ptr ())
-    return ((ptr :: Ptr (Ptr ())) `plusPtr` sizeOf pool)
+    poke ptr v
+    return (castPtr $ ptr `plusPtr` sizeOf pool)
 
 -- | Adjust the storage area for an element in the pool to the given size of
 -- the required type.

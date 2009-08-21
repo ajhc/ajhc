@@ -17,8 +17,8 @@ import Jhc.Prim
 import Jhc.Types
 
 
-INST_STORABLE(Float,Float32_,fbits32)
-INST_STORABLE(Double,Float64_,fbits64)
+INST_STORABLE(Float,Float,Float32_,fbits32)
+INST_STORABLE(Double,Double,Float64_,fbits64)
 
 
 INST_STORABLE_XXX(Int,Bits32_,bits32)

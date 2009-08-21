@@ -1,62 +1,45 @@
 {-# OPTIONS_JHC -N -fffi -funboxed-values -fm4 #-}
 
 m4_include(Jhc/Order.m4)
-m4_include(Foreign/Storable.m4)
 
 module Jhc.Addr(
-    Addr(..),
-    FunAddr(..),
     Ptr(..),
     FunPtr(..),
-    ptrFromAddr__,
-    nullAddr,
+    nullPtr,
+    nullFunPtr,
     castPtr,
-    nullFunAddr,
-    plusAddr,
-    minusAddr,
-    addrToWordPtr,
-    wordPtrToAddr,
-    wordPtrToFunAddr,
-    funAddrToWordPtr
+    plusPtr,
+    minusPtr
     ) where
 
+import Jhc.Basics
 import Jhc.Int
-import Data.Word
+import Jhc.Order
 import Jhc.Prim
 import Jhc.Types
-import Jhc.Order
-import Jhc.Basics
-import Jhc.IO
-import Foreign.Storable
 
-data Addr = Addr BitsPtr_
-data FunAddr = FunAddr BitsPtr_
 
-newtype Ptr a = Ptr Addr
-newtype FunPtr a = FunPtr FunAddr
+data Ptr a = Ptr BitsPtr_
+data FunPtr a = FunPtr BitsPtr_
 
-nullAddr = Addr 0#
-nullFunAddr = FunAddr 0#
+nullPtr :: Ptr a
+nullFunPtr :: FunPtr a
+nullPtr = Ptr 0#
+nullFunPtr = FunPtr 0#
 
-INST_EQORDER(Addr,BitsPtr_)
-INST_EQORDER(FunAddr,BitsPtr_)
+INST_EQORDER((Ptr a),Ptr,BitsPtr_,U)
+INST_EQORDER((FunPtr a),FunPtr,BitsPtr_,U)
 
-INST_STORABLE(Addr,BitsPtr_,bits<ptr>)
-INST_STORABLE(FunAddr,BitsPtr_,bits<ptr>)
 
-{-# INLINE plusAddr #-}
-plusAddr :: Addr -> Int -> Addr
-plusAddr (Addr addr) off = case unboxInt off of
-    off_ -> Addr (addr `plusWordPtr` intToPtr__ off_)
+{-# INLINE plusPtr #-}
+plusPtr :: Ptr a -> Int -> Ptr a
+plusPtr (Ptr addr) off = case unboxInt off of
+    off_ -> Ptr (addr `plusWordPtr` intToPtr__ off_)
 
-{-# INLINE minusAddr #-}
-minusAddr :: Addr -> Addr -> Int
-minusAddr (Addr a1) (Addr a2) = boxInt (ptrToInt__ (a1 `minusWP` a2))
+{-# INLINE minusPtr #-}
+minusPtr :: Ptr a -> Ptr a -> Int
+minusPtr (Ptr a1) (Ptr a2) = boxInt (ptrToInt__ (a1 `minusWP` a2))
 
-foreign import primitive "U2U" addrToWordPtr :: Addr -> WordPtr
-foreign import primitive "U2U" wordPtrToAddr :: WordPtr -> Addr
-foreign import primitive "U2U" wordPtrToFunAddr :: WordPtr -> FunAddr
-foreign import primitive "U2U" funAddrToWordPtr :: FunAddr -> WordPtr
 
 foreign import primitive "Sx" intToPtr__ :: Int__ -> BitsPtr_
 foreign import primitive "I2I" ptrToInt__ :: BitsPtr_ -> Int__
@@ -64,27 +47,10 @@ foreign import primitive "I2I" ptrToInt__ :: BitsPtr_ -> Int__
 foreign import primitive "Add" plusWordPtr :: BitsPtr_ -> BitsPtr_ -> BitsPtr_
 foreign import primitive "Sub" minusWP :: BitsPtr_ -> BitsPtr_ -> BitsPtr_
 
-ptrFromAddr__ :: Addr__ -> Ptr a
-ptrFromAddr__ addr = Ptr (Addr addr)
-
-instance Storable (Ptr a) where
-    sizeOf (Ptr a) = sizeOf a
-    alignment (Ptr a) = alignment a
-    peek p = peek (castPtr p) `thenIO` (returnIO . Ptr)
-    poke p (Ptr x) = poke (castPtr p) x
-
-instance Eq (Ptr a) where
-    Ptr a == Ptr b = a == b
-    Ptr a /= Ptr b = a /= b
-
-instance Ord (Ptr a) where
-    compare (Ptr a) (Ptr b) = compare a b
-    Ptr a <= Ptr b = a <= b
-    Ptr a < Ptr b = a < b
-    Ptr a > Ptr b = a > b
-    Ptr a >= Ptr b = a >= b
 
 castPtr :: Ptr a -> Ptr b
 castPtr (Ptr addr) = Ptr addr
 
+castFunPtr :: FunPtr a -> FunPtr b
+castFunPtr (FunPtr addr) = FunPtr addr
 

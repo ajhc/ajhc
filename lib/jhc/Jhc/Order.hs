@@ -1,4 +1,6 @@
-{-# OPTIONS_JHC -N -fffi #-}
+{-# OPTIONS_JHC -fm4 -N -fffi #-}
+
+m4_include(Jhc/Order.m4)
 
 module Jhc.Order(
     Bool(..),
@@ -13,6 +15,7 @@ module Jhc.Order(
 
 import Jhc.Enum
 import Jhc.Basics
+import Jhc.Types
 
 data Bool = False | True
     deriving (Eq, Ord, Bounded, Enum)
@@ -93,15 +96,8 @@ instance Ord a => Ord [a] where
     x <= y = not (y < x)
 
 
-instance Eq Char where
-    Char x == Char y = boxBool (equalsChar x y)
-    Char x /= Char y = boxBool (nequalsChar x y)
+INST_EQORDER(Char,Char,Bits32_,U)
 
-instance Ord Char where
-    Char x < Char y = boxBool (bits32ULt x y)
-    Char x > Char y = boxBool (bits32UGt x y)
-    Char x <= Char y = boxBool (bits32ULte x y)
-    Char x >= Char y = boxBool (bits32UGte x y)
 
 infixr 3  &&
 infixr 2  ||
@@ -121,11 +117,4 @@ not x = if x then False else True
 otherwise        :: Bool
 otherwise        =  True
 
-foreign import primitive "Eq" equalsChar :: Char__ -> Char__ -> Bool__
-foreign import primitive "NEq" nequalsChar :: Char__ -> Char__ -> Bool__
-foreign import primitive "ULt" bits32ULt :: Char__ -> Char__ -> Bool__
-foreign import primitive "ULte" bits32ULte :: Char__ -> Char__ -> Bool__
-foreign import primitive "UGt" bits32UGt :: Char__ -> Char__ -> Bool__
-foreign import primitive "UGte" bits32UGte :: Char__ -> Char__ -> Bool__
-foreign import primitive "box" boxBool :: Bool__ -> Bool
 

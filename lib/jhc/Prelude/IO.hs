@@ -68,7 +68,7 @@ getContents = unsafeInterleaveIO getContents' where
 
 readFile :: FilePath -> IO String
 readFile fn = do
-    file <- withCString fn $ \fnc -> c_fopen fnc (ptrFromAddr__ "r"#)
+    file <- withCString fn $ \fnc -> c_fopen fnc (Ptr "r"#)
     if  (file == nullPtr) then (fail "Could not open file.") else do
         let gc = do
                 ch <- c_fgetwc file

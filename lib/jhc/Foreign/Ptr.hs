@@ -25,19 +25,11 @@ import Jhc.Basics
 import Jhc.Num
 import Jhc.Addr
 import Foreign.Storable
+import Data.Word
 
 
 instance Show (Ptr a) where
-    showsPrec n (Ptr x) = showsPrec n (toInteger (addrToWordPtr  x))
-
-nullPtr :: Ptr a
-nullPtr = Ptr nullAddr
-
-plusPtr :: Ptr a -> Int -> Ptr b
-plusPtr (Ptr addr) off = Ptr (plusAddr addr off)
-
-minusPtr :: Ptr a -> Ptr b -> Int
-minusPtr (Ptr a1) (Ptr a2) =  minusAddr a1 a2
+    showsPrec n x = showsPrec n (toInteger (ptrToWordPtr  x))
 
 
 alignPtr :: Ptr a -> Int -> Ptr a
@@ -48,18 +40,13 @@ alignPtr = error "alignPtr"
 --      n -> Ptr (plusAddr# a (i -# n)) }
 
 
+castFunPtrToPtr :: FunPtr a -> Ptr b
+castFunPtrToPtr (FunPtr x) = Ptr x
 
-nullFunPtr = FunPtr nullFunAddr
-castFunPtr (FunPtr addr) = FunPtr addr
-
---castFunPtrToPtr :: FunPtr a -> Ptr b
---castFunPtrToPtr = unsafeCoerce
-
---castPtrToFunPtr :: Ptr a -> FunPtr b
---castPtrToFunPtr = unsafeCoerce
+castPtrToFunPtr :: Ptr a -> FunPtr b
+castPtrToFunPtr (Ptr x) = FunPtr x
 
 
-foreign import primitive "U2U" castFunPtrToPtr :: FunPtr a -> Ptr b
-foreign import primitive "U2U" castPtrToFunPtr :: Ptr a -> FunPtr b
-
+foreign import primitive "U2U" ptrToWordPtr :: Ptr a -> WordPtr
+foreign import primitive "U2U" wordPtrToPtr :: WordPtr -> Ptr a
 
