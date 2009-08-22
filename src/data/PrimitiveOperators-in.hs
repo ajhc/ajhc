@@ -30,12 +30,6 @@ import Name.Id
 rawType s = ELit litCons { litName = toName RawType s, litType = eHash }
 nameToOpTy n = do RawType <- return $ nameType n; Op.readTy (show n)
 
-tPtr t = ELit (litCons { litName = tc_Ptr
-                       , litArgs = [t]
-                       , litType = eStar
-                       , litAliasFor = Just (ELam tvr { tvrIdent = va1
-                                                      , tvrType = eStar}
-                                             (ELit litCons { litName = tc_Addr, litType = eStar })) })
 
 create_integralCast conv c1 t1 c2 t2 e t = eCase e [Alt (litCons { litName = c1, litArgs = [tvra], litType = te }) cc] Unknown  where
     te = getType e
@@ -157,21 +151,6 @@ build_signum ct cn v = unbox' v cn tvra (eCase (EVar tvra) [Alt zero (rebox (ELi
     negativeOne = ELit $ LitInt (-1) st
     rebox x = ELit (litCons { litName = cn, litArgs = [x], litType = te })
 
-buildPeek cn t p = ELam tvr $ ELam tvrWorld (unbox' (EVar tvr) dc_Addr tvr' rest)  where
-    tvr = (tVr va1 (tPtr t))
-    tvr' = tVr va2 (rawType "bits<ptr>")
-    tvrWorld2 = tVr (anonymous 258) tWorld__
-    tvrWorld = tVr (anonymous 256) tWorld__
-    rtVar = tVr (anonymous 260) (rawType p)
-    rtVar' = tVr (anonymous 262) t
-    rest = eCaseTup' (EPrim (APrim (Peek (stringToOpTy p)) mempty) [EVar tvrWorld, EVar tvr'] (ltTuple' [tWorld__,rawType p])) [tvrWorld2,rtVar] (eLet rtVar' (ELit $ litCons { litName = cn, litArgs = [EVar rtVar], litType = t }) $ eJustIO (EVar tvrWorld2) (EVar rtVar') )
-
-
-buildPoke cn t p = ELam ptr_tvr $ ELam v_tvr $ createIO_ $ (\tw -> unbox' (EVar ptr_tvr) dc_Addr ptr_tvr' $ unbox' (EVar v_tvr) cn v_tvr' $ EPrim (APrim (Poke (stringToOpTy p)) mempty) [EVar tw, EVar ptr_tvr', EVar v_tvr'] tWorld__) where
-    ptr_tvr =  (tVr va1 (tPtr t))
-    v_tvr = tVr va2 t
-    ptr_tvr' =  (tVr va3 (rawType "bits<ptr>"))
-    v_tvr' = tVr va4 (rawType p)
 
 toIO :: E -> E -> E
 toIO t x = x
