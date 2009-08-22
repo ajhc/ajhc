@@ -49,6 +49,7 @@ Exposed-Modules:
 	Prelude.Float,
 	Prelude.IO,
 	Prelude.Text,
+        System.C.Stdio,
         System.IO.Unsafe,
         System.Mem,
         System.Mem.StableName

@@ -12,29 +12,32 @@ module Jhc.Handle(
     openFile
     ) where
 
+import Foreign.C.Error
+import Foreign.C.String
+import Foreign.C.Types
+import Foreign.Marshal.Utils
 import Foreign.Ptr
 import Foreign.Storable
-import Foreign.C.Types
-import Jhc.IO
 import Jhc.Addr
-import Foreign.C.String
-import Foreign.Marshal.Utils
-import Foreign.C.Error
-import Jhc.Show
-import Jhc.Order
-import Jhc.Enum
 import Jhc.Basics
-import Jhc.Monad
+import Jhc.Enum
+import Jhc.IO
 import Jhc.Maybe
+import Jhc.Monad
+import Jhc.Order
+import Jhc.Show
 import Prelude.IO
+import System.C.Stdio
+
 
 
 data IOMode = ReadMode | WriteMode | AppendMode | ReadWriteMode
     deriving(Eq, Ord, Bounded, Enum, Show)
 
+
 data Handle = Handle {
     handleName :: String,
-    handleFile :: !(Ptr (Ptr Handle)),
+    handleFile :: !(Ptr FILE),
     handleBinary :: !Bool,
     handleIOMode :: !IOMode
     }
@@ -44,7 +47,7 @@ instance Show Handle where
 
 stdin, stdout, stderr :: Handle
 
-make_builtin mode name std = Handle { handleName = "(" ++ name ++ ")", handleFile = std, handleIOMode = mode }
+make_builtin mode name std = Handle { handleName = "(" ++ name ++ ")", handleFile = std, handleIOMode = mode, handleBinary = False }
 
 stdin = make_builtin ReadMode "stdin" c_stdin
 stdout = make_builtin WriteMode "stdout" c_stdout
@@ -56,9 +59,9 @@ stdout = Handle (unsafePerformIO (peek c_stdout))
 stderr = Handle (unsafePerformIO (peek c_stderr))
 -}
 
-foreign import ccall "stdio.h &stdin" c_stdin :: Ptr (Ptr Handle)
-foreign import ccall "stdio.h &stdout" c_stdout :: Ptr (Ptr Handle)
-foreign import ccall "stdio.h &stderr" c_stderr :: Ptr (Ptr Handle)
+foreign import ccall "stdio.h &stdin" c_stdin :: Ptr FILE
+foreign import ccall "stdio.h &stdout" c_stdout :: Ptr FILE
+foreign import ccall "stdio.h &stderr" c_stderr :: Ptr FILE
 
 withHandle h action = do
     ptr <- peek (handleFile h)
@@ -99,8 +102,5 @@ toStr ReadMode = "r"#
 toStr WriteMode = "w"#
 toStr AppendMode = "a"#
 toStr ReadWriteMode = "r+"#
-
-foreign import ccall "stdio.h fclose" c_fclose :: Ptr Handle -> IO CInt
-foreign import ccall "stdio.h fopen" c_fopen :: Ptr CChar -> Ptr CChar ->  IO (Ptr Handle)
 
 

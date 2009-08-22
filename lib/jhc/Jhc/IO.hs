@@ -17,7 +17,6 @@ module Jhc.IO(
     fixIO,
     ioError,
     runMain,
-    runNoWrapper,
     exitFailure,
     strictReturn,
     unsafeInterleaveIO,
@@ -49,7 +48,7 @@ fromUIO :: UIO a -> IO a
 fromUIO x = IO x
 
 fromUIO_ :: UIO_ -> IO ()
-fromUIO_ f = IO $ \w -> (# f w, () #) 
+fromUIO_ f = IO $ \w -> (# f w, () #)
 
 
 -- | this ensures the world parameter is eta expanded out

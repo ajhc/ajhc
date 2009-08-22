@@ -20,6 +20,7 @@ module Prelude.IO(
     userError
     ) where
 
+import System.C.Stdio
 import Foreign.C.String
 import Foreign.C.Types
 import Foreign.Ptr
@@ -30,11 +31,9 @@ import Jhc.Monad
 import Jhc.Order
 import Jhc.Show
 
-
 -- IO operations exported by the prelude
 
-type  FilePath = String
-
+type FilePath = String
 
 
 {-# RULES "putStr/++"      forall xs ys . putStr (xs ++ ys) = putStr xs >> putStr ys #-}
@@ -68,7 +67,7 @@ getContents = unsafeInterleaveIO getContents' where
 readFile :: FilePath -> IO String
 readFile fn = do
     file <- withCString fn $ \fnc -> c_fopen fnc (Ptr "r"#)
-    if  (file == nullPtr) then (fail "Could not open file.") else do
+    if  (file == nullPtr) then (fail $ "Could not open file:" ++ fn) else do
         let gc = do
                 ch <- c_fgetwc file
                 if ch == -1 then c_fclose file >> return [] else do
@@ -76,10 +75,6 @@ readFile fn = do
                         return (unsafeChr ch:xs)
         unsafeInterleaveIO gc
 
-
-foreign import ccall "stdio.h fopen" c_fopen :: CString -> CString -> IO (Ptr ())
-foreign import ccall "stdio.h fclose" c_fclose :: Ptr () -> IO CInt
-foreign import ccall "wchar.h jhc_utf8_getc" c_fgetwc :: Ptr () -> IO Int
 
 -- | The 'interact' function takes a function of type @String->String@
 -- as its argument.  The entire input from the standard input device is
@@ -99,12 +94,19 @@ interact f  =  do hSetBuffering stdin  NoBuffering
 
 -}
 
+writeFile'  :: FilePath -> String -> Addr__ -> IO ()
+writeFile' fn s mode = do
+    file <- withCString fn $ \fnc -> c_fopen fnc (Ptr mode)
+    if  (file == nullPtr) then (fail $ "Could not open file: " ++ fn) else do
+        mapM_ (flip c_fputwc file . ord) s
+        c_fclose file
+        return ()
 
 writeFile  :: FilePath -> String -> IO ()
-writeFile  =  error "writeFile"
+writeFile fn s = writeFile' fn s "w"#
 
-appendFile :: FilePath -> String -> IO ()
-appendFile =  error "appendFile"
+appendFile  :: FilePath -> String -> IO ()
+appendFile fn s = writeFile' fn s "a"#
 
 
 
@@ -124,7 +126,5 @@ getChar = do
 foreign import primitive "I2I" cwintToChar :: CWint -> Char
 foreign import primitive "U2U" charToCWchar :: Char -> CWchar
 
-foreign import ccall "stdio.h jhc_utf8_putchar" c_putwchar :: Int -> IO ()
-foreign import ccall "wchar.h jhc_utf8_getchar" c_getwchar :: IO Int
 
 

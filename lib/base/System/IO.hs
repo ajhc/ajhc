@@ -45,6 +45,7 @@ module System.IO(
 import Jhc.IO
 import Jhc.Handle
 import Foreign.Ptr
+import System.C.Stdio
 import Foreign.Storable
 import Foreign.C.Types
 import Data.Char(ord)
@@ -147,13 +148,13 @@ hSetPosn h hp = hSeek h AbsoluteSeek hp
 hPutBuf :: Handle -> Ptr a -> Int -> IO ()
 hPutBuf h p c = do
     let count = fromIntegral c
-    rc <- withHandle h $ fwrite p 1 count
+    rc <- withHandle h $ c_fwrite p 1 count
     if rc /= count then fail "hPutBuf: short write" else return ()
 
 hGetBuf :: Handle -> Ptr a -> Int -> IO Int
 hGetBuf h p c = do
     let count = fromIntegral c
-    rc <- withHandle h $ fread p 1 count
+    rc <- withHandle h $ c_fread p 1 count
     return $ fromIntegral rc
 
 hIsSeekable :: Handle -> IO Bool
@@ -179,22 +180,8 @@ hFileSize h = do
     hSeek h AbsoluteSeek cp
     return fl
 
-foreign import ccall "stdio.h fwrite_unlocked" fwrite  :: Ptr a -> CSize -> CSize -> Ptr Handle -> IO CSize
-foreign import ccall "stdio.h fread_unlocked" fread :: Ptr a -> CSize -> CSize -> Ptr Handle -> IO CSize
 
 foreign import primitive "I2I" cwintToChar :: CWint -> Char
+foreign import ccall "jhc_wait_for_input" c_wait_for_input :: FILE -> Int -> IO Bool
 
-foreign import ccall "stdio.h fflush" c_fflush :: Ptr Handle -> IO ()
-
-foreign import ccall "wchar.h jhc_utf8_getc" c_fgetwc :: Ptr Handle -> IO Int
-foreign import ccall "wchar.h jhc_utf8_putc" c_fputwc :: Int -> Ptr Handle -> IO Int
-
-foreign import ccall "jhc_wait_for_input" c_wait_for_input :: Ptr Handle -> Int -> IO Bool
-foreign import ccall "stdio.h feof" c_feof :: Ptr Handle -> IO CInt
-foreign import ccall "stdio.h ftell" c_ftell :: Ptr Handle -> IO IntMax                  -- XXX
-foreign import ccall "stdio.h fseek" c_fseek :: Ptr Handle -> IntMax -> CInt -> IO CInt  -- XXX
-
-foreign import primitive "const.SEEK_SET" c_SEEK_SET :: CInt
-foreign import primitive "const.SEEK_CUR" c_SEEK_CUR :: CInt
-foreign import primitive "const.SEEK_END" c_SEEK_END :: CInt
 
