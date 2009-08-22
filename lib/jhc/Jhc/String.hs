@@ -1,4 +1,5 @@
 -- module for things dealing with string constants needed by the compiler internally
+{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 {-# OPTIONS_JHC -N -fffi -funboxed-values #-}
 module Jhc.String(
     eqString,
@@ -83,8 +84,6 @@ eqUnpacked addr cs = f addr cs where
             0# -> 0#
             1# -> f (increment offset) cs
 
--- returns it in an Char__ even though it is just a byte
-foreign import primitive constPeekByte :: Addr__ -> Char__
 
 
 eqString :: [Char] -> [Char] -> Bool__
@@ -96,6 +95,8 @@ eqString _ _ = 0#
 
 foreign import primitive increment :: Addr__ -> Addr__
 foreign import primitive "Eq" equalsChar :: Char__ -> Char__ -> Bool__
+-- returns it in an Char__ even though it is just a byte
+foreign import primitive constPeekByte :: Addr__ -> Char__
 
 
 

@@ -1,4 +1,3 @@
-{-# LANUAGE FFI #-}
 {-# OPTIONS_JHC -fffi  #-}
 module Data.Unique (
    -- * Unique objects

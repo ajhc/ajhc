@@ -1,7 +1,6 @@
 {-# OPTIONS_JHC -N -fm4 -funboxed-values -funboxed-tuples -fffi #-}
 module Foreign.Storable(Storable(..)) where
 
-m4_include(Foreign/Storable.m4)
 
 import Jhc.Types
 import Jhc.Basics
@@ -9,6 +8,7 @@ import Jhc.Addr
 import Jhc.Int
 import Jhc.IO
 
+m4_include(Foreign/Storable.m4)
 
 class Storable a where
     sizeOf :: a -> Int

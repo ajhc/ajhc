@@ -1,4 +1,5 @@
 {-# OPTIONS_JHC -N -fffi -funboxed-tuples #-}
+{-# LANGUAGE UnboxedTuples, ForeignFunctionInterface, NoImplicitPrelude #-}
 module Jhc.Prim where
 
 -- this module is always included in all programs compiled by jhc. it defines some things that are needed to make jhc work at all.
@@ -29,15 +30,15 @@ newtype Addr_ = Addr_ BitsPtr_
 newtype FunAddr_ = FunAddr_ BitsPtr_
 
 
--- | this is wrapped around arbitrary expressions and just evaluates them to whnf
-foreign import primitive "seq" runRaw :: a -> World__ -> World__
 
 -- | when no exception wrapper is wanted
 runNoWrapper :: IO a -> World__ -> World__
 runNoWrapper (IO run) w = case run w of (# w, _ #) -> w
 
+-- | this is wrapped around arbitrary expressions and just evaluates them to whnf
+foreign import primitive "seq" runRaw :: a -> World__ -> World__
 
 foreign import primitive "unsafeCoerce" unsafeCoerce__ :: a -> b
 
 -- like 'const' but creates an artificial dependency on its second argument to guide optimization.
-foreign import primitive dependingOn :: forall a b. a -> b -> a
+foreign import primitive dependingOn :: a -> b -> a

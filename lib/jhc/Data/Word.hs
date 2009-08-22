@@ -1,4 +1,5 @@
-{-# OPTIONS -N #-}
+{-# OPTIONS_JHC -N #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 module Data.Word(Word,Word8,Word16,Word32,Word64,WordMax,WordPtr) where
 
 data Word

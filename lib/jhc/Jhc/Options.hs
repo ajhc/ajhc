@@ -1,4 +1,5 @@
 {-# OPTIONS_JHC -N -fffi -fcpp -funboxed-values #-}
+{-# LANGUAGE CPP #-}
 
 module Jhc.Options(
 #ifdef __JHC__

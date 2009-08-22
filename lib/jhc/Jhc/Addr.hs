@@ -1,6 +1,5 @@
 {-# OPTIONS_JHC -N -fffi -funboxed-values -fm4 #-}
 
-m4_include(Jhc/Order.m4)
 
 module Jhc.Addr(
     Ptr(..),
@@ -18,6 +17,7 @@ import Jhc.Order
 import Jhc.Prim
 import Jhc.Types
 
+m4_include(Jhc/Order.m4)
 
 data Ptr a = Ptr BitsPtr_
 data FunPtr a = FunPtr BitsPtr_

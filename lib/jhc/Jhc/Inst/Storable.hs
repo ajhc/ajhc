@@ -2,7 +2,6 @@
 module Jhc.Inst.Storable() where
 
 
-m4_include(Foreign/Storable.m4)
 
 import Data.Int
 import Data.Word
@@ -16,6 +15,7 @@ import Jhc.IO
 import Jhc.Prim
 import Jhc.Types
 
+m4_include(Foreign/Storable.m4)
 
 INST_STORABLE(Float,Float,Float32_,fbits32)
 INST_STORABLE(Double,Double,Float64_,fbits64)

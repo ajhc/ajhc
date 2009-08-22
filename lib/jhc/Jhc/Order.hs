@@ -1,6 +1,5 @@
 {-# OPTIONS_JHC -fm4 -N -fffi #-}
 
-m4_include(Jhc/Order.m4)
 
 module Jhc.Order(
     Bool(..),
@@ -13,9 +12,12 @@ module Jhc.Order(
     otherwise
     ) where
 
+
 import Jhc.Enum
 import Jhc.Basics
 import Jhc.Types
+
+m4_include(Jhc/Order.m4)
 
 data Bool = False | True
     deriving (Eq, Ord, Bounded, Enum)
