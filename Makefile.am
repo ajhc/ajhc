@@ -62,7 +62,7 @@ EXTRA_DIST = src/data utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/jhc lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal lib/containers.cabal \
-	     manual.html
+	     manual.html lib/containers lib/applicative
 
 CC = $(HC)
 
