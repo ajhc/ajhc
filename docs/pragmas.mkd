@@ -1,49 +1,37 @@
 {-#Pragmas
 
+Pragmas are special compiler directives that change its behavior in certain
+ways. In general, each compiler is free to define its own pragmas however jhc
+does try to implement the same ones as other compilers when it makes sense.
+pragmas appear in source code  as {-# PRAGMANAME ... #-}
+
 # Function Properties
 
 These must appear in the same file as the definition of a function. To apply
 one to a instance or class method, you must place it in the where clause of the
 instance or class declaration.
 
-NOINLINE
-: Do not inline the given function during core transformations. The function
-_may_ be inlined during grin transformations.
-
-INLINE
-: Inline this function whenever possible
-
-SUPERINLINE
-: Always inline no matter what, even if it means making a local copy of the
-functions body.
-
-NOETA
-: When applied to a class method, do not perform eta expansion up to the number
-of arguments specified by the type.
+Pragma
+------             ----------------------------------------------------
+_NOINLINE_         Do not inline the given function during core transformations. The function _may_ be inlined during grin transformations.
+_INLINE_           Inline this function whenever possible
+_SUPERINLINE_      Always inline no matter what, even if it means making a local copy of the functions body.
+_VCONSTRUCTOR_     Treat the function as a virtual constructor. CPR analysis and the worker/wrapper transforms will treat the function application as if it were a constructor. This implies 'NOINLINE'.
+_NOETA_            By default, jhc eta-expands all class methods to help enable optimizations. This disables this optimization.
 
 # Rules/Specializations
 
-RULES
-: rewrite rules. These have the same syntax and behave like GHC's rewrite rules,
-except 'phase' information is not allowed.
-
-SPECIALIZE
-: create a version of a function that is specialized for a given type
-
-SUPERSPECIALIZE
-: has the same effect as SPECIALIZE, but also places a run-time check in the
-generic version of the function to determine whether to call the specialized
-version.
+Pragma
+------              ---------------------------------------------------
+_RULES_             rewrite rules. These have the same syntax and behave similarly to GHC's rewrite rules, except 'phase' information is not allowed.
+_SPECIALIZE_        create a version of a function that is specialized for a given type
+_SUPERSPECIALIZE_   has the same effect as SPECIALIZE, but also places a run-time check in the generic version of the function to determine whether to call the specialized version.
 
 # Header Pragmas
 
 These pragmas are only valid in the 'head' of a file, meaning they must come
 before the initial 'module' definition and in the first 4096 bytes of the file
 and must be preceded by and contain only characters in the ASCII character set.
-
-NOPRELUDE
-: do not load the 'Prelude' automatically. equivalent to passing --noprelude on
-the command line.
 
 OPTIONS_JHC
 : Specify extra options to use when processing this file. The options available

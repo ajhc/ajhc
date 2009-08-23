@@ -11,10 +11,10 @@ getopts('h:c:',\%o) or die "unknown option";
 my @order = $o{c} ? split /,/,$o{c} : qw(
     Using
     Options
-    CrossCompilation
     Pragmas
     Extensions
     Differences
+    CrossCompilation
     Internals
     );
 

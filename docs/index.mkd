@@ -1,25 +1,25 @@
 Jhc Haskell Compiler
 ====================
 
-jhc is a haskell compiler which aims to produce the most efficient programs possible via whole program analysis and other optimizations.
+jhc is a haskell compiler which aims to produce the most efficient programs
+possible via whole program analysis and other optimizations.
 
-Getting jhc
------------
+Using Jhc
+---------
 
- * See the [Installation page](building.shtml) for information about downloading and installing jhc.
- * For information on running jhc, see [The Manual](manual.html). 
+ * See the [Installation Page](building.shtml) for information about downloading and installing jhc.
+ * For information on running jhc, see [The User's Manual](manual.html).
+ * Join the [jhc mailing list](http://www.haskell.org/mailman/listinfo/jhc) for jhc discussion, announcements, and bug reports.
+ * There is a [spot on the wiki](http://haskell.org/haskellwiki/Jhc) but it doesn't have much info yet. feel free to expand it.
 
 
-Development and other info
---------------------------
+Developing Jhc
+--------------
 
  * [the development page](development.shtml) has information on how to pull the development tree from the darcs repository
  * [the bug tracker](bug) tracks known jhc issues, bugs can be added by submitting darcs patches or just posting to the mailing list jhc@haskell.org
- * the [darcs repository](http://repetae.net/repos/jhc) is where the code is housed
- * [the darcsweb repository browser](http://repetae.net/dw/darcsweb.cgi?r=jhc) can be used to see a changelog and view individual patches
+ * [Browse The Repository](http://repetae.net/dw/darcsweb.cgi?r=jhc)
  * An informal graph of the internal code motion in jhc is [here (pdf)](big-picture.pdf).
- * There is a [mailing list](http://www.haskell.org/mailman/listinfo/jhc) for jhc discussion and bug reports.
- * There is a [spot on the wiki](http://haskell.org/haskellwiki/Jhc) but it doesn't have much info yet. feel free to expand it.
 
 Historical
 ----------
