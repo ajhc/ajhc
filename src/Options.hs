@@ -82,7 +82,7 @@ for a given key is the one that is used.
 An example describing how to cross compile for windows is as follows:
 
     [win32]
-    gcc=i386-mingw32-gcc
+    cc=i386-mingw32-gcc
     cflags+=-mwindows -mno-cygwin
     executable_extension=.exe
     merge=i686
@@ -120,14 +120,14 @@ _cc_                      what c compiler to use. generally this will be gcc for
 _byteorder_               one of *le* or *be* for little or big endian
 _gc_                      what garbage collector to use. It should be one of *static* or *boehm*.
 _cflags_                  options to pass to the c compiler
-_cflags\_debug_            options to pass to the c compiler only when debugging is enabled
-_cflags\_nodebug_          options to pass to the c compiler only when debugging is disabled
+_cflags\_debug_           options to pass to the c compiler only when debugging is enabled
+_cflags\_nodebug_         options to pass to the c compiler only when debugging is disabled
 _profile_                 whether to include profiling code in the generated executable
 _autoload_                what haskell libraries to autoload, seperated by commas.
-_executable\_extension_    specifies an extension that should be appended to executable files, (i.e. .EXE on windows)
+_executable\_extension_   specifies an extension that should be appended to executable files, (i.e. .EXE on windows)
 _merge_                   a special option that merges the contents of another configuration target into the currrent one.
 _bits_                    the number of bits a pointer contains on this architecture
-_bits\_max_                the number of bits in the largest integral type. should be the number of bits in the 'intmax_t' C type.
+_bits\_max_               the number of bits in the largest integral type. should be the number of bits in the 'intmax_t' C type.
 _arch_                    what to pass to gcc as the architecture
 
 -}
