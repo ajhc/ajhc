@@ -171,11 +171,13 @@ fetchSource done_ref fs mm = do
     (mod,m,ds) <- case mlookup hash (knownSourceMap done) of
         Just (m,ds) -> do return (Left lbs,m,ds)
         Nothing -> do
-            hmod <- parseHsSource fn lbs
+            (hmod,_) <- parseHsSource fn lbs
             let m = hsModuleName hmod
                 ds = hsModuleRequires hmod
             writeIORef done_ref (knownSourceMap_u (Map.insert hash (m,ds)) done)
-            return (Right hmod,m,ds)
+            case optAnnotate options of
+                Just _ -> return (Left lbs,m,ds)
+                _ -> return (Right hmod,m,ds)
     case mm of
         Just m' | m /= m' -> do
             putErrLn $ "Skipping file" <+> fn <+> "because it's module declaration of" <+> show m <+> "does not equal the expected" <+> show m'
@@ -222,7 +224,6 @@ data CompUnit
     = CompHo HoHeader HoIDeps Ho
     | CompSources [SourceCode]
     | CompTCed ((HoTcInfo,TiData,[(HoHash,HsModule)],[String]))
-    | CompProcessed [SourceCode]
     | CompDummy
     | CompLibrary Ho Library
 
@@ -240,7 +241,6 @@ data SourceInfo = SI {
 data SourceCode
     = SourceParsed     { sourceInfo :: !SourceInfo, sourceModule :: HsModule }
     | SourceRaw        { sourceInfo :: !SourceInfo, sourceLBS :: LBS.ByteString }
-    | SourceProcessed  { sourceInfo :: !SourceInfo, sourceLBS :: LBS.ByteString }
 
 
 sourceIdent sp = show . sourceModName $ sourceInfo sp
@@ -391,6 +391,7 @@ parseFiles need ifunc func = do
     performGC
     putProgressLn "Typechecking..."
     typeCheckGraph cnode
+    if isJust (optAnnotate options) then exitSuccess else do
     performGC
     putProgressLn "Compiling..."
     cho <- compileCompNode ifunc func ksm cnode
@@ -525,15 +526,26 @@ typeCheckGraph cn = do
                         writeIORef ref (CompTcCollected ctc' lu)
                         return ctc'
                     CompSources sc -> do
+                        let mods = sort $ map (sourceModName . sourceInfo) sc
                         modules <- forM sc $ \x -> case x of
-                            SourceParsed { sourceInfo = SI { .. }, .. } -> return (sourceHash,sourceModule)
+                            SourceParsed { sourceInfo = SI { .. }, .. } -> return (sourceHash,sourceModule, error "SourceParsed in AnnotateSource")
                             SourceRaw { sourceInfo = SI { .. }, .. } -> do
-                                mod <- parseHsSource sourceFP sourceLBS
-                                return (sourceHash,mod)
-                        showProgress (snds modules)
-                        (htc,tidata) <- doModules' ctc (snds modules)
+                                (mod,lbs') <- parseHsSource sourceFP sourceLBS
+                                case optAnnotate options of
+                                    Just fp -> do
+                                        let ann = LBSU.fromString $ unlines [
+                                                "{- --ANNOTATE--", 
+                                                "Module: " ++ show sourceModName, 
+                                                "Deps: " ++ show (sort sourceDeps), 
+                                                "Siblings: " ++ show mods,
+                                                "-}"]
+                                        LBS.writeFile (fp ++ "/" ++ show (hsModuleName mod) ++ ".hs") (ann `LBS.append` lbs')
+                                    _ -> return ()
+                                return (sourceHash,mod,lbs')
+                        showProgress (map snd3 modules)
+                        (htc,tidata) <- doModules' ctc (map snd3 modules)
                         let ctc' = htc `mappend` ctc
-                        writeIORef ref (CompTcCollected ctc' (CompTCed ((htc,tidata,modules,map (sourceHoName . sourceInfo) sc))))
+                        writeIORef ref (CompTcCollected ctc' (CompTCed ((htc,tidata,[ (x,y) | (x,y,_) <- modules],map (sourceHoName . sourceInfo) sc))))
                         return ctc'
         showProgress ms = printModProgress fmtLen maxModules tickProgress ms
         fmtLen = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
@@ -657,7 +669,7 @@ preprocess fn lbs = do
     return lbs'
 
 
-parseHsSource :: String -> LBS.ByteString -> IO HsModule
+parseHsSource :: String -> LBS.ByteString -> IO (HsModule,LBS.ByteString)
 parseHsSource fn lbs = do
     lbs' <- preprocess fn lbs
     let s = LBSU.toString lbs'
@@ -671,7 +683,7 @@ parseHsSource fn lbs = do
         putStrLn s'
     fn <- shortenPath fn
     case runParserWithMode (parseModeOptions $ collectFileOpts fn s) { parseFilename = fn } parse  s'  of
-                      ParseOk ws e -> processErrors ws >> return e
+                      ParseOk ws e -> processErrors ws >> return (e,LBSU.fromString s')
                       ParseFailed sl err -> putErrDie $ show sl ++ ": " ++ err
 
 

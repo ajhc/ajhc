@@ -132,19 +132,19 @@ _arch_                    what to pass to gcc as the architecture
 
 -}
 
-data Mode = BuildHl String  -- ^ Build the specified hl-file given a description file.
-          | Interactive     -- ^ Run interactively.
-          | Version         -- ^ Print version and die.
-          | VersionCtx      -- ^ Print version context and die.
-          | ShowHelp        -- ^ Show help message and die.
-          | ShowConfig      -- ^ Show configuration info.
-          | CompileHo       -- ^ Compile ho
-          | CompileHoGrin   -- ^ Compile ho and grin
-          | CompileExe      -- ^ Compile executable
-          | ShowHo String   -- ^ Show ho-file.
-          | ListLibraries   -- ^ List libraries
-          | PrintHscOptions -- ^ Print options for hsc2hs
-          | Preprocess      -- ^ Filter through preprocessor
+data Mode = BuildHl FilePath         -- ^ Build the specified hl-file given a description file.
+          | Interactive              -- ^ Run interactively.
+          | Version                  -- ^ Print version and die.
+          | VersionCtx               -- ^ Print version context and die.
+          | ShowHelp                 -- ^ Show help message and die.
+          | ShowConfig               -- ^ Show configuration info.
+          | CompileHo                -- ^ Compile ho
+          | CompileHoGrin            -- ^ Compile ho and grin
+          | CompileExe               -- ^ Compile executable
+          | ShowHo String            -- ^ Show ho-file.
+          | ListLibraries            -- ^ List libraries
+          | PrintHscOptions          -- ^ Print options for hsc2hs
+          | Preprocess               -- ^ Filter through preprocessor
             deriving(Eq)
 
 
@@ -161,6 +161,7 @@ data Opt = Opt {
     optHlPath      ::  [String],  -- ^ Path to look for libraries.
     optIncs        ::  [String],
     optDefs        ::  [String],
+    optAnnotate    ::  Maybe FilePath,
     optHoDir       ::  Maybe FilePath,
     optHoCache     ::  Maybe FilePath,
     optArgs        ::  [String],
@@ -188,6 +189,7 @@ opt = Opt {
     optDebug       = False,
     optCross       = False,
     optIncdirs     = initialIncludes,
+    optAnnotate    = Nothing,
     optHls         = [],
     optHlPath      = initialLibIncludes,
     optIncs        = [],
@@ -248,6 +250,7 @@ theoptions =
     , Option ['p'] []            (ReqArg (\d -> optHls_u (++ [d])) "file.hl") "Load given haskell library .hl file"
     , Option ['L'] []            (ReqArg (optHlPath_u . idu) "path")   "Look for haskell libraries in the given directory"
     , Option []    ["build-hl"]  (ReqArg (optMode_s . BuildHl) "file.cabal") "Build hakell library from given library description file"
+    , Option []    ["annotate-source"]  (ReqArg (optAnnotate_s . Just) "<dir>") "Write preprocessed and annotated source code to the directory specified"
     , Option []    ["interactive"] (NoArg  (optMode_s Interactive))    "run interactivly"
     , Option []    ["ignore-ho"]   (NoArg  (optIgnoreHo_s True))       "Ignore existing haskell object files"
     , Option []    ["nowrite-ho"]  (NoArg  (optNoWriteHo_s True))      "Do not write new haskell object files"
