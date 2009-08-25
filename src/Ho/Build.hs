@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 module Ho.Build (
     module Ho.Type,
     dumpHoFile,
@@ -180,8 +181,9 @@ fetchSource done_ref fs mm = do
             putErrLn $ "Skipping file" <+> fn <+> "because it's module declaration of" <+> show m <+> "does not equal the expected" <+> show m'
             killMod
         _ -> do
-            let sc (Right mod) = SourceParsed hash ds mod fn mho
-                sc (Left lbs) = SourceRaw hash ds m lbs fn mho
+            let sc (Right mod) = SourceParsed sinfo mod
+                sc (Left lbs) = SourceRaw sinfo lbs
+                sinfo = SI { sourceHash = hash, sourceDeps = ds, sourceFP = fn, sourceHoName = mho, sourceModName = m }
             modifyIORef done_ref (modEncountered_u $ Map.insert m (Found (sc mod)))
             fn' <- shortenPath fn
             mho' <- shortenPath mho
@@ -220,20 +222,28 @@ data CompUnit
     = CompHo HoHeader HoIDeps Ho
     | CompSources [SourceCode]
     | CompTCed ((HoTcInfo,TiData,[(HoHash,HsModule)],[String]))
+    | CompProcessed [SourceCode]
     | CompDummy
     | CompLibrary Ho Library
 
 instance Show CompUnit where
     showsPrec _ cu = shows $ providesModules cu
 
-data SourceCode
-    = SourceParsed { sourceHash :: SourceHash, sourceDeps :: [Module]
-                   , sourceModule :: HsModule, sourceFP :: FilePath, sourceHoName :: FilePath }
-    | SourceRaw    { sourceHash :: SourceHash, sourceDeps :: [Module]
-                   , sourceModName :: Module, sourceLBS :: LBS.ByteString, sourceFP :: FilePath, sourceHoName :: FilePath }
+data SourceInfo = SI {
+    sourceHash :: SourceHash,
+    sourceDeps :: [Module],
+    sourceFP :: FilePath,
+    sourceModName :: Module,
+    sourceHoName :: FilePath
+    }
 
-sourceIdent SourceParsed { sourceModule = m } = show $ hsModuleName m
-sourceIdent SourceRaw { sourceModName = fp } = show fp
+data SourceCode
+    = SourceParsed     { sourceInfo :: !SourceInfo, sourceModule :: HsModule }
+    | SourceRaw        { sourceInfo :: !SourceInfo, sourceLBS :: LBS.ByteString }
+    | SourceProcessed  { sourceInfo :: !SourceInfo, sourceLBS :: LBS.ByteString }
+
+
+sourceIdent sp = show . sourceModName $ sourceInfo sp
 
 class ProvidesModules a where
     providesModules :: a -> [Module]
@@ -258,8 +268,7 @@ instance ProvidesModules CompLink where
     providesModules (CompTcCollected _ cu) = providesModules cu
 
 instance ProvidesModules SourceCode where
-    providesModules SourceParsed { sourceModule = mod } = [hsModuleName mod]
-    providesModules SourceRaw    { sourceModName = n } = [n]
+    providesModules sp = [sourceModName (sourceInfo sp)]
 
 
 -- | this walks the loaded modules and ho files, discarding out of
@@ -276,14 +285,14 @@ toCompUnitGraph :: Done -> [Module] -> IO (HoHash,CompUnitGraph)
 toCompUnitGraph done roots = do
     let fs m = map inject $ maybe (error $ "can't find deps for: " ++ show m) snd (Map.lookup m (knownSourceMap done))
         fs' m (Library _ libr _ _) = fromMaybe (error $ "can't find deps for: " ++ show m) (Map.lookup m (hoModuleDeps libr))
-        foundMods = [ ((m,Left (sourceHash sc)),fs (sourceHash sc)) | (m,Found sc) <- Map.toList (modEncountered done)]
+        foundMods = [ ((m,Left (sourceHash $ sourceInfo sc)),fs (sourceHash $ sourceInfo sc)) | (m,Found sc) <- Map.toList (modEncountered done)]
         foundMods' = Map.elems $ Map.fromList [ (mg,((mg,Right lib),fs' mg lib)) | (_,ModLibrary _ mg lib) <- Map.toList (modEncountered done)]
         fullModMap = Map.unions (map libModMap $ Map.elems (loadedLibraries done))
         inject m = Map.findWithDefault m m fullModMap
         gr = G.newGraph  (foundMods ++ foundMods') (fst . fst) snd
         gr' = G.sccGroups gr
         phomap = Map.fromListWith (++) (concat [  [ (m,[hh]) | (m,_) <- hoDepends idep ] | (hh,(_,_,idep,_)) <- Map.toList (hosEncountered done)])
-        sources = Map.fromList [ (m,sourceHash sc) | (m,Found sc) <- Map.toList (modEncountered done)]
+        sources = Map.fromList [ (m,sourceHash $ sourceInfo sc) | (m,Found sc) <- Map.toList (modEncountered done)]
 
    -- mapM_ (putErrLn . show) $ [ (x,y) | ((x,_),y) <- foundMods ++ foundMods' ]
 
@@ -517,14 +526,14 @@ typeCheckGraph cn = do
                         return ctc'
                     CompSources sc -> do
                         modules <- forM sc $ \x -> case x of
-                            SourceParsed { sourceHash = h,sourceModule = mod } -> return (h,mod)
-                            SourceRaw { sourceHash = h,sourceLBS = lbs, sourceFP = fp } -> do
-                                mod <- parseHsSource fp lbs
-                                return (h,mod)
+                            SourceParsed { sourceInfo = SI { .. }, .. } -> return (sourceHash,sourceModule)
+                            SourceRaw { sourceInfo = SI { .. }, .. } -> do
+                                mod <- parseHsSource sourceFP sourceLBS
+                                return (sourceHash,mod)
                         showProgress (snds modules)
                         (htc,tidata) <- doModules' ctc (snds modules)
                         let ctc' = htc `mappend` ctc
-                        writeIORef ref (CompTcCollected ctc' (CompTCed ((htc,tidata,modules,map sourceHoName sc))))
+                        writeIORef ref (CompTcCollected ctc' (CompTCed ((htc,tidata,modules,map (sourceHoName . sourceInfo) sc))))
                         return ctc'
         showProgress ms = printModProgress fmtLen maxModules tickProgress ms
         fmtLen = ceiling (logBase 10 (fromIntegral maxModules+1) :: Double) :: Int
