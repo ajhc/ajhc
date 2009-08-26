@@ -4,6 +4,8 @@ import qualified Data.IntSet as IS
 import qualified Data.IntMap as IM
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Control.Monad.Identity
+import Data.Maybe
 
 import StringTable.Atom
 import Grin.Grin
@@ -154,6 +156,13 @@ simpExp e = f e [] where
         dtup xs ys senv b rs
     f (Case v [l]) rs = do
         f (Return [v] :>>= l) rs
+    f (Case v ls) rs | isJust utypes = ans where
+        utypes@(~(Just ts)) = unboxTypes ur
+        ur = foldr1 combineUnboxing [ getUnboxing e | _ :-> e <- ls ]
+        ans = do
+            mtick "Grin.Simplify.Unbox.case-return"
+            let vs = zipWith Var [v1 ..] ts
+            f (unboxModify ur (Case v ls) :>>= vs :-> Return (unboxRet ur vs)) rs
     f a ((senv,p,b):xs) = do
         a <- g a
         (p,env') <- renamePattern p
@@ -180,11 +189,19 @@ simpExp e = f e [] where
         v <- applySubst v
         as <- mapM simpLam as
         return $ Case v as
-
     g  lt@Let { expDefs = defs, expBody = body } = do
         body <- f body []
         defs <- simpFuncs defs
-        return $ updateLetProps lt { expBody = body, expDefs = defs }
+        let dnames = Set.fromList $ map funcDefName defs
+            isInvalid e = Set.null (freeVars e `Set.intersection` dnames)
+        case body of
+            e :>>= l :-> r | isInvalid e -> do
+                mtick "Simplify.simplify.let-shrink-head"
+                return $ e :>>= l :-> updateLetProps lt { expBody = r, expDefs = defs }
+            e :>>= l :-> r | isInvalid r -> do
+                mtick "Optimize.optimize.let-shrink-tail"
+                return (updateLetProps lt { expBody = e } :>>= l :-> r)
+            _ -> return $ updateLetProps lt { expBody = body, expDefs = defs }
     g x = applySubstE x
 
 
@@ -230,3 +247,95 @@ newVarName (V sv) = do
 
 isHoly (NodeC _ as) | any isValUnknown as = True
 isHoly n = False
+
+data UnboxingResult = UnErr [Ty] | UnTup [Unbox]
+
+data Unbox = UnNode Atom [Unbox] Ty | UnConst Val | UnUnknown Ty
+    deriving(Eq,Ord)
+
+isUnUnknown UnUnknown  {} = True
+isUnUnknown _ = False
+
+instance CanType UnboxingResult [Ty] where
+    getType (UnErr tys) = tys
+    getType (UnTup us) = map getType us
+
+instance CanType Unbox Ty where
+    getType (UnNode _ _ t) = t
+    getType (UnConst v) = getType v
+    getType (UnUnknown t) = t
+
+unboxRet :: UnboxingResult -> [Val] -> [Val]
+unboxRet ur vs = f ur vs where
+    f (UnTup xs) vs = let (r,[]) = g xs vs in r
+    f _ vs = vs
+    g [] vs = ([],vs)
+    g (UnUnknown _:xs) (v:vs) = let (r,y) = g xs vs in (v:r,y)
+    g (UnConst v:xs) vs = let (r,y) = g xs vs in (v:r,y)
+    g (UnNode a ts _:xs) vs = let (ts',vs') = g ts vs; (r,y) = g xs vs' in (NodeC a ts':r,y)
+
+unboxTypes :: UnboxingResult -> Maybe [Ty]
+unboxTypes ur = f ur where
+    f UnErr {} = Nothing
+    f (UnTup us) | all isUnUnknown us = Nothing
+    f (UnTup xs) = Just $ concatMap h xs
+    h (UnUnknown t) = [t]
+    h (UnConst {}) = []
+    h (UnNode _ ts _) = concatMap h ts
+
+unboxModify :: UnboxingResult -> Exp -> Exp
+unboxModify ur = f ur where
+    nty = getType ur
+    f UnErr {} = id
+    f (UnTup us) | all isUnUnknown us = id
+    f (UnTup xs) = runIdentity . editTail nty (g xs)
+    g xs (Return ys) = return $ Return (concat $ zipWith h xs ys)
+    h (UnUnknown _) y = [y]
+    h (UnConst {}) _ = []
+    h (UnNode _ us _) (NodeC _ ts) = concat $ zipWith h us ts
+
+combineUnboxing :: UnboxingResult -> UnboxingResult -> UnboxingResult
+combineUnboxing ub1 ub2 = f ub1 ub2 where
+    f UnErr {} x = x
+    f x UnErr {} = x
+    f (UnTup xs) (UnTup ys) = UnTup (zipWith g xs ys)
+    g (UnNode a1 ubs1 t1) (UnNode a2 ubs2 t2) | a1 == a2 = UnNode a1 (zipWith g ubs1 ubs2) t1
+                                              | otherwise = UnUnknown t1
+    g (UnConst v1) (UnConst v2) | v1 == v2 = UnConst v1
+                                | otherwise = UnUnknown (getType v1)
+    g x@UnUnknown {} _ = x
+    g _ x@UnUnknown {} = x
+
+getUnboxing :: Exp -> UnboxingResult
+getUnboxing e = f e where
+    f (Return rs) = UnTup (map g rs)
+    f (Error _ tys) = UnErr tys
+--    f (Case _ ls) = foldr1 combineUnboxing  [ f e | _ :-> e <- ls ]
+    f Let { expBody = body } = f body
+    f (_ :>>= _ :-> e) = f e
+    f e = UnTup (map UnUnknown $ getType e)
+    g (NodeC t xs) = UnNode t (map g xs) tyDNode
+    g v | valIsConstant v = UnConst v
+    g v = UnUnknown (getType v)
+
+editTail :: Monad m => [Ty] -> (Exp -> m Exp) -> Exp -> m Exp
+editTail nty mt te = f mempty te where
+    f _ (Error s ty) = return $ Error s nty
+    f lf (Case x ls) = return (Case x) `ap` mapM (g lf) ls
+    f lf lt@Let {expIsNormal = False, expBody = body } = do
+        body <- f lf body
+        return $ updateLetProps lt { expBody = body }
+    f lf lt@Let {expDefs = defs, expIsNormal = True } = do
+        let nlf = lf `Set.union` Set.fromList (map funcDefName defs)
+        mapExpExp (f nlf) lt
+    f lf lt@MkCont {expLam = lam, expCont = cont } = do
+        a <- g lf lam
+        b <- g lf cont
+        return $ lt { expLam = a, expCont = b }
+    f lf (e1 :>>= p :-> e2) = do
+        e2 <- f lf e2
+        return $ e1 :>>= p :-> e2
+    f lf e@(App a as t) | a `Set.member` lf = return $ App a as nty
+    f lf e = mt e
+    g lf (p :-> e) = do e <- f lf e; return $ p :-> e
+

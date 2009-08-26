@@ -641,49 +641,25 @@ compileToGrin prog = do
     x <- Grin.FromE.compile prog
     when verbose $ Stats.print "Grin" Stats.theStats
     wdump FD.GrinInitial $ do dumpGrin "initial" x
-    --x <- return $ normalizeGrin x
     x <- transformGrin simplifyParms x
     wdump FD.GrinNormalized $ do dumpGrin "normalized" x
     lintCheckGrin x
     let pushGrin grin = do
-            grin <- transformGrin simplifyParms grin
             nf   <- mapMsnd (grinPush undefined) (grinFuncs grin)
             return $ setGrinFunctions nf grin
-
-        opt s grin = do
-            stats' <- Stats.new
-            let fop grin = do Grin.Simplify.simplify stats' grin
-                tparms = transformParms {
-                    transformDumpProgress = verbose,
-                    transformCategory = s,
-                    transformPass = "Grin",
-                    transformOperation = fop
-                    }
-            grin <- transformGrin tparms grin
-            t' <- Stats.isEmpty stats'
-            wdump FD.Progress $ Stats.print s stats'
-            Stats.combine stats stats'
-            case t' of
-                True -> return grin
-                False -> opt s grin
-
     x <- deadCode stats (grinEntryPointNames x) x  -- XXX
-    x <- Grin.SSimplify.simplify x
-    --x <- transformGrin simplifyParms x
-
+    x <- transformGrin simplifyParms x
     x <- pushGrin x
-    x <- opt "Optimization" x
     lintCheckGrin x
+    x <- transformGrin simplifyParms x
     x <- grinSpeculate x
     lintCheckGrin x
-
     x <- deadCode stats (grinEntryPointNames x) x  -- XXX
-    --x <- transformGrin simplifyParms x
-
-    x <- opt "Optimization" x
-    --lintCheckGrin x
-    x <- Grin.SSimplify.simplify x
-
+    lintCheckGrin x
+    x <- transformGrin simplifyParms x
+    x <- pushGrin x
+    lintCheckGrin x
+    x <- transformGrin simplifyParms x
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     wdump FD.GrinPreeval $ dumpGrin "preeval" x
     x <- transformGrin nodeAnalyzeParms x
@@ -693,7 +669,7 @@ compileToGrin prog = do
     lintCheckGrin x
     wdump FD.GrinFinal $ dumpGrin "predevolve" x
     x <- transformGrin devolveTransform x
-    x <- opt "After Devolve Optimization" x
+    --x <- opt "After Devolve Optimization" x
     x <- transformGrin simplifyParms x
     x <- return $ twiddleGrin x
     dumpFinalGrin x
