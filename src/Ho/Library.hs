@@ -101,12 +101,17 @@ findLibrary pn = do
 
 listLibraries :: IO ()
 listLibraries = do
-    putStrLn "Search path:"
-    mapM_ putStrLn (optHlPath options)
-    putStrLn "Libraries found:"
+    putStrLn "SearchPath:"
+    mapM_ (putStrLn . (" - " ++)) (optHlPath options)
+    putStrLn "Libraries:"
     (_,byhashes) <- fetchAllLibraries
     let nameComp a b = compare (libName a) (libName b)
-    forM_ (sortBy nameComp $ Map.elems byhashes) $ \ lib -> putStrLn (libName lib)
+    forM_ (sortBy nameComp $ Map.elems byhashes) $ \ lib -> do
+        putStrLn " -"
+        let f n v = putStrLn ("  " ++ n ++ ": " ++ v)
+        f "Name" (libName lib)
+        f "Hash" (show $ libHash lib)
+--        f "Modules" (show $ libModules lib)
 
 
 
