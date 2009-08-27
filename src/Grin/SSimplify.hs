@@ -99,6 +99,13 @@ simpDone e = do
                 mtick "Grin.Simplify.Unbox.case-return"
                 let vs = zipWith Var [v1 ..] ts
                 return (unboxModify ur (Case v ls) :>>= vs :-> Return (unboxRet ur vs))
+        (Case v1 ls) | [v1'] :-> Case v2 ls' <- last ls, v1' == v2 || v1 == v2 -> do
+            let f (p :-> e) = p :-> Return [v1] :>>= [v1'] :-> e
+            mtick "Grin.Simplify.case-merge"
+            return $ Case v1 (init ls ++ map f ls')
+        --(e :>>= p :-> Return p') | p == p' -> do
+        --    mtick "Grin.Simplify.tail-return-omit"
+        --    return e
         _ -> do
             cmap <- asks envCSE
             case Map.lookup e cmap of
@@ -133,6 +140,9 @@ extEnv (V vn) v s = s { envSubst = IM.insert vn v (envSubst s) }
 
 simpExp :: Exp -> S Exp
 simpExp e = f e [] where
+    f (e :>>= p :-> Return p') rs | p == p' = do
+        mtick "Grin.Simplify.tail-return-omit"
+        f e rs
     f  (a :>>= (v :-> b)) xs = do
         env <- ask
         f a ((env,v,b):xs)
@@ -261,7 +271,7 @@ newVarName (V sv) = do
 isHoly (NodeC _ as) | any isValUnknown as = True
 isHoly n = False
 
-data UnboxingResult = UnErr [Ty] | UnTup [Unbox] -- | UnTail (Set.Set Atom) UnboxingResult
+data UnboxingResult = UnErr [Ty] | UnTup [Unbox] | UnTail (Set.Set Atom) UnboxingResult
 
 data Unbox = UnNode Atom [Unbox] Ty | UnConst Val | UnUnknown Ty
     deriving(Eq,Ord)
@@ -290,6 +300,7 @@ unboxRet ur vs = f ur vs where
 
 unboxTypes :: UnboxingResult -> Maybe [Ty]
 unboxTypes ur = f ur where
+    f (UnTail {}) = Nothing
     f (UnErr []) = Nothing
     f (UnErr (_:_)) = Just []
     f (UnTup us) | all isUnUnknown us = Nothing
@@ -313,7 +324,9 @@ combineUnboxing :: UnboxingResult -> UnboxingResult -> UnboxingResult
 combineUnboxing ub1 ub2 = f ub1 ub2 where
     f UnErr {} x = x
     f x UnErr {} = x
---    f (UnTail t1 u1) UnTail t2 u2) = UnTail (t1 `Set.append` t2) (f u1 u2)
+    f (UnTail t1 u1) (UnTail t2 u2) = UnTail (t1 `Set.union` t2) (f u1 u2)
+    f (UnTail t1 u1) u2 = UnTail t1 (f u1 u2)
+    f u1 (UnTail t2 u2) = UnTail t2 (f u1 u2)
     f (UnTup xs) (UnTup ys) = UnTup (zipWith g xs ys)
     g (UnNode a1 ubs1 t1) (UnNode a2 ubs2 t2) | a1 == a2 = UnNode a1 (zipWith g ubs1 ubs2) t1
                                               | otherwise = UnUnknown t1
@@ -326,7 +339,8 @@ getUnboxing :: Exp -> UnboxingResult
 getUnboxing e = f e where
     f (Return rs) = UnTup (map g rs)
     f (Error _ tys) = UnErr tys
---    f (Case _ ls) = foldr1 combineUnboxing  [ f e | _ :-> e <- ls ]
+    f (App f _ ts) = UnTail (Set.singleton f) (UnErr ts)
+    f (Case _ ls) = foldr1 combineUnboxing  [ f e | _ :-> e <- ls ]
     f Let { expBody = body } = f body
     f (_ :>>= _ :-> e) = f e
     f e = UnTup (map UnUnknown $ getType e)
