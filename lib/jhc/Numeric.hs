@@ -209,8 +209,8 @@ formatRealFloat fmt decs x
                   _ ->
                     let (ei, is') = roundTo base (dec'+1) is
                         d:ds = map intToDigit
-                                   (if ei > 0 then init is' else is')
-                    in d:'.':ds  ++ "e" ++ show (e-1+ei)
+                                   (if ei then init is' else is')
+                    in d:'.':ds  ++ "e" ++ show (e-1+fromEnum ei)
 
           FFFixed ->
             case decs of
@@ -223,14 +223,14 @@ formatRealFloat fmt decs x
                  let dec' = max dec 0 in
                  if e >= 0 then
                    let (ei, is') = roundTo base (dec' + e) is
-                       (ls, rs)  = splitAt (e+ei)
+                       (ls, rs)  = splitAt (e+fromEnum ei)
                                               (map intToDigit is')
                    in  mk0 ls ++ mkdot0 rs
                  else
                    let (ei, is') = roundTo base dec'
                                            (replicate (-e) 0 ++ is)
                        d : ds = map intToDigit
-                                    (if ei > 0 then is' else 0:is')
+                                    (if ei then is' else 0:is')
                    in  d : mkdot0 ds
             where
               mk0 "" = "0"        -- Print 0.34, not .34
@@ -241,17 +241,17 @@ formatRealFloat fmt decs x
 			           -- digits after the decimal point
 
 
-roundTo :: Int -> Int -> [Int] -> (Int, [Int])
+roundTo :: Int -> Int -> [Int] -> (Bool, [Int])
 roundTo base d is | base `seq` d `seq` True = case f d is of
-                (0, is) -> (0, is)
-                (1, is) -> (1, 1 : is)
+                (False, is) -> (False, is)
+                (True, is) -> (True, 1 : is)
   where b2 = base `div` 2
-        f n [] = (0, replicate n 0)
-        f 0 (i:_) = (if i >= b2 then 1 else 0, [])
+        f n [] = (False, replicate n 0)
+        f 0 (i:_) = (i >= b2, [])
         f d (i:is) =
             let (c, ds) = f (d-1) is
-                i' = c + i
-            in  if i' == base then (1, 0:ds) else (0, i':ds)
+                i' = fromEnum c + i
+            in  if i' == base then (True, 0:ds) else (False, i':ds)
 
 --
 -- Based on "Printing Floating-Point Numbers Quickly and Accurately"
