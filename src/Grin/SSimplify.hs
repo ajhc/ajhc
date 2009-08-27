@@ -44,6 +44,12 @@ data SCol = SCol {
     }
     {-! derive: Monoid !-}
 
+data ExpInfo = ExpInfo {
+    expFreeVars :: Set.Set Var,
+    expUnboxing :: UnboxingResult,
+    expType     :: [Ty]
+    }
+
 newtype S a = S (RWS SEnv SCol SState a)
     deriving(Monad,Functor,MonadWriter SCol, MonadReader SEnv,MonadState SState)
 
@@ -86,6 +92,13 @@ simpDone e = do
             let ne = if cl == 1 then App fn (gs ++ fs) ty else Return [NodeC (partialTag fn (cl - 1)) (gs ++ fs)]
             mtick $ if cl == 1 then "Simplify.Apply.Papp.{" ++ show tl  else ("Simplify.Apply.App.{" ++ show fn)
             return ne
+        (Case v ls) | isJust utypes -> ans where
+            utypes@(~(Just ts)) = unboxTypes ur
+            ur = foldr1 combineUnboxing [ getUnboxing e | _ :-> e <- ls ]
+            ans = do
+                mtick "Grin.Simplify.Unbox.case-return"
+                let vs = zipWith Var [v1 ..] ts
+                return (unboxModify ur (Case v ls) :>>= vs :-> Return (unboxRet ur vs))
         _ -> do
             cmap <- asks envCSE
             case Map.lookup e cmap of
@@ -156,13 +169,13 @@ simpExp e = f e [] where
         dtup xs ys senv b rs
     f (Case v [l]) rs = do
         f (Return [v] :>>= l) rs
-    f (Case v ls) rs | isJust utypes = ans where
-        utypes@(~(Just ts)) = unboxTypes ur
-        ur = foldr1 combineUnboxing [ getUnboxing e | _ :-> e <- ls ]
-        ans = do
-            mtick "Grin.Simplify.Unbox.case-return"
-            let vs = zipWith Var [v1 ..] ts
-            f (unboxModify ur (Case v ls) :>>= vs :-> Return (unboxRet ur vs)) rs
+--    f e@(Case v ls) rs | isJust utypes  = ans where
+--        utypes@(~(Just ts)) = unboxTypes ur
+--        ur = foldr1 combineUnboxing [ getUnboxing e | _ :-> e <- ls ]
+--        ans = do
+--            mtick "Grin.Simplify.Unbox.case-return"
+--            let vs = zipWith Var [v1 ..] ts
+--            f (unboxModify ur (Case v ls) :>>= vs :-> Return (unboxRet ur vs)) rs
     f a ((senv,p,b):xs) = do
         a <- g a
         (p,env') <- renamePattern p
@@ -248,7 +261,7 @@ newVarName (V sv) = do
 isHoly (NodeC _ as) | any isValUnknown as = True
 isHoly n = False
 
-data UnboxingResult = UnErr [Ty] | UnTup [Unbox]
+data UnboxingResult = UnErr [Ty] | UnTup [Unbox] -- | UnTail (Set.Set Atom) UnboxingResult
 
 data Unbox = UnNode Atom [Unbox] Ty | UnConst Val | UnUnknown Ty
     deriving(Eq,Ord)
@@ -268,6 +281,7 @@ instance CanType Unbox Ty where
 unboxRet :: UnboxingResult -> [Val] -> [Val]
 unboxRet ur vs = f ur vs where
     f (UnTup xs) vs = let (r,[]) = g xs vs in r
+    f UnErr {} _ = []
     f _ vs = vs
     g [] vs = ([],vs)
     g (UnUnknown _:xs) (v:vs) = let (r,y) = g xs vs in (v:r,y)
@@ -276,7 +290,8 @@ unboxRet ur vs = f ur vs where
 
 unboxTypes :: UnboxingResult -> Maybe [Ty]
 unboxTypes ur = f ur where
-    f UnErr {} = Nothing
+    f (UnErr []) = Nothing
+    f (UnErr (_:_)) = Just []
     f (UnTup us) | all isUnUnknown us = Nothing
     f (UnTup xs) = Just $ concatMap h xs
     h (UnUnknown t) = [t]
@@ -285,7 +300,7 @@ unboxTypes ur = f ur where
 
 unboxModify :: UnboxingResult -> Exp -> Exp
 unboxModify ur = f ur where
-    nty = getType ur
+    Just nty = unboxTypes ur
     f UnErr {} = id
     f (UnTup us) | all isUnUnknown us = id
     f (UnTup xs) = runIdentity . editTail nty (g xs)
@@ -298,6 +313,7 @@ combineUnboxing :: UnboxingResult -> UnboxingResult -> UnboxingResult
 combineUnboxing ub1 ub2 = f ub1 ub2 where
     f UnErr {} x = x
     f x UnErr {} = x
+--    f (UnTail t1 u1) UnTail t2 u2) = UnTail (t1 `Set.append` t2) (f u1 u2)
     f (UnTup xs) (UnTup ys) = UnTup (zipWith g xs ys)
     g (UnNode a1 ubs1 t1) (UnNode a2 ubs2 t2) | a1 == a2 = UnNode a1 (zipWith g ubs1 ubs2) t1
                                               | otherwise = UnUnknown t1
