@@ -30,6 +30,7 @@ import Support.CanType
 import Support.FreeVars
 import Util.Graphviz
 import qualified Cmm.Op as Op
+import Name.VConsts
 
 
 
@@ -116,6 +117,9 @@ prettyVal :: DocLike d => Val -> d
 prettyVal s | Just [] <- valToList s = text "[]"
 prettyVal s | Just st <- fromVal s = text $ show (st::String)
 prettyVal s | Just vs <- valToList s = list $ map prettyVal vs
+prettyVal (NodeC ch [t]) | ch == toAtom "CJhc.Prim.Char" =  parens $ text "Char" <+> sc t where
+    sc (Lit n t) | t == tCharzh = tshow (chr $ fromIntegral n)
+    sc v = prettyVal v
 prettyVal (NodeC t []) = parens $ tag (fromAtom t)
 prettyVal (NodeC t vs) = parens $ tag (fromAtom t) <+> hsep (map prettyVal vs)
 prettyVal (Index p off) = prettyVal p <> char '[' <> prettyVal off <> char ']'
