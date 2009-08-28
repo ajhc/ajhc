@@ -120,10 +120,12 @@ createApply argType retType te ts'
         Just (n,fn) = tagUnfunction t
         a2s = if argType == TyUnit then [] else [a2]
         g | n == 1 =  App fn (vs ++ a2s) ty
-          | n > 1 = Return $ [NodeC (partialTag fn (n - 1)) (vs ++ a2s)]
+          | n > 1 = dstore (NodeC (partialTag fn (n - 1)) (vs ++ a2s))
           | otherwise = error "createApply"
          where
             Just (_,ty) = findArgsType te fn
+
+dstore x = BaseOp (StoreNode True) [x]
 
 {-# NOINLINE createEvalApply #-}
 createEvalApply :: Grin -> IO Grin

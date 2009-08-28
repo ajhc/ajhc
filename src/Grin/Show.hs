@@ -73,8 +73,8 @@ prettyExp vl (e1 :>>= v :-> e2) = align (prettyExp (pVar v) e1 <$> prettyExp vl 
 prettyExp vl (Return []) = vl <> keyword "return" <+> text "()"
 prettyExp vl (Return [v]) = vl <> keyword "return" <+> prettyVal v
 prettyExp vl (Return vs) = vl <> keyword "return" <+> tupled (map prettyVal vs)
-prettyExp vl (Store v@Var {}) | getType v == tyDNode = vl <> keyword "demote" <+> prettyVal v
-prettyExp vl (Store v) = vl <> keyword "store" <+> prettyVal v
+--prettyExp vl (Store v@Var {}) | getType v == tyDNode = vl <> keyword "demote" <+> prettyVal v
+--prettyExp vl (Store v) = vl <> keyword "store" <+> prettyVal v
 prettyExp vl (Error "" _) = vl <> prim "exitFailure"
 prettyExp vl (Error s _) = vl <> keyword "error" <+> tshow s
 prettyExp vl (BaseOp Eval [v]) = vl <> keyword "eval" <+> prettyVal v
@@ -90,6 +90,9 @@ prettyExp vl (BaseOp Redirect [x,y]) = vl <> keyword "redirect" <+> prettyVal x 
 prettyExp vl (BaseOp PokeVal [x,y]) = vl <> keyword "pokeVal" <+> prettyVal x <+> prettyVal y
 prettyExp vl (BaseOp PeekVal [x]) = vl <> keyword "peekVal" <+> prettyVal x
 prettyExp vl (BaseOp Promote [x]) = vl <> keyword "promote" <+> prettyVal x
+prettyExp vl (BaseOp Demote [x]) = vl <> keyword "demote" <+> prettyVal x
+prettyExp vl (BaseOp (StoreNode b) [x]) = vl <> keyword ((if b then "d" else "i") ++ "store") <+> prettyVal x
+prettyExp vl (BaseOp (StoreNode b) [x,y]) = vl <> keyword ((if b then "d" else "i") ++ "store") <+> prettyVal x <> char '@' <> prettyVal y
 prettyExp vl (Case v vs) = vl <> keyword "case" <+> prettyVal v <+> keyword "of" <$> indent 2 (vsep (map f vs)) where
     f (~[v] :-> e) | isOneLine e = prettyVal v <+> operator "->" <+> prettyExp empty e
     f (~[v] :-> e) = prettyVal v <+> operator "->" <+> keyword "do" <$> indent 2 (prettyExp empty e)

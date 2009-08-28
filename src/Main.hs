@@ -70,7 +70,6 @@ import qualified E.SSimplify as SS
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Grin.SSimplify
-import qualified Grin.Simplify
 import qualified IO
 import qualified Info.Info as Info
 import qualified Interactive

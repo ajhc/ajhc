@@ -416,8 +416,10 @@ convertBody (Error s t) = do
             v <- g t
             return (jerr & creturn v)
 
-convertBody (Store  n@NodeC {})  = newNode sptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
-convertBody (Return [n@NodeC {}])  = newNode wptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
+convertBody (BaseOp (StoreNode b)  [n@NodeC {}])  = newNode (bool b wptr_t sptr_t) n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
+--convertBody (Return [n@NodeC {}])  = newNode wptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
+--convertBody (Store  n@NodeC {})  = newNode sptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
+--convertBody (Return [n@NodeC {}])  = newNode wptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
 
 
 convertBody (e :>>= [(Var vn _)] :-> e') | vn == v0 = do
@@ -473,8 +475,9 @@ convertBody (GcRoots vs b) = do
     return $ gc_roots vs & b' & gc_end
 
 -- return, promote and demote
-convertBody (BaseOp Promote [v])        | getType v == tyINode = simpleRet =<< f_promote `liftM` convertVal v
-convertBody (Store n@Var {}) | getType n == tyDNode = simpleRet =<< f_demote `liftM` convertVal n
+convertBody (BaseOp Promote [v])       | getType v == tyINode = simpleRet =<< f_promote `liftM` convertVal v
+convertBody (BaseOp Demote [n@Var {}]) | getType n == tyDNode = simpleRet =<< f_demote `liftM` convertVal n
+--convertBody (Store n@Var {}) | getType n == tyDNode = simpleRet =<< f_demote `liftM` convertVal n
 
 convertBody (Return []) = simpleRet emptyExpression
 convertBody (Return [v]) = simpleRet =<< convertVal v
@@ -530,7 +533,7 @@ nodeAssign v t as e' = cna where
 --isCompound Fetch {} = False
 isCompound BaseOp {} = False
 isCompound Return {} = False
-isCompound Store {} = False
+--isCompound Store {} = False
 isCompound Prim {} = False
 isCompound _ = True
 
@@ -936,3 +939,4 @@ generateArchAssertions = unlines (h:map f (filter notVoid as) ++ [t]) where
 
 
 
+bool b x y = if b then x else y

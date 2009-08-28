@@ -179,10 +179,10 @@ grinSpeculate grin = do
 performSpeculate specs grin = do
     let sset = Set.fromList (map tagFlipFunction specs)
     let f (a,l) = mapBodyM h l  >>= \l' -> return (a,l')
-        h (Store (NodeC t xs)) | t `member` sset = do
+        h (BaseOp (StoreNode False) [NodeC t xs]) | t `member` sset = do
             let t' = tagFlipFunction t
             mtick $ "Optimize.speculate.store.{" ++ show t'
-            return (App t' xs [TyNode] :>>= [n1] :-> Store n1)
+            return (App t' xs [TyNode] :>>= [n1] :-> demote n1)
 --        h (Update v (NodeC t xs)) | not (isMutableNodeTag t), t `member` sset = do
 --            let t' = tagFlipFunction t
 --            mtick $ "Optimize.speculate.update.{" ++ show t'
@@ -199,12 +199,15 @@ findSpeculatable grin = ans where
         | tagIsFunction t = [t]
         | otherwise = []
     isSpeculatable Return {} = True
-    isSpeculatable Store {} = True
+    isSpeculatable (BaseOp (StoreNode _) _) = True
+    isSpeculatable (BaseOp Promote _) = True
+    isSpeculatable (BaseOp Demote _) = True
     isSpeculatable (x :>>= _ :-> y) = isSpeculatable x && isSpeculatable y
     isSpeculatable (Case e as) = all isSpeculatable [ e | _ :-> e <- as]
     isSpeculatable Prim { expPrimitive = APrim p _ } = primIsConstant p
     isSpeculatable _ = False
 
+demote x = BaseOp Demote [x]
 
 
 

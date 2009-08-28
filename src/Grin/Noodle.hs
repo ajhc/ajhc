@@ -42,7 +42,7 @@ mapExpVal g x = f x where
     f (BaseOp a vs) = return (BaseOp a) `ap` mapM g vs
     f (Return vs) = return Return `ap` mapM g vs
     f (Prim x vs t) = return (Prim x) `ap` mapM g vs `ap` return t
-    f (Store v) = return Store `ap` g v
+--    f (Store v) = return Store `ap` g v
     f e@Alloc { expValue = v, expCount = c } = do
         v <- g v
         c <- g c
@@ -143,10 +143,12 @@ valIsConstant _ = False
 
 
 isOmittable (BaseOp Promote _) = True
+isOmittable (BaseOp Demote _) = True
 isOmittable (BaseOp PeekVal _) = True
+isOmittable (BaseOp (StoreNode _) _) = True
 isOmittable (Return {}) = True
-isOmittable (Store x) | getType x /= TyNode = False
-isOmittable (Store {}) = True
+--isOmittable (Store x) | getType x /= TyNode = False
+--isOmittable (Store {}) = True
 isOmittable Prim { expPrimitive = aprim } = aprimIsCheap aprim
 isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
 isOmittable Let { expBody = x } = isOmittable x
@@ -183,7 +185,7 @@ collectFuncs exp = runWriter (cfunc exp) where
         cfunc Prim {} = return mempty
         cfunc Return {} = return mempty
         cfunc BaseOp {} = return mempty
-        cfunc Store {} = return mempty
+--        cfunc Store {} = return mempty
         cfunc Alloc {} = return mempty
         cfunc GcRoots { expBody = b} = cfunc b
         cfunc NewRegion { expLam = l } = clfunc l

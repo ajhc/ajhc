@@ -338,6 +338,10 @@ instance ToVal TVr where
 doApply x y ty | not (keepIt y) = BaseOp (Apply ty) [x]
 doApply x y ty = BaseOp (Apply ty) [x,y]
 
+istore n = BaseOp (StoreNode False) [n]
+dstore n = BaseOp (StoreNode True) [n]
+demote v = BaseOp Demote [v]
+
 evalVar :: [Ty] -> TVr -> C Exp
 evalVar fty tvr  = do
     let v = toVal tvr
@@ -392,7 +396,7 @@ compile' cenv (tvr,as,e) = ans where
                         app fty (App v (keepIts x) es) y
                     | otherwise -> do
                         let pt = partialTag v (length as' - length as)
-                        return $ Return [NodeC pt (keepIts as)]
+                        return $ dstore (NodeC pt (keepIts as))
                 Nothing | not (isLifted $ EVar tvr) -> do
                     mtick "Grin.FromE.app-unlifted"
                     app fty (Return [toVal tvr]) as
@@ -405,6 +409,7 @@ compile' cenv (tvr,as,e) = ans where
     ce e | Just z <- literal e = return (Return z)
     ce e | Just (Const z) <- constant e = return (Return $ keepIts [z])
     ce e | Just z <- constant e = return (gEval z)
+    ce e | Just [z@NodeC {}] <- con e = return (dstore z)
     ce e | Just z <- con e = return (Return z)
 
 
@@ -422,8 +427,6 @@ compile' cenv (tvr,as,e) = ans where
         f "newWorld__" [_] = do
             return $ Return []
         f "dependingOn" [e,_] = ce e
-
-
         -- references
         f "newRef__" [v,_] = do
             let [v'] = args [v]
@@ -526,7 +529,7 @@ compile' cenv (tvr,as,e) = ans where
             (_,_) | isLifted scrut -> localEvaled [b] v $ do
                     as <- mapM cp as
                     def <- createDef d newNodeVar
-                    return $ e :>>= [v] :-> Store v :>>= [toVal b] :-> Case v (as ++ def)
+                    return $ e :>>= [v] :-> demote v :>>= [toVal b] :-> Case v (as ++ def)
             (_,_) | otherwise -> do
                     as <- mapM cp as
                     def <- createDef d newNodeVar
@@ -577,7 +580,7 @@ compile' cenv (tvr,as,e) = ans where
         let t  = toAtom $ "Bap_" ++ show (length as) ++ "_" ++ funcName ++ "_" ++ show vn
             tl = toAtom $ "bap_" ++ show (length as) ++ "_" ++  funcName ++ "_" ++ show vn
             targs = [Var v ty | v <- [v1..] | ty <- (TyINode:map getType as)]
-            s = Store (NodeC t (keepIts $ e:as))
+            s = istore (NodeC t (keepIts $ e:as))
         d <- app [TyNode] (gEval p1) (tail targs)
         liftIO $ addNewFunction cenv (tl,(keepIts targs) :-> d)
         return s
@@ -593,7 +596,7 @@ compile' cenv (tvr,as,e) = ans where
     cc (EPrim don [e,_] _) | don == p_dependingOn  = cc e
     cc e | Just _ <- literal e = error "unboxed literal in lazy context"
     cc e | Just z <- constant e = return (Return $ keepIts [z])
-    cc e | Just [z] <- con e = return $ if isLifted e then Store z else Return [z]
+    cc e | Just [z] <- con e = return $ BaseOp (StoreNode (not $ isLifted e)) [z] -- if isLifted e then Store z else Return [z]
     cc (EError s e) = do
         let ty = toTypes TyNode e
         a <- liftIO $ runOnceMap (errorOnce cenv) (ty,s) $ do
@@ -611,7 +614,7 @@ compile' cenv (tvr,as,e) = ans where
             Just (v,as',es)
                 | length as > length as' -> do
                     let (x,y) = splitAt (length as') as
-                    let s = Store (NodeC (partialTag v 0) (keepIts x))
+                    let s = istore (NodeC (partialTag v 0) (keepIts x))
                     nv <- newNodePtrVar
                     z <- app' nv y
                     return $ s :>>= [nv] :-> z
@@ -624,9 +627,9 @@ compile' cenv (tvr,as,e) = ans where
                     as <- return $ keepIts as
                     return $ if all valIsConstant as
                       then Return [Const (NodeC pt as)]
-                      else Store (NodeC pt as)
+                      else istore (NodeC pt as)
                 | otherwise -> do -- length as == length as'
-                    return $ Store (NodeC (tagFlipFunction v) (keepIts as))
+                    return $ istore (NodeC (tagFlipFunction v) (keepIts as))
             Nothing -> app' (toVal v) as
     cc (EVar v) = do
         return $ Return [toVal v]
@@ -669,13 +672,14 @@ compile' cenv (tvr,as,e) = ans where
                     v' <- newNodeVar
                     e <- cc e
                     let (du,t,ts) = doUpdate (toVal tvr) e
-                    u rs (\y -> Store (NodeC t (map ValUnknown ts)) :>>= [toVal tvr] :-> ss y) (\y -> du :>>= [] :-> dus y)
+                    u rs (\y -> istore (NodeC t (map ValUnknown ts)) :>>= [toVal tvr] :-> ss y) (\y -> du :>>= [] :-> dus y)
             rr <- u bs id id
             v <- f ds x
             return (rr v)
 
     -- This avoids a blind update on recursive thunks
-    doUpdate vr (Store n@(NodeC t ts)) = (BaseOp Overwrite [vr,n],t,map getType ts)
+    --doUpdate vr (Store n@(NodeC t ts)) = (BaseOp Overwrite [vr,n],t,map getType ts)
+    doUpdate vr (BaseOp StoreNode {} [n@(NodeC t ts)]) = (BaseOp Overwrite [vr,n],t,map getType ts)
     doUpdate vr (x :>>= v :-> e) = let (du,t,ts) = doUpdate vr e in (x :>>= v :-> du,t,ts)
     doUpdate vr x = error $ "doUpdate: " ++ show x
     args es = map f es where

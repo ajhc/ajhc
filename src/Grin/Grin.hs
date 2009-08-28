@@ -163,11 +163,11 @@ infixr 1  :->, :>>=
 --
 
 data BaseOp
---    = Demote                -- turn a node into an inode, always okay
-    = Promote               -- turn an inode into a node, the inode _must_ already be a valid node
+    = Demote                -- turn a node into an inode, always okay
+    | Promote               -- turn an inode into a node, the inode _must_ already be a valid node
     | Eval                  -- evaluate an inode, returns a node representing the evaluated value. Bool is whether to update the inode
     | Apply [Ty]            -- apply a partial application to a value, returning the given type
-    | StoreNode !Bool       -- create a new node, Bool is true if it should be an indirect node, the second val is the region
+    | StoreNode !Bool       -- create a new node, Bool is true if it should be an direct node, the second val is the region
     | Redirect              -- write an indirection over its first argument to point to its second one
     | Overwrite             -- overwrite an existing node with new data (the tag must match what was used for the initial Store)
     | PeekVal               -- read a value from a pointed to location
@@ -191,7 +191,7 @@ data Exp =
                   expType :: [Ty] }                                       -- ^ Primitive operation
     | Case      { expValue :: Val, expAlts :: [Lam] }                     -- ^ Case statement
     | Return    { expValues :: [Val] }                                    -- ^ Return a value
-    | Store     { expValue :: Val }                                       -- ^ Allocate a new heap node
+--    | Store     { expValue :: Val }                                       -- ^ Allocate a new heap node
     | Error     { expError :: String, expType :: [Ty] }                   -- ^ Abort with an error message, non recoverably.
     | Call      { expValue :: Val,
                   expArgs :: [Val],
@@ -500,13 +500,14 @@ instance CanType Exp [Ty] where
     getType (_ :>>= (_ :-> e2)) = getType e2
     getType (Prim _ _ ty) = ty
     getType App { expType = t } = t
-    getType (Store v) = case getType v of
-        TyNode -> [TyINode]
-        t -> [TyPtr t]
+--    getType (Store v) = case getType v of
+--        TyNode -> [TyINode]
+--        t -> [TyPtr t]
     getType (BaseOp Overwrite _) = []
     getType (BaseOp Redirect _) = []
     getType (BaseOp Promote _) = [TyNode]
     getType (BaseOp Eval _) = [TyNode]
+    getType (BaseOp (StoreNode b) _) = if b then [TyNode] else [TyINode]
     getType (BaseOp (Apply ty) _) = ty
     getType (BaseOp PeekVal [v]) = case getType v of
         TyPtr t -> [t]
@@ -572,7 +573,7 @@ instance FreeVars Exp (Set.Set Var) where
     freeVars (App a vs _) =  freeVars vs
     freeVars (Case x xs) = freeVars (x,xs)
     freeVars (Return v) = freeVars v
-    freeVars (Store v) = freeVars v
+--    freeVars (Store v) = freeVars v
     freeVars (BaseOp _ vs) = freeVars vs
     freeVars (Prim _ x _) = freeVars x
     freeVars Error {} = Set.empty
@@ -589,7 +590,7 @@ instance FreeVars Exp (Set.Set (Var,Ty)) where
     freeVars (App a vs _) =  freeVars vs
     freeVars (Case x xs) = freeVars (x,xs)
     freeVars (Return v) = freeVars v
-    freeVars (Store v) = freeVars v
+--    freeVars (Store v) = freeVars v
     freeVars (BaseOp _ vs) = freeVars vs
     freeVars (Prim _ x _) = freeVars x
     freeVars Error {} = Set.empty
@@ -629,7 +630,7 @@ instance FreeVars Exp (Set.Set Tag) where
     freeVars (App a vs _) = Set.singleton a `Set.union` freeVars vs
     freeVars (Case x xs) = freeVars (x,xs)
     freeVars (Return v) = freeVars v
-    freeVars (Store v) = freeVars v
+--    freeVars (Store v) = freeVars v
     freeVars (BaseOp _ vs) = freeVars vs
     freeVars (Prim _ x _) = freeVars x
     freeVars Error {} = Set.empty

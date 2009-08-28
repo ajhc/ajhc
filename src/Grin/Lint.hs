@@ -131,9 +131,9 @@ printDL h n fs e = f fs e where
         f (map Right l) x
         f fs y
     f bs (Return vs) = do zipWithM_ (assign "assign") bs vs
-    f [Left b] (Store (NodeC n vs)) = hPrintf h "store(%s,%s,%s).\n" (dshow b) (dshow n) (if tagIsWHNF n then "true" else "false")
-    f [Right (Var b _)] (Store (NodeC n vs)) = hPrintf h "store(%s,%s,%s).\n" (dshow b) (dshow n) (if tagIsWHNF n then "true" else "false") >> app n vs
-    f [b] (Store x@Var {}) = do assign "demote" b x
+--    f [Left b] (Store (NodeC n vs)) = hPrintf h "store(%s,%s,%s).\n" (dshow b) (dshow n) (if tagIsWHNF n then "true" else "false")
+--    f [Right (Var b _)] (Store (NodeC n vs)) = hPrintf h "store(%s,%s,%s).\n" (dshow b) (dshow n) (if tagIsWHNF n then "true" else "false") >> app n vs
+--    f [b] (Store x@Var {}) = do assign "demote" b x
     f [b] (BaseOp Eval [x]) = do assign "eval" b x
     f b (App fn as ty) = do
         forM_ (zip naturals as) $ \ (i,a) -> do
@@ -271,9 +271,10 @@ tcExp e = f e where
             if as'' == as' then return t' else
                 fail $ "App: arguments do not match: " ++ show (a,as',t')
          else fail $ "App: results do not match: " ++ show (a,t,(as',t'))
-    f (Store v) = do
-        t <- tcVal v
-        return (getType (Store v))
+    f e@(BaseOp (StoreNode _) vs) = do
+        [NodeC {}] <- return vs
+        mapM_ tcVal vs
+        return (getType e)
     f Alloc { expValue = v } = do
         t <- tcVal v
         return [TyPtr t]
@@ -281,6 +282,9 @@ tcExp e = f e where
     f (BaseOp Promote [v]) = do
         TyINode <- tcVal v
         return [TyNode]
+    f (BaseOp Demote [v]) = do
+        TyNode <- tcVal v
+        return [TyINode]
     f (Error _ t) = return t
     f e@(BaseOp Overwrite [w,v]) = do
         return []

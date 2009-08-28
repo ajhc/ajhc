@@ -83,13 +83,17 @@ simpLam (ps :-> e) = do
     ps <- mapM (zeroVars (`Set.member` colFreeVars col)) ps
     return (ps :-> e)
 
+
+dstore x = BaseOp (StoreNode True) [x]
+
+
 simpDone :: Exp -> S Exp
 simpDone e = do
     pmap <- asks envPapp
     case e of
         (BaseOp (Apply ty) (Var (V vn) _:fs)) | Just (tl,gs) <- IM.lookup vn pmap -> do
             (cl,fn) <- tagUnfunction tl
-            let ne = if cl == 1 then App fn (gs ++ fs) ty else Return [NodeC (partialTag fn (cl - 1)) (gs ++ fs)]
+            let ne = if cl == 1 then App fn (gs ++ fs) ty else dstore (NodeC (partialTag fn (cl - 1)) (gs ++ fs))
             mtick $ if cl == 1 then "Simplify.Apply.Papp.{" ++ show tl  else ("Simplify.Apply.App.{" ++ show fn)
             return ne
         (Case v ls) | isJust utypes -> ans where
@@ -98,7 +102,7 @@ simpDone e = do
             ans = do
                 mtick "Grin.Simplify.Unbox.case-return"
                 let vs = zipWith Var [v1 ..] ts
-                return (unboxModify ur (Case v ls) :>>= vs :-> Return (unboxRet ur vs))
+                return (unboxModify ur (Case v ls) :>>= vs :->  (unboxRet ur vs))
         (Case v1 ls) | [v1'] :-> Case v2 ls' <- last ls, v1' == v2 || v1 == v2 -> do
             let f (p :-> e) = p :-> Return [v1] :>>= [v1'] :-> e
             mtick "Grin.Simplify.case-merge"
@@ -123,14 +127,20 @@ simpBind p e cont = f p e where
          else return $ e :>>= (p :-> z)
     cse' name xs = cse name ((e,Return p):xs)
     f p app@(BaseOp Eval [v]) =  cse' "Simplify.CSE.eval" [(BaseOp Promote [v],Return p)]
-    f p (BaseOp Promote [v@Var {}]) =  cse' "Simplify.CSE.fetch" [(gEval v,Return p)]
-    f [p@(Var (V vn) _)] (Return [v@(NodeC t vs)]) | not (isHoly v) = case tagUnfunction t of
-        Nothing -> cse "Simplify.CSE.return-node" [(Return [p],Return [v]),(Store p,Store v)]
-        Just (n,fn) -> local (\s -> s { envPapp = IM.insert vn (t,vs) (envPapp s) }) $ cse' "Simplify.CSE.return-node" [(Return [p],Return [v]),(Store p,Store v)]
-    f [p] (Store v@Var {})  =  cse' "Simplify.CSE.demote" [(BaseOp Promote [p],Return [v]),(gEval p,Return [v])]
-    f [p@(Var (V vn) _)] (Store v@(NodeC t vs)) | not (isHoly v) = case tagIsWHNF t of
-        True -> local (\s -> s { envPush = IM.insert vn (Store v) (envPush s) }) $ cse "Simplify.CSE.store-whnf" [(BaseOp Promote [p],Return [v]),(gEval p,Return [v])]
-        False -> cse' "Simplify.CSE.store" []
+    f p (BaseOp Promote [v@Var {}]) =  cse' "Simplify.CSE.promote" [(gEval v,Return p)]
+    f [p] (BaseOp Demote [v@Var {}]) =  cse' "Simplify.CSE.demote" [(BaseOp Promote [p],Return [v]),(gEval p,Return [v])]
+    f [p@(Var (V vn) _)] (BaseOp (StoreNode isD) [v@(NodeC t vs)]) | not (isHoly v) = case (isD,tagUnfunction t,tagIsWHNF t) of
+        (True,Nothing,_) -> cse "Simplify.CSE.return-node" []
+        (True,Just (n,fn),_) -> local (\s -> s { envPapp = IM.insert vn (t,vs) (envPapp s) }) $ cse' "Simplify.CSE.return-node" []
+        --(False,_,True)  -> local (\s -> s { envPush = IM.insert vn (Store v) (envPush s) }) $ cse "Simplify.CSE.store-whnf" []
+        --(False,_,False) -> cse' "Simplify.CSE.store" []
+        _ -> cse' "Simplify.CSE.store" []
+--    f [p@(Var (V vn) _)] (Return [v@(NodeC t vs)]) | not (isHoly v) = case tagUnfunction t of
+--        Nothing -> cse "Simplify.CSE.return-node" [(Return [p],Return [v]),(Store p,Store v)]
+--        Just (n,fn) -> local (\s -> s { envPapp = IM.insert vn (t,vs) (envPapp s) }) $ cse' "Simplify.CSE.return-node" [(Return [p],Return [v]),(Store p,Store v)]
+--    f [p@(Var (V vn) _)] (Store v@(NodeC t vs)) | not (isHoly v) = case tagIsWHNF t of
+--        True -> local (\s -> s { envPush = IM.insert vn (Store v) (envPush s) }) $ cse "Simplify.CSE.store-whnf" [(BaseOp Promote [p],Return [v]),(gEval p,Return [v])]
+--        False -> cse' "Simplify.CSE.store" []
     f _ _ = cse "Simplify.CSE.NOT" []
 
 extEnv :: Var -> Val -> SEnv -> SEnv
@@ -148,12 +158,12 @@ simpExp e = f e [] where
         f a ((env,v,b):xs)
 
     -- simple transforms
-    f (BaseOp Promote [Const x]) rs = do
-        mtick "Grin.Simplify.fetch-const"
-        f (Return [x]) rs
-    f (Store x) rs | valIsNF x = do
-        mtick "Grin.Simplify.store-normalform"
-        f (Return [Const x]) rs
+--    f (BaseOp Promote [Const x]) rs = do
+--        mtick "Grin.Simplify.fetch-const"
+--        f (Return [x]) rs
+--    f (Store x) rs | valIsNF x = do
+--        mtick "Grin.Simplify.store-normalform"
+--        f (Return [Const x]) rs
     f (BaseOp Eval [Const n]) rs = do
         mtick "Grin.Simplify.eval-const"
         f (Return [n]) rs
@@ -161,23 +171,22 @@ simpExp e = f e [] where
         mtick "Grin.Simplify.error-discard"
         let (_,_,b) = last rs
         f (Error s (getType b)) []
-
     f (Return [v@Const {}]) ((senv,[Var vn _],b):rs) = do
         mtick "Grin.Simplify.Subst.const"
         fbind vn v senv b rs
     f (Return [v@Var {}]) ((senv,[Var vn _],b):rs) = do
         mtick "Grin.Simplify.Subst.var"
         fbind vn v senv b rs
-    f a@(Return [NodeC t xs]) ((senv,[NodeC t' ys],b):rs) | t == t' = do
-        mtick "Grin.Simplify.Assign.node-node"
-        dtup xs ys senv b rs
+--    f a@(Return [NodeC t xs]) ((senv,[NodeC t' ys],b):rs) | t == t' = do
+--        mtick "Grin.Simplify.Assign.node-node"
+--        dtup xs ys senv b rs
     f (Return []) ((senv,[],b):rs) = do
         mtick "Grin.Simplify.Assign.unit-unit"
         dtup [] [] senv b rs
     f a@(Return (xs@(_:_:_))) ((senv,ys,b):rs) = do
         mtick "Grin.Simplify.Assign.tuple-tuple"
         dtup xs ys senv b rs
-    f (Case v [l]) rs = do
+    f (Case v@Var {} [l]) rs = do
         f (Return [v] :>>= l) rs
 --    f e@(Case v ls) rs | isJust utypes  = ans where
 --        utypes@(~(Just ts)) = unboxTypes ur
@@ -271,9 +280,9 @@ newVarName (V sv) = do
 isHoly (NodeC _ as) | any isValUnknown as = True
 isHoly n = False
 
-data UnboxingResult = UnErr [Ty] | UnTup [Unbox] | UnTail (Set.Set Atom) UnboxingResult
+data UnboxingResult = UnErr [Ty] | UnStore !Bool !Atom [Unbox] | UnReturn [Unbox] | UnTail (Set.Set Atom) UnboxingResult
 
-data Unbox = UnNode Atom [Unbox] Ty | UnConst Val | UnUnknown Ty
+data Unbox =  UnConst Val | UnUnknown Ty
     deriving(Eq,Ord)
 
 isUnUnknown UnUnknown  {} = True
@@ -281,44 +290,46 @@ isUnUnknown _ = False
 
 instance CanType UnboxingResult [Ty] where
     getType (UnErr tys) = tys
-    getType (UnTup us) = map getType us
+    getType (UnReturn us) = map getType us
+    getType (UnStore b _ _) = [bool b tyDNode tyINode]
 
 instance CanType Unbox Ty where
-    getType (UnNode _ _ t) = t
     getType (UnConst v) = getType v
     getType (UnUnknown t) = t
 
-unboxRet :: UnboxingResult -> [Val] -> [Val]
+unboxRet :: UnboxingResult -> [Val] -> Exp
 unboxRet ur vs = f ur vs where
-    f (UnTup xs) vs = let (r,[]) = g xs vs in r
-    f UnErr {} _ = []
-    f _ vs = vs
+    f (UnReturn xs) vs = Return $ let (r,[]) = g xs vs in r
+    f (UnStore b c xs) vs = let (xs',[]) = g xs vs in BaseOp (StoreNode b) [NodeC c xs']
+    f UnErr {} _ = Return []
+    f _ vs = Return vs
     g [] vs = ([],vs)
     g (UnUnknown _:xs) (v:vs) = let (r,y) = g xs vs in (v:r,y)
     g (UnConst v:xs) vs = let (r,y) = g xs vs in (v:r,y)
-    g (UnNode a ts _:xs) vs = let (ts',vs') = g ts vs; (r,y) = g xs vs' in (NodeC a ts':r,y)
+ --   g (UnNode a ts _:xs) vs = let (ts',vs') = g ts vs; (r,y) = g xs vs' in (NodeC a ts':r,y)
 
 unboxTypes :: UnboxingResult -> Maybe [Ty]
 unboxTypes ur = f ur where
     f (UnTail {}) = Nothing
     f (UnErr []) = Nothing
     f (UnErr (_:_)) = Just []
-    f (UnTup us) | all isUnUnknown us = Nothing
-    f (UnTup xs) = Just $ concatMap h xs
+    f (UnReturn us) | all isUnUnknown us = Nothing
+    f (UnReturn xs) = Just $ concatMap h xs
+    f (UnStore _ _ ts) = Just $ concatMap h ts
     h (UnUnknown t) = [t]
     h (UnConst {}) = []
-    h (UnNode _ ts _) = concatMap h ts
 
 unboxModify :: UnboxingResult -> Exp -> Exp
 unboxModify ur = f ur where
     Just nty = unboxTypes ur
     f UnErr {} = id
-    f (UnTup us) | all isUnUnknown us = id
-    f (UnTup xs) = runIdentity . editTail nty (g xs)
+    f (UnReturn us) | all isUnUnknown us = id
+    f (UnReturn xs) = runIdentity . editTail nty (g xs)
+    f (UnStore _ _ us) =runIdentity . editTail nty (z us)
     g xs (Return ys) = return $ Return (concat $ zipWith h xs ys)
     h (UnUnknown _) y = [y]
     h (UnConst {}) _ = []
-    h (UnNode _ us _) (NodeC _ ts) = concat $ zipWith h us ts
+    z xs (BaseOp (StoreNode _) [NodeC _ ts]) = return . Return . concat $ zipWith h xs ts
 
 combineUnboxing :: UnboxingResult -> UnboxingResult -> UnboxingResult
 combineUnboxing ub1 ub2 = f ub1 ub2 where
@@ -327,24 +338,28 @@ combineUnboxing ub1 ub2 = f ub1 ub2 where
     f (UnTail t1 u1) (UnTail t2 u2) = UnTail (t1 `Set.union` t2) (f u1 u2)
     f (UnTail t1 u1) u2 = UnTail t1 (f u1 u2)
     f u1 (UnTail t2 u2) = UnTail t2 (f u1 u2)
-    f (UnTup xs) (UnTup ys) = UnTup (zipWith g xs ys)
-    g (UnNode a1 ubs1 t1) (UnNode a2 ubs2 t2) | a1 == a2 = UnNode a1 (zipWith g ubs1 ubs2) t1
-                                              | otherwise = UnUnknown t1
+    f (UnReturn xs) (UnReturn ys) = UnReturn (zipWith g xs ys)
+    f (UnStore b1 a1 xs1) (UnStore b2 a2 xs2) | a1 == a2 = UnStore b1 a1 (zipWith g xs1 xs2)
+                                              | otherwise = UnReturn [UnUnknown (bool b1 tyDNode tyINode)]
+    f x _ = UnReturn (map UnUnknown (getType x))
+    --g (UnNode a1 ubs1 t1) (UnNode a2 ubs2 t2) | a1 == a2 = UnNode a1 (zipWith g ubs1 ubs2) t1
+    --                                          | otherwise = UnUnknown t1
     g (UnConst v1) (UnConst v2) | v1 == v2 = UnConst v1
                                 | otherwise = UnUnknown (getType v1)
     g x _ = UnUnknown (getType x)
 
 getUnboxing :: Exp -> UnboxingResult
 getUnboxing e = f e where
-    f (Return rs) = UnTup (map g rs)
+    f (Return rs) = UnReturn (map g rs)
+    f (BaseOp (StoreNode b) [NodeC c xs]) = UnStore b c (map g xs)
     f (Error _ tys) = UnErr tys
     f (App f _ ts) = UnTail (Set.singleton f) (UnErr ts)
     f (Case _ ls) = foldr1 combineUnboxing  [ f e | _ :-> e <- ls ]
     f Let { expBody = body } = f body
     f (_ :>>= _ :-> e) = f e
-    f e = UnTup (map UnUnknown $ getType e)
+    f e = UnReturn (map UnUnknown $ getType e)
     g v | valIsConstant v = UnConst v
-    g (NodeC t xs) = UnNode t (map g xs) tyDNode
+--    g (NodeC t xs) = UnNode t (map g xs) tyDNode
     g v = UnUnknown (getType v)
 
 editTail :: Monad m => [Ty] -> (Exp -> m Exp) -> Exp -> m Exp
@@ -368,3 +383,4 @@ editTail nty mt te = f mempty te where
     f lf e = mt e
     g lf (p :-> e) = do e <- f lf e; return $ p :-> e
 
+bool b x y = if b then x else y

@@ -8,20 +8,23 @@ module Grin.NodeAnalyze(nodeAnalyze) where
 
 import Control.Monad(forM, forM_, when)
 import Control.Monad.RWS(MonadWriter(..), RWS(..))
+import Control.Monad.RWS hiding(join)
 import Data.Monoid
 import Data.Maybe
+import IO
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Support.FreeVars
-import Support.CanType
-import StringTable.Atom
-import IO
+import Util.UniqueMonad
+import Util.SetLike
 import Grin.Grin hiding(V)
-import Grin.Simplify
 import Grin.Noodle
-import Util.UnionSolve
+import Grin.Whiz
+import StringTable.Atom
+import Support.CanType
+import Support.FreeVars
 import Util.Gen
+import Util.UnionSolve
 
 
 
@@ -209,12 +212,15 @@ doFunc (name,arg :-> body) = ans where
         f (Return x) = do
             ww' <- mapM convertVal x
             dres ww'
-        f (Store w) | TyNode == getType w = do
-            ww <- convertVal w
-            dres [ww]
-        f (Store w) = do
-            ww <- convertVal w
-            dunno [TyPtr (getType w)]
+        f (BaseOp (StoreNode _) w) = do
+            ww <- mapM convertVal w
+            dres ww
+        f (BaseOp Demote w) = do
+            ww <- mapM convertVal w
+            dres ww
+--        f (Store w) = do
+--            ww <- convertVal w
+--            dunno [TyPtr (getType w)]
         f (BaseOp Promote [w]) = do
             ww <- convertVal w
             --dres [ww]
@@ -301,3 +307,39 @@ fixupFunc cmap (name,l :-> body) = fmap (\b -> (name, l :-> b)) (f body) where
         _ -> return a
     f e = mapExpExp f e
 
+renameUniqueGrin :: Grin -> Grin
+renameUniqueGrin grin = res where
+    (res,()) = evalRWS (execUniqT 1 ans) ( mempty :: Map.Map Atom Atom) (fromList [ x | (x,_) <- grinFuncs grin ] :: Set.Set Atom)
+    ans = do mapGrinFuncsM f grin
+    f (l :-> b) = g b >>= return . (l :->)
+    g a@App  { expFunction = fn } = do
+        m <- lift ask
+        case mlookup fn m of
+            Just fn' -> return a { expFunction = fn' }
+            _ -> return a
+    g a@Call { expValue = Item fn t } = do
+        m <- lift ask
+        case mlookup fn m of
+            Just fn' -> return a { expValue = Item fn' t }
+            _ -> return a
+    g (e@Let { expDefs = defs }) = do
+        (defs',rs) <- liftM unzip $ flip mapM defs $ \d -> do
+            (nn,rs) <- newName (funcDefName d)
+            return (d { funcDefName = nn },rs)
+        local (fromList rs `mappend`) $  mapExpExp g e { expDefs = defs' }
+    g b = mapExpExp g b
+    newName a = do
+        m <- lift get
+        case member a m of
+            False -> do lift $ modify (insert a); return (a,(a,a))
+            True -> do
+            let cfname = do
+                uniq <- newUniq
+                let fname = toAtom $ show a  ++ "-" ++ show uniq
+                if fname `member` (m :: Set.Set Atom) then cfname else return fname
+            nn <- cfname
+            lift $ modify (insert nn)
+            return (nn,(a,nn))
+
+mapGrinFuncsM :: Monad m => (Lam -> m Lam) -> Grin -> m Grin
+mapGrinFuncsM f grin = liftM (`setGrinFunctions` grin) $ mapM  (\x -> do nb <- f (funcDefBody x); return (funcDefName x, nb)) (grinFunctions grin)

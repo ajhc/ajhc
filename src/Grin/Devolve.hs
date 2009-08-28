@@ -114,7 +114,7 @@ twiddleExp e = f e where
     f (Case v as) = return Case `ap` twiddle v `ap` twiddle as
     f n = do e <- mapExpVal twiddleVal n ; mapExpExp twiddle e
 
-    isAllocing Store {} = True
+    isAllocing (BaseOp StoreNode {} _) = True
     isAllocing (Return [Var {}]) = False
     isAllocing (Return [NodeC {}]) = True
     isAllocing App {} = True
