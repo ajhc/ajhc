@@ -280,7 +280,7 @@ newVarName (V sv) = do
 isHoly (NodeC _ as) | any isValUnknown as = True
 isHoly n = False
 
-data UnboxingResult = UnErr [Ty] | UnStore !Bool !Atom [Unbox] | UnReturn [Unbox] | UnTail (Set.Set Atom) UnboxingResult
+data UnboxingResult = UnErr [Ty] | UnStore !Bool !Atom [Unbox] | UnDemote Unbox | UnReturn [Unbox] | UnTail (Set.Set Atom) UnboxingResult
 
 data Unbox =  UnConst Val | UnUnknown Ty
     deriving(Eq,Ord)
@@ -292,6 +292,7 @@ instance CanType UnboxingResult [Ty] where
     getType (UnErr tys) = tys
     getType (UnReturn us) = map getType us
     getType (UnStore b _ _) = [bool b tyDNode tyINode]
+    getType (UnDemote _) = [tyINode]
 
 instance CanType Unbox Ty where
     getType (UnConst v) = getType v
@@ -301,6 +302,7 @@ unboxRet :: UnboxingResult -> [Val] -> Exp
 unboxRet ur vs = f ur vs where
     f (UnReturn xs) vs = Return $ let (r,[]) = g xs vs in r
     f (UnStore b c xs) vs = let (xs',[]) = g xs vs in BaseOp (StoreNode b) [NodeC c xs']
+    f (UnDemote u) vs = let ([u'],[]) = g [u] vs in BaseOp Demote [u']
     f UnErr {} _ = Return []
     f _ vs = Return vs
     g [] vs = ([],vs)
@@ -316,6 +318,7 @@ unboxTypes ur = f ur where
     f (UnReturn us) | all isUnUnknown us = Nothing
     f (UnReturn xs) = Just $ concatMap h xs
     f (UnStore _ _ ts) = Just $ concatMap h ts
+    f (UnDemote _) = Just [tyDNode]
     h (UnUnknown t) = [t]
     h (UnConst {}) = []
 
@@ -326,10 +329,13 @@ unboxModify ur = f ur where
     f (UnReturn us) | all isUnUnknown us = id
     f (UnReturn xs) = runIdentity . editTail nty (g xs)
     f (UnStore _ _ us) =runIdentity . editTail nty (z us)
+    f (UnDemote _) =runIdentity . editTail nty y
     g xs (Return ys) = return $ Return (concat $ zipWith h xs ys)
     h (UnUnknown _) y = [y]
     h (UnConst {}) _ = []
     z xs (BaseOp (StoreNode _) [NodeC _ ts]) = return . Return . concat $ zipWith h xs ts
+    y (BaseOp Demote [x]) = return $ Return [x]
+    y (Return [Const v]) = return $ Return [v]
 
 combineUnboxing :: UnboxingResult -> UnboxingResult -> UnboxingResult
 combineUnboxing ub1 ub2 = f ub1 ub2 where
@@ -341,6 +347,9 @@ combineUnboxing ub1 ub2 = f ub1 ub2 where
     f (UnReturn xs) (UnReturn ys) = UnReturn (zipWith g xs ys)
     f (UnStore b1 a1 xs1) (UnStore b2 a2 xs2) | a1 == a2 = UnStore b1 a1 (zipWith g xs1 xs2)
                                               | otherwise = UnReturn [UnUnknown (bool b1 tyDNode tyINode)]
+    f (UnDemote u1) (UnDemote u2) = UnDemote (g u1 u2)
+    f (UnDemote u1) (UnReturn [UnConst (Const v)]) = UnDemote (UnUnknown tyDNode)
+    f (UnReturn [UnConst (Const v)]) (UnDemote u1) = UnDemote (UnUnknown tyDNode)
     f x _ = UnReturn (map UnUnknown (getType x))
     --g (UnNode a1 ubs1 t1) (UnNode a2 ubs2 t2) | a1 == a2 = UnNode a1 (zipWith g ubs1 ubs2) t1
     --                                          | otherwise = UnUnknown t1
@@ -352,6 +361,7 @@ getUnboxing :: Exp -> UnboxingResult
 getUnboxing e = f e where
     f (Return rs) = UnReturn (map g rs)
     f (BaseOp (StoreNode b) [NodeC c xs]) = UnStore b c (map g xs)
+    f (BaseOp Demote [v]) = UnDemote (g v)
     f (Error _ tys) = UnErr tys
     f (App f _ ts) = UnTail (Set.singleton f) (UnErr ts)
     f (Case _ ls) = foldr1 combineUnboxing  [ f e | _ :-> e <- ls ]
