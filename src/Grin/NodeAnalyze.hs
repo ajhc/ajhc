@@ -6,6 +6,7 @@
 
 module Grin.NodeAnalyze(nodeAnalyze) where
 
+import Control.Monad.Identity hiding(join)
 import Control.Monad(forM, forM_, when)
 import Control.Monad.RWS(MonadWriter(..), RWS(..))
 import Control.Monad.RWS hiding(join)
@@ -120,8 +121,8 @@ nodeAnalyze grin' = do
     --print cs
     --putStrLn "----------------------------"
     -- putStrLn "-- NodeAnalyze"
-    (rm,res) <- solve (const (return ())) cs
-    --(rm,res) <- solve putStrLn cs
+    --(rm,res) <- solve (const (return ())) cs
+    (rm,res) <- solve putStrLn cs
     let cmap = Map.map (fromJust . flip Map.lookup res) rm
     --putStrLn "----------------------------"
     --mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList rm)
@@ -130,9 +131,10 @@ nodeAnalyze grin' = do
     --putStrLn "----------------------------"
     --hFlush stdout
     --exitWith ExitSuccess
-    nfs <- mapM (fixupFunc (grinSuspFunctions grin `Set.union` grinPartFunctions grin) cmap) (grinFuncs grin)
-    let grin' = setGrinFunctions nfs grin
-    return $ grin' { grinTypeEnv = extendTyEnv (grinFunctions grin') (grinTypeEnv grin') }
+    --nfs <- mapM (fixupFunc (grinSuspFunctions grin `Set.union` grinPartFunctions grin) cmap) (grinFuncs grin)
+    --let grin' = setGrinFunctions nfs grin
+    --return $ grin' { grinTypeEnv = extendTyEnv (grinFunctions grin') (grinTypeEnv grin') }
+    return $ transformFuncs (fixupFuncs (grinSuspFunctions grin `Set.union` grinPartFunctions grin) cmap) grin
 
 
 data Todo = Todo !Bool [V] | TodoNothing
@@ -171,8 +173,9 @@ doFunc (name,arg :-> body) = ans where
             f rest
         f body = gn ret body
     isfn _ x y | not (isGood x) = mempty
-    isfn (Todo True  _) x y = Left x `equals` y
-    isfn (Todo False _) x y = Left x `isgte` y
+    --isfn (Todo True  _) x y = Left x `equals` y
+    --isfn (Todo False _) x y = Left x `isgte` y
+    isfn (Todo _ _) x y = Left x `isgte` y
     isfn TodoNothing x y =  mempty
     equals x y | isGood x && isGood y = Util.UnionSolve.equals x y
                | otherwise = mempty
@@ -215,9 +218,9 @@ doFunc (name,arg :-> body) = ans where
         f (BaseOp (StoreNode _) w) = do
             ww <- mapM convertVal w
             dres ww
-        f (BaseOp Demote w) = do
-            ww <- mapM convertVal w
-            dres ww
+--        f (BaseOp Demote w) = do
+--            ww <- mapM convertVal w
+--            dres ww
 --        f (Store w) = do
 --            ww <- convertVal w
 --            dunno [TyPtr (getType w)]
@@ -295,56 +298,124 @@ doFunc (name,arg :-> body) = ans where
 --bottom = N WHNF (Only (Set.empty))
 top = N Lazy Top
 
---data WhatToDo
---    = WhatDelete
---    | WhatNothing
---    | WhatSubs (Var -> Exp) (Var -> Exp)
+data WhatToDo
+    = WhatDelete
+    | WhatUnchanged
+    | WhatConstant Val
+    | WhatSubs Ty (Val -> Exp) (Val -> Exp)
+
+isWhatUnchanged WhatUnchanged = True
+isWhatUnchanged _ = False
 
 
---type TFunc = [()]
+transformFuncs :: (Atom -> ([Ty],[Ty]) -> ([WhatToDo],[WhatToDo])) -> Grin -> Grin
+transformFuncs fn grin = grin'' where
+    grin'' =  grin' { grinTypeEnv = extendTyEnv (grinFunctions grin') (grinTypeEnv grin') }
+    grin' = setGrinFunctions (nfs $ grinFuncs grin) grin
+    nfs ds = map fs ds
+    fs (n,l@(ps :-> e)) = (n,f (fn n (map getType ps,getType e)) l)
+    f (ats,rts) (p :-> e) = ans where
+        ans = if all isWhatUnchanged (ats ++ rts) then p :-> j e else p' :-> e'
+        p' = concatMap f (zip p ats) where
+            f (v,WhatUnchanged) = [v]
+            f (_,WhatDelete) = []
+            f (_,WhatConstant _) = []
+            f (Var v _,WhatSubs nty _ _) = [Var v nty]
+        e' =  g (zip p ats) (j e)
+        g ((_,WhatUnchanged):xs) e = g xs e
+        g ((_,WhatDelete):xs) e = g xs e
+        g ((vr,WhatConstant c):xs) e = Return [c] :>>= [vr] :-> g xs e
+        g ((Var v vt,WhatSubs nt _ ft):xs) e = ft (Var v nt) :>>= [Var v vt] :-> g xs e
+        g [] e = e :>>= rvs :-> h (zip rvs rts) (drop (length (getType e)) [v1 .. ]) [] where
+            rvs = zipWith Var [v1 .. ] (getType e)
+        h ((r,WhatUnchanged):xs) vs rs = h xs vs (r:rs)
+        h ((r,WhatDelete):xs) vs rs = h xs vs rs
+        h ((r,WhatConstant _):xs) vs rs = h xs vs rs
+        h ((r,WhatSubs nty tt _):xs) (v:vs) rs = tt r :>>= [Var v nty] :-> h xs vs (Var v nty:rs)
+        h [] _ rs = Return (reverse rs)
 
---transformFuncs :: (Atom -> (TFunc,TFunc)) -> Grin -> Grin
+
+    j app@(App a xs ts) = res where
+        res = if all isWhatUnchanged (ats ++ rts) then app else e'
+        (ats,rts) = fn a (map getType xs,ts)
+        lvars = zipWith Var [ v1 .. ] (map getType xs)
+        e' = Return xs :>>= lvars :-> f (zip lvars ats) []
+
+        f ((v,WhatUnchanged):xs) rs = f xs (v:rs)
+        f ((_,WhatDelete):xs) rs = f xs rs
+        f ((_,WhatConstant _):xs) rs = f xs rs
+        f ((Var v oty,WhatSubs nty tt _):xs) rs = tt (Var v oty) :>>= [Var v nty] :-> f xs (Var v nty:rs)
+        f [] rs = App a (reverse rs) ts' :>>= rvars :-> g (zip rvars' rts) rvars []
+
+        g [] [] rs = Return (reverse rs)
+        g ((_,WhatUnchanged):xs) (n:ns) rs = g xs ns (n:rs)
+        g ((v,WhatDelete):xs) vs rs = Return [ValUnknown (getType v)] :>>= [v] :-> g xs vs (v:rs)
+        g ((v,WhatConstant c):xs) vs rs = Return [c] :>>= [v] :-> g xs vs (v:rs)
+        g ((v,WhatSubs _ _ ft):xs) (n:ns) rs = ft n :>>= [v] :-> g xs ns (v:rs)
 
 
+        rvars = zipWith Var [ v1 .. ] ts'
+        rvars' = zipWith Var (drop (length rvars) [ v1 .. ]) ts
+        ts' = concatMap g (zip ts rts) where
+            g (t,WhatUnchanged) = [t]
+            g (t,WhatConstant _) = []
+            g (t,WhatDelete) = []
+            g (t,WhatSubs nty _ _) = [nty]
 
-fixupFunc sfuncs cmap (name,l :-> body) = fmap (\b -> (name, l' :-> b)) (f body >>= g fixups') where
-    (l',fixups') | name `Set.member` sfuncs = (l,[])
-                 | otherwise = ((map f $ zip l ll),fixups) where
-        ll = map lupVar l
-        fixups = [ v | (v@(Var _ TyINode),Just (N WHNF _)) <- zip l ll]
-        f (Var v _,Just (N WHNF _)) = Var v TyNode
-        f (v,_) = v
+    j Let { expDefs = ds, expBody = e } =  grinLet [ updateFuncDefProps d { funcDefBody = snd $ fs (funcDefName d, funcDefBody d) } | d <- ds ] (j e)
 
-    lupVar (Var v t) =  case Map.lookup (vr v t) cmap of
-        _ | v < v0 -> fail "nocafyet"
-        Just (ResultJust _ lb) -> return lb
-        Just ResultBounded { resultLB = Just lb } -> return lb
-        _ -> fail "lupVar"
-    lupArg a (x,i) =  case Map.lookup (fa a i (getType x)) cmap of
-        Just (ResultJust _ lb) -> return lb
-        Just ResultBounded { resultLB = Just lb } -> return lb
-        _ -> fail "lupArg"
-    g [] e = return e
-    g (Var v TyINode:xs) e = do e' <- g xs e ; return $ BaseOp Demote [Var v TyNode] :>>= [Var v TyINode] :-> e'
-    f (App a xs ts)  | a `Set.notMember` sfuncs, not $ null mvars = return res where
-        largs = map (lupArg a) (zip xs [0 ..  ])
-        largs' =  [ (Var v (getType x),la) | (x,v,la) <- zip3 xs [ v1 .. ] largs ]
-        mvars = [ (Var v TyINode) | (Var v TyINode,Just (N WHNF _)) <- largs' ]
-        mvars' = [ case (v,la) of (Var v' TyINode,Just (N WHNF _)) -> Var v' TyNode ; _ -> v  | (v,la) <- largs' ]
-        res = Return xs :>>= fsts largs' :-> f mvars (App a mvars' ts)
-        f (Var v TyINode:rs) e = BaseOp Promote [Var v TyINode] :>>= [Var v TyNode] :-> f rs e
-        f [] e = e
-    f Let { expDefs = ds, expBody = e } = do
-        ds' <- forM ds $ \d -> do
-            (_,l) <- fixupFunc sfuncs cmap (funcDefName d, funcDefBody d)
-            return $ updateFuncDefProps  d { funcDefBody = l }
-        e' <- f e
-        return $ grinLet ds' e'
+    j e = runIdentity $ mapExpExp (return . j) e
 
-    f a@(BaseOp Eval [arg]) | Just n <- lupVar arg = case n of
-        N WHNF _ -> return (BaseOp Promote [arg])
-        _ -> return a
-    f e = mapExpExp f e
+
+fixupFuncs sfuncs cmap  = ans where
+    ans a (as,rs) | a `Set.member` sfuncs = (map (const WhatUnchanged) as,map (const WhatUnchanged) rs)
+                  | otherwise = (map (bool pnode WhatUnchanged) largs,map (bool pnode WhatUnchanged) rargs) where
+        largs = map (lupArg fa a) (zip as [0 ..  ])
+        rargs = map (lupArg fr a) (zip rs [0 ..  ])
+    lupArg fa a (x,i) =  case (x,Map.lookup (fa a i x) cmap) of
+        (TyINode,Just (ResultJust _ (N WHNF _))) -> True
+        (TyINode,Just ResultBounded { resultLB = Just (N WHNF _) }) -> True
+        _ -> False
+    pnode = WhatSubs TyNode (\v -> BaseOp Promote [v]) (\v -> BaseOp Demote [v])
+
+--fixupFunc sfuncs cmap (name,l :-> body) = fmap (\b -> (name, l' :-> b)) (f body >>= g fixups') where
+--    (l',fixups') | name `Set.member` sfuncs = (l,[])
+--                 | otherwise = ((map f $ zip l ll),fixups) where
+--        ll = map lupVar l
+--        fixups = [ v | (v@(Var _ TyINode),Just (N WHNF _)) <- zip l ll]
+--        f (Var v _,Just (N WHNF _)) = Var v TyNode
+--        f (v,_) = v
+--
+--    lupVar (Var v t) =  case Map.lookup (vr v t) cmap of
+--        _ | v < v0 -> fail "nocafyet"
+--        Just (ResultJust _ lb) -> return lb
+--        Just ResultBounded { resultLB = Just lb } -> return lb
+--        _ -> fail "lupVar"
+--    lupArg a (x,i) =  case Map.lookup (fa a i (getType x)) cmap of
+--        Just (ResultJust _ lb) -> return lb
+--        Just ResultBounded { resultLB = Just lb } -> return lb
+--        _ -> fail "lupArg"
+--    g [] e = return e
+--    g (Var v TyINode:xs) e = do e' <- g xs e ; return $ BaseOp Demote [Var v TyNode] :>>= [Var v TyINode] :-> e'
+--    f (App a xs ts)  | a `Set.notMember` sfuncs, not $ null mvars = return res where
+--        largs = map (lupArg a) (zip xs [0 ..  ])
+--        largs' =  [ (Var v (getType x),la) | (x,v,la) <- zip3 xs [ v1 .. ] largs ]
+--        mvars = [ (Var v TyINode) | (Var v TyINode,Just (N WHNF _)) <- largs' ]
+--        mvars' = [ case (v,la) of (Var v' TyINode,Just (N WHNF _)) -> Var v' TyNode ; _ -> v  | (v,la) <- largs' ]
+--        res = Return xs :>>= fsts largs' :-> f mvars (App a mvars' ts)
+--        f (Var v TyINode:rs) e = BaseOp Promote [Var v TyINode] :>>= [Var v TyNode] :-> f rs e
+--        f [] e = e
+--    f Let { expDefs = ds, expBody = e } = do
+--        ds' <- forM ds $ \d -> do
+--            (_,l) <- fixupFunc sfuncs cmap (funcDefName d, funcDefBody d)
+--            return $ updateFuncDefProps  d { funcDefBody = l }
+--        e' <- f e
+--        return $ grinLet ds' e'
+--
+--    f a@(BaseOp Eval [arg]) | Just n <- lupVar arg = case n of
+--        N WHNF _ -> return (BaseOp Promote [arg])
+--        _ -> return a
+--    f e = mapExpExp f e
 
 renameUniqueGrin :: Grin -> Grin
 renameUniqueGrin grin = res where
@@ -382,3 +453,5 @@ renameUniqueGrin grin = res where
 
 mapGrinFuncsM :: Monad m => (Lam -> m Lam) -> Grin -> m Grin
 mapGrinFuncsM f grin = liftM (`setGrinFunctions` grin) $ mapM  (\x -> do nb <- f (funcDefBody x); return (funcDefName x, nb)) (grinFunctions grin)
+
+bool x y b = if b then x else y
