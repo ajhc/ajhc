@@ -67,8 +67,8 @@ type Preds = [Pred]
 
 data Constraint = Equality {
     constraintSrcLoc :: SrcLoc,
-    constraintType1 :: Type,
-    constraintType2 ::Type
+    constraintType1  :: Type,
+    constraintType2  :: Type
     }
 
 instance HasLocation Constraint where
@@ -143,10 +143,11 @@ extractBox t = fail $ "not a metaTyVar:" ++ show t
 
 
 data UnVarOpt = UnVarOpt {
-    openBoxes :: Bool,
-    failEmptyMetaVar :: Bool
+    openBoxes :: {-# UNPACK #-} !Bool,
+    failEmptyMetaVar :: {-# UNPACK #-} !Bool
     }
 
+{-# SPECIALIZE flattenType :: MonadIO m => Type -> m Type #-}
 flattenType :: (MonadIO m, UnVar t) => t -> m t
 flattenType t =  unVar UnVarOpt { openBoxes = True, failEmptyMetaVar = False } t
 
@@ -265,18 +266,18 @@ instance FreeVars Type b =>  FreeVars Pred b where
 
 instance Tickleable Type Pred where
     tickleM f (IsIn c t) = liftM (IsIn c) (f t)
-    tickleM f (IsEq t1 t2) = return IsEq `ap` f t1 `ap` f t2
+    tickleM f (IsEq t1 t2) = liftM2 IsEq (f t1) (f t2)
 
 instance Tickleable Type Type where
-    tickleM f (TAp l r) = return tAp `ap` f l `ap` f r
-    tickleM f (TArrow l r) = return TArrow `ap` f l `ap` f r
-    tickleM f (TAssoc c cas eas) = return (TAssoc c) `ap` mapM f cas `ap` mapM f eas
+    tickleM f (TAp l r) = liftM2 tAp (f l) (f r)
+    tickleM f (TArrow l r) = liftM2 TArrow (f l) (f r)
+    tickleM f (TAssoc c cas eas) = liftM2 (TAssoc c) (mapM f cas) (mapM f eas)
     tickleM f (TForAll ta (ps :=> t)) = do
         ps <- mapM (tickleM f) ps
-        return (TForAll ta . (ps :=>)) `ap` f t
+        liftM (TForAll ta . (ps :=>)) (f t)
     tickleM f (TExists ta (ps :=> t)) = do
         ps <- mapM (tickleM f) ps
-        return (TExists ta . (ps :=>)) `ap` f t
+        liftM (TExists ta . (ps :=>)) (f t)
     tickleM _ t = return t
 
 

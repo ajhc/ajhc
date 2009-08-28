@@ -110,7 +110,7 @@ data TcEnv = TcEnv {
 data Output = Output {
     collectedPreds   :: Preds,
     existentialPreds :: Preds,
-    constraints      :: [Constraint],
+    constraints      :: Seq.Seq Constraint,
     checkedRules     :: Seq.Seq Rule,
     existentialVars  :: [Tyvar],
     tcWarnings       :: Seq.Seq Warning,
@@ -311,16 +311,16 @@ freshInstance _ x = return ([],x)
 addPreds :: Preds -> Tc ()
 addPreds ps = do
     sl <- getSrcLoc
-    Tc $ tell mempty { collectedPreds = [ p | p@IsIn {} <- ps ], constraints = [ Equality { constraintSrcLoc = sl, constraintType1 = a, constraintType2 = b } | IsEq a b <- ps ] }
+    Tc $ tell mempty { collectedPreds = [ p | p@IsIn {} <- ps ], constraints = Seq.fromList [ Equality { constraintSrcLoc = sl, constraintType1 = a, constraintType2 = b } | IsEq a b <- ps ] }
 
 addConstraints :: [Constraint] -> Tc ()
-addConstraints ps = Tc $ tell mempty { constraints = ps }
+addConstraints ps = Tc $ tell mempty { constraints = Seq.fromList ps }
 
 listenPreds :: Tc a -> Tc (a,Preds)
 listenPreds action = censor (\x -> x { collectedPreds = mempty }) $ listens collectedPreds action
 
 listenCPreds :: Tc a -> Tc (a,(Preds,[Constraint]))
-listenCPreds action = censor (\x -> x { constraints = mempty, collectedPreds = mempty }) $ listens (\x -> (collectedPreds x,constraints x)) action
+listenCPreds action = censor (\x -> x { constraints = mempty, collectedPreds = mempty }) $ listens (\x -> (collectedPreds x,T.toList $ constraints x)) action
 
 listenCheckedRules :: Tc a -> Tc (a,[Rule])
 listenCheckedRules action = do
