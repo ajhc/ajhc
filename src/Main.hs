@@ -620,6 +620,18 @@ simplifyParms = transformParms {
     transformIterate = IterateDone
     }
 
+nodeAnalyzeParms = transformParms {
+    transformDumpProgress = verbose,
+    transformCategory = "NodeAnalyze",
+    transformPass = "Grin",
+    transformOperation = nodealyze
+    }  where
+        nodealyze grin = do
+            stats <- Stats.new
+            g <- deadCode stats (grinEntryPointNames grin) grin
+            g <- nodeAnalyze g
+            return g
+
 compileToGrin prog = do
     stats <- Stats.new
     putProgressLn "Converting to Grin..."
@@ -674,11 +686,10 @@ compileToGrin prog = do
 
     wdump FD.OptimizationStats $ Stats.print "Optimization" stats
     wdump FD.GrinPreeval $ dumpGrin "preeval" x
-    x <- nodeAnalyze x
-    lintCheckGrin x
+    x <- transformGrin nodeAnalyzeParms x
+    x <- transformGrin simplifyParms x
     x <- createEvalApply x
-    lintCheckGrin x
-    x <- Grin.SSimplify.simplify x
+    x <- transformGrin simplifyParms x
     lintCheckGrin x
     wdump FD.GrinFinal $ dumpGrin "predevolve" x
     x <- transformGrin devolveTransform x

@@ -157,7 +157,7 @@ hPrintGrin handle grin@Grin { grinCafs = cafs } = do
         mapM_ (hPutStrLn handle) $ map (\(x,y) -> show x ++ " := " ++  render (prettyVal y))  cafs
     hPutStrLn handle "-- Functions"
     forM_ (grinFuncs grin) $ \ f@(n,l :-> e) -> do
-        hPutStrLn handle . render $ func (fromAtom n) <+> operator "::" <+> hsep (map (tshow . getType) l)  <+> operator "->" <+> tshow (getType e)
+        hPutStrLn handle . render $ func (fromAtom n) <+> operator "::" <+> tupled (map (tshow . getType) l)  <+> operator "->" <+> tupled (map tshow (getType e))
         hPutStrLn handle (render $ prettyFun f)
         hPutStrLn handle ""
 
