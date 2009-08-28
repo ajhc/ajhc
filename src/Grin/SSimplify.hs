@@ -332,8 +332,7 @@ combineUnboxing ub1 ub2 = f ub1 ub2 where
                                               | otherwise = UnUnknown t1
     g (UnConst v1) (UnConst v2) | v1 == v2 = UnConst v1
                                 | otherwise = UnUnknown (getType v1)
-    g x@UnUnknown {} _ = x
-    g _ x@UnUnknown {} = x
+    g x _ = UnUnknown (getType x)
 
 getUnboxing :: Exp -> UnboxingResult
 getUnboxing e = f e where
@@ -344,8 +343,8 @@ getUnboxing e = f e where
     f Let { expBody = body } = f body
     f (_ :>>= _ :-> e) = f e
     f e = UnTup (map UnUnknown $ getType e)
-    g (NodeC t xs) = UnNode t (map g xs) tyDNode
     g v | valIsConstant v = UnConst v
+    g (NodeC t xs) = UnNode t (map g xs) tyDNode
     g v = UnUnknown (getType v)
 
 editTail :: Monad m => [Ty] -> (Exp -> m Exp) -> Exp -> m Exp
