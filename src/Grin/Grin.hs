@@ -191,7 +191,6 @@ data Exp =
                   expType :: [Ty] }                                       -- ^ Primitive operation
     | Case      { expValue :: Val, expAlts :: [Lam] }                     -- ^ Case statement
     | Return    { expValues :: [Val] }                                    -- ^ Return a value
---    | Store     { expValue :: Val }                                       -- ^ Allocate a new heap node
     | Error     { expError :: String, expType :: [Ty] }                   -- ^ Abort with an error message, non recoverably.
     | Call      { expValue :: Val,
                   expArgs :: [Val],
@@ -500,12 +499,10 @@ instance CanType Exp [Ty] where
     getType (_ :>>= (_ :-> e2)) = getType e2
     getType (Prim _ _ ty) = ty
     getType App { expType = t } = t
---    getType (Store v) = case getType v of
---        TyNode -> [TyINode]
---        t -> [TyPtr t]
     getType (BaseOp Overwrite _) = []
     getType (BaseOp Redirect _) = []
     getType (BaseOp Promote _) = [TyNode]
+    getType (BaseOp Demote _) = [TyINode]
     getType (BaseOp Eval _) = [TyNode]
     getType (BaseOp (StoreNode b) _) = if b then [TyNode] else [TyINode]
     getType (BaseOp (Apply ty) _) = ty

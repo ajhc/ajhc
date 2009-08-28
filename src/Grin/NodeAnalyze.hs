@@ -30,9 +30,8 @@ import Util.UnionSolve
 
 
 
-data NodeType =
-    WHNF         -- ^ guarenteed to be a WHNF
---    | LazyWHNF   -- ^ WHNF or an indirection to a WHNF
+data NodeType
+    = WHNF       -- ^ guarenteed to be a WHNF
     | Lazy       -- ^ a suspension, a WHNF, or an indirection to a WHNF
     deriving(Eq,Ord,Show)
 
@@ -131,14 +130,22 @@ nodeAnalyze grin' = do
     --putStrLn "----------------------------"
     --hFlush stdout
     --exitWith ExitSuccess
-    nfs <- mapM (fixupFunc cmap) (grinFuncs grin)
-    return $ setGrinFunctions nfs grin
+    nfs <- mapM (fixupFunc (grinSuspFunctions grin `Set.union` grinPartFunctions grin) cmap) (grinFuncs grin)
+    let grin' = setGrinFunctions nfs grin
+    return $ grin' { grinTypeEnv = extendTyEnv (grinFunctions grin') (grinTypeEnv grin') }
 
 
-data Todo = Todo Bool [V] | TodoNothing
+data Todo = Todo !Bool [V] | TodoNothing
 
 doFunc :: (Atom,Lam) -> M ()
 doFunc (name,arg :-> body) = ans where
+    ans = do
+        let rts = getType body
+        forMn_ rts $ \ (t,i) -> dVar (fr name i t) t
+        forMn_ arg $ \ (~(Var v vt),i) -> do
+            dVar (vr v vt) vt
+            tell $ Left (fa name i vt) `equals` Left (vr v vt)
+        fn (Todo True [ fr name i t | i <- naturals | t <- rts ]) body
     -- restrict values of TyNode type to be in WHNF
     dVar v TyNode = do
         tell $ Left v `islte` Right (N WHNF Top)
@@ -147,13 +154,6 @@ doFunc (name,arg :-> body) = ans where
     -- should only be used in patterns
     zVar v TyNode = tell $ Left (vr v TyNode) `equals` Right (N WHNF Top)
     zVar v t = tell $ Left (vr v t) `equals` Right top
-    ans = do
-        let rts = getType body
-        forMn_ rts $ \ (t,i) -> dVar (fr name i t) t
-        forMn_ arg $ \ (~(Var v vt),i) -> do
-            dVar (vr v vt) vt
-            tell $ Left (fa name i vt) `equals` Left (vr v vt)
-        fn (Todo True [ fr name i t | i <- naturals | t <- rts ]) body
     fn ret body = f body where
         f (x :>>= [Var v vt] :-> rest) = do
             dVar (vr v vt) vt
@@ -225,6 +225,10 @@ doFunc (name,arg :-> body) = ans where
             ww <- convertVal w
             --dres [ww]
             dres [Right (N WHNF Top)]
+        f (BaseOp Demote [w]) = do
+            ww <- convertVal w
+            --dres [ww]
+            dres [Right (N WHNF Top)]
         f (BaseOp PeekVal [w])  = do
             dres [Right top]
         f Error {} = dres []
@@ -291,19 +295,54 @@ doFunc (name,arg :-> body) = ans where
 --bottom = N WHNF (Only (Set.empty))
 top = N Lazy Top
 
+--data WhatToDo
+--    = WhatDelete
+--    | WhatNothing
+--    | WhatSubs (Var -> Exp) (Var -> Exp)
 
 
-fixupFunc cmap (name,l :-> body) = fmap (\b -> (name, l :-> b)) (f body) where
+--type TFunc = [()]
+
+--transformFuncs :: (Atom -> (TFunc,TFunc)) -> Grin -> Grin
+
+
+
+fixupFunc sfuncs cmap (name,l :-> body) = fmap (\b -> (name, l' :-> b)) (f body >>= g fixups') where
+    (l',fixups') | name `Set.member` sfuncs = (l,[])
+                 | otherwise = ((map f $ zip l ll),fixups) where
+        ll = map lupVar l
+        fixups = [ v | (v@(Var _ TyINode),Just (N WHNF _)) <- zip l ll]
+        f (Var v _,Just (N WHNF _)) = Var v TyNode
+        f (v,_) = v
+
     lupVar (Var v t) =  case Map.lookup (vr v t) cmap of
         _ | v < v0 -> fail "nocafyet"
         Just (ResultJust _ lb) -> return lb
         Just ResultBounded { resultLB = Just lb } -> return lb
         _ -> fail "lupVar"
-    lupVar _ = fail "lupVar"
+    lupArg a (x,i) =  case Map.lookup (fa a i (getType x)) cmap of
+        Just (ResultJust _ lb) -> return lb
+        Just ResultBounded { resultLB = Just lb } -> return lb
+        _ -> fail "lupArg"
+    g [] e = return e
+    g (Var v TyINode:xs) e = do e' <- g xs e ; return $ BaseOp Demote [Var v TyNode] :>>= [Var v TyINode] :-> e'
+    f (App a xs ts)  | a `Set.notMember` sfuncs, not $ null mvars = return res where
+        largs = map (lupArg a) (zip xs [0 ..  ])
+        largs' =  [ (Var v (getType x),la) | (x,v,la) <- zip3 xs [ v1 .. ] largs ]
+        mvars = [ (Var v TyINode) | (Var v TyINode,Just (N WHNF _)) <- largs' ]
+        mvars' = [ case (v,la) of (Var v' TyINode,Just (N WHNF _)) -> Var v' TyNode ; _ -> v  | (v,la) <- largs' ]
+        res = Return xs :>>= fsts largs' :-> f mvars (App a mvars' ts)
+        f (Var v TyINode:rs) e = BaseOp Promote [Var v TyINode] :>>= [Var v TyNode] :-> f rs e
+        f [] e = e
+    f Let { expDefs = ds, expBody = e } = do
+        ds' <- forM ds $ \d -> do
+            (_,l) <- fixupFunc sfuncs cmap (funcDefName d, funcDefBody d)
+            return $ updateFuncDefProps  d { funcDefBody = l }
+        e' <- f e
+        return $ grinLet ds' e'
+
     f a@(BaseOp Eval [arg]) | Just n <- lupVar arg = case n of
-        N WHNF _ -> do
-                --putStrLn $ "NA-EVAL-WHNF-" ++ show fn
-                return (BaseOp Promote [arg])
+        N WHNF _ -> return (BaseOp Promote [arg])
         _ -> return a
     f e = mapExpExp f e
 

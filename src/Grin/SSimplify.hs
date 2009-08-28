@@ -113,7 +113,7 @@ simpDone e = do
         _ -> do
             cmap <- asks envCSE
             case Map.lookup e cmap of
-                Just (n,e') -> do mtick n; return e'
+                Just (n,e') -> do mtick n; tellFV e'; return e'
                 Nothing -> return e
 
 simpBind :: [Val] -> Exp -> S Exp -> S Exp
@@ -158,9 +158,9 @@ simpExp e = f e [] where
         f a ((env,v,b):xs)
 
     -- simple transforms
---    f (BaseOp Promote [Const x]) rs = do
---        mtick "Grin.Simplify.fetch-const"
---        f (Return [x]) rs
+    f (BaseOp Promote [Const x]) rs = do
+        mtick "Grin.Simplify.fetch-const"
+        f (Return [x]) rs
 --    f (Store x) rs | valIsNF x = do
 --        mtick "Grin.Simplify.store-normalform"
 --        f (Return [Const x]) rs

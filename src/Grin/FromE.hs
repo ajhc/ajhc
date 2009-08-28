@@ -338,6 +338,7 @@ instance ToVal TVr where
 doApply x y ty | not (keepIt y) = BaseOp (Apply ty) [x]
 doApply x y ty = BaseOp (Apply ty) [x,y]
 
+istore (NodeC t ts) | tagIsWHNF t = dstore (NodeC t ts) :>>= [Var v1 TyNode] :-> demote (Var v1 TyNode)
 istore n = BaseOp (StoreNode False) [n]
 dstore n = BaseOp (StoreNode True) [n]
 demote v = BaseOp Demote [v]
@@ -596,7 +597,7 @@ compile' cenv (tvr,as,e) = ans where
     cc (EPrim don [e,_] _) | don == p_dependingOn  = cc e
     cc e | Just _ <- literal e = error "unboxed literal in lazy context"
     cc e | Just z <- constant e = return (Return $ keepIts [z])
-    cc e | Just [z] <- con e = return $ BaseOp (StoreNode (not $ isLifted e)) [z] -- if isLifted e then Store z else Return [z]
+    cc e | Just [z] <- con e = return $ bool (isLifted e) istore dstore z -- BaseOp (StoreNode (not $ isLifted e)) [z] -- if isLifted e then Store z else Return [z]
     cc (EError s e) = do
         let ty = toTypes TyNode e
         a <- liftIO $ runOnceMap (errorOnce cenv) (ty,s) $ do
@@ -680,6 +681,7 @@ compile' cenv (tvr,as,e) = ans where
     -- This avoids a blind update on recursive thunks
     --doUpdate vr (Store n@(NodeC t ts)) = (BaseOp Overwrite [vr,n],t,map getType ts)
     doUpdate vr (BaseOp StoreNode {} [n@(NodeC t ts)]) = (BaseOp Overwrite [vr,n],t,map getType ts)
+    doUpdate vr (BaseOp StoreNode {} [n@(NodeC t ts)] :>>= [p] :-> BaseOp Demote [p']) | p == p' = (BaseOp Overwrite [vr,n],t,map getType ts)
     doUpdate vr (x :>>= v :-> e) = let (du,t,ts) = doUpdate vr e in (x :>>= v :-> du,t,ts)
     doUpdate vr x = error $ "doUpdate: " ++ show x
     args es = map f es where
@@ -752,3 +754,5 @@ literal (EPrim aprim@(APrim p _) xs ty) | Just ptype <- toCmmTy ty, primIsConsta
     return $ [ValPrim aprim (concat xs) (TyPrim ptype)]
 literal _ = fail "not a literal term"
 
+
+bool b x y = if b then x else y
