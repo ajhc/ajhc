@@ -29,8 +29,6 @@ import Util.UnionSolve
 
 
 
-
-
 data NodeType
     = WHNF       -- ^ guarenteed to be a WHNF
     | Lazy       -- ^ a suspension, a WHNF, or an indirection to a WHNF
@@ -120,9 +118,9 @@ nodeAnalyze grin' = do
     --putStrLn "----------------------------"
     --print cs
     --putStrLn "----------------------------"
-    -- putStrLn "-- NodeAnalyze"
-    --(rm,res) <- solve (const (return ())) cs
-    (rm,res) <- solve putStrLn cs
+    --putStrLn "-- NodeAnalyze"
+    (rm,res) <- solve (const (return ())) cs
+    --(rm,res) <- solve putStrLn cs
     let cmap = Map.map (fromJust . flip Map.lookup res) rm
     --putStrLn "----------------------------"
     --mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList rm)
@@ -134,7 +132,7 @@ nodeAnalyze grin' = do
     --nfs <- mapM (fixupFunc (grinSuspFunctions grin `Set.union` grinPartFunctions grin) cmap) (grinFuncs grin)
     --let grin' = setGrinFunctions nfs grin
     --return $ grin' { grinTypeEnv = extendTyEnv (grinFunctions grin') (grinTypeEnv grin') }
-    return $ transformFuncs (fixupFuncs (grinSuspFunctions grin `Set.union` grinPartFunctions grin) cmap) grin
+    return $ transformFuncs (fixupFuncs (grinSuspFunctions grin) (grinPartFunctions grin) cmap) grin
 
 
 data Todo = Todo !Bool [V] | TodoNothing
@@ -173,9 +171,9 @@ doFunc (name,arg :-> body) = ans where
             f rest
         f body = gn ret body
     isfn _ x y | not (isGood x) = mempty
-    --isfn (Todo True  _) x y = Left x `equals` y
-    --isfn (Todo False _) x y = Left x `isgte` y
-    isfn (Todo _ _) x y = Left x `isgte` y
+    isfn (Todo True  _) x y = Left x `equals` y
+    isfn (Todo False _) x y = Left x `isgte` y
+    --isfn (Todo _ _) x y = Left x `isgte` y
     isfn TodoNothing x y =  mempty
     equals x y | isGood x && isGood y = Util.UnionSolve.equals x y
                | otherwise = mempty
@@ -218,20 +216,16 @@ doFunc (name,arg :-> body) = ans where
         f (BaseOp (StoreNode _) w) = do
             ww <- mapM convertVal w
             dres ww
---        f (BaseOp Demote w) = do
---            ww <- mapM convertVal w
---            dres ww
---        f (Store w) = do
---            ww <- convertVal w
---            dunno [TyPtr (getType w)]
         f (BaseOp Promote [w]) = do
             ww <- convertVal w
-            --dres [ww]
-            dres [Right (N WHNF Top)]
+            tell $ ww `islte` Right (N WHNF Top)
+            dres [ww]
+            --dres [Right (N WHNF Top)]
         f (BaseOp Demote [w]) = do
             ww <- convertVal w
-            --dres [ww]
-            dres [Right (N WHNF Top)]
+            tell $ ww `islte` Right (N WHNF Top)
+            dres [ww]
+            --dres [Right (N WHNF Top)]
         f (BaseOp PeekVal [w])  = do
             dres [Right top]
         f Error {} = dres []
@@ -242,7 +236,6 @@ doFunc (name,arg :-> body) = ans where
         f Alloc { expValue = v } | getType v == tyINode = do
             convertVal v
             dunno [TyPtr tyINode]
---            dres [v']
         f NewRegion { expLam = _ :-> body } = fn ret body
         f (BaseOp Overwrite [Var vname ty,v]) | ty == TyINode = do
             v' <- convertVal v
@@ -257,22 +250,10 @@ doFunc (name,arg :-> body) = ans where
         f (BaseOp PeekVal vs) = do
             mapM_ convertVal vs
             dres []
---        f (Update (Var vname ty) v) | ty == TyINode  = do
---            v' <- convertVal v
---            tell $ Left (vr vname ty) `isgte` v'
---            dres []
---        f (Update (Var vname ty) v) | ty == TyPtr TyINode  = do
---            v' <- convertVal v
---            dres []
---        f (Update v1 v)  = do
---            v' <- convertVal v
---            v' <- convertVal v1
---            dres []
         f Let { expDefs = ds, expBody = e } = do
             mapM_ doFunc (map (\x -> (funcDefName x, funcDefBody x)) ds)
             fn ret e
         f exp = error $ "NodeAnalyze.f: " ++ show exp
---        f _ = dres []
 
 
     convertVal (Const (NodeC t _)) = return $ Right (N WHNF (Only $ Set.singleton t))
@@ -308,14 +289,15 @@ isWhatUnchanged WhatUnchanged = True
 isWhatUnchanged _ = False
 
 
-transformFuncs :: (Atom -> ([Ty],[Ty]) -> ([WhatToDo],[WhatToDo])) -> Grin -> Grin
+transformFuncs :: (Atom -> [Ty] -> Maybe [Ty] -> (Maybe [WhatToDo],Maybe [WhatToDo])) -> Grin -> Grin
 transformFuncs fn grin = grin'' where
     grin'' =  grin' { grinTypeEnv = extendTyEnv (grinFunctions grin') (grinTypeEnv grin') }
     grin' = setGrinFunctions (nfs $ grinFuncs grin) grin
     nfs ds = map fs ds
-    fs (n,l@(ps :-> e)) = (n,f (fn n (map getType ps,getType e)) l)
-    f (ats,rts) (p :-> e) = ans where
-        ans = if all isWhatUnchanged (ats ++ rts) then p :-> j e else p' :-> e'
+    fs (n,l@(ps :-> e)) = (n,f (fn n (map getType ps) (Just $ getType e)) l)
+    f (Nothing,Nothing) (p :-> e) = p :-> j e
+    f (Just ats,rts') (p :-> e) = p' :-> e' where
+        rts = maybe (map (const WhatUnchanged) (getType e)) id rts'
         p' = concatMap f (zip p ats) where
             f (v,WhatUnchanged) = [v]
             f (_,WhatDelete) = []
@@ -334,10 +316,26 @@ transformFuncs fn grin = grin'' where
         h ((r,WhatSubs nty tt _):xs) (v:vs) rs = tt r :>>= [Var v nty] :-> h xs vs (Var v nty:rs)
         h [] _ rs = Return (reverse rs)
 
+    j app@(BaseOp (StoreNode False) [NodeC a xs]) = res where
+        res = if isNothing ats' then app else e'
+        ats = maybe (repeat WhatUnchanged) id ats'
+        (ats',_) = fn (tagFlipFunction a) (map getType xs) Nothing
+        lvars = zipWith Var [ v1 .. ] (map getType xs)
+        e' = Return xs :>>= lvars :-> f (zip lvars ats) []
+
+        f ((v,WhatUnchanged):xs) rs = f xs (v:rs)
+        f ((_,WhatDelete):xs) rs = f xs rs
+        f ((_,WhatConstant _):xs) rs = f xs rs
+        f ((Var v oty,WhatSubs nty tt _):xs) rs = tt (Var v oty) :>>= [Var v nty] :-> f xs (Var v nty:rs)
+        f [] rs = BaseOp (StoreNode False) [NodeC a (reverse rs)]
+
+
 
     j app@(App a xs ts) = res where
-        res = if all isWhatUnchanged (ats ++ rts) then app else e'
-        (ats,rts) = fn a (map getType xs,ts)
+        res = if isNothing ats' && isNothing rts'  then app else e'
+        ats = maybe (repeat WhatUnchanged) id ats'
+        rts = maybe (repeat WhatUnchanged) id rts'
+        (ats',rts') = fn a (map getType xs) (Just ts)
         lvars = zipWith Var [ v1 .. ] (map getType xs)
         e' = Return xs :>>= lvars :-> f (zip lvars ats) []
 
@@ -367,11 +365,13 @@ transformFuncs fn grin = grin'' where
     j e = runIdentity $ mapExpExp (return . j) e
 
 
-fixupFuncs sfuncs cmap  = ans where
-    ans a (as,rs) | a `Set.member` sfuncs = (map (const WhatUnchanged) as,map (const WhatUnchanged) rs)
-                  | otherwise = (map (bool pnode WhatUnchanged) largs,map (bool pnode WhatUnchanged) rargs) where
+fixupFuncs sfuncs pfuncs cmap  = ans where
+    ans a as jrs | a `Set.member` pfuncs = (Nothing,Nothing)
+                 | a `Set.member` sfuncs = (Just aargs,Nothing)
+                 | otherwise =  (Just aargs,fmap rargs jrs) where
+        aargs = map (bool pnode WhatUnchanged) largs
         largs = map (lupArg fa a) (zip as [0 ..  ])
-        rargs = map (lupArg fr a) (zip rs [0 ..  ])
+        rargs rs = map (bool pnode WhatUnchanged) (map (lupArg fr a) (zip rs [0 ..  ]))
     lupArg fa a (x,i) =  case (x,Map.lookup (fa a i x) cmap) of
         (TyINode,Just (ResultJust _ (N WHNF _))) -> True
         (TyINode,Just ResultBounded { resultLB = Just (N WHNF _) }) -> True

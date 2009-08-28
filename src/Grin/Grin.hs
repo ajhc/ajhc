@@ -270,6 +270,7 @@ setGrinFunctions xs grin = grin { grinFunctions = map (uncurry (createFuncDef Fa
 
 extendTyEnv ds (TyEnv env) = TyEnv (Map.fromList xs `mappend` env) where
     xs = [ (funcDefName d,tyTy { tySlots = ss, tyReturn = r }) |  d <- ds, let (ss,r) = funcType $ funcDefProps d]
+      ++ [ (tagFlipFunction (funcDefName d),tyTy { tySlots = ss, tyReturn = r }) |  d <- ds, let (ss,r) = funcType $ funcDefProps d, r == [TyNode]]
 
 -- cached info
 data FuncProps = FuncProps {
