@@ -17,14 +17,19 @@ import Util.UnionFind as UF
 
 
 class Fixable a where
+    -- determine if we are at the top or bottom of the lattice, we can
+    -- solidify bounds if we know we are at an endpoint.
     isBottom :: a -> Bool
     isTop :: a -> Bool
+
     join :: a -> a -> a
     meet :: a -> a -> a
-    eq :: a -> a -> Bool
 
+    eq :: a -> a -> Bool
     lte :: a -> a -> Bool
+
     showFixable :: a -> String
+
     showFixable x | isBottom x = "B"
                   | isTop x = "T"
                   | otherwise = "*"
@@ -86,15 +91,9 @@ showResult rb@ResultBounded {} = sb (resultLB rb) (resultLBV rb) ++ " <= " ++ sh
     sb (Just x) n = show x ++ show n
 
 
-
-
 collectVars (Cset x y:xs) = x:y:collectVars xs
 collectVars (Clte x y:xs) = x:y:collectVars xs
 collectVars [] = []
-
-data Direction = Lower | Upper
-
-
 
 --
 -- (C l v) represents a constraint (or set of constraints) that confine the
@@ -334,10 +333,13 @@ instance Fixable a => Fixable (Topped a) where
     isTop _ = False
     meet Top b = b
     meet a Top = a
-    meet (Only a) (Only b) = Only (join a b)
+    meet (Only a) (Only b) = Only (meet a b)
     join Top b = Top
     join a Top = Top
-    join (Only a) (Only b) = Only (meet a b)
+    join (Only a) (Only b) = Only (join a b)
+    eq Top Top = True
+    eq (Only x) (Only y) = eq x y
+    eq _ _ = False
     lte _ Top = True
     lte Top _ = False
     lte (Only x) (Only y) = x `lte` y
