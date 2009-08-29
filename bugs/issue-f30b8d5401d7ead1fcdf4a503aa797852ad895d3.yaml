@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: IO exceptions are not working properly
+desc: IO exceptions are basically a stub, in addition, they behave oddly in certain ways, such as printing to stdout instead of stderr.
+type: :bugfix
+component: libraries
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2009-08-29 23:02:27.581638 Z
+references: []
+
+id: f30b8d5401d7ead1fcdf4a503aa797852ad895d3
+log_events: 
+- - 2009-08-29 23:02:28.394912 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

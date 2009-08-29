@@ -1,0 +1,27 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: parse error on where
+desc: |-
+  a 'where' should be able to end a do block when indented at the same level.
+  here is a test case.
+  
+  >  configureFlagWithDefault :: String -> String -> String
+  >                           -> C () -> (String -> C ()) -> C FranchiseFlag
+  >  configureFlagWithDefault n argname h defaultaction j =
+  >   do whenC amConfiguring $ addHook n defaultaction
+  >      return $ FF $ Option [] [n] (ReqArg (addHook n . j') argname) h
+  >      where j' v = do putV $ "handling configure flag --"++n++" "++v; j v
+type: :bugfix
+component: front_end
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2009-08-29 23:01:16.342844 Z
+references: []
+
+id: 35cc6ddc1a577e163e9830b96f89151f0562c029
+log_events: 
+- - 2009-08-29 23:01:17.411021 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

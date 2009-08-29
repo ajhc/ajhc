@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: fails when the same library is imported more than once
+desc: when the same library is imported more than once then jhc reports it as a conflict, it should merge such imports.
+type: :bugfix
+component: front_end
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2009-08-29 22:59:46.673238 Z
+references: []
+
+id: a5f0a804e60ea4297c09ff8662e8d1bfbdc8e222
+log_events: 
+- - 2009-08-29 22:59:47.893146 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
