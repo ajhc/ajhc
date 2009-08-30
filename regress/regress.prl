@@ -142,7 +142,7 @@ sub my_system {
 }
 
 my @libs = $opt_l ? ("-pjhc") : ("--noauto", "-i$jhc_dir/lib/jhc", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
-my @fast = $opt_n ? ("-fno-lint") : ("-flint");
+my @fast = $opt_n ? ("-fno-lint") : ("-fdebug", "-flint");
 
 sub do_it {
     my ($cwd,$name) = @_;
