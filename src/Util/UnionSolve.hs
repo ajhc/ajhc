@@ -214,20 +214,28 @@ solve putLog (C csp _vset) = do
             case xw of
                 R v -> (v `lessThen` ye)
                 Ri xml xlb xmu xub -> do
-                    xlb <- finds xlb
-                    if ye `Set.member` xub then return () else do
                     xub <- finds xub
+                    if ye `Set.member` xub then return () else do
+                    xlb <- finds xlb
                     if ye `Set.member` xlb then equal xe ye  else do
                     yw <- UF.getW ye
                     case yw of
                         R v -> (v `greaterThen` xe)
                         Ri yml ylb ymu yub -> do
-                            xlb <- finds xlb
+                            ylb <- finds ylb
                             if xe `Set.member` ylb then return () else do
-                            xub <- finds xub
+                            yub <- finds yub
                             if xe `Set.member` yub then equal xe ye  else do
+                            let newxu = mmeet ymu xmu
+                            case newxu of
+                                Just v -> mapM_ (v `greaterThen`) (Set.toList xlb)
+                                _ -> return ()
                             updateW (const (Ri xml xlb (mmeet ymu xmu) (Set.delete xe $ Set.insert ye xub))) xe
-                            updateW (const (Ri (mjoin yml xml) (Set.delete ye $ Set.insert xe ylb) ymu yub)) ye
+                            let newyl = mjoin yml xml
+                            case newyl of
+                                Just v -> mapM_ (v `lessThen`) (Set.toList yub)
+                                _ -> return ()
+                            updateW (const (Ri newyl (Set.delete ye $ Set.insert xe ylb) ymu yub)) ye
                             w <- getW xe
                             checkRS w xe
                             w <- getW ye
