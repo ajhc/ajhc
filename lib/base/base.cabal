@@ -47,9 +47,10 @@ Exposed-Modules: Control.Exception,
         System.Random,
         System.Time,
         System.Environment,
+	System.Exit
+	System.Cmd
         Control.Monad.Fix,
         Data.Function,
-        System,
         Text.Show.Functions,
         Data.Typeable,
         Control.Monad.Instances,

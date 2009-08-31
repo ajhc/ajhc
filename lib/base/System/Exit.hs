@@ -1,8 +1,6 @@
 {-# OPTIONS_JHC -fffi #-}
-module System (
-    ExitCode(ExitSuccess,ExitFailure),
-    getArgs, getProgName, getEnv, system, exitWith, exitFailure
-  ) where
+module System.Exit ( ExitCode(ExitSuccess,ExitFailure),
+                     exitWith, exitFailure ) where
 
 import Foreign.C.String
 import Foreign.Ptr
