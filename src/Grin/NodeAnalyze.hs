@@ -130,9 +130,6 @@ nodeAnalyze grin' = do
     --putStrLn "----------------------------"
     --mapM_ print (Map.elems res)
     --putStrLn "----------------------------"
-    --hFlush stdout
-    --exitWith ExitSuccess
-    --return $ grin' { grinTypeEnv = extendTyEnv (grinFunctions grin') (grinTypeEnv grin') }
     let cmap = Map.map (fromJust . flip Map.lookup res) rm
     (grin',stats) <- Stats.runStatT $ mapGrinFuncsM (fixupfs cmap (grinTypeEnv grin)) grin
     return $ transformFuncs (fixupFuncs (grinSuspFunctions grin) (grinPartFunctions grin) cmap) grin' { grinStats = stats `mappend` grinStats grin' }
@@ -142,6 +139,7 @@ data Todo = Todo !Bool [V] | TodoNothing
 
 doFunc :: (Atom,Lam) -> M ()
 doFunc (name,arg :-> body) = ans where
+    ans :: M ()
     ans = do
         let rts = getType body
         forMn_ rts $ \ (t,i) -> dVar (fr name i t) t
@@ -157,6 +155,7 @@ doFunc (name,arg :-> body) = ans where
     -- should only be used in patterns
     zVar v TyNode = tell $ Left (vr v TyNode) `equals` Right (N WHNF Top)
     zVar v t = tell $ Left (vr v t) `equals` Right top
+    fn :: Todo -> Exp -> M ()
     fn ret body = f body where
         f (x :>>= [Var v vt] :-> rest) = do
             dVar (vr v vt) vt
@@ -213,26 +212,18 @@ doFunc (name,arg :-> body) = ans where
             forMn_ (zip vs vs') $ \ ((tv,v),i) ->  do
                 tell $ v `islte` Left (fa fn i (getType tv))
             dres [Left $ fr fn i t | i <- [ 0 .. ] | t <- ty ]
-        f (Return x) = do
-            ww' <- mapM convertVal x
-            dres ww'
-        f (BaseOp (StoreNode _) w) = do
-            ww <- mapM convertVal w
-            dres ww
+        f (Return x) = do mapM convertVal x >>= dres
+        f (BaseOp (StoreNode _) w) = do mapM convertVal w >>= dres
         f (BaseOp Promote [w]) = do
             ww <- convertVal w
             tell $ ww `islte` Right (N WHNF Top)
             dres [ww]
-            --dres [Right (N WHNF Top)]
         f (BaseOp Demote [w]) = do
             ww <- convertVal w
             tell $ ww `islte` Right (N WHNF Top)
             dres [ww]
-            --dres [Right (N WHNF Top)]
-        f (BaseOp PeekVal [w])  = do
-            dres [Right top]
-        f Error {} = dres []
-        f Prim { expArgs = as } = mapM_ convertVal as
+        f Error {} = return ()
+        f Prim { expArgs = as, expType = ty } = mapM_ convertVal as >> dunno ty
         f Alloc { expValue = v } | getType v == TyNode = do
             v' <- convertVal v
             dres [v']
@@ -244,15 +235,9 @@ doFunc (name,arg :-> body) = ans where
             v' <- convertVal v
             tell $ Left (vr vname ty) `isgte` v'
             dres []
-        f (BaseOp Overwrite vs) = do
-            mapM_ convertVal vs
-            dres []
-        f (BaseOp PokeVal vs) = do
-            mapM_ convertVal vs
-            dres []
-        f (BaseOp PeekVal vs) = do
-            mapM_ convertVal vs
-            dres []
+        f e@(BaseOp Overwrite vs) = do mapM_ convertVal vs >> dunno (getType e)
+        f e@(BaseOp PokeVal vs) = do mapM_ convertVal vs >> dunno (getType e)
+        f e@(BaseOp PeekVal vs) = do mapM_ convertVal vs  >> dunno (getType e)
         f Let { expDefs = ds, expBody = e } = do
             mapM_ doFunc (map (\x -> (funcDefName x, funcDefBody x)) ds)
             fn ret e
