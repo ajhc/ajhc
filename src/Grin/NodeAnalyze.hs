@@ -6,6 +6,7 @@
 
 module Grin.NodeAnalyze(nodeAnalyze) where
 
+import Control.Monad.Trans
 import Control.Monad.Identity hiding(join)
 import Control.Monad(forM, forM_, when)
 import Control.Monad.RWS(MonadWriter(..), RWS(..))
@@ -13,6 +14,7 @@ import Control.Monad.RWS hiding(join)
 import Data.Monoid
 import Data.Maybe
 import IO
+import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -23,9 +25,11 @@ import Grin.Noodle
 import Grin.Whiz
 import StringTable.Atom
 import Support.CanType
+import Support.Tickle
 import Support.FreeVars
 import Util.Gen
 import Util.UnionSolve
+import qualified Stats
 
 
 
@@ -121,7 +125,6 @@ nodeAnalyze grin' = do
     --putStrLn "-- NodeAnalyze"
     (rm,res) <- solve (const (return ())) cs
     --(rm,res) <- solve putStrLn cs
-    let cmap = Map.map (fromJust . flip Map.lookup res) rm
     --putStrLn "----------------------------"
     --mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList rm)
     --putStrLn "----------------------------"
@@ -129,10 +132,10 @@ nodeAnalyze grin' = do
     --putStrLn "----------------------------"
     --hFlush stdout
     --exitWith ExitSuccess
-    --nfs <- mapM (fixupFunc (grinSuspFunctions grin `Set.union` grinPartFunctions grin) cmap) (grinFuncs grin)
-    --let grin' = setGrinFunctions nfs grin
     --return $ grin' { grinTypeEnv = extendTyEnv (grinFunctions grin') (grinTypeEnv grin') }
-    return $ transformFuncs (fixupFuncs (grinSuspFunctions grin) (grinPartFunctions grin) cmap) grin
+    let cmap = Map.map (fromJust . flip Map.lookup res) rm
+    (grin',stats) <- Stats.runStatT $ mapGrinFuncsM (fixupfs cmap (grinTypeEnv grin)) grin
+    return $ transformFuncs (fixupFuncs (grinSuspFunctions grin) (grinPartFunctions grin) cmap) grin' { grinStats = stats `mappend` grinStats grin' }
 
 
 data Todo = Todo !Bool [V] | TodoNothing
@@ -202,12 +205,12 @@ doFunc (name,arg :-> body) = ans where
             dunno ty
         f (App { expFunction = fn, expArgs = vs, expType = ty }) = do
             vs' <- mapM convertVal vs
-            forMn_ (zip vs vs') $ \ ((tv,v),i) -> when (isGood tv) $ do
+            forMn_ (zip vs vs') $ \ ((tv,v),i) -> do
                 tell $ v `islte` Left (fa fn i (getType tv))
             dres [Left $ fr fn i t | i <- [ 0 .. ] | t <- ty ]
         f (Call { expValue = Item fn _, expArgs = vs, expType = ty }) = do
             vs' <- mapM convertVal vs
-            forMn_ (zip vs vs') $ \ ((tv,v),i) -> when (isGood tv) $ do
+            forMn_ (zip vs vs') $ \ ((tv,v),i) ->  do
                 tell $ v `islte` Left (fa fn i (getType tv))
             dres [Left $ fr fn i t | i <- [ 0 .. ] | t <- ty ]
         f (Return x) = do
@@ -378,44 +381,47 @@ fixupFuncs sfuncs pfuncs cmap  = ans where
         _ -> False
     pnode = WhatSubs TyNode (\v -> BaseOp Promote [v]) (\v -> BaseOp Demote [v])
 
---fixupFunc sfuncs cmap (name,l :-> body) = fmap (\b -> (name, l' :-> b)) (f body >>= g fixups') where
---    (l',fixups') | name `Set.member` sfuncs = (l,[])
---                 | otherwise = ((map f $ zip l ll),fixups) where
---        ll = map lupVar l
---        fixups = [ v | (v@(Var _ TyINode),Just (N WHNF _)) <- zip l ll]
---        f (Var v _,Just (N WHNF _)) = Var v TyNode
---        f (v,_) = v
---
---    lupVar (Var v t) =  case Map.lookup (vr v t) cmap of
---        _ | v < v0 -> fail "nocafyet"
---        Just (ResultJust _ lb) -> return lb
---        Just ResultBounded { resultLB = Just lb } -> return lb
---        _ -> fail "lupVar"
---    lupArg a (x,i) =  case Map.lookup (fa a i (getType x)) cmap of
---        Just (ResultJust _ lb) -> return lb
---        Just ResultBounded { resultLB = Just lb } -> return lb
---        _ -> fail "lupArg"
---    g [] e = return e
---    g (Var v TyINode:xs) e = do e' <- g xs e ; return $ BaseOp Demote [Var v TyNode] :>>= [Var v TyINode] :-> e'
---    f (App a xs ts)  | a `Set.notMember` sfuncs, not $ null mvars = return res where
---        largs = map (lupArg a) (zip xs [0 ..  ])
---        largs' =  [ (Var v (getType x),la) | (x,v,la) <- zip3 xs [ v1 .. ] largs ]
---        mvars = [ (Var v TyINode) | (Var v TyINode,Just (N WHNF _)) <- largs' ]
---        mvars' = [ case (v,la) of (Var v' TyINode,Just (N WHNF _)) -> Var v' TyNode ; _ -> v  | (v,la) <- largs' ]
---        res = Return xs :>>= fsts largs' :-> f mvars (App a mvars' ts)
---        f (Var v TyINode:rs) e = BaseOp Promote [Var v TyINode] :>>= [Var v TyNode] :-> f rs e
---        f [] e = e
---    f Let { expDefs = ds, expBody = e } = do
---        ds' <- forM ds $ \d -> do
---            (_,l) <- fixupFunc sfuncs cmap (funcDefName d, funcDefBody d)
---            return $ updateFuncDefProps  d { funcDefBody = l }
---        e' <- f e
---        return $ grinLet ds' e'
---
---    f a@(BaseOp Eval [arg]) | Just n <- lupVar arg = case n of
---        N WHNF _ -> return (BaseOp Promote [arg])
---        _ -> return a
---    f e = mapExpExp f e
+fixupfs cmap tyEnv l = tickleM f (l::Lam) where
+    lupVar (Var v t) =  case Map.lookup (vr v t) cmap of
+        _ | v < v0 -> fail "nocafyet"
+        Just (ResultJust _ lb) -> return lb
+        Just ResultBounded { resultLB = Just lb } -> return lb
+        _ -> fail "lupVar"
+    pstuff x arg n@(N w t) = liftIO $ printf "-- %s %s %s\n" x (show arg) (show n)
+    f a@(BaseOp Eval [arg]) | Just n <- lupVar arg = case n of
+        N WHNF _ -> do
+            pstuff "eval" arg n
+            Stats.mtick (toAtom "Optimize.NodeAnalyze.eval-promote")
+            return (BaseOp Promote [arg])
+        _ -> return a
+    f a@(BaseOp (Apply ty) (papp:args)) | Just nn <- lupVar papp = case nn of
+        N WHNF tset | Only set <- tset, [sv] <- Set.toList set, TagPApp n fn <- tagInfo sv, Just (ts,_) <- findArgsType tyEnv sv -> do
+            pstuff "apply" papp nn
+            case (n,args) of
+                (1,[arg]) -> do
+                    Stats.mtick (toAtom "Optimize.NodeAnalyze.apply-inline")
+                    let va = Var v1 (getType arg)
+                        vars = zipWith Var [ v2 .. ] ts
+                    return $ Return [arg,papp] :>>= [va,NodeC sv vars] :-> App fn (vars ++ [va]) ty
+                (1,[]) -> do
+                    Stats.mtick (toAtom "Optimize.NodeAnalyze.apply-inline")
+                    let vars = zipWith Var [ v2 .. ] ts
+                    return $ Return [papp] :>>= [NodeC sv vars] :-> App fn vars ty
+                (pn,[arg]) -> do
+                    Stats.mtick (toAtom "Optimize.NodeAnalyze.apply-inline")
+                    let va = Var v1 (getType arg)
+                        vars = zipWith Var [ v2 .. ] ts
+                    return $ Return [arg,papp] :>>= [va,NodeC sv vars] :-> dstore (NodeC (partialTag fn (pn - 1)) (vars ++ [va]))
+                (pn,[]) -> do
+                    Stats.mtick (toAtom "Optimize.NodeAnalyze.apply-inline")
+                    let vars = zipWith Var [ v2 .. ] ts
+                    return $ Return [papp] :>>= [NodeC sv vars] :-> dstore (NodeC (partialTag fn (pn - 1)) vars)
+                _ -> return a
+        _ -> return a
+    f e = mapExpExp f e
+
+dstore x = BaseOp (StoreNode True) [x]
+
 
 renameUniqueGrin :: Grin -> Grin
 renameUniqueGrin grin = res where

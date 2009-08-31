@@ -40,6 +40,8 @@ module Grin.Grin(
     properHole,
     tagFlipFunction,
     tagHole,
+    tagInfo,
+    TagInfo(..),
     tagIsFunction,
     tagIsPartialAp,
     tagIsSuspFunction,
@@ -127,21 +129,6 @@ newtype Var = V Int
 instance Show Var where
     showsPrec _ (V n) xs = 'v':shows n xs
 
-
--- For historical reasons, some of the grin expressions do different things depending on the arguments type and whether it is a variable.
---
---
---
--- Store : NodeC:TyNode  -> TyINode   - this allocates a new indirect node
--- Store : var:TyNode -> TyINode - this demotes a node to an indirect node. called 'demote'
--- Update : var:TyINode, TyNode - this stores an indirection to the second argument in the first
--- Update : TyPtr t, t - this sets the memory pointed to by the first argumnet to the second. it is called 'poke'
--- Update : var:TyNode, x:TyNode - this copies the contents of the second argument over the first
--- Update : var:TyINode, x:TyINode - this copies the contents of the second argument over the first
--- Fetch  : TyINode -> TyNode - follow an indirection, also called 'promote'
--- Fetch  : TyPtr t -> t - read a pointer, also called 'peek'
---
---
 
 
 {-
@@ -369,6 +356,25 @@ emptyGrin = Grin {
 }
 
 grinEntryPointNames = Map.keys . grinEntryPoints
+
+data TagInfo
+    = TagPApp !Int !Atom   -- partial application, number is how many more arguments needed
+    | TagSusp !Bool !Atom  -- a suspended version of the function, true if an update is required
+    | TagDataCons          -- data constructor
+    | TagTypeCons          -- type constructor
+    | TagTypePApp !Int Tag -- type partial app
+    | TagFunc
+
+tagInfo t = case fromAtom t of
+    'F':xs ->  TagSusp True (toAtom $ 'f':xs)
+    'B':xs ->  TagSusp True (toAtom $ 'b':xs)
+    'f':_  -> TagFunc
+    'b':_  -> TagFunc
+    'P':is | (n@(_:_),('_':xs)) <- span isDigit is -> TagPApp (read n) (toAtom $ 'f':xs)
+    'Y':is | (n@(_:_),('_':xs)) <- span isDigit is -> TagTypePApp (read n) (toAtom $ 'T':xs)
+    'C':_ -> TagDataCons
+    'T':_ -> TagTypeCons
+    t -> error $ "tagInfo: bad tag " ++  t
 
 
 partialTag :: Tag -> Int -> Tag

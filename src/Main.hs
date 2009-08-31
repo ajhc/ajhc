@@ -663,6 +663,9 @@ compileToGrin prog = do
     wdump FD.GrinPreeval $ dumpGrin "preeval" x
     x <- transformGrin nodeAnalyzeParms x
     x <- transformGrin simplifyParms x
+    wdump FD.GrinPreeval $ dumpGrin "preeval2" x
+    x <- transformGrin nodeAnalyzeParms x
+    x <- transformGrin simplifyParms x
     x <- createEvalApply x
     x <- transformGrin simplifyParms x
     lintCheckGrin x

@@ -14,6 +14,7 @@ import Util.Gen
 import Grin.Grin
 import Support.CanType
 import Debug.Trace
+import Support.Tickle
 
 
 modifyTail :: Lam -> Exp -> Exp
@@ -33,7 +34,18 @@ modifyTail lam@(_ :-> lb) te = f mempty te where
     g lf (p :-> e) | flint && not (Set.null $ Set.intersection (freeVars p) lamFV) = error "modifyTail: lam floated inside bad scope"
     g lf (p :-> e) = p :-> f lf e
 
+instance Tickleable Exp Lam where
+    tickleM = mapBodyM
 
+instance Tickleable Exp Exp where
+    tickleM = mapExpExp
+instance Tickleable Val Exp where
+    tickleM = mapExpVal
+instance Tickleable Val Val where
+    tickleM = mapValVal
+    tickleM_ = mapValVal_
+
+mapBodyM :: Monad m => (Exp -> m Exp) -> Lam -> m Lam
 mapBodyM f (x :-> y) = f y >>= return . (x :->)
 
 mapExpVal :: Monad m => (Val -> m Val) -> Exp -> m Exp

@@ -4,11 +4,14 @@ module Util.UnionSolve(
     Fixable(..),
     Topped(..),
     Result(..),
-    islte,isgte,equals
+    islte,isgte,equals,
+    varIsInteresting
     ) where
 
 import Data.List(intersperse)
 import Data.Monoid
+import qualified Data.Sequence as S
+import qualified Data.Foldable as S
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import Util.UnionFind as UF
@@ -39,18 +42,19 @@ class Fixable a where
 
 
 -- arguments are the lattice and the variable type
-newtype C l v = C ([CL l v] -> [CL l v])
+-- we make the fields strict because many empty values will be
+-- mappended together when used in a writer monad.
+data C l v = C !(S.Seq (CL l v)) !(Set.Set v)
 
-instance Monoid (C l v) where
-    mempty = C id
-    mappend (C a) (C b) = C (a . b)
+instance Ord v => Monoid (C l v) where
+    mempty = C mempty mempty
+    mappend (C a b) (C c d) = C (a `mappend` c) (b `mappend` d)
 
 data CL l v = (Either v l) `Clte` (Either v l) | (Either v l) `Cset` (Either v l)
     deriving(Eq,Ord)
 
-
 instance (Show e,Show l) => Show (C l e) where
-    showsPrec _ (C xs) = showString "" . foldr (.) id (intersperse (showString "\n") (map shows (xs []))) . showString "\n"
+    showsPrec _ (C xs _) = showString "" . foldr (.) id (intersperse (showString "\n") (map shows (S.toList xs))) . showString "\n"
 
 seither (Left x) = shows x
 seither (Right x) = shows x
@@ -60,10 +64,13 @@ instance (Show e,Show l) => Show (CL l e) where
     showsPrec _ (x `Cset` l) = seither x . showString " := " . seither l
 
 -- basic constraints
-islte,isgte,equals :: Either v l -> Either v l -> C l v
-islte  x y = C ((x `Clte` y):)
+islte,isgte,equals :: Ord v => Either v l -> Either v l -> C l v
+islte  x y = C (S.singleton (x `Clte` y)) mempty
 isgte  x y = islte y x
-equals x y = C ((x `Cset` y):)
+equals x y = C (S.singleton (x `Cset` y)) mempty
+
+varIsInteresting :: v -> C l v
+varIsInteresting v = C mempty (Set.singleton v)
 
 -- a variable is either set to a value or bounded by other values
 data R l a = R l |  Ri (Maybe l) (Set.Set (RS l a))  (Maybe l) (Set.Set (RS l a))
@@ -106,9 +113,9 @@ solve :: (Fixable l, Show l, Show v, Ord v)
     => (String -> IO ())
     -> C l v
     -> IO (Map.Map v v,Map.Map v (Result l v))
-solve putLog (C csp) = do
+solve putLog (C csp _vset) = do
     let vars = Set.fromList [ x | Left x <- collectVars cs]
-        cs = csp []
+        cs = S.toList csp
     ufs <- flip mapM (Set.toList vars) $ \a -> do
         uf <- UF.new (Ri Nothing mempty Nothing mempty) a
         return (a,uf)
