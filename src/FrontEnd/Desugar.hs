@@ -241,7 +241,7 @@ doToExp :: Monad m
     -> HsName      -- ^ fail to use
     -> [HsStmt]
     -> m HsExp
-doToExp newName f_bind f_bind_ f_fail ss = f ss where
+doToExp newName f_bind f_bind_ f_fail ss = hsParen `liftM` f ss where
     f [] = fail "doToExp: empty statements in do notation"
     f [HsQualifier e] = return e
     f [gen@(HsGenerator srcLoc _pat _e)] = fail $ "doToExp: last expression n do notation is a generator (srcLoc):" ++ show srcLoc
