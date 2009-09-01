@@ -1,4 +1,4 @@
-module Grin.Whiz(whiz, fizz, whizState, normalizeGrin,normalizeGrin', applySubstE, applySubst, whizExps) where
+module Grin.Whiz(whiz, fizz, WhizState, whizState, normalizeGrin,normalizeGrin', applySubstE, applySubst, whizExps) where
 
 import Control.Monad.Identity
 import Control.Monad.State

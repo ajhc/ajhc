@@ -21,6 +21,7 @@ import qualified Data.Set as Set
 import Util.UniqueMonad
 import Util.SetLike
 import Grin.Grin hiding(V)
+import Grin.Lint
 import Grin.Noodle
 import Grin.Whiz
 import StringTable.Atom
@@ -123,8 +124,8 @@ nodeAnalyze grin' = do
     --print cs
     --putStrLn "----------------------------"
     --putStrLn "-- NodeAnalyze"
-    --(rm,res) <- solve (const (return ())) cs
-    (rm,res) <- solve putStrLn cs
+    (rm,res) <- solve (const (return ())) cs
+    --(rm,res) <- solve putStrLn cs
     --putStrLn "----------------------------"
     --mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList rm)
     --putStrLn "----------------------------"
@@ -145,7 +146,7 @@ doFunc (name,arg :-> body) = ans where
         forMn_ rts $ \ (t,i) -> dVar (fr name i t) t
         forMn_ arg $ \ (~(Var v vt),i) -> do
             dVar (vr v vt) vt
-            tell $ Left (fa name i vt) `equals` Left (vr v vt)
+            tell $ cAnnotate "FunArg" $ Left (fa name i vt) `equals` Left (vr v vt)
         fn (Todo True [ fr name i t | i <- naturals | t <- rts ]) body
     -- restrict values of TyNode type to be in WHNF
     dVar v TyNode = do
@@ -153,8 +154,8 @@ doFunc (name,arg :-> body) = ans where
     dVar _ _ = return ()
     -- set concrete values for vars based on their type only
     -- should only be used in patterns
-    zVar v TyNode = tell $ Left (vr v TyNode) `equals` Right (N WHNF Top)
-    zVar v t = tell $ Left (vr v t) `equals` Right top
+    zVar s v TyNode = tell $ cAnnotate ("zVar - tynode " ++ s) $ Left (vr v TyNode) `equals` Right (N WHNF Top)
+    zVar s v t = tell $ cAnnotate ("zVar - inode " ++ s) $ Left (vr v t) `equals` Right top
     fn :: Todo -> Exp -> M ()
     fn ret body = f body where
         f (x :>>= [Var v vt] :-> rest) = do
@@ -168,12 +169,12 @@ doFunc (name,arg :-> body) = ans where
             gn (if all (== VIgnore) vs' then TodoNothing else Todo True vs') x
             f rest
         f (x :>>= v :-> rest) = do
-            forM_ (Set.toList $ freeVars v) $ \ (v,vt) -> zVar v vt
+            forM_ (Set.toList $ freeVars v) $ \ (v,vt) -> zVar "Bind" v vt
             gn TodoNothing x
             f rest
         f body = gn ret body
     isfn _ x y | not (isGood x) = mempty
-    isfn (Todo True  _) x y = Left x `equals` y
+    isfn (Todo True  _) x y = cAnnotate "isfn True" $ Left x `equals` y
     isfn (Todo False _) x y = Left x `isgte` y
     --isfn (Todo _ _) x y = Left x `isgte` y
     isfn TodoNothing x y =  mempty
@@ -185,7 +186,7 @@ doFunc (name,arg :-> body) = ans where
               | otherwise = mempty
     gn ret head = f head where
         fl ret (v :-> body) = do
-            forM_ (Set.toList $ freeVars v) $ \ (v,vt) -> zVar v vt
+            forM_ (Set.toList $ freeVars v) $ \ (v,vt) -> zVar "Alt" v vt
             fn ret body
         dunno ty = do
             dres [Right (if TyNode == t then N WHNF Top else top) | t <- ty ]

@@ -5,6 +5,7 @@ module Util.UnionSolve(
     Topped(..),
     Result(..),
     islte,isgte,equals,
+    cAnnotate,
     varIsInteresting
     ) where
 
@@ -50,8 +51,11 @@ instance Ord v => Monoid (C l v) where
     mempty = C mempty mempty
     mappend (C a b) (C c d) = C (a `mappend` c) (b `mappend` d)
 
-data CL l v = (Either v l) `Clte` (Either v l) | (Either v l) `Cset` (Either v l)
+data CL l v = (Either v l) `Clte` (Either v l) | (Either v l) `Cset` (Either v l) | CLAnnotate String (CL l v)
     deriving(Eq,Ord)
+
+cAnnotate :: String -> C l v -> C l v
+cAnnotate s (C seq set) = C (fmap (CLAnnotate s) seq) set
 
 instance (Show e,Show l) => Show (C l e) where
     showsPrec _ (C xs _) = showString "" . foldr (.) id (intersperse (showString "\n") (map shows (S.toList xs))) . showString "\n"
@@ -100,6 +104,7 @@ showResult rb@ResultBounded {} = sb (resultLB rb) (resultLBV rb) ++ " <= " ++ sh
 
 collectVars (Cset x y:xs) = x:y:collectVars xs
 collectVars (Clte x y:xs) = x:y:collectVars xs
+collectVars (CLAnnotate s x:xs) = collectVars (x:xs)
 collectVars [] = []
 
 --
@@ -119,7 +124,8 @@ solve putLog (C csp _vset) = do
     ufs <- flip mapM (Set.toList vars) $ \a -> do
         uf <- UF.new (Ri Nothing mempty Nothing mempty) a
         return (a,uf)
-    let prule (Left x `Clte` Left y) = ans where
+    let prule (CLAnnotate s cr) =  putLog s >> prule cr
+        prule (Left x `Clte` Left y) = ans where
             Just xe = Map.lookup x umap
             Just ye = Map.lookup y umap
             ans = do

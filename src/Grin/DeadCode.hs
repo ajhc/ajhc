@@ -68,10 +68,13 @@ deadCode stats roots grin = do
         directFuncs =  funSet Set.\\ suspFuncs Set.\\ pappFuncs
         fg xs = Set.fromList [ x | (x,True) <- xs ]
     newCafs <- flip mconcatMapM (grinCafs grin) $ \ (x,y) -> if x `Set.member` cafSet then return [(x,y)] else tick stats "Optimize.dead-code.caf" >> return []
-    newFuncs <- flip mconcatMapM (grinFuncs grin) $ \ (x,y) -> do
-        if not $ x `Set.member` funSet then tick stats "Optimize.dead-code.func" >> return [] else do
-        r <- runStatIO stats $ removeDeadArgs postInline funSet directFuncs cafSet argSet (x,y)
-        return [r]
+    let f ((x,y):xs) rs ws = do
+            if not $ x `Set.member` funSet then tick stats "Optimize.dead-code.func" >> f xs rs ws else do
+            (ws',r) <- runStatIO stats $ removeDeadArgs postInline funSet directFuncs cafSet argSet (x,y) ws
+            f xs (r:rs) ws'
+        f [] rs _ = return rs
+    newFuncs <- f (grinFuncs grin) [] whizState
+    --newFuncs <- flip mconcatMapM (grinFuncs grin) $ \ (x,y) -> do
     let (TyEnv mp) = grinTypeEnv grin
     mp' <- flip mconcatMapM (Map.toList mp) $ \ (x,tyty@TyTy { tySlots = ts }) -> case Just x  of
         Just _ | tagIsFunction x, not $ x `Set.member` funSet -> return []
@@ -114,7 +117,7 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,as :-> b
             g (App a vs _) = do
                 addRule $ conditionalRule id fn' $ mconcat [ mconcatMap (implies (sValue usedArgs fn) . varValue) (freeVars a) | (fn,a) <- combineArgs a vs]
                 addRule $ fn' `implies` sValue usedFuncs a
-                addRule (mconcatMap doConst vs)
+                addRule (mconcatMap doNode vs)
             g (BaseOp Overwrite [Var v _,n]) | v < v0 = do
                 v' <- supplyValue usedCafs v
                 addRule $ conditionalRule id v' $ doNode n
@@ -163,8 +166,9 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,as :-> b
         return nl
 
 
-removeDeadArgs :: MonadStats m => Bool -> Set.Set Atom -> Set.Set Atom -> (Set.Set Var) -> (Set.Set (Atom,Int)) -> (Atom,Lam) -> m (Atom,Lam)
-removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) =  whizExps f (margs a l) >>= return . (,) a where
+removeDeadArgs :: MonadStats m => Bool -> Set.Set Atom -> Set.Set Atom -> (Set.Set Var) -> (Set.Set (Atom,Int)) -> (Atom,Lam) -> WhizState -> m (WhizState,(Atom,Lam))
+removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) whizState =  whizExps f (margs a l) >>= \(l,ws) -> return (ws,(a,l)) where
+    whizExps f l = whiz (\_ x -> x) (\(p,e) -> f e >>= \e' -> return  (Just (p,e'))) f whizState l
     margs fn (as :-> e) | a `Set.member` directFuncs = ((removeArgs fn as) :-> e)
     margs _ x = x
     f (App fn as ty)  = do
