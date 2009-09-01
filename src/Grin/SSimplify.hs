@@ -171,7 +171,7 @@ simpExp e = f e [] where
         mtick "Grin.Simplify.error-discard"
         let (_,_,b) = last rs
         f (Error s (getType b)) []
-    f (Return [v@Const {}]) ((senv,[Var vn _],b):rs) = do
+    f (Return [v]) ((senv,[Var vn _],b):rs) | valIsConstant v = do
         mtick "Grin.Simplify.Subst.const"
         fbind vn v senv b rs
     f (Return [v@Var {}]) ((senv,[Var vn _],b):rs) = do

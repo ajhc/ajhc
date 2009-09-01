@@ -164,7 +164,7 @@ solve putLog (C csp _vset) = do
             xw <- getW xe
             case xw of
                 R c | c `eq` v -> return ()
-                    | otherwise -> fail $ "UnionSolve: equality constraints don't match " ++ show (c,v)
+                    | otherwise -> fail $ "UnionSolve: equality constraints don't match " ++ show (c,v)  ++ " when setting " ++ show (fromElement xe)
                 Ri ml lb mu ub | testBoundLT ml v && testBoundGT mu v -> do
                     mapM_ (v `greaterThen`) (Set.toList lb)
                     mapM_ (v `lessThen`)    (Set.toList ub)
@@ -227,15 +227,15 @@ solve putLog (C csp _vset) = do
                             yub <- finds yub
                             if xe `Set.member` yub then equal xe ye  else do
                             let newxu = mmeet ymu xmu
+                            updateW (const (Ri xml xlb newxu (Set.delete xe $ Set.insert ye xub))) xe
                             case newxu of
                                 Just v -> mapM_ (v `greaterThen`) (Set.toList xlb)
                                 _ -> return ()
-                            updateW (const (Ri xml xlb (mmeet ymu xmu) (Set.delete xe $ Set.insert ye xub))) xe
                             let newyl = mjoin yml xml
+                            updateW (const (Ri newyl (Set.delete ye $ Set.insert xe ylb) ymu yub)) ye
                             case newyl of
                                 Just v -> mapM_ (v `lessThen`) (Set.toList yub)
                                 _ -> return ()
-                            updateW (const (Ri newyl (Set.delete ye $ Set.insert xe ylb) ymu yub)) ye
                             w <- getW xe
                             checkRS w xe
                             w <- getW ye

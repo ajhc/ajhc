@@ -123,8 +123,8 @@ nodeAnalyze grin' = do
     --print cs
     --putStrLn "----------------------------"
     --putStrLn "-- NodeAnalyze"
-    (rm,res) <- solve (const (return ())) cs
-    --(rm,res) <- solve putStrLn cs
+    --(rm,res) <- solve (const (return ())) cs
+    (rm,res) <- solve putStrLn cs
     --putStrLn "----------------------------"
     --mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList rm)
     --putStrLn "----------------------------"
@@ -244,7 +244,7 @@ doFunc (name,arg :-> body) = ans where
         f exp = error $ "NodeAnalyze.f: " ++ show exp
 
 
-    convertVal (Const (NodeC t _)) = return $ Right (N WHNF (Only $ Set.singleton t))
+    convertVal (Const n@(NodeC _ _)) = convertVal n
     convertVal (Const _) = return $ Right (N WHNF Top)
     convertVal (NodeC t vs) = case tagUnfunction t of
         Nothing -> return $ Right (N WHNF (Only $ Set.singleton t))
@@ -264,7 +264,7 @@ doFunc (name,arg :-> body) = ans where
     convertVal ValUnknown {} = return $ Left VIgnore
     convertVal v = error $ "convertVal " ++ show v
 
---bottom = N WHNF (Only (Set.empty))
+bottom = N WHNF (Only (Set.empty))
 top = N Lazy Top
 
 data WhatToDo
@@ -363,6 +363,7 @@ fixupFuncs sfuncs pfuncs cmap  = ans where
     lupArg fa a (x,i) =  case (x,Map.lookup (fa a i x) cmap) of
         (TyINode,Just (ResultJust _ (N WHNF _))) -> True
         (TyINode,Just ResultBounded { resultLB = Just (N WHNF _) }) -> True
+        (TyINode,Just ResultBounded { resultLB = Nothing }) -> True
         _ -> False
     pnode = WhatSubs TyNode (\v -> BaseOp Promote [v]) (\v -> BaseOp Demote [v])
 
@@ -371,6 +372,7 @@ fixupfs cmap tyEnv l = tickleM f (l::Lam) where
         _ | v < v0 -> fail "nocafyet"
         Just (ResultJust _ lb) -> return lb
         Just ResultBounded { resultLB = Just lb } -> return lb
+        Just ResultBounded { resultLB = Nothing } -> return bottom
         _ -> fail "lupVar"
     pstuff x arg n@(N w t) = liftIO $ printf "-- %s %s %s\n" x (show arg) (show n)
     f a@(BaseOp Eval [arg]) | Just n <- lupVar arg = case n of
