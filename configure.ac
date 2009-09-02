@@ -62,5 +62,5 @@ AC_SUBST(SHORTVERSION)
 AC_SUBST(BYTE_ORDER)
 AC_SUBST(JLIBPATH)
 AC_SUBST(JETCPATH)
-AC_CONFIG_FILES([Makefile jhc.spec src/Version/Config.hs docs/building.mkd src/cbits/config.h])
+AC_CONFIG_FILES([Makefile jhc.spec src/Version/Config.hs lib/base/System/Info.hs docs/building.mkd src/cbits/config.h])
 AC_OUTPUT

@@ -4,9 +4,15 @@ module System.Info(compilerName,compilerVersion,os,arch) where
 import Foreign.C.String
 import System.IO.Unsafe
 import Foreign
+import Data.Version ( Version(..) )
 
 compilerName = "jhc"
-compilerVersion = "0"
+
+compilerVersion :: Version
+compilerVersion = Version (splitup "@VERSION@") []
+    where splitup s = case reads s of
+                        [(v,s')] -> v : splitup s'
+                        _ -> []
 
 os = unsafePerformIO $ peekCAString =<< peek options_os
 arch = unsafePerformIO $ peekCAString =<< peek options_arch
