@@ -180,7 +180,7 @@ fetchSource done_ref fs mm = do
                 _ -> return (Right hmod,m,ds)
     case mm of
         Just m' | m /= m' -> do
-            putErrLn $ "Skipping file" <+> fn <+> "because it's module declaration of" <+> show m <+> "does not equal the expected" <+> show m'
+            putErrLn $ "Skipping file" <+> fn <+> "because its module declaration of" <+> show m <+> "does not equal the expected" <+> show m'
             killMod
         _ -> do
             let sc (Right mod) = SourceParsed sinfo mod
