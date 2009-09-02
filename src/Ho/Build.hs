@@ -805,6 +805,7 @@ dumpHoFile fn = ans where
         case reverse fn of
             'l':'h':'.':_ -> doHl fn
             'o':'h':'.':_ -> doHo fn
+            _ -> putErrDie "Error: --show-ho requires a .hl or .ho file"
     vindent xs = vcat (map ("    " ++) xs)
     showList nm xs = when (not $ null xs) $ putStrLn $ (nm ++ ":\n") <>  vindent xs
     doHoh hoh = do
