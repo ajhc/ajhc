@@ -426,7 +426,8 @@ initialLibIncludes = unsafePerformIO $ do
     let paths = h ++ ["/usr/local","/usr"]
         bases = ["/lib","/share"]
         vers = ["/jhc-" ++ shortVersion, "/jhc"]
-    return $ nub $ maybe [] (tokens (':' ==))  ps ++ [ p ++ b ++ v | b <- bases, p <- paths, v <- vers ] ++ [libraryInstall]
+    return $ nub $ maybe [] (tokens (':' ==))  ps ++ [ p ++ b ++ v | p <- paths, v <- vers, b <- bases ]
+               ++ [d ++ v | d <- [libdir,datadir], v <- vers] ++ [libraryInstall]
 
 
 class Monad m => OptionMonad m where
