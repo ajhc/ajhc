@@ -248,7 +248,9 @@ doFunc (name,arg :-> body) = ans where
     convertVal (Const n@(NodeC _ _)) = convertVal n
     convertVal (Const _) = return $ Right (N WHNF Top)
     convertVal (NodeC t vs) = case tagUnfunction t of
-        Nothing -> return $ Right (N WHNF (Only $ Set.singleton t))
+        Nothing -> do
+            mapM_ convertVal vs
+            return $ Right (N WHNF (Only $ Set.singleton t))
         Just (n,fn) -> do
             vs' <- mapM convertVal vs
             forMn_ (zip vs vs') $ \ ((vt,v),i) -> do

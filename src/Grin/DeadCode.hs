@@ -121,16 +121,11 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,as :-> b
             g (BaseOp Overwrite [Var v _,n]) | v < v0 = do
                 v' <- supplyValue usedCafs v
                 addRule $ conditionalRule id v' $ doNode n
-           -- g (Update vv@(Index (Var v _) r) n) | v < v0 = do
-           --     v' <- supplyValue usedCafs v
-           --     addRule (doNode r)
-           --     addRule $ conditionalRule id v' $ doNode n
             g (BaseOp Overwrite [vv,n]) = addRule $ (doNode vv) `mappend` (doNode n)
             g (BaseOp PokeVal [vv,n]) = addRule $ (doNode vv) `mappend` (doNode n)
             g (BaseOp PeekVal [vv]) = addRule $ (doNode vv)
             g (BaseOp Promote [vv]) = addRule $ (doNode vv)
             g (BaseOp _ xs) = addRule $ mconcatMap doNode xs
-   --         g (Store n) = addRule $ doNode n
             g Alloc { expValue = v, expCount = c, expRegion = r } = addRule $ doNode v `mappend` doNode c `mappend` doNode r
             g Let { expDefs = defs, expBody = body } = do
                 mapM_ goAgain [ (name,bod) | FuncDef { funcDefBody = bod, funcDefName = name } <- defs]
@@ -150,7 +145,7 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,as :-> b
             h (p,BaseOp Promote [v]) = addRule $ mconcat $ [ conditionalRule id  (varValue pv) (doNode v) | pv <- freeVars p]
             h (p,e) = g e
             doNode (NodeC n as) | not postInline, Just (x,fn) <- tagUnfunction n  = let
-                consts = (mconcatMap doConst as)
+                consts = (mconcatMap doNode as)
                 usedfn = implies fn' (sValue usedFuncs fn)
                 suspfn | x > 0 = conditionalRule id fn' (pappFuncs `isSuperSetOf` value (Set.singleton fn))
                        | otherwise = conditionalRule id fn' (suspFuncs `isSuperSetOf` value (Set.singleton fn))
@@ -158,7 +153,6 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,as :-> b
             doNode x = doConst x `mappend` mconcatMap (implies fn' . varValue) (freeVars x)
             doConst _ | postInline  = mempty
             doConst (Const n) = doNode n
---            doConst (Tup ns) = mconcatMap doConst ns
             doConst (NodeC n as) = mconcatMap doConst as
             doConst _ = mempty
 
