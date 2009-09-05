@@ -26,6 +26,7 @@ import Jhc.Num
 import Jhc.Addr
 import Foreign.Storable
 import Data.Word
+import Jhc.Types
 
 
 instance Show (Ptr a) where
@@ -52,6 +53,16 @@ castPtrToFunPtr (Ptr x) = FunPtr x
 freeHaskellFunPtr :: FunPtr a -> IO ()
 freeHaskellFunPtr _ = error "freeHaskellFunPtr"
 
-foreign import primitive "U2U" ptrToWordPtr :: Ptr a -> WordPtr
-foreign import primitive "U2U" wordPtrToPtr :: WordPtr -> Ptr a
+--foreign import primitive "U2U" ptrToWordPtr :: Ptr a -> WordPtr
+--foreign import primitive "U2U" wordPtrToPtr :: WordPtr -> Ptr a
+
+ptrToWordPtr :: Ptr a -> WordPtr
+ptrToWordPtr (Ptr w) = boxWordPtr w
+
+wordPtrToPtr :: WordPtr -> Ptr a
+wordPtrToPtr w = Ptr (unboxWordPtr w)
+
+foreign import primitive "box" boxWordPtr :: BitsPtr_ -> WordPtr
+foreign import primitive "unbox" unboxWordPtr :: WordPtr -> BitsPtr_
+
 
