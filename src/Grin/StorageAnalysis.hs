@@ -1,19 +1,21 @@
 module Grin.StorageAnalysis(storeAnalyze) where
 
+import Control.Monad.Identity
 import Control.Monad
 import Control.Monad.Writer
 import Data.Maybe
 
-import Support.FreeVars
-import Support.CanType
-import Grin.Lint
-import StringTable.Atom
-import Support.Tickle
-import Util.UniqueMonad
-import Util.UnionSolve
 import Grin.Grin
+import Grin.Lint
 import Grin.Noodle
+import Grin.Val
+import StringTable.Atom
+import Support.CanType
+import Support.FreeVars
+import Support.Tickle
 import Util.Gen
+import Util.UnionSolve
+import Util.UniqueMonad
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -50,21 +52,26 @@ instance Show Vr where
 {-# NOINLINE storeAnalyze #-}
 storeAnalyze :: Grin -> IO Grin
 storeAnalyze grin = do
-    dumpGrin "storeAnalyze1" grin
+    --dumpGrin "storeAnalyze1" grin
     let (grin',cs) = execUniq1 $ runWriterT (mapGrinFuncsM firstLam grin)
-    dumpGrin "storeAnalyze2" grin'
-    --(rm,res) <- solve (const $ return ()) cs
-    (rm,res) <- solve putStrLn cs
-    putStrLn "----------------------------"
-    mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList rm)
-    putStrLn "----------------------------"
-    mapM_ print (Map.elems res)
-    putStrLn "----------------------------"
-    let cmap = Map.map (lower . fromJust . flip Map.lookup res) rm
+    --dumpGrin "storeAnalyze2" grin'
+    (rm,res) <- solve (const $ return ()) cs
+ --   (rm,res) <- solve putStrLn cs
+ --   putStrLn "----------------------------"
+ --   mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList rm)
+ --   putStrLn "----------------------------"
+ --   mapM_ print (Map.elems res)
+ --   putStrLn "----------------------------"
+    let cmap = Map.filterWithKey fm $ Map.map (lower . fromJust . flip Map.lookup res) rm
         lower (ResultJust _ j) = j
         lower ResultBounded { resultLB = Nothing } = S
+        fm _ E = False
+        fm (Vr _) _ = True
+        fm (Va _ _) _ = True
+        fm _ _ = False
     mapM_ (\ (x,y) -> putStrLn $ show x ++ " -> " ++ show y) (Map.toList cmap)
-    return grin'
+    let grin'' = runIdentity $ tickleM (lastLam cmap) grin'
+    return grin''
 
 
 isHeap TyNode = True
@@ -89,6 +96,7 @@ firstLam fname lam = g Nothing fname lam where
             f wtd e@(BaseOp Promote xs) = g wtd (toVs xs) >> return e
             f wtd e@(BaseOp Demote xs) = g wtd (toVs xs) >> return e
             f wtd e@(BaseOp Redirect xs) = g Nothing (toVs xs) >> return e
+            f wtd e@(BaseOp Overwrite [Var v _,n]) = do tell $ mconcat [ Left (Vb v) `islte` Left r | r <- concat $ toVs [n] ] ; return e
             f wtd e@(App fn vs ty) = do
                 tell $ mconcat [ Left (Va fn n) `islte` Left (Vb v) | (n,Var v t) <- zip naturals vs, isHeap t ]
                 return e
@@ -96,7 +104,10 @@ firstLam fname lam = g Nothing fname lam where
                 defs' <- mapM (tickleM (g' wtd)) defs
                 b <- f wtd b
                 return $ updateLetProps e { expDefs = defs', expBody = b }
-            f wtd e = return e
+            f wtd e =  do
+                let zs = Set.toList (Set.map (Vb . fst) $ Set.filter (isHeap . snd) (freeVars e))
+                tell $ mconcat [ Right E `islte` Left r | r <- zs ];
+                return e
 
             g Nothing vs = tell $ mconcat [ Right E `islte` Left v | v' <- vs, v <- v' ]
             g (Just as) vs = tell $ mconcat [ Left a `islte` Left v | (a',v') <- zip (toVs as) vs, a <- a', v <- v']
@@ -110,6 +121,17 @@ firstLam fname lam = g Nothing fname lam where
     g' wtd (fname,b) = do
         b <- g wtd fname b
         return (fname,b)
+
+
+
+
+lastLam :: Map.Map Vr T -> Lam -> Identity Lam
+lastLam cmap  lam = tickleM f lam where
+    f (BaseOp (StoreNode sh) [n,Var r TyRegion]) = do
+        case Map.lookup (Vr r) cmap of
+            Just S -> return (BaseOp (StoreNode sh) [n,region_stack])
+            _ ->  return (BaseOp (StoreNode sh) [n])
+    f e = tickleM f e
 
 
 

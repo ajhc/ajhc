@@ -405,19 +405,20 @@ label n = stmt $ SLabel n
 goto :: Name -> Statement
 goto n = stmt $ SGoto n
 
+massign a b = if isEmptyExpression b then toStatement a else assign a b
 
 newTmpVar t e = do
     u <- newUniq
     let n = name $ 'x':show u
         d = sd $ do
-            va <- draw (variable n `assign` e)
+            va <- draw (variable n `massign` e)
             t <- draw t
             return $ t <+> va
     return (d,variable n)
 
 newAssignVar t n e = do
     let d = sd $ do
-            va <- draw (variable n `assign` e)
+            va <- draw (variable n `massign` e)
             t <- draw t
             return $ t <+> va
     return d

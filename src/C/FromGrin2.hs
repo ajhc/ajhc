@@ -416,10 +416,8 @@ convertBody (Error s t) = do
             v <- g t
             return (jerr & creturn v)
 
-convertBody (BaseOp (StoreNode b)  [n@NodeC {}])  = newNode (bool b wptr_t sptr_t) n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
---convertBody (Return [n@NodeC {}])  = newNode wptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
---convertBody (Store  n@NodeC {})  = newNode sptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
---convertBody (Return [n@NodeC {}])  = newNode wptr_t n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
+convertBody (BaseOp (StoreNode b)  [n@NodeC {}])  = newNode region_heap (bool b wptr_t sptr_t) n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
+convertBody (BaseOp (StoreNode b)  [n@NodeC {},region]) = newNode region (bool b wptr_t sptr_t) n >>= \(x,y) -> simpleRet y >>= \v -> return (x & v)
 
 
 convertBody (e :>>= [(Var vn _)] :-> e') | vn == v0 = do
@@ -566,7 +564,7 @@ convertExp (BaseOp Overwrite [v@(Var vv _),tn@(NodeC t as)]) | getType v == TyIN
     nt <- nodeTypePtr t
     let tmp' = cast nt (f_DETAG v') -- (if vv < v0 then f_DETAG v' else v')
     if not (tagIsSuspFunction t) && vv < v0 then do
-        (nns, nn) <- newNode fptr_t tn
+        (nns, nn) <- newNode region_heap fptr_t tn
         return (nns & getHead (f_NODEP(f_DETAG v')) =* nn,emptyExpression)
      else do
         s <- tagAssign tmp' t
@@ -763,7 +761,7 @@ tellTags t = do
 
 
 
-newNode ty ~(NodeC t as) = do
+newNode region ty ~(NodeC t as) = do
     let sf = tagIsSuspFunction t
     bn <- basicNode t as
     case bn of
@@ -775,9 +773,14 @@ newNode ty ~(NodeC t as) = do
             malloc =  wmalloc (sizeof st)
             nonPtr TyPtr {} = False
             nonPtr TyNode = False
---            nonPtr (TyTup xs) = all nonPtr xs
+            nonPtr TyINode = False
             nonPtr _ = True
-        (dtmp,tmp) <- ty `newTmpVar` malloc
+        (dtmp,tmp) <- case region == region_stack of
+            True -> do
+                v <- newVar st
+                return (mempty,v)
+            False -> do ty `newTmpVar` malloc
+        tmp <- if region == region_stack then return (reference tmp) else return tmp
         let tmp' = concrete t tmp
             ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
         tagassign <- tagAssign tmp' t

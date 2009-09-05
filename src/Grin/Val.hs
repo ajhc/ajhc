@@ -8,6 +8,7 @@ module Grin.Val(
     cInt,
     convertName,
     region_heap,
+    region_stack,
     region_block
     ) where
 

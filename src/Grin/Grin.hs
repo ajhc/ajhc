@@ -614,6 +614,7 @@ instance FreeVars Val [Var] where
 instance FreeVars Lam [Var] where
     freeVars e = Set.toList $ freeVars e
 
+
 instance FreeVars Val (Set.Set Tag) where
     freeVars (NodeC t xs) = Set.singleton t `Set.union` freeVars xs
     freeVars (Index a b) = freeVars (a,b)

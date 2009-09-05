@@ -675,7 +675,7 @@ compileToGrin prog = do
     --x <- opt "After Devolve Optimization" x
     x <- transformGrin simplifyParms x
     x <- return $ twiddleGrin x
---    x <- storeAnalyze x
+    x <- storeAnalyze x
     dumpFinalGrin x
     compileGrinToC x
 
