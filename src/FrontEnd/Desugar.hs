@@ -210,8 +210,8 @@ desugarExp (HsCase e alts) = do
         return (HsCase newE newAlts)
 desugarExp (HsDo stmts) = HsDo `liftM` mapM desugarStmt stmts
 desugarExp (HsListComp e stmts) = do
-        newE <- desugarExp e
-        newStmts <- mapM desugarStmt stmts
+        e <- desugarExp e
+        stmts <- mapM desugarStmt stmts
         return (HsListComp e stmts)
 desugarExp e = traverseHsExp desugarExp e
 
