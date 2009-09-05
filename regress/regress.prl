@@ -181,7 +181,7 @@ sub do_it {
             }
             rlog "---- $name";
             my @jhc  = $opt_p ? ("$jhc_dir/jhcp",'+RTS', "-S$rd/$name.jhcp_prof",@opt_rts,'-RTS')  :  ("$jhc_dir/jhc");
-            my @cmd = (@jhc, ($verbose ? ('-v') : ()), '--ho-dir', $ho_dir, @libs , @fast, '-o', "$rd/$name", @flags, @opts, "$cwd/$fn");
+            my @cmd = (@jhc, ($verbose ? ('-v') : ()), @libs , @fast, '-o', "$rd/$name", @flags, @opts, "$cwd/$fn");
             my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
             my ($r,$time) = my_system $res;
             my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out", compile_time => $time };
