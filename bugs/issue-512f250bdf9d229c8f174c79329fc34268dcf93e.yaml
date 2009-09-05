@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: strict fields of newtypes are not unboxed properly
+desc: ""
+type: :bugfix
+component: front_end
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2009-09-05 01:06:30.674121 Z
+references: []
+
+id: 512f250bdf9d229c8f174c79329fc34268dcf93e
+log_events: 
+- - 2009-09-05 01:06:31.867265 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
