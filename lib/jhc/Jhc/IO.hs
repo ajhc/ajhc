@@ -110,14 +110,13 @@ catch (IO m) k =  case Jhc.Options.target of
 data FixIO a = FixIO World__ a
 
 fixIO :: (a -> IO a) -> IO a
-fixIO k = IO $ \w -> let
-            r = case k ans of
-                    IO z -> case z w of
-                        (# w, r #) -> FixIO w r
-            ans = case r of
-                FixIO _ z -> z
-               in case r of
-                FixIO w z -> (# w, z #)
+fixIO k = IO $ \w -> let r = case k ans of
+                               IO z -> case z w of
+                                         (# w', r' #) -> FixIO w' r'
+                         ans = case r of
+                                 FixIO _ z -> z
+                     in case r of
+                          FixIO w' z -> (# w', z #)
 
 
 -- some primitives
