@@ -368,7 +368,7 @@ boxPrimitive dataTable e et = case followAliases dataTable et of
                 return $ (ELit litCons { litName = cn, litArgs = [e], litType = et },(show n,st))
              else
                 return $ (eStrictLet tvra e $ ELit litCons { litName = cn, litArgs = [EVar tvra], litType = et },(show n,st))
-    e' -> fail $ "extractPrimitive: " ++ show (e,e')
+    e' -> fail $ "boxPrimitive: " ++ show (e,e')
 
 
 
