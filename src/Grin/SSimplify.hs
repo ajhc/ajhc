@@ -174,6 +174,9 @@ simpExp e = f e [] where
     f (Return [v]) ((senv,[Var vn _],b):rs) | valIsConstant v = do
         mtick "Grin.Simplify.Subst.const"
         fbind vn v senv b rs
+    f (Return [v@ValUnknown {}]) ((senv,[Var vn _],b):rs) = do
+        mtick "Grin.Simplify.Subst.unknown"
+        fbind vn v senv b rs
     f (Return [v@Var {}]) ((senv,[Var vn _],b):rs) = do
         mtick "Grin.Simplify.Subst.var"
         fbind vn v senv b rs
