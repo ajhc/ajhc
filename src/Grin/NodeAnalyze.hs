@@ -132,7 +132,7 @@ nodeAnalyze grin' = do
     --mapM_ print (Map.elems res)
     --putStrLn "----------------------------"
     let cmap = Map.map (fromJust . flip Map.lookup res) rm
-    (grin',stats) <- Stats.runStatT $ mapGrinFuncsM (fixupfs cmap (grinTypeEnv grin)) grin
+    (grin',stats) <- Stats.runStatT $ tickleM (fixupfs cmap (grinTypeEnv grin)) grin
     return $ transformFuncs (fixupFuncs (grinSuspFunctions grin) (grinPartFunctions grin) cmap) grin' { grinStats = stats `mappend` grinStats grin' }
 
 
@@ -414,7 +414,7 @@ dstore x = BaseOp (StoreNode True) [x]
 renameUniqueGrin :: Grin -> Grin
 renameUniqueGrin grin = res where
     (res,()) = evalRWS (execUniqT 1 ans) ( mempty :: Map.Map Atom Atom) (fromList [ x | (x,_) <- grinFuncs grin ] :: Set.Set Atom)
-    ans = do mapGrinFuncsM f grin
+    ans = do tickleM f grin
     f (l :-> b) = g b >>= return . (l :->)
     g a@App  { expFunction = fn } = do
         m <- lift ask
@@ -445,7 +445,5 @@ renameUniqueGrin grin = res where
             lift $ modify (insert nn)
             return (nn,(a,nn))
 
-mapGrinFuncsM :: Monad m => (Lam -> m Lam) -> Grin -> m Grin
-mapGrinFuncsM f grin = liftM (`setGrinFunctions` grin) $ mapM  (\x -> do nb <- f (funcDefBody x); return (funcDefName x, nb)) (grinFunctions grin)
 
 bool x y b = if b then x else y

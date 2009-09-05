@@ -36,7 +36,6 @@ modifyTail lam@(_ :-> lb) te = f mempty te where
 
 instance Tickleable Exp Lam where
     tickleM = mapBodyM
-
 instance Tickleable Exp Exp where
     tickleM = mapExpExp
 instance Tickleable Val Exp where
@@ -44,6 +43,14 @@ instance Tickleable Val Exp where
 instance Tickleable Val Val where
     tickleM = mapValVal
     tickleM_ = mapValVal_
+instance Tickleable Lam Grin where
+    tickleM f grin = liftM (`setGrinFunctions` grin) $ mapM  (\x -> do nb <- f (funcDefBody x); return (funcDefName x, nb)) (grinFunctions grin)
+instance Tickleable Lam FuncDef where
+    tickleM f fd = funcDefBody_uM f fd
+instance Tickleable (Atom,Lam) FuncDef where
+    tickleM f fd@FuncDef { funcDefName = n, funcDefBody = b } = do
+    (n',b') <- f (n,b)
+    return $  updateFuncDefProps fd { funcDefBody = b', funcDefName = n' }
 
 mapBodyM :: Monad m => (Exp -> m Exp) -> Lam -> m Lam
 mapBodyM f (x :-> y) = f y >>= return . (x :->)
@@ -249,5 +256,10 @@ getReturnInfo  e = ans where
             f nlf body
     f _ (App a _ _) = tells $ ReturnCalls a
     f _ e = tells ReturnOther
+
+
+
+mapGrinFuncsM :: Monad m => (Atom -> Lam -> m Lam) -> Grin -> m Grin
+mapGrinFuncsM f grin = liftM (`setGrinFunctions` grin) $ mapM  (\x -> do nb <- f (funcDefName x) (funcDefBody x); return (funcDefName x, nb)) (grinFunctions grin)
 
 

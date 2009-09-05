@@ -32,6 +32,8 @@ tn_unit  = convertName dc_Unit
 region_heap  = Item (toAtom "heap") TyRegion
 -- This allocates data in the innermost enclosing region, including implicit regions.
 region_block = Item (toAtom "block") TyRegion
+-- This allocates data on the stack, generally equivalent to 'block' for most back ends.
+region_stack = Item (toAtom "stack") TyRegion
 
 instance ConNames Val where
     vTrue  = NodeC tn_Boolzh [toUnVal (1 :: Int)]

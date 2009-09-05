@@ -159,7 +159,7 @@ data BaseOp
     | Overwrite             -- overwrite an existing node with new data (the tag must match what was used for the initial Store)
     | PeekVal               -- read a value from a pointed to location
     | PokeVal               -- write a value to a pointed to location
-    | Consume               -- consume a value, depending on the back end this may be needed to free memory
+    | Consume               -- consume a value, depending on the back end this may be used to free memory
     deriving(Eq,Ord,Show)
 
 data Lam = [Val] :-> Exp
@@ -305,6 +305,7 @@ instance Show Val where
     showsPrec _ (Var (V i) t)
         | TyINode <- t = text "ni" <> tshow i
         | TyNode <- t = text "nd" <> tshow i
+        | TyRegion <- t = text "r" <> tshow i
 --        | TyPtr TyINode <- t = text "np" <> tshow i
         | TyPtr t' <- t = text "p" <> shows (Var (V i) t')
         | TyPrim Op.TyBool <- t  = char 'b' <> tshow i

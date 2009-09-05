@@ -48,6 +48,7 @@ import Grin.Lint
 import Grin.NodeAnalyze
 import Grin.Optimize
 import Grin.Show
+import Grin.StorageAnalysis
 import Ho.Build
 import Ho.Collected
 import Ho.Library
@@ -674,6 +675,7 @@ compileToGrin prog = do
     --x <- opt "After Devolve Optimization" x
     x <- transformGrin simplifyParms x
     x <- return $ twiddleGrin x
+--    x <- storeAnalyze x
     dumpFinalGrin x
     compileGrinToC x
 
