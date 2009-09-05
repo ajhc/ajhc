@@ -12,7 +12,7 @@ module E.Traverse(
     ) where
 
 import Control.Monad.Reader
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 import Data.Monoid
 import Data.Maybe
 import qualified Data.Traversable as T

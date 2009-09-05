@@ -50,7 +50,7 @@ module FrontEnd.Tc.Monad(
 
 import Control.Monad.Error
 import Control.Monad.Reader
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 import qualified Data.Traversable as T
 import qualified Data.Foldable as T
 import qualified Data.Sequence as Seq

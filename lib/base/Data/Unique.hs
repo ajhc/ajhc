@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi  #-}
+{-# OPTIONS_JHC  -fffi  #-}
 module Data.Unique (
    -- * Unique objects
    Unique(),            -- instance (Eq, Ord)
@@ -30,6 +30,9 @@ newUnique = do
 hashUnique :: Unique -> Int
 hashUnique (Unique u) = u
 
+
+instance Show Unique where
+    showsPrec p (Unique n) = showsPrec p n
 
 foreign import ccall "&jhc_data_unique" c_data_unique :: Ptr Int
 

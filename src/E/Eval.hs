@@ -3,8 +3,8 @@ module E.Eval(eval, strong) where
 -- Simple lambda Calculus interpreter
 -- does not handle recursive Let or Case statements, but those don't appear in types anyway.
 
-import Control.Monad.Writer
 import qualified Data.Map as Map
+import Data.Monoid
 
 import Doc.DocLike
 import Doc.PPrint

@@ -34,7 +34,7 @@ module Stats(
 
 import Control.Monad.Identity
 import Control.Monad.Reader
-import Control.Monad.Writer
+import Control.Monad.Writer.Strict
 import Data.IORef
 import Data.Tree
 import List(sort,groupBy)
