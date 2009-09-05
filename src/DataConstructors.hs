@@ -256,7 +256,7 @@ tunboxedtuple n = (typeCons,dataCons) where
 
 
 tAbsurd k = ELit (litCons { litName = nameConjured modAbsurd k, litArgs = [], litType = k })
-mktBox k = ELit (litCons { litName = nameConjured modBox k, litArgs = [], litType = k, litAliasFor = af }) where
+mktBox  k = ELit (litCons { litName = nameConjured modBox k, litArgs = [], litType = k, litAliasFor = af }) where
     af = case k of
         EPi TVr { tvrType = t1 } t2 -> Just (ELam tvr { tvrType = t1 } (mktBox t2))
         _ -> Nothing
@@ -599,12 +599,17 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             f (Right (_,_,es)) = es
         tslots = f (newIds fvset) (map isHsBangedTy (hsConDeclArgs x)) origArgs where
             f (i:is) (False:bs) (e:es) = Left (e { tvrIdent = i, tvrType = subst (tvrType e) },False):f is bs es
-            f (i:j:is) (True:bs) (e:es) = maybe  (Left (e { tvrIdent = i, tvrType = subst (tvrType e) },True):f is bs es) id $ do
-                ELit LitCons { litName = n } <- return $ followAliases fullDataTable (getType e)
-                Constructor { conChildren = DataNormal [dc] } <- getConstructor n fullDataTable
-                [st] <- return $ slotTypes fullDataTable dc (tvrType e)
-                let nv = tvr { tvrIdent = j, tvrType = st }
-                return $ Right (e { tvrIdent = i, tvrType = subst (tvrType e)},dc,[nv]):f is bs es
+            f (i:j:is) (True:bs) (e:es) = maybe  (Left (e { tvrIdent = i, tvrType = subst (tvrType e) },True):f is bs es) id $ g e (tvrType e) where
+                g e te = do
+                    ELit LitCons { litName = n } <- return $ followAliases fullDataTable te
+                    Constructor { conChildren = DataNormal [dc] } <- getConstructor n fullDataTable
+                    con <- getConstructor dc fullDataTable
+                    case (conAlias con,slotTypes fullDataTable dc te) of
+                        (ErasedAlias,[nt]) -> g e nt
+                        (_,[st]) -> do
+                            let nv = tvr { tvrIdent = j, tvrType = st }
+                            return $ Right (e { tvrIdent = i, tvrType = subst (tvrType e)},dc,[nv]):f is bs es
+                        _ -> fail "not unboxable"
             f _ [] [] = []
             f _ _ _ = error "DataConstructors.tslots"
             fvset = freeVars (thisTypeArgs,origArgs) `mappend` fromList (take (length theTypeArgs + 2) anonymousIds)
