@@ -16,6 +16,7 @@ import Data.List hiding(union)
 import Data.Monoid
 import Data.Tree
 import Data.Version(Version,parseVersion,showVersion)
+import Version.Config(version)
 import Maybe
 import Monad
 import Prelude hiding(print,putStrLn)
@@ -165,7 +166,7 @@ fetchSource done_ref fs mm = do
             Nothing -> fail $ "Could not load file: " ++ show fs
             Just m -> modifyIORef done_ref (modEncountered_u $ Map.insert m ModNotFound) >> return m
     onErr killMod (findFirstFile mod [ (f,undefined) | f <- fs]) $ \ (lbs,fn,_) -> do
-    let hash = MD5.md5lazy lbs
+    let hash = MD5.md5lazy $ (LBSU.fromString version) `mappend` lbs
     (foundho,mho) <- findHoFile done_ref fn mm hash
     done <- readIORef done_ref
     (mod,m,ds) <- case mlookup hash (knownSourceMap done) of
