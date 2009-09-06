@@ -26,6 +26,22 @@ instance (Ord a, Ord b) => Ord (a,b) where
         EQ -> compare y b
         z -> z
 
+instance (Ord a, Ord b, Ord c) => Ord (a,b,c) where
+    compare (x,y,z) (a,b,c) = case compare x a of
+        EQ -> case compare y b of
+            EQ -> compare z c
+            z -> z
+        z -> z
+
+instance (Ord a, Ord b, Ord c, Ord d) => Ord (a,b,c,d) where
+    compare (x,y,z,j) (a,b,c,d) = case compare x a of
+        EQ -> case compare y b of
+            EQ -> case compare z c of
+                EQ -> compare j d
+                z -> z
+            z -> z
+        z -> z
+
 --instance (Eq a, Eq b) => Eq (a,b) where
 --    (x,y) == (a,b) = x == a && y == b
 
