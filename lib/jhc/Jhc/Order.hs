@@ -88,7 +88,7 @@ instance Ord a => Ord [a] where
     compare [] _ = LT
     compare _ [] = GT
 
-    [] < [] = False
+    _ < [] = False
     [] < _ = True
     (x:xs) < (y:ys) = if x == y then xs < ys else x < y
 
