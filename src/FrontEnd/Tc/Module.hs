@@ -121,7 +121,11 @@ tiModules htc ms = do
     let ms = fsts mserrs
     let thisFixityMap = buildFixityMap (concat [ filter isHsInfixDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
     let fixityMap = thisFixityMap  `mappend` hoFixities htc
-    let thisTypeSynonyms =  (declsToTypeSynonyms $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
+    --let thisTypeSynonyms =  (declsToTypeSynonyms $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms])
+    thisTypeSynonyms <- declsToTypeSynonyms (hoTypeSynonyms htc) $ concat [ filter isHsTypeDecl (hsModuleDecls $ modInfoHsModule m) | m <- ms]
+--    putStrLn "Synonyms"
+--    putStrLn $ HsPretty.render $ showSynonyms pprint thisTypeSynonyms
+
     let ts = thisTypeSynonyms `mappend` hoTypeSynonyms htc
     -- 'expandTypeSyns' is in the Warning monad and doesn't require IO.
     let f x = expandTypeSyns ts (modInfoHsModule x) >>= return . FrontEnd.Infix.infixHsModule fixityMap >>= \z -> return (modInfoHsModule_s ( z) x)

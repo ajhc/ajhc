@@ -7,11 +7,18 @@ import FrontEnd.HsSyn
 import Control.Monad.Identity
 import FrontEnd.SrcLoc
 import Support.FreeVars
+import Name.Name
 
 
 instance FreeVars HsType (Set.Set HsName) where
     freeVars t = execWriter (f t) where
         f (HsTyVar v) = tell (Set.singleton v)
+        f t = traverseHsType_ f t
+
+instance FreeVars HsType (Set.Set Name) where
+    freeVars t = execWriter (f t) where
+        f (HsTyVar v) = tell (Set.singleton $ toName TypeVal v)
+        f (HsTyCon v) = tell (Set.singleton $ toName TypeConstructor v)
         f t = traverseHsType_ f t
 
 traverse_ :: Monad m => (a -> m b) -> a -> m a

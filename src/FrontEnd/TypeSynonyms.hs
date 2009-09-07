@@ -4,25 +4,29 @@ module FrontEnd.TypeSynonyms (
     declsToTypeSynonyms,
     TypeSynonyms,
     restrictTypeSynonyms,
+    showSynonyms,
     showSynonym
     ) where
 
 import Control.Monad.Writer
-import Data.Monoid
 import Data.Binary
-import List
+import Data.List
+import Data.Monoid
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
+import Support.FreeVars
 import Doc.DocLike
-import FrontEnd.SrcLoc
-import GenUtil
-import Util.UniqueMonad
-import FrontEnd.Syn.Traverse
 import FrontEnd.HsSyn
-import Name.Name
-import Util.HasSize
+import FrontEnd.SrcLoc
+import FrontEnd.Syn.Traverse
 import FrontEnd.Warning
+import GenUtil
+import Name.Name
 import Support.MapBinaryInstance
+import Util.HasSize
+import Util.UniqueMonad
+import qualified Util.Graph as G
 
 
 newtype TypeSynonyms = TypeSynonyms (Map.Map Name ([HsName], HsType, SrcLoc))
@@ -41,13 +45,33 @@ showSynonym pprint n (TypeSynonyms m) =
       Just (ns, t, _) -> return $ hsep (tshow n:map tshow ns) <+> text "=" <+> pprint t
       Nothing         -> fail "key not found"
 
+showSynonyms :: DocLike d => (HsType -> d) -> TypeSynonyms -> d
+showSynonyms pprint (TypeSynonyms m) = vcat (map f (Map.toList m)) where
+    f (n,(ns,t,_)) =  hsep (tshow n:map tshow ns) <+> text "=" <+> pprint t
+
 -- | convert a set of type synonym declarations to a synonym map used for efficient synonym
 -- expansion
 
-declsToTypeSynonyms :: [HsDecl] -> TypeSynonyms
-declsToTypeSynonyms ts = TypeSynonyms $ Map.fromList $
-    [ (toName TypeConstructor name,( args , quantifyHsType args (HsQualType [] t) , sl)) | (HsTypeDecl sl name args' t) <- ts, let args = [ n | ~(HsTyVar n) <- args'] ]
-     ++ [ (toName TypeConstructor name,( args , HsTyAssoc, sl)) | (HsClassDecl _ _ ds) <- ts,(HsTypeDecl sl name args' _) <- ds, let args = [ n | ~(HsTyVar n) <- args'] ]
+--declsToTypeSynonyms :: [HsDecl] -> TypeSynonyms
+--declsToTypeSynonyms ts = TypeSynonyms $ Map.fromList $
+--    [ (toName TypeConstructor name,( args , quantifyHsType args (HsQualType [] t) , sl)) | (HsTypeDecl sl name args' t) <- ts, let args = [ n | ~(HsTyVar n) <- args'] ]
+--     ++ [ (toName TypeConstructor name,( args , HsTyAssoc, sl)) | (HsClassDecl _ _ ds) <- ts,(HsTypeDecl sl name args' _) <- ds, let args = [ n | ~(HsTyVar n) <- args'] ]
+
+-- | convert a set of type synonym declarations to a synonym map used for efficient synonym
+-- expansion, expanding out the body of synonyms along the way.
+
+declsToTypeSynonyms :: MonadWarn m => TypeSynonyms -> [HsDecl] -> m TypeSynonyms
+declsToTypeSynonyms tsin ds = f tsin gr [] where
+    gr = G.scc $ G.newGraph [ (toName TypeConstructor name,( args , quantifyHsType args (HsQualType [] t) , sl)) | (HsTypeDecl sl name args' t) <- ds, let args = [ n | ~(HsTyVar n) <- args'] ] fst (Set.toList . freeVars . (\ (_,(_,t,_)) -> t))
+    f tsin (Right ns:xs) rs = do
+            warn (head [ sl | (_,(_,_,sl)) <- ns]) "type-synonym-recursive" ("Recursive type synonyms:" <+> show (fsts ns))
+            f tsin xs rs
+    f tsin (Left (n,(as,body,sl)):xs) rs = do
+        body' <- removeSynonymsFromType tsin body
+        f (tsInsert n (as,body',sl) tsin) xs ((n,(as,body',sl)):rs)
+    f _ [] rs = return $ TypeSynonyms (Map.fromList rs)
+
+tsInsert x y (TypeSynonyms xs) = TypeSynonyms (Map.insert x y xs)
 
 removeSynonymsFromType :: MonadWarn m => TypeSynonyms -> HsType -> m HsType
 removeSynonymsFromType syns t = evalTypeSyms  syns t

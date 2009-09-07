@@ -93,6 +93,7 @@ fatal = [
     "missing-dep",
     "invalid-decl",
     "invalid-assoc",
+    "type-synonym-recursive",
     "type-synonym-partialap" ]
 
 ignore = ["h98-emptydata"]

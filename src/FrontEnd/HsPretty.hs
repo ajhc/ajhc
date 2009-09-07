@@ -381,6 +381,9 @@ parensIf :: Bool -> Doc -> Doc
 parensIf True = parens
 parensIf False = id
 
+instance P.PPrint Doc HsType where
+    pprint = ppHsType
+
 ppHsType :: HsType -> Doc
 ppHsType = ppHsTypePrec 0
 
