@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -XRecordWildCards #-}
 module Ho.Binary(readHoFile,recordHoFile,readHlFile,recordHlFile) where
 
 
@@ -89,23 +90,22 @@ recordHoFile ho idep fs header = do
 
 recordHlFile
     :: Library
-    -> FilePath
     -> IO ()
-recordHlFile (Library hoh libr ldef lcor) fp = do
+recordHlFile Library { .. } = do
     --let theho =  mapHoBodies eraseE ho
     let cfflbs = mkCFFfile cff_magic [
-            (cff_jhdr, compress $ encode hoh { hohVersion = current_version }),
-            (cff_libr, compress $ encode libr),
-            (cff_ldef, compress $ encode ldef),
-            (cff_lcor, compress $ encode lcor)]
-    let tfp = fp ++ ".tmp"
+            (cff_jhdr, compress $ encode libHoHeader { hohVersion = current_version }),
+            (cff_libr, compress $ encode libHoLib),
+            (cff_ldef, compress $ encode libTcMap),
+            (cff_lcor, compress $ encode libBuildMap)]
+    let tfp = libFileName ++ ".tmp"
     LBS.writeFile tfp cfflbs
-    rename tfp fp
+    rename tfp libFileName
 
 readHlFile :: FilePath -> IO Library
 readHlFile fn = do
     (_fn',hoh,fc) <- readHFile fn
-    return (Library hoh (fc cff_libr) (fc cff_ldef) (fc cff_lcor))
+    return Library { libHoHeader = hoh, libHoLib =  fc cff_libr, libTcMap = fc cff_ldef, libBuildMap = fc cff_lcor, libFileName = fn }
 
 instance Binary FieldMap where
     put (FieldMap ac ad) = do

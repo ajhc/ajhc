@@ -108,10 +108,16 @@ data HoLib = HoLib {
     }
 
 
-data Library = Library HoHeader HoLib (Map.Map ModuleGroup HoTcInfo) (Map.Map ModuleGroup HoBuild)
+data Library = Library {
+    libHoHeader :: HoHeader,
+    libHoLib :: HoLib,
+    libTcMap :: (Map.Map ModuleGroup HoTcInfo),
+    libBuildMap :: (Map.Map ModuleGroup HoBuild),
+    libFileName :: FilePath
+    }
 
 instance Show Library where
-    showsPrec n (Library hoh _ _ _) = showsPrec n (hohHash hoh)
+    showsPrec n lib = showsPrec n (hohHash $ libHoHeader lib)
 
 
 -- data only needed for type checking.

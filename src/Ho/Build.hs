@@ -285,7 +285,7 @@ instance ProvidesModules SourceCode where
 toCompUnitGraph :: Done -> [Module] -> IO (HoHash,CompUnitGraph)
 toCompUnitGraph done roots = do
     let fs m = map inject $ maybe (error $ "can't find deps for: " ++ show m) snd (Map.lookup m (knownSourceMap done))
-        fs' m (Library _ libr _ _) = fromMaybe (error $ "can't find deps for: " ++ show m) (Map.lookup m (hoModuleDeps libr))
+        fs' m libr = fromMaybe (error $ "can't find deps for: " ++ show m) (Map.lookup m (hoModuleDeps $ libHoLib libr))
         foundMods = [ ((m,Left (sourceHash $ sourceInfo sc)),fs (sourceHash $ sourceInfo sc)) | (m,Found sc) <- Map.toList (modEncountered done)]
         foundMods' = Map.elems $ Map.fromList [ (mg,((mg,Right lib),fs' mg lib)) | (_,ModLibrary _ mg lib) <- Map.toList (modEncountered done)]
         fullModMap = Map.unions (map libModMap $ Map.elems (loadedLibraries done))
@@ -323,9 +323,9 @@ toCompUnitGraph done roots = do
                 writeIORef (lmods m) (Right mhash)
                 modifyIORef cug_ref ((mhash,(deps',CompSources $ map fs amods)):)
                 return mhash
-        g [((mg,Right lib@(Library _ libr mhot mhob)),ds)] = do
-                let Just hob = Map.lookup mg mhob
-                    Just hot = Map.lookup mg mhot
+        g [((mg,Right lib@(Library { .. })),ds)] = do
+                let Just hob = Map.lookup mg libBuildMap
+                    Just hot = Map.lookup mg libTcMap
                     ho = Ho { hoModuleGroup = mg, hoBuild = hob, hoTcInfo = hot }
                     myHash = libMgHash mg lib
                 deps <- snub `fmap` mapM f ds
@@ -417,7 +417,7 @@ loadModules libs need = do
         modEncountered = Map.empty
         }
     (es,is) <- collectLibraries
-    let combModMap es = Map.unions [ Map.map ((,) l) mm | l@(Library _ HoLib { hoModuleMap = mm } _ _) <- es]
+    let combModMap es = Map.unions [ Map.map ((,) l) (hoModuleMap $ libHoLib l) | l <- es]
         explicitModMap = combModMap es
         implicitModMap = combModMap is
         reexported  = Set.fromList [ m | l <- es, (m,_) <- Map.toList $ hoReexports (libHoLib l) ]
@@ -437,8 +437,8 @@ loadModules libs need = do
 --        modifyIORef done_ref (modEncountered_u $ Map.union (Map.fromList [ (m,ModLibrary mg lib) | (m,mg) <- Map.toList (hoModuleMap libr) ]))
 --        modifyIORef done_ref (loadedLibraries_u $ Map.insert libName lib)
     done <- readIORef done_ref
-    forM_ (Map.elems $ loadedLibraries done) $ \ lib@(Library hoh  _ _ _) -> do
-        let libsBad = filter (\ (p,h) -> fmap (libHash) (Map.lookup p (loadedLibraries done)) /= Just h) (hohLibDeps hoh)
+    forM_ (Map.elems $ loadedLibraries done) $ \ lib -> do
+        let libsBad = filter (\ (p,h) -> fmap (libHash) (Map.lookup p (loadedLibraries done)) /= Just h) (hohLibDeps $ libHoHeader lib)
         unless (null libsBad) $ do
             putErr $ printf "Library Dependencies not met. %s needs\n" (libName lib)
             forM_ libsBad $ \ (p,h) -> putErr $ printf "    %s (hash:%s)\n" (unpackPS p) (show h)
@@ -583,7 +583,7 @@ compileCompNode ifunc func ksm cn = do
                         cho <- choLibDeps_u (Map.union $ Map.fromList (hohLibDeps hoh)) `fmap` ifunc cho ho
                         writeIORef ref (CompCollected cho cu)
                         return cho
-                    (CompLibrary ho (Library hoh _ _ _)) -> do
+                    (CompLibrary ho Library { libHoHeader = hoh }) -> do
                         cho <- ifunc cho ho
                         let Right (ln,_) = hohName hoh
                             lh = hohHash hoh
@@ -766,7 +766,7 @@ buildLibrary ifunc func = ans where
                 hoModuleDeps = mdeps
                 }
         putProgressLn $ "Writing Library: " ++ outName
-        recordHlFile (Library hoh libr ldef lcor) outName
+        recordHlFile Library { libHoHeader = hoh, libHoLib =  libr, libTcMap = ldef, libBuildMap = lcor, libFileName = outName }
     -- parse library description file
     parse fp = do
         putProgressLn $ "Creating library from description file: " ++ show fp
@@ -817,12 +817,12 @@ dumpHoFile fn = ans where
         showList "ArchDeps" (map pprint . sortUnder fst $ hohArchDeps hoh)
 
     doHl fn = do
-        Library hoh libr mhob mhot <- readHlFile fn
-        doHoh hoh
-        showList "MetaInfo" (sort [text (unpackPS k) <> char ':' <+> show v | (k,v) <- hoMetaInfo libr])
-        showList "ModuleMap" (map pprint . sortUnder fst $ Map.toList $ hoModuleMap libr)
-        showList "ModuleDeps" (map pprint . sortUnder fst $ Map.toList $ hoModuleDeps libr)
-        showList "ModuleReexports" (map pprint . sortUnder fst $ Map.toList $ hoReexports libr)
+        Library { .. } <- readHlFile fn
+        doHoh libHoHeader
+        showList "MetaInfo" (sort [text (unpackPS k) <> char ':' <+> show v | (k,v) <- hoMetaInfo libHoLib])
+        showList "ModuleMap" (map pprint . sortUnder fst $ Map.toList $ hoModuleMap libHoLib)
+        showList "ModuleDeps" (map pprint . sortUnder fst $ Map.toList $ hoModuleDeps libHoLib)
+        showList "ModuleReexports" (map pprint . sortUnder fst $ Map.toList $ hoReexports libHoLib)
 
     doHo fn = do
         (hoh,idep,ho) <- readHoFile fn

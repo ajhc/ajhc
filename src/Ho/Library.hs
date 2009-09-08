@@ -1,6 +1,5 @@
 module Ho.Library(
     readDescFile,
-    findLibrary,
     collectLibraries,
     libModMap,
     libHash,
@@ -16,6 +15,7 @@ import Char
 import Control.Monad
 import Data.List
 import Data.Maybe
+import Data.Monoid
 import Data.Version(showVersion)
 import System.Directory
 import System.IO
@@ -23,28 +23,28 @@ import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Data.Monoid
+import FrontEnd.HsSyn(Module)
 import GenUtil
 import Ho.Binary
 import Ho.Type
 import Options
 import PackedString(PackedString,packString,unpackPS)
+import Util.YAML
 import qualified CharIO
 import qualified FlagDump as FD
 import qualified Support.MD5 as MD5
 
-libModMap (Library _ libr _ _) = hoModuleMap libr
-libHash (Library hoh _ _ _) = hohHash hoh
+libModMap = hoModuleMap . libHoLib
+libHash  = hohHash . libHoHeader
 libMgHash mg lib = MD5.md5String $ show (libHash lib,mg)
-libProvides mg (Library _ lib _ _) = [ m | (m,mg') <- Map.toList (hoModuleMap lib), mg == mg']
-libName (Library HoHeader { hohName = ~(Right (name,vers)) } _ _ _) = unpackPS name ++ "-" ++ showVersion vers
-libBaseName (Library HoHeader { hohName = ~(Right (name,vers)) } _ _ _) = name
-libModules (Library _ lib _ _) = ([ m | (m,_) <- Map.toList (hoModuleMap lib)],Map.toList (hoReexports lib))
-libHoLib (Library _ lib _ _) = lib
+libProvides mg lib = [ m | (m,mg') <- Map.toList (libModMap lib), mg == mg']
+libName lib = let HoHeader { hohName = ~(Right (name,vers)) } = libHoHeader lib in unpackPS name ++ "-" ++ showVersion vers
+libVersion lib = let HoHeader { hohName = ~(Right (name,vers)) } = libHoHeader lib in vers
+libBaseName lib = let HoHeader { hohName = ~(Right (name,vers)) } = libHoHeader lib in name
+libModules l = let lib = libHoLib l in ([ m | (m,_) <- Map.toList (hoModuleMap lib)],Map.toList (hoReexports lib))
 
-libVersionCompare ~(Library HoHeader { hohName = Right (_,v1) } _ _ _ ) ~(Library HoHeader { hohName =  Right (_,v2) } _ _ _) = compare v1 v2
+libVersionCompare l1 l2 = compare (libVersion l1) (libVersion l2)
 
-type LibraryName = String
 
 ---------------------------------------
 -- parse description file (.cabal file)
@@ -87,30 +87,46 @@ condenseWhitespace xs =  reverse $ dropWhile isSpace (reverse (dropWhile isSpace
 -- finding and listing libraries
 --------------------------------
 
-type LibraryMap = Map.Map LibraryName FilePath
 
-findLibrary ::  LibraryName -> IO (LibraryName,FilePath)
-findLibrary pn = do
-    lm <- getLibraryMap (optHlPath options)
-    case Map.lookup pn lm of
-        Just x  -> return (pn,x)
-        Nothing -> case range (pn++"-") (pn++"-"++repeat maxBound) lm of
-                 [] -> fail ("LibraryMap: Library "++pn++" not found!")
-                 xs -> return $ last xs
 
+
+
+instance ToNode Module where
+    toNode m = toNode $ show m
+instance ToNode HoHash where
+    toNode m = toNode $ show m
+instance ToNode PackedString where
+    toNode m = toNode $ unpackPS m
 
 listLibraries :: IO ()
 listLibraries = do
-    putStrLn "SearchPath:"
-    mapM_ (putStrLn . (" - " ++)) (optHlPath options)
-    putStrLn "Libraries:"
     (_,byhashes) <- fetchAllLibraries
-    let nameComp a b = compare (libName a) (libName b)
-    forM_ (sortBy nameComp $ Map.elems byhashes) $ \ lib -> do
-        putStrLn " -"
-        let f n v = putStrLn ("  " ++ n ++ ": " ++ v)
-        f "Name" (libName lib)
-        f "Hash" (show $ libHash lib)
+    let libs = Map.toList byhashes
+        nameComp a b = compare (libName a) (libName b)
+    if not verbose then putStr $ showYAML (map (libName . snd) libs) else do
+    let f (h,l) = (show h,[
+            ("Name",toNode (libName l)),
+            ("BaseName",toNode (libBaseName l)),
+            ("Version",toNode (showVersion $ libVersion l)),
+            ("FilePath",toNode (libFileName l)),
+            ("LibDeps",toNode [ h | (_,h) <- hohLibDeps (libHoHeader l)]),
+            ("Exported-Modules",toNode $ mod ++ fsts rmod)
+            ]) where
+          (mod,rmod) = libModules l
+
+
+
+
+
+    putStr $ showYAML (map f libs)
+--    putStrLn "SearchPath:"
+--    mapM_ (putStrLn . (" - " ++)) (optHlPath options)
+--    putStrLn "Libraries:"
+--    let nameComp a b = compare (libName a) (libName b)
+--        putStrLn " -"
+--        let f n v = putStrLn ("  " ++ n ++ ": " ++ v)
+--        f "Name" (libName lib)
+--        f "Hash" (show $ libHash lib)
 --        f "Modules" (show $ libModules lib)
 
 
@@ -120,16 +136,6 @@ listLibraries = do
 range :: Ord k => k -> k -> Map.Map k v -> [(k,v)]
 range low high = Map.toList . fst . Map.split high . snd . Map.split low
 
-----
-
-getLibraryMap :: [FilePath] -> IO LibraryMap
-getLibraryMap fps = fmap Map.unions $ mapM getPM fps where
-    getPM fp = flip catch (\_ -> return Map.empty) $ do
-        raw <- getDirectoryContents fp
-        return $ Map.fromList $ flip concatMap raw $ \e ->
-            case reverse e of
-              ('l':'h':'.':r) -> [(reverse r,fp++"/"++e)]
-              _               -> []
 
 maxBy c x1 x2 = case x1 `c` x2 of
     LT -> x2
@@ -191,7 +197,7 @@ collectLibraries = ans where
                     Nothing -> f (Map.insert (libBaseName l) (ei,l) lmap) (Set.insert (libHash l) lset) (ls ++ newdeps)
                     Just (ei',l') | libHash l == libHash l' -> f  (Map.insert (libBaseName l) (ei || ei',l) lmap) lset ls
                     Just (_,l')  -> putErrDie $ printf  "Conflicting versions of library '%s' are required. [%s]\n" (libName l) (show (libHash l,libHash l'))
-              where newdeps = [ (False,fromMaybe (error $ printf "Dependency '%s' with hash '%s' needed by '%s' was not found" (unpackPS p) (show h) (libName l)) (Map.lookup h byhashes)) | let Library HoHeader { hohLibDeps = ldeps } _ _ _ = l , (p,h) <- ldeps ]
+              where newdeps = [ (False,fromMaybe (error $ printf "Dependency '%s' with hash '%s' needed by '%s' was not found" (unpackPS p) (show h) (libName l)) (Map.lookup h byhashes)) | let HoHeader { hohLibDeps = ldeps } = libHoHeader l , (p,h) <- ldeps ]
         finalmap <- f Map.empty Set.empty [ (True,l) | l <- es ]
         checkForModuleConficts [ l | (_,l) <- Map.elems finalmap ]
         when verbose $ forM_ (Map.toList finalmap) $ \ (n,(e,l)) -> do
