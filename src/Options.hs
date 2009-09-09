@@ -235,7 +235,7 @@ theoptions =
     , Option ['D'] []            (ReqArg (\d -> optDefs_u (d:)) "NAME=VALUE") "add new definitions to set in preprocessor"
     , Option []    ["optc"]      (ReqArg (optCCargs_u . idu) "option") "extra options to pass to c compiler"
     , Option ['N'] ["noprelude"] (NoArg  (optPrelude_s False))         "no implicit prelude"
-    , Option ['c'] []            (NoArg  (optMode_s CompileHo))        "Typecheck and compile ho"
+    , Option ['c'] []            (NoArg  (optMode_s CompileHo))        "Typecheck and compile module"
     , Option ['E'] []            (NoArg  (optMode_s Preprocess))       "preprocess the input and print result to stdout"
     , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))        "keep going on errors"
     , Option []    ["cross"]     (NoArg  (optCross_s True))            "enable cross-compilation, choose target with the -m flag"
