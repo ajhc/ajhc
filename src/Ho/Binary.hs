@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -XRecordWildCards #-}
 module Ho.Binary(readHoFile,recordHoFile,readHlFile,recordHlFile) where
 
 
@@ -91,16 +90,16 @@ recordHoFile ho idep fs header = do
 recordHlFile
     :: Library
     -> IO ()
-recordHlFile Library { .. } = do
+recordHlFile l = do
     --let theho =  mapHoBodies eraseE ho
     let cfflbs = mkCFFfile cff_magic [
-            (cff_jhdr, compress $ encode libHoHeader { hohVersion = current_version }),
-            (cff_libr, compress $ encode libHoLib),
-            (cff_ldef, compress $ encode libTcMap),
-            (cff_lcor, compress $ encode libBuildMap)]
-    let tfp = libFileName ++ ".tmp"
+            (cff_jhdr, compress $ encode (libHoHeader l) { hohVersion = current_version }),
+            (cff_libr, compress $ encode $ libHoLib l),
+            (cff_ldef, compress $ encode $ libTcMap l),
+            (cff_lcor, compress $ encode $ libBuildMap l)]
+    let tfp = libFileName l ++ ".tmp"
     LBS.writeFile tfp cfflbs
-    rename tfp libFileName
+    rename tfp $ libFileName l
 
 readHlFile :: FilePath -> IO Library
 readHlFile fn = do

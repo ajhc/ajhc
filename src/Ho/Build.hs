@@ -1,4 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
 module Ho.Build (
     module Ho.Type,
     dumpHoFile,
@@ -323,9 +322,9 @@ toCompUnitGraph done roots = do
                 writeIORef (lmods m) (Right mhash)
                 modifyIORef cug_ref ((mhash,(deps',CompSources $ map fs amods)):)
                 return mhash
-        g [((mg,Right lib@(Library { .. })),ds)] = do
-                let Just hob = Map.lookup mg libBuildMap
-                    Just hot = Map.lookup mg libTcMap
+        g [((mg,Right lib),ds)] = do
+                let Just hob = Map.lookup mg $ libBuildMap lib
+                    Just hot = Map.lookup mg $ libTcMap lib
                     ho = Ho { hoModuleGroup = mg, hoBuild = hob, hoTcInfo = hot }
                     myHash = libMgHash mg lib
                 deps <- snub `fmap` mapM f ds
@@ -529,20 +528,21 @@ typeCheckGraph cn = do
                     CompSources sc -> do
                         let mods = sort $ map (sourceModName . sourceInfo) sc
                         modules <- forM sc $ \x -> case x of
-                            SourceParsed { sourceInfo = SI { .. }, .. } -> return (sourceHash,sourceModule, error "SourceParsed in AnnotateSource")
-                            SourceRaw { sourceInfo = SI { .. }, .. } -> do
-                                (mod,lbs') <- parseHsSource sourceFP sourceLBS
+                            SourceParsed { sourceInfo = si, sourceModule = sm } ->
+                                return (sourceHash si, sm, error "SourceParsed in AnnotateSource")
+                            SourceRaw { sourceInfo = si, sourceLBS = lbs } -> do
+                                (mod,lbs') <- parseHsSource (sourceFP si) lbs
                                 case optAnnotate options of
                                     Just fp -> do
                                         let ann = LBSU.fromString $ unlines [
                                                 "{- --ANNOTATE--", 
-                                                "Module: " ++ show sourceModName, 
-                                                "Deps: " ++ show (sort sourceDeps), 
+                                                "Module: " ++ show (sourceModName si),
+                                                "Deps: " ++ show (sort $ sourceDeps si),
                                                 "Siblings: " ++ show mods,
                                                 "-}"]
                                         LBS.writeFile (fp ++ "/" ++ show (hsModuleName mod) ++ ".hs") (ann `LBS.append` lbs')
                                     _ -> return ()
-                                return (sourceHash,mod,lbs')
+                                return (sourceHash si,mod,lbs')
                         showProgress (map snd3 modules)
                         (htc,tidata) <- doModules' ctc (map snd3 modules)
                         let ctc' = htc `mappend` ctc
@@ -817,12 +817,13 @@ dumpHoFile fn = ans where
         showList "ArchDeps" (map pprint . sortUnder fst $ hohArchDeps hoh)
 
     doHl fn = do
-        Library { .. } <- readHlFile fn
-        doHoh libHoHeader
-        showList "MetaInfo" (sort [text (unpackPS k) <> char ':' <+> show v | (k,v) <- hoMetaInfo libHoLib])
-        showList "ModuleMap" (map pprint . sortUnder fst $ Map.toList $ hoModuleMap libHoLib)
-        showList "ModuleDeps" (map pprint . sortUnder fst $ Map.toList $ hoModuleDeps libHoLib)
-        showList "ModuleReexports" (map pprint . sortUnder fst $ Map.toList $ hoReexports libHoLib)
+        l <- readHlFile fn
+        doHoh $ libHoHeader l
+        showList "MetaInfo" (sort [text (unpackPS k) <> char ':' <+> show v |
+                                   (k,v) <- hoMetaInfo (libHoLib l)])
+        showList "ModuleMap" (map pprint . sortUnder fst $ Map.toList $ hoModuleMap $ libHoLib l)
+        showList "ModuleDeps" (map pprint . sortUnder fst $ Map.toList $ hoModuleDeps $ libHoLib l)
+        showList "ModuleReexports" (map pprint . sortUnder fst $ Map.toList $ hoReexports $ libHoLib l)
 
     doHo fn = do
         (hoh,idep,ho) <- readHoFile fn
