@@ -379,14 +379,15 @@ toCompUnitGraph done roots = do
 --    return (rhash,cug')
 
 
-parseFiles :: [Either Module String]                                   -- ^ Either a module or filename to find
-               -> (CollectedHo -> Ho -> IO CollectedHo)                -- ^ Process initial ho loaded from file
-               -> (CollectedHo -> Ho -> TiData -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
-               -> IO (CompNode,CollectedHo)                            -- ^ Final accumulated ho
-
-parseFiles need ifunc func = do
+parseFiles
+    :: [String]                                             -- ^ Extra libraries to load
+    -> [Either Module String]                               -- ^ Either a module or filename to find
+    -> (CollectedHo -> Ho -> IO CollectedHo)                -- ^ Process initial ho loaded from file
+    -> (CollectedHo -> Ho -> TiData -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
+    -> IO (CompNode,CollectedHo)                            -- ^ Final accumulated ho
+parseFiles elibs need ifunc func = do
     putProgressLn "Finding Dependencies..."
-    (ksm,chash,cug) <- loadModules (optHls options) need
+    (ksm,chash,cug) <- loadModules (optHls options ++ elibs) need
     cnode <- processCug cug chash
     performGC
     putProgressLn "Typechecking..."
@@ -415,7 +416,7 @@ loadModules libs need = do
         hosEncountered = Map.empty,
         modEncountered = Map.empty
         }
-    (es,is) <- collectLibraries
+    (es,is) <- collectLibraries libs
     let combModMap es = Map.unions [ Map.map ((,) l) (hoModuleMap $ libHoLib l) | l <- es]
         explicitModMap = combModMap es
         implicitModMap = combModMap is
@@ -426,15 +427,6 @@ loadModules libs need = do
     modifyIORef done_ref (modEncountered_u $ Map.union (modEnc True explicitModMap))
     modifyIORef done_ref (modEncountered_u $ Map.union (modEnc False implicitModMap))
 
---    unless (null libs) $ putProgressLn $ "Loading libraries:" <+> show libs
---    forM_ (optHls options) $ \l -> do
---        (n',fn) <- findLibrary l
---        lib@(Library hoh libr _ _)  <- catch (readHlFile fn) $ \_ ->
---            fail $ "Error loading library file: " ++ fn
---        let Right (libName,_libVers) = hohName hoh
---        putProgressLn $ printf "Library: %-15s <%s>" n' fn
---        modifyIORef done_ref (modEncountered_u $ Map.union (Map.fromList [ (m,ModLibrary mg lib) | (m,mg) <- Map.toList (hoModuleMap libr) ]))
---        modifyIORef done_ref (loadedLibraries_u $ Map.insert libName lib)
     done <- readIORef done_ref
     forM_ (Map.elems $ loadedLibraries done) $ \ lib -> do
         let libsBad = filter (\ (p,h) -> fmap (libHash) (Map.lookup p (loadedLibraries done)) /= Just h) (hohLibDeps $ libHoHeader lib)
@@ -535,7 +527,7 @@ typeCheckGraph cn = do
                                 case optAnnotate options of
                                     Just fp -> do
                                         let ann = LBSU.fromString $ unlines [
-                                                "{- --ANNOTATE--", 
+                                                "{- --ANNOTATE--",
                                                 "Module: " ++ show (sourceModName si),
                                                 "Deps: " ++ show (sort $ sourceDeps si),
                                                 "Siblings: " ++ show mods,
@@ -720,7 +712,7 @@ buildLibrary ifunc func = ans where
             hmodSet = Set.fromList hmods
 
         -- TODO - must check we depend only on libraries
-        (rnode@(CompNode lhash _ _),cho) <- parseFiles (map Left $ Set.toList allMods) ifunc func
+        (rnode@(CompNode lhash _ _),cho) <- parseFiles [] (map Left $ Set.toList allMods) ifunc func
         (_,(mmap,mdeps,prvds,lcor,ldef)) <- let
             f (CompNode hs cd ref) = do
                 cl <- readIORef ref

@@ -16,7 +16,7 @@ import Control.Monad
 import Data.List
 import Data.Maybe
 import Data.Monoid
-import Data.Version(showVersion)
+import Data.Version
 import System.Directory
 import System.IO
 import Text.Printf
@@ -24,7 +24,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import FrontEnd.HsSyn(Module)
-import GenUtil
+import Util.Gen hiding(intercalate)
 import Ho.Binary
 import Ho.Type
 import Options
@@ -113,28 +113,9 @@ listLibraries = do
             ("Exported-Modules",toNode $ mod ++ fsts rmod)
             ]) where
           (mod,rmod) = libModules l
-
-
-
-
-
     putStr $ showYAML (map f libs)
---    putStrLn "SearchPath:"
---    mapM_ (putStrLn . (" - " ++)) (optHlPath options)
---    putStrLn "Libraries:"
---    let nameComp a b = compare (libName a) (libName b)
---        putStrLn " -"
---        let f n v = putStrLn ("  " ++ n ++ ": " ++ v)
---        f "Name" (libName lib)
---        f "Hash" (show $ libHash lib)
---        f "Modules" (show $ libModules lib)
 
 
-
----- range queries for Data.Map
-
-range :: Ord k => k -> k -> Map.Map k v -> [(k,v)]
-range low high = Map.toList . fst . Map.split high . snd . Map.split low
 
 
 maxBy c x1 x2 = case x1 `c` x2 of
@@ -164,11 +145,11 @@ maxBy c x1 x2 = case x1 `c` x2 of
 --    - conflicting versions of any particular library are not required due to dependencies
 --
 
-fetchAllLibraries :: IO (Map.Map PackedString Library,Map.Map HoHash Library)
+fetchAllLibraries :: IO (Map.Map PackedString [Library],Map.Map HoHash Library)
 fetchAllLibraries = ans where
     ans = do
         (bynames',byhashes') <- unzip `fmap` concatMapM f (optHlPath options)
-        let bynames = Map.unionsWith vcomb bynames'
+        let bynames = Map.map (reverse . sortBy libVersionCompare) $ Map.unionsWith (++) bynames'
             byhashes = Map.unions byhashes'
             vcomb = maxBy libVersionCompare
         return (bynames,byhashes)
@@ -179,16 +160,45 @@ fetchAllLibraries = ans where
             ('l':'h':'.':r)  -> do
                 flip catch (\_ -> return mempty) $ do
                     lib <- readHlFile  (fp ++ "/" ++ e)
-                    return (Map.singleton (libBaseName lib) lib, Map.singleton (libHash lib) lib)
+                    return (Map.singleton (libBaseName lib) [lib], Map.singleton (libHash lib) lib)
             _               -> return mempty
 
-collectLibraries :: IO ([Library],[Library])
-collectLibraries = ans where
+
+splitOn' :: (a -> Bool) -> [a] -> [[a]]
+splitOn' f xs = split xs
+  where split xs = case break f xs of
+          (chunk,[])     -> chunk : []
+          (chunk,_:rest) -> chunk : split rest
+
+
+splitVersion :: String -> (String,Data.Version.Version)
+splitVersion s = ans where
+    ans = case reverse (splitOn' ('-' ==) s) of
+        (vrs:bs@(_:_)) | Just vrs <- runReadP parseVersion vrs -> (intercalate "-" (reverse bs),vrs)
+        _ -> (s,Data.Version.Version [] [])
+
+collectLibraries :: [String] -> IO ([Library],[Library])
+collectLibraries libs = ans where
     ans = do
         (bynames,byhashes) <- fetchAllLibraries
-        let f pn | Just x <- Map.lookup pn bynames = return x
-                 | otherwise = putErrDie $ printf "Library was not found '%s'\n" (unpackPS pn)
-        es <- mapM f ( map packString $ optHls options)
+        let f (pn,vrs) = lname pn vrs `mplus` lhash pn vrs where
+                lname pn vrs = do
+                    xs <- Map.lookup (packString pn) bynames
+                    (x:_) <- return $ filter isGood xs
+                    return x
+                isGood lib = versionBranch vrs `isPrefixOf` versionBranch (libVersion lib)
+                lhash pn vrs = do
+                    [] <- return $ versionBranch vrs
+                    Map.lookup pn byhashes'
+            byhashes' = Map.fromList $ [ (show x,y) | (x,y) <- Map.toList byhashes]
+        let es' = [ (x,f $ splitVersion x) | x <- libs ]
+            es = [ l | (_,Just l) <- es' ]
+            bad = [ n | (n,Nothing) <- es' ]
+        unless (null bad) $ do
+            putErrLn "Libraries not found:"
+            forM_ bad $ \b -> putErrLn ("    " ++ b)
+            exitFailure
+
         checkForModuleConficts es
         let f lmap _ [] = return lmap
             f lmap lset ((ei,l):ls)
