@@ -8,6 +8,8 @@ module Jhc.Handle(
     withHandle,
     hClose,
     hIsOpen,
+    openBinaryPipe,
+    openPipe,
     openBinaryFile,
     openFile
     ) where
@@ -39,6 +41,7 @@ data Handle = Handle {
     handleName :: String,
     handleFile :: !(Ptr FILE),
     handleBinary :: !Bool,
+    handleIsPipe :: !Bool,
     handleIOMode :: !IOMode
     }
 
@@ -47,7 +50,7 @@ instance Show Handle where
 
 stdin, stdout, stderr :: Handle
 
-make_builtin mode name std = Handle { handleName = "(" ++ name ++ ")", handleFile = std, handleIOMode = mode, handleBinary = False }
+make_builtin mode name std = Handle { handleName = "(" ++ name ++ ")", handleFile = std, handleIOMode = mode, handleBinary = False, handleIsPipe = False }
 
 stdin = make_builtin ReadMode "stdin" c_stdin
 stdout = make_builtin WriteMode "stdout" c_stdout
@@ -73,7 +76,11 @@ hClose h = do
     ptr <- peek (handleFile h)
     case ptr == nullPtr of
         True -> return ()
-        False -> c_fclose ptr >> poke (handleFile h) nullPtr
+        False -> do ec <- if handleIsPipe h then c_pclose ptr
+                                            else c_fclose ptr
+                    if ec /= 0 then fail ("hClose "++handleName h++" failed")
+                               else return ()
+                    poke (handleFile h) nullPtr
 
 hIsOpen h = do
     ptr <- peek (handleFile h)
@@ -91,7 +98,21 @@ openFile fp m = do
     ptr <- withCString fp $ \cfp -> c_fopen cfp (Ptr (toStr m))
     if ptr == nullPtr then throwErrnoFN "openFile" fp  else do
         pptr <- new ptr
-        return Handle { handleBinary = False, handleName = fp, handleIOMode = m, handleFile = pptr }
+        return Handle { handleBinary = False, handleIsPipe = False, handleName = fp, handleIOMode = m, handleFile = pptr }
+
+openPipe :: String -> IOMode -> IO Handle
+openPipe c m = do
+    ptr <- withCString c $ \command -> c_popen command (Ptr (toStr m))
+    -- if ptr == nullPtr then throwErrnoFN "openPipe" c else do
+    pptr <- new ptr
+    return Handle { handleBinary = False, handleIsPipe = True, handleName = c, handleIOMode = m, handleFile = pptr }
+
+openBinaryPipe :: String -> IOMode -> IO Handle
+openBinaryPipe c m = do
+    ptr <- withCString c $ \command -> c_popen command (Ptr (toStr m))
+    if ptr == nullPtr then throwErrnoFN "openPipe" c  else do
+        pptr <- new ptr
+        return Handle { handleBinary = True, handleIsPipe = True, handleName = c, handleIOMode = m, handleFile = pptr }
 
 openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile fp m = do

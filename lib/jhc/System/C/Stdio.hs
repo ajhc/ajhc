@@ -9,7 +9,9 @@ import Data.Int
 type FILE = Ptr CFile
 
 foreign import ccall "stdio.h fopen" c_fopen               :: Ptr CChar -> Ptr CChar -> IO FILE
+foreign import ccall "stdio.h popen" c_popen               :: Ptr CChar -> Ptr CChar -> IO FILE
 foreign import ccall "stdio.h fclose" c_fclose             :: FILE -> IO CInt
+foreign import ccall "stdio.h pclose" c_pclose             :: FILE -> IO CInt
 foreign import ccall "stdio.h jhc_utf8_putchar" c_putwchar :: Int -> IO ()
 foreign import ccall "wchar.h jhc_utf8_getc" c_fgetwc      :: FILE -> IO Int
 foreign import ccall "wchar.h jhc_utf8_getchar" c_getwchar :: IO Int
