@@ -31,6 +31,9 @@ if test -z "$DRIFTGHC"; then
     echo [DrIFT not found: using preprocessed files]
 fi
 
+AC_CHECK_PROGS([MINGW],[mingw-gcc i386-mingw32-gcc i586-mingw32msvc-gcc],
+               [i386-mingw32-gcc])
+
 GHC=$HC
 GHCFLAGS="-hide-all-packages -package base"
 GHC_CHECK_MODULE(Data.Generics.Instances,syb,,,[])
@@ -62,5 +65,6 @@ AC_SUBST(SHORTVERSION)
 AC_SUBST(BYTE_ORDER)
 AC_SUBST(JLIBPATH)
 AC_SUBST(JETCPATH)
-AC_CONFIG_FILES([Makefile jhc.spec src/Version/Config.hs lib/base/System/Info.hs docs/building.mkd src/cbits/config.h])
+AC_SUBST(MINGW)
+AC_CONFIG_FILES([Makefile jhc.spec src/Version/Config.hs lib/base/System/Info.hs docs/building.mkd src/cbits/config.h src/data/targets.ini])
 AC_OUTPUT

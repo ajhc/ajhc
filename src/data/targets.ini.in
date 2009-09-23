@@ -21,7 +21,7 @@ autoload=base,haskell98
 
 
 [win32]
-cc=i386-mingw32-gcc
+cc=@MINGW@
 executable_extension=.exe
 merge=i686
 
