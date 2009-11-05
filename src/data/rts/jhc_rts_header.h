@@ -10,6 +10,7 @@
 #include <locale.h>
 #include <math.h>
 #include <assert.h>
+#include <errno.h>
 #include <float.h>
 #ifndef __WIN32__
 #include <sys/select.h>
