@@ -189,6 +189,55 @@ expandTypeSigs ds =  (concatMap f ds) where
     f (HsTypeSig sl ns qt) =  [ HsTypeSig sl [n] qt | n <- ns]
     f d = return d
 
+getTypeClassModule :: HsQualType -> Maybe Module
+getTypeClassModule typ =
+   case hsQualTypeType typ of
+      HsTyApp cls arg ->
+         case hsTypeName cls of
+            Qual moduleName _ -> Just moduleName
+            UnQual _ -> Nothing
+      _ -> error "instance must consist of a type class application"
+
+qualifyMethodName :: Maybe Module -> HsName -> HsName
+qualifyMethodName moduleName name =
+   case name of
+      Qual _ _ -> name
+      UnQual token ->
+         maybe name (flip Qual token) moduleName
+
+{- |
+This renaming shall help accepting an instance declaration like
+
+> import qualified Custom
+>
+> instance Custom.Class T where
+>    methodA = ...
+>    methodB = ...
+
+by translating it to
+
+> instance Custom.Class T where
+>    Custom.methodA = ...
+>    Custom.methodB = ...
+
+I don't know, whether this also works if you do
+
+> import qualified Custom hiding (methodA, methodB, )
+-}
+qualifyInstMethod :: Maybe Module -> HsDecl -> HsDecl
+qualifyInstMethod moduleName decl =
+   case decl of
+      HsPatBind srcLoc (HsPVar {hsPatName = name}) rhs decls ->
+         HsPatBind srcLoc
+            (HsPVar {hsPatName = qualifyMethodName moduleName name})
+            rhs decls
+      HsFunBind matches ->
+         HsFunBind $ map
+            (\(HsMatch matchSrcLoc matchName pats rhs matchDecls) ->
+               HsMatch matchSrcLoc (qualifyMethodName moduleName matchName) pats rhs matchDecls)
+            matches
+      _ -> decl
+
 instance Rename HsDecl where
     rename (HsPatBind srcLoc hsPat hsRhs {-where-} hsDecls) = do
         withSrcLoc srcLoc $ do
@@ -268,7 +317,8 @@ instance Rename HsDecl where
         withSrcLoc srcLoc $ do
         updateWith hsQualType $ do
         hsQualType' <- rename hsQualType
-        hsDecls' <- rename hsDecls
+        hsDecls' <- rename $
+           map (qualifyInstMethod (getTypeClassModule hsQualType)) hsDecls
         return (HsInstDecl srcLoc hsQualType' hsDecls')
     rename (HsInfixDecl srcLoc assoc int hsNames) = do
         withSrcLoc srcLoc $ do
