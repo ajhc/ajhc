@@ -45,6 +45,7 @@ data Token
         | StringTok String
         | UStringTok String
         | PragmaOptions [String]
+        | PragmaInline String          -- also for NOINLINE
         | PragmaRules Bool
         | PragmaSpecialize Bool
         | PragmaStart String
@@ -655,16 +656,16 @@ pragmas_raw = [["OPTIONS", "JHC_OPTIONS", "OPTIONS_JHC" ]]
 
 -- pragmas which just have a simple string based start rule.
 pragmas_std = [
-    ["INLINE"],
     ["NOETA"],
     ["SUPERINLINE"],
-    ["NOINLINE","NOTINLINE"],
     ["MULTISPECIALIZE", "MULTISPECIALISE"],
     ["SRCLOC_ANNOTATE"]
     ]
 
 -- pragmas with a special starting token
 pragmas_parsed = [
+    (["INLINE"],PragmaInline "INLINE"),
+    (["NOINLINE","NOTINLINE"],PragmaInline "NOINLINE"),
     (["RULES","RULE","RULES_JHC","RULE_JHC"],PragmaRules False),
     (["CATALYST","CATALYSTS"],PragmaRules True),
     (["SPECIALIZE", "SPECIALISE"],PragmaSpecialize False),

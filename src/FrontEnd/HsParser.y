@@ -63,6 +63,7 @@ import Debug.Trace (trace)
       USTRING  { UStringTok $$ }
       PRAGMAOPTIONS { PragmaOptions $$ }
       PRAGMASTART { PragmaStart $$ }
+      PRAGMAINLINE { PragmaInline $$ }
       PRAGMARULES { PragmaRules $$ }
       PRAGMASPECIALIZE { PragmaSpecialize $$ }
       PRAGMAEND { PragmaEnd }
@@ -364,6 +365,7 @@ decl :: { HsDecl }
       : signdecl                      { $1 }
       | fixdecl                       { $1 }
       | valdef                        { $1 }
+      | pragmainline                  { $1 }
       | pragmaprops                   { $1 }
 
 
@@ -374,6 +376,17 @@ decllist :: { [HsDecl] }
 
 signdecl :: { HsDecl }
       : vars srcloc '::' ctype        { HsTypeSig $2 (reverse $1) $4 }
+
+pragmainline  :: { HsDecl }
+      : PRAGMAINLINE srcloc optphasesn vars PRAGMAEND  { HsPragmaProps $2 $1 $4 }
+
+optphasesn :: { (Bool, Maybe Int) }
+      : '~' optphases                 { (True, $2) }
+      | optphases                     { (False, $1) }
+
+optphases :: { Maybe Int }
+      : '[' INT ']'                   { (Just (readInteger $2)) }
+      |                               { Nothing }
 
 pragmaprops  :: { HsDecl }
       : PRAGMASTART srcloc  vars PRAGMAEND  { HsPragmaProps $2 $1 $3 }
