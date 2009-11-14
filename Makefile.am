@@ -166,7 +166,7 @@ src/RawFiles.hs:  utils/op_raw.prl $(RAWFILES)
 
 src/FrontEnd/HsParser.hs: src/FrontEnd/HsParser.y
 	happy -a -g -c $< -o $@
-	sed -e 's/^{-# OPTIONS/{-# OPTIONS_GHC -w/' -i $@
+	sed -e 's/^{-# OPTIONS[A-Z_]*/{-# OPTIONS_GHC -w /' -i $@
 
 
 .SECONDARY: _darcs/hashed_inventory src/data/shortchange.txt
