@@ -37,6 +37,14 @@ AC_CHECK_PROGS([MINGW],[mingw-gcc i386-mingw32-gcc i586-mingw32msvc-gcc],
 GHC=$HC
 GHCFLAGS="-hide-all-packages -package base"
 GHC_CHECK_MODULE(Data.Generics.Instances,syb,,,[])
+GHC_CHECK_MODULE(System.Console.Readline,readline,,,[
+     GHC_CHECK_MODULE(System.Console.Editline.Readline,editline,,
+         GHCFLAGS="$GHCFLAGS -DUSE_EDITLINE"
+         ,[
+          echo "no suitable readline found: install the 'readline' or 'editline' package."
+          exit 1
+      ])
+])
 
 AC_PROGRAM_REQUIRE(hsc2hs,hsc2hs,     [  --with-hsc2hs=<hsc2hs location>    Specify location of hsc2hs.])
 if test -z "$HSC2HS"; then

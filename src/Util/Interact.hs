@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -cpp #-}
+{-# LANGUAGE CPP #-}
+
 -- This module contains routines to provide an interactive shell prompt and is
 -- built on top of the readline library.
 
@@ -14,7 +17,11 @@ import Control.Monad.Identity
 import List
 import qualified Data.Map as Map
 import System
+#ifdef USE_EDITLINE
+import System.Console.Editline.Readline
+#else
 import System.Console.Readline
+#endif
 import System.Directory
 import IO
 

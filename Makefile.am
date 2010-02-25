@@ -47,7 +47,7 @@ GHCPROFOPTS= -prof -auto-all -osuf prof.o -hisuf prof.hi
 GHCINC=  -i -i$(srcdir)/drift_processed  \
 	 -i$(srcdir)/src  -i$(builddir)/src -odir $(builddir)/src -hidir $(builddir)/src
 
-PACKAGES= -package fgl -package regex-compat -package random -package array -package readline -package directory \
+PACKAGES= -package fgl -package regex-compat -package random -package array -package directory \
           -package bytestring -package binary -package pretty -package mtl -package containers   \
 	  -package unix  -package haskell98 -package utf8-string  -package zlib
 
