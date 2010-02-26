@@ -162,6 +162,7 @@ data Opt = Opt {
     optIncs        ::  [String],
     optDefs        ::  [String],
     optAnnotate    ::  Maybe FilePath,
+    optDeps        ::  Maybe FilePath,
     optHoDir       ::  Maybe FilePath,
     optHoCache     ::  Maybe FilePath,
     optArgs        ::  [String],
@@ -190,6 +191,7 @@ opt = Opt {
     optCross       = False,
     optIncdirs     = initialIncludes,
     optAnnotate    = Nothing,
+    optDeps        = Nothing,
     optHls         = [],
     optHlPath      = initialLibIncludes,
     optIncs        = [],
@@ -251,6 +253,7 @@ theoptions =
     , Option ['L'] []            (ReqArg (optHlPath_u . idu) "path")   "Look for haskell libraries in the given directory"
     , Option []    ["build-hl"]  (ReqArg (optMode_s . BuildHl) "file.cabal") "Build hakell library from given library description file"
     , Option []    ["annotate-source"]  (ReqArg (optAnnotate_s . Just) "<dir>") "Write preprocessed and annotated source code to the directory specified"
+    , Option []    ["deps"]      (ReqArg (optDeps_s . Just) "<file.yaml>") "Write dependency information to file specified"
     , Option []    ["interactive"] (NoArg  (optMode_s Interactive))    "run interactivly"
     , Option []    ["ignore-ho"]   (NoArg  (optIgnoreHo_s True))       "Ignore existing haskell object files"
     , Option []    ["nowrite-ho"]  (NoArg  (optNoWriteHo_s True))      "Do not write new haskell object files"
