@@ -1,4 +1,4 @@
-module Grin.SSimplify(simplify) where
+module Grin.SSimplify(simplify,explicitRecurse) where
 
 import qualified Data.IntSet as IS
 import qualified Data.IntMap as IM
@@ -7,6 +7,7 @@ import qualified Data.Set as Set
 import Control.Monad.Identity
 import Data.Maybe
 
+import Support.Tickle
 import StringTable.Atom
 import Grin.Grin
 import Grin.Noodle
@@ -397,3 +398,18 @@ editTail nty mt te = f mempty te where
     g lf (p :-> e) = do e <- f lf e; return $ p :-> e
 
 bool b x y = if b then x else y
+
+-- this finds top level functions that call themselves recursively and turns the recursive call into a
+-- local definition, allowing it to be compiled to a direct loop.
+
+explicitRecurse
+    :: Grin
+    -> IO Grin
+explicitRecurse grin =  mapGrinFuncsM f grin where
+    f name lam | name `Set.notMember` (freeVars lam) = return lam
+    f name (as :-> e) = do
+        let nname = toAtom $ "bR" ++ fromAtom name
+            g (App n rs t) | n == name = App nname rs t
+            g e = tickle g e
+        return $ as :-> grinLet [createFuncDef True nname (as :-> g e) ] (App nname as (getType e))
+

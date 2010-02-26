@@ -21,7 +21,7 @@ import qualified C.FromGrin2 as FG2
 import qualified Data.Map as Map
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
-import qualified Grin.SSimplify
+import Grin.SSimplify
 import qualified Stats
 import qualified System
 
@@ -34,6 +34,7 @@ compileToGrin prog = do
     wdump FD.GrinInitial $ do dumpGrin "initial" x
     x <- transformGrin simplifyParms x
     wdump FD.GrinNormalized $ do dumpGrin "normalized" x
+    x <- explicitRecurse x
     lintCheckGrin x
     let pushGrin grin = do
             nf   <- mapMsnd (grinPush undefined) (grinFuncs grin)
