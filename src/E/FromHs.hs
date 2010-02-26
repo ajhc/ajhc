@@ -446,7 +446,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
                 [rtVar] <- newVars [rt']
                 let rttIO' = ltTuple' [tWorld__, rt']
                 case isIO of
-                    False -> cFun $ \rs -> (,) id $ (prim False [ EVar t | t <- rs ] rt') 
+                    False -> cFun $ \rs -> (,) id $ (prim False [ EVar t | t <- rs ] rt')
                     True -> cFun $ \rs -> (,) (ELam tvrWorld) $
                                 eCaseTup' (prim True (EVar tvrWorld:[EVar t | t <- rs ]) rttIO')
                                           [tvrWorld2,rtVar]
@@ -1030,7 +1030,7 @@ makeSpec dataTable (t,e) T.RuleSpec { T.ruleType = rt, T.ruleUniq = (Module m,ui
         (ntype,Just m,q) = nameParts nn
         newName = toName ntype (Just $ "Spec@." ++ m ++ "." ++ show ui,'f':m ++ "." ++ q)
         sspec = if ss then [prop_SUPERSPECIALIZE] else []
-        ar = makeRule ("Specialize.{" ++ show newName) (Module m,ui) RuleSpecialization bvars t as (foldl eAp (EVar ntvr) (map EVar bvars)) 
+        ar = makeRule ("Specialize.{" ++ show newName) (Module m,ui) RuleSpecialization bvars t as (foldl eAp (EVar ntvr) (map EVar bvars))
         bvars = nub $ freeVars as
         nbody = foldr ELam (foldl EAp e as) bvars
     return ((ntvr,nbody),ar)

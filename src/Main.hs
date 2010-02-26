@@ -5,10 +5,10 @@ import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Writer
 import Directory
-import IO(hFlush,stderr,stdout)
-import List as L
+import IO(hFlush,stderr)
 import Prelude hiding(putStrLn, putStr,print)
 import System.Mem
+import qualified List
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -143,7 +143,7 @@ processInitialHo accumho aho = do
         nrules = map ruleUpdate . combRules $ mfindWithDefault emptyComb emptyId choCombinators'
         reRule :: Comb -> Comb
         reRule comb = combRules_u f comb where
-            f rs = L.union  rs [ x | x <- nrules, ruleHead x == combHead comb]
+            f rs = List.union  rs [ x | x <- nrules, ruleHead x == combHead comb]
 
     let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- map combHead $ melems choCombs ]) (choVarMap accumho)
         choCombs = mfilterWithKey (\k _ -> k /= emptyId) choCombinators'
@@ -230,7 +230,7 @@ processDecls cho ho' tiData = do
     -- now we must attach rules to the existing chos, as well as the current ones
     let addRule c = case mlookup (combIdent c) rules' of
             Nothing -> c
-            Just rs -> combRules_u (map ruleUpdate . L.union rs) c
+            Just rs -> combRules_u (map ruleUpdate . List.union rs) c
     prog <- return $ progCombinators_u (map addRule) prog
     cho <- return $ choCombinators_u (fmap addRule) cho
 

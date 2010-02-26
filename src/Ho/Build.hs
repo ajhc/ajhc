@@ -262,7 +262,6 @@ instance ProvidesModules CompUnit where
     providesModules CompDummy = []
 
 instance ProvidesModules CompLink where
---    providesModules CompLinkNone = []
     providesModules (CompLinkUnit cu) = providesModules cu
     providesModules (CompCollected _ cu) = providesModules cu
     providesModules (CompTcCollected _ cu) = providesModules cu
@@ -279,8 +278,6 @@ instance ProvidesModules SourceCode where
 -- source >= ho >= library
 -- in terms of dependencies
 
-
-
 toCompUnitGraph :: Done -> [Module] -> IO (HoHash,CompUnitGraph)
 toCompUnitGraph done roots = do
     let fs m = map inject $ maybe (error $ "can't find deps for: " ++ show m) snd (Map.lookup m (knownSourceMap done))
@@ -293,8 +290,6 @@ toCompUnitGraph done roots = do
         gr' = G.sccGroups gr
         phomap = Map.fromListWith (++) (concat [  [ (m,[hh]) | (m,_) <- hoDepends idep ] | (hh,(_,_,idep,_)) <- Map.toList (hosEncountered done)])
         sources = Map.fromList [ (m,sourceHash $ sourceInfo sc) | (m,Found sc) <- Map.toList (modEncountered done)]
-
-   -- mapM_ (putErrLn . show) $ [ (x,y) | ((x,_),y) <- foundMods ++ foundMods' ]
 
     when (dump FD.SccModules) $ do
         mapM_ (putErrLn . show) $ map (map $ fst . fst) gr'
@@ -369,14 +364,10 @@ toCompUnitGraph done roots = do
     let (rhash,cug') = mkPhonyCompUnit roots cug
     let gr = G.newGraph cug'  fst (fst . snd)
         gr' = G.transitiveReduction gr
---    putStrLn "gr"
- --   mapM_ print [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph gr]
     when (dump FD.SccModules) $ do
         putErrLn "ComponentsDeps:"
         mapM_ (putErrLn . show) [ (snd $ snd v, map (snd . snd) vs) | (v,vs) <- G.fromGraph gr']
     return (rhash,[ (h,([ d | (d,_) <- ns ],cu)) | ((h,(_,cu)),ns) <- G.fromGraph gr' ])
-
---    return (rhash,cug')
 
 
 parseFiles
@@ -441,7 +432,6 @@ loadModules libs need = do
     done <- readIORef done_ref
     let needed = (ms1 ++ lefts need)
     (chash,cug) <- toCompUnitGraph done needed
-    --mapM_ print [  (h,hs)| (h,(hs,cu)) <- cug ]
     return (Map.filterWithKey (\k _ -> k `Set.member` validSources done) (knownSourceMap done),chash,cug)
 
 
