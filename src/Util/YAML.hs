@@ -6,6 +6,12 @@ import qualified Data.Set as S
 
 data Node = Leaf String | List [Node] | Map [(String,Node)] | Null
 
+class MapKey a where
+    showMapKey :: a -> String
+
+
+instance MapKey String where
+    showMapKey s = s
 
 class ToNode a where
     toNode :: a -> Node
@@ -20,11 +26,11 @@ instance ToNode String where
 instance ToNode a => ToNode [a] where
     toNode ns = List (map toNode ns)
 
-instance ToNode a => ToNode [(String,a)] where
-    toNode ns = Map [ (x,toNode y) | (x,y) <- ns ]
+instance (MapKey k,ToNode a) => ToNode [(k,a)] where
+    toNode ns = Map [ (showMapKey x,toNode y) | (x,y) <- ns ]
 
-instance ToNode b => ToNode (M.Map String b) where
-    toNode mp = Map [(x, toNode y) | (x,y) <- M.toList mp]
+instance (MapKey k,ToNode b) => ToNode (M.Map k b) where
+    toNode mp = Map [(showMapKey x, toNode y) | (x,y) <- M.toList mp]
 
 instance ToNode a => ToNode (S.Set a) where
     toNode st = List $ map toNode (S.toList st)
