@@ -6,6 +6,10 @@ import Control.Monad.Error()
 class CanType a e | a -> e where
     getType :: a -> e
 
+instance CanType e t => CanType [e] [t] where
+    getType es = map getType es
+
+
 -- This should perform a full typecheck and may take any extra information needed as an extra parameter
 class CanTypeCheck env a ty | a -> ty env where
     typecheck :: Monad m => env -> a -> m ty

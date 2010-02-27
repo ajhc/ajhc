@@ -500,9 +500,6 @@ p2 = Var v2 TyINode
 p3 = Var v3 TyINode
 
 
-instance CanType e t => CanType [e] [t] where
-    getType es = map getType es
-
 instance CanType Exp [Ty] where
     getType (_ :>>= (_ :-> e2)) = getType e2
     getType (Prim _ _ ty) = ty
