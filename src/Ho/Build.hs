@@ -58,6 +58,7 @@ import RawFiles(prelude_m4)
 import Util.FilterInput
 import Util.Gen hiding(putErrLn,putErr,putErrDie)
 import Util.SetLike
+import Util.YAML
 import Version.Config(revision)
 import Version.Version(versionString)
 import qualified FlagDump as FD
@@ -217,6 +218,30 @@ compLinkCompUnit (CompLinkUnit cu) = cu
 compLinkCompUnit (CompCollected _ cu) = cu
 compLinkCompUnit (CompTcCollected _ cu) = cu
 compLinkCompUnit (CompLinkLib _ cu) = cu
+
+instance MapKey Module where
+    showMapKey = show
+instance MapKey MD5.Hash where
+    showMapKey = show
+
+dumpDeps memap cug = case optDeps options of
+    Nothing -> return ()
+    Just fp -> do
+        let (sfps,sdps,ls) = collectDeps memap cug
+        let yaml = Map.fromList [
+                ("LibraryDesc",toNode $ [ fp | BuildHl fp  <- [optMode options]]),
+                ("LibraryDeps",toNode $ ls),
+                ("ModuleSource",toNode sfps),
+                ("ModuleDeps",toNode $ sdps)
+                ]
+        writeFile fp (showYAML yaml)
+
+collectDeps memap cs = mconcatMap f [ cu | (_,(_,cu)) <- cs] where
+    f (CompSources ss) = mconcat [ (Map.singleton (sourceModName s) (sourceFP s),Map.singleton (sourceModName s) (sourceDeps s),mempty) | s <- map sourceInfo ss ]
+    f (CompLibrary _ lib) = (mempty,mempty,Map.singleton (libHash lib) (libFileName lib))
+    f (CompHo _hoh idep _ho) =  (Map.fromList [ (sourceModName $ sourceInfo src, sourceFP $ sourceInfo src) | s <- fsts ss, Just (Found src) <- [Map.lookup s memap] ],Map.fromList [ mms | s <- snds ss, Just mms <- [Map.lookup s (hoIDeps idep)] ],mempty) where
+        ss = [ s | s <- hoDepends idep ]
+    f _ = mempty
 
 type CompUnitGraph = [(HoHash,([HoHash],CompUnit))]
 
@@ -432,6 +457,7 @@ loadModules libs need = do
     done <- readIORef done_ref
     let needed = (ms1 ++ lefts need)
     (chash,cug) <- toCompUnitGraph done needed
+    dumpDeps (modEncountered done) cug
     return (Map.filterWithKey (\k _ -> k `Set.member` validSources done) (knownSourceMap done),chash,cug)
 
 

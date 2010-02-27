@@ -39,8 +39,8 @@ libHash  = hohHash . libHoHeader
 libMgHash mg lib = MD5.md5String $ show (libHash lib,mg)
 libProvides mg lib = [ m | (m,mg') <- Map.toList (libModMap lib), mg == mg']
 libName lib = let HoHeader { hohName = ~(Right (name,vers)) } = libHoHeader lib in unpackPS name ++ "-" ++ showVersion vers
-libVersion lib = let HoHeader { hohName = ~(Right (name,vers)) } = libHoHeader lib in vers
-libBaseName lib = let HoHeader { hohName = ~(Right (name,vers)) } = libHoHeader lib in name
+libVersion lib = let HoHeader { hohName = ~(Right (_name,vers)) } = libHoHeader lib in vers
+libBaseName lib = let HoHeader { hohName = ~(Right (name,_vers)) } = libHoHeader lib in name
 libModules l = let lib = libHoLib l in ([ m | (m,_) <- Map.toList (hoModuleMap lib)],Map.toList (hoReexports lib))
 
 libVersionCompare l1 l2 = compare (libVersion l1) (libVersion l2)
@@ -102,7 +102,6 @@ listLibraries :: IO ()
 listLibraries = do
     (_,byhashes) <- fetchAllLibraries
     let libs = Map.toList byhashes
-        nameComp a b = compare (libName a) (libName b)
     if not verbose then putStr $ showYAML (map (libName . snd) libs) else do
     let f (h,l) = (show h,[
             ("Name",toNode (libName l)),
@@ -118,9 +117,9 @@ listLibraries = do
 
 
 
-maxBy c x1 x2 = case x1 `c` x2 of
-    LT -> x2
-    _ -> x1
+--maxBy c x1 x2 = case x1 `c` x2 of
+--    LT -> x2
+--    _ -> x1
 
 -- Collect all libraries and return those which are explicitly and implicitly imported.
 --
@@ -151,7 +150,6 @@ fetchAllLibraries = ans where
         (bynames',byhashes') <- unzip `fmap` concatMapM f (optHlPath options)
         let bynames = Map.map (reverse . sortBy libVersionCompare) $ Map.unionsWith (++) bynames'
             byhashes = Map.unions byhashes'
-            vcomb = maxBy libVersionCompare
         return (bynames,byhashes)
 
     f fp = do
