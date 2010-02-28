@@ -10,10 +10,9 @@ and building it, see the [Development Page](development.shtml).
 Getting the RPM
 ---------------
 
-This is by far the easiest way to go about it if you have an rpm based system, an RPM for x86 based systems
- can be instaled from:
-<http://repetae.net/yum/@PACKAGE@-@VERSION@-@RPMRELEASE@.i586.rpm>.
-There is also a 'src' rpm in the download directory for rebuilding from source.
+There are source and binary rpms available:
+Binary RPM: <http://repetae.net/yum/@PACKAGE@-@VERSION@-@RPMRELEASE@.i686.rpm>.
+Source RPM: <http://repetae.net/yum/@PACKAGE@-@VERSION@-@RPMRELEASE@.src.rpm>.
 
 Building from the tarball
 -------------------------
@@ -21,7 +20,7 @@ Building from the tarball
 jhc is also distributed via a autoconf/automake style tarball. Building jhc
 has the following dependencies:
 
- * GHC 6.8.2 or better
+ * GHC 6.10.4 or better
  * haskell library [binary](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/binary)
  * haskell library [zlib](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/zlib)
  * haskell library [utf8-string](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/utf8-string)
@@ -44,9 +43,9 @@ then as root run
 A note on libraries
 -------------------
 
-All these prepackaged versions of jhc come with prebuilt versions of the
-'base' and 'haskell98' libraries for use by jhc in addition to the sourcecode
-for these libraries. You can rebuild them if you wish simply by deleting the
-'.hl' files in your build directory and doing a 'make libs'. however it is
-recommended you work with the development darcs tree if you plan on modifying
-the base libraries.
+All these prepackaged versions of jhc come with prebuilt versions of base,
+haskell98, and a few other libraries for use by jhc in addition to the
+sourcecode for these libraries. You can rebuild them if you wish simply by
+deleting the '.hl' files in your build directory and doing a 'make libs'.
+however it is recommended you work with the development darcs tree if you plan
+on modifying the base libraries.
