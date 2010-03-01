@@ -120,9 +120,9 @@ etaAnnotateProgram prog = runIdentity $ programMapRecGroups mempty pass iletann 
             let at' = arityType e
             when (at /= at') (put True)
             return $ annotateArity' at' nfo
-    f (rec,ts) = do
+    f (rg,ts) = do
         let (ts',fs) = runState (annotateCombs mempty pass letann pass ts) False
-        if fs then f (rec,ts') else return ts'
+        if fs then f (rg,ts') else return ts'
 
 
 

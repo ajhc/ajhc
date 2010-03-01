@@ -1,3 +1,4 @@
+{-# LANGUAGE RecursiveDo #-}
 module E.PrimOpt(
     performPrimOpt,
     processPrimPrim

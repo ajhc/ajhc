@@ -1,3 +1,4 @@
+{-# LANGUAGE ImpredicativeTypes #-}
 module Ho.Binary(readHoFile,recordHoFile,readHlFile,recordHlFile) where
 
 

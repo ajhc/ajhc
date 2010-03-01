@@ -1,3 +1,4 @@
+{-# LANGUAGE RecursiveDo #-}
 module Ho.Build (
     module Ho.Type,
     dumpHoFile,

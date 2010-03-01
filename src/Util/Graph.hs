@@ -1,5 +1,6 @@
 -- | Data.Graph is sorely lacking in several ways, This just tries to fill in
 -- some holes and provide a more convinient interface
+{-# LANGUAGE RecursiveDo #-}
 
 module Util.Graph(
     Graph(),

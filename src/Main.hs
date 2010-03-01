@@ -295,7 +295,7 @@ processDecls cho ho' tiData = do
         when miniCorePass $ printProgram mprog -- mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
         when miniCoreSteps $ Stats.printLStat (optStatLevel options) ("InitialOptimize:" ++ names) (progStats mprog)
         --wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
-        wdump FD.Progress $ let SubProgram rec = progType mprog in  progressIOSteps pr_r (if rec then "*" else ".")
+        wdump FD.Progress $ let SubProgram isRec = progType mprog in  progressIOSteps pr_r (if isRec then "*" else ".")
         return mprog
     lintCheckProgram onerrNone prog
     --putProgressLn "Initial optimization pass"
@@ -361,7 +361,7 @@ processDecls cho ho' tiData = do
         put $ fromList [ (combIdent c,c) | c <- progCombinators mprog] `S.union` smap
 
         --liftIO $ wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
-        liftIO $ wdump FD.Progress $ let SubProgram rec = progType mprog in  progressIOSteps pr_r (if wws > 0 then "w" else if rec then "*" else ".")
+        liftIO $ wdump FD.Progress $ let SubProgram isRec = progType mprog in  progressIOSteps pr_r (if wws > 0 then "w" else if isRec then "*" else ".")
         return mprog
 
     prog <- evalStateT (programMapProgGroups mempty optWW prog { progStats = mempty }) (SS.so_boundVars sopt)

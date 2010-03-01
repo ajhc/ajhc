@@ -1,4 +1,4 @@
-
+{-# LANGUAGE RecursiveDo #-}
 -- | determine export\/imports for modules via fixpoint recursion
 
 module FrontEnd.Exports(determineExports,ModInfo(..),modInfoHsModule_s) where
