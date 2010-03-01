@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fglasgow-exts -fbang-patterns #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- modified from Control.Monad.RWS by John Meacham to be strict
 

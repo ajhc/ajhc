@@ -1,4 +1,4 @@
-{-# OPTIONS -cpp -fglasgow-exts -fno-bang-patterns #-}
+{-# LANGUAGE CPP,NoBangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.IntBag

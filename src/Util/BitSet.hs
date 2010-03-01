@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fbang-patterns #-}
+{-# LANGUAGE BangPatterns #-}
 module Util.BitSet(
     BitSet(),
     EnumBitSet(..),
