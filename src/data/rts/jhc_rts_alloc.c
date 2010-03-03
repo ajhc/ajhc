@@ -63,7 +63,7 @@ print_alloc_size_stats(void) {
 static inline void jhc_malloc_init(void) { GC_INIT(); }
 static inline void jhc_alloc_print_stats(void) { GC_dump(); }
 
-#elif _JHC_GC == _JHC_GC_NONE
+#elif _JHC_GC == _JHC_GC_NONE || _JHC_GC == _JHC_GC_JGC
 
 // memory allocated in 1MB chunks.
 #define JHC_MEM_CHUNK_SIZE (1 << 20)
@@ -134,19 +134,21 @@ jhc_malloc_atomic(size_t n) {
         alloc_count(n,1);
         return jhc_malloc_basic(n);
 }
-
+#endif
 
 #endif
 
-#elif _JHC_GC == _JHC_GC_JGC
+#if _JHC_GC == _JHC_GC_JGC
 
-#define GC_STACK_LIMIT 8192
-static sptr_t *gc_stack_base;
+static gc_t saved_gc;
 
-static inline void
-jhc_malloc_init(void) {
-        gc_stack_base = malloc(sizeof(sptr_t) * GC_STACK_LIMIT);
-}
+// #define GC_STACK_LIMIT 8192
+// `static sptr_t *gc_stack_base;
+
+// static inline void
+// jhc_malloc_init(void) {
+//         gc_stack_base = malloc(sizeof(sptr_t) * GC_STACK_LIMIT);
+// }
 
 #elif _JHC_GC == _JHC_GC_REGION
 

@@ -177,7 +177,11 @@ jhc_valid_lazy(sptr_t s)
 #endif
 
 
+#if _JHC_GC == _JHC_GC_JGC
+typedef wptr_t (*eval_fn)(gc_t gc,node_t *node) A_STD;
+#else
 typedef wptr_t (*eval_fn)(node_t *node) A_STD;
+#endif
 
 // both promote and demote evaluate to nothing when debugging is not enabled
 // otherwise, they check that their arguments are in the correct form.
@@ -211,8 +215,12 @@ follow(sptr_t s)
         return (wptr_t)s;
 }
 
-static inline wptr_t A_STD A_UNUSED  A_HOT
+static wptr_t A_STD A_UNUSED  A_HOT
+#if _JHC_GC == _JHC_GC_JGC
+eval(gc_t gc,sptr_t s)
+#else
 eval(sptr_t s)
+#endif
 {
         assert(jhc_valid_lazy(s));
         if(ISLAZY(s)) {
@@ -225,7 +233,11 @@ eval(sptr_t s)
 #if _JHC_DEBUG
                         GETHEAD(ds) = BLACK_HOLE;
 #endif
+#if _JHC_GC == _JHC_GC_JGC
+                        wptr_t r = (*fn)(gc,NODEP(ds));
+#else
                         wptr_t r = (*fn)(NODEP(ds));
+#endif
 #if _JHC_DEBUG
                         assert(GETHEAD(ds) != BLACK_HOLE);
 #endif

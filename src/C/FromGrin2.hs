@@ -134,7 +134,7 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
                 text "static node_t _" <> tshow (varName v) <> text " = { .head = " <> ef <> text " };\n" <>
                 text "#define " <> tshow (varName v) <+>  text "(EVALTAGC(&_" <> tshow (varName v) <> text "))\n";
         return ts
-        
+
 
 convertFunc :: Maybe FfiExport -> (Atom,Lam) -> C [Function]
 convertFunc ffie (n,as :-> body) = do
@@ -161,11 +161,11 @@ convertFunc ffie (n,as :-> body) = do
                         fr2 = basicType retTy
 
                     return [function fnname2 fr2 as2 [Public]
-                                     (creturn $ cast fr2 $ functionCall fnname $
+                                     (creturn $ cast fr2 $ functionCall fnname $ (if fopts FO.Jgc then (variable (name "saved_gc"):) else id) $
                                       zipWith cast (map snd as')
                                                    (map variable newVars))]
 
-        return (function fnname fr as' ats (profile_function_inc & s) : mstub)
+        return (function fnname fr (mgct as') ats (profile_function_inc & s) : mstub)
 
 
 fetchVar :: Var -> Ty -> C Expression
@@ -470,7 +470,7 @@ convertBody (BaseOp PeekVal [Index base off]) | getType base == TyPtr tyINode = 
 convertBody (GcRoots vs b) = do
     vs <- mapM convertVal vs
     b' <- convertBody b
-    return $ gc_roots vs & b' & gc_end
+    return $ subBlock (gc_roots vs & b')
 
 -- return, promote and demote
 convertBody (BaseOp Promote [v])       | getType v == tyINode = simpleRet =<< f_promote `liftM` convertVal v
@@ -535,6 +535,8 @@ isCompound Return {} = False
 isCompound Prim {} = False
 isCompound _ = True
 
+mgc = if fopts FO.Jgc then (v_gc:) else id
+mgct = if fopts FO.Jgc then ((name "gc",gc_t):) else id
 
 convertExp :: Exp -> C (Statement,Expression)
 convertExp (Prim p vs ty) | APrim _ req <- p  =  do
@@ -557,7 +559,7 @@ convertExp (App a vs _) = do
         Just (nm,as) -> do
             let ss = [ a =* v | a <- as | v <- vs' ]
             return (mconcat ss & goto nm, emptyExpression)
-        Nothing -> return $ (mempty, functionCall (toName (fromAtom a)) vs')
+        Nothing -> return $ (mempty, functionCall (toName (fromAtom a)) (mgc vs'))
 convertExp (BaseOp Overwrite [v@(Var vv _),tn@(NodeC t as)]) | getType v == TyINode = do
     v' <- convertVal v
     as' <- mapM convertVal as
@@ -845,9 +847,9 @@ declareEvalFunc n = do
         aname = name "arg";
         rvar = localVariable wptr_t (name "r");
         atype = ptrType nt
-        body = rvar =* functionCall (toName (show $ fn)) [ project' (arg i) (variable aname) | _ <- ts | i <- [(1 :: Int) .. ] ]
+        body = rvar =* functionCall (toName (show $ fn)) (mgc [ project' (arg i) (variable aname) | _ <- ts | i <- [(1 :: Int) .. ] ])
         update =  f_update (cast sptr_t (variable aname)) rvar
-    tellFunctions [function fname wptr_t [(aname,atype)] [a_STD, a_FALIGNED] (body & update & creturn rvar )]
+    tellFunctions [function fname wptr_t (mgct [(aname,atype)]) [a_STD, a_FALIGNED] (body & update & creturn rvar )]
     return fname
 
 
@@ -874,7 +876,8 @@ castFunc _ _ tb e = cast (opTyToC tb) e
 -- c constants and utilities
 ----------------------------
 
-gc_roots vs = functionCall (name "gc_begin_frame0") (constant (number (fromIntegral $ length vs)):vs)
+--gc_roots vs = functionCall (name "gc_begin_frame0") (constant (number (fromIntegral $ length vs)):vs)
+gc_roots vs = functionCall (name "gc_frame0") (v_gc:constant (number (fromIntegral $ length vs)):vs)
 gc_end =      functionCall (name "gc_end") []
 jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
 f_assert e    = functionCall (name "assert") [e]
@@ -884,7 +887,7 @@ f_VALUE e     = functionCall (name "VALUE") [e]
 f_GETVALUE e  = functionCall (name "GETVALUE") [e]
 f_EVALTAG e   = functionCall (name "EVALTAG") [e]
 f_EVALFUNC e  = functionCall (name "EVALFUNC") [e]
-f_eval e      = functionCall (name "eval") [e]
+f_eval e      = functionCall (name "eval") (mgc [e])
 f_promote e   = functionCall (name "promote") [e]
 f_PROMOTE e   = functionCall (name "PROMOTE") [e]
 f_GETWHAT e   = functionCall (name "GETWHAT") [e]
@@ -909,9 +912,11 @@ nodeTagName a = toName (fromAtom a)
 nodeFuncName :: Atom -> Name
 nodeFuncName a = toName (fromAtom a)
 
-sptr_t    = basicGCType "sptr_t"
-fptr_t    = basicGCType "fptr_t"
-wptr_t    = basicGCType "wptr_t"
+sptr_t  = basicGCType "sptr_t"
+fptr_t  = basicGCType "fptr_t"
+wptr_t  = basicGCType "wptr_t"
+gc_t    = basicGCType "gc_t"
+v_gc = variable (name "gc")
 
 a_STD = Attribute "A_STD"
 a_FALIGNED = Attribute "A_FALIGNED"
