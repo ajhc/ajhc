@@ -843,7 +843,7 @@ declareEvalFunc n = do
     declareStruct n
     nt <- nodeType n
     let ts = runIdentity $ findArgs (grinTypeEnv grin) n
-        fname = toName $ "jhc_eval_" ++ show fn
+        fname = toName $ "E_" ++ show fn
         aname = name "arg";
         rvar = localVariable wptr_t (name "r");
         atype = ptrType nt

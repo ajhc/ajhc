@@ -546,26 +546,38 @@ instance Annotate Statement where
     annotate c s = sd (text "/* " <> text c <> text " */") `mappend` s
 
 
-mangleIdent xs =  concatMap f xs where
-        f '.' = "__"
-        f '@' = "_a"
-        f ',' = "_c"
-        f '(' = "_L"
-        f ')' = "_R"
-        f '$' = "_d"
-        f '%' = "_P"
-        f '#' = "_h"
-        f '/' = "_s"
-        f '=' = "_e"
-        f '+' = "_p"
-        f '-' = "_m"
-        f '!' = "_b"
-        f '>' = "_r"
-        f '<' = "_l"
-        f '\'' = "_t"
-        f '_' = "_u"
-        f c | isAlphaNum c = [c]
-        f c = '_':'x':showHex (ord c) ""
+mangleIdent xs = f xs where
+    f (x:xs) | isAlphaNum x = x:f xs
+    f ('.':'.':xs) = '$':g ('.':'.':xs)
+    f ('.':xs) = '_':f xs
+    f ('_':xs) = "__" ++ f xs
+    f ('@':xs) = "$_" ++ f xs  -- this is safe because we wouldn't switch to g-mode just for a underscore.
+    f xs@(_:_) = '$':g xs
+    f [] = []
+    g (x:xs) | isDigit x = x:g xs
+    g (x:xs) | isAlpha x = '$':f xs
+    g ('.':xs) = "_" ++ g xs
+    g ('@':xs) = "a" ++ g xs
+    g (',':xs) = "c" ++ g xs
+    g ('^':xs) = "C" ++ g xs
+    g ('(':xs) = "L" ++ g xs
+    g (')':xs) = "R" ++ g xs
+    g ('[':xs) = "B" ++ g xs
+    g (']':xs) = "E" ++ g xs
+    g ('$':xs) = "d" ++ g xs
+    g ('%':xs) = "P" ++ g xs
+    g ('#':xs) = "h" ++ g xs
+    g ('/':xs) = "s" ++ g xs
+    g ('=':xs) = "e" ++ g xs
+    g ('+':xs) = "p" ++ g xs
+    g ('-':xs) = "m" ++ g xs
+    g ('!':xs) = "b" ++ g xs
+    g ('>':xs) = "r" ++ g xs
+    g ('<':xs) = "l" ++ g xs
+    g ('\'':xs) = "t" ++ g xs
+    g ('_':xs) = "u" ++ g xs
+    g (x:xs) = 'x':showHex (ord x) (g xs)
+    g [] = []
 
 toName s = Name (mangleIdent s)
 
