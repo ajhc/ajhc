@@ -564,10 +564,10 @@ convertExp (BaseOp Overwrite [v@(Var vv _),tn@(NodeC t as)]) | getType v == TyIN
     v' <- convertVal v
     as' <- mapM convertVal as
     nt <- nodeTypePtr t
-    let tmp' = cast nt (f_DETAG v') -- (if vv < v0 then f_DETAG v' else v')
+    let tmp' = cast nt (f_FROM_SPTR v') -- (if vv < v0 then f_DETAG v' else v')
     if not (tagIsSuspFunction t) && vv < v0 then do
         (nns, nn) <- newNode region_heap fptr_t tn
-        return (nns & getHead (f_NODEP(f_DETAG v')) =* nn,emptyExpression)
+        return (nns & getHead (f_NODEP(f_FROM_SPTR v')) =* nn,emptyExpression)
      else do
         s <- tagAssign tmp' t
         let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
@@ -877,11 +877,11 @@ castFunc _ _ tb e = cast (opTyToC tb) e
 ----------------------------
 
 --gc_roots vs = functionCall (name "gc_begin_frame0") (constant (number (fromIntegral $ length vs)):vs)
-gc_roots vs = functionCall (name "gc_frame0") (v_gc:constant (number (fromIntegral $ length vs)):vs)
-gc_end =      functionCall (name "gc_end") []
+gc_roots vs   = functionCall (name "gc_frame0") (v_gc:constant (number (fromIntegral $ length vs)):vs)
+gc_end        = functionCall (name "gc_end") []
 jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
 f_assert e    = functionCall (name "assert") [e]
-f_DETAG e     = functionCall (name "DETAG") [e]
+f_FROM_SPTR e = functionCall (name "FROM_SPTR") [e]
 f_NODEP e     = functionCall (name "NODEP") [e]
 f_VALUE e     = functionCall (name "VALUE") [e]
 f_GETVALUE e  = functionCall (name "GETVALUE") [e]
