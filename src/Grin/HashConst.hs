@@ -18,7 +18,7 @@ data HcHash = HcHash !Int (Map.Map HcNode Int)
 
 emptyHcHash = HcHash 1 Map.empty
 
-newConst :: MonadState HcHash m => Set.Set Atom -> Val -> m (Bool,Int)
+newConst :: MonadState HcHash m => Map.Map Atom a -> Val -> m (Bool,Int)
 newConst cpr n = f n where
     f (NodeC t vs) = do
         let g (Lit i ty)
@@ -28,8 +28,8 @@ newConst cpr n = f n where
             g x@(Var (V n) _) | n < 0  = return $ Left x
             g n@(Const (NodeC _ [])) = return $ Left n
             g n@(NodeC _ []) = return $ Left n
-            g n@(Const (NodeC a _)) | a `Set.member` cpr = return $ Left n
-            g n@(NodeC a _) | a `Set.member` cpr  = return $ Left n
+            g n@(Const (NodeC a _)) | a `Map.member` cpr = return $ Left n
+            g n@(NodeC a _) | a `Map.member` cpr  = return $ Left n
             g (Const n) = liftM (Right . snd) $ f n
             g n@NodeC {} = liftM (Right . snd) $ f n
             g e = error $ "HashConst.g: " ++ show e

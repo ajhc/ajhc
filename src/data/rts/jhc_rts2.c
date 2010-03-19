@@ -111,8 +111,8 @@ redirection to a whnf value.
 #define P_VALUE 0x2
 #define P_FUNC  0x3
 
-#define IS_LAZY(x)     (((uintptr_t)(x)) & 0x1)
-#define IS_PTR(x)      (!(((uintptr_t)(x)) & 0x2))
+#define IS_LAZY(x)     (bool)(((uintptr_t)(x)) & 0x1)
+#define IS_PTR(x)      (bool)(!(((uintptr_t)(x)) & 0x2))
 
 #define FROM_SPTR(x)   (typeof (x))((uintptr_t)(x) & ~0x3)  // remove a ptype from a smart pointer
 #define GET_PTYPE(x)   ((uintptr_t)(x) & 0x3)               // return the ptype associated with a smart pointer
@@ -123,25 +123,29 @@ redirection to a whnf value.
 #define NODEP(x)     ((node_t *)(x))
 #define DNODEP(x)    ((dnode_t *)(x))
 
-#define EVALTAG(fn)  TO_SPTR(P_LAZY,(sptr_t)fn)
-#define EVALTAGC(fn) TO_SPTR_C(P_LAZY,(sptr_t)fn)
-#define EVALFUNC(fn) TO_SPTR_C(P_FUNC,(fptr_t)fn)
+#define MKLAZY(fn)    TO_SPTR(P_LAZY,(sptr_t)fn)
+#define MKLAZY_C(fn)  TO_SPTR_C(P_LAZY,(sptr_t)fn)
+#define TO_FPTR(fn)   TO_SPTR_C(P_FUNC,(fptr_t)fn)
 
-// #define EVALTAG(fn)  (assert(GET_PTYPE(fn) == 0),(sptr_t)((uintptr_t)(fn) | P_LAZY))
-// #define EVALTAGC(fn) ((sptr_t)((void *)(fn) + P_LAZY))
-// #define EVALFUNC(fn) ((fptr_t)((uintptr_t)(fn) + P_FUNC))
+#define RAW_SET_F(n)   ((wptr_t)(((intptr_t)(n) << 2) | P_VALUE))
+#define RAW_SET_UF(n)  ((wptr_t)(((uintptr_t)(n) << 2) | P_VALUE))
+#define RAW_GET_F(n)   ((intptr_t)(n) >> 2)
+#define RAW_GET_UF(n)  ((uintptr_t)(n) >> 2)
 
-#define VALUE(n)     ((wptr_t)(((intptr_t)(n) << 2) | P_VALUE))
-#define GETVALUE(n)  ((intptr_t)(n) >> 2)
-#define ISVALUE(n)   (assert(!IS_LAZY(n)), ((uintptr_t)(n) & 0x2))
+#define RAW_SET_16(w)  (wptr_t)(((uintptr_t)(w) << 16) | P_VALUE)
+#define RAW_GET_16(n)  ((intptr_t)(n) >> 16)
+#define RAW_GET_U16(n) ((uintptr_t)(n) >> 16)
 
 // demote is always safe, we must only promote when we know the argument is a WHNF
 #define PROMOTE(n)   ((wptr_t)(n))
 #define DEMOTE(n)    ((sptr_t)(n))
 
-#define GETWHAT(x)   (GET_PTYPE(x) == P_VALUE ? ((uintptr_t)(x) >> 16) : DNODEP(x)->what)
-#define SETWHAT(x,v) (DNODEP(x)->what = (v))
-#define RAWWHAT(w)   (wptr_t)(((uintptr_t)w << 16) | P_VALUE)
+#define FETCH_TAG(x)      (IS_RAW_TAG(x) ? FETCH_RAW_TAG(x) : FETCH_MEM_TAG(x))
+#define IS_RAW_TAG(x)     ((bool)((uintptr_t)(x) & 0x2))
+#define FETCH_RAW_TAG(x)  RAW_GET_U16(x)
+#define FETCH_MEM_TAG(x)  (DNODEP(x)->what)
+#define SET_RAW_TAG(x)    RAW_SET_16(x)
+#define SET_MEM_TAG(x,v)  (DNODEP(x)->what = (v))
 
 
 

@@ -25,7 +25,7 @@
 // #define our options
 
 #define _JHC_GC_NONE   0
-#define _JHC_GC_JGC       1
+#define _JHC_GC_JGC    1
 #define _JHC_GC_BOEHM  2
 #define _JHC_GC_REGION 3
 

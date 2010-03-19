@@ -60,7 +60,7 @@ data Env = Env {
     rStowed :: Set.Set Name,  -- names that the garbage collector knows about
     rDeclare :: Bool,
     rEMap :: Map.Map Atom (Name,[Expression]),
-    rCPR  :: Set.Set Atom,
+    rCPR  :: Map.Map Atom Bool,
     rGrin :: Grin
     }
     {-! derive: update !-}
@@ -82,8 +82,8 @@ runC grin (C m) =  execUniq1 (runRWST m startEnv  emptyHcHash) where
         rEMap = mempty,
         rInscope = mempty
         }
-    cpr = iw `Set.union` Set.insert cChar (Set.fromList [ a | (a,TyTy { tySlots = [s], tySiblings = Just [a'] }) <- Map.assocs tmap, a == a', isJust (good s) ])
-    iw = if fopts FO.FullInt then Set.empty else Set.fromList [cInt, cWord]
+    cpr = iw `Map.union` Map.insert cChar False (Map.fromList [ (a,False) | (a,TyTy { tySlots = [s], tySiblings = Just [a'] }) <- Map.assocs tmap, a == a', isJust (good s) ])
+    iw = if fopts FO.FullInt then mempty else Map.fromList [(cInt,True), (cWord,False)]
     good s = do
         ct <- Op.toCmmTy s
         b <- Op.cmmTyBits ct
@@ -129,10 +129,10 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
     cafs = text "/* CAFS */" $$ (vcat $ cafs')
     convertCAF (v,val@(NodeC a [])) = do
         en <- declareEvalFunc a
-        let ef =  drawG $ f_EVALFUNC (reference $ variable en)
+        let ef =  drawG $ f_TO_FPTR (reference $ variable en)
         let ts =  text "/* " <> text (show v) <> text " = " <> (text $ P.render (pprint val)) <> text "*/\n" <>
                 text "static node_t _" <> tshow (varName v) <> text " = { .head = " <> ef <> text " };\n" <>
-                text "#define " <> tshow (varName v) <+>  text "(EVALTAGC(&_" <> tshow (varName v) <> text "))\n";
+                text "#define " <> tshow (varName v) <+>  text "(MKLAZY_C(&_" <> tshow (varName v) <> text "))\n";
         return ts
 
 
@@ -338,8 +338,8 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == 
         am ~(NodeC t2 _) e = do
             tellTags t2
             return $ annotate (show p2) (f_assert ((constant $ enum (nodeTagName t2)) `eq` tag) & e)
-        tag = f_GETWHAT scrut
-        ifscrut = if null fps then f_RAWWHAT tenum `eq` scrut else tenum `eq` tag where
+        tag = f_FETCH_TAG scrut
+        ifscrut = if null fps then f_SET_RAW_TAG tenum `eq` scrut else tenum `eq` tag where
             tenum = (constant $ enum (nodeTagName t))
     p1' <- da p1 e1
     p2' <- am p2 =<< da p2 e2
@@ -357,7 +357,7 @@ convertBody (Case v@(Var _ t) [[p1] :-> e1, [p2] :-> e2]) | Set.null ((freeVars 
     return $ profile_case_inc & cif (cp p1 `eq` scrut) e1' (am e2')
 convertBody (Case v@(Var _ t) ls) | t == TyNode = do
     scrut <- convertVal v
-    let tag = f_GETWHAT scrut
+    let tag = f_FETCH_TAG scrut
         da ([(Var v _)] :-> e) | v == v0 = do
             e' <- convertBody e
             return $ (Nothing,e')
@@ -511,22 +511,22 @@ nodeAssign :: Val -> Atom -> [Val] -> Exp -> C Statement
 nodeAssign v t as e' = cna where
     cna = do
         cpr <- asks rCPR
-        if t `Set.notMember` cpr then na else do
         v' <- convertVal v
-        [arg] <- return as
-        t <- convertType $ getType arg
-        arg' <- iDeclare $ convertVal arg
-        let s = arg' =* cast t (f_GETVALUE v')
-        ss <- convertBody e'
-        return $ s & ss
-    na = do
-        declareStruct t
-        v' <- convertVal v
-        as' <- iDeclare $ mapM convertVal as
-        let ass = concat [perhapsM (a `Set.member` fve) $ a' =* (project' (arg i) (concrete t v')) | a' <- as' | Var a _ <- as |  i <- [( 1 :: Int) ..] ]
-            fve = freeVars e'
-        ss' <- convertBody e'
-        return $ mconcat ass & ss'
+        case Map.lookup t cpr of
+            Just signed -> do
+                [arg] <- return as
+                t <- convertType $ getType arg
+                arg' <- iDeclare $ convertVal arg
+                let s = arg' =* cast t (if signed then f_RAW_GET_F v' else f_RAW_GET_UF v')
+                ss <- convertBody e'
+                return $ s & ss
+            Nothing -> do
+                declareStruct t
+                as' <- iDeclare $ mapM convertVal as
+                let ass = concat [perhapsM (a `Set.member` fve) $ a' =* (project' (arg i) (concrete t v')) | a' <- as' | Var a _ <- as |  i <- [( 1 :: Int) ..] ]
+                    fve = freeVars e'
+                ss' <- convertBody e'
+                return $ mconcat ass & ss'
 
 --isCompound Fetch {} = False
 isCompound BaseOp {} = False
@@ -564,7 +564,7 @@ convertExp (BaseOp Overwrite [v@(Var vv _),tn@(NodeC t as)]) | getType v == TyIN
     v' <- convertVal v
     as' <- mapM convertVal as
     nt <- nodeTypePtr t
-    let tmp' = cast nt (f_FROM_SPTR v') -- (if vv < v0 then f_DETAG v' else v')
+    let tmp' = cast nt (f_FROM_SPTR v')
     if not (tagIsSuspFunction t) && vv < v0 then do
         (nns, nn) <- newNode region_heap fptr_t tn
         return (nns & getHead (f_NODEP(f_FROM_SPTR v')) =* nn,emptyExpression)
@@ -572,18 +572,6 @@ convertExp (BaseOp Overwrite [v@(Var vv _),tn@(NodeC t as)]) | getType v == TyIN
         s <- tagAssign tmp' t
         let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
         return (mconcat $ profile_update_inc:s:ass,emptyExpression)
---convertExp (Update v@(Var vv _) tn@(NodeC t as)) | getType v == TyINode = do
---    v' <- convertVal v
---    as' <- mapM convertVal as
---    nt <- nodeTypePtr t
---    let tmp' = cast nt (f_DETAG v') -- (if vv < v0 then f_DETAG v' else v')
---    if not (tagIsSuspFunction t) && vv < v0 then do
---        (nns, nn) <- newNode fptr_t tn
---        return (nns & getHead (f_NODEP(f_DETAG v')) =* nn,emptyExpression)
---     else do
---        s <- tagAssign tmp' t
---        let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
---        return (mconcat $ profile_update_inc:s:ass,emptyExpression)
 
 convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_heap, TyINode == getType v  = do
     v' <- convertVal v
@@ -602,7 +590,7 @@ convertExp e = return (err (show e),err "nothing")
 ccaf :: (Var,Val) -> P.Doc
 ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ P.render (pprint val)) <> text "*/\n" <>
      text "static node_t _" <> tshow (varName v) <> text ";\n" <>
-     text "#define " <> tshow (varName v) <+>  text "(EVALTAGC(&_" <> tshow (varName v) <> text "))\n";
+     text "#define " <> tshow (varName v) <+>  text "(MKLAZY_C(&_" <> tshow (varName v) <> text "))\n";
 
 
 buildConstants grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
@@ -735,7 +723,7 @@ primUnOp n ta r a
 tagAssign :: Expression -> Atom -> C Statement
 tagAssign e t | tagIsSuspFunction t = do
     en <- declareEvalFunc t
-    return $ getHead e =* f_EVALFUNC (reference (variable en))
+    return $ getHead e =* f_TO_FPTR (reference (variable en))
 tagAssign e t = do
     declareStruct t
     tyenv <- asks (grinTypeEnv . rGrin)
@@ -743,7 +731,7 @@ tagAssign e t = do
     tellTags t
     case sib of
         Just [n'] | n' == t -> return mempty
-        _ -> do return . toStatement $ f_SETWHAT e (constant (enum $ nodeTagName t))
+        _ -> do return . toStatement $ f_SET_MEM_TAG e (constant (enum $ nodeTagName t))
 
 
 tellAllTags :: Val -> C ()
@@ -786,7 +774,7 @@ newNode region ty ~(NodeC t as) = do
         let tmp' = concrete t tmp
             ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
         tagassign <- tagAssign tmp' t
-        let res = if sf then (f_EVALTAG tmp) else tmp
+        let res = if sf then (f_MKLAZY tmp) else tmp
         return (mconcat $ dtmp:tagassign:ass,res)
 
 
@@ -816,12 +804,13 @@ declareStruct n = do
 
 basicNode :: Atom -> [Val] -> C (Maybe Expression)
 basicNode a _ | tagIsSuspFunction a = return Nothing
-basicNode a []  = do tellTags a ; return . Just $ (f_RAWWHAT (constant $ enum (nodeTagName a)))
+basicNode a []  = do tellTags a ; return . Just $ (f_SET_RAW_TAG (constant $ enum (nodeTagName a)))
 basicNode a [v] = do
     cpr <- asks rCPR
-    if a `Set.notMember` cpr then return Nothing else
-        case v of
-            Lit i ty | a == cChar, Just c <- ch -> return $ Just (f_VALUE (toExpression c)) where
+    case Map.lookup a cpr of
+        Nothing -> return Nothing
+        Just signed -> case v of
+            Lit i ty | a == cChar, Just c <- ch -> return $ Just (f_RAW_SET_UF (toExpression c)) where
                 ch = do
                     c <- toIntegral i
                     guard $ c >= ord minBound && c <= ord maxBound
@@ -830,7 +819,7 @@ basicNode a [v] = do
                     return c
             _ -> do
                 v <- convertVal v
-                return $ Just (f_VALUE v)
+                return $ Just (if signed then f_RAW_SET_F v else f_RAW_SET_UF v)
 basicNode _ _ = return Nothing
 
 instance Op.ToCmmTy Ty where
@@ -883,16 +872,18 @@ jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
 f_assert e    = functionCall (name "assert") [e]
 f_FROM_SPTR e = functionCall (name "FROM_SPTR") [e]
 f_NODEP e     = functionCall (name "NODEP") [e]
-f_VALUE e     = functionCall (name "VALUE") [e]
-f_GETVALUE e  = functionCall (name "GETVALUE") [e]
-f_EVALTAG e   = functionCall (name "EVALTAG") [e]
-f_EVALFUNC e  = functionCall (name "EVALFUNC") [e]
+f_RAW_SET_F e  = functionCall (name "RAW_SET_F") [e]
+f_RAW_SET_UF e = functionCall (name "RAW_SET_UF") [e]
+f_RAW_GET_F e  = functionCall (name "RAW_GET_F") [e]
+f_RAW_GET_UF e = functionCall (name "RAW_GET_UF") [e]
+f_MKLAZY e     = functionCall (name "MKLAZY") [e]
+f_TO_FPTR e    = functionCall (name "TO_FPTR") [e]
 f_eval e      = functionCall (name "eval") (mgc [e])
 f_promote e   = functionCall (name "promote") [e]
 f_PROMOTE e   = functionCall (name "PROMOTE") [e]
-f_GETWHAT e   = functionCall (name "GETWHAT") [e]
-f_SETWHAT e v = functionCall (name "SETWHAT") [e,v]
-f_RAWWHAT e   = functionCall (name "RAWWHAT") [e]
+f_FETCH_TAG e = functionCall (name "FETCH_TAG") [e]
+f_SET_RAW_TAG e   = functionCall (name "SET_RAW_TAG") [e]
+f_SET_MEM_TAG e v = functionCall (name "SET_MEM_TAG") [e,v]
 f_demote e    = functionCall (name "demote") [e]
 f_follow e    = functionCall (name "follow") [e]
 f_update x y  = functionCall (name "update") [x,y]
