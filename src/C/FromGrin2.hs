@@ -54,13 +54,20 @@ data Written = Written {
     }
     {-! derive: Monoid !-}
 
+-- special type representations when possible
+data TyRep
+    = TyRepRawTag    -- stored raw tag
+    | TyRepUntagged  -- memory, without a tag
+    | TyRepRawVal !Bool   -- stored raw argument and whether it is signed
+
 data Env = Env {
     rTodo :: Todo,
     rInscope :: Set.Set Name,
     rStowed :: Set.Set Name,  -- names that the garbage collector knows about
     rDeclare :: Bool,
     rEMap :: Map.Map Atom (Name,[Expression]),
-    rCPR  :: Map.Map Atom Bool,
+    rCPR  :: Map.Map Atom TyRep,
+    rConst :: Set.Set Atom,
     rGrin :: Grin
     }
     {-! derive: update !-}
@@ -70,26 +77,42 @@ newtype C a = C (RWST Env Written HcHash Uniq a)
     deriving(Monad,UniqueProducer,MonadState HcHash,MonadWriter Written,MonadReader Env,Functor)
 
 
-runC :: Grin -> C a -> (a,HcHash,Written)
-runC grin (C m) =  execUniq1 (runRWST m startEnv  emptyHcHash) where
+runC :: Grin -> C a -> ((a,HcHash,Written),Map.Map Atom TyRep)
+runC grin (C m) =  (execUniq1 (runRWST m startEnv emptyHcHash),ityrep) where
     TyEnv tmap = grinTypeEnv grin
+    ityrep = Map.mapMaybeWithKey tyRep tmap
     startEnv = Env {
-        rCPR = cpr,
+        rCPR = ityrep,
         rGrin = grin,
         rStowed = Set.empty,
         rDeclare = False,
         rTodo = TodoExp [],
         rEMap = mempty,
+        rConst = Map.keysSet $ Map.filter isConst ityrep,
         rInscope = mempty
         }
-    cpr = iw `Map.union` Map.insert cChar False (Map.fromList [ (a,False) | (a,TyTy { tySlots = [s], tySiblings = Just [a'] }) <- Map.assocs tmap, a == a', isJust (good s) ])
-    iw = if fopts FO.FullInt then mempty else Map.fromList [(cInt,True), (cWord,False)]
-    good s = do
+    isConst TyRepRawVal {} = True
+    isConst TyRepRawTag {} = True
+    isConst _ = False
+    tyRep k _ | k == cChar = Just $ TyRepRawVal False
+    tyRep k _ | not (fopts FO.FullInt), k == cWord = Just $ TyRepRawVal False
+    tyRep k _ | not (fopts FO.FullInt), k == cInt = Just $ TyRepRawVal True
+    tyRep k TyTy { tySlots = [s], tySiblings = Just [k'] } | k == k', good s = Just $ TyRepRawVal False
+    tyRep k tyty | null (tySlots tyty) = Just TyRepRawTag
+    tyRep k tyty | Just xs <- tySiblings tyty, all triv [ x | x <- xs, x /= k] = Just TyRepUntagged where
+        triv x = case Map.lookup x tmap of
+            Just t -> null (tySlots t)
+            Nothing -> False
+    tyRep _ _ = Nothing
+--    tyRep k tyty | tySiblings tyty == Just [k] = Just TyRepUntagged
+    --cpr = iw `Map.union` Map.insert cChar False (Map.fromList [ (a,False) | (a,TyTy { tySlots = [s], tySiblings = Just [a'] }) <- Map.assocs tmap, a == a', isJust (good s) ])
+    --iw = if fopts FO.FullInt then mempty else Map.fromList [(cInt,True), (cWord,False)]
+    good s = isJust $ do
         ct <- Op.toCmmTy s
         b <- Op.cmmTyBits ct
         guard $ b <= 30
         Op.HintNone <- Op.cmmTyHint ct
-        return True
+        return ()
 
 tellFunctions :: [Function] -> C ()
 tellFunctions fs = tell mempty { wFunctions = Map.fromList $ map (\x -> (functionName x,x)) fs }
@@ -105,11 +128,11 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (String,[String])
 compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c ++ jhc_rts2_c ++ generateArchAssertions ++ P.render ans ++ "\n", snub (reqLibraries req))  where
-    ans = vcat $ includes ++ [text "", enum_tag_t, header,cafs, buildConstants grin finalHcHash, body]
+    ans = vcat $ includes ++ [text "", enum_tag_t, header,cafs, buildConstants cpr grin finalHcHash, body]
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
     (header,body) = generateC (Map.elems fm) (Map.elems sm)
-    (cafs',finalHcHash,Written { wRequires = req, wFunctions = fm, wEnums = wenum, wStructures = sm, wTags = ts }) = runC grin $ go >> mapM convertCAF (grinCafs grin)
+    ((cafs',finalHcHash,Written { wRequires = req, wFunctions = fm, wEnums = wenum, wStructures = sm, wTags = ts }),cpr) = runC grin $ go >> mapM convertCAF (grinCafs grin)
     enum_tag_t | null enums = mempty
                | otherwise  = text "enum {" $$ nest 4 (P.vcat (punctuate P.comma $ enums)) $$ text "};"
         where
@@ -197,7 +220,7 @@ convertVal v = cvc v where
     cvc v = convertConst v >>= maybe (cv v) return
     cv (Var v ty) = fetchVar v ty
     cv (Const h) = do
-        cpr <- asks rCPR
+        cpr <- asks rConst
         case h of
             NodeC a ts -> do
                 bn <- basicNode a ts
@@ -210,7 +233,7 @@ convertVal v = cvc v where
                 (_,i) <- newConst cpr h
                 return $ variable (name $  'c':show i )
     cv h@(NodeC a ts) | valIsConstant h = do
-        cpr <- asks rCPR
+        cpr <- asks rConst
         bn <- basicNode a ts
         case bn of
             Just bn -> return bn
@@ -305,7 +328,7 @@ convertBody (Return [v] :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
 convertBody (Case v [p1@([NodeC _ (_:_)] :-> _),p2@([NodeC _ []] :-> _)]) = convertBody $ Case v [p2,p1]
 convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == TyNode = do
     scrut <- convertVal v
-    cpr <- asks rCPR
+    cpr <- asks rConst
     tellTags t
     let da (Var v _) e | v == v0 = convertBody e
         da v@Var {} e = do
@@ -314,31 +337,12 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == 
             return $ v'' =* scrut & e'
         da n1@(NodeC t _) (Return [n2@NodeC {}]) | n1 == n2 = convertBody (Return [v])
         da ~(NodeC t as) e = nodeAssign v t as e
-        {-
-        da (NodeC t [a]) e | t `Set.member` cpr = do
-            a' <- iDeclare $ convertVal a
-            let tmp = concrete t  scrut
-                ass = mconcat [if needed a then a' =* (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
-                fve = freeVars e
-                needed ~(Var v _) = v `Set.member` fve
-            e' <- convertBody e
-            return (ass & e')
-        da ~(NodeC t as) e = do
-            tellTags t
-            declareStruct t
-            as' <- iDeclare $ mapM convertVal as
-            let tmp = concrete t  scrut
-                ass = mconcat [if needed a then a' =* (project' (arg i) tmp) else mempty | a' <- as' | a <- as | i <- [(1 :: Int) ..] ]
-                fve = freeVars e
-                needed ~(Var v _) = v `Set.member` fve
-            e' <- convertBody e
-            return (ass & e')
-            -}
         am Var {} e = return e
         am ~(NodeC t2 _) e = do
-            tellTags t2
-            return $ annotate (show p2) (f_assert ((constant $ enum (nodeTagName t2)) `eq` tag) & e)
-        tag = f_FETCH_TAG scrut
+            --tellTags t2
+            --return $ annotate (show p2) (f_assert ((constant $ enum (nodeTagName t2)) `eq` tag) & e)
+            return $ annotate (show p2) e
+        tag = if null fps then f_FETCH_RAW_TAG scrut else f_FETCH_TAG scrut
         ifscrut = if null fps then f_SET_RAW_TAG tenum `eq` scrut else tenum `eq` tag where
             tenum = (constant $ enum (nodeTagName t))
     p1' <- da p1 e1
@@ -513,14 +517,14 @@ nodeAssign v t as e' = cna where
         cpr <- asks rCPR
         v' <- convertVal v
         case Map.lookup t cpr of
-            Just signed -> do
+            Just (TyRepRawVal signed) -> do
                 [arg] <- return as
                 t <- convertType $ getType arg
                 arg' <- iDeclare $ convertVal arg
                 let s = arg' =* cast t (if signed then f_RAW_GET_F v' else f_RAW_GET_UF v')
                 ss <- convertBody e'
                 return $ s & ss
-            Nothing -> do
+            _ -> do
                 declareStruct t
                 as' <- iDeclare $ mapM convertVal as
                 let ass = concat [perhapsM (a `Set.member` fve) $ a' =* (project' (arg i) (concrete t v')) | a' <- as' | Var a _ <- as |  i <- [( 1 :: Int) ..] ]
@@ -593,21 +597,22 @@ ccaf (v,val) = text "/* " <> text (show v) <> text " = " <> (text $ P.render (pp
      text "#define " <> tshow (varName v) <+>  text "(MKLAZY_C(&_" <> tshow (varName v) <> text "))\n";
 
 
-buildConstants grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
+buildConstants cpr grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
     tyenv = grinTypeEnv grin
     comm nn = text "/* " <> tshow (nn) <> text " */"
     cc nn@(HcNode a zs,i) = comm nn $$ cd $$ def where
         cd = text "static const struct" <+> tshow (nodeStructName a) <+> text "_c" <> tshow i <+> text "= {" <> hsep (punctuate P.comma (ntag ++ rs)) <> text "};"
-        Just TyTy { tySiblings = sibs } = findTyTy tyenv a
-        ntag = case sibs of
-            Just [a'] | a' == a -> []
+        --Just TyTy { tySiblings = sibs } = findTyTy tyenv a
+        ntag = case Map.lookup a cpr of
+            --Just [a'] | a' == a -> []
+            Just _ -> []
             _ -> [text ".what =" <+> tshow (nodeTagName a)]
         def = text "#define c" <> tshow i <+> text "((sptr_t)&_c" <> tshow i <> text ")"
         rs = [ f z i |  (z,i) <- zip zs [ 1 :: Int .. ]]
         f (Right i) a = text ".a" <> tshow a <+> text "=" <+> text ('c':show i)
         f (Left (Var n _)) a = text ".a" <> tshow a <+> text "=" <+> tshow (varName n)
         f (Left v) a = text ".a" <> tshow a <+> text "=" <+> text (show $ drawG e) where
-            Just e = fst3 . runC grin $ convertConst v
+            Just e = fst3 . fst . runC grin $ convertConst v
 
 convertConst :: Val -> C (Maybe Expression)
 convertConst (NodeC n as) | all valIsConstant as = basicNode n as
@@ -725,13 +730,16 @@ tagAssign e t | tagIsSuspFunction t = do
     en <- declareEvalFunc t
     return $ getHead e =* f_TO_FPTR (reference (variable en))
 tagAssign e t = do
+    cpr <- asks rCPR
     declareStruct t
     tyenv <- asks (grinTypeEnv . rGrin)
-    TyTy { tySiblings = sib } <- findTyTy tyenv t
-    tellTags t
-    case sib of
-        Just [n'] | n' == t -> return mempty
-        _ -> do return . toStatement $ f_SET_MEM_TAG e (constant (enum $ nodeTagName t))
+    --TyTy { tySiblings = sib } <- findTyTy tyenv t
+    case Map.lookup t cpr of
+        --Just [n'] | n' == t -> return mempty
+        Just _ -> return mempty
+        _ -> do
+            tellTags t
+            return . toStatement $ f_SET_MEM_TAG e (constant (enum $ nodeTagName t))
 
 
 tellAllTags :: Val -> C ()
@@ -785,10 +793,12 @@ newNode region ty ~(NodeC t as) = do
 
 declareStruct n = do
     grin <- asks rGrin
+    cpr <- asks rCPR
     let TyTy { tySlots = ts, tySiblings = ss } = runIdentity $ findTyTy (grinTypeEnv grin) n
     ts' <- mapM convertType ts
     let (dis,needsDis) | tagIsSuspFunction n = ([(name "head",fptr_t)],False)
                        | null ts = ([],False)
+                       | Just TyRepUntagged <- Map.lookup n cpr = ([],False)
                        | Just [n'] <- ss, n == n' = ([],False)
                        | otherwise = ([],True)
         fields = (dis ++ zip [ name $ 'a':show i | i <-  [(1 :: Int) ..] ] ts')
@@ -808,8 +818,7 @@ basicNode a []  = do tellTags a ; return . Just $ (f_SET_RAW_TAG (constant $ enu
 basicNode a [v] = do
     cpr <- asks rCPR
     case Map.lookup a cpr of
-        Nothing -> return Nothing
-        Just signed -> case v of
+        Just (TyRepRawVal signed) -> case v of
             Lit i ty | a == cChar, Just c <- ch -> return $ Just (f_RAW_SET_UF (toExpression c)) where
                 ch = do
                     c <- toIntegral i
@@ -820,6 +829,7 @@ basicNode a [v] = do
             _ -> do
                 v <- convertVal v
                 return $ Just (if signed then f_RAW_SET_F v else f_RAW_SET_UF v)
+        _ -> return Nothing
 basicNode _ _ = return Nothing
 
 instance Op.ToCmmTy Ty where
@@ -882,6 +892,8 @@ f_eval e      = functionCall (name "eval") (mgc [e])
 f_promote e   = functionCall (name "promote") [e]
 f_PROMOTE e   = functionCall (name "PROMOTE") [e]
 f_FETCH_TAG e = functionCall (name "FETCH_TAG") [e]
+f_FETCH_RAW_TAG e = functionCall (name "FETCH_RAW_TAG") [e]
+f_FETCH_MEM_TAG e = functionCall (name "FETCH_MEM_TAG") [e]
 f_SET_RAW_TAG e   = functionCall (name "SET_RAW_TAG") [e]
 f_SET_MEM_TAG e v = functionCall (name "SET_MEM_TAG") [e,v]
 f_demote e    = functionCall (name "demote") [e]
