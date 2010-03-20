@@ -4,7 +4,10 @@ import Control.Monad.Identity
 import Control.Monad
 import Control.Monad.Writer
 import Data.Maybe
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 
+import Options
 import Grin.Grin
 import Grin.Lint
 import Grin.Noodle
@@ -16,8 +19,7 @@ import Support.Tickle
 import Util.Gen
 import Util.UnionSolve
 import Util.UniqueMonad
-import qualified Data.Map as Map
-import qualified Data.Set as Set
+import qualified FlagOpts as FO
 
 data T = S | E
     deriving(Eq,Show)
@@ -51,6 +53,7 @@ instance Show Vr where
 
 {-# NOINLINE storeAnalyze #-}
 storeAnalyze :: Grin -> IO Grin
+storeAnalyze grin | fopts FO.Jgc = return grin
 storeAnalyze grin = do
     --dumpGrin "storeAnalyze1" grin
     let (grin',cs) = execUniq1 $ runWriterT (mapGrinFuncsM firstLam grin)
