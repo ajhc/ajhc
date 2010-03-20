@@ -99,7 +99,4 @@
 
 #define JHC_isPosix (!JHC_isWindows)
 
-#if _JHC_GC == _JHC_GC_JGC
-#include "src/data/rts/jhc_jgc.h"
-#endif
 

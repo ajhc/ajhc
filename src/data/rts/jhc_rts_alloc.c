@@ -140,6 +140,7 @@ jhc_malloc_atomic(size_t n) {
 
 #if _JHC_GC == _JHC_GC_JGC
 
+typedef struct frame *gc_t;
 static gc_t saved_gc;
 
 // #define GC_STACK_LIMIT 8192

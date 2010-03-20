@@ -151,7 +151,7 @@ compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c 
         mapM_ tellTags (Set.toList $ tset `mappend` tset')
     cafs = text "/* CAFS */" $$ (vcat $ cafs')
     convertCAF (v,val@(NodeC a [])) = do
-        en <- declareEvalFunc a
+        en <- declareEvalFunc True a
         let ef =  drawG $ f_TO_FPTR (reference $ variable en)
         let ts =  text "/* " <> text (show v) <> text " = " <> (text $ P.render (pprint val)) <> text "*/\n" <>
                 text "static node_t _" <> tshow (varName v) <> text " = { .head = " <> ef <> text " };\n" <>
@@ -581,7 +581,7 @@ convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_hea
     v' <- convertVal v
     c' <- convertVal c
     tmp <- newVar (ptrType sptr_t)
-    let malloc = tmp =* jhc_malloc (operator "*" (sizeof sptr_t) c')
+    let malloc = tmp =* jhc_malloc_ptrs  (operator "*" (sizeof sptr_t) c')
     fill <- case v of
         ValUnknown _ -> return mempty
         _ -> do
@@ -727,7 +727,7 @@ primUnOp n ta r a
 
 tagAssign :: Expression -> Atom -> C Statement
 tagAssign e t | tagIsSuspFunction t = do
-    en <- declareEvalFunc t
+    en <- declareEvalFunc False t
     return $ getHead e =* f_TO_FPTR (reference (variable en))
 tagAssign e t = do
     cpr <- asks rCPR
@@ -762,12 +762,15 @@ tellTags t = do
 newNode region ty ~(NodeC t as) = do
     let sf = tagIsSuspFunction t
     bn <- basicNode t as
+    cpr <- asks rCPR
     case bn of
       Just e -> return (mempty,if ty == wptr_t then e else cast ty e)
       Nothing -> do
         st <- nodeType t
         as' <- mapM convertVal as
-        let wmalloc = if not sf && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
+        --let wmalloc = if not sf && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
+        let wmalloc = jhc_malloc (not sf && t `Map.notMember` cpr) nptrs
+            nptrs = length (filter (not . nonPtr . getType) as) + if sf then 1 else 0
             malloc =  wmalloc (sizeof st)
             nonPtr TyPtr {} = False
             nonPtr TyNode = False
@@ -807,7 +810,8 @@ declareStruct n = do
             structureFields = fields,
             structureAligned = True,
             structureHasDiscriminator = not $ null dis,
-            structureNeedsDiscriminator = needsDis
+            --structureNeedsDiscriminator = not (fopts FO.Jgc) &&  needsDis
+            structureNeedsDiscriminator =  needsDis
             }
     unless (null fields) $ tell mempty { wStructures = Map.singleton (structureName theStruct) theStruct }
 
@@ -836,7 +840,7 @@ instance Op.ToCmmTy Ty where
     toCmmTy (TyPrim p) = Just p
     toCmmTy _ = Nothing
 
-declareEvalFunc n = do
+declareEvalFunc isCAF n = do
     fn <- tagToFunction n
     grin <- asks rGrin
     declareStruct n
@@ -848,7 +852,8 @@ declareEvalFunc n = do
         atype = ptrType nt
         body = rvar =* functionCall (toName (show $ fn)) (mgc [ project' (arg i) (variable aname) | _ <- ts | i <- [(1 :: Int) .. ] ])
         update =  f_update (cast sptr_t (variable aname)) rvar
-    tellFunctions [function fname wptr_t (mgct [(aname,atype)]) [a_STD, a_FALIGNED] (body & update & creturn rvar )]
+        addroot =  if  fopts FO.Jgc then f_gc_add_root rvar else emptyExpression
+    tellFunctions [function fname wptr_t (mgct [(aname,atype)]) [a_STD, a_FALIGNED] (body & update & addroot & creturn rvar )]
     return fname
 
 
@@ -878,7 +883,15 @@ castFunc _ _ tb e = cast (opTyToC tb) e
 --gc_roots vs = functionCall (name "gc_begin_frame0") (constant (number (fromIntegral $ length vs)):vs)
 gc_roots vs   = functionCall (name "gc_frame0") (v_gc:constant (number (fromIntegral $ length vs)):vs)
 gc_end        = functionCall (name "gc_end") []
-jhc_malloc sz = functionCall (name "jhc_malloc") [sz]
+tbsize sz = functionCall (name "TO_BLOCKS") [sz]
+jhc_malloc has_tag nptrs sz | fopts FO.Jgc = functionCall (name "gc_alloc_tag") [v_gc,tbsize sz, toExpression nptrs, toExpression has_tag]
+--    | fopts FO.Jgc =  functionCall (name "gc_alloc") [v_gc,tbsize sz, toExpression nptrs]
+jhc_malloc _ 0 sz = functionCall (name "jhc_malloc_atomic") [sz]
+jhc_malloc _ _ sz = functionCall (name "jhc_malloc") [sz]
+
+jhc_malloc_ptrs sz | fopts FO.Jgc =  functionCall (name "gc_alloc") [v_gc,tbsize sz, tbsize sz]
+jhc_malloc_ptrs sz = functionCall (name "jhc_malloc") [sz]
+
 f_assert e    = functionCall (name "assert") [e]
 f_FROM_SPTR e = functionCall (name "FROM_SPTR") [e]
 f_NODEP e     = functionCall (name "NODEP") [e]
@@ -889,6 +902,7 @@ f_RAW_GET_UF e = functionCall (name "RAW_GET_UF") [e]
 f_MKLAZY e     = functionCall (name "MKLAZY") [e]
 f_TO_FPTR e    = functionCall (name "TO_FPTR") [e]
 f_eval e      = functionCall (name "eval") (mgc [e])
+f_gc_add_root e  = functionCall (name "gc_add_root") (mgc [e])
 f_promote e   = functionCall (name "promote") [e]
 f_PROMOTE e   = functionCall (name "PROMOTE") [e]
 f_FETCH_TAG e = functionCall (name "FETCH_TAG") [e]
@@ -899,7 +913,6 @@ f_SET_MEM_TAG e v = functionCall (name "SET_MEM_TAG") [e,v]
 f_demote e    = functionCall (name "demote") [e]
 f_follow e    = functionCall (name "follow") [e]
 f_update x y  = functionCall (name "update") [x,y]
-jhc_malloc_atomic sz = functionCall (name "jhc_malloc_atomic") [sz]
 profile_update_inc   = toStatement $ functionCall (name "jhc_update_inc") []
 profile_case_inc     = toStatement $ functionCall (name "jhc_case_inc") []
 profile_function_inc = toStatement $ functionCall (name "jhc_function_inc") []

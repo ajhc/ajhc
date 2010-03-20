@@ -143,9 +143,14 @@ redirection to a whnf value.
 #define FETCH_TAG(x)      (IS_RAW_TAG(x) ? FETCH_RAW_TAG(x) : FETCH_MEM_TAG(x))
 #define IS_RAW_TAG(x)     ((bool)((uintptr_t)(x) & 0x2))
 #define FETCH_RAW_TAG(x)  RAW_GET_U16(x)
-#define FETCH_MEM_TAG(x)  (DNODEP(x)->what)
 #define SET_RAW_TAG(x)    RAW_SET_16(x)
+#if 0 && _JHC_GC == _JHC_GC_JGC
+#define FETCH_MEM_TAG(x)  (gc_tag(x))
+#define SET_MEM_TAG(x,v)  (gc_tag(x) = (v))
+#else
+#define FETCH_MEM_TAG(x)  (DNODEP(x)->what)
 #define SET_MEM_TAG(x,v)  (DNODEP(x)->what = (v))
+#endif
 
 
 
@@ -253,6 +258,10 @@ follow(sptr_t s)
         return (wptr_t)s;
 }
 
+#if _JHC_GC == _JHC_GC_JGC
+#include "src/data/rts/jhc_jgc.h"
+#endif
+
 static wptr_t A_STD A_UNUSED  A_HOT
 #if _JHC_GC == _JHC_GC_JGC
 eval(gc_t gc,sptr_t s)
@@ -268,11 +277,13 @@ eval(sptr_t s)
                 assert(h != BLACK_HOLE);
                 if(IS_LAZY(h)) {
                         eval_fn fn = (eval_fn)FROM_SPTR(h);
+                        assert(GET_PTYPE(h) == P_FUNC);
 #if _JHC_DEBUG
                         GETHEAD(ds) = BLACK_HOLE;
 #endif
 #if _JHC_GC == _JHC_GC_JGC
-                        wptr_t r = (*fn)(gc,NODEP(ds));
+                            gc_frame0(gc,1,s);
+                            wptr_t r = (*fn)(gc,NODEP(ds));
 #else
                         wptr_t r = (*fn)(NODEP(ds));
 #endif
@@ -296,6 +307,7 @@ update(sptr_t thunk, wptr_t new)
         assert(!IS_LAZY(new));
         GETHEAD(thunk) = (fptr_t)new;
 }
+
 
 
 

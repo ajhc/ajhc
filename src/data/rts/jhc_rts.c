@@ -20,6 +20,31 @@ static char *jhc_options_arch = "(unknown arch)";
 
 #if _JHC_PROFILE
 
+
+struct profile_stack {
+    struct tms tm_total;
+    struct tms tm_pushed;
+};
+
+struct profile_stack gc_alloc_time;
+struct profile_stack gc_gc_time;
+
+
+void
+profile_push(struct profile_stack *ps)
+{
+        times(&ps->tm_pushed);
+}
+
+void
+profile_pop(struct profile_stack *ps)
+{
+    struct tms tm;
+    times(&tm);
+    ps->tm_total.tms_utime += tm.tms_utime - ps->tm_pushed.tms_utime;
+    ps->tm_total.tms_stime += tm.tms_stime - ps->tm_pushed.tms_stime;
+}
+
 static uintmax_t jhc_prof_function_calls;
 static uintmax_t jhc_prof_case_statements;
 static uintmax_t jhc_prof_updates;
@@ -33,8 +58,17 @@ static uintmax_t jhc_prof_updates;
 #define jhc_update_inc()    do { } while(0)
 #define jhc_function_inc()  do { } while(0)
 #define jhc_case_inc()      do { } while(0)
+#define profile_push(x) do { } while(0)
+#define profile_pop(x) do { } while(0)
 
 #endif
+
+void print_times(struct tms *tm) {
+    float cpt = (float)sysconf(_SC_CLK_TCK);
+    fprintf(stderr, "User Time:   %.2fs\n", (float)tm->tms_utime/cpt);
+    fprintf(stderr, "System Time: %.2fs\n", (float)tm->tms_stime/cpt);
+    fprintf(stderr, "Total Time:  %.2fs\n", (float)(tm->tms_stime + tm->tms_utime)/cpt);
+}
 
 static void A_COLD
 jhc_print_profile(void) {
@@ -51,13 +85,12 @@ jhc_print_profile(void) {
         fprintf(stderr, "Version: %s\n\n", jhc_version);
         jhc_alloc_print_stats();
 #ifndef __WIN32__
-        float cpt = (float)sysconf(_SC_CLK_TCK);
-        fprintf(stderr, "User Time:   %.2fs\n", (float)tm.tms_utime/cpt);
-        fprintf(stderr, "System Time: %.2fs\n", (float)tm.tms_stime/cpt);
-        fprintf(stderr, "Total Time:  %.2fs\n", (float)(tm.tms_stime + tm.tms_utime)/cpt);
+        print_times(&tm);
 #endif
 
 #if _JHC_PROFILE
+        print_times(&gc_gc_time.tm_total);
+        print_times(&gc_alloc_time.tm_total);
         fprintf(stderr, "\nFunction Calls:   %llu\n", (unsigned long long)jhc_prof_function_calls);
         fprintf(stderr, "Case Statements:  %llu\n", (unsigned long long)jhc_prof_case_statements);
         fprintf(stderr, "Updates:          %llu\n", (unsigned long long)jhc_prof_updates);
