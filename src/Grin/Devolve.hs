@@ -102,7 +102,7 @@ instance Twiddle a => Twiddle [a] where
 twiddleExp e = f e where
     f (x :>>= lam) | fopts FO.Jgc && isAllocing x = do
         roots <- asks envRoots
-        let nroots = Set.fromList [ Var v t | (v,t) <- Set.toList (freeVars lam), isNode t, v > v0] Set.\\ roots
+        let nroots = Set.fromList [ Var v t | (v,t) <- Set.toList (freeVars (if isUsing x then ([] :-> x :>>= lam) else lam)), isNode t, v > v0] Set.\\ roots
         local (\e -> e { envRoots = envRoots e `Set.union` nroots}) $ do
             ne <- return (:>>=) `ap` twiddle x `ap` twiddle lam
             return $ gcRoots (Set.toList nroots) ne
@@ -113,6 +113,10 @@ twiddleExp e = f e where
         return . updateLetProps $ l { expDefs = ds, expBody = b }
     f (Case v as) = return Case `ap` twiddle v `ap` twiddle as
     f n = do e <- mapExpVal twiddleVal n ; mapExpExp twiddle e
+
+    isUsing (BaseOp StoreNode {} _) = True
+    isUsing Alloc {} = True
+    isUsing _ = False
 
     isAllocing (BaseOp StoreNode {} _) = True
     isAllocing (Return [Var {}]) = False
