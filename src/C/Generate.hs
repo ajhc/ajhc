@@ -692,6 +692,14 @@ instance ToExpression Name where
 instance ToExpression Char where
     toExpression c = constant $ character c
 
+instance ToExpression Int where
+    toExpression c = constant $ number $ fromIntegral c
+
+instance ToExpression Integer where
+    toExpression c = constant $ number c
+
+instance ToExpression Bool where
+    toExpression b = toExpression $ if b then cTrue else cFalse
 
 infixl 1 &
 
