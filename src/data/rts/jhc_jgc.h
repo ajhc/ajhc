@@ -7,6 +7,8 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
+#define JGC_STATUS 1
+
 #define ALIGN(a,n) ((n) - 1 + ((a) - ((n) - 1) % (a)))
 
 typedef struct {
@@ -26,7 +28,7 @@ struct frame {
 // the underlying malloc implementation has some
 // minimum size and this allows memory blocks to
 // be reused more often.
-#define GC_MINIMUM_SIZE 2
+#define GC_MINIMUM_SIZE 1
 #define GC_BASE sizeof(void *)
 
 #define TO_BLOCKS(x) ((x) <= GC_MINIMUM_SIZE*GC_BASE ? GC_MINIMUM_SIZE : (((x) - 1)/GC_BASE) + 1)
@@ -43,6 +45,7 @@ struct frame {
 #define gc_mk_alloc_tag_s(ty, np, tag) static inline ty *gc_alloc_ ## ty ## _s(gc_t gc, ty v) { ty *x = gc_alloc(gc,gc_count(ty),np); gc_tag(x) = tag; *x = v; return x; }
 #define gc_tag(p) (((entry_header_t *)((void *)p - sizeof(void *)))->tag)
 
+#define FOOF 0xF00DF00FACEBAFFUL
 
 void gc_print_stats(gc_t gc);
 void gc_perform_gc(gc_t gc);
@@ -72,7 +75,7 @@ bool gc_del_root(gc_t gc, void *root);
 #include <stdio.h>
 
 
-#if 1
+#if 0
 #define debugf(...) fprintf(stderr,__VA_ARGS__)
 #else
 #define debugf(...)
@@ -208,7 +211,17 @@ gc_perform_gc(gc_t gc)
         gc_free = gc_allocated;
         assert(gc_grey == NULL);
         gc_allocated = gc_black;
+#if JGC_STATUS
         gc_print_stats(gc);
+#endif
+#if 0
+        for((J1F(r,gc_free,ix)); r; (J1N(r,gc_free,ix))) {
+                entry_t *e = (entry_t *)(ix * GC_BASE);
+                mem_inuse -= (e->u.v.count + 1)*GC_BASE;
+                J1U(r,gc_free,ix);
+                free(e);
+        }
+#endif
         profile_pop(&gc_gc_time);
 }
 
@@ -244,9 +257,11 @@ retry:
         if(retried) {
         if(mem_inuse > ((heap_threshold * 7) / 10)) {
                 heap_threshold *= 2;
+#if JGC_STATUS
                 fprintf(stderr, "Increasing heap threshold to %u bytes.\n", (unsigned) heap_threshold);
         } else {
                 fprintf(stderr, "Freed %u bytes.\n", (unsigned) (initial_mem - mem_inuse));
+#endif
         }
         }
         entry_t *e;

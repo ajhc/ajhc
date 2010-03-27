@@ -852,7 +852,7 @@ declareEvalFunc isCAF n = do
         atype = ptrType nt
         body = rvar =* functionCall (toName (show $ fn)) (mgc [ project' (arg i) (variable aname) | _ <- ts | i <- [(1 :: Int) .. ] ])
         update =  f_update (cast sptr_t (variable aname)) rvar
-        addroot =  if  fopts FO.Jgc then f_gc_add_root rvar else emptyExpression
+        addroot =  if isCAF && fopts FO.Jgc then f_gc_add_root rvar else emptyExpression
     tellFunctions [function fname wptr_t (mgct [(aname,atype)]) [a_STD, a_FALIGNED] (body & update & addroot & creturn rvar )]
     return fname
 
@@ -889,7 +889,7 @@ jhc_malloc has_tag nptrs sz | fopts FO.Jgc = functionCall (name "gc_alloc_tag") 
 jhc_malloc _ 0 sz = functionCall (name "jhc_malloc_atomic") [sz]
 jhc_malloc _ _ sz = functionCall (name "jhc_malloc") [sz]
 
-jhc_malloc_ptrs sz | fopts FO.Jgc =  functionCall (name "gc_alloc") [v_gc,tbsize sz, tbsize sz]
+jhc_malloc_ptrs sz | fopts FO.Jgc =  functionCall (name "gc_alloc_tag") [v_gc,tbsize sz, tbsize sz, toExpression False]
 jhc_malloc_ptrs sz = functionCall (name "jhc_malloc") [sz]
 
 f_assert e    = functionCall (name "assert") [e]

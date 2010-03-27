@@ -112,6 +112,12 @@ twiddleExp e = f e where
         b <- twiddle (expBody l)
         return . updateLetProps $ l { expDefs = ds, expBody = b }
     f (Case v as) = return Case `ap` twiddle v `ap` twiddle as
+    f x | fopts FO.Jgc && isUsing x && isAllocing x = do
+        roots <- asks envRoots
+        let nroots = Set.fromList [ Var v t | (v,t) <- Set.toList (freeVars x), isNode t, v > v0] Set.\\ roots
+        local (\e -> e { envRoots = envRoots e `Set.union` nroots}) $ do
+            ne <- mapExpVal twiddleVal x
+            return $ gcRoots (Set.toList nroots) ne
     f n = do e <- mapExpVal twiddleVal n ; mapExpExp twiddle e
 
     isUsing (BaseOp StoreNode {} _) = True
@@ -119,6 +125,7 @@ twiddleExp e = f e where
     isUsing _ = False
 
     isAllocing (BaseOp StoreNode {} _) = True
+    isAllocing (BaseOp Eval {} _) = True
     isAllocing (Return [Var {}]) = False
     isAllocing (Return [NodeC {}]) = True
     isAllocing App {} = True
