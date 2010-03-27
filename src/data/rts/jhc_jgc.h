@@ -53,19 +53,15 @@ struct frame {
 #define gc_mk_alloc_tag_s(ty, np, tag) static inline ty *gc_alloc_ ## ty ## _s(gc_t gc, ty v) { ty *x = gc_alloc(gc,gc_count(ty),np); gc_tag(x) = tag; *x = v; return x; }
 #define gc_tag(p) (((entry_header_t *)((void *)p - sizeof(void *)))->tag)
 
-#define FOOF 0xF00DF00FACEBAFFUL
-
-void gc_print_stats(gc_t gc);
-void gc_perform_gc(gc_t gc);
-void *gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag);
+static void gc_print_stats(gc_t gc);
+static void gc_perform_gc(gc_t gc);
+static void *gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag);
 
 static inline void *
 gc_alloc_bytes(gc_t gc,size_t count) {
         return gc_alloc_tag(gc, TO_BLOCKS(count), 0, 0);
 }
 
-bool gc_add_root(gc_t gc, void *root);
-bool gc_del_root(gc_t gc, void *root);
 
 #endif
 
@@ -82,12 +78,12 @@ bool gc_del_root(gc_t gc, void *root);
 #endif
 
 
-static Pvoid_t gc_roots = NULL;       // extra roots in addition to the stack
-static Pvoid_t gc_allocated = NULL;   // black set of currently allocated memory
-static size_t heap_threshold = 2048;  // threshold at which we want to run a gc rather than malloc more memory
-static size_t mem_inuse;              // amount of memory in use by gc'ed memory
-static unsigned number_gcs;           // number of garbage collections
-static unsigned number_allocs;        // number of allocations since last garbage collection
+static Pvoid_t  gc_roots = NULL;        // extra roots in addition to the stack
+static Pvoid_t  gc_allocated = NULL;    // black set of currently allocated memory
+static size_t   heap_threshold = 2048;  // threshold at which we want to run a gc rather than malloc more memory
+static size_t   mem_inuse;              // amount of memory in use by gc'ed memory
+static unsigned number_gcs;             // number of garbage collections
+static unsigned number_allocs;          // number of allocations since last garbage collection
 
 #define SHOULD_FOLLOW(w)  IS_PTR(w)
 
@@ -107,7 +103,7 @@ gc_add_root(gc_t gc, void *root)
                 int r;
                 J1S(r,gc_roots,((Word_t)root / GC_BASE) - 1 );
                 return (bool)r;
-        } else 
+        } else
                 return false;
 }
 
@@ -118,7 +114,7 @@ gc_del_root(gc_t gc, void *root)
                 int r;
                 J1U(r,gc_roots,((Word_t)root / GC_BASE) - 1);
                 return (bool)r;
-        } else 
+        } else
                 return false;
 }
 
@@ -131,41 +127,59 @@ gc_print_stats(gc_t gc)
         fprintf(stderr,"allocated: %5lu roots: %3lu mem_inuse: %5lu heap_threshold: %5lu gcs: %3u\n",n_allocated,n_roots,(long unsigned)mem_inuse,(long unsigned)heap_threshold,number_gcs);
 }
 
+
+struct stack {
+        unsigned size;
+        unsigned ptr;
+        uintptr_t *stack;
+};
+
+#define EMPTY_STACK { 0, 0, NULL }
+
+static void
+stack_check(struct stack *s, unsigned n) {
+        while(s->size - s->ptr <= n) {
+                s->size += 4096;
+                s->stack = realloc(s->stack, sizeof(uintptr_t)*s->size);
+                assert(s->stack);
+                debugf(stderr, "stack:");
+                for(unsigned i = 0; i < s->ptr; i++) {
+                        debugf(stderr, " %p", (void *)s->stack[i]);
+                }
+                debugf(stderr, "\n");
+        }
+}
+
 static void
 gc_perform_gc(gc_t gc)
 {
         profile_push(&gc_gc_time);
+        number_gcs++;
+
         unsigned number_redirects = 0;
         unsigned number_stack = 0;
         unsigned number_ptr = 0;
-        unsigned number_whnf = 0;
-        number_gcs++;
+        struct stack stack = EMPTY_STACK;
+
         Pvoid_t gc_grey = NULL;
-        Pvoid_t gc_black = NULL;
         Word_t ix;
-        int r;
-        // initialize the grey set with the roots
         debugf("Setting Roots:");
-        for(ix = 0,(J1F(r,gc_roots,ix)); r; (J1N(r,gc_roots,ix))) {
+        Word_t n_roots;
+        J1C(n_roots,gc_roots,0,-1);
+        stack_check(&stack, n_roots);
+        int r; for(ix = 0,(J1F(r,gc_roots,ix)); r; (J1N(r,gc_roots,ix))) {
                 debugf(" %p",(void *)(ix * GC_BASE));
+                stack.stack[stack.ptr++] = ix*GC_BASE;
                 int d; J1S(d,gc_grey,ix);
         }
         debugf("\n");
         debugf("Trace:");
         for(;gc;gc = gc->prev) {
                 debugf(" |");
+                stack_check(&stack, gc->nptrs);
                 for(unsigned i = 0;i < gc->nptrs; i++) {
                         number_stack++;
-                        //if(IS_LAZY(gc->ptrs[i])) {
-                        //        if(!IS_LAZY(GETHEAD(FROM_SPTR(gc->ptrs[i])))) {
-                        //                number_redirects++;
-                        //                debugf(" *");
-                        //                gc->ptrs[i] = GETHEAD(FROM_SPTR(gc->ptrs[i]));
-                        //                number_whnf++;
-                        //        }
-                        //} else {
-                        //        number_whnf++;
-                        //}
+                        // TODO - short circuit redirects on stack
                         if(__predict_false(!SHOULD_FOLLOW(gc->ptrs[i]))) {
                                 debugf(" -");
                                 continue;
@@ -174,24 +188,30 @@ gc_perform_gc(gc_t gc)
                         entry_t *e = (entry_t *)FROM_SPTR(gc->ptrs[i]) - 1;
                         debugf(" %p",(void *)e);
                         int d; J1S(d,gc_grey,(Word_t)e / GC_BASE);
+                        if(d)
+                                stack.stack[stack.ptr++] = (uintptr_t)e;
                 }
         }
         debugf("\n");
-        // trace the grey
-        while(ix = 0,(J1F(r,gc_grey,ix)),r) {
+
+        while(stack.ptr) {
+                uintptr_t ix = stack.stack[--stack.ptr] / GC_BASE;
+                J1T(r,gc_grey,ix);
+                assert(r);
                 debugf("Processing Grey: %p ",(void *)(ix * GC_BASE));
-                J1U(r,gc_grey,ix);
                 J1U(r,gc_allocated,ix);
                 if(__predict_false(r == 0)) {
+                        J1U(r,gc_grey,ix);
                         debugf("Skipping.\n");
                         continue;
                 }
                 debugf("Blackening\n");
-                J1S(r,gc_black,ix);
+                //J1S(r,gc_black,ix);
 
                 entry_t *e = (entry_t *)(ix * GC_BASE);
                 int offset = e->u.v.tag ? 1 : 0;
-                for(int i = 0 + offset;i < e->u.v.nptrs + offset; i++) {
+                stack_check(&stack, e->u.v.nptrs);
+                for(int i = offset; i < e->u.v.nptrs + offset; i++) {
                         if(P_LAZY == GET_PTYPE(e->ptrs[i])) {
                                 if(!IS_LAZY(GETHEAD(FROM_SPTR(e->ptrs[i])))) {
                                         number_redirects++;
@@ -199,30 +219,28 @@ gc_perform_gc(gc_t gc)
                                         e->ptrs[i] = GETHEAD(FROM_SPTR(e->ptrs[i]));
                                 }
                         }
-                        entry_t * ptr = e->ptrs[i];
-                        if(SHOULD_FOLLOW(ptr)) {
-                                ptr = FROM_SPTR(ptr);
-                                debugf("Following: %p %p\n",e->ptrs[i], (void *)(ptr - 1));
-                                Word_t p = (Word_t)(ptr - 1) / GC_BASE;
-                                int r;
-                                J1T(r,gc_black,p);
-                                if(__predict_true(!r))
-                                        J1S(r,gc_grey,p);
+                        if(SHOULD_FOLLOW(e->ptrs[i])) {
+                                entry_t * ptr = (entry_t *)(FROM_SPTR(e->ptrs[i])) - 1;
+                                debugf("Following: %p %p\n",e->ptrs[i], (void *)ptr);
+                                Word_t p = (Word_t)ptr / GC_BASE;
+                                int d;
+                                J1S(d,gc_grey,p);
+                                if(d)
+                                        stack.stack[stack.ptr++] = (uintptr_t)ptr;
                         }
-
                 }
         }
-        assert(gc_grey == NULL);
+        free(stack.stack);
         for(ix = 0, (J1F(r,gc_allocated,ix)); r; (J1N(r,gc_allocated,ix))) {
                 entry_t *e = (entry_t *)(ix * GC_BASE);
                 mem_inuse -= (e->u.v.count + 1)*GC_BASE;
                 free(e);
         }
         J1FA(r,gc_allocated);
-        gc_allocated = gc_black;
-#if JGC_STATUS
-        fprintf(stderr, "Ss: %5u Ws: %5u Ps: %5u Rs: %5u As: %5u ", number_stack, number_whnf, number_ptr, number_redirects, number_allocs);
+        gc_allocated = gc_grey;
         number_allocs = 0;
+#if JGC_STATUS
+        fprintf(stderr, "Ss: %5u Ps: %5u Rs: %5u As: %5u ", number_stack, number_ptr, number_redirects, number_allocs);
         gc_print_stats(gc);
 #endif
         profile_pop(&gc_gc_time);
