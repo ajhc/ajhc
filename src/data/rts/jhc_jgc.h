@@ -59,16 +59,8 @@ void gc_print_stats(gc_t gc);
 void gc_perform_gc(gc_t gc);
 void *gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag);
 
-// static inline void *
-// gc_alloc_tag(gc_t gc,size_t count, unsigned nptrs, int tag)
-// {
-//         void *ptr = gc_alloc(gc, TO_BLOCKS(count), 0);
-//         return ptr;
-// }
-
 static inline void *
-gc_alloc_bytes(gc_t gc,size_t count)
-{
+gc_alloc_bytes(gc_t gc,size_t count) {
         return gc_alloc_tag(gc, TO_BLOCKS(count), 0, 0);
 }
 
@@ -90,68 +82,56 @@ bool gc_del_root(gc_t gc, void *root);
 #endif
 
 
-static Pvoid_t gc_roots = NULL;
-static Pvoid_t gc_allocated = NULL;
-//static Pvoid_t gc_free = NULL;
+static Pvoid_t gc_roots = NULL;       // extra roots in addition to the stack
+static Pvoid_t gc_allocated = NULL;   // black set of currently allocated memory
+static size_t heap_threshold = 2048;  // threshold at which we want to run a gc rather than malloc more memory
+static size_t mem_inuse;              // amount of memory in use by gc'ed memory
+static unsigned number_gcs;           // number of garbage collections
+static unsigned number_allocs;        // number of allocations since last garbage collection
 
-// we allow new malloced memory until this threshold is reached
-static size_t heap_threshold = 2048;
-
-// how much memory is currently in use
-static size_t mem_inuse;
-
-unsigned number_gcs;
-unsigned number_allocs;
-
-
-// #define SHOULD_FOLLOW(w)  (w && !((uintptr_t)w & 0x3))
-// #define SHOULD_FOLLOW(w)  (IS_PTR(w) && ((w) < &_start || (w) >= &_end))
 #define SHOULD_FOLLOW(w)  IS_PTR(w)
 
 typedef struct {
         union {
-        entry_header_t v;
-        void * _dummy;
+                entry_header_t v;
+                void * _dummy;
         } u;
         void * ptrs[0];
 } entry_t;
 
 
-bool
+static bool
 gc_add_root(gc_t gc, void *root)
 {
         if(SHOULD_FOLLOW(root)) {
                 int r;
                 J1S(r,gc_roots,((Word_t)root / GC_BASE) - 1 );
                 return (bool)r;
-        } else {
+        } else 
                 return false;
-        }
 }
 
-bool
+static bool
 gc_del_root(gc_t gc, void *root)
 {
         if(SHOULD_FOLLOW(root)) {
                 int r;
                 J1U(r,gc_roots,((Word_t)root / GC_BASE) - 1);
                 return (bool)r;
-        } else {
+        } else 
                 return false;
-        }
 }
 
-void
+static void
 gc_print_stats(gc_t gc)
 {
         Word_t n_allocated,n_roots;
         J1C(n_allocated,gc_allocated,0,-1);
         J1C(n_roots,gc_roots,0,-1);
-//        J1C(n_free,gc_free,0,-1);
         fprintf(stderr,"allocated: %5lu roots: %3lu mem_inuse: %5lu heap_threshold: %5lu gcs: %3u\n",n_allocated,n_roots,(long unsigned)mem_inuse,(long unsigned)heap_threshold,number_gcs);
 }
 
-void
+static void
 gc_perform_gc(gc_t gc)
 {
         profile_push(&gc_gc_time);
@@ -232,16 +212,7 @@ gc_perform_gc(gc_t gc)
 
                 }
         }
-
-//        Word_t w;
-        // add any contents of the old list free list to our new one
-//        for((J1F(r,gc_free,ix)); r; (J1N(r,gc_free,ix))) {
- //               int d; J1S(d,gc_allocated,ix);
- //       }
-//        J1FA(w,gc_free);
-//        gc_free = gc_allocated;
         assert(gc_grey == NULL);
-
         for(ix = 0, (J1F(r,gc_allocated,ix)); r; (J1N(r,gc_allocated,ix))) {
                 entry_t *e = (entry_t *)(ix * GC_BASE);
                 mem_inuse -= (e->u.v.count + 1)*GC_BASE;
@@ -257,7 +228,7 @@ gc_perform_gc(gc_t gc)
         profile_pop(&gc_gc_time);
 }
 
-void *
+static void *
 gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag)
 {
         profile_push(&gc_alloc_time);
@@ -283,63 +254,3 @@ gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag)
         return (void *)(e + 1);
 }
 
-
-/*
-
-void *
-gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag)
-{
-        profile_push(&gc_alloc_time);
-        assert(nptrs <= count);
-        int r;
-        Word_t ix = 0;
-        bool retried = false;
-        size_t initial_mem = mem_inuse;
-retry:
-        for((J1F(r,gc_free,ix)); r; (J1N(r,gc_free,ix))) {
-                entry_t *e = (entry_t *)(ix * GC_BASE);
-                if(e->u.v.count == count) {
-                        debugf("Reusing space: %p %i %i %i\n",(void *)e,count,nptrs,tag);
-                        J1S(r,gc_allocated,ix);
-                        J1U(r,gc_free,ix);
-                        e->u.v.nptrs = nptrs;
-                        e->u.v.tag = tag;
-                        memset(e + 1,0,count*GC_BASE);
-                        profile_pop(&gc_alloc_time);
-                        return (void *)(e + 1);
-                } else {
-                        mem_inuse -= (e->u.v.count + 1)*GC_BASE;
-                        J1U(r,gc_free,ix);
-                        free(e);
-                }
-        }
-        // if we didn't free up
-        if(retried) {
-        if(mem_inuse > ((heap_threshold * 7) / 10)) {
-                heap_threshold *= 2;
-#if JGC_STATUS
-                fprintf(stderr, "Increasing heap threshold to %u bytes.\n", (unsigned) heap_threshold);
-        } else {
-                fprintf(stderr, "Freed %u bytes.\n", (unsigned) (initial_mem - mem_inuse));
-#endif
-        }
-        }
-        entry_t *e;
-        if(mem_inuse < heap_threshold && (e = malloc((count + 1)*GC_BASE))) {
-                mem_inuse += (count + 1)*GC_BASE;
-                e->u.v.count = count;
-                e->u.v.nptrs = nptrs;
-                e->u.v.tag = tag;
-                int r;
-                debugf("allocated: %p %i %i %i\n",(void *)e, count, nptrs, tag);
-                J1S(r,gc_allocated,(Word_t)e / GC_BASE);
-                profile_pop(&gc_alloc_time);
-                return (void *)(e + 1);
-        } else {
-                gc_perform_gc(gc);
-                retried = true;
-                goto retry;
-        }
-}
-
-*/
