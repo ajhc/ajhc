@@ -218,7 +218,8 @@ compile prog@Program { progDataTable = dataTable } = do
         dumpTyEnv newTyEnv
     fbaps <- readIORef funcBaps
     let cafs = [ (x,y) | (_,x,y) <- rcafs ]
-        initCafs = sequenceG_ [ BaseOp Overwrite [(Var v TyINode),node] | (v,node) <- cafs ]
+        --initCafs = sequenceG_ [ BaseOp Overwrite [(Var v TyINode),node] | (v,node) <- cafs ]
+        initCafs = Return []
         ds' = ds ++ fbaps
         a @>> b = a :>>= ([] :-> b)
         sequenceG_ [] = Return []

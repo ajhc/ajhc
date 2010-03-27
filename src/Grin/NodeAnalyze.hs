@@ -117,6 +117,7 @@ nodeAnalyze grin' = do
     let cs = runM grin $ do
             mapM_ doFunc (grinFuncs grin)
             mapM_ docaf (grinCafs grin)
+            doFunc (toAtom "@initcafs",[] :-> initCafs grin)
         grin = renameUniqueGrin grin'
         docaf (v,tt) | True = tell $ Right top `equals` Left (V (Vr v) TyINode)
                      | otherwise = return ()
@@ -137,6 +138,10 @@ nodeAnalyze grin' = do
 
 
 data Todo = Todo !Bool [V] | TodoNothing
+
+initCafs grin = f (grinCafs grin) (Return []) where
+        f ((v,node):rs) rest = BaseOp Overwrite [(Var v TyINode),node] :>>= [] :-> f rs rest
+        f [] rest = rest
 
 doFunc :: (Atom,Lam) -> M ()
 doFunc (name,arg :-> body) = ans where

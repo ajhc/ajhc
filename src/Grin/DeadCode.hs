@@ -1,8 +1,8 @@
 module Grin.DeadCode(deadCode) where
 
 
+import Control.Monad
 import Data.Monoid
-import Monad
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 
@@ -39,6 +39,11 @@ deadCode stats roots grin = do
         addRule $ value True `implies` sValue usedFuncs r
     let postInline = phaseEvalInlined (grinPhase grin)
 
+    forM_ (grinCafs grin) $ \ (v,NodeC t []) -> do
+        (0,fn) <- tagUnfunction t
+        v' <- supplyValue usedCafs v
+        addRule $ conditionalRule id v' $ (suspFuncs `isSuperSetOf` value (Set.singleton fn))
+        addRule $ v' `implies` (sValue usedFuncs fn)
 
     mapM_ (go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline) (grinFuncs grin)
     findFixpoint Nothing {-"Dead Code"-} fixer
@@ -60,7 +65,7 @@ deadCode stats roots grin = do
         print suspFuncs
     let cafSet = fg uc
         funSet = fg uf
-        argSet = fg ua 
+        argSet = fg ua
                  `Set.union`
                  Set.fromList [ (n,i) | FuncDef n (args :-> _) _ _ <- grinFunctions grin,
                                         n `Map.member` grinEntryPoints grin,
