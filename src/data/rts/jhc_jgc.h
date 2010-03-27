@@ -3,6 +3,14 @@
 #ifndef JGC_H
 #define JGC_H
 
+// #if __GNUC_PREREQ__(2, 96)
+#define __predict_true(exp)     __builtin_expect(!!(exp), 1)
+#define __predict_false(exp)    __builtin_expect(!!(exp), 0)
+// #else
+// #define __predict_true(exp)     (exp)
+// #define __predict_false(exp)    (exp)
+// #endif
+
 #include <stddef.h>
 #include <stdbool.h>
 #include <inttypes.h>
@@ -84,15 +92,16 @@ bool gc_del_root(gc_t gc, void *root);
 
 static Pvoid_t gc_roots = NULL;
 static Pvoid_t gc_allocated = NULL;
-static Pvoid_t gc_free = NULL;
+//static Pvoid_t gc_free = NULL;
 
 // we allow new malloced memory until this threshold is reached
-static size_t heap_threshold = 256;
+static size_t heap_threshold = 2048;
 
 // how much memory is currently in use
 static size_t mem_inuse;
 
 unsigned number_gcs;
+unsigned number_allocs;
 
 
 // #define SHOULD_FOLLOW(w)  (w && !((uintptr_t)w & 0x3))
@@ -135,11 +144,11 @@ gc_del_root(gc_t gc, void *root)
 void
 gc_print_stats(gc_t gc)
 {
-        Word_t n_allocated,n_roots,n_free;
+        Word_t n_allocated,n_roots;
         J1C(n_allocated,gc_allocated,0,-1);
         J1C(n_roots,gc_roots,0,-1);
-        J1C(n_free,gc_free,0,-1);
-        fprintf(stderr,"allocated: %lu roots: %lu free: %lu mem_inuse: %lu heap_threshold: %lu gcs: %u\n",n_allocated,n_roots,n_free,(long unsigned)mem_inuse,(long unsigned)heap_threshold,number_gcs);
+//        J1C(n_free,gc_free,0,-1);
+        fprintf(stderr,"allocated: %5lu roots: %3lu mem_inuse: %5lu heap_threshold: %5lu gcs: %3u\n",n_allocated,n_roots,(long unsigned)mem_inuse,(long unsigned)heap_threshold,number_gcs);
 }
 
 void
@@ -167,17 +176,17 @@ gc_perform_gc(gc_t gc)
                 debugf(" |");
                 for(unsigned i = 0;i < gc->nptrs; i++) {
                         number_stack++;
-                        if(IS_LAZY(gc->ptrs[i])) {
-                                if(!IS_LAZY(GETHEAD(FROM_SPTR(gc->ptrs[i])))) {
-                                        number_redirects++;
-                                        debugf(" *");
-                                        gc->ptrs[i] = GETHEAD(FROM_SPTR(gc->ptrs[i]));
-                                        number_whnf++;
-                                }
-                        } else {
-                                number_whnf++;
-                        }
-                        if(!SHOULD_FOLLOW(gc->ptrs[i])) {
+                        //if(IS_LAZY(gc->ptrs[i])) {
+                        //        if(!IS_LAZY(GETHEAD(FROM_SPTR(gc->ptrs[i])))) {
+                        //                number_redirects++;
+                        //                debugf(" *");
+                        //                gc->ptrs[i] = GETHEAD(FROM_SPTR(gc->ptrs[i]));
+                        //                number_whnf++;
+                        //        }
+                        //} else {
+                        //        number_whnf++;
+                        //}
+                        if(__predict_false(!SHOULD_FOLLOW(gc->ptrs[i]))) {
                                 debugf(" -");
                                 continue;
                         }
@@ -193,7 +202,7 @@ gc_perform_gc(gc_t gc)
                 debugf("Processing Grey: %p ",(void *)(ix * GC_BASE));
                 J1U(r,gc_grey,ix);
                 J1U(r,gc_allocated,ix);
-                if(r == 0) {
+                if(__predict_false(r == 0)) {
                         debugf("Skipping.\n");
                         continue;
                 }
@@ -217,38 +226,65 @@ gc_perform_gc(gc_t gc)
                                 Word_t p = (Word_t)(ptr - 1) / GC_BASE;
                                 int r;
                                 J1T(r,gc_black,p);
-                                if(!r)
+                                if(__predict_true(!r))
                                         J1S(r,gc_grey,p);
                         }
 
                 }
         }
 
-        ix = 0;
-        Word_t w;
+//        Word_t w;
         // add any contents of the old list free list to our new one
-        for((J1F(r,gc_free,ix)); r; (J1N(r,gc_free,ix))) {
-                int d; J1S(d,gc_allocated,ix);
-        }
-        J1FA(w,gc_free);
-        gc_free = gc_allocated;
+//        for((J1F(r,gc_free,ix)); r; (J1N(r,gc_free,ix))) {
+ //               int d; J1S(d,gc_allocated,ix);
+ //       }
+//        J1FA(w,gc_free);
+//        gc_free = gc_allocated;
         assert(gc_grey == NULL);
-        gc_allocated = gc_black;
-#if JGC_STATUS
-        fprintf(stderr, "Ss: %3u Ws: %3u Ps: %4u Rs: %3u\n", number_stack, number_whnf, number_ptr, number_redirects);
-        gc_print_stats(gc);
-#endif
-#if 0
-        for((J1F(r,gc_free,ix)); r; (J1N(r,gc_free,ix))) {
+
+        for(ix = 0, (J1F(r,gc_allocated,ix)); r; (J1N(r,gc_allocated,ix))) {
                 entry_t *e = (entry_t *)(ix * GC_BASE);
                 mem_inuse -= (e->u.v.count + 1)*GC_BASE;
-                J1U(r,gc_free,ix);
                 free(e);
         }
+        J1FA(r,gc_allocated);
+        gc_allocated = gc_black;
+#if JGC_STATUS
+        fprintf(stderr, "Ss: %5u Ws: %5u Ps: %5u Rs: %5u As: %5u ", number_stack, number_whnf, number_ptr, number_redirects, number_allocs);
+        number_allocs = 0;
+        gc_print_stats(gc);
 #endif
         profile_pop(&gc_gc_time);
 }
 
+void *
+gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag)
+{
+        profile_push(&gc_alloc_time);
+        number_allocs++;
+        assert(nptrs <= count);
+        if(__predict_false(mem_inuse > heap_threshold)) {
+                gc_perform_gc(gc);
+                if(__predict_false(mem_inuse > ((heap_threshold * 6) / 10))) {
+                        heap_threshold *= 2;
+#if JGC_STATUS
+                        fprintf(stderr, "Increasing heap threshold to %u bytes because mem usage is %u.\n", (unsigned) heap_threshold, (unsigned)mem_inuse);
+#endif
+                }
+        }
+        entry_t *e = malloc((count + 1)*GC_BASE);
+        mem_inuse += (count + 1)*GC_BASE;
+        e->u.v.count = count;
+        e->u.v.nptrs = nptrs;
+        e->u.v.tag = tag;
+        debugf("allocated: %p %i %i %i\n",(void *)e, count, nptrs, tag);
+        int r; J1S(r,gc_allocated,(Word_t)e / GC_BASE);
+        profile_pop(&gc_alloc_time);
+        return (void *)(e + 1);
+}
+
+
+/*
 
 void *
 gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag)
@@ -306,4 +342,4 @@ retry:
         }
 }
 
-
+*/
