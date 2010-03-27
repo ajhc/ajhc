@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
-#define JGC_STATUS 1
+#define JGC_STATUS 0
 
 #define ALIGN(a,n) ((n) - 1 + ((a) - ((n) - 1) % (a)))
 
@@ -75,7 +75,7 @@ bool gc_del_root(gc_t gc, void *root);
 #include <stdio.h>
 
 
-#if 0
+#if JGC_STATUS > 1
 #define debugf(...) fprintf(stderr,__VA_ARGS__)
 #else
 #define debugf(...)
@@ -146,6 +146,10 @@ void
 gc_perform_gc(gc_t gc)
 {
         profile_push(&gc_gc_time);
+        unsigned number_redirects = 0;
+        unsigned number_stack = 0;
+        unsigned number_ptr = 0;
+        unsigned number_whnf = 0;
         number_gcs++;
         Pvoid_t gc_grey = NULL;
         Pvoid_t gc_black = NULL;
@@ -162,10 +166,22 @@ gc_perform_gc(gc_t gc)
         for(;gc;gc = gc->prev) {
                 debugf(" |");
                 for(unsigned i = 0;i < gc->nptrs; i++) {
+                        number_stack++;
+                        if(IS_LAZY(gc->ptrs[i])) {
+                                if(!IS_LAZY(GETHEAD(FROM_SPTR(gc->ptrs[i])))) {
+                                        number_redirects++;
+                                        debugf(" *");
+                                        gc->ptrs[i] = GETHEAD(FROM_SPTR(gc->ptrs[i]));
+                                        number_whnf++;
+                                }
+                        } else {
+                                number_whnf++;
+                        }
                         if(!SHOULD_FOLLOW(gc->ptrs[i])) {
                                 debugf(" -");
                                 continue;
                         }
+                        number_ptr++;
                         entry_t *e = (entry_t *)FROM_SPTR(gc->ptrs[i]) - 1;
                         debugf(" %p",(void *)e);
                         int d; J1S(d,gc_grey,(Word_t)e / GC_BASE);
@@ -187,6 +203,13 @@ gc_perform_gc(gc_t gc)
                 entry_t *e = (entry_t *)(ix * GC_BASE);
                 int offset = e->u.v.tag ? 1 : 0;
                 for(int i = 0 + offset;i < e->u.v.nptrs + offset; i++) {
+                        if(P_LAZY == GET_PTYPE(e->ptrs[i])) {
+                                if(!IS_LAZY(GETHEAD(FROM_SPTR(e->ptrs[i])))) {
+                                        number_redirects++;
+                                        debugf(" *");
+                                        e->ptrs[i] = GETHEAD(FROM_SPTR(e->ptrs[i]));
+                                }
+                        }
                         entry_t * ptr = e->ptrs[i];
                         if(SHOULD_FOLLOW(ptr)) {
                                 ptr = FROM_SPTR(ptr);
@@ -212,6 +235,7 @@ gc_perform_gc(gc_t gc)
         assert(gc_grey == NULL);
         gc_allocated = gc_black;
 #if JGC_STATUS
+        fprintf(stderr, "Ss: %3u Ws: %3u Ps: %4u Rs: %3u\n", number_stack, number_whnf, number_ptr, number_redirects);
         gc_print_stats(gc);
 #endif
 #if 0
