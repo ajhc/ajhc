@@ -28,7 +28,7 @@ struct frame {
 // the underlying malloc implementation has some
 // minimum size and this allows memory blocks to
 // be reused more often.
-#define GC_MINIMUM_SIZE 1
+#define GC_MINIMUM_SIZE 3
 #define GC_BASE sizeof(void *)
 
 #define TO_BLOCKS(x) ((x) <= GC_MINIMUM_SIZE*GC_BASE ? GC_MINIMUM_SIZE : (((x) - 1)/GC_BASE) + 1)

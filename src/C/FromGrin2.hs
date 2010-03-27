@@ -847,13 +847,15 @@ declareEvalFunc isCAF n = do
     nt <- nodeType n
     let ts = runIdentity $ findArgs (grinTypeEnv grin) n
         fname = toName $ "E_" ++ show fn
-        aname = name "arg";
-        rvar = localVariable wptr_t (name "r");
+        aname = name "arg"
+        rvar = localVariable wptr_t (name "r")
         atype = ptrType nt
         body = rvar =* functionCall (toName (show $ fn)) (mgc [ project' (arg i) (variable aname) | _ <- ts | i <- [(1 :: Int) .. ] ])
         update =  f_update (cast sptr_t (variable aname)) rvar
         addroot =  if isCAF && fopts FO.Jgc then f_gc_add_root rvar else emptyExpression
-    tellFunctions [function fname wptr_t (mgct [(aname,atype)]) [a_STD, a_FALIGNED] (body & update & addroot & creturn rvar )]
+        body' = if not isCAF && fopts FO.Jgc then subBlock (gc_roots [variable aname] & rest) else rest
+        rest = body & update & addroot & creturn rvar
+    tellFunctions [function fname wptr_t (mgct [(aname,atype)]) [a_STD, a_FALIGNED] body']
     return fname
 
 

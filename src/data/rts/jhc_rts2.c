@@ -282,8 +282,7 @@ eval(sptr_t s)
                         GETHEAD(ds) = BLACK_HOLE;
 #endif
 #if _JHC_GC == _JHC_GC_JGC
-                            gc_frame0(gc,1,s);
-                            wptr_t r = (*fn)(gc,NODEP(ds));
+                        wptr_t r = (*fn)(gc,NODEP(ds));
 #else
                         wptr_t r = (*fn)(NODEP(ds));
 #endif
