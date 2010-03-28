@@ -1,29 +1,30 @@
 module Grin.Main(compileToGrin) where
 
-import Directory
-
 import Control.Monad
+import Directory
+import qualified Data.ByteString.Lazy.UTF8 as LBS
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Map as Map
+import qualified System
+
 import Grin.DeadCode
 import Grin.Devolve(twiddleGrin,devolveTransform)
 import Grin.EvalInline(createEvalApply)
-import Grin.FromE
 import Grin.FromE
 import Grin.Grin
 import Grin.Lint
 import Grin.NodeAnalyze
 import Grin.Optimize
+import Grin.SSimplify
 import Grin.Show
 import Grin.StorageAnalysis
 import Options
 import Support.Transform
 import Util.Gen
 import qualified C.FromGrin2 as FG2
-import qualified Data.Map as Map
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
-import Grin.SSimplify
 import qualified Stats
-import qualified System
 
 {-# NOINLINE compileToGrin #-}
 compileToGrin prog = do
@@ -95,9 +96,9 @@ compileGrinToC grin = do
         comm = shellQuote $ [lup "cc"] ++ words (lup "cflags") ++ ["-o", fn, cf] ++
                             (map ("-l" ++) rls) ++ debug ++ optCCargs options  ++ boehmOpts ++ profileOpts
         debug = if fopts FO.Debug then words (lup "cflags_debug") else words (lup "cflags_nodebug")
-        globalvar n c = "char " ++ n ++ "[] = \"" ++ c ++ "\";"
+        globalvar n c = LBS.fromString $ "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     putProgressLn ("Writing " ++ show cf)
-    writeFile cf $ unlines [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" sversion,"",cg]
+    LBS.writeFile cf $ LBS.intercalate (LBS.fromString "\n") [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" sversion,LBS.empty,cg]
     putProgressLn ("Running: " ++ comm)
     r <- System.system comm
     when (r /= System.ExitSuccess) $ fail "C code did not compile."

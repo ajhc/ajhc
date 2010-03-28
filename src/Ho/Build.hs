@@ -16,13 +16,14 @@ import Data.List hiding(union)
 import Data.Monoid
 import Data.Tree
 import Data.Version(Version,parseVersion,showVersion)
-import Version.Config(version)
 import Maybe
 import Monad
 import Prelude hiding(print,putStrLn)
 import System.IO hiding(print,putStrLn)
 import System.Mem
 import Text.Printf
+import Version.Config(version)
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.UTF8 as LBSU
 import qualified Data.Map as Map
@@ -646,7 +647,7 @@ searchPaths m = ans where
 
 
 m4Prelude :: IO FilePath
-m4Prelude = writeFile "/tmp/jhc_prelude.m4" prelude_m4 >> return "/tmp/jhc_prelude.m4"
+m4Prelude = BS.writeFile "/tmp/jhc_prelude.m4" prelude_m4 >> return "/tmp/jhc_prelude.m4"
 
 langmap = [
     "m4" ==> "m4",

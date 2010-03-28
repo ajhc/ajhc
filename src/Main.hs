@@ -5,6 +5,7 @@ import Control.Monad.Identity
 import IO(hFlush,stderr)
 import Prelude hiding(putStrLn, putStr,print)
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.UTF8 as BS
 
 import CharIO
 import DataConstructors
@@ -43,7 +44,7 @@ main = runMain $ bracketHtml $ do
         ShowHo ho       -> dumpHoFile ho
         Version         -> putStrLn versionString
         PrintHscOptions -> putStrLn $ "-I" ++ VC.datadir ++ "/" ++ VC.package ++ "-" ++ VC.shortVersion ++ "/include"
-        VersionCtx      -> putStrLn (versionString ++ versionContext)
+        VersionCtx      -> putStrLn (versionString ++ BS.toString versionContext)
         Preprocess      -> forM_ (optArgs o) $ \fn -> do
             LBS.readFile fn >>= preprocess fn >>= LBS.putStr
         _               -> darg >> processFiles  (optArgs o)

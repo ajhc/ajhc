@@ -6,7 +6,10 @@ use strict;
 my $mod = shift @ARGV;
 $mod =~ s/^.*\///;
 
-print "module $mod where\n\n\n";
+print "module $mod where\n\n";
+print "import Data.ByteString.Unsafe\n";
+print "import Data.ByteString\n";
+print "import System.IO.Unsafe\n\n";
 
 while (@ARGV) {
     my $fn = shift @ARGV;
@@ -19,8 +22,8 @@ while (@ARGV) {
     $fn =~ s{/}{\\/}g;
     print "-- | Generated from $fn on " . `date`;
     print "{-# NOINLINE $nn #-}\n";
-    print "$nn :: String\n";
-    print "$nn = \"\\\n \\";
+    print "$nn :: ByteString\n";
+    print "$nn = unsafePerformIO \$ unsafePackAddress \"\\\n \\";
     #print "$nn = \"";
     while (<F>) {
         s/\\/\\\\/g;
@@ -31,7 +34,7 @@ while (@ARGV) {
         print "$_\\\n \\";
     }
 
-    print "\"\n\n";
+    print "\"#\n\n";
 }
 
 

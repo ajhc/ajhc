@@ -36,6 +36,9 @@ import Util.Gen
 import Util.UniqueMonad
 import qualified Cmm.Op as Op
 import qualified FlagOpts as FO
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.UTF8 as BS
+import qualified Data.ByteString as BS
 
 
 ---------------
@@ -126,8 +129,8 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 --------------
 
 {-# NOINLINE compileGrin #-}
-compileGrin :: Grin -> (String,[String])
-compileGrin grin = (hsffi_h ++ jhc_rts_header_h ++ jhc_rts_alloc_c ++ jhc_rts_c ++ jhc_rts2_c ++ generateArchAssertions ++ P.render ans ++ "\n", snub (reqLibraries req))  where
+compileGrin :: Grin -> (LBS.ByteString,[String])
+compileGrin grin = (LBS.fromChunks [hsffi_h,jhc_rts_header_h,jhc_rts_alloc_c,jhc_rts_c,jhc_rts2_c,BS.fromString generateArchAssertions,BS.fromString $ P.render ans, BS.fromString "\n"], snub (reqLibraries req))  where
     ans = vcat $ includes ++ [text "", enum_tag_t, header,cafs, buildConstants cpr grin finalHcHash, body]
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
