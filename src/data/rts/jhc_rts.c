@@ -1,3 +1,8 @@
+#ifdef JHC_RTS_INCLUDE
+#undef JHC_RTS_INCLUDE
+#include "jhc_rts.c"
+#define JHC_RTS_INCLUDE
+#else
 
 static void _amain(void);
 static void jhc_arch_assert(void);
@@ -245,3 +250,4 @@ void hs_exit (void)
 
 
 
+#endif

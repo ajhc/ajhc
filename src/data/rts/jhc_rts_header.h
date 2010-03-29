@@ -1,3 +1,8 @@
+#ifdef JHC_RTS_INCLUDE
+#undef JHC_RTS_INCLUDE
+#include "jhc_rts_header.h"
+#define JHC_RTS_INCLUDE
+#else
 
 // jhc_rts_header.h
 
@@ -100,3 +105,4 @@
 #define JHC_isPosix (!JHC_isWindows)
 
 
+#endif

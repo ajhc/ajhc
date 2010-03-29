@@ -1,3 +1,8 @@
+#ifdef JHC_RTS_INCLUDE
+#undef JHC_RTS_INCLUDE
+#include "jhc_rts2.c"
+#define JHC_RTS_INCLUDE
+#else
 
 
 /*@Internals
@@ -311,3 +316,4 @@ update(sptr_t thunk, wptr_t new)
 
 
 
+#endif

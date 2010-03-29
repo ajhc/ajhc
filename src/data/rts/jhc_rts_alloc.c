@@ -1,3 +1,8 @@
+#ifdef JHC_RTS_INCLUDE
+#undef JHC_RTS_INCLUDE
+#include "jhc_rts_alloc.c"
+#define JHC_RTS_INCLUDE
+#else
 
 // some default definitions
 
@@ -254,6 +259,9 @@ jhc_malloc_region(unsigned current_region, struct region *r, size_t n) {
 
 
 
+
+
+#endif
 
 
 #endif
