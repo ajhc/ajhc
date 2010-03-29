@@ -11,10 +11,6 @@
 // #define __predict_false(exp)    (exp)
 // #endif
 
-#include <stddef.h>
-#include <stdbool.h>
-#include <inttypes.h>
-
 #define JGC_STATUS 0
 
 #define ALIGN(a,n) ((n) - 1 + ((a) - ((n) - 1) % (a)))
@@ -65,6 +61,10 @@ gc_alloc_bytes(gc_t gc,size_t count) {
 #endif
 
 
+#ifdef NDEBUG
+#define JUDYERROR_NOTEST 1
+#endif
+
 #include <Judy.h>
 #include <assert.h>
 #include <stdio.h>
@@ -73,7 +73,7 @@ gc_alloc_bytes(gc_t gc,size_t count) {
 #if JGC_STATUS > 1
 #define debugf(...) fprintf(stderr,__VA_ARGS__)
 #else
-#define debugf(...)
+#define debugf(...) do { } while (0)
 #endif
 
 
@@ -171,7 +171,7 @@ gc_perform_gc(gc_t gc)
                                                 J1S(r,gc_grey,((uintptr_t)FROM_SPTR(ptr) - sizeof(entry_t))/GC_ALIGNMENT);
                                         number_redirects++;
                                         debugf(" *");
-                                        ptr = GETHEAD(FROM_SPTR(ptr));
+                                        ptr = (sptr_t)GETHEAD(FROM_SPTR(ptr));
                                 }
                         }
                         if(__predict_false(!SHOULD_FOLLOW(ptr))) {
@@ -230,14 +230,14 @@ gc_perform_gc(gc_t gc)
         }
         J1FA(r,gc_allocated);
         gc_allocated = gc_grey;
-        number_allocs = 0;
         if(JGC_STATUS) {
-                fprintf(stderr, "Ss: %5u Ps: %5u Rs: %5u As: %5u ", number_stack, number_ptr, number_redirects, number_allocs);
+                fprintf(stderr, "%3u - Ss: %5u Ps: %5u Rs: %5u As: %6u ", number_gcs, number_stack, number_ptr, number_redirects, number_allocs);
                 Word_t n_allocated,n_roots;
                 J1C(n_allocated,gc_allocated,0,-1);
                 J1C(n_roots,gc_roots,0,-1);
-                fprintf(stderr,"allocated: %5lu roots: %3lu mem_inuse: %5lu heap_threshold: %5lu gcs: %3u\n",n_allocated,n_roots,(long unsigned)mem_inuse,(long unsigned)heap_threshold,number_gcs);
+                fprintf(stderr,"live: %5lu root: %3lu inuse: %6lu threshold: %6lu\n",n_allocated,n_roots,(long unsigned)mem_inuse,(long unsigned)heap_threshold);
         }
+        number_allocs = 0;
         profile_pop(&gc_gc_time);
 }
 
@@ -251,9 +251,8 @@ gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag)
                 gc_perform_gc(gc);
                 if(__predict_false(mem_inuse > ((heap_threshold * 6) / 10))) {
                         heap_threshold *= 2;
-#if JGC_STATUS
-                        fprintf(stderr, "Increasing heap threshold to %u bytes because mem usage is %u.\n", (unsigned) heap_threshold, (unsigned)mem_inuse);
-#endif
+                        if(JGC_STATUS)
+                                fprintf(stderr, "Increasing heap threshold to %u bytes because mem usage is %u.\n", (unsigned) heap_threshold, (unsigned)mem_inuse);
                 }
         }
         entry_t *e = malloc((count + 1)*GC_BASE);
