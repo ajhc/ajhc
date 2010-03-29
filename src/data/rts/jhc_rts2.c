@@ -263,10 +263,6 @@ follow(sptr_t s)
         return (wptr_t)s;
 }
 
-#if _JHC_GC == _JHC_GC_JGC
-#include "src/data/rts/jhc_jgc.h"
-#endif
-
 static wptr_t A_STD A_UNUSED  A_HOT
 #if _JHC_GC == _JHC_GC_JGC
 eval(gc_t gc,sptr_t s)

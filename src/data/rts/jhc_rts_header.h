@@ -57,6 +57,13 @@
 
 
 // GNU attributes
+#ifdef __GNUC__
+#  define __predict_true(exp)     __builtin_expect(!!(exp), 1)
+#  define __predict_false(exp)    __builtin_expect(!!(exp), 0)
+#else
+#  define __predict_true(exp)     (exp)
+#  define __predict_false(exp)    (exp)
+#endif
 
 #ifdef __GNUC__
 #define A_ALIGNED  __attribute__ ((aligned))

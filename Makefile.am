@@ -105,7 +105,7 @@ uninstall-hook: $(JHC_LIBS)
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
-RAWFILES = src/data/HsFFI.h src/data/rts/jhc_rts.c src/data/rts/jhc_rts_header.h src/data/wsize.h src/data/rts/jhc_rts_alloc.c src/data/rts/jhc_rts2.c src/data/ViaGhc.hs ChangeLog src/data/shortchange.txt src/data/prelude.m4 src/data/targets.ini
+RAWFILES = src/data/HsFFI.h src/data/rts/jhc_rts.c src/data/rts/jhc_rts_header.h src/data/wsize.h src/data/rts/jhc_rts_alloc.c src/data/rts/jhc_rts2.c src/data/ViaGhc.hs ChangeLog src/data/shortchange.txt src/data/prelude.m4 src/data/targets.ini src/data/rts/jhc_jgc.h src/data/rts/jhc_jgc.c
 
 DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/Cmm/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \
    drift_processed/DerivingDrift/StandardRules.hs drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \

@@ -4,6 +4,9 @@
 #define JHC_RTS_INCLUDE
 #else
 
+static void jhc_malloc_init(void);
+static void jhc_alloc_print_stats(void);
+
 // some default definitions
 
 #define jhc_malloc_whnf jhc_malloc
@@ -15,9 +18,12 @@
 
 extern void _start,_end;
 
+
+#ifdef JHC_ALLOC_NEEDS_STUBS
 void hs_perform_gc(void) {}
 void hs_free_stable_ptr(HsStablePtr sp) {}
 void hs_free_fun_ptr(HsFunPtr fp) {}
+#endif
 
 #if _JHC_PROFILE
 
@@ -68,7 +74,7 @@ print_alloc_size_stats(void) {
 static inline void jhc_malloc_init(void) { GC_INIT(); }
 static inline void jhc_alloc_print_stats(void) { GC_dump(); }
 
-#elif _JHC_GC == _JHC_GC_NONE || _JHC_GC == _JHC_GC_JGC
+#elif _JHC_GC == _JHC_GC_NONE
 
 // memory allocated in 1MB chunks.
 #define JHC_MEM_CHUNK_SIZE (1 << 20)
@@ -140,34 +146,6 @@ jhc_malloc_atomic(size_t n) {
 }
 #endif
 
-#endif
-
-#if _JHC_GC == _JHC_GC_JGC
-
-#ifdef JHC_JGC_STACK
-typedef struct frame *gc_t;
-#else
-typedef void* *gc_t;
-#endif
-static gc_t saved_gc;
-
-#ifndef JHC_JGC_STACK
-static gc_t gc_stack_base;
-#undef jhc_malloc_init
-static void
-jhc_malloc_init(void) {
-        saved_gc = gc_stack_base = malloc(8*8192*sizeof(gc_stack_base[0]));
-}
-
-#endif
-
-// #define GC_STACK_LIMIT 8192
-// `static sptr_t *gc_stack_base;
-
-// static inline void
-// jhc_malloc_init(void) {
-//         gc_stack_base = malloc(sizeof(sptr_t) * GC_STACK_LIMIT);
-// }
 
 #elif _JHC_GC == _JHC_GC_REGION
 
