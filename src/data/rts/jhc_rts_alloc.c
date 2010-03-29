@@ -79,8 +79,7 @@ static void *jhc_current_chunk = initial_chunk;
 static unsigned mem_chunks,mem_offset;
 
 
-static inline void
-jhc_malloc_init(void) { return; }
+#define jhc_malloc_init() do { } while(0)
 
 static void
 jhc_alloc_print_stats(void) {
@@ -145,8 +144,22 @@ jhc_malloc_atomic(size_t n) {
 
 #if _JHC_GC == _JHC_GC_JGC
 
+#ifdef JHC_JGC_STACK
 typedef struct frame *gc_t;
+#else
+typedef void* *gc_t;
+#endif
 static gc_t saved_gc;
+
+#ifndef JHC_JGC_STACK
+static gc_t gc_stack_base;
+#undef jhc_malloc_init
+static void
+jhc_malloc_init(void) {
+        saved_gc = gc_stack_base = malloc(8*8192*sizeof(gc_stack_base[0]));
+}
+
+#endif
 
 // #define GC_STACK_LIMIT 8192
 // `static sptr_t *gc_stack_base;

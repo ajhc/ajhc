@@ -4,12 +4,13 @@
 #define JGC_H
 
 // #if __GNUC_PREREQ__(2, 96)
-#define __predict_true(exp)     __builtin_expect(!!(exp), 1)
-#define __predict_false(exp)    __builtin_expect(!!(exp), 0)
-// #else
-// #define __predict_true(exp)     (exp)
-// #define __predict_false(exp)    (exp)
-// #endif
+#if 1
+#  define __predict_true(exp)     __builtin_expect(!!(exp), 1)
+#  define __predict_false(exp)    __builtin_expect(!!(exp), 0)
+#else
+#  define __predict_true(exp)     (exp)
+#  define __predict_false(exp)    (exp)
+#endif
 
 #define JGC_STATUS 0
 
@@ -40,14 +41,12 @@ struct frame {
 
 #define INITIAL_GC NULL
 
+#ifdef JHC_JGC_STACK
 #define gc_frame0(gc,n,...) struct { struct frame *prev; unsigned nptrs;void *ptrs[n]; } l \
           = { gc, n, { __VA_ARGS__ } }; gc_t gc = (gc_t)(void *)&l;
-
-#define gc_count(ty)  (TO_BLOCKS(sizeof(ty)))
-#define gc_mk_alloc_tag(ty, np, tag) static inline ty *gc_alloc_ ## ty(gc_t gc) { ty *x = gc_alloc(gc,gc_count(ty),np); gc_tag(x) = tag; return x; }
-#define gc_mk_alloc(ty, np) gc_mk_alloc_tag(ty,np,0)
-#define gc_mk_alloc_tag_s(ty, np, tag) static inline ty *gc_alloc_ ## ty ## _s(gc_t gc, ty v) { ty *x = gc_alloc(gc,gc_count(ty),np); gc_tag(x) = tag; *x = v; return x; }
-#define gc_tag(p) (((entry_header_t *)((void *)p - sizeof(void *)))->tag)
+#else
+#define gc_frame0(gc,n,...) void *ptrs[n] = { __VA_ARGS__ }; for(int i = 0; i < n; i++) gc[i] = (sptr_t)ptrs[i]; gc_t sgc = gc;  gc_t gc = sgc + n;
+#endif
 
 static void gc_perform_gc(gc_t gc);
 static void *gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag);
@@ -77,8 +76,8 @@ gc_alloc_bytes(gc_t gc,size_t count) {
 #endif
 
 
-static Pvoid_t  gc_roots = NULL;        // extra roots in addition to the stack
-static Pvoid_t  gc_allocated = NULL;    // black set of currently allocated memory
+static Pvoid_t  gc_roots       = NULL;  // extra roots in addition to the stack
+static Pvoid_t  gc_allocated   = NULL;  // black set of currently allocated memory
 static size_t   heap_threshold = 2048;  // threshold at which we want to run a gc rather than malloc more memory
 static size_t   mem_inuse;              // amount of memory in use by gc'ed memory
 static unsigned number_gcs;             // number of garbage collections
@@ -130,6 +129,18 @@ stack_check(struct stack *s, unsigned n) {
 }
 
 static void
+gc_add_grey(Pvoid_t gc_grey[1], struct stack *stack, uintptr_t ix)
+{
+        int r;
+        J1U(r, gc_allocated, ix);
+        if(r) {
+                J1S(r, *gc_grey, ix);
+                if(r)
+                        stack->stack[stack->ptr++] = (uintptr_t)ix * GC_ALIGNMENT;
+        }
+}
+
+static void
 gc_perform_gc(gc_t gc)
 {
         profile_push(&gc_gc_time);
@@ -148,15 +159,11 @@ gc_perform_gc(gc_t gc)
         stack_check(&stack, n_roots);
         int r; for(ix = 0,(J1F(r,gc_roots,ix)); r; (J1N(r,gc_roots,ix))) {
                 debugf(" %p", (void *)(ix * GC_ALIGNMENT));
-                J1U(r, gc_allocated, ix);
-                if(r) {
-                        J1S(r, gc_grey, ix);
-                        if(r)
-                                stack.stack[stack.ptr++] = (uintptr_t)ix * GC_ALIGNMENT;
-                }
+                gc_add_grey(&gc_grey, &stack, ix);
         }
         debugf("\n");
         debugf("Trace:");
+#ifdef JHC_JGC_STACK
         for(;gc;gc = gc->prev) {
                 debugf(" |");
                 stack_check(&stack, gc->nptrs);
@@ -181,21 +188,41 @@ gc_perform_gc(gc_t gc)
                         number_ptr++;
                         entry_t *e = (entry_t *)FROM_SPTR(ptr) - 1;
                         debugf(" %p",(void *)e);
-                        ix = (Word_t)e / GC_ALIGNMENT;
-                        J1U(r,gc_allocated,ix);
-                        if(r) {
-                                J1S(r,gc_grey,ix);
-                                if(r)
-                                        stack.stack[stack.ptr++] = (uintptr_t)ix * GC_ALIGNMENT;
-                        }
+                        gc_add_grey(&gc_grey, &stack, (uintptr_t)e / GC_ALIGNMENT);
                 }
         }
+#else
+        stack_check(&stack, gc - gc_stack_base);
+        number_stack = gc - gc_stack_base;
+        for(int i = 0; i < number_stack; i++) {
+                debugf(" |");
+                // TODO - short circuit redirects on stack
+                sptr_t ptr = gc_stack_base[i];
+                if(P_LAZY == GET_PTYPE(ptr)) {
+                        if(!IS_LAZY(GETHEAD(FROM_SPTR(ptr)))) {
+                                J1U(r,gc_allocated,((uintptr_t)FROM_SPTR(ptr) - sizeof(entry_t))/GC_ALIGNMENT);
+                                if(r)
+                                        J1S(r,gc_grey,((uintptr_t)FROM_SPTR(ptr) - sizeof(entry_t))/GC_ALIGNMENT);
+                                number_redirects++;
+                                debugf(" *");
+                                ptr = (sptr_t)GETHEAD(FROM_SPTR(ptr));
+                        }
+                }
+                if(__predict_false(!SHOULD_FOLLOW(ptr))) {
+                        debugf(" -");
+                        continue;
+                }
+                number_ptr++;
+                entry_t *e = (entry_t *)FROM_SPTR(ptr) - 1;
+                debugf(" %p",(void *)e);
+                ix = (Word_t)e / GC_ALIGNMENT;
+                gc_add_grey(&gc_grey, &stack, ix);
+        }
+#endif
         debugf("\n");
 
         while(stack.ptr) {
                 uintptr_t ix = stack.stack[--stack.ptr] / GC_ALIGNMENT;
-                //J1T(r,gc_grey,ix);
-                //assert(r);
                 debugf("Processing Grey: %p\n",(void *)(ix * GC_ALIGNMENT));
 
                 entry_t *e = (entry_t *)(ix * GC_ALIGNMENT);
@@ -209,16 +236,10 @@ gc_perform_gc(gc_t gc)
                                         e->ptrs[i] = GETHEAD(FROM_SPTR(e->ptrs[i]));
                                 }
                         }
-                        if(SHOULD_FOLLOW(e->ptrs[i])) {
+                        if(__predict_true(SHOULD_FOLLOW(e->ptrs[i]))) {
                                 entry_t * ptr = (entry_t *)(FROM_SPTR(e->ptrs[i])) - 1;
                                 debugf("Following: %p %p\n",e->ptrs[i], (void *)ptr);
-                                Word_t ix = (Word_t)ptr / GC_ALIGNMENT;
-                                J1U(r,gc_allocated,ix);
-                                if(r) {
-                                        J1S(r,gc_grey,ix);
-                                        if(r)
-                                                stack.stack[stack.ptr++] = (uintptr_t)ix * GC_ALIGNMENT;
-                                }
+                                gc_add_grey(&gc_grey, &stack, (uintptr_t)ptr / GC_ALIGNMENT);
                         }
                 }
         }
@@ -235,7 +256,10 @@ gc_perform_gc(gc_t gc)
                 Word_t n_allocated,n_roots;
                 J1C(n_allocated,gc_allocated,0,-1);
                 J1C(n_roots,gc_roots,0,-1);
-                fprintf(stderr,"live: %5lu root: %3lu inuse: %6lu threshold: %6lu\n",n_allocated,n_roots,(long unsigned)mem_inuse,(long unsigned)heap_threshold);
+#ifdef JHC_JGC_STACK
+                void * gc_stack_base = &gc_stack_base;
+#endif
+                fprintf(stderr,"live: %5lu root: %3lu inuse: %6lu threshold: %6lu %p %p\n",n_allocated,n_roots,(long unsigned)mem_inuse,(long unsigned)heap_threshold, gc_stack_base, gc);
         }
         number_allocs = 0;
         profile_pop(&gc_gc_time);
