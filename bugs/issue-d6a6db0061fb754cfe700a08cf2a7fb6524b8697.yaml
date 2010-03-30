@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: The GC needs to know about arrays of objects
+desc: ""
+type: :bugfix
+component: back_end
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-03-30 02:15:35.342694 Z
+references: []
+
+id: d6a6db0061fb754cfe700a08cf2a7fb6524b8697
+log_events: 
+- - 2010-03-30 02:15:37.102696 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

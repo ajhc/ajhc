@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: We should not pass the GC context to functions that perform no allocation
+desc: We currently pass the gc context everywhere just in case it is needed, we should detect when we can elide it and do so
+type: :feature
+component: back_end
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-03-30 02:14:46.192733 Z
+references: []
+
+id: 4c06716b7e527cc879786fcaee4a34a97ebdd2df
+log_events: 
+- - 2010-03-30 02:14:49.252715 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
