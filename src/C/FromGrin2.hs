@@ -622,7 +622,7 @@ convertConst (NodeC n as) | all valIsConstant as = basicNode n as
 convertConst (Const (NodeC n as)) = fmap (fmap $ cast sptr_t) $ basicNode n as
 convertConst v = return (f v) where
     f :: Val -> Maybe Expression
-    f (Lit i (TyPrim Op.TyBool)) = return $ if i == 0 then constant cFalse else constant cTrue
+    f (Lit i (TyPrim Op.TyBool)) = return $ toExpression (i /= 0)
     f (Lit i (TyPrim (Op.TyBits _ Op.HintFloat))) = return (constant $ floating (realToFrac i))
     f (Lit i _) = return (constant $ number (fromIntegral i))
     f (ValPrim (APrim p _) [] ty) = case p of

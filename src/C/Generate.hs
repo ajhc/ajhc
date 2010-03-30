@@ -14,7 +14,6 @@ module C.Generate(
     noAssign,
     cif,
     constant,
-    cTrue,cFalse,
     creturn,
     dereference,
     reference,
@@ -106,16 +105,15 @@ newtype G a = G (RWS Env [(Name,Type)] (Int,Map.Map [Type] Name) a)
 newtype Name = Name String
     deriving(Eq,Ord)
 
-
 instance Show Name where
     show (Name n) = n
 
 
 data TypeHint = TypeHint {
-    thPtr :: Bool,
-    thConst :: Bool,
-    thNoAssign :: Bool,
-    thOmittable :: Bool
+    thPtr :: !Bool,
+    thConst :: !Bool,
+    thNoAssign :: !Bool,
+    thOmittable :: !Bool
     }
 
 hintConst = typeHint { thConst = True, thOmittable = True }
@@ -348,8 +346,8 @@ structAnon es = Exp typeHint $ ED $ do
     draw $ commaExpression $ [operator "=" (projectAnon i lv) e | e <- fsts es | i <- [0..] ] ++ [lv]
 
 
-operator :: String -> Expression -> Expression -> Expression
-operator o x y = expDC (pdraw x <+> text o <+> pdraw y)
+operator :: (ToExpression a,ToExpression b) => String -> a -> b -> Expression
+operator o x y = expDC (pdraw (toExpression x) <+> text o <+> pdraw (toExpression y))
 
 uoperator :: String -> Expression -> Expression
 uoperator o x = expDC (text o <> pdraw x)
@@ -660,13 +658,13 @@ drawG x = fns where
 
 infix 3 `eq`
 
-eq :: Expression -> Expression -> Expression
+eq :: (ToExpression x, ToExpression y) => x -> y -> Expression
 eq = operator "=="
 
 infix 2 =*
 
-(=*) :: Expression -> Expression -> Statement
-x =* y = x `assign` y
+(=*) :: (ToExpression x, ToExpression y) => x -> y -> Statement
+x =* y = toExpression x `assign` toExpression y
 
 class ToStatement a  where
     toStatement :: a -> Statement
@@ -682,6 +680,9 @@ class ToExpression a where
 
 instance ToExpression Expression where
     toExpression e = e
+
+instance ToExpression a => ToStatement a where
+    toStatement x = toStatement $ toExpression x
 
 instance ToExpression Constant where
     toExpression c = constant c
@@ -700,6 +701,9 @@ instance ToExpression Integer where
 
 instance ToExpression Bool where
     toExpression b = toExpression $ if b then cTrue else cFalse
+
+instance (ToExpression a,ToExpression b) => ToExpression (a,b) where
+    toExpression (x,y) = commaExpression [toExpression x,toExpression y]
 
 infixl 1 &
 
