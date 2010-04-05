@@ -5,6 +5,7 @@
 #else
 
 static void jhc_malloc_init(void);
+static void jhc_malloc_fini(void);
 static void jhc_alloc_print_stats(void);
 
 // some default definitions

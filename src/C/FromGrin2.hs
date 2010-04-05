@@ -47,11 +47,16 @@ import qualified Data.ByteString as BS
 
 data Todo = TodoReturn | TodoExp [Expression] | TodoDecl Name Type | TodoNothing
 
+--data AllocInfo = AllocInfo {
+--        allocSize, allocPtrs, allocOffset :: Int
+--    } 
+--    deriving(Eq,Ord)
 
 data Written = Written {
     wRequires :: Requires,
     wStructures :: Map.Map Name Structure,
     wTags :: Set.Set Atom,
+--    wAllocs :: Set.Set AllocInfo,
     wEnums :: Map.Map Name Int,
     wFunctions :: Map.Map Name Function
     }
@@ -771,7 +776,6 @@ newNode region ty ~(NodeC t as) = do
       Nothing -> do
         st <- nodeType t
         as' <- mapM convertVal as
-        --let wmalloc = if not sf && all (nonPtr . getType) as then jhc_malloc_atomic else jhc_malloc
         let wmalloc = jhc_malloc (not sf && t `Map.notMember` cpr) nptrs
             nptrs = length (filter (not . nonPtr . getType) as) + if sf then 1 else 0
             malloc =  wmalloc (sizeof st)

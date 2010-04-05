@@ -5,6 +5,9 @@
 #else
 #if _JHC_GC == _JHC_GC_JGC
 
+#include "slub.c"
+
+static struct s_arena *arena;
 
 #define TO_BLOCKS(x) ((x) <= GC_MINIMUM_SIZE*GC_BASE ? GC_MINIMUM_SIZE : (((x) - 1)/GC_BASE) + 1)
 
@@ -190,7 +193,9 @@ gc_perform_gc(gc_t gc)
         for(ix = 0, (J1F(r,gc_allocated,ix)); r; (J1N(r,gc_allocated,ix))) {
                 entry_t *e = (entry_t *)(ix * GC_ALIGNMENT);
                 mem_inuse -= (e->u.v.count + 1)*GC_BASE;
-                free(e);
+                debugf("Freeing: %p\n", e);
+                s_free(e);
+                //free(e);
         }
         J1FA(r,gc_allocated);
         gc_allocated = gc_grey;
@@ -222,7 +227,8 @@ gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag)
                                 fprintf(stderr, "Increasing heap threshold to %u bytes because mem usage is %u.\n", (unsigned) heap_threshold, (unsigned)mem_inuse);
                 }
         }
-        entry_t *e = malloc((count + 1)*GC_BASE);
+        //entry_t *e = malloc((count + 1)*GC_BASE);
+        entry_t *e = s_alloc(find_cache(arena, GC_BASE*(count + 1), 0));
         mem_inuse += (count + 1)*GC_BASE;
         e->u.v.count = count;
         e->u.v.nptrs = nptrs;
@@ -246,8 +252,23 @@ static void jhc_malloc_init(void) { }
 static void
 jhc_malloc_init(void) {
         saved_gc = gc_stack_base = malloc(8*8192*sizeof(gc_stack_base[0]));
+        arena = new_arena();
 }
 #endif
+
+static void
+jhc_malloc_fini(void) {
+        if(1) {
+                printf("arena: %p\n", arena);
+                printf("  base: %p\n", arena->base);
+                printf("  next_free: %i\n", arena->next_free);
+                printf("  num_used: %i\n", arena->num_used);
+                struct s_cache *sc = SLIST_FIRST(&arena->caches);
+                for(;sc;sc = SLIST_NEXT(sc,next)) {
+                        print_cache(sc);
+                }
+        }
+}
 
 #endif
 #endif

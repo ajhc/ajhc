@@ -77,6 +77,7 @@ void print_times(struct tms *tm) {
 
 static void A_COLD
 jhc_print_profile(void) {
+
 #ifndef __WIN32__
         struct tms tm;
         times(&tm);
@@ -244,8 +245,10 @@ hs_init(int *argc, char **argv[])
 
 void hs_exit (void)
 {
-        if(!--hs_init_count)
+        if(!--hs_init_count) {
                 jhc_print_profile();
+                jhc_malloc_fini();
+        }
 }
 
 
