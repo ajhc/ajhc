@@ -50,7 +50,7 @@ struct s_cache {
 void print_cache(struct s_cache *sc);
 /* this finds a bit that isn't set, sets it, and returns it */
 
-inline static int
+static int
 bitset_find_free(int *next_free,int n,bitarray_t ba[static n]) {
         assert(*next_free < n);
         int i = *next_free;
@@ -71,40 +71,66 @@ found:
         }
 }
 
-struct s_page *
-get_free_page(struct s_arena *arena) {
+/* page allocator */
+
+static unsigned page_threshold = 4;
+
+static struct s_page *
+get_free_page(gc_t gc, struct s_arena *arena) {
+        if(arena->num_used >= page_threshold) {
+                gc_perform_gc(gc);
+                // if we are stil using 80% of the heap after a gc, raise the threshold.
+                if(arena->num_used * 10 >= page_threshold * 8) {
+                        page_threshold *= 2;
+                }
+        }
         int next_free = arena->next_free;
         int found = bitset_find_free(&next_free, BITARRAY_SIZE(ARENASIZE), arena->used);
         arena->next_free = next_free;
         if(found == -1)
                 return NULL;
-        return (struct s_page *)(arena->base + PAGESIZE*found);
         int r;
         J1S(r, gc_inheap, (uintptr_t)arena->base/PAGESIZE + found);
-        assert(r);
+        arena->num_used++;
+        return (struct s_page *)(arena->base + PAGESIZE*found);
 }
 
-void *
-s_alloc(struct s_cache *sc)
+static void
+s_cleanup_pages(struct s_arena *arena) {
+        struct s_cache *sc = SLIST_FIRST(&arena->caches);
+        for(;sc;sc = SLIST_NEXT(sc,next)) {
+                struct s_page *pg;
+                TAILQ_FOREACH(pg,&sc->pages,tailq) {
+                        if(pg->num_free == sc->num_entries) {
+                                TAILQ_REMOVE(&sc->pages,pg,tailq);
+                                BIT_UNSET(arena->used,((uintptr_t)pg - (uintptr_t)arena->base) / PAGESIZE);
+                                arena->num_used--;
+                        }
+                }
+        }
+}
+
+
+
+static void *
+s_alloc(gc_t gc, struct s_cache *sc)
 {
         struct s_page *pg;
         assert(sc);
-
-        TAILQ_FOREACH(pg,&sc->pages,tailq) {
+        TAILQ_FOREACH(pg,&sc->pages,tailq)
                 if(pg->num_free > 0)
                         break;
-        }
-        if(!pg) {
-                pg = get_free_page(sc->arena);
-                assert(pg);
-                pg->num_free = sc->num_entries;
-                pg->color = sc->color;
-                pg->size = sc->size;
-                pg->next_free = 0;
-                memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(sc->num_entries));
-                for(int i = BITARRAY_SIZE(sc->num_entries)*BITS_PER_UNIT - 1; i >= sc->num_entries; i--)
-                        BIT_SET(pg->used,i);
-                TAILQ_INSERT_HEAD(&sc->pages,pg,tailq);
+        if(__predict_false(!pg)) {
+        pg = get_free_page(gc, sc->arena);
+        assert(pg);
+        pg->num_free = sc->num_entries;
+        pg->color = sc->color;
+        pg->size = sc->size;
+        pg->next_free = 0;
+        memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(sc->num_entries));
+        for(int i = BITARRAY_SIZE(sc->num_entries)*BITS_PER_UNIT - 1; i >= sc->num_entries; i--)
+                BIT_SET(pg->used,i);
+        TAILQ_INSERT_HEAD(&sc->pages,pg,tailq);
         }
 
         int next_free = pg->next_free;
@@ -113,9 +139,9 @@ s_alloc(struct s_cache *sc)
         assert(found != -1);
         uintptr_t *pgp = (uintptr_t *)pg + pg->color;
         void *val = &pgp[found * (pg->size/sizeof(uintptr_t))];
-//        printf("s_alloc: val: %p s_page: %p size: %i color: %i found: %i num_free: %i\n", val, pg, pg->size, pg->color, found, pg->num_free);
+        //        printf("s_alloc: val: %p s_page: %p size: %i color: %i found: %i num_free: %i\n", val, pg, pg->size, pg->color, found, pg->num_free);
         pg->num_free--;
-        if(!pg->num_free) {
+        if(__predict_false(0 == pg->num_free)) {
                 TAILQ_REMOVE(&sc->pages,pg,tailq);
                 TAILQ_INSERT_TAIL(&sc->pages,pg,tailq);
         }
@@ -124,7 +150,7 @@ s_alloc(struct s_cache *sc)
 }
 
 
-void
+static void
 s_free(void *val)
 {
         assert(val);
@@ -137,7 +163,7 @@ s_free(void *val)
 }
 
 
-struct s_cache *
+static struct s_cache *
 new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
 {
         struct s_cache *sc = malloc(sizeof(struct s_cache));
@@ -154,6 +180,7 @@ new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
         return sc;
 }
 
+// clear all used bits, must be followed by a marking phase.
 static void
 clear_used_bits(struct s_arena *arena)
 {
@@ -169,10 +196,16 @@ clear_used_bits(struct s_arena *arena)
         }
 }
 
+// set a used bit. returns true if the
+// tagged node should be scanned by the GC.
+// this happens when the used bit was not previously set
+// and the node contains internal pointers.
+
 static bool
 s_set_used_bit(void *val)
 {
         assert(val);
+        // TODO - check if there are internal pointers
         struct s_page *pg = S_PAGE(val);
         unsigned int offset = ((uintptr_t *)val - (uintptr_t *)pg) - pg->color;
         if(BIT_IS_UNSET(pg->used,offset/(pg->size/sizeof(uintptr_t)))) {
@@ -183,11 +216,14 @@ s_set_used_bit(void *val)
         return false;
 }
 
-struct s_cache *
+static struct s_cache *
 find_cache(struct s_cache **rsc, struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
 {
-        if(rsc && *rsc)
+        if(__predict_true(rsc && *rsc)) {
+      //          printf("s_cached: %p\n", rsc);
                 return *rsc;
+        }
+       // printf("s_new: %p\n", rsc);
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
                 if(sc->size == size && sc->num_ptrs == num_ptrs)
@@ -227,7 +263,6 @@ print_cache(struct s_cache *sc) {
         printf("  color_off: %i bytes\n",(int)(sc->color*sizeof(uintptr_t)));
         printf("  end: %i bytes\n",(int)(sc->color*sizeof(uintptr_t) + sc->num_entries*sc->size));
         printf("%20s %9s %9s %9s %9s\n", "page", "num_free", "color", "size", "next_free");
-    
         struct s_page *pg;
         TAILQ_FOREACH(pg,&sc->pages,tailq) {
             printf("%20p %9i %9i %9i %9i\n", pg, pg->num_free, pg->color, pg->size, pg->next_free);
