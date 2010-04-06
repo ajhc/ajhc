@@ -1,4 +1,4 @@
-
+{-# LANGUAGE RecordWildCards #-}
 module C.FromGrin2(compileGrin) where
 
 import Control.Monad.Identity
@@ -49,14 +49,14 @@ data Todo = TodoReturn | TodoExp [Expression] | TodoDecl Name Type | TodoNothing
 
 --data AllocInfo = AllocInfo {
 --        allocSize, allocPtrs, allocOffset :: Int
---    } 
+--    }
 --    deriving(Eq,Ord)
 
 data Written = Written {
     wRequires :: Requires,
     wStructures :: Map.Map Name Structure,
     wTags :: Set.Set Atom,
---    wAllocs :: Set.Set AllocInfo,
+    wAllocs :: Set.Set Atom,
     wEnums :: Map.Map Name Int,
     wFunctions :: Map.Map Name Function
     }
@@ -135,12 +135,25 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 
 {-# NOINLINE compileGrin #-}
 compileGrin :: Grin -> (LBS.ByteString,[String])
-compileGrin grin = (LBS.fromChunks [hsffi_h,jhc_rts_header_h,jhc_jgc_h,jhc_rts_alloc_c,jhc_rts_c,jhc_rts2_c,jhc_jgc_c,BS.fromString generateArchAssertions,BS.fromString $ P.render ans, BS.fromString "\n"], snub (reqLibraries req))  where
-    ans = vcat $ includes ++ [text "", enum_tag_t, header,cafs, buildConstants cpr grin finalHcHash, body]
+compileGrin grin = (LBS.fromChunks code, snub (reqLibraries req))  where
+    code = [
+        hsffi_h,
+        jhc_rts_header_h,
+        jhc_jgc_h,
+        jhc_rts_alloc_c,
+        jhc_rts_c,
+        jhc_rts2_c,
+        jhc_jgc_c,
+        BS.fromString generateArchAssertions,
+        BS.fromString $ P.render ans,
+        BS.fromString "\n"
+        ]
+    ans = vcat $ includes ++ jgcs ++ [text "", enum_tag_t, header,cafs, buildConstants cpr grin finalHcHash, body]
+    jgcs = [ text "struct s_cache *" <> tshow (nodeCacheName m) <> char ';' | m <- Set.toList wAllocs]
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
     (header,body) = generateC (Map.elems fm) (Map.elems sm)
-    ((cafs',finalHcHash,Written { wRequires = req, wFunctions = fm, wEnums = wenum, wStructures = sm, wTags = ts }),cpr) = runC grin $ go >> mapM convertCAF (grinCafs grin)
+    ((cafs',finalHcHash,Written { wRequires = req, wFunctions = fm, wEnums = wenum, wStructures = sm, wTags = ts, .. }),cpr) = runC grin $ go >> mapM convertCAF (grinCafs grin)
     enum_tag_t | null enums = mempty
                | otherwise  = text "enum {" $$ nest 4 (P.vcat (punctuate P.comma $ enums)) $$ text "};"
         where
@@ -776,7 +789,7 @@ newNode region ty ~(NodeC t as) = do
       Nothing -> do
         st <- nodeType t
         as' <- mapM convertVal as
-        let wmalloc = jhc_malloc (not sf && t `Map.notMember` cpr) nptrs
+        let wmalloc = jhc_malloc (reference (toExpression $ nodeCacheName t)) (not sf && t `Map.notMember` cpr) nptrs
             nptrs = length (filter (not . nonPtr . getType) as) + if sf then 1 else 0
             malloc =  wmalloc (sizeof st)
             nonPtr TyPtr {} = False
@@ -786,9 +799,10 @@ newNode region ty ~(NodeC t as) = do
         (dtmp,tmp) <- case region == region_stack of
             True -> do
                 v <- newVar st
-                return (mempty,v)
-            False -> do ty `newTmpVar` malloc
-        tmp <- if region == region_stack then return (reference tmp) else return tmp
+                return (mempty,reference v)
+            False -> do
+                tell mempty { wAllocs = Set.singleton t }
+                ty `newTmpVar` malloc
         let tmp' = concrete t tmp
             ass = [ if isValUnknown aa then mempty else project' i tmp' =* a | a <- as' | aa <- as | i <- map arg [(1 :: Int) ..] ]
         tagassign <- tagAssign tmp' t
@@ -893,12 +907,12 @@ castFunc _ _ tb e = cast (opTyToC tb) e
 gc_roots vs   = functionCall (name "gc_frame0") (v_gc:constant (number (fromIntegral $ length vs)):vs)
 gc_end        = functionCall (name "gc_end") []
 tbsize sz = functionCall (name "TO_BLOCKS") [sz]
-jhc_malloc has_tag nptrs sz | fopts FO.Jgc = functionCall (name "gc_alloc_tag") [v_gc,tbsize sz, toExpression nptrs, toExpression has_tag]
+jhc_malloc ntn has_tag nptrs sz | fopts FO.Jgc = functionCall (name "gc_alloc_tag") [v_gc,ntn, tbsize sz, toExpression nptrs, toExpression has_tag]
 --    | fopts FO.Jgc =  functionCall (name "gc_alloc") [v_gc,tbsize sz, toExpression nptrs]
-jhc_malloc _ 0 sz = functionCall (name "jhc_malloc_atomic") [sz]
-jhc_malloc _ _ sz = functionCall (name "jhc_malloc") [sz]
+jhc_malloc _ _ 0 sz = functionCall (name "jhc_malloc_atomic") [sz]
+jhc_malloc _ _ _ sz = functionCall (name "jhc_malloc") [sz]
 
-jhc_malloc_ptrs sz | fopts FO.Jgc =  functionCall (name "gc_alloc_tag") [v_gc,tbsize sz, tbsize sz, toExpression False]
+jhc_malloc_ptrs sz | fopts FO.Jgc =  functionCall (name "gc_alloc_tag") [v_gc,nullPtr,tbsize sz, tbsize sz, toExpression False]
 jhc_malloc_ptrs sz = functionCall (name "jhc_malloc") [sz]
 
 f_assert e    = functionCall (name "assert") [e]
@@ -958,6 +972,7 @@ nodeTypePtr a = liftM ptrType (nodeType a)
 nodeType a = return $ structType (nodeStructName a)
 nodeStructName :: Atom -> Name
 nodeStructName a = toName ('s':fromAtom a)
+nodeCacheName a = toName ('c':fromAtom a)
 
 
 generateArchAssertions :: String

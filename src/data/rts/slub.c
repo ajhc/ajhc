@@ -15,6 +15,9 @@
 
 #define S_PAGE(val) (struct s_page *)((uintptr_t)(val) & ~ (PAGESIZE - 1))
 
+
+static Pvoid_t  gc_inheap; // whether the page is a heap page
+
 typedef uint16_t page_num_t;
 
 struct s_arena {
@@ -76,6 +79,9 @@ get_free_page(struct s_arena *arena) {
         if(found == -1)
                 return NULL;
         return (struct s_page *)(arena->base + PAGESIZE*found);
+        int r;
+        J1S(r, gc_inheap, (uintptr_t)arena->base/PAGESIZE + found);
+        assert(r);
 }
 
 void *
@@ -96,12 +102,9 @@ s_alloc(struct s_cache *sc)
                 pg->size = sc->size;
                 pg->next_free = 0;
                 memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(sc->num_entries));
-                //int excess = BITARRAY_SIZE(sc->num_entries)*BITS_PER_UNIT - sc->num_entries;
                 for(int i = BITARRAY_SIZE(sc->num_entries)*BITS_PER_UNIT - 1; i >= sc->num_entries; i--)
                         BIT_SET(pg->used,i);
-
                 TAILQ_INSERT_HEAD(&sc->pages,pg,tailq);
-                //printf("Creating New Page: %p\n", pg);
         }
 
         int next_free = pg->next_free;
@@ -151,15 +154,50 @@ new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
         return sc;
 }
 
-struct s_cache *
-find_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
+static void
+clear_used_bits(struct s_arena *arena)
 {
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
-                if(sc->size == size && sc->num_ptrs == num_ptrs)
-                        return sc;
+                struct s_page *pg;
+                TAILQ_FOREACH(pg,&sc->pages,tailq) {
+                        pg->num_free = sc->num_entries;
+                        memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(sc->num_entries));
+                        for(int i = BITARRAY_SIZE(sc->num_entries)*BITS_PER_UNIT - 1; i >= sc->num_entries; i--)
+                                BIT_SET(pg->used,i);
+                }
         }
-        return new_cache(arena,size,num_ptrs);
+}
+
+static bool
+s_set_used_bit(void *val)
+{
+        assert(val);
+        struct s_page *pg = S_PAGE(val);
+        unsigned int offset = ((uintptr_t *)val - (uintptr_t *)pg) - pg->color;
+        if(BIT_IS_UNSET(pg->used,offset/(pg->size/sizeof(uintptr_t)))) {
+                pg->num_free--;
+                BIT_SET(pg->used,offset/(pg->size/sizeof(uintptr_t)));
+                return true;
+        }
+        return false;
+}
+
+struct s_cache *
+find_cache(struct s_cache **rsc, struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
+{
+        if(rsc && *rsc)
+                return *rsc;
+        struct s_cache *sc = SLIST_FIRST(&arena->caches);
+        for(;sc;sc = SLIST_NEXT(sc,next)) {
+                if(sc->size == size && sc->num_ptrs == num_ptrs)
+                        goto found;
+        }
+        sc = new_cache(arena,size,num_ptrs);
+found:
+        if(rsc)
+                *rsc = sc;
+        return sc;
 }
 
 struct s_arena *

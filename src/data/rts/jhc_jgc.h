@@ -54,9 +54,10 @@ typedef struct {
 #define TO_BLOCKS(x) ((x) <= GC_MINIMUM_SIZE*GC_BASE ? GC_MINIMUM_SIZE : (((x) - 1)/GC_BASE) + 1)
 
 
+struct s_cache;
 
 static void gc_perform_gc(gc_t gc);
-static void *gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag);
+static void *gc_alloc_tag(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs, int tag);
 
 
 

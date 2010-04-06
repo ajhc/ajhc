@@ -19,9 +19,6 @@ static struct s_arena *arena;
 #define gc_frame0(gc,n,...) void *ptrs[n] = { __VA_ARGS__ }; for(int i = 0; i < n; i++) gc[i] = (sptr_t)ptrs[i]; gc_t sgc = gc;  gc_t gc = sgc + n;
 #endif
 
-static void gc_perform_gc(gc_t gc);
-static void *gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag);
-
 
 static Pvoid_t  gc_roots       = NULL;  // extra roots in addition to the stack
 static Pvoid_t  gc_allocated   = NULL;  // black set of currently allocated memory
@@ -214,7 +211,7 @@ gc_perform_gc(gc_t gc)
 }
 
 static void *
-gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag)
+gc_alloc_tag(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs, int tag)
 {
         profile_push(&gc_alloc_time);
         number_allocs++;
@@ -228,7 +225,7 @@ gc_alloc_tag(gc_t gc,unsigned count, unsigned nptrs, int tag)
                 }
         }
         //entry_t *e = malloc((count + 1)*GC_BASE);
-        entry_t *e = s_alloc(find_cache(arena, GC_BASE*(count + 1), 0));
+        entry_t *e = s_alloc(find_cache(sc, arena, GC_BASE*(count + 1), 0));
         mem_inuse += (count + 1)*GC_BASE;
         e->u.v.count = count;
         e->u.v.nptrs = nptrs;

@@ -87,6 +87,7 @@ static unsigned mem_chunks,mem_offset;
 
 
 #define jhc_malloc_init() do { } while(0)
+#define jhc_malloc_fini() do { } while(0)
 
 static void
 jhc_alloc_print_stats(void) {
