@@ -17,6 +17,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <float.h>
+#include <sys/queue.h>
 #ifndef __WIN32__
 #include <sys/select.h>
 #include <sys/times.h>

@@ -5,8 +5,6 @@
 #else
 #if _JHC_GC == _JHC_GC_JGC
 
-#include "slub.c"
-
 static struct s_arena *arena;
 
 #define TO_BLOCKS(x) ((x) <= GC_MINIMUM_SIZE*GC_BASE ? GC_MINIMUM_SIZE : (((x) - 1)/GC_BASE) + 1)

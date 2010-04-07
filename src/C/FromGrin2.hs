@@ -138,11 +138,14 @@ compileGrin :: Grin -> (LBS.ByteString,[String])
 compileGrin grin = (LBS.fromChunks code, snub (reqLibraries req))  where
     code = [
         hsffi_h,
+        wsize_h,
         jhc_rts_header_h,
         jhc_jgc_h,
         jhc_rts_alloc_c,
         jhc_rts_c,
         jhc_rts2_c,
+        bitarray_h,
+        slub_c,
         jhc_jgc_c,
         BS.fromString generateArchAssertions,
         BS.fromString $ P.render ans,

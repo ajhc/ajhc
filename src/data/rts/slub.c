@@ -1,13 +1,9 @@
-
-#include <sys/queue.h>
-#include <sys/param.h>
-#include <assert.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <stddef.h>
-#include "bitarray.h"
+#ifdef JHC_RTS_INCLUDE
+#undef JHC_RTS_INCLUDE
+#include "slub.c"
+#define JHC_RTS_INCLUDE
+#else
+#if _JHC_GC == _JHC_GC_JGC
 
 #define PAGESIZE  4096
 #define ARENASIZE 65536
@@ -382,4 +378,6 @@ main(int argc, char *argv[])
         return 0;
 }
 
+#endif
+#endif
 #endif
