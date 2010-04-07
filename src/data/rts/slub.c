@@ -29,7 +29,7 @@ struct s_arena {
 
 
 struct s_page {
-        TAILQ_ENTRY(s_page) tailq;
+        SLIST_ENTRY(s_page) link;
         unsigned short num_free;
         unsigned short color;
         unsigned short size;
@@ -40,8 +40,8 @@ struct s_page {
 struct s_cache {
         SLIST_ENTRY(s_cache) next;
         struct s_arena *arena;
-        TAILQ_HEAD(,s_page) pages;
-        TAILQ_HEAD(,s_page) full_pages;
+        SLIST_HEAD(,s_page) pages;
+        SLIST_HEAD(,s_page) full_pages;
         unsigned short num_entries;
         unsigned short size;
         unsigned short num_ptrs;
@@ -78,7 +78,7 @@ get_free_page(gc_t gc, struct s_arena *arena) {
         if(__predict_false(arena->num_used >= page_threshold)) {
                 gc_perform_gc(gc);
                 // if we are stil using 80% of the heap after a gc, raise the threshold.
-                if((unsigned)arena->num_used * 10 >= page_threshold * 8) {
+                if((unsigned)arena->num_used * 10 >= page_threshold * 9) {
                         page_threshold *= 2;
                 }
         }
@@ -99,23 +99,23 @@ static void
 s_cleanup_pages(struct s_arena *arena) {
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
-                struct s_page *pg = TAILQ_FIRST(&sc->pages);
-                struct s_page *fpg = TAILQ_FIRST(&sc->full_pages);
-                TAILQ_INIT(&sc->pages);
-                TAILQ_INIT(&sc->full_pages);
+                struct s_page *pg = SLIST_FIRST(&sc->pages);
+                struct s_page *fpg = SLIST_FIRST(&sc->full_pages);
+                SLIST_INIT(&sc->pages);
+                SLIST_INIT(&sc->full_pages);
                 if(!pg) {
                         pg = fpg;
                         fpg = NULL;
                 }
                 while(pg) {
-                        struct s_page *npg = TAILQ_NEXT(pg,tailq);
+                        struct s_page *npg = SLIST_NEXT(pg,link);
                         if(pg->num_free == 0) {
-                                TAILQ_INSERT_HEAD(&sc->full_pages,pg,tailq);
+                                SLIST_INSERT_HEAD(&sc->full_pages,pg,link);
                         } else if(pg->num_free == sc->num_entries) {
                                 arena->num_used--;
                                 BIT_UNSET(arena->used,((uintptr_t)pg - (uintptr_t)arena->base) / PAGESIZE);
                         } else {
-                                TAILQ_INSERT_HEAD(&sc->pages,pg,tailq);
+                                SLIST_INSERT_HEAD(&sc->pages,pg,link);
                         }
 
                         if(!npg && fpg) {
@@ -146,14 +146,14 @@ s_alloc(gc_t gc, struct s_cache *sc)
         struct s_page *pg;
         int found = 0;
         assert(sc);
-        pg = TAILQ_FIRST(&sc->pages);
+        pg = SLIST_FIRST(&sc->pages);
         if(__predict_false(!pg)) {
                 pg = get_free_page(gc, sc->arena);
                 assert(pg);
                 pg->color = sc->color;
                 pg->size = sc->size;
                 pg->next_free = 0;
-                TAILQ_INSERT_HEAD(&sc->pages,pg,tailq);
+                SLIST_INSERT_HEAD(&sc->pages,pg,link);
                 clear_page_used_bits(sc,pg);
                 pg->used[0] = 1; //set the first bit
         } else {
@@ -162,13 +162,13 @@ s_alloc(gc_t gc, struct s_cache *sc)
                 pg->next_free = next_free;
                 assert(found != -1);
         }
-
         uintptr_t *pgp = (uintptr_t *)pg + pg->color;
         void *val = &pgp[found * (pg->size/sizeof(uintptr_t))];
         pg->num_free--;
         if(__predict_false(0 == pg->num_free)) {
-                TAILQ_REMOVE(&sc->pages,pg,tailq);
-                TAILQ_INSERT_HEAD(&sc->full_pages,pg,tailq);
+                assert(pg == SLIST_FIRST(&sc->pages));
+                SLIST_REMOVE_HEAD(&sc->pages,link);
+                SLIST_INSERT_HEAD(&sc->full_pages,pg,link);
         }
         assert(S_PAGE(val) == pg);
         //printf("s_alloc: val: %p s_page: %p size: %i color: %i found: %i num_free: %i\n", val, pg, pg->size, pg->color, found, pg->num_free);
@@ -200,8 +200,8 @@ new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
         //sc->num_entries = (8*excess) / (8*size*sizeof(uintptr_t) + 1);
         sc->color = (sizeof(struct s_page) + BITARRAY_SIZE_IN_BYTES(sc->num_entries) + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
         sc->num_ptrs = num_ptrs;
-        TAILQ_INIT(&sc->pages);
-        TAILQ_INIT(&sc->full_pages);
+        SLIST_INIT(&sc->pages);
+        SLIST_INIT(&sc->full_pages);
         SLIST_INSERT_HEAD(&arena->caches,sc,next);
         //print_cache(sc);
         return sc;
@@ -214,10 +214,10 @@ clear_used_bits(struct s_arena *arena)
 {
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
-                struct s_page *pg = TAILQ_FIRST(&sc->pages);
-                struct s_page *fpg = TAILQ_FIRST(&sc->full_pages);
+                struct s_page *pg = SLIST_FIRST(&sc->pages);
+                struct s_page *fpg = SLIST_FIRST(&sc->full_pages);
                 do {
-                        for(;pg;pg = TAILQ_NEXT(pg,tailq))
+                        for(;pg;pg = SLIST_NEXT(pg,link))
                                 clear_page_used_bits(sc,pg);
                         pg = fpg;
                         fpg = NULL;
@@ -248,8 +248,11 @@ s_set_used_bit(void *val)
 static struct s_cache *
 find_cache(struct s_cache **rsc, struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
 {
-        if(__predict_true(rsc && *rsc))
+        if(__predict_true(rsc && *rsc)) {
+      //          printf("s_cached: %p\n", rsc);
                 return *rsc;
+        }
+       // printf("s_new: %p\n", rsc);
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
                 if(sc->size == size && sc->num_ptrs == num_ptrs)
@@ -290,11 +293,11 @@ print_cache(struct s_cache *sc) {
         printf("  end: %i bytes\n",(int)(sc->color*sizeof(uintptr_t) + sc->num_entries*sc->size));
         printf("%20s %9s %9s %9s %9s\n", "page", "num_free", "color", "size", "next_free");
         struct s_page *pg;
-        TAILQ_FOREACH(pg,&sc->pages,tailq) {
+        SLIST_FOREACH(pg,&sc->pages,link) {
             printf("%20p %9i %9i %9i %9i\n", pg, pg->num_free, pg->color, pg->size, pg->next_free);
         }
         printf("  full_pages:\n");
-        TAILQ_FOREACH(pg,&sc->full_pages,tailq) {
+        SLIST_FOREACH(pg,&sc->full_pages,link) {
             printf("%20p %9i %9i %9i %9i\n", pg, pg->num_free, pg->color, pg->size, pg->next_free);
         }
 }
