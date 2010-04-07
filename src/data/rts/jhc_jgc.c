@@ -5,8 +5,6 @@
 #else
 #if _JHC_GC == _JHC_GC_JGC
 
-// #define static 
-
 #include "slub.c"
 
 static struct s_arena *arena;
@@ -26,7 +24,6 @@ static unsigned number_gcs;             // number of garbage collections
 static unsigned number_allocs;          // number of allocations since last garbage collection
 
 #define SHOULD_FOLLOW(w)  IS_PTR(w)
-
 #define TO_GCPTR(x) (void *)((uintptr_t)FROM_SPTR(x) - sizeof(entry_t))
 
 typedef struct {
@@ -54,11 +51,6 @@ gc_add_root(gc_t gc, void *root)
                         int r; J1S(r,gc_roots,(Word_t)nroot);
                 }
         }
-        //       if(SHOULD_FOLLOW(root)) {
-        //                       int r; J1S(r,gc_roots,(((Word_t)root - sizeof(entry_t)) / GC_ALIGNMENT));
-        //               return (bool)r;
-        //       } else
-        //               return false;
 }
 
 struct stack {
@@ -83,20 +75,6 @@ stack_check(struct stack *s, unsigned n) {
         }
 }
 
-/*
-static void
-gc_add_grey(Pvoid_t gc_grey[1], struct stack *stack, uintptr_t ix)
-{
-        int r;
-        J1U(r, gc_allocated, ix);
-        if(r) {
-                J1S(r, *gc_grey, ix);
-                if(r)
-                        stack->stack[stack->ptr++] = (uintptr_t)ix * GC_ALIGNMENT;
-        }
-}
-*/
-
 static void
 gc_add_grey(struct stack *stack, void *s)
 {
@@ -116,7 +94,7 @@ gc_perform_gc(gc_t gc)
         struct stack stack = EMPTY_STACK;
 
         clear_used_bits(arena);
-//        Pvoid_t gc_grey = NULL;
+
         Word_t ix;
         debugf("Setting Roots:");
         Word_t n_roots;
@@ -165,14 +143,9 @@ gc_perform_gc(gc_t gc)
                 sptr_t ptr = gc_stack_base[i];
                 if(P_LAZY == GET_PTYPE(ptr)) {
                         if(!IS_LAZY(GETHEAD(FROM_SPTR(ptr)))) {
-                                if(gc_check_heap(ptr)) {
-                                        s_set_used_bit(TO_GCPTR(ptr));
-                                }
-                                /*
-                                J1U(r,gc_allocated,((uintptr_t)FROM_SPTR(ptr) - sizeof(entry_t))/GC_ALIGNMENT);
-                                if(r)
-                                        J1S(r,gc_grey,((uintptr_t)FROM_SPTR(ptr) - sizeof(entry_t))/GC_ALIGNMENT);
-                                        */
+                                void *gptr = TO_GCPTR(ptr);
+                                if(gc_check_heap(gptr))
+                                        s_set_used_bit(gptr);
                                 number_redirects++;
                                 debugf(" *");
                                 ptr = (sptr_t)GETHEAD(FROM_SPTR(ptr));
@@ -183,17 +156,14 @@ gc_perform_gc(gc_t gc)
                         continue;
                 }
                 number_ptr++;
-                entry_t *e = (entry_t *)TO_GCPTR(ptr); // (entry_t *)FROM_SPTR(ptr) - 1;
+                entry_t *e = TO_GCPTR(ptr);
                 debugf(" %p",(void *)e);
-                //ix = (Word_t)e / GC_ALIGNMENT;
                 gc_add_grey(&stack, e);
         }
 #endif
         debugf("\n");
 
         while(stack.ptr) {
-                //uintptr_t ix = stack.stack[--stack.ptr] / GC_ALIGNMENT;
-                //debugf("Processing Grey: %p\n",(void *)(ix * GC_ALIGNMENT));
                 entry_t *e = (entry_t *)stack.stack[--stack.ptr];
                 debugf("Processing Grey: %p\n",e);
 
@@ -208,22 +178,13 @@ gc_perform_gc(gc_t gc)
                                 }
                         }
                         if(__predict_true(SHOULD_FOLLOW(e->ptrs[i]))) {
-                                entry_t * ptr = (entry_t *)TO_GCPTR(e->ptrs[i]);
-                                debugf("Following: %p %p\n",e->ptrs[i], (void *)ptr);
+                                entry_t * ptr = TO_GCPTR(e->ptrs[i]);
+                                debugf("Following: %p %p\n",e->ptrs[i], ptr);
                                 gc_add_grey( &stack, ptr);
                         }
                 }
         }
         free(stack.stack);
-        //for(ix = 0, (J1F(r,gc_allocated,ix)); r; (J1N(r,gc_allocated,ix))) {
-        //        entry_t *e = (entry_t *)(ix * GC_ALIGNMENT);
-        //        mem_inuse -= (e->u.v.count + 1)*GC_BASE;
-        //        debugf("Freeing: %p\n", e);
-        //        s_free(e);
-                //free(e);
-        //}
-        //J1FA(r,gc_allocated);
-        //gc_allocated = gc_grey;
         s_cleanup_pages(arena);
         if(JGC_STATUS) {
 #ifdef JHC_JGC_STACK
@@ -241,8 +202,8 @@ gc_perform_gc(gc_t gc)
                         number_ptr,
                         number_redirects,
                         (unsigned)n_roots
-                        );
-               jhc_malloc_fini(); 
+                       );
+                //               jhc_malloc_fini();
         }
         number_allocs = 0;
         profile_pop(&gc_gc_time);
@@ -254,32 +215,14 @@ gc_alloc_tag(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs, int ta
         profile_push(&gc_alloc_time);
         number_allocs++;
         assert(nptrs <= count);
-//        static int c;
-        //if(__predict_false(mem_inuse > heap_threshold)) {
-//        if(c++ % 100000 == 0) {
- //               gc_perform_gc(gc);
-            //    if(__predict_false(mem_inuse > ((heap_threshold * 6) / 10))) {
-             //           heap_threshold *= 2;
-             //           if(JGC_STATUS)
-             //                   fprintf(stderr, "Increasing heap threshold to %u bytes because mem usage is %u.\n", (unsigned) heap_threshold, (unsigned)mem_inuse);
-             //   }
- //       }
-        //entry_t *e = malloc((count + 1)*GC_BASE);
-        entry_t *e = s_alloc(gc, find_cache(sc, arena, (count + 1), 0));
-        //mem_inuse += (count + 1)*GC_BASE;
+        entry_t *e = s_alloc(gc, find_cache(sc, arena, (count + 1), nptrs));
         e->u.v.count = count;
         e->u.v.nptrs = nptrs;
         e->u.v.tag = tag;
         debugf("allocated: %p %i %i %i\n",(void *)e, count, nptrs, tag);
-//        int r; J1S(r,gc_allocated,(Word_t)e / GC_ALIGNMENT);
         profile_pop(&gc_alloc_time);
         return (void *)(e + 1);
 }
-
-// static void *
-// gc_alloc_bytes(gc_t gc,size_t count) {
-//         return gc_alloc_tag(gc, TO_BLOCKS(count), 0, 0);
-// }
 
 static void jhc_alloc_print_stats(void) { }
 
@@ -295,7 +238,7 @@ jhc_malloc_init(void) {
 
 static void
 jhc_malloc_fini(void) {
-        if(0) {
+        if(1) {
                 printf("arena: %p\n", arena);
                 printf("  base: %p\n", arena->base);
                 printf("  next_free: %i\n", arena->next_free);
@@ -307,6 +250,5 @@ jhc_malloc_fini(void) {
         }
 }
 
-// #undef static
 #endif
 #endif
