@@ -265,7 +265,7 @@ gc_alloc_tag(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs, int ta
              //   }
  //       }
         //entry_t *e = malloc((count + 1)*GC_BASE);
-        entry_t *e = s_alloc(gc, find_cache(sc, arena, GC_BASE*(count + 1), 0));
+        entry_t *e = s_alloc(gc, find_cache(sc, arena, (count + 1), 0));
         //mem_inuse += (count + 1)*GC_BASE;
         e->u.v.count = count;
         e->u.v.nptrs = nptrs;
