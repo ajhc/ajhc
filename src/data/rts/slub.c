@@ -74,7 +74,7 @@ found: ;
 
 /* page allocator */
 
-static unsigned page_threshold = 4;
+static unsigned page_threshold = 8;
 
 static struct s_page *
 get_free_page(gc_t gc, struct s_arena *arena) {
@@ -102,6 +102,17 @@ static void
 s_cleanup_pages(struct s_arena *arena) {
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
+
+                // 'best' keeps track of the page with the fewest free spots
+                // and percolates it to the front, effectively a single pass
+                // of a bubblesort to help combat fragmentation. It does
+                // not increase the complexity of the cleanup algorithm as
+                // we had to scan every page anyway, but over many passes
+                // of the GC it will eventually result in a more sorted list
+                // than would occur by chance.
+
+                struct s_page *best = NULL;
+                int free_best = 4096;
                 struct s_page *pg = SLIST_FIRST(&sc->pages);
                 struct s_page *fpg = SLIST_FIRST(&sc->full_pages);
                 SLIST_INIT(&sc->pages);
@@ -118,15 +129,27 @@ s_cleanup_pages(struct s_arena *arena) {
                                 arena->num_used--;
                                 BIT_UNSET(arena->used,((uintptr_t)pg - (uintptr_t)arena->base) / PAGESIZE);
                         } else {
-                                SLIST_INSERT_HEAD(&sc->pages,pg,link);
+                                if(!best) {
+                                        free_best = pg->num_free;
+                                        best = pg;
+                                } else {
+                                        if(pg->num_free < free_best) {
+                                                struct s_page *tmp = best;
+                                                best = pg;
+                                                pg = tmp;
+                                                free_best = pg->num_free;
+                                        }
+                                        SLIST_INSERT_HEAD(&sc->pages,pg,link);
+                                }
                         }
-
                         if(!npg && fpg) {
                                 pg = fpg;
                                 fpg = NULL;
                         } else
                                 pg = npg;
                 }
+                if(best)
+                        SLIST_INSERT_HEAD(&sc->pages,best,link);
         }
 }
 
