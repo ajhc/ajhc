@@ -145,23 +145,19 @@ redirection to a whnf value.
 #define PROMOTE(n)   ((wptr_t)(n))
 #define DEMOTE(n)    ((sptr_t)(n))
 
-#define FETCH_TAG(x)      (IS_RAW_TAG(x) ? FETCH_RAW_TAG(x) : FETCH_MEM_TAG(x))
-#define IS_RAW_TAG(x)     ((bool)((uintptr_t)(x) & 0x2))
+#define FETCH_TAG(x)      (IS_PTR(x) ? FETCH_MEM_TAG(x) : FETCH_RAW_TAG(x))
 #define FETCH_RAW_TAG(x)  RAW_GET_U16(x)
 #define SET_RAW_TAG(x)    RAW_SET_16(x)
-#if 0 && _JHC_GC == _JHC_GC_JGC
-#define FETCH_MEM_TAG(x)  (gc_tag(x))
-#define SET_MEM_TAG(x,v)  (gc_tag(x) = (v))
-#else
 #define FETCH_MEM_TAG(x)  (DNODEP(x)->what)
 #define SET_MEM_TAG(x,v)  (DNODEP(x)->what = (v))
-#endif
 
 
 
+#define BLACK_HOLE TO_FPTR(0xDEADBEE0)
 
-#define BLACK_HOLE ((fptr_t)0xDEADBEEF)
-
+struct sptr {};
+struct wptr {};
+struct fptr {};
 
 // we use dummy structs here so the compiler will catch any attempt
 // to use one type in anothers place
@@ -275,7 +271,7 @@ eval(sptr_t s)
                 assert(GET_PTYPE(s) == P_LAZY);
                 void *ds = FROM_SPTR(s);
                 sptr_t h = (sptr_t)(GETHEAD(ds));
-                assert(h != BLACK_HOLE);
+                assert((fptr_t)h != BLACK_HOLE);
                 if(IS_LAZY(h)) {
                         eval_fn fn = (eval_fn)FROM_SPTR(h);
                         assert(GET_PTYPE(h) == P_FUNC);
@@ -299,8 +295,8 @@ eval(sptr_t s)
 }
 
 
-static inline void A_STD A_UNUSED A_HOT
-update(sptr_t thunk, wptr_t new)
+static void A_STD A_UNUSED A_HOT
+update(void * thunk, wptr_t new)
 {
         jhc_update_inc();
         assert(GETHEAD(thunk) == BLACK_HOLE);

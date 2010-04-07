@@ -21,27 +21,26 @@ static Pvoid_t  gc_roots       = NULL;  // extra roots in addition to the stack
 static unsigned number_gcs;             // number of garbage collections
 static unsigned number_allocs;          // number of allocations since last garbage collection
 
-#define SHOULD_FOLLOW(w)  IS_PTR(w)
-#define TO_GCPTR(x) (void *)((uintptr_t)FROM_SPTR(x) - sizeof(entry_t))
+#define TO_GCPTR(x) (entry_t *)(FROM_SPTR(x))
 
 typedef struct {
-        void * ptrs[0];
+        sptr_t ptrs[0];
 } entry_t;
 
 
 static bool
-gc_check_heap(void *s)
+gc_check_heap(entry_t *s)
 {
         int r; J1T(r,gc_inheap,(uintptr_t)s / PAGESIZE);
         return r;
 }
 
 static void
-gc_add_root(gc_t gc, void *root)
+gc_add_root(gc_t gc, sptr_t root)
 {
-        if(SHOULD_FOLLOW(root)) {
-                void * nroot = TO_GCPTR(root);
-                if(gc_check_heap((void *)nroot)) {
+        if(IS_PTR(root)) {
+                entry_t *nroot = TO_GCPTR(root);
+                if(gc_check_heap(nroot)) {
                         int r; J1S(r,gc_roots,(Word_t)nroot);
                 }
         }
@@ -50,7 +49,7 @@ gc_add_root(gc_t gc, void *root)
 struct stack {
         unsigned size;
         unsigned ptr;
-        uintptr_t *stack;
+        entry_t * *stack;
 };
 
 #define EMPTY_STACK { 0, 0, NULL }
@@ -70,10 +69,10 @@ stack_check(struct stack *s, unsigned n) {
 }
 
 static void
-gc_add_grey(struct stack *stack, void *s)
+gc_add_grey(struct stack *stack, entry_t *s)
 {
         if(gc_check_heap(s) && s_set_used_bit(s))
-                stack->stack[stack->ptr++] = (uintptr_t)s;
+                stack->stack[stack->ptr++] = s;
 }
 
 static void
@@ -96,7 +95,7 @@ gc_perform_gc(gc_t gc)
         stack_check(&stack, n_roots);
         int r; for(ix = 0,(J1F(r,gc_roots,ix)); r; (J1N(r,gc_roots,ix))) {
                 debugf(" %p", (void *)ix);
-                gc_add_grey(&stack, (void *)ix);
+                gc_add_grey(&stack, (entry_t *)ix);
         }
         debugf("\n");
         debugf("Trace:");
@@ -118,7 +117,7 @@ gc_perform_gc(gc_t gc)
                                         ptr = (sptr_t)GETHEAD(FROM_SPTR(ptr));
                                 }
                         }
-                        if(__predict_false(!SHOULD_FOLLOW(ptr))) {
+                        if(__predict_false(!IS_PTR(ptr))) {
                                 debugf(" -");
                                 continue;
                         }
@@ -135,7 +134,7 @@ gc_perform_gc(gc_t gc)
                 debugf(" |");
                 // TODO - short circuit redirects on stack
                 sptr_t ptr = gc_stack_base[i];
-                if(P_LAZY == GET_PTYPE(ptr)) {
+                if(1 && (IS_LAZY(ptr))) {
                         if(!IS_LAZY(GETHEAD(FROM_SPTR(ptr)))) {
                                 void *gptr = TO_GCPTR(ptr);
                                 if(gc_check_heap(gptr))
@@ -145,7 +144,7 @@ gc_perform_gc(gc_t gc)
                                 ptr = (sptr_t)GETHEAD(FROM_SPTR(ptr));
                         }
                 }
-                if(__predict_false(!SHOULD_FOLLOW(ptr))) {
+                if(__predict_false(!IS_PTR(ptr))) {
                         debugf(" -");
                         continue;
                 }
@@ -158,21 +157,21 @@ gc_perform_gc(gc_t gc)
         debugf("\n");
 
         while(stack.ptr) {
-                entry_t *e = (entry_t *)stack.stack[--stack.ptr];
+                entry_t *e = stack.stack[--stack.ptr];
                 struct s_page *pg = S_PAGE(e);
                 debugf("Processing Grey: %p\n",e);
 
                 int offset = pg->pi.tag ? 1 : 0;
                 stack_check(&stack, pg->pi.num_ptrs);
                 for(int i = offset; i < pg->pi.num_ptrs + offset; i++) {
-                        if(P_LAZY == GET_PTYPE(e->ptrs[i])) {
+                        if(1 && (P_LAZY == GET_PTYPE(e->ptrs[i]))) {
                                 if(!IS_LAZY(GETHEAD(FROM_SPTR(e->ptrs[i])))) {
                                         number_redirects++;
                                         debugf(" *");
-                                        e->ptrs[i] = GETHEAD(FROM_SPTR(e->ptrs[i]));
+                                        e->ptrs[i] = (sptr_t)GETHEAD(FROM_SPTR(e->ptrs[i]));
                                 }
                         }
-                        if(__predict_true(SHOULD_FOLLOW(e->ptrs[i]))) {
+                        if(__predict_true(IS_PTR(e->ptrs[i]))) {
                                 entry_t * ptr = TO_GCPTR(e->ptrs[i]);
                                 debugf("Following: %p %p\n",e->ptrs[i], ptr);
                                 gc_add_grey( &stack, ptr);

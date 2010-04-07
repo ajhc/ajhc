@@ -631,7 +631,7 @@ buildConstants cpr grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
             --Just [a'] | a' == a -> []
             Just _ -> []
             _ -> [text ".what =" <+> tshow (nodeTagName a)]
-        def = text "#define c" <> tshow i <+> text "((sptr_t)&_c" <> tshow i <> text ")"
+        def = text "#define c" <> tshow i <+> text "(TO_SPTR_C(P_WHNF, (sptr_t)&_c" <> tshow i <> text "))"
         rs = [ f z i |  (z,i) <- zip zs [ 1 :: Int .. ]]
         f (Right i) a = text ".a" <> tshow a <+> text "=" <+> text ('c':show i)
         f (Left (Var n _)) a = text ".a" <> tshow a <+> text "=" <+> tshow (varName n)
@@ -875,9 +875,9 @@ declareEvalFunc isCAF n = do
         rvar = localVariable wptr_t (name "r")
         atype = ptrType nt
         body = rvar =* functionCall (toName (show $ fn)) (mgc [ project' (arg i) (variable aname) | _ <- ts | i <- [(1 :: Int) .. ] ])
-        update =  f_update (cast sptr_t (variable aname)) rvar
-        addroot =  if isCAF && fopts FO.Jgc then f_gc_add_root rvar else emptyExpression
-        body' = if not isCAF && fopts FO.Jgc then subBlock (gc_roots [variable aname] & rest) else rest
+        update =  f_update (variable aname) rvar
+        addroot =  if isCAF && fopts FO.Jgc then f_gc_add_root (cast sptr_t rvar) else emptyExpression
+        body' = if not isCAF && fopts FO.Jgc then subBlock (gc_roots [f_MKLAZY(variable aname)] & rest) else rest
         rest = body & update & addroot & creturn rvar
     tellFunctions [function fname wptr_t (mgct [(aname,atype)]) [a_STD, a_FALIGNED] body']
     return fname

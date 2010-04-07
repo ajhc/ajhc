@@ -197,6 +197,7 @@ s_alloc(gc_t gc, struct s_cache *sc)
 }
 
 
+/*
 static void
 s_free(void *val)
 {
@@ -208,6 +209,7 @@ s_free(void *val)
         BIT_UNSET(pg->used,offset/(pg->pi.size));
         pg->num_free++;
 }
+*/
 
 
 static struct s_cache *
