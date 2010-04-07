@@ -72,8 +72,9 @@ print_alloc_size_stats(void) {
 #define jhc_malloc_atomic GC_malloc_atomic
 #define jhc_free GC_free
 
-static inline void jhc_malloc_init(void) { GC_INIT(); }
-static inline void jhc_alloc_print_stats(void) { GC_dump(); }
+static void jhc_malloc_init(void) { GC_INIT(); }
+static void jhc_malloc_fini(void) {  }
+static void jhc_alloc_print_stats(void) { GC_dump(); }
 
 #elif _JHC_GC == _JHC_GC_NONE
 
