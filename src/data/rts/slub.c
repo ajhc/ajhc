@@ -16,9 +16,10 @@ typedef uint16_t page_num_t;
 
 struct s_arena {
         void *base;
-        page_num_t next_free,num_used;
-        bitarray_t used[BITARRAY_SIZE(ARENASIZE)];
         SLIST_HEAD(,s_cache) caches;
+        page_num_t next_free,num_used;
+        SLIST_HEAD(,s_page) free_pages;
+        bitarray_t used[BITARRAY_SIZE(ARENASIZE)];
 };
 
 
@@ -77,20 +78,26 @@ get_free_page(gc_t gc, struct s_arena *arena) {
         if(__predict_false(arena->num_used >= page_threshold)) {
                 gc_perform_gc(gc);
                 // if we are stil using 80% of the heap after a gc, raise the threshold.
-                if((unsigned)arena->num_used * 10 >= page_threshold * 9) {
+                if(__predict_false((unsigned)arena->num_used * 10 >= page_threshold * 9)) {
                         page_threshold *= 2;
                 }
         }
-        int next_free = arena->next_free;
-        int found = bitset_find_free(&next_free, BITARRAY_SIZE(ARENASIZE), arena->used);
-        arena->next_free = next_free;
-        if(found == -1)
-                return NULL;
-        int r;
-        J1S(r, gc_inheap, (uintptr_t)arena->base/PAGESIZE + found);
-        struct s_page *pg = (struct s_page *)(arena->base + PAGESIZE*found);
+        struct s_page *pg;
+        if(__predict_true(SLIST_FIRST(&arena->free_pages))) {
+                pg = SLIST_FIRST(&arena->free_pages);
+                SLIST_REMOVE_HEAD(&arena->free_pages,link);
+        } else {
+                int next_free = arena->next_free;
+                int found = bitset_find_free(&next_free, BITARRAY_SIZE(ARENASIZE), arena->used);
+                arena->next_free = next_free;
+                if(found == -1)
+                        return NULL;
+                int r;
+                J1S(r, gc_inheap, (uintptr_t)arena->base/PAGESIZE + found);
+                pg = (struct s_page *)(arena->base + PAGESIZE*found);
+        }
         arena->num_used++;
-//        printf("Allocing: %p %u\n", pg, arena->num_used);
+        //        printf("Allocing: %p %u\n", pg, arena->num_used);
         return pg;
 }
 
@@ -119,11 +126,12 @@ s_cleanup_pages(struct s_arena *arena) {
                 }
                 while(pg) {
                         struct s_page *npg = SLIST_NEXT(pg,link);
-                        if(pg->num_free == 0) {
+                        if(__predict_false(pg->num_free == 0)) {
                                 SLIST_INSERT_HEAD(&sc->full_pages,pg,link);
-                        } else if(pg->num_free == sc->num_entries) {
+                        } else if(__predict_true(pg->num_free == sc->num_entries)) {
                                 arena->num_used--;
-                                BIT_UNSET(arena->used,((uintptr_t)pg - (uintptr_t)arena->base) / PAGESIZE);
+                                SLIST_INSERT_HEAD(&arena->free_pages,pg,link);
+//                                BIT_UNSET(arena->used,((uintptr_t)pg - (uintptr_t)arena->base) / PAGESIZE);
                         } else {
                                 if(!best) {
                                         free_best = pg->num_free;
@@ -260,7 +268,7 @@ s_set_used_bit(void *val)
         assert(val);
         struct s_page *pg = S_PAGE(val);
         unsigned int offset = ((uintptr_t *)val - (uintptr_t *)pg) - pg->pi.color;
-        if(BIT_IS_UNSET(pg->used,offset/pg->pi.size)) {
+        if(__predict_true(BIT_IS_UNSET(pg->used,offset/pg->pi.size))) {
                 BIT_SET(pg->used,offset/pg->pi.size);
                 pg->num_free--;
                 return (bool)pg->pi.num_ptrs;
@@ -289,6 +297,7 @@ struct s_arena *
 new_arena(void) {
         struct s_arena *arena = malloc(sizeof(struct s_arena));
         SLIST_INIT(&arena->caches);
+        SLIST_INIT(&arena->free_pages);
         int ret = posix_memalign(&arena->base,PAGESIZE,ARENASIZE*PAGESIZE);
         if(ret != 0) {
                 fprintf(stderr,"Unable to allocate memory with posix_memalign\n");

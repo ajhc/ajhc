@@ -171,7 +171,7 @@ gc_perform_gc(gc_t gc)
                                         e->ptrs[i] = (sptr_t)GETHEAD(FROM_SPTR(e->ptrs[i]));
                                 }
                         }
-                        if(__predict_true(IS_PTR(e->ptrs[i]))) {
+                        if(IS_PTR(e->ptrs[i])) {
                                 entry_t * ptr = TO_GCPTR(e->ptrs[i]);
                                 debugf("Following: %p %p\n",e->ptrs[i], ptr);
                                 gc_add_grey( &stack, ptr);
