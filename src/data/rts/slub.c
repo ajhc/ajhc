@@ -8,9 +8,8 @@
 #include <string.h>
 #include <stddef.h>
 #include "bitarray.h"
-// #include "slub.h"
 
-#define PAGESIZE 4096
+#define PAGESIZE  4096
 #define ARENASIZE 65536
 
 #define S_PAGE(val) (struct s_page *)((uintptr_t)(val) & ~ (PAGESIZE - 1))
@@ -28,24 +27,27 @@ struct s_arena {
 };
 
 
-struct s_page {
-        SLIST_ENTRY(s_page) link;
-        unsigned short num_free;
+struct s_page_info {
         unsigned short color;
         unsigned short size;
+};
+
+struct s_page {
+        SLIST_ENTRY(s_page) link;
+        struct s_page_info pi;
+        unsigned short num_free;
         unsigned short next_free;
         bitarray_t used[];
 };
 
 struct s_cache {
         SLIST_ENTRY(s_cache) next;
-        struct s_arena *arena;
         SLIST_HEAD(,s_page) pages;
         SLIST_HEAD(,s_page) full_pages;
+        struct s_page_info pi;
         unsigned short num_entries;
-        unsigned short size;
         unsigned short num_ptrs;
-        unsigned short color;
+        struct s_arena *arena;
 };
 
 
@@ -150,8 +152,7 @@ s_alloc(gc_t gc, struct s_cache *sc)
         if(__predict_false(!pg)) {
                 pg = get_free_page(gc, sc->arena);
                 assert(pg);
-                pg->color = sc->color;
-                pg->size = sc->size;
+                pg->pi = sc->pi;
                 pg->next_free = 0;
                 SLIST_INSERT_HEAD(&sc->pages,pg,link);
                 clear_page_used_bits(sc,pg);
@@ -162,8 +163,8 @@ s_alloc(gc_t gc, struct s_cache *sc)
                 pg->next_free = next_free;
                 assert(found != -1);
         }
-        uintptr_t *pgp = (uintptr_t *)pg + pg->color;
-        void *val = &pgp[found * (pg->size/sizeof(uintptr_t))];
+        uintptr_t *pgp = (uintptr_t *)pg + pg->pi.color;
+        void *val = &pgp[found * (pg->pi.size/sizeof(uintptr_t))];
         pg->num_free--;
         if(__predict_false(0 == pg->num_free)) {
                 assert(pg == SLIST_FIRST(&sc->pages));
@@ -171,7 +172,7 @@ s_alloc(gc_t gc, struct s_cache *sc)
                 SLIST_INSERT_HEAD(&sc->full_pages,pg,link);
         }
         assert(S_PAGE(val) == pg);
-        //printf("s_alloc: val: %p s_page: %p size: %i color: %i found: %i num_free: %i\n", val, pg, pg->size, pg->color, found, pg->num_free);
+        //printf("s_alloc: val: %p s_page: %p size: %i color: %i found: %i num_free: %i\n", val, pg, pg->pi.size, pg->pi.color, found, pg->num_free);
         return val;
 }
 
@@ -181,10 +182,10 @@ s_free(void *val)
 {
         assert(val);
         struct s_page *pg = S_PAGE(val);
-        unsigned int offset = ((uintptr_t *)val - (uintptr_t *)pg) - pg->color;
-//        printf("s_free:  val: %p s_page: %p size: %i color: %i num_free: %i offset: %i bit: %i\n", val, pg, pg->size, pg->color, pg->num_free, offset, offset/pg->size);
-        assert(BIT_VALUE(pg->used,offset/(pg->size/sizeof(uintptr_t))));
-        BIT_UNSET(pg->used,offset/(pg->size/sizeof(uintptr_t)));
+        unsigned int offset = ((uintptr_t *)val - (uintptr_t *)pg) - pg->pi.color;
+//        printf("s_free:  val: %p s_page: %p size: %i color: %i num_free: %i offset: %i bit: %i\n", val, pg, pg->pi.size, pg->pi.color, pg->num_free, offset, offset/pg->pi.size);
+        assert(BIT_VALUE(pg->used,offset/(pg->pi.size/sizeof(uintptr_t))));
+        BIT_UNSET(pg->used,offset/(pg->pi.size/sizeof(uintptr_t)));
         pg->num_free++;
 }
 
@@ -194,11 +195,11 @@ new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
 {
         struct s_cache *sc = malloc(sizeof(struct s_cache));
         sc->arena = arena;
-        sc->size = size;
+        sc->pi.size = size;
         size_t excess = PAGESIZE - sizeof(struct s_page);
         sc->num_entries = (8*excess) / (8*size + 1) - 1;
         //sc->num_entries = (8*excess) / (8*size*sizeof(uintptr_t) + 1);
-        sc->color = (sizeof(struct s_page) + BITARRAY_SIZE_IN_BYTES(sc->num_entries) + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
+        sc->pi.color = (sizeof(struct s_page) + BITARRAY_SIZE_IN_BYTES(sc->num_entries) + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
         sc->num_ptrs = num_ptrs;
         SLIST_INIT(&sc->pages);
         SLIST_INIT(&sc->full_pages);
@@ -236,10 +237,10 @@ s_set_used_bit(void *val)
         assert(val);
         // TODO - check if there are internal pointers
         struct s_page *pg = S_PAGE(val);
-        unsigned int offset = ((uintptr_t *)val - (uintptr_t *)pg) - pg->color;
-        if(BIT_IS_UNSET(pg->used,offset/(pg->size/sizeof(uintptr_t)))) {
+        unsigned int offset = ((uintptr_t *)val - (uintptr_t *)pg) - pg->pi.color;
+        if(BIT_IS_UNSET(pg->used,offset/(pg->pi.size/sizeof(uintptr_t)))) {
                 pg->num_free--;
-                BIT_SET(pg->used,offset/(pg->size/sizeof(uintptr_t)));
+                BIT_SET(pg->used,offset/(pg->pi.size/sizeof(uintptr_t)));
                 return true;
         }
         return false;
@@ -255,7 +256,7 @@ find_cache(struct s_cache **rsc, struct s_arena *arena, unsigned short size, uns
        // printf("s_new: %p\n", rsc);
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
-                if(sc->size == size && sc->num_ptrs == num_ptrs)
+                if(sc->pi.size == size && sc->num_ptrs == num_ptrs)
                         goto found;
         }
         sc = new_cache(arena,size,num_ptrs);
@@ -284,21 +285,21 @@ new_arena(void) {
 void
 print_cache(struct s_cache *sc) {
         printf("num_entries: %i\n",(int)sc->num_entries);
-        printf("  entries: %i bytes\n",(int)(sc->num_entries*sc->size));
+        printf("  entries: %i bytes\n",(int)(sc->num_entries*sc->pi.size));
         printf("  header: %lu bytes\n", sizeof(struct s_page) + BITARRAY_SIZE_IN_BYTES(sc->num_entries));
      //   printf("excess: %i\n", PAGESIZE - sizeof(struct s_page) - sizeof(bitarray_t));
-        printf("  size: %i bytes\n",(int)sc->size);
-        printf("  color: %i words\n",(int)sc->color);
-        printf("  color_off: %i bytes\n",(int)(sc->color*sizeof(uintptr_t)));
-        printf("  end: %i bytes\n",(int)(sc->color*sizeof(uintptr_t) + sc->num_entries*sc->size));
+        printf("  size: %i bytes\n",(int)sc->pi.size);
+        printf("  color: %i words\n",(int)sc->pi.color);
+        printf("  color_off: %i bytes\n",(int)(sc->pi.color*sizeof(uintptr_t)));
+        printf("  end: %i bytes\n",(int)(sc->pi.color*sizeof(uintptr_t) + sc->num_entries*sc->pi.size));
         printf("%20s %9s %9s %9s %9s\n", "page", "num_free", "color", "size", "next_free");
         struct s_page *pg;
         SLIST_FOREACH(pg,&sc->pages,link) {
-            printf("%20p %9i %9i %9i %9i\n", pg, pg->num_free, pg->color, pg->size, pg->next_free);
+            printf("%20p %9i %9i %9i %9i\n", pg, pg->num_free, pg->pi.color, pg->pi.size, pg->next_free);
         }
         printf("  full_pages:\n");
         SLIST_FOREACH(pg,&sc->full_pages,link) {
-            printf("%20p %9i %9i %9i %9i\n", pg, pg->num_free, pg->color, pg->size, pg->next_free);
+            printf("%20p %9i %9i %9i %9i\n", pg, pg->num_free, pg->pi.color, pg->pi.size, pg->next_free);
         }
 }
 
