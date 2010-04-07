@@ -35,13 +35,6 @@ static gc_t gc_stack_base;
 
 #define ALIGN(a,n) ((n) - 1 + ((a) - ((n) - 1) % (a)))
 
-typedef struct {
-        uint8_t count;
-        uint8_t nptrs;
-        uint16_t tag;
-} entry_header_t;
-
-
 
 // round all allocations up to this many blocks.
 // the underlying malloc implementation has some
@@ -58,7 +51,6 @@ struct s_cache;
 
 static void gc_perform_gc(gc_t gc);
 static void *gc_alloc_tag(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs, int tag);
-
 
 
 #ifdef NDEBUG

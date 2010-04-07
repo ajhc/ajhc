@@ -27,10 +27,6 @@ static unsigned number_allocs;          // number of allocations since last garb
 #define TO_GCPTR(x) (void *)((uintptr_t)FROM_SPTR(x) - sizeof(entry_t))
 
 typedef struct {
-        union {
-                entry_header_t v;
-                void * _dummy;
-        } u;
         void * ptrs[0];
 } entry_t;
 
@@ -165,11 +161,12 @@ gc_perform_gc(gc_t gc)
 
         while(stack.ptr) {
                 entry_t *e = (entry_t *)stack.stack[--stack.ptr];
+                struct s_page *pg = S_PAGE(e);
                 debugf("Processing Grey: %p\n",e);
 
-                int offset = e->u.v.tag ? 1 : 0;
-                stack_check(&stack, e->u.v.nptrs);
-                for(int i = offset; i < e->u.v.nptrs + offset; i++) {
+                int offset = pg->pi.tag ? 1 : 0;
+                stack_check(&stack, pg->pi.num_ptrs);
+                for(int i = offset; i < pg->pi.num_ptrs + offset; i++) {
                         if(P_LAZY == GET_PTYPE(e->ptrs[i])) {
                                 if(!IS_LAZY(GETHEAD(FROM_SPTR(e->ptrs[i])))) {
                                         number_redirects++;
@@ -215,13 +212,10 @@ gc_alloc_tag(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs, int ta
         profile_push(&gc_alloc_time);
         number_allocs++;
         assert(nptrs <= count);
-        entry_t *e = s_alloc(gc, find_cache(sc, arena, (count + 1), nptrs));
-        e->u.v.count = count;
-        e->u.v.nptrs = nptrs;
-        e->u.v.tag = tag;
+        entry_t *e = s_alloc(gc, find_cache(sc, arena, count, nptrs, tag));
         debugf("allocated: %p %i %i %i\n",(void *)e, count, nptrs, tag);
         profile_pop(&gc_alloc_time);
-        return (void *)(e + 1);
+        return (void *)e;
 }
 
 static void jhc_alloc_print_stats(void) { }
@@ -238,7 +232,7 @@ jhc_malloc_init(void) {
 
 static void
 jhc_malloc_fini(void) {
-        if(1) {
+        if(0) {
                 printf("arena: %p\n", arena);
                 printf("  base: %p\n", arena->base);
                 printf("  next_free: %i\n", arena->next_free);
