@@ -5,6 +5,8 @@
 #else
 #if _JHC_GC == _JHC_GC_JGC
 
+// #define static 
+
 #include "slub.c"
 
 static struct s_arena *arena;
@@ -20,9 +22,6 @@ static struct s_arena *arena;
 
 
 static Pvoid_t  gc_roots       = NULL;  // extra roots in addition to the stack
-static Pvoid_t  gc_allocated   = NULL;  // black set of currently allocated memory
-static size_t   heap_threshold = 2048;  // threshold at which we want to run a gc rather than malloc more memory
-static size_t   mem_inuse;              // amount of memory in use by gc'ed memory
 static unsigned number_gcs;             // number of garbage collections
 static unsigned number_allocs;          // number of allocations since last garbage collection
 
@@ -229,13 +228,21 @@ gc_perform_gc(gc_t gc)
         if(JGC_STATUS) {
 #ifdef JHC_JGC_STACK
                 void * gc_stack_base = &gc_stack_base;
+                Word_t n_roots;
+                J1C(n_roots,gc_roots,0,-1);
 #endif
 
-                fprintf(stderr, "%3u - Ss: %5u Ps: %5u Rs: %5u As: %6u ", number_gcs, number_stack, number_ptr, number_redirects, number_allocs);
-                Word_t n_allocated,n_roots;
-                J1C(n_allocated,gc_allocated,0,-1);
-                J1C(n_roots,gc_roots,0,-1);
-                fprintf(stderr,"live: %5lu root: %3lu inuse: %6lu threshold: %6lu %p %p\n",arena->num_used,n_roots,(long unsigned)mem_inuse,(long unsigned)heap_threshold, gc_stack_base, gc);
+                fprintf(stdout, "%3u - %6u Used: %4u Thresh: %4u Ss: %5u Ps: %5u Rs: %5u Root: %3u\n",
+                        number_gcs,
+                        number_allocs,
+                        (unsigned)arena->num_used,
+                        page_threshold,
+                        number_stack,
+                        number_ptr,
+                        number_redirects,
+                        (unsigned)n_roots
+                        );
+               jhc_malloc_fini(); 
         }
         number_allocs = 0;
         profile_pop(&gc_gc_time);
@@ -259,7 +266,7 @@ gc_alloc_tag(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs, int ta
  //       }
         //entry_t *e = malloc((count + 1)*GC_BASE);
         entry_t *e = s_alloc(gc, find_cache(sc, arena, GC_BASE*(count + 1), 0));
-        mem_inuse += (count + 1)*GC_BASE;
+        //mem_inuse += (count + 1)*GC_BASE;
         e->u.v.count = count;
         e->u.v.nptrs = nptrs;
         e->u.v.tag = tag;
@@ -288,7 +295,7 @@ jhc_malloc_init(void) {
 
 static void
 jhc_malloc_fini(void) {
-        if(1) {
+        if(0) {
                 printf("arena: %p\n", arena);
                 printf("  base: %p\n", arena->base);
                 printf("  next_free: %i\n", arena->next_free);
@@ -300,5 +307,6 @@ jhc_malloc_fini(void) {
         }
 }
 
+// #undef static
 #endif
 #endif

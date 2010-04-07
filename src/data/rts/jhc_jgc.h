@@ -7,7 +7,7 @@
 
 #if _JHC_GC == _JHC_GC_JGC
 
-#define JGC_STATUS 1
+#define JGC_STATUS 0
 
 
 #ifdef JHC_JGC_STACK

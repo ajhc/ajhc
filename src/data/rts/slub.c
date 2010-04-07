@@ -27,6 +27,7 @@ struct s_arena {
         SLIST_HEAD(,s_cache) caches;
 };
 
+
 struct s_page {
         TAILQ_ENTRY(s_page) tailq;
         unsigned short num_free;
@@ -40,6 +41,7 @@ struct s_cache {
         SLIST_ENTRY(s_cache) next;
         struct s_arena *arena;
         TAILQ_HEAD(,s_page) pages;
+        TAILQ_HEAD(,s_page) full_pages;
         unsigned short num_entries;
         unsigned short size;
         unsigned short num_ptrs;
@@ -47,9 +49,7 @@ struct s_cache {
 };
 
 
-void print_cache(struct s_cache *sc);
 /* this finds a bit that isn't set, sets it, and returns it */
-
 static int
 bitset_find_free(int *next_free,int n,bitarray_t ba[static n]) {
         assert(*next_free < n);
@@ -61,14 +61,12 @@ bitset_find_free(int *next_free,int n,bitarray_t ba[static n]) {
                 if(~ba[i]) goto found;
         }
         return -1;
-found:
-        {
-        int o = __builtin_ffsl(~ba[i]);
-        assert(o);
-        ba[i] |= (1UL << (o - 1));
-        *next_free = i;
-        return (i*BITS_PER_UNIT + (o - 1));
-        }
+found: ;
+       int o = __builtin_ffsl(~ba[i]);
+       assert(o);
+       ba[i] |= (1UL << (o - 1));
+       *next_free = i;
+       return (i*BITS_PER_UNIT + (o - 1));
 }
 
 /* page allocator */
@@ -77,10 +75,10 @@ static unsigned page_threshold = 4;
 
 static struct s_page *
 get_free_page(gc_t gc, struct s_arena *arena) {
-        if(arena->num_used >= page_threshold) {
+        if(__predict_false(arena->num_used >= page_threshold)) {
                 gc_perform_gc(gc);
                 // if we are stil using 80% of the heap after a gc, raise the threshold.
-                if(arena->num_used * 10 >= page_threshold * 8) {
+                if((unsigned)arena->num_used * 10 >= page_threshold * 9) {
                         page_threshold *= 2;
                 }
         }
@@ -91,46 +89,72 @@ get_free_page(gc_t gc, struct s_arena *arena) {
                 return NULL;
         int r;
         J1S(r, gc_inheap, (uintptr_t)arena->base/PAGESIZE + found);
+        struct s_page *pg = (struct s_page *)(arena->base + PAGESIZE*found);
         arena->num_used++;
-        return (struct s_page *)(arena->base + PAGESIZE*found);
+//        printf("Allocing: %p %u\n", pg, arena->num_used);
+        return pg;
 }
 
 static void
 s_cleanup_pages(struct s_arena *arena) {
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
-                struct s_page *pg;
-                TAILQ_FOREACH(pg,&sc->pages,tailq) {
-                        if(pg->num_free == sc->num_entries) {
-                                TAILQ_REMOVE(&sc->pages,pg,tailq);
-                                BIT_UNSET(arena->used,((uintptr_t)pg - (uintptr_t)arena->base) / PAGESIZE);
-                                arena->num_used--;
+                struct s_page *pg = TAILQ_FIRST(&sc->pages);
+                struct s_page *fpg = TAILQ_FIRST(&sc->full_pages);
+//                printf("Sc: %p %p %p\n", sc, pg, fpg);
+                TAILQ_INIT(&sc->pages);
+                TAILQ_INIT(&sc->full_pages);
+                if(!pg) {
+                        pg = fpg;
+                        fpg = NULL;
+                }
+                while(pg) {
+//                        printf("Considering: %p\n", pg);
+                        struct s_page *npg = TAILQ_NEXT(pg,tailq);
+                        if(pg->num_free == 0) {
+                                TAILQ_INSERT_HEAD(&sc->full_pages,pg,tailq);
+                        } else {
+                                if(pg->num_free == sc->num_entries) {
+                                        arena->num_used--;
+                                        BIT_UNSET(arena->used,((uintptr_t)pg - (uintptr_t)arena->base) / PAGESIZE);
+                                } else {
+                                        TAILQ_INSERT_HEAD(&sc->pages,pg,tailq);
+                                }
                         }
+
+//                        printf("moving on %p %p\n", pg, npg, fpg);
+                        if(!npg && fpg) {
+                                pg = fpg;
+                                fpg = NULL;
+                        } else
+                                pg = npg;
                 }
         }
 }
-
-
 
 static void *
 s_alloc(gc_t gc, struct s_cache *sc)
 {
         struct s_page *pg;
         assert(sc);
+//        pg = TAILQ_FIRST(&sc->pages);
         TAILQ_FOREACH(pg,&sc->pages,tailq)
                 if(pg->num_free > 0)
                         break;
         if(__predict_false(!pg)) {
-        pg = get_free_page(gc, sc->arena);
-        assert(pg);
-        pg->num_free = sc->num_entries;
-        pg->color = sc->color;
-        pg->size = sc->size;
-        pg->next_free = 0;
-        memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(sc->num_entries));
-        for(int i = BITARRAY_SIZE(sc->num_entries)*BITS_PER_UNIT - 1; i >= sc->num_entries; i--)
-                BIT_SET(pg->used,i);
-        TAILQ_INSERT_HEAD(&sc->pages,pg,tailq);
+                pg = get_free_page(gc, sc->arena);
+                assert(pg);
+                pg->num_free = sc->num_entries;
+                pg->color = sc->color;
+                pg->size = sc->size;
+                pg->next_free = 0;
+                memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(sc->num_entries));
+//                unsigned max = BITARRAY_SIZE(sc->num_entries);
+//               for(unsigned i = 0;i < max; i++)
+//                       pg->used[i] = 0;
+                for(int i = BITARRAY_SIZE(sc->num_entries)*BITS_PER_UNIT - 1; i >= sc->num_entries; i--)
+                        BIT_SET(pg->used,i);
+                TAILQ_INSERT_HEAD(&sc->pages,pg,tailq);
         }
 
         int next_free = pg->next_free;
@@ -143,7 +167,8 @@ s_alloc(gc_t gc, struct s_cache *sc)
         pg->num_free--;
         if(__predict_false(0 == pg->num_free)) {
                 TAILQ_REMOVE(&sc->pages,pg,tailq);
-                TAILQ_INSERT_TAIL(&sc->pages,pg,tailq);
+                //TAILQ_INSERT_TAIL(&sc->pages,pg,tailq);
+                TAILQ_INSERT_HEAD(&sc->full_pages,pg,tailq);
         }
         assert(S_PAGE(val) == pg);
         return val;
@@ -175,6 +200,7 @@ new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
         sc->color = (sizeof(struct s_page) + BITARRAY_SIZE_IN_BYTES(sc->num_entries) + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
         sc->num_ptrs = num_ptrs;
         TAILQ_INIT(&sc->pages);
+        TAILQ_INIT(&sc->full_pages);
         SLIST_INSERT_HEAD(&arena->caches,sc,next);
         //print_cache(sc);
         return sc;
@@ -186,13 +212,18 @@ clear_used_bits(struct s_arena *arena)
 {
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
-                struct s_page *pg;
-                TAILQ_FOREACH(pg,&sc->pages,tailq) {
-                        pg->num_free = sc->num_entries;
-                        memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(sc->num_entries));
-                        for(int i = BITARRAY_SIZE(sc->num_entries)*BITS_PER_UNIT - 1; i >= sc->num_entries; i--)
-                                BIT_SET(pg->used,i);
-                }
+                struct s_page *pg = TAILQ_FIRST(&sc->pages);
+                struct s_page *fpg = TAILQ_FIRST(&sc->full_pages);
+                do {
+                        for(;pg;pg = TAILQ_NEXT(pg,tailq)) {
+                                pg->num_free = sc->num_entries;
+                                memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(sc->num_entries));
+                                for(int i = BITARRAY_SIZE(sc->num_entries)*BITS_PER_UNIT - 1; i >= sc->num_entries; i--)
+                                        BIT_SET(pg->used,i);
+                        }
+                        pg = fpg;
+                        fpg = NULL;
+                }  while(pg);
         }
 }
 
@@ -265,6 +296,10 @@ print_cache(struct s_cache *sc) {
         printf("%20s %9s %9s %9s %9s\n", "page", "num_free", "color", "size", "next_free");
         struct s_page *pg;
         TAILQ_FOREACH(pg,&sc->pages,tailq) {
+            printf("%20p %9i %9i %9i %9i\n", pg, pg->num_free, pg->color, pg->size, pg->next_free);
+        }
+        printf("  full_pages:\n");
+        TAILQ_FOREACH(pg,&sc->full_pages,tailq) {
             printf("%20p %9i %9i %9i %9i\n", pg, pg->num_free, pg->color, pg->size, pg->next_free);
         }
 }
