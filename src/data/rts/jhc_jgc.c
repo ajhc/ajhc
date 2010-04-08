@@ -31,7 +31,7 @@ typedef struct {
 static bool
 gc_check_heap(entry_t *s)
 {
-        int r; J1T(r,gc_inheap,(uintptr_t)s / PAGESIZE);
+        int r; J1T(r,gc_inheap,(uintptr_t)s / MEGABLOCK_SIZE);
         return r;
 }
 
@@ -158,7 +158,7 @@ gc_perform_gc(gc_t gc)
 
         while(stack.ptr) {
                 entry_t *e = stack.stack[--stack.ptr];
-                struct s_page *pg = S_PAGE(e);
+                struct s_block *pg = S_BLOCK(e);
                 debugf("Processing Grey: %p\n",e);
 
                 stack_check(&stack, pg->pi.num_ptrs);
@@ -178,7 +178,7 @@ gc_perform_gc(gc_t gc)
                 }
         }
         free(stack.stack);
-        s_cleanup_pages(arena);
+        s_cleanup_blocks(arena);
         if(JGC_STATUS) {
 #ifdef JHC_JGC_STACK
                 void * gc_stack_base = &gc_stack_base;
@@ -189,8 +189,8 @@ gc_perform_gc(gc_t gc)
                 fprintf(stdout, "%3u - %6u Used: %4u Thresh: %4u Ss: %5u Ps: %5u Rs: %5u Root: %3u\n",
                         number_gcs,
                         number_allocs,
-                        (unsigned)arena->num_used,
-                        page_threshold,
+                        (unsigned)arena->block_used,
+                        block_threshold,
                         number_stack,
                         number_ptr,
                         number_redirects,
@@ -230,9 +230,8 @@ static void
 jhc_malloc_fini(void) {
         if(JGC_STATUS) {
                 printf("arena: %p\n", arena);
-                printf("  base: %p\n", arena->base);
-                printf("  next_free: %i\n", arena->next_free);
-                printf("  num_used: %i\n", arena->num_used);
+                printf("  block_used: %i\n", arena->block_used);
+                printf("  block_threshold: %i\n", arena->block_threshold);
                 struct s_cache *sc = SLIST_FIRST(&arena->caches);
                 for(;sc;sc = SLIST_NEXT(sc,next)) {
                         print_cache(sc);

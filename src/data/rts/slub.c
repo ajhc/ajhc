@@ -5,33 +5,39 @@
 #else
 #if _JHC_GC == _JHC_GC_JGC
 
-#define PAGESIZE  4096
-#define ARENASIZE 65536
+#define BLOCK_SIZE     (1UL << 12)
+#define MEGABLOCK_SIZE (1UL << 20)
 
-#define S_PAGE(val) (struct s_page *)((uintptr_t)(val) & ~ (PAGESIZE - 1))
+#define S_BLOCK(val) (struct s_block *)((uintptr_t)(val) & ~ (BLOCK_SIZE - 1))
 
-static Pvoid_t  gc_inheap; // whether the page is a heap page
-
-typedef uint16_t page_num_t;
+static Pvoid_t  gc_inheap; // whether the megablock is in the heap
 
 struct s_arena {
-        void *base;
+        struct s_megablock *current_megablock;
+        SLIST_HEAD(,s_block) free_blocks;
+        unsigned block_used;
+        unsigned block_threshold;
         SLIST_HEAD(,s_cache) caches;
-        page_num_t next_free,num_used;
-        SLIST_HEAD(,s_page) free_pages;
-        bitarray_t used[BITARRAY_SIZE(ARENASIZE)];
+        SLIST_HEAD(,s_megablock) megablocks;
+};
+
+struct s_megablock {
+        void *base;
+        unsigned next_free;
+        SLIST_ENTRY(s_megablock) next;
 };
 
 
-struct s_page_info {
+
+struct s_block_info {
         unsigned char color;
         unsigned char size;
         unsigned char num_ptrs;
 };
 
-struct s_page {
-        SLIST_ENTRY(s_page) link;
-        struct s_page_info pi;
+struct s_block {
+        SLIST_ENTRY(s_block) link;
+        struct s_block_info pi;
         unsigned short num_free;
         unsigned short next_free;
         bitarray_t used[];
@@ -39,9 +45,9 @@ struct s_page {
 
 struct s_cache {
         SLIST_ENTRY(s_cache) next;
-        SLIST_HEAD(,s_page) pages;
-        SLIST_HEAD(,s_page) full_pages;
-        struct s_page_info pi;
+        SLIST_HEAD(,s_block) blocks;
+        SLIST_HEAD(,s_block) full_blocks;
+        struct s_block_info pi;
         unsigned short num_entries;
         unsigned short num_ptrs;
         struct s_arena *arena;
@@ -68,77 +74,95 @@ bitset_find_free(unsigned *next_free,int n,bitarray_t ba[static n]) {
         } while (1);
 }
 
-/* page allocator */
+struct s_megablock *
+s_new_megablock(struct s_arena *arena)
+{
+        struct s_megablock *mb = malloc(sizeof(*mb));
+        int ret = posix_memalign(&mb->base,MEGABLOCK_SIZE,MEGABLOCK_SIZE);
+        if(ret != 0) {
+                fprintf(stderr,"Unable to allocate memory with posix_memalign for megablock\n");
+                abort();
+        }
+        int r; J1S(r, gc_inheap, (uintptr_t)mb->base/MEGABLOCK_SIZE);
+        mb->next_free = 0;
+        return mb;
+}
 
-static unsigned page_threshold = 8;
+/* block allocator */
 
-static struct s_page *
-get_free_page(gc_t gc, struct s_arena *arena) {
-        if(__predict_true(SLIST_FIRST(&arena->free_pages))) {
-                struct s_page *pg = SLIST_FIRST(&arena->free_pages);
-                SLIST_REMOVE_HEAD(&arena->free_pages,link);
-                arena->num_used++;
+static unsigned block_threshold = 8;
+
+static struct s_block *
+get_free_block(gc_t gc, struct s_arena *arena) {
+        arena->block_used++;
+        if(__predict_true(SLIST_FIRST(&arena->free_blocks))) {
+                struct s_block *pg = SLIST_FIRST(&arena->free_blocks);
+                SLIST_REMOVE_HEAD(&arena->free_blocks,link);
                 return pg;
         } else {
-                if((arena->num_used >= page_threshold)) {
+                if((arena->block_used >= arena->block_threshold)) {
                         gc_perform_gc(gc);
                         // if we are still using 80% of the heap after a gc, raise the threshold.
-                        if(__predict_false((unsigned)arena->num_used * 10 >= page_threshold * 9)) {
-                                page_threshold *= 2;
+                        if(__predict_false((unsigned)arena->block_used * 10 >= arena->block_threshold * 9)) {
+                                arena->block_threshold *= 2;
                         }
                 }
-                unsigned next_free = arena->next_free;
-                unsigned found = bitset_find_free(&next_free, BITARRAY_SIZE(ARENASIZE), arena->used);
-                arena->next_free = next_free;
-                int r; J1S(r, gc_inheap, (uintptr_t)arena->base/PAGESIZE + found);
-                arena->num_used++;
-                struct s_page *pg = (struct s_page *)(arena->base + PAGESIZE*found);
+                if(__predict_false(!arena->current_megablock))
+                        arena->current_megablock = s_new_megablock(arena);
+                struct s_megablock *mb = arena->current_megablock;
+                struct s_block *pg = mb->base + BLOCK_SIZE*mb->next_free;
+                mb->next_free++;
+                if(mb->next_free == MEGABLOCK_SIZE / BLOCK_SIZE) {
+                        SLIST_INSERT_HEAD(&arena->megablocks,mb, next);
+                        arena->current_megablock = NULL;
+                }
                 pg->num_free = 0;
                 return pg;
+
         }
 }
 
 static void
-s_cleanup_pages(struct s_arena *arena) {
+s_cleanup_blocks(struct s_arena *arena) {
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
 
-                // 'best' keeps track of the page with the fewest free spots
+                // 'best' keeps track of the block with the fewest free spots
                 // and percolates it to the front, effectively a single pass
                 // of a bubblesort to help combat fragmentation. It does
                 // not increase the complexity of the cleanup algorithm as
-                // we had to scan every page anyway, but over many passes
+                // we had to scan every block anyway, but over many passes
                 // of the GC it will eventually result in a more sorted list
                 // than would occur by chance.
 
-                struct s_page *best = NULL;
+                struct s_block *best = NULL;
                 int free_best = 4096;
-                struct s_page *pg = SLIST_FIRST(&sc->pages);
-                struct s_page *fpg = SLIST_FIRST(&sc->full_pages);
-                SLIST_INIT(&sc->pages);
-                SLIST_INIT(&sc->full_pages);
+                struct s_block *pg = SLIST_FIRST(&sc->blocks);
+                struct s_block *fpg = SLIST_FIRST(&sc->full_blocks);
+                SLIST_INIT(&sc->blocks);
+                SLIST_INIT(&sc->full_blocks);
                 if(!pg) {
                         pg = fpg;
                         fpg = NULL;
                 }
                 while(pg) {
-                        struct s_page *npg = SLIST_NEXT(pg,link);
+                        struct s_block *npg = SLIST_NEXT(pg,link);
                         if(__predict_false(pg->num_free == 0)) {
-                                SLIST_INSERT_HEAD(&sc->full_pages,pg,link);
+                                SLIST_INSERT_HEAD(&sc->full_blocks,pg,link);
                         } else if(__predict_true(pg->num_free == sc->num_entries)) {
-                                arena->num_used--;
-                                SLIST_INSERT_HEAD(&arena->free_pages,pg,link);
+                                arena->block_used--;
+                                SLIST_INSERT_HEAD(&arena->free_blocks,pg,link);
                         } else {
                                 if(!best) {
                                         free_best = pg->num_free;
                                         best = pg;
                                 } else {
                                         if(pg->num_free < free_best) {
-                                                struct s_page *tmp = best;
+                                                struct s_block *tmp = best;
                                                 best = pg; pg = tmp;
                                                 free_best = pg->num_free;
                                         }
-                                        SLIST_INSERT_HEAD(&sc->pages,pg,link);
+                                        SLIST_INSERT_HEAD(&sc->blocks,pg,link);
                                 }
                         }
                         if(!npg && fpg) {
@@ -148,12 +172,12 @@ s_cleanup_pages(struct s_arena *arena) {
                                 pg = npg;
                 }
                 if(best)
-                        SLIST_INSERT_HEAD(&sc->pages,best,link);
+                        SLIST_INSERT_HEAD(&sc->blocks,best,link);
         }
 }
 
 inline static void
-clear_page_used_bits(unsigned num_entries, struct s_page *pg)
+clear_block_used_bits(unsigned num_entries, struct s_block *pg)
 {
         pg->num_free = num_entries;
         memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(num_entries) - sizeof(pg->used[0]));
@@ -164,15 +188,15 @@ clear_page_used_bits(unsigned num_entries, struct s_page *pg)
 static void *
 s_alloc(gc_t gc, struct s_cache *sc)
 {
-        struct s_page *pg = SLIST_FIRST(&sc->pages);
+        struct s_block *pg = SLIST_FIRST(&sc->blocks);
         if(__predict_false(!pg)) {
-                pg = get_free_page(gc, sc->arena);
+                pg = get_free_block(gc, sc->arena);
                 assert(pg);
                 pg->pi = sc->pi;
                 pg->next_free = 0;
-                SLIST_INSERT_HEAD(&sc->pages,pg,link);
+                SLIST_INSERT_HEAD(&sc->blocks,pg,link);
                 if(sc->num_entries != pg->num_free)
-                        clear_page_used_bits(sc->num_entries, pg);
+                        clear_block_used_bits(sc->num_entries, pg);
                 pg->used[0] = 1; //set the first bit
                 pg->num_free = sc->num_entries - 1;
                 return (uintptr_t *)pg + pg->pi.color;
@@ -184,12 +208,12 @@ s_alloc(gc_t gc, struct s_cache *sc)
                 pg->next_free = next_free;
                 void *val = (uintptr_t *)pg + pg->pi.color + found*pg->pi.size;
                 if(__predict_false(0 == pg->num_free)) {
-                        assert(pg == SLIST_FIRST(&sc->pages));
-                        SLIST_REMOVE_HEAD(&sc->pages,link);
-                        SLIST_INSERT_HEAD(&sc->full_pages,pg,link);
+                        assert(pg == SLIST_FIRST(&sc->blocks));
+                        SLIST_REMOVE_HEAD(&sc->blocks,link);
+                        SLIST_INSERT_HEAD(&sc->full_blocks,pg,link);
                 }
-                assert(S_PAGE(val) == pg);
-                //printf("s_alloc: val: %p s_page: %p size: %i color: %i found: %i num_free: %i\n", val, pg, pg->pi.size, pg->pi.color, found, pg->num_free);
+                assert(s_block(val) == pg);
+                //printf("s_alloc: val: %p s_block: %p size: %i color: %i found: %i num_free: %i\n", val, pg, pg->pi.size, pg->pi.color, found, pg->num_free);
                 return val;
         }
 }
@@ -200,9 +224,9 @@ static void
 s_free(void *val)
 {
         assert(val);
-        struct s_page *pg = S_PAGE(val);
+        struct s_block *pg = s_block(val);
         unsigned int offset = ((uintptr_t *)val - (uintptr_t *)pg) - pg->pi.color;
-//        printf("s_free:  val: %p s_page: %p size: %i color: %i num_free: %i offset: %i bit: %i\n", val, pg, pg->pi.size, pg->pi.color, pg->num_free, offset, offset/pg->pi.size);
+//        printf("s_free:  val: %p s_block: %p size: %i color: %i num_free: %i offset: %i bit: %i\n", val, pg, pg->pi.size, pg->pi.color, pg->num_free, offset, offset/pg->pi.size);
         assert(BIT_VALUE(pg->used,offset/(pg->pi.size)));
         BIT_UNSET(pg->used,offset/(pg->pi.size));
         pg->num_free++;
@@ -217,12 +241,12 @@ new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
         sc->arena = arena;
         sc->pi.size = size;
         sc->pi.num_ptrs = num_ptrs;
-        size_t excess = PAGESIZE - sizeof(struct s_page);
+        size_t excess = BLOCK_SIZE - sizeof(struct s_block);
         sc->num_entries = (8*excess) / (8*sizeof(uintptr_t)*size + 1) - 1;
         //sc->num_entries = (8*excess) / (8*size*sizeof(uintptr_t) + 1);
-        sc->pi.color = (sizeof(struct s_page) + BITARRAY_SIZE_IN_BYTES(sc->num_entries) + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
-        SLIST_INIT(&sc->pages);
-        SLIST_INIT(&sc->full_pages);
+        sc->pi.color = (sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(sc->num_entries) + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
+        SLIST_INIT(&sc->blocks);
+        SLIST_INIT(&sc->full_blocks);
         SLIST_INSERT_HEAD(&arena->caches,sc,next);
         //print_cache(sc);
         return sc;
@@ -235,11 +259,11 @@ clear_used_bits(struct s_arena *arena)
 {
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
-                struct s_page *pg = SLIST_FIRST(&sc->pages);
-                struct s_page *fpg = SLIST_FIRST(&sc->full_pages);
+                struct s_block *pg = SLIST_FIRST(&sc->blocks);
+                struct s_block *fpg = SLIST_FIRST(&sc->full_blocks);
                 do {
                         for(;pg;pg = SLIST_NEXT(pg,link))
-                                clear_page_used_bits(sc->num_entries,pg);
+                                clear_block_used_bits(sc->num_entries,pg);
                         pg = fpg;
                         fpg = NULL;
                 }  while(pg);
@@ -255,7 +279,7 @@ static bool
 s_set_used_bit(void *val)
 {
         assert(val);
-        struct s_page *pg = S_PAGE(val);
+        struct s_block *pg = S_BLOCK(val);
         unsigned int offset = ((uintptr_t *)val - (uintptr_t *)pg) - pg->pi.color;
         if(__predict_true(BIT_IS_UNSET(pg->used,offset/pg->pi.size))) {
                 BIT_SET(pg->used,offset/pg->pi.size);
@@ -286,15 +310,11 @@ struct s_arena *
 new_arena(void) {
         struct s_arena *arena = malloc(sizeof(struct s_arena));
         SLIST_INIT(&arena->caches);
-        SLIST_INIT(&arena->free_pages);
-        int ret = posix_memalign(&arena->base,PAGESIZE,ARENASIZE*PAGESIZE);
-        if(ret != 0) {
-                fprintf(stderr,"Unable to allocate memory with posix_memalign\n");
-                exit(1);
-        }
-        arena->next_free = 0;
-        arena->num_used = 0;
-        memset(arena->used,0,sizeof(arena->used));
+        SLIST_INIT(&arena->free_blocks);
+        SLIST_INIT(&arena->megablocks);
+        arena->block_used = 0;
+        arena->block_threshold = 8;
+        arena->current_megablock = NULL;
         return arena;
 }
 
@@ -303,19 +323,19 @@ void
 print_cache(struct s_cache *sc) {
         printf("num_entries: %i\n",(int)sc->num_entries);
 //        printf("  entries: %i words\n",(int)(sc->num_entries*sc->pi.size));
-        printf("  header: %lu bytes\n", sizeof(struct s_page) + BITARRAY_SIZE_IN_BYTES(sc->num_entries));
+        printf("  header: %lu bytes\n", sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(sc->num_entries));
         printf("  size: %i words\n",(int)sc->pi.size);
 //        printf("  color: %i words\n",(int)sc->pi.color);
         printf("  nptrs: %i words\n",(int)sc->pi.num_ptrs);
 //        printf("  end: %i bytes\n",(int)(sc->pi.color+ sc->num_entries*sc->pi.size)*sizeof(uintptr_t));
-        printf("%20s %9s %9s\n", "page", "num_free", "next_free");
-        struct s_page *pg;
-        SLIST_FOREACH(pg,&sc->pages,link) {
-            printf("%20p %9i %9i\n", pg, pg->num_free, pg->next_free);
+        printf("%20s %9s %9s %s\n", "block", "num_free", "next_free", "status");
+        struct s_block *pg;
+        SLIST_FOREACH(pg,&sc->blocks,link) {
+            printf("%20p %9i %9i %c\n", pg, pg->num_free, pg->next_free, 'P');
         }
-        printf("  full_pages:\n");
-        SLIST_FOREACH(pg,&sc->full_pages,link) {
-            printf("%20p %9i %9i\n", pg, pg->num_free, pg->next_free);
+        printf("  full_blocks:\n");
+        SLIST_FOREACH(pg,&sc->full_blocks,link) {
+            printf("%20p %9i %9i %c\n", pg, pg->num_free, pg->next_free, 'F');
         }
 }
 
