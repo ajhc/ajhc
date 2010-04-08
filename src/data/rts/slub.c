@@ -26,7 +26,6 @@ struct s_arena {
 struct s_page_info {
         unsigned char color;
         unsigned char size;
-        unsigned char tag;
         unsigned char num_ptrs;
 };
 
@@ -212,12 +211,11 @@ s_free(void *val)
 
 
 static struct s_cache *
-new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs, unsigned char tag)
+new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
 {
         struct s_cache *sc = malloc(sizeof(struct s_cache));
         sc->arena = arena;
         sc->pi.size = size;
-        sc->pi.tag = tag;
         sc->pi.num_ptrs = num_ptrs;
         size_t excess = PAGESIZE - sizeof(struct s_page);
         sc->num_entries = (8*excess) / (8*sizeof(uintptr_t)*size + 1) - 1;
@@ -268,16 +266,16 @@ s_set_used_bit(void *val)
 }
 
 static struct s_cache *
-find_cache(struct s_cache **rsc, struct s_arena *arena, unsigned short size, unsigned short num_ptrs, unsigned char tag)
+find_cache(struct s_cache **rsc, struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
 {
         if(__predict_true(rsc && *rsc))
                 return *rsc;
         struct s_cache *sc = SLIST_FIRST(&arena->caches);
         for(;sc;sc = SLIST_NEXT(sc,next)) {
-                if(sc->pi.size == size && sc->pi.num_ptrs == num_ptrs && sc->pi.tag == tag)
+                if(sc->pi.size == size && sc->pi.num_ptrs == num_ptrs)
                         goto found;
         }
-        sc = new_cache(arena,size,num_ptrs, tag);
+        sc = new_cache(arena,size,num_ptrs);
 found:
         if(rsc)
                 *rsc = sc;
@@ -306,12 +304,9 @@ print_cache(struct s_cache *sc) {
         printf("num_entries: %i\n",(int)sc->num_entries);
 //        printf("  entries: %i words\n",(int)(sc->num_entries*sc->pi.size));
         printf("  header: %lu bytes\n", sizeof(struct s_page) + BITARRAY_SIZE_IN_BYTES(sc->num_entries));
-     //   printf("excess: %i\n", PAGESIZE - sizeof(struct s_page) - sizeof(bitarray_t));
         printf("  size: %i words\n",(int)sc->pi.size);
 //        printf("  color: %i words\n",(int)sc->pi.color);
         printf("  nptrs: %i words\n",(int)sc->pi.num_ptrs);
-        printf("  tag: %i words\n",(int)sc->pi.tag);
-//        printf("  color_off: %i bytes\n",(int)(sc->pi.color*sizeof(uintptr_t)));
 //        printf("  end: %i bytes\n",(int)(sc->pi.color+ sc->num_entries*sc->pi.size)*sizeof(uintptr_t));
         printf("%20s %9s %9s\n", "page", "num_free", "next_free");
         struct s_page *pg;

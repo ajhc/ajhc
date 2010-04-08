@@ -161,9 +161,8 @@ gc_perform_gc(gc_t gc)
                 struct s_page *pg = S_PAGE(e);
                 debugf("Processing Grey: %p\n",e);
 
-                int offset = pg->pi.tag ? 1 : 0;
                 stack_check(&stack, pg->pi.num_ptrs);
-                for(int i = offset; i < pg->pi.num_ptrs + offset; i++) {
+                for(int i = 0; i < pg->pi.num_ptrs; i++) {
                         if(1 && (P_LAZY == GET_PTYPE(e->ptrs[i]))) {
                                 if(!IS_LAZY(GETHEAD(FROM_SPTR(e->ptrs[i])))) {
                                         number_redirects++;
@@ -204,13 +203,13 @@ gc_perform_gc(gc_t gc)
 }
 
 static void *
-gc_alloc_tag(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs, int tag)
+gc_alloc(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
 {
         profile_push(&gc_alloc_time);
         number_allocs++;
         assert(nptrs <= count);
-        entry_t *e = s_alloc(gc, find_cache(sc, arena, count, nptrs, tag));
-        debugf("allocated: %p %i %i %i\n",(void *)e, count, nptrs, tag);
+        entry_t *e = s_alloc(gc, find_cache(sc, arena, count, nptrs));
+        debugf("allocated: %p %i %i\n",(void *)e, count, nptrs);
         profile_pop(&gc_alloc_time);
         return (void *)e;
 }
@@ -229,7 +228,7 @@ jhc_malloc_init(void) {
 
 static void
 jhc_malloc_fini(void) {
-        if(0) {
+        if(JGC_STATUS) {
                 printf("arena: %p\n", arena);
                 printf("  base: %p\n", arena->base);
                 printf("  next_free: %i\n", arena->next_free);

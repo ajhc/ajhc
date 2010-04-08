@@ -145,11 +145,11 @@ redirection to a whnf value.
 #define PROMOTE(n)   ((wptr_t)(n))
 #define DEMOTE(n)    ((sptr_t)(n))
 
-#define FETCH_TAG(x)      (IS_PTR(x) ? FETCH_MEM_TAG(x) : FETCH_RAW_TAG(x))
+#define FETCH_TAG(x)      RAW_GET_U16(IS_PTR(x) ? FETCH_MEM_TAG(x) : (what_t)(x))
 #define FETCH_RAW_TAG(x)  RAW_GET_U16(x)
 #define SET_RAW_TAG(x)    RAW_SET_16(x)
 #define FETCH_MEM_TAG(x)  (DNODEP(x)->what)
-#define SET_MEM_TAG(x,v)  (DNODEP(x)->what = (v))
+#define SET_MEM_TAG(x,v)  (DNODEP(x)->what = (what_t)RAW_SET_16(v))
 
 
 

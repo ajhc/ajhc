@@ -792,8 +792,9 @@ newNode region ty ~(NodeC t as) = do
       Nothing -> do
         st <- nodeType t
         as' <- mapM convertVal as
-        let wmalloc = jhc_malloc (reference (toExpression $ nodeCacheName t)) (not sf && t `Map.notMember` cpr) nptrs
+        let wmalloc = jhc_malloc (reference (toExpression $ nodeCacheName t)) nptrs'
             nptrs = length (filter (not . nonPtr . getType) as) + if sf then 1 else 0
+            nptrs' = if nptrs > 0 && not sf && t `Map.notMember` cpr then nptrs + 1 else nptrs
             malloc =  wmalloc (sizeof st)
             nonPtr TyPtr {} = False
             nonPtr TyNode = False
@@ -910,12 +911,12 @@ castFunc _ _ tb e = cast (opTyToC tb) e
 gc_roots vs   = functionCall (name "gc_frame0") (v_gc:constant (number (fromIntegral $ length vs)):vs)
 gc_end        = functionCall (name "gc_end") []
 tbsize sz = functionCall (name "TO_BLOCKS") [sz]
-jhc_malloc ntn has_tag nptrs sz | fopts FO.Jgc = functionCall (name "gc_alloc_tag") [v_gc,ntn, tbsize sz, toExpression nptrs, toExpression has_tag]
+jhc_malloc ntn nptrs sz | fopts FO.Jgc = functionCall (name "gc_alloc") [v_gc,ntn, tbsize sz, toExpression nptrs]
 --    | fopts FO.Jgc =  functionCall (name "gc_alloc") [v_gc,tbsize sz, toExpression nptrs]
-jhc_malloc _ _ 0 sz = functionCall (name "jhc_malloc_atomic") [sz]
-jhc_malloc _ _ _ sz = functionCall (name "jhc_malloc") [sz]
+jhc_malloc _ 0 sz = functionCall (name "jhc_malloc_atomic") [sz]
+jhc_malloc _ _ sz = functionCall (name "jhc_malloc") [sz]
 
-jhc_malloc_ptrs sz | fopts FO.Jgc =  functionCall (name "gc_alloc_tag") [v_gc,nullPtr,tbsize sz, tbsize sz, toExpression False]
+jhc_malloc_ptrs sz | fopts FO.Jgc =  functionCall (name "gc_alloc") [v_gc,nullPtr,tbsize sz, tbsize sz]
 jhc_malloc_ptrs sz = functionCall (name "jhc_malloc") [sz]
 
 f_assert e    = functionCall (name "assert") [e]
