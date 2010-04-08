@@ -222,7 +222,7 @@ static void jhc_malloc_init(void) { }
 #else
 static void
 jhc_malloc_init(void) {
-        saved_gc = gc_stack_base = malloc(8*8192*sizeof(gc_stack_base[0]));
+        saved_gc = gc_stack_base = malloc((1UL << 18)*sizeof(gc_stack_base[0]));
         arena = new_arena();
 }
 #endif

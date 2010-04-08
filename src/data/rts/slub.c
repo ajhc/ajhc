@@ -49,24 +49,24 @@ struct s_cache {
 };
 
 
-/* this finds a bit that isn't set, sets it, and returns it */
-static int
-bitset_find_free(int *next_free,int n,bitarray_t ba[static n]) {
+/* This finds a bit that isn't set, sets it, then returns its index.  It
+ * assumes that a bit is available to be found, otherwise it goes into an
+ * infinite loop. */
+
+static unsigned
+bitset_find_free(unsigned *next_free,int n,bitarray_t ba[static n]) {
         assert(*next_free < n);
-        int i = *next_free;
-        for(; i < n; i++) {
-                if(~ba[i]) goto found;
-        }
-        for(i = 0; i < *next_free; i++) {
-                if(~ba[i]) goto found;
-        }
-        return -1;
-found: ;
-       int o = __builtin_ffsl(~ba[i]);
-       assert(o);
-       ba[i] |= (1UL << (o - 1));
-       *next_free = i;
-       return (i*BITS_PER_UNIT + (o - 1));
+        unsigned i = *next_free;
+        do {
+                int o = __builtin_ffsl(~ba[i]);
+                if(__predict_true(o)) {
+                        ba[i] |= (1UL << (o - 1));
+                        *next_free = i;
+                        return (i*BITS_PER_UNIT + (o - 1));
+                }
+                i = (i + 1) % n;
+                assert(i != *next_free);
+        } while (1);
 }
 
 /* page allocator */
@@ -75,30 +75,28 @@ static unsigned page_threshold = 8;
 
 static struct s_page *
 get_free_page(gc_t gc, struct s_arena *arena) {
-        if(__predict_false(arena->num_used >= page_threshold)) {
-                gc_perform_gc(gc);
-                // if we are stil using 80% of the heap after a gc, raise the threshold.
-                if(__predict_false((unsigned)arena->num_used * 10 >= page_threshold * 9)) {
-                        page_threshold *= 2;
-                }
-        }
-        struct s_page *pg;
         if(__predict_true(SLIST_FIRST(&arena->free_pages))) {
-                pg = SLIST_FIRST(&arena->free_pages);
+                struct s_page *pg = SLIST_FIRST(&arena->free_pages);
                 SLIST_REMOVE_HEAD(&arena->free_pages,link);
+                arena->num_used++;
+                return pg;
         } else {
-                int next_free = arena->next_free;
-                int found = bitset_find_free(&next_free, BITARRAY_SIZE(ARENASIZE), arena->used);
+                if((arena->num_used >= page_threshold)) {
+                        gc_perform_gc(gc);
+                        // if we are still using 80% of the heap after a gc, raise the threshold.
+                        if(__predict_false((unsigned)arena->num_used * 10 >= page_threshold * 9)) {
+                                page_threshold *= 2;
+                        }
+                }
+                unsigned next_free = arena->next_free;
+                unsigned found = bitset_find_free(&next_free, BITARRAY_SIZE(ARENASIZE), arena->used);
                 arena->next_free = next_free;
-                if(found == -1)
-                        return NULL;
-                int r;
-                J1S(r, gc_inheap, (uintptr_t)arena->base/PAGESIZE + found);
-                pg = (struct s_page *)(arena->base + PAGESIZE*found);
+                int r; J1S(r, gc_inheap, (uintptr_t)arena->base/PAGESIZE + found);
+                arena->num_used++;
+                struct s_page *pg = (struct s_page *)(arena->base + PAGESIZE*found);
+                pg->num_free = 0;
+                return pg;
         }
-        arena->num_used++;
-        //        printf("Allocing: %p %u\n", pg, arena->num_used);
-        return pg;
 }
 
 static void
@@ -131,7 +129,6 @@ s_cleanup_pages(struct s_arena *arena) {
                         } else if(__predict_true(pg->num_free == sc->num_entries)) {
                                 arena->num_used--;
                                 SLIST_INSERT_HEAD(&arena->free_pages,pg,link);
-//                                BIT_UNSET(arena->used,((uintptr_t)pg - (uintptr_t)arena->base) / PAGESIZE);
                         } else {
                                 if(!best) {
                                         free_best = pg->num_free;
@@ -139,8 +136,7 @@ s_cleanup_pages(struct s_arena *arena) {
                                 } else {
                                         if(pg->num_free < free_best) {
                                                 struct s_page *tmp = best;
-                                                best = pg;
-                                                pg = tmp;
+                                                best = pg; pg = tmp;
                                                 free_best = pg->num_free;
                                         }
                                         SLIST_INSERT_HEAD(&sc->pages,pg,link);
@@ -158,50 +154,45 @@ s_cleanup_pages(struct s_arena *arena) {
 }
 
 inline static void
-clear_page_used_bits(struct s_cache *sc, struct s_page *pg)
+clear_page_used_bits(unsigned num_entries, struct s_page *pg)
 {
-        pg->num_free = sc->num_entries;
-        memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(sc->num_entries));
-//      unsigned max = BITARRAY_SIZE(sc->num_entries);
-//      for(unsigned i = 0;i < max; i++)
-//              pg->used[i] = 0;
-        int excess = sc->num_entries % BITS_PER_UNIT;
-        if(excess)
-                pg->used[BITARRAY_SIZE(sc->num_entries) - 1] = ~((1UL << excess) - 1);
+        pg->num_free = num_entries;
+        memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(num_entries) - sizeof(pg->used[0]));
+        int excess = num_entries % BITS_PER_UNIT;
+        pg->used[BITARRAY_SIZE(num_entries) - 1] = ~((1UL << excess) - 1);
 }
 
 static void *
 s_alloc(gc_t gc, struct s_cache *sc)
 {
-        struct s_page *pg;
-        int found = 0;
-        assert(sc);
-        pg = SLIST_FIRST(&sc->pages);
+        struct s_page *pg = SLIST_FIRST(&sc->pages);
         if(__predict_false(!pg)) {
                 pg = get_free_page(gc, sc->arena);
                 assert(pg);
                 pg->pi = sc->pi;
                 pg->next_free = 0;
                 SLIST_INSERT_HEAD(&sc->pages,pg,link);
-                clear_page_used_bits(sc,pg);
+                if(sc->num_entries != pg->num_free)
+                        clear_page_used_bits(sc->num_entries, pg);
                 pg->used[0] = 1; //set the first bit
+                pg->num_free = sc->num_entries - 1;
+                return (uintptr_t *)pg + pg->pi.color;
         } else {
-                int next_free = pg->next_free;
-                found = bitset_find_free(&next_free,BITARRAY_SIZE(sc->num_entries),pg->used);
+                __builtin_prefetch(pg->used,1);
+                pg->num_free--;
+                unsigned next_free = pg->next_free;
+                unsigned found = bitset_find_free(&next_free,BITARRAY_SIZE(sc->num_entries),pg->used);
                 pg->next_free = next_free;
-                assert(found != -1);
+                void *val = (uintptr_t *)pg + pg->pi.color + found*pg->pi.size;
+                if(__predict_false(0 == pg->num_free)) {
+                        assert(pg == SLIST_FIRST(&sc->pages));
+                        SLIST_REMOVE_HEAD(&sc->pages,link);
+                        SLIST_INSERT_HEAD(&sc->full_pages,pg,link);
+                }
+                assert(S_PAGE(val) == pg);
+                //printf("s_alloc: val: %p s_page: %p size: %i color: %i found: %i num_free: %i\n", val, pg, pg->pi.size, pg->pi.color, found, pg->num_free);
+                return val;
         }
-        uintptr_t *pgp = (uintptr_t *)pg + pg->pi.color;
-        void *val = &pgp[found *pg->pi.size];
-        pg->num_free--;
-        if(__predict_false(0 == pg->num_free)) {
-                assert(pg == SLIST_FIRST(&sc->pages));
-                SLIST_REMOVE_HEAD(&sc->pages,link);
-                SLIST_INSERT_HEAD(&sc->full_pages,pg,link);
-        }
-        assert(S_PAGE(val) == pg);
-        //printf("s_alloc: val: %p s_page: %p size: %i color: %i found: %i num_free: %i\n", val, pg, pg->pi.size, pg->pi.color, found, pg->num_free);
-        return val;
 }
 
 
@@ -250,7 +241,7 @@ clear_used_bits(struct s_arena *arena)
                 struct s_page *fpg = SLIST_FIRST(&sc->full_pages);
                 do {
                         for(;pg;pg = SLIST_NEXT(pg,link))
-                                clear_page_used_bits(sc,pg);
+                                clear_page_used_bits(sc->num_entries,pg);
                         pg = fpg;
                         fpg = NULL;
                 }  while(pg);
