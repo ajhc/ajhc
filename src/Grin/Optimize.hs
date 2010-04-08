@@ -183,10 +183,6 @@ performSpeculate specs grin = do
             let t' = tagFlipFunction t
             mtick $ "Optimize.speculate.store.{" ++ show t'
             return (App t' xs [TyNode] :>>= [n1] :-> demote n1)
---        h (Update v (NodeC t xs)) | not (isMutableNodeTag t), t `member` sset = do
---            let t' = tagFlipFunction t
---            mtick $ "Optimize.speculate.update.{" ++ show t'
---            return (App t' xs [TyNode] :>>= [n1] :-> Update v n1)
         h e = mapExpExp h e
     fs <- mapM f (grinFuncs grin)
     return $ setGrinFunctions fs grin

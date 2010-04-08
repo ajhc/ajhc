@@ -3,7 +3,6 @@ module Grin.Noodle where
 -- various routines for manipulating and exploring grin code.
 
 import Control.Monad.Writer
-import Data.Monoid
 import qualified Data.Set as Set
 
 import Support.FreeVars
@@ -164,10 +163,11 @@ valIsConstant _ = False
 isOmittable (BaseOp Promote _) = True
 isOmittable (BaseOp Demote _) = True
 isOmittable (BaseOp PeekVal _) = True
+isOmittable (BaseOp ReadRegister _) = True
+isOmittable (BaseOp NewRegister _) = True
+isOmittable (BaseOp GcPush _) = True  -- omittable because if we don't use the returned gc context, then we don't need to push to begin with
 isOmittable (BaseOp (StoreNode _) _) = True
 isOmittable (Return {}) = True
---isOmittable (Store x) | getType x /= TyNode = False
---isOmittable (Store {}) = True
 isOmittable Prim { expPrimitive = aprim } = aprimIsCheap aprim
 isOmittable (Case x ds) = all isOmittable [ e | _ :-> e <- ds ]
 isOmittable Let { expBody = x } = isOmittable x
@@ -176,14 +176,12 @@ isOmittable _ = False
 
 isErrOmittable (BaseOp Overwrite _) = True
 isErrOmittable (BaseOp PokeVal _) = True
+isErrOmittable (BaseOp WriteRegister _) = True
 isErrOmittable (e1 :>>= _ :-> e2) = isErrOmittable e1 && isErrOmittable e2
 isErrOmittable (Case x ds) = all isErrOmittable [ e | _ :-> e <- ds ]
 isErrOmittable x = isOmittable x
 
-
-
--- collect tail called, and normally called functions
-
+-- collect tail and normally called functions
 -- expression (tail called, non tail called)
 collectFuncs :: Exp -> (Set.Set Atom,Set.Set Atom)
 collectFuncs exp = runWriter (cfunc exp) where
@@ -204,7 +202,6 @@ collectFuncs exp = runWriter (cfunc exp) where
         cfunc Prim {} = return mempty
         cfunc Return {} = return mempty
         cfunc BaseOp {} = return mempty
---        cfunc Store {} = return mempty
         cfunc Alloc {} = return mempty
         cfunc GcRoots { expBody = b} = cfunc b
         cfunc NewRegion { expLam = l } = clfunc l

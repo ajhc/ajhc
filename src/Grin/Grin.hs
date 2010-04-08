@@ -160,6 +160,10 @@ data BaseOp
     | PeekVal               -- read a value from a pointed to location
     | PokeVal               -- write a value to a pointed to location
     | Consume               -- consume a value, depending on the back end this may be used to free memory
+    | GcPush                -- push some pointers onto the GC stack, returning registers representing the values on the stack
+    | NewRegister           -- create a new register
+    | ReadRegister          -- read a register
+    | WriteRegister         -- write to a register
     deriving(Eq,Ord,Show)
 
 data Lam = [Val] :-> Exp
@@ -231,6 +235,9 @@ data Ty =
     | TyUnit                     -- ^ type of Unit
     | TyCall Callable [Ty] [Ty]  -- ^ something call,jump, or cut-to-able
     | TyRegion                   -- ^ a region
+    | TyGcContext                -- ^ the context for garbage collection
+    | TyRegister Ty              -- ^ a register contains a mutable value, the register itself cannot be addressed, 
+                                 --   hence they may not be returned from functions or passed as arguments.
     | TyUnknown                  -- ^ an unknown possibly undefined type, All of these must be eliminated by code generation
     deriving(Eq,Ord)
 
@@ -292,7 +299,9 @@ instance Show Ty where
     show (TyPtr t) = '&':show t
     show (TyUnit) = "()"
     show (TyPrim t) = show t
-    show TyRegion = "R"
+    show TyRegion = "M"
+    show TyGcContext = "GC"
+    show (TyRegister t) = 'r':show t
     show (TyCall c as rt) = show c <> tupled (map show as) <+> "->" <+> show rt
     show TyUnknown = "?"
 
@@ -305,8 +314,9 @@ instance Show Val where
     showsPrec _ (Var (V i) t)
         | TyINode <- t = text "ni" <> tshow i
         | TyNode <- t = text "nd" <> tshow i
-        | TyRegion <- t = text "r" <> tshow i
---        | TyPtr TyINode <- t = text "np" <> tshow i
+        | TyRegion <- t = text "m" <> tshow i
+        | TyRegister ty <- t = text "r" <> tshow (Var (V i) ty)
+        | TyGcContext <- t = text "gc" <> tshow i
         | TyPtr t' <- t = text "p" <> shows (Var (V i) t')
         | TyPrim Op.TyBool <- t  = char 'b' <> tshow i
         | TyPrim (Op.TyBits _ Op.HintFloat) <- t  = char 'f' <> tshow i
@@ -510,6 +520,11 @@ instance CanType Exp [Ty] where
     getType (BaseOp Demote _) = [TyINode]
     getType (BaseOp Eval _) = [TyNode]
     getType (BaseOp (StoreNode b) _) = if b then [TyNode] else [TyINode]
+    getType (BaseOp NewRegister xs) = map (TyRegister . getType) xs
+    getType (BaseOp WriteRegister _) = []
+    getType (BaseOp ReadRegister [r]) = case getType r of
+        TyRegister t -> [t]
+        _ -> error "Exp.getType: ReadRegister of non register"
     getType (BaseOp (Apply ty) _) = ty
     getType (BaseOp PeekVal [v]) = case getType v of
         TyPtr t -> [t]
@@ -533,7 +548,7 @@ instance CanType Val Ty where
     getType Unit = TyUnit
     getType (Const t) = case (getType t) of
         TyNode -> TyINode
-        t -> TyPtr t
+        t -> error "Val.getType: Const of non-node"
     getType (NodeC {}) = TyNode
     getType (ValPrim _ _ ty) = ty
     getType (ValUnknown ty) = ty

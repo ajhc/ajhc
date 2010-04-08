@@ -90,6 +90,10 @@ prettyExp vl (BaseOp Redirect [x,y]) = vl <> keyword "redirect" <+> prettyVal x 
 prettyExp vl (BaseOp PokeVal [x,y]) = vl <> keyword "pokeVal" <+> prettyVal x <+> prettyVal y
 prettyExp vl (BaseOp PeekVal [x]) = vl <> keyword "peekVal" <+> prettyVal x
 prettyExp vl (BaseOp Promote [x]) = vl <> keyword "promote" <+> prettyVal x
+prettyExp vl (BaseOp NewRegister xs) = vl <> keyword "register" <+> tupled (map prettyVal xs)
+prettyExp vl (BaseOp WriteRegister [r,x]) = vl <> prettyVal r <+> keyword ":=" <+> prettyVal x
+prettyExp vl (BaseOp ReadRegister [r]) = vl <> keyword "*" <> prettyVal r
+prettyExp vl (BaseOp GcPush xs) = vl <> keyword "gcPush" <+> tupled (map prettyVal xs)
 prettyExp vl (BaseOp Demote [x]) = vl <> keyword "demote" <+> prettyVal x
 prettyExp vl (BaseOp (StoreNode b) [x]) = vl <> keyword ((if b then "d" else "i") ++ "store") <+> prettyVal x
 prettyExp vl (BaseOp (StoreNode b) [x,y]) = vl <> keyword ((if b then "d" else "i") ++ "store") <+> prettyVal x <> char '@' <> prettyVal y
