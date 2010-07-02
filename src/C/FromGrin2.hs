@@ -630,7 +630,7 @@ buildConstants cpr grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
         ntag = case Map.lookup a cpr of
             --Just [a'] | a' == a -> []
             Just _ -> []
-            _ -> [text ".what =" <+> tshow (nodeTagName a)]
+            _ -> [text ".what =" <+> text "SET_RAW_TAG(" <> tshow (nodeTagName a) <> text ")"]
         def = text "#define c" <> tshow i <+> text "(TO_SPTR_C(P_WHNF, (sptr_t)&_c" <> tshow i <> text "))"
         rs = [ f z i |  (z,i) <- zip zs [ 1 :: Int .. ]]
         f (Right i) a = text ".a" <> tshow a <+> text "=" <+> text ('c':show i)
