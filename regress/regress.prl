@@ -251,10 +251,14 @@ sub done {
     rlog("regress ", join " ", @saved_args) if @saved_args;
     rlog "\n--------------------------------------------------------------------";
 
-    my $fmt = "%50s %5s %5s %5s %7s %7s\n";
-    rlog sprintf $fmt, "Name", "Compile", "Run", "Out", "CTime", "RTime";
+    my $fmt = "%10s %25s %5s %5s %5s %7s %7s\n";
+    rlog sprintf $fmt, "Category", "Name", "Compile", "Run", "Out", "CTime", "RTime";
+    rlog "--------------------------------------------------------------------";
     foreach my $r (@res) {
-        rlog sprintf $fmt, $r->{name}, statf($r->{compile_status}),statf($r->{run_status}),statf($r->{stdout_diff}), timef($r->{compile_time}), timef($r->{run_time}) ;
+        my $name = $r->{name};
+        $name =~ s/^tests\.//;
+        $name =~ /^([^.]*)\.(.*)$/;
+        rlog sprintf $fmt, $1, $2, statf($r->{compile_status}),statf($r->{run_status}),statf($r->{stdout_diff}), timef($r->{compile_time}), timef($r->{run_time}) ;
 
     }
     close RLOG;
