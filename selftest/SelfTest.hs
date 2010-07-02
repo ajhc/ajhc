@@ -1,28 +1,29 @@
 
 import Data.Monoid
 import List(sort,nub)
-import qualified List
 import Monad
-import qualified Data.Set as Set
 import System.IO
 import Test.QuickCheck
+import qualified Data.Set as Set
+import qualified List
 
-import StringTable.Atom
 import Data.Binary
 import E.Arbitrary
 import E.E
-import GenUtil
 import FrontEnd.HsSyn
+import GenUtil
 import Info.Binary()
-import qualified Info.Info as Info
 import Info.Types
 import Name.Name
 import Name.Names
-import PackedString
+import StringTable.Atom
 import Util.ArbitraryInstances()
 import Util.HasSize
 import Util.SetLike
+import PackedString
+import qualified Data.ByteString as BS
 import qualified C.Generate
+import qualified Info.Info as Info
 
 
 
@@ -56,7 +57,7 @@ prop_atomneq xs ys = (xs /= ys) == (a1 /= a2) where
     a2 = toAtom (ys :: String)
 prop_atomIndex (xs :: String) = intToAtom (fromAtom a) == Just a where
     a = toAtom xs
-prop_atomneq' xs ys = (xs `compare` ys) == (fromAtom a1 `compare` (fromAtom a2 :: PackedString)) where
+prop_atomneq' xs ys = (xs `compare` ys) == (fromAtom a1 `compare` (fromAtom a2 :: BS.ByteString)) where
     a1 = toAtom xs
     a2 = toAtom (ys :: String)
 prop_atomint xs = an > 0 && odd an where
@@ -97,7 +98,7 @@ pshash xs = putStrLn $ xs ++ ": " ++ show (hashPS (packString xs ))
 
 testName = do
     putStrLn "Testing Name"
-    let nn = not . null
+    let nn x = (not (null x)) && ';' `notElem` x
     let prop_tofrom t a b = nn a && nn b ==> fromName (toName t (a::String,b::String)) == (t,(a,b))
         -- prop_pn t s = nn s ==> let (a,b) = fromName (parseName t s) in (a,b) == (t,s)
         prop_acc t a b = nn a && nn b ==> let

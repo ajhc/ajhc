@@ -15,7 +15,6 @@ import GenUtil
 import Support.FreeVars
 import Name.VConsts
 import Support.CanType
-import CharIO
 import Name.Id
 
 
@@ -72,12 +71,12 @@ genE = do
 
 ge = do
     e <- genE
-    CharIO.print e
-    CharIO.putStrLn (render $ (ePretty e :: Doc))
+    print e
+    putStrLn (render $ (ePretty e :: Doc))
     putDoc (pprint (getType e))
 
 testE = do
-    CharIO.putStrLn "Testing E"
+    putStrLn "Testing E"
     ge
     ge
 
