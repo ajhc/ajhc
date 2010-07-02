@@ -1,6 +1,5 @@
 module E.Program where
 
-import Prelude hiding(putStrLn, putStr,print)
 import Control.Monad.Identity
 import Data.Monoid
 import List
@@ -10,7 +9,6 @@ import qualified Data.Map as Map
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
-import CharIO
 import Doc.Pretty
 import E.E
 import E.Show
@@ -21,7 +19,7 @@ import Name.Id
 import Name.Name
 import Options
 import Util.SetLike
-import qualified IO
+import System.IO
 import qualified FlagDump as FD
 import qualified Stats
 
@@ -127,11 +125,11 @@ hPrintProgram fh prog@Program {progCombinators = cs, progDataTable = dataTable }
     when (progEntry prog /= singleton (progMain prog)) $
         hPutStrLn fh $ "EntryPoints: " ++ hsep (map pprint (progEntryPoints prog))
 
-printProgram prog = hPrintProgram IO.stderr prog
+printProgram prog = hPrintProgram stderr prog
 
-printCheckName'' = hPrintCheckName IO.stderr
+printCheckName'' = hPrintCheckName stderr
 
-hPrintCheckName :: IO.Handle -> DataTable -> TVr -> E -> IO ()
+hPrintCheckName :: Handle -> DataTable -> TVr -> E -> IO ()
 hPrintCheckName fh dataTable tvr e = do
     let (ty,pty) = case inferType dataTable [] e of
             Left err -> (Unknown,vcat $ map text (intersperse "---" $ tail err))

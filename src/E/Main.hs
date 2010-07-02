@@ -7,13 +7,11 @@ import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Writer
 import Data.Monoid
-import Prelude hiding(putStrLn, putStr,print)
 import System.Mem
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified List
 
-import CharIO
 import DataConstructors
 import Doc.PPrint
 import E.Annotate(annotateDs,annotateCombs,annotateProgram)
@@ -45,7 +43,7 @@ import Options
 import Support.CanType(getType)
 import Support.FreeVars
 import Support.Transform
-import Util.Gen hiding(putErrLn,putErr,putErrDie)
+import Util.Gen
 import Util.Graph
 import Util.Progress
 import Util.SetLike as S

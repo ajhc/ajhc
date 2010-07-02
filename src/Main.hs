@@ -3,25 +3,25 @@ module Main(main) where
 import Control.Exception
 import Control.Monad.Identity
 import IO(hFlush,stderr)
-import Prelude hiding(putStrLn, putStr,print)
+import Prelude
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.UTF8 as BS
 
-import CharIO
 import DataConstructors
-import E.Rules
+import E.Main
 import E.Program
+import E.Rules
 import E.Type
-import FrontEnd.HsSyn(Module(..))
 import FrontEnd.Class
+import FrontEnd.HsSyn(Module(..))
 import Grin.Main(compileToGrin)
 import Grin.Show(render)
 import Ho.Build
 import Ho.Collected
 import Ho.Library
-import E.Main
 import Name.Name
 import Options
+import Util.Gen
 import Util.SetLike as S
 import Version.Version(versionString,versionContext,versionSimple)
 import qualified FlagDump as FD
@@ -33,7 +33,7 @@ bracketHtml action = do
     wdump FD.Html $ putStrLn $ "<html><head><title>" ++ argstring ++ "</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body style=\"background: black; color: lightgrey\"><pre>"
     action `finally` (wdump FD.Html $ putStrLn "</pre></body></html>")
 
-main = runMain $ bracketHtml $ do
+main = bracketHtml $ do
     o <- processOptions
     let darg = progressM $ do
         (argstring,_) <- getArgString

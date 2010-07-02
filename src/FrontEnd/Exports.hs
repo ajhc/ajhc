@@ -7,11 +7,10 @@ import Control.Monad.Identity
 import Data.Monoid
 import List
 import Maybe
-import Prelude hiding (putStr,putStrLn)
+import Prelude
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import CharIO
 import Doc.DocLike
 import FindFixpoint
 import FlagDump as FD

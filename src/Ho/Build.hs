@@ -17,9 +17,6 @@ import Data.Monoid
 import Data.Tree
 import Data.Version(Version,parseVersion,showVersion)
 import Maybe
-import Monad
-import Prelude hiding(print,putStrLn)
-import System.IO hiding(print,putStrLn)
 import System.Mem
 import Text.Printf
 import Version.Config(version)
@@ -30,7 +27,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
-import CharIO
 import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
@@ -58,7 +54,7 @@ import Options
 import PackedString(PackedString,packString,unpackPS)
 import RawFiles(prelude_m4)
 import Util.FilterInput
-import Util.Gen hiding(putErrLn,putErr,putErrDie)
+import Util.Gen
 import Util.SetLike
 import Util.YAML
 import Version.Config(revision)
@@ -856,13 +852,13 @@ dumpHoFile fn = ans where
         putStrLn $ "hoRules:" <+> tshow (size $  hoRules hoB)
         wdump FD.Exports $ do
             putStrLn "---- exports information ----";
-            CharIO.putStrLn $  (pprint $ hoExports hoE :: String)
+            putStrLn $  (pprint $ hoExports hoE :: String)
         wdump FD.Defs $ do
             putStrLn "---- defs information ----";
-            CharIO.putStrLn $  (pprint $ hoDefs hoE :: String)
+            putStrLn $  (pprint $ hoDefs hoE :: String)
         when (dump FD.Kind) $ do
             putStrLn "---- kind information ----";
-            CharIO.putStrLn $  (pprint $ hoKinds hoE :: String)
+            putStrLn $  (pprint $ hoKinds hoE :: String)
         when (dump FD.ClassSummary) $ do
             putStrLn "---- class summary ---- "
             printClassSummary (hoClassHierarchy hoE)
@@ -875,7 +871,7 @@ dumpHoFile fn = ans where
         wdump FD.RulesSpec $ putStrLn "  ---- specializations ---- " >> printRules RuleSpecialization rules
         wdump FD.Datatable $ do
              putStrLn "  ---- data table ---- "
-             putDocM CharIO.putStr (showDataTable (hoDataTable hoB))
+             putDocM putStr (showDataTable (hoDataTable hoB))
              putChar '\n'
         wdump FD.Types $ do
             putStrLn " ---- the types of identifiers ---- "

@@ -43,7 +43,6 @@ import Support.CanType
 import Support.FreeVars
 import Util.HasSize
 import Util.SetLike as S
-import qualified CharIO
 import qualified Util.Seq as Seq
 
 
@@ -102,11 +101,11 @@ putDocMLn' putStr d = displayM putStr (renderPretty 0.80 (optColumns options) d)
 printRule Rule {ruleName = n, ruleBinds = vs, ruleBody = e2, ruleHead = head, ruleArgs = args } = do
     let e1 = foldl EAp (EVar head) args
     let p v = parens $ pprint v <> text "::" <> pprint (getType v)
-    putDocMLn' CharIO.putStr $  (tshow n) <+> text "forall" <+> hsep (map p vs) <+> text "."
+    putDocMLn' putStr $  (tshow n) <+> text "forall" <+> hsep (map p vs) <+> text "."
     let ty = pprint $ getType e1 -- case inferType dataTable [] e1 of
     --    ty2 = pprint $ getType e2
-    putDocMLn' CharIO.putStr (indent 2 (pprint e1) <+> text "::" <+> ty )
-    putDocMLn' CharIO.putStr $ text " ==>" <+> pprint e2
+    putDocMLn' putStr (indent 2 (pprint e1) <+> text "::" <+> ty )
+    putDocMLn' putStr $ text " ==>" <+> pprint e2
     --putDocMLn CharIO.putStr (indent 2 (pprint e2))
     --putDocMLn CharIO.putStr (indent 2 (text "::" <+> ty2))
 

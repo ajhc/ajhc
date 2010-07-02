@@ -1,13 +1,11 @@
 module FindFixpoint(Ms, getVal, solve) where
 
 import Array
-import CharIO
 import Control.Monad.Writer
 import Data.Array.IO
 import Data.Graph
 import Data.IntSet as IntSet
-import GenUtil
-import Monad(liftM)
+import Util.Gen
 
 
 
@@ -21,7 +19,7 @@ instance Monad (Ms b) where
     Ms' comp >>= fun
         = Ms' (\v  -> comp v >>= \r -> case fun r   of Ms' x -> x v)
     Ms' a >> Ms' b = Ms' $ \v -> a v >> b v
-    fail x = Ms' (\_ -> (CharIO.putErrDie x))
+    fail x = Ms' (\_ -> (putErrDie x))
     {-# INLINE (>>) #-}
     {-# INLINE (>>=) #-}
     {-# INLINE return #-}
@@ -43,10 +41,10 @@ getVal n = Ms' $ \(Env arr ref self) ->  do
 solve :: (Eq b) => Maybe String -> b -> [Ms b b] -> IO [b]
 solve str' empty vs = do
     let put = case str' of
-            Just _ -> CharIO.putErrLn
+            Just _ -> putErrLn
             Nothing -> const (return ())
         put' = case str' of
-            Just _ -> CharIO.putErr
+            Just _ -> putErr
             Nothing -> const (return ())
         Just str = str'
     let len = length vs

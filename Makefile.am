@@ -15,7 +15,7 @@ BUILT_SOURCES= src/PrimitiveOperators.hs src/RawFiles.hs src/FrontEnd/HsParser.h
 MY_CINCLUDES= -I$(srcdir)/src/data -I$(srcdir)/src/StringTable -I$(srcdir)/src/cbits -I$(builddir)/src/cbits
 MY_CFLAGS= $(MY_CINCLUDES) -optc-std=c99 -optc-O2 -optc-Wall
 
-HSFILES=src/C/Generate.hs src/CharIO.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/DataP.hs \
+HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/DataP.hs \
 	src/DerivingDrift/Drift.hs src/DerivingDrift/RuleUtils.hs src/Doc/Attr.hs src/Doc/Chars.hs src/Doc/DocLike.hs \
 	src/Doc/PPrint.hs src/Doc/Pretty.hs src/E/Annotate.hs src/E/Binary.hs src/E/Diff.hs src/E/E.hs src/E/Eta.hs src/E/Eval.hs \
 	src/E/FreeVars.hs src/E/FromHs.hs src/E/Inline.hs src/E/LetFloat.hs src/E/PrimOpt.hs src/E/Program.hs src/E/Rules.hs \

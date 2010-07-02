@@ -44,7 +44,6 @@ import qualified Data.Map as Map
 import qualified Prelude(null)
 
 import StringTable.Atom
-import CharIO
 import GenUtil
 import qualified Doc.Chars as C
 import qualified Util.IntBag as IB
@@ -66,7 +65,7 @@ splitUp n str = filter (not . Prelude.null) (f n str)  where
 print greets stats = do
     l <- toList stats
     let fs = createForest 0 $ sort [(splitUp (-1) $ fromAtom x,y) | (x,y) <- l]
-    mapM_ CharIO.putErrLn $ ( draw . fmap p ) (Node (greets,0) fs)  where
+    mapM_ putStrLn $ ( draw . fmap p ) (Node (greets,0) fs)  where
         p (x,0) = x
         p (x,n) = x ++ ": " ++ show n
 
@@ -106,13 +105,13 @@ prependStat name (Stat m) = Stat $ IB.fromList [ (fromAtom $ mappend (toAtom $ "
 
 printStat greets (Stat s) = do
     let fs = createForest 0 $ sort [(splitUp (-1) $ fromAtom (unsafeIntToAtom x),y) | (x,y) <- IB.toList s]
-    mapM_ CharIO.putErrLn $ ( draw . fmap p ) (Node (greets,0) fs)  where
+    mapM_ putStrLn $ ( draw . fmap p ) (Node (greets,0) fs)  where
         p (x,0) = x
         p (x,n) = x ++ ": " ++ show n
 
 printLStat n greets (Stat s) = do
     let fs = createForest 0 $ [ (x,y) | (x,y) <- Map.toList $ Map.fromListWith (+) [( splitUp n (fromAtom (unsafeIntToAtom x)),y) | (x,y) <- IB.toList s]]
-    mapM_ CharIO.putErrLn $ ( draw . fmap p ) (Node (greets,0) fs)  where
+    mapM_ putStrLn $ ( draw . fmap p ) (Node (greets,0) fs)  where
         p (x,0) = x
         p (x,n) = x ++ ": " ++ show n
 
@@ -195,13 +194,13 @@ instance MonadStats IO where
     mticks' 0 _ = return ()
     mticks' n a = do
         p <- readIORef printStats
-        when p (CharIO.putStrLn $ (show a ++ ": " ++ show n))
+        when p (putStrLn $ (show a ++ ": " ++ show n))
         ticks theStats n a
     mtickStat (Stat s) = do
         tickStat theStats (Stat s)
         p <- readIORef printStats
         when p $ forM_ (IB.toList s) $ \ (x,y) -> do
-            CharIO.putStrLn (show (unsafeIntToAtom x) ++ ": " ++ show y)
+            putStrLn (show (unsafeIntToAtom x) ++ ": " ++ show y)
 
 
 

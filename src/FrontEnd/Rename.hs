@@ -2,7 +2,6 @@ module FrontEnd.Rename(unRename, collectDefsHsModule, renameModule, FieldMap(..)
 
 import Char
 import Control.Monad.RWS
-import Control.Monad.State
 import Control.Monad.Writer
 import Control.Applicative
 import Data.Monoid

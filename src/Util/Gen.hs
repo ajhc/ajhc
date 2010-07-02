@@ -1,6 +1,6 @@
 
 -- | similar to GenUtil but can rely on non-haskell 98 features
-module Util.Gen(module Util.Gen, module GenUtil) where
+module Util.Gen(module Util.Gen, module GenUtil, intercalate) where
 
 import Control.Monad.Writer
 import Control.Monad.Identity
@@ -11,7 +11,7 @@ import System.IO
 import Data.Maybe
 import Text.ParserCombinators.ReadP
 
-import GenUtil hiding(replicateM)
+import GenUtil hiding(replicateM, intercalate)
 
 mconcatMap f xs = mconcat (map f xs)
 mintercalate x xs = mconcat (intersperse x xs)

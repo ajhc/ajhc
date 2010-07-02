@@ -4,7 +4,6 @@ import Char
 import List
 import Control.Monad.Identity
 
-import CharIO
 import DerivingDrift.DataP
 import DerivingDrift.StandardRules
 import FrontEnd.HsParser
@@ -16,14 +15,15 @@ import Options
 import Text.PrettyPrint.HughesPJ(render)
 import qualified Data.Map as Map
 import qualified FlagDump as FD
+import Util.Gen
 
 driftDerive :: HsModule -> IO HsModule
 driftDerive hsModule = ans where
     ans | null ss = return hsModule
         | otherwise = do
             wdump FD.Derived $ do
-                CharIO.print $ hsModuleName hsModule
-                mapM_ CharIO.putErrLn ss
+                print $ hsModuleName hsModule
+                mapM_ putErrLn ss
             return hsMod'
     hsMod' = hsModule { hsModuleDecls = hsModuleDecls hsModule ++ ndcls }
     --hsMod = case parse (unlines ss) (SrcLoc (show $ hsModuleName hsModule) 1 1) 0 [] of

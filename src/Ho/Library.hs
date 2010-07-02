@@ -30,7 +30,6 @@ import Ho.Type
 import Options
 import PackedString(PackedString,packString,unpackPS)
 import Util.YAML
-import qualified CharIO
 import qualified FlagDump as FD
 import qualified Support.MD5 as MD5
 
@@ -53,7 +52,7 @@ libVersionCompare l1 l2 = compare (libVersion l1) (libVersion l2)
 readDescFile :: FilePath -> IO [(String,String)]
 readDescFile fp = do
     wdump FD.Progress $ putErrLn $ "Reading: " ++ show fp
-    fc <- CharIO.readFile fp
+    fc <- readFile fp
     case parseLibraryDescription fc of
         Left err -> fail $ "Error reading library description file: " ++ show fp ++ " " ++ err
         Right ps -> return ps
