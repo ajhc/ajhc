@@ -16,8 +16,6 @@ static struct s_arena *arena;
 #define gc_frame0(gc,n,...) void *ptrs[n] = { __VA_ARGS__ }; for(int i = 0; i < n; i++) gc[i] = (sptr_t)ptrs[i]; gc_t sgc = gc;  gc_t gc = sgc + n;
 #endif
 
-
-static Pvoid_t  gc_roots       = NULL;  // extra roots in addition to the stack
 static unsigned number_gcs;             // number of garbage collections
 static unsigned number_allocs;          // number of allocations since last garbage collection
 
@@ -31,20 +29,9 @@ typedef struct {
 static bool
 gc_check_heap(entry_t *s)
 {
-        int r; J1T(r,gc_inheap,(uintptr_t)s / MEGABLOCK_SIZE);
-        return r;
+        return (s < &_start || s > &_end);
 }
 
-static void
-gc_add_root(gc_t gc, sptr_t root)
-{
-        if(IS_PTR(root)) {
-                entry_t *nroot = TO_GCPTR(root);
-                if(gc_check_heap(nroot)) {
-                        int r; J1S(r,gc_roots,(Word_t)nroot);
-                }
-        }
-}
 
 struct stack {
         unsigned size;
@@ -55,16 +42,36 @@ struct stack {
 #define EMPTY_STACK { 0, 0, NULL }
 
 static void
+stack_grow(struct stack *s, unsigned grow)
+{
+        s->size += grow;
+        s->stack = realloc(s->stack, sizeof(uintptr_t)*s->size);
+        assert(s->stack);
+        debugf("stack:");
+        for(unsigned i = 0; i < s->ptr; i++) {
+                debugf(" %p", (void *)s->stack[i]);
+        }
+        debugf("\n");
+}
+
+inline static void
 stack_check(struct stack *s, unsigned n) {
         if(__predict_false(s->size - s->ptr < n)) {
-                s->size += 1024 + n;
-                s->stack = realloc(s->stack, sizeof(uintptr_t)*s->size);
-                assert(s->stack);
-                debugf("stack:");
-                for(unsigned i = 0; i < s->ptr; i++) {
-                        debugf(" %p", (void *)s->stack[i]);
+                stack_grow(s,n + 1024);
+        }
+}
+
+static struct stack root_stack = EMPTY_STACK;
+
+static void
+gc_add_root(gc_t gc, sptr_t root)
+{
+        if(IS_PTR(root)) {
+                entry_t *nroot = TO_GCPTR(root);
+                if(gc_check_heap(nroot)) {
+                        stack_check(&root_stack,1);
+                        root_stack.stack[root_stack.ptr++] = nroot;
                 }
-                debugf("\n");
         }
 }
 
@@ -88,15 +95,10 @@ gc_perform_gc(gc_t gc)
 
         clear_used_bits(arena);
 
-        Word_t ix;
         debugf("Setting Roots:");
-        Word_t n_roots;
-        J1C(n_roots,gc_roots,0,-1);
-        stack_check(&stack, n_roots);
-        int r; for(ix = 0,(J1F(r,gc_roots,ix)); r; (J1N(r,gc_roots,ix))) {
-                debugf(" %p", (void *)ix);
-                gc_add_grey(&stack, (entry_t *)ix);
-        }
+        stack_check(&stack, root_stack.ptr);
+        memcpy(stack.stack + stack.ptr,root_stack.stack, root_stack.ptr * sizeof(root_stack.stack[0]));
+        stack.ptr += root_stack.ptr;
         debugf("\n");
         debugf("Trace:");
 #ifdef JHC_JGC_STACK
@@ -194,7 +196,7 @@ gc_perform_gc(gc_t gc)
                         number_stack,
                         number_ptr,
                         number_redirects,
-                        (unsigned)n_roots
+                        (unsigned)root_stack.ptr
                        );
                 //               jhc_malloc_fini();
         }

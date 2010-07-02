@@ -10,7 +10,7 @@
 
 #define S_BLOCK(val) (struct s_block *)((uintptr_t)(val) & ~ (BLOCK_SIZE - 1))
 
-static Pvoid_t  gc_inheap; // whether the megablock is in the heap
+//static Pvoid_t  gc_inheap; // whether the megablock is in the heap
 
 struct s_arena {
         struct s_megablock *current_megablock;
@@ -83,7 +83,7 @@ s_new_megablock(struct s_arena *arena)
                 fprintf(stderr,"Unable to allocate memory with posix_memalign for megablock\n");
                 abort();
         }
-        int r; J1S(r, gc_inheap, (uintptr_t)mb->base/MEGABLOCK_SIZE);
+//        int r; J1S(r, gc_inheap, (uintptr_t)mb->base/MEGABLOCK_SIZE);
         mb->next_free = 0;
         return mb;
 }
@@ -212,7 +212,7 @@ s_alloc(gc_t gc, struct s_cache *sc)
                         SLIST_REMOVE_HEAD(&sc->blocks,link);
                         SLIST_INSERT_HEAD(&sc->full_blocks,pg,link);
                 }
-                assert(s_block(val) == pg);
+                assert(S_BLOCK(val) == pg);
                 //printf("s_alloc: val: %p s_block: %p size: %i color: %i found: %i num_free: %i\n", val, pg, pg->pi.size, pg->pi.color, found, pg->num_free);
                 return val;
         }

@@ -44,11 +44,13 @@ static void gc_perform_gc(gc_t gc);
 static void *gc_alloc(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs);
 
 
+#if 0
 #ifdef NDEBUG
 #define JUDYERROR_NOTEST 1
 #endif
 
 #include <Judy.h>
+#endif
 
 #if JGC_STATUS > 1
 #define debugf(...) fprintf(stderr,__VA_ARGS__)
