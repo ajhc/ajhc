@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RecordWildCards,ViewPatterns  #-}
 module C.FromGrin2(compileGrin) where
 
 import Control.Monad.Identity
@@ -350,7 +350,7 @@ convertBody (e :>>= [] :-> e') = do
 convertBody (Return [v] :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
 --convertBody (Fetch v :>>= [(NodeC t as)] :-> e') = nodeAssign v t as e'
 convertBody (Case v [p1@([NodeC _ (_:_)] :-> _),p2@([NodeC _ []] :-> _)]) = convertBody $ Case v [p2,p1]
-convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == TyNode = do
+convertBody (Case v@(getType -> TyNode) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) = do
     scrut <- convertVal v
     cpr <- asks rConst
     tellTags t
@@ -374,8 +374,8 @@ convertBody (Case v@(Var _ ty) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2]) | ty == 
     return $ profile_case_inc & cif ifscrut p1' p2'
 
 -- zero is usually faster to test for than other values, so flip them if zero is being tested for.
-convertBody (Case v@Var {} [v1, v2@([Lit n _] :-> _)]) | n == 0 = convertBody (Case v [v2,v1])
-convertBody (Case v@(Var _ t) [[p1] :-> e1, [p2] :-> e2]) | Set.null ((freeVars p2 :: Set.Set Var) `Set.intersection` freeVars e2) = do
+convertBody (Case v [v1, v2@([Lit n _] :-> _)]) | n == 0 = convertBody (Case v [v2,v1])
+convertBody (Case v@(getType -> t) [[p1] :-> e1, [p2] :-> e2]) | Set.null ((freeVars p2 :: Set.Set Var) `Set.intersection` freeVars e2) = do
     scrut <- convertVal v
     let cp ~(Lit i _) = constant (number $ fromIntegral i)
         am e | isVar p2 = e
@@ -383,7 +383,7 @@ convertBody (Case v@(Var _ t) [[p1] :-> e1, [p2] :-> e2]) | Set.null ((freeVars 
     e1' <- convertBody e1
     e2' <- convertBody e2
     return $ profile_case_inc & cif (cp p1 `eq` scrut) e1' (am e2')
-convertBody (Case v@(Var _ t) ls) | t == TyNode = do
+convertBody (Case v@(getType -> TyNode) ls) = do
     scrut <- convertVal v
     let tag = f_FETCH_TAG scrut
         da ([(Var v _)] :-> e) | v == v0 = do
@@ -409,7 +409,7 @@ convertBody (Case v@(Var _ t) ls) | t == TyNode = do
             return $ (Just (enum (nodeTagName t)), ass & e')
     ls' <- mapM da ls
     return $ profile_case_inc & switch' tag ls'
-convertBody (Case v@(Var _ t) ls) = do
+convertBody (Case v ls) = do
     scrut <- convertVal v
     let da ([(Var vv _)] :-> e) | vv == v0 = do
             e' <- convertBody e
