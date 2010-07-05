@@ -1,4 +1,4 @@
-{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE RecursiveDo,ViewPatterns #-}
 module E.PrimOpt(
     performPrimOpt,
     processPrimPrim
@@ -159,6 +159,7 @@ instance Expression E E where
 
 processPrimPrim :: DataTable -> E -> E
 processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o id (primopt (fromAtom s) es (followAliases dataTable orig_t)) where
+    primBoundMap = [("maxBound",PrimMaxBound), ("minBound",PrimMinBound), ("umaxBound",PrimUMaxBound)]
     primopt "seq" [x,y] _  = return $ prim_seq x y
     primopt "exitFailure__" [w] rt  = return $ EError "" rt
     primopt op [a,b] t | Just cop <- readM op = mdo
@@ -195,6 +196,12 @@ processPrimPrim dataTable o@(EPrim (APrim (PrimPrim s) _) es orig_t) = maybe o i
         (res,(_,sta)) <- boxPrimitive dataTable (ELit (LitInt num sta)) t; return res
         where vs = [("zero",0),("one",1)]
     primopt "options_target" [] t     = return (ELit (LitInt 0 t))
+    primopt pn@(flip lookup primBoundMap -> Just c) [] t  = return $ ans where
+        Just tt = Op.readTy $ show rtn
+        (ExtTypeBoxed cna rt _) = fromMaybe (error $ "lookupExtTypeInfo(box): " ++ show t) $ lookupExtTypeInfo dataTable t
+        ELit LitCons { litName = rtn } = rt
+        ee = (EPrim (APrim (PrimTypeInfo tt tt c) mempty) [] rt)
+        ans = ELit litCons { litName = cna, litArgs = [ee], litType = orig_t }
     primopt pn [] t | Just c <- getPrefix "options_" pn      = return (EPrim (APrim (CConst ("JHC_" ++ c) "int") mempty) [] t)
     primopt pn [a,w] t | Just c <- getPrefix "peek." pn      >>= Op.readTy = return (EPrim (APrim (Peek c) mempty) [w,a] t)
     primopt pn [a,v,w] t | Just c <- getPrefix "poke." pn    >>= Op.readTy = return (EPrim (APrim (Poke c) mempty) [w,a,v] t)
