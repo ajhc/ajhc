@@ -2,6 +2,7 @@
 
 module Jhc.Inst.Show() where
 
+import Jhc.Inst.Order
 import Data.Int
 import Data.Word
 import Jhc.Basics

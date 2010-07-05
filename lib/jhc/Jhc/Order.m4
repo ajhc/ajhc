@@ -35,4 +35,25 @@ BOXBOOL()
 
 m4_define(INST_EQORDER,{{INST_EQ($1,$2,$3)INST_ORDER($1,$2,$3,$4)}})
 
+m4_define(BOUNDED,{{
+instance Bounded $1 where
+    maxBound = maxBound$1
+    minBound = minBound$1
+
+foreign import primitive "maxBound" maxBound$1 :: $1
+foreign import primitive "minBound" minBound$1 :: $1
+
+}})
+
+m4_define(UBOUNDED,{{
+instance Bounded $1 where
+    maxBound = umaxBound$1
+    minBound = zero$1
+
+foreign import primitive "umaxBound" umaxBound$1 :: $1
+foreign import primitive "zero" zero$1 :: $1
+
+}})
+
+
 m4_divert

@@ -99,6 +99,8 @@ instance Ord a => Ord [a] where
 
 
 INST_EQORDER(Char,Char,Bits32_,U)
+INST_EQORDER(Int,,Int,)
+INST_EQORDER(Integer,,Integer,)
 
 
 infixr 3  &&

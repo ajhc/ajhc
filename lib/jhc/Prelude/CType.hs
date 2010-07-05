@@ -6,6 +6,7 @@ module Prelude.CType (
     toUpper, toLower
     ) where
 
+import Jhc.Inst.Order
 import Jhc.Basics
 import Jhc.Order
 import Jhc.Num

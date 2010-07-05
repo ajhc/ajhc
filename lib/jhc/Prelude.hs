@@ -66,6 +66,7 @@ import Jhc.Float
 import Data.Int(Int())
 
 import Jhc.Inst.Enum
+import Jhc.Inst.Order
 import Jhc.Inst.Read
 import Jhc.Inst.Show
 import Jhc.Inst.Storable

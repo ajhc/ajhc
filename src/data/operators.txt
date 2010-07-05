@@ -1,13 +1,13 @@
 
 
 
-[int,float,char,ptr]
-aaB, ==, Jhc.Order.Eq, ==
+# [int,float,char,ptr]
+# aaB, ==, Jhc.Order.Eq, ==
 # aaB, /=, Jhc.Order.Eq, !=
-aaB, >=, Jhc.Order.Ord, >=
-aaB, <=, Jhc.Order.Ord, <=
-aaB, >, Jhc.Order.Ord, >
-aaB, <, Jhc.Order.Ord, <
+# aaB, >=, Jhc.Order.Ord, >=
+# aaB, <=, Jhc.Order.Ord, <=
+# aaB, >, Jhc.Order.Ord, >
+# aaB, <, Jhc.Order.Ord, <
 
 
 [int,float]

@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -N -fffi -funboxed-values #-}
+{-# OPTIONS_JHC -fm4 -N -fffi -funboxed-values #-}
 module Jhc.Enum(Enum(..),Bounded(..)) where
 -- Enumeration and Bounded classes
 
@@ -8,6 +8,8 @@ import Jhc.Types
 import Jhc.Basics
 import Jhc.Order
 import Jhc.Int
+
+m4_include(Jhc/Enum.m4)
 
 class  Enum a  where
     succ, pred       :: a -> a
@@ -83,6 +85,9 @@ instance Enum Char where
 instance Bounded Char where
     minBound = Char 0#
     maxBound = Char 0x10ffff#
+
+BOUNDED(Int)
+BOUNDED(Integer)
 
 foreign import primitive "UGt"       bits32UGt       :: Bits32_ -> Bits32_ -> Bool__
 foreign import primitive "UGte"      bits32UGte      :: Bits32_ -> Bits32_ -> Bool__

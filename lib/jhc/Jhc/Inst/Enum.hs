@@ -9,33 +9,9 @@ import Jhc.Num
 import Jhc.Order
 import Jhc.IO(error)
 import Jhc.Basics
+import Jhc.Inst.Order
 
-m4_define(ENUMINST,{{
-instance Enum $1 where
-    toEnum = fromInt
-    fromEnum = toInt
-    succ = increment$1
-    pred = decrement$1
-    enumFrom c        = [c .. maxBound]
-    enumFromThen c c' = last `seq` [c, c' .. last]
-                      where last | c' < c    = minBound
-                                 | otherwise = maxBound
-    enumFromTo x y = f x where
-        f x | x > y = []
-            | otherwise = x:f (x + 1)
-    enumFromThenTo x y z | y >= x = inc `seq` z `seq` f x where
-        inc = y - x
-        f x | x <= z = x:f (x + inc)
-            | otherwise = []
-    enumFromThenTo x y z  = dec `seq` z `seq` f x where
-        dec = x - y
-        f x | x >= z = x:f (x - dec)
-            | otherwise = []
-
-foreign import primitive "increment" increment$1 :: $1 -> $1
-foreign import primitive "decrement" decrement$1 :: $1 -> $1
-
-}})
+m4_include(Jhc/Enum.m4)
 
 ENUMINST(Word)
 ENUMINST(Word8)
@@ -45,6 +21,14 @@ ENUMINST(Word64)
 ENUMINST(WordPtr)
 ENUMINST(WordMax)
 
+UBOUNDED(Word)
+UBOUNDED(Word8)
+UBOUNDED(Word16)
+UBOUNDED(Word32)
+UBOUNDED(Word64)
+UBOUNDED(WordPtr)
+UBOUNDED(WordMax)
+
 ENUMINST(Int8)
 ENUMINST(Int16)
 ENUMINST(Int32)
@@ -53,6 +37,12 @@ ENUMINST(IntPtr)
 ENUMINST(IntMax)
 ENUMINST(Integer)
 
+BOUNDED(Int8)
+BOUNDED(Int16)
+BOUNDED(Int32)
+BOUNDED(Int64)
+BOUNDED(IntPtr)
+BOUNDED(IntMax)
 
 instance Enum () where
     succ _      = error "Prelude.Enum.().succ: bad argument"
