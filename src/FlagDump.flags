@@ -27,8 +27,6 @@ class       detailed information on each class
 instance    show instances
 bindgroups  show bindgroups
 types       display unified type table containing all defined names
-all-kind    show unified kind table after everything has been typechecked
-all-dcons   show unified data constructor table
 all-types   show unified type table, after everything has been typechecked
 sigenv      initial signature environment
 srcsigs     processed signatures from source code
@@ -36,8 +34,6 @@ program     impl expls, the whole shebang.
 decls       processed declarations
 boxy-steps  show step by step what the type inferencer is doing
 aspats      show as patterns
-tyvar       show original tyvars rather than renaming them.
-
 
 !Intermediate code
 core-pass    show each iteration of code while transforming
@@ -67,8 +63,6 @@ grin-preeval show grin code just before eval/apply inlining
 grin-posteval show grin code just before eval/apply inlining
 grin-initial grin right after conversion from core
 grin-normalized grin right after first normalization
-grin-pass  show each iteration of code while transforming
-grin-steps show what happens in each transformation
 grin-graph print dot file of final grin code to outputname_grin.dot
 grin-final final grin before conversion to C
 

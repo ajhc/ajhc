@@ -13,7 +13,6 @@ unboxed-values allow unboxed value syntax
 ffi support foreign function declarations
 cpp pass haskell source through c preprocessor
 m4 pass haskell source through m4 preprocessor
-bang-patterns support bang pattern strictness annotations
 
 !Typechecking
 monomorphism-restriction enforce monomorphism restriction
@@ -25,15 +24,11 @@ lint perform lots of extra type checks
 !Optimization Options
 inline-pragmas use inline pragmas
 rules use rules
-float-in perform float inward transform
-strictness perform strictness analysis
-cpr do CPR analysis
-type-analysis perhaps a basic points-to analysis on types right after method generation
+type-analysis perform a basic points-to analysis on types right after method generation
 global-optimize perform whole program E optimization
 
 !Code Generation
 full-int extend Int and Word to 32 bits on a 32 bit machine (rather than 30)
-via-ghc compile via ghc
 wrapper wrap main in exception handler
 boehm use Boehm garbage collector
 jgc   use the jgc garbage collector
@@ -42,4 +37,4 @@ debug enable debugging code in generated executable
 raw just evaluate main to WHNF and nothing else.
 
 !Default settings
-@default inline-pragmas rules wrapper float-in strictness defaulting type-analysis monomorphism-restriction boxy eval-optimize global-optimize full-int
+@default inline-pragmas rules wrapper defaulting type-analysis monomorphism-restriction global-optimize full-int
