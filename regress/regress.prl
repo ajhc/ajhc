@@ -44,8 +44,10 @@ pod2usage(-verbose => 2) if $opt_man;
 pod2usage(1) if $opt_help;
 
 # clean out environment
-delete $ENV{JHCPATH};
-delete $ENV{JHCOPTS};
+delete $ENV{JHC_PATH};
+delete $ENV{JHC_OPTS};
+delete $ENV{JHC_CACHE};
+delete $ENV{JHC_LIBRARY_PATH};
 
 
 @opts = (@opts, (map { "-f$_" } @fopts), (map { "-m$_" } @mopts));
