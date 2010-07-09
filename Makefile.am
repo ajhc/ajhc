@@ -40,7 +40,7 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
 	src/Util/Relation.hs src/Util/RWS.hs src/Util/SameShape.hs src/Util/Seq.hs src/Util/SetLike.hs src/Util/UnionFind.hs \
 	src/Util/UnionSolve.hs src/Util/UniqueMonad.hs src/Util/Util.hs src/Util/VarName.hs src/Version/Config.hs src/Version/Version.hs \
 	src/Support/IniParse.hs src/E/Lint.hs src/Util/Progress.hs src/Grin/StorageAnalysis.hs src/Util/YAML.hs src/Grin/Main.hs \
-        src/E/Main.hs src/Grin/QueryOpt.hs src/Grin/Query.hs
+        src/E/Main.hs
 
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
