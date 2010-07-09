@@ -338,7 +338,7 @@ fromHsTypeApp t = f t [] where
 instanceToTopDecls :: KindEnv -> ClassHierarchy -> HsDecl -> (([HsDecl],[Assump]))
 instanceToTopDecls kt ch@(ClassHierarchy classHierarchy) (HsInstDecl _ qualType methods)
     = unzip $ map (methodToTopDecls ch kt [] crecord qualType) $ methodGroups where
-    methodGroups = groupEquations methods
+    methodGroups = groupEquations (filter (not . isHsPragmaProps) methods)
     (_,(className,_)) = qtToClassHead kt qualType
     crecord = case Map.lookup className classHierarchy  of
         Nothing -> error $ "instanceToTopDecls: could not find class " ++ show className ++ "in class hierarchy"
@@ -425,6 +425,7 @@ renameOneDecl newName (HsFunBind matches)
 -- (ie no compound patterns)
 renameOneDecl newName (HsPatBind sloc (HsPVar patName) rhs wheres)
    = HsPatBind sloc (HsPVar (nameName newName)) rhs wheres
+
 
 renameOneMatch :: Name -> HsMatch -> HsMatch
 renameOneMatch newName (HsMatch sloc oldName pats rhs wheres)

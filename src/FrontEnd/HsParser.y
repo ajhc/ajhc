@@ -328,6 +328,9 @@ topdecl :: { HsDecl }
       | srcloc PRAGMASPECIALIZE var '::' type PRAGMAEND
                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $3, hsDeclType = $5
                                            , hsDeclUniq = error "hsDeclUniq not set"  } }
+      | srcloc PRAGMASPECIALIZE conid var '::' type PRAGMAEND
+                      { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $4, hsDeclType = $6
+                                           , hsDeclUniq = error "hsDeclUniq not set"  } }
       | decl          { $1 }
 
 
@@ -618,6 +621,7 @@ valdef :: { HsDecl }
       | srcloc PRAGMASPECIALIZE 'instance'  type PRAGMAEND
                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = nameName u_instance , hsDeclType = $4
                                            , hsDeclUniq = error "hsDeclUniq not set"  } }
+      | pragmainline { $1 }
 
 rhs   :: { HsRhs }
       : '=' exp                       {% checkExpr $2 `thenP` \e ->
