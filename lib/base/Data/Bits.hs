@@ -1,10 +1,15 @@
-{-# OPTIONS_JHC -N #-}
+{-# OPTIONS_JHC -fm4 -N -fffi  #-}
 module Data.Bits where
 
 
 import Jhc.Num
 import Jhc.Order
+import Jhc.Basics
 import Jhc.Int
+import Data.Word
+import Data.Int
+
+m4_include(Data/Bits.m4)
 
 
 infixl 8 `shift`, `rotate`, `shiftL`, `shiftR`, `rotateL`, `rotateR`
@@ -140,3 +145,20 @@ class Num a => Bits a where
     x `rotateR` i = x `rotate` (-i)
 
 
+
+BITSINST(Int,a)
+BITSINST(Int8,a)
+BITSINST(Int16,a)
+BITSINST(Int32,a)
+BITSINST(Int64,a)
+BITSINST(IntPtr,a)
+BITSINST(IntMax,a)
+BITSINST(Integer,a)
+
+BITSINST(Word)
+BITSINST(Word8)
+BITSINST(Word16)
+BITSINST(Word32)
+BITSINST(Word64)
+BITSINST(WordPtr)
+BITSINST(WordMax)

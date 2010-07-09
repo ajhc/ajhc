@@ -19,16 +19,16 @@ aa, negate, Jhc.Num.Num, -
 # 1, signum, Jhc.Num.Num, abs
 
 [int]
-aaa, .&., Data.Bits.Bits, &
-aaa, .|., Data.Bits.Bits, |
-aaa, xor, Data.Bits.Bits, ^
-aa, complement, Data.Bits.Bits, ~
+#aaa, .&., Data.Bits.Bits, &
+#aaa, .|., Data.Bits.Bits, |
+#aaa, xor, Data.Bits.Bits, ^
+#aa, complement, Data.Bits.Bits, ~
 aaa, quot, Jhc.Num.Integral, /
 aaa, rem, Jhc.Num.Integral, %
 aaa, div, Jhc.Num.Integral, /
 aaa, mod, Jhc.Num.Integral, %
-aIa, shiftL, Data.Bits.Bits, <<
-aIa, shiftR, Data.Bits.Bits, >>
+#aIa, shiftL, Data.Bits.Bits, <<
+#aIa, shiftR, Data.Bits.Bits, >>
 
 
 # [float]
