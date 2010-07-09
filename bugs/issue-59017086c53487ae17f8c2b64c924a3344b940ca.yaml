@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: enable GC by default
+desc: get GC to the point where it can be enabled by default
+type: :feature
+component: back_end
+release: 0.7.5
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-09 22:16:12.878392 Z
+references: []
+
+id: 59017086c53487ae17f8c2b64c924a3344b940ca
+log_events: 
+- - 2010-07-09 22:16:14.638392 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

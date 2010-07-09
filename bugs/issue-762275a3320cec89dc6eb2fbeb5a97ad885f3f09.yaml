@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: Full Haskell 98 support
+desc: ""
+type: :task
+component: jhc
+release: 0.8.0
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-09 22:15:31.708371 Z
+references: []
+
+id: 762275a3320cec89dc6eb2fbeb5a97ad885f3f09
+log_events: 
+- - 2010-07-09 22:15:33.588388 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

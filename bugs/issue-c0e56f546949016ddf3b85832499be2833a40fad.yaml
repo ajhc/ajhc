@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: support associated types
+desc: Associated types have a particularly straightforward implementation in jhc as actual functions from types to types. They should be implemented to remove some of the pressure from not having MPTCs.
+type: :feature
+component: language
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-09 22:10:37.788425 Z
+references: []
+
+id: c0e56f546949016ddf3b85832499be2833a40fad
+log_events: 
+- - 2010-07-09 22:10:39.758390 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

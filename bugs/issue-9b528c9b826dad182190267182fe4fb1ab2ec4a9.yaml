@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: create a jhc-prim library with truely internal stuff
+desc: create a jhc-prim library that has only what is absolutely needed for jhc to work
+type: :task
+component: libraries
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-09 21:53:58.669195 Z
+references: []
+
+id: 9b528c9b826dad182190267182fe4fb1ab2ec4a9
+log_events: 
+- - 2010-07-09 21:54:01.489253 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

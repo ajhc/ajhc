@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: obfuscate the internal names of hidden modules
+desc: we should rename hidden modules to something dependent on the library so that the same module names may be reused by different libraries internally.
+type: :feature
+component: jhc
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-09 22:05:40.008440 Z
+references: []
+
+id: 09568163deee5af16caa8ea8e8cbfaddd8a5ca49
+log_events: 
+- - 2010-07-09 22:05:42.028388 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

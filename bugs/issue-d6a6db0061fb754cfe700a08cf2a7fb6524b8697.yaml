@@ -3,7 +3,7 @@ title: The GC needs to know about arrays of objects
 desc: ""
 type: :bugfix
 component: back_end
-release: 
+release: 0.7.5
 reporter: John Meacham <john@repetae.net>
 status: :unstarted
 disposition: 
@@ -15,4 +15,8 @@ log_events:
 - - 2010-03-30 02:15:37.102696 Z
   - John Meacham <john@repetae.net>
   - created
+  - ""
+- - 2010-07-09 22:11:34.098390 Z
+  - John Meacham <john@repetae.net>
+  - assigned to release 0.7.5 from unassigned
   - ""

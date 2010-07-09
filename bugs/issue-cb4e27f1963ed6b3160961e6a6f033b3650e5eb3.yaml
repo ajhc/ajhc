@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: Full haskell 2010 support
+desc: ""
+type: :task
+component: jhc
+release: 1.0.0
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-09 22:15:09.578402 Z
+references: []
+
+id: cb4e27f1963ed6b3160961e6a6f033b3650e5eb3
+log_events: 
+- - 2010-07-09 22:15:11.328398 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

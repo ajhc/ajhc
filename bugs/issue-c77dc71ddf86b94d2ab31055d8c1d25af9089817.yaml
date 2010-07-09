@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: remove special handling of 'Integral' from the compiler
+desc: "'Integral' is currently handled in a special manner by the compiler so it can generate instances internally for basic types. these instances should be explicit in the libraries."
+type: :task
+component: jhc
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-09 22:08:44.328395 Z
+references: []
+
+id: c77dc71ddf86b94d2ab31055d8c1d25af9089817
+log_events: 
+- - 2010-07-09 22:08:46.268394 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
