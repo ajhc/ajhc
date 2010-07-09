@@ -10,8 +10,15 @@ import Jhc.IO
 infixl 1  >>, >>=
 infixr 1  =<<
 
+infixl 4  <$
+
+
 class Functor f  where
-    fmap              :: (a -> b) -> f a -> f b
+    fmap :: (a -> b) -> f a -> f b
+    (<$) :: a -> f b -> f a
+
+    a <$ fb = fmap (const a) fb
+
 
 {- INLINE return, fail, (>>=), (>>) -}
 class Monad m where

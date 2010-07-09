@@ -38,6 +38,7 @@ module Control.Applicative (
 import Prelude hiding (id,(.))
 import qualified Prelude
 
+import Data.Functor
 import Control.Category
 import Control.Arrow
         (Arrow(arr, (&&&)), ArrowZero(zeroArrow), ArrowPlus((<+>)))
@@ -171,12 +172,12 @@ instance Applicative ZipList where
 -- extra functions
 
 -- | A synonym for 'fmap'.
-(<$>) :: Functor f => (a -> b) -> f a -> f b
-f <$> a = fmap f a
+--(<$>) :: Functor f => (a -> b) -> f a -> f b
+--f <$> a = fmap f a
 
 -- | Replace the value.
-(<$) :: Functor f => a -> f b -> f a
-(<$) = (<$>) . const
+--(<$) :: Functor f => a -> f b -> f a
+--(<$) = (<$>) . const
  
 -- | Sequence actions, discarding the value of the first argument.
 (*>) :: Applicative f => f a -> f b -> f b
