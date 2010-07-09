@@ -1,0 +1,18 @@
+#!/usr/bin/perl
+
+my $tb = $ARGV[0];
+
+$tb =~ /\.tar\.gz$/ or die "not tarball: $tb";
+
+my $tts = `rpmbuild -ts $tb`;
+$tts =~ /\s+(\S*\.src\.rpm)/ or die "$tts";
+$tts = $1;
+
+print "$tb $tts\n";
+
+my @args =  (qw/sudo mock rebuild -r fedora-12-i386/,  "$tts", qw/--no-clean --no-cleanup-after/);
+
+print join ' ',@args;
+print "\n";
+
+system @args;

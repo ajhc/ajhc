@@ -20,7 +20,7 @@ Building from the tarball
 jhc is also distributed via a autoconf/automake style tarball. Building jhc
 has the following dependencies:
 
- * GHC 6.10.4 or better
+ * GHC 6.12.1 or better
  * haskell library [binary](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/binary)
  * haskell library [zlib](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/zlib)
  * haskell library [utf8-string](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/utf8-string)

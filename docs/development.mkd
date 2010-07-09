@@ -10,20 +10,27 @@ darcsweb.
 Getting the source
 ------------------
 
-If you simply wish to use jhc, it is easier to build from the distribution
+If you simply wish to use jhc, it is much easier to build from the distribution
 tarball, as described on the [Building Page](building.shtml). If you are interested
 in developing or modifying jhc itself, then building from darcs as described on this
 page is recommended.
 
 In order to build from the darcs repo, you need the following things installed:
 
-    * GHC 6.8.2 or better
+    * GHC 6.12.1 or better
     * A recent version of DrIFT
     * pandoc if you wish to build documentation
     * graphviz if you wish to create code motion graphs
-    * a working 'perl' install for various sundry tasks
+    * a working perl install for various sundry tasks
     * the happy haskell parser generator
-    * for ghc 6.8 you need the binary, zlib, and utf8-string libraries installed. ghc 6.10 may require more depending on how it is installed.
+    * You need the following haskell libraries
+      * binary
+      * zlib
+      * utf8-string
+      * bytestring
+      * containers
+      * one of editline or readline
+      * mtl
 
 First you must install darcs, there are a couple projects you need to pull in
 order to compile jhc, the following should produce a working tree:

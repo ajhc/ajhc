@@ -3,11 +3,7 @@ ACLOCAL_AMFLAGS=-I ac-macros
 
 bin_PROGRAMS = jhc
 
-
 jhc_SOURCES = src/Main.hs  $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
-
-#SUFFIXES= .hs .lhs .o .hi .hsc .c .h .ly .hi-boot .hs-boot .o-boot
-#SUFFIXES=
 
 BUILT_SOURCES= src/PrimitiveOperators.hs src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
 	       src/FlagOpts.hs src/Name/Prim.hs src/Info/Properties.hs $(DRIFTFILES)
@@ -203,9 +199,6 @@ deps.txt:
 	$(MAKE) $(AM_MAKEFLAGS) $(BUILT_SOURCES)
 	$(HC) -M -optdep-f -optdep$@ $(GHCOPTS) src/Main.hs
 
-update-datestamp: ChangeLog
-	sh utils/update_datestamp.sh $< configure.ac
-
 depend.make: deps.txt
 	echo HSFILES=`egrep -o '[A-Za-z0-9/._]+.hs' $< | sed -e 's/^\.\///' | sort | uniq` > depend.make
 
@@ -214,7 +207,7 @@ built-sources: $(BUILT_SOURCES)
 i: $(BUILT_SOURCES)
 	$(HC) --interactive $(GHCOPTS) src/Main.hs $(CFILES)
 
-.PHONY: ho-clean hl-clean built-sources i update-datestamp manual man
+.PHONY: ho-clean hl-clean built-sources i manual man
 
 ho-clean:
 	rm -f -- `find -name \*.ho`
