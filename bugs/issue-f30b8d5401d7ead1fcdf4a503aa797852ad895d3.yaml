@@ -2,7 +2,7 @@
 title: IO exceptions are not working properly
 desc: IO exceptions are basically a stub, in addition, they behave oddly in certain ways, such as printing to stdout instead of stderr.
 type: :bugfix
-component: libraries
+component: lib
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

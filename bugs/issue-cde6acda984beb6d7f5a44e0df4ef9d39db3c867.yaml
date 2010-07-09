@@ -2,7 +2,7 @@
 title: unused return value of a function in grin should be elided
 desc: when the return value of a grin function is not used, we should modify the function to not return anything.
 type: :feature
-component: optimizer
+component: opt
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

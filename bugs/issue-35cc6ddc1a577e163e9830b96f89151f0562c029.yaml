@@ -11,7 +11,7 @@ desc: |-
   >      return $ FF $ Option [] [n] (ReqArg (addHook n . j') argname) h
   >      where j' v = do putV $ "handling configure flag --"++n++" "++v; j v
 type: :bugfix
-component: front_end
+component: fe
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

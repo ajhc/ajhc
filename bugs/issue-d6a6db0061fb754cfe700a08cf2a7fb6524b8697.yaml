@@ -2,7 +2,7 @@
 title: The GC needs to know about arrays of objects
 desc: ""
 type: :bugfix
-component: back_end
+component: be
 release: 0.7.5
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

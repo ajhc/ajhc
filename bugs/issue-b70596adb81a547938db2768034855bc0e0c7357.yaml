@@ -4,7 +4,7 @@ desc: |-
   The export list for modules is not checked for ambiguous or missing names.
   valid ones are correctly handled, but invalid ones are silently ignored.
 type: :bugfix
-component: front_end
+component: fe
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :closed

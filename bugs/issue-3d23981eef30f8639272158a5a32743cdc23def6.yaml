@@ -2,7 +2,7 @@
 title: show pre-renamed source code when reporting type errors
 desc: When printing the context in which an error occured, we should print out the source code using unqualified names as written, rather than what it looks like post-renaming
 type: :feature
-component: user_interface
+component: ui
 release: 0.8.0
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

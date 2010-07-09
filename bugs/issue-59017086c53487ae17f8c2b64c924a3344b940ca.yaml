@@ -2,7 +2,7 @@
 title: enable GC by default
 desc: get GC to the point where it can be enabled by default
 type: :feature
-component: back_end
+component: be
 release: 0.7.5
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

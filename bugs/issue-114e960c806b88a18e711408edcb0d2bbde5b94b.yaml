@@ -2,7 +2,7 @@
 title: address foreign imports don't include header files properly
 desc: when foreign importing an address, such as &foo, the specified include file is not included in the result.
 type: :bugfix
-component: back_end
+component: be
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted
@@ -18,5 +18,5 @@ log_events:
   - ""
 - - 2009-09-23 04:11:28.452221 Z
   - John Meacham <john@repetae.net>
-  - assigned to component back_end from jhc
+  - assigned to component be from jhc
   - ""

@@ -5,19 +5,19 @@ components:
 - !ditz.rubyforge.org,2008-03-06/component 
   name: jhc
 - !ditz.rubyforge.org,2008-03-06/component 
-  name: type_checker
+  name: tc
 - !ditz.rubyforge.org,2008-03-06/component 
-  name: user_interface
+  name: ui
 - !ditz.rubyforge.org,2008-03-06/component 
-  name: optimizer
+  name: opt
 - !ditz.rubyforge.org,2008-03-06/component 
-  name: front_end
+  name: fe
 - !ditz.rubyforge.org,2008-03-06/component 
-  name: libraries
+  name: lib
 - !ditz.rubyforge.org,2008-03-06/component 
-  name: language
+  name: lang
 - !ditz.rubyforge.org,2008-03-06/component 
-  name: back_end
+  name: be
 releases: 
 - !ditz.rubyforge.org,2008-03-06/release 
   name: 0.6.0

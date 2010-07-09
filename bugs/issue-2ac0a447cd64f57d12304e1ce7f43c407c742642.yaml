@@ -2,7 +2,7 @@
 title: flattenType called too often in type checker
 desc: The type checker calls flattenType which traverses a whole type in places where the type is already flat, or we only need the head to not be a reference. This slows it down.
 type: :bugfix
-component: type_checker
+component: tc
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

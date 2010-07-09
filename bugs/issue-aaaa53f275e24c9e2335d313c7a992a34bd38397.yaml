@@ -2,7 +2,7 @@
 title: defaulting does not work
 desc: defaulted types don't seem to be properly instantiated.
 type: :bugfix
-component: type_checker
+component: tc
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

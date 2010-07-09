@@ -2,7 +2,7 @@
 title: support associated types
 desc: Associated types have a particularly straightforward implementation in jhc as actual functions from types to types. They should be implemented to remove some of the pressure from not having MPTCs.
 type: :feature
-component: language
+component: lang
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

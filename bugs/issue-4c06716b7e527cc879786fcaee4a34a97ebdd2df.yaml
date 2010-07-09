@@ -2,7 +2,7 @@
 title: We should not pass the GC context to functions that perform no allocation
 desc: We currently pass the gc context everywhere just in case it is needed, we should detect when we can elide it and do so
 type: :feature
-component: back_end
+component: be
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

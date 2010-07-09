@@ -2,7 +2,7 @@
 title: strict fields of newtypes are not unboxed properly
 desc: ""
 type: :bugfix
-component: front_end
+component: fe
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

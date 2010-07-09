@@ -2,7 +2,7 @@
 title: fails when the same library is imported more than once
 desc: when the same library is imported more than once then jhc reports it as a conflict, it should merge such imports.
 type: :bugfix
-component: front_end
+component: fe
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

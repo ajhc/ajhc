@@ -2,7 +2,7 @@
 title: support newtype deriving
 desc: support newtype deriving, it can not only signifigantly cut down on the number of stub instance functions, but is just a darn useful extension
 type: :feature
-component: language
+component: lang
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

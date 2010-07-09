@@ -2,7 +2,7 @@
 title: create a jhc-prim library with truely internal stuff
 desc: create a jhc-prim library that has only what is absolutely needed for jhc to work
 type: :task
-component: libraries
+component: lib
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

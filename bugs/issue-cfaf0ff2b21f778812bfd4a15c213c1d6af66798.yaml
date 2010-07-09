@@ -2,7 +2,7 @@
 title: FunPtr has no Ord or Eq instance
 desc: FunPtr, declared in Jhc.Addr has no Eq or Ord instances, ideally since it is a newtype, we should be able to use newtype deriving to create this instance.
 type: :bugfix
-component: libraries
+component: lib
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :closed

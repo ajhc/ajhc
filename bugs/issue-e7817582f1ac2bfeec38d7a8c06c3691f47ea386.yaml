@@ -2,7 +2,7 @@
 title: desugaring of lambdas inside of list comprehension head seems broken
 desc: This code causes the compiler to fail when converting haskell to core [\() -> "Hello" | _ <- []  ]
 type: :bugfix
-component: front_end
+component: fe
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted

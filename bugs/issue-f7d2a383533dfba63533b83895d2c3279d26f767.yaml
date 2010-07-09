@@ -2,7 +2,7 @@
 title: The renamer should be able to disambiguate method names
 desc: When writing an instance for a class, the method names should always be renamed to match the class, as it is, they can generate errors if they are not in scope or ambiguous.
 type: :bugfix
-component: front_end
+component: fe
 release: 
 reporter: John Meacham <john@repetae.net>
 status: :unstarted
@@ -18,5 +18,5 @@ log_events:
   - ""
 - - 2009-03-27 04:15:07.713985 Z
   - John Meacham <john@repetae.net>
-  - assigned to component front_end from jhc
+  - assigned to component fe from jhc
   - ""
