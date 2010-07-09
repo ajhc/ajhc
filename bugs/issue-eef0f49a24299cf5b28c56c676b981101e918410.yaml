@@ -1,0 +1,20 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: Support 'slabs' of external objects
+desc: |-
+  The slab allocator should be able to work with a 'slab' of non haskell objects with a common destructor.
+  There should be same way to declare this in a haskell source file.
+type: :feature
+component: jhc
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-09 22:57:24.748393 Z
+references: []
+
+id: eef0f49a24299cf5b28c56c676b981101e918410
+log_events: 
+- - 2010-07-09 22:57:28.758392 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

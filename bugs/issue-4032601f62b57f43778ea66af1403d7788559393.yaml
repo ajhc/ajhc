@@ -1,0 +1,20 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: support classes for unboxed values
+desc: |-
+  you should be able to create typeclasses for unboxed values that are
+  expanded inline transparently. To implement things like (+#) in a uniform way.
+type: :feature
+component: lang
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-09 22:48:18.138427 Z
+references: []
+
+id: 4032601f62b57f43778ea66af1403d7788559393
+log_events: 
+- - 2010-07-09 22:48:20.338390 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

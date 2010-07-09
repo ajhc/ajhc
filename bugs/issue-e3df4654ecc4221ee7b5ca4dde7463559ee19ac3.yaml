@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: ForeignPtr finalizers need to be implemented
+desc: ForeignPtrs finalizers are currently not run. they need to be.
+type: :feature
+component: lang
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-09 22:56:13.028398 Z
+references: []
+
+id: e3df4654ecc4221ee7b5ca4dde7463559ee19ac3
+log_events: 
+- - 2010-07-09 22:56:15.228390 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
