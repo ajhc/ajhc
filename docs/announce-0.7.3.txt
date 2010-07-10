@@ -1,0 +1,64 @@
+It's been a long time coming, but jhc-0.7.3 is here. If you have been
+following the darcs repository, there are not a whole lot of new
+changes, but there have been substantial fixes since 0.7.2.
+
+  http://repetae.net/computer/jhc/
+
+One of the most important ones is I have begun the process of
+standardizing on YAML for all external interfaces that may be useful to
+automation, this should make interfacing jhc with external tools written
+in any language much easier, and it will prevent me from spending time
+trying to invent proprietary formats every time I think of something new
+to spit out. right now it is used in 3 places:
+
+ - dumping dependency info with --deps
+ - library dumping with --list-libraries -v
+ - annotating source code, for inputting to documentation generators via
+   --annotate-source
+
+The main place it isn't used yet that I desire too is to replace the
+'cabal' library description format with a true YAML file. jhc cabal
+files were never quite compatible with cabal ones anyway and naming them
+the same thing has been a source of connfusion.
+
+
+some of the other changes have been:
+
+
+features:
+  - a lot more regression tests, many user submitted bugs are now
+    regressions
+  - support for using 'mock' to build rpms
+  - System.Exit, System.Cmd added to base
+  - better compatibility with ghc in some library functions
+  - ui improvements in showing progress and errors
+  - extended --list-libraries info
+  - --deps dependency dumping
+  - more francise compatible thanks to patches from droundy
+  - more instances for bigger tuples added
+  - uses editline if readline not available
+  - select libraries by hash as well as version
+  - add System.IO.Pipe
+  - detect version of gcc needed for cross compiling to windows
+
+performance:
+  - storage analysis - a very basic region inference enabled by default
+  - deadcode analysis can see through partial applications now
+  - profiled and sped up some library routines that were producing
+    inellegant core.
+  - figure out when top level grin functions call themselves recursively
+    and turn them into explicit loops.
+
+bug fixes:
+  - do expression in infix
+  - fix strict newtype bug
+  - U2U bug fixed
+  - desugaring inside of list comprehensions fix
+  - c generator doesn't mess up on unknown values
+  - the compiler version is stored in the cache files, so multiple
+    versions of jhc don't clobber each others cache entries
+  - Ord instance for lists fixed
+  - recursive type synonyms detected properly
+  - make sure errno.h is included when errno is referenced
+  - don't give a parse error when seeing ghc extensions to INLINE
+  - qualified method names fix
