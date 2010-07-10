@@ -1,0 +1,46 @@
+Announcing jhc 0.7.4! There have been a few major changes, the main one being
+that there is now support for a garbage collector. This drastically increases
+the number of programs which are feasable to compile with jhc.
+
+  http://repetae.net/computer/jhc/
+
+Any testing people can do with -fjgc would be greatly appreciated! My gameplan
+is to fix any issues that come up with the new gc and release a 0.7.5 that
+will have the GC enabled by default. This will probably be the first version
+of jhc I can recommend to non-developers with a good concience :). Once that is
+done I can implement a good strategy for library compatibility with other
+compilers and the standards. As it is, jhc has a mix of haskell 98 and haskell
+2010 and the ghc base as its distributed libraries, basically whatever I found I
+needed in practice I added as I went along. This won't work in the long run.
+
+Major changes
+
+ * a garbage colletor which can be enabled with '-fjgc' is available.
+   after some more testing, I will make it the default in the 0.7.5 release.
+ * A new memory allocator based on Jeff Bonwick's slab memory allocator for
+   kernels. This means that in many cases, memory can be pulled off a slab
+   and immediately used with no initialization, in addition, it allowed a
+   rearrangement of the GC meta-data to optimizally use the cache.
+ * packed representation of algebraic types, 'Maybe Foo' is actually
+   represented in memory as a NULL pointer or just a 'Foo' with no tag bits.
+   Combined with the slab allocator, this can double the number of some common
+   values that can be put in a cache line.
+ * some intense profiling of generated code and modification of the rts and
+   code generator. Signifigant speed-ups in compiled programs are the result.
+
+Some other changes since 0.7.3 are
+ * documentation updates, especially when it comes to the runtime.
+ * ghc 6.12 support (it is in fact required now.)
+ * no more monolithic 'Main'. the core pass moved to E.Main and the grin pass
+   moved to Grin.Main.
+ * generated C code is more compact and easier to debug.
+ * more use of bytestring internally, improved performance
+ * JHC_RTS_INCLUDE flag allows including the rts from an
+   external file. useful for debugging/developing the RTS.
+ * explicit register support in grin, for alternate back ends such as a NCG
+ * Removed all compiler magic dealing with Eq,Bounded,Ord, and Bits. instances
+   for these are specified in haskell code even for built in types now.
+ * cleaned out some obsolete flags and options on command line.
+ * updated applicative and support for newest version of 'containers' library.
+ * bug updates
+ * various bug fixes
