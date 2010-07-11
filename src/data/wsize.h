@@ -30,7 +30,11 @@
 #ifndef __BYTE_ORDER
 #ifdef _BIG_ENDIAN
 #define __BYTE_ORDER __BIG_ENDIAN
+#elif defined(__BIG_ENDIAN__)
+#define __BYTE_ORDER __BIG_ENDIAN
 #elif defined(_LITTLE_ENDIAN)
+#define __BYTE_ORDER __LITTLE_ENDIAN
+#elif defined(__LITTLE_ENDIAN__)
 #define __BYTE_ORDER __LITTLE_ENDIAN
 #elif defined(__i386__)
 #define __BYTE_ORDER __LITTLE_ENDIAN
