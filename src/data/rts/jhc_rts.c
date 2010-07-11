@@ -14,12 +14,12 @@ static jmp_buf jhc_uncaught;
 static HsInt jhc_stdrnd[2] A_UNUSED = { 1 , 1 };
 static HsInt jhc_data_unique A_UNUSED;
 #ifdef __WIN32__
-static char *jhc_options_os =  "mingw32";
-static char *jhc_options_arch = "i386";
+A_UNUSED static char *jhc_options_os =  "mingw32";
+A_UNUSED static char *jhc_options_arch = "i386";
 #else
-struct utsname jhc_utsname;
-static char *jhc_options_os = "(unknown os)";
-static char *jhc_options_arch = "(unknown arch)";
+A_UNUSED struct utsname jhc_utsname;
+A_UNUSED static char *jhc_options_os = "(unknown os)";
+A_UNUSED static char *jhc_options_arch = "(unknown arch)";
 #endif
 
 
@@ -68,12 +68,14 @@ static uintmax_t jhc_prof_updates;
 
 #endif
 
+#ifndef __WIN32__
 void print_times(struct tms *tm) {
     float cpt = (float)sysconf(_SC_CLK_TCK);
     fprintf(stderr, "User Time:   %.2fs\n", (float)tm->tms_utime/cpt);
     fprintf(stderr, "System Time: %.2fs\n", (float)tm->tms_stime/cpt);
     fprintf(stderr, "Total Time:  %.2fs\n", (float)(tm->tms_stime + tm->tms_utime)/cpt);
 }
+#endif
 
 static void A_COLD
 jhc_print_profile(void) {

@@ -76,6 +76,7 @@ static void jhc_malloc_init(void) { GC_INIT(); }
 static void jhc_malloc_fini(void) {  }
 static void jhc_alloc_print_stats(void) { GC_dump(); }
 
+
 #elif _JHC_GC == _JHC_GC_NONE
 
 // memory allocated in 1MB chunks.
@@ -87,8 +88,8 @@ static void *jhc_current_chunk = initial_chunk;
 static unsigned mem_chunks,mem_offset;
 
 
-#define jhc_malloc_init() do { } while(0)
-#define jhc_malloc_fini() do { } while(0)
+static void jhc_malloc_init(void) {}
+static void jhc_malloc_fini(void) {}
 
 static void
 jhc_alloc_print_stats(void) {
