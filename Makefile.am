@@ -61,7 +61,8 @@ EXTRA_DIST = src/data utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/jhc lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal lib/containers.cabal \
-	     manual.html lib/containers lib/applicative
+	     manual.html lib/containers lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
+	     src/FlagOpts.flags src/FlagDump.flags
 
 CC = $(HC)
 
@@ -252,9 +253,9 @@ haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 	pandoc $< -s -f markdown -t html -o $@
 
 %.shtml: %.mkd
-	cat $(srcdir)/docs/my_header.shtml > $@
+	cat $(srcdir)/docs/template/my_header.shtml > $@
 	pandoc $<  -f markdown -t html >> $@
-	cat $(srcdir)/docs/my_footer.shtml >> $@
+	cat $(srcdir)/docs/template/my_footer.shtml >> $@
 
 publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml manual.html docs/manual.css
 	cp -- $^ /home/john/public_html/computer/jhc
