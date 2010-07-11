@@ -1,0 +1,24 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: add workaround for systems without posix_memalign
+desc: |-
+  Mac OSX 10.5 doesn't have posix_memalign which is needed by the garbage collector
+  We should be able to simulate it by allocating a larger amount of memory at a time and aligning the memory ourselves.
+type: :bugfix
+component: rts
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-11 05:07:41.306836 Z
+references: []
+
+id: 49afa2da88d487994dc55935ec2f1bd1331526d0
+log_events: 
+- - 2010-07-11 05:07:43.196780 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
+- - 2010-07-11 05:08:12.576910 Z
+  - John Meacham <john@repetae.net>
+  - assigned to component rts from be
+  - ""

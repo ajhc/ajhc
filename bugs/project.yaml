@@ -18,6 +18,10 @@ components:
   name: lang
 - !ditz.rubyforge.org,2008-03-06/component 
   name: be
+- !ditz.rubyforge.org,2008-03-06/component 
+  name: rts
+- !ditz.rubyforge.org,2008-03-06/component 
+  name: test
 releases: 
 - !ditz.rubyforge.org,2008-03-06/release 
   name: 0.6.0

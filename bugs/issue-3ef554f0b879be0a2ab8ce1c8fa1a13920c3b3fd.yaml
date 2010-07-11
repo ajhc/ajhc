@@ -1,0 +1,30 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: add regression test that compiles on windows target
+desc: using mingw32 and wine, we should perform a simple regression test that makes sure the windows target works.
+type: :feature
+component: test
+release: 0.7.5
+reporter: John Meacham <john@repetae.net>
+status: :closed
+disposition: :fixed
+creation_time: 2010-07-11 05:10:23.356948 Z
+references: []
+
+id: 3ef554f0b879be0a2ab8ce1c8fa1a13920c3b3fd
+log_events: 
+- - 2010-07-11 05:10:24.506914 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
+- - 2010-07-11 05:10:43.616910 Z
+  - John Meacham <john@repetae.net>
+  - assigned to component test from jhc
+  - ""
+- - 2010-07-11 07:11:53.019643 Z
+  - John Meacham <john@repetae.net>
+  - assigned to release 0.7.5 from unassigned
+  - ""
+- - 2010-07-11 07:12:12.149700 Z
+  - John Meacham <john@repetae.net>
+  - closed with disposition fixed
+  - ""

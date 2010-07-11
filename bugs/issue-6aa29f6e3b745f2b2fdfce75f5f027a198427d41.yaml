@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: replace HsName with Name everywhere
+desc: HsName is still used in the front end despite being slower and less flexible than the Name type. It should be gotten rid of.
+type: :task
+component: fe
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-11 05:18:50.346911 Z
+references: []
+
+id: 6aa29f6e3b745f2b2fdfce75f5f027a198427d41
+log_events: 
+- - 2010-07-11 05:18:51.556910 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

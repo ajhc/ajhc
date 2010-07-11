@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: make framework for benchmarking jhc's resource usage.
+desc: jhc itself can be slow and a memory hog at times, A standard way to measure the effect of changes should be made.
+type: :feature
+component: test
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-11 05:20:56.546903 Z
+references: []
+
+id: 38e54bc09340cfc7ad6d78b3c291d88e5f5be80f
+log_events: 
+- - 2010-07-11 05:20:57.946912 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
