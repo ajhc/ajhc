@@ -19,6 +19,7 @@ my $opt_l;
 my $opt_n;
 my $opt_p;
 my @opt_rts;
+my $opt_win;
 my $opt_clean;
 my $opt_timeout=60*5;
 my $opt_help;
@@ -37,6 +38,7 @@ GetOptions(
     n => \$opt_n,
     p => \$opt_p,
     v => \$verbose,
+    'win' => \$opt_win,
     'rts=s' =>\@opt_rts,
     clean => \$opt_clean,
     ) or pod2usage(2);
@@ -97,6 +99,8 @@ system "ln -sf $time $results_dir/current";
 my $ho_dir = $opt_clean ? "$rd/ho" : "$results_dir/ho";
 $ho_dir .= "_l" if $opt_l;
 mkdir $ho_dir;
+
+$ENV{JHC_CACHE} = $ho_dir;
 
 open RLOG, ">$rd/log.txt" or die "$!: Could not open log";
 
@@ -183,7 +187,7 @@ sub do_it {
             }
             rlog "---- $name";
             my @jhc  = $opt_p ? ("$jhc_dir/jhcp",'+RTS', "-S$rd/$name.jhcp_prof",@opt_rts,'-RTS')  :  ("$jhc_dir/jhc");
-            my @cmd = (@jhc, ($verbose ? ('-v') : ()), @libs , @fast, '-o', "$rd/$name", @flags, @opts, "$cwd/$fn");
+            my @cmd = (@jhc, ($verbose ? ('-v') : ()), ($opt_win ? ('-mwin32') : ()), @libs , @fast, '-o', "$rd/$name", @flags, @opts, "$cwd/$fn");
             my $res = join(" ",@cmd) . " > '$rd/$name.jhc_out' 2>&1";
             my ($r,$time) = my_system $res;
             my $result = { name => $name, compile_command => $res, compile_status => $r, compile_results => "$rd/$name.jhc_out", compile_time => $time };
@@ -211,7 +215,7 @@ sub do_it {
             my @args = maybe_read("$fbase.args");
             $result->{run_stdout} = "$rd/$name.stdout";
             my $stdin = " < $fbase.stdin" if -f "$fbase.stdin";
-            my $run_cmd = "$rd/$name " . join(" ",@args) . " > $result->{run_stdout}" . ($stdin || "");
+            my $run_cmd = ($opt_win ? "$rd/$name.exe " : "$rd/$name ") . join(" ",@args) . " > $result->{run_stdout}" . ($stdin || "");
             $result->{run_cmd} = $run_cmd;
             ($r,$time) = my_system $run_cmd;
             $result->{run_status} = $r;
@@ -225,7 +229,7 @@ sub do_it {
 
             if(-f "$fbase.expected.stdout" ) {
                 $result->{expected_stdout} = "$fbase.expected.stdout";
-                my $r = system "diff $result->{run_stdout} $result->{expected_stdout}";
+                my $r = system "diff --strip-trailing-cr $result->{run_stdout} $result->{expected_stdout}";
                 $result->{stdout_diff} = $r;
                 $error++ if $r ne 0;
             }
@@ -299,13 +303,13 @@ regress [options] [conditions]
    -o OPTION     pass given option to JHC
    -t INT        timeout in seconds of CPU time
 
-   -l            use base package (.hl file) rather than just pulling
-                 in the .ho files from lib/base/dist/build/
+   -l            use the libraries
    -n            go faster by not linting
    -p            profile JHC (requires jhcp to have been built)
 
    --rts         extra GHC RTS flags for JHC
    --clean       build .ho files for tests from scratch
+   --win         cross compile to windows and test with wine
 
 =head1 DESCRIPTION
 
