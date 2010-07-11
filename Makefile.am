@@ -70,7 +70,7 @@ CC = $(HC)
 dist-hook: man manual
 	cp $(srcdir)/manual.html $(distdir)/manual.html
 	cp $(srcdir)/jhc.1 $(distdir)/jhc.1
-	find $(distdir)  -name _darcs -o -name \*.ho | xargs rm -rf --
+	find $(distdir) \( -name _darcs -o -name \*.ho \)  -print | xargs rm -rf --
 
 darcs-fetch:
 	test -d src/Doc || darcs get --partial http://repetae.net/repos/Doc --repodir=src/Doc
@@ -169,7 +169,8 @@ src/RawFiles.hs:  utils/op_raw.prl $(RAWFILES)
 
 src/FrontEnd/HsParser.hs: src/FrontEnd/HsParser.y
 	happy -a -g -c $< -o $@
-	sed -e 's/^{-# OPTIONS[A-Z_]*/{-# OPTIONS_GHC -w /' -i $@
+
+#	sed -e 's/^{-# OPTIONS[A-Z_]*/{-# OPTIONS_GHC -w /' -i $@
 
 
 .SECONDARY: _darcs/hashed_inventory src/data/shortchange.txt
@@ -211,12 +212,12 @@ i: $(BUILT_SOURCES)
 .PHONY: ho-clean hl-clean built-sources i manual man
 
 ho-clean:
-	rm -f -- `find -name \*.ho`
+	rm -f -- `find -name \*.ho -print`
 hl-clean:
-	rm -f -- `find -name \*.hl`
+	rm -f -- `find -name \*.hl -print`
 
 clean-local:
-	find . \! -wholename \*/_\* \( -name \*.o-boot -o -name \*.hi -o -name \*.o -o -name \*.hi-boot \) | xargs rm -f --
+	find . \( \! -path \*/_\* \( -name \*.o-boot -o -name \*.hi -o -name \*.o -o -name \*.hi-boot \) \) -print | xargs rm -f --
 
 MAINTAINERCLEANFILES= $(BUILT_SOURCES) $(DRIFTFILES)
 
@@ -261,11 +262,11 @@ publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/in
 	cp -- $^ /home/john/public_html/computer/jhc
 
 manual: utils/stitch.prl src/FlagDump.mkd src/FlagOpts.mkd options.mkd docs/*.mkd
-	find . ! -wholename */jhc-*/* ! -wholename '*/examples/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/src/data/rts/*.c' \) | xargs perl utils/stitch.prl > manual.mkd
+	find . \( ! -path */jhc-*/* ! -path '*/examples/*'  ! -path '*/_darcs/*' ! -path '*/drift_processed/*'  ! -path '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -path '*/src/data/rts/*.c' \) \) -print | xargs perl utils/stitch.prl > manual.mkd
 	pandoc manual.mkd --toc -s -f markdown -t html -s -c manual.css -o $@.html
 
 man: utils/stitch.prl src/FlagDump.mkd src/FlagOpts.mkd options.mkd docs/man_header.mkd docs/*.mkd
-	find . ! -wholename */jhc-*/ ! -wholename '*/examples/*'  ! -wholename '*/_darcs/*' ! -wholename '*/drift_processed/*'  ! -wholename '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -wholename '*/src/data/rts/*.c' \) | xargs perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
+	find . \( ! -path */jhc-*/ ! -path '*/examples/*'  ! -path '*/_darcs/*' ! -path '*/drift_processed/*'  ! -path '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -path '*/src/data/rts/*.c' \) \) -print | xargs perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
 	pandoc jhc_man.mkd -s -f markdown -t man -s  -o jhc.1
 
 options.mkd: jhc
