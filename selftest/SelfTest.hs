@@ -97,19 +97,24 @@ testPackedString = do
 pshash xs = putStrLn $ xs ++ ": " ++ show (hashPS (packString xs ))
 
 testName = do
-    putStrLn "Testing Name"
     let nn x = (not (null x)) && ';' `notElem` x
-    let prop_tofrom t a b = nn a && nn b ==> fromName (toName t (a::String,b::String)) == (t,(a,b))
-        -- prop_pn t s = nn s ==> let (a,b) = fromName (parseName t s) in (a,b) == (t,s)
         prop_acc t a b = nn a && nn b ==> let
             n = toName t (a::String,b::String)
             un = toUnqualified n
             in  nameType n == t && getModule n == Just (Module a) && getModule un == Nothing && show un == b && show n == (a ++ "." ++ b)
-        prop_tup n = n >= 0 ==> fromUnboxedNameTuple (unboxedNameTuple RawType n) == Just n
-    quickCheck prop_tofrom
-    -- quickCheck prop_pn
-    quickCheck prop_acc
-    quickCheck prop_tup
+        qc s p = quickCheck $ label s p
+    qc "name.tofrom" $ \t a b -> nn a && nn b ==> fromName (toName t (a::String,b::String)) == (t,(a,b))
+    qc "name.nameparts" $ \t a b -> maybe True nn a && nn b ==> nameParts (toName t (a,b)) == (t,a,b)
+    qc "name.nameparts2" $ \t a b -> nn a  && nn b ==> nameParts (toName t (a,b)) == (t,Just a,b)
+    qc "name.toUnqualified" $ \t a b -> nn a && nn b ==> toUnqualified (toName t (a,b)) == toName t b
+    qc "name.getModule" $ \ t a b -> nn a && nn b ==> getModule (toName t (a,b)) == Just (Module a)
+    qc "name.getModule2" $ \ t b -> nn b ==> getModule (toName t b) == Nothing
+    qc "name.getIdent" $ \t a b -> maybe True nn a && nn b ==> getIdent (toName t (a,b)) == b
+    qc "name.setModule" $ \t a b c -> maybe True nn a && nn b && nn c ==> setModule (Module c) (toName t (a,b)) == toName t (c,b)
+    qc "name.show" $ \ t a b -> nn a && nn b ==> show (toName t (a,b)) == a ++ "." ++ b
+    qc "name.acc" prop_acc
+    qc "name.tup" $ \n -> n >= 0 ==> fromUnboxedNameTuple (unboxedNameTuple RawType n) == Just n
+    qc "name.overlap" $ \t -> (isTypeNamespace t,isValNamespace t) /= (True,True)
 
 testProperties = do
     putStrLn "Testing Properties"
