@@ -61,7 +61,7 @@ instance ConNames E where
 instance ConNames (Lit E E) where
     vTrue  = (litCons { litName = dc_Boolzh, litArgs = [ELit (LitInt 1 tEnumzh)], litType = tBool })
     vFalse = (litCons { litName = dc_Boolzh, litArgs = [ELit (LitInt 0 tEnumzh)], litType = tBool })
-    vUnit  = (litCons { litName = vUnit, litArgs = [], litType = tUnit })
+    vUnit  = (litCons { litName = dc_Unit, litArgs = [], litType = tUnit })
 
 
 
@@ -140,11 +140,11 @@ caseBodiesMapM f ec@ECase { eCaseAlts = as, eCaseDefault = d } = do
 caseBodiesMapM _ _ = error "caseBodiesMapM"
 
 eToList :: Monad m => E -> m  [E]
-eToList (ELit LitCons { litName = n, litArgs = [e,b] }) | vCons == n = eToList b >>= \x -> return (e:x)
-eToList (ELit LitCons { litName = n, litArgs = [] }) | vEmptyList == n = return []
+eToList (ELit LitCons { litName = n, litArgs = [e,b] }) | dc_Cons == n = eToList b >>= \x -> return (e:x)
+eToList (ELit LitCons { litName = n, litArgs = [] }) | dc_EmptyList == n = return []
 eToList _ = fail "eToList: not list"
 
-toString (ELit LitCons { litName = n, litArgs = [], litType = t }) = if vEmptyList == n && t == tString then return "" else fail "not a string"
+toString (ELit LitCons { litName = n, litArgs = [], litType = t }) = if dc_EmptyList == n && t == tString then return "" else fail "not a string"
 toString x = eToList x >>= mapM fromChar where
     fromChar (ELit LitCons { litName = dc, litArgs = [ELit (LitInt ch t)] }) | dc == dc_Char && t == tCharzh = return (chr $ fromIntegral ch)
     fromChar _ = fail "fromChar: not char"

@@ -1,23 +1,29 @@
 
 TypeConstructor:tc:
 
-JumpPoint Jhc.JumpPoint.JumpPoint
-Char      Jhc.Prim.Char
-IO        Jhc.Prim.IO
-World__   Jhc.Prim.World__
-Bool      Jhc.Order.Bool
-Target    Jhc.Options.Target
-Ptr       Jhc.Addr.Ptr
-FunPtr    Jhc.Addr.FunPtr
-Ratio     Jhc.Num.Ratio
-Unit      Jhc.Basics.()
-Float     Jhc.Float.Float
-Double    Jhc.Float.Double
-CLong     Foreign.C.Types.CLong
-CSChar    Foreign.C.Types.CSChar
-CUChar    Foreign.C.Types.CUChar
-CUShort   Foreign.C.Types.CUShort
-CULong    Foreign.C.Types.CULong
+Ref__      Data.IORef.Ref__
+MutArray__ Jhc.Array.MutArray__
+List       Jhc.Prim.[]
+JumpPoint  Jhc.JumpPoint.JumpPoint
+Char       Jhc.Prim.Char
+IO         Jhc.Prim.IO
+World__    Jhc.Prim.World__
+Int__      Jhc.Prim.Int__
+Array__    Jhc.Array.Array__
+Bool       Jhc.Order.Bool
+Boolzh     Jhc.Order.Bool#
+Target     Jhc.Options.Target
+Ptr        Jhc.Addr.Ptr
+FunPtr     Jhc.Addr.FunPtr
+Ratio      Jhc.Num.Ratio
+Unit       Jhc.Basics.()
+Float      Jhc.Float.Float
+Double     Jhc.Float.Double
+CLong      Foreign.C.Types.CLong
+CSChar     Foreign.C.Types.CSChar
+CUChar     Foreign.C.Types.CUChar
+CUShort    Foreign.C.Types.CUShort
+CULong     Foreign.C.Types.CULong
 #Int       Jhc.Prim.Int
 #Integer   Jhc.Basics.Integer
 #

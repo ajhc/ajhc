@@ -29,16 +29,6 @@ instance TypeNames Name where
     tIntegerzh = rt_bits_max_
     tWorld__ = tc_World__
 
-instance ConNames Name where
---    vTrue = dc_True
---    vFalse = dc_False
-    vEmptyList = dc_EmptyList
-    vUnit = dc_Unit
-    vCons = dc_Cons
-
-
--- Tuple handling
-
 --No tuple instance because it is easy to get the namespace wrong. use 'nameTuple'
 --instance ToTuple Name where
 --    toTuple n = toName DataConstructor (toTuple n :: (String,String))
@@ -56,24 +46,15 @@ instance FromTupname Name where
         (_,(m,nn)) = fromName name
     fromTupname _ = fail "not a tuple"
 
-
-
--- The constructors
-
-
 tc_Arrow = toName TypeConstructor  ("Jhc.Basics","->")
-tc_Int__ = toName TypeConstructor  ("Jhc.Prim","Int__")
-tc_Array__ = toName TypeConstructor  ("Jhc.Array","Array__")
-tc_MutArray__ = toName TypeConstructor  ("Jhc.Array","MutArray__")
-tc_Ref__ = toName TypeConstructor ("Data.IORef","Ref__")
-
-
-tc_Boolzh = toName TypeConstructor ("Jhc.Order","Bool#")
-tc_List = toName TypeConstructor  ("Jhc.Prim","[]")
 
 
 s_Star = toName SortName ("Jhc@","*")
 s_Hash = toName SortName ("Jhc@","#")
+s_Bang = toName SortName ("Jhc@","!")
+s_Quest = toName SortName ("Jhc@","?")
+s_QuestQuest = toName SortName ("Jhc@","??")
+s_StarBang = toName SortName ("Jhc@","*!")
 
 u_instance = toName UnknownType ("Jhc@","instance")
 

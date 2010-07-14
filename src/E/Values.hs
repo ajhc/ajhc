@@ -98,8 +98,8 @@ instance ToE a => ToE [a] where
 
 --eInt x = ELit $ LitInt x tInt
 
-eCons x xs = ELit $ litCons { litName = vCons, litArgs = [x,xs], litType = getType xs }
-eNil t = ELit $ litCons { litName = vEmptyList, litArgs = [], litType = t }
+eCons x xs = ELit $ litCons { litName = dc_Cons, litArgs = [x,xs], litType = getType xs }
+eNil t = ELit $ litCons { litName = dc_EmptyList, litArgs = [], litType = t }
 
 emptyCase = ECase {
     eCaseAllFV = mempty,
