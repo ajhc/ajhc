@@ -32,42 +32,39 @@ type Prop = Info.Types.Property
 {-# NOINLINE main #-}
 main :: IO ()
 main = do
-    putStrLn "Testing Atom"
-    quickCheck prop_atomid
-    quickCheck prop_atomeq
-    quickCheck prop_atomIndex
-    quickCheck prop_atomneq
-    quickCheck prop_atomneq'
-    quickCheck $ label "atomint" prop_atomint
-    quickCheck $ label "atomii" prop_atomii
-    quickCheck prop_aappend
-
+    testAtom
     testProperties
-
     testPackedString
     testHasSize
     testName
     testInfo
     testBinary
 
-prop_atomid xs = fromAtom (toAtom xs) == (xs::String)
-prop_atomeq xs = (toAtom xs) == toAtom (xs::String)
-prop_atomneq xs ys = (xs /= ys) == (a1 /= a2) where
-    a1 = toAtom xs
-    a2 = toAtom (ys :: String)
-prop_atomIndex (xs :: String) = intToAtom (fromAtom a) == Just a where
-    a = toAtom xs
-prop_atomneq' xs ys = (xs `compare` ys) == (fromAtom a1 `compare` (fromAtom a2 :: BS.ByteString)) where
-    a1 = toAtom xs
-    a2 = toAtom (ys :: String)
-prop_atomint xs = an > 0 && odd an where
-    an = fromAtom $ toAtom (xs :: String) :: Int
+qc s p = quickCheck $ label s p
 
-prop_atomii xs = Just xs == fromAtom `fmap` (intToAtom an) where
-    an = fromAtom $ toAtom (xs :: String) :: Int
-
-prop_aappend (xs,ys) = (toAtom xs `mappend` toAtom ys) == toAtom ((xs::String) ++ ys)
-prop_aappend' (xs,ys) = fromAtom (toAtom xs `mappend` toAtom ys) == ((xs::String) ++ ys)
+testAtom = do
+    let prop_atomneq xs ys = (xs /= ys) == (a1 /= a2) where
+            a1 = toAtom xs
+            a2 = toAtom (ys :: String)
+        prop_atomIndex (xs :: String) = intToAtom (fromAtom a) == Just a where
+            a = toAtom xs
+        prop_atomneq' xs ys = (xs `compare` ys) == (fromAtom a1 `compare` (fromAtom a2 :: BS.ByteString)) where
+            a1 = toAtom xs
+            a2 = toAtom (ys :: String)
+        prop_atomint xs = an > 0 && odd an where
+            an = fromAtom $ toAtom (xs :: String) :: Int
+        prop_atomii xs = Just xs == fromAtom `fmap` (intToAtom an) where
+            an = fromAtom $ toAtom (xs :: String) :: Int
+        prop_aappend (xs,ys) = (toAtom xs `mappend` toAtom ys) == toAtom ((xs::String) ++ ys)
+        prop_aappend' (xs,ys) = fromAtom (toAtom xs `mappend` toAtom ys) == ((xs::String) ++ ys)
+    qc "atom.id" $ \xs -> fromAtom (toAtom xs) == (xs::String)
+    qc "atom.eq" $ \xs -> (toAtom xs) == toAtom (xs::String)
+    qc "atom.index" prop_atomIndex
+    qc "atom.neq" prop_atomneq
+    qc "atom.eq'" prop_atomneq'
+    qc "atom.int" prop_atomint
+    qc "atom.ii" prop_atomii
+    qc "atom.aapend" prop_aappend
 
 --strings = [ "foo", "foobar", "baz", "", "bob"]
 strings =  ["h","n\206^um\198(","\186","yOw\246$\187x#",";\221x<n","\201\209\236\213J\244\233","\189eW\176v\175\209"]
@@ -102,7 +99,6 @@ testName = do
             n = toName t (a::String,b::String)
             un = toUnqualified n
             in  nameType n == t && getModule n == Just (Module a) && getModule un == Nothing && show un == b && show n == (a ++ "." ++ b)
-        qc s p = quickCheck $ label s p
     qc "name.tofrom" $ \t a b -> nn a && nn b ==> fromName (toName t (a::String,b::String)) == (t,(a,b))
     qc "name.nameparts" $ \t a b -> maybe True nn a && nn b ==> nameParts (toName t (a,b)) == (t,a,b)
     qc "name.nameparts2" $ \t a b -> nn a  && nn b ==> nameParts (toName t (a,b)) == (t,Just a,b)
@@ -117,24 +113,20 @@ testName = do
     qc "name.overlap" $ \t -> (isTypeNamespace t,isValNamespace t) /= (True,True)
 
 testProperties = do
-    putStrLn "Testing Properties"
     let prop_list x xs = sort (List.delete x $ nub xs) == toList p where
             p = unsetProperty x ((fromList xs) :: Properties)
         prop_enum :: Prop -> Prop -> Bool
         prop_enum x y = (fromEnum x `compare` fromEnum y) == (x `compare` y)
-    quickCheck $ label "prop_list"  prop_list
-    quickCheck $ label "prop_enum"  prop_enum
-
-
+    qc "prop.list" prop_list
+    qc "prop.enum" prop_enum
 
 testHasSize = do
-    putStrLn "Testing HasSize"
     let prop_gt (xs,n) = sizeGT n (xs::[Int]) == (length xs > n)
         prop_gte (xs,n) = sizeGTE n (xs::[Int]) == (length xs >= n)
         prop_lte (xs,n) = sizeLTE n (xs::[Int]) == (length xs <= n)
-    quickCheck prop_gt
-    quickCheck prop_gte
-    quickCheck prop_lte
+    qc "hasSize.gt" prop_gt
+    qc "hasSize.gte" prop_gte
+    qc "hasSize.lte" prop_lte
 
 
 testInfo = do
@@ -159,7 +151,6 @@ testInfo = do
     print (getProperties x')
 
 
-
 testBinary = do
     let test = ("hello",3::Int,toAtom "Up and Atom!")
         fn = "/tmp/jhc.test.bin"
@@ -179,11 +170,6 @@ testBinary = do
     print $ x `asTypeOf` nf
     z <- Info.lookup nfo
     if (z /= t) then fail "Info Test Failed" else return ()
-
-
-
-
-
 
 
 
