@@ -32,11 +32,12 @@ import Foreign.C
 import Data.Monoid
 import Data.Dynamic
 import Data.Bits
+import Data.Data
 
 
 
 newtype Atom = Atom (#type atom_t)
-    deriving(Typeable,Eq,Ord)
+    deriving(Typeable,Eq,Data,Ord)
 
 class FromAtom a where
     fromAtom :: Atom -> a

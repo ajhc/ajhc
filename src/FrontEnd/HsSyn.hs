@@ -8,6 +8,8 @@ import Data.Binary
 import C.FFI
 import Data.Generics
 import FrontEnd.SrcLoc
+import Name.Name
+import Name.Names
 
 
 
@@ -24,34 +26,31 @@ instance HasLocation HsExp where
     srcLoc _ = bogusASrcLoc
 
 
+hsNameIdent_u f n = mapName (id,f) n
+hsIdentString_u f x = f x
 
-newtype Module = Module String
-  deriving(Eq,Data,Typeable,Ord,ToAtom,FromAtom)
-
-instance Show Module where
-    showsPrec _ (Module n) = showString n
-
-fromModule (Module s) = s
 
 -- Names
 
-data HsName
-	= Qual { hsNameModule :: Module, hsNameIdent ::  HsIdentifier}
-	| UnQual { hsNameIdent :: HsIdentifier}
-  deriving(Data,Typeable,Eq,Ord)
-  {-! derive: is, update, Binary !-}
+
+type HsName = Name
+--data HsName
+--	= Qual { hsNameModule :: Module, hsNameIdent ::  HsIdentifier}
+--	| UnQual { hsNameIdent :: HsIdentifier}
+--  deriving(Data,Typeable,Eq,Ord)
+--  {- derive: is, update, Binary !-}
 
 
-instance ToAtom HsName where
-    toAtom = toAtom . show
+--instance ToAtom HsName where
+--    toAtom = toAtom . show
 
-instance Show HsName where
-   showsPrec _ (Qual (Module m) s) =
-	showString m . showString "." . shows s
-   showsPrec _ (UnQual s) = shows s
+--instance Show HsName where
+--   showsPrec _ (Qual (Module m) s) =
+--	showString m . showString "." . shows s
+--   showsPrec _ (UnQual s) = shows s
 
-newtype HsIdentifier = HsIdent { hsIdentString :: String }
-  deriving(Data,Typeable,Eq,Ord)
+--newtype HsIdentifier = HsIdent { hsIdentString :: String }
+--  deriving(Data,Typeable,Eq,Ord)
 
 instance Binary Module where
     get = do
@@ -59,19 +58,19 @@ instance Binary Module where
         return (Module $ fromAtom ps)
     put (Module n) = put (toAtom n)
 
-instance Binary HsIdentifier where
-    get = do
-        ps <- get
-        return (HsIdent $ fromAtom ps)
-    put (HsIdent n) = put (toAtom n)
-
-hsIdentString_u f x = x { hsIdentString = f $ hsIdentString x }
+--instance Binary HsIdentifier where
+--    get = do
+--        ps <- get
+--        return (HsIdent $ fromAtom ps)
+--    put (HsIdent n) = put (toAtom n)
+--
+--hsIdentString_u f x = x { hsIdentString = f $ hsIdentString x }
 
 --	| HsSymbol {hsIdentString :: String }
 --	| HsSpecial {hsIdentString :: String }
 
-instance Show HsIdentifier where
-   showsPrec _ (HsIdent s) = showString s
+--instance Show HsIdentifier where
+--   showsPrec _ (HsIdent s) = showString s
 --   showsPrec _ (HsSymbol s) = showString s
 --   showsPrec _ (HsSpecial s) = showString s
 
@@ -253,8 +252,13 @@ data HsRule = HsRule {
 instance HasLocation HsMatch where
     srcLoc (HsMatch sl _ _ _ _) = sl
 
-data HsMatch
-	 = HsMatch SrcLoc HsName [HsPat] HsRhs {-where-} [HsDecl]
+data HsMatch = HsMatch {
+    hsMatchSrcLoc :: SrcLoc,
+    hsMatchName :: HsName,
+    hsMatchPats :: [HsPat],
+    hsMatchRhs :: HsRhs,
+    {-where-} hsMatchDecls :: [HsDecl]
+    }
   deriving(Eq,Show)
 
 data HsConDecl
@@ -434,12 +438,19 @@ data HsKind = HsKind HsName | HsKindFn HsKind HsKind
   deriving(Data,Typeable,Eq,Ord,Show)
   {-! derive: Binary !-}
 
-hsKindStar = HsKind (Qual (Module "Jhc@") (HsIdent "*"))
-hsKindHash = HsKind (Qual (Module "Jhc@") (HsIdent "#"))
-hsKindBang = HsKind (Qual (Module "Jhc@") (HsIdent "!"))
-hsKindQuest = HsKind (Qual (Module "Jhc@") (HsIdent "?"))
-hsKindQuestQuest = HsKind (Qual (Module "Jhc@") (HsIdent "??"))
-hsKindStarBang   = HsKind (Qual (Module "Jhc@") (HsIdent "*!"))
+--hsKindStar = HsKind (Qual (Module "Jhc@") (HsIdent "*"))
+--hsKindHash = HsKind (Qual (Module "Jhc@") (HsIdent "#"))
+--hsKindBang = HsKind (Qual (Module "Jhc@") (HsIdent "!"))
+--hsKindQuest = HsKind (Qual (Module "Jhc@") (HsIdent "?"))
+--hsKindQuestQuest = HsKind (Qual (Module "Jhc@") (HsIdent "??"))
+--hsKindStarBang   = HsKind (Qual (Module "Jhc@") (HsIdent "*!"))
+--
+hsKindStar = HsKind s_Star
+hsKindHash = HsKind s_Hash
+hsKindBang = HsKind s_Bang
+hsKindQuest = HsKind s_Quest
+hsKindQuestQuest = HsKind s_QuestQuest
+hsKindStarBang = HsKind s_StarBang
 
 -----------------------------------------------------------------------------
 -- Builtin names.

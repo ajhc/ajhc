@@ -34,12 +34,14 @@ module FrontEnd.ParseUtils (
         , doForeignEq
  ) where
 
+import Data.Maybe
 import Char
 import Data.Monoid
 import Ratio
 import qualified Data.Traversable as T
 
 import C.FFI
+import Name.Name
 import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
 import FrontEnd.HsSyn
@@ -71,7 +73,7 @@ qualTypeToClassHead qt = do
         _ -> fail "Invalid Class Head"
 
 checkContext :: HsType -> P HsContext
-checkContext (HsTyCon (UnQual (HsIdent "()"))) = return []
+checkContext (HsTyCon (nameParts -> (_,Nothing,"()"))) = return []
 checkContext (HsTyTuple ts) =
 	mapM checkAssertion ts
 checkContext t = do
@@ -321,8 +323,9 @@ checkMethodDef _ = return ()
 -- For occasions when doing this in the grammar would cause conflicts.
 
 checkUnQual :: HsQName -> P HsName
-checkUnQual (Qual _ _) = fail "Illegal qualified name"
-checkUnQual n@(UnQual _) = return n
+checkUnQual n = if isJust (getModule n) then fail "Illegal qualified name" else return n
+--checkUnQual (Qual _ _) = fail "Illegal qualified name"
+--checkUnQual n@(UnQual _) = return n
 --checkUnQual (Special _) = fail "Illegal special name"
 
 -----------------------------------------------------------------------------
@@ -382,7 +385,7 @@ sameFun _ _ = False
 doForeign :: Monad m => SrcLoc -> [HsName] -> Maybe (String,HsName) -> HsQualType -> m HsDecl
 doForeign srcLoc names ms qt = ans where
     ans = do
-        (mstring,vname@(UnQual (HsIdent cname)),names') <- case ms of
+        (mstring,vname@(nameParts -> (_,Nothing,cname)),names') <- case ms of
             Just (s,n) -> return (Just s,n,names)
             Nothing -> do
                 (n:ns) <- return $ reverse names

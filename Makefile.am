@@ -51,7 +51,7 @@ PACKAGES= -package fgl -package regex-compat -package random -package array -pac
 	  -package unix  -package haskell98 -package utf8-string  -package zlib
 
 
-GHCLANG= -XUndecidableInstances -XOverlappingInstances -fglasgow-exts
+GHCLANG= -XViewPatterns -XUndecidableInstances -XOverlappingInstances -fglasgow-exts -XRecordWildCards -XRecursiveDo -XTupleSections
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
 JHC_LIBS =  jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl

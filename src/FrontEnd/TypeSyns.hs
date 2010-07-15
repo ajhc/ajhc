@@ -5,6 +5,7 @@ import Control.Monad.Writer
 import qualified Data.Traversable as T
 import List
 
+import Name.Name
 import FrontEnd.SrcLoc hiding(srcLoc)
 import FrontEnd.HsSyn
 import FrontEnd.TypeSynonyms

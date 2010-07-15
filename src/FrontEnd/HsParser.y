@@ -154,7 +154,7 @@ module :: { HsModule }
 modulep  :: { HsModule }
       : 'module' modid maybeexports 'where' body      { HsModule { hsModuleName = $2, hsModuleExports = $3, hsModuleImports = (fst $5), hsModuleDecls = (snd $5)
                                                                  , hsModuleSrcLoc = error "hsModuleSrcLoc not set", hsModuleOptions = error "hsModuleOptions not set" } }
-      | body                                          { HsModule { hsModuleName = main_mod, hsModuleExports = Just [HsEVar (UnQual (HsIdent "main"))], hsModuleImports = (fst $1), hsModuleDecls = (snd $1)
+      | body                                          { HsModule { hsModuleName = main_mod, hsModuleExports = Just [HsEVar (toName Val "main")], hsModuleImports = (fst $1), hsModuleDecls = (snd $1)
                                                                  , hsModuleSrcLoc = error "hsModuleSrcLoc not set", hsModuleOptions = error "hsModuleOptions not set" } }
 
 body :: { ([HsImportDecl],[HsDecl]) }
@@ -318,7 +318,7 @@ topdecl :: { HsDecl }
       | pinfixexp srcloc '<-' exp      {% checkPattern $1 `thenP` \p ->
                                          returnP (HsActionDecl $2 p $4) }
       | 'foreign' srcloc 'import' varids mstring '::' ctype
-                      {% doForeign $2 (UnQual (HsIdent "import"):reverse $4) $5 $7  }
+                      {% doForeign $2 (toName Val "import":reverse $4) $5 $7  }
       | 'foreign' srcloc varids mstring '::' ctype
                       {% doForeign $2 (reverse $3) $4 $6  }
       | 'foreign' srcloc varids mstring '::' ctype '=' exp
@@ -936,32 +936,32 @@ qopm  :: { HsExp }
 
 qvarid :: { HsName }
       : varid                 {  $1 }
-      | QVARID                { Qual (Module (fst $1)) (HsIdent (snd $1)) }
+      | QVARID                { toName UnknownType $1 }
 
 varid :: { HsName }
-      : VARID                 { UnQual (HsIdent $1) }
+      : VARID                 { toUnqualName $1 }
       | 'as'                  { as_name }
-      | 'alias'               { UnQual (HsIdent "alias") }
-      | 'kind'                { UnQual (HsIdent "kind") }
+      | 'alias'               { toName UnknownType "alias" }
+      | 'kind'                { toName UnknownType "kind" }
       | 'qualified'           { qualified_name }
       | 'hiding'              { hiding_name }
-      | 'forall'              { UnQual (HsIdent "forall") }
-      | 'exists'              { UnQual (HsIdent "exists") }
+      | 'forall'              { toName UnknownType "forall" }
+      | 'exists'              { toName UnknownType "exists" }
       | 'derive'              { derive_name }
 
 qconid :: { HsName }
       : conid                 {  $1 }
-      | QCONID                { Qual (Module (fst $1)) (HsIdent (snd $1)) }
+      | QCONID                { toName UnknownType $1  }
 
 conid :: { HsName }
-      : CONID                 { UnQual (HsIdent $1) }
+      : CONID                 { toUnqualName $1 }
 
 qconsym :: { HsName }
       : consym                {  $1 }
-      | QCONSYM               { Qual (Module (fst $1)) (hsSymbol (snd $1)) }
+      | QCONSYM               { toName UnknownType $1 }
 
 consym :: { HsName }
-      : CONSYM                { UnQual (hsSymbol $1) }
+      : CONSYM                { toUnqualName $1 }
 
 qvarsym :: { HsName }
       : varsym                { $1 }
@@ -972,25 +972,25 @@ qvarsymm :: { HsName }
       | qvarsym1              { $1 }
 
 varsym :: { HsName }
-      : VARSYM                { UnQual (hsSymbol $1) }
+      : VARSYM                { toUnqualName $1 }
       | '-'                   { minus_name }
       | '!'                   { pling_name }
-      | '?'                   { UnQual (hsSymbol "?") }
-      | '??'                  { UnQual (hsSymbol "??") }
-      | '*!'                  { UnQual (hsSymbol "*!") }
+      | '?'                   { toName UnknownType "?" }
+      | '??'                  { toName UnknownType "??" }
+      | '*!'                  { toName UnknownType "*!" }
       | '*'                   { star_name }
       | '#'                   { hash_name }
       | '.'                   { dot_name }
 
 varsymm :: { HsName } -- varsym not including '-'
-      : VARSYM                { UnQual (hsSymbol $1) }
+      : VARSYM                { toUnqualName $1 }
       | '!'                   { pling_name }
       | '*'                   { star_name }
       | '#'                   { hash_name }
       | '.'                   { dot_name }
 
 qvarsym1 :: { HsName }
-      : QVARSYM               { Qual (Module (fst $1)) (hsSymbol (snd $1)) }
+      : QVARSYM               { toName UnknownType $1 }
 
 literal :: { HsExp }
       : INT                   { HsLit (HsInt (readInteger $1)) }
@@ -1047,33 +1047,35 @@ parse       :: P HsModule
 parseHsStmt :: P HsStmt
 
 happyError = parseError "Parse error"
-hsSymbol x = HsIdent x
+--hsSymbol x = HsIdent x
 readInteger x = fromIntegral x
 readRational x = x
 
-as_name	              = UnQual $ HsIdent "as"
-derive_name	      = UnQual $ HsIdent "derive"
-qualified_name        = UnQual $ HsIdent "qualified"
-hiding_name	      = UnQual $ HsIdent "hiding"
-minus_name	      = UnQual $ HsIdent "-"
-pling_name	      = UnQual $ HsIdent "!"
-star_name	      = UnQual $ HsIdent "*"
-hash_name	      = UnQual $ HsIdent "#"
-dot_name	      = UnQual $ HsIdent "."
+as_name	              = toName UnknownType  "as"
+derive_name	      = toName UnknownType  "derive"
+qualified_name        = toName UnknownType  "qualified"
+hiding_name	      = toName UnknownType  "hiding"
+minus_name	      = toName UnknownType  "-"
+pling_name	      = toName UnknownType  "!"
+star_name	      = toName UnknownType  "*"
+hash_name	      = toName UnknownType  "#"
+dot_name	      = toName UnknownType  "."
 prelude_mod	      = Module "Prelude"
 main_mod	      = Module "Main"
 
-unit_con_name	      = UnQual (HsIdent "()")
-tuple_con_name i      = Qual (Module "Jhc.Basics") (HsIdent ("("++replicate i ','++")"))
+unit_con_name	      = toName DataConstructor "()"
+tuple_con_name i      = toName DataConstructor ("Jhc.Basics","("++replicate i ','++")")
 
 unit_con	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = unit_con_name }
 tuple_con i	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = (tuple_con_name i) }
 
 
 unit_tycon_name       = unit_con_name
-fun_tycon_name        = Qual (Module "Jhc.Basics") (HsIdent "->")
-list_tycon_name       = UnQual (HsIdent "[]")
+fun_tycon_name        = tc_Arrow
+list_tycon_name       = toName UnknownType "[]"
 tuple_tycon_name i    = tuple_con_name i
 
 list_tycon	      = HsTyCon list_tycon_name
+
+toUnqualName n = toName UnknownType (Nothing :: Maybe String,n)
 }

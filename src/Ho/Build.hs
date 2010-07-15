@@ -28,6 +28,7 @@ import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import DataConstructors
+import Name.Name
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty

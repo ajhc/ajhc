@@ -7,6 +7,7 @@ import Monad
 import Data.Monoid
 import qualified Data.Map as Map
 
+import Name.Name
 import Doc.DocLike
 import FrontEnd.Exports
 import FrontEnd.Rename

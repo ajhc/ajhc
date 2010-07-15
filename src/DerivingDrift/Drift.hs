@@ -41,11 +41,9 @@ enumDontDerive = [
     ]  where
         f n = nameName (toUnqualified n)
 
-
-
 driftDerive' :: Monad m => HsDecl -> m String
 driftDerive' HsDataDecl { hsDeclName = name, hsDeclArgs = args, hsDeclCons = condecls, hsDeclDerives = derives } = do
-        let d =  toData  name args condecls derives
+        let d = toData  name args condecls derives
             isEnum = length condecls > 1 && null (concatMap hsConDeclArgs condecls)
         xs <- return $  map (derive isEnum d) derives -- (if isEnum then derives List.\\ enumDontDerive else derives )
         return $ unlines xs
@@ -65,14 +63,12 @@ toData name args cons derives = ans where
     lb r = concat [map show xs | (xs,_) <- hsConDeclRecArg r ]
     ans = D { statement = DataStmt, vars = map show args, constraints = [], name = show name,  derives = map show derives, body = map f cons }
 
-
-derive True d wh | Just fns <- lookup wh enumDontDerive = inst fns where
+derive True d (toName ClassName -> wh) | Just fns <- lookup wh enumDontDerive = inst fns where
     dummy = "{- This is a dummy instance, it will be rewritten internally -}\n"
     inst fns = dummy ++ "instance " ++ show wh ++ " " ++ name d ++ " where\n" ++ concat (intersperse "\n" (map f fns))
     f n = "    " ++ g (show n) ++ " = " ++ g (show n)
     g (c:cs) | c == '_' || c == '\'' || isAlpha c = c:cs
     g x = "(" ++ x ++ ")"
 
-derive _ d wh | Just fn <- Map.lookup wh (Map.mapKeys (nameName . toUnqualified) standardRules) = render $ fn d
+derive _ d wh | Just fn <- Map.lookup (toName ClassName wh) (Map.mapKeys (nameName . toUnqualified) standardRules) = render $ fn d
               | otherwise  = error ("derive: Tried to use non-existing rule "++show wh++" for "++name d)
-

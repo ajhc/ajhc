@@ -56,11 +56,11 @@ determineExports defs ae ms = do
     ms <- determineExports' ds ae ms
     let g m = do
             when (dump FD.Imports) $ do
-                putStrLn $ " -- Imports -- " ++  show (modInfoName m)
+                putStrLn $ " -- Imports: " ++  show (modInfoName m)
                 putStr $ unlines  (map show $ sort (modInfoImport m))
             when (dump FD.Exports) $ do
-                putStrLn $ " -- Exports -- " ++  show (modInfoName m)
-                putStr $ unlines (map show $ sort (modInfoExport m))
+                putStrLn $ " -- Exports: " ++  show (modInfoName m)
+                mapM_ putStrLn (sort [ show (nameType n) ++ " " ++ show n |  n <- modInfoExport m])
     mapM_ g ms
     processIOErrors
     return ms

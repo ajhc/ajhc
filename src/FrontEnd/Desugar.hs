@@ -78,7 +78,7 @@ desugarDecl pb@(HsPatBind sloc (HsPVar n) rhs wheres) = do
 desugarDecl pb@(HsPatBind sloc pat rhs wheres) = do
     rhs <- desugarRhs rhs
     unique <- getUnique
-    let newRhsName = nameName $ toName Val ("patrhs@" ++ show unique)
+    let newRhsName = toName Val ("patrhs@" ++ show unique)
     newWheres <- mapM desugarDecl wheres
     let newTopDeclForRhs
                = HsPatBind sloc (HsPVar newRhsName) rhs (concat newWheres)
@@ -103,7 +103,7 @@ desugarDecl dl@(HsNewTypeDecl sloc cntxt name args condecl derives) = do
         return $ dl:ss
 
 -- XXX we currently discard instance specializations
-desugarDecl HsPragmaSpecialize { hsDeclName = n } | n == nameName u_instance = return []
+desugarDecl HsPragmaSpecialize { hsDeclName = n } | n == u_instance = return []
 
 desugarDecl anyOtherDecl = return [anyOtherDecl]
 
@@ -144,7 +144,7 @@ getPatSelFuns :: SrcLoc -> HsPat -> [(HsName, (HsExp))]
 getPatSelFuns sloc pat = [(varName, HsParen (HsLambda sloc [HsPVar newPatVarName] (kase (replaceVarNamesInPat varName pat)))) | varName <- getNamesFromHsPat pat] where
     kase p =  HsCase (HsVar newPatVarName) [a1, a2 ] where
        a1 =  HsAlt sloc p (HsUnGuardedRhs (HsVar newPatVarName)) []
-       a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar (UnQual $ HsIdent "error")) (HsLit $ HsString $ show sloc ++ " failed pattern match"))) []
+       a2 =  HsAlt sloc HsPWildCard (HsUnGuardedRhs (HsApp (HsVar (toName Val "error")) (HsLit $ HsString $ show sloc ++ " failed pattern match"))) []
 
 
 -- replaces all occurrences of a name with a new variable
@@ -152,7 +152,7 @@ getPatSelFuns sloc pat = [(varName, HsParen (HsLambda sloc [HsPVar newPatVarName
 
 replaceVarNamesInPat :: HsName -> HsPat -> HsPat
 replaceVarNamesInPat name p = f name p where
-    f name1 (HsPVar name2)
+    f name1 (HsPVar (toName Val -> name2))
        | name1 == name2 = HsPVar $ newPatVarName
        | otherwise = HsPWildCard
     f _ p@(HsPLit _) = p

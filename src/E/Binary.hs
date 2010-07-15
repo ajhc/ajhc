@@ -4,6 +4,7 @@ import Data.Binary
 import E.Type
 import Monad
 import Name.Binary()
+import FrontEnd.HsSyn()
 import {-# SOURCE #-} Info.Binary(putInfo,getInfo)
 
 

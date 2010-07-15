@@ -588,9 +588,10 @@ ppHsFieldUpdate (HsFieldUpdate name exp) =
 
 ------------------------- Names -------------------------
 ppHsQName :: HsName -> Doc
-ppHsQName (UnQual name)			= ppHsIdentifier name
-ppHsQName z@(Qual m@(Module mod) name)
-	 | otherwise = text mod <> char '.' <> ppHsIdentifier name
+ppHsQName n = text $ show n
+--ppHsQName (UnQual name)			= ppHsIdentifier name
+--ppHsQName z@(Qual m@(Module mod) name)
+--	 | otherwise = text mod <> char '.' <> ppHsIdentifier name
 
 ppHsName = ppHsQName
 
@@ -602,8 +603,8 @@ ppHsQNameInfix name
 	| isSymbolName name = ppHsQName name
 	| otherwise = char '`' <> ppHsQName name <> char '`'
 
-ppHsIdentifier :: HsIdentifier -> Doc
-ppHsIdentifier name = text (show name)
+--ppHsIdentifier :: HsIdentifier -> Doc
+--ppHsIdentifier name = text (show name)
 
 ppHsNameParen :: HsName -> Doc
 ppHsNameParen name = parensIf (isSymbolName name) (ppHsName name)
@@ -616,7 +617,7 @@ ppHsNameInfix name
 isSymbolName :: HsName -> Bool
 --isSymbolName (Qual _ (HsSymbol _)) = True
 --isSymbolName (UnQual (HsSymbol _)) = True
-isSymbolName x | (c:_) <- hsIdentString (hsNameIdent (unRename x)), isAlpha c || c `elem` "'_" = False
+isSymbolName x | (_,_,c:_) <- nameParts (unRename x), isAlpha c || c `elem` "'_" = False
 isSymbolName _ = True
 
 

@@ -13,7 +13,6 @@ import E.Program
 import E.Rules
 import E.Type
 import FrontEnd.Class
-import FrontEnd.HsSyn(Module(..))
 import Grin.Main(compileToGrin)
 import Grin.Show(render)
 import Ho.Build

@@ -499,7 +499,7 @@ aHsQualTypeToQualType kt (HsQualType cntxt t) = map (hsAsstToPred kt) cntxt :=> 
 hsAsstToPred :: KindEnv -> HsAsst -> Pred
 hsAsstToPred kt (HsAsst className [varName])
    -- = IsIn className (TVar $ Tyvar varName (kindOf varName kt))
-   | isConstructorLike (hsIdentString . hsNameIdent $ varName) = IsIn  (toName ClassName className) (TCon (Tycon (toName TypeConstructor varName) (head $ kindOfClass (toName ClassName className) kt)))
+   | isConstructorLike varName = IsIn  (toName ClassName className) (TCon (Tycon (toName TypeConstructor varName) (head $ kindOfClass (toName ClassName className) kt)))
    | otherwise = IsIn (toName ClassName className) (TVar $ tyvar (toName TypeVal varName) (head $ kindOfClass (toName ClassName className) kt))
 hsAsstToPred kt (HsAsstEq t1 t2) = IsEq (runIdentity $ hsTypeToType' kt t1) (runIdentity $ hsTypeToType' kt t2)
 

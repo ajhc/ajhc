@@ -367,10 +367,10 @@ instanceToTopDecls _ _ _ = mempty
 
 
 
-instanceName n t = toName Val $ Qual (Module "Instance@") $ HsIdent ('i':show n ++ "." ++ show t)
-defaultInstanceName n = toName Val $ Qual (Module "Instance@") $ HsIdent ('i':show n ++ ".default")
+instanceName n t = toName Val ("Instance@",'i':show n ++ "." ++ show t)
+defaultInstanceName n = toName Val ("Instance@",'i':show n ++ ".default")
 aliasDefaultInstanceName :: Name -> Class -> Name
-aliasDefaultInstanceName n ca = toName Val $ Qual (Module "Instance@") $ HsIdent ('i':show n ++ ".default."++show ca)
+aliasDefaultInstanceName n ca = toName Val ("Instance@",'i':show n ++ ".default."++show ca)
 
 methodToTopDecls ::
     ClassHierarchy

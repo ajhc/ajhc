@@ -23,7 +23,7 @@ import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import FrontEnd.HsSyn(Module)
+import Name.Name(Module)
 import Util.Gen hiding(intercalate)
 import Ho.Binary
 import Ho.Type

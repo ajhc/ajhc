@@ -131,8 +131,7 @@ newHsVar ns = do
 
 
 isTypePlaceholder :: HsName -> Bool
-isTypePlaceholder (Qual (Module "Wild@") _) = True
-isTypePlaceholder (Qual (Module "As@") _) = True
+isTypePlaceholder (getModule -> Just (Module m)) = m `elem` ["Wild@","As@"]
 isTypePlaceholder _ = False
 
 tiExpr,tcExpr ::  HsExp -> Type ->  Tc HsExp
@@ -286,7 +285,8 @@ tiExpr (HsIf e e1 e2) typ = withContext (simpleMsg $ "in the if expression\n   i
     return (HsIf e e1 e2)
 
 tiExpr tuple@(HsTuple exps@(_:_)) typ = withContext (makeMsg "in the tuple" $ render $ ppHsExp tuple) $ do
-    (_,exps') <- tcApps (HsCon (toTuple (length exps))) exps typ
+    --(_,exps') <- tcApps (HsCon (toTuple (length exps))) exps typ
+    (_,exps') <- tcApps (HsCon (nameTuple TypeConstructor (length exps))) exps typ
     return (HsTuple exps')
 
 tiExpr tuple@(HsUnboxedTuple exps) typ = withContext (makeMsg "in the unboxed tuple" $ render $ ppHsExp tuple) $ do
@@ -507,7 +507,7 @@ tiPat (HsPAsPat i pat) typ = do
 tiPat (HsPInfixApp pLeft conName pRight) typ =  tiPat (HsPApp conName [pLeft,pRight]) typ
 
 tiPat (HsPUnboxedTuple ps) typ = tiPat (HsPApp (nameName $ unboxedNameTuple DataConstructor (length ps)) ps) typ
-tiPat tuple@(HsPTuple pats) typ = tiPat (HsPApp (toTuple (length pats)) pats) typ
+tiPat tuple@(HsPTuple pats) typ = tiPat (HsPApp (nameTuple DataConstructor (length pats)) pats) typ
 tiPat (HsPTypeSig _ pat qt)  typ = do
     kt <- getKindEnv
     s <- hsQualTypeToSigma kt qt

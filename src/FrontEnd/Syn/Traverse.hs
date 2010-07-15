@@ -10,10 +10,10 @@ import Support.FreeVars
 import Name.Name
 
 
-instance FreeVars HsType (Set.Set HsName) where
-    freeVars t = execWriter (f t) where
-        f (HsTyVar v) = tell (Set.singleton v)
-        f t = traverseHsType_ f t
+--instance FreeVars HsType (Set.Set HsName) where
+--    freeVars t = execWriter (f t) where
+--        f (HsTyVar v) = tell (Set.singleton v)
+--        f t = traverseHsType_ f t
 
 instance FreeVars HsType (Set.Set Name) where
     freeVars t = execWriter (f t) where
@@ -273,9 +273,9 @@ traverseHsDeclHsExp fn d = f d where
 
 getNamesFromHsPat :: HsPat -> [HsName]
 getNamesFromHsPat p = execWriter (getNamesFromPat p) where
-    getNamesFromPat (HsPVar hsName) = tell [hsName]
+    getNamesFromPat (HsPVar hsName) = tell [toName Val hsName]
     getNamesFromPat (HsPAsPat hsName hsPat) = do
-        tell [hsName]
+        tell [toName Val hsName]
         getNamesFromPat hsPat
     getNamesFromPat p = traverseHsPat_ getNamesFromPat p
 

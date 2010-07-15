@@ -210,28 +210,28 @@ instance Binary Tyvar where
         return (Tyvar aa ab)
 
 
-instance FromTupname HsName where
-    fromTupname (Qual (Module "Jhc.Basics") (HsIdent xs))  = fromTupname xs
-    fromTupname _ = fail "fromTupname: not Prelude"
+--instance FromTupname HsName where
+--    fromTupname (Qual (Module "Jhc.Basics") (HsIdent xs))  = fromTupname xs
+--    fromTupname _ = fail "fromTupname: not Prelude"
 
-instance ToTuple HsName where
-    toTuple n = (Qual (Module "Jhc.Basics") (HsIdent $ toTuple n))
+--instance ToTuple HsName where
+--    toTuple n = (Qual (Module "Jhc.Basics") (HsIdent $ toTuple n))
 
 -- pretty printing a HsName, Module and HsIdentifier
 
-instance DocLike d => PPrint d HsName where
-   pprint (Qual mod ident)
+--instance DocLike d => PPrint d HsName where
+--   pprint (Qual mod ident)
       -- don't print the Prelude module qualifier
-      | mod == Module "Prelude" = pprint ident
-      | otherwise               = pprint mod <> text "." <> pprint ident
-   pprint (UnQual ident)
-      = pprint ident
+--      | mod == Module "Prelude" = pprint ident
+--      | otherwise               = pprint mod <> text "." <> pprint ident
+--   pprint (UnQual ident)
+--      = pprint ident
 
 instance DocLike d => PPrint d Module where
    pprint (Module s) = text s
 
-instance DocLike d => PPrint d HsIdentifier where
-   pprint (HsIdent   s) = text s
+--instance DocLike d => PPrint d HsIdentifier where
+--   pprint (HsIdent   s) = text s
 
 
 withNewNames ts action = subVarName $ do
