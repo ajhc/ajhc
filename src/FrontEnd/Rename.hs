@@ -57,6 +57,30 @@ data Env = Env {
     envSrcLoc      :: SrcLoc
     }
 
+addTopLevels :: HsModule -> RM a -> RM a
+addTopLevels  hsmod action = do
+    mod <- getCurrentModule
+    let cdefs = map (\ (x,y,_) -> (x,y)) $ fst $ collectDefsHsModule hsmod
+    --let (ns,ts) = mconcat (map namesHsDecl hsDecls)
+    --    nm = Map.fromList $ foldl f [] (fsts ns)
+    --    tm = Map.fromList $ foldl f [] (fsts ts)
+        nmap = foldl f [] (fsts cdefs)
+        f r hsName@(getModule -> Just _)
+            | Just _ <- V.fromTupname hsName, Module "Jhc.Basics" <- mod
+                = let nn = hsName in (nn,nn):r
+            | nameName tc_Arrow == hsName, Module "Jhc.Basics" == mod
+                = let nn = hsName in (nn,nn):r
+ --           | otherwise = error $ "strong bad: " ++ show hsName
+            | otherwise = let nn = toUnqualified hsName in (nn,hsName):(hsName,hsName):r
+        --f r z@(UnQual n) = let nn = Qual mod n in (z,nn):(nn,nn):r
+        f r z@(getModule -> Nothing) = let nn = qualifyName mod z in (z,nn):(nn,nn):r
+        z ns = mapM mult (filter (\x -> length x > 1) $ groupBy (\a b -> fst a == fst b) (sort ns))
+        mult xs@(~((n,sl):_)) = warn sl "multiply-defined" (show n ++ " is defined multiple times: " ++ show xs )
+    --z cdefs
+    withSubTable (Map.fromList nmap) action
+
+
+{-
 addTopLevels ::  [HsDecl]  -> RM a -> RM a
 addTopLevels  hsDecls action = do
     mod <- getCurrentModule
@@ -75,7 +99,7 @@ addTopLevels  hsDecls action = do
         mult xs@(~((n,sl):_)) = warn sl "multiply-defined" (show n ++ " is defined multiple times: " ++ show xs )
     z ns >> z ts
     withSubTable (nm `Map.union` tm) action
-
+-}
 ambig x ys = "Ambiguous Name: " ++ show x ++ "\nCould refer to: " ++ tupled (map show ys)
 
 runRename :: MonadWarn m => (a -> RM a) -> Opt -> Module -> FieldMap -> [(Name,[Name])] -> a -> m a
@@ -115,13 +139,13 @@ withSubTable :: SubTable -> RM a -> RM a
 withSubTable st action = local ( \e -> e { envSubTable = st `Map.union` envSubTable e }) action
 
 renameDecls :: HsModule -> RM HsModule
-renameDecls tidy = do
-    withSrcLoc (hsModuleSrcLoc tidy) $ do
-    addTopLevels (hsModuleDecls tidy) $ do
-    decls' <- rename (hsModuleDecls tidy)
+renameDecls mod = do
+    withSrcLoc (hsModuleSrcLoc mod) $ do
+    addTopLevels mod $ do
+    decls' <- rename (hsModuleDecls mod)
     mapM_ HsErrors.hsDeclTopLevel decls'
-    mapM_ checkExportSpec $ fromMaybe [] (hsModuleExports tidy)
-    return tidy { hsModuleDecls = decls' }
+    --mapM_ checkExportSpec $ fromMaybe [] (hsModuleExports tidy)
+    return mod { hsModuleDecls = decls' }
 
 checkExportSpec :: HsExportSpec -> RM ()
 checkExportSpec e = f e  where
@@ -777,18 +801,18 @@ collectDefsHsModule m = (\ (x,y) -> (Seq.toList x,Seq.toList y)) $ execWriter (m
     zup cs = tellS (map g cs) where
         g ca = (toName DataConstructor (hsConDeclName ca), length $ hsConDeclArgs ca)
 
-namesHsConDecl' toName c = ans where
-    dc = (toName DataConstructor $ hsConDeclName c,sl,fls')
-    sl = hsConDeclSrcLoc c
-    ans = dc : [ (toName Val n,sl,[]) |  n <- fls ]  ++  [ (n,sl,[]) |  n <- fls' ]
-    fls' = map (toName FieldLabel) fls
-    fls = case c of
-        HsRecDecl { hsConDeclRecArg = ra } -> concatMap fst ra -- (map (rtup (hsConDeclSrcLoc c). toName FieldLabel) . fst) ra
-        _ -> []
+    namesHsConDecl' toName c = ans where
+        dc = (toName DataConstructor $ hsConDeclName c,sl,fls')
+        sl = hsConDeclSrcLoc c
+        ans = dc : [ (toName Val n,sl,[]) |  n <- fls ]  ++  [ (n,sl,[]) |  n <- fls' ]
+        fls' = map (toName FieldLabel) fls
+        fls = case c of
+            HsRecDecl { hsConDeclRecArg = ra } -> concatMap fst ra -- (map (rtup (hsConDeclSrcLoc c). toName FieldLabel) . fst) ra
+            _ -> []
 
-namesHsDeclTS' toName (HsTypeSig sl ns _) = (map ((,sl) . toName Val) ns)
-namesHsDeclTS' toName (HsTypeDecl sl n _ _) = [(toName TypeConstructor n,sl)]
-namesHsDeclTS' _ _ = []
+    namesHsDeclTS' toName (HsTypeSig sl ns _) = (map ((,sl) . toName Val) ns)
+    namesHsDeclTS' toName (HsTypeDecl sl n _ _) = [(toName TypeConstructor n,sl)]
+    namesHsDeclTS' _ _ = []
 
 namesHsDecl :: HsDecl -> ([(HsName, SrcLoc)],[(HsName, SrcLoc)])
 namesHsDecl (HsForeignDecl a _ n _)  = ([(fromValishHsName n,a)],[])
