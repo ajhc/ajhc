@@ -153,7 +153,7 @@ tiExpr (HsVar v) typ = do
       else do
         doCoerce f (HsVar v)
 
-tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n   case " ++ show e ++ " of ...") $ do
+tiExpr (HsCase e alts) typ = withContext (simpleMsg $ "in the case expression\n   case " ++ render (ppHsExp e) ++ " of ...") $ do
     scrutinee <- newBox kindFunRet
     e' <- tcExpr e scrutinee
     alts' <- mapM (tcAlt scrutinee typ) alts

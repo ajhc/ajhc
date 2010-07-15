@@ -61,9 +61,6 @@ addTopLevels :: HsModule -> RM a -> RM a
 addTopLevels  hsmod action = do
     mod <- getCurrentModule
     let cdefs = map (\ (x,y,_) -> (x,y)) $ fst $ collectDefsHsModule hsmod
-    --let (ns,ts) = mconcat (map namesHsDecl hsDecls)
-    --    nm = Map.fromList $ foldl f [] (fsts ns)
-    --    tm = Map.fromList $ foldl f [] (fsts ts)
         nmap = foldl f [] (fsts cdefs)
         f r hsName@(getModule -> Just _)
             | Just _ <- V.fromTupname hsName, Module "Jhc.Basics" <- mod
@@ -72,7 +69,6 @@ addTopLevels  hsmod action = do
                 = let nn = hsName in (nn,nn):r
  --           | otherwise = error $ "strong bad: " ++ show hsName
             | otherwise = let nn = toUnqualified hsName in (nn,hsName):(hsName,hsName):r
-        --f r z@(UnQual n) = let nn = Qual mod n in (z,nn):(nn,nn):r
         f r z@(getModule -> Nothing) = let nn = qualifyName mod z in (z,nn):(nn,nn):r
         z ns = mapM mult (filter (\x -> length x > 1) $ groupBy (\a b -> fst a == fst b) (sort ns))
         mult xs@(~((n,sl):_)) = warn sl "multiply-defined" (show n ++ " is defined multiple times: " ++ show xs )
@@ -80,26 +76,6 @@ addTopLevels  hsmod action = do
     withSubTable (Map.fromList nmap) action
 
 
-{-
-addTopLevels ::  [HsDecl]  -> RM a -> RM a
-addTopLevels  hsDecls action = do
-    mod <- getCurrentModule
-    let (ns,ts) = mconcat (map namesHsDecl hsDecls)
-        nm = Map.fromList $ foldl f [] (fsts ns)
-        tm = Map.fromList $ foldl f [] (fsts ts)
-        f r hsName@(getModule -> Just _)
-            | Just _ <- V.fromTupname hsName, Module "Jhc.Basics" <- mod
-                = let nn = hsName in (nn,nn):r
-            | nameName tc_Arrow == hsName, Module "Jhc.Basics" == mod
-                = let nn = hsName in (nn,nn):r
-            | otherwise = error $ "strong bad: " ++ show hsName
-        --f r z@(UnQual n) = let nn = Qual mod n in (z,nn):(nn,nn):r
-        f r z@(getModule -> Nothing) = let nn = qualifyName mod z in (z,nn):(nn,nn):r
-        z ns = mapM mult (filter (\x -> length x > 1) $ groupBy (\a b -> fst a == fst b) (sort ns))
-        mult xs@(~((n,sl):_)) = warn sl "multiply-defined" (show n ++ " is defined multiple times: " ++ show xs )
-    z ns >> z ts
-    withSubTable (nm `Map.union` tm) action
--}
 ambig x ys = "Ambiguous Name: " ++ show x ++ "\nCould refer to: " ++ tupled (map show ys)
 
 runRename :: MonadWarn m => (a -> RM a) -> Opt -> Module -> FieldMap -> [(Name,[Name])] -> a -> m a
@@ -710,7 +686,6 @@ clobberName hsName = do
     let hsName' = renameAndQualify hsName unique currModule
     return $ Map.singleton hsName hsName'
 
-
 renameAndQualify :: HsName -> Int -> Module -> HsName
 renameAndQualify name unique currentMod = qualifyName currentMod (renameName name unique) where
     renameName n unique = mapName (id,((show unique ++ "_") ++)) n
@@ -763,8 +738,6 @@ getHsNamesAndASrcLocsFromHsDecl d = f d where
     f (HsForeignDecl { .. }) = [(fromValishHsName hsDeclName, hsDeclSrcLoc)]
     f _ = []
 
-
-
 -- | Collect all names defined in a module as well as their declaration points
 -- and any subnames they might have. In addition, collect the arities of any
 -- constructors.
@@ -814,37 +787,14 @@ collectDefsHsModule m = (\ (x,y) -> (Seq.toList x,Seq.toList y)) $ execWriter (m
     namesHsDeclTS' toName (HsTypeDecl sl n _ _) = [(toName TypeConstructor n,sl)]
     namesHsDeclTS' _ _ = []
 
-namesHsDecl :: HsDecl -> ([(HsName, SrcLoc)],[(HsName, SrcLoc)])
-namesHsDecl (HsForeignDecl a _ n _)  = ([(fromValishHsName n,a)],[])
-namesHsDecl decl@(HsFunBind {})  = (getHsNamesAndASrcLocsFromHsDecl decl,  [])
-namesHsDecl (HsPatBind srcLoc p _ _) = (map (,srcLoc) (getNamesFromHsPat p),[])
-namesHsDecl (HsTypeDecl sl n _ _) = ([],[(fromTypishHsName n,sl)])
-namesHsDecl HsDataDecl { hsDeclSrcLoc = sl, hsDeclName = n, hsDeclCons = cs } = ( (concatMap namesHsConDecl cs) ,[(fromTypishHsName n,sl)])
-namesHsDecl (HsNewTypeDecl sl _ n _ c _) = ( (namesHsConDecl c),[(fromTypishHsName n,sl)])
-namesHsDecl cd@(HsClassDecl sl _ ds) = (mconcatMap namesHsDeclTS ds) `mappend` ([],[(z,sl)]) where
-    z = case maybeGetDeclName cd of
-        Just x | nameType x == ClassName -> x
-        --       | otherwise ->  parseName ClassName (show x ++ show (nameType x))
-        _ -> error "really not a class name"
-namesHsDecl _ = mempty
-
-namesHsDeclTS (HsTypeSig sl ns _) = ((map (,sl) ns),[])
-namesHsDeclTS _ = ([],[])
-
-namesHsConDecl c = (fromValishHsName $ hsConDeclName c,hsConDeclSrcLoc c) : case c of
-    -- HsRecDecl { hsConDeclRecArg = ra } -> concatMap (map (rtup (hsConDeclSrcLoc c)) . fst) ra
-    _ -> []
-
 getHsNamesAndASrcLocsFromHsStmt :: HsStmt -> [(HsName, SrcLoc)]
 getHsNamesAndASrcLocsFromHsStmt (HsGenerator srcLoc hsPat _hsExp) = zip (getNamesFromHsPat hsPat) (repeat srcLoc)
 getHsNamesAndASrcLocsFromHsStmt (HsQualifier _hsExp) = []
 getHsNamesAndASrcLocsFromHsStmt (HsLetStmt hsDecls) = concat $ map getHsNamesAndASrcLocsFromHsDecl hsDecls
 
-
 -----------
 -- RM Monad
 -----------
-
 
 newtype RM a = RM (RWS Env [Warning] ScopeState a)
     deriving(Monad,Functor,MonadReader Env, MonadWriter [Warning], MonadState ScopeState)

@@ -135,8 +135,6 @@ tExists [] ([] :=> t) = t
 tExists vs (ps :=> TExists vs' (ps' :=> t)) = tExists (vs ++ vs') ((ps ++ ps') :=> t)
 tExists x y = TExists x y
 
-
-
 tyvar n k = Tyvar n k
 
 instance Eq Tyvar where
@@ -149,8 +147,6 @@ instance Ord Tyvar where
     (Tyvar { tyvarName = x }) >= (Tyvar { tyvarName = y }) = x >= y
     (Tyvar { tyvarName = x }) <  (Tyvar { tyvarName = y })  = x < y
     (Tyvar { tyvarName = x }) >  (Tyvar { tyvarName = y })  = x > y
-
-
 
 -- Type constructors
 
@@ -183,19 +179,12 @@ data Qual t =  [Pred] :=> t
               deriving(Show, Eq,Ord)
     {-! derive: Binary !-}
 
-
 instance (DocLike d,PPrint d t) => PPrint d (Qual t) where
     pprint ([] :=> r) = pprint r
     pprint ([x] :=> r) = pprint x <+> text "=>" <+> pprint r
     pprint (xs :=> r) = tupled (map pprint xs) <+> text "=>" <+> pprint r
 
-
-
-
 type Class = Name
---------------------------------------------------------------------------------
-
-
 
 instance  DocLike d => PPrint d Tyvar where
   pprint tv = tshow (tyvarName tv)
@@ -209,30 +198,8 @@ instance Binary Tyvar where
         ab <- get
         return (Tyvar aa ab)
 
-
---instance FromTupname HsName where
---    fromTupname (Qual (Module "Jhc.Basics") (HsIdent xs))  = fromTupname xs
---    fromTupname _ = fail "fromTupname: not Prelude"
-
---instance ToTuple HsName where
---    toTuple n = (Qual (Module "Jhc.Basics") (HsIdent $ toTuple n))
-
--- pretty printing a HsName, Module and HsIdentifier
-
---instance DocLike d => PPrint d HsName where
---   pprint (Qual mod ident)
-      -- don't print the Prelude module qualifier
---      | mod == Module "Prelude" = pprint ident
---      | otherwise               = pprint mod <> text "." <> pprint ident
---   pprint (UnQual ident)
---      = pprint ident
-
 instance DocLike d => PPrint d Module where
    pprint (Module s) = text s
-
---instance DocLike d => PPrint d HsIdentifier where
---   pprint (HsIdent   s) = text s
-
 
 withNewNames ts action = subVarName $ do
     ts' <- mapM newTyvarName ts
