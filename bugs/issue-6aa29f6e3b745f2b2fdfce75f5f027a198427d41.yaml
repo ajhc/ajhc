@@ -3,10 +3,10 @@ title: replace HsName with Name everywhere
 desc: HsName is still used in the front end despite being slower and less flexible than the Name type. It should be gotten rid of.
 type: :task
 component: fe
-release: 
+release: 0.7.5
 reporter: John Meacham <john@repetae.net>
-status: :unstarted
-disposition: 
+status: :closed
+disposition: :fixed
 creation_time: 2010-07-11 05:18:50.346911 Z
 references: []
 
@@ -15,4 +15,12 @@ log_events:
 - - 2010-07-11 05:18:51.556910 Z
   - John Meacham <john@repetae.net>
   - created
+  - ""
+- - 2010-07-15 22:05:29.843454 Z
+  - John Meacham <john@repetae.net>
+  - assigned to release 0.7.5 from unassigned
+  - ""
+- - 2010-07-15 22:05:56.503446 Z
+  - John Meacham <john@repetae.net>
+  - closed with disposition fixed
   - ""

@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: remove need for _start and _end symbols
+desc: OSX and windows don't define the _start and _end symbols used for checking if something is a constantly allocated value. We need another mechanism on these platforms.
+type: :bugfix
+component: rts
+release: 0.7.5
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-16 03:52:28.856831 Z
+references: []
+
+id: 58ed9a007b69eed3132a6a38f1374cc59c1e48e0
+log_events: 
+- - 2010-07-16 03:52:30.216812 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
