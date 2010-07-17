@@ -1,22 +1,15 @@
-#ifdef JHC_RTS_INCLUDE
-#undef JHC_RTS_INCLUDE
-#include "jhc_rts_header.h"
-#define JHC_RTS_INCLUDE
-#else
-
-// jhc_rts_header.h
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <wchar.h>
-#include <limits.h>
-#include <locale.h>
-#include <math.h>
 #include <assert.h>
 #include <errno.h>
 #include <float.h>
+#include <limits.h>
+#include <locale.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <wchar.h>
 #ifndef __WIN32__
 #include <sys/select.h>
 #include <sys/times.h>
@@ -26,14 +19,12 @@
 #endif
 #include <setjmp.h>
 
-
 // #define our options
 
 #define _JHC_GC_NONE   0
 #define _JHC_GC_JGC    1
 #define _JHC_GC_BOEHM  2
 #define _JHC_GC_REGION 3
-
 
 #ifndef _JHC_GC
 #define _JHC_GC _JHC_GC_NONE
@@ -55,6 +46,9 @@
 #define _JHC_STANDALONE 1
 #endif
 
+#ifndef JHC_STATUS
+#define JHC_STATUS 0
+#endif
 
 // GNU attributes
 #ifdef __GNUC__
@@ -96,10 +90,7 @@
 #define A_COLD
 #define A_FALIGNED
 
-#define STR(s) #s
-#define XSTR(s) STR(s)
-#define ALIGN(a,n) ((n) - 1 + ((a) - ((n) - 1) % (a)))
-
+#define M_ALIGN(a,n) ((n) - 1 + ((a) - ((n) - 1) % (a)))
 
 #ifdef __WIN32__
 #define JHC_isWindows   1
@@ -111,5 +102,19 @@
 
 #define JHC_isPosix (!JHC_isWindows)
 
+static void _amain(void);
 
+static void jhc_alloc_init(void);
+static void jhc_alloc_fini(void);
+static void jhc_alloc_print_stats(void);
+static void jhc_print_profile(void);
+
+static int jhc_argc;
+static char **jhc_argv;
+static char *jhc_progname;
+
+#if JHC_STATUS > 1
+#define debugf(...) fprintf(stderr,__VA_ARGS__)
+#else
+#define debugf(...) do { } while (0)
 #endif

@@ -1,16 +1,12 @@
-#ifdef JHC_RTS_INCLUDE
-#undef JHC_RTS_INCLUDE
-#include "slub.c"
-#define JHC_RTS_INCLUDE
-#else
 #if _JHC_GC == _JHC_GC_JGC
+
+#include <sys/queue.h>
 
 #define BLOCK_SIZE     (1UL << 12)
 #define MEGABLOCK_SIZE (1UL << 20)
 
-#define S_BLOCK(val) (struct s_block *)((uintptr_t)(val) & ~ (BLOCK_SIZE - 1))
 
-//static Pvoid_t  gc_inheap; // whether the megablock is in the heap
+#define S_BLOCK(val) (struct s_block *)((uintptr_t)(val) & ~ (BLOCK_SIZE - 1))
 
 struct s_arena {
         struct s_megablock *current_megablock;
@@ -26,8 +22,6 @@ struct s_megablock {
         unsigned next_free;
         SLIST_ENTRY(s_megablock) next;
 };
-
-
 
 struct s_block_info {
         unsigned char color;
@@ -83,7 +77,6 @@ s_new_megablock(struct s_arena *arena)
                 fprintf(stderr,"Unable to allocate memory with posix_memalign for megablock\n");
                 abort();
         }
-//        int r; J1S(r, gc_inheap, (uintptr_t)mb->base/MEGABLOCK_SIZE);
         mb->next_free = 0;
         return mb;
 }
@@ -395,6 +388,5 @@ main(int argc, char *argv[])
         return 0;
 }
 
-#endif
 #endif
 #endif

@@ -2,6 +2,11 @@
 
 use strict;
 
+use Getopt::Std;
+
+
+our $opt_c;
+getopts('c');
 
 my $mod = shift @ARGV;
 $mod =~ s/^.*\///;
@@ -10,6 +15,40 @@ print "module $mod where\n\n";
 print "import Data.ByteString.Unsafe\n";
 print "import Data.ByteString\n";
 print "import System.IO.Unsafe\n\n";
+
+sub header {
+    print "{-# NOINLINE $_[0] #-}\n";
+    print "$_[0] :: ByteString\n";
+    print "$_[0] = unsafePerformIO \$ unsafePackAddress \"\\\n \\";
+}
+sub line {
+    local $_ = @_ ? $_[0] : $_;
+    s/\\/\\\\/g;
+    s/\n/\\n/g;
+    s/[^\x20-\x7e]/sprintf("\\x%04x\\&", ord($&))/eg;
+    s/\"/\\"/g;
+    print "$_\\\n \\";
+}
+
+if($opt_c) {
+    header('theData');
+
+    line "#ifdef JHC_RTS_INCLUDE\n";
+    for(@ARGV) {
+        local $_ = $_;
+        s/^.*\///;
+        line "#include \"$_\"\n";
+    }
+    line "#else\n";
+    for(@ARGV) {
+        line "/* $_ */\n";
+        open my $fh, "<:utf8", $_ or die "$!: $_";
+        line while(<$fh>);
+    }
+    line "#endif\n";
+    print "\"#\n\n";
+
+} else {
 
 while (@ARGV) {
     my $fn = shift @ARGV;
@@ -21,21 +60,12 @@ while (@ARGV) {
 
     $fn =~ s{/}{\\/}g;
     print "-- | Generated from $fn on " . `date`;
-    print "{-# NOINLINE $nn #-}\n";
-    print "$nn :: ByteString\n";
-    print "$nn = unsafePerformIO \$ unsafePackAddress \"\\\n \\";
-    #print "$nn = \"";
-    while (<F>) {
-        s/\\/\\\\/g;
-        s/\n/\\n/g;
-        s/[^\x20-\x7e]/sprintf("\\x%04x\\&", ord($&))/eg;
-
-        s/\"/\\"/g;
-        print "$_\\\n \\";
-    }
+    header($nn);
+    while (<F>) { line; }
 
     print "\"#\n\n";
 }
 
+}
 
 print "\n\n";

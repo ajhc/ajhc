@@ -5,7 +5,7 @@ bin_PROGRAMS = jhc
 
 jhc_SOURCES = src/Main.hs  $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
 
-BUILT_SOURCES= src/PrimitiveOperators.hs src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
+BUILT_SOURCES= src/PrimitiveOperators.hs src/RtsFiles.hs src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
 	       src/FlagOpts.hs src/Name/Prim.hs src/Info/Properties.hs $(DRIFTFILES)
 
 MY_CINCLUDES= -I$(srcdir)/src/data -I$(srcdir)/src/StringTable -I$(srcdir)/src/cbits -I$(builddir)/src/cbits
@@ -28,7 +28,7 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
 	src/Grin/Whiz.hs src/Ho/Binary.hs src/Ho/Collected.hs src/Ho/Library.hs src/Info/Binary.hs src/Info/Info.hs src/Info/Properties.hs \
 	src/Info/Types.hs src/Interactive.hs src/Main.hs src/Name/Binary.hs src/Name/Id.hs src/Name/Name.hs src/Name/Names.hs \
 	src/Name/Prim.hs src/PackedString.hs src/PrimitiveOperators.hs \
-	src/RawFiles.hs src/Stats.hs src/Support/CanType.hs src/Support/CFF.hs src/Support/Compat.hs \
+	src/RawFiles.hs src/RtsFiles.hs src/Stats.hs src/Support/CanType.hs src/Support/CFF.hs src/Support/Compat.hs \
 	src/Support/FreeVars.hs src/Support/MapBinaryInstance.hs src/Support/MD5.hs src/Support/Tickle.hs src/Support/Transform.hs \
 	src/Support/Tuple.hs src/Support/Unparse.hs src/Util/BitSet.hs src/Util/ContextMonad.hs src/Util/FilterInput.hs \
 	src/Util/Gen.hs src/Util/Graph.hs src/Util/Graphviz.hs src/Util/HasSize.hs src/Util/Histogram.hs src/Util/Inst.hs \
@@ -57,7 +57,7 @@ GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@  $(GHCDEBUGOPTS) $(GHCINC) $(PAC
 JHC_LIBS =  jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl
 
 
-EXTRA_DIST = src/data utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
+EXTRA_DIST = src/data src/rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/jhc lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal lib/containers.cabal \
@@ -104,10 +104,12 @@ uninstall-hook: $(JHC_LIBS)
 
 UTILS = utils/op_process.prl utils/opt_sets.prl utils/gen_props.prl utils/op_names.prl utils/op_raw.prl
 
-RAWFILES = src/data/HsFFI.h src/data/rts/jhc_rts.c src/data/rts/jhc_rts_header.h src/data/wsize.h \
-	   src/data/rts/jhc_rts_alloc.c src/data/rts/jhc_rts2.c src/data/ViaGhc.hs ChangeLog \
-	   src/data/shortchange.txt src/data/prelude.m4 src/data/targets.ini \
-	   src/data/rts/jhc_jgc.h src/data/rts/jhc_jgc.c src/data/rts/slub.c  src/data/rts/bitarray.h
+RAWFILES = src/data/ViaGhc.hs ChangeLog \
+	   src/data/shortchange.txt src/data/prelude.m4 src/data/targets.ini
+
+RTSFILES = src/data/HsFFI.h src/rts/wsize.h src/rts/jhc_rts_header.h src/rts/jhc_jgc.h \
+	   src/rts/jhc_rts_alloc.c src/rts/jhc_rts.c src/rts/profile.c src/rts/jhc_rts2.c src/rts/bitarray.h \
+	   src/rts/slub.c src/rts/jhc_jgc.c  src/rts/lib_cbits.c
 
 DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/Cmm/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \
    drift_processed/DerivingDrift/StandardRules.hs drift_processed/E/CPR.hs drift_processed/E/Demand.hs drift_processed/E/LambdaLift.hs \
@@ -166,6 +168,9 @@ src/Name/Prim.hs: utils/op_names.prl src/data/primitives.txt src/data/names.txt
 
 src/RawFiles.hs:  utils/op_raw.prl $(RAWFILES)
 	perl $< $(basename $@)  $(RAWFILES) > $@
+
+src/RtsFiles.hs:  utils/op_raw.prl $(RTSFILES)
+	perl $< -c $(basename $@)  $(RTSFILES) > $@
 
 src/FrontEnd/HsParser.hs: src/FrontEnd/HsParser.y
 	happy -a -g -c $< -o $@
@@ -262,11 +267,11 @@ publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/in
 	cp -- $^ /home/john/public_html/computer/jhc
 
 manual: utils/stitch.prl src/FlagDump.mkd src/FlagOpts.mkd options.mkd docs/*.mkd
-	find . \( ! -path */jhc-*/* ! -path '*/examples/*'  ! -path '*/_darcs/*' ! -path '*/drift_processed/*'  ! -path '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -path '*/src/data/rts/*.c' \) \) -print | xargs perl utils/stitch.prl > manual.mkd
+	find . \( ! -path */jhc-*/* ! -path '*/examples/*'  ! -path '*/_darcs/*' ! -path '*/drift_processed/*'  ! -path '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -path '*/src/rts/*.c' \) \) -print | xargs perl utils/stitch.prl > manual.mkd
 	pandoc manual.mkd --toc -s -f markdown -t html -s -c manual.css -o $@.html
 
 man: utils/stitch.prl src/FlagDump.mkd src/FlagOpts.mkd options.mkd docs/man_header.mkd docs/*.mkd
-	find . \( ! -path */jhc-*/ ! -path '*/examples/*'  ! -path '*/_darcs/*' ! -path '*/drift_processed/*'  ! -path '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -path '*/src/data/rts/*.c' \) \) -print | xargs perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
+	find . \( ! -path */jhc-*/ ! -path '*/examples/*'  ! -path '*/_darcs/*' ! -path '*/drift_processed/*'  ! -path '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -path '*/src/rts/*.c' \) \) -print | xargs perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
 	pandoc jhc_man.mkd -s -f markdown -t man -s  -o jhc.1
 
 options.mkd: jhc

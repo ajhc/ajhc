@@ -150,7 +150,7 @@ data Mode = BuildHl FilePath         -- ^ Build the specified hl-file given a de
 
 
 data Opt = Opt {
-    optMode        :: Mode,       -- ^ Mode of interaction
+    optMode        ::  Mode,      -- ^ Mode of interaction
     optColumns     :: !Int,       -- ^ Width of terminal.
     optDebug       :: !Bool,      -- ^ Debugging.
     optDump        ::  [String],  -- ^ Dump options (raw).
@@ -259,7 +259,7 @@ theoptions =
     , Option []    ["ignore-ho"]   (NoArg  (optIgnoreHo_s True))       "Ignore existing haskell object files"
     , Option []    ["nowrite-ho"]  (NoArg  (optNoWriteHo_s True))      "Do not write new haskell object files"
     , Option []    ["no-ho"]       (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "same as --ignore-ho and --nowrite-ho"
-    , Option []    ["ho-cache"]    (ReqArg (optHoCache_s . Just ) "HOCACHEDIR")    "Use a global ho cache located at the argument"
+    , Option []    ["ho-cache"]    (ReqArg (optHoCache_s . Just ) "JHC_CACHE")    "Use a global ho cache located at the argument"
     , Option []    ["ho-dir"]      (ReqArg (optHoDir_s . Just ) "<dir>")    "Where to place and look for ho files"
     , Option []    ["stale"]       (ReqArg (optStale_u . idu) "Module")     "Treat these modules as stale, even if a ho file is present"
     , Option []    ["list-libraries"] (NoArg  (optMode_s ListLibraries)) "List of installed libraries"

@@ -14,7 +14,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
 
-
 import C.FFI
 import C.Generate
 import C.Prims
@@ -29,6 +28,7 @@ import Grin.Val
 import Options
 import PackedString
 import RawFiles
+import RtsFiles
 import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
@@ -40,17 +40,11 @@ import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.UTF8 as BS
 import qualified Data.ByteString as BS
 
-
 ---------------
 -- C Monad
 ---------------
 
 data Todo = TodoReturn | TodoExp [Expression] | TodoDecl Name Type | TodoNothing
-
---data AllocInfo = AllocInfo {
---        allocSize, allocPtrs, allocOffset :: Int
---    }
---    deriving(Eq,Ord)
 
 data Written = Written {
     wRequires :: Requires,
@@ -80,10 +74,8 @@ data Env = Env {
     }
     {-! derive: update !-}
 
-
 newtype C a = C (RWST Env Written HcHash Uniq a)
     deriving(Monad,UniqueProducer,MonadState HcHash,MonadWriter Written,MonadReader Env,Functor)
-
 
 runC :: Grin -> C a -> ((a,HcHash,Written),Map.Map Atom TyRep)
 runC grin (C m) =  (execUniq1 (runRWST m startEnv emptyHcHash),ityrep) where
@@ -128,7 +120,6 @@ tellFunctions fs = tell mempty { wFunctions = Map.fromList $ map (\x -> (functio
 localTodo :: Todo -> C a -> C a
 localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 
-
 --------------
 -- entry point
 --------------
@@ -137,17 +128,17 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 compileGrin :: Grin -> (LBS.ByteString,[String])
 compileGrin grin = (LBS.fromChunks code, snub (reqLibraries req))  where
     code = [
-        hsffi_h,
-        wsize_h,
-        jhc_rts_header_h,
-        jhc_jgc_h,
-        jhc_rts_alloc_c,
-        jhc_rts_c,
-        jhc_rts2_c,
-        bitarray_h,
-        slub_c,
-        jhc_jgc_c,
-        BS.fromString generateArchAssertions,
+        --hsffi_h,
+        --wsize_h,
+        --jhc_rts_header_h,
+        --jhc_jgc_h,
+        --jhc_rts_alloc_c,
+        --jhc_rts_c,
+        --jhc_rts2_c,
+        --bitarray_h,
+        --slub_c,
+        --jhc_jgc_c,
+        theData,
         BS.fromString $ P.render ans,
         BS.fromString "\n"
         ]
@@ -212,7 +203,7 @@ convertFunc ffie (n,as :-> body) = do
                                       zipWith cast (map snd as')
                                                    (map variable newVars))]
 
-        return (function fnname fr (mgct as') ats (profile_function_inc & s) : mstub)
+        return (function fnname fr (mgct as') ats s : mstub)
 
 
 fetchVar :: Var -> Ty -> C Expression
@@ -371,7 +362,7 @@ convertBody (Case v@(getType -> TyNode) [[p1@(NodeC t fps)] :-> e1,[p2] :-> e2])
             tenum = (constant $ enum (nodeTagName t))
     p1' <- da p1 e1
     p2' <- am p2 =<< da p2 e2
-    return $ profile_case_inc & cif ifscrut p1' p2'
+    return $ cif ifscrut p1' p2'
 
 -- zero is usually faster to test for than other values, so flip them if zero is being tested for.
 convertBody (Case v [v1, v2@([Lit n _] :-> _)]) | n == 0 = convertBody (Case v [v2,v1])
@@ -382,7 +373,7 @@ convertBody (Case v@(getType -> t) [[p1] :-> e1, [p2] :-> e2]) | Set.null ((free
              | otherwise = annotate (show p2) (f_assert ((cp p2) `eq` scrut) & e)
     e1' <- convertBody e1
     e2' <- convertBody e2
-    return $ profile_case_inc & cif (cp p1 `eq` scrut) e1' (am e2')
+    return $ cif (cp p1 `eq` scrut) e1' (am e2')
 convertBody (Case v@(getType -> TyNode) ls) = do
     scrut <- convertVal v
     let tag = f_FETCH_TAG scrut
@@ -408,7 +399,7 @@ convertBody (Case v@(getType -> TyNode) ls) = do
                 needed ~(Var v _) = v `Set.member` fve
             return $ (Just (enum (nodeTagName t)), ass & e')
     ls' <- mapM da ls
-    return $ profile_case_inc & switch' tag ls'
+    return $ switch' tag ls'
 convertBody (Case v ls) = do
     scrut <- convertVal v
     let da ([(Var vv _)] :-> e) | vv == v0 = do
@@ -423,7 +414,7 @@ convertBody (Case v ls) = do
             return $ (Just (number $ fromIntegral i), e')
         --da (~[x] :-> e) = da ( x :-> e )
     ls' <- mapM da ls
-    return $ profile_case_inc & switch' scrut ls'
+    return $ switch' scrut ls'
 convertBody (Error s t) = do
     x <- asks rTodo
     let jerr | null s    = toStatement $ functionCall (name "jhc_exit") [constant $ number 255]
@@ -599,7 +590,7 @@ convertExp (BaseOp Overwrite [v@(Var vv _),tn@(NodeC t as)]) | getType v == TyIN
      else do
         s <- tagAssign tmp' t
         let ass = [project' (arg i) tmp' =* a | a <- as' | i <- [(1 :: Int) ..] ]
-        return (mconcat $ profile_update_inc:s:ass,emptyExpression)
+        return (mconcat $ s:ass,emptyExpression)
 
 convertExp Alloc { expValue = v, expCount = c, expRegion = r } | r == region_heap, TyINode == getType v  = do
     v' <- convertVal v
@@ -940,9 +931,6 @@ f_SET_MEM_TAG e v = functionCall (name "SET_MEM_TAG") [e,v]
 f_demote e    = functionCall (name "demote") [e]
 f_follow e    = functionCall (name "follow") [e]
 f_update x y  = functionCall (name "update") [x,y]
-profile_update_inc   = toStatement $ functionCall (name "jhc_update_inc") []
-profile_case_inc     = toStatement $ functionCall (name "jhc_case_inc") []
-profile_function_inc = toStatement $ functionCall (name "jhc_function_inc") []
 
 arg i = name $ 'a':show i
 
@@ -977,18 +965,6 @@ nodeType a = return $ structType (nodeStructName a)
 nodeStructName :: Atom -> Name
 nodeStructName a = toName ('s':fromAtom a)
 nodeCacheName a = toName ('c':fromAtom a)
-
-
-generateArchAssertions :: String
-generateArchAssertions = unlines (h:map f (filter notVoid as) ++ [t]) where
---    (_,_,as,_) = unsafePerformIO determineArch
-    as = []
-    notVoid pt = primTypeName pt /= "void"
-    f pt = printf "      assert(sizeof(%s) == %d);" (primTypeName pt) (primTypeSizeOf pt)
-    h = "static void\njhc_arch_assert(void)\n{"
-    t = "}"
-
-
 
 
 bool b x y = if b then x else y

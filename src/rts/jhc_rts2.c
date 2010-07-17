@@ -1,10 +1,3 @@
-#ifdef JHC_RTS_INCLUDE
-#undef JHC_RTS_INCLUDE
-#include "jhc_rts2.c"
-#define JHC_RTS_INCLUDE
-#else
-
-
 /*@Internals
 
 # The Run Time System
@@ -298,14 +291,7 @@ eval(sptr_t s)
 static void A_STD A_UNUSED A_HOT
 update(void * thunk, wptr_t new)
 {
-        jhc_update_inc();
         assert(GETHEAD(thunk) == BLACK_HOLE);
         assert(!IS_LAZY(new));
         GETHEAD(thunk) = (fptr_t)new;
 }
-
-
-
-
-
-#endif

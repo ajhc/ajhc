@@ -1,15 +1,14 @@
-#ifdef JHC_RTS_INCLUDE
-#undef JHC_RTS_INCLUDE
-#include "jhc_jgc.c"
-#define JHC_RTS_INCLUDE
-#else
 #if _JHC_GC == _JHC_GC_JGC
-
 static struct s_arena *arena;
 
 #define TO_BLOCKS(x) ((x) <= GC_MINIMUM_SIZE*GC_BASE ? GC_MINIMUM_SIZE : (((x) - 1)/GC_BASE) + 1)
 
 #ifdef JHC_JGC_STACK
+struct frame {
+        struct frame *prev;
+        unsigned nptrs;
+        void *ptrs[0];
+};
 #define gc_frame0(gc,n,...) struct { struct frame *prev; unsigned nptrs;void *ptrs[n]; } l \
           = { gc, n, { __VA_ARGS__ } }; gc_t gc = (gc_t)(void *)&l;
 #else
@@ -181,7 +180,7 @@ gc_perform_gc(gc_t gc)
         }
         free(stack.stack);
         s_cleanup_blocks(arena);
-        if(JGC_STATUS) {
+        if(JHC_STATUS) {
 #ifdef JHC_JGC_STACK
                 void * gc_stack_base = &gc_stack_base;
                 Word_t n_roots;
@@ -198,7 +197,6 @@ gc_perform_gc(gc_t gc)
                         number_redirects,
                         (unsigned)root_stack.ptr
                        );
-                //               jhc_malloc_fini();
         }
         number_allocs = 0;
         profile_pop(&gc_gc_time);
@@ -219,18 +217,18 @@ gc_alloc(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
 static void jhc_alloc_print_stats(void) { }
 
 #ifdef JHC_JGC_STACK
-static void jhc_malloc_init(void) { }
+static void jhc_alloc_init(void) { }
 #else
 static void
-jhc_malloc_init(void) {
+jhc_alloc_init(void) {
         saved_gc = gc_stack_base = malloc((1UL << 18)*sizeof(gc_stack_base[0]));
         arena = new_arena();
 }
 #endif
 
 static void
-jhc_malloc_fini(void) {
-        if(JGC_STATUS) {
+jhc_alloc_fini(void) {
+        if(JHC_STATUS) {
                 printf("arena: %p\n", arena);
                 printf("  block_used: %i\n", arena->block_used);
                 printf("  block_threshold: %i\n", arena->block_threshold);
@@ -240,6 +238,4 @@ jhc_malloc_fini(void) {
                 }
         }
 }
-
-#endif
 #endif

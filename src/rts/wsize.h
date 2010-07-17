@@ -53,7 +53,6 @@
 #else
 #error Could not determine bitsize
 #endif
-
 #endif
 
 

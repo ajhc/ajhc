@@ -4,13 +4,11 @@
 #include <limits.h>
 #include <stdbool.h>
 
-
 typedef unsigned long bitarray_t;
 
 #define BITS_PER_UNIT (bitarray_t)(CHAR_BIT*sizeof(bitarray_t))
 #define BITARRAY_SIZE(bits) (((bits) + (BITS_PER_UNIT - 1)) / BITS_PER_UNIT)
 #define BITARRAY_SIZE_IN_BYTES(bits) (sizeof(bitarray_t)*BITARRAY_SIZE(bits))
-
 
 #define WHICH_BIT(bit)  \
     (1UL << ((((bitarray_t)(bit)) % BITS_PER_UNIT)))
@@ -41,6 +39,5 @@ typedef unsigned long bitarray_t;
 
 #define BIT_SET_VALUE(array,bit,value) \
     do { (value) ? BIT_SET((array),(bit)) : BIT_UNSET((array),(bit)) } while(0)
-
 
 #endif
