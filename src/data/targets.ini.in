@@ -24,6 +24,7 @@ autoload=base,haskell98
 cc=@MINGW@
 executable_extension=.exe
 merge=i686
+cflags+=-fno-strict-aliasing
 
 ; macintosh
 [osx]
