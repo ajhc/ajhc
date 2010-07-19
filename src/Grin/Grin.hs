@@ -236,7 +236,7 @@ data Ty =
     | TyCall Callable [Ty] [Ty]  -- ^ something call,jump, or cut-to-able
     | TyRegion                   -- ^ a region
     | TyGcContext                -- ^ the context for garbage collection
-    | TyRegister Ty              -- ^ a register contains a mutable value, the register itself cannot be addressed, 
+    | TyRegister Ty              -- ^ a register contains a mutable value, the register itself cannot be addressed,
                                  --   hence they may not be returned from functions or passed as arguments.
     | TyUnknown                  -- ^ an unknown possibly undefined type, All of these must be eliminated by code generation
     deriving(Eq,Ord)
