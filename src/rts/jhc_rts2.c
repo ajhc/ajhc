@@ -199,7 +199,7 @@ jhc_valid_lazy(sptr_t s)
                 if(ds->head == BLACK_HOLE) return true;
                 assert(GET_PTYPE(ds->head) == P_FUNC);
                 fptr_t dhead = FROM_SPTR(ds->head);
-                assert((void *)dhead >= &_start && (void *)dhead < &_end);
+                //assert((void *)dhead >= &_start && (void *)dhead < &_end);
                 return true;
         } else
                 return jhc_valid_whnf((wptr_t)ds->head);

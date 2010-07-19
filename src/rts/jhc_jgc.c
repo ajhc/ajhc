@@ -25,10 +25,10 @@ typedef struct {
 } entry_t;
 
 
-static bool
+static void *nh_start, *nh_end;
 gc_check_heap(entry_t *s)
 {
-        return (s < &_start || s > &_end);
+        return (s < nh_start || s > nh_end);
 }
 
 
@@ -44,7 +44,7 @@ static void
 stack_grow(struct stack *s, unsigned grow)
 {
         s->size += grow;
-        s->stack = realloc(s->stack, sizeof(uintptr_t)*s->size);
+        s->stack = realloc(s->stack, sizeof(s->stack[0])*s->size);
         assert(s->stack);
         debugf("stack:");
         for(unsigned i = 0; i < s->ptr; i++) {
@@ -62,7 +62,7 @@ stack_check(struct stack *s, unsigned n) {
 
 static struct stack root_stack = EMPTY_STACK;
 
-static void
+A_UNUSED static void
 gc_add_root(gc_t gc, sptr_t root)
 {
         if(IS_PTR(root)) {
@@ -202,7 +202,7 @@ gc_perform_gc(gc_t gc)
         profile_pop(&gc_gc_time);
 }
 
-static void *
+A_UNUSED static void *
 gc_alloc(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
 {
         profile_push(&gc_alloc_time);
@@ -215,16 +215,24 @@ gc_alloc(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
 }
 
 static void jhc_alloc_print_stats(void) { }
+static const void *nh_stuff[];
 
-#ifdef JHC_JGC_STACK
-static void jhc_alloc_init(void) { }
-#else
 static void
 jhc_alloc_init(void) {
+#ifndef JHC_JGC_STACK
         saved_gc = gc_stack_base = malloc((1UL << 18)*sizeof(gc_stack_base[0]));
-        arena = new_arena();
-}
 #endif
+        arena = new_arena();
+        if(nh_stuff[0]) {
+                nh_end = nh_start = nh_stuff[0];
+        }
+        for(int i = 0; nh_stuff[i]; i++) {
+                if(nh_stuff[i] < nh_start)
+                        nh_start = nh_stuff[i];
+                if(nh_stuff[i] > nh_end)
+                        nh_end = nh_stuff[i];
+        }
+}
 
 static void
 jhc_alloc_fini(void) {

@@ -10,14 +10,16 @@
 #include <time.h>
 #include <unistd.h>
 #include <wchar.h>
+#include <setjmp.h>
 #ifndef __WIN32__
 #include <sys/select.h>
 #include <sys/times.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/utsname.h>
+#else
+#include <malloc.h>
 #endif
-#include <setjmp.h>
 
 // #define our options
 

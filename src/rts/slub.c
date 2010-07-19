@@ -97,9 +97,18 @@ struct s_megablock *
 s_new_megablock(struct s_arena *arena)
 {
         struct s_megablock *mb = malloc(sizeof(*mb));
-        int ret = posix_memalign(&mb->base,MEGABLOCK_SIZE,MEGABLOCK_SIZE);
+#if defined(__WIN32__)
+        mb->base = _aligned_malloc(MEGABLOCK_SIZE, BLOCK_SIZE);
+        int ret = !mb->base;
+#elif (defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ <  1060)
+        assert(sysconf(_SC_PAGESIZE) == BLOCK_SIZE);
+        mb->base = valloc(MEGABLOCK_SIZE);
+        int ret = !mb->base;
+#else
+        int ret = posix_memalign(&mb->base,BLOCK_SIZE,MEGABLOCK_SIZE);
+#endif
         if(ret != 0) {
-                fprintf(stderr,"Unable to allocate memory with posix_memalign for megablock\n");
+                fprintf(stderr,"Unable to allocate memory for megablock\n");
                 abort();
         }
         mb->next_free = 0;
@@ -236,7 +245,6 @@ s_alloc(gc_t gc, struct s_cache *sc)
         }
 }
 
-
 /*
 static void
 s_free(void *val)
@@ -251,11 +259,10 @@ s_free(void *val)
 }
 */
 
-
 static struct s_cache *
 new_cache(struct s_arena *arena, unsigned short size, unsigned short num_ptrs)
 {
-        struct s_cache *sc = malloc(sizeof(struct s_cache));
+        struct s_cache *sc = malloc(sizeof(*sc));
         sc->arena = arena;
         sc->pi.size = size;
         sc->pi.num_ptrs = num_ptrs;

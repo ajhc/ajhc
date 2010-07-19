@@ -8,7 +8,7 @@ import Data.List
 import Data.Char
 import Data.Maybe
 import Data.Monoid
-import Text.PrettyPrint.HughesPJ(nest,($$))
+import Text.PrettyPrint.HughesPJ(nest,($$),fsep)
 import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -128,25 +128,30 @@ localTodo todo (C act) = C $ local (\ r -> r { rTodo = todo }) act
 compileGrin :: Grin -> (LBS.ByteString,[String])
 compileGrin grin = (LBS.fromChunks code, snub (reqLibraries req))  where
     code = [
-        --hsffi_h,
-        --wsize_h,
-        --jhc_rts_header_h,
-        --jhc_jgc_h,
-        --jhc_rts_alloc_c,
-        --jhc_rts_c,
-        --jhc_rts2_c,
-        --bitarray_h,
-        --slub_c,
-        --jhc_jgc_c,
         theData,
         BS.fromString $ P.render ans,
         BS.fromString "\n"
         ]
-    ans = vcat $ includes ++ jgcs ++ [text "", enum_tag_t, header,cafs, buildConstants cpr grin finalHcHash, body]
-    jgcs = [ text "struct s_cache *" <> tshow (nodeCacheName m) <> char ';' | m <- Set.toList wAllocs]
+    ans = vcat [
+        vcat includes,
+        vcat jgcs,
+        text "",
+        enum_tag_t,
+        header,
+        cafs,
+        buildConstants cpr grin finalHcHash,
+        text "",
+        nh_stuff,
+        text "",
+        body
+        ]
+    jgcs = [ text "static struct s_cache *" <> tshow (nodeCacheName m) <> char ';' | m <- Set.toList wAllocs]
+    nh_stuff = text "static const void *nh_stuff[] = {" $$ fsep (punctuate (char ',') (cafnames ++ constnames ++ [text "NULL"]))  $$ text "};"
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
     (header,body) = generateC (Map.elems fm) (Map.elems sm)
+    cafnames = [ text "&_" <> tshow (varName v) | (v,_) <- grinCafs grin ]
+    constnames =  map (\n -> text "&_c" <> tshow n) [ 1 .. length $ Grin.HashConst.toList finalHcHash]
     ((cafs',finalHcHash,Written { wRequires = req, wFunctions = fm, wEnums = wenum, wStructures = sm, wTags = ts, .. }),cpr) = runC grin $ go >> mapM convertCAF (grinCafs grin)
     enum_tag_t | null enums = mempty
                | otherwise  = text "enum {" $$ nest 4 (P.vcat (punctuate P.comma $ enums)) $$ text "};"
