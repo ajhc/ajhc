@@ -32,14 +32,8 @@ jhc_case_fell_off(int n) {
         abort();
 }
 
-
-#ifdef __WIN32__
-#define jhc_setjmp(jb) setjmp(*(jmp_buf *)jb)
-#define jhc_longjmp(jb) longjmp(*(jmp_buf *)jb,1)
-#else
-#define jhc_setjmp(jb) sigsetjmp(*(jmp_buf *)jb,0)
-#define jhc_longjmp(jb) siglongjmp(*(jmp_buf *)jb,1)
-#endif
+#define jhc_setjmp(jb) setjmp(*(jb))
+#define jhc_longjmp(jb) longjmp(*(jb),1)
 
 struct jhc_continuation {
     void *argument;
@@ -49,24 +43,6 @@ struct jhc_continuation {
 #define prim_umaxbound(t) ((t)~((t)0))
 #define prim_maxbound(t) ((t)(~((t)1 << (sizeof(t)*8 - 1))))
 #define prim_minbound(t) ((t)(((t)1 << (sizeof(t)*8 - 1))))
-
-
-
-
-#if _JHC_STANDALONE
-int
-main(int argc, char *argv[])
-{
-        hs_init(&argc,&argv);
-        if (jhc_setjmp(jhc_uncaught))
-                jhc_error("Uncaught Exception");
-        else
-                _amain();
-        hs_exit();
-        return 0;
-}
-#endif
-
 
 void
 hs_set_argv(int argc, char *argv[])
@@ -116,4 +92,17 @@ hs_exit(void)
         }
 }
 
+#if _JHC_STANDALONE
+int
+main(int argc, char *argv[])
+{
+        hs_init(&argc,&argv);
+        if (jhc_setjmp(&jhc_uncaught))
+                jhc_error("Uncaught Exception");
+        else
+                _amain();
+        hs_exit();
+        return 0;
+}
+#endif
 
