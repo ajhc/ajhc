@@ -232,13 +232,13 @@ LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST) --noauto -L- -L.
 
 
 jhc-1.0.hl: lib/jhc/jhc.cabal
-	./jhc $(LIB_OPTIONS) -ilib/jhc --build-hl $< -o $@
+	./jhc $(LIB_OPTIONS) -N -ilib/jhc --build-hl $< -o $@
 
 base-1.0.hl: lib/base/base.cabal jhc-1.0.hl
 	./jhc $(LIB_OPTIONS) -ilib/base -pjhc --build-hl $< -o $@
 
 applicative-1.0.hl: lib/applicative/applicative.cabal base-1.0.hl
-	./jhc $(LIB_OPTIONS) -ilib/applicative -pjhc -pbase --build-hl $< -o $@
+	./jhc $(LIB_OPTIONS) -ilib/applicative -pbase --build-hl $< -o $@
 
 containers-0.2.0.hl: lib/containers.cabal base-1.0.hl applicative-1.0.hl
 	./jhc $(LIB_OPTIONS) -Isrc/data -Ilib/containers/include -ilib/containers -pjhc -pbase -papplicative -fcpp --build-hl $<  -o $@

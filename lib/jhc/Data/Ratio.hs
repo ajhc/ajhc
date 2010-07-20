@@ -3,9 +3,11 @@
 module  Data.Ratio (
     Ratio, Rational, (%), numerator, denominator, approxRational ) where
 
+import Prelude
 import Prelude.Text
 import Prelude.Float(doubleToRational)
 import Jhc.Num
+import Jhc.Order
 import Jhc.Float
 
 infixl 7  %

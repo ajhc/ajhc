@@ -7,6 +7,7 @@ module Numeric(fromRat,
                showEFloat, showFFloat, showGFloat, showFloat,
                readFloat, lexDigits) where
 
+import Prelude
 import Data.Word
 import Prelude.CType   ( isDigit, isOctDigit, isHexDigit
                    , digitToInt, intToDigit )
