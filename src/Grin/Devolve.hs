@@ -141,6 +141,8 @@ twiddleExp e = f e where
 
     isNode TyNode = True
     isNode TyINode = True
+    isNode (TyPtr TyNode) = True
+    isNode (TyPtr TyINode) = True
     isNode _ = False
 
 instance Twiddle Lam where
