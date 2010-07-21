@@ -691,8 +691,8 @@ parseHsSource fn lbs = do
         putStrLn s'
     fn <- shortenPath fn
     case runParserWithMode (parseModeOptions $ collectFileOpts fn s) { parseFilename = fn } parse  s'  of
-                      ParseOk ws e -> processErrors ws >> return (e,LBSU.fromString s')
-                      ParseFailed sl err -> putErrDie $ show sl ++ ": " ++ err
+                      (ws,ParseOk e) -> processErrors ws >> return (e,LBSU.fromString s')
+                      (_,ParseFailed sl err) -> putErrDie $ show sl ++ ": " ++ err
 
 
 mapHoBodies  :: (E -> E) -> Ho -> Ho

@@ -28,14 +28,17 @@ module FrontEnd.ParseMonad(
 
 import qualified Data.Set as Set
 
+import Data.Monoid
+import Data.Functor
 import FrontEnd.SrcLoc
 import FrontEnd.Warning
 import Options
 import qualified FlagOpts as FO
+import qualified Control.Applicative as A
 
 -- | The result of a parse.
 data ParseResult a
-	= ParseOk [Warning] a	-- ^ The parse succeeded, yielding a value and a set of warnings.
+	= ParseOk a	-- ^ The parse succeeded, yielding a value and a set of warnings.
 	| ParseFailed SrcLoc String
 				-- ^ The parse failed at the specified
 				-- source location, with an error message.
@@ -51,6 +54,27 @@ data LexContext = NoLayout | Layout Int
 --type ParseState = [LexContext]
 data ParseState = ParseState { psLexContext :: [LexContext], psWarnings :: [Warning] }
     deriving(Show)
+
+
+instance Functor ParseResult where
+    fmap f (ParseOk x) = ParseOk (f x)
+    fmap _ (ParseFailed x y) = ParseFailed x y
+
+instance A.Applicative ParseResult where
+  pure = ParseOk
+  ParseOk f <*> x = f <$> x
+  ParseFailed loc msg <*> _ = ParseFailed loc msg
+
+instance Monad ParseResult where
+  return = A.pure
+  ParseOk x         >>= f = f x
+  ParseFailed loc msg >>= _ = ParseFailed loc msg
+
+instance Monoid m => Monoid (ParseResult m) where
+  mempty = ParseOk mempty
+  ParseOk x `mappend` ParseOk y = ParseOk $ x `mappend` y
+  ParseOk x `mappend` err       = err
+  err       `mappend` _         = err -- left-biased
 
 indentOfParseState :: ParseState -> Int
 indentOfParseState ParseState { psLexContext = (Layout n:_) } = n
@@ -99,17 +123,17 @@ newtype P a = P { runP ::
 		     -> ParseStatus a
 		}
 
-runParserWithMode :: ParseMode -> P a -> String -> ParseResult a
+runParserWithMode :: ParseMode -> P a -> String -> ([Warning],ParseResult a)
 runParserWithMode mode (P m) s = case m s 0 1 start emptyParseState mode of
-	Ok s a -> ParseOk (psWarnings s) a
-	Failed loc msg -> ParseFailed loc msg
+	Ok s a -> (psWarnings s,ParseOk a)
+	Failed loc msg -> ([],ParseFailed loc msg)
     where start = SrcLoc {
 		srcLocFileName = parseFilename mode,
 		srcLocLine = 1,
 		srcLocColumn = 1
 	}
 
-runParser :: P a -> String -> ParseResult a
+runParser :: P a -> String -> ([Warning],ParseResult a)
 runParser = runParserWithMode defaultParseMode
 
 instance Monad P where

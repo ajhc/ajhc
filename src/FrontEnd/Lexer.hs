@@ -154,6 +154,7 @@ special_varops = [
  ( "!",  Exclamation ),	--ditto
  ( ".",  Dot ),		--ditto
  ( "*",  Star ),	--ditto
+ ( "\x2605",  Star ),	--ditto
  ( "#",  Hash )		--ditto
  ]
 
@@ -183,7 +184,9 @@ reserved_ids = [
  ( "type", 	KW_Type ),
  ( "foreign",   KW_Foreign ),
  ( "forall",    KW_Forall ),
+ ( "\x2200",    KW_Forall ),
  ( "exists",    KW_Exists ),
+ ( ['∃'],       KW_Exists ),
  ( "where", 	KW_Where )
  ]
 

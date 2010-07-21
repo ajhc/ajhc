@@ -163,8 +163,8 @@ kindShow (KBase b) = pprint b
 kindShow x = parens (pprint x)
 
 parseStmt ::  Monad m => String -> m HsStmt
-parseStmt s = case runParserWithMode (parseModeOptions options) { parseFilename = "(jhci)" } parseHsStmt  s  of
-                      ParseOk _ e -> return e
+parseStmt s = case snd $ runParserWithMode (parseModeOptions options) { parseFilename = "(jhci)" } parseHsStmt  s  of
+                      ParseOk e -> return e
                       ParseFailed sl err -> fail $ show sl ++ ": " ++ err
 
 printStatement stmt = do

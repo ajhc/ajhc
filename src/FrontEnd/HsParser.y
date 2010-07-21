@@ -616,12 +616,15 @@ valdef :: { HsDecl }
                       { HsTypeDecl $3 (fst $2) (snd $2) $5 }
       | 'type' simpletype srcloc
                       { HsTypeDecl $3 (fst $2) (snd $2) HsTyAssoc }
-      | pinfixexp srcloc rhs                   {% checkValDef $2 $1 $3 []}
-      | pinfixexp srcloc rhs 'where' decllist  {% checkValDef $2 $1 $3 $5}
+      | pinfixexp srcloc rhs optwhere          {% checkValDef $2 $1 $3 $4}
       | srcloc PRAGMASPECIALIZE 'instance'  type PRAGMAEND
                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = nameName u_instance , hsDeclType = $4
                                            , hsDeclUniq = error "hsDeclUniq not set"  } }
       | pragmainline { $1 }
+
+optwhere :: { [HsDecl] }
+       : 'where' decllist		{ $2 }
+       | {- empty -}			{ [] }
 
 rhs   :: { HsRhs }
       : '=' exp                       {% checkExpr $2 `thenP` \e ->
@@ -828,11 +831,8 @@ alts :: { [HsAlt] }
       | alt                                   { [$1] }
 
 alt :: { HsAlt }
-      : pinfixexp srcloc ralt  {% checkPattern $1 `thenP` \p ->
-                                 returnP (HsAlt $2 p $3 []) }
-      | pinfixexp srcloc ralt 'where' decllist
-                              {% checkPattern $1 `thenP` \p ->
-                                 returnP (HsAlt $2 p $3 $5) }
+      : pinfixexp srcloc ralt optwhere {% checkPattern $1 `thenP` \p ->
+                                 returnP (HsAlt $2 p $3 $4) }
 
 ralt :: { HsRhs }
       : '->' exp                              { HsUnGuardedRhs $2 }
