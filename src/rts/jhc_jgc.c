@@ -28,7 +28,7 @@ typedef struct {
 static void *nh_start, *nh_end;
 gc_check_heap(entry_t *s)
 {
-        return (s < nh_start || s > nh_end);
+        return (s < (entry_t *)nh_start || s > (entry_t *)nh_end);
 }
 
 
@@ -187,7 +187,7 @@ gc_perform_gc(gc_t gc)
                 J1C(n_roots,gc_roots,0,-1);
 #endif
 
-                fprintf(stdout, "%3u - %6u Used: %4u Thresh: %4u Ss: %5u Ps: %5u Rs: %5u Root: %3u\n",
+                fprintf(stderr, "%3u - %6u Used: %4u Thresh: %4u Ss: %5u Ps: %5u Rs: %5u Root: %3u\n",
                         number_gcs,
                         number_allocs,
                         (unsigned)arena->block_used,
@@ -237,9 +237,9 @@ jhc_alloc_init(void) {
 static void
 jhc_alloc_fini(void) {
         if(JHC_STATUS) {
-                printf("arena: %p\n", arena);
-                printf("  block_used: %i\n", arena->block_used);
-                printf("  block_threshold: %i\n", arena->block_threshold);
+                fprintf(stderr, "arena: %p\n", arena);
+                fprintf(stderr, "  block_used: %i\n", arena->block_used);
+                fprintf(stderr, "  block_threshold: %i\n", arena->block_threshold);
                 struct s_cache *sc = SLIST_FIRST(&arena->caches);
                 for(;sc;sc = SLIST_NEXT(sc,next)) {
                         print_cache(sc);

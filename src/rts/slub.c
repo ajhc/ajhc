@@ -343,24 +343,23 @@ new_arena(void) {
         return arena;
 }
 
-
 void
 print_cache(struct s_cache *sc) {
-        printf("num_entries: %i\n",(int)sc->num_entries);
+        fprintf(stderr, "num_entries: %i\n",(int)sc->num_entries);
 //        printf("  entries: %i words\n",(int)(sc->num_entries*sc->pi.size));
-        printf("  header: %lu bytes\n", sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(sc->num_entries));
-        printf("  size: %i words\n",(int)sc->pi.size);
+        fprintf(stderr, "  header: %lu bytes\n", sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(sc->num_entries));
+        fprintf(stderr, "  size: %i words\n",(int)sc->pi.size);
 //        printf("  color: %i words\n",(int)sc->pi.color);
-        printf("  nptrs: %i words\n",(int)sc->pi.num_ptrs);
+        fprintf(stderr, "  nptrs: %i words\n",(int)sc->pi.num_ptrs);
 //        printf("  end: %i bytes\n",(int)(sc->pi.color+ sc->num_entries*sc->pi.size)*sizeof(uintptr_t));
-        printf("%20s %9s %9s %s\n", "block", "num_free", "next_free", "status");
+        fprintf(stderr, "%20s %9s %9s %s\n", "block", "num_free", "next_free", "status");
         struct s_block *pg;
         SLIST_FOREACH(pg,&sc->blocks,link) {
-            printf("%20p %9i %9i %c\n", pg, pg->num_free, pg->next_free, 'P');
+            fprintf(stderr, "%20p %9i %9i %c\n", pg, pg->num_free, pg->next_free, 'P');
         }
-        printf("  full_blocks:\n");
+        fprintf(stderr, "  full_blocks:\n");
         SLIST_FOREACH(pg,&sc->full_blocks,link) {
-            printf("%20p %9i %9i %c\n", pg, pg->num_free, pg->next_free, 'F');
+            fprintf(stderr, "%20p %9i %9i %c\n", pg, pg->num_free, pg->next_free, 'F');
         }
 }
 
