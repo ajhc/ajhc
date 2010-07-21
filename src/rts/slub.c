@@ -1,19 +1,4 @@
 #if _JHC_GC == _JHC_GC_JGC
-
-#ifdef JHC_VALGRIND
-#include <valgrind/valgrind.h>
-#include <valgrind/memcheck.h>
-#else
-#define VALGRIND_MAKE_MEM_UNDEFINED(x,y) \
-    do { } while (0)
-#define VALGRIND_MAKE_MEM_DEFINED(x,y) \
-    do { } while (0)
-#define VALGRIND_MAKE_MEM_NOACCESS(x,y) \
-    do { } while (0)
-#define VALGRIND_PRINTF(...) \
-    do { } while (0)
-#endif
-
 /*
  * Singly-linked List definitions.
  */
@@ -82,7 +67,6 @@ struct s_cache {
         SLIST_HEAD(,s_block) full_blocks;
         struct s_block_info pi;
         unsigned short num_entries;
-        unsigned short num_ptrs;
         struct s_arena *arena;
 };
 
@@ -93,7 +77,7 @@ struct s_cache {
 
 static unsigned
 bitset_find_free(unsigned *next_free,int n,bitarray_t ba[static n]) {
-        assert(*next_free < n);
+        assert(*next_free < (unsigned)n);
         unsigned i = *next_free;
         do {
                 int o = __builtin_ffsl(~ba[i]);
@@ -227,8 +211,10 @@ clear_block_used_bits(unsigned num_entries, struct s_block *pg)
         memset(pg->used,0,BITARRAY_SIZE_IN_BYTES(num_entries) - sizeof(pg->used[0]));
         int excess = num_entries % BITS_PER_UNIT;
         pg->used[BITARRAY_SIZE(num_entries) - 1] = ~((1UL << excess) - 1);
-        unsigned header =  sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(num_entries);
-        VALGRIND_MAKE_MEM_NOACCESS((char *)pg + header, BLOCK_SIZE - header);
+        if(JHC_VALGRIND) {
+                unsigned header =  sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(num_entries);
+                VALGRIND_MAKE_MEM_NOACCESS((char *)pg + header, BLOCK_SIZE - header);
+        }
 }
 
 static void *
@@ -237,8 +223,12 @@ s_alloc(gc_t gc, struct s_cache *sc)
         struct s_block *pg = SLIST_FIRST(&sc->blocks);
         if(__predict_false(!pg)) {
                 pg = get_free_block(gc, sc->arena);
-                //VALGRIND_MALLOCLIKE_BLOCK(pg,sizeof(struct s_block) + BITARRAY_SIZE_IN_BYTES(sc->num_entries), 0, 0);
-                VALGRIND_MAKE_MEM_UNDEFINED((char *)pg->used,BITARRAY_SIZE_IN_BYTES(sc->num_entries));
+                VALGRIND_MAKE_MEM_NOACCESS(pg, BLOCK_SIZE);
+                VALGRIND_MAKE_MEM_DEFINED(pg, sizeof(struct s_block));
+                if(sc->num_entries != pg->num_free)
+                        VALGRIND_MAKE_MEM_UNDEFINED((char *)pg->used,BITARRAY_SIZE_IN_BYTES(sc->num_entries));
+                else
+                        VALGRIND_MAKE_MEM_DEFINED((char *)pg->used,BITARRAY_SIZE_IN_BYTES(sc->num_entries));
                 assert(pg);
                 pg->pi = sc->pi;
                 pg->next_free = 0;

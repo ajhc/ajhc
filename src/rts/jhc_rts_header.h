@@ -44,6 +44,14 @@
 #endif
 #endif
 
+#ifndef JHC_VALGRIND
+#define JHC_VALGRIND 0
+#endif
+
+#ifndef JHC_MEM_ANNOTATE
+#define JHC_MEM_ANNOTATE 0
+#endif
+
 #ifndef _JHC_STANDALONE
 #define _JHC_STANDALONE 1
 #endif

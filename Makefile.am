@@ -108,7 +108,7 @@ RAWFILES = src/data/ViaGhc.hs ChangeLog \
 	   src/data/shortchange.txt src/data/prelude.m4 src/data/targets.ini
 
 RTSFILES = src/data/HsFFI.h src/rts/wsize.h src/rts/jhc_rts_header.h src/rts/jhc_jgc.h \
-	   src/rts/jhc_rts_alloc.c src/rts/jhc_rts.c src/rts/profile.c src/rts/jhc_rts2.c src/rts/bitarray.h \
+	   src/rts/debug.c src/rts/jhc_rts_alloc.c src/rts/jhc_rts.c src/rts/profile.c src/rts/jhc_rts2.c src/rts/bitarray.h \
 	   src/rts/slub.c src/rts/jhc_jgc.c  src/rts/lib_cbits.c
 
 DRIFTFILES = drift_processed/C/FFI.hs drift_processed/C/FromGrin2.hs drift_processed/Cmm/Op.hs drift_processed/C/Prims.hs drift_processed/DataConstructors.hs \

@@ -1,8 +1,6 @@
 #if _JHC_GC == _JHC_GC_JGC
 static struct s_arena *arena;
 
-#define TO_BLOCKS(x) ((x) <= GC_MINIMUM_SIZE*GC_BASE ? GC_MINIMUM_SIZE : (((x) - 1)/GC_BASE) + 1)
-
 #ifdef JHC_JGC_STACK
 struct frame {
         struct frame *prev;
@@ -24,13 +22,13 @@ typedef struct {
         sptr_t ptrs[0];
 } entry_t;
 
+static const void *nh_start, *nh_end;
 
-static void *nh_start, *nh_end;
+static bool
 gc_check_heap(entry_t *s)
 {
         return (s < (entry_t *)nh_start || s > (entry_t *)nh_end);
 }
-
 
 struct stack {
         unsigned size;
@@ -77,6 +75,7 @@ gc_add_root(gc_t gc, sptr_t root)
 static void
 gc_add_grey(struct stack *stack, entry_t *s)
 {
+        VALGRIND_MAKE_MEM_DEFINED(s,S_BLOCK(s)->pi.size * sizeof(uintptr_t));
         if(gc_check_heap(s) && s_set_used_bit(s))
                 stack->stack[stack->ptr++] = s;
 }
@@ -96,8 +95,10 @@ gc_perform_gc(gc_t gc)
 
         debugf("Setting Roots:");
         stack_check(&stack, root_stack.ptr);
-        memcpy(stack.stack + stack.ptr,root_stack.stack, root_stack.ptr * sizeof(root_stack.stack[0]));
-        stack.ptr += root_stack.ptr;
+        for(int i = 0; i < root_stack.ptr; i++) {
+                gc_add_grey(&stack, root_stack.stack[i]);
+                debugf(" %p", root_stack.stack[i]);
+        }
         debugf("\n");
         debugf("Trace:");
 #ifdef JHC_JGC_STACK
@@ -207,7 +208,7 @@ gc_perform_gc(gc_t gc)
 }
 
 A_UNUSED static void *
-gc_alloc(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
+(gc_alloc)(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
 {
         profile_push(&gc_alloc_time);
         number_allocs++;
@@ -220,7 +221,7 @@ gc_alloc(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
 }
 
 static void jhc_alloc_print_stats(void) { }
-static const void *nh_stuff[];
+static const void * const nh_stuff[];
 
 static void
 jhc_alloc_init(void) {

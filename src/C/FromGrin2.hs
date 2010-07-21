@@ -146,7 +146,7 @@ compileGrin grin = (LBS.fromChunks code, snub (reqLibraries req))  where
         body
         ]
     jgcs = [ text "static struct s_cache *" <> tshow (nodeCacheName m) <> char ';' | m <- Set.toList wAllocs]
-    nh_stuff = text "static const void *nh_stuff[] = {" $$ fsep (punctuate (char ',') (cafnames ++ constnames ++ [text "NULL"]))  $$ text "};"
+    nh_stuff = text "static const void * const nh_stuff[] = {" $$ fsep (punctuate (char ',') (cafnames ++ constnames ++ [text "NULL"]))  $$ text "};"
     includes =  map include (snub $ reqIncludes req)
     include fn = text "#include <" <> text fn <> text ">"
     (header,body) = generateC (Map.elems fm) (Map.elems sm)
