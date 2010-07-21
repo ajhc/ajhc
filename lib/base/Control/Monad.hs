@@ -1,16 +1,10 @@
-module Control.Monad(
-    MonadPlus(mzero, mplus),
-    join, guard, when, unless, ap, msum,
-    filterM, mapAndUnzipM, zipWithM, zipWithM_, foldM,
-    liftM, liftM2, liftM3, liftM4, liftM5,
-
-    foldM_,replicateM,replicateM_,(>=>),(<=<),forever,
-
-    -- ...and what the Prelude exports
-    Monad((>>=), (>>), return, fail),
-    Functor(fmap),
-    mapM, mapM_, sequence, sequence_, (=<<)
-)where
+module Control.Monad (
+    Functor(fmap),  Monad((>>=), (>>), return, fail),  MonadPlus(mzero, mplus),
+    mapM,  mapM_,  forM,  forM_,  sequence,  sequence_,  (=<<),  (>=>),  (<=<),
+    forever,  void,  join,  msum,  filterM,  mapAndUnzipM,  zipWithM,
+    zipWithM_,  foldM,  foldM_,  replicateM,  replicateM_,  guard,  when,
+    unless,  liftM,  liftM2,  liftM3,  liftM4,  liftM5,  ap
+    ) where
 
 import Jhc.Basics
 

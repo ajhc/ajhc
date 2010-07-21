@@ -1,13 +1,8 @@
 {-# OPTIONS_JHC -N #-}
-module Data.Maybe(
-    isJust, isNothing,
-    fromJust, fromMaybe, listToMaybe, maybeToList,
-    catMaybes, mapMaybe,
-
-    -- ...and what the Prelude exports
-    Maybe(Nothing, Just),
-    maybe
-  ) where
+module Data.Maybe (
+    Maybe(Nothing, Just),  maybe,  isJust,  isNothing,  fromJust,  fromMaybe,
+    listToMaybe,  maybeToList,  catMaybes,  mapMaybe
+    ) where
 
 import Jhc.Maybe
 import Jhc.Order

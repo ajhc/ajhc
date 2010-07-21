@@ -1,6 +1,6 @@
 {-# OPTIONS_JHC -funboxed-tuples #-}
 module  Data.Array (
-    module Ix,  -- export all of Ix
+    module Data.Ix,  -- export all of Ix
     Array(),
     array,
     listArray,

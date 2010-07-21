@@ -1,6 +1,8 @@
 {-# OPTIONS_JHC -fffi #-}
-module System.Exit ( ExitCode(ExitSuccess,ExitFailure),
-                     exitWith, exitFailure ) where
+module System.Exit (
+    ExitCode(ExitSuccess,ExitFailure),
+    exitWith, exitFailure, exitSuccess
+    ) where
 
 import Foreign.C.String
 import Foreign.Ptr
@@ -19,7 +21,9 @@ getEnv      :: String -> IO String
 system      :: String -> IO ExitCode
 exitWith    :: ExitCode -> IO a
 exitFailure :: IO a
+exitSuccess :: IO a
 
+exitSuccess = exitWith ExitSuccess
 
 exitWith ExitSuccess = do
     c_exit 0
