@@ -152,7 +152,6 @@ data Mode = BuildHl FilePath         -- ^ Build the specified hl-file given a de
 data Opt = Opt {
     optMode        ::  Mode,      -- ^ Mode of interaction
     optColumns     :: !Int,       -- ^ Width of terminal.
-    optDebug       :: !Bool,      -- ^ Debugging.
     optDump        ::  [String],  -- ^ Dump options (raw).
     optStmts       ::  [String],  -- ^ statements to execute
     optFOpts       ::  [String],  -- ^ Flag options (raw).
@@ -188,7 +187,6 @@ data Opt = Opt {
 opt = Opt {
     optMode        = CompileExe,
     optColumns     = getColumns,
-    optDebug       = False,
     optCross       = False,
     optIncdirs     = initialIncludes,
     optAnnotate    = Nothing,
@@ -247,7 +245,6 @@ theoptions =
     , Option ['m'] ["arch"]      (ReqArg (optArch_u . idu ) "arch")      "target architecture options"
     , Option []    ["entry"]     (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression"
     , Option ['e'] []            (ReqArg (\d -> optStmts_u (d:)) "<statement>")  "run given statement as if on jhci prompt"
-    , Option []    ["debug"]     (NoArg  (optDebug_s True))            "debugging"
     , Option []    ["show-ho"]   (ReqArg  (optMode_s . ShowHo) "file.ho") "Show ho file"
     , Option []    ["noauto"]    (NoArg  (optNoAuto_s True))           "Don't automatically load base and haskell98 packages"
     , Option ['p'] []            (ReqArg (\d -> optHls_u (++ [d])) "file.hl") "Load given haskell library .hl file"
