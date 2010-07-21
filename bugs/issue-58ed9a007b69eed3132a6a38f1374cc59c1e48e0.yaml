@@ -5,8 +5,8 @@ type: :bugfix
 component: rts
 release: 0.7.5
 reporter: John Meacham <john@repetae.net>
-status: :unstarted
-disposition: 
+status: :closed
+disposition: :fixed
 creation_time: 2010-07-16 03:52:28.856831 Z
 references: []
 
@@ -15,4 +15,8 @@ log_events:
 - - 2010-07-16 03:52:30.216812 Z
   - John Meacham <john@repetae.net>
   - created
+  - ""
+- - 2010-07-21 10:40:15.638075 Z
+  - John Meacham <john@repetae.net>
+  - closed with disposition fixed
   - ""

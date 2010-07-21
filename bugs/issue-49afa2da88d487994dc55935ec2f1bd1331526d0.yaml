@@ -5,10 +5,10 @@ desc: |-
   We should be able to simulate it by allocating a larger amount of memory at a time and aligning the memory ourselves.
 type: :bugfix
 component: rts
-release: 
+release: 0.7.5
 reporter: John Meacham <john@repetae.net>
-status: :unstarted
-disposition: 
+status: :closed
+disposition: :fixed
 creation_time: 2010-07-11 05:07:41.306836 Z
 references: []
 
@@ -21,4 +21,12 @@ log_events:
 - - 2010-07-11 05:08:12.576910 Z
   - John Meacham <john@repetae.net>
   - assigned to component rts from be
+  - ""
+- - 2010-07-21 10:38:23.338075 Z
+  - John Meacham <john@repetae.net>
+  - assigned to release 0.7.5 from unassigned
+  - ""
+- - 2010-07-21 10:38:45.558075 Z
+  - John Meacham <john@repetae.net>
+  - closed with disposition fixed
   - ""

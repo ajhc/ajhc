@@ -20,3 +20,7 @@ log_events:
   - John Meacham <john@repetae.net>
   - assigned to release 0.7.5 from unassigned
   - ""
+- - 2010-07-21 10:40:50.958075 Z
+  - John Meacham <john@repetae.net>
+  - commented
+  - it can handle arrays that can fit on a single BLOCK fine right now.
