@@ -2,6 +2,9 @@ define detag
     print (void *)((uintptr_t)$arg0 & ~0x3)
 end
 
+define pblock
+    print *(struct s_block *)((uintptr_t)$arg0 & ~(0xFFF))
+end
 
 define pnode
         if ((uintptr_t)$arg0 & 1)

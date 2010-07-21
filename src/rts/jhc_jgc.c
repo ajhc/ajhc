@@ -136,6 +136,8 @@ gc_perform_gc(gc_t gc)
                 // TODO - short circuit redirects on stack
                 sptr_t ptr = gc_stack_base[i];
                 if(1 && (IS_LAZY(ptr))) {
+                        assert(GET_PTYPE(ptr) == P_LAZY);
+                        VALGRIND_MAKE_MEM_DEFINED(FROM_SPTR(ptr), sizeof(uintptr_t));
                         if(!IS_LAZY(GETHEAD(FROM_SPTR(ptr)))) {
                                 void *gptr = TO_GCPTR(ptr);
                                 if(gc_check_heap(gptr))
@@ -160,11 +162,13 @@ gc_perform_gc(gc_t gc)
         while(stack.ptr) {
                 entry_t *e = stack.stack[--stack.ptr];
                 struct s_block *pg = S_BLOCK(e);
+                VALGRIND_MAKE_MEM_DEFINED(e,pg->pi.size * sizeof(uintptr_t));
                 debugf("Processing Grey: %p\n",e);
 
                 stack_check(&stack, pg->pi.num_ptrs);
                 for(int i = 0; i < pg->pi.num_ptrs; i++) {
                         if(1 && (P_LAZY == GET_PTYPE(e->ptrs[i]))) {
+                                VALGRIND_MAKE_MEM_DEFINED(FROM_SPTR(e->ptrs[i]), sizeof(uintptr_t));
                                 if(!IS_LAZY(GETHEAD(FROM_SPTR(e->ptrs[i])))) {
                                         number_redirects++;
                                         debugf(" *");
@@ -209,6 +213,7 @@ gc_alloc(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
         number_allocs++;
         assert(nptrs <= count);
         entry_t *e = s_alloc(gc, find_cache(sc, arena, count, nptrs));
+        VALGRIND_MAKE_MEM_UNDEFINED(e,sizeof(uintptr_t)*count);
         debugf("allocated: %p %i %i\n",(void *)e, count, nptrs);
         profile_pop(&gc_alloc_time);
         return (void *)e;
@@ -219,18 +224,19 @@ static const void *nh_stuff[];
 
 static void
 jhc_alloc_init(void) {
+        VALGRIND_PRINTF("Jhc-Valgrind mode active.\n");
 #ifndef JHC_JGC_STACK
         saved_gc = gc_stack_base = malloc((1UL << 18)*sizeof(gc_stack_base[0]));
 #endif
         arena = new_arena();
         if(nh_stuff[0]) {
                 nh_end = nh_start = nh_stuff[0];
-        }
-        for(int i = 0; nh_stuff[i]; i++) {
-                if(nh_stuff[i] < nh_start)
-                        nh_start = nh_stuff[i];
-                if(nh_stuff[i] > nh_end)
-                        nh_end = nh_stuff[i];
+                for(int i = 1; nh_stuff[i]; i++) {
+                        if(nh_stuff[i] < nh_start)
+                                nh_start = nh_stuff[i];
+                        if(nh_stuff[i] > nh_end)
+                                nh_end = nh_stuff[i];
+                }
         }
 }
 
