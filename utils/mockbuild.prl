@@ -10,7 +10,7 @@ $tts = $1;
 
 print "$tb $tts\n";
 
-my @args =  (qw/sudo mock rebuild -r fedora-12-i386/,  "$tts", qw/--no-clean --no-cleanup-after/);
+my @args =  (qw(sudo /usr/local/encap/mock-git/sbin/mock rebuild -r fedora-13-i386),  "$tts", qw/--no-clean --no-cleanup-after/);
 
 print join ' ',@args;
 print "\n";

@@ -5,11 +5,11 @@ Release: @RPMRELEASE@
 License: COPYING
 Group: Development/Languages/Haskell
 BuildRoot: %{_tmppath}/%{name}-root
-Source: http://repetae.net/computer/jhc/drop/%{name}-%{version}.tar.gz
+Source: http://repetae.net/dist/%{name}-%{version}.tar.gz
 URL: http://repetae.net/computer/jhc/
 Packager: John Meacham <john@repetae.net>
 Prefix: %{_prefix}
-BuildRequires: ghc, ghc-zlib-devel, ghc-utf8-string-devel
+BuildRequires: ghc-editline-devel, ghc-binary-devel,  haskell-platform, ghc, ghc-zlib-devel, ghc-utf8-string-devel
 
 %description
 Jhc Haskell compiler.
@@ -38,8 +38,17 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/jhc-1.0.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/base-1.0.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/haskell98-1.0.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/flat-foreign-1.0.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/applicative-1.0.hl
-%{_datadir}/@PACKAGE@-@SHORTVERSION@/containers-0.2.0.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/containers-0.3.0.0.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/Diff-0.1.2.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/html-1.0.1.2.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/HUnit-1.2.2.1.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/pretty-1.0.1.1.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/safe-0.2.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/smallcheck-0.4.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/utility-ht-0.0.5.1.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/xhtml-3000.2.0.1.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/include/HsFFI.h
 %{_sysconfdir}/@PACKAGE@-@SHORTVERSION@/targets.ini
 
