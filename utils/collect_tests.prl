@@ -1,0 +1,33 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+my %has_test;
+
+for my $fn (@ARGV) {
+    my ($modname, $has_test) = (undef,0);
+    open my $fh, "<", $fn or next;
+    while($_ = <$fh>) {
+        s/--.*//;
+        s/{-.*-}//;
+        $modname = $1 if /\s*module\s+([A-Z][A-Za-z_.]*)/;
+        $has_test = 1 if /\bEXPORT_SELFTEST\b/;
+        last if /\bwhere\b/;
+    }
+    next unless defined $modname;
+    #print "$modname: $has_test\n";
+    $has_test{$modname} = $has_test;
+}
+
+
+print "module SelfTest(selfTest) where\n\n";
+foreach(sort keys %has_test) {
+    print "import qualified $_(_selftest)\n";
+}
+print "\n\n";
+
+print "selfTest = do\n";
+foreach(sort keys %has_test) {
+    print "    $_._selftest\n";
+}
