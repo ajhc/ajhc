@@ -19,6 +19,7 @@ import Jhc.Num
 import Jhc.Order
 import Jhc.Types
 import Jhc.Enum
+import Jhc.Inst.Num
 
 infixr 8  **
 

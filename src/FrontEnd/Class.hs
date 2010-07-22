@@ -44,7 +44,6 @@ import Monad
 import Name.Name
 import Name.Names
 import Support.CanType
-import PrimitiveOperators(primitiveInsts)
 import Support.FreeVars
 import Util.Gen
 import Util.HasSize
@@ -507,8 +506,8 @@ makeClassHierarchy (ClassHierarchy ch) kt ds = (ClassHierarchy ans) where
     f (HsClassDecl sl t decls)
         | HsTyApp (HsTyCon className) (HsTyVar argName)  <- tbody = do
             let qualifiedMethodAssumps = concatMap (aHsTypeSigToAssumps kt . qualifyMethod newClassContext) (filter isHsTypeSig decls)
-                newClassContext = [HsAsst className [argName]] -- hsContextToContext [(className, argName)]
-            tell [ClassRecord { classArgs = classArgs, classAssocs = classAssocs, className = toName ClassName className, classSrcLoc = sl, classSupers = [ toName ClassName x | HsAsst x _ <- cntxt], classInsts = [ emptyInstance { instHead = i } | i@(_ :=> IsIn n _) <- primitiveInsts, nameName n == className], classAssumps = qualifiedMethodAssumps }]
+                newClassContext = [HsAsst className [argName]] -- hsContextToContext [(className, argName)]                                                                                                                                                                   -- TODO
+            tell [ClassRecord { classArgs = classArgs, classAssocs = classAssocs, className = toName ClassName className, classSrcLoc = sl, classSupers = [ toName ClassName x | HsAsst x _ <- cntxt], classInsts = [ emptyInstance { instHead = i } | i@(_ :=> IsIn n _) <- [], nameName n == className], classAssumps = qualifiedMethodAssumps }]
         | otherwise = failSl sl "Invalid Class declaration."
         where
         HsQualType cntxt tbody = t

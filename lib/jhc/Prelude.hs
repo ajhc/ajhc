@@ -331,13 +331,6 @@ unzip3           =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
                           ([],[],[])
 
 
-instance Real Integer where
-    toRational = fromInteger
-instance Real Int where
-    toRational = fromInt
-
-
-
 {-# RULES "drop/0"        forall . drop 0 = \xs -> xs #-}
 {-# RULES "drop/1"        forall x xs . drop 1 (x:xs) = xs #-}
 {-# RULES "drop/2"        forall x y xs . drop 2 (x:y:xs) = xs #-}

@@ -19,7 +19,6 @@ numerator, denominator  :: Ratio a -> a
 numerator (x :% _)      =  x
 denominator (_ :% y)    =  y
 
-
 class  (Eq a, Show a) => Num a  where
     (+), (-), (*)    :: a -> a -> a
     negate           :: a -> a

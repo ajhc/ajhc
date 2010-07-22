@@ -21,6 +21,7 @@ import Jhc.Show
 import Jhc.Text.Read
 import Prelude.Float
 import Prelude.IO
+import Jhc.Inst.Num()
 
 
 import Data.Char(isSpace, isAlpha, isDigit, isAlphaNum,
