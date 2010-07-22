@@ -1,43 +1,32 @@
 # Ideally, people should be able to declare these in the program.
 
-# limits.h, float.h, inttypes.h
+Jhc.Prim.Int, bits32
+Jhc.Basics.Integer, bits<max>
 
-# Jhc.Prim.Char, ubits32, char, UINT32_MAX, 0
-Jhc.Prim.Int, sbits32, int, INT_MAX, INT_MIN
-Jhc.Basics.Integer, sbits<max>, int, INTMAX_MAX, INTMAX_MIN
+Data.Int.Int8, bits8
+Data.Int.Int16, bits16
+Data.Int.Int32, bits32
+Data.Int.Int64, bits64
+Data.Int.IntMax, bits<max>
+Data.Int.IntPtr, bits<ptr>
 
-Data.Int.Int8, sbits8, int, INT8_MAX, INT8_MIN
-Data.Int.Int16, sbits16, int, INT16_MAX, INT16_MIN
-Data.Int.Int32, sbits32, int, INT32_MAX, INT32_MIN
-Data.Int.Int64, sbits64, int, INT64_MAX, INT64_MIN
-Data.Int.IntMax, sbits<max>, int, INTMAX_MAX, INTMAX_MIN
-Data.Int.IntPtr, sbits<ptr>, int, INTPTR_MAX, INTPTR_MIN
+Data.Word.Word, bits32
+Data.Word.Word8, bits8
+Data.Word.Word16, bits16
+Data.Word.Word32, bits32
+Data.Word.Word64, bits64
+Data.Word.WordMax, bits<max>
+Data.Word.WordPtr, bits<ptr>
 
-Data.Word.Word, ubits32, int, UINT_MAX, 0
-Data.Word.Word8, ubits8, int, UINT8_MAX, 0
-Data.Word.Word16, ubits16, int, UINT16_MAX, 0
-Data.Word.Word32, ubits32, int, UINT32_MAX, 0
-Data.Word.Word64, ubits64, int, UINT64_MAX, 0
-Data.Word.WordMax, ubits<max>, int, UINTMAX_MAX, 0
-Data.Word.WordPtr, ubits<ptr>, int, UINTPTR_MAX, 0
-
-#Jhc.Float.Float, fbits<float>, float, FLT_MAX, FLT_MIN
-#Jhc.Float.Double, fbits<double>, float, DBL_MAX, DBL_MIN
-
-#Jhc.Addr.Addr, ubits<ptr>, ptr,UINTPTR_MAX, 0
-#Jhc.Addr.FunAddr, ubits<ptr>, ptr,UINTPTR_MAX,0
-
-Foreign.C.Types.CChar, sbits8, int, CHAR_MAX, CHAR_MIN
-Foreign.C.Types.CSChar, sbits8, int, CHAR_MAX, CHAR_MIN
-Foreign.C.Types.CUChar, sbits8, int, CHAR_MAX, CHAR_MIN
-Foreign.C.Types.CShort, sbits<short>, int, SHORT_MAX, SHORT_MIN
-Foreign.C.Types.CInt, sbits<int>, int, INT_MAX, INT_MIN
-Foreign.C.Types.CUInt, ubits<int>, int, UINT_MAX, 0
-Foreign.C.Types.CULong, ubits<ptr>, int, UINTPTR_MAX, 0
-Foreign.C.Types.CSize, ubits<size_t>, int, UINTPTR_MAX, 0
-Foreign.C.Types.CWchar, ubits<wchar_t>, int, 0x10FFFF, 0
-Foreign.C.Types.CWint, sbits<wchar_t>, int, 0x10FFFF, 0
-# not really right, need to find out actual minimum/maximum somehow
-Foreign.C.Types.CTime, ubits<time_t>, float, 0xffffffffff, 0
-
+Foreign.C.Types.CChar, bits8
+Foreign.C.Types.CSChar, bits8
+Foreign.C.Types.CUChar, bits8
+Foreign.C.Types.CShort, bits<short>
+Foreign.C.Types.CInt, bits<int>
+Foreign.C.Types.CUInt, bits<int>
+Foreign.C.Types.CULong, bits<ptr>
+Foreign.C.Types.CSize, bits<size_t>
+Foreign.C.Types.CWchar, bits<wchar_t>
+Foreign.C.Types.CWint, bits<wchar_t>
+Foreign.C.Types.CTime, bits<time_t>
 

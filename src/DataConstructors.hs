@@ -281,7 +281,7 @@ primitiveConstructor name = emptyConstructor {
 
 
 primitiveTable = concatMap f allCTypes  where
-    f (dc,tc,rt,y,z) | z /= "void" = [typeCons,dataCons] where
+    f (dc,tc,rt) = [typeCons,dataCons] where
         dataCons = emptyConstructor {
             conName = dc,
             conType = tipe,
@@ -296,7 +296,6 @@ primitiveTable = concatMap f allCTypes  where
             conInhabits = tStar,
             conChildren = DataNormal [dc]
            }
-
         tipe = ELit (litCons { litName = tc, litArgs = [], litType = eStar })
     f _ = []
 

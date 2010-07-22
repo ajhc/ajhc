@@ -151,7 +151,7 @@ HSBOOT= src/DataConstructors.hs-boot src/FrontEnd/Tc/Class.hs-boot src/Grin/Grin
 src/Info/Properties.hs: src/data/props.txt utils/gen_props.prl
 	perl $(srcdir)/utils/gen_props.prl $< > $@ || rm -f $@
 
-src/PrimitiveOperators.hs: utils/op_process.prl src/data/operators.txt src/data/primitives.txt src/data/PrimitiveOperators-in.hs
+src/PrimitiveOperators.hs: utils/op_process.prl src/data/primitives.txt src/data/PrimitiveOperators-in.hs
 	perl $< > $@ || rm -f $@
 
 src/Name/Prim.hs: utils/op_names.prl src/data/primitives.txt src/data/names.txt
