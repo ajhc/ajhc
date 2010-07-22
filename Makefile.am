@@ -75,7 +75,6 @@ dist-hook: man manual
 	find $(distdir) \( -name _darcs -o -name \*.ho \)  -print | xargs rm -rf --
 
 darcs-fetch:
-	test -d src/Doc || darcs get --partial http://repetae.net/repos/Doc --repodir=src/Doc
 	test -d lib/haskell98 || darcs get --partial http://darcs.haskell.org/packages/haskell98 --repodir=lib/haskell98
 
 
