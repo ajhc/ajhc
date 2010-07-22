@@ -223,11 +223,12 @@ instance MapKey Module where
 instance MapKey MD5.Hash where
     showMapKey = show
 
-dumpDeps memap cug = case optDeps options of
+dumpDeps targets memap cug = case optDeps options of
     Nothing -> return ()
     Just fp -> do
         let (sfps,sdps,ls) = collectDeps memap cug
         let yaml = Map.fromList [
+                ("Target",toNode targets),
                 ("LibraryDesc",toNode $ [ fp | BuildHl fp  <- [optMode options]]),
                 ("LibraryDeps",toNode $ ls),
                 ("ModuleSource",toNode sfps),
@@ -395,14 +396,15 @@ toCompUnitGraph done roots = do
 
 
 parseFiles
-    :: [String]                                             -- ^ Extra libraries to load
-    -> [Either Module String]                               -- ^ Either a module or filename to find
+    :: [FilePath]                                           -- ^ Targets we are building, used when dumping dependencies
+    -> [String]                                             -- ^ Extra libraries to load
+    -> [Either Module FilePath]                             -- ^ Either a module or filename to find
     -> (CollectedHo -> Ho -> IO CollectedHo)                -- ^ Process initial ho loaded from file
     -> (CollectedHo -> Ho -> TiData -> IO (CollectedHo,Ho)) -- ^ Process set of mutually recursive modules to produce final Ho
     -> IO (CompNode,CollectedHo)                            -- ^ Final accumulated ho
-parseFiles elibs need ifunc func = do
+parseFiles targets elibs need ifunc func = do
     putProgressLn "Finding Dependencies..."
-    (ksm,chash,cug) <- loadModules (optHls options ++ elibs) need
+    (ksm,chash,cug) <- loadModules targets (optHls options ++ elibs) need
     cnode <- processCug cug chash
     performGC
     putProgressLn "Typechecking..."
@@ -415,10 +417,12 @@ parseFiles elibs need ifunc func = do
 
 
 -- this takes a list of modules or files to load, and produces a compunit graph
-loadModules :: [String]                 -- ^ libraries to load
-            -> [Either Module String]   -- ^ a list of modules or filenames
-            -> IO (Map.Map SourceHash (Module,[Module]),HoHash,CompUnitGraph)  -- ^ the resulting acyclic graph of compilation units
-loadModules libs need = do
+loadModules
+    :: [FilePath]               -- ^ targets
+    -> [String]                 -- ^ libraries to load
+    -> [Either Module String]   -- ^ a list of modules or filenames
+    -> IO (Map.Map SourceHash (Module,[Module]),HoHash,CompUnitGraph)  -- ^ the resulting acyclic graph of compilation units
+loadModules targets libs need = do
     theCache <- findHoCache
     case theCache of
         Just s -> putProgressLn $ printf "Using Ho Cache: '%s'" s
@@ -456,7 +460,7 @@ loadModules libs need = do
     done <- readIORef done_ref
     let needed = (ms1 ++ lefts need)
     (chash,cug) <- toCompUnitGraph done needed
-    dumpDeps (modEncountered done) cug
+    dumpDeps targets (modEncountered done) cug
     return (Map.filterWithKey (\k _ -> k `Set.member` validSources done) (knownSourceMap done),chash,cug)
 
 
@@ -725,9 +729,11 @@ buildLibrary ifunc func = ans where
         let allMods = emodSet `Set.union` hmodSet
             emodSet = Set.fromList emods
             hmodSet = Set.fromList hmods
-
+        let outName = case optOutName options of
+                Nothing -> name ++ "-" ++ showVersion vers ++ ".hl"
+                Just fn -> fn
         -- TODO - must check we depend only on libraries
-        (rnode@(CompNode lhash _ _),cho) <- parseFiles [] (map Left $ Set.toList allMods) ifunc func
+        (rnode@(CompNode lhash _ _),cho) <- parseFiles [outName] [] (map Left $ Set.toList allMods) ifunc func
         (_,(mmap,mdeps,prvds,lcor,ldef)) <- let
             f (CompNode hs cd ref) = do
                 cl <- readIORef ref
@@ -762,9 +768,6 @@ buildLibrary ifunc func = ans where
                 hohArchDeps = [],
                 hohVersion = error "hohVersion"
                 }
-        let outName = case optOutName options of
-                Nothing -> name ++ "-" ++ showVersion vers ++ ".hl"
-                Just fn -> fn
         let pdesc = [(packString n, packString v) | (n,v) <- ("jhc-hl-filename",outName):("jhc-description-file",fp):("jhc-compiled-by",versionString):desc, n /= "exposed-modules" ]
             libr = HoLib {
                 hoReexports = Map.fromList [ (m,m) | m <- Set.toList $ allMods Set.\\ prvds ],

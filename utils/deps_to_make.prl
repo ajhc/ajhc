@@ -1,0 +1,32 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use YAML;
+
+sub pdeps {
+    while(@_) {
+        for(my $i = 0; $i < 4; $i++) {
+            last unless @_;
+            print " ", shift;
+        }
+        print " \\\n   " if @_;
+    }
+    print "\n";
+}
+
+
+for (@ARGV) {
+    my $y = YAML::LoadFile($_);
+    next unless exists $y->{Target};
+    my @deps = values %{$y->{ModuleSource}};
+    my @libs = values %{$y->{LibraryDeps}} if exists $y->{LibraryDeps};
+    map { s/^\.\/// } @libs;
+    @deps = (@{$y->{LibraryDesc}}, @deps) if exists $y->{LibraryDesc};
+    for (@{$y->{Target}}) {
+        #print "$_: ";, join(" ",@deps,@libs), "\n";
+        print "$_:";
+        pdeps(@deps,@libs);
+    }
+}
