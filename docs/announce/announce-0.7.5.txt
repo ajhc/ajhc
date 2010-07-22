@@ -1,0 +1,46 @@
+Announcing jhc 0.7.5! This mainly fixes some bugs that came up in peoples testing of
+0.7.4 and includes a lot more libraries in the standard install and better standards
+support.
+
+  http://repetae.net/computer/jhc/
+
+Any testing people can do with the new garbage collector -fjgc would be greatly
+appreciated! As far as I know, this release has no regressions when using the new
+GC, so it will be enabled by default if I get no reports of problems with this
+release.
+
+Major changes
+
+ * The Garbage Collector now fully supports the the Windows, OSX 10.5 (leapord),
+   and OSX 10.6 (snow leapord) targets.
+ * Lot's of libraries, now that I have a somewhat general script to
+   cut through the cabal, the following are now included with the default
+   install
+     - haskell98
+     - flat-foreign (CForegin, etc..)
+     - jhc
+     - base
+     - applicative
+     - containers
+     - Diff
+     - html
+     - HUnit
+     - pretty
+     - safe
+     - smallcheck
+     - utility-ht
+     - xhtml
+ * updates to base libraries to bring them closer to haskell 2010 and ghc base.
+     - updated Functor and Applicative
+     - added Debug.Trace
+ * support for adding valgrind annotations to generated source for
+   debugging the RTS.
+ * support for having the generated code annotate every heap location with
+   useful profiling/debugging info. useful for debugging the RTS.
+ * support for passing --win to the regression test driver to run all the
+   tests cross-compiled for windows.
+ * The Big HsName cleanup, finally got rid of old alegebraic HsName in favor
+   of abstract Name and its faster operations, faster typechecking/frontend and
+   code simplification opprotunities result.
+ * improve the selftest.
+ * bug fixes
