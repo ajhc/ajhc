@@ -54,13 +54,13 @@ PACKAGES= -package fgl -package regex-compat -package random -package array -pac
 GHCLANG= -XViewPatterns -XUndecidableInstances -XOverlappingInstances -fglasgow-exts -XRecordWildCards -XRecursiveDo -XTupleSections
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
-JHC_LIBS =  jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl
+JHC_LIBS =  jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-foreign-1.0.hl
 JHC_EXT_LIBS = containers-0.3.0.0.hl Diff-0.1.2.hl html-1.0.1.2.hl HUnit-1.2.2.1.hl pretty-1.0.1.1.hl \
 	safe-0.2.hl smallcheck-0.4.hl utility-ht-0.0.5.1.hl xhtml-3000.2.0.1.hl
 
 
 EXTRA_DIST = src/data src/rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
-             lib/jhc lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS) $(JHC_EXT_LIBS)   \
+             lib/jhc lib/base lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS)  \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
 	     src/StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal  \
 	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
@@ -73,9 +73,6 @@ dist-hook: man manual
 	cp $(srcdir)/manual.html $(distdir)/manual.html
 	cp $(srcdir)/jhc.1 $(distdir)/jhc.1
 	find $(distdir) \( -name _darcs -o -name \*.ho \)  -print | xargs rm -rf --
-
-darcs-fetch:
-	test -d lib/haskell98 || darcs get --partial http://darcs.haskell.org/packages/haskell98 --repodir=lib/haskell98
 
 
 all-local: libs
@@ -240,8 +237,11 @@ base-1.0.hl: lib/base/base.cabal jhc-1.0.hl
 applicative-1.0.hl: lib/applicative/applicative.cabal base-1.0.hl
 	./jhc $(LIB_OPTIONS) -ilib/applicative -pbase --build-hl $< -o $@
 
-haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
+haskell98-1.0.hl: lib/haskell98/haskell98.cabal base-1.0.hl
 	./jhc $(LIB_OPTIONS) -ilib/haskell98 -pjhc -pbase --build-hl $< -o $@
+
+flat-foreign-1.0.hl: lib/flat-foreign/flat-foreign.cabal base-1.0.hl
+	./jhc $(LIB_OPTIONS) -ilib/flat-foreign -pjhc -pbase --build-hl $< -o $@
 
 %.pdf: %.ps
 	epstopdf $< --outfile $@

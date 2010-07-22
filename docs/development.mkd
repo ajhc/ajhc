@@ -23,6 +23,7 @@ In order to build from the darcs repo, you need the following things installed:
     * graphviz if you wish to create code motion graphs
     * a working perl install for various sundry tasks
     * the happy haskell parser generator
+    * darcs 2.0 or better
     * You need the following haskell libraries
       * binary
       * zlib
@@ -32,14 +33,12 @@ In order to build from the darcs repo, you need the following things installed:
       * one of editline or readline
       * mtl
 
-First you must install darcs, there are a couple projects you need to pull in
-order to compile jhc, the following should produce a working tree:
+If the dependencies are installed properly, the following will produce a working tree:
 
     darcs get http://repetae.net/repos/jhc
     cd jhc
     autoreconf -i
     ./configure
-    make darcs-fetch
 
 Now you can begin to build jhc, in order to do so, switch to the jhc directory and do:
 

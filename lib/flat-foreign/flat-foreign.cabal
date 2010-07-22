@@ -1,0 +1,15 @@
+name:		flat-foreign
+version:	1.0
+maintainer:	libraries@haskell.org
+synopsis:	Compatibility with non hierarchical FFI module names
+description:
+  This package provides compatibility with the flat module names originally
+  proposed for the FFI modules, since hierarchical modules were introduced
+  at the same time, use of these aliases is rare.
+homepage:	http://www.haskell.org/definition/
+build-depends:	base
+exposed-modules:
+        -- FFI addendum (Foreign is in the base package)
+        Bits, CError, CForeign, CString, CTypes, ForeignPtr, Int,
+        MarshalAlloc, MarshalArray, MarshalError, MarshalUtils, Ptr,
+        StablePtr, Storable, Word
