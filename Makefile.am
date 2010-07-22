@@ -54,15 +54,17 @@ PACKAGES= -package fgl -package regex-compat -package random -package array -pac
 GHCLANG= -XViewPatterns -XUndecidableInstances -XOverlappingInstances -fglasgow-exts -XRecordWildCards -XRecursiveDo -XTupleSections
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
-JHC_LIBS =  jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl containers-0.2.0.hl
+JHC_LIBS =  jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl
+JHC_EXT_LIBS = containers-0.3.0.0.hl Diff-0.1.2.hl html-1.0.1.2.hl HUnit-1.2.2.1.hl pretty-1.0.1.1.hl \
+	safe-0.2.hl smallcheck-0.4.hl utility-ht-0.0.5.1.hl xhtml-3000.2.0.1.hl
 
 
 EXTRA_DIST = src/data src/rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
-             lib/jhc lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS)    \
+             lib/jhc lib/base lib/haskell98 lib/haskell98.cabal $(JHC_LIBS) $(JHC_EXT_LIBS)   \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
-	     src/StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal lib/containers.cabal \
-	     manual.html lib/containers lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
-	     src/FlagOpts.flags src/FlagDump.flags
+	     src/StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal  \
+	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
+	     src/FlagOpts.flags src/FlagDump.flags lib/ext
 
 CC = $(HC)
 
@@ -75,16 +77,15 @@ dist-hook: man manual
 darcs-fetch:
 	test -d src/Doc || darcs get --partial http://repetae.net/repos/Doc --repodir=src/Doc
 	test -d lib/haskell98 || darcs get --partial http://darcs.haskell.org/packages/haskell98 --repodir=lib/haskell98
-	test -d lib/containers || darcs get --partial http://darcs.haskell.org/packages/containers --repodir=lib/containers
 
 
 all-local: libs
 
-install-data-hook: $(JHC_LIBS)
+install-data-hook: $(JHC_LIBS) $(JHC_EXT_LIBS)
 	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@
 	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@
-	for lib in $(JHC_LIBS); do  \
+	for lib in $(JHC_LIBS) $(JHC_EXT_LIBS); do  \
 		test -f "$$lib" && $(INSTALL_DATA) $$lib $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 		test -f "$(srcdir)/$$lib" && $(INSTALL_DATA) "$(srcdir)/$$lib" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 	done
@@ -93,7 +94,7 @@ install-data-hook: $(JHC_LIBS)
 
 uninstall-hook: $(JHC_LIBS)
 	rm -f -- "$(DESTDIR)$(bindir)/jhci$(EXTEXT)"
-	for lib in $(JHC_LIBS); do  \
+	for lib in $(JHC_LIBS) $(JHC_EXT_LIBS); do  \
 		rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/$$lib" ; \
 	done
 	rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include/HsFFI.h"
@@ -240,9 +241,6 @@ base-1.0.hl: lib/base/base.cabal jhc-1.0.hl
 applicative-1.0.hl: lib/applicative/applicative.cabal base-1.0.hl
 	./jhc $(LIB_OPTIONS) -ilib/applicative -pbase --build-hl $< -o $@
 
-containers-0.2.0.hl: lib/containers.cabal base-1.0.hl applicative-1.0.hl
-	./jhc $(LIB_OPTIONS) -Isrc/data -Ilib/containers/include -ilib/containers -pjhc -pbase -papplicative -fcpp --build-hl $<  -o $@
-
 haskell98-1.0.hl: lib/haskell98.cabal base-1.0.hl
 	./jhc $(LIB_OPTIONS) -ilib/haskell98 -pjhc -pbase --build-hl $< -o $@
 
@@ -285,7 +283,14 @@ manual.html :
 	$(MAKE) manual
 
 .PHONY: libs
-libs: $(JHC_LIBS)
+libs: $(JHC_LIBS) $(JHC_EXT_LIBS)
+
+$(JHC_EXT_LIBS): lib/ext/*.cabal
+	perl utils/build_extlibs.prl $^
+
+show_elibs: lib/ext/*.cabal
+	-perl utils/build_extlibs.prl -l $^
+
 
 %: examples/%.hs jhc
 	./jhc  -L- -L. $(JHC_TEST) $< -o $@ 2>&1 | tee $@.log

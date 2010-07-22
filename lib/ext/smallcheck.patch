@@ -1,0 +1,10 @@
+diff -ru smallcheck-0.4/Test/SmallCheck.hs smallcheck-0.4-new/Test/SmallCheck.hs
+--- smallcheck-0.4/Test/SmallCheck.hs	2008-05-23 07:04:15.000000000 -0700
++++ smallcheck-0.4-new/Test/SmallCheck.hs	2010-07-21 15:59:11.000000000 -0700
+@@ -428,5 +428,5 @@
+ progressReport i n x | n >= x = do
+   when i $ ( putStr (n' ++ replicate (length n') '\b') >>
+              hFlush stdout )
+-  where
++ where
+   n' = show n

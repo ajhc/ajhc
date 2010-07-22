@@ -1,0 +1,15 @@
+Name:                   HUnit
+Version:                1.2.2.1
+options:                -fcpp
+Homepage:               http://hunit.sourceforge.net/
+Category:               Testing
+Synopsis:               A unit testing framework for Haskell
+Description:
+    HUnit is a unit testing framework for Haskell, inspired by the
+    JUnit tool for Java, see: <http://www.junit.org>.
+
+Exposed-Modules: Test.HUnit.Base,
+        Test.HUnit.Lang,
+        Test.HUnit.Terminal,
+        Test.HUnit.Text,
+        Test.HUnit

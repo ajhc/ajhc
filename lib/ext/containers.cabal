@@ -1,5 +1,6 @@
 name:       containers
-version:    0.2.0.1
+version:    0.3.0.0
+options:    -fcpp -Isrc/data -papplicative
 license:    BSD3
 license-file:    LICENSE
 maintainer:    libraries@haskell.org

@@ -1,0 +1,16 @@
+name:		html
+version:	1.0.1.2
+license:	BSD3
+license-file:	LICENSE
+maintainer:	libraries@haskell.org
+synopsis:	HTML combinator library
+category:       Web
+build-depends:  base>=2.0
+description:
+	This package contains a combinator library for constructing
+        HTML documents.
+build-type:     Simple
+exposed-modules:
+	Text.Html
+	Text.Html.BlockTable
+nhc98-options: -K2M

@@ -1,0 +1,10 @@
+name:		pretty
+version:	1.0.1.1
+synopsis:	Pretty-printing library
+category:       Text
+description:
+	This package contains John Hughes's pretty-printing library,
+        heavily modified by Simon Peyton Jones.
+Exposed-Modules:
+        Text.PrettyPrint
+        Text.PrettyPrint.HughesPJ

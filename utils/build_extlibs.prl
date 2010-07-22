@@ -1,0 +1,55 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use LWP::Simple;
+use Cwd;
+use Getopt::Std;
+
+our $opt_l;
+getopts('l') or die "unknown opt";
+
+
+
+my $tmpdir = "tmp/build";
+
+mkdir "tmp";
+mkdir "tmp/build";
+
+sub mysystem {
+    print( (join " ", @_), '\n');
+    system @_;
+}
+
+foreach my $fn (@ARGV) {
+    next unless $fn =~ /\.cabal$/;
+    my $patch = $fn;
+    $patch =~ s/\.cabal$/.patch/;
+    print "Processing $fn\n" unless $opt_l;
+    open my $fh, "<", $fn or die "$!: $fn";
+    my ($name,$version,$options);
+    $options = "";
+    while(<$fh>) {
+        $name = $1 if /^name:\s*(.*?)\s*$/i;
+        $version = $1 if /^version:\s*(.*?)\s*$/i;
+        $options = $1 if /^options:\s*(.*?)\s*$/i;
+    }
+    next unless $name;
+    next unless $version;
+
+    print("$name-$version.hl\n"),next if $opt_l;
+
+    print "Processing $fn, found $name-$version\n";
+    my $url = "http://hackage.haskell.org/packages/archive/$name/$version/$name-$version.tar.gz";
+    print "Fetching $url\n";
+    unless(-e "$tmpdir/$name-$version.tar.gz") {
+        getstore($url, "$tmpdir/$name-$version.tar.gz") or die "$!: $url";
+    }
+    mysystem "tar -zxv --directory $tmpdir -f $tmpdir/$name-$version.tar.gz" and die "$!: tar";
+    my $src = -d "$tmpdir/$name-$version/src" ? "/src" : "";
+    mysystem "patch -d $tmpdir/$name-$version -p1 < $patch" if -e $patch;
+    mysystem "./jhc $options --build-hl $fn -L. -i$tmpdir/$name-$version$src" and die "$!: jhc";
+}
+
+
