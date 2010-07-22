@@ -3,7 +3,7 @@ title: enable GC by default
 desc: get GC to the point where it can be enabled by default
 type: :feature
 component: be
-release: 0.7.5
+release: 0.7.6
 reporter: John Meacham <john@repetae.net>
 status: :unstarted
 disposition: 
@@ -15,4 +15,8 @@ log_events:
 - - 2010-07-09 22:16:14.638392 Z
   - John Meacham <john@repetae.net>
   - created
+  - ""
+- - 2010-07-22 02:20:54.144130 Z
+  - John Meacham <john@repetae.net>
+  - assigned to release 0.7.6 from 0.7.5
   - ""

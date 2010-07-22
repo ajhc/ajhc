@@ -3,7 +3,7 @@ title: The GC needs to know about arrays of objects
 desc: ""
 type: :bugfix
 component: be
-release: 0.7.5
+release: 0.7.6
 reporter: John Meacham <john@repetae.net>
 status: :unstarted
 disposition: 
@@ -24,3 +24,7 @@ log_events:
   - John Meacham <john@repetae.net>
   - commented
   - it can handle arrays that can fit on a single BLOCK fine right now.
+- - 2010-07-22 02:21:05.044129 Z
+  - John Meacham <john@repetae.net>
+  - assigned to release 0.7.6 from 0.7.5
+  - ""

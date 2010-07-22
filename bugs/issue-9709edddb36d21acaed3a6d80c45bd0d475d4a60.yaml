@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: add 'parsec' library to standard distribution
+desc: ""
+type: :feature
+component: lib
+release: 0.7.6
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-22 02:22:00.564146 Z
+references: []
+
+id: 9709edddb36d21acaed3a6d80c45bd0d475d4a60
+log_events: 
+- - 2010-07-22 02:22:01.744128 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

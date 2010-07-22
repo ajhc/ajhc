@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: add 'bytestring' to standard distribution
+desc: ""
+type: :feature
+component: lib
+release: 0.8.0
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-22 02:22:30.924112 Z
+references: []
+
+id: fc0678e4e7d9961b05657238199bda6132ab13b0
+log_events: 
+- - 2010-07-22 02:22:31.914107 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

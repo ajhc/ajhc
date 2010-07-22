@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: Suggest libraries when an unknown module is imported
+desc: ""
+type: :feature
+component: fe
+release: 
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-21 10:44:45.598095 Z
+references: []
+
+id: 0749fe6ac2d5c6589946fe4ba7a62c6ea6fdf853
+log_events: 
+- - 2010-07-21 10:44:46.818075 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""
