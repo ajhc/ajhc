@@ -50,14 +50,12 @@ PACKAGES= -package fgl -package regex-compat -package random -package array -pac
           -package bytestring -package binary -package pretty -package mtl -package containers   \
 	  -package unix  -package haskell98 -package utf8-string  -package zlib
 
-
 GHCLANG= -XViewPatterns -XUndecidableInstances -XOverlappingInstances -fglasgow-exts -XRecordWildCards -XRecursiveDo -XTupleSections
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
 JHC_LIBS =  jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-foreign-1.0.hl
 JHC_EXT_LIBS = containers-0.3.0.0.hl Diff-0.1.2.hl html-1.0.1.2.hl HUnit-1.2.2.1.hl pretty-1.0.1.1.hl \
 	safe-0.2.hl smallcheck-0.4.hl utility-ht-0.0.5.1.hl xhtml-3000.2.0.1.hl
-
 
 EXTRA_DIST = src/data src/rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/jhc lib/base lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS)  \
@@ -73,7 +71,6 @@ dist-hook: man manual
 	cp $(srcdir)/manual.html $(distdir)/manual.html
 	cp $(srcdir)/jhc.1 $(distdir)/jhc.1
 	find $(distdir) \( -name _darcs -o -name \*.ho \)  -print | xargs rm -rf --
-
 
 all-local: libs
 
@@ -120,8 +117,7 @@ drift_processed/%: src/%
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
 	DrIFT $< -o $@
 
-
-CFILES =  src/StringTable/StringTable_cbits.o  src/cbits/md5sum.o
+CFILES = src/StringTable/StringTable_cbits.o src/cbits/md5sum.o
 
 %.o : %.c
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
@@ -142,7 +138,6 @@ HSBOOT= src/DataConstructors.hs-boot src/FrontEnd/Tc/Class.hs-boot src/Grin/Grin
 
 # Various rules for generated Haskell files
 
-
 %.hs: %.hsc
 	mkdir -p `echo $@ | sed -e 's@/[^/]*$$@@'`
 	$(HSC2HS) $(MY_CINCLUDES) -o $@ $<
@@ -155,7 +150,6 @@ HSBOOT= src/DataConstructors.hs-boot src/FrontEnd/Tc/Class.hs-boot src/Grin/Grin
 
 src/Info/Properties.hs: src/data/props.txt utils/gen_props.prl
 	perl $(srcdir)/utils/gen_props.prl $< > $@ || rm -f $@
-
 
 src/PrimitiveOperators.hs: utils/op_process.prl src/data/operators.txt src/data/primitives.txt src/data/PrimitiveOperators-in.hs
 	perl $< > $@ || rm -f $@
@@ -172,9 +166,6 @@ src/RtsFiles.hs:  utils/op_raw.prl $(RTSFILES)
 src/FrontEnd/HsParser.hs: src/FrontEnd/HsParser.y
 	happy -a -g -c $< -o $@
 
-#	sed -e 's/^{-# OPTIONS[A-Z_]*/{-# OPTIONS_GHC -w /' -i $@
-
-
 .SECONDARY: _darcs/hashed_inventory src/data/shortchange.txt
 
 ChangeLog: _darcs/hashed_inventory
@@ -182,7 +173,6 @@ ChangeLog: _darcs/hashed_inventory
 
 src/data/shortchange.txt: ChangeLog
 	echo -n "`sed -ne 's/^  tagged \(.*\)/\1/p' $<`-`grep -c '^  \*' $<`"  > $@
-
 
 BINDISTDIR=$(PACKAGE)-$(VERSION)-$(host)
 
@@ -194,7 +184,6 @@ bin-dist: jhc
 	tar cvf $(BINDISTDIR).tar $(BINDISTDIR)
 	gzip -f -- $(BINDISTDIR).tar
 	rm -rf -- $(BINDISTDIR)
-
 
 .INTERMEDIATE: deps.txt
 .DELETE_ON_ERROR: deps.txt depend.make ChangeLog data/shortchange.txt
@@ -223,7 +212,7 @@ clean-local:
 
 MAINTAINERCLEANFILES= $(BUILT_SOURCES) $(DRIFTFILES)
 
-CLEANFILES= $(JHC_LIBS)
+CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS)
 
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST) --noauto -L- -L.
 
@@ -290,7 +279,5 @@ $(JHC_EXT_LIBS): lib/ext/*.cabal
 show_elibs: lib/ext/*.cabal
 	-perl utils/build_extlibs.prl -l $^
 
-
 %: examples/%.hs jhc
 	./jhc  -L- -L. $(JHC_TEST) $< -o $@ 2>&1 | tee $@.log
-
