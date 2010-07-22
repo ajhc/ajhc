@@ -56,7 +56,7 @@ GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@  $(GHCDEBUGOPTS) $(GHCINC) $(PAC
 JHC_LIBS =  jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-foreign-1.0.hl
 JHC_EXT_LIBS = containers-0.3.0.0.hl Diff-0.1.2.hl html-1.0.1.2.hl HUnit-1.2.2.1.hl pretty-1.0.1.1.hl \
 	safe-0.2.hl smallcheck-0.4.hl utility-ht-0.0.5.1.hl xhtml-3000.2.0.1.hl \
-	QuickCheck-1.2.0.0.hl
+	QuickCheck-1.2.0.0.hl parsec-2.1.0.1.hl
 
 
 EXTRA_DIST = src/data src/rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
