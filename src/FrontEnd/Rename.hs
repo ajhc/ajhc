@@ -345,7 +345,7 @@ instance Rename HsConDecl where
     rename cd@(HsConDecl { hsConDeclSrcLoc = srcLoc, hsConDeclName = hsName, hsConDeclConArg = hsBangTypes }) = do
         withSrcLoc srcLoc $ do
         hsName' <- renameValName hsName
-        updateWith  (map hsTyVarBindName (hsConDeclExists cd)) $ do
+        updateWith  (map (toName TypeVal . hsTyVarBindName) (hsConDeclExists cd)) $ do
         es <- rename (hsConDeclExists cd)
         hsBangTypes' <- rename hsBangTypes
         return cd { hsConDeclName = hsName', hsConDeclConArg = hsBangTypes', hsConDeclExists = es }
@@ -353,7 +353,7 @@ instance Rename HsConDecl where
         withSrcLoc srcLoc $ do
         hsName' <- renameValName hsName
         subTable <- asks envSubTable
-        updateWith (map hsTyVarBindName (hsConDeclExists cd)) $ do
+        updateWith (map (toName TypeVal . hsTyVarBindName) (hsConDeclExists cd)) $ do
         es <- rename (hsConDeclExists cd)
         stuff' <- sequence [ do ns' <- mapM renameName (map (toName FieldLabel) ns); t' <- withSubTable subTable $ rename t; return (ns',t')  |  (ns,t) <- stuff]
         return cd { hsConDeclName = hsName', hsConDeclRecArg = stuff', hsConDeclExists = es }
