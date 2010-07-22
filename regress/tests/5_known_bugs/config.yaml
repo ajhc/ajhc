@@ -1,0 +1,8 @@
+tests:
+  MultiplyDefined:
+    jhc_exit_code: 1
+  Shadowing:
+    jhc_exit_code: 1
+  ExportUnknown:
+    jhc_flags: [ "--stale", "Main",  "-c" ]
+    jhc_exit_code: 1

@@ -3,9 +3,11 @@
 use strict;
 use warnings;
 
+use YAML;
 use Getopt::Long;
 use Pod::Usage;
 use Data::Dumper;
+use Storable qw(dclone);
 use POSIX  qw(strftime SIGINT);
 use Cwd;
 
@@ -68,8 +70,6 @@ my $pwd = cwd();
 # figure out where we are
 
 my ($regress_dir,$jhc_dir);
-
-
 
 if (-d "tests" && -d "results") {
     $regress_dir = ".";
@@ -150,11 +150,37 @@ sub my_system {
 my @libs = $opt_l ? ("-L-", "-L$jhc_dir", "-pjhc") : ("--noauto", "-i$jhc_dir/lib/jhc", "-i$jhc_dir/lib/base","-i$jhc_dir/lib/haskell98");
 my @fast = $opt_n ? ("-fno-lint") : ("-fdebug", "-flint");
 
+sub to_list {
+    return () unless defined $_[0];
+    if(ref $_[0] eq 'ARRAY') {
+        return @{$_[0]};
+    } else {
+        return split /\s+/, $_[0];
+    }
+}
+
+sub combine_yaml {
+    my ($oy, $y) = @_;
+    my $ny = dclone $oy;
+    foreach(keys %$ny) {
+        next unless exists $y->{$_};
+        if(ref $ny->{$_} eq 'ARRAY') {
+            $ny->{$_} = [ @{$ny->{$_}}, to_list($y->{$_}) ];
+        } else {
+            $ny->{$_} = $y->{$_};
+        }
+    }
+    return $ny;
+}
+
 sub do_it {
-    my ($cwd,$name) = @_;
+    my ($cwd,$name, $oy) = @_;
+    my ($y,$yc) = ($oy,{});
+    if(-f "$cwd/config.yaml") {
+        $yc = YAML::LoadFile("$cwd/config.yaml");
+        $y = combine_yaml($oy, $yc);
+    }
     #print "Entering $cwd\n";
-    my $no_run = -f "$cwd/norun";
-    my @flags = maybe_read "$cwd/flags.txt";
     opendir my $dh,$cwd or die "$!: could not read $cwd";
     test: foreach my $fn (sort readdir $dh) {
         next unless $fn =~ /^\w/;
@@ -162,10 +188,13 @@ sub do_it {
         if (-d $n && $n ne "results") {
             my $fnn = $fn;
             $fnn =~ s/^\d+_//;
-            do_it($n,"$name.$fnn");
+            do_it($n,$name ? "$name.$fnn" : $fnn, $y);
         } elsif ($fn =~ /^([^_].*)\.l?hs$/) {
             my $ln = $1;
-            my $must_fail = -f "$cwd/$ln.mustfail" ? 1 : 0;
+            my $y = combine_yaml($y, $yc->{tests}{$ln});
+            my $must_fail = (0 + $y->{jhc_exit_code}) != 0;
+            my $no_run = $y->{run} eq 'no';
+            my @flags = @{$y->{jhc_flags}};
             next if $ln =~ /_code$/;
             my $fbase = "$cwd/$ln";
             my $name = "$name.$ln";
@@ -175,13 +204,11 @@ sub do_it {
                 $keep = 1 if $name  =~ /$_/;
                 }
                 unless($keep) {
-                    rlog "Skipping $name";
                     next;
                 }
             }
             foreach (@ncond) {
                 if($name =~ /$_/) {
-                    rlog "Skipping $name";
                     next test;
                 }
             }
@@ -212,7 +239,7 @@ sub do_it {
                 next;
             }
             next if $no_run;
-            my @args = maybe_read("$fbase.args");
+            my @args = @{$y->{args}};
             $result->{run_stdout} = "$rd/$name.stdout";
             my $stdin = " < $fbase.stdin" if -f "$fbase.stdin";
             my $run_cmd = ($opt_win ? "$rd/$name.exe " : "$rd/$name ") . join(" ",@args) . " > $result->{run_stdout}" . ($stdin || "");
@@ -238,7 +265,15 @@ sub do_it {
     closedir $dh;
 }
 
-do_it($test_dir,"tests");
+do_it($test_dir,"", {
+        jhc_flags => [],
+        cc_flags => [],
+        run_args => [],
+        jhc_exit_code => 0,
+        args => [],
+        libs => [],
+        run => 'yes'
+    });
 done();
 
 

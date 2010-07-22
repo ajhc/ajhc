@@ -1,0 +1,3 @@
+tests:
+  digits-of-e1:
+    args: 1000

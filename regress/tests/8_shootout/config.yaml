@@ -1,0 +1,9 @@
+tests:
+  BinaryTrees:
+    args: 12
+  Mandelbrot:
+    args: 1000
+  nbody:
+    args: 129333
+  PartialSums:
+    args: 250
