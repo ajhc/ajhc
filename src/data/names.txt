@@ -4,7 +4,6 @@ TypeConstructor:tc:
 Ref__      Data.IORef.Ref__
 MutArray__ Jhc.Array.MutArray__
 List       Jhc.Prim.[]
-JumpPoint  Jhc.JumpPoint.JumpPoint
 Char       Jhc.Prim.Char
 IO         Jhc.Prim.IO
 World__    Jhc.Prim.World__
@@ -12,7 +11,6 @@ Int__      Jhc.Prim.Int__
 Array__    Jhc.Array.Array__
 Bool       Jhc.Order.Bool
 Boolzh     Jhc.Order.Bool#
-Target     Jhc.Options.Target
 Ptr        Jhc.Addr.Ptr
 FunPtr     Jhc.Addr.FunPtr
 Ratio      Jhc.Num.Ratio
@@ -73,9 +71,7 @@ Cons       Jhc.Prim.:
 EmptyList  Jhc.Prim.[]
 Unit       Jhc.Basics.()
 Boolzh     Jhc.Order.Bool#
-Target     Jhc.Options.Target#
 Char       Jhc.Prim.Char
-Addr       Jhc.Addr.Addr
 #Int        Int#
 #Integer    Integer#
 
@@ -98,7 +94,6 @@ RealFrac	Jhc.Float.RealFrac
 RealFloat	Jhc.Float.RealFloat
 
 RawType:rt:
-
 
 bits8         bits8
 bits16        bits16
@@ -123,20 +118,13 @@ Val:v:
 
 eqString         Jhc.String.eqString
 eqUnpackedString Jhc.String.eqUnpackedString
-unpackString     Jhc.String.unpackString
 error            Jhc.IO.error
-minBound         Jhc.Enum.minBound
-maxBound         Jhc.Enum.maxBound
 map              Jhc.Basics.map
 and              Jhc.Order.&&
-filter           Jhc.List.filter
 foldr            Jhc.Basics.foldr
-undefined        Jhc.Basics.undefined
-
 
 bind                 Jhc.Monad.>>=
 bind_                Jhc.Monad.>>
-return               Jhc.Monad.return
 fail                 Jhc.Monad.fail
 concatMap            Jhc.Basics.concatMap
 fromInteger          Jhc.Num.fromInteger
@@ -147,9 +135,7 @@ leq                  Jhc.Order.<=
 geq                  Jhc.Order.>=
 lt                   Jhc.Order.<
 gt                   Jhc.Order.>
-compare              Jhc.Order.compare
 equals               Jhc.Order.==
-neq                  Jhc.Order./=
 fromEnum             Jhc.Enum.fromEnum
 toEnum               Jhc.Enum.toEnum
 enumFrom             Jhc.Enum.enumFrom
