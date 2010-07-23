@@ -1,5 +1,5 @@
 {-# OPTIONS -funbox-strict-fields  -O2 #-}
-module Support.MD5(Hash(),emptyHash,md5,md5file,md5lazy,md5Bytes,md5String,md5Handle,hashToBytes) where
+module Support.MD5(Hash(),emptyHash,md5,md5file,md5lazy,md5show32,md5Bytes,md5String,md5Handle,hashToBytes) where
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -73,6 +73,25 @@ hashToBytes (Hash a b c d) = tb a . tb b . tb c . tb d $ [] where
     showIt i x r = case quotRem x 256 of
                        (y, z) -> let c = fromIntegral z
                                  in c `seq` showIt (i-1) y (c:r)
+
+
+md5show32 :: Hash -> String
+md5show32 hash = f [] (hashToBytes hash) where
+    f cs [] = cs
+    f cs (o1:o2:o3:o4:o5:rest) = f ns rest where
+        i1 = o1 `shiftR` 3
+        i2 = (o1 `shiftL` 2 .|. o2 `shiftR` 6) .&. 0x1f
+        i3 = o2 `shiftR` 1 .&. 0x1f
+        i4 = (o2 `shiftL` 4 .|. o3 `shiftR` 4) .&. 0x1f
+        i5 = (o3 `shiftL` 1 .|. o4 `shiftR` 7) .&. 0x1f
+        i6 = o4 `shiftR` 2 .&. 0x1f
+        i7 = (o4 `shiftL` 3 .|. o5 `shiftR` 5) .&. 0x1f
+        i8 = o5 .&. 0x1f
+        ns = g i1:g i2:g i3:g i4:g i5:g i6:g i7:g i8:cs
+        g x | x <= 9 = chr (ord '0' + fromIntegral x)
+            | otherwise = chr (ord 'a' + fromIntegral x - 10)
+    f cs ns = reverse (take ((lns * 8 + 4) `div` 5) (f [] (ns ++ replicate (5 - lns) 0))) ++ cs where
+        lns = length ns
 
 
 instance Show Hash where

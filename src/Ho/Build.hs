@@ -131,11 +131,11 @@ hoFile :: Maybe FilePath -> FilePath -> Maybe Module -> SourceHash -> FilePath
 hoFile cacheDir fp mm sh = case (cacheDir,optHoDir options) of
     (Nothing,Nothing) -> replaceSuffix "ho" fp
     (Nothing,Just hdir) -> case mm of
-        Nothing -> hdir ++ "/" ++ show sh ++ ".ho"
+        Nothing -> hdir ++ "/" ++ MD5.md5show32 sh ++ ".ho"
         Just m -> hdir ++ "/" ++ map ft (show m) ++ ".ho" where
             ft '/' = '.'
             ft x = x
-    (Just hdir,_) -> hdir ++ "/" ++ show sh ++ ".ho"
+    (Just hdir,_) -> hdir ++ "/" ++ MD5.md5show32 sh ++ ".ho"
 
 findHoFile :: IORef Done -> FilePath -> Maybe Module -> SourceHash -> IO (Bool,FilePath)
 findHoFile done_ref fp mm sh = do
