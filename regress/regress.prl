@@ -47,6 +47,8 @@ GetOptions(
 pod2usage(-verbose => 2) if $opt_man;
 pod2usage(1) if $opt_help;
 
+$opt_l = !$opt_l;
+
 # clean out environment
 delete $ENV{JHC_PATH};
 delete $ENV{JHC_OPTS};
@@ -223,11 +225,17 @@ sub do_it {
                 if($r == 0) {
                     rlog "Compilation Succeeded When It shouldn't!";
                     $error++;
-                    $result->{compile_status} = 'FAIL';
+                    $result->{compile_status} = 'BAD';
                     next;
                 } else {
-                    $result->{compile_status} = 'PASS';
+                    $result->{compile_status} = 'pass';
                     next;
+                }
+            } else {
+                if($r == 0) {
+                    $result->{compile_status} = 'pass';
+                } else {
+                    $error++;
                 }
             }
             unless($r == 0) {
@@ -278,7 +286,7 @@ done();
 
 
 sub statf {
-    return $_[0] if defined $_[0] && $_[0] =~ /[A-Z]+/;
+    return $_[0] if defined $_[0] && $_[0] =~ /[a-zA-Z]+/;
     return defined $_[0] ? ($_[0] == 64512 || ($_[0] & 127) == SIGINT()  ? "INT" : $_[0] == 35072 || ($_[0] & 127) ==  24 ? "TIME" : $_[0]) : "-";
 }
 
@@ -290,17 +298,16 @@ sub done {
     rlog("$now_string");
     rlog("$jhc_version");
     rlog("regress ", join " ", @saved_args) if @saved_args;
-    rlog "\n--------------------------------------------------------------------";
+    rlog "\n-------------------------------------------------------------------------";
 
     my $fmt = "%10s %25s %5s %5s %5s %7s %7s\n";
     rlog sprintf $fmt, "Category", "Name", "Compile", "Run", "Out", "CTime", "RTime";
-    rlog "--------------------------------------------------------------------";
+    rlog "-------------------------------------------------------------------------";
     foreach my $r (@res) {
         my $name = $r->{name};
         $name =~ s/^tests\.//;
         $name =~ /^([^.]*)\.(.*)$/;
         rlog sprintf $fmt, $1, $2, statf($r->{compile_status}),statf($r->{run_status}),statf($r->{stdout_diff}), timef($r->{compile_time}), timef($r->{run_time}) ;
-
     }
     close RLOG;
     unlink "$results_dir/last";
@@ -338,7 +345,7 @@ regress [options] [conditions]
    -o OPTION     pass given option to JHC
    -t INT        timeout in seconds of CPU time
 
-   -l            use the libraries
+   -l            do not use the libraries
    -n            go faster by not linting
    -p            profile JHC (requires jhcp to have been built)
 

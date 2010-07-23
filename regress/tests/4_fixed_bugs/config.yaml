@@ -1,6 +1,0 @@
-tests:
-  rectypes:
-    jhc_exit_code: 1
-  Parsing1:
-    run: no
-    jhc_flags: -c --stale Main
