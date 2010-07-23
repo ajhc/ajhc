@@ -80,11 +80,12 @@ dumpFinalGrin grin = do
         writeFile (outputName ++ "_grin.dot") dot
     wdump FD.GrinFinal $ dumpGrin "final" grin
 
-compileGrinToC grin | optMode options /= CompileExe = return ()
 compileGrinToC grin = do
     let (cg,rls) = FG2.compileGrin grin
         fn = outputName ++ lup "executable_extension"
-        cf = (fn ++ "_code.c")
+        cf = case (optOutName options,optMode options) of
+            (Just fn,StopC) -> fn
+            _ -> (fn ++ "_code.c")
         lup k = maybe "" id $ Map.lookup k (optInis options)
     (argstring,sversion) <- getArgString
     let
@@ -99,6 +100,8 @@ compileGrinToC grin = do
         globalvar n c = LBS.fromString $ "char " ++ n ++ "[] = \"" ++ c ++ "\";"
     putProgressLn ("Writing " ++ show cf)
     LBS.writeFile cf $ LBS.intercalate (LBS.fromString "\n") [globalvar "jhc_c_compile" comm, globalvar "jhc_command" argstring,globalvar "jhc_version" sversion,LBS.empty,cg]
+    when (optMode options == StopC) $
+        exitSuccess
     putProgressLn ("Running: " ++ comm)
     r <- System.system comm
     when (r /= System.ExitSuccess) $ fail "C code did not compile."

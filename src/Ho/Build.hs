@@ -406,10 +406,14 @@ parseFiles targets elibs need ifunc func = do
     putProgressLn "Finding Dependencies..."
     (ksm,chash,cug) <- loadModules targets (optHls options ++ elibs) need
     cnode <- processCug cug chash
+    when (optMode options == StopParse) $
+        exitSuccess
     performGC
     putProgressLn "Typechecking..."
     typeCheckGraph cnode
     if isJust (optAnnotate options) then exitSuccess else do
+    when (optMode options  == StopTypeCheck) $
+        exitSuccess
     performGC
     putProgressLn "Compiling..."
     cho <- compileCompNode ifunc func ksm cnode

@@ -1,8 +1,9 @@
 module Main(main) where
 
+import System.Exit
+import System.IO
 import Control.Exception
 import Control.Monad.Identity
-import IO(hFlush,stderr)
 import Prelude
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.UTF8 as BS
@@ -42,12 +43,15 @@ main = bracketHtml $ do
         ListLibraries   -> listLibraries
         ShowHo ho       -> dumpHoFile ho
         Version         -> putStrLn versionString
+        StopError s     -> putErrLn "bad option passed to --stop should be one of parse, typecheck, or c" >> exitWith exitCodeUsage 
         PrintHscOptions -> putStrLn $ "-I" ++ VC.datadir ++ "/" ++ VC.package ++ "-" ++ VC.shortVersion ++ "/include"
         VersionCtx      -> putStrLn (versionString ++ BS.toString versionContext)
-        Preprocess      -> forM_ (optArgs o) $ \fn -> do
-            LBS.readFile fn >>= preprocess fn >>= LBS.putStr
-        _               -> darg >> processFiles  (optArgs o)
+        Preprocess      -> do
+            forM_ (optArgs o) $ \fn -> do
+                LBS.readFile fn >>= preprocess fn >>= LBS.putStr
+        _               -> darg >> processFiles (optArgs o)
 
+exitCodeUsage = ExitFailure 64
 
 processFiles :: [String] -> IO ()
 processFiles cs = f cs (optMainFunc options) where

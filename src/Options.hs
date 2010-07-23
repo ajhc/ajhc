@@ -139,8 +139,11 @@ data Mode = BuildHl FilePath         -- ^ Build the specified hl-file given a de
           | VersionCtx               -- ^ Print version context and die.
           | ShowHelp                 -- ^ Show help message and die.
           | ShowConfig               -- ^ Show configuration info.
+          | StopError String         -- ^ error
+          | StopParse                -- ^ Just parse and rename modules then exit
+          | StopTypeCheck            -- ^ Stop after type checking
           | CompileHo                -- ^ Compile ho
-          | CompileHoGrin            -- ^ Compile ho and grin
+          | StopC                    -- ^ Stop after producing C code.
           | CompileExe               -- ^ Compile executable
           | ShowHo String            -- ^ Show ho-file.
           | ListLibraries            -- ^ List libraries
@@ -235,16 +238,18 @@ theoptions =
     , Option ['I'] []            (ReqArg (optIncs_u . idu) "DIR")       "add to preprocessor include path"
     , Option ['D'] []            (ReqArg (\d -> optDefs_u (d:)) "NAME=VALUE") "add new definitions to set in preprocessor"
     , Option []    ["optc"]      (ReqArg (optCCargs_u . idu) "option") "extra options to pass to c compiler"
-    , Option ['N'] ["noprelude"] (NoArg  (optPrelude_s False))         "no implicit prelude"
-    , Option ['c'] []            (NoArg  (optMode_s CompileHo))        "Typecheck and compile module"
+    , Option ['N'] ["noprelude"] (NoArg  (optPrelude_s False))         "do not automatically import the prelude"
+    , Option ['c'] []            (NoArg  (optMode_s CompileHo))        "just compile the modules, caching the results."
+    , Option ['C'] []            (NoArg  (optMode_s StopC))            "compile to C code"
     , Option ['E'] []            (NoArg  (optMode_s Preprocess))       "preprocess the input and print result to stdout"
     , Option ['k'] ["keepgoing"] (NoArg  (optKeepGoing_s True))        "keep going on errors"
     , Option []    ["cross"]     (NoArg  (optCross_s True))            "enable cross-compilation, choose target with the -m flag"
+    , Option []    ["stop"]      (ReqArg (optMode_s . stop) "parse/typecheck/c")  "stop after the given pass, parse/typecheck/c"
     , Option []    ["width"]     (ReqArg (optColumns_s . read) "COLUMNS") "width of screen for debugging output"
     , Option []    ["main"]      (ReqArg (optMainFunc_s . Just . (,) False) "Main.main")  "main entry point"
     , Option ['m'] ["arch"]      (ReqArg (optArch_u . idu ) "arch")      "target architecture options"
     , Option []    ["entry"]     (ReqArg (optMainFunc_s . Just . (,) True)  "<expr>")  "main entry point, showable expression"
-    , Option ['e'] []            (ReqArg (\d -> optStmts_u (d:)) "<statement>")  "run given statement as if on jhci prompt"
+--    , Option ['e'] []            (ReqArg (\d -> optStmts_u (d:)) "<statement>")  "run given statement as if on jhci prompt"
     , Option []    ["show-ho"]   (ReqArg  (optMode_s . ShowHo) "file.ho") "Show ho file"
     , Option []    ["noauto"]    (NoArg  (optNoAuto_s True))           "Don't automatically load base and haskell98 packages"
     , Option ['p'] []            (ReqArg (\d -> optHls_u (++ [d])) "file.hl") "Load given haskell library .hl file"
@@ -252,7 +257,7 @@ theoptions =
     , Option []    ["build-hl"]  (ReqArg (optMode_s . BuildHl) "file.cabal") "Build hakell library from given library description file"
     , Option []    ["annotate-source"]  (ReqArg (optAnnotate_s . Just) "<dir>") "Write preprocessed and annotated source code to the directory specified"
     , Option []    ["deps"]      (ReqArg (optDeps_s . Just) "<file.yaml>") "Write dependency information to file specified"
-    , Option []    ["interactive"] (NoArg  (optMode_s Interactive))    "run interactivly"
+    , Option []    ["interactive"] (NoArg  (optMode_s Interactive))    "run interactivly (for debugging only)"
     , Option []    ["ignore-ho"]   (NoArg  (optIgnoreHo_s True))       "Ignore existing haskell object files"
     , Option []    ["nowrite-ho"]  (NoArg  (optNoWriteHo_s True))      "Do not write new haskell object files"
     , Option []    ["no-ho"]       (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "same as --ignore-ho and --nowrite-ho"
@@ -262,6 +267,13 @@ theoptions =
     , Option []    ["list-libraries"] (NoArg  (optMode_s ListLibraries)) "List of installed libraries"
     , Option []    ["print-hsc-options"] (NoArg (optMode_s PrintHscOptions)) "print options to pass to hsc2hs"
     ]
+
+stop "parse" = StopParse
+stop "deps" = StopParse
+stop "typecheck" = StopTypeCheck
+stop "c" = StopC
+stop s = StopError s
+
 
 -- | Width of terminal.
 getColumns :: Int
