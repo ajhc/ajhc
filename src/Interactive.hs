@@ -108,6 +108,8 @@ interact cho = mre where
         putStrLn "--------------------------------------------------------------"
         putStrLn "Welcome to the jhc interactive experience. use :help for help."
         putStrLn versionString
+        putStrLn "(This is not a full interpreter, but rather is used to"
+        putStrLn "help debug the compiler internals)"
         putStrLn "--------------------------------------------------------------"
         runInteraction initialInteract ":execfile jhci.rc"
         beginInteraction initialInteract
