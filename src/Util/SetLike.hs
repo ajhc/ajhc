@@ -1,220 +1,205 @@
-module Util.SetLike(
-    EnumSet(),
-    (\\),
-    notMember,
-    mnotMember,
-    minsert,
-    msingleton,
-    intersects,
-    mfindWithDefault,
-    SetLike(..),
-    ModifySet(..),
-    MapLike(..),
-    BuildSet(..)
-    ) where
-
+module Util.SetLike where
 
 import Data.Monoid
-import Data.Typeable
-import qualified Data.IntMap as IM
-import qualified Data.IntSet as IS
 import qualified Data.Map as M
+import qualified Data.IntMap as IM
 import qualified Data.Set as S
+import qualified Data.IntSet as IS
 
-import Util.HasSize
-
-infixl 9 \\ --
-
-(\\) :: SetLike s => s -> s -> s
-m1 \\ m2 = difference m1 m2
-
-class (HasSize s,IsEmpty s) => SetLike s where
-    difference :: s -> s -> s
-    intersection :: s -> s -> s
-    disjoint :: s -> s -> Bool
-    isSubsetOf :: s -> s -> Bool
-
+class Monoid s => Unionize s where
     union :: s -> s -> s
     unions :: [s] -> s
-    sempty :: s
+    difference :: s -> s -> s
+    intersection :: s -> s -> s
+    unions = mconcat
+    union = mappend
 
-    disjoint x y = isEmpty (x `intersection` y)
-    isSubsetOf x y = size x <= size y && (size (x `intersection` y) == size x)
-    unions ss = foldr union sempty ss
+type family Elem es
+type family Key s :: *
+type family Value m :: *
 
+class Monoid s => Collection s where
+    fromList :: [Elem s] -> s
+    toList :: s -> [Elem s]
+    singleton :: Elem s -> s
+    singleton e = fromList [e]
 
--- you can't pull values out of the set with this, as it might store the
--- essence of a data type
+type instance Elem [e] = e
 
-class SetLike s => BuildSet t s | s -> t where
-    fromList :: [t] -> s
-    fromDistinctAscList :: [t] -> s
-    insert :: t -> s -> s
-    singleton :: t -> s
-
-    singleton t = fromDistinctAscList [t]
-    fromDistinctAscList = fromList
-
-class BuildSet t s => ModifySet t s | s -> t where
-    toList :: s -> [t]
-    delete :: t -> s -> s
-    member :: t -> s -> Bool
-    sfilter :: (t -> Bool) -> s -> s
-
-notMember :: (ModifySet t s) => t -> s -> Bool
-notMember x t = not $ member x t
-mnotMember :: (MapLike k v m) => k -> m -> Bool
-mnotMember x t = not $ mmember x t
-
-intersects :: (SetLike s) => s -> s -> Bool
-intersects x y = not $ disjoint x y
+instance Collection [e] where
+    fromList = id
+    toList = id
 
 
---  int set
+class Collection s => SetLike s where
+    keys :: s -> [Key s]
+    member :: Key s -> s -> Bool
+    delete :: Key s -> s -> s
+    sfilter :: (Elem s -> Bool) -> s -> s
+    insert :: Elem s -> s -> s
 
-instance SetLike IS.IntSet where
+
+class SetLike m => MapLike m where
+    mlookup :: Key m -> m -> Maybe (Value m)
+    values :: m -> [Value m]
+
+instance Unionize IS.IntSet where
+    union = IS.union
     difference = IS.difference
     intersection = IS.intersection
-    isSubsetOf = IS.isSubsetOf
-    union      = IS.union
-    unions     = IS.unions
-    sempty      = IS.empty
 
-instance BuildSet Int IS.IntSet where
-    fromList xs = IS.fromList xs
-    fromDistinctAscList xs = IS.fromDistinctAscList xs
-    insert x s = IS.insert x s
-    singleton x = IS.singleton x
+type instance Elem IS.IntSet = Int
 
-instance ModifySet Int IS.IntSet where
-    toList s   = IS.toList s
-    delete x s = IS.delete x s
-    member x s = IS.member x s
-    sfilter    = IS.filter
+instance Collection IS.IntSet where
+    fromList = IS.fromList
+    toList = IS.toList
+    singleton = IS.singleton
 
--- normal set
+type instance  Key IS.IntSet = Int
+instance SetLike IS.IntSet where
+    keys = IS.toList
+    member = IS.member
+    sfilter = IS.filter
+    delete = IS.delete
+    insert = IS.insert
 
-instance Ord a => SetLike (S.Set a) where
-    difference = S.difference
+instance Ord k => Unionize (S.Set k) where
+    union = S.union
     intersection = S.intersection
-    isSubsetOf = S.isSubsetOf
-    union      = S.union
-    unions     = S.unions
-    sempty      = S.empty
+    difference = S.difference
 
-instance Ord a => BuildSet a (S.Set a) where
-    fromList xs = S.fromList xs
-    fromDistinctAscList xs = S.fromDistinctAscList xs
-    insert x s = S.insert x s
-    singleton x = S.singleton x
+type instance  Elem (S.Set k) = k
+instance Ord k => Collection (S.Set k) where
+    fromList = S.fromList
+    toList = S.toList
+    singleton = S.singleton
 
-instance Ord a => ModifySet a (S.Set a) where
-    toList s   = S.toList s
-    member x s = S.member x s
-    delete x s = S.delete x s
-    sfilter    = S.filter
+type instance Key (S.Set k) = k
+instance Ord k => SetLike (S.Set k) where
+    keys = S.toList
+    member = S.member
+    sfilter = S.filter
+    delete = S.delete
+    insert = S.insert
 
--- maps
-
-instance SetLike (IM.IntMap a) where    -- SIC
+instance Unionize (IM.IntMap v) where
+    union = IM.union
     difference = IM.difference
     intersection = IM.intersection
-    union      = IM.union
-    unions     = IM.unions
-    sempty     = IM.empty
 
-
-instance BuildSet (Int,a) (IM.IntMap a) where
-    fromList xs = IM.fromList xs
-    fromDistinctAscList xs = IM.fromDistinctAscList xs
-    insert (k,v) s = IM.insert k v s
+type instance Elem (IM.IntMap v) = (Int,v)
+instance Collection (IM.IntMap v) where
+    fromList = IM.fromList
+    toList = IM.toList
     singleton (k,v) = IM.singleton k v
 
+type instance Key (IM.IntMap v) = Int
+instance SetLike (IM.IntMap v) where
+    keys = IM.keys
+    member = IM.member
+    sfilter f = IM.filterWithKey (\ k v -> f (k,v))
+    delete = IM.delete
+    insert (k,v) = IM.insert k v
 
-instance Ord a => SetLike (M.Map a b) where
+type instance Value (IM.IntMap v) = v
+instance MapLike (IM.IntMap v) where
+    mlookup = IM.lookup
+    values = IM.elems
+
+instance Ord k => Unionize (M.Map k v) where
+    union = M.union
     difference = M.difference
     intersection = M.intersection
-    union      = M.union
-    unions     = M.unions
-    sempty     = M.empty
 
-instance Ord a => BuildSet (a,b) (M.Map a b) where
-    fromList xs = M.fromList xs
-    fromDistinctAscList xs = M.fromDistinctAscList xs
-    insert (k,v) s = M.insert k v s
+type instance Elem (M.Map k v) = (k,v)
+instance Ord k => Collection (M.Map k v) where
+    fromList = M.fromList
+    toList = M.toList
     singleton (k,v) = M.singleton k v
 
-minsert :: BuildSet (k,v) s => k -> v -> s -> s
-minsert k v s = insert (k,v) s
+type instance Key (M.Map k v) = k
+instance Ord k => SetLike (M.Map k v) where
+    keys = M.keys
+    member = M.member
+    sfilter f = M.filterWithKey (\ k v -> f (k,v))
+    delete = M.delete
+    insert (k,v) = M.insert k v
 
-msingleton :: BuildSet (k,v) s => k -> v -> s
-msingleton k v = singleton (k,v)
+type instance Value (M.Map k v) = v
+instance Ord k => MapLike (M.Map k v) where
+    mlookup = M.lookup
+    values = M.elems
 
+minsert :: (MapLike m, Elem m ~ (k,v)) => k -> v -> m -> m
+minsert k v = insert (k,v)
 
-class SetLike m => MapLike k v m | m -> k v where
-    mdelete :: k -> m -> m
-    mmember :: k -> m -> Bool
-    mlookup :: k -> m -> Maybe v
-    melems :: m -> [v]
-    massocs :: m -> [(k,v)]
-    mkeys :: m -> [k]
-    mmapWithKey :: (k -> v -> v) -> m -> m
-    mfilter :: (v -> Bool) -> m -> m
-    mfilterWithKey :: (k -> v -> Bool) -> m -> m
-    munionWith :: (v -> v -> v) -> m -> m -> m
-    mpartitionWithKey :: (k -> v -> Bool) -> m -> (m,m)
+{-
+instance SetLike (GMap k v) where
+    type Elem (GMap k v) = (k,v)
+    type Key (GMap k v) = k
 
-    mkeys = map fst . massocs
-    melems = map snd . massocs
-
-instance MapLike Int a (IM.IntMap a) where
-    mdelete = IM.delete
-    mmember = IM.member
-    mlookup k m = IM.lookup k m
-    melems = IM.elems
-    mkeys = IM.keys
-    massocs = IM.toList
-    mfilter = IM.filter
-    mmapWithKey = IM.mapWithKey
-    mfilterWithKey = IM.filterWithKey
-    munionWith = IM.unionWith
-    mpartitionWithKey = IM.partitionWithKey
-
-instance Ord k => MapLike k v (M.Map k v) where
-    mdelete = M.delete
-    mmember = M.member
-    mlookup k m = case M.lookup k m of
-        Nothing -> fail "Map: mlookup can't find key"
-        Just x -> return x
-    melems = M.elems
-    mkeys = M.keys
-    massocs = M.toList
-    mfilter = M.filter
-    mmapWithKey = M.mapWithKey
-    mfilterWithKey = M.filterWithKey
-    munionWith = M.unionWith
-    mpartitionWithKey = M.partitionWithKey
-
-mfindWithDefault :: MapLike k v m => v -> k -> m -> v
-mfindWithDefault d k m = case mlookup k m of
-    Nothing -> d
-    Just x -> x
-
--- EnumSet
-
-newtype EnumSet a = EnumSet IS.IntSet
-    deriving(Typeable,Monoid,SetLike,HasSize,Eq,Ord,IsEmpty)
-
-instance Enum a => BuildSet a (EnumSet a) where
-    fromList xs = EnumSet $ IS.fromList (map fromEnum xs)
-    fromDistinctAscList xs = EnumSet $ IS.fromDistinctAscList (map fromEnum xs)
-    insert x (EnumSet s) = EnumSet $ IS.insert (fromEnum x) s
-    singleton x = EnumSet $ IS.singleton (fromEnum x)
-
-instance Enum a => ModifySet a (EnumSet a) where
-    toList (EnumSet s) = map toEnum $ toList s
-    member x (EnumSet s) = IS.member (fromEnum x) s
-    delete x (EnumSet s) = EnumSet $ IS.delete (fromEnum x) s
-    sfilter f (EnumSet s) = EnumSet $ IS.filter (f . toEnum)  s
+instance SetLike (GSet k) where
+    type Elem (GSet k) = k
+    type Key (GSet k) = k
 
 
+class GMapKey k where
+    data GMap k :: * -> *
+    data GSet k :: *
+--    fromList :: [(k,v)] -> GMap k v
+--    fromDistinctAscList :: [(k,v)] -> GMap k v
+--    fromBinDistinctAscList :: Int -> [(k,v)] -> GMap k v
+--    insert :: k -> v -> GMap k v -> GMap k v
+--    union :: GMap k v -> GMap k v -> GMap k v
+--    toList :: GMap k v -> [(k,v)]
+--    delete :: k -> GMap k v -> GMap k v
+--    member :: k -> GMap k v -> Bool
+--    lookup :: k -> GMap k v -> Maybe v
+
+--    fromDistinctAscList = fromList
+--    fromBinDistinctAscList _ = fromList
+--
+instance GMapKey Int where
+    newtype GMap Int v = GMapInt (IM.IntMap v)
+    fromList vs = GMapInt (IM.fromList vs)
+    toList (GMapInt x) = IM.toList x
+    insert k v (GMapInt m) = GMapInt (IM.insert k v m)
+    union (GMapInt x) (GMapInt y) = GMapInt $  x `IM.union` y
+    lookup k (GMapInt m) = IM.lookup k m
+
+instance GMapKey a => GMapKey (Maybe a) where
+    data GMap (Maybe a) v = GMapMaybe (Maybe v) (GMap a v)
+-}
+
+
+{-
+class GMapKey k where
+    type GMap k :: * -> *
+    fromList :: [(k,v)] -> GMap k v
+    fromDistinctAscList :: [(k,v)] -> GMap k v
+    fromBinDistinctAscList :: Int -> [(k,v)] -> GMap k v
+    insert :: k -> v -> GMap k v -> GMap k v
+    union :: GMap k v -> GMap k v -> GMap k v
+    toList :: GMap k v -> [(k,v)]
+    delete :: k -> GMap k v -> GMap k v
+    member :: k -> GMap k v -> Bool
+    lookup :: k -> GMap k v -> Maybe v
+
+    fromDistinctAscList = fromList
+    fromBinDistinctAscList _ = fromList
+
+instance GMapKey Int where
+    type GMap Int v = (IM.IntMap v)
+    fromList vs = (IM.fromList vs)
+    toList x = IM.toList x
+    insert k v m = (IM.insert k v m)
+    union x y =  x `IM.union` y
+    lookup k m = IM.lookup k m
+
+
+data GMapMaybe k v = GMapMaybe (Maybe v) GMap k v)
+instance GMapKey a => GMapKey (Maybe a) where
+    data GMap (Maybe a) v = GMapMaybe (Maybe v) (GMap a v)
+
+
+-}

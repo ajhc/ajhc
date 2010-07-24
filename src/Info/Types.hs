@@ -22,12 +22,12 @@ data Arity = Arity Int Bool
 instance Show Properties where
     showsPrec _ props = shows (toList props)
 
-
 -- | list of properties of a function, such as specified by use pragmas or options
 newtype Properties = Properties (EnumBitSet Property)
-    deriving(Typeable,Eq,HasSize,Monoid,SetLike,BuildSet Property,ModifySet Property,IsEmpty)
+    deriving(Typeable,Eq,Collection,SetLike,HasSize,Monoid,Unionize,IsEmpty)
 
-
+type instance Elem Properties = Property
+type instance Key Properties = Property
 
 class HasProperties a where
     modifyProperties :: (Properties -> Properties) -> a -> a
