@@ -54,6 +54,7 @@ import Util.HasSize
 import Util.Inst()
 import Util.NameMonad
 import Util.SetLike as S
+import Util.GMap()
 --import Debug.Trace
 
 {-
