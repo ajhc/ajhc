@@ -4,10 +4,14 @@ use strict;
 use warnings;
 
 use YAML;
+use Getopt::Std;
+
+our $opt_e;
+getopts('e') or die;
 
 sub pdeps {
     while(@_) {
-        for(my $i = 0; $i < 4; $i++) {
+        for(my $i = 0; $i < 5; $i++) {
             last unless @_;
             print " ", shift;
         }
@@ -16,17 +20,26 @@ sub pdeps {
     print "\n";
 }
 
+my @targets;
 
-for (@ARGV) {
+foreach (@ARGV) {
     my $y = YAML::LoadFile($_);
     next unless exists $y->{Target};
-    my @deps = values %{$y->{ModuleSource}};
-    my @libs = values %{$y->{LibraryDeps}} if exists $y->{LibraryDeps};
-    map { s/^\.\/// } @libs;
+    my @deps;
+    @deps = values %{$y->{ModuleSource}} if !$opt_e;
+    push @deps, values %{$y->{LibraryDeps}} if exists $y->{LibraryDeps};
     @deps = (@{$y->{LibraryDesc}}, @deps) if exists $y->{LibraryDesc};
+    map { s/^\.\/// } @deps;
+    foreach (@deps) {
+        my $patch = $_;
+        push @deps, $patch if $patch =~ s/\.cabal$/.patch/ and -e $patch;
+    }
+    push @targets, @{$y->{Target}} if $opt_e;
     for (@{$y->{Target}}) {
-        #print "$_: ";, join(" ",@deps,@libs), "\n";
         print "$_:";
-        pdeps(@deps,@libs);
+        pdeps(@deps);
+        print "\tperl utils/build_extlibs.prl \$<\n" if $opt_e;
     }
 }
+print "JHC_EXT_LIBS =" if @targets;
+pdeps(@targets) if @targets;
