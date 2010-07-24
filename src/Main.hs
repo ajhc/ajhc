@@ -82,7 +82,7 @@ processCollectedHo cho = do
         printClassHierarchy (choClassHierarchy cho)
 
     let dataTable = choDataTable cho
-        combinators = melems $ choCombinators cho
+        combinators = values $ choCombinators cho
 
     evaluate dataTable
     evaluate combinators

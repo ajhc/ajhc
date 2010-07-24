@@ -538,7 +538,7 @@ removeNewtypes dataTable e = runIdentity (f e) where
 {-# NOINLINE toDataTable #-}
 toDataTable :: (Map.Map Name Kind) -> (Map.Map Name Type) -> [HsDecl] -> DataTable -> DataTable
 toDataTable km cm ds currentDataTable = newDataTable  where
-    newDataTable = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conName x,procNewTypes x) | x <- ds', conName x `notElem` mkeys primitiveAliases ])
+    newDataTable = DataTable (Map.mapWithKey fixupMap $ Map.fromList [ (conName x,procNewTypes x) | x <- ds', conName x `notElem` keys primitiveAliases ])
     fullDataTable = (newDataTable `mappend` currentDataTable)
     procNewTypes c = c { conExpr = f (conExpr c), conType = f (conType c), conOrigSlots = map (mapESlot f) (conOrigSlots c) } where
         f = removeNewtypes fullDataTable
@@ -636,7 +636,7 @@ toDataTable km cm ds currentDataTable = newDataTable  where
             fvset = freeVars (thisTypeArgs,origArgs) `mappend` fromList (take (length theTypeArgs + 2) anonymousIds)
 
         -- existentials are free variables in the arguments, that arn't bound in the type
-        existentials = melems $ freeVars (map getType origArgs) S.\\ (freeVars thisTypeArgs :: IdMap TVr)
+        existentials = values $ freeVars (map getType origArgs) S.\\ (freeVars thisTypeArgs :: IdMap TVr)
 
         -- arguments that the front end passes or pulls out of this constructor
         --hsArgs = existentials ++ [ tvr {tvrIdent = x} | tvr <- origArgs | x <- drop (5 + length theTypeArgs) [2,4..] ]

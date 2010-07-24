@@ -54,7 +54,7 @@ import Util.HasSize
 import Util.Inst()
 import Util.NameMonad
 import Util.SetLike as S
-import Util.GMap()
+import Util.GMap
 --import Debug.Trace
 
 {-
@@ -81,6 +81,8 @@ import Util.GMap()
 newtype Id = Id Int
     deriving(Eq,Ord)
 
+
+
 anonymous :: Int -> Id
 anonymous x | x <= 0 = error "invalid anonymous id"
             | otherwise = Id (2*x)
@@ -95,7 +97,14 @@ va5  = anonymous 5
 
 -- IdSet
 
+instance Intjection Id where
+    toIntjection i = (Id i)
+    fromIntjection (Id i) = i
 
+type IdSet = IntjectionSet Id
+type instance GSet Id = IdSet
+
+{-
 newtype IdSet = IdSet IS.IntSet
     deriving(Typeable,Monoid,HasSize,SetLike,IsEmpty,Eq,Ord)
 
@@ -111,22 +120,25 @@ instance ModifySet Id IdSet where
     member (Id x) (IdSet b) = IS.member x b
     sfilter f (IdSet s) = IdSet $ IS.filter (f . Id) s
 
+-}
 
 idSetToList :: IdSet -> [Id]
-idSetToList (IdSet is) = [ Id x | x <- IS.toList is ]
+idSetToList = S.toList
 
 idMapToList :: IdMap a -> [(Id,a)]
-idMapToList (IdMap is) = [ (Id x,y) | (x,y) <- IM.toList is ]
+idMapToList = S.toList
 
 idToInt :: Id -> Int
 idToInt (Id x) = x
 
 mapMaybeIdMap :: (a -> Maybe b) -> IdMap a -> IdMap b
-mapMaybeIdMap fn (IdMap m) = IdMap (IM.mapMaybe fn m)
+mapMaybeIdMap fn (IntjectionMap m) = IntjectionMap (IM.mapMaybe fn m)
 
 
--- IdMap
+type IdMap = IntjectionMap Id
+type instance GMap Id = IdMap
 
+{-
 newtype IdMap a = IdMap (IM.IntMap a)
     deriving(Typeable,Monoid,HasSize,SetLike,Functor,Traversable,Foldable,IsEmpty,Eq,Ord)
 
@@ -149,16 +161,23 @@ instance MapLike Id a (IdMap a) where
     munionWith f (IdMap m1) (IdMap m2) = IdMap $ IM.unionWith f m1 m2
     mfilterWithKey f (IdMap m) = IdMap $ IM.filterWithKey (\k v -> f (Id k) v) m
 
+-}
+
+instance GMapSet Id where
+    toSet (IntjectionMap im)  = IntjectionSet $ IM.keysSet im
+    toMap f (IntjectionSet is) = IntjectionMap $ IM.fromDistinctAscList [ (x,f (Id x)) |  x <- IS.toAscList is]
+    
 
 --deriving instance MapLike Int a (IM.IntMap a) => MapLike Id a (IdMap a)
 
 
 idSetToIdMap :: (Id -> a) -> IdSet -> IdMap a
-idSetToIdMap f (IdSet is) = IdMap $ IM.fromDistinctAscList [ (x,f (Id x)) |  x <- IS.toAscList is]
+--idSetToIdMap f (IdSet is) = IdMap $ IM.fromDistinctAscList [ (x,f (Id x)) |  x <- IS.toAscList is]
+idSetToIdMap = toMap
 
 idMapToIdSet :: IdMap a -> IdSet
-idMapToIdSet (IdMap im) = IdSet $ (IM.keysSet im)
-
+idMapToIdSet (IntjectionMap im)  = IntjectionSet $ IM.keysSet im
+--idMapToIdSet (IdMap im) = IdSet $ (IM.keysSet im)
 
 -- | Name monad transformer.
 newtype IdNameT m a = IdNameT (StateT (IdSet, IdSet) m a)
@@ -208,18 +227,16 @@ addBoundNamesIdMap nmap = IdNameT $ do
         nset = idMapToIdSet nmap
 
 idSetFromDistinctAscList :: [Id] -> IdSet
-idSetFromDistinctAscList ids = IdSet (IS.fromDistinctAscList [ x | Id x <- ids] )
+idSetFromDistinctAscList ids = IntjectionSet (IS.fromDistinctAscList [ x | Id x <- ids] )
 
 idSetFromList :: [Id] -> IdSet
-idSetFromList ids = IdSet (IS.fromList [ x | Id x <- ids])
+idSetFromList ids = fromList ids
 
 idMapFromList :: [(Id,a)] -> IdMap a
-idMapFromList ids = IdMap (IM.fromList [ (x,y) | (Id x,y) <- ids])
+idMapFromList ids = fromList  ids
 
 idMapFromDistinctAscList :: [(Id,a)] -> IdMap a
-idMapFromDistinctAscList ids = IdMap (IM.fromDistinctAscList [ (x,y) | (Id x,y) <- ids ] )
-
-
+idMapFromDistinctAscList ids = IntjectionMap (IM.fromDistinctAscList [ (x,y) | (Id x,y) <- ids ] )
 
 instance Show Id where
         showsPrec _ (Id 0) =  showChar '_'
@@ -257,7 +274,7 @@ emptyId = Id 0
 -- useful for generating a small number of local unique names.
 
 newIds :: IdSet -> [Id]
-newIds (IdSet ids) = [ i | i <- candidateIds (size ids' `xor` IS.findMin ids' `xor` IS.findMax ids') , i `notMember` IdSet ids ] where
+newIds (IntjectionSet ids) = [ Id i | Id i <- candidateIds (size ids' `xor` IS.findMin ids' `xor` IS.findMax ids') , i `notMember` ids ] where
     ids' = if size ids == 0 then IS.insert 0 ids else ids
 
 

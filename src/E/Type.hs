@@ -116,8 +116,8 @@ data ARules = ARules {
 
 data Lit e t = LitInt { litNumber :: Number, litType :: t }
     | LitCons  { litName :: Name, litArgs :: [e], litType :: t, litAliasFor :: Maybe E }
-    deriving(Eq,Ord)
-        {-!derive: is, Functor, Foldable, Traversable !-}
+    deriving(Eq,Ord,Functor,Foldable,Traversable)
+        {-!derive: is !-}
 
 
 --------------------------------------

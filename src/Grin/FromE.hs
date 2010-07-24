@@ -235,7 +235,7 @@ compile prog@Program { progDataTable = dataTable } = do
     return grin
     where
     scMap = fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- map combTriple $ progCombinators prog]
-    initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ concat [ makePartials (a,b,c) | (_,(a,b,c)) <-  massocs scMap] ++ concat [con x| x <- [cabsurd] ++ Map.elems (constructorMap dataTable), conType x /= eHash]
+    initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ concat [ makePartials (a,b,c) | (_,(a,b,c)) <-  toList scMap] ++ concat [con x| x <- [cabsurd] ++ Map.elems (constructorMap dataTable), conType x /= eHash]
     Just cabsurd = getConstructor (nameConjured modAbsurd eStar) mempty
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = return $ (tagArrow,toTyTy ([tyDNode, tyDNode],[TyNode]))
     con c | keepCon = return $ (n,TyTy { tyThunk = TyNotThunk, tySlots = keepIts as, tyReturn = [TyNode], tySiblings = fmap (map convertName) sibs}) where

@@ -54,8 +54,8 @@ getDyn = do
         Nothing -> fail $ "getDyn: don't know how to read something of type: " ++ show ps
 
 instance Binary Properties where
-    put (Properties (EnumBitSet props)) = put (fromIntegral $ BS.toWord props :: Word32)
-    get = (get :: Get Word32) >>= return . Properties . EnumBitSet . BS.fromWord . fromIntegral
+    put (Properties (EBS props)) = put (fromIntegral $ BS.toWord props :: Word32)
+    get = (get :: Get Word32) >>= return . Properties . EBS . BS.fromWord . fromIntegral
 
 
 instance Binary Info where

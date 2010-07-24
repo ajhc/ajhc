@@ -73,20 +73,20 @@ processInitialHo ::
 processInitialHo accumho aho = do
     let Rules rm = hoRules $ hoBuild aho
         newTVrs = fsts $ hoEs (hoBuild aho)
-        (_,orphans) = mpartitionWithKey (\k _ -> k `elem` map tvrIdent newTVrs) rm
+        (_,orphans) = spartition (\ (k,_) -> k `elem` map tvrIdent newTVrs) rm
 
-    let fakeEntry = emptyComb { combRules = map ruleUpdate . concat $ melems orphans }
-        combs =  fakeEntry:[combRules_s (map ruleUpdate $ mfindWithDefault [] (tvrIdent t) rm) (bindComb (t,e))  | (t,e) <- hoEs (hoBuild aho) ]
+    let fakeEntry = emptyComb { combRules = map ruleUpdate . concat $ values orphans }
+        combs =  fakeEntry:[combRules_s (map ruleUpdate $ findWithDefault [] (tvrIdent t) rm) (bindComb (t,e))  | (t,e) <- hoEs (hoBuild aho) ]
 
     -- extract new combinators and processed rules
     let choCombinators' = fromList [ (combIdent c,c) | c <- runIdentity $ annotateCombs (choVarMap accumho) (\_ -> return) letann lamann combs]
-        nrules = map ruleUpdate . combRules $ mfindWithDefault emptyComb emptyId choCombinators'
+        nrules = map ruleUpdate . combRules $ findWithDefault emptyComb emptyId choCombinators'
         reRule :: Comb -> Comb
         reRule comb = combRules_u f comb where
             f rs = List.union  rs [ x | x <- nrules, ruleHead x == combHead comb]
 
-    let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- map combHead $ melems choCombs ]) (choVarMap accumho)
-        choCombs = mfilterWithKey (\k _ -> k /= emptyId) choCombinators'
+    let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- map combHead $ values choCombs ]) (choVarMap accumho)
+        choCombs = sfilter (\(k,_) -> k /= emptyId) choCombinators'
     return $ updateChoHo mempty {
         choVarMap = finalVarMap,
         choExternalNames = choExternalNames accumho `mappend` (fromList . map tvrIdent $ newTVrs),
@@ -144,7 +144,7 @@ processDecls cho ho' tiData = do
 
     dumpRules rules
 
-    let seasoning = freeVars [ rs | (k,rs) <- massocs rules', k `notMember` defined ] `intersection` defined
+    let seasoning = freeVars [ rs | (k,rs) <- toList rules', k `notMember` defined ] `intersection` defined
         defined = fromList $ map (tvrIdent . fst) ds :: IdSet
 
     -- our initial program

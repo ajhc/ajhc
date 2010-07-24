@@ -117,7 +117,7 @@ lintCheckProgram onerr prog | flint = do
             lintCheckE onerr (progDataTable prog) tvr e
     mapM_ f (programDs prog)
     let ids = progExternalNames prog `mappend` fromList (map tvrIdent $ fsts (programDs prog)) `mappend` progSeasoning prog
-        fvs = Set.fromList $ melems (freeVars $ snds $ programDs prog :: IdMap TVr)
+        fvs = Set.fromList $ values (freeVars $ snds $ programDs prog :: IdMap TVr)
         unaccounted = Set.filter (not . (`member` ids) . tvrIdent) fvs
     unless (Set.null unaccounted) $ do
         onerr

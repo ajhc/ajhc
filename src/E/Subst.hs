@@ -91,20 +91,20 @@ litSMapM f (LitInt n t) = do
 
 
 substMap :: IdMap E -> E -> E
-substMap im e = doSubst' False False im (\n -> n `member` (unions $ (freeVars e :: IdSet):map freeVars (melems im))) e
+substMap im e = doSubst' False False im (\n -> n `member` (unions $ (freeVars e :: IdSet):map freeVars (values im))) e
 
 -- | doesn't seed with free variables.
 substMap' :: IdMap E -> E -> E
-substMap' im = doSubst' False False im (`mmember` im)
+substMap' im = doSubst' False False im (`member` im)
 
 -- | doesn't seed with free variables.
 substMap'' :: IdMap (Maybe E) -> E -> E
-substMap'' im = doSubst' False False (mapMaybeIdMap id im) (`mmember` im)
+substMap'' im = doSubst' False False (mapMaybeIdMap id im) (`member` im)
 
 -- Monadic code is so much nicer
 doSubst :: Bool -> Bool -> IdMap (Maybe E) -> E -> E
 doSubst substInVars allShadow bm e
-    = doSubst' substInVars allShadow (mapMaybeIdMap id bm) (`mmember` bm) e
+    = doSubst' substInVars allShadow (mapMaybeIdMap id bm) (`member` bm) e
 
 doSubst' :: Bool -> Bool -> IdMap E -> (Id -> Bool) -> E -> E
 doSubst' substInVars allShadow bm check e  = f e (Set.empty, bm) where
@@ -148,7 +148,7 @@ doSubst' substInVars allShadow bm check e  = f e (Set.empty, bm) where
         return  $ caseUpdate ec { eCaseScrutinee = e', eCaseDefault = d, eCaseBind = b', eCaseAlts = alts, eCaseType = nty }
     lp lam tvr@(TVr { tvrIdent = n, tvrType = t}) e | n == emptyId || (allShadow && n `notElem` freeVars e) = do
         t' <- f t
-        e' <- local (\(s,m) -> (Set.insert n s, mdelete n m)) $ f e
+        e' <- local (\(s,m) -> (Set.insert n s, delete n m)) $ f e
         return $ lam (tvr { tvrIdent =  emptyId, tvrType =  t'}) e'
     lp lam tvr e = do
         (tv,r) <- ntvr Set.empty tvr
@@ -170,7 +170,7 @@ doSubst' substInVars allShadow bm check e  = f e (Set.empty, bm) where
         (s,ss) <- ask
         let i' = mnv allShadow xs i check s ss
         let nvr = (tvr { tvrIdent =  i', tvrType =  t'})
-        return (nvr,\(s,m) -> (Set.insert i' . Set.insert i $ s, minsert i (EVar nvr) . mdelete i' $ m))
+        return (nvr,\(s,m) -> (Set.insert i' . Set.insert i $ s, minsert i (EVar nvr) . delete i' $ m))
 
 
 
@@ -180,7 +180,7 @@ mnv allShadow xs i checkTaken s ss
     | isInvalidId i || scheck i = newId (Set.size xs + Set.size s + size ss) (not . check)
             -- It is very important that we don't check for 'xs' membership in the guard above.
     | otherwise = i
-    where scheck n = n `mmember` ss || n `member` s || checkTaken n
+    where scheck n = n `member` ss || n `member` s || checkTaken n
           check n = scheck n || n `member` xs
 
 
@@ -203,7 +203,7 @@ typeSubst' termSub typeSub e | isEmpty termSub && isEmpty typeSub = e
 typeSubst' termSub typeSub e = typeSubst  (fmap Just termSub `union` fmap ((`mlookup` termSub) . tvrIdent) fvs) typeSub e  where
     fvs :: IdMap TVr
     fvs = (freeVars e `union` fvmap termSub `union` fvmap typeSub)
-    fvmap m = unions (map freeVars (melems m))
+    fvmap m = unions (map freeVars (values m))
 
 --substType t e e' = typeSubst (freeVars e `union` freeVars e') (msingleton t e) e'
 

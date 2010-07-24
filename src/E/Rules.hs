@@ -72,7 +72,7 @@ instance Eq Rule where
     r1 == r2 = ruleUniq r1 == ruleUniq r2
 
 instance Binary Rules where
-    put (Rules mp) = put (concat $ melems mp)
+    put (Rules mp) = put (concat $ values mp)
     get = do
         rs <- get
         return $ fromRules rs
@@ -93,7 +93,7 @@ instance FreeVars Rule [Id] where
     freeVars rule = idSetToList $ freeVars rule
 
 {-# NOINLINE printRules #-}
-printRules ty (Rules rules) = mapM_ (\r -> printRule r >> putChar '\n') [ r | r <- concat $ melems rules, ruleType r == ty ]
+printRules ty (Rules rules) = mapM_ (\r -> printRule r >> putChar '\n') [ r | r <- concat $ values rules, ruleType r == ty ]
 
 putDocMLn' :: Monad m => (String -> m ()) -> Doc -> m ()
 putDocMLn' putStr d = displayM putStr (renderPretty 0.80 (optColumns options) d) >> putStr "\n"
@@ -113,7 +113,7 @@ combineRules as bs = map head $ sortGroupUnder ruleUniq (as ++ bs)
 
 instance Monoid Rules where
     mempty = Rules mempty
-    mappend (Rules x) (Rules y) = Rules $ munionWith (combineRules) x y
+    mappend (Rules x) (Rules y) = Rules $ unionWith combineRules x y
 
 
 fromRules :: [Rule] -> Rules
@@ -189,7 +189,7 @@ joinARules ar@(ARules fvsa a) br@(ARules fvsb b)
    rs@(r:_) = map ruleHead a ++ map ruleHead b
 
 rsubstMap :: IdMap E -> E -> E
-rsubstMap im e = doSubst False True (fmap ( (`mlookup` im) . tvrIdent) (unions $ (freeVars e :: IdMap TVr):map freeVars (melems im))) e
+rsubstMap im e = doSubst False True (fmap ( (`mlookup` im) . tvrIdent) (unions $ (freeVars e :: IdMap TVr):map freeVars (values im))) e
 
 applyRules :: MonadStats m => (Id -> Maybe E) -> ARules -> [E] -> m (Maybe (E,[E]))
 applyRules lup (ARules _ rs) xs = f rs where

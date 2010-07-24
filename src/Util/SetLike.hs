@@ -1,18 +1,28 @@
 module Util.SetLike where
 
+import Data.List(foldl')
 import Data.Monoid
 import qualified Data.Map as M
 import qualified Data.IntMap as IM
 import qualified Data.Set as S
 import qualified Data.IntSet as IS
+import Util.HasSize
+
+infixl 9 \\ --
+
+(\\) :: Unionize s => s -> s -> s
+m1 \\ m2 = difference m1 m2
 
 class Monoid s => Unionize s where
     union :: s -> s -> s
-    unions :: [s] -> s
     difference :: s -> s -> s
     intersection :: s -> s -> s
-    unions = mconcat
+    unions :: [s] -> s
+    sempty :: s
+
+    sempty = mempty
     union = mappend
+    unions = foldl' union mempty
 
 type family Elem es
 type family Key s :: *
@@ -20,9 +30,12 @@ type family Value m :: *
 
 class Monoid s => Collection s where
     fromList :: [Elem s] -> s
+    fromDistinctAscList :: [Elem s] -> s
     toList :: s -> [Elem s]
     singleton :: Elem s -> s
     singleton e = fromList [e]
+
+    fromDistinctAscList = fromList
 
 type instance Elem [e] = e
 
@@ -37,11 +50,15 @@ class Collection s => SetLike s where
     delete :: Key s -> s -> s
     sfilter :: (Elem s -> Bool) -> s -> s
     insert :: Elem s -> s -> s
+    spartition :: (Elem s -> Bool) -> s -> (s,s)
 
+notMember :: SetLike s => Key s -> s -> Bool
+notMember k s = not $ member k s
 
 class SetLike m => MapLike m where
     mlookup :: Key m -> m -> Maybe (Value m)
     values :: m -> [Value m]
+    unionWith :: (Value m -> Value m -> Value m) -> m -> m -> m
 
 instance Unionize IS.IntSet where
     union = IS.union
@@ -62,6 +79,7 @@ instance SetLike IS.IntSet where
     sfilter = IS.filter
     delete = IS.delete
     insert = IS.insert
+    spartition = IS.partition
 
 instance Ord k => Unionize (S.Set k) where
     union = S.union
@@ -81,6 +99,7 @@ instance Ord k => SetLike (S.Set k) where
     sfilter = S.filter
     delete = S.delete
     insert = S.insert
+    spartition = S.partition
 
 instance Unionize (IM.IntMap v) where
     union = IM.union
@@ -100,11 +119,13 @@ instance SetLike (IM.IntMap v) where
     sfilter f = IM.filterWithKey (\ k v -> f (k,v))
     delete = IM.delete
     insert (k,v) = IM.insert k v
+    spartition f = IM.partitionWithKey (\ k v -> f (k,v))
 
 type instance Value (IM.IntMap v) = v
 instance MapLike (IM.IntMap v) where
     mlookup = IM.lookup
     values = IM.elems
+    unionWith = IM.unionWith
 
 instance Ord k => Unionize (M.Map k v) where
     union = M.union
@@ -124,15 +145,26 @@ instance Ord k => SetLike (M.Map k v) where
     sfilter f = M.filterWithKey (\ k v -> f (k,v))
     delete = M.delete
     insert (k,v) = M.insert k v
+    spartition f = M.partitionWithKey (\ k v -> f (k,v))
 
 type instance Value (M.Map k v) = v
 instance Ord k => MapLike (M.Map k v) where
     mlookup = M.lookup
     values = M.elems
+    unionWith = M.unionWith
 
 minsert :: (MapLike m, Elem m ~ (k,v)) => k -> v -> m -> m
 minsert k v = insert (k,v)
 
+msingleton :: (MapLike m, Elem m ~ (k,v)) => k -> v -> m
+msingleton k v = singleton (k,v)
+
+intersects x y = not $ isEmpty (x `intersection` y)
+
+findWithDefault :: MapLike m => Value m -> Key m -> m -> Value m
+findWithDefault d k m = case mlookup k m of
+    Nothing -> d
+    Just x -> x
 {-
 instance SetLike (GMap k v) where
     type Elem (GMap k v) = (k,v)

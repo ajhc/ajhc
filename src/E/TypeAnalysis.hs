@@ -32,7 +32,7 @@ import Name.Name
 import Name.Names
 import Support.CanType
 import Util.Gen
-import Util.SetLike
+import Util.SetLike hiding(Value)
 import qualified Stats
 import qualified Info.Info as Info
 

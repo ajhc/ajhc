@@ -23,7 +23,7 @@ getLitTyp (LitInt _ t) = t
 getLitTyp LitCons { litType = t } = t
 
 instance FreeVars E [TVr] where
-    freeVars x = melems $ (freeVars x :: IdMap TVr)
+    freeVars x = values $ (freeVars x :: IdMap TVr)
 instance FreeVars E [Id] where
     freeVars e =  idSetToList (freeVars e)
 
@@ -90,15 +90,15 @@ freeIdMap =   fv where
     (<>) = mappend
     fv (EAp e1 e2) = fv e1 <> fv e2
     fv (EVar tvr@TVr { tvrIdent = i }) = msingleton i tvr
-    fv (ELam TVr { tvrIdent = i, tvrType = t} e) = mdelete i $ fv e <> fv t
-    fv (EPi  TVr { tvrIdent = i, tvrType = t} e) = mdelete i $ fv e <> fv t
+    fv (ELam TVr { tvrIdent = i, tvrType = t} e) = delete i $ fv e <> fv t
+    fv (EPi  TVr { tvrIdent = i, tvrType = t} e) = delete i $ fv e <> fv t
     fv ELetRec { eDefs = dl, eBody = e } =  ((tl <> bl <> fv e) S.\\ fromList ll)  where
         (ll,tl,bl) = liftT3 (id,mconcat,mconcat) $ unzip3 $
             map (\(tvr@(TVr { tvrIdent = j, tvrType =  t}),y) -> ((j,tvr), fv t, fv y)) dl
     fv (EError _ e) = fv e
     fv (ELit l) = fvLit l
     fv (EPrim _ es e) = mconcat $ fv e : map fv es
-    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = mconcat ( fv e:freeVars (tvrType  b):freeVars ty:(mdelete (tvrIdent b) $ mconcat (freeVars d:map freeVars as)  ):[])
+    fv ECase { eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseDefault = d, eCaseType = ty } = mconcat ( fv e:freeVars (tvrType  b):freeVars ty:(delete (tvrIdent b) $ mconcat (freeVars d:map freeVars as)  ):[])
     fv Unknown = mempty
     fv ESort {} = mempty
     fvLit LitCons { litArgs = es, litType = e } = mconcat $ fv e:map fv es

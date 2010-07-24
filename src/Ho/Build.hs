@@ -848,7 +848,7 @@ dumpHoFile fn = ans where
         showList "ModDependencies" (map pprint $ hoModDepends idep)
         showList "IDepCache" (map pprint . sortUnder fst $ Map.toList $ hoIDeps idep)
     --    when (not $ Prelude.null (hohMetaInfo hoh)) $ putStrLn $ "MetaInfo:\n" <> vindent (sort [text (' ':' ':k) <> char ':' <+> show v | (k,v) <- hohMetaInfo hoh])
-        putStrLn $ "Modules contained:" <+> tshow (mkeys $ hoExports hoE)
+        putStrLn $ "Modules contained:" <+> tshow (keys $ hoExports hoE)
         putStrLn $ "number of definitions:" <+> tshow (size $ hoDefs hoE)
         putStrLn $ "hoAssumps:" <+> tshow (size $ hoAssumps hoE)
         putStrLn $ "hoFixities:" <+> tshow (size $  hoFixities hoE)

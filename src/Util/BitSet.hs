@@ -96,7 +96,6 @@ newtype EnumBitSet a = EBS BitSet
 
 type instance Elem (EnumBitSet a) = a
 instance Enum a => Collection (EnumBitSet a) where 
---    type Elem (EnumBitSet a) = a
     singleton i = EBS $ singleton (fromEnum i)
     fromList ts = EBS $ fromList (map fromEnum ts)
     toList (EBS w) = map toEnum $ toList w

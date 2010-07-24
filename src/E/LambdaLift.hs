@@ -28,7 +28,7 @@ import Support.CanType
 import Support.FreeVars
 import Util.Graph as G
 import Util.HasSize
-import Util.SetLike
+import Util.SetLike hiding(Value)
 import Util.UniqueMonad
 import Options (verbose)
 

@@ -93,7 +93,11 @@ newtype OM a = OM (ReaderWriter IdSet (OMap,IdSet) a)
 unOM (OM a) = a
 
 newtype OMap = OMap (IdMap UseInfo)
-   deriving(HasSize,SetLike,BuildSet (Id,UseInfo),MapLike Id UseInfo,Show,IsEmpty,Eq,Ord)
+   deriving(HasSize,Collection,Unionize,SetLike,MapLike,Show,IsEmpty,Eq,Ord)
+
+type instance Value OMap = UseInfo
+type instance Key OMap = Id
+type instance Elem OMap = (Key OMap,Value OMap)
 
 instance Monoid OMap where
     mempty = OMap mempty
@@ -113,7 +117,7 @@ collectOccurance' e = (fe,omap) where
     (fe,(OMap omap,_)) = runReaderWriter (unOM $ collectOccurance e) mempty
 
 collectOccurance :: E -> OM E -- ^ (annotated expression, free variables mapped to their occurance info)
-collectOccurance e = f e  where
+collectOccurance e = f e where
     f e@ESort {} = return e
     f e@Unknown {} = return e
     f (EPi tvr@TVr { tvrIdent = eid, tvrType =  a} b) | isEmptyId eid = arg $ do
@@ -125,7 +129,7 @@ collectOccurance e = f e  where
         (b,tfvs) <- grump (f b)
         case mlookup n tfvs of
             Nothing -> tell (tfvs,mempty) >>  return (EPi tvr { tvrIdent =  emptyId, tvrType = a } b)
-            Just occ -> tell (mdelete n tfvs,singleton n) >> return (EPi (annb' tvr { tvrType = a }) b)
+            Just occ -> tell (delete n tfvs,singleton n) >> return (EPi (annb' tvr { tvrType = a }) b)
     f (ELit lc@LitCons { litArgs = as, litType = t }) = arg $ do
         t <- f t
         as <- mapM f as
@@ -146,8 +150,8 @@ collectOccurance e = f e  where
         let avs = bvs `andOM` asfv
             as'' = map (annbind' avs) as'
         case all (getProperty prop_ONESHOT) as of
-            True ->  tell $ (foldr mdelete avs (map tvrIdent as),fromList $ map tvrIdent as)
-            False -> tell $ (inLam $ foldr mdelete avs (map tvrIdent as),fromList $ map tvrIdent as)
+            True ->  tell $ (foldr delete avs (map tvrIdent as),fromList $ map tvrIdent as)
+            False -> tell $ (inLam $ foldr delete avs (map tvrIdent as),fromList $ map tvrIdent as)
         return (foldr ELam b' as'')
     f e | Just (x,t) <- from_unsafeCoerce e  = do x <- f x ; t <- (arg (f t)); return (prim_unsafeCoerce x t)
     f (EVar tvr@TVr { tvrIdent = n, tvrType =  t}) = do
@@ -170,7 +174,7 @@ collectOccurance e = f e  where
         let fidm = orMaps (fvb:fvas)
         ct <- arg $ f (eCaseType ec)
         b <- arg (ftvr b)
-        tell $ (mdelete (tvrIdent b) fidm,singleton (tvrIdent b))
+        tell $ (delete (tvrIdent b) fidm,singleton (tvrIdent b))
         return $ caseUpdate ec { eCaseScrutinee = scrut', eCaseAlts = as', eCaseBind = annbind' fidm b, eCaseType = ct, eCaseDefault = d'}
     f ELetRec { eDefs = ds, eBody = e } = do
         (e',fve) <- grump (f e)
@@ -181,7 +185,7 @@ collectOccurance e = f e  where
         (e',fvs) <- grump (f e)
         l <- arg (mapLitBindsM ftvr l)
         l <- arg (T.mapM f l)
-        let fvs' = foldr mdelete fvs (map tvrIdent $ litBinds l)
+        let fvs' = foldr delete fvs (map tvrIdent $ litBinds l)
             l' = mapLitBinds (annbind' fvs) l
         tell (fvs',fromList $ map tvrIdent (litBinds l'))
         return (Alt l' e')
@@ -227,11 +231,11 @@ collectDs :: [Comb] -> OMap -> OM [Comb]
 collectDs ds (OMap fve) = do
     ds' <- mapM (grump . collectBinding) ds
     exp <- ask
-    let (reachable',graph) = newGraphReachable ds' (\ ((comb,_),_) -> combIdent comb) (\ ((_,rv),fv) -> mkeys (fv `mappend` rv))
-        rds = reachable' (mkeys fve ++ [ combIdent t | t <- ds,  (combIdent t `member` exp)])
+    let (reachable',graph) = newGraphReachable ds' (\ ((comb,_),_) -> combIdent comb) (\ ((_,rv),fv) -> keys (fv `mappend` rv))
+        rds = reachable' (keys fve ++ [ combIdent t | t <- ds,  (combIdent t `member` exp)])
         -- ignore rules when calculating loopbreakers
         -- we must not simplify the expanded body of a rule without recalculating occurance info.
-        graph' = newGraph rds (\ ((comb,_),_) -> combIdent comb) (\ (_,fv) -> mkeys fv)
+        graph' = newGraph rds (\ ((comb,_),_) -> combIdent comb) (\ (_,fv) -> keys fv)
         (lb,lbds) =  findLoopBreakers (\ ((comb,_),_) -> loopFunc (combHead comb) (combBody comb)) (const True) graph'
         ds'' = map ( \ ((t,rv),rv') -> (t,rv `mappend` rv') ) lbds
         fids = foldl andOM mempty (fve:map unOMap (snds ds''))
@@ -264,12 +268,12 @@ inLam (OMap om) = OMap (fmap il om) where
     il ui = ui { useOccurance = Many }
 
 --andOM :: IdMap UseInfo -> IdMap UseInfo -> IdMap UseInfo
-andOM x y = munionWith andOcc x y
+andOM x y = unionWith andOcc x y
 andOcc UseInfo { useOccurance = Unused } x = x
 andOcc x UseInfo { useOccurance = Unused } = x
 andOcc x y = UseInfo { useOccurance = Many, minimumArgs = min (minimumArgs x) (minimumArgs y) }
 
-orMaps ms = OMap $ fmap orMany $ foldl (munionWith (++)) mempty (map (fmap (:[])) (map unOMap ms)) where
+orMaps ms = OMap $ fmap orMany $ foldl (unionWith (++)) mempty (map (fmap (:[])) (map unOMap ms)) where
     unOMap (OMap m) = m
 
 orMany [] = error "empty orMany"
@@ -420,7 +424,7 @@ substAddList ls env = cacheSubst env { envSubst = fromList ls `union` envSubst e
 
 applySubst :: Subst -> IdMap a -> IdMap OutE
 applySubst s nn = applySubst' s where
-    check n = n `mmember` s || n `mmember` nn
+    check n = n `member` s || n `member` nn
     applySubst' s = fmap g s
     g (Done e) = e
     g (Susp e s') = doSubst' False False (applySubst' s') check e
@@ -432,7 +436,7 @@ evalRange (Susp e s) = localEnv (envSubst_s s)  $ dosub e
 cacheSubst env = env { envCachedSubst = applySubst (envSubst env) (envInScope env) }
 
 dosub :: InE -> SM OutE
-dosub e = ask >>= \inb ->  coerceOpt return (doSubst' False False (envCachedSubst inb) (`mmember` envCachedSubst inb) e)
+dosub e = ask >>= \inb ->  coerceOpt return (doSubst' False False (envCachedSubst inb) (`member` envCachedSubst inb) e)
 
 simplifyE :: SimplifyOpts -> InE -> (Stat,OutE)
 simplifyE sopts e = (stat,e') where
@@ -792,7 +796,7 @@ simplifyDs prog sopts dsIn = ans where
                 Just IsBoundTo { bindingE = e } -> Just e
                 _ -> Nothing
         case z of
-            Nothing | fopts FO.Rules -> applyRules lup (mfindWithDefault mempty (tvrIdent v) $ envRules inb) xs
+            Nothing | fopts FO.Rules -> applyRules lup (findWithDefault mempty (tvrIdent v) $ envRules inb) xs
             x -> return x
     done cont e = z cont [] where
         z (ApplyTo r cont') rs = evalRange r >>= \a -> z cont' (a:rs)

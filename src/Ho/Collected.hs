@@ -31,7 +31,7 @@ choTypeSynonyms = hoTypeSynonyms . hoTcInfo . choHo
 choFixities = hoFixities . hoTcInfo . choHo
 choAssumps = hoAssumps . hoTcInfo . choHo
 choRules = hoRules . hoBuild . choHo
-choEs cho = [ (combHead c,combBody c) | c <- melems $  choCombinators cho]
+choEs cho = [ (combHead c,combBody c) | c <- values $  choCombinators cho]
 
 instance Monoid CollectedHo where
     mempty = updateChoHo CollectedHo {
@@ -56,7 +56,7 @@ instance Monoid CollectedHo where
 updateChoHo cho = cho { choHo = ho } where
     ho = hoBuild_u (hoEs_u f) . mconcat . Map.elems $ choHoMap cho
     f ds = runIdentity $ annotateDs mmap  (\_ -> return) (\_ -> return) (\_ -> return) (map g ds) where
-        mmap = mfilterWithKey (\k _ -> (k `notElem` (map (tvrIdent . fst) ds))) (choVarMap cho)
+        mmap = sfilter (\(k,_) -> (k `notElem` (map (tvrIdent . fst) ds))) (choVarMap cho)
     g (t,e) = case mlookup (tvrIdent t) (choVarMap cho) of
         Just (Just (EVar t')) -> (t',e)
         _ -> (t,e)
@@ -64,7 +64,7 @@ updateChoHo cho = cho { choHo = ho } where
 
 -- this will have to merge rules and properties.
 mergeChoVarMaps :: IdMap (Maybe E) -> IdMap (Maybe E) -> IdMap (Maybe E)
-mergeChoVarMaps x y = munionWith f x y where
+mergeChoVarMaps x y = unionWith f x y where
     f (Just (EVar x)) (Just (EVar y)) = Just . EVar $ merge x y
     f x y = error "mergeChoVarMaps: bad merge."
     merge ta tb = ta { tvrInfo = minfo' }   where
@@ -76,7 +76,7 @@ mergeChoVarMaps x y = munionWith f x y where
 
 -- this will have to merge rules and properties.
 mergeChoCombinators :: IdMap Comb -> IdMap Comb -> IdMap Comb
-mergeChoCombinators x y = munionWith f x y where
+mergeChoCombinators x y = unionWith f x y where
     f c1 c2 = combRules_s  (combRules c1 `Data.List.union`  combRules c2) . combHead_s (merge (combHead c1) (combHead c2)) $ c1
     merge ta tb = ta { tvrInfo = minfo' }   where
         minfo = tvrInfo ta `mappend` tvrInfo tb

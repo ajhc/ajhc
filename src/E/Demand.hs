@@ -12,7 +12,7 @@ module E.Demand(
 import Control.Monad.Reader
 import Control.Monad.Writer hiding(Product(..))
 import Data.Binary
-import Data.List hiding(union)
+import Data.List hiding(union,delete)
 import Data.Monoid hiding(Product(..))
 import Data.Maybe
 import Data.Typeable
@@ -187,13 +187,13 @@ demandEnvSingleton _ Absent = DemandEnv mempty idGlb
 demandEnvSingleton t d = DemandEnv (msingleton (tvrIdent t) d) idGlb
 
 demandEnvMinus :: DemandEnv -> TVr -> DemandEnv
-demandEnvMinus (DemandEnv m r) x = DemandEnv (mdelete (tvrIdent x) m) r
+demandEnvMinus (DemandEnv m r) x = DemandEnv (delete (tvrIdent x) m) r
 
 instance Lattice DemandEnv where
     lub d1@(DemandEnv m1 r1) d2@(DemandEnv m2 r2) = DemandEnv m (r1 `lub` r2) where
-        m = fromList [ (x,lenv x d1 `lub` lenv x d2) | x <- mkeys (m1 `union` m2)]
+        m = fromList [ (x,lenv x d1 `lub` lenv x d2) | x <- keys (m1 `union` m2)]
     glb d1@(DemandEnv m1 r1) d2@(DemandEnv m2 r2) = DemandEnv m (r1 `glb` r2) where
-        m = fromList [ (x,lenv x d1 `glb` lenv x d2) | x <- mkeys (m1 `union` m2)]
+        m = fromList [ (x,lenv x d1 `glb` lenv x d2) | x <- keys (m1 `union` m2)]
 
 
 newtype IM a = IM (Reader (Env,DataTable) a)
@@ -341,7 +341,7 @@ analyzeCase ec s = do
     let nenv = foldr denvDelete (glb enva env) (caseBinds ec')
     return (caseUpdate $ ec' {eCaseScrutinee = ecs},nenv :=> siga)
 
-denvDelete x (DemandEnv m r) = DemandEnv (mdelete (tvrIdent x) m) r
+denvDelete x (DemandEnv m r) = DemandEnv (delete (tvrIdent x) m) r
 
 
 

@@ -153,8 +153,8 @@ annotate imap idann letann lamann e = runReaderT (f e) imap where
             False -> return (nvr,minsert i (Just $ EVar nvr) . minsert i' Nothing)
 
 mnv xs i ss
-    | isInvalidId i || i `mmember` ss  = newId (size ss) isOkay
+    | isInvalidId i || i `member` ss  = newId (size ss) isOkay
     | otherwise = i
-    where isOkay i = (i `mnotMember` ss) && (i `notElem` xs)
+    where isOkay i = (i `notMember` ss) && (i `notElem` xs)
 
 
