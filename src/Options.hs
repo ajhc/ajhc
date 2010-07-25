@@ -44,8 +44,11 @@ import qualified Data.ByteString.UTF8 as BS
 import RawFiles(targets_ini)
 import Support.IniParse
 import Util.Gen
+import Util.YAML
+import Util.ExitCodes
 import Version.Config
-import Version.Version(versionString)
+import Version.Version(versionString,versionContext)
+import qualified Version.Config as VC
 import qualified FlagDump
 import qualified FlagOpts
 
@@ -228,7 +231,7 @@ theoptions =
     [ Option ['V'] ["version"]   (NoArg  (optMode_s Version))          "print version info and exit"
     , Option []    ["version-context"] (NoArg  (optMode_s VersionCtx)) "print version context info and exit"
     , Option []    ["help"]      (NoArg  (optMode_s ShowHelp))         "print help information and exit"
-    , Option []    ["config"]    (NoArg  (optMode_s ShowConfig))       "show a variety of config info"
+    , Option []    ["info"]    (NoArg  (optMode_s ShowConfig))         "show compiler configuration information and exit"
     , Option ['v'] ["verbose"]   (NoArg  (optVerbose_u (+1)))          "chatty output on stderr"
     , Option ['z'] []            (NoArg  (optStatLevel_u (+1)))        "Increase verbosity of statistics"
     , Option ['d'] []            (ReqArg (\d -> optDump_u (d:)) "[no-]flag")  "dump specified data during compilation"
@@ -261,7 +264,7 @@ theoptions =
     , Option []    ["ignore-ho"]   (NoArg  (optIgnoreHo_s True))       "Ignore existing haskell object files"
     , Option []    ["nowrite-ho"]  (NoArg  (optNoWriteHo_s True))      "Do not write new haskell object files"
     , Option []    ["no-ho"]       (NoArg  (optNoWriteHo_s True . optIgnoreHo_s True)) "same as --ignore-ho and --nowrite-ho"
-    , Option []    ["ho-cache"]    (ReqArg (optHoCache_s . Just ) "JHC_CACHE")    "Use a global ho cache located at the argument"
+    , Option []    ["ho-cache"]    (ReqArg (optHoCache_s . Just ) "JHC_CACHE")  "Use a global cache located in the directory passed as an argument."
     , Option []    ["ho-dir"]      (ReqArg (optHoDir_s . Just ) "<dir>")    "Where to place and look for ho files"
     , Option []    ["stale"]       (ReqArg (optStale_u . idu) "Module")     "Treat these modules as stale, even if a ho file is present"
     , Option []    ["list-libraries"] (NoArg  (optMode_s ListLibraries)) "List of installed libraries"
@@ -315,24 +318,30 @@ pfill maxn length xs = f maxn xs [] [] where
     f _ [] [] ls = reverse (map reverse ls)
     f _ [] ws ls = reverse (map reverse (ws:ls))
 
+helpUsage = usageInfo header theoptions ++ trailer where
+    header = "Usage: jhc [OPTION...] Main.hs"
+    trailer = "\n" ++ mkoptlist "-d" FlagDump.helpFlags ++ "\n" ++ mkoptlist "-f" FlagOpts.helpFlags
+    mkoptlist d os = "valid " ++ d ++ " arguments: 'help' for more info\n    " ++ intercalate "\n    " (map (intercalate ", ") $ pfill 100 ((2 +) . length) os) ++ "\n"
+
 {-# NOINLINE processOptions #-}
 -- | Parse commandline options.
 processOptions :: IO Opt
 processOptions = do
     argv <- getArguments
-    let header = "Usage: jhc [OPTION...] Main.hs"
-    let mkoptlist d os = "valid " ++ d ++ " arguments: 'help' for more info\n    " ++ intercalate "\n    " (map (intercalate ", ") $ pfill 100 ((2 +) . length) os) ++ "\n"
-    let trailer = "\n" ++ mkoptlist "-d" FlagDump.helpFlags ++ "\n" ++ mkoptlist "-f" FlagOpts.helpFlags
     let (o,ns,rc) = getOpt Permute theoptions argv
-    when (rc /= []) $ putErrDie (concat rc ++ usageInfo header theoptions ++ trailer)
+    when (rc /= []) $ putErrLn (concat rc ++ helpUsage) >> exitWith exitCodeUsage
     o1 <- either putErrDie return $ postProcessFD (foldl (flip ($)) opt o)
     o2 <- either putErrDie return $ postProcessFO o1
-    when (optMode o2 == ShowHelp) $ do
-        putStrLn (usageInfo header theoptions ++ trailer)
-        exitSuccess
-    when (optMode o2 == ShowConfig) $ do
-        mapM_ (\ (x,y) -> putStrLn (x ++ ": " ++ y))  configs
-        exitSuccess
+    case optMode o2 of
+        ShowHelp    -> doShowHelp
+        ShowConfig  -> doShowConfig
+        StopError s -> putErrLn "bad option passed to --stop should be one of parse, deps, typecheck, or c" >> exitWith exitCodeUsage
+        Version     -> putStrLn versionString >> exitSuccess
+        VersionCtx  -> putStrLn (versionString ++ BS.toString versionContext) >> exitSuccess
+        PrintHscOptions -> do
+            putStrLn $ "-I" ++ VC.datadir ++ "/" ++ VC.package ++ "-" ++ VC.shortVersion ++ "/include"
+            exitSuccess
+        _ -> return ()
     Just home <- fmap (`mplus` Just "/") $ lookupEnv "HOME"
     inis <- parseIniFiles (optVerbose o2 > 0) (BS.toString targets_ini) [confDir ++ "/targets.ini", confDir ++ "/targets-local.ini", home ++ "/etc/jhc/targets.ini", home ++ "/.jhc/targets.ini"] (optArch o2)
     when (FlagDump.Ini `S.member` optDumpSet o2) $ flip mapM_ (M.toList inis) $ \(a,b) -> putStrLn (a ++ "=" ++ b)
@@ -343,6 +352,15 @@ processOptions = do
       False-> return o3 {  optHls  = (autoloads ++ optHls o2) }
 
 
+doShowHelp = do
+    putStrLn helpUsage
+    exitSuccess
+
+
+doShowConfig = do
+    --mapM_ (\ (x,y) -> putStrLn (x ++ ": " ++ y))  configs
+    putStrLn $ showYAML  configs
+    exitSuccess
 
 findHoCache :: IO (Maybe FilePath)
 findHoCache = do
@@ -359,9 +377,8 @@ findHoCache = do
 
 
 
-a ==> b = (a,show b)
 
-configs = [
+configs = toNode [
     "jhclibpath" ==> initialLibIncludes,
     "version" ==> version,
     "package" ==> package,
@@ -369,7 +386,8 @@ configs = [
     "datadir" ==> datadir,
     "libraryInstall" ==> libraryInstall,
     "host" ==> host
-    ]
+    ] where
+    a ==> b = (a,toNode b)
 
 
 {-# NOINLINE fileOptions #-}
@@ -442,7 +460,6 @@ initialLibIncludes = unsafePerformIO $ do
     return $ nub $ maybe [] (tokens (':' ==))  ps ++ [ p ++ b ++ v | p <- paths, v <- vers, b <- bases ]
                ++ [d ++ v | d <- [libdir,datadir], v <- vers] ++ [libraryInstall]
 
-
 class Monad m => OptionMonad m where
     getOptions :: m Opt
     getOptions = return options
@@ -456,8 +473,6 @@ type OptM = OptT Identity
 
 instance Monad m => OptionMonad (OptT m) where
     getOptions = OptT ask
-
-
 
 withOptions :: Opt -> OptM a -> a
 withOptions opt (OptT x) = runIdentity (runReaderT x opt)

@@ -26,7 +26,6 @@ import Util.SetLike as S
 import Version.Version(versionString,versionContext,versionSimple)
 import qualified FlagDump as FD
 import qualified Interactive
-import qualified Version.Config as VC
 
 bracketHtml action = do
     (argstring,_) <- getArgString
@@ -42,16 +41,10 @@ main = bracketHtml $ do
         BuildHl hl      -> darg >> buildLibrary processInitialHo processDecls hl
         ListLibraries   -> listLibraries
         ShowHo ho       -> dumpHoFile ho
-        Version         -> putStrLn versionString
-        StopError s     -> putErrLn "bad option passed to --stop should be one of parse, typecheck, or c" >> exitWith exitCodeUsage 
-        PrintHscOptions -> putStrLn $ "-I" ++ VC.datadir ++ "/" ++ VC.package ++ "-" ++ VC.shortVersion ++ "/include"
-        VersionCtx      -> putStrLn (versionString ++ BS.toString versionContext)
         Preprocess      -> do
             forM_ (optArgs o) $ \fn -> do
                 LBS.readFile fn >>= preprocess fn >>= LBS.putStr
         _               -> darg >> processFiles (optArgs o)
-
-exitCodeUsage = ExitFailure 64
 
 processFiles :: [String] -> IO ()
 processFiles cs = f cs (optMainFunc options) where
