@@ -10,13 +10,15 @@ import Char
 import Control.Monad.RWS
 import Control.Monad.Writer
 import Control.Applicative
-import List
+import List hiding(union)
 import Maybe
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import qualified Data.Foldable as Seq
 
+import Util.SetLike
+import Util.GMap
 import Doc.DocLike(tupled)
 import FrontEnd.Desugar (doToExp,listCompToExp)
 import FrontEnd.HsSyn
@@ -73,21 +75,21 @@ addTopLevels  hsmod action = do
         z ns = mapM mult (filter (\x -> length x > 1) $ groupBy (\a b -> fst a == fst b) (sort ns))
         mult xs@(~((n,sl):_)) = warn sl "multiply-defined" (show n ++ " is defined multiple times: " ++ show xs )
     --z cdefs
-    withSubTable (Map.fromList nmap) action
+    withSubTable (fromList nmap) action
 
 
 ambig x ys = "Ambiguous Name: " ++ show x ++ "\nCould refer to: " ++ tupled (map show ys)
 
 runRename :: MonadWarn m => (a -> RM a) -> Opt -> Module -> FieldMap -> [(Name,[Name])] -> a -> m a
 runRename doit opt mod fls ns m = mapM_ addWarning errors >> return renamedMod where
-    subTable = Map.fromList [ (x,y) | (x,[y]) <- ns]
-    nameMap = Map.fromList $ map f ns where
+    subTable = fromList [ (x,y) | (x,[y]) <- ns]
+    nameMap = fromList $ map f ns where
         f (x,[y]) = (x,Right y)
         f (x,ys)  = (x,Left $ ambig x ys)
     ns' = map fn ns
     fn (n,ns) = (fromName n, map nameName ns)
 
-    errorTab =  Map.fromList [ (x,ambig x ys) | ((typ,x),ys@(_:_:_)) <- ns' ]
+    errorTab =  fromList [ (x,ambig x ys) | ((typ,x),ys@(_:_:_)) <- ns' ]
 
     startState = ScopeState {
         unique         = 1,
@@ -112,7 +114,7 @@ renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] ->  Module -> HsSt
 renameStatement fls ns modName stmt = runRename rename options modName fls ns stmt
 
 withSubTable :: SubTable -> RM a -> RM a
-withSubTable st action = local ( \e -> e { envSubTable = st `Map.union` envSubTable e }) action
+withSubTable st action = local ( \e -> e { envSubTable = st `union` envSubTable e }) action
 
 renameDecls :: HsModule -> RM HsModule
 renameDecls mod = do
@@ -444,10 +446,10 @@ instance Rename HsPat where
     rename p = traverseHsPat rename p
 
 buildRecPat :: FieldMap -> HsName -> [HsPatField] -> RM HsPat
-buildRecPat (FieldMap amp fls) n us = case Map.lookup (toName DataConstructor n) amp of
+buildRecPat (FieldMap amp fls) n us = case mlookup (toName DataConstructor n) amp of
     Nothing -> failRename $ "Unknown Constructor: " ++ show n
     Just t -> do
-        let f (HsPFieldPat x p) = case  Map.lookup (toName FieldLabel x) fls of
+        let f (HsPFieldPat x p) = case  mlookup (toName FieldLabel x) fls of
                 Nothing -> failRename $ "Field Label does not exist: " ++ show x
                 Just cs -> case lookup n [ (nameName x,(y)) | (x,y) <- cs ] of
                     Nothing -> failRename $ "Field Label does not belong to constructor: " ++ show (x,n)
@@ -558,10 +560,10 @@ failRename s = do
 buildRecConstr ::  FieldMap -> HsName -> [HsFieldUpdate] -> RM HsExp
 buildRecConstr (FieldMap amp fls) n us = do
     undef <- createError HsErrorUninitializedField "Uninitialized Field"
-    case Map.lookup (toName DataConstructor n) amp of
+    case mlookup (toName DataConstructor n) amp of
         Nothing -> failRename $ "Unknown Constructor: " ++ show n
         Just t -> do
-            let f (HsFieldUpdate x e) = case  Map.lookup (toName FieldLabel x) fls of
+            let f (HsFieldUpdate x e) = case  mlookup (toName FieldLabel x) fls of
                     Nothing -> failRename $ "Field Label does not exist: " ++ show x
                     Just cs -> case lookup n [ (nameName x,(y)) | (x,y) <- cs ] of
                         Nothing -> failRename $ "Field Label does not belong to constructor: " ++ show (x,n)
@@ -575,12 +577,12 @@ buildRecConstr (FieldMap amp fls) n us = do
 buildRecUpdate ::  FieldMap -> HsExp -> [HsFieldUpdate] -> RM HsExp
 buildRecUpdate (FieldMap amp fls) n us = do
         sl <- getSrcLoc
-        let f (HsFieldUpdate x e) = case  Map.lookup (toName FieldLabel x) fls of
+        let f (HsFieldUpdate x e) = case  mlookup (toName FieldLabel x) fls of
                 Nothing -> failRename $ "Field Label does not exist: " ++ show x
                 Just cs -> return [ (x,(y,hsParen e)) | (x,y) <- cs ]
         fm <- liftM concat $ mapM f us
         let fm' = sortGroupUnderFG fst snd fm
-        let g (c,zs) = case Map.lookup c amp of
+        let g (c,zs) = case mlookup c amp of
                 Nothing -> failRename $ "Unknown Constructor: " ++ show n
                 Just t -> do
                     vars <- replicateM t newVar
@@ -663,7 +665,7 @@ renameHsName hsName subTable
     | nameName tc_Arrow == hsName = return hsName
     -- | Qual (Module ('@':m)) (HsIdent i) <- hsName = return $ Qual (Module m) (HsIdent i)
     | (nt,Just ('@':m),i) <- nameParts hsName = return $ toName nt (Module m, i)
-renameHsName hsName subTable = case Map.lookup hsName subTable of
+renameHsName hsName subTable = case mlookup hsName subTable of
     Just name@(getModule -> Just _) -> return name
     Just _ -> error "renameHsName"
     Nothing
@@ -671,7 +673,7 @@ renameHsName hsName subTable = case Map.lookup hsName subTable of
         | otherwise -> do
             sl <- getSrcLoc
             et <- gets errorTable
-            let err = case Map.lookup hsName et of {
+            let err = case mlookup hsName et of {
                 Just s -> s;
                 Nothing -> "Unknown name: " ++ show hsName }
             warn sl "undefined-name" err
@@ -684,7 +686,7 @@ clobberName hsName = do
     unique     <- newUniq
     currModule <- getCurrentModule
     let hsName' = renameAndQualify hsName unique currModule
-    return $ Map.singleton hsName hsName'
+    return $ msingleton hsName hsName'
 
 renameAndQualify :: HsName -> Int -> Module -> HsName
 renameAndQualify name unique currentMod = qualifyName currentMod (renameName name unique) where
@@ -702,10 +704,10 @@ unRenameString s = (dropUnderscore . dropDigits) s where
     dropDigits = dropWhile isDigit
 
 updateWithN nt x action = getUpdatesN nt x >>= flip withSubTable action
-getUpdatesN nt x = Map.unions `fmap` mapM clobberName (map (toName nt) $ getNames x)
+getUpdatesN nt x = unions `fmap` mapM clobberName (map (toName nt) $ getNames x)
 
 updateWith x action = getUpdates x >>= flip withSubTable action
-getUpdates x = Map.unions `fmap` mapM clobberName (getNames x)
+getUpdates x = unions `fmap` mapM clobberName (getNames x)
 
 class UpdateTable a where
     getNames :: a -> [HsName]

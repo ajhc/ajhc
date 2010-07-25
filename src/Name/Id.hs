@@ -102,7 +102,7 @@ instance Intjection Id where
     fromIntjection (Id i) = i
 
 type IdSet = IntjectionSet Id
-type instance GSet Id = IdSet
+--type instance GSet Id = IdSet
 
 {-
 newtype IdSet = IdSet IS.IntSet
@@ -136,7 +136,7 @@ mapMaybeIdMap fn (IntjectionMap m) = IntjectionMap (IM.mapMaybe fn m)
 
 
 type IdMap = IntjectionMap Id
-type instance GMap Id = IdMap
+--type instance GMap Id = IdMap
 
 {-
 newtype IdMap a = IdMap (IM.IntMap a)
@@ -163,17 +163,17 @@ instance MapLike Id a (IdMap a) where
 
 -}
 
-instance GMapSet Id where
-    toSet (IntjectionMap im)  = IntjectionSet $ IM.keysSet im
-    toMap f (IntjectionSet is) = IntjectionMap $ IM.fromDistinctAscList [ (x,f (Id x)) |  x <- IS.toAscList is]
-    
+--instance GMapSet Id where
+--    toSet (IntjectionMap im)  = IntjectionSet $ IM.keysSet im
+--    toMap f (IntjectionSet is) = IntjectionMap $ IM.fromDistinctAscList [ (x,f (Id x)) |  x <- IS.toAscList is]
+
 
 --deriving instance MapLike Int a (IM.IntMap a) => MapLike Id a (IdMap a)
 
 
 idSetToIdMap :: (Id -> a) -> IdSet -> IdMap a
 --idSetToIdMap f (IdSet is) = IdMap $ IM.fromDistinctAscList [ (x,f (Id x)) |  x <- IS.toAscList is]
-idSetToIdMap = toMap
+idSetToIdMap f (IntjectionSet is) = IntjectionMap $ IM.fromDistinctAscList [ (x,f (Id x)) |  x <- IS.toAscList is]
 
 idMapToIdSet :: IdMap a -> IdSet
 idMapToIdSet (IntjectionMap im)  = IntjectionSet $ IM.keysSet im
