@@ -44,8 +44,8 @@
 #endif
 
 #ifndef __WORDSIZE
-#ifdef WORD_BIT
-#define __WORDSIZE WORD_BIT
+#ifdef __SIZEOF_POINTER__
+#define __WORDSIZE (CHAR_BIT*__SIZEOF_POINTER__)
 #elif defined(__i386__)
 #define __WORDSIZE 32
 #elif defined(__x86_64__)
