@@ -18,6 +18,8 @@ import Data.Tree
 import Data.Version(Version,parseVersion,showVersion)
 import Maybe
 import System.Mem
+import System.Directory (removeFile)
+import System.Random (randomIO)
 import Text.Printf
 import Version.Config(version)
 import qualified Data.ByteString as BS
@@ -652,7 +654,9 @@ searchPaths m = ans where
 
 
 m4Prelude :: IO FilePath
-m4Prelude = BS.writeFile "/tmp/jhc_prelude.m4" prelude_m4 >> return "/tmp/jhc_prelude.m4"
+m4Prelude = (randomIO :: IO Integer) >>= \salt ->
+    let m4p_filename = "/tmp/jhc_prelude-" ++ show salt ++ ".m4"
+    in BS.writeFile m4p_filename prelude_m4 >> return m4p_filename
 
 langmap = [
     "m4" ==> "m4",
@@ -680,7 +684,8 @@ preprocess fn lbs = do
         _ | fopts FO.Cpp -> readSystem "cpp" $ ["-CC","-traditional"] ++ incFlags ++ defFlags ++ [fn]
           | fopts FO.M4 -> do
             m4p <- m4Prelude
-            readSystem "m4" $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
+            result <- readSystem "m4" $ ["-s", "-P"] ++ incFlags ++ defFlags ++ [m4p,fn]
+            removeFile m4p >> return result
           | otherwise -> return lbs
     return lbs'
 
