@@ -65,4 +65,5 @@ let b:current_syntax = "grin"
   hi link grinFuncname                    Structure
 
 
+set iskeyword+=.,$
 
