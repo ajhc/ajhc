@@ -1,12 +1,10 @@
 module Main(main) where
 
-import System.Exit
 import System.IO
 import Control.Exception
 import Control.Monad.Identity
 import Prelude
 import qualified Data.ByteString.Lazy as LBS
-import qualified Data.ByteString.UTF8 as BS
 
 import DataConstructors
 import E.Main
@@ -23,7 +21,7 @@ import Name.Name
 import Options
 import Util.Gen
 import Util.SetLike as S
-import Version.Version(versionString,versionContext,versionSimple)
+import Version.Version(versionSimple)
 import qualified FlagDump as FD
 import qualified Interactive
 
@@ -33,6 +31,8 @@ bracketHtml action = do
     action `finally` (wdump FD.Html $ putStrLn "</pre></body></html>")
 
 main = bracketHtml $ do
+    hSetEncoding stdout utf8
+    hSetEncoding stderr utf8
     o <- processOptions
     let darg = progressM $ do
         (argstring,_) <- getArgString
