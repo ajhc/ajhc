@@ -5,6 +5,7 @@ module Grin.Noodle where
 import Control.Monad.Writer
 import qualified Data.Set as Set
 
+import Data.Functor
 import Support.FreeVars
 import StringTable.Atom(Atom())
 import Options(flint)
@@ -107,7 +108,8 @@ mapExpExp fn e = f e where
     f (a :>>= b) = return (:>>=) `ap` fn a `ap` g b
     f l@Let { expBody = b, expDefs = defs } = do
         b <- fn b
-        mapExpLam g l { expBody = b }
+        return updateLetProps `ap` (mapExpLam g l { expBody = b })
+    f (GcRoots vs e) = return (GcRoots vs) `ap` fn e
     f e = mapExpLam g e
     g (l :-> e) = return (l :->) `ap` fn e
 

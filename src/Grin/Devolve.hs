@@ -4,6 +4,7 @@ import Control.Monad.Identity
 import Control.Monad.RWS
 import Data.IORef
 import Data.Maybe
+import Data.Functor
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -33,21 +34,20 @@ devolveGrin :: Grin -> IO Grin
 devolveGrin grin = do
     col <- newIORef []
     let g (n,l :-> r) = f r >>= \r -> return (n,l :-> r)
-        f lt@Let { expDefs = defs, expBody = body } = do
-            let nonTail = expNonNormal lt
-                iterZ :: Bool -> Map.Map Tag (Set.Set Val) -> [FuncDef] -> Map.Map Tag (Set.Set Val)
+        f lt@Let { expDefs = defs, expBody = body, .. } = do
+            let iterZ :: Bool -> Map.Map Tag (Set.Set Val) -> [FuncDef] -> Map.Map Tag (Set.Set Val)
                 iterZ b pmap (fd@FuncDef { funcDefName = name, funcDefBody = as :-> r }:fs) = iterZ (b || xs' /= xs) (Map.insert name xs pmap) fs where
                     xs = Set.unions $ xs':catMaybes [ Map.lookup t pmap | t <- Set.toList $ freeVars fd]
                     xs' = maybe Set.empty id (Map.lookup name pmap)
                 iterZ True pmap [] = iterZ False pmap defs
                 iterZ False pmap [] = pmap
 
-                nndefs = [ fd | fd <- defs, funcDefName fd `Set.member` nonTail ]
+                nndefs = [ fd | fd <- defs, funcDefName fd `Set.member` expNonNormal ]
                 pmap = iterZ False (fromList [ (funcDefName fd, fromList [ Var x y | (x,y) <- Set.toList $ freeVars (funcDefBody fd), x > v0]) | fd <- nndefs ]) nndefs
 
                 (nmaps,rmaps) = splitEither (map z defs)
                 z fd@FuncDef { funcDefName = name, funcDefBody = as :-> r }
-                    | name `Set.member` nonTail = Left ((name,(as ++ xs) :-> pr),xs)
+                    | name `Set.member` expNonNormal = Left ((name,(as ++ xs) :-> pr),xs)
                     | otherwise = Right fd { funcDefBody = as :-> pr }
                   where xs = maybe [] Set.toList $ Map.lookup name pmap
                         pr = runIdentity $ proc r
@@ -56,7 +56,7 @@ devolveGrin grin = do
             --mapM_ print (Map.toList pmap)
             nmaps <- mapM (g . fst) nmaps
             modifyIORef col (++ nmaps)
-            mapExpExp f $  updateLetProps lt { expDefs = rmaps, expBody = runIdentity $ proc body }
+            updateLetProps <$> mapExpExp f lt { expDefs = rmaps, expBody = runIdentity $ proc body }
         f e = mapExpExp f e
     nf <- mapM g (grinFuncs grin)
     lf <- readIORef col
