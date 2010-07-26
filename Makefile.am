@@ -240,8 +240,8 @@ flat-foreign-1.0.hl: lib/flat-foreign/flat-foreign.cabal base-1.0.hl
 %.pdf : %.dot
 	dot $< -Tpdf -o$@
 
-%.html: %.mkd
-	pandoc $< -s -f markdown -t html -o $@
+#%.html: %.mkd
+#	pandoc $< -s -f markdown -t html -o $@
 
 %.shtml: %.mkd
 	cat $(srcdir)/docs/template/my_header.shtml > $@
@@ -251,12 +251,17 @@ flat-foreign-1.0.hl: lib/flat-foreign/flat-foreign.cabal base-1.0.hl
 publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml manual.html docs/manual.css
 	cp -- $^ /home/john/public_html/computer/jhc
 
-manual: utils/stitch.prl src/FlagDump.mkd src/FlagOpts.mkd options.mkd docs/*.mkd
-	find . \( ! -path */jhc-*/* ! -path '*/examples/*'  ! -path '*/_darcs/*' ! -path '*/drift_processed/*'  ! -path '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -path '*/src/rts/*.c' \) \) -print | xargs perl utils/stitch.prl > manual.mkd
-	pandoc manual.mkd --toc -s -f markdown -t html -s -c manual.css -o $@.html
+manual.mkd: utils/stitch.prl $(JHC_MANUAL_FILES)
+	perl utils/stitch.prl $(JHC_MANUAL_FILES) > $a
 
-man: utils/stitch.prl src/FlagDump.mkd src/FlagOpts.mkd options.mkd docs/man_header.mkd docs/*.mkd
-	find . \( ! -path */jhc-*/ ! -path '*/examples/*'  ! -path '*/_darcs/*' ! -path '*/drift_processed/*'  ! -path '*/regress/*'  \( -name '*.hs' -o -name '*.hsc' -o -name '*.mkd' -o -path '*/src/rts/*.c' \) \) -print | xargs perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
+manual: manual.mkd
+	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
+
+
+jhc_man.mkd:  utils/stitch.prl  docs/man_header.mkd $(JHC_MANUAL_FILES)
+	perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
+
+man:  jhc_man.mkd
 	pandoc jhc_man.mkd -s -f markdown -t man -s  -o jhc.1
 
 options.mkd: jhc
@@ -343,3 +348,7 @@ xhtml-3000.2.0.1.hl: lib/ext/xhtml.cabal base-1.0.hl jhc-1.0.hl
 JHC_EXT_LIBS = containers-0.3.0.0.hl Diff-0.1.2.hl html-1.0.1.2.hl HUnit-1.2.2.1.hl parsec-2.1.0.1.hl \
     pretty-1.0.1.1.hl QuickCheck-1.2.0.0.hl safe-0.2.hl smallcheck-0.4.hl utility-ht-0.0.5.1.hl \
     xhtml-3000.2.0.1.hl
+
+JHC_MANUAL_FILES = options.mkd docs/make.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
+	docs/unboxed.mkd src/rts/jhc_rts2.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
+	src/E/TypeCheck.hs src/Options.hs

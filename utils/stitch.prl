@@ -6,7 +6,7 @@ use warnings;
 use Getopt::Std;
 
 my %o;
-getopts('h:c:',\%o) or die "unknown option";
+getopts('h:c:t:l',\%o) or die "unknown option";
 
 my @order = $o{c} ? split /,/,$o{c} : qw(
     Using
@@ -34,8 +34,11 @@ foreach my $fn (@ARGV) {
         $s{$section} ||= [];
         push @{$s{$section} ||= []}, [$order,$text];
         $h{$section}{files} .= ":$fn";
+        print "$fn\n" if $o{l};
     }
 }
+
+exit if $o{l};
 
 foreach (keys %s) {
     $h{$_}{text} = join "\n",map { $_->[1] } sort { $a->[0] <=> $b->[0] } @{$s{$_}};
