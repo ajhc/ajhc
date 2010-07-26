@@ -123,7 +123,7 @@ CFILES = src/StringTable/StringTable_cbits.o src/cbits/md5sum.o
 	$(HC) $(MY_CFLAGS) $< -c -o $@
 
 jhc: src/Main.hs  $(HSFILES) $(BUILT_SOURCES) src/StringTable/Atom.hs $(CFILES)
-	$(HC) $(GHCOPTS) --make $< $(CFILES) -o $@
+	$(BUILD_STOW) $(HC) $(GHCOPTS) --make $< $(CFILES) -o $@
 
 jhcp: src/Main.hs $(BUILT_SOURCES) $(HSFILES) src/StringTable/Atom.hs $(CFILES)
 	$(HC) $(GHCOPTS) $(GHCPROFOPTS) --make $< $(CFILES) -o $@

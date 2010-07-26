@@ -1,0 +1,48 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Getopt::Std;
+
+our $opt_t;
+getopts('t:') or die "bad option";
+
+
+
+my $stowdir = "/tmp/stow-$>";
+mkdir $stowdir;
+
+-e '_darcs' || die "not in darcs dir";
+
+my $sum = `( darcs whatsnew ; darcs changes) | md5sum`;
+chomp $sum;
+$sum =~ s/\s.*//;
+
+print STDERR "stow: sum=$sum\n";
+
+my $target = $opt_t;
+$target or die "must specify target with -t";
+
+my $sfile = "$stowdir/$sum-$target";
+
+if(-e "$stowdir/$sum-$target") {
+    if(system "cp -f '$sfile' '$target'") { unlink "$target"; die "could not copy";}
+    print STDERR "found $sfile -> $target\n";
+    exit 0;
+}
+
+
+system @ARGV and die "could not make $target";
+
+-e $target || die "target not built";
+
+if(system "cp -f '$target' '$sfile'")  { unlink "$sfile"; die "could not copy";}
+
+print STDERR "stow $target -> $sfile\n";
+
+exit 0;
+
+
+
+#BUILD_STOW='perl utils/stow.prl -t $@  -- ' make
