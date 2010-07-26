@@ -33,15 +33,17 @@ foreign import primitive "box" boxTarget :: Enum__ -> Target
 foreign import primitive "box" boxBool   :: Enum__ -> Bool
 
 
-target = boxTarget    (options_target      ())
-isWindows = boxBool   (options_isWindows   ())
-isPosix = boxBool     (options_isPosix     ())
-isBigEndian = boxBool (options_isBigEndian ())
+target      = boxTarget (options_target      ())
+isWindows   = boxBool   (options_isWindows   ())
+isPosix     = boxBool   (options_isPosix     ())
+isBigEndian = boxBool   (options_isBigEndian ())
+
 
 foreign import primitive options_target      :: () -> Enum__
 foreign import primitive options_isWindows   :: () -> Bool__
 foreign import primitive options_isPosix     :: () -> Bool__
 foreign import primitive options_isBigEndian :: () -> Bool__
+foreign import primitive options_isConsole   :: () -> Bool__
 
 #endif
 

@@ -8,7 +8,10 @@
 ; there is an implicit -mdefault processed first
 ; entries in the user config file are appended to this one.
 ;
-
+; the cross compilation entries in this file should be treated as examples.
+; although they work out of the box for many systems, cross compilation
+; environments differ, so you may need to override them for your
+; specific setup.
 
 [default]
 cc=gcc
@@ -20,13 +23,25 @@ profile=false
 autoload=base,haskell98
 
 
+; cross compilation entries
+
 [win32]
 cc=@MINGW@
 executable_extension=.exe
 merge=i686
 cflags+=-fno-strict-aliasing
 
-; macintosh
+[wii]
+cc=powerpc-eabi-gcc
+byteorder=be
+gc=static
+cflags+=-g -DGEKKO -D__WORDSIZE=32 -mrvl -mcpu=750 -meabi -mhard-float
+executable_extension=.elf
+bits=32
+bits_max=64
+merge=be32
+
+; macintosh, this is for cross compiling, not for native compilation on osx
 [osx]
 
 [osx-intel]
@@ -39,7 +54,7 @@ cc=powerpc-apple-darwin9-gcc
 merge=be32
 merge=osx
 
-
+; a couple specific cpus
 [i686]
 merge=le32
 arch=i686
@@ -66,7 +81,6 @@ merge=64
 [be64]
 byteorder=be
 merge=64
-
 
 [32]
 cflags+=-m32

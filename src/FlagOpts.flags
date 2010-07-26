@@ -28,6 +28,7 @@ type-analysis perform a basic points-to analysis on types right after method gen
 global-optimize perform whole program E optimization
 
 !Code Generation
+standalone compile to a standalone executable
 full-int extend Int and Word to 32 bits on a 32 bit machine (rather than 30)
 wrapper wrap main in exception handler
 boehm use Boehm garbage collector
