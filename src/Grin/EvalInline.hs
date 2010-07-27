@@ -2,11 +2,12 @@ module Grin.EvalInline(createEvalApply) where
 
 
 import Control.Monad.Identity
-import List
+import List hiding(union)
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 
 
+import Util.SetLike
 import StringTable.Atom
 import Grin.Grin
 import Grin.Noodle
@@ -160,8 +161,8 @@ createEvalApply grin = do
         cf ((targ,tret),name) = ((name,appBody),(name,tyTy { tySlots = [TyNode,targ],tyReturn = tret })) where
             appBody = createApply targ tret (grinTypeEnv grin) tags
         TyEnv tyEnv = grinTypeEnv grin
-        appTyEnv = Map.fromList ntyenv
-    return $ setGrinFunctions (apps ++ funcs) grin { grinTypeEnv = TyEnv (tyEnv `Map.union` appTyEnv) }
+        appTyEnv = fromList ntyenv
+    return $ setGrinFunctions (apps ++ funcs) grin { grinTypeEnv = TyEnv (tyEnv `union` appTyEnv) }
 
 
 

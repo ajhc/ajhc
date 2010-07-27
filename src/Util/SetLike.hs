@@ -219,6 +219,9 @@ class Intjection a where
 newtype IntjectionSet a = IntjectionSet IS.IntSet
     deriving(Monoid,IsEmpty,HasSize,Unionize,Eq,Ord)
 
+instance (Intjection a,Show a) => Show (IntjectionSet a) where
+    showsPrec n is = showsPrec n $ toList is
+
 type instance Elem (IntjectionSet a) = a
 type instance Key (IntjectionSet a) = a
 

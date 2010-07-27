@@ -9,7 +9,6 @@ module FrontEnd.Desugar (doToExp, listCompToExp, desugarHsModule, desugarHsStmt)
 
 import Control.Monad.State
 
-import FrontEnd.SrcLoc
 import GenUtil
 import FrontEnd.HsSyn
 import Name.Name

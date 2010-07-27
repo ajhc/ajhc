@@ -61,19 +61,22 @@ import Prelude
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import StringTable.Atom
 import C.FFI
 import C.Prims
-import Doc.DocLike
-import GenUtil
-import Name.VConsts
 import Cmm.Number
+import Doc.DocLike
+import Name.VConsts
 import Options
+import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
 import Util.Perhaps
-import qualified Info.Info as Info
+import Util.SetLike
+import Util.GMap
+import Util.HasSize
+import Util.Gen
 import qualified Cmm.Op as Op
+import qualified Info.Info as Info
 import qualified Stats
 
 -- Extremely simple first order monadic code with basic type system.  similar
@@ -97,7 +100,7 @@ data TyTy = TyTy {
 
 tyTy = TyTy { tySlots = [], tyReturn = [], tySiblings = Nothing, tyThunk = TyNotThunk }
 
-newtype TyEnv = TyEnv (Map.Map Atom TyTy)
+newtype TyEnv = TyEnv (GMap Atom TyTy)
     deriving(Monoid)
 
 
@@ -262,7 +265,7 @@ setGrinFunctions xs _grin | flint && hasRepeatUnder fst xs = error $ "setGrinFun
 setGrinFunctions xs grin = grin { grinFunctions = map (uncurry (createFuncDef False)) xs }
 
 
-extendTyEnv ds (TyEnv env) = TyEnv (Map.fromList xs `mappend` env) where
+extendTyEnv ds (TyEnv env) = TyEnv (fromList xs `mappend` env) where
     xs = [ (funcDefName d,tyTy { tySlots = ss, tyReturn = r }) |  d <- ds, let (ss,r) = funcType $ funcDefProps d]
       ++ [ (tagFlipFunction (funcDefName d),tyTy { tySlots = ss, tyReturn = r }) |  d <- ds, let (ss,r) = funcType $ funcDefProps d, r == [TyNode]]
 
@@ -344,7 +347,7 @@ phaseEvalInlined e = e >= PostInlineEval
 
 
 data Grin = Grin {
-    grinEntryPoints :: Map.Map Atom FfiExport,
+    grinEntryPoints :: GMap Atom FfiExport,
     grinPhase :: !Phase,
     grinTypeEnv :: TyEnv,
     grinFunctions :: [FuncDef],
@@ -366,7 +369,7 @@ emptyGrin = Grin {
     grinCafs = mempty
 }
 
-grinEntryPointNames = Map.keys . grinEntryPoints
+grinEntryPointNames = keys . grinEntryPoints
 
 data TagInfo
     = TagPApp !Int !Atom   -- partial application, number is how many more arguments needed
@@ -481,8 +484,8 @@ isValUnknown _ = False
 -- Look up stuff in the typing environment.
 ---------
 
-findTyTy (TyEnv m) a | Just tyty <-  Map.lookup a m = return tyty
-findTyTy (TyEnv m) a | ('Y':rs) <- fromAtom a, (ns,'_':rs) <- span isDigit rs  = case Map.lookup (toAtom ('T':rs)) m of
+findTyTy (TyEnv m) a | Just tyty <-  mlookup a m = return tyty
+findTyTy (TyEnv m) a | ('Y':rs) <- fromAtom a, (ns,'_':rs) <- span isDigit rs  = case mlookup (toAtom ('T':rs)) m of
     Just TyTy { tySlots = ts, tyReturn = n } -> return tyTy { tySlots = take (length ts - read ns) ts, tyReturn = n }
     Nothing -> fail $ "findArgsType: " ++ show a
 findTyTy _ a | "@hole" `isPrefixOf` fromAtom a  = return tyTy { tySlots = [], tyReturn = [TyNode] }
@@ -619,12 +622,6 @@ instance FreeVars Exp (Set.Set (Var,Ty)) where
     freeVars MkCont { expCont = v, expLam = as} = freeVars (v,as)
     freeVars GcRoots { expValues = v, expBody = b } = freeVars (v,b)
 
-instance FreeVars Exp [Var] where
-    freeVars e = Set.toList $ freeVars e
-instance FreeVars Val [Var] where
-    freeVars e = Set.toList $ freeVars e
-instance FreeVars Lam [Var] where
-    freeVars e = Set.toList $ freeVars e
 
 
 instance FreeVars Val (Set.Set Tag) where
@@ -660,6 +657,77 @@ instance FreeVars Exp (Set.Set Tag) where
     freeVars MkCont { expCont = v, expLam = as} = freeVars (v,as)
     freeVars GcRoots { expValues = v, expBody = b } = freeVars (v,b)
 
+instance FreeVars Lam (GSet Var) where
+    freeVars (x :-> y) = freeVars y \\ freeVars x
+
+instance  FreeVars Exp (GSet Var,GSet Tag) where
+    freeVars x = (freeVars x, freeVars x)
+
+instance FreeVars Val (GSet Var) where
+    freeVars (NodeC t xs) = freeVars xs
+    freeVars (Const v) = freeVars v
+    freeVars (Index a b) = freeVars (a,b)
+    freeVars (Var v _) = singleton v
+    freeVars _ = sempty
+
+
+instance FreeVars FuncProps (GSet Var) where
+    freeVars FuncProps { funcFreeVars = fv } = fromDistinctAscList $ toList fv
+
+instance FreeVars FuncProps (GSet Tag) where
+    freeVars FuncProps { funcTags = fv } = fromDistinctAscList $ toList fv
+
+instance FreeVars Exp (GSet Var) where
+    freeVars (a :>>= b) = freeVars (a,b)
+    freeVars (App a vs _) =  freeVars vs
+    freeVars (Case x xs) = freeVars (x,xs)
+    freeVars (Return v) = freeVars v
+--    freeVars (Store v) = freeVars v
+    freeVars (BaseOp _ vs) = freeVars vs
+    freeVars (Prim _ x _) = freeVars x
+    freeVars Error {} = sempty
+    freeVars Let { expDefs = fdefs, expBody = body } = mconcat (map (fromDistinctAscList . toList . funcFreeVars . funcDefProps) fdefs) `mappend` freeVars body
+    freeVars NewRegion { expLam = l } = freeVars l
+    freeVars Alloc { expValue = v, expCount = c, expRegion = r } = freeVars (v,c,r)
+    freeVars Call { expValue = v, expArgs = as } = freeVars (v:as)
+    freeVars MkClosure { expValue = v, expArgs = as, expRegion = r } = freeVars (v,as,r)
+    freeVars MkCont { expCont = v, expLam = as} = freeVars (v,as)
+    freeVars GcRoots { expValues = v, expBody = b } = freeVars (v,b)
+
+instance FreeVars Exp [Var] where
+    freeVars e = toList $ (freeVars e :: GSet Var)
+instance FreeVars Val [Var] where
+    freeVars e = toList $ (freeVars e :: GSet Var)
+instance FreeVars Lam [Var] where
+    freeVars e = toList $ (freeVars e :: GSet Var)
+
+
+instance FreeVars Val (GSet Tag) where
+    freeVars (NodeC t xs) = singleton t `union` freeVars xs
+    freeVars (Index a b) = freeVars (a,b)
+    freeVars (Const v) = freeVars v
+    freeVars _ = sempty
+
+instance FreeVars Lam (GSet Tag) where
+    freeVars (a :-> b) = freeVars (a,b)
+
+
+instance FreeVars Exp (GSet Tag) where
+    freeVars (a :>>= b) = freeVars (a,b)
+    freeVars (App a vs _) = singleton a `union` freeVars vs
+    freeVars (Case x xs) = freeVars (x,xs)
+    freeVars (Return v) = freeVars v
+--    freeVars (Store v) = freeVars v
+    freeVars (BaseOp _ vs) = freeVars vs
+    freeVars (Prim _ x _) = freeVars x
+    freeVars Error {} = sempty
+    freeVars Let { expDefs = fdefs, expBody = body } = unions (map (fromDistinctAscList . toList . funcTags . funcDefProps) fdefs) `mappend` freeVars body
+    freeVars NewRegion { expLam = l } = freeVars l
+    freeVars Alloc { expValue = v, expCount = c, expRegion = r } = freeVars (v,c,r)
+    freeVars Call { expValue = v, expArgs = as } = freeVars (v:as)
+    freeVars MkClosure { expValue = v, expArgs = as, expRegion = r } = freeVars (v,as,r)
+    freeVars MkCont { expCont = v, expLam = as} = freeVars (v,as)
+    freeVars GcRoots { expValues = v, expBody = b } = freeVars (v,b)
 
 lamExp (_ :-> e) = e
 lamBind (b :-> _) = b
@@ -668,5 +736,12 @@ isVar Var {} = True
 isVar _ = False
 
 
+instance Intjection Var where
+    toIntjection i = V (fromIntegral i)
+    fromIntjection (V i) = fromIntegral i
 
 
+newtype instance GSet Var = GSetVar (IntjectionSet Var)
+    deriving(Monoid,IsEmpty,HasSize,Collection,Unionize,SetLike,Eq,Ord)
+newtype instance GMap Var v = GMapVar (IntjectionMap Var v)
+    deriving(Monoid,IsEmpty,HasSize,Collection,Unionize,SetLike,MapLike,Eq,Ord)

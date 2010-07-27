@@ -24,7 +24,6 @@ import Doc.PPrint
 import FrontEnd.Class
 import FrontEnd.Tc.Monad
 import FrontEnd.Tc.Type
-import FrontEnd.Tc.Kind
 import Name.Names
 import Name.Name
 import Options

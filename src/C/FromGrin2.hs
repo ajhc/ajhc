@@ -34,6 +34,8 @@ import Support.CanType
 import Support.FreeVars
 import Util.Gen
 import Util.UniqueMonad
+import Util.SetLike
+import Util.GMap
 import qualified Cmm.Op as Op
 import qualified FlagOpts as FO
 import qualified Data.ByteString.Lazy as LBS
@@ -80,7 +82,7 @@ newtype C a = C (RWST Env Written HcHash Uniq a)
 runC :: Grin -> C a -> ((a,HcHash,Written),Map.Map Atom TyRep)
 runC grin (C m) =  (execUniq1 (runRWST m startEnv emptyHcHash),ityrep) where
     TyEnv tmap = grinTypeEnv grin
-    ityrep = Map.mapMaybeWithKey tyRep tmap
+    ityrep = Map.mapMaybeWithKey tyRep (fromDistinctAscList $ Util.SetLike.toList tmap)
     startEnv = Env {
         rCPR = ityrep,
         rGrin = grin,
@@ -100,7 +102,7 @@ runC grin (C m) =  (execUniq1 (runRWST m startEnv emptyHcHash),ityrep) where
     tyRep k TyTy { tySlots = [s], tySiblings = Just [k'] } | k == k', good s = Just $ TyRepRawVal False
     tyRep k tyty | null (tySlots tyty) = Just TyRepRawTag
     tyRep k tyty | Just xs <- tySiblings tyty, all triv [ x | x <- xs, x /= k] = Just TyRepUntagged where
-        triv x = case Map.lookup x tmap of
+        triv x = case mlookup x tmap of
             Just t -> null (tySlots t)
             Nothing -> False
     tyRep _ _ = Nothing
@@ -160,7 +162,7 @@ compileGrin grin = (LBS.fromChunks code, snub (reqLibraries req))  where
             enums =  map (uncurry f) (Map.toList wenum) ++ (zipWith f (Set.toList (Set.map nodeTagName ts)) [0 ..])
     go = do
         funcs <- liftM concat $ flip mapM (grinFuncs grin) $ \(a,l) -> do
-                    convertFunc (Map.lookup a (grinEntryPoints grin)) (a,l)
+                    convertFunc (mlookup a (grinEntryPoints grin)) (a,l)
         tellFunctions funcs
         h <- get
         let tset = Set.fromList [ n | (HcNode n (_:_),_) <- hconsts]
@@ -536,7 +538,7 @@ nodeAssign v t as e' = cna where
     cna = do
         cpr <- asks rCPR
         v' <- convertVal v
-        case Map.lookup t cpr of
+        case mlookup t cpr of
             Just (TyRepRawVal signed) -> do
                 [arg] <- return as
                 t <- convertType $ getType arg
@@ -579,7 +581,7 @@ convertExp (BaseOp Eval [v]) = do
 convertExp (App a vs _) = do
     lm <- asks rEMap
     vs' <- mapM convertVal vs
-    case a `Map.lookup` lm of
+    case a `mlookup` lm of
         Just (nm,as) -> do
             let ss = [ a =* v | a <- as | v <- vs' ]
             return (mconcat ss & goto nm, emptyExpression)
@@ -623,7 +625,7 @@ buildConstants cpr grin fh = P.vcat (map cc (Grin.HashConst.toList fh)) where
     cc nn@(HcNode a zs,i) = comm nn $$ cd $$ def where
         cd = text "static const struct" <+> tshow (nodeStructName a) <+> text "_c" <> tshow i <+> text "= {" <> hsep (punctuate P.comma (ntag ++ rs)) <> text "};"
         --Just TyTy { tySiblings = sibs } = findTyTy tyenv a
-        ntag = case Map.lookup a cpr of
+        ntag = case mlookup a cpr of
             --Just [a'] | a' == a -> []
             Just _ -> []
             _ -> [text ".what =" <+> text "SET_RAW_TAG(" <> tshow (nodeTagName a) <> text ")"]
@@ -754,7 +756,7 @@ tagAssign e t = do
     declareStruct t
     tyenv <- asks (grinTypeEnv . rGrin)
     --TyTy { tySiblings = sib } <- findTyTy tyenv t
-    case Map.lookup t cpr of
+    case mlookup t cpr of
         --Just [n'] | n' == t -> return mempty
         Just _ -> return mempty
         _ -> do
@@ -822,7 +824,7 @@ declareStruct n = do
     ts' <- mapM convertType ts
     let (dis,needsDis) | tagIsSuspFunction n = ([(name "head",fptr_t)],False)
                        | null ts = ([],False)
-                       | Just TyRepUntagged <- Map.lookup n cpr = ([],False)
+                       | Just TyRepUntagged <- mlookup n cpr = ([],False)
                        | Just [n'] <- ss, n == n' = ([],False)
                        | otherwise = ([],True)
         fields = (dis ++ zip [ name $ 'a':show i | i <-  [(1 :: Int) ..] ] ts')
@@ -842,7 +844,7 @@ basicNode a _ | tagIsSuspFunction a = return Nothing
 basicNode a []  = do tellTags a ; return . Just $ (f_SET_RAW_TAG (constant $ enum (nodeTagName a)))
 basicNode a [v] = do
     cpr <- asks rCPR
-    case Map.lookup a cpr of
+    case mlookup a cpr of
         Just (TyRepRawVal signed) -> case v of
             Lit i ty | a == cChar, Just c <- ch -> return $ Just (f_RAW_SET_UF (toExpression c)) where
                 ch = do

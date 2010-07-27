@@ -16,23 +16,22 @@ module StringTable.Atom(
 
 #include "StringTable_cbits.h"
 
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.UTF8 as BS(fromString,toString)
-import qualified Data.ByteString.Internal as BS
-import qualified Data.ByteString.Unsafe as BS
-import Control.Monad
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
-import Foreign
-import Foreign.Marshal
-import Data.Word
-import Data.Char
-import Foreign.C
-import Data.Monoid
-import Data.Dynamic
 import Data.Bits
 import Data.Data
+import Data.Monoid
+import Foreign
+import Foreign.C
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Internal as BS
+import qualified Data.ByteString.UTF8 as BS(fromString,toString)
+import qualified Data.ByteString.Unsafe as BS
+
+import Util.GMap
+import Util.SetLike
+import Util.HasSize
 
 
 
@@ -150,6 +149,18 @@ atomCompare a b = if c == 0 then EQ else if c > 0 then GT else LT where
     c = c_atomCompare a b
 
 
+instance Intjection Atom where
+    toIntjection i = Atom (fromIntegral i)
+    fromIntjection (Atom i) = fromIntegral i
+
+
+newtype instance GSet Atom = GSetAtom (IntjectionSet Atom)
+    deriving(Monoid,IsEmpty,HasSize,Collection,Unionize,SetLike,Eq,Ord,Show)
+newtype instance GMap Atom v = GMapAtom (IntjectionMap Atom v)
+    deriving(Monoid,IsEmpty,HasSize,Collection,Unionize,SetLike,MapLike,Eq,Ord)
+
+instance Functor (GMap Atom) where
+    fmap f (GMapAtom (IntjectionMap mp)) = GMapAtom (IntjectionMap (fmap f mp))
 
 
 instance Binary Atom where

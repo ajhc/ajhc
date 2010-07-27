@@ -1,13 +1,12 @@
 module FrontEnd.Syn.Traverse where
 
-import qualified Data.Set as Set
 import Control.Monad.Writer
+import qualified Data.Set as Set
 
 import FrontEnd.HsSyn
-import Control.Monad.Identity
 import FrontEnd.SrcLoc
-import Support.FreeVars
 import Name.Name
+import Support.FreeVars
 
 
 --instance FreeVars HsType (Set.Set HsName) where

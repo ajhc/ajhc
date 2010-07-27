@@ -4,6 +4,7 @@ import Data.Monoid
 import Util.SetLike
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
+import qualified Data.Set as Set
 import Util.HasSize
 import Data.Foldable hiding(toList)
 import Data.Traversable
@@ -31,8 +32,10 @@ newtype instance GSet Char = GSetChar (EnumSet Char)
 newtype instance GMap Char v = GMapChar (EnumMap Char v)
     deriving(Monoid,IsEmpty,HasSize,Collection,Unionize,SetLike,MapLike)
 
-data instance GSet [a] = GDone | GCons (GMap a (GSet [a]))
+--newtype instance GSet (a,b) = GSetTup2 (GMap a (GSet b))
 
+gsetToSet :: (Collection (GSet a), Ord a) => GSet a -> Set.Set a
+gsetToSet gs = Set.fromDistinctAscList (toList gs)
 
 class GMapSet k where
     toSet :: GMap k v -> GSet k

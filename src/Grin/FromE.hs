@@ -1,8 +1,6 @@
 module Grin.FromE(compile) where
 
-import Char
 import Control.Monad.Reader
-import Control.Monad.Trans
 import Data.Graph(stronglyConnComp, SCC(..))
 import Data.IORef
 import Data.Monoid
@@ -20,7 +18,6 @@ import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
 import E.E
-import E.FreeVars
 import E.Program
 import E.TypeCheck
 import E.Values
@@ -33,17 +30,15 @@ import Info.Types
 import Name.Id
 import Name.Name
 import Name.Names
-import Name.VConsts
 import Options
 import Stats(mtick)
 import Support.CanType
 import Support.FreeVars
-import Support.Tuple
 import Util.Graph as G
 import Util.Once
-import Util.SetLike
+import Util.SetLike as SL
+import Util.GMap
 import Util.UniqueMonad()
-import qualified C.FFI as FFI
 import qualified Cmm.Op as Op
 import Cmm.Op(ToCmmTy(..))
 import qualified FlagDump as FD
@@ -98,7 +93,7 @@ data CEnv = CEnv {
     counter :: IORef Int
 }
 
-dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ fromAtom n <+> hsep (map show as) <+> "::" <+> show t <> f z <> g th|  (n,TyTy { tySlots = as, tyReturn = t, tySiblings = z, tyThunk = th}) <- Map.toList tt] where
+dumpTyEnv (TyEnv tt) = mapM_ putStrLn $ sort [ fromAtom n <+> hsep (map show as) <+> "::" <+> show t <> f z <> g th|  (n,TyTy { tySlots = as, tyReturn = t, tySiblings = z, tyThunk = th}) <- toList tt] where
     f Nothing = mempty
     f (Just v) = text " " <> tshow v
     g TyNotThunk = mempty
@@ -213,7 +208,7 @@ compile prog@Program { progDataTable = dataTable } = do
 
     TyEnv endTyEnv <- readIORef tyEnv
     -- FIXME correct types.
-    let newTyEnv = TyEnv $ Map.fromList (Map.toList endTyEnv ++ [(funcMain, toTyTy ([],[]))] ++ [(en, toTyTy ([],[])) | en <- enames])
+    let newTyEnv = TyEnv $ fromList (toList endTyEnv ++ [(funcMain, toTyTy ([],[]))] ++ [(en, toTyTy ([],[])) | en <- enames])
     wdump FD.Tags $ do
         dumpTyEnv newTyEnv
     fbaps <- readIORef funcBaps
@@ -225,8 +220,8 @@ compile prog@Program { progDataTable = dataTable } = do
         sequenceG_ [] = Return []
         sequenceG_ (x:xs) = foldl (@>>) x xs
     let grin = setGrinFunctions theFuncs emptyGrin {
-            grinEntryPoints = Map.insert funcMain (FfiExport "_amain" Safe CCall [] "void") $
-                                Map.fromList epv,
+            grinEntryPoints = minsert funcMain (FfiExport "_amain" Safe CCall [] "void") $
+                                fromList epv,
             grinPhase = PhaseInit,
             grinTypeEnv = newTyEnv,
             grinCafs = [ (x,node) | (x,node) <- cafs]
@@ -235,7 +230,7 @@ compile prog@Program { progDataTable = dataTable } = do
     return grin
     where
     scMap = fromList [ (tvrIdent t,toEntry x) |  x@(t,_,_) <- map combTriple $ progCombinators prog]
-    initTyEnv = mappend primTyEnv $ TyEnv $ Map.fromList $ concat [ makePartials (a,b,c) | (_,(a,b,c)) <-  toList scMap] ++ concat [con x| x <- [cabsurd] ++ Map.elems (constructorMap dataTable), conType x /= eHash]
+    initTyEnv = mappend primTyEnv $ TyEnv $ fromList $ concat [ makePartials (a,b,c) | (_,(a,b,c)) <-  toList scMap] ++ concat [con x| x <- [cabsurd] ++ values (constructorMap dataTable), conType x /= eHash]
     Just cabsurd = getConstructor (nameConjured modAbsurd eStar) mempty
     con c | (EPi (TVr { tvrType = a }) b,_) <- fromLam $ conExpr c = return $ (tagArrow,toTyTy ([tyDNode, tyDNode],[TyNode]))
     con c | keepCon = return $ (n,TyTy { tyThunk = TyNotThunk, tySlots = keepIts as, tyReturn = [TyNode], tySiblings = fmap (map convertName) sibs}) where
@@ -274,7 +269,7 @@ makePartials (fn,ts,rt) | 'f':_ <- show fn = (fn,toTyTy (keepIts ts,rt)):f undef
 --    ans = (fn,toTyTy (keepIts ts,rt)):[(partialTag fn i,toTyTy (keepIts $ reverse $ drop i $ reverse ts ,TyNode)) |  i <- [0.. length ts] ]
 makePartials x = error "makePartials"
 
-primTyEnv = TyEnv . Map.map toTyTy $ Map.fromList $ [
+primTyEnv = TyEnv . fmap toTyTy $ fromList $ [
     (tagArrow,([tyDNode, tyDNode],[TyNode])),
     (tagHole, ([],[TyNode]))
     ]
@@ -588,7 +583,7 @@ compile' cenv (tvr,as,e) = ans where
         return s
     addNewFunction cenv tl@(n,args :-> body) = do
         liftIO $ modifyIORef (funcBaps cenv) (tl:)
-        let addt (TyEnv mp) =  TyEnv $ Map.insert sfn sft (Map.insert n (toTyTy (args',getType body)) mp)
+        let addt (TyEnv mp) =  TyEnv $ minsert sfn sft (minsert n (toTyTy (args',getType body)) mp)
             (sfn,sft) = tySusp n args'
             args' = map getType args
         liftIO $ modifyIORef (tyEnv cenv) addt

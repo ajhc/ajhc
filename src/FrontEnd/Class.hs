@@ -21,13 +21,12 @@ module FrontEnd.Class(
 
 import Control.Monad.Identity
 import Control.Monad.Writer
-import Data.Monoid
 import Data.Generics
 import Data.List(nub)
+import Debug.Trace
 import Text.PrettyPrint.HughesPJ(render,Doc())
 import qualified Data.Map as Map
 import qualified Text.PrettyPrint.HughesPJ as PPrint
-import Debug.Trace
 
 import Data.Binary
 import Doc.DocLike
@@ -40,7 +39,6 @@ import FrontEnd.Utils
 import FrontEnd.HsSyn
 import Support.MapBinaryInstance
 import Maybe
-import Monad
 import Name.Name
 import Name.Names
 import Support.CanType

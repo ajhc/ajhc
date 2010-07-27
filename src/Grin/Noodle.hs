@@ -5,33 +5,36 @@ module Grin.Noodle where
 import Control.Monad.Writer
 import qualified Data.Set as Set
 
-import Data.Functor
-import Support.FreeVars
-import StringTable.Atom(Atom())
-import Options(flint)
 import C.Prims
-import Util.Gen
-import Grin.Grin
-import Support.CanType
+import Data.Functor
 import Debug.Trace
+import Grin.Grin
+import Options(flint)
+import StringTable.Atom(Atom())
+import Support.CanType
+import Support.FreeVars
 import Support.Tickle
+import Util.GMap
+import Util.Gen
+import Util.SetLike
+import Util.HasSize
 
 
 modifyTail :: Lam -> Exp -> Exp
-modifyTail lam@(_ :-> lb) te = f mempty te where
-    lamFV = freeVars lam :: Set.Set Var
+modifyTail lam@(_ :-> lb) te = f (sempty :: GSet Atom) te where
+    lamFV = freeVars lam :: GSet Var
     f lf e | False && trace ("modifyTail: " ++ show (lf,e)) False = undefined
     f _ (Error s ty) = Error s (getType lb)
     f lf (Case x ls) = Case x (map (g lf) ls)
     f _ lt@Let {expIsNormal = False } = lt :>>= lam
     f lf lt@Let {expDefs = defs, expBody = body, expIsNormal = True } = updateLetProps lt { expBody = f nlf body, expDefs = defs' } where
-        nlf = lf `Set.union` Set.fromList (map funcDefName defs)
+        nlf = lf `union` fromList (map funcDefName defs)
         defs' = [ updateFuncDefProps d { funcDefBody = g nlf (funcDefBody d) } | d <- defs ]
     f lf lt@MkCont {expLam = lam, expCont = cont } = lt { expLam = g lf lam, expCont = g lf cont }
     f lf (e1 :>>= p :-> e2) = e1 :>>= p :-> f lf e2
-    f lf e@(App a as t) | a `Set.member` lf = App a as (getType lb)
+    f lf e@(App a as t) | a `member` lf = App a as (getType lb)
     f lf e = e :>>= lam
-    g lf (p :-> e) | flint && not (Set.null $ Set.intersection (freeVars p) lamFV) = error "modifyTail: lam floated inside bad scope"
+    g lf (p :-> e) | flint && not (isEmpty $ intersection (freeVars p) lamFV) = error "modifyTail: lam floated inside bad scope"
     g lf (p :-> e) = p :-> f lf e
 
 instance Tickleable Exp Lam where
@@ -130,14 +133,14 @@ grinFunctions_s nf grin = grin { grinFunctions = nf }
 --------------------------
 
 isManifestNode :: Monad m => Exp -> m [Atom]
-isManifestNode e = f mempty e where
+isManifestNode e = f (sempty :: GSet Atom) e where
     f lf _ | False && trace ("isManifestNode: " ++ show lf) False = undefined
     f lf (Return [(NodeC t _)]) = return [t]
     f lf Error {} = return []
-    f lf (App a _ _) | a `Set.member` lf = return []
+    f lf (App a _ _) | a `member` lf = return []
     f lf Let { expBody = body, expIsNormal = False } = f lf body
     f lf Let { expBody = body, expDefs = defs, expIsNormal = True } = ans where
-        nlf = lf `Set.union` Set.fromList (map funcDefName defs)
+        nlf = lf `union` fromList (map funcDefName defs)
         ans = do
             xs <- mapM (f nlf . lamExp . funcDefBody) defs
             b <- f nlf body
@@ -193,7 +196,7 @@ collectFuncs exp = runWriter (cfunc exp) where
             xs <- cfunc e
             tell xs
             clfunc y
-        cfunc (App a _ _) = return (Set.singleton a)
+        cfunc (App a _ _) = return (singleton a)
         cfunc (Case _ as) = do
             rs <- mapM clfunc as
             return (mconcat rs)
@@ -224,13 +227,13 @@ grinLet defs body = updateLetProps Let {
 updateLetProps Let { expDefs = [], expBody = body } = body
 updateLetProps lt@Let { expBody = body, expDefs = defs } =
         lt {
-            expFuncCalls = (tail Set.\\ myDefs, nonTail Set.\\ myDefs),
+            expFuncCalls = (tail \\ myDefs, nonTail \\ myDefs),
             expNonNormal = notNormal,
-            expIsNormal = Set.null notNormal
+            expIsNormal = isEmpty notNormal
             } where
     (tail,nonTail) = mconcatMap collectFuncs (body : map (lamExp . funcDefBody) defs)
-    notNormal =  nonTail `Set.intersection` (Set.fromList $ map funcDefName defs)
-    myDefs = Set.fromList $ map funcDefName defs
+    notNormal =  nonTail `intersection` (fromList $ map funcDefName defs)
+    myDefs = fromList $ map funcDefName defs
 updateLetProps e = e
 
 
@@ -239,7 +242,7 @@ data ReturnInfo = ReturnNode (Maybe Atom,[Ty]) | ReturnConst Val | ReturnCalls A
 
 getReturnInfo :: Exp -> [ReturnInfo]
 getReturnInfo  e = ans where
-    ans = execWriter (f mempty e)
+    ans = execWriter (f (sempty :: GSet Atom) e)
     tells x = tell [x]
     f lf (Return [(NodeC t as)]) = tells (ReturnNode (Just t,map getType as))
     f lf (Return [z]) | valIsConstant z = tell [ReturnConst z]
@@ -247,9 +250,9 @@ getReturnInfo  e = ans where
     f lf (Case _ ls) = do Prelude.mapM_ (f lf) [ e | _ :-> e <- ls ]
     f lf (_ :>>= _ :-> e) = f lf e
     f lf Let { expBody = body, expIsNormal = False } = f lf body
-    f lf (App a _ _) | a `Set.member` lf = return ()
+    f lf (App a _ _) | a `member` lf = return ()
     f lf Let { expBody = body, expDefs = defs, expIsNormal = True } = ans where
-        nlf = lf `Set.union` Set.fromList (map funcDefName defs)
+        nlf = lf `union` fromList (map funcDefName defs)
         ans = do
             mapM_ (f nlf . lamExp . funcDefBody) defs
             f nlf body

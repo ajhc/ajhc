@@ -12,9 +12,10 @@ import Fixer.Supply
 import Grin.Grin
 import Grin.Noodle
 import Grin.Whiz
-import Stats hiding(print)
+import Stats hiding(print, singleton)
 import Support.CanType
 import Support.FreeVars
+import Util.SetLike hiding(Value)
 import Util.Gen
 
 
@@ -42,7 +43,7 @@ deadCode stats roots grin = do
     forM_ (grinCafs grin) $ \ (v,NodeC t []) -> do
         (0,fn) <- tagUnfunction t
         v' <- supplyValue usedCafs v
-        addRule $ conditionalRule id v' $ (suspFuncs `isSuperSetOf` value (Set.singleton fn))
+        addRule $ conditionalRule id v' $ (suspFuncs `isSuperSetOf` value (singleton fn))
         addRule $ v' `implies` (sValue usedFuncs fn)
 
     mapM_ (go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline) (grinFuncs grin)
@@ -66,26 +67,26 @@ deadCode stats roots grin = do
     let cafSet = fg uc
         funSet = fg uf
         argSet = fg ua
-                 `Set.union`
-                 Set.fromList [ (n,i) | FuncDef n (args :-> _) _ _ <- grinFunctions grin,
-                                        n `Map.member` grinEntryPoints grin,
+                 `union`
+                 fromList [ (n,i) | FuncDef n (args :-> _) _ _ <- grinFunctions grin,
+                                        n `member` grinEntryPoints grin,
                                         i <- [0 .. length args] ]
-        directFuncs =  funSet Set.\\ suspFuncs Set.\\ pappFuncs
-        fg xs = Set.fromList [ x | (x,True) <- xs ]
-    newCafs <- flip mconcatMapM (grinCafs grin) $ \ (x,y) -> if x `Set.member` cafSet then return [(x,y)] else tick stats "Optimize.dead-code.caf" >> return []
+        directFuncs =  funSet \\ suspFuncs \\ pappFuncs
+        fg xs = fromList [ x | (x,True) <- xs ]
+    newCafs <- flip mconcatMapM (grinCafs grin) $ \ (x,y) -> if x `member` cafSet then return [(x,y)] else tick stats "Optimize.dead-code.caf" >> return []
     let f ((x,y):xs) rs ws = do
-            if not $ x `Set.member` funSet then tick stats "Optimize.dead-code.func" >> f xs rs ws else do
+            if not $ x `member` funSet then tick stats "Optimize.dead-code.func" >> f xs rs ws else do
             (ws',r) <- runStatIO stats $ removeDeadArgs postInline funSet directFuncs cafSet argSet (x,y) ws
             f xs (r:rs) ws'
         f [] rs _ = return rs
     newFuncs <- f (grinFuncs grin) [] whizState
     --newFuncs <- flip mconcatMapM (grinFuncs grin) $ \ (x,y) -> do
     let (TyEnv mp) = grinTypeEnv grin
-    mp' <- flip mconcatMapM (Map.toList mp) $ \ (x,tyty@TyTy { tySlots = ts }) -> case Just x  of
-        Just _ | tagIsFunction x, not $ x `Set.member` funSet -> return []
-        Just fn | fn `Set.member` directFuncs -> do
+    mp' <- flip mconcatMapM (toList mp) $ \ (x,tyty@TyTy { tySlots = ts }) -> case Just x  of
+        Just _ | tagIsFunction x, not $ x `member` funSet -> return []
+        Just fn | fn `member` directFuncs -> do
             let da (t,i)
-                    | Set.member (fn,i) argSet = return [t]
+                    | member (fn,i) argSet = return [t]
                     | otherwise = tick stats ("Optimize.dead-code.arg-func.{" ++ show x ++ "-" ++ show i) >> return []
             ts' <- mconcatMapM da (zip ts naturals)
             return [(x,tyty { tySlots = ts' })]
@@ -94,7 +95,7 @@ deadCode stats roots grin = do
     return $ setGrinFunctions newFuncs grin {
         grinCafs = newCafs,
         grinPartFunctions = pappFuncs,
-        grinTypeEnv = TyEnv $ Map.fromList mp',
+        grinTypeEnv = TyEnv $ fromList mp',
         --grinArgTags = Map.fromList newArgTags,
         grinSuspFunctions = suspFuncs
         }
@@ -152,8 +153,8 @@ go fixer pappFuncs suspFuncs usedFuncs usedArgs usedCafs postInline (fn,as :-> b
             doNode (NodeC n as) | not postInline, Just (x,fn) <- tagUnfunction n  = let
                 consts = (mconcatMap doNode as)
                 usedfn = implies fn' (sValue usedFuncs fn)
-                suspfn | x > 0 = conditionalRule id fn' (pappFuncs `isSuperSetOf` value (Set.singleton fn))
-                       | otherwise = conditionalRule id fn' (suspFuncs `isSuperSetOf` value (Set.singleton fn))
+                suspfn | x > 0 = conditionalRule id fn' (pappFuncs `isSuperSetOf` value (singleton fn))
+                       | otherwise = conditionalRule id fn' (suspFuncs `isSuperSetOf` value (singleton fn))
                 in mappend consts $ mconcat (usedfn:suspfn:[ mconcatMap (implies (sValue usedArgs fn) . varValue) (freeVars a) | (fn,a) <- combineArgs fn as])
             doNode x = doConst x `mappend` mconcatMap (implies fn' . varValue) (freeVars x)
             doConst _ | postInline  = mempty
@@ -199,13 +200,13 @@ removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) whizState =
     f lt@Let { expDefs = defs }  = return $ updateLetProps lt { expDefs = defs' } where
         defs' = [ updateFuncDefProps df { funcDefBody = margs name body } | df@FuncDef { funcDefName = name, funcDefBody = body } <- defs, name `Set.member` funSet ]
     f x = return x
-    dff' fn as | fn `Set.member` directFuncs = return as
+    dff' fn as | fn `member` directFuncs = return as
     dff' fn as = dff'' fn as
-    dff fn as | fn `Set.member` directFuncs = return (removeArgs fn as)
+    dff fn as | fn `member` directFuncs = return (removeArgs fn as)
     dff fn as = dff'' fn as
-    dff'' fn as | not (fn `Set.member` funSet) = return as -- if function was dropped, we don't have argument use information.
+    dff'' fn as | not (fn `member` funSet) = return as -- if function was dropped, we don't have argument use information.
     dff'' fn as = mapM df  (zip as naturals) where
-        df (a,i) | not (deadVal a) && not (Set.member (fn,i) usedArgs) = do
+        df (a,i) | not (deadVal a) && not (member (fn,i) usedArgs) = do
             mtick $ toAtom "Optimize.dead-code.func-arg"
             return $ properHole (getType a)
         df (a,_)  = return a
@@ -218,9 +219,9 @@ removeDeadArgs postInline funSet directFuncs usedCafs usedArgs (a,l) whizState =
     clearCaf (Index a b) = return Index `ap` clearCaf a `ap` clearCaf b
     clearCaf (Const a) = Const `liftM` clearCaf a
     clearCaf x = return x
-    deadCaf v = v < v0 && not (v `Set.member` usedCafs)
+    deadCaf v = v < v0 && not (v `member` usedCafs)
     deadVal (Lit 0 _) = True
     deadVal x = isHole x
-    removeArgs fn as = concat [ perhapsM ((fn,i) `Set.member` usedArgs) a | a <- as | i <- naturals ]
+    removeArgs fn as = concat [ perhapsM ((fn,i) `member` usedArgs) a | a <- as | i <- naturals ]
 
 

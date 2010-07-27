@@ -6,7 +6,6 @@ module FrontEnd.Tc.Unify(
     ) where
 
 import Control.Monad.Writer
-import Control.Monad.Reader
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -19,7 +18,6 @@ import FrontEnd.Tc.Kind
 import Options
 import Support.CanType
 import Support.FreeVars
-import Name.Names
 import qualified FlagDump as FD
 
 
@@ -108,9 +106,6 @@ subsumes s1 s2 = do
 
 
     sub a b = fail $ "subsumes failure: " <> ppretty a <+> ppretty b
-
-tArrow_star :: Type
-tArrow_star = TCon (Tycon tc_Arrow (kindStar `Kfun` (kindStar `Kfun` kindStar)))
 
 -- might as well return flattened type
 -- we can skip the occurs check for boxy types
