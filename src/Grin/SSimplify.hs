@@ -13,6 +13,9 @@ import Grin.Grin
 import Grin.Noodle
 import Util.Gen
 import Util.RWS
+import Util.GMap
+import Util.SetLike
+import Util.HasSize
 import Support.CanType
 import Support.FreeVars
 import qualified Stats
@@ -41,12 +44,12 @@ newtype SState = SState { usedVars :: IS.IntSet }
 
 data SCol = SCol {
     colStats :: Stats.Stat,
-    colFreeVars :: Set.Set Var
+    colFreeVars :: GSet Var
     }
     {-! derive: Monoid !-}
 
 data ExpInfo = ExpInfo {
-    expFreeVars :: Set.Set Var,
+    expFreeVars :: GSet Var,
     expUnboxing :: UnboxingResult,
     expType     :: [Ty]
     }
@@ -79,9 +82,9 @@ simpFuncs fd = do
 simpLam :: Lam -> S Lam
 simpLam (ps :-> e) = do
     (ps,env') <- renamePattern ps
-    let f col = col { colFreeVars = colFreeVars col Set.\\ freeVars ps }
+    let f col = col { colFreeVars = colFreeVars col \\ freeVars ps }
     (e,col) <- censor f $ listen $ local (env' `mappend`) $ simpExp e
-    ps <- mapM (zeroVars (`Set.member` colFreeVars col)) ps
+    ps <- mapM (zeroVars (`member` colFreeVars col)) ps
     return (ps :-> e)
 
 
@@ -122,7 +125,7 @@ simpBind p e cont = f p e where
     cse name xs = do
         (z,col) <- listen $ local (\s -> s { envCSE = Map.fromList [ (x,(toAtom name,y)) | (x,y) <- xs] `Map.union` envCSE s }) cont
         e <- simpDone e
-        if isOmittable e && Set.null (freeVars p `Set.intersection` colFreeVars col) then do
+        if isOmittable e && isEmpty (freeVars p `intersection` colFreeVars col) then do
             mtick "Simplify.Omit.Bind"
             return z
          else return $ e :>>= (p :-> z)
@@ -228,8 +231,8 @@ simpExp e = f e [] where
     g  lt@Let { expDefs = defs, expBody = body } = do
         body <- f body []
         defs <- simpFuncs defs
-        let dnames = Set.fromList $ map funcDefName defs
-            isInvalid e = Set.null (freeVars e `Set.intersection` dnames)
+        let dnames = fromList $ map funcDefName defs :: GSet Atom
+            isInvalid e = isEmpty (freeVars e `intersection` dnames)
         case body of
             e :>>= l :-> r | isInvalid e -> do
                 mtick "Simplify.simplify.let-shrink-head"
@@ -345,7 +348,7 @@ combineUnboxing :: UnboxingResult -> UnboxingResult -> UnboxingResult
 combineUnboxing ub1 ub2 = f ub1 ub2 where
     f UnErr {} x = x
     f x UnErr {} = x
-    f (UnTail t1 u1) (UnTail t2 u2) = UnTail (t1 `Set.union` t2) (f u1 u2)
+    f (UnTail t1 u1) (UnTail t2 u2) = UnTail (t1 `union` t2) (f u1 u2)
     f (UnTail t1 u1) u2 = UnTail t1 (f u1 u2)
     f u1 (UnTail t2 u2) = UnTail t2 (f u1 u2)
     f (UnReturn xs) (UnReturn ys) = UnReturn (zipWith g xs ys)
@@ -367,7 +370,7 @@ getUnboxing e = f e where
     f (BaseOp (StoreNode b) [NodeC c xs]) = UnStore b c (map g xs)
     f (BaseOp Demote [v]) = UnDemote (g v)
     f (Error _ tys) = UnErr tys
-    f (App f _ ts) = UnTail (Set.singleton f) (UnErr ts)
+    f (App f _ ts) = UnTail (singleton f) (UnErr ts)
     f (Case _ ls) = foldr1 combineUnboxing  [ f e | _ :-> e <- ls ]
     f Let { expBody = body } = f body
     f (_ :>>= _ :-> e) = f e
@@ -377,14 +380,14 @@ getUnboxing e = f e where
     g v = UnUnknown (getType v)
 
 editTail :: Monad m => [Ty] -> (Exp -> m Exp) -> Exp -> m Exp
-editTail nty mt te = f mempty te where
+editTail nty mt te = f (sempty :: GSet Atom) te where
     f _ (Error s ty) = return $ Error s nty
     f lf (Case x ls) = return (Case x) `ap` mapM (g lf) ls
     f lf lt@Let {expIsNormal = False, expBody = body } = do
         body <- f lf body
         return $ updateLetProps lt { expBody = body }
     f lf lt@Let {expDefs = defs, expIsNormal = True } = do
-        let nlf = lf `Set.union` Set.fromList (map funcDefName defs)
+        let nlf = lf `union` fromList (map funcDefName defs)
         mapExpExp (f nlf) lt
     f lf lt@MkCont {expLam = lam, expCont = cont } = do
         a <- g lf lam
@@ -393,7 +396,7 @@ editTail nty mt te = f mempty te where
     f lf (e1 :>>= p :-> e2) = do
         e2 <- f lf e2
         return $ e1 :>>= p :-> e2
-    f lf e@(App a as t) | a `Set.member` lf = return $ App a as nty
+    f lf e@(App a as t) | a `member` lf = return $ App a as nty
     f lf e = mt e
     g lf (p :-> e) = do e <- f lf e; return $ p :-> e
 
@@ -406,7 +409,7 @@ explicitRecurse
     :: Grin
     -> IO Grin
 explicitRecurse grin =  mapGrinFuncsM f grin where
-    f name lam | name `Set.notMember` (freeVars lam) = return lam
+    f name lam | name `notMember` (freeVars lam :: GSet Atom) = return lam
     f name (as :-> e) = do
         let nname = toAtom $ "bR" ++ fromAtom name
             g (App n rs t) | n == name = App nname rs t

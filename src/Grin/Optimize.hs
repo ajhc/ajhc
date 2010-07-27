@@ -9,9 +9,11 @@ import StringTable.Atom
 import C.Prims
 import Grin.Grin
 import Grin.Noodle
-import Stats hiding(null)
+import Stats hiding(null,isEmpty)
 import Support.CanType
 import Support.FreeVars
+import Util.HasSize
+import Util.GMap
 import Util.Graph
 import Util.SetLike
 import Options (verbose)
@@ -63,8 +65,8 @@ grinPush stats (l :-> e) = ans where
         return exp'
 
     fixupLet lt@Let { expDefs = defs, expBody = b } = do
-        let def = (Set.fromList $ map funcDefName defs)
-            f (e :>>= l :-> r) | Set.null (freeVars e `Set.intersection` def) = do
+        let def = (fromList $ map funcDefName defs :: GSet Atom)
+            f (e :>>= l :-> r) | isEmpty (freeVars e `intersection` def) = do
                 exp <- f r
                 return (e :>>= l :-> exp)
             f r = return $ updateLetProps lt {  expBody = r }
@@ -177,7 +179,7 @@ grinSpeculate grin = do
 
 
 performSpeculate specs grin = do
-    let sset = Set.fromList (map tagFlipFunction specs)
+    let sset = fromList (map tagFlipFunction specs) :: GSet Tag
     let f (a,l) = mapBodyM h l  >>= \l' -> return (a,l')
         h (BaseOp (StoreNode False) [NodeC t xs]) | t `member` sset = do
             let t' = tagFlipFunction t

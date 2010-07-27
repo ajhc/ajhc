@@ -3,16 +3,17 @@ module Grin.Whiz(whiz, fizz, WhizState, whizState, normalizeGrin,normalizeGrin',
 import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Writer
-import Data.Monoid
-import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Util.GMap
+import Util.SetLike
+import Util.HasSize
 
 import Grin.Grin
 import Grin.Noodle
 import Support.CanType
 
 type WhizState = Either (Set.Set Int) Int
-type WhizEnv = Map.Map Var Val
+type WhizEnv = GMap Var Val
 
 whizState :: WhizState
 whizState = Left mempty
@@ -172,7 +173,7 @@ applySubstE env x = mapExpVal (applySubst env) x
 
 applySubst env x = f x where
     f var@(Var v _)
-        | Just n <- Map.lookup v env =  return n
+        | Just n <- mlookup v env =  return n
     f x = mapValVal f x
 
 
@@ -183,7 +184,7 @@ renamePattern x = runWriterT (mapM f x) where
     f (Var v t) = do
         v' <- lift $ newVarName v
         let nv = Var v' t
-        tell (Map.singleton v nv)
+        tell (msingleton v nv)
         return nv
     f (NodeC t vs) = do
         vs' <- mapM f vs
@@ -197,9 +198,9 @@ newVarName (V sv) = do
     case s of
         Left s -> do
             let nv = v sv
-                v n | n `Set.member` s = v (n + Set.size s)
+                v n | n `member` s = v (n + size s)
                     | otherwise = n
-            put (Left $! Set.insert nv s)
+            put (Left $! insert nv s)
             return (V nv)
         Right n -> do
             put $! (Right $! (n + 1))
