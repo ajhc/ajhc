@@ -1,6 +1,6 @@
 -- various desugaring routines
 --
--- The general desugaring routine creates selectors for data 
+-- The general desugaring routine creates selectors for data
 -- constructors with named fields, changes all pattern bindings
 -- into 'simple' pattern bindings, and adds failure cases to lambda
 -- expressions which have failable patterns
@@ -56,7 +56,7 @@ newPatVarName = nameName $ toName Val "patvar@0"
 
 desugarHsModule :: HsModule -> HsModule
 desugarHsModule m = hsModuleDecls_s ds' m where
-    (ds', _) = runState (dsm (hsModuleDecls m))   (0::Int)
+    (ds', _) = runState (dsm (hsModuleDecls m)) (0::Int)
     dsm ds = fmap concat $ mapM desugarDecl ds
 
 desugarHsStmt :: Monad m => HsStmt -> m HsStmt
@@ -173,7 +173,7 @@ replaceVarNamesInPat name p = f name p where
     f name p = error $ "f: " ++ show (name,p)
 
 desugarRhs :: (HsRhs) -> PatSM (HsRhs)
-desugarRhs  = traverseHsRhsHsExp desugarExp 
+desugarRhs  = traverseHsRhsHsExp desugarExp
 
 desugarExp :: (HsExp) -> PatSM (HsExp)
 desugarExp (HsLambda sloc pats e)
@@ -269,49 +269,44 @@ hsIf e a b = hsParen $ HsIf e a b
 listCompToExp :: Monad m => m HsName -> HsExp -> [HsStmt] -> m HsExp
 listCompToExp newName exp ss = hsParen `liftM` f ss where
     f [] = return $ HsList [exp]
-    f (gen:HsQualifier q1:HsQualifier q2:ss)  = f (gen:HsQualifier (hsApp (HsVar f_and) [q1,q2]):ss)
+    f (gen:HsQualifier q1:HsQualifier q2:ss)  = f (gen:HsQualifier (hsApp (HsVar v_and) [q1,q2]):ss)
     f ((HsLetStmt ds):ss) = do ss' <- f ss; return $ hsParen (HsLet ds ss')
     f (HsQualifier e:ss) = do ss' <- f ss; return $ hsParen (HsIf e ss' (HsList []))
     f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat, Just exp' <- g ss = do
-        return $ hsParen $ HsVar f_map `app` HsLambda srcLoc [pat] exp' `app` e
+        return $ hsParen $ HsVar v_map `app` HsLambda srcLoc [pat] exp' `app` e
     --f ((HsGenerator srcLoc pat e):[HsQualifier q]) | isHsPVar pat = hsParen $ HsApp (HsApp (HsVar f_filter)  (hsParen $ HsLambda srcLoc [pat] q) ) e
     f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isLazyPat pat, Just exp' <- g ss = do
         npvar <- newName
-        return $ hsApp (HsVar f_foldr)  [HsLambda srcLoc [pat,HsPVar npvar] $ hsIf q (hsApp (HsCon con_cons) [exp',HsVar npvar]) (HsVar npvar), HsList [],e]
+        return $ hsApp (HsVar v_foldr)  [HsLambda srcLoc [pat,HsPVar npvar] $ hsIf q (hsApp (HsCon dc_Cons) [exp',HsVar npvar]) (HsVar npvar), HsList [],e]
     f ((HsGenerator srcLoc pat e):ss) | isLazyPat pat = do
         ss' <- f ss
-        return $ hsParen $ HsVar f_concatMap `app`  HsLambda srcLoc [pat] ss' `app` e
+        return $ hsParen $ HsVar v_concatMap `app`  HsLambda srcLoc [pat] ss' `app` e
     f ((HsGenerator srcLoc pat e):HsQualifier q:ss) | isFailablePat pat || Nothing == g ss = do
         npvar <- newName
         ss' <- f ss
         let kase = HsCase (HsVar npvar) [a1, a2 ]
             a1 =  HsAlt srcLoc pat (HsGuardedRhss [HsGuardedRhs srcLoc q ss']) []
             a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
-        return $ hsParen $ HsVar f_concatMap `app`  HsLambda srcLoc [HsPVar npvar] kase `app`  e
+        return $ hsParen $ HsVar v_concatMap `app`  HsLambda srcLoc [HsPVar npvar] kase `app`  e
     f ((HsGenerator srcLoc pat e):ss) | isFailablePat pat || Nothing == g ss = do
         npvar <- newName
         ss' <- f ss
         let kase = HsCase (HsVar npvar) [a1, a2 ]
             a1 =  HsAlt srcLoc pat (HsUnGuardedRhs ss') []
             a2 =  HsAlt srcLoc HsPWildCard (HsUnGuardedRhs $ HsList []) []
-        return $ hsParen $ HsVar f_concatMap `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
+        return $ hsParen $ HsVar v_concatMap `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
     f ((HsGenerator srcLoc pat e):ss) = do
         npvar <- newName
         let Just exp' = g ss
             kase = HsCase (HsVar npvar) [a1 ]
             a1 =  HsAlt srcLoc pat (HsUnGuardedRhs exp') []
-        return $ hsParen $ HsVar f_map `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
+        return $ hsParen $ HsVar v_map `app` HsLambda srcLoc [HsPVar npvar] kase `app` e
     g [] = return exp
     g (HsLetStmt ds:ss) = do
         e <- g ss
         return (hsParen (HsLet ds e))
     g _ = Nothing
     app x y = HsApp x (hsParen y)
-    f_concatMap = nameName v_concatMap
-    f_map = nameName v_map
-    f_foldr = nameName v_foldr
-    f_and = nameName v_and
-    con_cons = nameName dc_Cons
 
 -- patterns are
 -- failable - may fail to match

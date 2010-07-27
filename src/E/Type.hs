@@ -193,7 +193,8 @@ instance Show a => Show (TVr' a) where
 
 type TVr = TVr' E
 data TVr' e = TVr { tvrIdent :: !Id, tvrType :: e, tvrInfo :: Info.Info }
-        {-!derive: update, Functor, Foldable, Traversable !-}
+    deriving(Functor,Foldable,Traversable)
+        {-!derive: update !-}
 
 data Alt e = Alt (Lit TVr e) e
     deriving(Eq,Ord)

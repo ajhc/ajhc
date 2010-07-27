@@ -108,7 +108,6 @@ import Debug.Trace (trace)
 -- Reserved Ids
 
       'as'            { KW_As }
-      'derive'        { KW_Derive }
       'case'          { KW_Case }
       'class'         { KW_Class }
       'alias'         { KW_Alias }
@@ -137,6 +136,7 @@ import Debug.Trace (trace)
       'forall'        { KW_Forall }
       'exists'        { KW_Exists }
       'kind'          { KW_Kind }
+      'closed'        { KW_Closed }
 
 %monad { P } { thenP } { returnP }
 %lexer { lexer } { EOF }
@@ -943,11 +943,11 @@ varid :: { HsName }
       | 'as'                  { as_name }
       | 'alias'               { toName UnknownType "alias" }
       | 'kind'                { toName UnknownType "kind" }
+      | 'closed'              { toName UnknownType "closed" }
       | 'qualified'           { qualified_name }
       | 'hiding'              { hiding_name }
       | 'forall'              { toName UnknownType "forall" }
       | 'exists'              { toName UnknownType "exists" }
-      | 'derive'              { derive_name }
 
 qconid :: { HsName }
       : conid                 {  $1 }

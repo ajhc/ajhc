@@ -98,7 +98,6 @@ data Token
 	| KW_Data
 	| KW_Default
 	| KW_Deriving
-	| KW_Derive
 	| KW_Do
 	| KW_Else
         | KW_Hiding
@@ -121,6 +120,7 @@ data Token
 	| KW_Forall
         | KW_Exists
         | KW_Kind
+        | KW_Closed
 
         | EOF
         deriving (Eq,Show)
@@ -194,8 +194,8 @@ special_varids :: [(String,Token)]
 special_varids = [
  ( "as", 	KW_As ),
  ( "kind", 	KW_Kind ),
+ ( "closed", 	KW_Closed ),
  ( "qualified", KW_Qualified ),
- ( "derive",    KW_Derive ),
  ( "hiding", 	KW_Hiding )
  ]
 
