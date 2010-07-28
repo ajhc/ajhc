@@ -213,11 +213,18 @@ matchChar c msg = do
 -- whether to insert layout tokens.
 
 lexer :: (Token -> P a) -> P a
-lexer = runL $ do
-	bol <- checkBOL
-	bol <- lexWhiteSpace bol
-	startToken
-	if bol then lexBOL else lexToken
+lexer = runL topLexer
+
+topLexer :: Lex a Token
+topLexer = do
+    b <- pullCtxtFlag
+    if b
+     then setBOL >> return VRightCurly -- the lex context state flags that we must do an empty {} - UGLY
+     else do
+    bol <- checkBOL
+    bol <- lexWhiteSpace bol
+    startToken
+    if bol then lexBOL else lexToken
 
 lexWhiteSpace :: Bool -> Lex a Bool
 lexWhiteSpace bol = do
@@ -370,12 +377,13 @@ lexToken = do
 
 	    | isLower c || c == '_' -> do
 		ident <- lexWhile isIdent
-		return $ case lookup ident (reserved_ids ++ special_varids) of
+		case lookup ident (reserved_ids ++ special_varids) of
                         Just KW_Foreign
-                            | doFFI -> KW_Foreign
-                            | otherwise -> VarId ident
-			Just keyword -> keyword
-			Nothing -> VarId ident
+                            | doFFI -> return KW_Foreign
+                            | otherwise -> return $ VarId ident
+                        Just KW_Do -> setFlagDo >> return KW_Do
+			Just keyword -> return keyword
+			Nothing -> return $ VarId ident
 
 	    | isSymbol c -> do
 		sym <- lexWhile isSymbol
@@ -435,8 +443,9 @@ lexDecimalOrFloat = do
             exponent <- do
                     rest2 <- getInput
                     case rest2 of
-                        'e':_ -> lexExponent
-                        'E':_ -> lexExponent
+                        e:pm:d:_ | e `elem` "eE", (pm `elem` "+-" && isDigit d) || isDigit pm -> lexExponent
+--                        'e':_ -> lexExponent
+ --                       'E':_ -> lexExponent
                         _     -> return 0
             return (FloatTok ((num%1) * 10^^(exponent - decimals)))
         e:_ | toLower e == 'e' -> do

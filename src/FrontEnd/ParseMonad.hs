@@ -1,4 +1,4 @@
--- #hide
+{-# LANGUAGE NamedFieldPuns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Language.Haskell.ParseMonad
@@ -23,11 +23,13 @@ module FrontEnd.ParseMonad(
 		-- * Lexing
 		Lex(runL), getInput, discard, lexNewline, lexTab, lexWhile,
 		alternative, checkBOL, setBOL, startToken, getOffside,
-		pushContextL, popContextL, lexParseMode
+		pushContextL, popContextL, lexParseMode,
+                pullCtxtFlag, setFlagDo
 	) where
 
 import qualified Data.Set as Set
 
+import Control.Monad
 import Data.Monoid
 import Data.Functor
 import FrontEnd.SrcLoc
@@ -52,8 +54,12 @@ data LexContext = NoLayout | Layout Int
 	deriving (Eq,Ord,Show)
 
 --type ParseState = [LexContext]
-data ParseState = ParseState { psLexContext :: [LexContext], psWarnings :: [Warning] }
-    deriving(Show)
+data ParseState = ParseState {
+    psLexContext :: [LexContext],
+    psWarnings :: [Warning],
+    psInDo :: !Bool,
+    psForceClose :: !Bool
+    } deriving(Show)
 
 
 instance Functor ParseResult where
@@ -80,7 +86,7 @@ indentOfParseState :: ParseState -> Int
 indentOfParseState ParseState { psLexContext = (Layout n:_) } = n
 indentOfParseState _            = 0
 
-emptyParseState = ParseState { psLexContext = [], psWarnings = [] }
+emptyParseState = ParseState { psLexContext = [], psWarnings = [], psForceClose = False, psInDo = False }
 
 -- | Static parameters governing a parse.
 -- More to come later, e.g. literate mode, language extensions.
@@ -167,9 +173,12 @@ instance MonadWarn P where
 
 pushCurrentContext :: P ()
 pushCurrentContext = do
-	loc <- getSrcLoc
+	lc <- getSrcLoc
 	indent <- currentIndent
-	pushContext (Layout (max (indent) (srcLocColumn loc)))
+        let loc = srcLocColumn lc
+        dob <- pullDoStatus
+        when (if dob then loc < indent else loc <= indent) pushCtxtFlag
+	pushContext (Layout loc)
 
 currentIndent :: P Int
 currentIndent = P $ \_r _x _y loc stk _mode -> Ok stk (indentOfParseState stk)
@@ -186,9 +195,26 @@ popContext = P $ \_i _x _y _l stk _m ->
             Ok stk { psLexContext = s } ()
         []    -> error "Internal error: empty context in popContext"
 
+pullCtxtFlag :: Lex a Bool
+pullCtxtFlag = Lex $ \cont -> P $ \r x y loc s ->
+        runP (cont $ psForceClose s) r x y loc s { psForceClose = False }
+
+pushCtxtFlag :: P ()
+pushCtxtFlag =
+    P $ \_i _x _y _l s _m -> case psForceClose s of
+        False -> Ok s { psForceClose = True } ()
+        _     -> error "Internal error: context flag already pushed"
+
+pullDoStatus :: P Bool
+pullDoStatus = P $ \_i _x _y _l s _m -> Ok s { psInDo = False } (psInDo s)
+
+setFlagDo :: Lex a ()
+setFlagDo = Lex $ \cont -> P $ \r x y loc s ->
+        runP (cont ()) r x y loc s { psInDo = True }
+
 -- Monad for lexical analysis:
 -- a continuation-passing version of the parsing monad
-
+--
 newtype Lex r a = Lex { runL :: (a -> P r) -> P r }
 
 instance Monad (Lex r) where

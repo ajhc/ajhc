@@ -162,15 +162,20 @@ body :: { ([HsImportDecl],[HsDecl]) }
       |      layout_on  bodyaux close                 { $2 }
 
 bodyaux :: { ([HsImportDecl],[HsDecl]) }
-      : impdecls ';' topdecls optsemi                 { (reverse $1, fixupHsDecls (reverse $3)) }
-      |              topdecls optsemi                 { ([], fixupHsDecls (reverse $1)) }
-      | impdecls              optsemi                 { (reverse $1, []) }
-      | {- empty -}                                   { ([], []) }
+      : optsemis impdecls semis topdecls              { (reverse $2, fixupHsDecls $4) }
+      | optsemis                topdecls              { ([], fixupHsDecls $2) }
+      | optsemis impdecls optsemis                    { (reverse $2, []) }
+      | optsemis                                      { ([], []) }
 
 optsemi :: { () }
       : ';'                                           { () }
       | {- empty -}                                   { () }
 
+semis :: { () }
+       : optsemis ';'				{ () }
+optsemis :: { () }
+       : semis					{ () }
+       | {- empty -}				{ () }
 -- -----------------------------------------------------------------------------
 -- The Export List
 
@@ -210,7 +215,7 @@ qcname :: { HsName }
 -- Import Declarations
 
 impdecls :: { [HsImportDecl] }
-      : impdecls ';' impdecl                  { $3 : $1 }
+      : impdecls semis impdecl                  { $3 : $1 }
       | impdecl                               { [$1] }
 
 impdecl :: { HsImportDecl }
@@ -231,9 +236,10 @@ maybeimpspec :: { Maybe (Bool, [HsImportSpec]) }
       | {- empty -}                           { Nothing }
 
 impspec :: { (Bool, [HsImportSpec]) }
-      :  '(' importlist maybecomma ')'        { (False, reverse $2) }
-      |  '(' ')'                              { (False, []) }
+      :  '(' importlist maybecomma ')'          { (False, reverse $2) }
+      |  '(' ')'                                { (False, []) }
       |  'hiding' '(' importlist maybecomma ')' { (True,  reverse $3) }
+      |  'hiding' '(' ')'                       { (True, []) }
 
 importlist :: { [HsImportSpec] }
       :  importlist ',' import                { $3 : $1 }
@@ -281,8 +287,10 @@ ops   :: { [HsName] }
 -- shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 
 topdecls :: { [HsDecl] }
-      : topdecls ';' topdecl          { $3 : $1 }
-      | topdecls ';'                  { $1 }
+      : topdecls1 optsemis          { reverse $1 } -- TODO checkRevDecls
+
+topdecls1 :: { [HsDecl] }
+      : topdecls1 semis topdecl       { $3 : $1  }
       | topdecl                       { [$1] }
 
 topdecl :: { HsDecl }
@@ -357,11 +365,11 @@ vbinds :: { [(HsName,Maybe HsType)] }
       |                              { [] }
 
 decls :: { [HsDecl] }
-      : decls1 optsemi                { fixupHsDecls ( reverse $1 ) }
-      | optsemi                       { [] }
+      : optsemis decls1 optsemis      { fixupHsDecls ( reverse $2 ) }
+      | optsemis                      { [] }
 
 decls1 :: { [HsDecl] }
-      : decls1 ';' decl               { $3 : $1 }
+      : decls1 semis decl             { $3 : $1 }
       | decl                          { [$1] }
 
 decl :: { HsDecl }
@@ -466,7 +474,7 @@ ktype :: { HsType }
     | type                  { $1 }
 
 gtycon :: { HsName }
-      : qconid                        { $1 }
+      : qcon                          { $1 }
       | '(' ')'                       { unit_tycon_name }
       | '(' '->' ')'                  { fun_tycon_name }
       | '[' ']'                       { list_tycon_name }
@@ -484,9 +492,11 @@ gtycon :: { HsName }
 -- C a, or (C1 a, C2 b, ... Cn z) and convert it into a context.  Blaach!
 
 ctype :: { HsQualType }
-      : btype '=>' type               {% checkContext $1 `thenP` \c ->
-                                         returnP (HsQualType c $3) }
+      : context '=>' type             { HsQualType $1 $3 }
       | type                          { HsQualType [] $1 }
+
+context :: { HsContext }
+        : btype				{% checkContext $1 }
 
 carhs :: { (HsContext, HsContext) }
        : btype '=>' btype {% liftM2 (,)     (checkContext $1) (checkContext $3) }
@@ -519,6 +529,8 @@ constr :: { HsConDecl }
       | srcloc mexists sbtype conop sbtype    { HsConDecl { hsConDeclSrcLoc = $1, hsConDeclName = $4, hsConDeclConArg = [$3,$5], hsConDeclExists = $2 } }
       | srcloc mexists con '{' fielddecls '}'
                                       { HsRecDecl { hsConDeclSrcLoc = $1, hsConDeclName = $3, hsConDeclRecArg = (reverse $5), hsConDeclExists = $2 } }
+      | srcloc mexists con '{' '}'
+                                      { HsRecDecl { hsConDeclSrcLoc = $1, hsConDeclName = $3, hsConDeclRecArg = [], hsConDeclExists = $2 } }
 
 mexists :: { [HsTyVarBind] }
         : 'exists' tbinds '.'         { $2 }
@@ -813,7 +825,7 @@ quals :: { [HsStmt] }
       | qual                                  { [$1] }
 
 qual  :: { HsStmt }
-      : infixexp srcloc '<-' exp      {% checkPattern $1 `thenP` \p ->
+      : exp srcloc '<-' exp      {% checkPattern $1 `thenP` \p ->
                                          returnP (HsGenerator $2 p $4) }
       | exp                           { HsQualifier $1 }
       | 'let' decllist                { HsLetStmt $2 }
@@ -853,11 +865,11 @@ stmtlist :: { [HsStmt] }
         |     layout_on  stmts close  { $2 }
 
 stmts :: { [HsStmt] }
-      : stmts1 ';' exp                { reverse (HsQualifier $3 : $1) }
+      : stmts1 semis exp              { reverse (HsQualifier $3 : $1) }
       | exp                           { [HsQualifier $1] }
 
 stmts1 :: { [HsStmt] }
-      : stmts1 ';' qual               { $3 : $1 }
+      : stmts1 semis qual             { $3 : $1 }
       | qual                          { [$1] }
 
 -- -----------------------------------------------------------------------------
@@ -1010,7 +1022,7 @@ close :: { () }
       : vccurly               { () } -- context popped in lexer.
       | error                 {% popContext }
 
-layout_on  :: { () }  : optsemi  {% getSrcLoc `thenP` \sl ->
+layout_on  :: { () }  :   {% getSrcLoc `thenP` \sl ->
                                  pushCurrentContext  }
 
 --                                 pushCurrentContext (Layout (srcLocColumn sl)) }
