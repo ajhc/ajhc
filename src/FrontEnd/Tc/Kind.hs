@@ -121,9 +121,9 @@ instance Monoid KindConstraint where
     mappend k1 k2 = mappend k2 k1
 
 data Kindvar = Kindvar {
-    kvarUniq :: !Int,
-    kvarRef :: IORef (Maybe Kind),
-    kvarConstraint :: KindConstraint
+    kvarUniq       :: {-# UNPACK #-} !Int,
+    kvarRef        :: {-# UNPACK #-} !(IORef (Maybe Kind)),
+    kvarConstraint :: {-# UNPACK #-} !KindConstraint
     }
 
 instance Binary Kindvar where

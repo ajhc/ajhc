@@ -96,9 +96,9 @@ type TypeEnv = Map.Map Name Sigma
 data TcEnv = TcEnv {
     tcInfo              :: TcInfo,
     tcDiagnostics       :: [Diagnostic],   -- list of information that might help diagnosis
-    tcVarnum            :: IORef Int,
-    tcCollectedEnv      :: IORef (Map.Map Name Sigma),
-    tcCollectedCoerce   :: IORef (Map.Map Name CoerceTerm),
+    tcVarnum            :: {-# UNPACK #-} !(IORef Int),
+    tcCollectedEnv      :: {-# UNPACK #-} !(IORef (Map.Map Name Sigma)),
+    tcCollectedCoerce   :: {-# UNPACK #-} !(IORef (Map.Map Name CoerceTerm)),
     tcCurrentEnv        :: Map.Map Name Sigma,
     tcCurrentScope      :: Set.Set MetaVar,
     tcRecursiveCalls    :: Set.Set Name,
