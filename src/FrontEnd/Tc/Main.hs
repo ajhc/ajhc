@@ -767,63 +767,7 @@ restricted bs = any isHsActionDecl bs || (fopts FO.MonomorphismRestriction && an
    isSimpleDecl (HsPatBind _sloc _pat _rhs _wheres) = True
    isSimpleDecl _ = False
 
-{-
-
-
-
---------------------------------------------------------------------------------
-
-tiStmts ::  TypeEnv -> [(HsStmt)] -> TI ([Pred], TypeEnv)
-
-tiStmts = tiStmtsAcc [] Map.empty
-
-tiStmtsAcc ::   [Pred] -> TypeEnv -> TypeEnv -> [(HsStmt)] -> TI ([Pred], TypeEnv)
-tiStmtsAcc predAcc envAcc _ []
-   = return (predAcc, envAcc)
-
-tiStmtsAcc predAcc envAcc env (s:ss)
-   = do
-        (newPs, newEnv) <- tiStmt (envAcc `Map.union` env) s
-        tiStmtsAcc (newPs ++ predAcc) (newEnv `Map.union` envAcc) env ss
-
-tiStmt :: TypeEnv -> (HsStmt) -> TI ([Pred], TypeEnv)
-
--- with lists:
--- x <- xs
--- xs :: [a]
--- x :: a
-
-tiStmt env expr@(HsGenerator srcLoc pat e)
-   = withContext
-        (locMsg srcLoc "in the generator " $ render $ ppHsStmt expr) $
-        do
-        (ePs, eEnv, eT) <- tiExpr env e
-        (patPs, patEnv, patT) <- tiPat pat
-        unify eT (TAp tList patT)
-        return (ePs ++ patPs, eEnv `Map.union` patEnv)
-
-tiStmt env stmt@(HsQualifier e)
-   = withContext (makeMsg "in " $ render $ ppHsStmt stmt) $
-        do
-        (ePs, eEnv, eT) <- tiExpr env e
-        unify eT tBool
-        return (ePs, eEnv)
-
-tiStmt env stmt@(HsLetStmt decls)
-   = withContext
-         (makeMsg "in let statement" $ render $ ppHsStmt stmt) $
-         do
-         sigEnv <- getSigEnv
-         let bgs = getFunDeclsBg sigEnv decls
-         tiSeq tiBindGroup env bgs
-
---------------------------------------------------------------------------------
-
-
--}
-
 getBindGroupName (expl,impls) =  map getDeclName (snds expl ++ concat (rights impls) ++ lefts impls)
-
 
 tiProgram ::  [BindGroup] -> [HsDecl] -> Tc [HsDecl]
 tiProgram bgs es = ans where
