@@ -1,2 +1,2 @@
-jhc_flags: --stop typecheck --stale Main
+jhc_flags: --stop typecheck --stale Main --no-ho -pcontainers
 run: no
