@@ -865,12 +865,16 @@ stmtlist :: { [HsStmt] }
         |     layout_on  stmts close  { $2 }
 
 stmts :: { [HsStmt] }
-      : stmts1 semis exp              { reverse (HsQualifier $3 : $1) }
-      | exp                           { [HsQualifier $1] }
+      : stmt stmts1                   { $1:$2 }
+      | ';' stmts                     { $2 }
+      | {- empty -}                   { [] }
 
 stmts1 :: { [HsStmt] }
-      : stmts1 semis qual             { $3 : $1 }
-      | qual                          { [$1] }
+      : ';' stmts                     { $2 }
+      |                               { [] }
+
+stmt :: { HsStmt }
+    : qual            { $1 }
 
 -- -----------------------------------------------------------------------------
 -- Record Field Update/Construction
