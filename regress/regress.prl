@@ -26,6 +26,7 @@ my $opt_clean;
 my $opt_timeout=60*5;
 my $opt_help;
 my $opt_man;
+my $opt_tc;
 my $verbose;
 
 Getopt::Long::Configure ("bundling", "auto_help");
@@ -40,6 +41,7 @@ GetOptions(
     n => \$opt_n,
     p => \$opt_p,
     v => \$verbose,
+    t => \$opt_tc,
     'win' => \$opt_win,
     'rts=s' =>\@opt_rts,
     clean => \$opt_clean,
@@ -57,6 +59,7 @@ delete $ENV{JHC_LIBRARY_PATH};
 
 
 @opts = (@opts, (map { "-f$_" } @fopts), (map { "-m$_" } @mopts));
+@opts = (@opts, '--no-ho', '--stop', 'typecheck') if $opt_tc;
 
 my @cond;
 my @ncond;
@@ -246,7 +249,7 @@ sub do_it {
                 if(statf($r) eq 'INT') {done()};
                 next;
             }
-            next if $no_run;
+            next if $no_run || $opt_tc;
             my @args = @{$y->{args}};
             $result->{run_stdout} = "$rd/$name.stdout";
             my $stdin = " < $fbase.stdin" if -f "$fbase.stdin";
