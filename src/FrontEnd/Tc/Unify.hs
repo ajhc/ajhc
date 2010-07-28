@@ -2,6 +2,7 @@
 module FrontEnd.Tc.Unify(
     subsumes,
     boxyMatch,
+    printRule,
     listenSolvePreds
     ) where
 

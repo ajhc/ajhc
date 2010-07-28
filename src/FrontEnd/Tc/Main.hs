@@ -9,6 +9,7 @@ import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
 import System.IO(hPutStr,stderr)
 
+import Doc.PPrint
 import Control.Monad.Reader
 import FrontEnd.DeclsDepends(getDeclDeps)
 import FrontEnd.Diagnostic
@@ -44,6 +45,8 @@ type Expl = (Sigma, HsDecl)
 -- a binding group.
 type BindGroup = ([Expl], [Either HsDecl [HsDecl]])
 
+tpretty vv = prettyPrintType vv
+tppretty vv = parens (tpretty vv)
 
 tcKnownApp e coerce vname as typ = do
     sc <- lookupName vname
@@ -84,6 +87,7 @@ tcApps e as typ = tcApps' e as typ
 
 -- the fall through case
 tcApps' e as typ = do
+    printRule $ "tcApps': " ++ (show e)
     bs <- sequence [ newBox kindArg | _ <- as ]
     e' <- tcExpr e (foldr fn typ bs)
     as' <- sequence [ tcExprPoly a r | r <- bs | a <- as ]
@@ -99,6 +103,7 @@ tiExprPoly,tcExprPoly ::  HsExp -> Type ->  Tc HsExp
 
 tcExprPoly e t = do
     t <- evalType t
+    printRule $ "tiExprPoly " ++ tppretty t <+> show e
     tiExprPoly e t
 
 tiExprPoly e t@TMetaVar {} = tcExpr e t   -- GEN2
@@ -751,7 +756,9 @@ tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typ
     ch <- getClassHierarchy
     env <- freeMetaVarsEnv
     (_,ds,rs) <- splitReduce env (freeMetaVarsPreds qs) ps
-    assertEntailment qs (rs ++ ds)
+    printRule $ "endtiExpl: " <+> show ps <+> show qs <+> show ds <+> show rs
+    addPreds ds
+    assertEntailment qs rs
     return ret
 
 restricted   :: [HsDecl] -> Bool
