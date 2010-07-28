@@ -5,8 +5,8 @@ type: :feature
 component: lib
 release: 0.7.6
 reporter: John Meacham <john@repetae.net>
-status: :unstarted
-disposition: 
+status: :closed
+disposition: :fixed
 creation_time: 2010-07-22 02:22:00.564146 Z
 references: []
 
@@ -15,4 +15,8 @@ log_events:
 - - 2010-07-22 02:22:01.744128 Z
   - John Meacham <john@repetae.net>
   - created
+  - ""
+- - 2010-07-28 10:06:04.393045 Z
+  - John Meacham <john@repetae.net>
+  - closed with disposition fixed
   - ""

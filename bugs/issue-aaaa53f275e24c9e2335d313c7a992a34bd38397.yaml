@@ -5,8 +5,8 @@ type: :bugfix
 component: tc
 release: 
 reporter: John Meacham <john@repetae.net>
-status: :unstarted
-disposition: 
+status: :closed
+disposition: :fixed
 creation_time: 2009-03-27 09:01:58.266972 Z
 references: []
 
@@ -20,3 +20,7 @@ log_events:
   - John Meacham <john@repetae.net>
   - commented
   - this bug appears to actually be that when a type is defaulted, the instances the default type belong to arn't added to the context
+- - 2010-07-28 10:04:43.243047 Z
+  - John Meacham <john@repetae.net>
+  - closed with disposition fixed
+  - ""
