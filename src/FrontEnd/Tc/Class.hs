@@ -60,7 +60,7 @@ splitPreds :: Monad m
            -> m (Preds, Preds)
 splitPreds h fs ps  = do
     ps' <- toHnfs h ps
-    return $ partition (\p -> freeMetaVarsPred p `Set.isSubsetOf` fs) $ simplify h  $ ps'
+    return $ partition (\p -> let fv = freeMetaVarsPred p in not (Set.null fv) && fv `Set.isSubsetOf` fs) $ simplify h ps'
 
 toHnfs      :: Monad m => ClassHierarchy -> [Pred] -> m [Pred]
 toHnfs h ps =  mapM (toHnf h) ps >>= return . concat

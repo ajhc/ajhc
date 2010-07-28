@@ -756,7 +756,7 @@ tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typ
     ch <- getClassHierarchy
     env <- freeMetaVarsEnv
     (_,ds,rs) <- splitReduce env (freeMetaVarsPreds qs) ps
-    printRule $ "endtiExpl: " <+> show ps <+> show qs <+> show ds <+> show rs
+    printRule $ "endtiExpl: " <+> show env <+> show ps <+> show qs <+> show ds <+> show rs
     addPreds ds
     assertEntailment qs rs
     return ret
