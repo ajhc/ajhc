@@ -5,6 +5,7 @@ use warnings;
 use strict;
 
 use Getopt::Std;
+use Text::Wrap;
 
 my %opt;
 getopts("n:mf:",\%opt);
@@ -111,13 +112,21 @@ print "   f (Left x) (s,xs) = (s,x:xs)\n";
 
 
 my $help = "";
+$Text::Wrap::columns = 72;
+$Text::Wrap::unexpand = 0;
 
 foreach (@cat) {
-    $help .= "\\n-- $_ --\\n";
+    $help .= "\n-- $_ --\n";
     foreach my $j (sort @{$cat{$_}}) {
-        $help .= " $h{$j}{oname}\\n    $h{$j}{desc}\\n";
+        my $name = $h{$j}{oname};
+        $help .= wrap(sprintf("%-15s ", $name),' 'x16, $h{$j}{desc}) . "\n";
+#        my @words = split /\s+/, $h{$j}{desc};
+#        $help .= " $h{$j}{oname}\\n    $h{$j}{desc}\\n";
     }
 }
+
+#print STDERR $help, "\n";
+$help =~ s/\n/\\n/g;
 
 print "\n{-# NOINLINE helpMsg #-}\n";
 print "helpMsg = \"$help\"\n";
