@@ -297,6 +297,22 @@ product	l = prod l 1 where
     prod []     a = a
     prod (x:xs) a = prod xs (a*x)
 
+--sum              =  foldl (+) 0
+--product          =  foldl (*) 1
+sum l	= sum' l 0 where
+    sum' []     a = a
+    sum' (x:xs) a = sum' xs (a+x)
+product	l = prod l 1 where
+    prod []     a = a
+    prod (x:xs) a = prod xs (a*x)
+
+sum' l	= rsum l 0 where
+    rsum []     a = a
+    rsum (x:xs) a = a `seq` rsum xs (a+x)
+
+{-# SPECIALIZE sum' :: [Int] -> Int #-}
+{-# RULES "sum/Int" forall . sum = sum' :: [Int] -> Int #-}
+
 -- maximum and minimum return the maximum or minimum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
 
