@@ -331,7 +331,7 @@ topdecl :: { HsDecl }
                       {% doForeign $2 (reverse $3) $4 $6  }
       | 'foreign' srcloc varids mstring '::' ctype '=' exp
                       {% doForeignEq $2 (reverse $3) $4 $6 $8 }
-      | PRAGMARULES rulelist PRAGMAEND
+      | PRAGMARULES rules PRAGMAEND
               { HsPragmaRules $ map (\x -> x { hsRuleIsMeta = $1 }) (reverse $2) }
       | srcloc PRAGMASPECIALIZE var '::' type PRAGMAEND
                       { HsPragmaSpecialize { hsDeclSrcLoc = $1, hsDeclBool = $2, hsDeclName = $3, hsDeclType = $5
@@ -348,12 +348,10 @@ rule :: { HsRule }
                   , hsRuleUniq = error "hsRuleUniq not set", hsRuleIsMeta = error "hsRuleIsMeta not set" } }
 
 rules :: { [HsRule] }
-      : rules optsemi rule  { $3 : $1 }
-      | rule optsemi           { [$1] }
-
-rulelist :: { [HsRule] }
-      : '{' rules '}' { $2 }
-      | layout_on rules close { $2 }
+      : rules ';'rule         { $3 : $1 }
+      | rules ';'             { $1 }
+      | rule                  { [$1] }
+      | {- empty -}           { [] }
 
 mfreevars :: { [(HsName,Maybe HsType)] }
       : 'forall' vbinds '.' { $2 }

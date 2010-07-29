@@ -78,20 +78,20 @@ realToFrac     :: (Real a, Fractional b) => a -> b
 realToFrac x   =  fromRational (toRational x)
 
 {-# RULES
-  "realToFrac/toRational"     realToFrac = toRational
-  "realToFrac/fromRational"   realToFrac = fromRational
-  "realToFrac/toDouble"       realToFrac = toDouble
-  "realToFrac/fromDouble"     realToFrac = fromDouble
- #-}
+"realToFrac/toRational"     realToFrac = toRational
+"realToFrac/fromRational"   realToFrac = fromRational
+"realToFrac/toDouble"       realToFrac = toDouble
+"realToFrac/fromDouble"     realToFrac = fromDouble
+#-}
 
 {-# RULES
-  "fromIntegral/Int"          fromIntegral = (id :: Int -> Int)
-  "fromIntegral/Integer"      fromIntegral = (id :: Integer -> Integer)
-  "fromIntegral/toInt"        fromIntegral = toInt
-  "fromIntegral/fromInt"      fromIntegral = fromInt
-  "fromIntegral/toInteger"    fromIntegral = toInteger
-  "fromIntegral/fromInteger"  fromIntegral = fromInteger
- #-}
+"fromIntegral/Int"          fromIntegral = (id :: Int -> Int)
+"fromIntegral/Integer"      fromIntegral = (id :: Integer -> Integer)
+"fromIntegral/toInt"        fromIntegral = toInt
+"fromIntegral/fromInt"      fromIntegral = fromInt
+"fromIntegral/toInteger"    fromIntegral = toInteger
+"fromIntegral/fromInteger"  fromIntegral = fromInteger
+#-}
 
 
 {-# INLINE subtract #-}
