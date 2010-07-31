@@ -555,7 +555,8 @@ tiNonRecImpl decl = withContext (locSimple (srcLoc decl) ("in the implicitly typ
         gs = vss Set.\\ fs
     (mvs,ds,rs) <- splitReduce fs vss ps'
     addPreds ds
-    sc' <- if restricted [decl] then do
+    mr <- flagOpt FO.MonomorphismRestriction
+    sc' <- if restricted mr [decl] then do
         let gs' = gs Set.\\ Set.fromList (freeVars rs)
         addPreds rs
         quantify (Set.toList gs') [] mv'
@@ -587,7 +588,8 @@ tiImpls bs = withContext (locSimple (srcLoc bs) ("in the recursive implicitly ty
         gs = (Set.unions vss) Set.\\ fs
     (mvs,ds,rs) <- splitReduce fs (foldr1 Set.intersection vss) ps'
     addPreds ds
-    scs' <- if restricted bs then do
+    mr <- flagOpt FO.MonomorphismRestriction
+    scs' <- if restricted mr bs then do
         let gs' = gs Set.\\ Set.fromList (freeVars rs)
         addPreds rs
         quantify_n (Set.toList gs') [] ts'
@@ -757,8 +759,8 @@ tiExpl (sc, decl) = withContext (locSimple (srcLoc decl) ("in the explicitly typ
     assertEntailment qs rs
     return ret
 
-restricted   :: [HsDecl] -> Bool
-restricted bs = any isHsActionDecl bs || (fopts FO.MonomorphismRestriction && any isSimpleDecl bs) where
+restricted :: Bool -> [HsDecl] -> Bool
+restricted monomorphismRestriction bs = any isHsActionDecl bs || (monomorphismRestriction && any isSimpleDecl bs) where
    isSimpleDecl :: (HsDecl) -> Bool
    isSimpleDecl (HsPatBind _sloc _pat _rhs _wheres) = True
    isSimpleDecl _ = False
