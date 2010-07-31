@@ -82,10 +82,14 @@ releases:
     - ""
 - !ditz.rubyforge.org,2008-03-06/release 
   name: 0.7.6
-  status: :unreleased
-  release_time: 
+  status: :released
+  release_time: 2010-07-31 09:20:11.763166 Z
   log_events: 
   - - 2010-07-22 02:20:12.504129 Z
     - John Meacham <john@repetae.net>
     - created
+    - ""
+  - - 2010-07-31 09:20:11.763166 Z
+    - John Meacham <john@repetae.net>
+    - released
     - ""
