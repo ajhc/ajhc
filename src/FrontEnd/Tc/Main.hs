@@ -93,8 +93,6 @@ tcApps' e as typ = do
     as' <- sequence [ tcExprPoly a r | r <- bs | a <- as ]
     return (e',as')
 
-
-
 tcApp e1 e2 typ = do
     (e1,[e2]) <- tcApps e1 [e2] typ
     return (e1,e2)
@@ -226,8 +224,6 @@ tiExpr (HsRightSection e1 e2) typ = do
     e2 <- tcExpr e2 (arg `fn` (arg2 `fn` ret))
     (arg `fn` ret) `subsumes` typ
     return (HsRightSection e1 e2)
-
-
 
 tiExpr expr@HsApp {} typ = withContext (makeMsg "in the application" $ render $ ppHsExp $ backToApp h as) $ do
     (h,as) <- tcApps h as typ
@@ -774,33 +770,21 @@ tiProgram bgs es = ans where
     ans = do
         let (pr,is) = progressStep (progressNew (length bgs + 1) 45) '.'
         wdump FD.Progress $ liftIO $ do hPutStr stderr ("(" ++ is)
-        (r,ps) <- listenPreds $ f pr bgs [] mempty
+        (r,ps) <- listenPreds $ f pr bgs []
         ps <- flattenType ps
-        ch <- getClassHierarchy
-        ([],rs) <- splitPreds ch Set.empty ps
+--        ch <- getClassHierarchy
+    --    ([],rs) <- splitPreds ch Set.empty ps
+        (_,[],rs) <- splitReduce Set.empty Set.empty ps
         topDefaults rs
         return r
-        --ps <- return $ simplify ch ps
-        --liftIO $ mapM_ (putStrLn.show) ps
-        --return r
-    f pr (bg:bgs) rs cenv  = do
-        ((ds,env),ps) <- listenPreds (tcBindGroup bg)
-        ch <- getClassHierarchy
-        withContext (makeMsg "in the binding group:" $ show (getBindGroupName bg)) $ do
-            ([],leftovers) <- splitPreds ch Set.empty ps
-            --topDefaults leftovers
-            return ()
-
+    f pr (bg:bgs) rs  = do
+        (ds,env) <- (tcBindGroup bg)
         let (pr',os) = progressStep pr '.'
         wdump FD.Progress $ liftIO $ do hPutStr stderr os
-        localEnv env $ f pr' bgs (ds ++ rs) (env `mappend` cenv)
-    f _ [] rs _cenv = do
+        localEnv env $ f pr' bgs (ds ++ rs)
+    f _ [] rs = do
         ch <- getClassHierarchy
-        (pdecls,ps) <- listenPreds $ mapM tcPragmaDecl es
-        withContext (makeMsg "in the pragmas:" $ "rules") $ do
-            ([],leftovers) <- splitPreds ch Set.empty ps
-            --topDefaults leftovers
-            return ()
+        pdecls <- mapM tcPragmaDecl es
         wdump FD.Progress $ liftIO $ do hPutStr stderr ")\n"
         return (rs ++ concat pdecls)
 
