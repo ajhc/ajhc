@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: replace .cabal library files with some YAML format
+desc: ""
+type: :feature
+component: fe
+release: 0.8.0
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-31 09:02:29.663166 Z
+references: []
+
+id: 4349a0366c4341276ad62997d1d108a431f8f931
+log_events: 
+- - 2010-07-31 09:02:30.793166 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

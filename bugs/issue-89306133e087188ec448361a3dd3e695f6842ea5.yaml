@@ -1,0 +1,18 @@
+--- !ditz.rubyforge.org,2008-03-06/issue 
+title: handle LANGUAGE pragma and -X in uniform way
+desc: ""
+type: :feature
+component: fe
+release: 0.8.0
+reporter: John Meacham <john@repetae.net>
+status: :unstarted
+disposition: 
+creation_time: 2010-07-31 09:01:06.643165 Z
+references: []
+
+id: 89306133e087188ec448361a3dd3e695f6842ea5
+log_events: 
+- - 2010-07-31 09:01:07.893167 Z
+  - John Meacham <john@repetae.net>
+  - created
+  - ""

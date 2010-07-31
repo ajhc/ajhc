@@ -3,10 +3,10 @@ title: remove special handling of 'Integral' from the compiler
 desc: "'Integral' is currently handled in a special manner by the compiler so it can generate instances internally for basic types. these instances should be explicit in the libraries."
 type: :task
 component: jhc
-release: 
+release: 0.7.6
 reporter: John Meacham <john@repetae.net>
-status: :unstarted
-disposition: 
+status: :closed
+disposition: :fixed
 creation_time: 2010-07-09 22:08:44.328395 Z
 references: []
 
@@ -15,4 +15,12 @@ log_events:
 - - 2010-07-09 22:08:46.268394 Z
   - John Meacham <john@repetae.net>
   - created
+  - ""
+- - 2010-07-31 09:00:21.953166 Z
+  - John Meacham <john@repetae.net>
+  - assigned to release 0.7.6 from unassigned
+  - ""
+- - 2010-07-31 09:13:23.853166 Z
+  - John Meacham <john@repetae.net>
+  - closed with disposition fixed
   - ""
