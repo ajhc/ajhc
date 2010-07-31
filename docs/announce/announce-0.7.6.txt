@@ -1,0 +1,25 @@
+Announcing jhc 0.7.6! This release fixes a large number of bugs that cropped up
+when compiling hoskell out in the wild. In addition it has some major internal
+cleanups and better support for cross-compilation. This is a minor release in
+that I am just announcing it on jhc@haskell.org.
+
+  http://repetae.net/computer/jhc/
+
+Changes:
+
+ * New standard libraries
+     - parsec
+     - QuickCheck
+ * New option '-C' that compiles to C code and stops, useful for targeting other
+   platforms or building shared libraries.
+ * Nintendo Wii added as target (thanks to Korcan Hussein)
+ * All Num, Real, and Integral magic removed from compiler. This is a very
+   good thing.
+ * monomorphism-restriction flag is now respected
+ * Type Defaulting now works properly
+ * RULES parse like ghc now for compatibility
+ * 'do' 'where' on same indent now parses
+ * improved help messages
+ * a number of bug fixes
+
+        John
