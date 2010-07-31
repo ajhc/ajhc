@@ -49,6 +49,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/smallcheck-0.4.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/utility-ht-0.0.5.1.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/xhtml-3000.2.0.1.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/QuickCheck-1.2.0.0.hl
+%{_datadir}/@PACKAGE@-@SHORTVERSION@/parsec-2.1.0.1.hl
 %{_datadir}/@PACKAGE@-@SHORTVERSION@/include/HsFFI.h
 %{_sysconfdir}/@PACKAGE@-@SHORTVERSION@/targets.ini
 

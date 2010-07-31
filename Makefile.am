@@ -36,7 +36,7 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
 	src/Util/Relation.hs src/Util/RWS.hs src/Util/SameShape.hs src/Util/Seq.hs src/Util/SetLike.hs src/Util/UnionFind.hs \
 	src/Util/UnionSolve.hs src/Util/UniqueMonad.hs src/Util/Util.hs src/Util/VarName.hs src/Version/Config.hs src/Version/Version.hs \
 	src/Support/IniParse.hs src/E/Lint.hs src/Util/Progress.hs src/Grin/StorageAnalysis.hs src/Util/YAML.hs src/Grin/Main.hs \
-        src/E/Main.hs src/Util/GMap.hs
+        src/E/Main.hs src/Util/GMap.hs src/Util/ExitCodes.hs
 
 
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
@@ -252,7 +252,7 @@ publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/in
 	cp -- $^ /home/john/public_html/computer/jhc
 
 manual.mkd: utils/stitch.prl $(JHC_MANUAL_FILES)
-	perl utils/stitch.prl $(JHC_MANUAL_FILES) > $a
+	perl utils/stitch.prl $(JHC_MANUAL_FILES) > $@
 
 manual: manual.mkd
 	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
@@ -287,7 +287,7 @@ show_elibs: lib/ext/*.cabal
 
 applicative-1.0.hl: lib/applicative/applicative.cabal lib/applicative/Control/Arrow.hs lib/applicative/Control/Applicative.hs lib/applicative/Data/Foldable.hs \
     lib/applicative/Control/Category.hs lib/applicative/Data/Traversable.hs base-1.0.hl jhc-1.0.hl
-base-1.0.hl: lib/base/base.cabal lib/base/System/Info.hs lib/base/Debug/Trace.hs lib/base/Data/Array.hs \
+base-1.0.hl: lib/base/base.cabal lib/base/Debug/Trace.hs lib/base/Data/Array.hs \
     lib/base/Data/Typeable.hs lib/base/Text/Printf.hs lib/base/System/Directory.hs lib/base/Data/Maybe.hs \
     lib/base/System/IO/Error.hs lib/base/System/IO/Binary.hs lib/base/System/CPUTime.hs lib/base/System/IO/Pipe.hs \
     lib/base/Control/Monad/Instances.hs lib/base/Foreign/Marshal/Error.hs lib/base/System/Exit.hs lib/base/System/Environment.hs \
