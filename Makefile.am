@@ -351,4 +351,4 @@ JHC_EXT_LIBS = containers-0.3.0.0.hl Diff-0.1.2.hl html-1.0.1.2.hl HUnit-1.2.2.1
 
 JHC_MANUAL_FILES = options.mkd docs/make.mkd docs/dependency_format.mkd docs/pragmas.mkd docs/differences.mkd \
 	docs/unboxed.mkd src/rts/jhc_rts2.c src/FlagOpts.mkd src/FlagDump.mkd src/E/PrimOpt.hs \
-	src/E/TypeCheck.hs src/Options.hs
+	drift_processed/E/TypeCheck.hs drift_processed/Options.hs
