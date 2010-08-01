@@ -10,7 +10,6 @@ import Char
 import Control.Monad.Identity
 import Control.Monad.RWS
 import qualified Data.Traversable as T
-import Data.Monoid
 import List(isPrefixOf,nub)
 import Prelude
 import qualified Data.Map as Map
@@ -289,7 +288,7 @@ convertRules mod tiData classHierarchy assumps dataTable hsDecls = ans where
                 nn <- newNameFrom (map (:'\'':[]) ['a' ..])
                 return (tvrIdent tvr,tvr { tvrIdent = toId (toName TypeVal nn) })
             cs <- flip mapM [toTVr assumps dataTable (toName Val v) | (v,_) <- hsRuleFreeVars pr ] $ \tvr -> do
-                let ur = show $ unRename $ nameName (toUnqualified $ runIdentity $ fromId (tvrIdent tvr))
+                let ur = show $ unRename (toUnqualified $ runIdentity $ fromId (tvrIdent tvr))
                 nn <- newNameFrom (ur:map (\v -> ur ++ show v) [1 ::Int ..])
                 return (tvrIdent tvr,tvr { tvrIdent = toId (toName Val nn) })
             return (ts,cs)
@@ -303,11 +302,10 @@ convertRules mod tiData classHierarchy assumps dataTable hsDecls = ans where
 
 convertE :: Monad m => TiData -> ClassHierarchy -> Map.Map Name Type -> DataTable -> SrcLoc -> HsExp -> m E
 convertE tiData classHierarchy assumps dataTable srcLoc exp = do
-    [(_,_,e)] <- convertDecls tiData mempty classHierarchy assumps dataTable [HsPatBind srcLoc (HsPVar sillyName') (HsUnGuardedRhs exp) []]
+    [(_,_,e)] <- convertDecls tiData mempty classHierarchy assumps dataTable [HsPatBind srcLoc (HsPVar v_silly) (HsUnGuardedRhs exp) []]
     return e
 
 v_silly = toName Val ("Jhc@","silly")
-sillyName' = nameName v_silly
 
 data CeEnv = CeEnv {
     ceAssumps :: Map.Map Name Type,
@@ -580,7 +578,7 @@ convertDecls tiData props classHierarchy assumps dataTable hsDecls = liftM fst $
                               setProperty prop_EXPORTED fn),
                  result)]
 
-    cDecl (HsPatBind sl (HsPVar n) (HsUnGuardedRhs exp) []) | n == sillyName' = do
+    cDecl (HsPatBind sl (HsPVar n) (HsUnGuardedRhs exp) []) | n == v_silly = do
         e <- cExpr exp
         return [(v_silly,tvr,e)]
     cDecl (HsPatBind sl p rhs wh) | (HsPVar n) <- p = do
@@ -886,11 +884,11 @@ convertMatches bs ms err = do
 
         match :: Monad m => [E] -> [([HsPat],E->E)] -> E -> Ce m E
         -- when we run out of arguments, we should run out of patterns. simply fold the transformers.
-        match  [] ps err = return $ foldr f err ps where f ([],fe) err = fe err
+        match  [] ps err = return $ foldr f err ps where f (~[],fe) err = fe err
         -- when we are out of patterns, return the error term
         match _ [] err = return err
         match ~(b:bs) ps err = do
-            (b',mf) <- if isEVar b   then return (b,id) else do
+            (b',mf) <- if isEVar b then return (b,id) else do
                 [ev] <- newVars [getType b]
                 return $ (EVar ev, eLet ev b)
             pps <- tidyHeads b' ps
