@@ -53,7 +53,7 @@ data DemandType = (:=>) !DemandEnv ![Demand]
     deriving(Eq,Ord)
         {-! derive: Binary !-}
 
-data DemandSignature = DemandSignature !Int !DemandType
+data DemandSignature = DemandSignature {-# UNPACK #-} !Int !DemandType
     deriving(Eq,Ord,Typeable)
         {-! derive: Binary !-}
 

@@ -78,7 +78,7 @@ data MetaVar = MetaVar {
     metaUniq :: {-# UNPACK #-} !Int,
     metaKind :: Kind,
     metaRef :: {-# UNPACK #-} !(IORef (Maybe Type)),
-    metaType :: MetaVarType
+    metaType :: {-# UNPACK #-} !MetaVarType
     }
     {-! derive: Binary !-}
 

@@ -46,7 +46,7 @@ instance Monoid FieldMap where
 type SubTable = Map.Map HsName HsName
 
 data ScopeState = ScopeState {
-    unique         :: !Int,
+    unique         :: {-# UNPACK #-} !Int,
     errorTable     :: Map.Map HsName String
     }
 

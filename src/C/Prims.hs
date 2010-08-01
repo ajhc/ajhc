@@ -15,10 +15,10 @@ data PrimTypeType = PrimTypeIntegral | PrimTypeFloating | PrimTypePointer | Prim
 
 data PrimType = PrimType {
     primTypeName :: ExtType,
-    primTypeType :: PrimTypeType,
-    primTypeAlignmentOf :: !Int,
-    primTypeIsSigned :: !Bool,
-    primTypeSizeOf :: !Int
+    primTypeType :: {-# UNPACK #-} !PrimTypeType,
+    primTypeAlignmentOf :: {-# UNPACK #-} !Int,
+    primTypeIsSigned :: {-# UNPACK #-} !Bool,
+    primTypeSizeOf :: {-# UNPACK #-} !Int
     } deriving(Show)
 
 type ExtType = String
@@ -41,29 +41,29 @@ data Prim =
     PrimPrim Atom          -- Special primitive implemented in the compiler somehow.
     | CConst { primConst :: String, primRetType :: ExtType }  -- C code which evaluates to a constant
     | Func {
-        funcIOLike :: !Bool,
+        funcIOLike :: {-# UNPACK #-} !Bool,
         funcName :: PackedString,
         primArgTypes :: [ExtType],
         primRetType :: ExtType
         }   -- function call with C calling convention
     | IFunc {
-        funcIOLike :: !Bool,
+        funcIOLike :: {-# UNPACK #-} !Bool,
         primArgTypes :: [ExtType],
         primRetType :: ExtType
         } -- indirect function call with C calling convention
-    | AddrOf PackedString              -- address of linker name
+    | AddrOf PackedString          -- address of linker name
     | Peek { primArgTy :: Op.Ty }  -- read value from memory
     | Poke { primArgTy :: Op.Ty }  -- write value to memory
     | PrimTypeInfo {
         primArgTy :: Op.Ty,
         primRetTy :: Op.Ty,
-        primTypeInfo :: PrimTypeInfo
+        primTypeInfo :: {-# UNPACK #-} !PrimTypeInfo
         }
     | PrimString PackedString                                 -- address of a raw string. encoded in utf8.
     | PrimDotNet {
-        primStatic :: !Bool,
+        primStatic :: {-# UNPACK #-} !Bool,
         primDotNet :: DotNetPrim,
-        primIOLike :: !Bool,
+        primIOLike :: {-# UNPACK #-} !Bool,
         primAssembly :: PackedString,
         primDotNetName :: PackedString
         }

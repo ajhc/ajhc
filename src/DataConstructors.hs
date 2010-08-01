@@ -124,11 +124,11 @@ data AliasType = NotAlias | ErasedAlias | RecursiveAlias
 
 -- these apply to types
 data DataFamily =
-    DataAbstract        -- abstract internal type, has children of representation unknown and irrelevant.
-    | DataNone          -- children don't apply. data constructor for instance
-    | DataPrimitive     -- primitive type, children are all numbers.
-    | DataEnum !Int     -- bounded integral type, argument is maximum number
-    | DataNormal [Name] -- child constructors
+    DataAbstract                   -- abstract internal type, has children of representation unknown and irrelevant.
+    | DataNone                     -- children don't apply. data constructor for instance
+    | DataPrimitive                -- primitive type, children are all numbers.
+    | DataEnum {-# UNPACK #-} !Int -- bounded integral type, argument is maximum number
+    | DataNormal [Name]            -- child constructors
     deriving(Eq,Ord,Show)
     {-! derive: Binary !-}
 
@@ -141,7 +141,7 @@ data Constructor = Constructor {
     conExpr      :: E,            -- expression which constructs this value
     conOrigSlots :: [Slot],       -- original slots
     conDeriving  :: [Name],       -- classes this type derives
-    conAlias     :: AliasType,    -- whether this is a simple alias and has no tag of its own.
+    conAlias     :: {-# UNPACK #-} !AliasType, -- whether this is a simple alias and has no tag of its own.
     conInhabits  :: Name,         -- what constructor it inhabits, similar to conType, but not quite.
     conVirtual   :: Maybe [Name], -- whether this is a virtual constructor that translates into an enum and its siblings
     conChildren  :: DataFamily

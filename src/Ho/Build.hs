@@ -208,7 +208,7 @@ resolveDeps done_ref m = do
 
 type LibInfo = (Map.Map Module ModuleGroup, Map.Map ModuleGroup [ModuleGroup], Set.Set Module,Map.Map ModuleGroup HoBuild,Map.Map ModuleGroup HoTcInfo)
 
-data CompNode = CompNode !HoHash [CompNode] !(IORef CompLink)
+data CompNode = CompNode !HoHash [CompNode] {-# UNPACK #-} !(IORef CompLink)
 data CompLink
     = CompLinkUnit CompUnit
     | CompCollected CollectedHo CompUnit

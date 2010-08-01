@@ -80,8 +80,8 @@ class Fixable a where
 data MkFixable = forall a . Fixable a => MkFixable (RvValue a)
 
 data Fixer  = Fixer {
-    vars :: !(IORef [MkFixable]),
-    todo :: !(IORef (Set.Set MkFixable))
+    vars :: {-# UNPACK #-} !(IORef [MkFixable]),
+    todo :: {-# UNPACK #-} !(IORef (Set.Set MkFixable))
     }
 
 
@@ -115,9 +115,9 @@ instance Fixable a => Show (Value a) where
 
 data RvValue a = RvValue {
     ident :: {-# UNPACK #-} !Unique,
-    action :: !(IORef [a -> IO ()]),
-    pending :: !(IORef a),
-    current :: !(IORef a),
+    action :: {-# UNPACK #-} !(IORef [a -> IO ()]),
+    pending :: {-# UNPACK #-} !(IORef a),
+    current :: {-# UNPACK #-} !(IORef a),
     fixer :: Fixer
     }
 

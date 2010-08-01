@@ -12,7 +12,7 @@ import Data.Generics
 import Data.Binary
 
 
-data SrcLoc = SrcLoc { srcLocFileName :: String, srcLocLine :: !Int, srcLocColumn :: !Int}
+data SrcLoc = SrcLoc { srcLocFileName :: String, srcLocLine :: {-# UNPACK #-} !Int, srcLocColumn :: {-# UNPACK #-}  !Int}
     deriving(Data,Typeable,Eq,Ord)
     {-! derive: update, Binary !-}
 

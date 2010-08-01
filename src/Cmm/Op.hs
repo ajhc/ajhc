@@ -146,7 +146,7 @@ data ArchBits = BitsMax | BitsPtr | BitsUnknown
     deriving(Eq,Ord)
     {-! derive: Binary !-}
 
-data TyBits = Bits !Int | BitsArch !ArchBits |  BitsExt String
+data TyBits = Bits {-# UNPACK #-} !Int | BitsArch {-# UNPACK #-} !ArchBits |  BitsExt String
     deriving(Eq,Ord)
     {-! derive: Binary !-}
 
@@ -160,7 +160,7 @@ data TyHint
     {-! derive: Binary !-}
 
 data Ty
-    = TyBits !TyBits !TyHint
+    = TyBits !TyBits {-# UNPACK #-} !TyHint
     | TyBool
     deriving(Eq,Ord)
     {-! derive: Binary !-}
