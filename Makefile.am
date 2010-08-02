@@ -298,7 +298,7 @@ base-1.0.hl: lib/base/base.cabal lib/base/Debug/Trace.hs lib/base/Data/Array.hs 
     lib/base/Data/Unicode.hs lib/base/Foreign/ForeignPtr.hs lib/base/System/Time.hs lib/base/Control/Exception.hs \
     lib/base/Foreign/StablePtr.hs lib/base/Foreign/C.hs lib/base/Data/Bits.hs lib/base/Foreign/Marshal.hs \
     lib/base/Foreign.hs lib/base/Data/Array/Unboxed.hs lib/base/Data/Function.hs lib/base/Data/Ix.hs \
-    jhc-1.0.hl
+    lib/base/System/Info.hs jhc-1.0.hl
 flat-foreign-1.0.hl: lib/flat-foreign/flat-foreign.cabal lib/flat-foreign/StablePtr.hs lib/flat-foreign/MarshalAlloc.hs lib/flat-foreign/CForeign.hs \
     lib/flat-foreign/Storable.hs lib/flat-foreign/Ptr.hs lib/flat-foreign/MarshalArray.hs lib/flat-foreign/Int.hs \
     lib/flat-foreign/CString.hs lib/flat-foreign/Word.hs lib/flat-foreign/CError.hs lib/flat-foreign/CTypes.hs \

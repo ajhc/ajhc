@@ -60,7 +60,7 @@ import Util.FilterInput
 import Util.Gen
 import Util.SetLike
 import Util.YAML
-import Version.Config(revision)
+import Version.Config(revision,version)
 import Version.Version(versionString)
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
@@ -678,7 +678,7 @@ preprocess fn lbs = do
     let fopts s = s `member` optFOptsSet initialOpts
         initialOpts = collectFileOpts fn (LBSU.toString $ LBS.take 2048 lbs)
         incFlags = [ "-I" ++ d | d <- optIncdirs options ++ optIncs initialOpts]
-        defFlags = ("-D__JHC__=" ++ revision):[ "-D" ++ d | d <- optDefs initialOpts]
+        defFlags = ("-D__JHC__=" ++ revision):("-D__JHC_VERSION__=" ++ version):[ "-D" ++ d | d <- optDefs initialOpts]
 
     lbs' <- case () of
         _ | fopts FO.Cpp -> readSystem "cpp" $ ["-CC","-traditional"] ++ incFlags ++ defFlags ++ [fn]

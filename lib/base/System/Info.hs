@@ -1,4 +1,4 @@
-{-# OPTIONS_JHC -fffi #-}
+{-# OPTIONS_JHC -fm4 -fffi #-}
 module System.Info(compilerName,compilerVersion,os,arch) where
 
 import Foreign.C.String
@@ -9,7 +9,7 @@ import Data.Version ( Version(..) )
 compilerName = "jhc"
 
 compilerVersion :: Version
-compilerVersion = Version (splitup "@VERSION@") []
+compilerVersion = Version (splitup "__JHC_VERSION__") []
     where splitup s = case reads s of
                         [(v,s')] -> v : splitup s'
                         _ -> []
