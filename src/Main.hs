@@ -41,9 +41,10 @@ main = bracketHtml $ do
         BuildHl hl      -> darg >> buildLibrary processInitialHo processDecls hl
         ListLibraries   -> listLibraries
         ShowHo ho       -> dumpHoFile ho
-        Preprocess      -> do
-            forM_ (optArgs o) $ \fn -> do
-                LBS.readFile fn >>= preprocess fn >>= LBS.putStr
+        Preprocess      -> forM_ (optArgs o) $ \fn -> do
+            lbs <- LBS.readFile fn
+            res <- preprocessHs fn lbs
+            LBS.putStr res
         _               -> darg >> processFiles (optArgs o)
 
 processFiles :: [String] -> IO ()

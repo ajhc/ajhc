@@ -4,6 +4,7 @@ module Ho.Build (
     dumpHoFile,
     parseFiles,
     preprocess,
+    preprocessHs,
     buildLibrary
     ) where
 
@@ -30,7 +31,6 @@ import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as PPrint
 
 import DataConstructors
-import Name.Name
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
@@ -53,6 +53,8 @@ import Ho.Binary
 import Ho.Collected()
 import Ho.Library
 import Ho.Type
+import Name.Name
+import Options
 import Options
 import PackedString(PackedString,packString,unpackPS)
 import RawFiles(prelude_m4)
@@ -673,13 +675,14 @@ collectFileOpts fn s = opt where
     opts = opts' ++ [ "--noprelude" | ("NOPRELUDE",_) <- popts] ++ langs
     langs = catMaybes $ map (flip lookup langmap) $ concat [ words (map (\c -> if c == ',' then ' ' else toLower c) as) | ("LANGUAGE",as) <- popts ]
 
-preprocess :: FilePath -> LBS.ByteString -> IO LBS.ByteString
-preprocess fn lbs = do
-    let fopts s = s `member` optFOptsSet initialOpts
-        initialOpts = collectFileOpts fn (LBSU.toString $ LBS.take 2048 lbs)
-        incFlags = [ "-I" ++ d | d <- optIncdirs options ++ optIncs initialOpts]
-        defFlags = ("-D__JHC__=" ++ revision):("-D__JHC_VERSION__=" ++ version):[ "-D" ++ d | d <- optDefs initialOpts]
+preprocessHs :: FilePath -> LBS.ByteString -> IO LBS.ByteString
+preprocessHs fn lbs = preprocess (collectFileOpts fn (LBSU.toString $ LBS.take 2048 lbs)) fn lbs
 
+preprocess :: Opt -> FilePath -> LBS.ByteString -> IO LBS.ByteString
+preprocess opt fn lbs = do
+    let fopts s = s `member` optFOptsSet opt
+        incFlags = [ "-I" ++ d | d <- optIncdirs options ++ optIncs opt]
+        defFlags = ("-D__JHC__=" ++ revision):("-D__JHC_VERSION__=" ++ version):[ "-D" ++ d | d <- optDefs opt]
     lbs' <- case () of
         _ | fopts FO.Cpp -> readSystem "cpp" $ ["-CC","-traditional"] ++ incFlags ++ defFlags ++ [fn]
           | fopts FO.M4 -> do
@@ -692,7 +695,8 @@ preprocess fn lbs = do
 
 parseHsSource :: String -> LBS.ByteString -> IO (HsModule,LBS.ByteString)
 parseHsSource fn lbs = do
-    lbs' <- preprocess fn lbs
+    let fileOpts = collectFileOpts fn (LBSU.toString $ LBS.take 2048 lbs)
+    lbs' <- preprocess fileOpts fn lbs
     let s = LBSU.toString lbs'
     let s' = if "shl." `isPrefixOf` reverse fn  then unlit fn s'' else s''
         s'' = case s of
