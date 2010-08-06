@@ -81,7 +81,11 @@ addTopLevels  hsmod action = do
         z ns = mapM mult (filter (\x -> length x > 1) $ groupBy (\a b -> fst a == fst b) (sort ns))
         mult xs@(~((n,sl):_)) = warn sl "multiply-defined" (show n ++ " is defined multiple times: " ++ show xs)
     z cdefs
+    let cn k (Right x) (Right y) | x /= y = Left $ ambig k [x,y]
+        cn _ _ x@Left {} = x
+        cn _ x _ = x
     withSubTable (fromList nmap) action
+    --local ( \e -> e { envNameMap = Map.unionWithKey cn (Map.map Right (fromList nmap)) (envNameMap e) }) action
 
 createSelectors sloc ds = mapM g ns where
     ds' :: [(HsName,[(HsName,HsBangType)])]
@@ -99,19 +103,12 @@ ambig x ys = "Ambiguous Name: " ++ show x ++ "\nCould refer to: " ++ tupled (map
 
 runRename :: MonadWarn m => (a -> RM a) -> Opt -> Module -> FieldMap -> [(Name,[Name])] -> a -> m a
 runRename doit opt mod fls ns m = mapM_ addWarning errors >> return renamedMod where
-    subTable = fromList [ (x,y) | (x,[y]) <- ns]
     nameMap = fromList $ map f ns where
         f (x,[y]) = (x,Right y)
         f (x,ys)  = (x,Left $ ambig x ys)
-    ns' = map fn ns
-    fn (n,ns) = (fromName n, map nameName ns)
-
-    errorTab =  fromList [ (x,ambig x ys) | ((typ,x),ys@(_:_:_)) <- ns' ]
 
     startState = ScopeState { unique = 1 }
     startEnv = Env {
-        envSubTable    = subTable,
-        errorTable     = errorTab,
         envModule      = mod,
         envNameMap     = nameMap,
         envOptions     = opt,
@@ -129,7 +126,7 @@ renameStatement :: MonadWarn m => FieldMap -> [(Name,[Name])] ->  Module -> HsSt
 renameStatement fls ns modName stmt = runRename rename options modName fls ns stmt
 
 withSubTable :: SubTable -> RM a -> RM a
-withSubTable st action = local ( \e -> e { envSubTable = st `union` envSubTable e }) action
+withSubTable st action = local ( \e -> e { envNameMap = Map.map Right st `union` envNameMap e }) action
 
 renameDecls :: HsModule -> RM HsModule
 renameDecls mod = do
@@ -382,10 +379,9 @@ instance Rename HsConDecl where
     rename cd@HsRecDecl { hsConDeclSrcLoc = srcLoc, hsConDeclName = hsName, hsConDeclRecArg = stuff} = do
         withSrcLoc srcLoc $ do
         hsName' <- renameValName hsName
-        subTable <- asks envSubTable
         updateWith (map (toName TypeVal . hsTyVarBindName) (hsConDeclExists cd)) $ do
         es <- rename (hsConDeclExists cd)
-        stuff' <- sequence [ do ns' <- mapM renameName (map (toName FieldLabel) ns); t' <- withSubTable subTable $ rename t; return (ns',t')  |  (ns,t) <- stuff]
+        stuff' <- sequence [ do ns' <- mapM renameName (map (toName FieldLabel) ns); t' <- rename t; return (ns',t')  |  (ns,t) <- stuff]
         return cd { hsConDeclName = hsName', hsConDeclRecArg = stuff', hsConDeclExists = es }
 
 instance Rename HsBangType where
@@ -685,23 +681,21 @@ renameName :: Name -> RM Name
 renameName hsName
     | hsName `elem` [tc_Arrow,dc_Unit,tc_Unit] = return hsName
     | (nt,Just ('@':m),i) <- nameParts hsName = return $ toName nt (Module m, i)
+    | Just _ <- V.fromTupname hsName = return hsName
 renameName hsName = do
-    subTable <- asks envSubTable
+    subTable <- asks envNameMap
     case mlookup hsName subTable of
-        Just name@(getModule -> Just _) -> return name
-        Just _ -> error "renameHsName"
-        Nothing
-            | Just n <- V.fromTupname hsName -> return hsName
-            | otherwise -> do
-                sl <- getSrcLoc
-                et <- asks errorTable
-                let err = case mlookup hsName et of {
-                    Just s -> s;
-                    Nothing -> "Unknown name: " ++ show hsName }
-                warn sl "undefined-name" err
-                -- e <- createError ("Undefined Name: " ++ show hsName)
-                return $ hsName
-                --return (Qual modName name)
+        Just (Right name) -> return name
+        Just (Left err) -> do
+            sl <- getSrcLoc
+            warn sl "undefined-name" err
+            return hsName
+        Nothing -> do
+            sl <- getSrcLoc
+            let err = "Unknown name: " ++ show hsName
+            warn sl "undefined-name" err
+            return hsName
+
 clobberedName :: Name -> RM Name
 clobberedName hsName = do
     unique     <- newUniq
