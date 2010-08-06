@@ -128,3 +128,5 @@ f >=> g     = \x -> f x >>= g
 forever     :: (Monad m) => m a -> m ()
 forever a   = a >> forever a
 
+void :: Monad m => m a -> m ()
+void x = x >> return ()

@@ -297,21 +297,14 @@ product	l = prod l 1 where
     prod []     a = a
     prod (x:xs) a = prod xs (a*x)
 
---sum              =  foldl (+) 0
---product          =  foldl (*) 1
-sum l	= sum' l 0 where
-    sum' []     a = a
-    sum' (x:xs) a = sum' xs (a+x)
-product	l = prod l 1 where
-    prod []     a = a
-    prod (x:xs) a = prod xs (a*x)
-
 sum' l	= rsum l 0 where
     rsum []     a = a
     rsum (x:xs) a = a `seq` rsum xs (a+x)
 
 {-# SPECIALIZE sum' :: [Int] -> Int #-}
 {-# RULES "sum/Int" forall . sum = sum' :: [Int] -> Int #-}
+{-# SPECIALIZE sum' :: [Double] -> Double #-}
+{-# RULES "sum/Double" forall . sum = sum' :: [Double] -> Double #-}
 
 -- maximum and minimum return the maximum or minimum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
@@ -391,5 +384,6 @@ unzip3           =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
 -- {-# RULES "foldr/sequence" forall k z xs . foldr k z (sequence xs) = foldr (\x y -> do rx <- x; ry <- y; return (k rx ry)) (return z) xs #-}
 -- {-# RULES "foldr/mapM" forall k z f xs . foldr k z (mapM f xs) = foldr (\x y -> do rx <- f x; ry <- y; return (k rx ry)) (return z) xs   #-}
 {-# RULES "take/repeat"   forall n x . take n (repeat x) = replicate n x #-}
+
 
 default(Int,Double)
