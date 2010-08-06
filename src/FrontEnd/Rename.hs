@@ -133,19 +133,24 @@ renameDecls mod = do
     withSrcLoc (hsModuleSrcLoc mod) $ do
     addTopLevels mod $ do
     decls' <- renameHsDecls ContextTopLevel (hsModuleDecls mod)
---    mapM_ HsErrors.hsDeclTopLevel decls'
-    --mapM_ checkExportSpec $ fromMaybe [] (hsModuleExports tidy)
+    mapM_ checkExportSpec $ fromMaybe [] (hsModuleExports mod)
     return mod { hsModuleDecls = decls' }
 
 checkExportSpec :: HsExportSpec -> RM ()
 checkExportSpec e = f e  where
-    f (HsEVar n) = do renameValName n; return ()
-    f (HsEAbs n) = do renameTypeName n; return ()
-    f (HsEThingAll n) = do renameTypeName n; return ()
+    f (HsEVar n) = do check [Val] n
+    f (HsEAbs n) = do check [DataConstructor,TypeConstructor,ClassName] n
+    f (HsEThingAll n) = do check [DataConstructor,TypeConstructor,ClassName] n
     f (HsEThingWith n ns) = do
-        renameTypeName n
-        mapM_ renameValName ns
+        check [DataConstructor,TypeConstructor,ClassName] n
+        mapM_ (check [DataConstructor,Val]) ns
     f HsEModuleContents {} = return ()
+    check ts n = do
+        nm <- asks envNameMap
+        let idef = any isJust (map (flip mlookup nm) $ zipWith toName ts (repeat n))
+        unless idef $ do
+            sl <- getSrcLoc
+            warn sl "undefined-name" ("unknown name in export list: " ++ show n)
 
 expandTypeSigs :: [HsDecl] -> [HsDecl]
 expandTypeSigs ds =  (concatMap f ds) where
@@ -265,7 +270,7 @@ instance Rename HsDecl where
     rename (HsClassDecl srcLoc hsQualType hsDecls) = do
         withSrcLoc srcLoc $ do
         hsQualType' <- updateWithN TypeVal hsQualType $ renameClassHead hsQualType
-        --doesClassMakeSense hsQualType'
+        doesClassMakeSense hsQualType'
         hsDecls' <- rename hsDecls
         return (HsClassDecl srcLoc hsQualType' hsDecls')
     rename (HsClassAliasDecl srcLoc name args hsContext hsClasses hsDecls) = do
