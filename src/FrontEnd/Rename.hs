@@ -683,7 +683,7 @@ renameTypeName hsName = renameName (fromTypishHsName hsName)
 renameName :: Name -> RM Name
 -- a few hard coded cases
 renameName hsName
-    | nameName tc_Arrow == hsName = return hsName
+    | hsName `elem` [tc_Arrow,dc_Unit,tc_Unit] = return hsName
     | (nt,Just ('@':m),i) <- nameParts hsName = return $ toName nt (Module m, i)
 renameName hsName = do
     subTable <- asks envSubTable

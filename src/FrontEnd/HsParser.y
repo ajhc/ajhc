@@ -1077,14 +1077,13 @@ dot_name	      = toName UnknownType  "."
 prelude_mod	      = Module "Prelude"
 main_mod	      = Module "Main"
 
-unit_con_name	      = toName DataConstructor "()"
 tuple_con_name i      = toName DataConstructor ("Jhc.Basics","("++replicate i ','++")")
 
-unit_con	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = unit_con_name }
+unit_con	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = dc_Unit }
 tuple_con i	      = HsCon { {-hsExpSrcSpan = bogusSrcSpan,-} hsExpName = (tuple_con_name i) }
 
 
-unit_tycon_name       = unit_con_name
+unit_tycon_name       = tc_Unit
 fun_tycon_name        = tc_Arrow
 list_tycon_name       = toName UnknownType "[]"
 tuple_tycon_name i    = tuple_con_name i
