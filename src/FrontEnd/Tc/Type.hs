@@ -148,43 +148,40 @@ newtype UnVarOpt = UnVarOpt {
 
 {-# SPECIALIZE flattenType :: MonadIO m => Type -> m Type #-}
 flattenType :: (MonadIO m, UnVar t) => t -> m t
-flattenType t =  unVar UnVarOpt { failEmptyMetaVar = False } t
+flattenType t = liftIO $ unVar' t
 
 
 
 class UnVar t where
-    unVar' ::  UnVarOpt -> t -> IO t
-
-unVar :: (UnVar t, MonadIO m) => UnVarOpt -> t -> m t
-unVar opt t = liftIO (unVar' opt t)
+    unVar' ::   t -> IO t
 
 instance UnVar t => UnVar [t] where
-   unVar' opt xs = mapM (unVar' opt) xs
+   unVar' xs = mapM unVar' xs
 
 instance UnVar Pred where
-    unVar' opt (IsIn c t) = IsIn c `liftM` unVar' opt t
-    unVar' opt (IsEq t1 t2) = liftM2 IsEq (unVar' opt t1) (unVar' opt t2)
+    unVar' (IsIn c t) = IsIn c `liftM` unVar' t
+    unVar' (IsEq t1 t2) = liftM2 IsEq (unVar' t1) (unVar' t2)
 
 instance (UnVar a,UnVar b) => UnVar (a,b) where
-    unVar' opt (a,b) = do
-        a <- unVar' opt a
-        b <- unVar' opt b
+    unVar' (a,b) = do
+        a <- unVar' a
+        b <- unVar' b
         return (a,b)
 
 instance UnVar t => UnVar (Qual t) where
-    unVar' opt (ps :=> t) = liftM2 (:=>) (unVar' opt ps) (unVar' opt t)
+    unVar' (ps :=> t) = liftM2 (:=>) (unVar' ps) (unVar' t)
 
 instance UnVar Type where
-    unVar' opt tv =  do
+    unVar' tv =  do
         let ft (TForAll vs qt) = do
-                qt' <- unVar' opt qt
+                qt' <- unVar' qt
                 return $ TForAll vs qt'
             ft (TExists vs qt) = do
-                qt' <- unVar' opt qt
+                qt' <- unVar' qt
                 return $ TExists vs qt'
             ft (TAp (TAp (TCon arr) a1) a2) | tyconName arr == tc_Arrow = ft (TArrow a1 a2)
-            ft t@(TMetaVar _) = if failEmptyMetaVar opt then fail $ "empty meta var" ++ prettyPrintType t else return t
-            ft t = tickleM (unVar' opt . (id :: Type -> Type)) t
+            ft t@(TMetaVar _) = return t
+            ft t = tickleM (unVar' . (id :: Type -> Type)) t
         tv' <- findType tv
         ft tv'
 
@@ -353,10 +350,10 @@ composeCoerce x y = CTCompose x y
 
 
 instance UnVar Type => UnVar CoerceTerm where
-    unVar' opt (CTAp ts) = CTAp `liftM` unVar' opt ts
-    unVar' opt (CTFun ct) = CTFun `liftM` unVar' opt ct
-    unVar' opt (CTCompose c1 c2) = liftM2 CTCompose (unVar' opt c1) (unVar' opt c2)
-    unVar' _ x = return x
+    unVar' (CTAp ts) = CTAp `liftM` unVar' ts
+    unVar' (CTFun ct) = CTFun `liftM` unVar' ct
+    unVar' (CTCompose c1 c2) = liftM2 CTCompose (unVar' c1) (unVar' c2)
+    unVar' x = return x
 
 
 

@@ -51,6 +51,7 @@ module FrontEnd.Tc.Monad(
 import Control.Monad.Error
 import Control.Monad.Reader
 import Control.Monad.Writer.Strict
+import qualified Control.Applicative as T
 import qualified Data.Traversable as T
 import qualified Data.Foldable as T
 import qualified Data.Sequence as Seq
@@ -135,10 +136,11 @@ data TcInfo = TcInfo {
 -- | run a computation with a local environment
 localEnv :: TypeEnv -> Tc a -> Tc a
 localEnv te act = do
-    te' <- mapM (\ (x,y) -> do y <- flattenType y; return (x,y)) (Map.toList te)
-    if any isBoxy (snds te') then
-        fail $ "localEnv error!\n" ++ show te
-     else local (tcMutableEnv_u (Map.fromList te' `Map.union`)) act
+    te' <- T.mapM flattenType te
+    let (cenv,menv) = Map.partition (Set.null . freeMetaVars) te'
+    --if any isBoxy (Map.elems te') then
+    --    fail $ "localEnv error!\n" ++ show te
+    local (tcConcreteEnv_u (cenv `Map.union`) . tcMutableEnv_u ((menv `Map.union`) . Map.filterWithKey (\k _ -> k `Map.notMember` cenv))) act
 
 -- | add to the collected environment which will be used to annotate uses of variables with their instantiated types.
 -- should contain @-aliases for each use of a polymorphic variable or pattern match.
