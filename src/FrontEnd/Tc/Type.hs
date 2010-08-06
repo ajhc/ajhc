@@ -142,14 +142,13 @@ extractBox t = fail $ "not a metaTyVar:" ++ show t
 
 
 
-data UnVarOpt = UnVarOpt {
-    openBoxes :: {-# UNPACK #-} !Bool,
-    failEmptyMetaVar :: {-# UNPACK #-} !Bool
+newtype UnVarOpt = UnVarOpt {
+    failEmptyMetaVar :: Bool
     }
 
 {-# SPECIALIZE flattenType :: MonadIO m => Type -> m Type #-}
 flattenType :: (MonadIO m, UnVar t) => t -> m t
-flattenType t =  unVar UnVarOpt { openBoxes = True, failEmptyMetaVar = False } t
+flattenType t =  unVar UnVarOpt { failEmptyMetaVar = False } t
 
 
 
@@ -228,7 +227,6 @@ readMetaVar MetaVar { metaRef = r }  = liftIO $ do
 freeMetaVars :: Type -> S.Set MetaVar
 freeMetaVars (TMetaVar mv) = S.singleton mv
 freeMetaVars t = tickleCollect freeMetaVars t
--}
 freeMetaVars :: Type -> S.Set MetaVar
 freeMetaVars t = worker t S.empty
     where worker :: Type -> (S.Set MetaVar -> S.Set MetaVar)
@@ -242,6 +240,19 @@ freeMetaVars t = worker t S.empty
           worker2 :: Pred -> (S.Set MetaVar -> S.Set MetaVar)
           worker2 (IsIn c t) = worker t
           worker2 (IsEq t1 t2) = worker t1 . worker t2
+-}
+
+freeMetaVars :: Type -> S.Set MetaVar
+freeMetaVars t = f t where
+    f (TMetaVar mv) = S.singleton mv
+    f (TAp l r) = f l `S.union` f r
+    f (TArrow l r) = f l `S.union` f r
+    f (TAssoc c cas eas) = S.unions (map f cas ++ map f eas)
+    f (TForAll ta (ps :=> t)) = S.unions (f t:map f2 ps)
+    f (TExists ta (ps :=> t)) = S.unions (f t:map f2 ps)
+    f _ = S.empty
+    f2 (IsIn c t) = f t
+    f2 (IsEq t1 t2) = f t1 `S.union` f t2
 
 
 instance FreeVars Type [Tyvar] where

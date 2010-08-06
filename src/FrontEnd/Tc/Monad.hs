@@ -98,7 +98,8 @@ data TcEnv = TcEnv {
     tcVarnum            :: {-# UNPACK #-} !(IORef Int),
     tcCollectedEnv      :: {-# UNPACK #-} !(IORef (Map.Map Name Sigma)),
     tcCollectedCoerce   :: {-# UNPACK #-} !(IORef (Map.Map Name CoerceTerm)),
-    tcCurrentEnv        :: Map.Map Name Sigma,
+    tcConcreteEnv       :: Map.Map Name Sigma,
+    tcMutableEnv        :: Map.Map Name Sigma,
     tcCurrentScope      :: Set.Set MetaVar,
     tcRecursiveCalls    :: Set.Set Name,
     tcInstanceEnv       :: InstanceEnv,
@@ -107,12 +108,12 @@ data TcEnv = TcEnv {
    {-! derive: update !-}
 
 data Output = Output {
-    collectedPreds   :: Preds,
-    existentialPreds :: Preds,
-    constraints      :: Seq.Seq Constraint,
-    checkedRules     :: Seq.Seq Rule,
+    collectedPreds   :: !Preds,
+    existentialPreds :: !Preds,
+    constraints      :: !(Seq.Seq Constraint),
+    checkedRules     :: !(Seq.Seq Rule),
     existentialVars  :: [Tyvar],
-    tcWarnings       :: Seq.Seq Warning,
+    tcWarnings       :: !(Seq.Seq Warning),
     outKnots         :: [(Name,Name)]
     }
    {-! derive: update, Monoid !-}
@@ -137,7 +138,7 @@ localEnv te act = do
     te' <- mapM (\ (x,y) -> do y <- flattenType y; return (x,y)) (Map.toList te)
     if any isBoxy (snds te') then
         fail $ "localEnv error!\n" ++ show te
-     else local (tcCurrentEnv_u (Map.fromList te' `Map.union`)) act
+     else local (tcMutableEnv_u (Map.fromList te' `Map.union`)) act
 
 -- | add to the collected environment which will be used to annotate uses of variables with their instantiated types.
 -- should contain @-aliases for each use of a polymorphic variable or pattern match.
@@ -177,7 +178,8 @@ runTc tcInfo  (Tc tim) = do
     (a,out) <- runWriterT $ runReaderT tim TcEnv {
         tcCollectedEnv = ce,
         tcCollectedCoerce = cc,
-        tcCurrentEnv = tcInfoEnv tcInfo `mappend` tcInfoSigEnv tcInfo,
+        tcConcreteEnv = tcInfoEnv tcInfo `mappend` tcInfoSigEnv tcInfo,
+        tcMutableEnv = mempty,
         tcVarnum = vn,
         tcDiagnostics = [Msg Nothing $ "Compilation of module: " ++ tcInfoModName tcInfo],
         tcInfo = tcInfo,
@@ -221,10 +223,14 @@ getModName :: Tc String
 getModName = asks ( tcInfoModName . tcInfo)
 
 
+askCurrentEnv = do
+    env1 <- asks tcConcreteEnv
+    env2 <- asks tcMutableEnv
+    return (env2 `Map.union` env1)
 
 dConScheme :: Name -> Tc Sigma
 dConScheme conName = do
-    env <- asks tcCurrentEnv
+    env <- askCurrentEnv
     case Map.lookup conName env of
         Just s -> return s
         Nothing -> error $ "dConScheme: constructor not found: " ++ show conName ++
@@ -251,7 +257,7 @@ unificationError t1 t2 = do
 
 lookupName :: Name -> Tc Sigma
 lookupName n = do
-    env <- asks tcCurrentEnv
+    env <- askCurrentEnv
     case Map.lookup n env of
         Just x -> freshSigma x
         Nothing | Just 0 <- fromUnboxedNameTuple n  -> do
@@ -389,7 +395,7 @@ boxySpec (TForAll as qt@(ps :=> t)) = do
 
 freeMetaVarsEnv :: Tc (Set.Set MetaVar)
 freeMetaVarsEnv = do
-    env <- asks tcCurrentEnv
+    env <- asks tcMutableEnv
     xs <- flip mapM (Map.elems env)  $ \ x -> do
         x <- flattenType x
         return $ freeMetaVars x
