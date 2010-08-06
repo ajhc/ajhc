@@ -2,10 +2,6 @@ module FrontEnd.Tc.Module (tiModules,TiData(..)) where
 
 import Char
 import Control.Monad.Writer
-import IO
-import List
-import Maybe
-import Monad
 import Text.PrettyPrint.HughesPJ as PPrint
 import qualified Data.Map as Map
 import qualified Data.Set as Set

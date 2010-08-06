@@ -45,13 +45,19 @@ instance Monoid FieldMap where
 
 type SubTable = Map.Map HsName HsName
 
-data ScopeState = ScopeState {
-    unique         :: {-# UNPACK #-} !Int,
-    errorTable     :: Map.Map HsName String
+newtype ScopeState = ScopeState {
+    unique         :: Int
     }
+
+data Context
+    = ContextTopLevel
+    | ContextInstance Name
+    | ContextLocal
+    deriving(Eq)
 
 data Env = Env {
     envSubTable    :: Map.Map HsName HsName,
+    errorTable     :: Map.Map HsName String,
     envModule      :: Module,
     envNameMap     :: Map.Map Name (Either String Name),
     envOptions     :: Opt,
@@ -73,10 +79,21 @@ addTopLevels  hsmod action = do
             | otherwise = let nn = toUnqualified hsName in (nn,hsName):(hsName,hsName):r
         f r z@(getModule -> Nothing) = let nn = qualifyName mod z in (z,nn):(nn,nn):r
         z ns = mapM mult (filter (\x -> length x > 1) $ groupBy (\a b -> fst a == fst b) (sort ns))
-        mult xs@(~((n,sl):_)) = warn sl "multiply-defined" (show n ++ " is defined multiple times: " ++ show xs )
-    --z cdefs
+        mult xs@(~((n,sl):_)) = warn sl "multiply-defined" (show n ++ " is defined multiple times: " ++ show xs)
+    z cdefs
     withSubTable (fromList nmap) action
 
+createSelectors sloc ds = mapM g ns where
+    ds' :: [(HsName,[(HsName,HsBangType)])]
+    ds' = [ (c,[(n,t) | (ns,t) <- rs , n <- ns ]) | HsRecDecl { hsConDeclName = c, hsConDeclRecArg = rs } <- ds ]
+    ns = sortGroupUnderF fst $ concatMap f ds' -- [  | (c,nts) <- ds' ]
+    f (c,nts) = [ (n,(c,i,length nts)) | (n,_) <- nts | i <- [0..]]
+    g (n,cs) = do
+        var <- clobberedName (toName Val "_sel")
+        let f (_,(c,i,l)) = HsMatch sloc n [pat c i l] (HsUnGuardedRhs (HsVar var)) []
+            pat c i l = HsPApp c [ if p == i then HsPVar var else HsPWildCard | p <- [0 .. l - 1]]
+            els = HsMatch sloc n [HsPWildCard] (HsUnGuardedRhs HsError { hsExpSrcLoc = sloc, hsExpString = show n, hsExpErrorType = HsErrorFieldSelect } ) []
+        return $ HsFunBind (map f cs ++ [els]) where
 
 ambig x ys = "Ambiguous Name: " ++ show x ++ "\nCould refer to: " ++ tupled (map show ys)
 
@@ -91,12 +108,10 @@ runRename doit opt mod fls ns m = mapM_ addWarning errors >> return renamedMod w
 
     errorTab =  fromList [ (x,ambig x ys) | ((typ,x),ys@(_:_:_)) <- ns' ]
 
-    startState = ScopeState {
-        unique         = 1,
-        errorTable     = errorTab
-        }
+    startState = ScopeState { unique = 1 }
     startEnv = Env {
         envSubTable    = subTable,
+        errorTable     = errorTab,
         envModule      = mod,
         envNameMap     = nameMap,
         envOptions     = opt,
@@ -120,8 +135,8 @@ renameDecls :: HsModule -> RM HsModule
 renameDecls mod = do
     withSrcLoc (hsModuleSrcLoc mod) $ do
     addTopLevels mod $ do
-    decls' <- rename (hsModuleDecls mod)
-    mapM_ HsErrors.hsDeclTopLevel decls'
+    decls' <- renameHsDecls ContextTopLevel (hsModuleDecls mod)
+--    mapM_ HsErrors.hsDeclTopLevel decls'
     --mapM_ checkExportSpec $ fromMaybe [] (hsModuleExports tidy)
     return mod { hsModuleDecls = decls' }
 
@@ -178,6 +193,19 @@ qualifyInstMethod moduleName decl = case decl of
             (\(m@HsMatch { .. }) -> m { hsMatchName = qualifyMethodName moduleName hsMatchName })
             matches
     _ -> decl
+
+renameHsDecls :: Context -> [HsDecl] -> RM [HsDecl]
+renameHsDecls c ds = f ds where
+    f (d:ds) = do
+        d' <- rename d
+        when (c == ContextTopLevel) $ HsErrors.hsDeclTopLevel d'
+        eds <- g d'
+        ds' <- f ds
+        return $ d':eds ++ ds'
+    f [] = return []
+    g HsDataDecl { hsDeclSrcLoc = sloc, hsDeclCons = cs } = createSelectors sloc cs
+    g HsNewTypeDecl { hsDeclSrcLoc = sloc, hsDeclCon = c } = createSelectors sloc [c]
+    g _ = return []
 
 instance Rename HsDecl where
     rename (HsPatBind srcLoc hsPat hsRhs {-where-} hsDecls) = do
@@ -546,7 +574,7 @@ instance Rename HsExp where
             return e
     rename p = traverseHsExp rename p
 
-desugarEnum s as = foldl HsApp (HsVar (nameName $ toName Val s)) as
+desugarEnum s as = foldl HsApp (HsVar (toName Val s)) as
 
 createError et s = do
     sl <- getSrcLoc
@@ -642,50 +670,47 @@ instance Rename HsFieldUpdate where
         hsExp' <- rename hsExp
         return (HsFieldUpdate hsName' hsExp')
 
---instance Rename HsName where
---    rename n = do
---        subTable <- asks envSubTable
---        renameHsName n subTable
 renameValName :: HsName -> RM HsName
 renameValName hsName = renameName (fromValishHsName hsName)
 
 renameTypeName :: HsName -> RM HsName
 renameTypeName hsName = renameName (fromTypishHsName hsName)
 
-renameName :: Name -> RM Name
-renameName n = do
-    st <- asks envSubTable
-    renameHsName n st
 
 -- This looks up a replacement name in the subtable.
 -- Regardless of whether the name is found, if it's not qualified
 -- it will be qualified with the current module's prefix.
-renameHsName :: HsName -> SubTable -> RM (HsName)
-renameHsName hsName subTable
+renameName :: Name -> RM Name
+-- a few hard coded cases
+renameName hsName
     | nameName tc_Arrow == hsName = return hsName
-    -- | Qual (Module ('@':m)) (HsIdent i) <- hsName = return $ Qual (Module m) (HsIdent i)
     | (nt,Just ('@':m),i) <- nameParts hsName = return $ toName nt (Module m, i)
-renameHsName hsName subTable = case mlookup hsName subTable of
-    Just name@(getModule -> Just _) -> return name
-    Just _ -> error "renameHsName"
-    Nothing
-        | Just n <- V.fromTupname hsName -> return hsName
-        | otherwise -> do
-            sl <- getSrcLoc
-            et <- gets errorTable
-            let err = case mlookup hsName et of {
-                Just s -> s;
-                Nothing -> "Unknown name: " ++ show hsName }
-            warn sl "undefined-name" err
-            -- e <- createError ("Undefined Name: " ++ show hsName)
-            return $ hsName
-            --return (Qual modName name)
+renameName hsName = do
+    subTable <- asks envSubTable
+    case mlookup hsName subTable of
+        Just name@(getModule -> Just _) -> return name
+        Just _ -> error "renameHsName"
+        Nothing
+            | Just n <- V.fromTupname hsName -> return hsName
+            | otherwise -> do
+                sl <- getSrcLoc
+                et <- asks errorTable
+                let err = case mlookup hsName et of {
+                    Just s -> s;
+                    Nothing -> "Unknown name: " ++ show hsName }
+                warn sl "undefined-name" err
+                -- e <- createError ("Undefined Name: " ++ show hsName)
+                return $ hsName
+                --return (Qual modName name)
+clobberedName :: Name -> RM Name
+clobberedName hsName = do
+    unique     <- newUniq
+    currModule <- getCurrentModule
+    return $ renameAndQualify hsName unique currModule
 
 clobberName :: HsName -> RM SubTable
 clobberName hsName = do
-    unique     <- newUniq
-    currModule <- getCurrentModule
-    let hsName' = renameAndQualify hsName unique currModule
+    hsName' <- clobberedName hsName
     return $ msingleton hsName hsName'
 
 renameAndQualify :: HsName -> Int -> Module -> HsName
@@ -750,7 +775,7 @@ collectDefsHsModule m = (\ (x,y) -> (Seq.toList x,Seq.toList y)) $ execWriter (m
     tellName sl n = tellF [(n,sl,[])]
     tellF xs = tell (Seq.fromList xs,Seq.empty) >> return ()
     tellS xs = tell (Seq.empty,Seq.fromList xs) >> return ()
-    f (HsForeignDecl a _ n _)  = tellName a (toName Val n)
+    f (HsForeignDecl a _ n _)    = tellName a (toName Val n)
     f (HsForeignExport a e _ _)  = tellName a (ffiExportName e)
     f (HsFunBind [])  = return ()
     f (HsFunBind (HsMatch a n _ _ _:_))  = tellName a (toName Val n)

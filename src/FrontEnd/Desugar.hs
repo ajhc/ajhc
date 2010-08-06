@@ -93,33 +93,11 @@ desugarDecl (HsInstDecl sloc qualtype decls) = do
     newDecls <- mapM desugarDecl decls
     return [HsInstDecl sloc qualtype (concat newDecls)]
 
-desugarDecl dl@HsDataDecl { hsDeclSrcLoc = sloc, hsDeclName =  name, hsDeclArgs = args, hsDeclCons = condecls, hsDeclDerives = derives } = do
-        ss <- createSelectors sloc condecls
-        return $ dl:ss
-
-desugarDecl dl@(HsNewTypeDecl sloc cntxt name args condecl derives) = do
-        ss <- createSelectors sloc [condecl]
-        return $ dl:ss
 
 -- XXX we currently discard instance specializations
 desugarDecl HsPragmaSpecialize { hsDeclName = n } | n == u_instance = return []
 
 desugarDecl anyOtherDecl = return [anyOtherDecl]
-
-createSelectors _sloc ds = ans where
-    ds' :: [(HsName,[(HsName,HsBangType)])]
-    ds' = [ (c,[(n,t) | (ns,t) <- rs , n <- ns ]) | HsRecDecl { hsConDeclName = c, hsConDeclRecArg = rs } <- ds ]
-    ns = sortGroupUnderF fst $ concatMap f ds' -- [  | (c,nts) <- ds' ]
-    f ::  (HsName,[(HsName,HsBangType)]) -> [ (HsName, (HsName,Int,Int)) ]
-    f (c,nts) = [ (n,(c,i,length nts)) | (n,_) <- nts | i <- [0..]]
-    ans = return $  map g ns
-    g (n,cs) = HsFunBind (map f cs ++ [els]) where
-        f (_,(c,i,l)) = HsMatch _sloc n [pat c i l] (HsUnGuardedRhs (HsVar var)) []
-        pat c i l = HsPApp c [ if p == i then HsPVar var else HsPWildCard | p <- [0 .. l - 1]]
-        els = HsMatch _sloc n [HsPWildCard] (HsUnGuardedRhs HsError { hsExpSrcLoc = _sloc, hsExpString = show n, hsExpErrorType = HsErrorFieldSelect } ) []
-    var = nameName $ toName Val "x"
-
-
 
 
 desugarMatch :: (HsMatch) -> PatSM (HsMatch)
