@@ -12,7 +12,6 @@ module E.SSimplify(
 
 import Util.RWS
 import Control.Monad.Identity
-import Control.Monad.Writer
 import Control.Monad.Reader
 import Data.Typeable
 import Data.Monoid

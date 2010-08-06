@@ -6,7 +6,6 @@ import Control.Exception
 import Control.Monad.Identity
 import Control.Monad.State
 import Control.Monad.Writer
-import Data.Monoid
 import System.Mem
 import qualified Data.Map as Map
 import qualified Data.Set as Set
