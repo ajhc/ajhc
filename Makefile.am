@@ -54,7 +54,7 @@ GHCLANG= -XViewPatterns -XUndecidableInstances -XOverlappingInstances -fglasgow-
 GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
 JHC_LIBS =  jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-foreign-1.0.hl
-
+#             jhc-prim-0.7.0.hl 
 
 EXTRA_DIST = src/data src/rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
              lib/jhc lib/base lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS)  \
@@ -216,18 +216,16 @@ CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS)
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST) --noauto -L- -L. # --deps tmp/$@.yaml
 
 
+jhc-prim-0.7.0.hl: lib/jhc-prim/jhc-prim.cabal
+	./jhc $(LIB_OPTIONS) -N -ilib/jhc-prim --build-hl $< -o $@
 jhc-1.0.hl: lib/jhc/jhc.cabal
 	./jhc $(LIB_OPTIONS) -N -ilib/jhc --build-hl $< -o $@
-
 base-1.0.hl: lib/base/base.cabal jhc-1.0.hl
 	./jhc $(LIB_OPTIONS) -ilib/base -pjhc --build-hl $< -o $@
-
 applicative-1.0.hl: lib/applicative/applicative.cabal base-1.0.hl
 	./jhc $(LIB_OPTIONS) -ilib/applicative -pbase --build-hl $< -o $@
-
 haskell98-1.0.hl: lib/haskell98/haskell98.cabal base-1.0.hl
 	./jhc $(LIB_OPTIONS) -ilib/haskell98 -pjhc -pbase --build-hl $< -o $@
-
 flat-foreign-1.0.hl: lib/flat-foreign/flat-foreign.cabal base-1.0.hl
 	./jhc $(LIB_OPTIONS) -ilib/flat-foreign -pjhc -pbase --build-hl $< -o $@
 

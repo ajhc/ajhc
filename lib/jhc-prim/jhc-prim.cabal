@@ -1,0 +1,9 @@
+Name: jhc-prim
+Version: 1.0
+
+Exposed-Modules:
+        Jhc.Prim.Bits
+        Jhc.Prim.Words
+        Jhc.Prim.IO
+        Jhc.Prim
+
