@@ -1026,11 +1026,12 @@ stat_unsafeCoerce = toAtom "E.Simplify.unsafeCoerce"
 -----------------------
 
 data SmState = SmState {
+    idsSeed :: {-# UNPACK #-} !Int,
     idsUsed :: !IdSet,
     idsBound :: !IdSet
     }
 
-smState = SmState { idsUsed = mempty, idsBound = mempty }
+smState = SmState { idsSeed = 1, idsUsed = mempty, idsBound = mempty }
 
 newtype SM a = SM (RWS Env Stats.Stat SmState a)
     deriving(Monad,Functor,MonadReader Env, MonadState SmState)
@@ -1073,8 +1074,10 @@ instance NameMonad Id SM where
         putIds (insert nn used, insert nn bound)
         return nn
     newName  = do
-        (used,bound) <- getIds
-        newNameFrom $ candidateIds (size used + 10000*size bound)
+        seed <- gets idsSeed
+        modify (\e -> e { idsSeed = seed + 1 })
+--        (used,bound) <- getIds
+        newNameFrom $ candidateIds seed -- (size used + 10000*size bound)
 
 smUsedNames = SM $ gets idsUsed
 smBoundNames = SM $ gets idsBound

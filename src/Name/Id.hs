@@ -38,6 +38,7 @@ import Control.Monad.State
 import Data.Bits
 import Data.Foldable
 import Data.Int
+import Data.Word
 import Data.Monoid
 import Data.Traversable
 import Data.Typeable
@@ -215,7 +216,7 @@ instance Monad m => NameMonad Id (IdNameT m) where
         return nn
     newName  = IdNameT $ do
         (used,bound) <- get
-        fromIdNameT $ newNameFrom (candidateIds (size used `xor` size bound))
+        fromIdNameT $ newNameFrom (candidateIds (size used `xor` 128 * size bound))
 
 addNamesIdSet nset = IdNameT $ do
     modify (\ (used,bound) -> (nset `union` used, bound) )
@@ -285,10 +286,20 @@ newId seed check = head $ filter check (candidateIds seed)
 
 -- generate a list of candidate anonymous ids based on a seed value
 candidateIds :: Int -> [Id]
-candidateIds seed = map mask $ randoms (mkStdGen seed) where
-    mask x = Id $ x .&. 0x0FFFFFFE
+candidateIds !seed = f (2 + (mask $ hashInt seed)) where
+    mask x = x .&. 0x0FFFFFFE
+    f !x = Id x:f (x + 2)
     --mask x = trace ("candidate " ++ show seed) $ Id $ x .&. 0x0FFFFFFE
 
+hashInt :: Int -> Int
+hashInt x = fromIntegral $ f (fromIntegral x) where
+    f :: Word -> Word
+    f a = a''''' where
+        !a' = (a `xor` 61) `xor` (a `shiftR` 16)
+        !a'' = a' + (a' `shiftL` 3)
+        !a''' = a'' `xor` (a'' `shiftR` 4)
+        !a'''' = a''' * 0x27d4eb2d
+        !a''''' = a'''' `xor` (a'''' `shiftR` 15)
 
 toId :: Name -> Id
 toId x = Id $ fromAtom (toAtom x)
