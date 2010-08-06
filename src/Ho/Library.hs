@@ -18,7 +18,6 @@ import Data.Maybe
 import Data.Monoid
 import Data.Version
 import System.Directory
-import System.IO
 import Text.Printf
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -101,7 +100,7 @@ listLibraries :: IO ()
 listLibraries = do
     (_,byhashes) <- fetchAllLibraries
     let libs = Map.toList byhashes
-    if not verbose then putStr $ showYAML (map (libName . snd) libs) else do
+    if not verbose then putStr $ showYAML (sort $ map (libName . snd) libs) else do
     let f (h,l) = (show h,[
             ("Name",toNode (libName l)),
             ("BaseName",toNode (libBaseName l)),

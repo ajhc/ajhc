@@ -18,6 +18,7 @@ import FrontEnd.SrcLoc
 import FrontEnd.HsSyn
 import Name.Name as Name
 import Options
+import Util.SetLike as SL
 import Util.Relation as R
 import FrontEnd.Warning
 
@@ -68,7 +69,7 @@ determineExports defs ae ms = do
 determineExports' :: [(Name,[Name])] -> [(Module,[Name])] -> [ModInfo] -> IO [ModInfo]
 determineExports' owns doneMods todoMods = mdo
     rs <- solve Nothing  mempty [ x |(_,_,x) <- ms]
-    let lf m = maybe (fail $ "determineExports'.lf: " ++ show m) return $  Map.lookup m  $ dmodMap `mappend` Map.fromList [ (modInfoName x,Set.fromList [(toUnqualified x,x) | x <- modInfoExport x]) |  x  <- xs]
+    let lf m = maybe (fail $ "determineExports'.lf: " ++ show m) return $  Map.lookup m  $ dmodMap `mappend` Map.fromList [ (modInfoName x,fromList [(toUnqualified x,x) | x <- modInfoExport x]) |  x  <- xs]
     let g  (mi,ne) = do
             ne' <- ce mi ne
             return mi { modInfoExport = ne', modInfoImport = toRelationList $ runIdentity $  getImports mi lf  }
@@ -76,7 +77,7 @@ determineExports' owns doneMods todoMods = mdo
     return xs
     where
     ms = [ (i,mi, getExports mi le ) | mi <- todoMods | i <- [0..]]
-    dmodMap = Map.fromList  [ ( x,Set.fromList [(toUnqualified n,n) | n <- xs]) |  (x,xs) <- doneMods ]
+    dmodMap = Map.fromList  [ ( x,fromList [(toUnqualified n,n) | n <- xs]) |  (x,xs) <- doneMods ]
     modMap = fmap return dmodMap `mappend` (Map.fromList [ (modInfoName n,getVal i) | (i,n,_) <- ms])
     ownsMap = Map.fromList owns
     le m = runIdentity $ maybe (fail $ "determineExports'.le: " ++ show m) return $ Map.lookup m modMap
@@ -89,11 +90,11 @@ determineExports' owns doneMods todoMods = mdo
     getExports mi@ModInfo { modInfoHsModule = m@HsModule { hsModuleExports = Nothing } } _ = return $ defsToRel (modInfoDefs mi)
     getExports mi le | HsModule { hsModuleExports = Just es } <- modInfoHsModule mi = do
         is <- getImports mi le
-        let f (HsEModuleContents m) = mapDomain g unqs `R.intersection` qs where
+        let f (HsEModuleContents m) = mapDomain g unqs `intersection` qs where
                 (qs,unqs) = partitionDomain (isJust . getModule ) is
                 g x = Name.qualifyName m x
             f z = entSpec False is z
-        return $ mapDomain toUnqualified (R.unions $ map f es)
+        return $ mapDomain toUnqualified (unions $ map f es)
 
     -- | determine what is visible in a module
     getImports :: Monad m => ModInfo -> (Module -> m (Rel Name Name)) -> m (Rel Name Name)
@@ -105,29 +106,30 @@ determineExports' owns doneMods todoMods = mdo
                 Nothing -> return es -- return $ (mapDomain ((Name.qualifyName as)) es `mappend` if hsImportDeclQualified x then mempty else es)
                 Just (isHiding,xs) -> do
                     let listed = mconcat $ map (entSpec isHiding es . importToExport) xs
-                    return $ if isHiding then es Set.\\ listed else listed
+                    return $ if isHiding then es SL.\\ listed else listed
             return $ (mapDomain ((Name.qualifyName as)) es' `mappend` if hsImportDeclQualified x then mempty else es')
         is = modInfoModImports mi
-        ls = R.fromList $  concat [ [(toUnqualified z,z),(z,z)]| (z, _, _) <- modInfoDefs mi]
+        ls = fromList $  concat [ [(toUnqualified z,z),(z,z)]| (z, _, _) <- modInfoDefs mi]
 
     entSpec ::
         Bool     -- ^ is it a hiding import?
         -> Rel Name Name  -- ^ the original relation
         -> HsExportSpec   -- ^ the specification
         -> Rel Name Name  -- ^ the subset satisfying the specification
-    entSpec isHiding rel (HsEVar n) = restrictDomain (== toName Val n) rel
-    entSpec isHiding rel (HsEAbs n) = restrictDomain (`elem` [ toName x n | x <- ts]) rel  where
+    entSpec isHiding rel (HsEVar n) = restrictDomainS (toName Val n) rel
+    entSpec isHiding rel (HsEAbs n) = restrictDomainSet (Set.fromList [ toName x n | x <- ts]) rel  where
         ts = TypeConstructor:ClassName:if isHiding then [DataConstructor] else []
-    entSpec isHiding rel (HsEThingWith n xs) = restrictDomain (\x -> x `elem` concat (ct:(map (cd) xs)))  rel where
+    entSpec isHiding rel (HsEThingWith n xs) = restrictDomainSet (fromList (concat (ct:(map cd xs)))) rel where
         ct = [toName TypeConstructor n, toName ClassName n]
         cd n =  [toName DataConstructor n, toName Val n, toName FieldLabel n ]
-    entSpec isHiding rel (HsEThingAll n) = restrictDomain (`elem` ct ) rel `mappend` restrictRange (`elem` ss) rel where
+    entSpec isHiding rel (HsEThingAll n) = rdl `mappend` restrictRange (`elem` ss) rel where
         ct = [toName TypeConstructor n, toName ClassName n]
-        ss = concat $ concat [ maybeToList (Map.lookup x ownsMap) | x <- Set.toList $ range (restrictDomain (`elem` ct) rel)]
-        cd n =  [toName DataConstructor n, toName Val n, toName FieldLabel n ]
+        ss = concat $ concat [ maybeToList (Map.lookup x ownsMap) | x <- Set.toList $ range rdl ]
+        cd n =  [toName DataConstructor n, toName Val n, toName FieldLabel n ]               
+        rdl = (restrictDomain (`elem` ct) rel)
 
 
-defsToRel xs = R.fromList $ map f xs where
+defsToRel xs = fromList $ map f xs where
     f (n,_,_) = (toUnqualified n,n)
 
 importToExport :: HsImportSpec -> HsExportSpec
