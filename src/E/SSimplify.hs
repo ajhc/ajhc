@@ -327,11 +327,11 @@ data Forced = ForceInline | ForceNoinline | NotForced
 data Binding =
     NotAmong [Name]
     | IsBoundTo {
-        bindingOccurance :: Occurance,
+        bindingOccurance :: {-# UNPACK #-} !Occurance,
         bindingE :: OutE,
-        bindingCheap :: Bool,
-        inlineForced :: Forced,
-        bindingAtomic :: Bool
+        bindingCheap :: {-# UNPACK #-} !Bool,
+        inlineForced :: {-# UNPACK #-} !Forced,
+        bindingAtomic :: {-# UNPACK #-} !Bool
         }
     | NotKnown
     deriving(Ord,Eq)
