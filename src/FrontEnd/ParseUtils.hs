@@ -42,6 +42,7 @@ import qualified Data.Traversable as T
 
 import C.FFI
 import Name.Name
+import Name.Names
 import FrontEnd.ParseMonad
 import FrontEnd.SrcLoc
 import FrontEnd.HsSyn
@@ -73,7 +74,7 @@ qualTypeToClassHead qt = do
         _ -> fail "Invalid Class Head"
 
 checkContext :: HsType -> P HsContext
-checkContext (HsTyCon (nameParts -> (_,Nothing,"()"))) = return []
+checkContext (HsTyCon (toName TypeConstructor -> name)) | name == tc_Unit = return []
 checkContext (HsTyTuple ts) =
 	mapM checkAssertion ts
 checkContext t = do
