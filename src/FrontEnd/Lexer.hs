@@ -20,8 +20,9 @@
 module FrontEnd.Lexer (Token(..), lexer) where
 
 
-import Char
+import Data.Char hiding(isSymbol)
 import Data.Ratio
+import qualified Data.Char
 import qualified Data.Map as Map
 
 import FrontEnd.ParseMonad
@@ -199,9 +200,11 @@ special_varids = [
  ( "hiding", 	KW_Hiding )
  ]
 
-isIdent, isSymbol :: Char -> Bool
+isIdent :: Char -> Bool
 isIdent  c = isAlpha c || isDigit c || c == '\'' || c == '_'
-isSymbol c = elem c ":!#$%&*+./<=>?@\\^|-~"
+
+isSymbol :: Char -> Bool
+isSymbol c = elem c ":!#$%&*+./<=>?@\\^|-~" || (not (isAscii c) && Data.Char.isSymbol c)
 
 matchChar :: Char -> String -> Lex a ()
 matchChar c msg = do
@@ -375,7 +378,7 @@ lexToken = do
 
 	    | isUpper c -> lexConIdOrQual ""
 
-	    | isLower c || c == '_' -> do
+	    | isLower c || c == '_' || generalCategory c == OtherLetter -> do
 		ident <- lexWhile isIdent
 		case lookup ident (reserved_ids ++ special_varids) of
                         Just KW_Foreign
