@@ -26,6 +26,7 @@ has the following dependencies:
  * haskell library [utf8-string](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/utf8-string)
  * haskell library [readline](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/readline)
  * haskell library [fgl](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/fgl)
+ * haskell library [regex-compat](http://hackage.haskell.org/cgi-bin/hackage-scripts/package/regex-compat)
 
 You can get the tarball
 at <http://repetae.net/dist/@PACKAGE@-@VERSION@.tar.gz>. In order
