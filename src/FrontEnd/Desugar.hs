@@ -1,4 +1,4 @@
--- various desugaring routines
+    -- various desugaring routines
 --
 -- The general desugaring routine creates selectors for data
 -- constructors with named fields, changes all pattern bindings
@@ -9,7 +9,6 @@ module FrontEnd.Desugar (doToExp, listCompToExp, desugarHsModule, desugarHsStmt)
 
 import Control.Monad.State
 
-import GenUtil
 import FrontEnd.HsSyn
 import Name.Name
 import Name.Names
@@ -155,7 +154,7 @@ desugarRhs  = traverseHsRhsHsExp desugarExp
 
 desugarExp :: (HsExp) -> PatSM (HsExp)
 desugarExp (HsLambda sloc pats e)
-    | all isLazyPat pats && not (any isHsPIrrPat pats) = do
+    | all isSimplePat pats  = do
         newE <- desugarExp e
         return (HsLambda sloc pats newE)
 desugarExp (HsLambda sloc pats e) = z where
@@ -226,7 +225,7 @@ doToExp newName f_bind f_bind_ f_fail ss = hsParen `liftM` f ss where
     f (HsQualifier e:ss) = do
         ss <- f ss
         return $ HsInfixApp (hsParen e) (HsVar f_bind_) (hsParen ss)
-    f ((HsGenerator _srcLoc pat e):ss) | isLazyPat pat = do
+    f ((HsGenerator _srcLoc pat e):ss) | isSimplePat pat = do
         ss <- f ss
         return $ HsInfixApp (hsParen e) (HsVar f_bind) (HsLambda _srcLoc [pat] ss)
     f ((HsGenerator srcLoc pat e):ss) = do
@@ -287,17 +286,25 @@ listCompToExp newName exp ss = hsParen `liftM` f ss where
     app x y = HsApp x (hsParen y)
 
 -- patterns are
--- failable - may fail to match
+-- failable - strict and may fail to match
 -- refutable or strict - may bottom out
 -- irrefutable or lazy - match no matter what
+-- simple, a wildcard or variable
 -- failable is a subset of refutable
 
 
 isFailablePat p | isStrictPat p = f (openPat p) where
     f (HsPTuple ps) = any isFailablePat ps
     f (HsPUnboxedTuple ps) = any isFailablePat ps
+    f (HsPBangPat (Located _ p)) = isFailablePat p
     f _ = True
 isFailablePat _ = False
+
+isSimplePat p = f (openPat p) where
+    f HsPVar {} = True
+    f HsPWildCard = True
+    f _ = False
+
 
 isLazyPat pat = not (isStrictPat pat)
 isStrictPat p = f (openPat p) where
