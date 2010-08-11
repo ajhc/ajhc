@@ -197,6 +197,7 @@ sub do_it {
         } elsif ($fn =~ /^([^_].*)\.l?hs$/) {
             my $ln = $1;
             my $y = combine_yaml($y, $yc->{tests}{$ln});
+            next if defined $y->{skip};
             my $must_fail = (0 + $y->{jhc_exit_code}) != 0;
             my $no_run = $y->{run} eq 'no';
             my @flags = @{$y->{jhc_flags}};
@@ -283,7 +284,8 @@ do_it($test_dir,"", {
         jhc_exit_code => 0,
         args => [],
         libs => [],
-        run => 'yes'
+        run => 'yes',
+        skip => undef
     });
 done();
 
