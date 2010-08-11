@@ -1,0 +1,15 @@
+tests:
+    read028:
+        skip: known_bug
+    read030:
+        skip: known_bug
+    read042:
+        skip: BangPatterns
+    read050:
+        skip: KindSignatures
+    read054:
+        skip: ParallelListComp
+    read058:
+        skip: RecursiveDo
+    read062:
+        skip: TransformListComp
