@@ -249,7 +249,7 @@ withContextDoc s a = withContext (render s) a
 inferType :: ContextMonad String m => DataTable -> [(TVr,E)] -> E -> m E
 inferType dataTable ds e = rfc e where
     inferType' ds e = inferType dataTable ds e
-    prettyE = ePrettyEx
+    prettyE = ePretty
     rfc e =  withContextDoc (text "fullCheck:" </> prettyE e) (fc e >>=  strong')
     rfc' nds e = withContextDoc (text "fullCheck:" </> prettyE e) (inferType' nds e >>=  strong')
     strong' e = withContextDoc (text "Strong:" </> prettyE e) $ strong ds e
@@ -425,10 +425,10 @@ instance ContextMonad String Tc where
 
 tcE :: E -> Tc E
 tcE e = rfc e where
-    rfc e =  withContextDoc (text "tcE:" </> ePrettyEx e) (fc e >>=  strong')
+    rfc e =  withContextDoc (text "tcE:" </> ePretty e) (fc e >>=  strong')
     strong' e = do
         ds <- asks tcDefns
-        withContextDoc (text "tcE.strong:" </> ePrettyEx e) $ strong ds e
+        withContextDoc (text "tcE.strong:" </> ePretty e) $ strong ds e
 
     fc s@ESort {} = return $ getType s
     fc (ELit LitCons { litType = t }) = strong' t
@@ -456,14 +456,14 @@ tcE e = rfc e where
     fc ECase { eCaseType = ty } = do
         strong' ty
     fc Unknown = return Unknown
-    fc e = failDoc $ text "what's this? " </> (ePrettyEx e)
+    fc e = failDoc $ text "what's this? " </> (ePretty e)
 
 typeInfer'' :: ContextMonad String m => DataTable -> [(TVr,E)] -> E -> m E
 typeInfer'' dataTable ds e = rfc e where
     inferType' ds e = typeInfer'' dataTable ds e
-    rfc e =  withContextDoc (text "fullCheck':" </> ePrettyEx e) (fc e >>=  strong')
-    rfc' nds e =  withContextDoc (text "fullCheck':" </> ePrettyEx e) (inferType' nds  e >>=  strong')
-    strong' e = withContextDoc (text "Strong':" </> ePrettyEx e) $ strong ds e
+    rfc e =  withContextDoc (text "fullCheck':" </> ePretty e) (fc e >>=  strong')
+    rfc' nds e =  withContextDoc (text "fullCheck':" </> ePretty e) (inferType' nds  e >>=  strong')
+    strong' e = withContextDoc (text "Strong':" </> ePretty e) $ strong ds e
     fc s@ESort {} = return $ getType s
     fc (ELit LitCons { litType = t }) = strong' t
     fc e@ELit {} = strong' (getType e)
@@ -493,7 +493,7 @@ typeInfer'' dataTable ds e = rfc e where
     fc ECase { eCaseType = ty } = do
         strong' ty
     fc Unknown = return Unknown
-    fc e = failDoc $ text "what's this? " </> (ePrettyEx e)
+    fc e = failDoc $ text "what's this? " </> (ePretty e)
 
 
 

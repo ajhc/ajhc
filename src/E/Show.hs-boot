@@ -1,6 +1,6 @@
 -- -*- Haskell -*-
 
-module E.Show(ePretty,render,prettyE,ePrettyEx) where
+module E.Show(ePretty,render,prettyE) where
 
 import E.E
 import Doc.DocLike
@@ -9,7 +9,6 @@ import Doc.PPrint
 
 render :: Doc -> String
 prettyE :: E -> String
-ePrettyEx :: E -> Doc
 ePretty :: E -> Doc
 
 instance DocLike d => PPrint d TVr

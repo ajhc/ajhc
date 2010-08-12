@@ -1,4 +1,4 @@
-module E.Show(ePretty,render,prettyE,ePrettyEx) where
+module E.Show(ePretty,render,prettyE) where
 
 import Control.Monad.Identity
 import Maybe
@@ -24,15 +24,11 @@ import qualified FlagDump as FD
 {-# NOINLINE render #-}
 {-# NOINLINE ePretty #-}
 {-# NOINLINE prettyE #-}
-{-# NOINLINE ePrettyEx #-}
 render :: Doc -> String
 render doc =  displayS (renderPretty 100.0 (optColumns options)  doc) ""
 
 prettyE :: E -> String
 prettyE e = render $ ePretty e
-
-ePrettyEx = ePretty
-
 
 instance DocLike d => PPrint d TVr where
     pprint TVr { tvrIdent = i }  = pprint i
@@ -41,11 +37,7 @@ instance PPrint Doc E where
     pprint x = ePretty x
 
 instance PPrint String E where
-    pprint x = prettyE x
-
-instance PPrint String e => PPrint String (Maybe e) where
-    pprint Nothing = "Nothing"
-    pprint (Just e) = pprint e
+    pprintAssoc a i x = render $ pprintAssoc a i x
 
 instance PPrint String (Lit E E) where
     pprintAssoc _ n x | n <= 9    = prettyE (ELit x)
