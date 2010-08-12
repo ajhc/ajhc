@@ -239,7 +239,7 @@ simpExp e = f e [] where
                 return $ e :>>= l :-> updateLetProps lt { expBody = r, expDefs = defs }
             e :>>= l :-> r | isInvalid r -> do
                 mtick "Optimize.optimize.let-shrink-tail"
-                return (updateLetProps lt { expBody = e } :>>= l :-> r)
+                return (updateLetProps lt { expBody = e, expDefs = defs } :>>= l :-> r)
             _ -> return $ updateLetProps lt { expBody = body, expDefs = defs }
     g x = applySubstE x
 
