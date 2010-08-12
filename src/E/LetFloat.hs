@@ -9,7 +9,6 @@ module E.LetFloat(
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.Writer
-import Data.Monoid
 import Data.Typeable
 import List  hiding(delete,insert)
 import qualified Data.Map as Map
@@ -17,7 +16,6 @@ import qualified Data.Map as Map
 import DataConstructors
 import Doc.PPrint
 import E.E
-import E.FreeVars
 import E.Inline
 import E.Program
 import E.Subst

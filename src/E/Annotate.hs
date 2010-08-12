@@ -6,11 +6,9 @@ import qualified Data.Traversable as T
 
 import E.E
 import E.Program
-import E.Rules
 import E.Subst
 import GenUtil
 import Name.Id
-import qualified Info.Info as Info
 import Info.Info(Info)
 import Util.SetLike
 import Util.HasSize

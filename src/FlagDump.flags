@@ -75,4 +75,3 @@ c don't delete C source file after compilation
 @veryverbose progress stats
 progress     show basic progress indicators
 stats        show extra information about stuff
-html         use html escape codes in output

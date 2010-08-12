@@ -1,10 +1,8 @@
 module E.Show(ePretty,render,prettyE,ePrettyEx) where
 
-import Char
 import Control.Monad.Identity
 import Maybe
 
-import Doc.Attr
 import Doc.DocLike
 import Doc.PPrint
 import Doc.Pretty
@@ -61,17 +59,50 @@ enumList = [
     (toName TypeConstructor ("Jhc.Order","Ordering#"),["LT#","EQ#","GT#"])
     ]
 
+{-
+instance PPrint (SEM Doc) a => PPrint (SEM Doc) (Lit a E)  where
+    pprintAssoc a i lit = f lit where
+        f (LitInt i (ELit LitCons { litName = n })) | Just l <- lookup n enumList, i >= 0 && fromIntegral i < length l = text $ l !! (fromIntegral i)
+        f (LitInt i _) = text $ show i
+        f LitCons { litName = s, litArgs = es } | Just n <- fromTupname s , n == length es = do
+            es' <- mapM pprint es
+            return $ tupled es'
+        f LitCons { litName = s, litArgs = es } | Just n <- fromUnboxedNameTuple s, n == length es = do
+            es' <- mapM pprint es
+            return $ encloseSep (text "(# ") (text " #)") (text ", ") es'
+        f LitCons { litName = n, litArgs = [a,b] } | dc_Cons == n  = do
+            a' <- showBind a
+            b' <- showBind b
+            return $ a' `cons` b'
+        f LitCons { litName = n, litArgs = [e] } | tc_List == n = do
+            e <- pprint e
+            return $ (char '[' <> e <> char ']')
+        f LitCons { litName = n, litArgs = [] } | dc_EmptyList == n = return $ text "[]"
+        f LitCons { litName = n, litArgs = [v] }
+            | n == dc_Integer = go "Integer#"
+            | n == dc_Int     = go "Int#"
+            | n == dc_Char    = go "Char#"
+          where go n = do
+                    se <- pprintAssoc AssocNone 10 v
+                    return $ atom (text n) `app` se
+        f LitCons { litName = s, litArgs = es, litType = t, litAliasFor = Just af } | dump FD.EAlias = do
+            es' <- mapM showBind es
+            se <- showE af
+            return $ foldl appCon (atom (tshow s <> char '@' <> parens (unparse se))) es' -- `inhabit` prettye t
+        f LitCons { litName = s, litArgs = es, litType = t } = do
+            es' <- mapM showBind es
+            return $ foldl appCon (atom (tshow s)) es' -- `inhabit` prettye t
+        cons = bop (R,5) (text ":")
+        -}
+
 showLit ::
     (a -> SEM (Unparse Doc))   -- ^ routine for showing the contents of constructor literals
     -> Lit a E                 -- ^ the literal to show
     -> SEM (Unparse Doc)       -- ^ the final result
 showLit showBind l = do
-    let const_color = col "blue"
-    let --f (LitInt c t) | t == tCharzh = return $ atom $ (const_color (tshow $ chr i)) where
-        --    i = fromIntegral c
-        f (LitInt i (ELit LitCons { litName = n })) | Just l <- lookup n enumList, i >= 0 && fromIntegral i < length l =
-            return $ atom $ (const_color (text $ l !! (fromIntegral i)))
-        f (LitInt i _) = return $ atom $ (const_color (text $ show i))
+    let f (LitInt i (ELit LitCons { litName = n })) | Just l <- lookup n enumList, i >= 0 && fromIntegral i < length l =
+            return $ atom $ ((text $ l !! (fromIntegral i)))
+        f (LitInt i _) = return $ atom $ ((text $ show i))
         f LitCons { litName = s, litArgs = es } | Just n <- fromTupname s , n == length es = do
             es' <- mapM (fmap unparse . showBind) es
             return $ atom $ tupled es'
@@ -105,8 +136,12 @@ showLit showBind l = do
 
 app = bop (L,100) (text " ")
 appCon = bop (L,99) (text " ")
-col n x = attrColor (attr oob) n x
-attr = if dump FD.Html then html else ansi
+
+--class EPrint a where
+--    eprint :: a -> SEM Doc
+--    eprintAssoc :: Assoc -> a -> Int -> SEM Doc
+--    eprintAssoc _ _ a = eprint a
+--    eprint a = eprintAssoc AssocNone (-1) a
 
 showI i = do
     n <- SEM $ maybeLookupName i
@@ -154,8 +189,7 @@ collectAbstractions e0 = go e0 [] where
 
 showE :: E -> SEM (Unparse Doc)
 showE e = do
-    let const_color = col "blue"
-    let f e | Just s <- E.E.toString e = return $ atom $ const_color (text $ show s)
+    let f e | Just s <- E.E.toString e = return $ atom $ (text $ show s)
         f e | Just xs <- eToList e = do
             xs <- mapM (fmap unparse . showE) xs
             return $ atom $ list xs
@@ -183,7 +217,7 @@ showE e = do
             where
               p :: (Doc, TVr, Bool) -> SEM Doc
               p (c,t,detailed) = do tvr <- if detailed then showTVr t else showTVr' t
-                                    return (retOp c <> unparse tvr <> retOp (char '.'))
+                                    return (c <> unparse tvr <> (char '.'))
         f (EVar tvr) = if dump FD.EVerbose then showTVr tvr else showTVr' tvr
         f Unknown = return $ symbol (char  '?')
         f (ESort s) = return $ symbol (tshow s)
@@ -201,8 +235,8 @@ showE e = do
         f ELetRec { eDefs = ds, eBody = e } = foldr (\(tvr,_) -> allocTVr tvr) (do
             e <- fmap unparse $ showE e
             ds <- mapM (fmap unparse . showDecl) ds
-            return $ fixitize (L,(-10)) $ atom $ nest 4 (group ( keyword "let"
-                                                                  <$> (align $ sep (map (<> bc ';') ds))
+            return $ fixitize (L,(101)) $ atom $ nest 2 (group ( keyword "let"
+                                                                  <$> (align $ sep (map (<> char ';') ds))
                                                                   <$> (keyword "in")) </> e )) ds
 
         f ec@(ECase { eCaseScrutinee = e, eCaseAlts = alts }) = mt (showE (eCaseType ec)) $  allocTVr (eCaseBind ec) $ do
@@ -215,29 +249,26 @@ showE e = do
                 Nothing -> return []
                 Just e -> do
                     e <- showE e
-                    return [unparse db <+> UC.rArrow <+> unparse e]
-            let alts' = map (<> bc ';') (alts ++ dcase)
+                    return [unparse db <+> UC.rArrow </> unparse e]
+            let alts' = map (\a -> nest 2 (group (a <> char ';'))) (alts ++ dcase)
             let mbind | isJust (eCaseDefault ec) = empty
                       | (isUsed && isNothing (eCaseDefault ec)) || dump FD.EVerbose = text " " <> (if isUsed then id else (char '_' <>)) (unparse db) <+> text "<-"
                       | otherwise = empty
-            return $ fixitize ((L,(-10))) $ atom $
-                group (nest 4 ( keyword "case" <> mbind <+> scrut <+> keyword "of" <$>  (align $ vcat (alts'))) )
+            return $ fixitize ((L,(101))) $ atom $
+                group (nest 2 ( keyword "case" <> mbind <+> scrut <+> keyword "of" <$>  (align $ vcat alts')) )
         f _ = error "undefined value in E.Show"
         showAlt (Alt l e) = foldr allocTVr ans (litBinds l) where
             ans = do
                 l <- showLit showTVr l
                 e <- showE e
-                return $ fill 10 ((unparse l) <+>  UC.rArrow </> (unparse e))
+                return $ unparse l <+> UC.rArrow </> unparse e
         showDecl (t,e) = do
             t <- subSEM $ showTVr t
             e <- subSEM $ showE e
-            return $ atom $ unparse t <+> retOp (char '=') </> unparse e
-        bold' = bold
-        bc = bold' . char
-        keyword x = col "magenta" (text x)
-        symbol x = atom (bold' x)
-        arr = bop (R,0) $ retOp (space <> UC.rArrow <> space)
-
+            return $ atom $ nest 2 $ group $ unparse t <+> (char '=') </> unparse e
+        keyword x = text x
+        symbol x = atom x
+        arr = bop (R,0) $ (space <> UC.rArrow <> space)
         mt t x | dump FD.EVerbose = do
                     t <- t
                     x <- x
@@ -248,12 +279,7 @@ showE e = do
     f e
 
 subSEM (SEM act) = SEM $ subVarName act
-
-
-retOp x = col "lightgreen" x
-inhabit = bop (N,-2) $ retOp UC.coloncolon
-bold :: Doc -> Doc
-bold = attrBold (attr oob)
+inhabit = bop (N,-2) $ UC.coloncolon
 
 ePretty e = unparse pe where
     (SEM pe') = showE e

@@ -9,7 +9,6 @@ module E.Inline(
     ) where
 
 import Control.Monad.Writer
-import Data.Monoid
 
 import StringTable.Atom
 import E.Annotate
@@ -20,13 +19,11 @@ import E.Values
 import Support.FreeVars
 import Info.Info(Info)
 import Info.Types
-import Name.Id
 import Options
 import Stats
 import Util.Graph
 import Util.SetLike
 import qualified FlagOpts as FO
-import qualified Info.Info as Info
 
 
 

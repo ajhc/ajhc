@@ -49,7 +49,8 @@ transformProgram tp prog = liftIO $ do
     let ferr e = do
         putErrLn $ "\n>>> Exception thrown"
         putErrLn $ "\n>>> Before " ++ name
-        printProgram prog
+        dumpCore ("lint-before-" ++ name) prog
+--        printProgram prog
         putErrLn $ "\n>>>"
         putErrLn (show (e::SomeException'))
         maybeDie
@@ -58,9 +59,11 @@ transformProgram tp prog = liftIO $ do
     let estat = progStats prog'
         onerr = do
             putErrLn $ "\n>>> Before " ++ name
-            printProgram prog
+            dumpCore ("lint-before-" ++ name) prog
+--            printProgram prog
             Stats.printStat name estat
             putErrLn $ "\n>>> After " ++ name
+            dumpCore ("lint-after-" ++ name) prog'
     if transformSkipNoStats tp && estat == mempty then do
         when dodump $ putErrLn "program not changed"
         return prog

@@ -13,7 +13,6 @@ import Doc.Pretty
 import E.E
 import E.Show
 import E.TypeCheck
-import FrontEnd.Class
 import Util.Gen hiding(putErrLn)
 import Name.Id
 import Name.Name

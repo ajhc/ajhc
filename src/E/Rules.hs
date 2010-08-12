@@ -18,7 +18,6 @@ module E.Rules(
 
 import Control.Monad.Writer
 import qualified Data.Traversable as T
-import List
 import Maybe
 
 import StringTable.Atom(toAtom)

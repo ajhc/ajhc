@@ -5,13 +5,11 @@ import Control.Monad.Writer
 import Data.Maybe
 import Data.IORef
 import Text.Printf
-import List hiding(insert)
 
 import StringTable.Atom
 import Doc.PPrint
 import E.Annotate
 import E.E
-import E.FreeVars
 import E.Inline
 import E.Program
 import E.Subst

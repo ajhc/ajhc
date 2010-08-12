@@ -25,12 +25,8 @@ import Version.Version(versionSimple)
 import qualified FlagDump as FD
 import qualified Interactive
 
-bracketHtml action = do
-    (argstring,_) <- getArgString
-    wdump FD.Html $ putStrLn $ "<html><head><title>" ++ argstring ++ "</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body style=\"background: black; color: lightgrey\"><pre>"
-    action `finally` (wdump FD.Html $ putStrLn "</pre></body></html>")
 
-main = bracketHtml $ do
+main = do
     hSetEncoding stdout utf8
     hSetEncoding stderr utf8
     o <- processOptions
