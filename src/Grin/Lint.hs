@@ -287,8 +287,15 @@ tcExp e = f e where
         return [TyINode]
     f (Error _ t) = return t
     f e@(BaseOp Overwrite [w,v]) = do
+        NodeC {} <- return v
+        tcVal w
+        tcVal v
         return []
     f e@(BaseOp PokeVal [w,v]) = do
+        TyPtr t <- tcVal w
+        tv <- tcVal v
+        when (t /= tv) $
+            fail "PokeVal: types don't match"
         return []
     f e@(BaseOp PeekVal [w]) = do
         TyPtr t <- tcVal w
