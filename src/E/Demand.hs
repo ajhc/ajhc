@@ -13,8 +13,6 @@ import Control.Monad.Reader
 import Control.Monad.Writer hiding(Product(..))
 import Data.Binary
 import Data.List hiding(union,delete)
-import Data.Monoid hiding(Product(..))
-import Data.Maybe
 import Data.Typeable
 
 import DataConstructors

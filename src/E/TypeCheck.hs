@@ -13,7 +13,6 @@ module E.TypeCheck(
 
 import Control.Monad.Reader
 import Control.Monad.Writer
-import Monad(when,liftM)
 import qualified Data.Map as Map
 
 import Doc.DocLike

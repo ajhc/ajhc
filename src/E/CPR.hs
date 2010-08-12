@@ -9,7 +9,6 @@ import qualified Data.Map as Map
 import DataConstructors
 import Doc.DocLike
 import E.E
-import E.FreeVars
 import GenUtil
 import E.Program
 import Name.Name
