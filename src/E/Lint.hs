@@ -48,10 +48,7 @@ transformProgram tp prog = liftIO $ do
     let istat = progStats prog
     let ferr e = do
         putErrLn $ "\n>>> Exception thrown"
-        putErrLn $ "\n>>> Before " ++ name
-        dumpCore ("lint-before-" ++ name) prog
---        printProgram prog
-        putErrLn $ "\n>>>"
+        dumpCoreExtra ("lint-before-" ++ name) prog (show (e::SomeException'))
         putErrLn (show (e::SomeException'))
         maybeDie
         return prog
@@ -132,13 +129,16 @@ lintCheckProgram onerr prog | flint = do
 lintCheckProgram _ _ = return ()
 
 
-dumpCore pname prog = do
+dumpCore pname prog = dumpCoreExtra pname prog ""
+
+dumpCoreExtra pname prog extra = do
     let fn = outputName ++ "_" ++ pname ++ ".jhc_core"
     putErrLn $ "Writing: " ++ fn
     h <- IO.openFile fn IO.WriteMode
     (argstring,sversion) <- getArgString
     IO.hPutStrLn h $ unlines [ "-- " ++ argstring,"-- " ++ sversion,""]
     hPrintProgram h prog
+    IO.hPutStrLn h extra
     IO.hClose h
     wdump FD.Core $ do
         putErrLn $ "v-- " ++ pname ++ " Core"
