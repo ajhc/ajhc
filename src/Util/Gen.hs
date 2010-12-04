@@ -3,12 +3,9 @@
 module Util.Gen(module Util.Gen, module GenUtil, intercalate) where
 
 import Control.Monad.Writer
-import Control.Monad.Identity
-import Data.Monoid
 import Data.List
-import Directory
-import System.IO
 import Data.Maybe
+import Directory
 import Text.ParserCombinators.ReadP
 
 import GenUtil hiding(replicateM, intercalate)

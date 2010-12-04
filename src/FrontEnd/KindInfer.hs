@@ -17,35 +17,33 @@ module FrontEnd.KindInfer (
     getConstructorKinds
     ) where
 
-import Control.Monad.Reader
-import Data.List
-import qualified Data.Traversable as T
-import Util.Inst()
-import Data.Maybe
 import Control.Monad.Identity
+import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.Generics
 import Data.IORef
-import Data.Monoid
-import qualified Data.Map as Map
-import System.IO.Unsafe
-
+import Data.List
 import Data.Binary
+import System.IO.Unsafe
+import Util.Inst()
+import qualified Data.Map as Map
+import qualified Data.Traversable as T
+
 import Doc.DocLike
 import Doc.PPrint
-import FrontEnd.Tc.Type
-import FrontEnd.Tc.Kind
-import FrontEnd.Utils
-import GenUtil
-import Support.FreeVars
 import FrontEnd.HsSyn
-import Support.MapBinaryInstance
+import FrontEnd.Tc.Kind
+import FrontEnd.Tc.Type
+import FrontEnd.Utils
 import Name.Name
-import qualified Util.Seq as Seq
-import qualified FlagDump as FD
 import Options
+import Support.FreeVars
+import Support.MapBinaryInstance
 import Util.ContextMonad
+import Util.Gen
 import Util.HasSize
+import qualified FlagDump as FD
+import qualified Util.Seq as Seq
 
 
 data KindEnv = KindEnv {

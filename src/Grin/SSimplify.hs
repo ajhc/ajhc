@@ -1,25 +1,28 @@
 module Grin.SSimplify(simplify,explicitRecurse) where
 
-import qualified Data.IntSet as IS
+import Control.Monad.Identity
+import Control.Monad.Reader
+import Control.Monad.Writer
+import Control.Monad.State
+import Data.Maybe
 import qualified Data.IntMap as IM
+import qualified Data.IntSet as IS
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Control.Monad.Identity
-import Data.Maybe
 
-import Support.Tickle
-import StringTable.Atom
 import Grin.Grin
 import Grin.Noodle
-import Util.Gen
-import Util.RWS
-import Util.GMap
-import Util.SetLike
-import Util.HasSize
+import Stats(mtick)
+import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
+import Support.Tickle
+import Util.GMap
+import Util.Gen
+import Util.HasSize
+import Util.RWS
+import Util.SetLike
 import qualified Stats
-import Stats(mtick)
 
 -- This goes through and puts grin into a normal form, in addition, it carries out some straightforward
 -- simplifications.

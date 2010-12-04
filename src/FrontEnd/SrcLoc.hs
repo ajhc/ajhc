@@ -2,12 +2,10 @@ module FrontEnd.SrcLoc where
 
 import Control.Monad.Writer
 import Control.Monad.Identity
-import Control.Monad
 import Control.Applicative
 import Data.Traversable
 import Data.Foldable
 
-import Data.Monoid
 import Data.Generics
 import Data.Binary
 

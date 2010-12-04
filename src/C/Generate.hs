@@ -72,10 +72,8 @@ module C.Generate(
 import Char
 import Control.Monad.RWS
 import Control.Monad.Writer
-import Control.Monad
 import Data.List(intersperse)
 import Data.Maybe(isNothing)
-import Data.Monoid
 import Numeric
 import Text.PrettyPrint.HughesPJ(Doc,render,nest,($$),($+$))
 import qualified Data.Foldable as Seq

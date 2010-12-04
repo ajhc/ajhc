@@ -8,11 +8,11 @@ module Cmm.OpEval(
     unOp
     ) where
 
-import Cmm.Number
-import Cmm.Op
-import Control.Monad
 import Maybe
 import qualified Data.Map as Map
+
+import Cmm.Number
+import Cmm.Op
 
 
 class Expression t e | e -> t where

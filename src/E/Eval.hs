@@ -9,7 +9,6 @@ import Data.Monoid
 import Doc.DocLike
 import Doc.PPrint
 import E.E
-import E.FreeVars
 import {-# SOURCE #-} E.Show
 import E.Subst
 import Name.Id

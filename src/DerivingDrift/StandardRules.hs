@@ -1,7 +1,6 @@
 module DerivingDrift.StandardRules (standardRules) where
 
 import DerivingDrift.RuleUtils
-import List
 import Name.Prim
 import Name.Name
 import qualified Data.Map as Map

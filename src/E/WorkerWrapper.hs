@@ -1,14 +1,11 @@
 module E.WorkerWrapper(performWorkWrap,workWrapProgram) where
 
 import Control.Monad.Writer.Strict hiding(Product(..))
-import Data.Monoid hiding(Product(..))
 import Maybe
-import Monad
 
 import DataConstructors
 import E.CPR
 import E.E
-import E.FreeVars
 import E.Program
 import E.Traverse
 import E.TypeCheck()

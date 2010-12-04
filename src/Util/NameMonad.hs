@@ -5,7 +5,6 @@ module Util.NameMonad(NameMonad(..), GenName(..), NameMT, runNameMT, runNameMT',
 
 import qualified Data.Set as Set
 import Control.Monad.State
-import Control.Monad.Trans
 
 -- | There are bound names and used names, the used names are always a superset of the bound names.
 -- used names will not be chosen for any new bindings, bound names should be renamed if encountered.

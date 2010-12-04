@@ -1,17 +1,15 @@
 {-# OPTIONS -funbox-strict-fields  -O2 #-}
 module Support.MD5(Hash(),emptyHash,md5,md5file,md5lazy,md5show32,md5Bytes,md5String,md5Handle,hashToBytes) where
 
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as LBS
-import Data.Binary
 import Control.Monad
-import qualified Data.ByteString.Unsafe as BS
+import Data.Binary
+import Data.Char
 import Foreign
 import Foreign.C
-import Data.Bits
-import Data.Word
-import Data.Char
 import System.IO
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Unsafe as BS
 
 
 data Hash = Hash !Word32 !Word32 !Word32 !Word32

@@ -8,14 +8,13 @@ import Data.Functor
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Util.Gen
-import Util.SetLike
-import Support.Transform
-import Support.CanType
 import Grin.Grin
 import Grin.Noodle
-import Support.FreeVars
 import Options (verbose,fopts)
+import Support.FreeVars
+import Support.Transform
+import Util.Gen
+import Util.SetLike
 import qualified FlagOpts as FO
 
 {-# NOINLINE devolveTransform #-}

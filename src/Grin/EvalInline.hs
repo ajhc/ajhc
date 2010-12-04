@@ -4,7 +4,6 @@ module Grin.EvalInline(createEvalApply) where
 import Control.Monad.Identity
 import List hiding(union)
 import qualified Data.Set as Set
-import qualified Data.Map as Map
 
 
 import Util.SetLike

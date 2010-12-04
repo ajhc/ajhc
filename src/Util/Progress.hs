@@ -68,7 +68,7 @@ progressStep pr k = (pr { pTreap = ot, pBias = nb, pTotal = pTotal pr + pIncreme
         Just (k,p,t') = extract t
 
 toPercent :: Double -> Double
-toPercent d = (/ 100) . fromIntegral $ round (d * 10000)
+toPercent d = (/ 100) . fromInteger $ round (d * 10000)
 
 histogram :: Ord k => [k] -> (Int,[(k,Int)])
 histogram ks = mapSnd toListByPriority (foldr f (0,Nil) ks) where

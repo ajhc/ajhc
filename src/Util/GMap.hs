@@ -1,13 +1,11 @@
 module Util.GMap where
 
 import Data.Monoid
+import Util.HasSize
 import Util.SetLike
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 import qualified Data.Set as Set
-import Util.HasSize
-import Data.Foldable hiding(toList)
-import Data.Traversable
 
 
 data family GMap k :: * -> *

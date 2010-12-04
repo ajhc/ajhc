@@ -36,13 +36,9 @@ module Name.Id(
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bits
-import Data.Foldable
 import Data.Int
 import Data.Word
 import Data.Monoid
-import Data.Traversable
-import Data.Typeable
-import System.Random
 import qualified Data.Binary as B
 import qualified Data.IntMap  as IM
 import qualified Data.IntSet as IS
@@ -55,7 +51,6 @@ import Util.HasSize
 import Util.Inst()
 import Util.NameMonad
 import Util.SetLike as S
-import Util.GMap
 --import Debug.Trace
 
 {-

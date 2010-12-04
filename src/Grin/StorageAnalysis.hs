@@ -1,7 +1,6 @@
 module Grin.StorageAnalysis(storeAnalyze) where
 
 import Control.Monad.Identity
-import Control.Monad
 import Control.Monad.Writer
 import Data.Maybe
 import qualified Data.Map as Map
@@ -9,11 +8,9 @@ import qualified Data.Set as Set
 
 import Options
 import Grin.Grin
-import Grin.Lint
 import Grin.Noodle
 import Grin.Val
 import StringTable.Atom
-import Support.CanType
 import Support.FreeVars
 import Support.Tickle
 import Util.Gen

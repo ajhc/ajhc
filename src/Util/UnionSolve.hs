@@ -66,6 +66,7 @@ seither (Right x) = shows x
 instance (Show e,Show l) => Show (CL l e) where
     showsPrec _ (x `Clte` y) = seither x . showString " <= " . seither y
     showsPrec _ (x `Cset` l) = seither x . showString " := " . seither l
+    showsPrec _ (CLAnnotate s w) = showString s . showChar '@' . shows w
 
 -- basic constraints
 islte,isgte,equals :: Ord v => Either v l -> Either v l -> C l v

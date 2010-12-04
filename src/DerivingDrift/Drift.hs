@@ -2,20 +2,19 @@ module DerivingDrift.Drift(driftDerive) where
 
 import Char
 import List
-import Control.Monad.Identity
+import qualified Data.Map as Map
 
 import DerivingDrift.DataP
 import DerivingDrift.StandardRules
 import FrontEnd.HsParser
-import FrontEnd.ParseMonad
 import FrontEnd.HsSyn
+import FrontEnd.ParseMonad
 import Name.Name
 import Name.Names
 import Options
 import Text.PrettyPrint.HughesPJ(render)
-import qualified Data.Map as Map
-import qualified FlagDump as FD
 import Util.Gen
+import qualified FlagDump as FD
 
 driftDerive :: HsModule -> IO HsModule
 driftDerive hsModule = ans where

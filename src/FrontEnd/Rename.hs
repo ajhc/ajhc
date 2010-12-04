@@ -18,7 +18,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Foldable as Seq
 
 import Util.SetLike
-import Util.GMap
 import Doc.DocLike(tupled)
 import FrontEnd.Desugar (doToExp,listCompToExp)
 import FrontEnd.HsSyn
@@ -56,8 +55,6 @@ data Context
     deriving(Eq)
 
 data Env = Env {
-    envSubTable    :: Map.Map HsName HsName,
-    errorTable     :: Map.Map HsName String,
     envModule      :: Module,
     envNameMap     :: Map.Map Name (Either String Name),
     envOptions     :: Opt,
@@ -77,13 +74,13 @@ addTopLevels  hsmod action = do
                 = let nn = hsName in (nn,nn):r
  --           | otherwise = error $ "strong bad: " ++ show hsName
             | otherwise = let nn = toUnqualified hsName in (nn,hsName):(hsName,hsName):r
-        f r z@(getModule -> Nothing) = let nn = qualifyName mod z in (z,nn):(nn,nn):r
+        f r z = let nn = qualifyName mod z in (z,nn):(nn,nn):r
         z ns = mapM mult (filter (\x -> length x > 1) $ groupBy (\a b -> fst a == fst b) (sort ns))
         mult xs@(~((n,sl):_)) = warn sl "multiply-defined" (show n ++ " is defined multiple times: " ++ show xs)
     z cdefs
-    let cn k (Right x) (Right y) | x /= y = Left $ ambig k [x,y]
-        cn _ _ x@Left {} = x
-        cn _ x _ = x
+--    let cn k (Right x) (Right y) | x /= y = Left $ ambig k [x,y]
+--        cn _ _ x@Left {} = x
+--        cn _ x _ = x
     withSubTable (fromList nmap) action
     --local ( \e -> e { envNameMap = Map.unionWithKey cn (Map.map Right (fromList nmap)) (envNameMap e) }) action
 

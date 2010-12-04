@@ -17,8 +17,6 @@ import Data.Maybe
 import qualified Data.Traversable as T
 
 import E.E
-import E.FreeVars(caseUpdate)
-import E.Type
 import Name.Id
 import Util.Gen
 import Util.HasSize

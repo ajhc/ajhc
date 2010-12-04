@@ -50,7 +50,6 @@ module PackedString (
     ) where
 
 import Data.Typeable
-import Data.Char
 import Data.Int
 import Data.Binary
 import Data.List
@@ -58,8 +57,6 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.UTF8 as BSU
 
 import Bits
-import GHC.Exts
-import Word
 import Data.Monoid
 
 instance Monoid PackedString where

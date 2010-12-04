@@ -1,4 +1,5 @@
 {-# OPTIONS -funbox-strict-fields  -O2 #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- chunked file format.
 -- A generalization of the PNG format for user defined file formats.
@@ -13,6 +14,7 @@ module Support.CFF(
     isPrivate,
     isSafeToCopy,
     readCFFHeader,
+    readCFFInfo,
     readCFF,
     bsCFF,
     lbsCFF,
@@ -22,18 +24,13 @@ module Support.CFF(
     writeCFF
     )where
 
-import Control.Concurrent.MVar
 import Control.Monad
 import Data.Bits
 import Data.Char
-import Data.List
 import Data.Word
-import System
 import System.IO
-import System.IO.Unsafe
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
-import qualified Data.Map as Map
 
 
 type FileOffset = Word
@@ -175,7 +172,7 @@ writeCFFHeader h ft = BS.hPut h (mkCFFHeader ft)
 readCFFInfo :: Handle -> IO (ChunkType,[(ChunkType,FileOffset,ChunkLength)])
 readCFFInfo h = do
     cffType <- readCFFHeader h
-    let readChunk fo | fo `seq` True = do
+    let readChunk !fo = do
             b <- hIsEOF h
             if b then return [] else do
             len <- readWord32 h

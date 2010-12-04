@@ -153,11 +153,11 @@ printDL h n fs e = f fs e where
             genAssign "assign" a (Left $ funRet fn i)
 
     f bs e = do zipWithM_ (assign "assign") bs (map ValUnknown (getType e))
-    app n as | Just (0,fn) <- tagUnfunction n = do
-        hPrintf h "lazyfunc(%s).\n" (dshow fn)
-        forM_ (zip naturals as) $ \ (i,a) -> do
-            assign "assign" (Left $ funArg fn i) a
-    app _ _ = return ()
+    --app n as | Just (0,fn) <- tagUnfunction n = do
+    --    hPrintf h "lazyfunc(%s).\n" (dshow fn)
+    --    forM_ (zip naturals as) $ \ (i,a) -> do
+    --        assign "assign" (Left $ funArg fn i) a
+    --app _ _ = return ()
 
 
     assign op b v = genAssign op b (Right v)

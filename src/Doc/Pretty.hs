@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-monomorphism-restriction #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 -----------------------------------------------------------
 -- Daan Leijen (c) 2000, http://www.cs.uu.nl/~daan
 -- modified by John Meacham 2003

@@ -38,17 +38,14 @@ module FrontEnd.Representation(
 
 import Control.Monad.Identity
 import Data.IORef
-import Text.PrettyPrint.HughesPJ(Doc)
 
 import Data.Binary
 import Doc.DocLike
 import Doc.PPrint
-import FrontEnd.HsSyn
 import Name.Name
 import Name.Names
 import Support.CanType
 import Name.VConsts
-import qualified Doc.DocLike as D
 import Support.Unparse
 import Util.VarName
 import FrontEnd.Tc.Kind

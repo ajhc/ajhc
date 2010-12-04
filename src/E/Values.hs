@@ -1,6 +1,5 @@
 module E.Values where
 
-import Char
 import Control.Monad.Identity
 import Data.Monoid
 import List

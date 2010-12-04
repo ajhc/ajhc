@@ -2,22 +2,19 @@
 
 module E.Type where
 
-import Maybe
-import Control.Monad.Identity
-import Data.Traversable
 import Data.Foldable hiding(concat)
-import Control.Applicative
+import Data.Traversable
 
 
-import StringTable.Atom
+import Cmm.Number
 import C.Prims
 import Doc.DocLike hiding((<$>))
+import Info.Types
 import Name.Id
-import Util.Gen
 import Name.Name
 import Name.Names
-import Cmm.Number
-import Info.Types
+import StringTable.Atom
+import Util.Gen
 import qualified Info.Info as Info
 
 {- @Internals

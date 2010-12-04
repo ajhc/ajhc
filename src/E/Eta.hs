@@ -14,9 +14,7 @@ module E.Eta(
 import Control.Monad.Identity
 import Control.Monad.Writer
 import Control.Monad.State
-import Data.Monoid
 import Data.Typeable
-import Maybe
 
 import DataConstructors
 import E.Annotate
@@ -79,7 +77,6 @@ andArityType ATop	    at2		  = ATop
 andArityType (AFun t1 at1)  (AFun t2 at2) = AFun (t1 && t2) (andArityType at1 at2)
 andArityType at1	    at2		  = andArityType at2 at1
 
-lamann _ nfo = return nfo
 
 annotateArity e nfo = annotateArity' (arityType e) nfo
 
@@ -158,8 +155,8 @@ etaExpandDef :: (NameMonad Id m,Stats.MonadStats m)
     -> m (Maybe (TVr,E))
 etaExpandDef _ _ _ e | isAtomic e = return Nothing -- will be inlined
 etaExpandDef dataTable min t e  = ans where
-    fvs = foldr insert (freeVars (b,map getType rs,(tvrType t,e))) (map tvrIdent rs) `mappend` collectIds e
-    (b,rs) = fromLam e
+    --fvs = foldr insert (freeVars (b,map getType rs,(tvrType t,e))) (map tvrIdent rs) `mappend` collectIds e
+    --(b,rs) = fromLam e
     at = arityType e
     zeroName = case fromAp e of
         (EVar v,_) -> "use.{" ++ tvrShowName v

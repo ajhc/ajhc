@@ -39,18 +39,16 @@ See Name.Id.newId for more information.
 
 import Control.Monad.Reader
 import qualified Data.Traversable as T
-import List hiding(union,insert,delete)
+import qualified Data.Set as Set
 
-import Name.Names
 import E.E
 import E.FreeVars()
-import Name.Id
-import Support.FreeVars
 import GenUtil
-import Util.SetLike as S
+import Name.Id
+import Name.Names
+import Support.FreeVars
 import Util.HasSize
-
-import qualified Data.Set as Set
+import Util.SetLike as S
 
 --eLetRec :: [(TVr,E)] -> E -> E
 --eLetRec ds e = f (filter ((/= emptyId) . tvrIdent . fst) ds) where

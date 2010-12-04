@@ -1,15 +1,14 @@
 module Util.FilterInput (filterInput,readSystem) where
 
-import Data.List
 import Control.Monad (when)
+import Data.List
 import System
 import System.IO
 import System.Posix
-import qualified Data.ByteString.Lazy as LBS
-import qualified Data.ByteString.Lazy.UTF8 as LBSU
-import qualified Data.ByteString as BS
 import Text.Printf
 import Util.Gen
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 
 
 filterInput :: String -> [String] -> Handle -> IO String

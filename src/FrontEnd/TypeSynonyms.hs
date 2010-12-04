@@ -11,7 +11,6 @@ module FrontEnd.TypeSynonyms (
 import Control.Monad.Writer
 import Data.Binary
 import Data.List
-import Data.Monoid
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 

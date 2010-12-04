@@ -95,11 +95,3 @@ processCollectedHo cho = do
 -- | this is called on parsed, typechecked haskell code to convert it to the internal representation
 
 progressM c  = wdump FD.Progress $ (c >>= putErrLn) >> hFlush stderr
-
-
-
-
-
-
-
-

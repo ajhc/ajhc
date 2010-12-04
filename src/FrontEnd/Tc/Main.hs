@@ -1,40 +1,36 @@
 module FrontEnd.Tc.Main (tiExpr, tiProgram, makeProgram, isTypePlaceholder ) where
 
+import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.Graph(stronglyConnComp, SCC(..))
-import IO(hFlush,stdout)
-import List
+import System.IO(hPutStr,stderr)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Text.PrettyPrint.HughesPJ as P
-import System.IO(hPutStr,stderr)
 
-import Doc.PPrint
-import Control.Monad.Reader
-import FrontEnd.DeclsDepends(getDeclDeps)
-import FrontEnd.Diagnostic
 import Doc.DocLike
 import Doc.PPrint as PPrint
-import FrontEnd.Desugar(doToExp)
+import FrontEnd.DeclsDepends(getDeclDeps)
+import FrontEnd.Diagnostic
+import FrontEnd.HsPretty
+import FrontEnd.HsSyn
 import FrontEnd.KindInfer
 import FrontEnd.SrcLoc
 import FrontEnd.Tc.Class
+import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Monad hiding(listenPreds)
 import FrontEnd.Tc.Type
-import FrontEnd.Tc.Kind
 import FrontEnd.Tc.Unify
 import FrontEnd.Utils(getDeclName)
 import GenUtil
-import FrontEnd.HsPretty
-import FrontEnd.HsSyn
 import Name.Name
 import Name.Names
 import Name.VConsts
 import Options
 import Support.FreeVars
+import Util.Progress
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
-import Util.Progress
 
 
 listenPreds = listenSolvePreds

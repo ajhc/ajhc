@@ -11,7 +11,6 @@ import Char
 import Control.Monad.Writer
 import Data.Maybe
 import IO
-import Monad
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 

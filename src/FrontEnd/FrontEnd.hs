@@ -4,20 +4,17 @@ module FrontEnd.FrontEnd(
     ) where
 
 import Monad
-import Data.Monoid
 import qualified Data.Map as Map
 
-import Name.Name
 import Doc.DocLike
 import FrontEnd.Exports
+import FrontEnd.HsSyn
 import FrontEnd.Rename
 import FrontEnd.SrcLoc
-import GenUtil
-import Ho.Collected
-import Ho.Type
-import FrontEnd.HsSyn
-import Options
 import FrontEnd.Warning
+import Ho.Type
+import Name.Name
+import Options
 import qualified FlagDump as FD
 import qualified FrontEnd.Tc.Module as Tc
 
@@ -34,7 +31,6 @@ parseFiles fs ifunc func = do
     wdump FD.Progress $ do
         putErrLn $ "Compiling " ++ show fs
     compileModules fs ifunc (doModules func)
--}
 
 -- Process modules found by Ho
 doModules :: (CollectedHo -> Ho -> Tc.TiData -> IO (CollectedHo,Ho)) -> CollectedHo -> [HsModule] -> IO (CollectedHo,Ho)
@@ -47,6 +43,7 @@ doModules func ho ms  = do
     --(ho',tiData) <- Tc.tiModules' ho ms
     (htc,tiData) <- Tc.tiModules (hoTcInfo (choHo ho)) ms
     func ho mempty { hoTcInfo = htc } tiData
+-}
 
 -- Process modules found by Ho
 doModules' :: HoTcInfo -> [HsModule] -> IO  (HoTcInfo,Tc.TiData)

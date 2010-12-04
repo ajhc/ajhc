@@ -3,16 +3,13 @@ module Interactive(Interactive.interact, isInteractive) where
 import Control.Exception as CE
 import Control.Monad.Identity
 import Control.Monad.Reader
-import Control.Monad.Trans
 import Data.Monoid
 import IO(stdout)
 import List(sort,isPrefixOf)
 import Maybe
-import Monad
 import System
 import Text.Regex
 import qualified Data.Map as Map
-import qualified Text.PrettyPrint.HughesPJ as P
 
 
 import DataConstructors
@@ -30,7 +27,6 @@ import FrontEnd.Tc.Class
 import FrontEnd.Desugar(desugarHsStmt)
 import GenUtil
 import Ho.Type
-import Ho.Collected
 import FrontEnd.HsPretty()
 import FrontEnd.HsSyn
 import Support.Compat

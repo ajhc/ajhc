@@ -12,9 +12,7 @@ module E.SSimplify(
 
 import Util.RWS
 import Control.Monad.Identity
-import Control.Monad.Reader
 import Data.Typeable
-import Data.Monoid
 import Debug.Trace
 import List hiding(delete,union,insert)
 import Data.Maybe
@@ -55,8 +53,6 @@ import qualified E.Demand as Demand
 import qualified FlagDump as FD
 import qualified FlagOpts as FO
 import qualified Info.Info as Info
-
-import System.Random
 
 type Bind = (TVr,E)
 

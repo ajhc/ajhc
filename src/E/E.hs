@@ -10,13 +10,12 @@ module E.E(
     ) where
 
 import Char(chr)
-import qualified Data.Traversable as T
-import List
 import Maybe
+import qualified Data.Traversable as T
 
-import E.FreeVars
-import C.Prims
 import Control.Monad.Identity
+import C.Prims
+import E.FreeVars
 import E.Type
 import Name.Id
 import Name.Name

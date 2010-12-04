@@ -4,27 +4,24 @@ module E.PrimOpt(
     processPrimPrim
     ) where
 
-import List
-import Monad
 import Control.Monad.Fix()
 import Maybe
 
-import StringTable.Atom
 import C.Prims
+import Cmm.Op(stringToOpTy)
 import Cmm.OpEval
-import DataConstructors
 import Data.Monoid
+import DataConstructors
 import Doc.DocLike
 import Doc.PPrint
 import E.E
 import E.Values
 import GenUtil
-import Name.Id
 import Stats
+import StringTable.Atom
 import Support.CanType
 import Support.FreeVars
 import qualified Cmm.Op as Op
-import Cmm.Op(stringToOpTy)
 
 
 {-@Extensions

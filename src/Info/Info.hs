@@ -20,9 +20,7 @@ module Info.Info(
     ) where
 
 import Data.Dynamic
-import Data.Generics
 import Data.Monoid
-import Monad
 import qualified Data.List as List
 
 import GenUtil

@@ -5,7 +5,6 @@ import GenUtil
 import Data.Unique
 import Control.Monad.State
 import Control.Monad.Reader
-import Control.Monad.Writer
 import Control.Monad.Identity
 
 

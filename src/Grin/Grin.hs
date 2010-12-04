@@ -58,7 +58,6 @@ import Control.Monad.Identity
 import Data.Monoid
 import List(isPrefixOf)
 import Prelude
-import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import C.FFI

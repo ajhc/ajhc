@@ -22,7 +22,6 @@ import System.Mem
 import System.Directory (removeFile)
 import System.Random (randomIO)
 import Text.Printf
-import Version.Config(version)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import qualified Data.ByteString.Lazy.UTF8 as LBSU
@@ -54,7 +53,6 @@ import Ho.Collected()
 import Ho.Library
 import Ho.Type
 import Name.Name
-import Options
 import Options
 import PackedString(PackedString,packString,unpackPS)
 import RawFiles(prelude_m4)

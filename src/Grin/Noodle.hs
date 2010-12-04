@@ -6,7 +6,6 @@ import Control.Monad.Writer
 import qualified Data.Set as Set
 
 import C.Prims
-import Data.Functor
 import Debug.Trace
 import Grin.Grin
 import Options(flint)
