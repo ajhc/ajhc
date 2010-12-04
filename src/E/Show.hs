@@ -204,7 +204,7 @@ showE e = do
             foldr (\(_, tvr, _) -> allocTVr tvr)
                   (do tops <- mapM p as
                       e <- showE e
-                      return (atom $ group $ (align $ skipToNest <> fillCat tops) <$> unparse e))
+                      return (fixitize (N,1) $ atom $ group $ (align $ skipToNest <> fillCat tops) <$> unparse e))
                   as
             where
               p :: (Doc, TVr, Bool) -> SEM Doc
@@ -227,7 +227,7 @@ showE e = do
         f ELetRec { eDefs = ds, eBody = e } = foldr (\(tvr,_) -> allocTVr tvr) (do
             e <- fmap unparse $ showE e
             ds <- mapM (fmap unparse . showDecl) ds
-            return $ fixitize (L,(101)) $ atom $ nest 2 (group ( keyword "let"
+            return $ fixitize (N,98) $ atom $ nest 2 (group ( keyword "let"
                                                                   <$> (align $ sep (map (<> char ';') ds))
                                                                   <$> (keyword "in")) </> e )) ds
 
@@ -246,7 +246,7 @@ showE e = do
             let mbind | isJust (eCaseDefault ec) = empty
                       | (isUsed && isNothing (eCaseDefault ec)) || dump FD.EVerbose = text " " <> (if isUsed then id else (char '_' <>)) (unparse db) <+> text "<-"
                       | otherwise = empty
-            return $ fixitize ((L,(101))) $ atom $
+            return $ fixitize ((N,98)) $ atom $
                 group (nest 2 ( keyword "case" <> mbind <+> scrut <+> keyword "of" <$>  (align $ vcat alts')) )
         f _ = error "undefined value in E.Show"
         showAlt (Alt l e) = foldr allocTVr ans (litBinds l) where
