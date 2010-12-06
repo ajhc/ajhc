@@ -1,4 +1,3 @@
-
 import Data.Monoid
 import List(sort,nub)
 import Monad
@@ -17,17 +16,12 @@ import Info.Types
 import Name.Name
 import Name.Names
 import StringTable.Atom
-import Util.ArbitraryInstances()
 import Util.HasSize
 import Util.SetLike
 import PackedString
 import qualified Data.ByteString as BS
 import qualified C.Generate
 import qualified Info.Info as Info
-
-
-
-type Prop = Info.Types.Property
 
 {-# NOINLINE main #-}
 main :: IO ()
@@ -115,7 +109,7 @@ testName = do
 testProperties = do
     let prop_list x xs = sort (List.delete x $ nub xs) == toList p where
             p = unsetProperty x ((fromList xs) :: Properties)
-        prop_enum :: Prop -> Prop -> Bool
+        prop_enum :: Info.Types.Property -> Info.Types.Property -> Bool
         prop_enum x y = (fromEnum x `compare` fromEnum y) == (x `compare` y)
     qc "prop.list" prop_list
     qc "prop.enum" prop_enum

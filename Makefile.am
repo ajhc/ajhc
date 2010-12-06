@@ -1,15 +1,15 @@
-
 ACLOCAL_AMFLAGS=-I ac-macros
 
 bin_PROGRAMS = jhc
 
-jhc_SOURCES = src/Main.hs  $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
+jhc_SOURCES = src/Main.hs $(HSFILES) $(BUILT_SOURCES) $(HSBOOT) $(DRIFTFILES)
 
 BUILT_SOURCES= src/PrimitiveOperators.hs src/RtsFiles.hs src/RawFiles.hs src/FrontEnd/HsParser.hs src/FlagDump.hs \
 	       src/FlagOpts.hs src/Name/Prim.hs src/Info/Properties.hs $(DRIFTFILES)
 
 MY_CINCLUDES= -I$(srcdir)/src/data -I$(srcdir)/src/StringTable -I$(srcdir)/src/cbits -I$(builddir)/src/cbits
 MY_CFLAGS= $(MY_CINCLUDES) -optc-std=c99 -optc-O2 -optc-Wall
+CC = $(HC)
 
 HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/DataP.hs \
 	src/DerivingDrift/Drift.hs src/DerivingDrift/RuleUtils.hs src/Doc/Attr.hs src/Doc/Chars.hs src/Doc/DocLike.hs \
@@ -38,38 +38,35 @@ HSFILES=src/C/Generate.hs src/Cmm/Number.hs src/Cmm/OpEval.hs src/DerivingDrift/
 	src/Support/IniParse.hs src/E/Lint.hs src/Util/Progress.hs src/Grin/StorageAnalysis.hs src/Util/YAML.hs src/Grin/Main.hs \
         src/E/Main.hs src/Util/GMap.hs src/Util/ExitCodes.hs
 
-
 GHCDEBUGOPTS= -W -fno-warn-unused-matches  -fwarn-type-defaults
 GHCPROFOPTS= -prof -auto-all -osuf prof.o -hisuf prof.hi
 GHCSELFTESTOPTS= -osuf test.o -hisuf test.hi -DEXPORT_SELFTEST=,_selftest
 GHCNONSELFTESTOPTS= -DEXPORT_SELFTEST=
-GHCINC=  -i -i$(srcdir)/drift_processed  \
-	 -i$(srcdir)/src  -i$(builddir)/src -odir $(builddir)/src -hidir $(builddir)/src
+GHCINC=  -i -i$(srcdir)/drift_processed \
+	 -i$(srcdir)/src -i$(builddir)/src -odir $(builddir)/src -hidir $(builddir)/src
 
 PACKAGES= -package fgl -package regex-compat -package random -package array -package directory \
-          -package bytestring -package binary -package pretty -package mtl -package containers   \
-	  -package unix  -package haskell98 -package utf8-string  -package zlib
+          -package bytestring -package binary -package pretty -package mtl -package containers \
+	  -package unix -package haskell98 -package utf8-string -package zlib
 
 GHCLANG= -XViewPatterns -XUndecidableInstances -XOverlappingInstances -fglasgow-exts -XRecordWildCards -XRecursiveDo -XTupleSections
-GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@  $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
+GHCOPTS= $(HSOPTS) -XBangPatterns -O @GHCFLAGS@ $(GHCDEBUGOPTS) $(GHCINC) $(PACKAGES) $(GHCLANG)
 
-JHC_LIBS =  jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-foreign-1.0.hl
+JHC_LIBS = jhc-1.0.hl base-1.0.hl haskell98-1.0.hl applicative-1.0.hl flat-foreign-1.0.hl
 #             jhc-prim-0.7.0.hl
 
 EXTRA_DIST = src/data src/rts utils docs src/FrontEnd/HsParser.y $(BUILT_SOURCES) \
-             lib/jhc lib/base lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS)  \
+             lib/jhc lib/base lib/haskell98 lib/flat-foreign $(JHC_LIBS) $(JHC_EXT_LIBS) \
 	     src/StringTable/StringTable_cbits.c src/StringTable/StringTable_cbits.h src/cbits/md5sum.c jhc.1 \
-	     src/StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal  \
+	     src/StringTable/Atom.hsc jhc.spec lib/applicative/applicative.cabal \
 	     manual.html lib/applicative examples/HelloWorld.hs examples/Calendar.hs \
 	     src/FlagOpts.flags src/FlagDump.flags lib/ext
-
-CC = $(HC)
 
 # we recreate the manual and man page here just to ensure they are up to date
 dist-hook: man manual
 	cp $(srcdir)/manual.html $(distdir)/manual.html
 	cp $(srcdir)/jhc.1 $(distdir)/jhc.1
-	find $(distdir) \( -name _darcs -o -name \*.ho \)  -print | xargs rm -rf --
+	find $(distdir) \( -name _darcs -o -name \*.ho \) -print | xargs rm -rf --
 
 all-local: libs
 
@@ -77,7 +74,7 @@ install-data-hook: $(JHC_LIBS) $(JHC_EXT_LIBS)
 	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@
 	$(INSTALL) -d $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include
 	$(INSTALL) -d $(DESTDIR)$(sysconfdir)/@PACKAGE@-@SHORTVERSION@
-	for lib in $(JHC_LIBS) $(JHC_EXT_LIBS); do  \
+	for lib in $(JHC_LIBS) $(JHC_EXT_LIBS); do \
 		test -f "$$lib" && $(INSTALL_DATA) $$lib $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 		test -f "$(srcdir)/$$lib" && $(INSTALL_DATA) "$(srcdir)/$$lib" $(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@ ; \
 	done
@@ -86,7 +83,7 @@ install-data-hook: $(JHC_LIBS) $(JHC_EXT_LIBS)
 
 uninstall-hook:
 	rm -f -- "$(DESTDIR)$(bindir)/jhci$(EXTEXT)"
-	for lib in $(JHC_LIBS) $(JHC_EXT_LIBS); do  \
+	for lib in $(JHC_LIBS) $(JHC_EXT_LIBS); do \
 		rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/$$lib" ; \
 	done
 	rm -f -- "$(DESTDIR)$(datadir)/@PACKAGE@-@SHORTVERSION@/include/HsFFI.h"
@@ -142,10 +139,10 @@ HSBOOT= src/DataConstructors.hs-boot src/FrontEnd/Tc/Class.hs-boot src/Grin/Grin
 	$(HSC2HS) $(MY_CINCLUDES) -o $@ $<
 
 %.hs: %.flags  utils/opt_sets.prl
-	perl $(srcdir)/utils/opt_sets.prl -n $< $<  > $@
+	perl $(srcdir)/utils/opt_sets.prl -n $< $< > $@
 
 %.mkd: %.flags  utils/opt_sets.prl
-	perl $(srcdir)/utils/opt_sets.prl -f f -m -n $< $<  > $@
+	perl $(srcdir)/utils/opt_sets.prl -f f -m -n $< $< > $@
 
 src/Info/Properties.hs: src/data/props.txt utils/gen_props.prl
 	perl $(srcdir)/utils/gen_props.prl $< > $@ || rm -f $@
@@ -156,11 +153,11 @@ src/PrimitiveOperators.hs: utils/op_process.prl src/data/primitives.txt src/data
 src/Name/Prim.hs: utils/op_names.prl src/data/primitives.txt src/data/names.txt
 	perl $< > $@ || rm -f $@
 
-src/RawFiles.hs:  utils/op_raw.prl $(RAWFILES)
-	perl $< $(basename $@)  $(RAWFILES) > $@
+src/RawFiles.hs: utils/op_raw.prl $(RAWFILES)
+	perl $< $(basename $@) $(RAWFILES) > $@
 
-src/RtsFiles.hs:  utils/op_raw.prl $(RTSFILES)
-	perl $< -c $(basename $@)  $(RTSFILES) > $@
+src/RtsFiles.hs: utils/op_raw.prl $(RTSFILES)
+	perl $< -c $(basename $@) $(RTSFILES) > $@
 
 src/FrontEnd/HsParser.hs: src/FrontEnd/HsParser.y
 	happy -a -g -c $< -o $@
@@ -215,7 +212,6 @@ CLEANFILES= $(JHC_LIBS) $(JHC_EXT_LIBS)
 
 LIB_OPTIONS=$(RTSOPTS) $(JHC_TEST) --noauto -L- -L. # --deps tmp/$@.yaml
 
-
 jhc-prim-0.7.0.hl: lib/jhc-prim/jhc-prim.cabal
 	./jhc $(LIB_OPTIONS) -N -ilib/jhc-prim --build-hl $< -o $@
 jhc-1.0.hl: lib/jhc/jhc.cabal
@@ -243,7 +239,7 @@ flat-foreign-1.0.hl: lib/flat-foreign/flat-foreign.cabal base-1.0.hl
 
 %.shtml: %.mkd
 	cat $(srcdir)/docs/template/my_header.shtml > $@
-	pandoc $<  -f markdown -t html >> $@
+	pandoc $< -f markdown -t html >> $@
 	cat $(srcdir)/docs/template/my_footer.shtml >> $@
 
 publish: docs/building.shtml docs/big-picture.pdf docs/development.shtml docs/index.shtml docs/jhc.shtml manual.html docs/manual.css
@@ -256,10 +252,10 @@ manual: manual.mkd
 	pandoc $< --toc -s -f markdown -t html -s -c manual.css -o $@.html
 
 
-jhc_man.mkd:  utils/stitch.prl  docs/man_header.mkd $(JHC_MANUAL_FILES)
+jhc_man.mkd: utils/stitch.prl docs/man_header.mkd $(JHC_MANUAL_FILES)
 	perl utils/stitch.prl -h docs/man_header.mkd -c Using,Options > jhc_man.mkd
 
-man:  jhc_man.mkd
+man: jhc_man.mkd
 	pandoc jhc_man.mkd -s -f markdown -t man -s  -o jhc.1
 
 options.mkd: jhc
@@ -279,7 +275,7 @@ show_elibs: lib/ext/*.cabal
 	-perl utils/build_extlibs.prl -l $^
 
 %: examples/%.hs jhc
-	./jhc  -L- -L. $(JHC_TEST) $< -o $@ 2>&1 | tee $@.log
+	./jhc -L- -L. $(JHC_TEST) $< -o $@ 2>&1 | tee $@.log
 
 ## autogenerated dependencies
 
