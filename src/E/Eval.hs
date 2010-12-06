@@ -6,6 +6,7 @@ module E.Eval(eval, strong) where
 import qualified Data.Map as Map
 import Data.Monoid
 
+--import Debug.Trace
 import Doc.DocLike
 import Doc.PPrint
 import E.E
@@ -13,8 +14,9 @@ import {-# SOURCE #-} E.Show
 import E.Subst
 import Name.Id
 
+trace _ x = x
 
-
+-- evaluate to WHNF
 eval :: E -> E
 eval term = eval' term []  where
     -- final terms
@@ -51,14 +53,13 @@ eval term = eval' term []  where
 
 
 strong :: Monad m => [(TVr,E)] -> E -> m E
-strong dsMap' term = eval' dsMap term [] where
+strong dsMap' term = trace ("strong: " ++ show term) $ eval' dsMap term [] where
     dsMap = Map.fromList dsMap'
-    --eval' ds t@EVar {} [] = t
     etvr ds tvr = do
         t' <- (eval' ds (tvrType tvr) [])
         return $ tvr { tvrType = t' }
-    eval' :: Monad m => Map.Map TVr E -> E -> [E] -> m E
 
+    eval' :: Monad m => Map.Map TVr E -> E -> [E] -> m E
     eval' ds (ELam v body) [] = do
         let ds' = Map.delete v ds
         v' <- etvr ds' v
@@ -83,7 +84,7 @@ strong dsMap' term = eval' dsMap term [] where
     eval' ds (EAp t1 t2) stack = eval' ds t1 (t2:stack)
     eval' _ds (EVar TVr { tvrIdent = eid }) _stack | eid == emptyId = fail "empty ident in term"
     eval' ds t@(EVar v) stack
-        | Just x <- Map.lookup v ds = eval' ds x stack
+        | Just x <- Map.lookup v ds = trace ("strong-lookup: " ++ show v) $ eval' ds x stack
         | otherwise = do
             tvr <- etvr ds v
             unwind ds (EVar tvr) stack
@@ -99,7 +100,7 @@ strong dsMap' term = eval' dsMap term [] where
                                       <$> text "With stack:"
                                       <$> pprint stack
                                       <$> text "And bindings for:"
-                                      <$> pprint (Map.keys ds)
+                                      <$> pprint ds
 
     unwind ds t [] = return t
     unwind ds t (t1:rest) = do

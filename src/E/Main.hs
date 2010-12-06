@@ -204,7 +204,9 @@ processDecls cho ho' tiData = do
         let tparms = transformParms { transformPass = "Init", transformDumpProgress = coreMini }
 
 
+        lintCheckProgram onerrNone mprog
         mprog <- evaluate $ etaAnnotateProgram mprog
+        lintCheckProgram onerrNone mprog
 
         mprog <- simplifyProgram sopt "Init-One" coreMini mprog
 

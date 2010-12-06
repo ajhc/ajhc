@@ -61,12 +61,12 @@ described by the following.
 The following Rules table shows what sort of abstractions are allowed, a rule
 of the form (A,B,C) means you can have functions of things of sort A to things
 of sort B and the result is something of sort C. _Function_ in this context
-subsumes both term and type level abstractions. 
+subsumes both term and type level abstractions.
 
 Notice that functions are always boxed, but may be strict if they take an
 unboxed tuple as an argument.  When a function is strict it means that it is
 represented by a pointer to code directly, it cannot be a suspended value that
-evaluates to a function. 
+evaluates to a function.
 
 These type system rules apply to lambda abstractions. It is possible that data
 constructors might exist that cannot be given a type on their own with these
@@ -75,7 +75,7 @@ would be unboxed tuples. This presents no difficulty as one concludes correctly
 that it is a type error for these constructors to ever appear when not fully
 saturated with arguments.
 
-    as a shortcut we will use *# to mean every combination involving * and #, and so forth. 
+    as a shortcut we will use *# to mean every combination involving * and #, and so forth.
     for instance, (*#,*#,*) means the set (*,*,*) (#,*,*) (*,#,*) (#,#,*)
 
     Rules =
@@ -106,7 +106,7 @@ The PTS can be considered stratified into the following levels
 ## On boxed kinds
 
 The boxed kinds (* and !) represent types that have a uniform run time
-representation. Due to this, functions may be written that are polymorphic in types of these kinds. 
+representation. Due to this, functions may be written that are polymorphic in types of these kinds.
 Hence the rules of the form (**,?,?), allowing taking types of boxed kinds as arguments.
 
 the unboxed kind # is inhabited with types that have their own specific run
@@ -150,7 +150,7 @@ code or discourse, we will ignore them from now on.
              □    (□)        - sort box
             / \      \
           **   ##     (##)   - sort superkind
-          /\     \    | 
+          /\     \    |
          *  !     #   (#)    - sort kind
 
 -}
@@ -250,9 +250,9 @@ inferType :: ContextMonad String m => DataTable -> [(TVr,E)] -> E -> m E
 inferType dataTable ds e = rfc e where
     inferType' ds e = inferType dataTable ds e
     prettyE = ePretty
-    rfc e =  withContextDoc (text "fullCheck:" </> prettyE e) (fc e >>=  strong')
-    rfc' nds e = withContextDoc (text "fullCheck:" </> prettyE e) (inferType' nds e >>=  strong')
-    strong' e = withContextDoc (text "Strong:" </> prettyE e) $ strong ds e
+    rfc e =  withContextDoc (text "fullCheck:" </> prettyE e) (fc e >>= strong')
+    rfc' nds e = withContextDoc (text "fullCheck':" </> prettyE e) (inferType' nds e)
+    strong' e = withContextDoc (parens $ text "Strong:" </> prettyE e) $ strong ds e
     fc s@(ESort _) = return $ getType s
     fc (ELit lc@LitCons {}) | let lc' = updateLit dataTable lc, litAliasFor lc /= litAliasFor lc' = fail $ "Alias not correct: " ++ show (lc, litAliasFor lc')
     fc (ELit LitCons { litName = n, litArgs = es, litType =  t}) | nameType n == TypeConstructor, Just _ <- fromUnboxedNameTuple n = do
@@ -283,11 +283,12 @@ inferType dataTable ds e = rfc e where
         --valid at >> rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
     --fc (ELam tvr@(TVr n at) b) = valid at >> rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b >>= \b' -> (strong' $ EPi tvr b')
     fc (ELam tvr@(TVr { tvrIdent = n, tvrType =  at}) b) = do
+        withContext "Checking Lambda" $ do
         valid at
-        b' <- rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
-        strong' $ EPi tvr b'
+        b' <- withContext "Checking Lambda Body" $ rfc' [ d | d@(v,_) <- ds, tvrIdent v /= n ] b
+        withContext "Checking lambda pi" $ strong' $ EPi tvr b'
     fc (EAp (EPi tvr e) b) = rfc (subst tvr b e)
-    fc (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = fc (EAp (foldl eAp af (litArgs lc)) b)
+    fc (EAp (ELit lc@LitCons { litAliasFor = Just af }) b) = rfc (EAp (foldl eAp af (litArgs lc)) b)
     fc (EAp a b) = do
         withContextDoc (text "EAp:" </> parens (prettyE a) </> parens (prettyE b)) $ do
             a' <- rfc a
@@ -301,11 +302,13 @@ inferType dataTable ds e = rfc e where
             nds = vs ++ ds
         mapM_ ck vs
         when (hasRepeatUnder (tvrIdent . fst) vs) $ fail "Repeat Variable in ELetRec"
-        et <- inferType' nds e
-        strong nds et
+        inferType' nds e
+        --et <- inferType' nds e
+        --strong nds et
     fc (EError _ e) = valid e >> (strong'  e)
     fc (EPrim _ ts t) = mapM_ valid ts >> valid t >> ( strong' t)
     fc ec@ECase { eCaseScrutinee = e@ELit {}, eCaseBind = b, eCaseAlts = as, eCaseType = dt } | sortTypeLike e = do   -- TODO - this is a hack to get around case of constants.
+        withContext "Checking typelike pattern binding case" $ do
         et <- rfc e
         withContext "Checking typelike default binding" $ eq et (getType b)
         verifyPats (casePats ec)
@@ -314,6 +317,7 @@ inferType dataTable ds e = rfc e where
         withContext "Checking typelike pattern equality" $  eqAll (et:ps)
         strong' dt
     fc ec@ECase {eCaseScrutinee = e, eCaseBind = b, eCaseAlts = as, eCaseType = dt } | sortTypeLike e  = do   -- TODO - we should substitute the tested for value into the default type.
+        withContext "Checking typelike binding case" $ do
         et <- rfc e
         withContext "Checking typelike default binding" $ eq et (getType b)
         --dt <- rfc d
@@ -321,10 +325,11 @@ inferType dataTable ds e = rfc e where
         withContext "Checking typelike alternatives" $ mapM_ (calt e) as
         --eqAll bs
         verifyPats (casePats ec)
-        ps <- mapM (strong' . getType) $ casePats ec
+        ps <- withContext "Getting pattern types" $ mapM (strong' . getType) $ casePats ec
         withContext "checking typelike pattern equality" $ eqAll (et:ps)
-        strong' dt
+        withContext "Evaluating Case Type" $ strong' dt
     fc ec@ECase { eCaseScrutinee =e, eCaseBind = b } = do
+        withContext "Checking plain case" $ do
         et <- rfc e
         withContext "Checking default binding" $ eq et (getType b)
         bs <- withContext "Checking case bodies" $ mapM rfc (caseBodies ec)
@@ -376,7 +381,7 @@ inferType dataTable ds e = rfc e where
 
 instance CanTypeCheck DataTable E E where
     typecheck dataTable e = case typeInfer'' dataTable [] e of
-        Left ss -> fail $ "\n>>> internal error:\n" ++ unlines (tail ss)
+        Left ss -> fail $ "\n>>> internal error:\n" ++ unlines ss
         Right v -> return v
 
 instance CanTypeCheck DataTable TVr E where
@@ -461,8 +466,8 @@ tcE e = rfc e where
 typeInfer'' :: ContextMonad String m => DataTable -> [(TVr,E)] -> E -> m E
 typeInfer'' dataTable ds e = rfc e where
     inferType' ds e = typeInfer'' dataTable ds e
-    rfc e =  withContextDoc (text "fullCheck':" </> ePretty e) (fc e >>=  strong')
-    rfc' nds e =  withContextDoc (text "fullCheck':" </> ePretty e) (inferType' nds  e >>=  strong')
+    rfc e =  withContextDoc (text "fullCheck':" </> ePretty e) (fc e >>= strong')
+    rfc' nds e =  withContextDoc (text "fullCheck':" </> ePretty e) (inferType' nds e)
     strong' e = withContextDoc (text "Strong':" </> ePretty e) $ strong ds e
     fc s@ESort {} = return $ getType s
     fc (ELit LitCons { litType = t }) = strong' t
@@ -486,8 +491,9 @@ typeInfer'' dataTable ds e = rfc e where
         if a' == tBox then return tBox else strong' (eAp a' b)
     fc (ELetRec vs e) = do
         let nds = vs ++ ds
-        et <- inferType' nds e
-        strong nds et
+        --et <- inferType' nds e
+        --strong nds et
+        inferType' nds e
     fc (EError _ e) = strong' e
     fc (EPrim _ ts t) = strong' t
     fc ECase { eCaseType = ty } = do

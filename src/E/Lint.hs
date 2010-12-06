@@ -1,13 +1,17 @@
-module E.Lint where
+module E.Lint(
+    transformProgram,
+    onerrNone,
+    lintCheckProgram,
+    dumpCore
+    ) where
 
 import Control.Exception
 import Control.Monad
 import Control.Monad.Trans
-import qualified Data.Set as Set
 import Data.List as List
 import Data.Maybe
 import Support.Compat
-
+import qualified Data.Set as Set
 
 import Stats
 import Name.Id
@@ -27,7 +31,6 @@ import Support.Transform
 import Options
 import qualified FlagDump as FD
 import qualified IO
-
 
 -- all transformation routines assume they are being passed a correct program, and only check the output
 
@@ -57,10 +60,11 @@ transformProgram tp prog = liftIO $ do
         onerr = do
             putErrLn $ "\n>>> Before " ++ name
             dumpCore ("lint-before-" ++ name) prog
---            printProgram prog
             Stats.printStat name estat
             putErrLn $ "\n>>> After " ++ name
-            dumpCore ("lint-after-" ++ name) prog'
+            let fvs = programFreeVars prog' `mappend` programFreeVars prog
+                rtvrs = "FreeVars:\n" ++ (render $ vcat $ map (\tvr -> hang 4 (pprint (tvr :: TVr) <+> text "::" <+> (pprint $ tvrType tvr))) fvs)
+            dumpCoreExtra ("lint-after-" ++ name) prog' rtvrs
     if transformSkipNoStats tp && estat == mempty then do
         when dodump $ putErrLn "program not changed"
         return prog
@@ -124,10 +128,10 @@ lintCheckProgram onerr prog | flint = do
         putErrLn ("\n>>> Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
         printProgram prog
         putErrLn (">>> Unaccounted for free variables: " ++ render (pprint $ Set.toList $ unaccounted))
-        --putErrLn (show ids)
         maybeDie
 lintCheckProgram _ _ = return ()
 
+programFreeVars prog = freeVars (ELetRec (programDs prog) Unknown)
 
 dumpCore pname prog = dumpCoreExtra pname prog ""
 
