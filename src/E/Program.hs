@@ -86,7 +86,9 @@ programUpdate prog = check $ ucache prog where
 
 programSetDs' :: [(TVr,E)] -> Program -> Program
 programSetDs' ds prog = progCombinators_s [ combRules_s (lupRules (tvrIdent t)) $ bindComb (t,e) | (t,e) <- ds ] prog where
-    lupRules t = concat [ combRules c | c <- progCombinators prog, combIdent c == t]
+    lupRules t = case mlookup t (progCombMap prog) of
+        Just c -> combRules c
+        Nothing -> mempty
 
 programSetDs :: [(TVr,E)] -> Program -> Program
 programSetDs ds prog = progCombinators_s [ bindComb (t,e) | (t,e) <- ds ] prog

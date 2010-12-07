@@ -244,14 +244,11 @@ processDecls cho ho' tiData = do
 
     prog <- Demand.analyzeProgram prog
     prog <- simplifyProgram' sopt "Init-Big-One" verbose (IterateMax 4) prog
-    putErrLn "-- ChoRulesPostSimp";
-    putErrLn "------------";
-    dumpRules (Rules $ fromList [ (combIdent x,combRules x) | x <- progCombinators prog, not $ null (combRules x) ])
 
     wdump FD.Stats $
         Stats.printLStat (optStatLevel options) "Init-Big-One Stats" (progStats prog)
 
-    pr_r <- progressIONew (length $ programDecomposedDs prog) 25 '.'
+    pr_r <- progressIONew (length $ programDecomposedCombs prog) 25 '.'
 
     -- This is the main function that optimizes the routines before writing them out
     let optWW mprog = do
