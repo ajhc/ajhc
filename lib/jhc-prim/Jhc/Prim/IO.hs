@@ -12,6 +12,6 @@ type UIO_ = World__ -> World__
 newtype IO a = IO (STRep RealWorld a)
 newtype ST s a = ST (STRep s a)
 
--- | no the implicit unsafeCoerce__ here!
+-- | note the implicit unsafeCoerce__ here!
 foreign import primitive catch__ :: UIO a -> (e -> UIO a) -> UIO a
 foreign import primitive raiseIO__ :: e -> UIO_

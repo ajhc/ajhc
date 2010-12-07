@@ -202,8 +202,8 @@ gc_perform_gc(gc_t gc)
                         number_redirects,
                         (unsigned)root_stack.ptr
                        );
+                number_allocs = 0;
         }
-        number_allocs = 0;
         profile_pop(&gc_gc_time);
 }
 
@@ -211,7 +211,8 @@ A_UNUSED static void *
 (gc_alloc)(gc_t gc,struct s_cache **sc, unsigned count, unsigned nptrs)
 {
         profile_push(&gc_alloc_time);
-        number_allocs++;
+        if (JHC_STATUS)
+                number_allocs++;
         assert(nptrs <= count);
         entry_t *e = s_alloc(gc, find_cache(sc, arena, count, nptrs));
         VALGRIND_MAKE_MEM_UNDEFINED(e,sizeof(uintptr_t)*count);
