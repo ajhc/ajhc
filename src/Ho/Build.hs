@@ -85,7 +85,6 @@ import qualified Util.Graph as G
 -- LCOR - library map of module group name to CORE
 -- GRIN - compiled grin code
 
-
 {-
  - We separate the data into various chunks for logical layout as well as the important property that
  - each chunk is individually compressed and accessable. What this means is
@@ -95,12 +94,7 @@ import qualified Util.Graph as G
  - serialization, we would have to parse all preceding information just to discard it right away.
  - We also lay them out so that we can generate error messages quickly. for instance, we can determine
  - if a symbol is undefined quickly, before it has to load the typechecking data.
- -
  -}
-
--- | this should be updated every time the on-disk file format changes for a chunk. It is independent of the
--- version number of the compiler.
-
 
 type LibraryName = PackedString
 
@@ -109,7 +103,6 @@ findFirstFile err [] = FrontEnd.Warning.err "missing-dep" ("Module not found: " 
 findFirstFile err ((x,a):xs) = flip catch (\e ->   findFirstFile err xs) $ do
     bs <- LBS.readFile x
     return (bs,x,a)
-
 
 data ModDone
     = ModNotFound
@@ -125,7 +118,6 @@ data Done = Done {
     modEncountered  :: Map.Map Module     ModDone
     }
     {-! derive: update !-}
-
 
 replaceSuffix suffix fp = reverse (dropWhile ('.' /=) (reverse fp)) ++ suffix
 
@@ -153,8 +145,6 @@ findHoFile done_ref fp mm sh = do
                 modifyIORef done_ref (validSources_u $ Set.union (Set.fromList . map snd $ hoDepends hidep))
                 modifyIORef done_ref (hosEncountered_u $ Map.insert (hohHash hoh) (honame,hoh,hidep,ho))
                 return (True,honame)
-
-
 
 onErr :: IO a -> IO b -> (b -> IO a) -> IO a
 onErr err good cont = catch (good >>= \c -> return (cont c)) (\_ -> return err) >>= id
@@ -204,7 +194,6 @@ resolveDeps done_ref m = do
         Just (ModLibrary False _ lib) | m /= Module "Jhc.Prim" -> putErrDie $ printf  "ERROR: Attempt to import module '%s' which is a member of the library '%s'." (show m) (libName lib)
         Just _ -> return ()
         Nothing -> fetchSource done_ref (map fst $ searchPaths (show m)) (Just m) >> return ()
-
 
 type LibInfo = (Map.Map Module ModuleGroup, Map.Map ModuleGroup [ModuleGroup], Set.Set Module,Map.Map ModuleGroup HoBuild,Map.Map ModuleGroup HoTcInfo)
 
@@ -268,7 +257,6 @@ data SourceInfo = SI {
 data SourceCode
     = SourceParsed     { sourceInfo :: !SourceInfo, sourceModule :: HsModule }
     | SourceRaw        { sourceInfo :: !SourceInfo, sourceLBS :: LBS.ByteString }
-
 
 sourceIdent sp = show . sourceModName $ sourceInfo sp
 

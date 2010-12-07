@@ -44,9 +44,6 @@ import Util.HasSize
 import Util.SetLike as S
 import qualified Util.Seq as Seq
 
-
-
-
 instance Show Rule where
     showsPrec _ r = shows $ ruleName r
 

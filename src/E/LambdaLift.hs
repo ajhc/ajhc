@@ -45,8 +45,13 @@ annotateId mn x = case fromId x of
 
 staticArgumentTransform :: Program -> Program
 staticArgumentTransform prog = ans where
-    ans = programSetDs (concat ds') prog { progStats = progStats prog `mappend` nstat }
-    (ds',nstat) = runStatM $ mapM (f True) (programDecomposedDs prog)
+    ans = progCombinators_s (concat ds') prog { progStats = progStats prog `mappend` nstat }
+    (ds',nstat) = runStatM $ mapM h (programDecomposedCombs prog)
+    h (True,[comb]) = do [(_,nb)] <- f True (Right [(combHead comb, combBody comb)]); return [combBody_s nb comb]
+    h (_,cs) = do
+        forM cs $ \ c -> do
+            e' <- g (combBody c)
+            return (combBody_s e' c)
     f _ (Left (t,e)) = gds [(t,e)]
     f always (Right [(t,v@ELam {})]) | not (null collectApps), always || dropArgs > 0 = ans where
         nname = annotateId "R@" (tvrIdent t)
@@ -164,7 +169,7 @@ lambdaLift prog@Program { progDataTable = dataTable, progCombinators = cs } = do
     fc <- newIORef []
     fm <- newIORef mempty
     statRef <- newIORef mempty
-    let z comb  = do      
+    let z comb  = do
             (n,as,v) <- return $ combTriple comb
             let ((v',(cs',rm)),stat) = runReader (runStatT $ execUniqT 1 $ runWriterT (f v)) S { funcName = mkFuncName (tvrIdent n), topVars = wp,isStrict = True, declEnv = [] }
             modifyIORef statRef (mappend stat)

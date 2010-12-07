@@ -3,6 +3,7 @@ module E.Inline(
     programMapRecGroups,
     forceInline,
     programDecomposedDs,
+    programDecomposedCombs,
     programMapProgGroups,
     forceNoinline,
     baseInlinability
@@ -24,10 +25,6 @@ import Stats
 import Util.Graph
 import Util.SetLike
 import qualified FlagOpts as FO
-
-
-
-
 
 -- | higher numbers mean we want to inline it more
 baseInlinability t e

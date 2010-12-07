@@ -84,10 +84,8 @@ processInitialHo accumho aho = do
         reRule comb = combRules_u f comb where
             f rs = List.union  rs [ x | x <- nrules, ruleHead x == combHead comb]
 
-    let finalVarMap = mappend (fromList [(tvrIdent tvr,Just $ EVar tvr) | tvr <- map combHead $ values choCombs ]) (choVarMap accumho)
-        choCombs = sfilter (\(k,_) -> k /= emptyId) choCombinators'
+    let choCombs = sfilter (\(k,_) -> k /= emptyId) choCombinators'
     return $ updateChoHo mempty {
-        choVarMap = finalVarMap,
         choExternalNames = choExternalNames accumho `mappend` (fromList . map tvrIdent $ newTVrs),
         choCombinators = choCombs `mappend` fmap reRule (choCombinators accumho),
         choHoMap = Map.singleton (hoModuleGroup aho) aho `mappend` choHoMap accumho
@@ -155,14 +153,12 @@ processDecls cho ho' tiData = do
             Nothing -> c
             Just rs -> combRules_u (map ruleUpdate . List.union rs) c
     prog <- return $ progCombinators_u (map addRule) prog
-    cho <- return $ choCombinators_u (fmap addRule) cho
+    cho <- return $ updateChoHo $ choCombinators_u (fmap addRule) cho
 
     -- Here we substitute in all the original types, with rules and properties defined in the current module included
     prog <- return $ runIdentity $ annotateProgram (choVarMap cho) (idann theProps) letann lamann prog
 
     lintCheckProgram (putErrLn "LintPostProcess") prog
-
-
 
     let entryPoints = fromList . execWriter $ programMapDs_ (\ (t,_) -> when (getProperty prop_EXPORTED t || getProperty prop_INSTANCE t || getProperty prop_SPECIALIZATION t)  (tell [tvrIdent t])) prog
     prog <- return $ prog { progEntry = entryPoints `mappend` progSeasoning prog }
@@ -170,7 +166,6 @@ processDecls cho ho' tiData = do
     lintCheckProgram (putErrLn "InitialLint") prog
 
     prog <- programPrune prog
-
 
     -- initial pass, performs
     -- eta expansion of definitons
@@ -203,7 +198,6 @@ processDecls cho ho' tiData = do
         when coreMini $ putErrLn ("----\n" ++ names)
         let tparms = transformParms { transformPass = "Init", transformDumpProgress = coreMini }
 
-
         lintCheckProgram onerrNone mprog
         mprog <- evaluate $ etaAnnotateProgram mprog
         lintCheckProgram onerrNone mprog
@@ -214,14 +208,15 @@ processDecls cho ho' tiData = do
         mprog <- transformProgram tparms { transformSkipNoStats = True, transformCategory = "SimpleRecursive"
                                          , transformOperation = return . staticArgumentTransform } mprog
 
+        mprog <- transformProgram tparms { transformCategory = "FloatOutward", transformOperation = floatOutward } mprog
         mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformPass = "PreInit"
                                          , transformOperation = typeAnalyze True } mprog
 
         mprog <- transformProgram tparms { transformCategory = "FloatOutward", transformOperation = floatOutward } mprog
+
         -- perform another supersimplify in order to substitute the once used
         -- variables back in and replace the variable of case of variables with
         -- the default binding of the case statement.
-
         mprog <- simplifyProgram sopt "Init-Two-FloatOutCleanup" coreMini mprog
         mprog <- transformProgram tparms { transformCategory = "typeAnalyze", transformOperation = typeAnalyze True } mprog
 
@@ -231,12 +226,9 @@ processDecls cho ho' tiData = do
         mprog <- simplifyProgram sopt "Init-Three-AfterDemand" False mprog
         when miniCorePass $ printProgram mprog -- mapM_ (\ (v,lc) -> printCheckName'' fullDataTable v lc) (programDs mprog)
         when miniCoreSteps $ Stats.printLStat (optStatLevel options) ("InitialOptimize:" ++ names) (progStats mprog)
-        --wdump FD.Progress $ let SubProgram rec = progType mprog in  putErr (if rec then "*" else ".")
         wdump FD.Progress $ let SubProgram isRec = progType mprog in  progressIOSteps pr_r (if isRec then "*" else ".")
         return mprog
     lintCheckProgram onerrNone prog
-    --putProgressLn "Initial optimization pass"
-
     prog <- programMapProgGroups mempty fint prog
 
     wdump FD.Stats $
@@ -252,6 +244,9 @@ processDecls cho ho' tiData = do
 
     prog <- Demand.analyzeProgram prog
     prog <- simplifyProgram' sopt "Init-Big-One" verbose (IterateMax 4) prog
+    putErrLn "-- ChoRulesPostSimp";
+    putErrLn "------------";
+    dumpRules (Rules $ fromList [ (combIdent x,combRules x) | x <- progCombinators prog, not $ null (combRules x) ])
 
     wdump FD.Stats $
         Stats.printLStat (optStatLevel options) "Init-Big-One Stats" (progStats prog)
@@ -310,7 +305,6 @@ processDecls cho ho' tiData = do
 
     prog <- programPrune prog
 
-
     lintCheckProgram (putErrLn "After the Opimization") prog
     wdump FD.Core $ printProgram prog
 
@@ -323,8 +317,7 @@ processDecls cho ho' tiData = do
     return (updateChoHo $ mempty {
         choHoMap = Map.singleton (hoModuleGroup ho') ho' { hoBuild = newHoBuild},
         choCombinators = fromList $ [ (combIdent c,c) | c <- progCombinators prog ],
-        choExternalNames = idMapToIdSet newMap,
-        choVarMap = newMap
+        choExternalNames = idMapToIdSet newMap
         } `mappend` cho,ho' { hoBuild = newHoBuild })
 
 coreMini = dump FD.CoreMini

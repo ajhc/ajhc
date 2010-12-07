@@ -51,18 +51,19 @@ type ModuleGroup = Module
 data CollectedHo = CollectedHo {
     -- this is a list of external names that are valid but that we may not know
     -- anything else about it is used to recognize invalid ids.
-    choExternalNames :: IdSet, choCombinators  :: IdMap Comb,
-    -- this is a map of ids to their full TVrs with all rules and whatnot
-    -- attached.
-    choVarMap :: IdMap (Maybe E),
+    choExternalNames :: IdSet,
+    -- these are the functions in Comb form.
+    choCombinators  :: IdMap Comb,
     -- these are rules that may need to be retroactively applied to other
     -- modules
     choOrphanRules :: Rules,
     -- the hos
-    choHo :: Ho, -- this is a cache, it must be updated whenever choHoMap is updated.
     choHoMap :: Map.Map ModuleGroup Ho,
     -- libraries depended on
-    choLibDeps :: Map.Map PackedString HoHash
+    choLibDeps :: Map.Map PackedString HoHash,
+    -- these are caches of pre-computed values
+    choHo :: Ho, -- ^ cache of combined and renamed ho
+    choVarMap :: IdMap (Maybe E) -- ^ cache of variable substitution map
     }
     {-! derive: update !-}
 
